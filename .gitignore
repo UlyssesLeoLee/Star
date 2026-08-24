@@ -1,0 +1,26 @@
+# Agent / IDE runtime
+/.claude/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.iml
+
+# Rust (future)
+/target/
+**/*.rs.bk
+
+# Logs
+*.log
+
+# Temporary backup
+*.bak
+docs.untracked.bak/

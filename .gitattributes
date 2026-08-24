@@ -1,0 +1,24 @@
+# Enforce LF line endings for documentation and source code text files
+# Overrides core.autocrlf=true on Windows to keep worktree in LF
+*.md           text eol=lf
+*.txt          text eol=lf
+*.adoc         text eol=lf
+*.rs           text eol=lf
+*.toml         text eol=lf
+*.yaml         text eol=lf
+*.yml          text eol=lf
+*.json         text eol=lf
+*.sh           text eol=lf eof=lf
+*.gitignore    text eol=lf
+*.gitattributes text eol=lf
+
+# Binary files (explicit)
+*.png          binary
+*.jpg          binary
+*.jpeg         binary
+*.gif          binary
+*.ico          binary
+*.pdf          binary
+*.zip          binary
+*.gz           binary
+*.tar          binary
