@@ -12,7 +12,7 @@
 
 本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本设计書》阶段的产出。其上游是《要件定義書 v2.0》(§0-§47),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
 
-**本文档不输出生产代码**(重申 §105):
+**本文档不输出生产代码**(重申 §47):
 
 - ❌ 不写 SQL DDL
 - ❌ 不写 SQLx / Diesel 完整 Repository 实现
@@ -66,7 +66,7 @@
 - **Observed State**: 高频、非业务事实的运行时状态(§14.1)
 - **SoR**: System of Record,本设计中默认为 PostgreSQL
 - **ACL**: Anti-Corruption Layer
-- **P0/P1/P2**: 优先级(继承 §63)
+- **P0/P1/P2**: 优先级(继承 §41.2)
 
 ### 0.4 受众
 
@@ -178,6 +178,7 @@ flowchart LR
         D_NT[domain-notification]
         D_IN[domain-integration]
         D_AU[domain-automation]
+        D_LR[domain-local-runtime]
     end
 
     subgraph infra[crates/infrastructure]
@@ -273,27 +274,27 @@ flowchart LR
 
 ## 2. Domain / Module 划分
 
-### 2.1 完整 Domain 列表(继承 §6 共 19 个 + 5 个子域 = 24 个逻辑 Module)
+### 2.1 完整 Domain 列表(继承 §6 共 22 个 + 3 个拆分/合并 = 25 个逻辑 Module)
 
-> §6 列出 19 个 Domain。本设计书将其中 **Work Management / Planning / Collaboration / Integration / Development Execution / Development Context** 进一步细分,得到 24 个 crate 级 Module。所有 Module 均为 `crates/domain-*` 或内嵌于 `crates/application` 的 Submodule。
+> §6 列出 22 个 Domain(Identity, Tenant, Workspace, Project, Work Management, Workflow, Planning, Collaboration, Permission, Automation, Integration, SCM, Development Context, Development Execution, Worktree, Agent, Feedback, Context, Validation, Audit, Search, Notification)。本设计书对其中 3 个作拆分/合并,并新增 1 个服务器侧 Runtime 管理面,共得到 25 个 crate 级 Module:1) `Collaboration` 拆为 `domain-comment` + `domain-collaboration`;2) `Development Context` 合并入 `domain-development`(主要实体补 `SymbolIndex`, `RepositoryContext`, `DevelopmentContext`);3) 新增 `domain-local-runtime`,对应 §23 Local Runtime 的服务器侧 Runtime Registry / Port(注意:Local Daemon 二进制进程本身**不**属此 crate,见 §4.6.1 区分)。所有 Module 均为 `crates/domain-*` 或内嵌于 `crates/application` 的 Submodule。
 
 #### 2.1.1 核心域(Core Domain)
 
 | # | Module | 一句话职责 | 主要实体 | 关键不变量 | 关键依赖 |
 |---|---|---|---|---|---|
-| 1 | domain-work-item | WorkItem 的创建 / 状态流转 / 关系 | WorkItem, Requirement, AcceptanceCriterion | WorkItem ≠ Git Branch(§85);1 WorkItem → 0/1/N Repository | domain-workflow, domain-project, domain-permission |
+| 1 | domain-work-item | WorkItem 的创建 / 状态流转 / 关系 | WorkItem, Requirement, AcceptanceCriterion | WorkItem ≠ Git Branch(§44.3);1 WorkItem → 0/1/N Repository | domain-workflow, domain-project, domain-permission |
 | 2 | domain-worktree | Worktree 一级领域对象,生命周期管理 | Worktree, ConflictState, HealthState | Worktree Status 独立于 WorkItem Status(§22.2,REQ-WF-002) | domain-work-item, domain-scm, domain-development |
 | 3 | domain-agent | Agent Adapter 与 AgentSession 生命周期 | Agent, AgentSession, AgentPolicy | 1 AgentSession → 1 Active Worktree(§21,REQ-DEV-003) | domain-worktree, domain-feedback, domain-validation |
 | 4 | domain-feedback | 结构化 Feedback 一级领域对象 | Feedback, FeedbackResolution | Feedback Target 覆盖 WorkItem→Diff Hunk 全粒度(§25.1) | domain-work-item, domain-worktree, domain-agent |
 | 5 | domain-context | Context Packet 生成与 Decision Memory | ContextPacket, Decision | Context Provenance 强制可追溯(§26.3) | domain-work-item, domain-worktree, domain-feedback, domain-validation |
-| 6 | domain-validation | Validation Evidence 与 Acceptance Coverage | ValidationResult, AcceptanceCoverage | AI 自我报告不构成完成(§27.3,REQ-AUT-001) | domain-work-item, domain-worktree, domain-agent |
+| 6 | domain-validation | Validation Evidence 与 Acceptance Coverage | ValidationResult, AcceptanceCoverage | AI 自我报告不构成完成(§27.3,VAL-001) | domain-work-item, domain-worktree, domain-agent |
 
 #### 2.1.2 支撑域(Supporting Domain)
 
 | # | Module | 一句话职责 | 主要实体 | 关键不变量 | 关键依赖 |
 |---|---|---|---|---|---|
 | 7 | domain-scm | SCM Adapter 抽象与 Repository 同步 | Repository, Branch, Commit, PullRequest, Review, Pipeline | Domain 层无厂商对象(§19.1,REQ-SCM-002) | domain-work-item, domain-worktree |
-| 8 | domain-development | Development Execution 聚合层 | DevelopmentExecution, ChangeSet, Link | ChangeSet ≠ Git Diff(§21.1) | domain-work-item, domain-worktree, domain-agent, domain-scm |
+| 8 | domain-development | Development Execution 聚合层 + Repository Indexing(§20 合并入) | DevelopmentExecution, ChangeSet, Link, SymbolIndex, RepositoryContext, DevelopmentContext | ChangeSet ≠ Git Diff(§21.1);Symbol-aware Context 逐步演进(§21.2) | domain-work-item, domain-worktree, domain-agent, domain-scm |
 | 9 | domain-workflow | Workflow 定义与状态机 | WorkflowDefinition, State, Transition | Worktree Status 与 WorkItem Status 独立(REQ-WF-002) | domain-work-item |
 | 10 | domain-board | Kanban / Scrum 板视图 | Board, Column, Swimlane | 与 Sprint / Gantt 共享数据模型(§9,REQ-PLAN-003) | domain-work-item, domain-planning |
 | 11 | domain-planning | Sprint / Backlog / Roadmap | Sprint, Backlog, Roadmap | Burndown 最小必需,Velocity/CFD 控制图 V1(§9) | domain-work-item, domain-board |
@@ -315,6 +316,7 @@ flowchart LR
 | 22 | domain-identity | 用户 / 设备身份 | User, Device, Credential, DeviceBinding | Device 需 Tenant+User+Project 三重绑定(§23.2) | domain-tenant |
 | 23 | domain-notification | 通知渠道与模板 | NotificationChannel, NotificationTemplate | MVP 邮件 + 站内(REQ-NOTIF-001) | domain-tenant |
 | 24 | domain-collaboration | 协作(实时状态、Presence) | Presence, RealtimeSubscription | 高频 Token Stream 可不入 SaaS(§15,REQ-RT-003) | domain-work-item, domain-worktree |
+| 25 | domain-local-runtime | 集群外 Local Runtime 的服务器侧 Registry / Port | Runtime, RuntimeCommand, RuntimeObservation | Local Daemon 二进制不属此 crate(§4.6.1,§23.1) | domain-worktree, domain-identity |
 
 ### 2.2 Domain 分层结论
 
@@ -322,7 +324,11 @@ flowchart LR
 - **Supporting Domain**(必要支撑):scm, development, workflow, board, planning, relation, comment, search, audit, integration, automation
 - **Generic Domain**(通用基础):tenant, workspace, project, permission, identity, notification, collaboration
 
-> 注:§6 的"Collaboration"在本设计中拆为 `domain-comment` + `domain-collaboration`(Realtime Presence),因为前者是 WorkItem 内嵌聚合,后者是横切能力。
+> 注:§6 的 22 个 Domain 在本设计中的拆分/合并如下(详见 §2.1 标题段):
+> 
+> 1. `Collaboration` 拆为 `domain-comment` + `domain-collaboration`(Realtime Presence),因为前者是 WorkItem 内嵌聚合,后者是横切能力。
+> 2. `Development Context`(§20)合并入 `domain-development`,因为 Development Context 的核心实体(`SymbolIndex` / `RepositoryContext` / `DevelopmentContext`)与 Development Execution 在同一聚合内,拆分会导致跨聚合的 Symbol-level Feedback 路由复杂化(`domain-context` 仅承担 §26 Context Compiler,职责严格区分)。
+> 3. 新增 `domain-local-runtime`,对应 §23 Local Runtime 的服务器侧 Runtime Registry / Port(注意:Local Daemon 二进制进程本身不属此 crate,见 §4.6.1)。
 
 ### 2.3 Domain 间调用方向(硬约束)
 
@@ -348,6 +354,8 @@ domain-automation ← domain-work-item
 domain-notification ← 任意 domain(发布事件)
 domain-integration ← domain-scm
 domain-collaboration ← domain-work-item, domain-worktree
+domain-local-runtime ← domain-worktree(接收 Runtime Observation,§23.3)
+domain-local-runtime ← domain-identity(device_identity,§23.2)
 ```
 
 **禁线**:
@@ -372,6 +380,7 @@ domain-collaboration ← domain-work-item, domain-worktree
 | 提交 Feedback | feedback, work-item, audit | 单 PG 事务 |
 | 创建 Commit Link | development, scm, worktree, validation, audit | 单 PG 事务 |
 | 完成 WorkItem | work-item, validation, feedback, workflow, audit | 单 PG 事务 |
+| 注册 Runtime | local-runtime, identity, worktree, audit | 单 PG 事务 + Outbox(发 Runtime Registered 给 worker) |
 
 **Outbox 触发的事件**(非事务组成,异步):
 
@@ -825,7 +834,7 @@ pub trait AgentPort {
 - ❌ Agent Negotiation
 - ❌ Autonomous Planning Society
 
-**Agent Handoff**(§52):接管同一 Worktree 时,**不**依赖发送全量聊天记录,生成 Handoff Context Packet:
+**Agent Handoff**(§24.5):接管同一 Worktree 时,**不**依赖发送全量聊天记录,生成 Handoff Context Packet:
 
 ```rust
 pub struct HandoffContextPacket {
@@ -1257,11 +1266,15 @@ READY_FOR_REVIEW
 
 ---
 
-### 4.6 domain-local-runtime(Local Runtime / Daemon 抽象)
+### 4.6 domain-local-runtime(集群外 Runtime 的服务器侧 Registry / Port)
 
 #### 4.6.1 职责与定位
 
-Local Runtime 是运行于开发者机器 / 企业 Runner 的安全代理进程(§23.1)。它**不**属于 Kubernetes Application Workload,服务器端最小闭环保持不变(§13.1,§23.1)。
+> **重要区分**:本节描述的是**服务器侧**的 Runtime Registry / Port(`domain-local-runtime` crate,跑在 work-core 进程内,部署于 K3s Cluster 内),不是 Local Daemon 二进制进程本身。Local Daemon 是独立 Rust 二进制,运行在 Developer Machine / Self-hosted Runner / Cloud Workspace 上,通过 Secure Channel 与本 crate 对接,部署拓扑见 §1.1 LocalRuntime 子图。两个制品命名易混,本节描述的是前者。
+
+`domain-local-runtime` 的职责是管理集群外 Local Daemon 的注册、命令下发、Observation 接收。它**不**实现 Local Daemon 进程本身,Local Daemon 进程属于另一个独立制品(Local Daemon Binary),不在 `crates/domain-*` 任何 crate 内。
+
+Local Runtime **不**属于 Kubernetes Application Workload(§23.1),服务器端最小闭环(`gateway / identity / work-core / worker`)保持不变(§13.1,§23.1)。
 
 #### 4.6.2 关键实体
 
@@ -1704,15 +1717,20 @@ Work Management Core 承担 Jira-class 闭环(§30.1)。本节合并描述,因�
 - `work_item_ids[]`
 - `state`(Planning / Active / Closed)
 
-#### 4.9.3 状态机(WorkItem 默认)
+#### 4.9.3 状态机(WorkItem 默认,§8.2 REQ-WF-001)
+
+> **默认最简三态**(REQ-WF-001 强约束,不属于 MVP 范围裁剪):
 
 ```text
-TODO → IN_PROGRESS → IN_REVIEW → DONE
-                ↓              ↑
-              BLOCKED ─────────┘
+TODO → IN_PROGRESS → DONE
 ```
 
-**扩展状态**(Project Policy 自定义):如 IN_TESTING, READY_FOR_DEPLOY 等。
+**Project Policy 自定义扩展示例**(非默认,以下为常见项目可选项):
+
+- `IN_REVIEW`:在 IN_PROGRESS 与 DONE 之间的显式审查阶段
+- `BLOCKED`:WorkItem 因依赖/外部因素被阻塞,可由 IN_PROGRESS 转入,解除后回 IN_PROGRESS
+- `CANCELLED`:任意状态均可转入(终态)
+- `IN_TESTING`, `READY_FOR_DEPLOY`, `NEEDS_INFO` 等
 
 **与 Worktree 状态的独立性**(REQ-WF-002):WorkItem.status = IN_PROGRESS 时,其下 Worktree A 可为 AGENT_RUNNING,Worktree B 可为 BLOCKED,Worktree C 可为 REVIEWING。
 
@@ -1840,7 +1858,7 @@ pub struct ActorContext {
 
 > 任何遗漏 `tenant_id` 或等效隔离边界都可能造成严重数据泄漏(§16,§91)。
 
-**强制 tenant_id 携带的对象**(12 项):
+**强制 tenant_id 携带的对象**(13 项):
 
 | # | 对象 | 强制位置 |
 |---|---|---|
@@ -1979,7 +1997,7 @@ PostgreSQL 存储的对象 = 元数据 + 摘要 + 引用(ref)
 
 **架构含义**:
 
-- Observed State 走独立 Projection 表,**不**进入核心事务(§60)
+- Observed State 走独立 Projection 表,**不**进入核心事务(§14.1)
 - UI 读 Observed State 必须带 `last_observed_at`,显示 "Possibly Stale"(§23.4)
 - Business Truth 与 Observed State 冲突时,以 Business Truth 为准(§43.2)
 
@@ -2316,18 +2334,18 @@ CREATED → READY → ASSIGNED → AGENT_RUNNING
 
 ### 7.2 WorkItem Workflow(§8.2,REQ-WF-001/002)
 
-**默认最简三态**:
+**默认最简三态**(REQ-WF-001 强约束,不属于 MVP 范围裁剪):
 
 ```text
-TODO → IN_PROGRESS → IN_REVIEW → DONE
-              ↓
-           BLOCKED ─────────┐
-              ↓             │
-           CANCELLED        ↓
-                          DONE
+TODO → IN_PROGRESS → DONE
 ```
 
-**扩展状态**(Project Policy 自定义):IN_TESTING, READY_FOR_DEPLOY, NEEDS_INFO 等。
+**Project Policy 自定义扩展示例**(非默认):
+
+- `IN_REVIEW`(在 IN_PROGRESS 与 DONE 之间)
+- `BLOCKED`(可由 IN_PROGRESS 转入,解除后回 IN_PROGRESS)
+- `CANCELLED`(任意状态均可转入,终态)
+- `IN_TESTING`, `READY_FOR_DEPLOY`, `NEEDS_INFO` 等
 
 **与 Worktree Status 独立性**(REQ-WF-002,§4):
 
@@ -2424,9 +2442,9 @@ DRAFT → OPEN → REVIEWING
 | 实体 | 状态数 | 触发者种类 | 见附录 |
 |---|---|---|---|
 | Worktree | 17 | 4 (SaaS / Local / Webhook / Human) | A.1 |
-| WorkItem(默认) | 5 + 扩展 | 3 (User / System / Workflow) | A.2 |
+| WorkItem(默认 + 扩展) | 3 + 扩展 | 3 (User / System / Workflow) | A.2 |
 | Feedback | 6 | 3 (User / Agent / Application) | A.3 |
-| AgentSession | 13 | 4 (SaaS / Local / Agent / Timeout) | A.4 |
+| AgentSession | 14 | 4 (SaaS / Local / Agent / Timeout) | A.4 |
 | ValidationResult | 6 | 2 (CI / Local) | A.5 |
 | PullRequest | 7 | 2 (User / Webhook) | A.6 |
 | Decision | 3 | 2 (User / System) | A.7 |
@@ -3391,6 +3409,7 @@ flowchart LR
     DPE[domain-permission]:::genericDomain
     DNT[domain-notification]:::genericDomain
     DCB[domain-collaboration]:::genericDomain
+    DLR[domain-local-runtime]:::genericDomain
 
     DWI[domain-work-item]:::coreDomain
     DWF[domain-workflow]:::supportingDomain
@@ -3433,6 +3452,7 @@ flowchart LR
     DDX --> DSC
     DWT --> DSC
     DWT --> DAG
+    DWT --> DLR
     DFB --> DCT
     DFB --> DVL
     DCT --> DVL
@@ -3445,6 +3465,7 @@ flowchart LR
     DCB -.Realtime.-> DWI
     DCB -.Realtime.-> DWT
     DAU -.Trigger.-> DNT
+    DID --> DLR
 ```
 
 **依赖方向规则**:
@@ -3487,6 +3508,7 @@ flowchart LR
 | **domain-collaboration** | R(Realtime) | R | R | - | - | - | - | - | - | - | - | - | - | - | - | - |
 | **domain-automation** | R(Trigger) | R | R | - | R | R | R | - | - | - | - | - | - | - | - | - |
 | **domain-integration** | R | - | - | - | - | - | - | - | R | R | - | - | - | - | - | - |
+| **domain-local-runtime** | R | R(查询) | R(查询) | - | - | - | - | - | - | - | Append | - | - | - | - | - |
 
 **图例**:
 
@@ -3511,14 +3533,14 @@ flowchart LR
 
 本文档作为基本设计書输出,以下接口将在后续阶段保持稳定(不会因详细设计而变更契约,除非 §15 Open Issue 解决):
 
-1. **Domain 列表与依赖方向**(§2):保持 24 个 Module 划分
+1. **Domain 列表与依赖方向**(§2):保持 25 个 Module 划分(含 `domain-local-runtime` 集群外 Runtime 服务器侧 Registry / Port,见 §4.6.1 与 Local Daemon 二进制区分)
 2. **聚合根与不变量**(§5.7):保持 10 个核心聚合根
 3. **Context Priority 分级**(§4.4.4):P0-P4 五层
 4. **Risk Signal 类型**(§4.8.5):8 种类型
 5. **Worktree 状态机**(§7.1):17 个状态
-6. **WorkItem 状态机**(§7.2):5 个默认 + 扩展
+6. **WorkItem 状态机**(§7.2):3 个默认(TODO/IN_PROGRESS/DONE)+ 扩展(§4.9.3 列出常见扩展示例,实际由 Project Policy 定义)
 7. **Feedback 状态机**(§7.3):6 个状态
-8. **AgentSession 状态机**(§7.4):13 个状态
+8. **AgentSession 状态机**(§7.4):14 个状态
 9. **Decision 状态机**(§A.7):3 个状态
 10. **NATS Subject 命名空间**(§5.5):`star.*` 前缀
 11. **13 类 tenant_id 必带对象**(§6.1)
