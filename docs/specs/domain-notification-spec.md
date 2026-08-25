@@ -2,7 +2,7 @@
 
 > **状态**: Draft v0.1 (2026-08-25)
 > **上游依赖**:
-> - 《Requirements》§12, REQ-NOTIF-001
+> - 《Requirements》§12, REQ-NOTIF-001, REQ-NOTIF-002(2026-08-26 补充,默认降噪策略)
 > - 《Basic Design》§2.1(表 23), §5.7
 > - 《API Design》§3.16
 > - 《Data Design》§4.15 (`notification` schema)
@@ -15,6 +15,8 @@
 ## 1. 职责与边界
 
 `domain-notification` 承载**通知渠道与模板**(§12,REQ-NOTIF-001)。MVP 邮件 + 站内,Slack / 钉钉列入 V1(§30.3)。
+
+默认降噪策略(REQ-NOTIF-002,2026-08-26 补充):`NotificationDispatcher` 默认仅在需要人工决策的节点触发通知 —— WAITING_FEEDBACK、Validation 失败、Protected Action 待授权;Agent 执行的中间步骤不触发通知,但 100% 记入 AgentSession Transcript(INV-AGT-09),不影响可审计性。该默认策略上游未标注 V1/V2/Future 分级,视为当前默认行为,见 INV-N-07。
 
 **属于本 crate 的**:
 - NotificationChannel(用户渠道:email / in_app / Slack)
@@ -64,6 +66,7 @@
 | INV-N-04 | NotificationTemplate 仅 Project Admin 可改 | data-design §4.15 |
 | INV-N-05 | Notification 不可修改 body / subject(Append-only + 状态字段) | data-design §4.15 |
 | INV-N-06 | 失败重试(指数退避,最多 5 次),超限进入 DLQ | basic-design §5.4 |
+| INV-N-07 | 默认仅在 WAITING_FEEDBACK / Validation 失败 / Protected Action 待授权三类人工决策节点触发通知;Agent 中间步骤不触发通知,但仍 100% 写入 AgentSession Transcript | requirements REQ-NOTIF-002, INV-AGT-09 |
 
 ## 4. 接口签名
 

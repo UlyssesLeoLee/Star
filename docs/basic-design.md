@@ -1465,7 +1465,7 @@ SCM Domain 通过统一 Port 接入 GitHub / GitLab / 未来 SCM(§19.1,REQ-SCM-
 
 - `repository_id`, `tenant_id`, `project_id`
 - `external_id`(在 GitHub/GitLab 中的 ID)
-- `provider`(GitHub / GitLab / Gitea / Bitbucket / Future)
+- `provider`(GitHub / GitLab / Gitea / Forgejo / Bitbucket / Future)
 - `url`, `default_branch`
 - `ownership`:RepositoryOwnership(Connected / Mirrored / Managed / LocalOnly)
 - `last_sync_token`, `last_synced_at`

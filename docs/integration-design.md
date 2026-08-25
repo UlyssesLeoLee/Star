@@ -6,7 +6,7 @@
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
 > | v0.1 | 2026-08-25 | 初始版本 | — |
-> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(Gitea/Forgejo Adapter 已在 V1 阶段交付,与基本设计 §4.7.1 优先级一致) | — |
+> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(Gitea/Forgejo Adapter 协议设计预留,排期为 V2 候选,与基本设计 §4.7.1 优先级一致) | — |
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/api-design.md` v0.1,`docs/security-design.md` v0.1,`docs/runtime-design.md` v0.1
 > **下游**: Implementation(`crates/infrastructure/scm/*` / `crates/infrastructure/agent/*` / `crates/infrastructure/notification/*` / `crates/infrastructure/identity/*`)、Operation(生产环境 Adapter 配置)
 > **文档定位**: 本文规定 SCM / Agent / Notification / Identity Provider 四类 Adapter 的协议契约。供 Implementation 阶段按本协议实现具体 Adapter,供 Operation Design 配置生产环境。
@@ -19,7 +19,7 @@
 >
 > | 同步项 | 落位 |
 > |---|---|
-> | **S3** REQ-SCM-003(自建 Git 提前到 V1) | §2.1 概述:与基本设计 §4.7.1 一致;§2.4 Gitea/Forgejo Adapter 在 V1 交付,优先级高于 Bitbucket/Azure DevOps |
+> | **S3** REQ-SCM-003(自建 Git 排期调整,V2 候选) | §2.1 概述:与基本设计 §4.7.1 一致;§2.4 Gitea/Forgejo Adapter 协议设计预留(V2 候选),优先级高于 Bitbucket/Azure DevOps |
 >
 > **不变量保留**:MVP 4 类 Adapter(SCM/Agent/Notification/Identity)主结构 / Webhook 签名机制 / 速率限制全部不动。
 
@@ -234,14 +234,14 @@ pub struct HealthStatus {
 |---|---|---|
 | **GitHub** | MVP(POC-026) | REST v3 + GraphQL v4 + WebHook + App(推荐) |
 | **GitLab** | MVP(POC-027) | REST v4 + WebHook + OAuth/PAT |
-| **Gitea** | V1 | REST v1 + WebHook |
-| **Forgejo** | V1 | REST v1 + WebHook(Gitea Fork) |
-| **Bitbucket** | V2 | REST v2 + WebHook |
-| **Azure DevOps** | V2 | REST + WebHook |
+| **Gitea** | V2 候选(优先) | REST v1 + WebHook |
+| **Forgejo** | V2 候选(优先) | REST v1 + WebHook(Gitea Fork) |
+| **Bitbucket** | V2 候选 | REST v2 + WebHook |
+| **Azure DevOps** | V2 候选 | REST + WebHook |
 
 **默认使用 GitHub App / GitLab Project Access Token**(继承《Security Design》§5.4),不推荐 PAT。
 
-> **S3 落点**(继承 basic-design 5f1ea5b §4.7.1,REQ-SCM-003 V2 候选):Adapter 扩展优先级调整为 Gitea/Forgejo(V1) > Bitbucket/Azure DevOps(V2);理由:本设计已完成厂商对象 ACL 隔离,新增 Adapter 边际成本低于新建领域模型;Self-hosted 场景通过 `endpoint` 自定义 URL 支持。
+> **S3 落点**(继承 basic-design 5f1ea5b §4.7.1,REQ-SCM-003 V2 候选):Adapter 扩展优先级调整为 Gitea/Forgejo 优先于 Bitbucket/Azure DevOps(均为 V2 候选,非 V1 交付);理由:本设计已完成厂商对象 ACL 隔离,新增 Adapter 边际成本低于新建领域模型;Self-hosted 场景通过 `endpoint` 自定义 URL 支持。
 
 ### 2.2 GitHub Adapter(POC-026,MVP 必须)
 
@@ -411,7 +411,7 @@ X-RateLimit-Resource (core / graphql / integration_manifest)
 
 **Rate Limit**:GitLab.com 600 req/min(per user);Self-hosted 无限制或管理员配置。
 
-### 2.4 Gitea / Forgejo Adapter(V1)
+### 2.4 Gitea / Forgejo Adapter(V2 候选)
 
 **Gitea API v1**(Forgejo 兼容):
 
@@ -1498,14 +1498,13 @@ P0 (MVP):
   - Local Account Adapter
 
 P1 (V1):
-  - Gitea Adapter
-  - Forgejo Adapter
   - Local Agent Adapter
   - Slack / Teams / Discord Adapter
   - SAML Adapter
   - Jira / Linear 双向同步
 
 P2 (V2):
+  - Gitea / Forgejo Adapter(REQ-SCM-003,优先于 Bitbucket/Azure DevOps)
   - Bitbucket / Azure DevOps Adapter
   - Notion / Confluence Adapter
   - PagerDuty / Sentry Adapter

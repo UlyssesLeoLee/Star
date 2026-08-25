@@ -6,7 +6,7 @@
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
 > | v0.1 | 2026-08-25 | 初始版本 | — |
-> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(Gitea/Forgejo Adapter V1 提前,8 种白名单命令不变) | — |
+> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(Gitea/Forgejo Adapter 排期预留为 V2 候选,8 种白名单命令不变) | — |
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/api-design.md` v0.1,`docs/security-design.md` v0.1
 > **下游**: Implementation(Rust Local Daemon 二进制 crate)、Operation(Self-hosted Runner / Cloud Workspace 部署)
 > **文档定位**: 本文档定义 **Local Daemon 二进制进程** 的内部架构与外部契约。**不**讨论服务器侧 `domain-local-runtime` crate(后者见《Basic Design》§4.6)。
@@ -19,7 +19,7 @@
 >
 > | 同步项 | 落位 |
 > |---|---|
-> | **S3** REQ-SCM-003(Gitea/Forgejo Adapter V1) | §5.5.x 注释:Local Daemon 调用的 SCM Adapter 现已包含 Gitea/Forgejo(V1);8 种白名单命令不变,Repository 注册 endpoint 接受 `provider: 'gitea' | 'forgejo'` |
+> | **S3** REQ-SCM-003(Gitea/Forgejo Adapter,V2 候选) | §5.5.x 注释:Local Daemon 调用的 SCM Adapter 预留 Gitea/Forgejo 支持(排期 V2 候选,非 V1 交付);8 种白名单命令不变,Repository 注册 endpoint 预留接受 `provider: 'gitea' | 'forgejo'` |
 > | **S4** AgentSession `token_usage` / `cost_summary` | §10.1 性能预算注释:V1 候选,Local Daemon 可选上报 token 增量(节流上报,默认 30s) |
 >
 > **不变量保留**:Local Daemon 8 种白名单命令 / 16 强制项 / mTLS 设备鉴权全部不动。
@@ -1385,7 +1385,7 @@ WSS 推送:
 
 > **D-03 修复**:`ReportObservation` 不在白名单命令(8 种)内;上报事件走独立 `RuntimeObservation` 枚举(basic-design §4.6.2,7 个变体),由 Local Daemon 主动上报,Control Plane 端不做"命令授权"拦截。
 
-> **S3 落点**(继承 basic-design 5f1ea5b §4.7.1,REQ-SCM-003 V2 候选):Gitea/Forgejo Adapter 在 V1 阶段交付,Local Daemon 调用的 SCM Adapter 已包含 Gitea/Forgejo(本节 8 种白名单命令不变,Repository 注册 endpoint 接受 `provider: 'gitea' | 'forgejo'`,Self-hosted 场景通过 `endpoint` 自定义 URL)。
+> **S3 落点**(继承 basic-design 5f1ea5b §4.7.1,REQ-SCM-003 V2 候选):Gitea/Forgejo Adapter 排期为 V2 候选(非 V1 交付),Local Daemon 调用的 SCM Adapter 预留 Gitea/Forgejo 支持(本节 8 种白名单命令不变,Repository 注册 endpoint 预留接受 `provider: 'gitea' | 'forgejo'`,Self-hosted 场景通过 `endpoint` 自定义 URL)。
 
 **严格白名单**:
 - ❌ `ExecuteArbitraryShell(cmd: String)`(继承《Requirements》§23.2 LRT-002)

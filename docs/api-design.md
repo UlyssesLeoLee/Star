@@ -21,7 +21,7 @@
 > |---|---|---|
 > | **S1** REQ-AUTO-002(Trigger 增加 Schedule/Cron 变体) | §2.1.2 + §5.6 事件清单 | §3.14 automation 注释 + §5.3 事件清单 19→20 条 + §5.5.20 payload(V1 候选) |
 > | **S2** REQ-NOTIF-002(默认仅人类决策节点触达) | §2.1.3 | §3.16 notification 注释 |
-> | **S3** REQ-SCM-003(自建 Git 提前到 V1) | §4.7.1 | §3.19.4 Webhook 入口表追加 Gitea/Forgejo 行(V2 候选) |
+> | **S3** REQ-SCM-003(自建 Git 排期调整,V2 候选) | §4.7.1 | §3.19.4 Webhook 入口表追加 Gitea/Forgejo 行(V2 候选) |
 > | **S4** AgentSession `token_usage` / `cost_summary` 字段 | §4.2.2 | §3.22.1 Agent 注册表注释 + §12 附录 A OpenAPI Schema(V1 候选) |
 > | **S5** Skill/Playbook + Squad V2 候选 | §4.2.8 + §4.4 Provenance | §3.24 context 端点注释(V2 候选,占位) |
 >
@@ -67,7 +67,7 @@
 | §4.9 `domain-work-item` + workflow + board + planning 实体 | §3.5-§3.8 |
 | §4.10 `domain-permission` + Security 13 类对象 | §1.8 + §2.2 + §3 全部 |
 | §5.5 NATS Subject 命名空间 `star.*` | §5 AsyncAPI |
-| §5.6 核心事件清单(WorktreeCreated/AgentSessionStarted 等 19 种) | §5 完整映射 |
+| §5.6 核心事件清单(WorktreeCreated/AgentSessionStarted 等 20 种) | §5 完整映射 |
 | §6.1 13 类 tenant_id 必带对象 | §2.2 表 + §1.8 |
 | §7.1 Worktree 状态机(17 状态) | §3.21 状态迁移端点 |
 | §7.2 WorkItem Workflow(默认三态 + 扩展) | §3.5 状态迁移端点 |
@@ -865,7 +865,7 @@ flowchart TB
 
 > Webhook 由 SCM Adapter 内部 ACL 翻译成内部 Domain Event,见 §5。
 >
-> **S3 落点**(继承 basic-design 5f1ea5b §4.7.1,REQ-SCM-003 V2 候选):Gitea/Forgejo Adapter 在 V1 阶段交付(排在 Bitbucket / Azure DevOps 之前);Self-hosted 场景通过 `endpoint` 自定义 URL 支持。
+> **S3 落点**(继承 basic-design 5f1ea5b §4.7.1,REQ-SCM-003 V2 候选):Gitea/Forgejo Adapter 端点设计预留,排期为 V2 候选(排在 Bitbucket / Azure DevOps 之前,非 V1 交付);Self-hosted 场景通过 `endpoint` 自定义 URL 支持。
 
 ### 3.20 domain-development(§4.8)
 
@@ -2828,7 +2828,7 @@ info:
   description: |
     Star Platform AsyncAPI 3.0 草案(CloudEvents 1.0 兼容)
     继承 basic-design §5.5 `star.*` Subject 命名空间
-    覆盖 19 种核心事件(basic-design §5.6)
+    覆盖 20 种核心事件(basic-design §5.6)
 
 servers:
   nats-production:
@@ -2938,7 +2938,7 @@ components:
 
 | 步骤 | 工具 | 产出 |
 |---|---|---|
-| 1. 编写 19 种事件 Schema | 手写 | `docs/api-design/asyncapi.yaml`(约 1500-2500 行) |
+| 1. 编写 20 种事件 Schema | 手写 | `docs/api-design/asyncapi.yaml`(约 1500-2500 行) |
 | 2. 验证 | `asyncapi-cli validate` | 验证通过 |
 | 3. Mock / Test | `microcks` 或 NATS 内置 | 本地 E2E |
 | 4. SDK 生成 | `asyncapi-generator` | `crates/star-events-rust/` |
@@ -3018,7 +3018,7 @@ components:
 - `star.realtime.{tenant_id}.{project_id}.{entity}`
 - `star.dlq.{original_subject}`
 
-### API-5:19 个核心事件清单(§5.3)
+### API-5:20 个核心事件清单(§5.3)
 - 严格 1:1 覆盖 basic-design §5.6 全部事件
 - 事件 Schema 继承 CloudEvents 1.0
 - 每个事件含 Producer / Consumer / Subject / 触发条件

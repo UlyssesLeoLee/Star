@@ -2,7 +2,7 @@
 
 > **状态**: Draft v0.1 (2026-08-25)
 > **上游依赖**:
-> - 《Requirements》§19 (SCM / GitHub / GitLab), REQ-SCM-001/002
+> - 《Requirements》§19 (SCM / GitHub / GitLab), REQ-SCM-001/002/003(2026-08-26 补充,V2 候选)
 > - 《Basic Design》§2.1(表 7), §4.7, §5.7, §6.6
 > - 《API Design》§3.19
 > - 《Data Design》§4.18 (`scm` schema)
@@ -34,7 +34,7 @@
 
 **Repository**(聚合根,§19.2)
 - 标识: `repository_id`, `tenant_id`, `project_id`
-- 外部引用: `external_id`(GitHub/GitLab 中的 ID), `provider`(GitHub / GitLab / Gitea / Bitbucket / Future)
+- 外部引用: `external_id`(GitHub/GitLab 中的 ID), `provider`(GitHub / GitLab / Gitea / Forgejo / Bitbucket / Future,Gitea/Forgejo 为 REQ-SCM-003 V2 候选)
 - 元数据: `url`, `default_branch`
 - 所有权: `ownership`(Connected / Mirrored / Managed / LocalOnly)
 - 同步: `last_sync_token`, `last_synced_at`, `sync_status`(InSync / Behind / Ahead / Conflict / Disabled)
@@ -265,7 +265,7 @@ Feature: SCM 集成与同步
 
 ## 12. Open Issues
 
-- J-SCM-01: Self-hosted Git(Gitea / Bitbucket)是否 MVP 支持?(目前 GitHub + GitLab,§30.6)
+- J-SCM-01: ~~Self-hosted Git(Gitea / Bitbucket)是否 MVP 支持?~~ 已由 REQ-SCM-003(2026-08-26)解决:MVP 仍仅 GitHub + GitLab;Self-hosted Git 排期为 V2 候选,且 Gitea/Forgejo 优先于 Bitbucket / Azure DevOps(§30.4)。
 - J-SCM-02: Bidirectional Sync 默认策略是 ManualReview 还是 LatestWins?(需 ADR)
 - J-SCM-03: PR 状态机是否支持 `BLOCKED`(Policy 拒绝)?(目前 7 状态)
 - J-SCM-04: Webhook 接收端是否使用 NATS Subscription(异步)或直接 HTTP?(目前 HTTP 入口,Worker 异步处理)

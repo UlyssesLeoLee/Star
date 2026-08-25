@@ -21,7 +21,7 @@
 > |---|---|---|
 > | **S1** REQ-AUTO-002(Trigger 增加 Schedule/Cron) | §2.1.2 + §5.6 | §15.2 AI-J.14 Open Issue(占位,事件清单见 api-design §5.3) |
 > | **S2** REQ-NOTIF-002(默认仅人类决策节点触达) | §2.1.3 | §15.2 AI-J.15 Open Issue + §2.4 Priority 5 级注释 |
-> | **S3** REQ-SCM-003(自建 Git 提前到 V1) | §4.7.1 | 与本设计无直接章节(SCM Adapter 在 integration-design),本设计仅在 §9 Provider Data Boundary 注释同步 |
+> | **S3** REQ-SCM-003(自建 Git 排期调整,V2 候选) | §4.7.1 | 与本设计无直接章节(SCM Adapter 在 integration-design),本设计仅在 §9 Provider Data Boundary 注释同步 |
 > | **S4** AgentSession `token_usage` / `cost_summary` 字段 | §4.2.2 | §4.6 AgentSession 数据 Schema 追加 2 个 JSONB 列(V1 候选) |
 > | **S5** Skill/Playbook + Squad V2 候选 | §4.2.8 + §4.4 Provenance | §2.3 Provenance 强制 注释 + §9.4 强制点 + §15.2 AI-J.12/13 |
 >

@@ -23,7 +23,7 @@
 > |---|---|---|
 > | **S1** REQ-AUTO-002(Trigger 增加 Schedule/Cron) | §2.1.2 + §5.6 | §9.2 现有 T1 类目已覆盖,无需新增 |
 > | **S2** REQ-NOTIF-002(默认仅人类决策节点触达) | §2.1.3 | §9.2.14 Notification Inbox 噪声(新增 T2.x) |
-> | **S3** REQ-SCM-003(自建 Git 提前到 V1) | §4.7.1 | §9.2.7 已有 T7 Malicious Webhook 覆盖 |
+> | **S3** REQ-SCM-003(自建 Git 排期调整,V2 候选) | §4.7.1 | §9.2.7 已有 T7 Malicious Webhook 覆盖(不因排期变化而新增威胁) |
 > | **S4** AgentSession `token_usage` / `cost_summary` 字段 | §4.2.2 | §8.5 Retention 7 级注释(成本数据按 Metadata 处理) |
 > | **S5** Skill/Playbook + Squad V2 候选 | §4.2.8 + §4.4 Provenance | §9.2.13 Skill/Playbook Content Injection(新增 T1.x)+ §9.1 威胁总览 |
 >

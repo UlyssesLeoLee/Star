@@ -6,7 +6,7 @@
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
 > | v0.1 | 2026-08-25 | 初始版本 | — |
-> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(REQ-AUTO-002 Schedule Trigger / REQ-NOTIF-002 Inbox 噪声抑制 / REQ-SCM-003 自建 Git 提前 / AgentSession token_usage+cost_summary / Skill·Playbook+Squad V2 候选) | — |
+> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(REQ-AUTO-002 Schedule Trigger / REQ-NOTIF-002 Inbox 噪声抑制 / REQ-SCM-003 自建 Git 排期调整(V2 候选) / AgentSession token_usage+cost_summary / Skill·Playbook+Squad V2 候选) | — |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
 > **上游 API 設計書**: `D:\Star-worktrees\data-security-design\docs\api-design.md` v0.1
@@ -22,7 +22,7 @@
 > |---|---|---|
 > | **S1** REQ-AUTO-002(Trigger 增加 Schedule/Cron 变体) | §2.1.2 (Module 17) + §5.6 事件清单 | §4.13.1 `automation_rule.trigger_config` 注释(V1 候选,JSONB 已支持) |
 > | **S2** REQ-NOTIF-002(默认仅人类决策节点触达) | §2.1.3 (Module 23) | §4.15.3 `notification` 表追加 3 列 + CHECK |
-> | **S3** REQ-SCM-003(自建 Git 提前到 V1) | §4.7.1 | §4.18.1 `repository` 表 `ck_repository_provider` CHECK 加 `'forgejo'` |
+> | **S3** REQ-SCM-003(自建 Git 排期调整,V2 候选) | §4.7.1 | §4.18.1 `repository` 表 `ck_repository_provider` CHECK 预留加 `'forgejo'`(枚举预留,交付仍为 V2) |
 > | **S4** AgentSession `token_usage` / `cost_summary` 字段 | §4.2.2 | §4.21.2 `agent_session` 表追加 2 个 JSONB 列(V1 候选) |
 > | **S5** Skill/Playbook + Squad V2 候选 | §4.2.8 + §4.4 Provenance | §4.23.2 `provenance_entry` 表 `ck_provenance_source_type` CHECK 加 `'Skill'`(V2 候选) |
 >
@@ -2554,7 +2554,7 @@ CREATE INDEX idx_repository_tenant_project
 CREATE INDEX idx_repository_sync_status
   ON scm.repository (sync_status) WHERE sync_status <> 'IN_SYNC' AND deleted_at IS NULL;
 
-COMMENT ON TABLE scm.repository IS 'Repository 注册表;MVP 仅 CONNECTED 模式(继承 §4.7.4,§R-SCM-001/002);Adapter 扩展优先级:Gitea/Forgejo(V1) > Bitbucket/Azure DevOps(V2),S3 落点(继承 basic-design 5f1ea5b §4.7.1,REQ-SCM-003 V2 候选)';
+COMMENT ON TABLE scm.repository IS 'Repository 注册表;MVP 仅 CONNECTED 模式(继承 §4.7.4,§R-SCM-001/002);Adapter 扩展优先级(均为 V2 候选):Gitea/Forgejo 排在 Bitbucket/Azure DevOps 之前,S3 落点(继承 basic-design 5f1ea5b §4.7.1,REQ-SCM-003 V2 候选)';
 
 ALTER TABLE scm.repository ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_policy ON scm.repository
