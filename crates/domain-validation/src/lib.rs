@@ -1,304 +1,572 @@
 //! Validation 领域
 //!
 //! **crate**: `domain-validation`
-//! **上游 spec**: docs/specs/domain-validation-spec.md §27 Validation Model
-//! **基本设计**: docs/basic-design.md §2.1 / §4.5 / §4.10.7
-//! **数据设计**: docs/data-design.md §4.7 (`validation` schema)
-//! **API 设计**: docs/api-design.md §3.10 (Validation Evidence + Coverage)
+//! **上游 spec**: docs/specs/domain-validation-spec.md
+//! **基本设计**: docs/basic-design.md §4.5
+//! **数据设计**: docs/data-design.md §4.24 (`validation` schema)
+//! **API 设计**: docs/api-design.md §3.25 (Validation endpoints)
 //!
 //! ## 职责
 //!
-//! 详细职责边界见 spec 文档第 1 节。骨架阶段仅声明 Port trait + Entity + Error,
-//! 具体实现由 `crates/infrastructure` 中的 Adapter 提供。
+//! ValidationResult 聚合根 + 7+3 类 Validation + 5 状态机 + AcceptanceCoverage
+//! 派生 + ValidationPolicy 模板 + Evidence Object Storage 引用。
+//! 核心职责是 **AI 自我报告不构成完成**(VAL-001,INV-VL-01)+ **四重门强约束**
+//! (ValidationPassed && AcceptanceCoverage==100 && FeedbackResolved && GateApproved)。
 //!
 //! ## 关键不变量
 //!
-//! //! - AI 自我报告不构成完成(§27.3,VAL-001)
-//! - Acceptance Coverage 必须由 Validation Evidence 驱动(REQ-VAL-002)
-//! - ValidationFailed 触发 Outbox 通知(§2.4)
+//! - 7 类 Validation:Build / UnitTest / IntegrationTest / Lint / Format / StaticAnalysis / SecurityCheck
+//!   (SOW 必交付;另含 3 类附加 AcceptanceCheck / Review / CustomValidation 与 data-design 对齐)
+//! - 5 状态机:PENDING / RUNNING / PASSED / FAILED / SKIPPED
+//! - Validation Evidence 独立来源,不可 Agent 自报(INV-VL-04,VAL-001)
+//! - 必带 tenant_id,跨 tenant 拒绝(INV-VL-07)
+//! - Object Storage Key 必带 tenant_id 前缀(INV-VL-08,13 类 #10/#11)
+//! - AI 自我声明完成时必须经四重门(INV-VL-01/02,VAL-001)
+//! - AcceptanceCoverage 100% 是 READY_FOR_REVIEW 必要条件(INV-VL-05)
+//! - Override 必须人类 Protected 鉴权(INV-VL-06)
+//! - ValidationPolicy.allow_ai_self_claim 默认 false(INV-VL-09,VAL-001)
+//!
+//! ## 上游依赖
+//!
+//! 本 crate 不依赖任何 domain-* crate(spec §1 职责边界),保持独立性。
 
-//! ## 上游依赖(basic-design §2.3)
-//!
-//! 本 crate 依赖以下 domain-*(骨架阶段不实际 import,Cargo.toml 仅声明本 crate 自身需要的外部依赖):
-//!
-//!   - `domain-work-item`
-//!   - `domain-worktree`
-//!   - `domain-agent`
-//!
-//! **禁止反向依赖**(§2.3 禁线)。
-
-//! ## 关键引用
-//!
-//! AI 自我报告不构成完成(VAL-001,F-06 修复后)
-
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 #![warn(rust_2018_idioms)]
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
 // =====================================================================
-// 实体(Entity / Aggregate Root)
+// 子模块装载
 // =====================================================================
 
-/// ValidationResult (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.7 (`validation` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationResult {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// AcceptanceCoverage (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.7 (`validation` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AcceptanceCoverage {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
+pub mod context;
+pub mod entity;
+pub mod error;
+pub mod event;
+pub mod invariants;
+pub mod macros;
+pub mod port;
+pub mod service;
+pub mod value_object;
 
 // =====================================================================
-// 端口(Port / 抽象)
+// 便捷 re-export
 // =====================================================================
 
-/// **ValidationCommandPort**(命令端口)
-///
-/// 来源: docs/api-design.md §3.10 (Validation Evidence + Coverage)
-///
-/// **骨架阶段**: 仅方法签名,无 body 实现。Phase 2 在
-/// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
-#[async_trait]
-pub trait ValidationCommandPort: Send + Sync {
-    async fn submit_evidence(
-        &self,
-        cmd: SubmitValidationEvidenceCommand,
-        actor: ActorContext,
-    ) -> Result<ValidationResultId, ValidationError>;
-    async fn mark_passed(
-        &self,
-        cmd: MarkValidationPassedCommand,
-        actor: ActorContext,
-    ) -> Result<ValidationResult, ValidationError>;
-    async fn mark_failed(
-        &self,
-        cmd: MarkValidationFailedCommand,
-        actor: ActorContext,
-    ) -> Result<ValidationResult, ValidationError>;
-    async fn record_coverage(
-        &self,
-        cmd: RecordCoverageCommand,
-        actor: ActorContext,
-    ) -> Result<AcceptanceCoverage, ValidationError>;
-}
-
-
-/// **ValidationQueryPort**(查询端口)
-///
-/// 来源: docs/api-design.md §3.10 (Validation Evidence + Coverage)
-#[async_trait]
-pub trait ValidationQueryPort: Send + Sync {
-    async fn get_by_id(
-        &self,
-        id: ValidationResultId,
-        viewer: ActorContext,
-    ) -> Result<ValidationResult, ValidationError>;
-    async fn list_by_work_item(
-        &self,
-        id: WorkItemId,
-        viewer: ActorContext,
-    ) -> Result<Vec<ValidationResult>, ValidationError>;
-    async fn compute_coverage(
-        &self,
-        id: WorkItemId,
-        viewer: ActorContext,
-    ) -> Result<AcceptanceCoverage, ValidationError>;
-}
+pub use context::ActorContext;
+pub use entity::{
+    AcceptanceCoverage, AcceptanceCoverageReport, EvidenceDownloadURL, ValidationEvidence,
+    ValidationOverride, ValidationPolicy, ValidationResult,
+};
+pub use error::ValidationError;
+pub use event::{
+    AcceptanceCoverageAchieved, AcceptanceCoverageLinked, EventMeta, EvidenceLinked,
+    FeedbackRequired, ValidationEvent, ValidationFailed, ValidationOverridden, ValidationPassed,
+    ValidationResultSubmitted,
+};
+pub use invariants::{
+    check_ai_self_claim_requires_validation_passed, check_ai_self_claim_status,
+    check_create_invariants, check_invariant_03_state_transition,
+    check_invariant_04_evidence_required, check_invariant_05_full_coverage_required,
+    check_invariant_06_override_human_only, check_invariant_07_tenant_id_present,
+    check_invariant_08_evidence_storage_tenant_prefix,
+    check_invariant_09_policy_default_ai_self_claim,
+    check_invariant_10_evidence_type_whitelist, check_status_transition,
+};
+pub use port::{
+    AddEvidenceCommand, CreateValidationPolicyCommand, LinkAcceptanceEvidenceCommand,
+    LinkEvidenceCommand, ListValidationQuery, MarkValidationStatusCommand,
+    OverrideValidationCommand, SubmitValidationResultCommand, ValidationCommandPort,
+    ValidationQueryPort, ValidationRepository,
+};
+pub use service::InMemoryValidationService;
+pub use value_object::{
+    is_valid_state_transition, roles, AcceptanceCoverageId, AcceptanceCriterionId,
+    AgentSessionId, ChangeSetId, CommitId, CoverageStatus, EvidenceType, ProjectId, TenantId,
+    TriggeredBy, UserId, ValidationEvidenceId, ValidationId, ValidationKind,
+    ValidationOverrideId, ValidationPolicyId, ValidationStatus, WorkItemId, WorktreeId,
+};
 
 // =====================================================================
-// Domain Events(CloudEvents 1.0,见 api-design §5)
-// =====================================================================
-
-/// Domain Event: `star.events.validation.result.submitted.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Validation01Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Domain Event: `star.events.validation.result.passed.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Validation02Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Domain Event: `star.events.validation.result.failed.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Validation03Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 类型别名与命令/查询/返回类型占位
-// =====================================================================
-/// **ID 类型别名**(Phase 1 骨架:均为 UUID 别名)
-///
-/// 真实使用应由 `domain-identity` 颁发强类型 ID(§23.2);
-/// 骨架阶段以 `Uuid` 替代以避免跨 crate 编译依赖。
-
-pub type AcceptanceCoverageId = Uuid;
-pub type ValidationResultId = Uuid;
-pub type WorkItemId = Uuid;
-
-/// **命令 / 查询 / 跨 crate 类型占位结构**(Phase 1 骨架:最小字段集)
-
-/// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
-/// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MarkValidationFailedCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MarkValidationPassedCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordCoverageCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubmitValidationEvidenceCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-
-// =====================================================================
-// Error
-// =====================================================================
-
-/// **Validation 错误**
-///
-/// 来源: docs/api-design.md §8 (错误码)
-/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
-#[derive(Debug, thiserror::Error)]
-pub enum ValidationError {
-    #[error("not found: {0}")]
-    NotFound(Uuid),
-    #[error("invalid state: {0}")]
-    InvalidState(String),
-    #[error("permission denied")]
-    PermissionDenied,
-    #[error("conflict: {0}")]
-    Conflict(String),
-    #[error("internal: {0}")]
-    Internal(String),
-}
-
-// =====================================================================
-// 共享类型
-// =====================================================================
-
-/// **Actor 上下文**(来自 `domain-identity` / `domain-permission` 的 JWT claim)
-///
-/// **骨架阶段**: 字段占位;Phase 2 由 `domain-identity` 颁发的 ActorContext 取代
-/// 本 crate 内的占位定义(避免循环依赖)。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    /// 当前用户 ID
-    pub user_id: Uuid,
-    /// 当前租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 当前设备 ID(Local Runtime 三重绑定,§23.2)
-    pub device_id: Option<Uuid>,
-    /// 当前 Project IDs(用于 Project Policy 校验)
-    pub project_ids: Vec<Uuid>,
-    /// 当前用户角色(`tenant_admin` / `project_admin` / `developer` / `viewer`)
-    pub roles: Vec<String>,
-}
-
-// =====================================================================
-// 单元测试占位
+// 单元测试(SOW 要求 5+ 场景;7 类 + Coverage)
 // =====================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::value_object::{
+        ProjectId, TenantId, TriggeredBy, UserId, ValidationKind, ValidationStatus, WorkItemId,
+    };
 
-    /// **骨架阶段**: 最小冒烟测试,验证 crate 可编译、ActorContext 字段可达。
-    /// Phase 2 由具体 spec 引入完整单元测试(状态机覆盖 / RLS 矩阵等)。
+    fn make_test_actor(tenant_id: TenantId) -> ActorContext {
+        ActorContext::new(UserId::new(), tenant_id).with_role(roles::DEVELOPER)
+    }
+
+    fn make_service_actor(tenant_id: TenantId) -> ActorContext {
+        ActorContext::new(UserId::new(), tenant_id).with_role(roles::SERVICE_INTERNAL)
+    }
+
+    fn make_submit_cmd(tenant_id: TenantId, kind: ValidationKind) -> SubmitValidationResultCommand {
+        SubmitValidationResultCommand {
+            tenant_id,
+            project_id: ProjectId::new(),
+            work_item_id: Some(WorkItemId::new()),
+            worktree_id: None,
+            kind,
+            log_excerpt_ref: format!("validation.build_log/{tenant_id}/test.log"),
+            evidence_ids: vec![],
+            triggered_by_id: None,
+            policy_id: None,
+            policy_required: false,
+            is_ai_complete_claim: false,
+        }
+    }
+
+    // -------- 1. 字段数审计(19/9/10/9/6) --------
+
     #[test]
-    fn actor_context_skeleton() {
-        let actor = ActorContext {
-            user_id: Uuid::new_v4(),
-            tenant_id: Uuid::new_v4(),
-            device_id: None,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-        };
-        assert!(!actor.tenant_id.is_nil(), "tenant_id must be non-nil (§6.1,REQ-SEC-001)");
+    fn entity_field_count_audit() {
+        assert_eq!(ValidationResult::FIELD_COUNT, 19);
+        assert_eq!(ValidationEvidence::FIELD_COUNT, 9);
+        assert_eq!(AcceptanceCoverage::FIELD_COUNT, 10);
+        assert_eq!(ValidationPolicy::FIELD_COUNT, 9);
+        assert_eq!(ValidationOverride::FIELD_COUNT, 6);
+    }
+
+    // -------- 2. 7 类 ValidationKind 锁定(SOW) --------
+
+    #[test]
+    fn seven_validation_kinds_locked() {
+        // SOW 必交付 7 类
+        assert_eq!(ValidationKind::SOW_REQUIRED.len(), 7);
+        for k in ValidationKind::SOW_REQUIRED {
+            assert!(k.is_sow_required());
+        }
+        // 不在 SOW 集合的
+        assert!(!ValidationKind::AcceptanceCheck.is_sow_required());
+        assert!(!ValidationKind::Review.is_sow_required());
+        assert!(!ValidationKind::CustomValidation.is_sow_required());
+    }
+
+    // -------- 3. 5 状态机迁移表 --------
+
+    #[test]
+    fn five_state_transitions() {
+        // 合法
+        assert!(is_valid_state_transition(
+            ValidationStatus::Pending,
+            ValidationStatus::Running
+        ));
+        assert!(is_valid_state_transition(
+            ValidationStatus::Running,
+            ValidationStatus::Passed
+        ));
+        assert!(is_valid_state_transition(
+            ValidationStatus::Running,
+            ValidationStatus::Failed
+        ));
+        assert!(is_valid_state_transition(
+            ValidationStatus::Pending,
+            ValidationStatus::Skipped
+        ));
+        // 终态不可迁出
+        assert!(!is_valid_state_transition(
+            ValidationStatus::Passed,
+            ValidationStatus::Running
+        ));
+        assert!(!is_valid_state_transition(
+            ValidationStatus::Failed,
+            ValidationStatus::Running
+        ));
+        assert!(!is_valid_state_transition(
+            ValidationStatus::Skipped,
+            ValidationStatus::Running
+        ));
+        // 同态禁止
+        assert!(!is_valid_state_transition(
+            ValidationStatus::Running,
+            ValidationStatus::Running
+        ));
+    }
+
+    // -------- 4. submit_result 7 类各能成功创建 + INV-VL-04 evidence 必带 --------
+
+    #[tokio::test]
+    async fn submit_seven_kinds_all_succeed() {
+        let svc = InMemoryValidationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_service_actor(tenant_id);
+        for (i, kind) in ValidationKind::SOW_REQUIRED.iter().enumerate() {
+            let cmd = make_submit_cmd(tenant_id, *kind);
+            let r = svc
+                .submit_result(cmd, actor.clone())
+                .await
+                .expect("submit 成功");
+            assert_eq!(r.kind, *kind);
+            assert_eq!(r.status, ValidationStatus::Pending);
+            assert!(r.log_excerpt_ref.is_some());
+            assert!(!r.is_ai_complete_claim);
+            // 用于 SOW 测试断言计数
+            assert_eq!(svc.result_count().await, i + 1);
+        }
+    }
+
+    // -------- 5. INV-VL-04:log_excerpt_ref 缺失必拒(VAL-001) --------
+
+    #[tokio::test]
+    async fn invariant_04_evidence_required_reject_empty_log_ref() {
+        let svc = InMemoryValidationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_service_actor(tenant_id);
+        let mut cmd = make_submit_cmd(tenant_id, ValidationKind::Build);
+        cmd.log_excerpt_ref = "   ".to_string();
+        let res = svc.submit_result(cmd, actor).await;
+        assert!(matches!(res, Err(ValidationError::InvalidState(_))));
+    }
+
+    // -------- 6. 状态机:Running -> Passed 触发 PASSED 事件 + evidence 必带 --------
+
+    #[tokio::test]
+    async fn state_transition_running_to_passed_emits_event() {
+        let (svc, mut rx) = InMemoryValidationService::new();
+        let tenant_id = TenantId::new();
+        let actor = make_service_actor(tenant_id);
+        let r = svc
+            .submit_result(make_submit_cmd(tenant_id, ValidationKind::UnitTest), actor.clone())
+            .await
+            .unwrap();
+        // Running
+        svc.mark_status(
+            MarkValidationStatusCommand {
+                tenant_id,
+                validation_id: r.id,
+                new_status: ValidationStatus::Running,
+                failure_summary: None,
+            },
+            actor.clone(),
+        )
+        .await
+        .unwrap();
+        // Passed
+        let passed = svc
+            .mark_status(
+                MarkValidationStatusCommand {
+                    tenant_id,
+                    validation_id: r.id,
+                    new_status: ValidationStatus::Passed,
+                    failure_summary: None,
+                },
+                actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(passed.status, ValidationStatus::Passed);
+        // 查事件
+        let mut found_passed = false;
+        for _ in 0..10 {
+            if let Ok(e) = rx.try_recv() {
+                if matches!(e, ValidationEvent::Passed(_)) {
+                    found_passed = true;
+                    break;
+                }
+            }
+        }
+        assert!(found_passed, "应收到 ValidationPassed 事件");
+    }
+
+    // -------- 7. INV-VL-05:AcceptanceCoverage 100% 派生 + 未达 100% 拒绝 --------
+
+    #[tokio::test]
+    async fn acceptance_coverage_100_percent_derived() {
+        let svc = InMemoryValidationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_service_actor(tenant_id);
+        // 提交 3 个 PASSED Validation,关联到 3 个 AC
+        let work_item = WorkItemId::new();
+        for _ in 0..3 {
+            let r = svc
+                .submit_result(
+                    SubmitValidationResultCommand {
+                        work_item_id: Some(work_item),
+                        ..make_submit_cmd(tenant_id, ValidationKind::AcceptanceCheck)
+                    },
+                    actor.clone(),
+                )
+                .await
+                .unwrap();
+            svc.mark_status(
+                MarkValidationStatusCommand {
+                    tenant_id,
+                    validation_id: r.id,
+                    new_status: ValidationStatus::Running,
+                    failure_summary: None,
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+            svc.mark_status(
+                MarkValidationStatusCommand {
+                    tenant_id,
+                    validation_id: r.id,
+                    new_status: ValidationStatus::Passed,
+                    failure_summary: None,
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+            svc.link_to_acceptance_criterion(
+                LinkAcceptanceEvidenceCommand {
+                    tenant_id,
+                    work_item_id: work_item,
+                    acceptance_criterion_id: uuid::Uuid::new_v4(),
+                    validation_id: r.id,
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        }
+        let report = svc
+            .get_acceptance_coverage(work_item, actor.clone())
+            .await
+            .unwrap();
+        assert_eq!(report.total_criteria, 3);
+        assert_eq!(report.covered, 3);
+        assert!(report.is_fully_covered());
+        assert!((report.coverage_percent() - 100.0).abs() < 0.01);
+
+        // INV-VL-05:未达 100% 拒绝
+        let work_item2 = WorkItemId::new();
+        let res = check_invariant_05_full_coverage_required(3, 2);
+        assert!(matches!(res, Err(ValidationError::InvalidState(_))));
+        let _ = work_item2;
+    }
+
+    // -------- 8. INV-VL-06:Service-Internal 不可 Override(必须人类) --------
+
+    #[tokio::test]
+    async fn invariant_06_override_human_only_rejects_service() {
+        let svc = InMemoryValidationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let svc_actor = make_service_actor(tenant_id);
+        let r = svc
+            .submit_result(make_submit_cmd(tenant_id, ValidationKind::Build), svc_actor.clone())
+            .await
+            .unwrap();
+        let res = svc
+            .override_result(
+                OverrideValidationCommand {
+                    tenant_id,
+                    validation_id: r.id,
+                    reason: "test".to_string(),
+                    approver_user_id: UserId::new(),
+                },
+                svc_actor,
+            )
+            .await;
+        assert!(matches!(res, Err(ValidationError::PermissionDenied)));
+
+        // 人类 Developer 可 Override
+        let dev_actor = make_test_actor(tenant_id);
+        let ovr = svc
+            .override_result(
+                OverrideValidationCommand {
+                    tenant_id,
+                    validation_id: r.id,
+                    reason: "测试覆盖".to_string(),
+                    approver_user_id: dev_actor.user_id,
+                },
+                dev_actor,
+            )
+            .await
+            .expect("Override 成功");
+        assert_eq!(ovr.validation_id, r.id);
+    }
+
+    // -------- 9. INV-VL-08:Evidence storage_ref 缺 tenant_id 前缀被拒 --------
+
+    #[tokio::test]
+    async fn invariant_08_evidence_storage_tenant_prefix_rejected() {
+        let svc = InMemoryValidationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_service_actor(tenant_id);
+        let r = svc
+            .submit_result(make_submit_cmd(tenant_id, ValidationKind::Build), actor.clone())
+            .await
+            .unwrap();
+        let res = svc
+            .add_evidence(
+                AddEvidenceCommand {
+                    tenant_id,
+                    validation_id: r.id,
+                    evidence_type: EvidenceType::BuildLog,
+                    storage_ref: "wrong-prefix/file.log".to_string(), // 缺 tenant_id
+                    size_bytes: Some(1024),
+                    mime_type: Some("text/plain".to_string()),
+                },
+                actor,
+            )
+            .await;
+        assert!(matches!(res, Err(ValidationError::InvalidState(_))));
+    }
+
+    // -------- 10. INV-VL-09:Policy allow_ai_self_claim=true 必拒(VAL-001) --------
+
+    #[tokio::test]
+    async fn invariant_09_policy_allow_ai_self_claim_rejected() {
+        let svc = InMemoryValidationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let res = svc
+            .create_policy(
+                CreateValidationPolicyCommand {
+                    tenant_id,
+                    project_id: ProjectId::new(),
+                    name: "bad-policy".to_string(),
+                    required_kinds: vec![ValidationKind::Build],
+                    optional_kinds: vec![],
+                    pass_thresholds: Default::default(),
+                    allow_ai_self_claim: true, // VAL-001 禁止
+                    override_allow: false,
+                },
+                actor,
+            )
+            .await;
+        assert!(matches!(res, Err(ValidationError::InvariantViolated(_))));
+    }
+
+    // -------- 11. 跨 tenant 访问被拒 --------
+
+    #[tokio::test]
+    async fn cross_tenant_access_denied() {
+        let svc = InMemoryValidationService::new_for_test();
+        let tenant_a = TenantId::new();
+        let tenant_b = TenantId::new();
+        let actor_a = make_service_actor(tenant_a);
+        let r = svc
+            .submit_result(make_submit_cmd(tenant_a, ValidationKind::Build), actor_a)
+            .await
+            .unwrap();
+        let actor_b = make_service_actor(tenant_b);
+        let res = svc.get_result(r.id, actor_b).await;
+        assert!(matches!(res, Err(ValidationError::PermissionDenied)));
+    }
+
+    // -------- 12. ValidationFailed 触发 FeedbackRequired 事件 --------
+
+    #[tokio::test]
+    async fn validation_failed_triggers_feedback_required_event() {
+        let (svc, mut rx) = InMemoryValidationService::new();
+        let tenant_id = TenantId::new();
+        let actor = make_service_actor(tenant_id);
+        let work_item = WorkItemId::new();
+        let r = svc
+            .submit_result(
+                SubmitValidationResultCommand {
+                    work_item_id: Some(work_item),
+                    ..make_submit_cmd(tenant_id, ValidationKind::UnitTest)
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        svc.mark_status(
+            MarkValidationStatusCommand {
+                tenant_id,
+                validation_id: r.id,
+                new_status: ValidationStatus::Running,
+                failure_summary: None,
+            },
+            actor.clone(),
+        )
+        .await
+        .unwrap();
+        svc.mark_status(
+            MarkValidationStatusCommand {
+                tenant_id,
+                validation_id: r.id,
+                new_status: ValidationStatus::Failed,
+                failure_summary: Some("Test XYZ failed".to_string()),
+            },
+            actor,
+        )
+        .await
+        .unwrap();
+        // 事件队列中应能找到 FeedbackRequired
+        let mut found_fr = false;
+        let mut found_failed = false;
+        for _ in 0..20 {
+            if let Ok(e) = rx.try_recv() {
+                match e {
+                    ValidationEvent::FeedbackRequired(_) => found_fr = true,
+                    ValidationEvent::Failed(_) => found_failed = true,
+                    _ => {}
+                }
+                if found_fr && found_failed {
+                    break;
+                }
+            }
+        }
+        assert!(found_fr, "应收到 FeedbackRequired 事件");
+        assert!(found_failed, "应收到 ValidationFailed 事件");
+    }
+
+    // -------- 13. INV-VL-01 + AI self claim + status=Passed 必带 evidence --------
+
+    #[tokio::test]
+    async fn ai_self_claim_requires_evidence_for_passed() {
+        let svc = InMemoryValidationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_service_actor(tenant_id);
+        // is_ai_complete_claim=true 但 log_excerpt_ref 为空 → submit 即拒
+        let mut cmd = make_submit_cmd(tenant_id, ValidationKind::Build);
+        cmd.is_ai_complete_claim = true;
+        cmd.log_excerpt_ref = "".to_string();
+        let res = svc.submit_result(cmd, actor).await;
+        assert!(matches!(res, Err(ValidationError::InvalidState(_))));
+
+        // 正常 submit 后尝试 mark_status=Passed 但 evidence 缺
+        let actor2 = make_service_actor(tenant_id);
+        let r = svc
+            .submit_result(make_submit_cmd(tenant_id, ValidationKind::UnitTest), actor2.clone())
+            .await
+            .unwrap();
+        // 清除 log_excerpt_ref,模拟 evidence 缺失
+        {
+            let mut results = svc.results.write().unwrap();
+            if let Some(r) = results.get_mut(&r.id) {
+                r.log_excerpt_ref = None;
+                r.evidence_ids.clear();
+            }
+        }
+        svc.mark_status(
+            MarkValidationStatusCommand {
+                tenant_id,
+                validation_id: r.id,
+                new_status: ValidationStatus::Running,
+                failure_summary: None,
+            },
+            actor2.clone(),
+        )
+        .await
+        .unwrap();
+        let res = svc
+            .mark_status(
+                MarkValidationStatusCommand {
+                    tenant_id,
+                    validation_id: r.id,
+                    new_status: ValidationStatus::Passed,
+                    failure_summary: None,
+                },
+                actor2,
+            )
+            .await;
+        assert!(matches!(res, Err(ValidationError::InvalidState(_))));
+    }
+
+    // 静默引用
+    #[allow(dead_code)]
+    fn _unused_tb(_: TriggeredBy) -> TriggeredBy {
+        TriggeredBy::User
     }
 }
