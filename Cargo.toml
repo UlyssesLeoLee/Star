@@ -1,0 +1,77 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/api",
+    "crates/application",
+    "crates/domain-agent",
+    "crates/domain-audit",
+    "crates/domain-automation",
+    "crates/domain-board",
+    "crates/domain-collaboration",
+    "crates/domain-comment",
+    "crates/domain-context",
+    "crates/domain-development",
+    "crates/domain-feedback",
+    "crates/domain-identity",
+    "crates/domain-integration",
+    "crates/domain-local-runtime",
+    "crates/domain-notification",
+    "crates/domain-permission",
+    "crates/domain-planning",
+    "crates/domain-project",
+    "crates/domain-relation",
+    "crates/domain-scm",
+    "crates/domain-search",
+    "crates/domain-tenant",
+    "crates/domain-validation",
+    "crates/domain-work-item",
+    "crates/domain-workflow",
+    "crates/domain-workspace",
+    "crates/domain-worktree",
+    "crates/infrastructure",
+]
+exclude = ["target"]
+
+[workspace.lints.rust]
+missing_docs = "warn"
+rust_2018_idioms = "warn"
+unreachable_pub = "warn"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Star Team"]
+license = "Apache-2.0"
+repository = "https://github.com/UlyssesLeoLee/Star"
+
+[workspace.dependencies]
+# 异步运行时与异步 trait
+tokio = { version = "1.40", features = ["full"] }
+async-trait = "0.1"
+
+# 序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 错误
+thiserror = "1"
+anyhow = "1"
+
+# ID / 时间
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
+
+# 数据库(Phase 2 使用,骨架阶段仅 workspace 声明,infrastructure crate 引用)
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros"] }
+
+# Tracing
+tracing = "0.1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[profile.dev]
+opt-level = 0
+debug = 1
