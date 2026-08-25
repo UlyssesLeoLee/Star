@@ -1,240 +1,531 @@
-//! 协作(Realtime Presence)
+//! Collaboration 领域(Realtime Presence + 协作投影)
 //!
 //! **crate**: `domain-collaboration`
 //! **上游 spec**: docs/specs/domain-collaboration-spec.md §15 Realtime / Presence
-//! **基本设计**: docs/basic-design.md §2.1(表 24) / §1.1 部署图
-//! **数据设计**: docs/data-design.md §4.24 (`collaboration` schema)
-//! **API 设计**: docs/api-design.md §3.23 (Presence / RealtimeSubscription)
+//! **基本设计**: docs/basic-design.md §2.1(表 24) / §1.1 部署图 / §15 REQ-RT-001~003
+//! **数据设计**: docs/data-design.md §4.17 (`collaboration` schema)
+//! **API 设计**: docs/api-design.md §3.18 (Presence) / §4 (Realtime WS 通道)
 //!
 //! ## 职责
 //!
-//! 详细职责边界见 spec 文档第 1 节。骨架阶段仅声明 Port trait + Entity + Error,
-//! 具体实现由 `crates/infrastructure` 中的 Adapter 提供。
+//! 协作(实时状态、Presence)(§15, REQ-RT-001~003):
+//! - 1 个核心聚合根 `CollaborationSession`(11 字段)
+//! - 3 个子实体 `PresenceParticipant` / `PresenceCursor` / `RealtimeChannel`
+//! - 6 个核心 Domain Event(CloudEvents 1.0 envelope)
+//! - 2 个端口 `CollaborationCommandPort`(6 方法) / `CollaborationQueryPort`(4 方法) +
+//!   1 个仓库端口 `CollaborationRepository` + 1 个路由端口 `RealtimeEventRouter`
+//! - 8 条不变量检查(INV-CB-01~08)
+//! - 1 个 `InMemoryCollaborationService` 真实实现
 //!
 //! ## 关键不变量
 //!
-//! //! - 高频 Token Stream 可不入 SaaS(§15,REQ-RT-003)
-//! - 第一阶段不部署 realtime role(§13.1,§15)
-
-//! ## 上游依赖(basic-design §2.3)
+//! - 必带 tenant_id,跨 tenant 拒绝(INV-CB-01,§6.1, REQ-SEC-001)
+//! - 单 Connection ≤ 100 Subscription(INV-CB-02,api-design §4.2)
+//! - Presence 60s 心跳过期(INV-CB-03,spec §2,basic-design §23.4)
+//! - Realtime Event 必带 tenant_id,跨 tenant 推送拒绝(INV-CB-04)
+//! - Subscription filter.resource_types 非空(INV-CB-05)
+//! - Project 范围匹配(INV-CB-06)
+//! - Session owner 才能 close(INV-CB-07)
+//! - Cursor 选区范围合法(INV-CB-08)
 //!
-//! 本 crate 依赖以下 domain-*(骨架阶段不实际 import,Cargo.toml 仅声明本 crate 自身需要的外部依赖):
+//! ## 上游依赖
 //!
-//!   - `domain-work-item`
-//!   - `domain-worktree`
+//! 本 crate 仅依赖自身外部依赖,无跨 domain-* crate 依赖(强类型 ID newtype 隔离)。
 //!
-//! **禁止反向依赖**(§2.3 禁线)。
-
 //! ## 关键引用
 //!
-//! Realtime 第一阶段不部署(§13.1);高频 Token Stream 可旁路(§15)
+//! 高频 Token Stream 可旁路(§15, REQ-RT-003);MVP 不拆 realtime-service(§13.1, §15)
 
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 #![warn(rust_2018_idioms)]
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
 // =====================================================================
-// 实体(Entity / Aggregate Root)
+// 子模块装载
 // =====================================================================
 
-/// Presence (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.24 (`collaboration` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Presence {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// RealtimeSubscription (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.24 (`collaboration` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RealtimeSubscription {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
+pub mod context;
+pub mod entity;
+pub mod error;
+pub mod event;
+pub mod invariants;
+pub mod macros;
+pub mod port;
+pub mod service;
+pub mod value_object;
 
 // =====================================================================
-// 端口(Port / 抽象)
+// 便捷 re-export
 // =====================================================================
 
-/// **CollaborationCommandPort**(命令端口)
-///
-/// 来源: docs/api-design.md §3.23 (Presence / RealtimeSubscription)
-///
-/// **骨架阶段**: 仅方法签名,无 body 实现。Phase 2 在
-/// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
-#[async_trait]
-pub trait CollaborationCommandPort: Send + Sync {
-    async fn update_presence(
-        &self,
-        cmd: UpdatePresenceCommand,
-        actor: ActorContext,
-    ) -> Result<Presence, CollaborationError>;
-    async fn subscribe_realtime(
-        &self,
-        cmd: SubscribeRealtimeCommand,
-        actor: ActorContext,
-    ) -> Result<RealtimeSubscriptionId, CollaborationError>;
-}
-
-
-/// **CollaborationQueryPort**(查询端口)
-///
-/// 来源: docs/api-design.md §3.23 (Presence / RealtimeSubscription)
-#[async_trait]
-pub trait CollaborationQueryPort: Send + Sync {
-    async fn list_presence(
-        &self,
-        id: ProjectId,
-        viewer: ActorContext,
-    ) -> Result<Vec<Presence>, CollaborationError>;
-    async fn list_subscriptions(
-        &self,
-        id: UserId,
-        viewer: ActorContext,
-    ) -> Result<Vec<RealtimeSubscription>, CollaborationError>;
-}
+pub use context::ActorContext;
+pub use entity::{
+    CollaborationSession, PresenceCursor, PresenceParticipant, RealtimeChannel,
+};
+pub use error::CollaborationError;
+pub use event::{
+    CollaborationEvent, CursorMoved, EventMeta, HeartbeatReceived, ParticipantJoined,
+    ParticipantLeft, SessionClosed, SessionOpened,
+};
+pub use invariants::{
+    check_create_invariants, check_invariant_01_tenant_id_present,
+    check_invariant_02_channel_quota, check_invariant_03_heartbeat_not_expired,
+    check_invariant_04_event_tenant_match, check_invariant_05_channel_filter_not_empty,
+    check_invariant_06_project_scope_match, check_invariant_07_owner_or_admin,
+    check_invariant_08_cursor_selection_valid, run_invariants, ALL_INVARIANT_CHECKS,
+};
+pub use port::{
+    CloseSessionCommand, CollaborationCommandPort, CollaborationQueryPort,
+    CollaborationRepository, GetCursorQuery, HeartbeatCommand, JoinSessionCommand,
+    LeaveSessionCommand, ListActiveSessionsQuery, ListParticipantsQuery, OpenSessionCommand,
+    RealtimeEventRouter, UpdateCursorCommand,
+};
+pub use service::{
+    InMemoryCollaborationService, CHANNEL_TTL_SECS, DEFAULT_HEARTBEAT_TIMEOUT_SECS,
+    DEFAULT_SESSION_IDLE_SECS, MAX_CHANNELS_PER_CONNECTION,
+};
+pub use value_object::{
+    permissions, roles, ChannelId, ParticipantId, ParticipantStatus, ProjectId, ResourceType,
+    SelectionShape, SessionId, TenantId, UserId, WorkspaceId,
+};
 
 // =====================================================================
-// Domain Events(CloudEvents 1.0,见 api-design §5)
-// =====================================================================
-
-/// Domain Event: `star.events.collaboration.presence.updated.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Collaboration01Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 类型别名与命令/查询/返回类型占位
-// =====================================================================
-/// **ID 类型别名**(Phase 1 骨架:均为 UUID 别名)
-///
-/// 真实使用应由 `domain-identity` 颁发强类型 ID(§23.2);
-/// 骨架阶段以 `Uuid` 替代以避免跨 crate 编译依赖。
-
-pub type PresenceId = Uuid;
-pub type ProjectId = Uuid;
-pub type RealtimeSubscriptionId = Uuid;
-pub type UserId = Uuid;
-
-/// **命令 / 查询 / 跨 crate 类型占位结构**(Phase 1 骨架:最小字段集)
-
-/// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
-/// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubscribeRealtimeCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdatePresenceCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-
-// =====================================================================
-// Error
-// =====================================================================
-
-/// **Collaboration 错误**
-///
-/// 来源: docs/api-design.md §8 (错误码)
-/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
-#[derive(Debug, thiserror::Error)]
-pub enum CollaborationError {
-    #[error("not found: {0}")]
-    NotFound(Uuid),
-    #[error("invalid state: {0}")]
-    InvalidState(String),
-    #[error("permission denied")]
-    PermissionDenied,
-    #[error("conflict: {0}")]
-    Conflict(String),
-    #[error("internal: {0}")]
-    Internal(String),
-}
-
-// =====================================================================
-// 共享类型
-// =====================================================================
-
-/// **Actor 上下文**(来自 `domain-identity` / `domain-permission` 的 JWT claim)
-///
-/// **骨架阶段**: 字段占位;Phase 2 由 `domain-identity` 颁发的 ActorContext 取代
-/// 本 crate 内的占位定义(避免循环依赖)。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    /// 当前用户 ID
-    pub user_id: Uuid,
-    /// 当前租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 当前设备 ID(Local Runtime 三重绑定,§23.2)
-    pub device_id: Option<Uuid>,
-    /// 当前 Project IDs(用于 Project Policy 校验)
-    pub project_ids: Vec<Uuid>,
-    /// 当前用户角色(`tenant_admin` / `project_admin` / `developer` / `viewer`)
-    pub roles: Vec<String>,
-}
-
-// =====================================================================
-// 单元测试占位
+// 单元测试
 // =====================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::value_object::{SelectionShape, SessionId, TenantId, UserId};
+    use std::sync::Arc;
 
-    /// **骨架阶段**: 最小冒烟测试,验证 crate 可编译、ActorContext 字段可达。
-    /// Phase 2 由具体 spec 引入完整单元测试(状态机覆盖 / RLS 矩阵等)。
+    // -------- 测试夹具 --------
+
+    fn make_test_actor(tenant_id: TenantId) -> ActorContext {
+        ActorContext::new(UserId::new(), tenant_id)
+            .with_role(roles::DEVELOPER)
+            .with_project(ProjectId::new())
+    }
+
+    fn make_open_cmd(tenant_id: TenantId, project_id: ProjectId) -> OpenSessionCommand {
+        OpenSessionCommand {
+            tenant_id,
+            project_id,
+            workspace_id: None,
+            name: "test-session".to_string(),
+            description: Some("unit test session".to_string()),
+            is_open: true,
+        }
+    }
+
+    // -------- 1. ActorContext + 强类型 ID smoke test --------
+
     #[test]
-    fn actor_context_skeleton() {
-        let actor = ActorContext {
-            user_id: Uuid::new_v4(),
-            tenant_id: Uuid::new_v4(),
-            device_id: None,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
+    fn actor_context_typed_ids() {
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        assert!(!actor.tenant_id.as_uuid().is_nil());
+        assert!(actor.has_role(roles::DEVELOPER));
+    }
+
+    // -------- 2. FIELD_COUNT 字段数审计 --------
+
+    #[test]
+    fn entity_field_count_audit() {
+        assert_eq!(CollaborationSession::FIELD_COUNT, 11);
+        assert_eq!(PresenceParticipant::FIELD_COUNT, 11);
+        assert_eq!(PresenceCursor::FIELD_COUNT, 12);
+        assert_eq!(RealtimeChannel::FIELD_COUNT, 10);
+    }
+
+    // -------- 3. open_session 成功路径 --------
+
+    #[tokio::test]
+    async fn open_session_success() {
+        let svc = InMemoryCollaborationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let cmd = make_open_cmd(tenant_id, actor.project_ids[0]);
+        let s = svc.open_session(cmd, actor).await.expect("open_session");
+        assert_eq!(s.name, "test-session");
+        assert_eq!(s.lock_version, 1);
+        assert!(s.is_open);
+        assert_eq!(svc.count_sessions().await, 1);
+    }
+
+    // -------- 4. INV-CB-01:跨租户拒绝 --------
+
+    #[tokio::test]
+    async fn invariant_01_cross_tenant_rejected() {
+        let svc = InMemoryCollaborationService::new_for_test();
+        let tenant_a = TenantId::new();
+        let tenant_b = TenantId::new();
+        let actor_a = make_test_actor(tenant_a);
+        let actor_b = make_test_actor(tenant_b);
+        let cmd = make_open_cmd(tenant_a, actor_a.project_ids[0]);
+        let s = svc.open_session(cmd, actor_a).await.unwrap();
+        // 跨租户读取
+        let res = svc.get_session(s.id, actor_b).await;
+        assert!(matches!(res, Err(CollaborationError::PermissionDenied)));
+    }
+
+    // -------- 5. join_session + heartbeat + stale 判定 --------
+
+    #[tokio::test]
+    async fn join_heartbeat_and_stale_detection() {
+        let svc = InMemoryCollaborationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let open_cmd = make_open_cmd(tenant_id, actor.project_ids[0]);
+        let session = svc.open_session(open_cmd, actor.clone()).await.unwrap();
+
+        // join
+        let join = JoinSessionCommand {
+            tenant_id,
+            session_id: session.id,
+            user_id: actor.user_id,
+            resource_type: Some("worktree".to_string()),
+            resource_id: Some(uuid::Uuid::new_v4()),
         };
-        assert!(!actor.tenant_id.is_nil(), "tenant_id must be non-nil (§6.1,REQ-SEC-001)");
+        let p = svc.join_session(join, actor.clone()).await.expect("join");
+        assert_eq!(p.status, ParticipantStatus::Active);
+        assert_eq!(svc.count_participants().await, 1);
+
+        // heartbeat
+        let hb = HeartbeatCommand {
+            tenant_id,
+            session_id: session.id,
+            participant_id: p.id,
+            client_now: None,
+        };
+        let p2 = svc.heartbeat(hb, actor.clone()).await.expect("heartbeat");
+        assert_eq!(p2.status, ParticipantStatus::Active);
+        // heartbeat 之后 last_active_at 应该更新
+        assert!(p2.last_active_at >= p.last_active_at);
+
+        // 构造一个明显 stale 的 Participant(从未来 100s 的视角,心跳早已过期)
+        let now_plus_100s = chrono::Utc::now() + chrono::Duration::seconds(100);
+        assert!(p2.is_stale(now_plus_100s, DEFAULT_HEARTBEAT_TIMEOUT_SECS));
+    }
+
+    // -------- 6. update_cursor + INV-CB-08 选区合法/非法 --------
+
+    #[tokio::test]
+    async fn update_cursor_and_invariant_08() {
+        let svc = InMemoryCollaborationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let open_cmd = make_open_cmd(tenant_id, actor.project_ids[0]);
+        let session = svc.open_session(open_cmd, actor.clone()).await.unwrap();
+        let join = JoinSessionCommand {
+            tenant_id,
+            session_id: session.id,
+            user_id: actor.user_id,
+            resource_type: None,
+            resource_id: None,
+        };
+        let p = svc.join_session(join, actor.clone()).await.unwrap();
+
+        // 合法 Point cursor
+        let c1 = UpdateCursorCommand {
+            tenant_id,
+            session_id: session.id,
+            participant_id: p.id,
+            resource_type: "worktree".to_string(),
+            resource_id: uuid::Uuid::new_v4(),
+            position_x: 10,
+            position_y: 20,
+            selection_start: None,
+            selection_end: None,
+            selection_shape: SelectionShape::Point,
+        };
+        let cur = svc.update_cursor(c1, actor.clone()).await.expect("point cursor");
+        assert_eq!(cur.position_x, 10);
+        assert_eq!(cur.position_y, 20);
+
+        // 合法 Range cursor
+        let c2 = UpdateCursorCommand {
+            tenant_id,
+            session_id: session.id,
+            participant_id: p.id,
+            resource_type: "worktree".to_string(),
+            resource_id: uuid::Uuid::new_v4(),
+            position_x: 0,
+            position_y: 0,
+            selection_start: Some(5),
+            selection_end: Some(15),
+            selection_shape: SelectionShape::Range,
+        };
+        svc.update_cursor(c2, actor.clone()).await.expect("range cursor");
+
+        // 非法:start > end
+        let c_bad = UpdateCursorCommand {
+            tenant_id,
+            session_id: session.id,
+            participant_id: p.id,
+            resource_type: "worktree".to_string(),
+            resource_id: uuid::Uuid::new_v4(),
+            position_x: 0,
+            position_y: 0,
+            selection_start: Some(20),
+            selection_end: Some(10),
+            selection_shape: SelectionShape::Range,
+        };
+        let res = svc.update_cursor(c_bad, actor.clone()).await;
+        assert!(matches!(res, Err(CollaborationError::InvalidState(_))));
+
+        // get_cursor 验证最新值
+        let q = GetCursorQuery {
+            tenant_id,
+            session_id: session.id,
+            participant_id: p.id,
+        };
+        let got = svc.get_cursor(q, actor).await.expect("get_cursor");
+        assert!(got.is_some());
+    }
+
+    // -------- 7. list_participants 含 stale 过滤 --------
+
+    #[tokio::test]
+    async fn list_participants_excludes_stale() {
+        let svc = InMemoryCollaborationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let open_cmd = make_open_cmd(tenant_id, actor.project_ids[0]);
+        let session = svc.open_session(open_cmd, actor.clone()).await.unwrap();
+        let join = JoinSessionCommand {
+            tenant_id,
+            session_id: session.id,
+            user_id: actor.user_id,
+            resource_type: None,
+            resource_id: None,
+        };
+        let p = svc.join_session(join, actor.clone()).await.unwrap();
+
+        let q = ListParticipantsQuery {
+            tenant_id,
+            session_id: session.id,
+            status_filter: None,
+        };
+        let active = svc.list_participants(q, actor).await.expect("list");
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].id, p.id);
+    }
+
+    // -------- 8. INV-CB-07:非 owner 不可 close --------
+
+    #[tokio::test]
+    async fn invariant_07_non_owner_cannot_close() {
+        let svc = InMemoryCollaborationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let owner = make_test_actor(tenant_id);
+        let open_cmd = make_open_cmd(tenant_id, owner.project_ids[0]);
+        let session = svc.open_session(open_cmd, owner.clone()).await.unwrap();
+
+        // 另一个非 owner actor
+        let other = ActorContext::new(UserId::new(), tenant_id)
+            .with_role(roles::DEVELOPER)
+            .with_project(owner.project_ids[0]);
+        let close = CloseSessionCommand {
+            tenant_id,
+            session_id: session.id,
+        };
+        let res = svc.close_session(close, other).await;
+        assert!(matches!(res, Err(CollaborationError::PermissionDenied)));
+        // owner 可 close
+        let close2 = CloseSessionCommand {
+            tenant_id,
+            session_id: session.id,
+        };
+        let res2 = svc.close_session(close2, owner).await;
+        assert!(res2.is_ok());
+        assert_eq!(svc.count_sessions().await, 0);
+    }
+
+    // -------- 9. close_session 级联清理 Participant / Cursor --------
+
+    #[tokio::test]
+    async fn close_session_cascades_participants_and_cursors() {
+        let svc = InMemoryCollaborationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let open_cmd = make_open_cmd(tenant_id, actor.project_ids[0]);
+        let session = svc.open_session(open_cmd, actor.clone()).await.unwrap();
+        let join = JoinSessionCommand {
+            tenant_id,
+            session_id: session.id,
+            user_id: actor.user_id,
+            resource_type: None,
+            resource_id: None,
+        };
+        let p = svc.join_session(join, actor.clone()).await.unwrap();
+        let cur = UpdateCursorCommand {
+            tenant_id,
+            session_id: session.id,
+            participant_id: p.id,
+            resource_type: "wt".to_string(),
+            resource_id: uuid::Uuid::new_v4(),
+            position_x: 1,
+            position_y: 2,
+            selection_start: None,
+            selection_end: None,
+            selection_shape: SelectionShape::Point,
+        };
+        svc.update_cursor(cur, actor.clone()).await.unwrap();
+        assert_eq!(svc.count_participants().await, 1);
+
+        let close = CloseSessionCommand {
+            tenant_id,
+            session_id: session.id,
+        };
+        svc.close_session(close, actor).await.unwrap();
+        assert_eq!(svc.count_sessions().await, 0);
+        assert_eq!(svc.count_participants().await, 0);
+    }
+
+    // -------- 10. INV-CB-02:Channel 超过 100/Connection 拒绝 --------
+
+    #[tokio::test]
+    async fn invariant_02_channel_quota_rejected() {
+        let svc = InMemoryCollaborationService::new_for_test();
+        let user_id = UserId::new();
+        let tenant_id = TenantId::new();
+        // 直接通过 repository 插入 100 个 Channel
+        for _ in 0..MAX_CHANNELS_PER_CONNECTION {
+            let c = RealtimeChannel {
+                id: ChannelId::new(),
+                session_id: SessionId::new(),
+                tenant_id,
+                user_id,
+                filter_resource_types: vec![ResourceType::Presence],
+                filter_project_ids: vec![],
+                last_event_id: None,
+                is_active: true,
+                expires_at: chrono::Utc::now() + chrono::Duration::seconds(CHANNEL_TTL_SECS),
+                last_ping_at: chrono::Utc::now(),
+            };
+            svc.insert_channel(&c).await.expect("insert_channel");
+        }
+        // 第 101 个被拒
+        let c101 = RealtimeChannel {
+            id: ChannelId::new(),
+            session_id: SessionId::new(),
+            tenant_id,
+            user_id,
+            filter_resource_types: vec![ResourceType::Presence],
+            filter_project_ids: vec![],
+            last_event_id: None,
+            is_active: true,
+            expires_at: chrono::Utc::now() + chrono::Duration::seconds(CHANNEL_TTL_SECS),
+            last_ping_at: chrono::Utc::now(),
+        };
+        let res = svc.insert_channel(&c101).await;
+        assert!(matches!(res, Err(CollaborationError::RateLimited(_))));
+    }
+
+    // -------- 11. INV-CB-05:Channel filter.resource_types 为空被拒 --------
+
+    #[tokio::test]
+    async fn invariant_05_empty_filter_rejected() {
+        let svc = InMemoryCollaborationService::new_for_test();
+        let c = RealtimeChannel {
+            id: ChannelId::new(),
+            session_id: SessionId::new(),
+            tenant_id: TenantId::new(),
+            user_id: UserId::new(),
+            filter_resource_types: vec![],
+            filter_project_ids: vec![],
+            last_event_id: None,
+            is_active: true,
+            expires_at: chrono::Utc::now() + chrono::Duration::seconds(CHANNEL_TTL_SECS),
+            last_ping_at: chrono::Utc::now(),
+        };
+        let res = svc.insert_channel(&c).await;
+        assert!(matches!(res, Err(CollaborationError::InvalidState(_))));
+    }
+
+    // -------- 12. INV-CB-04:Realtime 路由跨 tenant 拒绝 --------
+
+    #[tokio::test]
+    async fn invariant_04_event_tenant_mismatch_blocked() {
+        let svc = Arc::new(InMemoryCollaborationService::new().0);
+        let tenant_a = TenantId::new();
+        let tenant_b = TenantId::new();
+        let user_id = UserId::new();
+        // tenant_a 下插入一个 Channel
+        let c = RealtimeChannel {
+            id: ChannelId::new(),
+            session_id: SessionId::new(),
+            tenant_id: tenant_a,
+            user_id,
+            filter_resource_types: vec![ResourceType::Presence],
+            filter_project_ids: vec![],
+            last_event_id: None,
+            is_active: true,
+            expires_at: chrono::Utc::now() + chrono::Duration::seconds(CHANNEL_TTL_SECS),
+            last_ping_at: chrono::Utc::now(),
+        };
+        svc.insert_channel(&c).await.unwrap();
+
+        // tenant_b 的事件不投递
+        let ev_id = uuid::Uuid::new_v4();
+        let delivered = svc
+            .route(
+                "star.events.test",
+                ev_id,
+                tenant_b,
+                ProjectId::new(),
+                ResourceType::Presence,
+            )
+            .await
+            .unwrap();
+        assert_eq!(delivered, 0);
+
+        // tenant_a 的事件正常投递
+        let ev_id2 = uuid::Uuid::new_v4();
+        let delivered2 = svc
+            .route(
+                "star.events.test",
+                ev_id2,
+                tenant_a,
+                ProjectId::new(),
+                ResourceType::Presence,
+            )
+            .await
+            .unwrap();
+        assert_eq!(delivered2, 1);
+    }
+
+    // -------- 13. event bus 收到 SessionOpened / SessionClosed --------
+
+    #[tokio::test]
+    async fn event_bus_receives_session_lifecycle() {
+        let (svc, mut rx) = InMemoryCollaborationService::new();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let open_cmd = make_open_cmd(tenant_id, actor.project_ids[0]);
+        let session = svc.open_session(open_cmd, actor.clone()).await.unwrap();
+        let close = CloseSessionCommand {
+            tenant_id,
+            session_id: session.id,
+        };
+        svc.close_session(close, actor).await.unwrap();
+
+        // 检查收到 SessionOpened 和 SessionClosed
+        let mut got_opened = false;
+        let mut got_closed = false;
+        for _ in 0..20 {
+            if let Ok(evt) = rx.try_recv() {
+                match evt {
+                    CollaborationEvent::SessionOpened(_) => got_opened = true,
+                    CollaborationEvent::SessionClosed(_) => got_closed = true,
+                    _ => {}
+                }
+                if got_opened && got_closed {
+                    break;
+                }
+            }
+        }
+        assert!(got_opened, "应收到 SessionOpened 事件");
+        assert!(got_closed, "应收到 SessionClosed 事件");
     }
 }
