@@ -1,258 +1,371 @@
 //! WorkItem 关系领域
 //!
 //! **crate**: `domain-relation`
-//! **上游 spec**: docs/specs/domain-relation-spec.md §12 Relation
-//! **基本设计**: docs/basic-design.md §2.1 / §4.10.2
-//! **数据设计**: docs/data-design.md §4.13 (`relation` schema)
-//! **API 设计**: docs/api-design.md §3.16 (Relation / Dependency)
+//! **上游 spec**: docs/specs/domain-relation-spec.md
+//! **基本设计**: docs/basic-design.md §2.1 / §4.9.4
+//! **数据设计**: docs/data-design.md §4.8 (`relation` schema)
+//! **API 设计**: docs/api-design.md §3.9 (Relation / Dependency)
 //!
 //! ## 职责
 //!
-//! 详细职责边界见 spec 文档第 1 节。骨架阶段仅声明 Port trait + Entity + Error,
-//! 具体实现由 `crates/infrastructure` 中的 Adapter 提供。
+//! WorkItem 间关系与依赖图(§10, REQ-COLLAB-002):
+//! - 1 个核心实体(`Relation`) + 3 个派生 Projection(`Dependency` / `CircularDependencyReport` / `GanttReport`)
+//! - 3 个核心 Domain Event
+//! - 2 个端口(`RelationCommandPort` × 2 / `RelationQueryPort` × 4) + 1 个仓库端口
+//! - 6 条不变量(INV-R-01~06)
+//! - 1 个 `InMemoryRelationService` 真实实现
 //!
 //! ## 关键不变量
 //!
-//! //! - 关系图谱无环(§4.10.2);Dependency 关系不允许循环
-//! - Gantt 依赖与冲突分析基础(REQ-COLLAB-002)
+//! - source ≠ target(INV-R-01,§4.8)
+//! - 同 (source, target, type) UNIQUE(INV-R-02,§4.8)
+//! - 创建不引入循环(INV-R-03/04,§4.9.4,DFS 检测)
+//! - 删除不级联(INV-R-05,§5.7)
 
-//! ## 上游依赖(basic-design §2.3)
-//!
-//! 本 crate 依赖以下 domain-*(骨架阶段不实际 import,Cargo.toml 仅声明本 crate 自身需要的外部依赖):
-//!
-//!   - `domain-work-item`
-//!
-//! **禁止反向依赖**(§2.3 禁线)。
-
-//! ## 关键引用
-//!
-//! Relation 仅聚合 WorkItem 关系,Worktree/Agent 关系不属本 crate
-
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 #![warn(rust_2018_idioms)]
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+pub mod context;
+pub mod entity;
+pub mod error;
+pub mod event;
+pub mod invariants;
+pub mod macros;
+pub mod port;
+pub mod service;
+pub mod value_object;
 
-// =====================================================================
-// 实体(Entity / Aggregate Root)
-// =====================================================================
-
-/// Relation (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.13 (`relation` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Relation {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Dependency (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.13 (`relation` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Dependency {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 端口(Port / 抽象)
-// =====================================================================
-
-/// **RelationCommandPort**(命令端口)
-///
-/// 来源: docs/api-design.md §3.16 (Relation / Dependency)
-///
-/// **骨架阶段**: 仅方法签名,无 body 实现。Phase 2 在
-/// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
-#[async_trait]
-pub trait RelationCommandPort: Send + Sync {
-    async fn create_relation(
-        &self,
-        cmd: CreateRelationCommand,
-        actor: ActorContext,
-    ) -> Result<RelationId, RelationError>;
-    async fn delete_relation(
-        &self,
-        cmd: RelationId,
-        actor: ActorContext,
-    ) -> Result<(), RelationError>;
-    async fn detect_cycle(
-        &self,
-        cmd: WorkItemId,
-        actor: ActorContext,
-    ) -> Result<CycleReport, RelationError>;
-}
-
-
-/// **RelationQueryPort**(查询端口)
-///
-/// 来源: docs/api-design.md §3.16 (Relation / Dependency)
-#[async_trait]
-pub trait RelationQueryPort: Send + Sync {
-    async fn list_relations(
-        &self,
-        id: WorkItemId,
-        viewer: ActorContext,
-    ) -> Result<Vec<Relation>, RelationError>;
-    async fn list_dependencies(
-        &self,
-        id: WorkItemId,
-        viewer: ActorContext,
-    ) -> Result<Vec<Dependency>, RelationError>;
-}
-
-// =====================================================================
-// Domain Events(CloudEvents 1.0,见 api-design §5)
-// =====================================================================
-
-/// Domain Event: `star.events.relation.relation.created.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Relation01Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Domain Event: `star.events.relation.cycle.detected.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Relation02Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 类型别名与命令/查询/返回类型占位
-// =====================================================================
-/// **ID 类型别名**(Phase 1 骨架:均为 UUID 别名)
-///
-/// 真实使用应由 `domain-identity` 颁发强类型 ID(§23.2);
-/// 骨架阶段以 `Uuid` 替代以避免跨 crate 编译依赖。
-
-pub type DependencyId = Uuid;
-pub type RelationId = Uuid;
-pub type WorkItemId = Uuid;
-
-/// **命令 / 查询 / 跨 crate 类型占位结构**(Phase 1 骨架:最小字段集)
-
-/// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
-/// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateRelationCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CycleReport {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-
-// =====================================================================
-// Error
-// =====================================================================
-
-/// **Relation 错误**
-///
-/// 来源: docs/api-design.md §8 (错误码)
-/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
-#[derive(Debug, thiserror::Error)]
-pub enum RelationError {
-    #[error("not found: {0}")]
-    NotFound(Uuid),
-    #[error("invalid state: {0}")]
-    InvalidState(String),
-    #[error("permission denied")]
-    PermissionDenied,
-    #[error("conflict: {0}")]
-    Conflict(String),
-    #[error("internal: {0}")]
-    Internal(String),
-}
-
-// =====================================================================
-// 共享类型
-// =====================================================================
-
-/// **Actor 上下文**(来自 `domain-identity` / `domain-permission` 的 JWT claim)
-///
-/// **骨架阶段**: 字段占位;Phase 2 由 `domain-identity` 颁发的 ActorContext 取代
-/// 本 crate 内的占位定义(避免循环依赖)。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    /// 当前用户 ID
-    pub user_id: Uuid,
-    /// 当前租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 当前设备 ID(Local Runtime 三重绑定,§23.2)
-    pub device_id: Option<Uuid>,
-    /// 当前 Project IDs(用于 Project Policy 校验)
-    pub project_ids: Vec<Uuid>,
-    /// 当前用户角色(`tenant_admin` / `project_admin` / `developer` / `viewer`)
-    pub roles: Vec<String>,
-}
-
-// =====================================================================
-// 单元测试占位
-// =====================================================================
+pub use context::ActorContext;
+pub use entity::{
+    CircularDependencyReport, DateRange, Dependency, GanttReport, Relation,
+};
+pub use error::RelationError;
+pub use event::{
+    CircularDependencyDetected, EventMeta, RelationCreated, RelationDeleted, RelationEvent,
+};
+pub use invariants::{
+    check_create_invariants, check_invariant_01_source_not_target, check_invariant_02_unique,
+    check_invariant_03_same_project_placeholder, check_invariant_04_no_cycle,
+    check_invariant_05_no_cascade_placeholder, check_invariant_06_enum_placeholder,
+    run_invariants, ALL_INVARIANT_CHECKS,
+};
+pub use port::{
+    CreateRelationCommand, RelationCommandPort, RelationQueryPort, RelationRepository,
+};
+pub use service::InMemoryRelationService;
+pub use value_object::{
+    roles, ProjectId, RelationId, RelationType, TenantId, UserId, WorkItemId,
+};
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::value_object::{ProjectId, RelationType, TenantId, UserId, WorkItemId};
 
-    /// **骨架阶段**: 最小冒烟测试,验证 crate 可编译、ActorContext 字段可达。
-    /// Phase 2 由具体 spec 引入完整单元测试(状态机覆盖 / RLS 矩阵等)。
+    fn make_test_actor(tenant_id: TenantId) -> ActorContext {
+        ActorContext::new(UserId::new(), tenant_id).with_role(roles::DEVELOPER)
+    }
+
+    fn make_create_cmd(
+        tenant_id: TenantId,
+        source: WorkItemId,
+        target: WorkItemId,
+        rt: RelationType,
+    ) -> CreateRelationCommand {
+        CreateRelationCommand {
+            tenant_id,
+            project_id: ProjectId::new(),
+            source_work_item_id: source,
+            target_work_item_id: target,
+            relation_type: rt,
+            note: None,
+            same_project: true,
+        }
+    }
+
+    // -------- 1. ActorContext smoke test --------
+
     #[test]
-    fn actor_context_skeleton() {
-        let actor = ActorContext {
-            user_id: Uuid::new_v4(),
-            tenant_id: Uuid::new_v4(),
-            device_id: None,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-        };
-        assert!(!actor.tenant_id.is_nil(), "tenant_id must be non-nil (§6.1,REQ-SEC-001)");
+    fn actor_context_typed_ids() {
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        assert!(actor.has_role(roles::DEVELOPER));
+    }
+
+    // -------- 2. 字段数审计 --------
+
+    #[test]
+    fn field_count_audit() {
+        assert_eq!(Relation::FIELD_COUNT, 9);
+        assert_eq!(Dependency::FIELD_COUNT, 4);
+        assert_eq!(CircularDependencyReport::FIELD_COUNT, 3);
+        assert_eq!(GanttReport::FIELD_COUNT, 5);
+    }
+
+    // -------- 3. create_relation 成功路径 --------
+
+    #[tokio::test]
+    async fn create_relation_success() {
+        let svc = InMemoryRelationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let cmd = make_create_cmd(
+            tenant_id,
+            WorkItemId::new(),
+            WorkItemId::new(),
+            RelationType::RelatesTo,
+        );
+        let r = svc.create_relation(cmd, actor).await.expect("创建成功");
+        assert_eq!(svc.count().await, 1);
+        assert_eq!(r.relation_type, RelationType::RelatesTo);
+    }
+
+    // -------- 4. INV-R-01:source == target 自关系禁止 --------
+
+    #[tokio::test]
+    async fn invariant_01_source_equals_target() {
+        let svc = InMemoryRelationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let wi = WorkItemId::new();
+        let cmd = make_create_cmd(tenant_id, wi, wi, RelationType::Blocks);
+        let res = svc.create_relation(cmd, actor).await;
+        assert!(matches!(res, Err(RelationError::InvalidState(_))));
+    }
+
+    // -------- 5. INV-R-02:重复关系被拒 --------
+
+    #[tokio::test]
+    async fn invariant_02_duplicate_relation() {
+        let svc = InMemoryRelationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let src = WorkItemId::new();
+        let tgt = WorkItemId::new();
+        svc.create_relation(
+            make_create_cmd(tenant_id, src, tgt, RelationType::RelatesTo),
+            actor.clone(),
+        )
+        .await
+        .unwrap();
+        let res = svc
+            .create_relation(
+                make_create_cmd(tenant_id, src, tgt, RelationType::RelatesTo),
+                actor,
+            )
+            .await;
+        assert!(matches!(res, Err(RelationError::Conflict(_))));
+    }
+
+    // -------- 6. INV-R-03:跨 Project 被拒 --------
+
+    #[tokio::test]
+    async fn invariant_03_cross_project_rejected() {
+        let svc = InMemoryRelationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let mut cmd = make_create_cmd(
+            tenant_id,
+            WorkItemId::new(),
+            WorkItemId::new(),
+            RelationType::RelatesTo,
+        );
+        cmd.same_project = false;
+        let res = svc.create_relation(cmd, actor).await;
+        assert!(matches!(res, Err(RelationError::InvalidState(_))));
+    }
+
+    // -------- 7. INV-R-04:循环依赖检测(A → B → C → A) --------
+
+    #[tokio::test]
+    async fn invariant_04_circular_dependency_detected() {
+        let svc = InMemoryRelationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let a = WorkItemId::new();
+        let b = WorkItemId::new();
+        let c = WorkItemId::new();
+        svc.create_relation(
+            make_create_cmd(tenant_id, a, b, RelationType::Blocks),
+            actor.clone(),
+        )
+        .await
+        .unwrap();
+        svc.create_relation(
+            make_create_cmd(tenant_id, b, c, RelationType::Blocks),
+            actor.clone(),
+        )
+        .await
+        .unwrap();
+        // c blocks a → 形成 A→B→C→A 环,应被拒绝
+        let res = svc
+            .create_relation(
+                make_create_cmd(tenant_id, c, a, RelationType::Blocks),
+                actor.clone(),
+            )
+            .await;
+        assert!(matches!(res, Err(RelationError::InvalidState(_))));
+
+        // 实际不存储环,所以 detect_circular 返回 is_circular=false(已成功拦截)
+        let viewer = make_test_actor(tenant_id);
+        let report = svc.detect_circular(a, viewer).await.unwrap();
+        assert!(!report.is_circular, "环已被拦截,无环");
+    }
+
+    // -------- 8. list_by_work_item 双向查询 --------
+
+    #[tokio::test]
+    async fn list_by_work_item_both_sides() {
+        let svc = InMemoryRelationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let a = WorkItemId::new();
+        let b = WorkItemId::new();
+        let c = WorkItemId::new();
+        svc.create_relation(
+            make_create_cmd(tenant_id, a, b, RelationType::RelatesTo),
+            actor.clone(),
+        )
+        .await
+        .unwrap();
+        svc.create_relation(
+            make_create_cmd(tenant_id, c, a, RelationType::RelatesTo),
+            actor.clone(),
+        )
+        .await
+        .unwrap();
+        // a 出现在 source 和 target 各一次
+        let viewer = make_test_actor(tenant_id);
+        let list = svc.list_by_work_item(a, viewer).await.unwrap();
+        assert_eq!(list.len(), 2);
+    }
+
+    // -------- 9. list_dependencies 派生投影 --------
+
+    #[tokio::test]
+    async fn list_dependencies_derives_transitive() {
+        let svc = InMemoryRelationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let a = WorkItemId::new();
+        let b = WorkItemId::new();
+        let c = WorkItemId::new();
+        svc.create_relation(
+            make_create_cmd(tenant_id, a, b, RelationType::Blocks),
+            actor.clone(),
+        )
+        .await
+        .unwrap();
+        svc.create_relation(
+            make_create_cmd(tenant_id, b, c, RelationType::Blocks),
+            actor.clone(),
+        )
+        .await
+        .unwrap();
+        let viewer = make_test_actor(tenant_id);
+        let dep = svc.list_dependencies(a, viewer).await.unwrap();
+        assert_eq!(dep.direct_dependencies, vec![b]);
+        // 传递闭包应包含 c
+        assert!(dep.transitive_dependencies.contains(&c));
+        assert!(!dep.is_circular);
+    }
+
+    // -------- 10. delete_relation 成功 --------
+
+    #[tokio::test]
+    async fn delete_relation_success() {
+        let svc = InMemoryRelationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let r = svc
+            .create_relation(
+                make_create_cmd(
+                    tenant_id,
+                    WorkItemId::new(),
+                    WorkItemId::new(),
+                    RelationType::RelatesTo,
+                ),
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        svc.delete_relation(r.id, actor).await.unwrap();
+        assert_eq!(svc.count().await, 0);
+    }
+
+    // -------- 11. 跨租户访问被拒 --------
+
+    #[tokio::test]
+    async fn cross_tenant_access_denied() {
+        let svc = InMemoryRelationService::new_for_test();
+        let tenant_a = TenantId::new();
+        let tenant_b = TenantId::new();
+        let actor_a = make_test_actor(tenant_a);
+        let r = svc
+            .create_relation(
+                make_create_cmd(
+                    tenant_a,
+                    WorkItemId::new(),
+                    WorkItemId::new(),
+                    RelationType::RelatesTo,
+                ),
+                actor_a,
+            )
+            .await
+            .unwrap();
+        let actor_b = make_test_actor(tenant_b);
+        let res = svc.delete_relation(r.id, actor_b).await;
+        assert!(matches!(res, Err(RelationError::PermissionDenied)));
+    }
+
+    // -------- 12. 事件总线烟囱测试 --------
+
+    #[tokio::test]
+    async fn event_bus_receives_created() {
+        let (svc, mut rx) = InMemoryRelationService::new();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let cmd = make_create_cmd(
+            tenant_id,
+            WorkItemId::new(),
+            WorkItemId::new(),
+            RelationType::RelatesTo,
+        );
+        svc.create_relation(cmd, actor).await.unwrap();
+        let evt = rx.try_recv().expect("应收到 Created 事件");
+        assert!(matches!(evt, RelationEvent::Created(_)));
+        assert_eq!(evt.subject(), "star.events.relation.relation.created.v1");
+    }
+
+    // -------- 13. Gantt 派生 --------
+
+    #[tokio::test]
+    async fn get_gantt_critical_path() {
+        let svc = InMemoryRelationService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let a = WorkItemId::new();
+        let b = WorkItemId::new();
+        svc.create_relation(
+            make_create_cmd(tenant_id, a, b, RelationType::Blocks),
+            actor,
+        )
+        .await
+        .unwrap();
+        let viewer = make_test_actor(tenant_id);
+        let now = chrono::Utc::now();
+        let gantt = svc
+            .get_gantt(
+                a,
+                DateRange {
+                    start: now,
+                    end: now + chrono::Duration::days(7),
+                },
+                viewer,
+            )
+            .await
+            .unwrap();
+        assert!(gantt.is_critical_path);
+        assert_eq!(gantt.dependencies, vec![b]);
     }
 }
