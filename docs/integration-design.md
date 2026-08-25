@@ -1387,7 +1387,7 @@ async fn test_github_webhook_signature_validation() {
 
 **Contract Test 覆盖**:
 
-- ✅ 9 种白名单命令的入参/出参(继承《Runtime Design》§12.1)
+- ✅ 8 种白名单命令的入参/出参(继承《Runtime Design》§12.1,D-03 修复)
 - ✅ 所有 WebHook 事件解析
 - ✅ Rate Limit 处理
 - ✅ Auth 失败重试

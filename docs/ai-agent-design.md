@@ -209,23 +209,27 @@
 
 **算法步骤**(伪代码):
 
+> **重要**:Priority 分桶采用基本设计 §4.4.4 锁定的 **P0-P4 五层结构**(接口稳定承诺 #3);P5 `Untrusted Repo Content` **不参与** P0-P4 的分桶/预算循环,仅在 Step 6 走独立隔离通道(见 `filter_untrusted`)。D-02 修复:恢复 P4 桶;Step 2-4 完全移除 P5。
+
 ```text
 function compile_context(input: ContextInput) -> ContextPacket:
     # Step 1: 收集所有候选元素
     candidates = collect_candidates(input)
     # 包含: AC, Decisions, Feedback, Files, Symbols, ADRs, Rules, Diff, etc.
 
-    # Step 2: 按 Priority 分桶
+    # Step 2: 按 Priority 分桶(仅 P0-P4 五层,锁定)
     by_priority = group_by_priority(candidates)
-    # P0 > P1 > P2 > P3 > P5
+    # P0 > P1 > P2 > P3 > P4
+    # P5(Untrusted Repo Content)在 Step 1 阶段即被标记,不在 by_priority 字典中
 
-    # Step 3: Token Budget 分配
+    # Step 3: Token Budget 分配(五桶总和 100%)
     budget = allocate_budget(input.token_budget)
-    # P0: 30% | P1: 30% | P2: 25% | P3: 10% | P5: 5%
+    # P0: 30% | P1: 25% | P2: 20% | P3: 15% | P4: 10%
+    # (P5 不占预算;其 Token 消耗走独立通道,见 Step 6)
 
     # Step 4: 按桶填充,直到 Budget 满
     sections = {}
-    for priority in [P0, P1, P2, P3, P5]:
+    for priority in [P0, P1, P2, P3, P4]:
         remaining = budget[priority] - token_count(sections)
         for candidate in by_priority[priority]:
             if remaining <= 0: break
@@ -237,10 +241,11 @@ function compile_context(input: ContextInput) -> ContextPacket:
     for each section in sections:
         section.provenance = resolve_provenance(section, input)
 
-    # Step 6: Untrusted 严格隔离
+    # Step 6: Untrusted 严格隔离(P5 唯一处理路径)
     untrusted = filter_untrusted(candidates)
     sections['untrusted_repo_content'] = untrusted
-    # 强制:Untrusted 不得进入 P0/P1/P2/P3 任何桶
+    # 强制:Untrusted 不得进入 P0/P1/P2/P3/P4 任何桶
+    # 仅供 Agent 显式 `is_untrusted` 引用,Prompt 中独立段落
 
     # Step 7: 重新计算 Token Usage
     token_usage = compute_token_usage(sections, budget)
@@ -254,9 +259,9 @@ function compile_context(input: ContextInput) -> ContextPacket:
 
 **关键设计**:
 
-- ✅ **Priority 严格分桶**:P0 不可被 P5 覆盖
+- ✅ **Priority 严格分桶(P0-P4 五层)**:P0 不可被任何低优先级内容覆盖
 - ✅ **Budget 硬上限**:超限部分裁剪,记录 Truncation Log
-- ✅ **Untrusted 隔离**:P5 单独成段,Prompt 中显式标签
+- ✅ **Untrusted 隔离(P5 独立通道)**:P5 不进入 P0-P4 分桶,单独成段 `untrusted_repo_content`,Prompt 中显式标签
 - ✅ **Provenance 强制**:每条都有 source
 
 ### 2.3 Provenance 强制(继承《Requirements》§26.3,《Basic Design》§26.3)

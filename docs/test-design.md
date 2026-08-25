@@ -160,7 +160,7 @@ flowchart TB
 | `domain-integration` | 双向同步 / Conflict | cargo test |
 | `domain-automation` | 触发器 / 条件 / 动作 | cargo test |
 | `domain-collaboration` | Realtime Subscription | cargo test |
-| `domain-local-runtime` | 9 种白名单命令 / Device Identity | cargo test |
+| `domain-local-runtime` | 8 种白名单命令 / Device Identity | cargo test |
 
 **测试工具**:
 
@@ -510,7 +510,7 @@ export default function() {
 | **AuthN/AuthZ**(继承《Security Design》§2-§3) | JWT 校验 / RBAC / Agent Policy |
 | **Tenant Isolation**(§4) | RLS Bypass 尝试 / Cross-Tenant 访问 |
 | **AI Provider Boundary**(§8) | Code 不得离开指定 Provider / Untrusted 隔离 |
-| **Local Runtime Security**(§9.3) | 9 种白名单命令 / 禁止 Shell |
+| **Local Runtime Security**(§9.3) | 8 种白名单命令 / 禁止 Shell |
 | **Prompt Injection**(§7) | README 注入 P5 验证不影响 P0 |
 | **Secret Boundary**(§5) | Agent 看不到其它 Session Token |
 
@@ -781,9 +781,45 @@ Feature: <Feature Name>
 
 ### 6.3 验收门禁
 
+#### 6.3.1 AC 覆盖率门禁
+
 - ✅ 所有 MUST AC 必须有 Test
 - ⚠️ SHOULD AC 鼓励有 Test
 - ❌ COULD AC 可选
+
+#### 6.3.2 VAL-001 四重门验收门禁(P0 不变量,basic-design §4.5.6 / §27.3,D-04 修复)
+
+AI 完成声明(`is_ai_complete_claim == true`)必须同时满足以下四重门,缺一不可,任何一门不满足即拒绝完成声明(防止 AI 自我报告充当完成依据):
+
+| Gate | 名称 | 判定条件 | 失败处理 |
+|---|---|---|---|
+| Gate 1 | **ValidationPassed** | Build / Unit / Integration / Lint / Format / Static Analysis / Security / Review / Custom 十项校验全部通过 | 拒绝 + 列出失败项 |
+| Gate 2 | **AcceptanceCoverage==100%** | 所有 MUST AC 必须有对应 Test 且全部通过(`AcceptanceCoverage == 1.0`) | 拒绝 + 列出未覆盖 AC |
+| Gate 3 | **FeedbackResolved** | 所有未关闭 Feedback 状态为 Resolved;无未决 P0/P1 Feedback | 拒绝 + 列出未决 Feedback |
+| Gate 4 | **GateApproved** | 显式人工审批环节通过(approve / 多人 review 等) | 拒绝 + 等待审批 |
+
+**正向测试用例**(TC-VAL001-P):
+
+| ID | 场景 | 期望 |
+|---|---|---|
+| TC-VAL001-P1 | 四门同时通过 | 完成声明被接受,`is_ai_complete_claim=true` |
+
+**负向测试用例**(TC-VAL001-N,4 选 1/2/3/4 缺失边界,任一不满足即拒绝):
+
+| ID | 缺失门 | 期望 |
+|---|---|---|
+| TC-VAL001-N1 | ValidationPassed 缺失(任一子校验失败) | 拒绝;错误码:VAL-001-G1 |
+| TC-VAL001-N2 | AcceptanceCoverage < 100%(任一 MUST AC 无 Test) | 拒绝;错误码:VAL-001-G2 |
+| TC-VAL001-N3 | FeedbackResolved 未达(存在未关闭 P0/P1) | 拒绝;错误码:VAL-001-G3 |
+| TC-VAL001-N4 | GateApproved 未获(无审批) | 拒绝;错误码:VAL-001-G4 |
+| TC-VAL001-N5 | 同时缺 2 门(N1+N2) | 拒绝;错误码:VAL-001-G1-G2 |
+| TC-VAL001-N6 | 同时缺 3 门(N1+N2+N3) | 拒绝;错误码:VAL-001-G1-G3 |
+| TC-VAL001-N7 | 同时缺 4 门 | 拒绝;错误码:VAL-001-G1-G4 |
+| TC-VAL001-N8 | Agent 自我声明 done 但 GateApproved 未获(典型"AI 抢跑"场景) | 拒绝 + 记录审计事件 `audit.ai_self_complete_blocked` |
+
+**集成位置**:`domain-validation::check_ai_complete_claim()`(实现侧)+ API 端点 `POST /v1/validation-results/claim`(调用侧)。具体见 basic-design §4.5.6 + §27.3 + §0.5 接口稳定承诺 #4。
+
+**安全分类**:此不变量本质是"防止 Agent 自我报告绕过流程"的安全防线,见 security-design §10.1 威胁 #6 "Fake Validation" 控制项。
 
 ---
 
@@ -900,7 +936,7 @@ Feature: <Feature Name>
 
 **Command Injection**:
 
-- Local Daemon 9 种白名单命令(继承《Runtime Design》§12.1)
+- Local Daemon 8 种白名单命令(继承《Runtime Design》§12.1,D-03 修复)
 - ❌ ExecuteArbitraryShell 必须被拒绝
 - 子进程参数严格校验
 
@@ -974,7 +1010,7 @@ async fn test_untrusted_content_isolation() {
 
 ### 8.4 Local Runtime 安全(继承《Security Design》§9.3)
 
-- 9 种白名单命令测试(每个命令验证参数 + scope + actor)
+- 8 种白名单命令测试(每个命令验证参数 + scope + actor)
 - ❌ ExecuteArbitraryShell 必须 100% 拒绝
 - Filesystem Scope 边界
 - Process Scope 边界
@@ -1360,8 +1396,9 @@ apps/web/
 11. **Gherkin 验收格式**:§6.1
 12. **RLS Bypass 测试**:§8.2
 13. **Untrusted 隔离测试**:§8.3
-14. **Local Runtime 9 种白名单测试**:§8.4
+14. **Local Runtime 8 种白名单测试**:§8.4
 15. **Mutation Test 软目标**:§11.1
+16. **VAL-001 四重门全部 4 子条件 + 4 选 1/2/3/4 缺失的负向测试**:§6.3.2(D-04 修复,basic-design §4.5.6 P0 不变量)
 
 **变更流程**:任何对上述接口的修改,需走 RFC + 重新冻结本设计。
 

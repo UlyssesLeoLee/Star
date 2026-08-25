@@ -3275,15 +3275,17 @@ stateDiagram-v2
 
 ### A.2 WorkItem Workflow(默认三态 + 扩展)
 
+> 默认最简三态路径:`TODO → IN_PROGRESS → DONE`(basic-design §4.9.3 / §7.2,F-05 修复后口径)。扩展状态 `IN_REVIEW / BLOCKED / CANCELLED` 属于 Project Policy 自定义扩展,非默认。
+
 ```mermaid
 stateDiagram-v2
     [*] --> TODO
     TODO --> IN_PROGRESS: User / System
-    IN_PROGRESS --> IN_REVIEW: User
-    IN_REVIEW --> DONE: User
+    IN_PROGRESS --> DONE: 直接完成(默认三态)
+    IN_PROGRESS --> IN_REVIEW: User 提交审查
+    IN_REVIEW --> DONE: User 审查通过
     IN_PROGRESS --> BLOCKED: 阻塞
     BLOCKED --> IN_PROGRESS: 解除
-    IN_PROGRESS --> IN_REVIEW: 直接提交
     TODO --> CANCELLED: User
     IN_PROGRESS --> CANCELLED: User
     IN_REVIEW --> CANCELLED: User

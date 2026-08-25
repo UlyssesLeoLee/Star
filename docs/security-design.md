@@ -36,8 +36,8 @@
 | 上游章节 | 本设计承接物 |
 |---|---|
 | 基本設計書 §6.1(13 类 tenant_id 必带对象) | §4 多租户隔离实施;§6.3 13 类对象授权控制 |
-| 基本設計書 §6.2(Local Runtime Security Boundary) | §5.5 Local Runtime 鉴权流程;§10.1 9 种白名单命令 |
-| 基本設計書 §6.3(默认禁止 SaaS Server → Arbitrary Shell) | §5.5.2 9 种白名单命令;§10.1 严禁能力 |
+| 基本設計書 §6.2(Local Runtime Security Boundary) | §5.5 Local Runtime 鉴权流程;§10.1 8 种白名单命令 |
+| 基本設計書 §6.3(默认禁止 SaaS Server → Arbitrary Shell) | §5.5.2 8 种白名单命令;§10.1 严禁能力 |
 | 基本設計書 §6.4(Agent Secret Boundary) | §5.4 密钥与凭据管理;§10.2 威胁 #4 Secret 越权读取 |
 | 基本設計書 §6.5(Prompt Injection 防护) | §10.1 威胁 #1 Prompt Injection;§8.4 Untrusted-as-Instruct 检测 |
 | 基本設計書 §6.6(Cross-Tenant / Cross-Repository / Cross-Worktree) | §6 多租户隔离;§10.1 威胁 #5-#7 |
@@ -66,7 +66,7 @@
 | 下游设计 | 本设计提供的输入 |
 |---|---|
 | **Implementation** | §3 鉴权流程的代码结构;§6 AuthorizationChecker 接口契约;§9 Audit 字段定义;§5.4 Credential Broker 接口 |
-| **Runtime Design** | §5.5 Local Runtime mTLS + Command Token 流程;§6.3 9 种白名单命令的 ACL;§7.1 Filesystem Scope 要求 |
+| **Runtime Design** | §5.5 Local Runtime mTLS + Command Token 流程;§6.3 8 种白名单命令的 ACL;§7.1 Filesystem Scope 要求 |
 | **AI/Agent Design** | §8 Provider Data Boundary 配置;§6.2 Agent Policy 强制点;§10.1 威胁 #1 Prompt Injection 防护 |
 | **Test Design** | §10.2 威胁 ↔ 控制矩阵 → E2E 测试用例;§6.4 Cross-Tenant 测试矩阵;§5.3 鉴权流程 E2E |
 | **Operation Design** | §5.4 密钥轮转流程;§11.4 监控告警;§11.5 WORM 存储;§11.6 Backup 加密 |
@@ -98,7 +98,7 @@
 | **SEC-1**:鉴权 5 级分层稳定(Anonymous / Authenticated / Policy / Protected / Service-Internal) | §3.1 |
 | **SEC-2**:13 类 tenant_id 必带对象授权控制矩阵 | §6.3 |
 | **SEC-3**:6 大威胁类别完整覆盖(Prompt Injection / Agent 越权 / Local Runtime / Secret / Context Poisoning / Fake Validation) | §10.1 |
-| **SEC-4**:9 种 Local Runtime 白名单命令(严禁 ExecuteArbitraryShell 等) | §5.5.2 |
+| **SEC-4**:8 种 Local Runtime 白名单命令(严禁 ExecuteArbitraryShell 等) | §5.5.2 |
 | **SEC-5**:9 问必答 AI Audit Metadata 字段 | §9.3 |
 | **SEC-6**:AI Provider Data Boundary 6 维 Policy 类别 | §8.5 |
 | **SEC-7**:Credential Broker 抽象接口(身份 / 类型 / 范围 / 过期 / 加密) | §5.4 |
@@ -174,7 +174,7 @@ flowchart TB
 | **REST API 端点** | 公共入口 | `https://api.star.dev/v1/*` | §3 鉴权 + §6 授权 + §4 RLS + §7 输入校验 + §9 审计 |
 | **WebSocket 通道** | 双向长连接 | `wss://api.star.dev/v1/realtime/subscribe` | §3 鉴权 + §6 授权 + §4 RLS + §9 审计 |
 | **Event Bus** | 内部 NATS | `nats://nats.star.dev:4222` | mTLS + Tenant ID 在 Subject + Outbox 限流 |
-| **Local Runtime 通道** | 集群外入口 | `wss://api.star.dev/v1/runtime/{id}/ws` | mTLS + 设备身份 + 9 种白名单 + §5.5 |
+| **Local Runtime 通道** | 集群外入口 | `wss://api.star.dev/v1/runtime/{id}/ws` | mTLS + 设备身份 + 8 种白名单 + §5.5 |
 | **Outbound 调用** | 平台 → 外部 | HTTPS Egress | §7.6 SSRF 白名单 + Credential Broker |
 | **AI Provider 上传** | 平台 → AI | HTTPS Egress | §8 AI Data Boundary Policy 强制 |
 | **Object Storage** | 平台 ↔ S3 | HTTPS + IAM | §4.3 Bucket Policy + Key 前缀 |
@@ -427,7 +427,7 @@ sequenceDiagram
 | **Repository Authorization** | `device_binding.allowed_repositories[]` + SCM Adapter 二次校验 | §4.14.3 |
 | **Short-lived Credential** | mTLS Cert 1h + Command Token 5min | §5.5.1 |
 | **Mutual Authentication** | mTLS 双向认证 | §5.5.1 |
-| **Command Authorization** | 9 种白名单(§5.5.2)| Data Design §4.25.2 |
+| **Command Authorization** | 8 种白名单(§5.5.2,D-03 修复)| Data Design §4.25.2 |
 | **Command Scope** | 每条命令必带 `worktree_id` / `agent_session_id` / `repository_id` | §4.25.2 |
 | **Filesystem Scope** | Local Daemon 强制 Path Jail(syscall 拦截) | Runtime Design |
 | **Process Scope** | Local Daemon 监控子进程(禁止 fork outside scope) | Runtime Design |
@@ -443,7 +443,7 @@ sequenceDiagram
 - ❌ `ReadArbitraryFile(path: String)` — LRT-002
 - ❌ `WriteArbitraryFile(path: String, content: String)` — LRT-002
 - ❌ 任何 `*` 通配符路径 / 命令
-- ❌ 任何 `command_type` 不在 9 种白名单(§5.5.2)
+- ❌ 任何 `command_type` 不在 8 种白名单(§5.5.2)
 
 ### 2.4 Service-to-Service(Service Account + JWT)
 
@@ -735,7 +735,7 @@ pub trait AuthorizationChecker {
 | `SEC-005` | 403 | Cross-Repository Forbidden | AgentPolicy.allowed_repositories 阻止 |
 | `SEC-006` | 403 | Cross-Worktree Forbidden | Worktree Isolation 阻止 |
 | `SEC-007` | 403 | Cross-Tenant Access Forbidden | `actor.tenant_id != resource.tenant_id` |
-| `SEC-008` | 422 | Command Not Whitelisted | 9 种白名单外命令 |
+| `SEC-008` | 422 | Command Not Whitelisted | 8 种白名单外命令 |
 | `SEC-009` | 403 | Cloud AI Restricted | `cloud_ai_allowed=false`,但用了 Cloud Provider |
 | `SEC-010` | 403 | No Code Upload | `no_code_upload=true`,但准备上传 Code |
 | `SEC-011` | 403 | Metadata Only | `metadata_only=true`,但准备上传 Code/Diff |
@@ -975,9 +975,9 @@ flowchart LR
 | **CRL** | Local Daemon 每 5min 拉取;Keyless mTLS via SPIFFE(V1 评估) |
 | **Remote Disable** | `POST /v1/runtimes/{id}:disable` → 撤销 Cert + 推送 disable 命令 |
 
-#### 5.5.2 9 种白名单命令(§0.5 SEC-4,继承 §6.3,§4.6.3)
+#### 5.5.2 8 种白名单命令(§0.5 SEC-4,继承 §6.3,§4.6.3,D-03 修复)
 
-> **强制**:Local Daemon 仅接受 9 种 `command_type`(Data Design §4.25.2)
+> **强制**:Local Daemon 仅接受 8 种 `command_type`(Data Design §4.25.2)
 
 | # | command_type | 用途 | 必需参数 |
 |---|---|---|---|
@@ -989,7 +989,8 @@ flowchart LR
 | 6 | `SubmitFeedback` | 提交结构化 Feedback | `feedback_id`(应用层生成) |
 | 7 | `StartAuthorizedAgentSession` | 启动已授权 Agent Session | `agent_session_id`, `agent_id` |
 | 8 | `StopAgentSession` | 停止 Agent | `agent_session_id`, `reason` |
-| 9 | `ReportObservation` | 上报 Observation(Worktree/AgentSession/Build/Test/Diff/Heartbeat/Disconnected) | `observation_type`, `payload` |
+
+> **D-03 修复**:`ReportObservation` 不在 8 种白名单命令内。上报事件走独立 `RuntimeObservation` 枚举(basic-design §4.6.2,7 变体),由 Local Daemon 主动上报;Control Plane 端仅做格式校验/审计,不做"命令授权"拦截。
 
 **严禁**(继承 §4.6.3,§6.3,§LRT-002):
 
@@ -1506,7 +1507,7 @@ sequenceDiagram
 
 **防御(继承 §4.6.3,§6.3,§5.5.2)**:
 
-- **9 种白名单命令**:Local Daemon 仅接受 §5.5.2 列出的 9 种
+- **8 种白名单命令**:Local Daemon 仅接受 §5.5.2 列出的 8 种
 - **Command Authorization**:Server 端验证(每个 command 必带 `command_token` 短期凭证)
 - **Path Jail**(由 Local Runtime syscall 拦截)
 - **错误码**:`LRT-002 Runtime Arbitrary Command Forbidden` + `SEC-008 Command Not Whitelisted`
@@ -1534,7 +1535,7 @@ sequenceDiagram
 **防御(继承 §4.6.3,§6.2,§5.5)**:
 
 - **16 强制项**(§2.3.2 表):Device Identity / mTLS / Command Scope / Filesystem Scope / Process Scope / Secret Isolation / Audit / Revocation / Remote Disable
-- **9 种白名单命令**(§5.5.2):即使 Daemon 被攻陷,只能执行 9 种白名单操作
+- **8 种白名单命令**(§5.5.2):即使 Daemon 被攻陷,只能执行 8 种白名单操作
 - **Filesystem Scope**:`syscall` 拦截,即使 Daemon 被攻陷,无法越权读文件
 - **Remote Disable**:Tenant Admin 主动撤销 → 30 秒内 CRL 推送 → Daemon 强制停机
 - **错误码**:`LRT-001 Runtime Not Authenticated` / `LRT-010 Runtime Revoked`
@@ -1830,7 +1831,7 @@ flowchart TB
 | 输入 | 说明 |
 |---|---|
 | §3.5 mTLS 设备证书 | TLS 1.3,Cert 1h,Command Token 5min |
-| §3.6 9 种白名单命令 | 严禁 ExecuteArbitraryShell 等 4 种 |
+| §3.6 8 种白名单命令 | 严禁 ExecuteArbitraryShell 等 4 种 |
 | §3.7 16 项强制项 | Device Identity / Filesystem Scope / Process Scope / Secret Isolation / Audit / Revocation / Remote Disable |
 | §5.5.5 设备撤销流程 | 30s 内 CRL 推送 + TLS Alert |
 | §9.2.4-9.2.8 威胁控制 | Filesystem Scope / Process Scope / Sandbox |
@@ -1854,7 +1855,7 @@ flowchart TB
 | §10.2 威胁 ↔ 控制矩阵(40 行) | E2E 测试用例基础 |
 | §3.3 鉴权流程图(5 种 Flow) | OAuth Flow E2E |
 | §3.7 Cross-Tenant 测试矩阵 | T-CT-01 ~ T-CT-07 |
-| §3.6 9 种白名单命令 | Local Runtime 命令 E2E |
+| §3.6 8 种白名单命令 | Local Runtime 命令 E2E |
 | §6 6 类输入校验 | SQL 注入 / XSS / CSRF / SSRF / Path Traversal / DoS |
 | §8.4 AI Data Boundary E2E | 6 维 Policy 组合 |
 | §9.2 12 大威胁 | 威胁场景 E2E |
@@ -1898,7 +1899,7 @@ flowchart TB
 | **T-06** | Agent Unauthorized File Read(越 Worktree Scope) | T2 Agent 越权 | High | Filesystem Scope / Path Jail | Local Runtime | §9.2.4 |
 | **T-07** | Agent Unauthorized File Write(改 .env 等敏感) | T2 Agent 越权 | High | Path Jail / `forbidden_paths[]` | Local Runtime | §9.2.4 |
 | **T-08** | Agent Change Scope 越界(> max_change_files) | T2 Agent 越权 | Medium | Change Scope Gate | Local Runtime + Application | §3.6.1 |
-| **T-09** | Agent Unauthorized Command Execution(`ExecuteArbitraryShell`) | T2 Agent 越权 | Critical | 9 种白名单 + LRT-002 严禁 | Local Daemon | §5.5.2 |
+| **T-09** | Agent Unauthorized Command Execution(`ExecuteArbitraryShell`) | T2 Agent 越权 | Critical | 8 种白名单 + LRT-002 严禁 | Local Daemon | §5.5.2 |
 | **T-10** | Cross-Worktree File Access | T2 Agent 越权 | High | Worktree Isolation + `SEC-006` | Local Runtime + Application | §9.2.6 |
 | **T-11** | Cross-Repository File Access | T2 Agent 越权 | High | `agent_policy.allowed_repositories[]` + `SEC-005` | Local Runtime + Application | §9.2.6 |
 | **T-12** | Cross-Tenant Context Leakage | T2 Agent 越权 | Critical | PostgreSQL RLS + `SEC-007` | Data Design §7 | §4.2 |
@@ -2039,7 +2040,7 @@ sequenceDiagram
         GW-->>D: 11b. 返回 command_token
         D->>GW: 12. GET /v1/runtimes/{id}/commands/pending<br/>+ Authorization: Bearer command_token
         GW->>ID: 13. 验证 token 有效 + 未消费
-        ID->>ID: 14. 检查 9 种白名单
+        ID->>ID: 14. 检查 8 种白名单
         alt 命令在白名单
             ID-->>GW: 15a. 返回待执行命令
             GW-->>D: 16a. 命令列表
@@ -2074,7 +2075,7 @@ sequenceDiagram
         AGT->>POL: 9. 校验 tool 在 allowed_tools
         alt Tool 在白名单
             AGT->>D: 10a. Command 必带 worktree_id / agent_session_id / repository_id
-            D->>D: 11a. 验证 9 种白名单 + command_token
+            D->>D: 11a. 验证 8 种白名单 + command_token
             D-->>AGT: 12a. 执行结果
         else Tool 不在白名单
             AGT->>AGT: 10b. 拒绝 + Audit + AGT-005
@@ -2115,7 +2116,7 @@ sequenceDiagram
 1. **鉴权 5 级分层稳定**(§3.1,§0.5 SEC-1)
 2. **13 类 tenant_id 必带对象授权控制矩阵稳定**(§3.4,§0.5 SEC-2)
 3. **6 大威胁类别完整覆盖 40 行控制矩阵**(§10.2 / §14,§0.5 SEC-3)
-4. **9 种 Local Runtime 白名单命令锁定**(§5.5.2,§0.5 SEC-4)
+4. **8 种 Local Runtime 白名单命令锁定**(§5.5.2,§0.5 SEC-4,D-03 修复)
 5. **9 问必答 AI Audit 字段稳定**(§9.2 / §10.2,§0.5 SEC-5)
 6. **AI Provider Data Boundary 6 维 Policy 类别稳定**(§8.2,§0.5 SEC-6)
 7. **Credential Broker 抽象接口稳定**(§5.4,§0.5 SEC-7):Owner 四选一 + PGP 加密 + KMS Key
