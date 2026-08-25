@@ -1,266 +1,265 @@
 //! Workspace 协作单位
 //!
 //! **crate**: `domain-workspace`
-//! **上游 spec**: docs/specs/domain-workspace-spec.md §7 Workspace 协作单位
-//! **基本设计**: docs/basic-design.md §2.1(表 19)
-//! **数据设计**: docs/data-design.md §4.20 (`workspace` schema)
-//! **API 设计**: docs/api-design.md §3.3 (Workspace CRUD)
+//! **上游 spec**: docs/specs/domain-workspace-spec.md
+//! **基本设计**: docs/basic-design.md §2.1 / §4.2
+//! **数据设计**: docs/data-design.md §4.2 (`workspace` / `workspace_member` schema)
+//! **API 设计**: docs/api-design.md §3.2 (domain-workspace 端点)
 //!
 //! ## 职责
 //!
-//! 详细职责边界见 spec 文档第 1 节。骨架阶段仅声明 Port trait + Entity + Error,
-//! 具体实现由 `crates/infrastructure` 中的 Adapter 提供。
+//! - 颁发 `workspace_id` / `workspace_member_id`
+//! - 2 个核心实体(`Workspace` / `WorkspaceMember`)
+//! - 3 个核心 Domain Event
+//! - 2 个端口(4 cmd / 4 query)
+//! - 3 条不变量(INV-WS-01~03)
+//! - 1 个 `InMemoryWorkspaceService` 真实实现
 //!
 //! ## 关键不变量
 //!
-//! //! - Workspace → 多个 Project(§7)
-//! - Workspace 必须归属唯一 Tenant(§6.1)
+//! - 任何 Workspace INSERT/UPDATE 必须带 tenant_id(INV-WS-02,§6.1,REQ-SEC-001)
+//! - `workspace_key` 在 tenant 内唯一(INV-WS-01)
 
-//! ## 上游依赖(basic-design §2.3)
-//!
-//! 本 crate 依赖以下 domain-*(骨架阶段不实际 import,Cargo.toml 仅声明本 crate 自身需要的外部依赖):
-//!
-//!   - `domain-tenant`
-//!
-//! **禁止反向依赖**(§2.3 禁线)。
-
-//! ## 关键引用
-//!
-//! 1 Workspace → N Project(§7)
-
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 #![warn(rust_2018_idioms)]
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+pub mod context;
+pub mod entity;
+pub mod error;
+pub mod event;
+pub mod invariants;
+pub mod macros;
+pub mod port;
+pub mod service;
+pub mod value_object;
 
-// =====================================================================
-// 实体(Entity / Aggregate Root)
-// =====================================================================
-
-/// Workspace (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.20 (`workspace` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Workspace {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// WorkspaceMember (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.20 (`workspace` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkspaceMember {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 端口(Port / 抽象)
-// =====================================================================
-
-/// **WorkspaceCommandPort**(命令端口)
-///
-/// 来源: docs/api-design.md §3.3 (Workspace CRUD)
-///
-/// **骨架阶段**: 仅方法签名,无 body 实现。Phase 2 在
-/// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
-#[async_trait]
-pub trait WorkspaceCommandPort: Send + Sync {
-    async fn create_workspace(
-        &self,
-        cmd: CreateWorkspaceCommand,
-        actor: ActorContext,
-    ) -> Result<WorkspaceId, WorkspaceError>;
-    async fn add_member(
-        &self,
-        cmd: AddWorkspaceMemberCommand,
-        actor: ActorContext,
-    ) -> Result<WorkspaceMember, WorkspaceError>;
-    async fn remove_member(
-        &self,
-        cmd: RemoveWorkspaceMemberCommand,
-        actor: ActorContext,
-    ) -> Result<(), WorkspaceError>;
-}
-
-
-/// **WorkspaceQueryPort**(查询端口)
-///
-/// 来源: docs/api-design.md §3.3 (Workspace CRUD)
-#[async_trait]
-pub trait WorkspaceQueryPort: Send + Sync {
-    async fn get_workspace(
-        &self,
-        id: WorkspaceId,
-        viewer: ActorContext,
-    ) -> Result<Workspace, WorkspaceError>;
-    async fn list_members(
-        &self,
-        id: WorkspaceId,
-        viewer: ActorContext,
-    ) -> Result<Vec<WorkspaceMember>, WorkspaceError>;
-}
-
-// =====================================================================
-// Domain Events(CloudEvents 1.0,见 api-design §5)
-// =====================================================================
-
-/// Domain Event: `star.events.workspace.workspace.created.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Workspace01Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Domain Event: `star.events.workspace.member.added.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Workspace02Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 类型别名与命令/查询/返回类型占位
-// =====================================================================
-/// **ID 类型别名**(Phase 1 骨架:均为 UUID 别名)
-///
-/// 真实使用应由 `domain-identity` 颁发强类型 ID(§23.2);
-/// 骨架阶段以 `Uuid` 替代以避免跨 crate 编译依赖。
-
-pub type WorkspaceId = Uuid;
-pub type WorkspaceMemberId = Uuid;
-
-/// **命令 / 查询 / 跨 crate 类型占位结构**(Phase 1 骨架:最小字段集)
-
-/// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
-/// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AddWorkspaceMemberCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateWorkspaceCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RemoveWorkspaceMemberCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-
-// =====================================================================
-// Error
-// =====================================================================
-
-/// **Workspace 错误**
-///
-/// 来源: docs/api-design.md §8 (错误码)
-/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
-#[derive(Debug, thiserror::Error)]
-pub enum WorkspaceError {
-    #[error("not found: {0}")]
-    NotFound(Uuid),
-    #[error("invalid state: {0}")]
-    InvalidState(String),
-    #[error("permission denied")]
-    PermissionDenied,
-    #[error("conflict: {0}")]
-    Conflict(String),
-    #[error("internal: {0}")]
-    Internal(String),
-}
-
-// =====================================================================
-// 共享类型
-// =====================================================================
-
-/// **Actor 上下文**(来自 `domain-identity` / `domain-permission` 的 JWT claim)
-///
-/// **骨架阶段**: 字段占位;Phase 2 由 `domain-identity` 颁发的 ActorContext 取代
-/// 本 crate 内的占位定义(避免循环依赖)。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    /// 当前用户 ID
-    pub user_id: Uuid,
-    /// 当前租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 当前设备 ID(Local Runtime 三重绑定,§23.2)
-    pub device_id: Option<Uuid>,
-    /// 当前 Project IDs(用于 Project Policy 校验)
-    pub project_ids: Vec<Uuid>,
-    /// 当前用户角色(`tenant_admin` / `project_admin` / `developer` / `viewer`)
-    pub roles: Vec<String>,
-}
-
-// =====================================================================
-// 单元测试占位
-// =====================================================================
+pub use context::ActorContext;
+pub use entity::{Workspace, WorkspaceMember};
+pub use error::WorkspaceError;
+pub use event::{EventMeta, MemberAdded, MemberRemoved, WorkspaceCreated, WorkspaceEvent};
+pub use invariants::{
+    check_invariant_01_workspace_key_unique, check_invariant_02_tenant_id_present,
+    check_invariant_03_workspace_key_format, run_invariants, ALL_INVARIANT_CHECKS,
+};
+pub use port::{
+    AddMemberCommand, CreateWorkspaceCommand, ListWorkspaceQuery, RemoveMemberCommand,
+    UpdateWorkspaceCommand, WorkspaceCommandPort, WorkspaceQueryPort,
+};
+pub use service::InMemoryWorkspaceService;
+pub use value_object::{roles, TenantId, UserId, WorkspaceId, WorkspaceMemberId, WorkspaceRole};
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// **骨架阶段**: 最小冒烟测试,验证 crate 可编译、ActorContext 字段可达。
-    /// Phase 2 由具体 spec 引入完整单元测试(状态机覆盖 / RLS 矩阵等)。
+    fn make_actor(tenant_id: TenantId) -> ActorContext {
+        ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::WORKSPACE_ADMIN)
+    }
+
     #[test]
-    fn actor_context_skeleton() {
-        let actor = ActorContext {
-            user_id: Uuid::new_v4(),
-            tenant_id: Uuid::new_v4(),
-            device_id: None,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
+    fn field_count_audit() {
+        assert_eq!(Workspace::FIELD_COUNT, 8);
+        assert_eq!(WorkspaceMember::FIELD_COUNT, 7);
+    }
+
+    #[tokio::test]
+    async fn create_workspace_success() {
+        let svc = InMemoryWorkspaceService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let cmd = CreateWorkspaceCommand {
+            tenant_id,
+            workspace_key: "acme".to_string(),
+            name: "Acme Workspace".to_string(),
+            description: Some("main".to_string()),
+            owner_user_id: UserId::new(),
         };
-        assert!(!actor.tenant_id.is_nil(), "tenant_id must be non-nil (§6.1,REQ-SEC-001)");
+        let ws = svc.create_workspace(cmd, actor).await.unwrap();
+        assert_eq!(ws.version, 1);
+        assert_eq!(svc.count().await, 1);
+        // owner 自动为 Admin
+        let members = svc
+            .list_members(ws.id, make_actor(tenant_id))
+            .await
+            .unwrap();
+        assert_eq!(members.len(), 1);
+        assert!(members[0].is_admin());
+    }
+
+    #[tokio::test]
+    async fn invariant_01_workspace_key_conflict() {
+        let svc = InMemoryWorkspaceService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let cmd1 = CreateWorkspaceCommand {
+            tenant_id,
+            workspace_key: "dup".to_string(),
+            name: "W1".to_string(),
+            description: None,
+            owner_user_id: UserId::new(),
+        };
+        svc.create_workspace(cmd1, actor.clone()).await.unwrap();
+        let cmd2 = CreateWorkspaceCommand {
+            tenant_id,
+            workspace_key: "dup".to_string(),
+            name: "W2".to_string(),
+            description: None,
+            owner_user_id: UserId::new(),
+        };
+        let res = svc.create_workspace(cmd2, actor).await;
+        assert!(matches!(res, Err(WorkspaceError::Conflict(_))));
+    }
+
+    #[tokio::test]
+    async fn invariant_03_empty_key_rejected() {
+        let svc = InMemoryWorkspaceService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let cmd = CreateWorkspaceCommand {
+            tenant_id,
+            workspace_key: "".to_string(),
+            name: "Empty".to_string(),
+            description: None,
+            owner_user_id: UserId::new(),
+        };
+        let res = svc.create_workspace(cmd, actor).await;
+        assert!(matches!(res, Err(WorkspaceError::InvalidState(_))));
+    }
+
+    #[tokio::test]
+    async fn cross_tenant_access_denied() {
+        let svc = InMemoryWorkspaceService::new_for_test();
+        let tenant_a = TenantId::new();
+        let actor_a = make_actor(tenant_a);
+        let ws = svc
+            .create_workspace(
+                CreateWorkspaceCommand {
+                    tenant_id: tenant_a,
+                    workspace_key: "a".to_string(),
+                    name: "A".to_string(),
+                    description: None,
+                    owner_user_id: UserId::new(),
+                },
+                actor_a,
+            )
+            .await
+            .unwrap();
+        let tenant_b = TenantId::new();
+        let actor_b = make_actor(tenant_b);
+        let res = svc.get_by_id(ws.id, actor_b).await;
+        assert!(matches!(res, Err(WorkspaceError::PermissionDenied)));
+    }
+
+    #[tokio::test]
+    async fn add_and_remove_member() {
+        let svc = InMemoryWorkspaceService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let ws = svc
+            .create_workspace(
+                CreateWorkspaceCommand {
+                    tenant_id,
+                    workspace_key: "ws".to_string(),
+                    name: "WS".to_string(),
+                    description: None,
+                    owner_user_id: UserId::new(),
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        let new_user = UserId::new();
+        let m = svc
+            .add_member(
+                AddMemberCommand {
+                    workspace_id: ws.id,
+                    tenant_id,
+                    user_id: new_user,
+                    role: WorkspaceRole::Member,
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        assert!(!m.is_admin());
+        // 重复加 → Conflict
+        let res = svc
+            .add_member(
+                AddMemberCommand {
+                    workspace_id: ws.id,
+                    tenant_id,
+                    user_id: new_user,
+                    role: WorkspaceRole::Member,
+                },
+                actor.clone(),
+            )
+            .await;
+        assert!(matches!(res, Err(WorkspaceError::Conflict(_))));
+
+        // 移除
+        svc.remove_member(
+            RemoveMemberCommand {
+                workspace_id: ws.id,
+                tenant_id,
+                user_id: new_user,
+            },
+            actor,
+        )
+        .await
+        .unwrap();
+        let members = svc.list_members(ws.id, make_actor(tenant_id)).await.unwrap();
+        // owner 还在
+        assert_eq!(members.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn event_bus_receives_created() {
+        let (svc, mut rx) = InMemoryWorkspaceService::new();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let cmd = CreateWorkspaceCommand {
+            tenant_id,
+            workspace_key: "evt".to_string(),
+            name: "E".to_string(),
+            description: None,
+            owner_user_id: UserId::new(),
+        };
+        svc.create_workspace(cmd, actor).await.unwrap();
+        let evt = rx.try_recv().expect("应收到 Created 事件");
+        assert!(matches!(evt, WorkspaceEvent::Created(_)));
+        assert_eq!(evt.subject(), "star.events.workspace.workspace.created.v1");
+    }
+
+    #[tokio::test]
+    async fn update_workspace_version_conflict() {
+        let svc = InMemoryWorkspaceService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let ws = svc
+            .create_workspace(
+                CreateWorkspaceCommand {
+                    tenant_id,
+                    workspace_key: "v".to_string(),
+                    name: "V".to_string(),
+                    description: None,
+                    owner_user_id: UserId::new(),
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        let res = svc
+            .update_workspace(
+                UpdateWorkspaceCommand {
+                    workspace_id: ws.id,
+                    tenant_id,
+                    expected_version: 99,
+                    name: Some("New".to_string()),
+                    description: None,
+                },
+                actor,
+            )
+            .await;
+        assert!(matches!(res, Err(WorkspaceError::Conflict(_))));
     }
 }

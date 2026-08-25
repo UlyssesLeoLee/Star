@@ -1,330 +1,407 @@
-//! 用户 / 设备身份
+//! Identity 身份域(颁发 UserId / DeviceId / Role)
 //!
 //! **crate**: `domain-identity`
-//! **上游 spec**: docs/specs/domain-identity-spec.md §23.2 Local Runtime 三重绑定
-//! **基本设计**: docs/basic-design.md §2.1(表 22) / §4.6.3 / §23.2
-//! **数据设计**: docs/data-design.md §4.23 (`identity` schema)
-//! **API 设计**: docs/api-design.md §3.6 (User / Device / Credential)
+//! **上游 spec**: docs/specs/domain-identity-spec.md
+//! **基本设计**: docs/basic-design.md §2.1(表 18) / §23.2(三重绑定)
+//! **数据设计**: docs/data-design.md §4.23 (`user` / `device` / `device_binding` / `credential` / `role`)
+//! **API 设计**: docs/api-design.md §3.2 (domain-identity 端点) / §5.5 / §8.3.7
 //!
 //! ## 职责
 //!
-//! 详细职责边界见 spec 文档第 1 节。骨架阶段仅声明 Port trait + Entity + Error,
-//! 具体实现由 `crates/infrastructure` 中的 Adapter 提供。
+//! - 颁发 `user_id` / `device_id` / `role_id` / `credential_id` / `device_binding_id`
+//! - 定义 5 个核心实体(`User` / `Device` / `DeviceBinding` / `Credential` / `Role`)
+//! - 3 个核心 Domain Event
+//! - 2 个端口(`IdentityCommandPort` × 5 方法 / `IdentityQueryPort` × 8 方法) + 1 个仓库端口
+//! - 4 条不变量检查(INV-IDN-01~04)
+//! - 1 个 `InMemoryIdentityService` 真实实现
 //!
 //! ## 关键不变量
 //!
-//! //! - Device 需 Tenant+User+Project 三重绑定(§23.2)
-//! - Credential 永不明文化,仅 CredentialRef(security-design §5.4)
-
+//! - 任何 User INSERT/UPDATE 必须带 tenant_id(INV-IDN-03,§6.1,REQ-SEC-001)
+//! - email 在 tenant 内唯一(INV-IDN-01)
+//! - (device, user, project) 三元组唯一(INV-IDN-02,§23.2)
+//! - 邮箱格式合法(INV-IDN-04)
+//!
 //! ## 上游依赖(basic-design §2.3)
 //!
-//! 本 crate 依赖以下 domain-*(骨架阶段不实际 import,Cargo.toml 仅声明本 crate 自身需要的外部依赖):
+//! 本 crate 仅依赖 `crates/domain-identity` 自身的外部 crate 依赖。
 //!
-//!   - `domain-tenant`
+//! **禁止反向依赖** 任何其他 `domain-*` crate。
 //!
-//! **禁止反向依赖**(§2.3 禁线)。
-
 //! ## 关键引用
 //!
-//! Device 三重绑定 Tenant+User+Project(§23.2)
+//! 本 crate 是 6 个横切 crate 中"颁发 ID"的核心:UserId / DeviceId / RoleId /
+//! DeviceBindingId / CredentialId。Phase 3 由 `crates/application` 编排时,其他
+//! 5 个横切 crate 的"占位 ActorContext"可由本 crate 颁发。
 
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 #![warn(rust_2018_idioms)]
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
 // =====================================================================
-// 实体(Entity / Aggregate Root)
+// 子模块装载
 // =====================================================================
 
-/// User (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.23 (`identity` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct User {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Device (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.23 (`identity` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Device {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Credential (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.23 (`identity` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Credential {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// DeviceBinding (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.23 (`identity` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeviceBinding {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
+pub mod context;
+pub mod entity;
+pub mod error;
+pub mod event;
+pub mod invariants;
+pub mod macros;
+pub mod port;
+pub mod service;
+pub mod value_object;
 
 // =====================================================================
-// 端口(Port / 抽象)
+// 便捷 re-export
 // =====================================================================
 
-/// **IdentityCommandPort**(命令端口)
-///
-/// 来源: docs/api-design.md §3.6 (User / Device / Credential)
-///
-/// **骨架阶段**: 仅方法签名,无 body 实现。Phase 2 在
-/// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
-#[async_trait]
-pub trait IdentityCommandPort: Send + Sync {
-    async fn create_user(
-        &self,
-        cmd: CreateUserCommand,
-        actor: ActorContext,
-    ) -> Result<UserId, IdentityError>;
-    async fn bind_device(
-        &self,
-        cmd: BindDeviceCommand,
-        actor: ActorContext,
-    ) -> Result<DeviceBindingId, IdentityError>;
-    async fn revoke_device(
-        &self,
-        cmd: DeviceId,
-        actor: ActorContext,
-    ) -> Result<(), IdentityError>;
-    async fn rotate_credential(
-        &self,
-        cmd: RotateCredentialCommand,
-        actor: ActorContext,
-    ) -> Result<CredentialId, IdentityError>;
-}
-
-
-/// **IdentityQueryPort**(查询端口)
-///
-/// 来源: docs/api-design.md §3.6 (User / Device / Credential)
-#[async_trait]
-pub trait IdentityQueryPort: Send + Sync {
-    async fn get_user(
-        &self,
-        id: UserId,
-        viewer: ActorContext,
-    ) -> Result<User, IdentityError>;
-    async fn list_devices(
-        &self,
-        id: UserId,
-        viewer: ActorContext,
-    ) -> Result<Vec<Device>, IdentityError>;
-    async fn verify_credential(
-        &self,
-        q: VerifyCredentialQuery,
-        viewer: ActorContext,
-    ) -> Result<CredentialVerification, IdentityError>;
-}
+pub use context::ActorContext;
+pub use entity::{Credential, Device, DeviceBinding, Role, User};
+pub use error::IdentityError;
+pub use event::{DeviceBound, EventMeta, IdentityEvent, UserCreated, UserLoggedIn};
+pub use invariants::{
+    check_invariant_01_email_unique, check_invariant_02_device_binding_unique,
+    check_invariant_03_tenant_id_present, check_invariant_04_email_format, run_invariants,
+    ALL_INVARIANT_CHECKS,
+};
+pub use port::{
+    BindDeviceCommand, CredentialSpec, CreateRoleCommand, CreateUserCommand, IdentityCommandPort,
+    IdentityQueryPort, IdentityRepository, ListUserQuery, RecordLoginCommand, UpdateUserCommand,
+};
+pub use service::InMemoryIdentityService;
+pub use value_object::{
+    roles, CredentialId, CredentialType, DeviceBindingId, DeviceId, DeviceType, ProjectId, RoleId,
+    TenantId, UserId, UserStatus,
+};
 
 // =====================================================================
-// Domain Events(CloudEvents 1.0,见 api-design §5)
-// =====================================================================
-
-/// Domain Event: `star.events.identity.user.created.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Identity01Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Domain Event: `star.events.identity.device.bound.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Identity02Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 类型别名与命令/查询/返回类型占位
-// =====================================================================
-/// **ID 类型别名**(Phase 1 骨架:均为 UUID 别名)
-///
-/// 真实使用应由 `domain-identity` 颁发强类型 ID(§23.2);
-/// 骨架阶段以 `Uuid` 替代以避免跨 crate 编译依赖。
-
-pub type CredentialId = Uuid;
-pub type DeviceBindingId = Uuid;
-pub type DeviceId = Uuid;
-pub type UserId = Uuid;
-
-/// **命令 / 查询 / 跨 crate 类型占位结构**(Phase 1 骨架:最小字段集)
-
-/// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
-/// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BindDeviceCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateUserCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CredentialVerification {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RotateCredentialCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerifyCredentialQuery {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-
-// =====================================================================
-// Error
-// =====================================================================
-
-/// **Identity 错误**
-///
-/// 来源: docs/api-design.md §8 (错误码)
-/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
-#[derive(Debug, thiserror::Error)]
-pub enum IdentityError {
-    #[error("not found: {0}")]
-    NotFound(Uuid),
-    #[error("invalid state: {0}")]
-    InvalidState(String),
-    #[error("permission denied")]
-    PermissionDenied,
-    #[error("conflict: {0}")]
-    Conflict(String),
-    #[error("internal: {0}")]
-    Internal(String),
-}
-
-// =====================================================================
-// 共享类型
-// =====================================================================
-
-/// **Actor 上下文**(来自 `domain-identity` / `domain-permission` 的 JWT claim)
-///
-/// **骨架阶段**: 字段占位;Phase 2 由 `domain-identity` 颁发的 ActorContext 取代
-/// 本 crate 内的占位定义(避免循环依赖)。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    /// 当前用户 ID
-    pub user_id: Uuid,
-    /// 当前租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 当前设备 ID(Local Runtime 三重绑定,§23.2)
-    pub device_id: Option<Uuid>,
-    /// 当前 Project IDs(用于 Project Policy 校验)
-    pub project_ids: Vec<Uuid>,
-    /// 当前用户角色(`tenant_admin` / `project_admin` / `developer` / `viewer`)
-    pub roles: Vec<String>,
-}
-
-// =====================================================================
-// 单元测试占位
+// 单元测试
 // =====================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::value_object::{DeviceType, TenantId, UserId, UserStatus};
 
-    /// **骨架阶段**: 最小冒烟测试,验证 crate 可编译、ActorContext 字段可达。
-    /// Phase 2 由具体 spec 引入完整单元测试(状态机覆盖 / RLS 矩阵等)。
+    // -------- 测试夹具 --------
+
+    fn make_test_actor(tenant_id: TenantId) -> ActorContext {
+        ActorContext::new(UserId::new(), tenant_id).with_role(roles::TENANT_ADMIN)
+    }
+
+    // -------- 1. ActorContext + 强类型 ID smoke test --------
+
     #[test]
-    fn actor_context_skeleton() {
-        let actor = ActorContext {
-            user_id: Uuid::new_v4(),
-            tenant_id: Uuid::new_v4(),
-            device_id: None,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
+    fn actor_context_typed_ids() {
+        let user_id = UserId::new();
+        let tenant_id = TenantId::new();
+        let device_id = DeviceId::new();
+        let project_id = ProjectId::new();
+        let role_id = RoleId::new();
+        let actor = ActorContext::new(user_id, tenant_id)
+            .with_role(roles::TENANT_ADMIN)
+            .with_role_id(role_id)
+            .with_project(project_id)
+            .with_device(device_id);
+        assert!(actor.is_tenant_admin());
+        assert!(actor.has_role_id(role_id));
+        assert!(actor.is_member_of(project_id));
+    }
+
+    // -------- 2. User 字段数审计 --------
+
+    #[test]
+    fn user_field_count_audit() {
+        assert_eq!(User::FIELD_COUNT, 10);
+        assert_eq!(Device::FIELD_COUNT, 10);
+        assert_eq!(DeviceBinding::FIELD_COUNT, 8);
+        assert_eq!(Credential::FIELD_COUNT, 10);
+        assert_eq!(Role::FIELD_COUNT, 10);
+    }
+
+    // -------- 3. create_user 成功路径 --------
+
+    #[tokio::test]
+    async fn create_user_success() {
+        let svc = InMemoryIdentityService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let cmd = CreateUserCommand {
+            tenant_id,
+            email: "alice@acme.com".to_string(),
+            display_name: "Alice".to_string(),
+            avatar_url: None,
+            initial_credential: Some(CredentialSpec {
+                credential_type: CredentialType::Password,
+                hash: "argon2id$...".to_string(),
+                provider_id: None,
+                expires_at: None,
+            }),
         };
-        assert!(!actor.tenant_id.is_nil(), "tenant_id must be non-nil (§6.1,REQ-SEC-001)");
+        let u = svc.create_user(cmd, actor).await.expect("创建成功");
+        assert_eq!(u.status, UserStatus::Active);
+        assert_eq!(u.email, "alice@acme.com");
+        assert_eq!(svc.count().await, 1);
+
+        // 同步创建了 credential
+        let creds = svc
+            .list_user_credentials(u.id, make_test_actor(tenant_id))
+            .await
+            .unwrap();
+        assert_eq!(creds.len(), 1);
+        assert_eq!(creds[0].credential_type, CredentialType::Password);
+        assert_eq!(creds[0].hash, "***"); // 已脱敏
+    }
+
+    // -------- 4. 跨租户访问被拒 --------
+
+    #[tokio::test]
+    async fn cross_tenant_access_denied() {
+        let svc = InMemoryIdentityService::new_for_test();
+        let tenant_a = TenantId::new();
+        let actor_a = make_test_actor(tenant_a);
+        let cmd = CreateUserCommand {
+            tenant_id: tenant_a,
+            email: "bob@a.com".to_string(),
+            display_name: "Bob".to_string(),
+            avatar_url: None,
+            initial_credential: None,
+        };
+        let u = svc.create_user(cmd, actor_a).await.unwrap();
+        // 用 tenant_b 尝试访问
+        let tenant_b = TenantId::new();
+        let actor_b = make_test_actor(tenant_b);
+        let res = svc.get_user(u.id, actor_b).await;
+        assert!(matches!(res, Err(IdentityError::PermissionDenied)));
+    }
+
+    // -------- 5. INV-IDN-01:email 重复被拒 --------
+
+    #[tokio::test]
+    async fn invariant_01_email_conflict() {
+        let svc = InMemoryIdentityService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let cmd1 = CreateUserCommand {
+            tenant_id,
+            email: "dup@x.com".to_string(),
+            display_name: "First".to_string(),
+            avatar_url: None,
+            initial_credential: None,
+        };
+        svc.create_user(cmd1, actor.clone()).await.unwrap();
+        let cmd2 = CreateUserCommand {
+            tenant_id,
+            email: "dup@x.com".to_string(),
+            display_name: "Second".to_string(),
+            avatar_url: None,
+            initial_credential: None,
+        };
+        let res = svc.create_user(cmd2, actor).await;
+        assert!(matches!(res, Err(IdentityError::Conflict(_))));
+    }
+
+    // -------- 6. INV-IDN-04:邮箱格式非法被拒 --------
+
+    #[tokio::test]
+    async fn invariant_04_email_format_rejected() {
+        let svc = InMemoryIdentityService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let cmd = CreateUserCommand {
+            tenant_id,
+            email: "not-an-email".to_string(),
+            display_name: "Bad".to_string(),
+            avatar_url: None,
+            initial_credential: None,
+        };
+        let res = svc.create_user(cmd, actor).await;
+        assert!(matches!(res, Err(IdentityError::InvalidState(_))));
+    }
+
+    // -------- 7. bind_device 三重绑定(INV-IDN-02) --------
+
+    #[tokio::test]
+    async fn bind_device_three_tuple_unique() {
+        let svc = InMemoryIdentityService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let u = svc
+            .create_user(
+                CreateUserCommand {
+                    tenant_id,
+                    email: "cd@x.com".to_string(),
+                    display_name: "CD".to_string(),
+                    avatar_url: None,
+                    initial_credential: None,
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        let device_id = DeviceId::new();
+        let project_id = ProjectId::new();
+        // 第一次绑定 OK
+        let b1 = svc
+            .bind_device(
+                BindDeviceCommand {
+                    tenant_id,
+                    device_id,
+                    user_id: u.id,
+                    project_id: Some(project_id),
+                    reason: Some("first bind".to_string()),
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        assert!(!b1.is_tenant_wide());
+        // 第二次同三元组 → Conflict
+        let res = svc
+            .bind_device(
+                BindDeviceCommand {
+                    tenant_id,
+                    device_id,
+                    user_id: u.id,
+                    project_id: Some(project_id),
+                    reason: Some("dup".to_string()),
+                },
+                actor,
+            )
+            .await;
+        assert!(matches!(res, Err(IdentityError::Conflict(_))));
+    }
+
+    // -------- 8. 事件总线烟囱测试 --------
+
+    #[tokio::test]
+    async fn event_bus_receives_user_created() {
+        let (svc, mut rx) = InMemoryIdentityService::new();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let cmd = CreateUserCommand {
+            tenant_id,
+            email: "evt@x.com".to_string(),
+            display_name: "Evt".to_string(),
+            avatar_url: None,
+            initial_credential: None,
+        };
+        svc.create_user(cmd, actor).await.unwrap();
+        let evt = rx.try_recv().expect("应收到 UserCreated 事件");
+        assert!(matches!(evt, IdentityEvent::UserCreated(_)));
+        assert_eq!(evt.subject(), "star.events.identity.user.created.v1");
+    }
+
+    // -------- 9. 乐观锁冲突 --------
+
+    #[tokio::test]
+    async fn update_user_version_conflict() {
+        let svc = InMemoryIdentityService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let u = svc
+            .create_user(
+                CreateUserCommand {
+                    tenant_id,
+                    email: "v@x.com".to_string(),
+                    display_name: "V".to_string(),
+                    avatar_url: None,
+                    initial_credential: None,
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        let res = port::IdentityCommandPort::update_user(
+            &*svc,
+            UpdateUserCommand {
+                user_id: u.id,
+                tenant_id,
+                expected_version: 99, // 错的
+                display_name: Some("New".to_string()),
+                avatar_url: None,
+            },
+            actor,
+        )
+        .await;
+        assert!(matches!(res, Err(IdentityError::Conflict(_))));
+    }
+
+    // -------- 10. create_role + 权限校验 --------
+
+    #[tokio::test]
+    async fn create_role_and_check_permission() {
+        let svc = InMemoryIdentityService::new_for_test();
+        let tenant_id = TenantId::new();
+        let admin = make_test_actor(tenant_id);
+        let role = svc
+            .create_role(
+                CreateRoleCommand {
+                    tenant_id,
+                    name: "developer".to_string(),
+                    description: Some("dev role".to_string()),
+                    permissions: vec!["workitem:read".to_string(), "workitem:create".to_string()],
+                },
+                admin.clone(),
+            )
+            .await
+            .unwrap();
+        assert!(role.has_permission("workitem:read"));
+        assert!(!role.has_permission("admin:god"));
+
+        // 非 admin 创建被拒
+        let mut normal = ActorContext::new(UserId::new(), tenant_id);
+        normal.roles.push("user".to_string());
+        let res = svc
+            .create_role(
+                CreateRoleCommand {
+                    tenant_id,
+                    name: "hacker".to_string(),
+                    description: None,
+                    permissions: vec![],
+                },
+                normal,
+            )
+            .await;
+        assert!(matches!(res, Err(IdentityError::PermissionDenied)));
+    }
+
+    // -------- 11. record_login 触发 UserLoggedIn 事件 --------
+
+    #[tokio::test]
+    async fn record_login_updates_last_login_at() {
+        let svc = InMemoryIdentityService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        let u = svc
+            .create_user(
+                CreateUserCommand {
+                    tenant_id,
+                    email: "login@x.com".to_string(),
+                    display_name: "L".to_string(),
+                    avatar_url: None,
+                    initial_credential: None,
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        assert!(u.last_login_at.is_none());
+        let device_id = DeviceId::new();
+        svc.record_login(
+            RecordLoginCommand {
+                user_id: u.id,
+                device_id,
+                device_type: DeviceType::Web,
+            },
+            actor,
+        )
+        .await
+        .unwrap();
+        let u2 = svc
+            .get_user(u.id, make_test_actor(tenant_id))
+            .await
+            .unwrap();
+        assert!(u2.last_login_at.is_some());
     }
 }

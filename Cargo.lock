@@ -256,7 +256,9 @@ dependencies = [
  "async-trait",
  "chrono",
  "serde",
+ "serde_json",
  "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 
@@ -345,6 +347,7 @@ dependencies = [
  "chrono",
  "serde",
  "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 
@@ -389,6 +392,7 @@ dependencies = [
  "chrono",
  "serde",
  "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 
@@ -410,7 +414,9 @@ dependencies = [
  "async-trait",
  "chrono",
  "serde",
+ "serde_json",
  "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 
@@ -455,6 +461,7 @@ dependencies = [
  "chrono",
  "serde",
  "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 
@@ -477,6 +484,7 @@ dependencies = [
  "chrono",
  "serde",
  "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 
@@ -499,6 +507,7 @@ dependencies = [
  "chrono",
  "serde",
  "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 
