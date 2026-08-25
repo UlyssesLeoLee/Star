@@ -271,12 +271,14 @@ Backlog → Sprint 规划 → 看板执行（含甘特图排期视图）→ 燃�
 - REQ-PERM-001：项目级、角色级细粒度权限控制（Permission Scheme）。
 - REQ-PERM-002：Agent 相关操作（第 24、28 章 Agent Policy）必须由 Application / Authorization 层强制执行，不得仅通过 Prompt 约束（§28）。
 - REQ-AUTO-001：自动化规则采用触发器-条件-动作模式，MVP 提供默认方案，不强制可视化配置器（第 30 章范围裁剪）。
+- REQ-AUTO-002（V1 候选，参考竞品 Multica「Autopilot」分析，2026-08-26 补充）：Trigger 除事件订阅（`event_type + filter`）外，须支持 Schedule/Cron 类型，用于定时 Standup / Audit / Report 等主动巡检场景，不得与事件触发混用同一执行路径（避免循环触发歧义，沿用 REQ-AUTO-001 的 Rule 聚合根，仅扩展 `Trigger` 枚举）。
 
 ---
 
 ## 12. Notification & Search 要求
 
 - REQ-NOTIF-001：事件触发的邮件/站内通知，覆盖 WorkItem 状态变更、Feedback 请求、Validation 失败等（详见第 25、27 章事件源）。
+- REQ-NOTIF-002（参考竞品 Multica「Inbox 降噪」分析，2026-08-26 补充）：Notification/Inbox 默认策略是"仅在需要人类决策的节点触达"（如 WAITING_FEEDBACK、Validation 失败、Protected Action 待授权），而非 Agent 每一次工具调用/中间步骤都产生通知；中间过程仍需 100% 写入 AgentSession Transcript（INV-AGT-09 对应，见第 24 章）供按需查阅，二者不冲突。
 - REQ-SEARCH-001：Search 为 Projection，不得成为业务事实源（§90）。初期覆盖 WorkItem / Comment / Project，未来扩展 Repository / Worktree / AgentSession / Feedback / Decision / Symbol（§90）。
 - REQ-SEARCH-002（精简范围）：MVP 不做 JQL 高级查询语言，以 Filter（状态/负责人/标签/Sprint）替代（前次对话结论），降低学习成本。
 
@@ -497,6 +499,7 @@ GitHub   GitLab
 
 - REQ-SCM-001（P0，§63）：GitHub / GitLab 必须通过统一 SCM Adapter 接入。
 - REQ-SCM-002：Domain 层只允许出现 `Repository / Branch / Commit / PullRequest / Review / Pipeline`，不得出现 `GitHubPullRequestObject` / `GitLabMergeRequestEntity` 等厂商污染对象（§24）。
+- REQ-SCM-003（V2 候选，解决 J-SCM-01 未决问题，参考竞品 Multica「Any Git host / Self-hosted included」定位，2026-08-26 补充）：自建 Git（Gitea / Forgejo）企业场景优先于 Bitbucket / Azure DevOps 排期，理由是已有 ACL 层完成厂商对象隔离（REQ-SCM-002），新增 Adapter 边际成本低于新建领域模型；仍不改变 §47 "系统不承担完整 Git Server 职能"的边界。
 
 ### 19.2 Repository Ownership（§47）
 
@@ -703,6 +706,7 @@ AgentSession
 ├── ToolActivitySummary
 ├── ChangeSet / ValidationResult / FeedbackConsumed
 ├── ResultSummary
+├── TokenUsage / CostSummary（V1 候选，参考竞品 Multica「per-run token 成本可见性」分析，2026-08-26 补充；对应第 30.3 章 Context Cost Analysis 扩展，非新增独立能力）
 └── TraceReference
 ```
 
@@ -748,6 +752,22 @@ AgentPolicy 至少研究：Allowed Repository、Allowed Worktree、Allowed Path�
 **Agent Handoff**（§52）：接管同一 Worktree 时不得依赖发送全部聊天记录，应生成 Handoff Context Packet：`Objective / Current State / Completed Work / Open Work / Decisions / Open Feedback / Changed Symbols / Failed Tests / Constraints`。
 
 **Agent Comparison**（§53）：同一 Task 由多个 Agent 并行产生 Worktree 对比 Diff/Tests/Complexity/Review Finding/Context Cost/Feedback Count，列为 V2 候选（第 32 章），不进入初始 MVP。
+
+### 24.6 Skill / Playbook 复用（V2 候选，参考竞品 Multica 分析，2026-08-26 补充）
+
+Multica 将"解决过一次的问题"沉淀为可复用 Playbook，供其他 Agent 复用。本系统目前仅有 `AgentPolicyTemplate`（权限模板），缺少"任务经验模板"维度。V2 候选方向：
+
+- Skill/Playbook 是**只读**的 Context 素材（Instruction + 参考 Diff/Decision），挂载到 Context Compiler（第 26 章 Context Packet 生成流程），不是可执行代码，不获得独立权限。
+- Skill/Playbook 与 Agent Policy 是正交概念：前者影响 Prompt/Context 内容，后者由 Application 层强制执行边界（§28），二者不得混淆，禁止通过 Playbook 绕过 REQ-PERM-002。
+- 安全上须视为 Untrusted Content 同一优先级处理（§41，第 28.3 章 Prompt Injection 威胁），来源于 Repository 或第三方共享的 Playbook 不得高于 Trusted Human Policy 的 Instruction Priority。
+
+### 24.7 Squad / 团队分组视图（Future 候选，参考竞品 Multica 分析，2026-08-26 补充）
+
+Multica 提出"Squad"（Agent + 人类混编小队，Leader 路由任务）。本系统采纳其中**分组可见性**价值，明确排除其"自治协商"含义：
+
+- Squad 仅作为 WorkItem/Worktree 维度的 Assignee 分组展示（谁负责、谁在跑哪个 Worktree），不引入 Agent 间自主任务分派或协商机制。
+- 必须与 §51、INV-AGT-10 的既有边界一致：**禁止** Agent Swarm / Agent Negotiation / Autonomous Planning Society（第 30.6 章 Explicit Non-Goals 不变）。
+- 若要落地，归入 Future（第 30.5 章），且实现方式是"人类或规则引擎指定 Assignee"，而非"Agent 自己决定谁来做"。
 
 ---
 
@@ -982,7 +1002,8 @@ Saved Worktree Views
 Development Heatmap
 Agent Policy Templates
 Remote Runner
-Context Cost Analysis
+Context Cost Analysis（含 Agent Session Token/Cost 明细，§24.1 补充）
+Scheduled Automation Trigger（Autopilot 型 Cron 触发，REQ-AUTO-002）
 ```
 
 ### 30.4 V2 Candidates（§67）
@@ -996,6 +1017,8 @@ Task Parallelization Recommendation
 Agent Performance Analytics
 Advanced Runtime Isolation
 Cloud Development Runtime
+Skill / Playbook Library（REQ §24.6）
+Self-hosted SCM：Gitea / Forgejo（REQ-SCM-003）
 ```
 
 ### 30.5 Future（§68）
@@ -1005,6 +1028,7 @@ Agent Swarm / Autonomous Task Decomposition / Autonomous Multi-Agent Scheduling
 Graph Database / Vector Database / Semantic Repository Memory
 Cloud IDE / Managed Git Hosting
 Autonomous Merge / Autonomous Deployment
+Squad / 团队分组视图（人类指定 Assignee，非自治协商，REQ §24.7）
 ```
 
 只有验证价值后才研究。
@@ -1091,6 +1115,7 @@ Full Event Sourcing / Complex CQRS
 | RISK-028 | Worktree Conflict Explosion |
 | RISK-029 | Local Runtime Version Fragmentation |
 | RISK-030 | Agent Vendor Lock-in |
+| RISK-031 | Skill/Playbook Content Injection（第 24.6 章，参考竞品 Multica 分析，2026-08-26 补充） |
 
 ---
 

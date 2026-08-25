@@ -303,7 +303,7 @@ flowchart LR
 | 14 | domain-search | 全文 / 符号检索 Projection | SearchIndex, SearchQuery | 不得成为业务事实源(§12,REQ-SEARCH-001) | 所有 domain-*(只读) |
 | 15 | domain-audit | 审计日志 / AI Audit Metadata | AuditEvent, AIAuditMetadata | 敏感 Prompt/Code 不默认进入普通日志(§17,§28.2) | 所有 domain-*(Append-only) |
 | 16 | domain-integration | 第三方平台双向同步抽象 | Integration, SyncState | 区分 Link/Mirror/Bidirectional/Platform-owned(§18.1) | domain-scm, domain-work-item |
-| 17 | domain-automation | 触发器-条件-动作规则 | Rule, Trigger, Action | MVP 不强制可视化配置器(§11,REQ-AUTO-001) | domain-work-item, domain-notification |
+| 17 | domain-automation | 触发器-条件-动作规则 | Rule, Trigger, Action | MVP 不强制可视化配置器(§11,REQ-AUTO-001);Trigger 支持 Event 与 Schedule/Cron 两类,互不共用执行路径(REQ-AUTO-002,V1 候选) | domain-work-item, domain-notification |
 
 #### 2.1.3 通用域(Generic Domain)
 
@@ -314,7 +314,7 @@ flowchart LR
 | 20 | domain-project | Project 模板与配置 | Project, ProjectTemplate, ProjectPolicy | 可独立配置 Workflow/Permission/Notification/Agent Policy(REQ-TWP-003) | domain-tenant, domain-workspace |
 | 21 | domain-permission | Permission Scheme 与 RBAC | Role, Permission, PermissionScheme | Agent 操作必须 Application/Authorization 强制(§11,REQ-PERM-002) | domain-tenant |
 | 22 | domain-identity | 用户 / 设备身份 | User, Device, Credential, DeviceBinding | Device 需 Tenant+User+Project 三重绑定(§23.2) | domain-tenant |
-| 23 | domain-notification | 通知渠道与模板 | NotificationChannel, NotificationTemplate | MVP 邮件 + 站内(REQ-NOTIF-001) | domain-tenant |
+| 23 | domain-notification | 通知渠道与模板 | NotificationChannel, NotificationTemplate | MVP 邮件 + 站内(REQ-NOTIF-001);默认仅在需要人类决策的节点触达,不对 Agent 中间步骤逐条通知(REQ-NOTIF-002) | domain-tenant |
 | 24 | domain-collaboration | 协作(实时状态、Presence) | Presence, RealtimeSubscription | 高频 Token Stream 可不入 SaaS(§15,REQ-RT-003) | domain-work-item, domain-worktree |
 | 25 | domain-local-runtime | 集群外 Local Runtime 的服务器侧 Registry / Port | Runtime, RuntimeCommand, RuntimeObservation | Local Daemon 二进制不属此 crate(§4.6.1,§23.1) | domain-worktree, domain-identity |
 
@@ -329,6 +329,14 @@ flowchart LR
 > 1. `Collaboration` 拆为 `domain-comment` + `domain-collaboration`(Realtime Presence),因为前者是 WorkItem 内嵌聚合,后者是横切能力。
 > 2. `Development Context`(§20)合并入 `domain-development`,因为 Development Context 的核心实体(`SymbolIndex` / `RepositoryContext` / `DevelopmentContext`)与 Development Execution 在同一聚合内,拆分会导致跨聚合的 Symbol-level Feedback 路由复杂化(`domain-context` 仅承担 §26 Context Compiler,职责严格区分)。
 > 3. 新增 `domain-local-runtime`,对应 §23 Local Runtime 的服务器侧 Runtime Registry / Port(注意:Local Daemon 二进制进程本身不属此 crate,见 §4.6.1)。
+
+> **2026-08-26 Requirement 同步**(参考竞品 Multica 分析,详见《requirements.md》第 11/12/19/24 章):本设计书已同步以下变更,均为 V1/V2/Future 候选,不改变 MVP 边界与既有 Domain 划分:
+>
+> - REQ-AUTO-002:`domain-automation` 的 `Trigger` 增加 Schedule/Cron 变体(未进入本章 10 个深度设计 Module,先在本表与 §5.6 事件清单中登记)。
+> - REQ-NOTIF-002:`domain-notification` 默认仅在人类决策节点触达,详见上表。
+> - REQ-SCM-003:`domain-scm` 的 Adapter 扩展优先级调整,自建 Git(Gitea/Forgejo)排在 Bitbucket/Azure DevOps 之前,见 §4.7.1。
+> - AgentSession 新增 `token_usage` / `cost_summary` 字段,见 §4.2.2。
+> - `domain-agent` 新增 Skill/Playbook 与 Squad 分组视图(§4.2.8)两个未来扩展方向,均不改变 §24.5/INV-AGT-10 的 Multi-Agent Control 边界。
 
 ### 2.3 Domain 间调用方向(硬约束)
 
@@ -723,6 +731,7 @@ Agent Domain 承担双重职责:
 - `tool_activity_summary`(摘要,非全文)
 - `change_set_ids[]`, `validation_result_ids[]`, `feedback_consumed_ids[]`
 - `result_summary`
+- `token_usage` / `cost_summary`(V1 候选,§24.1 补充,参考竞品 Multica「per-run token 成本可见性」;与 Context Cost Analysis 共用统计口径,不新增独立采集链路)
 - `trace_reference`(OpenTelemetry TraceId)
 
 **AgentPolicy**(值对象 + 策略对象):
@@ -852,14 +861,29 @@ pub struct HandoffContextPacket {
 
 **Agent Comparison**(§53,V2 候选,§30.4):同 Task 多个 Agent 并行 → Worktree 对比 Diff/Tests/Complexity/Review/Context Cost/Feedback Count。
 
-#### 4.2.8 Requirement 索引
+#### 4.2.8 未来扩展方向:Skill/Playbook 与 Squad(§24.6-24.7,V2/Future 候选,参考竞品 Multica 分析,2026-08-26 补充)
+
+> 以下两项均为方向性登记,不在当前 MVP/V1 范围内实现,仅约束未来设计不得违反已有不变量。
+
+**Skill/Playbook 复用**(§24.6,V2 候选):
+
+- 定位为**只读 Context 素材**,不是可执行代码,不获得独立权限;挂载方式是作为 `domain-context`(§4.4)Context Packet 的一个新增 `SourceType::Skill` Provenance 来源,而不是 `domain-agent` 内部新聚合根。
+- 与 `AgentPolicy` 正交:Skill/Playbook 只影响 Prompt/Context 内容,不得绕过 §4.2.5 的 12 个强制点。
+- 安全等级视为 Untrusted Content(§28.3),Instruction Priority 不得高于 Trusted Human Policy,对应 RISK-031(Skill/Playbook Content Injection)。
+
+**Squad 分组视图**(§24.7,Future 候选):
+
+- 仅是 WorkItem/Worktree 维度的 Assignee 分组展示(Query 侧),不新增 Command 语义,不引入 Agent 间自主任务分派。
+- 必须与 §24.7、INV-AGT-10 一致:**禁止** Agent Swarm / Agent Negotiation / Autonomous Planning Society,分组只能由人类或规则引擎(`domain-automation`)指定 Assignee。
+
+#### 4.2.9 Requirement 索引
 
 - REQ-PERM-002(Policy 由 Application 强制)
 - REQ-DEV-002(1 Worktree → N AgentSession)
 - REQ-DEV-003(1 AgentSession → 1 Active Worktree)
 - ARCH-OBL-DEV-001(Worktree Isolation → Agent 限制在授权 Runtime/Repository/Worktree)
 - AGT-001/002(§41 P0)
-- §24 全章
+- §24 全章(含 §24.6/24.7 未来扩展)
 - §28.4(Agent Secret Boundary)
 
 ---
@@ -1028,12 +1052,14 @@ Context Compiler **不是 LLM**,而是"根据当前任务、代码状态、历�
 
 ```rust
 pub struct ProvenanceEntry {
-    pub source_type: SourceType, // Requirement / AcceptanceCriterion / Decision / Feedback / File / Symbol / Test / ADR / FailedValidation / OpenFeedback
+    pub source_type: SourceType, // Requirement / AcceptanceCriterion / Decision / Feedback / File / Symbol / Test / ADR / FailedValidation / OpenFeedback / Skill(V2 候选,§24.6)
     pub source_id: SourceId,
     pub version: u64,            // 用于追踪被取代的版本
     pub included_at_layer: Priority,
 }
 ```
+
+> **Skill/Playbook 来源**(`SourceType::Skill`,V2 候选,§4.2.8,参考竞品 Multica 分析,2026-08-26 补充):挂载方式与 File/Symbol 等其他来源一致,必须携带 Provenance;安全等级视为 Untrusted Content(§28.3),Instruction Priority 不得高于 P0 Explicit Human Constraint。
 
 **Decision**(聚合根,§26.5):
 
@@ -1430,6 +1456,8 @@ Domain 层不区分具体 Runtime 类型,通过 `RuntimeKind` 枚举实现多态
 #### 4.7.1 职责与定位
 
 SCM Domain 通过统一 Port 接入 GitHub / GitLab / 未来 SCM(§19.1,REQ-SCM-001/002)。**Domain 层不得出现厂商特有对象**(`GitHubPullRequestObject` / `GitLabMergeRequestEntity` 等)。
+
+> **扩展优先级**(REQ-SCM-003,V2 候选,解决 J-SCM-01,参考竞品 Multica「Any Git host / Self-hosted included」定位,2026-08-26 补充):自建 Git(Gitea / Forgejo)排在 Bitbucket / Azure DevOps 之前,理由是本节 ACL 已完成厂商对象隔离,新增 Adapter 边际成本低于新建领域模型;不改变 §19.2 "系统不承担完整 Git Server 职能"的边界。
 
 #### 4.7.2 关键实体
 
@@ -2084,6 +2112,7 @@ FeedbackCreated / FeedbackAcknowledged / FeedbackApplied / FeedbackVerified
 ValidationStarted / ValidationPassed / ValidationFailed
 ContextPacketCreated
 PullRequestLinked / MergeRequestLinked
+AutomationRuleScheduleTriggered(V1 候选,REQ-AUTO-002,2026-08-26 补充)
 ```
 
 每个事件都包含 `tenant_id`, `aggregate_id`, `version`, `occurred_at`, `actor`(用户/Agent/系统), `payload`(JSON Schema 描述)。
