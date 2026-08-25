@@ -1,323 +1,431 @@
 //! Sprint / Backlog / Roadmap 规划领域
 //!
 //! **crate**: `domain-planning`
-//! **上游 spec**: docs/specs/domain-planning-spec.md §9 / §10 / §11 Planning
-//! **基本设计**: docs/basic-design.md §2.1 / §4.10.1
-//! **数据设计**: docs/data-design.md §4.12 (`planning` schema)
-//! **API 设计**: docs/api-design.md §3.15 (Sprint / Backlog / Roadmap)
+//! **上游 spec**: docs/specs/domain-planning-spec.md
+//! **基本设计**: docs/basic-design.md §2.1 / §4.9.2 / §4.9.4
+//! **数据设计**: docs/data-design.md §4.7 (`planning` schema)
+//! **API 设计**: docs/api-design.md §3.8 (Sprint / Backlog / Roadmap)
 //!
 //! ## 职责
 //!
-//! 详细职责边界见 spec 文档第 1 节。骨架阶段仅声明 Port trait + Entity + Error,
-//! 具体实现由 `crates/infrastructure` 中的 Adapter 提供。
+//! 敏捷规划核心数据(§9, REQ-PLAN-001~005):
+//! - 5 个核心实体(`Sprint` / `Backlog` / `Roadmap` / `Milestone` / `BurndownSnapshot`)
+//! - 5 个核心 Domain Event(CloudEvents 1.0)
+//! - 2 个端口(`PlanningCommandPort` × 7 / `PlanningQueryPort` × 5) + 1 个仓库端口
+//! - 6 条不变量(INV-PL-01~06)
+//! - 1 个 `InMemoryPlanningService` 真实实现
 //!
 //! ## 关键不变量
 //!
-//! //! - Sprint 期间 WorkItem 状态由 Workflow 决定,本 crate 仅编排(§4.10.1)
-//! - Burndown 最小必需,Velocity/CFD 控制图 V1(§9)
+//! - Sprint 状态机 Planning → Active → Closed 不可逆(INV-PL-01,§4.9.2)
+//! - Sprint 时长 1-4 周(INV-PL-02,REQ-PLAN-001)
+//! - 同 Project 同时刻最多 1 个 Active Sprint(INV-PL-03,§4.9.4)
+//! - Burndown 是 Projection(INV-PL-05,§5.7)
 
-//! ## 上游依赖(basic-design §2.3)
-//!
-//! 本 crate 依赖以下 domain-*(骨架阶段不实际 import,Cargo.toml 仅声明本 crate 自身需要的外部依赖):
-//!
-//!   - `domain-work-item`
-//!   - `domain-board`
-//!
-//! **禁止反向依赖**(§2.3 禁线)。
-
-//! ## 关键引用
-//!
-//! Sprint/Backlog/Roadmap;Burndown MVP 必需(§9)
-
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 #![warn(rust_2018_idioms)]
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
 // =====================================================================
-// 实体(Entity / Aggregate Root)
+// 子模块装载
 // =====================================================================
 
-/// Sprint (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.12 (`planning` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Sprint {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Backlog (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.12 (`planning` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Backlog {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Roadmap (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.12 (`planning` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Roadmap {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Burndown (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.12 (`planning` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Burndown {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
+pub mod context;
+pub mod entity;
+pub mod error;
+pub mod event;
+pub mod invariants;
+pub mod macros;
+pub mod port;
+pub mod service;
+pub mod value_object;
 
 // =====================================================================
-// 端口(Port / 抽象)
+// 便捷 re-export
 // =====================================================================
 
-/// **PlanningCommandPort**(命令端口)
-///
-/// 来源: docs/api-design.md §3.15 (Sprint / Backlog / Roadmap)
-///
-/// **骨架阶段**: 仅方法签名,无 body 实现。Phase 2 在
-/// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
-#[async_trait]
-pub trait PlanningCommandPort: Send + Sync {
-    async fn create_sprint(
-        &self,
-        cmd: CreateSprintCommand,
-        actor: ActorContext,
-    ) -> Result<SprintId, PlanningError>;
-    async fn add_to_sprint(
-        &self,
-        cmd: AddToSprintCommand,
-        actor: ActorContext,
-    ) -> Result<Sprint, PlanningError>;
-    async fn create_roadmap(
-        &self,
-        cmd: CreateRoadmapCommand,
-        actor: ActorContext,
-    ) -> Result<RoadmapId, PlanningError>;
-    async fn record_burndown_snapshot(
-        &self,
-        cmd: RecordBurndownCommand,
-        actor: ActorContext,
-    ) -> Result<Burndown, PlanningError>;
-}
-
-
-/// **PlanningQueryPort**(查询端口)
-///
-/// 来源: docs/api-design.md §3.15 (Sprint / Backlog / Roadmap)
-#[async_trait]
-pub trait PlanningQueryPort: Send + Sync {
-    async fn get_sprint(
-        &self,
-        id: SprintId,
-        viewer: ActorContext,
-    ) -> Result<Sprint, PlanningError>;
-    async fn list_active_sprints(
-        &self,
-        id: ProjectId,
-        viewer: ActorContext,
-    ) -> Result<Vec<Sprint>, PlanningError>;
-    async fn compute_burndown(
-        &self,
-        id: SprintId,
-        viewer: ActorContext,
-    ) -> Result<Burndown, PlanningError>;
-}
+pub use context::ActorContext;
+pub use entity::{Backlog, BurndownReport, BurndownSnapshot, Milestone, Roadmap, Sprint};
+pub use error::PlanningError;
+pub use event::{
+    BacklogReordered, EventMeta, PlanningEvent, SprintClosed, SprintCreated, SprintStarted,
+    WorkItemAddedToSprint,
+};
+pub use invariants::{
+    check_create_invariants, check_invariant_01_sprint_state_legal,
+    check_invariant_02_sprint_duration, check_invariant_03_single_active_sprint,
+    check_invariant_04_no_duplicate_work_item, check_invariant_05_burndown_projection_placeholder,
+    check_invariant_06_backlog_no_duplicates, run_invariants, ALL_INVARIANT_CHECKS,
+};
+pub use port::{
+    AddWorkItemToSprintCommand, BacklogReorderCommand, CloseSprintCommand, CreateSprintCommand,
+    ListSprintQuery, PlanningCommandPort, PlanningQueryPort, PlanningRepository,
+    RemoveWorkItemFromSprintCommand, UpdateSprintCommand,
+};
+pub use service::InMemoryPlanningService;
+pub use value_object::{
+    roles, BacklogId, BurndownSnapshotId, CloseMoveTarget, MilestoneId, ProjectId, RoadmapId,
+    SprintId, SprintState, TenantId, UserId, WorkItemId,
+};
 
 // =====================================================================
-// Domain Events(CloudEvents 1.0,见 api-design §5)
-// =====================================================================
-
-/// Domain Event: `star.events.planning.sprint.created.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Planning01Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Domain Event: `star.events.planning.sprint.started.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Planning02Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 类型别名与命令/查询/返回类型占位
-// =====================================================================
-/// **ID 类型别名**(Phase 1 骨架:均为 UUID 别名)
-///
-/// 真实使用应由 `domain-identity` 颁发强类型 ID(§23.2);
-/// 骨架阶段以 `Uuid` 替代以避免跨 crate 编译依赖。
-
-pub type BacklogId = Uuid;
-pub type BurndownId = Uuid;
-pub type ProjectId = Uuid;
-pub type RoadmapId = Uuid;
-pub type SprintId = Uuid;
-
-/// **命令 / 查询 / 跨 crate 类型占位结构**(Phase 1 骨架:最小字段集)
-
-/// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
-/// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AddToSprintCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateRoadmapCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateSprintCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordBurndownCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-
-// =====================================================================
-// Error
-// =====================================================================
-
-/// **Planning 错误**
-///
-/// 来源: docs/api-design.md §8 (错误码)
-/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
-#[derive(Debug, thiserror::Error)]
-pub enum PlanningError {
-    #[error("not found: {0}")]
-    NotFound(Uuid),
-    #[error("invalid state: {0}")]
-    InvalidState(String),
-    #[error("permission denied")]
-    PermissionDenied,
-    #[error("conflict: {0}")]
-    Conflict(String),
-    #[error("internal: {0}")]
-    Internal(String),
-}
-
-// =====================================================================
-// 共享类型
-// =====================================================================
-
-/// **Actor 上下文**(来自 `domain-identity` / `domain-permission` 的 JWT claim)
-///
-/// **骨架阶段**: 字段占位;Phase 2 由 `domain-identity` 颁发的 ActorContext 取代
-/// 本 crate 内的占位定义(避免循环依赖)。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    /// 当前用户 ID
-    pub user_id: Uuid,
-    /// 当前租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 当前设备 ID(Local Runtime 三重绑定,§23.2)
-    pub device_id: Option<Uuid>,
-    /// 当前 Project IDs(用于 Project Policy 校验)
-    pub project_ids: Vec<Uuid>,
-    /// 当前用户角色(`tenant_admin` / `project_admin` / `developer` / `viewer`)
-    pub roles: Vec<String>,
-}
-
-// =====================================================================
-// 单元测试占位
+// 单元测试
 // =====================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::value_object::{CloseMoveTarget, ProjectId, SprintState, TenantId, UserId, WorkItemId};
+    use chrono::{Duration, Utc};
 
-    /// **骨架阶段**: 最小冒烟测试,验证 crate 可编译、ActorContext 字段可达。
-    /// Phase 2 由具体 spec 引入完整单元测试(状态机覆盖 / RLS 矩阵等)。
+    fn make_test_actor(tenant_id: TenantId) -> ActorContext {
+        ActorContext::new(UserId::new(), tenant_id)
+            .with_role(roles::PROJECT_ADMIN)
+            .with_project(ProjectId::new())
+    }
+
+    fn make_create_cmd(tenant_id: TenantId, project_id: ProjectId) -> CreateSprintCommand {
+        let now = Utc::now();
+        CreateSprintCommand {
+            tenant_id,
+            project_id,
+            name: "Sprint 1".to_string(),
+            goal: Some("Ship MVP".to_string()),
+            start_at: now,
+            end_at: now + Duration::days(14),
+            capacity_story_points: Some(50),
+        }
+    }
+
+    // -------- 1. ActorContext smoke test --------
+
     #[test]
-    fn actor_context_skeleton() {
-        let actor = ActorContext {
-            user_id: Uuid::new_v4(),
-            tenant_id: Uuid::new_v4(),
-            device_id: None,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
+    fn actor_context_typed_ids() {
+        let tenant_id = TenantId::new();
+        let actor = make_test_actor(tenant_id);
+        assert!(!actor.tenant_id.as_uuid().is_nil());
+        assert!(actor.has_role(roles::PROJECT_ADMIN));
+    }
+
+    // -------- 2. 字段数审计 --------
+
+    #[test]
+    fn field_count_audit() {
+        assert_eq!(Sprint::FIELD_COUNT, 15);
+        assert_eq!(Backlog::FIELD_COUNT, 8);
+        assert_eq!(Roadmap::FIELD_COUNT, 9);
+        assert_eq!(Milestone::FIELD_COUNT, 8);
+    }
+
+    // -------- 3. create_sprint 成功路径 --------
+
+    #[tokio::test]
+    async fn create_sprint_success() {
+        let svc = InMemoryPlanningService::new_for_test();
+        let tenant_id = TenantId::new();
+        let project_id = ProjectId::new();
+        let actor = make_test_actor(tenant_id);
+        let cmd = make_create_cmd(tenant_id, project_id);
+        let sprint = svc
+            .create_sprint(cmd, actor)
+            .await
+            .expect("创建成功");
+        assert_eq!(sprint.state, SprintState::Planning);
+        assert_eq!(sprint.lock_version, 1);
+        assert_eq!(svc.count_sprints().await, 1);
+    }
+
+    // -------- 4. INV-PL-02:时长 1-4 周 --------
+
+    #[tokio::test]
+    async fn invariant_02_sprint_duration() {
+        // 5 天 < 1 周 → InvalidState
+        let tenant_id = TenantId::new();
+        let project_id = ProjectId::new();
+        let actor = make_test_actor(tenant_id);
+        let now = Utc::now();
+        let cmd = CreateSprintCommand {
+            tenant_id,
+            project_id,
+            name: "Short".to_string(),
+            goal: None,
+            start_at: now,
+            end_at: now + Duration::days(5), // < 1 周
+            capacity_story_points: None,
         };
-        assert!(!actor.tenant_id.is_nil(), "tenant_id must be non-nil (§6.1,REQ-SEC-001)");
+        let svc = InMemoryPlanningService::new_for_test();
+        let res = svc.create_sprint(cmd, actor).await;
+        assert!(matches!(res, Err(PlanningError::InvalidState(_))));
+
+        // 6 周 > 4 周 → InvalidState
+        let actor2 = make_test_actor(tenant_id);
+        let now2 = Utc::now();
+        let cmd2 = CreateSprintCommand {
+            tenant_id,
+            project_id,
+            name: "Long".to_string(),
+            goal: None,
+            start_at: now2,
+            end_at: now2 + Duration::days(42),
+            capacity_story_points: None,
+        };
+        let res2 = svc.create_sprint(cmd2, actor2).await;
+        assert!(matches!(res2, Err(PlanningError::InvalidState(_))));
+    }
+
+    // -------- 5. INV-PL-01 + start_sprint 状态机迁移 --------
+
+    #[tokio::test]
+    async fn start_sprint_success() {
+        let svc = InMemoryPlanningService::new_for_test();
+        let tenant_id = TenantId::new();
+        let project_id = ProjectId::new();
+        let actor = make_test_actor(tenant_id);
+        let cmd = make_create_cmd(tenant_id, project_id);
+        let sprint = svc.create_sprint(cmd, actor.clone()).await.unwrap();
+        let started = svc
+            .start_sprint(sprint.id, actor)
+            .await
+            .expect("启动成功");
+        assert_eq!(started.state, SprintState::Active);
+        assert!(started.started_at.is_some());
+    }
+
+    // -------- 6. INV-PL-01:已 Closed 不可再启动 --------
+
+    #[tokio::test]
+    async fn invariant_01_closed_sprint_cannot_restart() {
+        let svc = InMemoryPlanningService::new_for_test();
+        let tenant_id = TenantId::new();
+        let project_id = ProjectId::new();
+        let actor = make_test_actor(tenant_id);
+        let cmd = make_create_cmd(tenant_id, project_id);
+        let sprint = svc.create_sprint(cmd, actor.clone()).await.unwrap();
+        // 启动
+        let s = svc
+            .start_sprint(sprint.id, actor.clone())
+            .await
+            .unwrap();
+        // 关闭
+        let s = svc
+            .close_sprint(
+                s.id,
+                CloseSprintCommand {
+                    move_incomplete_to: CloseMoveTarget::Backlog,
+                    next_sprint_id: None,
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(s.state, SprintState::Closed);
+        // 尝试再次启动 → InvalidState
+        let res = svc.start_sprint(s.id, actor).await;
+        assert!(matches!(res, Err(PlanningError::InvalidState(_))));
+    }
+
+    // -------- 7. INV-PL-03:同 Project 同时刻只能 1 Active --------
+
+    #[tokio::test]
+    async fn invariant_03_single_active_sprint() {
+        let svc = InMemoryPlanningService::new_for_test();
+        let tenant_id = TenantId::new();
+        let project_id = ProjectId::new();
+        let actor = make_test_actor(tenant_id);
+
+        // 创建并启动第一个 sprint
+        let s1 = svc
+            .create_sprint(make_create_cmd(tenant_id, project_id), actor.clone())
+            .await
+            .unwrap();
+        svc.start_sprint(s1.id, actor.clone()).await.unwrap();
+
+        // 创建第二个 sprint
+        let s2 = svc
+            .create_sprint(make_create_cmd(tenant_id, project_id), actor.clone())
+            .await
+            .unwrap();
+        // 尝试启动第二个 → 冲突
+        let res = svc.start_sprint(s2.id, actor).await;
+        assert!(matches!(res, Err(PlanningError::Conflict(_))));
+    }
+
+    // -------- 8. add/remove work_item to sprint --------
+
+    #[tokio::test]
+    async fn add_remove_work_item_to_sprint() {
+        let svc = InMemoryPlanningService::new_for_test();
+        let tenant_id = TenantId::new();
+        let project_id = ProjectId::new();
+        let actor = make_test_actor(tenant_id);
+        let cmd = make_create_cmd(tenant_id, project_id);
+        let sprint = svc.create_sprint(cmd, actor.clone()).await.unwrap();
+
+        let wi1 = WorkItemId::new();
+        let s = svc
+            .add_work_item_to_sprint(
+                AddWorkItemToSprintCommand {
+                    sprint_id: sprint.id,
+                    tenant_id,
+                    work_item_id: wi1,
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(s.work_item_ids.len(), 1);
+        assert_eq!(s.work_item_ids[0], wi1);
+
+        // 重复添加 → Conflict
+        let res = svc
+            .add_work_item_to_sprint(
+                AddWorkItemToSprintCommand {
+                    sprint_id: sprint.id,
+                    tenant_id,
+                    work_item_id: wi1,
+                },
+                actor.clone(),
+            )
+            .await;
+        assert!(matches!(res, Err(PlanningError::Conflict(_))));
+
+        // 移除
+        let s = svc
+            .remove_work_item_from_sprint(
+                RemoveWorkItemFromSprintCommand {
+                    sprint_id: sprint.id,
+                    tenant_id,
+                    work_item_id: wi1,
+                },
+                actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(s.work_item_ids.len(), 0);
+    }
+
+    // -------- 9. list_sprints 过滤 --------
+
+    #[tokio::test]
+    async fn list_sprints_filter_by_state() {
+        let svc = InMemoryPlanningService::new_for_test();
+        let tenant_id = TenantId::new();
+        let project_id = ProjectId::new();
+        let actor = make_test_actor(tenant_id);
+        let s1 = svc
+            .create_sprint(make_create_cmd(tenant_id, project_id), actor.clone())
+            .await
+            .unwrap();
+        svc.start_sprint(s1.id, actor.clone()).await.unwrap();
+        // 第二个 planning
+        svc.create_sprint(make_create_cmd(tenant_id, project_id), actor.clone())
+            .await
+            .unwrap();
+
+        let q = ListSprintQuery {
+            tenant_id,
+            project_id: Some(project_id),
+            state: Some(SprintState::Active),
+            limit: 10,
+            offset: 0,
+        };
+        let viewer = make_test_actor(tenant_id);
+        let active = svc.list_sprints(q, viewer).await.unwrap();
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].id, s1.id);
+    }
+
+    // -------- 10. update_sprint 乐观锁 --------
+
+    #[tokio::test]
+    async fn update_sprint_version_conflict() {
+        let svc = InMemoryPlanningService::new_for_test();
+        let tenant_id = TenantId::new();
+        let project_id = ProjectId::new();
+        let actor = make_test_actor(tenant_id);
+        let sprint = svc
+            .create_sprint(make_create_cmd(tenant_id, project_id), actor.clone())
+            .await
+            .unwrap();
+        let res = svc
+            .update_sprint(
+                UpdateSprintCommand {
+                    sprint_id: sprint.id,
+                    tenant_id,
+                    expected_version: 99,
+                    name: Some("X".to_string()),
+                    goal: None,
+                    start_at: None,
+                    end_at: None,
+                    capacity_story_points: None,
+                },
+                actor,
+            )
+            .await;
+        assert!(matches!(res, Err(PlanningError::Conflict(_))));
+    }
+
+    // -------- 11. close_sprint 带 move target --------
+
+    #[tokio::test]
+    async fn close_sprint_with_move_target() {
+        let svc = InMemoryPlanningService::new_for_test();
+        let tenant_id = TenantId::new();
+        let project_id = ProjectId::new();
+        let actor = make_test_actor(tenant_id);
+        let sprint = svc
+            .create_sprint(make_create_cmd(tenant_id, project_id), actor.clone())
+            .await
+            .unwrap();
+        svc.start_sprint(sprint.id, actor.clone()).await.unwrap();
+        let closed = svc
+            .close_sprint(
+                sprint.id,
+                CloseSprintCommand {
+                    move_incomplete_to: CloseMoveTarget::NextSprint,
+                    next_sprint_id: Some(SprintId::new()),
+                },
+                actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(closed.state, SprintState::Closed);
+        assert!(closed.closed_at.is_some());
+    }
+
+    // -------- 12. 事件总线烟囱测试 --------
+
+    #[tokio::test]
+    async fn event_bus_receives_sprint_lifecycle() {
+        let (svc, mut rx) = InMemoryPlanningService::new();
+        let tenant_id = TenantId::new();
+        let project_id = ProjectId::new();
+        let actor = make_test_actor(tenant_id);
+        let sprint = svc
+            .create_sprint(make_create_cmd(tenant_id, project_id), actor.clone())
+            .await
+            .unwrap();
+        svc.start_sprint(sprint.id, actor.clone()).await.unwrap();
+        svc.close_sprint(
+            sprint.id,
+            CloseSprintCommand {
+                move_incomplete_to: CloseMoveTarget::Backlog,
+                next_sprint_id: None,
+            },
+            actor,
+        )
+        .await
+        .unwrap();
+
+        let mut events = Vec::new();
+        for _ in 0..10 {
+            if let Ok(e) = rx.try_recv() {
+                events.push(e);
+            }
+        }
+        // 至少 3 个事件:Created, Started, Closed
+        let kinds: Vec<&str> = events.iter().map(|e| e.subject()).collect();
+        assert!(kinds.iter().any(|s| s.contains("created")));
+        assert!(kinds.iter().any(|s| s.contains("started")));
+        assert!(kinds.iter().any(|s| s.contains("closed")));
     }
 }
