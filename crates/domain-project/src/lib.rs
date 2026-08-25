@@ -1,291 +1,295 @@
-//! Project 模板与配置
+//! Project 项目模板与配置
 //!
 //! **crate**: `domain-project`
-//! **上游 spec**: docs/specs/domain-project-spec.md §8 Project 模板
-//! **基本设计**: docs/basic-design.md §2.1(表 20)
-//! **数据设计**: docs/data-design.md §4.21 (`project` schema)
-//! **API 设计**: docs/api-design.md §3.4 (Project CRUD + Policy)
+//! **上游 spec**: docs/specs/domain-project-spec.md
+//! **基本设计**: docs/basic-design.md §4.3
+//! **数据设计**: docs/data-design.md §4.3
 //!
 //! ## 职责
 //!
-//! 详细职责边界见 spec 文档第 1 节。骨架阶段仅声明 Port trait + Entity + Error,
-//! 具体实现由 `crates/infrastructure` 中的 Adapter 提供。
-//!
-//! ## 关键不变量
-//!
-//! //! - 可独立配置 Workflow/Permission/Notification/Agent Policy(REQ-TWP-003)
-//! - ProjectPolicy 是 WorkflowDefinition 的运行时注入点(§4.9.3)
+//! - 颁发 `project_id` / `project_template_id` / `project_policy_id`
+//! - 3 个核心实体
+//! - 2 个核心 Domain Event
+//! - 2 个端口(4 cmd / 5 query)
+//! - 3 条不变量
+//! - 1 个 `InMemoryProjectService`
 
-//! ## 上游依赖(basic-design §2.3)
-//!
-//! 本 crate 依赖以下 domain-*(骨架阶段不实际 import,Cargo.toml 仅声明本 crate 自身需要的外部依赖):
-//!
-//!   - `domain-tenant`
-//!   - `domain-workspace`
-//!
-//! **禁止反向依赖**(§2.3 禁线)。
-
-//! ## 关键引用
-//!
-//! ProjectPolicy 注入 Workflow/Agent/Permission 配置(REQ-TWP-003)
-
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 #![warn(rust_2018_idioms)]
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+pub mod context;
+pub mod entity;
+pub mod error;
+pub mod event;
+pub mod invariants;
+pub mod macros;
+pub mod port;
+pub mod service;
+pub mod value_object;
 
-// =====================================================================
-// 实体(Entity / Aggregate Root)
-// =====================================================================
-
-/// Project (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.21 (`project` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Project {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// ProjectTemplate (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.21 (`project` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectTemplate {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// ProjectPolicy (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.21 (`project` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectPolicy {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 端口(Port / 抽象)
-// =====================================================================
-
-/// **ProjectCommandPort**(命令端口)
-///
-/// 来源: docs/api-design.md §3.4 (Project CRUD + Policy)
-///
-/// **骨架阶段**: 仅方法签名,无 body 实现。Phase 2 在
-/// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
-#[async_trait]
-pub trait ProjectCommandPort: Send + Sync {
-    async fn create_project(
-        &self,
-        cmd: CreateProjectCommand,
-        actor: ActorContext,
-    ) -> Result<ProjectId, ProjectError>;
-    async fn update_project_policy(
-        &self,
-        cmd: UpdateProjectPolicyCommand,
-        actor: ActorContext,
-    ) -> Result<Project, ProjectError>;
-    async fn apply_template(
-        &self,
-        cmd: ApplyProjectTemplateCommand,
-        actor: ActorContext,
-    ) -> Result<Project, ProjectError>;
-}
-
-
-/// **ProjectQueryPort**(查询端口)
-///
-/// 来源: docs/api-design.md §3.4 (Project CRUD + Policy)
-#[async_trait]
-pub trait ProjectQueryPort: Send + Sync {
-    async fn get_project(
-        &self,
-        id: ProjectId,
-        viewer: ActorContext,
-    ) -> Result<Project, ProjectError>;
-    async fn list_by_workspace(
-        &self,
-        id: WorkspaceId,
-        viewer: ActorContext,
-    ) -> Result<Vec<Project>, ProjectError>;
-    async fn get_template(
-        &self,
-        id: ProjectTemplateId,
-        viewer: ActorContext,
-    ) -> Result<ProjectTemplate, ProjectError>;
-}
-
-// =====================================================================
-// Domain Events(CloudEvents 1.0,见 api-design §5)
-// =====================================================================
-
-/// Domain Event: `star.events.project.project.created.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Project01Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Domain Event: `star.events.project.policy.updated.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Project02Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 类型别名与命令/查询/返回类型占位
-// =====================================================================
-/// **ID 类型别名**(Phase 1 骨架:均为 UUID 别名)
-///
-/// 真实使用应由 `domain-identity` 颁发强类型 ID(§23.2);
-/// 骨架阶段以 `Uuid` 替代以避免跨 crate 编译依赖。
-
-pub type ProjectId = Uuid;
-pub type ProjectPolicyId = Uuid;
-pub type ProjectTemplateId = Uuid;
-pub type WorkspaceId = Uuid;
-
-/// **命令 / 查询 / 跨 crate 类型占位结构**(Phase 1 骨架:最小字段集)
-
-/// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
-/// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApplyProjectTemplateCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateProjectCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateProjectPolicyCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-
-// =====================================================================
-// Error
-// =====================================================================
-
-/// **Project 错误**
-///
-/// 来源: docs/api-design.md §8 (错误码)
-/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
-#[derive(Debug, thiserror::Error)]
-pub enum ProjectError {
-    #[error("not found: {0}")]
-    NotFound(Uuid),
-    #[error("invalid state: {0}")]
-    InvalidState(String),
-    #[error("permission denied")]
-    PermissionDenied,
-    #[error("conflict: {0}")]
-    Conflict(String),
-    #[error("internal: {0}")]
-    Internal(String),
-}
-
-// =====================================================================
-// 共享类型
-// =====================================================================
-
-/// **Actor 上下文**(来自 `domain-identity` / `domain-permission` 的 JWT claim)
-///
-/// **骨架阶段**: 字段占位;Phase 2 由 `domain-identity` 颁发的 ActorContext 取代
-/// 本 crate 内的占位定义(避免循环依赖)。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    /// 当前用户 ID
-    pub user_id: Uuid,
-    /// 当前租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 当前设备 ID(Local Runtime 三重绑定,§23.2)
-    pub device_id: Option<Uuid>,
-    /// 当前 Project IDs(用于 Project Policy 校验)
-    pub project_ids: Vec<Uuid>,
-    /// 当前用户角色(`tenant_admin` / `project_admin` / `developer` / `viewer`)
-    pub roles: Vec<String>,
-}
-
-// =====================================================================
-// 单元测试占位
-// =====================================================================
+pub use context::ActorContext;
+pub use entity::{Project, ProjectPolicy, ProjectTemplate};
+pub use error::ProjectError;
+pub use event::{EventMeta, ProjectCreated, ProjectEvent, ProjectPolicyUpdated};
+pub use invariants::{
+    check_invariant_01_project_key_unique, check_invariant_02_tenant_id_present,
+    check_invariant_03_project_key_format, run_invariants, ALL_INVARIANT_CHECKS,
+};
+pub use port::{
+    ArchiveProjectCommand, CreateProjectCommand, ListProjectQuery, ProjectCommandPort,
+    ProjectQueryPort, UpdateProjectCommand, UpdateProjectPolicyCommand,
+};
+pub use service::InMemoryProjectService;
+pub use value_object::{
+    roles, AgentPolicyId, NotificationSchemeId, PermissionSchemeId, ProjectId, ProjectPolicyId,
+    ProjectStatus, ProjectTemplateId, ProjectTemplateType, TenantId, WorkflowId, WorkspaceId,
+};
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// **骨架阶段**: 最小冒烟测试,验证 crate 可编译、ActorContext 字段可达。
-    /// Phase 2 由具体 spec 引入完整单元测试(状态机覆盖 / RLS 矩阵等)。
+    fn make_actor(tenant_id: TenantId) -> ActorContext {
+        ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::PROJECT_ADMIN)
+    }
+
     #[test]
-    fn actor_context_skeleton() {
-        let actor = ActorContext {
-            user_id: Uuid::new_v4(),
-            tenant_id: Uuid::new_v4(),
-            device_id: None,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
+    fn field_count_audit() {
+        assert_eq!(Project::FIELD_COUNT, 16);
+        assert_eq!(ProjectTemplate::FIELD_COUNT, 9);
+        assert_eq!(ProjectPolicy::FIELD_COUNT, 9);
+    }
+
+    #[tokio::test]
+    async fn create_project_success() {
+        let svc = InMemoryProjectService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let cmd = CreateProjectCommand {
+            tenant_id,
+            workspace_id: WorkspaceId::new(),
+            project_key: "STAR".to_string(),
+            name: "Star Project".to_string(),
+            description: None,
+            template_type: ProjectTemplateType::SoftwareDev,
+            lead_user_id: Some(uuid::Uuid::new_v4()),
         };
-        assert!(!actor.tenant_id.is_nil(), "tenant_id must be non-nil (§6.1,REQ-SEC-001)");
+        let p = svc.create_project(cmd, actor).await.unwrap();
+        assert_eq!(p.status, ProjectStatus::Active);
+        assert_eq!(p.version, 1);
+        assert_eq!(svc.count().await, 1);
+    }
+
+    #[tokio::test]
+    async fn invariant_01_project_key_conflict() {
+        let svc = InMemoryProjectService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let ws = WorkspaceId::new();
+        let cmd1 = CreateProjectCommand {
+            tenant_id,
+            workspace_id: ws,
+            project_key: "DUP".to_string(),
+            name: "P1".to_string(),
+            description: None,
+            template_type: ProjectTemplateType::SoftwareDev,
+            lead_user_id: None,
+        };
+        svc.create_project(cmd1, actor.clone()).await.unwrap();
+        let cmd2 = CreateProjectCommand {
+            tenant_id,
+            workspace_id: ws,
+            project_key: "DUP".to_string(),
+            name: "P2".to_string(),
+            description: None,
+            template_type: ProjectTemplateType::SoftwareDev,
+            lead_user_id: None,
+        };
+        let res = svc.create_project(cmd2, actor).await;
+        assert!(matches!(res, Err(ProjectError::Conflict(_))));
+    }
+
+    #[tokio::test]
+    async fn invariant_03_empty_key_rejected() {
+        let svc = InMemoryProjectService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let cmd = CreateProjectCommand {
+            tenant_id,
+            workspace_id: WorkspaceId::new(),
+            project_key: "".to_string(),
+            name: "X".to_string(),
+            description: None,
+            template_type: ProjectTemplateType::SoftwareDev,
+            lead_user_id: None,
+        };
+        let res = svc.create_project(cmd, actor).await;
+        assert!(matches!(res, Err(ProjectError::InvalidState(_))));
+    }
+
+    #[tokio::test]
+    async fn cross_tenant_access_denied() {
+        let svc = InMemoryProjectService::new_for_test();
+        let tenant_a = TenantId::new();
+        let actor_a = make_actor(tenant_a);
+        let p = svc
+            .create_project(
+                CreateProjectCommand {
+                    tenant_id: tenant_a,
+                    workspace_id: WorkspaceId::new(),
+                    project_key: "A".to_string(),
+                    name: "A".to_string(),
+                    description: None,
+                    template_type: ProjectTemplateType::SoftwareDev,
+                    lead_user_id: None,
+                },
+                actor_a,
+            )
+            .await
+            .unwrap();
+        let tenant_b = TenantId::new();
+        let actor_b = make_actor(tenant_b);
+        let res = svc.get_by_id(p.id, actor_b).await;
+        assert!(matches!(res, Err(ProjectError::PermissionDenied)));
+    }
+
+    #[tokio::test]
+    async fn archive_project() {
+        let svc = InMemoryProjectService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let p = svc
+            .create_project(
+                CreateProjectCommand {
+                    tenant_id,
+                    workspace_id: WorkspaceId::new(),
+                    project_key: "ARC".to_string(),
+                    name: "Arc".to_string(),
+                    description: None,
+                    template_type: ProjectTemplateType::Kanban,
+                    lead_user_id: None,
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        let p2 = svc
+            .archive_project(
+                ArchiveProjectCommand {
+                    project_id: p.id,
+                    tenant_id,
+                    expected_version: 1,
+                },
+                actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(p2.status, ProjectStatus::Archived);
+        assert_eq!(p2.version, 2);
+    }
+
+    #[tokio::test]
+    async fn list_built_in_templates() {
+        let svc = InMemoryProjectService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let tpls = svc.list_templates(tenant_id, actor).await.unwrap();
+        assert_eq!(tpls.len(), 4);
+        assert!(tpls.iter().all(|t| t.built_in));
+    }
+
+    #[tokio::test]
+    async fn update_project_policy_first_time() {
+        let svc = InMemoryProjectService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let p = svc
+            .create_project(
+                CreateProjectCommand {
+                    tenant_id,
+                    workspace_id: WorkspaceId::new(),
+                    project_key: "POL".to_string(),
+                    name: "Pol".to_string(),
+                    description: None,
+                    template_type: ProjectTemplateType::SoftwareDev,
+                    lead_user_id: None,
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        let policy = svc
+            .update_project_policy(
+                UpdateProjectPolicyCommand {
+                    project_id: p.id,
+                    tenant_id,
+                    expected_version: 0,
+                    agent_policy: Some(serde_json::json!({"claude": "enabled"})),
+                    worktree_policy: None,
+                    validation_policy: None,
+                    context_policy: None,
+                },
+                actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(policy.version, 1);
+        assert_eq!(policy.agent_policy["claude"], "enabled");
+    }
+
+    #[tokio::test]
+    async fn event_bus_receives_created() {
+        let (svc, mut rx) = InMemoryProjectService::new();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let cmd = CreateProjectCommand {
+            tenant_id,
+            workspace_id: WorkspaceId::new(),
+            project_key: "EVT".to_string(),
+            name: "E".to_string(),
+            description: None,
+            template_type: ProjectTemplateType::SoftwareDev,
+            lead_user_id: None,
+        };
+        svc.create_project(cmd, actor).await.unwrap();
+        let evt = rx.try_recv().expect("应收到 Created 事件");
+        assert!(matches!(evt, ProjectEvent::Created(_)));
+        assert_eq!(evt.subject(), "star.events.project.project.created.v1");
+    }
+
+    #[tokio::test]
+    async fn update_project_version_conflict() {
+        let svc = InMemoryProjectService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_actor(tenant_id);
+        let p = svc
+            .create_project(
+                CreateProjectCommand {
+                    tenant_id,
+                    workspace_id: WorkspaceId::new(),
+                    project_key: "V".to_string(),
+                    name: "V".to_string(),
+                    description: None,
+                    template_type: ProjectTemplateType::SoftwareDev,
+                    lead_user_id: None,
+                },
+                actor.clone(),
+            )
+            .await
+            .unwrap();
+        let res = svc
+            .update_project(
+                UpdateProjectCommand {
+                    project_id: p.id,
+                    tenant_id,
+                    expected_version: 99,
+                    name: Some("N".to_string()),
+                    description: None,
+                    lead_user_id: None,
+                },
+                actor,
+            )
+            .await;
+        assert!(matches!(res, Err(ProjectError::Conflict(_))));
     }
 }

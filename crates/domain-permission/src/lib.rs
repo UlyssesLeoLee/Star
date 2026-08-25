@@ -1,288 +1,276 @@
-//! Permission Scheme / RBAC
+//! Permission RBAC 权限层
 //!
 //! **crate**: `domain-permission`
-//! **上游 spec**: docs/specs/domain-permission-spec.md §11 Permission
-//! **基本设计**: docs/basic-design.md §2.1(表 21)
-//! **数据设计**: docs/data-design.md §4.22 (`permission` schema)
-//! **API 设计**: docs/api-design.md §3.5 (Permission CRUD + Role)
-//!
-//! ## 职责
-//!
-//! 详细职责边界见 spec 文档第 1 节。骨架阶段仅声明 Port trait + Entity + Error,
-//! 具体实现由 `crates/infrastructure` 中的 Adapter 提供。
-//!
-//! ## 关键不变量
-//!
-//! //! - Agent 操作必须 Application/Authorization 强制(§11,REQ-PERM-002)
-//! - PermissionScheme 按 Project 注入(§3 ACL)
+//! **上游 spec**: docs/specs/domain-permission-spec.md
+//! **基本设计**: docs/basic-design.md §4.8
+//! **数据设计**: docs/data-design.md §4.8
 
-//! ## 上游依赖(basic-design §2.3)
-//!
-//! 本 crate 依赖以下 domain-*(骨架阶段不实际 import,Cargo.toml 仅声明本 crate 自身需要的外部依赖):
-//!
-//!   - `domain-tenant`
-//!
-//! **禁止反向依赖**(§2.3 禁线)。
-
-//! ## 关键引用
-//!
-//! PermissionScheme = RBAC + Project Policy(§11)
-
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 #![warn(rust_2018_idioms)]
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+pub mod context;
+pub mod entity;
+pub mod error;
+pub mod event;
+pub mod invariants;
+pub mod macros;
+pub mod port;
+pub mod service;
+pub mod value_object;
 
-// =====================================================================
-// 实体(Entity / Aggregate Root)
-// =====================================================================
-
-/// Role (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.22 (`permission` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Role {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Permission (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.22 (`permission` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Permission {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// PermissionScheme (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.22 (`permission` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PermissionScheme {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 端口(Port / 抽象)
-// =====================================================================
-
-/// **PermissionCommandPort**(命令端口)
-///
-/// 来源: docs/api-design.md §3.5 (Permission CRUD + Role)
-///
-/// **骨架阶段**: 仅方法签名,无 body 实现。Phase 2 在
-/// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
-#[async_trait]
-pub trait PermissionCommandPort: Send + Sync {
-    async fn create_role(
-        &self,
-        cmd: CreateRoleCommand,
-        actor: ActorContext,
-    ) -> Result<RoleId, PermissionError>;
-    async fn assign_permission(
-        &self,
-        cmd: AssignPermissionCommand,
-        actor: ActorContext,
-    ) -> Result<Role, PermissionError>;
-    async fn create_scheme(
-        &self,
-        cmd: CreatePermissionSchemeCommand,
-        actor: ActorContext,
-    ) -> Result<PermissionSchemeId, PermissionError>;
-}
-
-
-/// **PermissionQueryPort**(查询端口)
-///
-/// 来源: docs/api-design.md §3.5 (Permission CRUD + Role)
-#[async_trait]
-pub trait PermissionQueryPort: Send + Sync {
-    async fn check(
-        &self,
-        q: AuthorizationCheckQuery,
-        viewer: ActorContext,
-    ) -> Result<AuthorizationDecision, PermissionError>;
-    async fn list_roles(
-        &self,
-        id: TenantId,
-        viewer: ActorContext,
-    ) -> Result<Vec<Role>, PermissionError>;
-}
-
-// =====================================================================
-// Domain Events(CloudEvents 1.0,见 api-design §5)
-// =====================================================================
-
-/// Domain Event: `star.events.permission.role.created.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Permission01Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 类型别名与命令/查询/返回类型占位
-// =====================================================================
-/// **ID 类型别名**(Phase 1 骨架:均为 UUID 别名)
-///
-/// 真实使用应由 `domain-identity` 颁发强类型 ID(§23.2);
-/// 骨架阶段以 `Uuid` 替代以避免跨 crate 编译依赖。
-
-pub type PermissionId = Uuid;
-pub type PermissionSchemeId = Uuid;
-pub type RoleId = Uuid;
-pub type TenantId = Uuid;
-
-/// **命令 / 查询 / 跨 crate 类型占位结构**(Phase 1 骨架:最小字段集)
-
-/// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
-/// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssignPermissionCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuthorizationCheckQuery {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuthorizationDecision {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreatePermissionSchemeCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateRoleCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-
-// =====================================================================
-// Error
-// =====================================================================
-
-/// **Permission 错误**
-///
-/// 来源: docs/api-design.md §8 (错误码)
-/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
-#[derive(Debug, thiserror::Error)]
-pub enum PermissionError {
-    #[error("not found: {0}")]
-    NotFound(Uuid),
-    #[error("invalid state: {0}")]
-    InvalidState(String),
-    #[error("permission denied")]
-    PermissionDenied,
-    #[error("conflict: {0}")]
-    Conflict(String),
-    #[error("internal: {0}")]
-    Internal(String),
-}
-
-// =====================================================================
-// 共享类型
-// =====================================================================
-
-/// **Actor 上下文**(来自 `domain-identity` / `domain-permission` 的 JWT claim)
-///
-/// **骨架阶段**: 字段占位;Phase 2 由 `domain-identity` 颁发的 ActorContext 取代
-/// 本 crate 内的占位定义(避免循环依赖)。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    /// 当前用户 ID
-    pub user_id: Uuid,
-    /// 当前租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 当前设备 ID(Local Runtime 三重绑定,§23.2)
-    pub device_id: Option<Uuid>,
-    /// 当前 Project IDs(用于 Project Policy 校验)
-    pub project_ids: Vec<Uuid>,
-    /// 当前用户角色(`tenant_admin` / `project_admin` / `developer` / `viewer`)
-    pub roles: Vec<String>,
-}
-
-// =====================================================================
-// 单元测试占位
-// =====================================================================
+pub use context::ActorContext;
+pub use entity::{Permission, PermissionScheme, Role};
+pub use error::PermissionError;
+pub use event::{EventMeta, PermissionChecked, PermissionEvent, RoleCreated, SchemeCreated};
+pub use invariants::{
+    check_invariant_01_permission_code_unique, check_invariant_02_scheme_has_owner,
+    check_invariant_03_tenant_id_present, check_invariant_04_role_name_format, run_invariants,
+    ALL_INVARIANT_CHECKS,
+};
+pub use port::{
+    CheckPermissionQuery, CreatePermissionSchemeCommand, CreateRoleCommand,
+    PermissionCommandPort, PermissionQueryPort, UpdateRoleCommand,
+};
+pub use service::InMemoryPermissionService;
+pub use value_object::{
+    perm_codes, roles, PermissionId, PermissionSchemeId, PermissionScope, ProjectId, RoleId,
+    TenantId,
+};
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
-    /// **骨架阶段**: 最小冒烟测试,验证 crate 可编译、ActorContext 字段可达。
-    /// Phase 2 由具体 spec 引入完整单元测试(状态机覆盖 / RLS 矩阵等)。
+    fn make_admin(tenant_id: TenantId) -> ActorContext {
+        ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::TENANT_ADMIN)
+    }
+
+    fn make_normal(tenant_id: TenantId) -> ActorContext {
+        ActorContext::new(uuid::Uuid::new_v4(), tenant_id)
+    }
+
     #[test]
-    fn actor_context_skeleton() {
-        let actor = ActorContext {
-            user_id: Uuid::new_v4(),
-            tenant_id: Uuid::new_v4(),
-            device_id: None,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
+    fn field_count_audit() {
+        assert_eq!(Role::FIELD_COUNT, 10);
+        assert_eq!(Permission::FIELD_COUNT, 6);
+        assert_eq!(PermissionScheme::FIELD_COUNT, 9);
+    }
+
+    #[tokio::test]
+    async fn list_builtin_permissions() {
+        let svc = InMemoryPermissionService::new_for_test();
+        let perms = svc.list_permissions().await.unwrap();
+        assert!(perms.len() >= 6);
+        assert!(perms.iter().any(|p| p.code == "workitem:read"));
+    }
+
+    #[tokio::test]
+    async fn create_role_success() {
+        let svc = InMemoryPermissionService::new_for_test();
+        let tenant_id = TenantId::new();
+        let admin = make_admin(tenant_id);
+        let role = svc
+            .create_role(
+                CreateRoleCommand {
+                    tenant_id,
+                    name: "developer".to_string(),
+                    description: Some("dev role".to_string()),
+                    permissions: vec![perm_codes::WORKITEM_READ.to_string()],
+                },
+                admin,
+            )
+            .await
+            .unwrap();
+        assert!(role.has_permission(perm_codes::WORKITEM_READ));
+        assert!(!role.built_in);
+    }
+
+    #[tokio::test]
+    async fn create_role_non_admin_denied() {
+        let svc = InMemoryPermissionService::new_for_test();
+        let tenant_id = TenantId::new();
+        let normal = make_normal(tenant_id);
+        let res = svc
+            .create_role(
+                CreateRoleCommand {
+                    tenant_id,
+                    name: "x".to_string(),
+                    description: None,
+                    permissions: vec![],
+                },
+                normal,
+            )
+            .await;
+        assert!(matches!(res, Err(PermissionError::PermissionDenied)));
+    }
+
+    #[tokio::test]
+    async fn create_role_duplicate_name() {
+        let svc = InMemoryPermissionService::new_for_test();
+        let tenant_id = TenantId::new();
+        let admin = make_admin(tenant_id);
+        let cmd = CreateRoleCommand {
+            tenant_id,
+            name: "dup".to_string(),
+            description: None,
+            permissions: vec![],
         };
-        assert!(!actor.tenant_id.is_nil(), "tenant_id must be non-nil (§6.1,REQ-SEC-001)");
+        svc.create_role(cmd.clone(), admin.clone()).await.unwrap();
+        let res = svc.create_role(cmd, admin).await;
+        assert!(matches!(res, Err(PermissionError::Conflict(_))));
+    }
+
+    #[tokio::test]
+    async fn invariant_04_empty_name_rejected() {
+        let svc = InMemoryPermissionService::new_for_test();
+        let tenant_id = TenantId::new();
+        let admin = make_admin(tenant_id);
+        let res = svc
+            .create_role(
+                CreateRoleCommand {
+                    tenant_id,
+                    name: "".to_string(),
+                    description: None,
+                    permissions: vec![],
+                },
+                admin,
+            )
+            .await;
+        assert!(matches!(res, Err(PermissionError::InvalidState(_))));
+    }
+
+    #[tokio::test]
+    async fn check_permission_grants() {
+        let svc = InMemoryPermissionService::new_for_test();
+        let tenant_id = TenantId::new();
+        let admin = make_admin(tenant_id);
+        let role = svc
+            .create_role(
+                CreateRoleCommand {
+                    tenant_id,
+                    name: "r".to_string(),
+                    description: None,
+                    permissions: vec![perm_codes::WORKITEM_READ.to_string()],
+                },
+                admin.clone(),
+            )
+            .await
+            .unwrap();
+        let granted = svc
+            .check_permission(
+                CheckPermissionQuery {
+                    role_id: role.id,
+                    permission: perm_codes::WORKITEM_READ.to_string(),
+                },
+                admin.clone(),
+            )
+            .await
+            .unwrap();
+        assert!(granted);
+        let denied = svc
+            .check_permission(
+                CheckPermissionQuery {
+                    role_id: role.id,
+                    permission: perm_codes::WORKITEM_DELETE.to_string(),
+                },
+                admin,
+            )
+            .await
+            .unwrap();
+        assert!(!denied);
+    }
+
+    #[tokio::test]
+    async fn scheme_must_have_default_role() {
+        let svc = InMemoryPermissionService::new_for_test();
+        let tenant_id = TenantId::new();
+        let admin = make_admin(tenant_id);
+        let mut role_perms = HashMap::new();
+        role_perms.insert("developer".to_string(), vec!["workitem:read".to_string()]);
+        let res = svc
+            .create_scheme(
+                CreatePermissionSchemeCommand {
+                    project_id: ProjectId::new(),
+                    tenant_id,
+                    name: "Default".to_string(),
+                    default_role: "missing-role".to_string(), // 不在 role_permissions 中
+                    role_permissions: role_perms,
+                },
+                admin,
+            )
+            .await;
+        assert!(matches!(res, Err(PermissionError::InvalidState(_))));
+    }
+
+    #[tokio::test]
+    async fn scheme_grants_via_default_role() {
+        let svc = InMemoryPermissionService::new_for_test();
+        let tenant_id = TenantId::new();
+        let admin = make_admin(tenant_id);
+        let mut role_perms = HashMap::new();
+        role_perms.insert(
+            "developer".to_string(),
+            vec![perm_codes::WORKITEM_READ.to_string()],
+        );
+        let scheme = svc
+            .create_scheme(
+                CreatePermissionSchemeCommand {
+                    project_id: ProjectId::new(),
+                    tenant_id,
+                    name: "Default".to_string(),
+                    default_role: "developer".to_string(),
+                    role_permissions: role_perms,
+                },
+                admin.clone(),
+            )
+            .await
+            .unwrap();
+        assert!(scheme.grants("developer", perm_codes::WORKITEM_READ));
+        assert!(!scheme.grants("viewer", perm_codes::WORKITEM_READ));
+    }
+
+    #[tokio::test]
+    async fn cross_tenant_access_denied() {
+        let svc = InMemoryPermissionService::new_for_test();
+        let tenant_a = TenantId::new();
+        let admin_a = make_admin(tenant_a);
+        let role = svc
+            .create_role(
+                CreateRoleCommand {
+                    tenant_id: tenant_a,
+                    name: "r".to_string(),
+                    description: None,
+                    permissions: vec![],
+                },
+                admin_a,
+            )
+            .await
+            .unwrap();
+        let tenant_b = TenantId::new();
+        let admin_b = make_admin(tenant_b);
+        let res = svc.get_role(role.id, admin_b).await;
+        assert!(matches!(res, Err(PermissionError::PermissionDenied)));
+    }
+
+    #[tokio::test]
+    async fn event_bus_receives_role_created() {
+        let (svc, mut rx) = InMemoryPermissionService::new();
+        let tenant_id = TenantId::new();
+        let admin = make_admin(tenant_id);
+        svc.create_role(
+            CreateRoleCommand {
+                tenant_id,
+                name: "r".to_string(),
+                description: None,
+                permissions: vec![],
+            },
+            admin,
+        )
+        .await
+        .unwrap();
+        let evt = rx.try_recv().expect("应收到 RoleCreated 事件");
+        assert!(matches!(evt, PermissionEvent::RoleCreated(_)));
+        assert_eq!(evt.subject(), "star.events.permission.role.created.v1");
     }
 }

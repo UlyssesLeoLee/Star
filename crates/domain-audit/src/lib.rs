@@ -1,242 +1,264 @@
-//! Audit 领域
+//! Audit 审计日志 + AI Audit Metadata
 //!
 //! **crate**: `domain-audit`
-//! **上游 spec**: docs/specs/domain-audit-spec.md §17 Audit Log / AI Audit Metadata
-//! **基本设计**: docs/basic-design.md §2.1 / §9 Traceability / §28.2
-//! **数据设计**: docs/data-design.md §4.16 (`audit` schema)
-//! **API 设计**: docs/api-design.md §3.19 (Audit Query / 不可删)
-//!
-//! ## 职责
-//!
-//! 详细职责边界见 spec 文档第 1 节。骨架阶段仅声明 Port trait + Entity + Error,
-//! 具体实现由 `crates/infrastructure` 中的 Adapter 提供。
-//!
-//! ## 关键不变量
-//!
-//! //! - Audit 仅 Append,不可读其它 domain,不可删(§2.3 禁线,§3 ACL)
-//! - 敏感 Prompt/Code 不默认进入普通日志(§17,§28.2)
+//! **上游 spec**: docs/specs/domain-audit-spec.md
+//! **基本设计**: docs/basic-design.md §4.18
+//! **数据设计**: docs/data-design.md §4.18
 
-//! ## 上游依赖
-//!
-//! 本 crate 为依赖图最底层(basic-design §2.3),无 domain-* 上游依赖。
-
-//! ## 关键引用
-//!
-//! Audit Append-only,不可读其它 domain(§2.3 禁线)
-
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 #![warn(rust_2018_idioms)]
 
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+pub mod context;
+pub mod entity;
+pub mod error;
+pub mod event;
+pub mod invariants;
+pub mod macros;
+pub mod port;
+pub mod service;
+pub mod value_object;
 
-// =====================================================================
-// 实体(Entity / Aggregate Root)
-// =====================================================================
-
-/// AuditEvent (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.16 (`audit` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuditEvent {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// AIAuditMetadata (聚合根 / 实体)
-///
-/// 来源: docs/data-design.md §4.16 (`audit` schema)
-///
-/// **骨架阶段**: 仅占位字段,完整字段与不变量留待 Phase 2。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AIAuditMetadata {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户隔离(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 创建时间
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    /// 更新时间
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 端口(Port / 抽象)
-// =====================================================================
-
-/// **AuditCommandPort**(命令端口)
-///
-/// 来源: docs/api-design.md §3.19 (Audit Query / 不可删)
-///
-/// **骨架阶段**: 仅方法签名,无 body 实现。Phase 2 在
-/// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
-#[async_trait]
-pub trait AuditCommandPort: Send + Sync {
-    async fn record_event(
-        &self,
-        cmd: RecordAuditEventCommand,
-        actor: ActorContext,
-    ) -> Result<AuditEventId, AuditError>;
-    async fn record_ai_metadata(
-        &self,
-        cmd: RecordAIAuditMetadataCommand,
-        actor: ActorContext,
-    ) -> Result<AIAuditMetadataId, AuditError>;
-}
-
-
-/// **AuditQueryPort**(查询端口)
-///
-/// 来源: docs/api-design.md §3.19 (Audit Query / 不可删)
-#[async_trait]
-pub trait AuditQueryPort: Send + Sync {
-    async fn list_by_actor(
-        &self,
-        q: ListAuditQuery,
-        viewer: ActorContext,
-    ) -> Result<Vec<AuditEvent>, AuditError>;
-    async fn get_ai_metadata(
-        &self,
-        id: AIAuditMetadataId,
-        viewer: ActorContext,
-    ) -> Result<AIAuditMetadata, AuditError>;
-}
-
-// =====================================================================
-// Domain Events(CloudEvents 1.0,见 api-design §5)
-// =====================================================================
-
-/// Domain Event: `star.events.audit.event.recorded.v1`
-///
-/// 来源: docs/api-design.md §5 (CloudEvents 1.0)
-///
-/// **骨架阶段**: 仅占位字段,Phase 2 补充完整 Payload 字段。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Audit01Event {
-    /// 事件唯一 ID(UUIDv7)
-    pub event_id: Uuid,
-    /// 租户 ID(必带)
-    pub tenant_id: Uuid,
-    /// 事件发生时间
-    pub occurred_at: chrono::DateTime<chrono::Utc>,
-}
-
-// =====================================================================
-// 类型别名与命令/查询/返回类型占位
-// =====================================================================
-/// **ID 类型别名**(Phase 1 骨架:均为 UUID 别名)
-///
-/// 真实使用应由 `domain-identity` 颁发强类型 ID(§23.2);
-/// 骨架阶段以 `Uuid` 替代以避免跨 crate 编译依赖。
-
-pub type AIAuditMetadataId = Uuid;
-pub type AuditEventId = Uuid;
-
-/// **命令 / 查询 / 跨 crate 类型占位结构**(Phase 1 骨架:最小字段集)
-
-/// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
-/// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ListAuditQuery {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordAIAuditMetadataCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordAuditEventCommand {
-    /// 主键 UUID
-    pub id: Uuid,
-    /// 租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    // 其它字段在 Phase 2 由具体 spec 补充
-}
-
-
-// =====================================================================
-// Error
-// =====================================================================
-
-/// **Audit 错误**
-///
-/// 来源: docs/api-design.md §8 (错误码)
-/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
-#[derive(Debug, thiserror::Error)]
-pub enum AuditError {
-    #[error("not found: {0}")]
-    NotFound(Uuid),
-    #[error("invalid state: {0}")]
-    InvalidState(String),
-    #[error("permission denied")]
-    PermissionDenied,
-    #[error("conflict: {0}")]
-    Conflict(String),
-    #[error("internal: {0}")]
-    Internal(String),
-}
-
-// =====================================================================
-// 共享类型
-// =====================================================================
-
-/// **Actor 上下文**(来自 `domain-identity` / `domain-permission` 的 JWT claim)
-///
-/// **骨架阶段**: 字段占位;Phase 2 由 `domain-identity` 颁发的 ActorContext 取代
-/// 本 crate 内的占位定义(避免循环依赖)。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    /// 当前用户 ID
-    pub user_id: Uuid,
-    /// 当前租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 当前设备 ID(Local Runtime 三重绑定,§23.2)
-    pub device_id: Option<Uuid>,
-    /// 当前 Project IDs(用于 Project Policy 校验)
-    pub project_ids: Vec<Uuid>,
-    /// 当前用户角色(`tenant_admin` / `project_admin` / `developer` / `viewer`)
-    pub roles: Vec<String>,
-}
-
-// =====================================================================
-// 单元测试占位
-// =====================================================================
+pub use context::ActorContext;
+pub use entity::{AIAuditMetadata, AuditEvent};
+pub use error::AuditError;
+pub use event::{AuditEventAppended, AuditEventKind, EventMeta};
+pub use invariants::{
+    check_invariant_02_required_fields, check_invariant_03_immutable_hash,
+    check_invariant_04_ai_metadata_required, compute_immutable_hash, run_invariants,
+    ALL_INVARIANT_CHECKS,
+};
+pub use port::{
+    AuditCommandPort, AuditQueryPort, ListAuditEventQuery, RecordAIAuditMetadataCommand,
+    RecordAuditEventCommand,
+};
+pub use service::InMemoryAuditService;
+pub use value_object::{roles, AIAuditMetadataId, AuditAction, AuditEventId, TenantId, UserId};
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::value_object::{AuditAction, TenantId, UserId};
 
-    /// **骨架阶段**: 最小冒烟测试,验证 crate 可编译、ActorContext 字段可达。
-    /// Phase 2 由具体 spec 引入完整单元测试(状态机覆盖 / RLS 矩阵等)。
+    fn make_admin(tenant_id: TenantId) -> ActorContext {
+        ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::TENANT_ADMIN)
+    }
+
+    fn make_auditor(tenant_id: TenantId) -> ActorContext {
+        ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::TENANT_AUDITOR)
+    }
+
     #[test]
-    fn actor_context_skeleton() {
-        let actor = ActorContext {
-            user_id: Uuid::new_v4(),
-            tenant_id: Uuid::new_v4(),
-            device_id: None,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
+    fn field_count_audit() {
+        assert_eq!(AuditEvent::FIELD_COUNT, 9);
+        assert_eq!(AIAuditMetadata::FIELD_COUNT, 9);
+    }
+
+    #[tokio::test]
+    async fn record_event_success() {
+        let svc = InMemoryAuditService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_admin(tenant_id);
+        let cmd = RecordAuditEventCommand {
+            tenant_id,
+            actor_id: UserId::new(),
+            action: AuditAction::UserCreate,
+            target_type: "User".to_string(),
+            target_id: uuid::Uuid::new_v4(),
+            payload_json: serde_json::json!({"email": "x@y.com"}),
         };
-        assert!(!actor.tenant_id.is_nil(), "tenant_id must be non-nil (§6.1,REQ-SEC-001)");
+        let ev = svc.record_event(cmd, actor).await.unwrap();
+        assert_eq!(ev.action, AuditAction::UserCreate);
+        assert_eq!(ev.immutable_hash.len(), 64);
+        assert_eq!(svc.count().await, 1);
+    }
+
+    #[tokio::test]
+    async fn invariant_02_missing_target_type() {
+        let svc = InMemoryAuditService::new_for_test();
+        let tenant_id = TenantId::new();
+        let actor = make_admin(tenant_id);
+        let cmd = RecordAuditEventCommand {
+            tenant_id,
+            actor_id: UserId::new(),
+            action: AuditAction::UserCreate,
+            target_type: "".to_string(),
+            target_id: uuid::Uuid::new_v4(),
+            payload_json: serde_json::json!({}),
+        };
+        let res = svc.record_event(cmd, actor).await;
+        assert!(matches!(res, Err(AuditError::InvalidState(_))));
+    }
+
+    #[tokio::test]
+    async fn record_ai_metadata() {
+        let svc = InMemoryAuditService::new_for_test();
+        let tenant_id = TenantId::new();
+        let admin = make_admin(tenant_id);
+        let ev = svc
+            .record_event(
+                RecordAuditEventCommand {
+                    tenant_id,
+                    actor_id: UserId::new(),
+                    action: AuditAction::AgentExecute,
+                    target_type: "Agent".to_string(),
+                    target_id: uuid::Uuid::new_v4(),
+                    payload_json: serde_json::json!({}),
+                },
+                admin.clone(),
+            )
+            .await
+            .unwrap();
+        let m = svc
+            .record_ai_metadata(
+                RecordAIAuditMetadataCommand {
+                    audit_event_id: ev.id,
+                    tenant_id,
+                    agent_session_id: uuid::Uuid::new_v4(),
+                    worktree_id: None,
+                    prompt_hash: "a".repeat(64),
+                    response_hash: "b".repeat(64),
+                    retention_until: None,
+                },
+                admin,
+            )
+            .await
+            .unwrap();
+        assert!(!m.is_expired(chrono::Utc::now()));
+    }
+
+    #[tokio::test]
+    async fn invariant_04_ai_metadata_missing_hash() {
+        let svc = InMemoryAuditService::new_for_test();
+        let tenant_id = TenantId::new();
+        let admin = make_admin(tenant_id);
+        let ev = svc
+            .record_event(
+                RecordAuditEventCommand {
+                    tenant_id,
+                    actor_id: UserId::new(),
+                    action: AuditAction::AgentExecute,
+                    target_type: "Agent".to_string(),
+                    target_id: uuid::Uuid::new_v4(),
+                    payload_json: serde_json::json!({}),
+                },
+                admin.clone(),
+            )
+            .await
+            .unwrap();
+        let res = svc
+            .record_ai_metadata(
+                RecordAIAuditMetadataCommand {
+                    audit_event_id: ev.id,
+                    tenant_id,
+                    agent_session_id: uuid::Uuid::new_v4(),
+                    worktree_id: None,
+                    prompt_hash: "".to_string(), // 空
+                    response_hash: "ok".to_string(),
+                    retention_until: None,
+                },
+                admin,
+            )
+            .await;
+        assert!(matches!(res, Err(AuditError::InvalidState(_))));
+    }
+
+    #[tokio::test]
+    async fn non_auditor_cannot_list_events() {
+        let svc = InMemoryAuditService::new_for_test();
+        let tenant_id = TenantId::new();
+        let admin = make_admin(tenant_id);
+        svc.record_event(
+            RecordAuditEventCommand {
+                tenant_id,
+                actor_id: UserId::new(),
+                action: AuditAction::UserCreate,
+                target_type: "User".to_string(),
+                target_id: uuid::Uuid::new_v4(),
+                payload_json: serde_json::json!({}),
+            },
+            admin,
+        )
+        .await
+        .unwrap();
+        // 普通 user 角色尝试 list → 拒
+        let mut normal = ActorContext::new(uuid::Uuid::new_v4(), tenant_id);
+        normal.roles.push("user".to_string());
+        let res = svc
+            .list_events(ListAuditEventQuery::default(), normal)
+            .await;
+        assert!(matches!(res, Err(AuditError::PermissionDenied)));
+    }
+
+    #[tokio::test]
+    async fn auditor_can_list_events() {
+        let svc = InMemoryAuditService::new_for_test();
+        let tenant_id = TenantId::new();
+        let admin = make_admin(tenant_id);
+        for _ in 0..3 {
+            svc.record_event(
+                RecordAuditEventCommand {
+                    tenant_id,
+                    actor_id: UserId::new(),
+                    action: AuditAction::Custom,
+                    target_type: "Test".to_string(),
+                    target_id: uuid::Uuid::new_v4(),
+                    payload_json: serde_json::json!({}),
+                },
+                admin.clone(),
+            )
+            .await
+            .unwrap();
+        }
+        let auditor = make_auditor(tenant_id);
+        let q = ListAuditEventQuery {
+            tenant_id,
+            ..Default::default()
+        };
+        let events = svc.list_events(q.clone(), auditor.clone()).await.unwrap();
+        assert_eq!(events.len(), 3);
+        let count = svc.count_events(q, auditor).await.unwrap();
+        assert_eq!(count, 3);
+    }
+
+    #[tokio::test]
+    async fn cross_tenant_record_denied() {
+        let svc = InMemoryAuditService::new_for_test();
+        let tenant_a = TenantId::new();
+        let admin_a = make_admin(tenant_a);
+        let tenant_b = TenantId::new();
+        // 用 admin_a 但命令带 tenant_b → 租户不一致 → 拒
+        let cmd = RecordAuditEventCommand {
+            tenant_id: tenant_b,
+            actor_id: UserId::new(),
+            action: AuditAction::Custom,
+            target_type: "X".to_string(),
+            target_id: uuid::Uuid::new_v4(),
+            payload_json: serde_json::json!({}),
+        };
+        let res = svc.record_event(cmd, admin_a).await;
+        assert!(matches!(res, Err(AuditError::PermissionDenied)));
+    }
+
+    #[tokio::test]
+    async fn event_bus_receives_appended() {
+        let (svc, mut rx) = InMemoryAuditService::new();
+        let tenant_id = TenantId::new();
+        let admin = make_admin(tenant_id);
+        svc.record_event(
+            RecordAuditEventCommand {
+                tenant_id,
+                actor_id: UserId::new(),
+                action: AuditAction::Custom,
+                target_type: "X".to_string(),
+                target_id: uuid::Uuid::new_v4(),
+                payload_json: serde_json::json!({}),
+            },
+            admin,
+        )
+        .await
+        .unwrap();
+        let kind = rx.try_recv().expect("应收到 Appended 事件");
+        assert!(matches!(kind, AuditEventKind::Appended(_)));
+        assert_eq!(kind.subject(), "star.events.audit.event.appended.v1");
     }
 }
