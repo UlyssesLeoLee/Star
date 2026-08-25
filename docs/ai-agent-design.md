@@ -1,9 +1,34 @@
 # Star 平台《AI / Agent Design》(AI 子系统详细设计)
 
-> **文档版本**: v0.1 (2026-08-25)
+> **文档版本**: v0.2 (2026-08-26)
+> **修订历史**:
+>
+> | 版本 | 日期 | 变更 | 审批者 |
+> |---|---|---|---|
+> | v0.1 | 2026-08-25 | 初始版本 | — |
+> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(REQ-AUTO-002 / REQ-NOTIF-002 / REQ-SCM-003 / AgentSession token+cost / Skill-Playbook+Squad V2 候选) | — |
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/api-design.md` v0.1,`docs/security-design.md` v0.1,`docs/runtime-design.md` v0.1,`docs/integration-design.md` v0.1
 > **下游**: Implementation(`crates/domain-context` / `crates/domain-agent` / `crates/domain-feedback` / `crates/domain-validation` 内部 AI 子系统)、AI Provider 集成
 > **文档定位**: 本文规定 Star 平台所有 AI 子系统的详细设计:Context Compiler / AgentSession 状态机 / Decision Memory / Feedback Instruction Generator / Handoff Context Packet / Acceptance Coverage / AI Audit / Provider Data Boundary / AI Observability。
+
+---
+
+## 上游同步 2026-08-26(继承 basic-design 5f1ea5b)
+
+> 本设计书跟随《基本設計書》5f1ea5b 同步,引入以下 5 项变更。**均不改 MVP 边界与既有 14 状态 AgentSession / 5 级 Priority / 3 态 Decision**:
+>
+> | 同步项 | 基本設計書位置 | 本设计落位 |
+> |---|---|---|
+> | **S1** REQ-AUTO-002(Trigger 增加 Schedule/Cron) | §2.1.2 + §5.6 | §15.2 AI-J.14 Open Issue(占位,事件清单见 api-design §5.3) |
+> | **S2** REQ-NOTIF-002(默认仅人类决策节点触达) | §2.1.3 | §15.2 AI-J.15 Open Issue + §2.4 Priority 5 级注释 |
+> | **S3** REQ-SCM-003(自建 Git 提前到 V1) | §4.7.1 | 与本设计无直接章节(SCM Adapter 在 integration-design),本设计仅在 §9 Provider Data Boundary 注释同步 |
+> | **S4** AgentSession `token_usage` / `cost_summary` 字段 | §4.2.2 | §4.6 AgentSession 数据 Schema 追加 2 个 JSONB 列(V1 候选) |
+> | **S5** Skill/Playbook + Squad V2 候选 | §4.2.8 + §4.4 Provenance | §2.3 Provenance 强制 注释 + §9.4 强制点 + §15.2 AI-J.12/13 |
+>
+> **不变量保留**:
+> - §16 接口稳定承诺(21 项)**不**改(S4/S5 都是字段层 / V2 候选占位,不是冻结的接口)
+> - 14 状态 / 5 级 Priority / 3 态 Decision / 9 问必答 / 6 维 Policy 全部不动
+> - V1 候选允许在 DDL Schema 加 JSONB 字段;V2 / Future 必须显式标注
 
 ---
 
@@ -291,6 +316,8 @@ provenance_graph:
 - ❌ Provenance 不得是空字符串 / `unknown` / `ai_memory` 等无意义值
 - ✅ 至少一个:`{type, id_ref, tenant_id}`
 - ✅ AI 生成的元素(摘要)→ provenance.type = "AI_Summary",provenance.source = 原内容 ID
+
+> **S5 落点**(继承 basic-design 5f1ea5b §4.2.8,V2 候选):Provenance.source_type 候选扩展 `Skill`(Skill/Playbook 只读 Context 素材);MVP 不实现,落位时**必须**走 P5 隔离层(Untrusted Content,§2.4)+ Instruction Priority 不得高于 Trusted Human Policy;违反 → 拒绝加入 Context Packet。
 
 ### 2.4 Token Budget 优先级(继承《Requirements》§26.4)
 
@@ -622,6 +649,8 @@ agent_session (PostgreSQL)
 ├── change_set_id       (FK to change_set, NULL 表示未提交)
 ├── validation_result_ids (FK[] to validation_result)
 ├── result_summary      (TEXT)
+├── token_usage         (JSONB, V1 候选,S4 落点:{input_tokens, output_tokens, cached_tokens, total})
+├── cost_summary        (JSONB, V1 候选,S4 落点:{input_cost_usd, output_cost_usd, total_cost_usd, currency, computed_at})
 ├── max_runtime_seconds (INT, 默认 1800 = 30min)
 ├── max_context_tokens  (INT, 默认 32000)
 ├── max_change_scope    (INT, 默认 100 files)
@@ -1189,6 +1218,8 @@ function select_provider(
 
 **任何一步失败**:拒绝操作 + 写 Audit + 通知 Project Admin。
 
+> **S5 落点**(继承 basic-design 5f1ea5b §4.2.8,V2 候选):Skill/Playbook 作为 Context Packet 的 Provenance 来源 `source_type='Skill'`(V2 候选)进入 Provider 时,必须视同 Untrusted Content 走 P5 隔离层;LLM Instruction Priority 不得高于 Trusted Human Policy(P0);Agent Adapter 解析 Tool Call 时对 Skill 来源显式标签 `[UNTRUSTED SKILL CONTENT]`。
+
 ### 9.5 Data Classification(辅助)
 
 ```text
@@ -1607,6 +1638,11 @@ flowchart TB
 - **AI-J.8**:Context Packet 是否需要支持加密(防 SaaS Admin 偷看)?**否**(SaaS Admin 在 RLS 内,允许看)。V2 候选给极高敏感项目。
 - **AI-J.9**:Untrusted 隔离是否需要支持"软警告"模式(允许 Agent 看但要求 Acknowledgment)?**否**,硬隔离更安全。
 - **AI-J.10**:Decision 链是否需要支持"Conditional Decision"(如"如果 X 成立则 Y")?**V1 候选**。
+- **AI-J.11**:`token_usage` / `cost_summary` JSONB schema 细节(S4 落点,V1 候选),需与 Context Cost Analysis 复用统计口径(避免重复采集)。**V1 候选**。
+- **AI-J.12**:Skill/Playbook Provenance `SourceType::Skill` V2 候选(§2.3,§4.2.8,S5 落点);当前 MVP 不实现,需校验不绕过 §4.2.5 12 强制点 + 走 P5 隔离层(安全边界见 security-design §9.2.13)。**V2 候选**。
+- **AI-J.13**:Squad 分组视图 Future 候选(§4.2.8,S5 落点),仅 WorkItem/Worktree 维度的 Assignee 分组 Query;**不得**引入 Agent 间自主任务分派(违反 INV-AGT-10 Multi-Agent Control 边界);分组只能由人类或 `domain-automation` 规则指定 Assignee。**Future 候选**。
+- **AI-J.14**:AutomationRuleScheduleTriggered 事件 V1 候选(§api-design §5.3,§5.5.20,S1 落点);Event 与 Schedule/Cron 不共用执行路径,Worker 端按 `trigger_kind` 分流。**V1 候选**。
+- **AI-J.15**:Notification `requires_human_decision` 默认值与具体 `event_type` 矩阵定义待 V1 细化(REQ-NOTIF-002,§api-design §3.16,S2 落点);MVP 阶段默认所有 `audience_scope='human'` 通知均需人类决策,Agent 中间步骤必须显式 `audience_scope='agent'`。**V1 候选**。
 
 ---
 

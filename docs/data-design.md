@@ -1,10 +1,35 @@
 # Star 平台《Data Design 詳細設計書》
 
-> **文档版本**: v0.1 (2026-08-25)
+> **文档版本**: v0.2 (2026-08-26)
+> **修订历史**:
+>
+> | 版本 | 日期 | 变更 | 审批者 |
+> |---|---|---|---|
+> | v0.1 | 2026-08-25 | 初始版本 | — |
+> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(REQ-AUTO-002 Schedule Trigger / REQ-NOTIF-002 Inbox 噪声抑制 / REQ-SCM-003 自建 Git 提前 / AgentSession token_usage+cost_summary / Skill·Playbook+Squad V2 候选) | — |
 > **上游基本設計書**: `D:\Star-worktrees\data-security-design\docs\basic-design.md` v0.1+feedback(下文以 §N 引用 N 为 basic-design 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号;`§API-N` 形式引用 api-design.md v0.1 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\data-security-design\docs\requirements.md` v2.0
 > **上游 API 設計書**: `D:\Star-worktrees\data-security-design\docs\api-design.md` v0.1
 > **文档定位**: 详细设计阶段产出,定义 PostgreSQL SoR 的完整 DDL(schema + 索引 + 约束 + RLS + 分区)、Object Storage 边界、事务边界、Migration 工具选型,供 Implementation / Runtime / Integration / AI / Operation / Test Design 引用,供实现阶段(代码生成)直接使用
+
+---
+
+## 上游同步 2026-08-26(继承 basic-design 5f1ea5b)
+
+> 本设计书跟随《基本設計書》5f1ea5b 同步,引入以下 5 项变更。**均不改 MVP 边界与既有 25 Module / 25 Schema 划分**,不破坏既有不变量。具体落位:
+>
+> | 同步项 | 基本設計書位置 | 本设计落位 |
+> |---|---|---|
+> | **S1** REQ-AUTO-002(Trigger 增加 Schedule/Cron 变体) | §2.1.2 (Module 17) + §5.6 事件清单 | §4.13.1 `automation_rule.trigger_config` 注释(V1 候选,JSONB 已支持) |
+> | **S2** REQ-NOTIF-002(默认仅人类决策节点触达) | §2.1.3 (Module 23) | §4.15.3 `notification` 表追加 3 列 + CHECK |
+> | **S3** REQ-SCM-003(自建 Git 提前到 V1) | §4.7.1 | §4.18.1 `repository` 表 `ck_repository_provider` CHECK 加 `'forgejo'` |
+> | **S4** AgentSession `token_usage` / `cost_summary` 字段 | §4.2.2 | §4.21.2 `agent_session` 表追加 2 个 JSONB 列(V1 候选) |
+> | **S5** Skill/Playbook + Squad V2 候选 | §4.2.8 + §4.4 Provenance | §4.23.2 `provenance_entry` 表 `ck_provenance_source_type` CHECK 加 `'Skill'`(V2 候选) |
+>
+> **不变量保留**:
+> - 不拆 25 Module / 25 Schema
+> - 不新建独立聚合根(Squad 仅作为 Query 视图)
+> - V1 候选字段允许在 DDL 落位;V2 / Future 必须显式标注
 
 ---
 
@@ -1941,6 +1966,7 @@ CREATE INDEX idx_automation_trigger_gin
   ON automation.automation_rule USING GIN (trigger_config);
 
 COMMENT ON TABLE automation.automation_rule IS 'Trigger-Conditions-Actions 规则;JSONB 灵活(继承 §R-AUTO-001)';
+COMMENT ON COLUMN automation.automation_rule.trigger_config IS 'JSONB;支持 Event / Schedule / Cron 三类 Trigger(S1 落点,继承 basic-design 5f1ea5b §2.1.2,REQ-AUTO-002 V1 候选);Event 与 Schedule 不共用执行路径,需在 trigger_config.kind 字段显式区分';
 
 ALTER TABLE automation.automation_rule ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_policy ON automation.automation_rule
@@ -2286,7 +2312,21 @@ CREATE INDEX idx_notification_tenant_user_status
 CREATE INDEX idx_notification_tenant_created
   ON notification.notification (tenant_id, created_at DESC);
 
-COMMENT ON TABLE notification.notification IS '发出的通知;按月分区;状态机 PENDING → SENT → READ';
+-- 4.15.3.1 人类决策节点过滤列(S2 落点,继承 basic-design 5f1ea5b §2.1.3,REQ-NOTIF-002 V1 候选)
+ALTER TABLE notification.notification
+  ADD COLUMN requires_human_decision BOOLEAN NOT NULL DEFAULT TRUE,
+  ADD COLUMN audience_scope VARCHAR(16) NOT NULL DEFAULT 'human',
+  ADD COLUMN suppression_reason TEXT NULL,
+  ADD CONSTRAINT ck_notification_audience_scope CHECK (audience_scope IN ('human','agent','system'));
+
+CREATE INDEX idx_notification_tenant_user_human
+  ON notification.notification (tenant_id, recipient_user_id, created_at DESC)
+  WHERE requires_human_decision = TRUE AND audience_scope = 'human' AND status = 'PENDING';
+
+COMMENT ON TABLE notification.notification IS '发出的通知;按月分区;状态机 PENDING → SENT → READ;默认仅触达人类决策节点(requires_human_decision=TRUE AND audience_scope=''human'',S2 落点,继承 REQ-NOTIF-002)';
+COMMENT ON COLUMN notification.notification.requires_human_decision IS '是否触达人类决策节点;Agent 中间步骤(WAITING_TOOL / TOOL_RUNNING)默认 FALSE(S2 落点)';
+COMMENT ON COLUMN notification.notification.audience_scope IS '目标受众;human / agent / system;默认 human(S2 落点)';
+COMMENT ON COLUMN notification.notification.suppression_reason IS '被抑制时记录原因,如 agent_mid_step / rate_limited(S2 落点)';
 
 ALTER TABLE notification.notification ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_policy ON notification.notification
@@ -2503,7 +2543,7 @@ CREATE TABLE scm.repository (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   deleted_at TIMESTAMPTZ NULL,
   version INT NOT NULL DEFAULT 1,
-  CONSTRAINT ck_repository_provider CHECK (provider IN ('github','gitlab','gitea','bitbucket')),
+  CONSTRAINT ck_repository_provider CHECK (provider IN ('github','gitlab','gitea','forgejo','bitbucket')),
   CONSTRAINT ck_repository_ownership CHECK (ownership IN ('CONNECTED','MIRRORED','MANAGED','LOCAL_ONLY')),
   CONSTRAINT ck_repository_sync_status CHECK (sync_status IN ('IN_SYNC','BEHIND','AHEAD','CONFLICT','DISABLED')),
   CONSTRAINT uq_repository_tenant_provider_external UNIQUE (tenant_id, provider, external_id, deleted_at)
@@ -2514,7 +2554,7 @@ CREATE INDEX idx_repository_tenant_project
 CREATE INDEX idx_repository_sync_status
   ON scm.repository (sync_status) WHERE sync_status <> 'IN_SYNC' AND deleted_at IS NULL;
 
-COMMENT ON TABLE scm.repository IS 'Repository 注册表;MVP 仅 CONNECTED 模式(继承 §4.7.4,§R-SCM-001/002)';
+COMMENT ON TABLE scm.repository IS 'Repository 注册表;MVP 仅 CONNECTED 模式(继承 §4.7.4,§R-SCM-001/002);Adapter 扩展优先级:Gitea/Forgejo(V1) > Bitbucket/Azure DevOps(V2),S3 落点(继承 basic-design 5f1ea5b §4.7.1,REQ-SCM-003 V2 候选)';
 
 ALTER TABLE scm.repository ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_policy ON scm.repository
@@ -3386,6 +3426,9 @@ CREATE TABLE agent.agent_session (
   feedback_consumed_ids UUID[] NOT NULL DEFAULT '{}'::uuid[],
   -- 结果
   result_summary TEXT NULL,
+  -- Token / 成本(S4 落点,继承 basic-design 5f1ea5b §4.2.2,V1 候选)
+  token_usage JSONB NULL,                      -- {input_tokens, output_tokens, cached_tokens, total}
+  cost_summary JSONB NULL,                     -- {input_cost_usd, output_cost_usd, total_cost_usd, currency, computed_at}
   -- Trace
   trace_reference VARCHAR(64) NULL,            -- OpenTelemetry TraceId
   -- Transcript(走 Object Storage,继承 §1.5)
@@ -3435,6 +3478,8 @@ COMMENT ON TABLE agent.agent_session IS 'AgentSession 聚合根;14 状态(继承
 COMMENT ON COLUMN agent.agent_session.status IS '14 状态:CREATED/STARTING/RUNNING/WAITING_TOOL/TOOL_RUNNING/TOOL_COMPLETED/WAITING_FEEDBACK/FEEDBACK_RECEIVED/VALIDATING/COMPLETED/FAILED/ABORTED/CRASHED/TIMEOUT';
 COMMENT ON COLUMN agent.agent_session.tool_activity_summary IS 'JSONB 摘要;全文 Transcript 走 Object Storage(§1.5)';
 COMMENT ON COLUMN agent.agent_session.transcript_ref IS 's3://star-transcripts/{tenant_id}/{project_id}/{agent_session_id}/transcript.json(默认 90 天)';
+COMMENT ON COLUMN agent.agent_session.token_usage IS 'JSONB;{input_tokens, output_tokens, cached_tokens, total};V1 候选(S4 落点,与 Context Cost Analysis 共用统计口径)';
+COMMENT ON COLUMN agent.agent_session.cost_summary IS 'JSONB;{input_cost_usd, output_cost_usd, total_cost_usd, currency, computed_at};V1 候选(S4 落点)';
 
 -- 4.21.2.4 RLS
 ALTER TABLE agent.agent_session ENABLE ROW LEVEL SECURITY;
@@ -3831,7 +3876,7 @@ CREATE TABLE context.provenance_entry (
   -- 时间
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT ck_provenance_source_type CHECK (source_type IN (
-    'Requirement','AcceptanceCriterion','Decision','Feedback','File','Symbol','Test','ADR','FailedValidation','OpenFeedback'
+    'Requirement','AcceptanceCriterion','Decision','Feedback','File','Symbol','Test','ADR','FailedValidation','OpenFeedback','Skill'
   )),
   CONSTRAINT ck_provenance_layer CHECK (included_at_layer IN ('P0','P1','P2','P3','P4','P5'))
 );
@@ -3841,8 +3886,8 @@ CREATE INDEX idx_provenance_tenant_packet
 CREATE INDEX idx_provenance_tenant_source
   ON context.provenance_entry (tenant_id, source_type, source_id);
 
-COMMENT ON TABLE context.provenance_entry IS 'ContextPacket Provenance;每条 relevant_* 必须带(继承 §4.4.5,§R-26.3)';
-COMMENT ON COLUMN context.provenance_entry.included_at_layer IS 'P0-P5;P0 不可裁剪;P5 = Untrusted(分离,§4.10.7)';
+COMMENT ON TABLE context.provenance_entry IS 'ContextPacket Provenance;每条 relevant_* 必须带(继承 §4.4.5,§R-26.3);source_type=''Skill'' 为 V2 候选(S5 落点,继承 basic-design 5f1ea5b §4.2.8)';
+COMMENT ON COLUMN context.provenance_entry.included_at_layer IS 'P0-P5;P0 不可裁剪;P5 = Untrusted(分离,§4.10.7);Skill 必须走 P5(S5 落点)';
 
 ALTER TABLE context.provenance_entry ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_policy ON context.provenance_entry
@@ -5545,6 +5590,8 @@ erDiagram
 | **DATA-J.8** | §4.20.4 `worktree_heatmap` 物化视图刷新频率(ON COMMIT vs 定时)需 PoC 校准性能 | 影响 Heatmap 实时性 | V1(POC-024) |
 | **DATA-J.9** | §9.2 pg_partman 是否引入(替代 Application 层手动)需 RFC 决定 | 影响 Operation Design | RFC |
 | **DATA-J.10** | §4.1.2 `tenant_policy` 与 §4.3.2 `project_policy` 的 6 维 Policy 优先级关系(覆盖 / 合并) | 影响 Security Design 策略层级 | V1 |
+| **DDL-001** | §4.21.2 `agent_session.token_usage` / `cost_summary` JSONB schema 细节(S4 落点,V1 候选),需与 Context Cost Analysis 统计口径对齐 | 影响 §4.21.2 JSONB 结构 + §11.4 Connection Pool + §9.3 归档策略 | V1(实现阶段细化) |
+| **DDL-002** | §4.23.2 `provenance_entry.source_type` 新增 `'Skill'`(S5 落点,V2 候选);Skill/Playbook V2 候选,需校验不绕过 §4.2.5 12 强制点 + 走 P5 隔离 | 影响 §4.23.2 CHECK + Security Design §9.2.13 | V2(实现阶段细化) |
 
 ---
 

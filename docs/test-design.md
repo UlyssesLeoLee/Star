@@ -1,9 +1,31 @@
 # Star 平台《Test Design》(测试策略详细设计)
 
-> **文档版本**: v0.1 (2026-08-25)
+> **文档版本**: v0.2 (2026-08-26)
+> **修订历史**:
+>
+> | 版本 | 日期 | 变更 | 审批者 |
+> |---|---|---|---|
+> | v0.1 | 2026-08-25 | 初始版本 | — |
+> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(5 个同步项对应测试点已落位,详见 §X 上游同步测试) | — |
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/api-design.md` v0.1,`docs/security-design.md` v0.1
 > **下游**: Implementation(测试代码 + CI 配置)、Operation(测试环境 + 监控)
 > **文档定位**: 完整测试策略:单元 / 集成 / E2E / 性能 / 安全 / 验收。
+
+---
+
+## 上游同步 2026-08-26(继承 basic-design 5f1ea5b)
+
+> 本设计书跟随《基本設計書》5f1ea5b 同步,新增以下测试要求。**不**改 MVP 测试矩阵主结构:
+>
+> | 同步项 | 测试点 | 优先级 |
+> |---|---|---|
+> | **S1** REQ-AUTO-002(Trigger 增加 Schedule/Cron) | Schedule Trigger 规则不触发 Event 路径(隔离测试);Event 与 Schedule 子队列独立;Cron 表达式解析正确性 | V1 测试 |
+> | **S2** REQ-NOTIF-002(Inbox 噪声抑制) | Agent 中间步骤通知被抑制(WAITING_TOOL/TOOL_RUNNING/TOOL_COMPLETED);`audience_scope='agent'` 通知不触达 human;关键事件突破上限 | V1 测试 |
+> | **S3** REQ-SCM-003(Gitea/Forgejo V1) | Gitea/Forgejo Adapter 集成测试(V1);Self-hosted endpoint 自定义 URL;Webhook HMAC 签名验证 | V1 测试 |
+> | **S4** AgentSession `token_usage` / `cost_summary` | AgentSession 字段存在性 + JSONB schema 验证;`total_cost_usd` 数值正确性;与 Context Cost Analysis 数据一致 | V1 测试 |
+> | **S5** Skill/Playbook V2 候选 | Provenance.source_type='Skill' 走 P5 隔离层;Instruction Priority 封顶;Tool Call 二次校验(允许 skip,占位) | V2 占位 |
+>
+> **不变量保留**:MVP 测试矩阵 / AC 覆盖率公式 / E2E 路径全部不动。
 
 ---
 

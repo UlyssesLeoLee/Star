@@ -1,9 +1,30 @@
 # Star 平台《Internal Design》(前端组件级详细设计)
 
-> **文档版本**: v0.1 (2026-08-25)
+> **文档版本**: v0.2 (2026-08-26)
+> **修订历史**:
+>
+> | 版本 | 日期 | 变更 | 审批者 |
+> |---|---|---|---|
+> | v0.1 | 2026-08-25 | 初始版本 | — |
+> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(新增 ScheduleTriggerForm / InboxFilter / CostSummaryTab / SquadGroupView 占位组件) | — |
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/external-design.md` v0.1,`docs/api-design.md` v0.1
 > **下游**: Implementation(React + Vite + TypeScript)
 > **文档定位**: External Design 展开为内部组件,定义 React 组件树、状态管理、路由、API 调用层。**仍然不写完整 React 代码**,只到组件级、状态形状、API 调用契约级别。
+
+---
+
+## 上游同步 2026-08-26(继承 basic-design 5f1ea5b)
+
+> 本设计书跟随《基本設計書》5f1ea5b 同步,新增以下占位组件。**不**改 React 组件树主结构 / 状态管理选型:
+>
+> | 同步项 | 占位组件(Props / State / API 契约) |
+> |---|---|
+> | **S1** REQ-AUTO-002(Schedule Trigger) | `ScheduleTriggerForm`:Props=`{ rule, onChange }`,State=`{ kind: 'Schedule' \| 'Cron', expression: string }`,API=无(本地解析) |
+> | **S2** REQ-NOTIF-002(Inbox 噪声抑制) | `InboxFilter`:Props=`{ defaultScope: 'human' }`,State=`{ audience_scope, requires_human_decision }`,API=`GET /v1/notifications?audience_scope=human` |
+> | **S4** AgentSession `cost_summary` | `CostSummaryTab`:Props=`{ agentSessionId }`,State=`{ tokenUsage, costSummary, range }`,API=`GET /v1/agent-sessions/{id}`(取 cost_summary 字段) |
+> | **S5** Squad 分组视图(Future) | `SquadGroupView`:Props=`{ projectId }`,State=`{ groupBy: 'squad' }`(只读),API=待定(Future 占位) |
+>
+> **不变量保留**:React 组件树主结构 / 状态管理选型 / 路由结构全部不动;占位组件按需实现。
 
 ---
 

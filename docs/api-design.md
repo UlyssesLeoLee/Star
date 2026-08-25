@@ -1,9 +1,34 @@
 # Star 平台《API Design 詳細設計書》
 
-> **文档版本**: v0.1 (2026-08-25)
+> **文档版本**: v0.2 (2026-08-26)
+> **修订历史**:
+>
+> | 版本 | 日期 | 变更 | 审批者 |
+> |---|---|---|---|
+> | v0.1 | 2026-08-25 | 初始版本 | — |
+> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(REQ-AUTO-002 / REQ-NOTIF-002 / REQ-SCM-003 / AgentSession token+cost / Skill-Playbook+Squad V2 候选) | — |
 > **上游基本設計書**: `D:\Star-worktrees\api-design\docs\basic-design.md` v0.1(下文以 §N 引用 N 为 basic-design.md 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\api-design\docs\requirements.md` v2.0
 > **文档定位**: 详细设计阶段第一件产物,定义 SaaS Control Plane 对外所有接口契约(REST + WebSocket + Event Stream);后续 Data Design / Security Design / Runtime Design / Integration Design / AI Design / Test Design / Operation Design 均依赖本设计输入
+
+---
+
+## 上游同步 2026-08-26(继承 basic-design 5f1ea5b)
+
+> 本设计书跟随《基本設計書》5f1ea5b 同步,引入以下 5 项变更。**均不改 MVP 边界与既有 Resource Model 25 Module**:
+>
+> | 同步项 | 基本設計書位置 | 本设计落位 |
+> |---|---|---|
+> | **S1** REQ-AUTO-002(Trigger 增加 Schedule/Cron 变体) | §2.1.2 + §5.6 事件清单 | §3.14 automation 注释 + §5.3 事件清单 19→20 条 + §5.5.20 payload(V1 候选) |
+> | **S2** REQ-NOTIF-002(默认仅人类决策节点触达) | §2.1.3 | §3.16 notification 注释 |
+> | **S3** REQ-SCM-003(自建 Git 提前到 V1) | §4.7.1 | §3.19.4 Webhook 入口表追加 Gitea/Forgejo 行(V2 候选) |
+> | **S4** AgentSession `token_usage` / `cost_summary` 字段 | §4.2.2 | §3.22.1 Agent 注册表注释 + §12 附录 A OpenAPI Schema(V1 候选) |
+> | **S5** Skill/Playbook + Squad V2 候选 | §4.2.8 + §4.4 Provenance | §3.24 context 端点注释(V2 候选,占位) |
+>
+> **不变量保留**:
+> - 不拆 25 Module 资源
+> - 不重写 §3 端点清单结构,仅追加/调整
+> - V1 候选允许 API Schema 加字段;V2 / Future 必须显式标注
 
 ---
 
@@ -732,6 +757,8 @@ flowchart TB
 | POST | `/v1/automations/rules/{rule_id}:test` | Policy | 模拟执行(给 Sample Event 测规则) | RuleTestRequest | RuleTestResult |
 
 > §R-11 REQ-AUTO-001:不强制可视化配置器,API 已足够;UI 用 Form 渲染。
+>
+> **S1 落点**(继承 basic-design 5f1ea5b §2.1.2,REQ-AUTO-002 V1 候选):RuleCreate.trigger_config 支持 `kind: "Event" | "Schedule" | "Cron"` 三类;Event 与 Schedule/Cron 不共用执行路径,Worker 端按 kind 分流到 `automation` Role 的两个子队列。
 
 ### 3.15 domain-identity(§23.2 Device 三重绑定)
 
@@ -762,6 +789,8 @@ flowchart TB
 | POST | `/v1/notifications/mark-all-read` | Authenticated | 全部已读 | — | 204 |
 
 > §R-12 REQ-NOTIF-001:MVP 邮件 + 站内(§2.3.4)即可,Slack / 钉钉 列入 V1。
+>
+> **S2 落点**(继承 basic-design 5f1ea5b §2.1.3,REQ-NOTIF-002 V1 候选):通知触达必须满足 `requires_human_decision=true AND audience_scope='human'`;Agent 中间步骤(WAITING_TOOL / TOOL_RUNNING / TOOL_COMPLETED)默认 `audience_scope='agent'` 抑制触达。`GET /v1/notifications` 默认仅返回人类决策节点通知。
 
 ### 3.17 domain-permission(§4.10 + §23.2 + REQ-PERM-002)
 
@@ -832,8 +861,11 @@ flowchart TB
 |---|---|---|---|---|---|
 | POST | `/v1/webhooks/scm/github` | Webhook(HMAC 签名校验) | GitHub Webhook 入口 | GitHubWebhookPayload | 204 |
 | POST | `/v1/webhooks/scm/gitlab` | Webhook(Token 校验) | GitLab Webhook 入口 | GitLabWebhookPayload | 204 |
+| POST | `/v1/webhooks/scm/gitea` | Webhook(HMAC 签名校验) | Gitea/Forgejo Webhook 入口(共享,Self-hosted 支持自定义 endpoint) | GiteaWebhookPayload | 204 |
 
 > Webhook 由 SCM Adapter 内部 ACL 翻译成内部 Domain Event,见 §5。
+>
+> **S3 落点**(继承 basic-design 5f1ea5b §4.7.1,REQ-SCM-003 V2 候选):Gitea/Forgejo Adapter 在 V1 阶段交付(排在 Bitbucket / Azure DevOps 之前);Self-hosted 场景通过 `endpoint` 自定义 URL 支持。
 
 ### 3.20 domain-development(§4.8)
 
@@ -947,6 +979,8 @@ flowchart TB
 
 **幂等**:所有 `:xxx` 端点需 `Idempotency-Key`;非法迁移 → 409 `AGT-003`。
 
+> **S4 落点**(继承 basic-design 5f1ea5b §4.2.2,V1 候选):AgentSession Resource Schema 含 `token_usage: {input_tokens, output_tokens, cached_tokens, total}` 与 `cost_summary: {input_cost_usd, output_cost_usd, total_cost_usd, currency, computed_at}` 两字段(GET /v1/agent-sessions/{id} 返回),与 Context Cost Analysis 共用统计口径,不新增独立采集链路。
+
 ### 3.23 domain-feedback(§4.3,§7.3 6 状态)
 
 #### 3.23.1 Feedback CRUD
@@ -994,6 +1028,8 @@ flowchart TB
 | POST | `/v1/decisions/{decision_id}:invalidate` | Policy(`decision:invalidate`) | Invalidate(不取代,标记无效) | InvalidateCommand | Decision |
 | GET | `/v1/decisions/{decision_id}/trace` | Policy | 反向追溯到来源(Source Conversation / Requirement / Review) | — | DecisionTrace |
 | POST | `/v1/agent-sessions/{session_id}/handoff-context` | Service-Internal(由新 Agent 触发) | 生成 Handoff Context Packet(§4.2.7) | HandoffRequest | HandoffContextPacket |
+
+> **S5 落点**(继承 basic-design 5f1ea5b §4.2.8,V2 候选):ProvenanceEntry `source_type` 新增 `'Skill'`(占位,MVP 不实现);Squad 分组视图仅为 WorkItem/Worktree 维度的 Assignee 分组 Query,未来候选,不得引入 Agent 间自主任务分派。
 
 ### 3.25 domain-validation(§4.5,VAL-001)
 
@@ -1293,7 +1329,7 @@ star.audit.{tenant_id}.{action_type}                           # 审计专用(�
 - Ack Wait:30s
 - Max Deliver:5(超过进 DLQ)
 
-### 5.3 核心事件清单(19 种,与 basic-design §5.6 严格 1:1)
+### 5.3 核心事件清单(20 种,与 basic-design §5.6 严格 1:1)
 
 > **基础设计 §5.6 锁定**(接口稳定承诺 #10);本设计给出每个事件的 Subject + Producer / Consumer + 触发条件 + Schema 草案。
 
@@ -1318,8 +1354,9 @@ star.audit.{tenant_id}.{action_type}                           # 审计专用(�
 | 17 | **ContextPacketCreated** | `star.events.{tenant_id}.context.context_packet.created.v1` | `domain-context` | `domain-realtime` / `domain-audit` | ContextCompiler 完成 | §4.4.3 |
 | 18 | **PullRequestLinked** | `star.events.{tenant_id}.scm.pull_request.linked.v1` | `domain-scm` | `domain-development` / `domain-audit` | Commit / PR 关联 WorkItem | §19 |
 | 19 | **MergeRequestLinked** | `star.events.{tenant_id}.scm.merge_request.linked.v1` | `domain-scm` | `domain-development` / `domain-audit` | GitLab MR 关联 WorkItem | §19 |
+| 20 | **AutomationRuleScheduleTriggered** | `star.events.{tenant_id}.automation.rule.schedule_triggered.v1` | `domain-automation` | `domain-audit` / `domain-notification` / `domain-realtime` | Schedule/Cron 规则到点触发(V1 候选) | §11 REQ-AUTO-002, S1 落点,2026-08-26 补充 |
 
-**事件总数核对**:19(与 basic-design §5.6 完全一致)✅
+**事件总数核对**:20(与 basic-design §5.6 完全一致)✅
 
 ### 5.4 事件 Schema 通用结构(CloudEvents 1.0)
 
@@ -1445,6 +1482,26 @@ star.audit.{tenant_id}.{action_type}                           # 审计专用(�
     "evidence_refs": ["obs://evidence/tnt_xxx/vr_01HXXX/junit.xml"],
     "failed_at": "2026-08-25T10:30:00Z",
     "policy_required": true
+  }
+}
+```
+
+#### 5.5.20 AutomationRuleScheduleTriggered(S1 落点,2026-08-26 补充,V1 候选)
+
+```json
+{
+  "data": {
+    "rule_id": "rule_01HXXX",
+    "tenant_id": "tnt_01HXXX",
+    "project_id": "prj_01HXXX",
+    "trigger_kind": "Schedule",            // Event / Schedule / Cron
+    "schedule_expression": "0 9 * * 1-5",  // Cron 表达式(仅 Schedule/Cron)
+    "fired_at": "2026-08-26T09:00:00Z",
+    "next_fire_at": "2026-08-27T09:00:00Z",
+    "evaluation": {
+      "conditions_matched": true,
+      "matched_count": 3
+    }
   }
 }
 ```

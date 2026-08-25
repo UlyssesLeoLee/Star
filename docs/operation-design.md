@@ -1,9 +1,28 @@
 # Star 平台《Operation Design》(K3s 部署运维详细设计)
 
-> **文档版本**: v0.1 (2026-08-25)
+> **文档版本**: v0.2 (2026-08-26)
+> **修订历史**:
+>
+> | 版本 | 日期 | 变更 | 审批者 |
+> |---|---|---|---|
+> | v0.1 | 2026-08-25 | 初始版本 | — |
+> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(cost_summary 监控指标 + Gitea/Forgejo Adapter 部署) | — |
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/api-design.md` v0.1,`docs/security-design.md` v0.1,`docs/data-design.md` v0.1
 > **下游**: SRE / Platform 团队实施、生产环境运维
 > **文档定位**: K3s 部署拓扑、Kubernetes 资源清单、SRE 运维手册、可观察性、灾备。
+
+---
+
+## 上游同步 2026-08-26(继承 basic-design 5f1ea5b)
+
+> 本设计书跟随《基本設計書》5f1ea5b 同步,引入以下变更。**不**改 K3s 部署拓扑主结构 / Service 拆分原则:
+>
+> | 同步项 | 落位 |
+> |---|---|
+> | **S3** REQ-SCM-003(Gitea/Forgejo V1) | V1 部署清单追加 Gitea/Forgejo Adapter Service(与 GitHub/GitLab Adapter 同 Deployment 模板) |
+> | **S4** AgentSession `cost_summary` 字段 | 监控指标段:`agent_session_cost_total_usd` V1 候选(Prometheus Counter,与 Context Cost Analysis 共用统计口径) |
+>
+> **不变量保留**:K3s 部署拓扑主结构 / Service 拆分原则 / RTO/RPO 全部不动。
 
 ---
 

@@ -1,9 +1,30 @@
 # Star 平台《External Design》(产品 UI/UX 详细设计)
 
-> **文档版本**: v0.1 (2026-08-25)
+> **文档版本**: v0.2 (2026-08-26)
+> **修订历史**:
+>
+> | 版本 | 日期 | 变更 | 审批者 |
+> |---|---|---|---|
+> | v0.1 | 2026-08-25 | 初始版本 | — |
+> | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(通知 Inbox 折叠 + Squad 分组视图 + Schedule Trigger 配置 UI 入口占位) | — |
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1
 > **下游**: Internal Design(组件级)、Implementation(React + Vite)
 > **文档定位**: 外部可见的产品 UI/UX 设计:页面结构、信息架构、用户流程。**不**写 React 代码,只描述组件层级、状态、事件。
+
+---
+
+## 上游同步 2026-08-26(继承 basic-design 5f1ea5b)
+
+> 本设计书跟随《基本設計書》5f1ea5b 同步,新增以下 UI 入口与交互。**不**改 MVP 页面结构主流程:
+>
+> | 同步项 | UI 落位 |
+> |---|---|
+> | **S1** REQ-AUTO-002(Schedule Trigger) | 自动化规则创建页:Trigger 类型选择器新增 "Schedule" / "Cron" 选项(下拉),Event 路径配置在子 Tab 切换 |
+> | **S2** REQ-NOTIF-002(Inbox 噪声抑制) | 通知 Inbox 页:默认仅展示人类决策节点(ValidationFailed/FeedbackCreated/AgentSessionFailed),Agent 中间步骤折叠到 "系统活动" 抽屉 |
+> | **S4** AgentSession `cost_summary` | AgentSession 详情页:新增 "Token / 成本" Tab,显示 token_usage 与 cost_summary 折线图(V1 候选) |
+> | **S5** Squad 分组视图(Future) | WorkItem / Worktree 列表:顶部新增 "按 Squad 分组" 切换(只读视图,FV/Future 占位) |
+>
+> **不变量保留**:MVP 5 个核心页面 / 信息架构主流程 / 关键操作键盘快捷键全部不动。
 
 ---
 
