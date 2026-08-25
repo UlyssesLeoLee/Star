@@ -621,7 +621,7 @@ flowchart TB
 
 #### 3.5.3 状态机约束(§7.2)
 
-- 默认三态:`TODO → IN_PROGRESS → DONE`(`ARCHIVED` 终态)
+- 默认三态:`TODO → IN_PROGRESS → DONE`(无终态;`ARCHIVED` 是 Worktree/AgentSession 的状态,不属于 WorkItem;basic-design §4.9.3 / §7.2,D-01 修复)
 - 扩展示例(由 Project Policy 定义,本设计不在 MVP 默认提供,只暴露 `GET /v1/work-items/{id}/transitions` 让 UI 动态渲染)
 
 ### 3.6 domain-workflow
@@ -1035,7 +1035,7 @@ flowchart TB
 
 **强制**(§4.6.2,§4.6.3,§6.2,§6.3):
 - ❌ **禁止出现** `ExecuteArbitraryShell`, `ReadArbitraryFile(*)`, `WriteArbitraryFile(*)` 等任意命令
-- ✅ 仅允许 9 种白名单命令(§6.3):`GitStatus / CreateWorktree / ReadDiff / RunApprovedTest / QueryAgentStatus / SubmitFeedback / StartAuthorizedAgentSession / StopAgentSession / ReportObservation`
+- ✅ 仅允许 8 种白名单命令(§6.3):`GitStatus / CreateWorktree / ReadDiff / RunApprovedTest / QueryAgentStatus / SubmitFeedback / StartAuthorizedAgentSession / StopAgentSession`(上报走独立 RuntimeObservation 通道,见 basic-design §4.6.2)
 - ✅ 每个命令必带 `worktree_id / agent_session_id / repository_id` 范围
 - ✅ 每个命令必带 `command_token`(短时 5min TTL)
 - ✅ 每个命令必带 mTLS 设备身份
@@ -1594,7 +1594,7 @@ message RuntimeCommandResponse {
 {
   "command_id": "cmd_01HXXX",
   "runtime_id": "rt_01HXXX",
-  "command_type": "RunApprovedTest",  // 仅 9 种,见 §4.6.2 / §6.3
+  "command_type": "RunApprovedTest",  // 仅 8 种,见 §4.6.2 / §6.3
   "command_args": {
     "worktree_id": "wt_01HXXX",
     "test_id": "test_xxx",
@@ -1607,7 +1607,7 @@ message RuntimeCommandResponse {
 }
 ```
 
-**白名单命令**(9 种,§6.3 锁定):
+**白名单命令**(8 种,§6.3 锁定):
 1. `GitStatus` — 查询 Worktree Git 状态
 2. `CreateWorktree` — 创建 Git Worktree
 3. `ReadDiff` — 读取 diff 全文
@@ -1616,7 +1616,8 @@ message RuntimeCommandResponse {
 6. `SubmitFeedback` — 提交结构化 Feedback
 7. `StartAuthorizedAgentSession` — 启动已授权 Agent Session
 8. `StopAgentSession` — 停止 Agent
-9. `ReportObservation`(Heartbeat/Disconnected/Build/Test/Diff/WorktreeStatus/AgentStatus)
+
+> 注:`ReportObservation` 不在白名单命令中(基本设计 §4.6.2 `RuntimeCommand` 枚举 8 变体)。上报事件走独立 `RuntimeObservation` 枚举(basic-design §4.6.2),由 Local Daemon 主动上报,Control Plane 端不做"命令授权"拦截。
 
 **严禁**(`SEC-008` 拦截):
 - ❌ `ExecuteArbitraryShell(cmd: String)`
@@ -1775,7 +1776,7 @@ sequenceDiagram
 | §6.2 User / Tenant / Project Binding | §7.5 三重绑定校验 |
 | §6.2 Short-lived Credential | §7.5 Client Cert 1h, Command Token 5min |
 | §6.2 Mutual Authentication(mTLS) | §7.5 mTLS 双向 |
-| §6.2 Command Authorization(白名单) | §7.2.1 9 种白名单 |
+| §6.2 Command Authorization(白名单) | §7.2.1 8 种白名单 |
 | §6.2 Command Scope(Repository/Worktree/Path) | §7.2.1 必带 worktree_id / repository_id |
 | §6.2 Filesystem Scope | **本地侧**:`domain-local-runtime` 不实现,Local Daemon 进程负责 syscall 拦截(§4.6.3);不在 API 范围 |
 | §6.2 Process Scope | **本地侧**:Local Daemon 负责,不在 API 范围 |
@@ -1784,7 +1785,7 @@ sequenceDiagram
 | §6.2 Audit | §7.2.2 / §7.3 每条命令/上报写 Audit |
 | §6.2 Revocation(黑名单) | §7.5 Cert CRL + 主动 disable |
 | §6.2 Remote Disable | §7.5 Server 主动停机命令 |
-| §6.3 默认禁止任意 Shell | §7.2.1 9 种白名单 + 路径/参数验证 |
+| §6.3 默认禁止任意 Shell | §7.2.1 8 种白名单 + 路径/参数验证 |
 
 ---
 
@@ -1930,7 +1931,7 @@ sequenceDiagram
 | `SEC-005` | 403 | Cross-Repository Forbidden | 操作跨 Repository(AgentPolicy 阻止) | §4.2.5, REQ-PERM-002 |
 | `SEC-006` | 403 | Cross-Worktree Forbidden | 操作跨 Worktree(Worktree Isolation 阻止) | §22.5, REQ-PERM-002 |
 | `SEC-007` | 403 | Cross-Tenant Access Forbidden | `actor.tenant_id != resource.tenant_id` | REQ-SEC-001 |
-| `SEC-008` | 422 | Command Not Whitelisted | 9 种白名单外的命令 | §4.6.2, §6.3 |
+| `SEC-008` | 422 | Command Not Whitelisted | 8 种白名单外的命令 | §4.6.2, §6.3 |
 | `SEC-009` | 403 | Cloud AI Restricted | `cloud_ai_allowed=false`,但 Agent 用了 Cloud Provider | REQ-SEC-002 |
 | `SEC-010` | 403 | No Code Upload | `no_code_upload=true`,但 Context Compiler 准备上传 Code | REQ-SEC-002 |
 | `SEC-011` | 403 | Metadata Only | `metadata_only=true`,但准备上传 Code/Diff | REQ-SEC-002 |
@@ -2270,13 +2271,15 @@ INDEX (created_at) WHERE published_at IS NULL
 | Change Scope | Local Runtime fs watcher + commit gate | `AGT-009` |
 | Review/Test/Approval Gate | 状态迁移端点 | `WI-002` |
 
-#### 11.2.4 9 种 Local Runtime 白名单命令(§6.3,§7.2.1)
+#### 11.2.4 8 种 Local Runtime 白名单命令(§6.3,§7.2.1)
 
 ```
 GitStatus / CreateWorktree / ReadDiff / RunApprovedTest
 QueryAgentStatus / SubmitFeedback / StartAuthorizedAgentSession
-StopAgentSession / ReportObservation
+StopAgentSession
 ```
+
+> 注:上报走独立 `RuntimeObservation` 通道(basic-design §4.6.2),`ReportObservation` 不在命令白名单中。
 
 Security Design 应将这些命令的 ACL 翻译到 Local Daemon 二进制实现侧(由 Runtime Design / Integration Design 实施)。
 
@@ -2291,7 +2294,7 @@ Security Design 应将这些命令的 ACL 翻译到 Local Daemon 二进制实现
 - 实现 Process Scope(子进程监控,禁止 fork outside scope)
 - 维护 fs watcher(inotify / FSEvents / ReadDirectoryChangesW)
 - 启动 / 监控 Agent 进程
-- 缓存 9 种白名单命令的本地实现
+- 缓存 8 种白名单命令的本地实现
 
 **`domain-local-runtime` crate**(= §3.26 API 的实现侧):
 - 在 work-core 进程内
@@ -2363,7 +2366,7 @@ Agent Design 需实现:每个强制点在 Agent Adapter / Local Runtime / Applic
 |---|---|---|
 | **WorkItem 完整生命周期** | POST /v1/work-items → POST /v1/worktrees → POST /v1/agent-sessions → POST /v1/validation-results → PATCH /v1/work-items/{id}:transition | §4.5.5 AI Completion 判定链 + §4.1.9 Worktree 7 项检查 |
 | **Cross-Tenant 拦截** | 切换 JWT tenant_id 访问另一 Tenant 资源 | 必须 403 `SEC-007` + AuditEvent 记录 |
-| **Local Runtime 9 白名单命令** | 模拟 Local Daemon 上报 9 种命令 | 全部通过;`ExecuteArbitraryShell` 等 4 种禁止 → 403 `SEC-008` |
+| **Local Runtime 8 白名单命令** | 模拟 Local Daemon 上报 8 种命令 | 全部通过;`ExecuteArbitraryShell` 等 4 种禁止 → 403 `SEC-008` |
 | **Feedback Inbox 优先级** | 提交 P0 Security / P1 Architecture / P2 Test Failure Feedback | Inbox 排序按 P0 > P1 > P2;SLA 倒计时 |
 | **Worktree Conflict Detection** | 2 个 Worktree 改同一文件 | WS 推送 `worktree.conflict_detected` + DB 写 WorktreeConflict |
 | **Context Packet Provenance** | 触发 ContextPacket 生成 | 校验所有 `relevant_*` 字段都带 ProvenanceEntry,否则 422 `CTX-002` |
@@ -2923,7 +2926,7 @@ components:
 | # | 项 | 影响 | 解决建议 |
 |---|---|---|---|
 | B-1 | Realtime Service 拆分决策(§1,§4) | 决定 V1 是否拆独立 `realtime-service`(§30.3) | 由 V1 真实负载决定 |
-| B-2 | Local Daemon 跨平台 Filesystem Scope 实现(§4.6.3) | 决定 §7.2 9 种白名单命令的可靠执行边界 | Runtime Design 决定 |
+| B-2 | Local Daemon 跨平台 Filesystem Scope 实现(§4.6.3) | 决定 §7.2 8 种白名单命令的可靠执行边界 | Runtime Design 决定 |
 | B-3 | AI Provider 私有 SDK 抽象层稳定性(§4.2.4) | 决定 §3.22 Agent Port 抽象的有效性 | Integration / AI Design 决定 |
 | B-4 | GraphQL / BFF 引入(§10.4) | 决定 V1 是否补充 GraphQL 端点 | 由 UI 多端需求决定 |
 
@@ -2972,7 +2975,7 @@ components:
 ### API-7:Local Runtime 协议端口(§7)
 - Local Daemon 监听 `127.0.0.1:9100`
 - SaaS 接收 mTLS(443)
-- 9 种白名单命令(锁定)
+- 8 种白名单命令(锁定;`ReportObservation` 不在白名单,见 basic-design §4.6.2)
 - Cert TTL 1h,Command Token TTL 5min
 - 7.6.2 Reconciliation 时序图稳定
 

@@ -1351,7 +1351,7 @@ WSS 推送:
 
 ## 12. 安全边界(继承《Security Design》§9.3 Local Runtime 安全)
 
-### 12.1 9 种白名单命令详解(继承《Basic Design》§6.3)
+### 12.1 8 种白名单命令详解(继承《Basic Design》§6.3,D-03 修复)
 
 | # | 命令 | 入参 | 出参 | Scope 限制 | 审计要求 |
 |---|---|---|---|---|---|
@@ -1363,7 +1363,8 @@ WSS 推送:
 | 6 | `SubmitFeedback` | `{worktree_id, target, type, intent, reason}` | `{feedback_id}` | `worktree:write:{worktree_id}` | 记录全部 |
 | 7 | `StartAuthorizedAgentSession` | `{worktree_id, agent_type, policy}` | `{session_id, scoped_token, env_inject[]}` | `worktree:execute:{worktree_id} + agent:create` | 记录 policy |
 | 8 | `StopAgentSession` | `{agent_session_id, reason}` | `{exit_code, duration}` | `agent:stop:{session_id}` | 记录 |
-| 9 | `ReportObservation` | `{worktree_id?, agent_session_id?, type, payload}` | `{ack_seq}` | `runtime:write` | 记录 payload hash |
+
+> **D-03 修复**:`ReportObservation` 不在白名单命令(8 种)内;上报事件走独立 `RuntimeObservation` 枚举(basic-design §4.6.2,7 个变体),由 Local Daemon 主动上报,Control Plane 端不做"命令授权"拦截。
 
 **严格白名单**:
 - ❌ `ExecuteArbitraryShell(cmd: String)`(继承《Requirements》§23.2 LRT-002)
@@ -1556,7 +1557,7 @@ crates/local-daemon-bins/
 2. **WSS 重连**:Server 主动断开,客户端重连,事件续传无丢失
 3. **Worktree 生命周期**:17 状态迁移全路径
 4. **Agent 启动/停止**:Codex / Claude Code / Gemini CLI 各跑一个 smoke test
-5. **Command 白名单**:9 种命令全部通过;ExecuteArbitraryShell 必须被拒绝
+5. **Command 白名单**:8 种命令全部通过;ExecuteArbitraryShell 必须被拒绝
 6. **Secret 隔离**:Agent 子进程 Env 看不到其它 Session 的 Token
 7. **Crash Recovery**:Daemon panic 后重启,本地状态从 SQLite 恢复
 8. **升级**:从版本 N 升级到 N+1,数据迁移无丢失
@@ -1831,7 +1832,7 @@ sequenceDiagram
 7. **Secret Manager Trait**(`SecretManager`):§2.2.7 签名
 8. **Realtime Publisher Trait**(`RealtimePublisher`):§2.2.8 签名
 9. **Agent Adapter Trait**(`AgentAdapter`):§5.4 签名
-10. **9 种白名单命令的入参/出参 Schema**:§12.1
+10. **8 种白名单命令的入参/出参 Schema**:§12.1
 11. **Command Token 协议**:§3.3(继承《API Design》§7.2)
 12. **Worktree 17 状态机迁移表**:§4.2
 13. **配置 Schema**(`daemon.toml`):§9.2

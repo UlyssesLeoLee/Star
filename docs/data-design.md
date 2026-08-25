@@ -2752,7 +2752,7 @@ COMMENT ON TABLE scm.webhook_event IS 'RLS 禁用:Webhook 入站时 Tenant 未�
 > **R/W**:R/W(SoR)(SymbolIndex / RepositoryContext / DevelopmentContext 为 Projection)
 > **必带 tenant_id**:是(13 类对象 #9 "Diff" / #13 "Symbol Index")
 
-#### 4.19.1 `development_execution` 表
+#### 4.19.1 `development_execution` 表(核心聚合根)
 
 ```sql
 CREATE TABLE development.development_execution (
@@ -2799,7 +2799,7 @@ CREATE POLICY tenant_isolation_policy ON development.development_execution
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
 ```
 
-#### 4.19.2 `change_set` 表(继承 §4.8.2,§R-21.1,§R-21.2)
+#### 4.19.2 `change_set` 表(核心聚合根;继承 §4.8.2,§R-21.1,§R-21.2)
 
 ```sql
 CREATE TABLE development.change_set (
@@ -3850,7 +3850,7 @@ CREATE POLICY tenant_isolation_policy ON context.provenance_entry
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', TRUE)::UUID);
 ```
 
-#### 4.23.3 `decision` 表(继承 §4.4.6,§R-26.5,§A.7)
+#### 4.23.3 `decision` 表(核心聚合根;继承 §4.4.6,§R-26.5,§A.7)
 
 ```sql
 CREATE TABLE context.decision (
@@ -4173,8 +4173,8 @@ CREATE TABLE local_runtime.runtime_command (
   tenant_id UUID NOT NULL REFERENCES tenant.tenant(id) ON DELETE CASCADE,
   -- Runtime
   runtime_id UUID NOT NULL REFERENCES local_runtime.runtime(id) ON DELETE CASCADE,
-  -- 命令类型(9 种白名单,继承 §6.3)
-  command_type VARCHAR(32) NOT NULL,           -- 'GitStatus' / 'CreateWorktree' / 'ReadDiff' / 'RunApprovedTest' / 'QueryAgentStatus' / 'SubmitFeedback' / 'StartAuthorizedAgentSession' / 'StopAgentSession' / 'ReportObservation'
+  -- 命令类型(8 种白名单,继承 §6.3,basic-design §4.6.2)
+  command_type VARCHAR(32) NOT NULL,           -- 'GitStatus' / 'CreateWorktree' / 'ReadDiff' / 'RunApprovedTest' / 'QueryAgentStatus' / 'SubmitFeedback' / 'StartAuthorizedAgentSession' / 'StopAgentSession' (D-03 修复:ReportObservation 不在白名单,上报走独立 RuntimeObservation 枚举)
   -- 参数(JSONB,必带 worktree_id / agent_session_id / repository_id)
   command_args JSONB NOT NULL,
   -- Token(短时 5min TTL,继承 §4.6.3)
@@ -4192,8 +4192,8 @@ CREATE TABLE local_runtime.runtime_command (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT ck_runtime_command_type CHECK (command_type IN (
     'GitStatus','CreateWorktree','ReadDiff','RunApprovedTest','QueryAgentStatus',
-    'SubmitFeedback','StartAuthorizedAgentSession','StopAgentSession','ReportObservation'
-  )),
+    'SubmitFeedback','StartAuthorizedAgentSession','StopAgentSession'
+  )),  -- D-03 修复:8 种白名单,ReportObservation 移出
   CONSTRAINT ck_runtime_command_status CHECK (status IN (
     'PENDING','EXECUTING','COMPLETED','FAILED','EXPIRED','CANCELLED'
   )),
@@ -4209,8 +4209,8 @@ CREATE INDEX idx_runtime_command_token_hash ON local_runtime.runtime_command (co
 CREATE INDEX idx_runtime_command_expires
   ON local_runtime.runtime_command (expires_at) WHERE status IN ('PENDING','EXECUTING');
 
-COMMENT ON TABLE local_runtime.runtime_command IS '服务器侧 → Daemon 命令下发;9 种白名单(继承 §4.6.2,§6.3)';
-COMMENT ON COLUMN local_runtime.runtime_command.command_type IS '9 种白名单;SEC-008 拦截 ExecuteArbitraryShell 等(继承 §4.6.3,§API-7.2.1)';
+COMMENT ON TABLE local_runtime.runtime_command IS '服务器侧 → Daemon 命令下发;8 种白名单(继承 §4.6.2,§6.3,D-03 修复)';
+COMMENT ON COLUMN local_runtime.runtime_command.command_type IS '8 种白名单(D-03 修复:ReportObservation 不在);SEC-008 拦截 ExecuteArbitraryShell 等(继承 §4.6.3,§API-7.2.1)';
 COMMENT ON COLUMN local_runtime.runtime_command.command_token_hash IS '短时 5min TTL;一次性消费;bcrypt hash';
 
 ALTER TABLE local_runtime.runtime_command ENABLE ROW LEVEL SECURITY;
@@ -5103,7 +5103,7 @@ autovacuum_analyze_scale_factor = 0.05
 | Worktree 17 状态枚举(`§4.20.1`) | Local Daemon 状态机驱动 |
 | AgentSession 14 状态枚举(`§4.21.2`) | Local Daemon Agent 进程监控 |
 | WorktreeStatusObserved 表(`§4.20.2`) | 高频 Observed State 写入目标 |
-| RuntimeCommand 9 种白名单(`§4.25.2`) | Local Daemon 命令执行边界 |
+| RuntimeCommand 8 种白名单(`§4.25.2`,D-03 修复) | Local Daemon 命令执行边界 |
 | Reconcile Report 表(`§4.25.4`) | Local Daemon 重连后比对结果 |
 
 ### 13.3 给 Security Design
