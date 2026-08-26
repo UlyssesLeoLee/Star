@@ -233,10 +233,13 @@ Validation Policy
 Context Policy
 ```
 
+- REQ-WI-001：WorkItem 支持自由文本分类属性 `Labels: Vec<String>` 与 `Components: Vec<String>`，两者均为可选、长度不限、按字符串精确匹配（不做标签层级、不做组件依赖推导）。Labels 用于跨 WorkItem 的横切分类（如 `bug`、`perf`、`regression`），Components 可选地对应 Repository / 模块 / 子系统（由 Project 决定语义约定）。Components 在 AI Task 场景下可作为 §8.1 AI Task "Repository Scope / Allowed Files" 的粗粒度前置（Repository Scope 的初步范围划定），但是否实际生效仍以 AgentPolicy / Worktree 授权边界为准（§24.3、§28）。**已实现**：`crates/domain-work-item/src/entity.rs:100, 103` 与 `src/lib.rs:116-117, 329` 定义 `labels: Vec<String>` 与 `components: Vec<String>` 字段；`src/service.rs:146-147` 在创建 WorkItem 时初始化为空 Vec。**已实现追溯，2026-08-26 补登记。**
+
 ### 8.2 Workflow
 
 - REQ-WF-001：默认最简三态工作流（待办 / 进行中 / 完成），支持自定义状态扩展（前次对话结论：默认给出简化方案，不强制可视化工作流配置器，属于 MVP 精简范围，见第 30 章）。
 - REQ-WF-002：Worktree Status 不等于 WorkItem Status（§4）。同一 WorkItem 下，Worktree A 可为 Agent Running，Worktree B 可为 Blocked，Worktree C 可为 Reviewing，系统必须允许该并存状态。
+- REQ-WF-003：WorkItem 状态转换（transition）可配置 Guard，转换只有在 Guard 满足时才允许执行。Guard 类型至少包括：角色要求（RequireRole）、人工批准（RequireApproval）、Validation 通过（RequireValidation）。典型场景包括但不限于：（a）"Agent 未通过 Validation 不能自动流转到 Done"，对应 §27 AI Task 的 Validation Policy；（b）"需要人工 Approval 才能合并到 Done / Merged"，对应 §28 Agent Policy 的 Require Approval 授权级别。Guard 校验由 Application/Authorization 层强制执行（不得仅通过 Prompt 约束，§28，与 REQ-PERM-002 一致）。Guard 失败时返回可定位错误（哪个 Guard 不满足），便于 UI/CLI 给出可执行的下一步建议。**已实现**：`crates/domain-workflow/src/lib.rs:134-148` 定义 `enum Guard { RequireRole(String), RequireValidation(String), RequireApproval }`，第 618/626/634 行在状态转换执行时实际做校验；第 1384 行有使用示例。**已实现追溯，2026-08-26 补登记。**
 
 ---
 
@@ -254,6 +257,7 @@ Backlog → Sprint 规划 → 看板执行（含甘特图排期视图）→ 燃�
 - REQ-PLAN-004：甘特图（Gantt）基于 WorkItem 的开始/截止日期与依赖关系生成，与 Sprint/看板共享同一份问题数据，是"看板"的排期视图变体，不是独立子系统。
 - REQ-PLAN-005：燃尽图（Burndown）为 Sprint 内剩余工作量趋势展示，是敏捷闭环反馈的最小必需图表；速度图 / 累积流图 / 控制图为进阶分析，列入 V1（第 30 章）。
 - REQ-PLAN-006（Agent-aware Planning，§35）：Backlog/Sprint 应研究提供 Agent Suitability、Parallelizable、Context Cost、Conflict Risk、Dependency Risk、Human Review Cost、Validation Cost 等规划辅助信息，属于 Planning Assistance，不构成 AI 强制调度。
+- REQ-PLAN-007：Milestone（里程碑）用于对一组 WorkItem 打分组标签并设定共同 `due_date`，Roadmap 是基于 Milestone 的只读 Projection 视图（按时间线聚合 Milestone 及其下属 WorkItem 的进度）。Milestone 字段至少包括：`id / tenant_id / project_id / name / description / due_date / status / work_item_ids / created_at`，不携带发布/上线语义。**与 Jira Fix Version 的差异点**：当前 Milestone 不含 `release_date` / `released` 标记，不追踪"哪个 PR / Worktree 落地到了哪次发布"；如后续需做"agent 产出的 PR 属于哪次发布"这类追溯，需另开需求（如 REQ-PLAN-008），不在本条登记范围内。**已实现**：`crates/domain-planning/src/lib.rs:335-346` 定义 `struct Milestone`；`docs/api-design.md:429` 与 §3 端点暴露 `GET /v1/projects/{id}/roadmap`（R 投影），`/v1/projects/{id}/milestones` 系列端点由 `domain-planning` 提供 CRUD。**已实现追溯，2026-08-26 补登记。**
 
 ---
 
@@ -272,6 +276,7 @@ Backlog → Sprint 规划 → 看板执行（含甘特图排期视图）→ 燃�
 - REQ-PERM-002：Agent 相关操作（第 24、28 章 Agent Policy）必须由 Application / Authorization 层强制执行，不得仅通过 Prompt 约束（§28）。
 - REQ-AUTO-001：自动化规则采用触发器-条件-动作模式，MVP 提供默认方案，不强制可视化配置器（第 30 章范围裁剪）。
 - REQ-AUTO-002（V1 候选，参考竞品 Multica「Autopilot」分析，2026-08-26 补充）：Trigger 除事件订阅（`event_type + filter`）外，须支持 Schedule/Cron 类型，用于定时 Standup / Audit / Report 等主动巡检场景，不得与事件触发混用同一执行路径（避免循环触发歧义，沿用 REQ-AUTO-001 的 Rule 聚合根，仅扩展 `Trigger` 枚举）。
+- REQ-AUTO-003（V1 候选）：系统需支持对多个 WorkItem 的批量操作，至少包括**批量状态转换**（Bulk Transition）、**批量分配**（Bulk Assign）、**批量取消**（Bulk Cancel）。批量操作的输入为 WorkItem ID 列表（或 Filter 表达式结果集）+ 目标动作；输出为逐条结果（成功/失败/原因），整体操作是**部分成功**语义（不要求全成功才返回），调用方可基于结果列表做重试或回滚。**关键约束**：批量操作中的**每一条**仍须独立经过 REQ-WF-003 定义的 Guard 校验（角色 / Validation / Approval），**不得绕过**单条转换的授权检查（即使操作由 Automation Rule 触发）；同样，单条权限不足时该条失败但不影响其他条。典型 AI 开发管理场景：（a）一次性为某 Epic 拆出的 N 个 AI Task 批量分配 Agent Policy；（b）当某上游 Decision（§26.5）被否决时，批量取消该 Decision 下所有还在 Queued / In-Progress 状态的 Agent Task；（c）批量将一组已解决 WorkItem 标记为 Archived。**未实现**：当前 `crates/` 全代码库无 `bulk` / `batch` 关键字命中（`\bbulk\b|\bBulk\b|\bbatch\b|\bBatch\b` 零命中），属真实功能缺口，V1 候选。
 
 ---
 
@@ -279,6 +284,7 @@ Backlog → Sprint 规划 → 看板执行（含甘特图排期视图）→ 燃�
 
 - REQ-NOTIF-001：事件触发的邮件/站内通知，覆盖 WorkItem 状态变更、Feedback 请求、Validation 失败等（详见第 25、27 章事件源）。
 - REQ-NOTIF-002（参考竞品 Multica「Inbox 降噪」分析，2026-08-26 补充）：Notification/Inbox 默认策略是"仅在需要人类决策的节点触达"（如 WAITING_FEEDBACK、Validation 失败、Protected Action 待授权），而非 Agent 每一次工具调用/中间步骤都产生通知；中间过程仍需 100% 写入 AgentSession Transcript（INV-AGT-09 对应，见第 24 章）供按需查阅，二者不冲突。
+- REQ-NOTIF-003：WorkItem 支持 Watcher（关注者）列表，**用户可自行加入/退出**对特定 WorkItem 的关注；Watcher 收到的通知**不受** REQ-NOTIF-002 全局降噪策略限制（即即使该 WorkItem 不满足"需要人类决策"触发条件，Watcher 仍会收到关键事件通知，如状态转换、Comment、Feedback 产生、Validation 失败、Merge / Close 等）。这是 REQ-NOTIF-002 默认行为之外的可选补充机制，**不改变** REQ-NOTIF-002 的默认行为：非 Watcher 用户仍只收到降噪后的关键通知。典型场景：人类想专门盯某个 Agent 正在处理的高风险 AI Task（即使其状态不满足降噪触发条件），或想关注某个 Project 关键路径上所有 WorkItem 的进度。实现位置在 `domain-notification`，与现有 Notification 通道（inbox / email / IM）共用投递通道；Watcher 列表变更本身应写 audit（谁在何时关注/取消关注了哪个 WorkItem）。
 - REQ-SEARCH-001：Search 为 Projection，不得成为业务事实源（§90）。初期覆盖 WorkItem / Comment / Project，未来扩展 Repository / Worktree / AgentSession / Feedback / Decision / Symbol（§90）。
 - REQ-SEARCH-002（精简范围）：MVP 不做 JQL 高级查询语言，以 Filter（状态/负责人/标签/Sprint）替代（前次对话结论），降低学习成本。
 
@@ -1270,6 +1276,7 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | `SCM-xxx` | Source Control Integration Requirement |
 | `LRT-xxx` | Local Runtime Requirement |
 | `SEC-xxx` | 安全 / 隔离边界 Requirement（跨 Tenant/Repository/Worktree Leakage 防护，见第 16 章） |
+| `WI-xxx` | WorkItem 属性 Requirement（Labels / Components 等 WorkItem 字段语义，§8.1） |
 
 ### 41.2 关键 P0 Requirement 登记表（§63）
 
@@ -1281,6 +1288,7 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | AGT-001 | 系统必须将 AgentSession 与 Worktree 关联 | 第 24.1 章 | ARCH-OBL-DEV-001 |
 | AGT-002 | 系统不得允许 Agent 越过授权 Worktree 执行受保护修改 | 第 24.3-24.4 章 | ARCH-OBL-DEV-001 |
 | FBK-001 | 用户必须能够向 WorkItem/File/Symbol/Diff/Test 等目标发送结构化 Feedback | 第 25.1 章 | ARCH-OBL-DEV-002 |
+| WF-003 | WorkItem 状态转换必须可配置 Guard（角色/Validation/Approval），由 Application/Authorization 层强制执行 | 第 8.2 章 | ARCH-OBL-DEV-001/002 |
 | FBK-002 | 系统必须能够追踪 Feedback 是否被 Agent 消费、应用和验证 | 第 25.3 章 | ARCH-OBL-DEV-002 |
 | CTX-001 | 系统必须能够根据任务自动生成 Context Packet | 第 26.1 章 | ARCH-OBL-DEV-002 |
 | CTX-002 | Context Packet 必须保留来源追踪信息 | 第 26.3 章 | ARCH-OBL-DEV-002 |
@@ -1290,7 +1298,7 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | LRT-002 | SaaS 不得获得任意本地 Shell 执行能力 | 第 23.2 章 | ARCH-OBL-DEV-004 |
 | SEC-xxx | 必须防止 Cross-Tenant / Cross-Repository / Cross-Worktree Context Leakage | 第 16、28.3、34 章 | ARCH-OBL-DEV-001/002 |
 
-本文档第 1-17 章新增的基础 Requirement（`REQ-TWP-xxx / REQ-WF-xxx / REQ-PLAN-xxx / REQ-COLLAB-xxx / REQ-PERM-xxx / REQ-AUTO-xxx / REQ-NOTIF-xxx / REQ-SEARCH-xxx / REQ-DATA-xxx / REQ-RT-xxx / REQ-SEC-xxx / REQ-AUDIT-xxx`）与 Vibe Coding 扩展 P0 Requirement 共同构成完整 ID 登记表，下游《基本设计书》须逐项继承。
+本文档第 1-17 章新增的基础 Requirement（`REQ-TWP-xxx / REQ-WF-xxx / REQ-PLAN-xxx / REQ-COLLAB-xxx / REQ-PERM-xxx / REQ-AUTO-xxx / REQ-NOTIF-xxx / REQ-SEARCH-xxx / REQ-DATA-xxx / REQ-RT-xxx / REQ-SEC-xxx / REQ-AUDIT-xxx / REQ-WI-xxx`）与 Vibe Coding 扩展 P0 Requirement 共同构成完整 ID 登记表，下游《基本设计书》须逐项继承。
 
 ---
 
