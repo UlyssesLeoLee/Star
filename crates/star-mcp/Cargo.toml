@@ -1,0 +1,25 @@
+[package]
+name = "star-mcp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "STAR MCP server — Phase D 骨架(16 tool stubs)"
+
+[[bin]]
+name = "star-mcp"
+path = "src/main.rs"
+
+[dependencies]
+# workspace 已有依赖
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+# Phase D 骨架:不引入 rmcp(避免 beta 风险,per spec §1 transport 选择)
+# MCP transport 留 TODO,仅 stub JSON-RPC 请求/响应
+
+[lints]
+workspace = true
