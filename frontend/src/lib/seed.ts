@@ -407,6 +407,80 @@ export const whiteboards: Whiteboard[] = [
 ];
 
 // =====================================================================
+// Canvas(无限画布)— Miro 模式
+// =====================================================================
+export const canvases: Canvas[] = [
+  {
+    id: "canvas-001",
+    tenant_id: TENANT_ID,
+    workspace_id: "ws-001",
+    title: "Physis Sprint 23 — Worktree + Agent 工作流",
+    ref_kind: "project",
+    ref_id: PROJECT_ID,
+    viewport: { x: 0, y: 0, zoom: 1 },
+    frames: [
+      { id: "frame-001", canvas_id: "canvas-001", title: "Worktree 状态",     x: 0,   y: 0,   width: 500, height: 360, element_ids: ["el-wi-001","el-wi-002","el-wt-001","el-wt-002","el-wt-003"], is_slide: true,  order: 0 },
+      { id: "frame-002", canvas_id: "canvas-001", title: "Agent Session",      x: 600, y: 0,   width: 460, height: 360, element_ids: ["el-ag-001","el-ag-002","el-ag-003"],                          is_slide: true,  order: 1 },
+      { id: "frame-003", canvas_id: "canvas-001", title: "Feedback Inbox",     x: 0,   y: 460, width: 500, height: 300, element_ids: ["el-fb-001","el-fb-002","el-sn-001"],                            is_slide: false, order: 2 },
+      { id: "frame-004", canvas_id: "canvas-001", title: "Automation Rules",   x: 600, y: 460, width: 460, height: 300, element_ids: ["el-au-001","el-au-002"],                                            is_slide: true,  order: 3 },
+    ],
+    creator_id: "usr-001",
+    collaborator_ids: ["usr-001","usr-002","usr-003","usr-005"],
+    created_at: ago(60 * 24 * 5),
+    updated_at: ago(60 * 2),
+    snapshot_url: "/canvas/001.png",
+  },
+  {
+    id: "canvas-002",
+    tenant_id: TENANT_ID,
+    workspace_id: "ws-004",
+    title: "Dashboard 信息架构 — Realtime 拓扑",
+    ref_kind: "free",
+    viewport: { x: 0, y: 0, zoom: 1 },
+    frames: [],
+    creator_id: "usr-002",
+    collaborator_ids: ["usr-002","usr-005","usr-007"],
+    created_at: ago(60 * 24 * 2),
+    updated_at: ago(60 * 1),
+  },
+];
+
+// Canvas Element — 25-30 个,跨 7 种 kind,演示 25 module 联动
+export const canvasElements: CanvasElement[] = [
+  // === Frame 1: Worktree 状态 ===
+  { id: "el-wi-001", canvas_id: "canvas-001", kind: "work_item_card", x: 30,  y: 50,  width: 200, height: 90,  rotation: 0, z_index: 1, content: { work_item_id: "wi-001", text: "Implement Worktree 17-state machine" }, locked: false, hidden: false, created_by: "usr-001", created_at: ago(60 * 24 * 5), updated_at: ago(60 * 4) },
+  { id: "el-wi-002", canvas_id: "canvas-001", kind: "work_item_card", x: 30,  y: 180, width: 200, height: 90,  rotation: 0, z_index: 1, content: { work_item_id: "wi-002", text: "Agent 14 状态机 + 12 强制迁移" },         locked: false, hidden: false, created_by: "usr-001", created_at: ago(60 * 24 * 5), updated_at: ago(60 * 4) },
+  { id: "el-wt-001", canvas_id: "canvas-001", kind: "worktree_node",  x: 260, y: 50,  width: 220, height: 70,  rotation: 0, z_index: 2, content: { worktree_id: "wt-001", text: "feat/worktree-sm" },         locked: false, hidden: false, created_by: "usr-001", created_at: ago(60 * 24 * 5), updated_at: ago(60 * 4) },
+  { id: "el-wt-002", canvas_id: "canvas-001", kind: "worktree_node",  x: 260, y: 140, width: 220, height: 70,  rotation: 0, z_index: 2, content: { worktree_id: "wt-002", text: "feat/agent-14-sm" },         locked: false, hidden: false, created_by: "usr-001", created_at: ago(60 * 24 * 5), updated_at: ago(60 * 4) },
+  { id: "el-wt-003", canvas_id: "canvas-001", kind: "worktree_node",  x: 260, y: 230, width: 220, height: 70,  rotation: 0, z_index: 2, content: { worktree_id: "wt-003", text: "feat/automation-v2" },      locked: false, hidden: false, created_by: "usr-001", created_at: ago(60 * 24 * 5), updated_at: ago(60 * 4) },
+  // === Frame 2: Agent Session ===
+  { id: "el-ag-001", canvas_id: "canvas-001", kind: "agent_cursor",    x: 630, y: 50,  width: 180, height: 80,  rotation: 0, z_index: 2, content: { agent_session_id: "ag-001", text: "ag-001 / claude-sonnet" },   locked: false, hidden: false, created_by: "usr-002", created_at: ago(60 * 24 * 4), updated_at: ago(60 * 2) },
+  { id: "el-ag-002", canvas_id: "canvas-001", kind: "agent_cursor",    x: 630, y: 160, width: 180, height: 80,  rotation: 0, z_index: 2, content: { agent_session_id: "ag-002", text: "ag-002 / codex" },         locked: false, hidden: false, created_by: "usr-002", created_at: ago(60 * 24 * 4), updated_at: ago(60 * 2) },
+  { id: "el-ag-003", canvas_id: "canvas-001", kind: "agent_cursor",    x: 630, y: 270, width: 180, height: 80,  rotation: 0, z_index: 2, content: { agent_session_id: "ag-003", text: "ag-003 / awaiting_human" },  locked: false, hidden: false, created_by: "usr-002", created_at: ago(60 * 24 * 4), updated_at: ago(60 * 1) },
+  // === Frame 3: Feedback Inbox ===
+  { id: "el-fb-001", canvas_id: "canvas-001", kind: "sticky_note",     x: 30,  y: 510, width: 140, height: 100, rotation: 0, z_index: 1, content: { text: "Need spec clarification on CEL guard scope", color: "#f9d77e" }, locked: false, hidden: false, created_by: "usr-005", created_at: ago(60 * 24 * 3), updated_at: ago(60 * 3) },
+  { id: "el-fb-002", canvas_id: "canvas-001", kind: "sticky_note",     x: 200, y: 510, width: 140, height: 100, rotation: 0, z_index: 1, content: { text: "Permission rule CEL 解析失败 fallback", color: "#ffb3c1" }, locked: false, hidden: false, created_by: "usr-005", created_at: ago(60 * 24 * 3), updated_at: ago(60 * 0.4) },
+  { id: "el-sn-001", canvas_id: "canvas-001", kind: "comment_pin",     x: 370, y: 540, width: 90,  height: 60,  rotation: 0, z_index: 3, content: { comment_id: "cm-001", text: "3 comments" },          locked: false, hidden: false, created_by: "usr-002", created_at: ago(60 * 24 * 3), updated_at: ago(60 * 6) },
+  // === Frame 4: Automation Rules ===
+  { id: "el-au-001", canvas_id: "canvas-001", kind: "automation_node", x: 630, y: 510, width: 200, height: 90,  rotation: 0, z_index: 2, content: { automation_id: "au-rule-001", text: "Auto-assign P0" }, locked: false, hidden: false, created_by: "usr-003", created_at: ago(60 * 24 * 3), updated_at: ago(60 * 2) },
+  { id: "el-au-002", canvas_id: "canvas-001", kind: "automation_node", x: 850, y: 510, width: 200, height: 90,  rotation: 0, z_index: 2, content: { automation_id: "au-rule-003", text: "Dispatch agent on PR review" }, locked: false, hidden: false, created_by: "usr-003", created_at: ago(60 * 24 * 3), updated_at: ago(60 * 3) },
+  // === 自由 element ===
+  { id: "el-tx-001", canvas_id: "canvas-001", kind: "text",           x: 1100, y: 200, width: 240, height: 60,  rotation: 0, z_index: 0, content: { text: "INV-AGT-N07: Agent 14 状态机 + 12 强制迁移" },     locked: false, hidden: false, created_by: "usr-001", created_at: ago(60 * 24 * 5), updated_at: ago(60 * 4) },
+];
+
+// Canvas Connector — 演示 Relation 域联动
+export const canvasConnectors: CanvasConnector[] = [
+  { id: "el-cn-001", canvas_id: "canvas-001", kind: "work_item_relation", from_element_id: "el-wi-001", to_element_id: "el-wt-001", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#2f81f7", width: 2, label: "parent_of",  relation_id: "rl-001" },
+  { id: "el-cn-002", canvas_id: "canvas-001", kind: "work_item_relation", from_element_id: "el-wi-002", to_element_id: "el-wt-002", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#2f81f7", width: 2, label: "parent_of",  relation_id: "rl-002" },
+  { id: "el-cn-003", canvas_id: "canvas-001", kind: "work_item_relation", from_element_id: "el-wi-001", to_element_id: "el-wi-002", routing: "curved",  arrow_start: true,  arrow_end: true,  color: "#d29922", width: 2, label: "duplicates", relation_id: "rl-005" },
+  { id: "el-cn-004", canvas_id: "canvas-001", kind: "agent_handoff",      from_element_id: "el-wt-001", to_element_id: "el-ag-001", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#3fb950", width: 2, label: "executes" },
+  { id: "el-cn-005", canvas_id: "canvas-001", kind: "agent_handoff",      from_element_id: "el-wt-002", to_element_id: "el-ag-002", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#3fb950", width: 2, label: "executes" },
+  { id: "el-cn-006", canvas_id: "canvas-001", kind: "agent_handoff",      from_element_id: "el-wt-003", to_element_id: "el-ag-003", routing: "curved",  arrow_start: false, arrow_end: true,  color: "#3fb950", width: 2, label: "executes" },
+  { id: "el-cn-007", canvas_id: "canvas-001", kind: "free",               from_element_id: "el-fb-001", to_element_id: "el-wi-001", routing: "orthogonal", arrow_start: false, arrow_end: true, color: "#8b949e", width: 1, label: "blocks" },
+  { id: "el-cn-008", canvas_id: "canvas-001", kind: "dependency",         from_element_id: "el-au-001", to_element_id: "el-wi-001", routing: "straight", arrow_start: false, arrow_end: true,  color: "#d29922", width: 2, label: "triggers" },
+];
+
+// =====================================================================
 // planning
 // =====================================================================
 export const sprints: Sprint[] = [

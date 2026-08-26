@@ -112,6 +112,16 @@ export default function WorktreePage() {
                 </div>
               )}
 
+              <div className="mt-4 pt-3 border-t border-line">
+                <Link
+                  href={`/canvas/canvas-001?highlight=${wt.id === "wt-001" ? "el-wt-001" : wt.id === "wt-002" ? "el-wt-002" : wt.id === "wt-003" ? "el-wt-003" : "el-wt-001"}`}
+                  className="btn text-[10px]"
+                  title="在 Miro 模式画布中查看 worktree node 状态(双击可跳回)"
+                >
+                  <span className="font-mono">⊞</span> 打开在 Canvas
+                </Link>
+              </div>
+
               <div className="mt-4 pt-3 border-t border-line text-[10px] text-ink-mute space-y-1">
                 <div className="flex items-center gap-1.5">
                   <Lock size={10} /> Optimistic lock via lock_version

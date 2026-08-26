@@ -488,6 +488,125 @@ export interface Whiteboard {
 }
 
 // =====================================================================
+// Canvas(无限画布)— 来自 frontend-canvas-design.md v0.1
+// 替代 Whiteboard 作为 collaboration 域主入口
+// 保留 Whiteboard 实体(向后兼容),新增 Canvas / CanvasElement / CanvasConnector
+// =====================================================================
+
+/** Canvas 视口状态 */
+export interface CanvasViewport {
+  x: number;
+  y: number;
+  zoom: number; // 0.1 ~ 4
+}
+
+/** Canvas Frame(画布分区,可作 slide) */
+export interface CanvasFrame {
+  id: Uuid;
+  canvas_id: Uuid;
+  title: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  element_ids: Uuid[];
+  is_slide: boolean;
+  order: number;
+}
+
+/** Canvas 主体 */
+export interface Canvas {
+  id: Uuid;
+  tenant_id: Uuid;
+  workspace_id: Uuid;
+  title: string;
+  ref_kind?: "work_item" | "worktree" | "project" | "free";
+  ref_id?: Uuid;
+  viewport: CanvasViewport;
+  frames: CanvasFrame[];
+  creator_id: Uuid;
+  collaborator_ids: Uuid[];
+  created_at: Iso8601;
+  updated_at: Iso8601;
+  snapshot_url?: string;
+}
+
+/** Canvas 元素类型 */
+export type CanvasElementKind =
+  | "sticky_note"
+  | "text"
+  | "shape"
+  | "image"
+  | "embed"
+  | "work_item_card"
+  | "worktree_node"
+  | "agent_cursor"
+  | "automation_node"
+  | "comment_pin";
+
+/** Canvas 元素 */
+export interface CanvasElement {
+  id: Uuid;
+  canvas_id: Uuid;
+  kind: CanvasElementKind;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  z_index: number;
+  content: {
+    text?: string;
+    color?: string;
+    image_url?: string;
+    embed_url?: string;
+    work_item_id?: Uuid;
+    worktree_id?: Uuid;
+    agent_session_id?: Uuid;
+    automation_id?: Uuid;
+    comment_id?: Uuid;
+  };
+  locked: boolean;
+  hidden: boolean;
+  created_by: Uuid;
+  created_at: Iso8601;
+  updated_at: Iso8601;
+}
+
+/** Canvas 连接线 */
+export type CanvasConnectorKind =
+  | "work_item_relation"
+  | "agent_handoff"
+  | "free"
+  | "dependency";
+
+export interface CanvasConnector {
+  id: Uuid;
+  canvas_id: Uuid;
+  kind: CanvasConnectorKind;
+  from_element_id: Uuid;
+  to_element_id: Uuid;
+  routing: "straight" | "curved" | "orthogonal";
+  arrow_start: boolean;
+  arrow_end: boolean;
+  color: string;
+  width: number;
+  label?: string;
+  relation_id?: Uuid;
+}
+
+/** Canvas 实时视口(每用户) */
+export interface CanvasViewportState {
+  canvas_id: Uuid;
+  user_id: Uuid;
+  x: number;
+  y: number;
+  zoom: number;
+  selected_element_ids: Uuid[];
+  updated_at: Iso8601;
+}
+
+// =====================================================================
 // 21. planning (Sprint + Milestone + Burndown)
 // =====================================================================
 export type SprintStatus = "planned" | "active" | "completed" | "cancelled";

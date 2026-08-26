@@ -13,6 +13,7 @@ import type {
   WorkItem, WorkItemStatus,
   ChangeSet, ChangeSetStatus,
   Notification, NotificationStatus,
+  Canvas, CanvasElement, CanvasConnector,
 } from "@/types/ids";
 
 interface StoreState {
@@ -42,6 +43,9 @@ interface StoreState {
   integrations: typeof seed.integrations;
   presenceCursors: typeof seed.presenceCursors;
   whiteboards: typeof seed.whiteboards;
+  canvases: Canvas[];
+  canvasElements: CanvasElement[];
+  canvasConnectors: CanvasConnector[];
   sprints: typeof seed.sprints;
   milestones: typeof seed.milestones;
   burndownSeries: typeof seed.burndownSeries;
@@ -58,6 +62,13 @@ interface StoreState {
   transitionWorkItem: (id: string, to: WorkItemStatus) => void;
   transitionChangeSet:(id: string, to: ChangeSetStatus) => void;
   markNotificationRead: (id: string) => void;
+
+  // Canvas mutations(无限画布,frontend-canvas-design.md §2)
+  addCanvasElement: (element: CanvasElement) => void;
+  moveCanvasElement: (id: string, x: number, y: number) => void;
+  deleteCanvasElement: (id: string) => void;
+  addCanvasConnector: (connector: CanvasConnector) => void;
+  setCanvasViewport: (canvasId: string, x: number, y: number, zoom: number) => void;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -86,6 +97,9 @@ export const useStore = create<StoreState>((set) => ({
   integrations: seed.integrations,
   presenceCursors: seed.presenceCursors,
   whiteboards: seed.whiteboards,
+  canvases: seed.canvases,
+  canvasElements: seed.canvasElements,
+  canvasConnectors: seed.canvasConnectors,
   sprints: seed.sprints,
   milestones: seed.milestones,
   burndownSeries: seed.burndownSeries,
@@ -121,5 +135,24 @@ export const useStore = create<StoreState>((set) => ({
   markNotificationRead: (id) =>
     set((s) => ({
       notifications: s.notifications.map((n) => n.id === id ? { ...n, status: "read" as NotificationStatus } : n),
+    })),
+
+  // Canvas mutations
+  addCanvasElement: (element) =>
+    set((s) => ({ canvasElements: [...s.canvasElements, element] })),
+  moveCanvasElement: (id, x, y) =>
+    set((s) => ({
+      canvasElements: s.canvasElements.map((e) => e.id === id ? { ...e, x, y, updated_at: new Date().toISOString() } : e),
+    })),
+  deleteCanvasElement: (id) =>
+    set((s) => ({
+      canvasElements: s.canvasElements.filter((e) => e.id !== id),
+      canvasConnectors: s.canvasConnectors.filter((c) => c.from_element_id !== id && c.to_element_id !== id),
+    })),
+  addCanvasConnector: (connector) =>
+    set((s) => ({ canvasConnectors: [...s.canvasConnectors, connector] })),
+  setCanvasViewport: (canvasId, x, y, zoom) =>
+    set((s) => ({
+      canvases: s.canvases.map((c) => c.id === canvasId ? { ...c, viewport: { x, y, zoom } } : c),
     })),
 }));

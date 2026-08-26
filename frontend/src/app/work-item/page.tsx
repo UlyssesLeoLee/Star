@@ -122,6 +122,15 @@ export default function WorkItemPage() {
               ))}
               {allowed.length === 0 && <span className="text-xs text-ink-mute italic">终态, 无下游迁移</span>}
             </div>
+            <div className="mt-3 pt-3 border-t border-line">
+              <Link
+                href={`/canvas/canvas-001?highlight=el-wi-001`}
+                className="btn text-[10px]"
+                title="在 Miro 模式画布中查看(双击 element 可跳回)"
+              >
+                <span className="font-mono">⊞</span> 打开在 Canvas
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="card text-center text-ink-mute text-sm">← 选择一个 work-item 查看详情</div>

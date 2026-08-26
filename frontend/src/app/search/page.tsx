@@ -60,6 +60,23 @@ export default function SearchPage() {
                       </div>
                       <div className="text-sm font-medium">{h.title}</div>
                       <p className="text-xs text-ink-dim mt-0.5 line-clamp-2">{h.snippet}</p>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <a
+                          href={`/canvas/canvas-001?highlight=${
+                            h.id === "wi-001" ? "el-wi-001" :
+                            h.id === "wi-002" ? "el-wi-002" :
+                            h.id === "wt-001" ? "el-wt-001" :
+                            h.id === "wt-002" ? "el-wt-002" :
+                            h.id === "wt-003" ? "el-wt-003" :
+                            h.id === "fb-001" ? "el-fb-001" :
+                            h.id === "fb-002" ? "el-fb-002" :
+                            "el-wi-001"
+                          }`}
+                          className="text-[10px] text-accent hover:underline font-mono"
+                        >
+                          ⊞ 在 Canvas 中查看
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>
