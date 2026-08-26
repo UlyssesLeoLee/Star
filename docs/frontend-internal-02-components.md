@@ -59,7 +59,7 @@
 
 | 组件 | 使用 page 数 | 复用率 |
 |---|---|---|
-| `<StatusPill value=...>` | 24 / 26 | **92%** |
+| `<StatusPill value=...>` | 25 / 26 | **96%** |
 | `<PageHeader title=...>` | 26 / 26 | **100%** |
 | `<Stat label=...>` | 5 / 26 | 19% |
 | `<SectionTitle>` | 11 / 26 | 42% |
@@ -484,7 +484,7 @@ const allowed = item ? sm.transitions
 
 ## 6. 复用率实测报告
 
-### 6.1 StatusPill 复用 24/26(92%)
+### 6.1 StatusPill 复用 25/26(96%)
 
 **未使用 page**(2 个):
 - `/`(Dashboard) — 不需要状态 pill

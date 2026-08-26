@@ -21,7 +21,7 @@
 ### 0.1 目的
 
 继承 frontend-design §2.4(键盘)+ §8(交互规范)+ §10(已知缺口)+ §11(V1/V2/Future),做 Internal Design 级别的:
-- 9 键盘快捷键 + 焦点管理 + 事件流
+- 11 行快捷键表(9 个独立动作:⌘K、g d、g w、g a、j/k、Enter、Esc、t、?)+ 焦点管理 + 事件流
 - 6 类错误反馈 UI 表现
 - 三态(Loading / Empty / Error)规范
 - a11y / 性能 / i18n
@@ -544,7 +544,7 @@ const WorkItemPage = lazy(() => import("./WorkItemPage"));
 - Relation 力导向图
 - ⌘K 语音
 - PWA / 离线
-- AI 助手(每页 ✨ 按钮)
+- AI 助手(每页 AI 按钮)
 - BurndownChart 长 span 缩放
 
 ### 10.3 Future
@@ -701,7 +701,7 @@ const WorkItemPage = lazy(() => import("./WorkItemPage"));
 
 | # | 验证项 | 验证方法 | 状态 |
 |---|---|---|---|
-| 1 | 9 键盘快捷键 + MVP 标志 | grep "⌘K\|Esc" 章节 | ✓ |
+| 1 | 11 行快捷键表(9 独立动作)+ MVP 标志 | grep "⌘K\|Esc" 章节 | ✓ |
 | 2 | 6 类错误 UI 表现 | grep "SEC-001\|WF-403\|WF-409\|API-429\|API-500\|SC-001" | ✓ |
 | 3 | 三态(Loading / Empty / Error) | grep "Loading\|Empty\|Error" §3 | ✓ |
 | 4 | a11y / 性能 / 测试 3 章 | grep "a11y\|Web Vitals\|E2E" | ✓ |
