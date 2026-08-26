@@ -2,7 +2,7 @@
 
 > **审查对象**：5 份主 spec（CLI / agent-api / ide-api / MCP / REST）+ 4 份交叉对账（arch/03 / arch/04 / protocol-survey / star-vs-gitgit）
 > **审查范围**：命令名一致性、Schema 内部矛盾、MCP 2026-07-28 符合度、CLI 17 命令覆盖度、OpenAPI 3.1 正确性、版本号一致性、JSON 字段命名、错误模型、Capability Discovery 对齐、守门规则遵循度
-> **审查者**：架构师（Mavis 接手 agent per DEC-008）— 子代理 A
+> **审查者**：架构师（Ulysses（一人公司 12 角色 per DEC-008））— 子代理 A
 > **审查日期**：2026-08-26
 > **基于 commit**：`876a2a7`（Phase C 54 份 spec 草案）
 > **不沿用**：`bc23d6c` 的叙事（该 commit 引用了未做过的 frontend commit hash，属于历史叙事灰区）
@@ -1118,11 +1118,12 @@ star context current --json  # 之前
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
-| v0.1 | 2026-08-26 | 架构师（Mavis 接手 agent per DEC-008）— 子代理 A | 初版（30 finding：🔴 7 / 🟡 13 / 🟢 10 + 5 节对齐分析 + 3 条守门规则） | Phase C 第 2 轮接口一致性审查 |
+| v0.1 | 2026-08-26 | 架构师（Ulysses（一人公司 12 角色 per DEC-008））— 子代理 A | 初版（30 finding：🔴 7 / 🟡 13 / 🟢 10 + 5 节对齐分析 + 3 条守门规则） | Phase C 第 2 轮接口一致性审查 |
+| v0.2 | 2026-08-27 | Ulysses（一人公司 12 角色 per DEC-008）| 代签规则反转（per 2026-08-26 08:40 JST 新规则）— 全文"架构师（Mavis 接手 agent per DEC-008）"全部替换为"Ulysses（一人公司 12 角色 per DEC-008）"；具体修订内容与 v0.1 一致，仅署名更新 | per 用户 2026-08-27 07:16 JST 指令"全部允许代签 Ulysses，并签名 Ulysses" |
 
 ### 7.2 签字栏
 
-> 架构师（Mavis 接手 agent per DEC-008）— 子代理 A — 2026-08-26
+> 架构师（Ulysses（一人公司 12 角色 per DEC-008））— 子代理 A — 2026-08-26
 >
 > 本报告基于 commit `876a2a7`（Phase C 54 份 spec 草案）的 9 份 spec + 4 份交叉对账；不沿用 `bc23d6c` 的叙事（该 commit 引用了未做过的 frontend commit hash，属于历史叙事灰区）。
 >
