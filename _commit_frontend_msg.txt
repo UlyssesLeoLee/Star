@@ -1,0 +1,43 @@
+feat(frontend): add Next.js 14 control plane UI + frontend-design.md v0.1
+
+Star 平台 25 module 控制面 (Control Plane) 的 Next.js 14 (App Router) +
+TypeScript + Tailwind 前端实现,基于 docs/frontend-design.md v0.1 设计。
+
+## 新增
+
+- docs/frontend-design.md v0.1 (40 KB, 11 章 + 3 附录)
+  * 25 module 1:1 路由对齐 backend
+  * 6 状态机可视化规范 (WTSM 17 / AGSM 14 / FBSM 6 / PRSM 7 / WISM 6 / CSSM 5)
+  * 8 项 ADR-FE-001~008
+  * 25 项 V1/V2/Future 范围裁剪
+  * 10 项新发现 Open Issue (FE-OI-01~10)
+- frontend/ (Next.js 14 + TS + Tailwind)
+  * 25 route (1:1 对应 25 domain module) + 1 Dashboard
+  * 5 component (Sidebar / Topbar / PageHeader / StatusPill / StateMachineDiagram)
+  * 6 状态机 SVG 可视化 (5x4 grid 统一布局)
+  * 6 状态机 transition mutator (Zustand store)
+  * 357+ seed 数据 (25 域 + 6 SM 全量 mock)
+
+## 设计原则 (继承 docs/frontend-design.md §1.4)
+
+- P-FE-1: 25 module 1:1 严格对齐 (不拆不并)
+- P-FE-2: 6 SM 统一交互 (同一种 SmView 组件)
+- P-FE-3: 不引入新聚合根 (前端只持有 UI 投影)
+- P-FE-4: tenant 强制 (Topbar 显式显示,不可切换)
+- P-FE-5: 25 page 全部 "use client" (MVP 阶段, V1 升级 RSC)
+- P-FE-6: 设计 token 单一来源 (Tailwind theme)
+- P-FE-7: Mock-first (Seed + Zustand, 切真后端时换 fetch)
+- P-FE-8: 不画 UI 截图 (规范靠 token + token-driven 组件)
+
+## 启动
+
+  cd D:\Star\frontend
+  npm install
+  npm run dev
+  # -> http://localhost:3000
+
+## 已知缺口 (留 V1/V2)
+
+详见 docs/frontend-design.md §10 FE-OI-01~10。
+
+Refs: basic-design §2.1 (25 module) + §7 (6 SM) + api-design §3 (REST endpoints) + §5.5 (NATS Subject)
