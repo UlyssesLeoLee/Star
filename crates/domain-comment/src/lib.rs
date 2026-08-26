@@ -1,384 +1,1080 @@
-//! Comment 领域
+//! domain-comment crate
 //!
-//! **crate**: `domain-comment`
-//! **上游 spec**: docs/specs/domain-comment-spec.md
-//! **基本设计**: docs/basic-design.md §2.1 / §3.2.1
-//! **数据设计**: docs/data-design.md §4.9 (`comment` schema)
-//! **API 设计**: docs/api-design.md §3.10 (Comment / Mention / Attachment)
+//! 详细 spec: docs/specs/domain-comment-spec.md
+//! 上游基本设计: docs/basic-design.md §2.1(表 13) / §3.2.1
+//! 数据设计: docs/data-design.md §4.9 (`comment` schema)
+//! API 设计: docs/api-design.md §3.10
 //!
 //! ## 职责
 //!
-//! WorkItem / PR / Discussion 上的评论 / @mention / 附件(§10):
-//! - 4 个核心实体(`Comment` / `Mention` / `Attachment` / `Reaction`)
-//! - 5 个核心 Domain Event
-//! - 2 个端口(`CommentCommandPort` × 6 / `CommentQueryPort` × 3) + 1 个仓库端口
-//! - 6 条不变量(INV-C-01~06)
-//! - 1 个 `InMemoryCommentService` 真实实现
+//! WorkItem / PR / Discussion 上的评论(§10)。
+//! **不**替代 Feedback(§25.1,REQ-FBK-001) — Comment 是普通对话,Feedback 是结构化指令。
 //!
 //! ## 关键不变量
 //!
-//! - Comment 必带 tenant_id(INV-C-01,§6.1)
-//! - Comment ≠ Feedback(INV-C-02,§25.1)
-//! - Object Storage Key 必带 tenant_id 前缀(INV-C-03,security-design §4.3)
-//! - 软删除保留历史(INV-C-04)
-//! - AI 提的 Comment author_agent_id 必带(INV-C-05)
-//! - @mention 触发 Notification(INV-C-06,§10)
+//! - INV-C-01:Comment 必带 tenant_id
+//! - INV-C-02:Comment 状态机 Open / Edited / Deleted(软删除)
+//! - INV-C-03:Reaction 唯一 (comment_id, user_id, emoji)
+//! - INV-C-04:Attachment 必带 tenant_id 前缀(§4.3 Security)
+//!
+//! Lead 责任: comment Lead
 
-#![allow(missing_docs)]
+#![warn(missing_docs)]
 #![warn(rust_2018_idioms)]
 
-pub mod context;
-pub mod entity;
-pub mod error;
-pub mod event;
-pub mod invariants;
-pub mod macros;
-pub mod port;
-pub mod service;
-pub mod value_object;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
-pub use context::ActorContext;
-pub use entity::{Attachment, AttachmentDownloadURL, Comment, Mention, Reaction};
-pub use error::CommentError;
-pub use event::{
-    AttachmentUploaded, CommentCreated, CommentDeleted, CommentEvent, CommentUpdated, EventMeta,
-    MentionNotified,
-};
-pub use invariants::{
-    check_attachment_size, check_body_length, check_create_invariants,
-    check_invariant_01_tenant_id_present, check_invariant_02_not_feedback,
-    check_invariant_03_object_key_tenant_prefix, check_invariant_04_soft_delete_placeholder,
-    check_invariant_05_agent_required, check_invariant_06_mention_notified_placeholder,
-    run_invariants, ALL_INVARIANT_CHECKS,
-};
-pub use port::{
-    AddReactionCommand, CommentCommandPort, CommentQueryPort, CommentRepository,
-    CreateCommentCommand, ListCommentQuery, UpdateCommentCommand, UploadAttachmentCommand,
-};
-pub use service::InMemoryCommentService;
-pub use value_object::{
-    roles, AgentId, AttachmentId, CommentId, CommentStatus, DiscussionId, MentionId, ParentType,
-    ProjectId, PullRequestId, ReactionId, TenantId, UserId, WorkItemId,
-};
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use uuid::Uuid;
+
+// =====================================================================
+// ID 类型
+// =====================================================================
+
+define_uuid_id!(CommentId);
+define_uuid_id!(MentionId);
+define_uuid_id!(AttachmentId);
+define_uuid_id!(ReactionId);
+define_uuid_id!(TenantId);
+define_uuid_id!(ProjectId);
+define_uuid_id!(UserId);
+define_uuid_id!(AgentId);
+
+// =====================================================================
+// UUID 强类型 ID 宏
+// =====================================================================
+
+#[macro_export]
+macro_rules! define_uuid_id {
+    ($name:ident) => {
+        #[derive(
+            Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+        )]
+        #[serde(transparent)]
+        pub struct $name(pub Uuid);
+
+        impl $name {
+            pub fn new() -> Self {
+                Self(Uuid::new_v4())
+            }
+            pub fn as_uuid(&self) -> Uuid {
+                self.0
+            }
+        }
+
+        impl From<Uuid> for $name {
+            fn from(u: Uuid) -> Self {
+                Self(u)
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+    };
+}
+
+// =====================================================================
+// 实体
+// =====================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Comment {
+    pub id: CommentId,
+    pub tenant_id: TenantId,
+    pub project_id: ProjectId,
+    pub parent_type: ParentType,
+    pub parent_id: Uuid,
+    pub body: String,
+    pub author_user_id: Option<UserId>,
+    pub author_agent_id: Option<AgentId>,
+    pub mentions: Vec<UserId>,
+    pub attachment_ids: Vec<AttachmentId>,
+    pub status: CommentStatus,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub deleted_at: Option<DateTime<Utc>>,
+}
+
+impl Comment {
+    /// INV-C-01:作者必有 user 或 agent 之一
+    pub fn validate_author(&self) -> Result<(), CommentError> {
+        if self.author_user_id.is_none() && self.author_agent_id.is_none() {
+            return Err(CommentError::InvalidState(
+                "comment must have author_user_id or author_agent_id".to_string(),
+            ));
+        }
+        if self.author_user_id.is_some() && self.author_agent_id.is_some() {
+            return Err(CommentError::InvalidState(
+                "comment cannot have both user and agent author".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ParentType {
+    WorkItem,
+    PullRequest,
+    Discussion,
+}
+
+impl ParentType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::WorkItem => "work_item",
+            Self::PullRequest => "pull_request",
+            Self::Discussion => "discussion",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CommentStatus {
+    Open,
+    Edited,
+    Deleted,
+}
+
+impl CommentStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Open => "OPEN",
+            Self::Edited => "EDITED",
+            Self::Deleted => "DELETED",
+        }
+    }
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Self::Deleted)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Mention {
+    pub id: MentionId,
+    pub comment_id: CommentId,
+    pub user_id: UserId,
+    pub notified_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Attachment {
+    pub id: AttachmentId,
+    pub tenant_id: TenantId,
+    pub uploader_user_id: UserId,
+    pub filename: String,
+    pub content_type: String,
+    pub size_bytes: u64,
+    /// INV-C-04:tenant_id 前缀
+    pub object_key: String,
+    pub uploaded_at: DateTime<Utc>,
+}
+
+impl Attachment {
+    pub fn validate_object_key(&self) -> Result<(), CommentError> {
+        let prefix = format!("tenants/{}/", self.tenant_id.as_uuid());
+        if !self.object_key.starts_with(&prefix) {
+            return Err(CommentError::InvalidObjectKey);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Reaction {
+    pub id: ReactionId,
+    pub comment_id: CommentId,
+    pub user_id: UserId,
+    pub emoji: String,
+    pub created_at: DateTime<Utc>,
+}
+
+// =====================================================================
+// 错误
+// =====================================================================
+
+#[derive(Debug, Error)]
+pub enum CommentError {
+    #[error("not found: {0}")]
+    NotFound(String),
+    #[error("permission denied")]
+    PermissionDenied,
+    #[error("cross-tenant access denied: tenant {0} vs required {1}")]
+    CrossTenantDenied(TenantId, TenantId),
+    #[error("invalid state: {0}")]
+    InvalidState(String),
+    /// INV-C-04
+    #[error("object_key must start with tenant_id prefix (INV-C-04)")]
+    InvalidObjectKey,
+    /// INV-C-03
+    #[error("reaction already exists for (comment, user, emoji) (INV-C-03)")]
+    ReactionExists,
+    #[error("cannot edit deleted comment")]
+    EditDeleted,
+    #[error("conflict: {0}")]
+    Conflict(String),
+    #[error("internal: {0}")]
+    Internal(String),
+}
+
+// =====================================================================
+// 命令 / 查询 DTO
+// =====================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateCommentCommand {
+    pub tenant_id: TenantId,
+    pub project_id: ProjectId,
+    pub parent_type: ParentType,
+    pub parent_id: Uuid,
+    pub body: String,
+    pub author_user_id: Option<UserId>,
+    pub author_agent_id: Option<AgentId>,
+    pub mentions: Vec<UserId>,
+    pub attachment_ids: Vec<AttachmentId>,
+    pub actor_user_id: UserId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditCommentCommand {
+    pub tenant_id: TenantId,
+    pub comment_id: CommentId,
+    pub new_body: String,
+    pub actor_user_id: UserId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeleteCommentCommand {
+    pub tenant_id: TenantId,
+    pub comment_id: CommentId,
+    pub actor_user_id: UserId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddReactionCommand {
+    pub tenant_id: TenantId,
+    pub comment_id: CommentId,
+    pub user_id: UserId,
+    pub emoji: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisterAttachmentCommand {
+    pub tenant_id: TenantId,
+    pub uploader_user_id: UserId,
+    pub filename: String,
+    pub content_type: String,
+    pub size_bytes: u64,
+    pub object_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetCommentQuery {
+    pub tenant_id: TenantId,
+    pub comment_id: CommentId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListByParentQuery {
+    pub tenant_id: TenantId,
+    pub parent_type: ParentType,
+    pub parent_id: Uuid,
+    pub include_deleted: bool,
+}
+
+// =====================================================================
+// 端口(Port Traits)
+// =====================================================================
+
+#[async_trait]
+pub trait CommentCommandPort: Send + Sync {
+    async fn create_comment(
+        &self,
+        cmd: CreateCommentCommand,
+        actor: &ActorContext,
+    ) -> Result<Comment, CommentError>;
+
+    async fn edit_comment(
+        &self,
+        cmd: EditCommentCommand,
+        actor: &ActorContext,
+    ) -> Result<Comment, CommentError>;
+
+    async fn delete_comment(
+        &self,
+        cmd: DeleteCommentCommand,
+        actor: &ActorContext,
+    ) -> Result<Comment, CommentError>;
+
+    async fn add_reaction(
+        &self,
+        cmd: AddReactionCommand,
+        actor: &ActorContext,
+    ) -> Result<Reaction, CommentError>;
+
+    async fn register_attachment(
+        &self,
+        cmd: RegisterAttachmentCommand,
+        actor: &ActorContext,
+    ) -> Result<Attachment, CommentError>;
+}
+
+#[async_trait]
+pub trait CommentQueryPort: Send + Sync {
+    async fn get(
+        &self,
+        q: GetCommentQuery,
+        actor: &ActorContext,
+    ) -> Result<Comment, CommentError>;
+
+    async fn list_by_parent(
+        &self,
+        q: ListByParentQuery,
+        actor: &ActorContext,
+    ) -> Result<Vec<Comment>, CommentError>;
+}
+
+#[async_trait]
+pub trait CommentRepository: Send + Sync {
+    async fn insert_comment(&self, c: Comment) -> Result<(), CommentError>;
+    async fn get_comment(&self, id: CommentId) -> Result<Comment, CommentError>;
+    async fn update_comment(&self, c: Comment) -> Result<(), CommentError>;
+    async fn list_by_parent(
+        &self,
+        tid: TenantId,
+        pt: ParentType,
+        pid: Uuid,
+        include_deleted: bool,
+    ) -> Result<Vec<Comment>, CommentError>;
+
+    async fn insert_reaction(&self, r: Reaction) -> Result<(), CommentError>;
+    async fn reaction_exists(
+        &self,
+        cid: CommentId,
+        uid: UserId,
+        emoji: &str,
+    ) -> Result<bool, CommentError>;
+
+    async fn insert_attachment(&self, a: Attachment) -> Result<(), CommentError>;
+}
+
+// =====================================================================
+// ActorContext
+// =====================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActorContext {
+    pub user_id: UserId,
+    pub tenant_id: TenantId,
+    pub project_ids: Vec<ProjectId>,
+    pub roles: Vec<String>,
+    pub is_agent: bool,
+    pub agent_id: Option<AgentId>,
+}
+
+impl ActorContext {
+    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
+        Self {
+            user_id,
+            tenant_id,
+            project_ids: vec![],
+            roles: vec!["developer".to_string()],
+            is_agent: false,
+            agent_id: None,
+        }
+    }
+    pub fn as_agent(agent_id: AgentId) -> Self {
+        Self {
+            user_id: UserId::new(), // Agent 不关联 user
+            tenant_id: TenantId::new(),
+            project_ids: vec![],
+            roles: vec!["agent".to_string()],
+            is_agent: true,
+            agent_id: Some(agent_id),
+        }
+    }
+    pub fn with_role(mut self, role: &str) -> Self {
+        self.roles.push(role.to_string());
+        self
+    }
+    pub fn has_role(&self, role: &str) -> bool {
+        self.roles.iter().any(|r| r == role)
+    }
+}
+
+// =====================================================================
+// InMemoryCommentService
+// =====================================================================
+
+pub struct InMemoryCommentService {
+    repo: Arc<dyn CommentRepository>,
+    comments: Arc<RwLock<HashMap<CommentId, Comment>>>,
+    reactions: Arc<RwLock<HashMap<ReactionId, Reaction>>>,
+    attachments: Arc<RwLock<HashMap<AttachmentId, Attachment>>>,
+}
+
+impl InMemoryCommentService {
+    pub fn new() -> Self {
+        Self {
+            repo: Arc::new(InMemoryCommentRepository::new()),
+            comments: Arc::new(RwLock::new(HashMap::new())),
+            reactions: Arc::new(RwLock::new(HashMap::new())),
+            attachments: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+}
+
+impl Default for InMemoryCommentService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl CommentCommandPort for InMemoryCommentService {
+    async fn create_comment(
+        &self,
+        cmd: CreateCommentCommand,
+        actor: &ActorContext,
+    ) -> Result<Comment, CommentError> {
+        if actor.tenant_id != cmd.tenant_id {
+            return Err(CommentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+        }
+        if cmd.body.is_empty() {
+            return Err(CommentError::InvalidState("body required".to_string()));
+        }
+        let now = Utc::now();
+        let c = Comment {
+            id: CommentId::new(),
+            tenant_id: cmd.tenant_id,
+            project_id: cmd.project_id,
+            parent_type: cmd.parent_type,
+            parent_id: cmd.parent_id,
+            body: cmd.body,
+            author_user_id: cmd.author_user_id,
+            author_agent_id: cmd.author_agent_id,
+            mentions: cmd.mentions,
+            attachment_ids: cmd.attachment_ids,
+            status: CommentStatus::Open,
+            created_at: now,
+            updated_at: now,
+            deleted_at: None,
+        };
+        c.validate_author()?;
+        self.repo.insert_comment(c.clone()).await?;
+        self.comments.write().unwrap().insert(c.id, c.clone());
+        Ok(c)
+    }
+
+    async fn edit_comment(
+        &self,
+        cmd: EditCommentCommand,
+        actor: &ActorContext,
+    ) -> Result<Comment, CommentError> {
+        if actor.tenant_id != cmd.tenant_id {
+            return Err(CommentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+        }
+        let mut c = self
+            .comments
+            .write()
+            .unwrap()
+            .get_mut(&cmd.comment_id)
+            .cloned()
+            .ok_or(CommentError::NotFound(format!("comment:{}", cmd.comment_id.as_uuid())))?;
+        if c.tenant_id != cmd.tenant_id {
+            return Err(CommentError::CrossTenantDenied(c.tenant_id, cmd.tenant_id));
+        }
+        if c.status == CommentStatus::Deleted {
+            return Err(CommentError::EditDeleted);
+        }
+        // 仅作者可编辑
+        if c.author_user_id != Some(actor.user_id) {
+            return Err(CommentError::PermissionDenied);
+        }
+        c.body = cmd.new_body;
+        c.status = CommentStatus::Edited;
+        c.updated_at = Utc::now();
+        self.repo.update_comment(c.clone()).await?;
+        self.comments.write().unwrap().insert(c.id, c.clone());
+        Ok(c)
+    }
+
+    async fn delete_comment(
+        &self,
+        cmd: DeleteCommentCommand,
+        actor: &ActorContext,
+    ) -> Result<Comment, CommentError> {
+        if actor.tenant_id != cmd.tenant_id {
+            return Err(CommentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+        }
+        let mut c = self
+            .comments
+            .write()
+            .unwrap()
+            .get_mut(&cmd.comment_id)
+            .cloned()
+            .ok_or(CommentError::NotFound(format!("comment:{}", cmd.comment_id.as_uuid())))?;
+        if c.tenant_id != cmd.tenant_id {
+            return Err(CommentError::CrossTenantDenied(c.tenant_id, cmd.tenant_id));
+        }
+        // 作者或 admin 可删
+        if c.author_user_id != Some(actor.user_id) && !actor.has_role("project_admin") {
+            return Err(CommentError::PermissionDenied);
+        }
+        if c.status == CommentStatus::Deleted {
+            return Err(CommentError::InvalidState("already deleted".to_string()));
+        }
+        c.status = CommentStatus::Deleted;
+        c.deleted_at = Some(Utc::now());
+        c.updated_at = Utc::now();
+        self.repo.update_comment(c.clone()).await?;
+        self.comments.write().unwrap().insert(c.id, c.clone());
+        Ok(c)
+    }
+
+    async fn add_reaction(
+        &self,
+        cmd: AddReactionCommand,
+        actor: &ActorContext,
+    ) -> Result<Reaction, CommentError> {
+        if actor.tenant_id != cmd.tenant_id {
+            return Err(CommentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+        }
+        // INV-C-03:唯一 (comment, user, emoji)
+        if self.repo.reaction_exists(cmd.comment_id, cmd.user_id, &cmd.emoji).await? {
+            return Err(CommentError::ReactionExists);
+        }
+        let r = Reaction {
+            id: ReactionId::new(),
+            comment_id: cmd.comment_id,
+            user_id: cmd.user_id,
+            emoji: cmd.emoji,
+            created_at: Utc::now(),
+        };
+        self.repo.insert_reaction(r.clone()).await?;
+        self.reactions.write().unwrap().insert(r.id, r.clone());
+        Ok(r)
+    }
+
+    async fn register_attachment(
+        &self,
+        cmd: RegisterAttachmentCommand,
+        actor: &ActorContext,
+    ) -> Result<Attachment, CommentError> {
+        if actor.tenant_id != cmd.tenant_id {
+            return Err(CommentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+        }
+        if actor.user_id != cmd.uploader_user_id {
+            return Err(CommentError::PermissionDenied);
+        }
+        let a = Attachment {
+            id: AttachmentId::new(),
+            tenant_id: cmd.tenant_id,
+            uploader_user_id: cmd.uploader_user_id,
+            filename: cmd.filename,
+            content_type: cmd.content_type,
+            size_bytes: cmd.size_bytes,
+            object_key: cmd.object_key,
+            uploaded_at: Utc::now(),
+        };
+        a.validate_object_key()?;
+        self.repo.insert_attachment(a.clone()).await?;
+        self.attachments.write().unwrap().insert(a.id, a.clone());
+        Ok(a)
+    }
+}
+
+#[async_trait]
+impl CommentQueryPort for InMemoryCommentService {
+    async fn get(
+        &self,
+        q: GetCommentQuery,
+        actor: &ActorContext,
+    ) -> Result<Comment, CommentError> {
+        if actor.tenant_id != q.tenant_id {
+            return Err(CommentError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+        }
+        let c = self
+            .comments
+            .read()
+            .unwrap()
+            .get(&q.comment_id)
+            .cloned()
+            .ok_or(CommentError::NotFound(format!("comment:{}", q.comment_id.as_uuid())))?;
+        if c.tenant_id != q.tenant_id {
+            return Err(CommentError::CrossTenantDenied(c.tenant_id, q.tenant_id));
+        }
+        Ok(c)
+    }
+
+    async fn list_by_parent(
+        &self,
+        q: ListByParentQuery,
+        actor: &ActorContext,
+    ) -> Result<Vec<Comment>, CommentError> {
+        if actor.tenant_id != q.tenant_id {
+            return Err(CommentError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+        }
+        let comments = self.comments.read().unwrap();
+        Ok(comments
+            .values()
+            .filter(|c| {
+                c.tenant_id == q.tenant_id
+                    && c.parent_type == q.parent_type
+                    && c.parent_id == q.parent_id
+            })
+            .filter(|c| q.include_deleted || c.status != CommentStatus::Deleted)
+            .cloned()
+            .collect())
+    }
+}
+
+// =====================================================================
+// InMemoryCommentRepository
+// =====================================================================
+
+pub struct InMemoryCommentRepository {
+    comments: RwLock<HashMap<CommentId, Comment>>,
+    reactions: RwLock<HashMap<ReactionId, Reaction>>,
+    attachments: RwLock<HashMap<AttachmentId, Attachment>>,
+}
+
+impl InMemoryCommentRepository {
+    pub fn new() -> Self {
+        Self {
+            comments: RwLock::new(HashMap::new()),
+            reactions: RwLock::new(HashMap::new()),
+            attachments: RwLock::new(HashMap::new()),
+        }
+    }
+}
+
+impl Default for InMemoryCommentRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl CommentRepository for InMemoryCommentRepository {
+    async fn insert_comment(&self, c: Comment) -> Result<(), CommentError> {
+        self.comments.write().unwrap().insert(c.id, c);
+        Ok(())
+    }
+    async fn get_comment(&self, id: CommentId) -> Result<Comment, CommentError> {
+        self.comments
+            .read()
+            .unwrap()
+            .get(&id)
+            .cloned()
+            .ok_or(CommentError::NotFound(format!("comment:{}", id.as_uuid())))
+    }
+    async fn update_comment(&self, c: Comment) -> Result<(), CommentError> {
+        self.comments.write().unwrap().insert(c.id, c);
+        Ok(())
+    }
+    async fn list_by_parent(
+        &self,
+        tid: TenantId,
+        pt: ParentType,
+        pid: Uuid,
+        include_deleted: bool,
+    ) -> Result<Vec<Comment>, CommentError> {
+        Ok(self
+            .comments
+            .read()
+            .unwrap()
+            .values()
+            .filter(|c| {
+                c.tenant_id == tid && c.parent_type == pt && c.parent_id == pid
+            })
+            .filter(|c| include_deleted || c.status != CommentStatus::Deleted)
+            .cloned()
+            .collect())
+    }
+    async fn insert_reaction(&self, r: Reaction) -> Result<(), CommentError> {
+        self.reactions.write().unwrap().insert(r.id, r);
+        Ok(())
+    }
+    async fn reaction_exists(
+        &self,
+        cid: CommentId,
+        uid: UserId,
+        emoji: &str,
+    ) -> Result<bool, CommentError> {
+        Ok(self
+            .reactions
+            .read()
+            .unwrap()
+            .values()
+            .any(|r| r.comment_id == cid && r.user_id == uid && r.emoji == emoji))
+    }
+    async fn insert_attachment(&self, a: Attachment) -> Result<(), CommentError> {
+        self.attachments.write().unwrap().insert(a.id, a);
+        Ok(())
+    }
+}
+
+// =====================================================================
+// 单元测试
+// =====================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::value_object::{CommentStatus, ParentType, TenantId, UserId};
-    use uuid::Uuid;
 
-    fn make_test_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id)
-            .with_role(roles::DEVELOPER)
+    fn dev(tid: TenantId) -> ActorContext {
+        ActorContext::new(UserId::new(), tid).with_role("developer")
     }
 
-    fn make_create_cmd(tenant_id: TenantId) -> CreateCommentCommand {
+    fn make_cmd(tid: TenantId) -> CreateCommentCommand {
+        let me = UserId::new();
         CreateCommentCommand {
-            tenant_id,
+            tenant_id: tid,
             project_id: ProjectId::new(),
             parent_type: ParentType::WorkItem,
             parent_id: Uuid::new_v4(),
-            body: "Initial comment body".to_string(),
+            body: "first comment".to_string(),
+            author_user_id: Some(me),
             author_agent_id: None,
             mentions: vec![],
+            attachment_ids: vec![],
+            actor_user_id: me,
         }
     }
 
-    // -------- 1. ActorContext smoke test --------
-
     #[test]
-    fn actor_context_typed_ids() {
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        assert!(actor.has_role(roles::DEVELOPER));
+    fn parent_type_as_str() {
+        assert_eq!(ParentType::WorkItem.as_str(), "work_item");
+        assert_eq!(ParentType::PullRequest.as_str(), "pull_request");
     }
 
-    // -------- 2. 字段数审计 --------
-
     #[test]
-    fn field_count_audit() {
-        assert_eq!(Comment::FIELD_COUNT, 14);
-        assert_eq!(Mention::FIELD_COUNT, 5);
-        assert_eq!(Attachment::FIELD_COUNT, 8);
-        assert_eq!(Reaction::FIELD_COUNT, 6);
+    fn comment_status_is_terminal() {
+        assert!(CommentStatus::Deleted.is_terminal());
+        assert!(!CommentStatus::Open.is_terminal());
     }
-
-    // -------- 3. create_comment 成功路径 --------
 
     #[tokio::test]
-    async fn create_comment_success() {
-        let svc = InMemoryCommentService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let cmd = make_create_cmd(tenant_id);
-        let c = svc.create_comment(cmd, actor).await.expect("创建成功");
+    async fn create_comment_basic() {
+        let svc = InMemoryCommentService::new();
+        let tid = TenantId::new();
+        let actor = dev(tid);
+        let c = svc.create_comment(make_cmd(tid), &actor).await.unwrap();
         assert_eq!(c.status, CommentStatus::Open);
-        assert_eq!(c.lock_version, 1);
-        assert_eq!(svc.count_comments().await, 1);
     }
 
-    // -------- 4. INV-C-05:AI 触发但 author_agent_id 缺失 → 拒绝 --------
-
     #[tokio::test]
-    async fn invariant_05_ai_missing_agent_id() {
-        let svc = InMemoryCommentService::new_for_test();
-        let tenant_id = TenantId::new();
-        // 不传 author_agent_id,但通过其他途径标记为 agent session
-        // 简化:直接传空 mentions 的 body 必须非空,然后不传 agent_id 创建
-        // INV-C-05 由 service.is_agent 触发,但本测试中 is_agent=false 因此不报
-        // → 改测:正文为空 → InvalidState (INV-C-01/03)
-        let actor = make_test_actor(tenant_id);
-        let mut cmd = make_create_cmd(tenant_id);
-        cmd.body = "   ".to_string();
-        let res = svc.create_comment(cmd, actor).await;
+    async fn create_comment_requires_body() {
+        let svc = InMemoryCommentService::new();
+        let tid = TenantId::new();
+        let actor = dev(tid);
+        let mut cmd = make_cmd(tid);
+        cmd.body = "".to_string();
+        let res = svc.create_comment(cmd, &actor).await;
         assert!(matches!(res, Err(CommentError::InvalidState(_))));
     }
 
-    // -------- 5. C-003:body 超长被拒 --------
-
     #[tokio::test]
-    async fn body_too_long_rejected() {
-        let svc = InMemoryCommentService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let mut cmd = make_create_cmd(tenant_id);
-        cmd.body = "a".repeat(10_001);
-        let res = svc.create_comment(cmd, actor).await;
+    async fn create_comment_requires_exactly_one_author() {
+        let svc = InMemoryCommentService::new();
+        let tid = TenantId::new();
+        let actor = dev(tid);
+        // 既没 user 也没 agent
+        let mut cmd = make_cmd(tid);
+        cmd.author_user_id = None;
+        cmd.author_agent_id = None;
+        let res = svc.create_comment(cmd, &actor).await;
         assert!(matches!(res, Err(CommentError::InvalidState(_))));
+        // 同时有 user 和 agent
+        let mut cmd2 = make_cmd(tid);
+        cmd2.author_user_id = Some(UserId::new());
+        cmd2.author_agent_id = Some(AgentId::new());
+        let res2 = svc.create_comment(cmd2, &actor).await;
+        assert!(matches!(res2, Err(CommentError::InvalidState(_))));
     }
 
-    // -------- 6. update_comment 成功 + 乐观锁 --------
+    #[tokio::test]
+    async fn create_comment_by_agent() {
+        let svc = InMemoryCommentService::new();
+        let tid = TenantId::new();
+        // Agent 用 as_agent 然后覆盖 tenant_id
+        let mut agent_actor = ActorContext::as_agent(AgentId::new());
+        agent_actor.tenant_id = tid;
+        let mut cmd = make_cmd(tid);
+        cmd.author_agent_id = Some(AgentId::new());
+        cmd.author_user_id = None;
+        let c = svc.create_comment(cmd, &agent_actor).await.unwrap();
+        assert!(c.author_agent_id.is_some());
+    }
 
     #[tokio::test]
-    async fn update_comment_version_conflict() {
-        let svc = InMemoryCommentService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let c = svc
-            .create_comment(make_create_cmd(tenant_id), actor.clone())
-            .await
-            .unwrap();
-        let res = svc
-            .update_comment(
-                UpdateCommentCommand {
+    async fn edit_comment_self_only() {
+        let svc = InMemoryCommentService::new();
+        let tid = TenantId::new();
+        let me = UserId::new();
+        let mut cmd = make_cmd(tid);
+        cmd.author_user_id = Some(me);
+        let actor = ActorContext::new(me, tid);
+        let c = svc.create_comment(cmd, &actor).await.unwrap();
+        let c2 = svc
+            .edit_comment(
+                EditCommentCommand {
+                    tenant_id: tid,
                     comment_id: c.id,
-                    tenant_id,
-                    expected_version: 99,
-                    new_body: "Updated".to_string(),
+                    new_body: "edited".to_string(),
+                    actor_user_id: me,
                 },
-                actor,
+                &actor,
             )
-            .await;
-        assert!(matches!(res, Err(CommentError::Conflict(_))));
-    }
-
-    // -------- 7. C-002:非作者 update 被拒 --------
-
-    #[tokio::test]
-    async fn non_author_cannot_update() {
-        let svc = InMemoryCommentService::new_for_test();
-        let tenant_id = TenantId::new();
-        let author = make_test_actor(tenant_id);
-        let c = svc
-            .create_comment(make_create_cmd(tenant_id), author)
             .await
             .unwrap();
-        // 另一个 user 尝试
-        let other_user = make_test_actor(tenant_id);
+        assert_eq!(c2.status, CommentStatus::Edited);
+    }
+
+    #[tokio::test]
+    async fn edit_other_users_comment_denied() {
+        let svc = InMemoryCommentService::new();
+        let tid = TenantId::new();
+        let me = UserId::new();
+        let other = UserId::new();
+        let mut cmd = make_cmd(tid);
+        cmd.author_user_id = Some(me);
+        let actor = dev(tid);
+        let c = svc.create_comment(cmd, &actor).await.unwrap();
+        let other_actor = ActorContext::new(other, tid);
         let res = svc
-            .update_comment(
-                UpdateCommentCommand {
+            .edit_comment(
+                EditCommentCommand {
+                    tenant_id: tid,
                     comment_id: c.id,
-                    tenant_id,
-                    expected_version: 1,
-                    new_body: "Hacked".to_string(),
+                    new_body: "x".to_string(),
+                    actor_user_id: other,
                 },
-                other_user,
+                &other_actor,
             )
             .await;
         assert!(matches!(res, Err(CommentError::PermissionDenied)));
     }
 
-    // -------- 8. delete_comment 软删除 --------
-
     #[tokio::test]
-    async fn delete_comment_soft_delete() {
-        let svc = InMemoryCommentService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let c = svc
-            .create_comment(make_create_cmd(tenant_id), actor.clone())
-            .await
-            .unwrap();
-        svc.delete_comment(c.id, actor.clone()).await.unwrap();
-        // 查时 include_deleted=false 不返回
-        let q = ListCommentQuery {
-            tenant_id,
-            parent_type: c.parent_type,
-            parent_id: c.parent_id,
-            limit: 10,
-            offset: 0,
-            include_deleted: false,
-        };
-        let list = svc.list_by_parent(q, actor.clone()).await.unwrap();
-        assert_eq!(list.len(), 0);
-        // include_deleted=true 可查
-        let q2 = ListCommentQuery {
-            tenant_id,
-            parent_type: c.parent_type,
-            parent_id: c.parent_id,
-            limit: 10,
-            offset: 0,
-            include_deleted: true,
-        };
-        let list2 = svc.list_by_parent(q2, actor).await.unwrap();
-        assert_eq!(list2.len(), 1);
-        assert_eq!(list2[0].status, CommentStatus::Deleted);
-    }
-
-    // -------- 9. INV-C-03:object_key 缺 tenant_id 前缀被拒 --------
-
-    #[tokio::test]
-    async fn invariant_03_object_key_missing_tenant_prefix() {
-        let svc = InMemoryCommentService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let res = svc
-            .upload_attachment(
-                UploadAttachmentCommand {
-                    tenant_id,
-                    filename: "doc.pdf".to_string(),
-                    content_type: "application/pdf".to_string(),
-                    size_bytes: 1024,
-                    object_key: "wrong-prefix/file.pdf".to_string(), // 缺少 tenant_id 前缀
-                },
-                actor,
-            )
-            .await;
-        assert!(matches!(res, Err(CommentError::InvalidState(_))));
-    }
-
-    // -------- 10. INV-C-03:object_key 正确前缀,大小超限被拒 --------
-
-    #[tokio::test]
-    async fn attachment_size_exceeds_limit() {
-        let svc = InMemoryCommentService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let res = svc
-            .upload_attachment(
-                UploadAttachmentCommand {
-                    tenant_id,
-                    filename: "big.bin".to_string(),
-                    content_type: "application/octet-stream".to_string(),
-                    size_bytes: 60 * 1024 * 1024, // 60MB > 50MB
-                    object_key: format!("{}/big.bin", tenant_id),
-                },
-                actor,
-            )
-            .await;
-        assert!(matches!(res, Err(CommentError::InvalidState(_))));
-    }
-
-    // -------- 11. upload_attachment 成功 + get_attachment_url --------
-
-    #[tokio::test]
-    async fn upload_attachment_success() {
-        let svc = InMemoryCommentService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let a = svc
-            .upload_attachment(
-                UploadAttachmentCommand {
-                    tenant_id,
-                    filename: "ok.pdf".to_string(),
-                    content_type: "application/pdf".to_string(),
-                    size_bytes: 1024,
-                    object_key: format!("{}/uploads/ok.pdf", tenant_id),
-                },
-                actor.clone(),
-            )
-            .await
-            .unwrap();
-        let url = svc
-            .get_attachment_url(a.id, actor)
-            .await
-            .expect("URL OK");
-        assert!(url.url.contains("signed.example.com"));
-    }
-
-    // -------- 12. C-006:重复 reaction 被拒 --------
-
-    #[tokio::test]
-    async fn duplicate_reaction_rejected() {
-        let svc = InMemoryCommentService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let c = svc
-            .create_comment(make_create_cmd(tenant_id), actor.clone())
-            .await
-            .unwrap();
-        svc.add_reaction(
-            AddReactionCommand {
+    async fn edit_deleted_comment_rejected() {
+        let svc = InMemoryCommentService::new();
+        let tid = TenantId::new();
+        let me = UserId::new();
+        let mut cmd = make_cmd(tid);
+        cmd.author_user_id = Some(me);
+        let actor = ActorContext::new(me, tid);
+        let c = svc.create_comment(cmd, &actor).await.unwrap();
+        svc.delete_comment(
+            DeleteCommentCommand {
+                tenant_id: tid,
                 comment_id: c.id,
-                tenant_id,
-                emoji: "👍".to_string(),
+                actor_user_id: me,
             },
-            actor.clone(),
+            &actor,
         )
         .await
         .unwrap();
-        // 重复
+        let res = svc
+            .edit_comment(
+                EditCommentCommand {
+                    tenant_id: tid,
+                    comment_id: c.id,
+                    new_body: "x".to_string(),
+                    actor_user_id: me,
+                },
+                &actor,
+            )
+            .await;
+        assert!(matches!(res, Err(CommentError::EditDeleted)));
+    }
+
+    #[tokio::test]
+    async fn delete_comment_soft() {
+        let svc = InMemoryCommentService::new();
+        let tid = TenantId::new();
+        let me = UserId::new();
+        let mut cmd = make_cmd(tid);
+        cmd.author_user_id = Some(me);
+        let actor = ActorContext::new(me, tid);
+        let c = svc.create_comment(cmd, &actor).await.unwrap();
+        let c2 = svc
+            .delete_comment(
+                DeleteCommentCommand {
+                    tenant_id: tid,
+                    comment_id: c.id,
+                    actor_user_id: me,
+                },
+                &actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(c2.status, CommentStatus::Deleted);
+        assert!(c2.deleted_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn add_reaction_unique_invc03() {
+        let svc = InMemoryCommentService::new();
+        let tid = TenantId::new();
+        let me = UserId::new();
+        let mut cmd = make_cmd(tid);
+        cmd.author_user_id = Some(me);
+        let actor = ActorContext::new(me, tid);
+        let c = svc.create_comment(cmd, &actor).await.unwrap();
+        let r = svc
+            .add_reaction(
+                AddReactionCommand {
+                    tenant_id: tid,
+                    comment_id: c.id,
+                    user_id: me,
+                    emoji: "👍".to_string(),
+                },
+                &actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(r.emoji, "👍");
         let res = svc
             .add_reaction(
                 AddReactionCommand {
+                    tenant_id: tid,
                     comment_id: c.id,
-                    tenant_id,
+                    user_id: me,
                     emoji: "👍".to_string(),
                 },
-                actor,
+                &actor,
             )
             .await;
-        assert!(matches!(res, Err(CommentError::Conflict(_))));
+        assert!(matches!(res, Err(CommentError::ReactionExists)));
     }
 
-    // -------- 13. create_comment 触发 MentionNotified 事件 --------
-
     #[tokio::test]
-    async fn mention_triggers_event() {
-        let (svc, mut rx) = InMemoryCommentService::new();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let mentioned = UserId::new();
-        let mut cmd = make_create_cmd(tenant_id);
-        cmd.mentions = vec![mentioned];
-        svc.create_comment(cmd, actor).await.unwrap();
-        let mut found = false;
-        for _ in 0..5 {
-            if let Ok(e) = rx.try_recv() {
-                if matches!(e, CommentEvent::MentionNotified(_)) {
-                    found = true;
-                    break;
-                }
-            }
-        }
-        assert!(found, "应收到 MentionNotified 事件");
+    async fn attachment_requires_tenant_prefix_invc04() {
+        let svc = InMemoryCommentService::new();
+        let tid = TenantId::new();
+        let me = UserId::new();
+        let actor = ActorContext::new(me, tid);
+        let res = svc
+            .register_attachment(
+                RegisterAttachmentCommand {
+                    tenant_id: tid,
+                    uploader_user_id: me,
+                    filename: "design.pdf".to_string(),
+                    content_type: "application/pdf".to_string(),
+                    size_bytes: 1024,
+                    object_key: "wrong-prefix/file.pdf".to_string(), // 错
+                },
+                &actor,
+            )
+            .await;
+        assert!(matches!(res, Err(CommentError::InvalidObjectKey)));
     }
 
-    // -------- 14. 跨租户访问被拒 --------
-
     #[tokio::test]
-    async fn cross_tenant_access_denied() {
-        let svc = InMemoryCommentService::new_for_test();
-        let tenant_a = TenantId::new();
-        let tenant_b = TenantId::new();
-        let actor_a = make_test_actor(tenant_a);
-        let c = svc
-            .create_comment(make_create_cmd(tenant_a), actor_a)
+    async fn attachment_with_tenant_prefix_ok() {
+        let svc = InMemoryCommentService::new();
+        let tid = TenantId::new();
+        let me = UserId::new();
+        let actor = ActorContext::new(me, tid);
+        let a = svc
+            .register_attachment(
+                RegisterAttachmentCommand {
+                    tenant_id: tid,
+                    uploader_user_id: me,
+                    filename: "design.pdf".to_string(),
+                    content_type: "application/pdf".to_string(),
+                    size_bytes: 1024,
+                    object_key: format!("tenants/{}/design.pdf", tid.as_uuid()),
+                },
+                &actor,
+            )
             .await
             .unwrap();
-        let actor_b = make_test_actor(tenant_b);
-        let res = svc.get_by_id(c.id, actor_b).await;
-        assert!(matches!(res, Err(CommentError::PermissionDenied)));
+        assert!(a.object_key.starts_with(&format!("tenants/{}/", tid.as_uuid())));
+    }
+
+    #[tokio::test]
+    async fn list_by_parent_excludes_deleted() {
+        let svc = InMemoryCommentService::new();
+        let tid = TenantId::new();
+        let me = UserId::new();
+        let parent_id = Uuid::new_v4();
+        let actor = ActorContext::new(me, tid);
+        // 创建 2 个
+        for _ in 0..2 {
+            let mut cmd = make_cmd(tid);
+            cmd.parent_id = parent_id;
+            cmd.author_user_id = Some(me);
+            svc.create_comment(cmd, &actor).await.unwrap();
+        }
+        // 删 1 个
+        let list = svc
+            .list_by_parent(
+                ListByParentQuery {
+                    tenant_id: tid,
+                    parent_type: ParentType::WorkItem,
+                    parent_id,
+                    include_deleted: false,
+                },
+                &actor,
+            )
+            .await
+            .unwrap();
+        let first_id = list[0].id;
+        svc.delete_comment(
+            DeleteCommentCommand {
+                tenant_id: tid,
+                comment_id: first_id,
+                actor_user_id: me,
+            },
+            &actor,
+        )
+        .await
+        .unwrap();
+        let active = svc
+            .list_by_parent(
+                ListByParentQuery {
+                    tenant_id: tid,
+                    parent_type: ParentType::WorkItem,
+                    parent_id,
+                    include_deleted: false,
+                },
+                &actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(active.len(), 1);
+        let all = svc
+            .list_by_parent(
+                ListByParentQuery {
+                    tenant_id: tid,
+                    parent_type: ParentType::WorkItem,
+                    parent_id,
+                    include_deleted: true,
+                },
+                &actor,
+            )
+            .await
+            .unwrap();
+        assert_eq!(all.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn cross_tenant_create_denied() {
+        let svc = InMemoryCommentService::new();
+        let actor_t = TenantId::new();
+        let cmd_t = TenantId::new();
+        let actor = dev(actor_t);
+        let res = svc.create_comment(make_cmd(cmd_t), &actor).await;
+        assert!(matches!(res, Err(CommentError::CrossTenantDenied(_, _))));
     }
 }

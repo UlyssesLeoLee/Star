@@ -8,9 +8,7 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-# 公共依赖(workspace 共享)
 serde = { workspace = true }
-serde_json = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
