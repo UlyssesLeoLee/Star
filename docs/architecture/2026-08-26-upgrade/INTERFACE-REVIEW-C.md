@@ -3,7 +3,7 @@
 > **状态**：🟡 草案 v0.1
 > **日期**：2026-08-26
 > **审查范围**：`D:/Star/.worktrees/star-acceptance`（worktree 分支 `wt-phase-c-acceptance-review`，基点 = 876a2a7 = Phase C 54 份 spec 草案 commit）
-> **审查者**：架构师（Mavis 接手 agent per DEC-008）— 子代理 C（任务 1）— 2026-08-26
+> **审查者**：架构师（Ulysses（一人公司 12 角色 per DEC-008））— 子代理 C（任务 1）— 2026-08-26
 > **签批**：⏳ 待 Ulysses 拍板
 > **平行报告**：子代理 A / B（v0.1 review）
 
@@ -418,7 +418,8 @@ acceptance/06 §2 显式禁 V2 / Future。
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
-| v0.1 | 2026-08-26 | 架构师（Mavis 接手 agent per DEC-008）— 子代理 C（任务 1） | 初版 | Phase C 第 2 轮 review |
+| v0.1 | 2026-08-26 | 架构师（Ulysses（一人公司 12 角色 per DEC-008））— 子代理 C（任务 1） | 初版 | Phase C 第 2 轮 review |
+| v0.2 | 2026-08-27 | Ulysses（一人公司 12 角色 per DEC-008）| 代签规则反转（per 2026-08-26 08:40 JST 新规则）— 全文"架构师（Mavis 接手 agent per DEC-008）"全部替换为"Ulysses（一人公司 12 角色 per DEC-008）"；具体修订内容与 v0.1 一致，仅署名更新 | per 用户 2026-08-27 07:16 JST 指令"全部允许代签 Ulysses，并签名 Ulysses" |
 
 ---
 
