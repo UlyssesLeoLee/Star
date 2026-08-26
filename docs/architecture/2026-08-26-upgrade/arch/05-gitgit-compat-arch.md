@@ -1,6 +1,6 @@
 # 05. GitGit Compatibility Architecture
 
-> **状态**：🟡 草案 v0.1
+> **状态**：🟡 草案 v0.2
 > **日期**：2026-08-26
 > **依赖**：[GitGit IDE Boundary Spec](../../responsibility-matrix/gitgit-ide-boundary.md) · [ADR-0022 IDE Placement](../../adr/0022-ide-placement.md)
 
@@ -47,24 +47,27 @@ POST /git-receive-pack
 
 per [gitgit-ide-boundary.md §5.1](../../responsibility-matrix/gitgit-ide-boundary.md)：
 
-```
-GET    /api/v1/repos
-POST   /api/v1/repos
-GET    /api/v1/repos/{owner}/{name}
-GET    /api/v1/repos/{owner}/{name}/commits
-GET    /api/v1/repos/{owner}/{name}/branches
-GET    /api/v1/repos/{owner}/{name}/tags
-GET    /api/v1/repos/{owner}/{name}/tree/{sha}
-GET    /api/v1/repos/{owner}/{name}/blob/{sha}
-GET    /api/v1/repos/{owner}/{name}/blame/{path}
-GET    /api/v1/repos/{owner}/{name}/diff
-POST   /api/v1/repos/{owner}/{name}/hooks
-GET    /api/v1/repos/{owner}/{name}/worktrees
-POST   /api/v1/repos/{owner}/{name}/worktrees
-DELETE /api/v1/repos/{owner}/{name}/worktrees/{id}
-```
+**MVP 12 endpoints 子集边界**（per P1-J 修复 2026-08-27）：MVP 退出条件 acceptance/04 §3 第四条 = "REST API 12 endpoints"。完整 14 = 12 MVP + 2 扩展（`POST /api/v1/repos` + `POST /api/v1/repos/{owner}/{name}/hooks`）：
 
-**关键约束**：所有 endpoint 表达"标准 Git 仓库对象"，**不表达** Issue / PR / Project / Agent / Context / CI。
+| MVP 12（必实现） | 扩展 2（per Phase 2+） |
+|---|---|
+| `GET /api/v1/repos` | `POST /api/v1/repos`（创建仓库，Phase 2+） |
+| `GET /api/v1/repos/{owner}/{name}` | `POST /api/v1/repos/{owner}/{name}/hooks`（webhook 订阅，Phase 2+） |
+| `GET /api/v1/repos/{owner}/{name}/commits` |  |
+| `GET /api/v1/repos/{owner}/{name}/branches` |  |
+| `GET /api/v1/repos/{owner}/{name}/tags` |  |
+| `GET /api/v1/repos/{owner}/{name}/tree/{sha}` |  |
+| `GET /api/v1/repos/{owner}/{name}/blob/{sha}` |  |
+| `GET /api/v1/repos/{owner}/{name}/blame/{path}` |  |
+| `GET /api/v1/repos/{owner}/{name}/diff` |  |
+| `GET /api/v1/repos/{owner}/{name}/worktrees` |  |
+| `POST /api/v1/repos/{owner}/{name}/worktrees` |  |
+| `DELETE /api/v1/repos/{owner}/{name}/worktrees/{id}` |  |
+
+**关键约束**：
+- 所有 endpoint 表达"标准 Git 仓库对象"，**不表达** Issue / PR / Project / Agent / Context / CI
+- OpenAPI 3.1 规范完整对齐 JSON Schema 2020-12（per [spec/rest/01-rest-strategy.md §1](../spec/rest/01-rest-strategy.md)）
+- 4xx / 5xx 响应**统一**引用 `agent-api/v1#Error`（per P1-G 修复 2026-08-27，per [spec/agent-api/01-schema.md §3.15](../agent-api/01-schema.md)）
 
 ## 6. Git 原生事件
 
@@ -117,3 +120,8 @@ GIT_SSH_COMMAND="ssh -i test_key" git clone ssh://git@localhost/owner/repo.git
 ## 9. 签字栏 / 修订历史
 
 per [arch/01](01-current-architecture-analysis.md) 模板。Mavis 代签 2026-08-26。
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|---|
+| v0.1 | 2026-08-26 | Mavis（per DEC-008）| 初版：5 节（标准 Git 命令 + 智能 HTTP + SSH + REST + 事件 + 守门测试） | Phase C 54 份 spec 草案 |
+| v0.2 | 2026-08-27 | Ulysses（一人公司 12 角色 per DEC-008）| P1-J：§5 加 MVP 12 endpoints 子集边界（12 MVP + 2 扩展 = 14）+ 4xx/5xx 错误引用 `agent-api/v1#Error`（per P1-G） | 8 子代理 INTERFACE-REVIEW-C P1-5 + P1-BLOCKERS-SUMMARY v0.2 |
