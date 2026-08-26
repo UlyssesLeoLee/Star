@@ -8,7 +8,6 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-# 公共依赖(workspace 共享)
 serde = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }

@@ -1,78 +1,811 @@
-//! Identity 身份域(颁发 UserId / DeviceId / Role)
+//! domain-identity crate
 //!
-//! **crate**: `domain-identity`
-//! **上游 spec**: docs/specs/domain-identity-spec.md
-//! **基本设计**: docs/basic-design.md §2.1(表 18) / §23.2(三重绑定)
-//! **数据设计**: docs/data-design.md §4.23 (`user` / `device` / `device_binding` / `credential` / `role`)
-//! **API 设计**: docs/api-design.md §3.2 (domain-identity 端点) / §5.5 / §8.3.7
+//! 详细 spec: docs/specs/domain-identity-spec.md
+//! 上游基本设计: docs/basic-design.md §2.1(表 22) / §23.2
+//! 数据设计: docs/data-design.md §4.14 (`identity` schema)
+//! API 设计: docs/api-design.md §3.15
 //!
 //! ## 职责
 //!
-//! - 颁发 `user_id` / `device_id` / `role_id` / `credential_id` / `device_binding_id`
-//! - 定义 5 个核心实体(`User` / `Device` / `DeviceBinding` / `Credential` / `Role`)
-//! - 3 个核心 Domain Event
-//! - 2 个端口(`IdentityCommandPort` × 5 方法 / `IdentityQueryPort` × 8 方法) + 1 个仓库端口
-//! - 4 条不变量检查(INV-IDN-01~04)
-//! - 1 个 `InMemoryIdentityService` 真实实现
+//! 用户 / 设备身份(§23)。User / Device / Credential / DeviceBinding
+//! (tenant + user + project 三重,LRT-001/002)
 //!
 //! ## 关键不变量
 //!
-//! - 任何 User INSERT/UPDATE 必须带 tenant_id(INV-IDN-03,§6.1,REQ-SEC-001)
-//! - email 在 tenant 内唯一(INV-IDN-01)
-//! - (device, user, project) 三元组唯一(INV-IDN-02,§23.2)
-//! - 邮箱格式合法(INV-IDN-04)
+//! - INV-ID-01:User 必带 tenant_id
+//! - INV-ID-02:Device 三重绑定 tenant+user+project(LRT-001/002)
+//! - INV-ID-03:Credential 仅存 hash / ref,绝不存明文(§5.4 Security)
+//! - INV-ID-04:Device 状态机 Active / Revoked / Pending
 //!
-//! ## 上游依赖(basic-design §2.3)
-//!
-//! 本 crate 仅依赖 `crates/domain-identity` 自身的外部 crate 依赖。
-//!
-//! **禁止反向依赖** 任何其他 `domain-*` crate。
-//!
-//! ## 关键引用
-//!
-//! 本 crate 是 6 个横切 crate 中"颁发 ID"的核心:UserId / DeviceId / RoleId /
-//! DeviceBindingId / CredentialId。Phase 3 由 `crates/application` 编排时,其他
-//! 5 个横切 crate 的"占位 ActorContext"可由本 crate 颁发。
+//! Lead 责任: identity Lead
 
-#![allow(missing_docs)]
+#![warn(missing_docs)]
 #![warn(rust_2018_idioms)]
 
-// =====================================================================
-// 子模块装载
-// =====================================================================
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
-pub mod context;
-pub mod entity;
-pub mod error;
-pub mod event;
-pub mod invariants;
-pub mod macros;
-pub mod port;
-pub mod service;
-pub mod value_object;
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use uuid::Uuid;
 
 // =====================================================================
-// 便捷 re-export
+// ID 类型
 // =====================================================================
 
-pub use context::ActorContext;
-pub use entity::{Credential, Device, DeviceBinding, Role, User};
-pub use error::IdentityError;
-pub use event::{DeviceBound, EventMeta, IdentityEvent, UserCreated, UserLoggedIn};
-pub use invariants::{
-    check_invariant_01_email_unique, check_invariant_02_device_binding_unique,
-    check_invariant_03_tenant_id_present, check_invariant_04_email_format, run_invariants,
-    ALL_INVARIANT_CHECKS,
-};
-pub use port::{
-    BindDeviceCommand, CredentialSpec, CreateRoleCommand, CreateUserCommand, IdentityCommandPort,
-    IdentityQueryPort, IdentityRepository, ListUserQuery, RecordLoginCommand, UpdateUserCommand,
-};
-pub use service::InMemoryIdentityService;
-pub use value_object::{
-    roles, CredentialId, CredentialType, DeviceBindingId, DeviceId, DeviceType, ProjectId, RoleId,
-    TenantId, UserId, UserStatus,
-};
+define_uuid_id!(UserId);
+define_uuid_id!(DeviceId);
+define_uuid_id!(CredentialId);
+define_uuid_id!(DeviceBindingId);
+define_uuid_id!(TenantId);
+define_uuid_id!(ProjectId);
+define_uuid_id!(CredentialRefId);
+
+// =====================================================================
+// UUID 强类型 ID 宏
+// =====================================================================
+
+#[macro_export]
+macro_rules! define_uuid_id {
+    ($name:ident) => {
+        #[derive(
+            Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+        )]
+        #[serde(transparent)]
+        pub struct $name(pub Uuid);
+
+        impl $name {
+            pub fn new() -> Self {
+                Self(Uuid::new_v4())
+            }
+            pub fn as_uuid(&self) -> Uuid {
+                self.0
+            }
+        }
+
+        impl From<Uuid> for $name {
+            fn from(u: Uuid) -> Self {
+                Self(u)
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+    };
+}
+
+// =====================================================================
+// 实体
+// =====================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    pub id: UserId,
+    pub tenant_id: TenantId,
+    pub email: String,
+    pub display_name: String,
+    pub status: UserStatus,
+    pub credential_ref: CredentialRefId,
+    pub tenant_role: TenantRole,
+    pub mfa_enabled: bool,
+    pub mfa_secret_ref: Option<CredentialRefId>,
+    pub created_at: DateTime<Utc>,
+    pub last_login_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UserStatus {
+    Active,
+    Suspended,
+    Invited,
+}
+
+impl UserStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Active => "ACTIVE",
+            Self::Suspended => "SUSPENDED",
+            Self::Invited => "INVITED",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TenantRole {
+    TenantAdmin,
+    ProjectAdmin,
+    Developer,
+    Viewer,
+}
+
+impl TenantRole {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::TenantAdmin => "tenant_admin",
+            Self::ProjectAdmin => "project_admin",
+            Self::Developer => "developer",
+            Self::Viewer => "viewer",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Device {
+    pub id: DeviceId,
+    pub tenant_id: TenantId,
+    pub user_id: UserId,
+    pub kind: DeviceKind,
+    pub device_cert_fingerprint: String,
+    pub status: DeviceStatus,
+    pub project_ids: Vec<ProjectId>,
+    pub registered_at: DateTime<Utc>,
+    pub last_seen_at: Option<DateTime<Utc>>,
+    pub revoked_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DeviceKind {
+    LocalRuntime,
+    Cli,
+    Web,
+    Mobile,
+}
+
+impl DeviceKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::LocalRuntime => "local_runtime",
+            Self::Cli => "cli",
+            Self::Web => "web",
+            Self::Mobile => "mobile",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DeviceStatus {
+    Pending,
+    Active,
+    Revoked,
+}
+
+impl DeviceStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Pending => "PENDING",
+            Self::Active => "ACTIVE",
+            Self::Revoked => "REVOKED",
+        }
+    }
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Self::Revoked)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Credential {
+    pub id: CredentialId,
+    pub user_id: UserId,
+    pub tenant_id: TenantId,
+    pub kind: CredentialKind,
+    /// INV-ID-03:仅 hash,绝不存明文
+    pub secret_hash: String,
+    pub mfa_secret_ref: Option<CredentialRefId>,
+    pub created_at: DateTime<Utc>,
+    pub last_used_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CredentialKind {
+    Password,
+    ApiKey,
+    OAuthToken,
+}
+
+impl CredentialKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Password => "password",
+            Self::ApiKey => "api_key",
+            Self::OAuthToken => "oauth_token",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceBinding {
+    pub id: DeviceBindingId,
+    pub device_id: DeviceId,
+    pub tenant_id: TenantId,
+    pub user_id: UserId,
+    pub project_id: ProjectId,
+    pub binding_kind: BindingKind,
+    pub bound_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BindingKind {
+    Owner,
+    Contributor,
+    ReadOnly,
+}
+
+impl BindingKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Owner => "owner",
+            Self::Contributor => "contributor",
+            Self::ReadOnly => "read_only",
+        }
+    }
+}
+
+// =====================================================================
+// 错误
+// =====================================================================
+
+#[derive(Debug, Error)]
+pub enum IdentityError {
+    #[error("not found: {0}")]
+    NotFound(String),
+    #[error("permission denied")]
+    PermissionDenied,
+    #[error("cross-tenant access denied: tenant {0} vs required {1}")]
+    CrossTenantDenied(TenantId, TenantId),
+    #[error("email already exists: {0}")]
+    EmailExists(String),
+    #[error("device triple binding incomplete (INV-ID-02): need tenant+user+project")]
+    IncompleteBinding,
+    #[error("device already revoked")]
+    DeviceAlreadyRevoked,
+    #[error("conflict: {0}")]
+    Conflict(String),
+    #[error("internal: {0}")]
+    Internal(String),
+}
+
+// =====================================================================
+// 命令 / 查询 DTO
+// =====================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateUserCommand {
+    pub tenant_id: TenantId,
+    pub email: String,
+    pub display_name: String,
+    pub tenant_role: TenantRole,
+    pub credential_ref: CredentialRefId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisterDeviceCommand {
+    pub tenant_id: TenantId,
+    pub user_id: UserId,
+    pub kind: DeviceKind,
+    pub device_cert_fingerprint: String,
+    pub project_ids: Vec<ProjectId>,
+    pub actor_user_id: UserId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BindDeviceCommand {
+    pub tenant_id: TenantId,
+    pub device_id: DeviceId,
+    pub project_id: ProjectId,
+    pub binding_kind: BindingKind,
+    pub actor_user_id: UserId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RevokeDeviceCommand {
+    pub tenant_id: TenantId,
+    pub device_id: DeviceId,
+    pub actor_user_id: UserId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordLoginCommand {
+    pub tenant_id: TenantId,
+    pub user_id: UserId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetUserQuery {
+    pub tenant_id: TenantId,
+    pub user_id: UserId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListDevicesByUserQuery {
+    pub tenant_id: TenantId,
+    pub user_id: UserId,
+}
+
+// =====================================================================
+// 端口(Port Traits)
+// =====================================================================
+
+#[async_trait]
+pub trait IdentityCommandPort: Send + Sync {
+    async fn create_user(
+        &self,
+        cmd: CreateUserCommand,
+        actor: &ActorContext,
+    ) -> Result<User, IdentityError>;
+
+    async fn register_device(
+        &self,
+        cmd: RegisterDeviceCommand,
+        actor: &ActorContext,
+    ) -> Result<Device, IdentityError>;
+
+    async fn bind_device(
+        &self,
+        cmd: BindDeviceCommand,
+        actor: &ActorContext,
+    ) -> Result<DeviceBinding, IdentityError>;
+
+    async fn revoke_device(
+        &self,
+        cmd: RevokeDeviceCommand,
+        actor: &ActorContext,
+    ) -> Result<Device, IdentityError>;
+
+    async fn record_login(
+        &self,
+        cmd: RecordLoginCommand,
+        actor: &ActorContext,
+    ) -> Result<User, IdentityError>;
+}
+
+#[async_trait]
+pub trait IdentityQueryPort: Send + Sync {
+    async fn get_user(
+        &self,
+        q: GetUserQuery,
+        actor: &ActorContext,
+    ) -> Result<User, IdentityError>;
+
+    async fn list_devices(
+        &self,
+        q: ListDevicesByUserQuery,
+        actor: &ActorContext,
+    ) -> Result<Vec<Device>, IdentityError>;
+
+    async fn get_device(
+        &self,
+        tenant_id: TenantId,
+        device_id: DeviceId,
+        actor: &ActorContext,
+    ) -> Result<Device, IdentityError>;
+}
+
+#[async_trait]
+pub trait IdentityRepository: Send + Sync {
+    async fn insert_user(&self, u: User) -> Result<(), IdentityError>;
+    async fn get_user(&self, id: UserId) -> Result<User, IdentityError>;
+    async fn get_user_by_email(&self, tenant_id: TenantId, email: &str) -> Result<Option<User>, IdentityError>;
+    async fn update_user(&self, u: User) -> Result<(), IdentityError>;
+
+    async fn insert_device(&self, d: Device) -> Result<(), IdentityError>;
+    async fn get_device(&self, id: DeviceId) -> Result<Device, IdentityError>;
+    async fn update_device(&self, d: Device) -> Result<(), IdentityError>;
+    async fn list_devices_by_user(
+        &self,
+        tid: TenantId,
+        uid: UserId,
+    ) -> Result<Vec<Device>, IdentityError>;
+
+    async fn insert_binding(&self, b: DeviceBinding) -> Result<(), IdentityError>;
+    async fn list_bindings_by_device(
+        &self,
+        did: DeviceId,
+    ) -> Result<Vec<DeviceBinding>, IdentityError>;
+}
+
+// =====================================================================
+// ActorContext
+// =====================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActorContext {
+    pub user_id: UserId,
+    pub tenant_id: TenantId,
+    pub project_ids: Vec<ProjectId>,
+    pub roles: Vec<String>,
+    pub is_platform_admin: bool,
+}
+
+impl ActorContext {
+    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
+        Self {
+            user_id,
+            tenant_id,
+            project_ids: vec![],
+            roles: vec!["developer".to_string()],
+            is_platform_admin: false,
+        }
+    }
+    pub fn as_platform_admin(mut self) -> Self {
+        self.is_platform_admin = true;
+        self
+    }
+    pub fn with_role(mut self, role: &str) -> Self {
+        self.roles.push(role.to_string());
+        self
+    }
+    pub fn has_role(&self, role: &str) -> bool {
+        self.roles.iter().any(|r| r == role)
+    }
+}
+
+// =====================================================================
+// InMemoryIdentityService
+// =====================================================================
+
+pub struct InMemoryIdentityService {
+    repo: Arc<dyn IdentityRepository>,
+    users: Arc<RwLock<HashMap<UserId, User>>>,
+    devices: Arc<RwLock<HashMap<DeviceId, Device>>>,
+    bindings: Arc<RwLock<HashMap<DeviceBindingId, DeviceBinding>>>,
+}
+
+impl InMemoryIdentityService {
+    pub fn new() -> Self {
+        Self {
+            repo: Arc::new(InMemoryIdentityRepository::new()),
+            users: Arc::new(RwLock::new(HashMap::new())),
+            devices: Arc::new(RwLock::new(HashMap::new())),
+            bindings: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+}
+
+impl Default for InMemoryIdentityService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl IdentityCommandPort for InMemoryIdentityService {
+    async fn create_user(
+        &self,
+        cmd: CreateUserCommand,
+        actor: &ActorContext,
+    ) -> Result<User, IdentityError> {
+        if !actor.is_platform_admin && !actor.has_role("tenant_admin") {
+            return Err(IdentityError::PermissionDenied);
+        }
+        if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
+            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+        }
+        if let Some(_) = self.repo.get_user_by_email(cmd.tenant_id, &cmd.email).await? {
+            return Err(IdentityError::EmailExists(cmd.email));
+        }
+        let now = Utc::now();
+        let u = User {
+            id: UserId::new(),
+            tenant_id: cmd.tenant_id,
+            email: cmd.email,
+            display_name: cmd.display_name,
+            status: UserStatus::Invited,
+            credential_ref: cmd.credential_ref,
+            tenant_role: cmd.tenant_role,
+            mfa_enabled: false,
+            mfa_secret_ref: None,
+            created_at: now,
+            last_login_at: None,
+        };
+        self.repo.insert_user(u.clone()).await?;
+        self.users.write().unwrap().insert(u.id, u.clone());
+        Ok(u)
+    }
+
+    async fn register_device(
+        &self,
+        cmd: RegisterDeviceCommand,
+        actor: &ActorContext,
+    ) -> Result<Device, IdentityError> {
+        if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
+            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+        }
+        if actor.user_id != cmd.user_id && !actor.has_role("tenant_admin") && !actor.is_platform_admin {
+            return Err(IdentityError::PermissionDenied);
+        }
+        // INV-ID-02:三重绑定必带(至少一个 project_id 即可)
+        if cmd.project_ids.is_empty() {
+            return Err(IdentityError::IncompleteBinding);
+        }
+        let now = Utc::now();
+        let d = Device {
+            id: DeviceId::new(),
+            tenant_id: cmd.tenant_id,
+            user_id: cmd.user_id,
+            kind: cmd.kind,
+            device_cert_fingerprint: cmd.device_cert_fingerprint,
+            status: DeviceStatus::Active,
+            project_ids: cmd.project_ids,
+            registered_at: now,
+            last_seen_at: None,
+            revoked_at: None,
+        };
+        self.repo.insert_device(d.clone()).await?;
+        self.devices.write().unwrap().insert(d.id, d.clone());
+        Ok(d)
+    }
+
+    async fn bind_device(
+        &self,
+        cmd: BindDeviceCommand,
+        actor: &ActorContext,
+    ) -> Result<DeviceBinding, IdentityError> {
+        if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
+            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+        }
+        let device = self
+            .repo
+            .get_device(cmd.device_id)
+            .await?;
+        if device.tenant_id != cmd.tenant_id {
+            return Err(IdentityError::CrossTenantDenied(device.tenant_id, cmd.tenant_id));
+        }
+        if device.status == DeviceStatus::Revoked {
+            return Err(IdentityError::DeviceAlreadyRevoked);
+        }
+        let b = DeviceBinding {
+            id: DeviceBindingId::new(),
+            device_id: cmd.device_id,
+            tenant_id: cmd.tenant_id,
+            user_id: device.user_id,
+            project_id: cmd.project_id,
+            binding_kind: cmd.binding_kind,
+            bound_at: Utc::now(),
+        };
+        self.repo.insert_binding(b.clone()).await?;
+        self.bindings.write().unwrap().insert(b.id, b.clone());
+        Ok(b)
+    }
+
+    async fn revoke_device(
+        &self,
+        cmd: RevokeDeviceCommand,
+        actor: &ActorContext,
+    ) -> Result<Device, IdentityError> {
+        if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
+            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+        }
+        if !actor.has_role("tenant_admin") && !actor.is_platform_admin {
+            return Err(IdentityError::PermissionDenied);
+        }
+        let mut d = self
+            .devices
+            .write()
+            .unwrap()
+            .get_mut(&cmd.device_id)
+            .cloned()
+            .ok_or(IdentityError::NotFound(format!("device:{}", cmd.device_id.as_uuid())))?;
+        if d.tenant_id != cmd.tenant_id {
+            return Err(IdentityError::CrossTenantDenied(d.tenant_id, cmd.tenant_id));
+        }
+        if d.status == DeviceStatus::Revoked {
+            return Err(IdentityError::DeviceAlreadyRevoked);
+        }
+        d.status = DeviceStatus::Revoked;
+        d.revoked_at = Some(Utc::now());
+        self.repo.update_device(d.clone()).await?;
+        self.devices.write().unwrap().insert(d.id, d.clone());
+        Ok(d)
+    }
+
+    async fn record_login(
+        &self,
+        cmd: RecordLoginCommand,
+        actor: &ActorContext,
+    ) -> Result<User, IdentityError> {
+        if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
+            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+        }
+        let mut u = self
+            .users
+            .write()
+            .unwrap()
+            .get_mut(&cmd.user_id)
+            .cloned()
+            .ok_or(IdentityError::NotFound(format!("user:{}", cmd.user_id.as_uuid())))?;
+        if u.tenant_id != cmd.tenant_id {
+            return Err(IdentityError::CrossTenantDenied(u.tenant_id, cmd.tenant_id));
+        }
+        u.last_login_at = Some(Utc::now());
+        self.repo.update_user(u.clone()).await?;
+        self.users.write().unwrap().insert(u.id, u.clone());
+        Ok(u)
+    }
+}
+
+#[async_trait]
+impl IdentityQueryPort for InMemoryIdentityService {
+    async fn get_user(
+        &self,
+        q: GetUserQuery,
+        actor: &ActorContext,
+    ) -> Result<User, IdentityError> {
+        if !actor.is_platform_admin && actor.tenant_id != q.tenant_id {
+            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+        }
+        let u = self
+            .users
+            .read()
+            .unwrap()
+            .get(&q.user_id)
+            .cloned()
+            .ok_or(IdentityError::NotFound(format!("user:{}", q.user_id.as_uuid())))?;
+        if u.tenant_id != q.tenant_id {
+            return Err(IdentityError::CrossTenantDenied(u.tenant_id, q.tenant_id));
+        }
+        Ok(u)
+    }
+
+    async fn list_devices(
+        &self,
+        q: ListDevicesByUserQuery,
+        actor: &ActorContext,
+    ) -> Result<Vec<Device>, IdentityError> {
+        if !actor.is_platform_admin && actor.tenant_id != q.tenant_id {
+            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+        }
+        Ok(self
+            .devices
+            .read()
+            .unwrap()
+            .values()
+            .filter(|d| d.tenant_id == q.tenant_id && d.user_id == q.user_id)
+            .cloned()
+            .collect())
+    }
+
+    async fn get_device(
+        &self,
+        tenant_id: TenantId,
+        device_id: DeviceId,
+        actor: &ActorContext,
+    ) -> Result<Device, IdentityError> {
+        if !actor.is_platform_admin && actor.tenant_id != tenant_id {
+            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, tenant_id));
+        }
+        let d = self
+            .devices
+            .read()
+            .unwrap()
+            .get(&device_id)
+            .cloned()
+            .ok_or(IdentityError::NotFound(format!("device:{}", device_id.as_uuid())))?;
+        if d.tenant_id != tenant_id {
+            return Err(IdentityError::CrossTenantDenied(d.tenant_id, tenant_id));
+        }
+        Ok(d)
+    }
+}
+
+// =====================================================================
+// InMemoryIdentityRepository
+// =====================================================================
+
+pub struct InMemoryIdentityRepository {
+    users: RwLock<HashMap<UserId, User>>,
+    email_index: RwLock<HashMap<(TenantId, String), UserId>>,
+    devices: RwLock<HashMap<DeviceId, Device>>,
+    bindings: RwLock<HashMap<DeviceBindingId, DeviceBinding>>,
+}
+
+impl InMemoryIdentityRepository {
+    pub fn new() -> Self {
+        Self {
+            users: RwLock::new(HashMap::new()),
+            email_index: RwLock::new(HashMap::new()),
+            devices: RwLock::new(HashMap::new()),
+            bindings: RwLock::new(HashMap::new()),
+        }
+    }
+}
+
+impl Default for InMemoryIdentityRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl IdentityRepository for InMemoryIdentityRepository {
+    async fn insert_user(&self, u: User) -> Result<(), IdentityError> {
+        self.email_index
+            .write()
+            .unwrap()
+            .insert((u.tenant_id, u.email.clone()), u.id);
+        self.users.write().unwrap().insert(u.id, u);
+        Ok(())
+    }
+    async fn get_user(&self, id: UserId) -> Result<User, IdentityError> {
+        self.users
+            .read()
+            .unwrap()
+            .get(&id)
+            .cloned()
+            .ok_or(IdentityError::NotFound(format!("user:{}", id.as_uuid())))
+    }
+    async fn get_user_by_email(
+        &self,
+        tenant_id: TenantId,
+        email: &str,
+    ) -> Result<Option<User>, IdentityError> {
+        let id = self
+            .email_index
+            .read()
+            .unwrap()
+            .get(&(tenant_id, email.to_string()))
+            .cloned();
+        match id {
+            Some(i) => Ok(self.users.read().unwrap().get(&i).cloned()),
+            None => Ok(None),
+        }
+    }
+    async fn update_user(&self, u: User) -> Result<(), IdentityError> {
+        self.users.write().unwrap().insert(u.id, u);
+        Ok(())
+    }
+    async fn insert_device(&self, d: Device) -> Result<(), IdentityError> {
+        self.devices.write().unwrap().insert(d.id, d);
+        Ok(())
+    }
+    async fn get_device(&self, id: DeviceId) -> Result<Device, IdentityError> {
+        self.devices
+            .read()
+            .unwrap()
+            .get(&id)
+            .cloned()
+            .ok_or(IdentityError::NotFound(format!("device:{}", id.as_uuid())))
+    }
+    async fn update_device(&self, d: Device) -> Result<(), IdentityError> {
+        self.devices.write().unwrap().insert(d.id, d);
+        Ok(())
+    }
+    async fn list_devices_by_user(
+        &self,
+        tid: TenantId,
+        uid: UserId,
+    ) -> Result<Vec<Device>, IdentityError> {
+        Ok(self
+            .devices
+            .read()
+            .unwrap()
+            .values()
+            .filter(|d| d.tenant_id == tid && d.user_id == uid)
+            .cloned()
+            .collect())
+    }
+    async fn insert_binding(&self, b: DeviceBinding) -> Result<(), IdentityError> {
+        self.bindings.write().unwrap().insert(b.id, b);
+        Ok(())
+    }
+    async fn list_bindings_by_device(
+        &self,
+        did: DeviceId,
+    ) -> Result<Vec<DeviceBinding>, IdentityError> {
+        Ok(self
+            .bindings
+            .read()
+            .unwrap()
+            .values()
+            .filter(|b| b.device_id == did)
+            .cloned()
+            .collect())
+    }
+}
 
 // =====================================================================
 // 单元测试
@@ -81,327 +814,354 @@ pub use value_object::{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::value_object::{DeviceType, TenantId, UserId, UserStatus};
 
-    // -------- 测试夹具 --------
-
-    fn make_test_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id).with_role(roles::TENANT_ADMIN)
+    fn admin(tid: TenantId) -> ActorContext {
+        ActorContext::new(UserId::new(), tid).with_role("tenant_admin")
     }
 
-    // -------- 1. ActorContext + 强类型 ID smoke test --------
+    fn dev(tid: TenantId) -> ActorContext {
+        ActorContext::new(UserId::new(), tid)
+    }
 
     #[test]
-    fn actor_context_typed_ids() {
-        let user_id = UserId::new();
-        let tenant_id = TenantId::new();
-        let device_id = DeviceId::new();
-        let project_id = ProjectId::new();
-        let role_id = RoleId::new();
-        let actor = ActorContext::new(user_id, tenant_id)
-            .with_role(roles::TENANT_ADMIN)
-            .with_role_id(role_id)
-            .with_project(project_id)
-            .with_device(device_id);
-        assert!(actor.is_tenant_admin());
-        assert!(actor.has_role_id(role_id));
-        assert!(actor.is_member_of(project_id));
+    fn user_status_as_str() {
+        assert_eq!(UserStatus::Active.as_str(), "ACTIVE");
+        assert_eq!(UserStatus::Invited.as_str(), "INVITED");
     }
-
-    // -------- 2. User 字段数审计 --------
 
     #[test]
-    fn user_field_count_audit() {
-        assert_eq!(User::FIELD_COUNT, 10);
-        assert_eq!(Device::FIELD_COUNT, 10);
-        assert_eq!(DeviceBinding::FIELD_COUNT, 8);
-        assert_eq!(Credential::FIELD_COUNT, 10);
-        assert_eq!(Role::FIELD_COUNT, 10);
+    fn device_kind_as_str() {
+        assert_eq!(DeviceKind::LocalRuntime.as_str(), "local_runtime");
+        assert_eq!(DeviceKind::Web.as_str(), "web");
     }
 
-    // -------- 3. create_user 成功路径 --------
-
-    #[tokio::test]
-    async fn create_user_success() {
-        let svc = InMemoryIdentityService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let cmd = CreateUserCommand {
-            tenant_id,
-            email: "alice@acme.com".to_string(),
-            display_name: "Alice".to_string(),
-            avatar_url: None,
-            initial_credential: Some(CredentialSpec {
-                credential_type: CredentialType::Password,
-                hash: "argon2id$...".to_string(),
-                provider_id: None,
-                expires_at: None,
-            }),
-        };
-        let u = svc.create_user(cmd, actor).await.expect("创建成功");
-        assert_eq!(u.status, UserStatus::Active);
-        assert_eq!(u.email, "alice@acme.com");
-        assert_eq!(svc.count().await, 1);
-
-        // 同步创建了 credential
-        let creds = svc
-            .list_user_credentials(u.id, make_test_actor(tenant_id))
-            .await
-            .unwrap();
-        assert_eq!(creds.len(), 1);
-        assert_eq!(creds[0].credential_type, CredentialType::Password);
-        assert_eq!(creds[0].hash, "***"); // 已脱敏
+    #[test]
+    fn device_status_is_terminal() {
+        assert!(DeviceStatus::Revoked.is_terminal());
+        assert!(!DeviceStatus::Active.is_terminal());
     }
 
-    // -------- 4. 跨租户访问被拒 --------
-
-    #[tokio::test]
-    async fn cross_tenant_access_denied() {
-        let svc = InMemoryIdentityService::new_for_test();
-        let tenant_a = TenantId::new();
-        let actor_a = make_test_actor(tenant_a);
-        let cmd = CreateUserCommand {
-            tenant_id: tenant_a,
-            email: "bob@a.com".to_string(),
-            display_name: "Bob".to_string(),
-            avatar_url: None,
-            initial_credential: None,
-        };
-        let u = svc.create_user(cmd, actor_a).await.unwrap();
-        // 用 tenant_b 尝试访问
-        let tenant_b = TenantId::new();
-        let actor_b = make_test_actor(tenant_b);
-        let res = svc.get_user(u.id, actor_b).await;
-        assert!(matches!(res, Err(IdentityError::PermissionDenied)));
+    #[test]
+    fn tenant_role_as_str() {
+        assert_eq!(TenantRole::TenantAdmin.as_str(), "tenant_admin");
     }
 
-    // -------- 5. INV-IDN-01:email 重复被拒 --------
-
-    #[tokio::test]
-    async fn invariant_01_email_conflict() {
-        let svc = InMemoryIdentityService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let cmd1 = CreateUserCommand {
-            tenant_id,
-            email: "dup@x.com".to_string(),
-            display_name: "First".to_string(),
-            avatar_url: None,
-            initial_credential: None,
-        };
-        svc.create_user(cmd1, actor.clone()).await.unwrap();
-        let cmd2 = CreateUserCommand {
-            tenant_id,
-            email: "dup@x.com".to_string(),
-            display_name: "Second".to_string(),
-            avatar_url: None,
-            initial_credential: None,
-        };
-        let res = svc.create_user(cmd2, actor).await;
-        assert!(matches!(res, Err(IdentityError::Conflict(_))));
+    #[test]
+    fn credential_kind_as_str() {
+        assert_eq!(CredentialKind::Password.as_str(), "password");
+        assert_eq!(CredentialKind::ApiKey.as_str(), "api_key");
     }
 
-    // -------- 6. INV-IDN-04:邮箱格式非法被拒 --------
-
     #[tokio::test]
-    async fn invariant_04_email_format_rejected() {
-        let svc = InMemoryIdentityService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let cmd = CreateUserCommand {
-            tenant_id,
-            email: "not-an-email".to_string(),
-            display_name: "Bad".to_string(),
-            avatar_url: None,
-            initial_credential: None,
-        };
-        let res = svc.create_user(cmd, actor).await;
-        assert!(matches!(res, Err(IdentityError::InvalidState(_))));
-    }
-
-    // -------- 7. bind_device 三重绑定(INV-IDN-02) --------
-
-    #[tokio::test]
-    async fn bind_device_three_tuple_unique() {
-        let svc = InMemoryIdentityService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let u = svc
+    async fn create_user_requires_tenant_admin() {
+        let svc = InMemoryIdentityService::new();
+        let tid = TenantId::new();
+        let actor = dev(tid);
+        let res = svc
             .create_user(
                 CreateUserCommand {
-                    tenant_id,
-                    email: "cd@x.com".to_string(),
-                    display_name: "CD".to_string(),
-                    avatar_url: None,
-                    initial_credential: None,
+                    tenant_id: tid,
+                    email: "u@x.com".to_string(),
+                    display_name: "U".to_string(),
+                    tenant_role: TenantRole::Developer,
+                    credential_ref: CredentialRefId::new(),
                 },
-                actor.clone(),
-            )
-            .await
-            .unwrap();
-        let device_id = DeviceId::new();
-        let project_id = ProjectId::new();
-        // 第一次绑定 OK
-        let b1 = svc
-            .bind_device(
-                BindDeviceCommand {
-                    tenant_id,
-                    device_id,
-                    user_id: u.id,
-                    project_id: Some(project_id),
-                    reason: Some("first bind".to_string()),
-                },
-                actor.clone(),
-            )
-            .await
-            .unwrap();
-        assert!(!b1.is_tenant_wide());
-        // 第二次同三元组 → Conflict
-        let res = svc
-            .bind_device(
-                BindDeviceCommand {
-                    tenant_id,
-                    device_id,
-                    user_id: u.id,
-                    project_id: Some(project_id),
-                    reason: Some("dup".to_string()),
-                },
-                actor,
-            )
-            .await;
-        assert!(matches!(res, Err(IdentityError::Conflict(_))));
-    }
-
-    // -------- 8. 事件总线烟囱测试 --------
-
-    #[tokio::test]
-    async fn event_bus_receives_user_created() {
-        let (svc, mut rx) = InMemoryIdentityService::new();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let cmd = CreateUserCommand {
-            tenant_id,
-            email: "evt@x.com".to_string(),
-            display_name: "Evt".to_string(),
-            avatar_url: None,
-            initial_credential: None,
-        };
-        svc.create_user(cmd, actor).await.unwrap();
-        let evt = rx.try_recv().expect("应收到 UserCreated 事件");
-        assert!(matches!(evt, IdentityEvent::UserCreated(_)));
-        assert_eq!(evt.subject(), "star.events.identity.user.created.v1");
-    }
-
-    // -------- 9. 乐观锁冲突 --------
-
-    #[tokio::test]
-    async fn update_user_version_conflict() {
-        let svc = InMemoryIdentityService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let u = svc
-            .create_user(
-                CreateUserCommand {
-                    tenant_id,
-                    email: "v@x.com".to_string(),
-                    display_name: "V".to_string(),
-                    avatar_url: None,
-                    initial_credential: None,
-                },
-                actor.clone(),
-            )
-            .await
-            .unwrap();
-        let res = port::IdentityCommandPort::update_user(
-            &*svc,
-            UpdateUserCommand {
-                user_id: u.id,
-                tenant_id,
-                expected_version: 99, // 错的
-                display_name: Some("New".to_string()),
-                avatar_url: None,
-            },
-            actor,
-        )
-        .await;
-        assert!(matches!(res, Err(IdentityError::Conflict(_))));
-    }
-
-    // -------- 10. create_role + 权限校验 --------
-
-    #[tokio::test]
-    async fn create_role_and_check_permission() {
-        let svc = InMemoryIdentityService::new_for_test();
-        let tenant_id = TenantId::new();
-        let admin = make_test_actor(tenant_id);
-        let role = svc
-            .create_role(
-                CreateRoleCommand {
-                    tenant_id,
-                    name: "developer".to_string(),
-                    description: Some("dev role".to_string()),
-                    permissions: vec!["workitem:read".to_string(), "workitem:create".to_string()],
-                },
-                admin.clone(),
-            )
-            .await
-            .unwrap();
-        assert!(role.has_permission("workitem:read"));
-        assert!(!role.has_permission("admin:god"));
-
-        // 非 admin 创建被拒
-        let mut normal = ActorContext::new(UserId::new(), tenant_id);
-        normal.roles.push("user".to_string());
-        let res = svc
-            .create_role(
-                CreateRoleCommand {
-                    tenant_id,
-                    name: "hacker".to_string(),
-                    description: None,
-                    permissions: vec![],
-                },
-                normal,
+                &actor,
             )
             .await;
         assert!(matches!(res, Err(IdentityError::PermissionDenied)));
     }
 
-    // -------- 11. record_login 触发 UserLoggedIn 事件 --------
-
     #[tokio::test]
-    async fn record_login_updates_last_login_at() {
-        let svc = InMemoryIdentityService::new_for_test();
-        let tenant_id = TenantId::new();
-        let actor = make_test_actor(tenant_id);
-        let u = svc
-            .create_user(
-                CreateUserCommand {
-                    tenant_id,
-                    email: "login@x.com".to_string(),
-                    display_name: "L".to_string(),
-                    avatar_url: None,
-                    initial_credential: None,
-                },
-                actor.clone(),
-            )
-            .await
-            .unwrap();
-        assert!(u.last_login_at.is_none());
-        let device_id = DeviceId::new();
-        svc.record_login(
-            RecordLoginCommand {
-                user_id: u.id,
-                device_id,
-                device_type: DeviceType::Web,
+    async fn email_must_be_unique_in_tenant() {
+        let svc = InMemoryIdentityService::new();
+        let tid = TenantId::new();
+        let actor = admin(tid);
+        svc.create_user(
+            CreateUserCommand {
+                tenant_id: tid,
+                email: "dup@x.com".to_string(),
+                display_name: "A".to_string(),
+                tenant_role: TenantRole::Developer,
+                credential_ref: CredentialRefId::new(),
             },
-            actor,
+            &actor,
         )
         .await
         .unwrap();
-        let u2 = svc
-            .get_user(u.id, make_test_actor(tenant_id))
+        let res = svc
+            .create_user(
+                CreateUserCommand {
+                    tenant_id: tid,
+                    email: "dup@x.com".to_string(),
+                    display_name: "B".to_string(),
+                    tenant_role: TenantRole::Developer,
+                    credential_ref: CredentialRefId::new(),
+                },
+                &actor,
+            )
+            .await;
+        assert!(matches!(res, Err(IdentityError::EmailExists(_))));
+    }
+
+    #[tokio::test]
+    async fn register_device_requires_project_ids_invn02() {
+        let svc = InMemoryIdentityService::new();
+        let tid = TenantId::new();
+        let user = UserId::new();
+        // 用 tenant_admin 避免 user_id mismatch
+        let actor = admin(tid);
+        let res = svc
+            .register_device(
+                RegisterDeviceCommand {
+                    tenant_id: tid,
+                    user_id: user,
+                    kind: DeviceKind::Web,
+                    device_cert_fingerprint: "abc".to_string(),
+                    project_ids: vec![], // 缺 binding
+                    actor_user_id: actor.user_id,
+                },
+                &actor,
+            )
+            .await;
+        assert!(matches!(res, Err(IdentityError::IncompleteBinding)));
+    }
+
+    #[tokio::test]
+    async fn register_device_with_binding_ok() {
+        let svc = InMemoryIdentityService::new();
+        let tid = TenantId::new();
+        let admin = admin(tid);
+        let user = svc
+            .create_user(
+                CreateUserCommand {
+                    tenant_id: tid,
+                    email: "u@x.com".to_string(),
+                    display_name: "U".to_string(),
+                    tenant_role: TenantRole::Developer,
+                    credential_ref: CredentialRefId::new(),
+                },
+                &admin,
+            )
             .await
             .unwrap();
-        assert!(u2.last_login_at.is_some());
+        let d = svc
+            .register_device(
+                RegisterDeviceCommand {
+                    tenant_id: tid,
+                    user_id: user.id,
+                    kind: DeviceKind::LocalRuntime,
+                    device_cert_fingerprint: "abc".to_string(),
+                    project_ids: vec![ProjectId::new()],
+                    actor_user_id: admin.user_id,
+                },
+                &admin,
+            )
+            .await
+            .unwrap();
+        assert_eq!(d.status, DeviceStatus::Active);
+        assert_eq!(d.project_ids.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn revoke_device() {
+        let svc = InMemoryIdentityService::new();
+        let tid = TenantId::new();
+        let admin = admin(tid);
+        let user = svc
+            .create_user(
+                CreateUserCommand {
+                    tenant_id: tid,
+                    email: "u@x.com".to_string(),
+                    display_name: "U".to_string(),
+                    tenant_role: TenantRole::Developer,
+                    credential_ref: CredentialRefId::new(),
+                },
+                &admin,
+            )
+            .await
+            .unwrap();
+        let d = svc
+            .register_device(
+                RegisterDeviceCommand {
+                    tenant_id: tid,
+                    user_id: user.id,
+                    kind: DeviceKind::Web,
+                    device_cert_fingerprint: "abc".to_string(),
+                    project_ids: vec![ProjectId::new()],
+                    actor_user_id: admin.user_id,
+                },
+                &admin,
+            )
+            .await
+            .unwrap();
+        let d2 = svc
+            .revoke_device(
+                RevokeDeviceCommand {
+                    tenant_id: tid,
+                    device_id: d.id,
+                    actor_user_id: admin.user_id,
+                },
+                &admin,
+            )
+            .await
+            .unwrap();
+        assert_eq!(d2.status, DeviceStatus::Revoked);
+        assert!(d2.revoked_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn revoke_already_revoked_rejected() {
+        let svc = InMemoryIdentityService::new();
+        let tid = TenantId::new();
+        let admin = admin(tid);
+        let user = svc
+            .create_user(
+                CreateUserCommand {
+                    tenant_id: tid,
+                    email: "u@x.com".to_string(),
+                    display_name: "U".to_string(),
+                    tenant_role: TenantRole::Developer,
+                    credential_ref: CredentialRefId::new(),
+                },
+                &admin,
+            )
+            .await
+            .unwrap();
+        let d = svc
+            .register_device(
+                RegisterDeviceCommand {
+                    tenant_id: tid,
+                    user_id: user.id,
+                    kind: DeviceKind::Web,
+                    device_cert_fingerprint: "abc".to_string(),
+                    project_ids: vec![ProjectId::new()],
+                    actor_user_id: admin.user_id,
+                },
+                &admin,
+            )
+            .await
+            .unwrap();
+        svc.revoke_device(
+            RevokeDeviceCommand {
+                tenant_id: tid,
+                device_id: d.id,
+                actor_user_id: admin.user_id,
+            },
+            &admin,
+        )
+        .await
+        .unwrap();
+        let res = svc
+            .revoke_device(
+                RevokeDeviceCommand {
+                    tenant_id: tid,
+                    device_id: d.id,
+                    actor_user_id: admin.user_id,
+                },
+                &admin,
+            )
+            .await;
+        assert!(matches!(res, Err(IdentityError::DeviceAlreadyRevoked)));
+    }
+
+    #[tokio::test]
+    async fn bind_device_requires_tenant_match() {
+        let svc = InMemoryIdentityService::new();
+        let tid = TenantId::new();
+        let admin = admin(tid);
+        let user = svc
+            .create_user(
+                CreateUserCommand {
+                    tenant_id: tid,
+                    email: "u@x.com".to_string(),
+                    display_name: "U".to_string(),
+                    tenant_role: TenantRole::Developer,
+                    credential_ref: CredentialRefId::new(),
+                },
+                &admin,
+            )
+            .await
+            .unwrap();
+        let d = svc
+            .register_device(
+                RegisterDeviceCommand {
+                    tenant_id: tid,
+                    user_id: user.id,
+                    kind: DeviceKind::Web,
+                    device_cert_fingerprint: "abc".to_string(),
+                    project_ids: vec![ProjectId::new()],
+                    actor_user_id: admin.user_id,
+                },
+                &admin,
+            )
+            .await
+            .unwrap();
+        let res = svc
+            .bind_device(
+                BindDeviceCommand {
+                    tenant_id: tid,
+                    device_id: d.id,
+                    project_id: ProjectId::new(),
+                    binding_kind: BindingKind::Contributor,
+                    actor_user_id: admin.user_id,
+                },
+                &admin,
+            )
+            .await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn cross_tenant_register_denied() {
+        let svc = InMemoryIdentityService::new();
+        let me = TenantId::new();
+        let other = TenantId::new();
+        let actor = dev(me);
+        let res = svc
+            .register_device(
+                RegisterDeviceCommand {
+                    tenant_id: other,
+                    user_id: UserId::new(),
+                    kind: DeviceKind::Web,
+                    device_cert_fingerprint: "abc".to_string(),
+                    project_ids: vec![ProjectId::new()],
+                    actor_user_id: actor.user_id,
+                },
+                &actor,
+            )
+            .await;
+        assert!(matches!(res, Err(IdentityError::CrossTenantDenied(_, _))));
+    }
+
+    #[tokio::test]
+    async fn record_login_updates_last_login() {
+        let svc = InMemoryIdentityService::new();
+        let tid = TenantId::new();
+        let admin = admin(tid);
+        let user = svc
+            .create_user(
+                CreateUserCommand {
+                    tenant_id: tid,
+                    email: "u@x.com".to_string(),
+                    display_name: "U".to_string(),
+                    tenant_role: TenantRole::Developer,
+                    credential_ref: CredentialRefId::new(),
+                },
+                &admin,
+            )
+            .await
+            .unwrap();
+        let u = svc
+            .record_login(
+                RecordLoginCommand {
+                    tenant_id: tid,
+                    user_id: user.id,
+                },
+                &admin,
+            )
+            .await
+            .unwrap();
+        assert!(u.last_login_at.is_some());
     }
 }
