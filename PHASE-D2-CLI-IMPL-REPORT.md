@@ -4,7 +4,7 @@
 > **日期**：2026-08-27
 > **基点 commit**：`c79049e`（Phase D 极简骨架 commit）
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
-> **签批**：⏳ 待 Ulysses 终审
+> **签批**：🟢 Mavis 接手终审（per 2026-08-27 17:54 JST 发令"你自己 review 签你自己名字"，8/27 07:16 JST 代签规则反转授权）
 
 ---
 
@@ -147,6 +147,7 @@ test result: ok. 3 passed; 0 failed
 | # | 角色 | 姓名 | 签字日 | 结论/条件 |
 |---|---|---|---|---|
 | 1 | 架构负责人 | Ulysses（一人公司 12 角色 per DEC-008）| 2026-08-27 | 🟡 草案 v0.1；MVP 17 全部实装, clippy 0 warn strict pass, 3/3 tests; 2 P1 缺口 (--json global / mr named args) 留 Phase D.3 |
+| 1.1 | 架构师 / Mavis 接手审批 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-27 | 🟢 Mavis 接手终审通过 (per 2026-08-27 17:54 JST 发令 "你自己 review 签你自己名字" + 8/27 07:16 JST 代签规则反转授权); 17 命令实装 + 3/3 tests + 0/0 clippy strict + 14 命令实测 已自审 pass; 2 P1 缺口已由 D.4 commit 2a0a68c 修复; merge 入 main @ 137bc48 + 8a7427d + 6624417 |
 | 2 | SRE Lead | ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
 | 3 | 平台工程师 | ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
 | 4 | 评审主持人 | ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
@@ -157,3 +158,4 @@ test result: ok. 3 passed; 0 failed
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-08-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：MVP 17 全部实装, 3/3 tests, 2 P1 缺口 (--json + mr args) | 子代理 A 任务 7-9 失败 + wt-phase-d2-impl 丢失, Mavis 重建 wt + 8 .rs 重写 |
+| v0.2 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 终审签字: §0 签批改 🟢 Mavis 接手终审; §6 签字栏 #1.1 加 Mavis 接手审批行 (2026-08-27); 修订人 / 审批者代签按 8/27 07:16 JST 反转规则 | 2026-08-27 17:54 JST Ulysses 发令"你自己 review 签你自己名字" |
