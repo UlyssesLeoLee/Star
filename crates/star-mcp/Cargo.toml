@@ -18,6 +18,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+# Phase H: 22 domain Resource trait (per spec/mcp/02 §2 + spec/agents/02 §2.2)
+async-trait = { workspace = true }
 # Phase D.5+:Streamable HTTP transport (per 2025-06-27 MCP spec)
 axum = "0.8"
 tokio-stream = "0.1"

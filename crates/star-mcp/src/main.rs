@@ -1,6 +1,10 @@
-//! `star-mcp` MCP server (Phase E: stdio + Streamable HTTP + Resources + Prompts + 6-field error model)
+//! `star-mcp` MCP server (Phase E: stdio + Streamable HTTP + Resources + Prompts + 6-field error model
+//! + Phase H: 22 domain handler 真实数据接入框架)
 //!
 //! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §1-§5
+//! + `spec/agents/02-data-sources-spec.md` §2 (22 domain)
+//! + `spec/mcp/02-resources-prompts-spec.md` §2 (Resources 扩展)
+//! + `spec/cache/01-cache-contract-spec.md` §4 (TTL 策略)
 //!
 //! ## Phase E 实装
 //!
@@ -18,6 +22,21 @@
 //!   `code` / `message` / `source_module` / `source_kind` / `retriable` / `hint`
 //! - 24 个 SCREAMING_SNAKE_CASE 错误码 (per `error_code` 模块)
 //! - **不**依赖 rmcp (per 任务 brief 极简骨架约束)
+//!
+//! ## Phase H 实装 (新增)
+//!
+//! per `docs/architecture/2026-08-26-upgrade/spec/agents/02-data-sources-spec.md` §2 (22 domain crate)
+//! + `spec/mcp/02-resources-prompts-spec.md` §2 (Resources Phase H 扩展)
+//! + `spec/cache/01-cache-contract-spec.md` §4 (TTL 策略: 5s/30s/60s/300s/3600s/86400s):
+//!
+//! - **22 domain handler** (`crates/star-mcp/src/handlers/*.rs`): 每个 handler 暴露 URI pattern
+//!   (e.g. `agent://{id}` / `worktree://{id}`) + cache TTL + mock-but-functional read
+//! - `Resource` trait (`crates/star-mcp/src/resources.rs`): typed `Resource<Data = X>`
+//! - `DynResource` trait: type-erased (Box<dyn DynResource>) 注册到 `ResourcesHandler::domains`
+//! - `KeyBuilder` (`spec/cache/01` §3 L119-126): cache key 格式化
+//! - `ResourceError`: handler 内部错误 → 映射到 6-field `McpError`
+//! - 全部 mock-but-functional (per AGENTS.md 缺标比错标安全守门 + Phase E mock 标记):
+//!   数据标 `TODO: Phase H+ 接 crates/domain-*` 真实数据源
 //!
 //! ## CLI
 //!
@@ -48,11 +67,13 @@
 //! - 0 unsafe
 //! - Phase D.5+ 新增 axum + tokio-stream 依赖 (D.3 0 新外部依赖已不适用)
 //! - RUSTFLAGS=-D warnings 必 pass
+//! - Phase H: 22 domain 全部 mock-but-functional, 真实数据接入标 `TODO: Phase H+`
 
 #![warn(missing_docs)]
 #![warn(rust_2018_idioms)]
 
 mod error;
+mod handlers;
 mod prompts;
 mod resources;
 mod tools;
@@ -81,20 +102,20 @@ async fn main() -> Result<(), McpError> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let (transport, bind_addr) = parse_args(&args);
 
-    // Phase E: 显式实例化 Resources + Prompts handler
-    // (per task brief "在 transport.rs 初始化时注册")
-    // 当前是 unit struct, 不需要持有 config; Future Phase F 可注入 Arc<dyn ReadPort>
-    let resources_handler = ResourcesHandler::new();
+    // Phase H: 22 domain handler 全部实例化 + 注册到 ResourcesHandler
+    // (per `docs/architecture/2026-08-26-upgrade/spec/agents/02-data-sources-spec.md` §2
+    //   + `spec/mcp/02-resources-prompts-spec.md` §2)
+    let resources_handler = ResourcesHandler::with_domains(handlers::all_domain_handlers());
     let prompts_handler = PromptsHandler::new();
     eprintln!(
-        "star-mcp: Phase E handlers ready (resources: {}, prompts: {})",
+        "star-mcp: Phase E + H handlers ready (resources: {} = 4 core + 22 domain, prompts: {})",
         resources_handler.list().len(),
         prompts_handler.list().len()
     );
 
     match transport {
         Transport::Stdio => {
-            eprintln!("star-mcp: stdio transport (16 tools + 4 resources + 5 prompts, JSON-RPC 2.0, 6-field error)");
+            eprintln!("star-mcp: stdio transport (16 tools + 4 resources + 5 prompts + 22 domain handlers, JSON-RPC 2.0, 6-field error)");
             let stdin = std::io::stdin();
             let stdout = std::io::stdout();
             run_session(stdin.lock(), stdout.lock())
