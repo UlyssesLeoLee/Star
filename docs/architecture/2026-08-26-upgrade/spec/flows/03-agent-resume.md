@@ -63,12 +63,16 @@ star workspace resume STAR-1024
 > 10. `remaining_work` (string[])
 > 11. `last_modified` (timestamp)
 
+> v0.3 fix: 2026-08-27 per B-19 (Resume 11 字段 cross-ref §3.17) / B-23 (state 1:1 对齐 flows/01)
+
 ## 3. 关键约束
 
 - 实现真正的 **Vendor-independent Agent Handoff**
 - 不同厂商的 Agent 都能 Resume 同一任务
 - 必须包含"前一个 Agent 为什么失败"
 - 状态字符串统一 PascalCase（与 [spec/flows/01 §1](01-agent-task-lifecycle.md) Rust enum 命名一致，per P1-M 修复 2026-08-27）
+
+> v0.2 fix: 2026-08-27 per B-01 (PascalCase 引用) / B-19 (Resume 11 字段 §3.17 cross-ref)
 
 ## 4. 实施位置
 
@@ -83,3 +87,8 @@ per [arch/01](../../arch/01-current-architecture-analysis.md) 模板。Mavis 代
 |---|---|---|---|---|
 | v0.1 | 2026-08-26 | Mavis（per DEC-008）| 初版：11 字段 Resume JSON 协议 | Phase C 54 份 spec 草案 |
 | v0.2 | 2026-08-27 | Ulysses（一人公司 12 角色 per DEC-008）| P1-M：§2/§3 状态字符串统一 PascalCase 引用（`"Implementing"`，与 flows/01 §1 Rust enum 一致） · P1-O：§2 完整引用 [`agent-api/v1#Resume`](../agent-api/01-schema.md) §3.17（11 字段权威定义），加 `last_modified` 字段 + 补全 `open_diagnostics` / `test_results` / `relevant_context` 等之前未明确的字段 | 8 子代理 INTERFACE-REVIEW-B 🔴 B-01/B-19 + P1-BLOCKERS-SUMMARY v0.2 |
+| v0.3 | 2026-08-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 agent（per 2026-08-27 07:16 JST 代签规则反转）| 🔴 B-19 再次校准：明确 §2 11 字段权威定义位置 [`agent-api/v1` §3.17 Resume](../agent-api/01-schema.md#317-resumeper-p1-o-修复-2026-08-27)（W4 子代理定义），与 §3.1 Task.status enum 联动 · 🟡 B-23：§3 补 PascalCase 与 [flows/01 §1](01-agent-task-lifecycle.md) Rust enum 命名 1:1 对齐声明 | worker 子代理修 INTERFACE-REVIEW-B 8 子代理报告 follow-up |
+
+> v0.3 fix: 2026-08-27 per B-19 / B-23
+
+> **已知缺口（缺标比错标安全）**：B-19 / B-23 任务摘要列的 11 字段（`id, agent_id, state, last_heartbeat_at, lease_expires_at, current_state, current_step, retry_count, artifacts, checkpoint, recovery_hint`）与 [`agent-api/v1` §3.17 Resume](../agent-api/01-schema.md#317-resumeper-p1-o-修复-2026-08-27) 实际 11 字段（`current_state, workspace, worktree, previous_plan, modified_files, open_diagnostics, test_results, failed_attempts, relevant_context, remaining_work, last_modified`）**不对齐**。本 spec 以 `agent-api/v1` §3.17 为准（权威 schema 来自 W4 子代理 §3.17 定义，非任务摘要）。任务摘要与 schema 的差异需 Ulysses 终审时确认是调整 spec 还是调整 schema。
