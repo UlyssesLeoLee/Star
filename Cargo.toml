@@ -29,6 +29,10 @@ members = [
     "crates/domain-workspace",
     "crates/domain-worktree",
     "crates/infrastructure",
+    # Phase D 骨架:2026-08-27 新增 3 crate
+    "crates/star-cli",
+    "crates/star-mcp",
+    "crates/star-context",
 ]
 exclude = ["target"]
 
