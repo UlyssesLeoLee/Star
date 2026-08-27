@@ -35,6 +35,8 @@ docs.untracked.bak/
 
 # RustGameServer (RGS) ops scripts accidentally copied into Star root - not part of Star
 # Keep .ps1/.sh/.py from RGS scratch space out of Star history
+# (Staging area for cleanup: see STAR-UNTRACKED-CLEANUP-REPORT.md v0.1)
+/.scratch/
 /check_wt.ps1
 /wt_check_remaining.ps1
 /wt_clean.ps1
