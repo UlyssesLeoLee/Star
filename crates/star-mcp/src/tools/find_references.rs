@@ -16,7 +16,7 @@ use crate::tools::{mock_response, optional_string, require_string};
 
 /// `find_references` tool stub
 pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
-    let name = require_string(&args, "name").map_err(McpError::BadRequest)?;
+    let name = require_string(&args, "name").map_err(McpError::validation)?;
     let file = optional_string(&args, "file")
         .unwrap_or_else(|| "crates/star-cli/src/commands/agent.rs".to_string());
     let body = json!({

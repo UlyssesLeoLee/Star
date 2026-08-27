@@ -1,100 +1,246 @@
-//! `star-mcp` Resources 能力(per 2025-06-27 MCP spec §3)
+//! `star-mcp` Resources 能力(per MCP 2025-06-27 spec §3, Phase E 实装)
 //!
-//! Phase D.5+ 实装:
-//! - `resources/list`: 暴露 16 tool 资源(URI = `star://tools/<name>`)
-//! - `resources/read`: 读取资源(mock-but-functional, 返回工具描述 JSON)
+//! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §4 (Phase 2 候选, Phase E 提升到 Level 3+)
+//!
+//! ## Phase E 实装
+//!
+//! - **4 个核心 resource** (per 任务 brief):
+//!   - `workspace://current` — 当前 workspace 摘要(per `agent-api/v1#WorkspaceSummary`)
+//!   - `worktree://{id}`     — worktree 详情(per `agent-api/v1#Worktree`)
+//!   - `agent://{id}/state`  — agent session 状态(per ADR-0030 Lease + Heartbeat)
+//!   - `decision://{id}`     — 决策记录(per `flows/02` Decision schema)
+//! - **`ResourcesHandler` struct** + URI 解析 + 错误处理走 `error.rs` 6-field 错误模型
+//! - 数据源: **mock-but-functional** —— 返回带 `_mock: true` 标记的 JSON, 真实数据源接入留 Phase F
 //!
 //! ## 守门规则
 //!
 //! - 0 unsafe
-//! - 复用 `transport::tools_list` 现有 16 tool inputSchema, 不重复维护
-//! - 资源 read 走 `tools::invoke` 同款 mock 数据
+//! - URI 解析失败 → `McpError::user_input()` (per F-06 source_kind = user_input)
+//! - 资源不存在 → `McpError::new(RESOURCE_NOT_FOUND, ...)`
+//! - 缺标比错标安全: mock 数据不编造, 加 `_mock: true` + `_todo: "Phase F 接入真实数据源"` 标记
+//! - 旧 D.5+ `star://tools/*` 资源移除(per Phase E 任务 brief 明确换 URI scheme)
+//!
+//! ## MCP 2025-06-27 协议契合
+//!
+//! - `resources/list` 返回 `{ resources: [{ uri, name, description, mimeType }] }` 数组
+//! - `resources/read` 返回 `{ contents: [{ uri, mimeType, text }] }` 数组(per spec §3.2)
+//! - URI scheme 必为 `<scheme>://<path>` 格式(per spec §3.1)
 
 #![warn(missing_docs)]
 
 use serde_json::{Value, json};
 
-use crate::transport::{JsonRpcError, JsonRpcErrorBody, JsonRpcRequest, JsonRpcSuccess, error_code, tools_list};
+use crate::error::{ErrorSourceKind, McpError, error_code};
+use crate::transport::{JsonRpcError, JsonRpcErrorBody, JsonRpcRequest, JsonRpcSuccess};
 
-/// 资源 URI 前缀(per MCP 2025-06-27 spec §3.1 URI scheme)
-pub(crate) const RESOURCE_URI_PREFIX: &str = "star://tools/";
-
-/// 处理 `resources/list` 请求
+/// Resources handler (Phase E: 4 核心 resource)
 ///
-/// 返回 16 tool 资源列表(URI = `star://tools/<tool_name>`, mimeType = `application/json`)
-pub(crate) fn handle_resources_list(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRpcError> {
-    // 复用 tools_list 的 16 tool 数据, 但包装为 resources 字段
-    let tools_obj = tools_list();
-    let tools_arr = tools_obj
-        .get("tools")
-        .and_then(Value::as_array)
-        .ok_or_else(|| {
-            // 理论上不会发生: tools_list 总是返回 {"tools": [...]}
-            err_internal("tools_list() did not return a 'tools' array", &req.id)
-        })?;
-
-    let resources: Vec<Value> = tools_arr
-        .iter()
-        .map(|t| {
-            let name = t.get("name").and_then(Value::as_str).unwrap_or("");
-            let description = t.get("description").and_then(Value::as_str).unwrap_or("");
-            json!({
-                "uri": format!("{RESOURCE_URI_PREFIX}{name}"),
-                "name": name,
-                "description": description,
-                "mimeType": "application/json"
-            })
-        })
-        .collect();
-
-    let result = json!({ "resources": resources });
-    Ok(JsonRpcSuccess { jsonrpc: "2.0", id: req.id.clone(), result })
+/// 当前是 unit struct, 未来可注入 `Arc<WorktreeService>` / `Arc<AgentService>` 做真实数据接入。
+#[allow(unreachable_pub)] // pub(crate) module
+#[derive(Debug, Default, Clone)]
+pub struct ResourcesHandler {
+    // Phase F 占位: 真实数据源依赖将在此处注入
+    // e.g. _worktree_service: Arc<dyn WorktreeReadPort>,
+    //      _agent_service: Arc<dyn AgentStateReadPort>,
+    //      _decision_service: Arc<dyn DecisionReadPort>,
 }
 
-/// 处理 `resources/read` 请求
-///
-/// 期望 params = { "uri": "star://tools/<name>" }
-/// 返回 mock JSON (per spec/agent-api/v1 schema) 通过 text content
-pub(crate) fn handle_resources_read(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRpcError> {
-    let uri = req
-        .params
-        .get("uri")
-        .and_then(Value::as_str)
-        .ok_or_else(|| err_invalid_params("missing 'uri' in params", &req.id))?;
+#[allow(unreachable_pub)] // ResourcesHandler is pub(crate); methods inherit that scope
+impl ResourcesHandler {
+    /// 构造新 handler
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    // 校验 prefix
-    let tool_name = uri.strip_prefix(RESOURCE_URI_PREFIX).ok_or_else(|| {
-        err_invalid_params(
-            format!("uri must start with '{RESOURCE_URI_PREFIX}', got: {uri}").as_str(),
-            &req.id,
-        )
-    })?;
+    /// 列出所有可读 resource
+    ///
+    /// per `spec/mcp/01` §3: 数组元素 = `{ uri, name, description, mimeType }`
+    #[allow(dead_code)] // 公开 API, 供 Phase F handler 注入后用
+    pub fn list(&self) -> Vec<Value> {
+        vec![
+            self.resource_descriptor("workspace://current", "current workspace summary"),
+            self.resource_descriptor("worktree://wt-STAR-1024", "worktree detail (example)"),
+            self.resource_descriptor("agent://agent-1/state", "agent session state (example)"),
+            self.resource_descriptor("decision://dec-001", "decision record (example)"),
+        ]
+    }
 
-    // 复用 tools_list 校验 tool 是否存在(16 tool 之一)
-    let tools_obj = tools_list();
-    let tools_arr = tools_obj.get("tools").and_then(Value::as_array).ok_or_else(|| {
-        err_internal("tools_list() did not return a 'tools' array", &req.id)
-    })?;
+    fn resource_descriptor(&self, uri: &str, description: &str) -> Value {
+        let name = uri.split("://").next().unwrap_or(uri);
+        json!({
+            "uri": uri,
+            "name": name,
+            "description": description,
+            "mimeType": "application/json"
+        })
+    }
 
-    let matched = tools_arr.iter().find(|t| {
-        t.get("name").and_then(Value::as_str) == Some(tool_name)
-    });
+    /// 读取指定 URI 的资源内容
+    ///
+    /// 返回 JSON 字符串(text 字段), 失败时返回 6-field `McpError`。
+    #[allow(dead_code)] // 公开 API
+    pub async fn read(&self, uri: &str) -> Result<Value, McpError> {
+        // URI scheme 解析
+        let (scheme, path) = parse_uri(uri)?;
 
-    let tool_value = match matched {
-        Some(t) => t.clone(),
-        None => {
-            return Err(err_invalid_params(
-                format!("unknown resource uri: {uri}").as_str(),
-                &req.id,
+        match (scheme, path) {
+            ("workspace", "current") => self.read_workspace_current(uri).await,
+            ("worktree", id) => self.read_worktree(uri, id).await,
+            ("agent", rest) => {
+                // 期望 `agent://{id}/state` 或 `agent://{id}/...`
+                let (id, suffix) = rest.split_once('/').unwrap_or((rest, "state"));
+                self.read_agent_state(uri, id, suffix).await
+            }
+            ("decision", id) => self.read_decision(uri, id).await,
+            (other, _) => Err(McpError::new(
+                error_code::RESOURCE_URI_INVALID,
+                format!("unsupported resource scheme: '{other}://'"),
+                "mcp",
+                ErrorSourceKind::UserInput,
+                false,
+                Some("supported schemes: workspace://, worktree://, agent://, decision://".to_string()),
+            )),
+        }
+    }
+
+    // ===== 4 个核心 resource mock-but-functional 实装 =====
+
+    /// `workspace://current` — 当前 workspace 摘要
+    ///
+    /// per `agent-api/v1#WorkspaceSummary` (spec/agent-api/01 §3.15)
+    /// TODO(Phase F): 注入 `WorkspaceReadPort` 真实数据源
+    async fn read_workspace_current(&self, uri: &str) -> Result<Value, McpError> {
+        // mock-but-functional: 返回符合 §3.15 schema 的 JSON, 加 _mock 标记
+        let body = json!({
+            "_mock": true,
+            "_todo": "Phase F: inject WorkspaceReadPort for live data",
+            "schema_version": "agent-api/v1",
+            "workspace": {
+                "id": "ws-current",
+                "name": "current workspace (mock)",
+                "repository": {
+                    "id": "repo-1",
+                    "provider": "git",
+                    "url": "https://example.invalid/repo.git"
+                },
+                "worktree_id": "wt-STAR-1024",
+                "agent_session_id": "agent-1",
+                "created_at": "2026-08-27T00:00:00Z",
+                "updated_at": "2026-08-27T19:00:00Z"
+            }
+        });
+        Ok(contents(uri, &body))
+    }
+
+    /// `worktree://{id}` — worktree 详情
+    ///
+    /// per `agent-api/v1#Worktree` (spec/agent-api/01 §3.2)
+    /// TODO(Phase F): 注入 `WorktreeReadPort` 真实数据源
+    async fn read_worktree(&self, uri: &str, id: &str) -> Result<Value, McpError> {
+        if id.is_empty() {
+            return Err(McpError::new(
+                error_code::USER_INPUT,
+                "worktree URI must include a non-empty id (e.g. worktree://wt-STAR-1024)",
+                "mcp",
+                ErrorSourceKind::UserInput,
+                false,
+                None,
             ));
         }
-    };
+        let body = json!({
+            "_mock": true,
+            "_todo": "Phase F: inject WorktreeReadPort for live data",
+            "schema_version": "agent-api/v1",
+            "worktree": {
+                "id": id,
+                "branch": "feat/example",
+                "base": "main",
+                "head_sha": "0000000",
+                "status": "open",
+                "issue_id": null,
+                "agent_session_id": "agent-1",
+                "created_at": "2026-08-27T00:00:00Z"
+            }
+        });
+        Ok(contents(uri, &body))
+    }
 
-    // 返回 resources/read 标准格式
-    // per MCP 2025-06-27 spec §3.2:
-    //   contents: [{ uri, mimeType, text }]
-    let text = serde_json::to_string_pretty(&tool_value).unwrap_or_else(|_| "{}".to_string());
-    let result = json!({
+    /// `agent://{id}/state` — agent session 状态
+    ///
+    /// per ADR-0030 Lease + Heartbeat, 11 字段 agent session 视角
+    /// TODO(Phase F): 注入 `AgentStateReadPort` 真实数据源
+    async fn read_agent_state(&self, uri: &str, id: &str, suffix: &str) -> Result<Value, McpError> {
+        if id.is_empty() {
+            return Err(McpError::user_input(
+                "agent URI must include a non-empty id (e.g. agent://agent-1/state)",
+                None,
+            ));
+        }
+        if suffix != "state" {
+            return Err(McpError::new(
+                error_code::RESOURCE_URI_INVALID,
+                format!("unsupported agent resource suffix: '/{suffix}' (expected '/state')"),
+                "mcp",
+                ErrorSourceKind::UserInput,
+                false,
+                Some(format!("try '{uri}state' instead")),
+            ));
+        }
+        let body = json!({
+            "_mock": true,
+            "_todo": "Phase F: inject AgentStateReadPort for live lease/heartbeat data",
+            "schema_version": "agent-api/v1",
+            "agent": {
+                "id": id,
+                "state": "Running",
+                "last_heartbeat_at": "2026-08-27T19:00:00Z",
+                "lease_expires_at": "2026-08-27T19:05:00Z",
+                "current_state": "Step 3 of 12 (Universal Submit)",
+                "current_step": 3,
+                "retry_count": 0,
+                "artifacts": [],
+                "checkpoint": "ckpt-001",
+                "recovery_hint": "use lease resume (per ADR-0030)"
+            }
+        });
+        Ok(contents(uri, &body))
+    }
+
+    /// `decision://{id}` — 决策记录
+    ///
+    /// per `spec/flows/02` Decision schema
+    /// TODO(Phase F): 注入 `DecisionReadPort` 真实数据源
+    async fn read_decision(&self, uri: &str, id: &str) -> Result<Value, McpError> {
+        if id.is_empty() {
+            return Err(McpError::user_input(
+                "decision URI must include a non-empty id (e.g. decision://dec-001)",
+                None,
+            ));
+        }
+        let body = json!({
+            "_mock": true,
+            "_todo": "Phase F: inject DecisionReadPort for live decision log",
+            "schema_version": "agent-api/v1",
+            "decision": {
+                "id": id,
+                "title": "decision record (mock)",
+                "status": "recorded",
+                "actor": "agent-1",
+                "context_refs": ["issue:STAR-1024", "worktree:wt-STAR-1024"],
+                "alternatives_considered": [],
+                "chosen": "mock choice (no real data yet)",
+                "rationale": "Phase E stub — Phase F will populate from real decision log",
+                "created_at": "2026-08-27T00:00:00Z"
+            }
+        });
+        Ok(contents(uri, &body))
+    }
+}
+
+/// 把 resource body 包装成 MCP `resources/read` 标准 `contents[]` 格式
+fn contents(uri: &str, body: &Value) -> Value {
+    let text = serde_json::to_string_pretty(body).unwrap_or_else(|_| "{}".to_string());
+    json!({
         "contents": [
             {
                 "uri": uri,
@@ -102,32 +248,78 @@ pub(crate) fn handle_resources_read(req: &JsonRpcRequest) -> Result<JsonRpcSucce
                 "text": text
             }
         ]
-    });
+    })
+}
+
+/// URI 解析: `<scheme>://<path>`
+///
+/// 拆分 scheme 与 path, 校验基本格式
+fn parse_uri(uri: &str) -> Result<(&str, &str), McpError> {
+    let (scheme, rest) = uri.split_once("://").ok_or_else(|| {
+        McpError::new(
+            error_code::RESOURCE_URI_INVALID,
+            format!("uri must be 'scheme://path' format, got: {uri}"),
+            "mcp",
+            ErrorSourceKind::UserInput,
+            false,
+            Some("supported schemes: workspace://, worktree://, agent://, decision://".to_string()),
+        )
+    })?;
+    if scheme.is_empty() || rest.is_empty() {
+        return Err(McpError::new(
+            error_code::RESOURCE_URI_INVALID,
+            format!("uri must have non-empty scheme and path, got: {uri}"),
+            "mcp",
+            ErrorSourceKind::UserInput,
+            false,
+            None,
+        ));
+    }
+    Ok((scheme, rest))
+}
+
+// ===== JSON-RPC 2.0 入口(per Phase D.5+ 接口契约, 委托给 handler) =====
+
+/// 处理 `resources/list` 请求 — 返回 4 个 resource 描述
+pub(crate) fn handle_resources_list(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRpcError> {
+    let handler = ResourcesHandler::new();
+    let resources = handler.list();
+    let result = json!({ "resources": resources });
     Ok(JsonRpcSuccess { jsonrpc: "2.0", id: req.id.clone(), result })
 }
 
-// 错误构造 helpers (与 transport.rs 保持一致)
-fn err_invalid_params(msg: &str, id: &Value) -> JsonRpcError {
-    JsonRpcError {
-        jsonrpc: "2.0",
-        id: id.clone(),
-        error: JsonRpcErrorBody {
-            code: error_code::INVALID_PARAMS,
-            message: msg.to_string(),
-            data: None,
-        },
-    }
-}
+/// 处理 `resources/read` 请求
+///
+/// 期望 params = { "uri": "<scheme>://<path>" }
+pub(crate) async fn handle_resources_read(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRpcError> {
+    let uri = req
+        .params
+        .get("uri")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            JsonRpcError {
+                jsonrpc: "2.0",
+                id: req.id.clone(),
+                error: JsonRpcErrorBody {
+                    code: crate::transport::error_code::INVALID_PARAMS,
+                    message: "missing 'uri' in params".to_string(),
+                    data: None,
+                },
+            }
+        })?;
 
-fn err_internal(msg: &str, id: &Value) -> JsonRpcError {
-    JsonRpcError {
-        jsonrpc: "2.0",
-        id: id.clone(),
-        error: JsonRpcErrorBody {
-            code: error_code::INTERNAL_ERROR,
-            message: msg.to_string(),
-            data: None,
-        },
+    let handler = ResourcesHandler::new();
+    match handler.read(uri).await {
+        Ok(result) => Ok(JsonRpcSuccess { jsonrpc: "2.0", id: req.id.clone(), result }),
+        Err(e) => Err(JsonRpcError {
+            jsonrpc: "2.0",
+            id: req.id.clone(),
+            error: JsonRpcErrorBody {
+                code: crate::transport::error_code::INVALID_PARAMS,
+                message: e.to_string(),
+                data: serde_json::to_value(&e).ok(),
+            },
+        }),
     }
 }
 
@@ -136,8 +328,136 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    fn handler() -> ResourcesHandler {
+        ResourcesHandler::new()
+    }
+
+    // ===== 1. workspace://current =====
+
     #[tokio::test]
-    async fn test_resources_list_returns_16() {
+    async fn test_read_workspace_current_returns_summary() {
+        let h = handler();
+        let v = h.read("workspace://current").await.unwrap();
+        let contents = v.get("contents").unwrap().as_array().unwrap();
+        assert_eq!(contents.len(), 1);
+        let item = &contents[0];
+        assert_eq!(item.get("uri").unwrap().as_str().unwrap(), "workspace://current");
+        assert_eq!(item.get("mimeType").unwrap().as_str().unwrap(), "application/json");
+        let text = item.get("text").unwrap().as_str().unwrap();
+        let parsed: Value = serde_json::from_str(text).unwrap();
+        assert_eq!(parsed.get("schema_version").unwrap().as_str().unwrap(), "agent-api/v1");
+        let workspace = parsed.get("workspace").unwrap();
+        assert_eq!(workspace.get("id").unwrap().as_str().unwrap(), "ws-current");
+        assert!(parsed.get("_mock").unwrap().as_bool().unwrap(), "must be marked _mock");
+    }
+
+    // ===== 2. worktree://{id} =====
+
+    #[tokio::test]
+    async fn test_read_worktree_returns_mock() {
+        let h = handler();
+        let v = h.read("worktree://wt-STAR-1024").await.unwrap();
+        let contents = v.get("contents").unwrap().as_array().unwrap();
+        let text = contents[0].get("text").unwrap().as_str().unwrap();
+        let parsed: Value = serde_json::from_str(text).unwrap();
+        let wt = parsed.get("worktree").unwrap();
+        assert_eq!(wt.get("id").unwrap().as_str().unwrap(), "wt-STAR-1024");
+        assert_eq!(wt.get("status").unwrap().as_str().unwrap(), "open");
+    }
+
+    #[tokio::test]
+    async fn test_read_worktree_empty_id_rejected() {
+        let h = handler();
+        let err = h.read("worktree://").await.unwrap_err();
+        // parse_uri 早于 read_worktree 拦截 empty path → RESOURCE_URI_INVALID
+        assert_eq!(err.code, error_code::RESOURCE_URI_INVALID);
+        assert_eq!(err.source_kind, ErrorSourceKind::UserInput);
+    }
+
+    // ===== 3. agent://{id}/state =====
+
+    #[tokio::test]
+    async fn test_read_agent_state_returns_lease_info() {
+        let h = handler();
+        let v = h.read("agent://agent-1/state").await.unwrap();
+        let text = v.get("contents").unwrap().as_array().unwrap()[0]
+            .get("text").unwrap().as_str().unwrap();
+        let parsed: Value = serde_json::from_str(text).unwrap();
+        let agent = parsed.get("agent").unwrap();
+        assert_eq!(agent.get("id").unwrap().as_str().unwrap(), "agent-1");
+        assert!(agent.get("state").is_some());
+        assert!(agent.get("lease_expires_at").is_some(), "ADR-0030 lease field");
+    }
+
+    #[tokio::test]
+    async fn test_read_agent_state_wrong_suffix_rejected() {
+        let h = handler();
+        let err = h.read("agent://agent-1/foo").await.unwrap_err();
+        assert_eq!(err.code, error_code::RESOURCE_URI_INVALID);
+        assert!(err.hint.is_some());
+    }
+
+    // ===== 4. decision://{id} =====
+
+    #[tokio::test]
+    async fn test_read_decision_returns_mock() {
+        let h = handler();
+        let v = h.read("decision://dec-001").await.unwrap();
+        let text = v.get("contents").unwrap().as_array().unwrap()[0]
+            .get("text").unwrap().as_str().unwrap();
+        let parsed: Value = serde_json::from_str(text).unwrap();
+        let dec = parsed.get("decision").unwrap();
+        assert_eq!(dec.get("id").unwrap().as_str().unwrap(), "dec-001");
+        assert!(parsed.get("_mock").unwrap().as_bool().unwrap());
+    }
+
+    // ===== 错误路径 / URI 解析 =====
+
+    #[tokio::test]
+    async fn test_read_unsupported_scheme_rejected() {
+        let h = handler();
+        let err = h.read("http://example.com/").await.unwrap_err();
+        assert_eq!(err.code, error_code::RESOURCE_URI_INVALID);
+        assert!(err.message.contains("http"));
+    }
+
+    #[tokio::test]
+    async fn test_read_missing_scheme_separator_rejected() {
+        let h = handler();
+        let err = h.read("not-a-uri").await.unwrap_err();
+        assert_eq!(err.code, error_code::RESOURCE_URI_INVALID);
+    }
+
+    // ===== resources/list 入口测试 =====
+
+    #[tokio::test]
+    async fn test_list_returns_4_resources() {
+        let h = handler();
+        let resources = h.list();
+        assert_eq!(resources.len(), 4, "4 core resources per Phase E");
+        // 校验 4 个 URI scheme
+        let uris: Vec<&str> = resources.iter()
+            .map(|r| r.get("uri").unwrap().as_str().unwrap())
+            .collect();
+        assert!(uris.contains(&"workspace://current"));
+        assert!(uris.iter().any(|u| u.starts_with("worktree://")));
+        assert!(uris.iter().any(|u| u.starts_with("agent://")));
+        assert!(uris.iter().any(|u| u.starts_with("decision://")));
+    }
+
+    #[tokio::test]
+    async fn test_list_includes_mimetype() {
+        let h = handler();
+        let resources = h.list();
+        for r in &resources {
+            assert_eq!(r.get("mimeType").unwrap().as_str().unwrap(), "application/json");
+        }
+    }
+
+    // ===== JSON-RPC 入口测试(委托给 handler) =====
+
+    #[tokio::test]
+    async fn test_handle_resources_list_jsonrpc_entry() {
         let req = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
             id: json!(1),
@@ -145,76 +465,52 @@ mod tests {
             params: json!({}),
         };
         let res = handle_resources_list(&req).unwrap();
-        let resources = res.result.get("resources").unwrap().as_array().unwrap();
-        assert_eq!(resources.len(), 16, "16 tool resources per P1-F + submit");
-
-        // 验证 URI 前缀 + name
-        let first = &resources[0];
-        assert_eq!(
-            first.get("uri").unwrap().as_str().unwrap(),
-            "star://tools/get_issue"
-        );
-        assert_eq!(first.get("name").unwrap().as_str().unwrap(), "get_issue");
-        assert_eq!(first.get("mimeType").unwrap().as_str().unwrap(), "application/json");
+        let arr = res.result.get("resources").unwrap().as_array().unwrap();
+        assert_eq!(arr.len(), 4);
     }
 
     #[tokio::test]
-    async fn test_resources_read_known_tool() {
+    async fn test_handle_resources_read_jsonrpc_entry() {
         let req = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
             id: json!(2),
             method: "resources/read".to_string(),
-            params: json!({ "uri": "star://tools/submit" }),
+            params: json!({ "uri": "workspace://current" }),
         };
-        let res = handle_resources_read(&req).unwrap();
+        let res = handle_resources_read(&req).await.unwrap();
         let contents = res.result.get("contents").unwrap().as_array().unwrap();
         assert_eq!(contents.len(), 1);
-        let item = &contents[0];
-        assert_eq!(item.get("uri").unwrap().as_str().unwrap(), "star://tools/submit");
-        let text = item.get("text").unwrap().as_str().unwrap();
-        // text 是 tool 描述 JSON, 必含 name + inputSchema
-        let parsed: Value = serde_json::from_str(text).unwrap();
-        assert_eq!(parsed.get("name").unwrap().as_str().unwrap(), "submit");
-        assert!(parsed.get("inputSchema").is_some());
     }
 
     #[tokio::test]
-    async fn test_resources_read_unknown_uri() {
+    async fn test_handle_resources_read_missing_uri() {
         let req = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
             id: json!(3),
             method: "resources/read".to_string(),
-            params: json!({ "uri": "star://tools/nonexistent" }),
+            params: json!({}),
         };
-        let res = handle_resources_read(&req);
+        let res = handle_resources_read(&req).await;
         assert!(res.is_err());
         let err = res.unwrap_err();
-        assert_eq!(err.error.code, error_code::INVALID_PARAMS);
+        assert_eq!(err.error.code, crate::transport::error_code::INVALID_PARAMS);
     }
 
     #[tokio::test]
-    async fn test_resources_read_wrong_prefix() {
+    async fn test_handle_resources_read_error_has_data_envelope() {
+        // per spec/mcp/01 §3.2: error.data 应含 6 字段 agent-api/v1#Error
         let req = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
             id: json!(4),
             method: "resources/read".to_string(),
-            params: json!({ "uri": "http://example.com/foo" }),
+            params: json!({ "uri": "http://invalid" }),
         };
-        let res = handle_resources_read(&req);
+        let res = handle_resources_read(&req).await;
         assert!(res.is_err());
-        assert_eq!(res.unwrap_err().error.code, error_code::INVALID_PARAMS);
-    }
-
-    #[tokio::test]
-    async fn test_resources_read_missing_uri() {
-        let req = JsonRpcRequest {
-            jsonrpc: "2.0".to_string(),
-            id: json!(5),
-            method: "resources/read".to_string(),
-            params: json!({}),
-        };
-        let res = handle_resources_read(&req);
-        assert!(res.is_err());
-        assert_eq!(res.unwrap_err().error.code, error_code::INVALID_PARAMS);
+        let err = res.unwrap_err();
+        assert!(err.error.data.is_some(), "error.data must contain 6-field Error");
+        let data = err.error.data.unwrap();
+        assert!(data.get("code").is_some());
+        assert!(data.get("source_kind").is_some());
     }
 }

@@ -16,7 +16,7 @@ use crate::tools::{mock_response, optional_string, require_string};
 
 /// `search_code` tool stub
 pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
-    let query = require_string(&args, "query").map_err(McpError::BadRequest)?;
+    let query = require_string(&args, "query").map_err(McpError::validation)?;
     let limit = args
         .get("limit")
         .and_then(serde_json::Value::as_u64)

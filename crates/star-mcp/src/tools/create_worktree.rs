@@ -16,7 +16,7 @@ use crate::tools::{mock_response, optional_string, require_string};
 
 /// `create_worktree` tool stub
 pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
-    let issue_id = require_string(&args, "issue_id").map_err(McpError::BadRequest)?;
+    let issue_id = require_string(&args, "issue_id").map_err(McpError::validation)?;
     let branch =
         optional_string(&args, "branch_name").unwrap_or_else(|| format!("feature/{issue_id}"));
     let wt_id = format!("wt-{issue_id}");

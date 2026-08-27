@@ -59,7 +59,14 @@ struct AppState {
 pub(crate) async fn run_http_server(bind_addr: &str) -> Result<(), McpError> {
     let app = build_router();
     let listener = TcpListener::bind(bind_addr).await.map_err(|e| {
-        McpError::BadRequest(format!("failed to bind to {bind_addr}: {e}"))
+        McpError::new(
+            crate::error::error_code::IO,
+            format!("failed to bind to {bind_addr}: {e}"),
+            "mcp",
+            crate::error::ErrorSourceKind::External,
+            true,
+            Some(format!("check if {bind_addr} is free (port in use?)")),
+        )
     })?;
     eprintln!("star-mcp: Streamable HTTP server listening on http://{bind_addr}/");
     eprintln!("star-mcp: POST JSON-RPC 2.0 requests to / (returns text/event-stream SSE)");
@@ -67,7 +74,16 @@ pub(crate) async fn run_http_server(bind_addr: &str) -> Result<(), McpError> {
 
     axum::serve(listener, app)
         .await
-        .map_err(|e| McpError::BadRequest(format!("axum::serve error: {e}")))?;
+        .map_err(|e| {
+            McpError::new(
+                crate::error::error_code::IO,
+                format!("axum::serve error: {e}"),
+                "mcp",
+                crate::error::ErrorSourceKind::External,
+                true,
+                None,
+            )
+        })?;
     Ok(())
 }
 
@@ -198,8 +214,11 @@ mod tests {
         let body_bytes = to_bytes(response.into_body(), 4096).await.unwrap();
         let s = String::from_utf8(body_bytes.to_vec()).unwrap();
         assert!(s.contains("\"resources\""));
-        assert!(s.contains("\"uri\":\"star://tools/get_issue\""));
-        assert!(s.contains("\"uri\":\"star://tools/submit\""));
+        // Phase E 4 核心 resource URI(per task brief): workspace/worktree/agent/decision
+        assert!(s.contains("\"uri\":\"workspace://current\""));
+        assert!(s.contains("\"uri\":\"worktree://"));
+        assert!(s.contains("\"uri\":\"agent://"));
+        assert!(s.contains("\"uri\":\"decision://"));
     }
 
     #[tokio::test]
@@ -214,9 +233,12 @@ mod tests {
             .unwrap();
         let response = app.oneshot(req).await.unwrap();
         assert_eq!(response.status(), AxStatus::OK);
-        let body_bytes = to_bytes(response.into_body(), 1024).await.unwrap();
+        let body_bytes = to_bytes(response.into_body(), 4096).await.unwrap();
         let s = String::from_utf8(body_bytes.to_vec()).unwrap();
-        assert!(s.contains("\"prompts\":[]"));
+        // Phase E: 5 prompts (submit, review, context, workflow, debug), not 0
+        assert!(s.contains("\"prompts\""));
+        assert!(s.contains("\"name\":\"submit\""));
+        assert!(s.contains("\"name\":\"debug\""));
     }
 
     #[tokio::test]

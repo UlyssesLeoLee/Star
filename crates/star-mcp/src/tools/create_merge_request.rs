@@ -16,9 +16,9 @@ use crate::tools::{mock_response, require_string};
 
 /// `create_merge_request` tool
 pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
-    let title = require_string(&args, "title").map_err(McpError::BadRequest)?;
-    let base = require_string(&args, "base").map_err(McpError::BadRequest)?;
-    let head = require_string(&args, "head").map_err(McpError::BadRequest)?;
+    let title = require_string(&args, "title").map_err(McpError::validation)?;
+    let base = require_string(&args, "base").map_err(McpError::validation)?;
+    let head = require_string(&args, "head").map_err(McpError::validation)?;
     let body = json!({
         "mr": {
             "id": "MR-mock-001",

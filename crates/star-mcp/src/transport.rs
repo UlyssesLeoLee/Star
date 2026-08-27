@@ -267,9 +267,9 @@ pub(crate) async fn handle(req: JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRp
         "tools/list" => handle_tools_list(&req),
         "tools/call" => handle_tools_call(&req).await,
         "resources/list" => resources::handle_resources_list(&req),
-        "resources/read" => resources::handle_resources_read(&req),
+        "resources/read" => resources::handle_resources_read(&req).await,
         "prompts/list" => prompts::handle_prompts_list(&req),
-        "prompts/get" => prompts::handle_prompts_get(&req),
+        "prompts/get" => prompts::handle_prompts_get(&req).await,
         method => Err(error(method_not_found(method), req.id.clone())),
     }
 }
@@ -311,7 +311,20 @@ async fn handle_tools_call(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonR
         .unwrap_or_else(|| json!({}));
 
     // 路由到 16 tool
-    let tool_result = dispatch(&name, arguments).await.map_err(|e| error(JsonRpcErrorBody { code: error_code::INTERNAL_ERROR, message: e.to_string(), data: None }, req.id.clone()))?;
+    // per spec/mcp/01 §3.2: error.data = 完整 agent-api/v1#Error 6 字段(per F-06 修复)
+    let tool_result = dispatch(&name, arguments)
+        .await
+        .map_err(|e| {
+            let data = serde_json::to_value(&e).ok();
+            error(
+                JsonRpcErrorBody {
+                    code: error_code::INTERNAL_ERROR,
+                    message: e.to_string(),
+                    data,
+                },
+                req.id.clone(),
+            )
+        })?;
 
     // tools/call 响应: { content: [{type: "text", text: "<JSON 字符串>"}], isError: false }
     let result = json!({
@@ -346,7 +359,7 @@ async fn dispatch(tool: &str, args: Value) -> Result<Value, McpError> {
         "run_validation" => tools::run_validation::invoke(args).await,
         "get_pipeline_status" => tools::get_pipeline_status::invoke(args).await,
         "submit" => tools::submit::invoke(args).await,
-        unknown => Err(McpError::UnknownTool(unknown.to_string())),
+        unknown => Err(McpError::unknown_tool(unknown)),
     }
 }
 

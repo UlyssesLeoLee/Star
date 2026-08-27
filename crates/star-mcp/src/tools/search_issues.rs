@@ -16,7 +16,7 @@ use crate::tools::{mock_response, require_string};
 
 /// `search_issues` tool stub
 pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
-    let query = require_string(&args, "query").map_err(McpError::BadRequest)?;
+    let query = require_string(&args, "query").map_err(McpError::validation)?;
     let body = json!({
         "query": query,
         "total": 2,
