@@ -1,19 +1,21 @@
-//! `star-mcp` JSON-RPC 2.0 transport + 3 MCP 标准方法
+//! `star-mcp` JSON-RPC 2.0 transport + MCP 标准方法
 //!
 //! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §1 + 2026-07-28 关键变更
 //!
-//! ## Phase D.3 实装
+//! ## Phase D.3 + D.5+ 实装
 //!
 //! - JSON-RPC 2.0 协议 (id / method / params / result / error)
-//! - 3 个标准方法: `initialize` / `tools/list` / `tools/call`
+//! - 7 个 MCP 标准方法: `initialize` / `tools/list` / `tools/call` /
+//!   `resources/list` / `resources/read` / `prompts/list` / `prompts/get`
 //! - 5 个错误码: -32700 / -32600 / -32601 / -32602 / -32603
 //! - 16 tool inputSchema (复用 mod.rs 现有 16 tool invoke)
+//! - capabilities 含 `tools` + `resources` + `prompts` (per 2025-06-27 spec)
 //! - **不**依赖 rmcp (per 任务 brief 极简骨架约束)
 //!
 //! ## 守门规则
 //!
 //! - 0 unsafe
-//! - 0 新外部依赖
+//! - Phase D.5+ 在 Cargo.toml 新增 axum + tokio-stream 依赖 (D.3 的 0 新外部依赖已不适用)
 //! - RUSTFLAGS=-D warnings 必 pass
 
 #![warn(missing_docs)]
@@ -24,6 +26,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::error::McpError;
+use crate::prompts;
+use crate::resources;
 use crate::tools;
 
 /// JSON-RPC 2.0 request
@@ -262,15 +266,23 @@ pub(crate) async fn handle(req: JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRp
         "initialize" => handle_initialize(&req),
         "tools/list" => handle_tools_list(&req),
         "tools/call" => handle_tools_call(&req).await,
+        "resources/list" => resources::handle_resources_list(&req),
+        "resources/read" => resources::handle_resources_read(&req),
+        "prompts/list" => prompts::handle_prompts_list(&req),
+        "prompts/get" => prompts::handle_prompts_get(&req),
         method => Err(error(method_not_found(method), req.id.clone())),
     }
 }
 
 fn handle_initialize(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRpcError> {
+    // capabilities: tools + resources + prompts (per 2025-06-27 MCP spec)
+    // Phase D.5+ 把 resources + prompts 加进 capabilities (per 任务 brief)
     let result = json!({
         "protocolVersion": "2025-06-27",
         "capabilities": {
-            "tools": {}
+            "tools": {},
+            "resources": {},
+            "prompts": {}
         },
         "serverInfo": {
             "name": "star-mcp",
@@ -430,6 +442,12 @@ mod tests {
         assert_eq!(result.get("protocolVersion").unwrap().as_str().unwrap(), "2025-06-27");
         assert!(result.get("capabilities").is_some());
         assert!(result.get("serverInfo").is_some());
+
+        // Phase D.5+: capabilities 必含 tools + resources + prompts
+        let capabilities = result.get("capabilities").unwrap().as_object().unwrap();
+        assert!(capabilities.contains_key("tools"), "tools capability missing");
+        assert!(capabilities.contains_key("resources"), "resources capability missing");
+        assert!(capabilities.contains_key("prompts"), "prompts capability missing");
     }
 
     #[tokio::test]

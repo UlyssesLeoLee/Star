@@ -6,7 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "STAR MCP server — Phase D 骨架(16 tool stubs)"
+description = "STAR MCP server — Phase D.5+ (stdio + Streamable HTTP + Resources + Prompts)"
 
 [[bin]]
 name = "star-mcp"
@@ -18,8 +18,15 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+# Phase D.5+:Streamable HTTP transport (per 2025-06-27 MCP spec)
+axum = "0.8"
+tokio-stream = "0.1"
 # Phase D 骨架:不引入 rmcp(避免 beta 风险,per spec §1 transport 选择)
-# MCP transport 留 TODO,仅 stub JSON-RPC 请求/响应
+# MCP transport 由 D.3 (stdio) + D.5+ (Streamable HTTP) 自行实装, 不依赖 rmcp
+
+[dev-dependencies]
+# axum::Router::oneshot 测试 helper (per transport_http.rs tests)
+tower = { version = "0.5", features = ["util"] }
 
 [lints]
 workspace = true
