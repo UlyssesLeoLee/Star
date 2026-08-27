@@ -33,8 +33,11 @@ members = [
     "crates/star-cli",
     "crates/star-mcp",
     "crates/star-context",
-    # Phase F 骨架: 2026-08-27 新增 crates/star-sa
+    # Phase F 骨架: 2026-08-27 新增 crates/star-sa (4 Git Provider)
     "crates/star-sa",
+    # Phase F 骨架:2026-08-27 新增 2 crate (SSE + Webhook)
+    "crates/star-sse",
+    "crates/star-webhook",
 ]
 exclude = ["target"]
 
@@ -73,6 +76,11 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-r
 
 # Tracing
 tracing = "0.1"
+
+# 加密(Phase F webhook 签名验证使用)
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
 
 [profile.release]
 lto = "thin"
