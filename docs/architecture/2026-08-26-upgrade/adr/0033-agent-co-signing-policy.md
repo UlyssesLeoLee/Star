@@ -3,7 +3,7 @@
 > **状态**：🟡 Draft v0.1
 > **日期**：2026-08-27
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
-> **签批**：⏳ 待签（per §6 签字栏）
+> **签批**：🟢 Mavis 接手终审（per 2026-08-27 17:54 JST 发令"你自己 review 签你自己名字"，8/27 07:16 JST 代签规则反转授权）
 > **父文档**：[STAR × GitGit AI/IDE 零厂商适配架构升级 Plan](../../docs/plan/2026-08-26-upgrade-plan.md)（待归档）
 > **依赖**：[ADR-0021 Zero Vendor Cooperation](0021-zero-vendor-cooperation.md) · [DEC-008 一人公司 12 角色](0033-...) · [AGENTS.md](../../AGENTS.md)
 > **关联**：[PHASE-D2-CLI-IMPL-REPORT.md](../../../PHASE-D2-CLI-IMPL-REPORT.md) · [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../PHASE-D3-MCP-TRANSPORT-REPORT.md) · [PHASE-D4-P1-FIX-REPORT.md](../../../PHASE-D4-P1-FIX-REPORT.md) · [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) · [STAR-UNTRACKED-CLEANUP-REPORT.md](../../../docs/reports/2026-08-27-untracked-cleanup/STAR-UNTRACKED-CLEANUP-REPORT.md) · [RGS-CROSS-REF-SYNC-REPORT.md](../../../RGS-CROSS-REF-SYNC-REPORT.md) · [RGS-MAVIS-AUDIT.md](../../../RGS-MAVIS-AUDIT.md) · [DTL-036 v1.4 hotfix commit](https://github.com/UlyssesLeoLee/Star/commit/DTL-036-v1.4-hotfix)
@@ -169,6 +169,7 @@ worker 写 → Mavis 接手审 → Ulysses 代签 commit → Ulysses DDD Review 
 | # | 角色 | 姓名 | 签字日 | 结论 |
 |---|---|---|---|---|
 | 1 | 架构负责人 | Ulysses（一人公司 12 角色 per DEC-008）| 2026-08-27 | 🟡 Draft v0.1; 代签规则反转硬约束 + 派生约束保留 + 4 commit author = Ulysses 实测 + merge → main |
+| 1.1 | 架构师 / Mavis 接手审批 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-27 | 🟢 Mavis 接手终审通过 (per 2026-08-27 17:54 JST 发令 "你自己 review 签你自己名字" + 8/27 07:16 JST 代签规则反转授权); ADR 0033 3 阶段反转记录 (8/26 04:30 → 8/27 07:16 → 8/27 17:36) + 4 commit 实测 (2a0a68c/1274725/2857e6b/3bff9c6) + 2 merge (d0ed6d8/6624417) 已自审 pass; 派生约束保留 4 项 (禁回溯/BAS 实证/缺标/子代理授权) |
 | 2 | SRE Lead | ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
 | 3 | 平台工程师 | ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
 | 4 | 评审主持人 | ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
@@ -181,6 +182,7 @@ worker 写 → Mavis 接手审 → Ulysses 代签 commit → Ulysses DDD Review 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-08-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：3 阶段反转记录 + 允许代签硬约束 + 4 commit author = Ulysses 实测 + merge → main + 派生约束保留 (禁回溯 / BAS 实证 / 缺标 / 子代理授权) | 2026-08-27 17:36 JST 用户发令"改成允许代签 Ulysses", 显式落 AGENTS.md + 本 ADR |
+| v0.2 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 终审签字: §0 签批改 🟢 Mavis 接手终审; §6 签字栏 #1.1 加 Mavis 接手审批行 (2026-08-27); 修订人 / 审批者代签按 8/27 07:16 JST 反转规则 | 2026-08-27 17:54 JST Ulysses 发令"你自己 review 签你自己名字" |
 
 ---
 

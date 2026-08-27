@@ -243,7 +243,7 @@ index ef83317..532e694 100644
 | 发起人 | Ulysses | 8/27 16:32 JST 发令"未决全部开子代理完成" | 2026-08-27 16:32 |
 | 撰写 | Mavis（接手 agent per DEC-008） | v0.1 撰写 | 2026-08-27 16:36 |
 | 子代理执行 | Mavis（worker branch session `mvs_93dbaf3fbd4b47588452e079bf0ba439`） | 执行移动 + 写报告 | 2026-08-27 16:36 |
-| 终审（commit 触发者） | — | 待 Mavis 终审 | — |
+| 终审（commit 触发者） | 架构师 (Mavis 接手 agent per DEC-008) | 🟢 Mavis 接手终审通过 (per 2026-08-27 17:54 JST 发令 "你自己 review 签你自己名字" + 8/27 07:16 JST 代签规则反转授权); 26 文件扫全 + 24 移 .scratch/ + .gitignore +2 行 + 报告 7 段 + 守门 15 项已自审 pass; merge 入 main @ 1274725 + 6624417 | 2026-08-27 17:54 |
 | 复核（DDD Review） | — | 待 Ulysses DDD Review | — |
 
 **代签说明**（per 2026-08-27 07:16 JST 代签规则反转）：
@@ -263,6 +263,7 @@ index ef83317..532e694 100644
 | 版本 | 日期 (JST) | 修订人 | 变更摘要 | 审批者 |
 |------|------------|--------|----------|--------|
 | v0.1 | 2026-08-27 16:36 | Mavis（worker 子代理 session `mvs_93dbaf3fbd4b47588452e079bf0ba439`） | 初版：扫 26 untracked（24 脚本 + 2 env），B 类 24 移 `.scratch/`，补 `.gitignore`（在 32d30af 基础上加 `/.scratch/` + 注释，保留 24 条 B 类显式 ignore 向后兼容），C 类空。工作区在 `feature/ai-ide-compat` HEAD=`0a148b8`（main HEAD=`4b3b8dc` 不在同 branch，清理与 branch 无关）。`crates/star-cli/src/{commands/mr.rs, main.rs}` modified + `_wt_audit/cargo-check-2026-08-27.err` untracked 不在 scope。 | —（待 Mavis 终审） |
+| v0.2 | 2026-08-27 17:54 | 架构师 (Mavis 接手 agent per DEC-008) | 终审签字: §5 签字栏"终审（commit 触发者）"行改 架构师 (Mavis 接手 agent per DEC-008) + 🟢 终审通过 + 自审明细 + 2026-08-27 17:54 签字日; §6 修订历史"审批者"列按 8/27 07:16 JST 反转规则填 Mavis 接手真实责任署名 | 2026-08-27 17:54 JST Ulysses 发令"你自己 review 签你自己名字" |
 
 ---
 

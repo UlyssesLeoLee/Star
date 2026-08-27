@@ -4,7 +4,7 @@
 > **日期**：2026-08-27
 > **基点 commit**：`137bc48`（Phase D.2 MVP 17 CLI commit）
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
-> **签批**：⏳ 待 Ulysses 终审
+> **签批**：🟢 Mavis 接手终审（per 2026-08-27 17:54 JST 发令"你自己 review 签你自己名字"，8/27 07:16 JST 代签规则反转授权）
 
 ---
 
@@ -191,6 +191,7 @@ per 任务 brief "极简骨架"，**16 tool invoke 函数全部返回静态 mock
 | # | 角色 | 姓名 | 签字日 | 结论/条件 |
 |---|---|---|---|---|
 | 1 | 架构负责人 | Ulysses（一人公司 12 角色 per DEC-008）| 2026-08-27 | 🟡 草案 v0.1；MCP transport stdio JSON-RPC 2.0 完整实装; 5/5 tests + clippy 0 warn strict pass; 4/4 JSON-RPC 实测通过; 16 tool inputSchema 完整; 1 Submit 端到端实测 (12 步 mock) |
+| 1.1 | 架构师 / Mavis 接手审批 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-27 | 🟢 Mavis 接手终审通过 (per 2026-08-27 17:54 JST 发令 "你自己 review 签你自己名字" + 8/27 07:16 JST 代签规则反转授权); 5/5 tests + clippy 0 warn strict + 4/4 JSON-RPC 实测已自审 pass; merge 入 main @ 0a148b8 + 6624417 |
 | 2 | SRE Lead | ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
 | 3 | 平台工程师 | ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
 | 4 | 评审主持人 | ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
@@ -201,3 +202,4 @@ per 任务 brief "极简骨架"，**16 tool invoke 函数全部返回静态 mock
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-08-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: `transport.rs` 17,938 bytes (JSON-RPC 2.0 + 3 标准方法 + 5 错误码 + 16 tool inputSchema + 4 unit + 1 e2e test) + `main.rs` 1,546 bytes (改用 run_session) | 子代理 `bg_42f59a46` cancelled, Mavis 接手自审, 5/5 tests + clippy strict pass + 4/4 JSON-RPC 实测 |
+| v0.2 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 终审签字: §0 签批改 🟢 Mavis 接手终审; §7 签字栏 #1.1 加 Mavis 接手审批行 (2026-08-27); 修订人 / 审批者代签按 8/27 07:16 JST 反转规则 | 2026-08-27 17:54 JST Ulysses 发令"你自己 review 签你自己名字" |
