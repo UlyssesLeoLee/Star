@@ -31,8 +31,10 @@ members = [
     "crates/infrastructure",
     # Phase D 骨架:2026-08-27 新增 3 crate
     "crates/star-cli",
-    "crates/star-mcp",
     "crates/star-context",
+    # Phase G 骨架:2026-08-27 新增 crates/star-saga (Saga orchestrator + Q-003 跨域协调)
+    "crates/star-saga",
+    "crates/star-mcp",
     # Phase F 骨架: 2026-08-27 新增 crates/star-sa (4 Git Provider)
     "crates/star-sa",
     # Phase F 骨架:2026-08-27 新增 2 crate (SSE + Webhook)

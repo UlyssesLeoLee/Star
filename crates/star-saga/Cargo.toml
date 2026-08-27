@@ -1,0 +1,15 @@
+[package]
+name = "star-saga"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "STAR Saga orchestrator (Phase G) — per spec/saga/01 + Q-003 跨域协调"
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+[lints]
+workspace = true
