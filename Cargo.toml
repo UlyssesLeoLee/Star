@@ -29,6 +29,8 @@ members = [
     "crates/domain-workspace",
     "crates/domain-worktree",
     "crates/infrastructure",
+    # Phase G 骨架:2026-08-28 新增 crates/star-cache (Cache 抽象 + InMemory + Redis stub)
+    "crates/star-cache",
     # Phase D 骨架:2026-08-27 新增 3 crate
     "crates/star-cli",
     "crates/star-mcp",
