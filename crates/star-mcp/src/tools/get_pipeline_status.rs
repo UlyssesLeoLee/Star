@@ -16,7 +16,7 @@ use crate::tools::{mock_response, require_string};
 
 /// `get_pipeline_status` tool
 pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
-    let pipeline_run_id = require_string(&args, "pipeline_run_id").map_err(McpError::BadRequest)?;
+    let pipeline_run_id = require_string(&args, "pipeline_run_id").map_err(McpError::validation)?;
     let body = json!({
         "pipeline": {
             "id": pipeline_run_id,

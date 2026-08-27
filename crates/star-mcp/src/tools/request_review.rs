@@ -16,7 +16,7 @@ use crate::tools::{mock_response, require_string};
 
 /// `request_review` tool
 pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
-    let mr_id = require_string(&args, "mr_id").map_err(McpError::BadRequest)?;
+    let mr_id = require_string(&args, "mr_id").map_err(McpError::validation)?;
     let body = json!({
         "review": {
             "id": "REV-mock-001",

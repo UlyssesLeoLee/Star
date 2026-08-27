@@ -20,7 +20,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
         .get("file")
         .and_then(serde_json::Value::as_str)
         .map(str::to_string)
-        .ok_or_else(|| McpError::BadRequest("missing 'file'".to_string()))?;
+        .ok_or_else(|| McpError::validation("missing 'file'".to_string()))?;
     let range = args
         .get("range")
         .cloned()

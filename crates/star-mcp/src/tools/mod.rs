@@ -4,7 +4,7 @@
 //!
 //! Phase D 行为:
 //! - 真实 schema 返回(per `agent-api/v1`)
-//! - 解析 `args` 拿必填字段(缺字段 → McpError::BadRequest)
+//! - 解析 `args` 拿必填字段(缺字段 → McpError::validation)
 //! - 返回 mock 数据
 //! - 不实现真实业务逻辑(Phase D.1 补齐)
 

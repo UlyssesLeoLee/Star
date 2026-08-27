@@ -16,7 +16,7 @@ use crate::tools::{mock_response, require_string};
 
 /// `get_issue` tool stub
 pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
-    let issue_id = require_string(&args, "issue_id").map_err(McpError::BadRequest)?;
+    let issue_id = require_string(&args, "issue_id").map_err(McpError::validation)?;
     let body = json!({
         "issue": {
             "id": issue_id,

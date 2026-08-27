@@ -1,8 +1,8 @@
-//! `star-mcp` MCP server (Phase D.5+: stdio + Streamable HTTP + Resources + Prompts)
+//! `star-mcp` MCP server (Phase E: stdio + Streamable HTTP + Resources + Prompts + 6-field error model)
 //!
-//! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md`
+//! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §1-§5
 //!
-//! ## Phase D.5+ 实装
+//! ## Phase E 实装
 //!
 //! - **stdio transport** (Phase D.3): `JSON-RPC 2.0` over stdin/stdout
 //! - **Streamable HTTP transport** (Phase D.5+): `JSON-RPC 2.0` over `POST /` + SSE response
@@ -10,7 +10,13 @@
 //!   `resources/list` / `resources/read` / `prompts/list` / `prompts/get`
 //! - capabilities: `tools` + `resources` + `prompts` (per 2025-06-27 spec)
 //! - 16 tool (per P1-F + submit) 通过 transport dispatch
-//! - 5 个错误码: -32700 / -32600 / -32601 / -32602 / -32603
+//! - 4 个 resource (Phase E per task brief):
+//!   - `workspace://current` · `worktree://{id}` · `agent://{id}/state` · `decision://{id}`
+//! - 5 个 prompt (Phase E per task brief):
+//!   - `submit` · `review` · `context` · `workflow` · `debug`
+//! - 6-field 错误模型 (per `agent-api/v1#Error` §3.14, F-06 修复):
+//!   `code` / `message` / `source_module` / `source_kind` / `retriable` / `hint`
+//! - 24 个 SCREAMING_SNAKE_CASE 错误码 (per `error_code` 模块)
 //! - **不**依赖 rmcp (per 任务 brief 极简骨架约束)
 //!
 //! ## CLI
@@ -30,6 +36,13 @@
 //! get_context / create_merge_request / request_review / run_validation /
 //! get_pipeline_status / submit
 //!
+//! ## Phase E handler 集成
+//!
+//! - `ResourcesHandler` (unit struct) — `crates/star-mcp/src/resources.rs`
+//!   - 真实数据源依赖 (Phase F) 占位字段已声明, mock 数据标 `_mock: true` + `_todo: ...`
+//! - `PromptsHandler` (unit struct) — `crates/star-mcp/src/prompts.rs`
+//!   - 5 个模板覆盖 spec/flows 关键路径, 模板内联 mock-but-functional 渲染
+//!
 //! ## 守门规则
 //!
 //! - 0 unsafe
@@ -47,6 +60,8 @@ mod transport;
 mod transport_http;
 
 pub(crate) use error::McpError;
+pub(crate) use prompts::PromptsHandler;
+pub(crate) use resources::ResourcesHandler;
 pub(crate) use transport::run_session;
 pub(crate) use transport_http::run_http_server;
 
@@ -59,21 +74,31 @@ enum Transport {
     Http,
 }
 
-/// Phase D.5+ MCP server main: 解析 CLI → 启动对应 transport
+/// Phase E MCP server main: 解析 CLI → 实例化 handlers → 启动对应 transport
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), McpError> {
     // 解析 CLI args
     let args: Vec<String> = std::env::args().skip(1).collect();
     let (transport, bind_addr) = parse_args(&args);
 
+    // Phase E: 显式实例化 Resources + Prompts handler
+    // (per task brief "在 transport.rs 初始化时注册")
+    // 当前是 unit struct, 不需要持有 config; Future Phase F 可注入 Arc<dyn ReadPort>
+    let resources_handler = ResourcesHandler::new();
+    let prompts_handler = PromptsHandler::new();
+    eprintln!(
+        "star-mcp: Phase E handlers ready (resources: {}, prompts: {})",
+        resources_handler.list().len(),
+        prompts_handler.list().len()
+    );
+
     match transport {
         Transport::Stdio => {
-            eprintln!("star-mcp: Phase D.5+ stdio transport (16 tools + Resources + Prompts, JSON-RPC 2.0)");
+            eprintln!("star-mcp: stdio transport (16 tools + 4 resources + 5 prompts, JSON-RPC 2.0, 6-field error)");
             let stdin = std::io::stdin();
             let stdout = std::io::stdout();
             run_session(stdin.lock(), stdout.lock())
-                .await
-                .map_err(McpError::Io)?;
+                .await?;
         }
         Transport::Http => {
             // 优先从环境变量读 (per 任务 brief STAR_MCP_BIND_ADDR), 然后从 CLI
