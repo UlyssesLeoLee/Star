@@ -10,7 +10,19 @@ use crate::output;
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum MrCommand {
-    Create { title: String, base: String, head: String },
+    /// 创建 MR(per `spec/cli/01-cli-spec.md` §2 MVP 17 #14)
+    ///
+    /// 命名参数(per D.4 P1-2 修复):`--title <T> --base <B> --head <H>`。
+    /// 原为 positional,clap 报 `Usage: star.exe mr create <TITLE> <BASE> <HEAD>`,
+    /// 不符合 spec §3 命令风格。
+    Create {
+        #[arg(long)]
+        title: String,
+        #[arg(long)]
+        base: String,
+        #[arg(long)]
+        head: String,
+    },
     Show { id: String },
     Review { id: String },
 }

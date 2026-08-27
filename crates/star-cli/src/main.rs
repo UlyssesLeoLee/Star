@@ -18,6 +18,14 @@ use commands::{agent, code, context, issue, mr, pipeline, project, submit, task,
 #[derive(Debug, Parser)]
 #[command(name = "star", version, about, long_about = None)]
 struct Cli {
+    /// 强制 JSON 输出(per `spec/cli/01-cli-spec.md` §3 通用 flags)
+    ///
+    /// 现状:所有 MVP 17 命令已统一走 `output::json_pretty` 输出 JSON,本 flag
+    /// 仅作为 clap global arg 暴露,所有子命令接受但不分支(per D.4 P1-1 修复)。
+    #[arg(long, global = true)]
+    #[allow(dead_code)] // clap derive 内部读取,运行时不直接用
+    json: bool,
+
     #[command(subcommand)]
     command: TopCommand,
 }
