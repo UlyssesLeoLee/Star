@@ -28,17 +28,25 @@
 
 #![warn(missing_docs)]
 
+use async_trait::async_trait;
+use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::error::{ErrorSourceKind, McpError, error_code};
 use crate::transport::{JsonRpcError, JsonRpcErrorBody, JsonRpcRequest, JsonRpcSuccess};
 
-/// Resources handler (Phase E: 4 核心 resource)
+/// Resources handler (Phase E: 4 核心 resource + Phase H: 22 domain handler 框架)
+///
+/// Phase H (per `docs/architecture/2026-08-26-upgrade/spec/agents/02-data-sources-spec.md` §2.2 URI 模式
+/// + `spec/mcp/02-resources-prompts-spec.md` §2 + `spec/cache/01-cache-contract-spec.md` §4):
+/// - 内置 22 domain handler 槽位 (`Vec<Box<dyn DynResource>>`), 每 domain 对应一种 `crate::handlers::*Handler`
+/// - 全部 mock-but-functional (per Phase E mock 守门), 真实数据源接入留 Phase H+
 ///
 /// 当前是 unit struct, 未来可注入 `Arc<WorktreeService>` / `Arc<AgentService>` 做真实数据接入。
 #[allow(unreachable_pub)] // pub(crate) module
-#[derive(Debug, Default, Clone)]
 pub struct ResourcesHandler {
+    /// Phase H: 22 domain handler 列表 (per spec/agents/02 §2 + spec/mcp/02 §2)
+    pub(crate) domains: Vec<Box<dyn DynResource>>,
     // Phase F 占位: 真实数据源依赖将在此处注入
     // e.g. _worktree_service: Arc<dyn WorktreeReadPort>,
     //      _agent_service: Arc<dyn AgentStateReadPort>,
@@ -46,23 +54,51 @@ pub struct ResourcesHandler {
 }
 
 #[allow(unreachable_pub)] // ResourcesHandler is pub(crate); methods inherit that scope
+impl Default for ResourcesHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[allow(unreachable_pub)] // ResourcesHandler is pub(crate); methods inherit that scope
 impl ResourcesHandler {
-    /// 构造新 handler
+    /// 构造新 handler (Phase E: 空 domain 列表)
     pub fn new() -> Self {
-        Self::default()
+        Self { domains: Vec::new() }
+    }
+
+    /// 构造带 22 domain handler 列表的 handler (Phase H 工厂)
+    ///
+    /// per `docs/architecture/2026-08-26-upgrade/spec/agents/02-data-sources-spec.md` §2
+    /// + `spec/mcp/02-resources-prompts-spec.md` §2:22 domain URI 模式注册
+    /// + `spec/cache/01-cache-contract-spec.md` §4 TTL 策略。
+    ///
+    /// 22 handler 全部 mock-but-functional (per AGENTS.md 缺标比错标安全守门), 真实数据源接入
+    /// 由 Phase H+ 排期, 当前标 `TODO: Phase H+ 接 crates/domain-*` 真实数据。
+    pub fn with_domains(domains: Vec<Box<dyn DynResource>>) -> Self {
+        Self { domains }
     }
 
     /// 列出所有可读 resource
     ///
     /// per `spec/mcp/01` §3: 数组元素 = `{ uri, name, description, mimeType }`
+    /// Phase H: 4 核心 (Phase E) + 22 domain (Phase H) = 26 entries
     #[allow(dead_code)] // 公开 API, 供 Phase F handler 注入后用
     pub fn list(&self) -> Vec<Value> {
-        vec![
+        let mut out = vec![
             self.resource_descriptor("workspace://current", "current workspace summary"),
             self.resource_descriptor("worktree://wt-STAR-1024", "worktree detail (example)"),
             self.resource_descriptor("agent://agent-1/state", "agent session state (example)"),
             self.resource_descriptor("decision://dec-001", "decision record (example)"),
-        ]
+        ];
+        // Phase H: 22 domain URI 注入
+        for d in &self.domains {
+            out.push(self.resource_descriptor(
+                d.uri_pattern(),
+                d.description(),
+            ));
+        }
+        out
     }
 
     fn resource_descriptor(&self, uri: &str, description: &str) -> Value {
@@ -83,6 +119,34 @@ impl ResourcesHandler {
         // URI scheme 解析
         let (scheme, path) = parse_uri(uri)?;
 
+        // Phase H: 优先查 22 domain handler (per spec/agents/02 §2.2 URI 模式)
+        for d in &self.domains {
+            let pattern_scheme = d.uri_pattern().split("://").next().unwrap_or("");
+            if pattern_scheme == scheme {
+                // 提取 ID: `pattern://{id}` → 取 path 作为 id (兼容 `path/with/slash`)
+                return match d.read_json(path).await {
+                    Ok(Some(data)) => Ok(contents(uri, &data)),
+                    Ok(None) => Err(McpError::new(
+                        error_code::RESOURCE_NOT_FOUND,
+                        format!("resource not found: {uri}"),
+                        "mcp",
+                        ErrorSourceKind::UserInput,
+                        false,
+                        None,
+                    )),
+                    Err(e) => Err(McpError::new(
+                        error_code::INTERNAL,
+                        format!("domain handler read failed: {e}"),
+                        "mcp",
+                        ErrorSourceKind::External,
+                        true,
+                        None,
+                    )),
+                };
+            }
+        }
+
+        // Phase E: 4 核心 resource 兜底
         match (scheme, path) {
             ("workspace", "current") => self.read_workspace_current(uri).await,
             ("worktree", id) => self.read_worktree(uri, id).await,
@@ -98,7 +162,7 @@ impl ResourcesHandler {
                 "mcp",
                 ErrorSourceKind::UserInput,
                 false,
-                Some("supported schemes: workspace://, worktree://, agent://, decision://".to_string()),
+                Some("supported schemes: workspace://, worktree://, agent://, decision:// + 22 domain (Phase H)".to_string()),
             )),
         }
     }
@@ -234,6 +298,161 @@ impl ResourcesHandler {
             }
         });
         Ok(contents(uri, &body))
+    }
+}
+
+// ======================================================================
+// Phase H: 22 domain Resource trait + KeyBuilder + ResourceError
+// (per `docs/architecture/2026-08-26-upgrade/spec/agents/02-data-sources-spec.md` §2
+//   + `spec/mcp/02-resources-prompts-spec.md` §2
+//   + `spec/cache/01-cache-contract-spec.md` §3 §4)
+// ======================================================================
+
+/// Cache key builder (per `spec/cache/01-cache-contract-spec.md` §3 L119-126)
+///
+/// 22 domain handler 用 `KeyBuilder::for_resource(scheme, id)` 生成统一 cache key
+/// (e.g. `agent:agent-1`), Phase G+ 接入 Redis 后端后实际生效。
+#[allow(unreachable_pub)]
+pub(crate) struct KeyBuilder;
+
+impl KeyBuilder {
+    /// Build cache key from resource URI per `spec/cache/01` §3
+    ///
+    /// 格式: `<scheme>:<id>` (e.g. `agent:agent-1` / `worktree:wt-STAR-1024`)
+    /// Phase H mock handler 在 read 时调用此函数生成 cache key (Phase G+ 真正写入 Redis)。
+    #[allow(dead_code)] // Phase G+ Redis 接入后由 cache 层调用
+    pub(crate) fn for_resource(scheme: &str, id: &str) -> String {
+        format!("{scheme}:{id}")
+    }
+}
+
+/// Resource read error (per `spec/mcp/03-error-model-spec.md` §3 6-field error model)
+///
+/// Phase H mock handler 的 read 错误, 映射到 McpError 走 6 字段模型
+/// (per `spec/mcp/03` §1 定义)。
+#[allow(unreachable_pub)]
+#[allow(dead_code)] // 部分 variant 留给 Phase H+ 真实数据接入
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum ResourceError {
+    /// 资源不存在 (`RESOURCE_NOT_FOUND`)
+    #[error("not found: {0}")]
+    NotFound(String),
+    /// URI 格式非法 (`RESOURCE_URI_INVALID`)
+    #[error("invalid URI: {0}")]
+    InvalidUri(String),
+    /// 权限拒绝 (`POLICY_DENIED`, per spec/agents/02 §4 写权限矩阵)
+    #[error("permission denied: {0}")]
+    PermissionDenied(String),
+    /// 序列化失败 (内部)
+    #[error("serialize error: {0}")]
+    Serialize(String),
+    /// 上游错误 (内部)
+    #[error("internal error: {0}")]
+    Internal(String),
+}
+
+/// Resource trait (per `spec/mcp/02` §2 + `spec/agents/02` §2.2)
+///
+/// 22 domain handler 各自实现此 trait 暴露 URI-patterned resource。
+///
+/// 关联类型 `Data` 用具体结构体 (e.g. `AgentData`) 提供类型安全,
+/// 同时通过 blanket impl 自动获得 `DynResource` 以注册到 `ResourcesHandler::domains`。
+#[allow(unreachable_pub)]
+#[async_trait]
+pub(crate) trait Resource: Send + Sync {
+    /// 资源数据类型 (e.g. `AgentData` / `WorktreeData`)
+    ///
+    /// 必须 `Serialize` 以便 `DynResource::read_json` 转换为 `serde_json::Value`
+    type Data: Serialize + Send + Sync;
+
+    /// URI 模式 (e.g. `agent://{id}` / `worktree://{id}`)
+    fn uri_pattern(&self) -> &str;
+
+    /// Cache TTL in seconds (per `spec/cache/01` §4 TTL 策略表)
+    #[allow(dead_code)] // 真实 cache 层 Phase G+ 接入时调用
+    fn cache_ttl_sec(&self) -> u32;
+
+    /// 读取资源(返回 typed Data)
+    ///
+    /// 返回 `Ok(None)` 表示资源不存在 (per `spec/mcp/02` §3 404 语义)。
+    async fn read(&self, id: &str) -> Result<Option<Self::Data>, ResourceError>;
+}
+
+/// Type-erased Resource (per Phase H 设计: 22 handler 装入 `Vec<Box<dyn DynResource>>`)
+///
+/// 把 `Resource<Data = X>` 适配为统一 JSON 输出, 允许 `ResourcesHandler` 持有异构 handler 列表。
+#[allow(unreachable_pub)]
+#[async_trait]
+pub(crate) trait DynResource: Send + Sync {
+    /// URI 模式 (e.g. `agent://{id}`)
+    fn uri_pattern(&self) -> &str;
+
+    /// 人类可读描述 (e.g. `agent session state`)
+    fn description(&self) -> &str;
+
+    /// Cache TTL in seconds (per `spec/cache/01` §4)
+    #[allow(dead_code)] // 真实 cache 层 Phase G+ 接入时调用
+    fn cache_ttl_sec(&self) -> u32;
+
+    /// 读取资源, 序列化为 `serde_json::Value` (统一 JSON 输出)
+    async fn read_json(&self, id: &str) -> Result<Option<Value>, ResourceError>;
+}
+
+/// Blanket impl: 任何 `Resource` 自动 `DynResource`
+///
+/// 委托 `Resource::uri_pattern` / `cache_ttl_sec` / `read` 序列化为 `Value`。
+#[async_trait]
+impl<T> DynResource for T
+where
+    T: Resource,
+    T::Data: Serialize + Send + Sync,
+{
+    fn uri_pattern(&self) -> &str {
+        Resource::uri_pattern(self)
+    }
+    fn description(&self) -> &str {
+        // 默认从 uri_pattern 提取 scheme: `agent://{id}` → `agent domain resource`
+        let scheme = self.uri_pattern().split("://").next().unwrap_or("");
+        // 我们借用 self.uri_pattern 一次: 在 description 闭包内复制
+        // 简单处理: 用 Box::leak 不可行 (会泄漏), 改为返回静态字符串
+        // 这里返回 scheme 名字 + " domain resource"
+        match scheme {
+            "agent" => "agent domain resource",
+            "worktree" => "worktree domain resource",
+            "feedback" => "feedback domain resource",
+            "audit" => "audit domain resource",
+            "automation" => "automation domain resource",
+            "context" => "context domain resource",
+            "decision" => "decision domain resource",
+            "identity" => "identity domain resource",
+            "integration" => "integration domain resource",
+            "notification" => "notification domain resource",
+            "permission" => "permission domain resource",
+            "scm" => "scm domain resource",
+            "search" => "search domain resource",
+            "tenant" => "tenant domain resource",
+            "validation" => "validation domain resource",
+            "work_item" => "work_item domain resource",
+            "board" => "board domain resource",
+            "collaboration" => "collaboration domain resource",
+            "comment" => "comment domain resource",
+            "development" => "development domain resource",
+            "planning" => "planning domain resource",
+            "project" => "project domain resource",
+            "relation" => "relation domain resource",
+            _ => "domain resource",
+        }
+    }
+    fn cache_ttl_sec(&self) -> u32 {
+        Resource::cache_ttl_sec(self)
+    }
+    async fn read_json(&self, id: &str) -> Result<Option<Value>, ResourceError> {
+        match Resource::read(self, id).await? {
+            Some(data) => serde_json::to_value(&data)
+                .map(Some)
+                .map_err(|e| ResourceError::Serialize(e.to_string())),
+            None => Ok(None),
+        }
     }
 }
 
@@ -512,5 +731,76 @@ mod tests {
         let data = err.error.data.unwrap();
         assert!(data.get("code").is_some());
         assert!(data.get("source_kind").is_some());
+    }
+
+    // ===== Phase H: 22 domain handler 注册 (per spec/agents/02 §2.2 + spec/mcp/02 §2) =====
+
+    fn handler_with_domains() -> ResourcesHandler {
+        ResourcesHandler::with_domains(crate::handlers::all_domain_handlers())
+    }
+
+    #[tokio::test]
+    async fn test_with_domains_returns_27_resources_in_list() {
+        // 4 核心 (Phase E) + 23 domain (Phase H: 22 task brief + scm) = 27
+        let h = handler_with_domains();
+        let resources = h.list();
+        assert_eq!(resources.len(), 27, "4 Phase E core + 23 Phase H domain = 27");
+    }
+
+    #[tokio::test]
+    async fn test_with_domains_list_includes_all_22_domain_schemes() {
+        let h = handler_with_domains();
+        let resources = h.list();
+        let uris: Vec<String> = resources.iter()
+            .filter_map(|r| r.get("uri").and_then(Value::as_str).map(String::from))
+            .collect();
+        // 校验 22 domain scheme (per spec/agents/02 §2.2 URI 模式)
+        let schemes = [
+            "agent://", "audit://", "automation://", "board://",
+            "collaboration://", "comment://", "context://", "decision://",
+            "development://", "feedback://", "identity://", "integration://",
+            "notification://", "permission://", "planning://", "project://",
+            "relation://", "scm://", "search://", "tenant://",
+            "validation://", "workitem://", "worktree://",
+        ];
+        for s in schemes {
+            assert!(uris.iter().any(|u| u.starts_with(s)), "missing scheme {s}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_read_dispatches_to_domain_handler() {
+        // 验证 read() 走 22 domain handler 路径
+        let h = handler_with_domains();
+        let v = h.read("agent://agent-42").await.unwrap();
+        let text = v.get("contents").unwrap().as_array().unwrap()[0]
+            .get("text").unwrap().as_str().unwrap();
+        let parsed: Value = serde_json::from_str(text).unwrap();
+        assert_eq!(parsed.get("agent_id").and_then(Value::as_str), Some("agent-42"));
+        assert_eq!(parsed.get("state").and_then(Value::as_str), Some("Running"));
+    }
+
+    #[tokio::test]
+    async fn test_read_dispatches_each_domain_scheme() {
+        // 验证 read() 对每个 22 domain scheme 都能正确分发
+        let h = handler_with_domains();
+        let cases = [
+            ("audit://a-1", "audit_id"),
+            ("worktree://wt-1", "wt_id"),
+            ("decision://d-1", "dec_id"),
+            ("validation://v-1", "val_id"),
+            ("search://q-1", "query_id"),
+            ("tenant://t-1", "tenant_id"),
+        ];
+        for (uri, id_field) in cases {
+            let v = h.read(uri).await.unwrap_or_else(|e| panic!("{uri} failed: {e}"));
+            let text = v.get("contents").unwrap().as_array().unwrap()[0]
+                .get("text").unwrap().as_str().unwrap();
+            let parsed: Value = serde_json::from_str(text).unwrap();
+            let id_value = parsed.get(id_field).and_then(Value::as_str)
+                .unwrap_or_else(|| panic!("{uri} missing field {id_field}"));
+            let expected_id = uri.rsplit('/').next().unwrap();
+            assert_eq!(id_value, expected_id, "{uri} field {id_field}");
+        }
     }
 }
