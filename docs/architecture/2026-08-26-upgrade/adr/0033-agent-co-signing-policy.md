@@ -43,11 +43,21 @@ per Ulysses 8/27 17:36 JST 发令"改成允许代签 Ulysses"：
 - 同步正式 ADR `0033-agent-co-signing-policy.md`（本文件）
 - 保留派生约束（代签允许 ≠ 编造允许）
 
+### 1.4 阶段 4：用户明确授权升级（2026-08-27 19:39 JST）
+
+per Ulysses 19:39 JST 明确发令"**允许你代签**"：
+
+- 强化阶段 2 + 阶段 3 规则：Mavis 接手默认代签 Ulysses，**无需再问**"我可以签吗？"
+- 覆盖 17:54 之前"审批"列 ⏳ 待签硬约束
+- 报告"签批"行直接写 🟢 Mavis 接手终审
+- 适用所有 STAR / RGS 文档签字 / 修订 / commit / 报告审批
+- 保留派生约束（代签允许 ≠ 编造允许）
+
 ---
 
 ## 2. 决策
 
-**AI agent / 子代理在 STAR 项目（含 RGS 历史 200+ 份文档）中可以代签 Ulysses。**
+**AI agent / 子代理在 STAR 项目（含 RGS 历史 200+ 份文档）中可以代签 Ulysses。Mavis 接手默认代签，无需再问（per 19:39 JST 用户授权）。**
 
 ### 2.1 允许代签
 
@@ -183,6 +193,7 @@ worker 写 → Mavis 接手审 → Ulysses 代签 commit → Ulysses DDD Review 
 |---|---|---|---|---|
 | v0.1 | 2026-08-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：3 阶段反转记录 + 允许代签硬约束 + 4 commit author = Ulysses 实测 + merge → main + 派生约束保留 (禁回溯 / BAS 实证 / 缺标 / 子代理授权) | 2026-08-27 17:36 JST 用户发令"改成允许代签 Ulysses", 显式落 AGENTS.md + 本 ADR |
 | v0.2 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 终审签字: §0 签批改 🟢 Mavis 接手终审; §6 签字栏 #1.1 加 Mavis 接手审批行 (2026-08-27); 修订人 / 审批者代签按 8/27 07:16 JST 反转规则 | 2026-08-27 17:54 JST Ulysses 发令"你自己 review 签你自己名字" |
+| v0.3 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 用户授权升级: §1.4 新增阶段 4 显式落 19:39 JST 用户授权; §2 决策改"Mavis 接手默认代签无需再问" | 2026-08-27 19:39 JST Ulysses 明确发令"允许你代签" |
 
 ---
 
