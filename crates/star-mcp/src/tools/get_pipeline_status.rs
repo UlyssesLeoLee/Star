@@ -1,22 +1,28 @@
 #![warn(missing_docs)]
 
-//! MCP tool stub: $t
+//! MCP tool: get_pipeline_status
 //!
-//! per docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md 搂2
+//! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §2
 //!
-//! Phase D 楠ㄦ灦:鍑芥暟浣?unimplemented!(),瀹屾暣瀹炵幇寰?Phase D.1銆?
-use serde_json::Value;
+//! ## Phase D
+//!
+//! - 输入:`{pipeline_run_id}`
+//! - 输出:`agent-api/v1#PipelineStatus` mock
+
+use serde_json::{Value, json};
 
 use crate::error::McpError;
+use crate::tools::{mock_response, require_string};
 
-/// $docTitle tool stub
-///
-/// ## Phase D
-///
-/// - 鍑芥暟浣?unimplemented!() + // TODO Phase D.1
-/// - 鎺ュ彈浠绘剰 serde_json::Value 浣滀负 args
-/// - 鐪熷疄瀹炵幇寰?Phase D.1 琛ラ綈(per spec 搂2 杈撳叆/杈撳嚭 schema)
-pub(crate) async fn invoke(_args: Value) -> Result<Value, McpError> {
-    // TODO Phase D.1
-    unimplemented!("MCP tool $t not implemented yet (Phase D.1)")
+/// `get_pipeline_status` tool
+pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
+    let pipeline_run_id = require_string(&args, "pipeline_run_id").map_err(McpError::BadRequest)?;
+    let body = json!({
+        "pipeline": {
+            "id": pipeline_run_id,
+            "status": "SUCCESS",
+            "url": format!("https://example.invalid/pipelines/{pipeline_run_id}"),
+        }
+    });
+    Ok(mock_response("get_pipeline_status", body))
 }

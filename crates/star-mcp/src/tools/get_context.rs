@@ -1,22 +1,36 @@
 #![warn(missing_docs)]
 
-//! MCP tool stub: $t
+//! MCP tool stub: get_context
 //!
-//! per docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md 搂2
+//! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §2
 //!
-//! Phase D 楠ㄦ灦:鍑芥暟浣?unimplemented!(),瀹屾暣瀹炵幇寰?Phase D.1銆?
-use serde_json::Value;
+//! ## Phase D
+//!
+//! - 输入:`{issue_id: "<id>"}`
+//! - 输出:`agent-api/v1#Context` mock
+
+use serde_json::{Value, json};
 
 use crate::error::McpError;
+use crate::tools::{mock_response, require_string};
 
-/// $docTitle tool stub
-///
-/// ## Phase D
-///
-/// - 鍑芥暟浣?unimplemented!() + // TODO Phase D.1
-/// - 鎺ュ彈浠绘剰 serde_json::Value 浣滀负 args
-/// - 鐪熷疄瀹炵幇寰?Phase D.1 琛ラ綈(per spec 搂2 杈撳叆/杈撳嚭 schema)
-pub(crate) async fn invoke(_args: Value) -> Result<Value, McpError> {
-    // TODO Phase D.1
-    unimplemented!("MCP tool $t not implemented yet (Phase D.1)")
+/// `get_context` tool stub
+pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
+    let issue_id = require_string(&args, "issue_id").map_err(McpError::BadRequest)?;
+    let body = json!({
+        "context": {
+            "issue_id": issue_id,
+            "linked_files": [
+                "docs/architecture/2026-08-26-upgrade/spec/flows/05-universal-submit.md",
+                "crates/star-cli/src/commands/submit.rs"
+            ],
+            "linked_specs": [
+                "arch/03-star-ai-compat-arch.md",
+                "arch/04-star-ide-gateway-arch.md"
+            ],
+            "linked_mrs": [],
+            "summary": format!("Phase D mock context for issue {issue_id}"),
+        }
+    });
+    Ok(mock_response("get_context", body))
 }

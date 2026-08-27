@@ -1,20 +1,21 @@
-//! `star-context` — STAR AGENTS.md bootstrap 生成器骨架(Phase D)
+//! `star-context` crate (Phase D 实装)
 //!
-//! 唯一对外 API: [`generate_bootstrap`]
+//! 唯一公开 API:
+//! - [`generate_bootstrap`]  — 生成 AGENTS.md bootstrap 文本 (不写文件)
+//! - [`write_bootstrap`]     — 写 AGENTS.md 到指定仓库路径 (per Phase D 任务 6)
 //!
-//! ## 设计原则
+//! ## 守门规则
 //!
-//! - **不写文件** — 只返回 `String`,调用方决定写不写
-//! - **bootstrap,不是 knowledge base** — 模板硬上限 50 行(per `spec/acceptance/09-agent-instructions-spec.md` §2)
-//! - **薄模板** — 不塞企业知识,不依赖 LLM
-//! - **静态资源** — 模板用 `include_str!` 嵌入,无运行时模板引擎
-//!
-//! 完整 Project / Task 级 context(per `spec/acceptance/09-agent-instructions-spec.md` §5)
-//! 待 Phase D.1 增量补齐(当前 crate 不包含 Project / Task 上下文 API)。
+//! - 0 unsafe
+//! - 0 新依赖 (除 workspace 继承的 std / serde)
+//! - bootstrap 必须 <= 50 行 (per `spec/acceptance/09-agent-instructions-spec.md` §2)
+//! - 是 bootstrap, 不是 knowledge base (per spec §0: 极薄, 不塞企业知识)
+//! - write_bootstrap 如目标文件存在 -> 拒绝 (Err(AlreadyExists)), 不覆盖
 
 #![warn(missing_docs)]
 #![warn(rust_2018_idioms)]
 
+use std::fs;
 use std::path::Path;
 
 use thiserror::Error;
@@ -23,54 +24,85 @@ mod template;
 
 pub use template::BOOTSTRAP_TEMPLATE;
 
-/// Context 生成错误(Phase D 骨架只暴露 IO / 不支持两类)
+/// Context 生成错误 (Phase D 任务 6 实装)
 #[derive(Debug, Error)]
 pub enum ContextError {
-    /// 输入路径不可访问
+    /// IO 错误
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// 仓库不被 STAR 管理(Phase D 暂不实现检测,留 stub)
-    #[error("not a STAR-managed repository: {0}")]
-    NotStarManaged(String),
+    /// AGENTS.md 已存在, 拒绝覆盖
+    #[error("AGENTS.md already exists at {0} (refusing to overwrite)")]
+    AlreadyExists(String),
+
+    /// 仓库路径不是目录
+    #[error("not a directory: {0}")]
+    NotADirectory(String),
 }
 
-/// 生成 AGENTS.md bootstrap 内容
+/// 生成 AGENTS.md bootstrap 文本
 ///
-/// **不写文件** — 仅返回 `String`,调用方决定写不写。
+/// **不写文件** — 仅返回 `String` 文本, 由调用方决定写不写.
 ///
 /// ## 参数
 ///
-/// - `repo_path`: 仓库根路径。Phase D 骨架只用作未来扩展 hook(例如检测 `.star/`
-///   是否存在);当前实现不读 `repo_path` 任何文件。
+/// - `_repo_path`: 仓库路径 (Phase D 任务 6 仅保留, 不读; Phase D.1 扩展为读 `.star/`)
+pub fn generate_bootstrap(_repo_path: &Path) -> Result<String, ContextError> {
+    Ok(BOOTSTRAP_TEMPLATE.to_string())
+}
+
+/// 写 AGENTS.md 到指定仓库路径
+///
+/// ## 行为
+///
+/// - `repo_path` 必须存在且是目录, 否则 `Err(NotADirectory)`
+/// - `<repo_path>/AGENTS.md` 不存在时, 调 `generate_bootstrap` 写文件
+/// - **已存在** AGENTS.md -> `Err(AlreadyExists)`, **不覆盖** (Phase D 安全约束)
+/// - 任何 IO 错误 -> `Err(Io)`
 ///
 /// ## 返回
 ///
-/// - `Ok(String)`:bootstrap 内容(per `spec/acceptance/09-agent-instructions-spec.md` §1)
-/// - `Err(ContextError::NotStarManaged)`:Phase D 永不返回(留 stub)
-/// - `Err(ContextError::Io(_))`:Phase D 永不返回(留 stub)
-pub fn generate_bootstrap(_repo_path: &Path) -> Result<String, ContextError> {
-    // Phase D 骨架:静态模板,无运行时分支
-    Ok(BOOTSTRAP_TEMPLATE.to_string())
+/// - `Ok(())`: 写成功
+/// - `Err(ContextError::AlreadyExists)`: 已存在, 未改
+/// - `Err(ContextError::NotADirectory)`: 路径不是目录
+/// - `Err(ContextError::Io(_))`: IO 错误
+pub fn write_bootstrap(repo_path: &Path) -> Result<(), ContextError> {
+    // 1. 验证 repo_path 是目录
+    let metadata = fs::metadata(repo_path)?;
+    if !metadata.is_dir() {
+        return Err(ContextError::NotADirectory(repo_path.display().to_string()));
+    }
+
+    // 2. 检查 AGENTS.md 是否已存在
+    let target = repo_path.join("AGENTS.md");
+    if target.exists() {
+        return Err(ContextError::AlreadyExists(target.display().to_string()));
+    }
+
+    // 3. 生成 bootstrap 文本
+    let content = generate_bootstrap(repo_path)?;
+
+    // 4. 写文件
+    fs::write(&target, content)?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::env;
 
     #[test]
     fn bootstrap_under_50_lines() {
-        // 验证 bootstrap 模板不超 50 行(per spec §2)
         let line_count = BOOTSTRAP_TEMPLATE.lines().count();
         assert!(
             line_count <= 50,
-            "AGENTS.md bootstrap 上限 50 行(per spec),实际 {line_count} 行"
+            "AGENTS.md bootstrap 必须 <= 50 行 (per spec), 实际 {line_count} 行"
         );
     }
 
     #[test]
     fn bootstrap_contains_core_commands() {
-        // 验证模板包含 6 个核心 star 命令(per spec §1)
         let s = BOOTSTRAP_TEMPLATE;
         assert!(s.contains("star agent capabilities"));
         assert!(s.contains("star task current"));
@@ -82,9 +114,56 @@ mod tests {
 
     #[test]
     fn generate_bootstrap_does_not_write_files() {
-        // 验证 generate_bootstrap 是纯函数(返回 String,不写盘)
-        // Phase D 骨架不实现任何写文件路径,这里 smoke-test 一下
+        // generate_bootstrap 纯函数, 不写文件
         let result = generate_bootstrap(Path::new("."));
         assert!(result.is_ok());
+    }
+
+    // Phase D 任务 6 新增 2 tests
+
+    #[test]
+    fn write_bootstrap_creates_agets_md_in_temp_dir() {
+        // 用 tempdir 测 write_bootstrap 真实写文件
+        let tmp = env::temp_dir().join(format!("star-context-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        let result = write_bootstrap(&tmp);
+        assert!(result.is_ok(), "write_bootstrap 应该成功, 实际: {:?}", result);
+
+        // 验证文件已写
+        let target = tmp.join("AGENTS.md");
+        assert!(target.exists(), "AGENTS.md 应被创建");
+
+        // 验证内容 = BOOTSTRAP_TEMPLATE
+        let content = fs::read_to_string(&target).unwrap();
+        assert_eq!(content, BOOTSTRAP_TEMPLATE);
+
+        // 清理
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn write_bootstrap_refuses_overwrite_existing() {
+        // 写 2 次, 第 2 次应该 Err(AlreadyExists)
+        let tmp = env::temp_dir().join(format!("star-context-test-overwrite-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        // 第 1 次: 成功
+        let r1 = write_bootstrap(&tmp);
+        assert!(r1.is_ok());
+
+        // 第 2 次: Err(AlreadyExists), 文件未改
+        let r2 = write_bootstrap(&tmp);
+        assert!(matches!(r2, Err(ContextError::AlreadyExists(_))), "第 2 次应 Err(AlreadyExists), 实际: {:?}", r2);
+
+        // 验证内容仍是第 1 次的 (没被覆盖)
+        let target = tmp.join("AGENTS.md");
+        let content = fs::read_to_string(&target).unwrap();
+        assert_eq!(content, BOOTSTRAP_TEMPLATE);
+
+        // 清理
+        let _ = fs::remove_dir_all(&tmp);
     }
 }

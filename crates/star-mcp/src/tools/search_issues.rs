@@ -1,22 +1,39 @@
 #![warn(missing_docs)]
 
-//! MCP tool stub: $t
+//! MCP tool stub: search_issues
 //!
-//! per docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md 搂2
+//! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §2
 //!
-//! Phase D 楠ㄦ灦:鍑芥暟浣?unimplemented!(),瀹屾暣瀹炵幇寰?Phase D.1銆?
-use serde_json::Value;
+//! ## Phase D
+//!
+//! - 输入:`{query: "...", filters?: {...}}`
+//! - 输出:`agent-api/v1#IssueList` mock(2 条)
+
+use serde_json::{Value, json};
 
 use crate::error::McpError;
+use crate::tools::{mock_response, require_string};
 
-/// $docTitle tool stub
-///
-/// ## Phase D
-///
-/// - 鍑芥暟浣?unimplemented!() + // TODO Phase D.1
-/// - 鎺ュ彈浠绘剰 serde_json::Value 浣滀负 args
-/// - 鐪熷疄瀹炵幇寰?Phase D.1 琛ラ綈(per spec 搂2 杈撳叆/杈撳嚭 schema)
-pub(crate) async fn invoke(_args: Value) -> Result<Value, McpError> {
-    // TODO Phase D.1
-    unimplemented!("MCP tool $t not implemented yet (Phase D.1)")
+/// `search_issues` tool stub
+pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
+    let query = require_string(&args, "query").map_err(McpError::BadRequest)?;
+    let body = json!({
+        "query": query,
+        "total": 2,
+        "issues": [
+            {
+                "id": "ISSUE-1",
+                "title": format!("Mock match for '{query}' #1"),
+                "status": "OPEN",
+                "labels": ["mock"],
+            },
+            {
+                "id": "ISSUE-2",
+                "title": format!("Mock match for '{query}' #2"),
+                "status": "IN_PROGRESS",
+                "labels": ["mock"],
+            }
+        ],
+    });
+    Ok(mock_response("search_issues", body))
 }

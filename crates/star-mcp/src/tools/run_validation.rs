@@ -1,22 +1,28 @@
 #![warn(missing_docs)]
 
-//! MCP tool stub: $t
+//! MCP tool: run_validation
 //!
-//! per docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md 搂2
+//! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §2
 //!
-//! Phase D 楠ㄦ灦:鍑芥暟浣?unimplemented!(),瀹屾暣瀹炵幇寰?Phase D.1銆?
-use serde_json::Value;
+//! ## Phase D
+//!
+//! - 输入:`{worktree_id?}`
+//! - 输出:`agent-api/v1#ValidationResult` mock
+
+use serde_json::{Value, json};
 
 use crate::error::McpError;
+use crate::tools::mock_response;
 
-/// $docTitle tool stub
-///
-/// ## Phase D
-///
-/// - 鍑芥暟浣?unimplemented!() + // TODO Phase D.1
-/// - 鎺ュ彈浠绘剰 serde_json::Value 浣滀负 args
-/// - 鐪熷疄瀹炵幇寰?Phase D.1 琛ラ綈(per spec 搂2 杈撳叆/杈撳嚭 schema)
+/// `run_validation` tool
 pub(crate) async fn invoke(_args: Value) -> Result<Value, McpError> {
-    // TODO Phase D.1
-    unimplemented!("MCP tool $t not implemented yet (Phase D.1)")
+    let body = json!({
+        "validation": {
+            "passed": 0,
+            "failed": 0,
+            "skipped": 0,
+            "failed_tests": [],
+        }
+    });
+    Ok(mock_response("run_validation", body))
 }

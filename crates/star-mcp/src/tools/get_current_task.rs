@@ -1,22 +1,31 @@
 #![warn(missing_docs)]
 
-//! MCP tool stub: $t
+//! MCP tool stub: get_current_task
 //!
-//! per docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md 搂2
+//! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §2
 //!
-//! Phase D 楠ㄦ灦:鍑芥暟浣?unimplemented!(),瀹屾暣瀹炵幇寰?Phase D.1銆?
-use serde_json::Value;
+//! ## Phase D
+//!
+//! - 输入:`{}`
+//! - 输出:`agent-api/v1#Task` mock
+
+use serde_json::{Value, json};
 
 use crate::error::McpError;
+use crate::tools::mock_response;
 
-/// $docTitle tool stub
-///
-/// ## Phase D
-///
-/// - 鍑芥暟浣?unimplemented!() + // TODO Phase D.1
-/// - 鎺ュ彈浠绘剰 serde_json::Value 浣滀负 args
-/// - 鐪熷疄瀹炵幇寰?Phase D.1 琛ラ綈(per spec 搂2 杈撳叆/杈撳嚭 schema)
+/// `get_current_task` tool stub
 pub(crate) async fn invoke(_args: Value) -> Result<Value, McpError> {
-    // TODO Phase D.1
-    unimplemented!("MCP tool $t not implemented yet (Phase D.1)")
+    let body = json!({
+        "task": {
+            "id": "STAR-1024",
+            "title": "Phase D 骨架 — STAR CLI / MCP / Context 三 crate 落地",
+            "status": "IN_PROGRESS",
+            "assigned_to": "agent-mock",
+            "context_refs": ["DEC-008", "arch/03-star-ai-compat-arch.md"],
+            "labels": ["phase-d", "skeleton", "mvp"],
+            "updated_at": "2026-08-27T00:00:00Z",
+        }
+    });
+    Ok(mock_response("get_current_task", body))
 }

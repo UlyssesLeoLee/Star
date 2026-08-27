@@ -1,22 +1,38 @@
 #![warn(missing_docs)]
 
-//! MCP tool stub: $t
+//! MCP tool stub: get_workspace
 //!
-//! per docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md 搂2
+//! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §2
 //!
-//! Phase D 楠ㄦ灦:鍑芥暟浣?unimplemented!(),瀹屾暣瀹炵幇寰?Phase D.1銆?
-use serde_json::Value;
+//! ## Phase D
+//!
+//! - 输入:`{workspace_id?: "<id>"}`
+//! - 输出:`agent-api/v1#Workspace` mock(per `spec/ide-api/01-schema.md` §2.1)
+
+use serde_json::{Value, json};
 
 use crate::error::McpError;
+use crate::tools::{mock_response, optional_string};
 
-/// $docTitle tool stub
-///
-/// ## Phase D
-///
-/// - 鍑芥暟浣?unimplemented!() + // TODO Phase D.1
-/// - 鎺ュ彈浠绘剰 serde_json::Value 浣滀负 args
-/// - 鐪熷疄瀹炵幇寰?Phase D.1 琛ラ綈(per spec 搂2 杈撳叆/杈撳嚭 schema)
-pub(crate) async fn invoke(_args: Value) -> Result<Value, McpError> {
-    // TODO Phase D.1
-    unimplemented!("MCP tool $t not implemented yet (Phase D.1)")
+/// `get_workspace` tool stub
+pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
+    let ws_id = optional_string(&args, "workspace_id").unwrap_or_else(|| "ws-default".to_string());
+    let body = json!({
+        "workspace": {
+            "id": ws_id,
+            "name": "main-workspace",
+            "repository": {
+                "id": "repo-1",
+                "provider": "gitgit",
+                "url": "https://github.com/UlyssesLeoLee/Star"
+            },
+            "worktree_id": "wt-STAR-1024",
+            "open_files": [],
+            "active_symbol": null,
+            "diagnostics": [],
+            "ide_client": "vscode",
+            "ide_version": "1.95.0",
+        }
+    });
+    Ok(mock_response("get_workspace", body))
 }

@@ -1,22 +1,36 @@
 #![warn(missing_docs)]
 
-//! MCP tool stub: $t
+//! MCP tool stub: create_worktree
 //!
-//! per docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md 搂2
+//! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §2
 //!
-//! Phase D 楠ㄦ灦:鍑芥暟浣?unimplemented!(),瀹屾暣瀹炵幇寰?Phase D.1銆?
-use serde_json::Value;
+//! ## Phase D
+//!
+//! - 输入:`{issue_id: "<id>", branch_name?: "..."}`
+//! - 输出:`agent-api/v1#Worktree` mock
+
+use serde_json::{Value, json};
 
 use crate::error::McpError;
+use crate::tools::{mock_response, optional_string, require_string};
 
-/// $docTitle tool stub
-///
-/// ## Phase D
-///
-/// - 鍑芥暟浣?unimplemented!() + // TODO Phase D.1
-/// - 鎺ュ彈浠绘剰 serde_json::Value 浣滀负 args
-/// - 鐪熷疄瀹炵幇寰?Phase D.1 琛ラ綈(per spec 搂2 杈撳叆/杈撳嚭 schema)
-pub(crate) async fn invoke(_args: Value) -> Result<Value, McpError> {
-    // TODO Phase D.1
-    unimplemented!("MCP tool $t not implemented yet (Phase D.1)")
+/// `create_worktree` tool stub
+pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
+    let issue_id = require_string(&args, "issue_id").map_err(McpError::BadRequest)?;
+    let branch =
+        optional_string(&args, "branch_name").unwrap_or_else(|| format!("feature/{issue_id}"));
+    let wt_id = format!("wt-{issue_id}");
+    let body = json!({
+        "worktree": {
+            "id": wt_id,
+            "path": format!("/repos/owner/repo/{wt_id}"),
+            "branch": branch,
+            "head_commit": "0000000000000000000000000000000000000000",
+            "dirty": true,
+            "agent_session_id": "agent-mock",
+            "ide_session_id": "ide-mock",
+            "created_at": "2026-08-27T00:00:00Z",
+        }
+    });
+    Ok(mock_response("create_worktree", body))
 }

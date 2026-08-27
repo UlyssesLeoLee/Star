@@ -1,22 +1,35 @@
 #![warn(missing_docs)]
 
-//! MCP tool stub: $t
+//! MCP tool stub: find_references
 //!
-//! per docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md 搂2
+//! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §2
 //!
-//! Phase D 楠ㄦ灦:鍑芥暟浣?unimplemented!(),瀹屾暣瀹炵幇寰?Phase D.1銆?
-use serde_json::Value;
+//! ## Phase D
+//!
+//! - 输入:`{name: "<symbol>", file?: "..."}`
+//! - 输出:`agent-api/v1#References` mock
+
+use serde_json::{Value, json};
 
 use crate::error::McpError;
+use crate::tools::{mock_response, optional_string, require_string};
 
-/// $docTitle tool stub
-///
-/// ## Phase D
-///
-/// - 鍑芥暟浣?unimplemented!() + // TODO Phase D.1
-/// - 鎺ュ彈浠绘剰 serde_json::Value 浣滀负 args
-/// - 鐪熷疄瀹炵幇寰?Phase D.1 琛ラ綈(per spec 搂2 杈撳叆/杈撳嚭 schema)
-pub(crate) async fn invoke(_args: Value) -> Result<Value, McpError> {
-    // TODO Phase D.1
-    unimplemented!("MCP tool $t not implemented yet (Phase D.1)")
+/// `find_references` tool stub
+pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
+    let name = require_string(&args, "name").map_err(McpError::BadRequest)?;
+    let file = optional_string(&args, "file")
+        .unwrap_or_else(|| "crates/star-cli/src/commands/agent.rs".to_string());
+    let body = json!({
+        "name": name,
+        "total": 1,
+        "references": [
+            {
+                "file": file,
+                "line": 42,
+                "col": 1,
+                "context": format!("reference to {name}"),
+            }
+        ],
+    });
+    Ok(mock_response("find_references", body))
 }
