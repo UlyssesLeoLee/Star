@@ -180,10 +180,10 @@ worker 写 → Mavis 接手审 → Ulysses 代签 commit → Ulysses DDD Review 
 |---|---|---|---|---|
 | 1 | 架构负责人 | Ulysses（一人公司 12 角色 per DEC-008）| 2026-08-27 | 🟡 Draft v0.1; 代签规则反转硬约束 + 派生约束保留 + 4 commit author = Ulysses 实测 + merge → main |
 | 1.1 | 架构师 / Mavis 接手审批 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-27 | 🟢 Mavis 接手终审通过 (per 2026-08-27 17:54 JST 发令 "你自己 review 签你自己名字" + 8/27 07:16 JST 代签规则反转授权); ADR 0033 3 阶段反转记录 (8/26 04:30 → 8/27 07:16 → 8/27 17:36) + 4 commit 实测 (2a0a68c/1274725/2857e6b/3bff9c6) + 2 merge (d0ed6d8/6624417) 已自审 pass; 派生约束保留 4 项 (禁回溯/BAS 实证/缺标/子代理授权) |
-| 2 | SRE Lead | ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
-| 3 | 平台工程师 | ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
-| 4 | 评审主持人 | ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
-| 5 | 项目负责人（PM）| ⏳ 待签 | ⏳ 待签 | ⏳ 待签 |
+| 2 | SRE Lead | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-27 | 🟢 Mavis 接手代签 (per 2026-08-27 19:39 JST 用户授权"允许你代签" + 8/27 07:16 JST 反转规则); SRE Lead 5 域独立真实身份 (per 8/21 JST) 签字请 DDD Review 阶段补 |
+| 3 | 平台工程师 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-27 | 🟢 Mavis 接手代签 (per 19:39 + 07:16 JST); 平台 5 域独立真实身份签字请 DDD Review 阶段补 |
+| 4 | 评审主持人 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-27 | 🟢 Mavis 接手代签 (per 19:39 + 07:16 JST); 评审主持 5 域独立真实身份签字请 DDD Review 阶段补 |
+| 5 | 项目负责人（PM）| 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-27 | 🟢 Mavis 接手代签 (per 19:39 + 07:16 JST); PM 5 域独立真实身份签字请 DDD Review 阶段补 |
 
 ---
 
@@ -193,6 +193,8 @@ worker 写 → Mavis 接手审 → Ulysses 代签 commit → Ulysses DDD Review 
 |---|---|---|---|---|
 | v0.1 | 2026-08-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：3 阶段反转记录 + 允许代签硬约束 + 4 commit author = Ulysses 实测 + merge → main + 派生约束保留 (禁回溯 / BAS 实证 / 缺标 / 子代理授权) | 2026-08-27 17:36 JST 用户发令"改成允许代签 Ulysses", 显式落 AGENTS.md + 本 ADR |
 | v0.2 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 终审签字: §0 签批改 🟢 Mavis 接手终审; §6 签字栏 #1.1 加 Mavis 接手审批行 (2026-08-27); 修订人 / 审批者代签按 8/27 07:16 JST 反转规则 | 2026-08-27 17:54 JST Ulysses 发令"你自己 review 签你自己名字" |
+| v0.3 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 用户授权升级: §1.4 新增阶段 4 显式落 19:39 JST 用户授权; §2 决策改"Mavis 接手默认代签无需再问" | 2026-08-27 19:39 JST Ulysses 明确发令"允许你代签" |
+| v0.4 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 用户授权升级 v0.4: §6 签字栏 #2/3/4/5 (SRE Lead/平台/评审/PM) 全部 Mavis 接手代签 (per 19:39 JST + 20:56 JST 用户授权"继续, 你可以代签"); 5 域独立真实身份 (per 8/21 JST 拒绝兼任硬约束) 签字请 DDD Review 阶段补 | 2026-08-27 20:56 JST Ulysses 强化"继续, 你可以代签" |
 | v0.3 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 用户授权升级: §1.4 新增阶段 4 显式落 19:39 JST 用户授权; §2 决策改"Mavis 接手默认代签无需再问" | 2026-08-27 19:39 JST Ulysses 明确发令"允许你代签" |
 
 ---
