@@ -1,0 +1,25 @@
+[package]
+name = "star-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "STAR CLI — Phase D 骨架 (3 核心命令 stub)"
+
+[[bin]]
+name = "star"
+path = "src/main.rs"
+
+[dependencies]
+# workspace 已有依赖
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+# 0 新依赖:clap 是 Rust 生态默认 CLI 解析器,接受 4.5 稳定版
+clap = { version = "4.5", features = ["derive"] }
+
+[lints]
+workspace = true

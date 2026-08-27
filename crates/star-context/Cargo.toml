@@ -1,0 +1,21 @@
+[package]
+name = "star-context"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "STAR Context — AGENTS.md bootstrap 生成器骨架(Phase D)"
+
+[lib]
+name = "star_context"
+path = "src/lib.rs"
+
+[dependencies]
+# workspace 已有依赖
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

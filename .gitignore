@@ -24,3 +24,40 @@ desktop.ini
 # Temporary backup
 *.bak
 docs.untracked.bak/
+
+# Secrets / env (per 2026-08-27 env-var safety rule)
+.env
+.env.*
+!.env.example
+
+# Nested worktrees (managed by `git worktree`, not part of source tree)
+/.worktrees/
+
+# RustGameServer (RGS) ops scripts accidentally copied into Star root - not part of Star
+# Keep .ps1/.sh/.py from RGS scratch space out of Star history
+# (Staging area for cleanup: see STAR-UNTRACKED-CLEANUP-REPORT.md v0.1)
+/.scratch/
+/check_wt.ps1
+/wt_check_remaining.ps1
+/wt_clean.ps1
+/wt_clean2.ps1
+/wt_clean3.ps1
+/wt_clean_failed.ps1
+/cluster_ops_check.sh
+/cluster_ops_log.sh
+/db_url_check.ps1
+/debug_match.py
+/fetch_log.py
+/fetch_log2.sh
+/fetch_log3.sh
+/force_clean.sh
+/hpa_rebuild.py
+/patch_probe.py
+/patch_probe2.py
+/patch_probe_exec.py
+/patch_tcp.py
+/restart_wt.sh
+/seed_5db.sh
+/seed_5db_v2.sh
+/sign_raci.py
+/sign_raci2.py
