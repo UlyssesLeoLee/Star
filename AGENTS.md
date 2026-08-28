@@ -107,7 +107,7 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 | 1 | **R-05 不 push** | 2026-08-27 11:09 JST | Ulysses 拍板 |
 | 2 | **bc23d6c 保留** | 2026-08-27 11:09 JST | Ulysses 拍板 (commit 引用了未做过的 frontend commit hash 5181288 / b9858b2 / 6d78158 / c102fdf3 / 0b584411) |
 | 3 | **5 域独立 Lead，不接受兼任** | 2026-08-21 JST | Ulysses 拍板 (RGS 5 域 player/economy/match/social/admin) |
-| 4 | **AI 协作 token-OLU 而非人天** | 2026-08-21 JST | Ulysses 拍板 (1 SRE·周 ≈ 1M tokens, 1 人·天 ≈ 100-300K tokens) |
+| 4 | **AI 协作 token-OLU 而非人天** | 2026-08-21 JST | Ulysses 拍板 (1 SRE·周 ≈ 1M tokens, 1 人·天 ≈ 100-300K tokens); STAR 独立基线 `STAR-OLU-001.md` v0.1 (1 SRE·周 = 1.2M) 2026-08-29 落档 |
 | 5 | **环境变量安全** | 2026-08-27 11:06 JST | Ulysses hard ban (禁 `Get-ChildItem env:` / `echo $VAR` / `cat .env` 等泄露 secret 操作) |
 | 6 | **PowerShell only** | 持续 | 系统约束 (非 bash, `;` 替 `&&`, `Get-ChildItem` 替 `ls -la`, `Select-String` 替 `grep`) |
 | 7 | **0 unsafe** | 持续 | 代码守门 |
@@ -153,17 +153,21 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 
 ---
 
-## 7. 待办 (per 当前 main HEAD `6624417`)
+## 7. 待办 (per 当前 main HEAD `c1450d9`, token 双轴 WBS per `STAR-OLU-001.md`)
 
-| # | 项 | 状态 | 优先级 |
-|---|---|---|---|
-| 1 | 4 份报告签字栏"审批"列 ⏳ 待 Ulysses DDD Review 终审 | pending | P0 |
-| 2 | Streamable HTTP spec 完整实现 (session 重连 / server-push / Last-Event-ID / DELETE) | Phase D.6+ | P2 |
-| 3 | Prompts 实际模板 / Resources 独立资源类型 | Phase D.6+ | P2 |
-| 4 | 16 tool 真实数据源接入 (现 mock) | Phase D.6+ | P2 |
-| 5 | 推 origin (R-05 不 push 反转决策) | 待 Ulysses 拍板 | P1 |
-| 6 | 9 个 wt 是否 merge 到 main (acceptance-vcs-blockers / adr-0026-0032 / cli-mcp / api / flows / arch 等) | 已部分在 feature/ai-ide-compat | P1 |
-| 7 | 25 domain-* crate 真实数据接入 (现 stub) | Phase 2+ | P3 |
+> **排序原则 (per 2026-08-29 04:23 JST Ulysses 拍板)**: 不按日期排,按 **token 预算** 降序;推进门槛是**质量门禁 ≥4/5**,不是截止日期。
+> **换算基线**: `STAR-OLU-001.md` v0.1 — 1 SRE · 周 = 1.2M tokens (STAR 独立,同源不套 RGS §6.2 数字)
+> **质量门 5 维**: 功能完整 / 测试覆盖 / 守门 0 违反 / 文档同步 / git 证据 (per STAR-OLU-001 §6)
+
+| # | 项 | token 预算 | 质量门 (5 维) | 依赖 | 状态 |
+|---|---|---|---|---|---|
+| 1 | 25 domain-* crate 真实数据接入 (现 stub) | ~6.0M (5 周) | 16 tool e2e pass + 25 crate no-stub 守门 + 文档同步 | 无 | pending |
+| 2 | 16 tool 真实数据源接入 (现 mock) | ~3.6M (3 周) | 16 tool 接入 + Phase D 报告更新 + e2e ≥80% | #1 | pending |
+| 3 | Streamable HTTP spec 完整实现 (session 重连 / server-push / Last-Event-ID / DELETE) | ~2.4M (2 周) | spec 5 项 e2e + MCP 协议一致性测试 + 文档同步 | 无 | pending |
+| 4 | Prompts 实际模板 / Resources 独立资源类型 | ~1.8M (1.5 周) | 模板覆盖 5 域 + Resources 类型 ≥3 + 测试 | #2 | pending |
+| 5 | 9 个 wt 是否 merge 到 main (acceptance-vcs-blockers / adr-0026-0032 / cli-mcp / api / flows / arch 等) | ~1.2M (1 周) | merge 后守门 0 违反 + commit message per 守门 + DDD Review 拍板 | 无 | pending (部分在 feature/ai-ide-compat) |
+| 6 | 4 份报告签字栏"审批"列 DDD Review 终审 | ~0.4M (决策会议) | 4 份签字栏全填 + 修订历史 +1 + 守门 0 违反 | 无 | pending (P0 但 token 小) |
+| 7 | 推 origin (R-05 不 push 反转决策) | ~0.1M (单次 git push) | author=Ulysses + 守门 0 违反 + DDD Review 拍板 | #5, #6 | 待 Ulysses 拍板 (P1 但 token 最小) |
 
 ---
 
@@ -176,6 +180,7 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 | v0.3 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 用户授权升级: §0 一句话硬约束引用 19:39 JST 授权; 新增 §1.0 用户授权升级节; §1 节标题改"19:39 JST 用户授权 + 07:16 JST 反转"; 覆盖范围增加 19:39 JST 覆盖 17:54 之前"审批"列 ⏳ 待签约束; Mavis 接手默认代签 Ulysses 无需再问 | 2026-08-27 19:39 JST Ulysses 明确发令"允许你代签" |
 | v0.4 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 用户授权升级 v0.4: §9 签字栏 #2/3/4/5 (SRE Lead/平台/评审/PM) 全部 Mavis 接手代签 (per 19:39 JST 用户授权"继续, 你可以代签"); 5 域独立真实身份 (per 8/21 JST 拒绝兼任硬约束) 签字请 DDD Review 阶段补 | 2026-08-27 20:56 JST Ulysses 强化"继续, 你可以代签" |
 | v0.5 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 用户授权第三次强化 v0.5: 19:39/20:56/21:59 三次连续发令"允许你代签"/"继续, 你可以代签"/"继续, 你可以代签", 建立稳定规则; 全部 8 STAR 报告 + 1 RGS 报告签字栏已 Mavis 接手代签 (commit 39cc252 + a0eaee6); 剩余 ⏳ 待签为 §0/§1 规则描述引用的历史形态证据, 不属于真签字栏, 按"缺标比错标安全"不改 | 2026-08-27 21:59 JST Ulysses 第三次强化"继续, 你可以代签" |
+| v0.6 | 2026-08-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | token 双轴 WBS 重排: §7 7 项按 token 预算降序重排（实质工作先行，签字/push 收尾），列结构扩成 token 预算 / 质量门 5 维 / 依赖 / 状态；新增 `STAR-OLU-001.md` 独立基线（1 SRE·周 = 1.2M, 同源不套 RGS §6.2 数字）；§4 守门 #4 追加 STAR-OLU-001 引用 | 2026-08-29 04:23 JST Ulysses 决策"WBS 不按日期按 token 排" + 05:32 JST 拍板"STAR 独立换算 + 双轴 WBS" + 05:52 JST 强令"更新原有 wbs"（原地改写，不另起新表） |
 
 ---
 
