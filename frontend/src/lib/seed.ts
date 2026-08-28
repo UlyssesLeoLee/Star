@@ -94,6 +94,10 @@ const workItem = (i: number, status: WorkItem["status"], kind: WorkItem["kind"],
   labels: [["backend"], ["backend", "perf"], ["frontend"], ["infra"], ["ai"], ["spec"]][i % 6],
   sprint_id: i % 3 === 0 ? "spr-001" : (i % 3 === 1 ? "spr-002" : undefined),
   workflow_id: "wf-default",
+  // W3 Calendar: 给每个 work-item 派 due_date, 散布在 [now-30d, now+30d] 区间内
+  // 用 i*2 - 30 天偏移 (i 偶正奇负交错) 让 calendar 有数据可显示
+  // per dynamic-interaction-design.md §5.2 月视图 "每格显示 due work-item 数"
+  due_date: ago(-60 * 24 * (i * 2 - 30)),
   created_at: ago(60 * 24 * (30 - i)),
   updated_at: ago(60 * (i * 2)),
 });

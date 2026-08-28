@@ -1,37 +1,71 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { PageHeader, SectionTitle, Stat } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
-import { Calendar, TrendingDown, Flag, Target, SquareChartGantt } from "lucide-react";
 import { GanttChart } from "@/components/gantt";
+import { Tabs } from "@/components/Tabs";
+import { MonthView } from "@/components/calendar/MonthView";
+import { WeekView } from "@/components/calendar/WeekView";
+import { CalendarHeader } from "@/components/calendar/CalendarHeader";
+import { CalendarLegend } from "@/components/calendar/CalendarLegend";
+import { buildEvents } from "@/components/calendar/events";
 import {
-  transitionMilestone,
-  transitionSprint,
-  transitionWorkItemSprint,
-} from "@/components/gantt";
+  Calendar,
+  TrendingDown,
+  Flag,
+  Target,
+  SquareChartGantt,
+  CalendarRange,
+} from "lucide-react";
 import { addDays, format, parseISO, differenceInDays } from "date-fns";
-
-type TabKey = "overview" | "gantt" | "calendar";
-
-const TABS: Array<{ key: TabKey; label: string; icon: React.ReactNode }> = [
-  { key: "overview", label: "Sprint / Milestone", icon: <Target size={11} /> },
-  { key: "gantt", label: "Gantt", icon: <SquareChartGantt size={11} /> },
-  { key: "calendar", label: "Calendar", icon: <Calendar size={11} /> },
-];
 
 export default function PlanningPage() {
   const sprints = useStore((s) => s.sprints);
   const milestones = useStore((s) => s.milestones);
   const burndown = useStore((s) => s.burndownSeries);
   const workItems = useStore((s) => s.workItems);
+  const transitionMilestone = useStore((s) => s.transitionMilestone);
+  const updateWorkItemDueDate = useStore((s) => s.updateWorkItemDueDate);
+  const transitionSprint = useStore((s) => s.transitionSprint);
+  const transitionWorkItemSprint = useStore(
+    (s) => s.transitionWorkItemSprint,
+  );
 
-  const [tab, setTab] = useState<TabKey>("gantt");
+  const [tab, setTab] = useState<string>("gantt");
+  const [view, setView] = useState<"month" | "week">("month");
+  const [cursor, setCursor] = useState<{ year: number; month: number }>(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+  const [weekStart, setWeekStart] = useState<Date>(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now;
+  });
+
+  const events = useMemo(
+    () => buildEvents(sprints, milestones, workItems),
+    [sprints, milestones, workItems],
+  );
+
+  const handleEventMove = (eventId: string, newDate: string) => {
+    const ev = events.find((e) => e.id === eventId);
+    if (!ev) return;
+    const iso = `${newDate}T00:00:00.000Z`;
+    if (ev.kind === "milestone") {
+      transitionMilestone(eventId, iso);
+    } else if (ev.kind === "work_item") {
+      updateWorkItemDueDate(eventId, iso);
+    }
+  };
+
+  const handleMonthChange = (year: number, month: number) =>
+    setCursor({ year, month });
 
   const maxRemaining = Math.max(...burndown.map((b) => b.remaining_points), 1);
 
-  // Gantt dateRange: from earliest start - 7d to latest end + 7d, capped at 120d
   const dateRange = useMemo(() => {
     const all = [
       ...sprints.flatMap((s) => [parseISO(s.start_date), parseISO(s.end_date)]),
@@ -45,14 +79,12 @@ export default function PlanningPage() {
     const max = all.reduce((a, b) => (a > b ? a : b));
     const start = addDays(min, -7);
     const end = addDays(max, 7);
-    // cap at 180d for sanity
     if (differenceInDays(end, start) > 180) {
       return { start: format(start, "yyyy-MM-dd"), end: format(addDays(start, 180), "yyyy-MM-dd") };
     }
     return { start: format(start, "yyyy-MM-dd"), end: format(end, "yyyy-MM-dd") };
   }, [sprints, milestones]);
 
-  // W2 stub handlers: console + audit mock (W5 替换为真实 store action)
   const handleMilestoneUpdate = (id: string, newDueDate: string) => {
     transitionMilestone(id, newDueDate);
   };
@@ -67,38 +99,26 @@ export default function PlanningPage() {
     <div className="max-w-7xl">
       <PageHeader
         title="Planning"
-        subtitle="Sprint / Milestone / Burndown 三件套 + Gantt 时间轴 (W2 实装)。每个 sprint 有 capacity / committed / completed 三维度。"
+        subtitle={`Sprint / Milestone / Burndown + Gantt 时间轴 (W2) + Calendar 月/周 (W3) 四件套。Calendar 拖 work-item/milestone 改 due_date, Gantt 拖动改 milestone due_date / sprint 起止 / work-item 跨 sprint。`}
         icon={<Calendar className="text-accent" size={20} />}
         track="E"
-        count={`${sprints.length} sprints / ${milestones.length} milestones`}
+        count={`${sprints.length} sprints / ${milestones.length} milestones / ${workItems.length} work-items`}
       />
 
-      {/* Tabs (per W2 任务 §2) */}
-      <div className="flex items-center gap-1 mb-4 border-b border-line">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            data-tab={t.key}
-            data-active={tab === t.key ? "true" : "false"}
-            className={`px-3 py-2 text-xs flex items-center gap-1.5 border-b-2 transition-colors ${
-              tab === t.key
-                ? "border-accent text-accent"
-                : "border-transparent text-ink-dim hover:text-ink hover:border-line"
-            }`}
-          >
-            {t.icon}
-            {t.label}
-            {t.key === "calendar" && (
-              <span className="text-[9px] text-ink-mute ml-1 font-mono">(W3)</span>
-            )}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        active={tab}
+        onChange={setTab}
+        items={[
+          { id: "overview",  label: "Overview",  icon: <Target size={12} />,          badge: `${sprints.length + milestones.length}` },
+          { id: "burndown",  label: "Burndown",  icon: <TrendingDown size={12} />,   badge: burndown.length },
+          { id: "gantt",     label: "Gantt",     icon: <SquareChartGantt size={12} />, badge: milestones.length },
+          { id: "calendar",  label: "Calendar",  icon: <CalendarRange size={12} />,   badge: events.length },
+          { id: "sprints",   label: "Sprints",   icon: <Flag size={12} />,             badge: sprints.length },
+        ]}
+      />
 
       {tab === "overview" && (
-        <>
+        <div data-testid="tab-overview">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-5">
             <div className="card">
               <SectionTitle><TrendingDown size={11} className="inline mr-1" /> Burndown</SectionTitle>
@@ -110,7 +130,7 @@ export default function PlanningPage() {
                   </linearGradient>
                 </defs>
                 <line x1="30" y1="170" x2="490" y2="170" stroke="#21262d" />
-                <line x1="30" y1="20"  x2="30"  y2="170" stroke="#21262d" />
+                <line x1="30" y1="20" x2="30"  y2="170" stroke="#21262d" />
                 <line x1="30" y1="30" x2="490" y2="155" stroke="#6e7681" strokeDasharray="3,3" />
                 <path
                   d={`M 30 ${170 - (burndown[0].remaining_points / maxRemaining) * 140} ` +
@@ -156,7 +176,112 @@ export default function PlanningPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
 
+      {tab === "burndown" && (
+        <div data-testid="tab-burndown" className="card">
+          <SectionTitle><TrendingDown size={11} className="inline mr-1" /> Sprint burndown (14 days)</SectionTitle>
+          <svg viewBox="0 0 500 200" className="w-full h-64">
+            <defs>
+              <linearGradient id="burn-fill-2" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#2f81f7" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#2f81f7" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <line x1="30" y1="170" x2="490" y2="170" stroke="#21262d" />
+            <line x1="30" y1="20" x2="30"  y2="170" stroke="#21262d" />
+            <line x1="30" y1="30" x2="490" y2="155" stroke="#6e7681" strokeDasharray="3,3" />
+            <path
+              d={`M 30 ${170 - (burndown[0].remaining_points / maxRemaining) * 140} ` +
+                 burndown.map((b, i) => `L ${30 + (i * 460 / (burndown.length - 1))} ${170 - (b.remaining_points / maxRemaining) * 140}`).join(" ") +
+                 ` L 490 170 L 30 170 Z`}
+              fill="url(#burn-fill-2)"
+            />
+            <path
+              d={`M 30 ${170 - (burndown[0].remaining_points / maxRemaining) * 140} ` +
+                 burndown.map((b, i) => `L ${30 + (i * 460 / (burndown.length - 1))} ${170 - (b.remaining_points / maxRemaining) * 140}`).join(" ")}
+              fill="none"
+              stroke="#2f81f7"
+              strokeWidth="2"
+            />
+          </svg>
+        </div>
+      )}
+
+      {tab === "gantt" && (
+        <GanttChart
+          sprints={sprints}
+          milestones={milestones}
+          workItems={workItems}
+          dateRange={dateRange}
+          onMilestoneUpdate={handleMilestoneUpdate}
+          onSprintUpdate={handleSprintUpdate}
+          onWorkItemMove={handleWorkItemMove}
+        />
+      )}
+
+      {tab === "calendar" && (
+        <div data-testid="tab-calendar" className="space-y-3">
+          <CalendarHeader
+            year={cursor.year}
+            month={cursor.month}
+            weekStart={weekStart}
+            view={view}
+            onPrev={() => {
+              if (view === "month") {
+                const d = new Date(cursor.year, cursor.month - 1, 1);
+                setCursor({ year: d.getFullYear(), month: d.getMonth() });
+              } else {
+                const d = new Date(weekStart);
+                d.setDate(d.getDate() - 7);
+                setWeekStart(d);
+              }
+            }}
+            onNext={() => {
+              if (view === "month") {
+                const d = new Date(cursor.year, cursor.month + 1, 1);
+                setCursor({ year: d.getFullYear(), month: d.getMonth() });
+              } else {
+                const d = new Date(weekStart);
+                d.setDate(d.getDate() + 7);
+                setWeekStart(d);
+              }
+            }}
+            onToday={() => {
+              const now = new Date();
+              setCursor({ year: now.getFullYear(), month: now.getMonth() });
+              const w = new Date(now);
+              w.setHours(0, 0, 0, 0);
+              setWeekStart(w);
+            }}
+            onViewChange={setView}
+            userTimezone={Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}
+          />
+
+          {view === "month" ? (
+            <MonthView
+              year={cursor.year}
+              month={cursor.month}
+              events={events}
+              onEventMove={handleEventMove}
+              onMonthChange={handleMonthChange}
+            />
+          ) : (
+            <WeekView
+              startDate={weekStart}
+              events={events}
+              onEventMove={handleEventMove}
+              userTimezone={Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}
+            />
+          )}
+
+          <CalendarLegend />
+        </div>
+      )}
+
+      {tab === "sprints" && (
+        <div data-testid="tab-sprints">
           <SectionTitle><Target size={11} className="inline mr-1" /> Sprints</SectionTitle>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {sprints.map((sp) => {
@@ -185,26 +310,6 @@ export default function PlanningPage() {
               );
             })}
           </div>
-        </>
-      )}
-
-      {tab === "gantt" && (
-        <GanttChart
-          sprints={sprints}
-          milestones={milestones}
-          workItems={workItems}
-          dateRange={dateRange}
-          onMilestoneUpdate={handleMilestoneUpdate}
-          onSprintUpdate={handleSprintUpdate}
-          onWorkItemMove={handleWorkItemMove}
-        />
-      )}
-
-      {tab === "calendar" && (
-        <div className="card text-center text-ink-mute text-sm py-12" data-tab-placeholder="calendar">
-          <Calendar size={28} className="mx-auto mb-2 text-ink-dim" />
-          <div>Calendar view (W3 模块占位)</div>
-          <div className="text-[10px] mt-1 font-mono">per dynamic-interaction-design.md §5</div>
         </div>
       )}
     </div>
