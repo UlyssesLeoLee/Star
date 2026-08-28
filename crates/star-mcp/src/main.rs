@@ -72,6 +72,7 @@
 #![warn(missing_docs)]
 #![warn(rust_2018_idioms)]
 
+mod d6_session;
 mod error;
 mod handlers;
 mod prompts;
