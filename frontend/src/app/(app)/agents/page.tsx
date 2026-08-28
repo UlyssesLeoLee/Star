@@ -13,22 +13,8 @@
 import { PageHeader, Stat, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Bot, Activity } from "lucide-react";
-
-type AgentRow = {
-  id: string;
-  name: string;
-  status: "active" | "in_progress" | "paused" | "failed" | "completed";
-  role: string;
-  last_active: string;
-};
-
-const MOCK_AGENTS: ReadonlyArray<AgentRow> = [
-  { id: "ag-001", name: "Ulysses-CLI",      status: "active",      role: "root / architect", last_active: "2 min ago" },
-  { id: "ag-002", name: "Physis-builder",   status: "in_progress", role: "rust / physics",   last_active: "5 min ago" },
-  { id: "ag-003", name: "Star-frontend",    status: "paused",      role: "react / nextjs",   last_active: "1 h ago"   },
-  { id: "ag-004", name: "Doc-scribe",       status: "active",      role: "docs / adr",       last_active: "12 min ago" },
-  { id: "ag-005", name: "Review-bot",       status: "failed",      role: "ci / review",      last_active: "23 min ago" },
-];
+import { MOCK_AGENTS } from "@/mocks/data";
+import type { AgentRow } from "@/mocks/schemas/agent";
 
 export default function AgentsPage() {
   const active = MOCK_AGENTS.filter((a) => a.status === "active" || a.status === "in_progress").length;

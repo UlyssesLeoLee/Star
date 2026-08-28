@@ -1,0 +1,18 @@
+// frontend/src/mocks/data/inbox.ts
+// MOCK_NOTIFS — 10 row fixture (per mock-data-isolation.md §2.1)
+// Source: previously inline in frontend/src/app/(app)/inbox/page.tsx
+
+import type { MockNotif } from "@/mocks/schemas/inbox";
+
+export const MOCK_NOTIFS: ReadonlyArray<MockNotif> = [
+  { id: "n-001", kind: "agent_decision_required", subject: "ag-005 awaiting decision",         body: "Spec excerpt conflicts with INV-RT-03, please confirm",     read: false, ago: "2 min ago" },
+  { id: "n-002", kind: "ci_failed",                subject: "CI failed: Physis-builder #482", body: "test:integration:rt_step failed 3/12",                     read: false, ago: "8 min ago" },
+  { id: "n-003", kind: "review_requested",         subject: "Review: feat/w2-gantt → main",   body: "@Ulysses review required (5 files, +420 -118)",             read: false, ago: "23 min ago" },
+  { id: "n-004", kind: "merge_conflict",           subject: "Merge conflict on planning/page", body: "Resolve conflict before pushing (per §4 fix/*)",          read: true,  ago: "1 h ago"   },
+  { id: "n-005", kind: "budget_alert",             subject: "Budget 80% used",                body: "ag-002 Physis-builder hit $4.00/$5.00 daily cap",           read: false, ago: "1 h ago"   },
+  { id: "n-006", kind: "policy_violation",         subject: "Policy violation: INV-FB-02",    body: "ag-005 reported feedback required, lease paused",          read: true,  ago: "2 h ago"   },
+  { id: "n-007", kind: "feedback_question",        subject: "ag-007 asks: which spec?",       body: "Multiple matches for SPEC-001 vs SPEC-002",                read: false, ago: "3 h ago"   },
+  { id: "n-008", kind: "ci_failed",                subject: "CI failed: Star-frontend #117",  body: "typecheck exit 1 — see log",                                read: true,  ago: "5 h ago"   },
+  { id: "n-009", kind: "review_requested",         subject: "Review: DTL-036 v1.4 hotfix",    body: "3 P1/P2/P3 violations — please review",                    read: true,  ago: "1 d ago"   },
+  { id: "n-010", kind: "budget_alert",             subject: "Weekly cost summary",            body: "Total $87.42 across 5 agents (down 12% vs last week)",     read: true,  ago: "2 d ago"   },
+];

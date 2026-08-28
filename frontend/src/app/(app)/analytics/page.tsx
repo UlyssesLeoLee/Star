@@ -12,26 +12,10 @@
 
 import { PageHeader, Stat, SectionTitle } from "@/components/PageHeader";
 import { BarChart3, TrendingUp } from "lucide-react";
+import { MOCK_KPI, COST_SERIES } from "@/mocks/data";
+import type { CostPoint } from "@/mocks/schemas/analytics";
 
-const MOCK_KPI = [
-  { label: "Cost (24h)",   value: "$12.48", hint: "mock aggregated", tone: "warn"  as const },
-  { label: "Tokens (24h)", value: "1.24M",  hint: "input 0.78M / output 0.46M", tone: "info" as const },
-  { label: "Tasks (24h)",  value: 87,       hint: "completed 74 / in_progress 13", tone: "ok" as const },
-  { label: "Errors (24h)", value: 3,        hint: "ci_failed 2 / failed 1", tone: "err" as const },
-];
-
-// mock 7-day cost series, 7 个数据点
-const COST_SERIES: ReadonlyArray<{ day: string; usd: number }> = [
-  { day: "Mon", usd: 9.4 },
-  { day: "Tue", usd: 11.2 },
-  { day: "Wed", usd: 8.7 },
-  { day: "Thu", usd: 13.1 },
-  { day: "Fri", usd: 12.48 },
-  { day: "Sat", usd: 6.3 },
-  { day: "Sun", usd: 4.2 },
-];
-
-function MiniLineChart({ data }: { data: ReadonlyArray<{ day: string; usd: number }> }) {
+function MiniLineChart({ data }: { data: ReadonlyArray<CostPoint> }) {
   const W = 320;
   const H = 96;
   const PAD = 8;

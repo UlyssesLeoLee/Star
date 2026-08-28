@@ -26,6 +26,7 @@ import { KanbanCard } from "./KanbanCard";
 import { StatusPill } from "@/components/StatusPill";
 import { AlertTriangle } from "lucide-react";
 import type { Board, WorkItem, WorkItemStatus, Identity } from "@/types/ids";
+import { KANBAN_COLUMNS } from "@/mocks/data";
 
 export interface KanbanBoardProps {
   board: Board;
@@ -45,7 +46,7 @@ export interface KanbanBoardProps {
   onDragEndCard?: () => void;
 }
 
-const KANBAN_COLUMNS: WorkItemStatus[] = ["todo", "in_progress", "review", "done"];
+const KANBAN_COLUMNS_LOCAL: ReadonlyArray<WorkItemStatus> = KANBAN_COLUMNS;
 
 export function KanbanBoard({
   board,
