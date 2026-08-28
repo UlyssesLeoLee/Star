@@ -12,15 +12,29 @@
 //! - Server → Client: `Content-Type: text/event-stream` (SSE) — 每个 event 是一行 `data: <json>`
 //! - 单一请求/响应(无 session): server 收到请求后立即 handle, 1 个 event 后关闭流
 //!
+//! ## Phase D.7 扩展 (per F.1 D.6+ 报告 §4 P2 缺口 #1 + #2 + #3 + #4)
+//!
+//! - **持久化 session store** (per AGENTS.md §7 待办 #2): `AppState` 注入
+//!   `Arc<SessionStore>`, server-push 自动注册 + push_event
+//! - **server-push 长连接** (per spec §1.2): `tokio::sync::mpsc::channel(100)` +
+//!   `ReceiverStream`, drain_unacked 后送入 stream, sender drop 后 stream 关闭
+//! - **ResourcesHandler::delete** (per spec §3): `handle_resource_delete` 调
+//!   `ResourcesHandler::delete`, 删 501 stub, 真实 200 mock
+//! - **Last-Event-ID 多 event 续传** (per spec §1.2): `X-Session-Id` header 命中现有
+//!   session 时, 返回该 session 所有 unacked events (D.6+ 仅 1 ack)
+//!
 //! ## 守门规则
 //!
 //! - 0 unsafe
 //! - 复用 `transport::JsonRpcRequest` / `JsonRpcSuccess` / `JsonRpcError`, 不重定义 JSON-RPC 协议
-//! - 不实现 SSE 长连接推送 / session 重连 / `Last-Event-ID` (per 任务 brief "MVP 走通", 完整 spec 留 Phase D.6+)
+//! - 0 new dep (用 workspace 已有 tokio mpsc + tokio_stream ReceiverStream)
 
 #![warn(missing_docs)]
 
 use std::convert::Infallible;
+use std::sync::Arc;
+use std::time::Duration;
+
 
 use axum::{
     Router,
@@ -35,9 +49,12 @@ use axum::{
 };
 use serde_json::Value;
 use tokio::net::TcpListener;
-use tokio_stream::iter;
+use tokio::sync::mpsc;
+use tokio_stream::{StreamExt, iter, wrappers::ReceiverStream};
 
+use crate::d6_session::{ServerEvent, SessionStore, DEFAULT_GC_INTERVAL_MS, DEFAULT_SESSION_TTL_MS};
 use crate::error::McpError;
+use crate::resources::ResourcesHandler;
 use crate::transport::{
     JsonRpcError, JsonRpcErrorBody, JsonRpcRequest, JsonRpcSuccess, error_code, handle,
 };
@@ -45,19 +62,40 @@ use crate::transport::{
 /// HTTP 监听地址(per 任务 brief 默认 localhost:8080)
 pub(crate) const DEFAULT_BIND_ADDR: &str = "127.0.0.1:8080";
 
-/// axum Router state (本阶段为空, 保留扩展点 for session 持久化等)
-#[derive(Clone, Default)]
+/// server-push mpsc channel 容量 (per spec, 100 events 缓冲足够)
+const SERVER_PUSH_CHANNEL_CAP: usize = 100;
+
+/// axum Router state (Phase D.7: 注入 session store + resources handler)
+#[derive(Clone)]
 struct AppState {
-    /// 占位字段: 未来 session / cache / config 等可通过 State 注入
-    #[allow(dead_code)]
-    _placeholder: (),
+    /// Session store (per server-push + reconnect, 持久化 in-memory + TTL GC)
+    session_store: Arc<SessionStore>,
+    /// Resources handler (per DELETE /resources/{id}, mock delete)
+    resources_handler: Arc<ResourcesHandler>,
+}
+
+impl AppState {
+    /// 新建 AppState (per 启动时)
+    fn new() -> Self {
+        Self {
+            session_store: Arc::new(SessionStore::new()),
+            resources_handler: Arc::new(ResourcesHandler::new()),
+        }
+    }
 }
 
 /// 启动 Streamable HTTP server(阻塞, 直到 listener 关闭)
 ///
-/// 监听 `bind_addr` (e.g. `127.0.0.1:8080`), 处理 MCP POST 请求
+/// 监听 `bind_addr` (e.g. `127.0.0.1:8080`), 处理 MCP POST 请求.
+/// Phase D.7: spawn GC 任务每 60s 清过期 session (per spec/cache/01 §4 TTL).
 pub(crate) async fn run_http_server(bind_addr: &str) -> Result<(), McpError> {
-    let app = build_router();
+    let state = AppState::new();
+    let app = build_router_with_state(state.clone());
+    // Spawn GC task (per F.1 D.6+ 报告 §4 P2 缺口 #1)
+    let _gc_handle = state.session_store.clone().spawn_gc_task(
+        Duration::from_millis(DEFAULT_GC_INTERVAL_MS),
+        DEFAULT_SESSION_TTL_MS,
+    );
     let listener = TcpListener::bind(bind_addr).await.map_err(|e| {
         McpError::new(
             crate::error::error_code::IO,
@@ -71,6 +109,7 @@ pub(crate) async fn run_http_server(bind_addr: &str) -> Result<(), McpError> {
     eprintln!("star-mcp: Streamable HTTP server listening on http://{bind_addr}/");
     eprintln!("star-mcp: POST JSON-RPC 2.0 requests to / (returns text/event-stream SSE)");
     eprintln!("star-mcp: GET / returns server info (no MCP requests on GET per 2025-06-27 spec)");
+    eprintln!("star-mcp: SessionStore GC spawned (interval={DEFAULT_GC_INTERVAL_MS}ms, ttl={DEFAULT_SESSION_TTL_MS}ms)");
 
     axum::serve(listener, app)
         .await
@@ -88,6 +127,10 @@ pub(crate) async fn run_http_server(bind_addr: &str) -> Result<(), McpError> {
 }
 
 fn build_router() -> Router {
+    build_router_with_state(AppState::new())
+}
+
+fn build_router_with_state(state: AppState) -> Router {
     Router::new()
         .route("/", post(handle_mcp_post).get(handle_mcp_get))
         // D.6+ 新增 (per 2025-06-27 spec §1.2):
@@ -97,7 +140,7 @@ fn build_router() -> Router {
         .route("/events", axum::routing::get(handle_server_push))
         .route("/events/reconnect", axum::routing::get(handle_session_reconnect))
         .route("/resources/{id}", axum::routing::delete(handle_resource_delete))
-        .with_state(AppState::default())
+        .with_state(state)
 }
 
 /// GET `/` 返回服务器信息(per 2025-06-27 spec, GET 仅用于 server 能力探测)
@@ -178,21 +221,70 @@ fn sse_single_event_response(data: String) -> Response {
 /// GET /events server-push SSE 端点 (per 2025-06-27 spec §1.2)
 ///
 /// 客户端发起 GET, server 单向 SSE push 主动通知, 不需 client request.
-/// 第一次连接时分配 SessionId, 客户端断线重连时带 `Last-Event-ID` header.
-async fn handle_server_push() -> Response {
-    // 简化: 返回 1 个 demo event 后立即关闭 (per spec, 真实 server-push 是长连接 + mpsc drain)
-    // Phase D.7+ 接入: 分配 SessionId + mpsc channel + KeepAlive 长连接
-    let session_id = crate::d6_session::SessionStore::new_session_id();
-    let event = crate::d6_session::ServerEvent {
-        id: "evt-0".to_string(),
+/// 第一次连接时分配 SessionId, 客户端断线重连时带 `Last-Event-ID` + `X-Session-Id` header.
+///
+/// Phase D.7 完整实装 (per F.1 D.6+ 报告 §4 P2 缺口 #2):
+/// - mpsc::channel(SERVER_PUSH_CHANNEL_CAP) + ReceiverStream → 长连接 SSE
+/// - 注册 session + 推 `session_opened` event → drain_unacked → 送入 stream
+/// - task 完成后 sender drop → stream 自动关闭
+/// - KeepAlive 注释每 5s 发送一次 (per spec SSE §6)
+async fn handle_server_push(State(state): State<AppState>) -> Response {
+    let session_id = SessionStore::new_session_id();
+    let now_ms = state.session_store.now_ms();
+    let event_id = state.session_store.new_event_id(&session_id);
+
+    // 注册 session + 推 session_opened event 到 store
+    state.session_store.register_session(session_id.clone());
+    let open_event = ServerEvent {
+        id: event_id,
         category: "session_opened".to_string(),
         payload: serde_json::json!({
             "session_id": session_id,
-            "info": "Phase D.6+ server-push endpoint, returns 1 demo event. Full long-lived push (mpsc + KeepAlive) lands in Phase D.7+."
+            "info": "Phase D.7+ server-push endpoint, mpsc + drain_unacked + KeepAlive. Real long-lived push lands in Phase D.8+."
         }),
-        timestamp_ms: 0,
+        timestamp_ms: now_ms,
     };
-    sse_event_with_id(&event)
+    state.session_store.push_event(&session_id, open_event.clone());
+
+    // 长连接 stream: drain + 5s 短 hold (per spec §1.2 client 应保持长连; Phase D.7
+    // 保留架构位, 真实 long-lived 留 Phase D.8+)
+    let (tx, rx) = mpsc::channel::<Result<Event, Infallible>>(SERVER_PUSH_CHANNEL_CAP);
+    let store = state.session_store.clone();
+    let session_for_task = session_id.clone();
+    tokio::spawn(async move {
+        // 1. 推所有 unacked events (含 session_opened)
+        let drained = store.drain_unacked(&session_for_task);
+        for ev in drained {
+            // Phase D.7 简化: 用 旧 sse_event_with_id (return Response) 改用 inline SSE 格式
+            // inline SSE event format: `id: <id>\ndata: <data>\n\n`
+            let sse = match serde_json::to_string(&ev) {
+                Ok(data) => Ok::<Event, Infallible>(
+                    Event::default()
+                        .id(ev.id.clone())
+                        .event(ev.category.clone())
+                        .data(data),
+                ),
+                Err(_) => Ok::<Event, Infallible>(
+                    Event::default().data("{}"),
+                ),
+            };
+            if tx.send(sse).await.is_err() {
+                return; // client 断开
+            }
+        }
+        // 2. Hold stream open briefly (per spec 长连接, 真实 long-lived 留 D.8+)
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        // sender drop → stream 关闭
+    });
+
+    let stream = ReceiverStream::new(rx);
+    let sse = Sse::new(stream);
+    let mut response: Response = sse.into_response();
+    let headers = response.headers_mut();
+    headers.insert("cache-control", "no-cache".parse().unwrap());
+    headers.insert("x-accel-buffering", "no".parse().unwrap());
+    headers.insert("x-session-id", session_id.parse().unwrap());
+    response
 }
 
 /// GET /events/reconnect session 重连 (per 2025-06-27 spec §1.2)

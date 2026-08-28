@@ -277,6 +277,50 @@ impl ResourcesHandler {
         Ok(contents(uri, &body))
     }
 
+    /// 删除资源 (per 2025-06-27 MCP spec §3 `resources/unsubscribe` 语义 + DELETE /resources/{id})
+    ///
+    /// Phase D.7 mock 实装 (per F.1 D.6+ 报告 §4 P2 缺口 #3):
+    /// - URI 解析 → scheme 校验 → 200 响应 `_mock: true` + `_deleted: <id>`
+    /// - 真实持久化删除 (Workspace / Worktree / Agent / Decision 4 域) 留 Phase D.8+
+    /// - 缺标比错标安全: 未做真实删除, 标 `_todo: "Phase D.8+ 真实持久化"`
+    ///
+    /// 参数 `id` 可以是 `scheme://path` (完整 URI) 或仅 path (e.g. `wt-STAR-1024`).
+    /// 若 `id` 不含 `://`, 视为 path, scheme 默认走 4 核心之一 (per list()).
+    pub async fn delete(&self, id: &str) -> Result<Value, McpError> {
+        // 1. URI 格式校验
+        if id.is_empty() {
+            return Err(McpError::user_input(
+                "resource id must be non-empty (e.g. 'workspace://current' or 'wt-STAR-1024')",
+                None,
+            ));
+        }
+        // 2. 若 id 是完整 URI, parse_uri 校验格式
+        let (scheme, path) = if id.contains("://") {
+            parse_uri(id)?
+        } else {
+            // 裸 id (e.g. 'wt-STAR-1024'), 视为 path, scheme 由调用方决定
+            // D.7 mock 阶段: 默认 scheme = "resource" 表示未指定
+            ("resource", id)
+        };
+
+        // 3. 校验 scheme 在已知列表 (4 核心 + 22 domain)
+        // Phase D.7 mock 阶段: 不强制 scheme 白名单, 全部接受 → 200 mock
+        eprintln!(
+            "star-mcp: ResourcesHandler::delete mock (scheme='{scheme}', path='{path}', \
+             _todo='Phase D.8+ 真实持久化接入')"
+        );
+
+        // 4. 返回 mock 200 envelope
+        Ok(json!({
+            "_mock": true,
+            "_todo": "Phase D.8+: real persistence via WorkspaceDeletePort/WorktreeDeletePort/etc.",
+            "scheme": scheme,
+            "id": id,
+            "deleted": true,
+            "phase": "D.7",
+        }))
+    }
+
     /// `decision://{id}` — 决策记录
     ///
     /// per `spec/flows/02` Decision schema
