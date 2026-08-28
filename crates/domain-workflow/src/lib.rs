@@ -1517,3 +1517,5 @@ mod tests {
         assert_eq!(inst2_fetched.history.len(), 0);
     }
 }
+
+pub mod visualize;
