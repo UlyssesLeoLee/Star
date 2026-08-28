@@ -12,13 +12,8 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 
-<<<<<<< HEAD
 type IconType = React.ComponentType<{ size?: number; className?: string }>;
 type NavItem = { href: string; label: string; icon: React.ElementType; track: string };
-=======
-type IconType = React.ComponentType<{ size?: number; className?: string }>;
-type NavItem = { href: string; label: string; icon: React.ElementType; track: string };
->>>>>>> feat/w1-kanban-dnd
 type NavGroup = { label: string; items: NavItem[] };
 
 const NAV: NavGroup[] = [
