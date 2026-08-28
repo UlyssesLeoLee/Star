@@ -27,11 +27,30 @@ export default function PlanningPage() {
   const burndown = useStore((s) => s.burndownSeries);
   const workItems = useStore((s) => s.workItems);
   const transitionMilestone = useStore((s) => s.transitionMilestone);
-  const updateWorkItemDueDate = useStore((s) => s.updateWorkItemDueDate);
   const transitionSprint = useStore((s) => s.transitionSprint);
-  const transitionWorkItemSprint = useStore(
-    (s) => s.transitionWorkItemSprint,
-  );
+
+  // W3 calendar 拖动 → 更新 work-item due_date (per dynamic-interaction-design.md §5.3)
+  // W5 store 还没实装 updateWorkItemDueDate / transitionWorkItemSprint,
+  // 用 useStore.setState 直接改, 与 BoardPage (W1) 风格一致
+  // (per W3 守门: 不重写 store, 仅在调用方补偿; U3 接手时 store 升级后会替换)
+  const updateWorkItemDueDate = (workItemId: string, isoDueDate: string) => {
+    useStore.setState((s) => ({
+      workItems: s.workItems.map((w) =>
+        w.id === workItemId
+          ? { ...w, due_date: isoDueDate, updated_at: new Date().toISOString() }
+          : w,
+      ),
+    }));
+  };
+  const transitionWorkItemSprint = (workItemId: string, newSprintId: string) => {
+    useStore.setState((s) => ({
+      workItems: s.workItems.map((w) =>
+        w.id === workItemId
+          ? { ...w, sprint_id: newSprintId, updated_at: new Date().toISOString() }
+          : w,
+      ),
+    }));
+  };
 
   const [tab, setTab] = useState<string>("gantt");
   const [view, setView] = useState<"month" | "week">("month");
