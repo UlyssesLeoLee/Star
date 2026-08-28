@@ -17,6 +17,14 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react"; // 
 import { KanbanBoard } from "./KanbanBoard";
 import type { Board, WorkItem, Identity } from "@/types/ids";
 
+// ---- mock next/navigation (per U2 — KanbanCard click → router.push) ----
+const mockRouterPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockRouterPush, replace: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => "/issues",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 // ---- mock fixtures ----
 const mockIdentities: Identity[] = [
   { id: "usr-001", tenant_id: "t-1", email: "u@x", display_name: "Ulysses", provider: "github", status: "active", mfa_enabled: true },
@@ -145,5 +153,31 @@ describe("KanbanBoard", () => {
     fireEvent.drop(inProgressColAfter, { dataTransfer: dropDt });
     const inProgressColFinal = screen.getByTestId("kanban-column-in_progress");
     expect(inProgressColFinal.className).not.toMatch(/ring-accent/);
+  });
+
+  // ---- Test 4: U2 路由集成 — 点击卡片触发 router.push 到 /work-item/{id} ----
+  // (KanbanCard 默认 onClick → router.push, Issues 主面板 / Projects 多 panel 共用同一行为)
+  it("U2 路由集成: card click navigates to /work-item/{id} via router.push", () => {
+    const onTransition = vi.fn();
+    render(
+      <KanbanBoard
+        board={mockBoard}
+        workItems={mockWorkItems}
+        identities={mockIdentities}
+        onTransition={onTransition}
+      />,
+    );
+
+    // 点击 wi-1 卡片
+    const card = screen.getByTestId("kanban-card-wi-1");
+    fireEvent.click(card);
+
+    // router.push 应被调用, 路径为 /work-item/wi-1 (per KanbanCard 默认 click handler)
+    expect(mockRouterPush).toHaveBeenCalledTimes(1);
+    expect(mockRouterPush).toHaveBeenCalledWith("/work-item/wi-1");
+
+    // 注意: drop 路径不应触发 click (drag → drop 是另一通道)
+    // 验证 onTransition 没被 click 误触发
+    expect(onTransition).not.toHaveBeenCalled();
   });
 });

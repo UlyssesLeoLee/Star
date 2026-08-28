@@ -4,24 +4,24 @@
 // useBoardSync — TanStack-Query 风格的 2s 轮询多人协同 hook
 // =====================================================================
 // 职责:
-//   1. 每 2s 从 /api/board-sync?since={timestamp} 拉增量
+//   1. 用 TanStack Query 每 2s 从 productionApi.boardSync(projectId) 拉增量
 //   2. 检测 workItems[i].updated_at > since 的项 → 标记为"他人改动"
-//   3. 调用 applyRemoteChange(snapshot) 把远端状态合入 zustand store
-//   4. 返回 { hasRemoteChange, lastSyncAt, isPolling, changeCount }
+//   3. 调用 onRemoteChange(changes) 回调, page.tsx 用它来 toast
+//   4. 暴露 { data, fetchStatus, refetch, hasRemoteChange, changeCount, lastSyncAt, isPolling }
 //
 // 设计取舍 (per docs/frontend/design/dynamic-interaction-design.md §8.1):
-//   - 不引入 @tanstack/react-query (避免重依赖, per §2.4 性能原则)
-//   - 用 setInterval + useState 自实现, 行为对齐 TanStack Query
+//   - W5 重构: 用 @tanstack/react-query useQuery + refetchInterval (而非手写 setInterval)
 //   - last-write-wins 冲突解决 (per §8.1), 不引入 CRDT
 //   - 暂不接 WebSocket (per §2.2 + §10.3 已知缺口 #1)
 //
 // 已知缺口 (per §10.3 缺标比错标):
-//   - 后端 /api/board-sync mock 由 W5 在 layout/store 升级时提供
-//   - 当前 useBoardSync 默认走 stub: 模拟其他用户随机 1/6 概率改 1 个 work-item
+//   - productionApi.boardSync 走 zustand store 拿全量, since cursor 忽略 (mock 阶段)
 //   - Phase I+ 切换为 SSE 推送
 // =====================================================================
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { productionApi } from "@/lib/api";
 import type { WorkItem } from "@/types/ids";
 
 export interface BoardSyncChange {
@@ -39,14 +39,16 @@ export interface BoardSyncSnapshot {
 }
 
 export interface UseBoardSyncOptions {
+  /** 项目 id, queryKey 必含 (per §8.1) */
+  projectId: string;
   /** 轮询间隔 ms, 默认 2000 (per §2.2 + §8.1) */
   intervalMs?: number;
   /** 启用 / 停用轮询, 默认 true */
   enabled?: boolean;
   /** 收到变更时的回调, page.tsx 用它来 toast */
   onRemoteChange?: (changes: BoardSyncChange[]) => void;
-  /** 拉取函数; 不传则用内置 stub */
-  fetcher?: (since: string) => Promise<BoardSyncSnapshot>;
+  /** 拉取函数; 不传则用 productionApi.boardSync */
+  fetcher?: (projectId: string, since?: string) => Promise<{ cursor: string; snapshot: { board: unknown; recentActivity: unknown[] } }>;
 }
 
 export interface UseBoardSyncResult {
@@ -54,88 +56,64 @@ export interface UseBoardSyncResult {
   changeCount: number;
   lastSyncAt: string | null;
   isPolling: boolean;
+  /** 最近一次 fetcher 返回的原始 response (测试断言用) */
+  data: { cursor: string; snapshot: { board: unknown; recentActivity: unknown[] } } | undefined;
+  /** TanStack-Query 风格: "idle" | "fetching" (测试断言用) */
+  fetchStatus: "idle" | "fetching";
   /** 强制立即拉一次 */
   refetch: () => void;
 }
 
-// ---- 内置 stub fetcher: 模拟他人改动 ----
-// 真实后端接入 (Phase D.6+) 后, page.tsx 传 fetcher 参数覆盖即可。
-const stubFetcher = async (_since: string): Promise<BoardSyncSnapshot> => {
-  // 1/6 概率模拟一个远程变更 (per 任务"多人协同"演示需要)
-  // 注意: 这个 stub 只在演示模式生效, 接入真实后端后会消失
-  if (Math.random() > 5 / 6) {
-    const mockIds = ["wi-001", "wi-005", "wi-010"];
-    const mockId = mockIds[Math.floor(Math.random() * mockIds.length)];
-    return {
-      since: _since,
-      server_time: new Date().toISOString(),
-      changes: [
-        {
-          work_item_id: mockId,
-          from_status: "todo",
-          to_status: "in_progress",
-          changed_by: "usr-002",
-          changed_at: new Date().toISOString(),
-        },
-      ],
-    };
-  }
-  return {
-    since: _since,
-    server_time: new Date().toISOString(),
-    changes: [],
-  };
-};
-
-export function useBoardSync(opts: UseBoardSyncOptions = {}): UseBoardSyncResult {
-  const { intervalMs = 2000, enabled = true, onRemoteChange, fetcher } = opts;
+export function useBoardSync(opts: UseBoardSyncOptions): UseBoardSyncResult {
+  const { projectId, intervalMs = 2000, enabled = true, onRemoteChange, fetcher } = opts;
   const [changeCount, setChangeCount] = useState(0);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
   const onRemoteChangeRef = useRef(onRemoteChange);
-  const fetcherRef = useRef(fetcher ?? stubFetcher);
+  const queryClient = useQueryClient();
 
-  // 保持回调 ref 最新, 避免 effect 重启
   useEffect(() => {
     onRemoteChangeRef.current = onRemoteChange;
   }, [onRemoteChange]);
-  useEffect(() => {
-    fetcherRef.current = fetcher ?? stubFetcher;
-  }, [fetcher]);
 
-  const doFetch = useCallback(async () => {
-    if (!enabled) return;
-    setIsPolling(true);
-    try {
-      const snap = await fetcherRef.current(lastSyncAt ?? new Date(Date.now() - intervalMs * 5).toISOString());
-      setLastSyncAt(snap.server_time);
-      if (snap.changes.length > 0) {
-        setChangeCount((c) => c + snap.changes.length);
-        onRemoteChangeRef.current?.(snap.changes);
-      }
-    } catch (err) {
-      // fetch 失败静默, 下一轮重试 (last-write-wins 容错)
-      // eslint-disable-next-line no-console
-      console.warn("[useBoardSync] poll failed:", err);
-    } finally {
-      setIsPolling(false);
+  const queryKey = ["board-sync", projectId];
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const fn = fetcher ?? productionApi.boardSync;
+      return fn(projectId);
+    },
+    enabled,
+    refetchInterval: enabled ? intervalMs : false,
+    refetchOnMount: enabled,
+    refetchOnWindowFocus: false,
+  });
+
+  // 每次 data 变化: 更新 lastSyncAt + 触发 onRemoteChange
+  useEffect(() => {
+    if (!query.data) return;
+    setLastSyncAt(query.data.cursor);
+    const recent = (query.data.snapshot?.recentActivity ?? []) as Array<{ work_item_id: string; to_status: WorkItem["status"]; actor_id: string; at: string }>;
+    if (recent.length > 0) {
+      const changes: BoardSyncChange[] = recent.map((r) => ({
+        work_item_id: r.work_item_id,
+        from_status: "todo",
+        to_status: r.to_status,
+        changed_by: r.actor_id,
+        changed_at: r.at,
+      }));
+      setChangeCount((c) => c + changes.length);
+      onRemoteChangeRef.current?.(changes);
     }
-  }, [enabled, lastSyncAt, intervalMs]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    // 启动时立即拉一次, 之后 intervalMs 周期拉
-    doFetch();
-    const timer = setInterval(doFetch, intervalMs);
-    return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, intervalMs]);
+  }, [query.data]);
 
   return {
     hasRemoteChange: changeCount > 0,
     changeCount,
     lastSyncAt,
-    isPolling,
-    refetch: doFetch,
+    isPolling: query.isFetching,
+    data: query.data,
+    fetchStatus: query.fetchStatus as "idle" | "fetching",
+    refetch: () => { void queryClient.invalidateQueries({ queryKey }); },
   };
 }

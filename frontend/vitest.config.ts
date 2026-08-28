@@ -1,5 +1,9 @@
 // =====================================================================
-// vitest.config.ts — W5 + W2 合并配置
+// vitest.config.ts — W5 + W2 + U5 合并配置
+//
+// W5 store/toast original. W2 Gantt added esbuild.jsx + setupFiles.
+// U5 multica-style redirects added `e2e/**\/*.spec.ts` to the include
+// list so frontend/e2e/redirects.spec.ts is picked up by `vitest run`.
 // =====================================================================
 import { defineConfig } from "vitest/config";
 import path from "node:path";
@@ -11,7 +15,10 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    include: [
+      "src/**/*.{test,spec}.{ts,tsx}",
+      "e2e/**/*.{test,spec}.{ts,tsx}",
+    ],
     exclude: ["node_modules", ".next", "**/node_modules/**"],
     setupFiles: ["./vitest.setup.ts"],
   },
