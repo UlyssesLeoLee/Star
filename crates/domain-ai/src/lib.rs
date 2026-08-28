@@ -267,12 +267,13 @@ impl LlmProviderPort for MockLlmProvider {
             AgentRole::JqlGenerator => mock_jql(&request.prompt),
             AgentRole::RovoChat => mock_chat(&request.prompt),
         };
+        let tokens_used = content.len() as u32 / 4;
         Ok(AiResponse {
             request_id: request.id,
             role: request.role,
             content,
             structured: None,
-            tokens_used: content.len() as u32 / 4,
+            tokens_used,
             latency_ms: 50,
             created_at: chrono::Utc::now(),
         })
