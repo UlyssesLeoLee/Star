@@ -10,9 +10,8 @@ import type {
   PermissionRule, Workflow, ChangeSet, Worktree, AgentSession, Feedback,
   ContextPacket, ContextDecision, ValidationCase, LocalRuntime, Repository,
   PullRequest, Notification, SearchHit, SavedSearch, Integration, PresenceCursor,
-  Whiteboard, Canvas, CanvasElement, CanvasConnector,
-  Sprint, Milestone, BurndownPoint, Board, Relation, AuditEvent,
-  AutomationRule,
+  Whiteboard, Canvas, CanvasElement, CanvasConnector, Sprint, Milestone,
+  BurndownPoint, Board, Relation, AuditEvent, AutomationRule,
 } from "@/types/ids";
 
 const now = () => new Date().toISOString();
