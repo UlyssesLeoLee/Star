@@ -1731,3 +1731,5 @@ mod tests {
         assert!(matches!(res, Err(PlanningError::CrossTenantDenied(_, _))));
     }
 }
+
+pub mod whatif;
