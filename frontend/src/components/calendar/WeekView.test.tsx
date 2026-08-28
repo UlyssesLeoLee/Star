@@ -11,11 +11,13 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { WeekView } from "./WeekView";
 import type { CalendarEvent } from "./types";
 
-const today = new Date(2026, 7, 28); // Friday
+const today = new Date(2026, 7, 28); // Friday — week = Aug 23 (Sun) – Aug 29 (Sat)
 
 const sampleEvents: CalendarEvent[] = [
-  { id: "wi-007", kind: "work_item", title: "PHYSIS-7 · Auto Rule", start_date: "2026-08-28T00:00:00.000Z", color: "err", badge: "P0" },
-  { id: "wi-013", kind: "work_item", title: "PHYSIS-13 · Validation", start_date: "2026-08-30T00:00:00.000Z", color: "warn", badge: "P2" },
+  // U3 (2026-08-28) 修: 原始 wi-013 的 start_date "2026-08-30" 在 next week 不在 view 内
+  // 把 2 个 event 都放在同一周 (Aug 23-29) 以便 WeekView 渲染并断言
+  { id: "wi-007", kind: "work_item", title: "PHYSIS-7 · Auto Rule",      start_date: "2026-08-25T00:00:00.000Z", color: "err",  badge: "P0" },
+  { id: "wi-013", kind: "work_item", title: "PHYSIS-13 · Validation",    start_date: "2026-08-28T00:00:00.000Z", color: "warn", badge: "P2" },
 ];
 
 describe("WeekView", () => {
@@ -40,10 +42,10 @@ describe("WeekView", () => {
   it("calls onEventMove on drag-drop of work-item to a different day", () => {
     const handleMove = vi.fn();
     render(<WeekView startDate={today} events={sampleEvents} onEventMove={handleMove} />);
-    // 找 2026-08-30 (Sunday of next week 实际是 8/30)
+    // 找 2026-08-25 (Tuesday) — sample wi-007 的 start_date
     const days = screen.getAllByTestId("week-day");
-    const day830 = days.find((d) => d.getAttribute("data-date") === "2026-08-30");
-    expect(day830).toBeDefined();
+    const day825 = days.find((d) => d.getAttribute("data-date") === "2026-08-25");
+    expect(day825).toBeDefined();
 
     const dataTransfer = {
       getData: (type: string) => (type === "text/plain" ? "wi-007" : ""),
@@ -51,8 +53,8 @@ describe("WeekView", () => {
       dropEffect: "move",
     } as unknown as DataTransfer;
 
-    fireEvent.drop(day830!, { dataTransfer });
-    expect(handleMove).toHaveBeenCalledWith("wi-007", "2026-08-30");
+    fireEvent.drop(day825!, { dataTransfer });
+    expect(handleMove).toHaveBeenCalledWith("wi-007", "2026-08-25");
   });
 
   it("renders work-item events in their respective day", () => {

@@ -57,6 +57,7 @@ export default function BoardPage() {
   // ---- 多人协同: useBoardSync 2s 轮询, 检测到他人改动 → toast ----
   // (per §8.1 last-write-wins; W5 接管 Toaster 后, 这里改成 toast.success)
   useBoardSync({
+    projectId: board.project_id,
     intervalMs: 2000,
     enabled: true,
     onRemoteChange: (changes: BoardSyncChange[]) => {
