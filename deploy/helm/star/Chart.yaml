@@ -1,0 +1,13 @@
+apiVersion: v2
+name: star
+description: Star Helm chart — Phase I production rollout (8 services: cli/mcp/context/sa/sse/webhook/cache/saga)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/UlyssesLeoLee/Star
+maintainers:
+  - name: Ulysses (一人公司 12 角色 per DEC-008)
+    email: ulysses@mavis.local
+annotations:
+  category: Application
+  licenses: Apache-2.0
