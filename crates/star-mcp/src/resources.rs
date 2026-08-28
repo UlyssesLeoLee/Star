@@ -119,11 +119,29 @@ impl ResourcesHandler {
         // URI scheme 解析
         let (scheme, path) = parse_uri(uri)?;
 
-        // Phase H: 优先查 22 domain handler (per spec/agents/02 §2.2 URI 模式)
+        // 优先级 (per spec/agents/02 §2.2 L80-86 + spec/mcp/02 §1.6 L69-79):
+        //   1) 4 核心 mock 仅在 URI 匹配 Phase E example id 时生效:
+        //      - workspace://current
+        //      - worktree://wt-STAR-1024 (mock example)
+        //      - agent://agent-1/state (mock example)
+        //      - decision://dec-001 (mock example)
+        //   2) 24 domain handler — Phase H 真实数据接入 (UUID 格式 id)
+        // 注: B.2.6 起 24 domain 注册, worktree/agent 真实 handler 接收
+        //   UUID 格式 id; mock example 走 4 核心, 真实 UUID 走 domain handler
+        match (scheme, path) {
+            ("workspace", "current") => return self.read_workspace_current(uri).await,
+            ("worktree", "wt-STAR-1024") => return self.read_worktree(uri, "wt-STAR-1024").await,
+            ("agent", "agent-1/state") => {
+                return self.read_agent_state(uri, "agent-1", "state").await;
+            }
+            ("decision", "dec-001") => return self.read_decision(uri, "dec-001").await,
+            _ => {}
+        }
+
+        // Phase H: 24 domain handler fallback (UUID 格式 ID)
         for d in &self.domains {
             let pattern_scheme = d.uri_pattern().split("://").next().unwrap_or("");
             if pattern_scheme == scheme {
-                // 提取 ID: `pattern://{id}` → 取 path 作为 id (兼容 `path/with/slash`)
                 return match d.read_json(path).await {
                     Ok(Some(data)) => Ok(contents(uri, &data)),
                     Ok(None) => Err(McpError::new(
@@ -146,25 +164,14 @@ impl ResourcesHandler {
             }
         }
 
-        // Phase E: 4 核心 resource 兜底
-        match (scheme, path) {
-            ("workspace", "current") => self.read_workspace_current(uri).await,
-            ("worktree", id) => self.read_worktree(uri, id).await,
-            ("agent", rest) => {
-                // 期望 `agent://{id}/state` 或 `agent://{id}/...`
-                let (id, suffix) = rest.split_once('/').unwrap_or((rest, "state"));
-                self.read_agent_state(uri, id, suffix).await
-            }
-            ("decision", id) => self.read_decision(uri, id).await,
-            (other, _) => Err(McpError::new(
-                error_code::RESOURCE_URI_INVALID,
-                format!("unsupported resource scheme: '{other}://'"),
-                "mcp",
-                ErrorSourceKind::UserInput,
-                false,
-                Some("supported schemes: workspace://, worktree://, agent://, decision:// + 22 domain (Phase H)".to_string()),
-            )),
-        }
+        Err(McpError::new(
+            error_code::RESOURCE_URI_INVALID,
+            format!("unsupported resource scheme: '{scheme}://'"),
+            "mcp",
+            ErrorSourceKind::UserInput,
+            false,
+            Some("supported schemes: workspace://, worktree://, agent://, decision:// + 22 domain (Phase H)".to_string()),
+        ))
     }
 
     // ===== 4 个核心 resource mock-but-functional 实装 =====
@@ -499,9 +506,10 @@ fn parse_uri(uri: &str) -> Result<(&str, &str), McpError> {
 
 // ===== JSON-RPC 2.0 入口(per Phase D.5+ 接口契约, 委托给 handler) =====
 
-/// 处理 `resources/list` 请求 — 返回 4 个 resource 描述
+/// 处理 `resources/list` 请求 — 返回 4 个 core + 24 domain resource 描述
 pub(crate) fn handle_resources_list(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRpcError> {
-    let handler = ResourcesHandler::new();
+    // B.2.6 fix: 必须用 with_domains 注册 24 domain handler, 否则 dispatch 走 4 核心 fallback
+    let handler = ResourcesHandler::with_domains(crate::handlers::all_domain_handlers());
     let resources = handler.list();
     let result = json!({ "resources": resources });
     Ok(JsonRpcSuccess { jsonrpc: "2.0", id: req.id.clone(), result })
@@ -527,7 +535,7 @@ pub(crate) async fn handle_resources_read(req: &JsonRpcRequest) -> Result<JsonRp
             }
         })?;
 
-    let handler = ResourcesHandler::new();
+    let handler = ResourcesHandler::with_domains(crate::handlers::all_domain_handlers());
     match handler.read(uri).await {
         Ok(result) => Ok(JsonRpcSuccess { jsonrpc: "2.0", id: req.id.clone(), result }),
         Err(e) => Err(JsonRpcError {
