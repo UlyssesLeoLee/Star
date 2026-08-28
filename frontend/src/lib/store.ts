@@ -63,6 +63,16 @@ interface StoreState {
   transitionChangeSet:(id: string, to: ChangeSetStatus) => void;
   markNotificationRead: (id: string) => void;
 
+  // W3 Calendar mutations (per dynamic-interaction-design.md §4.3 + §5)
+  // W3 minimal data layer contribution: drag-to-reschedule on Calendar / Gantt
+  //  - transitionMilestone: 拖 milestone 条左右 = 改 due_date
+  //  - updateWorkItemDueDate: 拖 work-item 到不同日期 = 改 due_date
+  //  - updateSprintDates: 拖 sprint 条左右 = 改 start/end_date
+  // W5 后续会叠 persist + toast (per §11.2 W5 在 W1-W4 之后)
+  transitionMilestone: (id: string, newDueDate: string) => void;
+  updateWorkItemDueDate: (id: string, newDueDate: string) => void;
+  updateSprintDates: (id: string, newStart: string, newEnd: string) => void;
+
   // Canvas mutations(无限画布,frontend-canvas-design.md §2)
   addCanvasElement: (element: CanvasElement) => void;
   moveCanvasElement: (id: string, x: number, y: number) => void;
@@ -135,6 +145,20 @@ export const useStore = create<StoreState>((set) => ({
   markNotificationRead: (id) =>
     set((s) => ({
       notifications: s.notifications.map((n) => n.id === id ? { ...n, status: "read" as NotificationStatus } : n),
+    })),
+
+  // W3 Calendar drag-to-reschedule (per dynamic-interaction-design.md §4.3 + §5)
+  transitionMilestone: (id, newDueDate) =>
+    set((s) => ({
+      milestones: s.milestones.map((m) => m.id === id ? { ...m, due_date: newDueDate } : m),
+    })),
+  updateWorkItemDueDate: (id, newDueDate) =>
+    set((s) => ({
+      workItems: s.workItems.map((w) => w.id === id ? { ...w, due_date: newDueDate, updated_at: new Date().toISOString() } : w),
+    })),
+  updateSprintDates: (id, newStart, newEnd) =>
+    set((s) => ({
+      sprints: s.sprints.map((sp) => sp.id === id ? { ...sp, start_date: newStart, end_date: newEnd } : sp),
     })),
 
   // Canvas mutations

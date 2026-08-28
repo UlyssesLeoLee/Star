@@ -5,6 +5,7 @@ import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { FileText, Tag, User, Hash, Flag } from "lucide-react";
 import { useState } from "react";
+import Link from "next/link";
 import { WORKITEM_SM, type WorkItemStatus } from "@/types/ids";
 import { StateMachineDiagram } from "@/components/StateMachineDiagram";
 

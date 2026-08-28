@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { StateMachineDiagram } from "@/components/StateMachineDiagram";
-import { WORKTREE_SM } from "@/types/ids";
+import { WORKTREE_SM, type WorktreeStatus } from "@/types/ids";
 import { GitBranch, GitMerge, Lock, Cpu, AlertCircle } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -103,7 +104,7 @@ export default function WorktreePage() {
                   {allowedNext.map((to) => (
                     <button
                       key={to}
-                      onClick={() => transitionWorktree(wt.id, to)}
+                      onClick={() => transitionWorktree(wt.id, to as WorktreeStatus)}
                       className="btn-primary"
                     >
                       → {to}

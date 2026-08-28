@@ -121,6 +121,9 @@ export interface WorkItem {
   labels: string[];
   sprint_id?: Uuid;
   workflow_id?: Uuid;
+  // W3 Calendar: optional due_date for calendar月/周视图 drag-to-reschedule
+  // 由 W3 worker 2026-08-28 加入 (per dynamic-interaction-design.md §5)
+  due_date?: Iso8601;
   created_at: Iso8601;
   updated_at: Iso8601;
 }

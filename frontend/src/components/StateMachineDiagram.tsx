@@ -29,7 +29,8 @@ export function StateMachineDiagram({ sm, highlightState }: { sm: StateMachine; 
 
   // 边
   const edges = sm.transitions.map((t) => ({
-    ...t,
+    fromId: t.from,
+    toId: t.to,
     from: posOf(t.from),
     to: posOf(t.to),
   }));
@@ -64,7 +65,7 @@ export function StateMachineDiagram({ sm, highlightState }: { sm: StateMachine; 
         {/* edges */}
         {edges.map((e, i) => {
           if (!e.from || !e.to) return null;
-          const isActive = active && (active === e.from || active === e.to);
+          const isActive = active && (active === e.fromId || active === e.toId);
           const dx = e.to.x - e.from.x;
           const dy = e.to.y - e.from.y;
           const cx1 = e.from.x + dx * 0.25;
