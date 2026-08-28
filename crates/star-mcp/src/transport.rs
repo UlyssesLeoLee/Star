@@ -480,7 +480,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_tools_call_get_issue() {
+    async fn test_tools_call_get_issue_invalid_uuid_returns_error() {
+        // Phase F.2: get_issue 现在走真实 domain-work-item service,要求 issue_id 为合法 UUID.
+        // "STAR-1024" 不是 UUID → 工具返回 McpError::validation → JSON-RPC error 响应.
         let req = JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
             id: json!(3),
@@ -490,14 +492,28 @@ mod tests {
                 "arguments": { "issue_id": "STAR-1024" }
             }),
         };
-        let res = handle(req).await.unwrap();
-        let content = res.result.get("content").unwrap().as_array().unwrap();
-        assert_eq!(content.len(), 1);
-        let text = content[0].get("text").unwrap().as_str().unwrap();
-        let parsed: Value = serde_json::from_str(text).unwrap();
-        assert_eq!(parsed.get("schema_version").unwrap().as_str().unwrap(), "agent-api/v1");
-        let issue = parsed.get("issue").unwrap();
-        assert_eq!(issue.get("id").unwrap().as_str().unwrap(), "STAR-1024");
+        let res = handle(req).await;
+        assert!(res.is_err(), "non-UUID issue_id 应触发 JSON-RPC error");
+        let err = res.unwrap_err();
+        assert_eq!(err.error.code, error_code::INTERNAL_ERROR);
+        assert!(err.error.message.contains("invalid issue_id UUID"));
+    }
+
+    #[tokio::test]
+    async fn test_tools_call_get_issue_valid_uuid_returns_error_via_simplification() {
+        // Phase F.2: tool 简化设计,nil-tenant actor 触发跨 tenant 拒绝 → validation error.
+        // 即便 issue_id 是合法 UUID,也返回 JSON-RPC error (per handler 简化, B.2.5 文档化).
+        let req = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: json!(3),
+            method: "tools/call".to_string(),
+            params: json!({
+                "name": "get_issue",
+                "arguments": { "issue_id": uuid::Uuid::new_v4().to_string() }
+            }),
+        };
+        let res = handle(req).await;
+        assert!(res.is_err(), "nil-tenant 简化应返回 JSON-RPC error");
     }
 
     #[tokio::test]
