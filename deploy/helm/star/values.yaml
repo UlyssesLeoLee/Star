@@ -1,0 +1,122 @@
+# Default values for star chart
+# Phase I production rollout (per ADR-0038)
+
+# Global
+global:
+  imageRegistry: ghcr.io/ulysses-lee-lee
+  imageTag: latest  # TODO: Phase I+ 实测 tag
+  namespace: star-system
+  tenantNamespace: star-tenant-{id}
+
+# Per-service defaults (replicas / resources / probes)
+# 8 服务: cli / mcp / context / sa / sse / webhook / cache / saga
+cli:
+  enabled: true
+  replicas: 1
+mcp:
+  enabled: true
+  replicas: 3
+  port: 8080
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+context:
+  enabled: true
+  replicas: 3
+  port: 8081
+sa:
+  enabled: true
+  replicas: 2
+  port: 8082
+sse:
+  enabled: true
+  replicas: 3
+  port: 8083
+webhook:
+  enabled: true
+  replicas: 2
+  port: 8084
+cache:
+  enabled: true
+  replicas: 2
+  port: 8085
+  redis:
+    enabled: false  # TODO: Phase I+ 切换
+    url: redis://redis-master:6379
+saga:
+  enabled: true
+  replicas: 2
+  port: 8086
+
+# Ingress
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+  hosts:
+    - host: star.example.com
+      paths:
+        - path: /mcp
+          service: mcp
+        - path: /sse
+          service: sse
+        - path: /webhook
+          service: webhook
+  tls:
+    - hosts: [star.example.com]
+      secretName: star-tls
+
+# ServiceAccount + RBAC
+serviceAccount:
+  create: true
+  name: star
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: [pods, services, configmaps, secrets]
+      verbs: [get, list, watch]
+
+# Resource quotas
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Probes
+probes:
+  liveness:
+    path: /healthz
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readiness:
+    path: /readyz
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+# Secrets (per 8/27 11:06 JST secret 安全 — 默认空,部署前必须设置)
+secrets:
+  githubToken: ""
+  gitlabToken: ""
+  bitbucketAppPassword: ""
+  giteaToken: ""
+  webhookSecret: ""
+  redisUrl: ""
+
+# Monitoring (per spec/observability/01)
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics

@@ -1,0 +1,15 @@
+Star has been installed!
+
+Release: {{ .Release.Name }}
+Namespace: {{ .Values.global.namespace }}
+
+8 services deployed:
+{{- range $name, $svc := (list "cli" "mcp" "context" "sa" "sse" "webhook" "cache" "saga") }}
+{{- if eq (index $.Values $svc).enabled true }}
+- {{ $svc }}: {{ (index $.Values $svc).replicas }} replicas
+{{- end }}
+{{- end }}
+
+Ingress: {{ if .Values.ingress.enabled }}https://{{ (index .Values.ingress.hosts 0).host }}{{ else }}disabled{{ end }}
+
+Phase I production rollout (per ADR-0038). Per 8/27 11:06 JST secret 安全, secrets 默认空 — 部署前必须设置。
