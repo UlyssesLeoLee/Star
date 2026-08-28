@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 
-type NavItem = { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; track: string };
+type IconType = React.ComponentType<{ size?: number; className?: string }>;
+type NavItem = { href: string; label: string; icon: React.ElementType; track: string };
 type NavGroup = { label: string; items: NavItem[] };
 
 const NAV: NavGroup[] = [
@@ -73,8 +74,8 @@ const NAV: NavGroup[] = [
   {
     label: "Meta",
     items: [
-      { href: "/relation",     label: "Relation",      icon: Network,         track: "E" },
-      { href: "/workspace",    label: "Workspace",     icon: Briefcase,       track: "E" },
+      { href: "/relation",     label: "Relation",      icon: Network,          track: "E" },
+      { href: "/workspace",    label: "Workspace",     icon: Briefcase,        track: "E" },
     ],
   },
 ];
