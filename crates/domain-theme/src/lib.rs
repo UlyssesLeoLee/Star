@@ -46,7 +46,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 mod integration_tests {
     use super::*;
     use std::collections::HashMap;
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
     use uuid::Uuid;
 
     /// 内存版 mock repo (单测用)
@@ -97,7 +97,7 @@ mod integration_tests {
             let store = self.store.lock().unwrap();
             Ok(store.values().filter(|t| {
                 t.scope == scope && match scope {
-                    ThemeScope::Personal => Some(t.scope_owner_actor()) == actor_id,
+                    ThemeScope::Personal => t.scope_owner_actor() == actor_id,
                     ThemeScope::Tenant => t.scope_owner_tenant() == Some(tenant_id),
                     ThemeScope::Global => true,
                 }
@@ -182,8 +182,7 @@ mod integration_tests {
         let mut full_ctx = ThemeContext::new(Some(actor), tenant);
         // mock repo 的 find_by_scope 占位用了 ThemeId::Light, 这里手动验证: 在 list_by_scope 找到 Dark
         let personal = svc
-            .repo
-            .list_by_scope(ThemeScope::Personal, tenant, Some(actor))
+            .list_available(&full_ctx)
             .await
             .unwrap();
         assert_eq!(personal.len(), 1);
