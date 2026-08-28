@@ -31,6 +31,8 @@
 // 子模块装载
 // =====================================================================
 
+pub mod adapter;
+pub mod confluence;
 pub mod context;
 pub mod entity;
 pub mod error;
