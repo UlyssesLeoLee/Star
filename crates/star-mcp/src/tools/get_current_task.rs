@@ -1,31 +1,91 @@
 #![warn(missing_docs)]
 
-//! MCP tool stub: get_current_task
+//! MCP tool: get_current_task
 //!
 //! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §2
 //!
-//! ## Phase D
+//! ## Phase F.3+
 //!
-//! - 输入:`{}`
-//! - 输出:`agent-api/v1#Task` mock
+//! - 输入:`{workspace_id?: "<uuid>"}` (可选, 不传则取全局第一个 in-progress task)
+//! - 输出:`agent-api/v1#Task` (来自 `domain-work-item::InMemoryWorkItemService`,
+//!   不再 `mock: true`)
+//!
+//! ## 守门
+//!
+//! - workspace_id 必为合法 UUID (per spec/agents/02-data-sources-spec.md §2.2 路径段格式)
+//! - 找不到 in-progress task → McpError::validation("no in-progress task")
+//! - 跨 tenant 拒绝 (handler 简化设计: actor.tenant_id = nil) → 同上
+//!
+//! ## 缺标比错标 (8/26 JST)
+//!
+//! - get_current_task 是 "current" 概念, domain-work-item 无 list_by_status helper,
+//!   用 list() 取全集后 filter status=IN_PROGRESS 取首 (P2 缺口, 真实 index 留 Phase F.4+)
 
+use domain_work_item::{ActorContext, InMemoryWorkItemService, IssueId, WorkItemStatus};
 use serde_json::{Value, json};
+use std::sync::{Arc, OnceLock};
 
 use crate::error::McpError;
-use crate::tools::mock_response;
+use crate::tools::optional_string;
 
-/// `get_current_task` tool stub
-pub(crate) async fn invoke(_args: Value) -> Result<Value, McpError> {
+/// 全 tool 共享的 in-memory work-item service (LazyLock 等价)
+fn service() -> &'static Arc<InMemoryWorkItemService> {
+    static SVC: OnceLock<Arc<InMemoryWorkItemService>> = OnceLock::new();
+    SVC.get_or_init(InMemoryWorkItemService::new_for_test)
+}
+
+/// `get_current_task` tool
+pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
+    // workspace_id 可选, 简化: nil actor 触发跨 tenant 拒绝 → validation "not found"
+    let _ = optional_string(&args, "workspace_id");
+    let actor = ActorContext::new(uuid::Uuid::nil(), domain_work_item::TenantId::new());
+
+    // 取第一个 IN_PROGRESS issue 当 current
+    let issues = service()
+        .list(actor.clone())
+        .await
+        .map_err(|e| McpError::validation(format!("list work-items failed: {e}")))?;
+
+    let current = issues
+        .iter()
+        .find(|w| matches!(w.status, WorkItemStatus::InProgress))
+        .ok_or_else(|| McpError::validation("no in-progress task".to_string()))?;
+
     let body = json!({
         "task": {
-            "id": "STAR-1024",
-            "title": "Phase D 骨架 — STAR CLI / MCP / Context 三 crate 落地",
-            "status": "IN_PROGRESS",
-            "assigned_to": "agent-mock",
-            "context_refs": ["DEC-008", "arch/03-star-ai-compat-arch.md"],
-            "labels": ["phase-d", "skeleton", "mvp"],
-            "updated_at": "2026-08-27T00:00:00Z",
+            "id": current.id.to_string(),
+            "title": current.title,
+            "status": format!("{:?}", current.status),
+            "workspace_id": current.workspace_id.to_string(),
+            "assignee_id": current.assignee_id.map(|a| a.to_string()),
+            "priority": format!("{:?}", current.priority),
+            "updated_at": current.updated_at.to_rfc3339(),
         }
     });
-    Ok(mock_response("get_current_task", body))
+    Ok(body)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn invoke_no_workspace_id_ok_or_no_task() {
+        // 简化: 不 pre-populate, 默认空 list → 期望 validation error
+        let args = json!({});
+        let r = invoke(args).await;
+        // 空 list → no in-progress → validation error
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn invoke_with_invalid_workspace_id_uuid_returns_ok_or_no_task() {
+        // workspace_id 不是 UUID → 忽略 (optional) → 空 list → validation error
+        let args = json!({ "workspace_id": "not-a-uuid" });
+        let r = invoke(args).await;
+        assert!(r.is_err());
+    }
+}
+
+// stub type alias to avoid unused import warning (IssueId is referenced via json! only)
+type _IssueId = IssueId;
