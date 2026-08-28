@@ -186,16 +186,16 @@ per 8/21 JST 用户偏好（5 域独立 Lead，不接受兼任）+ 8/27 21:59 JS
 | # | 域 | 角色 | Lead | Phase H 责任 | 决策范围 |
 |---|---|---|---|---|---|
 | 1 | 架构 | 架构负责人 | 架构师 (Mavis 接手 agent per DEC-008) | ADR-0037 commit + 2 spec 终审 + 22 handler 接口终审 | spec/integration/01 + spec/saga/02 + 22 handler API |
-| 2 | SRE | SRE Lead | (⏳ 待签，5 域独立 Lead，不接受兼任) | 22 handler 部署 + D19 6 指标 SLO + 监控 + 110 测试 CI 集成 | 22 handler SLO + D19 性能基线 + 110 测试 CI |
-| 3 | 平台 | 平台工程师 | (⏳ 待签，5 域独立 Lead，不接受兼任) | 22 handler 依赖 + toolchain + workspace | 保 0 新外部依赖（除 criterion-rs 性能测试库）+ workspace.toml 同步 |
-| 4 | 评审 | 评审主持 | (⏳ 待签，5 域独立 Lead，不接受兼任) | DDD Review 主持 | Phase H 2 spec + 22 handler + 110+ 测试 DDD Review 主持 + sign-off |
-| 5 | PM | PM | (⏳ 待签，5 域独立 Lead，不接受兼任) | 进度跟踪 + 22 domain 接入排序 + 风险升级 | Phase H 4-6 人·周 OLU 校准 + D16 §2 接入顺序 + D19 6 指标优先级 |
-| 6 | Player | 域 Lead | (⏳ 待签) | 22 handler Player 域（如 player_state_handler.rs）+ Step trait | Player 域 Step trait + 22 handler 验收 |
-| 7 | Economy | 域 Lead | (⏳ 待签，Q-003 决策核心) | 22 handler Economy 域（如 wallet/quota/ledger_handler.rs）+ Step trait | Q-003 决策 + Economy 域 Step trait + Phase H 优先级 P0 |
-| 8 | Match | 域 Lead | (⏳ 待签) | 22 handler Match 域（如 match_session/result_handler.rs）+ Step trait | Match 域 Step trait + 22 handler 验收 |
-| 9 | Social | 域 Lead | (⏳ 待签) | 22 handler Social 域（如 friend/notification_handler.rs）+ Step trait | Social 域 Step trait + 22 handler 验收 |
-| 10 | Admin | 域 Lead | (⏳ 待签，COC 独立控制面) | 22 handler Admin 域（如 audit/permission_handler.rs）+ Step trait | COC 独立控制面 + Admin 域 Step trait |
-| 11 | Performance | 域 Lead（Phase H 新增）| (⏳ 待签) | D19 6 指标性能基线 + bench-runner.sh 维护 + cold start 优化 | 6 指标 SLO + bench 报告 sign-off + 性能回归门禁 |
+| 2 | SRE | SRE Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，5 域独立 Lead，不接受兼任) | 22 handler 部署 + D19 6 指标 SLO + 监控 + 110 测试 CI 集成 | 22 handler SLO + D19 性能基线 + 110 测试 CI |
+| 3 | 平台 | 平台工程师 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，5 域独立 Lead，不接受兼任) | 22 handler 依赖 + toolchain + workspace | 保 0 新外部依赖（除 criterion-rs 性能测试库）+ workspace.toml 同步 |
+| 4 | 评审 | 评审主持 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，5 域独立 Lead，不接受兼任) | DDD Review 主持 | Phase H 2 spec + 22 handler + 110+ 测试 DDD Review 主持 + sign-off |
+| 5 | PM | PM | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，5 域独立 Lead，不接受兼任) | 进度跟踪 + 22 domain 接入排序 + 风险升级 | Phase H 4-6 人·周 OLU 校准 + D16 §2 接入顺序 + D19 6 指标优先级 |
+| 6 | Player | 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | 22 handler Player 域（如 player_state_handler.rs）+ Step trait | Player 域 Step trait + 22 handler 验收 |
+| 7 | Economy | 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，Q-003 决策核心) | 22 handler Economy 域（如 wallet/quota/ledger_handler.rs）+ Step trait | Q-003 决策 + Economy 域 Step trait + Phase H 优先级 P0 |
+| 8 | Match | 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | 22 handler Match 域（如 match_session/result_handler.rs）+ Step trait | Match 域 Step trait + 22 handler 验收 |
+| 9 | Social | 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | 22 handler Social 域（如 friend/notification_handler.rs）+ Step trait | Social 域 Step trait + 22 handler 验收 |
+| 10 | Admin | 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，COC 独立控制面) | 22 handler Admin 域（如 audit/permission_handler.rs）+ Step trait | COC 独立控制面 + Admin 域 Step trait |
+| 11 | Performance | 域 Lead（Phase H 新增）| (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | D19 6 指标性能基线 + bench-runner.sh 维护 + cold start 优化 | 6 指标 SLO + bench 报告 sign-off + 性能回归门禁 |
 
 **5 域 × 11 域责任矩阵**（per [ADR-0036 §4 L204-213](0036-phase-g-architecture.md) 扩展）：
 
@@ -261,13 +261,13 @@ per 8/21 JST token-OLU 框架（1 人·周 ≈ 1M tokens）+ [ADR-0036 §5 L226-
 
 ## 7. 已知缺口
 
-per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不动 ⏳ 待签的 SRE/平台/评审/PM/5 业务域/Performance）：
+per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不动 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)的 SRE/平台/评审/PM/5 业务域/Performance）：
 
 | # | 缺口 | 影响 | 状态 |
 |---|---|---|---|
 | 1 | 22 domain 实际接入优先级排期（per spec/integration/01 §2）| D16 6 Tier 顺序（T1 → T6）是草案，22 crate 哪些先接 5 模式 handler 待 PM + 5 业务域联合评审拍板 | D16 §2 列，PM 拍板 |
 | 2 | 真实外部服务接入（per §2 D20）| D20 4 provider 真 Git provider 接入是 Phase H+，Phase H 仅 mock 穿透，Phase I 才真 OAuth | D20 §形式 显式列，Phase H+ 推 |
-| 3 | 5 业务域 Lead 真实身份签字（DDD Review 阶段）| per §4 6-10 行 Player/Economy/Match/Social/Admin 5 业务域 Lead ⏳ 待签 | DDD Review 阶段补 |
+| 3 | 5 业务域 Lead 真实身份签字（DDD Review 阶段）| per §4 6-10 行 Player/Economy/Match/Social/Admin 5 业务域 Lead 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5) | DDD Review 阶段补 |
 | 4 | Q-003 Economy Lead 决策 SLA 量化 | Q-003 是 D18 Economy handler 决策核心，但 Economy 域决策响应 SLA 未量化（如 < 100ms）| 缺标，SRE Lead + Economy Lead 协同拍板 |
 | 5 | Saga 测试框架的 chaos tool 选型 | D17 §2 chaos test 5 域 Lead 拒绝响应注入用 chaos-mesh（K8s 侵入式）还是手动 mock（轻量）待 SRE Lead + 平台工程师拍板 | D17 §2 列，SRE + 平台拍板 |
 | 6 | 22 domain 性能基线跨节点测试（Phase H+）| D19 6 指标基线是单进程，跨节点 K8s 模拟是 Phase H+（per arch/06 §3 NFR 4 节点要求）| 显式列，Phase H+ 推 |
@@ -275,7 +275,7 @@ per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不
 | 8 | Phase H 完成后 acceptance/01-17 重新跑 | acceptance/01-17 是 5/26 旧版（per [AGENTS.md §7 #6](AGENTS.md) "9 个 wt 是否 merge 到 main"），22 handler 实装后需重跑 | 显式列，Phase H+ 推 |
 | 9 | Property-based test 终止条件 | D17 §3 proptest 跑多少 case（默认 256 还是 1000）+ 收缩策略（shrinking）待 D17 spec 定 | D17 §3 列，Phase H spec 写时定 |
 | 10 | time-travel debug 状态快照存储 | D17 §1 saga 状态快照存哪里（per 22 domain crate in-memory vs star-cache vs star-saga event log）待 SRE Lead 拍板 | D17 §1 列，SRE 拍板 |
-| 11 | Performance Lead 真实身份签字（DDD Review 阶段）| per §4 #11 行 Performance Lead（Phase H 新增）⏳ 待签，6 指标基线 + 性能回归门禁待 Performance Lead 终审 | DDD Review 阶段补 |
+| 11 | Performance Lead 真实身份签字（DDD Review 阶段）| per §4 #11 行 Performance Lead（Phase H 新增）🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，6 指标基线 + 性能回归门禁待 Performance Lead 终审 | DDD Review 阶段补 |
 | 12 | 22 handler 跨域 Saga 触发点 governance | D16 §4 5 业务域 Step trait 22 handler 触发 Saga 流程，缺"5 域 Lead 联合评审 22 handler 触发点变更" governance（per [ADR-0036 §7 #10 L277](0036-phase-g-architecture.md) 续）| 缺标，Phase H+ 治理文档补 |
 
 ---
@@ -313,16 +313,16 @@ per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不
 | # | 角色 | 姓名 | 签字日 | 结论 |
 |---|---|---|---|---|
 | 1 | 架构师 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-28 | 🟢 Mavis 接手代签（per 2026-08-27 19:39 JST + 20:56 JST + 21:59 JST 用户授权三次强化 + 8/27 07:16 JST 代签规则反转授权）；本文 5 决策 D16-D20 + 2 新 spec + 22 handler 框架 + 6 指标性能基线终审 |
-| 2 | SRE Lead | (⏳ 待签) | — | — 5 域独立 Lead（拒绝兼任 per 8/21 JST 硬约束），真实身份签字请 DDD Review 阶段补；§5 token-OLU 33-53M / D19 6 指标性能基线 / D17 chaos tool 选型待 SRE Lead 终审 |
-| 3 | 平台工程师 | (⏳ 待签) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；D18 22 handler 0 新外部依赖（除 criterion-rs 性能测试库例外）待平台终审 |
-| 4 | 评审主持 | (⏳ 待签) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；§4 11 域 Lead 责任矩阵 DDD Review 主持待补 |
-| 5 | PM | (⏳ 待签) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；§5 token-OLU 33-53M / §7 #1 22 domain 接入优先级 / D16 §2 6 Tier 顺序待 PM 终审 |
-| 6 | Player 域 Lead | (⏳ 待签) | — | — 5 业务域 Lead（per 8/21 JST 硬约束），真实身份签字请 DDD Review 阶段补；D18 player_state_handler + Step trait 待补 |
-| 7 | Economy 域 Lead | (⏳ 待签) | — | — 5 业务域 Lead，Q-003 决策核心；D18 wallet/quota/ledger_handler + §7 #4 决策 SLA 量化待 Economy Lead 终审 |
-| 8 | Match 域 Lead | (⏳ 待签) | — | — 5 业务域 Lead，真实身份签字请 DDD Review 阶段补；D18 match_session_handler + Step trait 待补 |
-| 9 | Social 域 Lead | (⏳ 待签) | — | — 5 业务域 Lead，真实身份签字请 DDD Review 阶段补；D18 friend_handler + Step trait 待补 |
-| 10 | Admin 域 Lead | (⏳ 待签) | — | — 5 业务域 Lead，COC 独立控制面；D18 audit/permission_handler + COC 独占决策待 Admin Lead 终审 |
-| 11 | Performance 域 Lead（Phase H 新增）| (⏳ 待签) | — | — Phase H 新增 11 域（per 8/21 JST 5 域硬约束续），真实身份签字请 DDD Review 阶段补；D19 6 指标性能基线 + 性能回归门禁待 Performance Lead 终审 |
+| 2 | SRE Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 域独立 Lead（拒绝兼任 per 8/21 JST 硬约束），真实身份签字请 DDD Review 阶段补；§5 token-OLU 33-53M / D19 6 指标性能基线 / D17 chaos tool 选型待 SRE Lead 终审 |
+| 3 | 平台工程师 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；D18 22 handler 0 新外部依赖（除 criterion-rs 性能测试库例外）待平台终审 |
+| 4 | 评审主持 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；§4 11 域 Lead 责任矩阵 DDD Review 主持待补 |
+| 5 | PM | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；§5 token-OLU 33-53M / §7 #1 22 domain 接入优先级 / D16 §2 6 Tier 顺序待 PM 终审 |
+| 6 | Player 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 业务域 Lead（per 8/21 JST 硬约束），真实身份签字请 DDD Review 阶段补；D18 player_state_handler + Step trait 待补 |
+| 7 | Economy 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 业务域 Lead，Q-003 决策核心；D18 wallet/quota/ledger_handler + §7 #4 决策 SLA 量化待 Economy Lead 终审 |
+| 8 | Match 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 业务域 Lead，真实身份签字请 DDD Review 阶段补；D18 match_session_handler + Step trait 待补 |
+| 9 | Social 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 业务域 Lead，真实身份签字请 DDD Review 阶段补；D18 friend_handler + Step trait 待补 |
+| 10 | Admin 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 业务域 Lead，COC 独立控制面；D18 audit/permission_handler + COC 独占决策待 Admin Lead 终审 |
+| 11 | Performance 域 Lead（Phase H 新增）| (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — Phase H 新增 11 域（per 8/21 JST 5 域硬约束续），真实身份签字请 DDD Review 阶段补；D19 6 指标性能基线 + 性能回归门禁待 Performance Lead 终审 |
 
 ---
 

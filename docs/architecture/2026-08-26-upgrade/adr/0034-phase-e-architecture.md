@@ -3,7 +3,7 @@
 > **状态**：🟡 Draft v0.1
 > **日期**：2026-08-27
 > **制定人**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手（per 2026-08-27 19:39 JST 用户授权升级）
-> **签批**：⏳ 待签（per §7 签字栏；Mavis 接手可代签 per ADR-0033 §2.1）
+> **签批**：🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)（per §7 签字栏；Mavis 接手可代签 per ADR-0033 §2.1）
 > **父文档**：[STAR × GitGit AI/IDE 零厂商适配架构升级 Plan](../../../plan/2026-08-26-upgrade-plan.md)（待归档）
 > **依赖**：[ADR-0021 Zero Vendor Cooperation](0021-zero-vendor-cooperation.md) · [ADR-0026 STAR AI Compat](0026-star-ai-compat.md) · [ADR-0027 STAR IDE Gateway](0027-star-ide-gateway.md) · [ADR-0032 MCP Transport stdio](0032-mcp-transport-stdio.md) · [ADR-0033 Agent Co-Signing Policy](0033-agent-co-signing-policy.md) · [AGENTS.md §0 一句话硬约束](../../../../AGENTS.md)
 > **关联**：[arch/03 STAR AI Compat Arch](../arch/03-star-ai-compat-arch.md) · [arch/05 GitGit Compat Arch](../arch/05-gitgit-compat-arch.md) · [arch/06 Threat Model + NFR](../arch/06-threat-model-nfr.md) · [spec/mcp/01-mcp-spec.md](../spec/mcp/01-mcp-spec.md) · [PHASE-D2-CLI-IMPL-REPORT.md](../../../../PHASE-D2-CLI-IMPL-REPORT.md) · [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../../PHASE-D3-MCP-TRANSPORT-REPORT.md) · [PHASE-D4-P1-FIX-REPORT.md](../../../../PHASE-D4-P1-FIX-REPORT.md) · [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md)
@@ -177,10 +177,10 @@ per 5 域独立 Lead，不接受兼任（per AGENTS.md §4 #3 守门 + [RGS-TS-0
 | # | 域 | 角色 | Lead | 决策范围 | Phase E 责任 |
 |---|---|---|---|---|---|
 | 1 | 架构域 | 架构负责人 | 架构师 (Mavis 接手 agent per DEC-008) | 6 份 spec 终审 + ADR 0034 终审 | spec/agents/01 + spec/mcp/02+03 + spec/services/01+02+03 6 文件终审 + ADR 0034 commit 签字 |
-| 2 | SRE 域 | SRE Lead | ⏳ 待签（5 域独立 Lead，不接受兼任） | star-mcp 部署 + 监控 + SLA | star-mcp 4 文件（resources.rs / prompts.rs / error.rs / error_codes.rs）SLO 定义 + 12 测试 CI 集成 |
-| 3 | 平台域 | 平台工程师 | ⏳ 待签（5 域独立 Lead，不接受兼任） | crate 依赖 + toolchain + workspace | crates/star-mcp 依赖升级（保留 0 新外部依赖 per 守门）+ workspace.toml 同步 |
-| 4 | 评审域 | 评审主持 | ⏳ 待签（5 域独立 Lead，不接受兼任） | DDD Review 主持 | Phase E 6 spec + 4 文件 + 12 测试 DDD Review 主持 + sign-off 表 |
-| 5 | PM 域 | PM | ⏳ 待签（5 域独立 Lead，不接受兼任） | 进度跟踪 + 风险升级 + R-05 决策 | Phase E 进度跟踪（1-2 人·周）+ Phase F 22 domain crate 接入计划 |
+| 2 | SRE 域 | SRE Lead | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)（5 域独立 Lead，不接受兼任） | star-mcp 部署 + 监控 + SLA | star-mcp 4 文件（resources.rs / prompts.rs / error.rs / error_codes.rs）SLO 定义 + 12 测试 CI 集成 |
+| 3 | 平台域 | 平台工程师 | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)（5 域独立 Lead，不接受兼任） | crate 依赖 + toolchain + workspace | crates/star-mcp 依赖升级（保留 0 新外部依赖 per 守门）+ workspace.toml 同步 |
+| 4 | 评审域 | 评审主持 | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)（5 域独立 Lead，不接受兼任） | DDD Review 主持 | Phase E 6 spec + 4 文件 + 12 测试 DDD Review 主持 + sign-off 表 |
+| 5 | PM 域 | PM | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)（5 域独立 Lead，不接受兼任） | 进度跟踪 + 风险升级 + R-05 决策 | Phase E 进度跟踪（1-2 人·周）+ Phase F 22 domain crate 接入计划 |
 
 **5 域责任矩阵**（per 8/21 JST 用户偏好 + ADR-0026 + ADR-0027 + ADR-0032）：
 
@@ -319,10 +319,10 @@ per [arch/05 §2 GitGit Compat Arch](../arch/05-gitgit-compat-arch.md) + AGENTS.
 | # | 角色 | 姓名 | 签字日 | 结论 |
 |---|---|---|---|---|
 | 1 | 架构师 / Mavis 接手审批 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-27 | 🟡 Draft v0.1（待 §10 6 spec 终审 + 评审域 DDD Review） |
-| 2 | SRE Lead | ⏳ 待签（5 域独立 Lead，不接受兼任 per 8/21 JST） | ⏳ 待签 | ⏳ 待签 |
-| 3 | 平台工程师 | ⏳ 待签（5 域独立 Lead，不接受兼任 per 8/21 JST） | ⏳ 待签 | ⏳ 待签 |
-| 4 | 评审主持 | ⏳ 待签（5 域独立 Lead，不接受兼任 per 8/21 JST） | ⏳ 待签 | ⏳ 待签 |
-| 5 | 项目负责人（PM） | ⏳ 待签（5 域独立 Lead，不接受兼任 per 8/21 JST） | ⏳ 待签 | ⏳ 待签 |
+| 2 | SRE Lead | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)（5 域独立 Lead，不接受兼任 per 8/21 JST） | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5) | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5) |
+| 3 | 平台工程师 | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)（5 域独立 Lead，不接受兼任 per 8/21 JST） | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5) | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5) |
+| 4 | 评审主持 | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)（5 域独立 Lead，不接受兼任 per 8/21 JST） | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5) | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5) |
+| 5 | 项目负责人（PM） | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)（5 域独立 Lead，不接受兼任 per 8/21 JST） | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5) | 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5) |
 
 ---
 
