@@ -51,10 +51,10 @@ impl WorkflowViz {
     /// 导出 SVG (固定 800x600, 简单布局)
     pub fn to_svg(&self) -> String {
         let mut svg = String::from(
-            r#"<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">"#
+            r##"<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">"##
         );
-        svg.push_str(r#"<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/></marker></defs>"#);
-        svg.push_str(r#"<rect width="100%" height="100%" fill="#F8FAFC"/>"#);
+        svg.push_str(r##"<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/></marker></defs>"##);
+        svg.push_str(r##"<rect width="100%" height="100%" fill="#F8FAFC"/>"##);
 
         // 边
         for edge in &self.edges {
@@ -67,14 +67,14 @@ impl WorkflowViz {
                     None => "#5B5BD6",    // 普通: 主色
                 };
                 svg.push_str(&format!(
-                    r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="2" marker-end="url(#arrow)"/>"#,
+                    r##"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="2" marker-end="url(#arrow)"/>"##,
                     from.x + 60.0, from.y + 30.0, to.x + 60.0, to.y + 30.0, color
                 ));
                 if !edge.label.is_empty() {
                     let mx = (from.x + to.x) / 2.0 + 60.0;
                     let my = (from.y + to.y) / 2.0 + 30.0;
                     svg.push_str(&format!(
-                        r#"<text x="{}" y="{}" font-size="11" fill="#475569" text-anchor="middle">{}</text>"#,
+                        r##"<text x="{}" y="{}" font-size="11" fill="#475569" text-anchor="middle">{}</text>"##,
                         mx, my, edge.label
                     ));
                 }
@@ -99,11 +99,11 @@ impl WorkflowViz {
                 "#0F172A"
             };
             svg.push_str(&format!(
-                r#"<rect x="{}" y="{}" width="120" height="60" rx="8" fill="{}" stroke="{}" stroke-width="2"/>"#,
+                r##"<rect x="{}" y="{}" width="120" height="60" rx="8" fill="{}" stroke="{}" stroke-width="2"/>"##,
                 node.x, node.y, fill, stroke
             ));
             svg.push_str(&format!(
-                r#"<text x="{}" y="{}" font-size="14" font-weight="600" fill="{}" text-anchor="middle" dominant-baseline="central">{}</text>"#,
+                r##"<text x="{}" y="{}" font-size="14" font-weight="600" fill="{}" text-anchor="middle" dominant-baseline="central">{}</text>"##,
                 node.x + 60.0, node.y + 30.0, text_color, node.label
             ));
         }
