@@ -51,7 +51,7 @@ use crate::resources::DynResource;
 #[allow(dead_code)]
 pub(crate) fn all_domain_handlers() -> Vec<Box<dyn DynResource>> {
     vec![
-        Box::new(agent::AgentHandler),
+        Box::new(agent::AgentHandler::new()),
         Box::new(audit::AuditHandler),
         Box::new(automation::AutomationHandler),
         Box::new(board::BoardHandler),
@@ -60,7 +60,7 @@ pub(crate) fn all_domain_handlers() -> Vec<Box<dyn DynResource>> {
         Box::new(context::ContextHandler),
         Box::new(decision::DecisionHandler),
         Box::new(development::DevelopmentHandler),
-        Box::new(feedback::FeedbackHandler),
+        Box::new(feedback::FeedbackHandler::new()),
         Box::new(identity::IdentityHandler::new()),
         Box::new(integration::IntegrationHandler),
         Box::new(notification::NotificationHandler),
@@ -74,6 +74,6 @@ pub(crate) fn all_domain_handlers() -> Vec<Box<dyn DynResource>> {
         Box::new(validation::ValidationHandler),
         Box::new(work_item::WorkItemHandler::new()),
         Box::new(workspace::WorkspaceHandler::new()),
-        Box::new(worktree::WorktreeHandler),
+        Box::new(worktree::WorktreeHandler::new()),
     ]
 }

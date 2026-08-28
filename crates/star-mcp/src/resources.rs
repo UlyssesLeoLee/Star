@@ -775,26 +775,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_read_dispatches_to_domain_handler() {
-        // 验证 read() 走 22 domain handler 路径
+        // 验证 read() 走 domain handler 路径
+        // B.2.6 起 agent handler 接真实数据 (UUID), 此测试改用
+        // 仍为 mock 的 audit URI (audit_id 字段保留, 验证 dispatch 路径)
         let h = handler_with_domains();
-        let v = h.read("agent://agent-42").await.unwrap();
+        let v = h.read("audit://audit-42").await.unwrap();
         let text = v.get("contents").unwrap().as_array().unwrap()[0]
             .get("text").unwrap().as_str().unwrap();
         let parsed: Value = serde_json::from_str(text).unwrap();
-        assert_eq!(parsed.get("agent_id").and_then(Value::as_str), Some("agent-42"));
-        assert_eq!(parsed.get("state").and_then(Value::as_str), Some("Running"));
+        assert_eq!(parsed.get("audit_id").and_then(Value::as_str), Some("audit-42"));
     }
 
     #[tokio::test]
     async fn test_read_dispatches_each_domain_scheme() {
-        // 验证 read() 对每个 22 domain scheme 都能正确分发
-        // (Phase B.2 真实接入: tenant/identity/permission 用 UUID,
-        //  故从 dispatch 测试中移除, 它们在各自 handler 的
-        //  read_real_*_roundtrip test 中已端到端覆盖)
+        // 验证 read() 对每个 domain scheme 都能正确分发
+        // (Phase B.2 + B.2.5 + B.2.6 真实接入: tenant/identity/permission/
+        //  workspace/project/workitem/worktree/agent/feedback 用 UUID, 移
+        //  除自 dispatch 测试, 在各自 handler roundtrip test 中端到端覆盖)
         let h = handler_with_domains();
         let cases = [
             ("audit://a-1", "audit_id"),
-            ("worktree://wt-1", "wt_id"),
             ("decision://d-1", "dec_id"),
             ("validation://v-1", "val_id"),
             ("search://q-1", "query_id"),

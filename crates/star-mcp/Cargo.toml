@@ -34,6 +34,11 @@ domain-permission = { path = "../domain-permission" }
 domain-workspace = { path = "../domain-workspace" }
 domain-project = { path = "../domain-project" }
 domain-work-item = { path = "../domain-work-item" }
+# Phase B.2.6 (Tier 3): 真实数据源接入 worktree / agent / feedback
+# (domain-decision crate 缺失 per spec/integration/01 §6 已知缺口,待创建)
+domain-worktree = { path = "../domain-worktree" }
+domain-agent = { path = "../domain-agent" }
+domain-feedback = { path = "../domain-feedback" }
 uuid = { workspace = true }
 chrono = { workspace = true }
 
