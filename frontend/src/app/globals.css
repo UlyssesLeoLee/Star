@@ -2,8 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Star 主题 CSS 变量 (per 2026-08-29 04:09 JST 主题决策)
+ * next-themes attribute=class 切换 .dark / .light
+ * 完整 token 定义在 styles/theme.css
+ */
+@import "../styles/theme.css";
+
 :root {
-  color-scheme: dark;
+  color-scheme: light dark;
 }
 
 html, body {

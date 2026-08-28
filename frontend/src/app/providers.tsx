@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "react-hot-toast";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   // useState 保证 QueryClient 在 React 生命周期内只创建 1 次
@@ -28,23 +29,25 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <QueryClientProvider client={client}>
-      {children}
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 3_000,
-          style: {
-            background: "#161b22",
-            color: "#e6edf3",
-            border: "1px solid #30363d",
-            fontSize: "12px",
-            fontFamily: "monospace",
-          },
-          success: { iconTheme: { primary: "#3fb950", secondary: "#0d1117" } },
-          error:   { iconTheme: { primary: "#f85149", secondary: "#0d1117" } },
-        }}
-      />
-    </QueryClientProvider>
+    <ThemeProvider defaultTheme="light" themes={["light", "dark"]}>
+      <QueryClientProvider client={client}>
+        {children}
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 3_000,
+            style: {
+              background: "#161b22",
+              color: "#e6edf3",
+              border: "1px solid #30363d",
+              fontSize: "12px",
+              fontFamily: "monospace",
+            },
+            success: { iconTheme: { primary: "#3fb950", secondary: "#0d1117" } },
+            error:   { iconTheme: { primary: "#f85149", secondary: "#0d1117" } },
+          }}
+        />
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
