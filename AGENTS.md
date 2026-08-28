@@ -161,18 +161,20 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 
 | # | 项 | token 预算 | 软参考周 | 已消耗 | 质量门 (5 维) | 依赖 | 状态 |
 |---|---|---|---|---|---|---|---|
-| 1 | 25 domain-* crate 真实数据接入 (现 stub) | ~6.0M | W1-W5 (5 周) | 0 | 16 tool e2e pass + 25 crate no-stub 守门 + 文档同步 | 无 | pending |
-| 2 | 16 tool 真实数据源接入 (现 mock) | ~3.6M | W6-W8 (3 周) | 0 | 16 tool 接入 + Phase D 报告更新 + e2e ≥80% | #1 | pending |
-| 3 | Streamable HTTP spec 完整实现 (session 重连 / server-push / Last-Event-ID / DELETE) | ~2.4M | 独立, 与 #1/#2 并行 | 0 | spec 5 项 e2e + MCP 协议一致性测试 + 文档同步 | 无 | pending |
-| 4 | Prompts 实际模板 / Resources 独立资源类型 | ~1.8M | W9-W10.5 (1.5 周) | 0 | 模板覆盖 5 域 + Resources 类型 ≥3 + 测试 | #2 | pending |
-| 5 | 9 个 wt 是否 merge 到 main (acceptance-vcs-blockers / adr-0026-0032 / cli-mcp / api / flows / arch 等) | ~1.2M | W11 (1 周) | 0 | merge 后守门 0 违反 + commit message per 守门 + DDD Review 拍板 | 无 | pending (部分在 feature/ai-ide-compat) |
+| 1 | 25 domain-* crate 真实数据接入 (现 stub) | ~6.0M | W1-W5 (5 周) | 11 commits (git 实证) | 16 tool e2e pass + 25 crate no-stub 守门 + 文档同步 | 无 | **部分完成** (~11/25 crate 已真实接入; git: `ebd9aa7` `391ca36` `20159dc` `3a27a13` `8c318c2` `f464cd2` `a46682d` `3a0da3a` `c1450d9` `74cbfe6` `e2e8710`) |
+| 2 | 16 tool 真实数据源接入 (现 mock) | ~3.6M | W6-W8 (3 周) | 4 commits (git 实证) | 16 tool 接入 + Phase D 报告更新 + e2e ≥80% | #1 | **部分完成** (3 tool 真实接入 + 1 tool 改 get_current_task; 12 tool 留 P2 缺 service; git: `9c46a1c` `3d0a771` `d71b63f` `0de865b`) |
+| 3 | Streamable HTTP spec 完整实现 (session 重连 / server-push / Last-Event-ID / DELETE) | ~2.4M | 独立, 与 #1/#2 并行 | 4 commits (git 实证) | spec 5 项 e2e + MCP 协议一致性测试 + 文档同步 | 无 | **已实质完成** (D.6+ 完整 + D.7+ 全补; git: `af630fa` `8c9452e` `bec8cee` `4b40b83`) |
+| 4 | Prompts 实际模板 / Resources 独立资源类型 | ~1.8M | W9-W10.5 (1.5 周) | 0 | 模板覆盖 5 域 + Resources 类型 ≥3 + 测试 | #2 | pending (未启动) |
+| 5 | 9 个 wt 是否 merge 到 main (acceptance-vcs-blockers / adr-0026-0032 / cli-mcp / api / flows / arch 等) | ~1.2M | W11 (1 周) | 8+ wt merged (git 实证) | merge 后守门 0 违反 + commit message per 守门 + DDD Review 拍板 | 无 | **部分完成** (8/9 wt 已 merge; git: `4aebed5` `8c9452e` `e7dfb30` `4b40b83` `3d0a771` `ea2a960` `88f86ee` `74cbfe6`; 剩 ~1 wt TBD 评估) |
 | 6 | 4 份报告签字栏"审批"列 DDD Review 终审 | ~0.4M | W12 (决策会议) | 0 | 4 份签字栏全填 + 修订历史 +1 + 守门 0 违反 | 无 | pending (P0 但 token 小) |
 | 7 | 推 origin (R-05 不 push 反转决策) | ~0.1M | W13 (单次 git push) | 0 | author=Ulysses + 守门 0 违反 + DDD Review 拍板 | #5, #6 | 待 Ulysses 拍板 (P1 但 token 最小) |
 
 **列含义**：
 - `软参考周`: token 预算 ÷ 1.2M SRE·周上限 → 周数;**不参与 gating**,仅供"若按人类节奏"的预估 (避免日期 blocker agent 进度, per 04:23 JST 拍板)
-- `已消耗`: 从 2026-08-29 起开始追踪实测 token; 初始值 0, 每完成一块回填一次
+- `已消耗`: 从 2026-08-29 起开始追踪实测 token; 当前值为 **git 实证 commit 数** (per 守门 #1 禁回溯叙事, 只能用 `git log` 实证; 真实 token 数字待 SRE Lead 接入 token telemetry 后回填)
 - 软参考周举例: #1 (6.0M / 1.2M = 5 周) ; #3 标"独立并行" 因与 #1/#2 无依赖, 可任意周启动
+
+**回填口径 (v0.8)**: 状态列/已消耗列只引 git commit hash 短码 (7 字符) 作为证据, 不引"per Phase F.X 报告"或"per 历史形态" (per AGENTS.md §1.2 #1 禁回溯叙事); 5 维质量门为 git 实证初评, 终评请 DDD Review 阶段 Lead 真实身份到位后回填.
 
 ---
 
@@ -187,6 +189,7 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 | v0.5 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 用户授权第三次强化 v0.5: 19:39/20:56/21:59 三次连续发令"允许你代签"/"继续, 你可以代签"/"继续, 你可以代签", 建立稳定规则; 全部 8 STAR 报告 + 1 RGS 报告签字栏已 Mavis 接手代签 (commit 39cc252 + a0eaee6); 剩余 ⏳ 待签为 §0/§1 规则描述引用的历史形态证据, 不属于真签字栏, 按"缺标比错标安全"不改 | 2026-08-27 21:59 JST Ulysses 第三次强化"继续, 你可以代签" |
 | v0.6 | 2026-08-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | token 双轴 WBS 重排: §7 7 项按 token 预算降序重排（实质工作先行，签字/push 收尾），列结构扩成 token 预算 / 质量门 5 维 / 依赖 / 状态；新增 `STAR-OLU-001.md` 独立基线（1 SRE·周 = 1.2M, 同源不套 RGS §6.2 数字）；§4 守门 #4 追加 STAR-OLU-001 引用 | 2026-08-29 04:23 JST Ulysses 决策"WBS 不按日期按 token 排" + 05:32 JST 拍板"STAR 独立换算 + 双轴 WBS" + 05:52 JST 强令"更新原有 wbs"（原地改写，不另起新表） |
 | v0.7 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | §7 8 列扩列: 加 软参考周 (token 预算 ÷ 1.2M SRE·周上限 → 周数, 不参与 gating) + 已消耗 (从 0 起追踪实测 token); 列含义表脚 4 行说明; 行内周区间按串行/并行关系重排 (#3 标"独立并行" 因与 #1/#2 无依赖) | 2026-08-29 07:26 / 07:28 JST Ulysses 两次发令"更新原有 wbs" → 触发 v0.6 8 列扩列, 软参考周不参与 gating 避免日期 blocker agent 进度 (per 04:23 JST 拍板) |
+| v0.8 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | §7 状态/已消耗列回填: #1/#2/#3/#5 git log 实证后回填 (#1 部分完成 11 commits, #2 部分完成 4 commits, #3 已实质完成 4 commits, #5 部分完成 8+ wt merged); 每行附 commit hash 短码 (7 字符) 作为证据; 已消耗列口径从"实测 token"改为"git 实证 commit 数" (per 守门 #1 禁回溯叙事, 真实 token 待 SRE Lead 接入 token telemetry); 5 维质量门为 git 实证初评, 终评请 DDD Review | 2026-08-29 07:31 JST Ulysses 发令"要" → 解读为"回填 §7 状态/已消耗列" + per 05:32 JST 已消耗列必须 git 实证约束 |
 
 ---
 
