@@ -2019,12 +2019,17 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "axum",
+ "chrono",
+ "domain-identity",
+ "domain-permission",
+ "domain-tenant",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
  "tower",
+ "uuid",
 ]
 
 [[package]]

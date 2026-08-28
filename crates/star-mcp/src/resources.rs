@@ -783,6 +783,9 @@ mod tests {
     #[tokio::test]
     async fn test_read_dispatches_each_domain_scheme() {
         // 验证 read() 对每个 22 domain scheme 都能正确分发
+        // (Phase B.2 真实接入: tenant/identity/permission 用 UUID,
+        //  故从 dispatch 测试中移除, 它们在各自 handler 的
+        //  read_real_*_roundtrip test 中已端到端覆盖)
         let h = handler_with_domains();
         let cases = [
             ("audit://a-1", "audit_id"),
@@ -790,7 +793,6 @@ mod tests {
             ("decision://d-1", "dec_id"),
             ("validation://v-1", "val_id"),
             ("search://q-1", "query_id"),
-            ("tenant://t-1", "tenant_id"),
         ];
         for (uri, id_field) in cases {
             let v = h.read(uri).await.unwrap_or_else(|e| panic!("{uri} failed: {e}"));

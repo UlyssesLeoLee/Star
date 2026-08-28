@@ -26,6 +26,13 @@ tokio-stream = "0.1"
 # Phase D 骨架:不引入 rmcp(避免 beta 风险,per spec §1 transport 选择)
 # MCP transport 由 D.3 (stdio) + D.5+ (Streamable HTTP) 自行实装, 不依赖 rmcp
 
+# Phase B.2 (Tier 1 试水): 真实数据源接入 tenant / identity / permission
+domain-tenant = { path = "../domain-tenant" }
+domain-identity = { path = "../domain-identity" }
+domain-permission = { path = "../domain-permission" }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
 [dev-dependencies]
 # axum::Router::oneshot 测试 helper (per transport_http.rs tests)
 tower = { version = "0.5", features = ["util"] }
