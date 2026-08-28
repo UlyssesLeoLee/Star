@@ -9,29 +9,53 @@
 //   3. 3 column layout (源 / 列表 / 详情) 简化为 1 column
 //   4. 实时 SSE 推送 (Phase I+) P3
 //   5. light mode (per §7) P3
+//   6. useEffect+fetch 阶段用 MOCK_NOTIFS_FALLBACK SSR 兜底 (per mock-msw-handlers §2.4 + §4 #1 缺标)
 // =====================================================================
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Inbox, Bell } from "lucide-react";
-import { MOCK_NOTIFS } from "@/mocks/data";
+import { MOCK_NOTIFS_FALLBACK } from "@/mocks/data";
 import type { MockNotif } from "@/mocks/schemas/inbox";
 
 export default function InboxPage() {
+  const [notifs, setNotifs] = useState<ReadonlyArray<MockNotif>>(MOCK_NOTIFS_FALLBACK);
+
   // local-only read/unread toggle (per 缺标, 不联动 store)
   const [readSet, setReadSet] = useState<Set<string>>(
-    () => new Set(MOCK_NOTIFS.filter((n) => n.read).map((n) => n.id)),
+    () => new Set(MOCK_NOTIFS_FALLBACK.filter((n) => n.read).map((n) => n.id)),
   );
+
+  useEffect(() => {
+    fetch("/api/notifications")
+      .then((r) => r.json())
+      .then((data: ReadonlyArray<MockNotif>) => {
+        setNotifs(data);
+        // 同步 readSet (per §2.7, fetch 后用 server read state 重置本地)
+        setReadSet(new Set(data.filter((n) => n.read).map((n) => n.id)));
+      })
+      .catch(() => {
+        /* keep FALLBACK (per §4 #1 缺标) */
+      });
+  }, []);
+
   const toggle = (id: string) => {
     setReadSet((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
+      const wasRead = next.has(id);
+      if (wasRead) next.delete(id);
       else next.add(id);
+      // PATCH 真实持久化 (per inbox.ts handler §2.2)
+      fetch(`/api/notifications/${id}`, { method: "PATCH" }).catch(() => {
+        /* P3 真实持久化待 Phase F+, 此处失败本地回滚 */
+        if (wasRead) next.add(id);
+        else next.delete(id);
+      });
       return next;
     });
   };
-  const unread = MOCK_NOTIFS.filter((n) => !readSet.has(n.id)).length;
+  const unread = notifs.filter((n) => !readSet.has(n.id)).length;
 
   return (
     <div className="max-w-5xl mx-auto" data-testid="inbox-page">
@@ -45,7 +69,7 @@ export default function InboxPage() {
       <div className="card">
         <SectionTitle>Notifications (mock, local read state)</SectionTitle>
         <ul className="divide-y divide-line/40" data-testid="inbox-list">
-          {MOCK_NOTIFS.map((n) => {
+          {notifs.map((n) => {
             const isRead = readSet.has(n.id);
             return (
               <li

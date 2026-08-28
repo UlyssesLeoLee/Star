@@ -8,16 +8,28 @@
 //   2. live activity feed 仅占位文案 — 真实 WS 接入 P3
 //   3. light mode (per §7) P3
 //   4. agent 状态机 / lease / heartbeat 详情面板 P2 (Phase I+)
+//   5. useEffect+fetch 阶段用 MOCK_AGENTS_FALLBACK SSR 兜底 (per mock-msw-handlers §2.4 + §4 #1 缺标)
 // =====================================================================
 
+import { useEffect, useState } from "react";
 import { PageHeader, Stat, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Bot, Activity } from "lucide-react";
-import { MOCK_AGENTS } from "@/mocks/data";
+import { MOCK_AGENTS_FALLBACK } from "@/mocks/data";
 import type { AgentRow } from "@/mocks/schemas/agent";
 
 export default function AgentsPage() {
-  const active = MOCK_AGENTS.filter((a) => a.status === "active" || a.status === "in_progress").length;
+  const [agents, setAgents] = useState<ReadonlyArray<AgentRow>>(MOCK_AGENTS_FALLBACK);
+  useEffect(() => {
+    fetch("/api/agents")
+      .then((r) => r.json())
+      .then((data: ReadonlyArray<AgentRow>) => setAgents(data))
+      .catch(() => {
+        /* keep FALLBACK (per §4 #1 缺标, 避免 UX 退化) */
+      });
+  }, []);
+
+  const active = agents.filter((a) => a.status === "active" || a.status === "in_progress").length;
 
   return (
     <div className="max-w-7xl mx-auto" data-testid="agents-page">
@@ -29,10 +41,10 @@ export default function AgentsPage() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <Stat label="Total" value={MOCK_AGENTS.length} hint="mock 5" tone="info" />
+        <Stat label="Total" value={agents.length} hint="mock 5" tone="info" />
         <Stat label="Active" value={active} hint="active + in_progress" tone="ok" />
-        <Stat label="Paused" value={MOCK_AGENTS.filter((a) => a.status === "paused").length} tone="warn" />
-        <Stat label="Failed" value={MOCK_AGENTS.filter((a) => a.status === "failed").length} tone="err" />
+        <Stat label="Paused" value={agents.filter((a) => a.status === "paused").length} tone="warn" />
+        <Stat label="Failed" value={agents.filter((a) => a.status === "failed").length} tone="err" />
       </div>
 
       <div className="card">
@@ -48,7 +60,7 @@ export default function AgentsPage() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_AGENTS.map((a) => (
+            {agents.map((a) => (
               <tr key={a.id} data-testid={`agent-row-${a.id}`}>
                 <td className="font-mono text-xs text-ink-dim">{a.id}</td>
                 <td className="font-mono text-sm text-info">{a.name}</td>

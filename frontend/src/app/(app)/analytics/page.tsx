@@ -8,12 +8,14 @@
 //   2. 折线图为内联 SVG 占位, 不依赖 recharts (新增依赖禁)
 //   3. error mix donut / leaderboard 表格 P2 (Phase I+)
 //   4. light mode (per §7) P3
+//   5. useEffect+fetch 阶段用 MOCK_KPI_FALLBACK / COST_SERIES_FALLBACK SSR 兜底 (per mock-msw-handlers §2.4 + §4 #1 缺标)
 // =====================================================================
 
+import { useEffect, useState } from "react";
 import { PageHeader, Stat, SectionTitle } from "@/components/PageHeader";
 import { BarChart3, TrendingUp } from "lucide-react";
-import { MOCK_KPI, COST_SERIES } from "@/mocks/data";
-import type { CostPoint } from "@/mocks/schemas/analytics";
+import { MOCK_KPI_FALLBACK, COST_SERIES_FALLBACK } from "@/mocks/data";
+import type { KpiCard, CostPoint } from "@/mocks/schemas/analytics";
 
 function MiniLineChart({ data }: { data: ReadonlyArray<CostPoint> }) {
   const W = 320;
@@ -57,6 +59,27 @@ function MiniLineChart({ data }: { data: ReadonlyArray<CostPoint> }) {
 }
 
 export default function AnalyticsPage() {
+  const [kpi, setKpi] = useState<ReadonlyArray<KpiCard>>(MOCK_KPI_FALLBACK);
+  const [costSeries, setCostSeries] = useState<ReadonlyArray<CostPoint>>(COST_SERIES_FALLBACK);
+
+  useEffect(() => {
+    fetch("/api/analytics/kpi")
+      .then((r) => r.json())
+      .then((data: ReadonlyArray<KpiCard>) => setKpi(data))
+      .catch(() => {
+        /* keep FALLBACK (per §4 #1 缺标) */
+      });
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/analytics/cost")
+      .then((r) => r.json())
+      .then((data: ReadonlyArray<CostPoint>) => setCostSeries(data))
+      .catch(() => {
+        /* keep FALLBACK (per §4 #1 缺标) */
+      });
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto" data-testid="analytics-page">
       <PageHeader
@@ -67,7 +90,7 @@ export default function AnalyticsPage() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        {MOCK_KPI.map((k) => (
+        {kpi.map((k) => (
           <Stat key={k.label} label={k.label} value={k.value} hint={k.hint} tone={k.tone} />
         ))}
       </div>
@@ -77,9 +100,9 @@ export default function AnalyticsPage() {
           <SectionTitle>Daily Cost Trend (7d, mock)</SectionTitle>
           <TrendingUp size={12} className="text-ok" />
         </div>
-        <MiniLineChart data={COST_SERIES} />
+        <MiniLineChart data={costSeries} />
         <div className="flex justify-between mt-1 font-mono text-[10px] text-ink-mute">
-          {COST_SERIES.map((d) => (
+          {costSeries.map((d) => (
             <span key={d.day}>{d.day}</span>
           ))}
         </div>

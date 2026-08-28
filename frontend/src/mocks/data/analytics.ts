@@ -20,3 +20,8 @@ export const COST_SERIES: ReadonlyArray<CostPoint> = [
   { day: "Sat", usd: 6.3  },
   { day: "Sun", usd: 4.2  },
 ];
+
+// FALLBACK alias for page SSR — page 改 useEffect+fetch 后, SSR 阶段用 FALLBACK 兜底
+// (per mock-msw-handlers.md §2.4 + §4 #1 缺标)
+export const MOCK_KPI_FALLBACK: ReadonlyArray<KpiCard> = MOCK_KPI;
+export const COST_SERIES_FALLBACK: ReadonlyArray<CostPoint> = COST_SERIES;
