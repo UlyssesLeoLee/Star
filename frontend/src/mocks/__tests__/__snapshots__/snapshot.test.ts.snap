@@ -1,0 +1,197 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mock snapshot (lock fixture output) > COST_SERIES stable 1`] = `
+[
+  {
+    "day": "Mon",
+    "usd": 9.4,
+  },
+  {
+    "day": "Tue",
+    "usd": 11.2,
+  },
+  {
+    "day": "Wed",
+    "usd": 8.7,
+  },
+  {
+    "day": "Thu",
+    "usd": 13.1,
+  },
+  {
+    "day": "Fri",
+    "usd": 12.48,
+  },
+  {
+    "day": "Sat",
+    "usd": 6.3,
+  },
+  {
+    "day": "Sun",
+    "usd": 4.2,
+  },
+]
+`;
+
+exports[`mock snapshot (lock fixture output) > KANBAN_COLUMNS stable 1`] = `
+[
+  "todo",
+  "in_progress",
+  "review",
+  "done",
+]
+`;
+
+exports[`mock snapshot (lock fixture output) > MOCK_AGENTS stable 1`] = `
+[
+  {
+    "id": "ag-001",
+    "last_active": "2 min ago",
+    "name": "Ulysses-CLI",
+    "role": "root / architect",
+    "status": "active",
+  },
+  {
+    "id": "ag-002",
+    "last_active": "5 min ago",
+    "name": "Physis-builder",
+    "role": "rust / physics",
+    "status": "in_progress",
+  },
+  {
+    "id": "ag-003",
+    "last_active": "1 h ago",
+    "name": "Star-frontend",
+    "role": "react / nextjs",
+    "status": "paused",
+  },
+  {
+    "id": "ag-004",
+    "last_active": "12 min ago",
+    "name": "Doc-scribe",
+    "role": "docs / adr",
+    "status": "active",
+  },
+  {
+    "id": "ag-005",
+    "last_active": "23 min ago",
+    "name": "Review-bot",
+    "role": "ci / review",
+    "status": "failed",
+  },
+]
+`;
+
+exports[`mock snapshot (lock fixture output) > MOCK_KPI stable 1`] = `
+[
+  {
+    "hint": "mock aggregated",
+    "label": "Cost (24h)",
+    "tone": "warn",
+    "value": "$12.48",
+  },
+  {
+    "hint": "input 0.78M / output 0.46M",
+    "label": "Tokens (24h)",
+    "tone": "info",
+    "value": "1.24M",
+  },
+  {
+    "hint": "completed 74 / in_progress 13",
+    "label": "Tasks (24h)",
+    "tone": "ok",
+    "value": 87,
+  },
+  {
+    "hint": "ci_failed 2 / failed 1",
+    "label": "Errors (24h)",
+    "tone": "err",
+    "value": 3,
+  },
+]
+`;
+
+exports[`mock snapshot (lock fixture output) > MOCK_NOTIFS stable 1`] = `
+[
+  {
+    "ago": "2 min ago",
+    "body": "Spec excerpt conflicts with INV-RT-03, please confirm",
+    "id": "n-001",
+    "kind": "agent_decision_required",
+    "read": false,
+    "subject": "ag-005 awaiting decision",
+  },
+  {
+    "ago": "8 min ago",
+    "body": "test:integration:rt_step failed 3/12",
+    "id": "n-002",
+    "kind": "ci_failed",
+    "read": false,
+    "subject": "CI failed: Physis-builder #482",
+  },
+  {
+    "ago": "23 min ago",
+    "body": "@Ulysses review required (5 files, +420 -118)",
+    "id": "n-003",
+    "kind": "review_requested",
+    "read": false,
+    "subject": "Review: feat/w2-gantt → main",
+  },
+  {
+    "ago": "1 h ago",
+    "body": "Resolve conflict before pushing (per §4 fix/*)",
+    "id": "n-004",
+    "kind": "merge_conflict",
+    "read": true,
+    "subject": "Merge conflict on planning/page",
+  },
+  {
+    "ago": "1 h ago",
+    "body": "ag-002 Physis-builder hit $4.00/$5.00 daily cap",
+    "id": "n-005",
+    "kind": "budget_alert",
+    "read": false,
+    "subject": "Budget 80% used",
+  },
+  {
+    "ago": "2 h ago",
+    "body": "ag-005 reported feedback required, lease paused",
+    "id": "n-006",
+    "kind": "policy_violation",
+    "read": true,
+    "subject": "Policy violation: INV-FB-02",
+  },
+  {
+    "ago": "3 h ago",
+    "body": "Multiple matches for SPEC-001 vs SPEC-002",
+    "id": "n-007",
+    "kind": "feedback_question",
+    "read": false,
+    "subject": "ag-007 asks: which spec?",
+  },
+  {
+    "ago": "5 h ago",
+    "body": "typecheck exit 1 — see log",
+    "id": "n-008",
+    "kind": "ci_failed",
+    "read": true,
+    "subject": "CI failed: Star-frontend #117",
+  },
+  {
+    "ago": "1 d ago",
+    "body": "3 P1/P2/P3 violations — please review",
+    "id": "n-009",
+    "kind": "review_requested",
+    "read": true,
+    "subject": "Review: DTL-036 v1.4 hotfix",
+  },
+  {
+    "ago": "2 d ago",
+    "body": "Total $87.42 across 5 agents (down 12% vs last week)",
+    "id": "n-010",
+    "kind": "budget_alert",
+    "read": true,
+    "subject": "Weekly cost summary",
+  },
+]
+`;

@@ -1,6 +1,7 @@
 // frontend/src/mocks/index.ts
 // mock infra entry (per mock-data-isolation.md §2.1)
 //
+// 兼容 d4b3193 commit (mock data layer) + M1 hotfix (zod → TS type guards).
 // 当前 Phase E.2 (M1) 不引 MSW (per 设计书 §5 P2 缺口, 留 Phase E.3+)
 // M1 范围: data/ + schemas/ + __tests__/ + seed.ts. handlers/ 留空.
 //
@@ -11,7 +12,27 @@
 //   4. lib/store.ts (W5) mock 改造 — P3 (W5 scope, 不在 M1)
 
 export * from "./data";
-export * from "./schemas/agent";
-export * from "./schemas/inbox";
-export * from "./schemas/analytics";
+export {
+  AGENT_STATUSES,
+  isAgentStatus,
+  isAgentRow,
+  type AgentStatus,
+  type AgentRow,
+} from "./schemas/agent";
+export {
+  NOTIF_KINDS,
+  isNotifKind,
+  isMockNotif,
+  type NotifKind,
+  type MockNotif,
+} from "./schemas/inbox";
+export {
+  KPI_TONES,
+  isKpiTone,
+  isKpiCard,
+  isCostPoint,
+  type KpiTone,
+  type KpiCard,
+  type CostPoint,
+} from "./schemas/analytics";
 export { mulberry32 } from "./seed";

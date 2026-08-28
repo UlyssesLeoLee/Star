@@ -1,19 +1,18 @@
 // frontend/src/mocks/__tests__/agents.test.ts
-// mock 自身 unit test (per mock-data-isolation.md §3.4)
-// 不 mount React 树, 直接 import mock 数据校验.
+// 替代 d4b3193 zod parse, 用 TS type guard isAgentRow.
 
 import { describe, it, expect } from "vitest";
 import { MOCK_AGENTS } from "@/mocks/data";
-import { AgentRowSchema, AgentStatusSchema } from "@/mocks/schemas/agent";
+import { isAgentRow, isAgentStatus, AGENT_STATUSES } from "@/mocks/schemas/agent";
 
 describe("MOCK_AGENTS", () => {
   it("has 5 rows", () => {
     expect(MOCK_AGENTS).toHaveLength(5);
   });
 
-  it("all rows match zod schema", () => {
+  it("all rows match type guard isAgentRow", () => {
     MOCK_AGENTS.forEach((row) => {
-      expect(() => AgentRowSchema.parse(row)).not.toThrow();
+      expect(isAgentRow(row)).toBe(true);
     });
   });
 
@@ -25,7 +24,8 @@ describe("MOCK_AGENTS", () => {
 
   it("all status values are valid enum", () => {
     MOCK_AGENTS.forEach((a) => {
-      expect(() => AgentStatusSchema.parse(a.status)).not.toThrow();
+      expect(isAgentStatus(a.status)).toBe(true);
+      expect(AGENT_STATUSES as readonly string[]).toContain(a.status);
     });
   });
 

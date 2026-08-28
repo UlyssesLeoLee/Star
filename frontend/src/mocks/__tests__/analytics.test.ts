@@ -1,17 +1,18 @@
 // frontend/src/mocks/__tests__/analytics.test.ts
+// 替代 d4b3193 zod parse, 用 TS type guard isKpiCard / isCostPoint.
 
 import { describe, it, expect } from "vitest";
 import { MOCK_KPI, COST_SERIES } from "@/mocks/data";
-import { KpiCardSchema, CostPointSchema } from "@/mocks/schemas/analytics";
+import { isKpiCard, isCostPoint } from "@/mocks/schemas/analytics";
 
 describe("MOCK_KPI", () => {
   it("has 4 cards", () => {
     expect(MOCK_KPI).toHaveLength(4);
   });
 
-  it("all cards match zod schema", () => {
+  it("all cards match type guard isKpiCard", () => {
     MOCK_KPI.forEach((k) => {
-      expect(() => KpiCardSchema.parse(k)).not.toThrow();
+      expect(isKpiCard(k)).toBe(true);
     });
   });
 });
@@ -21,9 +22,9 @@ describe("COST_SERIES", () => {
     expect(COST_SERIES).toHaveLength(7);
   });
 
-  it("all points match zod schema", () => {
+  it("all points match type guard isCostPoint", () => {
     COST_SERIES.forEach((p) => {
-      expect(() => CostPointSchema.parse(p)).not.toThrow();
+      expect(isCostPoint(p)).toBe(true);
     });
   });
 

@@ -1,17 +1,18 @@
 // frontend/src/mocks/__tests__/inbox.test.ts
+// 替代 d4b3193 zod parse, 用 TS type guard isMockNotif.
 
 import { describe, it, expect } from "vitest";
 import { MOCK_NOTIFS } from "@/mocks/data";
-import { MockNotifSchema, NotifKindSchema } from "@/mocks/schemas/inbox";
+import { isMockNotif, isNotifKind, NOTIF_KINDS } from "@/mocks/schemas/inbox";
 
 describe("MOCK_NOTIFS", () => {
   it("has 10 rows", () => {
     expect(MOCK_NOTIFS).toHaveLength(10);
   });
 
-  it("all rows match zod schema", () => {
+  it("all rows match type guard isMockNotif", () => {
     MOCK_NOTIFS.forEach((n) => {
-      expect(() => MockNotifSchema.parse(n)).not.toThrow();
+      expect(isMockNotif(n)).toBe(true);
     });
   });
 
@@ -23,7 +24,8 @@ describe("MOCK_NOTIFS", () => {
 
   it("all kind values are valid enum", () => {
     MOCK_NOTIFS.forEach((n) => {
-      expect(() => NotifKindSchema.parse(n.kind)).not.toThrow();
+      expect(isNotifKind(n.kind)).toBe(true);
+      expect(NOTIF_KINDS as readonly string[]).toContain(n.kind);
     });
   });
 

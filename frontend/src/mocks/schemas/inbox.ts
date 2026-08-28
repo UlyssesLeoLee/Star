@@ -1,9 +1,7 @@
 // frontend/src/mocks/schemas/inbox.ts
-// zod schema for MockNotif (per docs/frontend/design/mock-data-isolation.md §2.1)
+// 零 prod dep, 用 TS type guards (替代 d4b3193 的 zod).
 
-import { z } from "zod";
-
-export const NotifKindSchema = z.enum([
+export const NOTIF_KINDS = [
   "agent_decision_required",
   "ci_failed",
   "review_requested",
@@ -11,15 +9,35 @@ export const NotifKindSchema = z.enum([
   "budget_alert",
   "policy_violation",
   "feedback_question",
-]);
-export type NotifKind = z.infer<typeof NotifKindSchema>;
+] as const;
+export type NotifKind = (typeof NOTIF_KINDS)[number];
 
-export const MockNotifSchema = z.object({
-  id: z.string().regex(/^n-\d{3}$/, "notif id must be n-NNN format"),
-  kind: NotifKindSchema,
-  subject: z.string().min(1),
-  body: z.string().min(1),
-  read: z.boolean(),
-  ago: z.string().min(1),
-});
-export type MockNotif = z.infer<typeof MockNotifSchema>;
+export function isNotifKind(v: unknown): v is NotifKind {
+  return typeof v === "string" && (NOTIF_KINDS as readonly string[]).includes(v);
+}
+
+export interface MockNotif {
+  id: string;
+  kind: NotifKind;
+  subject: string;
+  body: string;
+  read: boolean;
+  ago: string;
+}
+
+export function isMockNotif(v: unknown): v is MockNotif {
+  if (typeof v !== "object" || v === null) return false;
+  const n = v as Record<string, unknown>;
+  return (
+    typeof n.id === "string" &&
+    /^n-\d{3}$/.test(n.id) &&
+    isNotifKind(n.kind) &&
+    typeof n.subject === "string" &&
+    n.subject.length > 0 &&
+    typeof n.body === "string" &&
+    n.body.length > 0 &&
+    typeof n.read === "boolean" &&
+    typeof n.ago === "string" &&
+    n.ago.length > 0
+  );
+}
