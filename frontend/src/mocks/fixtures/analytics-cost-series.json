@@ -1,0 +1,9 @@
+[
+  { "day": "Mon", "usd": 9.4  },
+  { "day": "Tue", "usd": 11.2 },
+  { "day": "Wed", "usd": 8.7  },
+  { "day": "Thu", "usd": 13.1 },
+  { "day": "Fri", "usd": 12.48 },
+  { "day": "Sat", "usd": 6.3  },
+  { "day": "Sun", "usd": 4.2  }
+]

@@ -1,0 +1,6 @@
+[
+  { "label": "Cost (24h)",   "value": "$12.48", "hint": "mock aggregated",                "tone": "warn" },
+  { "label": "Tokens (24h)", "value": "1.24M",  "hint": "input 0.78M / output 0.46M",     "tone": "info" },
+  { "label": "Tasks (24h)",  "value": 87,       "hint": "completed 74 / in_progress 13",  "tone": "ok"   },
+  { "label": "Errors (24h)", "value": 3,        "hint": "ci_failed 2 / failed 1",         "tone": "err"  }
+]
