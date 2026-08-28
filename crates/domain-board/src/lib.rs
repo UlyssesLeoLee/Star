@@ -1811,3 +1811,5 @@ mod tests {
         assert_eq!(view.cards[0].column_id, col0);
     }
 }
+
+pub mod wip_swimlane;
