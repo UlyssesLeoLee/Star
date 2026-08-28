@@ -1,0 +1,180 @@
+// =====================================================================
+// frontend/src/lib/redirects.ts — U5 (multica-style route consolidation)
+//
+// Single source of truth for the 26 legacy-route → 6-panel redirect map
+// per docs/frontend/design/ui-redesign-multica-style.md §2.
+//
+// 22 domain routes are absorbed into 6 new panel routes (27 total
+// entries because /workspace has both an exact-match and a /:id
+// path-param variant for deep links):
+//   /inbox      ← notification / comment / audit / feedback / search / context
+//   /issues     ← work-item / worktree
+//   /projects   ← project / workspace / board / planning / scm / collaboration
+//                 / workflow / canvas (with id) / relation
+//   /agents     ← agent / validation / automation / development / local-runtime
+//   /settings   ← tenant / identity / permission / integration
+//
+// Notes:
+//   - We keep the path-param variants (/workspace/:id, /canvas/:id) so deep
+//     links from emails, docs and old bookmarks survive the migration.
+//   - The root path / is NOT in this list — its redirect is handled by
+//     app/page.tsx (redirect → /inbox) so it can be unit-tested at the
+//     page level rather than the routing-config level.
+//   - This module is imported by:
+//        1. next.config.js (rewrites the redirects() function)
+//        2. e2e/redirects.spec.ts (vitest spec validating structure)
+//   - permanent: false → 307 (preserves HTTP method, correct for GET nav)
+//   - 308 is the Next.js fallback for permanent: true; we prefer 307 for
+//     user-facing nav (avoids caching stale redirects on the client).
+// =====================================================================
+
+import type { NextRedirect } from "./redirects.types";
+
+/**
+ * Ordered list of legacy-route redirects.
+ *
+ * Order matters only for human readability — Next.js matches on first
+ * hit regardless. The test suite asserts on the *set*, not the order.
+ */
+export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
+  // ── /projects sink ─────────────────────────────────────────────────
+  { source: "/workspace", destination: "/projects", permanent: false },
+  {
+    source: "/workspace/:id",
+    destination: "/projects/:id",
+    permanent: false,
+  },
+  { source: "/project", destination: "/projects", permanent: false },
+  { source: "/board", destination: "/projects?tab=board", permanent: false },
+  {
+    source: "/planning",
+    destination: "/projects?tab=gantt",
+    permanent: false,
+  },
+  {
+    source: "/scm",
+    destination: "/projects?tab=workflow",
+    permanent: false,
+  },
+  {
+    source: "/collaboration",
+    destination: "/projects?tab=workflow",
+    permanent: false,
+  },
+  {
+    source: "/workflow",
+    destination: "/projects?tab=workflow",
+    permanent: false,
+  },
+  {
+    source: "/relation",
+    destination: "/projects?tab=relations",
+    permanent: false,
+  },
+  {
+    source: "/canvas/:id",
+    destination: "/projects?canvas=:id",
+    permanent: false,
+  },
+
+  // ── /issues sink ────────────────────────────────────────────────────
+  {
+    source: "/work-item",
+    destination: "/issues?view=kanban",
+    permanent: false,
+  },
+  { source: "/worktree", destination: "/issues?view=tree", permanent: false },
+
+  // ── /agents sink ────────────────────────────────────────────────────
+  { source: "/agent", destination: "/agents", permanent: false },
+  {
+    source: "/validation",
+    destination: "/agents?tab=validation",
+    permanent: false,
+  },
+  {
+    source: "/automation",
+    destination: "/agents?tab=automation",
+    permanent: false,
+  },
+  {
+    source: "/development",
+    destination: "/agents?tab=development",
+    permanent: false,
+  },
+  {
+    source: "/local-runtime",
+    destination: "/agents?tab=runtime",
+    permanent: false,
+  },
+
+  // ── /inbox sink ─────────────────────────────────────────────────────
+  { source: "/notification", destination: "/inbox", permanent: false },
+  {
+    source: "/comment",
+    destination: "/inbox?type=comment",
+    permanent: false,
+  },
+  { source: "/audit", destination: "/inbox?type=audit", permanent: false },
+  {
+    source: "/feedback",
+    destination: "/inbox?type=feedback",
+    permanent: false,
+  },
+  { source: "/search", destination: "/inbox?type=search", permanent: false },
+  {
+    source: "/context",
+    destination: "/inbox?type=context",
+    permanent: false,
+  },
+
+  // ── /settings sink ──────────────────────────────────────────────────
+  {
+    source: "/permission",
+    destination: "/settings?tab=permissions",
+    permanent: false,
+  },
+  {
+    source: "/identity",
+    destination: "/settings?tab=members",
+    permanent: false,
+  },
+  {
+    source: "/tenant",
+    destination: "/settings?tab=workspace",
+    permanent: false,
+  },
+  {
+    source: "/integration",
+    destination: "/settings?tab=integrations",
+    permanent: false,
+  },
+];
+
+/**
+ * Build a lookup map for fast tests and runtime introspection.
+ * Multiple rules can share the same source only via path params (e.g.
+ * /workspace vs /workspace/:id), so the LAST write wins for exact
+ * matches but a Map preserves insertion order.
+ */
+export const REDIRECTS_BY_SOURCE: ReadonlyMap<string, NextRedirect> = new Map(
+  LEGACY_REDIRECTS.map((r) => [r.source, r]),
+);
+
+/**
+ * The 6 panel target routes used by redirects. Pages that don't exist
+ * yet will 404, but the redirect itself is still served (307).
+ *
+ * Note: this is informational only; the actual page files are produced
+ * by U2/U3/U4. U5 does NOT create them.
+ */
+export const NEW_PANEL_ROUTES = [
+  "/inbox",
+  "/issues",
+  "/projects",
+  "/agents",
+  "/analytics",
+  "/settings",
+] as const;
+
+export type NewPanelRoute = (typeof NEW_PANEL_ROUTES)[number];
