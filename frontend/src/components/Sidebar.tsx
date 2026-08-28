@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 
-type NavItem = { href: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; track: string };
+type NavItem = { href: string; label: string; icon: React.ComponentType<any>; track: string };
 type NavGroup = { label: string; items: NavItem[] };
 
 const NAV: NavGroup[] = [
