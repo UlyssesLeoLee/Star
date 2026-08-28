@@ -12,3 +12,8 @@ export const MOCK_AGENTS: ReadonlyArray<AgentRow> = [
   { id: "ag-004", name: "Doc-scribe",     status: "active",      role: "docs / adr",       last_active: "12 min ago" },
   { id: "ag-005", name: "Review-bot",     status: "failed",      role: "ci / review",      last_active: "23 min ago" },
 ];
+
+// FALLBACK alias for page SSR — page 改 useEffect+fetch 后, SSR 阶段用 FALLBACK 兜底
+// (per mock-msw-handlers.md §2.4 + §4 #1 缺标)
+// 业务数据不变, 仅 alias. 真实接入 backend 后删 FALLBACK.
+export const MOCK_AGENTS_FALLBACK: ReadonlyArray<AgentRow> = MOCK_AGENTS;

@@ -16,3 +16,7 @@ export const MOCK_NOTIFS: ReadonlyArray<MockNotif> = [
   { id: "n-009", kind: "review_requested",         subject: "Review: DTL-036 v1.4 hotfix",    body: "3 P1/P2/P3 violations — please review",                    read: true,  ago: "1 d ago"   },
   { id: "n-010", kind: "budget_alert",             subject: "Weekly cost summary",            body: "Total $87.42 across 5 agents (down 12% vs last week)",     read: true,  ago: "2 d ago"   },
 ];
+
+// FALLBACK alias for page SSR — page 改 useEffect+fetch 后, SSR 阶段用 FALLBACK 兜底
+// (per mock-msw-handlers.md §2.4 + §4 #1 缺标)
+export const MOCK_NOTIFS_FALLBACK: ReadonlyArray<MockNotif> = MOCK_NOTIFS;
