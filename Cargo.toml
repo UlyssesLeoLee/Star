@@ -23,6 +23,7 @@ members = [
     "crates/domain-scm",
     "crates/domain-search",
     "crates/domain-tenant",
+    "crates/domain-theme",
     "crates/domain-validation",
     "crates/domain-work-item",
     "crates/domain-workflow",

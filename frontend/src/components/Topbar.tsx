@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Search, Bell, ChevronDown, Building2 } from "lucide-react";
+import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
 
 export function Topbar() {
   const [q, setQ] = useState("");
@@ -27,6 +28,7 @@ export function Topbar() {
           </div>
         </div>
         <div className="flex items-center gap-3 text-sm">
+          <ThemeSwitcher />
           <button className="btn relative" aria-label="notifications">
             <Bell size={14} />
             <span className="absolute -top-1 -right-1 size-4 rounded-full bg-err text-white text-[10px] grid place-items-center">3</span>

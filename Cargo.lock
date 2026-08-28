@@ -637,6 +637,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "domain-theme"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "domain-validation"
 version = "0.1.0"
 dependencies = [

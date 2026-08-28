@@ -1,0 +1,60 @@
+/* Star Frontend — 主题 CSS 变量
+ * Per 2026-08-29 04:09 JST 主题决策: next-themes + 三元组 enum + 三层作用域.
+ * 与 frontend/src/lib/theme/types.ts 保持一致.
+ * 注入位置: :root (Light 默认) + .dark (Dark 覆盖).
+ */
+
+:root {
+  /* === Star Light 默认 (per ui-3pane-arch.md §2.1) === */
+  --color-primary: #5b5bd6;
+  --color-success: #3d8b5f;
+  --color-warning: #c77b30;
+  --color-danger: #b53d3d;
+  --color-neutral: #475569;
+  --color-surface: #f8fafc;
+  --color-surface-2: #eef2f7;
+  --color-text: #0f172a;
+  --color-text-dim: #475569;
+  --color-border: #cbd5e1;
+
+  /* === 间距 (4px 栅格) === */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* === 圆角 (3 档) === */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* === 阴影 (2 档) === */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 8px 24px 0 rgba(0, 0, 0, 0.12);
+}
+
+.dark {
+  /* === Star Dark 覆盖 === */
+  --color-primary: #7b7bf0;
+  --color-success: #52b583;
+  --color-warning: #e89b4a;
+  --color-danger: #e05959;
+  --color-neutral: #94a3b8;
+  --color-surface: #0f172a;
+  --color-surface-2: #1e293b;
+  --color-text: #f1f5f9;
+  --color-text-dim: #94a3b8;
+  --color-border: #334155;
+
+  /* 暗色阴影更弱 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* 预留扩展位 (per 2026-08-29 04:09 JST 用户拍板 "支持后续增加"):
+ * 未来 .high-contrast / .solarized / .corporate-light 等主题可在这里加块.
+ */

@@ -16,8 +16,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-screen bg-bg text-ink">
+    // suppressHydrationWarning: next-themes 在 client 注入 .dark class, SSR 不一致是预期.
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen bg-[color:var(--color-surface)] text-[color:var(--color-text)]">
         <Providers>
           <div className="flex min-h-screen">
             <Sidebar />
