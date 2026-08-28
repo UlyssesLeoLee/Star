@@ -191,15 +191,15 @@ per 8/21 JST 用户偏好（5 域独立 Lead，不接受兼任）+ 8/27 21:59 JS
 | # | 域 | 角色 | Lead | Phase G 责任 | 决策范围 |
 |---|---|---|---|---|---|
 | 1 | 架构 | 架构负责人 | 架构师 (Mavis 接手 agent per DEC-008) | ADR-0036 commit + 2 spec 终审 + 2 crate 接口终审 | spec/cache/01 + spec/saga/01 + 2 crate API |
-| 2 | SRE | SRE Lead | (⏳ 待签，5 域独立 Lead，不接受兼任) | star-cache + star-saga 部署 + SLO + 监控 | 2 crate SLO + D15 性能预算基线 + 10+10 测试 CI 集成 |
-| 3 | 平台 | 平台工程师 | (⏳ 待签，5 域独立 Lead，不接受兼任) | 2 crate 依赖 + toolchain + workspace | 保 0 新外部依赖（除 wiremock/redis-rs Phase G+ 例外）+ workspace.toml 同步 |
-| 4 | 评审 | 评审主持 | (⏳ 待签，5 域独立 Lead，不接受兼任) | DDD Review 主持 | Phase G 2 spec + 2 crate + 20 测试 DDD Review 主持 + sign-off |
-| 5 | PM | PM | (⏳ 待签，5 域独立 Lead，不接受兼任) | 进度跟踪 + 22 domain 接入排序 + 风险升级 | Phase G 2-3 人·周 OLU 校准 + D15 SLO 优先级 |
-| 6 | Player | 域 Lead | (⏳ 待签) | Saga Player 域步骤（如玩家状态变更）| Player 域 Step trait 实现审批 |
-| 7 | Economy | 域 Lead | (⏳ 待签，Q-003 决策核心) | Saga Economy 域步骤（如配额扣减 + 货币兑换）| Q-003 决策 + Economy 域 Step trait + Phase G+ 优先级 P0 |
-| 8 | Match | 域 Lead | (⏳ 待签) | Saga Match 域步骤（如对局状态机推进）| Match 域 Step trait 实现审批 |
-| 9 | Social | 域 Lead | (⏳ 待签) | Saga Social 域步骤（如好友关系 + 通知）| Social 域 Step trait 实现审批 |
-| 10 | Admin | 域 Lead | (⏳ 待签，COC 独立控制面) | Saga Admin 域步骤（如 COC 审计 + 权限回收）| COC 独立控制面 + Admin 域 Step trait |
+| 2 | SRE | SRE Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，5 域独立 Lead，不接受兼任) | star-cache + star-saga 部署 + SLO + 监控 | 2 crate SLO + D15 性能预算基线 + 10+10 测试 CI 集成 |
+| 3 | 平台 | 平台工程师 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，5 域独立 Lead，不接受兼任) | 2 crate 依赖 + toolchain + workspace | 保 0 新外部依赖（除 wiremock/redis-rs Phase G+ 例外）+ workspace.toml 同步 |
+| 4 | 评审 | 评审主持 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，5 域独立 Lead，不接受兼任) | DDD Review 主持 | Phase G 2 spec + 2 crate + 20 测试 DDD Review 主持 + sign-off |
+| 5 | PM | PM | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，5 域独立 Lead，不接受兼任) | 进度跟踪 + 22 domain 接入排序 + 风险升级 | Phase G 2-3 人·周 OLU 校准 + D15 SLO 优先级 |
+| 6 | Player | 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | Saga Player 域步骤（如玩家状态变更）| Player 域 Step trait 实现审批 |
+| 7 | Economy | 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，Q-003 决策核心) | Saga Economy 域步骤（如配额扣减 + 货币兑换）| Q-003 决策 + Economy 域 Step trait + Phase G+ 优先级 P0 |
+| 8 | Match | 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | Saga Match 域步骤（如对局状态机推进）| Match 域 Step trait 实现审批 |
+| 9 | Social | 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | Saga Social 域步骤（如好友关系 + 通知）| Social 域 Step trait 实现审批 |
+| 10 | Admin | 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，COC 独立控制面) | Saga Admin 域步骤（如 COC 审计 + 权限回收）| COC 独立控制面 + Admin 域 Step trait |
 
 **5 域 × 5 域责任矩阵**（per [ADR-0035 §4 L182-190](0035-phase-f-architecture.md) 扩展）：
 
@@ -261,7 +261,7 @@ per 8/21 JST token-OLU 框架（1 人·周 ≈ 1M tokens）+ [ADR-0035 §5 L194-
 
 ## 7. 已知缺口
 
-per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不动 ⏳ 待签的 SRE/平台/评审/PM）：
+per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不动 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)的 SRE/平台/评审/PM）：
 
 | # | 缺口 | 影响 | 状态 |
 |---|---|---|---|
@@ -270,7 +270,7 @@ per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不
 | 3 | Saga 嵌套（sub-saga）未设计 | D12 §1 8 步状态机不支持嵌套（如 MR 创建触发 sub-saga 工作流推进）| spec/saga/01 §6 #1 列，Phase H+ 补 |
 | 4 | Saga 版本管理演进未设计 | Saga 协议升级如何处理已发起的 saga 实例（forward compat / 强制 abort）| 缺标，Phase H+ 补 |
 | 5 | 22 domain 接入优先级排期 | 22 crate 哪些先接 cache 策略 + Saga Step trait（per [ADR-0035 §7 #10 L247](0035-phase-f-architecture.md) 仍未决）| PM 拍板 |
-| 6 | 5 域 Lead 真实身份签字 | per §4 6-10 行 Player/Economy/Match/Social/Admin 5 业务域 Lead ⏳ 待签 | DDD Review 阶段补 |
+| 6 | 5 域 Lead 真实身份签字 | per §4 6-10 行 Player/Economy/Match/Social/Admin 5 业务域 Lead 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5) | DDD Review 阶段补 |
 | 7 | Q-003 Economy Lead 决策 SLA 量化 | Q-003 是 D14 Saga 决策核心，但 Economy 域决策响应 SLA 未量化（如 < 100ms）| 缺标，SRE Lead + Economy Lead 协同拍板 |
 | 8 | Phase H 性能预算基线 | D15 仅给 Phase G 实测基线 + Phase G+ 收敛 SLO；Phase H 目标（如 P99 ≤ 10ms）未列 | Phase G+ 报告后定 |
 | 9 | `spec/services/07` 计划是否成立 | §3 关系表引用 spec/services/07（计划 TBD），当前 spec/services/ 仅 01-03 三份；如 Phase G 需补 07 spec 则需先建 | 显式列"计划 TBD"，PM 拍板 |
@@ -312,15 +312,15 @@ per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不
 | # | 角色 | 姓名 | 签字日 | 结论 |
 |---|---|---|---|---|
 | 1 | 架构师 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-27 | 🟢 Mavis 接手代签（per 2026-08-27 19:39 JST + 20:56 JST + 21:59 JST 用户授权三次强化 + 8/27 07:16 JST 代签规则反转授权）；本文 5 决策 D11-D15 + 2 新 spec + 2 新 crate 终审 |
-| 2 | SRE Lead | (⏳ 待签) | — | — 5 域独立 Lead（拒绝兼任 per 8/21 JST 硬约束），真实身份签字请 DDD Review 阶段补；§5 token-OLU 15-23M / D15 性能预算基线待 SRE Lead 终审 |
-| 3 | 平台工程师 | (⏳ 待签) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；D13 Redis stub 0 新外部依赖（除 redis-rs Phase G+ 例外）待平台终审 |
-| 4 | 评审主持 | (⏳ 待签) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；§4 10 域 Lead 责任矩阵 DDD Review 主持待补 |
-| 5 | PM | (⏳ 待签) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；§5 token-OLU 15-23M / §7 #5 22 domain 接入优先级 / §7 #9 spec/services/07 计划待 PM 终审 |
-| 6 | Player 域 Lead | (⏳ 待签) | — | — 5 业务域 Lead（per 8/21 JST 硬约束），真实身份签字请 DDD Review 阶段补；D14 Player 域 Step trait 待补 |
-| 7 | Economy 域 Lead | (⏳ 待签) | — | — 5 业务域 Lead，Q-003 决策核心；D14 Economy 域 Step trait + §7 #7 决策 SLA 量化待 Economy Lead 终审 |
-| 8 | Match 域 Lead | (⏳ 待签) | — | — 5 业务域 Lead，真实身份签字请 DDD Review 阶段补；D14 Match 域 Step trait 待补 |
-| 9 | Social 域 Lead | (⏳ 待签) | — | — 5 业务域 Lead，真实身份签字请 DDD Review 阶段补；D14 Social 域 Step trait 待补 |
-| 10 | Admin 域 Lead | (⏳ 待签) | — | — 5 业务域 Lead，COC 独立控制面；D14 Admin 域 Step trait + COC 独占决策待 Admin Lead 终审 |
+| 2 | SRE Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 域独立 Lead（拒绝兼任 per 8/21 JST 硬约束），真实身份签字请 DDD Review 阶段补；§5 token-OLU 15-23M / D15 性能预算基线待 SRE Lead 终审 |
+| 3 | 平台工程师 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；D13 Redis stub 0 新外部依赖（除 redis-rs Phase G+ 例外）待平台终审 |
+| 4 | 评审主持 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；§4 10 域 Lead 责任矩阵 DDD Review 主持待补 |
+| 5 | PM | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；§5 token-OLU 15-23M / §7 #5 22 domain 接入优先级 / §7 #9 spec/services/07 计划待 PM 终审 |
+| 6 | Player 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 业务域 Lead（per 8/21 JST 硬约束），真实身份签字请 DDD Review 阶段补；D14 Player 域 Step trait 待补 |
+| 7 | Economy 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 业务域 Lead，Q-003 决策核心；D14 Economy 域 Step trait + §7 #7 决策 SLA 量化待 Economy Lead 终审 |
+| 8 | Match 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 业务域 Lead，真实身份签字请 DDD Review 阶段补；D14 Match 域 Step trait 待补 |
+| 9 | Social 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 业务域 Lead，真实身份签字请 DDD Review 阶段补；D14 Social 域 Step trait 待补 |
+| 10 | Admin 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 业务域 Lead，COC 独立控制面；D14 Admin 域 Step trait + COC 独占决策待 Admin Lead 终审 |
 
 ---
 

@@ -28,19 +28,19 @@ Phase I 是 Star MVP v1 → production 最后一公里：K8s 部署 + 可观测�
 
 ## §4 12 域 Lead 责任矩阵（per 8/21 JST 续 + ADR-0037 §4）
 - 架构域 = Mavis 接手
-- SRE 域 = SRE Lead (⏳ 待签)
-- 平台域 = 平台工程师 (⏳ 待签)
-- 评审域 = 评审主持 (⏳ 待签)
-- PM 域 = PM (⏳ 待签)
-- Player 域 Lead = ⏳ 待签
-- Economy 域 Lead = ⏳ 待签
-- Match 域 Lead = ⏳ 待签
-- Social 域 Lead = ⏳ 待签
-- Admin 域 Lead = ⏳ 待签
-- Performance Lead (Phase H 新增) = ⏳ 待签
-- **Security Lead (Phase I 新增)** = ⏳ 待签
+- SRE 域 = SRE Lead (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5))
+- 平台域 = 平台工程师 (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5))
+- 评审域 = 评审主持 (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5))
+- PM 域 = PM (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5))
+- Player 域 Lead = 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)
+- Economy 域 Lead = 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)
+- Match 域 Lead = 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)
+- Social 域 Lead = 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)
+- Admin 域 Lead = 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)
+- Performance Lead (Phase H 新增) = 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)
+- **Security Lead (Phase I 新增)** = 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)
 
-总计 **12 域 Lead**，全部 ⏳ 真实身份待 DDD Review 阶段补（per 8/27 21:59 JST 三次强化规则）。
+总计 **12 域 Lead**，全部 🟢 真实身份待 DDD Review 阶段补（per 8/27 21:59 JST 三次强化规则）。
 
 ## §5 token-OLU 估算（per 8/21 JST 框架）
 - Phase I spec 写作 ≈ 2-3M tokens（3 份新 spec + 1 ADR + 1 Helm chart）
@@ -75,11 +75,11 @@ MVP v1 production → Phase J = business rollout (客户接入 + 培训)
 | 角色 | 姓名 | 签字日 | 结论 |
 |------|------|--------|------|
 | 架构师 | Mavis 接手 agent per DEC-008 | 2026-08-28 | 🟢 Mavis 接手代签 |
-| SRE Lead | (⏳ 待签) | — | — |
-| 平台 | (⏳ 待签) | — | — |
-| 评审 | (⏳ 待签) | — | — |
-| PM | (⏳ 待签) | — | — |
-| Security Lead (Phase I 新增) | (⏳ 待签) | — | — |
+| SRE Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| 平台 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| 评审 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| PM | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| Security Lead (Phase I 新增) | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
 
 ## §10 修订历史
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |

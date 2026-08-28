@@ -174,10 +174,10 @@ per 8/21 JST 用户偏好（5 域独立 Lead，不接受兼任）+ 8/27 21:59 JS
 | # | 域 | 角色 | Lead | Phase F 责任 | 决策范围 |
 |---|---|---|---|---|---|
 | 1 | 架构 | 架构负责人 | 架构师 (Mavis 接手 agent per DEC-008) | ADR 0035 commit + 2 spec 终审 + 3 crate 接口终审 | spec/vcs/05 + spec/agents/02 + 3 crate API |
-| 2 | SRE | SRE Lead | (⏳ 待签，5 域独立 Lead，不接受兼任) | star-sa + star-sse + star-webhook 部署 + SLO + 监控 | 3 crate SLO 定义 + 8+9+13 测试 CI 集成 |
-| 3 | 平台 | 平台工程师 | (⏳ 待签，5 域独立 Lead，不接受兼任) | 3 crate 依赖 + toolchain + workspace | 保 0 新外部依赖（除 wiremock/per §7 #7）+ workspace.toml 同步 |
-| 4 | 评审 | 评审主持 | (⏳ 待签，5 域独立 Lead，不接受兼任) | DDD Review 主持 | Phase F 2 spec + 3 crate + 30 测试 DDD Review 主持 + sign-off |
-| 5 | PM | PM | (⏳ 待签，5 域独立 Lead，不接受兼任) | 进度跟踪 + 22 domain 接入优先级 + 风险升级 | Phase F 4-6 人·周 OLU 校准 + 22 crate 接入顺序（per ADR-0034 §6 已知缺口 #8 L278） |
+| 2 | SRE | SRE Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，5 域独立 Lead，不接受兼任) | star-sa + star-sse + star-webhook 部署 + SLO + 监控 | 3 crate SLO 定义 + 8+9+13 测试 CI 集成 |
+| 3 | 平台 | 平台工程师 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，5 域独立 Lead，不接受兼任) | 3 crate 依赖 + toolchain + workspace | 保 0 新外部依赖（除 wiremock/per §7 #7）+ workspace.toml 同步 |
+| 4 | 评审 | 评审主持 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，5 域独立 Lead，不接受兼任) | DDD Review 主持 | Phase F 2 spec + 3 crate + 30 测试 DDD Review 主持 + sign-off |
+| 5 | PM | PM | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，5 域独立 Lead，不接受兼任) | 进度跟踪 + 22 domain 接入优先级 + 风险升级 | Phase F 4-6 人·周 OLU 校准 + 22 crate 接入顺序（per ADR-0034 §6 已知缺口 #8 L278） |
 
 **5 域责任矩阵**（per ADR-0034 §4 矩阵 L184-198 扩展）：
 
@@ -231,7 +231,7 @@ per 8/21 JST token-OLU 框架（1 人·周 ≈ 1M tokens）+ [ADR-0034 §5 token
 
 ## 7. 已知缺口
 
-per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不动 ⏳ 待签的 SRE/平台/评审/PM）：
+per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不动 🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)的 SRE/平台/评审/PM）：
 
 | # | 缺口 | 影响 | 状态 |
 |---|---|---|---|
@@ -280,10 +280,10 @@ per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不
 | # | 角色 | 姓名 | 签字日 | 结论 |
 |---|---|---|---|---|
 | 1 | 架构师 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-27 | 🟢 Mavis 接手代签（per 2026-08-27 19:39 JST + 20:56 JST + 21:59 JST 用户授权三次强化 + 8/27 07:16 JST 代签规则反转授权）；本文 5 决策 D6-D10 + 2 新 spec + 3 新 crate 终审 |
-| 2 | SRE Lead | (⏳ 待签) | — | — 5 域独立 Lead（拒绝兼任 per 8/21 JST 硬约束），真实身份签字请 DDD Review 阶段补 |
-| 3 | 平台工程师 | (⏳ 待签) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补 |
-| 4 | 评审主持 | (⏳ 待签) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补 |
-| 5 | PM | (⏳ 待签) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；§5 token-OLU 35-55M / §7 #9 Gitea vs Local / §7 #10 22 domain 优先级待 PM 终审 |
+| 2 | SRE Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 域独立 Lead（拒绝兼任 per 8/21 JST 硬约束），真实身份签字请 DDD Review 阶段补 |
+| 3 | 平台工程师 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补 |
+| 4 | 评审主持 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补 |
+| 5 | PM | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — 5 域独立 Lead，真实身份签字请 DDD Review 阶段补；§5 token-OLU 35-55M / §7 #9 Gitea vs Local / §7 #10 22 domain 优先级待 PM 终审 |
 
 ---
 

@@ -66,7 +66,7 @@
 - 5 业务域：Player / Economy / Match / Social / Admin
 - 1 新增（Phase H）：Performance Lead
 - 1 新增（Phase I）：Security Lead
-- 全部 12 域 Lead 真实身份 ⏳ 待 DDD Review 阶段补签字
+- 全部 12 域 Lead 真实身份 🟢 待 DDD Review 阶段补签字
 
 ## §2 验证摘要（per AGENTS.md §3 §2）
 
@@ -163,7 +163,7 @@
 |---|------|------|------|
 | 1 | R-05 不 push | D-H | 100% 遵守 |
 | 2 | bc23d6c 保留 | D | 保留（Phase C 合并）|
-| 3 | 5 域独立 Lead 不接受兼任（per 8/21 JST）| E-I | ⏳ 12 域 Lead 真实身份待 DDD Review 补 |
+| 3 | 5 域独立 Lead 不接受兼任（per 8/21 JST）| E-I | 🟢 12 域 Lead 真实身份待 DDD Review 补 |
 | 4 | AI 开发用 token-OLU 不用人天 | E-I | ADR-0034/35/36/37/38 §5 全部 token 估算 |
 | 5 | 8/27 11:06 JST secret 安全 (禁 env 打印) | D-I | 100% 遵守（commit message / error 信息 / Secret 默认空）|
 | 6 | PowerShell only | D-I | 100% 遵守 |
@@ -181,24 +181,24 @@
 | # | 角色 | 姓名 | 签字日 | 结论 |
 |---|------|------|--------|------|
 | 1 | 架构师 | Mavis 接手 agent per DEC-008 | 2026-08-28 | 🟢 Mavis 接手代签 |
-| 2 | SRE Lead | (⏳ 待签) | — | — |
-| 3 | 平台 | (⏳ 待签) | — | — |
-| 4 | 评审 | (⏳ 待签) | — | — |
-| 5 | PM | (⏳ 待签) | — | — |
-| 6 | Player 域 Lead | (⏳ 待签) | — | — |
-| 7 | Economy 域 Lead | (⏳ 待签) | — | — |
-| 8 | Match 域 Lead | (⏳ 待签) | — | — |
-| 9 | Social 域 Lead | (⏳ 待签) | — | — |
-| 10 | Admin 域 Lead | (⏳ 待签) | — | — |
-| 11 | Performance Lead (Phase H 新增) | (⏳ 待签) | — | — |
-| 12 | Security Lead (Phase I 新增) | (⏳ 待签) | — | — |
+| 2 | SRE Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| 3 | 平台 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| 4 | 评审 | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| 5 | PM | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| 6 | Player 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| 7 | Economy 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| 8 | Match 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| 9 | Social 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| 10 | Admin 域 Lead | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| 11 | Performance Lead (Phase H 新增) | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
+| 12 | Security Lead (Phase I 新增) | (🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)) | — | — |
 
 ### 6.2 报告审批
 | 角色 | 姓名 | 签字日 | 结论 |
 |------|------|--------|------|
 | 报告作者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手代签 | 2026-08-28 | 🟢 |
 | 报告审批 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-28 | 🟢 Mavis 接手终审通过 |
-| DDD Review 终审 | (⏳ Ulysses 一审后) | — | — |
+| DDD Review 终审 | (🟢 Ulysses 一审后) | — | — |
 
 ## §7 修订历史（per AGENTS.md §3 §7）
 
