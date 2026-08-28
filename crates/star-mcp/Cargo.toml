@@ -30,6 +30,10 @@ tokio-stream = "0.1"
 domain-tenant = { path = "../domain-tenant" }
 domain-identity = { path = "../domain-identity" }
 domain-permission = { path = "../domain-permission" }
+# Phase B.2.5 (Tier 2): 真实数据源接入 workspace / project / work-item
+domain-workspace = { path = "../domain-workspace" }
+domain-project = { path = "../domain-project" }
+domain-work-item = { path = "../domain-work-item" }
 uuid = { workspace = true }
 chrono = { workspace = true }
 

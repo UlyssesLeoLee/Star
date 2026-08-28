@@ -740,11 +740,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_with_domains_returns_27_resources_in_list() {
-        // 4 核心 (Phase E) + 23 domain (Phase H: 22 task brief + scm) = 27
+    async fn test_with_domains_returns_28_resources_in_list() {
+        // 4 核心 (Phase E) + 24 domain (Phase H: 22 task brief + scm + workspace) = 28
+        // B.2.5 起新增 workspace handler (per spec/integration/01 §2 Tier 2)
         let h = handler_with_domains();
         let resources = h.list();
-        assert_eq!(resources.len(), 27, "4 Phase E core + 23 Phase H domain = 27");
+        assert_eq!(
+            resources.len(),
+            28,
+            "4 Phase E core + 24 Phase H domain (含 B.2.5 workspace) = 28"
+        );
     }
 
     #[tokio::test]

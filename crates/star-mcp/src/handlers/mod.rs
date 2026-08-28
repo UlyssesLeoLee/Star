@@ -38,6 +38,7 @@ pub(crate) mod search;
 pub(crate) mod tenant;
 pub(crate) mod validation;
 pub(crate) mod work_item;
+pub(crate) mod workspace;
 pub(crate) mod worktree;
 
 use crate::resources::DynResource;
@@ -65,13 +66,14 @@ pub(crate) fn all_domain_handlers() -> Vec<Box<dyn DynResource>> {
         Box::new(notification::NotificationHandler),
         Box::new(permission::PermissionHandler::new()),
         Box::new(planning::PlanningHandler),
-        Box::new(project::ProjectHandler),
+        Box::new(project::ProjectHandler::new()),
         Box::new(relation::RelationHandler),
         Box::new(scm::ScmHandler),
         Box::new(search::SearchHandler),
         Box::new(tenant::TenantHandler::new()),
         Box::new(validation::ValidationHandler),
-        Box::new(work_item::WorkItemHandler),
+        Box::new(work_item::WorkItemHandler::new()),
+        Box::new(workspace::WorkspaceHandler::new()),
         Box::new(worktree::WorktreeHandler),
     ]
 }
