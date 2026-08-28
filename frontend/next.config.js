@@ -41,6 +41,21 @@ const nextConfig = {
     const { LEGACY_REDIRECTS } = require("./src/lib/redirects.shim.cjs");
     return LEGACY_REDIRECTS;
   },
+  // Phase F.2 MSW client (per docs/frontend/design/mock-msw-handlers.md §4 P2 缺口 #2):
+  // - mockServiceWorker.js (per npx msw init public/) 在 production build 自动 copy
+  // - headers: service worker 需 'Service-Worker-Allowed' header (per spec 2025-06-27)
+  // - 仅 dev / NEXT_PUBLIC_API_MOCKING=enabled 启用 (per instrumentation.ts)
+  async headers() {
+    return [
+      {
+        source: "/mockServiceWorker.js",
+        headers: [
+          { key: "Service-Worker-Allowed", value: "/" },
+          { key: "Cache-Control", value: "no-cache" },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
