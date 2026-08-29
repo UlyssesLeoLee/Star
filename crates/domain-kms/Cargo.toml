@@ -1,0 +1,28 @@
+[package]
+name = "domain-kms"
+version = "0.1.0"
+edition = "2021"
+description = "KMS 集成 (Vault / AWS KMS 凭证) — E.4 mock 备选 (per 29692a7 mock 备选路径)"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+async-trait = "0.1"
+tracing = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.22"
+aes-gcm = "0.10"
+rand = "0.8"
+tokio = { version = "1", features = ["sync", "rt", "macros"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+
+[lints.rust]
+unsafe_code = "forbid"
