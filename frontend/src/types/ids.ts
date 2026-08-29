@@ -654,6 +654,8 @@ export interface Board {
   name: string;
   columns: Array<{
     status: WorkItemStatus;
+    /** 自定义列名 (per 2026-08-29 18:52 JST 拍板); undefined 时回退到 status */
+    name?: string;
     work_item_ids: Uuid[];
     wip_limit?: number;
   }>;

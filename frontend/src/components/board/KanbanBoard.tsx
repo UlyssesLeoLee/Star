@@ -44,6 +44,13 @@ export interface KanbanBoardProps {
   onDragStartCard?: (workItemId: string) => void;
   /** 拖动结束回调 */
   onDragEndCard?: () => void;
+  // Board 列编辑 (per 2026-08-29 18:52 JST 拍板: 列可改 + 增加减少)
+  /** 在末尾追加新列 (status) */
+  onAddColumn?: (status: WorkItemStatus) => void;
+  /** 删除列 (status) */
+  onRemoveColumn?: (status: WorkItemStatus) => void;
+  /** 重命名列 (status, newName) */
+  onRenameColumn?: (status: WorkItemStatus, newName: string) => void;
 }
 
 const KANBAN_COLUMNS_LOCAL: ReadonlyArray<WorkItemStatus> = KANBAN_COLUMNS;
@@ -57,11 +64,29 @@ export function KanbanBoard({
   draggingId,
   onDragStartCard,
   onDragEndCard,
+  onAddColumn,
+  onRemoveColumn,
+  onRenameColumn,
 }: KanbanBoardProps) {
   const [dropTarget, setDropTarget] = useState<WorkItemStatus | null>(null);
   // 内部拖动 id 兜底, 父组件没传时本地维护
   const [localDraggingId, setLocalDraggingId] = useState<string | null>(null);
   const effectiveDraggingId = draggingId ?? localDraggingId;
+  // 列名 inline 编辑 (per 2026-08-29 18:52 JST 拍板)
+  const [editingCol, setEditingCol] = useState<WorkItemStatus | null>(null);
+  const [editingName, setEditingName] = useState<string>("");
+  const startEdit = (status: WorkItemStatus, currentName: string) => {
+    setEditingCol(status);
+    setEditingName(currentName);
+  };
+  const commitEdit = (status: WorkItemStatus) => {
+    if (editingCol !== status) return;
+    const trimmed = editingName.trim();
+    if (trimmed && trimmed !== (board.columns.find((c) => c.status === status)?.name ?? status)) {
+      onRenameColumn?.(status, trimmed);
+    }
+    setEditingCol(null);
+  };
 
   const workItemMap = useMemo(
     () => Object.fromEntries(workItems.map((w) => [w.id, w])),
@@ -116,7 +141,9 @@ export function KanbanBoard({
   return (
     <div
       data-testid="kanban-board"
-      className="grid grid-cols-1 md:grid-cols-4 gap-3"
+      className="grid gap-3"
+      // grid-cols-1 mobile, 2 col tablet, 列数 dynamic 桌面 (per 2026-08-29 18:52 JST)
+      style={{ gridTemplateColumns: `repeat(${board.columns.length}, minmax(0, 1fr))` }}
     >
       {board.columns.map((col) => {
         const overWip =
@@ -143,12 +170,51 @@ export function KanbanBoard({
               isDropTarget && "ring-2 ring-accent bg-accent/10",
             )}
           >
-            <div className="flex items-center justify-between mb-3">
-              <StatusPill value={col.status} />
-              <span className="text-[10px] text-ink-mute font-mono">
-                {cards.length}
-                {col.wip_limit !== undefined && col.wip_limit < 99 && ` / ${col.wip_limit}`}
-              </span>
+            <div className="flex items-center justify-between mb-3 gap-1">
+              {editingCol === col.status && onRenameColumn ? (
+                // Inline edit 模式 (per 2026-08-29 18:52 JST 拍板)
+                <input
+                  data-testid={`kanban-column-name-input-${col.status}`}
+                  autoFocus
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onBlur={() => commitEdit(col.status)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitEdit(col.status);
+                    else if (e.key === "Escape") setEditingCol(null);
+                  }}
+                  className="text-[11px] font-mono uppercase tracking-wider bg-bg-card border border-accent/60 rounded px-1.5 py-0.5 text-ink outline-none w-full"
+                />
+              ) : (
+                <button
+                  data-testid={`kanban-column-name-${col.status}`}
+                  type="button"
+                  onClick={() => startEdit(col.status, col.name ?? col.status)}
+                  disabled={!onRenameColumn}
+                  className="text-[11px] font-mono uppercase tracking-wider text-ink hover:text-accent transition-colors text-left truncate"
+                  title="点击改列名"
+                >
+                  {col.name ?? col.status}
+                </button>
+              )}
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-[10px] text-ink-mute font-mono">
+                  {cards.length}
+                  {col.wip_limit !== undefined && col.wip_limit < 99 && ` / ${col.wip_limit}`}
+                </span>
+                {onRemoveColumn && (
+                  <button
+                    type="button"
+                    data-testid={`kanban-column-remove-${col.status}`}
+                    onClick={() => onRemoveColumn(col.status)}
+                    aria-label={`删除列 ${col.name ?? col.status}`}
+                    className="text-ink-mute hover:text-err transition-colors text-xs leading-none px-1"
+                    title="删除列"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
             {overWip && (
               <div className="mb-2 text-[10px] text-warn flex items-center gap-1">
@@ -175,6 +241,27 @@ export function KanbanBoard({
           </div>
         );
       })}
+
+      {/* Add column 按钮 (per 2026-08-29 18:52 JST 拍板) */}
+      {onAddColumn && (
+        <button
+          type="button"
+          data-testid="kanban-add-column"
+          onClick={() => {
+            // 找未在现有 columns 的 status 作为新列 (todo/in_progress/review/done/blocked/wontfix 轮询)
+            const candidates: WorkItemStatus[] = [
+              "todo", "in_progress", "review", "done", "blocked", "wontfix",
+            ];
+            const used = new Set(board.columns.map((c) => c.status));
+            const next = candidates.find((s) => !used.has(s)) ?? "blocked";
+            onAddColumn(next);
+          }}
+          className="card min-h-[200px] flex items-center justify-center text-ink-mute hover:text-accent hover:border-accent/40 transition-all duration-150 border-dashed cursor-pointer"
+        >
+          <span className="text-2xl leading-none">+</span>
+          <span className="ml-2 text-sm">Add column</span>
+        </button>
+      )}
     </div>
   );
 }

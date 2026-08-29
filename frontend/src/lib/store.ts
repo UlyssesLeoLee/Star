@@ -111,6 +111,12 @@ interface StoreState {
   transitionMilestone: (id: string, newDueDate: string) => void;  // ISO8601
   transitionSprint:    (id: string, newStart: string, newEnd: string) => void;
 
+  // Board 列编辑 (per 2026-08-29 18:52 JST 拍板: 列可改 + 增加减少)
+  addBoardColumn:    (status: WorkItemStatus) => void;     // 在末尾追加新列
+  removeBoardColumn: (status: WorkItemStatus) => void;     // 删除列 (work_item_ids 移交给 "wontfix")
+  renameBoardColumn: (status: WorkItemStatus, newName: string) => void;  // 改 name
+  reorderBoardColumns: (fromIdx: number, toIdx: number) => void;  // 拖动列重排 (后续)
+
   // 多人协同 (per §8.3) — W5 新增
   // 接受 boardSync 推送的 partial snapshot,执行 last-write-wins 覆盖
   applyRemoteChange: (snapshot: Partial<Pick<StoreState,
@@ -205,6 +211,52 @@ const initialState = (set: any): StoreState => ({
     set((s: StoreState) => ({
       sprints: s.sprints.map((sp) => sp.id === id ? { ...sp, start_date: newStart, end_date: newEnd } : sp),
     })),
+
+  // Board 列编辑 (per 2026-08-29 18:52 JST 拍板)
+  addBoardColumn: (status) =>
+    set((s: StoreState) => {
+      // 防重: 已存在该 status 跳过
+      if (s.board.columns.some((c) => c.status === status)) return s;
+      return {
+        board: {
+          ...s.board,
+          columns: [...s.board.columns, { status, work_item_ids: [] }],
+        },
+      };
+    }),
+  removeBoardColumn: (status) =>
+    set((s: StoreState) => {
+      const col = s.board.columns.find((c) => c.status === status);
+      if (!col) return s;
+      // 列里 work_item_ids 的 wi 状态改为 wontfix (兜底, 避免丢数据; 真实场景会弹确认)
+      const idsInCol = new Set(col.work_item_ids);
+      return {
+        board: {
+          ...s.board,
+          columns: s.board.columns.filter((c) => c.status !== status),
+        },
+        workItems: s.workItems.map((w) =>
+          idsInCol.has(w.id) ? { ...w, status: "wontfix" as WorkItemStatus } : w
+        ),
+      };
+    }),
+  renameBoardColumn: (status, newName) =>
+    set((s: StoreState) => ({
+      board: {
+        ...s.board,
+        columns: s.board.columns.map((c) =>
+          c.status === status ? { ...c, name: newName } : c
+        ),
+      },
+    })),
+  reorderBoardColumns: (fromIdx, toIdx) =>
+    set((s: StoreState) => {
+      const cols = [...s.board.columns];
+      if (fromIdx < 0 || fromIdx >= cols.length || toIdx < 0 || toIdx >= cols.length) return s;
+      const [moved] = cols.splice(fromIdx, 1);
+      cols.splice(toIdx, 0, moved);
+      return { board: { ...s.board, columns: cols } };
+    }),
 
   // W5 新增 — 多人协同: last-write-wins 覆盖本地
   applyRemoteChange: (snapshot) =>
