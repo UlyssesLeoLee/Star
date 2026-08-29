@@ -7,11 +7,14 @@
 // - 右: ⌘K 搜索触发 / 🔔 通知 badge / 🟢 Realtime status / 👤 user avatar
 // - 高度 64px, border-bottom 1px line, dark theme
 // - active tab: 底部 2px accent border + text-accent
+// - 反色: 2026-08-29 17:12 JST Ulysses 拍板 "所有字体颜色都应该和它的背景反色"
+//   → Star logo + 副标题 + tab 字色随 useTheme 切换, light=深色 / dark=浅色
 // =====================================================================
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import { useState, useEffect } from "react";
+import { useTheme } from "next-themes";
 import { ChevronDown, Bell, Settings, Search, Sun, Moon } from "lucide-react";
 import { useCommandBarStore } from "@/lib/commandBarStore";
 import { UserMenu } from "@/components/UserMenu";
@@ -82,8 +85,19 @@ export function AppHeader() {
               </svg>
             </div>
             <div className="hidden md:block">
-              <div className="text-sm font-semibold text-ink group-hover:text-accent transition-colors">Star</div>
-              <div className="text-[10px] uppercase tracking-wider text-ink-mute">Vibe Coding WM</div>
+              <div className={clsx(
+                "text-sm font-semibold transition-colors",
+                // 反色 (per 2026-08-29 17:12 JST): light=深 / dark=浅, hover=accent
+                isDark
+                  ? "text-zinc-50 group-hover:text-cyan-300"
+                  : "text-zinc-900 group-hover:text-cyan-700"
+              )}>Star</div>
+              <div className={clsx(
+                "text-[10px] uppercase tracking-wider transition-colors",
+                isDark
+                  ? "text-zinc-400"
+                  : "text-zinc-500"
+              )}>Vibe Coding WM</div>
             </div>
           </Link>
           <button

@@ -87,12 +87,19 @@ const NAV: NavGroup[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  // 反色 token: 与 AppHeader 一致 (per 2026-08-29 17:12 JST)
+  // light=深 zinc-900, dark=浅 zinc-50; muted: zinc-500 / zinc-400
+  // Sidebar 没有 isDark state, 改用 CSS class hook + 检测 html.dark
+  const isDark = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+  const fgPrimary = isDark ? "text-zinc-50" : "text-zinc-900";
+  const fgMuted = isDark ? "text-zinc-400" : "text-zinc-500";
+  const fgHover = isDark ? "hover:text-zinc-50" : "hover:text-zinc-900";
   return (
     <aside className="w-60 shrink-0 border-r border-line bg-bg-soft/40 flex flex-col h-screen sticky top-0">
       <nav className="flex-1 overflow-y-auto py-3 text-sm">
         {NAV.map((group) => (
           <div key={group.label} className="mb-2">
-            <div className="px-4 py-1.5 text-[10px] uppercase tracking-wider text-ink-mute">
+            <div className={clsx("px-4 py-1.5 text-[10px] uppercase tracking-wider", fgMuted)}>
               {group.label}
             </div>
             <ul>
@@ -109,10 +116,10 @@ export function Sidebar() {
                           ? "bg-accent/15 text-accent font-medium shadow-[inset_0_0_12px_rgba(0,240,255,0.08)] border-l-2 border-accent"
                           : item.core
                             ? "text-accent hover:bg-accent/10 border-l-2 border-accent/40"
-                            : "text-ink-dim hover:bg-bg-card/70 hover:text-ink border-l-2 border-transparent",
+                            : clsx(fgMuted, "hover:bg-bg-card/70", fgHover, "border-l-2 border-transparent"),
                       )}
                     >
-                      <Icon size={15} className={clsx("shrink-0 transition-transform group-hover:scale-110", (active || item.core) ? "text-accent" : "text-ink-dim")} />
+                      <Icon size={15} className={clsx("shrink-0 transition-transform group-hover:scale-110", (active || item.core) ? "text-accent" : fgMuted)} />
                       <span className="flex-1 truncate tracking-tight">{item.label}</span>
                       {item.core && (
                         <span className="text-[8px] font-mono uppercase tracking-wider text-accent/80 px-1 py-0.2 rounded border border-accent/40 bg-accent/5">
@@ -120,7 +127,7 @@ export function Sidebar() {
                         </span>
                       )}
                       {item.track !== "—" && !item.core && (
-                        <span className="text-[9px] font-mono text-ink-mute px-1 py-0.2 rounded border border-line/50 bg-bg-card/80 group-hover:border-accent/30 transition-colors">
+                        <span className={clsx("text-[9px] font-mono px-1 py-0.2 rounded border border-line/50 bg-bg-card/80 group-hover:border-accent/30 transition-colors", fgMuted)}>
                           TRK_{item.track}
                         </span>
                       )}
@@ -133,7 +140,7 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
-      <div className="border-t border-line px-4 py-2.5 text-[10px] text-ink-mute font-mono flex items-center justify-between">
+      <div className={clsx("border-t border-line px-4 py-2.5 text-[10px] font-mono flex items-center justify-between", fgMuted)}>
         <span>SYS // v0.1.0</span>
         <span className="text-accent/60">ONLINE</span>
       </div>
