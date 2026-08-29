@@ -37,12 +37,13 @@ per 守门 #1 派生 v5 (A.15 后): 之前守门均用 debug build, `cargo build
 
 ## §2 验证摘要
 
-**实证 cargo build --release** (守门 #1 派生 v5):
+**实证 cargo build --release + doc + bench** (守门 #1 派生 v5):
 
-| 阶段 | 错误数 | 耗时 |
-|---|---|---|
-| 修复前 (实为 0) | 0 | 3m 10s |
-| 修复后 (无需修) | 0 | n/a |
+| 命令 | 错误数 | 耗时 | 产物 |
+|---|---|---|---|
+| `cargo build --release -p 4 crate` | 0 | 3m 10s | release binary |
+| `cargo doc --no-deps -p 4 crate` | 0 | 92.5s | 42 HTML files |
+| `cargo bench --no-run -p 4 crate` | 0 | <1s (rebuild) | 5 star-* bench executables |
 
 **守门覆盖**:
 - 守门 #1 (R-05 不 push): ✅ 仅本地 commit
@@ -50,14 +51,14 @@ per 守门 #1 派生 v5 (A.15 后): 之前守门均用 debug build, `cargo build
 - 守门 #7 (0 unsafe): ✅ 0 unsafe
 - 守门 #9 (不 commit 散落子代理产出): ✅ root 直装, 无子代理
 
-**累计 P3-A 守门 6 层级全过**:
+**累计 P3-A 守门 7 层级全过**:
 1. cargo check --lib (A.9)
 2. cargo check --workspace --lib (A.10)
 3. cargo check --workspace --all-targets (A.11)
 4. cargo fmt + clippy --all-targets (A.12)
 5. cargo test 单 crate 100/100 (A.14)
 6. cargo test 4 crate 160/160 (A.15)
-7. cargo build --release 4 crate 0 err (A.16 本任务)
+7. cargo build --release + doc + bench (A.16 本任务)
 
 ---
 
