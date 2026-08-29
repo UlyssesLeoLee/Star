@@ -889,3 +889,4 @@ pub mod openclaw_client;
 // =====================================================================
 pub mod hermes_client;
 pub mod fallback;
+pub mod api_monitor;
