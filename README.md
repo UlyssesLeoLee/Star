@@ -18,17 +18,19 @@ Star 不为旧时代增加一个 AI 按钮。
 
 ---
 
-## 当前状态 (2026-08-29 15:18 JST)
+## 当前状态 (2026-08-29 19:42 JST)
 
 | 维度 | 状态 | 入口 |
 |---|---|---|
 | **守门** | 13+ 层级全过 + 派生 v1-v14 累积规 | `AGENTS.md` §4.1 + `STAR-OLU-001.md` §6 质量门 |
 | **P3-A 阶段** | 🟢 25/25 收官 (8 原始 + 17 守门补救, 41/41 crate 100% 覆盖, 1384 tests 0 fail) | `PHASE-P3-A-PHASE-CLOSEOUT-REPORT.md` |
+| **P3-A 后 9 scope-ui-only commits** | 🟢 cda49f3 react-hot-toast / fcccdc2 Star logo 8→9 / 66d6f8e Gantt zoom+localStorage / 42446aa ThemeSwitcher / 90a9607 Sidebar w-56 / f6c6533 KanbanBoard 列宽 / 5b7475f AGENTS.md v0.12 / 7c54a39 WBS §11 / b483f33 三份架构 doc v0.2 | `AGENTS.md` §8 v0.12 + 三份 `docs/architecture/*.md` v0.2 |
 | **P3-B-F 阶段** | 🟡 占位 + 7 阻塞项 | `STAR-P3-WBS-001.md` §0 表格 + §7 阻塞项 |
 | **累计 token 实证** | ~28.5M / 30M 软预算 (5% 余量, P3-A 实证) | `STAR-P3-WBS-001.md` §6 累计统计 |
-| **Git ahead of origin/main** | 64 commits (per `git rev-list --count origin/main..HEAD`, 2026-08-29 15:18 JST) | main `fbafe98` |
+| **Git ahead of origin/main** | 89 commits (per `git rev-list --count origin/main..HEAD`, 2026-08-29 19:42 JST) | main `b483f33` |
 | **架构入口** | 11 模块 (domain-local-runtime) + 4 新 crate (report/dashboard/form/ai) | `docs/architecture/domain-local-runtime.md` |
 | **MSW real-mode** | 10 cli endpoint 切换, 3 handler 留 TODO (per A.7 §3 #1) | `docs/architecture/msw-real-mode.md` |
+| **MCP Streamable HTTP** | 5 项 spec 能力落地 (session 重连 / server-push / Last-Event-ID / DELETE / Initialize) | `docs/architecture/mcp-streamable-http.md` |
 | **CI 守门** | `.github/workflows/ci.yml` 4 job (rust-ci / e2e-integration / cross-platform / frontend-ci) | 待 P3-A.6 CI runner 跑通 |
 
 **新 agent 入坑路径**: 读 `AGENTS.md` → `STAR-OLU-001.md` §6 质量门 → `PHASE-P3-A-PHASE-CLOSEOUT-REPORT.md` 阶段收官 → 16 份 `PHASE-P3-A{1-A16}-IMPL-REPORT.md` → 2 架构 doc → 41 域 crate 实装。
