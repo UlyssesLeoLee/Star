@@ -251,6 +251,7 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - `PHASE-P3-A1-IMPL-REPORT.md` / `PHASE-P3-A2-IMPL-REPORT.md` / `PHASE-P3-A3-IMPL-REPORT.md` / `PHASE-P3-A4-IMPL-REPORT.md` / `PHASE-P3-A5-IMPL-REPORT.md` / `PHASE-P3-A6-IMPL-REPORT.md` / `PHASE-P3-A7-IMPL-REPORT.md` / `PHASE-P3-A8-IMPL-REPORT.md` / `PHASE-P3-A9-IMPL-REPORT.md` / `PHASE-P3-A10-IMPL-REPORT.md` / `PHASE-P3-A11-IMPL-REPORT.md` / `PHASE-P3-A12-IMPL-REPORT.md` / `PHASE-P3-A13-IMPL-REPORT.md` / `PHASE-P3-A14-IMPL-REPORT.md` / `PHASE-P3-A15-IMPL-REPORT.md` / `PHASE-P3-A16-IMPL-REPORT.md` — P3-A 16 子项报告 (8 原始 + 8 守门补救, 17/17 收官, 守门 7 层级全过, 质量门 5/5; 实证 commit 67085f9 / 9c85ca6 / f7fb55b / 479fbb6 / 138ad72 / 57d4787 / 6976772 / 798a01b / 6f028f4 / 7b14703 / a959f31 / 389e8b3 / cd8a6e1 / 4223cd1)
 - `PHASE-P3-A-PHASE-CLOSEOUT-REPORT.md` — P3-A 阶段收官 (17 子项元汇总 + 7 层级守门 + 5/5 质量门 + 9 高频缺口 + 7 阻塞项移交 P3-B)
 - `PHASE-P3-A-INC-SESSION-001.md` — 收官后增量会话 (P3-A 80 → 91 ahead, 10 commits 6 scope-ui-only UI + 5 docs 治理元汇总, 守门 #1 + #12 双过, 2026-08-29 19:24–19:46 JST)
+- `PHASE-P3-A-INC-SESSION-002.md` — 守门 #12 docs 同步闭环 (P3-A 91 → 93 ahead, 2 commits d910164 + a59cfdd, 6 维度闭环实证, 2026-08-29 19:48 JST)
 - `docs/architecture/domain-local-runtime.md` — 11 模块架构 + 依赖图 + API (P3-A.8 同步)
 - `docs/architecture/msw-real-mode.md` — MSW real-mode 开关使用指南 (P3-A.7 同步)
 - `STAR-P3-WBS-001.md` §0 P3 阶段拆分表 (6 阶段 × 46 子项, P3-A 17/17 实证, P3-B-F 占位待拍板)
