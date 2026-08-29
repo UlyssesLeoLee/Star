@@ -26,9 +26,10 @@
 | A.8 | 文档同步 | 1M | `798a01b` | `6aa318f` | `6aa318f` | 🟢 完成 |
 | **A.9** | **cargo check 守门修复 (单 crate 实证)** | **0.5M** | **`6f028f4`** | **`4814c41`** | **`4814c41`** | **🟢 完成** |
 | **A.10** | **cargo check workspace 守门 (41 crates 实证)** | **0.3M** | **`7b14703`** | **直装 main** | **`4ca6884`** | **🟢 完成** |
-| **小计** | | **~25.3M** | | | | **10/10** |
+| **A.11** | **cargo check --all-targets 守门 (tests 实证)** | **0.3M** | **`a959f31`** | **直装 main** | **`d435378`** | **🟢 完成** |
+| **小计** | | **~25.6M** | | | | **11/11** |
 
-**累计 main HEAD**: `4ca6884` (per 2026-08-29 12:30 JST, 32 commits ahead of origin/main)
+**累计 main HEAD**: `d435378` (per 2026-08-29 12:50 JST, 35 commits ahead of origin/main)
 
 **质量门 5 维自审** (per STAR-OLU-001 §6):
 - 功能完整: 10/10 子项 spec 全部实现 (10 份 PHASE 报告 §1 改动矩阵)
