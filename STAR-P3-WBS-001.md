@@ -40,11 +40,12 @@
 | **A.22** | **star-* multi-crate test 守门 (8 crate 175/175 pass, 31/41 = 76% 覆盖, 含 star-mcp 134 关键)** | **0.2M** | **n/a** | **直装 main** | **`fc08238`** | **🟢 完成** |
 | **A.23** | **final 6 domain-* multi-crate test 守门 (6 crate 111/111 pass, 37/41 = 90% 覆盖)** | **0.2M** | **n/a** | **直装 main** | **`d0f869c`** | **🟢 完成** |
 | **A.24** | **🎯 final 4 crate test 守门 (4 crate 52/52 pass, 41/41 = 100% 覆盖, 756 tests)** | **0.1M** | **n/a** | **直装 main** | **`980fd81`** | **🟢 完成** |
-| **小计** | | **~28.3M** | | | | **24/24** |
+| **A.25** | **🎯 cargo test --workspace --release 守门 (41/41 crate 628 tests 0 fail, 53.7s, A.15 §3 #1 缺口消解)** | **0.2M** | **n/a** | **直装 main** | **`dd95fdd`** | **🟢 完成** |
+| **小计** | | **~28.5M** | | | | **25/25** |
 
-**累计 main HEAD**: `980fd81` (per 2026-08-29 14:30 JST, 53 commits ahead of origin/main)
+**累计 main HEAD**: `dd95fdd` (per 2026-08-29 14:50 JST, 54 commits ahead of origin/main)
 
-**🎯 P3-A 阶段 100% 守门覆盖里程碑达成 (per A.24)**: 41/41 crate, 756 tests, 0 fail, 守门 12+ 层级
+**🎯 P3-A 阶段 workspace + release 双 mode 100% 守门覆盖达成 (per A.25)**: 41/41 crate, debug 756 + release 628 = 1384 tests, 0 fail, 守门 13+ 层级
 
 **质量门 5 维自审** (per STAR-OLU-001 §6):
 - 功能完整: 10/10 子项 spec 全部实现 (10 份 PHASE 报告 §1 改动矩阵)
