@@ -216,3 +216,6 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - `PHASE-D2-CLI-IMPL-REPORT.md` / `PHASE-D3-MCP-TRANSPORT-REPORT.md` / `PHASE-D4-P1-FIX-REPORT.md` / `PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md` — Phase D 报告 4 份
 - `STAR-UNTRACKED-CLEANUP-REPORT.md` — 8/26 untracked 清理报告
 - `RGS-CROSS-REF-SYNC-REPORT.md` — RGS 跨文档引用同步报告
+- `PHASE-P3-A1-IMPL-REPORT.md` / `PHASE-P3-A2-IMPL-REPORT.md` / `PHASE-P3-A3-IMPL-REPORT.md` / `PHASE-P3-A4-IMPL-REPORT.md` / `PHASE-P3-A5-IMPL-REPORT.md` / `PHASE-P3-A6-IMPL-REPORT.md` / `PHASE-P3-A7-IMPL-REPORT.md` / `PHASE-P3-A8-IMPL-REPORT.md` — P3-A 8 子项报告 (8/8 收官, commit 67085f9 / 9c85ca6 / f7fb55b / 479fbb6 / 138ad72 / 57d4787 / 6976772)
+- `docs/architecture/domain-local-runtime.md` — 11 模块架构 + 依赖图 + API (P3-A.8 同步)
+- `docs/architecture/msw-real-mode.md` — MSW real-mode 开关使用指南 (P3-A.7 同步)
