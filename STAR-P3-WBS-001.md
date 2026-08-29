@@ -296,6 +296,8 @@
 拍板上述 7 阻塞项中**任一项**即开新 PHASE-P3-A-INC-SESSION-003.md, 步骤:
 
 > **触发条件更新 (per commit 29692a7, 2026-08-29 22:36 JST)**: B.5/B.6 阻塞项**新增 mock 备选路径** (走 wiremock 模式, 不依赖真实凭证), Ulysses 拍 "先 mock 后 real" 同样视为解锁; 7 阻塞项 → **6 阻塞项 + 1 备选 (B.5/B.6 可 mock 起步)**, 拍板路径变简单
+> 
+> **触发条件更新 (per 2026-08-29 23:03 JST 全部拍板 + 7 wt 并行)**: 用户选选项 4 (all_parallel), 7 wt 已开 (wt-push-origin / wt-b5-openclaw-mock / wt-b6-hermes-mock / wt-b1-openclaw-http / wt-b3-apikey-storage / wt-b7-api-quota, D phase2 b2/b4/b8/b9 留 phase 2 避免 cargo 互锁), 阻塞项 #1+#4+#5+#7 拍板触发, INC-003 启动条件满足; 每子项 1 wt + 守门 4 步 + commit author Ulysses + 子代理 brief 写明"无证据叙事 = 禁止"
 1. 新建 worktree (per 10:58 JST 决策, **每子项 1 wt**, 推翻原 4-7 wt 并行)
 2. worktree 内开子代理 (守门 #9 实证 RPC 不可靠, 优先 root 实装, 守门 #9 子代理授权边界写明"无证据叙事 = 禁止")
 3. 每子项单文件 4 层精简 (entity / value_object / error / service), 立即 commit 守门
