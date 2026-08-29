@@ -774,3 +774,4 @@ mod tests {
         assert!(!inv_04_api_agent_url(CliKind::Claude, ""));
     }
 }
+pub mod openclaw_client;
