@@ -24,6 +24,8 @@ tracing = { workspace = true }
 aes-gcm = "0.10"
 base64 = "0.22"
 rand = "0.8"
+# HTTP 客户端 (B.6 Hermes HTTP 客户端实装, per 2026-08-30 07:28 JST wt-b6-hermes-mock)
+reqwest = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
