@@ -31,9 +31,10 @@
 | **A.13** | **git 证据元守门 (12 报告 + 4 守门 commit 链)** | **0.1M** | **n/a** | **直装 main** | **`85c8ed2`** | **🟢 完成** |
 | **A.14** | **cargo test 守门 (100/100 pass, 4.11s)** | **0.5M** | **`cd8a6e1`** | **直装 main** | **`612e3c5`** | **🟢 完成** |
 | **A.15** | **multi-crate test 守门 (4 crate 160/160 pass)** | **0.3M** | **`4223cd1`** | **直装 main** | **`79e24b6`** | **🟢 完成** |
-| **小计** | | **~26.8M** | | | | **15/15** |
+| **A.16** | **release build + doc + bench 守门 (4 crate 全 0 err)** | **0.2M** | **n/a** | **直装 main** | **`0e6a965`** | **🟢 完成** |
+| **小计** | | **~27M** | | | | **16/16** |
 
-**累计 main HEAD**: `79e24b6` (per 2026-08-29 13:50 JST, 45 commits ahead of origin/main)
+**累计 main HEAD**: `0e6a965` (per 2026-08-29 14:00 JST, 47 commits ahead of origin/main)
 
 **质量门 5 维自审** (per STAR-OLU-001 §6):
 - 功能完整: 10/10 子项 spec 全部实现 (10 份 PHASE 报告 §1 改动矩阵)
