@@ -13,12 +13,14 @@ INC-SESSION-001 (caae89e, 91 ahead) 落档新 PHASE 报告后, 守门 #12 "docs 
 
 ---
 
-## §1 改动矩阵 — 2 commits (91 → 93 ahead)
+## §1 改动矩阵 — 3 commits (91 → 96 ahead, 含本批落档)
 
 | # | commit | 改动文件 | 改动内容 | 触发 |
 |---|---|---|---|---|
 | 1 | `d910164` (92 ahead) | `AGENTS.md` §10 引用区 (+1/-0) | 补 `PHASE-P3-A-INC-SESSION-001.md` 引用行 (P3-A 80 → 91 ahead, 10 commits 元汇总, 守门 #1+#12) | 守门 #12 实证 (新 PHASE 报告需引用同步) |
 | 2 | `a59cfdd` (93 ahead) | `README.md` 状态表 (+4/-4) | 时间戳 19:42 → 19:47 JST, Git ahead 89 → 92, main b483f33 → d910164, 9 scope-ui-only commits → 12 commits 完整列出 (caae89e / d910164 两条新加) | 守门 #12 实证 (状态表与实际 commit 一致) |
+| 3 | `5864286` (95 ahead) | `AGENTS.md` §10 引用 (+1/-0) | 补 INC-SESSION-002 引用行 (P3-A 91→93 ahead, 2 commits 6 维度闭环) | 守门 #12 实证 (新 PHASE 报告需引用同步) |
+| 4 | `2ba8966` (96 ahead) | `README.md` 状态表 (+3/-3) | 时间戳 19:47 → 19:50 JST, Git ahead 92 → 95, main d910164 → 5864286, 12 commits → 14 commits 完整列出 (a59cfdd / 68ba2b1 / 5864286 三条新加) | 守门 #12 实证 (状态表与实际 commit 一致) |
 
 ---
 
@@ -96,6 +98,7 @@ INC-SESSION-001 (caae89e, 91 ahead) 落档新 PHASE 报告后, 守门 #12 "docs 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: 2 commits 91→93 ahead, 守门 #12 6 维度闭环 | 2026-08-29 19:48 JST 守门 no-progress guard 触发 → 选守门 #12 闭环 (而非空等) |
+| v0.2 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | 改动矩阵补 2 commit: `5864286` AGENTS.md §10 引用 INC-002 (95 ahead) + `2ba8966` README.md ahead 92→95 同步 (96 ahead); §1 范围从 2 commits 扩到 3+1 commits (91→96 ahead) | 2026-08-29 19:51 JST 守门 #12 再次闭环 (新落档 + 自指 commit 不沿用 v0.1 旧叙事) |
 
 ---
 
