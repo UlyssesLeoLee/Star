@@ -68,8 +68,8 @@
 | B.2 | B.2 | Hermes HTTP API 客户端 | 4M | 0.7 周 | 无 | 🟡 占位 | 同上 |
 | B.3 | B.3 | API Key 双模式存储 (encrypted + env_var) | 5M | 0.8 周 | A.7 | 🟡 占位 | w17 已部分实装, 待验证 + e2e |
 | B.4 | B.4 | CliProfile schema 扩展 (per-agent 字段) | 3M | 0.5 周 | 无 | 🟡 占位 | schema 来自 w17, 扩展 5 字段 |
-| **B.5** | B.5 | **OpenClaw 真实集成 e2e** | **5M** | **0.8 周** | **B.1 + 凭证** | 🔴 **阻塞** | **需真实 endpoint + API key** |
-| **B.6** | B.6 | **Hermes 真实集成 e2e** | **5M** | **0.8 周** | **B.2 + 凭证** | 🔴 **阻塞** | **同上** |
+| **B.5** | B.5 | **OpenClaw 真实集成 e2e** | **5M** | **0.8 周** | **B.1 + 凭证** | 🔴 **阻塞** | **需真实 endpoint + API key**; **备选: mock endpoint 模式** (per `docs/frontend/design/mock-msw-handlers.md` 既有 MSW 框架, B.5 可先用 `wiremock` 跑 e2e 验证 contract, 不依赖真实凭证, 凭证到位后仅替换 base_url + key) — 备选模式可降为 🟡 占位, 需 Ulysses 拍板"先 mock 后 real"vs"等凭证" |
+| **B.6** | B.6 | **Hermes 真实集成 e2e** | **5M** | **0.8 周** | **B.2 + 凭证** | 🔴 **阻塞** | **同上**; **备选: 同 B.5 mock 模式** |
 | B.7 | B.7 | API 配额 / 限流 / 重试 策略 | 4M | 0.7 周 | B.1+B.2 | 🟡 占位 | backoff + 抖动 |
 | B.8 | B.8 | API Agent 失败 → CLI Agent 降级 | 3M | 0.5 周 | B.1+B.2 | 🟡 占位 | fallback 链路 |
 | B.9 | B.9 | API Agent 监控 + 审计日志 | 2M | 0.3 周 | B.7+B.8 | 🟡 占位 | 接入 domain-audit |
