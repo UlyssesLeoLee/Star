@@ -309,3 +309,4 @@ adapter.shutdown().await?;
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-08-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 11 模块清单 + 依赖图 + 11 invariant + 4 链路 + 5 API + 64+ test + 9 跨阶段缺口 | 2026-08-29 11:52 JST P3-A.8 文档同步 (收尾 P3-A 系列 8/8) |
+| v0.2 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | 6 commits 元汇总 (origin/main 79 → 88 ahead, 19:24–19:39 JST):<br>- `cda49f3` react-hot-toast 接入 (GanttBar 冲突 toast + 3 TS 错修)<br>- `fcccdc2` Star logo size-8→9<br>- `66d6f8e` Gantt zoom default + localStorage 偏好<br>- `42446aa` ThemeSwitcher 接入 AppHeader 替换自研二态<br>- `90a9607` Sidebar w-60→w-56<br>- `f6c6533` KanbanBoard 列宽 minmax 260px<br>本批均 scope-ui-only, 不影响 domain-local-runtime 模块边界 + invariant + 4 链路, 仅前端 11 模块 UI 层微调; 守门 #12 实证 (commit 短码 + 触发原因 + 守门 4 步, 不沿用 v0.11 旧叙事) | 2026-08-29 19:39 JST 守门 #12 实证 (本架构 doc 补 6 commits 元汇总引用) |

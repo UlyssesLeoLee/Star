@@ -87,3 +87,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: P3-A 阶段 Streamable HTTP 落地索引, 5 项 spec 能力对应实装位置, 守门证据 + 已知缺口 | 守门提示 no-progress guard → 选不依赖 P3-B 拍板的独立可推进项 (docs 索引新建, 不实施 P3-B 任何子项) |
+| v0.2 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | 6 commits 元汇总 (origin/main 79 → 88 ahead, 19:24–19:39 JST):<br>- `cda49f3` react-hot-toast 接入 (GanttBar 冲突 toast)<br>- `fcccdc2` Star logo size-8→9<br>- `66d6f8e` Gantt zoom default + localStorage 偏好<br>- `42446aa` ThemeSwitcher 接入 AppHeader 替换自研二态<br>- `90a9607` Sidebar w-60→w-56<br>- `f6c6533` KanbanBoard 列宽 minmax 260px<br>本批 scope-ui-only, 不影响 Streamable HTTP 5 项 spec 能力 (session 重连 / server-push / Last-Event-ID / DELETE / Initialize), 仅前端 UI 层微调; 守门 #12 实证 (commit 短码 + 触发原因 + 守门 4 步) | 2026-08-29 19:39 JST 守门 #12 实证 (本架构 doc 补 6 commits 元汇总引用) |
