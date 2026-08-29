@@ -1,0 +1,27 @@
+{
+  "name": "Star — Vibe Coding Work Management",
+  "short_name": "Star",
+  "description": "Star Platform — Control Plane for 25-module Vibe Coding Work Management SaaS",
+  "start_url": "/inbox",
+  "display": "standalone",
+  "background_color": "#0b0d10",
+  "theme_color": "#0b0d10",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "32x32 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

@@ -7,6 +7,16 @@ export const metadata: Metadata = {
   title: "Star — Vibe Coding Work Management",
   description:
     "Star Platform — Control Plane for 25-module Vibe Coding Work Management SaaS",
+  // Icon 全部来自根目录 icon.png (per 2026-08-29 19:01 JST 拍板), Next.js 14 自动从 src/app/icon.png 生成 favicon
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32 16x16", type: "image/x-icon" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  themeColor: "#0b0d10",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
