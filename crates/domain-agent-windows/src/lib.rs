@@ -515,3 +515,6 @@ mod tests {
 
 pub mod upload_executor;
 
+
+pub mod commit_template;
+
