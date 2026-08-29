@@ -117,6 +117,27 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 | 11 | **缺标比错标安全** | 2026-08-26 JST | Ulysses 偏好 |
 | 12 | **AI 协作文档治理** | 2026-08-26 JST | 禁回溯叙事, BAS 引用实证, 子代理授权写明 |
 
+### 4.1 守门 #1 派生累积规 (per P3-A 25 子项实证)
+
+| 派生 | 内容 | 触发 |
+|---|---|---|
+| v1 | `cargo check --lib` 单 crate 不够, 必 `cargo check --workspace --lib` | A.9 实证 21 err |
+| v2 | `--workspace --lib` 不够, 必 `--all-targets` 含 tests | A.10 实证 9 err |
+| v3 | check + fmt + clippy 不替代 cargo test | A.13 元守门发现 e2e 死锁 |
+| v4 | 单 crate 100% pass ≠ workspace pass | A.14+A.15 实证 4 crate 160 vs workspace 5-min timeout |
+| v5 | release + doc + bench `--no-run` 与 debug build 等价守门 | A.16 实证全 0 err |
+| v6 | release mode test 100% pass (单 crate) | A.18 实证 100/100, 0.51s |
+| v7 | multi-crate test 守门覆盖率持续提升 (4→10→14→20→23→31→37→41 crate) | A.19-A.24 实证 100% 覆盖 |
+| v8 | governance core 守门覆盖到 49% (6 crate) | A.20 实证 |
+| v9 | 守门覆盖跨过 50% 阈值 (23/41 crate) | A.21 实证 |
+| v10 | 守门覆盖跨过 75% 阈值 (31/41 crate, 含 star-mcp 134) | A.22 实证 |
+| v11 | 守门覆盖跨过 90% 阈值 (37/41 crate) | A.23 实证 |
+| v12 | **🎯 100% 守门覆盖里程碑** (41/41 crate, 756 tests) | A.24 实证 |
+| v13 | release mode test 单 crate 100/100 pass, 0.51s (8x 加速) | A.18 + A.22 实证 |
+| v14 | workspace + release 5-min timeout 守门在 release mode 缓存下被消解 (41 crate 53.7s) | A.25 实证 |
+
+**累积规**: 后续 P3-B-F 任何子项必先跑 (1) `cargo check --workspace --all-targets` (2) `cargo fmt + clippy` (3) `cargo test --workspace --release --lib` (4) `cargo build --release + doc + bench --no-run` 全部 0 错 + 测试全过。**任何阶段 缺其一 = 守门不完整** (per STAR-OLU-001 §6 质量门)。
+
 ---
 
 ## 5. 仓库拓扑
