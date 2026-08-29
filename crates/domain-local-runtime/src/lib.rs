@@ -1565,4 +1565,5 @@ pub mod cli_spawn;
 
 
 pub mod sse_parser;
+pub mod subscribe_real;
 
