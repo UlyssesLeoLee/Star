@@ -888,3 +888,4 @@ pub mod openclaw_client;
 // 9. hermes_client (B.6 Hermes HTTP 客户端实装, per 2026-08-30 07:28 JST wt-b6-hermes-mock)
 // =====================================================================
 pub mod hermes_client;
+pub mod fallback;
