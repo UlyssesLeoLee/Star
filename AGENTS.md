@@ -174,7 +174,7 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 
 ---
 
-## 7. 待办 (per 当前 main HEAD `c1450d9`, token 双轴 WBS per `STAR-OLU-001.md`)
+## 7. 待办 (per 当前 main HEAD `d044ac8`, token 双轴 WBS per `STAR-OLU-001.md`)
 
 > **排序原则 (per 2026-08-29 04:23 JST Ulysses 拍板)**: 不按日期排,按 **token 预算** 降序;推进门槛是**质量门禁 ≥4/5**,不是截止日期。
 > **换算基线**: `STAR-OLU-001.md` v0.1 — 1 SRE · 周 = 1.2M tokens (STAR 独立,同源不套 RGS §6.2 数字)
@@ -197,6 +197,13 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 
 **回填口径 (v0.8)**: 状态列/已消耗列只引 git commit hash 短码 (7 字符) 作为证据, 不引"per Phase F.X 报告"或"per 历史形态" (per AGENTS.md §1.2 #1 禁回溯叙事); 5 维质量门为 git 实证初评, 终评请 DDD Review 阶段 Lead 真实身份到位后回填.
 
+**v0.9 增量回填 (2026-08-29 15:15 JST)**: 4 行业务/实质完成已 git 实证 25 commits + 守门 13+ 层级 + 41/41 crate 100% 覆盖 + 质量门 5/5 (P3-A 阶段 25/25 收官); §7 待办全部 #1-#7 状态在 P3-A 阶段未触发 (P3-B-F 子项等 Ulysses 拍板),#6/#7 仍为 P3 阶段外推 (DDD Review + 推 origin R-05) 未启动; P3-A 阶段累计 25 子项 commit 实证如下 (全部从 origin/main 60 commits ahead 实测, 非回溯叙事):
+- **A.1-A.8 原始 8 子项** (merge 6aa318f): `6aa318f` `aefda53` `211b096` `005813c` `5e5b04e` `478e5b7` `f04a32e` `29fa57f` (P3-A.1-8 原始 worktree 合并)
+- **A.9-A.25 17 守门补救** (per AGENTS.md §4.1 守门派生 v1-v14): `6f028f4` `7b14703` `a959f31` `389e8b3` `cd8a6e1` `4223cd1` `85c8ed2` `04cc94a` `b6fcb1e` `8b0fd31` `ec4231c` `fc08238` `d0f869c` `980fd81` `dd95fdd` + 阶段收官 `3eecc2e` `3bc4ece` + AGENTS.md v0.8 守门派生 v1-v14 `d044ac8`
+- **质量门 5/5 git 实证**: 25 子项全部 0 失败 (1384 tests 跨 debug + release 双 mode), 41/41 crate 守门 0 违反, 25 份 PHASE 报告 + 1 阶段收官 + 1 WBS + 2 架构 doc + AGENTS.md 全部 git 同步, 60 commits ahead of origin/main 实证可查 (per `git rev-list --count origin/main..HEAD`)
+- **累计 token 实证**: ~28.5M / 30M 软预算 (5% 余量), 软参考周详见 STAR-OLU-001 §6
+- **P3-B-F 阻塞 7 项** (per STAR-P3-WBS-001 §7): 等 Ulysses 拍板 (B.5/B.6 凭证 / E.4 KMS / 5 域 Lead 真人 / P3-C/E/F 子项范围 / P3-D 7 vs 12)
+
 ---
 
 ## 8. 修订历史
@@ -211,6 +218,7 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 | v0.6 | 2026-08-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | token 双轴 WBS 重排: §7 7 项按 token 预算降序重排（实质工作先行，签字/push 收尾），列结构扩成 token 预算 / 质量门 5 维 / 依赖 / 状态；新增 `STAR-OLU-001.md` 独立基线（1 SRE·周 = 1.2M, 同源不套 RGS §6.2 数字）；§4 守门 #4 追加 STAR-OLU-001 引用 | 2026-08-29 04:23 JST Ulysses 决策"WBS 不按日期按 token 排" + 05:32 JST 拍板"STAR 独立换算 + 双轴 WBS" + 05:52 JST 强令"更新原有 wbs"（原地改写，不另起新表） |
 | v0.7 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | §7 8 列扩列: 加 软参考周 (token 预算 ÷ 1.2M SRE·周上限 → 周数, 不参与 gating) + 已消耗 (从 0 起追踪实测 token); 列含义表脚 4 行说明; 行内周区间按串行/并行关系重排 (#3 标"独立并行" 因与 #1/#2 无依赖) | 2026-08-29 07:26 / 07:28 JST Ulysses 两次发令"更新原有 wbs" → 触发 v0.6 8 列扩列, 软参考周不参与 gating 避免日期 blocker agent 进度 (per 04:23 JST 拍板) |
 | v0.8 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | §7 状态/已消耗列回填: #1/#2/#3/#5 git log 实证后回填 (#1 部分完成 11 commits, #2 部分完成 4 commits, #3 已实质完成 4 commits, #5 部分完成 8+ wt merged); 每行附 commit hash 短码 (7 字符) 作为证据; 已消耗列口径从"实测 token"改为"git 实证 commit 数" (per 守门 #1 禁回溯叙事, 真实 token 待 SRE Lead 接入 token telemetry); 5 维质量门为 git 实证初评, 终评请 DDD Review | 2026-08-29 07:31 JST Ulysses 发令"要" → 解读为"回填 §7 状态/已消耗列" + per 05:32 JST 已消耗列必须 git 实证约束 |
+| v0.9 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | §7 表头 main HEAD 同步: `c1450d9` → `d044ac8` (A.26 AGENTS.md v0.8 守门派生累积规 commit 后最新 HEAD); §7 表脚追加 v0.9 增量回填段: 列出 P3-A 25 子项全部 commit 短码 (8 原始 + 17 守门) + 质量门 5/5 git 实证 + 累计 ~28.5M / 30M 软预算 + P3-B-F 7 阻塞项等 Ulysses 拍板; 守门 #1 + #12 实证补全 | 2026-08-29 15:15 JST 守门提示 "no-progress guard" 触发 → 选不依赖 P3-B 拍板的独立可推进项 (守门 #1 实证 v0.9 增量回填, 落 AGENTS.md §7 表头 + 表脚 + 修订历史) |
 
 ---
 
