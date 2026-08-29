@@ -1566,6 +1566,7 @@ pub mod cli_spawn;
 
 pub mod sse_parser;
 pub mod subscribe_real;
+pub mod subscribe_integration;
 
 
 pub mod spawn_upload_integration;
