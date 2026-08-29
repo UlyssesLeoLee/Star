@@ -95,7 +95,7 @@ export function Sidebar() {
   const fgMuted = isDark ? "text-zinc-400" : "text-zinc-500";
   const fgHover = isDark ? "hover:text-zinc-50" : "hover:text-zinc-900";
   return (
-    <aside className="w-60 shrink-0 border-r border-line bg-bg-soft/40 flex flex-col h-screen sticky top-0">
+    <aside className="w-56 shrink-0 border-r border-line bg-bg-soft/40 flex flex-col h-screen sticky top-0">
       {/* Star logo + Vibe Coding WM (per 2026-08-29 18:48 JST 用户拍板: 物理最左上角) */}
       <div className="px-3 py-3 border-b border-line shrink-0">
         <Link
