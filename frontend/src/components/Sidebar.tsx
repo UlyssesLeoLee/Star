@@ -96,6 +96,37 @@ export function Sidebar() {
   const fgHover = isDark ? "hover:text-zinc-50" : "hover:text-zinc-900";
   return (
     <aside className="w-60 shrink-0 border-r border-line bg-bg-soft/40 flex flex-col h-screen sticky top-0">
+      {/* Star logo + Vibe Coding WM (per 2026-08-29 18:48 JST 用户拍板: 物理最左上角) */}
+      <div className="px-3 py-3 border-b border-line shrink-0">
+        <Link
+          href="/"
+          className="flex items-center gap-2 group"
+          data-testid="sidebar-brand"
+          aria-label="Star home"
+        >
+          <div
+            aria-hidden="true"
+            className="size-8 rounded-md bg-accent/15 border border-accent/40 grid place-items-center text-accent font-bold shrink-0"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              {/* `*` 几何 clip-path 风格 logo (multica inspired) */}
+              <path d="M8 1l1.8 4.7L15 6.5l-3.8 3.4.9 5L8 12.5 3.9 14.9l.9-5L1 6.5l5.2-.8z" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className={clsx(
+              "text-sm font-semibold transition-colors leading-tight",
+              isDark
+                ? "text-zinc-50 group-hover:text-cyan-300"
+                : "text-zinc-900 group-hover:text-cyan-700",
+            )}>Star</div>
+            <div className={clsx(
+              "text-[9px] uppercase tracking-wider transition-colors leading-tight",
+              isDark ? "text-zinc-400" : "text-zinc-500",
+            )}>Vibe Coding WM</div>
+          </div>
+        </Link>
+      </div>
       <nav className="flex-1 overflow-y-auto py-3 text-sm">
         {NAV.map((group) => (
           <div key={group.label} className="mb-2">

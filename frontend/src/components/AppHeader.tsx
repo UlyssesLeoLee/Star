@@ -67,39 +67,8 @@ export function AppHeader() {
       className="h-16 sticky top-0 z-30 border-b border-line bg-bg/95 backdrop-blur"
     >
       <div className="h-full px-4 flex items-center gap-4">
-        {/* === Left: logo + workspace switcher === */}
+        {/* === Left: workspace switcher (Star logo 移到 Sidebar 顶部, 2026-08-29 18:48 JST) === */}
         <div className="flex items-center gap-2 shrink-0">
-          <Link
-            href="/"
-            className="flex items-center gap-2 group"
-            data-testid="app-header-logo"
-            aria-label="Star home"
-          >
-            <div
-              aria-hidden="true"
-              className="size-7 rounded-md bg-accent/15 border border-accent/40 grid place-items-center text-accent font-bold"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                {/* `*` 几何 clip-path 风格 logo (multica inspired) */}
-                <path d="M8 1l1.8 4.7L15 6.5l-3.8 3.4.9 5L8 12.5 3.9 14.9l.9-5L1 6.5l5.2-.8z" />
-              </svg>
-            </div>
-            <div className="hidden md:block">
-              <div className={clsx(
-                "text-sm font-semibold transition-colors",
-                // 反色 (per 2026-08-29 17:12 JST): light=深 / dark=浅, hover=accent
-                isDark
-                  ? "text-zinc-50 group-hover:text-cyan-300"
-                  : "text-zinc-900 group-hover:text-cyan-700"
-              )}>Star</div>
-              <div className={clsx(
-                "text-[10px] uppercase tracking-wider transition-colors",
-                isDark
-                  ? "text-zinc-400"
-                  : "text-zinc-500"
-              )}>Vibe Coding WM</div>
-            </div>
-          </Link>
           <button
             type="button"
             data-testid="workspace-switcher"
