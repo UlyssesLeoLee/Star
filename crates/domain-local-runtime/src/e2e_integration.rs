@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;
 
-use super::process::{OutputLine, OutputStream, ProcessState};
+use super::process::{OutputLine, OutputStream, ProcessState, LocalRuntime};
 use super::spawn_upload_hub::{HubAdapterConfig, HubIntegratorAdapter};
 use super::spawn_upload_integration::SpawnUploadIntegrator;
 use super::sse_parser::{SseChunk, SseParser};
@@ -183,16 +183,18 @@ async fn e2e_sse_parser_three_chunks() {
 #[tokio::test]
 async fn e2e_integrator_emit_to_manual_sender() {
     let (tx, mut rx) = tokio::sync::mpsc::channel::<OutputLine>(16);
+    // 留一份给测试手动 send
+    let tx_for_test = tx.clone();
     let integrator = SpawnUploadIntegrator::with_default().with_sender(tx);
 
     // 模拟 emit (内部 emit 是 async private, 走 process 路径触发)
     // 这里直接构造 OutputLine 推到 tx
-    tx.send(OutputLine {
+    tx_for_test.send(OutputLine {
         stream: OutputStream::System,
         content: "manual emit".into(),
         at: chrono::Utc::now(),
     }).await.unwrap();
-    drop(tx);
+    // tx 在 with_sender 中已 move, 此处不再 drop
 
     let received = rx.recv().await.unwrap();
     assert_eq!(received.content, "manual emit");
