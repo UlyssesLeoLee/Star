@@ -130,9 +130,9 @@ export function MonthView({
               <div className="flex items-center justify-between mb-1">
                 <span
                   className={clsx(
-                    "text-xs font-mono",
-                    isToday && "text-accent font-bold",
-                    !inMonth && "opacity-50",
+                    "text-xs font-mono transition-colors",
+                    isToday && "text-accent font-bold px-1.5 py-0.5 rounded bg-accent/15 border border-accent/40 shadow-[0_0_8px_rgba(0,240,255,0.4)]",
+                    !inMonth && "opacity-40",
                   )}
                 >
                   {dayNum}

@@ -1,23 +1,28 @@
-/* Star Frontend — 主题 CSS 变量
- * Per 2026-08-29 04:09 JST 主题决策: next-themes + 三元组 enum + 三层作用域.
- * 与 frontend/src/lib/theme/types.ts 保持一致.
- * 注入位置: :root (Light 默认) + .dark (Dark 覆盖).
+/* Star Frontend — 日漫科技美学双主题 (Neo-Tokyo Dark + Mecha Ceramic Light)
+ * Per 2026-08-29 UI/UX 决策: 默认暗色调，支持一键切换亮色调，融合 Persona 5 / EVA / Cyberpunk Charisma
  */
 
 :root {
-  /* === Star Light 默认 (per ui-3pane-arch.md §2.1) === */
-  --color-primary: #5b5bd6;
-  --color-success: #3d8b5f;
-  --color-warning: #c77b30;
-  --color-danger: #b53d3d;
+  /* === ☀️ Mecha Ceramic Light (机甲陶瓷白 / EVA 战术实验室) === */
+  --color-primary: #3b82f6;
+  --color-primary-glow: rgba(59, 130, 246, 0.2);
+  --color-secondary: #6366f1;
+  --color-success: #059669;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
   --color-neutral: #475569;
   --color-surface: #f8fafc;
-  --color-surface-2: #eef2f7;
+  --color-surface-2: #ffffff;
+  --color-surface-elevated: #f1f5f9;
   --color-text: #0f172a;
-  --color-text-dim: #475569;
-  --color-border: #cbd5e1;
+  --color-text-dim: #64748b;
+  --color-text-mute: #94a3b8;
+  --color-border: #e2e8f0;
+  --color-border-hover: #3b82f6;
+  --color-hud-tag: #0f172a;
+  --color-hud-tag-bg: #e2e8f0;
 
-  /* === 间距 (4px 栅格) === */
+  /* === 间距 (4px 战术栅格) === */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -27,34 +32,39 @@
   --space-12: 48px;
   --space-16: 64px;
 
-  /* === 圆角 (3 档) === */
+  /* === 切角与圆角 === */
   --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
 
-  /* === 阴影 (2 档) === */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 8px 24px 0 rgba(0, 0, 0, 0.12);
+  /* === 阴影与微光 === */
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 25px -5px rgba(59, 130, 246, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  --glow-accent: 0 0 15px rgba(59, 130, 246, 0.25);
 }
 
-.dark {
-  /* === Star Dark 覆盖 === */
-  --color-primary: #7b7bf0;
-  --color-success: #52b583;
-  --color-warning: #e89b4a;
-  --color-danger: #e05959;
+.dark, :root:not(.light) {
+  /* === 🌙 Neo-Tokyo Dark (默认暗色 / 赛博黑曜石 & 霓虹电光) === */
+  --color-primary: #00f0ff;
+  --color-primary-glow: rgba(0, 240, 255, 0.35);
+  --color-secondary: #8b5cf6;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ff3366;
   --color-neutral: #94a3b8;
-  --color-surface: #0f172a;
-  --color-surface-2: #1e293b;
-  --color-text: #f1f5f9;
+  --color-surface: #07090e;
+  --color-surface-2: #0e131f;
+  --color-surface-elevated: #141c2e;
+  --color-text: #f8fafc;
   --color-text-dim: #94a3b8;
-  --color-border: #334155;
+  --color-text-mute: #475569;
+  --color-border: #1e293b;
+  --color-border-hover: #00f0ff;
+  --color-hud-tag: #00f0ff;
+  --color-hud-tag-bg: rgba(0, 240, 255, 0.1);
 
-  /* 暗色阴影更弱 */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 8px 24px 0 rgba(0, 0, 0, 0.4);
+  /* 暗色霓虹阴影与微光 */
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 30px -5px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 240, 255, 0.05);
+  --glow-accent: 0 0 20px rgba(0, 240, 255, 0.3), 0 0 40px rgba(139, 92, 246, 0.15);
 }
-
-/* 预留扩展位 (per 2026-08-29 04:09 JST 用户拍板 "支持后续增加"):
- * 未来 .high-contrast / .solarized / .corporate-light 等主题可在这里加块.
- */

@@ -27,7 +27,7 @@ interface WindowsTabBarProps {
   onNewTab: () => void;
 }
 
-const STATE_ICON: Record<TabState, React.ComponentType<{ size?: number; className?: string }>> = {
+const STATE_ICON: Record<TabState, React.ElementType> = {
   created: Circle,
   running: Loader2,
   waiting_input: Circle,

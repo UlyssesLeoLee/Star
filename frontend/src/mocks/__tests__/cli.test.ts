@@ -1,8 +1,6 @@
-// frontend/src/mocks/__tests__/cli.test.ts
-// MSW handler + schema tests (per 2026-08-29 09:07 JST)
-
 import { describe, it, expect } from "vitest";
-import { isCliProfile, isApiKey, isTaskWindow, MOCK_CLI_PROFILES, MOCK_API_KEYS, MOCK_TASK_WINDOWS } from "@/mocks/data/cli";
+import { isCliProfile, isApiKey, isTaskWindow } from "@/mocks/schemas/cli";
+import { MOCK_CLI_PROFILES, MOCK_API_KEYS, MOCK_TASK_WINDOWS } from "@/mocks/data/cli";
 
 describe("CLI Schemas", () => {
   it("accepts all 6 built-in profiles", () => {

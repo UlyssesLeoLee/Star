@@ -108,20 +108,20 @@ export function Sidebar() {
                     <Link
                       href={item.href}
                       className={clsx(
-                        "flex items-center gap-2.5 px-4 py-1.5 mx-1 rounded-md transition-colors",
+                        "relative flex items-center gap-2.5 px-4 py-1.5 mx-1 rounded-md transition-all duration-150 group",
                         active
-                          ? "bg-accent/10 text-accent"
-                          : "text-ink-dim hover:bg-bg-card hover:text-ink",
+                          ? "bg-accent/15 text-accent font-medium shadow-[inset_0_0_12px_rgba(0,240,255,0.08)] border-l-2 border-accent"
+                          : "text-ink-dim hover:bg-bg-card/70 hover:text-ink border-l-2 border-transparent",
                       )}
                     >
-                      <Icon size={15} className="shrink-0" />
-                      <span className="flex-1 truncate">{item.label}</span>
+                      <Icon size={15} className={clsx("shrink-0 transition-transform group-hover:scale-110", active ? "text-accent" : "text-ink-dim")} />
+                      <span className="flex-1 truncate tracking-tight">{item.label}</span>
                       {item.track !== "—" && (
-                        <span className="text-[9px] font-mono text-ink-mute px-1 rounded bg-bg-card">
-                          {item.track}
+                        <span className="text-[9px] font-mono text-ink-mute px-1 py-0.2 rounded border border-line/50 bg-bg-card/80 group-hover:border-accent/30 transition-colors">
+                          TRK_{item.track}
                         </span>
                       )}
-                      {active && <ChevronRight size={12} className="text-accent" />}
+                      {active && <ChevronRight size={12} className="text-accent animate-pulse" />}
                     </Link>
                   </li>
                 );
@@ -130,8 +130,9 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
-      <div className="border-t border-line px-4 py-2.5 text-[10px] text-ink-mute font-mono">
-        v0.1.0 · 25 modules · 357 tests
+      <div className="border-t border-line px-4 py-2.5 text-[10px] text-ink-mute font-mono flex items-center justify-between">
+        <span>SYS // v0.1.0</span>
+        <span className="text-accent/60">ONLINE</span>
       </div>
     </aside>
   );

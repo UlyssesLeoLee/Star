@@ -1,3 +1,4 @@
+"use client";
 // =====================================================================
 // AppHeader — 顶栏 (per docs/frontend/design/ui-redesign-multica-style.md §3)
 // =====================================================================
@@ -7,28 +8,55 @@
 // - 高度 64px, border-bottom 1px line, dark theme
 // - active tab: 底部 2px accent border + text-accent
 // =====================================================================
-"use client";
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
-import { useState } from "react";
-import { ChevronDown, Bell, Settings, Search } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronDown, Bell, Settings, Search, Sun, Moon } from "lucide-react";
 import { useCommandBarStore } from "@/lib/commandBarStore";
+import { UserMenu } from "@/components/UserMenu";
 
 // 5 视图 tab — Settings 单独作为齿轮放在 tab 右侧 (per §3 + 任务说明)
-const TABS: ReadonlyArray<{ href: string; label: string }> = [
-  { href: "/inbox",     label: "Inbox" },
-  { href: "/issues",    label: "Issues" },
-  { href: "/projects",  label: "Projects" },
-  { href: "/agents",    label: "Agents" },
-  { href: "/analytics", label: "Analytics" },
+const TABS: ReadonlyArray<{ href: string; label: string; code: string }> = [
+  { href: "/inbox",     label: "Inbox",     code: "01" },
+  { href: "/issues",    label: "Issues",    code: "02" },
+  { href: "/projects",  label: "Projects",  code: "03" },
+  { href: "/agents",    label: "Agents",    code: "04" },
+  { href: "/analytics", label: "Analytics", code: "05" },
 ];
 
 export function AppHeader() {
   const pathname = usePathname() ?? "/";
   const openCommandBar = useCommandBarStore((s) => s.open);
   const [notifCount] = useState(3); // mock — Phase I+ 接 SSE
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("star-theme");
+    if (saved === "light") {
+      setIsDark(false);
+      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
+    } else {
+      setIsDark(true);
+      document.documentElement.classList.remove("light");
+      document.documentElement.classList.add("dark");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    if (next) {
+      document.documentElement.classList.remove("light");
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("star-theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
+      localStorage.setItem("star-theme", "light");
+    }
+  };
 
   return (
     <header
@@ -105,8 +133,24 @@ export function AppHeader() {
           </Link>
         </nav>
 
-        {/* === Right: ⌘K, bell, status, avatar === */}
+        {/* === Right: Theme Toggle, ⌘K, bell, status, avatar === */}
         <div className="ml-auto flex items-center gap-2">
+          {/* 日漫风格日/夜主题切换器 */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            data-testid="theme-toggle"
+            aria-label={isDark ? "Switch to Mecha Light Theme" : "Switch to Neo-Tokyo Dark Theme"}
+            title={isDark ? "切换至 Mecha 亮色主题" : "切换至 Neo-Tokyo 暗色主题"}
+            className="p-1.5 text-ink-dim hover:text-accent rounded-md hover:bg-bg-soft/60 border border-line/60 hover:border-accent/40 transition-all duration-200 active:scale-95"
+          >
+            {isDark ? (
+              <Sun size={15} className="text-warn hover:rotate-45 transition-transform" />
+            ) : (
+              <Moon size={15} className="text-accent hover:-rotate-12 transition-transform" />
+            )}
+          </button>
+
           <button
             type="button"
             onClick={openCommandBar}
@@ -131,7 +175,7 @@ export function AppHeader() {
             {notifCount > 0 && (
               <span
                 data-testid="notifications-badge"
-                className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-err text-white text-[10px] grid place-items-center px-1 font-mono"
+                className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-err text-white text-[10px] grid place-items-center px-1 font-mono shadow-[0_0_8px_rgba(255,51,102,0.6)]"
               >
                 {notifCount}
               </span>
@@ -140,27 +184,14 @@ export function AppHeader() {
 
           <div
             data-testid="realtime-status"
-            className="hidden sm:flex items-center gap-1.5 px-2 h-8 rounded-md border border-line"
+            className="hidden sm:flex items-center gap-1.5 px-2 h-8 rounded-md border border-line bg-bg-soft/30"
             aria-label="Realtime status: online"
           >
-            <span className="size-2 rounded-full bg-ok animate-pulse" aria-hidden="true" />
-            <span className="text-[11px] text-ink-dim font-mono">online</span>
+            <span className="size-2 rounded-full bg-ok animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.7)]" aria-hidden="true" />
+            <span className="text-[10px] text-ink-dim font-mono tracking-wider">SYNCED</span>
           </div>
 
-          <button
-            type="button"
-            data-testid="user-avatar"
-            aria-label="User menu: Ulysses (tenant_admin)"
-            className="flex items-center gap-2 pl-2 pr-1 h-8 rounded-md border-l border-line hover:bg-bg-soft/40 transition-colors"
-          >
-            <div className="size-6 rounded-full bg-accent/15 border border-accent/40 grid place-items-center text-accent text-xs font-bold">
-              U
-            </div>
-            <div className="text-left hidden md:block leading-tight">
-              <div className="text-xs">Ulysses</div>
-              <div className="text-[10px] text-ink-mute">tenant_admin</div>
-            </div>
-          </button>
+          <UserMenu />
         </div>
       </div>
     </header>

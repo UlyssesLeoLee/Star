@@ -2,10 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Star 主题 CSS 变量 (per 2026-08-29 04:09 JST 主题决策)
- * next-themes attribute=class 切换 .dark / .light
- * 完整 token 定义在 styles/theme.css
- */
+/* Star 日漫美学双主题 (Neo-Tokyo Dark 默认 + Mecha Ceramic Light) */
 @import "../styles/theme.css";
 
 :root {
@@ -13,31 +10,51 @@
 }
 
 html, body {
-  background: #0b0d10;
-  color: #e6edf3;
+  background-color: var(--color-surface);
+  color: var(--color-text);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+/* 日漫战术滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #21262d; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #30363d; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
 
 @layer components {
+  /* 日漫卡片：微切角与柔和微光 */
   .card {
-    @apply rounded-lg border border-line bg-bg-card p-4;
+    @apply rounded-lg border border-line bg-bg-card p-4 transition-all duration-200;
+    box-shadow: var(--shadow-sm);
   }
+  .card:hover {
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* 战术微标签 (HUD micro tag) */
+  .anime-hud-tag {
+    @apply inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border;
+    color: var(--color-hud-tag);
+    background-color: var(--color-hud-tag-bg);
+    border-color: var(--color-border);
+  }
+
+  /* 状态胶囊 */
   .pill {
-    @apply inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium transition-colors;
   }
+
+  /* 战术按钮 */
   .btn {
-    @apply inline-flex items-center gap-1.5 rounded-md border border-line bg-bg-soft px-3 py-1.5 text-sm text-ink hover:border-accent hover:text-accent transition-colors;
+    @apply inline-flex items-center gap-1.5 rounded-md border border-line bg-bg-soft px-3 py-1.5 text-sm text-ink hover:border-accent hover:text-accent transition-all duration-150 active:scale-[0.98];
   }
   .btn-primary {
-    @apply inline-flex items-center gap-1.5 rounded-md border border-accent bg-accent/10 px-3 py-1.5 text-sm text-accent hover:bg-accent/20 transition-colors;
+    @apply inline-flex items-center gap-1.5 rounded-md border border-accent bg-accent/15 px-3 py-1.5 text-sm text-accent hover:bg-accent/25 hover:shadow-[0_0_12px_rgba(0,240,255,0.3)] transition-all duration-150 active:scale-[0.98];
   }
+
+  /* 表格 */
   .table {
     @apply w-full text-sm;
   }

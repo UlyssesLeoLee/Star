@@ -1,7 +1,5 @@
-// frontend/src/mocks/data/cli.ts
-// Mock data: 6 CLI Profile + 2 API Key (per 2026-08-29 09:07 JST)
-
 import type { CliProfile, ApiKey, TaskWindow } from "@/mocks/schemas/cli";
+export { isCliProfile, isApiKey, isTaskWindow } from "@/mocks/schemas/cli";
 
 export const MOCK_CLI_PROFILES: CliProfile[] = [
   { id: "claude", name: "Claude Code", kind: "claude", command: "claude", args: "--model claude-3-5-sonnet", env: "PATH=$PATH", worktreeBinding: "auto", enabled: true, hasApiKey: true },

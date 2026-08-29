@@ -167,8 +167,7 @@ export function GanttBar(props: GanttBarProps) {
     whiteSpace: "nowrap",
     userSelect: "none",
     cursor: onDragEnd ? (isDragging ? "grabbing" : "grab") : "pointer",
-    transition: isDragging ? "none" : "left 0.15s, width 0.15s",
-    boxShadow: isCritical ? "0 0 0 1px #ff6b6b" : undefined,
+    boxShadow: isCritical ? "0 0 10px rgba(255, 51, 102, 0.8), 0 0 0 1px #ff3366" : "0 1px 4px rgba(0, 0, 0, 0.25)",
     transform: isMilestone ? "rotate(45deg)" : undefined,
     transformOrigin: "center",
   };

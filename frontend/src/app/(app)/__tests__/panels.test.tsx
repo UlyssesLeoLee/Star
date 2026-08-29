@@ -54,7 +54,11 @@ describe("U4 minimal panels — render smoke", () => {
     // KPI 4 个 (label 全部渲染)
     expect(screen.getByText("Cost (24h)")).toBeInTheDocument();
     expect(screen.getByText("Tokens (24h)")).toBeInTheDocument();
-    // SVG 折线图存在
+    // Default tab is burndown
+    expect(screen.getByTestId("tab-burndown")).toBeInTheDocument();
+    // Switch to cost tab -> SVG 折线图存在
+    const costTab = screen.getByRole("tab", { name: /Cost/i });
+    fireEvent.click(costTab);
     expect(screen.getByTestId("cost-trend-chart")).toBeInTheDocument();
   });
 

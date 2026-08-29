@@ -44,32 +44,32 @@ export interface ThemeDefinition {
   version: number;
 }
 
-/** Star 调色板 — Light 默认 (per ui-3pane-arch.md §2.1) */
+/** Star 调色板 — Mecha Ceramic Light (机甲陶瓷白) */
 const STAR_LIGHT_PALETTE: ColorToken[] = [
-  { name: "--color-primary", hex: "#5B5BD6" },
-  { name: "--color-success", hex: "#3D8B5F" },
-  { name: "--color-warning", hex: "#C77B30" },
-  { name: "--color-danger", hex: "#B53D3D" },
+  { name: "--color-primary", hex: "#3B82F6" },
+  { name: "--color-success", hex: "#059669" },
+  { name: "--color-warning", hex: "#D97706" },
+  { name: "--color-danger", hex: "#DC2626" },
   { name: "--color-neutral", hex: "#475569" },
   { name: "--color-surface", hex: "#F8FAFC" },
-  { name: "--color-surface-2", hex: "#EEF2F7" },
+  { name: "--color-surface-2", hex: "#FFFFFF" },
   { name: "--color-text", hex: "#0F172A" },
-  { name: "--color-text-dim", hex: "#475569" },
-  { name: "--color-border", hex: "#CBD5E1" },
+  { name: "--color-text-dim", hex: "#64748B" },
+  { name: "--color-border", hex: "#E2E8F0" },
 ];
 
-/** Star 调色板 — Dark */
+/** Star 调色板 — Neo-Tokyo Dark (默认暗色 / 赛博黑曜石) */
 const STAR_DARK_PALETTE: ColorToken[] = [
-  { name: "--color-primary", hex: "#7B7BF0" },
-  { name: "--color-success", hex: "#52B583" },
-  { name: "--color-warning", hex: "#E89B4A" },
-  { name: "--color-danger", hex: "#E05959" },
+  { name: "--color-primary", hex: "#00F0FF" },
+  { name: "--color-success", hex: "#10B981" },
+  { name: "--color-warning", hex: "#F59E0B" },
+  { name: "--color-danger", hex: "#FF3366" },
   { name: "--color-neutral", hex: "#94A3B8" },
-  { name: "--color-surface", hex: "#0F172A" },
-  { name: "--color-surface-2", hex: "#1E293B" },
-  { name: "--color-text", hex: "#F1F5F9" },
+  { name: "--color-surface", hex: "#07090E" },
+  { name: "--color-surface-2", hex: "#0E131F" },
+  { name: "--color-text", hex: "#F8FAFC" },
   { name: "--color-text-dim", hex: "#94A3B8" },
-  { name: "--color-border", hex: "#334155" },
+  { name: "--color-border", hex: "#1E293B" },
 ];
 
 /** 间距 token (4px 基础栅格) */
@@ -87,29 +87,29 @@ const STAR_SPACING: SpacingToken[] = [
 /** 圆角 token (3 档, per ui-3pane-arch.md §2.4) */
 const STAR_RADII: RadiusToken[] = [
   { name: "--radius-sm", px: 4 },
-  { name: "--radius-md", px: 8 },
-  { name: "--radius-lg", px: 12 },
+  { name: "--radius-md", px: 6 },
+  { name: "--radius-lg", px: 10 },
 ];
 
 /** 内置主题 (亮 + 暗) — 接口预留扩展 */
 export const THEMES: ThemeDefinition[] = [
   {
-    id: "light",
-    displayName: "Light",
-    isDark: false,
-    colors: STAR_LIGHT_PALETTE,
-    spacings: STAR_SPACING,
-    radii: STAR_RADII,
-    version: 1,
-  },
-  {
     id: "dark",
-    displayName: "Dark",
+    displayName: "Neo-Tokyo Dark",
     isDark: true,
     colors: STAR_DARK_PALETTE,
     spacings: STAR_SPACING,
     radii: STAR_RADII,
-    version: 1,
+    version: 2,
+  },
+  {
+    id: "light",
+    displayName: "Mecha Light",
+    isDark: false,
+    colors: STAR_LIGHT_PALETTE,
+    spacings: STAR_SPACING,
+    radii: STAR_RADII,
+    version: 2,
   },
   // 扩展占位 (per 2026-08-29 04:09 JST 用户拍板 "支持后续增加"):
   // {

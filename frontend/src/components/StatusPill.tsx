@@ -75,16 +75,43 @@ const COLOR: Record<string, string> = {
   none: "border-ink-mute/40 text-ink-dim bg-bg-soft",
 };
 
+const DOT_COLOR: Record<string, string> = {
+  active: "bg-ok shadow-[0_0_6px_rgba(16,185,129,0.8)]",
+  online: "bg-ok shadow-[0_0_6px_rgba(16,185,129,0.8)]",
+  completed: "bg-ok",
+  resolved: "bg-ok",
+  merged: "bg-ok",
+  approved: "bg-ok",
+  passing: "bg-ok",
+  pass: "bg-ok",
+  delivered: "bg-ok",
+  in_progress: "bg-info animate-pulse shadow-[0_0_6px_rgba(0,240,255,0.8)]",
+  initializing: "bg-info animate-pulse",
+  running: "bg-info animate-pulse",
+  awaiting_feedback: "bg-warn shadow-[0_0_6px_rgba(245,158,11,0.8)]",
+  awaiting_human: "bg-warn shadow-[0_0_6px_rgba(245,158,11,0.8)]",
+  paused: "bg-warn",
+  conflict: "bg-err shadow-[0_0_6px_rgba(255,51,102,0.8)]",
+  blocked: "bg-err shadow-[0_0_6px_rgba(255,51,102,0.8)]",
+  failed: "bg-err shadow-[0_0_6px_rgba(255,51,102,0.8)]",
+  error: "bg-err shadow-[0_0_6px_rgba(255,51,102,0.8)]",
+  circuit_open: "bg-err",
+  deny: "bg-err",
+  allow: "bg-ok",
+};
+
 export function StatusPill({ value, size = "sm" }: { value: string; size?: "sm" | "xs" }) {
   const k = value.toLowerCase();
   const cls = COLOR[k] ?? "border-line text-ink-dim bg-bg-soft";
+  const dot = DOT_COLOR[k];
   return (
     <span className={clsx(
-      "pill font-mono",
-      size === "xs" ? "text-[10px] px-1.5 py-0" : "text-xs",
+      "pill font-mono items-center",
+      size === "xs" ? "text-[10px] px-1.5 py-0" : "text-xs px-2 py-0.5",
       cls,
     )}>
-      {value.replace(/_/g, " ")}
+      {dot && <span className={clsx("size-1.5 rounded-full inline-block mr-1 shrink-0", dot)} />}
+      <span>{value.replace(/_/g, " ")}</span>
     </span>
   );
 }

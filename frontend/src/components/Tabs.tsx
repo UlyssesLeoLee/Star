@@ -103,7 +103,7 @@ export function Tabs({
               </span>
             )}
             {isActive && variant !== "pills" && (
-              <span aria-hidden className="absolute left-0 right-0 -bottom-px h-0.5 bg-accent" />
+              <span aria-hidden className="absolute left-0 right-0 -bottom-px h-0.5 bg-accent shadow-[0_0_8px_rgba(0,240,255,0.7)]" />
             )}
           </button>
         );
