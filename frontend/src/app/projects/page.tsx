@@ -1,17 +1,20 @@
 "use client";
 
 // =====================================================================
-// Projects Page — 5-panel project workspace (per ui-redesign-multica-style.md §5.2)
+// Projects Page — 5-panel project workspace (per ui-3pane-arch.md v0.2 + 2026-08-29 22:49 JST 5 tab 拍板)
 // =====================================================================
 // 职责:
 //   1. 顶部 project switcher — 切换 selectedProjectId (zustand 本地 state, 不持久化)
-//   2. 5 tab 切换: Overview / Board / Timeline / Calendar / Members
+//   2. 5 tab 切换 (per Ulysses 拍板 2026-08-29 22:49 JST 选项 1 批准 agent 提议):
+//      Kanban / Timeline / Backlog / Agents / Worktrees
+//      (原 Overview 段保留 PageHeader + 顶部 KPI, 不算 tab; 原 Board 改名 Kanban, 原 Members 改名 Agents,
+//       原 Calendar 并入 Timeline, 新加 Backlog = workItems 列表, 新加 Worktrees = worktrees 列表)
 //   3. 每个 tab 根据 project_id 过滤 store 数据:
-//      - Overview   — project 元信息 + KPI (work-items / agents / last activity)
-//      - Board      — Kanban (per project_id 过滤 workItems, 复用 W1 KanbanBoard)
-//      - Timeline   — Gantt (per project_id 过滤 sprint/milestone/work-item, 复用 W2 GanttChart)
-//      - Calendar   — 月/周视图 (per project_id 过滤 event, 复用 W3 MonthView/WeekView)
-//      - Members    — 团队成员 + 角色 (从 workspace.member_ids 推导)
+//      - Kanban     — KanbanBoard (per project_id 过滤 workItems, 复用 W1)
+//      - Timeline   — Gantt + Calendar (per project_id 过滤 sprint/milestone/event, 复用 W2/W3)
+//      - Backlog    — workItems 列表 (按 status 排序, 简单 table)
+//      - Agents     — 团队成员 + 角色 (从 workspace.member_ids 推导)
+//      - Worktrees  — worktree 列表 (per project_id 过滤, GitBranch 图标)
 //
 // 不做 (per 守门):
 //   - 不改 tailwind.config.ts (U5)
@@ -62,20 +65,21 @@ import {
   ChevronRight,
   Activity,
   Clock,
+  GitBranch,
 } from "lucide-react";
 import { addDays, format, parseISO, differenceInDays } from "date-fns";
 import type {
   Board, Project, WorkItem, WorkItemStatus, Identity, Workspace, Sprint, Milestone, Iso8601,
 } from "@/types/ids";
 
-// ---- 5 tab 定义 (per design §5.2) ----
-type ProjectsTabId = "overview" | "board" | "timeline" | "calendar" | "members";
+// ---- 5 tab 定义 (per Ulysses 拍板 2026-08-29 22:49 JST 选项 1: Kanban / Timeline / Backlog / Agents / Worktrees) ----
+type ProjectsTabId = "kanban" | "timeline" | "backlog" | "agents" | "worktrees";
 const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode }> = [
-  { id: "overview", label: "Overview", icon: <LayoutDashboard size={12} /> },
-  { id: "board",    label: "Board",    icon: <Trello size={12} /> },
-  { id: "timeline", label: "Timeline", icon: <SquareChartGantt size={12} /> },
-  { id: "calendar", label: "Calendar", icon: <CalendarRange size={12} /> },
-  { id: "members",  label: "Members",  icon: <Users size={12} /> },
+  { id: "kanban",    label: "Kanban",    icon: <Trello size={12} /> },
+  { id: "timeline",  label: "Timeline",  icon: <SquareChartGantt size={12} /> },
+  { id: "backlog",   label: "Backlog",   icon: <LayoutDashboard size={12} /> },
+  { id: "agents",    label: "Agents",    icon: <Users size={12} /> },
+  { id: "worktrees", label: "Worktrees", icon: <GitBranch size={12} /> },
 ];
 
 // Kanban 4 列 (per W1 KANBAN_COLUMNS, 内联避免循环 import)
@@ -117,12 +121,12 @@ export default function ProjectsPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     () => projects[0]?.id ?? "",
   );
-  const [tab, setTab] = useState<ProjectsTabId>("overview");
-  // 同步 URL ?tab=X 到 local state (per 2026-08-29 17:42 JST 修 next.config.js redirect 后, redirect 给 tab=timeline 但 page 默认 tab=overview, 必须 useSearchParams 同步)
+  const [tab, setTab] = useState<ProjectsTabId>("kanban");
+  // 同步 URL ?tab=X 到 local state (per 2026-08-29 17:42 JST 修 next.config.js redirect 后, redirect 给 tab=timeline 但 page 默认 tab=overview, 必须 useSearchParams 同步; 22:49 JST 5 tab 拍板改 kanban/timeline/backlog/agents/worktrees)
   const searchParams = useSearchParams();
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && ["overview", "board", "timeline", "calendar", "members"].includes(tabParam)) {
+    if (tabParam && ["kanban", "timeline", "backlog", "agents", "worktrees"].includes(tabParam)) {
       setTab(tabParam as ProjectsTabId);
     }
   }, [searchParams]);
@@ -154,6 +158,11 @@ export default function ProjectsPage() {
   const projectMilestones = useMemo(
     () => milestones.filter((m) => m.project_id === selectedProjectId),
     [milestones, selectedProjectId],
+  );
+  // worktree 列表 (per project_id 过滤, Worktrees tab content, 5 tab 拍板 2026-08-29 22:49 JST)
+  const projectWorktrees = useMemo(
+    () => worktrees.filter((w) => w.project_id === selectedProjectId),
+    [worktrees, selectedProjectId],
   );
   // 任务依赖关系 (per MS Project task link, 2026-08-29 17:33 JST)
   // 过滤: from_id / to_id 是本项目的 work_item / sprint / milestone
@@ -367,7 +376,7 @@ export default function ProjectsPage() {
     <div className="max-w-7xl" data-testid="projects-page">
       <PageHeader
         title="Projects"
-        subtitle="多面板项目工作区 — Overview / Board / Timeline / Calendar / Members 5 tab 聚合。"
+        subtitle="多面板项目工作区 — Kanban / Timeline / Backlog / Agents / Worktrees 5 tab 聚合 (per 2026-08-29 22:49 JST 拍板)。"
         icon={<FolderTree className="text-accent" size={20} />}
         track="D"
         count={`${projects.length} projects`}
@@ -389,27 +398,19 @@ export default function ProjectsPage() {
           label: t.label,
           icon: t.icon,
           badge:
-            t.id === "overview" ? undefined :
-            t.id === "board" ? projectWorkItems.length :
+            t.id === "kanban" ? projectWorkItems.length :
             t.id === "timeline" ? (projectSprints.length + projectMilestones.length) :
-            t.id === "calendar" ? projectEvents.length :
-            t.id === "members" ? projectMembers.length :
+            t.id === "backlog" ? projectWorkItems.filter((w) => w.status === "todo").length :
+            t.id === "agents" ? projectMembers.length :
+            t.id === "worktrees" ? projectWorktrees.length :
             undefined,
         }))}
       />
 
-      {/* ---- Tab content ---- */}
-      {tab === "overview" && (
-        <ProjectOverview
-          project={selectedProject}
-          owner={ownerIdentity}
-          workspaces={projectWorkspaces}
-          kpis={kpis}
-        />
-      )}
+      {/* ---- Tab content (5 tab per 2026-08-29 22:49 JST 拍板: Kanban / Timeline / Backlog / Agents / Worktrees) ---- */}
 
-      {tab === "board" && (
-        <div data-testid="projects-board-tab">
+      {tab === "kanban" && (
+        <div data-testid="projects-kanban-tab">
           <KanbanBoard
             board={projectBoard}
             workItems={projectWorkItems}
@@ -425,13 +426,14 @@ export default function ProjectsPage() {
           </div>
           {/* 已知缺口 #1 提示 */}
           <div className="mt-1 text-[10px] text-ink-mute font-mono">
-            ⚠ Board 拖动改 status 走 store 状态机 + 同步 board.columns; 后端 PATCH /work-items/{`{id}`}/status 持久化 D.6+ 接
+            ⚠ Kanban 拖动改 status 走 store 状态机 + 同步 board.columns; 后端 PATCH /work-items/{`{id}`}/status 持久化 D.6+ 接
           </div>
         </div>
       )}
 
       {tab === "timeline" && (
-        <div data-testid="projects-timeline-tab">
+        <div data-testid="projects-timeline-tab" className="space-y-4">
+          {/* Gantt 主视图 */}
           <GanttChart
             sprints={projectSprints}
             milestones={projectMilestones}
@@ -442,83 +444,154 @@ export default function ProjectsPage() {
             onSprintUpdate={handleSprintUpdate}
             onWorkItemMove={handleWorkItemMove}
           />
-          {/* 已知缺口 #2 提示 */}
-          <div className="mt-3 text-[10px] text-ink-mute font-mono">
+          <div className="text-[10px] text-ink-mute font-mono">
             ⚠ 拖动 milestone / sprint 改 due_date / 起止, 走 store + useStore.setState; 后端 PATCH D.6+ 接
           </div>
-        </div>
-      )}
-
-      {tab === "calendar" && (
-        <div data-testid="projects-calendar-tab" className="space-y-3">
-          <CalendarHeader
-            year={calendarCursor.year}
-            month={calendarCursor.month}
-            weekStart={weekStart}
-            view={calendarView}
-            onPrev={() => {
-              if (calendarView === "month") {
-                const d = new Date(calendarCursor.year, calendarCursor.month - 1, 1);
-                setCalendarCursor({ year: d.getFullYear(), month: d.getMonth() });
-              } else {
-                const d = new Date(weekStart);
-                d.setDate(d.getDate() - 7);
-                setWeekStart(d);
-              }
-            }}
-            onNext={() => {
-              if (calendarView === "month") {
-                const d = new Date(calendarCursor.year, calendarCursor.month + 1, 1);
-                setCalendarCursor({ year: d.getFullYear(), month: d.getMonth() });
-              } else {
-                const d = new Date(weekStart);
-                d.setDate(d.getDate() + 7);
-                setWeekStart(d);
-              }
-            }}
-            onToday={() => {
-              const now = new Date();
-              setCalendarCursor({ year: now.getFullYear(), month: now.getMonth() });
-              const w = new Date(now);
-              w.setHours(0, 0, 0, 0);
-              setWeekStart(w);
-            }}
-            onViewChange={setCalendarView}
-            userTimezone={Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}
-          />
-
-          {calendarView === "month" ? (
-            <MonthView
+          {/* Calendar 视图 (per 5 tab 拍板: Calendar 并入 Timeline, 保留 month/week 切换) */}
+          <div className="border-t border-line pt-4">
+            <div className="text-xs font-mono text-ink-mute mb-2">📅 Calendar (月/周视图, per 5 tab 拍板合并)</div>
+            <CalendarHeader
               year={calendarCursor.year}
               month={calendarCursor.month}
-              events={projectEvents}
-              onEventMove={handleCalendarEventMove}
-              onMonthChange={(y, m) => setCalendarCursor({ year: y, month: m })}
-            />
-          ) : (
-            <WeekView
-              startDate={weekStart}
-              events={projectEvents}
-              onEventMove={handleCalendarEventMove}
+              weekStart={weekStart}
+              view={calendarView}
+              onPrev={() => {
+                if (calendarView === "month") {
+                  const d = new Date(calendarCursor.year, calendarCursor.month - 1, 1);
+                  setCalendarCursor({ year: d.getFullYear(), month: d.getMonth() });
+                } else {
+                  const d = new Date(weekStart);
+                  d.setDate(d.getDate() - 7);
+                  setWeekStart(d);
+                }
+              }}
+              onNext={() => {
+                if (calendarView === "month") {
+                  const d = new Date(calendarCursor.year, calendarCursor.month + 1, 1);
+                  setCalendarCursor({ year: d.getFullYear(), month: d.getMonth() });
+                } else {
+                  const d = new Date(weekStart);
+                  d.setDate(d.getDate() + 7);
+                  setWeekStart(d);
+                }
+              }}
+              onToday={() => {
+                const now = new Date();
+                setCalendarCursor({ year: now.getFullYear(), month: now.getMonth() });
+                const w = new Date(now);
+                w.setHours(0, 0, 0, 0);
+                setWeekStart(w);
+              }}
+              onViewChange={setCalendarView}
               userTimezone={Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}
             />
-          )}
-
-          <CalendarLegend />
-          {/* 已知缺口 #3 提示 */}
-          <div className="text-[10px] text-ink-mute font-mono">
-            ⚠ 拖 work-item / milestone 改 due_date 走 useStore.setState; 后端 PATCH D.6+ 接
+            {calendarView === "month" ? (
+              <MonthView
+                year={calendarCursor.year}
+                month={calendarCursor.month}
+                events={projectEvents}
+                onEventMove={handleCalendarEventMove}
+                onMonthChange={(y, m) => setCalendarCursor({ year: y, month: m })}
+              />
+            ) : (
+              <WeekView
+                startDate={weekStart}
+                events={projectEvents}
+                onEventMove={handleCalendarEventMove}
+                userTimezone={Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}
+              />
+            )}
+            <CalendarLegend />
           </div>
         </div>
       )}
 
-      {tab === "members" && (
+      {tab === "backlog" && (
+        <div data-testid="projects-backlog-tab" className="space-y-2">
+          <div className="text-xs font-mono text-ink-mute">Backlog — work-items 按 status 排序 ({projectWorkItems.length} 总数)</div>
+          {projectWorkItems.length === 0 ? (
+            <div className="text-xs text-ink-mute italic">(no work-items)</div>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Title</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Assignee</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...projectWorkItems]
+                  .sort((a, b) => {
+                    // status 排序: todo > in_progress > review > blocked > done > wontfix (per WorkItemStatus 真实定义)
+                    const order: WorkItemStatus[] = ["todo", "in_progress", "review", "blocked", "done", "wontfix"];
+                    return order.indexOf(a.status) - order.indexOf(b.status);
+                  })
+                  .map((w) => {
+                    const assignee = identities.find((i) => i.id === w.assignee_id);
+                    return (
+                      <tr key={w.id} data-testid={`backlog-row-${w.id}`}>
+                        <td className="font-mono text-[10px] text-ink-mute">{w.key}</td>
+                        <td>{w.title}</td>
+                        <td><StatusPill value={w.status} /></td>
+                        <td className="text-xs">{w.priority ?? "—"}</td>
+                        <td className="text-xs">{assignee?.display_name ?? "—"}</td>
+                        <td className="text-[10px] text-ink-mute font-mono">{w.updated_at?.slice(0, 10) ?? "—"}</td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {tab === "agents" && (
         <ProjectMembers
           project={selectedProject}
           members={projectMembers}
           workspaces={projectWorkspaces}
           ownerId={selectedProject.owner_id}
         />
+      )}
+
+      {tab === "worktrees" && (
+        <div data-testid="projects-worktrees-tab" className="space-y-2">
+          <div className="text-xs font-mono text-ink-mute">Worktrees — per project_id 过滤 ({projectWorktrees.length} 总数)</div>
+          {projectWorktrees.length === 0 ? (
+            <div className="text-xs text-ink-mute italic">(no worktrees)</div>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Branch</th>
+                  <th>Status</th>
+                  <th>Last Event</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projectWorktrees.map((w) => (
+                  <tr key={w.id} data-testid={`worktree-row-${w.id}`}>
+                    <td className="font-mono text-[10px] text-ink-mute">{w.id.slice(0, 8)}</td>
+                    <td className="font-mono text-xs">{w.name}</td>
+                    <td className="font-mono text-xs">{w.branch ?? "—"}</td>
+                    <td>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-elev-1 border border-line">
+                        {w.status}
+                      </span>
+                    </td>
+                    <td className="text-[10px] text-ink-mute font-mono">{w.last_event_at?.slice(0, 16).replace("T", " ") ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
     </div>
   );
