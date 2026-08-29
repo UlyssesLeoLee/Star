@@ -1557,3 +1557,6 @@ mod tests {
 
 pub mod process;
 
+
+pub mod http_client;
+
