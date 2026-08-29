@@ -13,11 +13,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
-import { useState, useEffect } from "react";
-import { useTheme } from "next-themes";
-import { ChevronDown, Bell, Settings, Search, Sun, Moon } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, Bell, Settings, Search } from "lucide-react";
 import { useCommandBarStore } from "@/lib/commandBarStore";
 import { UserMenu } from "@/components/UserMenu";
+import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
 
 // 5 视图 tab — Settings 单独作为齿轮放在 tab 右侧 (per §3 + 任务说明)
 const TABS: ReadonlyArray<{ href: string; label: string; code: string }> = [
@@ -32,34 +32,8 @@ export function AppHeader() {
   const pathname = usePathname() ?? "/";
   const openCommandBar = useCommandBarStore((s) => s.open);
   const [notifCount] = useState(3); // mock — Phase I+ 接 SSE
-  const [isDark, setIsDark] = useState(true);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("star-theme");
-    if (saved === "light") {
-      setIsDark(false);
-      document.documentElement.classList.remove("dark");
-      document.documentElement.classList.add("light");
-    } else {
-      setIsDark(true);
-      document.documentElement.classList.remove("light");
-      document.documentElement.classList.add("dark");
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    const next = !isDark;
-    setIsDark(next);
-    if (next) {
-      document.documentElement.classList.remove("light");
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("star-theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.classList.add("light");
-      localStorage.setItem("star-theme", "light");
-    }
-  };
+  // 主题切换: 复用 ThemeSwitcher (light/dark 下拉 + Cmd+Shift+T 循环 + localStorage 持久化)
+  // per 2026-08-29 19:32 JST scope-ui-only 候选第 4 项 (ThemeSwitcher 位置)
 
   return (
     <header
@@ -118,21 +92,11 @@ export function AppHeader() {
 
         {/* === Right: Theme Toggle, ⌘K, bell, status, avatar === */}
         <div className="ml-auto flex items-center gap-2">
-          {/* 日漫风格日/夜主题切换器 */}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            data-testid="theme-toggle"
-            aria-label={isDark ? "Switch to Mecha Light Theme" : "Switch to Neo-Tokyo Dark Theme"}
-            title={isDark ? "切换至 Mecha 亮色主题" : "切换至 Neo-Tokyo 暗色主题"}
-            className="p-1.5 text-ink-dim hover:text-accent rounded-md hover:bg-bg-soft/60 border border-line/60 hover:border-accent/40 transition-all duration-200 active:scale-95"
-          >
-            {isDark ? (
-              <Sun size={15} className="text-warn hover:rotate-45 transition-transform" />
-            ) : (
-              <Moon size={15} className="text-accent hover:-rotate-12 transition-transform" />
-            )}
-          </button>
+          {/* 主题切换器 (per 2026-08-29 19:32 JST): 替换自研二态 toggle → 复用 ThemeSwitcher
+              - 下拉式: light / dark / high-contrast / solarized (扩展点)
+              - Cmd+Shift+T 循环切换
+              - 持久化用 next-themes (localStorage) */}
+          <ThemeSwitcher />
 
           <button
             type="button"
