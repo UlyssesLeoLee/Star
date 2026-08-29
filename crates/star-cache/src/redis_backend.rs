@@ -24,9 +24,7 @@ impl RedisBackend {
 #[async_trait]
 impl CacheBackend for RedisBackend {
     async fn get(&self, _key: &str) -> Result<Option<Vec<u8>>, CacheError> {
-        Err(CacheError::Other(
-            "Phase G+ 待实装 — 当前 stub".into(),
-        ))
+        Err(CacheError::Other("Phase G+ 待实装 — 当前 stub".into()))
     }
 
     async fn set(&self, _key: &str, _value: &[u8], _ttl_sec: u32) -> Result<(), CacheError> {

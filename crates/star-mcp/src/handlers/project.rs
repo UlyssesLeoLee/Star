@@ -47,7 +47,8 @@ impl ProjectHandler {
         Self::default()
     }
     fn service(&self) -> &Arc<InMemoryProjectService> {
-        self.svc.get_or_init(|| Arc::new(InMemoryProjectService::new()))
+        self.svc
+            .get_or_init(|| Arc::new(InMemoryProjectService::new()))
     }
 }
 
@@ -113,9 +114,7 @@ impl Resource for ProjectHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use domain_project::{
-        CreateProjectCommand, ProjectCommandPort, ProjectTemplateId, UserId,
-    };
+    use domain_project::{CreateProjectCommand, ProjectCommandPort, ProjectTemplateId, UserId};
 
     #[tokio::test]
     async fn read_invalid_uri_format() {
@@ -156,7 +155,10 @@ mod tests {
         let _ = h.service();
         let missing_tenant = uuid::Uuid::new_v4();
         let missing_project = uuid::Uuid::new_v4();
-        let d = h.read(&format!("{missing_tenant}:{missing_project}")).await.unwrap();
+        let d = h
+            .read(&format!("{missing_tenant}:{missing_project}"))
+            .await
+            .unwrap();
         assert!(d.is_none());
     }
 }

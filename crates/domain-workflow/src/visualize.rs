@@ -51,7 +51,7 @@ impl WorkflowViz {
     /// 导出 SVG (固定 800x600, 简单布局)
     pub fn to_svg(&self) -> String {
         let mut svg = String::from(
-            r##"<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">"##
+            r##"<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">"##,
         );
         svg.push_str(r##"<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/></marker></defs>"##);
         svg.push_str(r##"<rect width="100%" height="100%" fill="#F8FAFC"/>"##);
@@ -118,7 +118,10 @@ impl WorkflowViz {
             m.push_str(&format!("    {}: {}\n", node.id, node.label));
         }
         for edge in &self.edges {
-            m.push_str(&format!("    {} --> {}: {}\n", edge.from, edge.to, edge.label));
+            m.push_str(&format!(
+                "    {} --> {}: {}\n",
+                edge.from, edge.to, edge.label
+            ));
         }
         m
     }
@@ -133,10 +136,16 @@ impl WorkflowViz {
                 NodeCategory::Doing => "box,style=filled,fillcolor=blue",
                 NodeCategory::Done => "box,style=filled,fillcolor=green",
             };
-            d.push_str(&format!("  {} [label=\"{}\",{}];\n", node.id, node.label, shape));
+            d.push_str(&format!(
+                "  {} [label=\"{}\",{}];\n",
+                node.id, node.label, shape
+            ));
         }
         for edge in &self.edges {
-            d.push_str(&format!("  {} -> {} [label=\"{}\"];\n", edge.from, edge.to, edge.label));
+            d.push_str(&format!(
+                "  {} -> {} [label=\"{}\"];\n",
+                edge.from, edge.to, edge.label
+            ));
         }
         d.push_str("}\n");
         d
@@ -185,13 +194,43 @@ mod tests {
     fn sample_viz() -> WorkflowViz {
         WorkflowViz {
             nodes: vec![
-                VizNode { id: "todo".into(), label: "To Do".into(), category: NodeCategory::Todo, x: 0.0, y: 0.0 },
-                VizNode { id: "doing".into(), label: "In Progress".into(), category: NodeCategory::Doing, x: 0.0, y: 0.0 },
-                VizNode { id: "done".into(), label: "Done".into(), category: NodeCategory::Done, x: 0.0, y: 0.0 },
+                VizNode {
+                    id: "todo".into(),
+                    label: "To Do".into(),
+                    category: NodeCategory::Todo,
+                    x: 0.0,
+                    y: 0.0,
+                },
+                VizNode {
+                    id: "doing".into(),
+                    label: "In Progress".into(),
+                    category: NodeCategory::Doing,
+                    x: 0.0,
+                    y: 0.0,
+                },
+                VizNode {
+                    id: "done".into(),
+                    label: "Done".into(),
+                    category: NodeCategory::Done,
+                    x: 0.0,
+                    y: 0.0,
+                },
             ],
             edges: vec![
-                VizEdge { id: "e1".into(), from: "todo".into(), to: "doing".into(), label: "Start".into(), condition: None },
-                VizEdge { id: "e2".into(), from: "doing".into(), to: "done".into(), label: "Complete".into(), condition: Some("all subtasks done".into()) },
+                VizEdge {
+                    id: "e1".into(),
+                    from: "todo".into(),
+                    to: "doing".into(),
+                    label: "Start".into(),
+                    condition: None,
+                },
+                VizEdge {
+                    id: "e2".into(),
+                    from: "doing".into(),
+                    to: "done".into(),
+                    label: "Complete".into(),
+                    condition: Some("all subtasks done".into()),
+                },
             ],
         }
     }
@@ -222,9 +261,27 @@ mod tests {
     #[test]
     fn test_auto_layout() {
         let nodes = vec![
-            VizNode { id: "a".into(), label: "A".into(), category: NodeCategory::Todo, x: 0.0, y: 0.0 },
-            VizNode { id: "b".into(), label: "B".into(), category: NodeCategory::Doing, x: 0.0, y: 0.0 },
-            VizNode { id: "c".into(), label: "C".into(), category: NodeCategory::Done, x: 0.0, y: 0.0 },
+            VizNode {
+                id: "a".into(),
+                label: "A".into(),
+                category: NodeCategory::Todo,
+                x: 0.0,
+                y: 0.0,
+            },
+            VizNode {
+                id: "b".into(),
+                label: "B".into(),
+                category: NodeCategory::Doing,
+                x: 0.0,
+                y: 0.0,
+            },
+            VizNode {
+                id: "c".into(),
+                label: "C".into(),
+                category: NodeCategory::Done,
+                x: 0.0,
+                y: 0.0,
+            },
         ];
         let laid = auto_layout(nodes);
         assert_eq!(laid.len(), 3);

@@ -23,10 +23,7 @@ impl ThemeService {
     }
 
     /// 三层解析: Personal > Tenant > Global (per 2026-08-29 04:09 JST 拍板)
-    pub async fn resolve(
-        &self,
-        ctx: &ThemeContext,
-    ) -> Result<ThemeId, ThemeError> {
+    pub async fn resolve(&self, ctx: &ThemeContext) -> Result<ThemeId, ThemeError> {
         for scope in &ctx.resolution_chain {
             if let Some(t) = self
                 .repo
@@ -47,10 +44,7 @@ impl ThemeService {
     }
 
     /// 列出可用主题 (按 scope 过滤, Global 永远可见)
-    pub async fn list_available(
-        &self,
-        ctx: &ThemeContext,
-    ) -> Result<Vec<Theme>, ThemeError> {
+    pub async fn list_available(&self, ctx: &ThemeContext) -> Result<Vec<Theme>, ThemeError> {
         // 1. 内置永远可见
         let mut all = self.repo.list_builtin().await?;
         // 2. 当前租户的 Tenant scope 主题
@@ -101,14 +95,21 @@ impl ThemeService {
             _ => {}
         }
 
-        let scope_owner = match ctx.resolution_chain.first().copied().unwrap_or(ThemeScope::Global) {
+        let scope_owner = match ctx
+            .resolution_chain
+            .first()
+            .copied()
+            .unwrap_or(ThemeScope::Global)
+        {
             ThemeScope::Personal => ScopeOwner::Personal {
                 actor_id: ctx.actor_id.ok_or_else(|| ThemeError::PermissionDenied {
                     actor: "anonymous".into(),
                     scope: "personal".into(),
                 })?,
             },
-            ThemeScope::Tenant => ScopeOwner::Tenant { tenant_id: ctx.tenant_id },
+            ThemeScope::Tenant => ScopeOwner::Tenant {
+                tenant_id: ctx.tenant_id,
+            },
             ThemeScope::Global => ScopeOwner::Global,
         };
         let scope = scope_owner.scope_enum();

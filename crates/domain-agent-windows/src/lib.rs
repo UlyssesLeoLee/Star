@@ -138,7 +138,11 @@ impl TaskWindow {
         }
     }
 
-    pub fn add_tab(&mut self, profile_id: Uuid, label: impl Into<String>) -> Result<&TaskTab, WindowError> {
+    pub fn add_tab(
+        &mut self,
+        profile_id: Uuid,
+        label: impl Into<String>,
+    ) -> Result<&TaskTab, WindowError> {
         if self.tabs.len() >= 20 {
             return Err(WindowError::TooManyTabs(20));
         }
@@ -180,11 +184,17 @@ impl TaskWindow {
         state: TabState,
         exit_code: Option<i32>,
     ) -> Result<(), WindowError> {
-        let tab = self.tabs.iter_mut().find(|t| t.id == tab_id)
+        let tab = self
+            .tabs
+            .iter_mut()
+            .find(|t| t.id == tab_id)
             .ok_or(WindowError::TabNotFound(tab_id))?;
         tab.state = state;
         tab.exit_code = exit_code;
-        if matches!(state, TabState::Completed | TabState::Failed | TabState::Aborted) {
+        if matches!(
+            state,
+            TabState::Completed | TabState::Failed | TabState::Aborted
+        ) {
             tab.finished_at = Some(Utc::now());
         }
         self.updated_at = Utc::now();
@@ -266,7 +276,11 @@ impl WindowService {
     }
 
     pub fn close_window(&self, id: Uuid) -> Result<(), WindowError> {
-        self.windows.write().unwrap().remove(&id).ok_or(WindowError::WindowNotFound(id))?;
+        self.windows
+            .write()
+            .unwrap()
+            .remove(&id)
+            .ok_or(WindowError::WindowNotFound(id))?;
         Ok(())
     }
 
@@ -275,7 +289,10 @@ impl WindowService {
     }
 
     pub fn list_windows_by_worktree(&self, worktree_id: Uuid) -> Vec<TaskWindow> {
-        self.windows.read().unwrap().values()
+        self.windows
+            .read()
+            .unwrap()
+            .values()
             .filter(|w| w.worktree_id == worktree_id)
             .cloned()
             .collect()
@@ -290,11 +307,16 @@ impl WindowService {
         commit_message: impl Into<String>,
         trigger: TriggerMode,
     ) -> Result<UploadTask, WindowError> {
-        let window = self.get_window(window_id).ok_or(WindowError::WindowNotFound(id_()))?;
+        let window = self
+            .get_window(window_id)
+            .ok_or(WindowError::WindowNotFound(id_()))?;
         if window.upload_trigger != trigger {
             return Err(WindowError::TriggerMismatch(window.upload_trigger, trigger));
         }
-        let tab = window.tabs.iter().find(|t| t.id == tab_id)
+        let tab = window
+            .tabs
+            .iter()
+            .find(|t| t.id == tab_id)
             .ok_or(WindowError::TabNotFound(tab_id))?;
         let task = UploadTask {
             id: Uuid::new_v4(),
@@ -318,7 +340,9 @@ impl WindowService {
         let mut triggered = Vec::new();
         let windows = self.windows.read().unwrap().clone();
         for window in windows.values() {
-            if window.upload_trigger != TriggerMode::Polling { continue; }
+            if window.upload_trigger != TriggerMode::Polling {
+                continue;
+            }
             for tab in &window.tabs {
                 if !tab.files_changed.is_empty() {
                     let msg = format!("[polling] auto-upload tab {}", tab.label);
@@ -343,10 +367,14 @@ impl WindowService {
 }
 
 impl Default for WindowService {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-fn id_() -> Uuid { Uuid::nil() }
+fn id_() -> Uuid {
+    Uuid::nil()
+}
 
 // =====================================================================
 // 5. invariant
@@ -361,7 +389,9 @@ pub fn inv_01_max_tabs(window: &TaskWindow) -> bool {
 pub fn inv_02_unique_tab_ids(window: &TaskWindow) -> bool {
     let mut seen = std::collections::HashSet::new();
     for t in &window.tabs {
-        if !seen.insert(t.id) { return false; }
+        if !seen.insert(t.id) {
+            return false;
+        }
     }
     true
 }
@@ -395,7 +425,12 @@ mod tests {
 
     #[test]
     fn test_window_new() {
-        let w = TaskWindow::new("Test", Uuid::new_v4(), Uuid::new_v4(), TriggerMode::OnSuccessExit);
+        let w = TaskWindow::new(
+            "Test",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            TriggerMode::OnSuccessExit,
+        );
         assert_eq!(w.name, "Test");
         assert_eq!(w.upload_trigger, TriggerMode::OnSuccessExit);
         assert_eq!(w.polling_interval_sec, 300);
@@ -428,7 +463,8 @@ mod tests {
         let mut w = TaskWindow::new("Test", Uuid::new_v4(), Uuid::new_v4(), TriggerMode::Manual);
         let tab = w.add_tab(Uuid::new_v4(), "tab").unwrap();
         let tab_id = tab.id;
-        w.update_tab_state(tab_id, TabState::Completed, Some(0)).unwrap();
+        w.update_tab_state(tab_id, TabState::Completed, Some(0))
+            .unwrap();
         assert_eq!(w.tabs[0].state, TabState::Completed);
         assert_eq!(w.tabs[0].exit_code, Some(0));
         assert!(w.tabs[0].finished_at.is_some());
@@ -450,7 +486,12 @@ mod tests {
         let svc = WindowService::new();
         let wt_id = Uuid::new_v4();
         for i in 0..3 {
-            let w = TaskWindow::new(&format!("W{}", i), wt_id, Uuid::new_v4(), TriggerMode::Manual);
+            let w = TaskWindow::new(
+                &format!("W{}", i),
+                wt_id,
+                Uuid::new_v4(),
+                TriggerMode::Manual,
+            );
             svc.open_window(w).unwrap();
         }
         // 另一个 worktree
@@ -463,7 +504,12 @@ mod tests {
     #[test]
     fn test_trigger_upload_mismatch() {
         let svc = WindowService::new();
-        let w = TaskWindow::new("Test", Uuid::new_v4(), Uuid::new_v4(), TriggerMode::OnSuccessExit);
+        let w = TaskWindow::new(
+            "Test",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            TriggerMode::OnSuccessExit,
+        );
         let wid = w.id;
         let tid = Uuid::new_v4();
         svc.open_window(w).unwrap();
@@ -474,12 +520,25 @@ mod tests {
     #[test]
     fn test_trigger_upload_match() {
         let svc = WindowService::new();
-        let mut w = TaskWindow::new("Test", Uuid::new_v4(), Uuid::new_v4(), TriggerMode::OnSuccessExit);
+        let mut w = TaskWindow::new(
+            "Test",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            TriggerMode::OnSuccessExit,
+        );
         let wid = w.id;
         let tab = w.add_tab(Uuid::new_v4(), "tab").unwrap();
         let tid = tab.id;
         svc.open_window(w).unwrap();
-        let task = svc.trigger_upload(wid, tid, vec!["a.rs".into()], "msg", TriggerMode::OnSuccessExit).unwrap();
+        let task = svc
+            .trigger_upload(
+                wid,
+                tid,
+                vec!["a.rs".into()],
+                "msg",
+                TriggerMode::OnSuccessExit,
+            )
+            .unwrap();
         assert_eq!(task.trigger, TriggerMode::OnSuccessExit);
         assert_eq!(task.files_changed, vec!["a.rs".to_string()]);
     }
@@ -515,13 +574,12 @@ mod tests {
             tab.id
         };
         assert!(inv_04_finished_at_set(&w.tabs[0]));
-        w.update_tab_state(tab_id, TabState::Completed, Some(0)).unwrap();
+        w.update_tab_state(tab_id, TabState::Completed, Some(0))
+            .unwrap();
         assert!(inv_04_finished_at_set(&w.tabs[0]));
     }
 }
 
 pub mod upload_executor;
 
-
 pub mod commit_template;
-

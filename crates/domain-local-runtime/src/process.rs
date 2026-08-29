@@ -130,16 +130,24 @@ pub struct DefaultLocalRuntime {
 
 impl DefaultLocalRuntime {
     pub fn new() -> Self {
-        Self { processes: Arc::new(Mutex::new(HashMap::new())), mock: true }
+        Self {
+            processes: Arc::new(Mutex::new(HashMap::new())),
+            mock: true,
+        }
     }
 
     pub fn with_real_processes() -> Self {
-        Self { processes: Arc::new(Mutex::new(HashMap::new())), mock: false }
+        Self {
+            processes: Arc::new(Mutex::new(HashMap::new())),
+            mock: false,
+        }
     }
 }
 
 impl Default for DefaultLocalRuntime {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
@@ -155,7 +163,11 @@ impl LocalRuntime for DefaultLocalRuntime {
             // mock 模式: 立即返回一个已完成的 handle, 输出 "mock executed: <command>"
             let id = Uuid::new_v4();
             let now = chrono::Utc::now();
-            let pid = if cfg!(unix) { Some(std::process::id()) } else { Some(rand_pid()) };
+            let pid = if cfg!(unix) {
+                Some(std::process::id())
+            } else {
+                Some(rand_pid())
+            };
             return Ok(ProcessHandle {
                 id,
                 pid,
@@ -170,7 +182,9 @@ impl LocalRuntime for DefaultLocalRuntime {
             });
         }
         // 真实模式: tokio::process::Command (Phase 2 实现, 本任务留接口)
-        Err(RuntimeError::SpawnFailed("real process mode is Phase 2, use mock for now".into()))
+        Err(RuntimeError::SpawnFailed(
+            "real process mode is Phase 2, use mock for now".into(),
+        ))
     }
 
     async fn invoke_http(
@@ -197,13 +211,20 @@ impl LocalRuntime for DefaultLocalRuntime {
                 error: None,
             });
         }
-        Err(RuntimeError::HttpFailed("real HTTP mode is Phase 2, use mock for now".into()))
+        Err(RuntimeError::HttpFailed(
+            "real HTTP mode is Phase 2, use mock for now".into(),
+        ))
     }
 
     async fn cancel(&self, id: Uuid) -> Result<(), RuntimeError> {
         let mut procs = self.processes.lock().await;
-        let p = procs.get_mut(&id).ok_or(RuntimeError::ProcessNotFound(id))?;
-        if matches!(p.state, ProcessState::Completed | ProcessState::Failed | ProcessState::Cancelled) {
+        let p = procs
+            .get_mut(&id)
+            .ok_or(RuntimeError::ProcessNotFound(id))?;
+        if matches!(
+            p.state,
+            ProcessState::Completed | ProcessState::Failed | ProcessState::Cancelled
+        ) {
             return Err(RuntimeError::AlreadyFinished);
         }
         p.state = ProcessState::Cancelled;
@@ -220,7 +241,10 @@ impl LocalRuntime for DefaultLocalRuntime {
 
 fn rand_pid() -> u32 {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().subsec_nanos();
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos();
     1000 + (nanos % 9000) as u32
 }
 
@@ -269,7 +293,10 @@ mod tests {
         let runtime = DefaultLocalRuntime::new();
         let mut env = std::collections::HashMap::new();
         env.insert("PATH".to_string(), "/usr/bin".to_string());
-        let handle = runtime.spawn_cli("claude", &["--model".into(), "sonnet".into()], &env, "/tmp").await.unwrap();
+        let handle = runtime
+            .spawn_cli("claude", &["--model".into(), "sonnet".into()], &env, "/tmp")
+            .await
+            .unwrap();
         assert_eq!(handle.state, ProcessState::Completed);
         assert_eq!(handle.exit_code, Some(0));
         assert!(handle.pid.is_some());
@@ -278,12 +305,15 @@ mod tests {
     #[tokio::test]
     async fn test_default_runtime_mock_invoke_http() {
         let runtime = DefaultLocalRuntime::new();
-        let handle = runtime.invoke_http(
-            "https://api.openclaw.dev/v1",
-            Some("sk-test-123"),
-            "write a hello world",
-            Some("gpt-4"),
-        ).await.unwrap();
+        let handle = runtime
+            .invoke_http(
+                "https://api.openclaw.dev/v1",
+                Some("sk-test-123"),
+                "write a hello world",
+                Some("gpt-4"),
+            )
+            .await
+            .unwrap();
         assert_eq!(handle.state, ProcessState::Completed);
         assert!(handle.pid.is_none()); // API 模式无 PID
     }
@@ -319,7 +349,10 @@ mod tests {
         };
         assert!(inv_01_exit_code_consistent(&h));
 
-        let bad = ProcessHandle { exit_code: None, ..h.clone() };
+        let bad = ProcessHandle {
+            exit_code: None,
+            ..h.clone()
+        };
         assert!(!inv_01_exit_code_consistent(&bad));
     }
 

@@ -478,10 +478,7 @@ pub trait DevelopmentRepository: Send + Sync {
         status: ChangeSetStatus,
     ) -> Result<Vec<ChangeSet>, DevelopmentError>;
 
-    async fn insert_execution(
-        &self,
-        exec: DevelopmentExecution,
-    ) -> Result<(), DevelopmentError>;
+    async fn insert_execution(&self, exec: DevelopmentExecution) -> Result<(), DevelopmentError>;
 
     async fn upsert_symbol(&self, s: SymbolIndex) -> Result<(), DevelopmentError>;
     async fn get_symbol(&self, id: SymbolIndexId) -> Result<SymbolIndex, DevelopmentError>;
@@ -569,7 +566,10 @@ impl Default for InMemoryDevelopmentService {
 
 fn check_tenant(actor: &ActorContext, tenant_id: TenantId) -> Result<(), DevelopmentError> {
     if actor.tenant_id != tenant_id {
-        return Err(DevelopmentError::CrossTenantDenied(actor.tenant_id, tenant_id));
+        return Err(DevelopmentError::CrossTenantDenied(
+            actor.tenant_id,
+            tenant_id,
+        ));
     }
     Ok(())
 }
@@ -621,12 +621,17 @@ impl DevelopmentCommandPort for InMemoryDevelopmentService {
         check_tenant(actor, cs.tenant_id)?;
         // INV-DEV-05:Draft 状态可改,ReadyForReview 后只读
         if cs.status != ChangeSetStatus::Draft {
-            return Err(DevelopmentError::FileChangesReadOnly(cs.status.as_str().to_string()));
+            return Err(DevelopmentError::FileChangesReadOnly(
+                cs.status.as_str().to_string(),
+            ));
         }
         // 累计 stats
         cs.stats.files_changed = cs.stats.files_changed.saturating_add(1);
         cs.stats.lines_added = cs.stats.lines_added.saturating_add(cmd.file.lines_added);
-        cs.stats.lines_deleted = cs.stats.lines_deleted.saturating_add(cmd.file.lines_deleted);
+        cs.stats.lines_deleted = cs
+            .stats
+            .lines_deleted
+            .saturating_add(cmd.file.lines_deleted);
         cs.files.push(cmd.file);
         self.repo.update_change_set(cs.clone()).await?;
         self.change_sets.write().unwrap().insert(cs.id, cs.clone());
@@ -877,14 +882,14 @@ impl InMemoryDevelopmentService {
             .unwrap()
             .get(&id)
             .cloned()
-            .ok_or(DevelopmentError::NotFound(format!("change_set:{}", id.as_uuid())))
+            .ok_or(DevelopmentError::NotFound(format!(
+                "change_set:{}",
+                id.as_uuid()
+            )))
     }
 }
 
-fn transition(
-    cs: &mut ChangeSet,
-    next: ChangeSetStatus,
-) -> Result<(), DevelopmentError> {
+fn transition(cs: &mut ChangeSet, next: ChangeSetStatus) -> Result<(), DevelopmentError> {
     if !cs.status.can_transition_to(next) {
         return Err(DevelopmentError::InvalidStatus {
             from: cs.status.as_str().to_string(),
@@ -937,7 +942,10 @@ impl DevelopmentRepository for InMemoryDevelopmentRepository {
             .unwrap()
             .get(&id)
             .cloned()
-            .ok_or(DevelopmentError::NotFound(format!("change_set:{}", id.as_uuid())))
+            .ok_or(DevelopmentError::NotFound(format!(
+                "change_set:{}",
+                id.as_uuid()
+            )))
     }
     async fn list_change_sets_by_worktree(
         &self,
@@ -967,10 +975,7 @@ impl DevelopmentRepository for InMemoryDevelopmentRepository {
             .collect())
     }
 
-    async fn insert_execution(
-        &self,
-        exec: DevelopmentExecution,
-    ) -> Result<(), DevelopmentError> {
+    async fn insert_execution(&self, exec: DevelopmentExecution) -> Result<(), DevelopmentError> {
         self.executions.write().unwrap().insert(exec.id, exec);
         Ok(())
     }
@@ -985,7 +990,10 @@ impl DevelopmentRepository for InMemoryDevelopmentRepository {
             .unwrap()
             .get(&id)
             .cloned()
-            .ok_or(DevelopmentError::NotFound(format!("symbol:{}", id.as_uuid())))
+            .ok_or(DevelopmentError::NotFound(format!(
+                "symbol:{}",
+                id.as_uuid()
+            )))
     }
     async fn find_symbol_by_key(
         &self,
@@ -1106,7 +1114,10 @@ mod tests {
     async fn create_change_set_starts_as_draft() {
         let svc = InMemoryDevelopmentService::new();
         let tid = TenantId::new();
-        let cs = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
+        let cs = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
         assert_eq!(cs.status, ChangeSetStatus::Draft);
         assert_eq!(cs.tenant_id, tid);
         assert!(cs.submitted_at.is_none());
@@ -1117,7 +1128,10 @@ mod tests {
     async fn add_file_change_in_draft() {
         let svc = InMemoryDevelopmentService::new();
         let tid = TenantId::new();
-        let cs = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
+        let cs = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
         let actor = developer(tid);
         let cs2 = svc
             .add_file_change(
@@ -1146,11 +1160,16 @@ mod tests {
         // INV-DEV-05:ReadyForReview 后只读
         let svc = InMemoryDevelopmentService::new();
         let tid = TenantId::new();
-        let cs = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
+        let cs = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
         let actor = developer(tid);
         let cs = svc
             .submit(
-                SubmitChangeSetCommand { change_set_id: cs.id },
+                SubmitChangeSetCommand {
+                    change_set_id: cs.id,
+                },
                 &actor,
             )
             .await
@@ -1178,10 +1197,18 @@ mod tests {
     async fn submit_draft_to_ready_for_review() {
         let svc = InMemoryDevelopmentService::new();
         let tid = TenantId::new();
-        let cs = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
+        let cs = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
         let actor = developer(tid);
         let cs2 = svc
-            .submit(SubmitChangeSetCommand { change_set_id: cs.id }, &actor)
+            .submit(
+                SubmitChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &actor,
+            )
             .await
             .unwrap();
         assert_eq!(cs2.status, ChangeSetStatus::ReadyForReview);
@@ -1192,15 +1219,28 @@ mod tests {
     async fn approve_ready_for_review_to_approved() {
         let svc = InMemoryDevelopmentService::new();
         let tid = TenantId::new();
-        let cs = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
+        let cs = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
         let dev = developer(tid);
         let pa = project_admin(tid);
         let cs = svc
-            .submit(SubmitChangeSetCommand { change_set_id: cs.id }, &dev)
+            .submit(
+                SubmitChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &dev,
+            )
             .await
             .unwrap();
         let cs2 = svc
-            .approve(ApproveChangeSetCommand { change_set_id: cs.id }, &pa)
+            .approve(
+                ApproveChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &pa,
+            )
             .await
             .unwrap();
         assert_eq!(cs2.status, ChangeSetStatus::Approved);
@@ -1210,11 +1250,19 @@ mod tests {
     async fn reject_ready_for_review_to_rejected() {
         let svc = InMemoryDevelopmentService::new();
         let tid = TenantId::new();
-        let cs = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
+        let cs = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
         let dev = developer(tid);
         let pa = project_admin(tid);
         let cs = svc
-            .submit(SubmitChangeSetCommand { change_set_id: cs.id }, &dev)
+            .submit(
+                SubmitChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &dev,
+            )
             .await
             .unwrap();
         let cs2 = svc
@@ -1235,19 +1283,37 @@ mod tests {
     async fn merge_approved_to_merged_requires_admin() {
         let svc = InMemoryDevelopmentService::new();
         let tid = TenantId::new();
-        let cs = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
+        let cs = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
         let dev = developer(tid);
         let pa = project_admin(tid);
         let cs = svc
-            .submit(SubmitChangeSetCommand { change_set_id: cs.id }, &dev)
+            .submit(
+                SubmitChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &dev,
+            )
             .await
             .unwrap();
         let cs = svc
-            .approve(ApproveChangeSetCommand { change_set_id: cs.id }, &pa)
+            .approve(
+                ApproveChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &pa,
+            )
             .await
             .unwrap();
         let cs2 = svc
-            .merge(MergeChangeSetCommand { change_set_id: cs.id }, &pa)
+            .merge(
+                MergeChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &pa,
+            )
             .await
             .unwrap();
         assert_eq!(cs2.status, ChangeSetStatus::Merged);
@@ -1258,19 +1324,37 @@ mod tests {
         // INV-DEV-02:developer 角色 merge 拒绝
         let svc = InMemoryDevelopmentService::new();
         let tid = TenantId::new();
-        let cs = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
+        let cs = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
         let dev = developer(tid);
         let pa = project_admin(tid);
         let cs = svc
-            .submit(SubmitChangeSetCommand { change_set_id: cs.id }, &dev)
+            .submit(
+                SubmitChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &dev,
+            )
             .await
             .unwrap();
         let cs = svc
-            .approve(ApproveChangeSetCommand { change_set_id: cs.id }, &pa)
+            .approve(
+                ApproveChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &pa,
+            )
             .await
             .unwrap();
         let res = svc
-            .merge(MergeChangeSetCommand { change_set_id: cs.id }, &dev)
+            .merge(
+                MergeChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &dev,
+            )
             .await;
         assert!(matches!(res, Err(DevelopmentError::PermissionDenied(_))));
     }
@@ -1279,11 +1363,19 @@ mod tests {
     async fn request_changes_returns_to_draft() {
         let svc = InMemoryDevelopmentService::new();
         let tid = TenantId::new();
-        let cs = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
+        let cs = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
         let dev = developer(tid);
         let pa = project_admin(tid);
         let cs = svc
-            .submit(SubmitChangeSetCommand { change_set_id: cs.id }, &dev)
+            .submit(
+                SubmitChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &dev,
+            )
             .await
             .unwrap();
         let cs2 = svc
@@ -1303,7 +1395,10 @@ mod tests {
     async fn record_execution_links_to_change_set() {
         let svc = InMemoryDevelopmentService::new();
         let tid = TenantId::new();
-        let cs = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
+        let cs = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
         let actor = developer(tid);
         let exec = svc
             .record_execution(
@@ -1378,30 +1473,69 @@ mod tests {
         let dev = developer(tid);
         let pa = project_admin(tid);
         // 3 个 ChangeSet:1 Draft,1 ReadyForReview,1 Approved
-        let cs1 = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
-        let cs2 = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
-        let cs3 = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
-        svc.submit(SubmitChangeSetCommand { change_set_id: cs2.id }, &dev).await.unwrap();
-        svc.submit(SubmitChangeSetCommand { change_set_id: cs3.id }, &dev).await.unwrap();
-        svc.approve(ApproveChangeSetCommand { change_set_id: cs3.id }, &pa).await.unwrap();
+        let cs1 = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
+        let cs2 = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
+        let cs3 = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
+        svc.submit(
+            SubmitChangeSetCommand {
+                change_set_id: cs2.id,
+            },
+            &dev,
+        )
+        .await
+        .unwrap();
+        svc.submit(
+            SubmitChangeSetCommand {
+                change_set_id: cs3.id,
+            },
+            &dev,
+        )
+        .await
+        .unwrap();
+        svc.approve(
+            ApproveChangeSetCommand {
+                change_set_id: cs3.id,
+            },
+            &pa,
+        )
+        .await
+        .unwrap();
 
         let drafts = svc
             .list_by_status(
-                ListByStatusQuery { tenant_id: tid, status: ChangeSetStatus::Draft },
+                ListByStatusQuery {
+                    tenant_id: tid,
+                    status: ChangeSetStatus::Draft,
+                },
                 &dev,
             )
             .await
             .unwrap();
         let ready = svc
             .list_by_status(
-                ListByStatusQuery { tenant_id: tid, status: ChangeSetStatus::ReadyForReview },
+                ListByStatusQuery {
+                    tenant_id: tid,
+                    status: ChangeSetStatus::ReadyForReview,
+                },
                 &dev,
             )
             .await
             .unwrap();
         let approved = svc
             .list_by_status(
-                ListByStatusQuery { tenant_id: tid, status: ChangeSetStatus::Approved },
+                ListByStatusQuery {
+                    tenant_id: tid,
+                    status: ChangeSetStatus::Approved,
+                },
                 &dev,
             )
             .await
@@ -1420,13 +1554,24 @@ mod tests {
         let tid_a = TenantId::new();
         let tid_b = TenantId::new();
         let actor_a = developer(tid_a);
-        let cs = svc.create_change_set(make_cmd(tid_a), &developer(tid_a)).await.unwrap();
+        let cs = svc
+            .create_change_set(make_cmd(tid_a), &developer(tid_a))
+            .await
+            .unwrap();
         let actor_b = developer(tid_b);
         // 跨 tenant get 拒绝
         let res = svc
-            .get_change_set(GetChangeSetQuery { change_set_id: cs.id }, &actor_b)
+            .get_change_set(
+                GetChangeSetQuery {
+                    change_set_id: cs.id,
+                },
+                &actor_b,
+            )
             .await;
-        assert!(matches!(res, Err(DevelopmentError::CrossTenantDenied(_, _))));
+        assert!(matches!(
+            res,
+            Err(DevelopmentError::CrossTenantDenied(_, _))
+        ));
         // 跨 tenant create 拒绝
         let res = svc
             .create_change_set(
@@ -1442,7 +1587,10 @@ mod tests {
                 &actor_a,
             )
             .await;
-        assert!(matches!(res, Err(DevelopmentError::CrossTenantDenied(_, _))));
+        assert!(matches!(
+            res,
+            Err(DevelopmentError::CrossTenantDenied(_, _))
+        ));
     }
 
     #[tokio::test]
@@ -1452,7 +1600,10 @@ mod tests {
         let dev = developer(tid);
         let pa = project_admin(tid);
         // 1. Draft + add files
-        let cs = svc.create_change_set(make_cmd(tid), &developer(tid)).await.unwrap();
+        let cs = svc
+            .create_change_set(make_cmd(tid), &developer(tid))
+            .await
+            .unwrap();
         let cs = svc
             .add_file_change(
                 AddFileChangeCommand {
@@ -1473,13 +1624,23 @@ mod tests {
         assert_eq!(cs.files.len(), 1);
         // 2. submit
         let cs = svc
-            .submit(SubmitChangeSetCommand { change_set_id: cs.id }, &dev)
+            .submit(
+                SubmitChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &dev,
+            )
             .await
             .unwrap();
         assert_eq!(cs.status, ChangeSetStatus::ReadyForReview);
         // 3. approve
         let cs = svc
-            .approve(ApproveChangeSetCommand { change_set_id: cs.id }, &pa)
+            .approve(
+                ApproveChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &pa,
+            )
             .await
             .unwrap();
         assert_eq!(cs.status, ChangeSetStatus::Approved);
@@ -1500,7 +1661,12 @@ mod tests {
         assert_eq!(exec.result, ExecutionResult::Success);
         // 5. merge
         let cs = svc
-            .merge(MergeChangeSetCommand { change_set_id: cs.id }, &pa)
+            .merge(
+                MergeChangeSetCommand {
+                    change_set_id: cs.id,
+                },
+                &pa,
+            )
             .await
             .unwrap();
         assert_eq!(cs.status, ChangeSetStatus::Merged);
@@ -1514,7 +1680,9 @@ mod tests {
         let actor = developer(tid);
         let res = svc
             .get_change_set(
-                GetChangeSetQuery { change_set_id: ChangeSetId::new() },
+                GetChangeSetQuery {
+                    change_set_id: ChangeSetId::new(),
+                },
                 &actor,
             )
             .await;

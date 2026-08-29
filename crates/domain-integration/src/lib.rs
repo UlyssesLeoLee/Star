@@ -63,7 +63,8 @@ pub use invariants::{
 pub use port::{
     ConfigureIntegrationCommand, CreateIntegrationCommand, GetHistoryQuery, HandleWebhookCommand,
     IntegrationCommandPort, IntegrationQueryPort, IntegrationRepository, ListByProjectQuery,
-    PauseIntegrationCommand, ResumeIntegrationCommand, TriggerSyncCommand, UpdateIntegrationCommand,
+    PauseIntegrationCommand, ResumeIntegrationCommand, TriggerSyncCommand,
+    UpdateIntegrationCommand,
 };
 pub use service::InMemoryIntegrationService;
 pub use value_object::{
@@ -79,9 +80,10 @@ pub use value_object::{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::value_object::{roles, ConflictStrategy, ExternalEntityId, ExternalSystemName,
-        IntegrationRelationType, IntegrationSource, IntegrationState, ProjectId, SyncStateId,
-        TenantId, UserId};
+    use crate::value_object::{
+        roles, ConflictStrategy, ExternalEntityId, ExternalSystemName, IntegrationRelationType,
+        IntegrationSource, IntegrationState, ProjectId, SyncStateId, TenantId, UserId,
+    };
 
     // -------- 测试夹具 --------
 
@@ -91,7 +93,10 @@ mod tests {
             .with_project(ProjectId::new())
     }
 
-    fn make_create_cmd(tenant_id: TenantId, relation_type: IntegrationRelationType) -> CreateIntegrationCommand {
+    fn make_create_cmd(
+        tenant_id: TenantId,
+        relation_type: IntegrationRelationType,
+    ) -> CreateIntegrationCommand {
         let project_id = ProjectId::new();
         let initial_sync_token = if relation_type.requires_sync_token() {
             Some(format!("initial-token-{}", uuid::Uuid::new_v4()))
@@ -395,7 +400,8 @@ mod tests {
         ] {
             let mut cmd = make_create_cmd(tenant_id, rt);
             cmd.project_id = project_id;
-            svc.create_integration(cmd, actor.clone()).await
+            svc.create_integration(cmd, actor.clone())
+                .await
                 .unwrap_or_else(|e| panic!("创建 {:?} 失败: {:?}", rt, e));
         }
 
@@ -442,8 +448,14 @@ mod tests {
     fn relation_type_str_and_loop_guard() {
         assert_eq!(IntegrationRelationType::Link.as_str(), "LINK");
         assert_eq!(IntegrationRelationType::Mirror.as_str(), "MIRROR");
-        assert_eq!(IntegrationRelationType::Bidirectional.as_str(), "BIDIRECTIONAL");
-        assert_eq!(IntegrationRelationType::PlatformOwned.as_str(), "PLATFORM_OWNED");
+        assert_eq!(
+            IntegrationRelationType::Bidirectional.as_str(),
+            "BIDIRECTIONAL"
+        );
+        assert_eq!(
+            IntegrationRelationType::PlatformOwned.as_str(),
+            "PLATFORM_OWNED"
+        );
 
         assert!(!IntegrationRelationType::Link.requires_loop_guard());
         assert!(IntegrationRelationType::Bidirectional.requires_loop_guard());
@@ -462,7 +474,10 @@ mod tests {
     #[test]
     fn enums_as_str() {
         assert_eq!(IntegrationSource::Scm.as_str(), "SCM");
-        assert_eq!(IntegrationSource::ProjectManagement.as_str(), "PROJECT_MANAGEMENT");
+        assert_eq!(
+            IntegrationSource::ProjectManagement.as_str(),
+            "PROJECT_MANAGEMENT"
+        );
         assert_eq!(IntegrationSource::Communication.as_str(), "COMMUNICATION");
         assert_eq!(IntegrationSource::Other.as_str(), "OTHER");
 

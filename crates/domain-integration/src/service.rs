@@ -21,7 +21,8 @@ use crate::invariants::{check_invariant_03_tenant_required, check_register_invar
 use crate::port::{
     ConfigureIntegrationCommand, CreateIntegrationCommand, GetHistoryQuery, HandleWebhookCommand,
     IntegrationCommandPort, IntegrationQueryPort, IntegrationRepository, ListByProjectQuery,
-    PauseIntegrationCommand, ResumeIntegrationCommand, TriggerSyncCommand, UpdateIntegrationCommand,
+    PauseIntegrationCommand, ResumeIntegrationCommand, TriggerSyncCommand,
+    UpdateIntegrationCommand,
 };
 use crate::value_object::{
     ConflictStrategy, ExternalEntityId, ExternalSystemName, IntegrationId, IntegrationRelationType,
@@ -315,8 +316,8 @@ impl IntegrationCommandPort for InMemoryIntegrationService {
         drop(store);
 
         // 事件总线
-        let event = IntegrationEvent::IntegrationStateChanged(
-            crate::event::IntegrationStateChanged {
+        let event =
+            IntegrationEvent::IntegrationStateChanged(crate::event::IntegrationStateChanged {
                 meta: EventMeta {
                     actor_user_id: Some(actor.user_id.into_uuid()),
                     ..EventMeta::new(cmd.tenant_id)
@@ -324,8 +325,7 @@ impl IntegrationCommandPort for InMemoryIntegrationService {
                 integration_id: updated.id,
                 from_state: from.as_str().to_string(),
                 to_state: updated.state,
-            },
-        );
+            });
         let _ = self.event_tx.send(event);
 
         Ok(updated)
@@ -348,8 +348,8 @@ impl IntegrationCommandPort for InMemoryIntegrationService {
         let updated = integration.clone();
         drop(store);
 
-        let event = IntegrationEvent::IntegrationStateChanged(
-            crate::event::IntegrationStateChanged {
+        let event =
+            IntegrationEvent::IntegrationStateChanged(crate::event::IntegrationStateChanged {
                 meta: EventMeta {
                     actor_user_id: Some(actor.user_id.into_uuid()),
                     ..EventMeta::new(cmd.tenant_id)
@@ -357,8 +357,7 @@ impl IntegrationCommandPort for InMemoryIntegrationService {
                 integration_id: updated.id,
                 from_state: from.as_str().to_string(),
                 to_state: updated.state,
-            },
-        );
+            });
         let _ = self.event_tx.send(event);
 
         Ok(updated)
@@ -482,7 +481,9 @@ impl IntegrationCommandPort for InMemoryIntegrationService {
                     sync_token: integration.sync_token.clone().unwrap_or_default(),
                     synced_at: now,
                     outcome: SyncOutcome::Skipped,
-                    error: Some("INV-I-02: Bidirectional Webhook 缺 source_id 标记(Loop 防护)".to_string()),
+                    error: Some(
+                        "INV-I-02: Bidirectional Webhook 缺 source_id 标记(Loop 防护)".to_string(),
+                    ),
                     direction: SyncDirection::Bidirectional,
                     processed_count: 0,
                     skipped_count: 1,
@@ -703,8 +704,14 @@ impl IntegrationRepository for InMemoryIntegrationService {
     }
 
     async fn delete_integration(&self, id: IntegrationId) -> Result<(), IntegrationError> {
-        self.integrations.write().expect("integrations lock").remove(&id);
-        self.sync_states.write().expect("sync_states lock").remove(&id);
+        self.integrations
+            .write()
+            .expect("integrations lock")
+            .remove(&id);
+        self.sync_states
+            .write()
+            .expect("sync_states lock")
+            .remove(&id);
         Ok(())
     }
 
@@ -762,9 +769,7 @@ impl IntegrationRepository for InMemoryIntegrationService {
         integration_id: IntegrationId,
     ) -> Result<Option<SyncState>, IntegrationError> {
         let store = self.sync_states.read().expect("sync_states lock");
-        Ok(store
-            .get(&integration_id)
-            .and_then(|v| v.last().cloned()))
+        Ok(store.get(&integration_id).and_then(|v| v.last().cloned()))
     }
 
     async fn list_sync_states(

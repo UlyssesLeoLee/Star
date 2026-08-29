@@ -387,7 +387,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_policy_denied_constructor() {
-        let err = McpError::policy_denied("vendor lock rejected", Some("use neutral adapter".to_string()));
+        let err = McpError::policy_denied(
+            "vendor lock rejected",
+            Some("use neutral adapter".to_string()),
+        );
         assert_eq!(err.code, error_code::POLICY_DENIED);
         assert_eq!(err.source_kind, ErrorSourceKind::Policy);
         assert_eq!(err.hint.as_deref(), Some("use neutral adapter"));
@@ -395,7 +398,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_timeout_constructor_retriable() {
-        let err = McpError::timeout("lease heartbeat lost", Some("retry with resume".to_string()));
+        let err = McpError::timeout(
+            "lease heartbeat lost",
+            Some("retry with resume".to_string()),
+        );
         assert_eq!(err.code, error_code::AGENT_TIMEOUT);
         assert_eq!(err.source_kind, ErrorSourceKind::Timeout);
         assert!(err.retriable, "timeout should be retriable");
@@ -520,7 +526,14 @@ mod tests {
         assert!(data.is_object());
         let obj = data.as_object().unwrap();
         // 6 字段(无 hint 时 5 字段, 但 hint 是 Some 在 unknown_tool)
-        for key in ["code", "message", "source_module", "source_kind", "retriable", "hint"] {
+        for key in [
+            "code",
+            "message",
+            "source_module",
+            "source_kind",
+            "retriable",
+            "hint",
+        ] {
             assert!(obj.contains_key(key), "missing key {key}");
         }
     }

@@ -28,8 +28,8 @@ use crate::event::{
 use crate::invariants::{check_create_invariants, check_invariant_04_supersede_has_successor};
 use crate::port::{
     CreateFeedbackCommand, FeedbackCommandPort, FeedbackInboxQuery, FeedbackQueryPort,
-    FeedbackRepository, ListFeedbackQuery, SubmitResolutionCommand, TransitionFeedbackStatusCommand,
-    UpdateFeedbackCommand,
+    FeedbackRepository, ListFeedbackQuery, SubmitResolutionCommand,
+    TransitionFeedbackStatusCommand, UpdateFeedbackCommand,
 };
 use crate::value_object::{
     AgentId, FeedbackId, FeedbackResolutionId, FeedbackStatus, FeedbackTarget, Severity, TenantId,
@@ -126,13 +126,11 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
 
         let now = chrono::Utc::now();
         let is_agent = actor.is_agent_session;
-        let author_agent = cmd
-            .author_agent_id
-            .or(if is_agent {
-                Some(AgentId::new()) // INV-FB-07 自动兜底,真实实现应来自 session
-            } else {
-                None
-            });
+        let author_agent = cmd.author_agent_id.or(if is_agent {
+            Some(AgentId::new()) // INV-FB-07 自动兜底,真实实现应来自 session
+        } else {
+            None
+        });
 
         let f = Feedback {
             id: FeedbackId::new(),
@@ -296,8 +294,7 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
             }
         }
         // 状态迁移
-        f.transition(cmd.to)
-            .map_err(FeedbackError::InvalidState)?;
+        f.transition(cmd.to).map_err(FeedbackError::InvalidState)?;
         // INV-FB-04 校验
         check_invariant_04_supersede_has_successor(f)?;
 
@@ -311,9 +308,7 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
             FeedbackStatus::Acknowledged => FeedbackEvent::Acknowledged(FeedbackAcknowledged {
                 meta,
                 feedback_id: f.id,
-                consumed_by_agent_session_id: actor
-                    .user_id
-                    .into_uuid(), // 简化:实际为 agent_session_id
+                consumed_by_agent_session_id: actor.user_id.into_uuid(), // 简化:实际为 agent_session_id
             }),
             FeedbackStatus::Applied => FeedbackEvent::Applied(FeedbackApplied {
                 meta,
@@ -529,10 +524,7 @@ impl FeedbackQueryPort for InMemoryFeedbackService {
         let mut out: Vec<FeedbackInboxItem> = feedbacks
             .values()
             .filter(|f| f.tenant_id == q.tenant_id && f.project_id == q.project_id)
-            .filter(|f| {
-                q.min_severity
-                    .is_none_or(|min| f.severity <= min)
-            })
+            .filter(|f| q.min_severity.is_none_or(|min| f.severity <= min))
             // Inbox 默认仅显示 OPEN/ACKNOWLEDGED/Applied(P0-P3 排序的活跃反馈)
             .filter(|f| !f.is_terminal())
             .map(|f| FeedbackInboxItem {
@@ -550,7 +542,11 @@ impl FeedbackQueryPort for InMemoryFeedbackService {
             .collect();
         // 按 (severity ASC, created_at ASC) 排序
         // Severity 枚举已实现 Ord:P0 < P1 < P2 < P3
-        out.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.created_at.cmp(&b.created_at)));
+        out.sort_by(|a, b| {
+            a.severity
+                .cmp(&b.severity)
+                .then(a.created_at.cmp(&b.created_at))
+        });
         let start = q.offset as usize;
         let end = std::cmp::min(start + q.limit as usize, out.len());
         if start >= out.len() {
@@ -625,10 +621,7 @@ impl FeedbackRepository for InMemoryFeedbackService {
             .insert(f.id, f.clone());
         Ok(())
     }
-    async fn find_feedback(
-        &self,
-        id: FeedbackId,
-    ) -> Result<Option<Feedback>, FeedbackError> {
+    async fn find_feedback(&self, id: FeedbackId) -> Result<Option<Feedback>, FeedbackError> {
         Ok(self.feedbacks.read().expect("lock").get(&id).cloned())
     }
     async fn list_feedbacks_raw(
@@ -645,10 +638,7 @@ impl FeedbackRepository for InMemoryFeedbackService {
             .cloned()
             .collect())
     }
-    async fn insert_resolution(
-        &self,
-        r: &FeedbackResolution,
-    ) -> Result<(), FeedbackError> {
+    async fn insert_resolution(&self, r: &FeedbackResolution) -> Result<(), FeedbackError> {
         self.resolutions
             .write()
             .expect("lock")
@@ -668,10 +658,7 @@ impl FeedbackRepository for InMemoryFeedbackService {
             .cloned()
             .collect())
     }
-    async fn insert_consumed_event(
-        &self,
-        e: &FeedbackConsumedEvent,
-    ) -> Result<(), FeedbackError> {
+    async fn insert_consumed_event(&self, e: &FeedbackConsumedEvent) -> Result<(), FeedbackError> {
         self.consumed_events
             .write()
             .expect("lock")

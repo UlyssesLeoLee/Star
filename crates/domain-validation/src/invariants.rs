@@ -4,9 +4,7 @@
 
 use crate::entity::{ValidationEvidence, ValidationPolicy, ValidationResult};
 use crate::error::ValidationError;
-use crate::value_object::{
-    EvidenceType, TenantId, ValidationKind, ValidationStatus, roles,
-};
+use crate::value_object::{roles, EvidenceType, TenantId, ValidationKind, ValidationStatus};
 
 // =====================================================================
 // INV-VL-01:AI 自我报告不构成完成(VAL-001 P0)
@@ -23,8 +21,7 @@ pub fn check_ai_self_claim_requires_validation_passed(
 ) -> Result<(), ValidationError> {
     if r.is_ai_complete_claim && !validation_passed {
         return Err(ValidationError::InvariantViolated(
-            "INV-VL-01/VAL-001: AI 自我声明完成,但 ValidationPassed = false,四重门失败"
-                .to_string(),
+            "INV-VL-01/VAL-001: AI 自我声明完成,但 ValidationPassed = false,四重门失败".to_string(),
         ));
     }
     Ok(())
@@ -74,7 +71,11 @@ pub fn check_invariant_03_state_transition(
 /// **INV-VL-04**:PASSED 状态必须带 evidence(log_excerpt_ref 或 evidence_ids 非空)
 pub fn check_invariant_04_evidence_required(r: &ValidationResult) -> Result<(), ValidationError> {
     // 仅当状态进入 Passed / Failed 时强制 evidence(VAL-001 强约束)
-    if matches!(r.status, ValidationStatus::Passed | ValidationStatus::Failed) && !r.has_evidence() {
+    if matches!(
+        r.status,
+        ValidationStatus::Passed | ValidationStatus::Failed
+    ) && !r.has_evidence()
+    {
         return Err(ValidationError::InvalidState(
             "INV-VL-04 / VAL-001: ValidationResult PASSED/FAILED 必须带 evidence_ref(不可 Agent 自报)"
                 .to_string(),
@@ -108,7 +109,9 @@ pub fn check_invariant_05_full_coverage_required(
 pub fn check_invariant_06_override_human_only(
     actor: &crate::context::ActorContext,
 ) -> Result<(), ValidationError> {
-    if actor.is_service_internal() || actor.has_role(roles::DEVELOPER) && actor.user_id.as_uuid().is_nil() {
+    if actor.is_service_internal()
+        || actor.has_role(roles::DEVELOPER) && actor.user_id.as_uuid().is_nil()
+    {
         return Err(ValidationError::PermissionDenied);
     }
     // 简化:必须非 service_internal
@@ -177,9 +180,7 @@ pub fn check_invariant_09_policy_default_ai_self_claim(
 // =====================================================================
 
 /// **INV-VL-10**:evidence_type 必须在白名单(由 enum 类型保证;此处占位)
-pub fn check_invariant_10_evidence_type_whitelist(
-    _t: EvidenceType,
-) -> Result<(), ValidationError> {
+pub fn check_invariant_10_evidence_type_whitelist(_t: EvidenceType) -> Result<(), ValidationError> {
     Ok(())
 }
 

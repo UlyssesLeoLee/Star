@@ -14,8 +14,8 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use thiserror::Error;
+use uuid::Uuid;
 
 // =====================================================================
 // 1. RBAC
@@ -31,7 +31,10 @@ pub struct RbacConfig {
 
 impl Default for RbacConfig {
     fn default() -> Self {
-        Self { editor_groups: vec!["jira-administrators".into()], allow_non_admin: false }
+        Self {
+            editor_groups: vec!["jira-administrators".into()],
+            allow_non_admin: false,
+        }
     }
 }
 
@@ -54,7 +57,14 @@ pub struct PauseState {
 }
 
 impl PauseState {
-    pub fn new() -> Self { Self { paused: false, paused_at: None, paused_by: None, reason: None } }
+    pub fn new() -> Self {
+        Self {
+            paused: false,
+            paused_at: None,
+            paused_by: None,
+            reason: None,
+        }
+    }
 
     pub fn pause(&mut self, actor: Uuid, reason: impl Into<String>) {
         self.paused = true;
@@ -72,7 +82,9 @@ impl PauseState {
 }
 
 impl Default for PauseState {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // =====================================================================
@@ -120,7 +132,9 @@ pub struct BlockedActions {
 }
 
 impl Default for BlockedActions {
-    fn default() -> Self { Self { blocked: vec![] } }
+    fn default() -> Self {
+        Self { blocked: vec![] }
+    }
 }
 
 impl BlockedActions {
@@ -215,7 +229,10 @@ impl GovernanceService {
     pub fn new() -> Self {
         Self {
             rbac: RbacConfig::default(),
-            approval: ApprovalFlow { enabled: false, required_approver_groups: vec![] },
+            approval: ApprovalFlow {
+                enabled: false,
+                required_approver_groups: vec![],
+            },
             pause: PauseState::new(),
             throttle: ThrottleConfig::default(),
             blocked: BlockedActions::default(),
@@ -238,15 +255,23 @@ impl GovernanceService {
         }
         for w in &self.maintenance {
             if w.is_active(now) {
-                return Err(GovernanceError::InMaintenance { window: w.name.clone() });
+                return Err(GovernanceError::InMaintenance {
+                    window: w.name.clone(),
+                });
             }
         }
-        if !self.rbac.allow_non_admin && !actor_groups.iter().any(|g| self.rbac.editor_groups.contains(g)) {
+        if !self.rbac.allow_non_admin
+            && !actor_groups
+                .iter()
+                .any(|g| self.rbac.editor_groups.contains(g))
+        {
             return Err(GovernanceError::PermissionDenied);
         }
         for action in action_types {
             if self.blocked.is_blocked(action) {
-                return Err(GovernanceError::ActionBlocked { action: action.clone() });
+                return Err(GovernanceError::ActionBlocked {
+                    action: action.clone(),
+                });
             }
         }
         // 限流 (简化: 假设 per-hour counter 已经在外部维护)
@@ -286,7 +311,9 @@ impl GovernanceService {
 }
 
 impl Default for GovernanceService {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Debug, Error, Clone, PartialEq)]
@@ -387,7 +414,8 @@ mod tests {
         let mut g = GovernanceService::new();
         let id = Uuid::new_v4();
         g.add_dlq(DeadLetterEntry {
-            id, rule_id: Uuid::new_v4(),
+            id,
+            rule_id: Uuid::new_v4(),
             failure_reason: "timeout".into(),
             attempts: 3,
             first_failed_at: Utc::now(),
@@ -406,7 +434,10 @@ mod tests {
         let mut g = GovernanceService::new();
         g.add_audit(AuditEntry {
             id: Uuid::new_v4(),
-            event: AuditEvent::RuleCreated { rule_id: Uuid::new_v4(), name: "test".into() },
+            event: AuditEvent::RuleCreated {
+                rule_id: Uuid::new_v4(),
+                name: "test".into(),
+            },
             actor_id: None,
             tenant_id: Uuid::new_v4(),
             at: Utc::now(),

@@ -22,7 +22,9 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use super::process::{LocalRuntime, OutputLine, OutputStream, ProcessHandle, ProcessState, RuntimeError};
+use super::process::{
+    LocalRuntime, OutputLine, OutputStream, ProcessHandle, ProcessState, RuntimeError,
+};
 
 // =====================================================================
 // 1. value_object
@@ -50,16 +52,24 @@ pub struct RealCliRuntime {
 
 impl RealCliRuntime {
     pub fn new() -> Self {
-        Self { mock_fallback: false, active: Arc::new(Mutex::new(HashMap::new())) }
+        Self {
+            mock_fallback: false,
+            active: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 
     pub fn with_mock_fallback() -> Self {
-        Self { mock_fallback: true, active: Arc::new(Mutex::new(HashMap::new())) }
+        Self {
+            mock_fallback: true,
+            active: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 }
 
 impl Default for RealCliRuntime {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
@@ -121,8 +131,14 @@ impl LocalRuntime for RealCliRuntime {
         let pid = child.id();
 
         // 推 stdout/stderr 流
-        let stdout = child.stdout.take().ok_or_else(|| RuntimeError::SpawnFailed("no stdout".into()))?;
-        let stderr = child.stderr.take().ok_or_else(|| RuntimeError::SpawnFailed("no stderr".into()))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| RuntimeError::SpawnFailed("no stdout".into()))?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| RuntimeError::SpawnFailed("no stderr".into()))?;
 
         // 保存 child 句柄
         self.active.lock().await.insert(id, child);
@@ -132,11 +148,13 @@ impl LocalRuntime for RealCliRuntime {
         tokio::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                let _ = tx_out.send(OutputLine {
-                    stream: OutputStream::Stdout,
-                    content: line,
-                    at: chrono::Utc::now(),
-                }).await;
+                let _ = tx_out
+                    .send(OutputLine {
+                        stream: OutputStream::Stdout,
+                        content: line,
+                        at: chrono::Utc::now(),
+                    })
+                    .await;
             }
         });
 
@@ -145,11 +163,13 @@ impl LocalRuntime for RealCliRuntime {
         tokio::spawn(async move {
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                let _ = tx_err.send(OutputLine {
-                    stream: OutputStream::Stderr,
-                    content: line,
-                    at: chrono::Utc::now(),
-                }).await;
+                let _ = tx_err
+                    .send(OutputLine {
+                        stream: OutputStream::Stderr,
+                        content: line,
+                        at: chrono::Utc::now(),
+                    })
+                    .await;
             }
         });
 
@@ -169,10 +189,17 @@ impl LocalRuntime for RealCliRuntime {
                             map.remove(&id_clone);
                             drop(map);
                             // 推完成消息
-                            tracing::info!("CLI {} (pid={:?}) exited with {}", id_clone, pid_opt, exit_code);
+                            tracing::info!(
+                                "CLI {} (pid={:?}) exited with {}",
+                                id_clone,
+                                pid_opt,
+                                exit_code
+                            );
                             break;
                         }
-                        Ok(None) => { drop(map); }
+                        Ok(None) => {
+                            drop(map);
+                        }
                         Err(e) => {
                             tracing::error!("try_wait error: {}", e);
                             break;
@@ -208,7 +235,9 @@ impl LocalRuntime for RealCliRuntime {
         _model: Option<&str>,
     ) -> Result<ProcessHandle, RuntimeError> {
         // RealCliRuntime 不处理 HTTP; 应使用 RealHttpRuntime
-        Err(RuntimeError::SpawnFailed("RealCliRuntime doesn't support invoke_http; use RealHttpRuntime".into()))
+        Err(RuntimeError::SpawnFailed(
+            "RealCliRuntime doesn't support invoke_http; use RealHttpRuntime".into(),
+        ))
     }
 
     async fn cancel(&self, id: Uuid) -> Result<(), RuntimeError> {
@@ -298,7 +327,10 @@ mod tests {
         let rt = RealCliRuntime::with_mock_fallback();
         let mut env = HashMap::new();
         env.insert("PATH".to_string(), "/usr/bin".into());
-        let handle = rt.spawn_cli("claude", &["--model".into(), "sonnet".into()], &env, "/tmp").await.unwrap();
+        let handle = rt
+            .spawn_cli("claude", &["--model".into(), "sonnet".into()], &env, "/tmp")
+            .await
+            .unwrap();
         assert_eq!(handle.state, ProcessState::Completed);
         assert_eq!(handle.exit_code, Some(0));
     }
@@ -307,7 +339,10 @@ mod tests {
     async fn test_spawn_invalid_command() {
         let rt = RealCliRuntime::new();
         let env = HashMap::new();
-        let handle = rt.spawn_cli("/nonexistent/command_xyz", &[], &env, "/tmp").await.unwrap();
+        let handle = rt
+            .spawn_cli("/nonexistent/command_xyz", &[], &env, "/tmp")
+            .await
+            .unwrap();
         // 真实模式: command 找不到应返回 Failed
         assert_eq!(handle.state, ProcessState::Failed);
         assert!(handle.error.is_some());
@@ -316,7 +351,9 @@ mod tests {
     #[tokio::test]
     async fn test_invoke_http_unsupported() {
         let rt = RealCliRuntime::new();
-        let r = rt.invoke_http("https://api.openclaw.dev", None, "hi", None).await;
+        let r = rt
+            .invoke_http("https://api.openclaw.dev", None, "hi", None)
+            .await;
         assert!(r.is_err());
     }
 

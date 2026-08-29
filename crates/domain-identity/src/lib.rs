@@ -365,11 +365,7 @@ pub trait IdentityCommandPort: Send + Sync {
 
 #[async_trait]
 pub trait IdentityQueryPort: Send + Sync {
-    async fn get_user(
-        &self,
-        q: GetUserQuery,
-        actor: &ActorContext,
-    ) -> Result<User, IdentityError>;
+    async fn get_user(&self, q: GetUserQuery, actor: &ActorContext) -> Result<User, IdentityError>;
 
     async fn list_devices(
         &self,
@@ -389,7 +385,11 @@ pub trait IdentityQueryPort: Send + Sync {
 pub trait IdentityRepository: Send + Sync {
     async fn insert_user(&self, u: User) -> Result<(), IdentityError>;
     async fn get_user(&self, id: UserId) -> Result<User, IdentityError>;
-    async fn get_user_by_email(&self, tenant_id: TenantId, email: &str) -> Result<Option<User>, IdentityError>;
+    async fn get_user_by_email(
+        &self,
+        tenant_id: TenantId,
+        email: &str,
+    ) -> Result<Option<User>, IdentityError>;
     async fn update_user(&self, u: User) -> Result<(), IdentityError>;
 
     async fn insert_device(&self, d: Device) -> Result<(), IdentityError>;
@@ -483,9 +483,16 @@ impl IdentityCommandPort for InMemoryIdentityService {
             return Err(IdentityError::PermissionDenied);
         }
         if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
-            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(IdentityError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
-        if let Some(_) = self.repo.get_user_by_email(cmd.tenant_id, &cmd.email).await? {
+        if let Some(_) = self
+            .repo
+            .get_user_by_email(cmd.tenant_id, &cmd.email)
+            .await?
+        {
             return Err(IdentityError::EmailExists(cmd.email));
         }
         let now = Utc::now();
@@ -513,9 +520,15 @@ impl IdentityCommandPort for InMemoryIdentityService {
         actor: &ActorContext,
     ) -> Result<Device, IdentityError> {
         if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
-            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(IdentityError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
-        if actor.user_id != cmd.user_id && !actor.has_role("tenant_admin") && !actor.is_platform_admin {
+        if actor.user_id != cmd.user_id
+            && !actor.has_role("tenant_admin")
+            && !actor.is_platform_admin
+        {
             return Err(IdentityError::PermissionDenied);
         }
         // INV-ID-02:三重绑定必带(至少一个 project_id 即可)
@@ -546,14 +559,17 @@ impl IdentityCommandPort for InMemoryIdentityService {
         actor: &ActorContext,
     ) -> Result<DeviceBinding, IdentityError> {
         if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
-            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(IdentityError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
-        let device = self
-            .repo
-            .get_device(cmd.device_id)
-            .await?;
+        let device = self.repo.get_device(cmd.device_id).await?;
         if device.tenant_id != cmd.tenant_id {
-            return Err(IdentityError::CrossTenantDenied(device.tenant_id, cmd.tenant_id));
+            return Err(IdentityError::CrossTenantDenied(
+                device.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if device.status == DeviceStatus::Revoked {
             return Err(IdentityError::DeviceAlreadyRevoked);
@@ -578,7 +594,10 @@ impl IdentityCommandPort for InMemoryIdentityService {
         actor: &ActorContext,
     ) -> Result<Device, IdentityError> {
         if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
-            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(IdentityError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if !actor.has_role("tenant_admin") && !actor.is_platform_admin {
             return Err(IdentityError::PermissionDenied);
@@ -589,7 +608,10 @@ impl IdentityCommandPort for InMemoryIdentityService {
             .unwrap()
             .get_mut(&cmd.device_id)
             .cloned()
-            .ok_or(IdentityError::NotFound(format!("device:{}", cmd.device_id.as_uuid())))?;
+            .ok_or(IdentityError::NotFound(format!(
+                "device:{}",
+                cmd.device_id.as_uuid()
+            )))?;
         if d.tenant_id != cmd.tenant_id {
             return Err(IdentityError::CrossTenantDenied(d.tenant_id, cmd.tenant_id));
         }
@@ -609,7 +631,10 @@ impl IdentityCommandPort for InMemoryIdentityService {
         actor: &ActorContext,
     ) -> Result<User, IdentityError> {
         if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
-            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(IdentityError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         let mut u = self
             .users
@@ -617,7 +642,10 @@ impl IdentityCommandPort for InMemoryIdentityService {
             .unwrap()
             .get_mut(&cmd.user_id)
             .cloned()
-            .ok_or(IdentityError::NotFound(format!("user:{}", cmd.user_id.as_uuid())))?;
+            .ok_or(IdentityError::NotFound(format!(
+                "user:{}",
+                cmd.user_id.as_uuid()
+            )))?;
         if u.tenant_id != cmd.tenant_id {
             return Err(IdentityError::CrossTenantDenied(u.tenant_id, cmd.tenant_id));
         }
@@ -630,21 +658,23 @@ impl IdentityCommandPort for InMemoryIdentityService {
 
 #[async_trait]
 impl IdentityQueryPort for InMemoryIdentityService {
-    async fn get_user(
-        &self,
-        q: GetUserQuery,
-        actor: &ActorContext,
-    ) -> Result<User, IdentityError> {
+    async fn get_user(&self, q: GetUserQuery, actor: &ActorContext) -> Result<User, IdentityError> {
         if !actor.is_platform_admin && actor.tenant_id != q.tenant_id {
-            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(IdentityError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
-        let u = self
-            .users
-            .read()
-            .unwrap()
-            .get(&q.user_id)
-            .cloned()
-            .ok_or(IdentityError::NotFound(format!("user:{}", q.user_id.as_uuid())))?;
+        let u =
+            self.users
+                .read()
+                .unwrap()
+                .get(&q.user_id)
+                .cloned()
+                .ok_or(IdentityError::NotFound(format!(
+                    "user:{}",
+                    q.user_id.as_uuid()
+                )))?;
         if u.tenant_id != q.tenant_id {
             return Err(IdentityError::CrossTenantDenied(u.tenant_id, q.tenant_id));
         }
@@ -657,7 +687,10 @@ impl IdentityQueryPort for InMemoryIdentityService {
         actor: &ActorContext,
     ) -> Result<Vec<Device>, IdentityError> {
         if !actor.is_platform_admin && actor.tenant_id != q.tenant_id {
-            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(IdentityError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
         Ok(self
             .devices
@@ -684,7 +717,10 @@ impl IdentityQueryPort for InMemoryIdentityService {
             .unwrap()
             .get(&device_id)
             .cloned()
-            .ok_or(IdentityError::NotFound(format!("device:{}", device_id.as_uuid())))?;
+            .ok_or(IdentityError::NotFound(format!(
+                "device:{}",
+                device_id.as_uuid()
+            )))?;
         if d.tenant_id != tenant_id {
             return Err(IdentityError::CrossTenantDenied(d.tenant_id, tenant_id));
         }

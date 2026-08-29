@@ -30,9 +30,9 @@
 
 use async_trait::async_trait;
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
-use crate::error::{ErrorSourceKind, McpError, error_code};
+use crate::error::{error_code, ErrorSourceKind, McpError};
 use crate::transport::{JsonRpcError, JsonRpcErrorBody, JsonRpcRequest, JsonRpcSuccess};
 
 /// Resources handler (Phase E: 4 核心 resource + Phase H: 22 domain handler 框架)
@@ -64,7 +64,9 @@ impl Default for ResourcesHandler {
 impl ResourcesHandler {
     /// 构造新 handler (Phase E: 空 domain 列表)
     pub fn new() -> Self {
-        Self { domains: Vec::new() }
+        Self {
+            domains: Vec::new(),
+        }
     }
 
     /// 构造带 22 domain handler 列表的 handler (Phase H 工厂)
@@ -93,10 +95,7 @@ impl ResourcesHandler {
         ];
         // Phase H: 22 domain URI 注入
         for d in &self.domains {
-            out.push(self.resource_descriptor(
-                d.uri_pattern(),
-                d.description(),
-            ));
+            out.push(self.resource_descriptor(d.uri_pattern(), d.description()));
         }
         out
     }
@@ -556,32 +555,40 @@ pub(crate) fn handle_resources_list(req: &JsonRpcRequest) -> Result<JsonRpcSucce
     let handler = ResourcesHandler::with_domains(crate::handlers::all_domain_handlers());
     let resources = handler.list();
     let result = json!({ "resources": resources });
-    Ok(JsonRpcSuccess { jsonrpc: "2.0", id: req.id.clone(), result })
+    Ok(JsonRpcSuccess {
+        jsonrpc: "2.0",
+        id: req.id.clone(),
+        result,
+    })
 }
 
 /// 处理 `resources/read` 请求
 ///
 /// 期望 params = { "uri": "<scheme>://<path>" }
-pub(crate) async fn handle_resources_read(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRpcError> {
+pub(crate) async fn handle_resources_read(
+    req: &JsonRpcRequest,
+) -> Result<JsonRpcSuccess, JsonRpcError> {
     let uri = req
         .params
         .get("uri")
         .and_then(Value::as_str)
-        .ok_or_else(|| {
-            JsonRpcError {
-                jsonrpc: "2.0",
-                id: req.id.clone(),
-                error: JsonRpcErrorBody {
-                    code: crate::transport::error_code::INVALID_PARAMS,
-                    message: "missing 'uri' in params".to_string(),
-                    data: None,
-                },
-            }
+        .ok_or_else(|| JsonRpcError {
+            jsonrpc: "2.0",
+            id: req.id.clone(),
+            error: JsonRpcErrorBody {
+                code: crate::transport::error_code::INVALID_PARAMS,
+                message: "missing 'uri' in params".to_string(),
+                data: None,
+            },
         })?;
 
     let handler = ResourcesHandler::with_domains(crate::handlers::all_domain_handlers());
     match handler.read(uri).await {
-        Ok(result) => Ok(JsonRpcSuccess { jsonrpc: "2.0", id: req.id.clone(), result }),
+        Ok(result) => Ok(JsonRpcSuccess {
+            jsonrpc: "2.0",
+            id: req.id.clone(),
+            result,
+        }),
         Err(e) => Err(JsonRpcError {
             jsonrpc: "2.0",
             id: req.id.clone(),
@@ -612,14 +619,26 @@ mod tests {
         let contents = v.get("contents").unwrap().as_array().unwrap();
         assert_eq!(contents.len(), 1);
         let item = &contents[0];
-        assert_eq!(item.get("uri").unwrap().as_str().unwrap(), "workspace://current");
-        assert_eq!(item.get("mimeType").unwrap().as_str().unwrap(), "application/json");
+        assert_eq!(
+            item.get("uri").unwrap().as_str().unwrap(),
+            "workspace://current"
+        );
+        assert_eq!(
+            item.get("mimeType").unwrap().as_str().unwrap(),
+            "application/json"
+        );
         let text = item.get("text").unwrap().as_str().unwrap();
         let parsed: Value = serde_json::from_str(text).unwrap();
-        assert_eq!(parsed.get("schema_version").unwrap().as_str().unwrap(), "agent-api/v1");
+        assert_eq!(
+            parsed.get("schema_version").unwrap().as_str().unwrap(),
+            "agent-api/v1"
+        );
         let workspace = parsed.get("workspace").unwrap();
         assert_eq!(workspace.get("id").unwrap().as_str().unwrap(), "ws-current");
-        assert!(parsed.get("_mock").unwrap().as_bool().unwrap(), "must be marked _mock");
+        assert!(
+            parsed.get("_mock").unwrap().as_bool().unwrap(),
+            "must be marked _mock"
+        );
     }
 
     // ===== 2. worktree://{id} =====
@@ -652,12 +671,18 @@ mod tests {
         let h = handler();
         let v = h.read("agent://agent-1/state").await.unwrap();
         let text = v.get("contents").unwrap().as_array().unwrap()[0]
-            .get("text").unwrap().as_str().unwrap();
+            .get("text")
+            .unwrap()
+            .as_str()
+            .unwrap();
         let parsed: Value = serde_json::from_str(text).unwrap();
         let agent = parsed.get("agent").unwrap();
         assert_eq!(agent.get("id").unwrap().as_str().unwrap(), "agent-1");
         assert!(agent.get("state").is_some());
-        assert!(agent.get("lease_expires_at").is_some(), "ADR-0030 lease field");
+        assert!(
+            agent.get("lease_expires_at").is_some(),
+            "ADR-0030 lease field"
+        );
     }
 
     #[tokio::test]
@@ -675,7 +700,10 @@ mod tests {
         let h = handler();
         let v = h.read("decision://dec-001").await.unwrap();
         let text = v.get("contents").unwrap().as_array().unwrap()[0]
-            .get("text").unwrap().as_str().unwrap();
+            .get("text")
+            .unwrap()
+            .as_str()
+            .unwrap();
         let parsed: Value = serde_json::from_str(text).unwrap();
         let dec = parsed.get("decision").unwrap();
         assert_eq!(dec.get("id").unwrap().as_str().unwrap(), "dec-001");
@@ -707,7 +735,8 @@ mod tests {
         let resources = h.list();
         assert_eq!(resources.len(), 4, "4 core resources per Phase E");
         // 校验 4 个 URI scheme
-        let uris: Vec<&str> = resources.iter()
+        let uris: Vec<&str> = resources
+            .iter()
             .map(|r| r.get("uri").unwrap().as_str().unwrap())
             .collect();
         assert!(uris.contains(&"workspace://current"));
@@ -721,7 +750,10 @@ mod tests {
         let h = handler();
         let resources = h.list();
         for r in &resources {
-            assert_eq!(r.get("mimeType").unwrap().as_str().unwrap(), "application/json");
+            assert_eq!(
+                r.get("mimeType").unwrap().as_str().unwrap(),
+                "application/json"
+            );
         }
     }
 
@@ -780,7 +812,10 @@ mod tests {
         let res = handle_resources_read(&req).await;
         assert!(res.is_err());
         let err = res.unwrap_err();
-        assert!(err.error.data.is_some(), "error.data must contain 6-field Error");
+        assert!(
+            err.error.data.is_some(),
+            "error.data must contain 6-field Error"
+        );
         let data = err.error.data.unwrap();
         assert!(data.get("code").is_some());
         assert!(data.get("source_kind").is_some());
@@ -809,17 +844,35 @@ mod tests {
     async fn test_with_domains_list_includes_all_22_domain_schemes() {
         let h = handler_with_domains();
         let resources = h.list();
-        let uris: Vec<String> = resources.iter()
+        let uris: Vec<String> = resources
+            .iter()
             .filter_map(|r| r.get("uri").and_then(Value::as_str).map(String::from))
             .collect();
         // 校验 22 domain scheme (per spec/agents/02 §2.2 URI 模式)
         let schemes = [
-            "agent://", "audit://", "automation://", "board://",
-            "collaboration://", "comment://", "context://", "decision://",
-            "development://", "feedback://", "identity://", "integration://",
-            "notification://", "permission://", "planning://", "project://",
-            "relation://", "scm://", "search://", "tenant://",
-            "validation://", "workitem://", "worktree://",
+            "agent://",
+            "audit://",
+            "automation://",
+            "board://",
+            "collaboration://",
+            "comment://",
+            "context://",
+            "decision://",
+            "development://",
+            "feedback://",
+            "identity://",
+            "integration://",
+            "notification://",
+            "permission://",
+            "planning://",
+            "project://",
+            "relation://",
+            "scm://",
+            "search://",
+            "tenant://",
+            "validation://",
+            "workitem://",
+            "worktree://",
         ];
         for s in schemes {
             assert!(uris.iter().any(|u| u.starts_with(s)), "missing scheme {s}");
@@ -834,9 +887,15 @@ mod tests {
         let h = handler_with_domains();
         let v = h.read("audit://audit-42").await.unwrap();
         let text = v.get("contents").unwrap().as_array().unwrap()[0]
-            .get("text").unwrap().as_str().unwrap();
+            .get("text")
+            .unwrap()
+            .as_str()
+            .unwrap();
         let parsed: Value = serde_json::from_str(text).unwrap();
-        assert_eq!(parsed.get("audit_id").and_then(Value::as_str), Some("audit-42"));
+        assert_eq!(
+            parsed.get("audit_id").and_then(Value::as_str),
+            Some("audit-42")
+        );
     }
 
     #[tokio::test]
@@ -853,11 +912,19 @@ mod tests {
             ("search://q-1", "query_id"),
         ];
         for (uri, id_field) in cases {
-            let v = h.read(uri).await.unwrap_or_else(|e| panic!("{uri} failed: {e}"));
+            let v = h
+                .read(uri)
+                .await
+                .unwrap_or_else(|e| panic!("{uri} failed: {e}"));
             let text = v.get("contents").unwrap().as_array().unwrap()[0]
-                .get("text").unwrap().as_str().unwrap();
+                .get("text")
+                .unwrap()
+                .as_str()
+                .unwrap();
             let parsed: Value = serde_json::from_str(text).unwrap();
-            let id_value = parsed.get(id_field).and_then(Value::as_str)
+            let id_value = parsed
+                .get(id_field)
+                .and_then(Value::as_str)
                 .unwrap_or_else(|| panic!("{uri} missing field {id_field}"));
             let expected_id = uri.rsplit('/').next().unwrap();
             assert_eq!(id_value, expected_id, "{uri} field {id_field}");

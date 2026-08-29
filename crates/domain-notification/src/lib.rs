@@ -413,10 +413,8 @@ pub trait NotificationRepository: Send + Sync {
         &self,
         notification: Notification,
     ) -> Result<(), NotificationError>;
-    async fn get_notification(
-        &self,
-        id: NotificationId,
-    ) -> Result<Notification, NotificationError>;
+    async fn get_notification(&self, id: NotificationId)
+        -> Result<Notification, NotificationError>;
     async fn update_notification(
         &self,
         notification: Notification,
@@ -528,7 +526,10 @@ impl NotificationCommandPort for InMemoryNotificationService {
             updated_at: now,
         };
         self.repo.insert_channel(channel.clone()).await?;
-        self.channels.write().unwrap().insert(channel.id, channel.clone());
+        self.channels
+            .write()
+            .unwrap()
+            .insert(channel.id, channel.clone());
         Ok(channel)
     }
 
@@ -572,7 +573,10 @@ impl NotificationCommandPort for InMemoryNotificationService {
             updated_at: now,
         };
         self.repo.upsert_template_by_event(template.clone()).await?;
-        self.templates.write().unwrap().insert(template.id, template.clone());
+        self.templates
+            .write()
+            .unwrap()
+            .insert(template.id, template.clone());
         Ok(template)
     }
 
@@ -589,7 +593,9 @@ impl NotificationCommandPort for InMemoryNotificationService {
         }
         // INV-N-07:默认抑制决策
         if cmd.event_type.is_suppressed() {
-            return Err(NotificationError::EventSuppressed(cmd.event_type.as_str().to_string()));
+            return Err(NotificationError::EventSuppressed(
+                cmd.event_type.as_str().to_string(),
+            ));
         }
         // 找到用户可用 channel(InApp 默认;Email 需要显式)
         let channel = {
@@ -658,10 +664,16 @@ impl NotificationCommandPort for InMemoryNotificationService {
             .get_mut(&cmd.notification_id)
             .cloned()
             .ok_or_else(|| {
-                NotificationError::NotFound(format!("notification:{}", cmd.notification_id.as_uuid()))
+                NotificationError::NotFound(format!(
+                    "notification:{}",
+                    cmd.notification_id.as_uuid()
+                ))
             })?;
         if n.tenant_id != cmd.tenant_id {
-            return Err(NotificationError::CrossTenantDenied(n.tenant_id, cmd.tenant_id));
+            return Err(NotificationError::CrossTenantDenied(
+                n.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         // INV-N-03:仅本人可标已读
         if actor.user_id != n.user_id {
@@ -704,7 +716,10 @@ impl NotificationQueryPort for InMemoryNotificationService {
                 NotificationError::NotFound(format!("notification:{}", q.notification_id.as_uuid()))
             })?;
         if n.tenant_id != q.tenant_id {
-            return Err(NotificationError::CrossTenantDenied(n.tenant_id, q.tenant_id));
+            return Err(NotificationError::CrossTenantDenied(
+                n.tenant_id,
+                q.tenant_id,
+            ));
         }
         // 仅本人可读
         if actor.user_id != n.user_id {
@@ -803,7 +818,10 @@ impl NotificationRepository for InMemoryNotificationRepository {
         &self,
         template: NotificationTemplate,
     ) -> Result<(), NotificationError> {
-        self.templates.write().unwrap().insert(template.id, template);
+        self.templates
+            .write()
+            .unwrap()
+            .insert(template.id, template);
         Ok(())
     }
     async fn get_template(
@@ -821,7 +839,10 @@ impl NotificationRepository for InMemoryNotificationRepository {
         &self,
         template: NotificationTemplate,
     ) -> Result<(), NotificationError> {
-        self.templates.write().unwrap().insert(template.id, template);
+        self.templates
+            .write()
+            .unwrap()
+            .insert(template.id, template);
         Ok(())
     }
     async fn list_templates_by_project(
@@ -1151,7 +1172,10 @@ mod tests {
                 &actor,
             )
             .await;
-        assert!(matches!(res, Err(NotificationError::CrossTenantDenied(_, _))));
+        assert!(matches!(
+            res,
+            Err(NotificationError::CrossTenantDenied(_, _))
+        ));
     }
 
     #[tokio::test]

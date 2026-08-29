@@ -328,11 +328,7 @@ pub trait CommentCommandPort: Send + Sync {
 
 #[async_trait]
 pub trait CommentQueryPort: Send + Sync {
-    async fn get(
-        &self,
-        q: GetCommentQuery,
-        actor: &ActorContext,
-    ) -> Result<Comment, CommentError>;
+    async fn get(&self, q: GetCommentQuery, actor: &ActorContext) -> Result<Comment, CommentError>;
 
     async fn list_by_parent(
         &self,
@@ -445,7 +441,10 @@ impl CommentCommandPort for InMemoryCommentService {
         actor: &ActorContext,
     ) -> Result<Comment, CommentError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(CommentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(CommentError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if cmd.body.is_empty() {
             return Err(CommentError::InvalidState("body required".to_string()));
@@ -479,7 +478,10 @@ impl CommentCommandPort for InMemoryCommentService {
         actor: &ActorContext,
     ) -> Result<Comment, CommentError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(CommentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(CommentError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         let mut c = self
             .comments
@@ -487,7 +489,10 @@ impl CommentCommandPort for InMemoryCommentService {
             .unwrap()
             .get_mut(&cmd.comment_id)
             .cloned()
-            .ok_or(CommentError::NotFound(format!("comment:{}", cmd.comment_id.as_uuid())))?;
+            .ok_or(CommentError::NotFound(format!(
+                "comment:{}",
+                cmd.comment_id.as_uuid()
+            )))?;
         if c.tenant_id != cmd.tenant_id {
             return Err(CommentError::CrossTenantDenied(c.tenant_id, cmd.tenant_id));
         }
@@ -512,7 +517,10 @@ impl CommentCommandPort for InMemoryCommentService {
         actor: &ActorContext,
     ) -> Result<Comment, CommentError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(CommentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(CommentError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         let mut c = self
             .comments
@@ -520,7 +528,10 @@ impl CommentCommandPort for InMemoryCommentService {
             .unwrap()
             .get_mut(&cmd.comment_id)
             .cloned()
-            .ok_or(CommentError::NotFound(format!("comment:{}", cmd.comment_id.as_uuid())))?;
+            .ok_or(CommentError::NotFound(format!(
+                "comment:{}",
+                cmd.comment_id.as_uuid()
+            )))?;
         if c.tenant_id != cmd.tenant_id {
             return Err(CommentError::CrossTenantDenied(c.tenant_id, cmd.tenant_id));
         }
@@ -545,10 +556,17 @@ impl CommentCommandPort for InMemoryCommentService {
         actor: &ActorContext,
     ) -> Result<Reaction, CommentError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(CommentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(CommentError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         // INV-C-03:唯一 (comment, user, emoji)
-        if self.repo.reaction_exists(cmd.comment_id, cmd.user_id, &cmd.emoji).await? {
+        if self
+            .repo
+            .reaction_exists(cmd.comment_id, cmd.user_id, &cmd.emoji)
+            .await?
+        {
             return Err(CommentError::ReactionExists);
         }
         let r = Reaction {
@@ -569,7 +587,10 @@ impl CommentCommandPort for InMemoryCommentService {
         actor: &ActorContext,
     ) -> Result<Attachment, CommentError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(CommentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(CommentError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if actor.user_id != cmd.uploader_user_id {
             return Err(CommentError::PermissionDenied);
@@ -593,13 +614,12 @@ impl CommentCommandPort for InMemoryCommentService {
 
 #[async_trait]
 impl CommentQueryPort for InMemoryCommentService {
-    async fn get(
-        &self,
-        q: GetCommentQuery,
-        actor: &ActorContext,
-    ) -> Result<Comment, CommentError> {
+    async fn get(&self, q: GetCommentQuery, actor: &ActorContext) -> Result<Comment, CommentError> {
         if actor.tenant_id != q.tenant_id {
-            return Err(CommentError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(CommentError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
         let c = self
             .comments
@@ -607,7 +627,10 @@ impl CommentQueryPort for InMemoryCommentService {
             .unwrap()
             .get(&q.comment_id)
             .cloned()
-            .ok_or(CommentError::NotFound(format!("comment:{}", q.comment_id.as_uuid())))?;
+            .ok_or(CommentError::NotFound(format!(
+                "comment:{}",
+                q.comment_id.as_uuid()
+            )))?;
         if c.tenant_id != q.tenant_id {
             return Err(CommentError::CrossTenantDenied(c.tenant_id, q.tenant_id));
         }
@@ -620,7 +643,10 @@ impl CommentQueryPort for InMemoryCommentService {
         actor: &ActorContext,
     ) -> Result<Vec<Comment>, CommentError> {
         if actor.tenant_id != q.tenant_id {
-            return Err(CommentError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(CommentError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
         let comments = self.comments.read().unwrap();
         Ok(comments
@@ -692,9 +718,7 @@ impl CommentRepository for InMemoryCommentRepository {
             .read()
             .unwrap()
             .values()
-            .filter(|c| {
-                c.tenant_id == tid && c.parent_type == pt && c.parent_id == pid
-            })
+            .filter(|c| c.tenant_id == tid && c.parent_type == pt && c.parent_id == pid)
             .filter(|c| include_deleted || c.status != CommentStatus::Deleted)
             .cloned()
             .collect())
@@ -999,7 +1023,9 @@ mod tests {
             )
             .await
             .unwrap();
-        assert!(a.object_key.starts_with(&format!("tenants/{}/", tid.as_uuid())));
+        assert!(a
+            .object_key
+            .starts_with(&format!("tenants/{}/", tid.as_uuid())));
     }
 
     #[tokio::test]

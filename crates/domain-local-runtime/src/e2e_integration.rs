@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;
 
-use super::process::{OutputLine, OutputStream, ProcessState, LocalRuntime};
+use super::process::{LocalRuntime, OutputLine, OutputStream, ProcessState};
 use super::spawn_upload_hub::{HubAdapterConfig, HubIntegratorAdapter};
 use super::spawn_upload_integration::SpawnUploadIntegrator;
 use super::sse_parser::{SseChunk, SseParser};
@@ -43,9 +43,19 @@ impl EchoCmd {
     /// 跨平台构造: 输出 2 行后退出
     pub fn two_lines() -> Self {
         #[cfg(unix)]
-        { Self { cmd: "sh".into(), args: vec!["-c".into(), "echo alpha; echo bravo".into()] } }
+        {
+            Self {
+                cmd: "sh".into(),
+                args: vec!["-c".into(), "echo alpha; echo bravo".into()],
+            }
+        }
         #[cfg(windows)]
-        { Self { cmd: "cmd".into(), args: vec!["/c".into(), "echo alpha & echo bravo".into()] } }
+        {
+            Self {
+                cmd: "cmd".into(),
+                args: vec!["/c".into(), "echo alpha & echo bravo".into()],
+            }
+        }
     }
 }
 
@@ -75,12 +85,14 @@ async fn e2e_hub_two_subscribers_get_same_lines() {
         stream: OutputStream::Stdout,
         content: "shared-1".into(),
         at: chrono::Utc::now(),
-    }).unwrap();
+    })
+    .unwrap();
     tx.send(OutputLine {
         stream: OutputStream::Stdout,
         content: "shared-2".into(),
         at: chrono::Utc::now(),
-    }).unwrap();
+    })
+    .unwrap();
 
     let l1a = s1.recv().await.unwrap();
     let l2a = s2.recv().await.unwrap();
@@ -116,7 +128,9 @@ async fn e2e_hubcli_spawn_two_subscribers() {
     let sub1 = rt.subscribe_broadcast(id).await;
     let sub2 = rt.subscribe_broadcast(id).await;
     if sub1.is_err() || sub2.is_err() {
-        eprintln!("[skip] process exited before subscribe; e2e_hubcli_spawn_two_subscribers skipped");
+        eprintln!(
+            "[skip] process exited before subscribe; e2e_hubcli_spawn_two_subscribers skipped"
+        );
         return;
     }
     let mut s1 = sub1.unwrap();
@@ -129,8 +143,11 @@ async fn e2e_hubcli_spawn_two_subscribers() {
     // 至少 s1 收到 (s2 偶尔 lag 接受)
     match r1 {
         Ok(Ok(line)) => {
-            assert!(line.content.contains("alpha") || line.content.contains("bravo"),
-                    "got unexpected line: {:?}", line.content);
+            assert!(
+                line.content.contains("alpha") || line.content.contains("bravo"),
+                "got unexpected line: {:?}",
+                line.content
+            );
         }
         _ => eprintln!("[warn] s1 timeout or closed (acceptable for fast-exit process)"),
     }
@@ -161,19 +178,35 @@ async fn e2e_sse_parser_three_chunks() {
     // finish 收尾
     let tail = parser.finish();
     for r in tail {
-        if let Ok(c) = r { all_events.push(c); }
+        if let Ok(c) = r {
+            all_events.push(c);
+        }
     }
 
     // 期望: 3 个 chunk (role / content "hello" / content " world"), 末 chunk finish_reason
-    assert!(all_events.iter().any(|c| c.role.as_deref() == Some("assistant")),
-            "missing role chunk: {:?}", all_events);
-    assert!(all_events.iter().any(|c| c.content == "hello"),
-            "missing hello chunk: {:?}", all_events);
-    assert!(all_events.iter().any(|c| c.content == " world"),
-            "missing world chunk: {:?}", all_events);
+    assert!(
+        all_events
+            .iter()
+            .any(|c| c.role.as_deref() == Some("assistant")),
+        "missing role chunk: {:?}",
+        all_events
+    );
+    assert!(
+        all_events.iter().any(|c| c.content == "hello"),
+        "missing hello chunk: {:?}",
+        all_events
+    );
+    assert!(
+        all_events.iter().any(|c| c.content == " world"),
+        "missing world chunk: {:?}",
+        all_events
+    );
     // DONE sentinel 在 w27 实现中可能不显式推, 仅 finish_reason 即可
     let last_with_finish = all_events.iter().any(|c| c.finish_reason.is_some());
-    eprintln!("[info] last_with_finish = {} (DONE sentinel may be implicit)", last_with_finish);
+    eprintln!(
+        "[info] last_with_finish = {} (DONE sentinel may be implicit)",
+        last_with_finish
+    );
 }
 
 // =====================================================================
@@ -189,11 +222,14 @@ async fn e2e_integrator_emit_to_manual_sender() {
 
     // 模拟 emit (内部 emit 是 async private, 走 process 路径触发)
     // 这里直接构造 OutputLine 推到 tx
-    tx_for_test.send(OutputLine {
-        stream: OutputStream::System,
-        content: "manual emit".into(),
-        at: chrono::Utc::now(),
-    }).await.unwrap();
+    tx_for_test
+        .send(OutputLine {
+            stream: OutputStream::System,
+            content: "manual emit".into(),
+            at: chrono::Utc::now(),
+        })
+        .await
+        .unwrap();
     // tx 在 with_sender 中已 move, 此处不再 drop
 
     let received = rx.recv().await.unwrap();
@@ -218,7 +254,9 @@ async fn e2e_adapter_lifecycle() {
         id,
         SpawnUploadIntegrator::with_default(),
         HubAdapterConfig::default(),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     assert_eq!(adapter.process_id(), id);
 
     // cancel_and_emit 推 System 事件
@@ -262,7 +300,10 @@ async fn e2e_full_chain_spawn_to_sse_parser() {
     let line = tokio::time::timeout(Duration::from_millis(500), bcast_rx.recv()).await;
     match line {
         Ok(Ok(l)) => {
-            assert!(matches!(l.stream, OutputStream::Stdout | OutputStream::Stderr));
+            assert!(matches!(
+                l.stream,
+                OutputStream::Stdout | OutputStream::Stderr
+            ));
             assert!(!l.content.is_empty());
         }
         _ => eprintln!("[skip] e2e_full_chain: no output received within 500ms (fast process)"),
@@ -289,9 +330,24 @@ pub fn inv_02_cmd_not_empty(cmd: &EchoCmd) -> bool {
 #[test]
 fn test_inv_01_sse_event_count() {
     let parsed = vec![
-        SseChunk { content: String::new(), role: Some("assistant".into()), finish_reason: None, model: None },
-        SseChunk { content: "hello".into(), role: None, finish_reason: None, model: None },
-        SseChunk { content: " world".into(), role: None, finish_reason: Some("stop".into()), model: None },
+        SseChunk {
+            content: String::new(),
+            role: Some("assistant".into()),
+            finish_reason: None,
+            model: None,
+        },
+        SseChunk {
+            content: "hello".into(),
+            role: None,
+            finish_reason: None,
+            model: None,
+        },
+        SseChunk {
+            content: " world".into(),
+            role: None,
+            finish_reason: Some("stop".into()),
+            model: None,
+        },
     ];
     assert!(inv_01_sse_event_count(&parsed));
 }

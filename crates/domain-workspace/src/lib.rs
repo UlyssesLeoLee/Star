@@ -48,9 +48,7 @@ use uuid::Uuid;
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[allow(missing_docs)]
-        #[derive(
-            Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
-        )]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
         #[serde(transparent)]
         pub struct $name(uuid::Uuid);
 
@@ -778,9 +776,9 @@ impl WorkspaceCommandPort for InMemoryWorkspaceService {
         // 重复成员检查
         let dup = {
             let guard = self.members.read().await;
-            guard.values().any(|m| {
-                m.workspace_id == cmd.workspace_id && m.user_id == cmd.user_id
-            })
+            guard
+                .values()
+                .any(|m| m.workspace_id == cmd.workspace_id && m.user_id == cmd.user_id)
         };
         if dup {
             return Err(WorkspaceError::Conflict(format!(
@@ -931,8 +929,7 @@ mod tests {
     use super::*;
 
     fn make_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tenant_id)
-            .with_role(roles::WORKSPACE_ADMIN)
+        ActorContext::new(Uuid::new_v4(), tenant_id).with_role(roles::WORKSPACE_ADMIN)
     }
 
     #[test]
@@ -953,10 +950,7 @@ mod tests {
             description: Some("main".to_string()),
             owner_user_id: UserId::new(),
         };
-        let ws = svc
-            .create_workspace(cmd, actor.clone())
-            .await
-            .unwrap();
+        let ws = svc.create_workspace(cmd, actor.clone()).await.unwrap();
         assert_eq!(ws.version, 1);
         assert_eq!(svc.count().await, 1);
         // owner 自动为 Admin 成员
@@ -1086,7 +1080,10 @@ mod tests {
         )
         .await
         .unwrap();
-        let members = svc.list_members(ws.id, make_actor(tenant_id)).await.unwrap();
+        let members = svc
+            .list_members(ws.id, make_actor(tenant_id))
+            .await
+            .unwrap();
         // owner 还在
         assert_eq!(members.len(), 1);
     }

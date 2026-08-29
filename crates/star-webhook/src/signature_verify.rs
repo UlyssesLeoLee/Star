@@ -38,7 +38,9 @@ impl SignatureVerifier {
     /// - `header`: 原始 `X-Hub-Signature-256` 头值 (含 `sha256=` 前缀)
     /// - `body`: 原始 HTTP body 字节
     pub fn verify_github(secret: &[u8], header: &str, body: &[u8]) -> Result<(), SignatureError> {
-        let sig_hex = header.strip_prefix("sha256=").ok_or(SignatureError::Missing)?;
+        let sig_hex = header
+            .strip_prefix("sha256=")
+            .ok_or(SignatureError::Missing)?;
         let mut mac = Hmac::<Sha256>::new_from_slice(secret)
             .map_err(|e| SignatureError::Decode(e.to_string()))?;
         mac.update(body);
@@ -67,7 +69,11 @@ impl SignatureVerifier {
     }
 
     /// 验证 Bitbucket webhook 签名 (与 GitHub 算法相同)
-    pub fn verify_bitbucket(secret: &[u8], header: &str, body: &[u8]) -> Result<(), SignatureError> {
+    pub fn verify_bitbucket(
+        secret: &[u8],
+        header: &str,
+        body: &[u8],
+    ) -> Result<(), SignatureError> {
         Self::verify_github(secret, header, body)
     }
 
@@ -83,7 +89,8 @@ impl SignatureVerifier {
             "bitbucket" => Self::verify_bitbucket(secret, signature_header, body),
             // GitLab 的 secret 是 string,这里要求调用方传入 utf-8 bytes
             "gitlab" => {
-                let s = std::str::from_utf8(secret).map_err(|e| SignatureError::Decode(e.to_string()))?;
+                let s = std::str::from_utf8(secret)
+                    .map_err(|e| SignatureError::Decode(e.to_string()))?;
                 Self::verify_gitlab(s, signature_header)
             }
             _ => Err(SignatureError::Missing),

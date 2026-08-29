@@ -146,7 +146,9 @@ impl IntegrationEvent {
     pub fn subject(&self) -> &'static str {
         match self {
             Self::IntegrationCreated(_) => "star.events.integration.integration.created.v1",
-            Self::IntegrationStateChanged(_) => "star.events.integration.integration.state_changed.v1",
+            Self::IntegrationStateChanged(_) => {
+                "star.events.integration.integration.state_changed.v1"
+            }
             Self::SyncTriggered(_) => "star.events.integration.sync.triggered.v1",
             Self::SyncCompleted(_) => "star.events.integration.sync.completed.v1",
             Self::SyncConflictDetected(_) => "star.events.integration.sync.conflict_detected.v1",

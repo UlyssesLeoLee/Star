@@ -47,9 +47,20 @@ pub(crate) fn lookup_context(id: &str) -> Context {
     if id == "ctx-current" || id == "current" {
         Context {
             issue_id: "STAR-1024".to_string(),
-            related_code: vec![CodeRef { path: "crates/star-cli/src/commands/submit.rs".to_string(), line: 1, snippet: "// Universal Submit 12-step flow".to_string() }],
-            related_docs: vec![DocRef { path: "docs/architecture/2026-08-26-upgrade/spec/flows/05-universal-submit.md".to_string(), title: "Universal Submit Protocol".to_string() }],
-            related_mrs: vec![MRRef { id: "MR-mock-001".to_string(), title: "Phase D 极简骨架实装".to_string() }],
+            related_code: vec![CodeRef {
+                path: "crates/star-cli/src/commands/submit.rs".to_string(),
+                line: 1,
+                snippet: "// Universal Submit 12-step flow".to_string(),
+            }],
+            related_docs: vec![DocRef {
+                path: "docs/architecture/2026-08-26-upgrade/spec/flows/05-universal-submit.md"
+                    .to_string(),
+                title: "Universal Submit Protocol".to_string(),
+            }],
+            related_mrs: vec![MRRef {
+                id: "MR-mock-001".to_string(),
+                title: "Phase D 极简骨架实装".to_string(),
+            }],
             updated_at: now,
         }
     } else {
@@ -68,22 +79,28 @@ impl ContextCommand {
         match self {
             ContextCommand::Get { id } => {
                 let ctx = lookup_context(&id);
-                println!("{}", output::json_pretty(serde_json::json!({
-                    "schema_version": output::SCHEMA_VERSION,
-                    "mock": true,
-                    "tool": "context get",
-                    "context": ctx,
-                }))?);
+                println!(
+                    "{}",
+                    output::json_pretty(serde_json::json!({
+                        "schema_version": output::SCHEMA_VERSION,
+                        "mock": true,
+                        "tool": "context get",
+                        "context": ctx,
+                    }))?
+                );
                 Ok(())
             }
             ContextCommand::Current => {
                 let ctx = lookup_context("ctx-current");
-                println!("{}", output::json_pretty(serde_json::json!({
-                    "schema_version": output::SCHEMA_VERSION,
-                    "mock": true,
-                    "tool": "context current",
-                    "context": ctx,
-                }))?);
+                println!(
+                    "{}",
+                    output::json_pretty(serde_json::json!({
+                        "schema_version": output::SCHEMA_VERSION,
+                        "mock": true,
+                        "tool": "context current",
+                        "context": ctx,
+                    }))?
+                );
                 Ok(())
             }
         }

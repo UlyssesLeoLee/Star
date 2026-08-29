@@ -103,7 +103,9 @@ pub struct SessionStore {
 impl std::fmt::Debug for SessionStore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let count = self.inner.lock().map(|m| m.len()).unwrap_or(0);
-        f.debug_struct("SessionStore").field("session_count", &count).finish()
+        f.debug_struct("SessionStore")
+            .field("session_count", &count)
+            .finish()
     }
 }
 
@@ -116,12 +118,18 @@ impl Default for SessionStore {
 impl SessionStore {
     /// 新建空 store (用系统时钟)
     pub fn new() -> Self {
-        Self { inner: Arc::new(Mutex::new(HashMap::new())), clock: Arc::new(SystemClock) }
+        Self {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+            clock: Arc::new(SystemClock),
+        }
     }
 
     /// 构造带自定义时钟的 store (测试用)
     pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
-        Self { inner: Arc::new(Mutex::new(HashMap::new())), clock }
+        Self {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+            clock,
+        }
     }
 
     /// 生成新 SessionId (per UUID v4, 真实唯一标识)
@@ -170,7 +178,12 @@ impl SessionStore {
 
     /// 列出所有 session (server-push admin endpoint 用, Phase D.7+)
     pub fn list_sessions(&self) -> Vec<SessionId> {
-        self.inner.lock().expect("SessionStore mutex").keys().cloned().collect()
+        self.inner
+            .lock()
+            .expect("SessionStore mutex")
+            .keys()
+            .cloned()
+            .collect()
     }
 
     /// session 数 (per metrics, 测试用)
@@ -256,7 +269,10 @@ mod tests {
     #[test]
     fn test_new_session_id_format() {
         let id = SessionStore::new_session_id();
-        assert!(id.starts_with("sess-"), "session id should start with 'sess-': {id}");
+        assert!(
+            id.starts_with("sess-"),
+            "session id should start with 'sess-': {id}"
+        );
     }
 
     #[test]
@@ -410,6 +426,9 @@ mod tests {
 
         // gc 5 min TTL: drain 已 touch, 应保留
         let removed = store.gc_expired(DEFAULT_SESSION_TTL_MS);
-        assert_eq!(removed, 0, "drained session should not be gc'd (drain counts as activity)");
+        assert_eq!(
+            removed, 0,
+            "drained session should not be gc'd (drain counts as activity)"
+        );
     }
 }

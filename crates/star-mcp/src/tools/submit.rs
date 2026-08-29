@@ -10,7 +10,7 @@
 //! - 输入:`{worktree_id?, force?}`
 //! - 输出:`agent-api/v1#SubmitResult` mock
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::error::McpError;
 use crate::tools::mock_response;

@@ -360,11 +360,7 @@ pub trait WorkflowCommandPort: Send + Sync {
 
 #[async_trait]
 pub trait WorkflowQueryPort: Send + Sync {
-    async fn get(
-        &self,
-        id: WorkflowId,
-        actor: &ActorContext,
-    ) -> Result<Workflow, WorkflowError>;
+    async fn get(&self, id: WorkflowId, actor: &ActorContext) -> Result<Workflow, WorkflowError>;
 
     async fn list_by_tenant(
         &self,
@@ -379,18 +375,10 @@ pub trait WorkflowRepository: Send + Sync {
     async fn get(&self, id: WorkflowId) -> Result<Workflow, WorkflowError>;
     async fn update(&self, wf: Workflow) -> Result<(), WorkflowError>;
     async fn list_by_tenant(&self, tenant_id: TenantId) -> Result<Vec<Workflow>, WorkflowError>;
-    async fn insert_instance(
-        &self,
-        inst: WorkflowInstance,
-    ) -> Result<(), WorkflowError>;
-    async fn get_instance(
-        &self,
-        id: WorkflowInstanceId,
-    ) -> Result<WorkflowInstance, WorkflowError>;
-    async fn update_instance(
-        &self,
-        inst: WorkflowInstance,
-    ) -> Result<(), WorkflowError>;
+    async fn insert_instance(&self, inst: WorkflowInstance) -> Result<(), WorkflowError>;
+    async fn get_instance(&self, id: WorkflowInstanceId)
+        -> Result<WorkflowInstance, WorkflowError>;
+    async fn update_instance(&self, inst: WorkflowInstance) -> Result<(), WorkflowError>;
 }
 
 // =====================================================================
@@ -419,7 +407,10 @@ pub fn check_transition(
         });
     }
     // 严格表查找
-    let allowed = workflow.transitions.iter().any(|t| t.from == from && t.to == to);
+    let allowed = workflow
+        .transitions
+        .iter()
+        .any(|t| t.from == from && t.to == to);
     if !allowed {
         let from_name = workflow
             .states
@@ -467,9 +458,7 @@ pub fn check_invariant_02_initial_state(wf: &Workflow) -> Result<(), WorkflowErr
 }
 
 /// INV-WF-05:WorkflowInstance history 必带 actor + at
-pub fn check_invariant_05_history_audit(
-    inst: &WorkflowInstance,
-) -> Result<(), WorkflowError> {
+pub fn check_invariant_05_history_audit(inst: &WorkflowInstance) -> Result<(), WorkflowError> {
     for change in &inst.history {
         if change.actor.as_uuid().is_nil() {
             return Err(WorkflowError::Internal(
@@ -574,7 +563,10 @@ impl WorkflowCommandPort for InMemoryWorkflowService {
         self.ensure_cross_tenant(actor, cmd.tenant_id)?;
         let wf = self.repo.get(cmd.workflow_id).await?;
         if wf.tenant_id != cmd.tenant_id {
-            return Err(WorkflowError::CrossTenantDenied(actor.tenant_id, wf.tenant_id));
+            return Err(WorkflowError::CrossTenantDenied(
+                actor.tenant_id,
+                wf.tenant_id,
+            ));
         }
         // 校验 default_initial_state 存在
         if !wf.states.iter().any(|s| s.id == wf.default_initial_state) {
@@ -590,7 +582,10 @@ impl WorkflowCommandPort for InMemoryWorkflowService {
         };
         run_invariants(&wf, Some(&inst))?;
         self.repo.insert_instance(inst.clone()).await?;
-        self.instances.write().unwrap().insert(inst.id, inst.clone());
+        self.instances
+            .write()
+            .unwrap()
+            .insert(inst.id, inst.clone());
         Ok(inst)
     }
 
@@ -603,7 +598,10 @@ impl WorkflowCommandPort for InMemoryWorkflowService {
         let mut inst = self.repo.get_instance(cmd.instance_id).await?;
         let wf = self.repo.get(inst.workflow_id).await?;
         if wf.tenant_id != cmd.tenant_id {
-            return Err(WorkflowError::CrossTenantDenied(actor.tenant_id, wf.tenant_id));
+            return Err(WorkflowError::CrossTenantDenied(
+                actor.tenant_id,
+                wf.tenant_id,
+            ));
         }
         // 校验转换表 + 终态保护
         check_transition(&wf, inst.current_state, cmd.to)?;
@@ -647,18 +645,17 @@ impl WorkflowCommandPort for InMemoryWorkflowService {
         inst.current_state = cmd.to;
         run_invariants(&wf, Some(&inst))?;
         self.repo.update_instance(inst.clone()).await?;
-        self.instances.write().unwrap().insert(inst.id, inst.clone());
+        self.instances
+            .write()
+            .unwrap()
+            .insert(inst.id, inst.clone());
         Ok(inst)
     }
 }
 
 #[async_trait]
 impl WorkflowQueryPort for InMemoryWorkflowService {
-    async fn get(
-        &self,
-        id: WorkflowId,
-        actor: &ActorContext,
-    ) -> Result<Workflow, WorkflowError> {
+    async fn get(&self, id: WorkflowId, actor: &ActorContext) -> Result<Workflow, WorkflowError> {
         let wf = self.repo.get(id).await?;
         self.ensure_cross_tenant(actor, wf.tenant_id)?;
         Ok(wf)
@@ -703,7 +700,10 @@ impl WorkflowRepository for InMemoryWorkflowRepository {
     async fn insert(&self, wf: Workflow) -> Result<(), WorkflowError> {
         let mut s = self.workflows.write().unwrap();
         if s.contains_key(&wf.id) {
-            return Err(WorkflowError::Conflict(format!("Workflow {} 已存在", wf.id)));
+            return Err(WorkflowError::Conflict(format!(
+                "Workflow {} 已存在",
+                wf.id
+            )));
         }
         s.insert(wf.id, wf);
         Ok(())
@@ -714,7 +714,10 @@ impl WorkflowRepository for InMemoryWorkflowRepository {
             .unwrap()
             .get(&id)
             .cloned()
-            .ok_or(WorkflowError::NotFound(format!("workflow:{}", id.as_uuid())))
+            .ok_or(WorkflowError::NotFound(format!(
+                "workflow:{}",
+                id.as_uuid()
+            )))
     }
     async fn update(&self, wf: Workflow) -> Result<(), WorkflowError> {
         self.workflows.write().unwrap().insert(wf.id, wf);
@@ -730,10 +733,7 @@ impl WorkflowRepository for InMemoryWorkflowRepository {
             .cloned()
             .collect())
     }
-    async fn insert_instance(
-        &self,
-        inst: WorkflowInstance,
-    ) -> Result<(), WorkflowError> {
+    async fn insert_instance(&self, inst: WorkflowInstance) -> Result<(), WorkflowError> {
         let mut s = self.instances.write().unwrap();
         if s.contains_key(&inst.id) {
             return Err(WorkflowError::Conflict(format!(
@@ -753,12 +753,12 @@ impl WorkflowRepository for InMemoryWorkflowRepository {
             .unwrap()
             .get(&id)
             .cloned()
-            .ok_or(WorkflowError::NotFound(format!("instance:{}", id.as_uuid())))
+            .ok_or(WorkflowError::NotFound(format!(
+                "instance:{}",
+                id.as_uuid()
+            )))
     }
-    async fn update_instance(
-        &self,
-        inst: WorkflowInstance,
-    ) -> Result<(), WorkflowError> {
+    async fn update_instance(&self, inst: WorkflowInstance) -> Result<(), WorkflowError> {
         self.instances.write().unwrap().insert(inst.id, inst);
         Ok(())
     }
@@ -859,12 +859,7 @@ mod tests {
         assert!(inst.history.is_empty());
 
         // TODO → IN_PROGRESS
-        let todo_id = wf
-            .states
-            .iter()
-            .find(|s| s.name == "TODO")
-            .unwrap()
-            .id;
+        let todo_id = wf.states.iter().find(|s| s.name == "TODO").unwrap().id;
         let in_progress = wf
             .states
             .iter()

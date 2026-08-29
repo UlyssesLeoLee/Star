@@ -390,7 +390,8 @@ fn finish_result(
 /// Step 1: 读 `STAR-CURRENT-TASK.json` 拿 task_id
 fn step_check_task() -> Result<String, String> {
     let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-    let path = find_task_file(&cwd).ok_or_else(|| "STAR-CURRENT-TASK.json not found".to_string())?;
+    let path =
+        find_task_file(&cwd).ok_or_else(|| "STAR-CURRENT-TASK.json not found".to_string())?;
     let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let json: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
     json.get("id")
@@ -506,7 +507,9 @@ fn step_commit(task_id: &str) -> Result<Option<String>, String> {
         .args(["rev-parse", "HEAD"])
         .output()
         .map_err(|e| e.to_string())?;
-    let sha = String::from_utf8_lossy(&sha_output.stdout).trim().to_string();
+    let sha = String::from_utf8_lossy(&sha_output.stdout)
+        .trim()
+        .to_string();
     Ok(Some(sha))
 }
 

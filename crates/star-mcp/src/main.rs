@@ -119,8 +119,7 @@ async fn main() -> Result<(), McpError> {
             eprintln!("star-mcp: stdio transport (16 tools + 4 resources + 5 prompts + 22 domain handlers, JSON-RPC 2.0, 6-field error)");
             let stdin = std::io::stdin();
             let stdout = std::io::stdout();
-            run_session(stdin.lock(), stdout.lock())
-                .await?;
+            run_session(stdin.lock(), stdout.lock()).await?;
         }
         Transport::Http => {
             // 优先从环境变量读 (per 任务 brief STAR_MCP_BIND_ADDR), 然后从 CLI
@@ -170,7 +169,9 @@ fn parse_args(args: &[String]) -> (Transport, Option<String>) {
                 }
             }
             "-h" | "--help" => {
-                eprintln!("star-mcp: usage: star-mcp [--transport stdio|http] [--bind-addr <ADDR>]");
+                eprintln!(
+                    "star-mcp: usage: star-mcp [--transport stdio|http] [--bind-addr <ADDR>]"
+                );
                 eprintln!("  --transport stdio    # default, Phase D.3 stdio JSON-RPC 2.0");
                 eprintln!("  --transport http     # Phase D.5+ Streamable HTTP (POST + SSE)");
                 eprintln!("  --bind-addr ADDR     # default 127.0.0.1:8080 (also: STAR_MCP_BIND_ADDR env)");

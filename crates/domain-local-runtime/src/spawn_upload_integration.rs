@@ -130,7 +130,8 @@ impl SpawnUploadIntegrator {
                 stream: OutputStream::System,
                 content: format!("⚠️ CLI exit={}, skip commit", exit_code),
                 at: chrono::Utc::now(),
-            }).await;
+            })
+            .await;
             return Err(IntegrationError::NonZeroExit(exit_code));
         }
 
@@ -139,9 +140,14 @@ impl SpawnUploadIntegrator {
         if files.len() < self.config.min_files_for_commit as usize {
             self.emit(OutputLine {
                 stream: OutputStream::System,
-                content: format!("ℹ️ Only {} files, below threshold {}", files.len(), self.config.min_files_for_commit),
+                content: format!(
+                    "ℹ️ Only {} files, below threshold {}",
+                    files.len(),
+                    self.config.min_files_for_commit
+                ),
                 at: chrono::Utc::now(),
-            }).await;
+            })
+            .await;
             return Ok(IntegrationResult {
                 spawned: true,
                 exit_code: Some(exit_code),
@@ -161,26 +167,62 @@ impl SpawnUploadIntegrator {
             "Auto-uploaded by Star Agent Task Window ({}).\n\nFiles ({}):\n{}",
             self.config.trigger_source,
             files.len(),
-            files.iter().map(|f| format!("- {}", f)).collect::<Vec<_>>().join("\n"),
+            files
+                .iter()
+                .map(|f| format!("- {}", f))
+                .collect::<Vec<_>>()
+                .join("\n"),
         );
         let subject = match commit_type {
-            "feat" => format!("添加 {} 项变更 (来自 {})", files.len(), self.config.trigger_source),
-            "fix" => format!("修复 {} 项问题 (来自 {})", files.len(), self.config.trigger_source),
-            _ => format!("{} (来自 {}, {} 文件)", commit_type, self.config.trigger_source, files.len()),
+            "feat" => format!(
+                "添加 {} 项变更 (来自 {})",
+                files.len(),
+                self.config.trigger_source
+            ),
+            "fix" => format!(
+                "修复 {} 项问题 (来自 {})",
+                files.len(),
+                self.config.trigger_source
+            ),
+            _ => format!(
+                "{} (来自 {}, {} 文件)",
+                commit_type,
+                self.config.trigger_source,
+                files.len()
+            ),
         };
-        let mut msg = format!("{}{}: {}\n\n{}", emoji_for(commit_type), commit_type, subject, body);
+        let mut msg = format!(
+            "{}{}: {}\n\n{}",
+            emoji_for(commit_type),
+            commit_type,
+            subject,
+            body
+        );
         if let Some(s) = &scope {
-            msg = format!("{}{}({}): {}\n\n{}", emoji_for(commit_type), commit_type, s, subject, body);
+            msg = format!(
+                "{}{}({}): {}\n\n{}",
+                emoji_for(commit_type),
+                commit_type,
+                s,
+                subject,
+                body
+            );
         }
-        msg.push_str(&format!("\n\nTrigger: {}\nGenerated-by: Star v0.1 (P3-A.1)", self.config.trigger_source));
+        msg.push_str(&format!(
+            "\n\nTrigger: {}\nGenerated-by: Star v0.1 (P3-A.1)",
+            self.config.trigger_source
+        ));
 
         // 6. git add
         for file in &files {
             let out = Command::new("git")
-                .arg("add").arg(file)
+                .arg("add")
+                .arg(file)
                 .current_dir(&self.config.worktree_dir)
-                .stdout(Stdio::null()).stderr(Stdio::piped())
-                .output().await
+                .stdout(Stdio::null())
+                .stderr(Stdio::piped())
+                .output()
+                .await
                 .map_err(|e| IntegrationError::GitStatus(e.to_string()))?;
             if !out.status.success() {
                 return Err(IntegrationError::GitStatus(
@@ -192,16 +234,21 @@ impl SpawnUploadIntegrator {
             stream: OutputStream::System,
             content: format!("git add {} files", files.len()),
             at: chrono::Utc::now(),
-        }).await;
+        })
+        .await;
 
         // 7. git commit
         let commit = Command::new("git")
             .args(["commit", "-m", &msg])
-            .arg("-c").arg(format!("user.name={}", self.config.author_name))
-            .arg("-c").arg(format!("user.email={}", self.config.author_email))
+            .arg("-c")
+            .arg(format!("user.name={}", self.config.author_name))
+            .arg("-c")
+            .arg(format!("user.email={}", self.config.author_email))
             .current_dir(&self.config.worktree_dir)
-            .stdout(Stdio::null()).stderr(Stdio::piped())
-            .output().await
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .await
             .map_err(|e| IntegrationError::GitCommit(e.to_string()))?;
         if !commit.status.success() {
             return Err(IntegrationError::GitCommit(
@@ -214,9 +261,15 @@ impl SpawnUploadIntegrator {
 
         self.emit(OutputLine {
             stream: OutputStream::System,
-            content: format!("✓ committed {} ({} files, {})", &sha[..7.min(sha.len())], files.len(), self.config.trigger_source),
+            content: format!(
+                "✓ committed {} ({} files, {})",
+                &sha[..7.min(sha.len())],
+                files.len(),
+                self.config.trigger_source
+            ),
             at: chrono::Utc::now(),
-        }).await;
+        })
+        .await;
 
         // 9. 可选 push
         let pushed = if self.config.auto_push {
@@ -225,7 +278,8 @@ impl SpawnUploadIntegrator {
                 stream: OutputStream::System,
                 content: "✓ pushed".into(),
                 at: chrono::Utc::now(),
-            }).await;
+            })
+            .await;
             true
         } else {
             false
@@ -246,7 +300,8 @@ impl SpawnUploadIntegrator {
             .args(["status", "--porcelain"])
             .current_dir(&self.config.worktree_dir)
             .stdout(Stdio::piped())
-            .output().await
+            .output()
+            .await
             .map_err(|e| IntegrationError::GitStatus(e.to_string()))?;
         if !out.status.success() {
             return Err(IntegrationError::GitStatus(
@@ -265,7 +320,8 @@ impl SpawnUploadIntegrator {
             .args(["rev-parse", "HEAD"])
             .current_dir(&self.config.worktree_dir)
             .stdout(Stdio::piped())
-            .output().await
+            .output()
+            .await
             .map_err(|e| IntegrationError::GitStatus(e.to_string()))?;
         Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
     }
@@ -274,8 +330,10 @@ impl SpawnUploadIntegrator {
         let out = Command::new("git")
             .arg("push")
             .current_dir(&self.config.worktree_dir)
-            .stdout(Stdio::null()).stderr(Stdio::piped())
-            .output().await
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .await
             .map_err(|e| IntegrationError::GitPush(e.to_string()))?;
         if !out.status.success() {
             return Err(IntegrationError::GitPush(
@@ -288,14 +346,30 @@ impl SpawnUploadIntegrator {
 
 // 复用 commit_template 逻辑 (独立函数, 不跨 crate 依赖)
 fn infer_type(files: &[String]) -> &'static str {
-    let all_tests = !files.is_empty() && files.iter().all(|f| f.contains("test") || f.contains("__tests__"));
-    let all_docs = !files.is_empty() && files.iter().all(|f| f.starts_with("docs/") || f.ends_with(".md"));
+    let all_tests = !files.is_empty()
+        && files
+            .iter()
+            .all(|f| f.contains("test") || f.contains("__tests__"));
+    let all_docs = !files.is_empty()
+        && files
+            .iter()
+            .all(|f| f.starts_with("docs/") || f.ends_with(".md"));
     let all_frontend = !files.is_empty() && files.iter().all(|f| f.starts_with("frontend/"));
-    let has_cargo = files.iter().any(|f| f == "Cargo.toml" || f.ends_with(".lock"));
-    if all_tests { return "test"; }
-    if all_docs { return "docs"; }
-    if all_frontend { return "feat"; }
-    if has_cargo && files.len() <= 2 { return "build"; }
+    let has_cargo = files
+        .iter()
+        .any(|f| f == "Cargo.toml" || f.ends_with(".lock"));
+    if all_tests {
+        return "test";
+    }
+    if all_docs {
+        return "docs";
+    }
+    if all_frontend {
+        return "feat";
+    }
+    if has_cargo && files.len() <= 2 {
+        return "build";
+    }
     "feat"
 }
 
@@ -329,10 +403,14 @@ fn emoji_for(commit_type: &str) -> &'static str {
 // =====================================================================
 
 /// INV-INT-01: exit_code=0 必继续, 否则跳过 commit
-pub fn inv_01_must_zero(exit_code: i32) -> bool { exit_code == 0 }
+pub fn inv_01_must_zero(exit_code: i32) -> bool {
+    exit_code == 0
+}
 
 /// INV-INT-02: commit message 必含 Trigger 标签
-pub fn inv_02_contains_trigger(msg: &str) -> bool { msg.contains("Trigger:") }
+pub fn inv_02_contains_trigger(msg: &str) -> bool {
+    msg.contains("Trigger:")
+}
 
 /// INV-INT-03: author 必 Ulysses 代行 (per AGENTS.md §2.1)
 pub fn inv_03_author_ulysses(name: &str, email: &str) -> bool {

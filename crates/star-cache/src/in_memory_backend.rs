@@ -79,7 +79,9 @@ impl CacheBackend for InMemoryBackend {
 
     async fn incr(&self, _key: &str, _delta: i64) -> Result<i64, CacheError> {
         // Phase G+ 实装 — 当前为 stub
-        Err(CacheError::Other("incr not implemented for in-memory".into()))
+        Err(CacheError::Other(
+            "incr not implemented for in-memory".into(),
+        ))
     }
 
     async fn expire(&self, _key: &str, _ttl_sec: u32) -> Result<(), CacheError> {

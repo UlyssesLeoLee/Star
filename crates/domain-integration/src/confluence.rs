@@ -25,8 +25,8 @@ use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
 use crate::adapter::{
-    Adapter, AdapterCapability, AdapterError, AdapterResult, AuthToken, CredentialRefId, HttpClient,
-    OAuth2AuthRequest,
+    Adapter, AdapterCapability, AdapterError, AdapterResult, AuthToken, CredentialRefId,
+    HttpClient, OAuth2AuthRequest,
 };
 
 // =====================================================================
@@ -125,8 +125,8 @@ impl StarWorkItemMacro {
         let wiid = extract_attr(storage, "ac:work-item-id")?;
         let work_item_id = Uuid::parse_str(&wiid).ok()?;
         let project_key = extract_attr(storage, "ac:project");
-        let display_mode = extract_attr(storage, "ac:display-mode")
-            .unwrap_or_else(|| "card".to_string());
+        let display_mode =
+            extract_attr(storage, "ac:display-mode").unwrap_or_else(|| "card".to_string());
         Some(Self {
             work_item_id,
             project_key,
@@ -266,10 +266,13 @@ impl ConfluenceAdapter {
             return Err(AdapterError::RateLimited(1000));
         }
         if status >= 400 {
-            return Err(AdapterError::Http(format!("status={} body={}", status, body)));
+            return Err(AdapterError::Http(format!(
+                "status={} body={}",
+                status, body
+            )));
         }
-        let resp: SpacesResponse = serde_json::from_str(&body)
-            .map_err(|e| AdapterError::Parse(e.to_string()))?;
+        let resp: SpacesResponse =
+            serde_json::from_str(&body).map_err(|e| AdapterError::Parse(e.to_string()))?;
         Ok(resp.results)
     }
 
@@ -283,10 +286,13 @@ impl ConfluenceAdapter {
         let headers = self.auth_headers();
         let (status, body) = self.http.get(&url, headers).await?;
         if status >= 400 {
-            return Err(AdapterError::Http(format!("status={} body={}", status, body)));
+            return Err(AdapterError::Http(format!(
+                "status={} body={}",
+                status, body
+            )));
         }
-        let resp: PagesResponse = serde_json::from_str(&body)
-            .map_err(|e| AdapterError::Parse(e.to_string()))?;
+        let resp: PagesResponse =
+            serde_json::from_str(&body).map_err(|e| AdapterError::Parse(e.to_string()))?;
         Ok(resp.results)
     }
 
@@ -307,7 +313,8 @@ impl ConfluenceAdapter {
         }
         // 追加 macro 到 body 末尾
         let new_body = format!("{}\n{}", page.body_storage, macro_.to_storage_xml());
-        self.update_page_body(page_id, &new_body, page.version + 1).await
+        self.update_page_body(page_id, &new_body, page.version + 1)
+            .await
     }
 
     /// 拉取单个页面
@@ -319,7 +326,10 @@ impl ConfluenceAdapter {
             return Err(AdapterError::NotFound(format!("page:{}", page_id)));
         }
         if status >= 400 {
-            return Err(AdapterError::Http(format!("status={} body={}", status, body)));
+            return Err(AdapterError::Http(format!(
+                "status={} body={}",
+                status, body
+            )));
         }
         serde_json::from_str(&body).map_err(|e| AdapterError::Parse(e.to_string()))
     }
@@ -342,12 +352,9 @@ impl ConfluenceAdapter {
             },
             "version": { "number": new_version },
         });
-        let body = serde_json::to_string(&payload)
-            .map_err(|e| AdapterError::Internal(e.to_string()))?;
-        let (status, resp_body) = self
-            .http
-            .put(&url, self.auth_headers(), body)
-            .await?;
+        let body =
+            serde_json::to_string(&payload).map_err(|e| AdapterError::Internal(e.to_string()))?;
+        let (status, resp_body) = self.http.put(&url, self.auth_headers(), body).await?;
         if status >= 400 {
             return Err(AdapterError::Http(format!(
                 "status={} body={}",
@@ -506,9 +513,10 @@ mod tests {
             _headers: HashMap<String, String>,
         ) -> AdapterResult<(u16, String)> {
             let g = self.responses.lock().unwrap();
-            let r = g.get(url).cloned().ok_or_else(|| {
-                AdapterError::Internal(format!("no mock for GET {}", url))
-            })?;
+            let r = g
+                .get(url)
+                .cloned()
+                .ok_or_else(|| AdapterError::Internal(format!("no mock for GET {}", url)))?;
             Ok((r.status, r.body))
         }
         async fn post(
@@ -518,9 +526,10 @@ mod tests {
             _body: String,
         ) -> AdapterResult<(u16, String)> {
             let g = self.responses.lock().unwrap();
-            let r = g.get(url).cloned().ok_or_else(|| {
-                AdapterError::Internal(format!("no mock for POST {}", url))
-            })?;
+            let r = g
+                .get(url)
+                .cloned()
+                .ok_or_else(|| AdapterError::Internal(format!("no mock for POST {}", url)))?;
             Ok((r.status, r.body))
         }
         async fn put(
@@ -530,9 +539,10 @@ mod tests {
             _body: String,
         ) -> AdapterResult<(u16, String)> {
             let g = self.responses.lock().unwrap();
-            let r = g.get(url).cloned().ok_or_else(|| {
-                AdapterError::Internal(format!("no mock for PUT {}", url))
-            })?;
+            let r = g
+                .get(url)
+                .cloned()
+                .ok_or_else(|| AdapterError::Internal(format!("no mock for PUT {}", url)))?;
             Ok((r.status, r.body))
         }
         async fn delete(
@@ -541,9 +551,10 @@ mod tests {
             _headers: HashMap<String, String>,
         ) -> AdapterResult<(u16, String)> {
             let g = self.responses.lock().unwrap();
-            let r = g.get(url).cloned().ok_or_else(|| {
-                AdapterError::Internal(format!("no mock for DELETE {}", url))
-            })?;
+            let r = g
+                .get(url)
+                .cloned()
+                .ok_or_else(|| AdapterError::Internal(format!("no mock for DELETE {}", url)))?;
             Ok((r.status, r.body))
         }
     }
@@ -731,7 +742,10 @@ mod tests {
             "state-abc",
             "challenge-xyz",
         );
-        assert_eq!(r.auth_endpoint, "https://acme.atlassian.net/wiki/oauth/authorize");
+        assert_eq!(
+            r.auth_endpoint,
+            "https://acme.atlassian.net/wiki/oauth/authorize"
+        );
         assert_eq!(r.client_id, "client-123");
         assert_eq!(r.redirect_uri, "https://app.star.local/callback");
         assert_eq!(r.scope.len(), 2);

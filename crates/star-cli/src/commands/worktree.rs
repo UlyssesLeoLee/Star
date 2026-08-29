@@ -36,13 +36,22 @@ impl WorktreeCommand {
         match self {
             WorktreeCommand::Create { id } => {
                 let path = format!("/repos/owner/repo/wt-{id}");
-                let wt = Worktree { id: format!("wt-{id}"), path: path.clone(), branch: format!("feature/{id}"), head_commit: "deadbeef0000000000000000000000000000000".to_string(), dirty: false };
-                println!("{}", output::json_pretty(serde_json::json!({
-                    "schema_version": output::SCHEMA_VERSION,
-                    "mock": true,
-                    "tool": "worktree create",
-                    "worktree": wt,
-                }))?);
+                let wt = Worktree {
+                    id: format!("wt-{id}"),
+                    path: path.clone(),
+                    branch: format!("feature/{id}"),
+                    head_commit: "deadbeef0000000000000000000000000000000".to_string(),
+                    dirty: false,
+                };
+                println!(
+                    "{}",
+                    output::json_pretty(serde_json::json!({
+                        "schema_version": output::SCHEMA_VERSION,
+                        "mock": true,
+                        "tool": "worktree create",
+                        "worktree": wt,
+                    }))?
+                );
                 Ok(())
             }
             WorktreeCommand::Enter { id } => {
@@ -52,14 +61,27 @@ impl WorktreeCommand {
                 Ok(())
             }
             WorktreeCommand::Status => {
-                let wt = Worktree { id: "wt-current".to_string(), path: "/repos/owner/repo".to_string(), branch: "main".to_string(), head_commit: "deadbeef0000000000000000000000000000000".to_string(), dirty: false };
-                let status = WorktreeStatus { worktree: wt, last_commit: "deadbeef".to_string(), uncommitted_files: 0 };
-                println!("{}", output::json_pretty(serde_json::json!({
-                    "schema_version": output::SCHEMA_VERSION,
-                    "mock": true,
-                    "tool": "worktree status",
-                    "status": status,
-                }))?);
+                let wt = Worktree {
+                    id: "wt-current".to_string(),
+                    path: "/repos/owner/repo".to_string(),
+                    branch: "main".to_string(),
+                    head_commit: "deadbeef0000000000000000000000000000000".to_string(),
+                    dirty: false,
+                };
+                let status = WorktreeStatus {
+                    worktree: wt,
+                    last_commit: "deadbeef".to_string(),
+                    uncommitted_files: 0,
+                };
+                println!(
+                    "{}",
+                    output::json_pretty(serde_json::json!({
+                        "schema_version": output::SCHEMA_VERSION,
+                        "mock": true,
+                        "tool": "worktree status",
+                        "status": status,
+                    }))?
+                );
                 Ok(())
             }
         }

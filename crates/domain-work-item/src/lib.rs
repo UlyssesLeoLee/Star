@@ -511,7 +511,10 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
         actor: &ActorContext,
     ) -> Result<WorkItem, WorkItemError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(WorkItemError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(WorkItemError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if !actor.has_role("developer")
             && !actor.has_role("project_admin")
@@ -535,10 +538,7 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
         }
         // INV-WI-04:parent 必须同 project
         if let Some(pid) = cmd.parent_work_item_id {
-            let parent = self
-                .repo
-                .get(pid)
-                .await?;
+            let parent = self.repo.get(pid).await?;
             if parent.project_id != cmd.project_id {
                 return Err(WorkItemError::ParentProjectMismatch);
             }
@@ -584,7 +584,10 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
         actor: &ActorContext,
     ) -> Result<WorkItem, WorkItemError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(WorkItemError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(WorkItemError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         check_status_transition(cmd.from, cmd.to)?;
         let mut item = self
@@ -593,9 +596,15 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
             .unwrap()
             .get_mut(&cmd.work_item_id)
             .cloned()
-            .ok_or(WorkItemError::NotFound(format!("work_item:{}", cmd.work_item_id.as_uuid())))?;
+            .ok_or(WorkItemError::NotFound(format!(
+                "work_item:{}",
+                cmd.work_item_id.as_uuid()
+            )))?;
         if item.tenant_id != cmd.tenant_id {
-            return Err(WorkItemError::CrossTenantDenied(item.tenant_id, cmd.tenant_id));
+            return Err(WorkItemError::CrossTenantDenied(
+                item.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if item.status != cmd.from {
             return Err(WorkItemError::InvalidTransition {
@@ -617,7 +626,10 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
         actor: &ActorContext,
     ) -> Result<WorkItem, WorkItemError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(WorkItemError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(WorkItemError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         let mut item = self
             .items
@@ -625,9 +637,15 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
             .unwrap()
             .get_mut(&cmd.work_item_id)
             .cloned()
-            .ok_or(WorkItemError::NotFound(format!("work_item:{}", cmd.work_item_id.as_uuid())))?;
+            .ok_or(WorkItemError::NotFound(format!(
+                "work_item:{}",
+                cmd.work_item_id.as_uuid()
+            )))?;
         if item.tenant_id != cmd.tenant_id {
-            return Err(WorkItemError::CrossTenantDenied(item.tenant_id, cmd.tenant_id));
+            return Err(WorkItemError::CrossTenantDenied(
+                item.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         item.assignee_user_id = cmd.assignee_user_id;
         item.assignee_agent_id = cmd.assignee_agent_id;
@@ -644,7 +662,10 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
         actor: &ActorContext,
     ) -> Result<Requirement, WorkItemError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(WorkItemError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(WorkItemError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         let r = Requirement {
             id: RequirementId::new(),
@@ -666,7 +687,10 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
         actor: &ActorContext,
     ) -> Result<AcceptanceCriterion, WorkItemError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(WorkItemError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(WorkItemError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         let ac = AcceptanceCriterion {
             id: AcceptanceCriterionId::new(),
@@ -692,7 +716,10 @@ impl WorkItemQueryPort for InMemoryWorkItemService {
         actor: &ActorContext,
     ) -> Result<WorkItem, WorkItemError> {
         if actor.tenant_id != q.tenant_id {
-            return Err(WorkItemError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(WorkItemError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
         let item = self
             .items
@@ -700,9 +727,15 @@ impl WorkItemQueryPort for InMemoryWorkItemService {
             .unwrap()
             .get(&q.work_item_id)
             .cloned()
-            .ok_or(WorkItemError::NotFound(format!("work_item:{}", q.work_item_id.as_uuid())))?;
+            .ok_or(WorkItemError::NotFound(format!(
+                "work_item:{}",
+                q.work_item_id.as_uuid()
+            )))?;
         if item.tenant_id != q.tenant_id {
-            return Err(WorkItemError::CrossTenantDenied(item.tenant_id, q.tenant_id));
+            return Err(WorkItemError::CrossTenantDenied(
+                item.tenant_id,
+                q.tenant_id,
+            ));
         }
         Ok(item)
     }
@@ -713,7 +746,10 @@ impl WorkItemQueryPort for InMemoryWorkItemService {
         actor: &ActorContext,
     ) -> Result<Vec<WorkItem>, WorkItemError> {
         if actor.tenant_id != q.tenant_id {
-            return Err(WorkItemError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(WorkItemError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
         let items = self.items.read().unwrap();
         Ok(items
@@ -763,7 +799,10 @@ impl WorkItemRepository for InMemoryWorkItemRepository {
             .unwrap()
             .get(&id)
             .cloned()
-            .ok_or(WorkItemError::NotFound(format!("work_item:{}", id.as_uuid())))
+            .ok_or(WorkItemError::NotFound(format!(
+                "work_item:{}",
+                id.as_uuid()
+            )))
     }
     async fn update(&self, w: WorkItem) -> Result<(), WorkItemError> {
         self.items.write().unwrap().insert(w.id, w);
@@ -841,7 +880,8 @@ mod tests {
         assert!(check_status_transition(WorkItemStatus::InProgress, WorkItemStatus::Done).is_ok());
         assert!(check_status_transition(WorkItemStatus::InProgress, WorkItemStatus::Todo).is_ok()); // 回退
         assert!(check_status_transition(WorkItemStatus::Done, WorkItemStatus::InProgress).is_ok()); // 重开
-        assert!(check_status_transition(WorkItemStatus::Todo, WorkItemStatus::Done).is_err()); // 跳态
+        assert!(check_status_transition(WorkItemStatus::Todo, WorkItemStatus::Done).is_err());
+        // 跳态
     }
 
     #[test]

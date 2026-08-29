@@ -100,7 +100,10 @@ impl UploadExecutor {
         }
 
         // 2. 验证触发模式 (按 09:07 JST 拍板)
-        if !matches!(task.trigger, TriggerMode::OnSuccessExit | TriggerMode::Manual | TriggerMode::Polling) {
+        if !matches!(
+            task.trigger,
+            TriggerMode::OnSuccessExit | TriggerMode::Manual | TriggerMode::Polling
+        ) {
             return Err(UploadError::TriggerMismatch(task.trigger));
         }
 
@@ -165,7 +168,11 @@ impl UploadExecutor {
         task.status = UploadStatus::Completed;
         task.completed_at = Some(chrono::Utc::now());
 
-        Ok(UploadResult { commit_sha: sha, files_committed: files, pushed })
+        Ok(UploadResult {
+            commit_sha: sha,
+            files_committed: files,
+            pushed,
+        })
     }
 
     /// 拿最近一次 commit SHA
@@ -293,7 +300,11 @@ mod tests {
     fn test_trigger_modes_supported() {
         let task = sample_task();
         // 3 触发模式都应通过 TriggerMismatch 检查
-        for trigger in [TriggerMode::OnSuccessExit, TriggerMode::Manual, TriggerMode::Polling] {
+        for trigger in [
+            TriggerMode::OnSuccessExit,
+            TriggerMode::Manual,
+            TriggerMode::Polling,
+        ] {
             let mut t = task.clone();
             t.trigger = trigger;
             // 直接验证

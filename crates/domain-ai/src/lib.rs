@@ -25,8 +25,8 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LlmProvider {
-    Mock,    // 内置 mock (无外部 API)
-    OpenAI,  // 接口预留
+    Mock,   // 内置 mock (无外部 API)
+    OpenAI, // 接口预留
     Anthropic,
 }
 
@@ -139,7 +139,10 @@ impl PromptTemplate {
 #[async_trait]
 pub trait LlmProviderPort: Send + Sync {
     async fn complete(&self, request: &AiRequest) -> Result<AiResponse, AiError>;
-    async fn stream(&self, request: &AiRequest) -> Result<tokio::sync::mpsc::Receiver<String>, AiError>;
+    async fn stream(
+        &self,
+        request: &AiRequest,
+    ) -> Result<tokio::sync::mpsc::Receiver<String>, AiError>;
 }
 
 // =====================================================================
@@ -219,7 +222,11 @@ impl AiService {
     }
 
     /// Rovo Chat: 跨域问答
-    pub async fn rovo_chat(&self, question: &str, context: &serde_json::Value) -> Result<AiResponse, AiError> {
+    pub async fn rovo_chat(
+        &self,
+        question: &str,
+        context: &serde_json::Value,
+    ) -> Result<AiResponse, AiError> {
         let req = AiRequest {
             id: Uuid::new_v4(),
             role: AgentRole::RovoChat,
@@ -279,7 +286,10 @@ impl LlmProviderPort for MockLlmProvider {
         })
     }
 
-    async fn stream(&self, request: &AiRequest) -> Result<tokio::sync::mpsc::Receiver<String>, AiError> {
+    async fn stream(
+        &self,
+        request: &AiRequest,
+    ) -> Result<tokio::sync::mpsc::Receiver<String>, AiError> {
         let (tx, rx) = tokio::sync::mpsc::channel(16);
         let content = match request.role {
             AgentRole::RovoChat => format!("[mock] 收到: {}", request.prompt),
@@ -308,16 +318,25 @@ fn mock_workflow(desc: &str) -> String {
             {"from": "todo", "to": "doing"},
             {"from": "doing", "to": "done"}
         ]
-    }).to_string()
+    })
+    .to_string()
 }
 
 fn mock_readiness(ctx: &serde_json::Value) -> String {
-    let score = if ctx.get("description").is_some() { 75 } else { 45 };
-    format!("工作项就绪度评分: {}/100. 缺验收标准 / 子任务 / 关联.", score)
+    let score = if ctx.get("description").is_some() {
+        75
+    } else {
+        45
+    };
+    format!(
+        "工作项就绪度评分: {}/100. 缺验收标准 / 子任务 / 关联.",
+        score
+    )
 }
 
 fn mock_insight(_ctx: &serde_json::Value) -> String {
-    "本 Sprint 速度下降 12%, 风险点: 1 个高优工作项已 5 天未更新. 建议立即 review 并拆分.".to_string()
+    "本 Sprint 速度下降 12%, 风险点: 1 个高优工作项已 5 天未更新. 建议立即 review 并拆分."
+        .to_string()
 }
 
 fn mock_jql(prompt: &str) -> String {
@@ -331,7 +350,10 @@ fn mock_jql(prompt: &str) -> String {
 }
 
 fn mock_chat(prompt: &str) -> String {
-    format!("根据 Star 数据, 关于 '{}' 的回答: [mock] 涉及 3 个工作项, 1 个项目, 2 个评论.", prompt)
+    format!(
+        "根据 Star 数据, 关于 '{}' 的回答: [mock] 涉及 3 个工作项, 1 个项目, 2 个评论.",
+        prompt
+    )
 }
 
 #[cfg(test)]
@@ -353,7 +375,10 @@ mod tests {
     #[tokio::test]
     async fn test_workflow_builder() {
         let svc = AiService::new(Box::new(MockLlmProvider));
-        let r = svc.build_workflow("订单状态: 待支付 → 支付中 → 已支付 → 已发货").await.unwrap();
+        let r = svc
+            .build_workflow("订单状态: 待支付 → 支付中 → 已支付 → 已发货")
+            .await
+            .unwrap();
         assert!(r.content.contains("statuses"));
         assert!(r.content.contains("transitions"));
     }
@@ -376,7 +401,10 @@ mod tests {
     #[tokio::test]
     async fn test_rovo_chat() {
         let svc = AiService::new(Box::new(MockLlmProvider));
-        let r = svc.rovo_chat("本周高优工作项", &serde_json::json!({})).await.unwrap();
+        let r = svc
+            .rovo_chat("本周高优工作项", &serde_json::json!({}))
+            .await
+            .unwrap();
         assert!(r.content.contains("mock"));
     }
 
@@ -384,9 +412,13 @@ mod tests {
     async fn test_stream() {
         let provider = MockLlmProvider;
         let req = AiRequest {
-            id: Uuid::new_v4(), role: AgentRole::RovoChat, prompt: "test".into(),
-            context: serde_json::json!({}), model_config: ModelConfig::default(),
-            user_id: None, tenant_id: Uuid::nil(),
+            id: Uuid::new_v4(),
+            role: AgentRole::RovoChat,
+            prompt: "test".into(),
+            context: serde_json::json!({}),
+            model_config: ModelConfig::default(),
+            user_id: None,
+            tenant_id: Uuid::nil(),
             created_at: chrono::Utc::now(),
         };
         let mut rx = provider.stream(&req).await.unwrap();

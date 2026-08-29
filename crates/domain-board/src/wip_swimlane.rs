@@ -9,8 +9,8 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use thiserror::Error;
+use uuid::Uuid;
 
 // =====================================================================
 // 1. WIP 限制
@@ -82,7 +82,11 @@ pub struct Swimlane {
 
 impl Swimlane {
     pub fn new(group_by: SwimlaneGroupBy) -> Self {
-        Self { group_by, custom_field: None, collapsed: false }
+        Self {
+            group_by,
+            custom_field: None,
+            collapsed: false,
+        }
     }
 }
 
@@ -107,10 +111,10 @@ pub struct SavedView {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ViewLayout {
-    Board,      // Cmd+1
-    Timeline,   // Cmd+2
-    List,       // Cmd+3
-    Overview,   // Cmd+4
+    Board,    // Cmd+1
+    Timeline, // Cmd+2
+    List,     // Cmd+3
+    Overview, // Cmd+4
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -131,7 +135,13 @@ pub enum ViewDensity {
 }
 
 impl SavedView {
-    pub fn new(name: impl Into<String>, owner_id: Uuid, tenant_id: Uuid, board_id: Uuid, layout: ViewLayout) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        owner_id: Uuid,
+        tenant_id: Uuid,
+        board_id: Uuid,
+        layout: ViewLayout,
+    ) -> Self {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),
@@ -164,7 +174,9 @@ impl SavedView {
 pub struct BoardService;
 
 impl BoardService {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     /// 创建 WIP 限制
     pub fn create_wip_limit(column_id: impl Into<String>, max: u32) -> WipLimit {
@@ -193,7 +205,9 @@ impl BoardService {
 }
 
 impl Default for BoardService {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -202,7 +216,11 @@ mod tests {
 
     #[test]
     fn test_wip_allow_when_under() {
-        let mut l = WipLimit { column_id: "todo".into(), max_items: 5, current_count: 3 };
+        let mut l = WipLimit {
+            column_id: "todo".into(),
+            max_items: 5,
+            current_count: 3,
+        };
         let a = WipGuard::add(&mut l);
         assert_eq!(a, WipAction::Allow);
         assert_eq!(l.current_count, 4);
@@ -210,21 +228,33 @@ mod tests {
 
     #[test]
     fn test_wip_warn_at_limit() {
-        let mut l = WipLimit { column_id: "doing".into(), max_items: 5, current_count: 4 };
+        let mut l = WipLimit {
+            column_id: "doing".into(),
+            max_items: 5,
+            current_count: 4,
+        };
         let a = WipGuard::add(&mut l);
         assert_eq!(a, WipAction::Warn);
     }
 
     #[test]
     fn test_wip_block_over_limit() {
-        let mut l = WipLimit { column_id: "done".into(), max_items: 5, current_count: 5 };
+        let mut l = WipLimit {
+            column_id: "done".into(),
+            max_items: 5,
+            current_count: 5,
+        };
         let a = WipGuard::add(&mut l);
         assert_eq!(a, WipAction::Block);
     }
 
     #[test]
     fn test_wip_remove_decrement() {
-        let mut l = WipLimit { column_id: "todo".into(), max_items: 5, current_count: 3 };
+        let mut l = WipLimit {
+            column_id: "todo".into(),
+            max_items: 5,
+            current_count: 3,
+        };
         WipGuard::remove(&mut l);
         assert_eq!(l.current_count, 2);
         WipGuard::remove(&mut l);
@@ -242,15 +272,33 @@ mod tests {
 
     #[test]
     fn test_saved_view_shortcut() {
-        let v = SavedView::new("My Board", Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), ViewLayout::Board);
+        let v = SavedView::new(
+            "My Board",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            ViewLayout::Board,
+        );
         assert_eq!(v.shortcut(), "Cmd+1");
-        let v2 = SavedView::new("Timeline", Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), ViewLayout::Timeline);
+        let v2 = SavedView::new(
+            "Timeline",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            ViewLayout::Timeline,
+        );
         assert_eq!(v2.shortcut(), "Cmd+2");
     }
 
     #[test]
     fn test_saved_view_default_filters() {
-        let v = SavedView::new("Test", Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), ViewLayout::List);
+        let v = SavedView::new(
+            "Test",
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            ViewLayout::List,
+        );
         assert!(v.filters.assignee.is_none());
         assert!(v.filters.epic.is_none());
     }

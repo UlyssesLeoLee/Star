@@ -9,7 +9,7 @@
 //! - 输入:`{mr_id, reviewers?}`
 //! - 输出:`agent-api/v1#Review` mock
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::error::McpError;
 use crate::tools::{mock_response, require_string};

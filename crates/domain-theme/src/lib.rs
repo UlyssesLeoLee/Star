@@ -56,7 +56,9 @@ mod integration_tests {
 
     impl InMemoryThemeRepo {
         fn new() -> Self {
-            Self { store: Mutex::new(HashMap::new()) }
+            Self {
+                store: Mutex::new(HashMap::new()),
+            }
         }
     }
 
@@ -73,20 +75,23 @@ mod integration_tests {
             tenant_id: Uuid,
         ) -> Result<Option<Theme>, ThemeError> {
             let store = self.store.lock().unwrap();
-            Ok(store.values().find(|t| {
-                t.theme_id == theme_id
-                    && t.scope == scope
-                    && match (&t.scope_owner, scope) {
-                        (ScopeOwner::Personal { actor_id: a }, ThemeScope::Personal) => {
-                            Some(*a) == actor_id
+            Ok(store
+                .values()
+                .find(|t| {
+                    t.theme_id == theme_id
+                        && t.scope == scope
+                        && match (&t.scope_owner, scope) {
+                            (ScopeOwner::Personal { actor_id: a }, ThemeScope::Personal) => {
+                                Some(*a) == actor_id
+                            }
+                            (ScopeOwner::Tenant { tenant_id: t }, ThemeScope::Tenant) => {
+                                *t == tenant_id
+                            }
+                            (ScopeOwner::Global, ThemeScope::Global) => true,
+                            _ => false,
                         }
-                        (ScopeOwner::Tenant { tenant_id: t }, ThemeScope::Tenant) => {
-                            *t == tenant_id
-                        }
-                        (ScopeOwner::Global, ThemeScope::Global) => true,
-                        _ => false,
-                    }
-            }).cloned())
+                })
+                .cloned())
         }
         async fn list_by_scope(
             &self,
@@ -95,18 +100,28 @@ mod integration_tests {
             actor_id: Option<Uuid>,
         ) -> Result<Vec<Theme>, ThemeError> {
             let store = self.store.lock().unwrap();
-            Ok(store.values().filter(|t| {
-                t.scope == scope && match scope {
-                    ThemeScope::Personal => t.scope_owner_actor() == actor_id,
-                    ThemeScope::Tenant => t.scope_owner_tenant() == Some(tenant_id),
-                    ThemeScope::Global => true,
-                }
-            }).cloned().collect())
+            Ok(store
+                .values()
+                .filter(|t| {
+                    t.scope == scope
+                        && match scope {
+                            ThemeScope::Personal => t.scope_owner_actor() == actor_id,
+                            ThemeScope::Tenant => t.scope_owner_tenant() == Some(tenant_id),
+                            ThemeScope::Global => true,
+                        }
+                })
+                .cloned()
+                .collect())
         }
         async fn list_builtin(&self) -> Result<Vec<Theme>, ThemeError> {
-            Ok(self.store.lock().unwrap().values()
+            Ok(self
+                .store
+                .lock()
+                .unwrap()
+                .values()
                 .filter(|t| matches!(t.scope_owner, ScopeOwner::Global))
-                .cloned().collect())
+                .cloned()
+                .collect())
         }
         async fn save(&self, theme: &Theme) -> Result<(), ThemeError> {
             self.store.lock().unwrap().insert(theme.id, theme.clone());
@@ -121,7 +136,9 @@ mod integration_tests {
     struct NoopBus;
     #[async_trait::async_trait]
     impl ThemeEventBus for NoopBus {
-        async fn publish(&self, _event: ThemeEvent) -> Result<(), ThemeError> { Ok(()) }
+        async fn publish(&self, _event: ThemeEvent) -> Result<(), ThemeError> {
+            Ok(())
+        }
     }
 
     impl Theme {
@@ -145,8 +162,14 @@ mod integration_tests {
             display_name: theme_id.as_str().into(),
             is_dark: theme_id.is_dark(),
             colors: vec![ColorToken::new("--color-primary", "#5B5BD6")],
-            spacings: vec![SpacingToken { name: "--space-4".into(), px: 4 }],
-            radii: vec![RadiusToken { name: "--radius-sm".into(), px: 4 }],
+            spacings: vec![SpacingToken {
+                name: "--space-4".into(),
+                px: 4,
+            }],
+            radii: vec![RadiusToken {
+                name: "--radius-sm".into(),
+                px: 4,
+            }],
             version: 1,
         }
     }
@@ -181,10 +204,7 @@ mod integration_tests {
         // resolve 全链路
         let mut full_ctx = ThemeContext::new(Some(actor), tenant);
         // mock repo 的 find_by_scope 占位用了 ThemeId::Light, 这里手动验证: 在 list_by_scope 找到 Dark
-        let personal = svc
-            .list_available(&full_ctx)
-            .await
-            .unwrap();
+        let personal = svc.list_available(&full_ctx).await.unwrap();
         assert_eq!(personal.len(), 1);
         assert_eq!(personal[0].theme_id, ThemeId::Dark);
     }
@@ -196,7 +216,9 @@ mod integration_tests {
         let svc = ThemeService::new(repo, bus);
         let mut ctx = ThemeContext::new(None, Uuid::new_v4());
         ctx.resolution_chain = vec![ThemeScope::Personal];
-        let r = svc.set(&ctx, ThemeId::Dark, sample_def(ThemeId::Dark)).await;
+        let r = svc
+            .set(&ctx, ThemeId::Dark, sample_def(ThemeId::Dark))
+            .await;
         assert!(matches!(r, Err(ThemeError::PermissionDenied { .. })));
     }
 

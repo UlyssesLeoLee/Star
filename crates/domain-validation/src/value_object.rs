@@ -114,10 +114,7 @@ pub enum ValidationStatus {
 impl ValidationStatus {
     /// 是否终态
     pub fn is_terminal(&self) -> bool {
-        matches!(
-            self,
-            Self::Passed | Self::Failed | Self::Skipped
-        )
+        matches!(self, Self::Passed | Self::Failed | Self::Skipped)
     }
 }
 

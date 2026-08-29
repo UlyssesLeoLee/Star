@@ -202,8 +202,8 @@ impl LocalRuntime {
     /// INV-RT-04:距离 `now` 超过 `timeout` 即视为 Offline
     pub fn is_stale(&self, now: DateTime<Utc>, timeout: Duration) -> bool {
         let elapsed = now.signed_duration_since(self.last_heartbeat);
-        let max = ChronoDuration::from_std(timeout)
-            .unwrap_or_else(|_| ChronoDuration::seconds(300));
+        let max =
+            ChronoDuration::from_std(timeout).unwrap_or_else(|_| ChronoDuration::seconds(300));
         elapsed > max
     }
 
@@ -491,10 +491,7 @@ pub trait RuntimeRepository: Send + Sync {
         worktree_id: WorktreeId,
     ) -> Result<Option<WorktreeMount>, RuntimeError>;
 
-    async fn insert_exec_context(
-        &self,
-        c: AgentExecutionContext,
-    ) -> Result<(), RuntimeError>;
+    async fn insert_exec_context(&self, c: AgentExecutionContext) -> Result<(), RuntimeError>;
     async fn get_exec_context(
         &self,
         id: AgentExecutionContextId,
@@ -671,7 +668,10 @@ impl RuntimeRepository for InMemoryRuntimeRepository {
         user_id: UserId,
     ) -> Result<Vec<LocalRuntime>, RuntimeError> {
         let s = self.runtimes.read().expect("lock");
-        Ok(s.values().filter(|r| r.user_id == user_id).cloned().collect())
+        Ok(s.values()
+            .filter(|r| r.user_id == user_id)
+            .cloned()
+            .collect())
     }
 
     async fn insert_mount(&self, m: WorktreeMount) -> Result<(), RuntimeError> {
@@ -721,10 +721,7 @@ impl RuntimeRepository for InMemoryRuntimeRepository {
             .cloned())
     }
 
-    async fn insert_exec_context(
-        &self,
-        c: AgentExecutionContext,
-    ) -> Result<(), RuntimeError> {
+    async fn insert_exec_context(&self, c: AgentExecutionContext) -> Result<(), RuntimeError> {
         let mut s = self.exec_contexts.write().expect("lock");
         if s.contains_key(&c.id) {
             return Err(RuntimeError::Conflict(format!(
@@ -785,7 +782,9 @@ impl RuntimeCommandPort for InMemoryRuntimeService {
         }
         // INV-RT-05:1 Runtime → 1 User,owner 校验
         // (此处不要求 actor.user_id == cmd.user_id;允许管理员代注册)
-        if !actor.has_role("tenant_admin") && !actor.is_local_runtime && actor.user_id != cmd.user_id
+        if !actor.has_role("tenant_admin")
+            && !actor.is_local_runtime
+            && actor.user_id != cmd.user_id
         {
             return Err(RuntimeError::PermissionDenied);
         }
@@ -848,10 +847,7 @@ impl RuntimeCommandPort for InMemoryRuntimeService {
                 RuntimeError::NotFound(format!("runtime:{}", cmd.runtime_id.as_uuid()))
             })?;
         if r.tenant_id != cmd.tenant_id {
-            return Err(RuntimeError::CrossTenantDenied(
-                cmd.tenant_id,
-                r.tenant_id,
-            ));
+            return Err(RuntimeError::CrossTenantDenied(cmd.tenant_id, r.tenant_id));
         }
         r.record_heartbeat();
         self.repo.update_runtime(r.clone()).await?;
@@ -927,9 +923,7 @@ impl RuntimeCommandPort for InMemoryRuntimeService {
             .expect("lock")
             .get(&cmd.mount_id)
             .cloned()
-            .ok_or_else(|| {
-                RuntimeError::NotFound(format!("mount:{}", cmd.mount_id.as_uuid()))
-            })?;
+            .ok_or_else(|| RuntimeError::NotFound(format!("mount:{}", cmd.mount_id.as_uuid())))?;
         // 校验 tenant 一致性
         let r = self
             .runtimes
@@ -937,11 +931,12 @@ impl RuntimeCommandPort for InMemoryRuntimeService {
             .expect("lock")
             .get(&m.runtime_id)
             .cloned()
-            .ok_or_else(|| {
-                RuntimeError::NotFound(format!("runtime:{}", m.runtime_id.as_uuid()))
-            })?;
+            .ok_or_else(|| RuntimeError::NotFound(format!("runtime:{}", m.runtime_id.as_uuid())))?;
         if r.tenant_id != actor.tenant_id {
-            return Err(RuntimeError::CrossTenantDenied(actor.tenant_id, r.tenant_id));
+            return Err(RuntimeError::CrossTenantDenied(
+                actor.tenant_id,
+                r.tenant_id,
+            ));
         }
         if r.tenant_id != cmd.tenant_id {
             return Err(RuntimeError::CrossTenantDenied(cmd.tenant_id, r.tenant_id));
@@ -1021,16 +1016,12 @@ impl RuntimeQueryPort for InMemoryRuntimeService {
             .expect("lock")
             .get(&q.runtime_id)
             .cloned()
-            .ok_or_else(|| {
-                RuntimeError::NotFound(format!("runtime:{}", q.runtime_id.as_uuid()))
-            })?;
+            .ok_or_else(|| RuntimeError::NotFound(format!("runtime:{}", q.runtime_id.as_uuid())))?;
         if r.tenant_id != q.tenant_id {
             return Err(RuntimeError::CrossTenantDenied(q.tenant_id, r.tenant_id));
         }
         // INV-RT-05:1 Runtime → 1 User,非 owner 不可读
-        if !actor.is_local_runtime
-            && !actor.has_role("tenant_admin")
-            && actor.user_id != r.user_id
+        if !actor.is_local_runtime && !actor.has_role("tenant_admin") && actor.user_id != r.user_id
         {
             return Err(RuntimeError::PermissionDenied);
         }
@@ -1077,15 +1068,11 @@ impl RuntimeQueryPort for InMemoryRuntimeService {
             .expect("lock")
             .get(&q.runtime_id)
             .cloned()
-            .ok_or_else(|| {
-                RuntimeError::NotFound(format!("runtime:{}", q.runtime_id.as_uuid()))
-            })?;
+            .ok_or_else(|| RuntimeError::NotFound(format!("runtime:{}", q.runtime_id.as_uuid())))?;
         if r.tenant_id != q.tenant_id {
             return Err(RuntimeError::CrossTenantDenied(q.tenant_id, r.tenant_id));
         }
-        if !actor.is_local_runtime
-            && !actor.has_role("tenant_admin")
-            && actor.user_id != r.user_id
+        if !actor.is_local_runtime && !actor.has_role("tenant_admin") && actor.user_id != r.user_id
         {
             return Err(RuntimeError::PermissionDenied);
         }
@@ -1235,7 +1222,10 @@ mod tests {
             .unwrap();
         r2.last_heartbeat = Utc::now() - ChronoDuration::seconds(400);
         svc.repo.update_runtime(r2.clone()).await.unwrap();
-        svc.runtimes.write().expect("lock").insert(r2.id, r2.clone());
+        svc.runtimes
+            .write()
+            .expect("lock")
+            .insert(r2.id, r2.clone());
 
         // reconcile:模拟 350s 之后调用
         r2.reconcile_status(Utc::now(), default_heartbeat_timeout());
@@ -1445,10 +1435,7 @@ mod tests {
 
         // 管理员看,所有 runtimes
         let all = svc
-            .list_by_user(
-                ListByUserQuery { tenant_id, user_id },
-                &admin,
-            )
+            .list_by_user(ListByUserQuery { tenant_id, user_id }, &admin)
             .await
             .unwrap();
         assert_eq!(all.len(), 2);
@@ -1456,10 +1443,7 @@ mod tests {
         // 非管理员看自己(同 user_id 的 actor)
         let self_actor = make_actor(tenant_id, user_id);
         let mine = svc
-            .list_by_user(
-                ListByUserQuery { tenant_id, user_id },
-                &self_actor,
-            )
+            .list_by_user(ListByUserQuery { tenant_id, user_id }, &self_actor)
             .await
             .unwrap();
         assert_eq!(mine.len(), 2);
@@ -1467,10 +1451,7 @@ mod tests {
         // 非管理员看别人 → PermissionDenied
         let other = make_actor(tenant_id, UserId::new());
         let res = svc
-            .list_by_user(
-                ListByUserQuery { tenant_id, user_id },
-                &other,
-            )
+            .list_by_user(ListByUserQuery { tenant_id, user_id }, &other)
             .await;
         assert!(matches!(res, Err(RuntimeError::PermissionDenied)));
     }
@@ -1557,19 +1538,14 @@ mod tests {
 
 pub mod process;
 
-
 pub mod http_client;
-
 
 pub mod cli_spawn;
 
-
 pub mod sse_parser;
-pub mod subscribe_real;
 pub mod subscribe_integration;
+pub mod subscribe_real;
 
-
-pub mod spawn_upload_integration;
-pub mod spawn_upload_hub;
 pub mod e2e_integration;
-
+pub mod spawn_upload_hub;
+pub mod spawn_upload_integration;

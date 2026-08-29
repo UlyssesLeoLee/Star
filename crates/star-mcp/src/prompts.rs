@@ -29,9 +29,9 @@
 
 #![warn(missing_docs)]
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
-use crate::error::{ErrorSourceKind, McpError, error_code};
+use crate::error::{error_code, ErrorSourceKind, McpError};
 use crate::transport::{JsonRpcError, JsonRpcErrorBody, JsonRpcRequest, JsonRpcSuccess};
 
 /// Prompts handler (Phase E: 5 核心 prompt 模板)
@@ -94,7 +94,12 @@ impl PromptsHandler {
         ]
     }
 
-    fn prompt_descriptor(&self, name: &str, description: &str, args: &[(&str, &str, &str)]) -> Value {
+    fn prompt_descriptor(
+        &self,
+        name: &str,
+        description: &str,
+        args: &[(&str, &str, &str)],
+    ) -> Value {
         let arguments: Vec<Value> = args
             .iter()
             .map(|(arg_name, arg_type, arg_desc)| {
@@ -145,9 +150,8 @@ impl PromptsHandler {
         let worktree = worktree_id.unwrap_or("<unset — set worktree_id>");
         let force = args.get("force").and_then(Value::as_bool).unwrap_or(false);
 
-        let description = format!(
-            "Universal Submit 12-step flow for worktree '{worktree}' (force={force})"
-        );
+        let description =
+            format!("Universal Submit 12-step flow for worktree '{worktree}' (force={force})");
 
         let user_text = format!(
             "请按以下步骤执行 Universal Submit(per `spec/flows/05` 12 步流程):\n\n\
@@ -190,7 +194,8 @@ impl PromptsHandler {
             })
             .unwrap_or_else(|| "<unset — default: codeowners>".to_string());
 
-        let description = format!("Compose MR review request for '{mr_id}' (reviewers: {reviewers})");
+        let description =
+            format!("Compose MR review request for '{mr_id}' (reviewers: {reviewers})");
 
         let user_text = format!(
             "请为 MR '{mr_id}' 生成 review 请求:\n\n\
@@ -250,7 +255,8 @@ impl PromptsHandler {
             worktree_id.unwrap_or("N/A")
         );
 
-        let assistant_text = "Phase E stub: 即将并发调 4 个 read tool + 1 个 resources/read, 合并返回。".to_string();
+        let assistant_text =
+            "Phase E stub: 即将并发调 4 个 read tool + 1 个 resources/read, 合并返回。".to_string();
 
         Ok(prompt_messages(&description, &user_text, &assistant_text))
     }
@@ -330,7 +336,9 @@ impl PromptsHandler {
             agent_id.unwrap_or("N/A")
         );
 
-        let assistant_text = "Phase E stub: 即将串行调 3 个 read + 1 个 resources/read, 按 6 字段 Error 决策路径。".to_string();
+        let assistant_text =
+            "Phase E stub: 即将串行调 3 个 read + 1 个 resources/read, 按 6 字段 Error 决策路径。"
+                .to_string();
 
         Ok(prompt_messages(&description, &user_text, &assistant_text))
     }
@@ -383,15 +391,24 @@ pub(crate) fn handle_prompts_list(req: &JsonRpcRequest) -> Result<JsonRpcSuccess
     let handler = PromptsHandler::new();
     let prompts = handler.list();
     let result = json!({ "prompts": prompts });
-    Ok(JsonRpcSuccess { jsonrpc: "2.0", id: req.id.clone(), result })
+    Ok(JsonRpcSuccess {
+        jsonrpc: "2.0",
+        id: req.id.clone(),
+        result,
+    })
 }
 
 /// 处理 `prompts/get` 请求
 ///
 /// 期望 params = { "name": "<prompt_name>", "arguments": {...} }
-pub(crate) async fn handle_prompts_get(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRpcError> {
-    let name = req.params.get("name").and_then(Value::as_str).ok_or_else(|| {
-        JsonRpcError {
+pub(crate) async fn handle_prompts_get(
+    req: &JsonRpcRequest,
+) -> Result<JsonRpcSuccess, JsonRpcError> {
+    let name = req
+        .params
+        .get("name")
+        .and_then(Value::as_str)
+        .ok_or_else(|| JsonRpcError {
             jsonrpc: "2.0",
             id: req.id.clone(),
             error: JsonRpcErrorBody {
@@ -399,8 +416,7 @@ pub(crate) async fn handle_prompts_get(req: &JsonRpcRequest) -> Result<JsonRpcSu
                 message: "missing 'name' in params".to_string(),
                 data: None,
             },
-        }
-    })?;
+        })?;
     let arguments = req
         .params
         .get("arguments")
@@ -409,7 +425,11 @@ pub(crate) async fn handle_prompts_get(req: &JsonRpcRequest) -> Result<JsonRpcSu
 
     let handler = PromptsHandler::new();
     match handler.get(name, &arguments).await {
-        Ok(result) => Ok(JsonRpcSuccess { jsonrpc: "2.0", id: req.id.clone(), result }),
+        Ok(result) => Ok(JsonRpcSuccess {
+            jsonrpc: "2.0",
+            id: req.id.clone(),
+            result,
+        }),
         Err(e) => Err(JsonRpcError {
             jsonrpc: "2.0",
             id: req.id.clone(),
@@ -437,7 +457,10 @@ mod tests {
     async fn test_get_submit_with_worktree() {
         let h = handler();
         let v = h
-            .get("submit", &json!({ "worktree_id": "wt-STAR-1024", "force": false }))
+            .get(
+                "submit",
+                &json!({ "worktree_id": "wt-STAR-1024", "force": false }),
+            )
             .await
             .unwrap();
         let desc = v.get("description").unwrap().as_str().unwrap();
@@ -445,10 +468,25 @@ mod tests {
         let messages = v.get("messages").unwrap().as_array().unwrap();
         assert_eq!(messages.len(), 2, "user + assistant");
         assert_eq!(messages[0].get("role").unwrap().as_str().unwrap(), "user");
-        assert_eq!(messages[1].get("role").unwrap().as_str().unwrap(), "assistant");
-        let user_text = messages[0].get("content").unwrap().get("text").unwrap().as_str().unwrap();
-        assert!(user_text.contains("Universal Submit"), "must reference spec/flows/05");
-        assert!(user_text.contains("_mock: true"), "must be marked mock per Phase E");
+        assert_eq!(
+            messages[1].get("role").unwrap().as_str().unwrap(),
+            "assistant"
+        );
+        let user_text = messages[0]
+            .get("content")
+            .unwrap()
+            .get("text")
+            .unwrap()
+            .as_str()
+            .unwrap();
+        assert!(
+            user_text.contains("Universal Submit"),
+            "must reference spec/flows/05"
+        );
+        assert!(
+            user_text.contains("_mock: true"),
+            "must be marked mock per Phase E"
+        );
     }
 
     #[tokio::test]
@@ -497,9 +535,18 @@ mod tests {
     #[tokio::test]
     async fn test_get_context_with_issue_only() {
         let h = handler();
-        let v = h.get("context", &json!({ "issue_id": "STAR-1024" })).await.unwrap();
+        let v = h
+            .get("context", &json!({ "issue_id": "STAR-1024" }))
+            .await
+            .unwrap();
         let messages = v.get("messages").unwrap().as_array().unwrap();
-        let user_text = messages[0].get("content").unwrap().get("text").unwrap().as_str().unwrap();
+        let user_text = messages[0]
+            .get("content")
+            .unwrap()
+            .get("text")
+            .unwrap()
+            .as_str()
+            .unwrap();
         assert!(user_text.contains("STAR-1024"));
         assert!(user_text.contains("get_issue"));
     }
@@ -525,7 +572,10 @@ mod tests {
     async fn test_get_workflow_valid_domain() {
         let h = handler();
         for domain in ["player", "economy", "match", "social", "admin"] {
-            let v = h.get("workflow", &json!({ "domain": domain })).await.unwrap();
+            let v = h
+                .get("workflow", &json!({ "domain": domain }))
+                .await
+                .unwrap();
             let desc = v.get("description").unwrap().as_str().unwrap();
             assert!(desc.contains(domain));
         }
@@ -534,7 +584,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_workflow_invalid_domain_rejected() {
         let h = handler();
-        let err = h.get("workflow", &json!({ "domain": "unknown" })).await.unwrap_err();
+        let err = h
+            .get("workflow", &json!({ "domain": "unknown" }))
+            .await
+            .unwrap_err();
         assert_eq!(err.code, error_code::USER_INPUT);
         assert!(err.message.contains("unknown"));
         assert!(err.hint.is_some(), "must suggest valid domains");
@@ -557,7 +610,13 @@ mod tests {
             .await
             .unwrap();
         let messages = v.get("messages").unwrap().as_array().unwrap();
-        let user_text = messages[0].get("content").unwrap().get("text").unwrap().as_str().unwrap();
+        let user_text = messages[0]
+            .get("content")
+            .unwrap()
+            .get("text")
+            .unwrap()
+            .as_str()
+            .unwrap();
         assert!(user_text.contains("trace-001"));
         assert!(user_text.contains("WORKTREE_CONFLICT") || user_text.contains("code"));
     }
@@ -565,11 +624,22 @@ mod tests {
     #[tokio::test]
     async fn test_get_debug_with_agent_id() {
         let h = handler();
-        let v = h.get("debug", &json!({ "agent_id": "agent-1" })).await.unwrap();
+        let v = h
+            .get("debug", &json!({ "agent_id": "agent-1" }))
+            .await
+            .unwrap();
         let user_text = v.get("messages").unwrap().as_array().unwrap()[0]
-            .get("content").unwrap().get("text").unwrap().as_str().unwrap();
+            .get("content")
+            .unwrap()
+            .get("text")
+            .unwrap()
+            .as_str()
+            .unwrap();
         assert!(user_text.contains("agent-1"));
-        assert!(user_text.contains("agent://agent-1/state"), "must reference resources/read URI");
+        assert!(
+            user_text.contains("agent://agent-1/state"),
+            "must reference resources/read URI"
+        );
     }
 
     #[tokio::test]
@@ -612,7 +682,10 @@ mod tests {
         for p in &prompts {
             let name = p.get("name").unwrap().as_str().unwrap();
             let args = p.get("arguments").unwrap().as_array().unwrap();
-            assert!(!args.is_empty(), "prompt '{name}' must declare at least one argument");
+            assert!(
+                !args.is_empty(),
+                "prompt '{name}' must declare at least one argument"
+            );
             for arg in args {
                 assert!(arg.get("name").is_some());
                 assert!(arg.get("type").is_some());

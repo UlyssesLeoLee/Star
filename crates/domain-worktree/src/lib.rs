@@ -128,7 +128,10 @@ impl WorktreeStatus {
 
 /// 17 状态机迁移表(§7.1)
 /// 严格迁移:任何不在表中的迁移返回 InvalidTransition
-pub fn check_status_transition(from: WorktreeStatus, to: WorktreeStatus) -> Result<(), WorktreeError> {
+pub fn check_status_transition(
+    from: WorktreeStatus,
+    to: WorktreeStatus,
+) -> Result<(), WorktreeError> {
     use WorktreeStatus::*;
     let allowed = matches!(
         (from, to),
@@ -653,7 +656,10 @@ impl WorktreeCommandPort for InMemoryWorktreeService {
         actor: &ActorContext,
     ) -> Result<Worktree, WorktreeError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         // INV-WT-03:runtime 必带(runtime_id 是强类型,默认构造即带,此检查作为字段必带校验)
         if cmd.runtime_id.0.is_nil() {
@@ -694,10 +700,16 @@ impl WorktreeCommandPort for InMemoryWorktreeService {
     ) -> Result<Worktree, WorktreeError> {
         let mut wt = self.repo.get(cmd.worktree_id).await?;
         if wt.tenant_id != actor.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(actor.tenant_id, wt.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                actor.tenant_id,
+                wt.tenant_id,
+            ));
         }
         if wt.tenant_id != cmd.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(cmd.tenant_id, wt.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                cmd.tenant_id,
+                wt.tenant_id,
+            ));
         }
         // 必须先到 Ready 才能 assign
         check_status_transition(wt.status, WorktreeStatus::Assigned)?;
@@ -720,10 +732,16 @@ impl WorktreeCommandPort for InMemoryWorktreeService {
         }
         let mut wt = self.repo.get(cmd.worktree_id).await?;
         if wt.tenant_id != actor.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(actor.tenant_id, wt.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                actor.tenant_id,
+                wt.tenant_id,
+            ));
         }
         if wt.tenant_id != cmd.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(cmd.tenant_id, wt.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                cmd.tenant_id,
+                wt.tenant_id,
+            ));
         }
         let now = Utc::now();
         wt.ahead = cmd.ahead;
@@ -751,10 +769,16 @@ impl WorktreeCommandPort for InMemoryWorktreeService {
     ) -> Result<Worktree, WorktreeError> {
         let mut wt = self.repo.get(cmd.worktree_id).await?;
         if wt.tenant_id != actor.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(actor.tenant_id, wt.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                actor.tenant_id,
+                wt.tenant_id,
+            ));
         }
         if wt.tenant_id != cmd.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(cmd.tenant_id, wt.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                cmd.tenant_id,
+                wt.tenant_id,
+            ));
         }
         if wt.status != cmd.from {
             return Err(WorktreeError::InvalidTransition {
@@ -778,10 +802,16 @@ impl WorktreeCommandPort for InMemoryWorktreeService {
     ) -> Result<Worktree, WorktreeError> {
         let mut wt = self.repo.get(cmd.worktree_id).await?;
         if wt.tenant_id != actor.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(actor.tenant_id, wt.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                actor.tenant_id,
+                wt.tenant_id,
+            ));
         }
         if wt.tenant_id != cmd.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(cmd.tenant_id, wt.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                cmd.tenant_id,
+                wt.tenant_id,
+            ));
         }
         if wt.status.is_terminal() {
             return Err(WorktreeError::InvalidTransition {
@@ -806,7 +836,10 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
     ) -> Result<Worktree, WorktreeError> {
         let wt = self.repo.get(id).await?;
         if wt.tenant_id != actor.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(actor.tenant_id, wt.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                actor.tenant_id,
+                wt.tenant_id,
+            ));
         }
         Ok(wt)
     }
@@ -816,9 +849,15 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
         actor: &ActorContext,
     ) -> Result<Vec<WorktreeSummary>, WorktreeError> {
         if q.tenant_id != actor.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
-        let wts = self.repo.list_by_work_item(q.tenant_id, q.work_item_id).await?;
+        let wts = self
+            .repo
+            .list_by_work_item(q.tenant_id, q.work_item_id)
+            .await?;
         Ok(wts
             .into_iter()
             .map(|w| WorktreeSummary {
@@ -837,7 +876,10 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
         actor: &ActorContext,
     ) -> Result<Vec<WorktreeSummary>, WorktreeError> {
         if q.tenant_id != actor.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
         let wts = self.repo.list_by_agent(q.tenant_id, q.agent_id).await?;
         Ok(wts
@@ -859,7 +901,10 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
     ) -> Result<Vec<WorktreeId>, WorktreeError> {
         let wt = self.repo.get(worktree_id).await?;
         if wt.tenant_id != actor.tenant_id {
-            return Err(WorktreeError::CrossTenantDenied(actor.tenant_id, wt.tenant_id));
+            return Err(WorktreeError::CrossTenantDenied(
+                actor.tenant_id,
+                wt.tenant_id,
+            ));
         }
         // 简化:同 repository 的其他活跃 Worktree 都是潜在冲突
         let others = self
@@ -884,7 +929,10 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
         let mut by_status: HashMap<String, u32> = HashMap::new();
         for w in &wts {
             if w.tenant_id != actor.tenant_id {
-                return Err(WorktreeError::CrossTenantDenied(actor.tenant_id, w.tenant_id));
+                return Err(WorktreeError::CrossTenantDenied(
+                    actor.tenant_id,
+                    w.tenant_id,
+                ));
             }
             *by_status.entry(w.status.as_str().to_string()).or_insert(0) += 1;
         }
@@ -957,7 +1005,9 @@ mod tests {
 
     #[test]
     fn valid_transition_created_to_initializing() {
-        assert!(check_status_transition(WorktreeStatus::Created, WorktreeStatus::Initializing).is_ok());
+        assert!(
+            check_status_transition(WorktreeStatus::Created, WorktreeStatus::Initializing).is_ok()
+        );
     }
 
     #[test]
@@ -997,7 +1047,8 @@ mod tests {
     #[test]
     fn valid_transition_changes_requested_loop() {
         // Reviewing -> ChangesRequested -> Fixing -> AgentRunning 是合法循环
-        check_status_transition(WorktreeStatus::Reviewing, WorktreeStatus::ChangesRequested).unwrap();
+        check_status_transition(WorktreeStatus::Reviewing, WorktreeStatus::ChangesRequested)
+            .unwrap();
         check_status_transition(WorktreeStatus::ChangesRequested, WorktreeStatus::Fixing).unwrap();
         check_status_transition(WorktreeStatus::Fixing, WorktreeStatus::AgentRunning).unwrap();
     }

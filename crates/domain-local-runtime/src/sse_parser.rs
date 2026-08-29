@@ -71,7 +71,11 @@ pub struct SseParser {
 }
 
 impl SseParser {
-    pub fn new() -> Self { Self { buffer: String::new() } }
+    pub fn new() -> Self {
+        Self {
+            buffer: String::new(),
+        }
+    }
 
     /// 喂入一段原始字节, 返回完整事件列表
     pub fn feed(&mut self, chunk: &str) -> Vec<Result<SseChunk, SseParseError>> {
@@ -91,7 +95,9 @@ impl SseParser {
 
     /// 收尾 (流结束, 处理残余)
     pub fn finish(&mut self) -> Vec<Result<SseChunk, SseParseError>> {
-        if self.buffer.is_empty() { return vec![]; }
+        if self.buffer.is_empty() {
+            return vec![];
+        }
         let event = std::mem::take(&mut self.buffer);
         match parse_event(&event) {
             Some(r) => vec![r],
@@ -101,7 +107,9 @@ impl SseParser {
 }
 
 impl Default for SseParser {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn parse_event(event: &str) -> Option<Result<SseChunk, SseParseError>> {
@@ -115,17 +123,23 @@ fn parse_event(event: &str) -> Option<Result<SseChunk, SseParseError>> {
                 return None;
             }
             // 多 data 行: 拼接 (实际少见)
-            if !data.is_empty() { data.push('\n'); }
+            if !data.is_empty() {
+                data.push('\n');
+            }
             data.push_str(value);
         }
         // 忽略 event:/id:/retry:/: 注释
     }
-    if data.is_empty() { return None; }
+    if data.is_empty() {
+        return None;
+    }
 
     // 解析 JSON
     match serde_json::from_str::<OpenAiStreamChunk>(&data) {
         Ok(c) => {
-            if c.choices.is_empty() { return None; }
+            if c.choices.is_empty() {
+                return None;
+            }
             let choice = &c.choices[0];
             Some(Ok(SseChunk {
                 content: choice.delta.content.clone().unwrap_or_default(),
@@ -227,18 +241,22 @@ mod tests {
     fn test_buffer_split_events() {
         let mut p = SseParser::new();
         // 第一个完整事件
-        let c1 = p.feed(r#"data: {"choices":[{"delta":{"content":"a"}}]}
+        let c1 = p.feed(
+            r#"data: {"choices":[{"delta":{"content":"a"}}]}
 
-"#);
+"#,
+        );
         assert_eq!(c1.len(), 1);
         assert_eq!(c1[0].as_ref().unwrap().content, "a");
         // 跨 chunk: 半个事件
         let c2 = p.feed(r#"data: {"choices":[{"delta":{"con"#);
         assert_eq!(c2.len(), 0);
         // 完成另一半
-        let c3 = p.feed(r#"tent":"b"}}]}
+        let c3 = p.feed(
+            r#"tent":"b"}}]}
 
-"#);
+"#,
+        );
         assert_eq!(c3.len(), 1);
         assert_eq!(c3[0].as_ref().unwrap().content, "b");
     }

@@ -11,11 +11,10 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
 
 use domain_tenant::{
-    ActorContext, GetTenantQuery, InMemoryTenantService, TenantCommandPort, TenantError,
-    TenantId, TenantQueryPort, UserId,
+    ActorContext, GetTenantQuery, InMemoryTenantService, TenantCommandPort, TenantError, TenantId,
+    TenantQueryPort, UserId,
 };
 #[allow(unused_imports)]
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct TenantData {
     pub tenant_id: String,
@@ -43,7 +42,8 @@ impl TenantHandler {
         Self::default()
     }
     fn service(&self) -> &Arc<InMemoryTenantService> {
-        self.svc.get_or_init(|| Arc::new(InMemoryTenantService::new()))
+        self.svc
+            .get_or_init(|| Arc::new(InMemoryTenantService::new()))
     }
 }
 
@@ -59,9 +59,11 @@ impl Resource for TenantHandler {
             uuid::Uuid::parse_str(id).map_err(|e| ResourceError::InvalidUri(e.to_string()))?,
         );
         let svc = self.service();
-        let actor =
-            ActorContext::new(UserId::from(uuid::Uuid::nil()), tid).as_platform_admin();
-        match svc.get_tenant(GetTenantQuery { tenant_id: tid }, &actor).await {
+        let actor = ActorContext::new(UserId::from(uuid::Uuid::nil()), tid).as_platform_admin();
+        match svc
+            .get_tenant(GetTenantQuery { tenant_id: tid }, &actor)
+            .await
+        {
             Ok(t) => Ok(Some(TenantData {
                 tenant_id: t.id.to_string(),
                 slug: t.slug,
@@ -103,8 +105,7 @@ mod tests {
             display_name: "Acme Corp".into(),
             plan_tier: PlanTier::Pro,
         };
-        let actor =
-            ActorContext::new(UserId::from(uuid::Uuid::nil()), tid).as_platform_admin();
+        let actor = ActorContext::new(UserId::from(uuid::Uuid::nil()), tid).as_platform_admin();
         let created = svc.create_tenant(cmd, &actor).await.unwrap();
         // 通过 handler 读回
         let d = h.read(&created.id.to_string()).await.unwrap().unwrap();

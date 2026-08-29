@@ -43,9 +43,7 @@ use uuid::Uuid;
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[allow(missing_docs)]
-        #[derive(
-            Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
-        )]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
         #[serde(transparent)]
         pub struct $name(uuid::Uuid);
 
@@ -301,10 +299,9 @@ impl AutomationCondition {
             ConditionOperator::Equals => actual == Some(&self.value),
             ConditionOperator::NotEquals => actual != Some(&self.value),
             ConditionOperator::Contains => {
-                if let (Some(actual_str), Some(needle_str)) = (
-                    actual.and_then(|v| v.as_str()),
-                    self.value.as_str(),
-                ) {
+                if let (Some(actual_str), Some(needle_str)) =
+                    (actual.and_then(|v| v.as_str()), self.value.as_str())
+                {
                     actual_str.contains(needle_str)
                 } else {
                     false
@@ -326,7 +323,8 @@ impl AutomationCondition {
             }
             ConditionOperator::In => {
                 if let Some(arr) = self.value.as_array() {
-                    arr.iter().any(|v| v == actual.unwrap_or(&serde_json::Value::Null))
+                    arr.iter()
+                        .any(|v| v == actual.unwrap_or(&serde_json::Value::Null))
                 } else {
                     false
                 }
@@ -511,12 +509,16 @@ pub fn check_invariant_02_project_id(rule: &AutomationRule) -> Result<(), Automa
 }
 
 /// **INV-AUTO-05** Rule 不得含 Protected 动作
-pub fn check_invariant_05_no_protected_actions(rule: &AutomationRule) -> Result<(), AutomationError> {
+pub fn check_invariant_05_no_protected_actions(
+    rule: &AutomationRule,
+) -> Result<(), AutomationError> {
     rule.check_no_protected_actions()
 }
 
 /// **INV-AUTO-06** 限流必须 > 0(0 表示无限流 → 循环风险)
-pub fn check_invariant_06_rate_limit_positive(rule: &AutomationRule) -> Result<(), AutomationError> {
+pub fn check_invariant_06_rate_limit_positive(
+    rule: &AutomationRule,
+) -> Result<(), AutomationError> {
     if rule.rate_limit_per_minute == 0 {
         return Err(AutomationError::InvalidState(
             "INV-AUTO-06: rate_limit_per_minute 必须 > 0(防循环)".to_string(),
@@ -825,10 +827,11 @@ impl AutomationCommandPort for InMemoryAutomationService {
         // 项目内 name 唯一
         {
             let guard = self.rules.read().await;
-            if guard
-                .values()
-                .any(|r| r.tenant_id == cmd.tenant_id && r.project_id == cmd.project_id && r.name == rule.name)
-            {
+            if guard.values().any(|r| {
+                r.tenant_id == cmd.tenant_id
+                    && r.project_id == cmd.project_id
+                    && r.name == rule.name
+            }) {
                 return Err(AutomationError::Conflict(format!(
                     "project 内 rule name '{}' 已存在",
                     rule.name
@@ -928,7 +931,10 @@ impl AutomationCommandPort for InMemoryAutomationService {
             return Err(AutomationError::PermissionDenied);
         }
         // 评估所有条件
-        let matched = rule.conditions.iter().all(|c| c.evaluate(&cmd.sample_event));
+        let matched = rule
+            .conditions
+            .iter()
+            .all(|c| c.evaluate(&cmd.sample_event));
         Ok(matched)
     }
 }
@@ -1075,7 +1081,10 @@ impl RuleExecutor for InMemoryAutomationService {
                 continue;
             }
             // 限流(INV-AUTO-06)
-            if !self.check_rate_limit(rule.id, rule.rate_limit_per_minute).await {
+            if !self
+                .check_rate_limit(rule.id, rule.rate_limit_per_minute)
+                .await
+            {
                 let now = Utc::now();
                 let eid = ExecutionId::new();
                 to_log.push(AutomationExecution {
@@ -1310,10 +1319,16 @@ mod tests {
         let _ = svc.create_rule(cmd, actor).await.unwrap();
         let event = serde_json::json!({"resource_type": "feedback", "severity": "P0"});
         // 第 1 次: 通过
-        let r1 = svc.evaluate(TriggerType::FeedbackCreated, event.clone()).await.unwrap();
+        let r1 = svc
+            .evaluate(TriggerType::FeedbackCreated, event.clone())
+            .await
+            .unwrap();
         assert_eq!(r1.len(), 1);
         // 第 2 次: 限流(写 history: matched=true, RateLimited)
-        let r2 = svc.evaluate(TriggerType::FeedbackCreated, event.clone()).await.unwrap();
+        let r2 = svc
+            .evaluate(TriggerType::FeedbackCreated, event.clone())
+            .await
+            .unwrap();
         assert_eq!(r2.len(), 0);
         // 历史 100% 写(INV-AUTO-04): 至少 1 条 RateLimited
         assert!(svc.execution_count().await >= 1);
@@ -1439,4 +1454,3 @@ mod tests {
 }
 
 pub mod governance;
-

@@ -24,7 +24,9 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use super::process::{LocalRuntime, OutputLine, OutputStream, ProcessHandle, ProcessState, RuntimeError};
+use super::process::{
+    LocalRuntime, OutputLine, OutputStream, ProcessHandle, ProcessState, RuntimeError,
+};
 
 // =====================================================================
 // 1. value_object — HTTP 请求/响应类型
@@ -42,7 +44,9 @@ pub enum HttpMethod {
 }
 
 impl Default for HttpMethod {
-    fn default() -> Self { Self::Post }
+    fn default() -> Self {
+        Self::Post
+    }
 }
 
 /// HTTP 请求体
@@ -89,7 +93,9 @@ pub struct HttpClient {
 
 impl HttpClient {
     pub fn new() -> Self {
-        Self { clients: Mutex::new(HashMap::new()) }
+        Self {
+            clients: Mutex::new(HashMap::new()),
+        }
     }
 
     /// 发送 HTTP 请求, 实时推流到 mpsc
@@ -127,7 +133,10 @@ impl HttpClient {
         }
 
         let start = std::time::Instant::now();
-        let response = builder.send().await.map_err(|e| HttpError::Request(e.to_string()))?;
+        let response = builder
+            .send()
+            .await
+            .map_err(|e| HttpError::Request(e.to_string()))?;
         let status = response.status().as_u16();
         let mut headers = HashMap::new();
         for (k, v) in response.headers() {
@@ -151,37 +160,45 @@ impl HttpClient {
                     Ok(c) => {
                         if !c.content.is_empty() {
                             total_content.push_str(&c.content);
-                            let _ = out.send(OutputLine {
-                                stream: OutputStream::Stdout,
-                                content: c.content,
-                                at: chrono::Utc::now(),
-                            }).await;
+                            let _ = out
+                                .send(OutputLine {
+                                    stream: OutputStream::Stdout,
+                                    content: c.content,
+                                    at: chrono::Utc::now(),
+                                })
+                                .await;
                         }
                         if !role_seen {
                             if let Some(role) = &c.role {
-                                let _ = out.send(OutputLine {
-                                    stream: OutputStream::System,
-                                    content: format!("[role: {}]", role),
-                                    at: chrono::Utc::now(),
-                                }).await;
+                                let _ = out
+                                    .send(OutputLine {
+                                        stream: OutputStream::System,
+                                        content: format!("[role: {}]", role),
+                                        at: chrono::Utc::now(),
+                                    })
+                                    .await;
                                 role_seen = true;
                             }
                         }
                         if let Some(fr) = &c.finish_reason {
-                            let _ = out.send(OutputLine {
-                                stream: OutputStream::System,
-                                content: format!("[finish: {}]", fr),
-                                at: chrono::Utc::now(),
-                            }).await;
+                            let _ = out
+                                .send(OutputLine {
+                                    stream: OutputStream::System,
+                                    content: format!("[finish: {}]", fr),
+                                    at: chrono::Utc::now(),
+                                })
+                                .await;
                         }
                     }
                     Err(e) => {
                         // 单 chunk 失败: 推错误, 继续
-                        let _ = out.send(OutputLine {
-                            stream: OutputStream::System,
-                            content: format!("[sse-parse-error: {}]", e),
-                            at: chrono::Utc::now(),
-                        }).await;
+                        let _ = out
+                            .send(OutputLine {
+                                stream: OutputStream::System,
+                                content: format!("[sse-parse-error: {}]", e),
+                                at: chrono::Utc::now(),
+                            })
+                            .await;
                     }
                 }
             }
@@ -192,11 +209,13 @@ impl HttpClient {
             if let Ok(c) = parsed {
                 if !c.content.is_empty() {
                     total_content.push_str(&c.content);
-                    let _ = out.send(OutputLine {
-                        stream: OutputStream::Stdout,
-                        content: c.content,
-                        at: chrono::Utc::now(),
-                    }).await;
+                    let _ = out
+                        .send(OutputLine {
+                            stream: OutputStream::Stdout,
+                            content: c.content,
+                            at: chrono::Utc::now(),
+                        })
+                        .await;
                 }
             }
         }
@@ -204,17 +223,33 @@ impl HttpClient {
         let latency_ms = start.elapsed().as_millis() as u64;
 
         // 推完成消息 (现在用解析后的 content 长度, 更准确)
-        let _ = out.send(OutputLine {
-            stream: OutputStream::System,
-            content: format!("HTTP {} ({}ms, content: {} bytes)", status, latency_ms, total_content.len()),
-            at: chrono::Utc::now(),
-        }).await;
+        let _ = out
+            .send(OutputLine {
+                stream: OutputStream::System,
+                content: format!(
+                    "HTTP {} ({}ms, content: {} bytes)",
+                    status,
+                    latency_ms,
+                    total_content.len()
+                ),
+                at: chrono::Utc::now(),
+            })
+            .await;
 
-        Ok(HttpResponse { status, headers, body, latency_ms })
+        Ok(HttpResponse {
+            status,
+            headers,
+            body,
+            latency_ms,
+        })
     }
 
     /// 按 URL host 缓存 reqwest::Client (避免重复创建连接池)
-    async fn get_client_for_url(&self, url: &str, timeout_sec: u32) -> Result<reqwest::Client, HttpError> {
+    async fn get_client_for_url(
+        &self,
+        url: &str,
+        timeout_sec: u32,
+    ) -> Result<reqwest::Client, HttpError> {
         let host = url.split('/').nth(2).unwrap_or("default").to_string();
         let mut clients = self.clients.lock().await;
         if let Some(c) = clients.get(&host) {
@@ -230,7 +265,9 @@ impl HttpClient {
 }
 
 impl Default for HttpClient {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // =====================================================================
@@ -280,7 +317,9 @@ impl RealHttpRuntime {
 }
 
 impl Default for RealHttpRuntime {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
@@ -340,7 +379,9 @@ impl LocalRuntime for RealHttpRuntime {
 
         // 启动任务
         let http = self.http.clone();
-        let active = unsafe { &*(&self.active as *const _ as *const Mutex<HashMap<Uuid, mpsc::Sender<()>>>) }; // 安全简化, Phase 2 用 Arc<Mutex>
+        let active = unsafe {
+            &*(&self.active as *const _ as *const Mutex<HashMap<Uuid, mpsc::Sender<()>>>)
+        }; // 安全简化, Phase 2 用 Arc<Mutex>
         let _ = active; // suppress unused
         let active = Arc::new(Mutex::new(())); // 简化, 实际不用
         let _ = active;
@@ -467,8 +508,12 @@ mod tests {
 
     #[test]
     fn test_inv_02_chat_completions_path() {
-        assert!(inv_02_chat_completions_path("https://api.openclaw.dev/v1/chat/completions"));
-        assert!(!inv_02_chat_completions_path("https://api.openclaw.dev/v1/models"));
+        assert!(inv_02_chat_completions_path(
+            "https://api.openclaw.dev/v1/chat/completions"
+        ));
+        assert!(!inv_02_chat_completions_path(
+            "https://api.openclaw.dev/v1/models"
+        ));
     }
 
     #[test]
@@ -483,7 +528,10 @@ mod tests {
     #[test]
     fn test_http_client_creation() {
         let client = HttpClient::new();
-        let req = HttpRequest::new_post("https://api.example.com/v1/chat/completions", serde_json::json!({"a": 1}));
+        let req = HttpRequest::new_post(
+            "https://api.example.com/v1/chat/completions",
+            serde_json::json!({"a": 1}),
+        );
         assert!(inv_01_valid_url(&req.url));
         assert_eq!(req.method, HttpMethod::Post);
     }
@@ -503,12 +551,15 @@ mod tests {
     #[tokio::test]
     async fn test_invoke_http_mock_fallback() {
         let rt = RealHttpRuntime::new();
-        let handle = rt.invoke_http(
-            "https://api.openclaw.dev/v1",
-            Some("sk-test-123"),
-            "hello",
-            Some("gpt-4"),
-        ).await.unwrap();
+        let handle = rt
+            .invoke_http(
+                "https://api.openclaw.dev/v1",
+                Some("sk-test-123"),
+                "hello",
+                Some("gpt-4"),
+            )
+            .await
+            .unwrap();
         // mock fallback 立即返回 Completed
         assert_eq!(handle.state, ProcessState::Completed);
         assert_eq!(handle.exit_code, Some(0));

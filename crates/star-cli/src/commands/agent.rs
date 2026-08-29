@@ -44,7 +44,7 @@ pub(crate) mod capabilities {
     use std::fs;
     use std::path::{Path, PathBuf};
 
-    use super::{CapabilitiesArgs, StarError, output};
+    use super::{output, CapabilitiesArgs, StarError};
     use serde::Serialize;
 
     /// `agent-api/v1#Capabilities` 真实实现

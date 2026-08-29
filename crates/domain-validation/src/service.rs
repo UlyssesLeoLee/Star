@@ -45,7 +45,8 @@ pub struct InMemoryValidationService {
     pub(crate) results: Arc<RwLock<HashMap<ValidationId, ValidationResult>>>,
     pub(crate) evidences: Arc<RwLock<HashMap<ValidationEvidenceId, ValidationEvidence>>>,
     /// (ValidationId, EvidenceId) 防重复
-    pub(crate) evidence_links: Arc<RwLock<std::collections::HashSet<(ValidationId, ValidationEvidenceId)>>>,
+    pub(crate) evidence_links:
+        Arc<RwLock<std::collections::HashSet<(ValidationId, ValidationEvidenceId)>>>,
     pub(crate) coverages: Arc<RwLock<HashMap<uuid::Uuid, AcceptanceCoverage>>>, // key = acceptance_criterion_id
     pub(crate) policies: Arc<RwLock<HashMap<ValidationPolicyId, ValidationPolicy>>>,
     pub(crate) overrides: Arc<RwLock<HashMap<ValidationOverrideId, ValidationOverride>>>,
@@ -87,10 +88,7 @@ impl InMemoryValidationService {
         self.policies.read().expect("lock").len()
     }
 
-    fn check_tenant(
-        actor: &ActorContext,
-        expected: TenantId,
-    ) -> Result<(), ValidationError> {
+    fn check_tenant(actor: &ActorContext, expected: TenantId) -> Result<(), ValidationError> {
         if actor.tenant_id != expected {
             return Err(ValidationError::PermissionDenied);
         }
@@ -134,7 +132,8 @@ impl ValidationCommandPort for InMemoryValidationService {
         // INV-VL-04:log_excerpt_ref 必带(VAL-001)
         if cmd.log_excerpt_ref.trim().is_empty() {
             return Err(ValidationError::InvalidState(
-                "INV-VL-04 / VAL-001: log_excerpt_ref 必带,Validation 不能依赖 Agent 自报".to_string(),
+                "INV-VL-04 / VAL-001: log_excerpt_ref 必带,Validation 不能依赖 Agent 自报"
+                    .to_string(),
             ));
         }
 
@@ -170,10 +169,7 @@ impl ValidationCommandPort for InMemoryValidationService {
 
         check_create_invariants(&r)?;
         // 持久化
-        self.results
-            .write()
-            .expect("lock")
-            .insert(r.id, r.clone());
+        self.results.write().expect("lock").insert(r.id, r.clone());
 
         // 发布 Submitted 事件
         let evt = ValidationEvent::Submitted(ValidationResultSubmitted {
@@ -213,7 +209,8 @@ impl ValidationCommandPort for InMemoryValidationService {
             && r.log_excerpt_ref.as_deref().unwrap_or("").is_empty()
         {
             return Err(ValidationError::InvalidState(
-                "Passed status requires non-empty log_excerpt_ref (VAL-001 / INV-VL-04)".to_string(),
+                "Passed status requires non-empty log_excerpt_ref (VAL-001 / INV-VL-04)"
+                    .to_string(),
             ));
         }
         let now = chrono::Utc::now();
@@ -337,7 +334,9 @@ impl ValidationCommandPort for InMemoryValidationService {
         // 验证 Validation 存在且属于同 tenant
         {
             let results = self.results.read().expect("lock");
-            let r = results.get(&cmd.validation_id).ok_or(ValidationError::NotFound(cmd.validation_id))?;
+            let r = results
+                .get(&cmd.validation_id)
+                .ok_or(ValidationError::NotFound(cmd.validation_id))?;
             if r.tenant_id != cmd.tenant_id {
                 return Err(ValidationError::PermissionDenied);
             }
@@ -426,7 +425,9 @@ impl ValidationCommandPort for InMemoryValidationService {
         Self::check_tenant(&actor, cmd.tenant_id)?;
         {
             let results = self.results.read().expect("lock");
-            let r = results.get(&cmd.validation_id).ok_or(ValidationError::NotFound(cmd.validation_id))?;
+            let r = results
+                .get(&cmd.validation_id)
+                .ok_or(ValidationError::NotFound(cmd.validation_id))?;
             if r.tenant_id != cmd.tenant_id {
                 return Err(ValidationError::PermissionDenied);
             }
@@ -469,7 +470,9 @@ impl ValidationCommandPort for InMemoryValidationService {
             validation_id: cmd.validation_id,
         });
         let _ = self.event_tx.send(evt);
-        e.ok_or(ValidationError::NotFound(crate::value_object::ValidationId::default()))
+        e.ok_or(ValidationError::NotFound(
+            crate::value_object::ValidationId::default(),
+        ))
     }
 
     async fn add_evidence(
@@ -481,7 +484,9 @@ impl ValidationCommandPort for InMemoryValidationService {
         // 验证 Validation 存在
         {
             let results = self.results.read().expect("lock");
-            let r = results.get(&cmd.validation_id).ok_or(ValidationError::NotFound(cmd.validation_id))?;
+            let r = results
+                .get(&cmd.validation_id)
+                .ok_or(ValidationError::NotFound(cmd.validation_id))?;
             if r.tenant_id != cmd.tenant_id {
                 return Err(ValidationError::PermissionDenied);
             }
@@ -533,10 +538,7 @@ impl ValidationCommandPort for InMemoryValidationService {
             created_at: now,
             updated_at: now,
         };
-        self.policies
-            .write()
-            .expect("lock")
-            .insert(p.id, p.clone());
+        self.policies.write().expect("lock").insert(p.id, p.clone());
         Ok(p)
     }
 }
@@ -725,7 +727,10 @@ impl ValidationRepository for InMemoryValidationService {
     }
 
     async fn insert_evidence(&self, e: &ValidationEvidence) -> Result<(), ValidationError> {
-        self.evidences.write().expect("lock").insert(e.id, e.clone());
+        self.evidences
+            .write()
+            .expect("lock")
+            .insert(e.id, e.clone());
         Ok(())
     }
     async fn find_evidence(
@@ -748,7 +753,10 @@ impl ValidationRepository for InMemoryValidationService {
             .collect())
     }
     async fn save_evidence(&self, e: &ValidationEvidence) -> Result<(), ValidationError> {
-        self.evidences.write().expect("lock").insert(e.id, e.clone());
+        self.evidences
+            .write()
+            .expect("lock")
+            .insert(e.id, e.clone());
         Ok(())
     }
 
@@ -770,12 +778,7 @@ impl ValidationRepository for InMemoryValidationService {
         &self,
         ac_id: uuid::Uuid,
     ) -> Result<Option<AcceptanceCoverage>, ValidationError> {
-        Ok(self
-            .coverages
-            .read()
-            .expect("lock")
-            .get(&ac_id)
-            .cloned())
+        Ok(self.coverages.read().expect("lock").get(&ac_id).cloned())
     }
     async fn list_coverage_by_work_item(
         &self,
@@ -816,7 +819,10 @@ impl ValidationRepository for InMemoryValidationService {
     }
 
     async fn insert_override(&self, o: &ValidationOverride) -> Result<(), ValidationError> {
-        self.overrides.write().expect("lock").insert(o.id, o.clone());
+        self.overrides
+            .write()
+            .expect("lock")
+            .insert(o.id, o.clone());
         Ok(())
     }
 }

@@ -12,8 +12,8 @@ use crate::entity::{
 };
 use crate::error::ValidationError;
 use crate::value_object::{
-    EvidenceType, ProjectId, TenantId, UserId, ValidationEvidenceId, ValidationId,
-    ValidationKind, ValidationPolicyId, WorkItemId, WorktreeId,
+    EvidenceType, ProjectId, TenantId, UserId, ValidationEvidenceId, ValidationId, ValidationKind,
+    ValidationPolicyId, WorkItemId, WorktreeId,
 };
 
 // =====================================================================

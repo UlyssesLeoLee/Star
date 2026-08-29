@@ -19,18 +19,21 @@ impl TestCommand {
             TestCommand::Affected => ("test affected", 5u32, 0u32, 1234u64),
             TestCommand::Run => ("test run", 42u32, 0u32, 8765u64),
         };
-        println!("{}", output::json_pretty(serde_json::json!({
-            "schema_version": output::SCHEMA_VERSION,
-            "mock": true,
-            "tool": tool,
-            "test": {
-                "passed": passed,
-                "failed": failed,
-                "skipped": 0,
-                "failed_tests": [],
-                "duration_ms": duration_ms,
-            },
-        }))?);
+        println!(
+            "{}",
+            output::json_pretty(serde_json::json!({
+                "schema_version": output::SCHEMA_VERSION,
+                "mock": true,
+                "tool": tool,
+                "test": {
+                    "passed": passed,
+                    "failed": failed,
+                    "skipped": 0,
+                    "failed_tests": [],
+                    "duration_ms": duration_ms,
+                },
+            }))?
+        );
         Ok(())
     }
 }

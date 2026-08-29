@@ -392,10 +392,7 @@ pub trait SearchRepository: Send + Sync {
         tenant_id: TenantId,
         user_id: UserId,
     ) -> Result<Vec<SavedSearch>, SearchError>;
-    async fn get_saved(
-        &self,
-        id: SavedSearchId,
-    ) -> Result<SavedSearch, SearchError>;
+    async fn get_saved(&self, id: SavedSearchId) -> Result<SavedSearch, SearchError>;
     async fn delete_saved(&self, id: SavedSearchId) -> Result<bool, SearchError>;
 }
 
@@ -476,7 +473,10 @@ impl SearchCommandPort for InMemorySearchService {
         actor: &ActorContext,
     ) -> Result<SearchIndex, SearchError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(SearchError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(SearchError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         // INV-S-02:仅 Worker Projector 可调用
         if !actor.is_local_runtime && !actor.has_role("system:search-projector") {
@@ -530,7 +530,10 @@ impl SearchCommandPort for InMemorySearchService {
         actor: &ActorContext,
     ) -> Result<(), SearchError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(SearchError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(SearchError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if !actor.is_local_runtime && !actor.has_role("system:search-projector") {
             return Err(SearchError::PermissionDenied);
@@ -564,7 +567,10 @@ impl SearchCommandPort for InMemorySearchService {
         actor: &ActorContext,
     ) -> Result<BulkReindexResult, SearchError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(SearchError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(SearchError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if !actor.is_local_runtime && !actor.has_role("system:search-projector") {
             return Err(SearchError::PermissionDenied);
@@ -575,11 +581,7 @@ impl SearchCommandPort for InMemorySearchService {
         for entry in cmd.entries {
             let existing = self
                 .repo
-                .get_index_by_resource(
-                    cmd.tenant_id,
-                    entry.resource_type,
-                    entry.resource_id,
-                )
+                .get_index_by_resource(cmd.tenant_id, entry.resource_type, entry.resource_id)
                 .await?;
             match existing {
                 Some(e) if e.version >= entry.projection_version => {
@@ -608,7 +610,10 @@ impl SearchCommandPort for InMemorySearchService {
         actor: &ActorContext,
     ) -> Result<SavedSearch, SearchError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(SearchError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(SearchError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if actor.user_id != cmd.user_id {
             return Err(SearchError::PermissionDenied);
@@ -635,14 +640,17 @@ impl SearchCommandPort for InMemorySearchService {
         actor: &ActorContext,
     ) -> Result<(), SearchError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(SearchError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(SearchError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
-        let saved = self
-            .repo
-            .get_saved(cmd.saved_search_id)
-            .await?;
+        let saved = self.repo.get_saved(cmd.saved_search_id).await?;
         if saved.tenant_id != cmd.tenant_id {
-            return Err(SearchError::CrossTenantDenied(saved.tenant_id, cmd.tenant_id));
+            return Err(SearchError::CrossTenantDenied(
+                saved.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         // INV-S-05:仅本人
         if saved.user_id != actor.user_id {
@@ -695,7 +703,9 @@ impl SearchQueryPort for InMemorySearchService {
         if q.query.prefix.is_empty() {
             return Err(SearchError::InvalidQuery("prefix required".to_string()));
         }
-        self.repo.suggest(q.tenant_id, &q.query.prefix, q.query.limit).await
+        self.repo
+            .suggest(q.tenant_id, &q.query.prefix, q.query.limit)
+            .await
     }
 
     async fn list_saved(
@@ -706,7 +716,10 @@ impl SearchQueryPort for InMemorySearchService {
         if actor.tenant_id != tenant_id {
             return Err(SearchError::CrossTenantDenied(actor.tenant_id, tenant_id));
         }
-        let all = self.repo.list_saved_by_user(tenant_id, actor.user_id).await?;
+        let all = self
+            .repo
+            .list_saved_by_user(tenant_id, actor.user_id)
+            .await?;
         Ok(all)
     }
 }
@@ -951,7 +964,10 @@ mod tests {
         let tenant_id = TenantId::new();
         let actor = make_actor(tenant_id, UserId::new());
         let res = svc
-            .upsert_index(sample_index_cmd(tenant_id, ResourceType::WorkItem, "x"), &actor)
+            .upsert_index(
+                sample_index_cmd(tenant_id, ResourceType::WorkItem, "x"),
+                &actor,
+            )
             .await;
         assert!(matches!(res, Err(SearchError::PermissionDenied)));
     }
@@ -1274,7 +1290,11 @@ mod tests {
         let tenant_id = TenantId::new();
         let projector = projector_actor(tenant_id);
         svc.upsert_index(
-            sample_index_cmd(tenant_id, ResourceType::WorkItem, "implement authentication"),
+            sample_index_cmd(
+                tenant_id,
+                ResourceType::WorkItem,
+                "implement authentication",
+            ),
             &projector,
         )
         .await

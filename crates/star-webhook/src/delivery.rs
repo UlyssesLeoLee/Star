@@ -75,7 +75,9 @@ impl DeliveryStore {
     /// 标记投递成功
     pub async fn mark_delivered(&self, delivery_id: &str) -> Result<(), String> {
         let mut g = self.inner.write().await;
-        let e = g.get_mut(delivery_id).ok_or_else(|| "not found".to_string())?;
+        let e = g
+            .get_mut(delivery_id)
+            .ok_or_else(|| "not found".to_string())?;
         e.state = WebhookDeliveryState::Delivered;
         Ok(())
     }
@@ -83,7 +85,9 @@ impl DeliveryStore {
     /// 标记投递失败 (Failed 态,仍可重试)
     pub async fn mark_failed(&self, delivery_id: &str) -> Result<(), String> {
         let mut g = self.inner.write().await;
-        let e = g.get_mut(delivery_id).ok_or_else(|| "not found".to_string())?;
+        let e = g
+            .get_mut(delivery_id)
+            .ok_or_else(|| "not found".to_string())?;
         e.state = WebhookDeliveryState::Failed;
         Ok(())
     }
@@ -91,7 +95,9 @@ impl DeliveryStore {
     /// 标记死信 (DeadLetter,不再重试)
     pub async fn mark_dead_letter(&self, delivery_id: &str) -> Result<(), String> {
         let mut g = self.inner.write().await;
-        let e = g.get_mut(delivery_id).ok_or_else(|| "not found".to_string())?;
+        let e = g
+            .get_mut(delivery_id)
+            .ok_or_else(|| "not found".to_string())?;
         e.state = WebhookDeliveryState::DeadLetter;
         Ok(())
     }

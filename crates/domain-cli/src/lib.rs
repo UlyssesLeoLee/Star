@@ -64,8 +64,12 @@ impl CliKind {
 
     pub fn all_builtin() -> &'static [CliKind] {
         &[
-            Self::Claude, Self::Codex, Self::OpenClaw,
-            Self::Hermes, Self::Gemini, Self::Aider,
+            Self::Claude,
+            Self::Codex,
+            Self::OpenClaw,
+            Self::Hermes,
+            Self::Gemini,
+            Self::Aider,
         ]
     }
 }
@@ -198,12 +202,32 @@ pub enum WorktreeBinding {
 impl CliProfile {
     pub fn new_builtin(kind: CliKind) -> Self {
         let (name, command, default_args) = match kind {
-            CliKind::Claude => ("Claude Code".to_string(), "claude".to_string(), vec!["--model".to_string(), "claude-3-5-sonnet".to_string()]),
-            CliKind::Codex => ("OpenAI Codex".to_string(), "codex".to_string(), vec!["--model".to_string(), "gpt-4".to_string()]),
-            CliKind::OpenClaw => ("OpenClaw".to_string(), "https://api.openclaw.dev/v1".to_string(), vec![]),
-            CliKind::Hermes => ("Hermes".to_string(), "https://api.hermes.dev/v1".to_string(), vec![]),
+            CliKind::Claude => (
+                "Claude Code".to_string(),
+                "claude".to_string(),
+                vec!["--model".to_string(), "claude-3-5-sonnet".to_string()],
+            ),
+            CliKind::Codex => (
+                "OpenAI Codex".to_string(),
+                "codex".to_string(),
+                vec!["--model".to_string(), "gpt-4".to_string()],
+            ),
+            CliKind::OpenClaw => (
+                "OpenClaw".to_string(),
+                "https://api.openclaw.dev/v1".to_string(),
+                vec![],
+            ),
+            CliKind::Hermes => (
+                "Hermes".to_string(),
+                "https://api.hermes.dev/v1".to_string(),
+                vec![],
+            ),
             CliKind::Gemini => ("Google Gemini".to_string(), "gemini".to_string(), vec![]),
-            CliKind::Aider => ("Aider".to_string(), "aider".to_string(), vec!["--model".to_string(), "gpt-4".to_string()]),
+            CliKind::Aider => (
+                "Aider".to_string(),
+                "aider".to_string(),
+                vec!["--model".to_string(), "gpt-4".to_string()],
+            ),
             CliKind::Custom => ("Custom".to_string(), "".to_string(), vec![]),
         };
         let now = chrono::Utc::now();
@@ -411,7 +435,11 @@ impl CliService {
     }
 
     pub fn delete_profile(&self, id: Uuid) -> Result<(), CliError> {
-        self.profiles.write().unwrap().remove(&id).ok_or(CliError::ProfileNotFound(id))?;
+        self.profiles
+            .write()
+            .unwrap()
+            .remove(&id)
+            .ok_or(CliError::ProfileNotFound(id))?;
         Ok(())
     }
 
@@ -450,21 +478,35 @@ impl CliService {
     }
 
     pub fn list_api_keys(&self) -> Vec<ApiKeySummary> {
-        self.api_keys.read().unwrap().values().map(|k| k.summary()).collect()
+        self.api_keys
+            .read()
+            .unwrap()
+            .values()
+            .map(|k| k.summary())
+            .collect()
     }
 
     /// 解析 API Key 为明文 (供 CLI/HTTP 调用使用, 不返前端)
     pub fn resolve_key(&self, key_id: Uuid) -> Result<String, CliError> {
-        let key = self.api_keys.read().unwrap().get(&key_id).cloned()
+        let key = self
+            .api_keys
+            .read()
+            .unwrap()
+            .get(&key_id)
+            .cloned()
             .ok_or(CliError::ApiKeyMissing(key_id.to_string()))?;
         match key.mode {
             ApiKeyMode::EncryptedRust => {
-                let encrypted = key.encrypted_value.as_ref()
+                let encrypted = key
+                    .encrypted_value
+                    .as_ref()
                     .ok_or(CliError::ApiKeyMissing("encrypted_value".into()))?;
                 decrypt(encrypted, &self.master_key)
             }
             ApiKeyMode::EnvironmentVar => {
-                let name = key.env_var_name.as_ref()
+                let name = key
+                    .env_var_name
+                    .as_ref()
                     .ok_or(CliError::EnvVarMissing("<unknown>".into()))?;
                 std::env::var(name).map_err(|_| CliError::EnvVarMissing(name.clone()))
             }
@@ -472,7 +514,11 @@ impl CliService {
     }
 
     pub fn delete_api_key(&self, id: Uuid) -> Result<(), CliError> {
-        self.api_keys.write().unwrap().remove(&id).ok_or(CliError::ApiKeyMissing(id.to_string()))?;
+        self.api_keys
+            .write()
+            .unwrap()
+            .remove(&id)
+            .ok_or(CliError::ApiKeyMissing(id.to_string()))?;
         Ok(())
     }
 }
@@ -490,7 +536,8 @@ pub fn encrypt(plaintext: &str, master_key: &[u8; 32]) -> Result<String, CliErro
     let mut nonce_bytes = [0u8; 12];
     rand::thread_rng().fill_bytes(&mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
-    let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes())
+    let ciphertext = cipher
+        .encrypt(nonce, plaintext.as_bytes())
         .map_err(|e| CliError::EncryptionFailed(e.to_string()))?;
     // 格式: base64(nonce || ciphertext)
     let mut combined = Vec::with_capacity(12 + ciphertext.len());
@@ -500,7 +547,8 @@ pub fn encrypt(plaintext: &str, master_key: &[u8; 32]) -> Result<String, CliErro
 }
 
 pub fn decrypt(encoded: &str, master_key: &[u8; 32]) -> Result<String, CliError> {
-    let combined = base64::engine::general_purpose::STANDARD.decode(encoded)
+    let combined = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
         .map_err(|e| CliError::DecryptionOrBase64(e.to_string()))?;
     if combined.len() < 12 {
         return Err(CliError::DecryptionFailed);
@@ -509,7 +557,8 @@ pub fn decrypt(encoded: &str, master_key: &[u8; 32]) -> Result<String, CliError>
     let key = Key::<Aes256Gcm>::from_slice(master_key);
     let cipher = Aes256Gcm::new(key);
     let nonce = Nonce::from_slice(nonce_bytes);
-    let plaintext = cipher.decrypt(nonce, ciphertext)
+    let plaintext = cipher
+        .decrypt(nonce, ciphertext)
         .map_err(|_| CliError::DecryptionFailed)?;
     String::from_utf8(plaintext).map_err(|_| CliError::DecryptionFailed)
 }
@@ -522,7 +571,9 @@ pub fn decrypt(encoded: &str, master_key: &[u8; 32]) -> Result<String, CliError>
 pub fn inv_01_profile_unique(profiles: &[CliProfile]) -> bool {
     let mut seen = std::collections::HashSet::new();
     for p in profiles {
-        if !seen.insert(p.id) { return false; }
+        if !seen.insert(p.id) {
+            return false;
+        }
     }
     true
 }
@@ -531,7 +582,9 @@ pub fn inv_01_profile_unique(profiles: &[CliProfile]) -> bool {
 pub fn inv_02_key_unique(keys: &[ApiKey]) -> bool {
     let mut seen = std::collections::HashSet::new();
     for k in keys {
-        if !seen.insert(k.id) { return false; }
+        if !seen.insert(k.id) {
+            return false;
+        }
     }
     true
 }
@@ -539,8 +592,12 @@ pub fn inv_02_key_unique(keys: &[ApiKey]) -> bool {
 /// INV-CLI-03: EncryptedRust 模式必带密文, EnvironmentVar 必带 env_var_name
 pub fn inv_03_key_mode_complete(key: &ApiKey) -> bool {
     match key.mode {
-        ApiKeyMode::EncryptedRust => key.encrypted_value.is_some() && key.encrypted_value.as_ref().unwrap().len() > 0,
-        ApiKeyMode::EnvironmentVar => key.env_var_name.is_some() && !key.env_var_name.as_ref().unwrap().is_empty(),
+        ApiKeyMode::EncryptedRust => {
+            key.encrypted_value.is_some() && key.encrypted_value.as_ref().unwrap().len() > 0
+        }
+        ApiKeyMode::EnvironmentVar => {
+            key.env_var_name.is_some() && !key.env_var_name.as_ref().unwrap().is_empty()
+        }
     }
 }
 
@@ -559,7 +616,9 @@ mod tests {
 
     fn test_master_key() -> [u8; 32] {
         let mut key = [0u8; 32];
-        for i in 0..32 { key[i] = i as u8; }
+        for i in 0..32 {
+            key[i] = i as u8;
+        }
         key
     }
 
@@ -636,7 +695,9 @@ mod tests {
     #[test]
     fn test_cli_service_add_encrypted_key() {
         let svc = CliService::new(test_master_key());
-        let summary = svc.add_encrypted_key("anthropic", "primary", "sk-test-123").unwrap();
+        let summary = svc
+            .add_encrypted_key("anthropic", "primary", "sk-test-123")
+            .unwrap();
         assert_eq!(summary.mode, ApiKeyMode::EncryptedRust);
         assert_eq!(summary.provider, "anthropic");
         // 验证: resolve 出明文
@@ -649,7 +710,9 @@ mod tests {
     fn test_cli_service_add_env_var_key() {
         let svc = CliService::new(test_master_key());
         std::env::set_var("STAR_TEST_KEY", "env-value-456");
-        let summary = svc.add_env_var_key("openai", "test", "STAR_TEST_KEY").unwrap();
+        let summary = svc
+            .add_env_var_key("openai", "test", "STAR_TEST_KEY")
+            .unwrap();
         assert_eq!(summary.mode, ApiKeyMode::EnvironmentVar);
         let keys = svc.list_api_keys();
         let resolved = svc.resolve_key(keys[0].id).unwrap();
@@ -701,7 +764,10 @@ mod tests {
 
     #[test]
     fn test_inv_04_api_agent_url() {
-        assert!(inv_04_api_agent_url(CliKind::OpenClaw, "https://api.openclaw.dev/v1"));
+        assert!(inv_04_api_agent_url(
+            CliKind::OpenClaw,
+            "https://api.openclaw.dev/v1"
+        ));
         assert!(!inv_04_api_agent_url(CliKind::OpenClaw, "not-a-url"));
         assert!(inv_04_api_agent_url(CliKind::Claude, "claude"));
         assert!(!inv_04_api_agent_url(CliKind::Claude, ""));

@@ -48,23 +48,10 @@ use uuid::Uuid;
 /// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
 #[async_trait]
 pub trait ApiGateway: Send + Sync {
-    async fn register_route(
-        &self,
-        cmd: (),
-        actor: ActorContext,
-    ) -> Result<(), ApiError>;
-    async fn register_ws_handler(
-        &self,
-        cmd: (),
-        actor: ActorContext,
-    ) -> Result<(), ApiError>;
-    async fn register_middleware(
-        &self,
-        cmd: (),
-        actor: ActorContext,
-    ) -> Result<(), ApiError>;
+    async fn register_route(&self, cmd: (), actor: ActorContext) -> Result<(), ApiError>;
+    async fn register_ws_handler(&self, cmd: (), actor: ActorContext) -> Result<(), ApiError>;
+    async fn register_middleware(&self, cmd: (), actor: ActorContext) -> Result<(), ApiError>;
 }
-
 
 /// **ApiQuery**(查询端口)
 ///
@@ -99,7 +86,6 @@ pub struct RouteDescriptor {
     pub tenant_id: Uuid,
     // 其它字段在 Phase 2 由具体 spec 补充
 }
-
 
 // =====================================================================
 // Error
@@ -164,6 +150,9 @@ mod tests {
             project_ids: vec![],
             roles: vec!["developer".to_string()],
         };
-        assert!(!actor.tenant_id.is_nil(), "tenant_id must be non-nil (§6.1,REQ-SEC-001)");
+        assert!(
+            !actor.tenant_id.is_nil(),
+            "tenant_id must be non-nil (§6.1,REQ-SEC-001)"
+        );
     }
 }

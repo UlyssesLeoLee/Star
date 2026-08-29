@@ -350,7 +350,13 @@ pub struct Cursor {
 
 impl Cursor {
     /// 新建 Cursor
-    pub fn new(session_id: CollaborationSessionId, user_id: UserId, x: f32, y: f32, color: String) -> Self {
+    pub fn new(
+        session_id: CollaborationSessionId,
+        user_id: UserId,
+        x: f32,
+        y: f32,
+        color: String,
+    ) -> Self {
         Self {
             id: CursorId::new(),
             session_id,
@@ -894,7 +900,10 @@ impl CollabCommandPort for InMemoryCollabService {
     ) -> Result<CollaborationSession, CollabError> {
         // INV-CL-04
         if actor.tenant_id != cmd.tenant_id {
-            return Err(CollabError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(CollabError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if !actor.project_ids.contains(&cmd.project_id)
             && !actor.is_admin()
@@ -1832,14 +1841,8 @@ mod tests {
         // u2 / u3 直接进 in-memory store(模拟远程 user 的 presence)
         {
             let mut map = svc.presences.write().unwrap();
-            map.insert(
-                (s.id, u2),
-                Presence::new(s.id, u2),
-            );
-            map.insert(
-                (s.id, u3),
-                Presence::new(s.id, u3),
-            );
+            map.insert((s.id, u2), Presence::new(s.id, u2));
+            map.insert((s.id, u3), Presence::new(s.id, u3));
         }
         let active = svc
             .list_active_presences(

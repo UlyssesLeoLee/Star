@@ -17,7 +17,7 @@
 //! - 跨 tenant 拒绝 (handler 简化设计: actor.tenant_id = nil) → 同上
 
 use domain_workspace::{ActorContext, InMemoryWorkspaceService, WorkspaceId, WorkspaceQueryPort};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::sync::{Arc, OnceLock};
 
 use crate::error::McpError;

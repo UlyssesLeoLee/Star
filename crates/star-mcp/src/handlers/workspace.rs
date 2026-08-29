@@ -116,10 +116,7 @@ mod tests {
         // 验证 service 内部能 roundtrip (与 handler 简化无关)
         let actor_for_check =
             ActorContext::new(owner.into_uuid(), tid).with_role("workspace_admin");
-        let fetched = svc
-            .get_by_id(created.id, actor_for_check)
-            .await
-            .unwrap();
+        let fetched = svc.get_by_id(created.id, actor_for_check).await.unwrap();
         assert_eq!(fetched.id, created.id);
         assert_eq!(fetched.name, "Acme Workspace");
         // handler read() 当前 URI 只 1 段 (无 tenant_id), 真实 production 需

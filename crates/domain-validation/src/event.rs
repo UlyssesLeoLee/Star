@@ -127,9 +127,7 @@ impl ValidationEvent {
             Self::Passed(_) => "star.events.validation.validation_result.passed.v1",
             Self::Failed(_) => "star.events.validation.validation_result.failed.v1",
             Self::Overridden(_) => "star.events.validation.validation_result.overridden.v1",
-            Self::CoverageAchieved(_) => {
-                "star.events.validation.acceptance_coverage.achieved.v1"
-            }
+            Self::CoverageAchieved(_) => "star.events.validation.acceptance_coverage.achieved.v1",
             Self::FeedbackRequired(_) => "star.events.validation.feedback_required.v1",
             Self::EvidenceLinked(_) => "star.events.validation.evidence.linked.v1",
             Self::AcceptanceCoverageLinked(_) => {

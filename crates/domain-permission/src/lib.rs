@@ -533,7 +533,8 @@ pub trait PermissionQueryPort: Send + Sync {
 #[async_trait]
 pub trait PermissionRepository: Send + Sync {
     async fn insert_scheme(&self, s: PermissionScheme) -> Result<(), PermissionError>;
-    async fn get_scheme(&self, id: PermissionSchemeId) -> Result<PermissionScheme, PermissionError>;
+    async fn get_scheme(&self, id: PermissionSchemeId)
+        -> Result<PermissionScheme, PermissionError>;
     async fn update_scheme(&self, s: PermissionScheme) -> Result<(), PermissionError>;
 
     async fn insert_binding(&self, b: RoleBinding) -> Result<(), PermissionError>;
@@ -774,7 +775,10 @@ impl InMemoryPermissionService {
 
     fn ensure_tenant(actor: &ActorContext, expected: TenantId) -> Result<(), PermissionError> {
         if actor.tenant_id != expected {
-            return Err(PermissionError::CrossTenantDenied(actor.tenant_id, expected));
+            return Err(PermissionError::CrossTenantDenied(
+                actor.tenant_id,
+                expected,
+            ));
         }
         Ok(())
     }
@@ -804,7 +808,9 @@ impl PermissionCommandPort for InMemoryPermissionService {
             return Err(PermissionError::PermissionDenied);
         }
         if cmd.name.trim().is_empty() {
-            return Err(PermissionError::InvalidRule("scheme name 不能为空".to_string()));
+            return Err(PermissionError::InvalidRule(
+                "scheme name 不能为空".to_string(),
+            ));
         }
         let scheme = PermissionScheme::new(cmd.tenant_id, cmd.name);
         self.repo.insert_scheme(scheme.clone()).await?;
@@ -827,7 +833,12 @@ impl PermissionCommandPort for InMemoryPermissionService {
         }
         // INV-PM-03: (user, project) 唯一
         let key = RoleBinding::uniqueness_key(cmd.user_id, cmd.project_id);
-        if self.bindings.read().expect("bindings lock").contains_key(&key) {
+        if self
+            .bindings
+            .read()
+            .expect("bindings lock")
+            .contains_key(&key)
+        {
             return Err(PermissionError::Conflict(format!(
                 "RoleBinding 已存在 (user={}, project={})",
                 cmd.user_id, cmd.project_id
@@ -911,7 +922,10 @@ impl PermissionCommandPort for InMemoryPermissionService {
                 .ok_or_else(|| PermissionError::NotFound(format!("scheme {}", cmd.scheme_id)))?
         };
         if updated.tenant_id != cmd.tenant_id {
-            return Err(PermissionError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(PermissionError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         updated.upsert_rule(cmd.rule);
         // 3) 写回(短持锁)
@@ -1005,7 +1019,10 @@ impl PermissionQueryPort for InMemoryPermissionService {
             .cloned()
             .ok_or_else(|| PermissionError::NotFound(format!("scheme {}", q.scheme_id)))?;
         if s.tenant_id != q.tenant_id {
-            return Err(PermissionError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(PermissionError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
         Ok(s)
     }
@@ -1045,7 +1062,10 @@ impl PermissionRepository for InMemoryPermissionRepository {
         store.insert(s.id, s);
         Ok(())
     }
-    async fn get_scheme(&self, id: PermissionSchemeId) -> Result<PermissionScheme, PermissionError> {
+    async fn get_scheme(
+        &self,
+        id: PermissionSchemeId,
+    ) -> Result<PermissionScheme, PermissionError> {
         self.schemes
             .read()
             .expect("lock")
@@ -1075,7 +1095,10 @@ impl PermissionRepository for InMemoryPermissionRepository {
         user_id: UserId,
         project_id: ProjectId,
     ) -> Result<(), PermissionError> {
-        self.bindings.write().expect("lock").remove(&(user_id, project_id));
+        self.bindings
+            .write()
+            .expect("lock")
+            .remove(&(user_id, project_id));
         Ok(())
     }
     async fn list_bindings(
@@ -1182,7 +1205,9 @@ mod tests {
                     resource_id: None,
                     action: Action::Read,
                 },
-                &ActorContext::new(user, tenant).with_role("developer").with_project(project),
+                &ActorContext::new(user, tenant)
+                    .with_role("developer")
+                    .with_project(project),
             )
             .await
             .unwrap();
@@ -1902,7 +1927,10 @@ mod tests {
     #[test]
     fn role_from_str_parsing() {
         assert_eq!(Role::from_str_opt("tenant_admin"), Some(Role::TenantAdmin));
-        assert_eq!(Role::from_str_opt("project_admin"), Some(Role::ProjectAdmin));
+        assert_eq!(
+            Role::from_str_opt("project_admin"),
+            Some(Role::ProjectAdmin)
+        );
         assert_eq!(Role::from_str_opt("developer"), Some(Role::Developer));
         assert_eq!(Role::from_str_opt("viewer"), Some(Role::Viewer));
         assert_eq!(Role::from_str_opt("agent"), Some(Role::Agent));

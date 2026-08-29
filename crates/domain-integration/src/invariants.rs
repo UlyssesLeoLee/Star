@@ -14,9 +14,7 @@
 
 use crate::entity::Integration;
 use crate::error::IntegrationError;
-use crate::value_object::{
-    ConflictStrategy, IntegrationId, IntegrationRelationType, TenantId,
-};
+use crate::value_object::{ConflictStrategy, IntegrationId, IntegrationRelationType, TenantId};
 
 /// 不变量检查函数签名(取 Integration 输入)
 pub type InvariantCheck = fn(&Integration) -> Result<(), IntegrationError>;
@@ -29,7 +27,9 @@ pub type InvariantCheck = fn(&Integration) -> Result<(), IntegrationError>;
 ///
 /// 本检查仅作语义校验:确认 relation_type 是 4 类之一(类型系统已保证);
 /// 此外校验 `external_system_name` 非空、`external_id` 非空、`external_url` 非空。
-pub fn check_invariant_01_relation_type_classified(integration: &Integration) -> Result<(), IntegrationError> {
+pub fn check_invariant_01_relation_type_classified(
+    integration: &Integration,
+) -> Result<(), IntegrationError> {
     if integration.external_system_name.as_str().is_empty() {
         return Err(IntegrationError::InvalidArgument(
             "INV-I-01: external_system_name 不能为空".to_string(),
@@ -58,7 +58,9 @@ pub fn check_invariant_01_relation_type_classified(integration: &Integration) ->
 /// 当 `relation_type = Bidirectional` 时:
 /// 1. `sync_token` 必须非空(否则 I-004 拒绝)
 /// 2. `conflict_strategy` 应为 `Bidirectional` 变体或显式声明 `ManualReview`
-pub fn check_invariant_02_bidirectional_loop_guard(integration: &Integration) -> Result<(), IntegrationError> {
+pub fn check_invariant_02_bidirectional_loop_guard(
+    integration: &Integration,
+) -> Result<(), IntegrationError> {
     if !integration.needs_loop_guard() {
         return Ok(());
     }
@@ -103,7 +105,9 @@ pub fn check_invariant_03_tenant_required(
 /// **INV-I-04**: 凭据走 Credential Broker,不存明文(security-design §5.4)
 ///
 /// 校验 URL 不含 `user:pass@` 形式的明文凭据(由 `credential_id` 引用 Credential Broker)。
-pub fn check_invariant_04_no_plaintext_credential(integration: &Integration) -> Result<(), IntegrationError> {
+pub fn check_invariant_04_no_plaintext_credential(
+    integration: &Integration,
+) -> Result<(), IntegrationError> {
     if let Some(idx) = integration.external_url.find("://") {
         let after_scheme = &integration.external_url[idx + 3..];
         if after_scheme.contains('@') {
@@ -123,7 +127,9 @@ pub fn check_invariant_04_no_plaintext_credential(integration: &Integration) -> 
 /// **INV-I-05**: 字段完整性校验。
 ///
 /// 除 Link 外,其他 3 类关系都应有 sync_token;所有关系必须有 conflict_strategy。
-pub fn check_invariant_05_required_fields(integration: &Integration) -> Result<(), IntegrationError> {
+pub fn check_invariant_05_required_fields(
+    integration: &Integration,
+) -> Result<(), IntegrationError> {
     if integration.relation_type.requires_sync_token() && integration.sync_token.is_none() {
         return Err(IntegrationError::InvalidState(format!(
             "INV-I-05: 关系类型 {} 必须有 sync_token(integration_id={})",
@@ -141,7 +147,9 @@ pub fn check_invariant_05_required_fields(integration: &Integration) -> Result<(
 /// **INV-I-06**: 4 类关系不混用(每条 Integration 仅一种 relation_type,类型系统已保证);
 ///
 /// **Link 不反向同步**:`Link` 关系不应携带 `sync_token` / `last_synced_at`(只读链接)。
-pub fn check_invariant_06_link_no_reverse_sync(integration: &Integration) -> Result<(), IntegrationError> {
+pub fn check_invariant_06_link_no_reverse_sync(
+    integration: &Integration,
+) -> Result<(), IntegrationError> {
     if integration.is_link() {
         if integration.sync_token.is_some() {
             return Err(IntegrationError::InvalidState(format!(

@@ -43,7 +43,8 @@ impl IdentityHandler {
         Self::default()
     }
     fn service(&self) -> &Arc<InMemoryIdentityService> {
-        self.svc.get_or_init(|| Arc::new(InMemoryIdentityService::new()))
+        self.svc
+            .get_or_init(|| Arc::new(InMemoryIdentityService::new()))
     }
 }
 
@@ -74,13 +75,7 @@ impl Resource for IdentityHandler {
         let svc = self.service();
         let actor = ActorContext::new(user_id, tenant_id).as_platform_admin();
         match svc
-            .get_user(
-                GetUserQuery {
-                    tenant_id,
-                    user_id,
-                },
-                &actor,
-            )
+            .get_user(GetUserQuery { tenant_id, user_id }, &actor)
             .await
         {
             Ok(u) => Ok(Some(IdentityData {
@@ -141,7 +136,10 @@ mod tests {
         let _ = h.service();
         let missing_tenant = uuid::Uuid::new_v4();
         let missing_user = uuid::Uuid::new_v4();
-        let d = h.read(&format!("{missing_tenant}:{missing_user}")).await.unwrap();
+        let d = h
+            .read(&format!("{missing_tenant}:{missing_user}"))
+            .await
+            .unwrap();
         assert!(d.is_none());
     }
 }

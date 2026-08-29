@@ -23,10 +23,10 @@ impl ValidationError {
     pub fn code(&self) -> &'static str {
         match self {
             // 沿用 spec §8 错误码
-            Self::NotFound(_) => "VL_NOT_FOUND",         // VL-001
-            Self::InvalidState(_) => "VL_INVALID_STATE",  // VL-002/003/005
+            Self::NotFound(_) => "VL_NOT_FOUND", // VL-001
+            Self::InvalidState(_) => "VL_INVALID_STATE", // VL-002/003/005
             Self::PermissionDenied => "VL_PERMISSION_DENIED", // VL-006
-            Self::Conflict(_) => "VL_CONFLICT",          // VL-007
+            Self::Conflict(_) => "VL_CONFLICT",  // VL-007
             Self::InvariantViolated(_) => "VL_INVARIANT_VIOLATED", // VL-004
             Self::Internal(_) => "VL_INTERNAL",
         }

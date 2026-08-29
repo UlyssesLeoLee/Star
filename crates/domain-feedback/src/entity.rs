@@ -95,10 +95,7 @@ impl Feedback {
     /// 状态迁移(`from -> to` 校验 + 更新)
     pub fn transition(&mut self, to: FeedbackStatus) -> Result<(), String> {
         if !self.status.can_transition_to(to) {
-            return Err(format!(
-                "非法 6 状态迁移: {} -> {}",
-                self.status, to
-            ));
+            return Err(format!("非法 6 状态迁移: {} -> {}", self.status, to));
         }
         self.status = to;
         self.bump_version();

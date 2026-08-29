@@ -36,7 +36,10 @@ impl ThemeId {
     }
 
     pub fn is_dark(&self) -> bool {
-        matches!(self, ThemeId::Dark | ThemeId::HighContrast | ThemeId::Solarized)
+        matches!(
+            self,
+            ThemeId::Dark | ThemeId::HighContrast | ThemeId::Solarized
+        )
     }
 
     pub fn all_builtin() -> &'static [ThemeId] {
@@ -71,29 +74,33 @@ impl ThemeScope {
 /// 设计令牌 — 颜色
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ColorToken {
-    pub name: String,   // 例: "primary", "surface", "text"
-    pub hex: String,    // 例: "#5B5BD6"
+    pub name: String,       // 例: "primary", "surface", "text"
+    pub hex: String,        // 例: "#5B5BD6"
     pub alpha: Option<f32>, // 0.0 - 1.0, None = 不透明
 }
 
 impl ColorToken {
     pub fn new(name: impl Into<String>, hex: impl Into<String>) -> Self {
-        Self { name: name.into(), hex: hex.into(), alpha: None }
+        Self {
+            name: name.into(),
+            hex: hex.into(),
+            alpha: None,
+        }
     }
 }
 
 /// 设计令牌 — 间距 (4px 基础栅格)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SpacingToken {
-    pub name: String,   // 例: "space-4", "space-8"
-    pub px: u32,        // 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64
+    pub name: String, // 例: "space-4", "space-8"
+    pub px: u32,      // 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64
 }
 
 /// 设计令牌 — 圆角 (3 档)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RadiusToken {
-    pub name: String,   // 例: "sm", "md", "lg"
-    pub px: u32,        // 4 / 8 / 12
+    pub name: String, // 例: "sm", "md", "lg"
+    pub px: u32,      // 4 / 8 / 12
 }
 
 /// 完整主题定义
@@ -194,8 +201,14 @@ mod tests {
             display_name: "Light".to_string(),
             is_dark: false,
             colors: vec![ColorToken::new("--color-primary", "#5B5BD6")],
-            spacings: vec![SpacingToken { name: "--space-4".into(), px: 4 }],
-            radii: vec![RadiusToken { name: "--radius-sm".into(), px: 4 }],
+            spacings: vec![SpacingToken {
+                name: "--space-4".into(),
+                px: 4,
+            }],
+            radii: vec![RadiusToken {
+                name: "--radius-sm".into(),
+                px: 4,
+            }],
             version: 1,
         };
         let css = theme.to_css_variables();

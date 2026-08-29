@@ -10,7 +10,9 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
 
-use domain_feedback::{ActorContext, FeedbackError, FeedbackId, InMemoryFeedbackService, FeedbackQueryPort};
+use domain_feedback::{
+    ActorContext, FeedbackError, FeedbackId, FeedbackQueryPort, InMemoryFeedbackService,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct FeedbackData {
@@ -44,8 +46,7 @@ impl FeedbackHandler {
         Self::default()
     }
     fn service(&self) -> &Arc<InMemoryFeedbackService> {
-        self.svc
-            .get_or_init(InMemoryFeedbackService::new_for_test)
+        self.svc.get_or_init(InMemoryFeedbackService::new_for_test)
     }
 }
 

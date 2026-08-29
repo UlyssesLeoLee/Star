@@ -400,10 +400,7 @@ pub trait TenantRepository: Send + Sync {
     async fn upsert_security_policy(&self, p: SecurityPolicy) -> Result<(), TenantError>;
     async fn get_security_policy(&self, tid: TenantId) -> Result<SecurityPolicy, TenantError>;
 
-    async fn insert_provider_boundary(
-        &self,
-        b: ProviderDataBoundary,
-    ) -> Result<(), TenantError>;
+    async fn insert_provider_boundary(&self, b: ProviderDataBoundary) -> Result<(), TenantError>;
     async fn list_provider_boundaries(
         &self,
         tid: TenantId,
@@ -524,7 +521,10 @@ impl TenantCommandPort for InMemoryTenantService {
             .unwrap()
             .get_mut(&cmd.tenant_id)
             .cloned()
-            .ok_or(TenantError::NotFound(format!("tenant:{}", cmd.tenant_id.as_uuid())))?;
+            .ok_or(TenantError::NotFound(format!(
+                "tenant:{}",
+                cmd.tenant_id.as_uuid()
+            )))?;
         if t.status == TenantStatus::Deleted {
             return Err(TenantError::InvalidState(
                 "cannot suspend deleted tenant".to_string(),
@@ -551,7 +551,10 @@ impl TenantCommandPort for InMemoryTenantService {
             .unwrap()
             .get_mut(&tenant_id)
             .cloned()
-            .ok_or(TenantError::NotFound(format!("tenant:{}", tenant_id.as_uuid())))?;
+            .ok_or(TenantError::NotFound(format!(
+                "tenant:{}",
+                tenant_id.as_uuid()
+            )))?;
         if t.status != TenantStatus::Suspended {
             return Err(TenantError::InvalidState("not suspended".to_string()));
         }
@@ -571,13 +574,19 @@ impl TenantCommandPort for InMemoryTenantService {
             return Err(TenantError::PermissionDenied);
         }
         if actor.tenant_id != cmd.tenant_id {
-            return Err(TenantError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(TenantError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         let mut p = cmd.policy;
         p.tenant_id = cmd.tenant_id;
         p.updated_at = Utc::now();
         self.repo.upsert_tenant_policy(p.clone()).await?;
-        self.policies.write().unwrap().insert(cmd.tenant_id, p.clone());
+        self.policies
+            .write()
+            .unwrap()
+            .insert(cmd.tenant_id, p.clone());
         Ok(p)
     }
 
@@ -590,13 +599,19 @@ impl TenantCommandPort for InMemoryTenantService {
             return Err(TenantError::PermissionDenied);
         }
         if actor.tenant_id != cmd.tenant_id {
-            return Err(TenantError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(TenantError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         let mut p = cmd.policy;
         p.tenant_id = cmd.tenant_id;
         p.updated_at = Utc::now();
         self.repo.upsert_security_policy(p.clone()).await?;
-        self.sec_policies.write().unwrap().insert(cmd.tenant_id, p.clone());
+        self.sec_policies
+            .write()
+            .unwrap()
+            .insert(cmd.tenant_id, p.clone());
         Ok(p)
     }
 
@@ -609,7 +624,10 @@ impl TenantCommandPort for InMemoryTenantService {
             return Err(TenantError::PermissionDenied);
         }
         if actor.tenant_id != cmd.tenant_id {
-            return Err(TenantError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(TenantError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         let b = ProviderDataBoundary {
             id: ProviderDataBoundaryId::new(),
@@ -643,7 +661,10 @@ impl TenantQueryPort for InMemoryTenantService {
             .unwrap()
             .get(&q.tenant_id)
             .cloned()
-            .ok_or(TenantError::NotFound(format!("tenant:{}", q.tenant_id.as_uuid())))
+            .ok_or(TenantError::NotFound(format!(
+                "tenant:{}",
+                q.tenant_id.as_uuid()
+            )))
     }
 
     async fn get_tenant_policy(
@@ -659,7 +680,10 @@ impl TenantQueryPort for InMemoryTenantService {
             .unwrap()
             .get(&tenant_id)
             .cloned()
-            .ok_or(TenantError::NotFound(format!("policy:{}", tenant_id.as_uuid())))
+            .ok_or(TenantError::NotFound(format!(
+                "policy:{}",
+                tenant_id.as_uuid()
+            )))
     }
 
     async fn get_security_policy(
@@ -675,7 +699,10 @@ impl TenantQueryPort for InMemoryTenantService {
             .unwrap()
             .get(&tenant_id)
             .cloned()
-            .ok_or(TenantError::NotFound(format!("sec:{}", tenant_id.as_uuid())))
+            .ok_or(TenantError::NotFound(format!(
+                "sec:{}",
+                tenant_id.as_uuid()
+            )))
     }
 
     async fn list_provider_boundaries(
@@ -777,10 +804,7 @@ impl TenantRepository for InMemoryTenantRepository {
             .cloned()
             .ok_or(TenantError::NotFound(format!("sec:{}", tid.as_uuid())))
     }
-    async fn insert_provider_boundary(
-        &self,
-        b: ProviderDataBoundary,
-    ) -> Result<(), TenantError> {
+    async fn insert_provider_boundary(&self, b: ProviderDataBoundary) -> Result<(), TenantError> {
         self.boundaries.write().unwrap().insert(b.id, b);
         Ok(())
     }
@@ -968,10 +992,7 @@ mod tests {
         let other_t = TenantId::new();
         let user_actor = ActorContext::new(UserId::new(), other_t);
         let res = svc
-            .get_tenant(
-                GetTenantQuery { tenant_id: t.id },
-                &user_actor,
-            )
+            .get_tenant(GetTenantQuery { tenant_id: t.id }, &user_actor)
             .await;
         assert!(matches!(res, Err(TenantError::CrossTenantDenied(_, _))));
     }

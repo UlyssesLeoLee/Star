@@ -7,9 +7,9 @@
 #![allow(missing_docs)]
 
 pub mod provider_bitbucket;
+pub mod provider_gitea;
 pub mod provider_github;
 pub mod provider_gitlab;
-pub mod provider_gitea;
 pub mod provider_local;
 
 use async_trait::async_trait;
@@ -18,44 +18,100 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ProviderError {
-    #[error("auth: {0}")] Auth(String),
-    #[error("not_found: {0}")] NotFound(String),
-    #[error("rate_limit: retry_after {0}s")] RateLimit(u64),
-    #[error("network: {0}")] Network(String),
-    #[error("decode: {0}")] Decode(String),
-    #[error("other: {0}")] Other(String),
+    #[error("auth: {0}")]
+    Auth(String),
+    #[error("not_found: {0}")]
+    NotFound(String),
+    #[error("rate_limit: retry_after {0}s")]
+    RateLimit(u64),
+    #[error("network: {0}")]
+    Network(String),
+    #[error("decode: {0}")]
+    Decode(String),
+    #[error("other: {0}")]
+    Other(String),
 }
 
 impl ProviderError {
-    pub fn code(&self) -> &'static str { "PROVIDER_ERROR" }
-    pub fn retriable(&self) -> bool { matches!(self, Self::Network(_) | Self::RateLimit(_)) }
+    pub fn code(&self) -> &'static str {
+        "PROVIDER_ERROR"
+    }
+    pub fn retriable(&self) -> bool {
+        matches!(self, Self::Network(_) | Self::RateLimit(_))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Repo { pub owner: String, pub name: String, pub default_branch: String, pub url: String }
+pub struct Repo {
+    pub owner: String,
+    pub name: String,
+    pub default_branch: String,
+    pub url: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Branch { pub name: String, pub sha: String, pub protected: bool }
+pub struct Branch {
+    pub name: String,
+    pub sha: String,
+    pub protected: bool,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Commit { pub sha: String, pub message: String, pub author: String, pub timestamp: i64 }
+pub struct Commit {
+    pub sha: String,
+    pub message: String,
+    pub author: String,
+    pub timestamp: i64,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreatePrArgs { pub title: String, pub head: String, pub base: String, pub body: Option<String> }
+pub struct CreatePrArgs {
+    pub title: String,
+    pub head: String,
+    pub base: String,
+    pub body: Option<String>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PullRequest { pub number: u32, pub title: String, pub state: String, pub url: String }
+pub struct PullRequest {
+    pub number: u32,
+    pub title: String,
+    pub state: String,
+    pub url: String,
+}
 
 #[async_trait]
 pub trait Provider: Send + Sync {
     async fn list_repos(&self, owner: &str) -> Result<Vec<Repo>, ProviderError>;
     async fn get_repo(&self, owner: &str, name: &str) -> Result<Repo, ProviderError>;
     async fn list_branches(&self, owner: &str, repo: &str) -> Result<Vec<Branch>, ProviderError>;
-    async fn get_branch(&self, owner: &str, repo: &str, branch: &str) -> Result<Branch, ProviderError>;
-    async fn list_commits(&self, owner: &str, repo: &str, sha: Option<&str>, limit: u32) -> Result<Vec<Commit>, ProviderError>;
-    async fn get_commit(&self, owner: &str, repo: &str, sha: &str) -> Result<Commit, ProviderError>;
-    async fn create_pull_request(&self, owner: &str, repo: &str, args: CreatePrArgs) -> Result<PullRequest, ProviderError>;
-    async fn get_pull_request(&self, owner: &str, repo: &str, number: u32) -> Result<PullRequest, ProviderError>;
+    async fn get_branch(
+        &self,
+        owner: &str,
+        repo: &str,
+        branch: &str,
+    ) -> Result<Branch, ProviderError>;
+    async fn list_commits(
+        &self,
+        owner: &str,
+        repo: &str,
+        sha: Option<&str>,
+        limit: u32,
+    ) -> Result<Vec<Commit>, ProviderError>;
+    async fn get_commit(&self, owner: &str, repo: &str, sha: &str)
+        -> Result<Commit, ProviderError>;
+    async fn create_pull_request(
+        &self,
+        owner: &str,
+        repo: &str,
+        args: CreatePrArgs,
+    ) -> Result<PullRequest, ProviderError>;
+    async fn get_pull_request(
+        &self,
+        owner: &str,
+        repo: &str,
+        number: u32,
+    ) -> Result<PullRequest, ProviderError>;
 }
 
 #[cfg(test)]

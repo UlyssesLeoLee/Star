@@ -327,10 +327,7 @@ pub trait ProjectRepository: Send + Sync {
         project_id: ProjectId,
     ) -> Result<ProjectPolicy, ProjectError>;
 
-    async fn get_template(
-        &self,
-        id: ProjectTemplateId,
-    ) -> Result<ProjectTemplate, ProjectError>;
+    async fn get_template(&self, id: ProjectTemplateId) -> Result<ProjectTemplate, ProjectError>;
 }
 
 // =====================================================================
@@ -400,7 +397,10 @@ impl ProjectCommandPort for InMemoryProjectService {
         actor: &ActorContext,
     ) -> Result<Project, ProjectError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(ProjectError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(ProjectError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if !actor.has_role("project_admin") && !actor.has_role("tenant_admin") {
             return Err(ProjectError::PermissionDenied);
@@ -450,7 +450,10 @@ impl ProjectCommandPort for InMemoryProjectService {
         actor: &ActorContext,
     ) -> Result<ProjectPolicy, ProjectError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(ProjectError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(ProjectError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if !actor.has_role("project_admin") {
             return Err(ProjectError::PermissionDenied);
@@ -461,9 +464,15 @@ impl ProjectCommandPort for InMemoryProjectService {
             .unwrap()
             .get(&cmd.project_id)
             .cloned()
-            .ok_or(ProjectError::NotFound(format!("project:{}", cmd.project_id.as_uuid())))?;
+            .ok_or(ProjectError::NotFound(format!(
+                "project:{}",
+                cmd.project_id.as_uuid()
+            )))?;
         if project.tenant_id != cmd.tenant_id {
-            return Err(ProjectError::CrossTenantDenied(project.tenant_id, cmd.tenant_id));
+            return Err(ProjectError::CrossTenantDenied(
+                project.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         // INV-P-02:整体替换 — 强制 project_id + tenant_id
         let mut policy = cmd.policy;
@@ -471,7 +480,10 @@ impl ProjectCommandPort for InMemoryProjectService {
         policy.tenant_id = cmd.tenant_id;
         policy.updated_at = Utc::now();
         self.repo.upsert_project_policy(policy.clone()).await?;
-        self.policies.write().unwrap().insert(cmd.project_id, policy.clone());
+        self.policies
+            .write()
+            .unwrap()
+            .insert(cmd.project_id, policy.clone());
         Ok(policy)
     }
 
@@ -481,7 +493,10 @@ impl ProjectCommandPort for InMemoryProjectService {
         actor: &ActorContext,
     ) -> Result<Project, ProjectError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(ProjectError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(ProjectError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if !actor.has_role("project_admin") && !actor.has_role("tenant_admin") {
             return Err(ProjectError::PermissionDenied);
@@ -492,7 +507,10 @@ impl ProjectCommandPort for InMemoryProjectService {
             .unwrap()
             .get_mut(&cmd.project_id)
             .cloned()
-            .ok_or(ProjectError::NotFound(format!("project:{}", cmd.project_id.as_uuid())))?;
+            .ok_or(ProjectError::NotFound(format!(
+                "project:{}",
+                cmd.project_id.as_uuid()
+            )))?;
         if p.tenant_id != cmd.tenant_id {
             return Err(ProjectError::CrossTenantDenied(p.tenant_id, cmd.tenant_id));
         }
@@ -515,7 +533,10 @@ impl ProjectQueryPort for InMemoryProjectService {
         actor: &ActorContext,
     ) -> Result<Project, ProjectError> {
         if actor.tenant_id != q.tenant_id {
-            return Err(ProjectError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(ProjectError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
         let p = self
             .projects
@@ -523,7 +544,10 @@ impl ProjectQueryPort for InMemoryProjectService {
             .unwrap()
             .get(&q.project_id)
             .cloned()
-            .ok_or(ProjectError::NotFound(format!("project:{}", q.project_id.as_uuid())))?;
+            .ok_or(ProjectError::NotFound(format!(
+                "project:{}",
+                q.project_id.as_uuid()
+            )))?;
         if p.tenant_id != q.tenant_id {
             return Err(ProjectError::CrossTenantDenied(p.tenant_id, q.tenant_id));
         }
@@ -545,7 +569,10 @@ impl ProjectQueryPort for InMemoryProjectService {
             .unwrap()
             .get(&project_id)
             .cloned()
-            .ok_or(ProjectError::NotFound(format!("policy:{}", project_id.as_uuid())))?;
+            .ok_or(ProjectError::NotFound(format!(
+                "policy:{}",
+                project_id.as_uuid()
+            )))?;
         if p.tenant_id != tenant_id {
             return Err(ProjectError::CrossTenantDenied(p.tenant_id, tenant_id));
         }
@@ -558,7 +585,10 @@ impl ProjectQueryPort for InMemoryProjectService {
         actor: &ActorContext,
     ) -> Result<Vec<Project>, ProjectError> {
         if actor.tenant_id != q.tenant_id {
-            return Err(ProjectError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(ProjectError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
         let projects = self.projects.read().unwrap();
         Ok(projects
@@ -640,12 +670,12 @@ impl ProjectRepository for InMemoryProjectRepository {
             .unwrap()
             .get(&project_id)
             .cloned()
-            .ok_or(ProjectError::NotFound(format!("policy:{}", project_id.as_uuid())))
+            .ok_or(ProjectError::NotFound(format!(
+                "policy:{}",
+                project_id.as_uuid()
+            )))
     }
-    async fn get_template(
-        &self,
-        id: ProjectTemplateId,
-    ) -> Result<ProjectTemplate, ProjectError> {
+    async fn get_template(&self, id: ProjectTemplateId) -> Result<ProjectTemplate, ProjectError> {
         self.templates
             .read()
             .unwrap()
@@ -675,7 +705,10 @@ mod tests {
 
     #[test]
     fn template_category_as_str() {
-        assert_eq!(TemplateCategory::SoftwareDevelopment.as_str(), "software_development");
+        assert_eq!(
+            TemplateCategory::SoftwareDevelopment.as_str(),
+            "software_development"
+        );
     }
 
     #[test]

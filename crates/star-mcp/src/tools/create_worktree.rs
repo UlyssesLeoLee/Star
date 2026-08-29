@@ -9,7 +9,7 @@
 //! - 输入:`{issue_id: "<id>", branch_name?: "..."}`
 //! - 输出:`agent-api/v1#Worktree` mock
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::error::McpError;
 use crate::tools::{mock_response, optional_string, require_string};

@@ -23,8 +23,12 @@ pub(crate) enum MrCommand {
         #[arg(long)]
         head: String,
     },
-    Show { id: String },
-    Review { id: String },
+    Show {
+        id: String,
+    },
+    Review {
+        id: String,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -65,33 +69,56 @@ impl MrCommand {
         match self {
             MrCommand::Create { title, base, head } => {
                 let id = format!("MR-mock-{}", chrono::Utc::now().timestamp());
-                let mr = MR { id: id.clone(), title, status: "OPEN".to_string(), base, head, author: "agent-cli".to_string(), created_at: chrono::Utc::now().to_rfc3339(), url: format!("https://example.invalid/mr/{id}") };
-                println!("{}", output::json_pretty(serde_json::json!({
-                    "schema_version": output::SCHEMA_VERSION,
-                    "mock": true,
-                    "tool": "mr create",
-                    "mr": mr,
-                }))?);
+                let mr = MR {
+                    id: id.clone(),
+                    title,
+                    status: "OPEN".to_string(),
+                    base,
+                    head,
+                    author: "agent-cli".to_string(),
+                    created_at: chrono::Utc::now().to_rfc3339(),
+                    url: format!("https://example.invalid/mr/{id}"),
+                };
+                println!(
+                    "{}",
+                    output::json_pretty(serde_json::json!({
+                        "schema_version": output::SCHEMA_VERSION,
+                        "mock": true,
+                        "tool": "mr create",
+                        "mr": mr,
+                    }))?
+                );
                 Ok(())
             }
             MrCommand::Show { id } => {
                 let mr = mock_mr(&id);
-                println!("{}", output::json_pretty(serde_json::json!({
-                    "schema_version": output::SCHEMA_VERSION,
-                    "mock": true,
-                    "tool": "mr show",
-                    "mr": mr,
-                }))?);
+                println!(
+                    "{}",
+                    output::json_pretty(serde_json::json!({
+                        "schema_version": output::SCHEMA_VERSION,
+                        "mock": true,
+                        "tool": "mr show",
+                        "mr": mr,
+                    }))?
+                );
                 Ok(())
             }
             MrCommand::Review { id } => {
-                let result = ReviewResult { mr_id: id.clone(), status: "PENDING".to_string(), review_id: format!("REV-mock-{}", chrono::Utc::now().timestamp()), approved: false };
-                println!("{}", output::json_pretty(serde_json::json!({
-                    "schema_version": output::SCHEMA_VERSION,
-                    "mock": true,
-                    "tool": "mr review",
-                    "review": result,
-                }))?);
+                let result = ReviewResult {
+                    mr_id: id.clone(),
+                    status: "PENDING".to_string(),
+                    review_id: format!("REV-mock-{}", chrono::Utc::now().timestamp()),
+                    approved: false,
+                };
+                println!(
+                    "{}",
+                    output::json_pretty(serde_json::json!({
+                        "schema_version": output::SCHEMA_VERSION,
+                        "mock": true,
+                        "tool": "mr review",
+                        "review": result,
+                    }))?
+                );
                 Ok(())
             }
         }

@@ -68,8 +68,12 @@ impl CommitType {
 pub struct CommitScope(pub String);
 
 impl CommitScope {
-    pub fn new(s: impl Into<String>) -> Self { Self(s.into()) }
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 /// Commit 模板
@@ -165,17 +169,35 @@ pub struct CommitTemplateBuilder;
 impl CommitTemplateBuilder {
     /// 从 diff 推断 type (基于改动文件路径)
     pub fn infer_type(changed_files: &[String]) -> CommitType {
-        let all_tests = changed_files.iter().all(|f| f.contains("test") || f.contains("__tests__"));
-        let all_docs = changed_files.iter().all(|f| f.starts_with("docs/") || f.ends_with(".md"));
+        let all_tests = changed_files
+            .iter()
+            .all(|f| f.contains("test") || f.contains("__tests__"));
+        let all_docs = changed_files
+            .iter()
+            .all(|f| f.starts_with("docs/") || f.ends_with(".md"));
         let all_frontend = changed_files.iter().all(|f| f.starts_with("frontend/"));
-        let has_cargo = changed_files.iter().any(|f| f == "Cargo.toml" || f.ends_with(".lock"));
-        let has_workflow = changed_files.iter().any(|f| f.starts_with(".github/workflows/"));
+        let has_cargo = changed_files
+            .iter()
+            .any(|f| f == "Cargo.toml" || f.ends_with(".lock"));
+        let has_workflow = changed_files
+            .iter()
+            .any(|f| f.starts_with(".github/workflows/"));
 
-        if all_tests { return CommitType::Test; }
-        if all_docs { return CommitType::Docs; }
-        if has_workflow { return CommitType::Ci; }
-        if has_cargo && changed_files.len() <= 2 { return CommitType::Build; }
-        if all_frontend { return CommitType::Feat; }
+        if all_tests {
+            return CommitType::Test;
+        }
+        if all_docs {
+            return CommitType::Docs;
+        }
+        if has_workflow {
+            return CommitType::Ci;
+        }
+        if has_cargo && changed_files.len() <= 2 {
+            return CommitType::Build;
+        }
+        if all_frontend {
+            return CommitType::Feat;
+        }
         CommitType::Feat // 默认
     }
 
@@ -205,16 +227,30 @@ impl CommitTemplateBuilder {
         let subject = match commit_type {
             CommitType::Feat => format!("添加 {} 项变更 (来自 {})", file_count, trigger_source),
             CommitType::Fix => format!("修复 {} 项问题 (来自 {})", file_count, trigger_source),
-            _ => format!("{} (来自 {}, {} 文件)", commit_type.as_str(), trigger_source, file_count),
+            _ => format!(
+                "{} (来自 {}, {} 文件)",
+                commit_type.as_str(),
+                trigger_source,
+                file_count
+            ),
         };
         let body = format!(
             "Auto-uploaded by Star Agent Task Window.\n\nFiles:\n{}",
-            changed_files.iter().map(|f| format!("- {}", f)).collect::<Vec<_>>().join("\n"),
+            changed_files
+                .iter()
+                .map(|f| format!("- {}", f))
+                .collect::<Vec<_>>()
+                .join("\n"),
         );
         let mut t = CommitTemplate::new(commit_type, subject);
-        if let Some(s) = scope { t = t.with_scope(s); }
+        if let Some(s) = scope {
+            t = t.with_scope(s);
+        }
         t = t.with_body(body);
-        t = t.with_footer(format!("Trigger: {}\nGenerated-by: Star v0.1", trigger_source));
+        t = t.with_footer(format!(
+            "Trigger: {}\nGenerated-by: Star v0.1",
+            trigger_source
+        ));
         t.render()
     }
 }
@@ -266,7 +302,9 @@ pub async fn detect_worktree_status(worktree_dir: &Path) -> Result<WorktreeStatu
         .output()
         .await
         .map_err(|e| WorktreeError::GitFailed(e.to_string()))?;
-    let branch_str = String::from_utf8_lossy(&branch_out.stdout).trim().to_string();
+    let branch_str = String::from_utf8_lossy(&branch_out.stdout)
+        .trim()
+        .to_string();
     let detached = branch_str == "HEAD";
     let branch = if detached { None } else { Some(branch_str) };
 
@@ -283,7 +321,12 @@ pub async fn detect_worktree_status(worktree_dir: &Path) -> Result<WorktreeStatu
     // 3. ahead/behind
     let (ahead, behind) = if let Some(b) = &branch {
         let ab_out = Command::new("git")
-            .args(["rev-list", "--count", "--left-right", &format!("{}...@{{u}}", b)])
+            .args([
+                "rev-list",
+                "--count",
+                "--left-right",
+                &format!("{}...@{{u}}", b),
+            ])
             .current_dir(worktree_dir)
             .output()
             .await
@@ -328,7 +371,11 @@ pub async fn detect_worktree_status(worktree_dir: &Path) -> Result<WorktreeStatu
         .map_err(|e| WorktreeError::GitFailed(e.to_string()))?;
     let last_commit_sha = if sha_out.status.success() {
         let s = String::from_utf8_lossy(&sha_out.stdout).trim().to_string();
-        if s.is_empty() { None } else { Some(s) }
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
     } else {
         None
     };
@@ -424,8 +471,16 @@ mod tests {
 
     #[test]
     fn test_build_full() {
-        let files = vec!["crates/domain-cli/src/lib.rs".to_string(), "crates/domain-cli/Cargo.toml".to_string()];
-        let msg = CommitTemplateBuilder::build(CommitType::Feat, Some(CommitScope::new("cli")), &files, "wt-w17");
+        let files = vec![
+            "crates/domain-cli/src/lib.rs".to_string(),
+            "crates/domain-cli/Cargo.toml".to_string(),
+        ];
+        let msg = CommitTemplateBuilder::build(
+            CommitType::Feat,
+            Some(CommitScope::new("cli")),
+            &files,
+            "wt-w17",
+        );
         assert!(msg.contains("feat"));
         assert!(msg.contains("cli"));
         assert!(msg.contains("wt-w17"));

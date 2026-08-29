@@ -238,7 +238,9 @@ impl Sprint {
         end_date: DateTime<Utc>,
     ) -> Result<Self, PlanningError> {
         if name.trim().is_empty() {
-            return Err(PlanningError::InvalidState("sprint name required".to_string()));
+            return Err(PlanningError::InvalidState(
+                "sprint name required".to_string(),
+            ));
         }
         if end_date <= start_date {
             return Err(PlanningError::InvalidState(
@@ -704,19 +706,13 @@ pub trait PlanningRepository: Send + Sync {
         project_id: Option<ProjectId>,
     ) -> Result<Vec<Milestone>, PlanningError>;
 
-    async fn insert_backlog_item(
-        &self,
-        item: SprintBacklogItem,
-    ) -> Result<(), PlanningError>;
+    async fn insert_backlog_item(&self, item: SprintBacklogItem) -> Result<(), PlanningError>;
     async fn list_backlog_items(
         &self,
         sprint_id: SprintId,
     ) -> Result<Vec<SprintBacklogItem>, PlanningError>;
 
-    async fn insert_burndown_point(
-        &self,
-        point: BurndownPoint,
-    ) -> Result<(), PlanningError>;
+    async fn insert_burndown_point(&self, point: BurndownPoint) -> Result<(), PlanningError>;
     async fn list_burndown_points(
         &self,
         sprint_id: SprintId,
@@ -939,10 +935,7 @@ impl PlanningRepository for InMemoryPlanningRepository {
             .collect())
     }
 
-    async fn insert_backlog_item(
-        &self,
-        item: SprintBacklogItem,
-    ) -> Result<(), PlanningError> {
+    async fn insert_backlog_item(&self, item: SprintBacklogItem) -> Result<(), PlanningError> {
         let mut store = self.backlog.write().expect("lock");
         store.entry(item.sprint_id).or_default().push(item);
         Ok(())
@@ -956,10 +949,7 @@ impl PlanningRepository for InMemoryPlanningRepository {
         Ok(store.get(&sprint_id).cloned().unwrap_or_default())
     }
 
-    async fn insert_burndown_point(
-        &self,
-        point: BurndownPoint,
-    ) -> Result<(), PlanningError> {
+    async fn insert_burndown_point(&self, point: BurndownPoint) -> Result<(), PlanningError> {
         let mut store = self.burndown.write().expect("lock");
         store.entry(point.sprint_id).or_default().push(point);
         Ok(())
@@ -1167,8 +1157,7 @@ impl PlanningCommandPort for InMemoryPlanningService {
             .expect("lock")
             .insert(sprint.id, sprint.clone());
 
-        let item =
-            SprintBacklogItem::new(cmd.sprint_id, cmd.work_item_id, cmd.story_points);
+        let item = SprintBacklogItem::new(cmd.sprint_id, cmd.work_item_id, cmd.story_points);
         self.repo.insert_backlog_item(item.clone()).await?;
         self.backlog
             .write()
@@ -1370,10 +1359,7 @@ mod tests {
             .with_project(project_id)
     }
 
-    fn make_create_sprint_cmd(
-        tenant_id: TenantId,
-        project_id: ProjectId,
-    ) -> CreateSprintCommand {
+    fn make_create_sprint_cmd(tenant_id: TenantId, project_id: ProjectId) -> CreateSprintCommand {
         let now = Utc::now();
         CreateSprintCommand {
             tenant_id,
@@ -1717,8 +1703,7 @@ mod tests {
             .await
             .unwrap();
         let tenant_b = TenantId::new();
-        let actor_b = ActorContext::new(UserId::new(), tenant_b)
-            .with_role(roles::PROJECT_ADMIN);
+        let actor_b = ActorContext::new(UserId::new(), tenant_b).with_role(roles::PROJECT_ADMIN);
         let res = svc
             .get_sprint(
                 GetSprintQuery {

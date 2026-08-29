@@ -6,7 +6,10 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::context::ActorContext;
-use crate::entity::{Feedback, FeedbackConsumedEvent, FeedbackInboxItem, FeedbackResolution, ResolutionEvidence, ResolutionEvidenceRef};
+use crate::entity::{
+    Feedback, FeedbackConsumedEvent, FeedbackInboxItem, FeedbackResolution, ResolutionEvidence,
+    ResolutionEvidenceRef,
+};
 use crate::error::FeedbackError;
 use crate::value_object::{
     AgentId, AgentSessionId, FeedbackId, FeedbackResolutionId, FeedbackStatus, FeedbackTarget,
@@ -231,26 +234,17 @@ pub trait FeedbackQueryPort: Send + Sync {
 pub trait FeedbackRepository: Send + Sync {
     async fn insert_feedback(&self, f: &Feedback) -> Result<(), FeedbackError>;
     async fn save_feedback(&self, f: &Feedback) -> Result<(), FeedbackError>;
-    async fn find_feedback(
-        &self,
-        id: FeedbackId,
-    ) -> Result<Option<Feedback>, FeedbackError>;
+    async fn find_feedback(&self, id: FeedbackId) -> Result<Option<Feedback>, FeedbackError>;
     async fn list_feedbacks_raw(
         &self,
         q: ListFeedbackQuery,
     ) -> Result<Vec<Feedback>, FeedbackError>;
-    async fn insert_resolution(
-        &self,
-        r: &FeedbackResolution,
-    ) -> Result<(), FeedbackError>;
+    async fn insert_resolution(&self, r: &FeedbackResolution) -> Result<(), FeedbackError>;
     async fn list_resolutions_raw(
         &self,
         feedback_id: FeedbackId,
     ) -> Result<Vec<FeedbackResolution>, FeedbackError>;
-    async fn insert_consumed_event(
-        &self,
-        e: &FeedbackConsumedEvent,
-    ) -> Result<(), FeedbackError>;
+    async fn insert_consumed_event(&self, e: &FeedbackConsumedEvent) -> Result<(), FeedbackError>;
     async fn list_consumed_events_raw(
         &self,
         feedback_id: FeedbackId,

@@ -217,9 +217,5 @@ fn _unused_ws(
     _: ChangeSetId,
     _: CommitId,
 ) -> (AgentSessionId, ChangeSetId, CommitId) {
-    (
-        AgentSessionId::new(),
-        ChangeSetId::new(),
-        CommitId::new(),
-    )
+    (AgentSessionId::new(), ChangeSetId::new(), CommitId::new())
 }

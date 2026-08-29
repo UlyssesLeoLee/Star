@@ -237,7 +237,10 @@ pub enum FeedbackTarget {
         line_range: Option<LineRange>,
     },
     /// Symbol 目标
-    Symbol { symbol_id: SymbolId, ref_name: String },
+    Symbol {
+        symbol_id: SymbolId,
+        ref_name: String,
+    },
     /// DiffHunk 目标
     DiffHunk {
         commit_id: CommitId,

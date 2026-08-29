@@ -482,10 +482,7 @@ pub trait RelationRepository: Send + Sync {
     async fn insert_relation(&self, r: Relation) -> Result<(), RelationError>;
     async fn update_relation(&self, r: Relation) -> Result<(), RelationError>;
     async fn get_relation(&self, id: RelationId) -> Result<Relation, RelationError>;
-    async fn list_relations(
-        &self,
-        tenant_id: TenantId,
-    ) -> Result<Vec<Relation>, RelationError>;
+    async fn list_relations(&self, tenant_id: TenantId) -> Result<Vec<Relation>, RelationError>;
 
     async fn insert_group(&self, g: RelationGroup) -> Result<(), RelationError>;
     async fn update_group(&self, g: RelationGroup) -> Result<(), RelationError>;
@@ -533,9 +530,7 @@ impl ActorContext {
     }
     /// 是否有 admin 类角色(tenant_admin / project_admin)
     pub fn is_admin(&self) -> bool {
-        self.has_role("tenant_admin")
-            || self.has_role("project_admin")
-            || self.is_local_runtime
+        self.has_role("tenant_admin") || self.has_role("project_admin") || self.is_local_runtime
     }
 }
 
@@ -568,10 +563,7 @@ impl RelationRepository for InMemoryRelationRepository {
     async fn insert_relation(&self, r: Relation) -> Result<(), RelationError> {
         let mut s = self.relations.write().expect("lock");
         if s.contains_key(&r.id) {
-            return Err(RelationError::Conflict(format!(
-                "Relation {} 已存在",
-                r.id
-            )));
+            return Err(RelationError::Conflict(format!("Relation {} 已存在", r.id)));
         }
         s.insert(r.id, r);
         Ok(())
@@ -587,10 +579,7 @@ impl RelationRepository for InMemoryRelationRepository {
             .cloned()
             .ok_or_else(|| RelationError::NotFound(format!("relation:{}", id)))
     }
-    async fn list_relations(
-        &self,
-        tenant_id: TenantId,
-    ) -> Result<Vec<Relation>, RelationError> {
+    async fn list_relations(&self, tenant_id: TenantId) -> Result<Vec<Relation>, RelationError> {
         let s = self.relations.read().expect("lock");
         Ok(s.values()
             .filter(|r| r.tenant_id == tenant_id)
@@ -634,7 +623,21 @@ pub struct InMemoryRelationService {
     /// 按 (tenant_id, to_type, to_id) 索引,加速 to 查询
     to_index: Arc<RwLock<HashMap<(TenantId, ResourceType, Uuid), Vec<RelationId>>>>,
     /// 重复检测 (tenant, from, type, to) -> RelationId
-    dedup_index: Arc<RwLock<HashMap<(TenantId, ResourceType, Uuid, RelationType, ResourceType, Uuid), RelationId>>>,
+    dedup_index: Arc<
+        RwLock<
+            HashMap<
+                (
+                    TenantId,
+                    ResourceType,
+                    Uuid,
+                    RelationType,
+                    ResourceType,
+                    Uuid,
+                ),
+                RelationId,
+            >,
+        >,
+    >,
 }
 
 impl InMemoryRelationService {
@@ -771,14 +774,11 @@ impl RelationCommandPort for InMemoryRelationService {
             deleted: false,
         };
         // 持久化(可选,失败回滚)
-        self.repo
-            .insert_relation(rel.clone())
-            .await
-            .map_err(|e| {
-                // 回滚内存
-                self.dedup_index.write().expect("lock").remove(&dedup_key);
-                e
-            })?;
+        self.repo.insert_relation(rel.clone()).await.map_err(|e| {
+            // 回滚内存
+            self.dedup_index.write().expect("lock").remove(&dedup_key);
+            e
+        })?;
         // 内存 + 索引
         self.relations
             .write()
@@ -805,9 +805,7 @@ impl RelationCommandPort for InMemoryRelationService {
             .expect("lock")
             .get_mut(&cmd.relation_id)
             .cloned()
-            .ok_or_else(|| {
-                RelationError::NotFound(format!("relation:{}", cmd.relation_id))
-            })?;
+            .ok_or_else(|| RelationError::NotFound(format!("relation:{}", cmd.relation_id)))?;
         if r.tenant_id != cmd.tenant_id {
             return Err(RelationError::CrossTenantDenied(
                 actor.tenant_id,
@@ -843,10 +841,7 @@ impl RelationCommandPort for InMemoryRelationService {
         }
         let g = RelationGroup::new(cmd.tenant_id, cmd.name, cmd.description, actor.user_id);
         self.repo.insert_group(g.clone()).await?;
-        self.groups
-            .write()
-            .expect("lock")
-            .insert(g.id, g.clone());
+        self.groups.write().expect("lock").insert(g.id, g.clone());
         Ok(g)
     }
 
@@ -868,9 +863,7 @@ impl RelationCommandPort for InMemoryRelationService {
             .expect("lock")
             .get(&cmd.relation_id)
             .cloned()
-            .ok_or_else(|| {
-                RelationError::NotFound(format!("relation:{}", cmd.relation_id))
-            })?;
+            .ok_or_else(|| RelationError::NotFound(format!("relation:{}", cmd.relation_id)))?;
         if r.tenant_id != cmd.tenant_id {
             return Err(RelationError::CrossTenantDenied(
                 actor.tenant_id,
@@ -894,10 +887,7 @@ impl RelationCommandPort for InMemoryRelationService {
             g.relation_ids.push(cmd.relation_id);
         }
         self.repo.update_group(g.clone()).await?;
-        self.groups
-            .write()
-            .expect("lock")
-            .insert(g.id, g.clone());
+        self.groups.write().expect("lock").insert(g.id, g.clone());
         Ok(g)
     }
 
@@ -934,10 +924,7 @@ impl RelationCommandPort for InMemoryRelationService {
             )));
         }
         self.repo.update_group(g.clone()).await?;
-        self.groups
-            .write()
-            .expect("lock")
-            .insert(g.id, g.clone());
+        self.groups.write().expect("lock").insert(g.id, g.clone());
         Ok(g)
     }
 }
@@ -957,7 +944,10 @@ impl RelationQueryPort for InMemoryRelationService {
             .cloned()
             .ok_or_else(|| RelationError::NotFound(format!("relation:{}", id)))?;
         if r.tenant_id != actor.tenant_id {
-            return Err(RelationError::CrossTenantDenied(actor.tenant_id, r.tenant_id));
+            return Err(RelationError::CrossTenantDenied(
+                actor.tenant_id,
+                r.tenant_id,
+            ));
         }
         Ok(r)
     }
@@ -1040,7 +1030,9 @@ impl RelationQueryPort for InMemoryRelationService {
         let relations = self.relations.read().expect("lock");
         Ok(relations
             .values()
-            .filter(|r| r.tenant_id == q.tenant_id && r.relation_type == q.relation_type && !r.deleted)
+            .filter(|r| {
+                r.tenant_id == q.tenant_id && r.relation_type == q.relation_type && !r.deleted
+            })
             .cloned()
             .collect())
     }
@@ -1058,7 +1050,10 @@ impl RelationQueryPort for InMemoryRelationService {
             .cloned()
             .ok_or_else(|| RelationError::NotFound(format!("group:{}", group_id)))?;
         if g.tenant_id != actor.tenant_id {
-            return Err(RelationError::CrossTenantDenied(actor.tenant_id, g.tenant_id));
+            return Err(RelationError::CrossTenantDenied(
+                actor.tenant_id,
+                g.tenant_id,
+            ));
         }
         Ok(g)
     }
@@ -1767,7 +1762,10 @@ mod tests {
     // 16 (额外) ResourceType / RelationType 解析
     #[test]
     fn type_parse_roundtrip() {
-        assert_eq!(ResourceType::parse("work_item"), Some(ResourceType::WorkItem));
+        assert_eq!(
+            ResourceType::parse("work_item"),
+            Some(ResourceType::WorkItem)
+        );
         assert_eq!(ResourceType::parse("REPO"), Some(ResourceType::Repository));
         assert_eq!(ResourceType::parse("nope"), None);
         assert_eq!(RelationType::parse("blocks"), Some(RelationType::Blocks));

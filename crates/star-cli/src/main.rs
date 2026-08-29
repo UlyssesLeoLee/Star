@@ -13,7 +13,9 @@ mod output;
 
 pub(crate) use error::StarError;
 
-use commands::{agent, code, context, issue, mr, pipeline, project, submit, task, test, worktree, workspace};
+use commands::{
+    agent, code, context, issue, mr, pipeline, project, submit, task, test, workspace, worktree,
+};
 
 #[derive(Debug, Parser)]
 #[command(name = "star", version, about, long_about = None)]
@@ -32,25 +34,39 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum TopCommand {
-    #[command(subcommand)] Agent(agent::AgentCommand),
-    #[command(subcommand)] Task(task::TaskCommand),
+    #[command(subcommand)]
+    Agent(agent::AgentCommand),
+    #[command(subcommand)]
+    Task(task::TaskCommand),
     Submit(submit::SubmitArgs),
-    #[command(subcommand)] Project(project::ProjectCommand),
-    #[command(subcommand)] Issue(issue::IssueCommand),
-    #[command(subcommand)] Context(context::ContextCommand),
-    #[command(subcommand)] Code(code::CodeCommand),
-    #[command(subcommand)] Workspace(workspace::WorkspaceCommand),
-    #[command(subcommand)] Worktree(worktree::WorktreeCommand),
-    #[command(subcommand)] Mr(mr::MrCommand),
-    #[command(subcommand)] Test(test::TestCommand),
-    #[command(subcommand)] Pipeline(pipeline::PipelineCommand),
+    #[command(subcommand)]
+    Project(project::ProjectCommand),
+    #[command(subcommand)]
+    Issue(issue::IssueCommand),
+    #[command(subcommand)]
+    Context(context::ContextCommand),
+    #[command(subcommand)]
+    Code(code::CodeCommand),
+    #[command(subcommand)]
+    Workspace(workspace::WorkspaceCommand),
+    #[command(subcommand)]
+    Worktree(worktree::WorktreeCommand),
+    #[command(subcommand)]
+    Mr(mr::MrCommand),
+    #[command(subcommand)]
+    Test(test::TestCommand),
+    #[command(subcommand)]
+    Pipeline(pipeline::PipelineCommand),
 }
 
 fn main() -> std::process::ExitCode {
     let cli = Cli::parse();
     match run(cli) {
         Ok(()) => std::process::ExitCode::SUCCESS,
-        Err(e) => { eprintln!("error: {e}"); std::process::ExitCode::from(e.exit_code()) }
+        Err(e) => {
+            eprintln!("error: {e}");
+            std::process::ExitCode::from(e.exit_code())
+        }
     }
 }
 

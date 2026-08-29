@@ -32,7 +32,11 @@ struct HubInner {
 
 impl OutputHub {
     pub fn new() -> Self {
-        Self { inner: Arc::new(HubInner { senders: Mutex::new(HashMap::new()) }) }
+        Self {
+            inner: Arc::new(HubInner {
+                senders: Mutex::new(HashMap::new()),
+            }),
+        }
     }
 
     /// 注册 process (返回 broadcast sender 给调用方推送)
@@ -48,14 +52,21 @@ impl OutputHub {
     }
 
     /// 订阅 process 输出 (返回新 receiver, 不影响其他订阅者)
-    pub async fn subscribe(&self, id: Uuid) -> Result<broadcast::Receiver<OutputLine>, SubscribeError> {
+    pub async fn subscribe(
+        &self,
+        id: Uuid,
+    ) -> Result<broadcast::Receiver<OutputLine>, SubscribeError> {
         let map = self.inner.senders.lock().await;
-        map.get(&id).map(|tx| tx.subscribe()).ok_or(SubscribeError::ProcessNotFound(id))
+        map.get(&id)
+            .map(|tx| tx.subscribe())
+            .ok_or(SubscribeError::ProcessNotFound(id))
     }
 }
 
 impl Default for OutputHub {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // =====================================================================
@@ -75,11 +86,7 @@ pub enum SubscribeError {
 // =====================================================================
 
 /// 把 sender 给调用方, 调用方在 spawn 后用 sender 推送
-pub async fn route_output_to_hub(
-    hub: &OutputHub,
-    id: Uuid,
-    mut from: mpsc::Receiver<OutputLine>,
-) {
+pub async fn route_output_to_hub(hub: &OutputHub, id: Uuid, mut from: mpsc::Receiver<OutputLine>) {
     let tx = hub.register(id).await;
     while let Some(line) = from.recv().await {
         // broadcast 失败 (无订阅者) 不影响继续推送

@@ -9,8 +9,8 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use thiserror::Error;
+use uuid::Uuid;
 
 // =====================================================================
 // 1. What-if 沙盒
@@ -90,8 +90,8 @@ impl Confidence {
     pub fn color(&self) -> &'static str {
         match self {
             Self::Committed => "#3D8B5F",   // 绿
-            Self::Planned => "#C77B30",      // 橙
-            Self::Exploratory => "#94A3B8",  // 灰
+            Self::Planned => "#C77B30",     // 橙
+            Self::Exploratory => "#94A3B8", // 灰
         }
     }
 
@@ -119,7 +119,12 @@ pub struct Baseline {
 }
 
 impl Baseline {
-    pub fn new(name: impl Into<String>, plan_id: Uuid, snapshot: serde_json::Value, actor: Uuid) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        plan_id: Uuid,
+        snapshot: serde_json::Value,
+        actor: Uuid,
+    ) -> Self {
         Self {
             id: Uuid::new_v4(),
             name: name.into(),
@@ -152,7 +157,9 @@ pub struct BaselineChange {
 pub struct WhatIfService;
 
 impl WhatIfService {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     /// 创建 scenario
     pub fn create_scenario(
@@ -176,11 +183,7 @@ impl WhatIfService {
     }
 
     /// 对比基线 vs 当前 (简化: 字段数对比)
-    pub fn diff_baseline(
-        &self,
-        baseline: &Baseline,
-        current: &serde_json::Value,
-    ) -> BaselineDiff {
+    pub fn diff_baseline(&self, baseline: &Baseline, current: &serde_json::Value) -> BaselineDiff {
         let mut changes = Vec::new();
         if let (Some(b), Some(c)) = (baseline.snapshot.as_object(), current.as_object()) {
             for (k, v_old) in b {
@@ -210,7 +213,9 @@ impl WhatIfService {
 }
 
 impl Default for WhatIfService {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -250,7 +255,12 @@ mod tests {
 
     #[test]
     fn test_baseline_new() {
-        let b = Baseline::new("Initial", Uuid::new_v4(), serde_json::json!({"x": 1}), Uuid::new_v4());
+        let b = Baseline::new(
+            "Initial",
+            Uuid::new_v4(),
+            serde_json::json!({"x": 1}),
+            Uuid::new_v4(),
+        );
         assert_eq!(b.name, "Initial");
     }
 

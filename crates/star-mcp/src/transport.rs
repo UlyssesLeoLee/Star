@@ -23,7 +23,7 @@
 use std::io::{self, BufRead, Write};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::error::McpError;
 use crate::prompts;
@@ -289,11 +289,19 @@ fn handle_initialize(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRpcErro
             "version": "0.1.0"
         }
     });
-    Ok(JsonRpcSuccess { jsonrpc: "2.0", id: req.id.clone(), result })
+    Ok(JsonRpcSuccess {
+        jsonrpc: "2.0",
+        id: req.id.clone(),
+        result,
+    })
 }
 
 fn handle_tools_list(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRpcError> {
-    Ok(JsonRpcSuccess { jsonrpc: "2.0", id: req.id.clone(), result: tools_list() })
+    Ok(JsonRpcSuccess {
+        jsonrpc: "2.0",
+        id: req.id.clone(),
+        result: tools_list(),
+    })
 }
 
 async fn handle_tools_call(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonRpcError> {
@@ -312,19 +320,17 @@ async fn handle_tools_call(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonR
 
     // 路由到 16 tool
     // per spec/mcp/01 §3.2: error.data = 完整 agent-api/v1#Error 6 字段(per F-06 修复)
-    let tool_result = dispatch(&name, arguments)
-        .await
-        .map_err(|e| {
-            let data = serde_json::to_value(&e).ok();
-            error(
-                JsonRpcErrorBody {
-                    code: error_code::INTERNAL_ERROR,
-                    message: e.to_string(),
-                    data,
-                },
-                req.id.clone(),
-            )
-        })?;
+    let tool_result = dispatch(&name, arguments).await.map_err(|e| {
+        let data = serde_json::to_value(&e).ok();
+        error(
+            JsonRpcErrorBody {
+                code: error_code::INTERNAL_ERROR,
+                message: e.to_string(),
+                data,
+            },
+            req.id.clone(),
+        )
+    })?;
 
     // tools/call 响应: { content: [{type: "text", text: "<JSON 字符串>"}], isError: false }
     let result = json!({
@@ -337,7 +343,11 @@ async fn handle_tools_call(req: &JsonRpcRequest) -> Result<JsonRpcSuccess, JsonR
         ],
         "isError": false
     });
-    Ok(JsonRpcSuccess { jsonrpc: "2.0", id: req.id.clone(), result })
+    Ok(JsonRpcSuccess {
+        jsonrpc: "2.0",
+        id: req.id.clone(),
+        result,
+    })
 }
 
 /// 16 tool dispatch (复用 mod.rs 现有 invoke fn)
@@ -365,20 +375,35 @@ async fn dispatch(tool: &str, args: Value) -> Result<Value, McpError> {
 
 // 错误构造 helpers
 fn method_not_found(method: &str) -> JsonRpcErrorBody {
-    JsonRpcErrorBody { code: error_code::METHOD_NOT_FOUND, message: format!("method not found: {method}"), data: None }
+    JsonRpcErrorBody {
+        code: error_code::METHOD_NOT_FOUND,
+        message: format!("method not found: {method}"),
+        data: None,
+    }
 }
 
 fn invalid_params(msg: &str) -> JsonRpcErrorBody {
-    JsonRpcErrorBody { code: error_code::INVALID_PARAMS, message: msg.to_string(), data: None }
+    JsonRpcErrorBody {
+        code: error_code::INVALID_PARAMS,
+        message: msg.to_string(),
+        data: None,
+    }
 }
 
 fn error(body: JsonRpcErrorBody, id: Value) -> JsonRpcError {
-    JsonRpcError { jsonrpc: "2.0", id, error: body }
+    JsonRpcError {
+        jsonrpc: "2.0",
+        id,
+        error: body,
+    }
 }
 
 /// 从 stdin 读 1 行 + 解析 + handle + 写回 stdout
 /// 完整 JSON-RPC 2.0 端到端 (multi-turn 通过循环调用 run_session)
-pub(crate) async fn run_session<R: BufRead, W: Write>(mut reader: R, mut writer: W) -> io::Result<()> {
+pub(crate) async fn run_session<R: BufRead, W: Write>(
+    mut reader: R,
+    mut writer: W,
+) -> io::Result<()> {
     loop {
         let mut line = String::new();
         let n = reader.read_line(&mut line)?;
@@ -404,7 +429,11 @@ pub(crate) async fn run_session<R: BufRead, W: Write>(mut reader: R, mut writer:
                         data: None,
                     },
                 };
-                writeln!(writer, "{}", serde_json::to_string(&err).unwrap_or_default())?;
+                writeln!(
+                    writer,
+                    "{}",
+                    serde_json::to_string(&err).unwrap_or_default()
+                )?;
                 writer.flush()?;
                 continue;
             }
@@ -421,7 +450,11 @@ pub(crate) async fn run_session<R: BufRead, W: Write>(mut reader: R, mut writer:
                     data: None,
                 },
             };
-            writeln!(writer, "{}", serde_json::to_string(&err).unwrap_or_default())?;
+            writeln!(
+                writer,
+                "{}",
+                serde_json::to_string(&err).unwrap_or_default()
+            )?;
             writer.flush()?;
             continue;
         }
@@ -452,15 +485,27 @@ mod tests {
         let res = handle(req).await.unwrap();
         assert_eq!(res.jsonrpc, "2.0");
         let result = res.result.as_object().unwrap();
-        assert_eq!(result.get("protocolVersion").unwrap().as_str().unwrap(), "2025-06-27");
+        assert_eq!(
+            result.get("protocolVersion").unwrap().as_str().unwrap(),
+            "2025-06-27"
+        );
         assert!(result.get("capabilities").is_some());
         assert!(result.get("serverInfo").is_some());
 
         // Phase D.5+: capabilities 必含 tools + resources + prompts
         let capabilities = result.get("capabilities").unwrap().as_object().unwrap();
-        assert!(capabilities.contains_key("tools"), "tools capability missing");
-        assert!(capabilities.contains_key("resources"), "resources capability missing");
-        assert!(capabilities.contains_key("prompts"), "prompts capability missing");
+        assert!(
+            capabilities.contains_key("tools"),
+            "tools capability missing"
+        );
+        assert!(
+            capabilities.contains_key("resources"),
+            "resources capability missing"
+        );
+        assert!(
+            capabilities.contains_key("prompts"),
+            "prompts capability missing"
+        );
     }
 
     #[tokio::test]
@@ -474,7 +519,10 @@ mod tests {
         let res = handle(req).await.unwrap();
         let tools = res.result.get("tools").unwrap().as_array().unwrap();
         assert_eq!(tools.len(), 16);
-        let names: Vec<&str> = tools.iter().map(|t| t.get("name").unwrap().as_str().unwrap()).collect();
+        let names: Vec<&str> = tools
+            .iter()
+            .map(|t| t.get("name").unwrap().as_str().unwrap())
+            .collect();
         assert!(names.contains(&"get_issue"));
         assert!(names.contains(&"submit"));
     }
@@ -535,7 +583,9 @@ mod tests {
         use std::io::Cursor;
         let input = b"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}\n";
         let mut output = Vec::new();
-        run_session(Cursor::new(&input[..]), &mut output).await.unwrap();
+        run_session(Cursor::new(&input[..]), &mut output)
+            .await
+            .unwrap();
         let s = String::from_utf8(output).unwrap();
         // 2 个 JSON-RPC response
         assert!(s.contains("\"protocolVersion\""));

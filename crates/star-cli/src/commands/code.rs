@@ -50,39 +50,61 @@ impl CodeCommand {
             CodeCommand::Search { query } => {
                 let result = CodeSearchResult {
                     query: query.clone(),
-                    matches: vec![CodeMatch { file: "crates/star-cli/src/commands/code.rs".to_string(), line: 1, snippet: format!("// search: {query}") }],
+                    matches: vec![CodeMatch {
+                        file: "crates/star-cli/src/commands/code.rs".to_string(),
+                        line: 1,
+                        snippet: format!("// search: {query}"),
+                    }],
                     total: 1,
                 };
-                println!("{}", output::json_pretty(serde_json::json!({
-                    "schema_version": output::SCHEMA_VERSION,
-                    "mock": true,
-                    "tool": "code search",
-                    "result": result,
-                }))?);
+                println!(
+                    "{}",
+                    output::json_pretty(serde_json::json!({
+                        "schema_version": output::SCHEMA_VERSION,
+                        "mock": true,
+                        "tool": "code search",
+                        "result": result,
+                    }))?
+                );
                 Ok(())
             }
             CodeCommand::Symbol { name } => {
-                let result = SymbolResult { name: name.clone(), kind: "function".to_string(), file: format!("src/{name}.rs"), line: 1 };
-                println!("{}", output::json_pretty(serde_json::json!({
-                    "schema_version": output::SCHEMA_VERSION,
-                    "mock": true,
-                    "tool": "code symbol",
-                    "symbol": result,
-                }))?);
+                let result = SymbolResult {
+                    name: name.clone(),
+                    kind: "function".to_string(),
+                    file: format!("src/{name}.rs"),
+                    line: 1,
+                };
+                println!(
+                    "{}",
+                    output::json_pretty(serde_json::json!({
+                        "schema_version": output::SCHEMA_VERSION,
+                        "mock": true,
+                        "tool": "code symbol",
+                        "symbol": result,
+                    }))?
+                );
                 Ok(())
             }
             CodeCommand::References { name } => {
                 let result = ReferencesResult {
                     name: name.clone(),
-                    references: vec![CodeMatch { file: "src/main.rs".to_string(), line: 1, snippet: format!("use {name}") }],
+                    references: vec![CodeMatch {
+                        file: "src/main.rs".to_string(),
+                        line: 1,
+                        snippet: format!("use {name}"),
+                    }],
                     total: 1,
                 };
-                println!("{}", output::json_pretty(serde_json::json!({
-                    "schema_version": output::SCHEMA_VERSION,
-                    "mock": true,
-                    "tool": "code references",
-                    "result": result,
-                }))?);
+                println!(
+                    "{}",
+                    output::json_pretty(serde_json::json!({
+                        "schema_version": output::SCHEMA_VERSION,
+                        "mock": true,
+                        "tool": "code references",
+                        "result": result,
+                    }))?
+                );
                 Ok(())
             }
         }

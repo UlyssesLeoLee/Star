@@ -342,10 +342,7 @@ impl AgentPolicy {
 
     /// 12 强制点检查(REQ-PERM-002,§4.2.5)
     /// 由 Application 层在每次工具调用/操作前调用
-    pub fn enforce(
-        &self,
-        check: &PolicyCheck,
-    ) -> Result<(), AgentError> {
+    pub fn enforce(&self, check: &PolicyCheck) -> Result<(), AgentError> {
         // 1. path 必须在 allowed_paths(或 allowed_repositories 内)
         if !self.allowed_paths.is_empty() {
             if !self.allowed_paths.iter().any(|p| check.path.starts_with(p)) {
@@ -356,7 +353,11 @@ impl AgentPolicy {
             }
         }
         // 2. forbidden_paths 永远拒绝
-        if self.forbidden_paths.iter().any(|p| check.path.starts_with(p)) {
+        if self
+            .forbidden_paths
+            .iter()
+            .any(|p| check.path.starts_with(p))
+        {
             return Err(AgentError::PolicyViolation(format!(
                 "forbidden path: {}",
                 check.path
@@ -371,11 +372,15 @@ impl AgentPolicy {
         }
         // 4. network 策略
         if matches!(self.network_access, NetworkAccess::Deny) && check.requires_network {
-            return Err(AgentError::PolicyViolation("network access denied".to_string()));
+            return Err(AgentError::PolicyViolation(
+                "network access denied".to_string(),
+            ));
         }
         // 5. secret 策略
         if matches!(self.secret_access, SecretAccess::None) && check.requires_secret {
-            return Err(AgentError::PolicyViolation("secret access denied".to_string()));
+            return Err(AgentError::PolicyViolation(
+                "secret access denied".to_string(),
+            ));
         }
         // 6. runtime 上限
         if check.elapsed_seconds > self.max_runtime_seconds {
@@ -637,10 +642,8 @@ pub trait AgentRepository: Send + Sync {
         tenant_id: TenantId,
     ) -> Result<Vec<AgentSession>, AgentError>;
 
-    async fn insert_policy_template(
-        &self,
-        template: AgentPolicyTemplate,
-    ) -> Result<(), AgentError>;
+    async fn insert_policy_template(&self, template: AgentPolicyTemplate)
+        -> Result<(), AgentError>;
     async fn get_policy_template(
         &self,
         id: AgentPolicyTemplateId,
@@ -731,7 +734,10 @@ impl AgentCommandPort for InMemoryAgentService {
         actor: &ActorContext,
     ) -> Result<Agent, AgentError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(AgentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if !actor.has_role("project_admin") && !actor.has_role("tenant_admin") {
             return Err(AgentError::PermissionDenied);
@@ -753,7 +759,9 @@ impl AgentCommandPort for InMemoryAgentService {
         let key = format!("{}:{}", agent.provider, agent.version);
         let dup = {
             let agents = self.agents.read().unwrap();
-            agents.values().any(|a| format!("{}:{}", a.provider, a.version) == key && a.tenant_id == agent.tenant_id)
+            agents.values().any(|a| {
+                format!("{}:{}", a.provider, a.version) == key && a.tenant_id == agent.tenant_id
+            })
         };
         if dup {
             return Err(AgentError::Conflict(format!(
@@ -772,7 +780,10 @@ impl AgentCommandPort for InMemoryAgentService {
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(AgentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         let agent = {
             let agents = self.agents.read().unwrap();
@@ -780,7 +791,10 @@ impl AgentCommandPort for InMemoryAgentService {
         }
         .ok_or_else(|| AgentError::NotFound(format!("agent:{}", cmd.agent_id.as_uuid())))?;
         if agent.tenant_id != cmd.tenant_id {
-            return Err(AgentError::CrossTenantDenied(agent.tenant_id, cmd.tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                agent.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if !agent.enabled {
             return Err(AgentError::Conflict("agent disabled".to_string()));
@@ -815,7 +829,10 @@ impl AgentCommandPort for InMemoryAgentService {
             lock_version: 1,
         };
         self.repo.insert_session(session.clone()).await?;
-        self.sessions.write().unwrap().insert(session.id, session.clone());
+        self.sessions
+            .write()
+            .unwrap()
+            .insert(session.id, session.clone());
         Ok(session)
     }
 
@@ -825,7 +842,10 @@ impl AgentCommandPort for InMemoryAgentService {
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(AgentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         check_status_transition(cmd.from, cmd.to)?;
         let mut session = self
@@ -836,7 +856,10 @@ impl AgentCommandPort for InMemoryAgentService {
             .cloned()
             .ok_or_else(|| AgentError::NotFound(format!("session:{}", cmd.session_id.as_uuid())))?;
         if session.tenant_id != cmd.tenant_id {
-            return Err(AgentError::CrossTenantDenied(session.tenant_id, cmd.tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                session.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if session.status != cmd.from {
             return Err(AgentError::InvalidTransition {
@@ -852,7 +875,10 @@ impl AgentCommandPort for InMemoryAgentService {
         session.updated_at = now;
         session.lock_version += 1;
         self.repo.update_session(session.clone()).await?;
-        self.sessions.write().unwrap().insert(session.id, session.clone());
+        self.sessions
+            .write()
+            .unwrap()
+            .insert(session.id, session.clone());
         Ok(session)
     }
 
@@ -862,7 +888,10 @@ impl AgentCommandPort for InMemoryAgentService {
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(AgentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         let mut session = self
             .sessions
@@ -872,13 +901,19 @@ impl AgentCommandPort for InMemoryAgentService {
             .cloned()
             .ok_or_else(|| AgentError::NotFound(format!("session:{}", cmd.session_id.as_uuid())))?;
         if session.tenant_id != cmd.tenant_id {
-            return Err(AgentError::CrossTenantDenied(session.tenant_id, cmd.tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                session.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         *session.tool_activity_summary.entry(cmd.tool).or_insert(0) += cmd.count;
         session.updated_at = Utc::now();
         session.lock_version += 1;
         self.repo.update_session(session.clone()).await?;
-        self.sessions.write().unwrap().insert(session.id, session.clone());
+        self.sessions
+            .write()
+            .unwrap()
+            .insert(session.id, session.clone());
         Ok(session)
     }
 
@@ -888,7 +923,10 @@ impl AgentCommandPort for InMemoryAgentService {
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(AgentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         // 隐式迁移:WaitingFeedback → FeedbackReceived
         let session = self
@@ -931,7 +969,10 @@ impl AgentCommandPort for InMemoryAgentService {
             .cloned()
             .ok_or_else(|| AgentError::NotFound(format!("session:{}", cmd.session_id.as_uuid())))?;
         if session.tenant_id != cmd.tenant_id {
-            return Err(AgentError::CrossTenantDenied(session.tenant_id, cmd.tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                session.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if session.status.is_terminal() {
             return Err(AgentError::Conflict(format!(
@@ -959,7 +1000,10 @@ impl AgentCommandPort for InMemoryAgentService {
         actor: &ActorContext,
     ) -> Result<AgentPolicyTemplate, AgentError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(AgentError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if !actor.has_role("project_admin") && !actor.has_role("tenant_admin") {
             return Err(AgentError::PermissionDenied);
@@ -1146,10 +1190,7 @@ impl AgentRepository for InMemoryAgentRepository {
         &self,
         template: AgentPolicyTemplate,
     ) -> Result<(), AgentError> {
-        self.policies
-            .write()
-            .unwrap()
-            .insert(template.id, template);
+        self.policies.write().unwrap().insert(template.id, template);
         Ok(())
     }
     async fn get_policy_template(
@@ -1208,39 +1249,95 @@ mod tests {
 
     #[test]
     fn transition_start_sequence() {
-        assert!(check_status_transition(AgentSessionStatus::Created, AgentSessionStatus::Starting).is_ok());
-        assert!(check_status_transition(AgentSessionStatus::Starting, AgentSessionStatus::Running).is_ok());
+        assert!(
+            check_status_transition(AgentSessionStatus::Created, AgentSessionStatus::Starting)
+                .is_ok()
+        );
+        assert!(
+            check_status_transition(AgentSessionStatus::Starting, AgentSessionStatus::Running)
+                .is_ok()
+        );
     }
 
     #[test]
     fn transition_tool_loop() {
-        assert!(check_status_transition(AgentSessionStatus::Running, AgentSessionStatus::WaitingTool).is_ok());
-        assert!(check_status_transition(AgentSessionStatus::WaitingTool, AgentSessionStatus::ToolRunning).is_ok());
-        assert!(check_status_transition(AgentSessionStatus::ToolRunning, AgentSessionStatus::ToolCompleted).is_ok());
-        assert!(check_status_transition(AgentSessionStatus::ToolCompleted, AgentSessionStatus::Running).is_ok());
+        assert!(check_status_transition(
+            AgentSessionStatus::Running,
+            AgentSessionStatus::WaitingTool
+        )
+        .is_ok());
+        assert!(check_status_transition(
+            AgentSessionStatus::WaitingTool,
+            AgentSessionStatus::ToolRunning
+        )
+        .is_ok());
+        assert!(check_status_transition(
+            AgentSessionStatus::ToolRunning,
+            AgentSessionStatus::ToolCompleted
+        )
+        .is_ok());
+        assert!(check_status_transition(
+            AgentSessionStatus::ToolCompleted,
+            AgentSessionStatus::Running
+        )
+        .is_ok());
     }
 
     #[test]
     fn transition_feedback_loop() {
-        assert!(check_status_transition(AgentSessionStatus::Running, AgentSessionStatus::WaitingFeedback).is_ok());
-        assert!(check_status_transition(AgentSessionStatus::WaitingFeedback, AgentSessionStatus::FeedbackReceived).is_ok());
-        assert!(check_status_transition(AgentSessionStatus::FeedbackReceived, AgentSessionStatus::Running).is_ok());
+        assert!(check_status_transition(
+            AgentSessionStatus::Running,
+            AgentSessionStatus::WaitingFeedback
+        )
+        .is_ok());
+        assert!(check_status_transition(
+            AgentSessionStatus::WaitingFeedback,
+            AgentSessionStatus::FeedbackReceived
+        )
+        .is_ok());
+        assert!(check_status_transition(
+            AgentSessionStatus::FeedbackReceived,
+            AgentSessionStatus::Running
+        )
+        .is_ok());
     }
 
     #[test]
     fn transition_validation() {
-        assert!(check_status_transition(AgentSessionStatus::Running, AgentSessionStatus::Validating).is_ok());
-        assert!(check_status_transition(AgentSessionStatus::Validating, AgentSessionStatus::Completed).is_ok());
-        assert!(check_status_transition(AgentSessionStatus::Validating, AgentSessionStatus::Failed).is_ok());
+        assert!(check_status_transition(
+            AgentSessionStatus::Running,
+            AgentSessionStatus::Validating
+        )
+        .is_ok());
+        assert!(check_status_transition(
+            AgentSessionStatus::Validating,
+            AgentSessionStatus::Completed
+        )
+        .is_ok());
+        assert!(check_status_transition(
+            AgentSessionStatus::Validating,
+            AgentSessionStatus::Failed
+        )
+        .is_ok());
     }
 
     #[test]
     fn transition_invalid_skipped() {
         // 跳跃:Created → Running 不允许
-        assert!(check_status_transition(AgentSessionStatus::Created, AgentSessionStatus::Running).is_err());
+        assert!(
+            check_status_transition(AgentSessionStatus::Created, AgentSessionStatus::Running)
+                .is_err()
+        );
         // 终态不可再迁移
-        assert!(check_status_transition(AgentSessionStatus::Completed, AgentSessionStatus::Running).is_err());
-        assert!(check_status_transition(AgentSessionStatus::Aborted, AgentSessionStatus::Running).is_err());
+        assert!(check_status_transition(
+            AgentSessionStatus::Completed,
+            AgentSessionStatus::Running
+        )
+        .is_err());
+        assert!(
+            check_status_transition(AgentSessionStatus::Aborted, AgentSessionStatus::Running)
+                .is_err()
+        );
     }
 
     #[test]

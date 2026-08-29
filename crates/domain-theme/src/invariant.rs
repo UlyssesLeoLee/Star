@@ -18,7 +18,9 @@ pub fn inv_02_id_unique(
     candidate: super::value_object::ThemeId,
 ) -> bool {
     !existing.iter().any(|(t, a, id)| {
-        if id != &candidate { return false; }
+        if id != &candidate {
+            return false;
+        }
         match scope {
             super::value_object::ThemeScope::Personal => a == &actor_id,
             super::value_object::ThemeScope::Tenant => t == &tenant_id,
@@ -33,9 +35,15 @@ pub fn inv_02_id_unique(
 /// - 至少 1 个 radius token
 /// - is_dark 必须与 ThemeId::is_dark() 一致
 pub fn inv_03_definition_complete(theme: &super::value_object::ThemeDefinition) -> bool {
-    if theme.colors.is_empty() { return false; }
-    if theme.spacings.is_empty() { return false; }
-    if theme.radii.is_empty() { return false; }
+    if theme.colors.is_empty() {
+        return false;
+    }
+    if theme.spacings.is_empty() {
+        return false;
+    }
+    if theme.radii.is_empty() {
+        return false;
+    }
     theme.is_dark == theme.id.is_dark()
 }
 
@@ -62,9 +70,21 @@ mod tests {
         let a2 = Some(uuid::Uuid::new_v4());
         let existing = vec![(t, a1, ThemeId::Dark)];
         // 同一用户重复注册 → 违规
-        assert!(!inv_02_id_unique(&ThemeScope::Personal, t, a1, &existing, ThemeId::Dark));
+        assert!(!inv_02_id_unique(
+            &ThemeScope::Personal,
+            t,
+            a1,
+            &existing,
+            ThemeId::Dark
+        ));
         // 不同用户 → OK
-        assert!(inv_02_id_unique(&ThemeScope::Personal, t, a2, &existing, ThemeId::Dark));
+        assert!(inv_02_id_unique(
+            &ThemeScope::Personal,
+            t,
+            a2,
+            &existing,
+            ThemeId::Dark
+        ));
     }
 
     #[test]
@@ -74,8 +94,14 @@ mod tests {
             display_name: "Light".into(),
             is_dark: false,
             colors: vec![ColorToken::new("a", "#fff")],
-            spacings: vec![SpacingToken { name: "a".into(), px: 4 }],
-            radii: vec![RadiusToken { name: "a".into(), px: 4 }],
+            spacings: vec![SpacingToken {
+                name: "a".into(),
+                px: 4,
+            }],
+            radii: vec![RadiusToken {
+                name: "a".into(),
+                px: 4,
+            }],
             version: 1,
         };
         assert!(inv_03_definition_complete(&ok));
@@ -86,7 +112,10 @@ mod tests {
         };
         assert!(!inv_03_definition_complete(&empty));
 
-        let mismatch = ThemeDefinition { is_dark: true, ..ok };
+        let mismatch = ThemeDefinition {
+            is_dark: true,
+            ..ok
+        };
         assert!(!inv_03_definition_complete(&mismatch));
     }
 

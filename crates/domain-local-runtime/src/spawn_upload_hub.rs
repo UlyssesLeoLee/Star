@@ -27,7 +27,7 @@ use uuid::Uuid;
 
 use super::process::{OutputLine, OutputStream};
 use super::spawn_upload_integration::SpawnUploadIntegrator;
-use super::subscribe_real::{SubscribeError, OutputHub};
+use super::subscribe_real::{OutputHub, SubscribeError};
 
 // =====================================================================
 // 1. value_object
@@ -44,13 +44,19 @@ pub struct HubAdapterConfig {
 
 impl Default for HubAdapterConfig {
     fn default() -> Self {
-        Self { channel_capacity: 64, subscribe_immediately: true }
+        Self {
+            channel_capacity: 64,
+            subscribe_immediately: true,
+        }
     }
 }
 
 impl HubAdapterConfig {
     pub fn with_capacity(cap: usize) -> Self {
-        Self { channel_capacity: cap, subscribe_immediately: true }
+        Self {
+            channel_capacity: cap,
+            subscribe_immediately: true,
+        }
     }
 }
 
@@ -162,7 +168,10 @@ impl HubIntegratorAdapter {
         // 1. 推 System 事件到 hub
         let line = OutputLine {
             stream: OutputStream::System,
-            content: format!("⛔ process cancelled: {} (reason: {})", self.process_id, reason),
+            content: format!(
+                "⛔ process cancelled: {} (reason: {})",
+                self.process_id, reason
+            ),
             at: chrono::Utc::now(),
         };
         // broadcast::Sender::send 失败 (无订阅者) 不影响逻辑
@@ -209,7 +218,8 @@ async fn subscribe_with_retry(
             Ok(rx) => return Ok(rx),
             Err(SubscribeError::ProcessNotFound(_)) => {
                 // process 还未 register (race), 短暂等再试
-                tokio::time::sleep(std::time::Duration::from_millis(20 * (attempt as u64 + 1))).await;
+                tokio::time::sleep(std::time::Duration::from_millis(20 * (attempt as u64 + 1)))
+                    .await;
             }
             Err(e @ SubscribeError::Lag(_)) => return Err(e),
         }
@@ -308,7 +318,9 @@ mod tests {
             id,
             default_integrator(),
             HubAdapterConfig::default(),
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
         assert_eq!(adapter.process_id(), id);
         adapter.shutdown().await.unwrap();
     }
@@ -323,7 +335,9 @@ mod tests {
             id,
             default_integrator(),
             HubAdapterConfig::default(),
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
         // 订阅 hub 验证 cancel_and_emit 推了 System 消息
         let mut sub = hub.subscribe(id).await.unwrap();
@@ -355,7 +369,9 @@ mod tests {
             id,
             default_integrator(),
             HubAdapterConfig::default(),
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
         adapter.shutdown().await.unwrap();
         // 第二次 shutdown: forwarder 已 take 走, 不应 panic
         adapter.shutdown().await.unwrap();
@@ -371,7 +387,9 @@ mod tests {
             id,
             default_integrator(),
             HubAdapterConfig::default(),
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
         let _i: Arc<SpawnUploadIntegrator> = adapter.integrator();
         // 不 panic 即通过
         adapter.shutdown().await.unwrap();
@@ -389,7 +407,9 @@ mod tests {
             id,
             default_integrator(),
             HubAdapterConfig::default(),
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
         let _i: Arc<SpawnUploadIntegrator> = adapter.integrator();
         adapter.shutdown().await.unwrap();
     }

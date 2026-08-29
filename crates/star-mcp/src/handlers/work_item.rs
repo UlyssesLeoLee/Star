@@ -77,11 +77,8 @@ impl Resource for WorkItemHandler {
                 .map_err(|e| ResourceError::InvalidUri(format!("work_item_id: {e}")))?,
         );
         let svc = self.service();
-        let actor = ActorContext::new(
-            domain_work_item::UserId::from(uuid::Uuid::nil()),
-            tenant_id,
-        )
-        .with_role("developer");
+        let actor = ActorContext::new(domain_work_item::UserId::from(uuid::Uuid::nil()), tenant_id)
+            .with_role("developer");
         match svc
             .get(
                 GetWorkItemQuery {
@@ -145,11 +142,8 @@ mod tests {
         let h = WorkItemHandler::new();
         let svc = h.service();
         let tid = TenantId::new();
-        let actor = ActorContext::new(
-            domain_work_item::UserId::from(uuid::Uuid::nil()),
-            tid,
-        )
-        .with_role("developer");
+        let actor = ActorContext::new(domain_work_item::UserId::from(uuid::Uuid::nil()), tid)
+            .with_role("developer");
         let ws_id = domain_work_item::WorkspaceId::new();
         let proj_id = domain_work_item::ProjectId::new();
         let cmd = CreateWorkItemCommand {
@@ -180,7 +174,10 @@ mod tests {
         let _ = h.service();
         let missing_tenant = uuid::Uuid::new_v4();
         let missing_wi = uuid::Uuid::new_v4();
-        let d = h.read(&format!("{missing_tenant}:{missing_wi}")).await.unwrap();
+        let d = h
+            .read(&format!("{missing_tenant}:{missing_wi}"))
+            .await
+            .unwrap();
         assert!(d.is_none());
     }
 }

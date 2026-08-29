@@ -19,7 +19,7 @@
 use domain_work_item::{
     ActorContext, InMemoryWorkItemService, TenantId, WorkItemId, WorkItemQueryPort,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::sync::{Arc, OnceLock};
 
 use crate::error::McpError;
@@ -121,11 +121,8 @@ mod tests {
         // pre-populate service:用相同 tenant + actor 创建 + 读
         let svc = service();
         let tid = TenantId::new();
-        let actor = ActorContext::new(
-            domain_work_item::UserId::from(uuid::Uuid::nil()),
-            tid,
-        )
-        .with_role("developer");
+        let actor = ActorContext::new(domain_work_item::UserId::from(uuid::Uuid::nil()), tid)
+            .with_role("developer");
         let ws_id = domain_work_item::WorkspaceId::new();
         let proj_id = domain_work_item::ProjectId::new();
         let cmd = CreateWorkItemCommand {

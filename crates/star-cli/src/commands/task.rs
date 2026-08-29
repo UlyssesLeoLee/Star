@@ -48,7 +48,7 @@ pub(crate) mod current {
     use chrono::{DateTime, Utc};
     use serde::{Deserialize, Serialize};
 
-    use super::{CurrentArgs, StarError, output};
+    use super::{output, CurrentArgs, StarError};
 
     /// `agent-api/v1#CurrentTask` schema(per `spec/agent-api/01-schema.md` §3.1)
     #[derive(Debug, Serialize)]
@@ -155,7 +155,9 @@ pub(crate) mod current {
             id: parsed.id,
             title: parsed.title.unwrap_or_default(),
             status: parsed.status.unwrap_or_else(|| "IN_PROGRESS".to_string()),
-            assigned_to: parsed.assigned_to.unwrap_or_else(|| "agent-unassigned".to_string()),
+            assigned_to: parsed
+                .assigned_to
+                .unwrap_or_else(|| "agent-unassigned".to_string()),
             context_refs: parsed.context_refs,
             acceptance_criteria: parsed.acceptance_criteria,
             labels: parsed.labels,
@@ -172,12 +174,19 @@ pub(crate) mod current {
             title: "Phase D 骨架 — STAR CLI / MCP / Context 三 crate 落地".to_string(),
             status: "IN_PROGRESS".to_string(),
             assigned_to: "agent-mock".to_string(),
-            context_refs: vec!["DEC-008".to_string(), "arch/03-star-ai-compat-arch.md".to_string()],
+            context_refs: vec![
+                "DEC-008".to_string(),
+                "arch/03-star-ai-compat-arch.md".to_string(),
+            ],
             acceptance_criteria: vec![
                 "cargo build -p star-cli -p star-mcp -p star-context 通过".to_string(),
                 "cargo clippy --workspace ... RUSTFLAGS=-D warnings 通过".to_string(),
             ],
-            labels: vec!["phase-d".to_string(), "skeleton".to_string(), "mvp".to_string()],
+            labels: vec![
+                "phase-d".to_string(),
+                "skeleton".to_string(),
+                "mvp".to_string(),
+            ],
             updated_at: Utc::now(),
             source: "default_mock",
         }

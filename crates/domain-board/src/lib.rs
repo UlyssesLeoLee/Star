@@ -308,7 +308,12 @@ pub struct Board {
 
 impl Board {
     /// 新建 Board(默认 3 列)
-    pub fn new(tenant_id: TenantId, project_id: ProjectId, name: String, description: String) -> Self {
+    pub fn new(
+        tenant_id: TenantId,
+        project_id: ProjectId,
+        name: String,
+        description: String,
+    ) -> Self {
         let now = Utc::now();
         Self {
             id: BoardId::new(),
@@ -326,7 +331,12 @@ impl Board {
     }
 
     /// 追加 Column(append,order 追加到末尾)
-    pub fn append_column(&mut self, name: String, wip_limit: Option<u32>, color: Option<String>) -> BoardColumnId {
+    pub fn append_column(
+        &mut self,
+        name: String,
+        wip_limit: Option<u32>,
+        color: Option<String>,
+    ) -> BoardColumnId {
         let next_order = self.columns.len() as u32;
         let col = BoardColumn {
             id: BoardColumnId::new(),
@@ -342,7 +352,11 @@ impl Board {
     }
 
     /// 设置 WIP 限制(根据列 id 查找)
-    pub fn set_wip_limit(&mut self, column_id: BoardColumnId, limit: Option<u32>) -> Result<(), BoardError> {
+    pub fn set_wip_limit(
+        &mut self,
+        column_id: BoardColumnId,
+        limit: Option<u32>,
+    ) -> Result<(), BoardError> {
         let col = self
             .columns
             .iter_mut()
@@ -589,11 +603,7 @@ pub trait BoardCommandPort: Send + Sync {
 #[async_trait]
 pub trait BoardQueryPort: Send + Sync {
     /// 按 ID 读
-    async fn get(
-        &self,
-        board_id: BoardId,
-        actor: &ActorContext,
-    ) -> Result<Board, BoardError>;
+    async fn get(&self, board_id: BoardId, actor: &ActorContext) -> Result<Board, BoardError>;
 
     /// 按 Project 列出所有 Board
     async fn list_by_project(
@@ -691,8 +701,12 @@ fn check_tenant(actor: &ActorContext, target: TenantId) -> Result<(), BoardError
 }
 
 /// 校验 board 存在并返回克隆(INV-BD-01)
-fn require_board<'a>(map: &'a HashMap<BoardId, Board>, id: BoardId) -> Result<&'a Board, BoardError> {
-    map.get(&id).ok_or_else(|| BoardError::NotFound(format!("board:{}", id)))
+fn require_board<'a>(
+    map: &'a HashMap<BoardId, Board>,
+    id: BoardId,
+) -> Result<&'a Board, BoardError> {
+    map.get(&id)
+        .ok_or_else(|| BoardError::NotFound(format!("board:{}", id)))
 }
 
 // =====================================================================
@@ -789,8 +803,14 @@ impl BoardCommandPort for InMemoryBoardService {
         Self::check_column_order_unique(&board)?;
 
         self.repo.insert_board(&board).await?;
-        self.boards.write().expect("lock").insert(board.id, board.clone());
-        self.cards.write().expect("lock").insert(board.id, HashMap::new());
+        self.boards
+            .write()
+            .expect("lock")
+            .insert(board.id, board.clone());
+        self.cards
+            .write()
+            .expect("lock")
+            .insert(board.id, HashMap::new());
         self.project_index
             .write()
             .expect("lock")
@@ -813,7 +833,10 @@ impl BoardCommandPort for InMemoryBoardService {
             let mut boards = self.boards.write().expect("lock");
             let board = require_board(&boards, cmd.board_id)?.clone();
             if board.tenant_id != cmd.tenant_id {
-                return Err(BoardError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+                return Err(BoardError::CrossTenantDenied(
+                    actor.tenant_id,
+                    cmd.tenant_id,
+                ));
             }
             let mut b = board;
             new_col_id = b.append_column(cmd.name, cmd.wip_limit, cmd.color);
@@ -847,7 +870,10 @@ impl BoardCommandPort for InMemoryBoardService {
             let mut boards = self.boards.write().expect("lock");
             let board = require_board(&boards, cmd.board_id)?.clone();
             if board.tenant_id != cmd.tenant_id {
-                return Err(BoardError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+                return Err(BoardError::CrossTenantDenied(
+                    actor.tenant_id,
+                    cmd.tenant_id,
+                ));
             }
             // INV-BD-04:目标 column 必须在 board 内
             let to_col = board.find_column(cmd.to_column).ok_or_else(|| {
@@ -962,7 +988,10 @@ impl BoardCommandPort for InMemoryBoardService {
             let mut boards = self.boards.write().expect("lock");
             let board = require_board(&boards, cmd.board_id)?.clone();
             if board.tenant_id != cmd.tenant_id {
-                return Err(BoardError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+                return Err(BoardError::CrossTenantDenied(
+                    actor.tenant_id,
+                    cmd.tenant_id,
+                ));
             }
             let mut b = board;
             let new_id = b.append_swimlane(cmd.name, cmd.group_by);
@@ -992,7 +1021,10 @@ impl BoardCommandPort for InMemoryBoardService {
             let mut boards = self.boards.write().expect("lock");
             let board = require_board(&boards, cmd.board_id)?.clone();
             if board.tenant_id != cmd.tenant_id {
-                return Err(BoardError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+                return Err(BoardError::CrossTenantDenied(
+                    actor.tenant_id,
+                    cmd.tenant_id,
+                ));
             }
             let mut b = board;
             b.set_wip_limit(cmd.column_id, cmd.limit)?;
@@ -1015,15 +1047,14 @@ impl BoardCommandPort for InMemoryBoardService {
 
 #[async_trait]
 impl BoardQueryPort for InMemoryBoardService {
-    async fn get(
-        &self,
-        board_id: BoardId,
-        actor: &ActorContext,
-    ) -> Result<Board, BoardError> {
+    async fn get(&self, board_id: BoardId, actor: &ActorContext) -> Result<Board, BoardError> {
         let boards = self.boards.read().expect("lock");
         let board = require_board(&boards, board_id)?.clone();
         if board.tenant_id != actor.tenant_id {
-            return Err(BoardError::CrossTenantDenied(actor.tenant_id, board.tenant_id));
+            return Err(BoardError::CrossTenantDenied(
+                actor.tenant_id,
+                board.tenant_id,
+            ));
         }
         Ok(board)
     }
@@ -1272,14 +1303,8 @@ mod tests {
             work_item_type: "Task".to_string(),
             priority: "P2".to_string(),
         };
-        svc.repo
-            .insert_card(board.id, &c1)
-            .await
-            .unwrap();
-        svc.repo
-            .insert_card(board.id, &c2)
-            .await
-            .unwrap();
+        svc.repo.insert_card(board.id, &c1).await.unwrap();
+        svc.repo.insert_card(board.id, &c2).await.unwrap();
         // 也需要 service 自己的 cards map 更新
         svc.cards
             .write()

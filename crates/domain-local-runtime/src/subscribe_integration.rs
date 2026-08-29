@@ -11,10 +11,10 @@
 #![warn(missing_docs)]
 #![warn(rust_2018_idioms)]
 
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::Arc;
-use async_trait::async_trait;
 use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
@@ -61,7 +61,11 @@ impl HubCliRuntime {
     }
 
     pub fn with_mock_fallback(hub: OutputHub) -> Self {
-        Self { hub, mock_fallback: true, active: Arc::new(Mutex::new(HashMap::new())) }
+        Self {
+            hub,
+            mock_fallback: true,
+            active: Arc::new(Mutex::new(HashMap::new())),
+        }
     }
 }
 
@@ -128,8 +132,14 @@ impl LocalRuntime for HubCliRuntime {
         };
 
         let pid = child.id();
-        let stdout = child.stdout.take().ok_or_else(|| RuntimeError::SpawnFailed("no stdout".into()))?;
-        let stderr = child.stderr.take().ok_or_else(|| RuntimeError::SpawnFailed("no stderr".into()))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| RuntimeError::SpawnFailed("no stdout".into()))?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| RuntimeError::SpawnFailed("no stderr".into()))?;
 
         self.active.lock().await.insert(id, child);
 
@@ -137,7 +147,9 @@ impl LocalRuntime for HubCliRuntime {
         let (tx_out, rx_out) = mpsc::channel::<OutputLine>(64);
         let hub_out = self.hub.clone();
         let id_out = id;
-        tokio::spawn(async move { route_output_to_hub(&hub_out, id_out, rx_out).await; });
+        tokio::spawn(async move {
+            route_output_to_hub(&hub_out, id_out, rx_out).await;
+        });
         let tx_out_clone = tx_out.clone();
         tokio::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
@@ -156,7 +168,9 @@ impl LocalRuntime for HubCliRuntime {
         let (tx_err, rx_err) = mpsc::channel::<OutputLine>(64);
         let hub_err = self.hub.clone();
         let id_err = id;
-        tokio::spawn(async move { route_output_to_hub(&hub_err, id_err, rx_err).await; });
+        tokio::spawn(async move {
+            route_output_to_hub(&hub_err, id_err, rx_err).await;
+        });
         let tx_err_clone = tx_err.clone();
         tokio::spawn(async move {
             let mut reader = BufReader::new(stderr).lines();
@@ -185,10 +199,17 @@ impl LocalRuntime for HubCliRuntime {
                             let _ = child.wait();
                             map.remove(&id_clone);
                             drop(map);
-                            tracing::info!("HubCli {} (pid={:?}) exited with {}", id_clone, pid_opt, exit_code);
+                            tracing::info!(
+                                "HubCli {} (pid={:?}) exited with {}",
+                                id_clone,
+                                pid_opt,
+                                exit_code
+                            );
                             break;
                         }
-                        Ok(None) => { drop(map); }
+                        Ok(None) => {
+                            drop(map);
+                        }
                         Err(e) => {
                             tracing::error!("try_wait error: {}", e);
                             break;
@@ -225,7 +246,9 @@ impl LocalRuntime for HubCliRuntime {
         _prompt: &str,
         _model: Option<&str>,
     ) -> Result<ProcessHandle, RuntimeError> {
-        Err(RuntimeError::SpawnFailed("HubCliRuntime doesn't support invoke_http; use RealHttpRuntime".into()))
+        Err(RuntimeError::SpawnFailed(
+            "HubCliRuntime doesn't support invoke_http; use RealHttpRuntime".into(),
+        ))
     }
 
     async fn cancel(&self, id: Uuid) -> Result<(), RuntimeError> {
@@ -240,21 +263,19 @@ impl LocalRuntime for HubCliRuntime {
 
     async fn subscribe(&self, id: Uuid) -> Result<mpsc::Receiver<OutputLine>, RuntimeError> {
         // 从 hub 拿 broadcast receiver, 桥接到 mpsc (trait 签名约束)
-        let bcast_rx = self
-            .hub
-            .subscribe(id)
-            .await
-            .map_err(|e| match e {
-                SubscribeError::ProcessNotFound(_) => RuntimeError::ProcessNotFound(id),
-                SubscribeError::Lag(n) => RuntimeError::SpawnFailed(format!("subscribe lag: {}", n)),
-            })?;
+        let bcast_rx = self.hub.subscribe(id).await.map_err(|e| match e {
+            SubscribeError::ProcessNotFound(_) => RuntimeError::ProcessNotFound(id),
+            SubscribeError::Lag(n) => RuntimeError::SpawnFailed(format!("subscribe lag: {}", n)),
+        })?;
         let (tx, rx) = mpsc::channel::<OutputLine>(64);
         tokio::spawn(async move {
             let mut bcast_rx = bcast_rx;
             loop {
                 match bcast_rx.recv().await {
                     Ok(line) => {
-                        if tx.send(line).await.is_err() { break; }
+                        if tx.send(line).await.is_err() {
+                            break;
+                        }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                         tracing::warn!("subscribe lagged {} msgs, continuing", n);
@@ -380,7 +401,10 @@ mod tests {
         };
         #[cfg(windows)]
         let (cmd, args): (String, Vec<String>) = {
-            ("cmd".to_string(), vec!["/c".into(), "echo hello & echo world".into()])
+            (
+                "cmd".to_string(),
+                vec!["/c".into(), "echo hello & echo world".into()],
+            )
         };
 
         // mock 路径: 立即返回, 不挂 hub
@@ -392,10 +416,7 @@ mod tests {
         assert_eq!(h.state, ProcessState::Completed);
 
         // 真实路径: 启动 + 订阅
-        let handle = rt
-            .spawn_cli(&cmd, &args, &empty_env(), ".")
-            .await
-            .unwrap();
+        let handle = rt.spawn_cli(&cmd, &args, &empty_env(), ".").await.unwrap();
         // 至少是 Running 或 Completed (e2e 不可控, 容忍)
         if handle.state == ProcessState::Failed {
             // 平台无 sh/cmd, 跳过 e2e 验证
@@ -412,7 +433,7 @@ mod tests {
                 // 尝试 recv 一次, 1s 超时
                 match tokio::time::timeout(Duration::from_millis(500), rx.recv()).await {
                     Ok(Some(_line)) => {} // 收到即可
-                    _ => {}                // 超时/关闭 也接受
+                    _ => {}               // 超时/关闭 也接受
                 }
             }
             Err(_) => {} // ProcessNotFound 可接受 (进程快退出会先 unregister)
@@ -439,9 +460,15 @@ mod tests {
     async fn test_spawn_two_broadcast_subscribers() {
         let rt = HubCliRuntime::new(OutputHub::new());
         #[cfg(unix)]
-        let (cmd, args): (String, Vec<String>) = ("sh".into(), vec!["-c".into(), "echo line-a; echo line-b".into()]);
+        let (cmd, args): (String, Vec<String>) = (
+            "sh".into(),
+            vec!["-c".into(), "echo line-a; echo line-b".into()],
+        );
         #[cfg(windows)]
-        let (cmd, args): (String, Vec<String>) = ("cmd".into(), vec!["/c".into(), "echo line-a & echo line-b".into()]);
+        let (cmd, args): (String, Vec<String>) = (
+            "cmd".into(),
+            vec!["/c".into(), "echo line-a & echo line-b".into()],
+        );
 
         let handle = rt.spawn_cli(&cmd, &args, &empty_env(), ".").await.unwrap();
         if handle.state == ProcessState::Failed {

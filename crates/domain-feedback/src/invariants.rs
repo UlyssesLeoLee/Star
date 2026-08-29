@@ -13,7 +13,9 @@ pub fn check_invariant_01_six_state_machine_placeholder() -> Result<(), Feedback
 
 /// **INV-FB-02**:Target 必可解析(由 `service::check_target_resolvable` 实现,
 /// 本函数仅占位 — 真正实现跨域读需要基础设施层)
-pub fn check_invariant_02_target_resolvable_placeholder(_: &FeedbackTarget) -> Result<(), FeedbackError> {
+pub fn check_invariant_02_target_resolvable_placeholder(
+    _: &FeedbackTarget,
+) -> Result<(), FeedbackError> {
     Ok(())
 }
 
@@ -81,10 +83,7 @@ pub fn check_invariant_08_not_comment_placeholder() -> Result<(), FeedbackError>
 }
 
 /// **批量执行**(用于 create 入口)
-pub fn check_create_invariants(
-    f: &Feedback,
-    is_agent_session: bool,
-) -> Result<(), FeedbackError> {
+pub fn check_create_invariants(f: &Feedback, is_agent_session: bool) -> Result<(), FeedbackError> {
     check_invariant_06_tenant_id_present(f)?;
     check_invariant_07_agent_required(f, is_agent_session)?;
     Ok(())

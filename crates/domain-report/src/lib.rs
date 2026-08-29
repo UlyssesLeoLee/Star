@@ -46,9 +46,16 @@ pub enum ReportType {
 impl ReportType {
     pub fn all() -> &'static [ReportType] {
         &[
-            Self::Burndown, Self::Burnup, Self::Velocity, Self::Cfd,
-            Self::ControlChart, Self::AverageAge, Self::CreatedVsResolved,
-            Self::Workload, Self::EpicBurndown, Self::SprintReport,
+            Self::Burndown,
+            Self::Burnup,
+            Self::Velocity,
+            Self::Cfd,
+            Self::ControlChart,
+            Self::AverageAge,
+            Self::CreatedVsResolved,
+            Self::Workload,
+            Self::EpicBurndown,
+            Self::SprintReport,
         ]
     }
 
@@ -132,7 +139,7 @@ pub struct ReportResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReportSummary {
     pub total: f64,
-    pub trend: Trend, // Up / Down / Flat
+    pub trend: Trend,           // Up / Down / Flat
     pub anomalies: Vec<String>, // 异常点
 }
 
@@ -167,7 +174,9 @@ pub enum ReportError {
 pub struct ReportService;
 
 impl ReportService {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     /// 生成报告 (本任务用 stub, 真实数据走 Phase 2 接 domain-work-item)
     pub fn generate(
@@ -214,101 +223,199 @@ impl ReportService {
 }
 
 impl Default for ReportService {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // 10 个 stub 生成器 — 真实数据源接入 Phase 2
 fn burndown_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (0..10).map(|i| ReportPoint {
-        label: format!("Day {}", i + 1),
-        value: 100.0 - (i as f64) * 10.0,
-        extra: serde_json::json!({}),
-    }).collect();
-    (pts, ReportSummary { total: 100.0, trend: Trend::Down, anomalies: vec![] })
+    let pts = (0..10)
+        .map(|i| ReportPoint {
+            label: format!("Day {}", i + 1),
+            value: 100.0 - (i as f64) * 10.0,
+            extra: serde_json::json!({}),
+        })
+        .collect();
+    (
+        pts,
+        ReportSummary {
+            total: 100.0,
+            trend: Trend::Down,
+            anomalies: vec![],
+        },
+    )
 }
 
 fn burnup_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (0..10).map(|i| ReportPoint {
-        label: format!("Day {}", i + 1),
-        value: (i as f64) * 10.0,
-        extra: serde_json::json!({}),
-    }).collect();
-    (pts, ReportSummary { total: 100.0, trend: Trend::Up, anomalies: vec![] })
+    let pts = (0..10)
+        .map(|i| ReportPoint {
+            label: format!("Day {}", i + 1),
+            value: (i as f64) * 10.0,
+            extra: serde_json::json!({}),
+        })
+        .collect();
+    (
+        pts,
+        ReportSummary {
+            total: 100.0,
+            trend: Trend::Up,
+            anomalies: vec![],
+        },
+    )
 }
 
 fn velocity_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (1..=6).map(|i| ReportPoint {
-        label: format!("Sprint {}", i),
-        value: 30.0 + (i as f64) * 2.5,
-        extra: serde_json::json!({}),
-    }).collect();
-    (pts, ReportSummary { total: 187.5, trend: Trend::Up, anomalies: vec![] })
+    let pts = (1..=6)
+        .map(|i| ReportPoint {
+            label: format!("Sprint {}", i),
+            value: 30.0 + (i as f64) * 2.5,
+            extra: serde_json::json!({}),
+        })
+        .collect();
+    (
+        pts,
+        ReportSummary {
+            total: 187.5,
+            trend: Trend::Up,
+            anomalies: vec![],
+        },
+    )
 }
 
 fn cfd_stub() -> (Vec<ReportPoint>, ReportSummary) {
     let labels = ["Todo", "In Progress", "Review", "Done"];
-    let pts = labels.iter().enumerate().map(|(i, l)| ReportPoint {
-        label: l.to_string(),
-        value: 25.0 - (i as f64) * 6.0,
-        extra: serde_json::json!({}),
-    }).collect();
-    (pts, ReportSummary { total: 25.0, trend: Trend::Flat, anomalies: vec![] })
+    let pts = labels
+        .iter()
+        .enumerate()
+        .map(|(i, l)| ReportPoint {
+            label: l.to_string(),
+            value: 25.0 - (i as f64) * 6.0,
+            extra: serde_json::json!({}),
+        })
+        .collect();
+    (
+        pts,
+        ReportSummary {
+            total: 25.0,
+            trend: Trend::Flat,
+            anomalies: vec![],
+        },
+    )
 }
 
 fn control_chart_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (0..20).map(|i| ReportPoint {
-        label: format!("Sample {}", i + 1),
-        value: 5.0 + ((i as f64) * 0.3).sin(),
-        extra: serde_json::json!({}),
-    }).collect();
-    (pts, ReportSummary { total: 5.0, trend: Trend::Flat, anomalies: vec!["Sample 15".into()] })
+    let pts = (0..20)
+        .map(|i| ReportPoint {
+            label: format!("Sample {}", i + 1),
+            value: 5.0 + ((i as f64) * 0.3).sin(),
+            extra: serde_json::json!({}),
+        })
+        .collect();
+    (
+        pts,
+        ReportSummary {
+            total: 5.0,
+            trend: Trend::Flat,
+            anomalies: vec!["Sample 15".into()],
+        },
+    )
 }
 
 fn average_age_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (0..7).map(|i| ReportPoint {
-        label: format!("Day -{}", i),
-        value: 3.5 + (i as f64) * 0.2,
-        extra: serde_json::json!({}),
-    }).collect();
-    (pts, ReportSummary { total: 3.7, trend: Trend::Up, anomalies: vec![] })
+    let pts = (0..7)
+        .map(|i| ReportPoint {
+            label: format!("Day -{}", i),
+            value: 3.5 + (i as f64) * 0.2,
+            extra: serde_json::json!({}),
+        })
+        .collect();
+    (
+        pts,
+        ReportSummary {
+            total: 3.7,
+            trend: Trend::Up,
+            anomalies: vec![],
+        },
+    )
 }
 
 fn cvr_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (1..=14).map(|i| ReportPoint {
-        label: format!("Day {}", i),
-        value: 8.0 + ((i as f64) * 0.5).sin() * 2.0,
-        extra: serde_json::json!({"created": 9.0, "resolved": 7.5}),
-    }).collect();
-    (pts, ReportSummary { total: 8.0, trend: Trend::Up, anomalies: vec![] })
+    let pts = (1..=14)
+        .map(|i| ReportPoint {
+            label: format!("Day {}", i),
+            value: 8.0 + ((i as f64) * 0.5).sin() * 2.0,
+            extra: serde_json::json!({"created": 9.0, "resolved": 7.5}),
+        })
+        .collect();
+    (
+        pts,
+        ReportSummary {
+            total: 8.0,
+            trend: Trend::Up,
+            anomalies: vec![],
+        },
+    )
 }
 
 fn workload_stub() -> (Vec<ReportPoint>, ReportSummary) {
     let names = ["Alice", "Bob", "Charlie", "Dave", "Eve"];
-    let pts = names.iter().enumerate().map(|(i, n)| ReportPoint {
-        label: n.to_string(),
-        value: 5.0 + (i as f64) * 1.5,
-        extra: serde_json::json!({}),
-    }).collect();
-    (pts, ReportSummary { total: 20.0, trend: Trend::Flat, anomalies: vec![] })
+    let pts = names
+        .iter()
+        .enumerate()
+        .map(|(i, n)| ReportPoint {
+            label: n.to_string(),
+            value: 5.0 + (i as f64) * 1.5,
+            extra: serde_json::json!({}),
+        })
+        .collect();
+    (
+        pts,
+        ReportSummary {
+            total: 20.0,
+            trend: Trend::Flat,
+            anomalies: vec![],
+        },
+    )
 }
 
 fn epic_burndown_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (0..14).map(|i| ReportPoint {
-        label: format!("Day {}", i + 1),
-        value: 50.0 - (i as f64) * 3.5,
-        extra: serde_json::json!({}),
-    }).collect();
-    (pts, ReportSummary { total: 50.0, trend: Trend::Down, anomalies: vec![] })
+    let pts = (0..14)
+        .map(|i| ReportPoint {
+            label: format!("Day {}", i + 1),
+            value: 50.0 - (i as f64) * 3.5,
+            extra: serde_json::json!({}),
+        })
+        .collect();
+    (
+        pts,
+        ReportSummary {
+            total: 50.0,
+            trend: Trend::Down,
+            anomalies: vec![],
+        },
+    )
 }
 
 fn sprint_report_stub() -> (Vec<ReportPoint>, ReportSummary) {
     let labels = ["Completed", "Moved Out", "Moved In", "Not Done"];
-    let pts = labels.iter().enumerate().map(|(i, l)| ReportPoint {
-        label: l.to_string(),
-        value: 18.0 - (i as f64) * 4.0,
-        extra: serde_json::json!({}),
-    }).collect();
-    (pts, ReportSummary { total: 18.0, trend: Trend::Flat, anomalies: vec![] })
+    let pts = labels
+        .iter()
+        .enumerate()
+        .map(|(i, l)| ReportPoint {
+            label: l.to_string(),
+            value: 18.0 - (i as f64) * 4.0,
+            extra: serde_json::json!({}),
+        })
+        .collect();
+    (
+        pts,
+        ReportSummary {
+            total: 18.0,
+            trend: Trend::Flat,
+            anomalies: vec![],
+        },
+    )
 }
 
 #[cfg(test)]
@@ -338,7 +445,9 @@ mod tests {
     #[test]
     fn test_export_json() {
         let svc = ReportService::new();
-        let r = svc.generate(ReportType::Burndown, ReportFilter::default()).unwrap();
+        let r = svc
+            .generate(ReportType::Burndown, ReportFilter::default())
+            .unwrap();
         let json = svc.export_json(&r).unwrap();
         assert!(json.contains("burndown"));
         assert!(json.contains("Day 1"));
@@ -347,7 +456,9 @@ mod tests {
     #[test]
     fn test_export_csv() {
         let svc = ReportService::new();
-        let r = svc.generate(ReportType::Velocity, ReportFilter::default()).unwrap();
+        let r = svc
+            .generate(ReportType::Velocity, ReportFilter::default())
+            .unwrap();
         let csv = svc.export_csv(&r).unwrap();
         assert!(csv.starts_with("label,value\n"));
         assert!(csv.contains("Sprint 1"));

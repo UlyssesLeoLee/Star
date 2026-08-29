@@ -22,10 +22,10 @@
 //!   用 list() 取全集后 filter status=IN_PROGRESS 取首 (P2 缺口, 真实 index 留 Phase F.4+)
 
 use domain_work_item::{
-    ActorContext, InMemoryWorkItemService, ListByProjectQuery, ProjectId, UserId, WorkItemQueryPort,
-    WorkItemStatus,
+    ActorContext, InMemoryWorkItemService, ListByProjectQuery, ProjectId, UserId,
+    WorkItemQueryPort, WorkItemStatus,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::sync::{Arc, OnceLock};
 
 use crate::error::McpError;
@@ -41,7 +41,10 @@ fn service() -> &'static Arc<InMemoryWorkItemService> {
 pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
     // workspace_id 可选, 简化: nil actor 触发跨 tenant 拒绝 → validation "not found"
     let _ = optional_string(&args, "workspace_id");
-    let actor = ActorContext::new(UserId::from(uuid::Uuid::nil()), domain_work_item::TenantId::new());
+    let actor = ActorContext::new(
+        UserId::from(uuid::Uuid::nil()),
+        domain_work_item::TenantId::new(),
+    );
 
     // 取第一个 IN_PROGRESS issue 当 current
     let query = ListByProjectQuery {

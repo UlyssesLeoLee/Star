@@ -62,15 +62,15 @@ pub use invariants::{
 };
 pub use port::{
     CreateFeedbackCommand, FeedbackCommandPort, FeedbackInboxQuery, FeedbackQueryPort,
-    FeedbackRepository, ListFeedbackQuery, SubmitResolutionCommand, TransitionFeedbackStatusCommand,
-    UpdateFeedbackCommand,
+    FeedbackRepository, ListFeedbackQuery, SubmitResolutionCommand,
+    TransitionFeedbackStatusCommand, UpdateFeedbackCommand,
 };
 pub use service::InMemoryFeedbackService;
 pub use value_object::{
     roles, AcceptanceCriterionId, AgentId, AgentSessionId, BuildId, CommitId, DecisionId,
-    FeedbackId, FeedbackResolutionId, FeedbackStatus, FeedbackTarget, FeedbackType,
-    LineRange, ProjectId, RepositoryId, RequirementId, Severity, SymbolId, TenantId, TestId,
-    UserId, WorkItemId, WorktreeId,
+    FeedbackId, FeedbackResolutionId, FeedbackStatus, FeedbackTarget, FeedbackType, LineRange,
+    ProjectId, RepositoryId, RequirementId, Severity, SymbolId, TenantId, TestId, UserId,
+    WorkItemId, WorktreeId,
 };
 
 #[cfg(test)]
@@ -202,10 +202,7 @@ mod tests {
             work_item_id: WorkItemId::new(),
         };
         let cmd = make_create_cmd(tenant_id, target.clone());
-        let f = svc
-            .create_feedback(cmd, actor)
-            .await
-            .expect("create OK");
+        let f = svc.create_feedback(cmd, actor).await.expect("create OK");
         assert_eq!(f.status, FeedbackStatus::Open);
         assert_eq!(f.tenant_id, tenant_id);
         assert!(matches!(f.target, FeedbackTarget::WorkItem { .. }));
@@ -233,9 +230,12 @@ mod tests {
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
-                make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-                    work_item_id: WorkItemId::new(),
-                }),
+                make_create_cmd(
+                    tenant_id,
+                    FeedbackTarget::WorkItem {
+                        work_item_id: WorkItemId::new(),
+                    },
+                ),
                 actor.clone(),
             )
             .await
@@ -285,9 +285,12 @@ mod tests {
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
-                make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-                    work_item_id: WorkItemId::new(),
-                }),
+                make_create_cmd(
+                    tenant_id,
+                    FeedbackTarget::WorkItem {
+                        work_item_id: WorkItemId::new(),
+                    },
+                ),
                 actor.clone(),
             )
             .await
@@ -319,9 +322,12 @@ mod tests {
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
-                make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-                    work_item_id: WorkItemId::new(),
-                }),
+                make_create_cmd(
+                    tenant_id,
+                    FeedbackTarget::WorkItem {
+                        work_item_id: WorkItemId::new(),
+                    },
+                ),
                 actor.clone(),
             )
             .await
@@ -354,9 +360,12 @@ mod tests {
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
-                make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-                    work_item_id: WorkItemId::new(),
-                }),
+                make_create_cmd(
+                    tenant_id,
+                    FeedbackTarget::WorkItem {
+                        work_item_id: WorkItemId::new(),
+                    },
+                ),
                 actor.clone(),
             )
             .await
@@ -385,18 +394,24 @@ mod tests {
         let actor = make_actor(tenant_id);
         let f1 = svc
             .create_feedback(
-                make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-                    work_item_id: WorkItemId::new(),
-                }),
+                make_create_cmd(
+                    tenant_id,
+                    FeedbackTarget::WorkItem {
+                        work_item_id: WorkItemId::new(),
+                    },
+                ),
                 actor.clone(),
             )
             .await
             .unwrap();
         let f2 = svc
             .create_feedback(
-                make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-                    work_item_id: WorkItemId::new(),
-                }),
+                make_create_cmd(
+                    tenant_id,
+                    FeedbackTarget::WorkItem {
+                        work_item_id: WorkItemId::new(),
+                    },
+                ),
                 actor.clone(),
             )
             .await
@@ -429,9 +444,12 @@ mod tests {
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
-                make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-                    work_item_id: WorkItemId::new(),
-                }),
+                make_create_cmd(
+                    tenant_id,
+                    FeedbackTarget::WorkItem {
+                        work_item_id: WorkItemId::new(),
+                    },
+                ),
                 actor.clone(),
             )
             .await
@@ -483,9 +501,12 @@ mod tests {
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
-                make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-                    work_item_id: WorkItemId::new(),
-                }),
+                make_create_cmd(
+                    tenant_id,
+                    FeedbackTarget::WorkItem {
+                        work_item_id: WorkItemId::new(),
+                    },
+                ),
                 actor.clone(),
             )
             .await
@@ -519,27 +540,39 @@ mod tests {
         let project_id = ProjectId::new();
 
         // P3 第一个创建,P0 最后创建
-        let mut cmd = make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-            work_item_id: WorkItemId::new(),
-        });
+        let mut cmd = make_create_cmd(
+            tenant_id,
+            FeedbackTarget::WorkItem {
+                work_item_id: WorkItemId::new(),
+            },
+        );
         cmd.project_id = project_id;
         cmd.severity = Severity::P3;
         svc.create_feedback(cmd, actor.clone()).await.unwrap();
-        let mut cmd = make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-            work_item_id: WorkItemId::new(),
-        });
+        let mut cmd = make_create_cmd(
+            tenant_id,
+            FeedbackTarget::WorkItem {
+                work_item_id: WorkItemId::new(),
+            },
+        );
         cmd.project_id = project_id;
         cmd.severity = Severity::P1;
         svc.create_feedback(cmd, actor.clone()).await.unwrap();
-        let mut cmd = make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-            work_item_id: WorkItemId::new(),
-        });
+        let mut cmd = make_create_cmd(
+            tenant_id,
+            FeedbackTarget::WorkItem {
+                work_item_id: WorkItemId::new(),
+            },
+        );
         cmd.project_id = project_id;
         cmd.severity = Severity::P0;
         svc.create_feedback(cmd, actor.clone()).await.unwrap();
-        let mut cmd = make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-            work_item_id: WorkItemId::new(),
-        });
+        let mut cmd = make_create_cmd(
+            tenant_id,
+            FeedbackTarget::WorkItem {
+                work_item_id: WorkItemId::new(),
+            },
+        );
         cmd.project_id = project_id;
         cmd.severity = Severity::P2;
         svc.create_feedback(cmd, actor).await.unwrap();
@@ -575,9 +608,12 @@ mod tests {
         let actor_a = make_actor(tenant_a);
         let f = svc
             .create_feedback(
-                make_create_cmd(tenant_a, FeedbackTarget::WorkItem {
-                    work_item_id: WorkItemId::new(),
-                }),
+                make_create_cmd(
+                    tenant_a,
+                    FeedbackTarget::WorkItem {
+                        work_item_id: WorkItemId::new(),
+                    },
+                ),
                 actor_a,
             )
             .await
@@ -632,14 +668,20 @@ mod tests {
         // 不显式传 author_agent_id,service 应自动兜底
         let f = svc
             .create_feedback(
-                make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-                    work_item_id: WorkItemId::new(),
-                }),
+                make_create_cmd(
+                    tenant_id,
+                    FeedbackTarget::WorkItem {
+                        work_item_id: WorkItemId::new(),
+                    },
+                ),
                 actor,
             )
             .await
             .unwrap();
-        assert!(f.author_agent_id.is_some(), "AI 提的 Feedback author_agent_id 必带");
+        assert!(
+            f.author_agent_id.is_some(),
+            "AI 提的 Feedback author_agent_id 必带"
+        );
     }
 
     // -------- 14. FeedbackConsumedEvent 投影(Agent / Context / ChangeSet) --------
@@ -651,9 +693,12 @@ mod tests {
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
-                make_create_cmd(tenant_id, FeedbackTarget::WorkItem {
-                    work_item_id: WorkItemId::new(),
-                }),
+                make_create_cmd(
+                    tenant_id,
+                    FeedbackTarget::WorkItem {
+                        work_item_id: WorkItemId::new(),
+                    },
+                ),
                 actor.clone(),
             )
             .await
@@ -667,10 +712,7 @@ mod tests {
                 .await
                 .unwrap();
         }
-        let events = svc
-            .list_consumed_events(f.id, actor)
-            .await
-            .unwrap();
+        let events = svc.list_consumed_events(f.id, actor).await.unwrap();
         assert_eq!(events.len(), 3);
     }
 

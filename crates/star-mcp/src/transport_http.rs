@@ -35,28 +35,29 @@ use std::convert::Infallible;
 use std::sync::Arc;
 use std::time::Duration;
 
-
 use axum::{
-    Router,
     body::Bytes,
     extract::State,
     http::StatusCode,
     response::{
-        IntoResponse, Response,
         sse::{Event, KeepAlive, Sse},
+        IntoResponse, Response,
     },
     routing::post,
+    Router,
 };
 use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
-use tokio_stream::{StreamExt, iter, wrappers::ReceiverStream};
+use tokio_stream::{iter, wrappers::ReceiverStream, StreamExt};
 
-use crate::d6_session::{ServerEvent, SessionStore, DEFAULT_GC_INTERVAL_MS, DEFAULT_SESSION_TTL_MS};
+use crate::d6_session::{
+    ServerEvent, SessionStore, DEFAULT_GC_INTERVAL_MS, DEFAULT_SESSION_TTL_MS,
+};
 use crate::error::McpError;
 use crate::resources::ResourcesHandler;
 use crate::transport::{
-    JsonRpcError, JsonRpcErrorBody, JsonRpcRequest, JsonRpcSuccess, error_code, handle,
+    error_code, handle, JsonRpcError, JsonRpcErrorBody, JsonRpcRequest, JsonRpcSuccess,
 };
 
 /// HTTP 监听地址(per 任务 brief 默认 localhost:8080)
@@ -111,18 +112,16 @@ pub(crate) async fn run_http_server(bind_addr: &str) -> Result<(), McpError> {
     eprintln!("star-mcp: GET / returns server info (no MCP requests on GET per 2025-06-27 spec)");
     eprintln!("star-mcp: SessionStore GC spawned (interval={DEFAULT_GC_INTERVAL_MS}ms, ttl={DEFAULT_SESSION_TTL_MS}ms)");
 
-    axum::serve(listener, app)
-        .await
-        .map_err(|e| {
-            McpError::new(
-                crate::error::error_code::IO,
-                format!("axum::serve error: {e}"),
-                "mcp",
-                crate::error::ErrorSourceKind::External,
-                true,
-                None,
-            )
-        })?;
+    axum::serve(listener, app).await.map_err(|e| {
+        McpError::new(
+            crate::error::error_code::IO,
+            format!("axum::serve error: {e}"),
+            "mcp",
+            crate::error::ErrorSourceKind::External,
+            true,
+            None,
+        )
+    })?;
     Ok(())
 }
 
@@ -138,8 +137,14 @@ fn build_router_with_state(state: AppState) -> Router {
         // - GET /events/reconnect: session 重连 (Last-Event-ID header)
         // - DELETE /resources/{id}: 资源删除 (per spec §3, 留 Phase D.7+ P2 缺口)
         .route("/events", axum::routing::get(handle_server_push))
-        .route("/events/reconnect", axum::routing::get(handle_session_reconnect))
-        .route("/resources/{id}", axum::routing::delete(handle_resource_delete))
+        .route(
+            "/events/reconnect",
+            axum::routing::get(handle_session_reconnect),
+        )
+        .route(
+            "/resources/{id}",
+            axum::routing::delete(handle_resource_delete),
+        )
         .with_state(state)
 }
 
@@ -152,7 +157,12 @@ async fn handle_mcp_get() -> Response {
         "protocolVersion": "2025-06-27",
         "instructions": "POST JSON-RPC 2.0 requests to this endpoint. Responses are returned as Server-Sent Events (text/event-stream)."
     });
-    (StatusCode::OK, [("content-type", "application/json")], info.to_string()).into_response()
+    (
+        StatusCode::OK,
+        [("content-type", "application/json")],
+        info.to_string(),
+    )
+        .into_response()
 }
 
 /// POST `/` 处理 JSON-RPC 2.0 请求, 返回 SSE
@@ -160,12 +170,24 @@ async fn handle_mcp_post(State(_state): State<AppState>, body: Bytes) -> Respons
     // 1. 解析 JSON-RPC 2.0 body
     let raw = match std::str::from_utf8(&body) {
         Ok(s) => s,
-        Err(e) => return sse_error_response(Value::Null, error_code::PARSE_ERROR, format!("invalid UTF-8: {e}")),
+        Err(e) => {
+            return sse_error_response(
+                Value::Null,
+                error_code::PARSE_ERROR,
+                format!("invalid UTF-8: {e}"),
+            )
+        }
     };
 
     let req: JsonRpcRequest = match serde_json::from_str(raw) {
         Ok(r) => r,
-        Err(e) => return sse_error_response(Value::Null, error_code::PARSE_ERROR, format!("parse error: {e}")),
+        Err(e) => {
+            return sse_error_response(
+                Value::Null,
+                error_code::PARSE_ERROR,
+                format!("parse error: {e}"),
+            )
+        }
     };
 
     // 2. 校验 jsonrpc 字段(per JSON-RPC 2.0 spec)
@@ -179,9 +201,11 @@ async fn handle_mcp_post(State(_state): State<AppState>, body: Bytes) -> Respons
 
     // 3. 路由到 transport::handle(共享 dispatch 逻辑)
     let response_payload = match handle(req).await {
-        Ok(JsonRpcSuccess { jsonrpc, id, result }) => {
-            serde_json::json!({ "jsonrpc": jsonrpc, "id": id, "result": result }).to_string()
-        }
+        Ok(JsonRpcSuccess {
+            jsonrpc,
+            id,
+            result,
+        }) => serde_json::json!({ "jsonrpc": jsonrpc, "id": id, "result": result }).to_string(),
         Err(JsonRpcError { jsonrpc, id, error }) => {
             serde_json::json!({ "jsonrpc": jsonrpc, "id": id, "error": error }).to_string()
         }
@@ -244,7 +268,9 @@ async fn handle_server_push(State(state): State<AppState>) -> Response {
         }),
         timestamp_ms: now_ms,
     };
-    state.session_store.push_event(&session_id, open_event.clone());
+    state
+        .session_store
+        .push_event(&session_id, open_event.clone());
 
     // 长连接 stream: drain + 5s 短 hold (per spec §1.2 client 应保持长连; Phase D.7
     // 保留架构位, 真实 long-lived 留 Phase D.8+)
@@ -264,9 +290,7 @@ async fn handle_server_push(State(state): State<AppState>) -> Response {
                         .event(ev.category.clone())
                         .data(data),
                 ),
-                Err(_) => Ok::<Event, Infallible>(
-                    Event::default().data("{}"),
-                ),
+                Err(_) => Ok::<Event, Infallible>(Event::default().data("{}")),
             };
             if tx.send(sse).await.is_err() {
                 return; // client 断开
@@ -312,9 +336,7 @@ async fn handle_session_reconnect(headers: axum::http::HeaderMap) -> Response {
 /// DELETE /resources/{id} 资源删除 (per 2025-06-27 spec §3)
 ///
 /// 当前: 501 Not Implemented, 真实 ResourcesHandler::delete 留 Phase D.7+ P2 缺口.
-async fn handle_resource_delete(
-    axum::extract::Path(id): axum::extract::Path<String>,
-) -> Response {
+async fn handle_resource_delete(axum::extract::Path(id): axum::extract::Path<String>) -> Response {
     (
         StatusCode::NOT_IMPLEMENTED,
         [(axum::http::header::CONTENT_TYPE, "application/json")],
@@ -339,15 +361,23 @@ fn sse_event_with_id(event: &crate::d6_session::ServerEvent) -> Response {
         [
             (axum::http::header::CONTENT_TYPE, "text/event-stream"),
             (axum::http::header::CACHE_CONTROL, "no-cache"),
-            (axum::http::HeaderName::from_static("x-accel-buffering"), "no"),
+            (
+                axum::http::HeaderName::from_static("x-accel-buffering"),
+                "no",
+            ),
         ],
         sse_body,
-    ).into_response()
+    )
+        .into_response()
 }
 
 /// 构造 SSE 错误响应(per JSON-RPC 2.0 spec, 错误也走响应)
 fn sse_error_response(id: Value, code: i32, message: String) -> Response {
-    let err_body = JsonRpcErrorBody { code, message, data: None };
+    let err_body = JsonRpcErrorBody {
+        code,
+        message,
+        data: None,
+    };
     let payload = serde_json::to_string(&JsonRpcError { jsonrpc: "2.0", id, error: err_body })
         .unwrap_or_else(|_| r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"internal serialization error"}}"#.to_string());
     sse_single_event_response(payload)
@@ -373,7 +403,12 @@ mod tests {
         let response = app.oneshot(req).await.unwrap();
         assert_eq!(response.status(), AxStatus::OK);
         // SSE content-type
-        let ct = response.headers().get("content-type").unwrap().to_str().unwrap();
+        let ct = response
+            .headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap();
         assert!(ct.contains("text/event-stream"), "expected SSE, got: {ct}");
         let body_bytes = to_bytes(response.into_body(), 1024).await.unwrap();
         let s = String::from_utf8(body_bytes.to_vec()).unwrap();
@@ -455,7 +490,12 @@ mod tests {
             .unwrap();
         let response = app.oneshot(req).await.unwrap();
         assert_eq!(response.status(), AxStatus::OK);
-        let ct = response.headers().get("content-type").unwrap().to_str().unwrap();
+        let ct = response
+            .headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap();
         assert!(ct.contains("application/json"));
     }
 
@@ -472,14 +512,25 @@ mod tests {
             .unwrap();
         let response = app.oneshot(req).await.unwrap();
         assert_eq!(response.status(), AxStatus::OK);
-        let ct = response.headers().get("content-type").unwrap().to_str().unwrap();
+        let ct = response
+            .headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap();
         assert!(ct.contains("text/event-stream"), "expected SSE, got: {ct}");
         let body_bytes = to_bytes(response.into_body(), 4096).await.unwrap();
         let s = String::from_utf8(body_bytes.to_vec()).unwrap();
         // SSE event with id field per spec
-        assert!(s.contains("id: "), "expected 'id:' field per spec, got: {s}");
+        assert!(
+            s.contains("id: "),
+            "expected 'id:' field per spec, got: {s}"
+        );
         assert!(s.contains("data: "), "expected 'data:' field per spec");
-        assert!(s.contains("session_opened"), "expected session_opened category");
+        assert!(
+            s.contains("session_opened"),
+            "expected session_opened category"
+        );
         assert!(s.contains("sess-"), "expected session_id in payload");
     }
 
@@ -498,8 +549,14 @@ mod tests {
         let body_bytes = to_bytes(response.into_body(), 4096).await.unwrap();
         let s = String::from_utf8(body_bytes.to_vec()).unwrap();
         // reconnect event id 含 Last-Event-ID
-        assert!(s.contains("reconnect-evt-42"), "expected reconnect ack with last_event_id, got: {s}");
-        assert!(s.contains("session_reconnect"), "expected session_reconnect category");
+        assert!(
+            s.contains("reconnect-evt-42"),
+            "expected reconnect ack with last_event_id, got: {s}"
+        );
+        assert!(
+            s.contains("session_reconnect"),
+            "expected session_reconnect category"
+        );
     }
 
     /// GET /events/reconnect 无 Last-Event-ID header 默认 evt-0
@@ -515,7 +572,10 @@ mod tests {
         assert_eq!(response.status(), AxStatus::OK);
         let body_bytes = to_bytes(response.into_body(), 4096).await.unwrap();
         let s = String::from_utf8(body_bytes.to_vec()).unwrap();
-        assert!(s.contains("reconnect-evt-0"), "expected default evt-0, got: {s}");
+        assert!(
+            s.contains("reconnect-evt-0"),
+            "expected default evt-0, got: {s}"
+        );
     }
 
     /// DELETE /resources/{id} 返回 501 Not Implemented (Phase D.7+ todo)
@@ -533,7 +593,10 @@ mod tests {
         let body_bytes = to_bytes(response.into_body(), 4096).await.unwrap();
         let s = String::from_utf8(body_bytes.to_vec()).unwrap();
         assert!(s.contains("not_implemented"));
-        assert!(s.contains("workspace-current"), "resource id should be in response");
+        assert!(
+            s.contains("workspace-current"),
+            "resource id should be in response"
+        );
         assert!(s.contains("Phase D.7+"));
     }
 }

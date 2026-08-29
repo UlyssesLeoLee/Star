@@ -6,7 +6,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::entity::ResolutionEvidence;
-use crate::value_object::{FeedbackId, FeedbackStatus, FeedbackTarget, FeedbackType, Severity, TenantId, UserId};
+use crate::value_object::{
+    FeedbackId, FeedbackStatus, FeedbackTarget, FeedbackType, Severity, TenantId, UserId,
+};
 
 /// 事件通用元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]

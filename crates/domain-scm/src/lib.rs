@@ -48,9 +48,7 @@ use uuid::Uuid;
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[allow(missing_docs)]
-        #[derive(
-            Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
-        )]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
         #[serde(transparent)]
         pub struct $name(uuid::Uuid);
 
@@ -668,10 +666,7 @@ pub const ALL_INVARIANT_CHECKS: &[InvariantCheck] = &[
     check_invariant_02_connected_only,
 ];
 
-pub fn run_invariants(
-    checks: &[InvariantCheck],
-    r: &Repository,
-) -> Result<(), ScmError> {
+pub fn run_invariants(checks: &[InvariantCheck], r: &Repository) -> Result<(), ScmError> {
     for c in checks {
         c(r)?;
     }
@@ -836,14 +831,8 @@ pub trait ScmPort: Send + Sync {
         &self,
         external_id: ExternalRepositoryId,
     ) -> Result<Repository, ScmError>;
-    async fn list_branches(
-        &self,
-        repo: RepositoryId,
-    ) -> Result<Vec<Branch>, ScmError>;
-    async fn list_pull_requests(
-        &self,
-        repo: RepositoryId,
-    ) -> Result<Vec<PullRequest>, ScmError>;
+    async fn list_branches(&self, repo: RepositoryId) -> Result<Vec<Branch>, ScmError>;
+    async fn list_pull_requests(&self, repo: RepositoryId) -> Result<Vec<PullRequest>, ScmError>;
 }
 
 // =====================================================================
@@ -928,9 +917,7 @@ impl ScmCommandPort for InMemoryScmService {
         Self::check_tenant(&actor, cmd.tenant_id)?;
         // project 必带
         if !actor.project_ids.contains(&cmd.project_id) {
-            return Err(ScmError::PermissionDenied(
-                "actor 不属于该项目".to_string(),
-            ));
+            return Err(ScmError::PermissionDenied("actor 不属于该项目".to_string()));
         }
         // (tenant, provider, external_id) UNIQUE
         let external_id = ExternalRepositoryId(cmd.external_id.clone());
@@ -974,14 +961,14 @@ impl ScmCommandPort for InMemoryScmService {
             let mut guard = self.repos.write().await;
             guard.insert(id, repo.clone());
         }
-        let _ = self.event_tx.send(ScmEvent::RepositoryRegistered(
-            RepositoryRegistered {
+        let _ = self
+            .event_tx
+            .send(ScmEvent::RepositoryRegistered(RepositoryRegistered {
                 meta: EventMeta::new(cmd.tenant_id),
                 repository_id: id,
                 provider: cmd.provider,
                 external_id: cmd.external_id,
-            },
-        ));
+            }));
         Ok(repo)
     }
 
@@ -997,9 +984,7 @@ impl ScmCommandPort for InMemoryScmService {
                 .get_mut(&cmd.repository_id)
                 .ok_or(ScmError::NotFound(cmd.repository_id))?;
             if r.tenant_id != cmd.tenant_id {
-                return Err(ScmError::PermissionDenied(
-                    "跨 tenant 拒绝".to_string(),
-                ));
+                return Err(ScmError::PermissionDenied("跨 tenant 拒绝".to_string()));
             }
             r.sync_status = cmd.new_status;
             r.sync_token = cmd.new_token;
@@ -1046,12 +1031,14 @@ impl ScmCommandPort for InMemoryScmService {
             let mut guard = self.idempotency.write().await;
             guard.insert(event.external_event_id, id);
         }
-        let _ = self.event_tx.send(ScmEvent::WebhookReceived(WebhookReceived {
-            meta: EventMeta::new(event.tenant_id),
-            webhook_event_id: id,
-            external_event_id: we.external_event_id.clone(),
-            loop_breaker_id,
-        }));
+        let _ = self
+            .event_tx
+            .send(ScmEvent::WebhookReceived(WebhookReceived {
+                meta: EventMeta::new(event.tenant_id),
+                webhook_event_id: id,
+                external_event_id: we.external_event_id.clone(),
+                loop_breaker_id,
+            }));
         Ok(we)
     }
 
@@ -1084,14 +1071,14 @@ impl ScmCommandPort for InMemoryScmService {
             // 通知
             (from, cmd.new_state, new_pr.clone())
         };
-        let _ = self.event_tx.send(ScmEvent::PullRequestStateChanged(
-            PullRequestStateChanged {
+        let _ = self
+            .event_tx
+            .send(ScmEvent::PullRequestStateChanged(PullRequestStateChanged {
                 meta: EventMeta::new(updated.2.tenant_id),
                 pr_id: cmd.pr_id,
                 from: updated.0,
                 to: updated.1,
-            },
-        ));
+            }));
         Ok(updated.2)
     }
 }
@@ -1284,10 +1271,7 @@ mod tests {
             external_event_id: "gh-event-12345".to_string(),
             raw_payload: serde_json::json!({"ref": "refs/heads/main"}),
         };
-        let we1 = svc
-            .record_webhook_event(input.clone())
-            .await
-            .unwrap();
+        let we1 = svc.record_webhook_event(input.clone()).await.unwrap();
         assert_eq!(svc.webhook_count().await, 1);
         // 重复 → IdempotencyConflict(INV-SCM-03)
         let res = svc.record_webhook_event(input).await;
@@ -1327,7 +1311,9 @@ mod tests {
         let p_o = make_pr(PullRequestState::Open);
         assert!(p_o.try_transition(PullRequestState::Reviewing).is_ok());
         let p_r = make_pr(PullRequestState::Reviewing);
-        assert!(p_r.try_transition(PullRequestState::ChangesRequested).is_ok());
+        assert!(p_r
+            .try_transition(PullRequestState::ChangesRequested)
+            .is_ok());
         let p_r2 = make_pr(PullRequestState::Reviewing);
         assert!(p_r2.try_transition(PullRequestState::Approved).is_ok());
         let p_a = make_pr(PullRequestState::Approved);

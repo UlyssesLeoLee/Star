@@ -23,24 +23,31 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GadgetType {
-    IssueStats,       // 按 status/type/priority 统计
-    Burndown,         // 接 domain-report
-    Velocity,         // 接 domain-report
-    MyWork,           // assigned to me
-    RecentActivity,   // 接 domain-audit
-    DueSoon,          // 按 due 排序
-    JqlTable,         // 自定义 JQL 结果
-    Markdown,         // 富文本
-    Iframe,           // 嵌入 (Confluence/Notion)
-    Clock,            // Sprint 倒计时
+    IssueStats,     // 按 status/type/priority 统计
+    Burndown,       // 接 domain-report
+    Velocity,       // 接 domain-report
+    MyWork,         // assigned to me
+    RecentActivity, // 接 domain-audit
+    DueSoon,        // 按 due 排序
+    JqlTable,       // 自定义 JQL 结果
+    Markdown,       // 富文本
+    Iframe,         // 嵌入 (Confluence/Notion)
+    Clock,          // Sprint 倒计时
 }
 
 impl GadgetType {
     pub fn all() -> &'static [GadgetType] {
         &[
-            Self::IssueStats, Self::Burndown, Self::Velocity, Self::MyWork,
-            Self::RecentActivity, Self::DueSoon, Self::JqlTable,
-            Self::Markdown, Self::Iframe, Self::Clock,
+            Self::IssueStats,
+            Self::Burndown,
+            Self::Velocity,
+            Self::MyWork,
+            Self::RecentActivity,
+            Self::DueSoon,
+            Self::JqlTable,
+            Self::Markdown,
+            Self::Iframe,
+            Self::Clock,
         ]
     }
 
@@ -108,7 +115,12 @@ pub struct Dashboard {
 }
 
 impl Dashboard {
-    pub fn new(name: impl Into<String>, scope: DashboardScope, owner_id: Uuid, tenant_id: Uuid) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        scope: DashboardScope,
+        owner_id: Uuid,
+        tenant_id: Uuid,
+    ) -> Self {
         let now = chrono::Utc::now();
         Self {
             id: Uuid::new_v4(),
@@ -161,7 +173,11 @@ pub enum DashboardError {
     #[error("invalid gadget position: x={0} (max 11), y={1}")]
     InvalidPosition(u8, u8),
     #[error("permission denied: actor {actor} cannot {action} {scope:?}")]
-    PermissionDenied { actor: String, action: String, scope: DashboardScope },
+    PermissionDenied {
+        actor: String,
+        action: String,
+        scope: DashboardScope,
+    },
 }
 
 // =====================================================================
@@ -171,7 +187,9 @@ pub enum DashboardError {
 pub struct DashboardService;
 
 impl DashboardService {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     /// 创建仪表板 (按 scope 校验权限)
     pub fn create(
@@ -203,7 +221,12 @@ impl DashboardService {
     ) -> Result<&Gadget, DashboardError> {
         let size = gadget_type.default_size();
         // 找最底部 y=0 的位置
-        let y = dashboard.gadgets.iter().map(|g| g.position.y).max().unwrap_or(0);
+        let y = dashboard
+            .gadgets
+            .iter()
+            .map(|g| g.position.y)
+            .max()
+            .unwrap_or(0);
         let gadget = Gadget {
             id: Uuid::new_v4(),
             gadget_type,
@@ -218,7 +241,9 @@ impl DashboardService {
 }
 
 impl Default for DashboardService {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -233,7 +258,10 @@ mod tests {
     #[test]
     fn test_gadget_default_size() {
         assert_eq!(GadgetType::Clock.default_size(), GadgetSize { w: 1, h: 1 });
-        assert_eq!(GadgetType::JqlTable.default_size(), GadgetSize { w: 4, h: 2 });
+        assert_eq!(
+            GadgetType::JqlTable.default_size(),
+            GadgetSize { w: 4, h: 2 }
+        );
     }
 
     #[test]
@@ -241,7 +269,15 @@ mod tests {
         let svc = DashboardService::new();
         let actor = Uuid::new_v4();
         let tenant = Uuid::new_v4();
-        let d = svc.create("My Dashboard", DashboardScope::Personal, actor, false, tenant).unwrap();
+        let d = svc
+            .create(
+                "My Dashboard",
+                DashboardScope::Personal,
+                actor,
+                false,
+                tenant,
+            )
+            .unwrap();
         assert_eq!(d.name, "My Dashboard");
         assert_eq!(d.scope, DashboardScope::Personal);
     }
@@ -251,9 +287,21 @@ mod tests {
         let svc = DashboardService::new();
         let actor = Uuid::new_v4();
         let tenant = Uuid::new_v4();
-        let r = svc.create("Company Dashboard", DashboardScope::Global, actor, false, tenant);
+        let r = svc.create(
+            "Company Dashboard",
+            DashboardScope::Global,
+            actor,
+            false,
+            tenant,
+        );
         assert!(matches!(r, Err(DashboardError::PermissionDenied { .. })));
-        let r2 = svc.create("Company Dashboard", DashboardScope::Global, actor, true, tenant);
+        let r2 = svc.create(
+            "Company Dashboard",
+            DashboardScope::Global,
+            actor,
+            true,
+            tenant,
+        );
         assert!(r2.is_ok());
     }
 
@@ -262,7 +310,9 @@ mod tests {
         let svc = DashboardService::new();
         let actor = Uuid::new_v4();
         let tenant = Uuid::new_v4();
-        let mut d = svc.create("Test", DashboardScope::Personal, actor, false, tenant).unwrap();
+        let mut d = svc
+            .create("Test", DashboardScope::Personal, actor, false, tenant)
+            .unwrap();
         DashboardService::add_gadget_at(&mut d, GadgetType::Burndown, "Sprint Burndown").unwrap();
         assert_eq!(d.gadgets.len(), 1);
         assert_eq!(d.gadgets[0].gadget_type, GadgetType::Burndown);
@@ -273,7 +323,9 @@ mod tests {
         let svc = DashboardService::new();
         let actor = Uuid::new_v4();
         let tenant = Uuid::new_v4();
-        let mut d = svc.create("Test", DashboardScope::Personal, actor, false, tenant).unwrap();
+        let mut d = svc
+            .create("Test", DashboardScope::Personal, actor, false, tenant)
+            .unwrap();
         DashboardService::add_gadget_at(&mut d, GadgetType::Clock, "Sprint Clock").unwrap();
         let id = d.gadgets[0].id;
         d.remove_gadget(id).unwrap();

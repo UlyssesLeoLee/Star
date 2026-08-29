@@ -560,7 +560,9 @@ fn verify_packet(packet: &ContextPacket) -> Result<(), ContextError> {
                 && p.source_type == c.source_type
                 && p.included_at_layer == c.included_at_layer
         }) {
-            return Err(ContextError::ProvenanceInconsistent(packet.provenance.len()));
+            return Err(ContextError::ProvenanceInconsistent(
+                packet.provenance.len(),
+            ));
         }
     }
     Ok(())
@@ -574,7 +576,10 @@ impl ContextCommandPort for InMemoryContextService {
         actor: &ActorContext,
     ) -> Result<ContextPacket, ContextError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(ContextError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(ContextError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         let now = Utc::now();
         let packet = ContextPacket {
@@ -657,7 +662,10 @@ impl ContextCommandPort for InMemoryContextService {
         packet.lock_version += 1;
         packet.updated_at_now();
         self.repo.update_packet(packet.clone()).await?;
-        self.packets.write().unwrap().insert(packet.id, packet.clone());
+        self.packets
+            .write()
+            .unwrap()
+            .insert(packet.id, packet.clone());
         Ok(packet)
     }
 
@@ -667,9 +675,15 @@ impl ContextCommandPort for InMemoryContextService {
         actor: &ActorContext,
     ) -> Result<Decision, ContextError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(ContextError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(ContextError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
-        if !actor.has_role("project_admin") && !actor.has_role("tenant_admin") && !actor.has_role("developer") {
+        if !actor.has_role("project_admin")
+            && !actor.has_role("tenant_admin")
+            && !actor.has_role("developer")
+        {
             return Err(ContextError::PermissionDenied);
         }
         let now = Utc::now();
@@ -704,7 +718,10 @@ impl ContextCommandPort for InMemoryContextService {
         actor: &ActorContext,
     ) -> Result<Decision, ContextError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(ContextError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(ContextError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         // INV-CT-06:Successor 必须存在
         let successor = self
@@ -715,7 +732,10 @@ impl ContextCommandPort for InMemoryContextService {
             .cloned()
             .ok_or(ContextError::SupersedeMissingSuccessor)?;
         if successor.tenant_id != cmd.tenant_id {
-            return Err(ContextError::CrossTenantDenied(successor.tenant_id, cmd.tenant_id));
+            return Err(ContextError::CrossTenantDenied(
+                successor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if successor.status != DecisionStatus::Active {
             return Err(ContextError::InvalidState(format!(
@@ -729,9 +749,14 @@ impl ContextCommandPort for InMemoryContextService {
             .unwrap()
             .get_mut(&cmd.decision_id)
             .cloned()
-            .ok_or_else(|| ContextError::NotFound(format!("decision:{}", cmd.decision_id.as_uuid())))?;
+            .ok_or_else(|| {
+                ContextError::NotFound(format!("decision:{}", cmd.decision_id.as_uuid()))
+            })?;
         if decision.tenant_id != cmd.tenant_id {
-            return Err(ContextError::CrossTenantDenied(decision.tenant_id, cmd.tenant_id));
+            return Err(ContextError::CrossTenantDenied(
+                decision.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if decision.status != DecisionStatus::Active {
             return Err(ContextError::InvalidState(format!(
@@ -743,7 +768,10 @@ impl ContextCommandPort for InMemoryContextService {
         decision.superseded_by = Some(cmd.successor_id);
         decision.lock_version += 1;
         self.repo.update_decision(decision.clone()).await?;
-        self.decisions.write().unwrap().insert(decision.id, decision.clone());
+        self.decisions
+            .write()
+            .unwrap()
+            .insert(decision.id, decision.clone());
         Ok(decision)
     }
 
@@ -753,7 +781,10 @@ impl ContextCommandPort for InMemoryContextService {
         actor: &ActorContext,
     ) -> Result<Decision, ContextError> {
         if actor.tenant_id != cmd.tenant_id {
-            return Err(ContextError::CrossTenantDenied(actor.tenant_id, cmd.tenant_id));
+            return Err(ContextError::CrossTenantDenied(
+                actor.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if cmd.reason.is_empty() {
             return Err(ContextError::InvalidateMissingReason);
@@ -764,9 +795,14 @@ impl ContextCommandPort for InMemoryContextService {
             .unwrap()
             .get_mut(&cmd.decision_id)
             .cloned()
-            .ok_or_else(|| ContextError::NotFound(format!("decision:{}", cmd.decision_id.as_uuid())))?;
+            .ok_or_else(|| {
+                ContextError::NotFound(format!("decision:{}", cmd.decision_id.as_uuid()))
+            })?;
         if decision.tenant_id != cmd.tenant_id {
-            return Err(ContextError::CrossTenantDenied(decision.tenant_id, cmd.tenant_id));
+            return Err(ContextError::CrossTenantDenied(
+                decision.tenant_id,
+                cmd.tenant_id,
+            ));
         }
         if decision.status != DecisionStatus::Active {
             return Err(ContextError::InvalidState(format!(
@@ -779,14 +815,17 @@ impl ContextCommandPort for InMemoryContextService {
         decision.invalidation_reason = Some(cmd.reason);
         decision.lock_version += 1;
         self.repo.update_decision(decision.clone()).await?;
-        self.decisions.write().unwrap().insert(decision.id, decision.clone());
+        self.decisions
+            .write()
+            .unwrap()
+            .insert(decision.id, decision.clone());
         Ok(decision)
     }
 }
 
 impl ContextPacket {
     fn updated_at_now(&mut self) {
-        self.actual_tokens = self.actual_tokens; // noop, kept for future
+        // noop, kept for future (移除 self-assignment 守门 #1)
     }
 }
 
@@ -798,7 +837,10 @@ impl ContextQueryPort for InMemoryContextService {
         actor: &ActorContext,
     ) -> Result<ContextPacket, ContextError> {
         if actor.tenant_id != q.tenant_id {
-            return Err(ContextError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(ContextError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
         let p = self
             .packets
@@ -820,7 +862,10 @@ impl ContextQueryPort for InMemoryContextService {
         actor: &ActorContext,
     ) -> Result<Vec<Decision>, ContextError> {
         if actor.tenant_id != q.tenant_id {
-            return Err(ContextError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+            return Err(ContextError::CrossTenantDenied(
+                actor.tenant_id,
+                q.tenant_id,
+            ));
         }
         let decisions = self.decisions.read().unwrap();
         Ok(decisions
@@ -875,7 +920,10 @@ impl ContextRepository for InMemoryContextRepository {
         Ok(())
     }
     async fn insert_decision(&self, decision: Decision) -> Result<(), ContextError> {
-        self.decisions.write().unwrap().insert(decision.id, decision);
+        self.decisions
+            .write()
+            .unwrap()
+            .insert(decision.id, decision);
         Ok(())
     }
     async fn get_decision(&self, id: DecisionId) -> Result<Decision, ContextError> {
@@ -887,7 +935,10 @@ impl ContextRepository for InMemoryContextRepository {
             .ok_or_else(|| ContextError::NotFound(format!("decision:{}", id.as_uuid())))
     }
     async fn update_decision(&self, decision: Decision) -> Result<(), ContextError> {
-        self.decisions.write().unwrap().insert(decision.id, decision);
+        self.decisions
+            .write()
+            .unwrap()
+            .insert(decision.id, decision);
         Ok(())
     }
     async fn list_decisions_by_project(
@@ -1316,7 +1367,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(res.status, DecisionStatus::Invalidated);
-        assert_eq!(res.invalidation_reason, Some("superseded by ADR-024".to_string()));
+        assert_eq!(
+            res.invalidation_reason,
+            Some("superseded by ADR-024".to_string())
+        );
     }
 
     #[tokio::test]

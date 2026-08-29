@@ -68,8 +68,8 @@ pub use invariants::{
     check_invariant_04_evidence_required, check_invariant_05_full_coverage_required,
     check_invariant_06_override_human_only, check_invariant_07_tenant_id_present,
     check_invariant_08_evidence_storage_tenant_prefix,
-    check_invariant_09_policy_default_ai_self_claim,
-    check_invariant_10_evidence_type_whitelist, check_status_transition,
+    check_invariant_09_policy_default_ai_self_claim, check_invariant_10_evidence_type_whitelist,
+    check_status_transition,
 };
 pub use port::{
     AddEvidenceCommand, CreateValidationPolicyCommand, LinkAcceptanceEvidenceCommand,
@@ -79,10 +79,10 @@ pub use port::{
 };
 pub use service::InMemoryValidationService;
 pub use value_object::{
-    is_valid_state_transition, roles, AcceptanceCoverageId, AcceptanceCriterionId,
-    AgentSessionId, ChangeSetId, CommitId, CoverageStatus, EvidenceType, ProjectId, TenantId,
-    TriggeredBy, UserId, ValidationEvidenceId, ValidationId, ValidationKind,
-    ValidationOverrideId, ValidationPolicyId, ValidationStatus, WorkItemId, WorktreeId,
+    is_valid_state_transition, roles, AcceptanceCoverageId, AcceptanceCriterionId, AgentSessionId,
+    ChangeSetId, CommitId, CoverageStatus, EvidenceType, ProjectId, TenantId, TriggeredBy, UserId,
+    ValidationEvidenceId, ValidationId, ValidationKind, ValidationOverrideId, ValidationPolicyId,
+    ValidationStatus, WorkItemId, WorktreeId,
 };
 
 // =====================================================================
@@ -230,7 +230,10 @@ mod tests {
         let tenant_id = TenantId::new();
         let actor = make_service_actor(tenant_id);
         let r = svc
-            .submit_result(make_submit_cmd(tenant_id, ValidationKind::UnitTest), actor.clone())
+            .submit_result(
+                make_submit_cmd(tenant_id, ValidationKind::UnitTest),
+                actor.clone(),
+            )
             .await
             .unwrap();
         // Running
@@ -350,7 +353,10 @@ mod tests {
         let tenant_id = TenantId::new();
         let svc_actor = make_service_actor(tenant_id);
         let r = svc
-            .submit_result(make_submit_cmd(tenant_id, ValidationKind::Build), svc_actor.clone())
+            .submit_result(
+                make_submit_cmd(tenant_id, ValidationKind::Build),
+                svc_actor.clone(),
+            )
             .await
             .unwrap();
         let res = svc
@@ -391,7 +397,10 @@ mod tests {
         let tenant_id = TenantId::new();
         let actor = make_service_actor(tenant_id);
         let r = svc
-            .submit_result(make_submit_cmd(tenant_id, ValidationKind::Build), actor.clone())
+            .submit_result(
+                make_submit_cmd(tenant_id, ValidationKind::Build),
+                actor.clone(),
+            )
             .await
             .unwrap();
         let res = svc
@@ -528,7 +537,10 @@ mod tests {
         // 正常 submit 后尝试 mark_status=Passed 但 evidence 缺
         let actor2 = make_service_actor(tenant_id);
         let r = svc
-            .submit_result(make_submit_cmd(tenant_id, ValidationKind::UnitTest), actor2.clone())
+            .submit_result(
+                make_submit_cmd(tenant_id, ValidationKind::UnitTest),
+                actor2.clone(),
+            )
             .await
             .unwrap();
         // 清除 log_excerpt_ref,模拟 evidence 缺失

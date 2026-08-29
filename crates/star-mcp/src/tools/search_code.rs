@@ -9,7 +9,7 @@
 //! - 输入:`{query: "...", limit?: N, paths?: [...]}`
 //! - 输出:`agent-api/v1#CodeSearchResult` mock
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::error::McpError;
 use crate::tools::{mock_response, optional_string, require_string};

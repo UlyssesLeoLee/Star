@@ -15,10 +15,8 @@
 //! - worktree_id 必为合法 UUID (per spec/agents/02-data-sources-spec.md §2.2)
 //! - 找不到 / 跨 tenant 拒绝 → McpError::validation("worktree not found")
 
-use domain_worktree::{
-    ActorContext, InMemoryWorktreeService, WorktreeId, WorktreeQueryPort,
-};
-use serde_json::{Value, json};
+use domain_worktree::{ActorContext, InMemoryWorktreeService, WorktreeId, WorktreeQueryPort};
+use serde_json::{json, Value};
 use std::sync::{Arc, OnceLock};
 
 use crate::error::McpError;

@@ -9,7 +9,7 @@
 //! - 输入:`{pipeline_run_id}`
 //! - 输出:`agent-api/v1#PipelineStatus` mock
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::error::McpError;
 use crate::tools::{mock_response, require_string};

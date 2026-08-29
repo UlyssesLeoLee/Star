@@ -76,7 +76,6 @@ pub trait AdapterRegistry: Send + Sync {
     ) -> Result<(), InfrastructureError>;
 }
 
-
 /// **AdapterQuery**(查询端口)
 ///
 /// 来源: docs/api-design.md —
@@ -110,7 +109,6 @@ pub struct AdapterDescriptor {
     pub tenant_id: Uuid,
     // 其它字段在 Phase 2 由具体 spec 补充
 }
-
 
 // =====================================================================
 // Error
@@ -175,6 +173,9 @@ mod tests {
             project_ids: vec![],
             roles: vec!["developer".to_string()],
         };
-        assert!(!actor.tenant_id.is_nil(), "tenant_id must be non-nil (§6.1,REQ-SEC-001)");
+        assert!(
+            !actor.tenant_id.is_nil(),
+            "tenant_id must be non-nil (§6.1,REQ-SEC-001)"
+        );
     }
 }

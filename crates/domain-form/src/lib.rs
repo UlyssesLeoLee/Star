@@ -21,33 +21,69 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FieldType {
-    Text, Textarea, Number, Email, Url, Phone,
-    Date, Datetime, Time,
-    Select, MultiSelect, Radio, Checkbox,
-    UserPicker, MultiUser, Attachment, RichText, Cascader,
+    Text,
+    Textarea,
+    Number,
+    Email,
+    Url,
+    Phone,
+    Date,
+    Datetime,
+    Time,
+    Select,
+    MultiSelect,
+    Radio,
+    Checkbox,
+    UserPicker,
+    MultiUser,
+    Attachment,
+    RichText,
+    Cascader,
 }
 
 impl FieldType {
     pub fn all() -> &'static [FieldType] {
         &[
-            Self::Text, Self::Textarea, Self::Number, Self::Email,
-            Self::Url, Self::Phone, Self::Date, Self::Datetime, Self::Time,
-            Self::Select, Self::MultiSelect, Self::Radio, Self::Checkbox,
-            Self::UserPicker, Self::MultiUser, Self::Attachment,
-            Self::RichText, Self::Cascader,
+            Self::Text,
+            Self::Textarea,
+            Self::Number,
+            Self::Email,
+            Self::Url,
+            Self::Phone,
+            Self::Date,
+            Self::Datetime,
+            Self::Time,
+            Self::Select,
+            Self::MultiSelect,
+            Self::Radio,
+            Self::Checkbox,
+            Self::UserPicker,
+            Self::MultiUser,
+            Self::Attachment,
+            Self::RichText,
+            Self::Cascader,
         ]
     }
 
     pub fn name(&self) -> &'static str {
         match self {
-            Self::Text => "Text", Self::Textarea => "Textarea",
-            Self::Number => "Number", Self::Email => "Email",
-            Self::Url => "URL", Self::Phone => "Phone",
-            Self::Date => "Date", Self::Datetime => "Date & Time", Self::Time => "Time",
-            Self::Select => "Select", Self::MultiSelect => "Multi-Select",
-            Self::Radio => "Radio", Self::Checkbox => "Checkbox",
-            Self::UserPicker => "User Picker", Self::MultiUser => "Multi-User",
-            Self::Attachment => "Attachment", Self::RichText => "Rich Text",
+            Self::Text => "Text",
+            Self::Textarea => "Textarea",
+            Self::Number => "Number",
+            Self::Email => "Email",
+            Self::Url => "URL",
+            Self::Phone => "Phone",
+            Self::Date => "Date",
+            Self::Datetime => "Date & Time",
+            Self::Time => "Time",
+            Self::Select => "Select",
+            Self::MultiSelect => "Multi-Select",
+            Self::Radio => "Radio",
+            Self::Checkbox => "Checkbox",
+            Self::UserPicker => "User Picker",
+            Self::MultiUser => "Multi-User",
+            Self::Attachment => "Attachment",
+            Self::RichText => "Rich Text",
             Self::Cascader => "Cascader",
         }
     }
@@ -56,8 +92,8 @@ impl FieldType {
 /// 字段定义
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FormField {
-    pub key: String,           // 提交时字段名
-    pub label: String,         // UI 显示
+    pub key: String,   // 提交时字段名
+    pub label: String, // UI 显示
     pub field_type: FieldType,
     pub required: bool,
     pub default_value: Option<serde_json::Value>,
@@ -102,7 +138,13 @@ pub enum ConditionalAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CondOperator {
-    Eq, Ne, In, NotIn, Contains, Empty, NotEmpty,
+    Eq,
+    Ne,
+    In,
+    NotIn,
+    Contains,
+    Empty,
+    NotEmpty,
 }
 
 /// 提交动作
@@ -150,7 +192,12 @@ pub struct AccessControl {
 
 impl Default for AccessControl {
     fn default() -> Self {
-        Self { public: false, email_whitelist: vec![], require_token: false, token: None }
+        Self {
+            public: false,
+            email_whitelist: vec![],
+            require_token: false,
+            token: None,
+        }
     }
 }
 
@@ -226,7 +273,9 @@ pub enum FormError {
 pub struct FormService;
 
 impl FormService {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     /// 验证提交
     pub fn validate_submission(
@@ -237,7 +286,10 @@ impl FormService {
         // 1. 必填字段
         for f in &form.fields {
             if f.required {
-                let present = submission.values.iter().any(|(k, v)| k == &f.key && !v.is_null());
+                let present = submission
+                    .values
+                    .iter()
+                    .any(|(k, v)| k == &f.key && !v.is_null());
                 if !present {
                     return Err(FormError::RequiredFieldMissing(f.key.clone()));
                 }
@@ -247,7 +299,10 @@ impl FormService {
         for f in &form.fields {
             if let Some((_, v)) = submission.values.iter().find(|(k, _)| k == &f.key) {
                 if let Some(msg) = validate_field(f, v) {
-                    return Err(FormError::Validation { field: f.key.clone(), message: msg });
+                    return Err(FormError::Validation {
+                        field: f.key.clone(),
+                        message: msg,
+                    });
                 }
             }
         }
@@ -297,11 +352,17 @@ fn validate_field(f: &FormField, v: &serde_json::Value) -> Option<String> {
     None
 }
 
-fn regex_lite(_p: &str) -> Result<(), ()> { Ok(()) } // stub
-fn re_is_match(_re: &(), _s: &str) -> bool { true }
+fn regex_lite(_p: &str) -> Result<(), ()> {
+    Ok(())
+} // stub
+fn re_is_match(_re: &(), _s: &str) -> bool {
+    true
+}
 
 impl Default for FormService {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -340,7 +401,8 @@ mod tests {
             options: vec![],
             validation: FieldValidation::default(),
             conditional: None,
-        }).unwrap();
+        })
+        .unwrap();
         assert_eq!(f.fields.len(), 1);
     }
 
@@ -348,10 +410,14 @@ mod tests {
     fn test_form_duplicate_field_key() {
         let mut f = Form::new("Test", "test");
         let field = FormField {
-            key: "x".into(), label: "X".into(),
-            field_type: FieldType::Text, required: false,
-            default_value: None, options: vec![],
-            validation: FieldValidation::default(), conditional: None,
+            key: "x".into(),
+            label: "X".into(),
+            field_type: FieldType::Text,
+            required: false,
+            default_value: None,
+            options: vec![],
+            validation: FieldValidation::default(),
+            conditional: None,
         };
         f.add_field(field.clone()).unwrap();
         let r = f.add_field(field);
@@ -363,15 +429,23 @@ mod tests {
         let svc = FormService::new();
         let mut f = Form::new("Test", "test");
         f.add_field(FormField {
-            key: "name".into(), label: "Name".into(),
-            field_type: FieldType::Text, required: true,
-            default_value: None, options: vec![],
-            validation: FieldValidation::default(), conditional: None,
-        }).unwrap();
+            key: "name".into(),
+            label: "Name".into(),
+            field_type: FieldType::Text,
+            required: true,
+            default_value: None,
+            options: vec![],
+            validation: FieldValidation::default(),
+            conditional: None,
+        })
+        .unwrap();
         let sub = FormSubmission {
-            id: Uuid::new_v4(), form_id: f.id, values: vec![],
+            id: Uuid::new_v4(),
+            form_id: f.id,
+            values: vec![],
             submitted_at: chrono::Utc::now(),
-            submitter_email: None, submitter_ip: None,
+            submitter_email: None,
+            submitter_ip: None,
         };
         let r = svc.validate_submission(&f, &sub);
         assert!(matches!(r, Err(FormError::RequiredFieldMissing(_))));
@@ -380,12 +454,18 @@ mod tests {
     #[test]
     fn test_generate_slug() {
         assert_eq!(FormService::generate_slug("Contact Us!"), "contact-us");
-        assert_eq!(FormService::generate_slug("Bug Report 2026"), "bug-report-2026");
+        assert_eq!(
+            FormService::generate_slug("Bug Report 2026"),
+            "bug-report-2026"
+        );
     }
 
     #[test]
     fn test_public_url() {
         let f = Form::new("Contact", "contact");
-        assert_eq!(f.public_url("https://star.example.com"), "https://star.example.com/forms/contact");
+        assert_eq!(
+            f.public_url("https://star.example.com"),
+            "https://star.example.com/forms/contact"
+        );
     }
 }

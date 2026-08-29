@@ -9,7 +9,7 @@
 //! - 输入:`{file: "...", range: [start, end]}`
 //! - 输出:`agent-api/v1#CodeContext` mock
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::error::McpError;
 use crate::tools::mock_response;

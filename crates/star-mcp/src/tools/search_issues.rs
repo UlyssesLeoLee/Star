@@ -9,7 +9,7 @@
 //! - 输入:`{query: "...", filters?: {...}}`
 //! - 输出:`agent-api/v1#IssueList` mock(2 条)
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::error::McpError;
 use crate::tools::{mock_response, require_string};

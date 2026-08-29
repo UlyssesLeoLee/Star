@@ -129,7 +129,11 @@ mod tests {
         fs::create_dir_all(&tmp).unwrap();
 
         let result = write_bootstrap(&tmp);
-        assert!(result.is_ok(), "write_bootstrap 应该成功, 实际: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "write_bootstrap 应该成功, 实际: {:?}",
+            result
+        );
 
         // 验证文件已写
         let target = tmp.join("AGENTS.md");
@@ -146,7 +150,10 @@ mod tests {
     #[test]
     fn write_bootstrap_refuses_overwrite_existing() {
         // 写 2 次, 第 2 次应该 Err(AlreadyExists)
-        let tmp = env::temp_dir().join(format!("star-context-test-overwrite-{}", std::process::id()));
+        let tmp = env::temp_dir().join(format!(
+            "star-context-test-overwrite-{}",
+            std::process::id()
+        ));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
 
@@ -156,7 +163,11 @@ mod tests {
 
         // 第 2 次: Err(AlreadyExists), 文件未改
         let r2 = write_bootstrap(&tmp);
-        assert!(matches!(r2, Err(ContextError::AlreadyExists(_))), "第 2 次应 Err(AlreadyExists), 实际: {:?}", r2);
+        assert!(
+            matches!(r2, Err(ContextError::AlreadyExists(_))),
+            "第 2 次应 Err(AlreadyExists), 实际: {:?}",
+            r2
+        );
 
         // 验证内容仍是第 1 次的 (没被覆盖)
         let target = tmp.join("AGENTS.md");

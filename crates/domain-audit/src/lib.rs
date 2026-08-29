@@ -46,9 +46,7 @@ use uuid::Uuid;
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[allow(missing_docs)]
-        #[derive(
-            Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
-        )]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
         #[serde(transparent)]
         pub struct $name(uuid::Uuid);
 
@@ -462,9 +460,10 @@ pub fn check_invariant_02_required_fields(ev: &AuditEvent) -> Result<(), AuditEr
                 "INV-AU-02: Actor::User.user_id 必须非 nil".to_string(),
             ));
         }
-        Actor::Agent { session_id, agent_id }
-            if session_id.as_uuid().is_nil() || agent_id.as_uuid().is_nil() =>
-        {
+        Actor::Agent {
+            session_id,
+            agent_id,
+        } if session_id.as_uuid().is_nil() || agent_id.as_uuid().is_nil() => {
             return Err(AuditError::InvalidState(
                 "INV-AU-02: Actor::Agent session_id / agent_id 必须非 nil".to_string(),
             ));
@@ -487,11 +486,7 @@ pub fn check_invariant_03_immutable_hash(ev: &AuditEvent) -> Result<(), AuditErr
         ));
     }
     // 必须是 hex
-    if !ev
-        .immutable_hash
-        .chars()
-        .all(|c| c.is_ascii_hexdigit())
-    {
+    if !ev.immutable_hash.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(AuditError::InvalidState(
             "INV-AU-03: immutable_hash 必须为 hex 字符".to_string(),
         ));
@@ -546,10 +541,7 @@ pub const ALL_INVARIANT_CHECKS: &[InvariantCheck] = &[
     check_invariant_04_no_sensitive_plaintext,
 ];
 
-pub fn run_invariants(
-    checks: &[InvariantCheck],
-    ev: &AuditEvent,
-) -> Result<(), AuditError> {
+pub fn run_invariants(checks: &[InvariantCheck], ev: &AuditEvent) -> Result<(), AuditError> {
     for c in checks {
         c(ev)?;
     }
@@ -878,19 +870,16 @@ impl AuditRecorder for InMemoryAuditService {
     ) -> Result<AuditEvent, AuditError> {
         let now = Utc::now();
         let id = AuditEventId::new();
-        let hash = cmd
-            .immutable_hash
-            .clone()
-            .unwrap_or_else(|| {
-                compute_immutable_hash(
-                    cmd.tenant_id,
-                    &cmd.actor,
-                    cmd.action,
-                    &cmd.resource_type,
-                    cmd.resource_id,
-                    now,
-                )
-            });
+        let hash = cmd.immutable_hash.clone().unwrap_or_else(|| {
+            compute_immutable_hash(
+                cmd.tenant_id,
+                &cmd.actor,
+                cmd.action,
+                &cmd.resource_type,
+                cmd.resource_id,
+                now,
+            )
+        });
         let ev = AuditEvent {
             id,
             tenant_id: cmd.tenant_id,
@@ -977,7 +966,10 @@ impl AuditRecorder for InMemoryAuditService {
         let now = Utc::now();
         let id = AIAuditMetadataId::new();
         // INV-AU-06 默认 90 天,允许外部覆盖
-        let retention_dur = cmd.metadata.retention.unwrap_or(Duration::from_secs(90 * 24 * 60 * 60));
+        let retention_dur = cmd
+            .metadata
+            .retention
+            .unwrap_or(Duration::from_secs(90 * 24 * 60 * 60));
         let retention_until = now + chrono::Duration::seconds(retention_dur.as_secs() as i64);
         let meta = AIAuditMetadata {
             id,
@@ -1248,10 +1240,7 @@ mod tests {
             after_state: None,
             immutable_hash: None,
         };
-        let ev = svc
-            .record(cmd, make_admin_actor(tenant_id))
-            .await
-            .unwrap();
+        let ev = svc.record(cmd, make_admin_actor(tenant_id)).await.unwrap();
         // 验证 AuditRecorder trait 没有 update / delete 方法
         // (编译期约束 + 运行时只能通过 mutation 改,但本服务只暴露 `record`)
         assert_eq!(svc.event_count().await, 1);
@@ -1302,10 +1291,7 @@ mod tests {
             after_state: None,
             immutable_hash: None,
         };
-        let _ = svc
-            .record(cmd, make_admin_actor(tenant_id))
-            .await
-            .unwrap();
+        let _ = svc.record(cmd, make_admin_actor(tenant_id)).await.unwrap();
         // developer 不能读
         let developer = make_developer_actor(tenant_id);
         let q = AuditListQuery {
