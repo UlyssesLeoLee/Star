@@ -241,6 +241,30 @@ Context Policy
 - REQ-WF-002：Worktree Status 不等于 WorkItem Status（§4）。同一 WorkItem 下，Worktree A 可为 Agent Running，Worktree B 可为 Blocked，Worktree C 可为 Reviewing，系统必须允许该并存状态。
 - REQ-WF-003：WorkItem 状态转换（transition）可配置 Guard，转换只有在 Guard 满足时才允许执行。Guard 类型至少包括：角色要求（RequireRole）、人工批准（RequireApproval）、Validation 通过（RequireValidation）。典型场景包括但不限于：（a）"Agent 未通过 Validation 不能自动流转到 Done"，对应 §27 AI Task 的 Validation Policy；（b）"需要人工 Approval 才能合并到 Done / Merged"，对应 §28 Agent Policy 的 Require Approval 授权级别。Guard 校验由 Application/Authorization 层强制执行（不得仅通过 Prompt 约束，§28，与 REQ-PERM-002 一致）。Guard 失败时返回可定位错误（哪个 Guard 不满足），便于 UI/CLI 给出可执行的下一步建议。**已实现**：`crates/domain-workflow/src/lib.rs:134-148` 定义 `enum Guard { RequireRole(String), RequireValidation(String), RequireApproval }`，第 618/626/634 行在状态转换执行时实际做校验；第 1384 行有使用示例。**已实现追溯，2026-08-26 补登记。**
 
+### 8.3 Design Artifact（无对应原提示词章节编号 — 本节为线程 C 新增设计, P0：DSG-001/002 — brainstorming 线程 C，覆盖瀑布式 SIer 项目中"设计先行"的诉求）
+
+前两个线程（A：核心开发闭环，B：Review）都假设代码已经在写。瀑布式项目在写代码之前有一个独立的、需要正式批准才能往下走的阶段——设计书。系统不得强迫所有 Project 都走瀑布流程，但必须支持"设计书是先于 ChangeSet 存在、且需要独立 Approval Gate 才能放行"的 Project。不新建平行的"设计管理系统"，而是把设计书表达为一种可挂接到既有 WorkItem 状态机（§8.2 REQ-WF-003）与既有 ReviewRecord（§27.4）机制上的工作产出物：
+
+```text
+DesignArtifact
+├── ArtifactId / ProjectId / WorkItemId（关联 Epic/Story，非强制关联单个 Task）
+├── Kind: BasicDesign | ExternalDesign | InternalDesign | APIDesign | DataDesign
+       | SecurityDesign | RuntimeDesign | IntegrationDesign | AIAgentDesign
+       | TestDesign | OperationDesign
+      （枚举值取自本文档末尾"下一阶段清单"已列出的瀑布阶段名称，不新造分类体系）
+├── Version（设计书可迭代，历史版本须可追溯，不得覆盖式修改已批准版本）
+├── Status: DRAFT → IN_REVIEW → APPROVED / REJECTED / SUPERSEDED
+├── Content: 不规定具体格式/模板（文档或结构化字段留给《基本设计书》阶段决定，本层只定义生命周期与关联关系）
+└── ApprovalReviewId: ReviewRecord（§27.4，Target 从"仅 ChangeSet"泛化为"ChangeSet | DesignArtifact"，Kind 通常为 CrossReview）
+```
+
+**与既有对象的关系（不新增平行体系）**：
+- DesignArtifact 的批准流程复用 §27.4 ReviewRecord，不新建"设计评审"专属状态机；ReviewRecord 的 `ChangeSetId` 字段泛化为可选，改为对 DesignArtifact 或 ChangeSet 二选一关联（同一时刻只挂一种 Target，Review 的 Kind/Decision/Findings 语义不变）。
+- WorkItem 状态转换（§8.2 REQ-WF-003）可增加 Guard 前置条件"关联的 DesignArtifact 必须为 APPROVED"，用既有 `RequireApproval` Guard 类型表达，不新增 Guard 类型。典型场景："Epic 下的 Story 不得进入 In Progress，除非其 Basic/External/Internal Design 均已 APPROVED"——由 Project 自行配置是否启用该 Guard（非强制瀑布，敏捷 Project 可完全不用）。
+- DesignArtifact 不属于 DevelopmentExecution（§20），它先于 ChangeSet/Worktree 存在；DesignArtifact APPROVED 之后才允许对应 Worktree 创建（如 Project 选择启用该约束），二者关系属于 Guard 前置，不是新的执行层对象。
+- REQ-DSG-001：系统必须支持为 WorkItem（通常为 Epic/Story 级）关联 0..N 个 DesignArtifact，并跟踪每个 DesignArtifact 的独立 Status 与 Version 历史。
+- REQ-DSG-002：系统必须支持将"关联 DesignArtifact 全部 APPROVED"设置为既有 WorkItem 状态转换 Guard（§8.2 REQ-WF-003）的前置条件，Guard 失败时明确指出哪些 DesignArtifact 未批准。
+
 ---
 
 ## 9. Planning 要求（敏捷规划）
@@ -647,7 +671,7 @@ Local Runtime reconnect 后必须支持 Desired State ↔ Observed State 的 Rec
 
 ### 22.7 Worktree Completion 判定（§78）
 
-允许进入 `READY_FOR_REVIEW` 前至少考虑：No Critical Feedback、Required Tests Pass、Required Build Pass、No Blocking Conflict、Acceptance Criteria Covered、Required Review Complete、Git State Known。具体策略由 Project Policy 定义。
+允许进入 `READY_FOR_REVIEW` 前至少考虑：No Critical Feedback、Required Tests Pass、Required Build Pass、No Blocking Conflict、Acceptance Criteria Covered、Required Review Complete、Git State Known。具体策略由 Project Policy 定义。"Required Review Complete" 的实证来源见 §27.4 ReviewRecord（`Status=APPROVED` 且关联 `ValidationResult(Type=Review)` 存在）。
 
 ---
 
@@ -734,7 +758,7 @@ Domain 层不得出现厂商特有对象。
 
 ### 24.3 AI Task 与 Agent Policy（§27-28）
 
-AgentPolicy 至少研究：Allowed Repository、Allowed Worktree、Allowed Path、Allowed Tool、Allowed Command Category、Network Access、Secret Access、Max Runtime、Max Context、Max Change Scope、Require Review、Require Test、Require Approval。**Policy 必须由 Application / Authorization 层执行**，重要安全规则不能只靠 Prompt 告诉 Agent"不要修改 xxx"（§28）。
+AgentPolicy 至少研究：Allowed Repository、Allowed Worktree、Allowed Path、Allowed Tool、Allowed Command Category、Network Access、Secret Access、Max Runtime、Max Context、Max Change Scope、Require Review、Require Test、Require Approval。**Policy 必须由 Application / Authorization 层执行**，重要安全规则不能只靠 Prompt 告诉 Agent"不要修改 xxx"（§28）。`Require Review` 展开为 `ReviewerKind: SelfOnly | CrossHumanRequired | AgentAssistedAllowed` 与 `MinReviewers`，落地对象见 §27.4 ReviewRecord。
 
 ### 24.4 Human-in-the-loop 授权等级（§29）
 
@@ -758,6 +782,8 @@ AgentPolicy 至少研究：Allowed Repository、Allowed Worktree、Allowed Path�
 **Agent Handoff**（§52）：接管同一 Worktree 时不得依赖发送全部聊天记录，应生成 Handoff Context Packet：`Objective / Current State / Completed Work / Open Work / Decisions / Open Feedback / Changed Symbols / Failed Tests / Constraints`。
 
 **Agent Comparison**（§53）：同一 Task 由多个 Agent 并行产生 Worktree 对比 Diff/Tests/Complexity/Review Finding/Context Cost/Feedback Count，列为 V2 候选（第 32 章），不进入初始 MVP。
+
+**Agent-Assisted Review**（§27.5 补充，与 Agent Comparison 明确区分）：一个 Agent 对另一 Agent 的 ChangeSet 执行只读审查、产出 Feedback/ValidationResult，属于既有 Auto 授权层级（§24.4），**不算** Agent Swarm / Agent Negotiation，因为 Reviewer 与 Author 之间零直接通信，且 ReviewRecord 的触发权始终在人类/Policy 手中（§24.7 同一边界）。
 
 ### 24.6 Skill / Playbook 复用（V2 候选，参考竞品 Multica 分析，2026-08-26 补充）
 
@@ -898,6 +924,64 @@ Agent Result → Validation → Acceptance Coverage → Feedback Resolution
 → Human / Policy Gate → Ready for Review
 ```
 
+### 27.4 Review Record 领域对象（无对应原提示词章节编号 — 本节为线程 B 新增设计, P0：RVW-001/002 — brainstorming 线程 B，per Ulysses "自审交叉审核" 拍板）
+
+`Review`（§27.1 既有 ValidationResult Type 之一）目前只是一个"通过/不通过"的校验类型值，缺少审核人身份、自审/交叉区分、结论追溯的第一级对象。禁止继续只用一个枚举值代表审核。字段至少包括：
+
+```text
+ReviewRecord
+├── ReviewId / WorktreeId / WorkItemId
+├── Target: ChangeSet | DesignArtifact（二选一关联，同一时刻只挂一种；DesignArtifact 分支为 §8.3，线程 C 泛化，ChangeSetId 不再是唯一挂接字段）
+├── Kind: SelfReview | CrossReview | AgentAssistedReview
+├── Author: HumanIdentity | AgentSession（被审对象的归属者：Target=ChangeSet 时为提交者，Target=DesignArtifact 时为起草者，§8.3）
+├── Reviewer: HumanIdentity | AgentSession（审核执行者）
+├── Checklist: ReviewChecklistItem[]（来自 Project 级 ReviewPolicy 模板，复用 §24.6 AgentPolicyTemplate 同类机制，不新发明模板概念）
+├── Findings: ReviewFinding[]（每条可转化为 Feedback，Target=Review Finding，§25.1 既有类型，无需扩展）
+├── Status: DRAFT → IN_PROGRESS → APPROVED / CHANGES_REQUESTED / REJECTED / SUPERSEDED
+├── Decision: Approve | RequestChanges | Reject
+├── Evidence: ValidationResult[]（Type=Review，关联本 ReviewRecord，§27.1）
+├── StartedAt / CompletedAt
+└── TriggeredBy: AgentPolicy.RequireReview | Project ReviewPolicy | Human Manual
+```
+
+**Kind 判定规则**：`Reviewer == Author` → 必须标记 `SelfReview`；`Reviewer != Author` 且 Reviewer 为人类 → `CrossReview`；`Reviewer != Author` 且 Reviewer 为 AgentSession → `AgentAssistedReview`（见 §27.5 边界约束，禁止与 §24.5/§24.7 既有边界冲突）。
+
+**与既有对象的关系**（不新增平行体系，全部挂接既有闭环）：
+- ReviewRecord 的每条 Finding → 走既有 Feedback 状态机（`OPEN → ACKNOWLEDGED → APPLIED → VERIFIED/REJECTED/SUPERSEDED`，§25.3），不新建 Finding 专属状态机
+- ReviewRecord 完成后必须产生至少一条 `ValidationResult(Type=Review)`（§27.1），作为 §22.7 Worktree Completion 判定"Required Review Complete"条件的实证来源（§22.7 原文仅提及条件名，未定义来源对象，本节补齐）
+- ReviewRecord 挂接 Acceptance Coverage（§27.2）：`AC-xxx → ValidationEvidence` 映射中，`Human Review RV-12` 类证据即为 ReviewRecord 实例，非独立编号体系
+
+### 27.5 Self-Review / Cross-Review / Agent-Assisted Review 的边界（无对应原提示词章节编号 — 本节为线程 B 新增设计）
+
+- **Self-Review**（自审）：Author 自己在提交前走一遍 Checklist，不引入第二身份，不受 §24.4/§24.5 授权约束影响，属于最轻量 Gate。
+- **Cross-Review**（交叉审核）：Reviewer 必须是与 Author 不同的人类身份（Segregation of Duties），Reviewer 的 `Reject` 决策等价于 §24.4 表中的 "Require Approval" 级别，必须经 Human/Policy Gate 才能放行到 `READY_FOR_COMMIT`（呼应 §27.3 流程）。
+- **Agent-Assisted Review**（原始诉求"Agent 之间 QA"的落地形态）：Reviewer 是一个独立 AgentSession，对另一 Worktree/ChangeSet 执行只读分析并产出 Findings/ValidationResult。**这不是新的授权层级**——Review 输出即 Feedback（§25.1）与 ValidationResult（§27.1），二者均已属于 §24.4 表中 "AI Analyze / AI Suggest = Auto" 层级，Agent-as-Reviewer 不需要修改任何 Worktree、不触碰 Commit/Push/Merge，因此不产生新的授权空缺。
+- **禁止事项**（与 §24.5/§24.7/§30.6 既有边界保持一致，不得放宽）：
+  - Reviewer AgentSession 不得与 Author AgentSession 直接通信协商结论；所有交互必须经过 Feedback 状态机，不构成 Agent Negotiation（§24.5 Non-Goal）
+  - ReviewRecord 的创建时机与 Reviewer 指派，必须来自 AgentPolicy.RequireReview 或 Project ReviewPolicy 或人类手动触发，**不得由 Agent 自主发起对其他 Agent 的审查**（呼应 §24.7 "人类或规则引擎指定，而非 Agent 自己决定"）
+  - Agent-Assisted Review 的 `Reject` 决策不得自动阻断 Worktree 生命周期；必须仍经过 §24.4 Human/Policy Gate 才能生效，避免"Agent 审核 Agent"形成无人类介入的自治闭环
+
+### 27.6 Test Level（工程别テスト，无对应原提示词章节编号 — 本节为线程 C 新增设计, P0：TST-001 — brainstorming 线程 C）
+
+§27.1 的 ValidationResult Type 列表（Unit Test / Integration Test / Acceptance Check）回答的是"验证了什么种类的东西"，瀑布式 SIer 项目还需要回答一个正交问题——"这次验证处于哪个测试工程"（単体/結合/総合/受入）。这是粒度不同的两个维度，不是要新建一套 TestPlan/TestCase 平行对象体系：
+
+```text
+ValidationResult（§27.1 既有对象，本节仅新增一个字段维度）
+├── Type: Build | Unit Test | Integration Test | Lint | Format | Static Analysis
+       | Security Check | Acceptance Check | Review | Custom Validation（既有，不变）
+└── Level: UnitTestLevel | IntegrationTestLevel | SystemTestLevel | AcceptanceTestLevel
+      （新增字段，对应単体テスト/結合テスト/総合テスト/受入テスト；
+       与 Type 正交——例如 Type=Integration Test 的一次验证既可能属于
+       IntegrationTestLevel，也可能是更大范围 SystemTestLevel 演练的一部分）
+```
+
+**与既有对象的关系（不新增平行体系）**：
+- 不引入独立的 TestPlan/TestCase 对象；`Level` 是 ValidationResult 的字段，不是新实体。理由：ValidationResult 已经关联 WorkItem/AcceptanceCriterion/Worktree/AgentSession/ChangeSet/Commit（§27.1），新建 TestCase 会制造第二条平行的证据链，与 §27.4 line 924 "不新增平行体系，全部挂接既有闭环"的既定原则冲突。
+- §27.2 Acceptance Coverage 的 `AcceptanceCriteria → ValidationEvidence` 映射须能按 Level 筛选（例：`AC-001` 要求必须同时存在 IntegrationTestLevel 与 AcceptanceTestLevel 两条证据，而不是任意一条 Validation Passed 即视为满足）——这是对既有映射表达能力的扩展，不是新增映射体系。
+- SystemTestLevel（総合テスト）通常跨多个 WorkItem，其 ValidationResult 允许关联多个 WorkItem/ChangeSet（既有对象的多对多关联能力，非新语义）。
+- REQ-TST-001：系统必须支持 ValidationResult 携带 Level 字段（単体/結合/総合/受入四档），并支持按 Level 聚合查看某 WorkItem/Project 的测试覆盖状态。
+- REQ-TST-002：Acceptance Coverage 映射（§27.2）必须支持声明"某 AcceptanceCriteria 需要哪些 Level 的证据才算覆盖"，缺失特定 Level 时须在 UI/CLI 明确指出缺口，而非笼统显示"未覆盖"。
+
 ---
 
 ## 28. AI Extension 要求
@@ -956,6 +1040,30 @@ Runtime Offline / SCM Sync Error
 
 Agent Observability 具体指标见第 28.1 节，须遵守高 Cardinality 标签处理原则。
 
+### 29.1 Incident Record（生产事件追溯，无对应原提示词章节编号 — 本节为线程 C 新增设计, P0：OPS-001 — brainstorming 线程 C）
+
+**边界声明（先于对象定义，避免与 §30.6 冲突）**：本节只解决"生产事件如何被记录、追溯回是哪个 WorkItem/ChangeSet 造成、修复后如何验证"，这是 Jira-class 闭环（§30.1）在时间轴上的延伸，不是新增能力。系统**不**监控生产环境、**不**接收/处理告警信号、**不**执行自动回滚或自动修复、**不**获得生产系统的运行时访问权限——这些如果做了就是在做 §30.6 明确排除的 `Autonomous Production Deployment` 类能力的邻接功能，必须避免。IncidentRecord 是人工登记的追溯对象，事件本身的探测/告警交给外部 Monitoring/Alerting 系统（不在本产品范围内，只接受人工或既有 Webhook 转发登记的既成事实）。
+
+```text
+IncidentRecord
+├── IncidentId / ProjectId / Severity（Project 自定义分级，不规定具体档位）
+├── DetectedAt / ReportedBy（人工登记，或外部系统通过受限 Webhook 转发的既成事实，非本产品主动探测）
+├── Status: OPEN → INVESTIGATING → ROOT_CAUSE_IDENTIFIED → FIX_IN_PROGRESS
+       → RESOLVED → POSTMORTEM_DONE / WONT_FIX
+├── LinkedWorkItem: WorkItem（修复工作在既有 WorkItem/Worktree/ChangeSet 闭环内完成，不新建修复流程）
+├── RootCauseChangeSet: ChangeSet[]（可选，指向被认为引入问题的历史 ChangeSet，§21.1）
+├── ViolatedAcceptanceCriteria: AcceptanceCriteria[]（可选，指出事件暴露了哪条 AC 实际未被覆盖，§27.2）
+├── ResolutionEvidence: ValidationResult[]（修复后的验证证据，复用 §27.1，不新建证据体系）
+└── PostmortemNote：自由文本，不规定模板（模板留给后续团队按 SIer 惯例定义）
+```
+
+**与既有对象的关系（不新增平行体系）**：
+- 事件的修复不走独立流程：一旦 IncidentRecord 关联了 LinkedWorkItem，后续修复完全走既有 WorkItem → Worktree → AgentSession → ChangeSet → ValidationResult → ReviewRecord 闭环（§20-27），IncidentRecord 只是这条闭环之前的"为什么要开这个 WorkItem"的追溯挂钩，类似 Feedback（§25.1）挂接到 WorkItem 的方式。
+- ViolatedAcceptanceCriteria 字段回填 §27.2 Acceptance Coverage：如果事件证明某条 AC 的既有 ValidationEvidence 不足以真正保证质量，必须能在 Coverage 映射上看到"这条 AC 曾经被事件击穿过"，为后续补充 Level（§27.6）或 Review（§27.4）要求提供依据。
+- REQ-OPS-001：系统必须支持登记 IncidentRecord 并关联到 0..N 个 WorkItem，用于追溯"生产问题 → 根因 ChangeSet → 修复 WorkItem → 验证证据"的完整链条。
+- REQ-OPS-002：系统必须允许 IncidentRecord 反向标注哪些 AcceptanceCriteria 被证明覆盖不足，但不得自动修改历史 ValidationResult 或 Acceptance Coverage 的既有判定（保留历史事实，新增标注而非覆写）。
+- REQ-OPS-003（边界，与 §30.6 对齐）：系统不得实现生产环境探测、告警接收处理、自动回滚、自动修复能力；IncidentRecord 的创建只能来自人工输入，或经既有 §18 Integration Webhook 机制转发的、明确声明来源的外部登记，不新增独立的入站接口。
+
 ---
 
 ## 30. MVP / Roadmap 要求
@@ -993,6 +1101,7 @@ Commit Link / PR/MR Link
 Development Timeline
 Local Runtime
 Tenant-aware Security / Audit
+Self-Review Gate / Cross-Review Assignment（REQ §27.4-27.5，per brainstorming 线程 B 拍板"自审交叉审核核心化"）
 ```
 
 ### 30.3 V1 Should Have（§66）
@@ -1010,6 +1119,10 @@ Agent Policy Templates
 Remote Runner
 Context Cost Analysis（含 Agent Session Token/Cost 明细，§24.1 补充）
 Scheduled Automation Trigger（Autopilot 型 Cron 触发，REQ-AUTO-002）
+Agent-Assisted Review（Policy-Enforced Review Pass，REQ §27.4-27.5，仅只读分析 + Feedback/ValidationResult 输出，不引入新授权层级）
+Design Artifact + Approval Guard（REQ-DSG-001/002，§8.3，非强制瀑布——由 Project 自行启用，敏捷 Project 可完全不用，故不列入 §30.2 Must Have）
+Test Level 维度（単体/結合/総合/受入，REQ-TST-001/002，§27.6，ValidationResult 既有字段扩展，非新对象）
+Incident Record 追溯（REQ-OPS-001/002，§29.1，仅追溯既有 WorkItem→Worktree→ChangeSet→ValidationResult 链，不含监控/告警/自动回滚，见 §30.6）
 ```
 
 ### 30.4 V2 Candidates（§67）
@@ -1168,6 +1281,9 @@ ARCH-OBL-DEV-005  Validation Evidence
 
 ARCH-OBL-DEV-006  Observed State
   → Worktree 高频本地状态必须与核心业务事实区分。
+
+ARCH-OBL-DEV-007  Review Segregation of Duties（无对应原提示词章节编号 — per §27.4-27.5 新增）
+  → Cross-Review 的 Reviewer 不得等于 Author；Agent-Assisted Review 不得因"审核"身份获得超出既有 Feedback/ValidationResult（Auto 层级）以外的额外权限，Reject 决策不得绕过 Human/Policy Gate 自动阻断 Worktree 生命周期。
 ```
 
 ---
@@ -1190,6 +1306,10 @@ ARCH-OBL-DEV-006  Observed State
 | UC-DEV-010 | 创建 Commit / PR / MR |
 | UC-DEV-011 | 多个 Worktree 同时修改代码并产生 Conflict Warning |
 | UC-DEV-012 | Agent A Handoff 给 Agent B |
+| UC-DEV-013 | Project 配置 WorkItem 状态转换 Guard，要求关联 DesignArtifact 先 APPROVED（§8.3，线程 C） |
+| UC-DEV-014 | Reviewer 对 DesignArtifact 执行 CrossReview 并 Approve/RequestChanges（§8.3、27.4，线程 C） |
+| UC-DEV-015 | Developer 按 Level（単体/結合/総合/受入）查看某 WorkItem 的测试覆盖缺口（§27.6，线程 C） |
+| UC-DEV-016 | 运维人员登记 IncidentRecord 并关联到修复 WorkItem，追溯根因 ChangeSet（§29.1，线程 C） |
 
 ---
 
@@ -1235,8 +1355,12 @@ And    系统不得因为 Feedback 自动修改未经授权的其他 Worktree
 ```text
 Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 → Worktree → Agent Session → Context Packet → ChangeSet → Feedback
-→ Validation Evidence → Commit → PR / MR → Acceptance
+→ Review Record → Validation Evidence → Commit → PR / MR → Acceptance
 ```
+
+`Review Record`（§27.4，per 线程 B 拍板补入）插在 Feedback 与 Validation Evidence 之间：ReviewRecord 消费 ChangeSet + 已有 Feedback，产出新的 Finding（回流成 Feedback）与 `ValidationResult(Type=Review)`（汇入 Validation Evidence），不打断原有追踪链方向。
+
+`Design Artifact`（§8.3，per 线程 C 拍板补入）挂在链条最前端，`Business Requirement → WorkItem` 之后、`Worktree` 之前：DesignArtifact APPROVED（经 §27.4 ReviewRecord 批准）可作为 WorkItem 状态转换 Guard（§8.2 REQ-WF-003）的前置条件，非强制串接，Project 可选择不启用。`Incident Record`（§29.1，per 线程 C 拍板补入）挂在链条末端 `Acceptance` 之后，反向指回 `WorkItem`/`ChangeSet`/`Acceptance Criteria`，形成"生产事件 → 根因 → 修复 → 再验证"的回溯支线，不改变原有正向链条方向。`Validation Evidence` 的 Level 维度（§27.6，per 线程 C 拍板补入）是对既有节点的字段扩展，不新增链条节点。
 
 这条 Traceability Chain 是系统差异化核心（§79），也是第 105 章要求的《基本设计书》继承基础。
 
@@ -1277,6 +1401,10 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | `LRT-xxx` | Local Runtime Requirement |
 | `SEC-xxx` | 安全 / 隔离边界 Requirement（跨 Tenant/Repository/Worktree Leakage 防护，见第 16 章） |
 | `WI-xxx` | WorkItem 属性 Requirement（Labels / Components 等 WorkItem 字段语义，§8.1） |
+| `RVW-xxx` | Review Requirement（自审 / 交叉审核 / Agent-Assisted Review，第 27.4-27.5 章，per brainstorming 线程 B） |
+| `DSG-xxx` | Design Artifact Requirement（设计书生命周期与批准 Guard，第 8.3 章，per brainstorming 线程 C） |
+| `TST-xxx` | Test Level Requirement（単体/結合/総合/受入 Level 维度，第 27.6 章，per brainstorming 线程 C） |
+| `OPS-xxx` | Incident Record Requirement（生产事件追溯，第 29.1 章，per brainstorming 线程 C） |
 
 ### 41.2 关键 P0 Requirement 登记表（§63）
 
@@ -1293,10 +1421,16 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | CTX-001 | 系统必须能够根据任务自动生成 Context Packet | 第 26.1 章 | ARCH-OBL-DEV-002 |
 | CTX-002 | Context Packet 必须保留来源追踪信息 | 第 26.3 章 | ARCH-OBL-DEV-002 |
 | VAL-001 | Agent 完成状态不能仅以 Agent 自我报告作为依据 | 第 27.3 章 | ARCH-OBL-DEV-005 |
+| RVW-001 | 系统必须在 Worktree 进入 `READY_FOR_REVIEW` 前提供 Self-Review Checklist Gate | 第 22.7、27.4-27.5 章 | ARCH-OBL-DEV-005/007 |
+| RVW-002 | 系统必须支持 Reviewer ≠ Author 的 Cross-Review 指派与 Approve/RequestChanges/Reject 决策记录 | 第 27.4-27.5 章 | ARCH-OBL-DEV-007 |
 | SCM-001 | GitHub / GitLab 必须通过统一 SCM Adapter 接入 | 第 19.1 章 | ARCH-OBL-DEV-003 |
 | LRT-001 | Local Runtime 必须经过身份认证和设备授权 | 第 23.2 章 | ARCH-OBL-DEV-004 |
 | LRT-002 | SaaS 不得获得任意本地 Shell 执行能力 | 第 23.2 章 | ARCH-OBL-DEV-004 |
 | SEC-xxx | 必须防止 Cross-Tenant / Cross-Repository / Cross-Worktree Context Leakage | 第 16、28.3、34 章 | ARCH-OBL-DEV-001/002 |
+| DSG-001 | 系统必须支持为 WorkItem 关联 0..N 个 DesignArtifact，并跟踪独立 Status 与 Version 历史 | 第 8.3 章 | ARCH-OBL-DEV-001 |
+| DSG-002 | 系统必须支持将"关联 DesignArtifact 全部 APPROVED"设为既有 WorkItem 状态转换 Guard 的前置条件 | 第 8.2、8.3 章 | ARCH-OBL-DEV-001 |
+| TST-001 | 系统必须支持 ValidationResult 携带 Level 字段（単体/結合/総合/受入），并按 Level 聚合测试覆盖 | 第 27.6 章 | ARCH-OBL-DEV-005 |
+| OPS-001 | 系统必须支持登记 IncidentRecord 并关联到修复 WorkItem，追溯"生产问题 → 根因 ChangeSet → 修复 → 验证证据" | 第 29.1 章 | ARCH-OBL-DEV-002/005 |
 
 本文档第 1-17 章新增的基础 Requirement（`REQ-TWP-xxx / REQ-WF-xxx / REQ-PLAN-xxx / REQ-COLLAB-xxx / REQ-PERM-xxx / REQ-AUTO-xxx / REQ-NOTIF-xxx / REQ-SEARCH-xxx / REQ-DATA-xxx / REQ-RT-xxx / REQ-SEC-xxx / REQ-AUDIT-xxx / REQ-WI-xxx`）与 Vibe Coding 扩展 P0 Requirement 共同构成完整 ID 登记表，下游《基本设计书》须逐项继承。
 
@@ -1362,7 +1496,11 @@ Agent
 
 ### E. Traceability Model
 
+（本图为主链简化版，完整链条含 Review Record / Design Artifact / Incident Record 分支，见 §39）
+
 ```text
+(Design Artifact，可选前置，§8.3)
+↓
 Requirement
 ↓
 WorkItem
@@ -1373,9 +1511,13 @@ AgentSession
 ↓
 Change
 ↓
+Review Record（§27.4）
+↓
 Validation
 ↓
 PR/MR
+↓
+(Incident Record，可选回溯分支，反向指回 WorkItem/Change/Validation，§29.1)
 ```
 
 ---
@@ -1625,8 +1767,8 @@ WorkItem ≠ Git Branch ≠ Worktree ≠ AgentSession
 本要件定义书完成后停止，**不进入生产代码编写，不将要求偷换为技术实现**（§105）。下一阶段《基本设计书（基本設計書）》必须继承以下产出：
 
 ```text
-Requirement ID（第 41 章登记表，含 REQ-xxx / DEV-xxx / WT-xxx / AGT-xxx / FBK-xxx / CTX-xxx / VAL-xxx / SCM-xxx / LRT-xxx / SEC-xxx）
-Architecture Obligation（第 35 章 ARCH-OBL-DEV-001~006，及原有 ARCH-OBL 登记表）
+Requirement ID（第 41 章登记表，含 REQ-xxx / DEV-xxx / WT-xxx / AGT-xxx / FBK-xxx / CTX-xxx / VAL-xxx / SCM-xxx / LRT-xxx / SEC-xxx / RVW-xxx / DSG-xxx / TST-xxx / OPS-xxx）
+Architecture Obligation（第 35 章 ARCH-OBL-DEV-001~007，及原有 ARCH-OBL 登记表）
 ADR Candidate（第 32 章）
 PoC Result（第 31 章，需在基本设计前实际执行并记录结果）
 Risk（第 33 章）
@@ -1637,8 +1779,10 @@ Worktree Lifecycle（第 22.2 章）
 Agent Policy（第 24.3 章）
 Feedback Model（第 25 章）
 Context Model（第 26 章）
-Validation Model（第 27 章）
+Validation Model（第 27 章，含 Review Record 第 27.4-27.5 章、Test Level 第 27.6 章）
 SCM Integration Contract（第 18-19 章）
+Design Artifact Model（第 8.3 章，含批准 Guard 与 ReviewRecord 挂接关系）
+Incident Record Model（第 29.1 章，须与 §30.6 Non-Goals 边界声明一并继承）
 ```
 
 《基本设计书》阶段建议输入清单还应包括：Persona 与 Use Case 清单（第 3、36 章）、Acceptance Criteria 示例集（第 37 章）、Traceability Model（第 39 章）、决策表 A-O（第 46 章）、以及本文档第 0 章列出的与原文档待核对项。
