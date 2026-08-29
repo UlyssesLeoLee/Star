@@ -1571,4 +1571,5 @@ pub mod subscribe_integration;
 
 pub mod spawn_upload_integration;
 pub mod spawn_upload_hub;
+pub mod e2e_integration;
 
