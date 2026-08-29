@@ -45,6 +45,12 @@ export interface GanttBarProps {
   onClick?: () => void;
   /** (newStart ISO, newEnd ISO) — parent 决定是否接受 */
   onDragEnd?: (newStart: string, newEnd: string) => void;
+  /**
+   * 拖动冲突检测 (per MS Project task link constraint, 2026-08-29 18:48 JST)
+   * 返回 string 错误信息 = 冲突, 阻止 onDragEnd 触发, bar 红色 flash 1.5s
+   * 返回 null = 无冲突, 正常 onDragEnd
+   */
+  onCheckConflict?: (newStart: string, newEnd: string) => string | null;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -84,6 +90,7 @@ export function GanttBar(props: GanttBarProps) {
     isCritical = false,
     onClick,
     onDragEnd,
+    onCheckConflict,
   } = props;
 
   const start = parseISO(startDate);
@@ -96,6 +103,8 @@ export function GanttBar(props: GanttBarProps) {
 
   const [dragDelta, setDragDelta] = useState(0);
   const [resizeWidth, setResizeWidth] = useState(0);
+  // 冲突状态: 拖动冲突时显示红色 flash 1.5s, 阻止 onDragEnd 写入 (per 2026-08-29 19:14 JST 接入)
+  const [conflictMsg, setConflictMsg] = useState<string | null>(null);
   // dragMode 决定本次拖动语义: "move" 整体平移 / "resize-left" 左把手改 start / "resize-right" 右把手改 end
   const dragModeRef = useRef<"move" | "resize-left" | "resize-right">("move");
   const isDraggingRef = useRef(false);
@@ -159,11 +168,30 @@ export function GanttBar(props: GanttBarProps) {
               }
             }
           }
-          onDragEnd?.(
-            format(newStart, "yyyy-MM-dd"),
-            // GanttBar endDate 是 exclusive, 加 1 天转回 inclusive
-            format(addDays(newEnd, 1), "yyyy-MM-dd"),
-          );
+          // 冲突检查 (per 2026-08-29 19:14 JST): 拖动前先看 predecessor.end 是否冲突
+          if (onCheckConflict) {
+            const msg = onCheckConflict(
+              format(newStart, "yyyy-MM-dd"),
+              format(addDays(newEnd, 1), "yyyy-MM-dd"),
+            );
+            if (msg) {
+              // 冲突: 红色 flash 1.5s, 不调 onDragEnd (不写 store)
+              setConflictMsg(msg);
+              setTimeout(() => setConflictMsg(null), 1500);
+            } else {
+              onDragEnd?.(
+                format(newStart, "yyyy-MM-dd"),
+                // GanttBar endDate 是 exclusive, 加 1 天转回 inclusive
+                format(addDays(newEnd, 1), "yyyy-MM-dd"),
+              );
+            }
+          } else {
+            // 无 conflict check, 兼容旧行为
+            onDragEnd?.(
+              format(newStart, "yyyy-MM-dd"),
+              format(addDays(newEnd, 1), "yyyy-MM-dd"),
+            );
+          }
         }
         setDragDelta(0);
         setResizeWidth(0);
@@ -208,7 +236,13 @@ export function GanttBar(props: GanttBarProps) {
     whiteSpace: "nowrap",
     userSelect: "none",
     cursor: onDragEnd ? (isDragging ? "grabbing" : "grab") : "pointer",
-    boxShadow: isCritical ? "0 0 10px rgba(255, 51, 102, 0.8), 0 0 0 1px #ff3366" : "0 1px 4px rgba(0, 0, 0, 0.25)",
+    // 冲突 flash (per 2026-08-29 19:14 JST): 红色 box-shadow + 0.7 opacity 1.5s
+    boxShadow: conflictMsg
+      ? "0 0 16px rgba(255, 51, 102, 1), 0 0 0 2px #ff3366"
+      : isCritical
+        ? "0 0 10px rgba(255, 51, 102, 0.8), 0 0 0 1px #ff3366"
+        : "0 1px 4px rgba(0, 0, 0, 0.25)",
+    opacity: conflictMsg ? 0.7 : 1,
     transform: isMilestone ? "rotate(45deg)" : undefined,
     transformOrigin: "center",
   };
@@ -225,7 +259,12 @@ export function GanttBar(props: GanttBarProps) {
       data-bar-status={item.status}
       data-bar-variant={variant}
       data-bar-critical={isCritical ? "true" : "false"}
-      title={`${item.label} — ${text}${isCritical ? " (critical path)" : ""} (拖动移动 / 两端把手拉长缩短)`}
+      data-bar-conflict={conflictMsg ? "true" : "false"}
+      title={
+        conflictMsg
+          ? `⚠ ${conflictMsg}`
+          : `${item.label} — ${text}${isCritical ? " (critical path)" : ""} (拖动移动 / 两端把手拉长缩短)`
+      }
       style={style}
       onMouseDown={(e) => {
         // 把 target.dataset.mode 注入到 e.currentTarget, 让 handleMouseDown 读到
