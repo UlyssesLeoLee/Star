@@ -96,6 +96,7 @@ export default function ProjectsPage() {
   const sprints = useStore((s) => s.sprints);
   const milestones = useStore((s) => s.milestones);
   const board = useStore((s) => s.board);
+  const relations = useStore((s) => s.relations);
   const identities = useStore((s) => s.identities);
   const workspaces = useStore((s) => s.workspaces);
   const agentSessions = useStore((s) => s.agentSessions);
@@ -148,6 +149,20 @@ export default function ProjectsPage() {
   const projectMilestones = useMemo(
     () => milestones.filter((m) => m.project_id === selectedProjectId),
     [milestones, selectedProjectId],
+  );
+  // 任务依赖关系 (per MS Project task link, 2026-08-29 17:33 JST)
+  // 过滤: from_id / to_id 是本项目的 work_item / sprint / milestone
+  const projectRelations = useMemo(
+    () => {
+      const wiIds = new Set(projectWorkItems.map((w) => w.id));
+      const sprintIds = new Set(projectSprints.map((s) => s.id));
+      const msIds = new Set(projectMilestones.map((m) => m.id));
+      const known = new Set([...wiIds, ...sprintIds, ...msIds]);
+      return relations.filter(
+        (r) => known.has(r.from_id) || known.has(r.to_id),
+      );
+    },
+    [relations, projectWorkItems, projectSprints, projectMilestones],
   );
   const projectWorkspaces = useMemo(
     () => workspaces.filter((w) => w.project_id === selectedProjectId),
@@ -412,6 +427,7 @@ export default function ProjectsPage() {
             sprints={projectSprints}
             milestones={projectMilestones}
             workItems={projectWorkItems}
+            relations={projectRelations}
             dateRange={ganttDateRange}
             onMilestoneUpdate={handleMilestoneUpdate}
             onSprintUpdate={handleSprintUpdate}

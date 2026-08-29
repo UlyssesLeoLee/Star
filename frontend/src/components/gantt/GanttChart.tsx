@@ -34,6 +34,8 @@ export interface GanttChartProps {
   sprints: Sprint[];
   milestones: Milestone[];
   workItems: WorkItem[];
+  /** 任务依赖关系 (per MS Project task link), 用于渲染 SVG 箭头 + 检测拖动冲突 */
+  relations?: import("@/types/ids").Relation[];
   dateRange: { start: string; end: string };
   onMilestoneUpdate?: (id: string, newDueDate: string) => void;
   onSprintUpdate?: (id: string, newStart: string, newEnd: string) => void;
@@ -59,7 +61,7 @@ function workItemStatusToBarStatus(s: WorkItemStatus): GanttBarStatus {
 
 export function GanttChart(props: GanttChartProps) {
   const {
-    sprints, milestones, workItems, dateRange,
+    sprints, milestones, workItems, relations = [], dateRange,
     onMilestoneUpdate, onSprintUpdate, onWorkItemMove,
   } = props;
 
@@ -76,6 +78,106 @@ export function GanttChart(props: GanttChartProps) {
   const criticalIds = useMemo(() => {
     return new Set(milestones.filter((m) => m.progress < 0.5).map((m) => m.id));
   }, [milestones]);
+
+  // 任务依赖 link 渲染 (per MS Project task link 设计, 2026-08-29 17:33 JST)
+  // 计算每条 work_item->work_item blocks/relates_to/duplicates 关系的源点 / 终点坐标
+  // 行高: sprint row 12px (h-12), milestone row 10px (h-10), 行间距 8px
+  const ROW = { sprint: 48, ms: 40, gap: 8 } as const;
+  const rowOffsets = useMemo(() => {
+    // 按 id 找行, sprint 用 sprint_id, milestone 用 milestone row index
+    // 但 workItem link 可能跨 sprint, 行高用 rowIndex 算
+    const wiById = new Map(workItems.map((w) => [w.id, w]));
+    const sprintById = new Map(sprints.map((s) => [s.id, s]));
+    const sprintIdx = new Map(sprints.map((s, i) => [s.id, i]));
+    const msIdx = new Map(milestones.map((m, i) => [m.id, i]));
+
+    // 对每个 workItem, 它在 gantt 的 y 坐标 = sprint 行 (因为 wi 是 sprint 的子元素, 但实际
+    // 渲染在 sprint 行内顶部, 这里用 sprint row top)
+    // 但 wi 有 sprint_id 也有 start_date/end_date, 跨 sprint 拖动时用 sprint 索引
+    const chartStart = parseISO(dateRange.start);
+
+    const result: Record<string, { x: number; y: number; end_x: number; rowTop: number }> = {};
+    for (const sp of sprints) {
+      const i = sprintIdx.get(sp.id) ?? 0;
+      const top = i * (ROW.sprint + ROW.gap);
+      const spStart = parseISO(sp.start_date);
+      const spEnd = parseISO(addDays(parseISO(sp.end_date), 1).toISOString());
+      result[sp.id] = {
+        x: Math.max(0, differenceInDays(spStart, chartStart)) * pxPerDay,
+        y: top + ROW.sprint / 2,
+        end_x: Math.max(0, differenceInDays(spEnd, chartStart)) * pxPerDay,
+        rowTop: top,
+      };
+    }
+    for (const ms of milestones) {
+      const i = msIdx.get(ms.id) ?? 0;
+      const top = sprints.length * (ROW.sprint + ROW.gap) + ROW.gap + i * (ROW.ms + ROW.gap);
+      const msDate = parseISO(ms.due_date);
+      result[ms.id] = {
+        x: Math.max(0, differenceInDays(msDate, chartStart)) * pxPerDay,
+        y: top + ROW.ms / 2,
+        end_x: result[ms.id]?.x ?? 0,
+        rowTop: top,
+      };
+    }
+    return result;
+  }, [workItems, sprints, milestones, dateRange.start, pxPerDay]);
+
+  // SVG link 列表: 从 relations 过滤 work_item->work_item + work_item->milestone + milestone->work_item
+  // 用 FS (Finish-to-Start) 风格箭头
+  const links = useMemo(() => {
+    const out: Array<{
+      id: string;
+      fromId: string;
+      toId: string;
+      kind: string;
+      fromX: number;
+      fromY: number;
+      toX: number;
+      toY: number;
+    }> = [];
+    for (const r of relations) {
+      if (r.kind === "parent_of" || r.kind === "cloned_from") continue; // 父级关系, 不画箭头
+      const from = rowOffsets[r.from_id];
+      const to = rowOffsets[r.to_id];
+      if (!from || !to) continue;
+      out.push({
+        id: r.id,
+        fromId: r.from_id,
+        toId: r.to_id,
+        kind: r.kind,
+        fromX: from.end_x,  // 箭头从 from.end 出发 (FS 风格)
+        fromY: from.y,
+        toX: to.x,         // 箭头指向 to.start
+        toY: to.y,
+      });
+    }
+    return out;
+  }, [relations, rowOffsets]);
+
+  // 拖动冲突检测 (per MS Project FS link): workItem 新 start 不能早于所有 predecessor.end
+  // (per 2026-08-29 17:33 JST 增强, 避免 dependency 冲突)
+  const checkWorkItemConflict = useCallback(
+    (workItemId: string, newStart: string, newEnd: string): string | null => {
+      // 找 workItem 的所有 predecessor
+      const preds = relations.filter(
+        (r) => r.to_id === workItemId && (r.kind === "blocks" || r.kind === "relates_to"),
+      );
+      if (preds.length === 0) return null;
+      for (const p of preds) {
+        // predecessor 是 work_item, 找它的 sprint (wi.start_date = sp.start_date, wi.end_date = sp.end_date)
+        const wi = workItems.find((w) => w.id === p.from_id);
+        if (!wi || !wi.sprint_id) continue;
+        const sp = sprints.find((s) => s.id === wi.sprint_id);
+        if (!sp) continue;
+        if (newStart < sp.end_date) {
+          return `依赖冲突: predecessor ${wi.key || wi.id} (${sp.name}) 结束于 ${sp.end_date}, 当前任务不能早于此`;
+        }
+      }
+      return null;
+    },
+    [relations, workItems, sprints],
+  );
 
   // work items 按 sprint_id 分组 (跨 sprint 拖动)
   const workItemsBySprint = useMemo(() => {
@@ -127,6 +229,15 @@ export function GanttChart(props: GanttChartProps) {
           <span className="ml-2 text-[10px] text-ink-mute font-mono">
             {totalDays}d · {pxPerDay}px/day · {totalWidth}px
           </span>
+          {links.length > 0 && (
+            <span
+              data-testid="gantt-link-count"
+              className="ml-2 text-[10px] font-mono text-accent border border-accent/40 bg-accent/10 px-1.5 py-0.5 rounded"
+              title={`任务依赖链接数: ${links.length} 条 (per MS Project task link)`}
+            >
+              🔗 {links.length} link{links.length !== 1 ? "s" : ""}
+            </span>
+          )}
         </div>
         <GanttLegend />
       </div>
@@ -295,6 +406,72 @@ export function GanttChart(props: GanttChartProps) {
                 </div>
               );
             })}
+
+            {/* SVG link 渲染层 (per MS Project task link, 2026-08-29 17:33 JST) */}
+            <svg
+              data-testid="gantt-link-layer"
+              width={totalWidth}
+              height={(sprints.length * (ROW.sprint + ROW.gap)) + ROW.gap + (milestones.length * (ROW.ms + ROW.gap))}
+              style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
+            >
+              <defs>
+                {/* 箭头 marker (per MS Project FS link) */}
+                <marker
+                  id="gantt-arrow-blocks"
+                  viewBox="0 0 8 8"
+                  refX="6"
+                  refY="4"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 8 4 L 0 8 z" fill="#f85149" />
+                </marker>
+                <marker
+                  id="gantt-arrow-relates"
+                  viewBox="0 0 8 8"
+                  refX="6"
+                  refY="4"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 8 4 L 0 8 z" fill="#6e7681" />
+                </marker>
+                <marker
+                  id="gantt-arrow-duplicates"
+                  viewBox="0 0 8 8"
+                  refX="6"
+                  refY="4"
+                  markerWidth="6"
+                  markerHeight="6"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 8 4 L 0 8 z" fill="#d29922" />
+                </marker>
+              </defs>
+              {links.map((l) => {
+                // 绘制 L 型折线: 从 (fromX, fromY) 水平到中点, 然后垂直到 toY, 水平到 toX
+                const midX = (l.fromX + l.toX) / 2;
+                const color = l.kind === "blocks" ? "#f85149" :
+                              l.kind === "duplicates" ? "#d29922" : "#6e7681";
+                const marker = l.kind === "blocks" ? "url(#gantt-arrow-blocks)" :
+                              l.kind === "duplicates" ? "url(#gantt-arrow-duplicates)" :
+                              "url(#gantt-arrow-relates)";
+                return (
+                  <g key={l.id} data-link-id={l.id} data-link-kind={l.kind}>
+                    <path
+                      d={`M ${l.fromX} ${l.fromY} L ${midX} ${l.fromY} L ${midX} ${l.toY} L ${l.toX} ${l.toY}`}
+                      fill="none"
+                      stroke={color}
+                      strokeWidth="1.5"
+                      strokeDasharray={l.kind === "relates_to" ? "4 2" : "none"}
+                      markerEnd={marker}
+                    />
+                  </g>
+                );
+              })}
+            </svg>
           </div>
         </div>
       </div>
