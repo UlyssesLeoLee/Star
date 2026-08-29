@@ -57,6 +57,10 @@ docs.untracked.bak/
 /patch_probe_exec.py
 /patch_tcp.py
 /restart_wt.sh
+
+# 根目录源素材 (per 2026-08-29 favicon 替换 commit 80a2295: icon.png 已优化成 4 个 size 入 frontend/, 根目录源文件不再入 git)
+/icon.png
+/_ARCHIVED_resize_icon.py
 /seed_5db.sh
 /seed_5db_v2.sh
 /sign_raci.py

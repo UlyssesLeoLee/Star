@@ -54,19 +54,29 @@
 
 **5 个分组, 最多 2 层展开, 避免认知爆炸**:
 
+> **v0.2 修订** (2026-08-29, per Ulysses "A2" 拍板 — 线程 A: 导航 / IA 重排): v0.1 的 Home 组只有"个人待办"类条目, 未覆盖 Worktree Control Center / Agent / Feedback / Validation — 与 `requirements.md` §4/§82/§99 "Worktree Control Center 才是系统架构中心, AI Chat 不是" 的既定原则相冲突, 也未落实 `Sidebar.tsx` 现有 `core` 标记机制的产品意图。v0.2 不新增分组 (仍是 5 组, 不破坏 §3 规则 1/2), 只重排 Home 组内部结构: 把 Worktree/Agent/Feedback/Validation 提升为 Home 内**常驻置顶、不可折叠**的核心区, 个人待办类条目下沉为默认折叠的次级子块。
+
 ```
 🏠 Home
-   - 我的工作 (assigned to me)
-   - 提及我 (@me)
-   - 已关注 (watching)
-   - 草稿 (drafts, 3)
+   ── 核心 (pinned, 常驻展开, accent 边框 + 实时徽章, 不受"折叠记忆"约束) ──
+   ⚡ Worktree 控制中心    (运行中 N)
+   🤖 Agent               (活跃 N)
+   💬 Feedback            (待响应 P0/P1 N)
+   ✅ Validation           (待处理 N)
+   🛡 Review / 自审交叉审核  (待审 N — 线程 B 已完成设计, 见 `requirements.md` §27.4-27.5 ReviewRecord / RVW-001/002, 落地页 = ReviewRecord 列表按 Status 分组)
+   ── 个人 (默认折叠为 1 行摘要 "个人 (4) ▸", 点击展开) ──
+   我的工作 (assigned to me)
+   提及我 (@me)
+   已关注 (watching)
+   草稿 (drafts, 3)
 
 📂 项目 (5)
    - 折叠/展开, 显示 Pinned 3 个
+   - 进入项目后默认视图 = 看板 (原独立 /board 页面降级为项目内视图, 见 §1.3 与 §1.2.1)
    - + 新建项目
 
 👁 视图 (3)
-   - 看板 / 时间线 / 列表 / 日历 / 概览
+   - 看板 / 时间线 / 列表 / 日历 / 概览 (项目内视图预设)
    - 视图预设 (我保存的 3 个)
 
 🔍 筛选 (4)
@@ -74,17 +84,62 @@
    - 团队共享筛选
    - 全局默认筛选 (未分配 / 高优 / 即将到期)
 
-⚙ 管理 (1)
-   - 自动化规则 (12)
-   - 通知设置
-   - 集成 (8)
+⚙ 管理 (4 个二级子组, 收纳现有 26 路由中的非核心项 — 完整映射见 §1.2.1)
+   - 组织: Tenant / Identity / Permission / Workspace
+   - 集成: SCM / Integration / Notification
+   - 运维: Local Runtime / Audit / Automation / Collaboration
+   - 开发者 (内部调试页, 候选移出终端用户可见导航): Development / Workflow / Relation / Context
 ```
 
 **交互原则**:
-- 折叠 = 记忆, 不重置
+- 折叠 = 记忆, 不重置 (核心区例外, 见下)
 - Pinned 项 = 顶置, 上限 3 个
 - 数字徽章 = 真实计数, 不模糊 (区别于 Notion 的 "9+")
 - 键盘导航: `j/k` 上下, `Enter` 进入, `Space` 多选, `Cmd+B` 折叠整栏
+
+**核心区新增原则** (per §3 规则 1 每屏 ≤7±2 校验: Home 默认展开态 = 5 核心 + 1 "个人"折叠摘要行 = 6 个信息块, 在规则允许范围内):
+- 核心区五项 (Worktree / Agent / Feedback / Validation / Review) 常驻展开, 不参与 Home 组的折叠状态记忆
+- 徽章数字来自 `domain-worktree` / `domain-agent` / `domain-feedback` / `domain-validation` / `domain-review`（新增, 对应 `requirements.md` §27.4 ReviewRecord）的实时计数, 遵守 §3 规则 9
+- 视觉treatment复用 `Sidebar.tsx` 现有 `NavItem.core` 机制 (accent 左边框 + "core" 徽标), 无需新增 UI 原语
+
+### §1.2.1 现有 26 路由 → v0.2 分组映射 (per 线程 A 决策记录)
+
+| 现路由 | 现分组 (`Sidebar.tsx`) | v0.2 目标位置 | 备注 |
+|---|---|---|---|
+| `/` | Overview | Home (落地页) | 点击 Home 默认渲染 Worktree 控制中心为 MainWorkArea 首屏, 呼应 §99 |
+| `/board` | Pinned (`core`) | 项目 → 项目内默认视图 | 独立顶级页面降级为项目视图族一员, 见 §1.3 表格 |
+| `/worktree` | Worktree/Agent (B) | **Home → 核心** | 保留独立路由, 仅导航位置上移 |
+| `/agent` | Worktree/Agent (B) | **Home → 核心** | 同上 |
+| `/feedback` | Worktree/Agent (B) | **Home → 核心** | 同上 |
+| `/validation` | Worktree/Agent (B) | **Home → 核心** | 同上 |
+| `/context` | Worktree/Agent (B) | 管理 → 开发者 (过渡) | 长期应并入 Agent 详情页 ContextPanel, 不做独立顶级导航 |
+| `/tenant` | Foundational (D) | 管理 → 组织 | |
+| `/identity` | Foundational (D) | 管理 → 组织 | |
+| `/permission` | Work Mgmt (D) | 管理 → 组织 | |
+| `/workspace` | Meta (E) | 管理 → 组织 | |
+| `/project` | Foundational (D) | 项目 (分组落地页) | |
+| `/work-item` | Foundational (D) | 项目 (走 MainWorkArea 视图族, 非独立顶级导航) | |
+| `/comment` | Foundational (D) | 项目 → 挂靠工作项 ContextPanel "评论" Tab | 不需要独立顶级路由 |
+| `/planning` | Work Mgmt (E) | 项目 | Roadmap / 容量 / 依赖 |
+| `/scm` | Integration (C) | 管理 → 集成 | |
+| `/integration` | Integration (C) | 管理 → 集成 | |
+| `/notification` | Integration (B) | 管理 → 集成 | |
+| `/search` | Integration (B) | 视图 (仅留"我保存的搜索") | 全局搜索入口迁移到 TopBar Cmd+K, 呼应 §1.5 区域 3 |
+| `/local-runtime` | Runtime (E) | 管理 → 运维 | |
+| `/collaboration` | Runtime (E) | 管理 → 运维 | |
+| `/audit` | Runtime (E) | 管理 → 运维 | 亦是 `requirements.md` §28.2 AI Audit 落地页 |
+| `/automation` | Runtime (E) | 管理 → 运维 | |
+| `/relation` | Meta (E) | 管理 → 开发者 (过渡) | 通用关系图谱调试工具, 长期应并入 ContextPanel "关联" Tab |
+| `/workflow` | Work Mgmt (D) | 管理 → 开发者 (过渡) | 工作流编辑器, 长期应挂靠"项目设置", 而非全局顶级导航 |
+| `/development` | Work Mgmt (D) | 管理 → 开发者 (过渡, **用途待确认**) | 缺标比错标: 未能从代码确认此页面的终端用户价值, 需要下一轮单独向 Ulysses 确认是否应保留在用户可见导航 |
+
+**导航深度校验** (per §3 规则 2, ≤3 级): `Home → 核心 → Worktree` = 2 级; `管理 → 组织 → Tenant` = 2 级 (组 → 子组 → 页面均落在硬约束内)。
+
+**已知后续工作** (per 缺标比错标安全, 不在本次线程 A 范围内, 留给实现阶段或线程 B/C):
+- `/board` 降级为项目视图、`/comment` 并入 ContextPanel、`/work-item` 并入 MainWorkArea 视图族 — 这三项是路由结构变更, 不是单纯 `Sidebar.tsx` 重排, 需要单独的实现任务
+- `/context` `/relation` `/workflow` 三项标"过渡"是因为它们当前是独立路由, 目标态是被并入其他页面的子视图, 但并入前仍需保留独立路由防止功能丢失
+- `/development` 的终端用户价值未确认, 暂归入"开发者"子组, 不代表最终定论
+- Review/自审交叉审核 的数据模型与状态机已由线程 B 补齐 (`requirements.md` §27.4-27.5), 本文档核心区条目已从"占位灰态"更新为可点击; Sidebar.tsx 落地时需新增 `/review` 路由 (当前 26 路由列表中不存在)
 
 ### §1.3 MainWorkArea (中间, 核心)
 
@@ -316,3 +371,5 @@ UI:    Inter, "Helvetica Neue", system-ui, sans-serif
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 | 初版: 三栏自适应 + 12 条认知负荷防御 + 10 个 wt 拓扑 | 2026-08-29 04:02 JST Ulysses 拍板"Star 自创（推荐）" + "补齐 P1-P3 全部" |
+| v0.2 | 2026-08-29 | Mavis 接手 agent (brainstorming 线程 A) | §1.2 SideBar 重排: Worktree/Agent/Feedback/Validation 提升为 Home 组内常驻核心区, 预留 Review 位 (线程 B); 新增 §1.2.1 现有 26 路由 → 5 组完整映射表 | Ulysses "站在用户角度…把它们重点化, 核心化, 其他功能围绕它们服务, 不要在导航内干扰用户" (brainstorming) → 拍板范围 "A2" → "只需要把设计改好并制定 spec" |
+| v0.3 | 2026-08-29 | Mavis 接手 agent (brainstorming 线程 B 自审) | §1.2 Review 条目由"占位置灰"更新为可点击 (线程 B `requirements.md` §27.4-27.5 ReviewRecord/RVW-001/002 设计已落地); 核心区计数从"4核心+1预留"改为"5核心"; 补 `domain-review` 徽章数据源; 记录 `/review` 路由缺口 (Sidebar.tsx 26 路由中不存在, 待实现阶段新增) | 自审发现 v0.2 遗留的 "REQ-REVIEW-*" 占位引用与线程 B 最终定名 (`RVW-xxx`) 不一致, 顺带同步已完成状态 |
