@@ -184,7 +184,9 @@ export function KanbanBoard({
       data-testid="kanban-board"
       className="grid gap-3"
       // grid-cols-1 mobile, 2 col tablet, 列数 dynamic 桌面 (per 2026-08-29 18:52 JST)
-      style={{ gridTemplateColumns: `repeat(${board.columns.length}, minmax(0, 1fr))` }}
+      // minmax(260px, 1fr) per 2026-08-29 19:35 JST scope-ui-only 候选第 3 项 (Board 列宽):
+      // 4 列 (260×4=1040) 1280 屏 fit, 5+ 列 → 父 main overflow-x-auto 横向滚动
+      style={{ gridTemplateColumns: `repeat(${board.columns.length}, minmax(260px, 1fr))` }}
     >
       {board.columns.map((col) => {
         const overWip =
