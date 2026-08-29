@@ -189,9 +189,9 @@ mod tests {
 
     #[test]
     fn test_parse_simple_content_chunk() {
-        let raw = r#"data: {"id":"chatcmpl-1","model":"gpt-4","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}"#;
+        let raw = "data: {\"id\":\"chatcmpl-1\",\"model\":\"gpt-4\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hello\"},\"finish_reason\":null}]}\n\n";
         let chunks = SseParser::feed_str(raw);
-        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks.len(), 1, "raw: {:?}", raw);
         let c = chunks[0].as_ref().unwrap();
         assert_eq!(c.content, "Hello");
         assert_eq!(c.model.as_deref(), Some("gpt-4"));
@@ -199,8 +199,9 @@ mod tests {
 
     #[test]
     fn test_parse_role_chunk() {
-        let raw = r#"data: {"choices":[{"delta":{"role":"assistant"}}]}"#;
+        let raw = "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n\n";
         let chunks = SseParser::feed_str(raw);
+        assert_eq!(chunks.len(), 1);
         let c = chunks[0].as_ref().unwrap();
         assert_eq!(c.role.as_deref(), Some("assistant"));
         assert_eq!(c.content, "");
@@ -208,8 +209,9 @@ mod tests {
 
     #[test]
     fn test_parse_finish_chunk() {
-        let raw = r#"data: {"choices":[{"delta":{},"finish_reason":"stop"}]}"#;
+        let raw = "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n";
         let chunks = SseParser::feed_str(raw);
+        assert_eq!(chunks.len(), 1);
         let c = chunks[0].as_ref().unwrap();
         assert_eq!(c.finish_reason.as_deref(), Some("stop"));
     }
@@ -223,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_parse_ignore_sse_comments() {
-        let raw = ": keep-alive\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}";
+        let raw = ": keep-alive\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\n";
         let chunks = SseParser::feed_str(raw);
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].as_ref().unwrap().content, "hi");
@@ -231,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_json() {
-        let raw = r#"data: {invalid json"#;
+        let raw = "data: {invalid json\n\n";
         let chunks = SseParser::feed_str(raw);
         assert_eq!(chunks.len(), 1);
         assert!(chunks[0].is_err());
