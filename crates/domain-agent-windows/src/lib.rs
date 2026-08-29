@@ -560,10 +560,13 @@ mod tests {
     fn test_inv_01_max_tabs() {
         let mut w = TaskWindow::new("Test", Uuid::new_v4(), Uuid::new_v4(), TriggerMode::Manual);
         assert!(inv_01_max_tabs(&w));
-        for _ in 0..21 {
+        // add_tab 在 20 时返回 Err, 25 次调用最多成功 20 次
+        for _ in 0..25 {
             w.add_tab(Uuid::new_v4(), "t").ok();
         }
-        assert!(!inv_01_max_tabs(&w));
+        // len 应 <= 20 (超过 20 的 add 失败), 守门仍为真
+        assert!(w.tabs.len() <= 20);
+        assert!(inv_01_max_tabs(&w));
     }
 
     #[test]

@@ -757,8 +757,9 @@ mod tests {
         let p1 = CliProfile::new_builtin(CliKind::Claude);
         let p2 = CliProfile::new_builtin(CliKind::Codex);
         assert!(inv_01_profile_unique(&[p1.clone(), p2.clone()]));
+        // 让 p3 共享 p1.id 触发不唯一
         let mut p3 = p2.clone();
-        p3.name = "dup".into();
+        p3.id = p1.id;
         assert!(!inv_01_profile_unique(&[p1, p3]));
     }
 
