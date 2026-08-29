@@ -21,6 +21,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { addDays, differenceInDays, format, parseISO } from "date-fns";
+import toast from "react-hot-toast";
 import type { WorkItemStatus, SprintStatus } from "@/types/ids";
 
 export type GanttBarStatus =
@@ -111,6 +112,11 @@ export function GanttBar(props: GanttBarProps) {
   const startXRef = useRef(0);
   const lastDeltaRef = useRef(0);
 
+  // milestone 用菱形 (CSS clip-path) — 视觉区别
+  // 提前到 useCallback handleMouseDown 之前声明, 避免 TS2448 used-before-declaration
+  // (per 2026-08-29 19:27 JST 修)
+  const isMilestone = variant === "milestone";
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (!onDragEnd) {
@@ -175,9 +181,15 @@ export function GanttBar(props: GanttBarProps) {
               format(addDays(newEnd, 1), "yyyy-MM-dd"),
             );
             if (msg) {
-              // 冲突: 红色 flash 1.5s, 不调 onDragEnd (不写 store)
+              // 冲突: bar 红色 flash 1.5s (即时视觉反馈给拖拽者) +
+              //       toast.error (顶部 right, 全局可见, 文案详细)
+              // per 2026-08-29 19:24 JST react-hot-toast 接入
               setConflictMsg(msg);
               setTimeout(() => setConflictMsg(null), 1500);
+              toast.error(`⚠ 调度冲突 — ${msg}`, {
+                duration: 4500,
+                id: `gantt-conflict-${item.id}-${Date.now()}`,
+              });
             } else {
               onDragEnd?.(
                 format(newStart, "yyyy-MM-dd"),
@@ -204,6 +216,9 @@ export function GanttBar(props: GanttBarProps) {
     [onDragEnd, start, end, pxPerDay, isMilestone],
   );
 
+  // milestone 用菱形 (CSS clip-path) — 视觉区别
+  // (isMilestone 已在 useCallback 之前声明, 见上行)
+
   const bg = isCritical ? "#f85149" : (STATUS_COLOR[item.status] ?? "#6e7681");
   const text = STATUS_TEXT[item.status] ?? String(item.status);
 
@@ -213,8 +228,6 @@ export function GanttBar(props: GanttBarProps) {
     ? Math.max(18, baseWidth)
     : Math.max(8, baseWidth + resizeWidth);
 
-  // milestone 用菱形 (CSS clip-path) — 视觉区别
-  const isMilestone = variant === "milestone";
   const height = isMilestone ? 18 : variant === "work-item" ? 10 : 24;
   const top = isMilestone ? 8 : variant === "work-item" ? 4 : 6;
   const width = displayWidth;

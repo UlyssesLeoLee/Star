@@ -320,7 +320,7 @@ export function GanttChart(props: GanttChartProps) {
                     dateRangeStart={dateRange.start}
                     pxPerDay={pxPerDay}
                     variant="sprint"
-                    onCheckConflict={checkWorkItemConflict}
+                    onCheckConflict={undefined /* sprint 不检查 predecessor, 见 workItem 渲染分支 */}
                     onClick={() => handleSprintClick(sp.id)}
                     onDragEnd={(newStart, newEnd) => {
                       // newEnd 是 +1 day (GanttBar 内部 exclusive end), 转回 inclusive

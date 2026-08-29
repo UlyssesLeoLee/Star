@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { Providers } from "./providers";
+import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
   title: "Star — Vibe Coding Work Management",
@@ -36,6 +37,25 @@ export default function RootLayout({
               <main className="flex-1 px-6 py-5 overflow-x-auto">{children}</main>
             </div>
           </div>
+          {/* Global toast: GanttBar 拖拽冲突 / Board 列删除 / 主题切换等全局反馈
+              - 暗色模式背景, 适配 next-themes
+              - duration 4000 (默认), Gantt 冲突可单独传 duration:1500
+              - position top-right 不挡 Sidebar + MainWorkArea
+              per 2026-08-29 19:24 JST 实装 */}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: "var(--color-surface-2)",
+                color: "var(--color-text)",
+                border: "1px solid var(--color-border)",
+                fontSize: "13px",
+              },
+              success: { iconTheme: { primary: "#10b981", secondary: "#fff" } },
+              error: { iconTheme: { primary: "#ff3366", secondary: "#fff" } },
+            }}
+          />
         </Providers>
       </body>
     </html>
