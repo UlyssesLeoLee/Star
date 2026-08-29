@@ -294,6 +294,8 @@
 ### 12.5 INC-SESSION-003 触发条件 (P3-B 启动时)
 
 拍板上述 7 阻塞项中**任一项**即开新 PHASE-P3-A-INC-SESSION-003.md, 步骤:
+
+> **触发条件更新 (per commit 29692a7, 2026-08-29 22:36 JST)**: B.5/B.6 阻塞项**新增 mock 备选路径** (走 wiremock 模式, 不依赖真实凭证), Ulysses 拍 "先 mock 后 real" 同样视为解锁; 7 阻塞项 → **6 阻塞项 + 1 备选 (B.5/B.6 可 mock 起步)**, 拍板路径变简单
 1. 新建 worktree (per 10:58 JST 决策, **每子项 1 wt**, 推翻原 4-7 wt 并行)
 2. worktree 内开子代理 (守门 #9 实证 RPC 不可靠, 优先 root 实装, 守门 #9 子代理授权边界写明"无证据叙事 = 禁止")
 3. 每子项单文件 4 层精简 (entity / value_object / error / service), 立即 commit 守门
@@ -324,7 +326,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | 1 | 5 tab 命名 (Kanban/Timeline/Backlog/Agents/Worktrees 是 agent 提议) | DDD Review 拍板具体名字 |
 | 2 | P3-B 9 子项 + P3-C/E/F 子项 + P3-D 范围 | 等 Ulysses 拍板 |
 | 3 | P3-A 已知 client-render bug (useSearchParams 在 client 端生效) | P3-B 阶段修 (`dynamic = 'force-dynamic'` 决策) |
-| 4 | _ARCHIVED_*.tsx 4 文件仍 untracked (Topbar/BoardTabs) | DDD Review 阶段清理 |
+| 4 | _ARCHIVED_*.tsx 4 文件仍 untracked (Topbar/BoardTabs) | 🟢 **已 commit (per `85819f3`, 2026-08-29 22:25 JST)**, tsconfig exclude `**/_ARCHIVED_*.ts(x)` 已生效, DDD Review 阶段无需清理 |
 | 5 | 守门 #6 CI 仍未配 runner (.github/workflows/ci.yml 4 job 已配) | P3-B 启动前实装 |
 
 ### 12.9 P3-B 启动前最低门槛 (per 守门 #6 + #8 + #10)
