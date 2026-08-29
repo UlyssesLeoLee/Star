@@ -133,7 +133,7 @@ impl CommitTemplate {
         );
         // 去掉 emoji 后 (符合 Conventional Commits)
         let conventional_only = format!(
-            "{}{}{}: {}{}",
+            "{}{}{}: {}",
             self.commit_type.as_str(),
             scope_part,
             bang,

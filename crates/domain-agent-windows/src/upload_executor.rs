@@ -17,7 +17,7 @@ use thiserror::Error;
 use tokio::process::Command;
 use uuid::Uuid;
 
-use super::lib::{TriggerMode, UploadStatus, UploadTask};
+use crate::{TriggerMode, UploadStatus, UploadTask};
 
 // =====================================================================
 // 1. value_object

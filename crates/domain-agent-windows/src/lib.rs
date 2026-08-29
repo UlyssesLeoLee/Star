@@ -226,6 +226,7 @@ pub struct WindowService {
     cli_port: Option<Arc<dyn CliPort>>,
 }
 
+#[async_trait::async_trait]
 pub trait CliPort: Send + Sync {
     async fn run_cli(
         &self,

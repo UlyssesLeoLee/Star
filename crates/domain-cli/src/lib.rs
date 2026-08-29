@@ -321,6 +321,8 @@ pub enum CliError {
     ApiKeyMissing(String),
     #[error("API Key 解密失败")]
     DecryptionFailed,
+    #[error("API Key 解密或 Base64 失败: {0}")]
+    DecryptionOrBase64(String),
     #[error("加密失败: {0}")]
     EncryptionFailed(String),
     #[error("Profile 不存在: {0}")]
@@ -510,12 +512,6 @@ pub fn decrypt(encoded: &str, master_key: &[u8; 32]) -> Result<String, CliError>
     let plaintext = cipher.decrypt(nonce, ciphertext)
         .map_err(|_| CliError::DecryptionFailed)?;
     String::from_utf8(plaintext).map_err(|_| CliError::DecryptionFailed)
-}
-
-impl std::fmt::Display for CliError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
-    }
 }
 
 // =====================================================================
