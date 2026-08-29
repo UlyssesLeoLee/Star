@@ -35,6 +35,50 @@ jobs:
         run: cargo fmt --all -- --check
         continue-on-error: true
 
+  e2e-integration:
+    name: e2e Integration (P3-A.5 / wt-w32)
+    runs-on: ubuntu-latest
+    # 仅 main push 触发, PR 不跑(避免频繁)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo build domain-local-runtime
+        run: cargo build -p domain-local-runtime --lib
+
+      - name: cargo test e2e_integration (serial)
+        # --test-threads=1 避免并发 e2e 抢端口
+        run: cargo test -p domain-local-runtime --lib e2e_integration -- --test-threads=1 --nocapture
+
+  cross-platform:
+    name: Cross-platform smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo build domain-local-runtime
+        run: cargo build -p domain-local-runtime --lib
+
+      - name: cargo test domain-local-runtime (skip e2e)
+        # e2e 在独立 job 跑, 这里只跑单元 test
+        run: cargo test -p domain-local-runtime --lib -- --skip e2e_integration
+
   frontend-ci:
     name: Frontend (typecheck / test / build)
     runs-on: ubuntu-latest
