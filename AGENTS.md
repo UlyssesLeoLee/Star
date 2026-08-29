@@ -112,7 +112,7 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 | 6 | **PowerShell only** | 持续 | 系统约束 (非 bash, `;` 替 `&&`, `Get-ChildItem` 替 `ls -la`, `Select-String` 替 `grep`) |
 | 7 | **0 unsafe** | 持续 | 代码守门 |
 | 8 | **不沿用 bc23d6c 叙事** | 2026-08-27 11:09 JST | Ulysses 拍板 (per AI 协作文档治理禁回溯) |
-| 9 | **不 commit 散落子代理产出** | 2026-08-27 11:09 JST | Mavis 终审后统一入库 |
+| 9 | **不 commit 散落子代理产出** | 2026-08-27 11:09 JST | Mavis 终审后统一入库; **子代理 status="succeeded" ≠ 实际成功**, 必须 `git log -p --follow <wt-branch>` 实证 worktree commit 在 main 链上 (P3-A.6/A.7 RPC 失败实证, 10 background task `net::ERR_CONNECTION_CLOSED` 但 status 报 succeeded) |
 | 10 | **代签规则应用** | 2026-08-27 07:16 JST | Ulysses 拍板 (反转 04:30 旧规则) |
 | 11 | **缺标比错标安全** | 2026-08-26 JST | Ulysses 偏好 |
 | 12 | **AI 协作文档治理** | 2026-08-26 JST | 禁回溯叙事, BAS 引用实证, 子代理授权写明 |
@@ -219,6 +219,7 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 | v0.7 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | §7 8 列扩列: 加 软参考周 (token 预算 ÷ 1.2M SRE·周上限 → 周数, 不参与 gating) + 已消耗 (从 0 起追踪实测 token); 列含义表脚 4 行说明; 行内周区间按串行/并行关系重排 (#3 标"独立并行" 因与 #1/#2 无依赖) | 2026-08-29 07:26 / 07:28 JST Ulysses 两次发令"更新原有 wbs" → 触发 v0.6 8 列扩列, 软参考周不参与 gating 避免日期 blocker agent 进度 (per 04:23 JST 拍板) |
 | v0.8 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | §7 状态/已消耗列回填: #1/#2/#3/#5 git log 实证后回填 (#1 部分完成 11 commits, #2 部分完成 4 commits, #3 已实质完成 4 commits, #5 部分完成 8+ wt merged); 每行附 commit hash 短码 (7 字符) 作为证据; 已消耗列口径从"实测 token"改为"git 实证 commit 数" (per 守门 #1 禁回溯叙事, 真实 token 待 SRE Lead 接入 token telemetry); 5 维质量门为 git 实证初评, 终评请 DDD Review | 2026-08-29 07:31 JST Ulysses 发令"要" → 解读为"回填 §7 状态/已消耗列" + per 05:32 JST 已消耗列必须 git 实证约束 |
 | v0.9 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | §7 表头 main HEAD 同步: `c1450d9` → `d044ac8` (A.26 AGENTS.md v0.8 守门派生累积规 commit 后最新 HEAD); §7 表脚追加 v0.9 增量回填段: 列出 P3-A 25 子项全部 commit 短码 (8 原始 + 17 守门) + 质量门 5/5 git 实证 + 累计 ~28.5M / 30M 软预算 + P3-B-F 7 阻塞项等 Ulysses 拍板; 守门 #1 + #12 实证补全 | 2026-08-29 15:15 JST 守门提示 "no-progress guard" 触发 → 选不依赖 P3-B 拍板的独立可推进项 (守门 #1 实证 v0.9 增量回填, 落 AGENTS.md §7 表头 + 表脚 + 修订历史) |
+| v0.10 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | §4 守门 #9 主体规则补全: 加 "子代理 status=succeeded ≠ 实际成功" 半句 + P3-A.6/A.7 RPC 失败实证 (10 background task `net::ERR_CONNECTION_CLOSED` 但 status 报 succeeded) + `git log -p --follow <wt-branch>` 实证要求; 守门 #9 从"不 commit 散落子代理产出"显式补 "必须 git 实证" 派生规 | 2026-08-29 15:21 JST 守门提示 no-progress guard 触发 → 选 §4 主体规则补全 (守门 #9 派生规从 §4.1 隐式提升到 §4 #9 主体), 不依赖 P3-B 拍板 |
 
 ---
 
