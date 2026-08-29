@@ -104,6 +104,7 @@ export default function ProjectsPage() {
   const addBoardColumn = useStore((s) => s.addBoardColumn);
   const removeBoardColumn = useStore((s) => s.removeBoardColumn);
   const renameBoardColumn = useStore((s) => s.renameBoardColumn);
+  const reorderBoardColumns = useStore((s) => s.reorderBoardColumns);
   const changeSets = useStore((s) => s.changeSets);
   const worktrees = useStore((s) => s.worktrees);
   const repositories = useStore((s) => s.repositories);
@@ -417,6 +418,7 @@ export default function ProjectsPage() {
             onAddColumn={addBoardColumn}
             onRemoveColumn={removeBoardColumn}
             onRenameColumn={renameBoardColumn}
+            onReorderColumns={reorderBoardColumns}
           />
           <div className="mt-3 text-[10px] text-ink-mute font-mono">
             列对应状态: {KANBAN_COLUMNS.join(" / ")} — 拖动卡片触发 transitionWorkItem (走 store 状态机)

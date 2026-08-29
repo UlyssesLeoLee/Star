@@ -51,6 +51,8 @@ export interface KanbanBoardProps {
   onRemoveColumn?: (status: WorkItemStatus) => void;
   /** 重命名列 (status, newName) */
   onRenameColumn?: (status: WorkItemStatus, newName: string) => void;
+  /** 拖动列重排 (fromIdx, toIdx), per 2026-08-29 19:09 JST 补 reorderBoardColumns UI */
+  onReorderColumns?: (fromIdx: number, toIdx: number) => void;
 }
 
 const KANBAN_COLUMNS_LOCAL: ReadonlyArray<WorkItemStatus> = KANBAN_COLUMNS;
@@ -67,6 +69,7 @@ export function KanbanBoard({
   onAddColumn,
   onRemoveColumn,
   onRenameColumn,
+  onReorderColumns,
 }: KanbanBoardProps) {
   const [dropTarget, setDropTarget] = useState<WorkItemStatus | null>(null);
   // 内部拖动 id 兜底, 父组件没传时本地维护
@@ -87,6 +90,44 @@ export function KanbanBoard({
     }
     setEditingCol(null);
   };
+  // 列拖动重排 (per 2026-08-29 19:09 JST)
+  // 用 HTML5 native drag: 拖到目标列 drop 时 reorder
+  const [draggingColIdx, setDraggingColIdx] = useState<number | null>(null);
+  const [dropTargetColIdx, setDropTargetColIdx] = useState<number | null>(null);
+  const handleColDragStart = useCallback((e: React.DragEvent<HTMLDivElement>, idx: number) => {
+    if (!onReorderColumns) return;
+    e.dataTransfer.setData("text/col-idx", String(idx));
+    e.dataTransfer.effectAllowed = "move";
+    setDraggingColIdx(idx);
+  }, [onReorderColumns]);
+  const handleColDragOver = useCallback((e: React.DragEvent<HTMLDivElement>, idx: number) => {
+    if (!onReorderColumns) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDropTargetColIdx(idx);
+  }, [onReorderColumns]);
+  const handleColDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>, idx: number) => {
+    const related = e.relatedTarget as Node | null;
+    if (related && (e.currentTarget as Node).contains(related)) return;
+    setDropTargetColIdx((cur) => (cur === idx ? null : cur));
+  }, []);
+  const handleColDrop = useCallback((e: React.DragEvent<HTMLDivElement>, toIdx: number) => {
+    e.preventDefault();
+    setDropTargetColIdx(null);
+    const fromIdxStr = e.dataTransfer.getData("text/col-idx");
+    if (!fromIdxStr) return;
+    const fromIdx = Number(fromIdxStr);
+    if (Number.isNaN(fromIdx) || fromIdx === toIdx) {
+      setDraggingColIdx(null);
+      return;
+    }
+    onReorderColumns?.(fromIdx, toIdx);
+    setDraggingColIdx(null);
+  }, [onReorderColumns]);
+  const handleColDragEnd = useCallback(() => {
+    setDraggingColIdx(null);
+    setDropTargetColIdx(null);
+  }, []);
 
   const workItemMap = useMemo(
     () => Object.fromEntries(workItems.map((w) => [w.id, w])),
@@ -156,21 +197,64 @@ export function KanbanBoard({
           .filter((w): w is WorkItem => Boolean(w))
           .filter((w) => (filter ? filter(w) : true));
 
+        const colIdx = board.columns.findIndex((c) => c.status === col.status);
+        const isColDragging = draggingColIdx === colIdx;
+        const isColDropTarget = dropTargetColIdx === colIdx && draggingColIdx !== null && draggingColIdx !== colIdx;
         return (
           <div
             key={col.status}
             data-testid={`kanban-column-${col.status}`}
             data-status={col.status}
-            onDragOver={(e) => handleDragOver(e, col.status)}
-            onDragLeave={(e) => handleDragLeave(e, col.status)}
-            onDrop={(e) => handleDrop(e, col.status)}
+            data-col-idx={colIdx}
+            // 拖动高亮: card drop zone (红) + col drop zone (蓝) 区分
+            onDragOver={(e) => {
+              // card drop (text/issue-id) -> 红/绿环
+              if (e.dataTransfer.types.includes("text/issue-id")) {
+                handleDragOver(e, col.status);
+              }
+              // col drop (text/col-idx) -> 蓝边
+              if (e.dataTransfer.types.includes("text/col-idx")) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                if (draggingColIdx !== colIdx) setDropTargetColIdx(colIdx);
+              }
+            }}
+            onDragLeave={(e) => {
+              handleDragLeave(e, col.status);
+              handleColDragLeave(e, colIdx);
+            }}
+            onDrop={(e) => {
+              // 路由: col 拖到 col vs card 拖到 col
+              if (e.dataTransfer.types.includes("text/col-idx")) {
+                handleColDrop(e, colIdx);
+              } else if (e.dataTransfer.types.includes("text/issue-id")) {
+                handleDrop(e, col.status);
+              }
+            }}
             className={clsx(
               "card min-h-[200px] transition-colors",
               overWip && "border-warn/60",
               isDropTarget && "ring-2 ring-accent bg-accent/10",
+              // 列重排 drop 高亮 (per 2026-08-29 19:09 JST)
+              isColDragging && "opacity-50",
+              isColDropTarget && "ring-2 ring-cyan-400 bg-cyan-500/10",
             )}
           >
-            <div className="flex items-center justify-between mb-3 gap-1">
+            {/* 列拖动手柄 (per 2026-08-29 19:09 JST, 把整列设为 draggable) */}
+            {onReorderColumns && (
+              <div
+                draggable
+                onDragStart={(e) => handleColDragStart(e, board.columns.findIndex((c) => c.status === col.status))}
+                onDragEnd={handleColDragEnd}
+                data-testid={`kanban-column-drag-handle-${col.status}`}
+                className="text-ink-mute hover:text-accent cursor-grab active:cursor-grabbing text-xs select-none"
+                title="拖动重排列"
+                aria-label={`重排列 ${col.name ?? col.status}`}
+              >
+                ⋮⋮
+              </div>
+            )}
+            <div className="flex items-center justify-between mb-3 gap-1 flex-1 min-w-0">
               {editingCol === col.status && onRenameColumn ? (
                 // Inline edit 模式 (per 2026-08-29 18:52 JST 拍板)
                 <input
