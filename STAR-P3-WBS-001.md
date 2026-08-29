@@ -263,6 +263,7 @@
 
 - 守门 #1 跨 stage: `cargo check --workspace --lib` 0 err, 28 warning (pre-existing missing documentation, 与本批 UI 改动无关)
 - 守门 #1 v8 cargo test: `cargo test -p star-mcp` 134/134 0 fail 0.17s (P3-A 阶段同 134, 本批 0 回归)
+- **守门 #1 v13 release 模式跨 stage (per 2026-08-29 21:13 JST)**: `cargo test --workspace --release --lib` **41/41 crate 0 fail 102.96s** (P3-A 收官 53.7s, +1 worker commit `98db08e` 含 15 delivery tests), 本批 frontend 0 commit 0 跨 stage regression
 - 守门 #9 子代理: 本批 0 子代理调用, 全部 root 直实装 (守门 #9 RPC 历史不可靠实证)
 - 守门 #12 docs 同步: 6 维度闭环 (PHASE-001/002 报告 / AGENTS.md §8+§10 / WBS §11 / 三份架构 doc v0.2 / README 状态表)
 
