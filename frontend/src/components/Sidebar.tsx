@@ -13,7 +13,7 @@ import {
 import { clsx } from "clsx";
 
 type IconType = React.ComponentType<{ size?: number; className?: string }>;
-type NavItem = { href: string; label: string; icon: React.ElementType; track: string };
+type NavItem = { href: string; label: string; icon: React.ElementType; track: string; core?: boolean };
 type NavGroup = { label: string; items: NavItem[] };
 
 const NAV: NavGroup[] = [
@@ -21,6 +21,12 @@ const NAV: NavGroup[] = [
     label: "Overview",
     items: [
       { href: "/",            label: "Dashboard",     icon: LayoutDashboard, track: "—",  },
+    ],
+  },
+  {
+    label: "Pinned",
+    items: [
+      { href: "/board",       label: "Board",         icon: Trello,           track: "E", core: true },
     ],
   },
   {
@@ -34,13 +40,12 @@ const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Work Management (5)",
+    label: "Work Management (4)",
     items: [
       { href: "/workflow",     label: "Workflow",      icon: Workflow,         track: "D" },
       { href: "/permission",   label: "Permission",    icon: ShieldCheck,      track: "D" },
       { href: "/development",  label: "Development",   icon: Hammer,           track: "D" },
       { href: "/planning",     label: "Planning",      icon: Calendar,         track: "E" },
-      { href: "/board",        label: "Board",         icon: Trello,           track: "E" },
     ],
   },
   {
@@ -102,12 +107,19 @@ export function Sidebar() {
                         "relative flex items-center gap-2.5 px-4 py-1.5 mx-1 rounded-md transition-all duration-150 group",
                         active
                           ? "bg-accent/15 text-accent font-medium shadow-[inset_0_0_12px_rgba(0,240,255,0.08)] border-l-2 border-accent"
-                          : "text-ink-dim hover:bg-bg-card/70 hover:text-ink border-l-2 border-transparent",
+                          : item.core
+                            ? "text-accent hover:bg-accent/10 border-l-2 border-accent/40"
+                            : "text-ink-dim hover:bg-bg-card/70 hover:text-ink border-l-2 border-transparent",
                       )}
                     >
-                      <Icon size={15} className={clsx("shrink-0 transition-transform group-hover:scale-110", active ? "text-accent" : "text-ink-dim")} />
+                      <Icon size={15} className={clsx("shrink-0 transition-transform group-hover:scale-110", (active || item.core) ? "text-accent" : "text-ink-dim")} />
                       <span className="flex-1 truncate tracking-tight">{item.label}</span>
-                      {item.track !== "—" && (
+                      {item.core && (
+                        <span className="text-[8px] font-mono uppercase tracking-wider text-accent/80 px-1 py-0.2 rounded border border-accent/40 bg-accent/5">
+                          core
+                        </span>
+                      )}
+                      {item.track !== "—" && !item.core && (
                         <span className="text-[9px] font-mono text-ink-mute px-1 py-0.2 rounded border border-line/50 bg-bg-card/80 group-hover:border-accent/30 transition-colors">
                           TRK_{item.track}
                         </span>
