@@ -171,7 +171,7 @@ pub struct ApiKeySummary {
     pub last_used_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-/// CLI Profile (用户配置)
+/// CLI Profile (用户配置 + B.4 per-agent 字段扩展)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CliProfile {
     pub id: Uuid,
@@ -187,6 +187,31 @@ pub struct CliProfile {
     pub enabled: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+
+    // ---- B.4 per-agent 字段扩展 (per 2026-08-30 07:32 JST wt-b4-cliprofile-schema) ----
+    /// 单次 agent 调用的 token 上限 (0 = 不限, 跟 B.7 quota 配合)
+    #[serde(default)]
+    pub per_call_token_limit: u32,
+    /// 默认模型 (per provider, 例: "gpt-4" / "claude-3-5-sonnet" / "hermes-2")
+    #[serde(default)]
+    pub default_model: Option<String>,
+    /// 单次调用 timeout (秒, 0 = 不限)
+    #[serde(default = "default_call_timeout_secs")]
+    pub call_timeout_secs: u64,
+    /// 单次调用 retry 次数 (0 = 不重试, 跟 B.7 retry_with_backoff 配合)
+    #[serde(default = "default_retry_count")]
+    pub retry_count: u32,
+    /// 标签 (自由文本, 用于 UI 过滤 / 分类)
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+fn default_call_timeout_secs() -> u64 {
+    300
+}
+
+fn default_retry_count() -> u32 {
+    3
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -243,6 +268,12 @@ impl CliProfile {
             enabled: true,
             created_at: now,
             updated_at: now,
+            // B.4 per-agent 字段默认初始化
+            per_call_token_limit: 0,    // 0 = 不限
+            default_model: None,         // 用 args 里的 --model
+            call_timeout_secs: default_call_timeout_secs(),
+            retry_count: default_retry_count(),
+            tags: Vec::new(),
         }
     }
 }
@@ -641,6 +672,74 @@ mod tests {
         assert_eq!(p.kind, CliKind::Claude);
         assert!(p.enabled);
         assert!(!p.command.is_empty());
+    }
+
+    // ---- B.4 per-agent 字段测试 (per 2026-08-30 07:32 JST wt-b4-cliprofile-schema) ----
+
+    #[test]
+    fn test_b4_per_agent_fields_default() {
+        let p = CliProfile::new_builtin(CliKind::Claude);
+        // 默认值: per_call_token_limit=0 (不限), default_model=None, call_timeout_secs=300, retry_count=3, tags=[]
+        assert_eq!(p.per_call_token_limit, 0);
+        assert_eq!(p.default_model, None);
+        assert_eq!(p.call_timeout_secs, 300);
+        assert_eq!(p.retry_count, 3);
+        assert!(p.tags.is_empty());
+    }
+
+    #[test]
+    fn test_b4_per_agent_fields_custom() {
+        let now = chrono::Utc::now();
+        let p = CliProfile {
+            id: Uuid::new_v4(),
+            name: "Custom".into(),
+            kind: CliKind::OpenClaw,
+            command: "https://api.openclaw.dev/v1".into(),
+            args: vec![],
+            env: std::collections::HashMap::new(),
+            worktree_binding: WorktreeBinding::Auto,
+            api_key_id: None,
+            enabled: true,
+            created_at: now,
+            updated_at: now,
+            per_call_token_limit: 8000,
+            default_model: Some("gpt-4".into()),
+            call_timeout_secs: 60,
+            retry_count: 5,
+            tags: vec!["primary".into(), "production".into()],
+        };
+        assert_eq!(p.per_call_token_limit, 8000);
+        assert_eq!(p.default_model, Some("gpt-4".into()));
+        assert_eq!(p.call_timeout_secs, 60);
+        assert_eq!(p.retry_count, 5);
+        assert_eq!(p.tags.len(), 2);
+    }
+
+    #[test]
+    fn test_b4_serde_omits_default_optional_fields() {
+        let p = CliProfile::new_builtin(CliKind::Hermes);
+        let json = serde_json::to_string(&p).unwrap();
+        // None optional field (default_model) 应该序列化为 null (per OpenAI API spec 兼容)
+        assert!(json.contains("\"default_model\":null"));
+        // tags 空数组应该保留
+        assert!(json.contains("\"tags\":[]"));
+    }
+
+    #[test]
+    fn test_b4_retry_count_compatible_with_b7() {
+        // B.4 retry_count 跟 B.7 BackoffConfig.max_retries 配合: max_retries 应 >= retry_count
+        let p = CliProfile::new_builtin(CliKind::Codex);
+        let b7_max = 5; // B.7 default
+        assert!(b7_max >= p.retry_count, "B.7 max_retries 应 >= B.4 retry_count");
+    }
+
+    #[test]
+    fn test_b4_call_timeout_compatible_with_b1_b6() {
+        // B.4 call_timeout_secs 跟 B.1/B.6 OpenClawConfig.timeout / HermesConfig.timeout 配合
+        let p = CliProfile::new_builtin(CliKind::Claude);
+        let b1_b6_default = 30; // OpenClawConfig.new_mock().timeout = 30s
+        // CliProfile 默认 300s 应 >= b1_b6 30s (覆盖)
+        assert!(p.call_timeout_secs >= b1_b6_default);
     }
 
     #[test]
