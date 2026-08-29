@@ -25,7 +25,7 @@ const LEGACY_REDIRECTS = [
   { source: "/workspace/:id", destination: "/projects/:id", permanent: false },
   { source: "/project", destination: "/projects", permanent: false },
   { source: "/board", destination: "/projects?tab=board", permanent: false },
-  { source: "/planning", destination: "/projects?tab=gantt", permanent: false },
+  { source: "/planning", destination: "/projects?tab=timeline", permanent: false },
   { source: "/scm", destination: "/projects?tab=workflow", permanent: false },
   { source: "/collaboration", destination: "/projects?tab=workflow", permanent: false },
   { source: "/workflow", destination: "/projects?tab=workflow", permanent: false },

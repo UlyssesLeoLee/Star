@@ -95,6 +95,9 @@ export function GanttBar(props: GanttBarProps) {
   const baseWidth = Math.max(8, dayCount * pxPerDay);
 
   const [dragDelta, setDragDelta] = useState(0);
+  const [resizeWidth, setResizeWidth] = useState(0);
+  // dragMode 决定本次拖动语义: "move" 整体平移 / "resize-left" 左把手改 start / "resize-right" 右把手改 end
+  const dragModeRef = useRef<"move" | "resize-left" | "resize-right">("move");
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
   const lastDeltaRef = useRef(0);
@@ -107,16 +110,26 @@ export function GanttBar(props: GanttBarProps) {
       }
       e.preventDefault();
       e.stopPropagation();
+      // 从 target 的 data-mode 读 drag 模式 (per 2026-08-29 17:33 JST MS Project 风格 resize)
+      const target = e.currentTarget as HTMLElement;
+      const mode = (target.dataset.mode as "move" | "resize-left" | "resize-right") ?? "move";
+      dragModeRef.current = mode;
       isDraggingRef.current = true;
       startXRef.current = e.clientX;
       lastDeltaRef.current = 0;
       setDragDelta(0);
+      setResizeWidth(0);
 
       const onMove = (ev: MouseEvent) => {
         if (!isDraggingRef.current) return;
         const delta = ev.clientX - startXRef.current;
         lastDeltaRef.current = delta;
-        setDragDelta(delta);
+        if (mode === "move") {
+          setDragDelta(delta);
+        } else {
+          // resize 只动 width (左把手 width=baseWidth+delta, 右把手 width=baseWidth+delta, 起点不动或不动)
+          setResizeWidth(delta);
+        }
       };
       const onUp = () => {
         if (!isDraggingRef.current) return;
@@ -124,31 +137,59 @@ export function GanttBar(props: GanttBarProps) {
         const delta = lastDeltaRef.current;
         const deltaDays = Math.round(delta / pxPerDay);
         if (deltaDays !== 0) {
-          const newStart = format(addDays(start, deltaDays), "yyyy-MM-dd");
-          const newEnd = format(addDays(end, deltaDays), "yyyy-MM-dd");
-          onDragEnd?.(newStart, newEnd);
+          let newStart = start;
+          let newEnd = end;
+          if (mode === "move") {
+            newStart = addDays(start, deltaDays);
+            newEnd = addDays(end, deltaDays);
+          } else if (mode === "resize-left") {
+            // milestone 用 due_date 一天, 不支持拉长 (start == end)
+            if (!isMilestone) {
+              newStart = addDays(start, deltaDays);
+              // 最小 1 天 (newStart 不能超过 newEnd)
+              if (newStart >= end) {
+                newStart = addDays(end, -1);
+              }
+            }
+          } else if (mode === "resize-right") {
+            if (!isMilestone) {
+              newEnd = addDays(end, deltaDays);
+              if (newEnd <= start) {
+                newEnd = addDays(start, 1);
+              }
+            }
+          }
+          onDragEnd?.(
+            format(newStart, "yyyy-MM-dd"),
+            // GanttBar endDate 是 exclusive, 加 1 天转回 inclusive
+            format(addDays(newEnd, 1), "yyyy-MM-dd"),
+          );
         }
         setDragDelta(0);
+        setResizeWidth(0);
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);
       };
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     },
-    [onDragEnd, start, end, pxPerDay],
+    [onDragEnd, start, end, pxPerDay, isMilestone],
   );
 
   const bg = isCritical ? "#f85149" : (STATUS_COLOR[item.status] ?? "#6e7681");
   const text = STATUS_TEXT[item.status] ?? String(item.status);
 
-  const isDragging = isDraggingRef.current || dragDelta !== 0;
+  const isDragging = isDraggingRef.current || dragDelta !== 0 || resizeWidth !== 0;
   const displayLeft = baseLeft + dragDelta;
+  const displayWidth = isMilestone
+    ? Math.max(18, baseWidth)
+    : Math.max(8, baseWidth + resizeWidth);
 
   // milestone 用菱形 (CSS clip-path) — 视觉区别
   const isMilestone = variant === "milestone";
   const height = isMilestone ? 18 : variant === "work-item" ? 10 : 24;
   const top = isMilestone ? 8 : variant === "work-item" ? 4 : 6;
-  const width = isMilestone ? Math.max(18, baseWidth) : baseWidth;
+  const width = displayWidth;
 
   const style: React.CSSProperties = {
     position: "absolute",
@@ -172,6 +213,11 @@ export function GanttBar(props: GanttBarProps) {
     transformOrigin: "center",
   };
 
+  // resize handle 宽度: 6px (per MS Project 风格, 鼠标 hover 时变蓝色提示可拖)
+  const HANDLE_W = 6;
+  // milestone 不渲染 handle (它只有 1 天, 不能 resize)
+  const showHandles = !isMilestone && onDragEnd;
+
   return (
     <div
       data-testid="gantt-bar"
@@ -179,9 +225,13 @@ export function GanttBar(props: GanttBarProps) {
       data-bar-status={item.status}
       data-bar-variant={variant}
       data-bar-critical={isCritical ? "true" : "false"}
-      title={`${item.label} — ${text}${isCritical ? " (critical path)" : ""}`}
+      title={`${item.label} — ${text}${isCritical ? " (critical path)" : ""} (拖动移动 / 两端把手拉长缩短)`}
       style={style}
-      onMouseDown={handleMouseDown}
+      onMouseDown={(e) => {
+        // 把 target.dataset.mode 注入到 e.currentTarget, 让 handleMouseDown 读到
+        // 实际 handle 元素的 dataset.mode = resize-left/right, move 区域 = move
+        handleMouseDown(e);
+      }}
       onClick={(e) => {
         // 拖动结束的 click 不触发
         if (lastDeltaRef.current !== 0) {
@@ -191,6 +241,52 @@ export function GanttBar(props: GanttBarProps) {
         onClick?.();
       }}
     >
+      {/* 左 resize handle: 改 start_date (move 区域外, e.stopPropagation 避免冒泡到 move) */}
+      {showHandles && (
+        <div
+          data-mode="resize-left"
+          data-resize-handle="left"
+          aria-label="拉长缩短起点"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            handleMouseDown(e);
+          }}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: HANDLE_W,
+            height: "100%",
+            cursor: "ew-resize",
+            background: "transparent",
+            // hover 时显示蓝色把手 (per MS Project 风格)
+          }}
+          className="gantt-bar-handle gantt-bar-handle-left"
+        />
+      )}
+      {/* 中间 move 区域: 整体平移 (data-mode="move", 但 div 本身已带 onMouseDown) */}
+      {/* 右 resize handle: 改 end_date */}
+      {showHandles && (
+        <div
+          data-mode="resize-right"
+          data-resize-handle="right"
+          aria-label="拉长缩短终点"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            handleMouseDown(e);
+          }}
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            width: HANDLE_W,
+            height: "100%",
+            cursor: "ew-resize",
+            background: "transparent",
+          }}
+          className="gantt-bar-handle gantt-bar-handle-right"
+        />
+      )}
       <span style={isMilestone ? { display: "block", transform: "rotate(-45deg)" } : undefined}>
         {item.label}
       </span>

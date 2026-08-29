@@ -40,6 +40,7 @@
 // =====================================================================
 
 import { useMemo, useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { PageHeader, SectionTitle, Stat } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
@@ -111,6 +112,14 @@ export default function ProjectsPage() {
     () => projects[0]?.id ?? "",
   );
   const [tab, setTab] = useState<ProjectsTabId>("overview");
+  // 同步 URL ?tab=X 到 local state (per 2026-08-29 17:42 JST 修 next.config.js redirect 后, redirect 给 tab=timeline 但 page 默认 tab=overview, 必须 useSearchParams 同步)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam && ["overview", "board", "timeline", "calendar", "members"].includes(tabParam)) {
+      setTab(tabParam as ProjectsTabId);
+    }
+  }, [searchParams]);
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
   const [calendarCursor, setCalendarCursor] = useState<{ year: number; month: number }>(() => {
     const now = new Date();

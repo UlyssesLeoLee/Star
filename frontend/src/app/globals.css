@@ -67,4 +67,19 @@ html, body {
   .table tr:hover td {
     @apply bg-bg-soft/40;
   }
+
+  /* GanttBar resize handles (per 2026-08-29 17:33 JST MS Project 风格) */
+  .gantt-bar-handle {
+    /* hover 时显示蓝色 1px 高亮, 提示可拖 (per MS Project 风格) */
+    transition: background-color 120ms ease-out;
+  }
+  .gantt-bar-handle:hover,
+  .gantt-bar-handle:active {
+    background-color: rgba(0, 240, 255, 0.55) !important; /* accent + 透明度 */
+    box-shadow: 0 0 4px rgba(0, 240, 255, 0.8);
+  }
+  /* GanttBar 整体 hover 时也让两端把手微亮 (1px 边线) */
+  [data-testid="gantt-bar"]:hover .gantt-bar-handle {
+    background-color: rgba(0, 240, 255, 0.18);
+  }
 }
