@@ -1,0 +1,26 @@
+[package]
+name = "domain-agent-windows"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Star Team"]
+license = "Apache-2.0"
+description = "Star agent task windows: 多 CLI tab 并行 + 三触发上传 (success exit / manual / polling) + worktree 绑定"
+repository = "https://github.com/UlyssesLeoLee/Star"
+
+[lints.rust]
+missing_docs = "warn"
+rust_2018_idioms = "warn"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
