@@ -737,7 +737,8 @@ mod tests {
         };
         let res = handle_resources_list(&req).unwrap();
         let arr = res.result.get("resources").unwrap().as_array().unwrap();
-        assert_eq!(arr.len(), 4);
+        // 4 core (Phase E) + 24 domain (Phase H) per handle_resources_list doc comment
+        assert_eq!(arr.len(), 28);
     }
 
     #[tokio::test]

@@ -5,8 +5,9 @@
 // 包装 next-themes, 强制 attribute=class, 避免 SSR flash.
 
 import { ThemeProvider as NextThemesProvider } from "next-themes";
-import type { ReactNode } from "react";
-import type { ThemeProviderProps as NextThemesProps } from "next-themes";
+import type { ComponentProps, ReactNode } from "react";
+
+type NextThemesProps = ComponentProps<typeof NextThemesProvider>;
 
 /** Star 主题 Provider props */
 export interface StarThemeProviderProps {
@@ -29,7 +30,7 @@ export function ThemeProvider({
   defaultTheme = "light",
   themes = ["light", "dark"],
 }: StarThemeProviderProps) {
-  const props: NextThemesProps = {
+  const props: Omit<NextThemesProps, "children"> = {
     attribute: "class",
     defaultTheme,
     enableSystem: false,

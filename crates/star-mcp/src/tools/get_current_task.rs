@@ -21,7 +21,10 @@
 //! - get_current_task 是 "current" 概念, domain-work-item 无 list_by_status helper,
 //!   用 list() 取全集后 filter status=IN_PROGRESS 取首 (P2 缺口, 真实 index 留 Phase F.4+)
 
-use domain_work_item::{ActorContext, InMemoryWorkItemService, IssueId, WorkItemStatus};
+use domain_work_item::{
+    ActorContext, InMemoryWorkItemService, ListByProjectQuery, ProjectId, UserId, WorkItemQueryPort,
+    WorkItemStatus,
+};
 use serde_json::{Value, json};
 use std::sync::{Arc, OnceLock};
 
@@ -31,18 +34,23 @@ use crate::tools::optional_string;
 /// 全 tool 共享的 in-memory work-item service (LazyLock 等价)
 fn service() -> &'static Arc<InMemoryWorkItemService> {
     static SVC: OnceLock<Arc<InMemoryWorkItemService>> = OnceLock::new();
-    SVC.get_or_init(InMemoryWorkItemService::new_for_test)
+    SVC.get_or_init(|| Arc::new(InMemoryWorkItemService::new()))
 }
 
 /// `get_current_task` tool
 pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
     // workspace_id 可选, 简化: nil actor 触发跨 tenant 拒绝 → validation "not found"
     let _ = optional_string(&args, "workspace_id");
-    let actor = ActorContext::new(uuid::Uuid::nil(), domain_work_item::TenantId::new());
+    let actor = ActorContext::new(UserId::from(uuid::Uuid::nil()), domain_work_item::TenantId::new());
 
     // 取第一个 IN_PROGRESS issue 当 current
+    let query = ListByProjectQuery {
+        tenant_id: actor.tenant_id,
+        project_id: ProjectId::new(),
+        include_terminal: false,
+    };
     let issues = service()
-        .list(actor.clone())
+        .list_by_project(query, &actor)
         .await
         .map_err(|e| McpError::validation(format!("list work-items failed: {e}")))?;
 
@@ -57,7 +65,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
             "title": current.title,
             "status": format!("{:?}", current.status),
             "workspace_id": current.workspace_id.to_string(),
-            "assignee_id": current.assignee_id.map(|a| a.to_string()),
+            "assignee_id": current.assignee_user_id.map(|a| a.to_string()),
             "priority": format!("{:?}", current.priority),
             "updated_at": current.updated_at.to_rfc3339(),
         }
@@ -86,6 +94,3 @@ mod tests {
         assert!(r.is_err());
     }
 }
-
-// stub type alias to avoid unused import warning (IssueId is referenced via json! only)
-type _IssueId = IssueId;
