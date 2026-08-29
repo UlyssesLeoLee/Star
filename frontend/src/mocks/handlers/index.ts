@@ -6,13 +6,16 @@
 export { agentsHandlers } from "./agents";
 export { analyticsHandlers } from "./analytics";
 export { inboxHandlers } from "./inbox";
+export { cliHandlers } from "./cli";
 
 import { agentsHandlers } from "./agents";
 import { analyticsHandlers } from "./analytics";
 import { inboxHandlers } from "./inbox";
+import { cliHandlers } from "./cli";
 
 export const handlers = [
   ...agentsHandlers,
   ...analyticsHandlers,
   ...inboxHandlers,
+  ...cliHandlers,
 ];
