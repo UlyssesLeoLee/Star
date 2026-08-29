@@ -136,44 +136,77 @@ impl HttpClient {
             }
         }
 
-        // 流式读取 body
+        // 流式读取 body (P3-A.2: 接入 SseParser 解析 OpenAI ChatCompletion stream)
         let mut stream = response.bytes_stream();
         let mut body = String::new();
-        let mut line_buf = String::new();
+        let mut sse_parser = super::sse_parser::SseParser::new();
+        let mut total_content = String::new();
+        let mut role_seen = false;
         while let Some(chunk) = stream.next().await {
             let chunk: Bytes = chunk.map_err(HttpError::Stream)?;
-            // 按行分割 (SSE 风格: data: xxx\n\n)
             let s = String::from_utf8_lossy(&chunk);
-            for ch in s.chars() {
-                if ch == '\n' {
-                    // 推一行给前端
-                    let line = std::mem::take(&mut line_buf);
-                    let _ = out.send(OutputLine {
-                        stream: OutputStream::Stdout,
-                        content: line,
-                        at: chrono::Utc::now(),
-                    }).await;
-                } else {
-                    line_buf.push(ch);
+            // 1. 喂给 SSE 解析器 (跨 chunk 边界安全)
+            for parsed in sse_parser.feed(&s) {
+                match parsed {
+                    Ok(c) => {
+                        if !c.content.is_empty() {
+                            total_content.push_str(&c.content);
+                            let _ = out.send(OutputLine {
+                                stream: OutputStream::Stdout,
+                                content: c.content,
+                                at: chrono::Utc::now(),
+                            }).await;
+                        }
+                        if !role_seen {
+                            if let Some(role) = &c.role {
+                                let _ = out.send(OutputLine {
+                                    stream: OutputStream::System,
+                                    content: format!("[role: {}]", role),
+                                    at: chrono::Utc::now(),
+                                }).await;
+                                role_seen = true;
+                            }
+                        }
+                        if let Some(fr) = &c.finish_reason {
+                            let _ = out.send(OutputLine {
+                                stream: OutputStream::System,
+                                content: format!("[finish: {}]", fr),
+                                at: chrono::Utc::now(),
+                            }).await;
+                        }
+                    }
+                    Err(e) => {
+                        // 单 chunk 失败: 推错误, 继续
+                        let _ = out.send(OutputLine {
+                            stream: OutputStream::System,
+                            content: format!("[sse-parse-error: {}]", e),
+                            at: chrono::Utc::now(),
+                        }).await;
+                    }
                 }
             }
             body.push_str(&s);
         }
-        // 推最后一行
-        if !line_buf.is_empty() {
-            let _ = out.send(OutputLine {
-                stream: OutputStream::Stdout,
-                content: std::mem::take(&mut line_buf),
-                at: chrono::Utc::now(),
-            }).await;
+        // 收尾: 处理残余 buffer
+        for parsed in sse_parser.finish() {
+            if let Ok(c) = parsed {
+                if !c.content.is_empty() {
+                    total_content.push_str(&c.content);
+                    let _ = out.send(OutputLine {
+                        stream: OutputStream::Stdout,
+                        content: c.content,
+                        at: chrono::Utc::now(),
+                    }).await;
+                }
+            }
         }
 
         let latency_ms = start.elapsed().as_millis() as u64;
 
-        // 推完成消息
+        // 推完成消息 (现在用解析后的 content 长度, 更准确)
         let _ = out.send(OutputLine {
             stream: OutputStream::System,
-            content: format!("HTTP {} ({}ms, {} bytes)", status, latency_ms, body.len()),
+            content: format!("HTTP {} ({}ms, content: {} bytes)", status, latency_ms, total_content.len()),
             at: chrono::Utc::now(),
         }).await;
 
