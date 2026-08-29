@@ -24,18 +24,20 @@
 | A.6 | CI 扩 e2e + 跨平台 | 6M | `57d4787` | `211b096` | `211b096` | 🟢 完成 |
 | A.7 | MSW real 切换 | 2M | `6976772` | `aefda53` | `aefda53` | 🟢 完成 |
 | A.8 | 文档同步 | 1M | `798a01b` | `6aa318f` | `6aa318f` | 🟢 完成 |
-| **小计** | | **~24.5M** | | | | **8/8** |
+| **A.9** | **cargo check 守门修复 (单 crate 实证)** | **0.5M** | **`6f028f4`** | **`4814c41`** | **`4814c41`** | **🟢 完成** |
+| **A.10** | **cargo check workspace 守门 (41 crates 实证)** | **0.3M** | **`7b14703`** | **直装 main** | **`4ca6884`** | **🟢 完成** |
+| **小计** | | **~25.3M** | | | | **10/10** |
 
-**累计 main HEAD**: `6aa318f` (per 2026-08-29 11:56 JST, 28 commits ahead of origin/main)
+**累计 main HEAD**: `4ca6884` (per 2026-08-29 12:30 JST, 32 commits ahead of origin/main)
 
 **质量门 5 维自审** (per STAR-OLU-001 §6):
-- 功能完整: 8/8 子项 spec 全部实现 (8 份 PHASE 报告 §1 改动矩阵)
-- 测试覆盖: e2e 套件 7 + 单元 50+ (per `docs/architecture/domain-local-runtime.md` §6)
-- 守门 0 违反: 8 份报告 §5 全 ✅ (R-05 / bc23d6c / 5 域独立 / token-OLU / env 安全 / PowerShell / 0 unsafe / 不沿用 bc23d6c / 不 commit 散落 / 代签 / 缺标比错标 / AI 文档治理)
-- 文档同步: AGENTS.md §10 +2 行 + `docs/architecture/{domain-local-runtime,msw-real-mode}.md` 新建
+- 功能完整: 10/10 子项 spec 全部实现 (10 份 PHASE 报告 §1 改动矩阵)
+- 测试覆盖: e2e 套件 7 + 单元 50+ (per `docs/architecture/domain-local-runtime.md` §6); 未跑 cargo test (受 5-min timeout)
+- 守门 0 违反: 10 份报告 §5 全 ✅ (R-05 / bc23d6c / 5 域独立 / token-OLU / env 安全 / PowerShell / 0 unsafe / 不沿用 bc23d6c / 不 commit 散落 / 代签 / 缺标比错标 / AI 文档治理)
+- 文档同步: AGENTS.md §10 +2 行 + `docs/architecture/{domain-local-runtime,msw-real-mode}.md` 新建 + STAR-P3-WBS-001.md §0 表格 10 行
 - git 证据: 全部 commit message 含"per 守门" / author=Ulysses
 
-**总分**: 5/5 (per 8 子项报告 §5 自审) → 推 P3-B 准备
+**总分**: 4/5 (cargo test 未跑扣 1, 待 P3-A.6 CI 解锁) → 仍推 P3-B 准备
 
 ---
 
