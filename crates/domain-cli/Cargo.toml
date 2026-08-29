@@ -24,7 +24,7 @@ tracing = { workspace = true }
 aes-gcm = "0.10"
 base64 = "0.22"
 rand = "0.8"
-# HTTP 客户端 (B.1 OpenClaw HTTP 客户端实装, per 2026-08-30 07:25 JST wt-b1-openclaw-http)
+# HTTP 客户端 (B.1 OpenClaw + B.6 Hermes HTTP 客户端实装, per 2026-08-30 07:25 / 07:28 JST)
 reqwest = { workspace = true }
 
 [dev-dependencies]
