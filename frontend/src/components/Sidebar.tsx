@@ -84,16 +84,7 @@ export function Sidebar() {
   const pathname = usePathname();
   return (
     <aside className="w-60 shrink-0 border-r border-line bg-bg-soft/40 flex flex-col h-screen sticky top-0">
-      <div className="px-4 py-4 border-b border-line">
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="size-7 rounded-md bg-accent/15 border border-accent/40 grid place-items-center text-accent font-bold">★</div>
-          <div>
-            <div className="text-sm font-semibold text-ink group-hover:text-accent transition-colors">Star</div>
-            <div className="text-[10px] uppercase tracking-wider text-ink-mute">Vibe Coding WM</div>
-          </div>
-        </Link>
-      </div>
-      <nav className="flex-1 overflow-y-auto py-2 text-sm">
+      <nav className="flex-1 overflow-y-auto py-3 text-sm">
         {NAV.map((group) => (
           <div key={group.label} className="mb-2">
             <div className="px-4 py-1.5 text-[10px] uppercase tracking-wider text-ink-mute">
