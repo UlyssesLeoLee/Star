@@ -37,9 +37,10 @@
 | **A.19** | **multi-crate test 守门扩展 (10 crate 124/124 pass, 14/41 = 34% 守门覆盖)** | **0.3M** | **n/a** | **直装 main** | **`b6fcb1e`** | **🟢 完成** |
 | **A.20** | **governance multi-crate test 守门 (6 crate 81/81 pass, 20/41 = 49% 覆盖)** | **0.2M** | **n/a** | **直装 main** | **`8b0fd31`** | **🟢 完成** |
 | **A.21** | **worktree/collaboration/comment multi-crate test 守门 (3 crate 55/55 pass, 23/41 = 56% 覆盖)** | **0.1M** | **n/a** | **直装 main** | **`ec4231c`** | **🟢 完成** |
-| **小计** | | **~27.8M** | | | | **21/21** |
+| **A.22** | **star-* multi-crate test 守门 (8 crate 175/175 pass, 31/41 = 76% 覆盖, 含 star-mcp 134 关键)** | **0.2M** | **n/a** | **直装 main** | **`fc08238`** | **🟢 完成** |
+| **小计** | | **~28M** | | | | **22/22** |
 
-**累计 main HEAD**: `ec4231c` (per 2026-08-29 14:30 JST, 49 commits ahead of origin/main)
+**累计 main HEAD**: `fc08238` (per 2026-08-29 14:35 JST, 50 commits ahead of origin/main)
 
 **质量门 5 维自审** (per STAR-OLU-001 §6):
 - 功能完整: 10/10 子项 spec 全部实现 (10 份 PHASE 报告 §1 改动矩阵)
