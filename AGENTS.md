@@ -104,7 +104,7 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 
 | # | 规则 | 拍板日 | 拍板来源 |
 |---|---|---|---|
-| 1 | **R-05 不 push** | 2026-08-27 11:09 JST | Ulysses 拍板 |
+| 1 | **R-05 不 push** (反转: 2026-08-30 07:09 JST 推 origin 已落地) | 2026-08-27 11:09 JST, 反转 2026-08-30 07:09 JST | Ulysses 拍板, 反转拍板 (per ask_user push_confirm 拍板) |
 | 2 | **bc23d6c 保留** | 2026-08-27 11:09 JST | Ulysses 拍板 (commit 引用了未做过的 frontend commit hash 5181288 / b9858b2 / 6d78158 / c102fdf3 / 0b584411) |
 | 3 | **5 域独立 Lead，不接受兼任** | 2026-08-21 JST | Ulysses 拍板 (RGS 5 域 player/economy/match/social/admin) |
 | 4 | **AI 协作 token-OLU 而非人天** | 2026-08-21 JST | Ulysses 拍板 (1 SRE·周 ≈ 1M tokens, 1 人·天 ≈ 100-300K tokens); STAR 独立基线 `STAR-OLU-001.md` v0.1 (1 SRE·周 = 1.2M) 2026-08-29 落档 |

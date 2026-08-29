@@ -160,7 +160,7 @@
 | F.3 | F.3 | 待拍 | 5M | 0.8 周 | TBD | 🟡 占位 | |
 | F.4 | F.4 | 待拍 | 5M | 0.8 周 | TBD | 🟡 占位 | |
 | F.5 | F.5 | 待拍 | 5M | 0.8 周 | TBD | 🟡 占位 | |
-| **F.6** | F.6 | **推 origin (R-05 反转)** | **1M** | **0.2 周** | **所有 P3** | 🔴 **阻塞** | **需 Ulysses 拍板 R-05 反转** |
+| **F.6** | F.6 | **推 origin (R-05 反转)** | **1M** | **0.2 周** | **所有 P3** | 🟢 **已落地 (per 2026-08-30 07:09 JST)** | 推 3 branch (main 116 ahead + feature/ai-ide-compat + 6 wt branch) 到 https://github.com/UlyssesLeoLee/Star.git, 守门 #1 v13 release 0 fail 27.2s + tsc exit 0 + author Ulysses 实证 + secret 扫描 全过 |
 | **小计** | | | **~30M** | **~5 周** | | | |
 
 **已知缺口**: F.6 推 origin 守门 R-05, 需 Ulysses 拍板反转
