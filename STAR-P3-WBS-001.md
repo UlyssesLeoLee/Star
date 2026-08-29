@@ -239,3 +239,97 @@
 - `PHASE-P3-A-PHASE-CLOSEOUT-REPORT.md` — P3-A 阶段收官元汇总 (跨 17 子项 + 7 层级守门 + 5/5 质量门 + 9 高频缺口 + 7 阻塞项移交 P3-B)
 - `docs/architecture/domain-local-runtime.md` — 11 模块入口
 - `docs/architecture/msw-real-mode.md` — P3-A.7 开关使用指南
+
+---
+
+## 12. P3-A → P3-B Handoff (per 2026-08-29 21:09 JST)
+
+> **触发**: PHASE-P3-A-INC-SESSION-002.md v0.5 §10 声明 "P3-B 启动时另开 INC-SESSION-003, 不在本批系列续写"
+> **目的**: 把 P3-A 收官后的可推进范围 + 待拍板阻塞项, 一次性 handoff 给 P3-B 启动者 (人或 agent)
+> **Author**: Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 (per 8/27 19:39 JST 用户授权)
+
+### 12.1 P3-A 已落地范围 (per git 实证)
+
+| 维度 | 数据 | 证据 |
+|---|---|---|
+| 阶段 | 25/25 子项收官 (8 原始 + 17 守门补救) | `git log --merges --first-parent main` 17 merge commit |
+| 守门覆盖 | 41/41 crate 100%, 1384 tests 跨 debug+release 双 mode 0 fail | `PHASE-P3-A-PHASE-CLOSEOUT-REPORT.md` 5/5 质量门 |
+| 守门派生 | 13+ 层级 + 14 派生 v1-v14 累积规 | `AGENTS.md` §4.1 |
+| Token 实证 | ~28.5M / 30M P3-A 软预算 (5% 余量) | `STAR-OLU-001.md` §6 |
+| 当前 ahead | **104 commits** ahead of origin/main (main HEAD `e2e890e`) | `git rev-list --count origin/main..HEAD` |
+| P3-A 后 24 commits | 6 scope-ui-only + 5 docs 治理 + 2 PHASE 报告 + 7 docs 同步 + 1 AGENTS 引用 + 3 README 同步 | `PHASE-P3-A-INC-SESSION-001.md` + `002.md` 元汇总 |
+
+### 12.2 P3-A 守门 0 违反项 (per 守门 #1+#9+#12 联合实证)
+
+- 守门 #1 跨 stage: `cargo check --workspace --lib` 0 err, 28 warning (pre-existing missing documentation, 与本批 UI 改动无关)
+- 守门 #1 v8 cargo test: `cargo test -p star-mcp` 134/134 0 fail 0.17s (P3-A 阶段同 134, 本批 0 回归)
+- 守门 #9 子代理: 本批 0 子代理调用, 全部 root 直实装 (守门 #9 RPC 历史不可靠实证)
+- 守门 #12 docs 同步: 6 维度闭环 (PHASE-001/002 报告 / AGENTS.md §8+§10 / WBS §11 / 三份架构 doc v0.2 / README 状态表)
+
+### 12.3 P3-B 9 子项占位 + 拍板依赖 (per §0 表格 + §7 阻塞项)
+
+| # | 子项 | token 软预算 | 依赖 | 状态 |
+|---|---|---|---|---|
+| B.1 | 业务子项 1 | ~X M | 无 | 占位, 待拍板真实标题 |
+| B.2 | 业务子项 2 | ~X M | 无 | 占位, 待拍板真实标题 |
+| B.3 | 业务子项 3 | ~X M | 无 | 占位, 待拍板真实标题 |
+| B.4 | 业务子项 4 | ~X M | 无 | 占位, 待拍板真实标题 |
+| **B.5** | **OpenClaw 真实集成** | **~X M** | **🔴 真实 endpoint + API key 凭证** | **占位, 需 Ulysses 拍板** |
+| **B.6** | **Hermes 真实集成** | **~X M** | **🔴 真实 endpoint + API key 凭证** | **占位, 需 Ulysses 拍板** |
+| B.7 | 集成子项 1 | ~X M | 无 | 占位, 待拍板 |
+| B.8 | 集成子项 2 | ~X M | 无 | 占位, 待拍板 |
+| B.9 | 集成子项 3 | ~X M | 无 | 占位, 待拍板 |
+
+### 12.4 7 阻塞项 (per AGENTS.md §7, 需 Ulysses 拍板)
+
+1. **P3-B 9 子项真实标题** (尤其 B.5 OpenClaw / B.6 Hermes 凭证)
+2. **P3-C 子项真实标题** (占位)
+3. **P3-D 7 vs 12 范围** 拍板
+4. **B.5 OpenClaw 凭证**: 真实 endpoint + API key
+5. **B.6 Hermes 凭证**: 真实 endpoint + API key
+6. **E.4 KMS 集成凭证** (Vault / AWS KMS) — 等 P3-E 阶段
+7. **E.5/F.1 5 域 Lead 真人到位 + F.6 推 origin R-05 反转** — 5 域独立真人, 8/21 JST 拒绝兼任硬约束
+
+### 12.5 INC-SESSION-003 触发条件 (P3-B 启动时)
+
+拍板上述 7 阻塞项中**任一项**即开新 PHASE-P3-A-INC-SESSION-003.md, 步骤:
+1. 新建 worktree (per 10:58 JST 决策, **每子项 1 wt**, 推翻原 4-7 wt 并行)
+2. worktree 内开子代理 (守门 #9 实证 RPC 不可靠, 优先 root 实装, 守门 #9 子代理授权边界写明"无证据叙事 = 禁止")
+3. 每子项单文件 4 层精简 (entity / value_object / error / service), 立即 commit 守门
+4. handoff 内容追加到本节 §12: 已落地 commit short hash + 守门实证 + 已知缺口 + 移交决策
+5. 落档 7 段结构 PHASE-P3-B{1-N}-IMPL-REPORT.md (per AGENTS.md §3 模板)
+
+### 12.6 守门基线 (P3-B 启动时必跑, 任何子项缺一 = 守门不完整)
+
+per AGENTS.md §4.1 守门 #1 派生 v1-v14 累积规, P3-B 任何子项必先跑:
+1. `cargo check --workspace --all-targets` (含 tests) — 0 err
+2. `cargo fmt + clippy` — 0 err
+3. `cargo test --workspace --release --lib` — 0 fail
+4. `cargo build --release + doc + bench --no-run` — 0 err
+
+**任何阶段缺其一 = 守门不完整** (per STAR-OLU-001 §6 质量门)。
+
+### 12.7 5 域独立硬约束 (per 8/21 JST Ulysses 拍板)
+
+P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
+- 每域配独立 Lead, **不接受兼任** (架构师兼任 player / SRE 兼任 admin 禁止)
+- DDD Review 阶段 5 域真人签字
+- 守门 #1 v6 跨 stage release mode 100% pass
+
+### 12.8 已知缺口 (per 守门 #12 "缺标比错标安全")
+
+| # | 缺口 | 移交 |
+|---|---|---|
+| 1 | 5 tab 命名 (Kanban/Timeline/Backlog/Agents/Worktrees 是 agent 提议) | DDD Review 拍板具体名字 |
+| 2 | P3-B 9 子项 + P3-C/E/F 子项 + P3-D 范围 | 等 Ulysses 拍板 |
+| 3 | P3-A 已知 client-render bug (useSearchParams 在 client 端生效) | P3-B 阶段修 (`dynamic = 'force-dynamic'` 决策) |
+| 4 | _ARCHIVED_*.tsx 4 文件仍 untracked (Topbar/BoardTabs) | DDD Review 阶段清理 |
+| 5 | 守门 #6 CI 仍未配 runner (.github/workflows/ci.yml 4 job 已配) | P3-B 启动前实装 |
+
+### 12.9 P3-B 启动前最低门槛 (per 守门 #6 + #8 + #10)
+
+- [ ] 7 阻塞项中至少 P3-B 相关 3 项 (B.5/B.6 凭证 + 9 子项标题) 拍板
+- [ ] 守门 #6 CI runner 实装 (`.github/workflows/ci.yml` 4 job 跑通)
+- [ ] 守门 #8 不沿用 bc23d6c 叙事, P3-B 报告 commit short hash + 触发原因 + 守门 4 步全过
+- [ ] 守门 #10 author=Ulysses, 5 域 Lead 签字栏 Mavis 接手代签 (DDD Review 阶段补真人)
+- [ ] P3-A.6 e2e MSW real-mode 守门 (10 endpoint / 3 handler TODO 待 P3-B 阶段 handler 完整化)
