@@ -43,7 +43,7 @@
 | **A.25** | **🎯 cargo test --workspace --release 守门 (41/41 crate 628 tests 0 fail, 53.7s, A.15 §3 #1 缺口消解)** | **0.2M** | **n/a** | **直装 main** | **`dd95fdd`** | **🟢 完成** |
 | **小计** | | **~28.5M** | | | | **25/25** |
 
-**累计 main HEAD**: `dd95fdd` (per 2026-08-29 14:50 JST, 54 commits ahead of origin/main)
+**累计 main HEAD**: `a9bdb42` (per 2026-08-29 15:16 JST, 61 commits ahead of origin/main, per `git rev-list --count origin/main..HEAD` 实测)
 
 **🎯 P3-A 阶段 workspace + release 双 mode 100% 守门覆盖达成 (per A.25)**: 41/41 crate, debug 756 + release 628 = 1384 tests, 0 fail, 守门 13+ 层级
 
