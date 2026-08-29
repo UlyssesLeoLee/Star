@@ -34,6 +34,9 @@ members = [
     "crates/domain-dashboard",
     "crates/domain-form",
     "crates/domain-ai",
+    # Phase W17-W20 (2026-08-29) 新增 2 crate
+    "crates/domain-cli",
+    "crates/domain-agent-windows",
     "crates/infrastructure",
     # Phase G 骨架:2026-08-28 新增 crates/star-cache (Cache 抽象 + InMemory + Redis stub)
     "crates/star-cache",
