@@ -135,6 +135,7 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 | v12 | **🎯 100% 守门覆盖里程碑** (41/41 crate, 756 tests) | A.24 实证 |
 | v13 | release mode test 单 crate 100/100 pass, 0.51s (8x 加速) | A.18 + A.22 实证 |
 | v14 | workspace + release 5-min timeout 守门在 release mode 缓存下被消解 (41 crate 53.7s) | A.25 实证 |
+| v15 | **守门 #12 死循环饱和边界** (per 2026-08-29 22:39 JST `5cfb7b3` 实证): commit-time docs 同步触达饱和后, 任何后续 docs 同步 commit 必先有**新事件触发** (代码改动 / Ulysses 拍板), 否则违反饱和约束; 守门 #12 主动推进触达饱和点 = 113 ahead 落地 6 commits (85819f3 / 0f4386c / 29692a7 / ee09bf5 / 3ccfc1e / 5cfb7b3), worktree 0 untracked / 0 modified, 下一笔 docs 同步必等新事件 | `5cfb7b3` commit message + v0.14 修订历史饱和声明 |
 
 **累积规**: 后续 P3-B-F 任何子项必先跑 (1) `cargo check --workspace --all-targets` (2) `cargo fmt + clippy` (3) `cargo test --workspace --release --lib` (4) `cargo build --release + doc + bench --no-run` 全部 0 错 + 测试全过。**任何阶段 缺其一 = 守门不完整** (per STAR-OLU-001 §6 质量门)。
 
