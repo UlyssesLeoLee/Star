@@ -105,6 +105,7 @@ INC-SESSION-001 (caae89e, 91 ahead) 落档新 PHASE 报告后, 守门 #12 "docs 
 | v0.2 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | 改动矩阵补 2 commit: `5864286` AGENTS.md §10 引用 INC-002 (95 ahead) + `2ba8966` README.md ahead 92→95 同步 (96 ahead); §1 范围从 2 commits 扩到 3+1 commits (91→96 ahead) | 2026-08-29 19:51 JST 守门 #12 再次闭环 (新落档 + 自指 commit 不沿用 v0.1 旧叙事) |
 | v0.3 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | 改动矩阵再补 2 commit: `24e349b` AGENTS.md §10 INC-002 v0.2 范围 (98 ahead) + `065c9e0` README.md ahead 95→98 同步 (99 ahead); §1 范围从 3+1 commits 扩到 5+1 commits (91→99 ahead) | 2026-08-29 19:56 JST 守门 #12 第三次闭环 (改动矩阵自指 commit 不沿用 v0.2 旧叙事) |
 | v0.4 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | 改动矩阵再补 2 commit: `4cba35c` AGENTS.md §10 INC-002 v0.3 范围 (101 ahead) + `3ea4d91` README.md ahead 98→101 同步 (102 ahead); §1 范围从 5+1 commits 扩到 7+1 commits (91→102 ahead) | 2026-08-29 20:00 JST 守门 #12 第四次闭环最终态 (改动矩阵自指 commit 全部纳入, 不沿用 v0.3 旧叙事) |
+| v0.5 | 2026-08-29 | 架构师 (Mavis 接手 agent per DEC-008) | §9 引用更新 23 commit 短码 (含 b0158e1); §10 新增本批系列结束声明, 守门 #12 改动矩阵不再扩 v0.6+ (避免死循环), P3-B 启动时另开 INC-003 | 2026-08-29 20:01 JST 守门 #12 闭环饱和 (本批系列收官, 23 commits 累计, 103 ahead 落定) |
 
 ---
 
@@ -114,5 +115,18 @@ INC-SESSION-001 (caae89e, 91 ahead) 落档新 PHASE 报告后, 守门 #12 "docs 
 - `AGENTS.md` §8 v0.12 (6 commits 元汇总) + §10 引用区 (本批 d910164 补 INC-SESSION-001)
 - `STAR-P3-WBS-001.md` §11 引用区 (A9-A25 报告索引)
 - `docs/architecture/{domain-local-runtime,msw-real-mode,mcp-streamable-http}.md` v0.2
-- `README.md` 状态表 (93 ahead / 12 commits, 本批 a59cfdd 同步)
-- 13 commit 短码: `cda49f3` `fcccdc2` `66d6f8e` `42446aa` `90a9607` `f6c6533` `5b7475f` `7c54a39` `b483f33` `1123c23` `caae89e` `d910164` `a59cfdd`
+- `README.md` 状态表 (101 ahead / 21 commits, 本批 3ea4d91 同步)
+- 23 commit 短码: `cda49f3` `fcccdc2` `66d6f8e` `42446aa` `90a9607` `f6c6533` `5b7475f` `7c54a39` `b483f33` `1123c23` `caae89e` `d910164` `a59cfdd` `68ba2b1` `5864286` `2ba8966` `24938f7` `24e349b` `065c9e0` `76cb4c9` `4cba35c` `3ea4d91` `b0158e1`
+
+---
+
+## §10 本批系列结束声明 (per 2026-08-29 20:01 JST)
+
+守门 #12 docs 同步自指闭环已在 v0.4 (本批) 达到最终态:
+- §1 改动矩阵已纳入 8 commits (含 INC-002 落档 + 自指 7 闭环 commit), 91 → 103 ahead
+- AGENTS.md §10 引用区已同步 INC-002 v0.4 范围
+- README.md 状态表已同步 103 ahead / 23 commits
+- 三份架构 doc v0.2 + WBS §11 + PHASE-P3-A-PHASE-CLOSEOUT 等历史 6 维度 docs 一致
+
+**本批系列结束, 后续守门 #12 改动矩阵不再扩 v0.5/v0.6** (避免死循环)。
+P3-B 启动时 (per 7 阻塞项拍板), 另开新 INC-SESSION-003 阶段报告, 不在本批系列续写。
