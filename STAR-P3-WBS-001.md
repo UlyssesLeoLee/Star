@@ -49,12 +49,12 @@
 
 **质量门 5 维自审** (per STAR-OLU-001 §6):
 - 功能完整: 10/10 子项 spec 全部实现 (10 份 PHASE 报告 §1 改动矩阵)
-- 测试覆盖: e2e 套件 7 + 单元 50+ (per `docs/architecture/domain-local-runtime.md` §6); 未跑 cargo test (受 5-min timeout)
-- 守门 0 违反: 10 份报告 §5 全 ✅ (R-05 / bc23d6c / 5 域独立 / token-OLU / env 安全 / PowerShell / 0 unsafe / 不沿用 bc23d6c / 不 commit 散落 / 代签 / 缺标比错标 / AI 文档治理)
-- 文档同步: AGENTS.md §10 +2 行 + `docs/architecture/{domain-local-runtime,msw-real-mode}.md` 新建 + STAR-P3-WBS-001.md §0 表格 10 行
-- git 证据: 全部 commit message 含"per 守门" / author=Ulysses
+- 测试覆盖: e2e 套件 7 + 单元 50+ (per `docs/architecture/domain-local-runtime.md` §6); **P3-A 累计 41/41 crate 100% 覆盖 (debug 756 tests + release 628 tests, 0 fail, 5-min timeout 缺口 A.25 消解)**
+- 守门 0 违反: **25 份 PHASE 报告** (A.1-A.25) + 1 阶段收官 + 守门派生 v1-v14 (per AGENTS.md §4.1) 全 ✅
+- 文档同步: AGENTS.md §10 + 修订历史 v0.1-v0.9 + `docs/architecture/{domain-local-runtime,msw-real-mode}.md` 新建 + STAR-P3-WBS-001.md §0 表格 25 行
+- git 证据: 全部 commit message 含"per 守门" / author=Ulysses; **60 → 62 commits ahead of origin/main** (per `git rev-list --count origin/main..HEAD`)
 
-**总分**: 4/5 (cargo test 未跑扣 1, 待 P3-A.6 CI 解锁) → 仍推 P3-B 准备
+**总分**: **5/5** (P3-A.14 cargo test + P3-A.18 release test + P3-A.25 workspace + release 守门全部实证) → 推 P3-B 准备
 
 ---
 
