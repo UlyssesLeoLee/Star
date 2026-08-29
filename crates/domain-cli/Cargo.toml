@@ -24,6 +24,8 @@ tracing = { workspace = true }
 aes-gcm = "0.10"
 base64 = "0.22"
 rand = "0.8"
+# HTTP 客户端 (B.1 OpenClaw HTTP 客户端实装, per 2026-08-30 07:25 JST wt-b1-openclaw-http)
+reqwest = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
