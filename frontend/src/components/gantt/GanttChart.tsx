@@ -20,7 +20,7 @@
 //   - 跨 sprint 拖 work-item -> onWorkItemMove
 // =====================================================================
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { addDays, differenceInDays, format, parseISO } from "date-fns";
 import type { Sprint, Milestone, WorkItem, WorkItemStatus, SprintStatus } from "@/types/ids";
@@ -66,7 +66,21 @@ export function GanttChart(props: GanttChartProps) {
   } = props;
 
   const router = useRouter();
-  const [zoom, setZoom] = useState<ZoomLevel>("week");
+  // Default zoom "month" (20 px/day) — 整张图不溢出, 适合先看大盘
+  // per 2026-08-29 19:30 JST scope-ui-only 候选第 5 项 (从 "week" 60px/d 改起)
+  // localStorage "star.gantt.zoom" 保留用户上次选择, 跨刷新 / 跨 tab 一致
+  const [zoom, setZoom] = useState<ZoomLevel>("month");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem("star.gantt.zoom");
+    if (saved && (saved === "week" || saved === "month" || saved === "quarter")) {
+      setZoom(saved as ZoomLevel);
+    }
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("star.gantt.zoom", zoom);
+  }, [zoom]);
   const pxPerDay = PX_PER_DAY[zoom];
 
   const start = parseISO(dateRange.start);
