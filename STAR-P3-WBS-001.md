@@ -233,6 +233,9 @@
 
 - `STAR-OLU-001.md` — token-OLU 独立基线 (1 SRE·周 = 1.2M)
 - `AGENTS.md` §4 / §7 — 守门 + 待办
-- `PHASE-P3-A1..A8-IMPL-REPORT.md` — P3-A 8 份报告 (本文件 §0 实证)
+- `PHASE-P3-A1..A8-IMPL-REPORT.md` — P3-A 8 份原始报告 (本文件 §0 实证)
+- `PHASE-P3-A9..A16-IMPL-REPORT.md` — P3-A 8 份守门补救报告 (per §4.1 守门 #1 派生 v1-v8)
+- `PHASE-P3-A18..A25-IMPL-REPORT.md` — P3-A 8 份 test/build 守门报告 (A.17 阶段收官归 P3-A-PHASE-CLOSEOUT, 8 份含 cargo test 多 crate 100% 覆盖 + release mode 5min timeout 消解)
+- `PHASE-P3-A-PHASE-CLOSEOUT-REPORT.md` — P3-A 阶段收官元汇总 (跨 17 子项 + 7 层级守门 + 5/5 质量门 + 9 高频缺口 + 7 阻塞项移交 P3-B)
 - `docs/architecture/domain-local-runtime.md` — 11 模块入口
 - `docs/architecture/msw-real-mode.md` — P3-A.7 开关使用指南
