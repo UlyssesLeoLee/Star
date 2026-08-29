@@ -99,7 +99,7 @@ impl HttpClient {
         api_key: Option<&str>,
         out: mpsc::Sender<OutputLine>,
     ) -> Result<HttpResponse, HttpError> {
-        let client = self.get_client_for_url(&req.url, req.timeout_sec)?;
+        let client = self.get_client_for_url(&req.url, req.timeout_sec).await?;
 
         // 构造请求
         let mut builder = match req.method {
@@ -127,7 +127,7 @@ impl HttpClient {
         }
 
         let start = std::time::Instant::now();
-        let response = builder.send().await.map_err(HttpError::Request)?;
+        let response = builder.send().await.map_err(|e| HttpError::Request(e.to_string()))?;
         let status = response.status().as_u16();
         let mut headers = HashMap::new();
         for (k, v) in response.headers() {
@@ -143,7 +143,7 @@ impl HttpClient {
         let mut total_content = String::new();
         let mut role_seen = false;
         while let Some(chunk) = stream.next().await {
-            let chunk: Bytes = chunk.map_err(HttpError::Stream)?;
+            let chunk: Bytes = chunk.map_err(|e| HttpError::Stream(e.to_string()))?;
             let s = String::from_utf8_lossy(&chunk);
             // 1. 喂给 SSE 解析器 (跨 chunk 边界安全)
             for parsed in sse_parser.feed(&s) {
@@ -214,16 +214,16 @@ impl HttpClient {
     }
 
     /// 按 URL host 缓存 reqwest::Client (避免重复创建连接池)
-    fn get_client_for_url(&self, url: &str, timeout_sec: u32) -> Result<reqwest::Client, HttpError> {
+    async fn get_client_for_url(&self, url: &str, timeout_sec: u32) -> Result<reqwest::Client, HttpError> {
         let host = url.split('/').nth(2).unwrap_or("default").to_string();
-        let mut clients = self.clients.lock().unwrap();
+        let mut clients = self.clients.lock().await;
         if let Some(c) = clients.get(&host) {
             return Ok(c.clone());
         }
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(timeout_sec as u64))
             .build()
-            .map_err(HttpError::ClientBuild)?;
+            .map_err(|e| HttpError::ClientBuild(e.to_string()))?;
         clients.insert(host, client.clone());
         Ok(client)
     }
@@ -336,7 +336,7 @@ impl LocalRuntime for RealHttpRuntime {
 
         // 设置 cancel 通道
         let (cancel_tx, mut cancel_rx) = mpsc::channel::<()>(1);
-        self.active.lock().unwrap().insert(id, cancel_tx);
+        self.active.lock().await.insert(id, cancel_tx);
 
         // 启动任务
         let http = self.http.clone();
@@ -404,7 +404,7 @@ impl LocalRuntime for RealHttpRuntime {
     }
 
     async fn cancel(&self, id: Uuid) -> Result<(), RuntimeError> {
-        let mut active = self.active.lock().unwrap();
+        let mut active = self.active.lock().await;
         if let Some(tx) = active.remove(&id) {
             let _ = tx.send(()).await;
             Ok(())

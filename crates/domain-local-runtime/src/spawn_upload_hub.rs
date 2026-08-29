@@ -101,6 +101,8 @@ impl HubIntegratorAdapter {
     ) -> Result<Self, HubAdapterError> {
         // 1. integrator 接 mpsc sender (一次性注入)
         let (tx, mut rx) = mpsc::channel::<OutputLine>(config.channel_capacity);
+        // tx 给 integrator 存一份, forwarder 也需要一份, 提前 clone
+        let tx_for_forwarder = tx.clone();
         let integrator = Arc::new(integrator.with_sender(tx));
 
         // 2. 启动 forwarder task: hub.broadcast -> integrator.tx
@@ -120,7 +122,7 @@ impl HubIntegratorAdapter {
                     _ = shutdown_rx.recv() => break,
                     res = bcast_rx.recv() => match res {
                         Ok(line) => {
-                            if tx.send(line).await.is_err() { break; }
+                            if tx_for_forwarder.send(line).await.is_err() { break; }
                         }
                         Err(broadcast::error::RecvError::Lagged(n)) => {
                             // lag 视为可恢复, continue

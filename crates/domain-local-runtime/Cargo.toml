@@ -15,6 +15,14 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 tokio = { workspace = true }
+# w21 http_client 真实 HTTP (reqwest + SSE stream)
+reqwest = { workspace = true, features = ["stream"] }
+bytes = { workspace = true }
+futures-util = { workspace = true }
+# w25 sse_parser OpenAI JSON 解析
+serde_json = { workspace = true }
+# w22-w31 通用 tracing
+tracing = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
