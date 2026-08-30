@@ -33,7 +33,7 @@ depends_on / generated_by / reviewed_by / tested_by / deployed_by / caused_by / 
 ## 5. 存储
 
 - MVP: SQLite + 简单外键
-- Phase 2: 考虑图数据库（per [Compatibility Matrix §6 已知缺口](../../ecosystem-survey/compatibility-matrix.md) — **不**自建图数据库）
+- Phase 2: 考虑图数据库（per [Compatibility Matrix §6 已知缺口](../../../../ecosystem-survey/compatibility-matrix.md) — **不**自建图数据库）
 
 ## 6. 实施位置
 

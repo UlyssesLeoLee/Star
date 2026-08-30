@@ -22,7 +22,7 @@
 - 与 [spec/agents/02 §2 22 domain 数据源清单](../agents/02-data-sources-spec.md) 关系：SagaStep 通过 `agent://{crate}/{id}` Resource URI 调用 22 domain crate
 - 与 [spec/vcs/05 §2 4 Git Provider 接入规范](../vcs/05-real-providers-spec.md) 关系：MR/PR 创建作为典型 saga 触发场景（player 域发起 → economy 域记账 → admin 域审计）
 - 与 [spec/cache/01 §3 缓存契约](../cache/01-cache-contract-spec.md)（Phase G）关系：Saga 状态机持久化复用 star-cache
-- 与 [spec/services/07 审计模型](../services/07-audit-model.md)（Phase G）关系：Admin 域 AuditLog step 落 audit log
+- 与 [spec/services/07 审计模型](../flows/07-audit-model.md)（Phase G）关系：Admin 域 AuditLog step 落 audit log
 
 ## §2 Saga 抽象
 
@@ -108,7 +108,7 @@ pub struct SagaResult {
 - `domain()` 字段**强制**每 step 标注所属域（5 域独立 Lead 责任边界不可混用）
 - `compensate()` 失败不阻断其他 step 补偿（best-effort compensation，per §6 已知缺口 G-05 死信处理）
 - `SagaContext.domain_state` 允许 step 跨 step 传值（如 EconomicDecision 结果供 ExecuteTransaction 消费）
-- 编排器**不**直接调 step trait，step 通过 Application Service 注册（per [arch/01 §4 职责分层](../arch/01-current-architecture-analysis.md)）
+- 编排器**不**直接调 step trait，step 通过 Application Service 注册（per [arch/01 §4 职责分层](../../arch/01-current-architecture-analysis.md)）
 
 ## §3 5 域独立 Lead 映射
 
@@ -141,7 +141,7 @@ per 8/21 JST 用户偏好（不可兼任）+ [ADR-0035 §4 5 决策 D6-D10](../.
 2. **economy 域 step**: `EconomicDecision` — 决策（Q-003 核心）— 需 Economy Lead 独立决策（调 domain-economy crate）
 3. **economy 域 step**: `ExecuteTransaction` — 执行转账（调 domain-economy crate）
 4. **player 域 step**: `UpdatePlayerBalance` — 更新余额（调 domain-player crate）
-5. **admin 域 step**: `AuditLog` — 记录审计日志（per [spec/services/07 审计模型](../services/07-audit-model.md) Phase G，调 domain-admin crate）
+5. **admin 域 step**: `AuditLog` — 记录审计日志（per [spec/services/07 审计模型](../flows/07-audit-model.md) Phase G，调 domain-admin crate）
 
 **逆向补偿**（任意 step 失败触发，per §5 状态机 Compensating 路径）：
 
@@ -155,7 +155,7 @@ per 8/21 JST 用户偏好（不可兼任）+ [ADR-0035 §4 5 决策 D6-D10](../.
 
 **Q-003 决策点**（per §3 Economy Lead 独立决策边界）：
 
-- EconomicDecision step **不可被自动审批**（per [arch/06 §3 NFR-OP-015](../arch/06-threat-model-nfr.md) 关键路径人工 gate 原则）
+- EconomicDecision step **不可被自动审批**（per [arch/06 §3 NFR-OP-015](../../arch/06-threat-model-nfr.md) 关键路径人工 gate 原则）
 - 大额交易（> threshold）需 Economy Lead 显式签字（per ADR-0027 §3 SRE NFR 待 SRE Lead 量化）
 - Economy Lead 决策 SLA 未量化（per §6 已知缺口 G-06）
 
@@ -220,7 +220,7 @@ Pending ──execute()──> Running ──all steps OK──> Completed
 - [spec/agents/02-data-sources-spec.md](../agents/02-data-sources-spec.md) — 22 domain crate 数据源契约（§2 22 domain 清单 + `agent://{crate}/{id}` URI 模式）
 - [spec/vcs/05-real-providers-spec.md](../vcs/05-real-providers-spec.md) — 4 Git Provider 接入规范（MR 触发 saga 场景）
 - [spec/cache/01-cache-contract-spec.md](../cache/01-cache-contract-spec.md) — 缓存契约（**Phase G 规划目标，本 spec 引用其 §3 持久化模式**）
-- [spec/services/07-audit-model.md](../services/07-audit-model.md) — 审计模型（**Phase G 规划目标，AuditLog step 落 audit log**）
+- [spec/services/07-audit-model.md](../flows/07-audit-model.md) — 审计模型（**Phase G 规划目标，AuditLog step 落 audit log**）
 - [spec/services/01-service-adapter-spec.md](../services/01-service-adapter-spec.md) — SA 协议（§0 反污染原则参考）
 - [spec/services/03-webhook-adapter-spec.md](../services/03-webhook-adapter-spec.md) — Webhook Adapter（§7 死信模式参考）
 

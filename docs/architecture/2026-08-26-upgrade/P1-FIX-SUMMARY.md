@@ -152,7 +152,7 @@
 | 涉及 spec | 字段 | before | after |
 |---|---|---|---|
 | `spec/agent-api/01-schema.md` | §3 | 无 Resume schema | **§3.17 Resume**（11 字段权威定义） |
-| `spec/flows/03-agent-resume.md` | §2 协议 | 11 字段 JSON 例子（部分字段语义模糊） | 11 字段完整 JSON 例子 + **引用 [`agent-api/v1#Resume`](../agent-api/01-schema.md) §3.17** + 补全 `last_modified` / `open_diagnostics` / `test_results` / `relevant_context` 等之前未明确的字段 |
+| `spec/flows/03-agent-resume.md` | §2 协议 | 11 字段 JSON 例子（部分字段语义模糊） | 11 字段完整 JSON 例子 + **引用 [`agent-api/v1#Resume`](spec/agent-api/01-schema.md) §3.17** + 补全 `last_modified` / `open_diagnostics` / `test_results` / `relevant_context` 等之前未明确的字段 |
 
 ## 3. 11 份 spec 修改详情
 

@@ -34,9 +34,9 @@ Automation  # 外部脚本（CI / cron / 定时任务 / webhook）
 ```
 
 > **5 ActorType 边界澄清（per B-07 / B-16 修复 2026-08-27）**：
-> - **Human** ↔ [resources/05](../../resources/05-agent-permission-model.md) 隐式一致（User = Human）
-> - **Agent** ↔ [resources/03 §3](../../resources/03-agent-identity.md) Agent Schema
-> - **System** ↔ IDE Session + GitGit + Platform 内部事件（per [resources/04](../../resources/04-ide-session-identity.md) + [arch/05](../../arch/05-gitgit-compat-arch.md)，System 是合并抽象 — 区别于具体 IDE/具体 GitGit 客户端）
+> - **Human** ↔ [resources/05](../resources/05-agent-permission-model.md) 隐式一致（User = Human）
+> - **Agent** ↔ [resources/03 §3](../resources/03-agent-identity.md) Agent Schema
+> - **System** ↔ IDE Session + GitGit + Platform 内部事件（per [resources/04](../resources/04-ide-session-identity.md) + [arch/05](../../arch/05-gitgit-compat-arch.md)，System 是合并抽象 — 区别于具体 IDE/具体 GitGit 客户端）
 > - **Service** ↔ STAR 平台层服务（鉴权 / 审计 / 事件总线 / NATS consumer）— **是 STAR 一等对象**，与 Automation 区分
 > - **Automation** ↔ 外部脚本（CI / cron / 定时任务 / webhook）— **不是 STAR 一等对象**，是外部 trigger
 

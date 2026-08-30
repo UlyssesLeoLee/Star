@@ -7,7 +7,7 @@
 
 定义 STAR MCP server 的 **Resources**（只读 URI 资源）和 **Prompts**（预置 prompt 模板）规范。本 spec 显式覆盖 [spec/mcp/01-mcp-spec.md §4 Resources](./01-mcp-spec.md) 和 §5 Prompts 中 "MVP 不实现（Level 1-2 不含）" 的占位声明（per F-28 / arch/03 §2.3 v0.3 fix），为 **Phase 2+**（Level 3+ Full MCP 2026-07-28）提供可落地的 URI 命名表 / content type / 权限矩阵和 prompt 模板清单。
 
-> **MVP 范围重申（per F-28 修复 2026-08-27）**：MVP（Level 1-2）不实现 Resources / Prompts，IDE 通过 `tools/call` 即可获得全部 MVP 能力（per arch/03 §2.3 + [acceptance/04 §3](../../acceptance/04-mvp-acceptance.md)）。本 spec 是 Phase 2+ 的**设计预研**，不进 MVP 退出条件。
+> **MVP 范围重申（per F-28 修复 2026-08-27）**：MVP（Level 1-2）不实现 Resources / Prompts，IDE 通过 `tools/call` 即可获得全部 MVP 能力（per arch/03 §2.3 + [acceptance/04 §3](../acceptance/04-mvp.md)）。本 spec 是 Phase 2+ 的**设计预研**，不进 MVP 退出条件。
 
 ## 1. Resources 类型
 
@@ -64,7 +64,7 @@
 - **缓存 scope**：`workspace` / `ttlMs=300000`（decision 变更频率低，5 分钟缓存）
 - **典型字段**：见 ADR-0018
 
-> **F-28 守门**：4 类 Resources 在 MVP（Level 1-2）不实现，本节仅为 Phase 2+ 设计。MVP 退出条件 [acceptance/04 §3](../../acceptance/04-mvp-acceptance.md) 不含 Resources 数量。
+> **F-28 守门**：4 类 Resources 在 MVP（Level 1-2）不实现，本节仅为 Phase 2+ 设计。MVP 退出条件 [acceptance/04 §3](../acceptance/04-mvp.md) 不含 Resources 数量。
 
 ### 1.6 Resources 通用属性
 
@@ -170,7 +170,7 @@
 
 ### 5.2 Streamable HTTP transport（per arch/03 §5.1 F-22 — Phase 2+）
 
-- **POST `/mcp/resources/list`** — 列出 resources（per [spec/flows/03 §2](../flows/03-mcp-streamable-http.md) Phase 2+ 设计）
+- **POST `/mcp/resources/list`** — 列出 resources（per [MCP Streamable HTTP Transport](../../../mcp-streamable-http.md) Phase 2+ 设计）
 - **POST `/mcp/resources/read`** — 读取 resource
 - **POST `/mcp/prompts/list`** — 列出 prompts
 - **POST `/mcp/prompts/get`** — 渲染 prompt
@@ -193,7 +193,7 @@ resources / prompts 操作的 6 字段 Error 行为（per agent-api/v1 §3.14 + 
 1. **Resources **Phase 2** 评估延迟**：MVP 不实现（per F-28），4 类资源设计完整但无 Rust 代码实装（per 任务授权："不实装 Rust 代码"）；Phase 2 启动时需重新评估 URI scheme 是否与 2026-07-28 spec 后续版本冲突。
 2. **Prompts 模板内容待填**：5 个 prompt 仅 `name` / `description` / `arguments[]`，**不含** `messages[]` 模板正文（mcp/01 §5 也未给正文）。Phase 2 启动时需补每个 prompt 的 实际消息模板（当前是 placeholder）。
 3. **subscribe 协议未定**：resources 变更订阅（5.2 GET endpoint）依赖 Streamable HTTP server-push，协议细节 Phase 3+ 再定。
-4. **权限矩阵与 ADR-0021 Zero Vendor Cooperation 关系**：本 spec 假设 5 域 Lead 独立（per 8/21 JST），但具体 enforcement（policy engine 拒绝越权 read）依赖 [spec/policy/01](../policy/01-policy-engine.md) Phase 2+ 落地。
+4. **权限矩阵与 ADR-0021 Zero Vendor Cooperation 关系**：本 spec 假设 5 域 Lead 独立（per 8/21 JST），但具体 enforcement（policy engine 拒绝越权 read）依赖 `spec/policy/01-policy-engine.md`（尚未创建，Phase 2+ 落地）。
 5. **decision 类型的 supersede 链**：decision 不可改写只能 supersede，但 URI 表未定义 `decision://.../superseded-by:...` 跳转关系，Phase 2+ 需补 supersede 关系 URI。
 6. **与 agent-api/v1 §3.21 Decision schema 对齐**：上面 1.5 提到的 Decision 字段（`decision_id` / `kind` / ...）需以 [agent-api/01 §3.21](../agent-api/01-schema.md) 落盘版本为准，**目前仅引用 ADR-0018 历史记录**（per F-21 强化交叉引用原则，Phase 2+ 需重新对齐）。
 

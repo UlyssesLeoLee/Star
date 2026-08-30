@@ -6,6 +6,7 @@
 > **触发**: Ulysses 2026-08-29 04:02 JST 拍板 "Star 自创（推荐）" + "补齐 P1-P3 全部 33 项"
 > **关联**: `docs/frontend/design/dynamic-interaction-design.md` (DnD/协同基线)
 > **关联**: `docs/frontend/design/ui-detailed-design.md` (像素级 wireframe)
+> **上游架构基线**: [`docs/frontend-internal-01-architecture.md`](../../frontend-internal-01-architecture.md)(组件树/Store 分层/模块依赖总纲,本文档为其三栏信息架构的下游延伸)
 
 ---
 

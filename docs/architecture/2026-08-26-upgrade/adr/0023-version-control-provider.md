@@ -5,7 +5,7 @@
 > **制定者**：架构师（Mavis 接手 agent per DEC-008）— per 2026-08-26 08:40 JST 代签新规则
 > **签批**：⏳ 待签
 > **依赖**：[ADR-0022 IDE Placement](0022-ide-placement.md)
-> **关联**：[GitHub/GitLab Compatibility Spec](../spec/vcs/github-gitlab-compat.md)（起草中）
+> **关联**：[GitHub/GitLab Compatibility Spec](../spec/vcs/03-github-gitlab-compat.md)（起草中）
 
 ---
 

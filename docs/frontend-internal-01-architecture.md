@@ -13,6 +13,7 @@
 > **上游 requirements**: `D:\Star\docs\requirements.md` v2.0(下文以 §R-N 引用)
 > **4 份 frontend-internal 之一**: 01-架构 / 02-组件 / 03-数据流 / 04-交互
 > **文档定位**: Frontend Basic Design 下游第一份,做 Internal Design 级别具体化(组件树、Store 分层、路由分层、模块依赖、ADR 落地)。**继承 frontend-design.md §1-9 + §11,不重复内容**,只落地 + 详细化
+> **下游延伸(2026-08-29)**: 三栏信息架构见 [`docs/frontend/design/ui-3pane-arch.md`](frontend/design/ui-3pane-arch.md);像素级 wireframe 见 [`docs/frontend/design/ui-detailed-design.md`](frontend/design/ui-detailed-design.md)
 
 ---
 

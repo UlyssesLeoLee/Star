@@ -5,7 +5,7 @@
 > **制定者**：架构师（Mavis 接手 agent per DEC-008）— per 2026-08-26 08:40 JST 代签新规则
 > **签批**：⏳ 待签
 > **依赖**：[ADR-0021 Zero Vendor Cooperation](0021-zero-vendor-cooperation.md)
-> **关联**：[Compatibility Matrix 综合](../ecosystem-survey/compatibility-matrix.md) §4
+> **关联**：[Compatibility Matrix 综合](../../../ecosystem-survey/compatibility-matrix.md) §4
 
 ---
 

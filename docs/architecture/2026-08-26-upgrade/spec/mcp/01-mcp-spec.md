@@ -1,7 +1,7 @@
 # 14. STAR MCP Specification
 
 > **状态**：🟡 草案 v0.2
-> **依赖**：[Protocol Survey §1](../../ecosystem-survey/protocol-survey.md) · [ADR-0021 Zero Vendor Cooperation](../../adr/0021-zero-vendor-cooperation.md) · [spec/agent-api/01-schema.md §3.15 Error](../agent-api/01-schema.md)
+> **依赖**：[Protocol Survey §1](../../../../ecosystem-survey/protocol-survey.md) · [ADR-0021 Zero Vendor Cooperation](../../adr/0021-zero-vendor-cooperation.md) · [spec/agent-api/01-schema.md §3.15 Error](../agent-api/01-schema.md)
 
 ## 1. 规范版本
 
@@ -49,7 +49,7 @@
 
 ### 2.2 Tool list 排序 + ttlMs 缓存要求（per F-18 修复 2026-08-27）
 
-- **排序**：tool list 必须按 tool name 字典序升序（per [ecosystem-survey/protocol-survey.md §1 对 STAR 的推论](../../ecosystem-survey/protocol-survey.md)）—— 不排序会导致 client 端 hash 校验失败
+- **排序**：tool list 必须按 tool name 字典序升序（per [ecosystem-survey/protocol-survey.md §1 对 STAR 的推论](../../../../ecosystem-survey/protocol-survey.md)）—— 不排序会导致 client 端 hash 校验失败
 - **ttlMs 缓存**：每个 tool 的 `metadata` 列包含 `ttlMs`（毫秒）+ `cacheScope`（`workspace` / `session` / `none` 三选一）；0 = 不缓存
 - **cacheScope 语义**：
   - `workspace` — 同 workspace 内所有 agent 共享缓存（默认 30s / 60s）

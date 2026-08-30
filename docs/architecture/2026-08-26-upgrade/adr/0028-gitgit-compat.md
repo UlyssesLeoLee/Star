@@ -5,8 +5,8 @@
 > **制定者**：架构师（Mavis 接手 agent per DEC-008）— per 2026-08-26 08:40 JST 代签新规则
 > **签批**：⏳ 待签（per §6 签字栏）
 > **父文档**：[STAR × GitGit AI/IDE 零厂商适配架构升级 Plan](../../docs/plan/2026-08-26-upgrade-plan.md)（待归档）
-> **依赖**：[ADR-0022 IDE Placement](0022-ide-placement.md) · [ADR-0023 Version Control Provider](0023-version-control-provider.md) · [GitGit IDE Boundary Spec](../responsibility-matrix/gitgit-ide-boundary.md)
-> **关联**：[arch/05 GitGit Compat Arch](../architecture/2026-08-26-upgrade/arch/05-gitgit-compat-arch.md)
+> **依赖**：[ADR-0022 IDE Placement](0022-ide-placement.md) · [ADR-0023 Version Control Provider](0023-version-control-provider.md) · [GitGit IDE Boundary Spec](../../../responsibility-matrix/gitgit-ide-boundary.md)
+> **关联**：[arch/05 GitGit Compat Arch](../arch/05-gitgit-compat-arch.md)
 
 ---
 

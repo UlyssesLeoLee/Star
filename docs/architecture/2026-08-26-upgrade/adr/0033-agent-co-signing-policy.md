@@ -5,8 +5,8 @@
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **签批**：🟢 Mavis 接手终审（per 2026-08-27 17:54 JST 发令"你自己 review 签你自己名字"，8/27 07:16 JST 代签规则反转授权）
 > **父文档**：[STAR × GitGit AI/IDE 零厂商适配架构升级 Plan](../../docs/plan/2026-08-26-upgrade-plan.md)（待归档）
-> **依赖**：[ADR-0021 Zero Vendor Cooperation](0021-zero-vendor-cooperation.md) · [DEC-008 一人公司 12 角色](0033-...) · [AGENTS.md](../../AGENTS.md)
-> **关联**：[PHASE-D2-CLI-IMPL-REPORT.md](../../../PHASE-D2-CLI-IMPL-REPORT.md) · [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../PHASE-D3-MCP-TRANSPORT-REPORT.md) · [PHASE-D4-P1-FIX-REPORT.md](../../../PHASE-D4-P1-FIX-REPORT.md) · [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) · [STAR-UNTRACKED-CLEANUP-REPORT.md](../../../docs/reports/2026-08-27-untracked-cleanup/STAR-UNTRACKED-CLEANUP-REPORT.md) · [RGS-CROSS-REF-SYNC-REPORT.md](../../../RGS-CROSS-REF-SYNC-REPORT.md) · [RGS-MAVIS-AUDIT.md](../../../RGS-MAVIS-AUDIT.md) · [DTL-036 v1.4 hotfix commit](https://github.com/UlyssesLeoLee/Star/commit/DTL-036-v1.4-hotfix)
+> **依赖**：[ADR-0021 Zero Vendor Cooperation](0021-zero-vendor-cooperation.md) · DEC-008 一人公司 12 角色（见 [AGENTS.md](../../../../AGENTS.md)） · [AGENTS.md](../../../../AGENTS.md)
+> **关联**：[PHASE-D2-CLI-IMPL-REPORT.md](../../../../PHASE-D2-CLI-IMPL-REPORT.md) · [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../../PHASE-D3-MCP-TRANSPORT-REPORT.md) · [PHASE-D4-P1-FIX-REPORT.md](../../../../PHASE-D4-P1-FIX-REPORT.md) · [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) · [STAR-UNTRACKED-CLEANUP-REPORT.md](../../../reports/2026-08-27-untracked-cleanup/STAR-UNTRACKED-CLEANUP-REPORT.md) · RGS-CROSS-REF-SYNC-REPORT.md（未创建，待补）· RGS-MAVIS-AUDIT.md（未创建，待补）· [DTL-036 v1.4 hotfix commit](https://github.com/UlyssesLeoLee/Star/commit/DTL-036-v1.4-hotfix)
 
 ---
 

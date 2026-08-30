@@ -159,7 +159,7 @@ async fn handle_webhook(provider, delivery_id, body):
 ### 4.2 映射实施位置
 
 - **`crates/star-webhook/src/mapping.rs`**（计划位置）：每个 provider 一个 `pub fn map_<provider>_event(...) -> Option<DomainEvent>`
-- **`crates/star-webhook/src/dispatcher.rs`**（计划位置）：调 mapping → emit 到 [flows/08 §1.1 13 个 STAR Domain Event](../flows/08-event-model.md) → SSE 推（per [02 SSE §0](../../services/02-sse-streaming-spec.md)）
+- **`crates/star-webhook/src/dispatcher.rs`**（计划位置）：调 mapping → emit 到 [flows/08 §1.1 13 个 STAR Domain Event](../flows/08-event-model.md) → SSE 推（per [02 SSE §0](02-sse-streaming-spec.md)）
 - **`crates/star-webhook/src/handlers/`**（计划位置）：每个 provider 一个 `mod.rs`，含签名验证（per §2）+ 去重（per §3）
 
 ## §5 失败重试 + 死信

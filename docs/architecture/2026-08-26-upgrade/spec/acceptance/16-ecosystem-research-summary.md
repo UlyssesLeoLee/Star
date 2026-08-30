@@ -5,10 +5,10 @@
 
 ## 1. 调研范围
 
-- 7 款 Coding Agent（per [ai-compatibility-matrix.md](../../ecosystem-survey/ai-compatibility-matrix.md)）
+- 7 款 Coding Agent（per [ai-compatibility-matrix.md](../../../../ecosystem-survey/ai-compatibility-matrix.md)）
   - **7 款** (per [arch/03 §1 总体架构](../../arch/03-star-ai-compat-arch.md)): Codex · Claude Code · Gemini CLI · Copilot · Cursor · VS Code · Junie
-- 6 款 IDE / CDE（per [ide-compatibility-matrix.md](../../ecosystem-survey/ide-compatibility-matrix.md)）
-- 4 套协议 + 2 套工具（per [protocol-survey.md](../../ecosystem-survey/protocol-survey.md)）
+- 6 款 IDE / CDE（per [ide-compatibility-matrix.md](../../../../ecosystem-survey/ide-compatibility-matrix.md)）
+- 4 套协议 + 2 套工具（per [protocol-survey.md](../../../../ecosystem-survey/protocol-survey.md)）
 
 ### 1.1 Phase D 实测 4 款明确指定（per P2-12 修复 2026-08-27）
 
@@ -84,10 +84,10 @@
 
 ## 4. 详细资料
 
-- 7 款 Agent：[ai-compatibility-matrix.md](../../ecosystem-survey/ai-compatibility-matrix.md)
-- 6 款 IDE：[ide-compatibility-matrix.md](../../ecosystem-survey/ide-compatibility-matrix.md)
-- 4 套协议：[protocol-survey.md](../../ecosystem-survey/protocol-survey.md)
-- 综合矩阵：[compatibility-matrix.md](../../ecosystem-survey/compatibility-matrix.md)
+- 7 款 Agent：[ai-compatibility-matrix.md](../../../../ecosystem-survey/ai-compatibility-matrix.md)
+- 6 款 IDE：[ide-compatibility-matrix.md](../../../../ecosystem-survey/ide-compatibility-matrix.md)
+- 4 套协议：[protocol-survey.md](../../../../ecosystem-survey/protocol-survey.md)
+- 综合矩阵：[compatibility-matrix.md](../../../../ecosystem-survey/compatibility-matrix.md)
 
 ## 5. 签字栏 / 修订历史
 

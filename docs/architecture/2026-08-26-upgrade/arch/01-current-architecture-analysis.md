@@ -5,7 +5,7 @@
 > **制定者**：架构师（Mavis 接手 agent per DEC-008）— per 2026-08-26 08:40 JST 代签新规则
 > **签批**：⏳ 待签
 > **父文档**：[STAR × GitGit 升级 Plan](../../../plan/2026-08-26-upgrade-plan.md)
-> **依赖**：[ADR-0021 ~ 0025](../../adr/)
+> **依赖**：[ADR-0021 ~ 0025](../adr/)
 
 ---
 
@@ -138,8 +138,8 @@ star/
 | AI Ecosystem Research | `../../ecosystem-survey/ai-compatibility-matrix.md` |
 | IDE Ecosystem Research | `../../ecosystem-survey/ide-compatibility-matrix.md` |
 | AI and IDE Compatibility Matrix | `../../ecosystem-survey/compatibility-matrix.md` |
-| Zero Vendor Cooperation ADR | `../../adr/0021-zero-vendor-cooperation.md` |
-| IDE Placement ADR | `../../adr/0022-ide-placement.md` |
+| Zero Vendor Cooperation ADR | `../adr/0021-zero-vendor-cooperation.md` |
+| IDE Placement ADR | `../adr/0022-ide-placement.md` |
 | STAR AI Compatibility Architecture | `arch/02-star-ai-compat-arch.md` |
 | STAR IDE Gateway Architecture | `arch/03-star-ide-gateway-arch.md` |
 | GitGit Compatibility Architecture | `arch/04-gitgit-compat-arch.md` |

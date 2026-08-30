@@ -9,7 +9,7 @@ STAR 上层（CLI / MCP / REST / IDE Gateway）**不**直接调用任何 VCS / C
 
 1. **vendor 语义污染**：GitHub `pull_request` ≠ GitLab `merge_request` ≠ Gitea `pull_request`，上层如果写 if-else 分发，逻辑会被 vendor 概念反向侵蚀（per DTL-036 v1.4 hotfix 教训，Ulysses 一审即发现 P1/P2/P3 三项违规）
 2. **零厂商合作约束**（per [ADR-0021](../../adr/0021-zero-vendor-cooperation.md)）：不允许把 vendor SDK 当一等公民；STAR 必须拥有"中立翻译层"
-3. **测试可替换**：SA trait 让 conformance test 用 mock provider 跑通（per [spec/acceptance/01 Unknown Agent Test](../../acceptance/01.md)）
+3. **测试可替换**：SA trait 让 conformance test 用 mock provider 跑通（per [spec/acceptance/01 Unknown Agent Test](../acceptance/01-unknown-agent-test.md)）
 4. **入站 + 出站对称**：Webhook Adapter（inbound, [03 §1](03-webhook-adapter-spec.md)）与 SA（outbound, 本 spec）共享同一 trait 抽象边界，但分两 spec 描述 —— 入站侧重签名验证 / 幂等，出站侧重协议转换 / 限流
 
 **SA 与 VCS Provider 关系**：[spec/vcs/01 §2](../vcs/01-version-control-provider.md) `VersionControlProvider` trait 是 SA 的**子集** —— SA 是更广义的"对外服务适配层"，VCS Provider 仅覆盖 Git 协议（clone / fetch / push / PR/MR）。SA 还覆盖 CI / Issue Tracker / Notification（如 GitHub Actions / GitLab CI / Jira）三类**非 Git** 服务。
@@ -151,7 +151,7 @@ providers:
 | 认证失败 | 401 | ❌ | 立即 fail（per [agent-api/v1 §3.15 Error](../agent-api/01-schema.md) `AUTH_INVALID`）|
 | 权限不足 | 403 | ❌ | 立即 fail（`PERMISSION_DENIED`）|
 | 资源不存在 | 404 | ❌ | 立即 fail（`NOT_FOUND`）|
-| 客户端错误 | 400/422 | ❌ | 立即 fail（`INVALID_REQUEST`，触发 Universal Submit 12 步 [§6 错误处理](../../flows/05-universal-submit.md)）|
+| 客户端错误 | 400/422 | ❌ | 立即 fail（`INVALID_REQUEST`，触发 Universal Submit 12 步 [§6 错误处理](../flows/05-universal-submit.md)）|
 | 网络超时 | — | ✅ | 同 5xx |
 
 ### 4.2 限流策略
@@ -192,7 +192,7 @@ providers:
 | G-03 | `ServiceCapabilities.supports_graphql` 字段已定义但 GitHub GraphQL 限流（per node 复杂度）未建模 | 🟡 待 v0.2 补 | v0.1 初版未展开 |
 | G-04 | `request()` 返回 `RawResponse` 但 vendor 错误格式（GitHub `{message, errors}` vs GitLab `{message, error_description}`）未定义统一 schema | 🟡 待 v0.2 补 | vendor 错误格式差异大 |
 | G-05 | 凭据轮转（PAT 过期 / OAuth refresh）未在 SA 层自动处理 | 🟡 Phase 2+ 评估 | 安全要求但本 spec 范围外 |
-| G-06 | 与 [mcp/01 §2.3 `submit` tool](../mcp/01-mcp-spec.md) 的 Universal Submit 12 步流程（[flows/05 §2](../../flows/05-universal-submit.md)）集成点未明 —— 是 SA 直接做，还是 Application Service 编排？ | 🟡 待 v0.2 + W4 子代理定 | 本 spec v0.1 不展开 |
+| G-06 | 与 [mcp/01 §2.3 `submit` tool](../mcp/01-mcp-spec.md) 的 Universal Submit 12 步流程（[flows/05 §2](../flows/05-universal-submit.md)）集成点未明 —— 是 SA 直接做，还是 Application Service 编排？ | 🟡 待 v0.2 + W4 子代理定 | 本 spec v0.1 不展开 |
 | G-07 | Phase E 当前仅为 spec 草案，**不**进 MVP 退出条件（per [arch/03 §2.3](../../arch/03-star-ai-compat-arch.md) Level 1-2 范围 = tools + submit）| 🟢 显式不实现 | per F-28 修复措辞统一 |
 
 ## §7 修订历史

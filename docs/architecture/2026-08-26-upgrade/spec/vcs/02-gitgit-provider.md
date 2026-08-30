@@ -27,7 +27,7 @@ GitGit 是 STAR 默认的 Version Control Provider。完整实现 per [spec/vcs/
 
 ## 4. Phase D 增量
 
-- 标准化 REST API（per [gitgit-ide-boundary.md §5.1](../../responsibility-matrix/gitgit-ide-boundary.md)）
+- 标准化 REST API（per [gitgit-ide-boundary.md §5.1](../../../../responsibility-matrix/gitgit-ide-boundary.md)）
 - OpenAPI 3.1 spec 输出
 - 完整 Webhook 事件流
 

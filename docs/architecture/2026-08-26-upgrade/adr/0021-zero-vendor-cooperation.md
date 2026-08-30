@@ -5,7 +5,7 @@
 > **制定者**：架构师（Mavis 接手 agent per DEC-008）— per 2026-08-26 08:40 JST 代签新规则
 > **签批**：⏳ 待签（per §6 签字栏）
 > **父文档**：[STAR × GitGit AI/IDE 零厂商适配架构升级 Plan](../../docs/plan/2026-08-26-upgrade-plan.md)（待归档）
-> **关联**：[AI Compatibility Matrix](../ecosystem-survey/ai-compatibility-matrix.md) · [IDE Compatibility Matrix](../ecosystem-survey/ide-compatibility-matrix.md) · [Compatibility Matrix 综合](../ecosystem-survey/compatibility-matrix.md) · [Protocol Survey](../ecosystem-survey/protocol-survey.md)
+> **关联**：[AI Compatibility Matrix](../../../ecosystem-survey/ai-compatibility-matrix.md) · [IDE Compatibility Matrix](../../../ecosystem-survey/ide-compatibility-matrix.md) · [Compatibility Matrix 综合](../../../ecosystem-survey/compatibility-matrix.md) · [Protocol Survey](../../../ecosystem-survey/protocol-survey.md)
 
 ---
 
@@ -94,7 +94,7 @@
 - **依赖**：[ADR-0023 Version Control Provider](0023-version-control-provider.md) — 决定 GitGit 与 GitHub/GitLab 并列
 - **依赖**：[ADR-0024 IDE Session Identity](0024-ide-session-identity.md) — IDE Session 不污染 GitGit
 - **依赖**：[ADR-0025 Vendor Adapter Anti-Contamination](0025-vendor-adapter-anti-contamination.md) — Core 不允许 vendor-specific 逻辑
-- **被依赖**：[ADR-0026 STAR AI Compatibility Architecture](0026-star-ai-compat-arch.md)（起草中）
+- **被依赖**：[ADR-0026 STAR AI Compatibility Architecture](0026-star-ai-compat.md)（起草中）
 
 ## 6. 签字栏
 

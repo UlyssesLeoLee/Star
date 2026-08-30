@@ -6,7 +6,7 @@
 > **签批**：⏳ 待签（per §6 签字栏）
 > **父文档**：[STAR × GitGit AI/IDE 零厂商适配架构升级 Plan](../../docs/plan/2026-08-26-upgrade-plan.md)（待归档）
 > **依赖**：[ADR-0026 STAR AI Compat](0026-star-ai-compat.md) · [ADR-0029 Universal Submit](0029-universal-submit.md) · [ADR-0030 Agent Resume](0030-agent-lease-heartbeat-resume.md)
-> **关联**：[arch/03 STAR AI Compat Arch](../architecture/2026-08-26-upgrade/arch/03-star-ai-compat-arch.md) · [spec/context/01 Context API](../architecture/2026-08-26-upgrade/spec/context/01-context-api.md)
+> **关联**：[arch/03 STAR AI Compat Arch](../arch/03-star-ai-compat-arch.md) · [spec/context/01 Context API](../spec/context/01-context-api.md)
 
 ---
 

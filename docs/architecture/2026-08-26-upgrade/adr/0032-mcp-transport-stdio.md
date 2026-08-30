@@ -5,8 +5,8 @@
 > **制定者**：架构师（Mavis 接手 agent per DEC-008）— per 2026-08-26 08:40 JST 代签新规则
 > **签批**：⏳ 待签（per §6 签字栏）
 > **父文档**：[STAR × GitGit AI/IDE 零厂商适配架构升级 Plan](../../docs/plan/2026-08-26-upgrade-plan.md)（待归档）
-> **依赖**：[ADR-0021 Zero Vendor Cooperation](0021-zero-vendor-cooperation.md) · [ADR-0026 STAR AI Compat](0026-star-ai-compat.md) · [Protocol Survey §1](../ecosystem-survey/protocol-survey.md)
-> **关联**：[spec/mcp/01 MCP Spec](../architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md) · [spec/agent-api/01-schema.md §3.15 Error](../architecture/2026-08-26-upgrade/spec/agent-api/01-schema.md)
+> **依赖**：[ADR-0021 Zero Vendor Cooperation](0021-zero-vendor-cooperation.md) · [ADR-0026 STAR AI Compat](0026-star-ai-compat.md) · [Protocol Survey §1](../../../ecosystem-survey/protocol-survey.md)
+> **关联**：[spec/mcp/01 MCP Spec](../spec/mcp/01-mcp-spec.md) · [spec/agent-api/01-schema.md §3.15 Error](../spec/agent-api/01-schema.md)
 
 ---
 

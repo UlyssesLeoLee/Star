@@ -1,7 +1,7 @@
 # 15. REST / OpenAPI Strategy
 
 > **状态**：🟡 草案 v0.2
-> **依赖**：[Protocol Survey §3](../../ecosystem-survey/protocol-survey.md) · [arch/03 STAR AI Compat Arch](../../arch/03-star-ai-compat-arch.md) · [spec/agent-api/01-schema.md §3.14 Error](../agent-api/01-schema.md)
+> **依赖**：[Protocol Survey §3](../../../../ecosystem-survey/protocol-survey.md) · [arch/03 STAR AI Compat Arch](../../arch/03-star-ai-compat-arch.md) · [spec/agent-api/01-schema.md §3.14 Error](../agent-api/01-schema.md)
 
 ## 1. OpenAPI 版本
 

@@ -78,7 +78,7 @@
 - 两段独立验证，**全部通过**才算验收闭环
 - 不修改 STAR Core / GitGit Core
 - 不写 AI 厂商适配器
-- 测试环境**不**联网（无外部 AI 服务）— 测的是**本地 agent** 或 **mock agent**，非真实 7 款主流 Agent 之一（真实 Agent 实测由 [spec/acceptance/16 §2.3](../16-ecosystem-research-summary.md) per P2-12 修复选定 4 款 + Phase D 实测）
+- 测试环境**不**联网（无外部 AI 服务）— 测的是**本地 agent** 或 **mock agent**，非真实 7 款主流 Agent 之一（真实 Agent 实测由 [spec/acceptance/16 §2.3](16-ecosystem-research-summary.md) per P2-12 修复选定 4 款 + Phase D 实测）
 
 ## 7. 实施位置
 

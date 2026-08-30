@@ -69,7 +69,7 @@ Phase H 在 Phase G 基础上接 **3 大能力域**（per ADR-0036 §8.2 L293-29
 ### D16. 新增 `spec/integration/01-22-domain-integration-spec.md` — 6 Tier 接入顺序 + 5 验收 + 7 已知缺口
 
 **理由**：
-- Phase G 22 domain crate 已 stub（per §1.1 + [ADR-0036 §1.1 L22-32](0036-phase-g-architecture.md)），但 star-mcp 16 tool 仍 mock（per [AGENTS.md §7 #4](AGENTS.md) "16 tool 真实数据源接入（现 mock）"）
+- Phase G 22 domain crate 已 stub（per §1.1 + [ADR-0036 §1.1 L22-32](0036-phase-g-architecture.md)），但 star-mcp 16 tool 仍 mock（per [AGENTS.md §7 #4](../../../../AGENTS.md) "16 tool 真实数据源接入（现 mock）"）
 - spec/agents/02 §1 L16-38 已列 22 domain URI 表，但 Tier 分类（核心 / 重要 / 边缘 / 业务域 / 实验性 / 离线）未排
 - 5 业务域（Player / Economy / Match / Social / Admin）Step trait 待 Phase H 全部实装（per [ADR-0036 §7 #5 L272](0036-phase-g-architecture.md)）
 - 6 Tier 顺序决定 D17 Saga 测试用例的覆盖范围 + D19 性能基线优先级
@@ -109,7 +109,7 @@ Phase H 在 Phase G 基础上接 **3 大能力域**（per ADR-0036 §8.2 L293-29
 - AGENTS.md §7 #4 "16 tool 真实数据源接入" P2 待办 = Phase H 主战场
 - star-mcp 当前 16 tool handler（per [ADR-0034 §2 D3 L82-100](0034-phase-e-architecture.md)）走 mock 数据源
 - Phase G D13 star-cache + D14 star-saga 已就位（per §1.1），Phase H 只缺 handler ↔ 22 domain crate ↔ 真实数据源三层穿透
-- 22 handler × 5 测试（read / write / list / invalidate / error path）= 110 测试（per [AGENTS.md §7 #4](AGENTS.md) "16 tool 真实数据源接入（现 mock）"）
+- 22 handler × 5 测试（read / write / list / invalidate / error path）= 110 测试（per [AGENTS.md §7 #4](../../../../AGENTS.md) "16 tool 真实数据源接入（现 mock）"）
 
 **形式**：
 - 路径：`crates/star-mcp/src/handlers/`
@@ -127,7 +127,7 @@ Phase H 在 Phase G 基础上接 **3 大能力域**（per ADR-0036 §8.2 L293-29
 - Phase H 需 6 指标完整基线 = Phase G 4 指标 + cold start + error rate
 - [ADR-0036 §7 #8 L275](0036-phase-g-architecture.md) "Phase H 性能预算基线" 显式列待办
 - 0 unsafe + 0 新外部依赖（除 wiremock-rs Phase D.5+ 例外 + criterion-rs 性能测试库）继续生效
-- bench-runner.sh 跨平台（per 当前系统 win32）需 PowerShell 兼容（per [AGENTS.md §4 #6](AGENTS.md) "PowerShell only"）
+- bench-runner.sh 跨平台（per 当前系统 win32）需 PowerShell 兼容（per [AGENTS.md §4 #6](../../../../AGENTS.md) "PowerShell only"）
 
 **形式**：
 - `bench/perf-baseline.md`（~250 行，6 指标定义 + 实测方法 + 报告模板）：
@@ -148,7 +148,7 @@ Phase H 在 Phase G 基础上接 **3 大能力域**（per ADR-0036 §8.2 L293-29
 - 4 provider 配置（per spec/vcs/05 §1 配置 schema + §2 OAuth）：
   - GitHub：App OAuth（per 5 域 SRE NFR：≤ 5k req/h + ≤ 30 OAuth/scope）
   - GitLab：PAT + OAuth（≤ 5k req/h）
-  - Bitbucket：OAuth 1.0a（per [AGENTS.md §7 G-02 缺口](AGENTS.md)）
+  - Bitbucket：OAuth 1.0a（per [AGENTS.md §7 G-02 缺口](../../../../AGENTS.md)）
   - Gitea：PAT + Webhook（self-host 模式）
 - 22 handler → 真实 provider 穿透（per §3 关系表）
 - 报告形式：PHASE-H-* 真实接入报告 + ADR-0038 Phase H+ 收尾
@@ -272,7 +272,7 @@ per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不
 | 5 | Saga 测试框架的 chaos tool 选型 | D17 §2 chaos test 5 域 Lead 拒绝响应注入用 chaos-mesh（K8s 侵入式）还是手动 mock（轻量）待 SRE Lead + 平台工程师拍板 | D17 §2 列，SRE + 平台拍板 |
 | 6 | 22 domain 性能基线跨节点测试（Phase H+）| D19 6 指标基线是单进程，跨节点 K8s 模拟是 Phase H+（per arch/06 §3 NFR 4 节点要求）| 显式列，Phase H+ 推 |
 | 7 | Cache 命中率优化（Phase G+）| D13 star-cache LRU 10000 条是否够（per [ADR-0036 §7 #11 L278](0036-phase-g-architecture.md)）+ Cache warming 启动预热（per [ADR-0036 §7 #2 L269](0036-phase-g-architecture.md)）| 跨 ADR 引用 + D19 cold start 间接测 |
-| 8 | Phase H 完成后 acceptance/01-17 重新跑 | acceptance/01-17 是 5/26 旧版（per [AGENTS.md §7 #6](AGENTS.md) "9 个 wt 是否 merge 到 main"），22 handler 实装后需重跑 | 显式列，Phase H+ 推 |
+| 8 | Phase H 完成后 acceptance/01-17 重新跑 | acceptance/01-17 是 5/26 旧版（per [AGENTS.md §7 #6](../../../../AGENTS.md) "9 个 wt 是否 merge 到 main"），22 handler 实装后需重跑 | 显式列，Phase H+ 推 |
 | 9 | Property-based test 终止条件 | D17 §3 proptest 跑多少 case（默认 256 还是 1000）+ 收缩策略（shrinking）待 D17 spec 定 | D17 §3 列，Phase H spec 写时定 |
 | 10 | time-travel debug 状态快照存储 | D17 §1 saga 状态快照存哪里（per 22 domain crate in-memory vs star-cache vs star-saga event log）待 SRE Lead 拍板 | D17 §1 列，SRE 拍板 |
 | 11 | Performance Lead 真实身份签字（DDD Review 阶段）| per §4 #11 行 Performance Lead（Phase H 新增）🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)，6 指标基线 + 性能回归门禁待 Performance Lead 终审 | DDD Review 阶段补 |

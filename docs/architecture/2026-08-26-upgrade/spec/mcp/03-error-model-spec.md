@@ -135,7 +135,7 @@
 
 1. **HTTP 状态码映射未实装验证**：§4 表是 spec 推导，**未**经 Streamable HTTP 实测（Phase 2+ 才有 streamable-http，per mcp/01 §6 + F-22）；Phase 2 启动时需逐码用 curl 验证 30 个错误码对应 HTTP status。
 2. **30 个错误码粒度可能不够**：例如 `POLICY_DENIED` 可能需细化为 `POLICY_DENIED_LEASE` / `POLICY_DENIED_CROSS_WORKTREE` 等子码；当前 30 个是 MVP 基线，Phase 2+ 评估是否扩到 50+。
-3. **retry 退避策略未定义**：§3 矩阵只回答 "可不可重试"，**不**回答 "间隔多久 / 几次后放弃"；具体 backoff（指数 / 固定 / jitter）依赖 [spec/policy/01](../policy/01-policy-engine.md) Phase 2+ 落地。
+3. **retry 退避策略未定义**：§3 矩阵只回答 "可不可重试"，**不**回答 "间隔多久 / 几次后放弃"；具体 backoff（指数 / 固定 / jitter）依赖 `spec/policy/01-policy-engine.md`（尚未创建，Phase 2+ 落地）。
 4. **`trace_id` 字段未在 6 字段内**：v0.2 有 `trace_id`，F-06 重定义时**移除**（per agent-api/v1 §3.14 注释 "v0.2 的 trace_id 已弃用"）；Phase 2+ 评估是否通过 `details` 扩展或新增 `trace_id` 字段。
 5. **错误码跨语言映射**：本 spec 错误码为 SCREAMING_SNAKE_CASE 字符串，**不**含数字前缀；客户端用 string match 不用 integer match。Phase 2+ 评估是否加 `http_status` 数字字段便于 HTTP 客户端路由。
 6. **与 mcp/01 §3.2 fix 后内容未对齐**：本 spec 写于 2026-08-27 19:42 JST，mcp/01 v0.2 fix 注释说"§3.2 错误模型明确引用 agent-api/01 §3.15 Error"但实际 §3.14；本 spec 用**真实位置 §3.14**，mcp/01 fix 注释的 §3.15 编号是 W4 初稿残留（per mcp/01 §3.2 fix 注释段 "W4 子代理修复时的初稿编号"）。

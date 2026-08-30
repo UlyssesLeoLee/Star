@@ -6,7 +6,7 @@
 > **签批**：⏳ 待签（per §6 签字栏）
 > **父文档**：[STAR × GitGit AI/IDE 零厂商适配架构升级 Plan](../../docs/plan/2026-08-26-upgrade-plan.md)（待归档）
 > **依赖**：[ADR-0022 IDE Placement](0022-ide-placement.md) · [ADR-0024 IDE Session Identity](0024-ide-session-identity.md)
-> **关联**：[arch/04 STAR IDE Gateway Arch](../architecture/2026-08-26-upgrade/arch/04-star-ide-gateway-arch.md) · [IDE Compatibility Matrix](../ecosystem-survey/ide-compatibility-matrix.md)
+> **关联**：[arch/04 STAR IDE Gateway Arch](../arch/04-star-ide-gateway-arch.md) · [IDE Compatibility Matrix](../../../ecosystem-survey/ide-compatibility-matrix.md)
 
 ---
 

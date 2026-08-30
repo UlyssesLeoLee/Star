@@ -2,7 +2,7 @@
 
 > **状态**：🟡 草案 v0.1
 > **日期**：2026-08-26
-> **依赖**：[ADR-0022 IDE Placement](../../adr/0022-ide-placement.md) · [STAR vs GitGit Matrix](../../responsibility-matrix/star-vs-gitgit.md)
+> **依赖**：[ADR-0022 IDE Placement](../adr/0022-ide-placement.md) · [STAR vs GitGit Matrix](../../../responsibility-matrix/star-vs-gitgit.md)
 
 ---
 

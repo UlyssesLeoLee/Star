@@ -2,7 +2,7 @@
 
 > **状态**：🟡 草案 v0.1
 > **日期**：2026-08-26
-> **依赖**：[ADR-0021 ~ 0025](../../adr/) · [Protocol Survey](../../ecosystem-survey/protocol-survey.md)
+> **依赖**：[ADR-0021 ~ 0025](../adr/) · [Protocol Survey](../../../ecosystem-survey/protocol-survey.md)
 
 ---
 

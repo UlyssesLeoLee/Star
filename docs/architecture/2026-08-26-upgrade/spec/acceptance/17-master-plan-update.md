@@ -2,7 +2,7 @@
 
 > **状态**：🟡 草案 v0.1
 > **日期**：2026-08-26
-> **依赖**：[STAR master plan v0.1](../../plan/master-implementation-plan.md) · 本次升级全套 spec
+> **依赖**：[STAR master plan v0.1](../../../../plan/master-implementation-plan.md) · 本次升级全套 spec
 
 ## 1. Master Plan 升 v0.2 必要性
 

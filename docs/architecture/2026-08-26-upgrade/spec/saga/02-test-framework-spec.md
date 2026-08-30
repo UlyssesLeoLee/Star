@@ -121,7 +121,7 @@ saga_id: q003-trade-7f8a
 | C-01 | Step 执行超时 | `StepExecutor.execute_step` 包装 `tokio::time::timeout` | Saga 走 Compensating → Compensated | P0 |
 | C-02 | Step 永久失败 | `Step::execute` 返回 `Err(SagaError::StepFailed)` | Saga 走 Compensating → Compensated | P0 |
 | C-03 | Compensate 失败 | `Step::compensate` 返回 `Err(SagaError::CompensateFailed)` | Saga 走 Failed + 死信队列（per G-05 死信）| P0 |
-| C-04 | 网络瞬断 | Mock 网络层（chaos-mesh / 手动 mock）| 自动重试 3 次后 Compensate（per [spec/services/03 §7 死信](../services/03-event-bus-spec.md) 重试策略）| P1 |
+| C-04 | 网络瞬断 | Mock 网络层（chaos-mesh / 手动 mock）| 自动重试 3 次后 Compensate（per [spec/services/03 §5 死信](../services/03-webhook-adapter-spec.md) 重试策略）| P1 |
 | C-05 | Step 重复执行 | 同 saga_id 重入 | 幂等（去重，per [spec/cache/01 §3 缓存契约](../cache/01-cache-contract-spec.md) key = saga_id+step_name）| P1 |
 | C-06 | Saga 节点崩溃 | Orchestrator state 持久化（per spec/saga/01 §5 状态机持久化）| 启动恢复 + 续跑（per [spec/agents/01 §2 Lease 30s heartbeat](../agents/01-agent-runtime-spec.md) 失联检测）| P0 |
 | C-07 | 5 域 Lead 决策超时 | Economy Lead 决策 SLA 超（per ADR-0036 §7 #7 决策 SLA 量化）| 走 reject 分支（per [spec/saga/01 §4 Q-003 决策点](../saga/01-saga-coordination-spec.md) 大额交易显式签字）| P0 |
@@ -217,7 +217,7 @@ proptest! {
 - [spec/saga/01-saga-coordination-spec.md](../saga/01-saga-coordination-spec.md) — Saga 抽象 + 5 域 Lead + 状态机 8 步
 - [spec/agents/01-agent-runtime-spec.md](../agents/01-agent-runtime-spec.md) — Lease 协议 30s heartbeat / 300s TTL
 - [spec/services/01-service-adapter-spec.md](../services/01-service-adapter-spec.md) — 反污染原则（test mock 边界）
-- [spec/services/03-event-bus-spec.md](../services/03-event-bus-spec.md) — 死信 + 重试策略
+- [spec/services/03-webhook-adapter-spec.md](../services/03-webhook-adapter-spec.md) §5 — 死信 + 重试策略
 - [spec/cache/01-cache-contract-spec.md](../cache/01-cache-contract-spec.md) — 缓存契约（EventStore key 复用）
 - [ADR-0036 §3 spec/crate 关系](../../adr/0036-phase-g-architecture.md) — Phase H D14 Saga 测试维度映射
 - [ADR-0036 §7 已知缺口 #7](../../adr/0036-phase-g-architecture.md) — Economy Lead 决策 SLA 量化

@@ -17,23 +17,23 @@
 
 ### 1.1 生态事实基线（Phase A）
 
-- [ecosystem-survey/ai-compatibility-matrix.md](../ecosystem-survey/ai-compatibility-matrix.md) — 7 款 Coding Agent
-- [ecosystem-survey/ide-compatibility-matrix.md](../ecosystem-survey/ide-compatibility-matrix.md) — 6 款 IDE / CDE
-- [ecosystem-survey/protocol-survey.md](../ecosystem-survey/protocol-survey.md) — 4 套协议 + 2 套工具
-- [ecosystem-survey/compatibility-matrix.md](../ecosystem-survey/compatibility-matrix.md) — 综合矩阵 + 接入路径
+- [ecosystem-survey/ai-compatibility-matrix.md](../../ecosystem-survey/ai-compatibility-matrix.md) — 7 款 Coding Agent
+- [ecosystem-survey/ide-compatibility-matrix.md](../../ecosystem-survey/ide-compatibility-matrix.md) — 6 款 IDE / CDE
+- [ecosystem-survey/protocol-survey.md](../../ecosystem-survey/protocol-survey.md) — 4 套协议 + 2 套工具
+- [ecosystem-survey/compatibility-matrix.md](../../ecosystem-survey/compatibility-matrix.md) — 综合矩阵 + 接入路径
 
 ### 1.2 边界 ADR（Phase B）
 
-- [adr/0021-zero-vendor-cooperation.md](../adr/0021-zero-vendor-cooperation.md) — 最高原则
-- [adr/0022-ide-placement.md](../adr/0022-ide-placement.md) — IDE 归 STAR
-- [adr/0023-version-control-provider.md](../adr/0023-version-control-provider.md) — VCS Provider 抽象
-- [adr/0024-ide-session-identity.md](../adr/0024-ide-session-identity.md) — IDE Session 独立
-- [adr/0025-vendor-adapter-anti-contamination.md](../adr/0025-vendor-adapter-anti-contamination.md) — Vendor Adapter 隔离
+- [adr/0021-zero-vendor-cooperation.md](adr/0021-zero-vendor-cooperation.md) — 最高原则
+- [adr/0022-ide-placement.md](adr/0022-ide-placement.md) — IDE 归 STAR
+- [adr/0023-version-control-provider.md](adr/0023-version-control-provider.md) — VCS Provider 抽象
+- [adr/0024-ide-session-identity.md](adr/0024-ide-session-identity.md) — IDE Session 独立
+- [adr/0025-vendor-adapter-anti-contamination.md](adr/0025-vendor-adapter-anti-contamination.md) — Vendor Adapter 隔离
 
 ### 1.3 责任矩阵（Phase B）
 
-- [responsibility-matrix/star-vs-gitgit.md](../responsibility-matrix/star-vs-gitgit.md) — 60 项能力正交表
-- [responsibility-matrix/gitgit-ide-boundary.md](../responsibility-matrix/gitgit-ide-boundary.md) — GitGit IDE 接口边界
+- [responsibility-matrix/star-vs-gitgit.md](../../responsibility-matrix/star-vs-gitgit.md) — 60 项能力正交表
+- [responsibility-matrix/gitgit-ide-boundary.md](../../responsibility-matrix/gitgit-ide-boundary.md) — GitGit IDE 接口边界
 
 ### 1.4 架构分析（Phase C 第 1 组）
 
@@ -107,11 +107,11 @@
 
 | 决策 | 文档 |
 |---|---|
-| Zero Vendor Cooperation 最高原则 | [ADR-0021](../adr/0021-zero-vendor-cooperation.md) |
-| IDE 归 STAR | [ADR-0022](../adr/0022-ide-placement.md) |
-| VCS Provider 4 个并列 | [ADR-0023](../adr/0023-version-control-provider.md) |
-| IDE Session 独立 | [ADR-0024](../adr/0024-ide-session-identity.md) |
-| Optional Adapter 子 crate | [ADR-0025](../adr/0025-vendor-adapter-anti-contamination.md) |
+| Zero Vendor Cooperation 最高原则 | [ADR-0021](adr/0021-zero-vendor-cooperation.md) |
+| IDE 归 STAR | [ADR-0022](adr/0022-ide-placement.md) |
+| VCS Provider 4 个并列 | [ADR-0023](adr/0023-version-control-provider.md) |
+| IDE Session 独立 | [ADR-0024](adr/0024-ide-session-identity.md) |
+| Optional Adapter 子 crate | [ADR-0025](adr/0025-vendor-adapter-anti-contamination.md) |
 
 ## 3. 关键事实（per Phase A 2026-08-26 调研）
 

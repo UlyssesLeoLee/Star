@@ -6,7 +6,7 @@
 > **签批**：⏳ 待签
 > **父文档**：[STAR × GitGit AI/IDE 升级 Plan](../../docs/plan/2026-08-26-upgrade-plan.md)
 > **依赖**：[ADR-0021 Zero Vendor Cooperation](0021-zero-vendor-cooperation.md)
-> **关联**：[STAR vs GitGit Responsibility Matrix](../responsibility-matrix/star-vs-gitgit.md) · [GitGit IDE Boundary Spec](../responsibility-matrix/gitgit-ide-boundary.md)
+> **关联**：[STAR vs GitGit Responsibility Matrix](../../../responsibility-matrix/star-vs-gitgit.md) · [GitGit IDE Boundary Spec](../../../responsibility-matrix/gitgit-ide-boundary.md)
 
 ---
 
@@ -89,7 +89,7 @@ GitGit
 └── Worktree 底层能力
 ```
 
-### 2.4 IDE 能力归属（详尽正交表见 [responsibility-matrix/star-vs-gitgit.md](../responsibility-matrix/star-vs-gitgit.md)）
+### 2.4 IDE 能力归属（详尽正交表见 [responsibility-matrix/star-vs-gitgit.md](../../../responsibility-matrix/star-vs-gitgit.md)）
 
 **归 STAR**：编辑器工作流 · AI Coding Agent · Issue↔代码关联 · Task↔Worktree 关联 · 代码上下文 · 代码搜索 · 符号导航 · 代码智能分析 · RAG · Knowledge Graph · 代码解释/生成/修改建议 · 测试建议 · 影响分析 · Review 建议 · MR 创建 · CI/CD 状态 · Agent Session · Agent 权限 · Human-in-the-Loop · 多 Agent 协作 · 任务恢复 · 研发流程状态 · 项目级开发规范 · 企业级安全与合规策略
 

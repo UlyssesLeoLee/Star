@@ -2,7 +2,7 @@
 
 > **状态**：🟡 草案 v0.3
 > **日期**：2026-08-26
-> **依赖**：[ADR-0021 Zero Vendor Cooperation](../../adr/0021-zero-vendor-cooperation.md) · [Protocol Survey](../../ecosystem-survey/protocol-survey.md)
+> **依赖**：[ADR-0021 Zero Vendor Cooperation](../adr/0021-zero-vendor-cooperation.md) · [Protocol Survey](../../../ecosystem-survey/protocol-survey.md)
 
 ---
 
@@ -346,7 +346,7 @@ GitGit 原生事件（per [arch/05 §6](05-gitgit-compat-arch.md)）与 STAR Dom
 | `MergeCompleted.gitgit` | GitGit 物理层 | git merge 物理完成 | git merge 退出码 0 |
 | `MergeCompleted.star` | STAR 业务层 | MR 状态变 MERGED | STAR MR 状态机迁移 |
 | `ConflictDetected.gitgit` | GitGit 物理层 | git merge / rebase 检测到 conflict | merge / rebase 退出码非 0 |
-| `ConflictDetected.star` | STAR 业务层 | 9 类冲突（per [flows/04 §2](../spec/flows/04-multi-agent-conflict.md)）之一被识别 | STAR 冲突检测器判定 |
+| `ConflictDetected.star` | STAR 业务层 | 9 类冲突（per [flows/04 §2](../spec/flows/04-multi-agent.md)）之一被识别 | STAR 冲突检测器判定 |
 
 > **命名约定**（per B-17 修复 2026-08-27）：GitGit 物理层事件 = `<EventName>.gitgit`；STAR 业务层事件 = `<EventName>.star`。同一动词名（如 `WorktreeCreated`）跨层时**必须**带命名空间后缀。
 >

@@ -144,7 +144,7 @@ per [spec/agents/02 §2 22 domain 数据源清单](../agents/02-data-sources-spe
 
 ### §3.2 5 域 Lead 验收签字
 
-per 8/21 JST 用户偏好"5 域独立 Lead，不接受兼任"（per [AGENTS.md §4 #3 守门硬约束](../../../AGENTS.md)）：
+per 8/21 JST 用户偏好"5 域独立 Lead，不接受兼任"（per [AGENTS.md §4 #3 守门硬约束](../../../../../AGENTS.md)）：
 
 | 5 域 | 关联 crate（per [spec/agents/02 §2.1 5 域映射](../agents/02-data-sources-spec.md)）| Lead 身份 |
 |------|----------------------------------------|------------|
@@ -165,7 +165,7 @@ per [spec/saga/01 §1 跨域 Saga 协调契约](../saga/01-saga-coordination-spe
 
 ### §4.1 Tier 2: workspace creation → Tenant scope check
 
-**触发条件**：用户创建 workspace（`POST /workspaces` per [spec/rest/01](../../rest/) 草稿）
+**触发条件**：用户创建 workspace（`POST /workspaces` per [spec/rest/01](../rest/) 草稿）
 
 **Saga 步骤**（3 step）：
 1. **Permission 域 step**：`ValidateTenantScope` — 校验 tenant_id 有效 + 用户有 tenant 权限（调 domain-tenant + domain-permission）
@@ -243,7 +243,7 @@ per [ADR-0035 §8 不变量](../../adr/0035-phase-f-architecture.md) L304-306 + 
 - **规则**：Tier N 未通过不能推 Tier N+1
 - **强制点**：每 Tier 验收门 = 100% 接入 + 3 测试 / crate + DDD Review + 5 域 Lead 签字（per §3.2）
 - **违反后果**：违反顺序可能导致下游 crate 阻塞（mock 数据不一致）+ 测试不通过
-- **引用**：[AGENTS.md §4 #3 守门硬约束 5 域独立 Lead 不接受兼任](../../../AGENTS.md) + [spec/saga/01 §3 5 域 Lead 兼任约束](../saga/01-saga-coordination-spec.md)
+- **引用**：[AGENTS.md §4 #3 守门硬约束 5 域独立 Lead 不接受兼任](../../../../../AGENTS.md) + [spec/saga/01 §3 5 域 Lead 兼任约束](../saga/01-saga-coordination-spec.md)
 
 ### §5.2 回滚机制
 
@@ -253,7 +253,7 @@ per [ADR-0035 §8 不变量](../../adr/0035-phase-f-architecture.md) L304-306 + 
   - `git tag phase-h-tier-N-complete` 标签化
   - 失败 `git reset --hard phase-h-tier-N-complete` 回退
 - **commit author 守门**：per 8/27 21:59 JST 用户授权第三次强化 + 8/27 11:06 JST hard ban —— author = Ulysses（一人公司 12 角色 per DEC-008），**禁止** commit message 引用 `$env:XXX` 等环境变量（per memory "Commit message 不能引用 env 变量 2026-08-27 21:51 JST 教训"）
-- **引用**：[AGENTS.md §2 commit author 形式](../../../AGENTS.md) + §1.0 用户授权升级 v0.3-v0.5
+- **引用**：[AGENTS.md §2 commit author 形式](../../../../../AGENTS.md) + §1.0 用户授权升级 v0.3-v0.5
 
 ### §5.3 数据一致性
 
@@ -278,11 +278,11 @@ per [ADR-0035 §8 不变量](../../adr/0035-phase-f-architecture.md) L304-306 + 
 
 - **规则**：每 Tier 完成后 Ulysses 终审签字才进下一 Tier
 - **强制点**：
-  - 报告 7 段结构（per [AGENTS.md §3 报告 7 段结构](../../../AGENTS.md)）：§0 目的 + §1 改动矩阵 + §2 验证摘要 + §3 已知缺口 + §4 子代理失败接手清单 + §5 守门规则 + §6 签字栏
-  - 5 角色签字（per [AGENTS.md §3 #7](../../../AGENTS.md)）：架构 / SRE Lead / 平台 / 评审主持 / PM
-  - 代签规则：per [AGENTS.md §1.0 用户授权升级](../../../AGENTS.md) + 8/27 19:39 / 20:56 / 21:59 JST 三次强化
+  - 报告 7 段结构（per [AGENTS.md §3 报告 7 段结构](../../../../../AGENTS.md)）：§0 目的 + §1 改动矩阵 + §2 验证摘要 + §3 已知缺口 + §4 子代理失败接手清单 + §5 守门规则 + §6 签字栏
+  - 5 角色签字（per [AGENTS.md §3 #7](../../../../../AGENTS.md)）：架构 / SRE Lead / 平台 / 评审主持 / PM
+  - 代签规则：per [AGENTS.md §1.0 用户授权升级](../../../../../AGENTS.md) + 8/27 19:39 / 20:56 / 21:59 JST 三次强化
   - 5 域 Lead 真实身份（per 8/21 JST 拒绝兼任）签字请 DDD Review 阶段补（⏳ 待签 per [ADR-0036 §4 L182-190](../../adr/0036-phase-g-architecture.md)）
-- **引用**：[AGENTS.md §3 报告 7 段结构 + §4 12 项守门硬约束](../../../AGENTS.md)
+- **引用**：[AGENTS.md §3 报告 7 段结构 + §4 12 项守门硬约束](../../../../../AGENTS.md)
 
 ## §6 已知缺口
 
@@ -296,7 +296,7 @@ per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不
 | 4 | 数据迁移路径（mock → 真实）未设计 | Phase F mock stub → Phase H 真实数据源（PostgreSQL / Redis / S3 等）的 migration 脚本 + 数据回填 | 缺标，平台 Lead 拍板 | per [ADR-0035 §2 D7 L66-82](../../adr/0035-phase-f-architecture.md) |
 | 5 | 5 域业务域 Lead 真实身份 | Player / Economy / Match / Social / Admin 5 业务域 Lead 签字 ⏳ 待签（per [ADR-0036 §4 L182-190](../../adr/0036-phase-g-architecture.md)）| 缺标，DDD Review 阶段补 | per 8/21 JST 5 域独立 Lead 拒绝兼任 |
 | 6 | Tier 5 context domain 跨 22 域访问性能未基线 | domain-context 是 [ADR-0031 Context Graph](../../adr/0031-context-graph.md) 4 节点 MVP，跨 22 域访问 P99 未基线 | 缺标，SRE Lead 量化 | per [ADR-0036 §7 #8 L275](../../adr/0036-phase-g-architecture.md) |
-| 7 | 接入完成后的 acceptance/01-17 重新跑 | acceptance 是 5/26 旧版（per [AGENTS.md §7 待办 #7](../../../AGENTS.md) "25 domain-* crate 真实数据接入"），22 crate 真实接入后需重写 acceptance 01-17 测试 | 缺标，PM 拍板 | per [AGENTS.md §7 待办 #7](../../../AGENTS.md) |
+| 7 | 接入完成后的 acceptance/01-17 重新跑 | acceptance 是 5/26 旧版（per [AGENTS.md §7 待办 #7](../../../../../AGENTS.md) "25 domain-* crate 真实数据接入"），22 crate 真实接入后需重写 acceptance 01-17 测试 | 缺标，PM 拍板 | per [AGENTS.md §7 待办 #7](../../../../../AGENTS.md) |
 
 ### §6.1 缺口处理原则
 
@@ -319,20 +319,20 @@ per 2026-08-26 11:06 JST Ulysses 拍板"缺标比错标安全"原则：所有缺
 - [spec/vcs/05-real-providers-spec.md](../vcs/05-real-providers-spec.md) — 4 Git Provider 接入规范（§2 4 provider + §3 PR 模型）
 - [spec/services/02-sse-streaming-spec.md](../services/02-sse-streaming-spec.md) — SSE 推送通道（§3 event schema CacheInvalidate 广播）
 - [spec/services/03-webhook-adapter-spec.md](../services/03-webhook-adapter-spec.md) — Webhook Adapter（§7 死信模式参考 spec/saga/01 §4 G-05）
-- [AGENTS.md §0 一句话硬约束 + §3 报告 7 段结构 + §4 12 项守门硬约束](../../../AGENTS.md)
+- [AGENTS.md §0 一句话硬约束 + §3 报告 7 段结构 + §4 12 项守门硬约束](../../../../../AGENTS.md)
 
 ### §7.1 引用原则
 
 - §2 6 Tier 接入顺序与 [spec/agents/02 §2 22 domain 数据源清单](../agents/02-data-sources-spec.md) + [spec/agents/02 §2.1 5 域映射](../agents/02-data-sources-spec.md) 对齐
 - §3 5 项验收标准与 [spec/agents/02 §2-§4 22 domain 接入契约](../agents/02-data-sources-spec.md) + [spec/mcp/02 §1 4 资源类](../mcp/02-resources-prompts-spec.md) + [spec/cache/01 §4 TTL 表](../cache/01-cache-contract-spec.md) 协同
 - §4 跨域 Saga 触发点与 [spec/saga/01 §1-§5 Saga 协调契约](../saga/01-saga-coordination-spec.md) + [ADR-0036 §2 D12 Saga 跨域协调](../../adr/0036-phase-g-architecture.md) 引用
-- §5 风险控制与 [AGENTS.md §4 12 项守门硬约束](../../../AGENTS.md) + [ADR-0036 §8.3 Phase F → Phase G 不变量](../../adr/0036-phase-g-architecture.md) 引用
+- §5 风险控制与 [AGENTS.md §4 12 项守门硬约束](../../../../../AGENTS.md) + [ADR-0036 §8.3 Phase F → Phase G 不变量](../../adr/0036-phase-g-architecture.md) 引用
 
 ## §8 修订历史
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |------|------|--------|----------|------|
-| v0.1 | 2026-08-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：6 Tier 接入顺序（22+1=23 crate × 6 Tier 工作量 26.4-37.3M tokens）+ 5 项验收（Resources handler / URI 命名 / Read 矩阵 / Write 矩阵 + 状态机 / cache 策略）+ 3 测试 / crate = 75 测试 + 5 域 Lead 验收签字 + 5 跨域 Saga 触发点（workspace create / worktree create / pr open / policy update / integration event）+ 5 风险控制（顺序不可逆 / 回滚 commit / InMemory 同步 / 性能基线 / DDD Review）+ 7 已知缺口（per 缺标比错标安全）+ 8 引用文档 + 引用原则 | per [ADR-0036 §8.2 Phase H 方向 L293-298](../../adr/0036-phase-g-architecture.md) "22 domain 真实数据接入完整化" + 2026-08-27 21:59 JST 用户授权第三次强化代签（per [AGENTS.md §1.0 v0.5 三次强化](../../../AGENTS.md)）|
+| v0.1 | 2026-08-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：6 Tier 接入顺序（22+1=23 crate × 6 Tier 工作量 26.4-37.3M tokens）+ 5 项验收（Resources handler / URI 命名 / Read 矩阵 / Write 矩阵 + 状态机 / cache 策略）+ 3 测试 / crate = 75 测试 + 5 域 Lead 验收签字 + 5 跨域 Saga 触发点（workspace create / worktree create / pr open / policy update / integration event）+ 5 风险控制（顺序不可逆 / 回滚 commit / InMemory 同步 / 性能基线 / DDD Review）+ 7 已知缺口（per 缺标比错标安全）+ 8 引用文档 + 引用原则 | per [ADR-0036 §8.2 Phase H 方向 L293-298](../../adr/0036-phase-g-architecture.md) "22 domain 真实数据接入完整化" + 2026-08-27 21:59 JST 用户授权第三次强化代签（per [AGENTS.md §1.0 v0.5 三次强化](../../../../../AGENTS.md)）|
 
 ---
 
