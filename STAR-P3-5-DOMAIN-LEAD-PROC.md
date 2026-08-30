@@ -19,15 +19,17 @@ P3 全 5 阶段 60/65 拍板完成 (per P3-C-D-SELECTION-RESULT.md + P3-E-F-SELE
 
 ---
 
-## §1 5 域 Lead 角色定义 (per RGS 5 域镜像)
+## §1 5 域 Lead 角色定义 (Star 仓 5 域独立定义, 不引用 RGS 仓)
+
+> **独立约束 (per 2026-08-30 09:08 JST Ulysses 明确反馈)**: Star 仓与 RGS 仓 (`D:/RustGameServer`) **完全独立**, 5 域 (player / economy / match / social / admin) 命名是 Star 仓内部业务子域定义, **不双向同步, 不引用 RGS 仓代码, 不引用 RGS 5 域镜像作为业务源头**. 历史上 `RGS-LEAD-ROSTER.md` (3.3KB) 是 Star 侧 5 域 Lead 模板, 不引用 RGS 代码.
 
 | # | 域 | 角色职责 | 守门 | 不接受兼任 |
 |---|---|---|---|---|
-| 1 | **player** (玩家域) | 用户/identity/workspace 业务边界, 跟 RGS 5 域 player 镜像 | 守门 #1+#9+#12 | 不能是架构师 (避免架构师"自己审自己") |
-| 2 | **economy** (经济域) | billing / pricing / cost-trace 业务边界 (per RGS) | 守门 #1+#9+#12 | 不能是 SRE (避免 SRE 既写又审) |
-| 3 | **match** (匹配域) | workflow / 状态机 / saga 编排 业务边界 (per RGS) | 守门 #1+#9+#12 | 不能是 reviewer (避免 reviewer 既写又审) |
-| 4 | **social** (社交域) | collaboration / 通知 / 评论 业务边界 (per RGS) | 守门 #1+#9+#12 | 不能是 PM (避免 PM 既写又审) |
-| 5 | **admin** (管理域) | RBAC / permission / tenant 业务边界 (per RGS) | 守门 #1+#9+#12 | 不能是 SRE (避免 SRE 既写又审, 重复 #2) |
+| 1 | **player** (玩家域) | 用户 / identity / workspace 业务边界 (Star 仓独立) | 守门 #1+#9+#12 | 不能是架构师 (避免架构师"自己审自己") |
+| 2 | **economy** (经济域) | billing / pricing / cost-trace 业务边界 (Star 仓独立) | 守门 #1+#9+#12 | 不能是 SRE (避免 SRE 既写又审) |
+| 3 | **match** (匹配域) | workflow / 状态机 / saga 编排 业务边界 (Star 仓独立) | 守门 #1+#9+#12 | 不能是 reviewer (避免 reviewer 既写又审) |
+| 4 | **social** (社交域) | collaboration / 通知 / 评论 业务边界 (Star 仓独立) | 守门 #1+#9+#12 | 不能是 PM (避免 PM 既写又审) |
+| 5 | **admin** (管理域) | RBAC / permission / tenant 业务边界 (Star 仓独立) | 守门 #1+#9+#12 | 不能是 SRE (避免 SRE 既写又审, 重复 #2) |
 
 ---
 

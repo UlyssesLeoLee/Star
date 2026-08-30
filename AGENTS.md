@@ -149,10 +149,12 @@ D:/Star                                       # 主仓 (per 当前 git worktree 
   ├── feature/ai-ide-compat                  # 8 个 fix/* merge + D.2-D.5+ + cleanup (D.2 8a7427d / D.3 0a148b8 / D.4 2a0a68c / cleanup 1274725 / D.5+ 2857e6b)
   └── wt-phase-d5-impl                       # Phase D.5+ Streamable HTTP wt (已 merge → feature/ai-ide-compat @ d0ed6d8)
 
-D:/RustGameServer                             # 独立仓
+D:/RustGameServer                             # 独立仓 (Star 仓**不引用** RGS 仓代码, 见 §0 一句话硬约束 + §1.2 派生约束)
   ├── main                                   # 含 RGS 历史 200+ 份文档
   └── wt-plan-002-1-2week                    # 139b80a RGS 历史扩量 + 3bff9c6 跨引用同步 (commit author = Ulysses)
 ```
+
+> **硬约束 (per 2026-08-30 09:08 JST Ulysses 明确反馈)**: Star 仓 (`D:/Star`) 与 RGS 仓 (`D:/RustGameServer`) **完全独立**, 5 域 (player / economy / match / social / admin) 命名是 Star 仓**内部业务子域独立定义**, **不双向同步**, **不引用 RGS 仓代码**, **不引用 RGS 5 域镜像作为业务源头**. Star 仓 docs 不得写 "per RGS 5 域镜像" / "per RGS" 等隐含引用 RGS 作为命名来源的描述.
 
 ---
 
