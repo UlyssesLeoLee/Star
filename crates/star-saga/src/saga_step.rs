@@ -14,6 +14,7 @@
 //! - INV-SG-02: call_chain 必填, 跨域补偿按链顺序回滚
 //! - INV-SG-03: status 状态机 (Pending / Running / Completed / Compensating / Failed)
 //! - INV-SG-04: Failed 状态必填 failure_reason
+//! - INV-SG-05: idempotency_key 必填 (per E.6 match 域 Lead 真人补详细补偿机制 5 项之一, 防止跨 step 失败重复补偿)
 //!
 //! Lead 责任: match 域 Lead (待真人到位)
 
@@ -76,7 +77,7 @@ pub enum CrossDomainCall {
     },
 }
 
-/// SagaStep 5 字段
+/// SagaStep 5 字段 (per 2026-08-30 v0.2 增强: 加 idempotency_key 必填字段, 6 字段)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SagaStep {
     pub step_id: StepId,
@@ -84,7 +85,13 @@ pub struct SagaStep {
     pub saga_type: SagaType,
     pub status: SagaStepStatus,
     pub call_chain: Vec<CrossDomainCall>,  // 5 域调用链, 跨域补偿按链顺序回滚
+    pub idempotency_key: IdempotencyKey,  // 必填, 防止跨 step 失败重复补偿 (INV-SG-05)
 }
+
+/// IdempotencyKey: 跨 step 唯一标识, 防止同 step 多次重试导致 5 域重复调用
+/// 类型: String (UUID v7 序列化, 跨进程稳定)
+/// 必填, SagaStep::new 自动生成
+pub type IdempotencyKey = String;
 
 impl SagaStep {
     pub fn new(tenant_id: TenantId, saga_type: SagaType, call_chain: Vec<CrossDomainCall>) -> Self {
@@ -94,6 +101,7 @@ impl SagaStep {
             saga_type,
             status: SagaStepStatus::Pending,
             call_chain,
+            idempotency_key: format!("idem-{}", Uuid::new_v4()),
         }
     }
 }

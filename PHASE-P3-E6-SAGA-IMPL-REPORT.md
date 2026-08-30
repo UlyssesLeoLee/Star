@@ -102,10 +102,10 @@ pub struct SagaStep {
 
 | # | 缺口 | 移交 |
 |---|---|---|
-| 1 | E.6 Saga 详细补偿机制 (at-least-once / exactly-once / idempotency key / 补偿链顺序) | **match 域 Lead 真人到位后补** (5 域 Lead 真人 1 阻塞跨 P3-C/E/F) |
+| 1 | E.6 Saga 详细补偿机制 (at-least-once / exactly-once / idempotency key 持久化 / 补偿链顺序策略) | **match 域 Lead 真人到位后补** (5 域 Lead 真人 1 阻塞跨 P3-C/E/F) — INV-SG-05 idempotency_key 字段就绪 (per commit `d831f5e`, 2026-08-30 11:34 JST), 待 match 域 Lead 真人补 idempotency_key 持久化 (per process 重启 + per saga 重启) + at-least-once vs exactly-once 拍板 + 补偿链顺序策略 (DefaultCompensationStrategy 实现) |
 | 2 | 5 域 Lead review E.6 骨架 6 章节 (per `STAR-P3-5-DOMAIN-LEAD-REVIEW-PROTOCOL.md` v0.1) | 5 域 Lead 真人到位后, 13 commits 签字栏追溯 (per `STAR-P3-E7-SIGN-OFF-TEMPLATE.md`) |
 | 3 | E.6 5 域跨域调用 stub 待 5 域 Lead 真人补详细业务逻辑 | 5 域 Lead 真人到位后 |
-| 4 | crates/star-saga 单测 (SagaOrchestrator 5 域跨域调用 + Compensation at-least-once) 待 match 域 Lead 真人补 | match 域 Lead 真人到位后 |
+| 4 | crates/star-saga 单测 (SagaOrchestrator 5 域跨域调用 + Compensation at-least-once + idempotency_key dedup) — 3/3 域内 test 通过 (step_executor::exec + compensation::noop), 待 match 域 Lead 真人补 idempotency_key 持久化 + 完整单测 (含 dedup 验证) | match 域 Lead 真人到位后 |
 | 5 | E.6 docs 阶段落地后守门 #12 触发新一轮 docs 同步 (AGENTS.md v0.18 / WBS v0.3 / README 更新) | 5 域 Lead 真人到位 + E.6 详细补偿机制 commit 后 |
 
 ---
