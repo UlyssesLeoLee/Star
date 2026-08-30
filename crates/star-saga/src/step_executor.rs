@@ -9,11 +9,15 @@ impl Default for StepExecutor {
     }
 }
 impl StepExecutor {
+    /// 执行 step 并把 idempotency key 注入 SagaContext.data (per INV-SG-05 防止跨 step 失败重复补偿)
+    /// key 格式: `saga:{saga_id}:step:{step_name}`, 5 域调用方可以读 ctx.data["idempotency_key"] 做 dedup
     pub async fn execute_step(
         &self,
         step: &dyn SagaStep,
         ctx: &mut SagaContext,
     ) -> Result<StepResult, SagaError> {
+        let idem_key = format!("saga:{}:step:{}", ctx.saga_id, step.name());
+        ctx.data["idempotency_key"] = serde_json::Value::String(idem_key.clone());
         match step.execute(ctx).await {
             Ok(r) => Ok(r),
             Err(e) => Err(SagaError::StepFailed(step.name().into(), e.to_string())),
