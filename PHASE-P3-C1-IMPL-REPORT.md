@@ -8,7 +8,7 @@
 
 ## §0 目的
 
-P3-C 9 子项拍板完成后, 第 1 子项 C.1 Workspace 域 (per-tenant workspace + project 父子) 收官落地. Workspace 是 Star 顶层租户边界, RGS 5 域 (player / economy / match / social / admin) 之上的 tenant 容器, Project 是 workspace 子域, 角色矩阵 5 域 Lead 拒绝兼任硬约束 (per 8/21 JST 拍板).
+P3-C 9 子项拍板完成后, 第 1 子项 C.1 Workspace 域 (per-tenant workspace + project 父子) 收官落地. Workspace 是 Star 顶层租户边界, 5 域 (player / economy / match / social / admin, **Star 仓独立定义, per `a4b3cb7` RGS 边界硬约束**) 之上的 tenant 容器, Project 是 workspace 子域, 角色矩阵 5 域 Lead 拒绝兼任硬约束 (per 8/21 JST 拍板).
 
 **触发**: 2026-08-30 08:19 JST 跨 session 续做触发 (per Ulysses 指令 "完成跨 session 续作").
 
