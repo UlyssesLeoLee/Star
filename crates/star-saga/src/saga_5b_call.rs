@@ -11,7 +11,7 @@
 //! ## 关键不变量 (待 match 域 Lead 真人补详细机制)
 //!
 //! - INV-SG-5B-01: 5 域调用必带 tenant_id
-//! - INV-SG-5B-02: 5 域调用必填 idempotency key (待补)
+//! - INV-SG-5B-02: 5 域调用必填 idempotency key (per saga_step.rs `IdempotencyKey` type alias, INV-SG-05 字段就绪 per commit `d831f5e` 2026-08-30 11:34 JST; 待 match 域 Lead 真人补: 跨进程持久化 / 5 域 stub 业务逻辑应用)
 //! - INV-SG-5B-03: 5 域调用超时 + 重试 + 降级 (待补)
 //! - INV-SG-5B-04: 5 域调用失败触发 Saga 补偿 (per Compensation trait, 见 compensation_strategy.rs)
 //!
