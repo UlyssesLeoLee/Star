@@ -11,7 +11,7 @@
 //! ## 关键不变量 (待 match 域 Lead 真人补详细机制)
 //!
 //! - INV-CS-01: 补偿按 call_chain 逆序回滚 (per SagaStep INV-SG-02)
-//! - INV-CS-02: 补偿 idempotency key 必填 (待补)
+//! - INV-CS-02: 补偿 idempotency key 必填 (per saga_step.rs `IdempotencyKey` type alias, INV-SG-05 字段就绪 per commit `d831f5e` 2026-08-30 11:34 JST; 待 match 域 Lead 真人补: 跨进程持久化 / 补偿链顺序策略 DefaultCompensationStrategy 实现)
 //! - INV-CS-03: 补偿失败重试 + 告警 (待补)
 //!
 //! Lead 责任: match 域 Lead (待真人到位补)
