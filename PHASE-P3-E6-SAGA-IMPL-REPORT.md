@@ -14,15 +14,16 @@ P3-E.6 5 域 Saga 跨域编排 docs 阶段 + 骨架 落地. 5 域 Saga 编排 tr
 
 ---
 
-## §1 改动矩阵 (1 docs 阶段 commit + 5 域补偿 trait 骨架 stub)
+## §1 改动矩阵 (1 docs 阶段 commit + 5 域补偿 trait 骨架 stub + 字段就绪 + lib.rs export 同步 + 跨模块不变量 docs 同步)
 
-| # | 改动 | 状态 |
-|---|---|---|
-| 1 | `crates/star-saga/src/orchestrator.rs` (新增 trait) | Saga 编排 trait 5 域跨域调用 (player / economy / match / social / admin 5 域 stub) |
-| 2 | `crates/star-saga/src/compensation.rs` (新增 trait) | 补偿 trait 5 域各 1 stub (待 match 域 Lead 真人补详细机制) |
-| 3 | `crates/star-saga/src/saga_step.rs` (新增 struct) | SagaStep 5 字段 (step_id / tenant_id / saga_type / status / call_chain) |
-| 4 | `crates/star-saga/src/lib.rs` (export 3 新类型) | SagaOrchestrator / Compensation / SagaStep 3 trait 骨架 |
-| 5 | `PHASE-P3-E6-SAGA-IMPL-REPORT.md` (本文件) | 7 段结构 docs 阶段报告 |
+| # | 改动 | 状态 | commit |
+|---|---|---|---|
+| 1 | `crates/star-saga/src/orchestrator.rs` (新增 trait) | Saga 编排 trait 5 域跨域调用 (player / economy / match / social / admin 5 域 stub) | `64b3885` |
+| 2 | `crates/star-saga/src/compensation.rs` (新增 trait) | 补偿 trait 5 域各 1 stub (待 match 域 Lead 真人补详细机制) | `64b3885` |
+| 3 | `crates/star-saga/src/saga_step.rs` (新增 struct) | SagaStep **6 字段** (step_id / tenant_id / saga_type / status / call_chain / **idempotency_key 必填 INV-SG-05**) | `64b3885` + `d831f5e` |
+| 4 | `crates/star-saga/src/lib.rs` (export 公开类型) | 9 类型 export: `CallId` / `CrossDomainCall` / **`IdempotencyKey`** / `SagaId` / `SagaStepData` / `SagaStepStatus` / `SagaType` / `StepId` / **`TenantId`** + 6 trait/manager: `CompensationManager` / `CompensationMode/Plan/Strategy/Default` / `CrossDomainCallError/Result/Caller/Health` / `DomainHealth` / `FiveDomainCallerStub` / `SagaOrchestrator` / `StepExecutor` | `64b3885` + `6c35de7` |
+| 5 | `crates/star-saga/src/saga_5b_call.rs` + `compensation_strategy.rs` (跨模块不变量 docs 同步) | INV-SG-5B-02 + INV-CS-02 idempotency_key 引用 `IdempotencyKey` type alias + INV-SG-05 字段就绪 (待 match 域 Lead 真人补: 跨进程持久化 / 补偿链顺序策略 / 5 域 stub 业务逻辑) | `9b69629` |
+| 6 | `PHASE-P3-E6-SAGA-IMPL-REPORT.md` (本文件) | 7 段结构 docs 阶段报告 | `64b3885` + `d831f5e` 增量 + `6c35de7` 增量 + `9b69629` 增量 |
 
 **核心模块设计** (per E.6 骨架):
 
