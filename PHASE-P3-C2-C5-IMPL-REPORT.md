@@ -34,7 +34,7 @@ P3-C 5 域业务子域 C.2 Project / C.3 Identity / C.4 WorkItem / C.5 Workflow 
 // 已有 Identity 域, 3 实体协同 RBAC
 
 // C.4 WorkItem 域 (work_item + status 状态机 + per_project 过滤)
-// 已有 WorkItem 域, 13 status (todo / in_progress / review / blocked / done / wontfix 等)
+// 已有 WorkItem 域, 6 status (todo / in_progress / review / blocked / done / wontfix 等)
 
 // C.5 Workflow 域 (workflow + workflow_state + per_project 自动化)
 // 已有 Workflow 域, 跟 WorkItem 状态机集成
