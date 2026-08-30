@@ -1,3 +1,21 @@
+//! crates/star-saga/src/compensation.rs
+//!
+//! CompensationManager 补偿 saga 已完成 step (per P3-E.6 docs 阶段 + 骨架)
+//! per `docs/ddd/03-match-bc.md` §2.3 SagaInstance Aggregate + `PHASE-P3-E6-SAGA-IMPL-REPORT.md` v0.1
+//!
+//! ## 职责
+//!
+//! CompensationManager.compensate_all 逆序遍历 Saga.steps, 调 step.compensate
+//! 失败立即返回 CompensateFailed, 不继续补偿
+//!
+//! ## 关键不变量
+//!
+//! - INV-CMP-01: 补偿按 Saga.steps 逆序 (per docs/ddd/03-match-bc.md §2.3 + INV-CS-01)
+//! - INV-CMP-02: 补偿 idempotency_key 注入 `saga:{saga_id}:compensate:{step_name}` (per `b0f88b2`, 5 域补偿方读 ctx.data["idempotency_key"] 做 dedup)
+//! - INV-CMP-03: 补偿失败不重试, 立即返回 CompensateFailed (per SagaOrchestrator.execute line 50-55, 失败需人工介入)
+//!
+//! Lead 责任: match 域 Lead (待真人到位补: 补偿链顺序策略 DefaultCompensationStrategy 实现 + 持久化)
+
 // per spec/saga/01 §4 Q-003 compensation
 use super::*;
 pub struct CompensationManager;
