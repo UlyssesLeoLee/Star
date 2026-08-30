@@ -83,5 +83,8 @@ pub use saga_5b_call::{
     DomainHealth, FiveDomainCallerStub,
 };
 pub use saga_orchestrator::SagaOrchestrator;
-pub use saga_step::{CallId, CrossDomainCall, SagaId, SagaStep as SagaStepData, SagaStepStatus, SagaType, StepId};
+pub use saga_step::{
+    CallId, CrossDomainCall, IdempotencyKey, SagaId, SagaStep as SagaStepData, SagaStepStatus,
+    SagaType, StepId, TenantId,
+};
 pub use step_executor::StepExecutor;
