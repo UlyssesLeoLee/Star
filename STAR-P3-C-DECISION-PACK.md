@@ -25,7 +25,7 @@ P3-C 阶段软预算 40M tokens / 9 子项 / 6.7 周 (per STAR-OLU-001 §1 1 SRE
 ## §1 P3-C 拍板包 (9 子项推荐标题)
 
 > **推荐策略**: 5 域 DDD 边界 + 跨域编排 + 持久层 (per 8/21 JST Ulysses 5 域独立 Lead 拍板基础). 9 子项覆盖:
-> - 5 域业务 (C.1-C.5, 跟 RGS 5 域 player/economy/match/social/admin 镜像, 但给 Star 用)
+> - 5 域业务 (C.1-C.5, **Star 仓独立定义 per `a4b3cb7` RGS 边界硬约束**, player/economy/match/social/admin 不引用 RGS 仓 5 域)
 > - 1 跨域编排 (C.6 Saga)
 > - 1 持久层 (C.7 Postgres 接入)
 > - 1 多租户 (C.8 Tenant 边界)
@@ -33,9 +33,9 @@ P3-C 阶段软预算 40M tokens / 9 子项 / 6.7 周 (per STAR-OLU-001 §1 1 SRE
 
 | # | 子项 | 标题(推荐) | 软预算 | 软参考周 | 依赖 | 状态 | 备注 |
 |---|---|---|---|---|---|---|---|
-| C.1 | C.1 | **Workspace 域** (per-tenant workspace CRUD) | 4.4M | 0.7 周 | 无 | 🟡 占位 | 推荐: Workspace 是 Star 顶层租户边界, RGS 5 域 (player/economy/match/social/admin) 之上 |
+| C.1 | C.1 | **Workspace 域** (per-tenant workspace CRUD) | 4.4M | 0.7 周 | 无 | 🟡 占位 | 推荐: Workspace 是 Star 顶层租户边界, **Star 仓 5 域 (player/economy/match/social/admin, 独立定义)** 之上 |
 | C.2 | C.2 | **Project 域** (per-workspace project CRUD + per_project_role RBAC) | 4.4M | 0.7 周 | C.1 | 🟡 占位 | 推荐: Project 是 workspace 子域, 角色矩阵 5 域 Lead 拒绝兼任硬约束 |
-| C.3 | C.3 | **Identity 域** (Identity + Permission + WorkspaceMember 三实体) | 4.4M | 0.7 周 | C.1 | 🟡 占位 | 推荐: 跟 RGS identity 域镜像 |
+| C.3 | C.3 | **Identity 域** (Identity + Permission + WorkspaceMember 三实体) | 4.4M | 0.7 周 | C.1 | 🟡 占位 | 推荐: **Star 仓 Identity 域独立定义** (per `docs/ddd/02-economy-bc.md` 共享 INV-ID 不变量, 不引用 RGS) |
 | C.4 | C.4 | **WorkItem 域** (work_item + status 状态机 + per_project 过滤) | 4.4M | 0.7 周 | C.2 | 🟡 占位 | 推荐: WorkItem 是 Project 子域, 跟 frontend 5 tab 命名 (Kanban / Timeline / Backlog) 配合 |
 | C.5 | C.5 | **Workflow 域** (workflow + workflow_state + per_project 自动化) | 4.4M | 0.7 周 | C.4 | 🟡 占位 | 推荐: Workflow 是 WorkItem 子域, 跟 P3-A.6 / P3-A.7 接入 |
 | C.6 | C.6 | **Saga 跨域编排** (Q-003 / Per-domain saga + 跨域 compensation) | 4.4M | 0.7 周 | C.1-C.5 | 🟡 占位 | 推荐: 5 域业务子域都齐后, 跨域 Saga 编排 |
