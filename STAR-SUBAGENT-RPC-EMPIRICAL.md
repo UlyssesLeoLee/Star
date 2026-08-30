@@ -5,7 +5,7 @@
 > **Authority**: Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手代签 (per 8/27 19:39 JST 用户授权)
 > **承接**: AGENTS.md §4 #9 守门"子代理 status=succeeded ≠ 实际成功" + AGENTS.md §4.1 守门派生 v15 死循环饱和 + P3 全 5 阶段 22 跨 stage commits 实证
 
-本文件是**守门 #9 子代理 RPC 不可靠实证**固化, 防止未来 worker / 子代理散落子代理产出. 1 session 跨 P3 全 5 阶段 22 commits + 3 本 session commits = 25 commits 全部由 root 直实装, **0 子代理调用** (历史 1 子代理 commit `3369979` 在主仓 517 commits 中, 不在本 session P3 范围).
+本文件是**守门 #9 子代理 RPC 不可靠实证**固化, 防止未来 worker / 子代理散落子代理产出. 1 session 跨 P3 全 5 阶段 22 commits + 37 本 session 推进 commits = **59 commits 全部由 root 直实装, 0 子代理调用** (历史 1 子代理 commit `3369979` 在主仓 570 commits 中, 不在本 session P3 范围).
 
 ---
 
@@ -23,7 +23,7 @@
 | R-05 反转 + 推 origin | 1 commit (`587b212`) | ✅ 0 | per AGENTS.md §4 #1 反转 |
 | 本 session 真人 review 内容确认包 | 3 commits (`9918497` / `8ed164c` / `6a8ae29`) | ✅ 0 | per `PHASE-P3-CROSS-STAGE-INC-SESSION-005.md` |
 | 本 session typo 修 | 2 commits (`19b50a9` / `3d9b70c`) | ✅ 0 | per commit `19b50a9` |
-| **总计** | **27 跨 stage commits** (本 session) + 1 子代理 commit `3369979` (历史) | **✅ 0 子代理调用 (本 session 100% root 直实装)** | **517 commits 总仓, 5 author: Ulysses 291 / Ulysses Leo Lee 120 / Mavis 接手 84 / Mavis 39 / domain-development worker 1** |
+| **总计** | **59 跨 stage commits** (本 session) + 1 子代理 commit `3369979` (历史) | **✅ 0 子代理调用 (本 session 100% root 直实装)** | **570 commits 总仓, 5 author: Ulysses 311 / Ulysses Leo Lee 135 / Mavis 接手 84 / Mavis 39 / domain-development worker 1** |
 
 ---
 
@@ -61,14 +61,14 @@
 
 ### §2.2 派生规 v1 (本文件落地)
 
-1. **0 子代理调用实证 (本 session)**: 27 跨 stage commits 全部 author=Ulysses (per git log --format='%an' 实测: 5 author — Ulysses 291 / Ulysses Leo Lee 120 别人线程 C / Mavis 接手 84 / Mavis 39 / domain-development worker 1, 后 4 个非本 session P3 范围)
+1. **0 子代理调用实证 (本 session)**: 59 跨 stage commits 全部 author=Ulysses (per git log --format='%an' 实测: 5 author — Ulysses 311 / Ulysses Leo Lee 135 别人线程 C / Mavis 接手 84 / Mavis 39 / domain-development worker 1, 后 4 个非本 session P3 范围)
 2. **RPC 不可靠实证**: 10 background task 实证 status 不等于成功, 必须 `task_output` 读 last_error 字段验证
 3. **散落产出不收编**: 任何子代理产出的 wt branch 必须 `git log -p --follow <file>` 验证在 main 链后才能 merge
 4. **守门 #9 落档**: 本文件是守门 #9 实证固化, 防止未来 worker / 子代理 status 实证误信
 
 ### §2.3 守门 #9 实证检查清单 (真人 review 时用)
 
-- [ ] 27 commits author=Ulysses 唯一 (0 散落子代理 author, 主仓 517 commits 5 author 中 4 个非本 session P3 范围)
+- [ ] 59 commits author=Ulysses 唯一 (0 散落子代理 author, 主仓 570 commits 5 author 中 4 个非本 session P3 范围)
 - [ ] 10 background task 实证 RPC 不可靠 (status succeeded ≠ 实际成功)
 - [ ] 0 子代理产物收编进 main 链 (全部 root 直实装)
 - [ ] 守门 #9 主体 + v1 派生 (本文件) 实证 0 违反
