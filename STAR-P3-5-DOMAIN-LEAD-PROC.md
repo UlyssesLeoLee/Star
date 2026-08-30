@@ -57,11 +57,24 @@ P3 全 5 阶段 60/65 拍板完成 (per P3-C-D-SELECTION-RESULT.md + P3-E-F-SELE
 
 每域 1 份 域边界 docs (per ADR-0031 Context Graph MVP 4 节点 / Phase 2 12+10 节点/关系):
 
-- `docs/architecture/player.md` (Player 域 BoundedContext + Aggregate + Entity)
-- `docs/architecture/economy.md`
-- `docs/architecture/match.md`
-- `docs/architecture/social.md`
-- `docs/architecture/admin.md`
+**P3-E.7 5 域 docs 阶段 已实装** (per `e67bc8c` commit, 2026-08-30 08:55 JST):
+- `docs/ddd/01-player-bc.md` (Player 域 BoundedContext + 3 Aggregate: User / Workspace / Device + 7 pub + 3 sub 跨域事件)
+- `docs/ddd/02-economy-bc.md` (Economy 域 BoundedContext + 4 Aggregate: BillingAccount / Subscription / Invoice / ApiKey + 7 pub + 4 sub)
+- `docs/ddd/03-match-bc.md` (Match 域 BoundedContext + 3 Aggregate: Workflow / WorkflowInstance / SagaInstance + 7 pub + 5 sub)
+- `docs/ddd/04-social-bc.md` (Social 域 BoundedContext + 3 Aggregate: Notification / Comment / Mention + 7 pub + 12 sub)
+- `docs/ddd/05-admin-bc.md` (Admin 域 BoundedContext + 4 Aggregate: Tenant / Permission / Role / KmsKey + 8 pub + 8 sub)
+
+> **真人到位前过渡**: 5 份 docs 已由架构师代签 (per `ec6dee0` 选项 4 应急). 真人到位后, 签字栏 #1 追溯签字覆盖应急代签.
+>
+> **5 域 Lead review 模板**: 真人到位后, 真人先 review 5 份 docs (§1-§5 章节), 然后:
+> - **§1 BoundedContext 定义**: 确认业务子域 + Aggregate Root 划分合理
+> - **§2 Aggregate 字段 + 命令 + 事件**: 字段类型 / 索引 / 约束 (per docs/ddd/0X-*.md §5 已知缺口)
+> - **§3 跨域事件**: pub / sub 事件 schema + at-least-once / exactly-once 投递
+> - **§4 Cargo crate 引用**: 跨域 crate 散落 (per §4 注解), 是否需独立 crate phase 2
+> - **§6 签字栏 #1**: 真人签字覆盖架构师代签
+> - **§7 修订历史**: 真人 + 修订日期 + 修订内容
+>
+> **审阅时间预算**: 每域真人 review 30-60 分钟 (BoundedContext + Aggregate + 跨域事件 3 章节), 5 域 = 2.5-5 小时 (per STAR-OLU-001 §6 质量门 5 维).
 
 ### 步骤 4: 5 域 Lead DDD Review 签字 (守门 #3+#5)
 
@@ -79,6 +92,20 @@ P3 全 5 阶段 60/65 拍板完成 (per P3-C-D-SELECTION-RESULT.md + P3-E-F-SELE
 - 5 域业务子域 (P3-C.1-C.5) 推进时, 真人签字 docs
 - 跨域 Saga (P3-C.6) 真人主持跨域 review
 - 跨域 E2E (P3-F.2) 真人跑测试验收
+
+**真人到位验收 checklist** (per STAR-OLU-001 §6 质量门 5 维):
+1. [ ] 5 域 Lead 真人到位, 每人 1 域 (per §1 拒绝兼任硬约束)
+2. [ ] 5 域 Lead review 5 份 DDD 边界 docs (per §3 已实装), 签字栏 #1 追溯签字
+3. [ ] 5 域 Lead review 6 份 P3 阶段收官报告 (PHASE-P3-C1-IMPL-REPORT.md + PHASE-P3-C2-C5-IMPL-REPORT.md + PHASE-P3-C6-C8-IMPL-REPORT.md + PHASE-P3-D1-D7-IMPL-REPORT.md + PHASE-P3-E1-E4-IMPL-REPORT.md + PHASE-P3-F1-F5-IMPL-REPORT.md), 签字栏 #1 追溯签字覆盖架构师代签
+4. [ ] 5 域 Lead review PHASE-P3-CROSS-STAGE-INC-SESSION-004.md, 签字栏 5 角色全部追溯签字
+5. [ ] E.6 Saga 跨域编排 (per §3 match 域 Lead 真人补详细补偿机制) phase 2 启动
+6. [ ] DDD Review 阶段 (per F.5 P3-quality-gate-5d.md §6 DDD Review) 5 域 Lead 真人 + SRE Lead + 平台 + 评审 + PM 5 角色真人到位 (per AGENTS §3 模板)
+7. [ ] 质量门 5/5 (per STAR-OLU-001 §6) 实证: 功能完整 / 测试覆盖 / 守门 0 违反 / 文档同步 / git 证据
+
+**真人到位后 5 域边界 docs 收尾**:
+- 5 域 Lead 真人签字栏 #1 追溯签字 (覆盖架构师代签)
+- 5 域 Lead 补 §5 已知缺口 (字段类型 / 索引 / 约束 / ABAC conditions / 跨域事件总线架构等)
+- 5 域 Lead 拍板 §4 Cargo crate 引用 (是否需独立 domain-X crate phase 2 拆分)
 
 ---
 
@@ -143,3 +170,4 @@ P3 全 5 阶段 60/65 拍板完成 (per P3-C-D-SELECTION-RESULT.md + P3-E-F-SELE
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-08-30 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: 5 域 Lead 真人到位 5 步流程 + 4 拍板选项 + 5 域角色定义 (player / economy / match / social / admin) | 2026-08-30 P3 全 5 阶段 60/65 拍板完成, 5 域 Lead 真人到位是跨阶段硬约束 |
+| v0.2 | 2026-08-30 | 架构师 (Mavis 接手 agent per DEC-008) | §3 步骤 3 增强: 5 域 DDD 边界 docs 落地 (per `e67bc8c` commit) + 真人到位前过渡 + review 模板 + 审阅时间预算; §4 步骤 5 增强: 真人到位验收 checklist (7 项 per STAR-OLU-001 §6 质量门 5 维) + 5 域边界 docs 收尾 3 项 | 2026-08-30 09:01 JST P3-E.7 5 域 DDD 边界 docs 落地 (commit `e67bc8c`) 是新事件, 触发流程草案与 docs 同步, 守门 #12 commit-time 同步 |
