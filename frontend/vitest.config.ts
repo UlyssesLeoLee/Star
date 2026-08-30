@@ -19,7 +19,12 @@ export default defineConfig({
       "src/**/*.{test,spec}.{ts,tsx}",
       "e2e/**/*.{test,spec}.{ts,tsx}",
     ],
-    exclude: ["node_modules", ".next", "**/node_modules/**"],
+    exclude: [
+      "node_modules",
+      ".next",
+      "**/node_modules/**",
+      "e2e/cross-domain-5b.spec.ts", // Playwright-only spec (uses @playwright/test), not a vitest test
+    ],
     setupFiles: ["./vitest.setup.ts"],
   },
   resolve: {

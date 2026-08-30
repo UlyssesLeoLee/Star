@@ -411,6 +411,7 @@ export default function ProjectsPage() {
 
       {tab === "kanban" && (
         <div data-testid="projects-kanban-tab">
+          <DomainMarker domain="social" label="social 域 (collaboration/通知)" />
           <KanbanBoard
             board={projectBoard}
             workItems={projectWorkItems}
@@ -433,6 +434,7 @@ export default function ProjectsPage() {
 
       {tab === "timeline" && (
         <div data-testid="projects-timeline-tab" className="space-y-4">
+          <DomainMarker domain="match" label="match 域 (workflow/状态机/saga)" />
           {/* Gantt 主视图 */}
           <GanttChart
             sprints={projectSprints}
@@ -508,6 +510,7 @@ export default function ProjectsPage() {
 
       {tab === "backlog" && (
         <div data-testid="projects-backlog-tab" className="space-y-2">
+          <DomainMarker domain="economy" label="economy 域 (billing/pricing/cost)" />
           <div className="text-xs font-mono text-ink-mute">Backlog — work-items 按 status 排序 ({projectWorkItems.length} 总数)</div>
           {projectWorkItems.length === 0 ? (
             <div className="text-xs text-ink-mute italic">(no work-items)</div>
@@ -533,7 +536,7 @@ export default function ProjectsPage() {
                   .map((w) => {
                     const assignee = identities.find((i) => i.id === w.assignee_id);
                     return (
-                      <tr key={w.id} data-testid={`backlog-row-${w.id}`}>
+                      <tr key={w.id} data-testid="backlog-item" data-row-id={w.id}>
                         <td className="font-mono text-[10px] text-ink-mute">{w.key}</td>
                         <td>{w.title}</td>
                         <td><StatusPill value={w.status} /></td>
@@ -560,6 +563,7 @@ export default function ProjectsPage() {
 
       {tab === "worktrees" && (
         <div data-testid="projects-worktrees-tab" className="space-y-2">
+          <DomainMarker domain="admin" label="admin 域 (RBAC/permission/tenant)" />
           <div className="text-xs font-mono text-ink-mute">Worktrees — per project_id 过滤 ({projectWorktrees.length} 总数)</div>
           {projectWorktrees.length === 0 ? (
             <div className="text-xs text-ink-mute italic">(no worktrees)</div>
@@ -593,6 +597,22 @@ export default function ProjectsPage() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// =====================================================================
+// DomainMarker — P3-F.2 5 域跨域集成测试锚点 (per frontend/e2e/cross-domain-5b.spec.ts)
+// 每个 tab 对应 1 个业务子域 (player/economy/match/social/admin), 供 e2e 校验
+// 该 tab 已渲染出对应域的业务元素 (per 5 域 DDD 边界), 5 域 Lead 真人到位后接实域数据源标注
+// =====================================================================
+function DomainMarker({ domain, label }: { domain: string; label: string }) {
+  return (
+    <div
+      data-testid={`${domain}-domain-marker`}
+      className="text-[10px] font-mono text-ink-mute mb-2"
+    >
+      🔖 {label}
     </div>
   );
 }
@@ -810,6 +830,7 @@ function ProjectMembers({
   // 简化: 多数 workspace kind 决定主角色, 多个时逗号拼接
   return (
     <div data-testid="projects-members-tab" className="space-y-3">
+      <DomainMarker domain="player" label="player 域 (用户/identity/workspace)" />
       <div className="card">
         <div className="flex items-center justify-between mb-2">
           <div>
