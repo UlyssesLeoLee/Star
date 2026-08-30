@@ -85,7 +85,7 @@ domain-tenant 域 entity
 | 1 | R-05 反转 + 推 origin 落地 (per 587b212) | ✅ |
 | 1 (v1) | cargo check --workspace --lib 0 err | ✅ |
 | 1 (v8) | tsc --noEmit 0 错 | ✅ |
-| 1 (v13) | cargo test --workspace --release --lib 41/41 crate 0 fail | ✅ (主仓已实证) |
+| 1 (v13) | cargo test --workspace --release --lib 41/41 crate 0 fail | ✅ (主仓 P3-A 已实证; 当前 42/42 per `587b212` + `5ea9611` 加 crates/domain-kms) |
 | 6 | PowerShell only, no `&&`, no bash 残留 | ✅ |
 | 7 | 0 unsafe | ✅ |
 | 8 | 不沿用 bc23d6c 散落 touch 习惯 | ✅ (本 wt 无 touch) |
