@@ -111,3 +111,4 @@ sequenceDiagram
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-08-30 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: 5 域 DDD 边界表 + P3 阶段变更按域分块 + 跨域 Saga 流程图 + 已知缺口 5 项 | 2026-08-30 08:46 JST P3-F.3 拍板 + 跨 session 续做触发 |
+| v0.2 | 2026-08-30 | 架构师 (Mavis 接手 agent per DEC-008) | 5 域 Lead 真人 review 内容确认包 落地 同步: CONTENT-REVIEW-PACK 27KB + INC-SESSION-005 10.3KB = 37.3KB (per commit `9918497`, 2026-08-30 11:13 JST); §1 P3 阶段变更引用 CONTENT-REVIEW-PACK + 4 阻塞跨 session 续做列表 (5 域 Lead / E.6 Saga / B.5/B.6 + E.4 KMS / D.2/D.6 SRE) | 2026-08-30 11:13 JST Ulysses 指令"你替我把真人的内容全部确认好" 触发, CONTENT-REVIEW-PACK 落地是新事件, 触发守门 #12 commit-time 同步 |
