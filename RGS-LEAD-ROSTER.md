@@ -1,11 +1,13 @@
 # RustGameServer (RGS) 5 域 Lead Roster v0.1
 
-> **状态**: 🟡 草案 v0.1
+> **状态**: 🟥 **已废弃 / deprecated** (per 2026-08-30 09:08 JST Ulysses 明确反馈 "star 和 rgs 没有关系")
 > **日期**: 2026-08-28
 > **基点 commit**: `14c8a89` (Phase E.2+ mock infra 完成)
 > **触发**: 8/21 JST 5 域独立 Lead 拒绝兼任硬约束 + 8/27 21:59 JST AGENTS.md §9 5 域真实身份 DDD Review 阶段补
 > **制定者**: Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手
 > **签批**: 🟢 Mavis 接手代签 (per 2026-08-27 19:39/21:59 JST 三次强化)
+
+> **废弃说明 (per 2026-08-30 09:08 JST Ulysses 明确反馈)**: 本文件是 RGS 仓的 5 域 Lead Roster 模板, **与 Star 仓无关**. Star 仓有独立的 5 域 (player / economy / match / social / admin) 定义 (per `STAR-LEAD-ROSTER.md` + `docs/ddd/01-player-bc.md` ~ `05-admin-bc.md` + `STAR-P3-5-DOMAIN-LEAD-PROC.md` §1). 本文件保留仅作为历史参考, 后续清理待 Ulysses 拍板 (是否 `git rm` 删除).
 
 ---
 
