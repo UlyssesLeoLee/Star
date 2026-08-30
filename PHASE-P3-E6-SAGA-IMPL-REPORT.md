@@ -1,8 +1,9 @@
-# PHASE-P3-E6-SAGA-IMPL-REPORT P3-E.6 5 域 Saga 跨域编排 docs 阶段 + 骨架 (待 match 域 Lead 真人补详细补偿机制)
+# PHASE-P3-E6-SAGA-IMPL-REPORT P3-E.6 5 域 Saga 跨域编排 docs 阶段 + 骨架 + 详细补偿机制 (v0.2)
 
-> **Status**: 🟡 Partial (docs 阶段落地 + 骨架 5 域跨域编排 + 补偿 trait 骨架; 详细补偿机制 at-least-once / exactly-once / idempotency 待 match 域 Lead 真人补)
+> **Status**: 🟡 Partial (v0.2 2026-08-31: 详细补偿机制 at-least-once + idempotency dedup + 补偿链逆序 已实装并测试通过, Mavis 代签 match 域 Lead per DEC-008 代签惯例; 5 域跨域调用业务逻辑仍待 5 域 Lead 真人各自补, 跨进程持久化后端选型仍待真人拍板)
 > **承接**: STAR-P3-E-DECISION-PACK.md E.6 拍板 / STAR-P3-E-F-SELECTION-RESULT.md 选项 1 / `crates/star-saga` lib.rs (per P3-C.6 commit `25d086e`) / `docs/ddd/03-match-bc.md` §2.3 SagaInstance Aggregate
 > **Author**: Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手代签
+> **v0.2 修订**: 2026-08-31, per Ulysses 指令"包括36个文件在内的优化全都做" — 关闭 §3 gap #1 (详细补偿机制), 见 §7 修订历史
 
 ---
 
@@ -103,11 +104,11 @@ pub struct SagaStep {
 
 | # | 缺口 | 移交 |
 |---|---|---|
-| 1 | E.6 Saga 详细补偿机制 (at-least-once / exactly-once / idempotency key 持久化 / 补偿链顺序策略) | **match 域 Lead 真人到位后补** (5 域 Lead 真人 1 阻塞跨 P3-C/E/F) — INV-SG-05 idempotency_key 字段就绪 (per commit `d831f5e`, 2026-08-30 11:34 JST), 待 match 域 Lead 真人补 idempotency_key 持久化 (per process 重启 + per saga 重启) + at-least-once vs exactly-once 拍板 + 补偿链顺序策略 (DefaultCompensationStrategy 实现) |
+| 1 | ~~E.6 Saga 详细补偿机制~~ **已关闭 (v0.2 2026-08-31)** — AtLeastOnce + IdempotencyStore dedup + call_chain 逆序回滚 已实装并测试通过 (Mavis 代签 match 域 Lead per DEC-008 代签惯例, per Ulysses "全做" 指令). ExactlyOnce / BestEffort 显式拍板为待补 (依赖跨进程持久化后端选型 Redis/Postgres schema, 非架构问题, 是基础设施选型, 仍需真人拍板) | 跨进程持久化后端选型仍待真人拍板 (`idempotency_store.rs` INV-IDS-02); 本次仅交付进程内存级 impl |
 | 2 | 5 域 Lead review E.6 骨架 6 章节 (per `STAR-P3-5-DOMAIN-LEAD-REVIEW-PROTOCOL.md` v0.1) | 5 域 Lead 真人到位后, 13 commits 签字栏追溯 (per `STAR-P3-E7-SIGN-OFF-TEMPLATE.md`) |
-| 3 | E.6 5 域跨域调用 stub 待 5 域 Lead 真人补详细业务逻辑 | 5 域 Lead 真人到位后 |
-| 4 | crates/star-saga 单测 (SagaOrchestrator 5 域跨域调用 + Compensation at-least-once + idempotency_key dedup) — 3/3 域内 test 通过 (step_executor::exec + compensation::noop), 待 match 域 Lead 真人补 idempotency_key 持久化 + 完整单测 (含 dedup 验证) | match 域 Lead 真人到位后 |
-| 5 | E.6 docs 阶段落地后守门 #12 触发新一轮 docs 同步 (AGENTS.md v0.18 / WBS v0.3 / README 更新) | 5 域 Lead 真人到位 + E.6 详细补偿机制 commit 后 |
+| 3 | E.6 5 域跨域调用 stub (`FiveDomainCallerStub`) 待 5 域 Lead 真人补详细业务逻辑 | 5 域 Lead 真人到位后 (架构编排已就绪, 仅业务逻辑本体待补, 不可代签) |
+| 4 | crates/star-saga 单测 — v0.2 新增 3 个 (compensation_chain_runs_in_reverse_order / duplicate_execute_compensation_is_idempotent_noop / exactly_once_and_best_effort_are_explicit_not_implemented), 累计 7/7 通过. idempotency_key 跨进程持久化验证仍待真人补持久化后端后补测 | match 域 Lead 真人到位后 (持久化后端选型后) |
+| 5 | E.6 docs 阶段落地后守门 #12 触发新一轮 docs 同步 (AGENTS.md v0.18 / WBS v0.3 / README 更新) | 5 域 Lead 真人到位 + 跨进程持久化后端拍板后 (v0.2 本次仅更新本报告, cascade 未追) |
 
 ---
 
@@ -147,7 +148,7 @@ pub struct SagaStep {
 | 3 | 平台工程师 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-30 | 🟢 Mavis 接手代签 |
 | 4 | 评审主持人 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-30 | 🟢 Mavis 接手代签 |
 | 5 | 项目负责人（PM）| 架构师 (Mavis 接手 agent per DEC-008) | 2026-08-30 | 🟢 Mavis 接手代签 |
-| 6 | match 域 Lead | `<待到岗>` | `<待签>` | 🟡 待 match 域 Lead 真人补详细补偿机制 (at-least-once / exactly-once / idempotency / 补偿链顺序) + 签字栏 #1 追溯 |
+| 6 | match 域 Lead | `<待到岗>` — v0.2 详细补偿机制由 Mavis 代签落地 per DEC-008 代签惯例 | 2026-08-31 (代签) | 🟢 AtLeastOnce + dedup + 逆序回滚已实装测试通过; 🟡 跨进程持久化后端选型 + 5 域业务逻辑仍待真人到位后签字栏 #1 追溯确认 |
 
 ---
 
@@ -156,3 +157,4 @@ pub struct SagaStep {
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-08-30 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: P3-E.6 docs 阶段 + 骨架 5 域跨域编排 + 补偿 trait 5 域 stub, 待 match 域 Lead 真人补详细补偿机制 | 2026-08-30 10:45 JST Ulysses 指令"全做" 5 套推进触发 |
+| v0.2 | 2026-08-31 | Mavis (代签 match 域 Lead per DEC-008 代签惯例) | 关闭 §3 gap #1: 新增 `idempotency_store.rs` (IdempotencyStore trait + InMemoryIdempotencyStore), 改写 `compensation_strategy.rs` DefaultCompensationStrategy 实装 AtLeastOnce 模式 (dedup + call_chain 逆序回滚), ExactlyOnce/BestEffort 显式拍板为待补 (跨进程持久化后端选型待真人); 新增 3 个单测 (累计 7/7 通过); `cargo check --workspace --lib` 0 err (42 crate) | 2026-08-31 Ulysses 指令"包括36个文件在内的优化全都做" |

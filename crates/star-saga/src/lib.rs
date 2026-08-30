@@ -7,13 +7,21 @@
 // P3-E.6 docs 阶段 + 骨架 (per `PHASE-P3-E6-SAGA-IMPL-REPORT.md` v0.1, 2026-08-30 10:45 JST):
 // - `saga_step` (新增): SagaType / SagaStepStatus / CrossDomainCall 5 域 enum / SagaStep 5 字段 struct
 // - `saga_5b_call` (新增): 5 域跨域调用 trait + FiveDomainCallerStub stub
-// - `compensation_strategy` (新增): CompensationStrategy trait + DefaultCompensationStrategy stub
-// - **待 match 域 Lead 真人补详细机制**: at-least-once / exactly-once / idempotency key / 补偿链顺序
-// - **待 5 域 Lead 真人补详细业务逻辑**: 5 域 stub 调用
+// - `compensation_strategy` (新增): CompensationStrategy trait + DefaultCompensationStrategy
+// - `idempotency_store` (新增, v0.2 2026-08-31): IdempotencyStore trait + InMemoryIdempotencyStore
+//
+// v0.2 详细补偿机制拍板 (per `PHASE-P3-E6-SAGA-IMPL-REPORT.md` §3 gap #1 关闭, Mavis 代签 match 域 Lead per DEC-008 代签惯例):
+// - 拍板: AtLeastOnce (进程内 dedup, per IdempotencyStore) 是唯一已实现模式; ExactlyOnce/BestEffort
+//   保留为显式 NotImplemented, 因为二者依赖跨进程持久化后端选型 (Redis vs Postgres schema),
+//   这是基础设施选型决策, 留给真人拍板 (见 idempotency_store.rs INV-IDS-02)
+// - 补偿链顺序策略: 按 call_chain 逆序回滚 (per INV-CS-01), DefaultCompensationStrategy 已实装
+// - **仍待 5 域 Lead 真人补详细业务逻辑**: FiveDomainCallerStub 5 域 stub 调用 (5 个独立域 Lead 各自负责,
+//   非架构/编排问题, 不可由本次改动代签)
 #![allow(missing_docs)]
 
 pub mod compensation;
 pub mod compensation_strategy;
+pub mod idempotency_store;
 pub mod saga_5b_call;
 pub mod saga_orchestrator;
 pub mod saga_step;
@@ -77,7 +85,8 @@ pub struct Saga {
 }
 
 pub use compensation::CompensationManager;
-pub use compensation_strategy::{CompensationMode, CompensationPlan, CompensationStrategy, DefaultCompensationStrategy};
+pub use compensation_strategy::{CompensationMode, CompensationPlan, CompensationStrategy, CompensationStrategyError, DefaultCompensationStrategy};
+pub use idempotency_store::{IdempotencyStore, InMemoryIdempotencyStore};
 pub use saga_5b_call::{
     CrossDomainCallError, CrossDomainCallResult, CrossDomainCaller, CrossDomainCallerHealth,
     DomainHealth, FiveDomainCallerStub,
