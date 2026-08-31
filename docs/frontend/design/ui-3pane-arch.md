@@ -1,12 +1,28 @@
 # Star Frontend — 三栏自适应信息架构 v0.1
 
-> **状态**: Draft v0.1
-> **日期**: 2026-08-29
+> **状态**: Draft v0.1 → v0.2 (per 2026-08-31 12:48 JST handoff 兜底, 4 view → 5 tab 拍板实装注记, 守门 #11 缺标比错标)
+> **日期**: 2026-08-29 (v0.1) / 2026-08-31 12:48 JST (v0.2 追加实装注记)
 > **修订人**: 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签
 > **触发**: Ulysses 2026-08-29 04:02 JST 拍板 "Star 自创（推荐）" + "补齐 P1-P3 全部 33 项"
 > **关联**: `docs/frontend/design/dynamic-interaction-design.md` (DnD/协同基线)
 > **关联**: `docs/frontend/design/ui-detailed-design.md` (像素级 wireframe)
 > **上游架构基线**: [`docs/frontend-internal-01-architecture.md`](../../frontend-internal-01-architecture.md)(组件树/Store 分层/模块依赖总纲,本文档为其三栏信息架构的下游延伸)
+
+## §0.1 实装注记 (per 2026-08-29 22:49 JST Ulysses 拍板 + 2026-08-31 12:48 JST handoff 兜底)
+
+**4 view → 5 tab**: v0.1 §1.3 line 145-156 设计 `/projects` Cmd+1/2/3/4 = 看板/时间线/列表/概览 (4 view), 实装 (per `frontend/src/app/projects/page.tsx:78` ProjectsTabId) 5 tab: **kanban / timeline / backlog / agents / worktrees** (option 1, per `commit 7d85c34` 2026-08-29 22:49 JST 拍板)。
+
+**映射**:
+- 看板 → kanban (Jira 风 Kanban, +Add task 按钮 per `commit 4c8bd5c`)
+- 时间线 → timeline (GanttChart + Calendar 子视图合并)
+- 列表 → backlog (work-items 列表按 status 排序)
+- 概览 → PageHeader (KPI + SectionTitle 整合, 不再单 tab)
+- + agents tab (取代原 Members 入口, AI agent 实时状态)
+- + worktrees tab (worktree domain 入口, per `frontend/src/lib/nav/registry.ts`)
+
+**重定向 4 修复** (per `commit 4614267` 2026-08-31 12:48 JST): `/board` `/scm` `/collaboration` `/workflow` `/relation` 5 redirect 目标 tab 旧 (board/workflow/relations) 不在 5 tab 之内, 全部改 (kanban/worktrees), 详见 `ui-redesign-multica-style.md §0.1`。
+
+**不改原 v0.1 §1-§3 内容**: 保留三栏自适应 IA 思路 (左导航 + 中面板 + 右抽屉), 拍板后实装变更 (5 tab 替换 4 view) 在 §0.1 增量追加 (守门 #12 + #11 同 multica §0.1)。
 
 ---
 

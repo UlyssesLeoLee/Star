@@ -1,9 +1,28 @@
 # Star Frontend — UI/UX Redesign (Multica.ai 风格)
 
-> **状态**: Draft v0.1
-> **日期**: 2026-08-28
+> **状态**: Draft v0.1 → v0.2 (per 2026-08-31 12:48 JST handoff 兜底, 5 tab 拍板实装注记, 守门 #11 缺标比错标)
+> **日期**: 2026-08-28 (v0.1) / 2026-08-31 12:48 JST (v0.2 追加实装注记)
 > **修订人**: 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签
 > **触发**: Ulysses 2026-08-28 19:21 JST 反馈"UI/UX 不要给用户太大的认知负荷,核心功能聚合进类似 https://multica.ai/ 的 UI 中,简洁但功能丰富"
+
+## §0.1 实装注记 (per 2026-08-29 22:49 JST Ulysses 拍板 + 2026-08-31 12:48 JST handoff 兜底)
+
+**5 tab 拍板**: v0.1 §2 line 22-29 列 `/projects` 5 tab = list/board/gantt/calendar/workflow 与实装 (per `frontend/src/app/projects/page.tsx:78` ProjectsTabId) 不一致。**2026-08-29 22:49 JST Ulysses 拍板** 5 tab 改为: **kanban / timeline / backlog / agents / worktrees** (option 1, per `commit 7d85c34`)。
+
+| v0.1 设计 5 tab | v0.2 实装 5 tab (2026-08-29 22:49 JST 拍板) | 映射 |
+|---|---|---|
+| list | backlog | work-item 列表按 status 排序 (per PageHeader §4) |
+| board | kanban | Jira 风 Kanban + +Add task 按钮 (per `commit 4c8bd5c`) |
+| gantt | timeline | GanttChart + Calendar 并入 (per 8/28 22:49 拍板) |
+| calendar | timeline (合并) | Calendar 作为 timeline 子视图, 不再单 tab |
+| workflow | worktrees | worktree domain 入口 (per `frontend/src/lib/nav/registry.ts`) + 增 agents tab 取代原 Members 入口 |
+
+**重定向 4 修复 (per 2026-08-31 12:48 JST handoff 兜底, `commit 4614267`)**:
+- `/board` → `/projects?tab=kanban` (旧 tab=board 不存在, 改 kanban)
+- `/scm /collaboration /workflow /relation` 4 redirect → `/projects?tab=worktrees` (旧 tab=workflow/relations 不存在, 改 worktrees)
+- `/canvas/:id` → `/projects?canvas=:id` (deep link 修复, projects page useSearchParams 解析)
+
+**不改原 v0.1 §1-§10 内容**: 保留 v0.1 拍板时的设计思路 (multica 风格), 拍板后实装变更 (5 tab + 4 redirect) 在 §0.1 增量追加, 不回溯原段 (per 守门 #12 不沿用 v0.x 旧叙事 + #11 缺标比错标安全)。
 
 ---
 

@@ -5,7 +5,7 @@
 | 属性 | 内容 |
 |---|---|
 | **状态** | 🟢 Active |
-| **版本** | v1.0 |
+| **版本** | v1.0 → v1.1 (per 2026-08-31 12:48 JST handoff 兜底, 5 tab 拍板实装注记, 守门 #11 缺标比错标) |
 | **日期** | 2026-08-29 |
 | **负责人** | 架构师 (Mavis 接手 agent per DEC-008) |
 | **适用范围** | Star 平台前端全量 UI/UX 规范、组件交互与架构设计 |
@@ -17,6 +17,7 @@
 | v0.1 | 2026-08-28 | 架构师 (Mavis 接手) | 初始 Draft (Redesign 框架) |
 | v0.9 | 2026-08-29 | 架构师 (Mavis 接手) | 补全 6 大页面选项卡规范与组件参数表 |
 | v1.0 | 2026-08-29 | 架构师 (Mavis 接手) | 依据 IA 重构决策：甘特图与燃尽图统一归入 `/analytics` 图表中心，`/planning` 专注冲刺与排期；UTF-8 字符集统一与坐标原型 PDF 对齐 |
+| v1.1 | 2026-08-31 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 | handoff 兜底 §0.1 实装注记: 5 tab 拍板 (kanban/timeline/backlog/agents/worktrees, per 8/29 22:49 JST 拍板 + `commit 7d85c34`) 替换 §3.x 6 页面选项卡设计的 5 tab 概念; 4 redirect 修复 (per `commit 4614267` 8/31 12:48 JST); 不动原 v1.0 §1-§10 内容, 守门 #12 + #11 缺标比错标 |
 
 ---
 
