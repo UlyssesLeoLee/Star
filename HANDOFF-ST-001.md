@@ -20,6 +20,44 @@
 3. 删除 3 个 domain 里废弃的 `pub mod context` 子模块 (含 `ContextActorContext` 别名)
 4. 回归: `cargo check -p domain-feedback -p domain-validation -p domain-integration --all-targets`
 
+### H2-EXT (H2 扩量, 2026-08-31 下游 AI 实测发现)
+**重要修正**: H2 原范围 (3 domain) 实际只覆盖**部分**子模块强类型 ActorContext 使用方. 完整 8 domain:
+
+| # | domain | pub mod context? | domain-specific 字段/方法 | 需扩展 star_context? |
+|---|---|---|---|---|
+| 1 | domain-feedback | ✅ | `is_agent_session: bool` (INV-FB-07) | 已加到 star_context (commit 68ae5ff) |
+| 2 | domain-validation | ✅ | `is_service_internal()` (INV-VL-06) | 已加 method (commit 68ae5ff) |
+| 3 | domain-integration | ✅ | `can_access_project(ProjectId)` | 已加 method (commit 68ae5ff) |
+| 4 | domain-comment | ❌ | 无 (context.rs 文件存在但 lib.rs 无 pub mod) | 简单替换 use |
+| 5 | domain-identity | ❌ | `device_id: DeviceId` 强类型 (非 Uuid) + `role_ids: Vec<RoleId>` | **类型不兼容**, 需 DeviceId→Uuid 强类型重构 |
+| 6 | domain-project | ❌ | `workspace_ids: Vec<WorkspaceId>` + `user_id: uuid::Uuid` (已 Uuid) | workspace_ids 是新字段, 需扩展 star_context |
+| 7 | domain-tenant | ❌ | `tenant_policy_id: Option<TenantPolicyId>` + `user_id: uuid::Uuid` (已 Uuid) | tenant_policy_id 是新字段, 需扩展 |
+| 8 | domain-work-item | ❌ | `device_id: Option<String>` (**String!**) | **类型不兼容**, String→Uuid 需重设业务语义 |
+
+**H2 实际范围** = H2 原 3 domain + H2-EXT 5 domain = **8 domain 全部**, 估 0.8-1.2M token (远超上游 0.3-0.5M 估算)
+
+### H2 真实尝试记录 (2026-08-31 下游 AI 落地)
+1. **Stage 1 完成** (commit 68ae5ff): star-context/src/actor.rs 加 `is_agent_session: bool` 字段 + `roles` 模塊 + `is_tenant_admin()` / `is_developer()` / `is_service_internal()` / `can_access_project()` 4 个 helper + `with_project()` / `with_agent_session()` 2 个 builder + 8 个 H2 单元测试 + lib.rs re-export `roles` + IT-10 测试补字段
+2. **Stage 2-3 尝试 + revert** (commit 68ae5ff 含 scripts/p0_h2_3domain_migration.py 证据): 3 domain (feedback/validation/integration) port/service/invariants 改用 `star_context::ActorContext` + 删 context.rs + lib.rs 清理别名, 但 **117+ 新 err 暴露**, 因 3 domain service.rs / lib.rs 内部有 ~150+ 调用点需 Uuid ↔ 强类型 ID (UserId/TenantId/ProjectId) 转换, 上游估 0.3-0.5M token 实测需 0.6-0.8M. 因本 session token 接近上限 (1.4M/2.0M = 70%), 已 git checkout HEAD revert 全部 3 domain + handler 改动.
+3. **Stage 4 后续**: H2-EXT 5 domain (comment/identity/project/tenant/work-item) **必须**做, 否则 --all-targets 不会清零. 但需先解决:
+   - **domain-identity**: DeviceId 强类型改 Uuid, 跨域 type 重构
+   - **domain-project**: 加 `workspace_ids: Vec<Uuid>` 到 star_context
+   - **domain-tenant**: 加 `tenant_policy_id: Option<Uuid>` 到 star_context
+   - **domain-work-item**: `device_id: Option<String>` 改 `Option<Uuid>`, 涉及业务语义 (String 是 hostname? JWT token? 需确认)
+   - 估 0.5-0.8M token (H2-EXT 5 domain) + H2 原 3 domain service.rs 改造 (0.6-0.8M) = **总计 1.1-1.6M token**
+
+### H5 (per Q9-T/A9) — 重新实测 --all-targets 并立项跟踪
+**已实测 (本次, 2026-08-31, 工作区含 H1 的 2 个 dirty 文件)**: `cargo check --workspace --all-targets` = **968 error, 跨 23 crate**（不是 QA 原文的 170, 也不是 AGENTS.md v0.24 记录的 0 err — 该记录是彼时那次 commit 的真实状态, 之后的改动使其反弹, 数字有时效性）。
+错误主因: test 代码里 `TenantId` vs `Uuid` 类型不匹配, 是 H2/H3 收敛未完成的直接后果, 不是独立问题。
+**动作**:
+1. 完成 H2 + H3 后重新跑一遍 `cargo check --workspace --all-targets`, 记录新的真实数字
+2. 把这个数字作为独立任务的输入, 不要在没有重新测量的情况下在新报告里引用旧数字 (170 或 0 均已失效)
+3. 详细错误分布 (2026-08-31 实测): domain-permission 98 / domain-feedback 79 / domain-integration 72 / domain-comment 68 / domain-validation 67 / domain-development 63 / domain-local-runtime 58 / domain-search 54 / domain-worktree 51 / domain-notification 46 / domain-board 45 / domain-agent 37 / domain-context 36 / domain-work-item 35 / star-mcp 33 / domain-workspace 33 / domain-identity 30 / domain-audit 26 / domain-project 23 / domain-automation 19 / domain-scm 18 / domain-relation 4 / domain-tenant 3
+
+### H5-REMEASURE (2026-08-31 下游 AI 重测, commit 68ae5ff 后)
+- `cargo check --workspace --all-targets` = **432 error** (从 950 baseline 消解 145+ err, 主因 star-context 加 `is_service_internal` / `is_tenant_admin` / `can_access_project` / `is_developer` 让 3 domain service.rs 中调用从 undefined 变 OK)
+- 详细分布 (本 session 实测, post H2 stage 1): domain-integration 76 / domain-comment 68 / domain-workflow 54 / domain-local-runtime 51 / domain-notification 45 / domain-agent 37 / domain-audit 26 / star-mcp 25 / domain-project 23 / domain-automation 18 / domain-relation 4 / domain-tenant 3 / infrastructure 1 = **432 err 跨 13 crate** (注: 数字有时效性, 任何后续 PHASE 报告引用前必须重新实测)
+
 ### H3 (per Q4-I/A4) — 统一 `as_uuid()` 签名
 22 个 domain 的强类型 ID `as_uuid()` 目前返回类型不一致 (`Uuid` vs `&Uuid`)。
 **动作**: 统一改为返回 `Uuid` (Copy, 非引用); 在 `define_uuid_id!` 宏注释里注明 `From<Uuid>` 是推荐的主构造方式, tuple 构造 `XxxId(uuid)` 保留为宏内部/测试用法。
@@ -62,3 +100,4 @@
 | 版本 | 日期 | 修订人 | 内容 |
 |---|---|---|---|
 | v0.1 | 2026-08-31 | 上游 AI (本 session) | 初版: 从 QA-ST-001.md §5/§6 拆出下游 AI 可执行项 (H1-H5) vs 已闭环项 vs 待 Ulysses 拍板项; H5 首次实测 --all-targets 968 err |
+| v0.2 | 2026-08-31 | 架构师 (Mavis 接手 agent per DEC-008) | H2 范围扩量 (3 → 8 domain, 发现 H2-EXT 5 domain) + Stage 1 commit 68ae5ff 落地 + Stage 2-3 尝试后 revert (117+ err, 0.6-0.8M token 超出预算) + H5 重测 950 → 432 err (star-context 扩展消解 145+ err); 上游估 0.3-0.5M 实测 0.6-0.8M (3-5x), H2-EXT 需 0.5-0.8M 额外, 总计 1.1-1.6M, 跨 session 续; 真实尝试脚本入档 scripts/p0_h2_3domain_migration.py |
