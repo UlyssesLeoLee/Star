@@ -9,6 +9,7 @@ export { inboxHandlers } from "./inbox";
 export { cliHandlers } from "./cli";
 export { validationHandlers } from "./validation";
 export { designArtifactHandlers } from "./design-artifacts";
+export { incidentHandlers } from "./incidents";
 
 import { agentsHandlers } from "./agents";
 import { analyticsHandlers } from "./analytics";
@@ -16,6 +17,7 @@ import { inboxHandlers } from "./inbox";
 import { cliHandlers } from "./cli";
 import { validationHandlers } from "./validation";
 import { designArtifactHandlers } from "./design-artifacts";
+import { incidentHandlers } from "./incidents";
 
 export const handlers = [
   ...agentsHandlers,
@@ -24,4 +26,5 @@ export const handlers = [
   ...cliHandlers,
   ...validationHandlers,
   ...designArtifactHandlers,
+  ...incidentHandlers,
 ];
