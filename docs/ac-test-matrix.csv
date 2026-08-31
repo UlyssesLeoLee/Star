@@ -31,5 +31,5 @@ REQ-DEV-001,必须支持 `1 WorkItem → N Worktrees`。,REQ-DEV-001,,,,gap
 REQ-DEV-002,必须支持 `1 Worktree → N Agent Sessions`。,REQ-DEV-002,,,,gap
 REQ-TST-001,系统必须支持 ValidationResult 携带 Level 字段（単体/結合/総合/受入四档），并支持按 Level 聚合查看某 WorkItem/Project 的测试覆盖状态。,REQ-TST-001,Y,,,covered
 REQ-TST-002,"Acceptance Coverage 映射（§27.2）必须支持声明""某 AcceptanceCriteria 需要哪些 Level 的证据才算覆盖""，缺失特定 Level 时须在 UI/CLI 明确指出缺口，而非笼统显示""未覆盖""。",REQ-TST-002,Y,,,covered
-REQ-OPS-001,"系统必须支持登记 IncidentRecord 并关联到 0..N 个 WorkItem，用于追溯""生产问题 → 根因 ChangeSet → 修复 WorkItem → 验证证据""的完整链条。",REQ-OPS-001,,,,gap
-REQ-OPS-002,系统必须允许 IncidentRecord 反向标注哪些 AcceptanceCriteria 被证明覆盖不足，但不得自动修改历史 ValidationResult 或 Acceptance Coverage 的既有判定（保留历史事实，新增,REQ-OPS-002,,,,gap
+REQ-OPS-001,"系统必须支持登记 IncidentRecord 并关联到 0..N 个 WorkItem，用于追溯""生产问题 → 根因 ChangeSet → 修复 WorkItem → 验证证据""的完整链条。",REQ-OPS-001,Y,,,covered
+REQ-OPS-002,系统必须允许 IncidentRecord 反向标注哪些 AcceptanceCriteria 被证明覆盖不足，但不得自动修改历史 ValidationResult 或 Acceptance Coverage 的既有判定（保留历史事实，新增,REQ-OPS-002,Y,,,covered

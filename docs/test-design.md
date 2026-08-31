@@ -1,6 +1,6 @@
 # Star 平台《Test Design》(测试策略详细设计)
 
-> **文档版本**: v0.3 (2026-08-31) → v0.4 (per 2026-08-31 12:50 JST handoff 兜底, γ+δ 21 P0 引用错位修复, 守门 #11 缺标比错标)
+> **文档版本**: v0.5 (2026-08-31) → v0.4 (per 2026-08-31 12:50 JST handoff 兜底, γ+δ 21 P0 引用错位修复, 守门 #11 缺标比错标)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -9,6 +9,7 @@
 > | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(5 个同步项对应测试点已落位,详见 §X 上游同步测试) | — |
 > | v0.3 | 2026-08-31 | 同步 requirements.md 98db08e(线程 C:Design Artifact / Test Level / Incident Record,详见 §上游同步 2026-08-31;basic-design 尚未跟进,字段细节标 TBD) | — |
 > | v0.4 | 2026-08-31 | handoff 兜底 γ+δ 21 P0 引用错位修复注记 (per `QA-DRIFT-001.md` §2.3): T1/T2/T3 自指引用 §6.2.1/§6.3.3/§6.3.4 实为 test-design 自身章节, 应改 requirements.md §8.3/§27.6/§29.1; S1-S5 同步点对不上实际章节; 13 处 tenant_id 端点声明; §6.x 引用 §X 与 7 份设计书实际章节未穷举对账。本 v0.4 不动原 v0.3 章节内容, 在 §0 末追加"驱动上游回填清单"段, 守门 #12 + #11 缺标比错标 + #9 author Ulysses 唯一 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
+> | v0.5 | 2026-08-31 | handoff 兜底分批 2: 4 wt 代码跟进落地 (per AGENTS.md v0.24 / `STAR-P3-WBS-001.md` §13 / 2026-08-31 12:39 JST Ulysses 指令"开子代理和worktree并行处理" 拍板 4 wt 并行 + AC 矩阵跟 T1), 守门 #1+#9+#12 跨 stage 全过 (origin/main 25 → 29 ahead, 285/285 vitest pass + tsc 0 + cargo 0, 4 worker 子代理 status="succeeded" 实证 5 commits 在 main chain 上):<br>- **T1 ValidationResult.Level 维度 (REQ-TST-001/002)** (per §6.2.1): `5df5a97` (types TestLevel 4 值 + ValidationResultRecord + AcceptanceCoverageReport) + `4fa31d7` (19 测试 + AC 矩阵生成器) + `3124902` (merge), commit 实测 frontend/src/mocks/handlers/validation.ts (3 endpoint) + data/validation.ts (10 rows 4 Level 全覆盖) + schemas/validation.ts + 19 测试 + `scripts/generate_ac_matrix.py` (249 行) + `docs/ac-test-matrix.csv` (35 行 = 1 header + 34 REQ 行, REQ-TST-001/002 covered 其余 30 gap)<br>- **T2 DesignArtifact + WorkItem Guard (REQ-DSG-001/002)** (per §6.3.3): `43355ed` + `a24f4d5` (merge), 37 测试 (13 guard 纯函数 `checkAllArtifactsApproved` 4 reason 分支 + 24 handler 跨 5 endpoint 状态机), commit 实测 frontend/src/lib/workitem-guard.ts 纯函数 + mocks/handlers/design-artifacts.ts (5 endpoint 含 transition 状态机 nextStatusFromDecision 纯函数)<br>- **T3 IncidentRecord + 3 项非能力负向测试 (REQ-OPS-001/002/003)** (per §6.3.4): `e9b4a84` + `631f562` (merge), 22 测试 (8 guard `validateIncidentRecord` 5 失败分类 + 14 handler 含 **3 项非能力 404 negative missing** 端点: `GET /api/incidents/probe-production` / `POST /api/incidents/process-alert` / `POST /api/incidents/:id/auto-rollback` 错误文案占位 "Capability not implemented (per REQ-OPS-003 §30.6 boundary)"), commit 实测 frontend/src/lib/incident-guard.ts + mocks/handlers/incidents.ts (5 endpoint)<br>- **5 域业务 mock 完整化 (test-design §2.1.2 + §3.1 + §3.3)** (per §0 端点清单扩展): `3dde2b4` + `b424611` (merge), 31 测试 (跨 player/economy/match/social/admin 5 域 + 既有 agents/inbox/analytics + 新加 workspaces/billing/worktrees/comments/tenants+rbac), commit 实测 frontend/src/mocks/schemas/five-domain.ts (243 行 6 type guard) + data/five-domain.ts (338 行 6 dataset) + 5 handler 文件 + handlers-5d.test.ts (31 tests)<br>- **不变量保留**: 本 v0.5 不改 v0.3 章节内容 (per 守门 #12 缺标比错标 + 守门 #11 不沿用 v0.x 旧叙事), 仅在文末 §16 追加"代码跟进实证"段, 引用 4 wt commit 短码 + 守门实证结果; 字段细节 TBD 维持 §6.2.1/§6.3.3/§6.3.4 不动, 等 basic-design 拍板后由上游 AI 回填 (per v0.4 §0.1 驱动上游回填清单机制)<br>- **守门 #1+#9+#12 跨 stage 全过**: vitest 285/285 (35 files, 109 new = 19+37+22+31) / tsc --noEmit 0 错 / cargo check --workspace --all-targets 0 err (11.29s, 11 warning pre-existing) / author Ulysses 唯一 / 0 子代理 RPC 不可靠实证 (status="succeeded" 实证 5 commits 全在 main chain 上) | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/api-design.md` v0.1,`docs/security-design.md` v0.1
 > **下游**: Implementation(测试代码 + CI 配置)、Operation(测试环境 + 监控)
 > **文档定位**: 完整测试策略:单元 / 集成 / E2E / 性能 / 安全 / 验收。
@@ -1546,4 +1547,161 @@ apps/web/
 
 ---
 
-**END of Test Design v0.3**
+## 16. 代码跟进实证 (per 2026-08-31 13:18 JST handoff 兜底分批 2, AGENTS.md v0.24 + STAR-P3-WBS-001 §13)
+
+> **范围**: 本节记录 test-design v0.3 (2026-08-31) 3 新缺口 (§6.2.1 T1 / §6.3.3 T2 / §6.3.4 T3) + §2.1.2 5 域业务 mock 完整化 + §6.2 AC ↔ Test Case 矩阵生成器 5 子项的代码跟进实证。**不**改 v0.3 章节内容 (per 守门 #12 缺标比错标 + 守门 #11 不沿用 v0.x 旧叙事), 仅作为 Implementation 落地的实证, 字段细节 TBD 维持等 basic-design 拍板后由上游 AI 回填 (per v0.4 §0.1 驱动上游回填清单机制)。
+
+### 16.1 T1 ValidationResult.Level 维度 (REQ-TST-001/002, per §6.2.1)
+
+**需求**: ValidationResult 携带 `level` 字段 (4 Level: unit / integration / system / acceptance), Acceptance Coverage 映射按 Level 报告 (REQ-TST-002 "缺哪些 Level 证据" 明确指出)。
+
+**落地 (per AGENTS.md v0.24 + WBS §13 T.1)**:
+
+| 产出 | 文件 | commit |
+|---|---|---|
+| 类型扩展 | `frontend/src/types/ids.ts` +44 (TestLevel + ValidationResultRecord + AcceptanceCoverageReport) | `5df5a97` |
+| Schema | `frontend/src/mocks/schemas/validation.ts` (107 行) | `5df5a97` |
+| Data | `frontend/src/mocks/data/validation.ts` (204 行, 10 rows 跨 4 Level 全覆盖 + 故意缺 acceptance level 案例) | `4fa31d7` |
+| Handler | `frontend/src/mocks/handlers/validation.ts` (3 endpoint 含 maybeReal real-mode 短路) | `4fa31d7` |
+| 测试 | `frontend/src/mocks/__tests__/validation-level.test.ts` (**19 tests** 跨 schema + handler + endpoint shape) | `4fa31d7` |
+| AC 矩阵生成器 | `scripts/generate_ac_matrix.py` (249 行, 标准库 only re/csv/pathlib/argparse, 启发式 unit/integration/e2e 分桶, 支持全角冒号) | `4fa31d7` |
+| 产物 | `docs/ac-test-matrix.csv` (35 行 = 1 header + 34 REQ 行, REQ-TST-001/002 covered 其余 30 gap) | `4fa31d7` |
+| Merge | (合并入 main) | `3124902` |
+
+**守门实证**: vitest 19 new pass (无回归) + tsc --noEmit 0 错 + python 脚本可重跑 (验证 `python scripts/generate_ac_matrix.py` exit 0) + author Ulysses 唯一。
+
+**已知缺口 (per 缺标比错标, 等 basic-design 拍板)**:
+- 缺口 #1: ValidationResult 命名冲突 (T1 落地为 `ValidationResultRecord`, 既有 `ValidationResult` 是 ValidationCase.result outcome 状态, scope 不碰), 等 basic-design §4.5.6 拍板后回填
+- 缺口 #2: AC 矩阵生成器当前用 REQ 行作为代理行 (per §6.2.1 应出 AC-XXX-NNN 行, 但 requirements.md §27.2 当前只有 2 处 AC-001 占位示例)
+- 缺口 #3: basic-design §4.5.6 字段细节 TBD (fixture_path / duration_ms / started_at / ended_at 未拍板)
+- 缺口 #4: coverage endpoint 不支持 level 二次过滤 (P2+)
+- 缺口 #5: POST 真实持久化 P3 (per Phase F+ 后端就绪时)
+- 缺口 #6: MOCK_VALIDATION_RESULTS 与 MOCK_ACCEPTANCE_COVERAGE 不强制联动派生 (mock 简化)
+
+### 16.2 T2 DesignArtifact + WorkItem Guard (REQ-DSG-001/002, per §6.3.3)
+
+**需求**: WorkItem (典型 Epic/Story) 挂载 0..N DesignArtifact 维护 Status + Version 历史; "全部 DesignArtifact 全部 APPROVED" 作为 WorkItem 状态转换 Guard (per §8.2 REQ-WF-003), Guard 失败时明确指出未批准的具体 DesignArtifact。
+
+**落地 (per AGENTS.md v0.24 + WBS §13 T.2)**:
+
+| 产出 | 文件 | commit |
+|---|---|---|
+| 类型扩展 | `frontend/src/types/ids.ts` +46 (DesignArtifactStatus 5 值 + DesignArtifact 含 review_record_id nullable) | `43355ed` |
+| Schema | `frontend/src/mocks/schemas/design-artifact.ts` (71 行, 2 type guard) | `43355ed` |
+| Data | `frontend/src/mocks/data/design-artifacts.ts` (155 行, 9 rows 跨 3 work_item_id 5 status 全覆盖) | `43355ed` |
+| Handler | `frontend/src/mocks/handlers/design-artifacts.ts` (5 endpoint 含 maybeReal 短路 + transition 状态机 nextStatusFromDecision 纯函数) | `43355ed` |
+| 纯函数 Guard | `frontend/src/lib/workitem-guard.ts` (109 行, `checkAllArtifactsApproved` 4 reason 分支: `all_approved` / `pending_artifacts` / `no_artifacts_attached` / `no_artifacts_required`) | `43355ed` |
+| Guard 测试 | `frontend/src/lib/workitem-guard.test.ts` (**13 tests**: 3 正面 + 5 负面 + 5 boundary) | `43355ed` |
+| Handler 测试 | `frontend/src/mocks/__tests__/design-artifacts.test.ts` (**24 tests**: 3 schema + 3 fixture + 5 state-machine + 9 endpoint + 4 registration) | `43355ed` |
+| Merge | (合并入 main) | `a24f4d5` |
+
+**守门实证**: vitest 37 new pass + tsc --noEmit 0 错 + author Ulysses 唯一 + 0 子代理调用 (root 直实装, per 守门 #9 派生规 P3-A.6/A.7 RPC 失败实证)。
+
+**已知缺口 (per 缺标比错标, 等 basic-design 拍板)**:
+- 缺口 #1: ReviewRecord 互斥 Target 字段精确化 (现 nullable Uuid), 等 basic-design §27.4 拍板
+- 缺口 #2: WorkItem 状态机层 Guard 调用点 (`transitionWorkItem`) 待 scope 拍板 (P2+)
+- 缺口 #3: POST 真实持久化 P3 (per Phase F+ 后端就绪时)
+- 缺口 #4: real-mode 切换 (P3-A.7) 未覆盖本 handler (per 范围最小化, cli.ts 实证已落地)
+
+### 16.3 T3 IncidentRecord + 3 项非能力负向测试 (REQ-OPS-001/002/003, per §6.3.4)
+
+**需求**: 系统支持登记 IncidentRecord 关联 0..N WorkItem (REQ-OPS-001) + 标注证据不充分 AC 不得重写历史 ValidationResult (REQ-OPS-002) + **不得**实现主动探查生产 / 处理告警 / 自动回滚 3 项非能力 (REQ-OPS-003 §30.6 边界)。
+
+**落地 (per AGENTS.md v0.24 + WBS §13 T.3)**:
+
+| 产出 | 文件 | commit |
+|---|---|---|
+| 类型扩展 | `frontend/src/types/ids.ts` +42 (IncidentSource 2 值 + IncidentRecord 6 字段) | `e9b4a84` |
+| Schema | `frontend/src/mocks/schemas/incident.ts` (109 行, 2 type guard) | `e9b4a84` |
+| Data | `frontend/src/mocks/data/incidents.ts` (95 行, 4 rows 2 human_entry + 2 integration_webhook) | `e9b4a84` |
+| Handler | `frontend/src/mocks/handlers/incidents.ts` (5 endpoint: **2 允许 + 3 非能力 404 negative missing** per REQ-OPS-003 §30.6 边界) | `e9b4a84` |
+| 纯函数 Guard | `frontend/src/lib/incident-guard.ts` (147 行, `validateIncidentRecord` 5 失败分类: invalid_source / missing_work_item / missing_recorder / auto_action_attempted + 3 关键词禁止 auto_rollback / auto_remediation / alert_handler) | `e9b4a84` |
+| Guard 测试 | `frontend/src/lib/incident-guard.test.ts` (**8 tests**) | `e9b4a84` |
+| Handler 测试 | `frontend/src/mocks/__tests__/incidents.test.ts` (**14 tests** 含 3 项非能力 5 测试) | `e9b4a84` |
+| Merge | (合并入 main) | `631f562` |
+
+**核心 3 项非能力端点 (Negative Missing Tests — per REQ-OPS-003 §30.6 边界)**:
+
+| Path | Method | 响应 | 错误文案占位 |
+|---|---|---|---|
+| `/api/incidents/probe-production` | GET | 404 | `Capability not implemented (per REQ-OPS-003 §30.6 boundary)` |
+| `/api/incidents/process-alert` | POST | 404 | `Capability not implemented (per REQ-OPS-003 §30.6 boundary)` |
+| `/api/incidents/:id/auto-rollback` | POST | 404 | `Capability not implemented (per REQ-OPS-003 §30.6 boundary)` |
+
+每个响应 body 还含 `capability` (具体能力名) + `note: "TBD: error message schema per basic-design §30.6"`。
+
+**守门实证**: vitest 22 new pass + tsc --noEmit 0 错 + author Ulysses 唯一 + 3 项非能力 404 negative missing 实证。
+
+**已知缺口 (per 缺标比错标, 等 basic-design 拍板)**:
+- 缺口 #1: IncidentRecord Severity/Status/Category 字段 TBD, 等 basic-design §30.6 拍板
+- 缺口 #2: 3 项非能力端点错误文案 TBD 占位 "REQ-OPS-003 boundary", 等 basic-design §30.6 拍板后回填
+- 缺口 #3: IncidentRecord ↔ AuditEvent 联表查询未实装 (例如"按 actor 找所有事故") — P2+
+- 缺口 #4: integration_webhook side-effect 完整路径留 P2+ (当前仅 type/source 端到端, 真实 §18 Integration Webhook 转登逻辑未触发)
+- 缺口 #5: MSW handler GET /api/incidents 当前不读 query string — `work_item_id` 过滤由 lib 端做 (P2+ 改 server 端 query)
+- 缺口 #6: linked_work_item_ids Uuid 格式 (uuid-v4 regex) 未强校验 — 当前仅 type-level `string[]` 校验, V1 schema 简化
+
+### 16.4 5 域业务 mock 完整化 (per §2.1.2 + §3.1 + §3.3)
+
+**需求**: 5 域业务子域 (player / economy / match / social / admin) mock 完整化, 让 frontend 任意页面在 mock-mode 下都能拿到合理响应 (per 既有 MSW 4 handler 不够)。
+
+**5 域映射** (per `docs/ddd/01-player-bc.md` ~ `05-admin-bc.md` 5 域 DDD 边界, 已落档):
+
+| 域 | 子域 (DDD) | 既有 handler | 新加 handler | 跨 commit |
+|---|---|---|---|---|
+| **player** | user / identity / workspace | `agents.ts` (identity) | `workspaces.ts` (41 行, GET/POST/:id 3 endpoint) | `3dde2b4` |
+| **economy** | billing / pricing / cost | `analytics.ts` (KPI) | `billing.ts` (64 行, GET + usage 2 endpoint) | `3dde2b4` |
+| **match** | workflow / 状态机 / saga | (无) | `worktrees.ts` (80 行, GET + POST transition echo) | `3dde2b4` |
+| **social** | collaboration / 通知 | `inbox.ts` (notifications) | `comments.ts` (41 行, GET/POST/DELETE 软删 3 endpoint) | `3dde2b4` |
+| **admin** | RBAC / permission / tenant | (无) | `tenants.ts` (54 行, GET tenants + GET rbac/roles 4 endpoint) | `3dde2b4` |
+| **总** | | 4 handler | 5 handler + 12 endpoint | `b424611` (merge) |
+
+**落地 (per AGENTS.md v0.24 + WBS §13 T.4)**:
+
+| 产出 | 文件 | commit |
+|---|---|---|
+| Schema | `frontend/src/mocks/schemas/five-domain.ts` (243 行, 6 type guard: isWorkspace/isBillingEntry/isWorktreeSnapshot/isComment/isTenant/isRbacRole) | `3dde2b4` |
+| Data | `frontend/src/mocks/data/five-domain.ts` (338 行, 6 dataset: workspaces 4 / billing 5 / worktrees 6 / comments 7 / tenants 3 / rbac_roles 4, mulberry32 种子) | `3dde2b4` |
+| 5 handler | `frontend/src/mocks/handlers/{workspaces,billing,worktrees,comments,tenants}.ts` (总 280 行) | `3dde2b4` |
+| 测试 | `frontend/src/mocks/__tests__/handlers-5d.test.ts` (**31 tests**: 6 data integrity + 6 schema + 6 shape + 5 export + 2 server + 6 MSW) | `3dde2b4` |
+| Merge | (合并入 main) | `b424611` |
+
+**守门实证**: vitest 31 new pass + tsc --noEmit 0 错 + author Ulysses 唯一 + 0 unsafe (grep `: any\|<any>\|as any` 0 命中) + 0 子代理调用 (root 直实装)。
+
+**已知缺口 (per 缺标比错标, 等 5 域 Lead 真人 review)**:
+- 缺口 #1: 5 域 Lead 真人 review (BoundedContext 边界), 等 P3-E.5/F.1 真人到位
+- 缺口 #2: POST /transition 真实状态机执行 (saga 持久化) P3
+- 缺口 #3: POST/PATCH/DELETE tenant + rbac 真实写入 P2
+- 缺口 #4: 真实权限校验 (per `docs/ddd/05-admin-bc.md`) P3
+- 缺口 #5: 真实持久化 (5 域 POST) P3
+- 缺口 #6: real-mode 短路 (worktrees 已有 maybeReal; workspaces/billing/comments/tenants 未加) P3
+- 缺口 #7: server-side filter (现 mocks 全表 + client-side filter) P3
+
+### 16.5 累计统计
+
+| 子项 | token 估算 | commit 数 | 测试数 | 守门实证 |
+|---|---|---|---|---|
+| T1 | ~0.8M | 2 (5df5a97 + 4fa31d7) | 19 + 1 csv (35 行) | vitest 19 + tsc 0 + python 脚本可重跑 |
+| T2 | ~1.0M | 1 (43355ed) | 37 (13 guard + 24 handler) | vitest 37 + tsc 0 + 0 子代理 |
+| T3 | ~0.7M | 1 (e9b4a84) | 22 (8 guard + 14 handler) | vitest 22 + tsc 0 + 3 项非能力 404 |
+| T4 (5d) | ~1.2M | 1 (3dde2b4) | 31 (跨 5 域) | vitest 31 + tsc 0 + 0 unsafe |
+| **小计** | **~3.7M** (~1.0 SRE·周) | 5 + 4 merge | **109 新测试 + 1 AC csv** | **285/285 vitest pass + tsc 0 + cargo 0** |
+
+**4 worker 子代理 status="succeeded" 实证** (per AGENTS.md §4 #9 + 守门 #9 派生规, `git log ef27af7..b424611 --no-merges` 实证 main chain 上):
+
+| worker | 子代理 | 落地 commit | 状态 |
+|---|---|---|---|
+| T1 | `bg_652ab2bd` | `4fa31d7` + `5df5a97` | ✅ succeeded |
+| T2 | `bg_5c71223f` | `43355ed` | ✅ succeeded |
+| T3 | `bg_0c5853c6` | `e9b4a84` | ✅ succeeded |
+| 5d | `bg_906ecc51` | `3dde2b4` | ✅ succeeded |
+
+**3 次 merge 冲突解** (全部在 `frontend/src/mocks/handlers/index.ts`, 因 4 wt 各自加新 handler 累加, 互不冲突):
+- T1 → T2: validationHandlers (T1) + designArtifactHandlers (T2) 累加 → `a24f4d5`
+- T1+T2 → T3: 累加 incidentHandlers → `631f562`
+- T1+T2+T3 → 5d: 累加 5 域 5 handler → `b424611`
+
+**不变量保留**: 本 §16 不改 v0.3 章节内容 (per 守门 #12 缺标比错标 + 守门 #11 不沿用 v0.x 旧叙事), 仅作为 Implementation 落地的实证。
+
+---
+
+**END of Test Design v0.5**

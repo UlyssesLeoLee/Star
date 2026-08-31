@@ -345,3 +345,56 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 - [ ] 守门 #8 不沿用 bc23d6c 叙事, P3-B 报告 commit short hash + 触发原因 + 守门 4 步全过
 - [ ] 守门 #10 author=Ulysses, 5 域 Lead 签字栏 Mavis 接手代签 (DDD Review 阶段补真人)
 - [ ] P3-A.6 e2e MSW real-mode 守门 (10 endpoint / 3 handler TODO 待 P3-B 阶段 handler 完整化)
+
+---
+
+## 13. Test Design v0.3 (2026-08-31) 代码跟进 (4 子项, per AGENTS.md v0.24)
+
+> **触发**: 2026-08-31 12:39 JST Ulysses 指令"开子代理和worktree并行处理 / 根据测试设计书更新测试脚本和mock", 拍板 4 wt 并行 (per ask_user 选项 1) + AC 矩阵跟 T1 (per ask_user 选项 1).
+>
+> **范围**: 测试设计书 `docs/test-design.md` v0.3 (2026-08-31) 新增 3 缺口 (T1/T2/T3) + 5 域业务 mock 完整化 + AC 矩阵生成器 5 子项, 全部为 V1 Should-Have Test (TBD 待 basic-design 拍板字段).
+>
+> **状态**: **4/4 收官** (per AGENTS.md v0.24, origin/main 25 → 29 ahead, 跨 stage 守门 #1+#9+#12+#15 全过)
+
+| 子项 | 描述 | token 估算 | 实际 commit | 实际行数 | 守门实证 | 依赖 | 状态 |
+|---|---|---|---|---|---|---|---|
+| **T.1** | T1 ValidationResult.Level 维度 (REQ-TST-001/002) | ~0.8M | `5df5a97` (types) + `4fa31d7` (test + AC 矩阵) + `3124902` (merge) | 19 测试 + 1 csv (35 行) | vitest 19 new pass + tsc 0 + author Ulysses + AC 矩阵可重跑 | 无 | 🟢 收官 (per 4fa31d7 + 3124902) |
+| **T.2** | T2 DesignArtifact + WorkItem Guard (REQ-DSG-001/002) | ~1.0M | `43355ed` + `a24f4d5` (merge) | 37 测试 (13 guard + 24 handler) | vitest 37 new pass + tsc 0 + author Ulysses + 0 子代理调用 (root 直实装) | 无 | 🟢 收官 (per 43355ed + a24f4d5) |
+| **T.3** | T3 IncidentRecord + 3 项非能力负向测试 (REQ-OPS-001/002/003) | ~0.7M | `e9b4a84` + `631f562` (merge) | 22 测试 (8 guard + 14 handler) | vitest 22 new pass + tsc 0 + author Ulysses + 3 项非能力 404 negative missing 实证 | 无 | 🟢 收官 (per e9b4a84 + 631f562) |
+| **T.4** | 5 域业务 mock 完整化 (test-design §2.1.2 + §3.1 + §3.3) | ~1.2M | `3dde2b4` + `b424611` (merge) | 31 测试 (跨 5 域) | vitest 31 new pass + tsc 0 + author Ulysses + 0 unsafe (grep `: any` 0 命中) | 无 | 🟢 收官 (per 3dde2b4 + b424611) |
+| **小计** | | **~3.7M** (~1.0 SRE·周) | 5 commits + 4 merge commits | **109 新测试** (19+37+22+31) | 285/285 vitest pass (35 files) | | **4/4 收官** |
+
+**4 worker 子代理 status="succeeded" 实证** (per AGENTS.md §4 #9 + 守门 #9 派生规):
+- `bg_906ecc51` (mock-5d) — 3dde2b4 ✅
+- `bg_652ab2bd` (T1) — 4fa31d7 + 5df5a97 ✅
+- `bg_5c71223f` (T2) — 43355ed ✅
+- `bg_0c5853c6` (T3) — e9b4a84 ✅
+
+5 commits 全在 main chain 上 (per `git log ef27af7..b424611 --no-merges` 实证).
+
+**3 次 merge 冲突解** (全部在 `frontend/src/mocks/handlers/index.ts`, 因 4 wt 各自加新 handler 累加, 互不冲突):
+- T1 → T2: validationHandlers (T1) + designArtifactHandlers (T2) 累加 → `a24f4d5`
+- T1+T2 → T3: 累加 incidentHandlers → `631f562`
+- T1+T2+T3 → 5d: 累加 5 域 5 handler (workspaces/billing/worktrees/comments/tenants) → `b424611`
+
+**已知缺口** (per 缺标比错标, 4 wt 各自显式列):
+- **T.1 缺口 #1**: ValidationResult 命名冲突 (T1 落地为 `ValidationResultRecord`, 既有 `ValidationResult` 是 ValidationCase.result outcome 状态, scope 不碰), 等 basic-design §4.5.6 拍板后回填, 把 §14 字符串联合迁成 `ValidationOutcome`, 把 `ValidationResultRecord` 改名回 `ValidationResult`
+- **T.1 缺口 #2**: AC 矩阵生成器当前用 REQ 行作为代理行 (per test-design §6.2.1 应出 AC-XXX-NNN 行, 但 requirements.md §27.2 应有 AC-XXX-NNN 当前文档只有 2 处 AC-001 占位示例)
+- **T.2 缺口 #1**: ReviewRecord 互斥 Target 字段精确化 (现 nullable Uuid), 等 basic-design §27.4 拍板
+- **T.2 缺口 #2**: WorkItem 状态机层 Guard 调用点 (`transitionWorkItem`) 待 scope 拍板
+- **T.3 缺口 #1-2**: IncidentRecord Severity/Status/Category 字段 TBD + 3 项非能力端点错误文案 TBD 占位 "REQ-OPS-003 boundary", 等 basic-design §30.6 拍板
+- **T.4 缺口 #1**: 5 域 Lead 真人 review (BoundedContext 边界) 等 P3-E.5/F.1 真人到位
+- **T.4 缺口 #6**: 4 handler (workspaces/billing/comments/tenants) real-mode 短路未加 (per P3-A.7 §3 缺口 #1 范围最小化), cli.ts + worktrees.ts 已有 maybeReal
+- **跨 4 wt 共同**: 4 wt 内 phantom CRLF 警告 (mockServiceWorker.js + snapshot.test.ts.snap) 是 `.gitattributes` 配置项非本任务 scope (per v0.23 实证, 0 content diff)
+- **T.1 增量**: T1 wt 跑 AC 矩阵生成器产生 `scripts/__pycache__/` Python 缓存, 加 .gitignore 是 root 决策 (本批不擅自)
+
+**文档同步** (per 守门 #12 cascade):
+- `AGENTS.md` v0.24 修订历史 (本批 4 wt 收官 + 守门实证)
+- `AGENTS.md` §7 表头 main HEAD 同步 `27407f6` → `b424611`
+- `STAR-P3-WBS-001.md` §13 本节 (4 子项登记)
+- `docs/test-design.md` §6.2.1 / §6.3.3 / §6.3.4 引用本批 commit 短码 (待 root 收尾)
+- `CHANGELOG.md` (待 root 收尾)
+
+**累计统计** (per 本次 §13 + §6 联动):
+- P3 全 5 阶段: 56/64 (87.5%) 实质收官 (per §6, 维持不变)
+- 本批 (Test Design v0.3 代码跟进): 4/4 收官, 109 新测试, ~3.7M tokens (1 SRE·周)
