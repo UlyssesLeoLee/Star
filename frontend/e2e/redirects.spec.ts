@@ -78,9 +78,9 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
     expect(r?.destination).toBe("/inbox?type=audit");
   });
 
-  it("/planning → /projects?tab=gantt (case 5)", () => {
+  it("/planning → /projects?tab=timeline (case 5)", () => {
     const r = findRedirect("/planning");
-    expect(r?.destination).toBe("/projects?tab=gantt");
+    expect(r?.destination).toBe("/projects?tab=timeline");
   });
 
   it("/workflow → /projects?tab=workflow (case 6)", () => {

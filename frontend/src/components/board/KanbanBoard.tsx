@@ -208,16 +208,17 @@ export function KanbanBoard({
             data-testid={`kanban-column-${col.status}`}
             data-status={col.status}
             data-col-idx={colIdx}
-            // 拖动高亮: card drop zone (红) + col drop zone (蓝) 区分
+            // 拖动高亮: card drop zone (红/绿) + col drop zone (蓝) 区分
             onDragOver={(e) => {
+              const types = e.dataTransfer?.types ? Array.from(e.dataTransfer.types) : [];
               // card drop (text/issue-id) -> 红/绿环
-              if (e.dataTransfer.types.includes("text/issue-id")) {
+              if (types.includes("text/issue-id") || types.length === 0) {
                 handleDragOver(e, col.status);
               }
               // col drop (text/col-idx) -> 蓝边
-              if (e.dataTransfer.types.includes("text/col-idx")) {
+              if (types.includes("text/col-idx")) {
                 e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
+                if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
                 if (draggingColIdx !== colIdx) setDropTargetColIdx(colIdx);
               }
             }}
@@ -226,10 +227,11 @@ export function KanbanBoard({
               handleColDragLeave(e, colIdx);
             }}
             onDrop={(e) => {
+              const types = e.dataTransfer?.types ? Array.from(e.dataTransfer.types) : [];
               // 路由: col 拖到 col vs card 拖到 col
-              if (e.dataTransfer.types.includes("text/col-idx")) {
+              if (types.includes("text/col-idx")) {
                 handleColDrop(e, colIdx);
-              } else if (e.dataTransfer.types.includes("text/issue-id")) {
+              } else {
                 handleDrop(e, col.status);
               }
             }}

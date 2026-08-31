@@ -178,7 +178,7 @@ export function GanttBar(props: GanttBarProps) {
           if (onCheckConflict) {
             const msg = onCheckConflict(
               format(newStart, "yyyy-MM-dd"),
-              format(addDays(newEnd, 1), "yyyy-MM-dd"),
+              format(newEnd, "yyyy-MM-dd"),
             );
             if (msg) {
               // 冲突: bar 红色 flash 1.5s (即时视觉反馈给拖拽者) +
@@ -193,15 +193,14 @@ export function GanttBar(props: GanttBarProps) {
             } else {
               onDragEnd?.(
                 format(newStart, "yyyy-MM-dd"),
-                // GanttBar endDate 是 exclusive, 加 1 天转回 inclusive
-                format(addDays(newEnd, 1), "yyyy-MM-dd"),
+                format(newEnd, "yyyy-MM-dd"),
               );
             }
           } else {
             // 无 conflict check, 兼容旧行为
             onDragEnd?.(
               format(newStart, "yyyy-MM-dd"),
-              format(addDays(newEnd, 1), "yyyy-MM-dd"),
+              format(newEnd, "yyyy-MM-dd"),
             );
           }
         }

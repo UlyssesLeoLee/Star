@@ -42,7 +42,7 @@
 //   agentSessions, changeSets, worktrees, pullRequests
 // =====================================================================
 
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { PageHeader, SectionTitle, Stat } from "@/components/PageHeader";
@@ -94,6 +94,14 @@ function deriveRole(project: Project): "project_admin" | "developer" | "viewer" 
 }
 
 export default function ProjectsPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-xs text-ink-mute font-mono">LOADING PROJECTS...</div>}>
+      <ProjectsPageContent />
+    </Suspense>
+  );
+}
+
+function ProjectsPageContent() {
   // ---- store 订阅 (zustand selectors) ----
   const projects = useStore((s) => s.projects);
   const workItems = useStore((s) => s.workItems);

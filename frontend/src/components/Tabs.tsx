@@ -16,7 +16,7 @@ export interface TabItem {
 
 const badgeToneClass: Record<BadgeTone, string> = {
   default: "bg-bg-card text-ink-mute border-line",
-  accent: "bg-accent/15 text-accent border-accent/30",
+  accent: "bg-accent/15 text-accent border-accent/30 shadow-[0_0_6px_rgba(0,240,255,0.2)]",
   warn: "bg-warn/15 text-warn border-warn/30",
   err: "bg-err/15 text-err border-err/30",
   ok: "bg-ok/15 text-ok border-ok/30",
@@ -38,7 +38,7 @@ export function Tabs({
   size?: TabSize;
   ariaLabel?: string;
 }) {
-  const sizeClass = size === "sm" ? "px-2.5 py-1.5 text-xs" : size === "lg" ? "px-5 py-3 text-base" : "px-3 py-2 text-sm";
+  const sizeClass = size === "sm" ? "px-2.5 py-1.5 text-xs" : size === "lg" ? "px-5 py-3 text-base" : "px-3.5 py-2 text-xs";
 
   const handleKey = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
@@ -56,10 +56,10 @@ export function Tabs({
 
   const containerClass =
     variant === "pills"
-      ? "flex items-center gap-1 p-1 rounded-lg bg-bg-soft/60 border border-line mb-4 w-fit"
+      ? "flex items-center gap-1.5 p-1 rounded-xl bg-bg-soft/70 border border-line mb-5 w-fit shadow-inner"
       : variant === "cards"
-      ? "flex items-center gap-0 border-b border-line mb-4"
-      : "flex items-center gap-0 border-b border-line mb-4";
+      ? "flex items-center gap-0 border-b border-line mb-5"
+      : "flex items-center gap-0 border-b border-line mb-5";
 
   return (
     <div
@@ -82,28 +82,28 @@ export function Tabs({
             onClick={() => onChange(it.id)}
             onKeyDown={(e) => handleKey(e, idx)}
             className={clsx(
-              "relative flex items-center gap-1.5 font-medium transition-colors outline-none",
+              "relative flex items-center gap-2 font-medium transition-all duration-200 outline-none",
               sizeClass,
               variant === "pills" && [
-                "rounded-md",
+                "rounded-lg",
                 isActive
-                  ? "bg-bg-card text-ink shadow-sm border border-line"
+                  ? "bg-bg-card text-accent shadow-[0_2px_8px_rgba(0,0,0,0.15)] border border-line font-bold"
                   : "text-ink-dim hover:text-ink hover:bg-bg-soft",
               ],
               variant !== "pills" && [
-                isActive ? "text-accent" : "text-ink-dim hover:text-ink",
+                isActive ? "text-accent font-bold" : "text-ink-dim hover:text-ink",
               ],
             )}
           >
             {it.icon}
             <span>{it.label}</span>
             {it.badge !== undefined && (
-              <span className={clsx("ml-0.5 text-[9px] font-mono px-1.5 py-0 rounded-full border", badgeToneClass[tone])}>
+              <span className={clsx("ml-1 text-[9px] font-mono font-bold px-1.5 py-0 rounded-full border", badgeToneClass[tone])}>
                 {it.badge}
               </span>
             )}
             {isActive && variant !== "pills" && (
-              <span aria-hidden className="absolute left-0 right-0 -bottom-px h-0.5 bg-accent shadow-[0_0_8px_rgba(0,240,255,0.7)]" />
+              <span aria-hidden className="absolute left-0 right-0 -bottom-px h-0.5 bg-accent shadow-[0_0_10px_rgba(0,240,255,0.8)]" />
             )}
           </button>
         );

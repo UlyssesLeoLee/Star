@@ -118,6 +118,12 @@ const DATE_RANGE = {
 };
 
 describe("GanttChart", () => {
+  beforeEach(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.clear();
+    }
+  });
+
   it("renders sprint rows and milestone rows", () => {
     const { container } = render(
       <GanttChart

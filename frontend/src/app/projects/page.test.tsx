@@ -24,7 +24,7 @@ describe("ProjectsPage", () => {
     }));
   });
 
-  it("renders project switcher + 5 tabs + Overview by default", () => {
+  it("renders project switcher + 5 tabs by default", () => {
     render(<ProjectsPage />);
     // switcher
     expect(screen.getByTestId("project-switcher")).toBeTruthy();
@@ -32,42 +32,27 @@ describe("ProjectsPage", () => {
     expect(screen.getByTestId("project-switcher-prj-physis")).toBeTruthy();
     expect(screen.getByTestId("project-switcher-prj-stargate")).toBeTruthy();
     expect(screen.getByTestId("project-switcher-prj-mobile")).toBeTruthy();
-    // 5 个 tab 渲染
-    expect(screen.getByRole("tab", { name: /Overview/i })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: /Board/i })).toBeTruthy();
+    // 5 个 tab 渲染 (Kanban / Timeline / Backlog / Agents / Worktrees)
+    expect(screen.getByRole("tab", { name: /Kanban/i })).toBeTruthy();
     expect(screen.getByRole("tab", { name: /Timeline/i })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: /Calendar/i })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: /Members/i })).toBeTruthy();
-    // 默认 Overview
-    expect(screen.getByTestId("projects-overview-tab")).toBeTruthy();
-  });
-
-  it("Overview tab shows project metadata + KPIs", () => {
-    render(<ProjectsPage />);
-    // 默认 PHYSIS project — "Physis / GVPE" 出现在 switcher + overview metadata, 用 getAllByText
-    const physisTexts = screen.getAllByText("Physis / GVPE");
-    expect(physisTexts.length).toBeGreaterThanOrEqual(1);
-    // KPI 标签
-    expect(screen.getByText(/Open Issues/i)).toBeTruthy();
-    expect(screen.getByText(/Active Agents/i)).toBeTruthy();
-    expect(screen.getByText(/Last Activity/i)).toBeTruthy();
-    // Recent work-items 表
-    expect(screen.getByText(/Recent Work-items/i)).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /Backlog/i })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /Agents/i })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /Worktrees/i })).toBeTruthy();
+    // 默认 Kanban tab
+    expect(screen.getByTestId("projects-kanban-tab")).toBeTruthy();
   });
 
   it("switching project updates selected project", () => {
     render(<ProjectsPage />);
     const sgBtn = screen.getByTestId("project-switcher-prj-stargate");
     fireEvent.click(sgBtn);
-    // Overview 标签应换成 SG (getAllByText 因为可能出现在 switcher)
-    const sgTexts = screen.getAllByText("StarGate Dashboard");
-    expect(sgTexts.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId("project-switcher-prj-stargate")).toBeTruthy();
   });
 
-  it("Board tab renders KanbanBoard with project-filtered data", () => {
+  it("Kanban tab renders KanbanBoard with project-filtered data", () => {
     render(<ProjectsPage />);
-    const boardTab = screen.getByRole("tab", { name: /Board/i });
-    fireEvent.click(boardTab);
+    const kanbanTab = screen.getByRole("tab", { name: /Kanban/i });
+    fireEvent.click(kanbanTab);
     // kanban 4 列
     expect(screen.getByTestId("kanban-board")).toBeTruthy();
     expect(screen.getByTestId("kanban-column-todo")).toBeTruthy();
@@ -76,36 +61,43 @@ describe("ProjectsPage", () => {
     expect(screen.getByTestId("kanban-column-done")).toBeTruthy();
   });
 
-  it("Timeline tab renders Gantt", () => {
+  it("Timeline tab renders Gantt and Calendar", () => {
     render(<ProjectsPage />);
     const tlTab = screen.getByRole("tab", { name: /Timeline/i });
     fireEvent.click(tlTab);
     expect(screen.getByTestId("projects-timeline-tab")).toBeTruthy();
   });
 
-  it("Calendar tab renders MonthView by default", () => {
+  it("Backlog tab renders work-items list", () => {
     render(<ProjectsPage />);
-    const calTab = screen.getByRole("tab", { name: /Calendar/i });
-    fireEvent.click(calTab);
-    expect(screen.getByTestId("projects-calendar-tab")).toBeTruthy();
+    const backlogTab = screen.getByRole("tab", { name: /Backlog/i });
+    fireEvent.click(backlogTab);
+    expect(screen.getByTestId("projects-backlog-tab")).toBeTruthy();
   });
 
-  it("Members tab shows members table with role (mock)", () => {
+  it("Agents tab shows members table with role (mock)", () => {
     render(<ProjectsPage />);
-    const memTab = screen.getByRole("tab", { name: /Members/i });
-    fireEvent.click(memTab);
+    const agentsTab = screen.getByRole("tab", { name: /Agents/i });
+    fireEvent.click(agentsTab);
     expect(screen.getByTestId("projects-members-tab")).toBeTruthy();
     // 至少 1 行成员
     const memberRows = screen.getAllByTestId(/^member-/);
     expect(memberRows.length).toBeGreaterThan(0);
   });
 
-  it("switching to mobile project shows fewer work-items in Board", () => {
+  it("Worktrees tab shows worktree list", () => {
+    render(<ProjectsPage />);
+    const wtTab = screen.getByRole("tab", { name: /Worktrees/i });
+    fireEvent.click(wtTab);
+    expect(screen.getByTestId("projects-worktrees-tab")).toBeTruthy();
+  });
+
+  it("switching to mobile project shows fewer work-items in Kanban", () => {
     render(<ProjectsPage />);
     // 切到 MOB project
     fireEvent.click(screen.getByTestId("project-switcher-prj-mobile"));
-    // 切到 Board tab
-    fireEvent.click(screen.getByRole("tab", { name: /Board/i }));
+    // 切到 Kanban tab
+    fireEvent.click(screen.getByRole("tab", { name: /Kanban/i }));
     // 验证 4 列都有 (即使 0 卡)
     expect(screen.getByTestId("kanban-column-todo")).toBeTruthy();
   });

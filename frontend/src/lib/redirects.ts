@@ -48,7 +48,7 @@ export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
   { source: "/board", destination: "/projects?tab=board", permanent: false },
   {
     source: "/planning",
-    destination: "/projects?tab=gantt",
+    destination: "/projects?tab=timeline",
     permanent: false,
   },
   {

@@ -28,13 +28,12 @@ export default function RootLayout({
   return (
     // suppressHydrationWarning: next-themes 在 client 注入 .dark class, SSR 不一致是预期.
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-[color:var(--color-surface)] text-[color:var(--color-text)]">
+      <body className="min-h-screen bg-[color:var(--color-surface)] text-[color:var(--color-text)] antialiased transition-colors">
         <Providers>
           <div className="flex min-h-screen">
             <Sidebar />
-            <div className="flex-1 flex flex-col min-w-0">
-              {/* Topbar 已在 (app) 路由下由 AppShell/AppHeader 渲染, 移除外层重复 (per 2026-08-29 17:18 JST) */}
-              <main className="flex-1 px-6 py-5 overflow-x-auto">{children}</main>
+            <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+              {children}
             </div>
           </div>
           {/* Global toast: GanttBar 拖拽冲突 / Board 列删除 / 主题切换等全局反馈

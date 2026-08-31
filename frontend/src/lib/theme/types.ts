@@ -44,29 +44,31 @@ export interface ThemeDefinition {
   version: number;
 }
 
-/** Star 调色板 — Mecha Ceramic Light (机甲陶瓷白) */
+/** Star 调色板 — Mecha Ceramic Light (机甲陶瓷白 / 桜の光) */
 const STAR_LIGHT_PALETTE: ColorToken[] = [
-  { name: "--color-primary", hex: "#3B82F6" },
+  { name: "--color-primary", hex: "#0284C7" },
+  { name: "--color-secondary", hex: "#F43F5E" },
   { name: "--color-success", hex: "#059669" },
   { name: "--color-warning", hex: "#D97706" },
-  { name: "--color-danger", hex: "#DC2626" },
+  { name: "--color-danger", hex: "#E11D48" },
   { name: "--color-neutral", hex: "#475569" },
-  { name: "--color-surface", hex: "#F8FAFC" },
+  { name: "--color-surface", hex: "#F8FAFD" },
   { name: "--color-surface-2", hex: "#FFFFFF" },
   { name: "--color-text", hex: "#0F172A" },
-  { name: "--color-text-dim", hex: "#64748B" },
+  { name: "--color-text-dim", hex: "#475569" },
   { name: "--color-border", hex: "#E2E8F0" },
 ];
 
-/** Star 调色板 — Neo-Tokyo Dark (默认暗色 / 赛博黑曜石) */
+/** Star 调色板 — Neo-Tokyo Dark (默认暗色 / 赛博黑曜石 & 电光霓虹) */
 const STAR_DARK_PALETTE: ColorToken[] = [
   { name: "--color-primary", hex: "#00F0FF" },
+  { name: "--color-secondary", hex: "#FF2A85" },
   { name: "--color-success", hex: "#10B981" },
   { name: "--color-warning", hex: "#F59E0B" },
   { name: "--color-danger", hex: "#FF3366" },
   { name: "--color-neutral", hex: "#94A3B8" },
-  { name: "--color-surface", hex: "#07090E" },
-  { name: "--color-surface-2", hex: "#0E131F" },
+  { name: "--color-surface", hex: "#080B11" },
+  { name: "--color-surface-2", hex: "#0F1420" },
   { name: "--color-text", hex: "#F8FAFC" },
   { name: "--color-text-dim", hex: "#94A3B8" },
   { name: "--color-border", hex: "#1E293B" },

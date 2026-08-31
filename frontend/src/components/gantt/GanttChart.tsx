@@ -66,10 +66,8 @@ export function GanttChart(props: GanttChartProps) {
   } = props;
 
   const router = useRouter();
-  // Default zoom "month" (20 px/day) — 整张图不溢出, 适合先看大盘
-  // per 2026-08-29 19:30 JST scope-ui-only 候选第 5 项 (从 "week" 60px/d 改起)
-  // localStorage "star.gantt.zoom" 保留用户上次选择, 跨刷新 / 跨 tab 一致
-  const [zoom, setZoom] = useState<ZoomLevel>("month");
+  // Default zoom "week" (60 px/day)
+  const [zoom, setZoom] = useState<ZoomLevel>("week");
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = window.localStorage.getItem("star.gantt.zoom");
