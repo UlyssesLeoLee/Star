@@ -51,7 +51,8 @@ pub mod value_object;
 // 便捷 re-export
 // =====================================================================
 
-pub use context::ActorContext;
+pub use uuid::Uuid;
+use context::ActorContext;
 pub use entity::{
     AcceptanceCoverage, AcceptanceCoverageReport, EvidenceDownloadURL, ValidationEvidence,
     ValidationOverride, ValidationPolicy, ValidationResult,
@@ -97,11 +98,11 @@ mod tests {
     };
 
     fn make_test_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id).with_role(roles::DEVELOPER)
+        ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::DEVELOPER)
     }
 
     fn make_service_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id).with_role(roles::SERVICE_INTERNAL)
+        ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::SERVICE_INTERNAL)
     }
 
     fn make_submit_cmd(tenant_id: TenantId, kind: ValidationKind) -> SubmitValidationResultCommand {
@@ -192,7 +193,7 @@ mod tests {
     #[tokio::test]
     async fn submit_seven_kinds_all_succeed() {
         let svc = InMemoryValidationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_service_actor(tenant_id);
         for (i, kind) in ValidationKind::SOW_REQUIRED.iter().enumerate() {
             let cmd = make_submit_cmd(tenant_id, *kind);
@@ -214,7 +215,7 @@ mod tests {
     #[tokio::test]
     async fn invariant_04_evidence_required_reject_empty_log_ref() {
         let svc = InMemoryValidationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_service_actor(tenant_id);
         let mut cmd = make_submit_cmd(tenant_id, ValidationKind::Build);
         cmd.log_excerpt_ref = "   ".to_string();
@@ -227,7 +228,7 @@ mod tests {
     #[tokio::test]
     async fn state_transition_running_to_passed_emits_event() {
         let (svc, mut rx) = InMemoryValidationService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_service_actor(tenant_id);
         let r = svc
             .submit_result(
@@ -280,7 +281,7 @@ mod tests {
     #[tokio::test]
     async fn acceptance_coverage_100_percent_derived() {
         let svc = InMemoryValidationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_service_actor(tenant_id);
         // 提交 3 个 PASSED Validation,关联到 3 个 AC
         let work_item = WorkItemId::new();
@@ -321,7 +322,7 @@ mod tests {
                 LinkAcceptanceEvidenceCommand {
                     tenant_id,
                     work_item_id: work_item,
-                    acceptance_criterion_id: uuid::Uuid::new_v4(),
+                    acceptance_criterion_id: UserId.new(),
                     validation_id: r.id,
                 },
                 actor.clone(),
@@ -350,7 +351,7 @@ mod tests {
     #[tokio::test]
     async fn invariant_06_override_human_only_rejects_service() {
         let svc = InMemoryValidationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let svc_actor = make_service_actor(tenant_id);
         let r = svc
             .submit_result(
@@ -365,7 +366,7 @@ mod tests {
                     tenant_id,
                     validation_id: r.id,
                     reason: "test".to_string(),
-                    approver_user_id: UserId::new(),
+                    approver_user_id: UserId.new(),
                 },
                 svc_actor,
             )
@@ -394,7 +395,7 @@ mod tests {
     #[tokio::test]
     async fn invariant_08_evidence_storage_tenant_prefix_rejected() {
         let svc = InMemoryValidationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_service_actor(tenant_id);
         let r = svc
             .submit_result(
@@ -424,7 +425,7 @@ mod tests {
     #[tokio::test]
     async fn invariant_09_policy_allow_ai_self_claim_rejected() {
         let svc = InMemoryValidationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
         let res = svc
             .create_policy(
@@ -449,8 +450,8 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_access_denied() {
         let svc = InMemoryValidationService::new_for_test();
-        let tenant_a = TenantId::new();
-        let tenant_b = TenantId::new();
+        let tenant_a = uuid::Uuid::new_v4();
+        let tenant_b = uuid::Uuid::new_v4();
         let actor_a = make_service_actor(tenant_a);
         let r = svc
             .submit_result(make_submit_cmd(tenant_a, ValidationKind::Build), actor_a)
@@ -466,7 +467,7 @@ mod tests {
     #[tokio::test]
     async fn validation_failed_triggers_feedback_required_event() {
         let (svc, mut rx) = InMemoryValidationService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_service_actor(tenant_id);
         let work_item = WorkItemId::new();
         let r = svc
@@ -525,7 +526,7 @@ mod tests {
     #[tokio::test]
     async fn ai_self_claim_requires_evidence_for_passed() {
         let svc = InMemoryValidationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_service_actor(tenant_id);
         // is_ai_complete_claim=true 但 log_excerpt_ref 为空 → submit 即拒
         let mut cmd = make_submit_cmd(tenant_id, ValidationKind::Build);

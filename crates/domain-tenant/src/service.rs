@@ -99,7 +99,7 @@ impl TenantCommandPort for InMemoryTenantService {
         actor: ActorContext,
     ) -> Result<Tenant, TenantError> {
         let now = chrono::Utc::now();
-        let id = TenantId::new();
+        let id = uuid::Uuid::new_v4();
         let tenant = Tenant {
             id,
             tenant_key: cmd.tenant_key.clone(),

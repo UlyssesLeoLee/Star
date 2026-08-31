@@ -32,6 +32,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -397,42 +398,6 @@ pub trait SearchRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_local_runtime: false,
-        }
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn as_local_runtime(mut self) -> Self {
-        self.is_local_runtime = true;
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-}
-
-// =====================================================================
 // InMemorySearchService
 // =====================================================================
 
@@ -472,9 +437,9 @@ impl SearchCommandPort for InMemorySearchService {
         cmd: UpsertIndexCommand,
         actor: &ActorContext,
     ) -> Result<SearchIndex, SearchError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(SearchError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -529,9 +494,9 @@ impl SearchCommandPort for InMemorySearchService {
         cmd: DeleteIndexCommand,
         actor: &ActorContext,
     ) -> Result<(), SearchError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(SearchError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -566,9 +531,9 @@ impl SearchCommandPort for InMemorySearchService {
         cmd: BulkReindexCommand,
         actor: &ActorContext,
     ) -> Result<BulkReindexResult, SearchError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(SearchError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -609,13 +574,13 @@ impl SearchCommandPort for InMemorySearchService {
         cmd: SaveSearchCommand,
         actor: &ActorContext,
     ) -> Result<SavedSearch, SearchError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(SearchError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
-        if actor.user_id != cmd.user_id {
+        if UserId::from(actor.user_id) != cmd.user_id {
             return Err(SearchError::PermissionDenied);
         }
         if cmd.name.is_empty() {
@@ -624,7 +589,7 @@ impl SearchCommandPort for InMemorySearchService {
         let saved = SavedSearch {
             id: SavedSearchId::new(),
             tenant_id: cmd.tenant_id,
-            user_id: cmd.user_id,
+            user_id: UserId::from(cmd.user_id),
             name: cmd.name,
             query: cmd.query,
             created_at: Utc::now(),
@@ -639,9 +604,9 @@ impl SearchCommandPort for InMemorySearchService {
         cmd: DeleteSavedSearchCommand,
         actor: &ActorContext,
     ) -> Result<(), SearchError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(SearchError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -653,7 +618,7 @@ impl SearchCommandPort for InMemorySearchService {
             ));
         }
         // INV-S-05:仅本人
-        if saved.user_id != actor.user_id {
+        if saved.user_id != UserId::from(actor.user_id) {
             return Err(SearchError::PermissionDenied);
         }
         let deleted = self.repo.delete_saved(cmd.saved_search_id).await?;
@@ -671,8 +636,8 @@ impl SearchQueryPort for InMemorySearchService {
         q: SearchQueryDto,
         actor: &ActorContext,
     ) -> Result<SearchResult, SearchError> {
-        if actor.tenant_id != q.tenant_id {
-            return Err(SearchError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
+            return Err(SearchError::CrossTenantDenied(TenantId::from(actor.tenant_id), q.tenant_id));
         }
         if q.query.limit > 1000 {
             return Err(SearchError::InvalidQuery("limit > 1000".to_string()));
@@ -697,8 +662,8 @@ impl SearchQueryPort for InMemorySearchService {
         q: SuggestQueryDto,
         actor: &ActorContext,
     ) -> Result<Vec<Suggestion>, SearchError> {
-        if actor.tenant_id != q.tenant_id {
-            return Err(SearchError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
+            return Err(SearchError::CrossTenantDenied(TenantId::from(actor.tenant_id), q.tenant_id));
         }
         if q.query.prefix.is_empty() {
             return Err(SearchError::InvalidQuery("prefix required".to_string()));
@@ -713,12 +678,12 @@ impl SearchQueryPort for InMemorySearchService {
         tenant_id: TenantId,
         actor: &ActorContext,
     ) -> Result<Vec<SavedSearch>, SearchError> {
-        if actor.tenant_id != tenant_id {
-            return Err(SearchError::CrossTenantDenied(actor.tenant_id, tenant_id));
+        if TenantId::from(actor.tenant_id) != tenant_id {
+            return Err(SearchError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
         }
         let all = self
             .repo
-            .list_saved_by_user(tenant_id, actor.user_id)
+            .list_saved_by_user(tenant_id, UserId::from(actor.user_id))
             .await?;
         Ok(all)
     }
@@ -923,13 +888,12 @@ impl SearchRepository for InMemorySearchRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn make_actor(tenant_id: TenantId, user_id: UserId) -> ActorContext {
-        ActorContext::new(user_id, tenant_id).with_role("developer")
+        ActorContext::new(user_id.0, tenant_id.0).with_role("developer")
     }
 
     fn projector_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .as_local_runtime()
             .with_role("system:search-projector")
     }
@@ -961,8 +925,8 @@ mod tests {
     async fn non_projector_cannot_upsert() {
         // INV-S-02:非 Worker Projector 不可写
         let svc = InMemorySearchService::new();
-        let tenant_id = TenantId::new();
-        let actor = make_actor(tenant_id, UserId::new());
+        let tenant_id = uuid::Uuid::new_v4();
+        let actor = make_actor(tenant_id, uuid::Uuid::new_v4());
         let res = svc
             .upsert_index(
                 sample_index_cmd(tenant_id, ResourceType::WorkItem, "x"),
@@ -975,7 +939,7 @@ mod tests {
     #[tokio::test]
     async fn projector_upsert_and_search() {
         let svc = InMemorySearchService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let projector = projector_actor(tenant_id);
         // 注入 3 个 work_item 索引
         svc.upsert_index(
@@ -997,7 +961,7 @@ mod tests {
         .await
         .unwrap();
         // 检索 "login"
-        let user = make_actor(tenant_id, UserId::new());
+        let user = make_actor(tenant_id, uuid::Uuid::new_v4());
         let r = svc
             .search(
                 SearchQueryDto {
@@ -1008,7 +972,7 @@ mod tests {
                         sort: None,
                         limit: 10,
                         offset: 0,
-                        user_id: user.user_id,
+                        user_id: UserId::from(user.user_id),
                     },
                 },
                 &user,
@@ -1022,8 +986,8 @@ mod tests {
     async fn cross_tenant_search_isolated() {
         // INV-SR-02:跨 tenant 严格隔离
         let svc = InMemorySearchService::new();
-        let t1 = TenantId::new();
-        let t2 = TenantId::new();
+        let t1 = uuid::Uuid::new_v4();
+        let t2 = uuid::Uuid::new_v4();
         let p1 = projector_actor(t1);
         let p2 = projector_actor(t2);
         svc.upsert_index(
@@ -1038,7 +1002,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let user1 = make_actor(t1, UserId::new());
+        let user1 = make_actor(t1, uuid::Uuid::new_v4());
         let r = svc
             .search(
                 SearchQueryDto {
@@ -1049,7 +1013,7 @@ mod tests {
                         sort: None,
                         limit: 10,
                         offset: 0,
-                        user_id: user1.user_id,
+                        user_id: UserId::from(user1.user_id),
                     },
                 },
                 &user1,
@@ -1064,7 +1028,7 @@ mod tests {
     #[tokio::test]
     async fn search_filter_by_resource_type() {
         let svc = InMemorySearchService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let projector = projector_actor(tenant_id);
         svc.upsert_index(
             sample_index_cmd(tenant_id, ResourceType::WorkItem, "auth module refactor"),
@@ -1078,7 +1042,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let user = make_actor(tenant_id, UserId::new());
+        let user = make_actor(tenant_id, uuid::Uuid::new_v4());
         let mut filters = HashMap::new();
         filters.insert("resource_type".to_string(), "work_item".to_string());
         let r = svc
@@ -1091,7 +1055,7 @@ mod tests {
                         sort: None,
                         limit: 10,
                         offset: 0,
-                        user_id: user.user_id,
+                        user_id: UserId::from(user.user_id),
                     },
                 },
                 &user,
@@ -1105,7 +1069,7 @@ mod tests {
     #[tokio::test]
     async fn upsert_idempotent_old_version_skipped() {
         let svc = InMemorySearchService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let projector = projector_actor(tenant_id);
         let cmd = sample_index_cmd(tenant_id, ResourceType::WorkItem, "v1 text");
         svc.upsert_index(cmd.clone(), &projector).await.unwrap();
@@ -1120,7 +1084,7 @@ mod tests {
     #[tokio::test]
     async fn delete_index_by_resource() {
         let svc = InMemorySearchService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let projector = projector_actor(tenant_id);
         let resource_id = Uuid::new_v4();
         let cmd = UpsertIndexCommand {
@@ -1144,7 +1108,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let user = make_actor(tenant_id, UserId::new());
+        let user = make_actor(tenant_id, uuid::Uuid::new_v4());
         let r = svc
             .search(
                 SearchQueryDto {
@@ -1155,7 +1119,7 @@ mod tests {
                         sort: None,
                         limit: 10,
                         offset: 0,
-                        user_id: user.user_id,
+                        user_id: UserId::from(user.user_id),
                     },
                 },
                 &user,
@@ -1168,7 +1132,7 @@ mod tests {
     #[tokio::test]
     async fn bulk_reindex_mixed() {
         let svc = InMemorySearchService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let projector = projector_actor(tenant_id);
         let project_id = ProjectId::new();
         let entries = vec![
@@ -1212,8 +1176,8 @@ mod tests {
     #[tokio::test]
     async fn save_and_list_saved_search() {
         let svc = InMemorySearchService::new();
-        let tenant_id = TenantId::new();
-        let me = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, me);
         let q = SearchQuery {
             query_text: "login".to_string(),
@@ -1245,9 +1209,9 @@ mod tests {
     async fn saved_search_other_user_cannot_delete() {
         // INV-S-05:仅本人可删
         let svc = InMemorySearchService::new();
-        let tenant_id = TenantId::new();
-        let me = UserId::new();
-        let other = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
+        let other = uuid::Uuid::new_v4();
         let actor_me = make_actor(tenant_id, me);
         let q = SearchQuery {
             query_text: "x".to_string(),
@@ -1287,7 +1251,7 @@ mod tests {
     #[tokio::test]
     async fn suggest_partial_match() {
         let svc = InMemorySearchService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let projector = projector_actor(tenant_id);
         svc.upsert_index(
             sample_index_cmd(
@@ -1305,7 +1269,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let user = make_actor(tenant_id, UserId::new());
+        let user = make_actor(tenant_id, uuid::Uuid::new_v4());
         let s = svc
             .suggest(
                 SuggestQueryDto {
@@ -1313,7 +1277,7 @@ mod tests {
                     query: SuggestQuery {
                         prefix: "auth".to_string(),
                         limit: 10,
-                        user_id: user.user_id,
+                        user_id: UserId::from(user.user_id),
                     },
                 },
                 &user,
@@ -1326,8 +1290,8 @@ mod tests {
     #[tokio::test]
     async fn search_empty_query_rejected() {
         let svc = InMemorySearchService::new();
-        let tenant_id = TenantId::new();
-        let user = make_actor(tenant_id, UserId::new());
+        let tenant_id = uuid::Uuid::new_v4();
+        let user = make_actor(tenant_id, uuid::Uuid::new_v4());
         let res = svc
             .search(
                 SearchQueryDto {
@@ -1338,7 +1302,7 @@ mod tests {
                         sort: None,
                         limit: 10,
                         offset: 0,
-                        user_id: user.user_id,
+                        user_id: UserId::from(user.user_id),
                     },
                 },
                 &user,

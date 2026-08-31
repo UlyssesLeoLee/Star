@@ -60,7 +60,7 @@ pub struct ListProjectQuery {
 impl Default for ListProjectQuery {
     fn default() -> Self {
         Self {
-            tenant_id: TenantId::new(),
+            tenant_id: UserId.new(),
             workspace_id: None,
             limit: 50,
             offset: 0,

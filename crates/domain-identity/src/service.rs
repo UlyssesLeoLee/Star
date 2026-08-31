@@ -104,7 +104,7 @@ impl IdentityCommandPort for InMemoryIdentityService {
         Self::check_tenant(&actor, cmd.tenant_id)?;
 
         let now = chrono::Utc::now();
-        let id = UserId::new();
+        let id = uuid::Uuid::new_v4();
         let user = User {
             id,
             tenant_id: cmd.tenant_id,

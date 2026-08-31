@@ -8,6 +8,7 @@
 //! **Phase 3 计划**:`crates/infrastructure` 提供 SQLx / NATS Adapter 取代本实现;
 //! 本内存实现保留供单元测试 + 本地开发使用。
 
+use uuid::Uuid;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -332,12 +333,12 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
         check_invariant_09_status_transition_default(wi, cmd.target_status)?;
         // 记录迁移
         let transition = Transition {
-            id: uuid::Uuid::new_v4(),
+            id: UserId.new(),
             tenant_id: cmd.tenant_id,
             work_item_id: wi.id,
             from_status: wi.status,
             to_status: cmd.target_status,
-            actor_user_id: actor.user_id.into_uuid(),
+            actor_user_id: UserId::from(actor.user_id).into_uuid(),
             reason: cmd.reason.clone(),
             occurred_at: chrono::Utc::now(),
         };

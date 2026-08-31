@@ -24,6 +24,14 @@ mod template;
 
 pub use template::BOOTSTRAP_TEMPLATE;
 
+/// **权威 ActorContext** (per P0-1 联动审计修复, 2026-08-31)
+///
+/// 替换 14 个 domain-* + 3 supporting crate 的 17 处重复 `ActorContext` 定义.
+/// 字段用 `Uuid` 而非强类型 ID, 避免 star-context 引入对 domain-* 的依赖.
+/// 各 domain 内部收到后做 `UserId::from(actor.user_id)` 等转换.
+pub mod actor;
+pub use actor::ActorContext;
+
 /// Context 生成错误 (Phase D 任务 6 实装)
 #[derive(Debug, Error)]
 pub enum ContextError {

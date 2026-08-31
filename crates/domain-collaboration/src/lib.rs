@@ -32,6 +32,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // UUID 强类型 ID 宏(参考 domain-tenant / domain-permission 模式)
@@ -742,57 +743,6 @@ pub trait CollabRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext(本 crate 简化版,Phase 2 由 domain-identity 颁发)
-// =====================================================================
-
-/// ActorContext — 调用方上下文
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    /// 角色字符串(向后兼容)
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_local_runtime: false,
-        }
-    }
-
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-
-    pub fn with_project(mut self, project_id: ProjectId) -> Self {
-        self.project_ids.push(project_id);
-        self
-    }
-
-    pub fn as_local_runtime(mut self) -> Self {
-        self.is_local_runtime = true;
-        self
-    }
-
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-
-    /// 是否 admin(tenant_admin / project_admin)
-    pub fn is_admin(&self) -> bool {
-        self.has_role("tenant_admin") || self.has_role("project_admin")
-    }
-}
-
-// =====================================================================
 // InMemoryCollabService — 内存实现
 // =====================================================================
 
@@ -873,12 +823,12 @@ impl InMemoryCollabService {
         allow_admin: bool,
     ) -> Result<(), CollabError> {
         // tenant 边界
-        session.assert_tenant(actor.tenant_id)?;
+        session.assert_tenant(TenantId::from(actor.tenant_id))?;
         // 权限:session 发起人或 admin
-        if session.started_by == actor.user_id {
+        if session.started_by == UserId::from(actor.user_id) {
             return Ok(());
         }
-        if allow_admin && actor.is_admin() {
+        if allow_admin && actor.is_platform_admin {
             return Ok(());
         }
         Err(CollabError::PermissionDenied)
@@ -899,14 +849,14 @@ impl CollabCommandPort for InMemoryCollabService {
         actor: &ActorContext,
     ) -> Result<CollaborationSession, CollabError> {
         // INV-CL-04
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(CollabError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
-        if !actor.project_ids.contains(&cmd.project_id)
-            && !actor.is_admin()
+        if !actor.project_ids.iter().any(|p| *p == cmd.project_id.as_uuid())
+            && !actor.is_platform_admin
             && !actor.is_local_runtime
         {
             return Err(CollabError::PermissionDenied);
@@ -916,7 +866,7 @@ impl CollabCommandPort for InMemoryCollabService {
             cmd.project_id,
             cmd.parent_type,
             cmd.parent_id,
-            actor.user_id,
+            UserId::from(actor.user_id),
         );
         self.repo.insert_session(s.clone()).await?;
         self.sessions.write().unwrap().insert(s.id, s.clone());
@@ -952,7 +902,7 @@ impl CollabCommandPort for InMemoryCollabService {
     ) -> Result<Presence, CollabError> {
         let s = self.require_session(cmd.tenant_id, cmd.session_id)?;
         // 权限:只能更新自己的 presence(或 admin)
-        if cmd.user_id != actor.user_id && !actor.is_admin() {
+        if cmd.user_id != UserId::from(actor.user_id) && !actor.is_platform_admin {
             return Err(CollabError::PermissionDenied);
         }
         // INV-CL-05:Ended 不可再写
@@ -983,7 +933,7 @@ impl CollabCommandPort for InMemoryCollabService {
         actor: &ActorContext,
     ) -> Result<Cursor, CollabError> {
         let s = self.require_session(cmd.tenant_id, cmd.session_id)?;
-        if cmd.user_id != actor.user_id && !actor.is_admin() {
+        if cmd.user_id != UserId::from(actor.user_id) && !actor.is_platform_admin {
             return Err(CollabError::PermissionDenied);
         }
         s.assert_writable()?;
@@ -1039,7 +989,7 @@ impl CollabCommandPort for InMemoryCollabService {
         actor: &ActorContext,
     ) -> Result<Whiteboard, CollabError> {
         let mut w = self.require_whiteboard(cmd.tenant_id, cmd.whiteboard_id)?;
-        if !actor.project_ids.contains(&w.project_id) && !actor.is_admin() {
+        if !actor.project_ids.iter().any(|p| *p == w.project_id.as_uuid()) && !actor.is_platform_admin {
             return Err(CollabError::PermissionDenied);
         }
         let mut shape = cmd.shape;
@@ -1059,7 +1009,7 @@ impl CollabCommandPort for InMemoryCollabService {
         actor: &ActorContext,
     ) -> Result<Whiteboard, CollabError> {
         let mut w = self.require_whiteboard(cmd.tenant_id, cmd.whiteboard_id)?;
-        if !actor.project_ids.contains(&w.project_id) && !actor.is_admin() {
+        if !actor.project_ids.iter().any(|p| *p == w.project_id.as_uuid()) && !actor.is_platform_admin {
             return Err(CollabError::PermissionDenied);
         }
         let mut shape = cmd.shape;
@@ -1076,7 +1026,7 @@ impl CollabCommandPort for InMemoryCollabService {
         actor: &ActorContext,
     ) -> Result<Whiteboard, CollabError> {
         let mut w = self.require_whiteboard(cmd.tenant_id, cmd.whiteboard_id)?;
-        if !actor.project_ids.contains(&w.project_id) && !actor.is_admin() {
+        if !actor.project_ids.iter().any(|p| *p == w.project_id.as_uuid()) && !actor.is_platform_admin {
             return Err(CollabError::PermissionDenied);
         }
         w.delete_shape(cmd.shape_id)?;
@@ -1095,7 +1045,7 @@ impl CollabQueryPort for InMemoryCollabService {
     ) -> Result<CollaborationSession, CollabError> {
         let s = self.require_session(q.tenant_id, q.session_id)?;
         // 读权限:tenant 内 + project 内(或 admin)
-        if !actor.project_ids.contains(&s.project_id) && !actor.is_admin() {
+        if !actor.project_ids.iter().any(|p| *p == s.project_id.as_uuid()) && !actor.is_platform_admin {
             return Err(CollabError::PermissionDenied);
         }
         Ok(s)
@@ -1107,7 +1057,7 @@ impl CollabQueryPort for InMemoryCollabService {
         actor: &ActorContext,
     ) -> Result<Vec<Presence>, CollabError> {
         let s = self.require_session(q.tenant_id, q.session_id)?;
-        if !actor.project_ids.contains(&s.project_id) && !actor.is_admin() {
+        if !actor.project_ids.iter().any(|p| *p == s.project_id.as_uuid()) && !actor.is_platform_admin {
             return Err(CollabError::PermissionDenied);
         }
         let now = Utc::now();
@@ -1140,7 +1090,7 @@ impl CollabQueryPort for InMemoryCollabService {
         actor: &ActorContext,
     ) -> Result<Whiteboard, CollabError> {
         let w = self.require_whiteboard(q.tenant_id, q.whiteboard_id)?;
-        if !actor.project_ids.contains(&w.project_id) && !actor.is_admin() {
+        if !actor.project_ids.iter().any(|p| *p == w.project_id.as_uuid()) && !actor.is_platform_admin {
             return Err(CollabError::PermissionDenied);
         }
         Ok(w)
@@ -1301,15 +1251,14 @@ impl CollabRepository for InMemoryCollabRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn make_actor(user: UserId, tenant: TenantId, project: ProjectId) -> ActorContext {
-        ActorContext::new(user, tenant)
+        ActorContext::new(user.0, tenant.0)
             .with_project(project)
             .with_role("developer")
     }
 
     fn make_admin_actor(user: UserId, tenant: TenantId, project: ProjectId) -> ActorContext {
-        ActorContext::new(user, tenant)
+        ActorContext::new(user.0, tenant.0)
             .with_project(project)
             .with_role("tenant_admin")
     }
@@ -1324,7 +1273,7 @@ mod tests {
             h,
             content: None,
             color: color.to_string(),
-            created_by: UserId::new(),
+            created_by: UserId.new(),
             created_at: chrono::DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
             updated_at: Utc::now(),
         }
@@ -1336,9 +1285,9 @@ mod tests {
     #[tokio::test]
     async fn test_start_session() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(UserId::new(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
         let cmd = StartSessionCommand {
             tenant_id: tenant,
             project_id: project,
@@ -1358,9 +1307,9 @@ mod tests {
     #[tokio::test]
     async fn test_end_session() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let actor = make_actor(user, tenant, project);
         let s = svc
             .start_session(
@@ -1394,9 +1343,9 @@ mod tests {
     #[tokio::test]
     async fn test_end_ended_session_rejected() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let actor = make_actor(user, tenant, project);
         let s = svc
             .start_session(
@@ -1438,11 +1387,11 @@ mod tests {
     #[tokio::test]
     async fn test_cross_tenant_session_denied() {
         let svc = InMemoryCollabService::new();
-        let tenant_a = TenantId::new();
-        let tenant_b = TenantId::new();
+        let tenant_a = uuid::Uuid::new_v4();
+        let tenant_b = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor_a = make_actor(UserId::new(), tenant_a, project);
-        let actor_b = make_actor(UserId::new(), tenant_b, project);
+        let actor_a = make_actor(uuid::Uuid::new_v4(), tenant_a, project);
+        let actor_b = make_actor(uuid::Uuid::new_v4(), tenant_b, project);
         let s = svc
             .start_session(
                 StartSessionCommand {
@@ -1474,9 +1423,9 @@ mod tests {
     #[tokio::test]
     async fn test_update_presence_increments_heartbeat() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let actor = make_actor(user, tenant, project);
         let s = svc
             .start_session(
@@ -1528,9 +1477,9 @@ mod tests {
     #[tokio::test]
     async fn test_presence_inactive_for_ended_session() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let actor = make_actor(user, tenant, project);
         let s = svc
             .start_session(
@@ -1574,9 +1523,9 @@ mod tests {
     #[tokio::test]
     async fn test_update_cursor_upsert() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let actor = make_actor(user, tenant, project);
         let s = svc
             .start_session(
@@ -1631,9 +1580,9 @@ mod tests {
     #[tokio::test]
     async fn test_cursor_color_per_user() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let actor = make_actor(user, tenant, project);
         let s = svc
             .start_session(
@@ -1684,9 +1633,9 @@ mod tests {
     #[tokio::test]
     async fn test_add_shape() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(UserId::new(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
         let wb = Whiteboard::new(tenant, project, "demo".to_string());
         let wb_id = wb.id;
         // 直接写入 in-memory store
@@ -1713,9 +1662,9 @@ mod tests {
     #[tokio::test]
     async fn test_update_shape() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(UserId::new(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
         let wb = Whiteboard::new(tenant, project, "demo".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
@@ -1757,9 +1706,9 @@ mod tests {
     #[tokio::test]
     async fn test_delete_shape() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(UserId::new(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
         let wb = Whiteboard::new(tenant, project, "demo".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
@@ -1807,9 +1756,9 @@ mod tests {
     #[tokio::test]
     async fn test_list_active_presences() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let host = UserId::new();
+        let host = uuid::Uuid::new_v4();
         let host_actor = make_actor(host, tenant, project);
         let s = svc
             .start_session(
@@ -1823,8 +1772,8 @@ mod tests {
             )
             .await
             .expect("start");
-        let u2 = UserId::new();
-        let u3 = UserId::new();
+        let u2 = uuid::Uuid::new_v4();
+        let u3 = uuid::Uuid::new_v4();
         // host 给自己写 presence
         svc.update_presence(
             UpdatePresenceCommand {
@@ -1864,9 +1813,9 @@ mod tests {
     #[tokio::test]
     async fn test_get_whiteboard() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(UserId::new(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
         let wb = Whiteboard::new(tenant, project, "board-1".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
@@ -1883,7 +1832,7 @@ mod tests {
         assert_eq!(got.name, "board-1");
         assert_eq!(got.tenant_id, tenant);
         // 跨 tenant 拒绝
-        let other_tenant = TenantId::new();
+        let other_tenant = uuid::Uuid::new_v4();
         let r = svc
             .get_whiteboard(
                 GetWhiteboardQuery {
@@ -1902,9 +1851,9 @@ mod tests {
     #[tokio::test]
     async fn test_multiple_shapes_on_whiteboard() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(UserId::new(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
         let wb = Whiteboard::new(tenant, project, "multi".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
@@ -1949,9 +1898,9 @@ mod tests {
     #[tokio::test]
     async fn test_invalid_shape_dimensions_rejected() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(UserId::new(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
         let wb = Whiteboard::new(tenant, project, "dim".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
@@ -1989,11 +1938,11 @@ mod tests {
     #[tokio::test]
     async fn test_admin_can_end_others_session() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let host = UserId::new();
+        let host = uuid::Uuid::new_v4();
         let host_actor = make_actor(host, tenant, project);
-        let admin = UserId::new();
+        let admin = uuid::Uuid::new_v4();
         let admin_actor = make_admin_actor(admin, tenant, project);
         let s = svc
             .start_session(
@@ -2026,11 +1975,11 @@ mod tests {
     #[tokio::test]
     async fn test_non_owner_cannot_end_others_session() {
         let svc = InMemoryCollabService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let host = UserId::new();
+        let host = uuid::Uuid::new_v4();
         let host_actor = make_actor(host, tenant, project);
-        let other = UserId::new();
+        let other = uuid::Uuid::new_v4();
         let other_actor = make_actor(other, tenant, project);
         let s = svc
             .start_session(

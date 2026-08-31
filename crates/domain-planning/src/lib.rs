@@ -37,6 +37,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // UUID 强类型 ID 宏
@@ -720,67 +721,6 @@ pub trait PlanningRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-/// **ActorContext** — 调用方上下文(简化版,Phase 2 由 domain-identity 颁发)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    /// 默认 actor(developer)
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec![roles::DEVELOPER.to_string()],
-            is_local_runtime: false,
-        }
-    }
-
-    /// 追加角色
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-
-    /// 设置角色(覆盖)
-    pub fn with_roles(mut self, new_roles: Vec<String>) -> Self {
-        self.roles = new_roles;
-        self
-    }
-
-    /// 绑定项目
-    pub fn with_project(mut self, project_id: ProjectId) -> Self {
-        self.project_ids.push(project_id);
-        self
-    }
-
-    /// 标记为本地 Runtime
-    pub fn as_local_runtime(mut self) -> Self {
-        self.is_local_runtime = true;
-        self
-    }
-
-    /// 是否持有某角色
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-
-    /// 是否持有 project_admin
-    pub fn is_project_admin(&self) -> bool {
-        self.has_role(roles::PROJECT_ADMIN) || self.has_role(roles::TENANT_ADMIN)
-    }
-}
-
-// =====================================================================
 // InMemoryPlanningService
 // =====================================================================
 
@@ -999,9 +939,9 @@ impl PlanningCommandPort for InMemoryPlanningService {
         actor: &ActorContext,
     ) -> Result<Sprint, PlanningError> {
         // 跨租户检查
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(PlanningError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -1032,7 +972,7 @@ impl PlanningCommandPort for InMemoryPlanningService {
         actor: &ActorContext,
     ) -> Result<Sprint, PlanningError> {
         // INV-PL-05:start_sprint 需 project_admin
-        if !actor.is_project_admin() {
+        if !(actor.has_role("project_admin") || actor.is_platform_admin) {
             return Err(PlanningError::PermissionDenied);
         }
         let mut sprint = self
@@ -1042,9 +982,9 @@ impl PlanningCommandPort for InMemoryPlanningService {
             .get(&sprint_id)
             .cloned()
             .ok_or_else(|| PlanningError::NotFound(format!("sprint:{}", sprint_id)))?;
-        if sprint.tenant_id != actor.tenant_id {
+        if sprint.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(PlanningError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 sprint.tenant_id,
             ));
         }
@@ -1063,7 +1003,7 @@ impl PlanningCommandPort for InMemoryPlanningService {
         sprint_id: SprintId,
         actor: &ActorContext,
     ) -> Result<Sprint, PlanningError> {
-        if !actor.is_project_admin() {
+        if !(actor.has_role("project_admin") || actor.is_platform_admin) {
             return Err(PlanningError::PermissionDenied);
         }
         let mut sprint = self
@@ -1073,9 +1013,9 @@ impl PlanningCommandPort for InMemoryPlanningService {
             .get(&sprint_id)
             .cloned()
             .ok_or_else(|| PlanningError::NotFound(format!("sprint:{}", sprint_id)))?;
-        if sprint.tenant_id != actor.tenant_id {
+        if sprint.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(PlanningError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 sprint.tenant_id,
             ));
         }
@@ -1093,7 +1033,7 @@ impl PlanningCommandPort for InMemoryPlanningService {
         sprint_id: SprintId,
         actor: &ActorContext,
     ) -> Result<Sprint, PlanningError> {
-        if !actor.is_project_admin() {
+        if !(actor.has_role("project_admin") || actor.is_platform_admin) {
             return Err(PlanningError::PermissionDenied);
         }
         let mut sprint = self
@@ -1103,9 +1043,9 @@ impl PlanningCommandPort for InMemoryPlanningService {
             .get(&sprint_id)
             .cloned()
             .ok_or_else(|| PlanningError::NotFound(format!("sprint:{}", sprint_id)))?;
-        if sprint.tenant_id != actor.tenant_id {
+        if sprint.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(PlanningError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 sprint.tenant_id,
             ));
         }
@@ -1136,9 +1076,9 @@ impl PlanningCommandPort for InMemoryPlanningService {
                 sprint.tenant_id,
             ));
         }
-        if sprint.tenant_id != actor.tenant_id {
+        if sprint.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(PlanningError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 sprint.tenant_id,
             ));
         }
@@ -1173,9 +1113,9 @@ impl PlanningCommandPort for InMemoryPlanningService {
         cmd: CreateMilestoneCommand,
         actor: &ActorContext,
     ) -> Result<Milestone, PlanningError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(PlanningError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -1206,9 +1146,9 @@ impl PlanningCommandPort for InMemoryPlanningService {
             .get(&milestone_id)
             .cloned()
             .ok_or_else(|| PlanningError::NotFound(format!("milestone:{}", milestone_id)))?;
-        if milestone.tenant_id != actor.tenant_id {
+        if milestone.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(PlanningError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 milestone.tenant_id,
             ));
         }
@@ -1234,9 +1174,9 @@ impl PlanningCommandPort for InMemoryPlanningService {
             .get(&cmd.sprint_id)
             .cloned()
             .ok_or_else(|| PlanningError::NotFound(format!("sprint:{}", cmd.sprint_id)))?;
-        if sprint.tenant_id != actor.tenant_id || sprint.tenant_id != cmd.tenant_id {
+        if sprint.tenant_id != TenantId::from(actor.tenant_id) || sprint.tenant_id != cmd.tenant_id {
             return Err(PlanningError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 sprint.tenant_id,
             ));
         }
@@ -1275,9 +1215,9 @@ impl PlanningQueryPort for InMemoryPlanningService {
             .get(&q.sprint_id)
             .cloned()
             .ok_or_else(|| PlanningError::NotFound(format!("sprint:{}", q.sprint_id)))?;
-        if sprint.tenant_id != actor.tenant_id {
+        if sprint.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(PlanningError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 sprint.tenant_id,
             ));
         }
@@ -1289,9 +1229,9 @@ impl PlanningQueryPort for InMemoryPlanningService {
         q: ListActiveSprintQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Sprint>, PlanningError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(PlanningError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -1320,9 +1260,9 @@ impl PlanningQueryPort for InMemoryPlanningService {
             .get(&q.sprint_id)
             .cloned()
             .ok_or_else(|| PlanningError::NotFound(format!("sprint:{}", q.sprint_id)))?;
-        if sprint.tenant_id != actor.tenant_id {
+        if sprint.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(PlanningError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 sprint.tenant_id,
             ));
         }
@@ -1346,15 +1286,14 @@ impl PlanningQueryPort for InMemoryPlanningService {
 mod tests {
     use super::*;
     use chrono::Duration;
-
     fn make_admin_actor(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::PROJECT_ADMIN)
             .with_project(project_id)
     }
 
     fn make_dev_actor(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::DEVELOPER)
             .with_project(project_id)
     }
@@ -1375,7 +1314,7 @@ mod tests {
     #[tokio::test]
     async fn create_sprint_basic() {
         let svc = InMemoryPlanningService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let actor = make_admin_actor(tenant_id, project_id);
         let cmd = make_create_sprint_cmd(tenant_id, project_id);
@@ -1390,7 +1329,7 @@ mod tests {
     #[tokio::test]
     async fn sprint_status_state_machine() {
         let svc = InMemoryPlanningService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let actor = make_admin_actor(tenant_id, project_id);
         let cmd = make_create_sprint_cmd(tenant_id, project_id);
@@ -1406,7 +1345,7 @@ mod tests {
     #[tokio::test]
     async fn start_sprint_requires_admin() {
         let svc = InMemoryPlanningService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let admin = make_admin_actor(tenant_id, project_id);
         let dev = make_dev_actor(tenant_id, project_id);
@@ -1424,7 +1363,7 @@ mod tests {
     #[tokio::test]
     async fn cancel_sprint() {
         let svc = InMemoryPlanningService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let actor = make_admin_actor(tenant_id, project_id);
         let cmd = make_create_sprint_cmd(tenant_id, project_id);
@@ -1438,7 +1377,7 @@ mod tests {
     #[tokio::test]
     async fn completed_sprint_terminal() {
         let svc = InMemoryPlanningService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let actor = make_admin_actor(tenant_id, project_id);
         let cmd = make_create_sprint_cmd(tenant_id, project_id);
@@ -1454,7 +1393,7 @@ mod tests {
     #[tokio::test]
     async fn add_to_backlog() {
         let svc = InMemoryPlanningService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let actor = make_admin_actor(tenant_id, project_id);
         let cmd = make_create_sprint_cmd(tenant_id, project_id);
@@ -1493,7 +1432,7 @@ mod tests {
     #[tokio::test]
     async fn sprint_date_overlap_rejected() {
         let svc = InMemoryPlanningService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let actor = make_admin_actor(tenant_id, project_id);
         let now = Utc::now();
@@ -1524,10 +1463,10 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_sprint_denied() {
         let svc = InMemoryPlanningService::new();
-        let actor_tenant = TenantId::new();
-        let cmd_tenant = TenantId::new();
+        let actor_tenant = uuid::Uuid::new_v4();
+        let cmd_tenant = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = ActorContext::new(UserId::new(), actor_tenant)
+        let actor = ActorContext::new(Uuid::new_v4(), actor_tenant.0)
             .with_role(roles::PROJECT_ADMIN)
             .with_project(project_id);
         let cmd = CreateSprintCommand {
@@ -1546,7 +1485,7 @@ mod tests {
     #[tokio::test]
     async fn create_milestone() {
         let svc = InMemoryPlanningService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let actor = make_admin_actor(tenant_id, project_id);
         let m = svc
@@ -1570,7 +1509,7 @@ mod tests {
     #[tokio::test]
     async fn achieve_milestone() {
         let svc = InMemoryPlanningService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let actor = make_admin_actor(tenant_id, project_id);
         let m = svc
@@ -1595,7 +1534,7 @@ mod tests {
     #[tokio::test]
     async fn missed_milestone() {
         let m = Milestone::new(
-            TenantId::new(),
+            uuid::Uuid::new_v4(),
             ProjectId::new(),
             "v1.0".to_string(),
             "Release".to_string(),
@@ -1612,7 +1551,7 @@ mod tests {
     #[tokio::test]
     async fn burndown_point_append() {
         let svc = InMemoryPlanningService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let actor = make_admin_actor(tenant_id, project_id);
         let cmd = make_create_sprint_cmd(tenant_id, project_id);
@@ -1651,7 +1590,7 @@ mod tests {
     #[tokio::test]
     async fn list_active_sprints_filters() {
         let svc = InMemoryPlanningService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let actor = make_admin_actor(tenant_id, project_id);
         // 第一个 sprint:14 天
@@ -1695,15 +1634,15 @@ mod tests {
     #[tokio::test]
     async fn get_sprint_cross_tenant_denied() {
         let svc = InMemoryPlanningService::new();
-        let tenant_a = TenantId::new();
+        let tenant_a = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let actor_a = make_admin_actor(tenant_a, project_id);
         let sprint = svc
             .create_sprint(make_create_sprint_cmd(tenant_a, project_id), &actor_a)
             .await
             .unwrap();
-        let tenant_b = TenantId::new();
-        let actor_b = ActorContext::new(UserId::new(), tenant_b).with_role(roles::PROJECT_ADMIN);
+        let tenant_b = uuid::Uuid::new_v4();
+        let actor_b = ActorContext::new(Uuid::new_v4(), tenant_b.0).with_role(roles::PROJECT_ADMIN);
         let res = svc
             .get_sprint(
                 GetSprintQuery {

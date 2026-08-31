@@ -280,5 +280,5 @@ pub trait IntegrationRepository: Send + Sync {
 // 静默抑制未使用导入
 #[allow(dead_code)]
 fn _unused_imports() {
-    let _ = UserId::new();
+    let _ = uuid::Uuid::new_v4();
 }

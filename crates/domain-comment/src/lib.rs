@@ -30,6 +30,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -362,50 +363,6 @@ pub trait CommentRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_agent: bool,
-    pub agent_id: Option<AgentId>,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_agent: false,
-            agent_id: None,
-        }
-    }
-    pub fn as_agent(agent_id: AgentId) -> Self {
-        Self {
-            user_id: UserId::new(), // Agent 不关联 user
-            tenant_id: TenantId::new(),
-            project_ids: vec![],
-            roles: vec!["agent".to_string()],
-            is_agent: true,
-            agent_id: Some(agent_id),
-        }
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-}
-
-// =====================================================================
 // InMemoryCommentService
 // =====================================================================
 
@@ -440,9 +397,9 @@ impl CommentCommandPort for InMemoryCommentService {
         cmd: CreateCommentCommand,
         actor: &ActorContext,
     ) -> Result<Comment, CommentError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(CommentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -477,9 +434,9 @@ impl CommentCommandPort for InMemoryCommentService {
         cmd: EditCommentCommand,
         actor: &ActorContext,
     ) -> Result<Comment, CommentError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(CommentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -500,7 +457,7 @@ impl CommentCommandPort for InMemoryCommentService {
             return Err(CommentError::EditDeleted);
         }
         // 仅作者可编辑
-        if c.author_user_id != Some(actor.user_id) {
+        if c.author_user_id != Some(UserId::from(actor.user_id)) {
             return Err(CommentError::PermissionDenied);
         }
         c.body = cmd.new_body;
@@ -516,9 +473,9 @@ impl CommentCommandPort for InMemoryCommentService {
         cmd: DeleteCommentCommand,
         actor: &ActorContext,
     ) -> Result<Comment, CommentError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(CommentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -536,7 +493,7 @@ impl CommentCommandPort for InMemoryCommentService {
             return Err(CommentError::CrossTenantDenied(c.tenant_id, cmd.tenant_id));
         }
         // 作者或 admin 可删
-        if c.author_user_id != Some(actor.user_id) && !actor.has_role("project_admin") {
+        if c.author_user_id != Some(UserId::from(actor.user_id)) && !actor.has_role("project_admin") {
             return Err(CommentError::PermissionDenied);
         }
         if c.status == CommentStatus::Deleted {
@@ -555,9 +512,9 @@ impl CommentCommandPort for InMemoryCommentService {
         cmd: AddReactionCommand,
         actor: &ActorContext,
     ) -> Result<Reaction, CommentError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(CommentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -572,7 +529,7 @@ impl CommentCommandPort for InMemoryCommentService {
         let r = Reaction {
             id: ReactionId::new(),
             comment_id: cmd.comment_id,
-            user_id: cmd.user_id,
+            user_id: UserId::from(cmd.user_id),
             emoji: cmd.emoji,
             created_at: Utc::now(),
         };
@@ -586,13 +543,13 @@ impl CommentCommandPort for InMemoryCommentService {
         cmd: RegisterAttachmentCommand,
         actor: &ActorContext,
     ) -> Result<Attachment, CommentError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(CommentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
-        if actor.user_id != cmd.uploader_user_id {
+        if UserId::from(actor.user_id) != cmd.uploader_user_id {
             return Err(CommentError::PermissionDenied);
         }
         let a = Attachment {
@@ -615,9 +572,9 @@ impl CommentCommandPort for InMemoryCommentService {
 #[async_trait]
 impl CommentQueryPort for InMemoryCommentService {
     async fn get(&self, q: GetCommentQuery, actor: &ActorContext) -> Result<Comment, CommentError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(CommentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -642,9 +599,9 @@ impl CommentQueryPort for InMemoryCommentService {
         q: ListByParentQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Comment>, CommentError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(CommentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -753,13 +710,12 @@ impl CommentRepository for InMemoryCommentRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn dev(tid: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tid).with_role("developer")
+        ActorContext::new(Uuid::new_v4(), tid.0).with_role("developer")
     }
 
     fn make_cmd(tid: TenantId) -> CreateCommentCommand {
-        let me = UserId::new();
+        let me = uuid::Uuid::new_v4();
         CreateCommentCommand {
             tenant_id: tid,
             project_id: ProjectId::new(),
@@ -789,7 +745,7 @@ mod tests {
     #[tokio::test]
     async fn create_comment_basic() {
         let svc = InMemoryCommentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         let c = svc.create_comment(make_cmd(tid), &actor).await.unwrap();
         assert_eq!(c.status, CommentStatus::Open);
@@ -798,7 +754,7 @@ mod tests {
     #[tokio::test]
     async fn create_comment_requires_body() {
         let svc = InMemoryCommentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         let mut cmd = make_cmd(tid);
         cmd.body = "".to_string();
@@ -809,7 +765,7 @@ mod tests {
     #[tokio::test]
     async fn create_comment_requires_exactly_one_author() {
         let svc = InMemoryCommentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         // 既没 user 也没 agent
         let mut cmd = make_cmd(tid);
@@ -819,7 +775,7 @@ mod tests {
         assert!(matches!(res, Err(CommentError::InvalidState(_))));
         // 同时有 user 和 agent
         let mut cmd2 = make_cmd(tid);
-        cmd2.author_user_id = Some(UserId::new());
+        cmd2.author_user_id = Some(uuid::Uuid::new_v4());
         cmd2.author_agent_id = Some(AgentId::new());
         let res2 = svc.create_comment(cmd2, &actor).await;
         assert!(matches!(res2, Err(CommentError::InvalidState(_))));
@@ -828,7 +784,7 @@ mod tests {
     #[tokio::test]
     async fn create_comment_by_agent() {
         let svc = InMemoryCommentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         // Agent 用 as_agent 然后覆盖 tenant_id
         let mut agent_actor = ActorContext::as_agent(AgentId::new());
         agent_actor.tenant_id = tid;
@@ -842,11 +798,11 @@ mod tests {
     #[tokio::test]
     async fn edit_comment_self_only() {
         let svc = InMemoryCommentService::new();
-        let tid = TenantId::new();
-        let me = UserId::new();
+        let tid = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let mut cmd = make_cmd(tid);
         cmd.author_user_id = Some(me);
-        let actor = ActorContext::new(me, tid);
+        let actor = ActorContext::new(me.0, tid.0);
         let c = svc.create_comment(cmd, &actor).await.unwrap();
         let c2 = svc
             .edit_comment(
@@ -866,14 +822,14 @@ mod tests {
     #[tokio::test]
     async fn edit_other_users_comment_denied() {
         let svc = InMemoryCommentService::new();
-        let tid = TenantId::new();
-        let me = UserId::new();
-        let other = UserId::new();
+        let tid = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
+        let other = uuid::Uuid::new_v4();
         let mut cmd = make_cmd(tid);
         cmd.author_user_id = Some(me);
         let actor = dev(tid);
         let c = svc.create_comment(cmd, &actor).await.unwrap();
-        let other_actor = ActorContext::new(other, tid);
+        let other_actor = ActorContext::new(other.0, tid.0);
         let res = svc
             .edit_comment(
                 EditCommentCommand {
@@ -891,11 +847,11 @@ mod tests {
     #[tokio::test]
     async fn edit_deleted_comment_rejected() {
         let svc = InMemoryCommentService::new();
-        let tid = TenantId::new();
-        let me = UserId::new();
+        let tid = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let mut cmd = make_cmd(tid);
         cmd.author_user_id = Some(me);
-        let actor = ActorContext::new(me, tid);
+        let actor = ActorContext::new(me.0, tid.0);
         let c = svc.create_comment(cmd, &actor).await.unwrap();
         svc.delete_comment(
             DeleteCommentCommand {
@@ -924,11 +880,11 @@ mod tests {
     #[tokio::test]
     async fn delete_comment_soft() {
         let svc = InMemoryCommentService::new();
-        let tid = TenantId::new();
-        let me = UserId::new();
+        let tid = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let mut cmd = make_cmd(tid);
         cmd.author_user_id = Some(me);
-        let actor = ActorContext::new(me, tid);
+        let actor = ActorContext::new(me.0, tid.0);
         let c = svc.create_comment(cmd, &actor).await.unwrap();
         let c2 = svc
             .delete_comment(
@@ -948,11 +904,11 @@ mod tests {
     #[tokio::test]
     async fn add_reaction_unique_invc03() {
         let svc = InMemoryCommentService::new();
-        let tid = TenantId::new();
-        let me = UserId::new();
+        let tid = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let mut cmd = make_cmd(tid);
         cmd.author_user_id = Some(me);
-        let actor = ActorContext::new(me, tid);
+        let actor = ActorContext::new(me.0, tid.0);
         let c = svc.create_comment(cmd, &actor).await.unwrap();
         let r = svc
             .add_reaction(
@@ -984,9 +940,9 @@ mod tests {
     #[tokio::test]
     async fn attachment_requires_tenant_prefix_invc04() {
         let svc = InMemoryCommentService::new();
-        let tid = TenantId::new();
-        let me = UserId::new();
-        let actor = ActorContext::new(me, tid);
+        let tid = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
+        let actor = ActorContext::new(me.0, tid.0);
         let res = svc
             .register_attachment(
                 RegisterAttachmentCommand {
@@ -1006,9 +962,9 @@ mod tests {
     #[tokio::test]
     async fn attachment_with_tenant_prefix_ok() {
         let svc = InMemoryCommentService::new();
-        let tid = TenantId::new();
-        let me = UserId::new();
-        let actor = ActorContext::new(me, tid);
+        let tid = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
+        let actor = ActorContext::new(me.0, tid.0);
         let a = svc
             .register_attachment(
                 RegisterAttachmentCommand {
@@ -1031,10 +987,10 @@ mod tests {
     #[tokio::test]
     async fn list_by_parent_excludes_deleted() {
         let svc = InMemoryCommentService::new();
-        let tid = TenantId::new();
-        let me = UserId::new();
+        let tid = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let parent_id = Uuid::new_v4();
-        let actor = ActorContext::new(me, tid);
+        let actor = ActorContext::new(me.0, tid.0);
         // 创建 2 个
         for _ in 0..2 {
             let mut cmd = make_cmd(tid);
@@ -1097,8 +1053,8 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_create_denied() {
         let svc = InMemoryCommentService::new();
-        let actor_t = TenantId::new();
-        let cmd_t = TenantId::new();
+        let actor_t = uuid::Uuid::new_v4();
+        let cmd_t = uuid::Uuid::new_v4();
         let actor = dev(actor_t);
         let res = svc.create_comment(make_cmd(cmd_t), &actor).await;
         assert!(matches!(res, Err(CommentError::CrossTenantDenied(_, _))));

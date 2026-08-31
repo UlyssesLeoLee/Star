@@ -33,6 +33,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // UUID 强类型 ID 宏(参考 domain-tenant / domain-permission 模式)
@@ -490,51 +491,6 @@ pub trait RelationRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext(本 crate 简化版,Phase 2 由 domain-identity 颁发)
-// =====================================================================
-
-/// **ActorContext** — 调用方上下文
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_local_runtime: false,
-        }
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn with_project(mut self, project_id: ProjectId) -> Self {
-        self.project_ids.push(project_id);
-        self
-    }
-    pub fn as_local_runtime(mut self) -> Self {
-        self.is_local_runtime = true;
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-    /// 是否有 admin 类角色(tenant_admin / project_admin)
-    pub fn is_admin(&self) -> bool {
-        self.has_role("tenant_admin") || self.has_role("project_admin") || self.is_local_runtime
-    }
-}
-
-// =====================================================================
 // InMemoryRelationRepository
 // =====================================================================
 
@@ -728,9 +684,9 @@ impl RelationCommandPort for InMemoryRelationService {
         actor: &ActorContext,
     ) -> Result<Relation, RelationError> {
         // INV-RL-04: 跨 tenant 拒绝
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -769,7 +725,7 @@ impl RelationCommandPort for InMemoryRelationService {
             to_type: cmd.to_type,
             to_id: cmd.to_id,
             note: cmd.note,
-            created_by: actor.user_id,
+            created_by: UserId::from(actor.user_id),
             created_at: Utc::now(),
             deleted: false,
         };
@@ -793,9 +749,9 @@ impl RelationCommandPort for InMemoryRelationService {
         cmd: DeleteRelationCommand,
         actor: &ActorContext,
     ) -> Result<(), RelationError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -808,7 +764,7 @@ impl RelationCommandPort for InMemoryRelationService {
             .ok_or_else(|| RelationError::NotFound(format!("relation:{}", cmd.relation_id)))?;
         if r.tenant_id != cmd.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 r.tenant_id,
             ));
         }
@@ -828,9 +784,9 @@ impl RelationCommandPort for InMemoryRelationService {
         cmd: CreateRelationGroupCommand,
         actor: &ActorContext,
     ) -> Result<RelationGroup, RelationError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -839,7 +795,7 @@ impl RelationCommandPort for InMemoryRelationService {
                 "group name must not be empty".to_string(),
             ));
         }
-        let g = RelationGroup::new(cmd.tenant_id, cmd.name, cmd.description, actor.user_id);
+        let g = RelationGroup::new(cmd.tenant_id, cmd.name, cmd.description, UserId::from(actor.user_id));
         self.repo.insert_group(g.clone()).await?;
         self.groups.write().expect("lock").insert(g.id, g.clone());
         Ok(g)
@@ -850,9 +806,9 @@ impl RelationCommandPort for InMemoryRelationService {
         cmd: AddToGroupCommand,
         actor: &ActorContext,
     ) -> Result<RelationGroup, RelationError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -866,7 +822,7 @@ impl RelationCommandPort for InMemoryRelationService {
             .ok_or_else(|| RelationError::NotFound(format!("relation:{}", cmd.relation_id)))?;
         if r.tenant_id != cmd.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 r.tenant_id,
             ));
         }
@@ -879,7 +835,7 @@ impl RelationCommandPort for InMemoryRelationService {
             .ok_or_else(|| RelationError::NotFound(format!("group:{}", cmd.group_id)))?;
         if g.tenant_id != cmd.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 g.tenant_id,
             ));
         }
@@ -896,9 +852,9 @@ impl RelationCommandPort for InMemoryRelationService {
         cmd: AddToGroupCommand,
         actor: &ActorContext,
     ) -> Result<RelationGroup, RelationError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -911,7 +867,7 @@ impl RelationCommandPort for InMemoryRelationService {
             .ok_or_else(|| RelationError::NotFound(format!("group:{}", cmd.group_id)))?;
         if g.tenant_id != cmd.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 g.tenant_id,
             ));
         }
@@ -943,9 +899,9 @@ impl RelationQueryPort for InMemoryRelationService {
             .get(&id)
             .cloned()
             .ok_or_else(|| RelationError::NotFound(format!("relation:{}", id)))?;
-        if r.tenant_id != actor.tenant_id {
+        if r.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 r.tenant_id,
             ));
         }
@@ -957,9 +913,9 @@ impl RelationQueryPort for InMemoryRelationService {
         q: ListByEndpointQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Relation>, RelationError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -989,9 +945,9 @@ impl RelationQueryPort for InMemoryRelationService {
         q: ListByEndpointQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Relation>, RelationError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -1021,9 +977,9 @@ impl RelationQueryPort for InMemoryRelationService {
         q: ListByTypeQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Relation>, RelationError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -1049,9 +1005,9 @@ impl RelationQueryPort for InMemoryRelationService {
             .get(&group_id)
             .cloned()
             .ok_or_else(|| RelationError::NotFound(format!("group:{}", group_id)))?;
-        if g.tenant_id != actor.tenant_id {
+        if g.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 g.tenant_id,
             ));
         }
@@ -1063,9 +1019,9 @@ impl RelationQueryPort for InMemoryRelationService {
         q: GetGraphQuery,
         actor: &ActorContext,
     ) -> Result<RelationGraph, RelationError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(RelationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -1187,15 +1143,14 @@ fn endpoint_eq(a: (ResourceType, Uuid), b: (ResourceType, Uuid)) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn tenant_a() -> TenantId {
-        TenantId::new()
+        uuid::Uuid::new_v4()
     }
     fn tenant_b() -> TenantId {
-        TenantId::new()
+        uuid::Uuid::new_v4()
     }
     fn user_a() -> UserId {
-        UserId::new()
+        uuid::Uuid::new_v4()
     }
     fn actor(tenant_id: TenantId) -> ActorContext {
         ActorContext::new(user_a(), tenant_id)

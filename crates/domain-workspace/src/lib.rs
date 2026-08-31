@@ -37,6 +37,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // 强类型 ID 宏
@@ -253,62 +254,6 @@ impl WorkspaceMember {
     /// 是否 Admin
     pub fn is_admin(&self) -> bool {
         self.role == WorkspaceRole::Admin
-    }
-}
-
-// =====================================================================
-// 调用方上下文(ActorContext)
-// =====================================================================
-
-/// **Actor 上下文**(basic-design §3.5)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    /// 用户 ID
-    pub user_id: Uuid,
-    /// 租户 ID
-    pub tenant_id: TenantId,
-    /// 设备 ID
-    pub device_id: Option<Uuid>,
-    /// 角色字符串列表
-    pub roles: Vec<String>,
-    /// 已加入的 Workspace 列表
-    pub workspace_ids: Vec<WorkspaceId>,
-}
-
-impl ActorContext {
-    /// 构造一个最小 ActorContext
-    pub fn new(user_id: Uuid, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            device_id: None,
-            roles: Vec::new(),
-            workspace_ids: Vec::new(),
-        }
-    }
-    /// 是否拥有指定角色
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-    /// 是否 Workspace Admin
-    pub fn is_workspace_admin(&self) -> bool {
-        self.has_role(roles::WORKSPACE_ADMIN)
-    }
-    /// 是否是指定 workspace 成员
-    pub fn is_member_of(&self, ws: WorkspaceId) -> bool {
-        self.workspace_ids.contains(&ws)
-    }
-    /// 链式加角色
-    pub fn with_role(mut self, role: impl Into<String>) -> Self {
-        self.roles.push(role.into());
-        self
-    }
-    /// 链式加 workspace
-    pub fn with_workspace(mut self, ws: WorkspaceId) -> Self {
-        if !self.workspace_ids.contains(&ws) {
-            self.workspace_ids.push(ws);
-        }
-        self
     }
 }
 
@@ -537,7 +482,7 @@ pub struct ListWorkspaceQuery {
 impl Default for ListWorkspaceQuery {
     fn default() -> Self {
         Self {
-            tenant_id: TenantId::new(),
+            tenant_id: UserId.new(),
             limit: 50,
             offset: 0,
         }
@@ -635,7 +580,7 @@ impl InMemoryWorkspaceService {
     }
     /// tenant 一致性检查(INV-WS-02 的轻量级应用层校验)
     fn check_tenant(actor: &ActorContext, expected: TenantId) -> Result<(), WorkspaceError> {
-        if actor.tenant_id != expected {
+        if actor.tenant_id != expected.0 {
             return Err(WorkspaceError::PermissionDenied);
         }
         Ok(())
@@ -791,7 +736,7 @@ impl WorkspaceCommandPort for InMemoryWorkspaceService {
             id,
             workspace_id: cmd.workspace_id,
             tenant_id: cmd.tenant_id,
-            user_id: cmd.user_id,
+            user_id: UserId::from(cmd.user_id),
             role: cmd.role,
             joined_at: Utc::now(),
             version: 1,
@@ -806,7 +751,7 @@ impl WorkspaceCommandPort for InMemoryWorkspaceService {
                 ..EventMeta::new(cmd.tenant_id)
             },
             workspace_id: cmd.workspace_id,
-            user_id: cmd.user_id,
+            user_id: UserId::from(cmd.user_id),
             role: cmd.role,
         });
         let _ = self.event_tx.send(event);
@@ -844,7 +789,7 @@ impl WorkspaceCommandPort for InMemoryWorkspaceService {
                 ..EventMeta::new(cmd.tenant_id)
             },
             workspace_id: cmd.workspace_id,
-            user_id: cmd.user_id,
+            user_id: UserId::from(cmd.user_id),
         });
         let _ = self.event_tx.send(event);
         let _ = mid; // suppress unused
@@ -864,7 +809,7 @@ impl WorkspaceQueryPort for InMemoryWorkspaceService {
             guard.get(&id).cloned()
         };
         let w = w.ok_or(WorkspaceError::NotFound(id))?;
-        if w.tenant_id != viewer.tenant_id {
+        if w.tenant_id != TenantId::from(viewer.tenant_id) {
             return Err(WorkspaceError::PermissionDenied);
         }
         Ok(w)
@@ -876,7 +821,7 @@ impl WorkspaceQueryPort for InMemoryWorkspaceService {
         workspace_key: &str,
         viewer: ActorContext,
     ) -> Result<Workspace, WorkspaceError> {
-        Self::check_tenant(&viewer, tenant_id)?;
+        Self::check_tenant(&viewer, TenantId::from(tenant_id))?;
         let guard = self.workspaces.read().await;
         guard
             .values()
@@ -910,11 +855,11 @@ impl WorkspaceQueryPort for InMemoryWorkspaceService {
         workspace_id: WorkspaceId,
         viewer: ActorContext,
     ) -> Result<Vec<WorkspaceMember>, WorkspaceError> {
-        Self::check_tenant(&viewer, viewer.tenant_id)?;
+        Self::check_tenant(&viewer, TenantId::from(viewer.tenant_id))?;
         let guard = self.members.read().await;
         Ok(guard
             .values()
-            .filter(|m| m.workspace_id == workspace_id && m.tenant_id == viewer.tenant_id)
+            .filter(|m| m.workspace_id == workspace_id && m.tenant_id == TenantId::from(viewer.tenant_id))
             .cloned()
             .collect())
     }
@@ -927,9 +872,8 @@ impl WorkspaceQueryPort for InMemoryWorkspaceService {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn make_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tenant_id).with_role(roles::WORKSPACE_ADMIN)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role(roles::WORKSPACE_ADMIN)
     }
 
     #[test]
@@ -941,14 +885,14 @@ mod tests {
     #[tokio::test]
     async fn create_workspace_success() {
         let svc = InMemoryWorkspaceService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = CreateWorkspaceCommand {
             tenant_id,
             workspace_key: "acme".to_string(),
             name: "Acme Workspace".to_string(),
             description: Some("main".to_string()),
-            owner_user_id: UserId::new(),
+            owner_user_id: UserId.new(),
         };
         let ws = svc.create_workspace(cmd, actor.clone()).await.unwrap();
         assert_eq!(ws.version, 1);
@@ -963,14 +907,14 @@ mod tests {
     #[tokio::test]
     async fn invariant_01_workspace_key_conflict() {
         let svc = InMemoryWorkspaceService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd1 = CreateWorkspaceCommand {
             tenant_id,
             workspace_key: "dup".to_string(),
             name: "W1".to_string(),
             description: None,
-            owner_user_id: UserId::new(),
+            owner_user_id: UserId.new(),
         };
         svc.create_workspace(cmd1, actor.clone()).await.unwrap();
         let cmd2 = CreateWorkspaceCommand {
@@ -978,7 +922,7 @@ mod tests {
             workspace_key: "dup".to_string(),
             name: "W2".to_string(),
             description: None,
-            owner_user_id: UserId::new(),
+            owner_user_id: UserId.new(),
         };
         let res = svc.create_workspace(cmd2, actor).await;
         assert!(matches!(res, Err(WorkspaceError::InvalidState(_))));
@@ -987,14 +931,14 @@ mod tests {
     #[tokio::test]
     async fn invariant_03_empty_key_rejected() {
         let svc = InMemoryWorkspaceService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = CreateWorkspaceCommand {
             tenant_id,
             workspace_key: "".to_string(),
             name: "Empty".to_string(),
             description: None,
-            owner_user_id: UserId::new(),
+            owner_user_id: UserId.new(),
         };
         let res = svc.create_workspace(cmd, actor).await;
         assert!(matches!(res, Err(WorkspaceError::InvalidState(_))));
@@ -1003,7 +947,7 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_access_denied() {
         let svc = InMemoryWorkspaceService::new_for_test();
-        let tenant_a = TenantId::new();
+        let tenant_a = uuid::Uuid::new_v4();
         let actor_a = make_actor(tenant_a);
         let ws = svc
             .create_workspace(
@@ -1012,13 +956,13 @@ mod tests {
                     workspace_key: "a".to_string(),
                     name: "A".to_string(),
                     description: None,
-                    owner_user_id: UserId::new(),
+                    owner_user_id: UserId.new(),
                 },
                 actor_a,
             )
             .await
             .unwrap();
-        let tenant_b = TenantId::new();
+        let tenant_b = uuid::Uuid::new_v4();
         let actor_b = make_actor(tenant_b);
         let res = svc.get_by_id(ws.id, actor_b).await;
         assert!(matches!(res, Err(WorkspaceError::PermissionDenied)));
@@ -1027,7 +971,7 @@ mod tests {
     #[tokio::test]
     async fn add_and_remove_member() {
         let svc = InMemoryWorkspaceService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let ws = svc
             .create_workspace(
@@ -1036,13 +980,13 @@ mod tests {
                     workspace_key: "ws".to_string(),
                     name: "WS".to_string(),
                     description: None,
-                    owner_user_id: UserId::new(),
+                    owner_user_id: UserId.new(),
                 },
                 actor.clone(),
             )
             .await
             .unwrap();
-        let new_user = UserId::new();
+        let new_user = uuid::Uuid::new_v4();
         let m = svc
             .add_member(
                 AddMemberCommand {
@@ -1091,14 +1035,14 @@ mod tests {
     #[tokio::test]
     async fn event_bus_receives_created() {
         let (svc, mut rx) = InMemoryWorkspaceService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = CreateWorkspaceCommand {
             tenant_id,
             workspace_key: "evt".to_string(),
             name: "E".to_string(),
             description: None,
-            owner_user_id: UserId::new(),
+            owner_user_id: UserId.new(),
         };
         svc.create_workspace(cmd, actor).await.unwrap();
         let evt = rx.try_recv().expect("应收到 Created 事件");
@@ -1109,7 +1053,7 @@ mod tests {
     #[tokio::test]
     async fn update_workspace_version_conflict() {
         let svc = InMemoryWorkspaceService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let ws = svc
             .create_workspace(
@@ -1118,7 +1062,7 @@ mod tests {
                     workspace_key: "v".to_string(),
                     name: "V".to_string(),
                     description: None,
-                    owner_user_id: UserId::new(),
+                    owner_user_id: UserId.new(),
                 },
                 actor.clone(),
             )

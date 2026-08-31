@@ -24,6 +24,7 @@ serde_json = { workspace = true }
 # w22-w31 通用 tracing
 tracing = { workspace = true }
 
+star-context = { path = "../star-context" }
 [dev-dependencies]
 tokio = { workspace = true }
 

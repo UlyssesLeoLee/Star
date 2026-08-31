@@ -39,6 +39,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // 强类型 ID 宏
@@ -574,47 +575,6 @@ impl WebhookEvent {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: Uuid,
-    pub tenant_id: TenantId,
-    pub device_id: Option<Uuid>,
-    pub roles: Vec<String>,
-    pub project_ids: Vec<ProjectId>,
-}
-
-impl ActorContext {
-    pub fn new(user_id: Uuid, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            device_id: None,
-            roles: Vec::new(),
-            project_ids: Vec::new(),
-        }
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-    pub fn can_register_repo(&self) -> bool {
-        self.has_role(roles::PROJECT_ADMIN) || self.has_role("tenant_admin")
-    }
-    pub fn with_role(mut self, role: impl Into<String>) -> Self {
-        self.roles.push(role.into());
-        self
-    }
-    pub fn with_project(mut self, project_id: ProjectId) -> Self {
-        if !self.project_ids.contains(&project_id) {
-            self.project_ids.push(project_id);
-        }
-        self
-    }
-}
-
-// =====================================================================
 // 不变量(INV-SCM-01~08)
 // =====================================================================
 
@@ -875,10 +835,10 @@ impl InMemoryScmService {
         self.webhooks.read().await.len()
     }
     fn check_tenant(actor: &ActorContext, expected: TenantId) -> Result<(), ScmError> {
-        if actor.tenant_id != expected {
+        if TenantId::from(actor.tenant_id) != expected {
             return Err(ScmError::PermissionDenied(format!(
                 "SEC-007 跨 tenant 拒绝: actor={} expected={}",
-                actor.tenant_id, expected
+                TenantId::from(actor.tenant_id), expected
             )));
         }
         Ok(())
@@ -911,7 +871,7 @@ impl ScmCommandPort for InMemoryScmService {
         cmd: RegisterRepositoryCommand,
         actor: ActorContext,
     ) -> Result<Repository, ScmError> {
-        if !actor.can_register_repo() {
+        if !actor.has_role("project_admin") && !actor.is_platform_admin {
             return Err(ScmError::PermissionDenied("需要 project_admin".to_string()));
         }
         Self::check_tenant(&actor, cmd.tenant_id)?;
@@ -1052,7 +1012,7 @@ impl ScmCommandPort for InMemoryScmService {
             let pr = guard
                 .get_mut(&cmd.pr_id)
                 .ok_or(ScmError::NotFound(RepositoryId::default()))?;
-            if pr.tenant_id != actor.tenant_id {
+            if pr.tenant_id != TenantId::from(actor.tenant_id) {
                 return Err(ScmError::PermissionDenied("跨 tenant".to_string()));
             }
             // **INV-SCM-07** 状态机校验
@@ -1095,7 +1055,7 @@ impl ScmQueryPort for InMemoryScmService {
             guard.get(&id).cloned()
         };
         let r = r.ok_or(ScmError::NotFound(id))?;
-        if r.tenant_id != actor.tenant_id {
+        if r.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(ScmError::PermissionDenied("跨 tenant".to_string()));
         }
         Ok(r)
@@ -1109,7 +1069,7 @@ impl ScmQueryPort for InMemoryScmService {
         let guard = self.repos.read().await;
         Ok(guard
             .values()
-            .filter(|r| r.tenant_id == actor.tenant_id && r.project_id == project_id)
+            .filter(|r| r.tenant_id == TenantId::from(actor.tenant_id) && r.project_id == project_id)
             .cloned()
             .collect())
     }
@@ -1124,7 +1084,7 @@ impl ScmQueryPort for InMemoryScmService {
             .get(&id)
             .cloned()
             .ok_or(ScmError::NotFound(RepositoryId::default()))?;
-        if pr.tenant_id != actor.tenant_id {
+        if pr.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(ScmError::PermissionDenied("跨 tenant".to_string()));
         }
         Ok(pr)
@@ -1138,15 +1098,14 @@ impl ScmQueryPort for InMemoryScmService {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn make_admin(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tenant_id)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::PROJECT_ADMIN)
             .with_project(project_id)
     }
 
     fn make_developer(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tenant_id)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::DEVELOPER)
             .with_project(project_id)
     }
@@ -1165,7 +1124,7 @@ mod tests {
     #[tokio::test]
     async fn register_github_repo_success() {
         let svc = InMemoryScmService::new_for_test();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let cmd = RegisterRepositoryCommand {
@@ -1187,7 +1146,7 @@ mod tests {
     #[tokio::test]
     async fn invariant_05_credential_required_for_connected() {
         let svc = InMemoryScmService::new_for_test();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let cmd = RegisterRepositoryCommand {
@@ -1208,7 +1167,7 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_register_denied() {
         let svc = InMemoryScmService::new_for_test();
-        let tenant_a = TenantId::new();
+        let tenant_a = uuid::Uuid::new_v4();
         let project_a = ProjectId::new();
         let actor_a = make_admin(tenant_a, project_a);
         let cmd = RegisterRepositoryCommand {
@@ -1223,7 +1182,7 @@ mod tests {
             credential_id: Some(Uuid::new_v4()),
         };
         let _ = svc.register_repository(cmd, actor_a).await.unwrap();
-        let tenant_b = TenantId::new();
+        let tenant_b = uuid::Uuid::new_v4();
         let project_b = ProjectId::new();
         let actor_b = make_admin(tenant_b, project_b);
         // 尝试读 tenant_a 的 repo
@@ -1241,7 +1200,7 @@ mod tests {
     #[tokio::test]
     async fn developer_cannot_register_repo() {
         let svc = InMemoryScmService::new_for_test();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_developer(tenant, project);
         let cmd = RegisterRepositoryCommand {
@@ -1262,7 +1221,7 @@ mod tests {
     #[tokio::test]
     async fn webhook_idempotency() {
         let svc = InMemoryScmService::new_for_test();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let input = WebhookEventInput {
             tenant_id: tenant,
             repository_id: None,
@@ -1285,14 +1244,14 @@ mod tests {
         // 单元测试 PR 状态机(不需要 service)
         let make_pr = |state: PullRequestState| PullRequest {
             id: PullRequestId::new(),
-            tenant_id: TenantId::new(),
+            tenant_id: UserId.new(),
             repository_id: RepositoryId::new(),
             external_id: "1".to_string(),
             source_branch: "feat".to_string(),
             target_branch: "main".to_string(),
             title: "T".to_string(),
             description: None,
-            author_user_id: UserId::new(),
+            author_user_id: UserId.new(),
             state,
             mergeable: false,
             merged_at: None,
@@ -1336,7 +1295,7 @@ mod tests {
     #[tokio::test]
     async fn update_sync_state_advances_version() {
         let svc = InMemoryScmService::new_for_test();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let repo = svc

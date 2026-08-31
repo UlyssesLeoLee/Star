@@ -34,6 +34,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型 + define_uuid_id 宏
@@ -294,46 +295,6 @@ pub struct ListByTenantQuery {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_local_runtime: false,
-        }
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn with_project(mut self, project_id: ProjectId) -> Self {
-        self.project_ids.push(project_id);
-        self
-    }
-    pub fn as_local_runtime(mut self) -> Self {
-        self.is_local_runtime = true;
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-}
-
-// =====================================================================
 // 端口(Port Traits)
 // =====================================================================
 
@@ -516,8 +477,8 @@ impl InMemoryWorkflowService {
         actor: &ActorContext,
         required: TenantId,
     ) -> Result<(), WorkflowError> {
-        if actor.tenant_id != required {
-            return Err(WorkflowError::CrossTenantDenied(actor.tenant_id, required));
+        if TenantId::from(actor.tenant_id) != required {
+            return Err(WorkflowError::CrossTenantDenied(TenantId::from(actor.tenant_id), required));
         }
         Ok(())
     }
@@ -564,7 +525,7 @@ impl WorkflowCommandPort for InMemoryWorkflowService {
         let wf = self.repo.get(cmd.workflow_id).await?;
         if wf.tenant_id != cmd.tenant_id {
             return Err(WorkflowError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 wf.tenant_id,
             ));
         }
@@ -599,7 +560,7 @@ impl WorkflowCommandPort for InMemoryWorkflowService {
         let wf = self.repo.get(inst.workflow_id).await?;
         if wf.tenant_id != cmd.tenant_id {
             return Err(WorkflowError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 wf.tenant_id,
             ));
         }
@@ -640,7 +601,7 @@ impl WorkflowCommandPort for InMemoryWorkflowService {
             from: inst.current_state,
             to: cmd.to,
             at: Utc::now(),
-            actor: actor.user_id,
+            actor: UserId::from(actor.user_id),
         });
         inst.current_state = cmd.to;
         run_invariants(&wf, Some(&inst))?;
@@ -771,11 +732,10 @@ impl WorkflowRepository for InMemoryWorkflowRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     // -------- 工具夹具 --------
 
     fn make_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0)
     }
 
     /// 构造一个简单三态 TODO → IN_PROGRESS → DONE
@@ -836,7 +796,7 @@ mod tests {
     #[tokio::test]
     async fn three_state_workflow_full_transition() {
         let svc = InMemoryWorkflowService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.expect("创建成功");
@@ -849,7 +809,7 @@ mod tests {
                     tenant_id,
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -872,7 +832,7 @@ mod tests {
                     tenant_id,
                     instance_id: inst.id,
                     to: in_progress,
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -889,7 +849,7 @@ mod tests {
                     tenant_id,
                     instance_id: inst2.id,
                     to: done,
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -904,7 +864,7 @@ mod tests {
     #[tokio::test]
     async fn skip_state_rejected() {
         let svc = InMemoryWorkflowService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
@@ -915,7 +875,7 @@ mod tests {
                     tenant_id,
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -930,7 +890,7 @@ mod tests {
                     tenant_id,
                     instance_id: inst.id,
                     to: done,
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -948,7 +908,7 @@ mod tests {
     #[tokio::test]
     async fn terminal_state_cannot_transition() {
         let svc = InMemoryWorkflowService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
@@ -959,7 +919,7 @@ mod tests {
                     tenant_id,
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -980,7 +940,7 @@ mod tests {
                 tenant_id,
                 instance_id: inst.id,
                 to: in_progress,
-                actor: actor.user_id,
+                actor: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -991,7 +951,7 @@ mod tests {
                 tenant_id,
                 instance_id: inst.id,
                 to: done,
-                actor: actor.user_id,
+                actor: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1005,7 +965,7 @@ mod tests {
                     tenant_id,
                     instance_id: inst.id,
                     to: todo_id,
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1018,7 +978,7 @@ mod tests {
     #[tokio::test]
     async fn invalid_transition_rejected() {
         let svc = InMemoryWorkflowService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
@@ -1029,7 +989,7 @@ mod tests {
                     tenant_id,
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1043,7 +1003,7 @@ mod tests {
                     tenant_id,
                     instance_id: inst.id,
                     to: todo_id,
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1056,7 +1016,7 @@ mod tests {
     #[tokio::test]
     async fn multi_state_workflow_with_review_and_blocked() {
         let svc = InMemoryWorkflowService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let s_todo = WorkflowStateId::new();
         let s_wip = WorkflowStateId::new();
@@ -1153,7 +1113,7 @@ mod tests {
                     tenant_id,
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1164,7 +1124,7 @@ mod tests {
                 tenant_id,
                 instance_id: inst.id,
                 to: s_wip,
-                actor: actor.user_id,
+                actor: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1175,7 +1135,7 @@ mod tests {
                 tenant_id,
                 instance_id: inst.id,
                 to: s_blocked,
-                actor: actor.user_id,
+                actor: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1186,7 +1146,7 @@ mod tests {
                 tenant_id,
                 instance_id: inst.id,
                 to: s_wip,
-                actor: actor.user_id,
+                actor: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1197,7 +1157,7 @@ mod tests {
                 tenant_id,
                 instance_id: inst.id,
                 to: s_review,
-                actor: actor.user_id,
+                actor: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1209,7 +1169,7 @@ mod tests {
                     tenant_id,
                     instance_id: inst.id,
                     to: s_done,
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1224,7 +1184,7 @@ mod tests {
     #[tokio::test]
     async fn start_instance_uses_default_initial_state() {
         let svc = InMemoryWorkflowService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
@@ -1234,7 +1194,7 @@ mod tests {
                     tenant_id,
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1250,8 +1210,8 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_denied() {
         let svc = InMemoryWorkflowService::new();
-        let tenant_a = TenantId::new();
-        let tenant_b = TenantId::new();
+        let tenant_a = uuid::Uuid::new_v4();
+        let tenant_b = uuid::Uuid::new_v4();
         let actor_a = make_actor(tenant_a);
         let cmd = make_three_state_workflow(tenant_a);
         let wf = svc.create_workflow(cmd, &actor_a).await.unwrap();
@@ -1268,7 +1228,7 @@ mod tests {
                     tenant_id: tenant_b,
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
-                    actor: actor_b.user_id,
+                    actor: UserId::from(actor_b.user_id),
                 },
                 &actor_b,
             )
@@ -1281,7 +1241,7 @@ mod tests {
     #[tokio::test]
     async fn workflow_version_increment() {
         let svc = InMemoryWorkflowService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = make_three_state_workflow(tenant_id);
         let wf1 = svc.create_workflow(cmd, &actor).await.unwrap();
@@ -1300,7 +1260,7 @@ mod tests {
     #[tokio::test]
     async fn history_records_actor_and_at() {
         let svc = InMemoryWorkflowService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
@@ -1310,7 +1270,7 @@ mod tests {
                     tenant_id,
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1328,7 +1288,7 @@ mod tests {
                     tenant_id,
                     instance_id: inst.id,
                     to: in_progress,
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1337,7 +1297,7 @@ mod tests {
         // INV-WF-05: history 必带 actor + at
         assert_eq!(inst2.history.len(), 1);
         let change = &inst2.history[0];
-        assert_eq!(change.actor, actor.user_id);
+        assert_eq!(change.actor, UserId::from(actor.user_id));
         assert_ne!(change.at.timestamp(), 0);
         assert!(check_invariant_05_history_audit(&inst2).is_ok());
     }
@@ -1347,7 +1307,7 @@ mod tests {
     #[tokio::test]
     async fn role_guard_blocks_non_approver() {
         let svc = InMemoryWorkflowService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor_developer = make_actor(tenant_id);
         // 不带 project_admin 角色
         let s_todo = WorkflowStateId::new();
@@ -1387,7 +1347,7 @@ mod tests {
                     tenant_id,
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
-                    actor: actor_developer.user_id,
+                    actor: UserId::from(actor_developer.user_id),
                 },
                 &actor_developer,
             )
@@ -1400,7 +1360,7 @@ mod tests {
                     tenant_id,
                     instance_id: inst.id,
                     to: s_done,
-                    actor: actor_developer.user_id,
+                    actor: UserId::from(actor_developer.user_id),
                 },
                 &actor_developer,
             )
@@ -1416,7 +1376,7 @@ mod tests {
                     tenant_id,
                     instance_id: inst.id,
                     to: s_done,
-                    actor: actor_admin.user_id,
+                    actor: UserId::from(actor_admin.user_id),
                 },
                 &actor_admin,
             )
@@ -1429,7 +1389,7 @@ mod tests {
     #[tokio::test]
     async fn create_and_query_workflow() {
         let svc = InMemoryWorkflowService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
@@ -1454,7 +1414,7 @@ mod tests {
     #[tokio::test]
     async fn multiple_instances_are_independent() {
         let svc = InMemoryWorkflowService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
@@ -1471,7 +1431,7 @@ mod tests {
                     tenant_id,
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1483,7 +1443,7 @@ mod tests {
                     tenant_id,
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1498,7 +1458,7 @@ mod tests {
                     tenant_id,
                     instance_id: inst1.id,
                     to: in_progress,
-                    actor: actor.user_id,
+                    actor: UserId::from(actor.user_id),
                 },
                 &actor,
             )

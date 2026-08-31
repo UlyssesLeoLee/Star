@@ -33,6 +33,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -493,50 +494,6 @@ pub trait DevelopmentRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_local_runtime: false,
-        }
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn with_project(mut self, pid: ProjectId) -> Self {
-        self.project_ids.push(pid);
-        self
-    }
-    pub fn as_local_runtime(mut self) -> Self {
-        self.is_local_runtime = true;
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-    /// 是否具备 merge 权限(INV-DEV-02)
-    pub fn can_merge(&self) -> bool {
-        self.has_role("project_admin") || self.has_role("tenant_admin")
-    }
-}
-
-// =====================================================================
 // InMemoryDevelopmentService
 // =====================================================================
 
@@ -565,9 +522,9 @@ impl Default for InMemoryDevelopmentService {
 }
 
 fn check_tenant(actor: &ActorContext, tenant_id: TenantId) -> Result<(), DevelopmentError> {
-    if actor.tenant_id != tenant_id {
+    if TenantId::from(actor.tenant_id) != tenant_id {
         return Err(DevelopmentError::CrossTenantDenied(
-            actor.tenant_id,
+            TenantId::from(actor.tenant_id),
             tenant_id,
         ));
     }
@@ -712,7 +669,7 @@ impl DevelopmentCommandPort for InMemoryDevelopmentService {
         actor: &ActorContext,
     ) -> Result<ChangeSet, DevelopmentError> {
         // INV-DEV-02:Merge 必须 project_admin 或 tenant_admin
-        if !actor.can_merge() {
+        if !actor.has_role("developer") && !actor.has_role("project_admin") && !actor.is_platform_admin {
             return Err(DevelopmentError::PermissionDenied(
                 "merge requires project_admin or tenant_admin (INV-DEV-02)".to_string(),
             ));
@@ -833,7 +790,7 @@ impl DevelopmentQueryPort for InMemoryDevelopmentService {
         // 至少过滤跨 tenant
         let list = list
             .into_iter()
-            .filter(|cs| cs.tenant_id == actor.tenant_id)
+            .filter(|cs| cs.tenant_id == TenantId::from(actor.tenant_id))
             .collect();
         Ok(list)
     }
@@ -1024,13 +981,12 @@ impl DevelopmentRepository for InMemoryDevelopmentRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn developer(tid: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tid)
+        ActorContext::new(Uuid::new_v4(), tid.0)
     }
 
     fn project_admin(tid: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tid).with_role("project_admin")
+        ActorContext::new(Uuid::new_v4(), tid.0).with_role("project_admin")
     }
 
     fn make_cmd(tid: TenantId) -> CreateChangeSetCommand {
@@ -1101,19 +1057,19 @@ mod tests {
 
     #[test]
     fn actor_can_merge() {
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let dev = developer(tid);
         let pa = project_admin(tid);
-        let ta = ActorContext::new(UserId::new(), tid).with_role("tenant_admin");
-        assert!(!dev.can_merge());
-        assert!(pa.can_merge());
-        assert!(ta.can_merge());
+        let ta = ActorContext::new(Uuid::new_v4(), tid.0).with_role("tenant_admin");
+        assert!(!dev.has_role("project_admin") && !dev.has_role("developer"));
+        assert!(pa.has_role("project_admin"));
+        assert!(ta.has_role("tenant_admin") || ta.is_platform_admin);
     }
 
     #[tokio::test]
     async fn create_change_set_starts_as_draft() {
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let cs = svc
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
@@ -1127,7 +1083,7 @@ mod tests {
     #[tokio::test]
     async fn add_file_change_in_draft() {
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let cs = svc
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
@@ -1159,7 +1115,7 @@ mod tests {
     async fn add_file_change_rejected_after_ready_for_review() {
         // INV-DEV-05:ReadyForReview 后只读
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let cs = svc
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
@@ -1196,7 +1152,7 @@ mod tests {
     #[tokio::test]
     async fn submit_draft_to_ready_for_review() {
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let cs = svc
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
@@ -1218,7 +1174,7 @@ mod tests {
     #[tokio::test]
     async fn approve_ready_for_review_to_approved() {
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let cs = svc
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
@@ -1249,7 +1205,7 @@ mod tests {
     #[tokio::test]
     async fn reject_ready_for_review_to_rejected() {
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let cs = svc
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
@@ -1282,7 +1238,7 @@ mod tests {
     #[tokio::test]
     async fn merge_approved_to_merged_requires_admin() {
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let cs = svc
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
@@ -1323,7 +1279,7 @@ mod tests {
     async fn merge_denied_for_developer() {
         // INV-DEV-02:developer 角色 merge 拒绝
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let cs = svc
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
@@ -1362,7 +1318,7 @@ mod tests {
     #[tokio::test]
     async fn request_changes_returns_to_draft() {
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let cs = svc
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
@@ -1394,7 +1350,7 @@ mod tests {
     #[tokio::test]
     async fn record_execution_links_to_change_set() {
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let cs = svc
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
@@ -1404,7 +1360,7 @@ mod tests {
             .record_execution(
                 RecordExecutionCommand {
                     change_set_id: cs.id,
-                    executed_by: ExecutionActor::User(actor.user_id),
+                    executed_by: ExecutionActor::User(UserId::from(actor.user_id)),
                     command: "cargo test".to_string(),
                     result: ExecutionResult::Success,
                     output_ref: Some("s3://logs/test-123.log".to_string()),
@@ -1421,7 +1377,7 @@ mod tests {
     #[tokio::test]
     async fn upsert_symbol_creates_v1() {
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = developer(tid);
         let s = svc
             .upsert_symbol(
@@ -1446,7 +1402,7 @@ mod tests {
     async fn symbol_version_increments_on_upsert() {
         // INV-DEV-04:SymbolIndex version 随 file version 递增
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = developer(tid);
         let repo_id = RepositoryId::new();
         let cmd = UpsertSymbolCommand {
@@ -1469,7 +1425,7 @@ mod tests {
     #[tokio::test]
     async fn list_by_status_filters_correctly() {
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let dev = developer(tid);
         let pa = project_admin(tid);
         // 3 个 ChangeSet:1 Draft,1 ReadyForReview,1 Approved
@@ -1551,8 +1507,8 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_access_denied() {
         let svc = InMemoryDevelopmentService::new();
-        let tid_a = TenantId::new();
-        let tid_b = TenantId::new();
+        let tid_a = uuid::Uuid::new_v4();
+        let tid_b = uuid::Uuid::new_v4();
         let actor_a = developer(tid_a);
         let cs = svc
             .create_change_set(make_cmd(tid_a), &developer(tid_a))
@@ -1596,7 +1552,7 @@ mod tests {
     #[tokio::test]
     async fn full_lifecycle_draft_to_merged() {
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let dev = developer(tid);
         let pa = project_admin(tid);
         // 1. Draft + add files
@@ -1649,7 +1605,7 @@ mod tests {
             .record_execution(
                 RecordExecutionCommand {
                     change_set_id: cs.id,
-                    executed_by: ExecutionActor::User(dev.user_id),
+                    executed_by: ExecutionActor::User(UserId::from(dev.user_id)),
                     command: "cargo test".to_string(),
                     result: ExecutionResult::Success,
                     output_ref: None,
@@ -1676,7 +1632,7 @@ mod tests {
     #[tokio::test]
     async fn not_found_returns_proper_error() {
         let svc = InMemoryDevelopmentService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = developer(tid);
         let res = svc
             .get_change_set(

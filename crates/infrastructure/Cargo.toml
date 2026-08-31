@@ -17,5 +17,6 @@
         tokio = { workspace = true }
 sqlx = { workspace = true }
 
+star-context = { path = "../star-context" }
         [lints]
         workspace = true

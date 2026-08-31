@@ -34,6 +34,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -503,46 +504,6 @@ pub trait WorktreeRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext(本 crate 简化版,Phase 2 由 domain-identity 颁发)
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_local_runtime: false,
-        }
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn with_project(mut self, project_id: ProjectId) -> Self {
-        self.project_ids.push(project_id);
-        self
-    }
-    pub fn as_local_runtime(mut self) -> Self {
-        self.is_local_runtime = true;
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-}
-
-// =====================================================================
 // InMemoryWorktreeService(实现)
 // =====================================================================
 
@@ -655,9 +616,9 @@ impl WorktreeCommandPort for InMemoryWorktreeService {
         cmd: CreateWorktreeCommand,
         actor: &ActorContext,
     ) -> Result<Worktree, WorktreeError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(WorktreeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -699,9 +660,9 @@ impl WorktreeCommandPort for InMemoryWorktreeService {
         actor: &ActorContext,
     ) -> Result<Worktree, WorktreeError> {
         let mut wt = self.repo.get(cmd.worktree_id).await?;
-        if wt.tenant_id != actor.tenant_id {
+        if wt.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(WorktreeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 wt.tenant_id,
             ));
         }
@@ -731,9 +692,9 @@ impl WorktreeCommandPort for InMemoryWorktreeService {
             return Err(WorktreeError::PermissionDenied);
         }
         let mut wt = self.repo.get(cmd.worktree_id).await?;
-        if wt.tenant_id != actor.tenant_id {
+        if wt.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(WorktreeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 wt.tenant_id,
             ));
         }
@@ -768,9 +729,9 @@ impl WorktreeCommandPort for InMemoryWorktreeService {
         actor: &ActorContext,
     ) -> Result<Worktree, WorktreeError> {
         let mut wt = self.repo.get(cmd.worktree_id).await?;
-        if wt.tenant_id != actor.tenant_id {
+        if wt.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(WorktreeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 wt.tenant_id,
             ));
         }
@@ -801,9 +762,9 @@ impl WorktreeCommandPort for InMemoryWorktreeService {
         actor: &ActorContext,
     ) -> Result<Worktree, WorktreeError> {
         let mut wt = self.repo.get(cmd.worktree_id).await?;
-        if wt.tenant_id != actor.tenant_id {
+        if wt.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(WorktreeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 wt.tenant_id,
             ));
         }
@@ -835,9 +796,9 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
         actor: &ActorContext,
     ) -> Result<Worktree, WorktreeError> {
         let wt = self.repo.get(id).await?;
-        if wt.tenant_id != actor.tenant_id {
+        if wt.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(WorktreeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 wt.tenant_id,
             ));
         }
@@ -848,9 +809,9 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
         q: ListByWorkItemQuery,
         actor: &ActorContext,
     ) -> Result<Vec<WorktreeSummary>, WorktreeError> {
-        if q.tenant_id != actor.tenant_id {
+        if q.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(WorktreeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -875,9 +836,9 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
         q: ListByAgentQuery,
         actor: &ActorContext,
     ) -> Result<Vec<WorktreeSummary>, WorktreeError> {
-        if q.tenant_id != actor.tenant_id {
+        if q.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(WorktreeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -900,9 +861,9 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
         actor: &ActorContext,
     ) -> Result<Vec<WorktreeId>, WorktreeError> {
         let wt = self.repo.get(worktree_id).await?;
-        if wt.tenant_id != actor.tenant_id {
+        if wt.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(WorktreeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 wt.tenant_id,
             ));
         }
@@ -924,13 +885,13 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
     ) -> Result<HeatmapData, WorktreeError> {
         let wts = self
             .repo
-            .list_by_repository(actor.tenant_id, repository_id)
+            .list_by_repository(TenantId::from(actor.tenant_id), repository_id)
             .await?;
         let mut by_status: HashMap<String, u32> = HashMap::new();
         for w in &wts {
-            if w.tenant_id != actor.tenant_id {
+            if w.tenant_id != TenantId::from(actor.tenant_id) {
                 return Err(WorktreeError::CrossTenantDenied(
-                    actor.tenant_id,
+                    TenantId::from(actor.tenant_id),
                     w.tenant_id,
                 ));
             }
@@ -952,9 +913,8 @@ impl WorktreeQueryPort for InMemoryWorktreeService {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn make_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0)
     }
 
     fn make_create_cmd(tenant_id: TenantId) -> CreateWorktreeCommand {
@@ -966,7 +926,7 @@ mod tests {
             branch: "feat/test".to_string(),
             base_branch: "main".to_string(),
             runtime_id: RuntimeId::new(),
-            owner_user_id: UserId::new(),
+            owner_user_id: UserId.new(),
         }
     }
 
@@ -1061,7 +1021,7 @@ mod tests {
     #[tokio::test]
     async fn create_worktree_assigns_unique_id_and_initial_status() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let cmd = make_create_cmd(tenant_id);
         let wt = svc.create_worktree(cmd, &actor).await.unwrap();
@@ -1073,8 +1033,8 @@ mod tests {
     #[tokio::test]
     async fn create_worktree_cross_tenant_denied() {
         let svc = InMemoryWorktreeService::new();
-        let actor_tenant = TenantId::new();
-        let cmd_tenant = TenantId::new(); // 不同 tenant
+        let actor_tenant = uuid::Uuid::new_v4();
+        let cmd_tenant = uuid::Uuid::new_v4(); // 不同 tenant
         let actor = make_actor(actor_tenant);
         let cmd = make_create_cmd(cmd_tenant);
         let res = svc.create_worktree(cmd, &actor).await;
@@ -1084,7 +1044,7 @@ mod tests {
     #[tokio::test]
     async fn create_worktree_runtime_required() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let mut cmd = make_create_cmd(tenant_id);
         cmd.runtime_id = RuntimeId(Uuid::nil());
@@ -1095,7 +1055,7 @@ mod tests {
     #[tokio::test]
     async fn transition_status_valid() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let wt = svc
             .create_worktree(make_create_cmd(tenant_id), &actor)
@@ -1121,7 +1081,7 @@ mod tests {
     #[tokio::test]
     async fn transition_status_from_mismatch_rejected() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let wt = svc
             .create_worktree(make_create_cmd(tenant_id), &actor)
@@ -1146,7 +1106,7 @@ mod tests {
     #[tokio::test]
     async fn assign_to_agent_requires_ready_state() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let wt = svc
             .create_worktree(make_create_cmd(tenant_id), &actor)
@@ -1170,7 +1130,7 @@ mod tests {
     #[tokio::test]
     async fn record_observed_state_requires_local_runtime_actor() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let wt = svc
             .create_worktree(make_create_cmd(tenant_id), &actor)
@@ -1195,7 +1155,7 @@ mod tests {
     #[tokio::test]
     async fn abandon_sets_abandoned() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let wt = svc
             .create_worktree(make_create_cmd(tenant_id), &actor)
@@ -1218,7 +1178,7 @@ mod tests {
     #[tokio::test]
     async fn abandon_terminal_state_rejected() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let wt = svc
             .create_worktree(make_create_cmd(tenant_id), &actor)
@@ -1270,14 +1230,14 @@ mod tests {
     #[tokio::test]
     async fn get_by_id_cross_tenant_denied() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_a = TenantId::new();
+        let tenant_a = uuid::Uuid::new_v4();
         let actor_a = make_actor(tenant_a);
         let wt = svc
             .create_worktree(make_create_cmd(tenant_a), &actor_a)
             .await
             .unwrap();
         // 另一 tenant 的 actor
-        let tenant_b = TenantId::new();
+        let tenant_b = uuid::Uuid::new_v4();
         let actor_b = make_actor(tenant_b);
         let res = svc.get_by_id(wt.id, &actor_b).await;
         assert!(matches!(res, Err(WorktreeError::CrossTenantDenied(_, _))));
@@ -1286,7 +1246,7 @@ mod tests {
     #[tokio::test]
     async fn list_by_work_item_filters() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let wi = WorkItemId::new();
         let mut cmd = make_create_cmd(tenant_id);
@@ -1311,7 +1271,7 @@ mod tests {
     #[tokio::test]
     async fn list_by_agent_filters() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let wt = svc
             .create_worktree(make_create_cmd(tenant_id), &actor)
@@ -1370,7 +1330,7 @@ mod tests {
     #[tokio::test]
     async fn detect_conflicts_finds_other_active_worktrees() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let repo = RepositoryId::new();
         let mut cmd1 = make_create_cmd(tenant_id);
@@ -1388,7 +1348,7 @@ mod tests {
     #[tokio::test]
     async fn heatmap_aggregates_by_status() {
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let repo = RepositoryId::new();
         let mut cmd1 = make_create_cmd(tenant_id);
@@ -1407,7 +1367,7 @@ mod tests {
         // INV-WT-01:Worktree 状态独立于 WorkItem 状态
         // 同一 WorkItem 下 3 个 Worktree 不同状态同时存在
         let svc = InMemoryWorktreeService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let wi = WorkItemId::new();
         let mk = || {

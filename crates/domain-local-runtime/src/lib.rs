@@ -35,6 +35,7 @@ use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -508,46 +509,6 @@ pub trait RuntimeRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_local_runtime: false,
-        }
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn with_project(mut self, project_id: ProjectId) -> Self {
-        self.project_ids.push(project_id);
-        self
-    }
-    pub fn as_local_runtime(mut self) -> Self {
-        self.is_local_runtime = true;
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-}
-
-// =====================================================================
 // 配置:心跳超时阈值(§23.2 / INV-RT-04)
 // =====================================================================
 
@@ -774,17 +735,17 @@ impl RuntimeCommandPort for InMemoryRuntimeService {
         cmd: RegisterRuntimeCommand,
         actor: &ActorContext,
     ) -> Result<LocalRuntime, RuntimeError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(RuntimeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
         // INV-RT-05:1 Runtime → 1 User,owner 校验
-        // (此处不要求 actor.user_id == cmd.user_id;允许管理员代注册)
+        // (此处不要求 UserId::from(actor.user_id) == cmd.user_id;允许管理员代注册)
         if !actor.has_role("tenant_admin")
             && !actor.is_local_runtime
-            && actor.user_id != cmd.user_id
+            && UserId::from(actor.user_id) != cmd.user_id
         {
             return Err(RuntimeError::PermissionDenied);
         }
@@ -826,9 +787,9 @@ impl RuntimeCommandPort for InMemoryRuntimeService {
         cmd: HeartbeatCommand,
         actor: &ActorContext,
     ) -> Result<LocalRuntime, RuntimeError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(RuntimeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -865,9 +826,9 @@ impl RuntimeCommandPort for InMemoryRuntimeService {
         cmd: MountWorktreeCommand,
         actor: &ActorContext,
     ) -> Result<WorktreeMount, RuntimeError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(RuntimeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -932,9 +893,9 @@ impl RuntimeCommandPort for InMemoryRuntimeService {
             .get(&m.runtime_id)
             .cloned()
             .ok_or_else(|| RuntimeError::NotFound(format!("runtime:{}", m.runtime_id.as_uuid())))?;
-        if r.tenant_id != actor.tenant_id {
+        if r.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(RuntimeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 r.tenant_id,
             ));
         }
@@ -955,9 +916,9 @@ impl RuntimeCommandPort for InMemoryRuntimeService {
         cmd: CreateExecContextCommand,
         actor: &ActorContext,
     ) -> Result<AgentExecutionContext, RuntimeError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(RuntimeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -1004,9 +965,9 @@ impl RuntimeQueryPort for InMemoryRuntimeService {
         q: GetRuntimeQuery,
         actor: &ActorContext,
     ) -> Result<LocalRuntime, RuntimeError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(RuntimeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -1021,7 +982,7 @@ impl RuntimeQueryPort for InMemoryRuntimeService {
             return Err(RuntimeError::CrossTenantDenied(q.tenant_id, r.tenant_id));
         }
         // INV-RT-05:1 Runtime → 1 User,非 owner 不可读
-        if !actor.is_local_runtime && !actor.has_role("tenant_admin") && actor.user_id != r.user_id
+        if !actor.is_local_runtime && !actor.has_role("tenant_admin") && UserId::from(actor.user_id) != r.user_id
         {
             return Err(RuntimeError::PermissionDenied);
         }
@@ -1033,14 +994,14 @@ impl RuntimeQueryPort for InMemoryRuntimeService {
         q: ListByUserQuery,
         actor: &ActorContext,
     ) -> Result<Vec<LocalRuntime>, RuntimeError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(RuntimeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
         // 非管理员:只允许看自己
-        if !actor.has_role("tenant_admin") && actor.user_id != q.user_id {
+        if !actor.has_role("tenant_admin") && UserId::from(actor.user_id) != q.user_id {
             return Err(RuntimeError::PermissionDenied);
         }
         let s = self.runtimes.read().expect("lock");
@@ -1055,9 +1016,9 @@ impl RuntimeQueryPort for InMemoryRuntimeService {
         q: GetHeartbeatsQuery,
         actor: &ActorContext,
     ) -> Result<Vec<RuntimeHeartbeat>, RuntimeError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(RuntimeError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -1072,7 +1033,7 @@ impl RuntimeQueryPort for InMemoryRuntimeService {
         if r.tenant_id != q.tenant_id {
             return Err(RuntimeError::CrossTenantDenied(q.tenant_id, r.tenant_id));
         }
-        if !actor.is_local_runtime && !actor.has_role("tenant_admin") && actor.user_id != r.user_id
+        if !actor.is_local_runtime && !actor.has_role("tenant_admin") && UserId::from(actor.user_id) != r.user_id
         {
             return Err(RuntimeError::PermissionDenied);
         }
@@ -1088,17 +1049,16 @@ impl RuntimeQueryPort for InMemoryRuntimeService {
 mod tests {
     use super::*;
     use std::thread::sleep;
-
     fn make_actor(tenant_id: TenantId, user_id: UserId) -> ActorContext {
-        ActorContext::new(user_id, tenant_id)
+        ActorContext::new(user_id.0, tenant_id.0)
     }
 
     fn make_admin(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id).with_role("tenant_admin")
+        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role("tenant_admin")
     }
 
     fn make_local_runtime_actor(tenant_id: TenantId, user_id: UserId) -> ActorContext {
-        ActorContext::new(user_id, tenant_id).as_local_runtime()
+        ActorContext::new(user_id.0, tenant_id.0).as_local_runtime()
     }
 
     fn make_register_cmd(tenant_id: TenantId, user_id: UserId) -> RegisterRuntimeCommand {
@@ -1133,8 +1093,8 @@ mod tests {
     #[tokio::test]
     async fn register_runtime_basic() {
         let svc = InMemoryRuntimeService::new();
-        let tenant_id = TenantId::new();
-        let user_id = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, user_id);
         let cmd = make_register_cmd(tenant_id, user_id);
         let r = svc.register_runtime(cmd, &actor).await.unwrap();
@@ -1151,8 +1111,8 @@ mod tests {
     #[tokio::test]
     async fn register_runtime_unique_per_user() {
         let svc = InMemoryRuntimeService::new();
-        let tenant_id = TenantId::new();
-        let user_id = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, user_id);
         let device = DeviceId::new();
         // 同 device 第二次注册应 Conflict
@@ -1169,8 +1129,8 @@ mod tests {
     #[tokio::test]
     async fn heartbeat_updates_status() {
         let svc = InMemoryRuntimeService::new();
-        let tenant_id = TenantId::new();
-        let user_id = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user_id = uuid::Uuid::new_v4();
         let admin = make_admin(tenant_id);
         let r = svc
             .register_runtime(make_register_cmd(tenant_id, user_id), &admin)
@@ -1205,8 +1165,8 @@ mod tests {
     #[tokio::test]
     async fn heartbeat_timeout_offline() {
         let svc = InMemoryRuntimeService::new();
-        let tenant_id = TenantId::new();
-        let user_id = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user_id = uuid::Uuid::new_v4();
         let admin = make_admin(tenant_id);
         let r = svc
             .register_runtime(make_register_cmd(tenant_id, user_id), &admin)
@@ -1238,8 +1198,8 @@ mod tests {
     #[tokio::test]
     async fn mount_worktree() {
         let svc = InMemoryRuntimeService::new();
-        let tenant_id = TenantId::new();
-        let user_id = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user_id = uuid::Uuid::new_v4();
         let admin = make_admin(tenant_id);
         let r = svc
             .register_runtime(make_register_cmd(tenant_id, user_id), &admin)
@@ -1267,8 +1227,8 @@ mod tests {
     #[tokio::test]
     async fn mount_duplicate_worktree_rejected() {
         let svc = InMemoryRuntimeService::new();
-        let tenant_id = TenantId::new();
-        let user_id = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user_id = uuid::Uuid::new_v4();
         let admin = make_admin(tenant_id);
         let r = svc
             .register_runtime(make_register_cmd(tenant_id, user_id), &admin)
@@ -1306,8 +1266,8 @@ mod tests {
     #[tokio::test]
     async fn unmount_worktree() {
         let svc = InMemoryRuntimeService::new();
-        let tenant_id = TenantId::new();
-        let user_id = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user_id = uuid::Uuid::new_v4();
         let admin = make_admin(tenant_id);
         let r = svc
             .register_runtime(make_register_cmd(tenant_id, user_id), &admin)
@@ -1344,8 +1304,8 @@ mod tests {
     #[tokio::test]
     async fn create_exec_context() {
         let svc = InMemoryRuntimeService::new();
-        let tenant_id = TenantId::new();
-        let user_id = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user_id = uuid::Uuid::new_v4();
         let admin = make_admin(tenant_id);
         let r = svc
             .register_runtime(make_register_cmd(tenant_id, user_id), &admin)
@@ -1374,8 +1334,8 @@ mod tests {
     #[tokio::test]
     async fn environment_sanitized() {
         let svc = InMemoryRuntimeService::new();
-        let tenant_id = TenantId::new();
-        let user_id = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user_id = uuid::Uuid::new_v4();
         let admin = make_admin(tenant_id);
         let r = svc
             .register_runtime(make_register_cmd(tenant_id, user_id), &admin)
@@ -1422,8 +1382,8 @@ mod tests {
     #[tokio::test]
     async fn list_by_user() {
         let svc = InMemoryRuntimeService::new();
-        let tenant_id = TenantId::new();
-        let user_id = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user_id = uuid::Uuid::new_v4();
         let admin = make_admin(tenant_id);
         // 注册 2 个不同 device
         let mut cmd1 = make_register_cmd(tenant_id, user_id);
@@ -1449,7 +1409,7 @@ mod tests {
         assert_eq!(mine.len(), 2);
 
         // 非管理员看别人 → PermissionDenied
-        let other = make_actor(tenant_id, UserId::new());
+        let other = make_actor(tenant_id, uuid::Uuid::new_v4());
         let res = svc
             .list_by_user(ListByUserQuery { tenant_id, user_id }, &other)
             .await;
@@ -1462,9 +1422,9 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_register_denied() {
         let svc = InMemoryRuntimeService::new();
-        let actor_tenant = TenantId::new();
-        let cmd_tenant = TenantId::new();
-        let user_id = UserId::new();
+        let actor_tenant = uuid::Uuid::new_v4();
+        let cmd_tenant = uuid::Uuid::new_v4();
+        let user_id = uuid::Uuid::new_v4();
         let actor = make_admin(actor_tenant);
         let cmd = make_register_cmd(cmd_tenant, user_id);
         let res = svc.register_runtime(cmd, &actor).await;
@@ -1477,8 +1437,8 @@ mod tests {
     #[tokio::test]
     async fn get_heartbeats() {
         let svc = InMemoryRuntimeService::new();
-        let tenant_id = TenantId::new();
-        let user_id = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user_id = uuid::Uuid::new_v4();
         let admin = make_admin(tenant_id);
         let r = svc
             .register_runtime(make_register_cmd(tenant_id, user_id), &admin)

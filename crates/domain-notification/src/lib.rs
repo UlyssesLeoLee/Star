@@ -36,6 +36,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -428,38 +429,6 @@ pub trait NotificationRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_local_runtime: false,
-        }
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-}
-
-// =====================================================================
 // InMemoryNotificationService
 // =====================================================================
 
@@ -504,21 +473,21 @@ impl NotificationCommandPort for InMemoryNotificationService {
         cmd: RegisterChannelCommand,
         actor: &ActorContext,
     ) -> Result<NotificationChannel, NotificationError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(NotificationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
         // INV-N-03:仅本人可注册自己的 channel
-        if actor.user_id != cmd.user_id {
+        if UserId::from(actor.user_id) != cmd.user_id {
             return Err(NotificationError::PermissionDenied);
         }
         let now = Utc::now();
         let channel = NotificationChannel {
             id: NotificationChannelId::new(),
             tenant_id: cmd.tenant_id,
-            user_id: cmd.user_id,
+            user_id: UserId::from(cmd.user_id),
             kind: cmd.kind,
             address: cmd.address,
             enabled: true,
@@ -538,9 +507,9 @@ impl NotificationCommandPort for InMemoryNotificationService {
         cmd: UpsertTemplateCommand,
         actor: &ActorContext,
     ) -> Result<NotificationTemplate, NotificationError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(NotificationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -585,9 +554,9 @@ impl NotificationCommandPort for InMemoryNotificationService {
         cmd: DispatchNotificationCommand,
         actor: &ActorContext,
     ) -> Result<Notification, NotificationError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(NotificationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -612,7 +581,7 @@ impl NotificationCommandPort for InMemoryNotificationService {
                 NotificationChannel {
                     id: NotificationChannelId::new(),
                     tenant_id: cmd.tenant_id,
-                    user_id: cmd.user_id,
+                    user_id: UserId::from(cmd.user_id),
                     kind: ChannelKind::InApp,
                     address: format!("in_app://user/{}", cmd.user_id.as_uuid()),
                     enabled: true,
@@ -625,7 +594,7 @@ impl NotificationCommandPort for InMemoryNotificationService {
         let notification = Notification {
             id: NotificationId::new(),
             tenant_id: cmd.tenant_id,
-            user_id: cmd.user_id,
+            user_id: UserId::from(cmd.user_id),
             event_type: cmd.event_type,
             resource_type: cmd.resource_type,
             resource_id: cmd.resource_id,
@@ -651,9 +620,9 @@ impl NotificationCommandPort for InMemoryNotificationService {
         cmd: MarkReadCommand,
         actor: &ActorContext,
     ) -> Result<Notification, NotificationError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(NotificationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -676,7 +645,7 @@ impl NotificationCommandPort for InMemoryNotificationService {
             ));
         }
         // INV-N-03:仅本人可标已读
-        if actor.user_id != n.user_id {
+        if UserId::from(actor.user_id) != n.user_id {
             return Err(NotificationError::PermissionDenied);
         }
         if n.status.is_terminal() {
@@ -700,9 +669,9 @@ impl NotificationQueryPort for InMemoryNotificationService {
         q: GetNotificationQuery,
         actor: &ActorContext,
     ) -> Result<Notification, NotificationError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(NotificationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -722,7 +691,7 @@ impl NotificationQueryPort for InMemoryNotificationService {
             ));
         }
         // 仅本人可读
-        if actor.user_id != n.user_id {
+        if UserId::from(actor.user_id) != n.user_id {
             return Err(NotificationError::PermissionDenied);
         }
         Ok(n)
@@ -733,14 +702,14 @@ impl NotificationQueryPort for InMemoryNotificationService {
         q: ListByUserQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Notification>, NotificationError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(NotificationError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
         // INV-N-03:仅本人
-        if actor.user_id != q.user_id {
+        if UserId::from(actor.user_id) != q.user_id {
             return Err(NotificationError::PermissionDenied);
         }
         let notes = self.notifications.read().unwrap();
@@ -915,9 +884,8 @@ impl NotificationRepository for InMemoryNotificationRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn make_actor(tenant_id: TenantId, user_id: UserId) -> ActorContext {
-        ActorContext::new(user_id, tenant_id).with_role("project_admin")
+        ActorContext::new(user_id.0, tenant_id.0).with_role("project_admin")
     }
 
     #[test]
@@ -969,9 +937,9 @@ mod tests {
     #[tokio::test]
     async fn register_channel_self_only() {
         let svc = InMemoryNotificationService::new();
-        let tenant_id = TenantId::new();
-        let me = UserId::new();
-        let other = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
+        let other = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, me);
         let res = svc
             .register_channel(
@@ -991,8 +959,8 @@ mod tests {
     #[tokio::test]
     async fn register_channel_self_ok() {
         let svc = InMemoryNotificationService::new();
-        let tenant_id = TenantId::new();
-        let me = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, me);
         let ch = svc
             .register_channel(
@@ -1015,8 +983,8 @@ mod tests {
     async fn dispatch_breakthrough_succeeds() {
         // INV-N-07 关键事件:必须发送
         let svc = InMemoryNotificationService::new();
-        let tenant_id = TenantId::new();
-        let me = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, me);
         let n = svc
             .dispatch(
@@ -1042,8 +1010,8 @@ mod tests {
     async fn dispatch_suppressed_event_rejected_invn07() {
         // INV-N-07 默认抑制:中间步骤不通知
         let svc = InMemoryNotificationService::new();
-        let tenant_id = TenantId::new();
-        let me = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, me);
         let res = svc
             .dispatch(
@@ -1066,8 +1034,8 @@ mod tests {
     #[tokio::test]
     async fn dispatch_feedback_required_breakthrough() {
         let svc = InMemoryNotificationService::new();
-        let tenant_id = TenantId::new();
-        let me = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, me);
         let n = svc
             .dispatch(
@@ -1091,8 +1059,8 @@ mod tests {
     #[tokio::test]
     async fn dispatch_agent_session_failed_breakthrough() {
         let svc = InMemoryNotificationService::new();
-        let tenant_id = TenantId::new();
-        let me = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, me);
         let n = svc
             .dispatch(
@@ -1116,8 +1084,8 @@ mod tests {
     #[tokio::test]
     async fn mark_read_self_only() {
         let svc = InMemoryNotificationService::new();
-        let tenant_id = TenantId::new();
-        let me = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, me);
         let n = svc
             .dispatch(
@@ -1153,9 +1121,9 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_dispatch_denied() {
         let svc = InMemoryNotificationService::new();
-        let me = UserId::new();
-        let actor_t = TenantId::new();
-        let cmd_t = TenantId::new();
+        let me = uuid::Uuid::new_v4();
+        let actor_t = uuid::Uuid::new_v4();
+        let cmd_t = uuid::Uuid::new_v4();
         let actor = make_actor(actor_t, me);
         let res = svc
             .dispatch(
@@ -1181,8 +1149,8 @@ mod tests {
     #[tokio::test]
     async fn upsert_template_creates_then_updates() {
         let svc = InMemoryNotificationService::new();
-        let tenant_id = TenantId::new();
-        let me = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, me);
         let project = ProjectId::new();
         let t1 = svc
@@ -1223,8 +1191,8 @@ mod tests {
     #[tokio::test]
     async fn list_unread_filter() {
         let svc = InMemoryNotificationService::new();
-        let tenant_id = TenantId::new();
-        let me = UserId::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let me = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, me);
         let n1 = svc
             .dispatch(

@@ -29,6 +29,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -331,39 +332,6 @@ pub trait ProjectRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-        }
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-    pub fn has_project(&self, pid: ProjectId) -> bool {
-        self.project_ids.iter().any(|p| *p == pid)
-    }
-}
-
-// =====================================================================
 // InMemoryProjectService
 // =====================================================================
 
@@ -396,9 +364,9 @@ impl ProjectCommandPort for InMemoryProjectService {
         cmd: CreateProjectCommand,
         actor: &ActorContext,
     ) -> Result<Project, ProjectError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(ProjectError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -449,9 +417,9 @@ impl ProjectCommandPort for InMemoryProjectService {
         cmd: ReplaceProjectPolicyCommand,
         actor: &ActorContext,
     ) -> Result<ProjectPolicy, ProjectError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(ProjectError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -492,9 +460,9 @@ impl ProjectCommandPort for InMemoryProjectService {
         cmd: ArchiveProjectCommand,
         actor: &ActorContext,
     ) -> Result<Project, ProjectError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(ProjectError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -532,9 +500,9 @@ impl ProjectQueryPort for InMemoryProjectService {
         q: GetProjectQuery,
         actor: &ActorContext,
     ) -> Result<Project, ProjectError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(ProjectError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -560,8 +528,8 @@ impl ProjectQueryPort for InMemoryProjectService {
         project_id: ProjectId,
         actor: &ActorContext,
     ) -> Result<ProjectPolicy, ProjectError> {
-        if actor.tenant_id != tenant_id {
-            return Err(ProjectError::CrossTenantDenied(actor.tenant_id, tenant_id));
+        if TenantId::from(actor.tenant_id) != tenant_id {
+            return Err(ProjectError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
         }
         let p = self
             .policies
@@ -584,9 +552,9 @@ impl ProjectQueryPort for InMemoryProjectService {
         q: ListByWorkspaceQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Project>, ProjectError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(ProjectError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -692,9 +660,8 @@ impl ProjectRepository for InMemoryProjectRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn admin(tid: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tid).with_role("project_admin")
+        ActorContext::new(Uuid::new_v4(), tid.0).with_role("project_admin")
     }
 
     #[test]
@@ -714,7 +681,7 @@ mod tests {
     #[test]
     fn default_policy_has_merge_gate() {
         // INV-P-03:默认 merge_gate=true
-        let p = ProjectPolicy::default_for(ProjectId::new(), TenantId::new());
+        let p = ProjectPolicy::default_for(ProjectId::new(), uuid::Uuid::new_v4());
         assert!(p.merge_gate);
         assert!(p.commit_requires_user);
     }
@@ -722,8 +689,8 @@ mod tests {
     #[tokio::test]
     async fn create_project_requires_project_admin() {
         let svc = InMemoryProjectService::new();
-        let tid = TenantId::new();
-        let actor = ActorContext::new(UserId::new(), tid);
+        let tid = uuid::Uuid::new_v4();
+        let actor = ActorContext::new(Uuid::new_v4(), tid.0);
         let res = svc
             .create_project(
                 CreateProjectCommand {
@@ -733,7 +700,7 @@ mod tests {
                     display_name: "Alpha".to_string(),
                     description: "".to_string(),
                     project_template_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -744,7 +711,7 @@ mod tests {
     #[tokio::test]
     async fn create_project_unique_slug_per_workspace() {
         let svc = InMemoryProjectService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = admin(tid);
         let wid = WorkspaceId::new();
         svc.create_project(
@@ -755,7 +722,7 @@ mod tests {
                 display_name: "Alpha".to_string(),
                 description: "".to_string(),
                 project_template_id: None,
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -770,7 +737,7 @@ mod tests {
                     display_name: "Alpha2".to_string(),
                     description: "".to_string(),
                     project_template_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -781,7 +748,7 @@ mod tests {
     #[tokio::test]
     async fn same_slug_different_workspace_ok() {
         let svc = InMemoryProjectService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = admin(tid);
         let wid1 = WorkspaceId::new();
         let wid2 = WorkspaceId::new();
@@ -793,7 +760,7 @@ mod tests {
                 display_name: "A1".to_string(),
                 description: "".to_string(),
                 project_template_id: None,
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -807,7 +774,7 @@ mod tests {
                 display_name: "A2".to_string(),
                 description: "".to_string(),
                 project_template_id: None,
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -818,7 +785,7 @@ mod tests {
     #[tokio::test]
     async fn replace_policy_overwrites() {
         let svc = InMemoryProjectService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = admin(tid);
         let p = svc
             .create_project(
@@ -829,7 +796,7 @@ mod tests {
                     display_name: "X".to_string(),
                     description: "".to_string(),
                     project_template_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -844,7 +811,7 @@ mod tests {
                     tenant_id: tid,
                     project_id: p.id,
                     policy: new_policy,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -857,8 +824,8 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_get_denied() {
         let svc = InMemoryProjectService::new();
-        let t1 = TenantId::new();
-        let t2 = TenantId::new();
+        let t1 = uuid::Uuid::new_v4();
+        let t2 = uuid::Uuid::new_v4();
         let admin1 = admin(t1);
         let p = svc
             .create_project(
@@ -869,7 +836,7 @@ mod tests {
                     display_name: "X".to_string(),
                     description: "".to_string(),
                     project_template_id: None,
-                    actor_user_id: admin1.user_id,
+                    actor_user_id: UserId::from(admin1.user_id),
                 },
                 &admin1,
             )
@@ -891,7 +858,7 @@ mod tests {
     #[tokio::test]
     async fn archive_project() {
         let svc = InMemoryProjectService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = admin(tid);
         let p = svc
             .create_project(
@@ -902,7 +869,7 @@ mod tests {
                     display_name: "X".to_string(),
                     description: "".to_string(),
                     project_template_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -913,7 +880,7 @@ mod tests {
                 ArchiveProjectCommand {
                     tenant_id: tid,
                     project_id: p.id,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -925,7 +892,7 @@ mod tests {
     #[tokio::test]
     async fn list_by_workspace() {
         let svc = InMemoryProjectService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = admin(tid);
         let wid = WorkspaceId::new();
         for i in 0..3 {
@@ -937,7 +904,7 @@ mod tests {
                     display_name: format!("P{}", i),
                     description: "".to_string(),
                     project_template_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )

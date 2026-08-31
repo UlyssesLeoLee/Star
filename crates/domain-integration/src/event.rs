@@ -36,7 +36,7 @@ impl EventMeta {
     /// 构造一个 `EventMeta`(便于测试 / 命令 impl 中调用)。
     pub fn new(tenant_id: TenantId) -> Self {
         Self {
-            event_id: uuid::Uuid::new_v4(),
+            event_id: UserId.new(),
             tenant_id,
             occurred_at: Utc::now(),
             actor_user_id: None,

@@ -124,7 +124,7 @@ pub struct ListUserQuery {
 impl Default for ListUserQuery {
     fn default() -> Self {
         Self {
-            tenant_id: TenantId::new(),
+            tenant_id: UserId.new(),
             email_contains: None,
             status: None,
             limit: 50,

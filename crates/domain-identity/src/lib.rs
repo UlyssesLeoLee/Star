@@ -30,6 +30,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -409,42 +410,6 @@ pub trait IdentityRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_platform_admin: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_platform_admin: false,
-        }
-    }
-    pub fn as_platform_admin(mut self) -> Self {
-        self.is_platform_admin = true;
-        self
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-}
-
-// =====================================================================
 // InMemoryIdentityService
 // =====================================================================
 
@@ -482,9 +447,9 @@ impl IdentityCommandPort for InMemoryIdentityService {
         if !actor.is_platform_admin && !actor.has_role("tenant_admin") {
             return Err(IdentityError::PermissionDenied);
         }
-        if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
+        if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(IdentityError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -497,7 +462,7 @@ impl IdentityCommandPort for InMemoryIdentityService {
         }
         let now = Utc::now();
         let u = User {
-            id: UserId::new(),
+            id: UserId.new(),
             tenant_id: cmd.tenant_id,
             email: cmd.email,
             display_name: cmd.display_name,
@@ -519,13 +484,13 @@ impl IdentityCommandPort for InMemoryIdentityService {
         cmd: RegisterDeviceCommand,
         actor: &ActorContext,
     ) -> Result<Device, IdentityError> {
-        if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
+        if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(IdentityError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
-        if actor.user_id != cmd.user_id
+        if UserId::from(actor.user_id) != cmd.user_id
             && !actor.has_role("tenant_admin")
             && !actor.is_platform_admin
         {
@@ -558,9 +523,9 @@ impl IdentityCommandPort for InMemoryIdentityService {
         cmd: BindDeviceCommand,
         actor: &ActorContext,
     ) -> Result<DeviceBinding, IdentityError> {
-        if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
+        if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(IdentityError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -593,9 +558,9 @@ impl IdentityCommandPort for InMemoryIdentityService {
         cmd: RevokeDeviceCommand,
         actor: &ActorContext,
     ) -> Result<Device, IdentityError> {
-        if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
+        if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(IdentityError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -630,9 +595,9 @@ impl IdentityCommandPort for InMemoryIdentityService {
         cmd: RecordLoginCommand,
         actor: &ActorContext,
     ) -> Result<User, IdentityError> {
-        if !actor.is_platform_admin && actor.tenant_id != cmd.tenant_id {
+        if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(IdentityError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -659,9 +624,9 @@ impl IdentityCommandPort for InMemoryIdentityService {
 #[async_trait]
 impl IdentityQueryPort for InMemoryIdentityService {
     async fn get_user(&self, q: GetUserQuery, actor: &ActorContext) -> Result<User, IdentityError> {
-        if !actor.is_platform_admin && actor.tenant_id != q.tenant_id {
+        if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(IdentityError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -686,9 +651,9 @@ impl IdentityQueryPort for InMemoryIdentityService {
         q: ListDevicesByUserQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Device>, IdentityError> {
-        if !actor.is_platform_admin && actor.tenant_id != q.tenant_id {
+        if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(IdentityError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -708,8 +673,8 @@ impl IdentityQueryPort for InMemoryIdentityService {
         device_id: DeviceId,
         actor: &ActorContext,
     ) -> Result<Device, IdentityError> {
-        if !actor.is_platform_admin && actor.tenant_id != tenant_id {
-            return Err(IdentityError::CrossTenantDenied(actor.tenant_id, tenant_id));
+        if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != tenant_id {
+            return Err(IdentityError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
         }
         let d = self
             .devices
@@ -850,13 +815,12 @@ impl IdentityRepository for InMemoryIdentityRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn admin(tid: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tid).with_role("tenant_admin")
+        ActorContext::new(Uuid::new_v4(), tid.0).with_role("tenant_admin")
     }
 
     fn dev(tid: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tid)
+        ActorContext::new(Uuid::new_v4(), tid.0)
     }
 
     #[test]
@@ -891,7 +855,7 @@ mod tests {
     #[tokio::test]
     async fn create_user_requires_tenant_admin() {
         let svc = InMemoryIdentityService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         let res = svc
             .create_user(
@@ -911,7 +875,7 @@ mod tests {
     #[tokio::test]
     async fn email_must_be_unique_in_tenant() {
         let svc = InMemoryIdentityService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = admin(tid);
         svc.create_user(
             CreateUserCommand {
@@ -943,8 +907,8 @@ mod tests {
     #[tokio::test]
     async fn register_device_requires_project_ids_invn02() {
         let svc = InMemoryIdentityService::new();
-        let tid = TenantId::new();
-        let user = UserId::new();
+        let tid = uuid::Uuid::new_v4();
+        let user = uuid::Uuid::new_v4();
         // 用 tenant_admin 避免 user_id mismatch
         let actor = admin(tid);
         let res = svc
@@ -955,7 +919,7 @@ mod tests {
                     kind: DeviceKind::Web,
                     device_cert_fingerprint: "abc".to_string(),
                     project_ids: vec![], // 缺 binding
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -966,7 +930,7 @@ mod tests {
     #[tokio::test]
     async fn register_device_with_binding_ok() {
         let svc = InMemoryIdentityService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let admin = admin(tid);
         let user = svc
             .create_user(
@@ -989,7 +953,7 @@ mod tests {
                     kind: DeviceKind::LocalRuntime,
                     device_cert_fingerprint: "abc".to_string(),
                     project_ids: vec![ProjectId::new()],
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1002,7 +966,7 @@ mod tests {
     #[tokio::test]
     async fn revoke_device() {
         let svc = InMemoryIdentityService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let admin = admin(tid);
         let user = svc
             .create_user(
@@ -1025,7 +989,7 @@ mod tests {
                     kind: DeviceKind::Web,
                     device_cert_fingerprint: "abc".to_string(),
                     project_ids: vec![ProjectId::new()],
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1036,7 +1000,7 @@ mod tests {
                 RevokeDeviceCommand {
                     tenant_id: tid,
                     device_id: d.id,
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1049,7 +1013,7 @@ mod tests {
     #[tokio::test]
     async fn revoke_already_revoked_rejected() {
         let svc = InMemoryIdentityService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let admin = admin(tid);
         let user = svc
             .create_user(
@@ -1072,7 +1036,7 @@ mod tests {
                     kind: DeviceKind::Web,
                     device_cert_fingerprint: "abc".to_string(),
                     project_ids: vec![ProjectId::new()],
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1082,7 +1046,7 @@ mod tests {
             RevokeDeviceCommand {
                 tenant_id: tid,
                 device_id: d.id,
-                actor_user_id: admin.user_id,
+                actor_user_id: UserId::from(admin.user_id),
             },
             &admin,
         )
@@ -1093,7 +1057,7 @@ mod tests {
                 RevokeDeviceCommand {
                     tenant_id: tid,
                     device_id: d.id,
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1104,7 +1068,7 @@ mod tests {
     #[tokio::test]
     async fn bind_device_requires_tenant_match() {
         let svc = InMemoryIdentityService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let admin = admin(tid);
         let user = svc
             .create_user(
@@ -1127,7 +1091,7 @@ mod tests {
                     kind: DeviceKind::Web,
                     device_cert_fingerprint: "abc".to_string(),
                     project_ids: vec![ProjectId::new()],
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1140,7 +1104,7 @@ mod tests {
                     device_id: d.id,
                     project_id: ProjectId::new(),
                     binding_kind: BindingKind::Contributor,
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1151,18 +1115,18 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_register_denied() {
         let svc = InMemoryIdentityService::new();
-        let me = TenantId::new();
-        let other = TenantId::new();
+        let me = uuid::Uuid::new_v4();
+        let other = uuid::Uuid::new_v4();
         let actor = dev(me);
         let res = svc
             .register_device(
                 RegisterDeviceCommand {
                     tenant_id: other,
-                    user_id: UserId::new(),
+                    user_id: UserId.new(),
                     kind: DeviceKind::Web,
                     device_cert_fingerprint: "abc".to_string(),
                     project_ids: vec![ProjectId::new()],
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1173,7 +1137,7 @@ mod tests {
     #[tokio::test]
     async fn record_login_updates_last_login() {
         let svc = InMemoryIdentityService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let admin = admin(tid);
         let user = svc
             .create_user(

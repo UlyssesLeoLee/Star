@@ -117,7 +117,7 @@ impl CommentCommandPort for InMemoryCommentService {
             parent_type: cmd.parent_type,
             parent_id: cmd.parent_id,
             body: cmd.body.clone(),
-            author_user_id: actor.user_id,
+            author_user_id: UserId::from(actor.user_id),
             author_agent_id: author_agent,
             mentions: cmd.mentions.clone(),
             attachment_ids: Vec::new(),
@@ -152,7 +152,7 @@ impl CommentCommandPort for InMemoryCommentService {
                     ..EventMeta::new(cmd.tenant_id)
                 },
                 mention_id: m.id,
-                user_id: m.user_id,
+                user_id: UserId::from(m.user_id),
                 comment_id: c.id,
             });
             let _ = self.event_tx.send(evt);
@@ -283,7 +283,7 @@ impl CommentCommandPort for InMemoryCommentService {
             id: ReactionId::new(),
             tenant_id: cmd.tenant_id,
             comment_id: cmd.comment_id,
-            user_id: actor.user_id,
+            user_id: UserId::from(actor.user_id),
             emoji: cmd.emoji.clone(),
             created_at: now,
         };
@@ -332,7 +332,7 @@ impl CommentCommandPort for InMemoryCommentService {
         let a = Attachment {
             id: AttachmentId::new(),
             tenant_id: cmd.tenant_id,
-            uploader_user_id: actor.user_id,
+            uploader_user_id: UserId::from(actor.user_id),
             filename: cmd.filename.clone(),
             content_type: cmd.content_type,
             size_bytes: cmd.size_bytes,

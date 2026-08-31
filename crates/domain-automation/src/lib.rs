@@ -34,6 +34,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // 强类型 ID 宏
@@ -441,48 +442,6 @@ pub enum ExecutionResult {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-/// Actor 上下文
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: Uuid,
-    pub tenant_id: TenantId,
-    pub device_id: Option<Uuid>,
-    pub roles: Vec<String>,
-    pub project_ids: Vec<ProjectId>,
-}
-
-impl ActorContext {
-    pub fn new(user_id: Uuid, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            device_id: None,
-            roles: Vec::new(),
-            project_ids: Vec::new(),
-        }
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-    pub fn can_create_rule(&self) -> bool {
-        self.has_role(roles::PROJECT_ADMIN) || self.has_role("tenant_admin")
-    }
-    pub fn with_role(mut self, role: impl Into<String>) -> Self {
-        self.roles.push(role.into());
-        self
-    }
-    pub fn with_project(mut self, project_id: ProjectId) -> Self {
-        if !self.project_ids.contains(&project_id) {
-            self.project_ids.push(project_id);
-        }
-        self
-    }
-}
-
-// =====================================================================
 // 不变量(INV-AUTO-01~06)
 // =====================================================================
 
@@ -632,7 +591,7 @@ pub struct ListRulesQuery {
 impl Default for ListRulesQuery {
     fn default() -> Self {
         Self {
-            tenant_id: TenantId::new(),
+            tenant_id: UserId.new(),
             project_id: None,
             enabled_only: false,
             limit: 50,
@@ -741,7 +700,7 @@ impl InMemoryAutomationService {
         self.executions.read().await.len()
     }
     fn check_tenant(actor: &ActorContext, expected: TenantId) -> Result<(), AutomationError> {
-        if actor.tenant_id != expected {
+        if TenantId::from(actor.tenant_id) != expected {
             return Err(AutomationError::PermissionDenied);
         }
         Ok(())
@@ -789,7 +748,7 @@ impl AutomationCommandPort for InMemoryAutomationService {
         cmd: CreateRuleCommand,
         actor: ActorContext,
     ) -> Result<AutomationRule, AutomationError> {
-        if !actor.can_create_rule() {
+        if !actor.has_role("project_admin") && !actor.has_role("tenant_admin") && !actor.is_platform_admin {
             return Err(AutomationError::PermissionDenied);
         }
         Self::check_tenant(&actor, cmd.tenant_id)?;
@@ -850,7 +809,7 @@ impl AutomationCommandPort for InMemoryAutomationService {
         cmd: UpdateRuleCommand,
         actor: ActorContext,
     ) -> Result<AutomationRule, AutomationError> {
-        if !actor.can_create_rule() {
+        if !actor.has_role("project_admin") && !actor.has_role("tenant_admin") && !actor.is_platform_admin {
             return Err(AutomationError::PermissionDenied);
         }
         let updated = {
@@ -903,14 +862,14 @@ impl AutomationCommandPort for InMemoryAutomationService {
         rule_id: RuleId,
         actor: ActorContext,
     ) -> Result<(), AutomationError> {
-        if !actor.can_create_rule() {
+        if !actor.has_role("project_admin") && !actor.has_role("tenant_admin") && !actor.is_platform_admin {
             return Err(AutomationError::PermissionDenied);
         }
         let mut guard = self.rules.write().await;
         let r = guard
             .get(&rule_id)
             .ok_or(AutomationError::NotFound(rule_id))?;
-        if r.tenant_id != actor.tenant_id {
+        if r.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(AutomationError::PermissionDenied);
         }
         guard.remove(&rule_id);
@@ -927,7 +886,7 @@ impl AutomationCommandPort for InMemoryAutomationService {
             guard.get(&cmd.rule_id).cloned()
         };
         let rule = rule.ok_or(AutomationError::NotFound(cmd.rule_id))?;
-        if rule.tenant_id != actor.tenant_id {
+        if rule.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(AutomationError::PermissionDenied);
         }
         // 评估所有条件
@@ -975,7 +934,7 @@ impl AutomationQueryPort for InMemoryAutomationService {
             guard.get(&rule_id).cloned()
         };
         let r = r.ok_or(AutomationError::NotFound(rule_id))?;
-        if r.tenant_id != actor.tenant_id {
+        if r.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(AutomationError::PermissionDenied);
         }
         Ok(r)
@@ -991,7 +950,7 @@ impl AutomationQueryPort for InMemoryAutomationService {
             guard.get(&rule_id).cloned()
         };
         let r = r.ok_or(AutomationError::NotFound(rule_id))?;
-        if r.tenant_id != actor.tenant_id {
+        if r.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(AutomationError::PermissionDenied);
         }
         let guard = self.executions.read().await;
@@ -1125,15 +1084,14 @@ impl RuleExecutor for InMemoryAutomationService {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn make_admin(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tenant_id)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::PROJECT_ADMIN)
             .with_project(project_id)
     }
 
     fn make_developer(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tenant_id)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::DEVELOPER)
             .with_project(project_id)
     }
@@ -1150,7 +1108,7 @@ mod tests {
     #[tokio::test]
     async fn create_rule_success() {
         let svc = InMemoryAutomationService::new_for_test();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let cmd = CreateRuleCommand {
@@ -1187,7 +1145,7 @@ mod tests {
     #[tokio::test]
     async fn invariant_05_protected_action_blocked() {
         let svc = InMemoryAutomationService::new_for_test();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let cmd = CreateRuleCommand {
@@ -1224,7 +1182,7 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_denied() {
         let svc = InMemoryAutomationService::new_for_test();
-        let tenant_a = TenantId::new();
+        let tenant_a = uuid::Uuid::new_v4();
         let project_a = ProjectId::new();
         let actor_a = make_admin(tenant_a, project_a);
         let rule = svc
@@ -1251,7 +1209,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let tenant_b = TenantId::new();
+        let tenant_b = uuid::Uuid::new_v4();
         let project_b = ProjectId::new();
         let actor_b = make_admin(tenant_b, project_b);
         let res = svc.get_rule(rule.id, actor_b).await;
@@ -1261,7 +1219,7 @@ mod tests {
     #[tokio::test]
     async fn developer_cannot_create_rule() {
         let svc = InMemoryAutomationService::new_for_test();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_developer(tenant, project);
         let cmd = CreateRuleCommand {
@@ -1289,7 +1247,7 @@ mod tests {
     #[tokio::test]
     async fn rate_limit_throttles_execution() {
         let svc = InMemoryAutomationService::new_for_test();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let cmd = CreateRuleCommand {
@@ -1361,7 +1319,7 @@ mod tests {
     #[tokio::test]
     async fn update_rule_version_conflict() {
         let svc = InMemoryAutomationService::new_for_test();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let rule = svc
@@ -1412,7 +1370,7 @@ mod tests {
     #[tokio::test]
     async fn executions_logged_100_percent() {
         let svc = InMemoryAutomationService::new_for_test();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let _ = svc

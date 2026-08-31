@@ -42,6 +42,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -639,63 +640,13 @@ pub trait BoardRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-/// **ActorContext** — 调用方上下文
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    /// 构造一个新 Actor
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec![roles::DEVELOPER.to_string()],
-            is_local_runtime: false,
-        }
-    }
-    /// 加角色
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    /// 加 Project
-    pub fn with_project(mut self, p: ProjectId) -> Self {
-        self.project_ids.push(p);
-        self
-    }
-    /// 标记为 Local Runtime
-    pub fn as_local_runtime(mut self) -> Self {
-        self.is_local_runtime = true;
-        self
-    }
-    /// 是否具备某角色
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-    /// 是否为 admin 类
-    pub fn is_admin(&self) -> bool {
-        self.has_role(roles::TENANT_ADMIN) || self.has_role(roles::PROJECT_ADMIN)
-    }
-}
-
-// =====================================================================
 // 内部辅助:tenant / project 校验
 // =====================================================================
 
 /// 校验 actor 与目标 tenant 一致(INV-BD-01 / INV-BD-05)
 fn check_tenant(actor: &ActorContext, target: TenantId) -> Result<(), BoardError> {
-    if actor.tenant_id != target {
-        return Err(BoardError::CrossTenantDenied(actor.tenant_id, target));
+    if TenantId::from(actor.tenant_id) != target {
+        return Err(BoardError::CrossTenantDenied(TenantId::from(actor.tenant_id), target));
     }
     Ok(())
 }
@@ -834,7 +785,7 @@ impl BoardCommandPort for InMemoryBoardService {
             let board = require_board(&boards, cmd.board_id)?.clone();
             if board.tenant_id != cmd.tenant_id {
                 return Err(BoardError::CrossTenantDenied(
-                    actor.tenant_id,
+                    TenantId::from(actor.tenant_id),
                     cmd.tenant_id,
                 ));
             }
@@ -871,7 +822,7 @@ impl BoardCommandPort for InMemoryBoardService {
             let board = require_board(&boards, cmd.board_id)?.clone();
             if board.tenant_id != cmd.tenant_id {
                 return Err(BoardError::CrossTenantDenied(
-                    actor.tenant_id,
+                    TenantId::from(actor.tenant_id),
                     cmd.tenant_id,
                 ));
             }
@@ -989,7 +940,7 @@ impl BoardCommandPort for InMemoryBoardService {
             let board = require_board(&boards, cmd.board_id)?.clone();
             if board.tenant_id != cmd.tenant_id {
                 return Err(BoardError::CrossTenantDenied(
-                    actor.tenant_id,
+                    TenantId::from(actor.tenant_id),
                     cmd.tenant_id,
                 ));
             }
@@ -1022,7 +973,7 @@ impl BoardCommandPort for InMemoryBoardService {
             let board = require_board(&boards, cmd.board_id)?.clone();
             if board.tenant_id != cmd.tenant_id {
                 return Err(BoardError::CrossTenantDenied(
-                    actor.tenant_id,
+                    TenantId::from(actor.tenant_id),
                     cmd.tenant_id,
                 ));
             }
@@ -1050,9 +1001,9 @@ impl BoardQueryPort for InMemoryBoardService {
     async fn get(&self, board_id: BoardId, actor: &ActorContext) -> Result<Board, BoardError> {
         let boards = self.boards.read().expect("lock");
         let board = require_board(&boards, board_id)?.clone();
-        if board.tenant_id != actor.tenant_id {
+        if board.tenant_id != TenantId::from(actor.tenant_id) {
             return Err(BoardError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 board.tenant_id,
             ));
         }
@@ -1190,16 +1141,15 @@ impl BoardRepository for InMemoryBoardRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn make_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id).with_role(roles::PROJECT_ADMIN)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role(roles::PROJECT_ADMIN)
     }
 
     // 1. create_board + 默认 3 列
     #[tokio::test]
     async fn create_board_creates_three_default_columns() {
         let svc = InMemoryBoardService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_actor(tenant);
 
@@ -1227,7 +1177,7 @@ mod tests {
     #[tokio::test]
     async fn add_column_appends_with_next_order() {
         let svc = InMemoryBoardService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_actor(tenant);
 
@@ -1266,7 +1216,7 @@ mod tests {
     #[tokio::test]
     async fn move_card_within_column_reorders() {
         let svc = InMemoryBoardService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_actor(tenant);
 
@@ -1353,7 +1303,7 @@ mod tests {
     #[tokio::test]
     async fn move_card_across_columns() {
         let svc = InMemoryBoardService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_actor(tenant);
 
@@ -1409,7 +1359,7 @@ mod tests {
     #[tokio::test]
     async fn wip_limit_exceeded_rejected() {
         let svc = InMemoryBoardService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_actor(tenant);
 
@@ -1493,7 +1443,7 @@ mod tests {
     #[tokio::test]
     async fn wip_limit_disabled_no_check() {
         let svc = InMemoryBoardService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_actor(tenant);
 
@@ -1560,7 +1510,7 @@ mod tests {
     #[tokio::test]
     async fn add_swimlane_appends() {
         let svc = InMemoryBoardService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_actor(tenant);
 
@@ -1599,8 +1549,8 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_get_denied() {
         let svc = InMemoryBoardService::new();
-        let t1 = TenantId::new();
-        let t2 = TenantId::new();
+        let t1 = uuid::Uuid::new_v4();
+        let t2 = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let a1 = make_actor(t1);
         let a2 = make_actor(t2);
@@ -1627,7 +1577,7 @@ mod tests {
     #[tokio::test]
     async fn card_always_in_a_column() {
         let svc = InMemoryBoardService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_actor(tenant);
 
@@ -1686,7 +1636,7 @@ mod tests {
     #[tokio::test]
     async fn column_order_unique_invariant() {
         let svc = InMemoryBoardService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_actor(tenant);
 
@@ -1731,8 +1681,8 @@ mod tests {
     #[tokio::test]
     async fn list_by_project_returns_only_own() {
         let svc = InMemoryBoardService::new();
-        let t1 = TenantId::new();
-        let t2 = TenantId::new();
+        let t1 = uuid::Uuid::new_v4();
+        let t2 = uuid::Uuid::new_v4();
         let p1 = ProjectId::new();
         let p2 = ProjectId::new();
         let a1 = make_actor(t1);
@@ -1771,7 +1721,7 @@ mod tests {
     #[tokio::test]
     async fn get_view_returns_full_snapshot() {
         let svc = InMemoryBoardService::new();
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let actor = make_actor(tenant);
 

@@ -31,6 +31,7 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // 实体(Entity / Aggregate Root)
@@ -133,35 +134,12 @@ pub enum InfrastructureError {
 }
 
 // =====================================================================
-// 共享类型
-// =====================================================================
-
-/// **Actor 上下文**(来自 `domain-identity` / `domain-permission` 的 JWT claim)
-///
-/// **骨架阶段**: 字段占位;Phase 2 由 `domain-identity` 颁发的 ActorContext 取代
-/// 本 crate 内的占位定义(避免循环依赖)。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    /// 当前用户 ID
-    pub user_id: Uuid,
-    /// 当前租户 ID(13 类对象必带,§6.1)
-    pub tenant_id: Uuid,
-    /// 当前设备 ID(Local Runtime 三重绑定,§23.2)
-    pub device_id: Option<Uuid>,
-    /// 当前 Project IDs(用于 Project Policy 校验)
-    pub project_ids: Vec<Uuid>,
-    /// 当前用户角色(`tenant_admin` / `project_admin` / `developer` / `viewer`)
-    pub roles: Vec<String>,
-}
-
-// =====================================================================
 // 单元测试占位
 // =====================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     /// **骨架阶段**: 最小冒烟测试,验证 crate 可编译、ActorContext 字段可达。
     /// Phase 2 由具体 spec 引入完整单元测试(状态机覆盖 / RLS 矩阵等)。
     #[test]
@@ -169,7 +147,7 @@ mod tests {
         let actor = ActorContext {
             user_id: Uuid::new_v4(),
             tenant_id: Uuid::new_v4(),
-            device_id: None,
+            device_id: None, is_local_runtime: false, is_platform_admin: false,
             project_ids: vec![],
             roles: vec!["developer".to_string()],
         };

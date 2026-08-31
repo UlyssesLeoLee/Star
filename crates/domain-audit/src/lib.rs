@@ -37,6 +37,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // 强类型 ID 宏
@@ -390,47 +391,6 @@ pub enum ExportStatus {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-/// **Actor 上下文**(basic-design §3.5)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    /// User ID(actor 为 user / agent 时为调用者)
-    pub user_id: Uuid,
-    pub tenant_id: TenantId,
-    pub device_id: Option<Uuid>,
-    pub roles: Vec<String>,
-}
-
-impl ActorContext {
-    pub fn new(user_id: Uuid, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            device_id: None,
-            roles: Vec::new(),
-        }
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-    /// 是否可读 / 导出 audit(INV-AU-07)
-    pub fn can_read_audit(&self) -> bool {
-        self.has_role(roles::TENANT_ADMIN)
-            || self.has_role(roles::COMPLIANCE_OFFICER)
-            || self.has_role(roles::TENANT_AUDITOR)
-    }
-    pub fn can_export_audit(&self) -> bool {
-        self.has_role(roles::TENANT_ADMIN) || self.has_role(roles::COMPLIANCE_OFFICER)
-    }
-    pub fn with_role(mut self, role: impl Into<String>) -> Self {
-        self.roles.push(role.into());
-        self
-    }
-}
-
-// =====================================================================
 // 不变量(INV-AU-01~07)
 // =====================================================================
 
@@ -684,7 +644,7 @@ pub struct AuditListQuery {
 impl Default for AuditListQuery {
     fn default() -> Self {
         Self {
-            tenant_id: TenantId::new(),
+            tenant_id: UserId.new(),
             limit: 100,
             offset: 0,
             action: None,
@@ -830,13 +790,13 @@ impl InMemoryAuditService {
             .count()
     }
     fn check_audit_read_perm(actor: &ActorContext) -> Result<(), AuditError> {
-        if !actor.can_read_audit() {
+        if !actor.has_role("audit_reader") && !actor.is_platform_admin {
             return Err(AuditError::PermissionDenied);
         }
         Ok(())
     }
     fn check_audit_export_perm(actor: &ActorContext) -> Result<(), AuditError> {
-        if !actor.can_export_audit() {
+        if !actor.has_role("audit_exporter") && !actor.is_platform_admin {
             return Err(AuditError::PermissionDenied);
         }
         Ok(())
@@ -916,7 +876,7 @@ impl AuditRecorder for InMemoryAuditService {
         let id = AuditEventId::new();
         // INV-AU-03 跨租户:必须 actor's tenant 与 attempted_resource 不一致,
         // 但 Resource 仅引用 ID,本服务假定 caller 已校验,只负责记录(强记 cross_tenant=true)
-        let tenant_id = TenantId::from_uuid(actor_ctx.tenant_id.into_uuid());
+        let tenant_id = TenantId::from(actor_ctx.tenant_id);
         let actor = Actor::User {
             user_id: UserId::from_uuid(actor_ctx.user_id),
         };
@@ -1017,7 +977,7 @@ impl AuditQueryPort for InMemoryAuditService {
     ) -> Result<Vec<AuditEvent>, AuditError> {
         Self::check_audit_read_perm(&viewer)?;
         // 跨租户硬过滤
-        if viewer.tenant_id != q.tenant_id {
+        if viewer.tenant_id != q.tenant_id.0 {
             return Err(AuditError::PermissionDenied);
         }
         let mut all: Vec<AuditEvent> = {
@@ -1050,7 +1010,7 @@ impl AuditQueryPort for InMemoryAuditService {
             guard.get(&id).cloned()
         };
         let ev = ev.ok_or(AuditError::NotFound(id))?;
-        if ev.tenant_id != viewer.tenant_id {
+        if ev.tenant_id != TenantId::from(viewer.tenant_id) {
             return Err(AuditError::PermissionDenied);
         }
         Ok(ev)
@@ -1063,7 +1023,7 @@ impl AuditQueryPort for InMemoryAuditService {
         viewer: ActorContext,
     ) -> Result<Vec<AIAuditMetadata>, AuditError> {
         Self::check_audit_read_perm(&viewer)?;
-        if viewer.tenant_id != tenant_id {
+        if viewer.tenant_id != tenant_id.0 {
             return Err(AuditError::PermissionDenied);
         }
         let guard = self.ai_meta.read().await;
@@ -1083,7 +1043,7 @@ impl AuditQueryPort for InMemoryAuditService {
         viewer: ActorContext,
     ) -> Result<AuditExportJob, AuditError> {
         Self::check_audit_export_perm(&viewer)?;
-        if viewer.tenant_id != cmd.tenant_id {
+        if viewer.tenant_id != cmd.tenant_id.0 {
             return Err(AuditError::PermissionDenied);
         }
         let id = AuditExportJobId::new();
@@ -1116,18 +1076,17 @@ impl AuditQueryPort for InMemoryAuditService {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn make_admin_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tenant_id).with_role(roles::TENANT_ADMIN)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role(roles::TENANT_ADMIN)
     }
 
     fn make_developer_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tenant_id).with_role("developer")
+        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role("developer")
     }
 
     fn make_actor_user(_tenant_id: TenantId) -> Actor {
         Actor::User {
-            user_id: UserId::new(),
+            user_id: UserId.new(),
         }
     }
 
@@ -1139,7 +1098,7 @@ mod tests {
     #[tokio::test]
     async fn record_normal_audit_event() {
         let svc = InMemoryAuditService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let cmd = RecordAuditCommand {
             tenant_id,
             actor: make_actor_user(tenant_id),
@@ -1161,7 +1120,7 @@ mod tests {
     #[tokio::test]
     async fn record_ai_audit_with_9_questions() {
         let svc = InMemoryAuditService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let session = AgentSessionId::new();
         let agent = AgentId::new();
         let started = Utc::now() - chrono::Duration::seconds(30);
@@ -1178,7 +1137,7 @@ mod tests {
                 ended_at: ended,
                 validation_result_ids: vec![ValidationResultId::new()],
                 feedback_consumed_ids: vec![FeedbackId::new()],
-                approver_user_id: Some(UserId::new()),
+                approver_user_id: Some(uuid::Uuid::new_v4()),
                 data_categories_sent: vec!["prompt".to_string(), "diff".to_string()],
                 provider_boundary_ref: Some(ProviderDataBoundaryId::new()),
                 risk_signals: vec!["medium_risk".to_string()],
@@ -1203,7 +1162,7 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_attempt_100_percent_logged() {
         let svc = InMemoryAuditService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         // INV-AU-07:即使 developer 也能记录跨租户(系统强制 100% 记录)
         let developer = make_developer_actor(tenant_id);
         let cmd = RecordCrossTenantAttemptCommand {
@@ -1228,7 +1187,7 @@ mod tests {
         // 本 crate 不暴露 update/delete 接口 — 验证没有 public 写方法
         let svc = InMemoryAuditService::new_for_test();
         // 只能 record,不能 mutate
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let cmd = RecordAuditCommand {
             tenant_id,
             actor: make_actor_user(tenant_id),
@@ -1251,7 +1210,7 @@ mod tests {
     #[tokio::test]
     async fn export_requires_admin_or_compliance() {
         let svc = InMemoryAuditService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let developer = make_developer_actor(tenant_id);
         let cmd = ExportAuditCommand {
             tenant_id,
@@ -1278,7 +1237,7 @@ mod tests {
     #[tokio::test]
     async fn list_requires_audit_role() {
         let svc = InMemoryAuditService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         // 先记录一个
         let cmd = RecordAuditCommand {
             tenant_id,
@@ -1312,7 +1271,7 @@ mod tests {
 
     #[tokio::test]
     async fn invariant_03_invalid_hash_rejected() {
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let mut ev = AuditEvent {
             id: AuditEventId::new(),
             tenant_id,
@@ -1336,7 +1295,7 @@ mod tests {
 
     #[tokio::test]
     async fn cross_tenant_flag_consistency() {
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let mut ev = AuditEvent {
             id: AuditEventId::new(),
             tenant_id,

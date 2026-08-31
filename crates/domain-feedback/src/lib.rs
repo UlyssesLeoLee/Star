@@ -81,7 +81,7 @@ mod tests {
     use uuid::Uuid;
 
     fn make_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id).with_role(roles::DEVELOPER)
+        ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::DEVELOPER)
     }
 
     fn make_create_cmd(tenant_id: TenantId, target: FeedbackTarget) -> CreateFeedbackCommand {
@@ -196,7 +196,7 @@ mod tests {
     #[tokio::test]
     async fn create_feedback_success_and_event() {
         let (svc, mut rx) = InMemoryFeedbackService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let target = FeedbackTarget::WorkItem {
             work_item_id: WorkItemId::new(),
@@ -226,7 +226,7 @@ mod tests {
     #[tokio::test]
     async fn full_six_state_chain_open_to_verified() {
         let svc = InMemoryFeedbackService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
@@ -281,7 +281,7 @@ mod tests {
     #[tokio::test]
     async fn invalid_state_transition_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
@@ -318,7 +318,7 @@ mod tests {
     #[tokio::test]
     async fn reject_from_open_terminal() {
         let svc = InMemoryFeedbackService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
@@ -356,7 +356,7 @@ mod tests {
     #[tokio::test]
     async fn supersede_without_successor_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
@@ -390,7 +390,7 @@ mod tests {
     #[tokio::test]
     async fn supersede_with_successor_ok() {
         let svc = InMemoryFeedbackService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let f1 = svc
             .create_feedback(
@@ -440,7 +440,7 @@ mod tests {
     #[tokio::test]
     async fn update_after_applied_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
@@ -497,7 +497,7 @@ mod tests {
     #[tokio::test]
     async fn delete_only_open_allowed() {
         let svc = InMemoryFeedbackService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
@@ -535,7 +535,7 @@ mod tests {
     #[tokio::test]
     async fn inbox_severity_priority_ordering() {
         let svc = InMemoryFeedbackService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let project_id = ProjectId::new();
 
@@ -586,7 +586,7 @@ mod tests {
                     limit: 10,
                     offset: 0,
                 },
-                ActorContext::new(UserId::new(), tenant_id).with_role(roles::DEVELOPER),
+                ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::DEVELOPER),
             )
             .await
             .unwrap();
@@ -603,8 +603,8 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_access_denied() {
         let svc = InMemoryFeedbackService::new_for_test();
-        let tenant_a = TenantId::new();
-        let tenant_b = TenantId::new();
+        let tenant_a = uuid::Uuid::new_v4();
+        let tenant_b = uuid::Uuid::new_v4();
         let actor_a = make_actor(tenant_a);
         let f = svc
             .create_feedback(
@@ -628,7 +628,7 @@ mod tests {
     #[tokio::test]
     async fn cross_worktree_target_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let worktree_a = WorktreeId::new();
         let worktree_b = WorktreeId::new();
@@ -662,7 +662,7 @@ mod tests {
     #[tokio::test]
     async fn ai_authored_feedback_records_agent_id() {
         let svc = InMemoryFeedbackService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let mut actor = make_actor(tenant_id);
         actor.is_agent_session = true;
         // 不显式传 author_agent_id,service 应自动兜底
@@ -689,7 +689,7 @@ mod tests {
     #[tokio::test]
     async fn consumed_event_projection_three_kinds() {
         let svc = InMemoryFeedbackService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(

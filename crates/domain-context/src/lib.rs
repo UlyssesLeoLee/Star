@@ -37,6 +37,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -446,38 +447,6 @@ pub enum RelevantBucket {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_local_runtime: false,
-        }
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-}
-
-// =====================================================================
 // InMemoryContextService
 // =====================================================================
 
@@ -575,9 +544,9 @@ impl ContextCommandPort for InMemoryContextService {
         cmd: CreateContextPacketCommand,
         actor: &ActorContext,
     ) -> Result<ContextPacket, ContextError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(ContextError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -608,7 +577,7 @@ impl ContextCommandPort for InMemoryContextService {
             actual_tokens: 0,
             provenance: vec![],
             created_at: now,
-            created_by: ContextPacketCreator::User(actor.user_id),
+            created_by: ContextPacketCreator::User(UserId::from(actor.user_id)),
             lock_version: 1,
         };
         self.repo.insert_packet(packet.clone()).await?;
@@ -628,8 +597,8 @@ impl ContextCommandPort for InMemoryContextService {
         item: ProvenanceItem,
         actor: &ActorContext,
     ) -> Result<ContextPacket, ContextError> {
-        if actor.tenant_id != tenant_id {
-            return Err(ContextError::CrossTenantDenied(actor.tenant_id, tenant_id));
+        if TenantId::from(actor.tenant_id) != tenant_id {
+            return Err(ContextError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
         }
         if !priority.is_trusted() {
             return Err(ContextError::UntrustedAtTrustedLayer);
@@ -674,9 +643,9 @@ impl ContextCommandPort for InMemoryContextService {
         cmd: CreateDecisionCommand,
         actor: &ActorContext,
     ) -> Result<Decision, ContextError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(ContextError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -701,7 +670,7 @@ impl ContextCommandPort for InMemoryContextService {
             invalidated_by: None,
             invalidation_reason: None,
             created_at: now,
-            created_by: actor.user_id,
+            created_by: UserId::from(actor.user_id),
             lock_version: 1,
         };
         self.repo.insert_decision(decision.clone()).await?;
@@ -717,9 +686,9 @@ impl ContextCommandPort for InMemoryContextService {
         cmd: SupersedeDecisionCommand,
         actor: &ActorContext,
     ) -> Result<Decision, ContextError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(ContextError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -780,9 +749,9 @@ impl ContextCommandPort for InMemoryContextService {
         cmd: InvalidateDecisionCommand,
         actor: &ActorContext,
     ) -> Result<Decision, ContextError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(ContextError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -811,7 +780,7 @@ impl ContextCommandPort for InMemoryContextService {
             )));
         }
         decision.status = DecisionStatus::Invalidated;
-        decision.invalidated_by = Some(DecisionId::from(actor.user_id.as_uuid()));
+        decision.invalidated_by = Some(DecisionId::from(UserId::from(actor.user_id).as_uuid()));
         decision.invalidation_reason = Some(cmd.reason);
         decision.lock_version += 1;
         self.repo.update_decision(decision.clone()).await?;
@@ -836,9 +805,9 @@ impl ContextQueryPort for InMemoryContextService {
         q: GetContextPacketQuery,
         actor: &ActorContext,
     ) -> Result<ContextPacket, ContextError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(ContextError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -861,9 +830,9 @@ impl ContextQueryPort for InMemoryContextService {
         q: ListDecisionsQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Decision>, ContextError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(ContextError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -964,9 +933,8 @@ impl ContextRepository for InMemoryContextRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn make_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id).with_role("project_admin")
+        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role("project_admin")
     }
 
     fn sample_prov(layer: Priority) -> ProvenanceEntry {
@@ -1006,7 +974,7 @@ mod tests {
     #[tokio::test]
     async fn create_context_packet() {
         let svc = InMemoryContextService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let p = svc
             .create_context_packet(
@@ -1024,7 +992,7 @@ mod tests {
                     expected_output: "PR".to_string(),
                     verification_instructions: vec!["cargo test".to_string()],
                     token_budget: 8000,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1038,7 +1006,7 @@ mod tests {
     #[tokio::test]
     async fn add_relevant_item_updates_provenance() {
         let svc = InMemoryContextService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let p = svc
             .create_context_packet(
@@ -1056,7 +1024,7 @@ mod tests {
                     expected_output: "ok".to_string(),
                     verification_instructions: vec![],
                     token_budget: 1000,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1088,7 +1056,7 @@ mod tests {
     async fn add_untrusted_layer_rejected() {
         // INV-CT-10:P5 不可进入 trusted 层
         let svc = InMemoryContextService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let p = svc
             .create_context_packet(
@@ -1106,7 +1074,7 @@ mod tests {
                     expected_output: "ok".to_string(),
                     verification_instructions: vec![],
                     token_budget: 1000,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1141,8 +1109,8 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_create_denied() {
         let svc = InMemoryContextService::new();
-        let actor_t = TenantId::new();
-        let cmd_t = TenantId::new();
+        let actor_t = uuid::Uuid::new_v4();
+        let cmd_t = uuid::Uuid::new_v4();
         let actor = make_actor(actor_t);
         let res = svc
             .create_context_packet(
@@ -1160,7 +1128,7 @@ mod tests {
                     expected_output: "x".to_string(),
                     verification_instructions: vec![],
                     token_budget: 0,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1171,7 +1139,7 @@ mod tests {
     #[tokio::test]
     async fn create_decision() {
         let svc = InMemoryContextService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let d = svc
             .create_decision(
@@ -1186,7 +1154,7 @@ mod tests {
                     },
                     source: DecisionSource::Requirement(Uuid::new_v4()),
                     provenance: sample_prov(Priority::P0),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1198,7 +1166,7 @@ mod tests {
     #[tokio::test]
     async fn supersede_decision_lifecycle() {
         let svc = InMemoryContextService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let d1 = svc
             .create_decision(
@@ -1213,7 +1181,7 @@ mod tests {
                     },
                     source: DecisionSource::Requirement(Uuid::new_v4()),
                     provenance: sample_prov(Priority::P0),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1232,7 +1200,7 @@ mod tests {
                     },
                     source: DecisionSource::Requirement(Uuid::new_v4()),
                     provenance: sample_prov(Priority::P0),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1244,7 +1212,7 @@ mod tests {
                     tenant_id,
                     decision_id: d1.id,
                     successor_id: d2.id,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1257,7 +1225,7 @@ mod tests {
     #[tokio::test]
     async fn supersede_missing_successor_rejected() {
         let svc = InMemoryContextService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let d1 = svc
             .create_decision(
@@ -1272,7 +1240,7 @@ mod tests {
                     },
                     source: DecisionSource::Requirement(Uuid::new_v4()),
                     provenance: sample_prov(Priority::P0),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1284,7 +1252,7 @@ mod tests {
                     tenant_id,
                     decision_id: d1.id,
                     successor_id: DecisionId::new(), // 不存在
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1295,7 +1263,7 @@ mod tests {
     #[tokio::test]
     async fn invalidate_requires_reason() {
         let svc = InMemoryContextService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let d = svc
             .create_decision(
@@ -1310,7 +1278,7 @@ mod tests {
                     },
                     source: DecisionSource::Requirement(Uuid::new_v4()),
                     provenance: sample_prov(Priority::P0),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1322,7 +1290,7 @@ mod tests {
                     tenant_id,
                     decision_id: d.id,
                     reason: "".to_string(),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1333,7 +1301,7 @@ mod tests {
     #[tokio::test]
     async fn invalidate_with_reason() {
         let svc = InMemoryContextService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let d = svc
             .create_decision(
@@ -1348,7 +1316,7 @@ mod tests {
                     },
                     source: DecisionSource::Requirement(Uuid::new_v4()),
                     provenance: sample_prov(Priority::P0),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1360,7 +1328,7 @@ mod tests {
                     tenant_id,
                     decision_id: d.id,
                     reason: "superseded by ADR-024".to_string(),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1376,7 +1344,7 @@ mod tests {
     #[tokio::test]
     async fn list_decisions_active_only() {
         let svc = InMemoryContextService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let project_id = ProjectId::new();
         let d1 = svc
@@ -1392,7 +1360,7 @@ mod tests {
                     },
                     source: DecisionSource::Requirement(Uuid::new_v4()),
                     provenance: sample_prov(Priority::P0),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1411,7 +1379,7 @@ mod tests {
                     },
                     source: DecisionSource::Requirement(Uuid::new_v4()),
                     provenance: sample_prov(Priority::P0),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1422,7 +1390,7 @@ mod tests {
                 tenant_id,
                 decision_id: d1.id,
                 reason: "x".to_string(),
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1458,7 +1426,7 @@ mod tests {
     async fn get_packet_provenance_inconsistency_detected() {
         // 手工构造:provenance 缺失
         let svc = InMemoryContextService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let p = svc
             .create_context_packet(
@@ -1476,7 +1444,7 @@ mod tests {
                     expected_output: "ok".to_string(),
                     verification_instructions: vec![],
                     token_budget: 1000,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )

@@ -43,6 +43,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型(本 crate 内强类型)
@@ -651,46 +652,6 @@ pub trait AgentRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_local_runtime: false,
-        }
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn with_project(mut self, project_id: ProjectId) -> Self {
-        self.project_ids.push(project_id);
-        self
-    }
-    pub fn as_local_runtime(mut self) -> Self {
-        self.is_local_runtime = true;
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-}
-
-// =====================================================================
 // InMemoryAgentService
 // =====================================================================
 
@@ -733,9 +694,9 @@ impl AgentCommandPort for InMemoryAgentService {
         cmd: RegisterAgentCommand,
         actor: &ActorContext,
     ) -> Result<Agent, AgentError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(AgentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -779,9 +740,9 @@ impl AgentCommandPort for InMemoryAgentService {
         cmd: StartSessionCommand,
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(AgentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -841,9 +802,9 @@ impl AgentCommandPort for InMemoryAgentService {
         cmd: TransitionStatusCommand,
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(AgentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -887,9 +848,9 @@ impl AgentCommandPort for InMemoryAgentService {
         cmd: RecordToolActivityCommand,
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(AgentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -922,9 +883,9 @@ impl AgentCommandPort for InMemoryAgentService {
         cmd: SubmitFeedbackCommand,
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(AgentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -949,7 +910,7 @@ impl AgentCommandPort for InMemoryAgentService {
                 from: AgentSessionStatus::WaitingFeedback,
                 to: AgentSessionStatus::FeedbackReceived,
                 reason: Some(cmd.agent_instruction),
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             actor,
         )
@@ -987,7 +948,7 @@ impl AgentCommandPort for InMemoryAgentService {
                 from: session.status,
                 to: AgentSessionStatus::Aborted,
                 reason: Some(cmd.reason),
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             actor,
         )
@@ -999,9 +960,9 @@ impl AgentCommandPort for InMemoryAgentService {
         cmd: CreatePolicyTemplateCommand,
         actor: &ActorContext,
     ) -> Result<AgentPolicyTemplate, AgentError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(AgentError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -1033,8 +994,8 @@ impl AgentQueryPort for InMemoryAgentService {
         q: GetSessionQuery,
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError> {
-        if actor.tenant_id != q.tenant_id {
-            return Err(AgentError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
+            return Err(AgentError::CrossTenantDenied(TenantId::from(actor.tenant_id), q.tenant_id));
         }
         self.sessions
             .read()
@@ -1049,8 +1010,8 @@ impl AgentQueryPort for InMemoryAgentService {
         q: ListByWorktreeQuery,
         actor: &ActorContext,
     ) -> Result<Vec<AgentSessionSummary>, AgentError> {
-        if actor.tenant_id != q.tenant_id {
-            return Err(AgentError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
+            return Err(AgentError::CrossTenantDenied(TenantId::from(actor.tenant_id), q.tenant_id));
         }
         let sessions = self.sessions.read().unwrap();
         Ok(sessions
@@ -1073,8 +1034,8 @@ impl AgentQueryPort for InMemoryAgentService {
         tenant_id: TenantId,
         actor: &ActorContext,
     ) -> Result<Vec<AgentSessionSummary>, AgentError> {
-        if actor.tenant_id != tenant_id {
-            return Err(AgentError::CrossTenantDenied(actor.tenant_id, tenant_id));
+        if TenantId::from(actor.tenant_id) != tenant_id {
+            return Err(AgentError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
         }
         let sessions = self.sessions.read().unwrap();
         Ok(sessions
@@ -1213,9 +1174,8 @@ impl AgentRepository for InMemoryAgentRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn make_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id).with_role("project_admin")
+        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role("project_admin")
     }
 
     #[test]
@@ -1424,7 +1384,7 @@ mod tests {
     #[tokio::test]
     async fn register_and_start_session() {
         let svc = InMemoryAgentService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let agent = svc
             .register_agent(
@@ -1435,7 +1395,7 @@ mod tests {
                     version: "1.0".to_string(),
                     capabilities: vec!["code".to_string()],
                     policy_template_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1452,7 +1412,7 @@ mod tests {
                     work_item_id: WorkItemId::new(),
                     intent: "fix bug".to_string(),
                     context_packet_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1464,8 +1424,8 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_register_denied() {
         let svc = InMemoryAgentService::new();
-        let actor_tenant = TenantId::new();
-        let cmd_tenant = TenantId::new();
+        let actor_tenant = uuid::Uuid::new_v4();
+        let cmd_tenant = uuid::Uuid::new_v4();
         let actor = make_actor(actor_tenant);
         let res = svc
             .register_agent(
@@ -1476,7 +1436,7 @@ mod tests {
                     version: "1.0".to_string(),
                     capabilities: vec![],
                     policy_template_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1487,7 +1447,7 @@ mod tests {
     #[tokio::test]
     async fn full_session_lifecycle() {
         let svc = InMemoryAgentService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let agent = svc
             .register_agent(
@@ -1498,7 +1458,7 @@ mod tests {
                     version: "1.0".to_string(),
                     capabilities: vec![],
                     policy_template_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1513,7 +1473,7 @@ mod tests {
                     work_item_id: WorkItemId::new(),
                     intent: "test".to_string(),
                     context_packet_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1529,7 +1489,7 @@ mod tests {
                     from: AgentSessionStatus::Created,
                     to: AgentSessionStatus::Starting,
                     reason: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1544,7 +1504,7 @@ mod tests {
                     from: AgentSessionStatus::Starting,
                     to: AgentSessionStatus::Running,
                     reason: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1559,7 +1519,7 @@ mod tests {
                     from: AgentSessionStatus::Running,
                     to: AgentSessionStatus::Validating,
                     reason: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1574,7 +1534,7 @@ mod tests {
                     from: AgentSessionStatus::Validating,
                     to: AgentSessionStatus::Completed,
                     reason: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1587,7 +1547,7 @@ mod tests {
     #[tokio::test]
     async fn feedback_loop_transition() {
         let svc = InMemoryAgentService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let agent = svc
             .register_agent(
@@ -1598,7 +1558,7 @@ mod tests {
                     version: "1.0".to_string(),
                     capabilities: vec![],
                     policy_template_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1613,7 +1573,7 @@ mod tests {
                     work_item_id: WorkItemId::new(),
                     intent: "test".to_string(),
                     context_packet_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1628,7 +1588,7 @@ mod tests {
                 from: AgentSessionStatus::Created,
                 to: AgentSessionStatus::Starting,
                 reason: None,
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1641,7 +1601,7 @@ mod tests {
                 from: AgentSessionStatus::Starting,
                 to: AgentSessionStatus::Running,
                 reason: None,
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1654,7 +1614,7 @@ mod tests {
                 from: AgentSessionStatus::Running,
                 to: AgentSessionStatus::WaitingFeedback,
                 reason: None,
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1667,7 +1627,7 @@ mod tests {
                     tenant_id,
                     session_id: id,
                     agent_instruction: "请用 Redis 实现".to_string(),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1679,7 +1639,7 @@ mod tests {
     #[tokio::test]
     async fn abort_from_active() {
         let svc = InMemoryAgentService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let agent = svc
             .register_agent(
@@ -1690,7 +1650,7 @@ mod tests {
                     version: "1.0".to_string(),
                     capabilities: vec![],
                     policy_template_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1705,7 +1665,7 @@ mod tests {
                     work_item_id: WorkItemId::new(),
                     intent: "test".to_string(),
                     context_packet_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1719,7 +1679,7 @@ mod tests {
                 from: AgentSessionStatus::Created,
                 to: AgentSessionStatus::Starting,
                 reason: None,
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1732,7 +1692,7 @@ mod tests {
                 from: AgentSessionStatus::Starting,
                 to: AgentSessionStatus::Running,
                 reason: None,
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1744,7 +1704,7 @@ mod tests {
                     tenant_id,
                     session_id: id,
                     reason: "user requested".to_string(),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1757,7 +1717,7 @@ mod tests {
     #[tokio::test]
     async fn list_by_worktree() {
         let svc = InMemoryAgentService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let agent = svc
             .register_agent(
@@ -1768,7 +1728,7 @@ mod tests {
                     version: "1.0".to_string(),
                     capabilities: vec![],
                     policy_template_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1783,7 +1743,7 @@ mod tests {
                 work_item_id: WorkItemId::new(),
                 intent: "a".to_string(),
                 context_packet_id: None,
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1797,7 +1757,7 @@ mod tests {
                 work_item_id: WorkItemId::new(),
                 intent: "b".to_string(),
                 context_packet_id: None,
-                actor_user_id: actor.user_id,
+                actor_user_id: UserId::from(actor.user_id),
             },
             &actor,
         )
@@ -1819,7 +1779,7 @@ mod tests {
     #[tokio::test]
     async fn create_policy_template() {
         let svc = InMemoryAgentService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let tpl = svc
             .create_policy_template(
@@ -1827,7 +1787,7 @@ mod tests {
                     tenant_id,
                     name: "conservative".to_string(),
                     policy: AgentPolicy::conservative(),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1839,7 +1799,7 @@ mod tests {
     #[tokio::test]
     async fn record_tool_activity() {
         let svc = InMemoryAgentService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id);
         let agent = svc
             .register_agent(
@@ -1850,7 +1810,7 @@ mod tests {
                     version: "1.0".to_string(),
                     capabilities: vec![],
                     policy_template_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1865,7 +1825,7 @@ mod tests {
                     work_item_id: WorkItemId::new(),
                     intent: "test".to_string(),
                     context_packet_id: None,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )

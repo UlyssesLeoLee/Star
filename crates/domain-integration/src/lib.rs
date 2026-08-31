@@ -88,7 +88,7 @@ mod tests {
     // -------- 测试夹具 --------
 
     fn make_test_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id)
+        ActorContext::new(uuid::Uuid::new_v4(), tenant_id)
             .with_role(roles::PROJECT_ADMIN)
             .with_project(ProjectId::new())
     }
@@ -126,7 +126,7 @@ mod tests {
     #[tokio::test]
     async fn four_relation_types_create_success() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
 
         for rt in [
@@ -158,7 +158,7 @@ mod tests {
     #[tokio::test]
     async fn link_relation_cannot_trigger_sync() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
         let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Link);
         let integration = svc
@@ -188,7 +188,7 @@ mod tests {
     #[tokio::test]
     async fn bidirectional_without_sync_token_rejected() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
         let mut cmd = make_create_cmd(tenant_id, IntegrationRelationType::Bidirectional);
         cmd.initial_sync_token = None; // 故意缺失 → I-004
@@ -202,7 +202,7 @@ mod tests {
     #[tokio::test]
     async fn bidirectional_webhook_without_source_id_skipped() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
         let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Bidirectional);
         let integration = svc
@@ -232,7 +232,7 @@ mod tests {
     #[tokio::test]
     async fn bidirectional_webhook_with_source_id_succeeds() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
         let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Bidirectional);
         let integration = svc
@@ -260,7 +260,7 @@ mod tests {
     #[tokio::test]
     async fn webhook_idempotency_blocks_duplicates() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
         let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Mirror);
         let integration = svc
@@ -301,8 +301,8 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_access_rejected() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_a = TenantId::new();
-        let tenant_b = TenantId::new();
+        let tenant_a = uuid::Uuid::new_v4();
+        let tenant_b = uuid::Uuid::new_v4();
         let actor_a = make_test_actor(tenant_a);
         let cmd = make_create_cmd(tenant_a, IntegrationRelationType::Mirror);
         let integration = svc
@@ -310,7 +310,7 @@ mod tests {
             .await
             .expect("创建成功");
 
-        let actor_b = ActorContext::new(UserId::new(), tenant_b)
+        let actor_b = ActorContext::new(uuid::Uuid::new_v4(), tenant_b)
             .with_role(roles::PROJECT_ADMIN)
             .with_project(integration.project_id);
         let res = svc.get_integration(integration.id, actor_b).await;
@@ -322,7 +322,7 @@ mod tests {
     #[tokio::test]
     async fn unique_constraint_enforced() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
         let cmd1 = make_create_cmd(tenant_id, IntegrationRelationType::Link);
         svc.create_integration(cmd1.clone(), actor.clone())
@@ -339,7 +339,7 @@ mod tests {
     #[tokio::test]
     async fn url_with_plaintext_credential_rejected() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
         let mut cmd = make_create_cmd(tenant_id, IntegrationRelationType::Mirror);
         cmd.external_url = "https://user:pass@github.com/acme/foo".to_string();
@@ -352,7 +352,7 @@ mod tests {
     #[tokio::test]
     async fn pause_resume_state_machine() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
         let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Mirror);
         let integration = svc
@@ -390,7 +390,7 @@ mod tests {
     #[tokio::test]
     async fn list_by_project_filters() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
         let actor = make_test_actor(tenant_id).with_project(project_id);
         // 创建 2 个不同 relation_type
@@ -429,7 +429,7 @@ mod tests {
     #[tokio::test]
     async fn event_bus_receives_created() {
         let (svc, mut rx) = InMemoryIntegrationService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
         let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Link);
         svc.create_integration(cmd, actor).await.expect("ok");
@@ -498,7 +498,7 @@ mod tests {
     #[tokio::test]
     async fn trigger_sync_emits_event() {
         let (svc, mut rx) = InMemoryIntegrationService::new();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
         let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Mirror);
         let integration = svc
@@ -531,7 +531,7 @@ mod tests {
     #[tokio::test]
     async fn configure_sets_loop_guard_token_for_bidirectional() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let actor = make_test_actor(tenant_id);
         let mut cmd = make_create_cmd(tenant_id, IntegrationRelationType::Bidirectional);
         cmd.initial_sync_token = None; // 故意缺失,后续由 configure 注入
@@ -575,7 +575,7 @@ mod tests {
     #[tokio::test]
     async fn get_sync_state_and_history() {
         let svc = InMemoryIntegrationService::new_for_test();
-        let tenant_id = TenantId::new();
+        let tenant_id = uuid::Uuid::new_v4();
         let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Mirror);
         let actor = make_test_actor(tenant_id).with_project(cmd.project_id);
         let integration = svc

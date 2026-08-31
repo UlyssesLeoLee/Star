@@ -136,6 +136,7 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 | v13 | release mode test 单 crate 100/100 pass, 0.51s (8x 加速) | A.18 + A.22 实证 |
 | v14 | workspace + release 5-min timeout 守门在 release mode 缓存下被消解 (41 crate 53.7s) | A.25 实证 |
 | v15 | **守门 #12 死循环饱和边界** (per 2026-08-29 22:39 JST `5cfb7b3` 实证): commit-time docs 同步触达饱和后, 任何后续 docs 同步 commit 必先有**新事件触发** (代码改动 / Ulysses 拍板), 否则违反饱和约束; 守门 #12 主动推进触达饱和点 = 113 ahead 落地 6 commits (85819f3 / 0f4386c / 29692a7 / ee09bf5 / 3ccfc1e / 5cfb7b3), worktree 0 untracked / 0 modified, 下一笔 docs 同步必等新事件 | `5cfb7b3` commit message + v0.14 修订历史饱和声明 |
+| v16 | **P0-1 联动审计触发** (per 2026-08-31 11:00 JST 联动审计报告 P0-1): 22 domain + 3 supporting crate 各自定义 `ActorContext` (17 份重复, 字段不兼容), `api`/`application`/`infrastructure` 三个 supporting crate 仓库内 0 引用完全孤儿; P0-1b 字段类型兼容性 246→0 err (cargo check --workspace --lib 0 err) 实证 0.4-0.5M token (远超原 0.2M 估算, 因 Uuid/强类型 ID 共存 + 子模块 context.rs 本地版 vs 顶层 star_context 版并存是隐藏难点) | `PHASE-P0-1-ACTOR-CONTEXT-IMPL-REPORT.md` v0.3 §6.2 + 19 个 fix 脚本 (scripts/p0_1_*.py) |
 
 **累积规**: 后续 P3-B-F 任何子项必先跑 (1) `cargo check --workspace --all-targets` (2) `cargo fmt + clippy` (3) `cargo test --workspace --release --lib` (4) `cargo build --release + doc + bench --no-run` 全部 0 错 + 测试全过。**任何阶段 缺其一 = 守门不完整** (per STAR-OLU-001 §6 质量门)。
 

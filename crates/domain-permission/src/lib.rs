@@ -34,6 +34,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -552,65 +553,6 @@ pub trait PermissionRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-/// **ActorContext** — 调用方上下文(简化版,Phase 2 由 domain-identity 颁发)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    /// 角色字符串(向后兼容,优先用 Role 枚举)
-    pub roles: Vec<String>,
-    pub is_local_runtime: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-            is_local_runtime: false,
-        }
-    }
-
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-
-    pub fn with_role_enum(mut self, role: Role) -> Self {
-        self.roles.push(role.as_str().to_string());
-        self
-    }
-
-    pub fn with_project(mut self, project_id: ProjectId) -> Self {
-        self.project_ids.push(project_id);
-        self
-    }
-
-    pub fn as_local_runtime(mut self) -> Self {
-        self.is_local_runtime = true;
-        self
-    }
-
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-
-    /// 解析 actor 持有的 Role 枚举
-    pub fn parsed_roles(&self) -> Vec<Role> {
-        self.roles
-            .iter()
-            .filter_map(|s| Role::from_str_opt(s))
-            .collect()
-    }
-}
-
-// =====================================================================
 // 核心决策:check()  — INV-PM-02 Deny 优先,INV-PM-05 默认 Deny
 // =====================================================================
 
@@ -774,9 +716,9 @@ impl InMemoryPermissionService {
     }
 
     fn ensure_tenant(actor: &ActorContext, expected: TenantId) -> Result<(), PermissionError> {
-        if actor.tenant_id != expected {
+        if TenantId::from(actor.tenant_id) != expected {
             return Err(PermissionError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 expected,
             ));
         }
@@ -923,7 +865,7 @@ impl PermissionCommandPort for InMemoryPermissionService {
         };
         if updated.tenant_id != cmd.tenant_id {
             return Err(PermissionError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -1020,7 +962,7 @@ impl PermissionQueryPort for InMemoryPermissionService {
             .ok_or_else(|| PermissionError::NotFound(format!("scheme {}", q.scheme_id)))?;
         if s.tenant_id != q.tenant_id {
             return Err(PermissionError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -1124,26 +1066,25 @@ impl PermissionRepository for InMemoryPermissionRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn admin_ctx(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id).with_role("tenant_admin")
+        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role("tenant_admin")
     }
 
     fn dev_ctx(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id).with_role("developer")
+        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role("developer")
     }
 
     fn viewer_ctx(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id).with_role("viewer")
+        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role("viewer")
     }
 
     // ----- 基础 Allow / Deny -----
 
     #[tokio::test]
     async fn basic_allow() {
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let admin = admin_ctx(tenant);
 
         let svc = InMemoryPermissionService::new();
@@ -1153,7 +1094,7 @@ mod tests {
                 CreateSchemeCommand {
                     tenant_id: tenant,
                     name: "default".into(),
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1187,7 +1128,7 @@ mod tests {
                 user_id: user,
                 project_id: project,
                 role: Role::Developer,
-                granted_by: admin.user_id,
+                granted_by: UserId::from(admin.user_id),
             },
             &admin,
         )
@@ -1205,7 +1146,7 @@ mod tests {
                     resource_id: None,
                     action: Action::Read,
                 },
-                &ActorContext::new(user, tenant)
+                &ActorContext::new(user.0, tenant.0)
                     .with_role("developer")
                     .with_project(project),
             )
@@ -1216,9 +1157,9 @@ mod tests {
 
     #[tokio::test]
     async fn basic_deny_no_matching_rule() {
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let admin = admin_ctx(tenant);
 
         let svc = InMemoryPermissionService::new();
@@ -1227,7 +1168,7 @@ mod tests {
                 CreateSchemeCommand {
                     tenant_id: tenant,
                     name: "s".into(),
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1245,7 +1186,7 @@ mod tests {
                     resource_id: None,
                     action: Action::Read,
                 },
-                &ActorContext::new(user, tenant),
+                &ActorContext::new(user.0, tenant.0),
             )
             .await
             .unwrap();
@@ -1256,9 +1197,9 @@ mod tests {
 
     #[tokio::test]
     async fn deny_takes_precedence_over_allow() {
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let admin = admin_ctx(tenant);
 
         let svc = InMemoryPermissionService::new();
@@ -1267,7 +1208,7 @@ mod tests {
                 CreateSchemeCommand {
                     tenant_id: tenant,
                     name: "s".into(),
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1301,7 +1242,7 @@ mod tests {
                 user_id: user,
                 project_id: project,
                 role: Role::Developer,
-                granted_by: admin.user_id,
+                granted_by: UserId::from(admin.user_id),
             },
             &admin,
         )
@@ -1318,7 +1259,7 @@ mod tests {
                     resource_id: None,
                     action: Action::Read,
                 },
-                &ActorContext::new(user, tenant)
+                &ActorContext::new(user.0, tenant.0)
                     .with_role("developer")
                     .with_project(project),
             )
@@ -1331,10 +1272,10 @@ mod tests {
 
     #[tokio::test]
     async fn cross_tenant_check_denied() {
-        let tenant_a = TenantId::new();
-        let tenant_b = TenantId::new();
+        let tenant_a = uuid::Uuid::new_v4();
+        let tenant_b = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let admin_a = admin_ctx(tenant_a);
 
         let svc = InMemoryPermissionService::new();
@@ -1343,14 +1284,14 @@ mod tests {
                 CreateSchemeCommand {
                     tenant_id: tenant_a,
                     name: "s".into(),
-                    actor_user_id: admin_a.user_id,
+                    actor_user_id: UserId::from(admin_a.user_id),
                 },
                 &admin_a,
             )
             .await
             .unwrap();
         // 用 tenant_b 的 actor 去 check tenant_a 的 scheme → CrossTenantDenied
-        let actor_b = ActorContext::new(user, tenant_b);
+        let actor_b = ActorContext::new(user.0, tenant_b.0);
         let res = svc
             .check(
                 CheckQuery {
@@ -1372,9 +1313,9 @@ mod tests {
 
     #[tokio::test]
     async fn grant_and_revoke_role() {
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let admin = admin_ctx(tenant);
 
         let svc = InMemoryPermissionService::new();
@@ -1385,7 +1326,7 @@ mod tests {
                     user_id: user,
                     project_id: project,
                     role: Role::Developer,
-                    granted_by: admin.user_id,
+                    granted_by: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1402,7 +1343,7 @@ mod tests {
                     user_id: user,
                     project_id: project,
                     role: Role::Viewer,
-                    granted_by: admin.user_id,
+                    granted_by: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1438,9 +1379,9 @@ mod tests {
 
     #[tokio::test]
     async fn role_binding_unique() {
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let admin = admin_ctx(tenant);
         let svc = InMemoryPermissionService::new();
         svc.grant_role(
@@ -1449,7 +1390,7 @@ mod tests {
                 user_id: user,
                 project_id: project,
                 role: Role::Developer,
-                granted_by: admin.user_id,
+                granted_by: UserId::from(admin.user_id),
             },
             &admin,
         )
@@ -1463,7 +1404,7 @@ mod tests {
                     user_id: user,
                     project_id: project,
                     role: Role::Viewer,
-                    granted_by: admin.user_id,
+                    granted_by: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1475,9 +1416,9 @@ mod tests {
 
     #[tokio::test]
     async fn admin_action_requires_admin_role() {
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let admin = admin_ctx(tenant);
 
         let svc = InMemoryPermissionService::new();
@@ -1486,7 +1427,7 @@ mod tests {
                 CreateSchemeCommand {
                     tenant_id: tenant,
                     name: "s".into(),
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1519,7 +1460,7 @@ mod tests {
                 user_id: user,
                 project_id: project,
                 role: Role::Developer,
-                granted_by: admin.user_id,
+                granted_by: UserId::from(admin.user_id),
             },
             &admin,
         )
@@ -1536,7 +1477,7 @@ mod tests {
                     resource_id: None,
                     action: Action::Admin,
                 },
-                &ActorContext::new(user, tenant)
+                &ActorContext::new(user.0, tenant.0)
                     .with_role("developer")
                     .with_project(project),
             )
@@ -1549,9 +1490,9 @@ mod tests {
 
     #[tokio::test]
     async fn wildcard_resource_id() {
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let admin = admin_ctx(tenant);
         let svc = InMemoryPermissionService::new();
         let scheme = svc
@@ -1559,7 +1500,7 @@ mod tests {
                 CreateSchemeCommand {
                     tenant_id: tenant,
                     name: "s".into(),
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1591,7 +1532,7 @@ mod tests {
                 user_id: user,
                 project_id: project,
                 role: Role::Viewer,
-                granted_by: admin.user_id,
+                granted_by: UserId::from(admin.user_id),
             },
             &admin,
         )
@@ -1610,7 +1551,7 @@ mod tests {
                         resource_id: Some(Uuid::new_v4()),
                         action: Action::Read,
                     },
-                    &ActorContext::new(user, tenant)
+                    &ActorContext::new(user.0, tenant.0)
                         .with_role("viewer")
                         .with_project(project),
                 )
@@ -1624,9 +1565,9 @@ mod tests {
 
     #[tokio::test]
     async fn end_to_end_workflow() {
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let admin = admin_ctx(tenant);
         let svc = InMemoryPermissionService::new();
 
@@ -1637,7 +1578,7 @@ mod tests {
                 user_id: user,
                 project_id: project,
                 role: Role::ProjectAdmin,
-                granted_by: admin.user_id,
+                granted_by: UserId::from(admin.user_id),
             },
             &admin,
         )
@@ -1649,7 +1590,7 @@ mod tests {
                 CreateSchemeCommand {
                     tenant_id: tenant,
                     name: "p-admin".into(),
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1675,7 +1616,7 @@ mod tests {
         .await
         .unwrap();
         // 3) check 各动作
-        let actor_user = ActorContext::new(user, tenant)
+        let actor_user = ActorContext::new(user.0, tenant.0)
             .with_role("project_admin")
             .with_project(project);
         for action in [Action::Read, Action::Write, Action::Admin] {
@@ -1702,7 +1643,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_and_get_scheme() {
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let admin = admin_ctx(tenant);
         let svc = InMemoryPermissionService::new();
         let scheme = svc
@@ -1710,7 +1651,7 @@ mod tests {
                 CreateSchemeCommand {
                     tenant_id: tenant,
                     name: "my-scheme".into(),
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1735,7 +1676,7 @@ mod tests {
 
     #[tokio::test]
     async fn list_roles_for_project() {
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let admin = admin_ctx(tenant);
         let svc = InMemoryPermissionService::new();
@@ -1743,10 +1684,10 @@ mod tests {
             svc.grant_role(
                 GrantRoleCommand {
                     tenant_id: tenant,
-                    user_id: UserId::new(),
+                    user_id: UserId.new(),
                     project_id: project,
                     role: Role::Developer,
-                    granted_by: admin.user_id,
+                    granted_by: UserId::from(admin.user_id),
                 },
                 &admin,
             )
@@ -1757,10 +1698,10 @@ mod tests {
         svc.grant_role(
             GrantRoleCommand {
                 tenant_id: tenant,
-                user_id: UserId::new(),
+                user_id: UserId.new(),
                 project_id: ProjectId::new(),
                 role: Role::Viewer,
-                granted_by: admin.user_id,
+                granted_by: UserId::from(admin.user_id),
             },
             &admin,
         )
@@ -1784,10 +1725,10 @@ mod tests {
 
     #[tokio::test]
     async fn cross_tenant_role_check_denied() {
-        let tenant_a = TenantId::new();
-        let tenant_b = TenantId::new();
+        let tenant_a = uuid::Uuid::new_v4();
+        let tenant_b = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let user = UserId::new();
+        let user = uuid::Uuid::new_v4();
         let admin_a = admin_ctx(tenant_a);
         let admin_b = admin_ctx(tenant_b);
         let svc = InMemoryPermissionService::new();
@@ -1798,7 +1739,7 @@ mod tests {
                 user_id: user,
                 project_id: project,
                 role: Role::Developer,
-                granted_by: admin_a.user_id,
+                granted_by: UserId::from(admin_a.user_id),
             },
             &admin_a,
         )
@@ -1821,7 +1762,7 @@ mod tests {
 
     #[tokio::test]
     async fn non_admin_cannot_create_scheme() {
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let dev = dev_ctx(tenant);
         let svc = InMemoryPermissionService::new();
         let res = svc
@@ -1829,7 +1770,7 @@ mod tests {
                 CreateSchemeCommand {
                     tenant_id: tenant,
                     name: "x".into(),
-                    actor_user_id: dev.user_id,
+                    actor_user_id: UserId::from(dev.user_id),
                 },
                 &dev,
             )
@@ -1841,7 +1782,7 @@ mod tests {
 
     #[tokio::test]
     async fn invalid_rule_rejected() {
-        let tenant = TenantId::new();
+        let tenant = uuid::Uuid::new_v4();
         let admin = admin_ctx(tenant);
         let svc = InMemoryPermissionService::new();
         let scheme = svc
@@ -1849,7 +1790,7 @@ mod tests {
                 CreateSchemeCommand {
                     tenant_id: tenant,
                     name: "s".into(),
-                    actor_user_id: admin.user_id,
+                    actor_user_id: UserId::from(admin.user_id),
                 },
                 &admin,
             )

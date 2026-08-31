@@ -30,6 +30,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -446,36 +447,6 @@ pub trait WorkItemRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub project_ids: Vec<ProjectId>,
-    pub roles: Vec<String>,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            project_ids: vec![],
-            roles: vec!["developer".to_string()],
-        }
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-}
-
-// =====================================================================
 // InMemoryWorkItemService
 // =====================================================================
 
@@ -510,9 +481,9 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
         cmd: CreateWorkItemCommand,
         actor: &ActorContext,
     ) -> Result<WorkItem, WorkItemError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(WorkItemError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -583,9 +554,9 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
         cmd: TransitionStatusCommand,
         actor: &ActorContext,
     ) -> Result<WorkItem, WorkItemError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(WorkItemError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -625,9 +596,9 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
         cmd: AssignCommand,
         actor: &ActorContext,
     ) -> Result<WorkItem, WorkItemError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(WorkItemError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -661,9 +632,9 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
         cmd: CreateRequirementCommand,
         actor: &ActorContext,
     ) -> Result<Requirement, WorkItemError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(WorkItemError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -686,9 +657,9 @@ impl WorkItemCommandPort for InMemoryWorkItemService {
         cmd: CreateAcceptanceCriterionCommand,
         actor: &ActorContext,
     ) -> Result<AcceptanceCriterion, WorkItemError> {
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(WorkItemError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -715,9 +686,9 @@ impl WorkItemQueryPort for InMemoryWorkItemService {
         q: GetWorkItemQuery,
         actor: &ActorContext,
     ) -> Result<WorkItem, WorkItemError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(WorkItemError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -745,9 +716,9 @@ impl WorkItemQueryPort for InMemoryWorkItemService {
         q: ListByProjectQuery,
         actor: &ActorContext,
     ) -> Result<Vec<WorkItem>, WorkItemError> {
-        if actor.tenant_id != q.tenant_id {
+        if TenantId::from(actor.tenant_id) != q.tenant_id {
             return Err(WorkItemError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 q.tenant_id,
             ));
         }
@@ -839,9 +810,8 @@ impl WorkItemRepository for InMemoryWorkItemRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn dev(tid: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tid).with_role("developer")
+        ActorContext::new(Uuid::new_v4(), tid.0).with_role("developer")
     }
 
     fn basic_cmd(tid: TenantId) -> CreateWorkItemCommand {
@@ -854,7 +824,7 @@ mod tests {
             description: "details".to_string(),
             priority: Priority::High,
             severity: Some(Severity::Major),
-            reporter_user_id: UserId::new(),
+            reporter_user_id: UserId.new(),
             parent_work_item_id: None,
             ai_task_data: None,
             labels: vec!["bug".to_string()],
@@ -898,7 +868,7 @@ mod tests {
     #[tokio::test]
     async fn create_work_item_basic() {
         let svc = InMemoryWorkItemService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
         assert_eq!(item.status, WorkItemStatus::Todo);
@@ -908,7 +878,7 @@ mod tests {
     #[tokio::test]
     async fn ai_task_requires_objective_invw03() {
         let svc = InMemoryWorkItemService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         let mut cmd = basic_cmd(tid);
         cmd.item_type = WorkItemType::AITask;
@@ -920,7 +890,7 @@ mod tests {
     #[tokio::test]
     async fn ai_task_requires_repository_scope_invw03() {
         let svc = InMemoryWorkItemService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         let mut cmd = basic_cmd(tid);
         cmd.item_type = WorkItemType::AITask;
@@ -940,7 +910,7 @@ mod tests {
     #[tokio::test]
     async fn ai_task_with_full_data_ok() {
         let svc = InMemoryWorkItemService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         let mut cmd = basic_cmd(tid);
         cmd.item_type = WorkItemType::AITask;
@@ -960,7 +930,7 @@ mod tests {
     #[tokio::test]
     async fn transition_through_lifecycle() {
         let svc = InMemoryWorkItemService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
         let id = item.id;
@@ -972,7 +942,7 @@ mod tests {
                     work_item_id: id,
                     from: WorkItemStatus::Todo,
                     to: WorkItemStatus::InProgress,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -987,7 +957,7 @@ mod tests {
                     work_item_id: id,
                     from: WorkItemStatus::InProgress,
                     to: WorkItemStatus::Done,
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -999,7 +969,7 @@ mod tests {
     #[tokio::test]
     async fn transition_skip_rejected() {
         let svc = InMemoryWorkItemService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
         let res = svc
@@ -1009,7 +979,7 @@ mod tests {
                     work_item_id: item.id,
                     from: WorkItemStatus::Todo,
                     to: WorkItemStatus::Done, // 跳态
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1020,10 +990,10 @@ mod tests {
     #[tokio::test]
     async fn assign_user_and_agent() {
         let svc = InMemoryWorkItemService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
-        let u = UserId::new();
+        let u = uuid::Uuid::new_v4();
         let a = AgentId::new();
         let item = svc
             .assign(
@@ -1032,7 +1002,7 @@ mod tests {
                     work_item_id: item.id,
                     assignee_user_id: Some(u),
                     assignee_agent_id: Some(a),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1045,7 +1015,7 @@ mod tests {
     #[tokio::test]
     async fn parent_must_be_same_project_invw04() {
         let svc = InMemoryWorkItemService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         // 父项
         let parent = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
@@ -1060,8 +1030,8 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_transition_denied() {
         let svc = InMemoryWorkItemService::new();
-        let t1 = TenantId::new();
-        let t2 = TenantId::new();
+        let t1 = uuid::Uuid::new_v4();
+        let t2 = uuid::Uuid::new_v4();
         let actor1 = dev(t1);
         let item = svc.create_work_item(basic_cmd(t1), &actor1).await.unwrap();
         let actor2 = dev(t2);
@@ -1072,7 +1042,7 @@ mod tests {
                     work_item_id: item.id,
                     from: WorkItemStatus::Todo,
                     to: WorkItemStatus::InProgress,
-                    actor_user_id: actor2.user_id,
+                    actor_user_id: UserId::from(actor2.user_id),
                 },
                 &actor2,
             )
@@ -1083,7 +1053,7 @@ mod tests {
     #[tokio::test]
     async fn create_requirement_and_ac() {
         let svc = InMemoryWorkItemService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
         let req = svc
@@ -1093,7 +1063,7 @@ mod tests {
                     business_goal_id: None,
                     statement: "support OAuth".to_string(),
                     rationale: "industry standard".to_string(),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1106,7 +1076,7 @@ mod tests {
                     requirement_id: req.id,
                     work_item_id: item.id,
                     statement: "login via OAuth2".to_string(),
-                    actor_user_id: actor.user_id,
+                    actor_user_id: UserId::from(actor.user_id),
                 },
                 &actor,
             )
@@ -1118,7 +1088,7 @@ mod tests {
     #[tokio::test]
     async fn list_by_project_filter_terminal() {
         let svc = InMemoryWorkItemService::new();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor = dev(tid);
         let project = ProjectId::new();
         for _ in 0..3 {

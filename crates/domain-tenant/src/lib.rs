@@ -30,6 +30,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -408,40 +409,6 @@ pub trait TenantRepository: Send + Sync {
 }
 
 // =====================================================================
-// ActorContext
-// =====================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActorContext {
-    pub user_id: UserId,
-    pub tenant_id: TenantId,
-    pub roles: Vec<String>,
-    pub is_platform_admin: bool,
-}
-
-impl ActorContext {
-    pub fn new(user_id: UserId, tenant_id: TenantId) -> Self {
-        Self {
-            user_id,
-            tenant_id,
-            roles: vec!["developer".to_string()],
-            is_platform_admin: false,
-        }
-    }
-    pub fn as_platform_admin(mut self) -> Self {
-        self.is_platform_admin = true;
-        self
-    }
-    pub fn with_role(mut self, role: &str) -> Self {
-        self.roles.push(role.to_string());
-        self
-    }
-    pub fn has_role(&self, role: &str) -> bool {
-        self.roles.iter().any(|r| r == role)
-    }
-}
-
-// =====================================================================
 // InMemoryTenantService
 // =====================================================================
 
@@ -486,7 +453,7 @@ impl TenantCommandPort for InMemoryTenantService {
             return Err(TenantError::SlugExists(cmd.slug));
         }
         let t = Tenant {
-            id: TenantId::new(),
+            id: UserId.new(),
             slug: cmd.slug,
             display_name: cmd.display_name,
             status: TenantStatus::Active,
@@ -573,9 +540,9 @@ impl TenantCommandPort for InMemoryTenantService {
         if !actor.is_platform_admin && !actor.has_role("tenant_admin") {
             return Err(TenantError::PermissionDenied);
         }
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(TenantError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -598,9 +565,9 @@ impl TenantCommandPort for InMemoryTenantService {
         if !actor.is_platform_admin && !actor.has_role("tenant_admin") {
             return Err(TenantError::PermissionDenied);
         }
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(TenantError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -623,9 +590,9 @@ impl TenantCommandPort for InMemoryTenantService {
         if !actor.has_role("tenant_admin") && !actor.is_platform_admin {
             return Err(TenantError::PermissionDenied);
         }
-        if actor.tenant_id != cmd.tenant_id {
+        if TenantId::from(actor.tenant_id) != cmd.tenant_id {
             return Err(TenantError::CrossTenantDenied(
-                actor.tenant_id,
+                TenantId::from(actor.tenant_id),
                 cmd.tenant_id,
             ));
         }
@@ -653,8 +620,8 @@ impl TenantQueryPort for InMemoryTenantService {
         q: GetTenantQuery,
         actor: &ActorContext,
     ) -> Result<Tenant, TenantError> {
-        if !actor.is_platform_admin && actor.tenant_id != q.tenant_id {
-            return Err(TenantError::CrossTenantDenied(actor.tenant_id, q.tenant_id));
+        if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != q.tenant_id {
+            return Err(TenantError::CrossTenantDenied(TenantId::from(actor.tenant_id), q.tenant_id));
         }
         self.tenants
             .read()
@@ -672,8 +639,8 @@ impl TenantQueryPort for InMemoryTenantService {
         tenant_id: TenantId,
         actor: &ActorContext,
     ) -> Result<TenantPolicy, TenantError> {
-        if !actor.is_platform_admin && actor.tenant_id != tenant_id {
-            return Err(TenantError::CrossTenantDenied(actor.tenant_id, tenant_id));
+        if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != tenant_id {
+            return Err(TenantError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
         }
         self.policies
             .read()
@@ -691,8 +658,8 @@ impl TenantQueryPort for InMemoryTenantService {
         tenant_id: TenantId,
         actor: &ActorContext,
     ) -> Result<SecurityPolicy, TenantError> {
-        if !actor.is_platform_admin && actor.tenant_id != tenant_id {
-            return Err(TenantError::CrossTenantDenied(actor.tenant_id, tenant_id));
+        if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != tenant_id {
+            return Err(TenantError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
         }
         self.sec_policies
             .read()
@@ -710,8 +677,8 @@ impl TenantQueryPort for InMemoryTenantService {
         tenant_id: TenantId,
         actor: &ActorContext,
     ) -> Result<Vec<ProviderDataBoundary>, TenantError> {
-        if !actor.is_platform_admin && actor.tenant_id != tenant_id {
-            return Err(TenantError::CrossTenantDenied(actor.tenant_id, tenant_id));
+        if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != tenant_id {
+            return Err(TenantError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
         }
         Ok(self
             .boundaries
@@ -830,13 +797,12 @@ impl TenantRepository for InMemoryTenantRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn platform_admin() -> ActorContext {
-        ActorContext::new(UserId::new(), TenantId::new()).as_platform_admin()
+        ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
     }
 
     fn tenant_admin(tid: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tid).with_role("tenant_admin")
+        ActorContext::new(Uuid::new_v4(), tid.0).with_role("tenant_admin")
     }
 
     #[test]
@@ -868,21 +834,21 @@ mod tests {
 
     #[test]
     fn tenant_policy_default() {
-        let p = TenantPolicy::default_for(TenantId::new());
+        let p = TenantPolicy::default_for(uuid::Uuid::new_v4());
         assert!(p.cloud_ai_allowed);
         assert!(!p.local_ai_only);
     }
 
     #[test]
     fn security_policy_default() {
-        let p = SecurityPolicy::default_for(TenantId::new());
+        let p = SecurityPolicy::default_for(uuid::Uuid::new_v4());
         assert_eq!(p.session_max_age_seconds, 3600 * 8);
     }
 
     #[tokio::test]
     async fn create_tenant_requires_platform_admin() {
         let svc = InMemoryTenantService::new();
-        let actor = ActorContext::new(UserId::new(), TenantId::new());
+        let actor = ActorContext::new(Uuid::new_v4(), Uuid::new_v4());
         let res = svc
             .create_tenant(
                 CreateTenantCommand {
@@ -989,8 +955,8 @@ mod tests {
             )
             .await
             .unwrap();
-        let other_t = TenantId::new();
-        let user_actor = ActorContext::new(UserId::new(), other_t);
+        let other_t = uuid::Uuid::new_v4();
+        let user_actor = ActorContext::new(Uuid::new_v4(), other_t.0);
         let res = svc
             .get_tenant(GetTenantQuery { tenant_id: t.id }, &user_actor)
             .await;

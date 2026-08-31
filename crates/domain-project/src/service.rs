@@ -45,7 +45,7 @@ impl InMemoryProjectService {
                 id,
                 ProjectTemplate {
                     id,
-                    tenant_id: TenantId::new(), // 全局共享
+                    tenant_id: UserId.new(), // 全局共享
                     name: format!("Built-in {tt}"),
                     template_type: tt,
                     default_settings: serde_json::json!({}),
