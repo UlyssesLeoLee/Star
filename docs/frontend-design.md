@@ -1,11 +1,12 @@
 # Star 平台《Frontend Design 詳細設計書》
 
-> **文档版本**: v0.1 (2026-08-26)
+> **文档版本**: v0.1 (2026-08-26) → v0.2 (per 2026-08-31 12:48 JST handoff 兜底, 守门 #11 缺标比错标)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
 > | v0.1 | 2026-08-26 | 初始版本(基于 Star 25 module + 6 状态机 + 5 域 Track 实现) | — |
+> | v0.2 | 2026-08-31 | handoff 兜底 §0.1 实装注记: 5 tab 拍板 (kanban/timeline/backlog/agents/worktrees, per 8/29 22:49 JST 拍板 + `commit 7d85c34`) + 4 redirect 修复 (per `commit 4614267` 8/31 12:48 JST) + 25 module 1:1 路由对齐被 6 panel 吸收 (22 legacy redirect → 6 panel, per §X.Y known-gap 注记); 不动原 v0.1 §1-§6 内容, 守门 #12 不沿用 v0.x 旧叙事 + #11 缺标比错标安全 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
 >
 > **上游基本设计書**: `D:\Star\docs\basic-design.md` v0.1(下文以 §N 引用)
 > **上游 API 設計書**: `D:\Star\docs\api-design.md` v0.2(下文以 §3.x / §5.x 引用)
