@@ -134,6 +134,52 @@ export interface WorkItem {
 }
 
 // =====================================================================
+// 5b. design-artifact (per test-design.md §6.3.3 V1 Should-Have Test)
+// =====================================================================
+// 来源 (per 2026-08-31 wt-test-t2-dsg / AGENTS.md §0/§1.2):
+//   - docs/test-design.md §6.3.3   REQ-DSG-001/002 (V1 Should-Have Test)
+//   - docs/requirements.md §8.3   DesignArtifact 字段 + ReviewRecord 互斥 Target
+//   - docs/requirements.md §27.4  ReviewRecord Target 字段
+//                                  "ChangeSet | DesignArtifact" 二选一
+//   - docs/specs/domain-work-item-spec.md  WorkItem 6 状态
+//                                          (todo/in_progress/review/blocked/done/wontfix)
+//
+// 5 状态机:
+//   draft      — 初稿,未送审
+//   in_review  — 送审中,等待 reviewer 决策
+//   approved   — 通过审批 (WorkItem Guard 视为"已批准")
+//   rejected   — 被拒绝,需返回 draft 修订
+//   superseded — 已被新版本取代 (历史版本, 视为"已批准" 不阻塞 Guard)
+//
+// ReviewRecord 互斥 Target (per requirements.md §27.4):
+//   - 此处 review_record_id 在 DesignArtifact target 时存值
+//   - ChangeSet target 时存 ChangeSet.id (互斥, 不同时存)
+//   - **TBD**: basic-design §27.4 字段精确化后, 补 discriminated union 形态
+//     (现以 nullable Uuid 表达, 守门 缺标比错标 安全)
+export type DesignArtifactStatus =
+  | "draft" | "in_review" | "approved" | "rejected" | "superseded";
+
+export const DESIGN_ARTIFACT_STATUSES: DesignArtifactStatus[] = [
+  "draft",
+  "in_review",
+  "approved",
+  "rejected",
+  "superseded",
+];
+
+export interface DesignArtifact {
+  id: Uuid;
+  work_item_id: Uuid;
+  title: string;
+  status: DesignArtifactStatus;
+  version: number; // 单调递增, per REQ-DSG-001 "Version 历史" (>= 1)
+  author_id: Uuid;
+  created_at: Iso8601;
+  updated_at: Iso8601;
+  review_record_id: Uuid | null; // §27.4 Target 互斥, 此处 DesignArtifact target 时存
+}
+
+// =====================================================================
 // 6. comment
 // =====================================================================
 export interface Comment {
