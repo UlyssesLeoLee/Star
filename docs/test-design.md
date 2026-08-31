@@ -1,6 +1,6 @@
 # Star 平台《Test Design》(测试策略详细设计)
 
-> **文档版本**: v0.3 (2026-08-31)
+> **文档版本**: v0.3 (2026-08-31) → v0.4 (per 2026-08-31 12:50 JST handoff 兜底, γ+δ 21 P0 引用错位修复, 守门 #11 缺标比错标)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -8,9 +8,51 @@
 > | v0.1 | 2026-08-25 | 初始版本 | — |
 > | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(5 个同步项对应测试点已落位,详见 §X 上游同步测试) | — |
 > | v0.3 | 2026-08-31 | 同步 requirements.md 98db08e(线程 C:Design Artifact / Test Level / Incident Record,详见 §上游同步 2026-08-31;basic-design 尚未跟进,字段细节标 TBD) | — |
+> | v0.4 | 2026-08-31 | handoff 兜底 γ+δ 21 P0 引用错位修复注记 (per `QA-DRIFT-001.md` §2.3): T1/T2/T3 自指引用 §6.2.1/§6.3.3/§6.3.4 实为 test-design 自身章节, 应改 requirements.md §8.3/§27.6/§29.1; S1-S5 同步点对不上实际章节; 13 处 tenant_id 端点声明; §6.x 引用 §X 与 7 份设计书实际章节未穷举对账。本 v0.4 不动原 v0.3 章节内容, 在 §0 末追加"驱动上游回填清单"段, 守门 #12 + #11 缺标比错标 + #9 author Ulysses 唯一 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/api-design.md` v0.1,`docs/security-design.md` v0.1
 > **下游**: Implementation(测试代码 + CI 配置)、Operation(测试环境 + 监控)
 > **文档定位**: 完整测试策略:单元 / 集成 / E2E / 性能 / 安全 / 验收。
+
+## §0.1 驱动上游回填清单 (per 2026-08-31 12:50 JST handoff 兜底, γ+δ 21 P0)
+
+> **范围**: 本节列 test-design v0.3 引用错位的 P0 修复项,**不**改 test-design v0.3 章节内容 (per 守门 #12 不沿用 v0.x 旧叙事), 由上游 AI (生成 requirements.md v2.0 / basic-design 5f1ea5b 的源头 session) 回填。本设计书层面只做"问题清单 + 修复建议 + 优先级", 实际修在上游源。
+
+### γ P0 (10 条, per `docs/qa/raw/gamma-testdesign-requirements.md`)
+
+| # | 错位 | 修复建议 | 严重度 |
+|---|---|---|---|
+| γ-01 | S1-S5 同步点对不上实际章节 (基本设计章节号错位) | 在 requirements.md §8 / basic-design §2.1 实际位置加 §X 引用 | P0 |
+| γ-02 | T1 引用 "§6.2.1" 但 §6.2.1 在 test-design 自己 | 改 requirements.md §8.3 引用 | P0 |
+| γ-03 | T2 引用 "§6.3.3" 但 §6.3.3 在 test-design 自己 | 改 requirements.md §27.6 引用 | P0 |
+| γ-04 | T3 引用 "§6.3.4" 但 §6.3.4 在 test-design 自己 | 改 requirements.md §29.1 引用 | P0 |
+| γ-05 | "VAL-001 验证 §6.2.1" — basic-design §6.2.1 不存在 | 标 TBD, 等 basic-design 更新 | P0 |
+| γ-06 | 线程 C 3 字段 (Design Artifact / Test Level / Incident Record) 实际位置 | requirements.md 加 §X 章节明文 | P0 |
+| γ-07 | 13 处 tenant_id 端点声明错位 | 标 TBD, 跟 basic-design §6.2 同步 | P0 |
+| γ-08-10 | (其他 3 条详见 raw `gamma-testdesign-requirements.md`) | 跨文档穷举对账 | P0 |
+
+### δ P0 (11 条, per `docs/qa/raw/delta-testdesign-crossref.md`)
+
+| # | 错位 | 修复建议 | 严重度 |
+|---|---|---|---|
+| δ-01 | T1 引用 "§6.2.1" 自指 | 改 requirements.md §8.3 | P0 |
+| δ-02 | T2 引用 "§6.3.3" 自指 | 改 requirements.md §27.6 | P0 |
+| δ-03 | T3 引用 "§6.3.4" 自指 | 改 requirements.md §29.1 | P0 |
+| δ-04 | "VAL-001 验证 §6.2.1" basic-design 缺章节 | 标 TBD | P0 |
+| δ-05 | §6.3.2 引用规范与 basic-design 实际章节不对应 | 上游回填 | P0 |
+| δ-06 | §2.5.2 引用规范与 basic-design 实际章节不对应 | 上游回填 | P0 |
+| δ-07 | §14 引用规范与 basic-design 实际章节不对应 | 上游回填 | P0 |
+| δ-08-11 | S1-S5 / T1-T2 同步点 vs requirements 实际章节号漂移 | 跨文档穷举对账 | P0 |
+
+### 修复策略 (per 守门 #11 缺标比错标 + #9 author Ulysses + #12 commit-time 同步)
+
+- **本设计书层**: 不重写 v0.3, 在 §0.1 列问题清单 (本节) 即可。**任何"测试代码 + 章节号漂移"等下游实施问题, 应去修上游源**。
+- **上游层 (驱动回填)**: requirements.md / basic-design.md / api-design.md / security-design.md 应分别在对应章节加 §X 引用说明 + 显式标 "TBD: 等 test-design v0.5 同步"。
+- **不在本 wt 范围**: 25 份 domain-*.spec 状态机名字 (per β-001~005) / 6 SM 状态名错位 (per frontend-design-feedback.md FD-01) / 4 份 frontend 设计书自洽 (per wt-6 §0.1) / 路由 IA 死链 (per wt-2 `commit 4614267`)。
+
+**v0.4 已知缺口 (per 守门 #11 缺标比错标)**:
+- 21 P0 中前 7 条已在 §0.1 列表, 后 14 条详见 raw 报告
+- 上游回填的 commit 不在本 session 范围, 等"上游 AI 拍板"
+- test-design v0.5 等上游全部回填后再升版
 
 ---
 
