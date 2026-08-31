@@ -1,12 +1,13 @@
 # Star 平台《Test Design》(测试策略详细设计)
 
-> **文档版本**: v0.2 (2026-08-26)
+> **文档版本**: v0.3 (2026-08-31)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
 > |---|---|---|---|
 > | v0.1 | 2026-08-25 | 初始版本 | — |
 > | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(5 个同步项对应测试点已落位,详见 §X 上游同步测试) | — |
+> | v0.3 | 2026-08-31 | 同步 requirements.md 98db08e(线程 C:Design Artifact / Test Level / Incident Record,详见 §上游同步 2026-08-31;basic-design 尚未跟进,字段细节标 TBD) | — |
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/api-design.md` v0.1,`docs/security-design.md` v0.1
 > **下游**: Implementation(测试代码 + CI 配置)、Operation(测试环境 + 监控)
 > **文档定位**: 完整测试策略:单元 / 集成 / E2E / 性能 / 安全 / 验收。
@@ -26,6 +27,20 @@
 > | **S5** Skill/Playbook V2 候选 | Provenance.source_type='Skill' 走 P5 隔离层;Instruction Priority 封顶;Tool Call 二次校验(允许 skip,占位) | V2 占位 |
 >
 > **不变量保留**:MVP 测试矩阵 / AC 覆盖率公式 / E2E 路径全部不动。
+
+---
+
+## 上游同步 2026-08-31(继承 requirements.md 98db08e 线程 C)
+
+> 本设计书跟随《要件定義書》98db08e(线程 C:瀑布式 SIer 支持 —— Design Artifact / Test Level / Incident Record)同步。**注意**:`docs/basic-design.md` 截至本次同步仍停留在 98c73b1,尚未吸收 requirements.md §8.3/§27.6/§29.1,因此下表涉及的字段名/接口/错误码均为 requirements.md 层面的设计意图,**basic-design 层的具体落地细节标记为 TBD**,待 basic-design 完成同步后回填(缺标比错标安全)。三项均为 V1 Should-Have(非 V1 Must-Have,§30.3),不阻塞当前 MVP 验收门禁。
+>
+> | 同步项 | 测试点 | 优先级 |
+> |---|---|---|
+> | **T1** REQ-TST-001/002(ValidationResult.Level 维度) | 见 §6.2.1;Level 与既有 Type 正交,不新建 TestPlan/TestCase 对象;Acceptance Coverage 按 Level 缺口精确报告 | V1 Should-Have 测试(TBD,待 basic-design + spec 层补字段) |
+> | **T2** REQ-DSG-001/002(DesignArtifact + WorkItem Guard) | 见 §6.3.3;Guard 失败需指出未批准的具体 DesignArtifact;已批准版本不可覆盖式修改;ReviewRecord.Target 二选一互斥 | V1 Should-Have 测试(TBD) |
+> | **T3** REQ-OPS-001/002/003(IncidentRecord) | 见 §6.3.4;历史 ValidationResult/Acceptance Coverage 判定不可覆写,只可新增标注;OPS-003 三项非能力(不探测生产/不处理告警/不自动回滚修复)需负向缺失测试 | V1 Should-Have 测试(TBD) |
+>
+> **不变量保留**:MVP 测试矩阵 / AC 覆盖率公式(§6.2 现行列结构)/ E2E 路径 / VAL-001 四重门(§6.3.2)全部不动;上表新增内容均为叠加说明,不改写 §14 已冻结接口的现行文本,详见各子节内 RFC 待办标注。
 
 ---
 
@@ -801,6 +816,21 @@ Feature: <Feature Name>
 - 覆盖率(✅/⚠️/❌)
 - 最后验证日期
 
+#### 6.2.1 Test Level 维度(REQ-TST-001/002,requirements §27.6,V1 Should-Have,TBD)
+
+`Level`(単体/結合/総合/受入)是 ValidationResult 上与既有 `Type`(§0.3 七类命名)**正交**的新字段,回答"这次验证处于哪个测试工程"而非"验证了什么种类的东西"。**不新建 TestPlan/TestCase 平行对象**——Level 只是 ValidationResult 的一个字段(不新增平行体系)。
+
+本设计现有 Test Type 与四档 Level 的对应关系(初步映射,非最终 Schema):
+
+| 本设计 Test Type(§0.3) | 对应 Level | 备注 |
+|---|---|---|
+| Unit Test(§2.1) | UnitTestLevel | 对应关系明确 |
+| Integration Test / Contract Test(§2.2) | IntegrationTestLevel | 对应关系明确 |
+| E2E Test(§2.3) | AcceptanceTestLevel | 对应关系明确 |
+| — | **SystemTestLevel(総合テスト)** | **未落位缺口**:本设计当前没有一个测试层级明确对应"総合テスト"。候选:§2.2.4(NATS+PostgreSQL+Valkey 全容器集成)、§2.4 性能测试、或多 WorkItem 跨域的 §2.3 E2E 扩展场景均可能承载,但尚无正式归属决定,标记为待定,不臆造归属 |
+
+**已知会影响但**尚不修改**的冻结接口**(§14 #7/#8):requirements §27.6 要求 Acceptance Coverage 映射(§27.2)能表达"某 AC 需要 IntegrationTestLevel **与** AcceptanceTestLevel 两条证据才算覆盖",并在缺失时指出具体缺哪个 Level,而非笼统显示"未覆盖"。这意味着 §6.2 矩阵格式与 §6.3.2 Gate 2(`AcceptanceCoverage == 1.0`)未来需要支持按 Level 判定。**当前不改写 §6.2/§6.3.2 现行文本**——basic-design 尚未定义 Level 落地 Schema,spec 层(`docs/specs/domain-validation-spec.md`)也未见 Level 字段,提前改写矩阵格式属于错标风险。此事项登记为 Test-J.11(§13.2),需先走 RFC 完成 basic-design 同步 + Schema 定稿,再回来修改并重新冻结 §14 #7/#8。
+
 ### 6.3 验收门禁
 
 #### 6.3.1 AC 覆盖率门禁
@@ -842,6 +872,36 @@ AI 完成声明(`is_ai_complete_claim == true`)必须同时满足以下四重门
 **集成位置**:`domain-validation::check_ai_complete_claim()`(实现侧)+ API 端点 `POST /v1/validation-results/claim`(调用侧)。具体见 basic-design §4.5.6 + §27.3 + §0.5 接口稳定承诺 #4。
 
 **安全分类**:此不变量本质是"防止 Agent 自我报告绕过流程"的安全防线,见 security-design §10.1 威胁 #6 "Fake Validation" 控制项。
+
+#### 6.3.3 DSG-001/002 Design Artifact Guard 测试点(requirements §8.3,V1 Should-Have,TBD)
+
+DesignArtifact 复用既有 ReviewRecord(§27.4)审批与 WorkItem Guard(§8.2 REQ-WF-003 `RequireApproval`)机制,**不新建审批状态机、不新增 Guard 类型**。测试关注点:
+
+| 场景 | 期望(不变量) |
+|---|---|
+| WorkItem 关联的 DesignArtifact 未全部 APPROVED,尝试触发受 Guard 约束的状态转换 | 拒绝,且错误明确列出**哪些** DesignArtifact 未批准(而非笼统失败,呼应 REQ-DSG-002) |
+| 全部关联 DesignArtifact 为 APPROVED | 转换放行(正向用例) |
+| 尝试覆盖式修改已 APPROVED 的 DesignArtifact Version | 拒绝;需走新版本 + Status 流转,不得原地改写历史版本(requirements §8.3"不得覆盖式修改已批准版本") |
+| DesignArtifact 被标记 SUPERSEDED 后 | 旧版本只读可追溯,新版本走独立 DRAFT→IN_REVIEW→APPROVED 生命周期 |
+| ReviewRecord 同时关联 ChangeSet 与 DesignArtifact | 拒绝/校验失败——`Target` 为 ChangeSet \| DesignArtifact 二选一互斥,不得同时挂两种(不新增平行体系) |
+
+Project 未启用该 Guard(非瀑布/敏捷 Project)时,以上校验均不触发——需补一条"Guard 未配置时透明放行"的对照用例,避免默认强制瀑布流程。
+
+**已知备注**:本设计书自身(Test Design)即为 `DesignArtifact.Kind = TestDesign` 的一个实例,此处不对"设计书如何被设计书追踪"做递归展开。实现侧接口锚点(端点 / 错误码)TBD,待 basic-design 补齐后回填。
+
+#### 6.3.4 OPS-001/002/003 Incident Record 测试点(requirements §29.1,V1 Should-Have,TBD)
+
+IncidentRecord 是人工登记的生产事件追溯对象,修复走既有 WorkItem→Worktree→AgentSession→ChangeSet→ValidationResult→ReviewRecord 闭环(§20-27),不新建独立修复流程。测试关注点:
+
+| 场景 | 期望(不变量) |
+|---|---|
+| IncidentRecord 关联 `ViolatedAcceptanceCriteria` 回填 §6.2 AC↔Test 矩阵 | 对应 AC 条目新增"曾被事件击穿"标注 |
+| IncidentRecord 尝试基于事件回填,修改某条 AC 历史 ValidationResult 的既有判定(如把历史 Pass 改成 Fail) | **拒绝**——只能新增标注,不得覆写既有判定(REQ-OPS-002,负向测试,同 TC-VAL001-N 系列写法) |
+| Acceptance Coverage 历史快照在 IncidentRecord 登记前后对比 | 历史快照不变,新增记录独立可追溯 |
+| 系统被要求执行生产环境探测 / 接收处理告警信号 / 自动回滚 / 自动修复 | **必须被拒绝**——三项均为 REQ-OPS-003 明确排除的非能力,与 §8.2 "❌ ExecuteArbitraryShell 必须被拒绝"同类缺失测试写法 |
+| 通过非既有 §18 Integration Webhook 机制之外的入站接口尝试创建 IncidentRecord | **必须被拒绝**——不新增独立入站接口(REQ-OPS-003) |
+
+**已知备注**:IncidentRecord 的 `Severity` 分级、`Status` 状态机字段细节由 basic-design 阶段决定,当前无法给出具体 Schema 断言,标记 TBD,不臆造字段名。
 
 ---
 
@@ -1398,6 +1458,9 @@ apps/web/
 - **Test-J.8**:是否需要 Contract Test 在 Frontend ↔ Backend 之间自动生成?V1 候选(用 OpenAPI Generator)。
 - **Test-J.9**:E2E Test 是否用真实 AI Provider(Money 成本)?MVP 用 Mock,V1 跑少量真实。**已决定**。
 - **Test-J.10**:是否需要 Adversarial Test(故意制造冲突 / Prompt Injection)?**V1 候选**。
+- **Test-J.11**:ValidationResult.Level 维度(REQ-TST-001/002,§6.2.1)落地后,§6.2 矩阵格式与 §6.3.2 Gate 2 如何按 Level 判定覆盖?**待 RFC**(需先等 basic-design 完成 98db08e 同步 + spec 层定 Schema,当前不改写 §14 #7/#8 现行文本)。
+- **Test-J.12**:DesignArtifact Guard(REQ-DSG-001/002,§6.3.3)的实现侧接口锚点(端点 / 错误码)?**待 basic-design 补充**,当前只有 requirements 层面的行为约束。
+- **Test-J.13**:IncidentRecord(REQ-OPS-001/002/003,§6.3.4)与 Operation Design 现有监控 / 告警链路的边界如何在测试层面隔离验证(避免误测成"系统自动监控生产")?**V1 候选**,待 operation-design 同步后细化。
 
 ---
 
@@ -1422,6 +1485,8 @@ apps/web/
 15. **Mutation Test 软目标**:§11.1
 16. **VAL-001 四重门全部 4 子条件 + 4 选 1/2/3/4 缺失的负向测试**:§6.3.2(D-04 修复,basic-design §4.5.6 P0 不变量)
 
+**待处理(非冻结,RFC pending)**:REQ-TST-001/002(requirements 98db08e)引入的 ValidationResult.Level 维度会影响 #7(AC ↔ Test 矩阵格式)与 #8(测试覆盖率目标),需先完成 RFC + basic-design 同步后再修改并重新冻结,当前 #7/#8 描述保持不变(见 §6.2.1、Test-J.11)。
+
 **变更流程**:任何对上述接口的修改,需走 RFC + 重新冻结本设计。
 
 ---
@@ -1439,4 +1504,4 @@ apps/web/
 
 ---
 
-**END of Test Design v0.1**
+**END of Test Design v0.3**
