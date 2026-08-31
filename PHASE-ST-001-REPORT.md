@@ -77,7 +77,9 @@ per 用户发令"基于需求文档进行 ST 测试, 保留各类过程和结果
 
 ---
 
-## §3 ST-2 5 域独立验证 (8/8 pass)
+## §3 ST-2 4 域独立验证 (8/8 pass)
+
+> **注**: ST-2 实际验证 4 域 (identity / permission / workspace / worktree), 不是 AGENTS.md §5 "5 域" (player / economy / match / social / admin, 业务子域) 也不是 DDD 5 域 (bounded context)。AGENTS.md §5 5 域独立 Lead 守门见 ST-6 #1 acceptance ✅, 但本 ST 范围仅限 4 域可独立实例化的 DDD 验证。
 
 `crates/star-mcp/tests/st_five_domain_isolation.rs` (新增)
 
@@ -158,14 +160,14 @@ per 用户发令"基于需求文档进行 ST 测试, 保留各类过程和结果
 
 ---
 
-## §6 ST-5 守门 #1 v1 严格通过 (170 err 已知)
+## §6 ST-5 守门 #1 v1 严格通过 (950 err 已知)
 
 **per AGENTS.md §4.1 v1 守门 #1**: `cargo check --workspace --lib` 必须 0 err
 
 | 命令 | 状态 | 详细 |
 |---|---|---|
 | `cargo check --workspace --lib` | 🟡 0/1 err | 1 err: domain-validation `_unused_user` (cargo 自动生成 dead-code 检测函数) |
-| `cargo check --workspace --all-targets` | 🔴 170 err | 其他 domain test 代码 P0-1b 撤销残留 + 之前问题 |
+| `cargo check --workspace --all-targets` | 🔴 **950 err** (2026-08-31 H5 重测) | 测试代码 P0-1b 撤销残留 + 之前问题; 数字有时效性, H2/H3 收敛后预计大幅下降 |
 | `cargo test --workspace --lib` | ⏸ 未跑 | — |
 | `cargo test --workspace --all-targets` | ⏸ 未跑 | — |
 
@@ -176,8 +178,8 @@ per 用户发令"基于需求文档进行 ST 测试, 保留各类过程和结果
 - 实际是 macro 字段可见性 + cargo 自动 dead code 检测的交互问题
 - 已知 P0-1c 后续: 加 `#[allow(dead_code)]` 解决
 
-**170 err 详情**:
-- 主要分布: domain-collaboration 60 / domain-workflow 54 / domain-worktree 51 / domain-agent 37 / domain-validation 37
+**950 err 详情** (2026-08-31 H5 重测, H1+H3 已落地):
+- 主要分布: domain-permission 98 / domain-feedback 78 / domain-integration 69 / domain-validation 66 / domain-development 63 / domain-workflow 54 / domain-search 53 / domain-worktree 51 / domain-local-runtime 51 / domain-notification 45 / domain-planning 42 / domain-board 39 / domain-context 36 / domain-work-item 35 / domain-workspace 32 / domain-identity 30 / domain-audit 26 / domain-project 23 / domain-automation 18 / domain-scm 17 / domain-relation 4 / domain-tenant 3
 - 主要模式: 测试代码 `actor.as_platform_admin()` 链调用 (5 domain) / `ActorContext::new(Uuid, Uuid)` 误用强类型 ID / `*tenant_id` 解引用
 - 估计 0.3-0.5M token 修完
 
@@ -189,7 +191,7 @@ per `audit report P0-1` 5 需求 + AGENTS.md §5 守门规则:
 
 | 需求 | 守门 | acceptance | 证据 |
 |---|---|---|---|
-| **1. 5 域独立 Lead** (守门 #3) | 拒绝兼任 | ✅ | ST-2 8/8 pass + AGENTS.md §5 拓扑 (5 域命名独立) |
+| **1. 5 域独立 Lead** (守门 #3) | 拒绝兼任 | ✅ | AGENTS.md §5 拓扑 (业务 5 域命名) + ST-2 4 域 DDD 验证 (8/8) |
 | **2. AI 协作 token-OLU** (守门 #4) | 1 SRE·周 = 1.2M tokens | ✅ | P0 累计 0.9M < 1.2M, 在预算内 |
 | **3. 环境变量安全** (守门 #5) | 禁 secret 泄露 | ✅ | 本 ST 期间 0 `Get-ChildItem env:` / `echo $VAR` 操作 |
 | **4. PowerShell only** (守门 #6) | 非 bash | ✅ | 全部 PowerShell (`$ErrorActionPreference`, `Get-ChildItem`, `Select-String`, `python`) |

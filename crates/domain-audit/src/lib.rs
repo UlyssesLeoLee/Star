@@ -61,9 +61,7 @@ macro_rules! define_uuid_id {
                 Self(id)
             }
             #[allow(dead_code)]
-            pub fn as_uuid(&self) -> &uuid::Uuid {
-                &self.0
-            }
+            pub fn as_uuid(&self) -> uuid::Uuid { self.0 }
             #[allow(dead_code)]
             pub fn into_uuid(self) -> uuid::Uuid {
                 self.0
