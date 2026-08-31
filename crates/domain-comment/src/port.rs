@@ -3,7 +3,6 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::context::ActorContext;
 use crate::entity::{Attachment, AttachmentDownloadURL, Comment, Mention, Reaction};
 use crate::error::CommentError;
 use crate::value_object::{

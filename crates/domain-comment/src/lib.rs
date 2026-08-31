@@ -711,23 +711,23 @@ impl CommentRepository for InMemoryCommentRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn dev(tid: TenantId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tid.0).with_role("developer")
+    fn dev(tid: uuid::Uuid) -> ActorContext {
+        ActorContext::new(Uuid::new_v4(), tid).with_role("developer")
     }
 
-    fn make_cmd(tid: TenantId) -> CreateCommentCommand {
+    fn make_cmd(tid: uuid::Uuid) -> CreateCommentCommand {
         let me = uuid::Uuid::new_v4();
         CreateCommentCommand {
-            tenant_id: tid,
+            tenant_id: TenantId(tid),
             project_id: ProjectId::new(),
             parent_type: ParentType::WorkItem,
             parent_id: Uuid::new_v4(),
             body: "first comment".to_string(),
-            author_user_id: Some(me),
+            author_user_id: Some(UserId::from(me)),
             author_agent_id: None,
             mentions: vec![],
             attachment_ids: vec![],
-            actor_user_id: me,
+            actor_user_id: UserId::from(me),
         }
     }
 
@@ -776,7 +776,7 @@ mod tests {
         assert!(matches!(res, Err(CommentError::InvalidState(_))));
         // 同时有 user 和 agent
         let mut cmd2 = make_cmd(tid);
-        cmd2.author_user_id = Some(uuid::Uuid::new_v4());
+        cmd2.author_user_id = Some(UserId::from(uuid::Uuid::new_v4()));
         cmd2.author_agent_id = Some(AgentId::new());
         let res2 = svc.create_comment(cmd2, &actor).await;
         assert!(matches!(res2, Err(CommentError::InvalidState(_))));
@@ -787,7 +787,7 @@ mod tests {
         let svc = InMemoryCommentService::new();
         let tid = uuid::Uuid::new_v4();
         // Agent 用 as_agent 然后覆盖 tenant_id
-        let mut agent_actor = ActorContext::as_agent(AgentId::new());
+        let mut agent_actor = ActorContext::new(AgentId::new().as_uuid(), tid).with_agent_session(true);
         agent_actor.tenant_id = tid;
         let mut cmd = make_cmd(tid);
         cmd.author_agent_id = Some(AgentId::new());
@@ -802,16 +802,16 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
         let mut cmd = make_cmd(tid);
-        cmd.author_user_id = Some(me);
-        let actor = ActorContext::new(me.0, tid.0);
+        cmd.author_user_id = Some(UserId::from(me));
+        let actor = ActorContext::new(me, tid);
         let c = svc.create_comment(cmd, &actor).await.unwrap();
         let c2 = svc
             .edit_comment(
                 EditCommentCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     comment_id: c.id,
                     new_body: "edited".to_string(),
-                    actor_user_id: me,
+                    actor_user_id: UserId::from(me),
                 },
                 &actor,
             )
@@ -827,17 +827,17 @@ mod tests {
         let me = uuid::Uuid::new_v4();
         let other = uuid::Uuid::new_v4();
         let mut cmd = make_cmd(tid);
-        cmd.author_user_id = Some(me);
+        cmd.author_user_id = Some(UserId::from(me));
         let actor = dev(tid);
         let c = svc.create_comment(cmd, &actor).await.unwrap();
-        let other_actor = ActorContext::new(other.0, tid.0);
+        let other_actor = ActorContext::new(other, tid);
         let res = svc
             .edit_comment(
                 EditCommentCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     comment_id: c.id,
                     new_body: "x".to_string(),
-                    actor_user_id: other,
+                    actor_user_id: UserId::from(other),
                 },
                 &other_actor,
             )
@@ -851,14 +851,14 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
         let mut cmd = make_cmd(tid);
-        cmd.author_user_id = Some(me);
-        let actor = ActorContext::new(me.0, tid.0);
+        cmd.author_user_id = Some(UserId::from(me));
+        let actor = ActorContext::new(me, tid);
         let c = svc.create_comment(cmd, &actor).await.unwrap();
         svc.delete_comment(
             DeleteCommentCommand {
-                tenant_id: tid,
+                tenant_id: TenantId(tid),
                 comment_id: c.id,
-                actor_user_id: me,
+                actor_user_id: UserId::from(me),
             },
             &actor,
         )
@@ -867,10 +867,10 @@ mod tests {
         let res = svc
             .edit_comment(
                 EditCommentCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     comment_id: c.id,
                     new_body: "x".to_string(),
-                    actor_user_id: me,
+                    actor_user_id: UserId::from(me),
                 },
                 &actor,
             )
@@ -884,15 +884,15 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
         let mut cmd = make_cmd(tid);
-        cmd.author_user_id = Some(me);
-        let actor = ActorContext::new(me.0, tid.0);
+        cmd.author_user_id = Some(UserId::from(me));
+        let actor = ActorContext::new(me, tid);
         let c = svc.create_comment(cmd, &actor).await.unwrap();
         let c2 = svc
             .delete_comment(
                 DeleteCommentCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     comment_id: c.id,
-                    actor_user_id: me,
+                    actor_user_id: UserId::from(me),
                 },
                 &actor,
             )
@@ -908,15 +908,15 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
         let mut cmd = make_cmd(tid);
-        cmd.author_user_id = Some(me);
-        let actor = ActorContext::new(me.0, tid.0);
+        cmd.author_user_id = Some(UserId::from(me));
+        let actor = ActorContext::new(me, tid);
         let c = svc.create_comment(cmd, &actor).await.unwrap();
         let r = svc
             .add_reaction(
                 AddReactionCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     comment_id: c.id,
-                    user_id: me,
+                    user_id: UserId::from(me),
                     emoji: "👍".to_string(),
                 },
                 &actor,
@@ -927,9 +927,9 @@ mod tests {
         let res = svc
             .add_reaction(
                 AddReactionCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     comment_id: c.id,
-                    user_id: me,
+                    user_id: UserId::from(me),
                     emoji: "👍".to_string(),
                 },
                 &actor,
@@ -943,12 +943,12 @@ mod tests {
         let svc = InMemoryCommentService::new();
         let tid = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(me.0, tid.0);
+        let actor = ActorContext::new(me, tid);
         let res = svc
             .register_attachment(
                 RegisterAttachmentCommand {
-                    tenant_id: tid,
-                    uploader_user_id: me,
+                    tenant_id: TenantId(tid),
+                    uploader_user_id: UserId::from(me),
                     filename: "design.pdf".to_string(),
                     content_type: "application/pdf".to_string(),
                     size_bytes: 1024,
@@ -965,16 +965,16 @@ mod tests {
         let svc = InMemoryCommentService::new();
         let tid = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(me.0, tid.0);
+        let actor = ActorContext::new(me, tid);
         let a = svc
             .register_attachment(
                 RegisterAttachmentCommand {
-                    tenant_id: tid,
-                    uploader_user_id: me,
+                    tenant_id: TenantId(tid),
+                    uploader_user_id: UserId::from(me),
                     filename: "design.pdf".to_string(),
                     content_type: "application/pdf".to_string(),
                     size_bytes: 1024,
-                    object_key: format!("tenants/{}/design.pdf", tid.as_uuid()),
+                    object_key: format!("tenants/{}/design.pdf", tid),
                 },
                 &actor,
             )
@@ -982,7 +982,7 @@ mod tests {
             .unwrap();
         assert!(a
             .object_key
-            .starts_with(&format!("tenants/{}/", tid.as_uuid())));
+            .starts_with(&format!("tenants/{}/", tid)));
     }
 
     #[tokio::test]
@@ -991,19 +991,19 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
         let parent_id = Uuid::new_v4();
-        let actor = ActorContext::new(me.0, tid.0);
+        let actor = ActorContext::new(me, tid);
         // 创建 2 个
         for _ in 0..2 {
             let mut cmd = make_cmd(tid);
             cmd.parent_id = parent_id;
-            cmd.author_user_id = Some(me);
+            cmd.author_user_id = Some(UserId::from(me));
             svc.create_comment(cmd, &actor).await.unwrap();
         }
         // 删 1 个
         let list = svc
             .list_by_parent(
                 ListByParentQuery {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     parent_type: ParentType::WorkItem,
                     parent_id,
                     include_deleted: false,
@@ -1015,9 +1015,9 @@ mod tests {
         let first_id = list[0].id;
         svc.delete_comment(
             DeleteCommentCommand {
-                tenant_id: tid,
+                tenant_id: TenantId(tid),
                 comment_id: first_id,
-                actor_user_id: me,
+                actor_user_id: UserId::from(me),
             },
             &actor,
         )
@@ -1026,7 +1026,7 @@ mod tests {
         let active = svc
             .list_by_parent(
                 ListByParentQuery {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     parent_type: ParentType::WorkItem,
                     parent_id,
                     include_deleted: false,
@@ -1039,7 +1039,7 @@ mod tests {
         let all = svc
             .list_by_parent(
                 ListByParentQuery {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     parent_type: ParentType::WorkItem,
                     parent_id,
                     include_deleted: true,

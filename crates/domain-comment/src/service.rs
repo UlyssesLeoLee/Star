@@ -5,7 +5,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 
-use crate::context::ActorContext;
 use crate::entity::{Attachment, AttachmentDownloadURL, Comment, Mention, Reaction};
 use crate::error::CommentError;
 use crate::event::{
@@ -67,7 +66,7 @@ impl InMemoryCommentService {
     }
 
     fn check_tenant(actor: &ActorContext, expected: TenantId) -> Result<(), CommentError> {
-        if actor.tenant_id != expected {
+        if actor.tenant_id != expected.0 {
             return Err(CommentError::PermissionDenied);
         }
         Ok(())
@@ -148,7 +147,7 @@ impl CommentCommandPort for InMemoryCommentService {
             // 发布 MentionNotified 事件
             let evt = CommentEvent::MentionNotified(MentionNotified {
                 meta: EventMeta {
-                    actor_user_id: Some(actor.user_id.into_uuid()),
+                    actor_user_id: Some(actor.user_id),
                     ..EventMeta::new(cmd.tenant_id)
                 },
                 mention_id: m.id,
@@ -162,7 +161,7 @@ impl CommentCommandPort for InMemoryCommentService {
         // 发布 Created 事件
         let evt = CommentEvent::Created(CommentCreated {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 ..EventMeta::new(cmd.tenant_id)
             },
             comment_id: c.id,
@@ -190,7 +189,7 @@ impl CommentCommandPort for InMemoryCommentService {
             return Err(CommentError::PermissionDenied);
         }
         // C-002:仅作者 / admin 可更新
-        if c.author_user_id != actor.user_id && !actor.is_tenant_admin() {
+        if c.author_user_id != UserId::from(actor.user_id) && !actor.is_tenant_admin() {
             return Err(CommentError::PermissionDenied);
         }
         if c.is_deleted() {
@@ -211,7 +210,7 @@ impl CommentCommandPort for InMemoryCommentService {
 
         let evt = CommentEvent::Updated(CommentUpdated {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 ..EventMeta::new(cmd.tenant_id)
             },
             comment_id: c.id,
@@ -235,7 +234,7 @@ impl CommentCommandPort for InMemoryCommentService {
             return Err(CommentError::PermissionDenied);
         }
         // C-002:仅作者 / admin 可删除
-        if c.author_user_id != actor.user_id && !actor.is_tenant_admin() {
+        if c.author_user_id != UserId::from(actor.user_id) && !actor.is_tenant_admin() {
             return Err(CommentError::PermissionDenied);
         }
         let now = chrono::Utc::now();
@@ -245,7 +244,7 @@ impl CommentCommandPort for InMemoryCommentService {
 
         let evt = CommentEvent::Deleted(CommentDeleted {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 ..EventMeta::new(c.tenant_id)
             },
             comment_id: c.id,
@@ -308,7 +307,7 @@ impl CommentCommandPort for InMemoryCommentService {
             .get(&reaction_id)
             .ok_or(CommentError::NotFound(CommentId::from_uuid(uuid::Uuid::nil())))?
             .clone();
-        if r.user_id != actor.user_id && !actor.is_tenant_admin() {
+        if r.user_id != UserId::from(actor.user_id) && !actor.is_tenant_admin() {
             return Err(CommentError::PermissionDenied);
         }
         reactions.remove(&reaction_id);
@@ -348,7 +347,7 @@ impl CommentCommandPort for InMemoryCommentService {
 
         let evt = CommentEvent::AttachmentUploaded(AttachmentUploaded {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 ..EventMeta::new(cmd.tenant_id)
             },
             attachment_id: a.id,
