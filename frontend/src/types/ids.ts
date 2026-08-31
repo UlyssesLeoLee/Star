@@ -39,6 +39,50 @@ export type ModuleName =
   | "collaboration" | "planning" | "board" | "local-runtime" | "relation"
   | "workspace" | "audit" | "automation";
 
+// ----- Test Level 维度 (per REQ-TST-001, docs/test-design.md §6.2.1) -----
+// 已知缺口 (per 缺标比错标安全, 8/26 JST):
+//   1. basic-design §4.5.6 字段细节 TBD (e.g. 是否携带 fixture_path / duration_ms),
+//      现阶段按 UI 投影层最小集 5 字段 (id / work_item_id / kind / status / level / evidence_ref / linked_ac_ids / created_at).
+//   2. ValidationResult 6 状态机与 §27.1 spec 对齐: running/passed/failed/errored/skipped/superseded
+//      (per §A.5 supersede 由 P2 ValidationPolicy 引入, 此处先列).
+//   3. **命名冲突**: 现有 §14 ValidationResult 是字符串联合 ("pass" | "fail" | "skipped" | "feedback_required"),
+//      充当 ValidationCase.result 的 outcome 状态 (per seed.ts + app/validation/page.tsx 已用).
+//      按 spec §27.1 真正的"聚合根"应该叫 ValidationResult (本应承担 evidence_ref / level 等).
+//      改名需重写 §14 既有 2 个 consumer (scope 限定不碰), 故本节先以 ValidationResultRecord
+//      落地 REQ-TST-001/002 字段集合, basic-design §4.5.6 拍板时一并把 §14 字符串联合迁成
+//      ValidationOutcome, 把 ValidationResultRecord 改名回 ValidationResult (per 守门 #12 docs 同步).
+export type TestLevel = "unit" | "integration" | "system" | "acceptance";
+export const TEST_LEVELS: readonly TestLevel[] = [
+  "unit",
+  "integration",
+  "system",
+  "acceptance",
+] as const;
+
+export type ValidationResultKind =
+  | "build" | "test" | "lint" | "contract" | "security";
+export type ValidationResultStatus =
+  | "running" | "passed" | "failed" | "errored" | "skipped" | "superseded";
+
+export interface ValidationResultRecord {
+  id: Uuid;
+  work_item_id: Uuid;
+  kind: ValidationResultKind;
+  status: ValidationResultStatus;
+  level: TestLevel; // 必填,per REQ-TST-001
+  evidence_ref: string; // INV-VL-04 必填 (basic-design §4.5.5)
+  linked_ac_ids: Uuid[]; // 关联 AcceptanceCriteria (per §27.2)
+  created_at: Iso8601;
+}
+
+export interface AcceptanceCoverageReport {
+  work_item_id: Uuid;
+  total_count: number;
+  covered_count: number;
+  by_level: Record<TestLevel, number>; // per Level 覆盖数
+  uncovered_by_level: Record<TestLevel, Uuid[]>; // per Level 缺哪些 AC, per REQ-TST-002
+}
+
 // =====================================================================
 // 1. tenant
 // =====================================================================
