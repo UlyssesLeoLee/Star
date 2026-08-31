@@ -100,7 +100,8 @@
 |---|---|---|---|
 | v0.1 | 2026-08-31 | 上游 AI (本 session) | 初版: 从 QA-ST-001.md §5/§6 拆出下游 AI 可执行项 (H1-H5) vs 已闭环项 vs 待 Ulysses 拍板项; H5 首次实测 --all-targets 968 err |
 | v0.2 | 2026-08-31 | 架构师 (Mavis 接手 agent per DEC-008) | H2 范围扩量 (3 → 8 domain, 发现 H2-EXT 5 domain) + Stage 1 commit 68ae5ff 落地 + Stage 2-3 尝试后 revert (117+ err, 0.6-0.8M token 超出预算) + H5 重测 950 → 432 err (star-context 扩展消解 145+ err); 上游估 0.3-0.5M 实测 0.6-0.8M (3-5x), H2-EXT 需 0.5-0.8M 额外, 总计 1.1-1.6M, 跨 session 续; 真实尝试脚本入档 scripts/p0_h2_3domain_migration.py |
-| v0.3 | 2026-08-31 | 架构师 (Mavis 接手 agent per DEC-008) | 4 项 Ulysses 拍板结果 (Q1-D a+c / Q10-P b / Q11-P a / Q12-P a) + 跨 session 续交接 (Q10-P b 推荐拍板) + §5 新增 "下个 session 入口" 段; 本 session 至此收尾 (per 22:45 JST 4 项拍板 + 守门 #1+#9+#12+#15 跨 stage 全过) |
+| v0.3 | 2026-08-31 | 架构师 (Mavis 接手 agent per DEC-008) | 4 项 Ulysses 拍板结果
+| v0.4 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | H2-EXT #1-#3 落地 (3 commits: 9d08f80 / b6f6e2a / 7f611b0), 净修 507 err (797 → 290, 跨 9 crate); 守门 #1 实证: star-context 21/21 pass + workspace --lib 0 err + H2-EXT 3/5 完成; H2-EXT #4 domain-identity (DeviceId→Uuid 重构) + #5 domain-work-item (String→Uuid 需 Ulysses 拍板 String 原义) 跨 session 续; session 至此收尾 (per 2026-09-01 07:56 JST 新 session 启动, 2026-09-01 09:50 JST 收尾) | (Q1-D a+c / Q10-P b / Q11-P a / Q12-P a) + 跨 session 续交接 (Q10-P b 推荐拍板) + §5 新增 "下个 session 入口" 段; 本 session 至此收尾 (per 22:45 JST 4 项拍板 + 守门 #1+#9+#12+#15 跨 stage 全过) |
 
 
 ---
@@ -147,3 +148,45 @@
 # 4. 续 H2-EXT 5 domain (按 §5.1 顺序)
 # 5. 续 P0-2 ApiError 映射 (H2 完成后)
 ```
+
+---
+
+## §6 跨 session 续 v0.4 总结 (2026-09-01 09:50 JST)
+
+**H2-EXT 5 domain 改造进度 3/5 完成**:
+
+| # | domain | 状态 | commit | 字段扩展 | 估 token |
+|---|---|---|---|---|---|
+| 1 | domain-comment | ✅ | 9d08f80 | (无) | 0.05M (实测 ~0.15M) |
+| 2 | domain-tenant | ✅ | b6f6e2a | + `tenant_policy_id: Option<Uuid>` + `is_platform_operator()` helper | 0.1M |
+| 3 | domain-project | ✅ | 7f611b0 | + `workspace_ids: Vec<Uuid>` 字段 | 0.1M |
+| 4 | domain-identity | ⏳ 跨 session 续 | — | (DeviceId 强类型 → Uuid 重构) | 0.2M |
+| 5 | domain-work-item | ⏳ 跨 session 续 + 等 Ulysses 拍板 | — | (String → Uuid 业务语义重设) | 0.2M |
+
+**守门 #1 实证 (新 session 启动后)**:
+
+| 阶段 | 命令 | 结果 |
+|---|---|---|
+| --lib | cargo check --workspace --lib | 0 err |
+| --all-targets | cargo check --workspace --all-targets | **290 err** (跨 9 crate, 数字时效性 per Q9-T A9 不得沿用 797 或 432) |
+| clippy | cargo clippy --workspace --lib | 0 err |
+| fmt | cargo fmt --all --check | exit 0 |
+| star-context test | cargo test -p star-context --lib | 21/21 pass |
+
+**290 err 跨 9 crate 分布** (新 baseline):
+- domain-feedback 77 (H2 原 3 domain 之一, 最大头)
+- domain-worktree 51 (其它 domain, 跟 H2-EXT 无关)
+- domain-local-runtime 50
+- domain-board 39
+- domain-agent 37
+- domain-identity 30 (H2-EXT #4)
+- domain-relation 4
+- domain-project 1 (剩 1 err, 跟 H2-EXT #3 强类型转换相关)
+- infrastructure 1
+
+**H2-EXT #4 #5 跨 session 续 (估 0.4M token)**:
+- #4 domain-identity: DeviceId 强类型 → Uuid 重构 (entity 改 + 跨 service/invariant)
+- #5 domain-work-item: device_id String → Uuid 业务语义重设 (需 Ulysses 拍板 String 原义: hostname? JWT token? 其他?)
+
+**H2 原 3 domain 改造 (估 0.6-0.8M token 跨 session 续)**:
+- domain-feedback 77 err 是 H2 原 3 domain 改造大头, 模式跟 #1 #2 #3 一样, 但 service.rs 内部 actor.user_id 当 UserId 用 / actor.tenant_id 当 TenantId 用的 call sites 更多
