@@ -18,6 +18,11 @@
 //   - 同列内排序 (intra-column reorder) 不支持 — Phase D.6+ 加
 //   - 触屏拖动 (touch events) 未适配 — Phase Mobile 验证 (per §10.3 #5)
 //   - ARIA live region (a11y) 未实现 (per §10.3 #6)
+//
+// 兜底列保护 (per 2026-08-31 11:24 JST Ulysses 拍板):
+//   - 兜底列 (todo) 不可删, ✕ 按钮置灰 + tooltip
+//   - store removeBoardColumn 二次拒绝兜底 status
+//   - 删其他列时, 列里 wi 状态统一归 todo, 保证数据零丢失
 // =====================================================================
 
 import { useState, useCallback, useMemo } from "react";
@@ -27,6 +32,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { AlertTriangle, Plus, SlidersHorizontal } from "lucide-react";
 import type { Board, WorkItem, WorkItemStatus, Identity } from "@/types/ids";
 import { KANBAN_COLUMNS } from "@/mocks/data";
+import { isFallbackStatus } from "./constants";
 
 export interface KanbanBoardProps {
   board: Board;
@@ -327,18 +333,31 @@ export function KanbanBoard({
                     {cards.length}
                     {col.wip_limit !== undefined && col.wip_limit < 99 && ` / ${col.wip_limit}`}
                   </span>
-                  {onRemoveColumn && (
-                    <button
-                      type="button"
-                      data-testid={`kanban-column-remove-${col.status}`}
-                      onClick={() => onRemoveColumn(col.status)}
-                      aria-label={`删除列 ${col.name ?? col.status}`}
-                      className="text-ink-mute hover:text-err transition-colors text-xs leading-none px-1"
-                      title="删除列"
-                    >
-                      ✕
-                    </button>
-                  )}
+                  {onRemoveColumn && (() => {
+                    // per 2026-08-31 11:24 JST 拍板: 兜底列 (todo) 不可删,
+                    // 按钮置灰 + tooltip 解释, store 也会二次拒绝
+                    const isFallback = isFallbackStatus(col.status);
+                    return (
+                      <button
+                        type="button"
+                        data-testid={`kanban-column-remove-${col.status}`}
+                        onClick={() => {
+                          if (isFallback) return; // 兜底列 click 直接吞掉, 兜底保护
+                          onRemoveColumn(col.status);
+                        }}
+                        disabled={isFallback}
+                        aria-label={isFallback ? `兜底列 ${col.name ?? col.status} 不可删除` : `删除列 ${col.name ?? col.status}`}
+                        className={
+                          isFallback
+                            ? "text-ink-mute/40 cursor-not-allowed text-xs leading-none px-1"
+                            : "text-ink-mute hover:text-err transition-colors text-xs leading-none px-1"
+                        }
+                        title={isFallback ? "兜底列不可删除 — 删除时其他列的任务会回到此列, 是数据兜底" : "删除列"}
+                      >
+                        ✕
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
               {overWip && (

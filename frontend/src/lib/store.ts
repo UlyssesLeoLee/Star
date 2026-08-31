@@ -22,7 +22,47 @@ import type {
   ChangeSet, ChangeSetStatus,
   Notification, NotificationStatus,
   Canvas, CanvasElement, CanvasConnector,
+  Board,
 } from "@/types/ids";
+import { TODO_FALLBACK_STATUS, isFallbackStatus } from "@/components/board/constants";
+
+// =====================================================================
+// Board reconcile 工具 — 让 board.columns[].work_item_ids 始终是
+//   workItems[].status 的派生视图 (per 2026-08-31 11:24 JST Ulysses 拍板)
+// =====================================================================
+// 规则:
+//   1. 对每个 status, board.columns 里该 status 列的 work_item_ids 包含
+//      且仅包含 workItems 里 status 等于它的 wi.id
+//   2. 保留列在 board.columns 里的顺序 (不重排)
+//   3. 不存在的 status (workItems 有但 board.columns 没有) — 不自动加列;
+//      由 KanbanBoard 端"列 = 状态映射"的渲染决定是否显示游离 wi
+//      (这里只保证 *已存在列* 的 work_item_ids 跟 workItems.status 一致)
+//   4. 兜底列缺失时也不自动补 — 因为兜底列在 addBoardColumn/seed 阶段保证存在
+// =====================================================================
+const reconcileBoard = (
+  workItems: WorkItem[],
+  columns: Board["columns"],
+): Board["columns"] =>
+  columns.map((col) => {
+    // 该列 status 期望的 wi 集合 (按 workItems 顺序稳定输出, 避免抖动)
+    const expectedIds = workItems
+      .filter((w) => w.status === col.status)
+      .map((w) => w.id);
+    // 现状: 列里有的 id, 但 workItems 已不匹配 status (漂移) — 移除
+    const cleaned = col.work_item_ids.filter((id) => {
+      const w = workItems.find((x) => x.id === id);
+      return w?.status === col.status;
+    });
+    // 缺的: workItems 期望但列里没有 — 补回
+    const haveSet = new Set(cleaned);
+    for (const id of expectedIds) {
+      if (!haveSet.has(id)) {
+        cleaned.push(id);
+        haveSet.add(id);
+      }
+    }
+    return { ...col, work_item_ids: cleaned };
+  });
 
 // =====================================================================
 // SSR-safe localStorage 包装
@@ -111,9 +151,10 @@ interface StoreState {
   transitionMilestone: (id: string, newDueDate: string) => void;  // ISO8601
   transitionSprint:    (id: string, newStart: string, newEnd: string) => void;
 
-  // Board 列编辑 (per 2026-08-29 18:52 JST 拍板: 列可改 + 增加减少)
-  addBoardColumn:    (status: WorkItemStatus) => void;     // 在末尾追加新列
-  removeBoardColumn: (status: WorkItemStatus) => void;     // 删除列 (work_item_ids 移交给 "wontfix")
+  // Board 列编辑 (per 2026-08-29 18:52 JST 拍板: 列可改 + 增加减少; 2026-08-31 11:24 JST
+  // 强化: workItems.status 为主源, board.columns[].work_item_ids 派生; todo 兜底不可删)
+  addBoardColumn:    (status: WorkItemStatus) => void;     // 在末尾追加新列, 并回填 workItems.status 匹配的 wi
+  removeBoardColumn: (status: WorkItemStatus) => void;     // 删列; 兜底列拒绝; 列里 wi 全部归 todo (兜底)
   renameBoardColumn: (status: WorkItemStatus, newName: string) => void;  // 改 name
   reorderBoardColumns: (fromIdx: number, toIdx: number) => void;  // 拖动列重排 (后续)
 
@@ -190,9 +231,18 @@ const initialState = (set: any): StoreState => ({
       pullRequests: s.pullRequests.map((p) => p.id === id ? { ...p, status: to, merged_at: to === "merged" ? new Date().toISOString() : p.merged_at } : p),
     })),
   transitionWorkItem: (id, to) =>
-    set((s: StoreState) => ({
-      workItems: s.workItems.map((w) => w.id === id ? { ...w, status: to, updated_at: new Date().toISOString() } : w),
-    })),
+    set((s: StoreState) => {
+      const newWorkItems = s.workItems.map((w) =>
+        w.id === id ? { ...w, status: to, updated_at: new Date().toISOString() } : w
+      );
+      // per 2026-08-31 11:24 JST Ulysses 拍板: workItems.status 是主源,
+      // 改 status 后 board.columns[].work_item_ids 必须 reconcile 跟随,
+      // 否则 board 视图会跟 workItems 漂移 (drop 到不存在的列会丢卡)
+      return {
+        workItems: newWorkItems,
+        board: { ...s.board, columns: reconcileBoard(newWorkItems, s.board.columns) },
+      };
+    }),
   transitionChangeSet: (id, to) =>
     set((s: StoreState) => ({
       changeSets: s.changeSets.map((c) => c.id === id ? { ...c, status: to } : c),
@@ -212,15 +262,20 @@ const initialState = (set: any): StoreState => ({
       sprints: s.sprints.map((sp) => sp.id === id ? { ...sp, start_date: newStart, end_date: newEnd } : sp),
     })),
 
-  // Board 列编辑 (per 2026-08-29 18:52 JST 拍板)
+  // Board 列编辑 (per 2026-08-29 18:52 JST 拍板; 2026-08-31 11:24 JST 强化)
   addBoardColumn: (status) =>
     set((s: StoreState) => {
       // 防重: 已存在该 status 跳过
       if (s.board.columns.some((c) => c.status === status)) return s;
+      // 回填: 把 workItems 里 status 匹配的 wi 拉进新列 (per 11:24 拍板: 双向回填)
+      const newCol: Board["columns"][number] = {
+        status,
+        work_item_ids: s.workItems.filter((w) => w.status === status).map((w) => w.id),
+      };
       return {
         board: {
           ...s.board,
-          columns: [...s.board.columns, { status, work_item_ids: [] }],
+          columns: [...s.board.columns, newCol],
         },
       };
     }),
@@ -228,16 +283,25 @@ const initialState = (set: any): StoreState => ({
     set((s: StoreState) => {
       const col = s.board.columns.find((c) => c.status === status);
       if (!col) return s;
-      // 列里 work_item_ids 的 wi 状态改为 wontfix (兜底, 避免丢数据; 真实场景会弹确认)
+      // 兜底列不可删 (per 11:24 拍板: todo 列是数据兜底, 不允许被删)
+      if (isFallbackStatus(status)) {
+        // eslint-disable-next-line no-console
+        console.warn(`[store] removeBoardColumn: refused to delete fallback column "${status}"`);
+        return s;
+      }
+      // 删非兜底列: 列里 wi 状态全部改回 todo (兜底), 让 reconcile 把它放回 todo 列
       const idsInCol = new Set(col.work_item_ids);
+      const newWorkItems = s.workItems.map((w) =>
+        idsInCol.has(w.id) ? { ...w, status: TODO_FALLBACK_STATUS } : w
+      );
+      // 删列后 reconcile 一次, 确保 todo 列的 work_item_ids 包含刚改回 todo 的 wi
+      const newColumns = reconcileBoard(
+        newWorkItems,
+        s.board.columns.filter((c) => c.status !== status),
+      );
       return {
-        board: {
-          ...s.board,
-          columns: s.board.columns.filter((c) => c.status !== status),
-        },
-        workItems: s.workItems.map((w) =>
-          idsInCol.has(w.id) ? { ...w, status: "wontfix" as WorkItemStatus } : w
-        ),
+        board: { ...s.board, columns: newColumns },
+        workItems: newWorkItems,
       };
     }),
   renameBoardColumn: (status, newName) =>
@@ -298,6 +362,27 @@ export const useStore = create<StoreState>()(
       },
       // 持久化版本号 — 升 schema 时改 version + 加 migrate
       version: 1,
+      // hydrate 完成后跑一次 board reconcile (per 2026-08-31 11:24 JST 拍板):
+      //   老 localStorage 数据 / seed 跟 workItems.status 错位 / 11:24 前删除列的脏数据
+      //   都能在启动时一次性修复, 避免每个 action 各自去 catch 漂移
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const reconciledCols = reconcileBoard(state.workItems, state.board.columns);
+        // 仅在确实漂移时才 set, 避免无谓的 persist write
+        const drifted = reconciledCols.some((c, i) => {
+          const orig = state.board.columns[i];
+          if (!orig) return true;
+          if (c.status !== orig.status) return true;
+          if (c.work_item_ids.length !== orig.work_item_ids.length) return true;
+          for (let k = 0; k < c.work_item_ids.length; k++) {
+            if (c.work_item_ids[k] !== orig.work_item_ids[k]) return true;
+          }
+          return false;
+        });
+        if (drifted) {
+          useStore.setState({ board: { ...state.board, columns: reconciledCols } });
+        }
+      },
     }
   )
 );

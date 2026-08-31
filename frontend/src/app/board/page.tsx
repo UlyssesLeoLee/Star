@@ -95,37 +95,16 @@ export default function BoardPage() {
   );
 
   // ---- 拖动 transition 处理 ----
-  // 注: store.transitionWorkItem 只更新 workItems[i].status,
-  //     不更新 board.columns[j].work_item_ids, 所以这里在 page 层同步两处
-  // (per W1 守门: 不重写 store, 仅在调用方补偿)
+  // per 2026-08-31 11:24 JST Ulysses 拍板: workItems.status 为主源;
+  //   store.transitionWorkItem 内部已 reconcile board.columns[].work_item_ids,
+  //   page 不再手工 setState 改 board (之前双写易漂移, 已被 store 接管)
+  // (per W1 守门: page 只剩 audit log, store 是单一入口)
   const handleTransition = useCallback(
     (workItemId: string, toStatus: WorkItemStatus) => {
-      // 1) 走 store 的状态机 (INV-PM-01~05 校验由 store 后续实装承担)
+      // 1) 走 store 的状态机 (workItem.status + board reconcile 都在 store 完成)
       transitionWorkItem(workItemId, toStatus);
 
-      // 2) 同步更新 board.columns, 移动 work_item_ids (last-write-wins, 拖动 = 一次 transition)
-      useStore.setState((s) => {
-        const fromCol = s.board.columns.find((c) => c.work_item_ids.includes(workItemId));
-        const toCol = s.board.columns.find((c) => c.status === toStatus);
-        if (!fromCol || !toCol) return s;
-        if (fromCol.status === toCol.status) return s;
-        return {
-          board: {
-            ...s.board,
-            columns: s.board.columns.map((c) => {
-              if (c.status === fromCol.status) {
-                return { ...c, work_item_ids: c.work_item_ids.filter((id) => id !== workItemId) };
-              }
-              if (c.status === toCol.status) {
-                return { ...c, work_item_ids: [...c.work_item_ids, workItemId] };
-              }
-              return c;
-            }),
-          },
-        };
-      });
-
-      // 3) audit log (per §3.3 数据流) — stub, 1s 后写 console + localStorage event
+      // 2) audit log (per §3.3 数据流) — stub, 1s 后写 console + localStorage event
       // 真实后端 D.6+ 接入, 这里保留 stub 给 E2E 验证
       setTimeout(() => {
         const auditEntry = {
