@@ -55,11 +55,16 @@ export function Sidebar() {
         >
           <div
             aria-hidden="true"
-            className="size-9 rounded-xl bg-gradient-to-br from-accent/30 via-accent-violet/20 to-secondary/20 border border-accent/40 grid place-items-center text-accent shadow-[0_0_16px_rgba(0,240,255,0.3)] shrink-0 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-6"
+            className="size-9 rounded-xl overflow-hidden border border-accent/40 shadow-[0_0_16px_rgba(0,240,255,0.3)] shrink-0 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-6 bg-black"
           >
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-              <path d="M8 1l1.8 4.7L15 6.5l-3.8 3.4.9 5L8 12.5 3.9 14.9l.9-5L1 6.5l5.2-.8z" />
-            </svg>
+            {/* Star brand icon — 96x96 黑底 PNG, 由根目录 icon.png 缩放 (per 2026-08-31 11:30 JST 拍板) */}
+            <img
+              src="/sidebar-icon.png"
+              width={36}
+              height={36}
+              alt=""
+              className="block w-full h-full object-cover"
+            />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
