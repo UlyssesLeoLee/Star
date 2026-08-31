@@ -1,7 +1,11 @@
 // =====================================================================
 // zh-CN Dictionary — 简体中文 (默认语言)
 // =====================================================================
-// 命名规则: 按功能域分组 (userMenu / appHeader / common / nav / theme)
+// v0.2 (2026-08-31 补缺口) 新增: sidebar / appMatrix / commandBar /
+//   pageHeader / modules — 28 模块全量翻译
+//
+// 设计: 模块 label 走 native 中文; description 沿用原 registry 中文描述;
+//   categoryLabel 与 sidebar 类别对齐
 // =====================================================================
 
 import type { Dictionary } from "./dictionary";
@@ -45,5 +49,90 @@ export const zhCN: Dictionary = {
   languageSwitcher: {
     current: "当前: {name}",
     title: "界面语言",
+  },
+  sidebar: {
+    brandTagline: "VIBE CONTROL PLANE",
+    vibeControlPlane: "VIBE CONTROL PLANE",
+    groupWorkspaces: "Workspaces",
+    groupTactical: "Tactical Views",
+    pinned: "PINNED",
+    customAdd: "+ 定制添加模块",
+    footerStatus: "SYS // TACTICAL",
+    footerStatusAllGreen: "ALL GREEN",
+    footerNode: "NERV-01 // VIBE CODING NODE",
+    removeFromSidebar: "从左侧移除 {label}",
+    removeFromPinned: "从视图移除 {label}",
+  },
+  appMatrix: {
+    title: "APP MATRIX // 战术功能矩阵与导航定制",
+    subtitle: "默认仅展示核心功能，按需将任何模块一键钉选至左侧纵向或顶部横向导航。",
+    capabilities: "25+ CAPABILITIES",
+    searchPlaceholder: "快速检索 25+ 业务模块、简码代码 (例: KB, SCM, WT, AUD)...",
+    resetDefault: "重置默认",
+    resetDefaultTitle: "恢复系统默认导航",
+    done: "完成定制 (Done)",
+    pinToSidebar: "钉选到左侧导航",
+    unpinFromSidebar: "从左侧导航移除",
+    pinToHeader: "钉选到顶部标签",
+    unpinFromHeader: "从顶部标签移除",
+    openNow: "立即打开该模块",
+    sidebarLabel: "左侧",
+    headerLabel: "顶部",
+    footerPinnedSidebar: "左侧已钉选:",
+    footerPinnedHeader: "顶部已钉选:",
+    categories: {
+      all: { label: "全部模块", tag: "ALL" },
+      core: { label: "核心工作区", tag: "CORE" },
+      work: { label: "工作管理", tag: "WORK" },
+      agent: { label: "Agent & Worktree", tag: "AGENT" },
+      integration: { label: "集成与网关", tag: "INTEG" },
+      system: { label: "系统与安全", tag: "SYS" },
+    },
+  },
+  commandBar: {
+    placeholder: "搜索 25+ 模块 (按 label / code / description) ...",
+    emptyHint: "0 命中 — 按 Esc 退出",
+    hintNavigate: "navigate",
+    hintOpen: "open",
+    hintClose: "Esc close",
+    modulesCounter: "{filtered} / {total} modules",
+    recentCounter: "· {count} recent",
+    ariaLabel: "Command bar",
+    closeAria: "Close command bar (Esc)",
+  },
+  pageHeader: {
+    trackPill: "Track {track}",
+    telemetryTag: "// TELEMETRY",
+  },
+  modules: {
+    inbox: { label: "Inbox", description: "通知中心、@提及与审计流聚合工作台", categoryLabel: "核心工作区" },
+    issues: { label: "Issues", description: "工作项与任务看板 / 树形全景视图", categoryLabel: "核心工作区" },
+    projects: { label: "Projects", description: "多面板项目工作区 (Kanban / Timeline / Backlog / Agents / Worktrees)", categoryLabel: "核心工作区" },
+    agents: { label: "Agents", description: "智能 Agent 运行状态、编排、会话与执行日志", categoryLabel: "核心工作区" },
+    analytics: { label: "Analytics", description: "工程效能大盘、燃尽图与遥测指标统计", categoryLabel: "核心工作区" },
+    settings: { label: "Settings", description: "租户全局配置、团队成员、安全与权限管理", categoryLabel: "核心工作区" },
+    kanban: { label: "Kanban Board", description: "4 态泳道即时拖拽任务看板", categoryLabel: "工作管理" },
+    timeline: { label: "Timeline & Gantt", description: "甘特图排期、里程碑与日历时间线联动", categoryLabel: "工作管理" },
+    backlog: { label: "Backlog", description: "需求待办列表与优先级排期池", categoryLabel: "工作管理" },
+    "agent-windows": { label: "Agent Windows", description: "Agent 多终端并行任务执行窗口", categoryLabel: "Agent / Worktree" },
+    worktree: { label: "Worktree Manager", description: "Git Worktree 隔离分支工作流与状态机", categoryLabel: "Agent / Worktree" },
+    validation: { label: "Validation Test", description: "自动化用例验证与断言测试套件", categoryLabel: "Agent / Worktree" },
+    context: { label: "Context Graph", description: "Agent 上下文知识图谱与决策包", categoryLabel: "Agent / Worktree" },
+    feedback: { label: "Agent Feedback", description: "人机协作反馈回路与异常预警", categoryLabel: "Agent / Worktree" },
+    workflow: { label: "Workflow Engine", description: "自动化工作流编排与状态流转规则", categoryLabel: "工作管理" },
+    development: { label: "Development Hub", description: "变更集 ChangeSet 与分支代码协同", categoryLabel: "工作管理" },
+    planning: { label: "Planning Hub", description: "Sprint 迭代规划与容量负荷评估", categoryLabel: "工作管理" },
+    scm: { label: "SCM Provider", description: "Git VCS 仓库与 Pull Request 追踪", categoryLabel: "集成与网关" },
+    integration: { label: "MCP Integrations", description: "第三方工具链与 MCP 服务连接网关", categoryLabel: "集成与网关" },
+    "api-keys": { label: "API Keys & Secrets", description: "凭据密钥保管库与模型 API Key 配置", categoryLabel: "集成与网关" },
+    "cli-profiles": { label: "CLI Profiles", description: "命令行环境配置与凭据模板", categoryLabel: "集成与网关" },
+    search: { label: "Universal Search", description: "全域跨模块语义检索与索引", categoryLabel: "集成与网关" },
+    "local-runtime": { label: "Local Runtime", description: "本地容器执行时与守护进程控制台", categoryLabel: "系统与安全" },
+    audit: { label: "Audit Log", description: "不可篡改操作合规审计日志", categoryLabel: "系统与安全" },
+    automation: { label: "Automation Triggers", description: "事件驱动自动化与 Webhook 调度", categoryLabel: "系统与安全" },
+    relation: { label: "Entity Relations", description: "跨域实体依赖网状图谱", categoryLabel: "系统与安全" },
+    permission: { label: "RBAC Permissions", description: "细粒度角色权限策略矩阵", categoryLabel: "系统与安全" },
+    identity: { label: "Identity & Members", description: "成员账号、组织架构与鉴权身份", categoryLabel: "系统与安全" },
+    tenant: { label: "Tenant Admin", description: "多租户隔离与资源配额控制", categoryLabel: "系统与安全" },
   },
 };

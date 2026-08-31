@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import { Search, CornerDownLeft, ArrowUp, ArrowDown, X } from "lucide-react";
 import { useCommandBarStore, type RecentItem } from "@/lib/commandBarStore";
 import { ALL_MODULES, type ModuleDefinition } from "@/lib/nav/registry";
+import { useTranslation, useModuleTranslation, type Dictionary } from "@/lib/i18n";
 
 export function CommandBar() {
   const router = useRouter();
@@ -34,6 +35,7 @@ export function CommandBar() {
   const open = useCommandBarStore((s) => s.open);
   const pushRecent = useCommandBarStore((s) => s.pushRecent);
   const recent = useCommandBarStore((s) => s.recent);
+  const { t, tx } = useTranslation();
 
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -67,18 +69,24 @@ export function CommandBar() {
     return undefined;
   }, [isOpen]);
 
-  // 过滤: 子串不区分大小写命中 label / code / description / categoryLabel
+  // 过滤: 子串不区分大小写命中翻译后的 label / code / description / categoryLabel
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return ALL_MODULES;
-    return ALL_MODULES.filter(
-      (m) =>
-        m.label.toLowerCase().includes(q) ||
-        m.code.toLowerCase().includes(q) ||
-        m.description.toLowerCase().includes(q) ||
-        m.categoryLabel.toLowerCase().includes(q),
-    );
-  }, [query]);
+    const modulesDict = t.modules as Dictionary["modules"];
+    return ALL_MODULES.filter((m) => {
+      const mod = modulesDict[m.id];
+      const haystack = [
+        mod?.label ?? m.label,
+        m.code,
+        mod?.description ?? m.description,
+        mod?.categoryLabel ?? m.categoryLabel,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [query, t.modules]);
 
   // filtered 变化时, activeIdx 收回 [0, filtered.length-1]
   useEffect(() => {
@@ -114,7 +122,7 @@ export function CommandBar() {
       data-testid="command-bar-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Command bar"
+      aria-label={t.commandBar.ariaLabel}
       className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] bg-black/40 backdrop-blur-sm"
       onClick={(e) => {
         // 点击空白处关闭
@@ -134,7 +142,7 @@ export function CommandBar() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜索 25+ 模块 (按 label / code / description) ..."
+            placeholder={t.commandBar.placeholder}
             data-testid="command-bar-input"
             className="flex-1 bg-transparent outline-none text-sm text-ink placeholder:text-ink-mute"
             autoComplete="off"
@@ -144,7 +152,7 @@ export function CommandBar() {
             type="button"
             onClick={close}
             data-testid="command-bar-close"
-            aria-label="Close command bar (Esc)"
+            aria-label={t.commandBar.closeAria}
             className="p-1 text-ink-dim hover:text-ink rounded"
           >
             <X size={14} />
@@ -159,39 +167,18 @@ export function CommandBar() {
         >
           {filtered.length === 0 ? (
             <div className="px-4 py-8 text-center text-ink-mute text-xs font-mono">
-              0 命中 — 按 Esc 退出
+              {t.commandBar.emptyHint}
             </div>
           ) : (
-            filtered.map((m, idx) => {
-              const isActive = idx === activeIdx;
-              const Icon = m.icon;
-              return (
-                <button
-                  type="button"
-                  key={m.id}
-                  onClick={() => commit(m)}
-                  onMouseEnter={() => setActiveIdx(idx)}
-                  data-testid={`command-bar-item-${m.id}`}
-                  data-active={isActive ? "true" : "false"}
-                  className={
-                    "w-full flex items-center gap-3 px-4 h-10 text-left transition-colors " +
-                    (isActive
-                      ? "bg-accent/10 text-ink"
-                      : "text-ink-dim hover:bg-bg-soft/60")
-                  }
-                >
-                  <Icon size={14} className={isActive ? "text-accent" : "text-ink-mute"} />
-                  <span className="text-sm font-medium">{m.label}</span>
-                  <span className="text-[10px] font-mono text-ink-mute ml-1">[{m.code}]</span>
-                  <span className="text-[10px] text-ink-mute ml-1 px-1.5 py-0.5 rounded border border-line">
-                    {m.categoryLabel}
-                  </span>
-                  <span className="ml-auto text-[10px] text-ink-mute truncate max-w-[40%]">
-                    {m.description}
-                  </span>
-                </button>
-              );
-            })
+            filtered.map((m, idx) => (
+              <CommandBarItem
+                key={m.id}
+                module={m}
+                isActive={idx === activeIdx}
+                onClick={() => commit(m)}
+                onMouseEnter={() => setActiveIdx(idx)}
+              />
+            ))
           )}
         </div>
 
@@ -200,24 +187,69 @@ export function CommandBar() {
           <span className="flex items-center gap-1">
             <ArrowUp size={10} />
             <ArrowDown size={10} />
-            navigate
+            {t.commandBar.hintNavigate}
           </span>
           <span className="flex items-center gap-1">
             <CornerDownLeft size={10} />
-            open
+            {t.commandBar.hintOpen}
           </span>
-          <span>Esc close</span>
+          <span>{t.commandBar.hintClose}</span>
           <span className="ml-auto">
-            {filtered.length} / {ALL_MODULES.length} modules
+            {tx(t.commandBar.modulesCounter, {
+              filtered: filtered.length,
+              total: ALL_MODULES.length,
+            })}
             {recent.length > 0 && (
               <span data-testid="command-bar-recent-count" className="ml-2">
-                · {recent.length} recent
+                {tx(t.commandBar.recentCounter, { count: recent.length })}
               </span>
             )}
           </span>
         </div>
       </div>
     </div>
+  );
+}
+
+// =====================================================================
+// CommandBarItem — 单条命中 (per 2026-08-31 i18n 补缺口)
+// =====================================================================
+// 子组件, 在内合法调用 useModuleTranslation 拿翻译后字段
+// =====================================================================
+interface CommandBarItemProps {
+  module: ModuleDefinition;
+  isActive: boolean;
+  onClick: () => void;
+  onMouseEnter: () => void;
+}
+
+function CommandBarItem({ module: m, isActive, onClick, onMouseEnter }: CommandBarItemProps) {
+  const mod = useModuleTranslation(m);
+  const Icon = m.icon;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      data-testid={`command-bar-item-${m.id}`}
+      data-active={isActive ? "true" : "false"}
+      className={
+        "w-full flex items-center gap-3 px-4 h-10 text-left transition-colors " +
+        (isActive
+          ? "bg-accent/10 text-ink"
+          : "text-ink-dim hover:bg-bg-soft/60")
+      }
+    >
+      <Icon size={14} className={isActive ? "text-accent" : "text-ink-mute"} />
+      <span className="text-sm font-medium">{mod.label}</span>
+      <span className="text-[10px] font-mono text-ink-mute ml-1">[{m.code}]</span>
+      <span className="text-[10px] text-ink-mute ml-1 px-1.5 py-0.5 rounded border border-line">
+        {mod.categoryLabel}
+      </span>
+      <span className="ml-auto text-[10px] text-ink-mute truncate max-w-[40%]">
+        {mod.description}
+      </span>
+    </button>
   );
 }
 

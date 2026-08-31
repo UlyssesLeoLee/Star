@@ -10,12 +10,22 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import type { ReactNode } from "react";
 import ProjectsPage from "./page";
 import { useStore } from "@/lib/store";
+import { I18nProvider } from "@/lib/i18n";
+
+// per 2026-08-31 i18n 补缺口: PageHeader / Sidebar / AppHeader 等含 useTranslation() 必须包 I18nProvider
+function renderWithI18n(ui: ReactNode) {
+  return render(<I18nProvider initialLanguage="zh-CN">{ui}</I18nProvider>);
+}
 
 describe("ProjectsPage", () => {
   beforeEach(() => {
     cleanup();
+    if (typeof window !== "undefined") {
+      window.localStorage.clear();
+    }
     // 重置 store 状态 (persist 持久化可能带入其他测试的状态)
     useStore.setState((s) => ({
       ...s,
@@ -25,7 +35,7 @@ describe("ProjectsPage", () => {
   });
 
   it("renders project switcher + 5 tabs by default", () => {
-    render(<ProjectsPage />);
+    renderWithI18n(<ProjectsPage />);
     // switcher
     expect(screen.getByTestId("project-switcher")).toBeTruthy();
     // 3 个 project 都可点
@@ -43,14 +53,14 @@ describe("ProjectsPage", () => {
   });
 
   it("switching project updates selected project", () => {
-    render(<ProjectsPage />);
+    renderWithI18n(<ProjectsPage />);
     const sgBtn = screen.getByTestId("project-switcher-prj-stargate");
     fireEvent.click(sgBtn);
     expect(screen.getByTestId("project-switcher-prj-stargate")).toBeTruthy();
   });
 
   it("Kanban tab renders KanbanBoard with project-filtered data", () => {
-    render(<ProjectsPage />);
+    renderWithI18n(<ProjectsPage />);
     const kanbanTab = screen.getByRole("tab", { name: /Kanban/i });
     fireEvent.click(kanbanTab);
     // kanban 4 列
@@ -62,21 +72,21 @@ describe("ProjectsPage", () => {
   });
 
   it("Timeline tab renders Gantt and Calendar", () => {
-    render(<ProjectsPage />);
+    renderWithI18n(<ProjectsPage />);
     const tlTab = screen.getByRole("tab", { name: /Timeline/i });
     fireEvent.click(tlTab);
     expect(screen.getByTestId("projects-timeline-tab")).toBeTruthy();
   });
 
   it("Backlog tab renders work-items list", () => {
-    render(<ProjectsPage />);
+    renderWithI18n(<ProjectsPage />);
     const backlogTab = screen.getByRole("tab", { name: /Backlog/i });
     fireEvent.click(backlogTab);
     expect(screen.getByTestId("projects-backlog-tab")).toBeTruthy();
   });
 
   it("Agents tab shows members table with role (mock)", () => {
-    render(<ProjectsPage />);
+    renderWithI18n(<ProjectsPage />);
     const agentsTab = screen.getByRole("tab", { name: /Agents/i });
     fireEvent.click(agentsTab);
     expect(screen.getByTestId("projects-members-tab")).toBeTruthy();
@@ -86,14 +96,14 @@ describe("ProjectsPage", () => {
   });
 
   it("Worktrees tab shows worktree list", () => {
-    render(<ProjectsPage />);
+    renderWithI18n(<ProjectsPage />);
     const wtTab = screen.getByRole("tab", { name: /Worktrees/i });
     fireEvent.click(wtTab);
     expect(screen.getByTestId("projects-worktrees-tab")).toBeTruthy();
   });
 
   it("switching to mobile project shows fewer work-items in Kanban", () => {
-    render(<ProjectsPage />);
+    renderWithI18n(<ProjectsPage />);
     // 切到 MOB project
     fireEvent.click(screen.getByTestId("project-switcher-prj-mobile"));
     // 切到 Kanban tab

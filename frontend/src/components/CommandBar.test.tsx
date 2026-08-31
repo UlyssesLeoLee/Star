@@ -5,8 +5,15 @@
 // =====================================================================
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, within, cleanup } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { CommandBar } from "./CommandBar";
 import { useCommandBarStore } from "@/lib/commandBarStore";
+import { I18nProvider } from "@/lib/i18n";
+
+// per 2026-08-31 i18n 补缺口: CommandBar 内 useTranslation() 必须包 I18nProvider
+function renderWithI18n(ui: ReactNode) {
+  return render(<I18nProvider initialLanguage="zh-CN">{ui}</I18nProvider>);
+}
 
 // next/navigation 路由 mock (Enter 触发 router.push 不需要真导航)
 const mockPush = vi.fn();
@@ -28,14 +35,14 @@ describe("CommandBar (per DRIFT-α-020 fix)", () => {
   });
 
   it("A. isOpen=false 时不渲染 panel", () => {
-    render(<CommandBar />);
+    renderWithI18n(<CommandBar />);
     expect(screen.queryByTestId("command-bar-panel")).toBeNull();
     expect(screen.queryByTestId("command-bar-overlay")).toBeNull();
   });
 
   it("B. isOpen=true 时渲染 panel + 输入框 + 列表项", () => {
     useCommandBarStore.getState().open();
-    render(<CommandBar />);
+    renderWithI18n(<CommandBar />);
     expect(screen.getByTestId("command-bar-panel")).toBeTruthy();
     expect(screen.getByTestId("command-bar-input")).toBeTruthy();
     // ALL_MODULES 至少 25 项, 列表渲染若干
@@ -46,7 +53,7 @@ describe("CommandBar (per DRIFT-α-020 fix)", () => {
 
   it("C. 输入 query 过滤, 0 命中时显示空态", () => {
     useCommandBarStore.getState().open();
-    render(<CommandBar />);
+    renderWithI18n(<CommandBar />);
     const input = screen.getByTestId("command-bar-input");
     fireEvent.change(input, { target: { value: "zzzzz-no-match-zzzzz" } });
     expect(screen.getByText(/0 命中/)).toBeTruthy();
@@ -54,7 +61,7 @@ describe("CommandBar (per DRIFT-α-020 fix)", () => {
 
   it("D. 键盘 ↓ 移动 active, Enter 提交 router.push + pushRecent + close", () => {
     useCommandBarStore.getState().open();
-    render(<CommandBar />);
+    renderWithI18n(<CommandBar />);
     const input = screen.getByTestId("command-bar-input");
     const items = screen.getAllByTestId(/^command-bar-item-/);
     // 第 0 项默认 active
@@ -72,7 +79,7 @@ describe("CommandBar (per DRIFT-α-020 fix)", () => {
 
   it("E. Esc 关闭 panel", () => {
     useCommandBarStore.getState().open();
-    render(<CommandBar />);
+    renderWithI18n(<CommandBar />);
     expect(screen.getByTestId("command-bar-panel")).toBeTruthy();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(useCommandBarStore.getState().isOpen).toBe(false);
@@ -80,7 +87,7 @@ describe("CommandBar (per DRIFT-α-020 fix)", () => {
 
   it("F. 点击列表项直接 commit (pushRecent + close + router.push)", () => {
     useCommandBarStore.getState().open();
-    render(<CommandBar />);
+    renderWithI18n(<CommandBar />);
     const inboxItem = screen.getByTestId("command-bar-item-inbox");
     fireEvent.click(inboxItem);
     expect(mockPush).toHaveBeenCalledWith("/inbox");
@@ -91,11 +98,11 @@ describe("CommandBar (per DRIFT-α-020 fix)", () => {
 
   it("G. 重复点同一项, recent 去重 + 最新在前", () => {
     useCommandBarStore.getState().open();
-    const { unmount } = render(<CommandBar />);
+    const { unmount } = renderWithI18n(<CommandBar />);
     fireEvent.click(screen.getByTestId("command-bar-item-inbox"));
     unmount(); // 第一次 panel 关掉, 卸载 DOM
     useCommandBarStore.getState().open();
-    render(<CommandBar />);
+    renderWithI18n(<CommandBar />);
     fireEvent.click(screen.getByTestId("command-bar-item-inbox"));
     const recent = useCommandBarStore.getState().recent;
     expect(recent.length).toBe(1);

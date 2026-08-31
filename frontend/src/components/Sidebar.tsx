@@ -15,11 +15,13 @@ import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { useNavStore } from "@/lib/nav/navStore";
 import { MODULE_MAP, type ModuleDefinition } from "@/lib/nav/registry";
+import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 
 export function Sidebar() {
   const pathname = usePathname() ?? "/";
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const { t, tx } = useTranslation();
 
   const sidebarItemIds = useNavStore((s) => s.sidebarItemIds);
   const removeSidebarItem = useNavStore((s) => s.removeSidebarItem);
@@ -79,7 +81,7 @@ export function Sidebar() {
               </span>
             </div>
             <div className="text-[9px] font-mono tracking-widest text-ink-mute uppercase font-medium">
-              VIBE CONTROL PLANE
+              {t.sidebar.brandTagline}
             </div>
           </div>
         </Link>
@@ -94,69 +96,23 @@ export function Sidebar() {
         {/* Core Workspaces (用户自定义定制列表) */}
         <div>
           <div className="px-2.5 py-1 flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-ink-mute">
-            <span>Workspaces</span>
+            <span>{t.sidebar.groupWorkspaces}</span>
             <span className="text-[9px] font-mono opacity-70 border border-line px-1.5 py-0.2 rounded">
-              {activeSidebarModules.length} PINNED
+              {activeSidebarModules.length} {t.sidebar.pinned}
             </span>
           </div>
           <ul className="mt-1.5 space-y-1">
-            {activeSidebarModules.map((item) => {
-              const active = pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
-              const Icon = item.icon;
-
-              return (
-                <li key={item.id} className="relative group">
-                  <Link
-                    href={item.href}
-                    data-testid={`sidebar-item-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-                    className={clsx(
-                      "relative flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200",
-                      active
-                        ? "bg-accent/15 text-accent border border-accent/40 shadow-[0_0_16px_rgba(0,240,255,0.18)] font-semibold translate-x-0.5"
-                        : "text-ink-dim hover:bg-bg-soft/80 hover:text-ink border border-transparent hover:translate-x-0.5"
-                    )}
-                  >
-                    <Icon
-                      size={16}
-                      className={clsx(
-                        "shrink-0 transition-transform duration-200 group-hover:scale-110",
-                        active ? "text-accent drop-shadow-[0_0_6px_rgba(0,240,255,0.6)]" : "text-ink-dim group-hover:text-ink"
-                      )}
-                    />
-                    <span className="flex-1 truncate tracking-tight">{item.label}</span>
-                    
-                    <span className="text-[9px] font-mono text-ink-mute px-1.5 py-0.2 rounded border border-line/50 bg-bg/40 opacity-70 group-hover:opacity-100 transition-opacity">
-                      {item.code}
-                    </span>
-
-                    {item.count !== undefined && item.count > 0 && (
-                      <span className="min-w-[16px] h-4 rounded-full bg-err text-white text-[9px] font-mono grid place-items-center px-1 shadow-[0_0_8px_rgba(255,51,102,0.7)] font-bold">
-                        {item.count}
-                      </span>
-                    )}
-
-                    {active && (
-                      <ChevronRight size={12} className="text-accent animate-pulse" />
-                    )}
-                  </Link>
-
-                  {/* 悬停移除按钮 */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      removeSidebarItem(item.id);
-                    }}
-                    title={`从左侧移除 ${item.label}`}
-                    data-testid={`remove-sidebar-${item.id}`}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-err/20 hover:text-err text-ink-mute opacity-0 group-hover:opacity-100 transition-all duration-150"
-                  >
-                    <X size={11} />
-                  </button>
-                </li>
-              );
-            })}
+            {activeSidebarModules.map((item) => (
+              <SidebarRow
+                key={item.id}
+                module={item}
+                active={pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href))}
+                onRemove={removeSidebarItem}
+                removeTitle={tx(t.sidebar.removeFromSidebar, { label: "" })}
+                dataTestIdBase="sidebar-item"
+                removeDataTestIdBase="remove-sidebar"
+              />
+            ))}
           </ul>
         </div>
 
@@ -164,60 +120,21 @@ export function Sidebar() {
         {activePinnedModules.length > 0 && (
           <div>
             <div className="px-2.5 py-1 flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-ink-mute">
-              <span>Tactical Views</span>
-              <span className="text-[9px] font-mono opacity-70 border border-line px-1.5 py-0.2 rounded">PINNED</span>
+              <span>{t.sidebar.groupTactical}</span>
+              <span className="text-[9px] font-mono opacity-70 border border-line px-1.5 py-0.2 rounded">{t.sidebar.pinned}</span>
             </div>
             <ul className="mt-1.5 space-y-1">
-              {activePinnedModules.map((item) => {
-                const active = pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
-                const Icon = item.icon;
-
-                return (
-                  <li key={item.id} className="relative group">
-                    <Link
-                      href={item.href}
-                      data-testid={`sidebar-item-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-                      className={clsx(
-                        "relative flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200",
-                        active
-                          ? "bg-accent/15 text-accent border border-accent/40 shadow-[0_0_16px_rgba(0,240,255,0.18)] font-semibold translate-x-0.5"
-                          : "text-ink-dim hover:bg-bg-soft/80 hover:text-ink border border-transparent hover:translate-x-0.5"
-                      )}
-                    >
-                      <Icon
-                        size={16}
-                        className={clsx(
-                          "shrink-0 transition-transform duration-200 group-hover:scale-110",
-                          active ? "text-accent drop-shadow-[0_0_6px_rgba(0,240,255,0.6)]" : "text-ink-dim group-hover:text-ink"
-                        )}
-                      />
-                      <span className="flex-1 truncate tracking-tight">{item.label}</span>
-                      
-                      <span className="text-[9px] font-mono text-ink-mute px-1.5 py-0.2 rounded border border-line/50 bg-bg/40 opacity-70 group-hover:opacity-100 transition-opacity">
-                        {item.code}
-                      </span>
-
-                      {active && (
-                        <ChevronRight size={12} className="text-accent animate-pulse" />
-                      )}
-                    </Link>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        removePinnedView(item.id);
-                      }}
-                      title={`从视图移除 ${item.label}`}
-                      data-testid={`remove-pinned-${item.id}`}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-err/20 hover:text-err text-ink-mute opacity-0 group-hover:opacity-100 transition-all duration-150"
-                    >
-                      <X size={11} />
-                    </button>
-                  </li>
-                );
-              })}
+              {activePinnedModules.map((item) => (
+                <SidebarRow
+                  key={item.id}
+                  module={item}
+                  active={pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href))}
+                  onRemove={removePinnedView}
+                  removeTitle={tx(t.sidebar.removeFromPinned, { label: "" })}
+                  dataTestIdBase="sidebar-item"
+                  removeDataTestIdBase="remove-pinned"
+                />
+              ))}
             </ul>
           </div>
         )}
@@ -231,7 +148,7 @@ export function Sidebar() {
             className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-line hover:border-accent/60 bg-bg-soft/40 hover:bg-accent/10 text-xs font-mono text-ink-mute hover:text-accent transition-all duration-200 group shadow-sm hover:shadow-[0_0_12px_rgba(0,240,255,0.15)]"
           >
             <Plus size={13} className="text-accent group-hover:rotate-90 transition-transform duration-300" />
-            <span className="font-semibold">+ 定制添加模块</span>
+            <span className="font-semibold">{t.sidebar.customAdd}</span>
           </button>
         </div>
       </nav>
@@ -241,14 +158,100 @@ export function Sidebar() {
         <div className="flex items-center justify-between text-[10px] font-mono text-ink-mute">
           <span className="flex items-center gap-1.5">
             <Radio size={12} className="text-accent animate-spin" />
-            <span>SYS // TACTICAL</span>
+            <span>{t.sidebar.footerStatus}</span>
           </span>
-          <span className="text-ok font-bold drop-shadow-[0_0_6px_rgba(16,185,129,0.7)]">ALL GREEN</span>
+          <span className="text-ok font-bold drop-shadow-[0_0_6px_rgba(16,185,129,0.7)]">
+            {t.sidebar.footerStatusAllGreen}
+          </span>
         </div>
         <div className="text-[9px] font-mono text-ink-mute/70 truncate">
-          NERV-01 // VIBE CODING NODE
+          {t.sidebar.footerNode}
         </div>
       </div>
     </aside>
+  );
+}
+
+// =====================================================================
+// SidebarRow — 单行 nav 渲染 (per 2026-08-31 i18n 补缺口)
+// =====================================================================
+// 抽出来是为了在子组件内合法调用 useModuleTranslation (hook 不能在
+// 父组件 .map() 回调里直接调, 否则会破坏 hooks 规则).
+//
+// data-testid 仍用 registry 原 label (英文) 生成, 保证既有测试稳定
+// (sidebar-item-inbox / sidebar-item-issues / ...) 不受语言切换影响.
+// =====================================================================
+interface SidebarRowProps {
+  module: ModuleDefinition;
+  active: boolean;
+  onRemove: (id: string) => void;
+  removeTitle: string;
+  dataTestIdBase: string;
+  removeDataTestIdBase: string;
+}
+
+function SidebarRow({
+  module: item,
+  active,
+  onRemove,
+  removeTitle,
+  dataTestIdBase,
+  removeDataTestIdBase,
+}: SidebarRowProps) {
+  const mod = useModuleTranslation(item);
+  const { tx } = useTranslation();
+  const Icon = item.icon;
+  // 用 registry 静态 label 生成 testid, 避免翻译切换导致 testid 漂移
+  const testIdSlug = item.label.toLowerCase().replace(/\s+/g, "-");
+  return (
+    <li className="relative group">
+      <Link
+        href={item.href}
+        data-testid={`${dataTestIdBase}-${testIdSlug}`}
+        className={clsx(
+          "relative flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200",
+          active
+            ? "bg-accent/15 text-accent border border-accent/40 shadow-[0_0_16px_rgba(0,240,255,0.18)] font-semibold translate-x-0.5"
+            : "text-ink-dim hover:bg-bg-soft/80 hover:text-ink border border-transparent hover:translate-x-0.5"
+        )}
+      >
+        <Icon
+          size={16}
+          className={clsx(
+            "shrink-0 transition-transform duration-200 group-hover:scale-110",
+            active ? "text-accent drop-shadow-[0_0_6px_rgba(0,240,255,0.6)]" : "text-ink-dim group-hover:text-ink"
+          )}
+        />
+        <span className="flex-1 truncate tracking-tight">{mod.label}</span>
+
+        <span className="text-[9px] font-mono text-ink-mute px-1.5 py-0.2 rounded border border-line/50 bg-bg/40 opacity-70 group-hover:opacity-100 transition-opacity">
+          {item.code}
+        </span>
+
+        {item.count !== undefined && item.count > 0 && (
+          <span className="min-w-[16px] h-4 rounded-full bg-err text-white text-[9px] font-mono grid place-items-center px-1 shadow-[0_0_8px_rgba(255,51,102,0.7)] font-bold">
+            {item.count}
+          </span>
+        )}
+
+        {active && (
+          <ChevronRight size={12} className="text-accent animate-pulse" />
+        )}
+      </Link>
+
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onRemove(item.id);
+        }}
+        title={tx(removeTitle, { label: mod.label })}
+        data-testid={`${removeDataTestIdBase}-${item.id}`}
+        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-err/20 hover:text-err text-ink-mute opacity-0 group-hover:opacity-100 transition-all duration-150"
+      >
+        <X size={11} />
+      </button>
+    </li>
   );
 }

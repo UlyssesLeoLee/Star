@@ -20,7 +20,7 @@ import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
 import { useNavStore } from "@/lib/nav/navStore";
 import { MODULE_MAP, type ModuleDefinition } from "@/lib/nav/registry";
 import { AppMatrixDrawer } from "@/components/nav/AppMatrixDrawer";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 
 export function AppHeader() {
   const pathname = usePathname() ?? "/";
@@ -65,48 +65,14 @@ export function AppHeader() {
             data-testid="primary-tabs"
             aria-label="Primary navigation"
           >
-            {activeHeaderTabs.map((tab) => {
-              const active = pathname === tab.href || pathname?.startsWith(tab.href + "/");
-              return (
-                <div key={tab.id} className="relative group flex items-center">
-                  <Link
-                    href={tab.href}
-                    data-testid={`tab-${tab.label.toLowerCase()}`}
-                    data-active={active ? "true" : "false"}
-                    aria-current={active ? "page" : undefined}
-                    className={clsx(
-                      "relative px-3.5 h-16 inline-flex items-center gap-1.5 text-xs font-medium border-b-2 transition-all duration-200",
-                      active
-                        ? "text-accent border-accent font-semibold shadow-[inset_0_-2px_14px_rgba(0,240,255,0.18)]"
-                        : "text-ink-dim border-transparent hover:text-ink hover:border-line/60"
-                    )}
-                  >
-                    <span className={clsx(
-                      "text-[9px] font-mono transition-colors",
-                      active ? "text-accent font-bold" : "text-ink-mute group-hover:text-ink-dim"
-                    )}>
-                      {tab.code}
-                    </span>
-                    <span>{tab.label}</span>
-                  </Link>
-
-                  {/* 顶栏 Tab 删除按钮 */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      removeHeaderTab(tab.id);
-                    }}
-                    title={tx(t.appHeader.removeFromHeader, { label: tab.label })}
-                    data-testid={`remove-header-tab-${tab.id}`}
-                    className="p-0.5 ml-[-6px] mr-1 rounded hover:bg-err/20 hover:text-err text-ink-mute opacity-0 group-hover:opacity-100 transition-all duration-150 z-10"
-                  >
-                    <X size={10} />
-                  </button>
-                </div>
-              );
-            })}
+            {activeHeaderTabs.map((tab) => (
+              <HeaderTab
+                key={tab.id}
+                module={tab}
+                active={pathname === tab.href || pathname?.startsWith(tab.href + "/")}
+                onRemove={() => removeHeaderTab(tab.id)}
+              />
+            ))}
 
             {/* + 添加顶栏标签 */}
             <button
@@ -197,5 +163,63 @@ export function AppHeader() {
       {/* App Matrix Modal / Drawer */}
       <AppMatrixDrawer />
     </>
+  );
+}
+
+// =====================================================================
+// HeaderTab — 顶栏单个 tab (per 2026-08-31 i18n 补缺口)
+// =====================================================================
+// 子组件, 在内合法调用 useModuleTranslation 拿翻译后 label
+// data-testid 仍用 registry 原 label 生成, 保持既有测试稳定
+// =====================================================================
+interface HeaderTabProps {
+  module: ModuleDefinition;
+  active: boolean;
+  onRemove: () => void;
+}
+
+function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
+  const mod = useModuleTranslation(tab);
+  const { t, tx } = useTranslation();
+  // 用 registry 静态 label 生成 testid, 避免翻译切换导致 testid 漂移
+  const testIdSlug = tab.label.toLowerCase().replace(/\s+/g, "-");
+  return (
+    <div className="relative group flex items-center">
+      <Link
+        href={tab.href}
+        data-testid={`tab-${testIdSlug}`}
+        data-active={active ? "true" : "false"}
+        aria-current={active ? "page" : undefined}
+        className={clsx(
+          "relative px-3.5 h-16 inline-flex items-center gap-1.5 text-xs font-medium border-b-2 transition-all duration-200",
+          active
+            ? "text-accent border-accent font-semibold shadow-[inset_0_-2px_14px_rgba(0,240,255,0.18)]"
+            : "text-ink-dim border-transparent hover:text-ink hover:border-line/60"
+        )}
+      >
+        <span className={clsx(
+          "text-[9px] font-mono transition-colors",
+          active ? "text-accent font-bold" : "text-ink-mute group-hover:text-ink-dim"
+        )}>
+          {tab.code}
+        </span>
+        <span>{mod.label}</span>
+      </Link>
+
+      {/* 顶栏 Tab 删除按钮 */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onRemove();
+        }}
+        title={tx(t.appHeader.removeFromHeader, { label: mod.label })}
+        data-testid={`remove-header-tab-${tab.id}`}
+        className="p-0.5 ml-[-6px] mr-1 rounded hover:bg-err/20 hover:text-err text-ink-mute opacity-0 group-hover:opacity-100 transition-all duration-150 z-10"
+      >
+        <X size={10} />
+      </button>
+    </div>
   );
 }

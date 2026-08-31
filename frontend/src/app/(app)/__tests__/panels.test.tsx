@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import type { ReactNode } from "react";
 
 // next/navigation mock — AppRouterContext 避免 import 真实 next
 vi.mock("next/navigation", () => ({
@@ -27,17 +28,26 @@ import AgentsPage from "../agents/page";
 import AnalyticsPage from "../analytics/page";
 import InboxPage from "../inbox/page";
 import SettingsPage from "../settings/page";
+import { I18nProvider } from "@/lib/i18n";
+
+// per 2026-08-31 i18n 补缺口: PageHeader 内 useTranslation() 必须包 I18nProvider
+function renderWithI18n(ui: ReactNode) {
+  return render(<I18nProvider initialLanguage="zh-CN">{ui}</I18nProvider>);
+}
 
 describe("U4 minimal panels — render smoke", () => {
   beforeEach(() => {
     // 每个测试前清理
+    if (typeof window !== "undefined") {
+      window.localStorage.clear();
+    }
   });
   afterEach(() => {
     cleanup();
   });
 
   it("renders /agents without error", () => {
-    render(<AgentsPage />);
+    renderWithI18n(<AgentsPage />);
     expect(screen.getByTestId("agents-page")).toBeInTheDocument();
     expect(screen.getByText("Agents")).toBeInTheDocument();
     // 5 mock 行
@@ -48,7 +58,7 @@ describe("U4 minimal panels — render smoke", () => {
   });
 
   it("renders /analytics without error", () => {
-    render(<AnalyticsPage />);
+    renderWithI18n(<AnalyticsPage />);
     expect(screen.getByTestId("analytics-page")).toBeInTheDocument();
     expect(screen.getByText("Analytics")).toBeInTheDocument();
     // KPI 4 个 (label 全部渲染)
@@ -63,7 +73,7 @@ describe("U4 minimal panels — render smoke", () => {
   });
 
   it("renders /inbox without error", () => {
-    render(<InboxPage />);
+    renderWithI18n(<InboxPage />);
     expect(screen.getByTestId("inbox-page")).toBeInTheDocument();
     expect(screen.getByText("Inbox")).toBeInTheDocument();
     // 10 mock 通知
@@ -72,7 +82,7 @@ describe("U4 minimal panels — render smoke", () => {
   });
 
   it("renders /settings without error (default tab = profile)", () => {
-    render(<SettingsPage />);
+    renderWithI18n(<SettingsPage />);
     expect(screen.getByTestId("settings-page")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
     // default profile tab
@@ -82,7 +92,7 @@ describe("U4 minimal panels — render smoke", () => {
   });
 
   it("switches /settings tab to api keys", () => {
-    render(<SettingsPage />);
+    renderWithI18n(<SettingsPage />);
     const apiTab = screen.getByRole("tab", { name: /API Keys/i });
     fireEvent.click(apiTab);
     expect(screen.getByTestId("settings-panel-apikeys")).toBeInTheDocument();

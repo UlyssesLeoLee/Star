@@ -1,6 +1,7 @@
 "use client";
 
 import { clsx } from "clsx";
+import { useTranslation, interpolate } from "@/lib/i18n";
 
 export function PageHeader({
   title, subtitle, description, icon, track, count, action, actions,
@@ -14,6 +15,7 @@ export function PageHeader({
   action?: React.ReactNode;
   actions?: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const desc = subtitle ?? description;
   const act = action ?? actions;
   return (
@@ -23,7 +25,9 @@ export function PageHeader({
           {icon}
           <h1 className="text-2xl font-black text-ink tracking-tight">{title}</h1>
           {track && (
-            <span className="pill border-line text-ink-dim font-mono text-[10px] font-semibold">Track {track}</span>
+            <span className="pill border-line text-ink-dim font-mono text-[10px] font-semibold">
+              {interpolate(t.pageHeader.trackPill, { track })}
+            </span>
           )}
           {count !== undefined && (
             <span className="pill border-accent/40 text-accent bg-accent/10 font-mono text-[10px] font-bold shadow-[0_0_8px_rgba(0,240,255,0.2)]">
@@ -48,6 +52,7 @@ export function Stat({
   accent?: string;
   icon?: React.ElementType;
 }) {
+  const { t } = useTranslation();
   const effectiveTone = tone ?? (accent === "primary" ? "info" : accent === "success" ? "ok" : "default");
   const color = {
     ok: "text-ok drop-shadow-[0_0_8px_rgba(16,185,129,0.4)]",
@@ -63,7 +68,9 @@ export function Stat({
           {Icon && <Icon size={12} className="text-accent" />}
           {label}
         </span>
-        <span className="opacity-0 group-hover:opacity-100 text-[8px] font-mono text-accent transition-opacity">// TELEMETRY</span>
+        <span className="opacity-0 group-hover:opacity-100 text-[8px] font-mono text-accent transition-opacity">
+          {t.pageHeader.telemetryTag}
+        </span>
       </div>
       <div className={clsx("text-2xl font-bold mt-1 font-mono tracking-tight", color)}>{value}</div>
       {hint && <div className="text-[11px] text-ink-mute mt-0.5 leading-snug">{hint}</div>}

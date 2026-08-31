@@ -16,7 +16,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import IssuesPage from "./page";
+import { I18nProvider } from "@/lib/i18n";
+
+// per 2026-08-31 i18n 补缺口: PageHeader / Sidebar 等含 useTranslation() 必须包 I18nProvider
+function renderWithI18n(ui: ReactNode) {
+  return render(<I18nProvider initialLanguage="zh-CN">{ui}</I18nProvider>);
+}
 
 // ---- mock next/navigation ----
 const mockPush = vi.fn();
@@ -75,7 +82,7 @@ describe("IssuesPage (U2)", () => {
 
   // ---- Test 1: view 切换 (Kanban default) ----
   it("renders Kanban view by default with 4 view tabs", () => {
-    render(<IssuesPage />);
+    renderWithI18n(<IssuesPage />);
     // 4 tabs 渲染
     expect(screen.getByTestId("issues-view-tab-kanban")).toBeTruthy();
     expect(screen.getByTestId("issues-view-tab-list")).toBeTruthy();
@@ -94,7 +101,7 @@ describe("IssuesPage (U2)", () => {
   it("renders List view with table when view=list", () => {
     mockSearchParamsGet.mockImplementation((k: string) => (k === "view" ? "list" : null));
     mockSearchParams.toString = () => "view=list";
-    render(<IssuesPage />);
+    renderWithI18n(<IssuesPage />);
     expect(screen.getByTestId("issues-view-list")).toBeTruthy();
     expect(screen.getByTestId("issues-list-table")).toBeTruthy();
   });
@@ -103,7 +110,7 @@ describe("IssuesPage (U2)", () => {
   it("renders Tree view with hierarchical table when view=tree", () => {
     mockSearchParamsGet.mockImplementation((k: string) => (k === "view" ? "tree" : null));
     mockSearchParams.toString = () => "view=tree";
-    render(<IssuesPage />);
+    renderWithI18n(<IssuesPage />);
     expect(screen.getByTestId("issues-view-tree")).toBeTruthy();
     expect(screen.getByTestId("issues-tree")).toBeTruthy();
   });
@@ -112,14 +119,14 @@ describe("IssuesPage (U2)", () => {
   it("renders Sprint view grouped by sprint_id when view=sprint", () => {
     mockSearchParamsGet.mockImplementation((k: string) => (k === "view" ? "sprint" : null));
     mockSearchParams.toString = () => "view=sprint";
-    render(<IssuesPage />);
+    renderWithI18n(<IssuesPage />);
     expect(screen.getByTestId("issues-view-sprint")).toBeTruthy();
     expect(screen.getByTestId("issues-sprint-list")).toBeTruthy();
   });
 
   // ---- Test 5: "+ New issue" button ----
   it("renders '+ New issue' button with primary styling", () => {
-    render(<IssuesPage />);
+    renderWithI18n(<IssuesPage />);
     const btn = screen.getByTestId("issues-new-button");
     expect(btn).toBeTruthy();
     expect(btn.textContent).toContain("New");
@@ -129,7 +136,7 @@ describe("IssuesPage (U2)", () => {
 
   // ---- Test 6: "🔍" 搜索 button ----
   it("renders search button that toggles search bar", () => {
-    render(<IssuesPage />);
+    renderWithI18n(<IssuesPage />);
     const btn = screen.getByTestId("issues-search-button");
     expect(btn).toBeTruthy();
 
@@ -150,7 +157,7 @@ describe("IssuesPage (U2)", () => {
   it("shows 320px detail sidebar when a work-item row is clicked in List view", () => {
     mockSearchParamsGet.mockImplementation((k: string) => (k === "view" ? "list" : null));
     mockSearchParams.toString = () => "view=list";
-    render(<IssuesPage />);
+    renderWithI18n(<IssuesPage />);
 
     // 默认 detail sidebar 不在
     expect(screen.queryByTestId("issues-detail-sidebar")).toBeNull();
@@ -177,7 +184,7 @@ describe("IssuesPage (U2)", () => {
       return null;
     });
     mockSearchParams.toString = () => "view=kanban&new=true";
-    render(<IssuesPage />);
+    renderWithI18n(<IssuesPage />);
     // banner 出现
     expect(screen.getByTestId("issues-new-banner")).toBeTruthy();
     expect(screen.getByTestId("issues-new-title-input")).toBeTruthy();
