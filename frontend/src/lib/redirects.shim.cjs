@@ -24,12 +24,12 @@ const LEGACY_REDIRECTS = [
   { source: "/workspace", destination: "/projects", permanent: false },
   { source: "/workspace/:id", destination: "/projects/:id", permanent: false },
   { source: "/project", destination: "/projects", permanent: false },
-  { source: "/board", destination: "/projects?tab=board", permanent: false },
+  { source: "/board", destination: "/projects?tab=kanban", permanent: false },
   { source: "/planning", destination: "/projects?tab=timeline", permanent: false },
-  { source: "/scm", destination: "/projects?tab=workflow", permanent: false },
-  { source: "/collaboration", destination: "/projects?tab=workflow", permanent: false },
-  { source: "/workflow", destination: "/projects?tab=workflow", permanent: false },
-  { source: "/relation", destination: "/projects?tab=relations", permanent: false },
+  { source: "/scm", destination: "/projects?tab=worktrees", permanent: false },
+  { source: "/collaboration", destination: "/projects?tab=worktrees", permanent: false },
+  { source: "/workflow", destination: "/projects?tab=worktrees", permanent: false },
+  { source: "/relation", destination: "/projects?tab=worktrees", permanent: false },
   { source: "/canvas/:id", destination: "/projects?canvas=:id", permanent: false },
 
   // ── /issues sink ────────────────────────────────────────────────────

@@ -68,9 +68,11 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
     expect(r?.destination).toBe("/issues?view=kanban");
   });
 
-  it("/board → /projects?tab=board (case 3)", () => {
+  it("/board → /projects?tab=kanban (case 3, per 2026-08-31 12:42 JST DRIFT-α-003 修复)", () => {
+    // per handoff 兜底 + 5 tab 拍板 (kanban/timeline/backlog/agents/worktrees):
+    //   /board 旧 redirect tab=board 不存在, 改 tab=kanban (5 tab 之一)
     const r = findRedirect("/board");
-    expect(r?.destination).toBe("/projects?tab=board");
+    expect(r?.destination).toBe("/projects?tab=kanban");
   });
 
   it("/audit → /inbox?type=audit (case 4)", () => {
@@ -83,9 +85,12 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
     expect(r?.destination).toBe("/projects?tab=timeline");
   });
 
-  it("/workflow → /projects?tab=workflow (case 6)", () => {
+  it("/workflow → /projects?tab=worktrees (case 6, per 2026-08-31 12:42 JST DRIFT-α-004 修复)", () => {
+    // per handoff 兜底 + 5 tab 拍板:
+    //   /scm /collaboration /workflow /relation 4 redirect 旧 tab=workflow/relations 不存在
+    //   全部改 tab=worktrees (5 tab 之一, worktree domain 入口)
     const r = findRedirect("/workflow");
-    expect(r?.destination).toBe("/projects?tab=workflow");
+    expect(r?.destination).toBe("/projects?tab=worktrees");
   });
 
   it("/workspace/:id → /projects/:id (case 7, path-param variant)", () => {
