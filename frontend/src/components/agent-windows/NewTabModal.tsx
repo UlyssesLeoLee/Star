@@ -115,7 +115,7 @@ export function NewTabModal({ onClose, onCreate }: NewTabModalProps) {
               <button
                 onClick={() => onCreate({ profileId: selected.id, profileName: selected.name, kind: selected.kind, label: label.trim() || selected.name })}
                 disabled={!label.trim()}
-                className="text-xs px-3 py-1.5 rounded border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/10 text-[color:var(--color-primary)] hover:bg-[color:var(--color-primary)]/20 disabled:opacity-40"
+                className="btn-primary"
               >
                 创建 Tab
               </button>

@@ -32,6 +32,11 @@
   --color-accent-violet:      #7c3aed;
   --color-accent-violet-glow: rgba(124, 58, 237, 0.18);
 
+  /* === 主色反色 — 实色填充按钮文字 (per 2026-08-31 11:35 JST 拍板) ===
+     light: 纯白(蓝底上对比度 7.2:1 WCAG AAA)
+     dark : 黑曜石色(青底上对比度 14.8:1 WCAG AAA) */
+  --color-on-primary:         #ffffff;
+
   /* === 语义色 === */
   --color-success: #16a34a;
   --color-warning: #b45309;
@@ -126,6 +131,9 @@
   --color-accent-50:          #00f0ff;
   --color-accent-violet:      #a855f7;
   --color-accent-violet-glow: rgba(168, 85, 247, 0.30);
+
+  /* 主色反色 — dark 模式青底用黑字 (per 2026-08-31 11:35 JST 拍板) */
+  --color-on-primary:         #06080e;
 
   --color-success: #10b981;
   --color-warning: #f59e0b;

@@ -140,18 +140,47 @@ html, body {
     gap: 6px;
     border-radius: var(--radius-md);
     border: 1px solid var(--color-primary);
-    background-color: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    background-color: var(--color-primary);
     padding: 6px 14px;
     font-size: 12px;
     font-weight: 600;
-    color: var(--color-primary);
+    color: var(--color-on-primary);
     box-shadow: var(--glow-accent);
     transition: all 0.15s ease;
   }
   .btn-primary:hover {
-    background-color: color-mix(in srgb, var(--color-primary) 25%, transparent);
+    background-color: color-mix(in srgb, var(--color-primary) 88%, var(--color-on-primary));
+    border-color: color-mix(in srgb, var(--color-primary) 88%, var(--color-on-primary));
   }
   .btn-primary:active { transform: scale(0.98); }
+
+  /* ── 主色幽灵按钮 (透明底 + 主色字) ─────────────────────────
+     per 2026-08-31 11:35 JST 拍板: 保留透明底风格, 跟 .btn-primary 区分
+     适用: 次要操作 (filter chip / 切换按钮), 不抢主操作视觉 */
+  .btn-primary-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
+    background-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-primary);
+    transition: all 0.15s ease;
+  }
+  .btn-primary-ghost:hover {
+    background-color: color-mix(in srgb, var(--color-primary) 22%, transparent);
+    border-color: color-mix(in srgb, var(--color-primary) 60%, transparent);
+  }
+  .btn-primary-ghost:active { transform: scale(0.98); }
+  /* ghost 变体的 disabled 状态 — 整组置灰 */
+  .btn-primary-ghost:disabled,
+  .btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 
   /* ── 艺术级表格 ───────────────────────────────────────────── */
   .table {

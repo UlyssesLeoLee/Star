@@ -43,7 +43,7 @@ export default function CliProfilesPage() {
         title="CLI Profiles"
         description="管理 6 个内置 + 自定义 CLI / API Agent · {cliCount} CLI · {apiCount} API"
         actions={
-          <button className="text-xs px-3 py-1.5 rounded border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/10 text-[color:var(--color-primary)] hover:bg-[color:var(--color-primary)]/20 flex items-center gap-1">
+          <button className="btn-primary-ghost flex items-center gap-1">
             <Plus size={12} />
             新 Profile
           </button>

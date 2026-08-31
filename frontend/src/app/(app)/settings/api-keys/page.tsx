@@ -74,7 +74,7 @@ export default function ApiKeysPage() {
         actions={
           <button
             onClick={() => setAdding(true)}
-            className="text-xs px-3 py-1.5 rounded border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/10 text-[color:var(--color-primary)] hover:bg-[color:var(--color-primary)]/20 flex items-center gap-1"
+            className="btn-primary-ghost flex items-center gap-1"
           >
             <Plus size={12} />
             新 API Key
@@ -139,7 +139,7 @@ export default function ApiKeysPage() {
                     onClick={() => setForm((f) => ({ ...f, mode: m }))}
                     className={`flex-1 text-xs px-3 py-2 rounded border ${
                       form.mode === m
-                        ? "border-[color:var(--color-primary)] bg-[color:var(--color-primary)]/10 text-[color:var(--color-primary)]"
+                        ? "btn-primary-ghost"
                         : "border-[color:var(--color-border)] text-[color:var(--color-text-dim)]"
                     }`}
                   >
@@ -179,7 +179,7 @@ export default function ApiKeysPage() {
             <button
               onClick={addKey}
               disabled={!form.label || (form.mode === "encrypted_rust" ? !form.secret : !form.envVarName)}
-              className="text-xs px-3 py-1.5 rounded border border-[color:var(--color-primary)]/40 bg-[color:var(--color-primary)]/10 text-[color:var(--color-primary)] hover:bg-[color:var(--color-primary)]/20 disabled:opacity-40"
+              className="btn-primary"
             >
               保存
             </button>

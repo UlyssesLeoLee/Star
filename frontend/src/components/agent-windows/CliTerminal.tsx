@@ -60,7 +60,7 @@ export function CliTerminal({ tab, onRun, onCancel, onUpload, onClear }: CliTerm
             <button
               onClick={() => onRun(prompt)}
               disabled={!prompt.trim()}
-              className="flex items-center gap-1 px-2 py-1 text-xs rounded border border-[color:var(--color-primary)]/30 bg-[color:var(--color-primary)]/10 text-[color:var(--color-primary)] hover:bg-[color:var(--color-primary)]/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn-primary px-2 py-1 text-xs"
             >
               <Play size={10} />
               运行
