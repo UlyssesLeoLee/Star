@@ -51,7 +51,7 @@ macro_rules! define_uuid_id {
         #[allow(missing_docs)]
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
         #[serde(transparent)]
-        pub struct $name(uuid::Uuid);
+        pub struct $name(pub uuid::Uuid);
 
         impl $name {
             #[allow(dead_code)]
