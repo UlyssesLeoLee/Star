@@ -83,6 +83,10 @@ pub struct ActorContext {
     /// AI Agent 触发的会话标志 (per domain-feedback INV-FB-07, H2 扩展)
     #[serde(default)]
     pub is_agent_session: bool,
+
+    /// 关联 TenantPolicy ID (per domain-tenant, H2-EXT 扩展)
+    #[serde(default)]
+    pub tenant_policy_id: Option<Uuid>,
 }
 
 /// **角色字符串常量** (per `domain-permission::Role` 枚举字符串形式)
@@ -125,6 +129,7 @@ impl ActorContext {
             is_local_runtime: false,
             is_platform_admin: false,
             is_agent_session: false,
+            tenant_policy_id: None,
         }
     }
 
@@ -162,6 +167,11 @@ impl ActorContext {
     /// 是否 Service 内部调用 (per domain-validation INV-VL-06, H2 扩展)
     pub fn is_service_internal(&self) -> bool {
         self.has_role(roles::SERVICE_INTERNAL)
+    }
+
+    /// 是否平台运维 (per domain-tenant, H2-EXT 扩展)
+    pub fn is_platform_operator(&self) -> bool {
+        self.has_role("platform_operator")
     }
 
     /// 是否可访问指定 Project (per domain-integration, H2 扩展)
@@ -207,6 +217,7 @@ impl Default for ActorContext {
             is_local_runtime: false,
             is_platform_admin: false,
             is_agent_session: false,
+            tenant_policy_id: None,
         }
     }
 }

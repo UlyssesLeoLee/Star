@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 
-use crate::context::ActorContext;
 use crate::entity::{Tenant, TenantPolicy, TenantQuota};
 use crate::error::TenantError;
 use crate::event::{EventMeta, TenantEvent};
@@ -63,7 +62,7 @@ impl InMemoryTenantService {
 
     /// 校验 actor 与命令的 tenant_id 一致
     fn check_tenant(actor: &ActorContext, expected: TenantId) -> Result<(), TenantError> {
-        if actor.tenant_id != expected {
+        if actor.tenant_id != expected.0 {
             return Err(TenantError::PermissionDenied);
         }
         Ok(())
@@ -169,7 +168,7 @@ impl TenantCommandPort for InMemoryTenantService {
         // 6. 发送 Created 事件
         let event = TenantEvent::Created(crate::event::TenantCreated {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id),
+                actor_user_id: Some(UserId::from(actor.user_id)),
                 ..EventMeta::new(id)
             },
             tenant_id: id,
@@ -254,7 +253,7 @@ impl TenantCommandPort for InMemoryTenantService {
         // 发送事件
         let event = TenantEvent::StatusChanged(crate::event::TenantStatusChanged {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id),
+                actor_user_id: Some(UserId::from(actor.user_id)),
                 ..EventMeta::new(cmd.tenant_id)
             },
             tenant_id: cmd.tenant_id,
@@ -324,7 +323,7 @@ impl TenantCommandPort for InMemoryTenantService {
         // 发送事件
         let event = TenantEvent::PolicyUpdated(crate::event::TenantPolicyUpdated {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id),
+                actor_user_id: Some(UserId::from(actor.user_id)),
                 ..EventMeta::new(cmd.tenant_id)
             },
             tenant_id: cmd.tenant_id,
@@ -349,7 +348,7 @@ impl TenantQueryPort for InMemoryTenantService {
         viewer: ActorContext,
     ) -> Result<Tenant, TenantError> {
         // 平台运营可跨租户查询;否则只允许同租户
-        if !viewer.is_platform_operator() && viewer.tenant_id != id {
+        if !viewer.is_platform_operator() && viewer.tenant_id != id.0 {
             return Err(TenantError::PermissionDenied);
         }
         self.tenants

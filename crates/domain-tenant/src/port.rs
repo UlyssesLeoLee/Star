@@ -12,7 +12,6 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::context::ActorContext;
 use crate::entity::{Tenant, TenantPolicy, TenantQuota};
 use crate::error::TenantError;
 use crate::value_object::{TenantId, TenantPolicyId, TenantStatus, TenantTier};

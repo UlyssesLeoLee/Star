@@ -846,14 +846,14 @@ mod tests {
 
     #[test]
     fn tenant_policy_default() {
-        let p = TenantPolicy::default_for(uuid::Uuid::new_v4());
+        let p = TenantPolicy::default_for(TenantId(uuid::Uuid::new_v4()));
         assert!(p.cloud_ai_allowed);
         assert!(!p.local_ai_only);
     }
 
     #[test]
     fn security_policy_default() {
-        let p = SecurityPolicy::default_for(uuid::Uuid::new_v4());
+        let p = SecurityPolicy::default_for(TenantId(uuid::Uuid::new_v4()));
         assert_eq!(p.session_max_age_seconds, 3600 * 8);
     }
 
@@ -968,7 +968,7 @@ mod tests {
             .await
             .unwrap();
         let other_t = uuid::Uuid::new_v4();
-        let user_actor = ActorContext::new(Uuid::new_v4(), other_t.0);
+        let user_actor = ActorContext::new(Uuid::new_v4(), other_t);
         let res = svc
             .get_tenant(GetTenantQuery { tenant_id: t.id }, &user_actor)
             .await;
