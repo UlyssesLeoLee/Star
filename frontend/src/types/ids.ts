@@ -12,6 +12,48 @@
 export type Uuid = string;
 export type Iso8601 = string; // "2026-08-26T11:30:00Z"
 
+// =====================================================================
+// 26. IncidentRecord (per REQ-OPS-001/002/003, test-design §6.3.4)
+// =====================================================================
+// IncidentRecord 是"事件发生 → ChangeSet → 修复 WorkItem → 验证证据"链路的
+// 追溯锚点 (REQ-OPS-001),且必须能标注"哪些 AC 证据不充分"
+// (REQ-OPS-002,不得重写历史 ValidationResult / Acceptance Coverage 判定)。
+//
+// 边界 (per REQ-OPS-003 / requirements.md §30.6):
+//   系统**不得**主动探查生产 / 处理告警 / 自动回滚/自动修复;
+//   IncidentRecord 只能通过 source = "human_entry" | "integration_webhook"
+//   登记 (集成 webhook 经 §18 Integration Webhook 转登)。
+//
+// 设计依据:
+//   - docs/test-design.md §6.3.4 (V1 Should-Have Test T3, TBD)
+//   - docs/requirements.md §29.1 + §30.6
+//   - 守门 (per AGENTS.md §1.2 #3 缺标比错标):
+//     Schema 只覆盖允许字段, 3 项非能力端点的具体错误文案
+//     ("REQ-OPS-003 boundary" 占位) 等 basic-design §30.6 跟进后回填
+// =====================================================================
+
+/** IncidentRecord 来源: 只能人工录入 或经 §18 Integration Webhook 转登 */
+export type IncidentSource = "human_entry" | "integration_webhook";
+
+/** IncidentRecord 主体 */
+export interface IncidentRecord {
+  id: Uuid;
+  title: string;
+  source: IncidentSource;
+  /** REQ-OPS-001: 关联 0..N 个 WorkItem (可空, 0..N 范围) */
+  linked_work_item_ids: Uuid[];
+  /** REQ-OPS-002: 标注证据不充分的 AC (只能标注, 不得改写历史 ValidationResult) */
+  affected_ac_ids: Uuid[];
+  /** 事件发生时间 (ISO 8601) */
+  occurred_at: Iso8601;
+  /** 录入时间 (ISO 8601) */
+  recorded_at: Iso8601;
+  /** 录入者 (human user id, per REQ-OPS-003 限制) */
+  recorded_by: Uuid;
+  /** 自由文本备注; 不得含 auto_rollback / auto_remediation / alert_handler 关键词 */
+  notes: string;
+}
+
 // ----- 通用 -----
 export interface ActorContext {
   user_id: Uuid;
