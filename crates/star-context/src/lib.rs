@@ -30,7 +30,7 @@ pub use template::BOOTSTRAP_TEMPLATE;
 /// 字段用 `Uuid` 而非强类型 ID, 避免 star-context 引入对 domain-* 的依赖.
 /// 各 domain 内部收到后做 `UserId::from(actor.user_id)` 等转换.
 pub mod actor;
-pub use actor::ActorContext;
+pub use actor::{roles, ActorContext};
 
 /// Context 生成错误 (Phase D 任务 6 实装)
 #[derive(Debug, Error)]

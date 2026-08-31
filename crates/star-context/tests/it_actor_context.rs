@@ -124,6 +124,7 @@ fn it_actor_context_serde_all_fields() {
         roles: vec!["developer".to_string(), "tenant_admin".to_string()],
         is_local_runtime: true,
         is_platform_admin: true,
+        is_agent_session: true,
     };
     let json = serde_json::to_string(&actor).unwrap();
     let parsed: ActorContext = serde_json::from_str(&json).unwrap();

@@ -43,7 +43,8 @@ use uuid::Uuid;
 /// **权威 ActorContext** — 跨 crate 统一调用方上下文
 ///
 /// 字段设计: 合并 `domain-identity` 版的 `is_platform_admin` +
-/// `domain-permission` 版的 `is_local_runtime` + `api` 版的 `device_id`,
+/// `domain-permission` 版的 `is_local_runtime` + `api` 版的 `device_id` +
+/// `domain-feedback` 版的 `is_agent_session` (per H2 P0-1 收敛, 2026-08-31),
 /// 用 `Uuid` 而非强类型 ID (避免 star-context 引入对 domain-* 的依赖).
 ///
 /// **调用方语义** (per ADR-0024 IDE session identity):
@@ -78,6 +79,28 @@ pub struct ActorContext {
     /// 平台管理员标志 (跨 tenant 操作能力, per domain-identity INV-ID-01)
     #[serde(default)]
     pub is_platform_admin: bool,
+
+    /// AI Agent 触发的会话标志 (per domain-feedback INV-FB-07, H2 扩展)
+    #[serde(default)]
+    pub is_agent_session: bool,
+}
+
+/// **角色字符串常量** (per `domain-permission::Role` 枚举字符串形式)
+///
+/// 跨 crate 统一引用入口, 各 domain 内部不应再 fork 一份.
+pub mod roles {
+    /// 租户管理员
+    pub const TENANT_ADMIN: &str = "tenant_admin";
+    /// 项目管理员
+    pub const PROJECT_ADMIN: &str = "project_admin";
+    /// 开发者
+    pub const DEVELOPER: &str = "developer";
+    /// 观察者
+    pub const VIEWER: &str = "viewer";
+    /// Agent
+    pub const AGENT: &str = "agent";
+    /// Service 内部调用 (per domain-validation INV-VL-06)
+    pub const SERVICE_INTERNAL: &str = "service_internal";
 }
 
 impl ActorContext {
@@ -98,6 +121,7 @@ impl ActorContext {
             roles: vec!["developer".to_string()],
             is_local_runtime: false,
             is_platform_admin: false,
+            is_agent_session: false,
         }
     }
 
@@ -120,6 +144,40 @@ impl ActorContext {
     /// 是否 Local Runtime / Agent 自身 (per domain-permission §3)
     pub fn is_local_runtime(&self) -> bool {
         self.is_local_runtime
+    }
+
+    /// 是否租户管理员 (per domain-validation + domain-integration, H2 扩展)
+    pub fn is_tenant_admin(&self) -> bool {
+        self.has_role(roles::TENANT_ADMIN)
+    }
+
+    /// 是否开发者 (per domain-validation, H2 扩展)
+    pub fn is_developer(&self) -> bool {
+        self.has_role(roles::DEVELOPER)
+    }
+
+    /// 是否 Service 内部调用 (per domain-validation INV-VL-06, H2 扩展)
+    pub fn is_service_internal(&self) -> bool {
+        self.has_role(roles::SERVICE_INTERNAL)
+    }
+
+    /// 是否可访问指定 Project (per domain-integration, H2 扩展)
+    ///
+    /// **规则**: tenant_admin 永远可访问, 或 actor.project_ids 包含 project_id
+    pub fn can_access_project(&self, project_id: Uuid) -> bool {
+        self.is_tenant_admin() || self.project_ids.contains(&project_id)
+    }
+
+    /// 追加 Project (链式构造)
+    pub fn with_project(mut self, project_id: Uuid) -> Self {
+        self.project_ids.push(project_id);
+        self
+    }
+
+    /// 链式标记为 AI Agent 会话 (per domain-feedback INV-FB-07, H2 扩展)
+    pub fn with_agent_session(mut self, is_agent: bool) -> Self {
+        self.is_agent_session = is_agent;
+        self
     }
 
     /// 解析为 `Role` 枚举兼容的 `Vec<String>` (per domain-permission `from_str_opt`)
@@ -148,6 +206,7 @@ impl Default for ActorContext {
             roles: vec![],
             is_local_runtime: false,
             is_platform_admin: false,
+            is_agent_session: false,
         }
     }
 }
@@ -225,5 +284,69 @@ mod tests {
         assert_eq!(a.user_id, b.user_id);
         assert_eq!(a.tenant_id, b.tenant_id);
         assert_eq!(a.roles, b.roles);
+    }
+
+    // ===== H2 P0-1 扩展测试 (per 2026-08-31 H2 收敛, 加 is_agent_session + 角色 helper) =====
+
+    #[test]
+    fn h2_is_agent_session_default_false() {
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4());
+        assert!(!a.is_agent_session);
+    }
+
+    #[test]
+    fn h2_with_agent_session_sets_flag() {
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
+            .with_agent_session(true);
+        assert!(a.is_agent_session);
+    }
+
+    #[test]
+    fn h2_is_tenant_admin_helper() {
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4());
+        assert!(!a.is_tenant_admin()); // default role = developer
+        let b = a.with_role(roles::TENANT_ADMIN);
+        assert!(b.is_tenant_admin());
+    }
+
+    #[test]
+    fn h2_is_service_internal_helper() {
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4());
+        assert!(!a.is_service_internal());
+        let b = a.with_role(roles::SERVICE_INTERNAL);
+        assert!(b.is_service_internal());
+    }
+
+    #[test]
+    fn h2_is_developer_helper() {
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4());
+        assert!(a.is_developer()); // default role = developer
+    }
+
+    #[test]
+    fn h2_can_access_project_via_admin() {
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
+            .with_role(roles::TENANT_ADMIN);
+        let p = Uuid::new_v4();
+        assert!(a.can_access_project(p)); // tenant_admin 永远可访问
+    }
+
+    #[test]
+    fn h2_can_access_project_via_project_ids() {
+        let p = Uuid::new_v4();
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
+            .with_project(p);
+        assert!(a.can_access_project(p));
+        assert!(!a.can_access_project(Uuid::new_v4())); // 未授权 project
+    }
+
+    #[test]
+    fn h2_roles_constants() {
+        assert_eq!(roles::TENANT_ADMIN, "tenant_admin");
+        assert_eq!(roles::PROJECT_ADMIN, "project_admin");
+        assert_eq!(roles::DEVELOPER, "developer");
+        assert_eq!(roles::VIEWER, "viewer");
+        assert_eq!(roles::AGENT, "agent");
+        assert_eq!(roles::SERVICE_INTERNAL, "service_internal");
     }
 }
