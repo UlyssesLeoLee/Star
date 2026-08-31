@@ -1,107 +1,176 @@
 /* =====================================================================
- * STAR PLATFORM — 日漫未来美学双主题 (Neo-Tokyo Dark + Mecha Ceramic Light)
- * 艺术品级 UI 设计 · 色彩心理学 · 平面几何排版 · 黄金分割比例 (φ ≈ 1.618)
+ * STAR PLATFORM — 日漫双主题设计系统 v2.0
+ * ☀️  Shōnen Studio Light — 少年漫画工作室 · 白底墨线 · 樱花点缀
+ * 🌙  Neo-Tokyo Dark     — 赛博霓虹 · 黑曜石深空 · 电光青紫
+ *
+ * 设计原则 (艺术品级):
+ *   · 色彩心理学: 白=纯粹/力量, 深墨=专注/权威, 樱花粉=温度/活力
+ *   · 黄金比例:   --space-* 斐波那契 4→8→13→21→34→55→89px
+ *   · 平面设计:   3层背景(纯白/暖白/冷白灰) + 强力型排版对比度
+ *   · 漫画风格:   清晰边框线(manga panel borders) + 墨线强调
+ *   · 动态反色:   亮模式 text = 接近纯墨黑; 暗模式 text = 荧白
  * =====================================================================
  */
 
+/* ─────────────────────────────────────────────────────────────────────
+ * ☀️  LIGHT MODE — Shōnen Studio (少年漫画工作室)
+ *     背景: 纯白宣纸 #ffffff → 轻暖白 #f8f9fc → 冷白灰 #f1f4f9
+ *     文字: 墨线黑 #0d1117 → 次墨 #2c3a4a → 静默 #6b7a8d
+ *     主色: 少年漫画蓝 #1a6cf6 · 樱花玫瑰 #e8295a · 翡翠绿 #16a34a
+ * ─────────────────────────────────────────────────────────────────────*/
 :root {
-  /* === ☀️ Mecha Ceramic Light (机甲陶瓷白 / 桜の光 / 战术实验室) === */
-  --color-primary: #0284c7;
-  --color-primary-glow: rgba(2, 132, 199, 0.25);
-  --color-secondary: #f43f5e;
-  --color-secondary-glow: rgba(244, 63, 94, 0.2);
-  --color-accent-violet: #7c3aed;
-  --color-accent-violet-glow: rgba(124, 58, 237, 0.2);
-  --color-success: #059669;
-  --color-warning: #d97706;
-  --color-danger: #e11d48;
+  color-scheme: light;
+
+  /* === 主色 / 强调色 === */
+  --color-primary:            #1a6cf6;
+  --color-primary-glow:       rgba(26, 108, 246, 0.22);
+  --color-secondary:          #e8295a;
+  --color-secondary-glow:     rgba(232, 41, 90, 0.20);
+  --color-accent:             #1a6cf6;
+  --color-accent-soft:        #1256d0;
+  --color-accent-50:          #1a6cf6;
+  --color-accent-violet:      #7c3aed;
+  --color-accent-violet-glow: rgba(124, 58, 237, 0.18);
+
+  /* === 语义色 === */
+  --color-success: #16a34a;
+  --color-warning: #b45309;
+  --color-danger:  #dc2626;
   --color-neutral: #475569;
+  --color-info:    #0284c7;
 
-  /* 背景层级体系 (高纯度陶瓷白与浅钛灰过渡) */
-  --color-surface: #f7f9fd;
-  --color-surface-2: #ffffff;
-  --color-surface-elevated: #f0f4f9;
-  --color-surface-glass: rgba(255, 255, 255, 0.85);
+  /* === 背景层 (宣纸三级白) === */
+  --color-surface:          #ffffff;
+  --color-surface-2:        #f8f9fc;
+  --color-surface-elevated: #f1f4f9;
+  --color-surface-glass:    rgba(255, 255, 255, 0.88);
 
-  /* 文字高对比度反色保障 (WCAG AAA 级可读性) */
-  --color-text: #0f172a;
-  --color-text-dim: #334155;
-  --color-text-mute: #64748b;
+  /* Tailwind bg.* token 映射 (via CSS var → tailwind.config.ts colors.bg.* ) */
+  --bg-DEFAULT:  #f8f9fc;
+  --bg-soft:     #f1f4f9;
+  --bg-lighter:  #e8edf4;
+  --bg-card:     #ffffff;
 
-  /* 边框与微光线 */
-  --color-border: #e2e8f0;
-  --color-border-subtle: #edf2f7;
-  --color-border-hover: #0284c7;
+  /* === 文字 — 墨线黑 (WCAG AAA 对比度 ≥ 7:1 on white) === */
+  --color-text:      #0d1117;
+  --color-text-dim:  #2c3a4a;
+  --color-text-mute: #6b7a8d;
 
-  /* HUD 战术微标签色彩 */
-  --color-hud-tag: #0284c7;
-  --color-hud-tag-bg: #e0f2fe;
-  --color-hud-tag-border: #bae6fd;
+  /* Tailwind ink.* token 映射 */
+  --ink-DEFAULT: #0d1117;
+  --ink-dim:     #2c3a4a;
+  --ink-mute:    #6b7a8d;
 
-  /* 黄金分割间距体系 (φ ≈ 1.618 斐波那契战术栅格) */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 13px;
-  --space-4: 16px;
-  --space-5: 21px;
-  --space-6: 26px;
-  --space-7: 34px;
-  --space-8: 42px;
-  --space-9: 55px;
+  /* === 边框 — 漫画面板线 (清晰, 细腻) === */
+  --color-border:        #d0d7e2;
+  --color-border-subtle: #e8edf4;
+  --color-border-hover:  #1a6cf6;
+
+  /* Tailwind line / border.* token 映射 */
+  --line-DEFAULT:    #d0d7e2;
+  --border-DEFAULT:  #d0d7e2;
+  --border-line:     #c4cdd9;
+
+  /* === HUD 战术微标签 === */
+  --color-hud-tag:        #1a6cf6;
+  --color-hud-tag-bg:     #ddeeff;
+  --color-hud-tag-border: #a8ccf8;
+
+  /* === 语义 ok/warn/err/info Tailwind 映射 === */
+  --ok-DEFAULT:   #16a34a;
+  --warn-DEFAULT: #b45309;
+  --err-DEFAULT:  #dc2626;
+  --info-DEFAULT: #0284c7;
+
+  /* === 阴影 — 白昼漫射光 (无粗黑, 柔和晕光) === */
+  --shadow-sm: 0 1px 3px rgba(13, 17, 23, 0.07), 0 1px 2px rgba(13, 17, 23, 0.04);
+  --shadow-md: 0 4px 16px rgba(13, 17, 23, 0.09), 0 2px 6px rgba(13, 17, 23, 0.05);
+  --shadow-lg: 0 12px 32px rgba(26, 108, 246, 0.12), 0 4px 12px rgba(13, 17, 23, 0.08);
+  --glow-accent:    0 0 14px rgba(26, 108, 246, 0.25), 0 2px 8px rgba(26, 108, 246, 0.12);
+  --glow-secondary: 0 0 14px rgba(232, 41, 90, 0.22);
+
+  /* === 黄金分割间距 (φ ≈ 1.618 斐波那契战术栅格) === */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  13px;
+  --space-4:  16px;
+  --space-5:  21px;
+  --space-6:  26px;
+  --space-7:  34px;
+  --space-8:  42px;
+  --space-9:  55px;
   --space-10: 89px;
 
-  /* 切角与曲率半径 */
+  /* === 圆角 === */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 13px;
   --radius-xl: 21px;
-
-  /* 艺术阴影与柔光层 (多阶漫反射扩散) */
-  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 1px 3px 0 rgba(15, 23, 42, 0.02);
-  --shadow-md: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
-  --shadow-lg: 0 13px 34px -4px rgba(2, 132, 199, 0.09), 0 4px 16px -2px rgba(15, 23, 42, 0.04);
-  --glow-accent: 0 0 16px rgba(2, 132, 199, 0.28);
-  --glow-secondary: 0 0 16px rgba(244, 63, 94, 0.24);
 }
 
-.dark, :root:not(.light) {
-  /* === 🌙 Neo-Tokyo Dark (默认暗色 / 赛博黑曜石 & 电光霓虹) === */
-  --color-primary: #00f0ff;
-  --color-primary-glow: rgba(0, 240, 255, 0.38);
-  --color-secondary: #ff2a85;
-  --color-secondary-glow: rgba(255, 42, 133, 0.35);
-  --color-accent-violet: #a855f7;
-  --color-accent-violet-glow: rgba(168, 85, 247, 0.3);
+/* ─────────────────────────────────────────────────────────────────────
+ * 🌙  DARK MODE — Neo-Tokyo (赛博黑曜石霓虹)
+ *     背景: 黑曜石 #06080e → #0c111c → #121929
+ *     文字: 荧白 #f8fafc → 银蓝 #94a3b8 → 暗钢 #475569
+ *     主色: 电光青 #00f0ff · 霓虹粉 #ff2a85 · 星辰紫 #a855f7
+ * ─────────────────────────────────────────────────────────────────────*/
+.dark {
+  color-scheme: dark;
+
+  --color-primary:            #00f0ff;
+  --color-primary-glow:       rgba(0, 240, 255, 0.38);
+  --color-secondary:          #ff2a85;
+  --color-secondary-glow:     rgba(255, 42, 133, 0.35);
+  --color-accent:             #00f0ff;
+  --color-accent-soft:        #00c8d4;
+  --color-accent-50:          #00f0ff;
+  --color-accent-violet:      #a855f7;
+  --color-accent-violet-glow: rgba(168, 85, 247, 0.30);
+
   --color-success: #10b981;
   --color-warning: #f59e0b;
-  --color-danger: #ff3366;
+  --color-danger:  #ff3366;
   --color-neutral: #94a3b8;
+  --color-info:    #58a6ff;
 
-  /* 黑曜石深空层级 (带有微量量子紫/靛蓝底蕴，大幅降低眼疲劳) */
-  --color-surface: #06080e;
-  --color-surface-2: #0c111c;
+  --color-surface:          #06080e;
+  --color-surface-2:        #0c111c;
   --color-surface-elevated: #121929;
-  --color-surface-glass: rgba(12, 17, 28, 0.82);
+  --color-surface-glass:    rgba(12, 17, 28, 0.82);
 
-  /* 暗夜荧光文本体系 */
-  --color-text: #f8fafc;
-  --color-text-dim: #94a3b8;
+  --bg-DEFAULT: #06080e;
+  --bg-soft:    #0c111c;
+  --bg-lighter: #121929;
+  --bg-card:    #0c111c;
+
+  --color-text:      #f8fafc;
+  --color-text-dim:  #94a3b8;
   --color-text-mute: #475569;
 
-  /* 战术线与发光边框 */
-  --color-border: #1a2234;
-  --color-border-subtle: #111724;
-  --color-border-hover: #00f0ff;
+  --ink-DEFAULT: #f8fafc;
+  --ink-dim:     #94a3b8;
+  --ink-mute:    #475569;
 
-  /* HUD 战术微标签色彩 */
-  --color-hud-tag: #00f0ff;
-  --color-hud-tag-bg: rgba(0, 240, 255, 0.12);
+  --color-border:        #1a2234;
+  --color-border-subtle: #111724;
+  --color-border-hover:  #00f0ff;
+
+  --line-DEFAULT:   #1a2234;
+  --border-DEFAULT: #1a2234;
+  --border-line:    #21262d;
+
+  --color-hud-tag:        #00f0ff;
+  --color-hud-tag-bg:     rgba(0, 240, 255, 0.12);
   --color-hud-tag-border: rgba(0, 240, 255, 0.35);
 
-  /* 霓虹深空漫射阴影与微光 */
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.6);
-  --shadow-md: 0 6px 21px -3px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 240, 255, 0.04);
-  --shadow-lg: 0 16px 42px -6px rgba(0, 0, 0, 0.9), 0 0 26px rgba(0, 240, 255, 0.1);
-  --glow-accent: 0 0 21px rgba(0, 240, 255, 0.38), 0 0 42px rgba(168, 85, 247, 0.16);
+  --ok-DEFAULT:   #10b981;
+  --warn-DEFAULT: #f59e0b;
+  --err-DEFAULT:  #ff3366;
+  --info-DEFAULT: #58a6ff;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.60);
+  --shadow-md: 0 6px 21px rgba(0, 0, 0, 0.80), 0 0 12px rgba(0, 240, 255, 0.04);
+  --shadow-lg: 0 16px 42px rgba(0, 0, 0, 0.90), 0 0 26px rgba(0, 240, 255, 0.10);
+  --glow-accent:    0 0 21px rgba(0, 240, 255, 0.38), 0 0 42px rgba(168, 85, 247, 0.16);
   --glow-secondary: 0 0 21px rgba(255, 42, 133, 0.38);
 }

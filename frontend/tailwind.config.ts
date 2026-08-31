@@ -25,39 +25,37 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Background layers (dark theme primary)
+        // ── Background layers ── driven by CSS vars (theme-adaptive)
         bg: {
-          DEFAULT: "#0a0d12", // page background (per §3 multica micro-tune)
-          soft: "#161b22", // card / sidebar background
-          lighter: "#1c2128", // hover / elevated surface
-          card: "#161b22", // legacy alias for old .card utility (back-compat)
+          DEFAULT: "var(--bg-DEFAULT)",
+          soft:    "var(--bg-soft)",
+          lighter: "var(--bg-lighter)",
+          card:    "var(--bg-card)",
         },
-        // Border tokens
+        // ── Border tokens ── driven by CSS vars
         border: {
-          DEFAULT: "#21262d", // primary border
-          line: "#30363d", // secondary divider / table line
+          DEFAULT: "var(--border-DEFAULT)",
+          line:    "var(--border-line)",
         },
-        // Legacy alias used by old components (do NOT remove yet — U5 keeps
-        // back-compat for the 22 routes that still render before their
-        // redirect is triggered by SSR or hot-reload).
-        line: "#21262d",
-        // Foreground text
+        // Legacy alias (back-compat for old components)
+        line: "var(--line-DEFAULT)",
+        // ── Foreground text ── driven by CSS vars
         ink: {
-          DEFAULT: "#e6edf3", // primary text
-          dim: "#7d8590", // secondary text
-          mute: "#484f58", // tertiary / disabled
+          DEFAULT: "var(--ink-DEFAULT)",
+          dim:     "var(--ink-dim)",
+          mute:    "var(--ink-mute)",
         },
-        // Brand / accent
+        // ── Brand / accent ── driven by CSS vars
         accent: {
-          DEFAULT: "#2f81f7",
-          50: "#2f81f7", // numeric 50 reserved for opacity-suffixed usage
-          soft: "#1f6feb", // hover/pressed
+          DEFAULT: "var(--color-accent, var(--color-primary))",
+          50:      "var(--color-accent-50, var(--color-primary))",
+          soft:    "var(--color-accent-soft, var(--color-primary))",
         },
-        // Semantic status colors
-        ok: "#3fb950",
-        warn: "#d29922",
-        err: "#f85149",
-        info: "#58a6ff",
+        // ── Semantic status ── driven by CSS vars
+        ok:   "var(--ok-DEFAULT)",
+        warn: "var(--warn-DEFAULT)",
+        err:  "var(--err-DEFAULT)",
+        info: "var(--info-DEFAULT)",
       },
       fontSize: {
         micro: ["11px", { lineHeight: "16px", letterSpacing: "0.04em" }],
