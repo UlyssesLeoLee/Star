@@ -507,15 +507,42 @@ export const burndownSeries: BurndownPoint[] = Array.from({ length: 14 }, (_, i)
 // =====================================================================
 // board
 // =====================================================================
+// per 2026-08-31 12:05 JST Ulysses 拍板: board 全量跟 workItems 走, workItems.status 为主源
+// (跟 store.reconcileBoard 设计一致, seed 阶段也以 workItems 为准, 避免双写漂移)
+// 6 列: todo / in_progress / review / blocked / done / wontfix (加 blocked + wontfix)
+// wip_limit: 活跃列 (todo/in_progress/review) 有限制, 终态列 (done/wontfix) 不限, blocked 99 提示用
+// =====================================================================
+
+/**
+ * 按 workItems.status 自动生成 board.columns, workItems.status 为主源
+ * - 列顺序固定 (不依赖 workItems 数组顺序)
+ * - 同 status 内 work_item_ids 按 wi.id 字典序排序 (稳定输出, 避免热重载抖动)
+ * - 空 status 保留空列 (work_item_ids: []), UI 总能展示完整 6 列
+ */
+const buildBoardFromWorkItems = (wis: WorkItem[]): Board["columns"] => {
+  // 预设 6 列顺序 + wip_limit (跟 workItems 数组顺序解耦)
+  const columnDefs: Array<{ status: WorkItem["status"]; wip_limit: number }> = [
+    { status: "todo",        wip_limit: 8 },
+    { status: "in_progress", wip_limit: 5 },
+    { status: "review",      wip_limit: 3 },
+    { status: "blocked",     wip_limit: 99 },
+    { status: "done",        wip_limit: 99 },
+    { status: "wontfix",     wip_limit: 99 },
+  ];
+  return columnDefs.map((def) => ({
+    status: def.status,
+    wip_limit: def.wip_limit,
+    work_item_ids: wis
+      .filter((w) => w.status === def.status)
+      .map((w) => w.id)
+      .sort(), // 字典序,稳定输出
+  }));
+};
+
 export const board: Board = {
   id: "board-001", tenant_id: TENANT_ID, project_id: PROJECT_ID,
   name: "Physis Sprint 23",
-  columns: [
-    { status: "todo",        work_item_ids: ["wi-004","wi-011","wi-015","wi-023"],            wip_limit: 8 },
-    { status: "in_progress", work_item_ids: ["wi-001","wi-005","wi-007","wi-010","wi-017"], wip_limit: 5 },
-    { status: "review",      work_item_ids: ["wi-002","wi-008","wi-018","wi-022"],            wip_limit: 3 },
-    { status: "done",        work_item_ids: ["wi-003","wi-009","wi-013","wi-016","wi-020"], wip_limit: 99 },
-  ],
+  columns: buildBoardFromWorkItems(workItems),
 };
 
 // =====================================================================
