@@ -102,7 +102,8 @@
 | v0.2 | 2026-08-31 | 架构师 (Mavis 接手 agent per DEC-008) | H2 范围扩量 (3 → 8 domain, 发现 H2-EXT 5 domain) + Stage 1 commit 68ae5ff 落地 + Stage 2-3 尝试后 revert (117+ err, 0.6-0.8M token 超出预算) + H5 重测 950 → 432 err (star-context 扩展消解 145+ err); 上游估 0.3-0.5M 实测 0.6-0.8M (3-5x), H2-EXT 需 0.5-0.8M 额外, 总计 1.1-1.6M, 跨 session 续; 真实尝试脚本入档 scripts/p0_h2_3domain_migration.py |
 | v0.3 | 2026-08-31 | 架构师 (Mavis 接手 agent per DEC-008) | 4 项 Ulysses 拍板结果
 | v0.4 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | H2-EXT #1-#3 落地 (3 commits: 9d08f80 / b6f6e2a / 7f611b0), 净修 507 err (797 → 290, 跨 9 crate); 守门 #1 实证: star-context 21/21 pass + workspace --lib 0 err + H2-EXT 3/5 完成; H2-EXT #4 domain-identity (DeviceId→Uuid 重构) + #5 domain-work-item (String→Uuid 需 Ulysses 拍板 String 原义) 跨 session 续; session 至此收尾 (per 2026-09-01 07:56 JST 新 session 启动, 2026-09-01 09:50 JST 收尾) |
-| v0.5 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 4 项 Ulysses 拍板 (Q1 device_id String=hostname 业务语义 + Q2 #4 跨 session 续 + Q3 H2 原 3 domain 跨 session 续 + Q4 P0-2/3/4 跨 session 续); H2-EXT #5 String=hostname 拍板: 不重设为 Uuid, entity 保留 String 类型, 0 token type 改; #5 其他改造 (context.rs 删除 + port/service dead import) 估 0.05M 跨 session 续; session 至此收尾 (per 2026-09-01 08:32 JST 拍板, token 1.95M/2.0M = 97% 紧) | (Q1-D a+c / Q10-P b / Q11-P a / Q12-P a) + 跨 session 续交接 (Q10-P b 推荐拍板) + §5 新增 "下个 session 入口" 段; 本 session 至此收尾 (per 22:45 JST 4 项拍板 + 守门 #1+#9+#12+#15 跨 stage 全过) |
+| v0.5 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 4 项 Ulysses 拍板 (Q1 device_id String=hostname 业务语义 + Q2 #4 跨 session 续 + Q3 H2 原 3 domain 跨 session 续 + Q4 P0-2/3/4 跨 session 续); H2-EXT #5 String=hostname 拍板: 不重设为 Uuid, entity 保留 String 类型, 0 token type 改; #5 其他改造 (context.rs 删除 + port/service dead import) 估 0.05M 跨 session 续; session 至此收尾 (per 2026-09-01 08:32 JST 拍板, token 1.95M/2.0M = 97% 紧) |
+| v0.6 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | Ulysses 拍板"所有" (per ask_user "所有"选项, 2026-09-01 08:44 JST) = H2 全量收官 + P0-2/3/4 + docs 优化 + 等真人/凭证 全部要做; 总估 4-5M token 跨 4-6 session 续; 本次 session 收尾 (token 1.95M/2.0M = 97% 紧); 入口 HANDOFF v0.6 §8 跨 session 续执行计划 | (Q1-D a+c / Q10-P b / Q11-P a / Q12-P a) + 跨 session 续交接 (Q10-P b 推荐拍板) + §5 新增 "下个 session 入口" 段; 本 session 至此收尾 (per 22:45 JST 4 项拍板 + 守门 #1+#9+#12+#15 跨 stage 全过) |
 
 
 ---
@@ -212,3 +213,61 @@
 3. ⏳ H2 原 3 domain service.rs 改造: 跨 session 续
 4. ⏳ 5 域 Lead 真人到位: 等 Ulysses
 5. ⏳ P3-B 拍板: B.5 OpenClaw / B.6 Hermes 凭证
+
+
+---
+
+## §8 Ulysses "所有" 拍板执行计划 (per 2026-09-01 08:44 JST)
+
+**拍板**: 所有任务都要做 (a + b + c + d 全部). 总估 4-5M token, 跨 4-6 session 续.
+
+### 8.1 执行顺序 (按 token budget 优先级 + 依赖关系)
+
+| 序 | 任务 | 估 token | 依赖 | session |
+|---|---|---|---|---|
+| 1 | **H2-EXT #5 简化** (context.rs 删除 + port/service dead import, hostname 拍板 0 type 改) | 0.05M | 无 (本 session 已完成 hostname 拍板) | session #1 |
+| 2 | **H2-EXT #4** domain-identity (DeviceId 强类型 → Uuid 重构) | 0.2M | 无 (类型不兼容需 entity 改) | session #1 |
+| 3 | **H2 原 3 domain** service.rs 改造 (domain-feedback 77 err 大头 + validation/integration) | 0.6-0.8M | H2-EXT #4 #5 完成 (port trait 模式统一) | session #2 |
+| 4 | **守门 #1 阶段 2** --all-targets 0 err 实证 | 0.05M | H2 原 3 domain 完成 | session #2 末 |
+| 5 | **P0-2** ApiError 映射 (api crate ApiError ↔ domain Error) | 0.3M | 守门 #1 阶段 2 实证 | session #3 |
+| 6 | **P0-3** application crate 真实编排 (跨域 service 调用) | 0.6M | P0-2 完成 | session #4 |
+| 7 | **P0-4** infrastructure adapter (DB/KMS/Credential broker) | 0.4M | P0-3 完成 | session #5 |
+| 8 | **守门 #1 阶段 3** (release mode test + 派生 v3) | 0.2M | P0-4 完成 | session #5 末 |
+| 9 | **docs 优化** PHASE 模板标准化 + HANDOFF 自动生成 | 0.1M | 无 (跟代码独立) | session #1-6 任一 |
+| 10 | **cargo doc** 实证 (守门 #1 派生 v4) | 0.05M | 无 (跟代码独立) | session #1-6 任一 |
+| 11 | **5 域 Lead 真人到位** (P3-C/E/F 阻塞解除) | 0 | 等 Ulysses 真人 | (等) |
+| 12 | **P3-B 拍板** B.5 OpenClaw / B.6 Hermes 凭证 | 0 | 等 Ulysses | (等) |
+
+### 8.2 token 预算
+
+- session #1-#5 各约 1M token
+- 6 session 总 4-5M token (per STAR-OLU-001.md v0.1 1 SRE·周 = 1.2M token)
+- 实际每次 session 不能超 2M token (model context window)
+- 建议每次 session 1-1.5M 目标 (留 25-50% buffer)
+
+### 8.3 跨 session 续入口
+
+每次新 session 第一步:
+```bash
+# 1. 读 HANDOFF-ST-001.md v0.6 (本文件) + AGENTS.md 最新版
+# 2. git pull (per 推 origin 落地)
+# 3. git log --oneline -10 看最新 commit
+# 4. cargo check --workspace --all-targets 重测 (per Q9-T A9 数字时效性, 必须实测, 不得沿用)
+# 5. 续下一个任务 (per §8.1 顺序)
+# 6. 完成后 commit + docs 同步 + HANDOFF/AGENTS 修订
+```
+
+### 8.4 session 边界守门
+
+- 守门 #1 阶段 1 已收官 (本 session 实证 --lib 0 + clippy 0 + fmt 0 + 21/21 test)
+- 守门 #1 阶段 2 待 §8.1 #4 实证 (--all-targets 0 err)
+- 守门 #1 阶段 3 待 §8.1 #8 实证 (release test 100% pass)
+- 守门 #15 死循环饱和约束持续生效 (新事件触发新 docs 同步)
+
+### 8.5 风险点
+
+1. **session token 累加**: 每次 session 1-1.5M, 跨 6 session 总 4-5M, AI context 物理限制
+2. **跨域 type 风险**: H2-EXT #4 #5 + H2 原 3 domain service.rs 改造, entity / port trait / service 三层修改, 需谨慎
+3. **守门 #9 实证**: 子代理 RPC 不可靠 (P3-A.6/A.7 实证), 任何委派需 git log 实证
+4. **5 域 Lead 真人阻塞**: per 8/21 JST 拒绝兼任硬约束, P3-C/E/F 阶段需真人到位
+5. **P3-B 凭证**: B.5 OpenClaw / B.6 Hermes 需 Ulysses 提供凭证
