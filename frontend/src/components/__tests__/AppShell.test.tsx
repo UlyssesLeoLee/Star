@@ -9,6 +9,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
+import type { ReactNode } from "react";
 
 // Mock next/navigation — AppHeader 通过 usePathname 读 active tab
 vi.mock("next/navigation", () => ({
@@ -17,14 +18,23 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { AppShell } from "../AppShell";
+import { I18nProvider } from "@/lib/i18n";
+
+// per 2026-08-31 i18n 实装: AppShell -> AppHeader 内 useTranslation() 必须包 I18nProvider
+function renderWithI18n(ui: ReactNode) {
+  return render(<I18nProvider initialLanguage="zh-CN">{ui}</I18nProvider>);
+}
 
 describe("AppShell", () => {
   beforeEach(() => {
     cleanup();
+    if (typeof window !== "undefined") {
+      window.localStorage.clear();
+    }
   });
 
   it("renders app-shell + app-header + app-main (per §3 三层架构)", () => {
-    render(
+    renderWithI18n(
       <AppShell>
         <div>panel content</div>
       </AppShell>
@@ -35,7 +45,7 @@ describe("AppShell", () => {
   });
 
   it("passes children through to app-main (panel page renders inside shell)", () => {
-    render(
+    renderWithI18n(
       <AppShell>
         <p data-testid="child-marker">hello panel</p>
       </AppShell>
@@ -49,7 +59,7 @@ describe("AppShell", () => {
   });
 
   it("uses dark theme classes bg-bg text-ink (per §7 token)", () => {
-    render(
+    renderWithI18n(
       <AppShell>
         <span>x</span>
       </AppShell>
@@ -62,7 +72,7 @@ describe("AppShell", () => {
   });
 
   it("app-main has min-height calc(100vh - 64px) inline style (per §3 64px 顶栏)", () => {
-    render(
+    renderWithI18n(
       <AppShell>
         <span>x</span>
       </AppShell>

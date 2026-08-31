@@ -20,10 +20,12 @@ import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
 import { useNavStore } from "@/lib/nav/navStore";
 import { MODULE_MAP, type ModuleDefinition } from "@/lib/nav/registry";
 import { AppMatrixDrawer } from "@/components/nav/AppMatrixDrawer";
+import { useTranslation } from "@/lib/i18n";
 
 export function AppHeader() {
   const pathname = usePathname() ?? "/";
   const openCommandBar = useCommandBarStore((s) => s.open);
+  const { t, tx } = useTranslation();
   const [notifCount] = useState(3); // mock — Phase I+ 接 SSE
 
   const headerTabIds = useNavStore((s) => s.headerTabIds);
@@ -48,7 +50,7 @@ export function AppHeader() {
               type="button"
               data-testid="workspace-switcher"
               className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono text-ink-dim hover:text-ink rounded-lg hover:bg-bg-soft/70 border border-transparent hover:border-line transition-all duration-200"
-              aria-label="Switch workspace"
+              aria-label={t.appHeader.workspaceSwitcher}
             >
               <span className="size-2 rounded-sm bg-accent rotate-45 shadow-[0_0_8px_rgba(0,240,255,0.9)]" />
               <span className="truncate max-w-[140px] font-bold text-ink tracking-tight">ACME Studio</span>
@@ -96,7 +98,7 @@ export function AppHeader() {
                       e.stopPropagation();
                       removeHeaderTab(tab.id);
                     }}
-                    title={`从顶栏移除 ${tab.label}`}
+                    title={tx(t.appHeader.removeFromHeader, { label: tab.label })}
                     data-testid={`remove-header-tab-${tab.id}`}
                     className="p-0.5 ml-[-6px] mr-1 rounded hover:bg-err/20 hover:text-err text-ink-mute opacity-0 group-hover:opacity-100 transition-all duration-150 z-10"
                   >
@@ -111,7 +113,7 @@ export function AppHeader() {
               type="button"
               onClick={openMatrix}
               data-testid="header-add-tab"
-              title="添加更多标签到顶栏"
+              title={t.appHeader.addMoreTabs}
               className="p-1.5 text-ink-mute hover:text-accent rounded-lg hover:bg-bg-soft transition-colors"
             >
               <Plus size={13} />
@@ -141,8 +143,8 @@ export function AppHeader() {
               className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-line bg-bg-soft/70 text-ink-dim hover:text-accent hover:border-accent transition-all duration-200 text-xs font-mono group shadow-sm hover:shadow-[0_0_14px_rgba(0,240,255,0.22)]"
             >
               <LayoutGrid size={13} className="text-accent group-hover:scale-110 transition-transform duration-200" />
-              <span className="hidden lg:inline font-bold">ALL APPS</span>
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-accent/10 text-accent font-bold border border-accent/30">25+</span>
+              <span className="hidden lg:inline font-bold">{t.appHeader.allApps}</span>
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-accent/10 text-accent font-bold border border-accent/30">{t.appHeader.appsCount}</span>
             </button>
 
             <ThemeSwitcher />
@@ -155,7 +157,7 @@ export function AppHeader() {
               className="flex items-center gap-2 px-3 h-8 rounded-lg border border-line bg-bg-soft/70 text-ink-dim hover:text-ink hover:border-accent transition-all duration-200 text-xs shadow-sm hover:shadow-[0_0_12px_rgba(0,240,255,0.18)]"
             >
               <Search size={13} className="text-accent" />
-              <span className="hidden sm:inline font-medium">Tactical Jump...</span>
+              <span className="hidden sm:inline font-medium">{t.appHeader.tacticalJump}</span>
               <kbd className="hidden sm:inline-flex text-[10px] font-mono px-1.5 py-0.5 rounded border border-line bg-bg text-ink-mute font-semibold">
                 ⌘K
               </kbd>
@@ -164,7 +166,7 @@ export function AppHeader() {
             <button
               type="button"
               data-testid="notifications-bell"
-              aria-label={`Notifications (${notifCount} unread)`}
+              aria-label={tx(t.appHeader.notifications, { count: notifCount })}
               className="relative p-2 text-ink-dim hover:text-ink rounded-lg hover:bg-bg-soft transition-colors"
             >
               <Bell size={15} />
@@ -181,10 +183,10 @@ export function AppHeader() {
             <div
               data-testid="realtime-status"
               className="hidden sm:flex items-center gap-1.5 px-3 h-8 rounded-lg border border-line bg-bg-soft/50"
-              aria-label="Realtime status: online"
+              aria-label={t.appHeader.realtimeOnline}
             >
               <span className="size-2 rounded-full bg-ok animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.9)]" aria-hidden="true" />
-              <span className="text-[10px] text-ink-dim font-mono tracking-wider font-bold">SYNCED</span>
+              <span className="text-[10px] text-ink-dim font-mono tracking-wider font-bold">{t.appHeader.synced}</span>
             </div>
 
             <UserMenu />
