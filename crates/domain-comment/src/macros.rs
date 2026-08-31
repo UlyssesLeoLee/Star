@@ -12,7 +12,8 @@ macro_rules! define_uuid_id {
         impl $name {
             pub fn new() -> Self { Self(uuid::Uuid::new_v4()) }
             pub fn from_uuid(id: uuid::Uuid) -> Self { Self(id) }
-            pub fn as_uuid(&self) -> &uuid::Uuid { &self.0 }
+            pub fn as_uuid(&self) -> uuid::Uuid { self.0 }
+            /// 推荐主构造方式: XxxId::from(uuid) 或 XxxId(uuid) tuple 构造 (仅宏内部/测试)
             pub fn into_uuid(self) -> uuid::Uuid { self.0 }
         }
         impl Default for $name { fn default() -> Self { Self::new() } }
