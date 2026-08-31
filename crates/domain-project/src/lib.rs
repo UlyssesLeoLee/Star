@@ -663,8 +663,8 @@ impl ProjectRepository for InMemoryProjectRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn admin(tid: TenantId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tid.0).with_role("project_admin")
+    fn admin(tid: uuid::Uuid) -> ActorContext {
+        ActorContext::new(Uuid::new_v4(), tid).with_role("project_admin")
     }
 
     #[test]
@@ -684,7 +684,7 @@ mod tests {
     #[test]
     fn default_policy_has_merge_gate() {
         // INV-P-03:默认 merge_gate=true
-        let p = ProjectPolicy::default_for(ProjectId::new(), uuid::Uuid::new_v4());
+        let p = ProjectPolicy::default_for(ProjectId::new(), TenantId(uuid::Uuid::new_v4()));
         assert!(p.merge_gate);
         assert!(p.commit_requires_user);
     }
@@ -693,11 +693,11 @@ mod tests {
     async fn create_project_requires_project_admin() {
         let svc = InMemoryProjectService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(Uuid::new_v4(), tid.0);
+        let actor = ActorContext::new(Uuid::new_v4(), tid);
         let res = svc
             .create_project(
                 CreateProjectCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     workspace_id: WorkspaceId::new(),
                     slug: "alpha".to_string(),
                     display_name: "Alpha".to_string(),
@@ -719,7 +719,7 @@ mod tests {
         let wid = WorkspaceId::new();
         svc.create_project(
             CreateProjectCommand {
-                tenant_id: tid,
+                tenant_id: TenantId(tid),
                 workspace_id: wid,
                 slug: "alpha".to_string(),
                 display_name: "Alpha".to_string(),
@@ -734,7 +734,7 @@ mod tests {
         let res = svc
             .create_project(
                 CreateProjectCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     workspace_id: wid,
                     slug: "alpha".to_string(),
                     display_name: "Alpha2".to_string(),
@@ -757,7 +757,7 @@ mod tests {
         let wid2 = WorkspaceId::new();
         svc.create_project(
             CreateProjectCommand {
-                tenant_id: tid,
+                tenant_id: TenantId(tid),
                 workspace_id: wid1,
                 slug: "alpha".to_string(),
                 display_name: "A1".to_string(),
@@ -771,7 +771,7 @@ mod tests {
         .unwrap();
         svc.create_project(
             CreateProjectCommand {
-                tenant_id: tid,
+                tenant_id: TenantId(tid),
                 workspace_id: wid2,
                 slug: "alpha".to_string(),
                 display_name: "A2".to_string(),
@@ -793,7 +793,7 @@ mod tests {
         let p = svc
             .create_project(
                 CreateProjectCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     workspace_id: WorkspaceId::new(),
                     slug: "x".to_string(),
                     display_name: "X".to_string(),
@@ -805,13 +805,13 @@ mod tests {
             )
             .await
             .unwrap();
-        let mut new_policy = ProjectPolicy::default_for(p.id, tid);
+        let mut new_policy = ProjectPolicy::default_for(p.id, TenantId(tid));
         new_policy.merge_gate = false; // 关闭 merge gate
         new_policy.required_test_passes = 3;
         let updated = svc
             .replace_project_policy(
                 ReplaceProjectPolicyCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     project_id: p.id,
                     policy: new_policy,
                     actor_user_id: UserId::from(actor.user_id),
@@ -833,7 +833,7 @@ mod tests {
         let p = svc
             .create_project(
                 CreateProjectCommand {
-                    tenant_id: t1,
+                    tenant_id: TenantId(t1),
                     workspace_id: WorkspaceId::new(),
                     slug: "x".to_string(),
                     display_name: "X".to_string(),
@@ -849,7 +849,7 @@ mod tests {
         let res = svc
             .get_project(
                 GetProjectQuery {
-                    tenant_id: t1,
+                    tenant_id: TenantId(t1),
                     project_id: p.id,
                 },
                 &admin2,
@@ -866,7 +866,7 @@ mod tests {
         let p = svc
             .create_project(
                 CreateProjectCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     workspace_id: WorkspaceId::new(),
                     slug: "x".to_string(),
                     display_name: "X".to_string(),
@@ -881,7 +881,7 @@ mod tests {
         let res = svc
             .archive_project(
                 ArchiveProjectCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     project_id: p.id,
                     actor_user_id: UserId::from(actor.user_id),
                 },
@@ -901,7 +901,7 @@ mod tests {
         for i in 0..3 {
             svc.create_project(
                 CreateProjectCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     workspace_id: wid,
                     slug: format!("p{}", i),
                     display_name: format!("P{}", i),
@@ -917,7 +917,7 @@ mod tests {
         let list = svc
             .list_by_workspace(
                 ListByWorkspaceQuery {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     workspace_id: wid,
                 },
                 &actor,

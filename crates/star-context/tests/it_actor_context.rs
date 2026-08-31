@@ -124,6 +124,7 @@ fn it_actor_context_serde_all_fields() {
         is_platform_admin: true,
         is_agent_session: true,
         tenant_policy_id: None,
+        workspace_ids: vec![],
     };
     let json = serde_json::to_string(&actor).unwrap();
     let parsed: ActorContext = serde_json::from_str(&json).unwrap();

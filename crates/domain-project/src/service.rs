@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 
-use crate::context::ActorContext;
 use crate::entity::{Project, ProjectPolicy, ProjectTemplate};
 use crate::error::ProjectError;
 use crate::event::{EventMeta, ProjectEvent};
@@ -71,7 +70,7 @@ impl InMemoryProjectService {
         self.projects.read().await.len()
     }
     fn check_tenant(actor: &ActorContext, expected: TenantId) -> Result<(), ProjectError> {
-        if actor.tenant_id != expected {
+        if actor.tenant_id != expected.0 {
             return Err(ProjectError::PermissionDenied);
         }
         Ok(())
@@ -138,7 +137,7 @@ impl ProjectCommandPort for InMemoryProjectService {
         // 事件
         let event = ProjectEvent::Created(crate::event::ProjectCreated {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id),
+                actor_user_id: Some(UserId::from(actor.user_id)),
                 ..EventMeta::new(cmd.tenant_id)
             },
             project_id: id,
@@ -264,7 +263,7 @@ impl ProjectCommandPort for InMemoryProjectService {
 
         let event = ProjectEvent::PolicyUpdated(crate::event::ProjectPolicyUpdated {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id),
+                actor_user_id: Some(UserId::from(actor.user_id)),
                 ..EventMeta::new(cmd.tenant_id)
             },
             project_id: cmd.project_id,

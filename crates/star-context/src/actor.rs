@@ -87,6 +87,10 @@ pub struct ActorContext {
     /// 关联 TenantPolicy ID (per domain-tenant, H2-EXT 扩展)
     #[serde(default)]
     pub tenant_policy_id: Option<Uuid>,
+
+    /// 关联 Workspace IDs (per domain-project, H2-EXT 扩展)
+    #[serde(default)]
+    pub workspace_ids: Vec<Uuid>,
 }
 
 /// **角色字符串常量** (per `domain-permission::Role` 枚举字符串形式)
@@ -130,6 +134,7 @@ impl ActorContext {
             is_platform_admin: false,
             is_agent_session: false,
             tenant_policy_id: None,
+            workspace_ids: vec![],
         }
     }
 
@@ -218,6 +223,7 @@ impl Default for ActorContext {
             is_platform_admin: false,
             is_agent_session: false,
             tenant_policy_id: None,
+            workspace_ids: vec![],
         }
     }
 }
