@@ -24,7 +24,7 @@ import { useState, useCallback, useMemo } from "react";
 import { clsx } from "clsx";
 import { KanbanCard } from "./KanbanCard";
 import { StatusPill } from "@/components/StatusPill";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Plus, SlidersHorizontal } from "lucide-react";
 import type { Board, WorkItem, WorkItemStatus, Identity } from "@/types/ids";
 import { KANBAN_COLUMNS } from "@/mocks/data";
 
@@ -179,177 +179,194 @@ export function KanbanBoard({
     setDropTarget(null);
   }, [onDragEndCard]);
 
-  return (
-    <div
-      data-testid="kanban-board"
-      className="grid gap-3"
-      // grid-cols-1 mobile, 2 col tablet, 列数 dynamic 桌面 (per 2026-08-29 18:52 JST)
-      // minmax(260px, 1fr) per 2026-08-29 19:35 JST scope-ui-only 候选第 3 项 (Board 列宽):
-      // 4 列 (260×4=1040) 1280 屏 fit, 5+ 列 → 父 main overflow-x-auto 横向滚动
-      style={{ gridTemplateColumns: `repeat(${board.columns.length}, minmax(260px, 1fr))` }}
-    >
-      {board.columns.map((col) => {
-        const overWip =
-          col.wip_limit !== undefined &&
-          col.wip_limit < 99 &&
-          col.work_item_ids.length > col.wip_limit;
-        const isDropTarget = dropTarget === col.status;
-        const cards = col.work_item_ids
-          .map((id) => workItemMap[id])
-          .filter((w): w is WorkItem => Boolean(w))
-          .filter((w) => (filter ? filter(w) : true));
+  const handleAddColumn = () => {
+    // 找未在现有 columns 的 status 作为新列 (todo/in_progress/review/done/blocked/wontfix 轮询)
+    const candidates: WorkItemStatus[] = [
+      "todo", "in_progress", "review", "done", "blocked", "wontfix",
+    ];
+    const used = new Set(board.columns.map((c) => c.status));
+    const next = candidates.find((s) => !used.has(s)) ?? "blocked";
+    onAddColumn?.(next);
+  };
 
-        const colIdx = board.columns.findIndex((c) => c.status === col.status);
-        const isColDragging = draggingColIdx === colIdx;
-        const isColDropTarget = dropTargetColIdx === colIdx && draggingColIdx !== null && draggingColIdx !== colIdx;
-        return (
-          <div
-            key={col.status}
-            data-testid={`kanban-column-${col.status}`}
-            data-status={col.status}
-            data-col-idx={colIdx}
-            // 拖动高亮: card drop zone (红/绿) + col drop zone (蓝) 区分
-            onDragOver={(e) => {
-              const types = e.dataTransfer?.types ? Array.from(e.dataTransfer.types) : [];
-              // card drop (text/issue-id) -> 红/绿环
-              if (types.includes("text/issue-id") || types.length === 0) {
-                handleDragOver(e, col.status);
-              }
-              // col drop (text/col-idx) -> 蓝边
-              if (types.includes("text/col-idx")) {
-                e.preventDefault();
-                if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-                if (draggingColIdx !== colIdx) setDropTargetColIdx(colIdx);
-              }
-            }}
-            onDragLeave={(e) => {
-              handleDragLeave(e, col.status);
-              handleColDragLeave(e, colIdx);
-            }}
-            onDrop={(e) => {
-              const types = e.dataTransfer?.types ? Array.from(e.dataTransfer.types) : [];
-              // 路由: col 拖到 col vs card 拖到 col
-              if (types.includes("text/col-idx")) {
-                handleColDrop(e, colIdx);
-              } else {
-                handleDrop(e, col.status);
-              }
-            }}
-            className={clsx(
-              "card min-h-[200px] transition-colors",
-              overWip && "border-warn/60",
-              isDropTarget && "ring-2 ring-accent bg-accent/10",
-              // 列重排 drop 高亮 (per 2026-08-29 19:09 JST)
-              isColDragging && "opacity-50",
-              isColDropTarget && "ring-2 ring-cyan-400 bg-cyan-500/10",
-            )}
+  return (
+    <div className="space-y-3">
+      {/* === Kanban Board Toolbar Control Bar === */}
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2 text-xs font-mono text-ink-mute">
+          <span className="font-bold text-ink-dim uppercase tracking-wider">
+            COLUMNS // {board.columns.length} ACTIVE
+          </span>
+          <span className="text-[10px] opacity-60 hidden sm:inline">
+            · 拖动 ⋮⋮ 重排列，点击列名重命名
+          </span>
+        </div>
+
+        {onAddColumn && (
+          <button
+            type="button"
+            data-testid="kanban-add-column"
+            onClick={handleAddColumn}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-accent bg-bg-soft/70 hover:bg-accent/10 text-xs font-mono text-ink-dim hover:text-accent transition-all duration-150 shadow-sm group font-semibold"
+            title="添加新看板列"
           >
-            {/* 列拖动手柄 (per 2026-08-29 19:09 JST, 把整列设为 draggable) */}
-            {onReorderColumns && (
-              <div
-                draggable
-                onDragStart={(e) => handleColDragStart(e, board.columns.findIndex((c) => c.status === col.status))}
-                onDragEnd={handleColDragEnd}
-                data-testid={`kanban-column-drag-handle-${col.status}`}
-                className="text-ink-mute hover:text-accent cursor-grab active:cursor-grabbing text-xs select-none"
-                title="拖动重排列"
-                aria-label={`重排列 ${col.name ?? col.status}`}
-              >
-                ⋮⋮
-              </div>
-            )}
-            <div className="flex items-center justify-between mb-3 gap-1 flex-1 min-w-0">
-              {editingCol === col.status && onRenameColumn ? (
-                // Inline edit 模式 (per 2026-08-29 18:52 JST 拍板)
-                <input
-                  data-testid={`kanban-column-name-input-${col.status}`}
-                  autoFocus
-                  value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  onBlur={() => commitEdit(col.status)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitEdit(col.status);
-                    else if (e.key === "Escape") setEditingCol(null);
-                  }}
-                  className="text-[11px] font-mono uppercase tracking-wider bg-bg-card border border-accent/60 rounded px-1.5 py-0.5 text-ink outline-none w-full"
-                />
-              ) : (
-                <button
-                  data-testid={`kanban-column-name-${col.status}`}
-                  type="button"
-                  onClick={() => startEdit(col.status, col.name ?? col.status)}
-                  disabled={!onRenameColumn}
-                  className="text-[11px] font-mono uppercase tracking-wider text-ink hover:text-accent transition-colors text-left truncate"
-                  title="点击改列名"
-                >
-                  {col.name ?? col.status}
-                </button>
+            <Plus size={13} className="text-accent group-hover:rotate-90 transition-transform duration-200" />
+            <span>+ Add Column</span>
+          </button>
+        )}
+      </div>
+
+      {/* === Kanban Columns Grid === */}
+      <div
+        data-testid="kanban-board"
+        className="grid gap-3"
+        // grid-cols-1 mobile, 2 col tablet, 列数 dynamic 桌面 (per 2026-08-29 18:52 JST)
+        // minmax(260px, 1fr) per 2026-08-29 19:35 JST scope-ui-only 候选第 3 项 (Board 列宽):
+        // 4 列 (260×4=1040) 1280 屏 fit, 5+ 列 → 父 main overflow-x-auto 横向滚动
+        style={{ gridTemplateColumns: `repeat(${board.columns.length}, minmax(260px, 1fr))` }}
+      >
+        {board.columns.map((col) => {
+          const overWip =
+            col.wip_limit !== undefined &&
+            col.wip_limit < 99 &&
+            col.work_item_ids.length > col.wip_limit;
+          const isDropTarget = dropTarget === col.status;
+          const cards = col.work_item_ids
+            .map((id) => workItemMap[id])
+            .filter((w): w is WorkItem => Boolean(w))
+            .filter((w) => (filter ? filter(w) : true));
+
+          const colIdx = board.columns.findIndex((c) => c.status === col.status);
+          const isColDragging = draggingColIdx === colIdx;
+          const isColDropTarget = dropTargetColIdx === colIdx && draggingColIdx !== null && draggingColIdx !== colIdx;
+          return (
+            <div
+              key={col.status}
+              data-testid={`kanban-column-${col.status}`}
+              data-status={col.status}
+              data-col-idx={colIdx}
+              // 拖动高亮: card drop zone (红/绿) + col drop zone (蓝) 区分
+              onDragOver={(e) => {
+                const types = e.dataTransfer?.types ? Array.from(e.dataTransfer.types) : [];
+                // card drop (text/issue-id) -> 红/绿环
+                if (types.includes("text/issue-id") || types.length === 0) {
+                  handleDragOver(e, col.status);
+                }
+                // col drop (text/col-idx) -> 蓝边
+                if (types.includes("text/col-idx")) {
+                  e.preventDefault();
+                  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+                  if (draggingColIdx !== colIdx) setDropTargetColIdx(colIdx);
+                }
+              }}
+              onDragLeave={(e) => {
+                handleDragLeave(e, col.status);
+                handleColDragLeave(e, colIdx);
+              }}
+              onDrop={(e) => {
+                const types = e.dataTransfer?.types ? Array.from(e.dataTransfer.types) : [];
+                // 路由: col 拖到 col vs card 拖到 col
+                if (types.includes("text/col-idx")) {
+                  handleColDrop(e, colIdx);
+                } else {
+                  handleDrop(e, col.status);
+                }
+              }}
+              className={clsx(
+                "card min-h-[200px] transition-colors",
+                overWip && "border-warn/60",
+                isDropTarget && "ring-2 ring-accent bg-accent/10",
+                // 列重排 drop 高亮 (per 2026-08-29 19:09 JST)
+                isColDragging && "opacity-50",
+                isColDropTarget && "ring-2 ring-cyan-400 bg-cyan-500/10",
               )}
-              <div className="flex items-center gap-1 shrink-0">
-                <span className="text-[10px] text-ink-mute font-mono">
-                  {cards.length}
-                  {col.wip_limit !== undefined && col.wip_limit < 99 && ` / ${col.wip_limit}`}
-                </span>
-                {onRemoveColumn && (
-                  <button
-                    type="button"
-                    data-testid={`kanban-column-remove-${col.status}`}
-                    onClick={() => onRemoveColumn(col.status)}
-                    aria-label={`删除列 ${col.name ?? col.status}`}
-                    className="text-ink-mute hover:text-err transition-colors text-xs leading-none px-1"
-                    title="删除列"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            </div>
-            {overWip && (
-              <div className="mb-2 text-[10px] text-warn flex items-center gap-1">
-                <AlertTriangle size={10} /> WIP 超过限制
-              </div>
-            )}
-            <div className="space-y-2">
-              {cards.length === 0 && (
-                <div className="text-[10px] text-ink-mute italic text-center py-4">
-                  拖卡片到此
+            >
+              {/* 列拖动手柄 (per 2026-08-29 19:09 JST, 把整列设为 draggable) */}
+              {onReorderColumns && (
+                <div
+                  draggable
+                  onDragStart={(e) => handleColDragStart(e, board.columns.findIndex((c) => c.status === col.status))}
+                  onDragEnd={handleColDragEnd}
+                  data-testid={`kanban-column-drag-handle-${col.status}`}
+                  className="text-ink-mute hover:text-accent cursor-grab active:cursor-grabbing text-xs select-none"
+                  title="拖动重排列"
+                  aria-label={`重排列 ${col.name ?? col.status}`}
+                >
+                  ⋮⋮
                 </div>
               )}
-              {cards.map((w) => (
-                <KanbanCard
-                  key={w.id}
-                  workItem={w}
-                  assignee={w.assignee_id ? identityMap[w.assignee_id] : undefined}
-                  isDragging={effectiveDraggingId === w.id}
-                  onDragStart={handleCardDragStart}
-                  onDragEnd={handleCardDragEnd}
-                />
-              ))}
+              <div className="flex items-center justify-between mb-3 gap-1 flex-1 min-w-0">
+                {editingCol === col.status && onRenameColumn ? (
+                  // Inline edit 模式 (per 2026-08-29 18:52 JST 拍板)
+                  <input
+                    data-testid={`kanban-column-name-input-${col.status}`}
+                    autoFocus
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={() => commitEdit(col.status)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitEdit(col.status);
+                      else if (e.key === "Escape") setEditingCol(null);
+                    }}
+                    className="text-[11px] font-mono uppercase tracking-wider bg-bg-card border border-accent/60 rounded px-1.5 py-0.5 text-ink outline-none w-full"
+                  />
+                ) : (
+                  <button
+                    data-testid={`kanban-column-name-${col.status}`}
+                    type="button"
+                    onClick={() => startEdit(col.status, col.name ?? col.status)}
+                    disabled={!onRenameColumn}
+                    className="text-[11px] font-mono uppercase tracking-wider text-ink hover:text-accent transition-colors text-left truncate"
+                    title="点击改列名"
+                  >
+                    {col.name ?? col.status}
+                  </button>
+                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] text-ink-mute font-mono">
+                    {cards.length}
+                    {col.wip_limit !== undefined && col.wip_limit < 99 && ` / ${col.wip_limit}`}
+                  </span>
+                  {onRemoveColumn && (
+                    <button
+                      type="button"
+                      data-testid={`kanban-column-remove-${col.status}`}
+                      onClick={() => onRemoveColumn(col.status)}
+                      aria-label={`删除列 ${col.name ?? col.status}`}
+                      className="text-ink-mute hover:text-err transition-colors text-xs leading-none px-1"
+                      title="删除列"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+              {overWip && (
+                <div className="mb-2 text-[10px] text-warn flex items-center gap-1">
+                  <AlertTriangle size={10} /> WIP 超过限制
+                </div>
+              )}
+              <div className="space-y-2">
+                {cards.length === 0 && (
+                  <div className="text-[10px] text-ink-mute italic text-center py-4">
+                    拖卡片到此
+                  </div>
+                )}
+                {cards.map((w) => (
+                  <KanbanCard
+                    key={w.id}
+                    workItem={w}
+                    assignee={w.assignee_id ? identityMap[w.assignee_id] : undefined}
+                    isDragging={effectiveDraggingId === w.id}
+                    onDragStart={handleCardDragStart}
+                    onDragEnd={handleCardDragEnd}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        );
-      })}
-
-      {/* Add column 按钮 (per 2026-08-29 18:52 JST 拍板) */}
-      {onAddColumn && (
-        <button
-          type="button"
-          data-testid="kanban-add-column"
-          onClick={() => {
-            // 找未在现有 columns 的 status 作为新列 (todo/in_progress/review/done/blocked/wontfix 轮询)
-            const candidates: WorkItemStatus[] = [
-              "todo", "in_progress", "review", "done", "blocked", "wontfix",
-            ];
-            const used = new Set(board.columns.map((c) => c.status));
-            const next = candidates.find((s) => !used.has(s)) ?? "blocked";
-            onAddColumn(next);
-          }}
-          className="card min-h-[200px] flex items-center justify-center text-ink-mute hover:text-accent hover:border-accent/40 transition-all duration-150 border-dashed cursor-pointer"
-        >
-          <span className="text-2xl leading-none">+</span>
-          <span className="ml-2 text-sm">Add column</span>
-        </button>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
