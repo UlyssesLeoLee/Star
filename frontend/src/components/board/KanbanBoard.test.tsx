@@ -14,8 +14,15 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest"; // eslint-disable-line @typescript-eslint/no-unused-vars
 import { render, screen, fireEvent, cleanup } from "@testing-library/react"; // eslint-disable-line @typescript-eslint/no-unused-vars
+import type { ReactNode } from "react";
 import { KanbanBoard } from "./KanbanBoard";
 import type { Board, WorkItem, Identity } from "@/types/ids";
+import { I18nProvider } from "@/lib/i18n";
+
+// per 2026-08-31 i18n 补缺口 v2: KanbanBoard 内 useTranslation() 必须包 I18nProvider
+function renderWithI18n(ui: ReactNode) {
+  return render(<I18nProvider initialLanguage="zh-CN">{ui}</I18nProvider>);
+}
 
 // ---- mock next/navigation (per U2 — KanbanCard click → router.push) ----
 const mockRouterPush = vi.fn();
@@ -77,8 +84,7 @@ describe("KanbanBoard", () => {
   // ---- Test 1: write — 渲染 4 列 + 卡片数 ----
   it("renders 4 columns with correct card counts", () => {
     const onTransition = vi.fn();
-    render(
-      <KanbanBoard
+    renderWithI18n(<KanbanBoard
         board={mockBoard}
         workItems={mockWorkItems}
         identities={mockIdentities}
@@ -103,8 +109,7 @@ describe("KanbanBoard", () => {
   // ---- Test 2: drag — drop 触发 onTransition(id, toStatus) ----
   it("calls onTransition when a card is dropped on a different column", () => {
     const onTransition = vi.fn();
-    render(
-      <KanbanBoard
+    renderWithI18n(<KanbanBoard
         board={mockBoard}
         workItems={mockWorkItems}
         identities={mockIdentities}
@@ -126,8 +131,7 @@ describe("KanbanBoard", () => {
   // ---- Test 3: drag-over / dropTarget 高亮 ----
   it("highlights column as dropTarget on dragOver, clears on drop", () => {
     const onTransition = vi.fn();
-    render(
-      <KanbanBoard
+    renderWithI18n(<KanbanBoard
         board={mockBoard}
         workItems={mockWorkItems}
         identities={mockIdentities}
@@ -159,8 +163,7 @@ describe("KanbanBoard", () => {
   // (KanbanCard 默认 onClick → router.push, Issues 主面板 / Projects 多 panel 共用同一行为)
   it("U2 路由集成: card click navigates to /work-item/{id} via router.push", () => {
     const onTransition = vi.fn();
-    render(
-      <KanbanBoard
+    renderWithI18n(<KanbanBoard
         board={mockBoard}
         workItems={mockWorkItems}
         identities={mockIdentities}

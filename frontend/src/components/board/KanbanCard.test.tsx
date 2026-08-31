@@ -12,8 +12,15 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest"; // eslint-disable-line @typescript-eslint/no-unused-vars
 import { render, screen, fireEvent, cleanup } from "@testing-library/react"; // eslint-disable-line @typescript-eslint/no-unused-vars
+import type { ReactNode } from "react";
 import { KanbanCard } from "./KanbanCard";
 import type { WorkItem } from "@/types/ids";
+import { I18nProvider } from "@/lib/i18n";
+
+// per 2026-08-31 i18n 补缺口 v2: KanbanCard 内 useTranslation() 必须包 I18nProvider
+function renderWithI18n(ui: ReactNode) {
+  return render(<I18nProvider initialLanguage="zh-CN">{ui}</I18nProvider>);
+}
 
 const mockWorkItem: WorkItem = {
   id: "wi-007",
@@ -41,8 +48,7 @@ describe("KanbanCard", () => {
   // ---- Test 1: dragstart setData 正确 ----
   it("calls dataTransfer.setData('text/issue-id', id) on dragstart", () => {
     const onDragStart = vi.fn();
-    const card = render(
-      <KanbanCard
+    const card = renderWithI18n(<KanbanCard
         workItem={mockWorkItem}
         onDragStart={onDragStart}
       />,
@@ -68,8 +74,8 @@ describe("KanbanCard", () => {
 
   // ---- Test 2: dragging state — opacity-50 + ring-2 ----
   it("applies opacity-50 + ring-2 when isDragging=true", () => {
-    const { rerender } = render(
-      <KanbanCard workItem={mockWorkItem} isDragging={false} />,
+    const { rerender } = renderWithI18n(
+      <KanbanCard workItem={mockWorkItem} isDragging={false} />
     );
 
     const cardBefore = screen.getByTestId("kanban-card-wi-007");
@@ -77,8 +83,12 @@ describe("KanbanCard", () => {
     expect(cardBefore.className).not.toMatch(/opacity-50/);
     expect(cardBefore.className).not.toMatch(/ring-2/);
 
-    // 切到 dragging
-    rerender(<KanbanCard workItem={mockWorkItem} isDragging={true} />);
+    // 切到 dragging — rerender 用同一个 I18nProvider 包
+    rerender(
+      <I18nProvider initialLanguage="zh-CN">
+        <KanbanCard workItem={mockWorkItem} isDragging={true} />
+      </I18nProvider>
+    );
     const cardAfter = screen.getByTestId("kanban-card-wi-007");
     expect(cardAfter.className).toMatch(/opacity-50/);
     expect(cardAfter.className).toMatch(/ring-2/);

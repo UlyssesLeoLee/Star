@@ -116,4 +116,77 @@ export interface Dictionary {
     telemetryTag: string;          // "// TELEMETRY"
   };
   modules: Record<string, ModuleI18n>;
+  // ── v0.3 新增 (per 2026-08-31 补缺口 v2): Board / Gantt / Calendar + 状态枚举 ──
+  status: {
+    /** WorkItemStatus: todo / in_progress / review / done / blocked / wontfix */
+    workItem: Record<string, string>;
+    /** SprintStatus: active / planned / completed */
+    sprint: Record<string, string>;
+    /** WorkItemKind: bug / feature / task / story / epic (subset used in StatusPill) */
+    workItemKind: Record<string, string>;
+  };
+  board: {
+    columnsActive: string;            // "COLUMNS // 4 ACTIVE"
+    columnReorderHint: string;        // "· 拖动 ⋮⋮ 重排列, 点击列名重命名"
+    addColumn: string;                // "+ Add Column"
+    addColumnTitle: string;           // "添加新看板列"
+    dragCardsHere: string;            // "拖卡片到此"
+    addTask: string;                  // "Add task"
+    addTaskTitle: string;             // "新增任务卡 (弹抽屉)"
+    wipExceeded: string;              // "WIP 超过限制"
+    clickToRename: string;            // "点击改列名"
+    removeColumn: string;             // "删除列"
+    fallbackColumnProtected: string;  // "兜底列不可删除 — 删除时其他列的任务会回到此列, 是数据兜底"
+    fallbackColumnNotRemovable: string; // "兜底列 {name} 不可删除"
+    dragToReorder: string;            // "拖动重排列"
+    reorderColumn: string;            // "重排列 {name}"
+  };
+  gantt: {
+    zoom: string;                     // "Zoom"
+    zoomUnit: string;                 // "{totalDays}d · {pxPerDay}px/day · {totalWidth}px"
+    linkCount: string;                // "🔗 {count} link{s}"
+    linkCountTitle: string;           // "任务依赖链接数: {count} 条 (per MS Project task link)"
+    linkCountSingular: string;        // ""
+    sprintsHeader: string;            // "Sprints"
+    milestonesHeader: string;         // "Milestones"
+    conflictPredecessor: string;      // "依赖冲突: predecessor {key} ({name}) 结束于 {date}, 当前任务不能早于此"
+    expandModal: string;              // "⛶"
+    expandTitle: string;              // "展开为浮动窗口 (双击图表空白处也可打开)"
+    criticalPath: string;             // "critical path"
+    linkBlocks: string;               // "blocks"
+    linkDuplicates: string;           // "duplicates"
+    linkRelatesTo: string;            // "relates_to"
+  };
+  calendar: {
+    today: string;                    // "Today"
+    previous: string;                 // "Previous"
+    next: string;                     // "Next"
+    timezoneTitle: string;            // "Timezone: {tz}"
+    timezoneDisplay: string;          // "UTC · {tz}"
+    month: string;                    // "Month"
+    week: string;                     // "Week"
+    /** 12 月份名 (0-indexed 数组) */
+    monthNames: [string, string, string, string, string, string, string, string, string, string, string, string];
+    /** 7 星期名 (0=Sun ... 6=Sat) */
+    weekdayNames: [string, string, string, string, string, string, string];
+    weekOf: string;                   // "Week of {month} {day}, {year}"
+    legendHeader: string;             // "Legend:"
+    legendActiveSprint: string;       // "active sprint"
+    legendPlannedSprint: string;      // "planned sprint"
+    legendMilestone: string;          // "milestone due"
+    legendMilestoneKind: string;      // "Milestone"
+    legendP0: string;                 // "P0 item"
+    legendP0Hint: string;             // "high priority"
+    legendP1: string;                 // "P1 item"
+    legendP1Hint: string;             // "medium"
+    legendP2P3: string;               // "P2/P3"
+    legendP2P3Hint: string;           // "low"
+  };
+  workItem: {
+    storyPointsUnit: string;          // "SP"
+    priorityP0: string;               // "P0"
+    priorityP1: string;               // "P1"
+    priorityP2: string;               // "P2"
+    priorityP3: string;               // "P3"
+  };
 }

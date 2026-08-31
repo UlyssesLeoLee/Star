@@ -3,11 +3,7 @@
 import { ChevronLeft, ChevronRight, CalendarDays, Columns3 } from "lucide-react";
 import { clsx } from "clsx";
 import type { CalendarView } from "./types";
-
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+import { useTranslation, interpolate } from "@/lib/i18n";
 
 export function CalendarHeader({
   year,
@@ -30,9 +26,15 @@ export function CalendarHeader({
   onViewChange: (v: CalendarView) => void;
   userTimezone: string;
 }) {
+  const { t } = useTranslation();
+  const monthName = t.calendar.monthNames[month];
   const label = view === "month"
-    ? `${MONTH_NAMES[month]} ${year}`
-    : `Week of ${MONTH_NAMES[weekStart.getMonth()]} ${weekStart.getDate()}, ${weekStart.getFullYear()}`;
+    ? `${monthName} ${year}`
+    : interpolate(t.calendar.weekOf, {
+        year: weekStart.getFullYear(),
+        month: t.calendar.monthNames[weekStart.getMonth()],
+        day: weekStart.getDate(),
+      });
 
   return (
     <div
@@ -43,7 +45,7 @@ export function CalendarHeader({
         <button
           type="button"
           onClick={onPrev}
-          aria-label="Previous"
+          aria-label={t.calendar.previous}
           data-testid="cal-prev"
           className="btn px-2 py-1"
         >
@@ -55,12 +57,12 @@ export function CalendarHeader({
           data-testid="cal-today"
           className="btn"
         >
-          Today
+          {t.calendar.today}
         </button>
         <button
           type="button"
           onClick={onNext}
-          aria-label="Next"
+          aria-label={t.calendar.next}
           data-testid="cal-next"
           className="btn px-2 py-1"
         >
@@ -78,9 +80,9 @@ export function CalendarHeader({
         <span
           data-testid="cal-tz"
           className="text-[10px] text-ink-mute font-mono"
-          title={`Timezone: ${userTimezone}`}
+          title={interpolate(t.calendar.timezoneTitle, { tz: userTimezone })}
         >
-          UTC · {userTimezone}
+          {interpolate(t.calendar.timezoneDisplay, { tz: userTimezone })}
         </span>
         <div
           role="tablist"
@@ -98,7 +100,7 @@ export function CalendarHeader({
               view === "month" ? "bg-accent/15 text-accent" : "text-ink-dim hover:text-ink",
             )}
           >
-            <CalendarDays size={12} /> Month
+            <CalendarDays size={12} /> {t.calendar.month}
           </button>
           <button
             type="button"
@@ -111,7 +113,7 @@ export function CalendarHeader({
               view === "week" ? "bg-accent/15 text-accent" : "text-ink-dim hover:text-ink",
             )}
           >
-            <Columns3 size={12} /> Week
+            <Columns3 size={12} /> {t.calendar.week}
           </button>
         </div>
       </div>

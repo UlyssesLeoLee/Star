@@ -1,6 +1,7 @@
 "use client";
 
 import { clsx } from "clsx";
+import { useStatusLabel, type StatusKind } from "@/lib/i18n";
 
 const COLOR: Record<string, string> = {
   // 通用
@@ -100,10 +101,23 @@ const DOT_COLOR: Record<string, string> = {
   allow: "bg-ok",
 };
 
-export function StatusPill({ value, size = "sm" }: { value: string; size?: "sm" | "xs" }) {
+export interface StatusPillProps {
+  value: string;
+  size?: "sm" | "xs";
+  /**
+   * i18n 翻译类别 (per 2026-08-31 v0.3). 不传走原 value 美化 (snake -> "Snake Case"),
+   * 传了之后走字典查表 (e.g. workItem -> 待办/进行中, sprint -> Active/Planned).
+   */
+  translateAs?: StatusKind;
+}
+
+export function StatusPill({ value, size = "sm", translateAs }: StatusPillProps) {
   const k = value.toLowerCase();
   const cls = COLOR[k] ?? "border-line text-ink-dim bg-bg-soft";
   const dot = DOT_COLOR[k];
+  // 走 i18n 翻译 (useStatusLabel 内部处理 hook 规则, 即使未传 translateAs 也安全)
+  const label = useStatusLabel(translateAs ?? ("workItem" as StatusKind), k);
+  // 当 translateAs 未传, useStatusLabel 仍会兜底成 prettify, 与原行为一致
   return (
     <span className={clsx(
       "pill font-mono items-center",
@@ -111,7 +125,7 @@ export function StatusPill({ value, size = "sm" }: { value: string; size?: "sm" 
       cls,
     )}>
       {dot && <span className={clsx("size-1.5 rounded-full inline-block mr-1 shrink-0", dot)} />}
-      <span>{value.replace(/_/g, " ")}</span>
+      <span>{label}</span>
     </span>
   );
 }

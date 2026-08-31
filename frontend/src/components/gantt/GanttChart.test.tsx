@@ -9,8 +9,15 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { GanttChart } from "./GanttChart";
 import type { Sprint, Milestone, WorkItem } from "@/types/ids";
+import { I18nProvider } from "@/lib/i18n";
+
+// per 2026-08-31 i18n 补缺口 v2: GanttChart 内 useTranslation() 必须包 I18nProvider
+function renderWithI18n(ui: ReactNode) {
+  return render(<I18nProvider initialLanguage="zh-CN">{ui}</I18nProvider>);
+}
 
 // next/navigation mock — 用模块级 mockPush 共享同一 spy
 const mockPush = vi.fn();
@@ -125,8 +132,7 @@ describe("GanttChart", () => {
   });
 
   it("renders sprint rows and milestone rows", () => {
-    const { container } = render(
-      <GanttChart
+    const { container } = renderWithI18n(<GanttChart
         sprints={SPRINT_FIXTURES}
         milestones={MILESTONE_FIXTURES}
         workItems={WORKITEM_FIXTURES}
@@ -154,8 +160,7 @@ describe("GanttChart", () => {
   });
 
   it("marks milestones with progress < 50% as critical path", () => {
-    const { container } = render(
-      <GanttChart
+    const { container } = renderWithI18n(<GanttChart
         sprints={SPRINT_FIXTURES}
         milestones={MILESTONE_FIXTURES}
         workItems={WORKITEM_FIXTURES}
@@ -173,8 +178,7 @@ describe("GanttChart", () => {
   });
 
   it("zoom switching changes column width (pxPerDay) and header total width", () => {
-    const { container, rerender } = render(
-      <GanttChart
+    const { container, rerender } = renderWithI18n(<GanttChart
         sprints={SPRINT_FIXTURES}
         milestones={MILESTONE_FIXTURES}
         workItems={WORKITEM_FIXTURES}
@@ -210,8 +214,7 @@ describe("GanttChart", () => {
 
   it("dragging a milestone bar fires onMilestoneUpdate with new due_date", () => {
     const onMilestoneUpdate = vi.fn();
-    const { container } = render(
-      <GanttChart
+    const { container } = renderWithI18n(<GanttChart
         sprints={SPRINT_FIXTURES}
         milestones={MILESTONE_FIXTURES}
         workItems={WORKITEM_FIXTURES}
@@ -238,8 +241,7 @@ describe("GanttChart", () => {
 
   it("dragging a sprint bar fires onSprintUpdate with new start/end (date RangeMode)", () => {
     const onSprintUpdate = vi.fn();
-    const { container } = render(
-      <GanttChart
+    const { container } = renderWithI18n(<GanttChart
         sprints={SPRINT_FIXTURES}
         milestones={MILESTONE_FIXTURES}
         workItems={WORKITEM_FIXTURES}
@@ -267,8 +269,7 @@ describe("GanttChart", () => {
 
   it("milestone onClick triggers router push to /work-item?milestone={id}", () => {
     mockPush.mockClear();
-    const { container } = render(
-      <GanttChart
+    const { container } = renderWithI18n(<GanttChart
         sprints={SPRINT_FIXTURES}
         milestones={MILESTONE_FIXTURES}
         workItems={WORKITEM_FIXTURES}

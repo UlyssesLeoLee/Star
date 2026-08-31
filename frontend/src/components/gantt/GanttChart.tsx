@@ -32,6 +32,7 @@ import type { Sprint, Milestone, WorkItem, WorkItemStatus, SprintStatus } from "
 import { GanttBar, type GanttBarStatus } from "./GanttBar";
 import { GanttHeader } from "./GanttHeader";
 import { GanttLegend } from "./GanttLegend";
+import { useTranslation, interpolate } from "@/lib/i18n";
 
 export type ZoomLevel = "week" | "month" | "quarter";
 
@@ -190,8 +191,11 @@ export function GanttChart(props: GanttChartProps) {
 
   // 拖动冲突检测 (per MS Project FS link): workItem 新 start 不能早于所有 predecessor.end
   // (per 2026-08-29 17:33 JST 增强, 避免 dependency 冲突)
+  // 注: useTranslation hook 在外面拿, 这里直接调 t.gantt.conflictPredecessor
+  // 整个 hook 链需要 ref 因为 conflict message 依赖语言 (per 2026-08-31 v0.3)
+  const { t: i18nT } = useTranslation();
   const checkWorkItemConflict = useCallback(
-    (workItemId: string, newStart: string, newEnd: string): string | null => {
+    (workItemId: string, newStart: string, _newEnd: string): string | null => {
       // 找 workItem 的所有 predecessor
       const preds = relations.filter(
         (r) => r.to_id === workItemId && (r.kind === "blocks" || r.kind === "relates_to"),
@@ -204,12 +208,16 @@ export function GanttChart(props: GanttChartProps) {
         const sp = sprints.find((s) => s.id === wi.sprint_id);
         if (!sp) continue;
         if (newStart < sp.end_date) {
-          return `依赖冲突: predecessor ${wi.key || wi.id} (${sp.name}) 结束于 ${sp.end_date}, 当前任务不能早于此`;
+          return interpolate(i18nT.gantt.conflictPredecessor, {
+            key: wi.key || wi.id,
+            name: sp.name,
+            date: sp.end_date,
+          });
         }
       }
       return null;
     },
-    [relations, workItems, sprints],
+    [relations, workItems, sprints, i18nT.gantt.conflictPredecessor],
   );
 
   // work items 按 sprint_id 分组 (跨 sprint 拖动)
@@ -243,7 +251,7 @@ export function GanttChart(props: GanttChartProps) {
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wider text-ink-mute">Zoom</span>
+          <span className="text-[10px] uppercase tracking-wider text-ink-mute">{i18nT.gantt.zoom}</span>
           {ZOOM_ORDER.map((z) => (
             <button
               key={z}
@@ -261,15 +269,21 @@ export function GanttChart(props: GanttChartProps) {
             </button>
           ))}
           <span className="ml-2 text-[10px] text-ink-mute font-mono">
-            {totalDays}d · {pxPerDay}px/day · {totalWidth}px
+            {interpolate(i18nT.gantt.zoomUnit, {
+              totalDays,
+              pxPerDay,
+              totalWidth,
+            })}
           </span>
           {links.length > 0 && (
             <span
               data-testid="gantt-link-count"
               className="ml-2 text-[10px] font-mono text-accent border border-accent/40 bg-accent/10 px-1.5 py-0.5 rounded"
-              title={`任务依赖链接数: ${links.length} 条 (per MS Project task link)`}
+              title={interpolate(i18nT.gantt.linkCountTitle, { count: links.length })}
             >
-              🔗 {links.length} link{links.length !== 1 ? "s" : ""}
+              {interpolate(links.length === 1 ? i18nT.gantt.linkCountSingular : i18nT.gantt.linkCount, {
+                count: links.length,
+              })}
             </span>
           )}
         </div>
@@ -280,10 +294,10 @@ export function GanttChart(props: GanttChartProps) {
             type="button"
             data-testid="gantt-expand-btn"
             onClick={openModal}
-            title="展开为浮动窗口 (双击图表空白处也可打开)"
+            title={i18nT.gantt.expandTitle}
             className="flex items-center justify-center w-7 h-7 rounded border border-line text-ink-dim hover:border-accent hover:text-accent hover:bg-accent/10 transition-colors text-[14px]"
           >
-            ⛶
+            {i18nT.gantt.expandModal}
           </button>
         </div>
       </div>
@@ -295,7 +309,7 @@ export function GanttChart(props: GanttChartProps) {
           data-testid="gantt-yaxis"
         >
           <div className="h-10 border-b border-line bg-bg-soft/80 flex items-center px-2 text-[10px] uppercase tracking-wider text-ink-mute">
-            Sprints
+            {i18nT.gantt.sprintsHeader}
           </div>
           {sprints.map((sp) => (
             <div
@@ -311,7 +325,7 @@ export function GanttChart(props: GanttChartProps) {
           ))}
           <div className="h-2 bg-bg-soft/80" />
           <div className="h-7 border-b border-line bg-bg-soft/80 flex items-center px-2 text-[10px] uppercase tracking-wider text-ink-mute">
-            Milestones
+            {i18nT.gantt.milestonesHeader}
           </div>
           {milestones.map((ms) => {
             const critical = criticalIds.has(ms.id);

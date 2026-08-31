@@ -46,6 +46,8 @@ export interface I18nContextValue {
 }
 
 const I18nContext = createContext<I18nContextValue | null>(null);
+// 导出供 useStatusLabel 等需要直接读 ctx 的内部 hook 使用 (避免重复 createContext)
+export { I18nContext };
 
 function isSupportedLanguage(value: string | null): value is Language {
   return (

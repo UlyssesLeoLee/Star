@@ -33,6 +33,7 @@ import { AlertTriangle, Plus, SlidersHorizontal } from "lucide-react";
 import type { Board, WorkItem, WorkItemStatus, Identity } from "@/types/ids";
 import { KANBAN_COLUMNS } from "@/mocks/data";
 import { isFallbackStatus } from "./constants";
+import { useTranslation, interpolate, useStatusLabel } from "@/lib/i18n";
 
 export interface KanbanBoardProps {
   board: Board;
@@ -86,6 +87,9 @@ export function KanbanBoard({
   onRequestNewWorkItem,
   onWorkItemClick,
 }: KanbanBoardProps) {
+  const { t, tx } = useTranslation();
+  const fallbackLabel = useStatusLabel("workItem", "todo");
+  void fallbackLabel; // 防止未使用警告
   const [dropTarget, setDropTarget] = useState<WorkItemStatus | null>(null);
   // 内部拖动 id 兜底, 父组件没传时本地维护
   const [localDraggingId, setLocalDraggingId] = useState<string | null>(null);
@@ -210,10 +214,10 @@ export function KanbanBoard({
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2 text-xs font-mono text-ink-mute">
           <span className="font-bold text-ink-dim uppercase tracking-wider">
-            COLUMNS // {board.columns.length} ACTIVE
+            {interpolate(t.board.columnsActive, { count: board.columns.length })}
           </span>
           <span className="text-[10px] opacity-60 hidden sm:inline">
-            · 拖动 ⋮⋮ 重排列，点击列名重命名
+            {t.board.columnReorderHint}
           </span>
         </div>
 
@@ -223,10 +227,10 @@ export function KanbanBoard({
             data-testid="kanban-add-column"
             onClick={handleAddColumn}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-accent bg-bg-soft/70 hover:bg-accent/10 text-xs font-mono text-ink-dim hover:text-accent transition-all duration-150 shadow-sm group font-semibold"
-            title="添加新看板列"
+            title={t.board.addColumnTitle}
           >
             <Plus size={13} className="text-accent group-hover:rotate-90 transition-transform duration-200" />
-            <span>+ Add Column</span>
+            <span>{t.board.addColumn}</span>
           </button>
         )}
       </div>
@@ -304,8 +308,8 @@ export function KanbanBoard({
                   onDragEnd={handleColDragEnd}
                   data-testid={`kanban-column-drag-handle-${col.status}`}
                   className="text-ink-mute hover:text-accent cursor-grab active:cursor-grabbing text-xs select-none"
-                  title="拖动重排列"
-                  aria-label={`重排列 ${col.name ?? col.status}`}
+                  title={t.board.dragToReorder}
+                  aria-label={tx(t.board.reorderColumn, { name: col.name ?? col.status })}
                 >
                   ⋮⋮
                 </div>
@@ -332,7 +336,7 @@ export function KanbanBoard({
                     onClick={() => startEdit(col.status, col.name ?? col.status)}
                     disabled={!onRenameColumn}
                     className="text-[11px] font-mono uppercase tracking-wider text-ink hover:text-accent transition-colors text-left truncate"
-                    title="点击改列名"
+                    title={t.board.clickToRename}
                   >
                     {col.name ?? col.status}
                   </button>
@@ -355,13 +359,15 @@ export function KanbanBoard({
                           onRemoveColumn(col.status);
                         }}
                         disabled={isFallback}
-                        aria-label={isFallback ? `兜底列 ${col.name ?? col.status} 不可删除` : `删除列 ${col.name ?? col.status}`}
+                        aria-label={isFallback
+                          ? tx(t.board.fallbackColumnNotRemovable, { name: col.name ?? col.status })
+                          : `${t.board.removeColumn} ${col.name ?? col.status}`}
                         className={
                           isFallback
                             ? "text-ink-mute/40 cursor-not-allowed text-xs leading-none px-1"
                             : "text-ink-mute hover:text-err transition-colors text-xs leading-none px-1"
                         }
-                        title={isFallback ? "兜底列不可删除 — 删除时其他列的任务会回到此列, 是数据兜底" : "删除列"}
+                        title={isFallback ? t.board.fallbackColumnProtected : t.board.removeColumn}
                       >
                         ✕
                       </button>
@@ -371,13 +377,13 @@ export function KanbanBoard({
               </div>
               {overWip && (
                 <div className="mb-2 text-[10px] text-warn flex items-center gap-1">
-                  <AlertTriangle size={10} /> WIP 超过限制
+                  <AlertTriangle size={10} /> {t.board.wipExceeded}
                 </div>
               )}
               <div className="space-y-2">
                 {cards.length === 0 && (
                   <div className="text-[10px] text-ink-mute italic text-center py-4">
-                    拖卡片到此
+                    {t.board.dragCardsHere}
                   </div>
                 )}
                 {cards.map((w) => (
@@ -401,10 +407,10 @@ export function KanbanBoard({
                   data-testid={`kanban-column-add-card-${col.status}`}
                   onClick={() => onRequestNewWorkItem(col.status)}
                   className="mt-1 w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border border-dashed border-line/60 hover:border-accent/60 bg-transparent hover:bg-accent/5 text-[11px] text-ink-mute hover:text-accent transition-all duration-150 group"
-                  title="新增任务卡 (弹抽屉)"
+                  title={t.board.addTaskTitle}
                 >
                   <Plus size={12} className="group-hover:rotate-90 transition-transform duration-200" />
-                  <span>Add task</span>
+                  <span>{t.board.addTask}</span>
                 </button>
               )}
             </div>

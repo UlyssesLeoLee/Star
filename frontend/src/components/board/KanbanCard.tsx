@@ -20,6 +20,7 @@ import { clsx } from "clsx";
 import { StatusPill } from "@/components/StatusPill";
 import { Flag, User } from "lucide-react";
 import type { WorkItem, Identity } from "@/types/ids";
+import { useTranslation } from "@/lib/i18n";
 
 export interface KanbanCardProps {
   workItem: WorkItem;
@@ -51,7 +52,16 @@ export function KanbanCard({
   onClick,
 }: KanbanCardProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const pColor = PRIORITY_COLOR[workItem.priority] ?? "border-l-ink-mute";
+  // 优先级显示文本 (P0/P1/P2/P3 — 简写, 全语言通用)
+  const PRIORITY_LABEL: Record<WorkItem["priority"], string> = {
+    p0: t.workItem.priorityP0,
+    p1: t.workItem.priorityP1,
+    p2: t.workItem.priorityP2,
+    p3: t.workItem.priorityP3,
+  };
+  const priorityLabel = PRIORITY_LABEL[workItem.priority];
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     // HTML5 native drag API: dataTransfer 传 issue id
@@ -94,7 +104,7 @@ export function KanbanCard({
         </span>
         {workItem.story_points !== undefined && (
           <span className="font-mono text-[9px] px-1 py-0.2 rounded border border-line/60 bg-bg-card text-ink-mute">
-            {workItem.story_points} SP
+            {workItem.story_points} {t.workItem.storyPointsUnit}
           </span>
         )}
       </div>
@@ -104,8 +114,8 @@ export function KanbanCard({
 
       {/* Row 3: kind + status pills */}
       <div className="flex flex-wrap items-center gap-1 mb-2">
-        <StatusPill value={workItem.kind} size="xs" />
-        <StatusPill value={workItem.status} size="xs" />
+        <StatusPill value={workItem.kind} size="xs" translateAs="workItemKind" />
+        <StatusPill value={workItem.status} size="xs" translateAs="workItem" />
       </div>
 
       {/* Row 4: priority + assignee */}
@@ -118,7 +128,7 @@ export function KanbanCard({
           workItem.priority === "p3" && "text-ink-dim",
         )}>
           <Flag size={9} />
-          {workItem.priority.toUpperCase()}
+          {priorityLabel}
         </span>
         {assignee && (
           <span className="flex items-center gap-1 truncate max-w-[90px] font-mono text-[9px] text-ink-dim" title={assignee.display_name}>

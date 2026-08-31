@@ -7,6 +7,8 @@ export type { I18nContextValue, I18nProviderProps } from "./I18nProvider";
 export { useTranslation, interpolate } from "./useTranslation";
 export { useModuleTranslation } from "./useModuleTranslation";
 export type { ModuleTranslation } from "./useModuleTranslation";
+export { useStatusLabel, useStatusLabelMap } from "./useStatusLabel";
+export type { StatusKind } from "./useStatusLabel";
 export {
   SUPPORTED_LANGUAGES,
   DEFAULT_LANGUAGE,
