@@ -45,7 +45,9 @@ export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
     permanent: false,
   },
   { source: "/project", destination: "/projects", permanent: false },
-  { source: "/board", destination: "/projects?tab=board", permanent: false },
+  // per 2026-08-31 12:42 JST DRIFT-α-003/004 修复 (handoff 兜底):
+  //   5 tab 拍板 (kanban/timeline/backlog/agents/worktrees) → redirect 4 tab 死链全改 worktrees
+  { source: "/board", destination: "/projects?tab=kanban", permanent: false },
   {
     source: "/planning",
     destination: "/projects?tab=timeline",
@@ -53,22 +55,22 @@ export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
   },
   {
     source: "/scm",
-    destination: "/projects?tab=workflow",
+    destination: "/projects?tab=worktrees",
     permanent: false,
   },
   {
     source: "/collaboration",
-    destination: "/projects?tab=workflow",
+    destination: "/projects?tab=worktrees",
     permanent: false,
   },
   {
     source: "/workflow",
-    destination: "/projects?tab=workflow",
+    destination: "/projects?tab=worktrees",
     permanent: false,
   },
   {
     source: "/relation",
-    destination: "/projects?tab=relations",
+    destination: "/projects?tab=worktrees",
     permanent: false,
   },
   {

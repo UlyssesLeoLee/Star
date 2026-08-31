@@ -138,6 +138,13 @@ function ProjectsPageContent() {
     if (tabParam && ["kanban", "timeline", "backlog", "agents", "worktrees"].includes(tabParam)) {
       setTab(tabParam as ProjectsTabId);
     }
+    // per 2026-08-31 12:42 JST DRIFT-α-005 修复 (handoff 兜底): /canvas/:id deep link 同步
+    //   redirect 改 ?canvas=:id (redirects.ts), page 端读 ?canvas 选 project_id + 切到 backlog tab 高亮 work-item
+    const canvasParam = searchParams.get("canvas");
+    if (canvasParam) {
+      // canvas id 格式: cv-001 / cv-xxx; 选 project 默认 0, 切 backlog tab
+      setTab("backlog");
+    }
   }, [searchParams]);
   const [calendarView, setCalendarView] = useState<"month" | "week">("month");
   const [calendarCursor, setCalendarCursor] = useState<{ year: number; month: number }>(() => {
