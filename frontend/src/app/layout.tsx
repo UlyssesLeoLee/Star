@@ -3,6 +3,7 @@ import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { Providers } from "./providers";
 import { Toaster } from "react-hot-toast";
+import { CommandBar } from "@/components/CommandBar"; // per DRIFT-α-020 (2026-08-31 12:07 JST 试水)
 
 export const metadata: Metadata = {
   title: "Star — Vibe Coding Work Management",
@@ -55,6 +56,8 @@ export default function RootLayout({
               error: { iconTheme: { primary: "#ff3366", secondary: "#fff" } },
             }}
           />
+          {/* CommandBar: ⌘K 全局命令面板消费组件 (per DRIFT-α-020 修复) */}
+          <CommandBar />
         </Providers>
       </body>
     </html>
