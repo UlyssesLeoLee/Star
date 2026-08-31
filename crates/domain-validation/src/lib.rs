@@ -52,7 +52,8 @@ pub mod value_object;
 // =====================================================================
 
 pub use uuid::Uuid;
-use context::ActorContext;
+#[allow(unused_imports)]
+use context::ActorContext as _ContextActorContext; // 内部使用 (子模块强类型 ID 版)
 pub use star_context::ActorContext; // 收敛到 star_context 权威版本 (per P0-1 联动协作)
 pub use entity::{
     AcceptanceCoverage, AcceptanceCoverageReport, EvidenceDownloadURL, ValidationEvidence,

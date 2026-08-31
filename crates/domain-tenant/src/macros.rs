@@ -11,7 +11,7 @@ macro_rules! define_uuid_id {
         #[allow(missing_docs)]
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
         #[serde(transparent)]
-        pub struct $name(uuid::Uuid);
+        pub struct $name(pub uuid::Uuid);
 
         impl $name {
             /// 创建新的强类型 ID(包装 `Uuid::new_v4`)。

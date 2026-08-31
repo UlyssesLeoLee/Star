@@ -34,6 +34,7 @@ use crate::port::{
     OverrideValidationCommand, SubmitValidationResultCommand, ValidationCommandPort,
     ValidationQueryPort, ValidationRepository,
 };
+#[allow(unused_imports)]
 use crate::value_object::{
     CoverageStatus, EvidenceType, TenantId, UserId, ValidationEvidenceId, ValidationId,
     ValidationKind, ValidationOverrideId, ValidationPolicyId, ValidationStatus, WorkItemId,

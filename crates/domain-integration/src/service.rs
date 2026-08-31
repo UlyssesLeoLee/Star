@@ -26,7 +26,7 @@ use crate::port::{
 };
 use crate::value_object::{
     ConflictStrategy, ExternalEntityId, ExternalSystemName, IntegrationId, IntegrationRelationType,
-    IntegrationSource, IntegrationState, ProjectId, SyncOutcome, SyncStateId, TenantId, UserId,
+    IntegrationSource, IntegrationState, ProjectId, SyncOutcome, SyncStateId, TenantId,
 };
 
 // =====================================================================

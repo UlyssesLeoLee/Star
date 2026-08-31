@@ -4,6 +4,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::value_object::{
     AcceptanceCoverageId, CoverageStatus, TenantId, ValidationEvidenceId, ValidationId,
@@ -22,7 +23,7 @@ pub struct EventMeta {
 impl EventMeta {
     pub fn new(tenant_id: TenantId) -> Self {
         Self {
-            event_id: UserId.new(),
+            event_id: Uuid::new_v4(),
             tenant_id,
             occurred_at: Utc::now(),
             actor_user_id: None,
