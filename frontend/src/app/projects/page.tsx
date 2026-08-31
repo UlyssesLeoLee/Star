@@ -124,6 +124,8 @@ function ProjectsPageContent() {
   const transitionWorkItem = useStore((s) => s.transitionWorkItem);
   const transitionMilestone = useStore((s) => s.transitionMilestone);
   const transitionSprint = useStore((s) => s.transitionSprint);
+  // Kanban 列内 + Add task (per 2026-08-31 11:56 JST Ulysses 拍板)
+  const addWorkItem = useStore((s) => s.addWorkItem);
 
   // ---- local state ----
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
@@ -233,6 +235,25 @@ function ProjectsPageContent() {
       });
     },
     [workItems, selectedProjectId, transitionWorkItem],
+  );
+
+  // ---- Kanban 列内 + Add task (per 2026-08-31 11:56 JST Ulysses 拍板) ----
+  // 当前登录者 reporter_id 暂时取项目 owner (per seed pattern: project.owner_id);
+  // 真实身份接入后用 actor.user_id 替换.
+  const handleAddWorkItem = useCallback(
+    (status: WorkItemStatus, title: string) => {
+      if (!selectedProject) return;
+      addWorkItem({
+        tenant_id: selectedProject.tenant_id,
+        project_id: selectedProject.id,
+        title,
+        status,
+        kind: "task",
+        priority: "p2",
+        reporter_id: selectedProject.owner_id,
+      });
+    },
+    [addWorkItem, selectedProject],
   );
 
   // ---- ProjectBoard: project 过滤的虚拟 board (per project_id) ----
@@ -429,6 +450,7 @@ function ProjectsPageContent() {
             onRemoveColumn={removeBoardColumn}
             onRenameColumn={renameBoardColumn}
             onReorderColumns={reorderBoardColumns}
+            onAddWorkItem={handleAddWorkItem}
           />
           <div className="mt-3 text-[10px] text-ink-mute font-mono">
             列对应状态: {KANBAN_COLUMNS.join(" / ")} — 拖动卡片触发 transitionWorkItem (走 store 状态机)

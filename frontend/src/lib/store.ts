@@ -164,6 +164,25 @@ interface StoreState {
     "board" | "workItems" | "milestones" | "sprints" | "notifications"
   >>) => void;
 
+  // 新增 work-item (per 2026-08-31 11:56 JST Ulysses 拍板: Kanban 列内 + Add task 按钮)
+  // 输入: 部分 WorkItem 字段 (id / key / created_at / updated_at 由 store 生成)
+  //   - 必须带: tenant_id / project_id / title / status / reporter_id (board / project 上下文由调用方填)
+  //   - 可选带: description / kind / priority / assignee_id / labels / story_points
+  // 行为:
+  //   1. push 到 workItems
+  //   2. 把它加到 board.columns[status === status] 列的 work_item_ids 末尾
+  //   3. status 不在列里 -> 自动 addBoardColumn 走兜底 (保证可见)
+  addWorkItem: (input: Omit<WorkItem, "id" | "key" | "created_at" | "updated_at" | "description" | "labels"> & {
+    /** 可选注入 client id (回填后端响应); 不传由 store 生成 */
+    id?: string;
+    /** 可选注入 key (回填后端响应); 不传由 store 生成 (PHYSIS-N) */
+    key?: string;
+    /** description 可选, 缺省空串 */
+    description?: string;
+    /** labels 可选, 缺省空数组 */
+    labels?: string[];
+  }) => string; // 返回新生成的 work-item id
+
   // Canvas mutations(无限画布,frontend-canvas-design.md §2)
   addCanvasElement: (element: CanvasElement) => void;
   moveCanvasElement: (id: string, x: number, y: number) => void;
@@ -247,6 +266,69 @@ const initialState = (set: any): StoreState => ({
     set((s: StoreState) => ({
       changeSets: s.changeSets.map((c) => c.id === id ? { ...c, status: to } : c),
     })),
+  // 新增 work-item (per 2026-08-31 11:56 JST Ulysses 拍板)
+  // 上下文: 客户端 zustand store 还没接后端, key/id 由 store 本地生成.
+  //   - id: crypto.randomUUID() 或基于 seed wi 计数 fallback (SSR-safe)
+  //   - key: PHYSIS-N+ (按当前项目现有 max N+1 推; 不同项目共用 store 暂按 tenant 简化 PHYSIS)
+  addWorkItem: (input) => {
+    const newId = input.id
+      ?? (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `wi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    const nowIso = new Date().toISOString();
+    // key 推断: 同 project / kind 默认 "PHYSIS-N" 格式; 已存在 +1
+    let newKey = input.key;
+    if (!newKey) {
+      const sameProject = useStore.getState().workItems.filter(
+        (w) => w.project_id === input.project_id,
+      );
+      const maxN = sameProject.reduce((acc, w) => {
+        const m = /-(\d+)$/.exec(w.key);
+        return m ? Math.max(acc, Number(m[1])) : acc;
+      }, 0);
+      newKey = `PHYSIS-${maxN + 1}`;
+    }
+    set((s: StoreState) => {
+      const newWi: WorkItem = {
+        id: newId,
+        key: newKey!,
+        tenant_id: input.tenant_id,
+        project_id: input.project_id,
+        title: input.title,
+        description: input.description ?? "",
+        kind: input.kind ?? "task",
+        status: input.status,
+        priority: input.priority ?? "p2",
+        assignee_id: input.assignee_id,
+        reporter_id: input.reporter_id,
+        story_points: input.story_points,
+        labels: input.labels ?? [],
+        sprint_id: input.sprint_id,
+        workflow_id: input.workflow_id ?? "wf-default",
+        due_date: input.due_date,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+      // status 列不在 board.columns -> 走 addBoardColumn 等价行为,
+      // 兜底保底: 直接 reconcile 把它加到对应 status 列, 缺列就自动加
+      const hasCol = s.board.columns.some((c) => c.status === newWi.status);
+      const newColumns = hasCol
+        ? s.board.columns.map((c) =>
+            c.status === newWi.status
+              ? { ...c, work_item_ids: [...c.work_item_ids, newWi.id] }
+              : c,
+          )
+        : [
+            ...s.board.columns,
+            { status: newWi.status, work_item_ids: [newWi.id] },
+          ];
+      return {
+        workItems: [...s.workItems, newWi],
+        board: { ...s.board, columns: newColumns },
+      };
+    });
+    return newId;
+  },
   markNotificationRead: (id) =>
     set((s: StoreState) => ({
       notifications: s.notifications.map((n) => n.id === id ? { ...n, status: "read" as NotificationStatus } : n),

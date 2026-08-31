@@ -277,4 +277,65 @@ describe("useStore (Board 列管理 — 数据零丢失)", () => {
       expect(inReview || inTodo).toBe(true);
     }
   });
+
+  // ---------- addWorkItem (per 2026-08-31 11:56 JST Ulysses 拍板) ----------
+  // 守门 Kanban 列内 + Add task 按钮的 store 行为
+  it("E. addWorkItem: 加到现有列尾, workItems 同步新增", () => {
+    const before = useStore.getState().workItems.length;
+    const todoColBefore = useStore.getState().board.columns.find((c) => c.status === "todo");
+    const todoIdsBefore = todoColBefore?.work_item_ids.length ?? 0;
+    const newId = useStore.getState().addWorkItem({
+      tenant_id: "tnt-physis",
+      project_id: "proj-physis",
+      title: "列内 + Add task 验证",
+      status: "todo",
+      kind: "task",
+      priority: "p2",
+      reporter_id: "usr-001",
+    });
+    expect(newId).toBeTruthy();
+    expect(useStore.getState().workItems.length).toBe(before + 1);
+    const todoColAfter = useStore.getState().board.columns.find((c) => c.status === "todo");
+    expect(todoColAfter?.work_item_ids.length).toBe(todoIdsBefore + 1);
+    expect(todoColAfter?.work_item_ids).toContain(newId);
+    const w = useStore.getState().workItems.find((x) => x.id === newId);
+    expect(w?.title).toBe("列内 + Add task 验证");
+    expect(w?.status).toBe("todo");
+  });
+
+  it("F. addWorkItem: status 不在 board.columns 时, 自动加列 + 加到该列", () => {
+    // 删 blocked 列后, 加 wi 状态=blocked
+    useStore.getState().removeBoardColumn("blocked");
+    expect(useStore.getState().board.columns.some((c) => c.status === "blocked")).toBe(false);
+    const newId = useStore.getState().addWorkItem({
+      tenant_id: "tnt-physis",
+      project_id: "proj-physis",
+      title: "blocked 兜底加列验证",
+      status: "blocked",
+      kind: "bug",
+      priority: "p1",
+      reporter_id: "usr-001",
+    });
+    const blockedCol = useStore.getState().board.columns.find((c) => c.status === "blocked");
+    expect(blockedCol).toBeDefined();
+    expect(blockedCol?.work_item_ids).toContain(newId);
+  });
+
+  it("G. addWorkItem: key 自动生成 PHYSIS-N+ (按现有 max N+1)", () => {
+    const newId = useStore.getState().addWorkItem({
+      tenant_id: "tnt-physis",
+      project_id: "proj-physis",
+      title: "key 推断验证",
+      status: "in_progress",
+      kind: "task",
+      priority: "p3",
+      reporter_id: "usr-001",
+    });
+    const w = useStore.getState().workItems.find((x) => x.id === newId);
+    expect(w?.key).toMatch(/^PHYSIS-\d+$/);
+    // 推断: 现存 max N + 1, 不应跟 seed 重复
+    const sameProject = useStore.getState().workItems.filter((x) => x.project_id === "proj-physis");
+    const keys = new Set(sameProject.map((x) => x.key));
+    expect(keys.size).toBe(sameProject.length);
+  });
 });

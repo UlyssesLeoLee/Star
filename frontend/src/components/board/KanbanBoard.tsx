@@ -59,6 +59,9 @@ export interface KanbanBoardProps {
   onRenameColumn?: (status: WorkItemStatus, newName: string) => void;
   /** 拖动列重排 (fromIdx, toIdx), per 2026-08-29 19:09 JST 补 reorderBoardColumns UI */
   onReorderColumns?: (fromIdx: number, toIdx: number) => void;
+  // 列内新增任务卡 (per 2026-08-31 11:56 JST Ulysses 拍板: Jira 风格 + Add task)
+  /** 列内点击 + Add task, 提交 title 后调 onAddWorkItem(status, title) */
+  onAddWorkItem?: (status: WorkItemStatus, title: string) => void;
 }
 
 const KANBAN_COLUMNS_LOCAL: ReadonlyArray<WorkItemStatus> = KANBAN_COLUMNS;
@@ -76,6 +79,7 @@ export function KanbanBoard({
   onRemoveColumn,
   onRenameColumn,
   onReorderColumns,
+  onAddWorkItem,
 }: KanbanBoardProps) {
   const [dropTarget, setDropTarget] = useState<WorkItemStatus | null>(null);
   // 内部拖动 id 兜底, 父组件没传时本地维护
@@ -95,6 +99,28 @@ export function KanbanBoard({
       onRenameColumn?.(status, trimmed);
     }
     setEditingCol(null);
+  };
+  // 列内 + Add task (per 2026-08-31 11:56 JST Ulysses 拍板)
+  // 每列独立 editingCard 状态, 点击 + Add task 展开 input, Enter 提交, Esc 取消
+  const [editingCard, setEditingCard] = useState<WorkItemStatus | null>(null);
+  const [editingCardTitle, setEditingCardTitle] = useState<string>("");
+  const cardInputRef = useState<{ current: HTMLInputElement | null }>({ current: null })[0];
+  const startAddCard = (status: WorkItemStatus) => {
+    setEditingCard(status);
+    setEditingCardTitle("");
+    // auto-focus 在 next tick (input 已 mount)
+    requestAnimationFrame(() => cardInputRef.current?.focus());
+  };
+  const commitAddCard = (status: WorkItemStatus) => {
+    if (editingCard !== status) return;
+    const trimmed = editingCardTitle.trim();
+    setEditingCard(null);
+    setEditingCardTitle("");
+    if (trimmed) onAddWorkItem?.(status, trimmed);
+  };
+  const cancelAddCard = () => {
+    setEditingCard(null);
+    setEditingCardTitle("");
   };
   // 列拖动重排 (per 2026-08-29 19:09 JST)
   // 用 HTML5 native drag: 拖到目标列 drop 时 reorder
@@ -382,6 +408,63 @@ export function KanbanBoard({
                   />
                 ))}
               </div>
+              {/* + Add task (per 2026-08-31 11:56 JST Ulysses 拍板, Jira 风格) */}
+              {onAddWorkItem && (
+                editingCard === col.status ? (
+                  <div
+                    data-testid={`kanban-column-add-card-form-${col.status}`}
+                    className="mt-2 rounded-lg border border-accent/60 bg-bg-card p-2 shadow-sm space-y-1.5"
+                  >
+                    <input
+                      ref={(el) => { cardInputRef.current = el; }}
+                      data-testid={`kanban-column-add-card-input-${col.status}`}
+                      value={editingCardTitle}
+                      onChange={(e) => setEditingCardTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          commitAddCard(col.status);
+                        } else if (e.key === "Escape") {
+                          e.preventDefault();
+                          cancelAddCard();
+                        }
+                      }}
+                      placeholder="输入任务标题, Enter 提交"
+                      className="w-full text-xs bg-bg-soft border border-line rounded px-2 py-1.5 text-ink placeholder:text-ink-mute outline-none focus:border-accent"
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        data-testid={`kanban-column-add-card-submit-${col.status}`}
+                        onClick={() => commitAddCard(col.status)}
+                        disabled={!editingCardTitle.trim()}
+                        className="px-2.5 py-1 text-[11px] font-semibold rounded bg-accent text-bg hover:bg-accent/90 disabled:bg-ink-mute/40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        添加
+                      </button>
+                      <button
+                        type="button"
+                        data-testid={`kanban-column-add-card-cancel-${col.status}`}
+                        onClick={cancelAddCard}
+                        className="px-2 py-1 text-[11px] text-ink-mute hover:text-ink rounded hover:bg-bg-soft transition-colors"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid={`kanban-column-add-card-${col.status}`}
+                    onClick={() => startAddCard(col.status)}
+                    className="mt-1 w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border border-dashed border-line/60 hover:border-accent/60 bg-transparent hover:bg-accent/5 text-[11px] text-ink-mute hover:text-accent transition-all duration-150 group"
+                    title="新增任务卡"
+                  >
+                    <Plus size={12} className="group-hover:rotate-90 transition-transform duration-200" />
+                    <span>Add task</span>
+                  </button>
+                )
+              )}
             </div>
           );
         })}
