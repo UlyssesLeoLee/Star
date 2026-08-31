@@ -164,7 +164,9 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
-    use crate::saga_5b_call::{CrossDomainCallError, CrossDomainCallResult, CrossDomainCallerHealth, DomainHealth};
+    use crate::saga_5b_call::{
+        CrossDomainCallError, CrossDomainCallResult, CrossDomainCallerHealth, DomainHealth,
+    };
     use crate::saga_step::{CallId, SagaStep as SagaStepData, SagaStepStatus, SagaType};
 
     /// 记录调用顺序的 CrossDomainCaller 测试替身 (per 补偿链逆序验证)

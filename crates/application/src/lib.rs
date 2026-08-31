@@ -45,8 +45,8 @@
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 pub use star_context::ActorContext;
+use uuid::Uuid;
 
 // =====================================================================
 // 实体(Entity / Aggregate Root)
@@ -259,7 +259,9 @@ mod tests {
         let actor = ActorContext {
             user_id: Uuid::new_v4(),
             tenant_id: Uuid::new_v4(),
-            device_id: None, is_local_runtime: false, is_platform_admin: false,
+            device_id: None,
+            is_local_runtime: false,
+            is_platform_admin: false,
             project_ids: vec![],
             roles: vec!["developer".to_string()],
         };

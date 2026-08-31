@@ -10,11 +10,11 @@
 //! - 仅 OPEN 可删(FB-005)
 //! - Target 11 种(spec §7 + SOW 任务范围)
 
-use uuid::Uuid;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
+use uuid::Uuid;
 
 use crate::context::ActorContext;
 use crate::entity::{

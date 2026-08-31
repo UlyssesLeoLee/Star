@@ -31,9 +31,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // UUID 强类型 ID 宏(参考 domain-tenant / domain-permission 模式)
@@ -795,7 +795,12 @@ impl RelationCommandPort for InMemoryRelationService {
                 "group name must not be empty".to_string(),
             ));
         }
-        let g = RelationGroup::new(cmd.tenant_id, cmd.name, cmd.description, UserId::from(actor.user_id));
+        let g = RelationGroup::new(
+            cmd.tenant_id,
+            cmd.name,
+            cmd.description,
+            UserId::from(actor.user_id),
+        );
         self.repo.insert_group(g.clone()).await?;
         self.groups.write().expect("lock").insert(g.id, g.clone());
         Ok(g)

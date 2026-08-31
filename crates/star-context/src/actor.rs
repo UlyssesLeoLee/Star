@@ -108,7 +108,10 @@ impl ActorContext {
     ///
     /// **INV-ACT-01 校验**: user_id / tenant_id 非 nil, 否则 panic (debug) / assert (release)
     pub fn new(user_id: Uuid, tenant_id: Uuid) -> Self {
-        assert!(!user_id.is_nil(), "ActorContext::new: user_id 不能为 nil (INV-ACT-01)");
+        assert!(
+            !user_id.is_nil(),
+            "ActorContext::new: user_id 不能为 nil (INV-ACT-01)"
+        );
         assert!(
             !tenant_id.is_nil(),
             "ActorContext::new: tenant_id 不能为 nil (INV-ACT-01)"
@@ -185,10 +188,7 @@ impl ActorContext {
     /// **注意**: 仅做大小写归一, 不做权限裁决.
     /// 权限裁决走 `domain_permission::check` (INV-PM-02 Deny 优先 + INV-PM-05 默认 Deny).
     pub fn parsed_roles(&self) -> Vec<String> {
-        self.roles
-            .iter()
-            .map(|s| s.to_ascii_lowercase())
-            .collect()
+        self.roles.iter().map(|s| s.to_ascii_lowercase()).collect()
     }
 }
 
@@ -229,16 +229,14 @@ mod tests {
 
     #[test]
     fn with_role_appends() {
-        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-            .with_role("tenant_admin");
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_role("tenant_admin");
         assert!(a.has_role("tenant_admin"));
         assert!(a.has_role("developer"));
     }
 
     #[test]
     fn has_role_case_sensitive() {
-        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-            .with_role("Tenant_Admin");
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_role("Tenant_Admin");
         // has_role 严格大小写 (Role 枚举统一由 domain-permission 转换)
         assert!(!a.has_role("tenant_admin"));
         assert!(a.has_role("Tenant_Admin"));
@@ -277,8 +275,7 @@ mod tests {
 
     #[test]
     fn serde_roundtrip() {
-        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-            .with_role("tenant_admin");
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_role("tenant_admin");
         let json = serde_json::to_string(&a).unwrap();
         let b: ActorContext = serde_json::from_str(&json).unwrap();
         assert_eq!(a.user_id, b.user_id);
@@ -296,8 +293,7 @@ mod tests {
 
     #[test]
     fn h2_with_agent_session_sets_flag() {
-        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-            .with_agent_session(true);
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_agent_session(true);
         assert!(a.is_agent_session);
     }
 
@@ -325,8 +321,7 @@ mod tests {
 
     #[test]
     fn h2_can_access_project_via_admin() {
-        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-            .with_role(roles::TENANT_ADMIN);
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_role(roles::TENANT_ADMIN);
         let p = Uuid::new_v4();
         assert!(a.can_access_project(p)); // tenant_admin 永远可访问
     }
@@ -334,8 +329,7 @@ mod tests {
     #[test]
     fn h2_can_access_project_via_project_ids() {
         let p = Uuid::new_v4();
-        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-            .with_project(p);
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_project(p);
         assert!(a.can_access_project(p));
         assert!(!a.can_access_project(Uuid::new_v4())); // 未授权 project
     }

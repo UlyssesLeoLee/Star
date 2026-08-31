@@ -34,10 +34,10 @@ use std::time::Duration;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // 强类型 ID 宏
@@ -61,7 +61,9 @@ macro_rules! define_uuid_id {
                 Self(id)
             }
             #[allow(dead_code)]
-            pub fn as_uuid(&self) -> uuid::Uuid { self.0 }
+            pub fn as_uuid(&self) -> uuid::Uuid {
+                self.0
+            }
             #[allow(dead_code)]
             pub fn into_uuid(self) -> uuid::Uuid {
                 self.0

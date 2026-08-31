@@ -33,9 +33,9 @@ use std::time::Duration;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -982,7 +982,9 @@ impl RuntimeQueryPort for InMemoryRuntimeService {
             return Err(RuntimeError::CrossTenantDenied(q.tenant_id, r.tenant_id));
         }
         // INV-RT-05:1 Runtime → 1 User,非 owner 不可读
-        if !actor.is_local_runtime && !actor.has_role("tenant_admin") && UserId::from(actor.user_id) != r.user_id
+        if !actor.is_local_runtime
+            && !actor.has_role("tenant_admin")
+            && UserId::from(actor.user_id) != r.user_id
         {
             return Err(RuntimeError::PermissionDenied);
         }
@@ -1033,7 +1035,9 @@ impl RuntimeQueryPort for InMemoryRuntimeService {
         if r.tenant_id != q.tenant_id {
             return Err(RuntimeError::CrossTenantDenied(q.tenant_id, r.tenant_id));
         }
-        if !actor.is_local_runtime && !actor.has_role("tenant_admin") && UserId::from(actor.user_id) != r.user_id
+        if !actor.is_local_runtime
+            && !actor.has_role("tenant_admin")
+            && UserId::from(actor.user_id) != r.user_id
         {
             return Err(RuntimeError::PermissionDenied);
         }

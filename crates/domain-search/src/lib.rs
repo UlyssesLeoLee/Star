@@ -30,9 +30,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -637,7 +637,10 @@ impl SearchQueryPort for InMemorySearchService {
         actor: &ActorContext,
     ) -> Result<SearchResult, SearchError> {
         if TenantId::from(actor.tenant_id) != q.tenant_id {
-            return Err(SearchError::CrossTenantDenied(TenantId::from(actor.tenant_id), q.tenant_id));
+            return Err(SearchError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                q.tenant_id,
+            ));
         }
         if q.query.limit > 1000 {
             return Err(SearchError::InvalidQuery("limit > 1000".to_string()));
@@ -663,7 +666,10 @@ impl SearchQueryPort for InMemorySearchService {
         actor: &ActorContext,
     ) -> Result<Vec<Suggestion>, SearchError> {
         if TenantId::from(actor.tenant_id) != q.tenant_id {
-            return Err(SearchError::CrossTenantDenied(TenantId::from(actor.tenant_id), q.tenant_id));
+            return Err(SearchError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                q.tenant_id,
+            ));
         }
         if q.query.prefix.is_empty() {
             return Err(SearchError::InvalidQuery("prefix required".to_string()));
@@ -679,7 +685,10 @@ impl SearchQueryPort for InMemorySearchService {
         actor: &ActorContext,
     ) -> Result<Vec<SavedSearch>, SearchError> {
         if TenantId::from(actor.tenant_id) != tenant_id {
-            return Err(SearchError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
+            return Err(SearchError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                tenant_id,
+            ));
         }
         let all = self
             .repo

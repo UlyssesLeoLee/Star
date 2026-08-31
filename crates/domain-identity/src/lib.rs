@@ -28,9 +28,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -674,7 +674,10 @@ impl IdentityQueryPort for InMemoryIdentityService {
         actor: &ActorContext,
     ) -> Result<Device, IdentityError> {
         if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != tenant_id {
-            return Err(IdentityError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
+            return Err(IdentityError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                tenant_id,
+            ));
         }
         let d = self
             .devices

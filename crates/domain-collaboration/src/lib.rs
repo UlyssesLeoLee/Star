@@ -30,9 +30,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // UUID 强类型 ID 宏(参考 domain-tenant / domain-permission 模式)
@@ -855,7 +855,10 @@ impl CollabCommandPort for InMemoryCollabService {
                 cmd.tenant_id,
             ));
         }
-        if !actor.project_ids.iter().any(|p| *p == cmd.project_id.as_uuid())
+        if !actor
+            .project_ids
+            .iter()
+            .any(|p| *p == cmd.project_id.as_uuid())
             && !actor.is_platform_admin
             && !actor.is_local_runtime
         {
@@ -989,7 +992,12 @@ impl CollabCommandPort for InMemoryCollabService {
         actor: &ActorContext,
     ) -> Result<Whiteboard, CollabError> {
         let mut w = self.require_whiteboard(cmd.tenant_id, cmd.whiteboard_id)?;
-        if !actor.project_ids.iter().any(|p| *p == w.project_id.as_uuid()) && !actor.is_platform_admin {
+        if !actor
+            .project_ids
+            .iter()
+            .any(|p| *p == w.project_id.as_uuid())
+            && !actor.is_platform_admin
+        {
             return Err(CollabError::PermissionDenied);
         }
         let mut shape = cmd.shape;
@@ -1009,7 +1017,12 @@ impl CollabCommandPort for InMemoryCollabService {
         actor: &ActorContext,
     ) -> Result<Whiteboard, CollabError> {
         let mut w = self.require_whiteboard(cmd.tenant_id, cmd.whiteboard_id)?;
-        if !actor.project_ids.iter().any(|p| *p == w.project_id.as_uuid()) && !actor.is_platform_admin {
+        if !actor
+            .project_ids
+            .iter()
+            .any(|p| *p == w.project_id.as_uuid())
+            && !actor.is_platform_admin
+        {
             return Err(CollabError::PermissionDenied);
         }
         let mut shape = cmd.shape;
@@ -1026,7 +1039,12 @@ impl CollabCommandPort for InMemoryCollabService {
         actor: &ActorContext,
     ) -> Result<Whiteboard, CollabError> {
         let mut w = self.require_whiteboard(cmd.tenant_id, cmd.whiteboard_id)?;
-        if !actor.project_ids.iter().any(|p| *p == w.project_id.as_uuid()) && !actor.is_platform_admin {
+        if !actor
+            .project_ids
+            .iter()
+            .any(|p| *p == w.project_id.as_uuid())
+            && !actor.is_platform_admin
+        {
             return Err(CollabError::PermissionDenied);
         }
         w.delete_shape(cmd.shape_id)?;
@@ -1045,7 +1063,12 @@ impl CollabQueryPort for InMemoryCollabService {
     ) -> Result<CollaborationSession, CollabError> {
         let s = self.require_session(q.tenant_id, q.session_id)?;
         // 读权限:tenant 内 + project 内(或 admin)
-        if !actor.project_ids.iter().any(|p| *p == s.project_id.as_uuid()) && !actor.is_platform_admin {
+        if !actor
+            .project_ids
+            .iter()
+            .any(|p| *p == s.project_id.as_uuid())
+            && !actor.is_platform_admin
+        {
             return Err(CollabError::PermissionDenied);
         }
         Ok(s)
@@ -1057,7 +1080,12 @@ impl CollabQueryPort for InMemoryCollabService {
         actor: &ActorContext,
     ) -> Result<Vec<Presence>, CollabError> {
         let s = self.require_session(q.tenant_id, q.session_id)?;
-        if !actor.project_ids.iter().any(|p| *p == s.project_id.as_uuid()) && !actor.is_platform_admin {
+        if !actor
+            .project_ids
+            .iter()
+            .any(|p| *p == s.project_id.as_uuid())
+            && !actor.is_platform_admin
+        {
             return Err(CollabError::PermissionDenied);
         }
         let now = Utc::now();
@@ -1090,7 +1118,12 @@ impl CollabQueryPort for InMemoryCollabService {
         actor: &ActorContext,
     ) -> Result<Whiteboard, CollabError> {
         let w = self.require_whiteboard(q.tenant_id, q.whiteboard_id)?;
-        if !actor.project_ids.iter().any(|p| *p == w.project_id.as_uuid()) && !actor.is_platform_admin {
+        if !actor
+            .project_ids
+            .iter()
+            .any(|p| *p == w.project_id.as_uuid())
+            && !actor.is_platform_admin
+        {
             return Err(CollabError::PermissionDenied);
         }
         Ok(w)

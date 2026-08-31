@@ -15,8 +15,8 @@
 //!   - 不写 UI (per B.9)
 //!   - 不接 KMS, fallback 链明文配置
 
-use std::time::Duration;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use thiserror::Error;
 
 /// Fallback 触发原因 (简化版: untagged enum, 序列化所有字段为 JSON value, 不强加 tag 结构, 避免 newtype 限制)
@@ -37,9 +37,7 @@ pub enum FallbackReason {
     InvalidCredential(String),
     /// 整个 fallback 链用尽
     #[error("fallback chain exhausted after {attempts} attempts")]
-    Exhausted {
-        attempts: u32,
-    },
+    Exhausted { attempts: u32 },
 }
 
 impl FallbackReason {
@@ -90,9 +88,7 @@ pub enum FallbackDecision {
         reason: FallbackReason,
     },
     /// 整个链用尽, 报错
-    GiveUp {
-        reason: FallbackReason,
-    },
+    GiveUp { reason: FallbackReason },
 }
 
 /// FallbackChain: API Agent 失败 → CLI Agent 降级 决策
@@ -168,7 +164,10 @@ mod tests {
     #[test]
     fn default_policy_maps_openclaw_to_claude() {
         let policy = FallbackPolicy::default();
-        assert_eq!(policy.api_to_cli.get("openclaw"), Some(&"claude".to_string()));
+        assert_eq!(
+            policy.api_to_cli.get("openclaw"),
+            Some(&"claude".to_string())
+        );
         assert_eq!(policy.api_to_cli.get("hermes"), Some(&"codex".to_string()));
     }
 

@@ -65,10 +65,7 @@ impl Resource for FeedbackHandler {
         let svc = self.service();
         // handler 简化: actor.tenant_id = nil → PermissionDenied → None
         // (真实 production 需 URI 改 2 段承载 tenant, 与 B.2.5 workspace 同模式)
-        let actor = ActorContext::new(
-            UserId::new(),
-            domain_feedback::TenantId::new(),
-        );
+        let actor = ActorContext::new(UserId::new(), domain_feedback::TenantId::new());
         match svc.get_by_id(fb_id, actor).await {
             Ok(f) => Ok(Some(FeedbackData {
                 feedback_id: f.id.to_string(),
@@ -150,4 +147,3 @@ mod tests {
         assert!(d.is_none());
     }
 }
-

@@ -28,9 +28,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -493,7 +493,8 @@ impl CommentCommandPort for InMemoryCommentService {
             return Err(CommentError::CrossTenantDenied(c.tenant_id, cmd.tenant_id));
         }
         // 作者或 admin 可删
-        if c.author_user_id != Some(UserId::from(actor.user_id)) && !actor.has_role("project_admin") {
+        if c.author_user_id != Some(UserId::from(actor.user_id)) && !actor.has_role("project_admin")
+        {
             return Err(CommentError::PermissionDenied);
         }
         if c.status == CommentStatus::Deleted {

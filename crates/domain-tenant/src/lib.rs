@@ -28,9 +28,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -621,7 +621,10 @@ impl TenantQueryPort for InMemoryTenantService {
         actor: &ActorContext,
     ) -> Result<Tenant, TenantError> {
         if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != q.tenant_id {
-            return Err(TenantError::CrossTenantDenied(TenantId::from(actor.tenant_id), q.tenant_id));
+            return Err(TenantError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                q.tenant_id,
+            ));
         }
         self.tenants
             .read()
@@ -640,7 +643,10 @@ impl TenantQueryPort for InMemoryTenantService {
         actor: &ActorContext,
     ) -> Result<TenantPolicy, TenantError> {
         if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != tenant_id {
-            return Err(TenantError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
+            return Err(TenantError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                tenant_id,
+            ));
         }
         self.policies
             .read()
@@ -659,7 +665,10 @@ impl TenantQueryPort for InMemoryTenantService {
         actor: &ActorContext,
     ) -> Result<SecurityPolicy, TenantError> {
         if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != tenant_id {
-            return Err(TenantError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
+            return Err(TenantError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                tenant_id,
+            ));
         }
         self.sec_policies
             .read()
@@ -678,7 +687,10 @@ impl TenantQueryPort for InMemoryTenantService {
         actor: &ActorContext,
     ) -> Result<Vec<ProviderDataBoundary>, TenantError> {
         if !actor.is_platform_admin && TenantId::from(actor.tenant_id) != tenant_id {
-            return Err(TenantError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
+            return Err(TenantError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                tenant_id,
+            ));
         }
         Ok(self
             .boundaries

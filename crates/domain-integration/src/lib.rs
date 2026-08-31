@@ -48,7 +48,6 @@ pub mod value_object;
 // =====================================================================
 
 pub use context::ActorContext as ContextActorContext; // 子模块强类型 ID 版本 (供 domain 内部 use crate::context::ActorContext)
-pub use star_context::ActorContext; // 收敛到 star_context 权威版本 (per P0-1 联动协作)
 pub use entity::{Integration, MappingConfig, SyncDirection, SyncState};
 pub use error::IntegrationError;
 pub use event::{
@@ -68,6 +67,7 @@ pub use port::{
     UpdateIntegrationCommand,
 };
 pub use service::InMemoryIntegrationService;
+pub use star_context::ActorContext; // 收敛到 star_context 权威版本 (per P0-1 联动协作)
 pub use value_object::{
     roles, ConflictStrategy, ExternalEntityId, ExternalSystemName, IntegrationId,
     IntegrationRelationType, IntegrationSource, IntegrationState, ProjectId, SyncOutcome,

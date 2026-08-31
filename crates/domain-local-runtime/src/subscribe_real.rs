@@ -176,16 +176,8 @@ mod tests {
         tx.send(sample_line("b")).await.unwrap();
         drop(route_tx);
         // 订阅者收
-        let r1 = tokio::time::timeout(
-            std::time::Duration::from_millis(500),
-            sub.recv(),
-        )
-        .await;
-        let r2 = tokio::time::timeout(
-            std::time::Duration::from_millis(500),
-            sub.recv(),
-        )
-        .await;
+        let r1 = tokio::time::timeout(std::time::Duration::from_millis(500), sub.recv()).await;
+        let r2 = tokio::time::timeout(std::time::Duration::from_millis(500), sub.recv()).await;
         match r1 {
             Ok(Ok(l)) => assert_eq!(l.content, "a"),
             _ => {} // 接受 race 失败

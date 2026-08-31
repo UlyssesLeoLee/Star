@@ -35,9 +35,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // UUID 强类型 ID 宏
@@ -1174,7 +1174,8 @@ impl PlanningCommandPort for InMemoryPlanningService {
             .get(&cmd.sprint_id)
             .cloned()
             .ok_or_else(|| PlanningError::NotFound(format!("sprint:{}", cmd.sprint_id)))?;
-        if sprint.tenant_id != TenantId::from(actor.tenant_id) || sprint.tenant_id != cmd.tenant_id {
+        if sprint.tenant_id != TenantId::from(actor.tenant_id) || sprint.tenant_id != cmd.tenant_id
+        {
             return Err(PlanningError::CrossTenantDenied(
                 TenantId::from(actor.tenant_id),
                 sprint.tenant_id,

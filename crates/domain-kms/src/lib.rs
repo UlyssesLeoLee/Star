@@ -184,10 +184,7 @@ impl LocalMockKms {
         use rand::RngCore;
         let mut key = [0u8; 32];
         rand::thread_rng().fill_bytes(&mut key);
-        let master_key_id = KeyId::new(format!(
-            "mock-master-{}",
-            Utc::now().timestamp_millis()
-        ));
+        let master_key_id = KeyId::new(format!("mock-master-{}", Utc::now().timestamp_millis()));
         info!(master_key_id = %master_key_id.as_str(), "LocalMockKms initialized");
         Self {
             mode: KmsMode::LocalMock,
@@ -225,8 +222,8 @@ impl KmsClient for LocalMockKms {
         // 用 master key 加密 DEK (envelope encryption, per INV-KMS-02)
         use aes_gcm::aead::Aead;
         use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
-        let cipher =
-            Aes256Gcm::new_from_slice(&self.master_key).map_err(|e| KmsError::Internal(e.to_string()))?;
+        let cipher = Aes256Gcm::new_from_slice(&self.master_key)
+            .map_err(|e| KmsError::Internal(e.to_string()))?;
         let mut nonce_bytes = [0u8; 12];
         rand::thread_rng().fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from_slice(&nonce_bytes);
@@ -270,8 +267,8 @@ impl KmsClient for LocalMockKms {
         let dek_bytes = deks
             .get(&(tenant_id.clone(), dek.clone()))
             .ok_or_else(|| KmsError::KeyNotFound(dek.clone()))?;
-        let cipher = Aes256Gcm::new_from_slice(dek_bytes)
-            .map_err(|e| KmsError::Internal(e.to_string()))?;
+        let cipher =
+            Aes256Gcm::new_from_slice(dek_bytes).map_err(|e| KmsError::Internal(e.to_string()))?;
         let mut nonce_bytes = [0u8; 12];
         rand::thread_rng().fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from_slice(&nonce_bytes);
@@ -279,7 +276,13 @@ impl KmsClient for LocalMockKms {
             .encrypt(nonce, plaintext)
             .map_err(|e| KmsError::Internal(e.to_string()))?;
 
-        let key_version = self.key_versions.read().await.get(dek).copied().unwrap_or(1);
+        let key_version = self
+            .key_versions
+            .read()
+            .await
+            .get(dek)
+            .copied()
+            .unwrap_or(1);
 
         Ok(EncryptedBlob {
             algorithm: "aes-256-gcm".to_string(),
@@ -313,8 +316,8 @@ impl KmsClient for LocalMockKms {
         let dek_bytes = deks
             .get(&(tenant_id.clone(), blob.dek_id.clone()))
             .ok_or_else(|| KmsError::KeyNotFound(blob.dek_id.clone()))?;
-        let cipher = Aes256Gcm::new_from_slice(dek_bytes)
-            .map_err(|e| KmsError::Internal(e.to_string()))?;
+        let cipher =
+            Aes256Gcm::new_from_slice(dek_bytes).map_err(|e| KmsError::Internal(e.to_string()))?;
         let nonce_bytes = base64::engine::general_purpose::STANDARD
             .decode(&blob.nonce)
             .map_err(|e| KmsError::InvalidCiphertext(e.to_string()))?;

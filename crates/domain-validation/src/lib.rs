@@ -51,10 +51,8 @@ pub mod value_object;
 // 便捷 re-export
 // =====================================================================
 
-pub use uuid::Uuid;
 #[allow(unused_imports)]
 use context::ActorContext as _ContextActorContext; // 内部使用 (子模块强类型 ID 版)
-pub use star_context::ActorContext; // 收敛到 star_context 权威版本 (per P0-1 联动协作)
 pub use entity::{
     AcceptanceCoverage, AcceptanceCoverageReport, EvidenceDownloadURL, ValidationEvidence,
     ValidationOverride, ValidationPolicy, ValidationResult,
@@ -81,6 +79,8 @@ pub use port::{
     ValidationQueryPort, ValidationRepository,
 };
 pub use service::InMemoryValidationService;
+pub use star_context::ActorContext; // 收敛到 star_context 权威版本 (per P0-1 联动协作)
+pub use uuid::Uuid;
 pub use value_object::{
     is_valid_state_transition, roles, AcceptanceCoverageId, AcceptanceCriterionId, AgentSessionId,
     ChangeSetId, CommitId, CoverageStatus, EvidenceType, ProjectId, TenantId, TriggeredBy, UserId,

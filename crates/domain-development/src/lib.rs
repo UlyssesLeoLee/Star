@@ -31,9 +31,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -669,7 +669,10 @@ impl DevelopmentCommandPort for InMemoryDevelopmentService {
         actor: &ActorContext,
     ) -> Result<ChangeSet, DevelopmentError> {
         // INV-DEV-02:Merge 必须 project_admin 或 tenant_admin
-        if !actor.has_role("developer") && !actor.has_role("project_admin") && !actor.is_platform_admin {
+        if !actor.has_role("developer")
+            && !actor.has_role("project_admin")
+            && !actor.is_platform_admin
+        {
             return Err(DevelopmentError::PermissionDenied(
                 "merge requires project_admin or tenant_admin (INV-DEV-02)".to_string(),
             ));

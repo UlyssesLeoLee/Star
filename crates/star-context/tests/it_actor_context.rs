@@ -55,8 +55,7 @@ fn it_actor_context_with_role_chain() {
 /// **IT-4**: has_role 严格大小写 (per doc)
 #[test]
 fn it_actor_context_has_role_case_sensitive() {
-    let actor = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-        .with_role("Tenant_Admin");
+    let actor = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_role("Tenant_Admin");
     assert!(!actor.has_role("tenant_admin"));
     assert!(actor.has_role("Tenant_Admin"));
 }
@@ -102,8 +101,7 @@ fn it_actor_context_project_ids_default_empty() {
 /// **IT-9**: serde_json roundtrip
 #[test]
 fn it_actor_context_serde_roundtrip() {
-    let actor = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-        .with_role("tenant_admin");
+    let actor = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_role("tenant_admin");
     let json = serde_json::to_string(&actor).unwrap();
     let parsed: ActorContext = serde_json::from_str(&json).unwrap();
     assert_eq!(actor.user_id, parsed.user_id);
@@ -147,9 +145,7 @@ fn it_actor_context_default_not_invariant_01() {
 #[test]
 fn it_actor_context_public_api() {
     // 如果这一行能编译, 证明 star_context 公开了 ActorContext
-    let _type_check: fn() -> ActorContext = || {
-        ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-    };
+    let _type_check: fn() -> ActorContext = || ActorContext::new(Uuid::new_v4(), Uuid::new_v4());
 }
 
 /// **IT-13**: 5 角色枚举 (per domain_permission::Role)
@@ -161,7 +157,13 @@ fn it_actor_context_5_roles() {
         .with_role("developer")
         .with_role("viewer")
         .with_role("agent");
-    for r in ["tenant_admin", "project_admin", "developer", "viewer", "agent"] {
+    for r in [
+        "tenant_admin",
+        "project_admin",
+        "developer",
+        "viewer",
+        "agent",
+    ] {
         assert!(actor.has_role(r), "missing role: {r}");
     }
 }
@@ -181,8 +183,7 @@ fn it_actor_context_uuid_fields() {
 /// **IT-15**: 多 actor 实例独立 (无 shared state)
 #[test]
 fn it_actor_context_independent() {
-    let a1 = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-        .with_role("tenant_admin");
+    let a1 = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_role("tenant_admin");
     let a2 = ActorContext::new(Uuid::new_v4(), Uuid::new_v4());
     assert!(a1.has_role("tenant_admin"));
     assert!(!a2.has_role("tenant_admin")); // a2 不受影响

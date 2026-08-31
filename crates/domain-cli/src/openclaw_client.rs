@@ -57,7 +57,10 @@ impl OpenClawConfig {
     }
 
     /// 新建真实模式配置
-    pub fn new_real(base_url: impl Into<String>, api_key: impl Into<String>) -> Result<Self, OpenClawError> {
+    pub fn new_real(
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+    ) -> Result<Self, OpenClawError> {
         let api_key = api_key.into();
         if api_key.is_empty() {
             return Err(OpenClawError::InvalidKey);
@@ -124,9 +127,7 @@ impl OpenClawClient {
         if config.api_key.is_empty() {
             return Err(OpenClawError::InvalidKey);
         }
-        let http = reqwest::Client::builder()
-            .timeout(config.timeout)
-            .build()?;
+        let http = reqwest::Client::builder().timeout(config.timeout).build()?;
         Ok(Self { config, http })
     }
 
@@ -241,8 +242,14 @@ mod tests {
         let req = GenerateRequest {
             model: "gpt-4".into(),
             messages: vec![
-                ChatMessage { role: "system".into(), content: "You are helpful.".into() },
-                ChatMessage { role: "user".into(), content: "Hello world".into() },
+                ChatMessage {
+                    role: "system".into(),
+                    content: "You are helpful.".into(),
+                },
+                ChatMessage {
+                    role: "user".into(),
+                    content: "Hello world".into(),
+                },
             ],
             temperature: Some(0.7),
             max_tokens: Some(100),

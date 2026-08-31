@@ -66,10 +66,7 @@ impl Resource for WorktreeHandler {
         let svc = self.service();
         // handler 简化: actor.tenant_id = nil → CrossTenantDenied → None
         // (真实 production 需 URI 改 2 段承载 tenant, 与 B.2.5 workspace 同模式)
-        let actor = ActorContext::new(
-            uuid::Uuid::nil(),
-            uuid::Uuid::new_v4(),
-        );
+        let actor = ActorContext::new(uuid::Uuid::nil(), uuid::Uuid::new_v4());
         match svc.get_by_id(wt_id, &actor).await {
             Ok(w) => Ok(Some(WorktreeData {
                 worktree_id: w.id.to_string(),
@@ -115,8 +112,7 @@ mod tests {
         let h = WorktreeHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid.0)
-            .with_role("developer");
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid.0).with_role("developer");
         let cmd = CreateWorktreeCommand {
             tenant_id: tid,
             project_id: domain_worktree::ProjectId::new(),
@@ -144,4 +140,3 @@ mod tests {
         assert!(d.is_none());
     }
 }
-

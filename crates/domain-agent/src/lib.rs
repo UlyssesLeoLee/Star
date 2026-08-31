@@ -41,9 +41,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型(本 crate 内强类型)
@@ -995,7 +995,10 @@ impl AgentQueryPort for InMemoryAgentService {
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError> {
         if TenantId::from(actor.tenant_id) != q.tenant_id {
-            return Err(AgentError::CrossTenantDenied(TenantId::from(actor.tenant_id), q.tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                q.tenant_id,
+            ));
         }
         self.sessions
             .read()
@@ -1011,7 +1014,10 @@ impl AgentQueryPort for InMemoryAgentService {
         actor: &ActorContext,
     ) -> Result<Vec<AgentSessionSummary>, AgentError> {
         if TenantId::from(actor.tenant_id) != q.tenant_id {
-            return Err(AgentError::CrossTenantDenied(TenantId::from(actor.tenant_id), q.tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                q.tenant_id,
+            ));
         }
         let sessions = self.sessions.read().unwrap();
         Ok(sessions
@@ -1035,7 +1041,10 @@ impl AgentQueryPort for InMemoryAgentService {
         actor: &ActorContext,
     ) -> Result<Vec<AgentSessionSummary>, AgentError> {
         if TenantId::from(actor.tenant_id) != tenant_id {
-            return Err(AgentError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
+            return Err(AgentError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                tenant_id,
+            ));
         }
         let sessions = self.sessions.read().unwrap();
         Ok(sessions

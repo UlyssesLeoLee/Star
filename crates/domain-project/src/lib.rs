@@ -27,9 +27,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -529,7 +529,10 @@ impl ProjectQueryPort for InMemoryProjectService {
         actor: &ActorContext,
     ) -> Result<ProjectPolicy, ProjectError> {
         if TenantId::from(actor.tenant_id) != tenant_id {
-            return Err(ProjectError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
+            return Err(ProjectError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                tenant_id,
+            ));
         }
         let p = self
             .policies

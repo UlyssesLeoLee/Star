@@ -323,11 +323,8 @@ mod tests {
         .unwrap();
         assert_eq!(adapter.process_id(), id);
         // 替代原 adapter.shutdown().await.unwrap() (P3-A.13 守门发现 forwarder 死锁)
-        let _ = tokio::time::timeout(
-            std::time::Duration::from_millis(500),
-            adapter.shutdown(),
-        )
-        .await;
+        let _ =
+            tokio::time::timeout(std::time::Duration::from_millis(500), adapter.shutdown()).await;
     }
 
     #[tokio::test]
@@ -362,11 +359,8 @@ mod tests {
             }
         }
         // 替代原 adapter.shutdown().await.unwrap() (P3-A.13 守门发现 forwarder 死锁)
-        let _ = tokio::time::timeout(
-            std::time::Duration::from_millis(500),
-            adapter.shutdown(),
-        )
-        .await;
+        let _ =
+            tokio::time::timeout(std::time::Duration::from_millis(500), adapter.shutdown()).await;
     }
 
     #[tokio::test]
@@ -383,18 +377,12 @@ mod tests {
         .await
         .unwrap();
         // 替代原 adapter.shutdown().await.unwrap() (P3-A.13 守门发现 forwarder 死锁)
-        let _ = tokio::time::timeout(
-            std::time::Duration::from_millis(500),
-            adapter.shutdown(),
-        )
-        .await;
+        let _ =
+            tokio::time::timeout(std::time::Duration::from_millis(500), adapter.shutdown()).await;
         // 第二次 shutdown: forwarder 已 take 走, 不应 panic
         // 替代原 adapter.shutdown().await.unwrap() (P3-A.13 守门发现 forwarder 死锁)
-        let _ = tokio::time::timeout(
-            std::time::Duration::from_millis(500),
-            adapter.shutdown(),
-        )
-        .await;
+        let _ =
+            tokio::time::timeout(std::time::Duration::from_millis(500), adapter.shutdown()).await;
     }
 
     #[tokio::test]
@@ -413,11 +401,8 @@ mod tests {
         let _i: Arc<SpawnUploadIntegrator> = adapter.integrator();
         // 不 panic 即通过
         // 替代原 adapter.shutdown().await.unwrap() (P3-A.13 守门发现 forwarder 死锁)
-        let _ = tokio::time::timeout(
-            std::time::Duration::from_millis(500),
-            adapter.shutdown(),
-        )
-        .await;
+        let _ =
+            tokio::time::timeout(std::time::Duration::from_millis(500), adapter.shutdown()).await;
     }
 
     #[tokio::test]
@@ -437,10 +422,7 @@ mod tests {
         .unwrap();
         let _i: Arc<SpawnUploadIntegrator> = adapter.integrator();
         // 替代原 adapter.shutdown().await.unwrap() (P3-A.13 守门发现 forwarder 死锁)
-        let _ = tokio::time::timeout(
-            std::time::Duration::from_millis(500),
-            adapter.shutdown(),
-        )
-        .await;
+        let _ =
+            tokio::time::timeout(std::time::Duration::from_millis(500), adapter.shutdown()).await;
     }
 }

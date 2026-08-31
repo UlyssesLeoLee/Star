@@ -35,9 +35,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -598,7 +598,10 @@ impl ContextCommandPort for InMemoryContextService {
         actor: &ActorContext,
     ) -> Result<ContextPacket, ContextError> {
         if TenantId::from(actor.tenant_id) != tenant_id {
-            return Err(ContextError::CrossTenantDenied(TenantId::from(actor.tenant_id), tenant_id));
+            return Err(ContextError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                tenant_id,
+            ));
         }
         if !priority.is_trusted() {
             return Err(ContextError::UntrustedAtTrustedLayer);

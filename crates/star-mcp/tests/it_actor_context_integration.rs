@@ -48,8 +48,8 @@ fn it_cross_actor_context_7_fields() {
 #[tokio::test]
 async fn it_cross_inmemory_identity_create_user() {
     // actor 必须有 tenant_admin role (否则 service 第一行 PermissionDenied)
-    let star_actor = StarActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-        .with_role("tenant_admin");
+    let star_actor =
+        StarActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_role("tenant_admin");
     let svc = InMemoryIdentityService::new();
 
     let cmd = CreateUserCommand {
@@ -61,7 +61,11 @@ async fn it_cross_inmemory_identity_create_user() {
     };
 
     let result = svc.create_user(cmd, &star_actor).await;
-    assert!(result.is_ok(), "create_user 应该成功, 实际: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "create_user 应该成功, 实际: {:?}",
+        result.err()
+    );
     let user = result.unwrap();
     assert_eq!(user.email, "test@star.local");
     assert_eq!(user.tenant_id.as_uuid(), star_actor.tenant_id);
@@ -71,13 +75,13 @@ async fn it_cross_inmemory_identity_create_user() {
 #[tokio::test]
 async fn it_cross_inmemory_identity_cross_tenant_denied() {
     // actor 有 tenant_admin 但跨 tenant → 触发 CrossTenantDenied (跳过第一行 PermissionDenied)
-    let star_actor_tenant_a = StarActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-        .with_role("tenant_admin");
+    let star_actor_tenant_a =
+        StarActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_role("tenant_admin");
     let tenant_b_uuid = Uuid::new_v4();
     let svc = InMemoryIdentityService::new();
 
     let cmd = CreateUserCommand {
-        tenant_id: TenantId(tenant_b_uuid),  // 跨 tenant
+        tenant_id: TenantId(tenant_b_uuid), // 跨 tenant
         email: "evil@other.local".to_string(),
         display_name: "Evil".to_string(),
         tenant_role: TenantRole::Developer,
@@ -97,7 +101,7 @@ async fn it_cross_inmemory_identity_cross_tenant_denied() {
 #[tokio::test]
 async fn it_cross_inmemory_identity_platform_admin_bypass() {
     let mut star_actor = StarActorContext::new(Uuid::new_v4(), Uuid::new_v4());
-    star_actor.is_platform_admin = true;  // 平台 admin
+    star_actor.is_platform_admin = true; // 平台 admin
     let tenant_b_uuid = Uuid::new_v4();
     let svc = InMemoryIdentityService::new();
 
@@ -126,9 +130,16 @@ fn it_cross_actor_context_5_roles_preserved() {
         .with_role("developer")
         .with_role("viewer")
         .with_role("agent");
-    let parsed: ActorContext = serde_json::from_str(&serde_json::to_string(&star_actor).unwrap()).unwrap();
+    let parsed: ActorContext =
+        serde_json::from_str(&serde_json::to_string(&star_actor).unwrap()).unwrap();
     assert_eq!(parsed.roles.len(), 6); // default "developer" + 5
-    for r in ["tenant_admin", "project_admin", "developer", "viewer", "agent"] {
+    for r in [
+        "tenant_admin",
+        "project_admin",
+        "developer",
+        "viewer",
+        "agent",
+    ] {
         assert!(parsed.roles.contains(&r.to_string()));
     }
 }
@@ -136,8 +147,8 @@ fn it_cross_actor_context_5_roles_preserved() {
 /// **IT-CROSS-7**: 跨 crate serde_json 兼容
 #[test]
 fn it_cross_actor_context_json_through_crate_boundary() {
-    let star_actor = StarActorContext::new(Uuid::new_v4(), Uuid::new_v4())
-        .with_role("tenant_admin");
+    let star_actor =
+        StarActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_role("tenant_admin");
     let json = serde_json::to_string(&star_actor).unwrap();
     // domain_identity re-export 同一个类型
     let back: ActorContext = serde_json::from_str(&json).unwrap();

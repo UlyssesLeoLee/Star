@@ -52,7 +52,10 @@ impl HermesConfig {
         }
     }
 
-    pub fn new_real(base_url: impl Into<String>, api_key: impl Into<String>) -> Result<Self, HermesError> {
+    pub fn new_real(
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+    ) -> Result<Self, HermesError> {
         let api_key = api_key.into();
         if api_key.is_empty() {
             return Err(HermesError::InvalidKey);
@@ -118,9 +121,7 @@ impl HermesClient {
         if config.api_key.is_empty() {
             return Err(HermesError::InvalidKey);
         }
-        let http = reqwest::Client::builder()
-            .timeout(config.timeout)
-            .build()?;
+        let http = reqwest::Client::builder().timeout(config.timeout).build()?;
         Ok(Self { config, http })
     }
 
@@ -173,10 +174,8 @@ impl HermesClient {
             .iter()
             .map(|m| m.content.split_whitespace().count() as u32)
             .sum();
-        let completion_content = format!(
-            "[mock-hermes] model={} echo: {}",
-            req.model, last_user_msg
-        );
+        let completion_content =
+            format!("[mock-hermes] model={} echo: {}", req.model, last_user_msg);
         let completion_tokens = completion_content.split_whitespace().count() as u32;
         GenerateResponse {
             id: format!("mock-{}", uuid::Uuid::new_v4()),
@@ -235,8 +234,14 @@ mod tests {
         let req = GenerateRequest {
             model: "hermes-2".into(),
             messages: vec![
-                ChatMessage { role: "system".into(), content: "You are helpful.".into() },
-                ChatMessage { role: "user".into(), content: "Hello Hermes".into() },
+                ChatMessage {
+                    role: "system".into(),
+                    content: "You are helpful.".into(),
+                },
+                ChatMessage {
+                    role: "user".into(),
+                    content: "Hello Hermes".into(),
+                },
             ],
             temperature: None,
             max_tokens: None,

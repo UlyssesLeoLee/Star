@@ -17,7 +17,9 @@ use domain_identity::{ActorContext, InMemoryIdentityService, TenantId, UserId};
 use domain_permission::{
     InMemoryPermissionService, PermissionScheme, PermissionSchemeId, TenantId as PermTenantId,
 };
-use domain_workspace::{InMemoryWorkspaceService, WorkspaceId, TenantId as WsTenantId, UserId as WsUserId};
+use domain_workspace::{
+    InMemoryWorkspaceService, TenantId as WsTenantId, UserId as WsUserId, WorkspaceId,
+};
 use domain_worktree::InMemoryWorktreeService;
 use star_context::ActorContext as StarActorContext;
 use uuid::Uuid;
@@ -38,10 +40,22 @@ fn st_2_1_four_domain_module_independence() {
 #[test]
 fn st_2_2_four_domain_no_shared_state() {
     use std::any::TypeId;
-    assert_ne!(TypeId::of::<InMemoryIdentityService>(), TypeId::of::<InMemoryPermissionService>());
-    assert_ne!(TypeId::of::<InMemoryIdentityService>(), TypeId::of::<InMemoryWorkspaceService>());
-    assert_ne!(TypeId::of::<InMemoryPermissionService>(), TypeId::of::<InMemoryWorkspaceService>());
-    assert_ne!(TypeId::of::<InMemoryWorkspaceService>(), TypeId::of::<InMemoryWorktreeService>());
+    assert_ne!(
+        TypeId::of::<InMemoryIdentityService>(),
+        TypeId::of::<InMemoryPermissionService>()
+    );
+    assert_ne!(
+        TypeId::of::<InMemoryIdentityService>(),
+        TypeId::of::<InMemoryWorkspaceService>()
+    );
+    assert_ne!(
+        TypeId::of::<InMemoryPermissionService>(),
+        TypeId::of::<InMemoryWorkspaceService>()
+    );
+    assert_ne!(
+        TypeId::of::<InMemoryWorkspaceService>(),
+        TypeId::of::<InMemoryWorktreeService>()
+    );
 
     // 4 域可独立实例化 (调用 new() 成功, 不 panic)
     let _identity = InMemoryIdentityService::new();

@@ -264,17 +264,9 @@ async fn e2e_adapter_lifecycle() {
 
     // shutdown 用 timeout 防止 forwarder 死锁卡 5-min cargo test
     // (per P3-A.13 元守门实证: 9 unit + 1 e2e hang 守门发现)
-    let _ = tokio::time::timeout(
-        std::time::Duration::from_millis(500),
-        adapter.shutdown(),
-    )
-    .await;
+    let _ = tokio::time::timeout(std::time::Duration::from_millis(500), adapter.shutdown()).await;
     // shutdown 幂等: 二次调用不 panic
-    let _ = tokio::time::timeout(
-        std::time::Duration::from_millis(500),
-        adapter.shutdown(),
-    )
-    .await;
+    let _ = tokio::time::timeout(std::time::Duration::from_millis(500), adapter.shutdown()).await;
 }
 
 // =====================================================================

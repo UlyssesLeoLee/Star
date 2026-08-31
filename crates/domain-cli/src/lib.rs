@@ -269,8 +269,8 @@ impl CliProfile {
             created_at: now,
             updated_at: now,
             // B.4 per-agent 字段默认初始化
-            per_call_token_limit: 0,    // 0 = 不限
-            default_model: None,         // 用 args 里的 --model
+            per_call_token_limit: 0, // 0 = 不限
+            default_model: None,     // 用 args 里的 --model
             call_timeout_secs: default_call_timeout_secs(),
             retry_count: default_retry_count(),
             tags: Vec::new(),
@@ -730,7 +730,10 @@ mod tests {
         // B.4 retry_count 跟 B.7 BackoffConfig.max_retries 配合: max_retries 应 >= retry_count
         let p = CliProfile::new_builtin(CliKind::Codex);
         let b7_max = 5; // B.7 default
-        assert!(b7_max >= p.retry_count, "B.7 max_retries 应 >= B.4 retry_count");
+        assert!(
+            b7_max >= p.retry_count,
+            "B.7 max_retries 应 >= B.4 retry_count"
+        );
     }
 
     #[test]
@@ -738,7 +741,7 @@ mod tests {
         // B.4 call_timeout_secs 跟 B.1/B.6 OpenClawConfig.timeout / HermesConfig.timeout 配合
         let p = CliProfile::new_builtin(CliKind::Claude);
         let b1_b6_default = 30; // OpenClawConfig.new_mock().timeout = 30s
-        // CliProfile 默认 300s 应 >= b1_b6 30s (覆盖)
+                                // CliProfile 默认 300s 应 >= b1_b6 30s (覆盖)
         assert!(p.call_timeout_secs >= b1_b6_default);
     }
 
@@ -887,6 +890,6 @@ pub mod openclaw_client;
 // =====================================================================
 // 9. hermes_client (B.6 Hermes HTTP 客户端实装, per 2026-08-30 07:28 JST wt-b6-hermes-mock)
 // =====================================================================
-pub mod hermes_client;
-pub mod fallback;
 pub mod api_monitor;
+pub mod fallback;
+pub mod hermes_client;

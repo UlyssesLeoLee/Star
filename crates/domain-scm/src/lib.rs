@@ -36,10 +36,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // 强类型 ID 宏
@@ -63,7 +63,9 @@ macro_rules! define_uuid_id {
                 Self(id)
             }
             #[allow(dead_code)]
-            pub fn as_uuid(&self) -> uuid::Uuid { self.0 }
+            pub fn as_uuid(&self) -> uuid::Uuid {
+                self.0
+            }
             #[allow(dead_code)]
             pub fn into_uuid(self) -> uuid::Uuid {
                 self.0
@@ -836,7 +838,8 @@ impl InMemoryScmService {
         if TenantId::from(actor.tenant_id) != expected {
             return Err(ScmError::PermissionDenied(format!(
                 "SEC-007 跨 tenant 拒绝: actor={} expected={}",
-                TenantId::from(actor.tenant_id), expected
+                TenantId::from(actor.tenant_id),
+                expected
             )));
         }
         Ok(())
@@ -1067,7 +1070,9 @@ impl ScmQueryPort for InMemoryScmService {
         let guard = self.repos.read().await;
         Ok(guard
             .values()
-            .filter(|r| r.tenant_id == TenantId::from(actor.tenant_id) && r.project_id == project_id)
+            .filter(|r| {
+                r.tenant_id == TenantId::from(actor.tenant_id) && r.project_id == project_id
+            })
             .cloned()
             .collect())
     }

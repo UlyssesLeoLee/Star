@@ -77,8 +77,7 @@ impl Resource for ProjectHandler {
                 .map_err(|e| ResourceError::InvalidUri(format!("project_id: {e}")))?,
         );
         let svc = self.service();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tenant_id.0)
-            .with_role("project_admin");
+        let actor = ActorContext::new(uuid::Uuid::nil(), tenant_id.0).with_role("project_admin");
         match svc
             .get_project(
                 GetProjectQuery {
@@ -128,8 +127,7 @@ mod tests {
         let h = ProjectHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid.0)
-            .with_role("project_admin");
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid.0).with_role("project_admin");
         let ws_id = domain_project::WorkspaceId::new();
         let cmd = CreateProjectCommand {
             tenant_id: tid,
@@ -162,4 +160,3 @@ mod tests {
         assert!(d.is_none());
     }
 }
-

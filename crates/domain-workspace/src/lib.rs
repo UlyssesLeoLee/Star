@@ -34,10 +34,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // 强类型 ID 宏
@@ -63,7 +63,9 @@ macro_rules! define_uuid_id {
                 Self(id)
             }
             #[allow(dead_code)]
-            pub fn as_uuid(&self) -> uuid::Uuid { self.0 }
+            pub fn as_uuid(&self) -> uuid::Uuid {
+                self.0
+            }
             #[allow(dead_code)]
             pub fn into_uuid(self) -> uuid::Uuid {
                 self.0
@@ -857,7 +859,9 @@ impl WorkspaceQueryPort for InMemoryWorkspaceService {
         let guard = self.members.read().await;
         Ok(guard
             .values()
-            .filter(|m| m.workspace_id == workspace_id && m.tenant_id == TenantId::from(viewer.tenant_id))
+            .filter(|m| {
+                m.workspace_id == workspace_id && m.tenant_id == TenantId::from(viewer.tenant_id)
+            })
             .cloned()
             .collect())
     }

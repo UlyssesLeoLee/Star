@@ -40,11 +40,11 @@ pub enum SagaType {
 /// SagaStep 状态机
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SagaStepStatus {
-    Pending,        // 待启动
-    Running,         // 5 域调用链执行中
-    Completed,       // 5 域调用链全部成功
-    Compensating,    // 5 域调用链失败, 补偿中
-    Failed,          // 5 域调用链失败 + 补偿失败, 需人工介入
+    Pending,      // 待启动
+    Running,      // 5 域调用链执行中
+    Completed,    // 5 域调用链全部成功
+    Compensating, // 5 域调用链失败, 补偿中
+    Failed,       // 5 域调用链失败 + 补偿失败, 需人工介入
 }
 
 /// 5 域调用
@@ -52,28 +52,28 @@ pub enum SagaStepStatus {
 pub enum CrossDomainCall {
     PlayerCall {
         call_id: CallId,
-        action: String,        // e.g. "create_user" / "provision_workspace"
-        target_id: String,     // user_id / workspace_id
+        action: String,    // e.g. "create_user" / "provision_workspace"
+        target_id: String, // user_id / workspace_id
     },
     EconomyCall {
         call_id: CallId,
-        action: String,        // e.g. "create_billing_account"
-        target_id: String,     // billing_account_id
+        action: String,    // e.g. "create_billing_account"
+        target_id: String, // billing_account_id
     },
     MatchCall {
         call_id: CallId,
-        action: String,        // e.g. "start_workflow"
-        target_id: String,     // workflow_instance_id
+        action: String,    // e.g. "start_workflow"
+        target_id: String, // workflow_instance_id
     },
     SocialCall {
         call_id: CallId,
-        action: String,        // e.g. "send_notification"
-        target_id: String,     // notification_id
+        action: String,    // e.g. "send_notification"
+        target_id: String, // notification_id
     },
     AdminCall {
         call_id: CallId,
-        action: String,        // e.g. "assign_role"
-        target_id: String,     // role_id
+        action: String,    // e.g. "assign_role"
+        target_id: String, // role_id
     },
 }
 
@@ -84,7 +84,7 @@ pub struct SagaStep {
     pub tenant_id: TenantId,
     pub saga_type: SagaType,
     pub status: SagaStepStatus,
-    pub call_chain: Vec<CrossDomainCall>,  // 5 域调用链, 跨域补偿按链顺序回滚
+    pub call_chain: Vec<CrossDomainCall>, // 5 域调用链, 跨域补偿按链顺序回滚
     pub idempotency_key: IdempotencyKey,  // 必填, 防止跨 step 失败重复补偿 (INV-SG-05)
 }
 

@@ -32,9 +32,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型 + define_uuid_id 宏
@@ -478,7 +478,10 @@ impl InMemoryWorkflowService {
         required: TenantId,
     ) -> Result<(), WorkflowError> {
         if TenantId::from(actor.tenant_id) != required {
-            return Err(WorkflowError::CrossTenantDenied(TenantId::from(actor.tenant_id), required));
+            return Err(WorkflowError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                required,
+            ));
         }
         Ok(())
     }

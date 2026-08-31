@@ -3,8 +3,8 @@
 //! 来源: `docs/specs/domain-feedback-spec.md` §5 (6 状态迁移事件)
 
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::entity::ResolutionEvidence;
 use crate::value_object::{

@@ -121,8 +121,7 @@ mod tests {
         let h = PermissionHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor =
-            ActorContext::new(uuid::Uuid::nil(), tid.0).with_role("tenant_admin");
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid.0).with_role("tenant_admin");
         let cmd = CreateSchemeCommand {
             tenant_id: tid,
             name: format!("acme-scheme-{}", uuid::Uuid::new_v4()),
@@ -152,4 +151,3 @@ mod tests {
         assert!(d.is_none());
     }
 }
-

@@ -41,10 +41,7 @@ fn service() -> &'static Arc<InMemoryWorkItemService> {
 pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
     // workspace_id 可选, 简化: nil actor 触发跨 tenant 拒绝 → validation "not found"
     let _ = optional_string(&args, "workspace_id");
-    let actor = ActorContext::new(
-        uuid::Uuid::nil(),
-        uuid::Uuid::new_v4(),
-    );
+    let actor = ActorContext::new(uuid::Uuid::nil(), uuid::Uuid::new_v4());
 
     // 取第一个 IN_PROGRESS issue 当 current
     let query = ListByProjectQuery {

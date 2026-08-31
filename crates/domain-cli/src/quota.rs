@@ -17,8 +17,8 @@
 //!   - 不动 domain-local-runtime http_client (per B.1/B.2)
 //!   - 不写 UI (per B.9 API 监控审计)
 
-use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
 use thiserror::Error;
 
 /// API 错误类型 (区分 transient / permanent)
@@ -27,9 +27,7 @@ use thiserror::Error;
 pub enum ApiError {
     /// HTTP 429 Too Many Requests (transient, 触发退避)
     #[error("rate limited (retry after {retry_after_secs}s)")]
-    RateLimited {
-        retry_after_secs: u64,
-    },
+    RateLimited { retry_after_secs: u64 },
     /// HTTP 503 Service Unavailable (transient)
     #[error("service unavailable")]
     ServiceUnavailable,
@@ -47,9 +45,7 @@ pub enum ApiError {
     NotFound(String),
     /// 配额超限 (transient, 等下个窗口)
     #[error("quota exceeded for {scope}")]
-    QuotaExceeded {
-        scope: String,
-    },
+    QuotaExceeded { scope: String },
     /// 其他未知错误
     #[error("unknown error: {0}")]
     Other(String),
@@ -186,10 +182,7 @@ impl Default for BackoffConfig {
 }
 
 /// 指数退避 + 抖动 retry (per ADR-0029 Universal Submit 12 步)
-pub fn retry_with_backoff<F, T>(
-    config: &BackoffConfig,
-    mut op: F,
-) -> Result<T, ApiError>
+pub fn retry_with_backoff<F, T>(config: &BackoffConfig, mut op: F) -> Result<T, ApiError>
 where
     F: FnMut() -> Result<T, ApiError>,
 {
@@ -206,11 +199,12 @@ where
             }
             Err(_) => {
                 // 计算 delay: initial * 2^attempt, 截断到 max_delay, 加 jitter
-                let base_delay = config.initial_delay_ms.saturating_mul(1u64 << attempt.min(20));
+                let base_delay = config
+                    .initial_delay_ms
+                    .saturating_mul(1u64 << attempt.min(20));
                 let delay = base_delay.min(config.max_delay_ms);
                 let jitter = (delay as f64 * config.jitter_factor) as u64;
-                let actual_delay = delay.saturating_sub(jitter / 2)
-                    + (jitter % 2);
+                let actual_delay = delay.saturating_sub(jitter / 2) + (jitter % 2);
                 std::thread::sleep(Duration::from_millis(actual_delay));
                 attempt += 1;
             }
@@ -248,7 +242,8 @@ mod tests {
     #[test]
     fn retry_skips_permanent() {
         let config = BackoffConfig::default();
-        let result: Result<u32, ApiError> = retry_with_backoff(&config, || Err(ApiError::Unauthorized));
+        let result: Result<u32, ApiError> =
+            retry_with_backoff(&config, || Err(ApiError::Unauthorized));
         // permanent 错误, 不重试, 立刻返回
         assert!(matches!(result, Err(ApiError::Unauthorized)));
     }
@@ -277,7 +272,10 @@ mod tests {
 
     #[test]
     fn api_error_classify() {
-        assert!(ApiError::RateLimited { retry_after_secs: 1 }.is_transient());
+        assert!(ApiError::RateLimited {
+            retry_after_secs: 1
+        }
+        .is_transient());
         assert!(ApiError::ServiceUnavailable.is_transient());
         assert!(ApiError::Timeout(5000).is_transient());
         assert!(ApiError::QuotaExceeded { scope: "x".into() }.is_transient());

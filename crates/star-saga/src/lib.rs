@@ -85,7 +85,10 @@ pub struct Saga {
 }
 
 pub use compensation::CompensationManager;
-pub use compensation_strategy::{CompensationMode, CompensationPlan, CompensationStrategy, CompensationStrategyError, DefaultCompensationStrategy};
+pub use compensation_strategy::{
+    CompensationMode, CompensationPlan, CompensationStrategy, CompensationStrategyError,
+    DefaultCompensationStrategy,
+};
 pub use idempotency_store::{IdempotencyStore, InMemoryIdempotencyStore};
 pub use saga_5b_call::{
     CrossDomainCallError, CrossDomainCallResult, CrossDomainCaller, CrossDomainCallerHealth,

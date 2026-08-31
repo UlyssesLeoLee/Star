@@ -17,10 +17,10 @@
 //!   - 不写 UI (per frontend)
 //!   - 不接 OpenClaw/Hermes 真实调用, 只 1 行 API 接入
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -273,8 +273,7 @@ mod tests {
 
     #[test]
     fn event_succeeded_records_tokens() {
-        let e = ApiCallEvent::new("openclaw", "x")
-            .succeeded(100, 50);
+        let e = ApiCallEvent::new("openclaw", "x").succeeded(100, 50);
         assert_eq!(e.prompt_tokens, 100);
         assert_eq!(e.completion_tokens, 50);
         assert_eq!(e.status, ApiCallStatus::Success);
@@ -290,8 +289,7 @@ mod tests {
 
     #[test]
     fn event_fallback_records_target() {
-        let e = ApiCallEvent::new("openclaw", "x")
-            .fallback("claude");
+        let e = ApiCallEvent::new("openclaw", "x").fallback("claude");
         assert_eq!(e.fallback_target, Some("claude".into()));
         assert_eq!(e.status, ApiCallStatus::FallbackTriggered);
     }
@@ -344,7 +342,9 @@ mod tests {
         let monitor = ApiMonitor::with_sink(sink.clone());
         monitor.record(ApiCallEvent::new("openclaw", "x").succeeded(10, 5));
         monitor.record(ApiCallEvent::new("openclaw", "x").succeeded(20, 10));
-        monitor.record(ApiCallEvent::new("hermes", "y").failed(ApiCallStatus::NetworkError, "timeout"));
+        monitor.record(
+            ApiCallEvent::new("hermes", "y").failed(ApiCallStatus::NetworkError, "timeout"),
+        );
         assert_eq!(sink.len(), 3);
         let openclaw_stats = monitor.stats("openclaw").unwrap();
         assert_eq!(openclaw_stats.total_calls, 2);
@@ -357,8 +357,7 @@ mod tests {
 
     #[test]
     fn monitor_event_json_round_trip() {
-        let e = ApiCallEvent::new("openclaw", "https://api.openclaw.dev/v1")
-            .succeeded(100, 50);
+        let e = ApiCallEvent::new("openclaw", "https://api.openclaw.dev/v1").succeeded(100, 50);
         let json = serde_json::to_string(&e).unwrap();
         let parsed: ApiCallEvent = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.event_id, e.event_id);

@@ -40,9 +40,9 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+pub use star_context::ActorContext;
 use thiserror::Error;
 use uuid::Uuid;
-pub use star_context::ActorContext;
 
 // =====================================================================
 // ID 类型
@@ -646,7 +646,10 @@ pub trait BoardRepository: Send + Sync {
 /// 校验 actor 与目标 tenant 一致(INV-BD-01 / INV-BD-05)
 fn check_tenant(actor: &ActorContext, target: TenantId) -> Result<(), BoardError> {
     if TenantId::from(actor.tenant_id) != target {
-        return Err(BoardError::CrossTenantDenied(TenantId::from(actor.tenant_id), target));
+        return Err(BoardError::CrossTenantDenied(
+            TenantId::from(actor.tenant_id),
+            target,
+        ));
     }
     Ok(())
 }

@@ -57,11 +57,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
     let work_item_id = WorkItemId::from(issue_uuid);
 
     // handler 简化:nil tenant actor 触发跨 tenant 拒绝 → validation "not found"
-    let actor = ActorContext::new(
-        uuid::Uuid::nil(),
-        uuid::Uuid::new_v4(),
-    )
-    .with_role("developer");
+    let actor = ActorContext::new(uuid::Uuid::nil(), uuid::Uuid::new_v4()).with_role("developer");
 
     let item = service()
         .get(
@@ -121,8 +117,7 @@ mod tests {
         // pre-populate service:用相同 tenant + actor 创建 + 读
         let svc = service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid.0)
-            .with_role("developer");
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid.0).with_role("developer");
         let ws_id = domain_work_item::WorkspaceId::new();
         let proj_id = domain_work_item::ProjectId::new();
         let cmd = CreateWorkItemCommand {
@@ -146,4 +141,3 @@ mod tests {
         assert!(r.is_err(), "tool 简化设计应返回 not-found 错误");
     }
 }
-
