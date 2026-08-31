@@ -831,7 +831,7 @@ impl ValidationRepository for InMemoryValidationService {
 // 静默引用
 #[allow(dead_code)]
 fn _unused_user(_: UserId) -> UserId {
-    uuid::Uuid::new_v4()
+    crate::value_object::UserId(uuid::Uuid::new_v4())
 }
 #[allow(dead_code)]
 fn _unused_kind(_: ValidationKind) -> ValidationKind {
