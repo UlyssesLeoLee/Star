@@ -18,9 +18,14 @@
 //   - milestone onClick -> router.push("/work-item?milestone={id}")
 //   - 拖动 milestone 改 due_date -> onMilestoneUpdate -> stub 1s 后 /api/audit
 //   - 跨 sprint 拖 work-item -> onWorkItemMove
+//
+// 浮动窗口 (per 2026-08-31 用户需求):
+//   - 右上角 ⛶ 按钮 / 双击图表空白区打开浮动窗口
+//   - 浮动窗口内完整甘特图 (同 props, 可拖拽缩放精细操作)
 // =====================================================================
 
 import { useMemo, useState, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { addDays, differenceInDays, format, parseISO } from "date-fns";
 import type { Sprint, Milestone, WorkItem, WorkItemStatus, SprintStatus } from "@/types/ids";
@@ -68,6 +73,22 @@ export function GanttChart(props: GanttChartProps) {
   const router = useRouter();
   // Default zoom "week" (60 px/day)
   const [zoom, setZoom] = useState<ZoomLevel>("week");
+  // Floating modal state (per 2026-08-31 user request)
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalZoom, setModalZoom] = useState<ZoomLevel>("week");
+  // Sync modalZoom to base zoom when modal opens
+  const openModal = useCallback(() => {
+    setModalZoom(zoom);
+    setIsModalOpen(true);
+  }, [zoom]);
+  const closeModal = useCallback(() => setIsModalOpen(false), []);
+  // Close modal on Escape key
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeModal(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isModalOpen, closeModal]);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = window.localStorage.getItem("star.gantt.zoom");
@@ -217,6 +238,7 @@ export function GanttChart(props: GanttChartProps) {
   );
 
   return (
+    <>
     <div className="card overflow-hidden" data-testid="gantt-chart" data-zoom={zoom}>
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
@@ -251,7 +273,19 @@ export function GanttChart(props: GanttChartProps) {
             </span>
           )}
         </div>
-        <GanttLegend />
+        <div className="flex items-center gap-2">
+          <GanttLegend />
+          {/* 展开浮动窗口按钮 (per 2026-08-31 user request) */}
+          <button
+            type="button"
+            data-testid="gantt-expand-btn"
+            onClick={openModal}
+            title="展开为浮动窗口 (双击图表空白处也可打开)"
+            className="flex items-center justify-center w-7 h-7 rounded border border-line text-ink-dim hover:border-accent hover:text-accent hover:bg-accent/10 transition-colors text-[14px]"
+          >
+            ⛶
+          </button>
+        </div>
       </div>
 
       <div className="flex border border-line rounded overflow-hidden bg-bg-soft/30">
@@ -301,8 +335,17 @@ export function GanttChart(props: GanttChartProps) {
           })}
         </div>
 
-        {/* Timeline area (scrollable) */}
-        <div className="flex-1 overflow-x-auto" data-testid="gantt-timeline">
+        {/* Timeline area (scrollable) — 双击空白区打开浮动窗口 */}
+        <div
+          className="flex-1 overflow-x-auto"
+          data-testid="gantt-timeline"
+          onDoubleClick={(e) => {
+            // Only open if dbl-click landed on the bg row, not on a bar/label
+            const target = e.target as HTMLElement;
+            const isBar = target.closest("[data-gantt-bar]") || target.closest("[data-work-item-id]");
+            if (!isBar) openModal();
+          }}
+        >
           <div style={{ width: totalWidth, minWidth: "100%" }}>
             <GanttHeader
               start={start}
@@ -489,6 +532,236 @@ export function GanttChart(props: GanttChartProps) {
         </div>
       </div>
     </div>
+
+    {/* ── Floating Gantt Modal (portal) ── */}
+    {isModalOpen && typeof document !== "undefined" && createPortal(
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="甘特图详细视图"
+        data-testid="gantt-float-modal"
+        className="fixed inset-0 z-[9999] flex items-center justify-center"
+        style={{ backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", backgroundColor: "rgba(6,8,14,0.72)" }}
+        onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+      >
+        <div
+          className="anime-panel relative flex flex-col"
+          style={{
+            width: "92vw",
+            height: "86vh",
+            maxWidth: 1600,
+            borderRadius: "var(--radius-xl, 16px)",
+            boxShadow: "0 0 48px rgba(0,240,255,0.18), 0 8px 48px rgba(0,0,0,0.7)",
+            overflow: "hidden",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Modal title bar */}
+          <div className="flex items-center justify-between px-4 py-2 border-b border-line bg-bg-soft/60 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold text-accent tracking-wide uppercase">甘特图 · 详细视图</span>
+              <span className="text-[10px] text-ink-mute">{sprints.length} sprints · {milestones.length} milestones</span>
+              {/* Modal zoom controls */}
+              <div className="flex items-center gap-1 ml-3">
+                <span className="text-[10px] uppercase tracking-wider text-ink-mute">Zoom</span>
+                {ZOOM_ORDER.map((z) => (
+                  <button
+                    key={z}
+                    type="button"
+                    onClick={() => setModalZoom(z)}
+                    className={`px-2 py-0.5 text-[10px] font-mono rounded border transition-colors ${
+                      modalZoom === z
+                        ? "border-accent bg-accent/10 text-accent"
+                        : "border-line text-ink-dim hover:border-ink-dim"
+                    }`}
+                  >
+                    {z}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              data-testid="gantt-modal-close"
+              onClick={closeModal}
+              title="关闭 (Esc)"
+              className="flex items-center justify-center w-7 h-7 rounded border border-line text-ink-dim hover:border-err hover:text-err hover:bg-err/10 transition-colors text-[13px] font-bold"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Modal body — scrollable Gantt */}
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            {(() => {
+              const mPxPerDay = PX_PER_DAY[modalZoom];
+              const mTotalWidth = totalDays * mPxPerDay;
+              return (
+                <div className="flex flex-1 border-0 overflow-hidden" style={{ minHeight: 0 }}>
+                  {/* Y-axis */}
+                  <div className="w-[220px] flex-shrink-0 border-r border-line bg-bg-soft/50 overflow-y-auto">
+                    <div className="h-10 border-b border-line bg-bg-soft/80 flex items-center px-2 text-[10px] uppercase tracking-wider text-ink-mute sticky top-0">
+                      Sprints
+                    </div>
+                    {sprints.map((sp) => (
+                      <div
+                        key={`my-s-${sp.id}`}
+                        className="h-12 px-2 py-1 border-b border-line/50 flex flex-col justify-center cursor-pointer hover:bg-bg-soft/60"
+                        onClick={() => handleSprintClick(sp.id)}
+                      >
+                        <div className="text-[11px] font-medium text-ink truncate">{sp.name}</div>
+                        <div className="text-[9px] text-ink-mute truncate">{sp.status}</div>
+                      </div>
+                    ))}
+                    <div className="h-2 bg-bg-soft/80" />
+                    <div className="h-7 border-b border-line bg-bg-soft/80 flex items-center px-2 text-[10px] uppercase tracking-wider text-ink-mute sticky top-10">
+                      Milestones
+                    </div>
+                    {milestones.map((ms) => {
+                      const critical = criticalIds.has(ms.id);
+                      return (
+                        <div
+                          key={`my-m-${ms.id}`}
+                          className="h-10 px-2 py-1 border-b border-line/50 flex flex-col justify-center cursor-pointer hover:bg-bg-soft/60"
+                          onClick={() => handleMilestoneClick(ms.id)}
+                        >
+                          <div className={`text-[11px] font-medium truncate ${critical ? "text-err" : "text-ink"}`}>
+                            ◆ {ms.name}
+                          </div>
+                          <div className="text-[9px] text-ink-mute truncate">
+                            {Math.round(ms.progress * 100)}% · due {ms.due_date.slice(5)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Timeline */}
+                  <div className="flex-1 overflow-auto" data-testid="gantt-modal-timeline">
+                    <div style={{ width: mTotalWidth, minWidth: "100%" }}>
+                      <GanttHeader start={start} totalDays={totalDays} pxPerDay={mPxPerDay} zoom={modalZoom} />
+                      {sprints.map((sp) => {
+                        const wiList = workItemsBySprint[sp.id] ?? [];
+                        return (
+                          <div
+                            key={`mtl-s-${sp.id}`}
+                            data-row-kind="sprint"
+                            data-row-id={sp.id}
+                            className="h-12 border-b border-line/50 relative bg-bg-card/30"
+                          >
+                            <GanttBar
+                              item={{ id: sp.id, label: sp.name, status: sprintStatusToBarStatus(sp.status) }}
+                              startDate={sp.start_date}
+                              endDate={addDays(parseISO(sp.end_date), 1).toISOString()}
+                              dateRangeStart={dateRange.start}
+                              pxPerDay={mPxPerDay}
+                              variant="sprint"
+                              onCheckConflict={undefined}
+                              onClick={() => handleSprintClick(sp.id)}
+                              onDragEnd={(newStart, newEnd) => {
+                                const inclusiveEnd = format(addDays(parseISO(newEnd), -1), "yyyy-MM-dd");
+                                onSprintUpdate?.(sp.id, newStart, inclusiveEnd);
+                              }}
+                            />
+                            {wiList.slice(0, 4).map((wi, i) => (
+                              <div
+                                key={`mwi-${wi.id}`}
+                                data-work-item-id={wi.id}
+                                draggable
+                                onDragStart={(e) => {
+                                  e.dataTransfer.setData("text/work-item-id", wi.id);
+                                  e.dataTransfer.effectAllowed = "move";
+                                }}
+                                className="absolute h-3 text-[8px] text-white px-1 cursor-grab rounded-sm select-none"
+                                style={{
+                                  top: 32, left: 6 + i * 90, width: 84,
+                                  backgroundColor:
+                                    wi.status === "done" ? "#3fb950" :
+                                    wi.status === "in_progress" ? "#2f81f7" :
+                                    wi.status === "blocked" ? "#f85149" :
+                                    wi.status === "review" ? "#d29922" : "#6e7681",
+                                  lineHeight: "12px",
+                                }}
+                                title={`${wi.key} — ${wi.title}`}
+                              >
+                                {wi.key}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                      <div className="h-2 bg-bg-soft/60" />
+                      {milestones.map((ms) => {
+                        const critical = criticalIds.has(ms.id);
+                        return (
+                          <div
+                            key={`mtl-m-${ms.id}`}
+                            data-row-kind="milestone"
+                            data-row-id={ms.id}
+                            className="h-10 border-b border-line/50 relative bg-bg-card/30"
+                          >
+                            <GanttBar
+                              item={{ id: ms.id, label: ms.name, status: critical ? "blocked" : "done" }}
+                              startDate={ms.due_date}
+                              endDate={addDays(parseISO(ms.due_date), 1).toISOString()}
+                              dateRangeStart={dateRange.start}
+                              pxPerDay={mPxPerDay}
+                              variant="milestone"
+                              isCritical={critical}
+                              onClick={() => handleMilestoneClick(ms.id)}
+                              onDragEnd={(newStart) => { onMilestoneUpdate?.(ms.id, newStart); }}
+                            />
+                          </div>
+                        );
+                      })}
+                      {/* SVG links */}
+                      <svg
+                        width={mTotalWidth}
+                        height={(sprints.length * (ROW.sprint + ROW.gap)) + ROW.gap + (milestones.length * (ROW.ms + ROW.gap))}
+                        style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
+                      >
+                        <defs>
+                          <marker id="mgantt-arrow-blocks" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 8 4 L 0 8 z" fill="#f85149" />
+                          </marker>
+                          <marker id="mgantt-arrow-relates" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 8 4 L 0 8 z" fill="#6e7681" />
+                          </marker>
+                          <marker id="mgantt-arrow-duplicates" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 8 4 L 0 8 z" fill="#d29922" />
+                          </marker>
+                        </defs>
+                        {links.map((l) => {
+                          const fromX = (rowOffsets[l.fromId]?.end_x ?? 0) / pxPerDay * mPxPerDay;
+                          const toX = (rowOffsets[l.toId]?.x ?? 0) / pxPerDay * mPxPerDay;
+                          const fromY = rowOffsets[l.fromId]?.y ?? 0;
+                          const toY = rowOffsets[l.toId]?.y ?? 0;
+                          const midX = (fromX + toX) / 2;
+                          const color = l.kind === "blocks" ? "#f85149" : l.kind === "duplicates" ? "#d29922" : "#6e7681";
+                          const marker = l.kind === "blocks" ? "url(#mgantt-arrow-blocks)" : l.kind === "duplicates" ? "url(#mgantt-arrow-duplicates)" : "url(#mgantt-arrow-relates)";
+                          return (
+                            <g key={`ml-${l.id}`}>
+                              <path
+                                d={`M ${fromX} ${fromY} L ${midX} ${fromY} L ${midX} ${toY} L ${toX} ${toY}`}
+                                fill="none" stroke={color} strokeWidth="1.5"
+                                strokeDasharray={l.kind === "relates_to" ? "4 2" : "none"}
+                                markerEnd={marker}
+                              />
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 }
 
