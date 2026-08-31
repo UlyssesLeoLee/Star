@@ -462,7 +462,7 @@ impl IdentityCommandPort for InMemoryIdentityService {
         }
         let now = Utc::now();
         let u = User {
-            id: UserId.new(),
+            id: UserId::new(),
             tenant_id: cmd.tenant_id,
             email: cmd.email,
             display_name: cmd.display_name,

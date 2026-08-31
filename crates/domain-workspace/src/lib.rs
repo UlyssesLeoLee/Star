@@ -482,7 +482,7 @@ pub struct ListWorkspaceQuery {
 impl Default for ListWorkspaceQuery {
     fn default() -> Self {
         Self {
-            tenant_id: UserId.new(),
+            tenant_id: TenantId::new(),
             limit: 50,
             offset: 0,
         }

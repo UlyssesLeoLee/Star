@@ -77,7 +77,7 @@ impl Resource for WorkItemHandler {
                 .map_err(|e| ResourceError::InvalidUri(format!("work_item_id: {e}")))?,
         );
         let svc = self.service();
-        let actor = ActorContext::new(domain_work_item::UserId::from(uuid::Uuid::nil()), tenant_id)
+        let actor = ActorContext::new(uuid::Uuid::nil(), tenant_id)
             .with_role("developer");
         match svc
             .get(
@@ -141,8 +141,8 @@ mod tests {
     async fn read_real_workitem_roundtrip() {
         let h = WorkItemHandler::new();
         let svc = h.service();
-        let tid = TenantId::new();
-        let actor = ActorContext::new(domain_work_item::UserId::from(uuid::Uuid::nil()), tid)
+        let tid = uuid::Uuid::new_v4();
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid)
             .with_role("developer");
         let ws_id = domain_work_item::WorkspaceId::new();
         let proj_id = domain_work_item::ProjectId::new();

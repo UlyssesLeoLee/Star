@@ -98,7 +98,7 @@ mod tests {
         let aid = AgentId::new();
         let agent = Agent {
             id: aid,
-            tenant_id: domain_agent::TenantId::new(),
+            tenant_id: UserId.new(),
             agent_type: AgentType::Codex,
             provider: "openai".into(),
             version: "1.0.0".into(),

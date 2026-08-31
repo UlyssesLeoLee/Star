@@ -43,7 +43,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
     let ws_id = WorkspaceId::from(ws_uuid);
 
     // handler 简化: nil tenant actor 触发跨 tenant 拒绝 → validation "not found"
-    let actor = ActorContext::new(uuid::Uuid::nil(), domain_workspace::TenantId::new());
+    let actor = ActorContext::new(uuid::Uuid::nil(), uuid::Uuid::new_v4());
 
     let ws = service()
         .get_by_id(ws_id, actor)
@@ -99,7 +99,7 @@ mod tests {
     async fn invoke_service_roundtrip_returns_real_data() {
         // pre-populate service:创建 + 读取 (绕过 handler 跨 tenant 简化, 直接 service 验)
         let svc = service();
-        let tid = domain_workspace::TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let owner = domain_workspace::UserId::from(uuid::Uuid::new_v4());
         let cmd = CreateWorkspaceCommand {
             tenant_id: tid,

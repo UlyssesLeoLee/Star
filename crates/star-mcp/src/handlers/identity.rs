@@ -113,8 +113,8 @@ mod tests {
     async fn read_real_user_roundtrip() {
         let h = IdentityHandler::new();
         let svc = h.service();
-        let tid = TenantId::new();
-        let actor = ActorContext::new(UserId::from(uuid::Uuid::nil()), tid).as_platform_admin();
+        let tid = uuid::Uuid::new_v4();
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid).as_platform_admin();
         let cmd = CreateUserCommand {
             tenant_id: tid,
             email: format!("alice-{}@example.invalid", uuid::Uuid::new_v4()),

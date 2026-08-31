@@ -75,7 +75,7 @@ impl Resource for PermissionHandler {
         let svc = self.service();
         // permission 的 ActorContext 无 is_platform_admin 字段,
         // 仅 ensure_tenant(actor.tenant_id == q.tenant_id) 校验
-        let actor = ActorContext::new(UserId::from(uuid::Uuid::nil()), tenant_id);
+        let actor = ActorContext::new(uuid::Uuid::nil(), tenant_id);
         match svc
             .get_scheme(
                 GetSchemeQuery {
@@ -120,13 +120,13 @@ mod tests {
     async fn read_real_scheme_roundtrip() {
         let h = PermissionHandler::new();
         let svc = h.service();
-        let tid = TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let actor =
-            ActorContext::new(UserId::from(uuid::Uuid::nil()), tid).with_role("tenant_admin");
+            ActorContext::new(uuid::Uuid::nil(), tid).with_role("tenant_admin");
         let cmd = CreateSchemeCommand {
             tenant_id: tid,
             name: format!("acme-scheme-{}", uuid::Uuid::new_v4()),
-            actor_user_id: UserId::from(uuid::Uuid::nil()),
+            actor_user_id: uuid::Uuid::nil(),
         };
         let created = svc.create_scheme(cmd, &actor).await.unwrap();
         // actor.tenant_id == cmd.tenant_id + with_role("tenant_admin")

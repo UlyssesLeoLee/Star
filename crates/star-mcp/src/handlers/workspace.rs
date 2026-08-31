@@ -62,7 +62,7 @@ impl Resource for WorkspaceHandler {
         // 跨 tenant 校验依赖 actor.tenant_id == w.tenant_id;
         // 由于 URI 只传 ws_id, 取一个 nil-tenant actor 触发 PermissionDenied
         // (这是 handler 简化设计, 真实 production 应要求完整 tenant_id 路径)
-        let actor = ActorContext::new(uuid::Uuid::nil(), domain_workspace::TenantId::new());
+        let actor = ActorContext::new(uuid::Uuid::nil(), uuid::Uuid::new_v4());
         match svc.get_by_id(ws_id, actor).await {
             Ok(w) => Ok(Some(WorkspaceData {
                 workspace_id: w.id.to_string(),
@@ -102,7 +102,7 @@ mod tests {
         // 这是 B.2.5 简化设计, 真实 production 需 URI 改 "ws://{tenant_id}:{ws_id}" 2 段
         let h = WorkspaceHandler::new();
         let svc = h.service();
-        let tid = domain_workspace::TenantId::new();
+        let tid = uuid::Uuid::new_v4();
         let owner = domain_workspace::UserId::from(uuid::Uuid::new_v4());
         let cmd = CreateWorkspaceCommand {
             tenant_id: tid,

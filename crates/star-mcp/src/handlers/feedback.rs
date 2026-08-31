@@ -65,8 +65,8 @@ impl Resource for FeedbackHandler {
         // handler 简化: actor.tenant_id = nil → PermissionDenied → None
         // (真实 production 需 URI 改 2 段承载 tenant, 与 B.2.5 workspace 同模式)
         let actor = ActorContext::new(
-            domain_feedback::UserId::from(uuid::Uuid::nil()),
-            domain_feedback::TenantId::new(),
+            uuid::Uuid::nil(),
+            uuid::Uuid::new_v4(),
         );
         match svc.get_by_id(fb_id, actor).await {
             Ok(f) => Ok(Some(FeedbackData {
@@ -112,8 +112,8 @@ mod tests {
     async fn read_real_feedback_roundtrip() {
         let h = FeedbackHandler::new();
         let svc = h.service();
-        let tid = domain_feedback::TenantId::new();
-        let actor = ActorContext::new(UserId::from(uuid::Uuid::nil()), tid);
+        let tid = uuid::Uuid::new_v4();
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid);
         let cmd = CreateFeedbackCommand {
             tenant_id: tid,
             project_id: ProjectId::new(),
@@ -134,7 +134,7 @@ mod tests {
         let created = svc.create_feedback(cmd, actor.clone()).await.unwrap();
         let _ = created;
         // service roundtrip (handler 简化: 跨 tenant 拒绝 → None)
-        let actor2 = ActorContext::new(UserId::from(uuid::Uuid::nil()), tid);
+        let actor2 = ActorContext::new(uuid::Uuid::nil(), tid);
         let fetched = svc.get_by_id(created.id, actor2).await.unwrap();
         assert_eq!(fetched.id, created.id);
         assert_eq!(fetched.intent, "B.2.6 test feedback");

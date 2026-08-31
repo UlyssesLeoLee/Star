@@ -43,8 +43,8 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
 
     // handler 简化:nil tenant actor 触发跨 tenant 拒绝 → validation "not found"
     let actor = ActorContext::new(
-        domain_worktree::UserId::from(uuid::Uuid::nil()),
-        domain_worktree::TenantId::new(),
+        domain_worktree::uuid::Uuid::nil(),
+        uuid::Uuid::new_v4(),
     );
 
     let wt = service()
@@ -74,7 +74,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use domain_worktree::{CreateWorktreeCommand, RuntimeId, WorktreeCommandPort};
+    use domain_worktree::{CreateWorktreeCommand, WorktreeCommandPort};
 
     #[tokio::test]
     async fn invoke_invalid_uuid_returns_validation_error() {

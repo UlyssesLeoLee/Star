@@ -3,6 +3,7 @@
 //! 来源: `docs/specs/domain-feedback-spec.md` §5 (6 状态迁移事件)
 
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 
 use crate::entity::ResolutionEvidence;
@@ -29,7 +30,7 @@ impl EventMeta {
     /// 构造元数据
     pub fn new(tenant_id: TenantId) -> Self {
         Self {
-            event_id: UserId.new(),
+            event_id: Uuid::new_v4(),
             tenant_id,
             occurred_at: Utc::now(),
             actor_user_id: None,

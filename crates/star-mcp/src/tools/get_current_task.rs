@@ -42,13 +42,13 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
     // workspace_id 可选, 简化: nil actor 触发跨 tenant 拒绝 → validation "not found"
     let _ = optional_string(&args, "workspace_id");
     let actor = ActorContext::new(
-        UserId::from(uuid::Uuid::nil()),
-        domain_work_item::TenantId::new(),
+        uuid::Uuid::nil(),
+        uuid::Uuid::new_v4(),
     );
 
     // 取第一个 IN_PROGRESS issue 当 current
     let query = ListByProjectQuery {
-        tenant_id: actor.tenant_id,
+        tenant_id: domain_work_item::TenantId::from(actor.tenant_id),
         project_id: ProjectId::new(),
         include_terminal: false,
     };

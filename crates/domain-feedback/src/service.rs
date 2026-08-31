@@ -447,7 +447,7 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
         drop(feedbacks);
         let now = chrono::Utc::now();
         let e = FeedbackConsumedEvent {
-            event_id: UserId.new(),
+            event_id: Uuid::new_v4(),
             feedback_id,
             tenant_id,
             consumed_by,

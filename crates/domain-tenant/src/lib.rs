@@ -453,7 +453,7 @@ impl TenantCommandPort for InMemoryTenantService {
             return Err(TenantError::SlugExists(cmd.slug));
         }
         let t = Tenant {
-            id: UserId.new(),
+            id: TenantId::new(),
             slug: cmd.slug,
             display_name: cmd.display_name,
             status: TenantStatus::Active,

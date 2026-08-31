@@ -58,15 +58,15 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
 
     // handler 简化:nil tenant actor 触发跨 tenant 拒绝 → validation "not found"
     let actor = ActorContext::new(
-        domain_work_item::UserId::from(uuid::Uuid::nil()),
-        TenantId::new(),
+        domain_work_item::uuid::Uuid::nil(),
+        uuid::Uuid::new_v4(),
     )
     .with_role("developer");
 
     let item = service()
         .get(
             domain_work_item::GetWorkItemQuery {
-                tenant_id: TenantId::new(),
+                tenant_id: UserId.new(),
                 work_item_id,
             },
             &actor,
@@ -120,8 +120,8 @@ mod tests {
     async fn invoke_service_roundtrip_real_data() {
         // pre-populate service:用相同 tenant + actor 创建 + 读
         let svc = service();
-        let tid = TenantId::new();
-        let actor = ActorContext::new(domain_work_item::UserId::from(uuid::Uuid::nil()), tid)
+        let tid = uuid::Uuid::new_v4();
+        let actor = ActorContext::new(domain_work_item::uuid::Uuid::nil(), tid)
             .with_role("developer");
         let ws_id = domain_work_item::WorkspaceId::new();
         let proj_id = domain_work_item::ProjectId::new();

@@ -77,7 +77,7 @@ impl Resource for ProjectHandler {
                 .map_err(|e| ResourceError::InvalidUri(format!("project_id: {e}")))?,
         );
         let svc = self.service();
-        let actor = ActorContext::new(domain_project::UserId::from(uuid::Uuid::nil()), tenant_id)
+        let actor = ActorContext::new(uuid::Uuid::nil(), tenant_id)
             .with_role("project_admin");
         match svc
             .get_project(
@@ -127,8 +127,8 @@ mod tests {
     async fn read_real_project_roundtrip() {
         let h = ProjectHandler::new();
         let svc = h.service();
-        let tid = TenantId::new();
-        let actor = ActorContext::new(domain_project::UserId::from(uuid::Uuid::nil()), tid)
+        let tid = uuid::Uuid::new_v4();
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid)
             .with_role("project_admin");
         let ws_id = domain_project::WorkspaceId::new();
         let cmd = CreateProjectCommand {
@@ -138,7 +138,7 @@ mod tests {
             display_name: "Acme Project".into(),
             description: "Tier 2 试水".into(),
             project_template_id: None,
-            actor_user_id: UserId::from(uuid::Uuid::nil()),
+            actor_user_id: uuid::Uuid::nil(),
         };
         let _ = ProjectTemplateId; // silence unused if not used below
         let created = svc.create_project(cmd, &actor).await.unwrap();

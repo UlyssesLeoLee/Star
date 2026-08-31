@@ -45,6 +45,8 @@ chrono = { workspace = true }
 [dev-dependencies]
 # axum::Router::oneshot 测试 helper (per transport_http.rs tests)
 tower = { version = "0.5", features = ["util"] }
+# P0-1 跨 crate IT (it_actor_context_integration.rs)
+star-context = { path = "../star-context" }
 
 [lints]
 workspace = true
