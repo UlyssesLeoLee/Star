@@ -7,15 +7,18 @@ export { agentsHandlers } from "./agents";
 export { analyticsHandlers } from "./analytics";
 export { inboxHandlers } from "./inbox";
 export { cliHandlers } from "./cli";
+export { validationHandlers } from "./validation";
 
 import { agentsHandlers } from "./agents";
 import { analyticsHandlers } from "./analytics";
 import { inboxHandlers } from "./inbox";
 import { cliHandlers } from "./cli";
+import { validationHandlers } from "./validation";
 
 export const handlers = [
   ...agentsHandlers,
   ...analyticsHandlers,
   ...inboxHandlers,
   ...cliHandlers,
+  ...validationHandlers,
 ];

@@ -1,0 +1,35 @@
+AC_ID,description,REQ_ID,unit,integration,e2e,status
+REQ-TWP-001,系统必须支持多租户隔离，Tenant 为最高安全边界（详见第 16 章）。,REQ-TWP-001,,,,gap
+REQ-TWP-002,Workspace 用于组织多个 Project，Project 支持多种模板（软件开发、看板、Scrum 等）。,REQ-TWP-002,,,,gap
+REQ-TWP-003,Project 必须可独立配置 Workflow、Permission Scheme、Notification Scheme、Agent Policy（第 24 章）。,REQ-TWP-003,,,,gap
+REQ-WI-001,WorkItem 支持自由文本分类属性 `Labels: Vec<String>` 与 `Components: Vec<String>`，两者均为可选、长度不限、按字符串精确匹配（不做标签层级、不做组件依赖推导）。Labels 用于跨 W,REQ-WI-001,,,,gap
+REQ-WF-001,默认最简三态工作流（待办 / 进行中 / 完成），支持自定义状态扩展（前次对话结论：默认给出简化方案，不强制可视化工作流配置器，属于 MVP 精简范围，见第 30 章）。,REQ-WF-001,,,,gap
+REQ-WF-002,Worktree Status 不等于 WorkItem Status（§4）。同一 WorkItem 下，Worktree A 可为 Agent Running，Worktree B 可为 Blocked，Worktree C 可为 Re,REQ-WF-002,,,,gap
+REQ-WF-003,WorkItem 状态转换（transition）可配置 Guard，转换只有在 Guard 满足时才允许执行。Guard 类型至少包括：角色要求（RequireRole）、人工批准（RequireApproval）、Validation ,REQ-WF-003,,,,gap
+REQ-DSG-001,系统必须支持为 WorkItem（通常为 Epic/Story 级）关联 0..N 个 DesignArtifact，并跟踪每个 DesignArtifact 的独立 Status 与 Version 历史。,REQ-DSG-001,,,,gap
+REQ-DSG-002,"系统必须支持将""关联 DesignArtifact 全部 APPROVED""设置为既有 WorkItem 状态转换 Guard（§8.2 REQ-WF-003）的前置条件，Guard 失败时明确指出哪些 DesignArtifact 未批准",REQ-DSG-002,,,,gap
+REQ-PLAN-001,Backlog 统一待办池，支持排序与故事点估算。,REQ-PLAN-001,,,,gap
+REQ-PLAN-002,Sprint 支持计划/开始/结束时间盒管理。,REQ-PLAN-002,,,,gap
+REQ-PLAN-003,Board 同时支持 Kanban（持续流）与 Scrum 板视图，二者共享同一份 WorkItem 数据模型，不做成两套系统。,REQ-PLAN-003,,,,gap
+REQ-PLAN-004,"甘特图（Gantt）基于 WorkItem 的开始/截止日期与依赖关系生成，与 Sprint/看板共享同一份问题数据，是""看板""的排期视图变体，不是独立子系统。",REQ-PLAN-004,,,,gap
+REQ-PLAN-005,燃尽图（Burndown）为 Sprint 内剩余工作量趋势展示，是敏捷闭环反馈的最小必需图表；速度图 / 累积流图 / 控制图为进阶分析，列入 V1（第 30 章）。,REQ-PLAN-005,,,,gap
+REQ-PLAN-007,Milestone（里程碑）用于对一组 WorkItem 打分组标签并设定共同 `due_date`，Roadmap 是基于 Milestone 的只读 Projection 视图（按时间线聚合 Milestone 及其下属 WorkIte,REQ-PLAN-007,,,,gap
+REQ-PERM-001,项目级、角色级细粒度权限控制（Permission Scheme）。,REQ-PERM-001,,,,gap
+REQ-PERM-002,Agent 相关操作（第 24、28 章 Agent Policy）必须由 Application / Authorization 层强制执行，不得仅通过 Prompt 约束（§28）。,REQ-PERM-002,,,,gap
+REQ-AUTO-001,自动化规则采用触发器-条件-动作模式，MVP 提供默认方案，不强制可视化配置器（第 30 章范围裁剪）。,REQ-AUTO-001,,,,gap
+REQ-NOTIF-001,事件触发的邮件/站内通知，覆盖 WorkItem 状态变更、Feedback 请求、Validation 失败等（详见第 25、27 章事件源）。,REQ-NOTIF-001,,,,gap
+REQ-NOTIF-003,"WorkItem 支持 Watcher（关注者）列表，**用户可自行加入/退出**对特定 WorkItem 的关注；Watcher 收到的通知**不受** REQ-NOTIF-002 全局降噪策略限制（即即使该 WorkItem 不满足""需",REQ-NOTIF-003,,,,gap
+REQ-DATA-001,PostgreSQL 是 System of Record，保存 WorkItem、Requirement、AcceptanceCriteria、Worktree Registration、DevelopmentExecution、Agen,REQ-DATA-001,,,,gap
+REQ-DATA-002,大型 Raw Diff / Large Log / Build Artifact / Agent Transcript / Binary 需评估 PostgreSQL vs Object Storage 的合理边界，不得把无限 Agent ,REQ-DATA-002,,,,gap
+REQ-DATA-003,Worktree Observed State（`dirty=true`、`agent=running`、`tests=41/44` 等）属于 Observed State，可保存在 Projection / Snapshot 中，不要求每,REQ-DATA-003,,,,gap
+REQ-RT-001,实时展示 Agent Status、Worktree Status、Test Result、Build Result、Feedback Request、Conflict Warning（§61）。,REQ-RT-001,,,,gap
+REQ-RT-002,用户应能近实时看到 `Agent Running → Validation → Waiting Feedback → Running` 的状态流转。,REQ-RT-002,,,,gap
+REQ-RT-003,高频 Token Stream 不一定需要进入 SaaS Server，须区分 Persistent Business Event 与 Ephemeral Realtime Signal（§61）。,REQ-RT-003,,,,gap
+REQ-AUDIT-001,Audit 记录覆盖创建 / 修改 / 权限变更 / 删除等基础操作。,REQ-AUDIT-001,,,,gap
+REQ-SCM-002,Domain 层只允许出现 `Repository / Branch / Commit / PullRequest / Review / Pipeline`，不得出现 `GitHubPullRequestObject` / `GitLabM,REQ-SCM-002,,,,gap
+REQ-DEV-001,必须支持 `1 WorkItem → N Worktrees`。,REQ-DEV-001,,,,gap
+REQ-DEV-002,必须支持 `1 Worktree → N Agent Sessions`。,REQ-DEV-002,,,,gap
+REQ-TST-001,系统必须支持 ValidationResult 携带 Level 字段（単体/結合/総合/受入四档），并支持按 Level 聚合查看某 WorkItem/Project 的测试覆盖状态。,REQ-TST-001,Y,,,covered
+REQ-TST-002,"Acceptance Coverage 映射（§27.2）必须支持声明""某 AcceptanceCriteria 需要哪些 Level 的证据才算覆盖""，缺失特定 Level 时须在 UI/CLI 明确指出缺口，而非笼统显示""未覆盖""。",REQ-TST-002,Y,,,covered
+REQ-OPS-001,"系统必须支持登记 IncidentRecord 并关联到 0..N 个 WorkItem，用于追溯""生产问题 → 根因 ChangeSet → 修复 WorkItem → 验证证据""的完整链条。",REQ-OPS-001,,,,gap
+REQ-OPS-002,系统必须允许 IncidentRecord 反向标注哪些 AcceptanceCriteria 被证明覆盖不足，但不得自动修改历史 ValidationResult 或 Acceptance Coverage 的既有判定（保留历史事实，新增,REQ-OPS-002,,,,gap
