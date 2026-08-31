@@ -338,4 +338,79 @@ describe("useStore (Board 列管理 — 数据零丢失)", () => {
     const keys = new Set(sameProject.map((x) => x.key));
     expect(keys.size).toBe(sameProject.length);
   });
+
+  it("H. addWorkItem: worktree_id 关联 (per 2026-08-31 12:07 JST Drawer 拍板)", () => {
+    const newId = useStore.getState().addWorkItem({
+      tenant_id: "tnt-physis",
+      project_id: "proj-physis",
+      title: "worktree 关联验证",
+      status: "in_progress",
+      kind: "task",
+      priority: "p1",
+      reporter_id: "usr-001",
+      worktree_id: "wt-005",
+    });
+    const w = useStore.getState().workItems.find((x) => x.id === newId);
+    expect(w?.worktree_id).toBe("wt-005");
+  });
+
+  // ---------- updateWorkItemField (per 2026-08-31 12:07 JST Drawer 拍板) ----------
+  it("I. updateWorkItemField: 改 priority 不动 status / board", () => {
+    const w0 = useStore.getState().workItems.find((x) => x.id === "wi-001");
+    const origStatus = w0?.status;
+    const origPriority = w0?.priority;
+    useStore.getState().updateWorkItemField("wi-001", "priority", "p0");
+    const w1 = useStore.getState().workItems.find((x) => x.id === "wi-001");
+    expect(w1?.priority).toBe("p0");
+    expect(w1?.status).toBe(origStatus);
+    // board columns 应保持不动
+    const inStatusCol = useStore.getState().board.columns.find((c) => c.status === origStatus)?.work_item_ids ?? [];
+    expect(inStatusCol).toContain("wi-001");
+    // 还原
+    useStore.getState().updateWorkItemField("wi-001", "priority", origPriority ?? "p2");
+  });
+
+  it("J. updateWorkItemField: 改 status 走 reconcile, board.columns 同步", () => {
+    // 把 wi-001 (status=in_progress) 改成 review, 期望 board.review 列包含 wi-001
+    useStore.getState().updateWorkItemField("wi-001", "status", "review");
+    const w1 = useStore.getState().workItems.find((x) => x.id === "wi-001");
+    expect(w1?.status).toBe("review");
+    const reviewIds = useStore.getState().board.columns.find((c) => c.status === "review")?.work_item_ids ?? [];
+    expect(reviewIds).toContain("wi-001");
+    // 还原
+    useStore.getState().updateWorkItemField("wi-001", "status", "in_progress");
+  });
+
+  it("K. updateWorkItemField: 改 worktree_id 关联 / 解绑", () => {
+    useStore.getState().updateWorkItemField("wi-001", "worktree_id", "wt-005");
+    expect(useStore.getState().workItems.find((x) => x.id === "wi-001")?.worktree_id).toBe("wt-005");
+    useStore.getState().updateWorkItemField("wi-001", "worktree_id", undefined);
+    expect(useStore.getState().workItems.find((x) => x.id === "wi-001")?.worktree_id).toBeUndefined();
+  });
+
+  // ---------- removeWorkItem (per 2026-08-31 12:07 JST Drawer 拍板) ----------
+  it("L. removeWorkItem: 从 workItems 移除 + board.columns 全部列 reconcile", () => {
+    // 先建一个
+    const newId = useStore.getState().addWorkItem({
+      tenant_id: "tnt-physis",
+      project_id: "proj-physis",
+      title: "将删除",
+      status: "todo",
+      kind: "task",
+      priority: "p2",
+      reporter_id: "usr-001",
+    });
+    expect(useStore.getState().workItems.find((x) => x.id === newId)).toBeDefined();
+    const todoIdsBefore = useStore.getState().board.columns.find((c) => c.status === "todo")?.work_item_ids.length ?? 0;
+    useStore.getState().removeWorkItem(newId);
+    expect(useStore.getState().workItems.find((x) => x.id === newId)).toBeUndefined();
+    const todoIdsAfter = useStore.getState().board.columns.find((c) => c.status === "todo")?.work_item_ids.length ?? 0;
+    expect(todoIdsAfter).toBe(todoIdsBefore - 1);
+  });
+
+  it("M. removeWorkItem: 不存在 id 静默 no-op", () => {
+    const before = useStore.getState().workItems.length;
+    useStore.getState().removeWorkItem("wi-does-not-exist");
+    expect(useStore.getState().workItems.length).toBe(before);
+  });
 });

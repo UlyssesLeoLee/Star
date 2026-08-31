@@ -167,12 +167,12 @@ interface StoreState {
   // 新增 work-item (per 2026-08-31 11:56 JST Ulysses 拍板: Kanban 列内 + Add task 按钮)
   // 输入: 部分 WorkItem 字段 (id / key / created_at / updated_at 由 store 生成)
   //   - 必须带: tenant_id / project_id / title / status / reporter_id (board / project 上下文由调用方填)
-  //   - 可选带: description / kind / priority / assignee_id / labels / story_points
+  //   - 可选带: description / kind / priority / assignee_id / labels / story_points / worktree_id
   // 行为:
   //   1. push 到 workItems
   //   2. 把它加到 board.columns[status === status] 列的 work_item_ids 末尾
   //   3. status 不在列里 -> 自动 addBoardColumn 走兜底 (保证可见)
-  addWorkItem: (input: Omit<WorkItem, "id" | "key" | "created_at" | "updated_at" | "description" | "labels"> & {
+  addWorkItem: (input: Omit<WorkItem, "id" | "key" | "created_at" | "updated_at" | "description" | "labels" | "worktree_id"> & {
     /** 可选注入 client id (回填后端响应); 不传由 store 生成 */
     id?: string;
     /** 可选注入 key (回填后端响应); 不传由 store 生成 (PHYSIS-N) */
@@ -181,7 +181,23 @@ interface StoreState {
     description?: string;
     /** labels 可选, 缺省空数组 */
     labels?: string[];
+    /** worktree 关联 (per 2026-08-31 12:07 JST Kanban Drawer 拍板) */
+    worktree_id?: string;
   }) => string; // 返回新生成的 work-item id
+
+  // 原地更新 workItem 单字段 (per 2026-08-31 12:07 JST Kanban Drawer 拍板)
+  //   - 只改指定字段, 其他字段不变
+  //   - 改 status 走 reconcileBoard 同步 board.columns
+  //   - updated_at 自动刷
+  //   - 字段白名单: title / description / status / priority / kind / assignee_id / labels / worktree_id
+  updateWorkItemField: <K extends "title" | "description" | "status" | "priority" | "kind" | "assignee_id" | "labels" | "worktree_id">(
+    id: string,
+    field: K,
+    value: WorkItem[K],
+  ) => void;
+
+  // 删除 work-item (per 2026-08-31 12:07 JST Kanban Drawer 拍板, Drawer 加删除按钮)
+  removeWorkItem: (id: string) => void;
 
   // Canvas mutations(无限画布,frontend-canvas-design.md §2)
   addCanvasElement: (element: CanvasElement) => void;
@@ -306,6 +322,7 @@ const initialState = (set: any): StoreState => ({
         sprint_id: input.sprint_id,
         workflow_id: input.workflow_id ?? "wf-default",
         due_date: input.due_date,
+        worktree_id: input.worktree_id,
         created_at: nowIso,
         updated_at: nowIso,
       };
@@ -329,6 +346,37 @@ const initialState = (set: any): StoreState => ({
     });
     return newId;
   },
+  // 原地更新 workItem 单字段 (per 2026-08-31 12:07 JST Kanban Drawer 拍板)
+  //   - title / description / priority / kind / assignee_id / labels / worktree_id: 直接 set
+  //   - status: 走 reconcileBoard 同步 board.columns (跟 transitionWorkItem 一致)
+  updateWorkItemField: (id, field, value) =>
+    set((s: StoreState) => {
+      const idx = s.workItems.findIndex((w) => w.id === id);
+      if (idx === -1) return s;
+      const nowIso = new Date().toISOString();
+      const newWorkItems = [...s.workItems];
+      newWorkItems[idx] = { ...newWorkItems[idx], [field]: value, updated_at: nowIso };
+      if (field === "status") {
+        // 走 reconcile 让 board.columns 跟 workItems.status 同步
+        return {
+          workItems: newWorkItems,
+          board: { ...s.board, columns: reconcileBoard(newWorkItems, s.board.columns) },
+        };
+      }
+      return { workItems: newWorkItems };
+    }),
+  // 删除 work-item (per 2026-08-31 12:07 JST Kanban Drawer 拍板, Drawer 加删除按钮)
+  //   - 从 workItems 移除
+  //   - 从 board.columns[].work_item_ids 全部列移除 (reconcileBoard 自然过滤)
+  removeWorkItem: (id) =>
+    set((s: StoreState) => {
+      const newWorkItems = s.workItems.filter((w) => w.id !== id);
+      if (newWorkItems.length === s.workItems.length) return s; // 不存在
+      return {
+        workItems: newWorkItems,
+        board: { ...s.board, columns: reconcileBoard(newWorkItems, s.board.columns) },
+      };
+    }),
   markNotificationRead: (id) =>
     set((s: StoreState) => ({
       notifications: s.notifications.map((n) => n.id === id ? { ...n, status: "read" as NotificationStatus } : n),

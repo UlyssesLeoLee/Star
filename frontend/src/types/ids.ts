@@ -124,6 +124,11 @@ export interface WorkItem {
   // W3 Calendar: optional due_date for calendar月/周视图 drag-to-reschedule
   // 由 W3 worker 2026-08-28 加入 (per dynamic-interaction-design.md §5)
   due_date?: Iso8601;
+  // per 2026-08-31 12:07 JST Ulysses 拍板 (Kanban 卡 Drawer):
+  //   WorkItem 跟 Worktree 是 N:1 (一个 task 可关联到一个执行 worktree, AI 创作场景)
+  //   Worktree → AgentSession (1:1) → WorkItem (N:1) 三层关联
+  //   关联 wt 后可在 Drawer 展示 17 状态机 + 跳 wt 详情 (Phase 2+)
+  worktree_id?: Uuid;
   created_at: Iso8601;
   updated_at: Iso8601;
 }

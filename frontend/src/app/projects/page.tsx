@@ -49,6 +49,7 @@ import { PageHeader, SectionTitle, Stat } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Tabs } from "@/components/Tabs";
 import { KanbanBoard } from "@/components/board/KanbanBoard";
+import { WorkItemDetailDrawer, type WorkItemDrawerMode } from "@/components/board/WorkItemDetailDrawer";
 import { GanttChart } from "@/components/gantt";
 import { MonthView } from "@/components/calendar/MonthView";
 import { WeekView } from "@/components/calendar/WeekView";
@@ -124,8 +125,6 @@ function ProjectsPageContent() {
   const transitionWorkItem = useStore((s) => s.transitionWorkItem);
   const transitionMilestone = useStore((s) => s.transitionMilestone);
   const transitionSprint = useStore((s) => s.transitionSprint);
-  // Kanban 列内 + Add task (per 2026-08-31 11:56 JST Ulysses 拍板)
-  const addWorkItem = useStore((s) => s.addWorkItem);
 
   // ---- local state ----
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
@@ -237,23 +236,23 @@ function ProjectsPageContent() {
     [workItems, selectedProjectId, transitionWorkItem],
   );
 
-  // ---- Kanban 列内 + Add task (per 2026-08-31 11:56 JST Ulysses 拍板) ----
-  // 当前登录者 reporter_id 暂时取项目 owner (per seed pattern: project.owner_id);
-  // 真实身份接入后用 actor.user_id 替换.
-  const handleAddWorkItem = useCallback(
-    (status: WorkItemStatus, title: string) => {
-      if (!selectedProject) return;
-      addWorkItem({
-        tenant_id: selectedProject.tenant_id,
-        project_id: selectedProject.id,
-        title,
-        status,
-        kind: "task",
-        priority: "p2",
-        reporter_id: selectedProject.owner_id,
-      });
+  // ---- Kanban 卡 Drawer 状态 (per 2026-08-31 12:07 JST 拍板: 替换 inline add) ----
+  // mode="new"  → 列底部 +Add task 按钮触发, status 锁定为触发列
+  // mode="view" → KanbanCard 整张点击触发, 加载现有 wi
+  const [workItemDrawer, setWorkItemDrawer] = useState<WorkItemDrawerMode | null>(null);
+  const handleRequestNewWorkItem = useCallback(
+    (status: WorkItemStatus) => {
+      setWorkItemDrawer({ kind: "new", defaultStatus: status });
     },
-    [addWorkItem, selectedProject],
+    [],
+  );
+  const handleWorkItemClick = useCallback(
+    (w: WorkItem) => {
+      // 校验: 仅处理当前 project 的 work-item
+      if (w.project_id !== selectedProjectId) return;
+      setWorkItemDrawer({ kind: "view", workItemId: w.id });
+    },
+    [selectedProjectId],
   );
 
   // ---- ProjectBoard: project 过滤的虚拟 board (per project_id) ----
@@ -450,7 +449,17 @@ function ProjectsPageContent() {
             onRemoveColumn={removeBoardColumn}
             onRenameColumn={renameBoardColumn}
             onReorderColumns={reorderBoardColumns}
-            onAddWorkItem={handleAddWorkItem}
+            onRequestNewWorkItem={handleRequestNewWorkItem}
+            onWorkItemClick={handleWorkItemClick}
+          />
+          {/* Kanban 卡详情 / 新建 Drawer (per 2026-08-31 12:07 JST 拍板: Jira + Multica) */}
+          <WorkItemDetailDrawer
+            open={workItemDrawer}
+            onClose={() => setWorkItemDrawer(null)}
+            projectId={selectedProjectId}
+            projectKey={selectedProject?.key}
+            tenantId={selectedProject?.tenant_id}
+            reporterId={selectedProject?.owner_id}
           />
           <div className="mt-3 text-[10px] text-ink-mute font-mono">
             列对应状态: {KANBAN_COLUMNS.join(" / ")} — 拖动卡片触发 transitionWorkItem (走 store 状态机)
