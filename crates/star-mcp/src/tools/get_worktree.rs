@@ -43,7 +43,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
 
     // handler 简化:nil tenant actor 触发跨 tenant 拒绝 → validation "not found"
     let actor = ActorContext::new(
-        domain_worktree::uuid::Uuid::nil(),
+        uuid::Uuid::nil(),
         uuid::Uuid::new_v4(),
     );
 
@@ -100,3 +100,4 @@ mod tests {
         assert!(r.is_err());
     }
 }
+

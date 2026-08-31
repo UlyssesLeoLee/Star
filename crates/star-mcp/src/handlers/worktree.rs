@@ -115,7 +115,7 @@ mod tests {
         let h = WorktreeHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid)
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid.0)
             .with_role("developer");
         let cmd = CreateWorktreeCommand {
             tenant_id: tid,
@@ -129,7 +129,7 @@ mod tests {
         };
         let created = svc.create_worktree(cmd, &actor).await.unwrap();
         // service roundtrip (handler 简化设计: 跨 tenant 拒绝 → None)
-        let actor2 = ActorContext::new(uuid::Uuid::nil(), tid);
+        let actor2 = ActorContext::new(uuid::Uuid::nil(), tid.0);
         let fetched = svc.get_by_id(created.id, &actor2).await.unwrap();
         assert_eq!(fetched.id, created.id);
         assert!(fetched.branch.starts_with("feature/b2.6-"));
@@ -144,3 +144,4 @@ mod tests {
         assert!(d.is_none());
     }
 }
+

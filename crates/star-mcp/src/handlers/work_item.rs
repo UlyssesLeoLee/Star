@@ -77,7 +77,7 @@ impl Resource for WorkItemHandler {
                 .map_err(|e| ResourceError::InvalidUri(format!("work_item_id: {e}")))?,
         );
         let svc = self.service();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tenant_id)
+        let actor = ActorContext::new(uuid::Uuid::nil(), tenant_id.0)
             .with_role("developer");
         match svc
             .get(
@@ -142,7 +142,7 @@ mod tests {
         let h = WorkItemHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid)
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid.0)
             .with_role("developer");
         let ws_id = domain_work_item::WorkspaceId::new();
         let proj_id = domain_work_item::ProjectId::new();
@@ -181,3 +181,4 @@ mod tests {
         assert!(d.is_none());
     }
 }
+

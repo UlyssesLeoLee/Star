@@ -73,7 +73,7 @@ impl Resource for IdentityHandler {
                 .map_err(|e| ResourceError::InvalidUri(format!("user_id: {e}")))?,
         );
         let svc = self.service();
-        let actor = ActorContext::new(user_id, tenant_id).as_platform_admin();
+        let actor = ActorContext::new(user_id.as_uuid(), tenant_id.as_uuid());
         match svc
             .get_user(GetUserQuery { tenant_id, user_id }, &actor)
             .await
@@ -114,7 +114,7 @@ mod tests {
         let h = IdentityHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid).as_platform_admin();
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid.0);
         let cmd = CreateUserCommand {
             tenant_id: tid,
             email: format!("alice-{}@example.invalid", uuid::Uuid::new_v4()),
@@ -143,3 +143,6 @@ mod tests {
         assert!(d.is_none());
     }
 }
+
+
+

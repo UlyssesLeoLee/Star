@@ -53,6 +53,7 @@ pub mod value_object;
 
 pub use uuid::Uuid;
 use context::ActorContext;
+pub use star_context::ActorContext; // 收敛到 star_context 权威版本 (per P0-1 联动协作)
 pub use entity::{
     AcceptanceCoverage, AcceptanceCoverageReport, EvidenceDownloadURL, ValidationEvidence,
     ValidationOverride, ValidationPolicy, ValidationResult,
