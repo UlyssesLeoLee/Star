@@ -7,11 +7,11 @@
 
 ## §1 目的
 
-定义 Star 跨域 Saga 协调契约（5 域独立 Lead per 8/21 JST），实现 Q-003 经济域决策场景：player 域发起交易 → economy 域决策 → 通知 player 域结果。本 spec 是 Phase G 落地 `crates/star-saga` 的依据。
+定义 Star 跨域 Saga 协调契约（22 domain bounded context per [basic-design §6](../../../basic-design.md) + SagaCoordinationRole 5 类抽象功能角色 per §2），实现 Worktree Orchestration 跨 12 domain 8 步编排（per §4）。RGS 仓 Q-003 5 域（player/economy/match/social/admin）业务子域场景作为兼容性 footnote（per §4 Q-003 兼容性 footnote），不通过本 spec 推断 22 domain 归属。本 spec 是 Phase G 落地 `crates/star-saga` 的依据。
 
-**为何需要 Saga 抽象层**（per [ADR-0027 §2 STAR IDE Gateway](../../adr/0027-star-ide-gateway.md) 5 通道 + Fallback Ladder 4 级 + 5 域独立 Lead 派生需求 + [ADR-0035 §8.2 Phase G 方向](../../adr/0035-phase-f-architecture.md) "跨域 Saga 协调：22 domain 跨域事务" line 265）：
+**为何需要 Saga 抽象层**（per [ADR-0027 §2 STAR IDE Gateway](../../adr/0027-star-ide-gateway.md) 5 通道 + Fallback Ladder 4 级 + [ADR-0035 §8.2 Phase G 方向](../../adr/0035-phase-f-architecture.md) "跨域 Saga 协调：22 domain 跨域事务" line 265 + [ADR-0039 §D26-D32 Worktree Orchestration 跨域协作](../../adr/0039-worktree-orchestration-cross-domain.md)）：
 
-1. **跨域事务一致性**：单次用户操作可能跨 5 域（如 player 域发起交易 → economy 域决策 → admin 域审计），任一域失败需逆向补偿，否则系统状态不一致
+1. **跨域事务一致性**：单次用户操作可能跨 22 domain 中多个（如 Worktree Orchestration 8 步 per §4），任一 step 失败需逆向补偿，否则系统状态不一致
 2. **5 域独立 Lead 决策边界**（per 8/21 JST 用户偏好"不接受兼任"）：Q-003 经济域决策点必须 Economy Lead 独立拍板，不能由 player 域 Lead 兼任决策
 3. **可观测性**：Saga 状态机 + 补偿日志为 ops 提供"半成品事务"恢复入口
 4. **测试可替换**：Saga trait 让 conformance test 用 mock provider 跑通（per [spec/services/01 §0](../services/01-service-adapter-spec.md) 反污染原则 + ADR-0025）
@@ -20,9 +20,9 @@
 **Saga 与现有契约关系**：
 - 与 [spec/agents/01 §2 Lease 协议](../agents/01-agent-runtime-spec.md) 关系：Saga 状态持久化复用 Lease 30s heartbeat 周期
 - 与 [spec/agents/02 §2 22 domain 数据源清单](../agents/02-data-sources-spec.md) 关系：SagaStep 通过 `agent://{crate}/{id}` Resource URI 调用 22 domain crate
-- 与 [spec/vcs/05 §2 4 Git Provider 接入规范](../vcs/05-real-providers-spec.md) 关系：MR/PR 创建作为典型 saga 触发场景（player 域发起 → economy 域记账 → admin 域审计）
+- 与 [spec/vcs/05 §2 4 Git Provider 接入规范](../vcs/05-real-providers-spec.md) 关系：MR/PR 创建作为典型 saga 触发场景（Worktree Orchestration 7 步 `LinkPullRequest` step,per §4）
 - 与 [spec/cache/01 §3 缓存契约](../cache/01-cache-contract-spec.md)（Phase G）关系：Saga 状态机持久化复用 star-cache
-- 与 [spec/services/07 审计模型](../flows/07-audit-model.md)（Phase G）关系：Admin 域 AuditLog step 落 audit log
+- 与 [spec/services/07 审计模型](../flows/07-audit-model.md)（Phase G）关系：`AuditLogging` coordination_role 的 step (per §2) 落 audit log (responsible_crate = `domain-audit`)
 
 ## §2 Saga 抽象
 
@@ -41,7 +41,7 @@ use serde::{Deserialize, Serialize};
 /// 不通过本 enum 推断。Saga trait 不再以"5 域"为单位承载 Lead 责任分工。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SagaCoordinationRole {
-    /// 身份验证类 step（player/agent identity / 租户/device 三重绑定校验）
+    /// 身份验证类 step（agent identity / 租户/device 三重绑定校验）
     IdentityValidation,
     /// 资源变更类 step（balance / order / state mutation 等事务性写）
     ResourceMutation,
