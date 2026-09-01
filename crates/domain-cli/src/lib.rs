@@ -893,3 +893,23 @@ pub mod openclaw_client;
 pub mod api_monitor;
 pub mod fallback;
 pub mod hermes_client;
+
+// =====================================================================
+// 10. hermes (B.2 Hermes HTTP API 客户端实装, per 2026-09-01 22:30 JST wt-wbs-b2-hermes-mock)
+//
+// 4 层精简 (mod / entity / value_object / error / service):
+//   - entity.rs:       AuthToken / CancelResponse / QueryRequest / Task / TaskStatus
+//   - value_object.rs: HermesConfig / HermesMode / RetryPolicy
+//   - error.rs:        HermesError (Http / Auth / ServerError / Parse) + classify_status
+//   - service.rs:      HermesClient + HermesClientBuilder (5 endpoint)
+//
+// 与 B.6 hermes_client.rs (单文件, chat completions) 区别:
+//   - B.2: 5 endpoint task queue (auth / query / submit / status / cancel)
+//   - B.2: 错误模型 4 变体 (Auth / ServerError 拆分, per B.2 task queue spec)
+//   - B.2: RetryPolicy 3 变体 (NoRetry / FixedDelay / ExponentialBackoff)
+//   - B.6: 1 endpoint /chat/completions (per B.6 OpenAI 兼容, 跟 B.1 同结构)
+//
+// mock 备选 (per 29692a7): HermesConfig::new_mock() 默认 mock, 凭证到位 1 commit 替换
+// contract test: tests/hermes_mock_contract.rs (5 endpoint, wiremock mock server)
+// =====================================================================
+pub mod hermes;
