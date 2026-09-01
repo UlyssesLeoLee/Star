@@ -36,6 +36,7 @@
     activePhaseId: 'P1',
     view: 'kanban',          // kanban | list | timeline
     filter: '',
+    industry: store.load('vmodel-industry-v1', 'all'),  // all | finance | public | ec | embedded
     theme: store.load(THEME_KEY, 'dark')
   };
 
@@ -43,13 +44,21 @@
     // Convert phases[].tasks[] into flat task map with stable ids
     const out = {};
     DEFAULT_PHASES.forEach(p => {
-      p.tasks.forEach(t => { out[t.id] = { ...t }; });
+      p.tasks.forEach(t => { out[t.id] = { ...t, _industry: 'all' }; });
       if (p.subphases) {
         p.subphases.forEach(sp => {
-          sp.tasks.forEach(t => { out[t.id] = { ...t, _subphase: sp.id }; });
+          sp.tasks.forEach(t => { out[t.id] = { ...t, _subphase: sp.id, _industry: 'all' }; });
         });
       }
     });
+    // 加载行业预设 (if available — VMODEL_INDUSTRIES 由 data/industries/*.js 注入)
+    if (window.VMODEL_INDUSTRIES) {
+      Object.values(window.VMODEL_INDUSTRIES).forEach(entry => {
+        entry.tasks.forEach(t => {
+          out[t.id] = { ...t, _industry: entry.industry, _subphase: entry.phase };
+        });
+      });
+    }
     return out;
   }
 
@@ -68,20 +77,23 @@
    * 集計
    * ----------------------------------------------------------------*/
   function tasksForPhase(phase) {
-    // phase may be a top-level phase or a subphase. resolve to its parent's full set.
+    // 行业过滤规则: 主任务 (_industry='all') 总是显示; 行业预设任务只在选中其行业时显示。
+    // 任务归属: 主任务 (P1-001 等) 用 id 起始匹配 phaseId;
+    //          行业任务 (P1-FIN-001 等) 用 _subphase (buildInitialTasks 写入) 匹配 phaseId。
     const out = [];
-    state.phases.forEach(p => {
-      if (phase._parentId && p.id === phase._parentId) {
-        // target is a subphase of p
-        const sp = (p.subphases || []).find(x => x.id === phase.id);
-        if (sp) sp.tasks.forEach(t => { if (state.tasks[t.id]) out.push(state.tasks[t.id]); });
-      } else if (p.id === phase.id) {
-        // target is the parent — include direct tasks + all subphase tasks
-        (p.tasks || []).forEach(t => { if (state.tasks[t.id]) out.push(state.tasks[t.id]); });
-        (p.subphases || []).forEach(sp => {
-          sp.tasks.forEach(t => { if (state.tasks[t.id]) out.push(state.tasks[t.id]); });
-        });
+    const includeIndustry = state.industry;
+    const phaseId = phase.id;  // e.g. P1, P6.1, P6
+    Object.values(state.tasks).forEach(t => {
+      // 任务归属 phase: 优先用 _subphase (industry + main subphase)
+      let taskPhase = t._subphase;
+      if (!taskPhase) {
+        // 主任务: 从 id 推断 (P1-001, P6.1-001, P6-001)
+        const m = (t.id || '').match(/^(P\d+(?:\.\d+)?)-/);
+        taskPhase = m ? m[1] : null;
       }
+      if (taskPhase !== phaseId) return;
+      if (t._industry !== 'all' && t._industry !== includeIndustry) return;
+      out.push(t);
     });
     return out;
   }
@@ -89,6 +101,11 @@
   function taskCount(phaseId) {
     const phase = findPhase(phaseId);
     if (!phase) return 0;
+    return tasksForPhase(phase).length;
+  }
+
+  // Compute total task count for a phase under the *current industry filter* (used by stat)
+  function totalFilteredCount(phase) {
     return tasksForPhase(phase).length;
   }
 
@@ -343,10 +360,20 @@
     const owner = t.owner
       ? `<div class="card__owner" title="${t.owner}">${t.owner.slice(0, 2).toUpperCase()}</div>`
       : `<div class="card__owner card__owner--unassigned" title="未割り当て">?</div>`;
+    // 行业徽章 (如果有 _industry 且非 all)
+    let industryBadge = '';
+    if (t._industry && t._industry !== 'all') {
+      const indColors = { finance: '#dc2626', public: '#0ea5e9', ec: '#f59e0b', embedded: '#10b981' };
+      const indJa = { finance: '金融', public: '公共', ec: 'EC', embedded: '組込' };
+      const c = indColors[t._industry] || '#94a3b8';
+      const j = indJa[t._industry] || t._industry;
+      industryBadge = `<span class="card__industry" style="--c:${c}" title="業種プリセット: ${j}">${j}</span>`;
+    }
     return `
       <article class="card" draggable="true" data-id="${t.id}" style="--pc: var(--priority-${t.priority}, #6b7280)">
         <div class="card__head">
           <span class="card__id">${t.id}</span>
+          ${industryBadge}
           <span class="card__prio card__prio--${t.priority}">${t.priority}</span>
         </div>
         <div class="card__title">${escapeHTML(t.title)}</div>
@@ -941,6 +968,21 @@
 
     document.getElementById('addTaskBtn').addEventListener('click', () => {
       addTaskToColumn('todo');
+    });
+
+    // Industry switcher
+    document.querySelectorAll('.industry-switch__btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ind = btn.dataset.industry;
+        state.industry = ind;
+        store.save('vmodel-industry-v1', ind);
+        document.querySelectorAll('.industry-switch__btn').forEach(b => b.classList.toggle('is-active', b === btn));
+        renderAll();
+        toast(`業種切替: ${btn.querySelector('.industry-switch__label').textContent}`);
+      });
+      // restore active state from saved preference
+      if (btn.dataset.industry === state.industry) btn.classList.add('is-active');
+      else btn.classList.remove('is-active');
     });
 
     document.getElementById('addPhaseBtn').addEventListener('click', () => {
