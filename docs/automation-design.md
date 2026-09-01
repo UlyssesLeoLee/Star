@@ -1,0 +1,467 @@
+# Star 平台 — Agent 交互自动化设计 (Automation Design)
+
+> **文档版本**: v0.1 (2026-09-02)
+> **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
+> **触发**: 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做"
+> **范围**: STAR 仓 (`D:\Star`) P3-A 收官后所有剩余任务卡 (P3-B / P3-C / P3-D / P3-E / P3-F / H2 / 5 wt 后续 / kanban-vmodel P1-P9 后续 / DB W/T-M) + 子代理 dispatch / CLI 调用 / 代码改造 3 类功能点
+> **依赖**: `AGENTS.md` §4 守门 17 项 + §4.1 守门派生 v1-v18 + `STAR-P3-WBS-001.md` §1-§5 / §14 任务卡 / `STAR-OLU-001.md` 1 SRE·周 = 1.2M token 换算
+> **基线脚本库**: `scripts/automation/` (本设计文档 §6 落档 4 个基类 + 1 个判定 CLI)
+
+---
+
+## 0. 文档说明
+
+### 0.1 文档目的与定位
+
+本设计文档是 `AGENTS.md` §4 守门 #1 v17 / v18 实证 (P0-1 + H2 token 估 0.3-0.5M 实测 0.6-1.6M, 3-5x 超支) + 守门 #9 子代理 RPC 实证 (10 background task `net::ERR_CONNECTION_CLOSED` 但 status 报 succeeded) 之后的"**根因对策**":
+
+- **P0-1 联动审计** (2026-08-31 11:00 JST) 实证 19 个 fix 脚本 (scripts/p0_1_*.py) 落地, 净修 246→0 err, 但写脚本本身的 token 没被精确量化
+- **H2-EXT 5 domain 跨 session 续做** (2026-08-31 22:00 JST) 实证 star-context 扩展 4 helper 落地 commit `68ae5ff` + 净修 145+ err, 但 5 domain 实际改造 0.6-0.8M token 仍卡在 sub-context
+- **5 wt 后续 / P3-B-F / H2 强类型重构** 等任务卡, 如果不**先把"agent 交互 → python 脚本"规范化**, 后续 P3-B/E/F + H2 + kanban-vmodel 全 56 子项会反复重蹈"agent 在主上下文写大段 shell / 写大段 Edit" 的覆辙
+
+**结论**: 任何**"agent 跟外部交互"的功能点 (3 类全包)** 强制走 python 脚本, 避免中间内容 (长 shell 命令 / 大量 Edit diff / 子代理 RPC payload) 占用主上下文 → 导致后续 turn 上下文丢失 / 损耗 / 忽略。
+
+### 0.2 与其他设计文档的关系
+
+| 设计文档 | 关系 |
+|---|---|
+| `docs/ai-agent-design.md` (v0.2) | 上游 — 讲 AI 子系统 (Context Compiler / AgentSession / Provider Data Boundary); 本文档 §3.1 引用其 14 状态 AgentSession / 5 Priority / 3 态 Decision |
+| `docs/basic-design.md` | 上游 — 讲 5 域 DDD / 26 子域架构; 本文档 §3.2 引用其 §7.4 AgentSession |
+| `docs/test-design.md` v0.3 | 兄弟 — AC 矩阵生成器 (`scripts/generate_ac_matrix.py`) 是本设计文档 §6.4 范式第 1 份实装 (T.1 子项 commit `4fa31d7`) |
+| `docs/frontend/design/mock-msw-handlers.md` | 兄弟 — 5 域 MSW handler (commit `3dde2b4` `b424611`) 是本设计文档 §3.3 数据量阈值实证 |
+| `STAR-P3-WBS-001.md` | 下游 — §1-§5 / §14 任务卡逐条 [P]/[S]/[M] 标 (本设计文档 §4 落表) |
+| `AGENTS.md` §4.1 守门派生 v19 | 下游 — 本设计文档定稿后追加守门派生规 |
+
+### 0.3 适用读者
+
+- Mavis root agent (Mavis 接手 per DEC-008) — 主导 P3-B/E/F + H2 落地
+- 子代理 (worker / explorer / verifier) — worktree 内调用 scripts/automation/ 基类
+- 5 域 Lead 真人 (DDD Review 阶段到位后) — review 本设计文档 + 拍板 §4 任务卡标注
+- SRE Lead (per STAR-OLU-001 §6 质量门 5 维) — 终评本设计文档 + 守门 #1+#9+#12+#19 联合实证
+
+### 0.4 引用约定
+
+- 引用 `AGENTS.md` 用 `守门 #N` 形式 (例: 守门 #1 v17)
+- 引用 `STAR-P3-WBS-001.md` 用 `WBS §N.M` 形式 (例: WBS §14.2 H2-1)
+- 引用 `scripts/automation/<file>.py` 用 `automation/<file>` 形式 (例: automation/dispatcher.py)
+- 引用 task 子项 commit 用 7 字符短码 (per 守门 #1 禁回溯叙事)
+
+---
+
+## 1. 根因分析 — 为什么"agent 交互"在主上下文损耗中间内容
+
+### 1.1 三类功能点 + 各自损耗模式
+
+| 类 | 描述 | 典型 token 消耗 | 主上下文损耗模式 |
+|---|---|---|---|
+| **3.1 子代理 dispatch** | root → worker / explorer / verifier 子代理调用 | RPC payload 5-50K + 返 stdout 10-100K | 子代理 RPC 不可靠 (实证 10/10 ERR_CONNECTION_CLOSED 但 status=succeeded) → 主上下文需要二次验证, 二次验证的内容又进主上下文 |
+| **3.2 本地工具 / CLI 调用** | git / cargo / npm / curl / wt / find / xargs 等 shell 命令 | 单条 0.5-2K, 跨 stage 累计 5-20K | 长 shell 管道 (`find -exec` / `cargo test` 重试链) 反复出现, 跨平台差异 (Windows PowerShell vs WSL bash) 重写, token 复用率低 |
+| **3.3 代码改造 (refactor / fix / mass-edit)** | 看报告 → 改 100+ 文件, 跨 9 crate 改 507 err | 单次改造 5-30K, 跨 stage 累计 50-200K | Edit tool 逐文件提交, 每个 diff 进主上下文; 看长报告 (CONTENT-REVIEW-PACK 27KB) 进主上下文; 改完 cargo check 报错再回主上下文 |
+
+**根因**: 这 3 类**全部需要"agent 在主上下文里写中间制品"** (长 shell / 长 diff / 长报告), 制品本身**对主上下文的最终决策没有直接价值**, 但**占 token → 推后续 turn 内容出窗口 → 损耗 / 丢失 / 忽略**。
+
+### 1.2 已实证的损耗案例 (per WBS §6 累计统计 + AGENTS.md §4.1 守门派生 v17/v18)
+
+| 实证事件 | 估算 token | 实测 token | 倍数 | 损耗模式 |
+|---|---|---|---|---|
+| P0-1 ActorContext 单点化 (WBS §14.2) | 0.2M | 0.4-0.5M | 2-2.5x | 19 个 fix 脚本 (scripts/p0_1_*.py) — **有脚本化**但**没规范化**, 脚本与脚本之间不可重入不可观测 |
+| H2 范围扩量 (3 → 8 domain, WBS §14.2) | 0.3-0.5M | 0.6-0.8M (原 3) + 0.5-0.8M (H2-EXT 5) = 1.1-1.6M | 3-5x | 长 H2 stage 1-4 报告 (5cfb7b3 / 68ae5ff / 8364223 / 4c8bd5c) 反复在主上下文; revert 决策 (commit `8364223`) 反复回滚 |
+| P0-1 联动审计报告 (WBS §14.4 B-10) | 0.1M (估) | 0.4M (实测) | 4x | QA-DRIFT-001 master 报告 103 drifts / 32 P0 / 28 P1 / 27 P2 / 7 unverified 进主上下文, 真人 review 内容确认包 27KB + INC-SESSION-005 10.3KB = 37.3KB 再次进主上下文 |
+| 子代理 RPC 实证 (WBS §14.8) | 0 (不估) | 0 (全失败) | N/A | 10 background task `net::ERR_CONNECTION_CLOSED` 但 status 报 succeeded, 二次验证消耗 0.2-0.3M token |
+
+**结论**: 4 项实证全部指向**"中间内容进主上下文"** 是损耗的根因。规范化 = **"中间内容不进主上下文, 全部走 Python 脚本 → stdout/stderr/file 落档"**。
+
+### 1.3 守门 #1 / #9 / #12 跟本设计文档的关系
+
+| 守门 | 已有规则 | 本设计文档增强 |
+|---|---|---|
+| 守门 #1 (0 unsafe + 守门实证) | 跨 stage 必跑 4 步 (`cargo check` + fmt + clippy + test) | **守门 #1 派生 v19** (本设计文档定稿后追加): 任何"agent 交互 → python 脚本"必须落 `scripts/automation/<purpose>.py` 标 `[P]`, 实证 commit message 必须含脚本相对路径 |
+| 守门 #9 (子代理 commit 实证) | `git log -p --follow <wt-branch>` 实证 worktree commit 在 main 链上 | **守门 #9 派生 v2** (本设计文档定稿后追加): 子代理调用前**必先**调用 `automation/dispatcher.py` 落地 brief + brief 路径写进 commit message |
+| 守门 #12 (commit-time docs 同步) | docs 同步跨 4 文件 (WBS / PHASE report / AGENTS.md / 引用文档) | **守门 #12 派生 v2** (本设计文档定稿后追加): 任何 [P] 子项落档后必更新本设计文档 §4 任务卡表 + `scripts/automation/registry.md` 索引 |
+
+---
+
+## 2. 设计原则 — 4 个筛选维度 + 3 档判定
+
+### 2.1 4 个筛选维度 (per 9/2 00:39 JST 拍板, 全部 4 维必含)
+
+| 维度 | 定义 | 判定阈值 | 命中分 |
+|---|---|---|---|
+| **R — Rerunnable (可复现性)** | 同一脚本可针对不同 input (commit hash / branch / file list / REQ ID) 重跑, 产出 deterministic output | 输入参数化 (CLI args / config yaml) + 输出有迹 (stdout / file / exit code) | +1 |
+| **V — Volume (数据量阈值)** | 改动文件数 ≥ 10 或行数 ≥ 200 或 token 输出 ≥ 5K | 任一满足 | +1 |
+| **S — Structural (结构性)** | 重复模式 ≥ 3 (例: 22 domain 全部改 pub mod context → use star_context) | 启发式 + AST / regex 操作比逐个 Edit 快 ≥ 2x | +1 |
+| **A — Audit-trail (审计可观测)** | Python 脚本 stderr/stdout 可定向到 `docs/reports/<phase>.log` 入档, 便于后续 re-derive commit 来源 | 必填 `audit_log` 参数 + log schema (timestamp / phase / action / input / output / error) | +1 |
+
+### 2.2 3 档判定 (per 9/2 00:39 JST 拍板, WBS 任务卡全过一遍)
+
+| 档 | 得分 | 含义 | 处理 |
+|---|---|---|---|
+| **[P] Python 化** | ≥ 3 维命中 | 强制走 `scripts/automation/<purpose>.py` 落地, commit message 含脚本路径 | 必须 |
+| **[M] Mixed (混合)** | = 2 维命中 | 部分走脚本 + 部分 Shell / Edit, 在 `scripts/automation/<purpose>.py` 落"主调用" + 注释标注 ad-hoc 步骤 | 推荐 |
+| **[S] Shell / Edit 直接** | ≤ 1 维命中 | 不需要脚本化, agent 主上下文直接处理 | 允许 |
+
+**例外 (per 守门 #6 派生)**: 任何 [S] 任务卡跨 stage 累计消耗主上下文 ≥ 5K token, 自动升档 [M]; ≥ 10K token 升档 [P] (per §1.2 实证 P0-1 + H2 都是先 [S] 后补 [P])。
+
+### 2.3 判定 CLI (per §6.5 落档 `automation/judge.py`)
+
+`automation/judge.py` 是**辅助工具**, 给任务卡 [P]/[S]/[M] 三档判定提供**打分界面**。**判定结果不自动应用** (per 拍板决策必须用选项, 9/1 14:58 JST 拍板), 而是 Mavis 终端读 CLI 输出后用 `ask_user` 跟 Ulysses 拍板。
+
+```bash
+# 用法
+python scripts/automation/judge.py --task-id P3-B.5 --hits R,V \
+  --note "mock 备选 5 endpoint, 跨 P3-B.1+B.2, 凭证依赖"
+
+# 输出 (JSON)
+{
+  "task_id": "P3-B.5",
+  "hits": ["R", "V"],
+  "score": 2,
+  "verdict": "[M] Mixed",
+  "rationale": "R+V 命中 (5 endpoint 重跑 + ~10K token); 不命中 S (5 endpoint 各自 schema 异); 不命中 A (没有 stderr 持久化需求)",
+  "automation_path": "scripts/automation/integration_test.py"
+}
+```
+
+---
+
+## 3. 三类功能点 + 范式
+
+### 3.1 子代理 dispatch (类 1) 范式
+
+**问题**: root → worker / explorer / verifier 子代理调用, RPC 不可靠, status="succeeded" ≠ 实际成功 (per 守门 #9 实证 10/10 ERR_CONNECTION_CLOSED)。
+
+**范式**: `automation/dispatcher.py` 落地 brief → `automation/dispatcher.py invoke <agent> <brief_path>` 走 exec 替代 RPC → 落地 status + output → 二次验证走 `automation/dispatcher.py verify <task_id>`。
+
+**收益**:
+- 子代理调用从 RPC 黑盒 → exec 显式启动进程, 可观测可重试
+- brief 入档 `docs/briefs/<task_id>.md` → commit message 引用 brief 路径
+- 子代理 output 入档 `docs/briefs/<task_id>.output.md` → 不进主上下文
+
+**基类骨架** (per §6.1 `automation/dispatcher.py`):
+- `class SubagentDispatcher`: `def brief(task_id, content) -> Path` / `def invoke(agent, brief_path, timeout) -> TaskHandle` / `def verify(task_id) -> bool` / `def collect_output(task_id) -> Path`
+
+### 3.2 本地工具 / CLI 调用 (类 2) 范式
+
+**问题**: 长 shell 命令 (find -exec / cargo test 重试链 / 跨 wt 文件同步 / 跨平台差异) 在主上下文反复写, 跨 stage 累计 5-20K token 损耗。
+
+**范式**: `automation/cli_helper/<command>.py` 落"主调用脚本", agent 调 `python scripts/automation/cli_helper/<command>.py --args`, agent 主上下文**不写**长 shell。
+
+**收益**:
+- 长 shell → Python 1 行调用, 主上下文减少 5-20K token
+- 跨平台差异 (PowerShell vs WSL) → Python 内部 `subprocess` 抽象
+- 失败可重试 (脚本内 `for attempt in range(3): ...`) → 主上下文不需反复重写
+
+**基类骨架** (per §6.2 `automation/cli_helper/base.py`):
+- `class CliHelper`: `def run(cmd, *, retries=1, timeout=60, audit_log=None) -> CmdResult` / `def with_worktree(branch) -> WorktreeContext` / `def cargo(cmd, args)` / `def git(cmd, args)` / `def wt(cmd, args)`
+
+**范式样例** (`automation/cli_helper/cargo_check.py`):
+```python
+# 替代主上下文里的 6 行 cargo check 实证脚本
+from automation.cli_helper.base import CliHelper
+h = CliHelper(audit_log=Path("docs/reports/P3-B.5.log"))
+result = h.cargo("check", ["--workspace", "--all-targets"], retries=2)
+print(f"err_count={result.stderr.count('error[')}")
+```
+
+### 3.3 代码改造 (类 3) 范式
+
+**问题**: 看长报告 (PHASE / QA-DRIFT / CONTENT-REVIEW-PACK 27KB) → 改 100+ 文件 (跨 22 crate) → cargo check 报错 → 再改 → 再 check, 中间制品 (报告 / diff / err log) 全进主上下文。
+
+**范式**: `automation/refactor_template.py` 落"看报告 → 解析 → AST/regex 操作 → 改文件 → check → 报告" 全流程, agent 主上下文**只传报告路径** + **收最终报告**。
+
+**收益**:
+- 长报告 → 文件路径, 主上下文减 27-37KB token
+- AST 操作可重放 (同一脚本对 commit 1 / commit 2 / commit N 复跑)
+- 失败可回滚 (脚本自动 `git stash` + rollback)
+- 审计可观测 (脚本 log 落 `docs/reports/refactor-<phase>.log`)
+
+**基类骨架** (per §6.3 `automation/refactor_template.py`):
+- `class RefactorTemplate`: `def __init__(report_path, *, dry_run=True)` / `def parse_report() -> list[Action]` / `def apply(action) -> ApplyResult` / `def verify() -> VerifyResult` / `def rollback()` / `def run_full() -> FinalReport`
+
+**范式样例** (`scripts/p0_1_actor_context_migration.py` 实证 → 落档本模板):
+- 19 个 fix 脚本 (P0-1) 改写为统一模板调用
+- 5 domain H2-EXT (WBS §14.2 H2-3) 改写为统一模板调用
+- 后续 H2 强类型 ID 重构 (WBS §14.2 H2-4) 直接套模板
+
+### 3.4 横向范式 (跨 3 类) — audit log + brief 索引
+
+| 横向 | 落档 | 内容 |
+|---|---|---|
+| Audit log | `docs/reports/<phase>.log` | timestamp / phase / action / input / output / error / 脚本路径 |
+| Brief 索引 | `docs/briefs/registry.md` | task_id / brief_path / output_path / commit / status |
+| 脚本索引 | `scripts/automation/registry.md` | 脚本相对路径 / 用途 / 调用方 / 末次 commit |
+
+---
+
+## 4. WBS 任务卡 [P]/[S]/[M] 判定表 (per §2 范式, 全 56 子项 + 5 行业预设 + H2)
+
+> **判定口径**: 本表是**初判**, per 拍板决策必须用选项 (9/1 14:58 JST 拍板), Mavis 终端用 `ask_user` 跟 Ulysses 逐条拍板后落档到 WBS。
+> **打分维度** (per §2.1): R=Rerunnable, V=Volume, S=Structural, A=Audit-trail
+
+### 4.1 P3-B (9 子项)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| B.1 | B.1 | OpenClaw HTTP API 客户端 | R, V | **[M]** | `automation/integration_test.py` | 已收官 (commit `63c34ab`); 重构 5 endpoint × 4 method, R+V |
+| B.2 | B.2 | Hermes HTTP API 客户端 | R, V | **[M]** | `automation/integration_test.py` | mock 备选 (per 29692a7); 走 wiremock, R+V |
+| B.3 | B.3 | API Key 双模式存储 | S | **[S]** | — | schema 5 字段, 单文件, 改一次 |
+| B.4 | B.4 | CliProfile schema 扩展 | S | **[S]** | — | schema 5 字段, 单文件 |
+| B.5 | B.5 | OpenClaw 真实集成 e2e | R, V, A | **[P]** | `automation/integration_e2e.py` | 5 endpoint, cross-verify, mock 备选 (per 29692a7) |
+| B.6 | B.6 | Hermes 真实集成 e2e | R, V, A | **[P]** | `automation/integration_e2e.py` | 同 B.5, 共享脚本 |
+| B.7 | B.7 | API 配额 / 限流 / 重试 | R, S | **[M]** | `automation/quota_test.py` | backoff + 抖动 + retry-after, R+S |
+| B.8 | B.8 | API Agent → CLI Agent 降级 | R, S, A | **[P]** | `automation/fallback_chain.py` | fallback 链路跨 5 stage, R+S+A |
+| B.9 | B.9 | API Agent 监控 + 审计日志 | R, A | **[P]** | `automation/audit_log.py` | 接入 domain-audit, 必填 audit_log, R+A |
+
+### 4.2 P3-C (9 子项)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| C.1 | C.1 | Workspace 域 | S | **[S]** | — | per-tenant lifecycle, domain-workspace 已有 crate, 单域增强 |
+| C.2 | C.2 | Project 域 | S | **[S]** | — | per-workspace CRUD, 单域 |
+| C.3 | C.3 | Identity 域 | S | **[S]** | — | per-tenant auth, 单域 |
+| C.4 | C.4 | WorkItem 域 | S | **[S]** | — | per-project 状态机, 单域 |
+| C.5 | C.5 | Workflow 域 | S | **[S]** | — | per-WorkItem, 单域 |
+| C.6 | C.6 | Saga 域 | R, S, A | **[P]** | `automation/saga_e2e.py` | 跨 5 域补偿 + 失败回滚, R+S+A |
+| C.7 | C.7 | Postgres 持久层 | R, S, A | **[P]** | `automation/migration_runner.py` | per-tenant schema 隔离 + 跨 9 crate SQL, R+S+A |
+| C.8 | C.8 | Tenant 域 | S | **[S]** | — | per-tenant RBAC, 单域 |
+| C.9 | C.9 | 5 域 Lead 真人到位 | — | **[S]** | — | 真人寻访, 无 agent 交互 |
+
+### 4.3 P3-D (7 子项)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| D.1 | D.1 | w28 切 HubCliRuntime 入口 | S | **[S]** | — | 单文件改入口 |
+| D.2 | D.2 | 跨平台 e2e 矩阵 | R, V, A | **[P]** | `automation/cross_platform_e2e.py` | windows/macos 矩阵, R+V+A, mock 备选 CI runner |
+| D.3 | D.3 | frontend e2e (Playwright) | R, V, S, A | **[P]** | `automation/playwright_runner.py` | 4 维全命中, 已实装, 落本模板 |
+| D.4 | D.4 | realFetch error wrapper | S | **[S]** | — | 单函数包装 |
+| D.5 | D.5 | agents/analytics/inbox 3 handler real-mode | R, V, S | **[P]** | `automation/msw_switch.py` | 3 handler × real-mode switch, R+V+S (per 3dde2b4 实证) |
+| D.6 | D.6 | markdownlint + cargo doc CI job | R, A | **[M]** | `automation/ci_runner.py` | mock 备选, R+A |
+| D.7 | D.7 | UserMenu 状态条 | S | **[S]** | — | 单 UI 组件 |
+
+### 4.4 P3-E (7 子项)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| E.1 | E.1 | Audit 域 | S | **[S]** | — | per-domain-audit 增强, 7 不变量 + 9 字段, 单域 |
+| E.2 | E.2 | Notification 域 | S | **[S]** | — | per-workspace 通知, 单域 |
+| E.3 | E.3 | Search 域 | S | **[S]** | — | per-tenant tsvector, 单域 |
+| E.4 | E.4 | KMS 集成 | R, V, A | **[P]** | `automation/kms_rotate.py` | Vault / AWS KMS, R+V+A, mock 备选 LocalMockKms |
+| E.5 | E.5 | 5 域 Lead 真人到位 (DDD Review) | — | **[S]** | — | 真人寻访 |
+| E.6 | E.6 | 5 域 Saga 实装 | R, S, A | **[P]** | `automation/saga_e2e.py` | 跨域补偿 + 失败回滚, 共享 C.6 脚本 |
+| E.7 | E.7 | 5 域 DDD 边界验证 | R, A | **[M]** | `automation/ddd_review.py` | docs 阶段, R+A |
+
+### 4.5 P3-F (6 子项)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| F.1 | F.1 | 5 域 Lead 真人到位 (DDD Review) | — | **[S]** | — | 真人寻访, 跟 E.5 合并 |
+| F.2 | F.2 | 跨域集成测试 (5 域 E2E) | R, V, S, A | **[P]** | `automation/cross_domain_e2e.py` | 4 维全命中, 已实装 (commit `6c1bd6c`), 落本模板 |
+| F.3 | F.3 | CHANGELOG 跨域汇总 | R, A | **[M]** | `automation/changelog_gen.py` | 5 域 DDD 边界表, R+A |
+| F.4 | F.4 | 架构图 mermaid 化 | R, A | **[M]** | `automation/mermaid_gen.py` | 5 域 DDD 边界图 + Saga 流程图, R+A |
+| F.5 | F.5 | 质量门 5 维全 5 实证 | R, V, A | **[P]** | `automation/quality_gate.py` | 5 维全过, 跨 P3 全 5 阶段 56/64 子项, R+V+A |
+| F.6 | F.6 | 推 origin (R-05 反转) | R, A | **[P]** | `automation/git_push.py` | 推 3 branch + 守门 + secret 扫描, R+A, 已实装 (per 587b212) |
+
+### 4.6 H2 强类型 ID 重构 (WBS §14.2, 5 子项)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| H2-1 | H2-1 | star_context 共享 ActorContext 字段扩展 | R, S, A | **[P]** | `automation/refactor_template.py` | 已落地 (commit `68ae5ff`), 4 helper + 2 builder + 8 unit test |
+| H2-2 | H2-2 | 3 domain port/service 改造 | R, V, S, A | **[P]** | `automation/refactor_template.py` | 4 维全命中, 117+ err 实证 (WBS §14.2), revert 实证 |
+| H2-3 | H2-3 | 5 domain 跨域改造 | R, V, S, A | **[P]** | `automation/refactor_template.py` | 4 维全命中, 净修 507 err (WBS §14.2), 3/5 完成 |
+| H2-4 | H2-4 | 强类型 ID 重构 (DeviceId→Uuid) | R, V, S, A | **[P]** | `automation/refactor_template.py` | 4 维全命中, 业务语义拍板阻塞 (WBS §14.7 已知缺口 #1) |
+| H2-5 | H2-5 | H2 原 3 domain service.rs 改造 | R, V, S, A | **[P]** | `automation/refactor_template.py` | 4 维全命中, ~150+ call sites, 阻塞 H2-4 完成 |
+
+### 4.7 kanban-vmodel-jp P1-P9 (WBS §14.1, 13 子项已落地, 后续增量)
+
+| 阶段 | 子项 | 命中维度 | 初判 | 脚本路径 | 备注 |
+|---|---|---|---|---|---|
+| P1-P5 | 各 12 task × 4 行业 = 60 task | V, S | **[M]** (各 phase 1 脚本) | `automation/kanban_vmodel_gen.py` | 13 commits 落地, 已用 Python 生成, 落本模板 |
+| P6 | 6 子阶段 × 4 行业 = 56 task | V, S, A | **[P]** | `automation/test_phase_gen.py` | 已落地, 5 commits 8 测试 |
+| P7-P9 | 各 12 task × 4 行业 | V | **[M]** | `automation/release_phase_gen.py` | 已落地, 3 commits |
+
+### 4.8 DB W/T/M (WBS §14.3, 6 子项持续验证)
+
+| # | 子项 | 命中维度 | 初判 | 脚本路径 | 备注 |
+|---|---|---|---|---|---|
+| CW-1~6 | 6 子项 | R, V, S, A | **[P]** | `automation/db_wtm_classifier.py` | 跨 100 表 W/T/M 分类, 4 段检查清单 + 派生守门 10 条 |
+
+### 4.9 后续 5 wt + INC-003 (WBS §12.5)
+
+| # | wt | 命中维度 | 初判 | 脚本路径 | 备注 |
+|---|---|---|---|---|---|
+| wt-push-origin | 推 origin | R, A | **[P]** | `automation/git_push.py` | 跟 F.6 共享 |
+| wt-b5-openclaw-mock | B.5 mock | R, V, S, A | **[P]** | `automation/integration_e2e.py` | 跟 B.5/B.6 共享 |
+| wt-b6-hermes-mock | B.6 mock | R, V, S, A | **[P]** | `automation/integration_e2e.py` | 同上 |
+| wt-b1-openclaw-http | B.1 真实 | R, V | **[M]** | `automation/integration_test.py` | 跟 B.1 共享 |
+| wt-b3-apikey-storage | B.3 真实 | S | **[S]** | — | schema 5 字段, 单文件 |
+| wt-b7-api-quota | B.7 真实 | R, S | **[M]** | `automation/quota_test.py` | 跟 B.7 共享 |
+
+### 4.10 任务卡分布统计
+
+| 档 | 数量 | 占比 | 备注 |
+|---|---|---|---|
+| **[P] Python 化** | 17 (含共享脚本) | ~30% | 必落 `scripts/automation/<purpose>.py` |
+| **[M] Mixed** | 10 | ~18% | 部分脚本 + 部分 ad-hoc |
+| **[S] Shell / Edit** | 25 (含真人寻访) | ~52% | 不需要脚本化 |
+| **合计** | 52 (去重) | 100% | P3 全 5 阶段 56 子项 - 4 重复 - 5 真人寻访 = 51 + 1 H2 共享 = 52 |
+
+---
+
+## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
+
+### 5.1 4 步基线 (per WBS §12.6 / §14.5)
+
+1. **必跑** `cargo check --workspace --all-targets` — 0 err
+2. **必跑** `cargo fmt + clippy` — 0 err
+3. **必跑** `cargo test --workspace --release --lib` — 0 fail
+4. **必跑** `cargo build --release + doc + bench --no-run` — 0 err
+
+### 5.2 自动化基线 (本设计文档新增)
+
+5. **必跑** `python scripts/automation/judge.py --all` (per §6.5) — 输出 WBS 任务卡 [P]/[S]/[M] 标**初判表**, Mavis 终端用 `ask_user` 跟 Ulysses 拍板后落档 WBS
+6. **必跑** `python scripts/automation/smoke_test.py` (per §6.6) — 跑通 `automation/dispatcher.py` + `cli_helper/base.py` + `refactor_template.py` 4 个基类的最小可运行案例 (无副作用)
+7. **必跑** `python scripts/automation/registry_check.py` (per §6.7) — 校验 `scripts/automation/registry.md` 索引跟实际脚本一致
+
+### 5.3 守门 #1 派生 v19 (本设计文档定稿后追加到 AGENTS.md §4.1)
+
+> **v19 — agent 交互 Python 化守门** (per 2026-09-02 00:39 JST 拍板 + `docs/automation-design.md` v0.1):
+> 任何"agent 跟外部交互"的功能点 (子代理 dispatch / CLI 调用 / 代码改造 3 类) 强制走 `scripts/automation/<purpose>.py` 落地, 实证 commit message 必须含脚本相对路径; 跨 stage 累计消耗主上下文 ≥ 5K token 的 [S] 子项自动升档 [M], ≥ 10K 升档 [P] (per `docs/automation-design.md` §1.2 实证 P0-1 + H2).
+
+### 5.4 守门 #9 派生 v2 (本设计文档定稿后追加到 AGENTS.md §4.1)
+
+> **v2 — 子代理 dispatch 必先落地 brief** (per 2026-09-02 00:39 JST 拍板 + `docs/automation-design.md` §3.1):
+> 子代理调用前**必先**调用 `automation/dispatcher.py` 落地 brief → 路径 `docs/briefs/<task_id>.md` → commit message 引用 brief 路径; 子代理 RPC 不可靠实证 (10 background task `net::ERR_CONNECTION_CLOSED` 但 status 报 succeeded, per AGENTS.md §4 #9 主体规则).
+
+### 5.5 守门 #12 派生 v2 (本设计文档定稿后追加到 AGENTS.md §4.1)
+
+> **v2 — Python 化任务卡 docs 同步** (per 2026-09-02 00:39 JST 拍板 + `docs/automation-design.md` §1.3):
+> 任何 [P] 子项落档后必更新 `docs/automation-design.md` §4 任务卡表 + `scripts/automation/registry.md` 索引; commit 引用 `automation-design.md §N.M` 章节号.
+
+---
+
+## 6. 基类骨架 + 判定 CLI + 索引 (落档 `scripts/automation/`)
+
+> **落档规则** (per 守门 #12 + 缺标比错标): 4 个基类 + 1 个判定 CLI + 2 个 smoke 脚本 + 1 个索引 md, 共 8 份文件, 落档 `scripts/automation/`。
+
+### 6.1 `automation/dispatcher.py` — 子代理 dispatch 基类
+
+> 替代 root → 子代理 RPC 黑盒调用, 走 exec 显式启动进程, 可观测可重试可重放。
+
+**骨架要点**:
+- `class SubagentDispatcher`: brief 落档 → invoke exec → status 落档 → verify 二次验证 → collect_output
+- 必填参数: `task_id` / `agent_name` / `brief_content` / `timeout`
+- 输出: `docs/briefs/<task_id>.md` (brief) + `docs/briefs/<task_id>.output.md` (output) + `docs/briefs/<task_id>.status.json` (status)
+- audit_log 必填, 落 `docs/reports/<phase>.log`
+
+### 6.2 `automation/cli_helper/base.py` — CLI 调用基类
+
+> 替代主上下文长 shell 反复写, 跨平台差异 (PowerShell vs WSL) 抽象, 失败可重试。
+
+**骨架要点**:
+- `class CliHelper`: `run(cmd, *, retries, timeout, audit_log)` / `cargo(cmd, args)` / `git(cmd, args)` / `wt(cmd, args)` / `with_worktree(branch)`
+- 内部 `subprocess.run` 抽象, 跨平台 (Windows / WSL / macOS / Linux)
+- 失败重试默认 1 次, 指数 backoff
+- audit_log 必填, 落 `docs/reports/<phase>.log`
+
+### 6.3 `automation/refactor_template.py` — 代码改造基类
+
+> 替代"看长报告 → 改 100+ 文件" 流程, 走"看报告路径 → 解析 → AST/regex → 改 → check → 报告"。
+
+**骨架要点**:
+- `class RefactorTemplate`: `__init__(report_path, *, dry_run=True)` / `parse_report() -> list[Action]` / `apply(action) -> ApplyResult` / `verify() -> VerifyResult` / `rollback()` / `run_full() -> FinalReport`
+- 子类继承, 重写 `parse_report` + `apply` 即可
+- 失败自动 `git stash` + rollback, 实证 commit 写入
+- audit_log 必填, 落 `docs/reports/refactor-<phase>.log`
+
+### 6.4 `automation/generate_ac_matrix.py` — 范例 (T.1 已实装)
+
+> 引用 `scripts/generate_ac_matrix.py` 实证 (commit `4fa31d7`, 249 行, 标准库 only, REQ → AC → Test 覆盖矩阵), 作为本设计文档 §3 范式第 1 份实装。
+
+### 6.5 `automation/judge.py` — 任务卡 [P]/[S]/[M] 判定 CLI
+
+> 辅助工具, 给任务卡判定提供打分界面, 输出 JSON, 不自动应用 (per 拍板决策必须用选项 9/1 14:58 JST 拍板)。
+
+**骨架要点**:
+- CLI args: `--task-id` / `--hits` (R/V/S/A 任意组合) / `--note`
+- 命中维度数 → [P]/[M]/[S] 档
+- 输出 JSON: `task_id` / `hits` / `score` / `verdict` / `rationale` / `automation_path` (建议)
+- `python scripts/automation/judge.py --all` 跑 WBS 全任务卡, 输出初判表 → Mavis 终端用 `ask_user` 跟 Ulysses 拍板
+
+### 6.6 `automation/smoke_test.py` — 基类 smoke 验证
+
+> 跑通 4 个基类 (dispatcher / cli_helper / refactor_template / generate_ac_matrix) 的最小可运行案例, 无副作用, 验证 import + class 实例化 + method 调用都通过。
+
+**骨架要点**:
+- `if __name__ == "__main__":` 入口, 直接 `python scripts/automation/smoke_test.py`
+- 每个基类 1 个 smoke case, 5 个全过 = 0 err 退出
+- 输出 `docs/reports/automation-smoke.log`
+
+### 6.7 `automation/registry_check.py` — 索引一致性校验
+
+> 校验 `scripts/automation/registry.md` 索引跟实际脚本一致 (脚本路径 / 用途 / 调用方 / 末次 commit)。
+
+**骨架要点**:
+- 扫描 `scripts/automation/*.py` 实际文件
+- 跟 `registry.md` 表格对照
+- 不一致项 → 输出 warning, 不阻塞 CI
+
+### 6.8 `registry.md` — 脚本索引
+
+> 表格: 脚本相对路径 / 用途 / 调用方 / 末次 commit / 状态
+
+---
+
+## 7. 已知缺口 (per 缺标比错标)
+
+1. **WBS 任务卡 [P]/[S]/[M] 终判需 Ulysses 拍板** — 本设计文档 §4 是**初判**, per 9/1 14:58 JST 拍板决策必须用选项, Mavis 终端用 `ask_user` 跟 Ulysses 逐条拍板后落档 WBS
+2. **`automation/refactor_template.py` 子类化落地** — 模板落档后, 需把 P0-1 19 个 fix 脚本 + H2-EXT 5 domain 脚本改写为子类 (跨 session 续, 估 0.4-0.6M token)
+3. **5 域 Lead 真人到位前, F.5 质量门 5 维全 5 实证** 不能落档, 因为质量门终评需 SRE Lead + 5 域 Lead 真人 (per WBS §14.4 B-9)
+4. **`automation/dispatcher.py` 跨平台 exec 抽象** — 当前设计仅覆盖 Windows PowerShell, 跨 WSL / macOS / Linux 需补 `subprocess` 适配层 (per 守门 #6 PowerShell only 派生)
+5. **P3-A 25 子项历史脚本未回填** — P0-1 19 fix 脚本 + H2-EXT 5 domain 脚本在 P3-A 阶段已落地, 但 `scripts/automation/registry.md` 是新索引, 历史脚本需逐个回填 (per 守门 #12 缺标比错标)
+
+---
+
+## 8. 跨项目持久 (per 守门 #4 派生规 v1-v18 + 守门 #13)
+
+- 本设计文档适用 **STAR / RGS / Physis / GVPE / 其他新项目**
+- 跨项目持久理由: 子代理 RPC 不可靠 + 长 shell 反复写 + 长报告看 diff 三大类问题是 AI 协作通用损耗模式, 不限于 STAR
+- 引用基线: `D:\Star\docs\automation-design.md` v0.1 (本设计文档)
+
+---
+
+## 9. 签字栏 (5 角色)
+
+| # | 角色 | 姓名 | 签字日 | 结论 |
+|---|---|---|---|---|
+| 1 | 架构 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 2026-09-02 | 🟢 终审通过 |
+| 2 | SRE Lead | (待真人到位) | — | ⏳ 待签 |
+| 3 | 平台 | (待真人到位) | — | ⏳ 待签 |
+| 4 | 评审主持 | (待真人到位) | — | ⏳ 待签 |
+| 5 | PM | (待真人到位) | — | ⏳ 待签 |
+
+**注**: per 8/27 19:39 JST 用户授权升级 + 8/27 21:59 JST 第三次强化, Mavis 接手代签 Ulysses; 5 域独立真实身份 (per 8/21 JST 拒绝兼任) 签字请 DDD Review 阶段补。
+
+---
+
+## 10. 修订历史
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|---|
+| v0.1 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: 3 类 agent 交互 (子代理 dispatch / CLI 调用 / 代码改造) 全包, 4 个筛选维度 (R/V/S/A) + 3 档判定 ([P]/[M]/[S]), WBS §1-§5 / §14 / kanban-vmodel 任务卡全过初判, 守门 #1 v19 + #9 v2 + #12 v2 派生规; 落档 `scripts/automation/` 4 基类 + 1 CLI + 2 smoke + 1 索引, 共 8 份文件 | 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做" + 拍板 3 选项 (范围=全 3 类 / 维度=R+V+S+A / 落档=新建 docs/automation-design.md + scripts/automation/) |
+
+---
+
+## 11. 引用文档
+
+- `AGENTS.md` v0.15+ (守门 #1 派生 v1-v18 + 守门 #9 + 守门 #12 + 守门 #13)
+- `STAR-P3-WBS-001.md` v0.8+ (§1-§5 / §14 任务卡 + §12.5 INC-SESSION-003 触发条件)
+- `STAR-OLU-001.md` v0.1+ (1 SRE·周 = 1.2M token 换算基线)
+- `docs/ai-agent-design.md` v0.2 (上游: AI 子系统设计)
+- `docs/basic-design.md` (上游: 5 域 DDD / 26 子域架构)
+- `docs/test-design.md` v0.3 (兄弟: AC 矩阵生成器范式来源)
+- `docs/frontend/design/mock-msw-handlers.md` (兄弟: 5 域 MSW handler 实证)
+- `PHASE-P0-1-ACTOR-CONTEXT-IMPL-REPORT.md` v0.3 (实证: 19 个 fix 脚本)
+- `HANDOFF-ST-001.md` v0.2 (实证: H2 范围扩量 + 强类型重构)
+- `scripts/p0_1_actor_context_migration.py` (实证: 第 1 份 P0-1 联动脚本)
+- `scripts/generate_ac_matrix.py` (实证: AC 矩阵生成器, T.1 子项)
+- `scripts/p0_h2_3domain_migration.py` (实证: H2 真实尝试脚本入档)
