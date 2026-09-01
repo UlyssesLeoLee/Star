@@ -687,6 +687,24 @@ flowchart TB
 - WIP Limit 超出时,Column 红色高亮 + 提示
 - 状态变更走 Optimistic Update
 
+### 3.6 前端模块 ↔ 22 domain 协作映射 (v0.16 模块间协作细化新增)
+
+per [basic-design v0.16 §3.2.9 22 domain contact face 表](../../../basic-design.md) + [ADR-0039 §D26 Worktree Orchestration 跨 12 domain 协作范围](../architecture/2026-08-26-upgrade/adr/0039-worktree-orchestration-cross-domain.md),本节定义前端 5 大模块与 22 domain 的协作入口。
+
+| 前端模块 | 涉及 22 domain (核心 5) | API 入口 | Realtime 通道 (per [basic-design v0.16 §4.13](../../../basic-design.md)) | 状态机交互 |
+|---|---|---|---|---|
+| **Worktree Control Center** (§3.1) | worktree (主) + work-item + agent + validation + collaboration | `GET /v1/worktrees?filter=` + `GET /v1/worktrees/{id}/observed_state` | `/ws/feed` (高频 observed state 推送) | WorktreeStatusObserved 事件流 |
+| **Worktree Detail** (§3.2) | worktree (主) + agent + feedback + scm + validation | `GET /v1/worktrees/{id}` + `GET /v1/changesets?worktree_id=` + `GET /v1/feedback?target=worktree:{id}` | `/ws/feed` + `/ws/notif` (ValidationFailed 降噪触发) | Worktree 状态机 6 转换 (per [basic-design v0.16 §4.1.3](../../../basic-design.md)) |
+| **Agent Chat** (§3.3) | agent (主) + worktree + context + feedback | `POST /v1/agent_sessions/{id}/messages` + `GET /v1/context_packets?worktree_id=` | `/ws/feed` (Agent 实时消息) | AgentSessionStarted / Completed 事件流 |
+| **Feedback Inbox** (§3.4) | feedback (主) + work-item + worktree + agent + notification | `GET /v1/feedback?status=open&assignee=me` + `PATCH /v1/feedback/{id}` | `/ws/notif` (FeedbackCreated 降噪触发) | FeedbackCreated / Acknowledged / Applied / Verified 4 状态 (per [basic-design v0.16 §4.12.1](../../../basic-design.md)) |
+| **Board** (§3.5) | work-item (主) + workflow + planning + project + comment | `GET /v1/boards/{project_id}/columns` + `PATCH /v1/work_items/{id}` (transition) | `/ws/notif` (WorkItem StateChanged 触发) | WorkItem 状态机 + Workflow Guard 校验 (per REQ-WF-003) |
+
+**前端模块依赖的 22 domain 关键 Port** (per [basic-design v0.16 §3.2 contact face 表](../../../basic-design.md)):
+- 所有模块走 `domain-permission` PermissionChecker Port 鉴权 (per [basic-design v0.16 §3.2.8 permission 横切](../../../basic-design.md))
+- 实时性模块走 `domain-collaboration` + `star-sse` Realtime 推送 (per §D29 Realtime 3 通道)
+- 写操作走 Application Service (单 PG 事务,per [basic-design v0.16 §2.4 跨域事务](../../../basic-design.md)),不走 Event Chain
+- 跨域写走 Saga (per [spec/saga/01 v0.2 §4 Worktree Orchestration Saga 8 步](../architecture/2026-08-26-upgrade/spec/saga/01-saga-coordination-spec.md))
+
 ---
 
 ## 4. 状态管理

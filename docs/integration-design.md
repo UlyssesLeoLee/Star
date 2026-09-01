@@ -224,6 +224,28 @@ pub struct HealthStatus {
 - 连续 `recovery_threshold` 次成功 → Active
 - 健康检查超时 = 失败
 
+### 1.6 Adapter ↔ 22 domain 协作映射 (v0.16 模块间协作细化新增)
+
+per [basic-design v0.16 §3.2.9 22 domain contact face 表](../../../basic-design.md) + [ADR-0039 §D26-D32 Worktree Orchestration 跨域协作](../architecture/2026-08-26-upgrade/adr/0039-worktree-orchestration-cross-domain.md),本节定义 6 大 Adapter 与 22 domain 的协作入口 (per requirements §18 Integration 4 类关系:Link / Mirror / Bidirectional Sync / Platform-owned):
+
+| Adapter 类型 | 涉及 22 domain (核心 5) | 与 22 domain 协作方式 | 4 类关系 (per [basic-design §18.1](../../../basic-design.md)) | 反污染 (ACL) |
+|---|---|---|---|---|
+| **SCM Adapter** (§2, GitHub / GitLab / Gitea / Forgejo) | scm (主) + worktree + work-item + development + integration | worktree 调 SCM Port 创建 Git Worktree;work-item 调 scm 关联 Commit/PR;development 调 scm 引用 Repository/Branch | Bidirectional Sync (PR/Issue/MR 双向,需防环 per §2.6 Sync Token) | ✅ GitHubPullRequestObject → ScmPullRequest 域模型转换 |
+| **Agent Adapter** (§3, Codex / Claude / Gemini / OpenAI / Local) | agent (主) + worktree + context + feedback + identity | agent 进程 spawn/kill/lease (per ADR-0030);context 推送 Context Packet;feedback 监听人工 gate | Link (单向,AI 不反向写业务) | ✅ CodexMessage → AgentMessage 域模型转换 |
+| **Notification Adapter** (§4, Email / Webhook / IM) | notification (主) + feedback + work-item + validation + permission | 监听 19 事件 (per [basic-design v0.16 §4.12.1](../../../basic-design.md)) 触发降噪推送 | Platform-owned (Star 是 Source of Truth) | ✅ Slack Block → Notification 域模型转换 |
+| **Identity Provider Adapter** (§5, OIDC / SAML) | identity (主) + tenant + permission + audit | OIDC/SAML 完成 IdP 联邦 + JIT 用户配置 + Session 管理 | Mirror (IdP → Star 单向) | ✅ IdP claims → Star User/Role 域模型转换 |
+| **Jira / Linear 同步** (§6.2) | work-item (主) + project + workflow + comment + audit | 双向同步 Issue (防环 per [basic-design §2.5 顺序约束](../../../basic-design.md)) | Bidirectional Sync (需显式 Sync Token + Last Synced + Conflict Strategy) | ✅ JiraIssue → WorkItem 域模型转换 |
+| **WebHook Receiver** (§6.1) | integration (主) + scm + agent + audit | 接收 GitHub/GitLab/Jira 推送 + 签名校验 + 死信队列 | Link (单向,接收方) | ✅ Webhook payload → Domain Event 转换 |
+
+**Adapter 协作 5 守门规则** (v0.16 新增):
+1. **不得让 Adapter 域模型 (GitHubPullRequest / CodexMessage / Slack Block) 泄漏到 22 domain**: 通过 ACL 翻译层 (per [basic-design v0.16 §3.1 ACL 机制](../../../basic-design.md)) 转成 22 domain 域模型
+2. **Bidirectional Sync 必走 Sync Token + Last Synced + Conflict Strategy** (per §2.6),防 Infinite Sync Loop
+3. **Secret 走 KMS**: Adapter 任何 Token / API Key / Webhook Secret 不进配置文件 (per §1.4)
+4. **健康检查 60s 周期 + 失败阈值可配** (per §1.5 HealthCheck trait)
+5. **WebHook 接收必签名校验** (per §4.3 Webhook 签名),失败入死信队列 (per G-05)
+
+**与 ADR-0039 关系**: 本节是 [ADR-0039 §D26-D32](../architecture/2026-08-26-upgrade/adr/0039-worktree-orchestration-cross-domain.md) 跨域协作架构的集成层落地,6 大 Adapter 共同支撑 Worktree Orchestration Saga 8 步编排 (per [spec/saga/01 v0.2 §4](../architecture/2026-08-26-upgrade/spec/saga/01-saga-coordination-spec.md))。
+
 ---
 
 ## 2. SCM Adapter(GitHub / GitLab / Gitea / Forgejo)
