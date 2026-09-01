@@ -1,10 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { Providers } from "./providers";
 import { I18nProvider } from "@/lib/i18n";
 import { Toaster } from "react-hot-toast";
 import { CommandBar } from "@/components/CommandBar"; // per DRIFT-α-020 (2026-08-31 12:07 JST 试水)
+import { MobileHeader } from "@/components/MobileHeader";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { PwaBoot } from "@/components/PwaBoot";
 
 export const metadata: Metadata = {
   title: "Star — Vibe Coding Work Management",
@@ -18,8 +21,21 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
-  themeColor: "#0b0d10",
   manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Star",
+  },
+  formatDetection: { telephone: false },
+};
+
+// themeColor 必须在 viewport export (per Next.js 14+ 要求, 否则触发 /offline build 告警)
+export const viewport: Viewport = {
+  themeColor: "#0b0d10",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({
@@ -36,10 +52,18 @@ export default function RootLayout({
           <Providers>
             <div className="flex min-h-screen">
               <Sidebar />
-              <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+              <div className="flex-1 flex flex-col min-w-0 min-h-screen pb-20 md:pb-0">
+                {/* <768px: MobileHeader 顶栏 (per 2026-09-01 PHASE-MOBILE-PWA)
+                    ≥768px: AppHeader 顶栏由各 page 内部 AppShell 提供,
+                    此处 RootLayout 不重复 mount,避免双顶栏 */}
+                <MobileHeader />
                 {children}
               </div>
             </div>
+            {/* <768px 底部 5 域快捷导航 (per 2026-09-01 PHASE-MOBILE-PWA) */}
+            <MobileBottomNav />
+            {/* PWA Service Worker 注册 (production only) */}
+            <PwaBoot />
             {/* Global toast: GanttBar 拖拽冲突 / Board 列删除 / 主题切换等全局反馈
                 - 暗色模式背景, 适配 next-themes
                 - duration 4000 (默认), Gantt 冲突可单独传 duration:1500

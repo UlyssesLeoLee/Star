@@ -45,7 +45,8 @@ export function Sidebar() {
   return (
     <aside
       data-testid="app-sidebar"
-      className="w-64 shrink-0 border-r border-line bg-bg-soft/75 backdrop-blur-xl flex flex-col h-screen sticky top-0 select-none z-20 transition-all"
+      // 桌面: w-64 sticky; <768px: 隐藏 (由 MobileBottomNav + AppMatrixDrawer 抽屉替代, per 2026-09-01 PHASE-MOBILE-PWA)
+      className="hidden md:flex w-64 shrink-0 border-r border-line bg-bg-soft/75 backdrop-blur-xl flex-col h-screen sticky top-0 select-none z-20 transition-all"
     >
       {/* === Star Anime Cyber Crest (Brand Block) === */}
       <div className="px-4 py-4 border-b border-line shrink-0 flex items-center justify-between">

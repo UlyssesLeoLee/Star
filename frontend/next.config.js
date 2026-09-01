@@ -45,10 +45,21 @@ const nextConfig = {
   // - mockServiceWorker.js (per npx msw init public/) 在 production build 自动 copy
   // - headers: service worker 需 'Service-Worker-Allowed' header (per spec 2025-06-27)
   // - 仅 dev / NEXT_PUBLIC_API_MOCKING=enabled 启用 (per instrumentation.ts)
+  //
+  // Phase M.0 PWA (per 2026-09-01 PHASE-MOBILE-PWA):
+  // - sw.js 同为 service worker,需 Service-Worker-Allowed: '/' 才能注册到根 scope
+  // - cache 头 no-cache 确保 sw.js 升级立即生效
   async headers() {
     return [
       {
         source: "/mockServiceWorker.js",
+        headers: [
+          { key: "Service-Worker-Allowed", value: "/" },
+          { key: "Cache-Control", value: "no-cache" },
+        ],
+      },
+      {
+        source: "/sw.js",
         headers: [
           { key: "Service-Worker-Allowed", value: "/" },
           { key: "Cache-Control", value: "no-cache" },

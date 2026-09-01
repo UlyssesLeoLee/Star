@@ -2,15 +2,25 @@
   "name": "Star — Vibe Coding Work Management",
   "short_name": "Star",
   "description": "Star Platform — Control Plane for 25-module Vibe Coding Work Management SaaS",
-  "start_url": "/inbox",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#0b0d10",
   "theme_color": "#0b0d10",
+  "categories": ["productivity", "developer", "business"],
   "icons": [
     {
       "src": "/favicon.ico",
       "sizes": "32x32 16x16",
-      "type": "image/x-icon"
+      "type": "image/x-icon",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-512.png",
@@ -23,5 +33,53 @@
       "sizes": "180x180",
       "type": "image/png"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "Worktree 控制中心",
+      "short_name": "Worktree",
+      "description": "运行中 worktree 实时状态",
+      "url": "/worktree?utm_source=pwa",
+      "icons": [
+        { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    },
+    {
+      "name": "Agent 实时面板",
+      "short_name": "Agent",
+      "description": "活跃 agent session 状态 + token 监控",
+      "url": "/agent?utm_source=pwa",
+      "icons": [
+        { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    },
+    {
+      "name": "Feedback 待办",
+      "short_name": "Feedback",
+      "description": "AI 提问待响应",
+      "url": "/feedback?utm_source=pwa",
+      "icons": [
+        { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    },
+    {
+      "name": "通知收件箱",
+      "short_name": "通知",
+      "description": "未读通知 / @ 提及 / 关注更新",
+      "url": "/notification?utm_source=pwa",
+      "icons": [
+        { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    },
+    {
+      "name": "项目总览",
+      "short_name": "Projects",
+      "description": "看板 / 时间线 / 概览",
+      "url": "/projects?utm_source=pwa",
+      "icons": [
+        { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }
+      ]
+    }
+  ],
+  "prefer_related_applications": false
 }
