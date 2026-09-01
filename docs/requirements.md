@@ -1971,3 +1971,169 @@ Star 倉 22 `domain-*` crate (per ADR-0040) + 25 MRU (per api-design.md §2.1) �
 ---
 
 *本節 §48 は arch-agent-graph-viewer 機能追加 (2026-09-02 02:10 JST Ulysses "需求和基本设计, 詳細设计 補完" 発令) による。*
+
+
+## 49. Onboarding (First-Run) 要件 (per ADR-0042 v0.1, 2026-09-02 08:01 JST 拍板)
+
+> **追加日**: 2026-09-02
+> **修订人**: 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签
+> **依据**: [ADR-0042-onboarding-first-run v0.1](../architecture/2026-08-26-upgrade/adr/0042-onboarding-first-run.md) + [commit `a54c79d` OnboardingGuard 实现](../.git)
+> **ステータス**: Phase 1 完了 (frontend contract + 3 探测器 + 5 retry mock, per 8/1 08:14 JST 11/11 vitest pass), Phase 2 等 P3-B 拍板
+
+### 49.1 背景・動機 (per 2026-09-02 07:58 JST)
+
+ユーザーは初回起動時, 既に存在する LLM API key 凭证 (localStorage / env-var-hint / IDE 残留) を **自動識別** したい。**手動で 1 つ 1 つ入力** するのは摩擦が高い。識別出来后, ユーザーエージェントを選んで **関連付け**, 失敗したら **自動 5 回リトライ**, 最終的に失敗したら **解决步骤をユーザーに提示** + **audit log 記録** すべき。
+
+既存 `AgentSettingsModal` (per commit `cb2475e`) は **能動的な齿轮手動入力** のみで, **初回起動の自動オンボーディング** には対応していない。
+
+### 49.2 業務要件 (5 件)
+
+#### REQ-ONB-001: 初回起動で 3 探测を並列実行
+
+- **業務価値**: ユーザーが既存凭证を再入力する手間を排除
+- **要件**:
+  - アプリ起動時 (SettingsProvider init / mount) に 3 探测を並列実行
+  - localStorage `star:api-keys` (既存 /settings/api-keys 保存先) をスキャン
+  - env-var-hint: `process.env.NEXT_PUBLIC_*_API_KEY_HINT` の存在性のみ (値は読み取らない, 守門 #5 遵守)
+  - IDE-residual: `/.vscode/settings.json` 等 5 路径を fetch (Phase 1 mock, 4xx → 空配列)
+  - 検出完后, 重複排除 (provider + label 一致で最初の 1 件を残し)
+- **AC**:
+  - AC-1: 初回起動後 1 秒以内に 3 探测が並列完走
+  - AC-2: localStorage に 3 個のキー, 検出结果は 3 件 + 重複排除正しい
+  - AC-3: env-var-hint は 存在性のみで, 実値はメモリ/ログに现れない (守門 #5)
+- **守門**: 守門 #1 禁回溯叙事 / 守門 #5 環境変数安全 / 守門 #11 缺标比错标 / 守門 #12 文档治理
+
+#### REQ-ONB-002: ユーザーがエージェントを選んで関連付け
+
+- **業務価値**: 1 つの key を複数の agent で使う or 別々に使う, ユーザー選択で柔軟
+- **要件**:
+  - 検出キーの一覧 (provider / label / preview / source_label) を modal に表示
+  - 各 key に agent select dropdown (existing CliTab list)
+  - 「暂不关联」 (skip per key) を選択可能
+  - 4 必备 provider (openai / claude / gemini / minimax) を cyan chip で強調表示
+  - encrypted_rust モードで保存 (per 8/1 02:49 JST 拍板 storage_opt1)
+- **AC**:
+  - AC-1: 3 個の key 全部に agent select が表示され, 1 件も選ばず「确认关联」できる (0 件 = ボタン disabled)
+  - AC-2: 4 必备 provider は chip に "必备" マーク表示
+  - AC-3: 关联选择は `cli_profile_id` + `agent_kind` + `agent_id` 3 フィールドで保存
+- **守門**: 守門 #7 0 unsafe / 守門 #14 tc-skip 不滥用
+
+#### REQ-ONB-003: 失敗時の自動 5 回リトライ (3-6-12-24-48s 指数 backoff)
+
+- **業務価値**: 1 過性のネットワークジッタで関連付け失敗しない
+- **要件**:
+  - 1 過性失敗時, 指数 backoff で 5 回まで自動リトライ (3s / 6s / 12s / 24s / 48s)
+  - 1 回のテストは fetch タイムアウト 10 秒
+  - リトライ中, UI に attempt 数 + 次の backoff 秒数を表示
+  - 5 回すべて失敗 → 自動停止, 次の REQ-ONB-004 に遷移
+- **AC**:
+  - AC-1: 1 過性失敗 (e.g. timeout) → 3s 後 2 回目, 6s 後 3 回目 … 48s 後 5 回目
+  - AC-2: 1 回目で成功 → 1 回で停止 (リトライしない)
+  - AC-3: リトライ中 UI に `attempt 2/5 · 次回リトライ 6s 後` を表示
+- **守門**: 守門 #5 環境変数安全 (timeout 中も preview のみ, 明文なし)
+
+#### REQ-ONB-004: 失敗時の解决步骤提示
+
+- **業務価値**: 5 回リトライ後も失敗, ユーザーが自力で解决できる
+- **要件**:
+  - 5 回失敗後, 各失敗 key ごとに error card 表示
+  - error code 6 種類 (unauthorized 401 / forbidden 403 / rate_limited 429 / model_unavailable 404|503 / network_timeout / unknown) を分類
+  - 各 error code ごとに 解决步骤 (1-3 steps) + doc URL + curl test command
+  - 例: 401 の場合 → "API key が有效か確認" + platform.openai.com/account/api-keys リンク + `curl -H "Authorization: Bearer $KEY" ...`
+- **AC**:
+  - AC-1: 5 回失敗した key ごとに error card 表示
+  - AC-2: 401 / 403 / 429 / 0 / 404 / 503 / 500 が正しい code に分類
+  - AC-3: error card 内に "重试" ボタン表示, クリックすると 5 回リトライ再開
+- **守門**: 守門 #5 環境変数安全 (error message に明文含まない)
+
+#### REQ-ONB-005: audit log 記録 (per 守門 #9)
+
+- **業務価値**: どの key がどのユーザーでいつ失敗したか追跡可能
+- **要件**:
+  - 5 回失敗時, `star:onboarding-audit` localStorage に append (Phase 1 mock)
+  - 記録内容: `audit-{timestamp}-{provider}` ID + action `onboarding.test_key.failed` + provider + label + attempts (5) + status_code + error_message + timestamp
+  - Phase 2 で `audit_audit_event` テーブルに真書き (per AGENTS.md §4 #9 監査必帯)
+  - 13 類 tenant_id 必帯 (per REQ-SEC-001)
+- **AC**:
+  - AC-1: 5 回失敗後, `localStorage.getItem("star:onboarding-audit")` に 1 件以上の entry
+  - AC-2: entry 内に provider / label / status_code / timestamp 全部含む
+  - AC-3: Phase 2 で backend 監査ログに同期 (per #9 17 問遵守)
+- **守門**: 守門 #9 子代理実証 (audit log 必須) / 守門 #10 代签規則
+
+### 49.3 データ要件
+
+- **localStorage 2 key**: `star:api-keys` (既存 /settings/api-keys 保存) + `star:onboarding-completed` (boolean "true" | "skipped")
+- **audit log 1 key** (Phase 1 mock): `star:onboarding-audit` JSON 配列
+- **DB 三類横展開** (per 2026-09-01 18:30 JST 拍板, Phase 2 で audit_audit_event):
+  - `audit_audit_event` 走 Transaction (T) append-only (per 仓内 100 表実續)
+  - 物理削除禁止 + 90 日 TTL (per AI Content Retention §6.8)
+
+### 49.4 インターフェース要件
+
+- 3 探测エンドポイント (Phase 1 mock, Phase 2 后端):
+  - `GET /api/onboarding/env-hint` → 存在性 array
+  - `POST /api/onboarding/test-key` → 单 key 测试 (1 attempt)
+  - `POST /api/audit/onboarding-failed` → audit log 写入
+- 客户端既存 `/api/api-keys` 沿用 (encrypted_rust 存储)
+
+### 49.5 セキュリティ・テナント要件
+
+- **13 類 tenant_id 必帯** (per REQ-SEC-001): `tenantId` prop で OnboardingGuard に注入, Phase 1 mock = `tenant-physis-corp`
+- **JWT 検証**: 既存 /settings/api-keys 沿用
+- **LLM Secret**: preview のみ, 永続化しない (守門 #5)
+- **PII 排除**: audit log 内に preview ではなく status_code のみ
+- **AI Audit**: REQ-AUDIT-002 17 問遵守 (Phase 2 真接 audit_audit_event テーブル)
+
+### 49.6 非目標 (per 缺标比错标, 守門 #11)
+
+| # | 非目標 | 理由 | 計画 |
+|---|---|---|---|
+| NG-001 | IDE-residual Phase 1 mock 返空 | service worker / fs API ブラウザ制約 | Phase 2+ 接 service worker |
+| NG-002 | env-var-hint Phase 1 mock 返空 | process.env ブラウザ端不可 | Phase 2+ 接 /api/onboarding/env-hint |
+| NG-003 | 真 fetch テスト (testKeyOnce) | Phase 1 mock ランダム | Phase 2 真接 fetch + ep.build_headers |
+| NG-004 | 真 audit log テーブル | Phase 1 localStorage mock | Phase 2 audit_audit_event テーブル |
+| NG-005 | 関連付け時 backend 真接 | Phase 1 mock 走 /api/api-keys | Phase 2 + KMS 統合 |
+
+### 49.7 既知の缺口 (per 缺标比错标, 守門 #11)
+
+- test retry 真等 3-6-12-24-48s (最大 48s, テスト時 45s 経過): Phase 1 mock 化, vi.useFakeTimers で高速化可能
+- audit log 容量無制限 (append-only, 90 日後手動 cleanup 必要)
+- 関連付け時 key の masking (preview = `sk-***xyz` 形式, 真値取得不可 → Phase 1 mock, Phase 2 真接時 backend で真値復号化必要)
+
+### 49.8 段階計画 (per ADR-0042 §4)
+
+| 段階 | 内容 | token 予算 | 状態 |
+|---|---|---|---|
+| 1 | 4 段設計 + 11 ファイル実装 (ADR + types + scanner + retry + Guide + Guard + layout + test) | 4-5M | **🟢 完了** (per commit `a54c79d`, tsc 0 + 337/337 vitest pass) |
+| 2 | backend KmsAudit 真接 (audit_audit_event テーブル + KMS) | 0.8M | ⏳ P3-B 拍板待ち |
+| 3 | 真 fetch + IDE-residual + env-var-hint 后端 API | 1.5M | ⏳ Phase 2 完了後 |
+
+### 49.9 受け入れ基準 (Acceptance Criteria 集約)
+
+- AC-ONB-1: REQ-ONB-001~005 全 5 件が vitest 11/11 + tsc --noEmit 0 错
+- AC-ONB-2: 3 探测並列完走 + 重複排除正しい
+- AC-ONB-3: 5 回リトライ (3-6-12-24-48s) 動作
+- AC-ONB-4: 失敗時 6 error code に分類 + 解决步骤提示
+- AC-ONB-5: 5 回失敗時 audit log 記録 (Phase 1 localStorage, Phase 2 audit_audit_event)
+
+### 49.10 トレーサビリティ
+
+- 一次出典: ADR-0042 v0.1
+- 詳細設計: spec/agent-api/onboarding.md v0.1 (10 段, 別途)
+- 基本設計: basic-design.md §12 (3 段, 別途)
+- Phase 1 実装: frontend/src/{types,lib,components}/onboarding + app/layout.tsx (8 ファイル)
+- Phase 1 報告: docs/reports/ARCH-AGENT-GRAPH-001-REPORT.md v0.1 (同 session, onboarding も包含予定)
+- 関連要件: REQ-SEC-001 (13 類), REQ-AUDIT-002 (17 問), REQ-DATA-001/002/003
+- 関連 ADR: ADR-0027 (STAR IDE Gateway), ADR-0030 (Lease+Heartbeat+Resume), ADR-0041 (arch-graph)
+
+### 49.11 段階要件 (MVP / V1 / V2 / Future)
+
+| 段階 | 含める | 除外 |
+|---|---|---|
+| MVP (Phase 1) | 3 探测 mock + 5 retry + audit log localStorage + 4 必备 provider | IDE-residual / 真 fetch / audit テーブル |
+| V1 (Phase 2) | 真 fetch + IDE-residual + audit_audit_event テーブル | (per NG-001~005 段階拡張) |
+| V2 (Phase 3+) | 関連付け時 backend 真接 + KMS 統合 | (per NG-005 段階拡張) |
+
+---
+
+*本节 §49 は onboarding 機能追加 (2026-09-02 08:01 JST Ulysses 4 拍板) による。*

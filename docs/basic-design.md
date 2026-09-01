@@ -3985,3 +3985,132 @@ crates/
 ---
 
 *本節 §11 は arch-agent-graph-viewer 機能追加 (2026-09-02 02:10 JST Ulysses "需求和基本设计, 詳細设计 補完" 発令) による。*
+
+
+## 12. onboarding-first-run 基本設計 (per ADR-0042 v0.1)
+
+> **追加日**: 2026-09-02
+> **修订人**: 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签
+> **依据**: [ADR-0042-onboarding-first-run v0.1](../architecture/2026-08-26-upgrade/adr/0042-onboarding-first-run.md) + [commit `a54c79d` 实现](../.git) + 需求 §49
+> **位置付け**: 业务要件 §49 を受けた基本設計
+
+> **dual-use 提醒 (per AGENTS.md §5)**: 本节不涉及 25 domain / RGS 5 域映射, 是前端 UX + 浏览器 storage 范围内的事。
+
+### 12.1 アーキテクチャ概要
+
+3 層構造:
+
+| 層 | コンポーネント | 状態 |
+|---|---|---|
+| **Layer 1: Scanner** | `lib/onboarding/scanner.ts` (3 探测器並列) | 🟢 Phase 1 mock (localStorage + env-var-hint + IDE-residual 返空) |
+| **Layer 2: Retry** | `lib/onboarding/retry.ts` (5 重试 + 3-6-12-24-48s backoff + audit log) | 🟢 Phase 1 mock (testKeyOnce 随机) |
+| **Layer 3: UI** | `components/OnboardingGuard.tsx` (启动 wrapper) + `lib/onboarding/Guide.tsx` (4 阶段 modal) | 🟢 Phase 1 |
+
+### 12.2 3 探测器仕様 (per 拍板 scope_opt4)
+
+| 探测器 | ソース | 成功 | 失敗 | Phase 1 返值 |
+|---|---|---|---|---|
+| **localStorage** | `localStorage.getItem("star:api-keys")` | JSON 配列, 4 フィールド (provider/label/preview/createdAt) | JSON 损坏 / 无权限 → 空配列 | 既存データあり |
+| **env-var-hint** | `process.env.NEXT_PUBLIC_*_API_KEY_HINT` (4 变量) | 存在性のみ (守門 #5: 値読まない) | 変数未設定 | Phase 1 全空 (server side only) |
+| **IDE-residual** | 5 路径 fetch (`/.vscode/settings.json` 等) | 200 + JSON 解析 | 4xx / timeout | Phase 1 全空 (Next dev server 不暴露) |
+
+### 12.3 4 阶段状态机 (per ADR §1.1)
+
+```
+idle → scanning (3 探测並列) → reviewing (DetectedKey 列表) → associating (5 retry) → completed | error
+                ↑                                                  ↓
+                └───────── skip (用户点"稍后") ────────────────────┘
+```
+
+| 阶段 | UI 状态 | 退出条件 |
+|---|---|---|
+| **idle** | 无 modal | mount 后立即 → scanning |
+| **scanning** | spinner + "3 探测并列扫" | 扫完后 → reviewing (空 → 用户手动跳) / associating (有 key) |
+| **reviewing** | DetectedKey 列表 + per-key agent select | 用户点"确认关联" → associating / 用户点"skip" → completed |
+| **associating** | per-key progress (attempt X/5, next retry Xs) | 全 key 测试完 → completed (有 success) / error (全 failed) |
+| **completed** | 成功数 / 失敗数 统计 + "完成" 按钮 | markOnboardingCompleted() → close modal |
+| **error** | per-failed-key error card + 解决步骤 | 用户点"重试" / "完成" → close |
+
+### 12.4 5 重试 + 3-6-12-24-48s backoff (per 拍板 retry_opt3)
+
+| Attempt | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| Backoff | - | 3s | 6s | 12s | 24s | 48s |
+| 状态 | start | wait 3s | wait 6s | wait 12s | wait 24s | wait 48s → failed |
+
+- 单 attempt タイムアウト: 10 秒 (AbortController)
+- 5 回全失敗 → 自動停止, audit log 書込, 弹 error card
+
+### 12.5 6 ProviderErrorCode 分类 (per 拍板 retryreport_opt3)
+
+| Status | Error Code | 解决步骤 |
+|---|---|---|
+| 401 | unauthorized | 检查 key, 重新生成, platform.openai.com/account/api-keys |
+| 403 | forbidden | 开通模型权限, 检查计费 |
+| 429 | rate_limited | 等 1 分钟, 换 key, 升级套餐 |
+| 0 (timeout) | network_timeout | 检查网络 VPN 防火墙, curl -v TLS test |
+| 404 / 503 | model_unavailable | provider status 页, 切其它模型 |
+| 500 / 其它 | unknown | 重试, 提交 issue |
+
+### 12.6 存储模式 (per 拍板 storage_opt1)
+
+- encrypted_rust 沿用 (既存 `/api/api-keys` endpoint)
+- audit log Phase 1 localStorage, Phase 2 `audit_audit_event` テーブル (Transaction T, append-only)
+- 関連付け時 3 フィールド: `agent_id` (tab.id) + `cli_profile_id` (profileName) + `agent_kind` (profileName から推定)
+
+### 12.7 DB 三類横展開 (per 2026-09-01 18:30 JST 拍板)
+
+| 物理名 (Phase 2) | 種別 | 役割 |
+|---|---|---|
+| `audit.audit_event` (既存, 拡張) | **Transaction (T)** | append-only, 物理削除禁止, 90 日 TTL |
+| (Phase 1 localStorage: `star:onboarding-audit`) | (mock) | 5 回失敗時 append |
+
+> **Work (W) 類 0 表**: 短 TTL データは `agent.agent_session` で扱う, 本モジュールは監査/ログのみ
+
+### 12.8 モジュール配置 (Phase 1 完了)
+
+```
+frontend/src/
+├── types/
+│   └── onboarding.ts                    # 8 フィールド + RETRY_BACKOFF_MS + 4 provider endpoint
+├── lib/
+│   └── onboarding/
+│       ├── scanner.ts                   # 3 探测器並列 (localStorage + env-var-hint + IDE-residual)
+│       ├── retry.ts                     # 5 retry + 6 ProviderErrorCode + ERROR_RESOLUTIONS
+│       ├── Guide.tsx                    # 4 阶段 modal (scanning/reviewing/associating/completed|error)
+│       └── onboarding.test.ts           # 11 tests (11/11 pass)
+├── components/
+│   └── OnboardingGuard.tsx              # mount 时扫 + 5 retry 调
+└── app/
+    └── layout.tsx                       # 挂 <OnboardingGuard /> 1 行
+```
+
+### 12.9 段階計画 (per ADR-0042 §4)
+
+| Phase | 内容 | token 予算 | 状態 |
+|---|---|---|---|
+| 1 | 4 段設計 + 11 ファイル実装 | 4-5M | **🟢 完了** (per commit `a54c79d`, tsc 0 + 337/337 vitest pass) |
+| 2 | backend KmsAudit 真接 (audit_audit_event テーブル + KMS) | 0.8M | ⏳ P3-B 拍板待ち |
+| 3 | 真 fetch + IDE-residual + env-var-hint 后端 API | 1.5M | ⏳ Phase 2 完了後 |
+
+### 12.10 既知の缺口 (per 缺标比错标, 守門 #11, 5 項)
+
+| # | 缺口 | Phase 計画 |
+|---|---|---|
+| 1 | IDE-residual 探测器 Phase 1 返空 | Phase 2+ 接 service worker |
+| 2 | env-var-hint Phase 1 mock 返空 | Phase 2+ 接 /api/onboarding/env-hint |
+| 3 | testKeyOnce Phase 1 mock ランダム | Phase 2 真接 fetch + ep.build_headers |
+| 4 | audit log 写 localStorage (Phase 1) | Phase 2 真接 audit_audit_event テーブル |
+| 5 | retry 真等 3-6-12-24-48s (45s 测试) | Phase 1 OK, vi.useFakeTimers で最適化可能 |
+
+### 12.11 トレーサビリティ
+
+- 一次出典: ADR-0042 v0.1
+- 業務要件: requirements.md §49 (REQ-ONB-001~005)
+- 詳細設計: spec/agent-api/onboarding.md v0.1 (10 段, 別途)
+- 実装: commit `a54c79d` (8 ファイル, 1553 行)
+- 関連 ADR: ADR-0027 (STAR IDE Gateway), ADR-0030 (Lease+Heartbeat+Resume), ADR-0041 (arch-graph)
+
+---
+
+*本节 §12 は onboarding 機能追加 (2026-09-02 08:01 JST Ulysses 4 拍板) による。*
