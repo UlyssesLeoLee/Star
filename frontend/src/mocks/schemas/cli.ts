@@ -15,13 +15,20 @@ export interface CliProfile {
 
 export interface ApiKey {
   id: string;
-  provider: "anthropic" | "openai" | "openclaw" | "hermes" | "google";
+  /** LLM 厂商 (per 2026-09-02 02:49 JST Ulysses 拍板: openai/claude/gemini/minimax 4 必备) */
+  provider: "anthropic" | "openai" | "openclaw" | "hermes" | "google" | "claude" | "gemini" | "minimax";
   label: string;
   mode: "encrypted_rust" | "environment_var";
   preview: string;
   envVarName?: string;
   createdAt: string;
   lastUsedAt?: string;
+  /** 关联 agent tab (per CliTab.id) — 各 agent 分别填不同 key */
+  agent_id?: string;
+  /** 关联 CLI profile (per CliProfile.id, e.g. "claude" / "codex" / "openclaw") */
+  cli_profile_id?: string;
+  /** 关联 agent_kind (per types/ids.ts AgentSession.agent_kind) */
+  agent_kind?: "claude-sonnet" | "gpt-4o" | "codex" | "internal-vibe-coder" | "gemini-2" | "minimax-v1";
 }
 
 export interface TaskWindow {
@@ -73,7 +80,10 @@ export function isApiKey(x: unknown): x is ApiKey {
     typeof o.label === "string" &&
     ["encrypted_rust", "environment_var"].includes(o.mode as string) &&
     typeof o.preview === "string" &&
-    typeof o.createdAt === "string"
+    typeof o.createdAt === "string" &&
+    (o.agent_id === undefined || typeof o.agent_id === "string") &&
+    (o.cli_profile_id === undefined || typeof o.cli_profile_id === "string") &&
+    (o.agent_kind === undefined || typeof o.agent_kind === "string")
   );
 }
 

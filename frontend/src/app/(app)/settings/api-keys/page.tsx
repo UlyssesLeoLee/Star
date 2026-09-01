@@ -25,11 +25,16 @@ const INITIAL: ApiKey[] = [
 ];
 
 const PROVIDER_HINT: Record<string, string> = {
-  anthropic: "Anthropic Claude",
-  openai: "OpenAI GPT",
-  openclaw: "OpenClaw API",
-  hermes: "Hermes AI",
-  google: "Google Gemini",
+  // per 2026-09-02 02:49 JST Ulysses 拍板: 4 必备 = openai / claude / gemini / minimax
+  openai:    "OpenAI (GPT-4o / o1) — 4 必备",
+  claude:    "Anthropic Claude (3.5 / 4 Sonnet) — 4 必备",
+  gemini:    "Google Gemini (2.0 Flash / Pro) — 4 必备",
+  minimax:   "minimax (m2.7 / m-large) — 4 必备",
+  // 兼容旧 provider
+  anthropic: "Anthropic (legacy alias)",
+  openclaw:  "OpenClaw API (CLI tool)",
+  hermes:    "Hermes AI (CLI tool)",
+  google:    "Google AI (legacy alias)",
 };
 
 export default function ApiKeysPage() {

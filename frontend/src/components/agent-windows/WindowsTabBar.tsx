@@ -2,9 +2,11 @@
 
 // Star Frontend — 任务窗口多 CLI Tab Bar
 // Per 2026-08-29 04:09 JST 上轮拍板: 每 worktree 多 CLI session, Tab 切换
+// Per 2026-09-02 02:49 JST Ulysses 拍板: 每个 agent 齿轮按钮 (e.stopPropagation) 弹 AgentSettingsModal
+//   - 各 agent 独立 LLM API key (openai / claude / gemini / minimax 4 必备)
+//   - CLI profile + agent_kind 都可选绑定
 
-import { useState } from "react";
-import { Plus, X, Circle, Loader2, CheckCircle2, AlertCircle, XCircle, Terminal, Globe } from "lucide-react";
+import { Plus, X, Circle, Loader2, CheckCircle2, AlertCircle, XCircle, Terminal, Globe, Settings } from "lucide-react";
 
 export type TabState = "created" | "running" | "waiting_input" | "completed" | "failed" | "aborted";
 
@@ -25,6 +27,12 @@ interface WindowsTabBarProps {
   onTabSelect: (id: string) => void;
   onTabClose: (id: string) => void;
   onNewTab: () => void;
+  /**
+   * 齿轮按钮点击: 弹 AgentSettingsModal, 改该 agent tab 的 LLM API key
+   * per 2026-09-02 02:49 JST Ulysses 拍板: 每个 agent 旁边齿轮, 弹窗设 api key
+   * 不传 = 齿轮按钮不渲染
+   */
+  onAgentSettings?: (tab: CliTab) => void;
 }
 
 const STATE_ICON: Record<TabState, React.ElementType> = {
@@ -45,7 +53,7 @@ const STATE_COLOR: Record<TabState, string> = {
   aborted: "text-[color:var(--color-text-dim)]",
 };
 
-export function WindowsTabBar({ tabs, activeTabId, onTabSelect, onTabClose, onNewTab }: WindowsTabBarProps) {
+export function WindowsTabBar({ tabs, activeTabId, onTabSelect, onTabClose, onNewTab, onAgentSettings }: WindowsTabBarProps) {
   return (
     <div className="flex items-center border-b border-[color:var(--color-border)] bg-[color:var(--color-surface)] overflow-x-auto">
       {tabs.map((tab) => {
@@ -80,6 +88,18 @@ export function WindowsTabBar({ tabs, activeTabId, onTabSelect, onTabClose, onNe
             >
               <X size={10} />
             </button>
+            {/* 齿轮按钮 (per 2026-09-02 02:49 JST Ulysses 拍板) — 弹 AgentSettingsModal 设 LLM API key */}
+            {onAgentSettings && (
+              <button
+                data-testid={`agent-tab-settings-${tab.id}`}
+                onClick={(e) => { e.stopPropagation(); onAgentSettings?.(tab); }}
+                className="opacity-0 group-hover:opacity-100 hover:bg-[color:var(--color-primary)]/20 rounded p-0.5"
+                aria-label={`settings ${tab.label}`}
+                title="设置 LLM API key"
+              >
+                <Settings size={10} />
+              </button>
+            )}
           </div>
         );
       })}

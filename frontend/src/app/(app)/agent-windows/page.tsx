@@ -2,6 +2,9 @@
 
 // Star Frontend — 任务窗口中心页面
 // Per 2026-08-29 04:09 JST 上轮拍板: 新页面, 每 worktree 多 CLI session, 三触发上传
+// Per 2026-09-02 02:49 JST Ulysses 拍板: 每个 agent 齿轮按钮 → AgentSettingsModal
+//   4 必备 provider = openai / claude / gemini / minimax (per 02:49 JST 拍板)
+//   每 agent 分别填不同 key, 绑 CLI profile + agent_kind 双重关联 (均可选)
 
 import { useState } from "react";
 import { GitBranch, Plus, RefreshCw, Settings, Sparkles } from "lucide-react";
@@ -9,12 +12,14 @@ import { PageHeader, Stat, SectionTitle } from "@/components/PageHeader";
 import { WindowsTabBar, mockTabs, type CliTab } from "@/components/agent-windows/WindowsTabBar";
 import { CliTerminal } from "@/components/agent-windows/CliTerminal";
 import { NewTabModal } from "@/components/agent-windows/NewTabModal";
+import { AgentSettingsModal } from "@/components/agent-windows/AgentSettingsModal";
 import { useStore } from "@/lib/store";
 
 export default function AgentWindowsPage() {
   const [tabs, setTabs] = useState<CliTab[]>(mockTabs());
   const [activeTabId, setActiveTabId] = useState<string | null>("t1");
   const [modalOpen, setModalOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<CliTab | null>(null);
   const [selectedWorktree, setSelectedWorktree] = useState("wt-physis-gvpe");
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || null;
@@ -128,6 +133,7 @@ export default function AgentWindowsPage() {
           if (activeTabId === id) setActiveTabId(tabs[0]?.id || null);
         }}
         onNewTab={() => setModalOpen(true)}
+        onAgentSettings={(tab) => setSettingsTab(tab)}
       />
 
       {/* 终端 */}
@@ -141,6 +147,15 @@ export default function AgentWindowsPage() {
 
       {/* 新 Tab Modal */}
       {modalOpen && <NewTabModal onClose={() => setModalOpen(false)} onCreate={handleNewTab} />}
+
+      {/* Agent Settings Modal (per 2026-09-02 02:49 JST Ulysses 拍板) */}
+      {settingsTab && (
+        <AgentSettingsModal
+          open={true}
+          onClose={() => setSettingsTab(null)}
+          tab={settingsTab}
+        />
+      )}
     </div>
   );
 }
