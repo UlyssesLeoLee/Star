@@ -15,6 +15,8 @@ import {
   WifiOff,
   AlertCircle,
   RefreshCw,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { buildRemoteUrl, isRemoteMockMode } from "@/lib/remote/wsClient";
 
@@ -36,6 +38,8 @@ export function NoVncViewer({
   const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [mockMode, setMockMode] = useState(false);
+  const [zoom, setZoom] = useState(1); // 0.5x - 3x, mock 模式也用
+  const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
 
   // 状态机: idle → connecting → connected / error
   const connect = async () => {
@@ -131,7 +135,22 @@ export function NoVncViewer({
       <div
         ref={containerRef}
         data-testid="novnc-canvas"
-        className="flex-1 relative overflow-hidden"
+        className="flex-1 relative overflow-hidden bg-black touch-none"
+        // 1 指拖动 (per v0.3 触屏 UX)
+        onPointerDown={(e) => {
+          if (zoom <= 1) return; // 不缩放时不启动拖动
+          (e.target as HTMLElement).setPointerCapture(e.pointerId);
+          setDrag({ x: e.clientX, y: e.clientY });
+        }}
+        onPointerMove={(e) => {
+          if (!drag) return;
+          const dx = e.clientX - drag.x;
+          const dy = e.clientY - drag.y;
+          containerRef.current?.scrollBy({ left: -dx, top: -dy });
+          setDrag({ x: e.clientX, y: e.clientY });
+        }}
+        onPointerUp={() => setDrag(null)}
+        onPointerCancel={() => setDrag(null)}
       >
         {status === "idle" && (
           <button
@@ -173,10 +192,13 @@ export function NoVncViewer({
         {status === "connected" && mockMode && (
           <div
             data-testid="novnc-mock-surface"
-            className="absolute inset-0 p-4 text-[10px] font-mono text-green-400 leading-snug"
+            className="absolute inset-0 p-4 text-[10px] font-mono text-green-400 leading-snug origin-top-left"
             style={{
               backgroundImage: "linear-gradient(180deg, #001100 0%, #000 100%)",
               backgroundSize: "100% 24px",
+              transform: `scale(${zoom})`,
+              width: `${100 / zoom}%`,
+              height: `${100 / zoom}%`,
             }}
           >
             <pre className="whitespace-pre-wrap">
@@ -206,23 +228,56 @@ user@${hostname}:~$ ▮
 
       {/* Mobile toolbar */}
       {status === "connected" && (
-        <div className="flex items-center justify-around gap-1 px-2 py-2 border-t border-line bg-bg-soft/80 backdrop-blur">
-          {[
-            { label: "Ctrl", key: "ctrl" },
-            { label: "Alt", key: "alt" },
-            { label: "Shift", key: "shift" },
-            { label: "Tab", key: "tab" },
-            { label: "Esc", key: "esc" },
-          ].map((b) => (
+        <div className="flex items-center gap-1 px-2 py-2 border-t border-line bg-bg-soft/80 backdrop-blur">
+          <div className="flex items-center gap-0.5 pr-2 border-r border-line/50">
             <button
-              key={b.key}
               type="button"
-              data-testid={`novnc-key-${b.key}`}
-              className="px-3 py-1.5 rounded-lg border border-line text-[11px] font-mono text-ink-dim hover:text-ink active:scale-95"
+              onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}
+              data-testid="novnc-zoom-out"
+              className="p-1.5 rounded-md text-ink-dim hover:text-ink active:scale-95"
+              aria-label="Zoom out"
             >
-              {b.label}
+              <ZoomOut size={13} />
             </button>
-          ))}
+            <span className="text-[10px] font-mono text-ink-mute min-w-[32px] text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
+              data-testid="novnc-zoom-in"
+              className="p-1.5 rounded-md text-ink-dim hover:text-ink active:scale-95"
+              aria-label="Zoom in"
+            >
+              <ZoomIn size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom(1)}
+              data-testid="novnc-zoom-reset"
+              className="px-1.5 py-1 text-[10px] font-mono text-ink-mute hover:text-ink"
+            >
+              1x
+            </button>
+          </div>
+          <div className="flex items-center gap-0.5 flex-1 justify-around">
+            {[
+              { label: "Ctrl", key: "ctrl" },
+              { label: "Alt", key: "alt" },
+              { label: "Shift", key: "shift" },
+              { label: "Tab", key: "tab" },
+              { label: "Esc", key: "esc" },
+            ].map((b) => (
+              <button
+                key={b.key}
+                type="button"
+                data-testid={`novnc-key-${b.key}`}
+                className="px-2.5 py-1.5 rounded-lg border border-line text-[11px] font-mono text-ink-dim hover:text-ink active:scale-95"
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

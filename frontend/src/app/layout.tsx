@@ -8,6 +8,8 @@ import { CommandBar } from "@/components/CommandBar"; // per DRIFT-α-020 (2026-
 import { MobileHeader } from "@/components/MobileHeader";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { PwaBoot } from "@/components/PwaBoot";
+import { PwaUpdateToast } from "@/components/PwaUpdateToast";
+import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
 export const metadata: Metadata = {
   title: "Star — Vibe Coding Work Management",
@@ -64,6 +66,10 @@ export default function RootLayout({
             <MobileBottomNav />
             {/* PWA Service Worker 注册 (production only) */}
             <PwaBoot />
+            {/* PWA 更新提示 toast (监听 star:pwa-updated) */}
+            <PwaUpdateToast />
+            {/* PWA install prompt (beforeinstallprompt + iOS 引导) */}
+            <PwaInstallPrompt />
             {/* Global toast: GanttBar 拖拽冲突 / Board 列删除 / 主题切换等全局反馈
                 - 暗色模式背景, 适配 next-themes
                 - duration 4000 (默认), Gantt 冲突可单独传 duration:1500
