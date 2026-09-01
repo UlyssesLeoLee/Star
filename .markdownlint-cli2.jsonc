@@ -1,0 +1,32 @@
+{
+  // markdownlint-cli2 config — STAR project (per PHASE-P3-D6-IMPL-REPORT.md)
+  // 守门 #12: 配置 = evidence, 任何变更需 PHASE 报告 + commit 短码 + 触发原因
+  // 规则选择: 关闭 line-length / inline-html 等会因历史文档长行 / 表格触发误报的规则
+  "config": {
+    "default": true,
+    "MD013": false,         // line-length: AGENTS.md 5197 chars / CHANGELOG.md 1433 chars 历史形态, 关闭
+    "MD024": { "siblings_only": true },  // duplicate headings: 允许 sibling 段内重复 (e.g. §0 目的 跨多份报告)
+    "MD033": false,         // no-inline-html: AGENTS.md / WBS 含 <br> / <system-reminder> 引用, 关闭
+    "MD036": false,         // no-emphasis-as-heading: 章节首行 "**Status**:" 等, 关闭
+    "MD041": false          // first-line-heading: 多份报告首行是 H1 但内含 frontmatter, 关闭
+  },
+  "globs": [
+    "**/*.md",
+    "!node_modules",
+    "!.git",
+    "!target",
+    "!frontend/node_modules",
+    "!frontend/.next",
+    "!frontend/dist",
+    "!**/_ARCHIVED_*.md",
+    "!**/_ARCHIVED_*.mdx"
+  ],
+  "ignores": [
+    "node_modules",
+    ".git",
+    "target",
+    "frontend/node_modules",
+    "frontend/.next",
+    "frontend/dist"
+  ]
+}
