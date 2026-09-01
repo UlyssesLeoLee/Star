@@ -32,6 +32,8 @@ docs/data-design/ipa-detail/
 ├── 00-CONSTRAINTS.md                    # 全 CHECK / UK / FK 制約一覧
 ├── 00-FK-GRAPH.md                       # テーブル間 FK 俯瞰（有向グラフ + Mermaid）
 ├── OPTIMIZATION-NOTES.md                # 整理中发现した最適化提案清单
+├── 00-CLASSIFICATION-W-T-M.md           # 業務分類索引（Work / Transaction / Master）三類横展
+├── 00-CLASSIFICATION-RULES.md           # 跨プロジェクト ルール手册（新規 DB 設計 チェックリスト）
 ├── templates/
 │   └── TABLE-TEMPLATE.md                # 個別ファイル雛形（IPA 標準章立て）
 ├── tables/                              # テーブル別詳細（78+ ファイル）
@@ -182,6 +184,7 @@ sqlx migrate run --source migrations/
 | バージョン | 日付 | 改訂人 | 改訂内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：25 Schema × 78+ テーブル IPA 化開始 / テンプレート / INVENTORY / 4 Schema 完成 | per 2026-09-01 15:30 JST Ulysses 拍板（folder=ipa_inline / granularity=per_table / scope=scope_everything / optimize=opt_dual） |
+| v0.2 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | §1 フォルダ構成に `00-CLASSIFICATION-W-T-M.md` / `00-CLASSIFICATION-RULES.md` 2 ファイル追加 + §6 改訂履歴 v0.2 追記 | per 2026-09-01 18:30 JST Ulysses 指示「DB 表设计应包含 Work/Transaction/master, 分门别类, 类似问题横展开细化, 其他横展内容按日本 IPA 规则处理」 + per 守门 #12 commit-time docs 同期 |
 
 ---
 

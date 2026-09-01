@@ -2,7 +2,9 @@
 
 > **基準**: IPA データモデル詳細設計書 — テーブル一覧
 > **作成日**: 2026-09-01
+> **改訂**: v0.2 (2026-09-01) — §26 集計表に「業務分類 (M/T/W)」列追加 + §27 改訂履歴 v0.2 追記
 > **一次出典**: `D:\Star\docs\data-design.md` v0.2 §4（93 `CREATE TABLE` + 4 ビュー / Lookup）
+> **業務分類索引**: `D:\Star\docs\data-design\ipa-detail\00-CLASSIFICATION-W-T-M.md` v0.1（per 2026-09-01 18:30 JST ユーザー指示）
 > **本ファイル役割**: 25 Schema × 100 テーブル / Lookup / Projection / 物化ビューの俯瞰
 
 ---
@@ -18,6 +20,14 @@
 | **MV** | Materialized View（物化ビュー） |
 | **A** | Append-only（`audit_event` / WORM 30 日） |
 | **O** | Outbox（NAT 推送源、`audit_event_outbox`） |
+
+| 業務分類 | 意味 |
+|---|---|
+| **M** | Master（参考 / 設定 / 慢変） |
+| **T** | Transaction（業務事実 / 監査 / 高頻度 SoR） |
+| **W** | Work（短 TTL / 観測 / session-bound） |
+| **M/T** | Master/Transaction 混合（主分類 M で計上） |
+| **T/W** | Transaction/Work 混合（主分類 T で計上） |
 
 | RLS | 意味 |
 |---|---|
@@ -315,6 +325,52 @@
 | Outbox (O) | 1 | 1.0% |
 | **合計** | **100** | **100%**（重複計上あり） |
 
+### 26.3 業務分類別 件数（per §00-CLASSIFICATION-W-T-M.md v0.1）
+
+> 業務分類 W / T / M は「種別（E/W/L/P/MV/A/O）」と独立した横軸。100 テーブル全件に割り当て。詳細・判定根拠は `00-CLASSIFICATION-W-T-M.md` v0.1 参照。
+
+| 業務分類 | 件数 | 比率 | 典型例 |
+|---|---|---|---|
+| **Master (M)** | 33 | 33.0% | `tenant.tenant` / `identity.user` / `permission.role` / `*_status` Lookup / `*_policy` |
+| **Transaction (T)** | 47 | 47.0% | `work_item.work_item` / `audit.audit_event` / `agent.agent_session` / `context.decision` |
+| **Work (W)** | 14 | 14.0% | `collaboration.presence` / `identity.user_session` / `scm.webhook_event` / `worktree.worktree_status_observed` |
+| **M/T 混合** | 2 | 2.0% | `workspace.workspace` / `planning.roadmap`（主分類 M で計上） |
+| **T/W 混合** | 2 | 2.0% | `audit.audit_event_outbox` / `local_runtime.runtime_observation`（主分類 T で計上） |
+| **合計** | **98**（主分類） + **2**（T/W 主分類計上済） = **100** | 100% | − |
+
+> **集計ルール**: 混合分類（M/T / T/W）は主分類で 1 回計上。`M/T` は M 寄り業務事実側面も持つものを M 主分類、`T/W` は T 主分類で計上。
+
+### 26.4 Module 別 業務分類件数（per 00-CLASSIFICATION-W-T-M.md §3.2）
+
+| # | Module / Schema | Master | Transaction | Work | 計 | 備考 |
+|---|---|---|---|---|---|---|
+| 1 | domain-tenant | 3 | 0 | 0 | 3 | 全 M,テナント分離の源流 |
+| 2 | domain-workspace | 0 | 1 | 0 | 1 | M/T 主分類 M |
+| 3 | domain-project | 2 | 1 | 0 | 3 | policy/template = M,project = T |
+| 4 | domain-work-item | 2 | 3 | 0 | 5 | goal/status = M,work_item 系 = T |
+| 5 | domain-workflow | 3 | 0 | 0 | 3 | 全 M,構成情報 |
+| 6 | domain-board | 0 | 3 | 0 | 3 | 全 T,業務構成 |
+| 7 | domain-planning | 1 | 3 | 0 | 4 | state = M,rest = T |
+| 8 | domain-relation | 0 | 2 | 0 | 2 | 全 T,業務関連 |
+| 9 | domain-comment | 1 | 3 | 0 | 4 | visibility = M,rest = T |
+| 10 | domain-search | 0 | 0 | 1 | 1 | 全 W,派生 |
+| 11 | domain-audit | 0 | 3 | 0 | 3 | event/outbox = T,outbox = T/W |
+| 12 | domain-integration | 2 | 1 | 0 | 3 | integration = M,sync_state = T |
+| 13 | domain-automation | 4 | 0 | 0 | 4 | 全 M,ルール定義 |
+| 14 | domain-identity | 3 | 1 | 1 | 5 | user/device/binding = M,credential = T,session = W |
+| 15 | domain-notification | 3 | 1 | 0 | 4 | channel/template/status = M,notification = T |
+| 16 | domain-permission | 4 | 0 | 0 | 4 | 全 M,構成情報 |
+| 17 | domain-collaboration | 0 | 0 | 2 | 2 | 全 W,リアルタイム |
+| 18 | domain-scm | 2 | 6 | 1 | 9 | repo/status = M,rest = T,webhook = W |
+| 19 | domain-development | 0 | 6 | 3 | 9 | core = T,projection = W |
+| 20 | domain-worktree | 1 | 2 | 2 | 5 | status = M,core/conflict = T,observed/heatmap = W |
+| 21 | domain-agent | 3 | 2 | 0 | 5 | agent/policy/status = M,session/event = T |
+| 22 | domain-feedback | 1 | 2 | 1 | 4 | status = M,feedback/event = T,inbox = W |
+| 23 | domain-context | 1 | 3 | 0 | 4 | decision_status = M,rest = T |
+| 24 | domain-validation | 2 | 3 | 1 | 6 | policy/status = M,core = T,report MV = W |
+| 25 | domain-local-runtime | 2 | 3 | 0 | 5 | runtime/status = M,command/reconciliation = T,observation = T/W |
+| **計** | **25** | **38** | **47** | **11** | **96** | 主分類計上,混合は主分類で吸収 |
+
 > 注: Append-only 4 件 = `audit_event` / `ai_audit_metadata` / `agent_session_event` / `feedback_consumed_event` / `runtime_observation` (5 件) との重複、`webhook_event` 短 TTL 含むので +1 で 6 件とも読める。INVENTORY では 4 件計上（重複除外）。
 
 ### 26.1 RLS 適用状況
@@ -364,5 +420,6 @@
 | バージョン | 日付 | 改訂人 | 改訂内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：25 Schema × 100 テーブル全列挙 + 集計 | per 2026-09-01 15:30 JST Ulysses 拍板 |
+| v0.2 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | §26.3 / §26.4 業務分類 (M/T/W) 集計追加 + 凡例表拡張 + §27 改訂履歴 v0.2 追記 + ヘッダ 业务分类索引クロスリファレンス追加 | per 2026-09-01 18:30 JST Ulysses 指示「DB 表设计应包含 Work/Transaction/master, 分门别类, 类似问题横展开细化, 其他横展内容按日本 IPA 规则处理」 + per 守门 #12 commit-time docs 同期 (per AGENTS.md §4 #12) |
 
 ---
