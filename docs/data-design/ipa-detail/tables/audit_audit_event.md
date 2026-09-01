@@ -55,6 +55,7 @@
 | `audit_event_pkey` | PRIMARY KEY | `id` | − | 主キー |
 | `ck_audit_actor_type` | CHECK | `actor_type` | `IN ('user','agent','system')` | 3 種別 |
 | `audit_event_2026_09` 等 | PARTITION | `occurred_at` | `FOR VALUES FROM ('2026-09-01') TO ('2026-10-01')` | 月次パーティション |
+| `ck_audit_action_v0_2` (per 2026-09-02 追加) | DOMAIN (App) | `action` | `action ~ '^onboarding\.test_key\.(failed\|started\|succeeded)$'` | onboarding event 3 値許容, actor_type='system' 必須 (per ADR-0043 §2.2) |
 
 ---
 
@@ -146,3 +147,4 @@ CREATE POLICY policy_audit_event_tenant_isolation ON audit.audit_event
 | バージョン | 日付 | 改訂人 | 改訂内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版 | per 2026-09-01 15:30 JST Ulysses 拍板 |
+| v0.2 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 | onboarding event_type 追加 (per ADR-0043-audit-onboarding-failed v0.1 §2.2):<br>- `ck_audit_action_v0_2` DOMAIN 制約追加: `action ~ '^onboarding\.test_key\.(failed\|started\|succeeded)$'` (Phase 2 用, onboarding 3 event 許容)<br>- onboarding.test_key.failed: actor_type=`system`, resource_type=`api_key`, after_state={provider, label, attempts, status_code, error_message, detected_key_id}<br>- §10 RLS 不变 (per 13 類), §6 パーティション不变 (月次 BRIN), §5 REVOKE 不变 (WORM)<br>- 既存 16 字段不拡張, 新表 0 (per ADR-0043 §2.1 既存活用方針) | 2026-09-02 08:39 JST Ulysses 4 拍板 (仅 audit / .env 凭证 / 单 session / 增量 commit), 既存 audit_audit_event 活用戦略 |
