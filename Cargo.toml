@@ -6,6 +6,7 @@ members = [
     "crates/domain-agent",
     "crates/domain-audit",
     "crates/domain-automation",
+    "crates/domain-batch",
     "crates/domain-board",
     "crates/domain-collaboration",
     "crates/domain-comment",

@@ -1,0 +1,27 @@
+[package]
+name = "domain-batch"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "批处理任务调度 + DAG 编排 + 状态机 (per BATCH-REQ-001 v0.1.2 + ADR-0040)"
+
+[dependencies]
+# 通用 (跟 domain-automation 对齐, v0 phase 1 估 ~0.2M token)
+serde = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+
+star-context = { path = "../star-context" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true
