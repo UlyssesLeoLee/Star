@@ -343,3 +343,18 @@ sequenceDiagram
 | WorkItem 3 态 | **间接**:WorkItem.status 独立(REQ-WF-002),Worktree.status 变更不反向写 WorkItem |
 
 **接口稳定承诺**:Port trait 签名 + **17 状态机集合** + 9 项 Isolation 检查 + Completion Gate 七项检查 + 7 状态投影 + 10 条错误码在后续 RFC 阶段不会变更。
+
+## 15. 与其他 domain 协作 (v0.16 协作细化新增)
+
+per [basic-design v0.16 §3.2.9 22 domain contact face 表](../../basic-design.md) + [ADR-0039 §D26-D32 Worktree Orchestration 跨域协作](../../architecture/2026-08-26-upgrade/adr/0039-worktree-orchestration-cross-domain.md) + [spec/saga/01 v0.2 SagaCoordinationRole](../../architecture/2026-08-26-upgrade/spec/saga/01-saga-coordination-spec.md),本节定义 `worktree` 与 22 domain 中 4 个 domain 的显式接触面。
+
+| 源 Domain | 目标 Domain | 接触方式 | 接触点 |
+|---|---|---|---|
+| relation | worktree | Customer-Supplier | Relation 含 Worktree 冲突分析源 (per RFC-029) |
+| automation | worktree | Customer-Supplier | AutomationRule.action = Worktree reconcile |
+| development | worktree | Customer-Supplier | Worktree.development_execution_id 引用 |
+| local-runtime | worktree | Conformist | Local Runtime 上报 Worktree.observed_state (per requirements §23) |
+
+**接触面统计**: 4 条 (v0.16 新增,本 spec 由 `scripts/inter_collab_refine.py` 批量生成)
+
+**dual-use 警告** (per AGENTS.md §5 v0.6 + Q1-D 拍板): 5 域 (player/economy/match/social/admin) 是 RGS 仓历史治理命名,Star 仓不建立业务子域↔DDD 映射。本 spec 协作基于 22 domain crate,不通过 5 域绑定推导。

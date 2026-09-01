@@ -372,3 +372,25 @@ sequenceDiagram
 | WorkItem 3 态 | **本 Module 拥有**:TODO / IN_PROGRESS / DONE(REQ-WF-001 强约束);扩展 IN_REVIEW / BLOCKED / CANCELLED 等由 ProjectPolicy 自定义 |
 
 **接口稳定承诺**:Port trait 签名 + 8 条错误码 + 9 条不变量 + 默认三态状态机在后续 RFC 阶段不会变更。
+
+## 15. 与其他 domain 协作 (v0.16 协作细化新增)
+
+per [basic-design v0.16 §3.2.9 22 domain contact face 表](../../basic-design.md) + [ADR-0039 §D26-D32 Worktree Orchestration 跨域协作](../../architecture/2026-08-26-upgrade/adr/0039-worktree-orchestration-cross-domain.md) + [spec/saga/01 v0.2 SagaCoordinationRole](../../architecture/2026-08-26-upgrade/spec/saga/01-saga-coordination-spec.md),本节定义 `work-item` 与 22 domain 中 11 个 domain 的显式接触面。
+
+| 源 Domain | 目标 Domain | 接触方式 | 接触点 |
+|---|---|---|---|
+| project | work-item | Customer-Supplier | WorkItem.project_id + ProjectPolicy (Workflow 扩展状态机源) |
+| workflow | work-item | Customer-Supplier | WorkflowDefinition → state machine (per REQ-WF-001) |
+| board | work-item | Customer-Supplier | BoardConfiguration.project_id 投影 WorkItem 列表 |
+| planning | work-item | Customer-Supplier | Sprint.contains_work_item_ids[] (只读 FK) |
+| comment | work-item | Customer-Supplier | Comment.parent = WorkItem (per REQ-COLLAB-001) |
+| relation | work-item | Customer-Supplier | Relation.source/target = WorkItem (blocks/relates/duplicates, per REQ-COLLAB-002) |
+| collaboration | work-item | Customer-Supplier | Realtime 状态推送 (per requirements §15) |
+| automation | work-item | Customer-Supplier | AutomationRule.action = WorkItem transition (per REQ-AUTO-001) |
+| development | work-item | Customer-Supplier | DevelopmentExecution.work_item_id 引用 |
+| search | work-item | Published Language | 投影 WorkItem → Search Index (worker projection role) |
+| notification | work-item | Separate Ways(异步) | 监听 WorkItem StateChanged 触发 |
+
+**接触面统计**: 11 条 (v0.16 新增,本 spec 由 `scripts/inter_collab_refine.py` 批量生成)
+
+**dual-use 警告** (per AGENTS.md §5 v0.6 + Q1-D 拍板): 5 域 (player/economy/match/social/admin) 是 RGS 仓历史治理命名,Star 仓不建立业务子域↔DDD 映射。本 spec 协作基于 22 domain crate,不通过 5 域绑定推导。

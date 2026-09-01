@@ -325,3 +325,19 @@ sequenceDiagram
 | WorkItem 3 态 | 间接(Execution.work_item_id 引用) |
 
 **接口稳定承诺**:Port trait 签名 + 8 种 Risk Signal 类型 + 6 条错误码 + 8 条不变量 + Object Storage Key 强制 tenant_id 前缀在后续 RFC 阶段不会变更。
+
+## 15. 与其他 domain 协作 (v0.16 协作细化新增)
+
+per [basic-design v0.16 §3.2.9 22 domain contact face 表](../../basic-design.md) + [ADR-0039 §D26-D32 Worktree Orchestration 跨域协作](../../architecture/2026-08-26-upgrade/adr/0039-worktree-orchestration-cross-domain.md) + [spec/saga/01 v0.2 SagaCoordinationRole](../../architecture/2026-08-26-upgrade/spec/saga/01-saga-coordination-spec.md),本节定义 `development` 与 22 domain 中 6 个 domain 的显式接触面。
+
+| 源 Domain | 目标 Domain | 接触方式 | 接触点 |
+|---|---|---|---|
+| development | work-item | Customer-Supplier | DevelopmentExecution.work_item_id 引用 |
+| development | worktree | Customer-Supplier | Worktree.development_execution_id 引用 |
+| development | agent | Customer-Supplier | DevelopmentExecution.assignee_agent_id 引用 |
+| development | change-set | Customer-Supplier | DevelopmentExecution 聚合 ChangeSet[] (per requirements §21) |
+| development | audit | Separate Ways | Development 状态机事件全量审计 |
+
+**接触面统计**: 5 条 (v0.16 新增,本 spec 由 `scripts/inter_collab_refine.py` 批量生成)
+
+**dual-use 警告** (per AGENTS.md §5 v0.6 + Q1-D 拍板): 5 域 (player/economy/match/social/admin) 是 RGS 仓历史治理命名,Star 仓不建立业务子域↔DDD 映射。本 spec 协作基于 22 domain crate,不通过 5 域绑定推导。

@@ -325,3 +325,19 @@ sequenceDiagram
 | WorkItem 3 态 | 间接(Sprint 包含 WorkItem 列表,但不拥有状态机) |
 
 **接口稳定承诺**:Port trait 签名 + 7 条错误码 + 6 条不变量在后续 RFC 阶段不会变更。
+
+## 15. 与其他 domain 协作 (v0.16 协作细化新增)
+
+per [basic-design v0.16 §3.2.9 22 domain contact face 表](../../basic-design.md) + [ADR-0039 §D26-D32 Worktree Orchestration 跨域协作](../../architecture/2026-08-26-upgrade/adr/0039-worktree-orchestration-cross-domain.md) + [spec/saga/01 v0.2 SagaCoordinationRole](../../architecture/2026-08-26-upgrade/spec/saga/01-saga-coordination-spec.md),本节定义 `planning` 与 22 domain 中 5 个 domain 的显式接触面。
+
+| 源 Domain | 目标 Domain | 接触方式 | 接触点 |
+|---|---|---|---|
+| project | planning | Customer-Supplier | Project.sprint_scheme_id 引用 |
+| board | planning | Shared Kernel | Board 列定义与 Sprint 状态映射 (Kanban/Scrum 共享) |
+| planning | work-item | Customer-Supplier | Sprint.contains_work_item_ids[] (只读 FK) |
+| planning | board | Customer-Supplier | Board 视图从 Planning.Sprint 投影 (per REQ-PLAN-003) |
+| planning | relation | Customer-Supplier | Gantt 依赖基于 Relation (per REQ-PLAN-004) |
+
+**接触面统计**: 5 条 (v0.16 新增,本 spec 由 `scripts/inter_collab_refine.py` 批量生成)
+
+**dual-use 警告** (per AGENTS.md §5 v0.6 + Q1-D 拍板): 5 域 (player/economy/match/social/admin) 是 RGS 仓历史治理命名,Star 仓不建立业务子域↔DDD 映射。本 spec 协作基于 22 domain crate,不通过 5 域绑定推导。

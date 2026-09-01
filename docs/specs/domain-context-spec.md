@@ -336,3 +336,20 @@ sequenceDiagram
 | WorkItem 3 态 | 间接 |
 
 **接口稳定承诺**:Port trait 签名 + **P0-P4 五层结构** + 3 状态 Decision 状态机 + Provenance 强制 + Handoff Context Packet 结构 + 7 条错误码在后续 RFC 阶段不会变更(除非 D-02 修复再次被反演)。
+
+## 15. 与其他 domain 协作 (v0.16 协作细化新增)
+
+per [basic-design v0.16 §3.2.4 context → 多个 详表](../../basic-design.md) (context 已在 §3.2.4 详表覆盖,本节摘要引用),本 spec 涉及 6 个 contact face:
+
+| 源 Domain | 目标 Domain | 接触方式 | 接触点 |
+|---|---|---|---|
+| context | work-item | Customer-Supplier | 读取 Requirement/AcceptanceCriterion |
+| context | worktree | Customer-Supplier | 读取 Worktree.current_change_set, test_state |
+| context | feedback | Customer-Supplier | 读取 Open Feedback |
+| context | validation | Customer-Supplier | 读取 Failed Validation |
+| context | scm | Conformist | 通过 SCM Adapter 读取 Repository 元数据 |
+| context | identity | Customer-Supplier | 读取 AgentPolicy |
+
+**contact face 统计**: 6 条 (v0.16 新增,本 spec 由 scripts/inter_collab_refine.py 手工补充)
+
+**dual-use 警告** (per AGENTS.md §5 v0.6 + Q1-D 拍板): 5 域 (player/economy/match/social/admin) 是 RGS 仓历史治理命名,Star 仓不建立业务子域↔DDD 映射。本 spec 协作基于 22 domain crate,不通过 5 域绑定推导。
