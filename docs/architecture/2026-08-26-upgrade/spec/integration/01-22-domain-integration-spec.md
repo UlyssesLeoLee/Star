@@ -1,9 +1,16 @@
 # Spec-01: 22 domain crate 真实数据接入规范
 
-> **状态**：Draft v0.1
-> **日期**：2026-08-28
-> **修订人**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
-> **触发**：per [ADR-0036 §8.2 Phase H 方向](../../adr/0036-phase-g-architecture.md) / 2026-08-27 21:59 JST 用户授权第三次强化
+> **状态**：Draft v0.2
+> **日期**：2026-09-01
+> **修订人**：架构师 (Mavis 接手 agent per DEC-008)
+> **触发**：per [ADR-0036 §8.2 Phase H 方向](../../adr/0036-phase-g-architecture.md) / 2026-08-27 21:59 JST 用户授权第三次强化 / 2026-09-01 14:38 JST 模块间协作细化任务
+
+> **dual-use 警告 (per AGENTS.md §5 v0.6 + 2026-08-31 22:45 JST Q1-D 拍板)**：
+> 本 spec 沿用 5 域（Permission/Worktree/Flow/Integration/Agent/Admin）作为"5 位真人 Lead 问责结构"的历史治理命名，但**不**作为 22 domain crate 的业务子域映射。
+> - 5 域是 5 位真人 Lead 责任分工（per 8/21 JST 用户偏好"不接受兼任"）
+> - 22 domain crate 是 DDD bounded context（per [spec/agents/02 §2](../agents/02-data-sources-spec.md) 22 domain 数据源清单）
+> - 二者**非同一分类**，本 spec §2 Tier 表"5 域映射"列**仅作历史命名兼容性 footnote**，实际代码层归属通过 [spec/saga/01 v0.2 §2](../saga/01-saga-coordination-spec.md) `SagaStep.responsible_crate: &str` 字段显式声明
+> - Lead 兼任约束（架构师不得兼任意 5 域 Lead / SRE 不得兼 Admin Lead / 同一 Lead 不得签 2 域）**仅适用于 5 域历史治理命名**，22 domain crate 各自 lead 待 DDD Review 阶段补
 
 ## §1 目的
 
@@ -142,22 +149,49 @@ per [spec/agents/02 §2 22 domain 数据源清单](../agents/02-data-sources-spe
 
 **总测试数**：22 core × 3 = 66 + 3 非核心 × 3 = 9 = **75 测试**（per Tier 验收门：Tier 1 = 9 / Tier 2 = 9 / Tier 3 = 12 / Tier 4 = 12 / Tier 5 = 12 / Tier 6 = 18 + 3 非核心 3 = 75）。
 
-### §3.2 5 域 Lead 验收签字
+### §3.2 22 domain crate 各自 lead 验收签字 (v0.2 5 域脱钩后)
 
-per 8/21 JST 用户偏好"5 域独立 Lead，不接受兼任"（per [AGENTS.md §4 #3 守门硬约束](../../../../../AGENTS.md)）：
+per 8/21 JST 用户偏好"5 域独立 Lead，不接受兼任"（per [AGENTS.md §4 #3 守门硬约束](../../../../../AGENTS.md)）+ 2026-08-31 22:45 JST Q1-D 拍板（5 域脱钩 22 DDD）：
 
-| 5 域 | 关联 crate（per [spec/agents/02 §2.1 5 域映射](../agents/02-data-sources-spec.md)）| Lead 身份 |
-|------|----------------------------------------|------------|
-| Agent 域 | domain-agent / domain-lease / domain-resume / domain-validation | ⏳ Agent Lead (DDD Review 阶段补) |
-| Worktree 域 | domain-worktree / domain-workspace / domain-scm | ⏳ Worktree Lead |
-| Flow 域 | domain-work-item / domain-project / domain-flow / domain-decision / domain-event / domain-automation | ⏳ Flow Lead |
-| Permission 域 | domain-tenant / domain-identity / domain-permission / domain-policy / domain-audit | ⏳ Permission Lead |
-| Integration 域 | domain-integration / domain-search / domain-notification / domain-feedback / domain-context | ⏳ Integration Lead |
+**22 domain crate 各自 lead 签字表** (per [spec/agents/02 §2 22 domain 数据源清单](../agents/02-data-sources-spec.md) + [spec/saga/01 v0.2 §3 SagaCoordinationRole 映射](../../adr/0031-context-graph.md))：
 
-**禁止兼任**（per [ADR-0036 §4 5 决策 D11-D15](../../adr/0036-phase-g-architecture.md) L182-190 + [spec/saga/01 §3 5 域 Lead 兼任约束](../saga/01-saga-coordination-spec.md)）：
-- ❌ 架构师不得兼任 Agent / Worktree / Flow / Permission / Integration 5 域任意 Lead
+| 22 domain crate | 5 域历史归类 (footnote only) | SagaCoordinationRole 主导 | Lead 身份 |
+|---|---|---|---|
+| domain-tenant | Permission 域 | IdentityValidation | ⏳ tenant lead (DDD Review 阶段补) |
+| domain-identity | Permission 域 | IdentityValidation | ⏳ identity lead |
+| domain-permission | Permission 域 | DecisionAuthorization | ⏳ permission lead |
+| domain-policy | Permission 域 | DecisionAuthorization | ⏳ policy lead |
+| domain-workspace | Worktree 域 | ResourceMutation | ⏳ workspace lead |
+| domain-project | Flow 域 | ResourceMutation | ⏳ project lead |
+| domain-work-item | Flow 域 | ResourceMutation | ⏳ work-item lead |
+| domain-workflow | Flow 域 | DecisionAuthorization | ⏳ workflow lead |
+| domain-board | Flow 域 | ResourceMutation | ⏳ board lead |
+| domain-planning | Flow 域 | ResourceMutation | ⏳ planning lead |
+| domain-worktree | Worktree 域 | ResourceMutation | ⏳ worktree lead |
+| domain-agent | Agent 域 | IdentityValidation | ⏳ agent lead |
+| domain-feedback | Integration 域 | DecisionAuthorization | ⏳ feedback lead |
+| domain-validation | Agent 域 | ResourceMutation | ⏳ validation lead |
+| domain-scm | Worktree 域 | ACL(隔离) | ⏳ scm lead |
+| domain-development | Worktree 域 | ResourceMutation | ⏳ development lead |
+| domain-context | Integration 域 | StateObservation | ⏳ context lead |
+| domain-automation | Flow 域 | DecisionAuthorization | ⏳ automation lead |
+| domain-integration | Integration 域 | ACL(隔离) | ⏳ integration lead |
+| domain-audit | Admin 域 | AuditLogging | ⏳ audit lead (COC 独立控制面) |
+| domain-search | Integration 域 | Published Language | ⏳ search lead |
+| domain-notification | Integration 域 | Separate Ways | ⏳ notification lead |
+| domain-collaboration | Integration 域 | Customer-Supplier | ⏳ collaboration lead |
+| domain-comment | Integration 域 | ResourceMutation | ⏳ comment lead |
+| domain-relation | Integration 域 | Customer-Supplier | ⏳ relation lead |
+| domain-local-runtime | Worktree 域 | Conformist | ⏳ local-runtime lead |
+
+> **5 域历史归类列仅作 footnote** (per dual-use 警告 + AGENTS.md §5 v0.6)，实际代码层归属通过 [spec/saga/01 v0.2 §2](../saga/01-saga-coordination-spec.md) `SagaStep.responsible_crate: &str` 字段显式声明到 22 domain crate 之一。
+
+**禁止兼任约束**（per 8/21 JST + AGENTS.md §4 #3 守门，**仅适用于 5 域历史治理命名**）：
+- ❌ 架构师不得兼任 Permission / Worktree / Flow / Integration / Agent 5 域任意 Lead
 - ❌ SRE 不得兼任 Admin 域（per COC 独立控制面）
-- ❌ 同一 Lead 不得签 2 个域
+- ❌ 同一 Lead 不得签 2 个 5 域
+
+> Star 仓 22 domain crate 各自的 lead 兼任约束待 DDD Review 阶段补（per [AGENTS.md §4 #3 v0.6 Q1-D 拍板 +c](../../../../AGENTS.md)，5 域独立 Lead ≠ 22 domain 独立 lead，二者**不建立映射**）。
 
 ## §4 跨域 Saga 触发点
 
@@ -167,10 +201,10 @@ per [spec/saga/01 §1 跨域 Saga 协调契约](../saga/01-saga-coordination-spe
 
 **触发条件**：用户创建 workspace（`POST /workspaces` per [spec/rest/01](../rest/) 草稿）
 
-**Saga 步骤**（3 step）：
-1. **Permission 域 step**：`ValidateTenantScope` — 校验 tenant_id 有效 + 用户有 tenant 权限（调 domain-tenant + domain-permission）
-2. **Worktree 域 step**：`CreateWorkspace` — 调 domain-workspace 真实数据源（PostgreSQL 真实库 / Phase H+）
-3. **Audit 域 step**：`AuditLog` — 记录 workspace 创建审计（per [spec/saga/01 §4 AuditLog step](../saga/01-saga-coordination-spec.md)）
+**Saga 步骤**（3 step，每 step 标注 `responsible_crate` per [spec/saga/01 v0.2 §2](../saga/01-saga-coordination-spec.md)）：
+1. step `ValidateTenantScope`（responsible_crate: `domain-permission`, coordination_role: `IdentityValidation`）— 校验 tenant_id 有效 + 用户有 tenant 权限（调 domain-tenant + domain-permission）
+2. step `CreateWorkspace`（responsible_crate: `domain-workspace`, coordination_role: `ResourceMutation`）— 调 domain-workspace 真实数据源（PostgreSQL 真实库 / Phase H+）
+3. step `AuditLog`（responsible_crate: `domain-audit`, coordination_role: `AuditLogging`, 必填且最后）— 记录 workspace 创建审计
 
 **状态机**：Pending → Running → Completed / Compensating → Compensated
 
@@ -180,11 +214,11 @@ per [spec/saga/01 §1 跨域 Saga 协调契约](../saga/01-saga-coordination-spe
 
 **触发条件**：用户创建 worktree（`POST /worktrees` + git checkout per [spec/vcs/05 §2 4 Git Provider 接入](../vcs/05-real-providers-spec.md)）
 
-**Saga 步骤**（4 step）：
-1. **Worktree 域 step**：`CreateWorktreeGit` — 调 git provider（per [spec/vcs/05 §2 4 provider 接入](../vcs/05-real-providers-spec.md) 真实 provider，star-sa OAuth token 缓存 per [spec/cache/01 §3.1 Provider 元数据](../cache/01-cache-contract-spec.md)）
-2. **Worktree 域 step**：`PersistWorktree` — 调 domain-worktree 真实数据源
-3. **Flow 域 step**：`LogWorktreeDecision` — 调 domain-decision 记录 worktree 决策（`kind=worktree_create`）
-4. **Audit 域 step**：`AuditLog` — 记录审计
+**Saga 步骤**（4 step，每 step 标注 `responsible_crate`）：
+1. step `CreateWorktreeGit`（responsible_crate: `domain-scm`, coordination_role: `ResourceMutation`）— 调 git provider（per [spec/vcs/05 §2 4 provider 接入](../vcs/05-real-providers-spec.md) 真实 provider，star-sa OAuth token 缓存 per [spec/cache/01 §3.1 Provider 元数据](../cache/01-cache-contract-spec.md)）
+2. step `PersistWorktree`（responsible_crate: `domain-worktree`, coordination_role: `ResourceMutation`）— 调 domain-worktree 真实数据源
+3. step `LogWorktreeDecision`（responsible_crate: `domain-work-item` 或 `domain-context`, coordination_role: `DecisionAuthorization`）— 调 decision 记录 worktree 决策（`kind=worktree_create`）
+4. step `AuditLog`（responsible_crate: `domain-audit`, coordination_role: `AuditLogging`, 必填且最后）
 
 **状态机**：Pending → Running → Completed / Compensating → Compensated
 
@@ -194,12 +228,12 @@ per [spec/saga/01 §1 跨域 Saga 协调契约](../saga/01-saga-coordination-spe
 
 **触发条件**：用户开 PR（`POST /pulls` per [spec/vcs/05 §3 PR 模型](../vcs/05-real-providers-spec.md) + [spec/saga/01 §4 Q-003 交易 Saga 流程](../saga/01-saga-coordination-spec.md) MR 触发场景）
 
-**Saga 步骤**（5 step）：
-1. **Integration 域 step**：`CreatePullRequest` — 调 git provider API
-2. **Flow 域 step**：`LinkPRToWorkItem` — 关联 work_item_id
-3. **Flow 域 step**：`LogPRDecision` — 决策 kind=pr_open
-4. **Audit 域 step**：`AuditLog`
-5. **Integration 域 step**：`NotifyPRCreated` — 调 domain-notification 推送（per [spec/services/02 §3 SSE event schema](../services/02-sse-streaming-spec.md)）
+**Saga 步骤**（5 step，每 step 标注 `responsible_crate`）：
+1. step `CreatePullRequest`（responsible_crate: `domain-scm`, coordination_role: `ResourceMutation`）— 调 git provider API
+2. step `LinkPRToWorkItem`（responsible_crate: `domain-work-item`, coordination_role: `ResourceMutation`）— 关联 work_item_id
+3. step `LogPRDecision`（responsible_crate: `domain-work-item` 或 `domain-context`, coordination_role: `DecisionAuthorization`）— 决策 kind=pr_open
+4. step `AuditLog`（responsible_crate: `domain-audit`, coordination_role: `AuditLogging`, 必填且最后）
+5. step `NotifyPRCreated`（responsible_crate: `domain-notification`, coordination_role: `ResourceMutation`）— 调 domain-notification 推送（per [spec/services/02 §3 SSE event schema](../services/02-sse-streaming-spec.md)）
 
 **状态机**：Pending → Running → Completed / Compensating → Compensated
 
@@ -209,11 +243,11 @@ per [spec/saga/01 §1 跨域 Saga 协调契约](../saga/01-saga-coordination-spe
 
 **触发条件**：Permission Lead 更新 policy（`PATCH /policies/{policy_id}`）
 
-**Saga 步骤**（4 step）：
-1. **Permission 域 step**：`UpdatePolicy` — 调 domain-policy 真实数据源 + cache 写穿透（per [spec/cache/01 §5.1 写穿透伪代码](../cache/01-cache-contract-spec.md) L168-205）
-2. **Flow 域 step**：`LogPolicyDecision` — 决策 kind=policy_update
-3. **Audit 域 step**：`AuditLog`
-4. **Integration 域 step**：`NotifyPolicyUpdated`
+**Saga 步骤**（4 step，每 step 标注 `responsible_crate`）：
+1. step `UpdatePolicy`（responsible_crate: `domain-policy`, coordination_role: `ResourceMutation`）— 调 domain-policy 真实数据源 + cache 写穿透（per [spec/cache/01 §5.1 写穿透伪代码](../cache/01-cache-contract-spec.md) L168-205）
+2. step `LogPolicyDecision`（responsible_crate: `domain-work-item` 或 `domain-context`, coordination_role: `DecisionAuthorization`）— 决策 kind=policy_update
+3. step `AuditLog`（responsible_crate: `domain-audit`, coordination_role: `AuditLogging`, 必填且最后）
+4. step `NotifyPolicyUpdated`（responsible_crate: `domain-notification`, coordination_role: `ResourceMutation`）
 
 **状态机**：Pending → Running → Completed / Compensating → Compensated
 
@@ -223,12 +257,12 @@ per [spec/saga/01 §1 跨域 Saga 协调契约](../saga/01-saga-coordination-spe
 
 **触发条件**：外部集成事件（webhook 到达 per [spec/services/03 webhook adapter](../services/03-webhook-adapter-spec.md) 或 Integration 域 event bus）
 
-**Saga 步骤**（5 step）：
-1. **Integration 域 step**：`ReceiveIntegrationEvent` — webhook adapter 接收
-2. **Integration 域 step**：`PersistEvent` — 调 domain-event 真实数据源
-3. **Flow 域 step**：`LogEventDecision` — 决策 kind=integration_event
-4. **Audit 域 step**：`AuditLog`
-5. **Integration 域 step**：`NotifySubscribers` — SSE 推送（per [spec/services/02 §3 SSE event schema](../services/02-sse-streaming-spec.md) `CacheInvalidate` 广播）
+**Saga 步骤**（5 step，每 step 标注 `responsible_crate`）：
+1. step `ReceiveIntegrationEvent`（responsible_crate: `domain-integration`, coordination_role: `IdentityValidation`）— webhook adapter 接收
+2. step `PersistEvent`（responsible_crate: `domain-integration` 或 `domain-work-item`, coordination_role: `ResourceMutation`）— 调真实数据源
+3. step `LogEventDecision`（responsible_crate: `domain-work-item` 或 `domain-context`, coordination_role: `DecisionAuthorization`）— 决策 kind=integration_event
+4. step `AuditLog`（responsible_crate: `domain-audit`, coordination_role: `AuditLogging`, 必填且最后）
+5. step `NotifySubscribers`（responsible_crate: `domain-notification` 或 `domain-collaboration`, coordination_role: `ResourceMutation`）— SSE 推送（per [spec/services/02 §3 SSE event schema](../services/02-sse-streaming-spec.md) `CacheInvalidate` 广播）
 
 **状态机**：Pending → Running → Completed / Compensating → Compensated
 
@@ -333,8 +367,9 @@ per 2026-08-26 11:06 JST Ulysses 拍板"缺标比错标安全"原则：所有缺
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |------|------|--------|----------|------|
 | v0.1 | 2026-08-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：6 Tier 接入顺序（22+1=23 crate × 6 Tier 工作量 26.4-37.3M tokens）+ 5 项验收（Resources handler / URI 命名 / Read 矩阵 / Write 矩阵 + 状态机 / cache 策略）+ 3 测试 / crate = 75 测试 + 5 域 Lead 验收签字 + 5 跨域 Saga 触发点（workspace create / worktree create / pr open / policy update / integration event）+ 5 风险控制（顺序不可逆 / 回滚 commit / InMemory 同步 / 性能基线 / DDD Review）+ 7 已知缺口（per 缺标比错标安全）+ 8 引用文档 + 引用原则 | per [ADR-0036 §8.2 Phase H 方向 L293-298](../../adr/0036-phase-g-architecture.md) "22 domain 真实数据接入完整化" + 2026-08-27 21:59 JST 用户授权第三次强化代签（per [AGENTS.md §1.0 v0.5 三次强化](../../../../../AGENTS.md)）|
+| v0.2 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | **5 域绑定冲突修复 (per AGENTS.md §5 v0.6 + 2026-08-31 22:45 JST Q1-D 拍板)**：① §0 文件头加 dual-use 警告 + 5 域 ≠ 22 DDD 映射说明；② §3.2 整段重写为"22 domain crate 各自 lead 验收签字" (26 行 5 域 lead 表 → 22 domain crate × SagaCoordinationRole 主导表 + 5 域归类 footnote)；③ §4 5 个跨域 Saga 触发点全部 step 标注 `responsible_crate` + `coordination_role` (per [spec/saga/01 v0.2 §2](../saga/01-saga-coordination-spec.md))；④ §3.2 / §4 仍保留"5 域历史归类"作为兼容性 footnote，不删历史 | 2026-09-01 14:38 JST 模块间协作细化任务 (A 架构层 22 Domain 协作 + L3 完整覆盖 + doc-only) |
 
 ---
 
-> **审批者**：架构师 (Mavis 接手 agent per DEC-008) — 2026-08-28
+> **审批者**：架构师 (Mavis 接手 agent per DEC-008) — 2026-08-28 (v0.1) / 2026-09-01 (v0.2)
 > **per AGENTS.md §1 代签规则反转 + 2026-08-27 19:39 JST 代签授权升级 + 21:59 JST 第三次强化**：Mavis 接手默认代签 Ulysses 无需再问
