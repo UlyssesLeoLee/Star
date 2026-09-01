@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ja" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>JIRA · 日式 IT 開発 V字モデル Kanban</title>
+  <meta name="description" content="日本の IT 開発ワークフローに基づく V字モデル 9 段階 Kanban テンプレート。右側のフェーズタブはカスタマイズ可能。" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+JP:wght@400;500;600;700&display=swap"
+  />
+
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- ========================== Background atmosphere ========================== -->
+  <div class="atmosphere" aria-hidden="true">
+    <div class="atmosphere__grid"></div>
+    <div class="atmosphere__orb atmosphere__orb--violet"></div>
+    <div class="atmosphere__orb atmosphere__orb--cyan"></div>
+    <div class="atmosphere__orb atmosphere__orb--amber"></div>
+    <div class="atmosphere__noise"></div>
+  </div>
+
+  <!-- ========================== Top bar ========================== -->
+  <header class="topbar" role="banner">
+    <div class="topbar__brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="28" height="28">
+          <defs>
+            <linearGradient id="brandGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#a78bfa" />
+              <stop offset="50%" stop-color="#22d3ee" />
+              <stop offset="100%" stop-color="#fbbf24" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M4 8 L10 24 L16 12 L22 24 L28 8"
+            fill="none"
+            stroke="url(#brandGrad)"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-text__title">V-Model <span class="brand-text__ja">V字モデル</span></div>
+        <div class="brand-text__sub">日式 IT 開発ワークフロー · Kanban Template</div>
+      </div>
+    </div>
+
+    <nav class="vmodel-strip" aria-label="V字モデル 9 段階">
+      <!-- populated by JS -->
+    </nav>
+
+    <div class="topbar__actions">
+      <button class="icon-btn" id="themeToggle" title="テーマ切替" aria-label="テーマ切替">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <button class="icon-btn" title="検索 (Ctrl+K)" aria-label="検索">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      </button>
+      <button class="icon-btn" id="exportBtn" title="エクスポート" aria-label="エクスポート">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+      </button>
+      <div class="avatar" aria-label="ユーザー">UL</div>
+    </div>
+  </header>
+
+  <!-- ========================== Main shell ========================== -->
+  <main class="shell" id="shell">
+    <!-- LEFT: Kanban board -->
+    <section class="board" aria-label="Kanban ボード">
+      <!-- Stage header -->
+      <div class="stage-header" id="stageHeader">
+        <div class="stage-header__main">
+          <div class="stage-header__eyebrow">
+            <span class="stage-header__num" id="stageNum">01</span>
+            <span class="stage-header__sep" aria-hidden="true">/</span>
+            <span class="stage-header__total" id="stageTotal">09</span>
+            <span class="stage-header__kana" id="stageKana"></span>
+          </div>
+          <h1 class="stage-header__title" id="stageTitle">超上流工程</h1>
+          <p class="stage-header__desc" id="stageDesc"></p>
+        </div>
+
+        <div class="stage-header__meta">
+          <div class="progress-ring" id="progressRing" role="img" aria-label="進捗">
+            <svg viewBox="0 0 64 64" width="56" height="56">
+              <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6"/>
+              <circle id="progressArc" cx="32" cy="32" r="28" fill="none" stroke="currentColor" stroke-width="6"
+                stroke-linecap="round" stroke-dasharray="175.93" stroke-dashoffset="175.93"
+                transform="rotate(-90 32 32)"/>
+            </svg>
+            <span class="progress-ring__pct" id="progressPct">0%</span>
+          </div>
+          <dl class="stage-stats">
+            <div><dt>全タスク</dt><dd id="statTotal">0</dd></div>
+            <div><dt>完了</dt><dd id="statDone" class="text-done">0</dd></div>
+            <div><dt>進行中</dt><dd id="statDoing" class="text-doing">0</dd></div>
+            <div><dt>残</dt><dd id="statTodo" class="text-todo">0</dd></div>
+          </dl>
+        </div>
+
+        <div class="stage-header__tools">
+          <div class="seg" role="tablist" aria-label="ビュー切替">
+            <button class="seg__btn is-active" data-view="kanban" role="tab" aria-selected="true">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/></svg>
+              Kanban
+            </button>
+            <button class="seg__btn" data-view="list" role="tab" aria-selected="false">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="20" y2="12"/><line x1="8" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+              リスト
+            </button>
+            <button class="seg__btn" data-view="timeline" role="tab" aria-selected="false">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/><circle cx="7" cy="6" r="1.5" fill="currentColor"/><circle cx="14" cy="12" r="1.5" fill="currentColor"/><circle cx="9" cy="18" r="1.5" fill="currentColor"/></svg>
+              タイムライン
+            </button>
+          </div>
+
+          <div class="stage-header__search">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="searchInput" type="search" placeholder="タスク検索…" />
+          </div>
+
+          <button class="btn btn--ghost" id="filterBtn">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/></svg>
+            フィルター
+          </button>
+
+          <button class="btn btn--primary" id="addTaskBtn">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            タスク追加
+          </button>
+        </div>
+      </div>
+
+      <!-- Kanban columns -->
+      <div class="kanban" id="kanban" data-view="kanban">
+        <!-- columns populated by JS -->
+      </div>
+
+      <!-- List view -->
+      <div class="listview" id="listview" data-view="list" hidden>
+        <table class="listview__table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>タイトル</th>
+              <th>ステータス</th>
+              <th>優先度</th>
+              <th>担当</th>
+              <th>成果物</th>
+              <th>レビュー</th>
+            </tr>
+          </thead>
+          <tbody id="listBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Timeline view -->
+      <div class="timeline" id="timeline" data-view="timeline" hidden>
+        <!-- populated by JS -->
+      </div>
+    </section>
+
+    <!-- RIGHT: customizable V字モデル phase tabs -->
+    <aside class="phasebar" aria-label="フェーズタブ (カスタマイズ可)">
+      <div class="phasebar__head">
+        <div class="phasebar__title">
+          <span class="phasebar__title-kanji">V字モデル工程</span>
+          <span class="phasebar__title-hint">クリックで切替 · 右クリックで編集</span>
+        </div>
+        <button class="icon-btn icon-btn--sm" id="addPhaseBtn" title="フェーズ追加" aria-label="フェーズ追加">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        </button>
+      </div>
+
+      <ol class="phasebar__list" id="phaseList" role="tablist">
+        <!-- populated by JS -->
+      </ol>
+
+      <div class="phasebar__foot">
+        <div class="phasebar__section">
+          <div class="phasebar__section-title">
+            <span>補助リファレンス</span>
+          </div>
+          <ul class="phasebar__aux" id="auxList">
+            <li data-aux="process">
+              <span class="dot" style="--c:#94a3b8"></span>
+              <span>共通管理プロセス</span>
+              <span class="count">11</span>
+            </li>
+            <li data-aux="deliverables">
+              <span class="dot" style="--c:#22d3ee"></span>
+              <span>主要な成果物</span>
+              <span class="count">15</span>
+            </li>
+            <li data-aux="review">
+              <span class="dot" style="--c:#a78bfa"></span>
+              <span>レビュー・承認ポイント</span>
+              <span class="count">12</span>
+            </li>
+            <li data-aux="test-types">
+              <span class="dot" style="--c:#f59e0b"></span>
+              <span>テスト種別一覧</span>
+              <span class="count">12</span>
+            </li>
+            <li data-aux="glossary">
+              <span class="dot" style="--c:#ec4899"></span>
+              <span>略語一覧</span>
+              <span class="count">16</span>
+            </li>
+          </ul>
+        </div>
+
+        <button class="phasebar__reset" id="resetPhases" title="既定の V字モデルに戻す">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+          既定に戻す
+        </button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ========================== Aux drawer (overlay) ========================== -->
+  <div class="aux-drawer" id="auxDrawer" aria-hidden="true">
+    <div class="aux-drawer__backdrop" data-close="aux"></div>
+    <div class="aux-drawer__panel" role="dialog" aria-modal="true">
+      <header class="aux-drawer__head">
+        <div>
+          <div class="aux-drawer__eyebrow" id="auxEyebrow">補助リファレンス</div>
+          <h2 class="aux-drawer__title" id="auxTitle"></h2>
+        </div>
+        <button class="icon-btn" data-close="aux" aria-label="閉じる">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <div class="aux-drawer__body" id="auxBody"></div>
+    </div>
+  </div>
+
+  <!-- ========================== Task detail modal ========================== -->
+  <div class="task-modal" id="taskModal" aria-hidden="true">
+    <div class="task-modal__backdrop" data-close="task"></div>
+    <div class="task-modal__panel" role="dialog" aria-modal="true">
+      <header class="task-modal__head">
+        <div class="task-modal__id" id="taskModalId">P1-001</div>
+        <button class="icon-btn" data-close="task" aria-label="閉じる">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <div class="task-modal__body" id="taskModalBody"></div>
+    </div>
+  </div>
+
+  <!-- ========================== Phase editor modal ========================== -->
+  <div class="phase-modal" id="phaseModal" aria-hidden="true">
+    <div class="phase-modal__backdrop" data-close="phase"></div>
+    <div class="phase-modal__panel" role="dialog" aria-modal="true">
+      <header class="phase-modal__head">
+        <h2 class="phase-modal__title" id="phaseModalTitle">フェーズ編集</h2>
+        <button class="icon-btn" data-close="phase" aria-label="閉じる">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <div class="phase-modal__body" id="phaseModalBody"></div>
+    </div>
+  </div>
+
+  <!-- ========================== Context menu ========================== -->
+  <ul class="ctxmenu" id="ctxmenu" role="menu" hidden>
+    <li data-act="rename" role="menuitem">✏️ 名前変更</li>
+    <li data-act="recolor" role="menuitem">🎨 カラー変更</li>
+    <li data-act="duplicate" role="menuitem">🧬 複製</li>
+    <li data-act="move-up" role="menuitem">⬆️ 上へ移動</li>
+    <li data-act="move-down" role="menuitem">⬇️ 下へ移動</li>
+    <li class="ctxmenu__sep"></li>
+    <li data-act="delete" role="menuitem" class="ctxmenu__danger">🗑️ 削除</li>
+  </ul>
+
+  <!-- ========================== Toast ========================== -->
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="./data.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

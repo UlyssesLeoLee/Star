@@ -1,0 +1,1009 @@
+/* =====================================================================
+ * V-Model Kanban · アプリケーションロジック
+ * 状態管理 / レンダリング / インタラクション / 永続化
+ * =================================================================== */
+
+(function () {
+  'use strict';
+
+  const { PHASES: DEFAULT_PHASES, AUX } = window.VMODEL;
+  const STORAGE_KEY = 'vmodel-kanban-v1';
+  const PHASE_STORAGE_KEY = 'vmodel-phases-v1';
+  const TASK_STORAGE_KEY = 'vmodel-tasks-v1';
+  const THEME_KEY = 'vmodel-theme-v1';
+
+  /* ------------------------------------------------------------------
+   * 永続化レイヤー
+   * ----------------------------------------------------------------*/
+  const store = {
+    load(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch { return fallback; }
+    },
+    save(key, val) {
+      try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+    }
+  };
+
+  /* ------------------------------------------------------------------
+   * 状態
+   * ----------------------------------------------------------------*/
+  const state = {
+    phases: store.load(PHASE_STORAGE_KEY, null) || deepClone(DEFAULT_PHASES),
+    tasks:  store.load(TASK_STORAGE_KEY,  null) || buildInitialTasks(),
+    activePhaseId: 'P1',
+    view: 'kanban',          // kanban | list | timeline
+    filter: '',
+    theme: store.load(THEME_KEY, 'dark')
+  };
+
+  function buildInitialTasks() {
+    // Convert phases[].tasks[] into flat task map with stable ids
+    const out = {};
+    DEFAULT_PHASES.forEach(p => {
+      p.tasks.forEach(t => { out[t.id] = { ...t }; });
+      if (p.subphases) {
+        p.subphases.forEach(sp => {
+          sp.tasks.forEach(t => { out[t.id] = { ...t, _subphase: sp.id }; });
+        });
+      }
+    });
+    return out;
+  }
+
+  function deepClone(x) { return JSON.parse(JSON.stringify(x)); }
+
+  /* ------------------------------------------------------------------
+   * Theme
+   * ----------------------------------------------------------------*/
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    store.save(THEME_KEY, t);
+  }
+  applyTheme(state.theme);
+
+  /* ------------------------------------------------------------------
+   * 集計
+   * ----------------------------------------------------------------*/
+  function tasksForPhase(phase) {
+    // phase may be a top-level phase or a subphase. resolve to its parent's full set.
+    const out = [];
+    state.phases.forEach(p => {
+      if (phase._parentId && p.id === phase._parentId) {
+        // target is a subphase of p
+        const sp = (p.subphases || []).find(x => x.id === phase.id);
+        if (sp) sp.tasks.forEach(t => { if (state.tasks[t.id]) out.push(state.tasks[t.id]); });
+      } else if (p.id === phase.id) {
+        // target is the parent — include direct tasks + all subphase tasks
+        (p.tasks || []).forEach(t => { if (state.tasks[t.id]) out.push(state.tasks[t.id]); });
+        (p.subphases || []).forEach(sp => {
+          sp.tasks.forEach(t => { if (state.tasks[t.id]) out.push(state.tasks[t.id]); });
+        });
+      }
+    });
+    return out;
+  }
+
+  function taskCount(phaseId) {
+    const phase = findPhase(phaseId);
+    if (!phase) return 0;
+    return tasksForPhase(phase).length;
+  }
+
+  function findPhase(id) {
+    for (const p of state.phases) {
+      if (p.id === id) return p;
+      if (p.subphases) {
+        const sp = p.subphases.find(x => x.id === id);
+        if (sp) return { ...sp, _parentId: p.id };
+      }
+    }
+    return null;
+  }
+
+  function findPhaseStrict(id) {
+    for (const p of state.phases) {
+      if (p.id === id) return p;
+    }
+    return null;
+  }
+
+  function statForPhase(phase) {
+    const all = tasksForPhase(phase);
+    const total = all.length;
+    const done = all.filter(t => t.status === 'done').length;
+    const doing = all.filter(t => t.status === 'doing' || t.status === 'review').length;
+    const todo = total - done - doing;
+    return { total, done, doing, todo, pct: total ? Math.round(done / total * 100) : 0 };
+  }
+
+  /* ------------------------------------------------------------------
+   * Renderers
+   * ----------------------------------------------------------------*/
+
+  // ----- Top v-model strip -----
+  function renderVStrip() {
+    const el = document.querySelector('.vmodel-strip');
+    el.innerHTML = '';
+    state.phases.forEach((p, i) => {
+      const item = document.createElement('button');
+      item.className = 'vmodel-strip__item';
+      item.style.setProperty('--c', p.color);
+      item.dataset.phase = p.id;
+      item.innerHTML = `
+        <span class="vmodel-strip__num">${p.num}</span>
+        <span class="vmodel-strip__icon">${p.icon}</span>
+        <span>${p.name}</span>
+      `;
+      if (p.id === state.activePhaseId) item.classList.add('is-active');
+      item.addEventListener('click', () => switchPhase(p.id));
+      el.appendChild(item);
+
+      if (i < state.phases.length - 1) {
+        const sep = document.createElement('span');
+        sep.className = 'vmodel-strip__sep';
+        sep.textContent = '›';
+        el.appendChild(sep);
+      }
+    });
+  }
+
+  // ----- Right phasebar -----
+  function renderPhasebar() {
+    const el = document.getElementById('phaseList');
+    el.innerHTML = '';
+    state.phases.forEach((p, i) => {
+      const li = document.createElement('li');
+      li.className = 'phase-item';
+      li.style.setProperty('--c', p.color);
+      li.dataset.phase = p.id;
+      if (p.id === state.activePhaseId) li.classList.add('is-active');
+      li.innerHTML = `
+        <div class="phase-item__icon">${p.icon}</div>
+        <div class="phase-item__main">
+          <div class="phase-item__name">${p.name}</div>
+          <div class="phase-item__meta">
+            <span class="phase-item__num">${p.num}</span>
+            <span>·</span>
+            <span>${taskCount(p.id)} 件</span>
+          </div>
+        </div>
+        <div class="phase-item__count">${taskCount(p.id)}</div>
+        <button class="phase-item__menu" data-menu="${p.id}" aria-label="メニュー">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+        </button>
+      `;
+      li.addEventListener('click', (e) => {
+        if (e.target.closest('.phase-item__menu')) return;
+        switchPhase(p.id);
+      });
+      li.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        openCtxMenu(e.clientX, e.clientY, p.id);
+      });
+      el.appendChild(li);
+
+      // subphases (P6 children) — show whenever P6 is visible, not only when active
+      if (p.subphases) {
+        const wrap = document.createElement('div');
+        wrap.className = 'phasebar__sub-list';
+        p.subphases.forEach(sp => {
+          const sli = document.createElement('div');
+          sli.className = 'phase-item phase-item--sub';
+          sli.style.setProperty('--c', sp.color);
+          sli.dataset.phase = sp.id;
+          if (sp.id === state.activePhaseId) sli.classList.add('is-active');
+          sli.innerHTML = `
+            <div class="phase-item__icon">${sp.icon}</div>
+            <div class="phase-item__main">
+              <div class="phase-item__name">${sp.name}</div>
+              <div class="phase-item__meta">
+                <span class="phase-item__num">${sp.num}</span>
+                <span>·</span>
+                <span>${taskCount(sp.id)} 件</span>
+              </div>
+            </div>
+            <div class="phase-item__count">${taskCount(sp.id)}</div>
+          `;
+          sli.addEventListener('click', () => switchPhase(sp.id));
+          wrap.appendChild(sli);
+        });
+        el.appendChild(wrap);
+      }
+    });
+
+    // bind menu buttons
+    el.querySelectorAll('.phase-item__menu').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const r = btn.getBoundingClientRect();
+        openCtxMenu(r.right, r.bottom, btn.dataset.menu);
+      });
+    });
+
+    // auto-scroll active phase into view
+    requestAnimationFrame(() => {
+      const active = el.querySelector('.phase-item.is-active');
+      if (active) active.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+  }
+
+  // ----- Stage header -----
+  function renderStageHeader() {
+    const phase = findPhase(state.activePhaseId);
+    if (!phase) return;
+    const parent = findPhaseStrict(phase._parentId || phase.id);
+    const display = parent || phase;
+    const stat = statForPhase(phase);
+
+    document.documentElement.style.setProperty('--c-phase', display.color || phase.color);
+    document.documentElement.style.setProperty('--c-phase-2', mix(display.color || phase.color, '#818cf8', 0.5));
+
+    document.getElementById('stageNum').textContent = display.num;
+    document.getElementById('stageTotal').textContent = String(state.phases.length).padStart(2, '0');
+    document.getElementById('stageKana').textContent = display.kana || '';
+    document.getElementById('stageTitle').textContent = phase.name;
+    document.getElementById('stageDesc').textContent = phase.desc || '';
+
+    document.getElementById('statTotal').textContent = stat.total;
+    document.getElementById('statDone').textContent  = stat.done;
+    document.getElementById('statDoing').textContent = stat.doing;
+    document.getElementById('statTodo').textContent  = stat.todo;
+
+    const arc = document.getElementById('progressArc');
+    const dash = 175.93;
+    arc.setAttribute('stroke-dashoffset', String(dash * (1 - stat.pct / 100)));
+    document.getElementById('progressPct').textContent = `${stat.pct}%`;
+  }
+
+  // ----- Kanban board -----
+  function renderKanban() {
+    const phase = findPhase(state.activePhaseId);
+    if (!phase) return;
+    const board = document.getElementById('kanban');
+    board.innerHTML = '';
+    const allTasks = tasksForPhase(phase);
+    const cols = phase.cols || [
+      { id: 'backlog', name: 'バックログ', color: '#6b7280' },
+      { id: 'todo',    name: 'To Do',     color: '#3b82f6' },
+      { id: 'doing',   name: '進行中',    color: '#eab308' },
+      { id: 'review',  name: 'レビュー',  color: '#a855f7' },
+      { id: 'done',    name: '完了',      color: '#22c55e' }
+    ];
+
+    cols.forEach(col => {
+      const colEl = document.createElement('section');
+      colEl.className = 'kanban-col';
+      colEl.style.setProperty('--c', col.color);
+      colEl.dataset.col = col.id;
+
+      const tasks = allTasks
+        .filter(t => t.status === col.id)
+        .filter(t => !state.filter || (t.title + ' ' + t.desc + ' ' + t.tags.join(' ')).toLowerCase().includes(state.filter.toLowerCase()));
+
+      const limit = col.limit;
+      const limitWarn = limit && tasks.length > limit;
+      const headHTML = `
+        <header class="kanban-col__head">
+          <div class="kanban-col__title">
+            <span class="kanban-col__dot"></span>
+            <span>${col.name}</span>
+            ${limit ? `<span class="kanban-col__limit ${limitWarn ? 'is-warn' : ''}">/ WIP ${limit}</span>` : ''}
+          </div>
+          <span class="kanban-col__count">${tasks.length}</span>
+        </header>
+        <div class="kanban-col__body" data-dropzone="${col.id}">
+          ${tasks.length ? tasks.map(cardHTML).join('') : `<div class="kanban-col__empty">タスクなし</div>`}
+        </div>
+        <button class="kanban-col__add" data-addcol="${col.id}">+ 追加</button>
+      `;
+      colEl.innerHTML = headHTML;
+      board.appendChild(colEl);
+    });
+
+    // Drag & drop
+    board.querySelectorAll('[data-dropzone]').forEach(zone => {
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zone.closest('.kanban-col').classList.add('is-drop-target');
+      });
+      zone.addEventListener('dragleave', () => {
+        zone.closest('.kanban-col').classList.remove('is-drop-target');
+      });
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.closest('.kanban-col').classList.remove('is-drop-target');
+        const id = e.dataTransfer.getData('text/plain');
+        if (id && state.tasks[id]) {
+          state.tasks[id].status = zone.dataset.dropzone;
+          save();
+          renderAll();
+          toast(`${id} → ${zone.dataset.dropzone}`);
+        }
+      });
+    });
+
+    // Card click → modal
+    board.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        openTaskModal(card.dataset.id);
+      });
+    });
+
+    // Add buttons
+    board.querySelectorAll('[data-addcol]').forEach(btn => {
+      btn.addEventListener('click', () => addTaskToColumn(btn.dataset.addcol));
+    });
+  }
+
+  function cardHTML(t) {
+    const owner = t.owner
+      ? `<div class="card__owner" title="${t.owner}">${t.owner.slice(0, 2).toUpperCase()}</div>`
+      : `<div class="card__owner card__owner--unassigned" title="未割り当て">?</div>`;
+    return `
+      <article class="card" draggable="true" data-id="${t.id}" style="--pc: var(--priority-${t.priority}, #6b7280)">
+        <div class="card__head">
+          <span class="card__id">${t.id}</span>
+          <span class="card__prio card__prio--${t.priority}">${t.priority}</span>
+        </div>
+        <div class="card__title">${escapeHTML(t.title)}</div>
+        <div class="card__desc">${escapeHTML(t.desc)}</div>
+        ${t.tags && t.tags.length ? `<div class="card__tags">${t.tags.slice(0, 3).map(tag => `<span class="tag">${escapeHTML(tag)}</span>`).join('')}</div>` : ''}
+        <div class="card__foot">
+          <div class="card__meta">
+            <span class="card__meta-item" title="見積もり">⏱ ${t.estimate || 0}h</span>
+            ${t.linkedDocs && t.linkedDocs.length ? `<span class="card__meta-item" title="成果物">📄 ${t.linkedDocs.length}</span>` : ''}
+            ${t.reviewPoints && t.reviewPoints.length ? `<span class="card__meta-item" title="レビュー">🔍 ${t.reviewPoints.length}</span>` : ''}
+          </div>
+          ${owner}
+        </div>
+      </article>
+    `;
+  }
+
+  // ----- List view -----
+  function renderList() {
+    const phase = findPhase(state.activePhaseId);
+    if (!phase) return;
+    const all = tasksForPhase(phase);
+    const body = document.getElementById('listBody');
+    body.innerHTML = '';
+    if (!all.length) {
+      body.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:32px">タスクなし</td></tr>`;
+      return;
+    }
+    all.forEach(t => {
+      const tr = document.createElement('tr');
+      tr.dataset.id = t.id;
+      tr.innerHTML = `
+        <td class="row-id">${t.id}</td>
+        <td class="row-title">${escapeHTML(t.title)}</td>
+        <td><span class="status-pill" data-s="${t.status}">${t.status}</span></td>
+        <td><span class="card__prio card__prio--${t.priority}">${t.priority}</span></td>
+        <td>${t.owner ? escapeHTML(t.owner) : '—'}</td>
+        <td>${(t.linkedDocs || []).map(d => `<span class="tag">${d}</span>`).join(' ') || '—'}</td>
+        <td>${(t.reviewPoints || []).map(r => `<span class="tag">${r}</span>`).join(' ') || '—'}</td>
+      `;
+      tr.addEventListener('click', () => openTaskModal(t.id));
+      body.appendChild(tr);
+    });
+  }
+
+  // ----- Timeline view -----
+  function renderTimeline() {
+    const phase = findPhase(state.activePhaseId);
+    if (!phase) return;
+    const all = tasksForPhase(phase);
+    const el = document.getElementById('timeline');
+    if (!all.length) {
+      el.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:48px">タスクがありません</div>`;
+      return;
+    }
+    const maxE = Math.max(...all.map(t => t.estimate || 0), 1);
+    el.innerHTML = `
+      <div class="timeline__gantt">
+        ${all.map(t => {
+          const w = ((t.estimate || 0) / maxE) * 100;
+          return `
+            <div class="timeline__gantt-row">
+              <div class="timeline__gantt-label">
+                <span class="row-id">${t.id}</span>
+                <span>${escapeHTML(t.title)}</span>
+              </div>
+              <div class="timeline__gantt-bar">
+                <span style="left:0; width:${w}%; --pc: var(--priority-${t.priority}, #6b7280)"></span>
+              </div>
+              <div class="timeline__gantt-est">${t.estimate || 0}h</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  /* ------------------------------------------------------------------
+   * View switching
+   * ----------------------------------------------------------------*/
+  function setView(v) {
+    state.view = v;
+    document.querySelectorAll('[data-view]').forEach(el => {
+      el.hidden = el.dataset.view !== v;
+    });
+    document.querySelectorAll('.seg__btn').forEach(btn => {
+      const isActive = btn.dataset.view === v;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-selected', isActive);
+    });
+    if (v === 'kanban') renderKanban();
+    if (v === 'list') renderList();
+    if (v === 'timeline') renderTimeline();
+  }
+
+  /* ------------------------------------------------------------------
+   * Switch phase
+   * ----------------------------------------------------------------*/
+  function switchPhase(id) {
+    state.activePhaseId = id;
+    renderVStrip();
+    renderPhasebar();
+    renderStageHeader();
+    setView(state.view);
+  }
+
+  /* ------------------------------------------------------------------
+   * Task detail modal
+   * ----------------------------------------------------------------*/
+  function openTaskModal(id) {
+    const t = state.tasks[id];
+    if (!t) return;
+    document.getElementById('taskModalId').textContent = t.id;
+    const body = document.getElementById('taskModalBody');
+    body.innerHTML = `
+      <h2 class="task-detail__title">${escapeHTML(t.title)}</h2>
+      <p class="task-detail__desc">${escapeHTML(t.desc)}</p>
+
+      <div class="task-detail__row">
+        <div class="task-detail__label">優先度</div>
+        <div class="task-detail__value">
+          <span class="card__prio card__prio--${t.priority}">${t.priority}</span>
+        </div>
+      </div>
+      <div class="task-detail__row">
+        <div class="task-detail__label">ステータス</div>
+        <div class="task-detail__value">
+          <select class="form-select" id="taskStatusSel" style="width:auto">
+            <option value="backlog" ${t.status === 'backlog' ? 'selected' : ''}>バックログ</option>
+            <option value="todo"    ${t.status === 'todo'    ? 'selected' : ''}>To Do</option>
+            <option value="doing"   ${t.status === 'doing'   ? 'selected' : ''}>進行中</option>
+            <option value="review"  ${t.status === 'review'  ? 'selected' : ''}>レビュー</option>
+            <option value="done"    ${t.status === 'done'    ? 'selected' : ''}>完了</option>
+          </select>
+        </div>
+      </div>
+      <div class="task-detail__row">
+        <div class="task-detail__label">担当者</div>
+        <div class="task-detail__value">
+          <input class="form-input" id="taskOwnerInp" type="text" value="${escapeAttr(t.owner || '')}" placeholder="例: 山田太郎" style="max-width:200px">
+        </div>
+      </div>
+      <div class="task-detail__row">
+        <div class="task-detail__label">見積もり</div>
+        <div class="task-detail__value">
+          <span class="task-detail__pill">⏱ ${t.estimate || 0} 時間</span>
+        </div>
+      </div>
+      <div class="task-detail__row">
+        <div class="task-detail__label">タグ</div>
+        <div class="task-detail__value">
+          ${(t.tags || []).map(tg => `<span class="tag">${escapeHTML(tg)}</span>`).join(' ') || '<span style="color:var(--text-3)">—</span>'}
+        </div>
+      </div>
+      <div class="task-detail__row">
+        <div class="task-detail__label">関連成果物</div>
+        <div class="task-detail__value">
+          ${(t.linkedDocs || []).map(d => `<span class="task-detail__pill">📄 ${d}</span>`).join(' ') || '<span style="color:var(--text-3)">—</span>'}
+        </div>
+      </div>
+      <div class="task-detail__row">
+        <div class="task-detail__label">レビュー</div>
+        <div class="task-detail__value">
+          ${(t.reviewPoints || []).map(r => `<span class="task-detail__pill">🔍 ${r}</span>`).join(' ') || '<span style="color:var(--text-3)">—</span>'}
+        </div>
+      </div>
+
+      <div class="task-detail__actions">
+        <button class="task-detail__btn" id="taskDeleteBtn">🗑️ 削除</button>
+        <div style="flex:1"></div>
+        <button class="task-detail__btn" data-close="task">閉じる</button>
+        <button class="task-detail__btn is-primary" id="taskSaveBtn">保存</button>
+      </div>
+    `;
+    document.getElementById('taskStatusSel').addEventListener('change', (e) => {
+      state.tasks[t.id].status = e.target.value;
+      save();
+      renderAll();
+      toast(`${t.id} のステータスを更新`);
+    });
+    document.getElementById('taskSaveBtn').addEventListener('click', () => {
+      const owner = document.getElementById('taskOwnerInp').value.trim();
+      state.tasks[t.id].owner = owner || null;
+      save();
+      renderAll();
+      closeTaskModal();
+      toast(`${t.id} を保存`);
+    });
+    document.getElementById('taskDeleteBtn').addEventListener('click', () => {
+      if (!confirm(`${t.id} を削除しますか?`)) return;
+      delete state.tasks[t.id];
+      save();
+      renderAll();
+      closeTaskModal();
+      toast(`${t.id} を削除`);
+    });
+
+    openModal('task');
+  }
+
+  function closeTaskModal() { closeModal('task'); }
+
+  /* ------------------------------------------------------------------
+   * Phase edit modal
+   * ----------------------------------------------------------------*/
+  function openPhaseEdit(phaseId) {
+    const p = findPhase(phaseId);
+    if (!p) return;
+    const isNew = phaseId === '__new__';
+    const draft = isNew
+      ? { id: '', num: '', kana: '', name: '', desc: '', color: '#a78bfa', icon: '✨', gradient: '', tasks: [] }
+      : { ...p };
+
+    document.getElementById('phaseModalTitle').textContent = isNew ? 'フェーズ追加' : `フェーズ編集: ${p.name}`;
+    const body = document.getElementById('phaseModalBody');
+    const colors = ['#a78bfa','#818cf8','#22d3ee','#34d399','#fbbf24','#f59e0b','#f97316','#ef4444','#f43f5e','#ec4899','#a855f7','#94a3b8','#64748b','#06b6d4','#84cc16','#fb923c'];
+    const icons  = ['🌌','📋','🧩','🔬','🛠️','🧪','🚀','🛡️','🏁','⭐','💎','🎯','🔧','🎨','🧭','⚙️'];
+    body.innerHTML = `
+      <div class="form-group">
+        <label class="form-label">フェーズ名</label>
+        <input class="form-input" id="peName" type="text" value="${escapeAttr(draft.name)}" placeholder="例: 性能最適化">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ふりがな</label>
+        <input class="form-input" id="peKana" type="text" value="${escapeAttr(draft.kana || '')}" placeholder="例: せいのうさいてきか">
+      </div>
+      <div class="form-group">
+        <label class="form-label">説明</label>
+        <textarea class="form-textarea" id="peDesc" placeholder="このフェーズの目的と典型的な成果">${escapeHTML(draft.desc || '')}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">アイコン</label>
+        <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px" id="peIcons">
+          ${icons.map(ic => `
+            <button class="color-swatch" data-icon="${ic}" style="background:var(--bg-3);font-size:18px;display:grid;place-items:center;aspect-ratio:1;border-radius:8px;cursor:pointer;border:2px solid transparent;color:var(--text-0)">${ic}</button>
+          `).join('')}
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">テーマカラー</label>
+        <div class="color-grid" id="peColors">
+          ${colors.map(c => `
+            <button class="color-swatch" data-color="${c}" style="background:${c};color:${c}"></button>
+          `).join('')}
+        </div>
+      </div>
+
+      ${!isNew ? `
+      <div class="form-actions">
+        <button class="task-detail__btn" id="peDeleteBtn" style="background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.3);color:#fca5a5">🗑️ このフェーズを削除</button>
+        <div style="flex:1"></div>
+        <button class="task-detail__btn" data-close="phase">キャンセル</button>
+        <button class="task-detail__btn is-primary" id="peSaveBtn">保存</button>
+      </div>
+      ` : `
+      <div class="form-actions">
+        <div style="flex:1"></div>
+        <button class="task-detail__btn" data-close="phase">キャンセル</button>
+        <button class="task-detail__btn is-primary" id="peSaveBtn">追加</button>
+      </div>
+      `}
+    `;
+
+    const updateSwatchSelection = () => {
+      body.querySelectorAll('#peColors .color-swatch').forEach(s => {
+        s.classList.toggle('is-selected', s.dataset.color === draft.color);
+      });
+      body.querySelectorAll('#peIcons .color-swatch').forEach(s => {
+        s.classList.toggle('is-selected', s.dataset.icon === draft.icon);
+      });
+    };
+    updateSwatchSelection();
+
+    body.querySelectorAll('#peColors .color-swatch').forEach(s => {
+      s.addEventListener('click', () => { draft.color = s.dataset.color; updateSwatchSelection(); });
+    });
+    body.querySelectorAll('#peIcons .color-swatch').forEach(s => {
+      s.addEventListener('click', () => { draft.icon = s.dataset.icon; updateSwatchSelection(); });
+    });
+    body.querySelector('#peSaveBtn').addEventListener('click', () => {
+      const name = body.querySelector('#peName').value.trim();
+      if (!name) { toast('フェーズ名は必須です', 'error'); return; }
+      draft.name = name;
+      draft.kana = body.querySelector('#peKana').value.trim();
+      draft.desc = body.querySelector('#peDesc').value.trim();
+      draft.gradient = `linear-gradient(135deg, ${draft.color} 0%, ${mix(draft.color, '#818cf8', 0.4)} 100%)`;
+
+      if (isNew) {
+        const newId = 'CUSTOM-' + (state.phases.length + 1);
+        const newNum = String(state.phases.length + 1).padStart(2, '0');
+        state.phases.push({
+          id: newId, num: newNum, kana: draft.kana, name: draft.name,
+          color: draft.color, gradient: draft.gradient, icon: draft.icon,
+          desc: draft.desc,
+          cols: [
+            { id: 'backlog',  name: 'バックログ', color: '#6b7280' },
+            { id: 'todo',     name: 'To Do',     color: '#3b82f6' },
+            { id: 'doing',    name: '進行中',    color: '#eab308' },
+            { id: 'review',   name: 'レビュー',  color: '#a855f7' },
+            { id: 'done',     name: '完了',      color: '#22c55e' }
+          ],
+          tasks: []
+        });
+        state.activePhaseId = newId;
+        toast('フェーズを追加しました');
+      } else {
+        const p2 = findPhaseStrict(phaseId);
+        Object.assign(p2, {
+          name: draft.name, kana: draft.kana, desc: draft.desc,
+          color: draft.color, gradient: draft.gradient, icon: draft.icon
+        });
+        toast(`${p2.name} を更新`);
+      }
+      save();
+      renderAll();
+      closePhaseModal();
+    });
+    if (!isNew) {
+      body.querySelector('#peDeleteBtn').addEventListener('click', () => {
+        if (!confirm(`${draft.name} を削除しますか?\n配下のタスクは保持されます。`)) return;
+        const idx = state.phases.findIndex(p => p.id === phaseId);
+        if (idx >= 0) {
+          // 配下タスクをバックログ化
+          const target = state.phases[idx];
+          const targetIds = new Set((target.tasks || []).map(t => t.id));
+          if (target.subphases) target.subphases.forEach(sp => sp.tasks.forEach(t => targetIds.add(t.id)));
+          state.phases.splice(idx, 1);
+          if (state.activePhaseId === phaseId) state.activePhaseId = state.phases[0]?.id;
+          toast(`${draft.name} を削除`);
+          save();
+          renderAll();
+          closePhaseModal();
+        }
+      });
+    }
+
+    openModal('phase');
+  }
+
+  function closePhaseModal() { closeModal('phase'); }
+
+  /* ------------------------------------------------------------------
+   * Aux drawer
+   * ----------------------------------------------------------------*/
+  function openAuxDrawer(key) {
+    const aux = AUX[key];
+    if (!aux) return;
+    document.getElementById('auxEyebrow').textContent = aux.eyebrow;
+    document.getElementById('auxTitle').textContent  = aux.title;
+    const body = document.getElementById('auxBody');
+    body.innerHTML = `
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:18px;font-family:'Noto Sans JP',sans-serif">${escapeHTML(aux.subtitle)}</p>
+      ${aux.columns.map(col => `
+        <section class="aux-section">
+          <h3 class="aux-section__title"><span class="dot" style="--c:${col.color};background:${col.color}"></span>${col.name}</h3>
+          <div class="aux-list">
+            ${col.items.map(it => {
+              const meta = [];
+              if (it.code)   meta.push(`<span class="aux-row__code">${it.code}</span>`);
+              if (it.abbr)   meta.push(`<span class="aux-row__abbr">${it.abbr}</span>`);
+              if (it.output) meta.push(`<span class="aux-row__phase">${it.output}</span>`);
+              if (it.phase)  meta.push(`<span class="aux-row__phase">P${it.phase}</span>`);
+              if (typeof it.gate === 'boolean') meta.push(`<span class="aux-row__gate ${it.gate ? 'is-gate' : ''}">${it.gate ? '🚦 GATE' : '内部'}</span>`);
+              if (it.when)   meta.push(`<span class="aux-row__phase">${it.when}</span>`);
+              return `
+                <div class="aux-row">
+                  <div class="aux-row__head">${meta.join('')}</div>
+                  <div class="aux-row__name">${escapeHTML(it.name)}</div>
+                  ${it.en   ? `<div class="aux-row__en">${escapeHTML(it.en)}</div>` : ''}
+                  ${it.desc ? `<div class="aux-row__desc">${escapeHTML(it.desc)}</div>` : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </section>
+      `).join('')}
+    `;
+    openModal('aux');
+  }
+
+  /* ------------------------------------------------------------------
+   * Context menu
+   * ----------------------------------------------------------------*/
+  function openCtxMenu(x, y, phaseId) {
+    const menu = document.getElementById('ctxmenu');
+    menu.hidden = false;
+    menu.dataset.phase = phaseId;
+    // Position with viewport awareness
+    const w = 200, h = 280;
+    const px = Math.min(x, window.innerWidth - w - 8);
+    const py = Math.min(y, window.innerHeight - h - 8);
+    menu.style.left = px + 'px';
+    menu.style.top  = py + 'px';
+  }
+  function closeCtxMenu() {
+    document.getElementById('ctxmenu').hidden = true;
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.ctxmenu')) closeCtxMenu();
+  });
+  document.getElementById('ctxmenu').addEventListener('click', (e) => {
+    const li = e.target.closest('li');
+    if (!li) return;
+    const act = li.dataset.act;
+    const phaseId = document.getElementById('ctxmenu').dataset.phase;
+    closeCtxMenu();
+    handleCtxAct(act, phaseId);
+  });
+
+  function handleCtxAct(act, phaseId) {
+    const idx = state.phases.findIndex(p => p.id === phaseId);
+    if (idx < 0) return;
+    switch (act) {
+      case 'rename':
+      case 'recolor':
+        openPhaseEdit(phaseId);
+        break;
+      case 'duplicate': {
+        const src = state.phases[idx];
+        const copy = deepClone(src);
+        copy.id = 'CUSTOM-' + Date.now();
+        copy.num = String(state.phases.length + 1).padStart(2, '0');
+        copy.name = copy.name + ' (コピー)';
+        copy.tasks = (copy.tasks || []).map(t => ({ ...t, id: t.id + '-D' + idx }));
+        state.phases.push(copy);
+        save(); renderAll();
+        toast(`${src.name} を複製`);
+        break;
+      }
+      case 'move-up':
+        if (idx > 0) {
+          [state.phases[idx-1], state.phases[idx]] = [state.phases[idx], state.phases[idx-1]];
+          state.phases.forEach((p, i) => p.num = String(i+1).padStart(2, '0'));
+          save(); renderAll();
+          toast('フェーズを上に移動');
+        }
+        break;
+      case 'move-down':
+        if (idx < state.phases.length - 1) {
+          [state.phases[idx+1], state.phases[idx]] = [state.phases[idx], state.phases[idx+1]];
+          state.phases.forEach((p, i) => p.num = String(i+1).padStart(2, '0'));
+          save(); renderAll();
+          toast('フェーズを下に移動');
+        }
+        break;
+      case 'delete': {
+        const p = state.phases[idx];
+        if (idx === 0) { toast('最初のフェーズは削除できません', 'error'); return; }
+        if (!confirm(`${p.name} を削除しますか?`)) return;
+        state.phases.splice(idx, 1);
+        if (state.activePhaseId === phaseId) state.activePhaseId = state.phases[0]?.id;
+        save(); renderAll();
+        toast(`${p.name} を削除`);
+        break;
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------
+   * Modal open/close
+   * ----------------------------------------------------------------*/
+  function openModal(kind) {
+    const id = kind === 'aux' ? 'auxDrawer' : kind === 'task' ? 'taskModal' : 'phaseModal';
+    document.getElementById(id).classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal(kind) {
+    const id = kind === 'aux' ? 'auxDrawer' : kind === 'task' ? 'taskModal' : 'phaseModal';
+    document.getElementById(id).classList.remove('is-open');
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('click', (e) => {
+    const closer = e.target.closest('[data-close]');
+    if (closer) {
+      const kind = closer.dataset.close;
+      closeModal(kind === 'aux' ? 'aux' : kind === 'task' ? 'task' : 'phase');
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      ['aux', 'task', 'phase'].forEach(closeModal);
+      closeCtxMenu();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      document.getElementById('searchInput').focus();
+    }
+  });
+
+  /* ------------------------------------------------------------------
+   * Add task (lightweight, in-memory only)
+   * ----------------------------------------------------------------*/
+  function addTaskToColumn(col) {
+    const phase = findPhase(state.activePhaseId);
+    if (!phase) return;
+    const phaseStrict = findPhaseStrict(phase._parentId || phase.id);
+    const target = phaseStrict || phase;
+    const nextIdx = (target.tasks || []).length + 1;
+    const newId = `${target.id}-NEW${String(nextIdx).padStart(3, '0')}`;
+    const t = {
+      id: newId,
+      title: '新しいタスク',
+      desc: 'クリックして詳細を編集してください。',
+      priority: 'P2',
+      tags: ['新規'],
+      linkedDocs: [],
+      reviewPoints: [],
+      estimate: 4,
+      status: col,
+      owner: null
+    };
+    state.tasks[newId] = t;
+    if (target.id === phase.id) {
+      target.tasks.push(t);
+    } else if (target.subphases) {
+      const sp = target.subphases.find(s => s.id === phase.id);
+      if (sp) sp.tasks.push(t);
+    }
+    save(); renderAll();
+    openTaskModal(newId);
+  }
+
+  /* ------------------------------------------------------------------
+   * Toast
+   * ----------------------------------------------------------------*/
+  let toastTimer = null;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.hidden = false;
+    requestAnimationFrame(() => el.classList.add('is-show'));
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      el.classList.remove('is-show');
+      setTimeout(() => { el.hidden = true; }, 250);
+    }, 2200);
+  }
+
+  /* ------------------------------------------------------------------
+   * Save (persist)
+   * ----------------------------------------------------------------*/
+  function save() {
+    store.save(PHASE_STORAGE_KEY, state.phases);
+    store.save(TASK_STORAGE_KEY, state.tasks);
+  }
+
+  /* ------------------------------------------------------------------
+   * Util
+   * ----------------------------------------------------------------*/
+  function escapeHTML(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function escapeAttr(s) {
+    if (s == null) return '';
+    return String(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function mix(hex1, hex2, t) {
+    const c1 = hexToRgb(hex1), c2 = hexToRgb(hex2);
+    const r = Math.round(c1.r * (1 - t) + c2.r * t);
+    const g = Math.round(c1.g * (1 - t) + c2.g * t);
+    const b = Math.round(c1.b * (1 - t) + c2.b * t);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+  function hexToRgb(hex) {
+    const h = hex.replace('#', '');
+    return { r: parseInt(h.slice(0,2),16), g: parseInt(h.slice(2,4),16), b: parseInt(h.slice(4,6),16) };
+  }
+
+  /* ------------------------------------------------------------------
+   * Bind global events
+   * ----------------------------------------------------------------*/
+  function bindEvents() {
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      applyTheme(state.theme);
+    });
+
+    document.querySelectorAll('.seg__btn').forEach(btn => {
+      btn.addEventListener('click', () => setView(btn.dataset.view));
+    });
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      state.filter = e.target.value;
+      if (state.view === 'kanban') renderKanban();
+      else if (state.view === 'list') renderList();
+      else if (state.view === 'timeline') renderTimeline();
+    });
+
+    document.getElementById('addTaskBtn').addEventListener('click', () => {
+      addTaskToColumn('todo');
+    });
+
+    document.getElementById('addPhaseBtn').addEventListener('click', () => {
+      openPhaseEdit('__new__');
+    });
+
+    document.getElementById('resetPhases').addEventListener('click', () => {
+      if (!confirm('V字モデルの既定構成に戻します。カスタマイズは失われます。続行しますか?')) return;
+      state.phases = deepClone(DEFAULT_PHASES);
+      state.tasks = buildInitialTasks();
+      state.activePhaseId = 'P1';
+      save(); renderAll();
+      toast('既定に戻しました');
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', exportJSON);
+
+    document.querySelectorAll('#auxList li').forEach(li => {
+      li.addEventListener('click', () => openAuxDrawer(li.dataset.aux));
+    });
+
+    // Drag start (delegation)
+    document.addEventListener('dragstart', (e) => {
+      const card = e.target.closest('.card');
+      if (card) {
+        e.dataTransfer.setData('text/plain', card.dataset.id);
+        card.classList.add('is-dragging');
+      }
+    });
+    document.addEventListener('dragend', (e) => {
+      const card = e.target.closest('.card');
+      if (card) card.classList.remove('is-dragging');
+    });
+  }
+
+  function exportJSON() {
+    const blob = new Blob([JSON.stringify({ phases: state.phases, tasks: state.tasks }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vmodel-kanban-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('JSON をエクスポートしました');
+  }
+
+  /* ------------------------------------------------------------------
+   * Render-all
+   * ----------------------------------------------------------------*/
+  function renderAll() {
+    renderVStrip();
+    renderPhasebar();
+    renderStageHeader();
+    setView(state.view);
+  }
+
+  /* ------------------------------------------------------------------
+   * Init
+   * ----------------------------------------------------------------*/
+  function init() {
+    bindEvents();
+    renderAll();
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
