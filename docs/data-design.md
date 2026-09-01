@@ -429,7 +429,7 @@ INSERT INTO worktree.worktree_status (status_code, display_name, is_terminal, so
   ('READY', 'Ready', FALSE, 20),
   ('ASSIGNED', 'Assigned', FALSE, 30),
   ('AGENT_RUNNING', 'Agent Running', FALSE, 40),
-  ('WAITING_FEADBACK', 'Waiting Feedback', FALSE, 50), -- 注:应为 WAITING_FEEDBACK
+  ('WAITING_FEEDBACK', 'Waiting Feedback', FALSE, 50), -- per ON-001 (2026-09-01 IPA 化): FEADBACK → FEEDBACK 誤字修正
   ('FEEDBACK_RECEIVED', 'Feedback Received', FALSE, 60),
   ('VALIDATING', 'Validating', FALSE, 70),
   ('BLOCKED', 'Blocked', FALSE, 80),
