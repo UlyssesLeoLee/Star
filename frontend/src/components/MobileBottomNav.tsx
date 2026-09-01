@@ -67,6 +67,7 @@ export function MobileBottomNav() {
 
   // "更多" 入口跳出一张速查表(9 个常去页面)
   const moreItems: { label: string; href: string }[] = [
+    { label: "远程控制", href: "/remote" },
     { label: "项目 Projects", href: "/projects" },
     { label: "工作项 WorkItem", href: "/work-item" },
     { label: "看板 Board", href: "/board" },

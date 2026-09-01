@@ -31,6 +31,9 @@ import {
   Key,
   Terminal,
   Sparkles,
+  Monitor,
+  FolderOpen,
+  Smartphone,
 } from "lucide-react";
 
 export type ModuleCategory =
@@ -120,6 +123,17 @@ export const ALL_MODULES: ModuleDefinition[] = [
     categoryLabel: "Core Workspace",
     description: "租户全局配置、团队成员、安全与权限管理",
     icon: Settings,
+    isCore: true,
+  },
+  {
+    id: "remote",
+    label: "Remote Control",
+    code: "M",
+    href: "/remote",
+    category: "core",
+    categoryLabel: "Core Workspace",
+    description: "手机端远程连接 desktop / terminal / files (per 2026-09-01 PHASE-MOBILE-PWA v0.2)",
+    icon: Smartphone,
     isCore: true,
   },
 

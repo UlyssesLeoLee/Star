@@ -4,6 +4,8 @@
 
 /* Star 日漫科技美学双主题 v2.0 (Shōnen Studio Light + Neo-Tokyo Dark) */
 @import "../styles/theme.css";
+/* xterm.js v6 终端样式 (per 2026-09-01 PHASE-MOBILE-PWA v0.2 远程终端) */
+@import "@xterm/xterm/css/xterm.css";
 
 html {
   color-scheme: light dark;
