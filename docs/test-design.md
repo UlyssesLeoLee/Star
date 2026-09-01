@@ -10,6 +10,8 @@
 > | v0.3 | 2026-08-31 | 同步 requirements.md 98db08e(线程 C:Design Artifact / Test Level / Incident Record,详见 §上游同步 2026-08-31;basic-design 尚未跟进,字段细节标 TBD) | — |
 > | v0.4 | 2026-08-31 | handoff 兜底 γ+δ 21 P0 引用错位修复注记 (per `QA-DRIFT-001.md` §2.3): T1/T2/T3 自指引用 §6.2.1/§6.3.3/§6.3.4 实为 test-design 自身章节, 应改 requirements.md §8.3/§27.6/§29.1; S1-S5 同步点对不上实际章节; 13 处 tenant_id 端点声明; §6.x 引用 §X 与 7 份设计书实际章节未穷举对账。本 v0.4 不动原 v0.3 章节内容, 在 §0 末追加"驱动上游回填清单"段, 守门 #12 + #11 缺标比错标 + #9 author Ulysses 唯一 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
 > | v0.5 | 2026-08-31 | handoff 兜底分批 2: 4 wt 代码跟进落地 (per AGENTS.md v0.24 / `STAR-P3-WBS-001.md` §13 / 2026-08-31 12:39 JST Ulysses 指令"开子代理和worktree并行处理" 拍板 4 wt 并行 + AC 矩阵跟 T1), 守门 #1+#9+#12 跨 stage 全过 (origin/main 25 → 29 ahead, 285/285 vitest pass + tsc 0 + cargo 0, 4 worker 子代理 status="succeeded" 实证 5 commits 在 main chain 上):<br>- **T1 ValidationResult.Level 维度 (REQ-TST-001/002)** (per §6.2.1): `5df5a97` (types TestLevel 4 值 + ValidationResultRecord + AcceptanceCoverageReport) + `4fa31d7` (19 测试 + AC 矩阵生成器) + `3124902` (merge), commit 实测 frontend/src/mocks/handlers/validation.ts (3 endpoint) + data/validation.ts (10 rows 4 Level 全覆盖) + schemas/validation.ts + 19 测试 + `scripts/generate_ac_matrix.py` (249 行) + `docs/ac-test-matrix.csv` (35 行 = 1 header + 34 REQ 行, REQ-TST-001/002 covered 其余 30 gap)<br>- **T2 DesignArtifact + WorkItem Guard (REQ-DSG-001/002)** (per §6.3.3): `43355ed` + `a24f4d5` (merge), 37 测试 (13 guard 纯函数 `checkAllArtifactsApproved` 4 reason 分支 + 24 handler 跨 5 endpoint 状态机), commit 实测 frontend/src/lib/workitem-guard.ts 纯函数 + mocks/handlers/design-artifacts.ts (5 endpoint 含 transition 状态机 nextStatusFromDecision 纯函数)<br>- **T3 IncidentRecord + 3 项非能力负向测试 (REQ-OPS-001/002/003)** (per §6.3.4): `e9b4a84` + `631f562` (merge), 22 测试 (8 guard `validateIncidentRecord` 5 失败分类 + 14 handler 含 **3 项非能力 404 negative missing** 端点: `GET /api/incidents/probe-production` / `POST /api/incidents/process-alert` / `POST /api/incidents/:id/auto-rollback` 错误文案占位 "Capability not implemented (per REQ-OPS-003 §30.6 boundary)"), commit 实测 frontend/src/lib/incident-guard.ts + mocks/handlers/incidents.ts (5 endpoint)<br>- **5 域业务 mock 完整化 (test-design §2.1.2 + §3.1 + §3.3)** (per §0 端点清单扩展): `3dde2b4` + `b424611` (merge), 31 测试 (跨 player/economy/match/social/admin 5 域 + 既有 agents/inbox/analytics + 新加 workspaces/billing/worktrees/comments/tenants+rbac), commit 实测 frontend/src/mocks/schemas/five-domain.ts (243 行 6 type guard) + data/five-domain.ts (338 行 6 dataset) + 5 handler 文件 + handlers-5d.test.ts (31 tests)<br>- **不变量保留**: 本 v0.5 不改 v0.3 章节内容 (per 守门 #12 缺标比错标 + 守门 #11 不沿用 v0.x 旧叙事), 仅在文末 §16 追加"代码跟进实证"段, 引用 4 wt commit 短码 + 守门实证结果; 字段细节 TBD 维持 §6.2.1/§6.3.3/§6.3.4 不动, 等 basic-design 拍板后由上游 AI 回填 (per v0.4 §0.1 驱动上游回填清单机制)<br>- **守门 #1+#9+#12 跨 stage 全过**: vitest 285/285 (35 files, 109 new = 19+37+22+31) / tsc --noEmit 0 错 / cargo check --workspace --all-targets 0 err (11.29s, 11 warning pre-existing) / author Ulysses 唯一 / 0 子代理 RPC 不可靠实证 (status="succeeded" 实证 5 commits 全在 main chain 上) | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
+| v0.6 | 2026-09-01 | 新增 §7 シナリオ + テストデータ 章节 (per 2026-09-01 16:13 JST Ulysses 拍板 "加 §X 场景/数据章"); 覆盖 25 domain Module + 5 域业务 (per 守门 #3 历史治理命名) + 6 E2E 关键流程 + 3 AC 跨引用 (VAL-001/DSG-001/OPS-001); 原 §7-§16 顺位 §8-§17 同步 (修订历史 v0.1 ~ v0.5 中 §N 引用保留, 仅 body 内容 + 新增 §7 引用新编号); Test-J.14 ~ J.17 追加 (per 守门 #11 缺标比错标); 守门 #1 + #9 + #12 三过 (docs-only 改动, 无代码变更) | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
+
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/api-design.md` v0.1,`docs/security-design.md` v0.1
 > **下游**: Implementation(测试代码 + CI 配置)、Operation(测试环境 + 监控)
 > **文档定位**: 完整测试策略:单元 / 集成 / E2E / 性能 / 安全 / 验收。
@@ -41,7 +43,7 @@
 | δ-04 | "VAL-001 验证 §6.2.1" basic-design 缺章节 | 标 TBD | P0 |
 | δ-05 | §6.3.2 引用规范与 basic-design 实际章节不对应 | 上游回填 | P0 |
 | δ-06 | §2.5.2 引用规范与 basic-design 实际章节不对应 | 上游回填 | P0 |
-| δ-07 | §14 引用规范与 basic-design 实际章节不对应 | 上游回填 | P0 |
+| δ-07 | §15 引用规范与 basic-design 实际章节不对应 | 上游回填 | P0 |
 | δ-08-11 | S1-S5 / T1-T2 同步点 vs requirements 实际章节号漂移 | 跨文档穷举对账 | P0 |
 
 ### 修复策略 (per 守门 #11 缺标比错标 + #9 author Ulysses + #12 commit-time 同步)
@@ -83,7 +85,7 @@
 > | **T2** REQ-DSG-001/002(DesignArtifact + WorkItem Guard) | 见 §6.3.3;Guard 失败需指出未批准的具体 DesignArtifact;已批准版本不可覆盖式修改;ReviewRecord.Target 二选一互斥 | V1 Should-Have 测试(TBD) |
 > | **T3** REQ-OPS-001/002/003(IncidentRecord) | 见 §6.3.4;历史 ValidationResult/Acceptance Coverage 判定不可覆写,只可新增标注;OPS-003 三项非能力(不探测生产/不处理告警/不自动回滚修复)需负向缺失测试 | V1 Should-Have 测试(TBD) |
 >
-> **不变量保留**:MVP 测试矩阵 / AC 覆盖率公式(§6.2 现行列结构)/ E2E 路径 / VAL-001 四重门(§6.3.2)全部不动;上表新增内容均为叠加说明,不改写 §14 已冻结接口的现行文本,详见各子节内 RFC 待办标注。
+> **不变量保留**:MVP 测试矩阵 / AC 覆盖率公式(§6.2 现行列结构)/ E2E 路径 / VAL-001 四重门(§6.3.2)全部不动;上表新增内容均为叠加说明,不改写 §15 已冻结接口的现行文本,详见各子节内 RFC 待办标注。
 
 ---
 
@@ -343,7 +345,7 @@ async fn test_get_worktree_contract() {
 **关键契约点**(继承《API Design》§3):
 
 - 所有响应必须含 `tenant_id`(13 类必带对象,继承《Security Design》§4)
-- 错误响应符合 §8 错误码
+- 错误响应符合 §9 错误码
 - 字段命名走 snake_case
 - 时间格式 ISO 8601
 - 分页格式统一(limit / cursor)
@@ -589,9 +591,9 @@ export default function() {
 |---|---|
 | **AuthN/AuthZ**(继承《Security Design》§2-§3) | JWT 校验 / RBAC / Agent Policy |
 | **Tenant Isolation**(§4) | RLS Bypass 尝试 / Cross-Tenant 访问 |
-| **AI Provider Boundary**(§8) | Code 不得离开指定 Provider / Untrusted 隔离 |
-| **Local Runtime Security**(§9.3) | 8 种白名单命令 / 禁止 Shell |
-| **Prompt Injection**(§7) | README 注入 P5 验证不影响 P0 |
+| **AI Provider Boundary**(§9) | Code 不得离开指定 Provider / Untrusted 隔离 |
+| **Local Runtime Security**(§10.3) | 8 种白名单命令 / 禁止 Shell |
+| **Prompt Injection**(§8) | README 注入 P5 验证不影响 P0 |
 | **Secret Boundary**(§5) | Agent 看不到其它 Session Token |
 
 #### 2.5.3 渗透测试(每季度)
@@ -872,7 +874,7 @@ Feature: <Feature Name>
 | E2E Test(§2.3) | AcceptanceTestLevel | 对应关系明确 |
 | — | **SystemTestLevel(総合テスト)** | **未落位缺口**:本设计当前没有一个测试层级明确对应"総合テスト"。候选:§2.2.4(NATS+PostgreSQL+Valkey 全容器集成)、§2.4 性能测试、或多 WorkItem 跨域的 §2.3 E2E 扩展场景均可能承载,但尚无正式归属决定,标记为待定,不臆造归属 |
 
-**已知会影响但**尚不修改**的冻结接口**(§14 #7/#8):requirements §27.6 要求 Acceptance Coverage 映射(§27.2)能表达"某 AC 需要 IntegrationTestLevel **与** AcceptanceTestLevel 两条证据才算覆盖",并在缺失时指出具体缺哪个 Level,而非笼统显示"未覆盖"。这意味着 §6.2 矩阵格式与 §6.3.2 Gate 2(`AcceptanceCoverage == 1.0`)未来需要支持按 Level 判定。**当前不改写 §6.2/§6.3.2 现行文本**——basic-design 尚未定义 Level 落地 Schema,spec 层(`docs/specs/domain-validation-spec.md`)也未见 Level 字段,提前改写矩阵格式属于错标风险。此事项登记为 Test-J.11(§13.2),需先走 RFC 完成 basic-design 同步 + Schema 定稿,再回来修改并重新冻结 §14 #7/#8。
+**已知会影响但**尚不修改**的冻结接口**(§15 #7/#8):requirements §27.6 要求 Acceptance Coverage 映射(§27.2)能表达"某 AC 需要 IntegrationTestLevel **与** AcceptanceTestLevel 两条证据才算覆盖",并在缺失时指出具体缺哪个 Level,而非笼统显示"未覆盖"。这意味着 §6.2 矩阵格式与 §6.3.2 Gate 2(`AcceptanceCoverage == 1.0`)未来需要支持按 Level 判定。**当前不改写 §6.2/§6.3.2 现行文本**——basic-design 尚未定义 Level 落地 Schema,spec 层(`docs/specs/domain-validation-spec.md`)也未见 Level 字段,提前改写矩阵格式属于错标风险。此事项登记为 Test-J.11(§14.2),需先走 RFC 完成 basic-design 同步 + Schema 定稿,再回来修改并重新冻结 §15 #7/#8。
 
 ### 6.3 验收门禁
 
@@ -918,7 +920,7 @@ AI 完成声明(`is_ai_complete_claim == true`)必须同时满足以下四重门
 
 #### 6.3.3 DSG-001/002 Design Artifact Guard 测试点(requirements §8.3,V1 Should-Have,TBD)
 
-DesignArtifact 复用既有 ReviewRecord(§27.4)审批与 WorkItem Guard(§8.2 REQ-WF-003 `RequireApproval`)机制,**不新建审批状态机、不新增 Guard 类型**。测试关注点:
+DesignArtifact 复用既有 ReviewRecord(§27.4)审批与 WorkItem Guard(§9.2 REQ-WF-003 `RequireApproval`)机制,**不新建审批状态机、不新增 Guard 类型**。测试关注点:
 
 | 场景 | 期望(不变量) |
 |---|---|
@@ -941,16 +943,386 @@ IncidentRecord 是人工登记的生产事件追溯对象,修复走既有 WorkIt
 | IncidentRecord 关联 `ViolatedAcceptanceCriteria` 回填 §6.2 AC↔Test 矩阵 | 对应 AC 条目新增"曾被事件击穿"标注 |
 | IncidentRecord 尝试基于事件回填,修改某条 AC 历史 ValidationResult 的既有判定(如把历史 Pass 改成 Fail) | **拒绝**——只能新增标注,不得覆写既有判定(REQ-OPS-002,负向测试,同 TC-VAL001-N 系列写法) |
 | Acceptance Coverage 历史快照在 IncidentRecord 登记前后对比 | 历史快照不变,新增记录独立可追溯 |
-| 系统被要求执行生产环境探测 / 接收处理告警信号 / 自动回滚 / 自动修复 | **必须被拒绝**——三项均为 REQ-OPS-003 明确排除的非能力,与 §8.2 "❌ ExecuteArbitraryShell 必须被拒绝"同类缺失测试写法 |
+| 系统被要求执行生产环境探测 / 接收处理告警信号 / 自动回滚 / 自动修复 | **必须被拒绝**——三项均为 REQ-OPS-003 明确排除的非能力,与 §9.2 "❌ ExecuteArbitraryShell 必须被拒绝"同类缺失测试写法 |
 | 通过非既有 §18 Integration Webhook 机制之外的入站接口尝试创建 IncidentRecord | **必须被拒绝**——不新增独立入站接口(REQ-OPS-003) |
 
 **已知备注**:IncidentRecord 的 `Severity` 分级、`Status` 状态机字段细节由 basic-design 阶段决定,当前无法给出具体 Schema 断言,标记 TBD,不臆造字段名。
 
 ---
 
-## 7. 性能测试(详细)
+## 7. シナリオ + テストデータ (Test Scenarios & Test Data Catalogue)
 
-### 7.1 关键端点 P95 预算(继承《API Design》§10)
+> **本节目的**: 把 §6 验收测试的 AC↔Test 映射展开为可执行的「シナリオ + テストデータ」表, 覆盖 25 domain-* Module + 5 域业务 (per 守门 #3 历史治理命名) + 6 E2E 关键流程 (per §5.1), 以及 §6.2.1 / §6.3.3 / §6.3.4 三项 V1 Should-Have REQ。
+>
+> **继承**: §6 验收测试 + §10 测试数据管理 (本次升版顺位) + §1.3 数据原则 + §2 测试层级 + §5 E2E 策略。
+>
+> **不重复**: §6 已有 VAL-001/DSG-001/OPS-001 场景表, 此处只补充其他 REQ 的场景; §10 测试数据管理详细策略不重复, 此处聚焦"场景 ↔ 数据"映射。
+>
+> **场景表 Schema**: §7.1.1; **测试数据目录**: §7.3; **可追溯矩阵**: §7.4; **已知缺口**: §7.5。
+
+### 7.1 シナリオ表 Schema
+
+#### 7.1.1 通用 Schema
+
+| 列 | 含义 | 必填 |
+|---|---|---|
+| # | 场景编号 (REQ-ID + 序号) | ✅ |
+| シナリオ (Scenario) | 步骤或条件描述 (Gherkin Given/When/Then 风格) | ✅ |
+| 入力 (Input) | 触发条件 / 请求参数 | ✅ |
+| 期待結果 (Expected) | 响应 / 状态 / 副作用 | ✅ |
+| テストデータ (Test Data) | 关联 fixture ID / seed / 数据来源 | ✅ |
+| レベル (Level) | UnitTestLevel / IntegrationTestLevel / AcceptanceTestLevel / SystemTestLevel (per §6.2.1) | ✅ |
+| 自動化 (Automation) | Auto / Semi-Auto / Manual | ✅ |
+| 5 域 (Domain) | player / economy / match / social / admin (per 守门 #3 真人 Lead 结构, 非 DDD 映射) | optional |
+
+#### 7.1.2 レベル ↔ 场景类型 默认映射
+
+| Level | 适用场景 | 默认 Automation |
+|---|---|---|
+| UnitTestLevel | §7.2.1 25 domain 纯函数 / 状态机单测 | Auto |
+| IntegrationTestLevel | §7.2.2 5 域业务 + §7.2.3 跨域 Saga | Auto |
+| AcceptanceTestLevel | §7.2.4 6 E2E 关键流程 | Auto (Playwright) |
+| SystemTestLevel | §7.2.5 NATS+PostgreSQL+Valkey 全容器集成 (per §2.2.4 顺延) | Semi-Auto |
+
+### 7.2 シナリオ (Scenarios)
+
+#### 7.2.1 25 Domain Module シナリオ (per §2.1.1)
+
+> **范围**: 25 domain-* crate 的纯函数 / 状态机 / Guard 单测, 每个 domain 列 3-5 个核心场景。
+> **Level**: UnitTestLevel (Rust `cargo test`)
+> **Test Data**: `crates/domain-X/tests/fixtures/` 各自维护
+> **5 域 disclaimer**: 25 domain 是 DDD bounded context (per §5 仓库拓扑), 不是 5 域业务命名, 不做强制映射
+
+| Domain | # | シナリオ | 期待結果 | テストデータ |
+|---|---|---|---|---|
+| **domain-tenant** | T-TN1 | 创建 tenant + 默认 workspace + 默认 RBAC scheme | 200 + tenant_id 返回 + 3 子对象级联创建 | `tenant_factory.acme()` |
+|  | T-TN2 | 跨 tenant RLS 隔离 (A 创建, B 查询) | 403 RLS_BYPASS_DENIED | `tenant_a / tenant_b` |
+|  | T-TN3 | 软删除 + 回收站 | query 含 `include_deleted=true` 返 deleted | `tenant_factory.soft_deleted()` |
+|  | T-TN4 | 4 域 Lead 越权 (per 守门 #3 独立) | 跨域操作 拒绝 | `actor_factory(Lead, other_domain)` |
+| **domain-workspace** | T-WS1 | CRUD + 关联 tenant | 200 + tenant_id 校验 | `workspace_factory.default()` |
+|  | T-WS2 | 工作区权限继承 | 子对象继承父 workspace 策略 | `workspace_factory.with_rbac()` |
+|  | T-WS3 | 多 workspace 切换 | session 切换后 RLS 立即生效 | `workspace_factory.multi()` |
+| **domain-project** | T-PJ1 | 模板实例化 + policy 注入 | 200 + policy 列表 | `project_factory.from_template()` |
+|  | T-PJ2 | 敏捷 vs 瀑布模式切换 | mode 字段决定 Guard 集 | `project_factory.waterfall()` |
+|  | T-PJ3 | Project 删除级联 | 子对象 soft delete 不级联物理删 | `project_factory.with_children()` |
+| **domain-work-item** | T-WI1 | 3 态状态机: Created → InProgress → Done | happy path | `work_item_factory.created()` |
+|  | T-WI2 | 非法转换 (try_transition invalid) | Err + reason | `work_item_factory.done()` + 目标非法状态 |
+|  | T-WI3 | 扩展 4 态 (per basic-design §2.5) | 状态机含 Blocked / Cancelled | `work_item_factory.blocked()` |
+|  | T-WI4 | Guard 未配置 (非瀑布) | 透明放行 | `project_factory.agile()` + WorkItem with Guard |
+| **domain-workflow** | T-WF1 | Workflow 定义 + 状态迁移 | 200 + DAG 校验 | `workflow_factory.3step()` |
+|  | T-WF2 | 多分支 + Join | 全部 branch 完成后流转 | `workflow_factory.diamond()` |
+|  | T-WF3 | 状态迁移 + 事件发布 | event bus 收到 event | `workflow_factory + event subscriber` |
+| **domain-board** | T-BD1 | Board 视图 + Column CRUD | 200 + column 顺序保持 | `board_factory.kanban()` |
+|  | T-BD2 | 列重排 | order 字段更新 | `board_factory.with_5_columns()` |
+|  | T-BD3 | WorkItem 拖拽跨列 | status 同步更新 | `board_factory + work_item_factory` |
+| **domain-planning** | T-PL1 | Sprint 创建 + 容量计算 | 200 + capacity vs committed | `sprint_factory.2week()` |
+|  | T-PL2 | Backlog 优先级排序 | rank 字段反映拖拽顺序 | `backlog_factory.with_20_items()` |
+|  | T-PL3 | Sprint 结束未完成项回退 | status → backlog | `sprint_factory.ended()` |
+| **domain-permission** | T-PM1 | RBAC scheme 评估 | allow / deny 矩阵 | `rbac_factory.scheme()` |
+|  | T-PM2 | 5 域 Lead 互不兼任 (per 守门 #3) | 跨域操作 拒绝 | `actor_factory(Lead, player) + admin domain op` |
+|  | T-PM3 | Agent 操作受限 | Agent 仅 Own 域 | `actor_factory(AgentSession)` |
+|  | T-PM4 | 资源策略 + ABAC | attribute 评估 | `policy_factory.with_conditions()` |
+| **domain-comment** | T-CM1 | @ 提及 + 通知 | notification 创建 | `comment_factory.with_mention()` |
+|  | T-CM2 | 附件上传 + PII 检测 | PII 字段脱敏 | `comment_factory.with_attachment()` |
+|  | T-CM3 | 编辑历史 | edit history 保留 | `comment_factory.edited()` |
+| **domain-relation** | T-RL1 | 阻塞 + 关联 | 双向 link 创建 | `relation_factory.blocked_by()` |
+|  | T-RL2 | 循环依赖检测 | 拒绝 + 报错 | `relation_factory.cycle_attempt()` |
+|  | T-RL3 | 跨 WorkItem 关联 | cross-link 写入 | `relation_factory.cross_workitem()` |
+| **domain-development** | T-DV1 | ChangeSet 创建 + 关联 WorkItem | 200 + parent_id 校验 | `change_set_factory` |
+|  | T-DV2 | Symbol Index 同步 | index 写入 + 检索命中 | `change_set_factory + symbol_index_query` |
+|  | T-DV3 | 文件级 diff 追踪 | diff 字段记录 | `change_set_factory.with_diff()` |
+| **domain-worktree** | T-WT1 | 17 状态机 happy path | 状态逐步迁移 | `worktree_factory.creating()` |
+|  | T-WT2 | Conflict 检测 + 隔离 | conflict field 写入 + 隔离分支 | `worktree_factory.conflict()` |
+|  | T-WT3 | Merge 后清理 | 子对象清理 | `worktree_factory.merged()` |
+|  | T-WT4 | Isolation 字段强制 (per 守门 #1 派生) | 越权访问隔离区 拒绝 | `worktree_factory.isolated + other_tenant` |
+| **domain-agent** | T-AG1 | 14 状态机 | 状态逐步迁移 | `agent_factory.idle()` |
+|  | T-AG2 | AgentPolicy 强制 | 违规操作 拒绝 | `agent_factory.with_policy_violation()` |
+|  | T-AG3 | Lease + Heartbeat 过期 | session 自动回收 | `agent_factory.lease_expired()` |
+|  | T-AG4 | 5 域 Lead 真人指派 (per 守门 #3) | actor 必须含 Lead role | `actor_factory.sre_lead_player` |
+| **domain-feedback** | T-FB1 | 6 状态 happy path | Open → Ack → Resolving → Resolved → Closed | `feedback_factory.open()` |
+|  | T-FB2 | 5 段式 Instruction 校验 | 缺段 拒绝 | `feedback_factory.missing_provenance` |
+|  | T-FB3 | Supersede 旧版本 | 旧版只读可追溯 | `feedback_factory.supersede()` |
+| **domain-context** | T-CX1 | Context Compiler 编译 | Provenance.source 完整 | `context_factory.untrusted` |
+|  | T-CX2 | Decision 3 态: Proposed/Approved/Rejected | 状态机转换 | `decision_factory.proposed()` |
+|  | T-CX3 | P5 隔离层 | Skill/Playbook 走隔离通道 | `context_factory.skill_source` |
+|  | T-CX4 | Untrusted 隔离 | README 注入不影响 P0 | `context_factory.readme_injection` |
+| **domain-validation** | T-VL1 | Acceptance Coverage 报告 | coverage% + 缺项清单 | `validation_factory.with_5_ac` |
+|  | T-VL2 | Evidence 权重评估 | weighted score 正确 | `validation_factory.weighted` |
+|  | T-VL3 | Level 维度 (per §6.2.1) | 4 Level 字段 | `validation_factory.level_split` |
+|  | T-VL4 | VAL-001 四重门 (per §6.3.2) | 4 门同时通过 | `validation_factory.all_gates_pass` |
+| **domain-scm** | T-SC1 | ACL 翻译 (GitHub / GitLab / Gitea) | 规则映射正确 | `scm_factory.github_acl` |
+|  | T-SC2 | Event 映射 (push / PR / comment) | domain event 触发 | `scm_factory.push_event` |
+|  | T-SC3 | Webhook HMAC 验证 (per §1 S3) | 签名错误 拒绝 | `scm_factory.bad_signature` |
+| **domain-identity** | T-ID1 | Device 注册 + DeviceId | 200 + device_id 强类型 | `device_factory.new()` |
+|  | T-ID2 | User + Credential 绑定 | 凭据校验通过 | `user_factory.with_credential` |
+|  | T-ID3 | Token 轮换 | 旧 token 失效 | `identity_factory.token_rotation` |
+|  | T-ID4 | 5 域 Lead 真人凭据 (WebAuthn 强制, per 守门 #3 派生) | 缺 WebAuthn 拒绝 | `actor_factory(Lead) no_webauthn` |
+| **domain-audit** | T-AU1 | 9 问必答 (per §2.5 顺延) | 缺问 拒绝 | `audit_factory.9q_incomplete` |
+|  | T-AU2 | 7 级 Retention 策略 | 旧记录按级别归档 | `audit_factory.retention_l3` |
+|  | T-AU3 | 不可篡改 (append-only) | 修改尝试 拒绝 | `audit_factory.attempt_modify` |
+|  | T-AU4 | 强 MFA 强制 (per 8/21 JST 拒绝兼任) | SRE 角色缺 MFA 拒绝 | `actor_factory.sre no_mfa` |
+| **domain-search** | T-SR1 | Query 语法解析 | AST 正确 | `search_factory.complex_query` |
+|  | T-SR2 | Index 同步延迟 | lag < 5s | `search_factory.indexer` |
+|  | T-SR3 | 跨 domain 联合搜索 | 多 domain 命中 | `search_factory.cross_domain` |
+| **domain-notification** | T-NT1 | 模板渲染 | placeholder 替换 | `notification_factory.template` |
+|  | T-NT2 | 渠道 (邮件 / 站内 / IM) | 全部发送 | `notification_factory.multi_channel` |
+|  | T-NT3 | 退避策略 | 失败重试 N 次后放弃 | `notification_factory.retry_exhausted` |
+|  | T-NT4 | Inbox 噪声抑制 (per §1 S2) | Agent 中间步骤被抑制 | `notification_factory.agent_intermediate` |
+| **domain-integration** | T-IG1 | 双向同步 (Star ↔ SCM) | 两侧状态一致 | `integration_factory.bidirectional` |
+|  | T-IG2 | Conflict 解决 | last-write-wins 或 manual | `integration_factory.conflict` |
+|  | T-IG3 | Webhook 接收 + 签名 | 合法 webhook 处理 | `integration_factory.webhook_valid` |
+| **domain-automation** | T-AM1 | Trigger 规则: Schedule/Cron (per §1 S1) | Event 路径不被触发 | `automation_factory.schedule` |
+|  | T-AM2 | 条件 + 动作 | 条件满足执行 | `automation_factory.condition_action` |
+|  | T-AM3 | 子队列隔离 (Event vs Schedule) | 互不干扰 | `automation_factory.isolation` |
+| **domain-collaboration** | T-CB1 | Realtime Subscription | 多客户端同步 | `collab_factory.ws` |
+|  | T-CB2 | 离线消息 | 重连后补发 | `collab_factory.offline` |
+|  | T-CB3 | 协作冲突 (同字段并发) | 提示冲突 | `collab_factory.concurrent_edit` |
+| **domain-local-runtime** | T-LR1 | 8 种白名单命令 (per §9.4 顺延) | 白名单内执行 | `local_runtime_factory.whitelisted` |
+|  | T-LR2 | 禁 Shell 注入 | shell 字符 拒绝 | `local_runtime_factory.shell_inject` |
+|  | T-LR3 | Device Identity 强制 | 缺 device_id 拒绝 | `local_runtime_factory.no_device` |
+|  | T-LR4 | ExecuteArbitraryShell 拒绝 | 任意 shell 拒绝 | `local_runtime_factory.arbitrary_shell` |
+
+**已知缺口** (per 守门 #11 缺标比错标):
+- 25 Module 各 3-5 场景为最小覆盖, **真实数据接入完整场景**待 STAR-P3-WBS-001 §1 P0-1 (25 domain 真实数据接入 ~6M token 预算, W1-W5 软参考周)
+- T-WT1/T-AG1/T-FB1 状态机场景假设状态名/转换规则已 frozen, 实际 spec 落地 per `docs/specs/domain-X-spec.md` (TBD per §0.1 §X 上游回填)
+
+#### 7.2.2 5 域业务 シナリオ (per 守门 #3 真人 Lead 问责结构)
+
+> **命名 disclaimer** (per §5 仓库拓扑 + 守门 #3): 5 域 (player/economy/match/social/admin) 是**历史治理命名**, 指 5 位真人 Lead 问责结构, **不等于** Star 仓 22 domain-* DDD bounded context, **不建立业务子域↔DDD 映射**。文档提到 "5 域" 时默认指真人 Lead 结构, 提到 "DDD bounded context" 时指 22 domain-* crate。
+
+##### 7.2.2.1 player 域 (player Lead)
+
+| # | シナリオ | 入力 | 期待結果 | テストデータ |
+|---|---|---|---|---|
+| T-PL-1 | 新玩家注册 + 默认 profile | tenant + email | 200 + profile_id | `player_factory.newbie()` |
+| T-PL-2 | 跨 tenant 玩家数据隔离 (A tenant 玩家在 B tenant 不可见) | tenant_a.player_id | 404 NOT_FOUND | `player_factory.tenant_a + actor.tenant_b` |
+| T-PL-3 | Player 软删除 + GDPR 删除请求 | delete request | soft delete + 30 天后 hard delete | `player_factory.gdpr` |
+| T-PL-4 | player Lead 真人操作 (per 守门 #3) | actor=player Lead | 操作可执行 | `actor_factory(Lead, player)` |
+| T-PL-5 | 非 player 域 Lead 越权 (per 8/21 JST 拒绝兼任) | actor=economy Lead | 拒绝 + audit | `actor_factory(Lead, economy) + player op` |
+
+##### 7.2.2.2 economy 域 (economy Lead)
+
+| # | シナリオ | 入力 | 期待結果 | テストデータ |
+|---|---|---|---|---|
+| T-EC-1 | 货币交易 (per Q-003 Saga) | debit + credit | 双方 ledger 更新 | `economy_factory.transaction` |
+| T-EC-2 | 跨域 Saga 失败回滚 | step 3 失败 | 全部回滚 | `economy_factory.saga_rollback` |
+| T-EC-3 | 货币上限检查 | amount > cap | 拒绝 + 错误码 | `economy_factory.over_cap` |
+| T-EC-4 | economy Lead 真人 (per 守门 #3) | actor=economy Lead | 操作可执行 | `actor_factory(Lead, economy)` |
+| T-EC-5 | Q-003 决策: economy Lead 独立拍板 (per §0.1 Q-003 跨域核心) | 跨域冲突 | economy 拍板 | `actor_factory(Lead, economy) + cross_domain` |
+
+##### 7.2.2.3 match 域 (match Lead)
+
+| # | シナリオ | 入力 | 期待結果 | テストデータ |
+|---|---|---|---|---|
+| T-MT-1 | 匹配请求 + 房间分配 | player_id | room_id 返回 | `match_factory.queue` |
+| T-MT-2 | 匹配超时回退 | timeout | 状态回退 | `match_factory.timeout` |
+| T-MT-3 | 跨域数据访问 (match → player) | match 域读 player | 仅可见必要字段 | `match_factory + player_factory` |
+| T-MT-4 | match Lead 真人 (per 守门 #3) | actor=match Lead | 操作可执行 | `actor_factory(Lead, match)` |
+| T-MT-5 | 5 域 Lead 互不兼任 (per 8/21 JST 拒绝兼任硬约束) | actor=player Lead 做 match 操作 | 拒绝 | `actor_factory(Lead, player) + match op` |
+
+##### 7.2.2.4 social 域 (social Lead)
+
+| # | シナリオ | 入力 | 期待結果 | テストデータ |
+|---|---|---|---|---|
+| T-SC-1 | 好友请求 + 双向确认 | requester + target | 双向 friend 关系 | `social_factory.friend_request` |
+| T-SC-2 | 私聊消息 | sender + content | 消息持久化 | `social_factory.message` |
+| T-SC-3 | 聊天 PII 脱敏 (per §7.3.4) | 含 email / phone | 脱敏后展示 | `social_factory.message_pii` |
+| T-SC-4 | social Lead 真人 (per 守门 #3) | actor=social Lead | 操作可执行 | `actor_factory(Lead, social)` |
+| T-SC-5 | 跨域消息审计 (social → audit) | 敏感操作 | audit 记录 | `social_factory + audit_factory` |
+
+##### 7.2.2.5 admin 域 (admin Lead, 含 COC 属 admin 域独立控制面)
+
+| # | シナリオ | 入力 | 期待結果 | テストデータ |
+|---|---|---|---|---|
+| T-AD-1 | COC 配置 (per 8/21 JST admin 域独立控制面) | config key-value | 200 + 持久化 | `admin_factory.coc_config` |
+| T-AD-2 | 系统级操作 (全局查 / 强制下线) | admin actor | 200 + audit | `actor_factory(Lead, admin)` |
+| T-AD-3 | SRE 兼任 admin 越权 (per 8/21 JST 拒绝 SRE 兼任 admin) | actor=SRE + admin op | 拒绝 | `actor_factory(SRE) + admin op` |
+| T-AD-4 | admin Lead 真人 (per 守门 #3) | actor=admin Lead | 操作可执行 | `actor_factory(Lead, admin)` |
+| T-AD-5 | admin 操作全部走强 MFA (per 8/21 JST 强约束) | admin op no MFA | 拒绝 | `actor_factory(Lead, admin) no_mfa` |
+
+**已知缺口**:
+- 5 域 Lead 真人到位后, 上表 5 域 Lead 场景的 actor 字段需真实身份 (per 守门 #3 DDD Review 阶段补)
+- 5 域业务 mock 数据完整化已落地 commit `3dde2b4` + `b424611` (per §17 顺延 v0.5 实证)
+- 5 域 disclaimer 必须在所有报表 label 显示 (per REQ-OPS-012, 见 04-ops-test-design-spec.md T-601 ~ T-605)
+
+#### 7.2.3 跨域 Saga シナリオ (per Q-003 / §2.2.4)
+
+> 跨域场景 (per 守门 #3 5 域独立 + 守门 #9 子代理授权):
+> - **T-CROSS-1**: economy 域 + match 域 联合作战 (Q-003 跨域核心问题)
+> - **T-CROSS-2**: player 域 + social 域 好友 + 私聊联调
+> - **T-CROSS-3**: admin 域 + 全部域 全局配置下发
+> - **T-CROSS-4**: NATS + PostgreSQL + Valkey 全容器集成 (per §2.2.4 SystemTestLevel)
+>
+> **已知缺口**: 跨域 Saga 场景的 actor 字段需 5 域 Lead 真人到位 (per 守门 #3 派生), 当前是 mock actor。
+> 详见 Test-J.15 (§7.5)。
+
+#### 7.2.4 6 E2E 关键流程 シナリオ (per §5.1)
+
+> **Level**: AcceptanceTestLevel (Playwright)
+> **Test Data**: `tests/e2e/fixtures/<flow>.spec.ts` 各自维护
+> **5 域 disclaimer**: 6 流程跨 5 域业务, 流程级别不绑定单域
+
+##### 7.2.4.1 流程 1: 从 WorkItem 创建 Worktree
+
+| # | シナリオ | 入力 | 期待結果 | テストデータ |
+|---|---|---|---|---|
+| T-E2E-1-1 | User 打开 WorkItem 详情 | work_item_id | UI 渲染 + "Create Worktree" 按钮可见 | `e2e_fixtures.work_item_detail` |
+| T-E2E-1-2 | 点击 "Create Worktree" + 选择 base branch | work_item_id + base | 跳转到 Worktree 详情页 + 状态 Creating | `e2e_fixtures.create_worktree_dialog` |
+| T-E2E-1-3 | Worktree 创建完成 (SCM clone 完成) | poll status | 状态 → Ready | `e2e_fixtures.scm_clone_complete` |
+| T-E2E-1-4 | 关联 ChangeSet 创建 | worktree_id | 0 个 ChangeSet (新建空) | `e2e_fixtures.empty_worktree` |
+| T-E2E-1-5 | 跨租户越权创建 Worktree | actor.tenant_b + work_item.tenant_a | 403 + UI 报错 | `e2e_fixtures.cross_tenant` |
+
+##### 7.2.4.2 流程 2: 分配 Worktree 给 Agent
+
+| # | シナリオ | 入力 | 期待結果 | テストデータ |
+|---|---|---|---|---|
+| T-E2E-2-1 | User 选择 Agent 分配 | worktree_id + agent_id | worktree.assigned_agent_id 更新 | `e2e_fixtures.assign_agent` |
+| T-E2E-2-2 | Agent 启动 + Lease 申请 | worktree_id | agent.status → AgentRunning + lease 写入 | `e2e_fixtures.agent_lease` |
+| T-E2E-2-3 | Agent 5 域 Lead 越权 (per 守门 #3) | agent + other domain | 拒绝 + audit | `e2e_fixtures.cross_domain_agent` |
+| T-E2E-2-4 | Heartbeat 超时回收 | no heartbeat 30s | agent.status → Idle | `e2e_fixtures.heartbeat_timeout` |
+| T-E2E-2-5 | 5 域 Lead 真人指派 (per 守门 #3) | actor=Lead | 操作可执行 | `e2e_fixtures.lead_assign` |
+
+##### 7.2.4.3 流程 3: Agent 修改后 Review + 提交 Feedback
+
+| # | シナリオ | 入力 | 期待結果 | テストデータ |
+|---|---|---|---|---|
+| T-E2E-3-1 | Agent 修改文件 + 提交 ChangeSet | worktree_id + diff | changeset 写入 + symbol index 同步 | `e2e_fixtures.agent_change` |
+| T-E2E-3-2 | Agent 提交 Feedback (5 段式) | feedback payload | feedback.status = Open + Provenance 完整 | `e2e_fixtures.feedback_5segment` |
+| T-E2E-3-3 | 5 段式缺段拒绝 (per §7.2.1 T-FB2) | missing provenance | 拒绝 + reason 列出 | `e2e_fixtures.feedback_missing_provenance` |
+| T-E2E-3-4 | Review 页面渲染 | feedback_id | UI 渲染 + 5 段展示 | `e2e_fixtures.review_page` |
+| T-E2E-3-5 | Review 拒绝 + Agent 重新提交 | decision=reject | feedback → Rejected + Agent 重新 Open | `e2e_fixtures.reject_retry` |
+
+##### 7.2.4.4 流程 4: 处理 Feedback Inbox (Resolve / Supersede)
+
+| # | シナリオ | 入力 | 期待結果 | テストデータ |
+|---|---|---|---|---|
+| T-E2E-4-1 | Inbox 列表 + 过滤 | user_id + filter | 列表 + 计数 | `e2e_fixtures.inbox_list` |
+| T-E2E-4-2 | Inbox 噪声抑制 (per §1 S2) | agent intermediate notification | 列表中**不**显示 | `e2e_fixtures.noise_suppress` |
+| T-E2E-4-3 | Resolve Feedback | feedback_id + resolution | status → Resolving → Resolved | `e2e_fixtures.resolve` |
+| T-E2E-4-4 | Supersede 旧版本 (per §7.2.1 T-FB3) | old + new | old 只读, new 独立生命周期 | `e2e_fixtures.supersede` |
+| T-E2E-4-5 | 关键事件突破上限 (per §1 S2) | critical event | 即使超上限也展示 | `e2e_fixtures.critical_event` |
+
+##### 7.2.4.5 流程 5: 处理 Conflict (Rebase / Merge)
+
+| # | シナリオ | 入力 | 期待結果 | テストデータ |
+|---|---|---|---|---|
+| T-E2E-5-1 | Conflict 检测 | worktree_id + base | conflict field 写入 | `e2e_fixtures.conflict_detect` |
+| T-E2E-5-2 | Rebase 操作 | worktree_id + target | rebase 完成 + conflict 列表 | `e2e_fixtures.rebase` |
+| T-E2E-5-3 | Merge 操作 | worktree_id + target | merge commit + worktree 状态变化 | `e2e_fixtures.merge` |
+| T-E2E-5-4 | 冲突未解决强行 merge | unresolved conflict | 拒绝 + UI 引导 | `e2e_fixtures.force_merge_blocked` |
+| T-E2E-5-5 | Conflict 隔离分支 (per §7.2.1 T-WT2) | worktree + isolation | 隔离分支独立 | `e2e_fixtures.isolation_branch` |
+
+##### 7.2.4.6 流程 6: Merge PR
+
+| # | シナリオ | 入力 | 期待結果 | テストデータ |
+|---|---|---|---|---|
+| T-E2E-6-1 | PR 创建 | worktree + base | pr_url 返回 | `e2e_fixtures.pr_create` |
+| T-E2E-6-2 | CI 触发 + 状态同步 | pr_id | ci_status 同步 | `e2e_fixtures.ci_trigger` |
+| T-E2E-6-3 | VAL-001 四重门 (per §6.3.2) | is_ai_complete_claim | 4 门全部通过才接受 | `e2e_fixtures.val001_all_gates` |
+| T-E2E-6-4 | AI 抢跑 (per §6.3.2 TC-VAL001-N8) | claim done + no approval | 拒绝 + 审计 | `e2e_fixtures.ai_self_complete` |
+| T-E2E-6-5 | Merge 完成 + Worktree 清理 | pr merge | worktree 状态 → Merged + 资源清理 | `e2e_fixtures.pr_merged` |
+
+#### 7.2.5 AC 跨引用 (per §6.2.1 / §6.3.3 / §6.3.4)
+
+> §6 已包含 3 个 V1 Should-Have REQ 的场景表:
+> - **VAL-001 四重门** (§6.3.2 TC-VAL001-P1 + N1~N8): 9 个场景
+> - **DSG-001/002 Design Artifact Guard** (§6.3.3 5 行场景表): 5 个场景
+> - **OPS-001/002/003 IncidentRecord** (§6.3.4 5 行场景表): 5 个场景
+>
+> **不重复列出**, 详见 §6 原文。
+
+### 7.3 テストデータ 目录 (Test Data Catalogue)
+
+> **本节目的**: 把 §10 测试数据管理详细策略聚焦到"场景 ↔ 数据"映射层。
+> 详细策略 (Factory 模式 / Test DB 沙箱 / 脱敏 / Snapshot) 见 §10。
+
+#### 7.3.1 Master Fixture 清单
+
+| Fixture 文件 / 位置 | 用途 | 数据量 | 维护者 |
+|---|---|---|---|
+| `crates/domain-X/tests/fixtures/<name>.rs` | 25 domain Module 各自 fixture | < 1000 行 / file | domain owner |
+| `frontend/src/mocks/schemas/<name>.ts` | 前端 mock schema (Zod) | 1 file / domain | frontend |
+| `frontend/src/mocks/data/<name>.ts` | 前端 mock data | 10-100 rows | frontend |
+| `frontend/src/mocks/handlers/<name>.ts` | MSW handler | 1 file / endpoint | frontend |
+| `frontend/src/mocks/schemas/five-domain.ts` | 5 域业务 mock schema (per §7.2.2) | 243 行 / 6 type guard (per §17 顺延 v0.5 实证) | frontend |
+| `frontend/src/mocks/data/five-domain.ts` | 5 域业务 mock data | 338 行 / 6 dataset (per §17 顺延 v0.5 实证) | frontend |
+| `frontend/src/mocks/__tests__/uat/uat-test-data.ts` | UAT 测试数据 (已存在) | ~500 行 | frontend |
+| `tests/e2e/fixtures/<flow>.spec.ts` | E2E 流程 fixture (per §7.2.4 6 流程) | < 1000 行 / file | e2e owner |
+| `docs/ac-test-matrix.csv` | AC ↔ Test 矩阵 (auto-generated) | 35 行 = 1 header + 34 REQ (per §6.2 + §17 v0.5 §16.1) | auto |
+
+#### 7.3.2 Seed 规则 (per §1.3 不污染生产 + §10 数据脱敏)
+
+- **种子来源**: `factory_bot` / `faker` (Rust) + `@faker-js/faker` (TS) 随机生成
+- **种子固定**: CI 环境用 `SEED=42` 固定, 本地用 `SEED=now()` 重生
+- **PII 脱敏**: per §10 + Security Design §7.3
+  - Email → `user_{N}@example.com`
+  - 真实姓名 → `User {N}`
+  - Token / Secret → 随机生成
+  - Code Symbol 路径 → `src/file_{N}.rs`
+  - 5 域业务数据: player_id / economy_id / match_id / social_id / admin_id 用 `domain_{N}` 前缀避免撞真实
+
+#### 7.3.3 5 域 disclaimer 数据隔离 (per REQ-OPS-012 + 守门 #3)
+
+- 5 域业务 mock 数据 (five-domain.ts) 与 22 DDD domain-* crate 数据**不混用**
+- 报表 label / 测试报告 / UI banner 必显示 "5 域是历史治理命名" (per 04-ops-test-design-spec.md T-601~T-605)
+- 测试报告**不**做业务子域↔DDD 映射 (per 守门 #3 派生)
+
+#### 7.3.4 PII 脱敏映射 (per §10 + Security Design §7.3)
+
+| PII 类型 | 脱敏规则 | 5 域场景 |
+|---|---|---|
+| Email | `user_{N}@example.com` | player 域 (`player_factory`) |
+| 真实姓名 | `User {N}` | player / social 域 |
+| Token / Secret | `secret_{uuid}` | 全部 5 域 |
+| Code Symbol 路径 | `src/file_{N}.rs` | development 域 |
+| IP / 设备指纹 | `10.0.0.{N}` / `device_{uuid}` | identity 域 |
+| 经济数据 (per economy 域) | `amount_{random_usd}` | economy 域 |
+| 聊天内容 (per social 域) | `message_{N}` | social 域 |
+
+### 7.4 シナリオ ↔ テストデータ 可追溯矩阵
+
+#### 7.4.1 主矩阵结构 (Schema)
+
+| シナリオ # | 所属 REQ/Domain | テストデータ # | Fixture 文件 | Level |
+|---|---|---|---|---|
+| T-TN1 | domain-tenant | fixture: `tenant_factory.acme()` | `crates/domain-tenant/tests/fixtures/` | UnitTestLevel |
+| T-WT1 | domain-worktree | fixture: `worktree_factory.creating()` | `crates/domain-worktree/tests/fixtures/` | UnitTestLevel |
+| T-PL-1 | player 域 | fixture: `player_factory.newbie()` | `frontend/src/mocks/data/five-domain.ts` | IntegrationTestLevel |
+| T-E2E-1-1 | E2E 流程 1 | fixture: `e2e_fixtures.work_item_detail` | `tests/e2e/fixtures/create-worktree.spec.ts` | AcceptanceTestLevel |
+| T-VL4 | VAL-001 (per §6.3.2) | fixture: `validation_factory.all_gates_pass` | `crates/domain-validation/tests/fixtures/` | UnitTestLevel |
+| ... (完整 ~200 行主矩阵由 §7.4.2 自动生成器产出) | | | | |
+
+#### 7.4.2 矩阵自动生成 (per §6.2 `scripts/generate_ac_matrix.py`)
+
+- 现有 `generate_ac_matrix.py` 已生成 `docs/ac-test-matrix.csv` (per §17 顺延 v0.5 §16.1 T1)
+- **本节扩展**: matrix 增加 シナリオ + テストデータ 列 (per §7.1.1 Schema)
+- **不变量保留**: §6.2 现行列结构 + AC 覆盖率公式 + E2E 路径全部不动, 矩阵按 RFC 增列
+- **生成产物**: `docs/scenario-data-matrix.md` (TBD, 待 generate_scenario_matrix.py 落地, ~0.2M token)
+
+### 7.5 已知缺口 + Test-J.14 ~ J.17 (per 守门 #11 缺标比错标)
+
+- **Test-J.14**: 25 domain 真实数据接入 (per §7.2.1, 25 Module 3-5 场景为最小覆盖, **真实数据接入完整场景**待 STAR-P3-WBS-001 §1 P0-1 25 domain 真实数据接入, ~6M token 预算, W1-W5 软参考周)
+- **Test-J.15**: 跨域 Saga 场景 (per §7.2.3, actor 字段需 5 域 Lead 真人到位 per 守门 #3 派生)
+- **Test-J.16**: Level 维度落地后 §7.4 矩阵按 Level 判定 (per §6.2.1 + Test-J.11 关联, 等 RFC)
+- **Test-J.17**: Prompts 实际模板 / Resources 独立资源类型 (per STAR-P3-WBS-001 §1 #4, 1.8M token 预算, W9-W10.5 软参考周)
+
+**v0.6 已知缺口** (本节):
+- §7.2.1 25 Module 场景为最小覆盖, 不含完整 17/14 状态机全路径 (per 守门 #11 缺标比错标, 全路径测试由各自 domain spec 负责, 不在 test-design 重复)
+- §7.2.2 5 域业务场景的 actor 字段当前是 mock, 5 域 Lead 真人到位后需真实身份 (per 守门 #3 派生)
+- §7.3.1 Master Fixture 清单为代表性样本, 不是穷举
+- §7.4.1 主矩阵仅列 5 行示例, 完整 ~200 行的"全 scenario ↔ 全 fixture"映射由 `generate_ac_matrix.py` 自动生成 (per §7.4.2)
+
+**不变量保留** (per 守门 #12 + 守门 #1):
+- §6 验收测试现行文本 (§6.1 Gherkin + §6.2 AC 矩阵 + §6.3 验收门禁) 全部不动
+- §10 测试数据管理详细策略不重复
+- §14 (原 §13) Open Issues Test-J.1 ~ J.13 全部不动, 仅追加 J.14 ~ J.17
+- §17 (原 §16) 代码跟进实证不重复新增, 5 域业务 mock 完整化 commit 引用为 `3dde2b4` + `b424611`
+
+---
+
+## 8. 性能测试(详细)
+
+### 8.1 关键端点 P95 预算(继承《API Design》§10)
 
 | 端点类别 | 例子 | P95 预算 |
 |---|---|---|
@@ -963,7 +1335,7 @@ IncidentRecord 是人工登记的生产事件追溯对象,修复走既有 WorkIt
 
 **未达成项标记 `TBD-MEASURE`**。
 
-### 7.2 负载模型
+### 8.2 负载模型
 
 ```text
 基线: 1000 active users, 100 req/s
@@ -976,7 +1348,7 @@ IncidentRecord 是人工登记的生产事件追溯对象,修复走既有 WorkIt
 压力: 10000 req/s 直到 CPU > 90% 或 Error > 1%
 ```
 
-### 7.3 性能指标收集
+### 8.3 性能指标收集
 
 **关键指标**:
 
@@ -990,7 +1362,7 @@ IncidentRecord 是人工登记的生产事件追溯对象,修复走既有 WorkIt
 
 **监控**:Prometheus + Grafana Dashboard(继承《Operation Design》§6)
 
-### 7.4 性能回归检测
+### 8.4 性能回归检测
 
 **每次 PR**:
 
@@ -1003,7 +1375,7 @@ IncidentRecord 是人工登记的生产事件追溯对象,修复走既有 WorkIt
 - 全量性能测试
 - 生成报告
 
-### 7.5 性能预算分配
+### 8.5 性能预算分配
 
 继承《Basic Design》§44 K8s Tax 纪律:
 
@@ -1025,9 +1397,9 @@ IncidentRecord 是人工登记的生产事件追溯对象,修复走既有 WorkIt
 
 ---
 
-## 8. 安全测试(详细)
+## 9. 安全测试(详细)
 
-### 8.1 AuthN/AuthZ(继承《Security Design》§2-§3)
+### 9.1 AuthN/AuthZ(继承《Security Design》§2-§3)
 
 **AuthN 测试**:
 
@@ -1047,7 +1419,7 @@ IncidentRecord 是人工登记的生产事件追溯对象,修复走既有 WorkIt
 - Agent 操作(继承 REQ-PERM-002)
 - Permission Scheme 强制
 
-### 8.2 Injection / SSRF / RLS Bypass
+### 9.2 Injection / SSRF / RLS Bypass
 
 **SQL Injection**:
 
@@ -1093,7 +1465,7 @@ async fn test_rls_bypass_attempt() {
 }
 ```
 
-### 8.3 AI Provider 数据边界
+### 9.3 AI Provider 数据边界
 
 继承《Security Design》§8 + 《AI/Agent Design》§9:
 
@@ -1133,7 +1505,7 @@ async fn test_untrusted_content_isolation() {
 }
 ```
 
-### 8.4 Local Runtime 安全(继承《Security Design》§9.3)
+### 9.4 Local Runtime 安全(继承《Security Design》§9.3)
 
 - 8 种白名单命令测试(每个命令验证参数 + scope + actor)
 - ❌ ExecuteArbitraryShell 必须 100% 拒绝
@@ -1145,9 +1517,9 @@ async fn test_untrusted_content_isolation() {
 
 ---
 
-## 9. 测试数据管理
+## 10. 测试数据管理
 
-### 9.1 Fixture 模板
+### 10.1 Fixture 模板
 
 **统一 Factory**(用 `factory_bot` 风格):
 
@@ -1207,7 +1579,7 @@ export const worktreeFactory = (
 });
 ```
 
-### 9.2 Test DB 沙箱
+### 10.2 Test DB 沙箱
 
 **每个测试用独立 Schema**:
 
@@ -1230,7 +1602,7 @@ async fn setup_test_db() -> PgPool {
 
 **E2E Test**:用 Testcontainers 启动整套(K3s + PostgreSQL + NATS + Valkey + Object Storage)
 
-### 9.3 数据脱敏
+### 10.3 数据脱敏
 
 **生产数据严禁进入测试**(继承《Security Design》§7.3)。
 
@@ -1244,7 +1616,7 @@ async fn setup_test_db() -> PgPool {
 
 **生产数据导出**:`scripts/anonymize_prod_dump.py`(只能由 SRE 运行,需审批)
 
-### 9.4 Snapshot 测试
+### 10.4 Snapshot 测试
 
 **用途**:复杂对象序列化(API Response / Event Payload / JSON Output)
 
@@ -1262,9 +1634,9 @@ fn test_worktree_response_snapshot() {
 
 ---
 
-## 10. CI/CD
+## 11. CI/CD
 
-### 10.1 PR 门禁(继承 §1.2)
+### 11.1 PR 门禁(继承 §1.2)
 
 ```yaml
 # .github/workflows/pr.yml
@@ -1314,7 +1686,7 @@ jobs:
           cargo build --release
 ```
 
-### 10.2 主干门禁
+### 11.2 主干门禁
 
 ```yaml
 # .github/workflows/main.yml
@@ -1336,7 +1708,7 @@ jobs:
         run: k6 run tests/load/smoke.js
 ```
 
-### 10.3 部署门禁
+### 11.3 部署门禁
 
 ```yaml
 # .github/workflows/deploy.yml
@@ -1354,7 +1726,7 @@ jobs:
     # ...
 ```
 
-### 10.4 自动化告警
+### 11.4 自动化告警
 
 **Test Failure** → Slack Channel
 **Coverage Drop** > 5% → Slack
@@ -1363,9 +1735,9 @@ jobs:
 
 ---
 
-## 11. 测试覆盖率目标
+## 12. 测试覆盖率目标
 
-### 11.1 总体目标
+### 12.1 总体目标
 
 | 层级 | 目标 | 强制门禁 |
 |---|---|---|
@@ -1377,7 +1749,7 @@ jobs:
 | **E2E(关键流程)** | 100%(6 个) | ✅ |
 | **Mutation Test**(cargo-mutants) | ≥ 70% killed | ⚠️ 软目标 |
 
-### 11.2 排除规则
+### 12.2 排除规则
 
 **可排除的代码**:
 
@@ -1395,7 +1767,7 @@ jobs:
 - Repository(除 CRUD 之外)
 - Security 相关代码
 
-### 11.3 Coverage 工具
+### 12.3 Coverage 工具
 
 | 语言 | 工具 |
 |---|---|
@@ -1403,7 +1775,7 @@ jobs:
 | **TypeScript** | `c8` / `vitest coverage` |
 | **E2E** | Playwright 内置 + `nyc` |
 
-### 11.4 Coverage 趋势追踪
+### 12.4 Coverage 趋势追踪
 
 - 每次 commit 上传 Coverage Report(Codecov / SonarQube)
 - 趋势图 ≥ 30 天
@@ -1411,9 +1783,9 @@ jobs:
 
 ---
 
-## 12. 给下游契约
+## 13. 给下游契约
 
-### 12.1 给 Implementation(测试代码编写)
+### 13.1 给 Implementation(测试代码编写)
 
 **测试代码必须遵守**:
 
@@ -1444,7 +1816,7 @@ apps/web/
       foo.spec.ts
 ```
 
-### 12.2 给 Operation(测试环境 + 监控)
+### 13.2 给 Operation(测试环境 + 监控)
 
 **测试环境**(`staging.star.local`):
 
@@ -1470,7 +1842,7 @@ apps/web/
 - Performance Trend Dashboard
 - Security Scan Findings(每日)
 
-### 12.3 给 Test 自身(测试代码质量)
+### 13.3 给 Test 自身(测试代码质量)
 
 **测试代码也是代码**:
 
@@ -1482,14 +1854,14 @@ apps/web/
 
 ---
 
-## 13. Open Issues(继承上游 + 新增 Test-J.x)
+## 14. Open Issues(继承上游 + 新增 Test-J.x)
 
-### 13.1 继承自《Basic Design》§15 J.x
+### 14.1 继承自《Basic Design》§15 J.x
 
-- J-11:Mutation Testing 集成(本设计 §11.1 软目标)
+- J-11:Mutation Testing 集成(本设计 §12.1 软目标)
 - J-15:Traceability 自动化(本设计 §6.2 AC ↔ Test 矩阵)
 
-### 13.2 本设计新增
+### 14.2 本设计新增
 
 - **Test-J.1**:是否需要 E2E 录制 / 回放(类似 RR / WPR)?**V1 候选**。
 - **Test-J.2**:是否需要 Synthetic Monitoring(模拟真实用户)?**V1 候选**(继承《Operation Design》§6)。
@@ -1501,13 +1873,13 @@ apps/web/
 - **Test-J.8**:是否需要 Contract Test 在 Frontend ↔ Backend 之间自动生成?V1 候选(用 OpenAPI Generator)。
 - **Test-J.9**:E2E Test 是否用真实 AI Provider(Money 成本)?MVP 用 Mock,V1 跑少量真实。**已决定**。
 - **Test-J.10**:是否需要 Adversarial Test(故意制造冲突 / Prompt Injection)?**V1 候选**。
-- **Test-J.11**:ValidationResult.Level 维度(REQ-TST-001/002,§6.2.1)落地后,§6.2 矩阵格式与 §6.3.2 Gate 2 如何按 Level 判定覆盖?**待 RFC**(需先等 basic-design 完成 98db08e 同步 + spec 层定 Schema,当前不改写 §14 #7/#8 现行文本)。
+- **Test-J.11**:ValidationResult.Level 维度(REQ-TST-001/002,§6.2.1)落地后,§6.2 矩阵格式与 §6.3.2 Gate 2 如何按 Level 判定覆盖?**待 RFC**(需先等 basic-design 完成 98db08e 同步 + spec 层定 Schema,当前不改写 §15 #7/#8 现行文本)。
 - **Test-J.12**:DesignArtifact Guard(REQ-DSG-001/002,§6.3.3)的实现侧接口锚点(端点 / 错误码)?**待 basic-design 补充**,当前只有 requirements 层面的行为约束。
 - **Test-J.13**:IncidentRecord(REQ-OPS-001/002/003,§6.3.4)与 Operation Design 现有监控 / 告警链路的边界如何在测试层面隔离验证(避免误测成"系统自动监控生产")?**V1 候选**,待 operation-design 同步后细化。
 
 ---
 
-## 14. 接口稳定承诺(给 Implementation / Operation)
+## 15. 接口稳定承诺(给 Implementation / Operation)
 
 以下接口在本设计冻结后,**不**因下游阶段而变更:
 
@@ -1518,14 +1890,14 @@ apps/web/
 5. **6 个 E2E 关键流程**:§5.1
 6. **OWASP Top 10 覆盖**:§2.5.1
 7. **AC ↔ Test 矩阵格式**:§6.2
-8. **测试覆盖率目标**:§11.1
-9. **性能预算分配**:§7.5
-10. **CI/CD Pipeline 结构**:§10
+8. **测试覆盖率目标**:§12.1
+9. **性能预算分配**:§8.5
+10. **CI/CD Pipeline 结构**:§11
 11. **Gherkin 验收格式**:§6.1
-12. **RLS Bypass 测试**:§8.2
-13. **Untrusted 隔离测试**:§8.3
-14. **Local Runtime 8 种白名单测试**:§8.4
-15. **Mutation Test 软目标**:§11.1
+12. **RLS Bypass 测试**:§9.2
+13. **Untrusted 隔离测试**:§9.3
+14. **Local Runtime 8 种白名单测试**:§9.4
+15. **Mutation Test 软目标**:§12.1
 16. **VAL-001 四重门全部 4 子条件 + 4 选 1/2/3/4 缺失的负向测试**:§6.3.2(D-04 修复,basic-design §4.5.6 P0 不变量)
 
 **待处理(非冻结,RFC pending)**:REQ-TST-001/002(requirements 98db08e)引入的 ValidationResult.Level 维度会影响 #7(AC ↔ Test 矩阵格式)与 #8(测试覆盖率目标),需先完成 RFC + basic-design 同步后再修改并重新冻结,当前 #7/#8 描述保持不变(见 §6.2.1、Test-J.11)。
@@ -1534,28 +1906,28 @@ apps/web/
 
 ---
 
-## 15. 文档元信息
+## 16. 文档元信息
 
 - **章节数**:0~14 主章
-- **mermaid 图数**:2(§1.1, §11)
+- **mermaid 图数**:2(§1.1, §12)
 - **目标行数**:1000~2000
 - **目标大小**:30~70KB
 - **下游契约**:Implementation 测试代码 + Operation 测试环境
 - **关联设计**:全部 5 个 Phase 1/2 详细设计 + 全部 6 个其他详细设计
-- **覆盖 25 Module**:本设计覆盖 25 Module 的测试策略(§2.1.1 完整 Module 测试清单),domain-tenant(§2.1.1)、domain-workspace(§2.1.1)、domain-project(§2.1.1)、domain-work-item(§2.1.1 + §3.1)、domain-workflow(§2.1.1)、domain-board(§2.1.1)、domain-planning(§2.1.1)、domain-permission(§2.1.1 + §8.1)、domain-comment(§2.1.1)、domain-relation(§2.1.1)、domain-development(§2.1.1 + §5.3)、domain-worktree(§2.1.1 + §3.1)、domain-agent(§2.1.1 + §5.3)、domain-feedback(§2.1.1 + §3.1)、domain-context(§2.1.1 + §3.1 + §8.3)、domain-validation(§2.1.1 + §5.3)、domain-scm(§2.1.1 + §3.3)、domain-identity(§2.1.1 + §8.1)、domain-audit(§2.1.1 + §8.1)、domain-search(§2.1.1)、domain-notification(§2.1.1)、domain-integration(§2.1.1 + §3.3)、domain-automation(§2.1.1)、domain-collaboration(§2.1.1)、domain-local-runtime(§2.1.1 + §8.4)。**全部 25 Module 至少出现 1 次**。
-- **13 类 tenant_id 必带对象**:在测试中验证所有 13 类必带对象强制带 tenant_id:Repository Credential(§8.1 #1)、Local Runtime(§8.4 #2)、Worktree(§2.1.1 + §3.1 #3)、AgentSession(§2.1.1 + §3.1 + §5.3 #4)、ContextPacket(§3.1 + §5.3 + §8.3 #5)、Feedback(§2.1.1 #6)、AI Prompt(§8.3 #7)、AI Response(§8.3 #8)、Diff(§5.3 #9)、Build Log(§5.3 #10)、Test Log(§5.3 #11)、PR Content(§5.3 #12)、Symbol Index(§3.3 + §5.3 #13)。**全部 13 类必带对象至少出现 1 次**。
+- **覆盖 25 Module**:本设计覆盖 25 Module 的测试策略(§2.1.1 完整 Module 测试清单),domain-tenant(§2.1.1)、domain-workspace(§2.1.1)、domain-project(§2.1.1)、domain-work-item(§2.1.1 + §3.1)、domain-workflow(§2.1.1)、domain-board(§2.1.1)、domain-planning(§2.1.1)、domain-permission(§2.1.1 + §9.1)、domain-comment(§2.1.1)、domain-relation(§2.1.1)、domain-development(§2.1.1 + §5.3)、domain-worktree(§2.1.1 + §3.1)、domain-agent(§2.1.1 + §5.3)、domain-feedback(§2.1.1 + §3.1)、domain-context(§2.1.1 + §3.1 + §9.3)、domain-validation(§2.1.1 + §5.3)、domain-scm(§2.1.1 + §3.3)、domain-identity(§2.1.1 + §9.1)、domain-audit(§2.1.1 + §9.1)、domain-search(§2.1.1)、domain-notification(§2.1.1)、domain-integration(§2.1.1 + §3.3)、domain-automation(§2.1.1)、domain-collaboration(§2.1.1)、domain-local-runtime(§2.1.1 + §9.4)。**全部 25 Module 至少出现 1 次**。
+- **13 类 tenant_id 必带对象**:在测试中验证所有 13 类必带对象强制带 tenant_id:Repository Credential(§9.1 #1)、Local Runtime(§9.4 #2)、Worktree(§2.1.1 + §3.1 #3)、AgentSession(§2.1.1 + §3.1 + §5.3 #4)、ContextPacket(§3.1 + §5.3 + §9.3 #5)、Feedback(§2.1.1 #6)、AI Prompt(§9.3 #7)、AI Response(§9.3 #8)、Diff(§5.3 #9)、Build Log(§5.3 #10)、Test Log(§5.3 #11)、PR Content(§5.3 #12)、Symbol Index(§3.3 + §5.3 #13)。**全部 13 类必带对象至少出现 1 次**。
 
 ---
 
-## 16. 代码跟进实证 (per 2026-08-31 13:18 JST handoff 兜底分批 2, AGENTS.md v0.24 + STAR-P3-WBS-001 §13)
+## 17. 代码跟进实证 (per 2026-08-31 13:18 JST handoff 兜底分批 2, AGENTS.md v0.24 + STAR-P3-WBS-001 §13)
 
 > **范围**: 本节记录 test-design v0.3 (2026-08-31) 3 新缺口 (§6.2.1 T1 / §6.3.3 T2 / §6.3.4 T3) + §2.1.2 5 域业务 mock 完整化 + §6.2 AC ↔ Test Case 矩阵生成器 5 子项的代码跟进实证。**不**改 v0.3 章节内容 (per 守门 #12 缺标比错标 + 守门 #11 不沿用 v0.x 旧叙事), 仅作为 Implementation 落地的实证, 字段细节 TBD 维持等 basic-design 拍板后由上游 AI 回填 (per v0.4 §0.1 驱动上游回填清单机制)。
 
-### 16.1 T1 ValidationResult.Level 维度 (REQ-TST-001/002, per §6.2.1)
+### 17.1 T1 ValidationResult.Level 维度 (REQ-TST-001/002, per §6.2.1)
 
 **需求**: ValidationResult 携带 `level` 字段 (4 Level: unit / integration / system / acceptance), Acceptance Coverage 映射按 Level 报告 (REQ-TST-002 "缺哪些 Level 证据" 明确指出)。
 
-**落地 (per AGENTS.md v0.24 + WBS §13 T.1)**:
+**落地 (per AGENTS.md v0.24 + WBS §14 T.1)**:
 
 | 产出 | 文件 | commit |
 |---|---|---|
@@ -1578,11 +1950,11 @@ apps/web/
 - 缺口 #5: POST 真实持久化 P3 (per Phase F+ 后端就绪时)
 - 缺口 #6: MOCK_VALIDATION_RESULTS 与 MOCK_ACCEPTANCE_COVERAGE 不强制联动派生 (mock 简化)
 
-### 16.2 T2 DesignArtifact + WorkItem Guard (REQ-DSG-001/002, per §6.3.3)
+### 17.2 T2 DesignArtifact + WorkItem Guard (REQ-DSG-001/002, per §6.3.3)
 
-**需求**: WorkItem (典型 Epic/Story) 挂载 0..N DesignArtifact 维护 Status + Version 历史; "全部 DesignArtifact 全部 APPROVED" 作为 WorkItem 状态转换 Guard (per §8.2 REQ-WF-003), Guard 失败时明确指出未批准的具体 DesignArtifact。
+**需求**: WorkItem (典型 Epic/Story) 挂载 0..N DesignArtifact 维护 Status + Version 历史; "全部 DesignArtifact 全部 APPROVED" 作为 WorkItem 状态转换 Guard (per §9.2 REQ-WF-003), Guard 失败时明确指出未批准的具体 DesignArtifact。
 
-**落地 (per AGENTS.md v0.24 + WBS §13 T.2)**:
+**落地 (per AGENTS.md v0.24 + WBS §14 T.2)**:
 
 | 产出 | 文件 | commit |
 |---|---|---|
@@ -1603,11 +1975,11 @@ apps/web/
 - 缺口 #3: POST 真实持久化 P3 (per Phase F+ 后端就绪时)
 - 缺口 #4: real-mode 切换 (P3-A.7) 未覆盖本 handler (per 范围最小化, cli.ts 实证已落地)
 
-### 16.3 T3 IncidentRecord + 3 项非能力负向测试 (REQ-OPS-001/002/003, per §6.3.4)
+### 17.3 T3 IncidentRecord + 3 项非能力负向测试 (REQ-OPS-001/002/003, per §6.3.4)
 
 **需求**: 系统支持登记 IncidentRecord 关联 0..N WorkItem (REQ-OPS-001) + 标注证据不充分 AC 不得重写历史 ValidationResult (REQ-OPS-002) + **不得**实现主动探查生产 / 处理告警 / 自动回滚 3 项非能力 (REQ-OPS-003 §30.6 边界)。
 
-**落地 (per AGENTS.md v0.24 + WBS §13 T.3)**:
+**落地 (per AGENTS.md v0.24 + WBS §14 T.3)**:
 
 | 产出 | 文件 | commit |
 |---|---|---|
@@ -1640,7 +2012,7 @@ apps/web/
 - 缺口 #5: MSW handler GET /api/incidents 当前不读 query string — `work_item_id` 过滤由 lib 端做 (P2+ 改 server 端 query)
 - 缺口 #6: linked_work_item_ids Uuid 格式 (uuid-v4 regex) 未强校验 — 当前仅 type-level `string[]` 校验, V1 schema 简化
 
-### 16.4 5 域业务 mock 完整化 (per §2.1.2 + §3.1 + §3.3)
+### 17.4 5 域业务 mock 完整化 (per §2.1.2 + §3.1 + §3.3)
 
 **需求**: 5 域业务子域 (player / economy / match / social / admin) mock 完整化, 让 frontend 任意页面在 mock-mode 下都能拿到合理响应 (per 既有 MSW 4 handler 不够)。
 
@@ -1655,7 +2027,7 @@ apps/web/
 | **admin** | RBAC / permission / tenant | (无) | `tenants.ts` (54 行, GET tenants + GET rbac/roles 4 endpoint) | `3dde2b4` |
 | **总** | | 4 handler | 5 handler + 12 endpoint | `b424611` (merge) |
 
-**落地 (per AGENTS.md v0.24 + WBS §13 T.4)**:
+**落地 (per AGENTS.md v0.24 + WBS §14 T.4)**:
 
 | 产出 | 文件 | commit |
 |---|---|---|
@@ -1676,7 +2048,7 @@ apps/web/
 - 缺口 #6: real-mode 短路 (worktrees 已有 maybeReal; workspaces/billing/comments/tenants 未加) P3
 - 缺口 #7: server-side filter (现 mocks 全表 + client-side filter) P3
 
-### 16.5 累计统计
+### 17.5 累计统计
 
 | 子项 | token 估算 | commit 数 | 测试数 | 守门实证 |
 |---|---|---|---|---|
@@ -1700,7 +2072,7 @@ apps/web/
 - T1+T2 → T3: 累加 incidentHandlers → `631f562`
 - T1+T2+T3 → 5d: 累加 5 域 5 handler → `b424611`
 
-**不变量保留**: 本 §16 不改 v0.3 章节内容 (per 守门 #12 缺标比错标 + 守门 #11 不沿用 v0.x 旧叙事), 仅作为 Implementation 落地的实证。
+**不变量保留**: 本 §17 不改 v0.3 章节内容 (per 守门 #12 缺标比错标 + 守门 #11 不沿用 v0.x 旧叙事), 仅作为 Implementation 落地的实证。
 
 ---
 
