@@ -1,0 +1,9 @@
+{
+  "task_id": "smoke-dispatcher-001",
+  "agent": "worker",
+  "brief_path": "D:\\Star\\.worktrees\\feat-auto-20260902-c8cfc4ff\\docs\\briefs\\smoke\\smoke-dispatcher-001.md",
+  "started_at": 1788281205.4681885,
+  "finished_at": null,
+  "exit_code": null,
+  "status": "pending"
+}

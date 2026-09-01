@@ -61,19 +61,21 @@
 ## 1. P3-B 占位表 (9 子项 / 35M / 6-8 周) — 7/9 落地, 2 mock 备选
 
 > ⚠️ **9 子项标题已拍板** (per `STAR-P3-B-DECISION-PACK.md` 选项 1, 2026-08-30 07:42 JST 拍板), 7 子项落地, 2 子项 mock 备选 (per 29692a7 路径).
+>
+> **自动化档** (per `docs/automation-design.md` v0.1 §4.1, 9/2 00:39 JST 拍板): 5 [P] / 2 [M] / 2 [S], 共享 `scripts/automation/integration_e2e.py` / `integration_test.py` / `quota_test.py` / `fallback_chain.py` / `audit_log.py`.
 
-| # | 子项 | 标题(拍板) | 软预算 | 软参考周 | 依赖 | 状态 | 备注 |
-|---|---|---|---|---|---|---|---|
-| B.1 | B.1 | OpenClaw HTTP API 客户端 | 4M | 0.7 周 | 无 | 🟢 **收官** (commit `63c34ab`) | 真实 endpoint + API key 待 Ulysses 切真 |
-| B.2 | B.2 | Hermes HTTP API 客户端 | 4M | 0.7 周 | 无 | 🟡 mock 备选 (per 29692a7) | 拍板后走 wiremock, 等真实 endpoint + API key 切真 |
-| B.3 | B.3 | API Key 双模式存储 (encrypted + env_var) | 5M | 0.8 周 | A.7 | 🟢 **收官** (commit `d52f84a`) | 双模式 (encrypted + env_var) 已实装 |
-| B.4 | B.4 | CliProfile schema 扩展 (per-agent 字段) | 3M | 0.5 周 | 无 | 🟢 **收官** (commit `23b2ee2`) | schema 扩展 5 字段落地 |
-| **B.5** | B.5 | **OpenClaw 真实集成 e2e** | **5M** | **0.8 周** | **B.1 + 凭证** | 🟡 mock 备选 (per 29692a7 路径) | **mock 备选**: wiremock e2e 验证 contract; 等 Ulysses 凭证到位切真 |
-| **B.6** | B.6 | **Hermes 真实集成 e2e** | **5M** | **0.8 周** | **B.2 + 凭证** | 🟡 mock 备选 (per 29692a7 路径) | **mock 备选**: 同 B.5 |
-| B.7 | B.7 | API 配额 / 限流 / 重试 策略 | 4M | 0.7 周 | B.1+B.2 | 🟢 **收官** (commit `b5dd623`) | backoff + 抖动 + retry-after |
-| B.8 | B.8 | API Agent 失败 → CLI Agent 降级 | 3M | 0.5 周 | B.1+B.2 | 🟢 **收官** (commit `ac188de`) | fallback 链路 |
-| B.9 | B.9 | API Agent 监控 + 审计日志 | 2M | 0.3 周 | B.7+B.8 | 🟢 **收官** (commit `73e9abf`) | 接入 domain-audit |
-| **小计** | | | **35M** | **5.8 周** | | **7/9 收官 + 2 mock 备选** | **P3-B 7/9 收官 ✅ (B.5/B.6 等凭证切真)** |
+| # | 子项 | 标题(拍板) | 软预算 | 软参考周 | 依赖 | 状态 | 自动化档 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| B.1 | B.1 | OpenClaw HTTP API 客户端 | 4M | 0.7 周 | 无 | 🟢 **收官** (commit `63c34ab`) | **[M]** `integration_test.py` | 真实 endpoint + API key 待 Ulysses 切真 |
+| B.2 | B.2 | Hermes HTTP API 客户端 | 4M | 0.7 周 | 无 | 🟡 mock 备选 (per 29692a7) | **[M]** `integration_test.py` | 拍板后走 wiremock, 等真实 endpoint + API key 切真 |
+| B.3 | B.3 | API Key 双模式存储 (encrypted + env_var) | 5M | 0.8 周 | A.7 | 🟢 **收官** (commit `d52f84a`) | **[S]** — | 双模式 (encrypted + env_var) 已实装 |
+| B.4 | B.4 | CliProfile schema 扩展 (per-agent 字段) | 3M | 0.5 周 | 无 | 🟢 **收官** (commit `23b2ee2`) | **[S]** — | schema 扩展 5 字段落地 |
+| **B.5** | B.5 | **OpenClaw 真实集成 e2e** | **5M** | **0.8 周** | **B.1 + 凭证** | 🟡 mock 备选 (per 29692a7 路径) | **[P]** `integration_e2e.py` | **mock 备选**: wiremock e2e 验证 contract; 等 Ulysses 凭证到位切真 |
+| **B.6** | B.6 | **Hermes 真实集成 e2e** | **5M** | **0.8 周** | **B.2 + 凭证** | 🟡 mock 备选 (per 29692a7 路径) | **[P]** `integration_e2e.py` | **mock 备选**: 同 B.5 |
+| B.7 | B.7 | API 配额 / 限流 / 重试 策略 | 4M | 0.7 周 | B.1+B.2 | 🟢 **收官** (commit `b5dd623`) | **[M]** `quota_test.py` | backoff + 抖动 + retry-after |
+| B.8 | B.8 | API Agent 失败 → CLI Agent 降级 | 3M | 0.5 周 | B.1+B.2 | 🟢 **收官** (commit `ac188de`) | **[P]** `fallback_chain.py` | fallback 链路 |
+| B.9 | B.9 | API Agent 监控 + 审计日志 | 2M | 0.3 周 | B.7+B.8 | 🟢 **收官** (commit `73e9abf`) | **[P]** `audit_log.py` | 接入 domain-audit |
+| **小计** | | | **35M** | **5.8 周** | | **7/9 收官 + 2 mock 备选** | **5[P] / 2[M] / 2[S]** | **P3-B 7/9 收官 ✅ (B.5/B.6 等凭证切真)** |
 
 **列含义**:
 - 软预算: token 预算 ÷ 1.2M SRE·周上限 → 周数
@@ -94,19 +96,21 @@
 ## 2. P3-C 占位表 (9 子项 / 40M / 6.7 周) — 8/9 落地, 1 阻塞
 
 > ✅ **9 子项标题已拍板** (per `STAR-P3-C-DECISION-PACK.md` 选项 1, 2026-08-30 07:46 JST 拍板), 8 子项落地, 1 阻塞 (C.9 真人).
+>
+> **自动化档** (per `docs/automation-design.md` v0.1 §4.2): 2 [P] / 0 [M] / 6 [S] / 1 真人寻访, 共享 `scripts/automation/saga_e2e.py` / `migration_runner.py`.
 
-| # | 子项 | 标题(拍板) | 软预算 | 软参考周 | 依赖 | 状态 | 备注 |
-|---|---|---|---|---|---|---|---|
-| C.1 | C.1 | Workspace 域 (per-tenant workspace 生命周期) | 4.4M | 0.7 周 | 无 | 🟢 **收官** (commit `f93d909`) | `domain-workspace` 已有 crate |
-| C.2 | C.2 | Project 域 (per-workspace project CRUD + 计费) | 4.4M | 0.7 周 | C.1 | 🟢 **收官** (commit `81de99a`) | `domain-project` 增强 |
-| C.3 | C.3 | Identity 域 (per-tenant user identity + auth) | 4.4M | 0.7 周 | C.1 | 🟢 **收官** (commit `81de99a`) | `domain-identity` 增强 |
-| C.4 | C.4 | WorkItem 域 (per-project 任务 + 状态机) | 4.4M | 0.7 周 | C.2 | 🟢 **收官** (commit `81de99a`) | `domain-work-item` 增强 |
-| C.5 | C.5 | Workflow 域 (per-WorkItem 状态机 + 触发器) | 4.4M | 0.7 周 | C.4 | 🟢 **收官** (commit `81de99a`) | `domain-workflow` 增强 |
-| C.6 | C.6 | Saga 域 (跨 5 域补偿 + 失败回滚) | 4.4M | 0.7 周 | C.1-C.5 | 🟢 **收官** (commit `25d086e`) | `star-saga` 增强 |
-| C.7 | C.7 | Postgres 持久层 (per-tenant schema 隔离) | 4.4M | 0.7 周 | C.1 | 🟢 **收官** (commit `25d086e`) | `infrastructure` Postgres 适配 |
-| C.8 | C.8 | Tenant 域 (per-tenant 多租户 + RBAC) | 4.4M | 0.7 周 | C.1 | 🟢 **收官** (commit `25d086e`) | `domain-tenant` 增强 |
-| **C.9** | C.9 | **5 域 Lead 真人到位** | **4.4M** | **0.7 周** | **无** | 🔴 **阻塞** | **需 Ulysses 找 5 个真人** (per 8/21 JST 拒绝兼任), 跟 E.5/F.1 合并 |
-| **小计** | | | **40M** | **6.7 周** | | **8/9 收官 + 1 阻塞** | **P3-C 8/9 收官 ✅ (C.9 真人跨 session 续)** |
+| # | 子项 | 标题(拍板) | 软预算 | 软参考周 | 依赖 | 状态 | 自动化档 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| C.1 | C.1 | Workspace 域 (per-tenant workspace 生命周期) | 4.4M | 0.7 周 | 无 | 🟢 **收官** (commit `f93d909`) | **[S]** — | `domain-workspace` 已有 crate |
+| C.2 | C.2 | Project 域 (per-workspace project CRUD + 计费) | 4.4M | 0.7 周 | C.1 | 🟢 **收官** (commit `81de99a`) | **[S]** — | `domain-project` 增强 |
+| C.3 | C.3 | Identity 域 (per-tenant user identity + auth) | 4.4M | 0.7 周 | C.1 | 🟢 **收官** (commit `81de99a`) | **[S]** — | `domain-identity` 增强 |
+| C.4 | C.4 | WorkItem 域 (per-project 任务 + 状态机) | 4.4M | 0.7 周 | C.2 | 🟢 **收官** (commit `81de99a`) | **[S]** — | `domain-work-item` 增强 |
+| C.5 | C.5 | Workflow 域 (per-WorkItem 状态机 + 触发器) | 4.4M | 0.7 周 | C.4 | 🟢 **收官** (commit `81de99a`) | **[S]** — | `domain-workflow` 增强 |
+| C.6 | C.6 | Saga 域 (跨 5 域补偿 + 失败回滚) | 4.4M | 0.7 周 | C.1-C.5 | 🟢 **收官** (commit `25d086e`) | **[P]** `saga_e2e.py` | `star-saga` 增强 |
+| C.7 | C.7 | Postgres 持久层 (per-tenant schema 隔离) | 4.4M | 0.7 周 | C.1 | 🟢 **收官** (commit `25d086e`) | **[P]** `migration_runner.py` | `infrastructure` Postgres 适配 |
+| C.8 | C.8 | Tenant 域 (per-tenant 多租户 + RBAC) | 4.4M | 0.7 周 | C.1 | 🟢 **收官** (commit `25d086e`) | **[S]** — | `domain-tenant` 增强 |
+| **C.9** | C.9 | **5 域 Lead 真人到位** | **4.4M** | **0.7 周** | **无** | 🔴 **阻塞** | **[S]** 真人寻访 | **需 Ulysses 找 5 个真人** (per 8/21 JST 拒绝兼任), 跟 E.5/F.1 合并 |
+| **小计** | | | **40M** | **6.7 周** | | **8/9 收官 + 1 阻塞** | **2[P] / 0[M] / 7[S]** | **P3-C 8/9 收官 ✅ (C.9 真人跨 session 续)** |
 
 **已知缺口**: C.9 真人到位 (per 8/21 JST 拒绝兼任硬约束), 跨 session 续
 
@@ -115,17 +119,19 @@
 ## 3. P3-D 占位表 (7 子项 / 21M / 3.5 周) — 7/7 落地, 2 mock 备选
 
 > ✅ **7 子项标题已拍板** (per `STAR-P3-D-DECISION-PACK.md` 选项 1, 2026-08-30 07:46 JST 拍板), 5 实装 + 2 mock 备选, 7/7 收官.
+>
+> **自动化档** (per `docs/automation-design.md` v0.1 §4.3): 3 [P] / 1 [M] / 3 [S], 共享 `scripts/automation/cross_platform_e2e.py` / `playwright_runner.py` / `msw_switch.py` / `ci_runner.py`.
 
-| # | 子项 | 标题(拍板) | 软预算 | 软参考周 | 依赖 | 状态 | 备注 |
-|---|---|---|---|---|---|---|---|
-| D.1 | D.1 | w28 切 HubCliRuntime 入口 | 1M | 0.2 周 | A.4 | 🟢 **收官** (per P3-A.4 缺口 #6) | w28 切换入口已实装 |
-| **D.2** | D.2 | 跨平台 e2e 矩阵 (windows/macos) | **5M** | **0.8 周** | A.6 | 🟡 mock 备选 (CI runner stub) | per P3-A.6 缺口 #1/#2; 真实 e2e 跨 platform 需 GitHub Actions runner 配置 |
-| D.3 | D.3 | frontend e2e (Playwright) | 6M | 1 周 | 无 | 🟢 **收官** (per P3-A.5 缺口 #3) | Playwright e2e 测试已实装 |
-| D.4 | D.4 | realFetch error wrapper | 2M | 0.3 周 | A.7 | 🟢 **收官** (per P3-A.7 缺口 #2) | realFetch 错误处理包装已实装 |
-| D.5 | D.5 | agents/analytics/inbox 3 handler real-mode | 2M | 0.3 周 | A.7 | 🟢 **收官** (per P3-A.7 缺口 #1) | MSW handler 切换实装 |
-| **D.6** | D.6 | markdownlint + cargo doc CI job | **3M** | **0.5 周** | A.6 | 🟡 mock 备选 (runner stub) | per P3-A.8 缺口 #1/#2; 守门 #6 runner 需真实 GitHub Actions 配置 |
-| D.7 | D.7 | UserMenu 状态条 (real-mode 提示) | 2M | 0.3 周 | D.5 | 🟢 **收官** (per P3-A.7 缺口 #6) | UserMenu 状态条已实装 |
-| **小计** | | | **21M** | **3.5 周** | | **5 实装 + 2 mock 备选** | **P3-D 7/7 收官 ✅ (commit `8ace1d5` + merge `55006a0`)** |
+| # | 子项 | 标题(拍板) | 软预算 | 软参考周 | 依赖 | 状态 | 自动化档 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| D.1 | D.1 | w28 切 HubCliRuntime 入口 | 1M | 0.2 周 | A.4 | 🟢 **收官** (per P3-A.4 缺口 #6) | **[S]** — | w28 切换入口已实装 |
+| **D.2** | D.2 | 跨平台 e2e 矩阵 (windows/macos) | **5M** | **0.8 周** | A.6 | 🟡 mock 备选 (CI runner stub) | **[P]** `cross_platform_e2e.py` | per P3-A.6 缺口 #1/#2; 真实 e2e 跨 platform 需 GitHub Actions runner 配置 |
+| D.3 | D.3 | frontend e2e (Playwright) | 6M | 1 周 | 无 | 🟢 **收官** (per P3-A.5 缺口 #3) | **[P]** `playwright_runner.py` | Playwright e2e 测试已实装 |
+| D.4 | D.4 | realFetch error wrapper | 2M | 0.3 周 | A.7 | 🟢 **收官** (per P3-A.7 缺口 #2) | **[S]** — | realFetch 错误处理包装已实装 |
+| D.5 | D.5 | agents/analytics/inbox 3 handler real-mode | 2M | 0.3 周 | A.7 | 🟢 **收官** (per P3-A.7 缺口 #1) | **[P]** `msw_switch.py` | MSW handler 切换实装 |
+| **D.6** | D.6 | markdownlint + cargo doc CI job | **3M** | **0.5 周** | A.6 | 🟡 mock 备选 (runner stub) | **[M]** `ci_runner.py` | per P3-A.8 缺口 #1/#2; 守门 #6 runner 需真实 GitHub Actions 配置 |
+| D.7 | D.7 | UserMenu 状态条 (real-mode 提示) | 2M | 0.3 周 | D.5 | 🟢 **收官** (per P3-A.7 缺口 #6) | **[S]** — | UserMenu 状态条已实装 |
+| **小计** | | | **21M** | **3.5 周** | | **5 实装 + 2 mock 备选** | **3[P] / 1[M] / 3[S]** | **P3-D 7/7 收官 ✅ (commit `8ace1d5` + merge `55006a0`)** |
 
 **注**: P3-D 拍板 = 7 子项 (不含 D.8-D.12 高频缺口, 那些留 P3-E/F 拍板). D.2/D.6 mock 备选等真实 GitHub Actions runner 配置.
 
@@ -134,33 +140,37 @@
 ## 4. P3-E 占位表 (7 子项 / 30M / 5 周) — 4/7 落地, 1 mock, 3 阻塞
 
 > ✅ **7 子项标题已拍板** (per `STAR-P3-E-DECISION-PACK.md` 选项 1, 2026-08-30 07:47 JST 拍板), 4 子项落地, 1 mock 备选, 3 阻塞.
+>
+> **自动化档** (per `docs/automation-design.md` v0.1 §4.4): 2 [P] / 1 [M] / 3 [S] / 1 真人寻访, 共享 `scripts/automation/kms_rotate.py` / `saga_e2e.py` / `ddd_review.py`.
 
-| # | 子项 | 标题(拍板) | 软预算 | 软参考周 | 依赖 | 状态 | 备注 |
-|---|---|---|---|---|---|---|---|
-| E.1 | E.1 | Audit 域 (per domain-audit 增强 + 跨 5 域统一审计 API) | 4.3M | 0.7 周 | 无 | 🟢 **收官** (per `5ea9611`) | `domain-audit` 7 不变量 INV-AU-01~07 + 9 AI Audit 必填字段 |
-| E.2 | E.2 | Notification 域 (per-workspace 通知 + 5 域事件触发) | 4.3M | 0.7 周 | C.1 | 🟢 **收官** (per `5ea9611`) | `domain-notification` 跨 5 域事件触发 |
-| E.3 | E.3 | Search 域 (per-tenant 全文搜索 + 跨域索引) | 4.3M | 0.7 周 | C.7 | 🟢 **收官** (per `5ea9611`) | `domain-search` + jql.rs tsvector 全文搜索 |
-| **E.4** | E.4 | **KMS 集成 (Vault / AWS KMS 凭证)** | **5M** | **0.8 周** | **E.1 + 凭证** | 🟡 mock 备选 (per `5ea9611` + LocalMockKms) | **mock 备选**: `domain-kms` LocalMockKms; 等 Ulysses 凭证切真 |
-| **E.5** | E.5 | **5 域 Lead 真人到位 (DDD Review)** | **3M** | **0.5 周** | **无** | 🔴 **阻塞** | **需 Ulysses 找 5 个真人** (per 8/21 JST 拒绝兼任), 跟 C.9/F.1 合并 |
-| E.6 | E.6 | 5 域 Saga 实装 (per Q-003 / 跨域补偿 / 失败回滚) | 4.5M | 0.8 周 | C.1-C.5 + E.1-E.5 | 🔴 **阻塞** | 等 E.5 真人到位启动 |
-| E.7 | E.7 | 5 域 DDD 边界验证 (BoundedContext / Aggregate / Entity 文档 + code review) | 4.5M | 0.8 周 | E.5 | 🟡 **docs 阶段** (per `e67bc8c`) | 5 域 DDD 边界 docs 落地 (per `docs/ddd/01-player-bc.md` ~ `05-admin-bc.md`, 44.6KB), 真人到位后 review 签字 (per §3 步骤 3 review 模板) |
-| **小计** | | | **30M** | **5 周** | | **4 实装 + 1 mock + 2 阻塞** | **P3-E 5/7 收官 (E.5 真人 / E.6 Saga 跨域编排 等 5 域 Lead 真人到位后 phase 2 续做)** |
+| # | 子项 | 标题(拍板) | 软预算 | 软参考周 | 依赖 | 状态 | 自动化档 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| E.1 | E.1 | Audit 域 (per domain-audit 增强 + 跨 5 域统一审计 API) | 4.3M | 0.7 周 | 无 | 🟢 **收官** (per `5ea9611`) | **[S]** — | `domain-audit` 7 不变量 INV-AU-01~07 + 9 AI Audit 必填字段 |
+| E.2 | E.2 | Notification 域 (per-workspace 通知 + 5 域事件触发) | 4.3M | 0.7 周 | C.1 | 🟢 **收官** (per `5ea9611`) | **[S]** — | `domain-notification` 跨 5 域事件触发 |
+| E.3 | E.3 | Search 域 (per-tenant 全文搜索 + 跨域索引) | 4.3M | 0.7 周 | C.7 | 🟢 **收官** (per `5ea9611`) | **[S]** — | `domain-search` + jql.rs tsvector 全文搜索 |
+| **E.4** | E.4 | **KMS 集成 (Vault / AWS KMS 凭证)** | **5M** | **0.8 周** | **E.1 + 凭证** | 🟡 mock 备选 (per `5ea9611` + LocalMockKms) | **[P]** `kms_rotate.py` | **mock 备选**: `domain-kms` LocalMockKms; 等 Ulysses 凭证切真 |
+| **E.5** | E.5 | **5 域 Lead 真人到位 (DDD Review)** | **3M** | **0.5 周** | **无** | 🔴 **阻塞** | **[S]** 真人寻访 | **需 Ulysses 找 5 个真人** (per 8/21 JST 拒绝兼任), 跟 C.9/F.1 合并 |
+| E.6 | E.6 | 5 域 Saga 实装 (per Q-003 / 跨域补偿 / 失败回滚) | 4.5M | 0.8 周 | C.1-C.5 + E.1-E.5 | 🔴 **阻塞** | **[P]** `saga_e2e.py` | 等 E.5 真人到位启动 |
+| E.7 | E.7 | 5 域 DDD 边界验证 (BoundedContext / Aggregate / Entity 文档 + code review) | 4.5M | 0.8 周 | E.5 | 🟡 **docs 阶段** (per `e67bc8c`) | **[M]** `ddd_review.py` | 5 域 DDD 边界 docs 落地 (per `docs/ddd/01-player-bc.md` ~ `05-admin-bc.md`, 44.6KB), 真人到位后 review 签字 (per §3 步骤 3 review 模板) |
+| **小计** | | | **30M** | **5 周** | | **4 实装 + 1 mock + 2 阻塞** | **2[P] / 1[M] / 4[S]** | **P3-E 5/7 收官 (E.5 真人 / E.6 Saga 跨域编排 等 5 域 Lead 真人到位后 phase 2 续做)** |
 
 ---
 
 ## 5. P3-F 占位表 (6 子项 / 30M / 5 周) — 4/6 落地, 1 阻塞, 1 已落地
 
 > ✅ **6 子项标题已拍板** (per `STAR-P3-F-DECISION-PACK.md` 选项 1, 2026-08-30 07:50 JST 拍板), 4 子项落地, 1 阻塞 (F.1 真人), 1 已落地 (F.6 推 origin).
+>
+> **自动化档** (per `docs/automation-design.md` v0.1 §4.5): 3 [P] / 2 [M] / 1 [S] / 0 真人, 共享 `scripts/automation/cross_domain_e2e.py` / `changelog_gen.py` / `mermaid_gen.py` / `quality_gate.py` / `git_push.py`.
 
-| # | 子项 | 标题(拍板) | 软预算 | 软参考周 | 依赖 | 状态 | 备注 |
-|---|---|---|---|---|---|---|---|
-| **F.1** | F.1 | **5 域 Lead 真人到位 (DDD Review)** | **4M** | **0.7 周** | **无** | 🔴 **阻塞** | **需 Ulysses 找 5 个真人** (per 8/21 JST 拒绝兼任硬约束), 跟 E.5 合并 (跨 session 续) |
-| F.2 | F.2 | 跨域集成测试 (5 域 E2E) | 5M | 0.8 周 | P3-C 收官 | 🟢 **收官** (commit `6c1bd6c`) | `frontend/e2e/cross-domain-5b.spec.ts` 3 Playwright test |
-| F.3 | F.3 | CHANGELOG 跨域汇总 | 5M | 0.8 周 | 无 | 🟢 **收官** (commit `6c1bd6c`) | `CHANGELOG.md` 5 域 DDD 边界表 + P3 变更按域分块 |
-| F.4 | F.4 | 架构图 mermaid 化 (跨域) | 5M | 0.8 周 | 无 | 🟢 **收官** (commit `6c1bd6c`) | `docs/architecture/cross-domain-5b-mermaid.md` 5 域 DDD 边界图 + Saga 流程图 |
-| F.5 | F.5 | 质量门 5 维全 5 实证 | 5M | 0.8 周 | F.2 + F.3 + F.4 | 🟢 **收官** (commit `6c1bd6c`) | `docs/governance/P3-quality-gate-5d.md` P3 全 5 阶段 5 维实证 |
-| **F.6** | F.6 | **推 origin (R-05 反转)** | **1M** | **0.2 周** | **所有 P3** | 🟢 **已落地** (per 2026-08-30 07:09 JST) | 推 3 branch (main 116 ahead + feature/ai-ide-compat + 6 wt branch) 到 https://github.com/UlyssesLeoLee/Star.git, 守门 #1 v13 release 0 fail 27.2s + tsc exit 0 + author Ulysses 实证 + secret 扫描 全过 |
-| **小计** | | | **25M** | **4.2 周** | | **4/6 收官 + 1 阻塞 + 1 已落地** | **P3-F 4/6 收官 ✅ (F.1 真人跨 session 续)** |
+| # | 子项 | 标题(拍板) | 软预算 | 软参考周 | 依赖 | 状态 | 自动化档 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| **F.1** | F.1 | **5 域 Lead 真人到位 (DDD Review)** | **4M** | **0.7 周** | **无** | 🔴 **阻塞** | **[S]** 真人寻访 | **需 Ulysses 找 5 个真人** (per 8/21 JST 拒绝兼任硬约束), 跟 E.5 合并 (跨 session 续) |
+| F.2 | F.2 | 跨域集成测试 (5 域 E2E) | 5M | 0.8 周 | P3-C 收官 | 🟢 **收官** (commit `6c1bd6c`) | **[P]** `cross_domain_e2e.py` | `frontend/e2e/cross-domain-5b.spec.ts` 3 Playwright test |
+| F.3 | F.3 | CHANGELOG 跨域汇总 | 5M | 0.8 周 | 无 | 🟢 **收官** (commit `6c1bd6c`) | **[M]** `changelog_gen.py` | `CHANGELOG.md` 5 域 DDD 边界表 + P3 变更按域分块 |
+| F.4 | F.4 | 架构图 mermaid 化 (跨域) | 5M | 0.8 周 | 无 | 🟢 **收官** (commit `6c1bd6c`) | **[M]** `mermaid_gen.py` | `docs/architecture/cross-domain-5b-mermaid.md` 5 域 DDD 边界图 + Saga 流程图 |
+| F.5 | F.5 | 质量门 5 维全 5 实证 | 5M | 0.8 周 | F.2 + F.3 + F.4 | 🟢 **收官** (commit `6c1bd6c`) | **[P]** `quality_gate.py` | `docs/governance/P3-quality-gate-5d.md` P3 全 5 阶段 5 维实证 |
+| **F.6** | F.6 | **推 origin (R-05 反转)** | **1M** | **0.2 周** | **所有 P3** | 🟢 **已落地** (per 2026-08-30 07:09 JST) | **[P]** `git_push.py` | 推 3 branch (main 116 ahead + feature/ai-ide-compat + 6 wt branch) 到 https://github.com/UlyssesLeoLee/Star.git, 守门 #1 v13 release 0 fail 27.2s + tsc exit 0 + author Ulysses 实证 + secret 扫描 全过 |
+| **小计** | | | **25M** | **4.2 周** | | **4/6 收官 + 1 阻塞 + 1 已落地** | **3[P] / 2[M] / 1[S]** | **P3-F 4/6 收官 ✅ (F.1 真人跨 session 续)** |
 
 **已知缺口**: F.1 5 域 Lead 真人到位 (per 8/21 JST 拒绝兼任硬约束), 跨 session 续
 
@@ -201,6 +211,28 @@
 | 7 | E.7 DDD 边界验证 | P3-E | 5 域 Lead 真人到位后启动 |
 | 8 | F.1 DDD Review 阶段 | P3-F | 5 域 Lead + SRE Lead + 平台 + 评审 + PM 5 角色真人到位 (per STAR-OLU-001 §6 质量门 5 维终评) |
 
+### 7.1 自动化档汇总 (per `docs/automation-design.md` v0.1, 9/2 00:39 JST 拍板)
+
+> **范围**: P3 全 5 阶段 (38 子项 + 6 真人寻访 = 44 任务卡, 去重 43 项) + H2 强类型重构 (5 子项)
+> **判定 CLI**: `python scripts/automation/judge.py --all` → 输出 JSON
+> **初判口径**: 4 维打分 (Rerunnable / Volume / Structural / Audit-trail), ≥3 维 = [P] / 2 维 = [M] / ≤1 维 = [S]
+> **终判口径**: per 9/1 14:58 JST 拍板决策必须用选项, Mavis 终端用 `ask_user` 跟 Ulysses 逐条拍板后落档 WBS
+
+| 阶段 | 子项总数 | [P] Python 化 | [M] Mixed | [S] Shell/Edit | 共享脚本数 |
+|---|---|---|---|---|---|
+| P3-B | 9 | 5 (B.5/B.6/B.8/B.9 + B.7) | 2 (B.1/B.2) | 2 (B.3/B.4) | 5 |
+| P3-C | 9 (含 1 真人) | 2 (C.6/C.7) | 0 | 7 (C.1-C.5/C.8 + C.9 真人) | 2 |
+| P3-D | 7 | 3 (D.2/D.3/D.5) | 1 (D.6) | 3 (D.1/D.4/D.7) | 4 |
+| P3-E | 7 (含 1 真人) | 2 (E.4/E.6) | 1 (E.7) | 4 (E.1/E.2/E.3/E.5) | 3 |
+| P3-F | 6 (含 1 真人) | 3 (F.2/F.5/F.6) | 2 (F.3/F.4) | 1 (F.1 真人) | 5 |
+| H2 强类型重构 | 5 | 5 | 0 | 0 | 1 (refactor_template) |
+| **合计 (去重)** | **43** | **20 (~47%)** | **6 (~14%)** | **17 (~40%)** | **20 (共享)** |
+
+**已知缺口 (per 缺标比错标, per `docs/automation-design.md` §7)**:
+1. 本节初判表是 Mavis 终端读 `judge.py --all` 输出后落档, **未跟 Ulysses 逐条拍板** (per 9/1 14:58 JST 拍板决策必须用选项); 后续 Mavis 终端用 `ask_user` 跟 Ulysses 拍板, 拍板后回填到本表
+2. 共享脚本 (`integration_test.py` / `integration_e2e.py` / `refactor_template.py` 等 20 个) 全部是 **stub**, 真实实装需跨 session 续做 (per `docs/automation-design.md` §6 + §7 已知缺口 #1-#3)
+3. P3-A 25 子项历史脚本 (P0-1 19 fix 脚本 + H2-EXT 5 domain 脚本) 未回填 `scripts/automation/registry.md`, 跨 session 续 (per 守门 #12 缺标比错标)
+
 ---
 
 ## 8. 守门规则 (本文件专属, per AGENTS.md §4)
@@ -212,6 +244,7 @@
 | 3 | 阻塞项标 🔴, 需 Ulysses 拍板 / 凭证 | 本文件 §7 |
 | 4 | token 软预算 ÷ 1.2M SRE·周上限 → 软参考周, **不参与 gating** | STAR-OLU-001 §1 |
 | 5 | 推进门槛是质量门禁 ≥4/5, 不是截止日期 | STAR-OLU-001 §0 |
+| 6 | **任务卡自动化档** ([P]/[M]/[S]) 强制落档, 4 维打分 (Rerunnable / Volume / Structural / Audit-trail), 共享脚本落 `scripts/automation/<purpose>.py`; 判定 CLI `python scripts/automation/judge.py --all`; 守门 #1 v19 + #9 v2 + #12 v2 派生规 | 2026-09-02 00:39 JST Ulysses 拍板 + `docs/automation-design.md` v0.1 |
 
 ---
 
@@ -428,15 +461,17 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 ### 14.2 H2 范围扩量 + 强类型 ID 重构（per 守门 #4 派生规 v17 + v18）
 
 > **触发**: 2026-08-31 22:00 JST HANDOFF-ST-001 H2 真实尝试实证 — H2 原估 3 domain (feedback/validation/integration) 实际是 8 domain (3 + H2-EXT 5: comment/identity/project/tenant/work-item)。
+>
+> **自动化档** (per `docs/automation-design.md` v0.1 §4.6): **5/5 全部 [P]**, 全部走 `scripts/automation/refactor_template.py` 子类。
 
-| # | 子项 | token 预算 | 软参考周 | 依赖 | 状态 | 备注 |
-|---|---|---|---|---|---|---|
-| H2-1 | star_context 共享 ActorContext 字段扩展 | 0.4M | 0.07 周 | 无 | 🟢 **阶段 1 完成** (commit `68ae5ff`) | is_agent_session + roles + 4 helper 落地；净修 950 → 432 err |
-| H2-2 | 3 domain port/service 改造 (feedback/validation/integration) | 1.5M | 0.25 周 | H2-1 | 🔴 **阻塞** | revert (`8364223`)；3 domain port/service 改 use star_context 暴露 117+ err, 0.6-0.8M token 超单 session 上限 |
-| H2-3 | 5 domain 跨域改造 (comment/identity/project/tenant/work-item) | 0.6M | 0.10 周 | H2-1 | 🟡 **3/5 完成** | per HANDOFF v0.4 §5.1 H2-EXT；commit `9d08f80` `b6f6e2a` `7f611b0`；净修 507 err (797 → 290, 跨 9 crate) |
-| H2-4 | **强类型 ID 重构** (DeviceId→Uuid / device_id String→Uuid 业务语义重设) | 0.8M | 0.13 周 | H2-2 + H2-3 | 🔴 **阻塞** | `domain-identity` 强类型 DeviceId vs `domain-work-item` Option<String> 业务语义不兼容；per 守门 #4 v18 |
-| H2-5 | H2 原 3 domain service.rs 改造 (~150+ call sites) | 0.5M | 0.08 周 | H2-4 | 🔴 **阻塞** | 需先 H2-4 强类型重构完成 |
-| **小计** | | **~3.8M** | **~0.63 周** | | **1/5 阶段 1 + 3/5 H2-EXT** | **H2 实证 0.3-0.5M 估 → 1.1-1.6M 实测 (3-5x 超支)** |
+| # | 子项 | token 预算 | 软参考周 | 依赖 | 状态 | 自动化档 | 备注 |
+|---|---|---|---|---|---|---|---|
+| H2-1 | star_context 共享 ActorContext 字段扩展 | 0.4M | 0.07 周 | 无 | 🟢 **阶段 1 完成** (commit `68ae5ff`) | **[P]** `refactor_template.py` | is_agent_session + roles + 4 helper 落地；净修 950 → 432 err |
+| H2-2 | 3 domain port/service 改造 (feedback/validation/integration) | 1.5M | 0.25 周 | H2-1 | 🔴 **阻塞** | **[P]** `refactor_template.py` | revert (`8364223`)；3 domain port/service 改 use star_context 暴露 117+ err, 0.6-0.8M token 超单 session 上限 |
+| H2-3 | 5 domain 跨域改造 (comment/identity/project/tenant/work-item) | 0.6M | 0.10 周 | H2-1 | 🟡 **3/5 完成** | **[P]** `refactor_template.py` | per HANDOFF v0.4 §5.1 H2-EXT；commit `9d08f80` `b6f6e2a` `7f611b0`；净修 507 err (797 → 290, 跨 9 crate) |
+| H2-4 | **强类型 ID 重构** (DeviceId→Uuid / device_id String→Uuid 业务语义重设) | 0.8M | 0.13 周 | H2-2 + H2-3 | 🔴 **阻塞** | **[P]** `refactor_template.py` | `domain-identity` 强类型 DeviceId vs `domain-work-item` Option<String> 业务语义不兼容；per 守门 #4 v18 |
+| H2-5 | H2 原 3 domain service.rs 改造 (~150+ call sites) | 0.5M | 0.08 周 | H2-4 | 🔴 **阻塞** | **[P]** `refactor_template.py` | 需先 H2-4 强类型重构完成 |
+| **小计** | | **~3.8M** | **~0.63 周** | | **1/5 阶段 1 + 3/5 H2-EXT** | **5/5 [P]** | **H2 实证 0.3-0.5M 估 → 1.1-1.6M 实测 (3-5x 超支)** |
 
 **累计统计**: 净修 507 err (H2-EXT 跨 9 crate 797 → 290) + 145+ err (H2-1 stage 1 消解) = **652+ err 修复实证** (per 守门 #1 阶段 1 `cargo check --workspace --lib` 0 err + 阶段 2 `--all-targets` 0 err 待 #4 #5 完成)
 
@@ -555,6 +590,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | v0.3 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | §13 Test Design v0.3 4 子项收官 (109 新测试) + §14 P3 之外剩余任务 (P1-P9 行业预设 13 commits + H2 5 子项 + DB W/T/M 6 派生) + §15 累计 91 子项 78/91 实质收官 (85.7%) + §16 修订历史 v0.3 | 2026-09-01 21:41 JST Ulysses "所有剩余任务罗列出来" + 21:58 JST "整理进 wbs" 触发 |
 | v0.4 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 5 wt 并行收官后增量回填: 4/5 子项 🟢 (DB 100% 表 818706e + D.6 CI 7 job f4fd1c2 + AGENTS v0.31 287d9a0 + B.2 Hermes 696e274 57/57 test) + 1/5 子项 ❌ (P1-P9 task schema 0/147 = 0% 标 887ff3c 守门 #13 适用边界 DDD Review 拍板) + §15 累计 96 子项 82/96 实质收官 (85.4%) + §14.8 新增 (5 wt 收官实证段) | 2026-09-01 22:30 JST Ulysses "开子代理和 worktree 并行处理 wbs 任务" 触发 |
 | v0.5 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 5 wt 收官后 4 项拍板落地: (1) 强类型 ID 选项 1 全量 Uuid 强类型 2.5M / 0.4 周 启 H2-2/H2-4/H2-5; (2) 5 域 Lead 真人 选项 2 Mavis 内部代签 临时, 跨 session 续找真人追溯签字 (per 8/27 19:39 JST 用户授权); (3) 守门 #13 适用边界 选项 1 仅 Backend PG (INVENTORY 100/100 PASS), task schema 保持现状, 子项 5 FAIL 结论"结构性 NOT in scope"; (4) 推 origin 选项 1 现在推 main (55 ahead, ae03b74) + H2 强类型优先 9/2 9:00 JST 启 wt | 2026-09-01 23:59 JST Ulysses 4 项拍板全收触发 |
+| v0.6 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **agent 交互 Python 化** (per `docs/automation-design.md` v0.1 + 9/2 00:39 JST 拍板): §1-§5 + §14.2 任务卡加"自动化档"列 ([P]/[M]/[S]), 4 维打分 (Rerunnable / Volume / Structural / Audit-trail); §7.1 自动化档汇总 20 [P] / 6 [M] / 17 [S] / 20 共享脚本; §8 守门规则新增 #6 "任务卡自动化档强制落档"; 引用 `docs/automation-design.md` v0.1 + `scripts/automation/` 8 份基类骨架 (dispatcher / cli_helper / refactor_template / judge / smoke_test / registry_check + 2 __init__); 守门 #1 v19 + #9 v2 + #12 v2 派生规 (本文件落档后追加 AGENTS.md) | 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题" + 拍板 (范围=全 3 类 / 维度=R+V+S+A / 落档=新建 docs/automation-design.md + scripts/automation/) |
 
 ---
 
@@ -562,6 +598,8 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 
 - `STAR-OLU-001.md` — token-OLU 独立基线 (1 SRE·周 = 1.2M)
 - `AGENTS.md` §4 / §7 — 守门 + 待办
+- `docs/automation-design.md` v0.1 — agent 交互 Python 化设计 (9/2 00:39 JST 拍板落地)
+- `scripts/automation/registry.md` v0.1 — 8 份基类脚本索引
 - `docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md` v0.1 — DB W/T/M 三類索引
 - `docs/data-design/ipa-detail/00-CLASSIFICATION-RULES.md` v0.1 — 跨项目 ルール手册
 - `HANDOFF-ST-001.md` v0.4 — H2 范围扩量实证
