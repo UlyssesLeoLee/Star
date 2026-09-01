@@ -549,6 +549,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "domain-batch"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "star-context",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "domain-board"
 version = "0.1.0"
 dependencies = [

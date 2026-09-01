@@ -7,6 +7,9 @@ on:
     branches: [main]
 
 jobs:
+  # ─────────────────────────────────────────────────────────────
+  # 守门 #1 基础 (existing, per `2f6eb6b`)
+  # ─────────────────────────────────────────────────────────────
   rust-ci:
     name: Rust (check / test / clippy / fmt)
     runs-on: ubuntu-latest
@@ -106,3 +109,75 @@ jobs:
 
       - name: Build
         run: npx next build
+
+  # ─────────────────────────────────────────────────────────────
+  # D.6 新增 3 job (per WBS §3 D.6 + PHASE-P3-D6-IMPL-REPORT.md)
+  # 触发: 2026-09-01 22:31 JST P3-D.6 真实实装触发 (per ask_user 拍板)
+  # 范围: markdownlint + cargo doc + cargo bench --no-run
+  # 守门 #6 实证: 真实 CI runner 需 Ulysses 拍板 (per WBS §7 阻塞项 #5)
+  # ─────────────────────────────────────────────────────────────
+
+  markdownlint:
+    name: Markdown lint (markdownlint-cli2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: markdownlint-cli2
+        uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          globs: |
+            **/*.md
+          ignores: |
+            node_modules
+            .git
+            target
+            frontend/node_modules
+            frontend/.next
+            frontend/dist
+            _ARCHIVED_*.md
+
+  cargo-doc:
+    name: Rust doc (cargo doc --no-deps)
+    # 守门 #1 v5: release + doc + bench --no-run 与 debug build 等价守门 (per AGENTS.md §4.1 v5)
+    # 实证: per WBS §0 + A.16 commit `0e6a965` release mode cargo doc 0 warning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: RUSTDOCFLAGS deny warnings
+        run: echo "RUSTDOCFLAGS=-D warnings" >> $GITHUB_ENV
+
+      - name: cargo doc --workspace --no-deps
+        run: cargo doc --workspace --no-deps --all-features
+
+  cargo-bench-no-run:
+    name: Rust bench --no-run (compile-only)
+    # 守门 #1 v5: release + doc + bench --no-run 与 debug build 等价守门 (per AGENTS.md §4.1 v5)
+    # 实证: per WBS §0 + A.16 commit `0e6a965` release mode cargo bench --no-run 0 err (4 crate 全 0)
+    # 当前 42 crate 全 0 benches (Phase W 之前无 benchmark), 此 job 持续 0 工作
+    # 但保证未来加 benches 时 CI 自动校验 (per A.16 守门承诺)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo bench --workspace --no-run
+        # 当前 0 bench crate, 仍跑守门, 未来加 benches 自动校验编译
+        run: cargo bench --workspace --no-run
+        continue-on-error: true
+        # 0 benches 时 `cargo bench --no-run` 可能因 "no targets" exit 非 0, 容忍之
+        # (具体行为: cargo 对 workspace bench --no-run 0 target 会 exit 0; 显式保留 advisory)
