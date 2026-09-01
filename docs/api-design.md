@@ -1111,6 +1111,42 @@ flowchart TB
 
 **Module 覆盖核对**:25 Module 全部有端点(0 缺失)✅
 
+### §3.X API 端点 ↔ 22 domain 协作映射 (v0.16 模块间协作细化新增)
+
+per [basic-design v0.16 §3.2.9 22 domain contact face 表](../../../basic-design.md) + [ADR-0039 §D26-D32 Worktree Orchestration 跨域协作](../../architecture/2026-08-26-upgrade/adr/0039-worktree-orchestration-cross-domain.md),本节定义 234 REST 端点 + 1 WS 端点与 22 domain + 7 supporting crate 的协作入口 (v0.16 §3.2.9 接触面 100% 覆盖)。
+
+**端点 ↔ domain 映射示例 (核心 12 域 + 7 supporting)**:
+
+| 端点 | 涉及 22 domain (核心 5) | 鉴权 | Realtime 通道 (per [basic-design v0.16 §4.13](../../../basic-design.md)) | Saga 触发 |
+|---|---|---|---|---|
+| `POST /v1/work-items` | work-item (主) + workflow + project + permission + audit | `PermissionChecker` | `/ws/notif` (StateChanged) | — |
+| `POST /v1/work-items/{id}/worktree` | work-item + worktree (主) + scm + development + audit | `PermissionChecker` + Workflow Guard | `/ws/feed` (WorktreeCreated) | **Worktree Orchestration Saga 8 步** (per spec/saga/01 v0.2 §4) |
+| `POST /v1/worktrees/{id}/agent-session` | worktree + agent (主) + identity + permission + audit | `PermissionChecker` + AgentPolicy | `/ws/feed` (AgentSessionStarted) | Saga 3 步 (`RegisterAgentSession`) |
+| `POST /v1/feedback` | feedback (主) + work-item + agent + context | `PermissionChecker` | `/ws/notif` (FeedbackCreated, per REQ-NOTIF-002 降噪) | — |
+| `POST /v1/validations` | validation (主) + work-item + worktree + agent | `PermissionChecker` | `/ws/notif` (ValidationFailed) | Saga 6 步 (`TriggerValidation`) |
+| `POST /v1/scm/pull-requests` | scm (主) + work-item + development + audit | `PermissionChecker` + Workflow Guard | `/ws/notif` (PullRequestLinked) | Saga 7 步 (`LinkPullRequest`) |
+| `POST /v1/webhook-receiver` | integration (主) + scm + agent + audit | Webhook 签名校验 (per §7) | `/ws/notif` (SyncEvent) | — |
+| `GET /v1/search?q=` | search (主) + work-item + comment + agent | `PermissionChecker` | — (Pull API) | — |
+| `POST /v1/notifications/dispatch` | notification (主) + audit | `PermissionChecker` | — | — |
+| `POST /v1/forms/{id}/submit` | form (supporting) + work-item + notification | `PermissionChecker` | `/ws/notif` (FormSubmitted → 工单创建) | — |
+| `GET /v1/reports/{id}/snapshot` | report (supporting) + work-item + sprint | `PermissionChecker` | — (Pull API + cache) | — |
+| `POST /v1/dashboards` | dashboard (supporting) + work-item + report | `PermissionChecker` | — | — |
+| `GET /v1/themes/resolve` | theme (supporting) + identity + tenant | `PermissionChecker` | — | — |
+| `POST /v1/ai/invocations` | ai (supporting) + workflow + work-item | `PermissionChecker` + Token Budget P0 校验 (per basic-design §4.4.4) | — (Async) | — |
+| `POST /v1/cli/agents` | cli (supporting) + identity + audit + kms | `PermissionChecker` + KMS 引用 (per kms INV-KMS-01 注入式) | — | — |
+| `POST /v1/kms/keys` | kms (supporting) + audit | `PermissionChecker` | — | — |
+
+**API 协作 5 守门** (v0.16 新增):
+1. **不得拆核心业务事务为 Event Chain** (per [basic-design v0.16 §4.12.3 守门 1](../../../basic-design.md)) — 跨域写走 Saga 编排,单域写走 PG 事务
+2. **所有写操作必走 PermissionChecker** (per [basic-design v0.16 §3.2.8 横切综述](../../../basic-design.md))
+3. **Realtime 推送走 /ws/feed /ws/notif /ws/admin 3 通道** (per [basic-design v0.16 §4.13 Realtime 协作机制](../../../basic-design.md))
+4. **Webhook 接收必签名校验** (per §7 Local Runtime 协议),失败入死信 (per G-05)
+5. **Secret 走 KMS 引用** (per kms INV-KMS-01 + 注入式 SecretResolver),不进配置文件 (per [integration-design v0.16 §1.4 Adapter 凭据](../../../integration-design.md))
+
+**与 ADR-0039 关系**: 本节是 [ADR-0039 §D26-D32 Worktree Orchestration 跨域协作](../../architecture/2026-08-26-upgrade/adr/0039-worktree-orchestration-cross-domain.md) 跨域协作架构的 API 层落地,234 端点 + 1 WS 共同支撑 Worktree Orchestration Saga 8 步编排。
+
+**修订**: v0.2 → v0.16 (2026-09-01, per 模块间协作细化任务 A + L3 + doc-only)
+
 ---
 
 ## 4. WebSocket / Realtime 通道
