@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-scripts/automation/smoke_test.py — 4 基类 smoke 验证
-(per docs/automation-design.md §6.6)
+scripts/automation/smoke_test.py 鈥?4 鍩虹被 smoke 楠岃瘉
+(per docs/automation-design.md 搂6.6)
 
-跑通 4 个基类 (dispatcher / cli_helper / refactor_template / generate_ac_matrix) 的
-最小可运行案例, 无副作用, 验证 import + class 实例化 + method 调用都通过。
-
-用法:
+璺戦€?4 涓熀绫?(dispatcher / cli_helper / refactor_template / generate_ac_matrix) 鐨?鏈€灏忓彲杩愯妗堜緥, 鏃犲壇浣滅敤, 楠岃瘉 import + class 瀹炰緥鍖?+ method 璋冪敤閮介€氳繃銆?
+鐢ㄦ硶:
     python scripts/automation/smoke_test.py
 
-输出:
-    - stdout: 每个 case 的 OK / FAIL
+杈撳嚭:
+    - stdout: 姣忎釜 case 鐨?OK / FAIL
     - audit_log: docs/reports/automation-smoke.log
-    - exit code: 0 = 全部 OK, 1 = 有 FAIL
+    - exit code: 0 = 鍏ㄩ儴 OK, 1 = 鏈?FAIL
 
-约束 (per 守门 #1 v1):
-    - 标准库 only
-    - 无副作用 (不真跑 cargo / git, 用 stub 模式)
-    - audit_log 必填
+绾︽潫 (per 瀹堥棬 #1 v1):
+    - 鏍囧噯搴?only
+    - 鏃犲壇浣滅敤 (涓嶇湡璺?cargo / git, 鐢?stub 妯″紡)
+    - audit_log 蹇呭～
 """
 
 from __future__ import annotations
@@ -30,8 +28,8 @@ import traceback
 from pathlib import Path
 from typing import Callable, Tuple
 
-# 把 scripts/ 加到 sys.path, 这样 `import automation.dispatcher` 才能找到
-# (per 守门 #1 v1: 标准库 only, 不引入 setup.py / pyproject.toml)
+# 鎶?scripts/ 鍔犲埌 sys.path, 杩欐牱 `import automation.dispatcher` 鎵嶈兘鎵惧埌
+# (per 瀹堥棬 #1 v1: 鏍囧噯搴?only, 涓嶅紩鍏?setup.py / pyproject.toml)
 ROOT_DEFAULT = Path(__file__).resolve().parent.parent.parent
 SCRIPTS_DIR = ROOT_DEFAULT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
@@ -41,7 +39,7 @@ REPORTS_DIR_DEFAULT = ROOT_DEFAULT / "docs" / "reports"
 
 
 def case(name: str) -> Tuple[bool, str]:
-    """跑单个 smoke case, 返 (ok, msg)"""
+    """璺戝崟涓?smoke case, 杩?(ok, msg)"""
     try:
         if name == "dispatcher":
             from automation.dispatcher import SubagentDispatcher
@@ -70,7 +68,7 @@ def case(name: str) -> Tuple[bool, str]:
                 phase="smoke-test",
                 audit_log=REPORTS_DIR_DEFAULT / "automation-smoke.log",
             )
-            # 跑一个无害的命令 (python --version)
+            # 璺戜竴涓棤瀹崇殑鍛戒护 (python --version)
             result = h.run([sys.executable, "--version"], retries=0, timeout=5)
             assert result.exit_code == 0, f"exit_code={result.exit_code}"
             assert "Python" in result.stdout, "should contain 'Python'"
@@ -97,11 +95,11 @@ def case(name: str) -> Tuple[bool, str]:
 
         elif name == "judge":
             from automation.judge import judge, judge_all, DIMENSIONS, VERDICTS
-            # 单条判定
+            # 鍗曟潯鍒ゅ畾
             r = judge("P3-B.5", ["R", "V", "A"], note="smoke test")
             assert r.verdict == "P", f"P3-B.5 should be [P], got {r.verdict}"
             assert r.score == 3, f"score should be 3, got {r.score}"
-            # 全 WBS 判定
+            # 鍏?WBS 鍒ゅ畾
             all_results = judge_all()
             assert len(all_results) > 0, "should judge all tasks"
             summary = {
@@ -119,7 +117,7 @@ def case(name: str) -> Tuple[bool, str]:
 
 
 def main():
-    """跑 4 个 smoke case"""
+    """璺?4 涓?smoke case"""
     print("=== automation smoke test ===")
     print(f"phase=smoke-test")
     print(f"audit_log={REPORTS_DIR_DEFAULT / 'automation-smoke.log'}")
