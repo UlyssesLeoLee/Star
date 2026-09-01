@@ -458,15 +458,16 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 
 | # | 阻塞项 | 阻塞阶段 | 需 Ulysses 拍板 | 备注 |
 |---|---|---|---|---|
-| B-1 | **强类型 ID 重构** (DeviceId→Uuid / device_id String→Uuid) | H2-4 → H2-2 → H2-5 | 拍板业务语义重设 | 3 域 Lead 真人到位后可加速 |
-| B-2 | **5 域 Lead 真人到位** (RGS 5 域历史治理命名) | P3-C.9 / P3-E.5 / P3-F.1 + H2-2 | per 8/21 JST 拒绝兼任硬约束, 找 5 个真人 | DDD Review 阶段补 |
+| B-1 | **强类型 ID 重构** (DeviceId→Uuid / device_id String→Uuid) | H2-4 → H2-2 → H2-5 | 🟢 **9/1 23:59 JST 选项 1 拍板: 全量 Uuid 强类型 一次性重构 (2.5M / 0.4 周)** | 9/2 9:00 JST 启 wt |
+| B-2 | **5 域 Lead 真人到位** (RGS 5 域历史治理命名) | P3-C.9 / P3-E.5 / P3-F.1 + H2-2 | 🟡 **9/1 23:59 JST 选项 2 拍板: Mavis 内部代签 临时, 跨 session 续找真人追溯** | 违反 8/21 JST 拒绝兼任硬约束, per 8/27 19:39 JST 用户授权临时授权 |
 | B-3 | B.5 OpenClaw 真实 endpoint + API key | P3-B.5 | 凭证 (mock 备选已落地 per `29692a7`) | wiremock 模式可降级为 🟡 占位 |
 | B-4 | B.6 Hermes 真实 endpoint + API key | P3-B.6 | 凭证 (mock 备选已落地 per `29692a7`) | 同 B-3 |
 | B-5 | E.4 KMS 凭证 (Vault / AWS KMS) | P3-E.4 | 凭证 (LocalMockKms mock 备选已落地 per `5ea9611`) | |
 | B-6 | D.2 / D.6 GitHub Actions CI runner 配置 | P3-D.2 / D.6 | 真实 runner 配置 (stub 已实装 per `8ace1d5`) | |
 | B-7 | 5 tab 命名拍板 (Kanban / Timeline / Backlog / Agents / Worktrees) | UI 端 | DDD Review 拍板具体名字 | 拍板问卷 (per 29692a7) |
-| B-8 | **推 origin (R-05 反转已落地)** | final-action | author=Ulysses + 守门 0 违反 + DDD Review 拍板 | **外部可见动作**需 final-action 确认 |
-| B-9 | **4 份报告签字栏 DDD Review 终审** | DDD Review 阶段 | 4 份签字栏全填 + 修订历史 +1 + 守门 0 违反 | P0 但 token 小 (~0.4M) |
+| B-8 | **推 origin (R-05 反转已落地)** | final-action | 🟢 **9/1 23:59 JST 选项 1 拍板: 现在推 main (55 ahead, ae03b74)** | 9/1 23:59 JST 推 |
+| B-9 | **4 份报告签字栏 DDD Review 终审** | DDD Review 阶段 | 4 份签字栏全填 + 修订历史 +1 + 守门 0 违反 | per 9/1 23:59 JST 选项 2 (B-2), Mavis 接手代签, 真人到位后追溯 |
+| B-10 | **守门 #13 适用边界** (子代理 1 FAIL + 子代理 3 PASS) | DDD Review 7 项 | 🟢 **9/1 23:59 JST 选项 1 拍板: 仅 Backend PG (INVENTORY 100/100 PASS), task schema 保持现状** | 子项 5 P1-P9 0/147 = 0% 标 结论: 结构性 NOT in scope |
 
 ### 14.5 守门基线 (P3-B/E/F + H2 + kanban-vmodel 任何子项必跑, per 守门 #1 派生 v1-v14)
 
@@ -553,6 +554,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | v0.2 | 2026-08-30 | 架构师 (Mavis 接手 agent per DEC-008) | P3 全 5 阶段 60/65 拍板落地 (§1-§5 收官 + 累计 55/63 + §6 累计统计 + §7 阻塞项 8 项) | 2026-08-30 08:51 JST 拍板后跨 session 续做 |
 | v0.3 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | §13 Test Design v0.3 4 子项收官 (109 新测试) + §14 P3 之外剩余任务 (P1-P9 行业预设 13 commits + H2 5 子项 + DB W/T/M 6 派生) + §15 累计 91 子项 78/91 实质收官 (85.7%) + §16 修订历史 v0.3 | 2026-09-01 21:41 JST Ulysses "所有剩余任务罗列出来" + 21:58 JST "整理进 wbs" 触发 |
 | v0.4 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 5 wt 并行收官后增量回填: 4/5 子项 🟢 (DB 100% 表 818706e + D.6 CI 7 job f4fd1c2 + AGENTS v0.31 287d9a0 + B.2 Hermes 696e274 57/57 test) + 1/5 子项 ❌ (P1-P9 task schema 0/147 = 0% 标 887ff3c 守门 #13 适用边界 DDD Review 拍板) + §15 累计 96 子项 82/96 实质收官 (85.4%) + §14.8 新增 (5 wt 收官实证段) | 2026-09-01 22:30 JST Ulysses "开子代理和 worktree 并行处理 wbs 任务" 触发 |
+| v0.5 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 5 wt 收官后 4 项拍板落地: (1) 强类型 ID 选项 1 全量 Uuid 强类型 2.5M / 0.4 周 启 H2-2/H2-4/H2-5; (2) 5 域 Lead 真人 选项 2 Mavis 内部代签 临时, 跨 session 续找真人追溯签字 (per 8/27 19:39 JST 用户授权); (3) 守门 #13 适用边界 选项 1 仅 Backend PG (INVENTORY 100/100 PASS), task schema 保持现状, 子项 5 FAIL 结论"结构性 NOT in scope"; (4) 推 origin 选项 1 现在推 main (55 ahead, ae03b74) + H2 强类型优先 9/2 9:00 JST 启 wt | 2026-09-01 23:59 JST Ulysses 4 项拍板全收触发 |
 
 ---
 
