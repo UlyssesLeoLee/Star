@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-scripts/automation/integration_e2e.py — OpenClaw / Hermes 真实集成 e2e stub
-(per docs/automation-design.md v0.1 §3.2 + §4.1 + §6.4 B.5/B.6 共享)
+scripts/automation/integration_e2e.py 鈥?OpenClaw / Hermes 鐪熷疄闆嗘垚 e2e stub
+(per docs/automation-design.md v0.1 搂3.2 + 搂4.1 + 搂6.4 B.5/B.6 鍏变韩)
 
-B.5 (OpenClaw) + B.6 (Hermes) 共享 5 endpoint × 4 method = 20 case
-per WBS §1 B.5/B.6 拍板 (2026-08-30 07:42 JST 选项 1, 9/2 23:59 JST 选项 1)
+B.5 (OpenClaw) + B.6 (Hermes) 鍏变韩 5 endpoint 脳 4 method = 20 case
+per WBS 搂1 B.5/B.6 鎷嶆澘 (2026-08-30 07:42 JST 閫夐」 1, 9/2 23:59 JST 閫夐」 1)
 
-用法:
+鐢ㄦ硶:
     # B.5 OpenClaw dry-run
     python scripts/automation/integration_e2e.py --dry-run --provider openclaw
 
     # B.6 Hermes dry-run
     python scripts/automation/integration_e2e.py --dry-run --provider hermes
 
-    # 5 endpoint 全部跑 (真凭证需 Ulysses 提供 API key)
+    # 5 endpoint 鍏ㄩ儴璺?(鐪熷嚟璇侀渶 Ulysses 鎻愪緵 API key)
     OPENCLAW_API_KEY=xxx python scripts/automation/integration_e2e.py --provider openclaw
     HERMES_API_KEY=xxx python scripts/automation/integration_e2e.py --provider hermes
 
-约束 (per 守门 #1 v1 + 守门 #5 环境变量安全):
-    - 标准库 only: dataclasses / re / json / argparse / subprocess / pathlib
-    - 5 endpoint 共享, 改 base_url + auth header (B.5 = X-OpenClaw-Auth, B.6 = X-Hermes-Auth)
-    - 默认 dry_run=True (守门 #5: 不打印 env var, 只 invoke)
-    - audit_log 必填, 落 docs/reports/integration-e2e.log
+绾︽潫 (per 瀹堥棬 #1 v1 + 瀹堥棬 #5 鐜鍙橀噺瀹夊叏):
+    - 鏍囧噯搴?only: dataclasses / re / json / argparse / subprocess / pathlib
+    - 5 endpoint 鍏变韩, 鏀?base_url + auth header (B.5 = X-OpenClaw-Auth, B.6 = X-Hermes-Auth)
+    - 榛樿 dry_run=True (瀹堥棬 #5: 涓嶆墦鍗?env var, 鍙?invoke)
+    - audit_log 蹇呭～, 钀?docs/reports/integration-e2e.log
 """
 
 from __future__ import annotations
@@ -42,12 +42,12 @@ REPORTS_DIR_DEFAULT = ROOT_DEFAULT / "docs" / "reports"
 
 @dataclass
 class EndpointConfig:
-    """OpenClaw / Hermes 端点配置 (per WBS §1 B.5/B.6 拍板)"""
+    """OpenClaw / Hermes 绔偣閰嶇疆 (per WBS 搂1 B.5/B.6 鎷嶆澘)"""
 
     provider: str  # "openclaw" | "hermes"
     base_url: str
     auth_header: str
-    auth_value: str  # API key (从 env 读, 不打印)
+    auth_value: str  # API key (浠?env 璇? 涓嶆墦鍗?
     timeout: int = 30
 
     @classmethod
@@ -72,26 +72,38 @@ class EndpointConfig:
 
 @dataclass
 class Endpoint:
-    """单个端点定义 (5 endpoint 共享)"""
+    """鍗曚釜绔偣瀹氫箟 (5 endpoint 鍏变韩)"""
 
     name: str
     path: str
     methods: list  # 4 method: GET / POST / PUT / DELETE
 
 
-# 5 endpoint 共享 (per docs/automation-design.md §4.1 B.5/B.6 brief)
-ENDPOINTS = [
-    Endpoint("agents", "/agents", ["GET", "POST"]),
-    Endpoint("sessions", "/sessions", ["GET", "POST", "PUT", "DELETE"]),
-    Endpoint("messages", "/messages", ["GET", "POST"]),
-    Endpoint("tools_invoke", "/tools/invoke", ["POST"]),
-    Endpoint("cost", "/cost", ["GET"]),
-]
+# 5 endpoint 鍏变韩 (per docs/automation-design.md 搂4.1 B.5/B.6 brief)
+# B.5 OpenClaw: 路径前缀 /v1/ (per API design)
+# B.6 Hermes: 路径前缀 /v2/hermes/ (per Hermes API design)
+ENDPOINTS_BY_PROVIDER = {
+    "openclaw": [
+        Endpoint("agents", "/v1/agents", ["GET", "POST"]),
+        Endpoint("sessions", "/v1/sessions", ["GET", "POST", "PUT", "DELETE"]),
+        Endpoint("messages", "/v1/messages", ["GET", "POST"]),
+        Endpoint("tools_invoke", "/v1/tools/invoke", ["POST"]),
+        Endpoint("cost", "/v1/cost", ["GET"]),
+    ],
+    "hermes": [
+        Endpoint("agents", "/v2/hermes/agents", ["GET", "POST"]),
+        Endpoint("sessions", "/v2/hermes/sessions", ["GET", "POST", "PUT", "DELETE"]),
+        Endpoint("messages", "/v2/hermes/messages", ["GET", "POST"]),
+        Endpoint("tools_invoke", "/v2/hermes/tools/invoke", ["POST"]),
+        Endpoint("cost", "/v2/hermes/cost", ["GET"]),
+    ],
+}
+ENDPOINTS = ENDPOINTS_BY_PROVIDER["openclaw"]  # 默认 (B.5 主, B.6 镜像)
 
 
 @dataclass
 class CaseResult:
-    """单 case 实证结果"""
+    """鍗?case 瀹炶瘉缁撴灉"""
 
     endpoint: str
     method: str
@@ -99,14 +111,14 @@ class CaseResult:
     dry_run: bool
     success: bool
     status_code: int
-    response_preview: str  # 头 200 字符
+    response_preview: str  # 澶?200 瀛楃
     duration_ms: float
     error: Optional[str] = None
 
 
 @dataclass
 class AuditEntry:
-    """审计日志条目 (per docs/automation-design.md §3.4)"""
+    """瀹¤鏃ュ織鏉＄洰 (per docs/automation-design.md 搂3.4)"""
 
     timestamp: float
     phase: str
@@ -117,7 +129,7 @@ class AuditEntry:
 
 
 class IntegrationE2E:
-    """OpenClaw / Hermes 5 endpoint × 4 method 共享基类 (per §3.2)"""
+    """OpenClaw / Hermes 5 endpoint 脳 4 method 鍏变韩鍩虹被 (per 搂3.2)"""
 
     def __init__(self, config: EndpointConfig, dry_run: bool = True, audit_log: Optional[Path] = None):
         self.config = config
@@ -127,21 +139,27 @@ class IntegrationE2E:
         self.results: list = []
 
     def run_all(self) -> list:
-        """跑 5 endpoint × 4 method = 20 case"""
-        for endpoint in ENDPOINTS:
+        """璺?5 endpoint 脳 4 method = 20 case (per provider endpoint list)"""
+        endpoints = ENDPOINTS_BY_PROVIDER.get(self.config.provider, ENDPOINTS)
+        for endpoint in endpoints:
             for method in endpoint.methods:
                 result = self.run_case(endpoint, method)
                 self.results.append(result)
         return self.results
 
+    @property
+    def endpoints(self) -> list:
+        """per-provider endpoint list"""
+        return ENDPOINTS_BY_PROVIDER.get(self.config.provider, ENDPOINTS)
+
     def run_case(self, endpoint: Endpoint, method: str) -> CaseResult:
-        """单 case 跑 (per §3.2 run 方法)"""
+        """鍗?case 璺?(per 搂3.2 run 鏂规硶)"""
         start = time.time()
         url = f"{self.config.base_url}{endpoint.path}"
         headers = {self.config.auth_header: self.config.auth_value}
 
         if self.dry_run:
-            # dry-run 模式: 不真发请求, 返 mock 响应
+            # dry-run 妯″紡: 涓嶇湡鍙戣姹? 杩?mock 鍝嶅簲
             mock = self._mock_response(endpoint, method)
             duration = (time.time() - start) * 1000
             result = CaseResult(
@@ -161,8 +179,8 @@ class IntegrationE2E:
             )
             return result
         else:
-            # 真跑模式 (需 API key + 网络)
-            # stub: 真实实装需 import requests 或 subprocess curl (per §6 已知缺口)
+            # 鐪熻窇妯″紡 (闇€ API key + 缃戠粶)
+            # stub: 鐪熷疄瀹炶闇€ import requests 鎴?subprocess curl (per 搂6 宸茬煡缂哄彛)
             duration = (time.time() - start) * 1000
             result = CaseResult(
                 endpoint=endpoint.name,
@@ -173,7 +191,7 @@ class IntegrationE2E:
                 status_code=0,
                 response_preview="",
                 duration_ms=duration,
-                error="real-mode 需 import requests 或 subprocess curl (per §6 已知缺口, stub)",
+                error="real-mode 闇€ import requests 鎴?subprocess curl (per 搂6 宸茬煡缂哄彛, stub)",
             )
             self._audit(
                 action="run_case_real",
@@ -184,7 +202,7 @@ class IntegrationE2E:
             return result
 
     def _mock_response(self, endpoint: Endpoint, method: str) -> dict:
-        """mock 响应 (含 cost / token_usage / status 字段 per brief)"""
+        """mock 鍝嶅簲 (鍚?cost / token_usage / status 瀛楁 per brief)"""
         return {
             "endpoint": endpoint.name,
             "method": method,
@@ -221,9 +239,9 @@ class IntegrationE2E:
         failed = sum(1 for r in self.results if not r.success)
         return (
             f"=== Integration E2E: {self.config.provider} ===\n"
-            f"endpoints: {len(ENDPOINTS)}\n"
+            f"endpoints: {len(self.endpoints)}\n"
             f"methods_per_endpoint: 4 (GET/POST/PUT/DELETE)\n"
-            f"total_cases: {len(ENDPOINTS) * 4} (5 × 4)\n"
+            f"total_cases: {sum(len(e.methods) for e in self.endpoints)} (5 endpoint, methods sum)\n"
             f"success: {success}\n"
             f"failed: {failed}\n"
             f"dry_run: {self.dry_run}\n"
@@ -232,14 +250,14 @@ class IntegrationE2E:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="OpenClaw / Hermes 5 endpoint × 4 method 共享基类")
+    parser = argparse.ArgumentParser(description="OpenClaw / Hermes 5 endpoint 脳 4 method 鍏变韩鍩虹被")
     parser.add_argument("--provider", choices=["openclaw", "hermes"], required=True,
                         help="provider: openclaw (B.5) | hermes (B.6)")
     parser.add_argument("--dry-run", action="store_true", default=True,
-                        help="dry run 模式 (默认)")
+                        help="dry run 妯″紡 (榛樿)")
     parser.add_argument("--no-dry-run", dest="dry_run", action="store_false",
-                        help="真跑模式 (需 API key + 网络)")
-    parser.add_argument("--audit-log", type=Path, help="审计日志路径")
+                        help="鐪熻窇妯″紡 (闇€ API key + 缃戠粶)")
+    parser.add_argument("--audit-log", type=Path, help="瀹¤鏃ュ織璺緞")
     args = parser.parse_args()
 
     config = EndpointConfig.from_provider(args.provider)
