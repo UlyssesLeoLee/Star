@@ -14,4 +14,7 @@ out/
 # Playwright
 test-results/
 playwright-report/
+# ad-hoc debug spec (per 2026-09-01 16:41 JST "界面迁移全面完善" 拍板附项:
+#   debug-mobile.spec.ts 临时调试, 不入库, 保留本地用)
+e2e/debug-*.spec.ts
 
