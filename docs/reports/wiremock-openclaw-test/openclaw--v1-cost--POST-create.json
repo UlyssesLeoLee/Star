@@ -1,0 +1,36 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/cost"
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "Content-Type": "application/json",
+      "X-Provider": "openclaw",
+      "X-Request-Id": "req-1788284583"
+    },
+    "jsonBody": {
+      "id": "openclaw-v1-cost-create-req-1788",
+      "provider": "openclaw",
+      "endpoint": "/v1/cost",
+      "action": "create",
+      "method": "POST",
+      "status": "ok",
+      "http_status": 201,
+      "cost": 0.0001,
+      "token_usage": {
+        "prompt": 0,
+        "completion": 0,
+        "total": 0
+      },
+      "created_at": 1788284583.6734405,
+      "metadata": {
+        "stub": true,
+        "wiremock_compat": true,
+        "schema_version": "v0.1",
+        "dry_run": true
+      }
+    }
+  }
+}
