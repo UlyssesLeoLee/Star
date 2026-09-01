@@ -465,7 +465,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | B-5 | E.4 KMS 凭证 (Vault / AWS KMS) | P3-E.4 | 凭证 (LocalMockKms mock 备选已落地 per `5ea9611`) | |
 | B-6 | D.2 / D.6 GitHub Actions CI runner 配置 | P3-D.2 / D.6 | 真实 runner 配置 (stub 已实装 per `8ace1d5`) | |
 | B-7 | 5 tab 命名拍板 (Kanban / Timeline / Backlog / Agents / Worktrees) | UI 端 | DDD Review 拍板具体名字 | 拍板问卷 (per 29692a7) |
-| B-8 | **推 origin (R-05 反转已落地)** | final-action | 🟢 **9/1 23:59 JST 选项 1 拍板: 现在推 main (55 ahead, ae03b74)** | 9/1 23:59 JST 推 |
+| B-8 | **推 origin (R-05 反转已落地)** | final-action | 🟡 **9/1 23:59 JST 选项 1 拍板: 现在推 main, 9/1 23:59 JST 推 失败** | github.com 443 不可达 (Recv failure: Connection was reset, 21s timeout) + 无 PAT/GITHUB_TOKEN 环境变量 + credential helper 指向 127.0.0.1:8088 失效。等网络恢复 + Ulysses 提供 PAT 后跨 session 续推。 |
 | B-9 | **4 份报告签字栏 DDD Review 终审** | DDD Review 阶段 | 4 份签字栏全填 + 修订历史 +1 + 守门 0 违反 | per 9/1 23:59 JST 选项 2 (B-2), Mavis 接手代签, 真人到位后追溯 |
 | B-10 | **守门 #13 适用边界** (子代理 1 FAIL + 子代理 3 PASS) | DDD Review 7 项 | 🟢 **9/1 23:59 JST 选项 1 拍板: 仅 Backend PG (INVENTORY 100/100 PASS), task schema 保持现状** | 子项 5 P1-P9 0/147 = 0% 标 结论: 结构性 NOT in scope |
 
