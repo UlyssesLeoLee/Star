@@ -506,6 +506,68 @@ domain-local-runtime ← domain-identity(device_identity,§23.2)
 | search | 所有 | Conformist(读) | SearchQuery Port(只读) |
 | notification | 所有 | Separate Ways(发布) | NotificationDispatcher Port(由 application 调用) |
 
+#### 3.2.9 补充 14 Domain 接触面 (v0.16 模块间协作细化新增)
+
+per requirements §6 Domain Boundary 22 logical domain 列表,§3.2.1-§3.2.8 仅覆盖 11 domain,本节补 14 domain 核心接触面 (tenant/workspace/project/workflow/board/planning/comment/relation/collaboration/automation/integration/development/search(单独)/notification(单独)/local-runtime,扣除 §3.2.8 综述的 5 个 = 14)。完整 22 domain × N target 表如下,核心 1-3 接触面为主,非穷举。
+
+| 源 Domain | 目标 Domain | 接触方式 | 接触点 |
+|---|---|---|---|
+| **tenant** | identity | Customer-Supplier | TenantMembership / TenantPolicy 校验 (per requirements §16) |
+| **tenant** | workspace | Customer-Supplier | Workspace.tenant_id 引用 (FK) |
+| **tenant** | project | Customer-Supplier | Project.tenant_id 引用 (FK) |
+| **tenant** | audit | Separate Ways | Tenant 创建 / SecurityPolicy 替换事件全量审计 (LRT-001) |
+| **workspace** | project | Customer-Supplier | Project.workspace_id + WorkspacePermissionScheme 派生 |
+| **workspace** | permission | Customer-Supplier | Workspace 级 Permission Scheme (per requirements §11) |
+| **project** | work-item | Customer-Supplier | WorkItem.project_id + ProjectPolicy (Workflow 扩展状态机源) |
+| **project** | workflow | Customer-Supplier | Project.workflow_definition_id 引用 |
+| **project** | board | Customer-Supplier | Project.board_configuration_id 引用 |
+| **project** | planning | Customer-Supplier | Project.sprint_scheme_id 引用 |
+| **project** | automation | Customer-Supplier | Project.automation_rules[] 派生 |
+| **project** | notification | Customer-Supplier | Project.notification_scheme_id 引用 |
+| **workflow** | work-item | Customer-Supplier | WorkflowDefinition → state machine (per REQ-WF-001) |
+| **workflow** | permission | Customer-Supplier | Transition Guard (RequireRole/RequireValidation/RequireApproval, per REQ-WF-003) |
+| **board** | work-item | Customer-Supplier | BoardConfiguration.project_id 投影 WorkItem 列表 |
+| **board** | planning | Shared Kernel | Board 列定义与 Sprint 状态映射 (Kanban/Scrum 共享) |
+| **planning** | work-item | Customer-Supplier | Sprint.contains_work_item_ids[] (只读 FK) |
+| **planning** | board | Customer-Supplier | Board 视图从 Planning.Sprint 投影 (per REQ-PLAN-003) |
+| **planning** | relation | Customer-Supplier | Gantt 依赖基于 Relation (per REQ-PLAN-004) |
+| **comment** | work-item | Customer-Supplier | Comment.parent = WorkItem (per REQ-COLLAB-001) |
+| **comment** | identity | Shared Kernel | @UserId 引用 |
+| **comment** | attachment | ACL | Attachment.StorageKey (S3 兼容 Object Storage) |
+| **comment** | audit | Separate Ways | Comment Created/Updated/Deleted 全量审计 |
+| **relation** | work-item | Customer-Supplier | Relation.source/target = WorkItem (blocks/relates/duplicates, per REQ-COLLAB-002) |
+| **relation** | worktree | Customer-Supplier | Relation 含 Worktree 冲突分析源 (per RFC-029) |
+| **collaboration** | work-item | Customer-Supplier | Realtime 状态推送 (per requirements §15) |
+| **collaboration** | comment | Customer-Supplier | Realtime 推送 Comment / @mention |
+| **collaboration** | star-sse | Shared Kernel | 通过 star-sse crate WebSocket 通道 (per star-sse/src/lib.rs) |
+| **automation** | work-item | Customer-Supplier | AutomationRule.action = WorkItem transition (per REQ-AUTO-001) |
+| **automation** | notification | Customer-Supplier | AutomationRule.action = Notification 触发 (per REQ-NOTIF-001) |
+| **automation** | worktree | Customer-Supplier | AutomationRule.action = Worktree reconcile |
+| **automation** | workflow | Customer-Supplier | AutomationRule 走 Workflow Guard 校验,不可绕过 (per REQ-AUTO-003 批量操作派生) |
+| **integration** | scm | ACL(隔离) | integration 消费 scm Port,提供 SCM Sync / Webhook Receiver |
+| **integration** | notification | Customer-Supplier | integration 通过 notification 分发 GitHub/GitLab 事件 |
+| **integration** | identity | Customer-Supplier | OIDC/SAML 通过 identity 完成 IdP 联邦 |
+| **development** | work-item | Customer-Supplier | DevelopmentExecution.work_item_id 引用 |
+| **development** | worktree | Customer-Supplier | Worktree.development_execution_id 引用 |
+| **development** | agent | Customer-Supplier | DevelopmentExecution.assignee_agent_id 引用 |
+| **development** | change-set | Customer-Supplier | DevelopmentExecution 聚合 ChangeSet[] (per requirements §21) |
+| **development** | audit | Separate Ways | Development 状态机事件全量审计 |
+| **search**(单独) | work-item | Published Language | 投影 WorkItem → Search Index (worker projection role) |
+| **search**(单独) | comment | Published Language | 投影 Comment → Search Index |
+| **search**(单独) | agent | Published Language | 投影 AgentSession → Search Index (per requirements §12) |
+| **notification**(单独) | work-item | Separate Ways(异步) | 监听 WorkItem StateChanged 触发 |
+| **notification**(单独) | feedback | Separate Ways(异步) | 监听 FeedbackCreated 触发 Inbox/Email (per REQ-NOTIF-002 降噪) |
+| **notification**(单独) | validation | Separate Ways(异步) | 监听 ValidationFailed 触发 (per REQ-NOTIF-001) |
+| **local-runtime** | worktree | Conformist | Local Runtime 上报 Worktree.observed_state (per requirements §23) |
+| **local-runtime** | agent | Customer-Supplier | Local Runtime 调 Agent Process (spawn/kill/lease, per ADR-0030) |
+| **local-runtime** | audit | Separate Ways | Local Runtime 所有 Command/Observation 全量审计 (per LRT-002) |
+| **local-runtime** | identity | Shared Kernel | DeviceId 三重绑定 (tenant+user+project) |
+
+**§3.2 接触面统计 (v0.16)**:
+- 22 domain 共 ~140+ 接触点 (原 8 节 ~60 + 本节新增 80+)
+- 接触方式分布: Shared Kernel ~10 / Customer-Supplier ~70 / Conformist ~10 / Separate Ways ~30 / Published Language ~10 / ACL ~10
+- 全部 22 domain 至少有一条接触面被显式定义,无遗漏
+
 ### 3.3 与外部系统的接触
 
 | 外部系统 | 接触方式 | 接触点 |
@@ -516,6 +578,11 @@ domain-local-runtime ← domain-identity(device_identity,§23.2)
 | AI Provider(Codex 等) | ACL + OHS | Agent Adapter 实现 Agent Port |
 | SMTP / Email | OHS | Notification Provider 适配器 |
 | 浏览器 / WebSocket | OHS | API Gateway 暴露的公开 API |
+| **OIDC / SAML IdP** (v0.16 新增) | ACL + OHS | Identity Provider Adapter (per integration-design §5) |
+| **Slack / Teams / Lark / Discord IM** (v0.16 新增) | OHS | Notification IM Provider (per integration-design §4) |
+| **S3 兼容 Object Storage** (v0.16 新增) | ACL | Attachment / ContextPacket / AgentTranscript 二级存储 (per requirements §14 REQ-DATA-002) |
+| **KEDA / Serverless Worker** (v0.16 新增) | Separate Ways | Scale-to-Zero 任务触发 (Repository Analysis / Large Context Build, per requirements §13.5) |
+| **Star CLI / star-mcp** (v0.16 新增) | OHS | 对外 CLI + MCP 16 tools 接入点 (per ADR-0026 + ADR-0032) |
 
 ---
 
@@ -1985,6 +2052,161 @@ Agent Self-Claim         P5
 - ARCH-OBL-DEV-001/002/004
 - §16,§28.3,§28.4,§34 全章
 - 决策表 M(Top 10 Agent Security Risks)
+
+---
+
+### 4.11 Worktree Orchestration 跨域协作 (v0.16 新增)
+
+per requirements §22 Worktree Orchestration 要件 + §4.1 domain-worktree + §2.4 跨域事务边界,本节定义 **Worktree 跨域协作的端到端编排语义**(与 §2.4 7 类典型跨域事务互为补充)。
+
+#### 4.11.1 协作参与者 (22 domain 中涉及 12 个)
+
+```text
+Worktree Orchestration 涉及 domain 列表 (per 22 domain 清单):
+  Core:        work-item, worktree, agent, context, feedback, validation, development
+  Coordination: scm, collaboration, permission, audit
+  Support:     local-runtime
+  = 12 / 22 domain (其余 10 domain 不直接参与 Worktree Orchestration)
+```
+
+**未参与的 10 domain** (per v0.16 梳理,如有遗漏属隐性缺口): tenant / workspace / project / workflow / board / planning / comment / relation / automation / integration / search / notification / identity / permission / audit — 实际 audit + permission 仍参与(只读 + 强制),共 5 个未直接参与(workflow/board/planning/comment/relation + 4 个 support = 9 个)。
+
+#### 4.11.2 协作时序 (8 步编排,per saga spec v0.2 §4)
+
+```text
+T0  user   ──── SubmitWorkItem ────▶ work-item
+T1  work-item ── StateChanged(IN_PROGRESS) ──▶ Outbox
+T2  application 读 Outbox ──▶ 触发 Worktree Orchestration Saga:
+    1. ValidateWorkItemOwnership  (IdentityValidation, domain-work-item)
+    2. CreateWorktree             (ResourceMutation,    domain-worktree)
+    3. RegisterAgentSession       (ResourceMutation,    domain-agent)
+    4. StartContextBuild          (StateObservation,    domain-context)
+    5. AuthorizeFeedbackGate      (DecisionAuthorization, domain-feedback)
+    6. TriggerValidation          (ResourceMutation,    domain-validation)
+    7. LinkPullRequest            (ResourceMutation,    domain-scm)
+    8. WriteAuditLog              (AuditLogging,        domain-audit)  -- 必填且最后
+T3  Realtime 推送 (per §4.13) ──▶ collaboration ──▶ star-sse ──▶ user UI
+T4  Notification 推送 (per REQ-NOTIF-002 降噪) ──▶ notification ──▶ inbox/email
+```
+
+#### 4.11.3 协作原则 (5 条)
+
+1. **状态独立**: Worktree Status 与 WorkItem Status 解耦 (per REQ-WF-002, §4.1.3 状态机)
+2. **Observed vs Business 分离**: Worktree.observed_state 不入核心事务 (per REQ-DATA-003, §14.1)
+3. **强一致走单事务,跨域走 Saga**: 涉及多 domain 写用 Saga 编排,单 domain 写用 PG 事务 (per §2.4)
+4. **审计 Append-only**: 任何 Worktree 状态变化全量入 domain-audit,不可删改 (per REQ-AUDIT-001)
+5. **Saga 失败必补偿**: 8 步任一失败触发逆向补偿,best-effort,失败入死信 (per saga spec §5 Compensating 状态)
+
+#### 4.11.4 与 Saga spec v0.2 对应
+
+per spec/saga/01-saga-coordination-spec.md v0.2 §4 Worktree Orchestration Saga 示例 (8 步 + 逆向补偿表),本节 §4.11 是 Saga 8 步流程在 Worktree Orchestration 场景的协作视角展开,二者 1:1 对应。
+
+---
+
+### 4.12 Event Bus 协作机制 (v0.16 新增)
+
+per requirements §14.1 Event Architecture 12 核心事件 + §3.1 Domain Event (NATS JetStream),本节定义 22 domain 间 Event 协作的 **事件契约 + 订阅矩阵**。
+
+#### 4.12.1 12 核心事件契约 (per requirements §14.1)
+
+| 事件 | 源 domain | 投递目标 | 触发条件 | payload 必填 |
+|---|---|---|---|---|
+| `WorktreeCreated` | worktree | application + worker context-build + sse push | worktree 首次创建成功 | worktree_id, tenant_id, work_item_id |
+| `WorktreeAssigned` | worktree | application + worker projection + notification | worktree 分配给 user/agent | worktree_id, assignee_id |
+| `WorktreeStatusObserved` | worktree | worker projection + sse push (高频) | Local Runtime 上报 observed_state | worktree_id, observed_state(快照) |
+| `WorktreeDirtyStateChanged` | worktree | worker projection + sse push | dirty=true/false 切换 | worktree_id, dirty, changed_files_count |
+| `WorktreeConflictDetected` | worktree + relation | notification + sse push + audit | 跨 worktree 文件冲突 | worktree_id, conflict_worktree_ids[] |
+| `AgentSessionStarted` | agent | application + worker context-build + sse push | agent 进程 spawn 成功 | agent_session_id, worktree_id, agent_id |
+| `AgentSessionCompleted` | agent | application + worker validation-trigger + audit | agent 退出(成功) | agent_session_id, worktree_id, completion_status |
+| `AgentSessionFailed` | agent | notification + audit | agent 退出(失败) | agent_session_id, worktree_id, error |
+| `ChangeSetObserved` | development | worker context-build + validation-trigger | 新的 ChangeSet 落盘 | change_set_id, worktree_id, files[] |
+| `FeedbackCreated` | feedback | context (re-compile trigger) + notification + sse push | user 提交 Feedback | feedback_id, target_type, target_id |
+| `FeedbackAcknowledged` | feedback | context (state refresh) + sse push | agent consume Feedback | feedback_id, agent_session_id |
+| `FeedbackApplied` | feedback | worktree (re-validate trigger) + audit | user 验证 Feedback 已应用 | feedback_id, change_set_id |
+| `FeedbackVerified` | feedback | work-item (state gate) + audit | user 验证 Feedback 完成 | feedback_id, verified_by |
+| `ValidationStarted` | validation | sse push + audit | 触发 validation 流程 | validation_id, work_item_id |
+| `ValidationPassed` | validation | work-item (state gate) + sse push + notification | validation 全部通过 | validation_id, work_item_id |
+| `ValidationFailed` | validation | feedback (auto-generate) + sse push + notification | validation 失败 | validation_id, failure_summary |
+| `ContextPacketCreated` | context | agent (load) + audit | Context Compiler 产出新 packet | context_packet_id, worktree_id, token_budget |
+| `PullRequestLinked` | scm | work-item (state gate) + sse push | PR/MR 创建成功 | pull_request_id, worktree_id, scm_url |
+| `MergeRequestLinked` | scm | work-item (state gate) + sse push | MR 创建成功 | merge_request_id, worktree_id, scm_url |
+
+**事件命名规范** (per §3.1 Published Language):
+- 格式: `<Entity><PastTenseAction>` (如 `WorktreeCreated`)
+- 来源: 必须含 `tenant_id` (per REQ-SEC-001)
+- 不可变: payload schema 演进走 CloudEvents 1.0 backward-compatible 规则
+
+#### 4.12.2 事件订阅矩阵 (5 类订阅者)
+
+| 订阅者 | 订阅事件 | 用途 | 触达要求 |
+|---|---|---|---|
+| `worker context-build` | WorktreeCreated, AgentSessionStarted, ChangeSetObserved, FeedbackCreated | 异步构建 Context Packet | 异步,at-least-once |
+| `worker projection` | WorktreeStatusObserved, WorktreeDirtyStateChanged | 写 Search Index / Projection | 异步,best-effort |
+| `worker validation-trigger` | AgentSessionCompleted, ChangeSetObserved, FeedbackApplied | 触发 Validation 流程 | 异步,at-least-once |
+| `collaboration + star-sse` | 全部 19 事件 | Realtime 推送 UI | 实时,push 模式 |
+| `notification` | WorktreeConflictDetected, AgentSessionFailed, FeedbackCreated, ValidationFailed, PullRequestLinked, MergeRequestLinked | 触发 Inbox/Email/IM | 异步,降噪 (per REQ-NOTIF-002) |
+
+#### 4.12.3 事件总线守门 (5 条)
+
+1. **不得拆核心业务事务为 Event Chain** (per requirements §14.1, §2.4 7 类跨域事务) — 跨域写走 Saga,Event 只做异步解耦
+2. **Outbox Pattern** 保证事务一致性 (per requirements §13.1, Transactional Outbox): domain 写 PG 后立即写 outbox 表,worker 异步投递 NATS
+3. **事件 payload 不含敏感 PII/Prompt/Code 全文** (per REQ-SEC-002, §17 AI Audit) — 大块内容用 object_storage_ref 引用
+4. **死信队列** (per saga spec G-05): 3 次重试失败入 DLQ,需 ops 介入
+5. **追溯链**: 每个事件必含 `event_id` (UUID) + `causation_id` (父事件) + `correlation_id` (per requirements §39 Traceability)
+
+---
+
+### 4.13 Realtime 协作机制 (v0.16 新增)
+
+per requirements §15 Realtime 要求 + §4.12 Event Bus + star-sse crate,本节定义 22 domain 间 Realtime 协作的 **通道 + 降噪 + 心跳**。
+
+#### 4.13.1 Realtime 通道架构
+
+```text
+domain events (NATS JetStream)
+       │
+       ▼
+star-sse (Rust WebSocket 端点)            per star-sse/src/lib.rs
+       │
+       ├── /ws/feed  (高频 stream, agent token stream, raw diff)
+       ├── /ws/notif (降噪, REQ-NOTIF-002 关键事件)
+       └── /ws/admin (admin only, low freq)
+       │
+       ▼
+   browser (SSE/WS client)
+```
+
+**3 通道分工** (per ADR-0027 §2 STAR IDE Gateway 3 通道衍生):
+- `/ws/feed`: 高频 feed,只走当前选中 Worktree / WorktreeGroup,不全局广播
+- `/ws/notif`: 降噪后关键事件,默认全部订阅,可基于 Watcher 列表扩展
+- `/ws/admin`: 管理面,只给 Platform Admin / Tenant Admin 开放
+
+#### 4.13.2 降噪策略 (per REQ-NOTIF-002)
+
+默认**只推送需要人类决策的节点**:
+- `WAITING_FEEDBACK` (per §4.12.1 FeedbackCreated)
+- `ValidationFailed` (per §4.12.1 ValidationFailed)
+- `ProtectedAction 待授权` (per ADR-0025 vendor adapter anti-contamination)
+
+**不推送** (但仍 100% 写 AgentSession Transcript 供按需查阅,per INV-AGT-09):
+- Agent 每一次工具调用
+- 中间步骤 (LLM token stream)
+- 临时 observed state (per §4.12.1 WorktreeStatusObserved 走 /ws/feed,不进 /ws/notif)
+
+**Watcher 覆盖** (per REQ-NOTIF-003): 用户加 Watcher 后即使不满足降噪触发条件也收关键事件。
+
+#### 4.13.3 心跳与重连
+
+- 客户端 30s 发 heartbeat (per ADR-0030 §3 11 字段对齐)
+- 服务端 60s 无消息推 keep-alive frame
+- 重连策略: exponential backoff (1s, 2s, 4s, 8s, max 30s) + Last-Event-ID 续传 (per MCP Streamable HTTP D.6+)
+- 断线期间事件: 不重放 (客户端需通过 REST 拉取最新 snapshot),只续传 Last-Event-ID 之后的事件
+
+#### 4.13.4 与 §4.12 Event Bus 的边界
+
+- Event Bus 是 domain 间异步通信 (NATS, 多订阅者)
+- Realtime 是 user 端 push 通道 (WebSocket, 1:1 session)
+- **不允许 Realtime 反推 domain 状态变更** (单向),Realtime 只读 Outbox / NATS,不改业务事实
 
 ---
 
