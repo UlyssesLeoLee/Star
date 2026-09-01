@@ -398,3 +398,142 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 **累计统计** (per 本次 §13 + §6 联动):
 - P3 全 5 阶段: 56/64 (87.5%) 实质收官 (per §6, 维持不变)
 - 本批 (Test Design v0.3 代码跟进): 4/4 收官, 109 新测试, ~3.7M tokens (1 SRE·周)
+
+---
+
+## 14. P3 之外剩余任务（kanban-vmodel-jp P1-P9 4 行业预设 + H2 强类型重构 + DB W/T/M）
+
+> **触发**: 2026-09-01 21:41 JST Ulysses 指令"所有剩余任务罗列出来，按照 phase 进行规划" + 21:58 JST 指令"整理进 wbs"。
+> **范围**: P3 阶段（A-F 子阶段）之外的所有剩余任务，按 Phase 0-9 重新组织。
+> **状态**: 全部 P1-P9 4 行业预设已落地（13 commits + 13 merge）；H2 强类型重构阻塞；DB W/T/M 三類横展開持续验证。
+
+### 14.1 行业预设 P1-P9 收官实证（per 2026-09-01 21:42 JST git 实证）
+
+| Phase | 标题 | 行业预设 commit | 行业预设 merge | 任务数 | 状态 |
+|---|---|---|---|---|---|
+| P1 | 超上流工程 | `1fe4283` | `19160d2` | 12 task (4 行业 × 3) | 🟢 完成 |
+| P2 | 要件定義 | `1f8a456` | `7cbf0a9` | 12 task | 🟢 完成 |
+| P3 | 基本設計 | `867827b` | `578a430` | 12 task | 🟢 完成 |
+| P4 | 詳細設計 | `6778328` | `af97553` | 12 task | 🟢 完成 |
+| P5 | 実装 | `daeda9b` | `e56df4e` | 12 task | 🟢 完成 |
+| P6 | テスト工程 (6 子阶段) | `78e8edd` / `3643155` / `2253651` / `5e1101e` / `62eea78` | `8c1eed4` / `7a1aece` / `876fe46` / `fd536cf` / `0e962c4` | 8 + 12×4 = 56 task | 🟢 完成 |
+| P7 | 移行・リリース | `8a4c71b` | `ef51ced` | 12 task | 🟢 完成 |
+| P8 | 運用・保守 | `e54b6c8` | `36feb4e` | 12 task | 🟢 完成 |
+| P9 | 終結 | `0e0d3ac` | `7adeeef` | 8 task | 🟢 完成 |
+| **整合** | 行业切换器 UI 整合 | `76019ce` | (直装 main) | localStorage 持久化 + 全業種 | 🟢 完成 |
+| **小计** | | **13 commits** | **13 merge** | **~150 task (4 行业 × 各 phase × N)** | **13/13 收官** |
+
+**4 行业定义**（per 拍板，跨 9 phase 复用）：金融 / 公共 / EC / 組込（embedded）
+
+### 14.2 H2 范围扩量 + 强类型 ID 重构（per 守门 #4 派生规 v17 + v18）
+
+> **触发**: 2026-08-31 22:00 JST HANDOFF-ST-001 H2 真实尝试实证 — H2 原估 3 domain (feedback/validation/integration) 实际是 8 domain (3 + H2-EXT 5: comment/identity/project/tenant/work-item)。
+
+| # | 子项 | token 预算 | 软参考周 | 依赖 | 状态 | 备注 |
+|---|---|---|---|---|---|---|
+| H2-1 | star_context 共享 ActorContext 字段扩展 | 0.4M | 0.07 周 | 无 | 🟢 **阶段 1 完成** (commit `68ae5ff`) | is_agent_session + roles + 4 helper 落地；净修 950 → 432 err |
+| H2-2 | 3 domain port/service 改造 (feedback/validation/integration) | 1.5M | 0.25 周 | H2-1 | 🔴 **阻塞** | revert (`8364223`)；3 domain port/service 改 use star_context 暴露 117+ err, 0.6-0.8M token 超单 session 上限 |
+| H2-3 | 5 domain 跨域改造 (comment/identity/project/tenant/work-item) | 0.6M | 0.10 周 | H2-1 | 🟡 **3/5 完成** | per HANDOFF v0.4 §5.1 H2-EXT；commit `9d08f80` `b6f6e2a` `7f611b0`；净修 507 err (797 → 290, 跨 9 crate) |
+| H2-4 | **强类型 ID 重构** (DeviceId→Uuid / device_id String→Uuid 业务语义重设) | 0.8M | 0.13 周 | H2-2 + H2-3 | 🔴 **阻塞** | `domain-identity` 强类型 DeviceId vs `domain-work-item` Option<String> 业务语义不兼容；per 守门 #4 v18 |
+| H2-5 | H2 原 3 domain service.rs 改造 (~150+ call sites) | 0.5M | 0.08 周 | H2-4 | 🔴 **阻塞** | 需先 H2-4 强类型重构完成 |
+| **小计** | | **~3.8M** | **~0.63 周** | | **1/5 阶段 1 + 3/5 H2-EXT** | **H2 实证 0.3-0.5M 估 → 1.1-1.6M 实测 (3-5x 超支)** |
+
+**累计统计**: 净修 507 err (H2-EXT 跨 9 crate 797 → 290) + 145+ err (H2-1 stage 1 消解) = **652+ err 修复实证** (per 守门 #1 阶段 1 `cargo check --workspace --lib` 0 err + 阶段 2 `--all-targets` 0 err 待 #4 #5 完成)
+
+### 14.3 DB W/T/M 三類横展開（per 守门 #13）
+
+> **触发**: 2026-09-01 18:30 JST Ulysses 拍板（per ask_user 选项 1）: 所有 DB 基本设计阶段**必含** Work（短 TTL 作業中）/ Transaction（業務事実 / 監査 / Append-only）/ Master（参考 / 設定 / 慢変 SCD）三類分門別類, **100% 表覆盖**, 禁止「混在」一括列举。
+
+| # | 子项 | 状态 | 引用基线 | 备注 |
+|---|---|---|---|---|
+| CW-1 | W = 物理删除 / タイマー失効 / 短 TTL 明示 retention | 🟢 持续验证 | `00-CLASSIFICATION-W-T-M.md` v0.1 | 100 表 W/T/M 三類索引实绩 |
+| CW-2 | T = 物理删除禁止 + 監査必須 + RLS 13 類必携 | 🟢 持续验证 | `00-CLASSIFICATION-RULES.md` v0.1 | 跨项目 ルール手册 + 4 段检查清单 |
+| CW-3 | M = 物理删除禁止 + SCD Type 2 + RLS 13 類必携 | 🟢 持续验证 | 同上 | 跨项目持久 |
+| CW-4 | Master 100% RLS / Transaction 100% audit / Work 100% retention_period | 🟢 持续验证 | 同上 | 派生守门 10 条 CW-01~CW-10 |
+| CW-5 | 混合分類（M/T / T/W）主分類单计 + §已知缺口显式列出 | 🟢 持续验证 | 同上 | 待 DDD Review Lead 确认 |
+| CW-6 | 其他多分類横展 (status / role / permission / policy / event / tag / category) 按日本 IPA SEC 規則合一禁止, 全部独立列举 | 🟢 持续验证 | 同上 | 跨项目持久 |
+| **小计** | | **6/6 持续验证** | 2 引用基线 docs 落档 | 跨 STAR / RGS / Physis / GVPE / 其他新项目基本设计阶段 |
+
+### 14.4 跨 Phase 阻塞项汇总（per 守门 #3 + 守门 #4 派生 v17-v18）
+
+| # | 阻塞项 | 阻塞阶段 | 需 Ulysses 拍板 | 备注 |
+|---|---|---|---|---|
+| B-1 | **强类型 ID 重构** (DeviceId→Uuid / device_id String→Uuid) | H2-4 → H2-2 → H2-5 | 拍板业务语义重设 | 3 域 Lead 真人到位后可加速 |
+| B-2 | **5 域 Lead 真人到位** (RGS 5 域历史治理命名) | P3-C.9 / P3-E.5 / P3-F.1 + H2-2 | per 8/21 JST 拒绝兼任硬约束, 找 5 个真人 | DDD Review 阶段补 |
+| B-3 | B.5 OpenClaw 真实 endpoint + API key | P3-B.5 | 凭证 (mock 备选已落地 per `29692a7`) | wiremock 模式可降级为 🟡 占位 |
+| B-4 | B.6 Hermes 真实 endpoint + API key | P3-B.6 | 凭证 (mock 备选已落地 per `29692a7`) | 同 B-3 |
+| B-5 | E.4 KMS 凭证 (Vault / AWS KMS) | P3-E.4 | 凭证 (LocalMockKms mock 备选已落地 per `5ea9611`) | |
+| B-6 | D.2 / D.6 GitHub Actions CI runner 配置 | P3-D.2 / D.6 | 真实 runner 配置 (stub 已实装 per `8ace1d5`) | |
+| B-7 | 5 tab 命名拍板 (Kanban / Timeline / Backlog / Agents / Worktrees) | UI 端 | DDD Review 拍板具体名字 | 拍板问卷 (per 29692a7) |
+| B-8 | **推 origin (R-05 反转已落地)** | final-action | author=Ulysses + 守门 0 违反 + DDD Review 拍板 | **外部可见动作**需 final-action 确认 |
+| B-9 | **4 份报告签字栏 DDD Review 终审** | DDD Review 阶段 | 4 份签字栏全填 + 修订历史 +1 + 守门 0 违反 | P0 但 token 小 (~0.4M) |
+
+### 14.5 守门基线 (P3-B/E/F + H2 + kanban-vmodel 任何子项必跑, per 守门 #1 派生 v1-v14)
+
+1. `cargo check --workspace --all-targets` (含 tests) — 0 err
+2. `cargo fmt + clippy` — 0 err
+3. `cargo test --workspace --release --lib` — 0 fail
+4. `cargo build --release + doc + bench --no-run` — 0 err
+
+**任何阶段缺其一 = 守门不完整** (per STAR-OLU-001 §6 质量门)。
+
+### 14.6 当前 main 状态（per `git rev-list --count origin/main..HEAD`）
+
+- **当前 main HEAD**: `76019ce` (origin/main 落后 **43 commits**, per 2026-09-01 21:42 JST 实测)
+- **ahead 增量分解**: 25 P3-A 守门 + 8 kanban-vmodel-jp P1-P9 行业预设 commits + 5 P3-B 收官 (B.1/B.3/B.4/B.7/B.8/B.9 + 行业整合 76019ce) + 1 test-design v0.3 (4 子项 5 commits) + 1 P3-C 收官 + 1 P3-D 收官 + 1 P3-E 收官 + 1 P3-F 收官 (含推 origin 587b212)
+- **累计 token 实证**: 守门 #1 阶段 1 (--lib 0 + clippy 0 + fmt 0 + 21/21 test pass) 全过；阶段 2 (--all-targets 0) 待 H2 强类型重构完成
+
+### 14.7 已知缺口 (per 缺标比错标, 显式列)
+
+1. **H2 强类型 ID 重构** (DeviceId / device_id) 业务语义拍板 — 阻塞 H2-2 / H2-4 / H2-5
+2. **3 域 Lead 真人到位** (per 8/21 JST 拒绝兼任) — 跨 session 续
+3. **B.5 / B.6 / E.4 真实凭证** — mock 备选已落地，等切真
+4. **5 tab 命名拍板** (UI 端) — 问卷待 Ulysses 决策
+5. **推 origin final-action 确认** — 外部可见，需显式确认
+
+---
+
+## 15. 累计统计 (P3 全 5 阶段 + P3 之外 跨 Phase 0-9)
+
+| 阶段 | 子项 | token 预算 | 软参考周 | 实证状态 |
+|---|---|---|---|---|
+| P3-A | 25 (8 原始 + 17 守门) | ~28.5M | ~4.7 周 | 🟢 25/25 收官 (per §0) |
+| P3-B | 9 (拍板) | 35M | 5.8 周 | 🟢 7/9 收官 + 2 mock 备选 (per §1) |
+| P3-C | 9 (拍板) | 40M | 6.7 周 | 🟢 8/9 收官 + 1 阻塞 (per §2) |
+| P3-D | 7 (拍板) | ~21M | ~3.5 周 | 🟢 7/7 收官 + 2 mock 备选 (per §3) |
+| P3-E | 7 (拍板) | ~30M | 5 周 | 🟢 5/7 收官 + 1 mock + 2 阻塞 (per §4) |
+| P3-F | 6 (拍板) | 25M | 4.2 周 | 🟢 4/6 收官 + 1 阻塞 + 1 已落地 (per §5) |
+| Test Design v0.3 | 4 子项 (per §13) | ~3.7M | ~1.0 周 | 🟢 4/4 收官 (109 新测试) |
+| **P3 之外 行业预设** | 13 commits (P1-P9 + 整合) | ~6.0M | ~5 周 | 🟢 13/13 收官 (per §14.1) |
+| **P3 之外 H2 范围扩量** | 5 子项 (per §14.2) | ~3.8M | ~0.63 周 | 🟡 1/5 阶段 1 + 3/5 H2-EXT + 1 阻塞 (强类型) |
+| **P3 之外 DB W/T/M 横展開** | 6 派生守门 (per §14.3) | 持续验证 | 持续 | 🟢 6/6 持续验证 |
+| **合计** | **91 子项** (含 H2 + 行业预设) | **~196M** | **~32.6 周** | **78/91 实质收官 (85.7%) + 13 阻塞/待拍** |
+
+**注**: 200M 软预算 vs ~196M 实证, 余 4M 缓冲 (per 余量 2% 守门)。
+
+---
+
+## 16. 修订历史
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|---|
+| v0.1 | 2026-08-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: P3-A 8/8 实证表 + P3-B/C/D/E/F 占位表 (46 子项草案) + 7 阻塞项 + 软预算 ~192.5M / 32 周累计 | 2026-08-29 12:04 JST 用户拍板"补叙 P3-B 计划文档" |
+| v0.2 | 2026-08-30 | 架构师 (Mavis 接手 agent per DEC-008) | P3 全 5 阶段 60/65 拍板落地 (§1-§5 收官 + 累计 55/63 + §6 累计统计 + §7 阻塞项 8 项) | 2026-08-30 08:51 JST 拍板后跨 session 续做 |
+| v0.3 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | §13 Test Design v0.3 4 子项收官 (109 新测试) + §14 P3 之外剩余任务 (P1-P9 行业预设 13 commits + H2 5 子项 + DB W/T/M 6 派生) + §15 累计 91 子项 78/91 实质收官 (85.7%) + §16 修订历史 v0.3 | 2026-09-01 21:41 JST Ulysses "所有剩余任务罗列出来" + 21:58 JST "整理进 wbs" 触发 |
+
+---
+
+## 17. 引用文档
+
+- `STAR-OLU-001.md` — token-OLU 独立基线 (1 SRE·周 = 1.2M)
+- `AGENTS.md` §4 / §7 — 守门 + 待办
+- `docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md` v0.1 — DB W/T/M 三類索引
+- `docs/data-design/ipa-detail/00-CLASSIFICATION-RULES.md` v0.1 — 跨项目 ルール手册
+- `HANDOFF-ST-001.md` v0.4 — H2 范围扩量实证
+- `PHASE-P3-A1..A8-IMPL-REPORT.md` — P3-A 8 份原始报告
+- `PHASE-P3-A9..A25-IMPL-REPORT.md` — P3-A 17 份守门补救报告
+- `PHASE-P3-A-PHASE-CLOSEOUT-REPORT.md` — P3-A 阶段收官
+- `docs/architecture/domain-local-runtime.md` — 11 模块入口
+- `docs/architecture/msw-real-mode.md` — P3-A.7 开关使用指南
+- `docs/test-design.md` v0.3 — Test Design 文档
+
