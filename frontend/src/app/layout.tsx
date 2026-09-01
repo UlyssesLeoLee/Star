@@ -54,7 +54,15 @@ export default function RootLayout({
           <Providers>
             <div className="flex min-h-screen">
               <Sidebar />
-              <div className="flex-1 flex flex-col min-w-0 min-h-screen pb-20 md:pb-0">
+              <div
+                className="flex-1 flex flex-col min-w-0 md:pb-0 relative"
+                style={{
+                  // <768px: viewport 高度 - MobileHeader - Bottom Nav, 自带滚动
+                  height: "100dvh",
+                  overflowY: "auto",
+                  paddingBottom: "calc(4rem + env(safe-area-inset-bottom))",
+                }}
+              >
                 {/* <768px: MobileHeader 顶栏 (per 2026-09-01 PHASE-MOBILE-PWA)
                     ≥768px: AppHeader 顶栏由各 page 内部 AppShell 提供,
                     此处 RootLayout 不重复 mount,避免双顶栏 */}
@@ -62,7 +70,9 @@ export default function RootLayout({
                 {children}
               </div>
             </div>
-            {/* <768px 底部 5 域快捷导航 (per 2026-09-01 PHASE-MOBILE-PWA) */}
+            {/* <768px 底部 5 域快捷导航 (per 2026-09-01 PHASE-MOBILE-PWA)
+                fixed bottom-0 + z-[9999] 保证不被 inbox 列表等内 stacking 拦截,
+                main 区域 height: 100dvh + overflowY auto 让 list 自身滚动 */}
             <MobileBottomNav />
             {/* PWA Service Worker 注册 (production only) */}
             <PwaBoot />

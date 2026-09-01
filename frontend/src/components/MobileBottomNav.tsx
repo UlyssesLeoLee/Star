@@ -84,8 +84,8 @@ export function MobileBottomNav() {
       <nav
         data-testid="mobile-bottom-nav"
         aria-label="Mobile primary navigation"
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-line bg-bg/95 backdrop-blur-xl"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        className="md:hidden fixed bottom-0 inset-x-0 border-t border-line bg-bg/95 backdrop-blur-xl"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)", zIndex: 9999 }}
       >
         <ul className="grid grid-cols-5 h-14">
           {ITEMS.map((item) => {

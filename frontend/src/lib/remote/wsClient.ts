@@ -48,17 +48,23 @@ export function buildRemoteUrl(
 }
 
 /**
- * 判断当前是否 mock 模式 (NEXT_PUBLIC_API_MOCKING 启用 或 WebSocket 不可用)
+ * 判断当前是否 mock 模式
+ *
+ * MVP 阶段后端 BFF `/v1/remote/*` WS relay 未实装, 默认 mock (per 2026-09-01 v0.2 缺标 G1)
+ * 真实生产: BFF 暴露 WS endpoint + 设置 NEXT_PUBLIC_REMOTE_LIVE=1 opt-in real mode
  *
  * - SSR 永远返回 true
- * - 客户端: 检查环境变量 + 浏览器能力
+ * - 客户端: NEXT_PUBLIC_REMOTE_LIVE !== '1' → mock (per MVP 缺标)
  */
 export function isRemoteMockMode(): boolean {
   if (typeof window === "undefined") return true;
+  // 显式 opt-in real mode
+  if (process.env.NEXT_PUBLIC_REMOTE_LIVE === "1") return false;
   // MSW 模式已接管 fetch,WS 不接管 → 默认 mock
   if (process.env.NEXT_PUBLIC_API_MOCKING === "enabled") return true;
   if (!("WebSocket" in window)) return true;
-  return false;
+  // MVP 默认 mock, 后端 WS relay 实装后 opt-in
+  return true;
 }
 
 /**

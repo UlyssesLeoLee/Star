@@ -49,8 +49,11 @@ export function PwaUpdateToast() {
       data-testid="pwa-update-toast"
       role="status"
       aria-live="polite"
-      className="fixed bottom-20 md:bottom-6 left-3 right-3 md:left-auto md:right-6 md:max-w-sm z-50 rounded-2xl border border-accent/40 bg-bg-soft/95 backdrop-blur-xl p-3 shadow-[0_0_24px_rgba(0,240,255,0.18)]"
-      style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+      className="fixed bottom-20 md:bottom-6 left-3 right-3 md:left-auto md:right-6 md:max-w-sm rounded-2xl border border-accent/40 bg-bg-soft/95 backdrop-blur-xl p-3 shadow-[0_0_24px_rgba(0,240,255,0.18)]"
+      style={{
+        zIndex: 9997,
+        paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
+      }}
     >
       <div className="flex items-start gap-3">
         <div className="size-8 rounded-lg border border-accent/40 bg-accent/10 grid place-items-center shrink-0">

@@ -1,7 +1,6 @@
 // Star Mobile Remote Terminal (per 2026-09-01 PHASE-MOBILE-PWA v0.2)
 "use client";
 
-import { use } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -10,9 +9,9 @@ import { XtermViewer } from "@/components/remote/XtermViewer";
 export default function RemoteTerminalPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
-  const { id } = use(params);
+  const { id } = params;
   const runtime = useStore((s) => s.localRuntimes.find((r) => r.id === id));
 
   if (!runtime) {

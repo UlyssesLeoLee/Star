@@ -58,7 +58,7 @@ export default function InboxPage() {
   const unread = notifs.filter((n) => !readSet.has(n.id)).length;
 
   return (
-    <div className="max-w-5xl mx-auto" data-testid="inbox-page">
+    <div className="max-w-5xl mx-auto pb-4" data-testid="inbox-page">
       <PageHeader
         title="Inbox"
         subtitle="notification / comment / audit (10 mock; 真实 notification service P3 缺口)"

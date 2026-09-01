@@ -9,6 +9,7 @@ import { useStore } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Monitor, Terminal as TerminalIcon, FolderOpen, Server } from "lucide-react";
+import { PushSettings } from "@/components/remote/PushSettings";
 
 export default function RemoteHomePage() {
   const runtimes = useStore((s) => s.localRuntimes);
@@ -28,6 +29,11 @@ export default function RemoteHomePage() {
 
       <div className="mb-3 text-[11px] font-mono text-ink-mute px-1">
         走 Star BFF WebSocket relay: 手机 → /v1/remote/{`{kind}`}/{`{id}`} → BFF (auth/audit/rate-limit) → local-runtime agent
+      </div>
+
+      {/* Push 通知设置 (v0.4) */}
+      <div className="mb-4">
+        <PushSettings />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

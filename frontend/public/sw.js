@@ -125,9 +125,71 @@ async function cacheFirstStatic(req) {
   }
 }
 
-// 接收客户端消息: SKIP_WAITING (强制激活新 SW)
+// 接收客户端消息: SKIP_WAITING (强制激活新 SW) + SIMULATE_PUSH (本地推送测试)
 self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SKIP_WAITING") {
+  if (!event.data) return;
+  if (event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
+    return;
   }
+  if (event.data.type === "SIMULATE_PUSH" && event.data.payload) {
+    // 模拟收到 push 事件
+    const p = event.data.payload;
+    self.registration.showNotification(p.title || "Star", {
+      body: p.body,
+      icon: p.icon || "/icon-192.png",
+      badge: "/icon-192.png",
+      tag: p.tag || "star-test",
+      data: p.data || {},
+    });
+  }
+});
+
+// =====================================================================
+// Push 事件 (per 2026-09-01 PHASE-MOBILE-PWA v0.4)
+// 真实推送需后端 VAPID + push 端点, MVP 阶段供"推送测试"按钮触发
+// =====================================================================
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { title: "Star", body: event.data.text() };
+  }
+
+  const title = payload.title || "Star";
+  const options = {
+    body: payload.body || "",
+    icon: payload.icon || "/icon-192.png",
+    badge: "/icon-192.png",
+    data: payload.data || {},
+    tag: payload.tag || "star-default",
+    requireInteraction: payload.requireInteraction || false,
+    actions: payload.actions || [
+      { action: "open", title: "查看" },
+      { action: "dismiss", title: "稍后" },
+    ],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// 用户点击通知 → 打开或聚焦 app
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/";
+  event.waitUntil(
+    (async () => {
+      const allClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of allClients) {
+        const url = new URL(client.url);
+        if (url.pathname === targetUrl && "focus" in client) {
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(targetUrl);
+    })(),
+  );
 });

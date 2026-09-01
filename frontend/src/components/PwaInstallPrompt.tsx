@@ -83,12 +83,15 @@ export function PwaInstallPrompt() {
       data-testid="pwa-install-prompt"
       role="dialog"
       aria-label="Install Star App"
+      style={{
+        zIndex: 9998,
+        paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
+      }}
       className={clsx(
-        "fixed z-40 rounded-2xl border border-accent/40 bg-bg-soft/95 backdrop-blur-xl shadow-[0_0_24px_rgba(0,240,255,0.18)]",
+        "fixed rounded-2xl border border-accent/40 bg-bg-soft/95 backdrop-blur-xl shadow-[0_0_24px_rgba(0,240,255,0.18)]",
         // 移动端: 底部 16, 让出 bottom nav; 桌面: 右下角 24
         "bottom-20 left-3 right-3 md:bottom-6 md:left-auto md:right-6 md:max-w-sm",
       )}
-      style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
     >
       <div className="p-3">
         {state.kind === "native" && (
