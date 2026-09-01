@@ -491,6 +491,37 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 4. **5 tab 命名拍板** (UI 端) — 问卷待 Ulysses 决策
 5. **推 origin final-action 确认** — 外部可见，需显式确认
 
+### 14.8 5 wt 并行收官实证 (per 2026-09-01 22:30 JST 选项 4 all_parallel, 选项 1 per-item-1wt)
+
+> **触发**: 2026-09-01 22:30 JST Ulysses "开子代理和 worktree 并行处理 wbs 任务"，per ask_user 选项 4 all_parallel + 选项 1 每子项 1 wt 拍板。
+> **5 wt 全部基于 main @ `98d246e` base, 1 commit each, 5 merge commit 落 main @ `eecfc28` (54 ahead of origin/main)**
+> **守门 #1 跨 stage 实证**: `cargo check --workspace --lib` exit 0 (5.06s cache hit, 0 err, 194 warning pre-existing). 5 merge 0 回归。
+> **守门 #1 v2 `--all-targets` 3 err pre-existing**: api / application lib test H2 ActorContext 字段缺失, per HANDOFF-ST-001 v0.2 §1 v17 实证, 5 merge 没引入新 err。
+
+| # | wt 分支 | 收官 commit | 合并 merge | 子项 | 状态 | 关键产出 |
+|---|---|---|---|---|---|---|
+| 1 | `wt-wbs-db-wtm-audit` | `818706e` | `96900cd` | DB W/T/M 100% 表覆蓋审计 | 🟢 PASS | 100/100 表, M=43/T=47/W=12, 5 混合主计, 派生守门 PASS 8/WARN 2/FAIL 0 |
+| 2 | `wt-wbs-b2-hermes-mock` | `696e274` | `eecfc28` | P3-B.2 Hermes wiremock mock 备选 | 🟢 收官 | 4 层精简 + 5 endpoint contract test 11/11 + lib 46/46, 守门 4 步全过 (per crate) |
+| 3 | `wt-wbs-d6-md-cargo-ci` | `f4fd1c2` | `8f5c766` | P3-D.6 markdownlint + cargo doc + bench CI job | 🟢 收官 | 4 job → 7 job, yaml + jsonc 校验 0 err, 跨平台矩阵 (ubuntu/windows/macos) |
+| 4 | `wt-wbs-agents-v15-7tab` | `287d9a0` | `edb95b6` | AGENTS.md v0.31 §7 表头 main HEAD 同步 | 🟢 收官 (守门 #9 实证) | §7 表头 `b424611` → `98d246e`; 子代理主动拒绝 4/5 简报增量 (禁回溯叙事) |
+| 5 | `wt-wbs-p1p9-wtm-verify` | `887ff3c` | `1106f2b` | P1-P9 4 行业预设 W/T/M 验证 | ❌ **FAIL (结构性)** | 147 task / 0/147 = 0% W/T/M 标; task schema 8 字段无 W/T/M; 守门 #13 适用边界 DDD Review 待拍 |
+
+**子代理守门 #9 实证** (per 守门 #9 派生规: 无证据叙事 = 禁止, 子代理 status="succeeded" ≠ 实际成功):
+- 5/5 子代理 `git log -p --follow <wt-branch>` 实证 worktree commit 在 main chain 上 ✅
+- 子代理 4 (AGENTS v0.31) 主动列 5 项简报冲突并拒绝执行, git log 实证守门 #9 派生规最严苛执行 ✅
+- 5 子代理 status="succeeded" + git 实证双重确认, 守门 #9 RPC 不可靠背景下的安全选择 ✅
+
+**Dirty file 处理** (merge 前清理外部 session 16:23-18:53 JST 残留 14 untracked):
+- 9 docs/_*.txt 临时文件 + 1 docs/data-design/ipa-detail/AUDIT-REPORT-APPEND.md (空) + 1 docs/requirements/ + 1 docs/specs/domain-batch-spec.md + 1 scripts/debug_line_919.py = 13 文件 move 到 `D:\Star\.worktrees\feat-auto-20260901-abaa40a9` 作为外部 session 归档 (不动 .gitignore, 不删)
+- 1 deliverables/kanban-vmodel-jp/server.log.err modified 因 Windows file lock 持久, 改用 `git update-index --skip-worktree` 排除, 不影响 main status
+
+**已知缺口 (§14.7 增量, per 缺标比错标)**:
+6. **P1-P9 task schema 0% W/T/M 标 FAIL** — 子项 5 守门 #13 FAIL 根因 (per 887ff3c §3 已知缺口 7 项): task schema 8 字段结构性无 W/T/M, 守门 #13 适用边界错位 (DB 表 vs task 定义), DDD Review 7 项拍板等 5 域 Lead 真人到位
+7. **守门 #1 v2 `--all-targets` 3 err pre-existing** — H2 ActorContext 字段缺失 (per HANDOFF-ST-001 v0.2 §1 v17), 5 merge 没引入新 err, H2 phase 2 跨 session 续
+8. **守门 #1 fmt 1 diff pre-existing** — `domain-comment/src/lib.rs:787` `with_agent_session(true)` 格式微差, H2 v18 阶段 1 落地后 follow-up
+9. **deliverables/kanban-vmodel-jp/server.log.err 持久 file lock** — `skip-worktree` 临时绕过, 真因 (node/next dev server 句柄) 跨 session 续查
+10. **5 wt 落地后 fmt diff 未修** — 子项 3 (D.6) 子代理 cargo check 阶段 fmt check 0, 跨 merge 后 main 上 domain-comment 1 diff 暴露 H2 v18 follow-up, 子项 3 scope 不覆盖 (per 子代理 brief 限定), H2 phase 2 跨 session 续
+
 ---
 
 ## 15. 累计统计 (P3 全 5 阶段 + P3 之外 跨 Phase 0-9)
@@ -507,9 +538,10 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | **P3 之外 行业预设** | 13 commits (P1-P9 + 整合) | ~6.0M | ~5 周 | 🟢 13/13 收官 (per §14.1) |
 | **P3 之外 H2 范围扩量** | 5 子项 (per §14.2) | ~3.8M | ~0.63 周 | 🟡 1/5 阶段 1 + 3/5 H2-EXT + 1 阻塞 (强类型) |
 | **P3 之外 DB W/T/M 横展開** | 6 派生守门 (per §14.3) | 持续验证 | 持续 | 🟢 6/6 持续验证 |
-| **合计** | **91 子项** (含 H2 + 行业预设) | **~196M** | **~32.6 周** | **78/91 实质收官 (85.7%) + 13 阻塞/待拍** |
+| **P3 之外 5 wt 并行 (9/1 22:30 JST 选项 4)** | 5 子项 (DB 审计 + B.2 Hermes + D.6 CI + AGENTS v0.31 + P1-P9 验证) | ~2.3M | ~1.9 周 | 🟢 4/5 收官 + 1/5 FAIL (P1-P9 task schema 结构性, 守门 #13 适用边界 DDD Review 待拍) |
+| **合计** | **96 子项** (含 H2 + 行业预设 + 5 wt 并行) | **~198.3M** | **~33 周** | **82/96 实质收官 (85.4%) + 14 阻塞/待拍** |
 
-**注**: 200M 软预算 vs ~196M 实证, 余 4M 缓冲 (per 余量 2% 守门)。
+**注**: 200M 软预算 vs ~198.3M 实证, 余 1.7M 缓冲 (per 余量 2% 守门边界)。
 
 ---
 
@@ -520,6 +552,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | v0.1 | 2026-08-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: P3-A 8/8 实证表 + P3-B/C/D/E/F 占位表 (46 子项草案) + 7 阻塞项 + 软预算 ~192.5M / 32 周累计 | 2026-08-29 12:04 JST 用户拍板"补叙 P3-B 计划文档" |
 | v0.2 | 2026-08-30 | 架构师 (Mavis 接手 agent per DEC-008) | P3 全 5 阶段 60/65 拍板落地 (§1-§5 收官 + 累计 55/63 + §6 累计统计 + §7 阻塞项 8 项) | 2026-08-30 08:51 JST 拍板后跨 session 续做 |
 | v0.3 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | §13 Test Design v0.3 4 子项收官 (109 新测试) + §14 P3 之外剩余任务 (P1-P9 行业预设 13 commits + H2 5 子项 + DB W/T/M 6 派生) + §15 累计 91 子项 78/91 实质收官 (85.7%) + §16 修订历史 v0.3 | 2026-09-01 21:41 JST Ulysses "所有剩余任务罗列出来" + 21:58 JST "整理进 wbs" 触发 |
+| v0.4 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 5 wt 并行收官后增量回填: 4/5 子项 🟢 (DB 100% 表 818706e + D.6 CI 7 job f4fd1c2 + AGENTS v0.31 287d9a0 + B.2 Hermes 696e274 57/57 test) + 1/5 子项 ❌ (P1-P9 task schema 0/147 = 0% 标 887ff3c 守门 #13 适用边界 DDD Review 拍板) + §15 累计 96 子项 82/96 实质收官 (85.4%) + §14.8 新增 (5 wt 收官实证段) | 2026-09-01 22:30 JST Ulysses "开子代理和 worktree 并行处理 wbs 任务" 触发 |
 
 ---
 
