@@ -10,6 +10,7 @@ import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { PwaBoot } from "@/components/PwaBoot";
 import { PwaUpdateToast } from "@/components/PwaUpdateToast";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
+import { OnboardingGuard } from "@/components/OnboardingGuard";
 
 export const metadata: Metadata = {
   title: "Star — Vibe Coding Work Management",
@@ -80,6 +81,8 @@ export default function RootLayout({
             <PwaUpdateToast />
             {/* PWA install prompt (beforeinstallprompt + iOS 引导) */}
             <PwaInstallPrompt />
+            {/* \u9996\u6b21\u542f\u52a8 onboarding \u5f15\u5bfc (per ADR-0042, 2026-09-02 08:01 JST 4 \u62cd\u677f) */}
+            <OnboardingGuard />
             {/* Global toast: GanttBar 拖拽冲突 / Board 列删除 / 主题切换等全局反馈
                 - 暗色模式背景, 适配 next-themes
                 - duration 4000 (默认), Gantt 冲突可单独传 duration:1500
@@ -107,3 +110,4 @@ export default function RootLayout({
     </html>
   );
 }
+
