@@ -1,9 +1,11 @@
 // =====================================================================
 // KanbanCard.test.tsx — 卡片测试 (per §11.3 测试基线)
 // =====================================================================
-// 2 个测试:
+// 4 个测试:
 //   1. dragstart: dataTransfer.setData("text/issue-id", id) 正确
 //   2. dragging state: opacity-50 + ring-2
+//   3. arch 按钮 (per ADR-0041): onArchClick 传了才显示
+//   4. arch 按钮点击触发 onArchClick + e.stopPropagation 不冒泡到 onClick
 //
 // 已知缺口 (per 缺标比错标):
 //   - 暂未装 vitest / @testing-library/react (per W1 守门)
@@ -92,5 +94,50 @@ describe("KanbanCard", () => {
     const cardAfter = screen.getByTestId("kanban-card-wi-007");
     expect(cardAfter.className).toMatch(/opacity-50/);
     expect(cardAfter.className).toMatch(/ring-2/);
+  });
+
+  // ---- Test 3: arch 按钮 (per ADR-0041) ----
+  //   - onArchClick 传了才显示
+  //   - 不传 = 按钮不渲染
+  it("renders 🕸 Arch button when onArchClick is provided, hidden otherwise", () => {
+    // 1) 不传 onArchClick → 按钮不渲染
+    const { rerender } = renderWithI18n(
+      <KanbanCard workItem={mockWorkItem} />
+    );
+    expect(screen.queryByTestId("kanban-card-arch-wi-007")).toBeNull();
+
+    // 2) 传 onArchClick → 按钮渲染
+    const onArchClick = vi.fn();
+    rerender(
+      <I18nProvider initialLanguage="zh-CN">
+        <KanbanCard workItem={mockWorkItem} onArchClick={onArchClick} />
+      </I18nProvider>
+    );
+    const archBtn = screen.getByTestId("kanban-card-arch-wi-007");
+    expect(archBtn).toBeTruthy();
+    expect(archBtn.getAttribute("aria-label")).toContain("PHYSIS-7");
+  });
+
+  // ---- Test 4: arch 按钮点击触发 onArchClick + stopPropagation 不冒泡到 onClick ----
+  it("arch button click → onArchClick + does NOT bubble to onClick (router.push)", () => {
+    const onArchClick = vi.fn();
+    const onClick = vi.fn();
+    renderWithI18n(
+      <KanbanCard
+        workItem={mockWorkItem}
+        onArchClick={onArchClick}
+        onClick={onClick}
+      />,
+    );
+
+    const archBtn = screen.getByTestId("kanban-card-arch-wi-007");
+    fireEvent.click(archBtn);
+
+    // onArchClick 必须被调, 传 workItem
+    expect(onArchClick).toHaveBeenCalledTimes(1);
+    expect(onArchClick.mock.calls[0][0].id).toBe("wi-007");
+
+    // onClick 不应被调 (因 stopPropagation)
+    expect(onClick).not.toHaveBeenCalled();
   });
 });

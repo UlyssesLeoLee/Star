@@ -67,6 +67,9 @@ export interface KanbanBoardProps {
   // KanbanCard 点击 -> 父组件推 Drawer (mode="view", workItemId)
   // 2026-08-31 12:07 JST 拍板: 跟 Drawer view 模式联动
   onWorkItemClick?: (workItem: WorkItem) => void;
+  // 架构查看器 (per ADR-0041) → 父组件弹 ArchGraphModal
+  // 透传到 KanbanCard 的 🕸 Arch icon 按钮
+  onArchClick?: (workItem: WorkItem) => void;
 }
 
 const KANBAN_COLUMNS_LOCAL: ReadonlyArray<WorkItemStatus> = KANBAN_COLUMNS;
@@ -86,6 +89,7 @@ export function KanbanBoard({
   onReorderColumns,
   onRequestNewWorkItem,
   onWorkItemClick,
+  onArchClick,
 }: KanbanBoardProps) {
   const { t, tx } = useTranslation();
   const fallbackLabel = useStatusLabel("workItem", "todo");
@@ -395,6 +399,7 @@ export function KanbanBoard({
                     onDragStart={handleCardDragStart}
                     onDragEnd={handleCardDragEnd}
                     onClick={onWorkItemClick}
+                    onArchClick={onArchClick}
                   />
                 ))}
               </div>

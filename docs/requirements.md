@@ -1790,3 +1790,184 @@ Incident Record Model（第 29.1 章，须与 §30.6 Non-Goals 边界声明一�
 ---
 
 *文档结束。本文档为要件定义阶段产出，后续团队据此继续制作基本設計 / 外部設計 / 内部設計 / API Design / Data Design / Security Design / Runtime Design / Integration Design / AI・Agent Design / Test Design / Operation Design。*
+
+
+## 48. Architecture Agent Graph Viewer 要件 (per ADR-0041 v0.1, 2026-09-02 拍板)
+
+> **追加日**: 2026-09-02
+> **改訂人**: 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签
+> **依据**: [ADR-0041-arch-agent-graph-viewer v0.1](../architecture/2026-08-26-upgrade/adr/0041-arch-agent-graph-viewer.md) + [ARCH-AGENT-GRAPH-001-REPORT v0.1](../reports/ARCH-AGENT-GRAPH-001-REPORT.md)
+> **ステータス**: Phase 1 完了 (frontend 契約 + MSW mock 実裝), Phase 2/3 は token 拍板待ち
+
+> **dual-use 提醒 (per AGENTS.md §5 + 2026-08-31 22:45 JST Q1-D 拍板)**: 本節で扱う "25 domain 節点" は Star 倉 22 `domain-*` crate DDD bounded context の投影, **RGS 5 域 (player/economy/match/social/admin) とは非対応**。5 域は RGS 倉歴史治理命名, 業務子域↔DDD マッピングは構築しない。
+
+### 48.1 背景・動機 (per 2026-09-02 00:33 JST)
+
+Star 倉 22 `domain-*` crate (per ADR-0040) + 25 MRU (per api-design.md §2.1) が複雑に連携し, 業務者が「ある WorkItem がシステム全体のアーキテクチャのどこに位置するか」を把握することが困難。Kanban カードから 1 クリックで cypher 図を表示し, 1-hop 隣人ノードとエッジを高亮, 2-hop code-side は 20% opacity で弱化する。
+
+### 48.2 業務要件 (5 件)
+
+#### REQ-ARCH-001: Kanban カードに Arch ボタン必須
+
+- **業務価値**: 業務者がタスクから即座にシステム全体での位置関係を把握
+- **要件**:
+  - Kanban カードに 🕸 Arch icon ボタン (lucide Network) を第 4 行 (priority + assignee) 旁に配置
+  - クリック → `e.stopPropagation()` で既存 onClick (router.push) を抑止, 父組件が ArchGraphModal を弹起
+  - onArchClick prop を受け取った時のみボタン表示 (optional)
+  - title="View architecture context (cypher graph)" 必須
+- **AC**:
+  - AC-1: アーキテクトが Kanban カードで 🕸 Arch 按钮を確認できる
+  - AC-2: クリックで modal が弹起, 既存跳详情動作と干渉しない
+  - AC-3: ボタン未传递 (no onArchClick) の場合, ボタン非表示
+- **守門**: 守門 #1 禁回溯叙事 / 守門 #11 缺标比错标 / 守門 #12 文档治理
+
+#### REQ-ARCH-002: ArchGraphModal 1-hop 高亮
+
+- **業務価値**: 該当タスクがシステムのどこに位置するかを視覚的に把握
+- **要件**:
+  - Modal 80vw × 80vh, 中央, z-50
+  - 3 endpoint 调用: `POST /api/graph/ensure-fresh` → 200/202 → `POST /api/graph/cypher` fallback
+  - 描画 library: cytoscape.js 3.x + cose-bilkent 4.x レイアウト
+  - **高亮规则 (per ADR-0041 §2.3.3)**:
+    - 現 work_item ノード: cyan #00f0ff 64px 太枠 (主色)
+    - 1-hop 隣人ノード: kind 別既定色 (11 種), 48px
+    - 1-hop エッジ: cyan 2px solid
+    - 2-hop code-side ノード: 20% opacity (cratemodule / symbol のみ)
+    - 2-hop エッジ: gray #475569 1px dotted 30% opacity
+- **AC**:
+  - AC-1: Modal 表示後 1 秒以内に cytoscape 描画完了
+  - AC-2: 現 work_item ノードが他ノードと視覚的に区別できる (cyan + 64px)
+  - AC-3: 1-hop 隣人ノード (最大 11 種) が全て描画される
+  - AC-4: 2-hop コード側 (cratemodule / symbol) は 20% opacity で弱化
+- **守門**: 守門 #7 0 unsafe (TypeScript strict) / 守門 #14 tc-skip 不滥用
+
+#### REQ-ARCH-003: 冪等 (idempotency) 必須
+
+- **業務価値**: 同一 work_item への反復操作で DB に重複書込しない
+- **要件**:
+  - **fingerprint = sha256(work_item_id + worktree_branch + worktree_sha + source + project_id)** で冪等キー
+  - fingerprint 命中 → agent 起動 skip, 既存 graph 返却 (200 fresh)
+  - fingerprint 不一致 → agent 起動, 完了後 fingerprint 記録
+  - LLM 出力 deterministic: `temperature=0`, `top_p=0.1`, `seed=work_item_id.hash()`
+  - 書込は Cypher `MERGE ... ON MATCH SET ... ON CREATE SET ...` (重複書込防止)
+- **AC**:
+  - AC-1: 同一 fingerprint で 2 回連続 ensure-fresh → 2 回目 agent 起動 skip, < 200ms
+  - AC-2: worktree_sha 変化 → fingerprint 変化 → agent 起動
+  - AC-3: 同 work_item_id で 5 人同時クリック → 1 回 agent 起動, 残り 4 人は同じ結果
+- **守門**: 守門 #5 環境変数安全 / 守門 #12 文档治理
+
+#### REQ-ARCH-004: 排他 (mutex) 必須
+
+- **業務価値**: 多人同時アクセスで memgraph の書込が衝突しない
+- **要件**:
+  - per-work_item_id advisory lock (Postgres `pg_try_advisory_xact_lock(work_item_id_hash)`) 5 分 TTL
+  - 補完: Redis `SETNX graph:lock:{work_item_id} 1 EX 300` (任意, Phase 2+)
+  - in-process coalesce: `pending[work_item_id] = oneshot::Receiver` で同期待ち
+  - lock 取得失敗 → 202 Accepted + `Retry-After: 3s`, frontend 30s polling
+  - agent 失敗 / cancelled → lock 即解放 (advisory_xact は transaction end)
+- **AC**:
+  - AC-1: 2 人が同時に同一 work_item を ensure-fresh → 1 人は 200 fresh, もう 1 人は 202 running + retry_after_ms=3000
+  - AC-2: 30s 以内に 2 人目も 200 fresh 取得
+  - AC-3: agent 失敗時 lock 解放確認 (advisory lock のトランザクション commit/rollback)
+  - AC-4: 5 分 TTL 超過 → 自動解放, 別ユーザー取得可能
+- **守門**: 守門 #9 子代理实证 / 守門 #10 代签規則
+
+#### REQ-ARCH-005: データ源双支持 (local | git)
+
+- **業務価値**: ローカル開発 + CI/マルチユーザー環境の両方で動作
+- **要件**:
+  - `source: "local"` | `"git"` 2 値
+  - **local**: 当該 worktree の作業ディレクトリを直接走査 (Phase 2 で実装, Phase 1 mock のみ)
+  - **git**: git remote URL + branch + commit SHA を libgit2 で clone, ephemeral directory で走査
+  - フロントデフォルト: `ActorContext.local_runtime_id` 存在時 `"local"`, なければ `"git"`
+- **AC**:
+  - AC-1: source=local で 1 ワークツリー走査, AST 抽出, LLM 推断, memgraph 書込完了
+  - AC-2: source=git で remote URL + branch + SHA 指定, clone + 走査 + 書込完了
+  - AC-3: source 不正値 → 400 invalid_payload
+- **守門**: 守門 #6 PowerShell only / 守門 #8 不沿用历史叙事
+
+### 48.3 データ要件 (DB 三類横展開, per 2026-09-01 18:30 JST 拍板)
+
+| 物理名 | 論理名 | 種別 | 概要 |
+|---|---|---|---|
+| `graph.graph_node` | グラフノード | **Master (M)** | SCD Type 2, 物理削除禁止, 25 kind union |
+| `graph.graph_edge` | グラフエッジ | **Master (M)** | SCD Type 2, source/target 両 FK 必須, 24 kind union |
+| `graph.graph_fingerprint` | 指紋監査ログ | **Transaction (T)** | append-only, 物理削除禁止, 90 日 TTL |
+
+> Work (W) 類なし: 短 TTL データは `agent.agent_session` で扱う, 物理削除 + タイマー失効
+
+詳細: [data-design/ipa-detail/tables/graph_graph_node.md](../data-design/ipa-detail/tables/graph_graph_node.md) (T-NEW-001) / `graph_graph_edge.md` (T-NEW-002) / `graph_graph_fingerprint.md` (T-NEW-003)
+
+### 48.4 インターフェース要件
+
+- `POST /api/graph/ensure-fresh`: 冪等+排他 trigger (per REQ-ARCH-003, REQ-ARCH-004)
+- `POST /api/graph/cypher`: 1-hop 問合せ (max_hop=1 or 2)
+- `GET /api/graph/health`: memgraph + agent_runtime 健全性
+
+詳細: [architecture/2026-08-26-upgrade/spec/agent-api/arch-agent-graph-viewer.md §2](../architecture/2026-08-26-upgrade/spec/agent-api/arch-agent-graph-viewer.md) (詳細設計 11 段)
+
+### 48.5 セキュリティ・テナント要件
+
+- **13 類 tenant_id 必帯** (per REQ-SEC-001): 3 表全て RLS 13 類ポリシー強制
+- **JWT 検証**: API Gateway (per ADR-0027 STAR IDE Gateway) で全 request 検証
+- **LLM Secret**: Phase 2 で `agent.credential_broker` (per REQ-SEC-004)
+- **PII 排除**: ノード properties に email 含めない, display_name のみ
+- **AI Audit**: `graph_fingerprint` 記録全実行, per REQ-AUDIT-002 17 問遵守
+
+### 48.6 非目標 (per 缺标比错标, 守門 #11)
+
+| # | 非目標 | 理由 | 計画 |
+|---|---|---|---|
+| NG-001 | IDE ジャンプ (node click 遷移) | Phase 1 は in-modal 描画のみ | Phase 2+ |
+| NG-002 | git push webhook 自動再生成 | webhook 統合は別途 work | Phase 3+ |
+| NG-003 | マルチ monorepo 跨倉分析 | 単倉前提 | Phase 3+ |
+| NG-004 | ノード/辺手動編集 (DB 書込) | Phase 1 read-only | Phase 2+ |
+| NG-005 | export PNG / SVG / JSON | 単 modal 内表示のみ | Phase 2+ |
+| NG-006 | 実 memgraph 接続 | Phase 1 MSW mock, Phase 2 advisory lock + fingerprint のみ, Phase 3 で Bolt/HTTP 接続 | Phase 3 |
+
+### 48.7 既知の缺口 (per 缺标比错标, 守門 #11)
+
+- 1% random 202 パス (mock 動作確認) — 確率低, 100 リクエスト中 1 回
+- `useStore.actorContext` 不存在 → Phase 1 fallback で `workItem.tenant_id` 使用
+- cytoscape-cose-bilkent 公式 d.ts なし → 自作 `cytoscape-ext.d.ts` 兜底
+- Worktree 状態変化 webhook → Phase 3+ 自動再生成未実装
+- Symbol 詳細 (file/line/snippet) → Phase 2+ 节点 click 遷移先未実装
+
+### 48.8 段階計画 (per ADR-0041 §3)
+
+| Phase | 内容 | token 予算 | 状態 |
+|---|---|---|---|
+| 1 | フロント契約 + MSW mock 実装 | 1.0M | **🟢 完了** (per ARCH-AGENT-GRAPH-001-REPORT v0.1) |
+| 2 | backend LLM worker (`crates/star-graph-agent/`) + 冪等 advisory lock + agent-runtime 14 状態機統合 | 4.8M | ⏳ P3-B 拍板待ち |
+| 3 | 実 memgraph 例 (Bolt/HTTP) + 25 domain schema + インデックス + バックアップ | 2.0M | ⏳ Phase 2 完了後 |
+| **計** | | **7.8M** | (per STAR-OLU-001 v0.1 1 SRE·週 = 1.2M, 約 6.5 週) |
+
+### 48.9 受け入れ基準 (Acceptance Criteria 集約)
+
+- AC-ARCH-1: REQ-ARCH-001/002/003/004/005 全 5 件が unit test + integration test で pass
+- AC-ARCH-2: tsc --noEmit 0 错, vitest 320+/320+ pass (per Phase 1 実續)
+- AC-ARCH-3: 13 類 RLS 13 類ポリシー強制 (Phase 3 検証)
+- AC-ARCH-4: 並走 100 work_item で lock 競合率 < 1% (Phase 2 k6 検証)
+- AC-ARCH-5: P95 latency < 1s (fingerprint 命中), P95 < 60s (agent 起動含む)
+
+### 48.10 トレーサビリティ
+
+- 一次出典: ADR-0041 v0.1
+- 詳細設計: spec/agent-api/arch-agent-graph-viewer.md v0.1 (11 段)
+- データ設計: data-design/ipa-detail/tables/graph_*.md (3 表 T-NEW-001/002/003)
+- Phase 1 報告: docs/reports/ARCH-AGENT-GRAPH-001-REPORT.md v0.1 (7 段)
+- 関連要件: REQ-SEC-001 (13 類), REQ-AUDIT-002 (17 問), REQ-DATA-001/002/003
+- 関連 ADR: ADR-0027 (STAR IDE Gateway), ADR-0030 (Lease+Heartbeat+Resume)
+
+### 48.11 段階要件 (MVP / V1 / V2 / Future)
+
+| 段階 | 含める | 除外 |
+|---|---|---|
+| MVP (Phase 1) | フロント契約 + MSW mock | 実 memgraph, LLM agent |
+| V1 (Phase 2) | LLM worker + 冪等 + 排他 | 実 memgraph 接続, export, IDE ジャンプ |
+| V2 (Phase 3) | 実 memgraph + 25 schema + バックアップ | git push webhook, 跨倉分析 |
+| Future | webhook 自動再生成 + export + マルチ monorepo + 跨 tenant 共有 | (per NG-001~006 段階拡張) |
+
+---
+
+*本節 §48 は arch-agent-graph-viewer 機能追加 (2026-09-02 02:10 JST Ulysses "需求和基本设计, 詳細设计 補完" 発令) による。*

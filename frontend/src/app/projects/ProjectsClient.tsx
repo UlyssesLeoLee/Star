@@ -54,6 +54,7 @@ import {
 } from "@/lib/cookies";
 import { KanbanBoard } from "@/components/board/KanbanBoard";
 import { WorkItemDetailDrawer, type WorkItemDrawerMode } from "@/components/board/WorkItemDetailDrawer";
+import { ArchGraphModal, useArchGraphTrigger } from "@/components/board/ArchGraphModal";
 import { GanttChart } from "@/components/gantt";
 import { MonthView } from "@/components/calendar/MonthView";
 import { WeekView } from "@/components/calendar/WeekView";
@@ -120,6 +121,9 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   const transitionWorkItem = useStore((s) => s.transitionWorkItem);
   const transitionMilestone = useStore((s) => s.transitionMilestone);
   const transitionSprint = useStore((s) => s.transitionSprint);
+
+  // ---- 架构查看器 trigger (per ADR-0041) ----
+  const arch = useArchGraphTrigger();
 
   // ---- local state ----
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
@@ -450,6 +454,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
             onReorderColumns={reorderBoardColumns}
             onRequestNewWorkItem={handleRequestNewWorkItem}
             onWorkItemClick={handleWorkItemClick}
+            onArchClick={arch.open}
           />
           {/* Kanban 卡详情 / 新建 Drawer (per 2026-08-31 12:07 JST 拍板: Jira + Multica) */}
           <WorkItemDetailDrawer
@@ -460,6 +465,10 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
             tenantId={selectedProject?.tenant_id}
             reporterId={selectedProject?.owner_id}
           />
+          {/* 架构查看器 (per ADR-0041-arch-agent-graph-viewer v0.1) */}
+          {arch.modalProps && (
+            <ArchGraphModal {...arch.modalProps} />
+          )}
           <div className="mt-3 text-[10px] text-ink-mute font-mono">
             列对应状态: {KANBAN_COLUMNS.join(" / ")} — 拖动卡片触发 transitionWorkItem (走 store 状态机)
           </div>

@@ -8,6 +8,10 @@
 //   2. HTML5 native drag, 拖动时降低 opacity
 //   3. onClick → 跳 /work-item/{id} (per §7 跨模块联动)
 //   4. onDragStart 通过 dataTransfer 传递 issue id
+//   5. 架构查看器 (per ADR-0041-arch-agent-graph-viewer v0.1):
+//      - onArchClick prop 可选, 父组件传 = 卡片第 4 行显示 🕸 Arch icon
+//      - 点击 → onArchClick(workItem) 父组件弹 ArchGraphModal
+//      - e.stopPropagation() 防冒泡, 不影响 onClick 跳详情逻辑
 //
 // 设计:
 //   - 用 HTML5 native (per §2.4), 不引 dnd-kit / react-dnd
@@ -18,7 +22,7 @@
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
 import { StatusPill } from "@/components/StatusPill";
-import { Flag, User } from "lucide-react";
+import { Flag, User, Network } from "lucide-react";
 import type { WorkItem, Identity } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
 
@@ -34,6 +38,13 @@ export interface KanbanCardProps {
   assignee?: Identity | undefined;
   /** 点击跳详情, 默认跳 /work-item/{id} */
   onClick?: (workItem: WorkItem) => void;
+  /**
+   * 架构查看器触发 (per ADR-0041)
+   * 父组件传此回调, 卡片显示 🕸 Arch icon 按钮
+   * 点击 → onArchClick(workItem) 父组件弹 ArchGraphModal
+   * 不传 = 按钮隐藏
+   */
+  onArchClick?: (workItem: WorkItem) => void;
 }
 
 const PRIORITY_COLOR: Record<WorkItem["priority"], string> = {
@@ -50,6 +61,7 @@ export function KanbanCard({
   isDragging,
   assignee,
   onClick,
+  onArchClick,
 }: KanbanCardProps) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -77,6 +89,13 @@ export function KanbanCard({
       // 默认行为: 跳 work-item 详情页 (per §7 跨模块联动)
       router.push(`/work-item/${workItem.id}`);
     }
+  };
+
+  const handleArchClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // 阻止冒泡到 onClick, 避免同时跳详情 (per ADR-0041 §2.3.1)
+    e.stopPropagation();
+    e.preventDefault();
+    onArchClick?.(workItem);
   };
 
   return (
@@ -118,7 +137,7 @@ export function KanbanCard({
         <StatusPill value={workItem.status} size="xs" translateAs="workItem" />
       </div>
 
-      {/* Row 4: priority + assignee */}
+      {/* Row 4: priority + assignee + arch (per ADR-0041) */}
       <div className="flex items-center justify-between text-[10px] text-ink-mute pt-1 border-t border-line/40">
         <span className={clsx(
           "font-mono flex items-center gap-1 font-medium",
@@ -130,12 +149,27 @@ export function KanbanCard({
           <Flag size={9} />
           {priorityLabel}
         </span>
-        {assignee && (
-          <span className="flex items-center gap-1 truncate max-w-[90px] font-mono text-[9px] text-ink-dim" title={assignee.display_name}>
-            <User size={9} className="text-accent" />
-            <span className="truncate">{assignee.display_name}</span>
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {/* Arch icon button (per ADR-0041 §2.3.1) */}
+          {onArchClick && (
+            <button
+              type="button"
+              data-testid={`kanban-card-arch-${workItem.id}`}
+              onClick={handleArchClick}
+              aria-label={`View architecture graph for ${workItem.key}`}
+              title="View architecture context (cypher graph)"
+              className="text-ink-mute hover:text-accent transition-colors p-0.5 rounded hover:bg-accent/10"
+            >
+              <Network size={10} className="text-accent/80" />
+            </button>
+          )}
+          {assignee && (
+            <span className="flex items-center gap-1 truncate max-w-[90px] font-mono text-[9px] text-ink-dim" title={assignee.display_name}>
+              <User size={9} className="text-accent" />
+              <span className="truncate">{assignee.display_name}</span>
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Row 5: labels (前 2 个) */}

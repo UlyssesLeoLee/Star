@@ -3823,3 +3823,165 @@ flowchart LR
 ---
 
 *文档结束。本文档为基本设计書阶段产出,后续团队据此继续制作外部設計 / 内部設計 / API Design / Data Design / Security Design / Runtime Design / Integration Design / AI・Agent Design / Test Design / Operation Design。*
+
+
+## 11. arch-agent-graph-viewer 基本設計 (per ADR-0041 v0.1)
+
+> **追加日**: 2026-09-02
+> **改訂人**: 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签
+> **依据**: [ADR-0041-arch-agent-graph-viewer v0.1](../architecture/2026-08-26-upgrade/adr/0041-arch-agent-graph-viewer.md) + [ARCH-AGENT-GRAPH-001-REPORT v0.1](../reports/ARCH-AGENT-GRAPH-001-REPORT.md) + 詳細設計 [spec §1-§10](../architecture/2026-08-26-upgrade/spec/agent-api/arch-agent-graph-viewer.md)
+> **位置付け**: 業務要件 §48 を受けた基本設計 (Phase 1 完了, Phase 2/3 待ち)
+
+> **dual-use 提醒 (per AGENTS.md §5 + 2026-08-31 22:45 JST Q1-D 拍板)**: 本節で扱う "25 domain ノード" は Star 倉 22 `domain-*` crate DDD bounded context の投影, **RGS 5 域 (player/economy/match/social/admin) とは非対応**。5 域は RGS 倉歴史治理命名, 業務子域↔DDD マッピングは構築しない。
+
+### 11.1 アーキテクチャ概要
+
+3 層構造 (per 詳細設計 §1.1):
+
+| 層 | コンポーネント | 状態 |
+|---|---|---|
+| **Layer 1** Frontend | KanbanCard (🕸 Arch) + ArchGraphModal (cytoscape) + types/graph.ts + mocks/handlers/graph.ts | 🟢 Phase 1 完了 |
+| **Layer 2** API Gateway | `POST /api/graph/ensure-fresh` + `POST /api/graph/cypher` + `GET /api/graph/health` | 🟢 MSW 完了 / ⏳ Phase 2 実 backend |
+| **Layer 3** Backend | `crates/star-graph-agent/` (GraphService + LlmAgentWorker + AdvisoryLock + FingerprintCalculator) | ⏳ Phase 2 |
+| **Storage** | Memgraph (graph DB) + PostgreSQL (audit + RLS) | ⏳ Phase 3 |
+
+### 11.2 ノードモデル (per ADR-0041 §2.1)
+
+25 kind union, 1-hop 表示 = 11 kind, 2-hop code-side 限定表示 = 2 kind (cratemodule / symbol):
+
+| 主要 kind | 表示色 | 形状 | サイズ (px) | hop_level |
+|---|---|---|---|---|
+| `work_item` (現) | cyan #00f0ff | round-rectangle | 64 | 1 |
+| `work_item` (他) | #7c8499 | round-rectangle | 48 | 1 |
+| `worktree` | purple #a78bfa | hexagon | 48 | 1 |
+| `agent_session` | warn #f59e0b | diamond | 44 | 1 |
+| `change_set` | info #10b981 | ellipse | 44 | 1 |
+| `scm_repository` | ok #22c55e | round-triangle | 48 | 1 |
+| `pull_request` | magenta #ec4899 | round-pentagon | 44 | 1 |
+| `feedback` | err #f43f5e | octagon | 40 | 1 |
+| `validation_case` | blue #3b82f6 | round-diamond | 40 | 1 |
+| `comment` | slate #94a3b8 | tag | 36 | 1 |
+| `identity` | sky #0ea5e9 | circle | 40 | 1 |
+| `cratemodule` | ink #475569 | round-rectangle | 44 | 2 (code-side) |
+| `symbol` | ink-dim #64748b | ellipse | 28 | 2 (code-side) |
+
+### 11.3 エッジモデル (per ADR-0041 §2.1)
+
+24 typed edge label, hop_level 1/2 区分:
+
+| 区分 | 主要エッジ | 線色 | 幅 (px) | dash |
+|---|---|---|---|---|
+| 1-hop 業務 | ASSIGNED_TO / REPORTED_BY / IN_PROJECT / IN_WORKSPACE / ON_WORKTREE / PRODUCED / HAS_FEEDBACK / VALIDATED_BY / COMMENTED_ON / DESIGNED_BY / HAS_PR / WITH_PERMISSION / FOLLOWING_WORKFLOW | cyan #00f0ff | 2 | solid |
+| 1-hop transitive | RUNS_ON / POWERS / TARGETS_BRANCH / WEBHOOK_FOR | cyan #00f0ff | 2 | solid |
+| 2-hop code-side | REFERENCES / LIVES_IN / DEPENDS_ON / INHERITS_FROM | ink-mute #475569 | 1 | dotted, 30% opacity |
+
+### 11.4 データモデル (DB 三類横展開, per 2026-09-01 18:30 JST 拍板)
+
+| 物理名 | 種別 | 主キー | RLS | 役割 |
+|---|---|---|---|---|
+| `graph.graph_node` | **Master (M)** | `id UUID` | 13 類 | 25 kind 投影, SCD Type 2 |
+| `graph.graph_edge` | **Master (M)** | `id UUID` | 13 類 | 24 kind 投影, SCD Type 2 |
+| `graph.graph_fingerprint` | **Transaction (T)** | `id UUID` | 13 類 | append-only 監査ログ, 90 日 TTL |
+
+> **Work (W) 類なし**: 短 TTL データは `agent.agent_session` で扱う, 本モジュールは長期保存/監査/参照専用
+
+詳細: [data-design/ipa-detail/tables/graph_*.md](../data-design/ipa-detail/tables/) (3 表 T-NEW-001/002/003)
+
+### 11.5 冪等・排他設計 (per ADR-0041 §2.2)
+
+#### 11.5.1 冪等性 (5 層)
+
+| 層 | 仕組み | 効果 |
+|---|---|---|
+| L1 クライアント | React Query `staleTime: 30_000` | 30s 以内重複 fetch skip |
+| L2 バックエンド | `fingerprint = sha256(work_item_id + worktree_branch + worktree_sha + source + project_id)` | コード未変 = skip agent |
+| L3 DB | `MERGE ... ON MATCH SET ... ON CREATE SET ...` (Cypher) | 既存ノード上書き, 新規作成 |
+| L4 監査 | `graph_fingerprint` 履歴 append-only | 同 fingerprint でも実行時刻別行 |
+| L5 LLM | `temperature=0`, `top_p=0.1`, `seed=work_item_id.hash()` | LLM 出力 deterministic |
+
+#### 11.5.2 排他性 (5 層)
+
+| 層 | 仕組み | TTL |
+|---|---|---|
+| L1 advisory lock | `pg_try_advisory_xact_lock(work_item_id_hash)` | 5 分 |
+| L2 Redis | `SETNX graph:lock:{work_item_id} 1 EX 300` (任意) | 5 分 |
+| L3 in-process coalesce | `pending[work_item_id] = oneshot::Receiver` | - |
+| L4 失敗時 | lock 自動解放 (advisory_xact / SETNX) | - |
+| L5 agent 状態 | `agent_session` 14 状態機で `failed/cancelled` 時即解放 | - |
+
+### 11.6 フロントエンド実装 (Phase 1 完了)
+
+| ファイル | 行数 | 役割 |
+|---|---|---|
+| `frontend/src/types/graph.ts` | 8.5KB | 25 ノード kind + 24 エッジ kind + 3 endpoint 契約 |
+| `frontend/src/components/board/ArchGraphModal.tsx` | 21.1KB | modal + cytoscape 描画 + 1-hop 高亮 |
+| `frontend/src/components/board/KanbanCard.tsx` | (+~20 行) | 🕸 Arch ボタン + e.stopPropagation |
+| `frontend/src/components/board/KanbanBoard.tsx` | (+~10 行) | onArchClick prop 透伝 |
+| `frontend/src/app/projects/ProjectsClient.tsx` | (+~5 行) | useArchGraphTrigger + ArchGraphModal 挂载 |
+| `frontend/src/mocks/handlers/graph.ts` | 4.1KB | 3 endpoint MSW mock |
+| `frontend/src/mocks/data/graph.ts` | 9.5KB | 1-hop 13 ノード + 2-hop 4 ノード fixture |
+| `frontend/src/components/board/KanbanCard.test.tsx` | 4 tests | arch ボタン表示 + click stopPropagation |
+| `frontend/src/mocks/__tests__/graph.test.ts` | 6 tests | handler 登録 + fixture 完全性 + orphan edge 検出 |
+
+**守門 #1 実証**: tsc --noEmit 0 错, vitest 320/320 pass (per ARCH-AGENT-GRAPH-001-REPORT §2)
+
+### 11.7 API 設計 (3 endpoint, per 詳細設計 §2)
+
+| Method | Path | 用途 | 200 / 202 | 認証 |
+|---|---|---|---|---|
+| POST | `/api/graph/ensure-fresh` | 冪等+排他 trigger | 200 fresh / 202 running | Bearer JWT |
+| POST | `/api/graph/cypher` | 1-hop 問合せ | 200 GraphPayload | Bearer JWT |
+| GET | `/api/graph/health` | 健全性 | 200 / 503 | Bearer JWT |
+
+### 11.8 モジュール配置 (Phase 2 計画)
+
+```
+crates/
+└── domain-graph-agent/        # 第 23 個 domain crate (per ADR-0040 22 crate 平行)
+    ├── Cargo.toml
+    ├── src/
+    │   ├── lib.rs
+    │   ├── port/              # GraphServicePort, LlmAgentWorkerPort, AdvisoryLockPort
+    │   ├── domain/            # GraphPayload, GraphNode, GraphEdge, Fingerprint
+    │   ├── service/           # GraphService (ensure_fresh + cypher_query + health)
+    │   ├── infrastructure/    # MemgraphClient (Phase 3) + Postgres RLS adapter
+    │   └── api/               # REST + MCP tool 露出
+    └── docs/
+```
+
+### 11.9 段階計画 (per ADR-0041 §3)
+
+| Phase | 内容 | token 予算 | 状態 |
+|---|---|---|---|
+| 1 | フロント契約 + MSW mock | 1.0M | **🟢 完了** (commit 4dd0df1 時点) |
+| 2 | backend LLM worker + 冪等 + 排他 + agent-runtime 14 状態機 | 4.8M | ⏳ P3-B 拍板待ち |
+| 3 | 実 memgraph + 25 schema + バックアップ | 2.0M | ⏳ Phase 2 完了後 |
+| **計** | | **7.8M** | (per STAR-OLU-001 v0.1 1 SRE·週 = 1.2M, 約 6.5 週) |
+
+### 11.10 既知の缺口 (per 缺标比错标, 守門 #11, 10 項)
+
+| # | 缺口 | Phase 計画 |
+|---|---|---|
+| 1 | 実 memgraph 例未配備 | Phase 3 |
+| 2 | LLM worker 未実装 | Phase 2 |
+| 3 | 冪等 advisory lock 未実装 | Phase 2 |
+| 4 | ノード click 遷移先未実装 | Phase 2+ |
+| 5 | export PNG / SVG / JSON なし | Phase 2+ |
+| 6 | cytoscape-cose-bilkent 公式 d.ts なし | 自作 `cytoscape-ext.d.ts` 兜底 |
+| 7 | Symbol 詳細未表示 | Phase 2+ |
+| 8 | Playwright 冒煙未実行 | Phase 2 |
+| 9 | Agent 14 状態機との正式統合未実装 | Phase 2 |
+| 10 | Worktree 状態変化 webhook 自動再生成未実装 | Phase 3+ |
+
+### 11.11 トレーサビリティ
+
+- 一次出典: ADR-0041 v0.1
+- 業務要件: requirements.md §48 (REQ-ARCH-001~005)
+- 詳細設計: spec/agent-api/arch-agent-graph-viewer.md v0.1 (11 段)
+- データ設計: data-design/ipa-detail/tables/graph_*.md (3 表 T-NEW-001/002/003)
+- Phase 1 報告: docs/reports/ARCH-AGENT-GRAPH-001-REPORT.md v0.1 (7 段)
+- 関連 ADR: ADR-0027 (STAR IDE Gateway), ADR-0030 (Lease+Heartbeat+Resume), ADR-0040 (domain-batch 22 → 23 crate 拡張)
+
+---
+
+*本節 §11 は arch-agent-graph-viewer 機能追加 (2026-09-02 02:10 JST Ulysses "需求和基本设计, 詳細设计 補完" 発令) による。*
