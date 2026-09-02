@@ -358,25 +358,49 @@ interface TestKeyResponse {
 }
 ```
 
-### 6.3 `POST /api/audit/onboarding-failed`
+### 6.3 `POST /api/audit/onboarding-failed` (per ADR-0043 v0.1, commit 62bc032 / fa05464 / f14ef0f 真接)
 
 ```typescript
-// Request (5 回失敗時, client → server)
-interface AuditFailedRequest {
-  detected_key_id: string;
-  provider: string;
-  label: string;
-  attempts: 5;
-  status_code: number;
+// Request (per ADR-0043 §2.3, 10 字段)
+interface AuditOnboardingFailedRequest {
+  detected_key_id: string;        // DetectedKey.id (UUID)
+  provider: string;                // "openai" | "claude" | "gemini" | "minimax" | 兼容 4
+  label: string;                   // DetectedKey.label
+  attempts: number;                // 固定 5
+  status_code: number;             // 0 = network error / 4xx / 5xx
   error_message: string;
-  tenant_id: Uuid;  // 13 類必帯
+  tenant_id: Uuid;                  // 13 類必帯, per REQ-SEC-001
+  client_ip?: string;               // 任意, audit_audit_event.client_ip に転記
+  request_id?: Uuid;                // 任意, audit_audit_event.request_id に転記
 }
 
 // Response 201
-interface AuditFailedResponse {
-  audit_event_id: Uuid;  // per AGENTS.md §4 #9
+interface AuditOnboardingFailedResponse {
+  audit_event_id: string;            // Phase 2 実 backend → audit_audit_event.id (UUID)
+  occurred_at: Iso8601;              // 返り値 追加 (per commit f14ef0f MSW mock)
 }
 ```
+
+**后端 INSERT 仕様** (per ADR-0043 §2.2 + commit fae5c66 v0.2):
+- 既存 `audit_audit_event` テーブル (T30, T 類 append-only WORM, 16 字段) に直接 INSERT
+- 新表 0
+- `action` = `onboarding.test_key.failed` (per ck_audit_action_v0_2 DOMAIN 制約)
+- `actor_type` = `system`
+- `resource_type` = `api_key`
+- `resource_id` = `detected_key_id`
+- `after_state` (JSONB) = `{ provider, label, attempts, status_code, error_message, detected_key_id }`
+- `tenant_id` = request.tenant_id (per 13 類 RLS 強制)
+
+**frontend bridge** (per commit f14ef0f):
+- `retry.ts` writeAuditLog async 化
+- backend fetch 優先, 失敗時 localStorage fallback (Phase 1 挙動保持)
+- 6 变量 (per .env.example, commit 62c18f5):
+  - `AUDIT_BACKEND_URL` (default `http://localhost:3000`)
+  - `AUDIT_TENANT_ID` (default `tenant-physis-corp`)
+  - `AUDIT_REQUEST_ID_HEADER` (default `X-Request-Id`)
+  - `AUDIT_BACKEND_TIMEOUT_MS` (default 10000)
+  - `AUDIT_ONBOARDING_RETRY_ENABLED` (default `true`)
+  - `AUDIT_FAILURE_MODE` (default `silent`)
 
 ---
 
