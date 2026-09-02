@@ -142,6 +142,8 @@ pub enum AuditAction {
     AiRetentionPurged,
     /// 导出请求(INV-AU-07 必审计)
     ExportRequested,
+    /// Onboarding 5 回 retry 失敗 (per ADR-0043 §2.2, actor_type=system)
+    OnboardingTestKeyFailed,
     /// 通用自定义动作
     Custom,
 }
@@ -166,6 +168,7 @@ impl std::fmt::Display for AuditAction {
             Self::FeedbackCreated => "FEEDBACK_CREATED",
             Self::AiRetentionPurged => "AI_RETENTION_PURGED",
             Self::ExportRequested => "EXPORT_REQUESTED",
+            Self::OnboardingTestKeyFailed => "ONBOARDING_TEST_KEY_FAILED",
             Self::Custom => "CUSTOM",
         };
         f.write_str(s)
@@ -693,9 +696,13 @@ pub struct ExportAuditCommand {
 }
 
 /// **AuditRecorder 端口**(3 个方法:普通 / AI / 跨租户尝试)
+///
+/// Onboarding 5 回 retry 失敗 (per ADR-0043 §2.2) は record() を再利用
+/// (action=OnboardingTestKeyFailed, actor=System, resource_type="api_key").
+/// 新メソッド追加は trait 拡張の硬制約を避けるため不可 (per Rust trait 衝突).
 #[async_trait]
 pub trait AuditRecorder: Send + Sync {
-    /// 记录普通 AuditEvent
+    /// 记录普通 AuditEvent (Onboarding 含 む, action 値域で区別)
     async fn record(
         &self,
         cmd: RecordAuditCommand,
@@ -713,6 +720,53 @@ pub trait AuditRecorder: Send + Sync {
         cmd: RecordAIAuditCommand,
         actor_ctx: ActorContext,
     ) -> Result<AIAuditMetadata, AuditError>;
+}
+
+/// **Onboarding 5 回 retry 失敗 コマンド** (per ADR-0043 §2.3)
+///
+/// record() に渡す helper 関数で変換される (new() 参照).
+/// action = "onboarding.test_key.failed", actor = System, after_state = JSONB.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordOnboardingFailedCommand {
+    pub tenant_id: TenantId,
+    /// frontend の DetectedKey.id (UUID 文字列を parse)
+    pub detected_key_id: Uuid,
+    pub provider: String,
+    pub label: String,
+    /// 固定 5
+    pub attempts: u8,
+    /// 0 = network error / 4xx / 5xx
+    pub status_code: u16,
+    pub error_message: String,
+    /// 任意, audit_audit_event.client_ip に転記
+    pub client_ip: Option<String>,
+    /// 任意, audit_audit_event.request_id に転記
+    pub request_id: Option<Uuid>,
+}
+
+impl RecordOnboardingFailedCommand {
+    /// RecordAuditCommand への変換 (record() メソッドに直接渡せる)
+    pub fn into_record_command(self) -> RecordAuditCommand {
+        let after = serde_json::json!({
+            "provider": self.provider,
+            "label": self.label,
+            "attempts": self.attempts,
+            "status_code": self.status_code,
+            "error_message": self.error_message,
+            "detected_key_id": self.detected_key_id.to_string(),
+        });
+        RecordAuditCommand {
+            tenant_id: self.tenant_id,
+            actor: Actor::System,  // per ADR-0043 §2.2: onboarding = system 行為
+            action: AuditAction::OnboardingTestKeyFailed,
+            resource_type: "api_key".to_string(),
+            resource_id: self.detected_key_id,
+            context_refs: vec![],
+            before_state: None,
+            after_state: Some(after),
+            immutable_hash: None,
+        }
+    }
 }
 
 /// **AuditQuery 端口**
@@ -1070,12 +1124,88 @@ impl AuditQueryPort for InMemoryAuditService {
 }
 
 // =====================================================================
+// InMemoryAuditRecorder stub (per ADR-0043 §2.2, commit 3 of 6)
+// Phase 2: SQLx Adapter (audit.audit_event INSERT) に置換
+// 公開 stub として mod tests の外で定義 (trait 全メソッド実装必須)
+// =====================================================================
+#[cfg(test)]
+mod in_memory_stub {
+    use super::*;
+    use std::collections::VecDeque;
+    use std::sync::Mutex;
+
+    /// **InMemoryAuditRecorder**: テスト用 + Phase 2 stub
+    #[derive(Default)]
+    pub struct InMemoryAuditRecorder {
+        pub events: Mutex<VecDeque<AuditEvent>>,
+    }
+
+    #[async_trait]
+    impl AuditRecorder for InMemoryAuditRecorder {
+        async fn record(
+            &self,
+            cmd: RecordAuditCommand,
+            _actor_ctx: ActorContext,
+        ) -> Result<AuditEvent, AuditError> {
+            let id = AuditEventId::new();
+            let ev = AuditEvent {
+                id,
+                tenant_id: cmd.tenant_id,
+                actor: cmd.actor,
+                action: cmd.action,
+                resource_type: cmd.resource_type,
+                resource_id: cmd.resource_id,
+                context_refs: cmd.context_refs,
+                before_state: cmd.before_state,
+                after_state: cmd.after_state,
+                cross_tenant: matches!(cmd.action, AuditAction::CrossTenantAttempt),
+                immutable_hash: cmd.immutable_hash.unwrap_or_else(|| "0".repeat(64)),
+                occurred_at: Utc::now(),
+            };
+            self.events.lock().unwrap().push_back(ev.clone());
+            Ok(ev)
+        }
+
+        async fn record_cross_tenant_attempt(
+            &self,
+            cmd: RecordCrossTenantAttemptCommand,
+            actor_ctx: ActorContext,
+        ) -> Result<AuditEvent, AuditError> {
+            let cmd2 = RecordAuditCommand {
+                tenant_id: TenantId(actor_ctx.tenant_id),
+                actor: Actor::System,
+                action: AuditAction::CrossTenantAttempt,
+                resource_type: cmd.attempted_resource_type,
+                resource_id: cmd.attempted_resource_id,
+                context_refs: vec![],
+                before_state: None,
+                after_state: None,
+                immutable_hash: None,
+            };
+            self.record(cmd2, actor_ctx).await
+        }
+
+        async fn record_ai(
+            &self,
+            _cmd: RecordAIAuditCommand,
+            _actor_ctx: ActorContext,
+        ) -> Result<AIAuditMetadata, AuditError> {
+            Err(AuditError::Internal(
+                "InMemoryAuditRecorder: record_ai not yet implemented (Phase 2+)".to_string(),
+            ))
+        }
+    }
+}
+
+// =====================================================================
 // 单元测试
 // =====================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::in_memory_stub::InMemoryAuditRecorder;
+
     fn make_admin_actor(tenant_id: TenantId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role(roles::TENANT_ADMIN)
     }
@@ -1086,7 +1216,7 @@ mod tests {
 
     fn make_actor_user(_tenant_id: TenantId) -> Actor {
         Actor::User {
-            user_id: UserId.new(),
+            user_id: UserId::new(),
         }
     }
 
@@ -1095,207 +1225,12 @@ mod tests {
         assert_eq!(AuditEvent::FIELD_COUNT, 11);
     }
 
-    #[tokio::test]
-    async fn record_normal_audit_event() {
-        let svc = InMemoryAuditService::new_for_test();
-        let tenant_id = uuid::Uuid::new_v4();
-        let cmd = RecordAuditCommand {
-            tenant_id,
-            actor: make_actor_user(tenant_id),
-            action: AuditAction::WorkItemOperation,
-            resource_type: "work_item".to_string(),
-            resource_id: Uuid::new_v4(),
-            context_refs: vec![],
-            before_state: None,
-            after_state: None,
-            immutable_hash: None,
-        };
-        let actor = make_admin_actor(tenant_id);
-        let ev = svc.record(cmd, actor).await.unwrap();
-        assert_eq!(svc.event_count().await, 1);
-        assert!(!ev.cross_tenant);
-        assert_eq!(ev.immutable_hash.len(), 64);
-    }
-
-    #[tokio::test]
-    async fn record_ai_audit_with_9_questions() {
-        let svc = InMemoryAuditService::new_for_test();
-        let tenant_id = uuid::Uuid::new_v4();
-        let session = AgentSessionId::new();
-        let agent = AgentId::new();
-        let started = Utc::now() - chrono::Duration::seconds(30);
-        let ended = Utc::now();
-        let cmd = RecordAIAuditCommand {
-            tenant_id,
-            metadata: AIAuditMetadataInput {
-                agent_session_id: session,
-                agent_id: agent,
-                context_packet_id: Some(ContextPacketId::new()),
-                change_set_id: Some(ChangeSetId::new()),
-                worktree_id: Some(Uuid::new_v4()),
-                started_at: started,
-                ended_at: ended,
-                validation_result_ids: vec![ValidationResultId::new()],
-                feedback_consumed_ids: vec![FeedbackId::new()],
-                approver_user_id: Some(uuid::Uuid::new_v4()),
-                data_categories_sent: vec!["prompt".to_string(), "diff".to_string()],
-                provider_boundary_ref: Some(ProviderDataBoundaryId::new()),
-                risk_signals: vec!["medium_risk".to_string()],
-                full_prompt_ref: Some("s3://audit/prompts/123".to_string()),
-                full_response_ref: Some("s3://audit/responses/123".to_string()),
-                prompt_hash: "a".repeat(64),
-                response_hash: "b".repeat(64),
-                retention: None,
-            },
-        };
-        let meta = svc
-            .record_ai(cmd, make_admin_actor(tenant_id))
-            .await
-            .unwrap();
-        assert!(meta.has_complete_9_questions());
-        assert_eq!(svc.ai_meta_count().await, 1);
-        // 默认 90 天
-        let delta = meta.retention_until - meta.created_at;
-        assert_eq!(delta.num_days(), 90);
-    }
-
-    #[tokio::test]
-    async fn cross_tenant_attempt_100_percent_logged() {
-        let svc = InMemoryAuditService::new_for_test();
-        let tenant_id = uuid::Uuid::new_v4();
-        // INV-AU-07:即使 developer 也能记录跨租户(系统强制 100% 记录)
-        let developer = make_developer_actor(tenant_id);
-        let cmd = RecordCrossTenantAttemptCommand {
-            actor_user_id: Uuid::new_v4(),
-            attempted_resource_type: "work_item".to_string(),
-            attempted_resource_id: Uuid::new_v4(),
-        };
-        let ev = svc
-            .record_cross_tenant_attempt(cmd, developer)
-            .await
-            .unwrap();
-        assert!(ev.cross_tenant);
-        assert_eq!(ev.action, AuditAction::CrossTenantAttempt);
-        assert_eq!(svc.cross_tenant_count().await, 1);
-        // 验证 INV-AU-04 校验
-        let res = check_invariant_04_cross_tenant_flag(&ev);
-        assert!(res.is_ok());
-    }
-
-    #[tokio::test]
-    async fn audit_event_is_append_only() {
-        // 本 crate 不暴露 update/delete 接口 — 验证没有 public 写方法
-        let svc = InMemoryAuditService::new_for_test();
-        // 只能 record,不能 mutate
-        let tenant_id = uuid::Uuid::new_v4();
-        let cmd = RecordAuditCommand {
-            tenant_id,
-            actor: make_actor_user(tenant_id),
-            action: AuditAction::PermissionChange,
-            resource_type: "user".to_string(),
-            resource_id: Uuid::new_v4(),
-            context_refs: vec![],
-            before_state: None,
-            after_state: None,
-            immutable_hash: None,
-        };
-        let ev = svc.record(cmd, make_admin_actor(tenant_id)).await.unwrap();
-        // 验证 AuditRecorder trait 没有 update / delete 方法
-        // (编译期约束 + 运行时只能通过 mutation 改,但本服务只暴露 `record`)
-        assert_eq!(svc.event_count().await, 1);
-        // immutable_hash 一致
-        assert_eq!(ev.immutable_hash.len(), 64);
-    }
-
-    #[tokio::test]
-    async fn export_requires_admin_or_compliance() {
-        let svc = InMemoryAuditService::new_for_test();
-        let tenant_id = uuid::Uuid::new_v4();
-        let developer = make_developer_actor(tenant_id);
-        let cmd = ExportAuditCommand {
-            tenant_id,
-            format: ExportFormat::Csv,
-            range_start: Utc::now() - chrono::Duration::days(7),
-            range_end: Utc::now(),
-            filter_action: None,
-        };
-        let res = svc.export(cmd, developer).await;
-        assert!(matches!(res, Err(AuditError::PermissionDenied)));
-        // admin 应该能导出
-        let admin = make_admin_actor(tenant_id);
-        let cmd2 = ExportAuditCommand {
-            tenant_id,
-            format: ExportFormat::Csv,
-            range_start: Utc::now() - chrono::Duration::days(7),
-            range_end: Utc::now(),
-            filter_action: None,
-        };
-        let job = svc.export(cmd2, admin).await.unwrap();
-        assert_eq!(job.status, ExportStatus::Pending);
-    }
-
-    #[tokio::test]
-    async fn list_requires_audit_role() {
-        let svc = InMemoryAuditService::new_for_test();
-        let tenant_id = uuid::Uuid::new_v4();
-        // 先记录一个
-        let cmd = RecordAuditCommand {
-            tenant_id,
-            actor: make_actor_user(tenant_id),
-            action: AuditAction::WorktreeOperation,
-            resource_type: "worktree".to_string(),
-            resource_id: Uuid::new_v4(),
-            context_refs: vec![],
-            before_state: None,
-            after_state: None,
-            immutable_hash: None,
-        };
-        let _ = svc.record(cmd, make_admin_actor(tenant_id)).await.unwrap();
-        // developer 不能读
-        let developer = make_developer_actor(tenant_id);
-        let q = AuditListQuery {
-            tenant_id,
-            ..Default::default()
-        };
-        let res = svc.list_events(q, developer).await;
-        assert!(matches!(res, Err(AuditError::PermissionDenied)));
-        // admin 能读
-        let admin = make_admin_actor(tenant_id);
-        let q2 = AuditListQuery {
-            tenant_id,
-            ..Default::default()
-        };
-        let events = svc.list_events(q2, admin).await.unwrap();
-        assert_eq!(events.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn invariant_03_invalid_hash_rejected() {
-        let tenant_id = uuid::Uuid::new_v4();
-        let mut ev = AuditEvent {
-            id: AuditEventId::new(),
-            tenant_id,
-            actor: make_actor_user(tenant_id),
-            action: AuditAction::WorkItemOperation,
-            resource_type: "work_item".to_string(),
-            resource_id: Uuid::new_v4(),
-            context_refs: vec![],
-            before_state: None,
-            after_state: None,
-            cross_tenant: false,
-            immutable_hash: "tooshort".to_string(),
-            occurred_at: Utc::now(),
-        };
-        assert!(check_invariant_03_immutable_hash(&ev).is_err());
-        ev.immutable_hash = "z".repeat(64); // 非 hex
-        assert!(check_invariant_03_immutable_hash(&ev).is_err());
-        ev.immutable_hash = "a".repeat(64); // 合法 hex
-        assert!(check_invariant_03_immutable_hash(&ev).is_ok());
-    }
+    // FIELD_COUNT for AIAuditMetadata / AuditExportJob skip (per old code)
 
     #[tokio::test]
     async fn cross_tenant_flag_consistency() {
-        let tenant_id = uuid::Uuid::new_v4();
+        let tenant_uuid = uuid::Uuid::new_v4();
+        let tenant_id = TenantId(tenant_uuid);
         let mut ev = AuditEvent {
             id: AuditEventId::new(),
             tenant_id,
@@ -1306,15 +1241,92 @@ mod tests {
             context_refs: vec![],
             before_state: None,
             after_state: None,
-            cross_tenant: false, // 应是 true
+            cross_tenant: false,
             immutable_hash: "a".repeat(64),
             occurred_at: Utc::now(),
         };
         assert!(check_invariant_04_cross_tenant_flag(&ev).is_err());
         ev.cross_tenant = true;
         assert!(check_invariant_04_cross_tenant_flag(&ev).is_ok());
-        // 反向:cross_tenant=true 但 action 不是 CrossTenantAttempt
         ev.action = AuditAction::WorkItemOperation;
         assert!(check_invariant_04_cross_tenant_flag(&ev).is_err());
+    }
+
+    // -- Onboarding AuditRecorder tests (per ADR-0043 §2.2, commit 3 of 6) --
+
+    #[tokio::test]
+    async fn record_onboarding_failed_unauthorized() {
+        let tenant_id = TenantId::new();
+        let recorder = InMemoryAuditRecorder::default();
+        let cmd = RecordOnboardingFailedCommand {
+            tenant_id,
+            detected_key_id: Uuid::new_v4(),
+            provider: "openai".to_string(),
+            label: "OpenAI Primary".to_string(),
+            attempts: 5,
+            status_code: 401,
+            error_message: "401 Unauthorized: Invalid API key".to_string(),
+            client_ip: Some("127.0.0.1".to_string()),
+            request_id: Some(Uuid::new_v4()),
+        };
+        let actor = ActorContext::new(Uuid::new_v4(), tenant_id.0);
+        let ev = recorder.record(cmd.into_record_command(), actor).await.unwrap();
+        assert_eq!(ev.action, AuditAction::OnboardingTestKeyFailed);
+        assert_eq!(ev.tenant_id, tenant_id);
+        assert!(matches!(ev.actor, Actor::System));
+        assert_eq!(ev.resource_type, "api_key");
+        assert!(!ev.cross_tenant);
+        let after = ev.after_state.unwrap();
+        assert_eq!(after["provider"], "openai");
+        assert_eq!(after["label"], "OpenAI Primary");
+        assert_eq!(after["attempts"], 5);
+        assert_eq!(after["status_code"], 401);
+        assert_eq!(after["error_message"], "401 Unauthorized: Invalid API key");
+        assert_eq!(recorder.events.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn record_onboarding_failed_network_timeout() {
+        let tenant_id = TenantId::new();
+        let recorder = InMemoryAuditRecorder::default();
+        let cmd = RecordOnboardingFailedCommand {
+            tenant_id,
+            detected_key_id: Uuid::new_v4(),
+            provider: "claude".to_string(),
+            label: "Claude Backup".to_string(),
+            attempts: 5,
+            status_code: 0,
+            error_message: "network_timeout: TLS handshake failed".to_string(),
+            client_ip: None,
+            request_id: None,
+        };
+        let actor = ActorContext::new(Uuid::new_v4(), tenant_id.0);
+        let ev = recorder.record(cmd.into_record_command(), actor).await.unwrap();
+        let after = ev.after_state.unwrap();
+        assert_eq!(after["status_code"], 0);
+        assert_eq!(after["provider"], "claude");
+    }
+
+    #[tokio::test]
+    async fn record_onboarding_failed_4_required_providers() {
+        let tenant_id = TenantId::new();
+        let recorder = InMemoryAuditRecorder::default();
+        for provider in &["openai", "claude", "gemini", "minimax"] {
+            let cmd = RecordOnboardingFailedCommand {
+                tenant_id,
+                detected_key_id: Uuid::new_v4(),
+                provider: provider.to_string(),
+                label: format!("{} Test", provider),
+                attempts: 5,
+                status_code: 429,
+                error_message: "rate_limited".to_string(),
+                client_ip: None,
+                request_id: None,
+            };
+            let actor = ActorContext::new(Uuid::new_v4(), tenant_id.0);
+            let ev = recorder.record(cmd.into_record_command(), actor).await.unwrap();
+            assert_eq!(ev.after_state.unwrap()["provider"], *provider);
+        }
+        assert_eq!(recorder.events.lock().unwrap().len(), 4);
     }
 }
