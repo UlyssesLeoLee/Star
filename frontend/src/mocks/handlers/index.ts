@@ -25,6 +25,7 @@ export { tenantsHandlers } from "./tenants";
 export { graphHandlers } from "./graph";
 export { auditHandlers } from "./audit";
 export { providersLlmHandlers } from "./providers-llm";
+export { kmsHandlers } from "./kms";
 
 import { agentsHandlers } from "./agents";
 import { analyticsHandlers } from "./analytics";
@@ -41,6 +42,7 @@ import { tenantsHandlers } from "./tenants";
 import { graphHandlers } from "./graph";
 import { auditHandlers } from "./audit";
 import { providersLlmHandlers } from "./providers-llm";
+import { kmsHandlers } from "./kms";
 
 export const handlers = [
   ...agentsHandlers,
@@ -58,4 +60,5 @@ export const handlers = [
   ...graphHandlers,
   ...auditHandlers,
   ...providersLlmHandlers,
+  ...kmsHandlers,
 ];
