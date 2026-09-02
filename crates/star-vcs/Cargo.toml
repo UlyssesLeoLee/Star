@@ -1,0 +1,21 @@
+[package]
+name = "star-vcs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "STAR VCS — Version Control Provider 抽象 + cache 层 (R-007 落点, per acceptance/08 v0.2 fix 2026-08-27)"
+
+[lib]
+name = "star_vcs"
+path = "src/lib.rs"
+
+[dependencies]
+# 占位 crate: R-007 cache 层空壳 (per acceptance/08 v0.2 R-007 fix 2026-08-27).
+# Phase D 填实需要再加 workspace 已有依赖 (tokio / serde / thiserror 等)
+# 当前 cache.rs 仅有空 struct 占位, 0 依赖.
+
+[lints]
+workspace = true

@@ -55,6 +55,8 @@ members = [
     "crates/star-webhook",
     # Phase L 骨架: 2026-09-02 新增 crates/star-api-rest (Developer REST API, 22 路由 stub, 业务 P2 实装)
     "crates/star-api-rest",
+    # RF-001 T1.3 落点: 2026-09-03 注册 crates/star-vcs (R-007 cache 层落点, 8/27 commit 48610ff2 落档 src/cache.rs 占位, 本 commit 新建 Cargo.toml + lib.rs)
+    "crates/star-vcs",
 ]
 exclude = ["target"]
 

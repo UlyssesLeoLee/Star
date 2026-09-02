@@ -46,9 +46,23 @@
 #![allow(unused_imports)]
 
 // 占位: 空 struct 等 Phase D 填实.
+///
+/// Phase D 填实目标 (`Cache<K, V>` trait):
+/// - `async fn get(&self, key: &K) -> Result<Option<V>, CacheError>`
+/// - `async fn put(&self, key: &K, value: &V, ttl: Duration) -> Result<(), CacheError>`
+/// - `async fn invalidate(&self, key: &K) -> Result<(), CacheError>`
+/// - `fn scope(&self) -> CacheScope` (workspace / session / none)
+///
+/// 当前仅占位, Phase D 替换为 `InMemoryCache` impl (tokio RwLock<HashMap>).
 pub struct VcsCache;
 
 // 占位: CacheError 等 Phase D 填实.
+///
+/// Phase D 填实目标 (thiserror enum, 4 变体):
+/// - `Backend(String)` — 后端错误 (Redis / sled / in-memory 故障)
+/// - `Serialization(String)` — serde 序列化/反序列化失败
+/// - `KeyNotFound` — invalidate 调用时 key 不存在
+/// - `TtlExpired` — get 时 key 已过 TTL (用于触发 stale cache 降级判断)
 #[derive(Debug)]
 pub struct CacheError;
 
