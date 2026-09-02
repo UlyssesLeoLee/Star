@@ -112,12 +112,14 @@ function IssuesPageInner() {
   }, [workItems]);
 
   // ---- SubNav items ----
+  // Per 2026-09-02 17:32 JST: 4 view 各 1 域色 (Jira 风格)
+  // Kanban=work (蓝) / List=agent (绿) / Tree=integration (紫) / Sprint=system (橙)
   const subNavItems: SubNavItem[] = useMemo(
     () => [
-      { id: "kanban", label: "Kanban", href: `${pathname}?view=kanban`, count: statusCounts.todo + statusCounts.in_progress + statusCounts.review },
-      { id: "list",   label: "List",   href: `${pathname}?view=list`,   count: workItems.length },
-      { id: "tree",   label: "Tree",   href: `${pathname}?view=tree`,   count: workItems.filter((w) => w.kind === "epic").length },
-      { id: "sprint", label: "Sprint", href: `${pathname}?view=sprint`, count: sprints.filter((s) => s.status === "active").length },
+      { id: "kanban", label: "Kanban", href: `${pathname}?view=kanban`, count: statusCounts.todo + statusCounts.in_progress + statusCounts.review, category: "work" },
+      { id: "list",   label: "List",   href: `${pathname}?view=list`,   count: workItems.length, category: "agent" },
+      { id: "tree",   label: "Tree",   href: `${pathname}?view=tree`,   count: workItems.filter((w) => w.kind === "epic").length, category: "integration" },
+      { id: "sprint", label: "Sprint", href: `${pathname}?view=sprint`, count: sprints.filter((s) => s.status === "active").length, category: "system" },
     ],
     [pathname, statusCounts, workItems.length, sprints],
   );

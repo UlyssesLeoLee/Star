@@ -81,6 +81,44 @@ describe("SubNav (U2)", () => {
     expect(active.className).toMatch(/text-blue-900/);
   });
 
+  // ---- Test 2c: per-item category 覆盖 SubNav-level (per 2026-09-02 17:32 JST) ----
+  // 4 view 拆 4 个独立 it, 避免 vitest 多次 render 串扰
+  const perItemItems: SubNavItem[] = [
+    { id: "kanban", label: "Kanban", href: "/issues?view=kanban", category: "work" },
+    { id: "list",   label: "List",   href: "/issues?view=list",   category: "agent" },
+    { id: "tree",   label: "Tree",   href: "/issues?view=tree",   category: "integration" },
+    { id: "sprint", label: "Sprint", href: "/issues?view=sprint", category: "system" },
+  ];
+
+  it("per-item: kanban (category=work) → blue-500 active", () => {
+    render(<SubNav items={perItemItems} activeId="kanban" />);
+    expect(screen.getByTestId("subnav-item-kanban").className).toMatch(/bg-blue-500\/20/);
+  });
+  it("per-item: list (category=agent) → emerald-500 active", () => {
+    render(<SubNav items={perItemItems} activeId="list" />);
+    expect(screen.getByTestId("subnav-item-list").className).toMatch(/bg-emerald-500\/20/);
+  });
+  it("per-item: tree (category=integration) → violet-500 active", () => {
+    render(<SubNav items={perItemItems} activeId="tree" />);
+    expect(screen.getByTestId("subnav-item-tree").className).toMatch(/bg-violet-500\/20/);
+  });
+  it("per-item: sprint (category=system) → amber-500 active", () => {
+    render(<SubNav items={perItemItems} activeId="sprint" />);
+    expect(screen.getByTestId("subnav-item-sprint").className).toMatch(/bg-amber-500\/20/);
+  });
+
+  // ---- Test 2d: per-item 不传 category 时 fallback SubNav-level ----
+  it("falls back to SubNav-level category when item.category is undefined", () => {
+    const itemsNoCategory: SubNavItem[] = [
+      { id: "a", label: "A", href: "/x?a=1" },
+      { id: "b", label: "B", href: "/x?b=2" },
+    ];
+    render(<SubNav items={itemsNoCategory} activeId="a" category="system" />);
+    const a = screen.getByTestId("subnav-item-a");
+    // fallback 到 system 域色: amber
+    expect(a.className).toMatch(/bg-amber-500\/20/);
+  });
+
   // ---- Test 3: count badge 显示 ----
   it("renders count badge when item.count is defined, hides when undefined", () => {
     render(<SubNav items={items} activeId="kanban" />);

@@ -35,6 +35,13 @@ export interface SubNavItem {
   count?: number;
   /** 标记为 group separator (上方加 1px divider) */
   divider?: boolean;
+  /**
+   * per-item 域分类 (per 2026-09-02 17:32 JST).
+   * 覆盖 SubNav-level category, 让 SubNav 内 4 view 各走 1 域色
+   * (e.g. Kanban=work / List=agent / Tree=integration / Sprint=system).
+   * 不传则 fallback 到 SubNavProps.category.
+   */
+  category?: ModuleCategory;
 }
 
 export interface SubNavProps {
@@ -49,6 +56,7 @@ export interface SubNavProps {
    * 域分类 (per 2026-09-02 16:13 JST Jira 风格扩展).
    * 决定 active 项的 left border / bg / text 颜色.
    * 默认 'core' 兼容旧调用, 新 page 应该传 page 真实所在域.
+   * 优先被 SubNavItem.category 覆盖.
    */
   category?: ModuleCategory;
 }
@@ -94,6 +102,9 @@ export function SubNav({
             : matchActive
               ? matchActive(item, pathname)
               : defaultMatch(item, pathname);
+          // Per 2026-09-02 17:32 JST: per-item category 覆盖 SubNav-level
+          // (e.g. SubNav 4 view 各 1 色: Kanban=work / List=agent / Tree=integration / Sprint=system)
+          const itemCs = getCategoryStyles(item.category ?? category);
 
           return (
             <div key={item.id} data-divider={item.divider ? "true" : undefined}>
@@ -113,7 +124,7 @@ export function SubNav({
                   isActive
                     ? // Jira 风格: active 用域色 (per 2026-09-02 16:13 JST)
                       // 保留 multica 风格 12px uppercase, 只换色不换字号
-                      clsx(cs.bg, cs.text, cs.border, "font-semibold", cs.glow)
+                      clsx(itemCs.bg, itemCs.text, itemCs.border, "font-semibold", itemCs.glow)
                     : "text-ink-dim hover:bg-bg-soft/40 hover:text-ink border-l-transparent",
                 )}
               >
@@ -123,7 +134,7 @@ export function SubNav({
                     data-testid={`subnav-count-${item.id}`}
                     className={clsx(
                       "ml-2 text-[10px] font-mono",
-                      isActive ? cs.text : "text-ink-mute",
+                      isActive ? itemCs.text : "text-ink-mute",
                       isActive && "opacity-80"
                     )}
                   >

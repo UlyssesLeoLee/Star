@@ -101,6 +101,37 @@ async function shoot(page, name, theme) {
     await shoot(page, "nav", theme);
   }
 
+  // ---- Per 2026-09-02 17:32 JST: 截 /issues 页 SubNav 4 view 染色验证 ----
+  console.log(`\n[subnav] navigating to /issues ...`);
+  await page.goto(`${BASE}/issues?t=${Date.now()}`, { waitUntil: "networkidle", timeout: 30_000 });
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForSelector('[data-testid="subnav"]', { timeout: 10_000 });
+  console.log("  ✓ SubNav mounted");
+
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate((t) => {
+      document.documentElement.classList.toggle("dark", t === "dark");
+      document.documentElement.style.colorScheme = t;
+    }, theme);
+    await page.waitForTimeout(300);
+
+    // 截当前 active 状态的 SubNav (默认 kanban active)
+    const subnav = await page.$('[data-testid="subnav"]');
+    if (subnav) {
+      await subnav.screenshot({ path: join(OUT_DIR, `${theme}-subnav-kanban.png`) });
+      console.log(`  ✓ ${theme}-subnav-kanban.png`);
+    }
+
+    // 切到 list 激活态 (agent 绿)
+    await page.click('[data-testid="subnav-item-list"]');
+    await page.waitForTimeout(300);
+    const subnavList = await page.$('[data-testid="subnav"]');
+    if (subnavList) {
+      await subnavList.screenshot({ path: join(OUT_DIR, `${theme}-subnav-list.png`) });
+      console.log(`  ✓ ${theme}-subnav-list.png`);
+    }
+  }
+
   await browser.close();
   console.log("\nDone.");
 })().catch((e) => {
