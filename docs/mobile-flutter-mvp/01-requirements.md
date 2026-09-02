@@ -3,51 +3,51 @@
 > **基準**: 日本 IPA（情報処理推進機構）SEC ソフトウェア要件定義書 標準章立て
 > **作成日**: 2026-09-02
 > **改訂人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
-> **Pre-IPA 草稿**: `docs/architecture/2026-09-02-upgrade/spec/mobile/01-flutter-mvp-design.md` v0.1 (commit `bd4998e`) — 本書 v1.0 として正式 IPA 化で supersede
-> **上流要件定義書**: `D:\Star\docs\requirements.md` v2.0 (Star プラットフォーム全体,§N で引用)
-> **上流基本設計書**: `D:\Star\docs\basic-design.md` v0.1 (Star プラットフォーム全体,§N で引用)
+> **バージョン**: v1.1 (UAT 完全版, 2026-09-02 16:27 JST)
+> **前身**: v1.0 (read-only, commit `6bd6aa2`, 2026-09-02 16:14 JST) → UAT 範囲追加により v1.1 へ全面書き換え
+> **Pre-IPA 草稿**: `docs/architecture/2026-09-02-upgrade/spec/mobile/01-flutter-mvp-design.md` v0.1 (commit `bd4998e`)
+> **上流要件定義書**: `D:\Star\docs\requirements.md` v2.0 (Star プラットフォーム全体)
+> **上流基本設計書**: `D:\Star\docs\basic-design.md` v0.1 (Star プラットフォーム全体)
 
 ---
 
 ## §1 目的
 
-本文書は、Star プラットフォーム（AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration）における**モバイルクライアント第一版（Android Flutter MVP）**の要件を定義する。上流の `docs/requirements.md` v2.0 がプラットフォーム全体の要件を定義するのに対し、本書は「**モバイルユーザーが必要とする最小機能集合**」に焦点を絞り、IPA 標準の要件定義書章立て（§1〜§14）に従って記述する。
+本文書は、Star プラットフォーム（AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration）における**モバイルクライアント第一版（Android Flutter MVP）**の要件を定義する。**本バージョン v1.1 は UAT（User Acceptance Test）レベル**の完全版であり、v1.0 の read-only MVP（ログイン＋閲覧）から、**核心写操作（状態遷移 / コメント / フィールド編集）**、**オフラインキャッシュ（Drift/SQLite）**、**自前 WebSocket 推送**を含む包括的な UAT 対応版に拡張する。
 
-本書の位置付け：
 - 上流：Star プラットフォーム要件定義書 v2.0（プラットフォーム要件の正本）
-- 本書：モバイル MVP の要件定義（プラットフォーム要件のうち MVP スコープだけ取り出し、モバイル固有の追加要件で拡張）
-- 下流：モバイル MVP 基本設計書（`02-basic-design.md` v1.0）→ モバイル MVP 詳細設計書（`03-detailed-design.md` v1.0）
+- 本書：モバイル UAT 要件定義（プラットフォーム要件のうち UAT スコープを取り出し、モバイル固有の追加要件で拡張）
+- 下流：モバイル UAT 基本設計書（`02-basic-design.md` v1.1）→ モバイル UAT 詳細設計書（`03-detailed-design.md` v1.1）
 
 ---
 
 ## §2 適用範囲
 
-### 2.1 In Scope（MVP で実装する）
+### 2.1 In Scope（UAT で実装する）
 
 | 領域 | 範囲 | 出典 |
 |---|---|---|
 | プラットフォーム | **Android のみ**（minSdk 24 / Android 7.0+） | per 2026-09-02 15:52 JST 発令「安卓版」 |
-| 通信プロトコル | REST のみ（MCP / WebSocket は含まない） | `api-design.md` §1.1 |
-| 機能スコープ | **Read-Only**: ログイン、ボード閲覧、Work Item 閲覧、通知閲覧 | per 2026-09-02 15:54 JST Mavis 接手デフォルト |
+| 通信プロトコル | REST + WebSocket 両対応 | `api-design.md` §1.1 + §4 |
 | 認証 | JWT Bearer + Refresh Token | `api-design.md` §1.12 |
-| オフライン | **対応しない**（online-only） | per 9/2 デフォルト |
-| プッシュ通知 | **対応しない**（30s ポーリング） | per ADR-0021 零廠商合作 |
+| **核心写操作** | **状態遷移 / コメント投稿 / フィールド編集** (Work Item) | per 2026-09-02 16:27 JST UAT 拍板 |
+| **オフラインキャッシュ** | **Drift/SQLite + 同期キュー + 競合解決** | per 2026-09-02 16:27 JST UAT 拍板 |
+| **リアルタイム推送** | **自前 WebSocket** (per `api-design.md` §4) | per 2026-09-02 16:27 JST UAT 拍板, FCM 不可 (ADR-0021) |
 | Tablet 対応 | **対応しない**（スマホ縦画面のみ） | per 9/2 デフォルト |
 | 多言語 | **中国語のみ**（i18n 対応なし） | per 内網利用 |
 
-### 2.2 Out of Scope（MVP で実装しない、後の版で対応）
+### 2.2 Out of Scope（UAT でも実装しない、後の版で対応）
 
 | 領域 | 計画 | 参照 |
 |---|---|---|
 | iOS 対応 | V2 で対応 | `internal-design.md:1600` + V2 モバイル計画 |
-| Write 操作（作成/更新/状態遷移/コメント投稿） | V1.1 で対応 | 本書 §5.1 で要件化保留 |
-| オフラインキャッシュ（SQLite/Drift） | V1.1 で対応 | §11 既知未解決 G-04 |
-| プッシュ通知（FCM/自前 WS） | V1.1 で対応 | §11 既知未解決 G-05 |
-| Tablet / 横画面 | V1.1 で対応 | §11 既知未解決 G-06 |
-| ダークモード（system 連動以外の手動切替は含む） | V1.1 で対応 | 詳細設計で再評価 |
+| 添付ファイル Upload/Download | V1.2 で対応 | 容量/帯域/MIME 検証の複雑度 |
+| Tablet / 横画面 | V1.2 で対応 | §11 既知未解決 |
+| 多言語 i18n | V2 で対応 | 内部設計 §10 |
 | 生体認証（指紋/顔認証） | V1.2 で対応 | 詳細設計で再評価 |
-| Tablet 専用レイアウト | V1.2 で対応 | 同上 |
-| 多言語 i18n | V2 で対応（V2 モバイル計画に統合） | 内部設計 §10 |
+| Web 統合 SSO (OAuth/OIDC) | V1.2 で対応 | `api-design.md` §6.2 OAuth Phase 2+ |
+| 外部 SDK（Crashlytics / Firebase） | 永久禁止 | ADR-0021 |
+| Device 三重バインディング 厳密化 | V1.2 で対応 | `internal-design.md:23.2` |
 
 ---
 
@@ -55,11 +55,13 @@
 
 ### 3.1 前提条件
 
-1. Star プラットフォーム本体（Backend / API / DB）が既に運用可能で、対象エンドポイント（後述）が production 利用可能である
-2. 対象ユーザーは Star テナントの既存ユーザーである（モバイルアプリ単独での新規テナント作成は不可）
-3. 利用は**企業内ネットワーク**（内網）に限定され、インターネット公開はしない
-4. 利用者は Android 7.0+ のスマートフォンを所有している
-5. 利用者は Star のメールアドレス + パスワードを既に保有している
+1. Star プラットフォーム本体（Backend / API / DB / WebSocket Service）が既に運用可能
+2. WebSocket 推送エンドポイント（`wss://star.internal:8080/api/v1/ws`）が production 利用可能
+3. WS サブスクリプション対象リソースに `work_item` と `notification` が含まれている（§11 G-16 で拍板待ち）
+4. 対象ユーザーは Star テナントの既存ユーザーである
+5. 利用は**企業内ネットワーク**（内網）に限定
+6. 利用者は Android 7.0+ のスマートフォンを所有
+7. 利用者は Star のメールアドレス + パスワードを既に保有
 
 ### 3.2 制約事項
 
@@ -67,11 +69,12 @@
 |---|---|
 | **零廠商合作**（外部 SDK 不使用） | `docs/architecture/2026-08-26-upgrade/adr/0021-zero-vendor-cooperation.md` |
 | **5 域独立 Lead, 兼任禁止** | `AGENTS.md` §4 #3 + 8/21 JST 拍板 |
-| **トークン予算制（人日ではなく token）** | `AGENTS.md` §4 #4 + `STAR-OLU-001.md` v0.1 (1 SRE·周 = 1.2M) |
+| **トークン予算制** | `AGENTS.md` §4 #4 + `STAR-OLU-001.md` v0.1 (1 SRE·周 = 1.2M) |
 | **環境変数ハードコード禁止** | `AGENTS.md` §4 #5 + 8/27 11:06 JST hard ban |
-| **AI ドキュメント治理解禁**（回溯叙事禁止） | `AGENTS.md` §1.2 + §4 #12 |
+| **AI ドキュメント治理解禁** | `AGENTS.md` §1.2 + §4 #12 |
 | **V1 はモバイル App を範囲外**（本書は V1 範囲の**例外**として新規追加） | `docs/internal-design.md:50` + 2026-09-02 15:52 JST 発令 |
 | **Mobile V2 計画は React Native 候補**（本書は Flutter 採用で V2 と並走） | `docs/internal-design.md:1633` |
+| **FCM / Firebase 等の外部推送サービス使用禁止** | ADR-0021 + `api-design.md` §4 (自前 WebSocket のみ) |
 
 ---
 
@@ -80,29 +83,38 @@
 ### 4.1 システム構成図
 
 ```
-┌─────────────────────────────────┐         ┌──────────────────────┐
-│   Android スマートフォン        │         │   Star プラットフォーム │
-│  ┌───────────────────────────┐  │         │                      │
-│  │ Flutter App (本 MVP)      │  │  HTTP   │  ┌────────────────┐  │
-│  │ - Riverpod 状態管理        │  │ ───────▶│  │ API Gateway    │  │
-│  │ - Dio HTTP クライアント    │  │         │  │ (Rust axum)    │  │
-│  │ - flutter_secure_storage  │  │  REST   │  └────────────────┘  │
-│  │ - メモリ内キャッシュ       │  │ ◀───────│  ┌────────────────┐  │
-│  └───────────────────────────┘  │         │  │ work-core      │  │
-│                                 │         │  │ (Rust Modular │  │
-│  内網限定（cleartext HTTP）     │         │  │  Monolith)     │  │
-└─────────────────────────────────┘         │  └────────────────┘  │
-                                            └──────────────────────┘
+┌────────────────────────────────────────────────────┐         ┌──────────────────────────────────┐
+│   Android スマートフォン                            │         │   Star プラットフォーム           │
+│  ┌──────────────────────────────────────────────┐  │         │                                  │
+│  │ Flutter App (本 UAT MVP)                      │  │         │  ┌────────────────┐              │
+│  │ - Riverpod 状態管理                            │  │  HTTP   │  │ API Gateway    │              │
+│  │ - Dio HTTP クライアント                        │  │ ───────▶│  │ (Rust axum)    │              │
+│  │ - web_socket_channel 推送受信                  │  │  REST   │  └────────────────┘              │
+│  │ - Drift/SQLite オフラインキャッシュ            │  │ ◀───────│  ┌────────────────┐              │
+│  │ - flutter_secure_storage 認証トークン          │  │         │  │ work-core      │              │
+│  │ - 同期キュー + 競合解決                         │  │  WSS    │  │ (Rust Modular  │              │
+│  │ - 接続性監視 (connectivity_plus)                │  │ ═══════▶│  │  Monolith)     │              │
+│  │ - worktree 状態管理                            │  │ ◀═══════│  └────────────────┘              │
+│  └──────────────────────────────────────────────┘  │  WS Push│  ┌────────────────┐              │
+│                                 内網限定（HTTP/WS） │         │  │ WS Service     │              │
+└────────────────────────────────────────────────────┘         │  │ (Axum WS)     │              │
+                                                               │  └────────────────┘              │
+                                                               │  ┌────────────────┐              │
+                                                               │  │ PostgreSQL     │              │
+                                                               │  │ (SoR)          │              │
+                                                               │  └────────────────┘              │
+                                                               └──────────────────────────────────┘
 ```
 
-### 4.2 主要ユーザー像（Persona, `requirements.md` §3 から抜粋 + モバイル特化）
+### 4.2 主要ユーザー像（Persona, `requirements.md` §3 から抜粋 + モバイル UAT 特化）
 
-| Persona | モバイル利用シーン |
+| Persona | モバイル UAT 利用シーン |
 |---|---|
-| **Developer（人間）** | 通勤中・会議間で Work Item の状況確認、通知チェック |
-| **Product Owner / PM** | 移動中にボードの進捗確認、次の Sprint の優先順位確認 |
-| **Reviewer** | 移動中に PR レビュー依頼通知に気づき、後で PC で対応 |
-| **Tech Lead** | 会議中に Work Item 詳細を確認、チーム進捗を俯瞰 |
+| **Developer（人間）** | 通勤中に Work Item の状態遷移実行、コメント投稿、フィールド編集 |
+| **Product Owner / PM** | 移動中にボードの進捗確認、Sprint 内の Work Item 優先順位をその場で編集 |
+| **Reviewer** | 移動中に PR レビュー依頼通知に気づき、モバイルで状態遷移実行、帰社後 PC で詳細 |
+| **Tech Lead** | 会議中に Work Item の状態を確認、必要に応じてその場で状態遷移実行 |
+| **オフライン ユーザー** | 電車内/地下/海外出張先などネット断絶環境でも、過去閲覧データを参照 + ローカル操作を後で同期 |
 
 ---
 
@@ -112,84 +124,126 @@
 
 | ID | 要件 | 優先度 | 出典 |
 |---|---|---|---|
-| **FR-AUTH-001** | ユーザーはメールアドレス + パスワードでログインできる | P0 | 本書新規 |
-| **FR-AUTH-002** | ログイン成功時、access_token（15 分有効）と refresh_token（7 日有効）を受け取る | P0 | `api-design.md` §6.2 |
-| **FR-AUTH-003** | access_token 期限切れ時、refresh_token で自動更新し、元の API 呼び出しを retry する | P0 | 本書新規 |
-| **FR-AUTH-004** | refresh_token 期限切れ時、ユーザーのローカル資格情報をクリアしログイン画面に遷移する | P0 | 本書新規 |
-| **FR-AUTH-005** | ログアウト時、ローカルの全資格情報をクリアし、ログアウト API を呼ぶ（best-effort） | P0 | 本書新規 |
-| **FR-AUTH-006** | ログイン状態は `flutter_secure_storage`（Android Keystore）に暗号化して保存する | P0 | `api-design.md` §6.2 + 本書新規 |
-| FR-AUTH-007 | ❌ OAuth 2.0 は実装しない（`api-design.md` §6.2 G-01 で Phase 2+ 候補） | — | 保留 |
-| FR-AUTH-008 | ❌ 生体認証（指紋/顔）は実装しない（V1.2 候補） | — | 保留 |
-| FR-AUTH-009 | ❌ Device 三重バインディング（`internal-design.md:23.2`）は MVP スキップ（V1.1 で対応） | — | 保留 |
+| **FR-AUTH-001** | ユーザーはメールアドレス + パスワードでログインできる | P0 | v1.0 継承 |
+| **FR-AUTH-002** | ログイン成功時、access_token（15 分有効）と refresh_token（7 日有効）を受け取る | P0 | v1.0 継承 |
+| **FR-AUTH-003** | access_token 期限切れ時、refresh_token で自動更新し、元の API 呼び出しを retry する | P0 | v1.0 継承 |
+| **FR-AUTH-004** | refresh_token 期限切れ時、ユーザーのローカル資格情報をクリアしログイン画面に遷移する | P0 | v1.0 継承 |
+| **FR-AUTH-005** | ログアウト時、ローカルの全資格情報 + オフラインキャッシュを完全削除し、ログアウト API を呼ぶ（best-effort） | P0 | **UAT 拡張**: ローカル削除範囲拡大 |
+| **FR-AUTH-006** | ログイン状態は `flutter_secure_storage`（Android Keystore）に暗号化して保存する | P0 | v1.0 継承 |
+| **FR-AUTH-007** | ログアウト時に未同期の SyncQueue が残っていた場合、ユーザーに確認ダイアログを表示する | P0 | **UAT 拡張** |
+| FR-AUTH-008 | ❌ OAuth 2.0 は実装しない（V1.2 候補） | — | 保留 |
+| FR-AUTH-009 | ❌ 生体認証は実装しない（V1.2 候補） | — | 保留 |
+| FR-AUTH-010 | ❌ Device 三重バインディング（`internal-design.md:23.2`）は MVP スキップ（V1.2 で対応） | — | 保留 |
 
 ### 5.2 FR-BOARD: ボード閲覧機能
 
 | ID | 要件 | 優先度 | 出典 |
 |---|---|---|---|
-| **FR-BOARD-001** | ユーザーはプロジェクト単位でボードを閲覧できる | P0 | `api-design.md` §3.7 |
-| **FR-BOARD-002** | ボードはカンバン形式（横スクロール Columns）で表示される | P0 | 内部設計 §10 V1 |
-| **FR-BOARD-003** | 各 Column には複数の Work Item カードが縦に並ぶ | P0 | 内部設計 §10 V1 |
-| **FR-BOARD-004** | Work Item カードには title / assignee アバター / priority chip / 状態 chip が表示される | P0 | 本書新規 |
-| **FR-BOARD-005** | ボード画面は Pull-to-Refresh で再取得できる | P0 | 本書新規 |
-| **FR-BOARD-006** | ボード画面に入った瞬間に最新データを取得する | P0 | 本書新規 |
-| FR-BOARD-007 | ❌ カードのドラッグ&ドロップによる状態遷移は実装しない（V1.1） | — | 保留 |
-| FR-BOARD-008 | ❌ Column のリネーム / 並び替えは実装しない（V1.1） | — | 保留 |
+| **FR-BOARD-001** | ユーザーはプロジェクト単位でボードを閲覧できる | P0 | v1.0 継承 |
+| **FR-BOARD-002** | ボードはカンバン形式（横スクロール Columns）で表示される | P0 | v1.0 継承 |
+| **FR-BOARD-003** | 各 Column には複数の Work Item カードが縦に並ぶ | P0 | v1.0 継承 |
+| **FR-BOARD-004** | Work Item カードには title / assignee アバター / priority chip / 状態 chip / **最終更新時刻** が表示される | P0 | **UAT 拡張** |
+| **FR-BOARD-005** | ボード画面は Pull-to-Refresh で再取得できる | P0 | v1.0 継承 |
+| **FR-BOARD-006** | ボード画面に入った瞬間に最新データを取得する | P0 | v1.0 継承 |
+| **FR-BOARD-007** | **カードに未同期の SyncQueue アイテムがある場合にバッジ表示** | P0 | **UAT 新規** |
+| **FR-BOARD-008** | **WS 推送でボードが更新された場合、差分のみ部分更新**（全件取得しない） | P1 | **UAT 新規** |
+| FR-BOARD-009 | ❌ カードのドラッグ&ドロップによる状態遷移は実装しない（V1.2 候補） | — | 保留 |
+| FR-BOARD-010 | ❌ Column のリネーム / 並び替えは実装しない（V1.2 候補） | — | 保留 |
 
-### 5.3 FR-WORK-ITEM: Work Item 詳細閲覧機能
-
-| ID | 要件 | 優先度 | 出典 |
-|---|---|---|---|
-| **FR-WORK-001** | ユーザーは Work Item 詳細を閲覧できる | P0 | `api-design.md` §3.5:626 |
-| **FR-WORK-002** | 詳細画面は 3 タブ構成: Overview / Comments / Transitions | P0 | 内部設計 §10 |
-| **FR-WORK-003** | Overview タブには title, description, status, priority, assignee, reporter, due date, repository/worktree へのリンクが表示される | P0 | 内部設計 §10 |
-| **FR-WORK-004** | Comments タブにはコメント一覧（時系列降順）が表示される | P0 | `api-design.md` §3.10:700 |
-| **FR-WORK-005** | Transitions タブには現在の状態から遷移可能な状態一覧が表示される（**閲覧のみ、実行は V1.1**） | P0 | `api-design.md` §3.5:630 |
-| **FR-WORK-006** | 詳細画面右上に「Web で開く」ボタンを配置し、Star Web の該当 Work Item 詳細ページに遷移する | P0 | 本書新規 |
-| FR-WORK-007 | ❌ インライン編集は実装しない（V1.1） | — | 保留 |
-| FR-WORK-008 | ❌ コメント投稿は実装しない（V1.1） | — | 保留 |
-| FR-WORK-009 | ❌ 状態遷移の実行は実装しない（V1.1） | — | 保留 |
-| FR-WORK-010 | ❌ 添付ファイル閲覧は実装しない（V1.1） | — | 保留 |
-
-### 5.4 FR-NOTIF: 通知閲覧機能
+### 5.3 FR-WORK-ITEM: Work Item 詳細 + 編集機能
 
 | ID | 要件 | 優先度 | 出典 |
 |---|---|---|---|
-| **FR-NOTIF-001** | ユーザーは自分宛の通知一覧を閲覧できる | P0 | `api-design.md` §3.16:787 |
-| **FR-NOTIF-002** | 通知一覧は最新 20 件まで取得し、Pull-to-Refresh で追加取得できる | P0 | 本書新規 |
-| **FR-NOTIF-003** | 30 秒間隔でポーリングし、新規通知を自動取得する | P1 | per ADR-0021 制約 |
-| **FR-NOTIF-004** | 通知をタップすると既読化される（`POST /v1/notifications/{id}:read`） | P0 | `api-design.md` §3.16:788 |
-| **FR-NOTIF-005** | 「すべて既読」ボタンで全通知を一括既読化できる | P1 | `api-design.md` §3.16:789 |
-| **FR-NOTIF-006** | 通知をタップすると、関連する Work Item 詳細画面に遷移する | P0 | 本書新規 |
-| **FR-NOTIF-007** | 未読通知の件数をアプリアイコンバッジに表示する | P1 | 本書新規 |
-| FR-NOTIF-008 | ❌ プッシュ通知（OS レベルの通知）は実装しない | — | 保留 |
-| FR-NOTIF-009 | ❌ 通知のフィルタリング / 検索は実装しない（V1.1） | — | 保留 |
+| **FR-WORK-001** | ユーザーは Work Item 詳細を閲覧できる | P0 | v1.0 継承 |
+| **FR-WORK-002** | 詳細画面は 3 タブ構成: Overview / Comments / Transitions | P0 | v1.0 継承 |
+| **FR-WORK-003** | Overview タブには title, description, status, priority, assignee, reporter, due date, repository/worktree へのリンクが表示される | P0 | v1.0 継承 |
+| **FR-WORK-004** | Comments タブにはコメント一覧（時系列降順）が表示される | P0 | v1.0 継承 |
+| **FR-WORK-005** | Transitions タブには現在の状態から遷移可能な状態一覧が表示される | P0 | v1.0 継承 |
+| **FR-WORK-006** | 詳細画面右上に「Web で開く」ボタンを配置し、Star Web の該当 Work Item 詳細ページに遷移する | P0 | v1.0 継承 |
+| **FR-WORK-007** | **ユーザーは priority / assignee / due date / description フィールドをインライン編集できる** | P0 | **UAT 新規** |
+| **FR-WORK-008** | **ユーザーは Comments タブからコメントを投稿できる** | P0 | **UAT 新規** |
+| **FR-WORK-009** | **ユーザーは Transitions タブから状態遷移を実行できる** | P0 | **UAT 新規** |
+| **FR-WORK-010** | **編集操作はオフライン時にローカルで記録され、接続回復時に同期される** | P0 | **UAT 新規** |
+| **FR-WORK-011** | **編集が成功すると WS 推送で他クライアントにも即時反映** | P1 | **UAT 新規** |
+| **FR-WORK-012** | **添付ファイル表示は実装するが Upload/Download は V1.2 まで保留** | P1 | **UAT 部分実装** |
+| FR-WORK-013 | ❌ 添付ファイル Upload/Download は V1.2 | — | 保留 |
 
-### 5.5 FR-PROJ: プロジェクト選択機能
+### 5.4 FR-NOTIF: 通知閲覧 + 推送機能
 
 | ID | 要件 | 優先度 | 出典 |
 |---|---|---|---|
-| **FR-PROJ-001** | ユーザーは自分がメンバーであるプロジェクトの一覧を閲覧できる | P0 | `api-design.md` §3.4 |
-| **FR-PROJ-002** | プロジェクトをタップすると該当プロジェクトのボード画面に遷移する | P0 | 本書新規 |
-| **FR-PROJ-003** | プロジェクト一覧は最終アクセス時刻でソート表示される | P1 | 本書新規 |
+| **FR-NOTIF-001** | ユーザーは自分宛の通知一覧を閲覧できる | P0 | v1.0 継承 |
+| **FR-NOTIF-002** | 通知一覧は最新 20 件まで取得し、Pull-to-Refresh で追加取得できる | P0 | v1.0 継承 |
+| **FR-NOTIF-003** | 30 秒間隔の REST ポーリングを**残置**（WS 切断時のフォールバック） | P1 | **UAT 修正**: 30s 維持 |
+| **FR-NOTIF-004** | 通知をタップすると既読化される（`POST /v1/notifications/{id}:read`） | P0 | v1.0 継承 |
+| **FR-NOTIF-005** | 「すべて既読」ボタンで全通知を一括既読化できる | P1 | v1.0 継承 |
+| **FR-NOTIF-006** | 通知をタップすると、関連する Work Item 詳細画面に遷移する | P0 | v1.0 継承 |
+| **FR-NOTIF-007** | 未読通知の件数をアプリアイコンバッジに表示する | P1 | v1.0 継承 |
+| **FR-NOTIF-008** | **WebSocket 接続が確立している場合、サーバ推送でリアルタイムに通知を受信する** | P0 | **UAT 新規** |
+| **FR-NOTIF-009** | **WebSocket 切断時は 30s REST ポーリングにフォールバックする** | P0 | **UAT 新規** |
+| **FR-NOTIF-010** | **OS レベルプッシュ通知（NotificationChannel）は実装しない** | — | UAT で確認 (FCM 不可, ローカル通知のみ将来 V1.2) |
+| FR-NOTIF-011 | ❌ 通知のフィルタリング / 検索は実装しない（V1.2 候補） | — | 保留 |
+
+### 5.5 FR-OFFLINE: オフライン機能
+
+| ID | 要件 | 優先度 | 出典 |
+|---|---|---|---|
+| **FR-OFFLINE-001** | **ネットワーク接続喪失を `connectivity_plus` で検知し、`AppLifecycleState` と組み合わせて offline モードに入る** | P0 | **UAT 新規** |
+| **FR-OFFLINE-002** | **オフライン状態では、過去に閲覧した Work Item / Board / Comment をローカル SQLite から表示する** | P0 | **UAT 新規** |
+| **FR-OFFLINE-003** | **オフライン状態でも Work Item の編集 / コメント投稿 / 状態遷移操作が可能** | P0 | **UAT 新規** |
+| **FR-OFFLINE-004** | **オフライン中の操作は SyncQueue（Drift テーブル）にローカル保存される** | P0 | **UAT 新規** |
+| **FR-OFFLINE-005** | **接続回復時、SyncQueue のアイテムが順次同期される** | P0 | **UAT 新規** |
+| **FR-OFFLINE-006** | **同期中に競合が発生した場合、ユーザーに競合解決 UI を提示し、勝側を選択させる** | P0 | **UAT 新規** |
+| **FR-OFFLINE-007** | **オフライン状態は UI 上に明示的に表示**（バナー / アプリアイコン色変化） | P0 | **UAT 新規** |
+| **FR-OFFLINE-008** | **ローカル DB は SQLCipher で暗号化する** | P0 | **UAT 新規, 機微データ保護** |
+| **FR-OFFLINE-009** | **ローカル DB の容量上限は 50MB とし、上限到達時は古い Work Item から自動削除** | P1 | **UAT 新規** |
+| **FR-OFFLINE-010** | **手動同期ボタン: Settings / 各画面から明示的に同期トリガ可能** | P1 | **UAT 新規** |
+| **FR-OFFLINE-011** | **同期状態（synced / syncing / failed / conflict 件数）をアプリ内で可視化** | P1 | **UAT 新規** |
+
+### 5.6 FR-PROJ: プロジェクト選択機能
+
+| ID | 要件 | 優先度 | 出典 |
+|---|---|---|---|
+| **FR-PROJ-001** | ユーザーは自分がメンバーであるプロジェクトの一覧を閲覧できる | P0 | v1.0 継承 |
+| **FR-PROJ-002** | プロジェクトをタップすると該当プロジェクトのボード画面に遷移する | P0 | v1.0 継承 |
+| **FR-PROJ-003** | プロジェクト一覧は最終アクセス時刻でソート表示される | P1 | v1.0 継承 |
 | FR-PROJ-004 | ❌ プロジェクトの新規作成は実装しない（Web で実施） | — | 保留 |
 
-### 5.6 FR-SETTINGS: 設定機能
+### 5.7 FR-SETTINGS: 設定機能
 
 | ID | 要件 | 優先度 | 出典 |
 |---|---|---|---|
-| **FR-SETTINGS-001** | ユーザーはテーマ（light / dark / system）を切り替えられる | P0 | 本書新規 |
-| **FR-SETTINGS-002** | ユーザーはログアウトできる | P0 | FR-AUTH-005 |
-| **FR-SETTINGS-003** | 設定画面にアプリバージョン / ビルド番号が表示される | P2 | 本書新規 |
-| **FR-SETTINGS-004** | 設定画面に新バージョン通知バナー（`GET /v1/app-version`）が表示される | P2 | §11 G-02 |
+| **FR-SETTINGS-001** | ユーザーはテーマ（light / dark / system）を切り替えられる | P0 | v1.0 継承 |
+| **FR-SETTINGS-002** | ユーザーはログアウトできる | P0 | v1.0 継承 (FR-AUTH-005) |
+| **FR-SETTINGS-003** | 設定画面にアプリバージョン / ビルド番号 / **同期状態** / **未同期件数** が表示される | P0 | **UAT 拡張** |
+| **FR-SETTINGS-004** | 設定画面に**「手動同期」ボタン**が表示される | P0 | **UAT 新規** |
+| **FR-SETTINGS-005** | 設定画面に**「キャッシュクリア」ボタン**が表示される（ローカル DB + 同期キュー削除） | P0 | **UAT 新規** |
+| **FR-SETTINGS-006** | 設定画面に**「ログ送信」ボタン**が表示される（クラッシュログ + API 失敗ログ） | P1 | **UAT 新規** |
+| **FR-SETTINGS-007** | 設定画面に新バージョン通知バナー（`GET /v1/app-version`）が表示される | P2 | v1.0 継承 |
+| **FR-SETTINGS-008** | 設定画面に**WS 接続状態**（接続中 / 切断 / 再接続中）が表示される | P1 | **UAT 新規** |
 
-### 5.7 FR-NAV: ナビゲーション機能
+### 5.8 FR-NAV: ナビゲーション機能
 
 | ID | 要件 | 優先度 | 出典 |
 |---|---|---|---|
-| **FR-NAV-001** | アプリ起動時にログイン状態を確認し、未ログインならログイン画面、ログイン済みなら最終アクセス画面を表示する | P0 | 本書新規 |
-| **FR-NAV-002** | 認証必須画面には認証ガードが働き、未ログイン状態でアクセスするとログイン画面にリダイレクトされる | P0 | 本書新規 |
-| **FR-NAV-003** | アプリがバックグラウンドから復帰した時、認証トークンの有効性を確認し、無効ならログイン画面に遷移する | P0 | 本書新規 |
-| **FR-NAV-004** | アプリ起動時間（cold start → ボード表示まで）は 1.5 秒以内（Mid-range Android 想定） | P1 | 性能要件 §6.1 |
+| **FR-NAV-001** | アプリ起動時にログイン状態を確認し、未ログインならログイン画面、ログイン済みなら最終アクセス画面を表示する | P0 | v1.0 継承 |
+| **FR-NAV-002** | 認証必須画面には認証ガードが働き、未ログイン状態でアクセスするとログイン画面にリダイレクトされる | P0 | v1.0 継承 |
+| **FR-NAV-003** | アプリがバックグラウンドから復帰した時、認証トークンの有効性を確認し、無効ならログイン画面に遷移する | P0 | v1.0 継承 |
+| **FR-NAV-004** | アプリ起動時間（cold start → ボード表示まで）は 1.5 秒以内 | P1 | v1.0 継承 |
+| **FR-NAV-005** | **ネットワーク接続状態に応じて画面下部に「オフライン」バナーが表示される** | P0 | **UAT 新規** |
+
+### 5.9 FR-WS: WebSocket 推送機能
+
+| ID | 要件 | 優先度 | 出典 |
+|---|---|---|---|
+| **FR-WS-001** | **ログイン成功時、自動的に `wss://star.internal:8080/api/v1/ws` への接続を確立する** | P0 | **UAT 新規** |
+| **FR-WS-002** | **接続時に `subprotocol: star.v1` + `Authorization: Bearer <jwt>` を設定** | P0 | **UAT 新規, per `api-design.md` §4** |
+| **FR-WS-003** | **接続時に subscribe メッセージを送信し、`work_item` / `notification` リソースタイプを購読** | P0 | **UAT 新規, §11 G-16 拍板待ち** |
+| **FR-WS-004** | **サーバから ping を受信した場合、60s 以内に pong を返す** | P0 | **UAT 新規, per `api-design.md` §4.5** |
+| **FR-WS-005** | **接続切断時、指数バックオフ（1s → 3s → 10s）で自動再接続** | P0 | **UAT 新規** |
+| **FR-WS-006** | **再接続成功時、subscribe を再送する** | P0 | **UAT 新規** |
+| **FR-WS-007** | **WebSocket 接続は TLS 1.2+ で暗号化**（内網限定 cleartext は不可、WS のみ HTTPS 必須） | P0 | **UAT 新規, セキュリティ要件** |
+| **FR-WS-008** | **WebSocket 接続状態（接続中 / 切断 / 再接続中 / エラー）が `AppLifecycleState` と連動** | P0 | **UAT 新規** |
 
 ---
 
@@ -199,68 +253,81 @@
 
 | ID | 要件 | 目標値 | 出典 |
 |---|---|---|---|
-| NFR-PERF-001 | アプリ cold start 時間（Pixel 6 想定） | ≤ 1.5s | 本書新規 |
-| NFR-PERF-002 | ボード表示時間（API 取得 + レンダリング） | ≤ 2.0s | 本書新規 |
-| NFR-PERF-003 | API 呼び出し P95 応答時間（内網） | ≤ 200ms | `api-design.md` §10 |
-| NFR-PERF-004 | メモリ使用量（idle 時） | ≤ 120 MB | 本書新規 |
-| NFR-PERF-005 | APK サイズ（リリースビルド、Obfuscate 後） | ≤ 30 MB | 本書新規 |
-| NFR-PERF-006 | バッテリー消費（30 分アクティブ利用） | ≤ 5% | 本書新規 |
+| NFR-PERF-001 | アプリ cold start 時間（Pixel 6 想定） | ≤ 1.5s | v1.0 継承 |
+| NFR-PERF-002 | ボード表示時間（API 取得 + レンダリング） | ≤ 2.0s | v1.0 継承 |
+| NFR-PERF-003 | API 呼び出し P95 応答時間（内網） | ≤ 200ms | v1.0 継承 |
+| NFR-PERF-004 | メモリ使用量（idle 時） | ≤ 120 MB | v1.0 継承 |
+| NFR-PERF-005 | APK サイズ（リリースビルド、Obfuscate 後） | ≤ 40 MB | **UAT 修正** (Drift/SQLCipher で +10MB) |
+| NFR-PERF-006 | バッテリー消費（30 分アクティブ利用） | ≤ 5% | v1.0 継承 |
+| **NFR-PERF-007** | **オフライン状態の UI 応答時間（ローカル DB クエリ）** | **≤ 100ms** | **UAT 新規** |
+| **NFR-PERF-008** | **WebSocket 再接続時間（切断から復元まで）** | **≤ 5s** | **UAT 新規** |
+| **NFR-PERF-009** | **同期キュー内 1 件同期時間（local → server）** | **≤ 500ms** | **UAT 新規** |
+| **NFR-PERF-010** | **WebSocket 推送受信から UI 更新まで** | **≤ 200ms** | **UAT 新規** |
 
 ### 6.2 可用性要件（NFR-AVAIL）
 
 | ID | 要件 | 目標値 | 出典 |
 |---|---|---|---|
-| NFR-AVAIL-001 | アプリクラッシュ率（Firebase Crashlytics 不使用のため自社測定） | ≤ 0.1% | 本書新規 |
-| NFR-AVAIL-002 | 致命的バグ（起動不可 / 主要機能全滅）発生時の修正 SLA | 24 時間 | 本書新規 |
+| NFR-AVAIL-001 | アプリクラッシュ率 | ≤ 0.1% | v1.0 継承 |
+| NFR-AVAIL-002 | 致命的バグ修正 SLA | 24 時間 | v1.0 継承 |
+| **NFR-AVAIL-003** | **ネットワーク断絶時のオフライン稼働率** | **≥ 99%** | **UAT 新規** |
+| **NFR-AVAIL-004** | **WebSocket 接続維持率（セッション中）** | **≥ 95%** | **UAT 新規** |
 
 ### 6.3 セキュリティ要件（NFR-SEC）
 
 | ID | 要件 | 出典 |
 |---|---|---|
-| NFR-SEC-001 | access_token / refresh_token は Android Keystore 暗号化して保存する（平文 SharedPreferences 禁止） | 本書新規 |
-| NFR-SEC-002 | 通信は MVP 段階では cleartext HTTP（内網限定）;外網公開時は HTTPS 必須 | per 9/2 デフォルト |
-| NFR-SEC-003 | 通信先は `network_security_config.xml` で `star.internal` ドメインのみ cleartext 許可、他は拒否 | 本書新規 |
-| NFR-SEC-004 | ログイン画面でスクリーンショット無効化フラグ（`FLAG_SECURE`）を設定する | 本書新規 |
-| NFR-SEC-005 | ログアウト時にローカル資格情報を完全削除する | FR-AUTH-005 |
-| NFR-SEC-006 | APK は `obfuscate` + `split-debug-info` ビルドを必須とする | 本書新規 |
-| NFR-SEC-007 | 外部 SDK / 解析サービス（Firebase / Crashlytics / AppsFlyer 等）は使用禁止 | ADR-0021 |
-| NFR-SEC-008 | API Key 等の秘匿情報はコード / 設定ファイルにハードコード禁止、ビルド時 `--dart-define` で注入 | AGENTS.md §4 #5 |
-| NFR-SEC-009 | tenant_id はクライアントから送信せず、API Gateway が JWT から抽出（`api-design.md` §1.8） | `api-design.md` §1.8 |
+| NFR-SEC-001 | access_token / refresh_token は Android Keystore 暗号化して保存する | v1.0 継承 |
+| NFR-SEC-002 | REST 通信は MVP 段階では cleartext HTTP（内網限定）;外網公開時は HTTPS 必須 | v1.0 継承 |
+| **NFR-SEC-003** | **WebSocket 通信は WSS (TLS 1.2+) 必須、cleartext WS は不可** | **UAT 新規, FCM 不可のため WS は HTTPS 化** |
+| NFR-SEC-004 | 通信先は `network_security_config.xml` で `star.internal` ドメインのみ cleartext 許可、他は拒否 | v1.0 継承 |
+| NFR-SEC-005 | ログイン画面でスクリーンショット無効化フラグ（`FLAG_SECURE`）を設定する | v1.0 継承 |
+| NFR-SEC-006 | ログアウト時にローカル資格情報 + オフラインキャッシュを完全削除する | **UAT 拡張** |
+| NFR-SEC-007 | APK は `obfuscate` + `split-debug-info` ビルドを必須とする | v1.0 継承 |
+| NFR-SEC-008 | 外部 SDK / 解析サービス（Firebase / Crashlytics / AppsFlyer 等）は使用禁止 | ADR-0021 |
+| NFR-SEC-009 | API Key 等の秘匿情報はコード / 設定ファイルにハードコード禁止 | AGENTS.md §4 #5 |
+| NFR-SEC-010 | tenant_id はクライアントから送信せず、API Gateway が JWT から抽出 | `api-design.md` §1.8 |
+| **NFR-SEC-011** | **ローカル DB（Drift）は SQLCipher で暗号化する** | **UAT 新規** |
+| **NFR-SEC-012** | **ログ送信時、トークン / パスワード / PII を自動 redact する** | **UAT 新規** |
 
 ### 6.4 保守性要件（NFR-MAINT）
 
 | ID | 要件 | 出典 |
 |---|---|---|
-| NFR-MAINT-001 | コード品質: `flutter analyze --fatal-infos` 0 warning | 本書新規 |
-| NFR-MAINT-002 | コードフォーマット: `dart format` 100% pass | 本書新規 |
-| NFR-MAINT-003 | ユニットテストカバレッジ: ≥ 70% | 本書新規 |
-| NFR-MAINT-004 | ウィジェットテスト: 主要画面 100% カバレッジ | 本書新規 |
-| NFR-MAINT-005 | Lint ルール: `very_good_analysis` 採用 | 本書新規 |
+| NFR-MAINT-001 | `flutter analyze --fatal-infos` 0 warning | v1.0 継承 |
+| NFR-MAINT-002 | `dart format` 100% pass | v1.0 継承 |
+| NFR-MAINT-003 | ユニットテストカバレッジ: ≥ 70% | v1.0 継承 |
+| NFR-MAINT-004 | ウィジェットテスト: 主要画面 100% カバレッジ | v1.0 継承 |
+| NFR-MAINT-005 | Lint ルール: `very_good_analysis` 採用 | v1.0 継承 |
 | NFR-MAINT-006 | コードレビュー: 5 域独立 Lead 承認必須 | AGENTS.md §4 #3 |
+| **NFR-MAINT-007** | **統合テスト: 主要 UAT シナリオ 100% カバレッジ** | **UAT 新規** |
+| **NFR-MAINT-008** | **オフライン / 競合解決 / WS 切断 シナリオのカバレッジ** | **UAT 新規** |
 
 ### 6.5 移植性要件（NFR-PORT）
 
 | ID | 要件 | 出典 |
 |---|---|---|
-| NFR-PORT-001 | Android: minSdk 24, targetSdk 34 | 本書新規 |
-| NFR-PORT-002 | 異なる画面サイズ（4.7"〜6.7"）で正しくレイアウトされる | 本書新規 |
-| NFR-PORT-003 | ❌ iOS 対応は V2 | `internal-design.md:1600` |
+| NFR-PORT-001 | Android: minSdk 24, targetSdk 34 | v1.0 継承 |
+| NFR-PORT-002 | 異なる画面サイズ（4.7"〜6.7"）で正しくレイアウトされる | v1.0 継承 |
+| NFR-PORT-003 | ❌ iOS 対応は V2 | v1.0 継承 |
 
 ### 6.6 ユーザビリティ要件（NFR-USE）
 
 | ID | 要件 | 出典 |
 |---|---|---|
-| NFR-USE-001 | タップターゲット ≥ 48dp（Material Design guideline） | Material 3 |
-| NFR-USE-002 | ライト/ダーク両モード対応 | Material 3 |
-| NFR-USE-003 | ネットワークエラー時のリトライ UI 提供 | 本書新規 |
-| NFR-USE-004 | 空状態（Empty State）のイラスト + 案内文提供 | 内部設計 §10 |
-| NFR-USE-005 | ローディング中は進捗インジケータ表示 | 本書新規 |
+| NFR-USE-001 | タップターゲット ≥ 48dp | v1.0 継承 |
+| NFR-USE-002 | ライト/ダーク両モード対応 | v1.0 継承 |
+| NFR-USE-003 | ネットワークエラー時のリトライ UI 提供 | v1.0 継承 |
+| NFR-USE-004 | 空状態（Empty State）のイラスト + 案内文提供 | v1.0 継承 |
+| NFR-USE-005 | ローディング中は進捗インジケータ表示 | v1.0 継承 |
+| **NFR-USE-006** | **同期中の進捗（プログレスバー / 件数表示）を表示** | **UAT 新規** |
+| **NFR-USE-007** | **競合解決 UI は差分を左右に並べて表示、ユーザーが明示的に選択** | **UAT 新規** |
 
 ---
 
 ## §7 業務フロー / ユースケース
 
-### 7.1 UC-001: ログイン
+### 7.1 UC-001: ログイン（v1.0 継承）
 
 ```
 [User] → アプリ起動 → 未ログイン状態
@@ -271,60 +338,129 @@
    → flutter_secure_storage に token 暗号化保存
    → AuthState = Authenticated(user, tenant)
    → 最終アクセス画面に遷移（Projects → Project → Board）
+   → WebSocket 接続確立 (FR-WS-001)
 ```
 
-### 7.2 UC-002: ボード閲覧
+### 7.2 UC-002: ボード閲覧（v1.0 継承 + オフライン拡張）
 
 ```
 [User] → ログイン済み
    → プロジェクト選択画面 → プロジェクトタップ
    → go_router: /projects/:id/board
-   → BoardController.fetch(): GET /v1/projects/{id}/board + GET /v1/work-items?project_id=...
+   → BoardController.fetch(): 優先 Drift ローカル → なければ REST GET
    → Board 表示（横スクロール Columns + Cards）
-   → 30s 待機（ポーリングは Notifications のみ、Board は Pull-to-Refresh のみ）
+   → 30s REST ポーリング (FR-NOTIF-003) + WS 推送 (FR-NOTIF-008)
+   → WS 受信時、差分更新 (FR-BOARD-008)
 ```
 
-### 7.3 UC-003: Work Item 詳細閲覧
+### 7.3 UC-003: Work Item 詳細閲覧（v1.0 継承）
 
 ```
 [User] → ボード画面でカードタップ
    → go_router: /work-items/:id
-   → WorkItemController.fetch(): GET /v1/work-items/{id} + GET /v1/work-items/{id}/comments + GET /v1/work-items/{id}/transitions
+   → WorkItemController.fetch(): Drift ローカル → REST GET
    → 3 タブ表示（Overview / Comments / Transitions）
    → 「Web で開く」ボタンタップ → Star Web の /work-items/{id} を外部ブラウザ起動
 ```
 
-### 7.4 UC-004: 通知閲覧
+### 7.4 UC-004: 通知閲覧（v1.0 継承 + WS 拡張）
 
 ```
 [User] → アプリ起動 / バックグラウンド復帰
    → Notifications タブ開く
-   → NotificationsController.fetch(): GET /v1/notifications?read=false&limit=20
-   → 30 秒ごとにポーリング（バックグラウンド時停止）
+   → NotificationsController.fetch(): REST GET 20件
+   → WebSocket 接続中なら、推送受信で即時追加
+   → 30s ポーリング (WS 切断時のフォールバック)
    → 通知タップ → POST /v1/notifications/{id}:read → 該当 Work Item 詳細画面遷移
    → アプリアイコンバッジに未読件数表示
 ```
 
-### 7.5 UC-005: ログアウト
+### 7.5 UC-005: ログアウト（v1.0 拡張）
 
 ```
 [User] → Settings 画面 → ログアウトボタン
-   → flutter_secure_storage の全 key 削除
-   → POST /v1/auth/logout（best-effort）
-   → AuthState = Unauthenticated
-   → go_router: /login
+   → 未同期 SyncQueue 件数チェック
+   → 未同期 > 0 → 確認ダイアログ (FR-AUTH-007)
+      → ユーザー「破棄」: 全削除してログアウト
+      → ユーザー「キャンセル」: 戻る
+   → flutter_secure_storage 全 key 削除
+   → Drift DB 全テーブル削除
+   → POST /v1/auth/logout (best-effort)
+   → WebSocket 切断
+   → AuthState = Unauthenticated → /login
 ```
 
-### 7.6 例外フロー
+### 7.6 UC-006: 状態遷移実行（UAT 新規）
+
+```
+[User] → Work Item 詳細 → Transitions タブ
+   → 遷移可能状態一覧表示
+   → 遷移先タップ → 確認ダイアログ
+   → 確認 → POST /v1/work-items/{id}:transition (Idempotency-Key 必須, `api-design.md` §1.6)
+   
+   【オンライン】
+   → 200 OK → WorkItem 新状態を表示
+   → WS 推送 (FR-WS-008) で他クライアントへ伝播
+   
+   【オフライン】
+   → SyncQueue に追記 (FR-OFFLINE-004)
+   → Optimistic UI 更新（即座に新状態表示）
+   → UI 上に「未同期」バッジ表示
+   → 接続回復時に自動同期 (FR-OFFLINE-005)
+   → 競合時 (FR-OFFLINE-006):
+     → 409 Conflict 受領
+     → ConflictResolver: サーバ版 / ローカル版をユーザーに提示
+     → ユーザー選択 (サーバ優先 / ローカル優先 / マージ)
+     → 再送または破棄
+```
+
+### 7.7 UC-007: オフライン編集（UAT 新規）
+
+```
+[User] → 地下鉄で作業中、ネットワーク断
+   → UI 上に「オフライン」バナー表示 (FR-OFFLINE-007)
+   → Work Item の priority を「High」に変更
+     → Drift ローカル DB を即座に更新
+     → SyncQueue に追記
+     → Optimistic UI
+   → 別の Work Item にコメント投稿
+     → 同様にローカル保存 + SyncQueue
+   → 地下を出て接続回復
+   → 接続性監視 (FR-OFFLINE-001) が recovery 検知
+   → SyncQueue を順次同期
+   → 各リクエストに Idempotency-Key 付与
+   → 全て成功 → バナー消える、未同期バッジ消える
+   → 一部失敗 / 競合 → ユーザー通知 + 競合解決 UI
+```
+
+### 7.8 UC-008: WebSocket 推送受信（UAT 新規）
+
+```
+[Backend] → Work Item 状態変更イベント発生
+   → WS Service: 当該テナントの全 WS クライアントに推送
+   → [App] → WS 受信
+   → JSON parse → event type 判定
+     → 'work_item.updated': BoardController が該当 WorkItem を更新 → UI 反映
+     → 'work_item.commented': Comments タブにバッジ表示
+     → 'notification.new': NotificationsController がリスト先頭に追加 → UI 反映
+   → 200ms 以内 (NFR-PERF-010)
+```
+
+### 7.9 例外フロー（v1.0 継承 + 拡張）
 
 | 例外 | 挙動 |
 |---|---|
-| ネットワーク接続なし | 「ネットワーク接続がありません」トースト + ボード画面は最終取得データ表示（メモリ内）+ Pull-to-Refresh 時に再試行 |
-| API 500 エラー | 「サーバーエラーが発生しました」+ リトライボタン |
+| ネットワーク接続なし | 「オフライン」バナー + ボード画面は Drift ローカル データ + SyncQueue バッジ + Pull-to-Refresh 無効化 |
+| API 500 エラー | 「サーバーエラー」+ リトライボタン (オンライン時) |
 | API 401（refresh 失敗含む） | 自動ログアウト → ログイン画面 |
 | API 403 | 「アクセス権限がありません」+ 戻るボタン |
 | API 404 | 「Work Item が見つかりません」+ 戻るボタン |
+| API 409 競合 | 競合解決 UI (NFR-USE-007) |
 | トークン期限切れ + refresh 失敗 | 自動ログアウト + ログイン画面 + 「セッションの有効期限が切れました」トースト |
+| **WebSocket 接続失敗** | **フォールバック: 30s REST ポーリングで稼働継続** (FR-NOTIF-009) |
+| **WebSocket 接続中だが推送遅延 30s 超** | **接続再構築** (FR-WS-005) |
+| **同期キュー 100 件超** | **古い順に自動 drop + ユーザー通知** |
+| **SQLite 容量 50MB 到達** | **古い Work Item から削除 + ユーザー通知** (FR-OFFLINE-009) |
 
 ---
 
@@ -332,176 +468,261 @@
 
 ### 8.1 アプリ内部データ（クライアント側のみ）
 
-| データ | 種別 | 保持場所 | TTL |
-|---|---|---|---|
-| access_token | 資格情報 | flutter_secure_storage (Keystore) | 15 分（後端定） |
-| refresh_token | 資格情報 | flutter_secure_storage (Keystore) | 7 日 |
-| user（id, name, avatar_url） | 業務データ | flutter_secure_storage (JSON) | refresh まで |
-| tenant（id, name） | 業務データ | flutter_secure_storage (JSON) | refresh まで |
-| ボード設定 | 業務データ | メモリ（Riverpod） | 単一セッション |
-| Work Item リスト | 業務データ | メモリ | 単一セッション |
-| Work Item 詳細 | 業務データ | メモリ | 単一セッション |
-| 通知リスト | 業務データ | メモリ | 30s ポーリング更新 |
-| テーマ設定 | ユーザー設定 | flutter_secure_storage | 永続 |
+| データ | 種別 | 保持場所 | TTL | 暗号化 |
+|---|---|---|---|---|
+| access_token | 資格情報 | flutter_secure_storage (Keystore) | 15 分 | ✅ |
+| refresh_token | 資格情報 | flutter_secure_storage (Keystore) | 7 日 | ✅ |
+| user（id, name, avatar_url） | 業務データ | flutter_secure_storage (JSON) | refresh まで | ✅ |
+| tenant（id, name） | 業務データ | flutter_secure_storage (JSON) | refresh まで | ✅ |
+| テーマ設定 | ユーザー設定 | flutter_secure_storage | 永続 | ✅ |
+| **Work Item キャッシュ** | **業務データ** | **Drift/SQLite (SQLCipher)** | **最終アクセス + 7 日** | **✅ NFR-SEC-011** |
+| **Board キャッシュ** | **業務データ** | **Drift/SQLite** | **最終アクセス + 7 日** | **✅** |
+| **Comment キャッシュ** | **業務データ** | **Drift/SQLite** | **最終アクセス + 7 日** | **✅** |
+| **SyncQueue** | **業務データ** | **Drift/SQLite** | **同期完了まで** | **✅** |
+| **Conflict 解決待ち** | **業務データ** | **Drift/SQLite** | **ユーザー解決まで** | **✅** |
+| 通知リスト | 業務データ | メモリ + Drift | WS / 30s ポーリング | 一部 |
 
-**注**: MVP では**ローカル DB（SQLite/Hive 業務キャッシュ）を持たない**。理由: offline-only 機能要件がないため。V1.1 で Drift/SQLite 導入予定（§11 G-04）。
+### 8.2 Drift テーブル概要（DDL 詳細は `03-detailed-design.md` §6.3）
 
-### 8.2 サーバ側データ（要件のみ、DDL は `data-design.md` v0.2 §4 参照）
+| テーブル | 主キー | 用途 |
+|---|---|---|
+| `cached_work_items` | id | 閲覧済み Work Item キャッシュ |
+| `cached_boards` | project_id | プロジェクトボード設定 |
+| `cached_columns` | id | ボード列 |
+| `cached_comments` | id | コメント履歴 |
+| `cached_notifications` | id | 通知履歴 |
+| `sync_queue` | auto-increment id | オフライン操作の同期キュー |
+| `conflict_reports` | id | 競合解決待ちアイテム |
 
-本 MVP が読み取る既存 Star サーバ側データ：
-- `tenant` テーブル（id, name）
-- `user` テーブル（id, email, display_name, avatar_url, tenant_id）
-- `project` テーブル（id, tenant_id, name, slug）
-- `board` テーブル（id, project_id, columns[]）
-- `work_item` テーブル（id, project_id, type, title, status, assignee_user_id, priority, ...）
-- `comment` テーブル（id, parent_type, parent_id, author_user_id, body, ...）
-- `notification` テーブル（id, recipient_user_id, event_type, payload, read_at, sent_at）
+### 8.3 サーバ側データ
 
-サーバ側テーブル定義は本書の対象外（`docs/data-design.md` v0.2 §4 を参照）。
+`01-requirements.md` v1.0 §8.2 と同じ（`tenant`, `user`, `project`, `board`, `work_item`, `comment`, `notification`）。
+
+**UAT で新規に必要なサーバ側データ**:
+- `idempotency_keys` テーブル（既存? V1.0 経由で確認要、§11 G-17）
+- WS 接続管理（既存 / V1.0 経由で確認要、§11 G-18）
 
 ---
 
 ## §9 インターフェース要件（高レベル、詳細スキーマは §11 / 詳細設計書）
 
-### 9.1 API エンドポイント一覧（MVP で呼び出す 13 個）
+### 9.1 REST API エンドポイント一覧（UAT で 13 → 20 個に拡張）
 
-| # | Method | パス | 認証 | 用途 |
-|---|---|---|---|---|
-| 1 | POST | `/v1/auth/login` | Anonymous | ログイン（§11 G-01 で存在未確認） |
-| 2 | POST | `/v1/auth/refresh` | Authenticated | トークンリフレッシュ |
-| 3 | POST | `/v1/auth/logout` | Authenticated | ログアウト |
-| 4 | GET | `/v1/users/me` | Authenticated | 自分の情報取得 |
-| 5 | GET | `/v1/tenants/current` | Authenticated | 自分のテナント取得 |
-| 6 | GET | `/v1/projects/{id}/board` | Policy | ボード設定取得 |
-| 7 | GET | `/v1/work-items?project_id=&...` | Policy | Work Item リスト |
-| 8 | GET | `/v1/work-items/{id}` | Policy | Work Item 詳細 |
-| 9 | GET | `/v1/work-items/{id}/transitions` | Policy | 遷移可能状態 |
-| 10 | GET | `/v1/work-items/{id}/comments` | Policy | コメント一覧 |
-| 11 | GET | `/v1/notifications?read=false` | Authenticated | 通知一覧 |
-| 12 | POST | `/v1/notifications/{id}:read` | Authenticated | 単条既読化 |
-| 13 | POST | `/v1/notifications/mark-all-read` | Authenticated | 全既読化 |
+| # | Method | パス | 認証 | 用途 | UAT 区分 |
+|---|---|---|---|---|---|
+| 1 | POST | `/v1/auth/login` | Anonymous | ログイン | v1.0 継承 |
+| 2 | POST | `/v1/auth/refresh` | Authenticated | トークンリフレッシュ | v1.0 継承 |
+| 3 | POST | `/v1/auth/logout` | Authenticated | ログアウト | v1.0 継承 |
+| 4 | GET | `/v1/users/me` | Authenticated | 自分の情報取得 | v1.0 継承 |
+| 5 | GET | `/v1/tenants/current` | Authenticated | 自分のテナント取得 | v1.0 継承 |
+| 6 | GET | `/v1/projects/{id}/board` | Policy | ボード設定取得 | v1.0 継承 |
+| 7 | GET | `/v1/work-items?project_id=&...` | Policy | Work Item リスト | v1.0 継承 |
+| 8 | GET | `/v1/work-items/{id}` | Policy | Work Item 詳細 | v1.0 継承 |
+| 9 | GET | `/v1/work-items/{id}/transitions` | Policy | 遷移可能状態 | v1.0 継承 |
+| 10 | GET | `/v1/work-items/{id}/comments` | Policy | コメント一覧 | v1.0 継承 |
+| 11 | GET | `/v1/notifications?read=false` | Authenticated | 通知一覧 | v1.0 継承 |
+| 12 | POST | `/v1/notifications/{id}:read` | Authenticated | 単条既読化 | v1.0 継承 |
+| 13 | POST | `/v1/notifications/mark-all-read` | Authenticated | 全既読化 | v1.0 継承 |
+| **14** | **PATCH** | **`/v1/work-items/{id}`** | **Policy(`work_item:update`) + If-Match** | **Work Item 部分更新 (priority/assignee/description/due_date)** | **UAT 新規** |
+| **15** | **POST** | **`/v1/work-items/{id}:transition`** | **Policy + Idempotency-Key** | **状態遷移実行** | **UAT 新規** |
+| **16** | **POST** | **`/v1/work-items/{id}/comments`** | **Policy(`comment:create`) + Idempotency-Key** | **コメント投稿** | **UAT 新規** |
+| **17** | **POST** | **`/v1/comments/{id}` (PATCH/DELETE)** | **Policy** | **コメント編集/削除** (MVP は作成のみ) | **UAT 部分** |
+| **18** | **GET** | **`/v1/app-version`** | **Anonymous** | **最新アプリバージョン取得** (G-02) | **UAT 拡張** |
+| **19** | **POST** | **`/v1/sync/batch`** | **Policy** | **オフライン操作のバッチ同期 (DRYRUN/preview)** | **UAT 検討 (§11 G-19)** |
+| **20** | **GET** | **`/v1/work-items/{id}/attachments`** | **Policy** | **添付ファイル一覧 (V1.2 で download/upload)** | **UAT 部分** |
 
-### 9.2 通信仕様（高レベル）
+### 9.2 WebSocket エンドポイント（UAT 新規）
 
-- プロトコル: HTTP/1.1 + JSON
-- ベース URL: `http://<STAR_HOST>/api/v1`（STAR_HOST は §11 G-03 で拍板待ち）
-- 認証ヘッダ: `Authorization: Bearer <access_token>`
-- テナント: クライアント送信なし（API Gateway が JWT から抽出、`api-design.md` §1.8）
-- トレース: `traceparent` (W3C Trace Context)
-- コンテンツタイプ: `application/json; charset=utf-8`
-- エラー: RFC 7807 Problem Details 形式
+| 項目 | 値 |
+|---|---|
+| URL | `wss://star.internal:8080/api/v1/ws` (HTTPS 必須、NFR-SEC-003) |
+| Subprotocol | `star.v1`（強制、不一致 → 握手失敗） |
+| 認証 | `Sec-WebSocket-Protocol: star.v1` + `Authorization: Bearer <jwt>` |
+| tenant_id | JWT claim から抽出（query / subscribe で送らない） |
+| Heartbeat | サーバ 30s ごとに ping、クライアント 60s 以内に pong |
+| 最大同時 Subscription | 100 / Connection |
+| 購読 resource_types | `work_item`, `notification`（§11 G-16 で拍板待ち） |
 
-### 9.3 画面遷移仕様（高レベル）
+**WS メッセージ形式** (per `api-design.md` §4.4):
+
+```json
+// Client → Server: subscribe
+{
+  "type": "subscribe",
+  "id": "sub-001",
+  "filter": {
+    "resource_types": ["work_item", "notification"],
+    "project_id": "prj_xxx"
+  }
+}
+
+// Server → Client: push event
+{
+  "type": "event",
+  "id": "evt-001",
+  "resource_type": "work_item",
+  "resource_id": "01HYYY...",
+  "action": "updated",
+  "data": { /* work_item snapshot */ }
+}
+```
+
+### 9.3 画面遷移仕様（v1.0 継承 + UAT 拡張）
 
 ```
 /login (public)
   → /projects (auth)
     → /projects/:id/board (auth + project member)
       → /work-items/:id (auth)
+        → /work-items/:id/edit (auth, UAT 新規)
+        → /work-items/:id/transitions (auth, UAT 新規)
+        → /work-items/:id/comments (auth, UAT 新規)
   
   → /notifications (auth)
     → /work-items/:id (deep link)
   
   → /settings (auth)
+    → /settings/sync (auth, UAT 新規: 同期状態詳細)
+    → /settings/conflicts (auth, UAT 新規: 競合解決キュー)
+  
+  → /sync-conflict/:conflict_id (auth, UAT 新規: 競合解決画面)
 ```
 
 ---
 
-## §10 運用・保守要件
+## §10 運用・保守要件（v1.0 拡張）
 
 ### 10.1 APK 配布
 
-- **内網ファイル共有**（NAS / MinIO）からの手動ダウンロード
-- QR コードまたは URL を README / 社内ポータルに掲載
-- 自動更新は**未対応**（V1.1 で `GET /v1/app-version` ベースの更新通知バナーを実装予定、§11 G-02）
+- **内網ファイル共有** + 新バージョン通知バナー (FR-SETTINGS-007)
 
-### 10.2 ログ収集
+### 10.2 ログ収集（UAT 拡張）
 
 - **外部解析サービス禁止**（ADR-0021）
-- 自社クラッシュレポート: アプリ内 `try/catch` でローカルのログファイルに書き出し、ユーザーが「不具合報告」メニューから手動送信
-- API ログ: Backend 側 `audit_event` テーブルに記録（`api-design.md` §3.12）
+- 自社クラッシュレポート: アプリ内 `try/catch` でローカルのログファイルに書き出し
+- **ログ送信機能** (FR-SETTINGS-006): ユーザーが手動でログファイル送信
+- **自動 redact** (NFR-SEC-012): トークン / パスワード / PII を送信前に除去
 
 ### 10.3 監視
 
-- サーバー側メトリクス（API 応答時間、エラー率）は Backend 側 Grafana で監視
-- クライアント側クラッシュ率は §10.2 の手動収集で代替
+- サーバ側メトリクス（API 応答時間、エラー率、WS 接続数）は Backend 側 Grafana
+- クライアント側: **接続率 / 同期成功率 / 競合発生率** を匿名集計（V1.2 で詳細化）
 
 ### 10.4 バックアップ
 
-- モバイル側に永続データなし（§8.1）→ バックアップ不要
+- オフラインキャッシュは失われても再取得可能なため、バックアップ不要
+- ただし、**未同期 SyncQueue は失われるとユーザー操作が失われる**（重要）
 
 ---
 
-## §11 セキュリティ要件（詳細、§6.3 の拡張）
+## §11 セキュリティ要件（v1.0 §11 + UAT 拡張）
 
 | ID | 脅威 | 対策 | 出典 |
 |---|---|---|---|
-| SEC-001 | トークン盗難 | Android Keystore 暗号化 + FLAG_SECURE（スクリーンショット防止） | NFR-SEC-001/004 |
-| SEC-002 | 中間者攻撃 | MVP は cleartext HTTP（内網限定）;V1.1 で HTTPS 移行検討 | NFR-SEC-002/003 |
-| SEC-003 | デバイス紛失 | ログアウトでローカル完全削除 + Server 側トークン無効化 | NFR-SEC-005 |
+| SEC-001 | トークン盗難 | Android Keystore 暗号化 + FLAG_SECURE | NFR-SEC-001/005 |
+| SEC-002 | 中間者攻撃 | cleartext HTTP（内網限定）+ ドメイン制限 | NFR-SEC-002/004 |
+| SEC-003 | デバイス紛失 | ログアウトでローカル完全削除 + 同期キュー削除 | NFR-SEC-006 |
 | SEC-004 | バックドア SDK | 外部 SDK 全面禁止、AGP 依存関係レビュー必須 | ADR-0021 |
-| SEC-005 | APK 改ざん | 内網署名 + `network_security_config.xml` で通信先制限 | NFR-SEC-003 |
-| SEC-006 | コード解析 | `obfuscate` + `split-debug-info` 必須 | NFR-SEC-006 |
-| SEC-007 | 認証情報ハードコード | `--dart-define` 注入、AGP `BuildConfig` 経由 | NFR-SEC-008 |
-| SEC-008 | 不正 tenant アクセス | クライアントから tenant_id 送信禁止、Gateway が JWT 抽出 | NFR-SEC-009 |
+| SEC-005 | APK 改ざん | 内網署名 + `network_security_config.xml` | NFR-SEC-004 |
+| SEC-006 | コード解析 | `obfuscate` + `split-debug-info` | NFR-SEC-007 |
+| SEC-007 | 認証情報ハードコード | `--dart-define` 注入 | NFR-SEC-009 |
+| SEC-008 | 不正 tenant アクセス | クライアントから tenant_id 送信禁止 | NFR-SEC-010 |
+| **SEC-009** | **WS 中間者攻撃** | **WSS (TLS 1.2+) 必須 + cert pinning 検討** | **NFR-SEC-003** |
+| **SEC-010** | **オフラインキャッシュ漏洩** | **SQLCipher + ログアウト時全削除** | **NFR-SEC-011 + NFR-SEC-006** |
+| **SEC-011** | **同期キュー改ざん** | **Integrity check + Idempotency-Key** | **`api-design.md` §1.6** |
+| **SEC-012** | **ログ漏洩** | **送信前自動 redact (NFR-SEC-012)** | **UAT 新規** |
 
-### 11.1 認証トークン管理詳細
+### 11.1 認証トークン管理詳細（v1.0 継承 + 拡張）
 
 - **access_token**: 有効期限 15 分、API リクエストの `Authorization: Bearer` に使用
 - **refresh_token**: 有効期限 7 日、access_token 再発行にのみ使用
+- **WS 接続時の auth**: WS upgrade 時の `Authorization: Bearer` ヘッダで 1 度だけ認証、接続中は同一 token を使用
+- **WS token 期限切れ**: WS 切断 → REST refresh → WS 再接続
 - **保存場所**: `flutter_secure_storage` (Android Keystore バックエンド、API 23+)
-- **送信**: HTTPS のみ (MVP 段階は HTTP、§6.3 NFR-SEC-002)
-- **ローテーション**: 7 日経過または logout 時に無効化
-- **危殆化時の対応**: 即時サーバー側無効化（`api-design.md` §6.2）+ 全クライアント次回 refresh 失敗で自動ログアウト
+- **ログアウト時の完全削除**: `flutter_secure_storage.deleteAll()` + `Drift` 全テーブル `DELETE`
 
-### 11.2 通信セキュリティ
+### 11.2 通信セキュリティ（UAT 拡張）
 
-- MVP: `http://star.internal:8080` cleartext、`network_security_config.xml` で `*.internal` ドメインのみ許可
-- V1.1: HTTPS 移行 + 自前 CA 証明書（内網限定）または envoy + 自己署名証明書（per 9/1 13:03 JST 偏好）
-- パブリック CA（Let's Encrypt 等）は使用しない（V2 で評価）
+| プロトコル | 暗号化 | 備考 |
+|---|---|---|
+| REST | HTTP（cleartext、内網限定） / HTTPS（外網） | MVP 段階は HTTP、V1.2 で HTTPS 移行検討 |
+| WebSocket | **WSS (TLS 1.2+) 必須** | **cleartext WS は使用禁止** (NFR-SEC-003) |
+| 証明書 | システム信頼ストア + V1.2 で pinning 検討 | 内網 CA は V1.2 で評価 |
+
+### 11.3 オフラインキャッシュセキュリティ（UAT 新規）
+
+- **SQLCipher** で DB 全体を AES-256 暗号化
+- 暗号化キー: Keystore に保存 + 起動時取得
+- ログアウト時: キー削除 + DB ファイル削除（次起動時に新規 DB 作成）
 
 ---
 
-## §12 用語定義
+## §12 用語定義（v1.0 拡張）
 
 | 用語 | 定義 | 出典 |
 |---|---|---|
-| **Work Item** | 作業の最小単位（Jira で言う Issue、GitHub で言う Issue/PR） | `requirements.md` §26 |
+| **Work Item** | 作業の最小単位 | `requirements.md` §26 |
 | **Board** | Work Item をカラム（状態）で表示するカンバンビュー | `api-design.md` §3.7 |
-| **Column** | Board 内の一列、特定の状態（TODO/IN_PROGRESS/DONE 等）に対応 | `api-design.md` §3.7 |
+| **Column** | Board 内の一列、特定の状態に対応 | `api-design.md` §3.7 |
 | **Tenant** | テナント（組織単位）の論理境界 | `requirements.md` §26 |
 | **Project** | テナント内のプロジェクト単位 | `requirements.md` §26 |
-| **MVP** | Minimum Viable Product、本書のスコープ | IPA 標準 |
+| **UAT** | User Acceptance Test、本書のスコープ | IPA 標準 |
 | **access_token** | 短時間有効な API 認証トークン（15 分） | `api-design.md` §1.12 |
 | **refresh_token** | 長時間有効なトークン更新用トークン（7 日） | `api-design.md` §1.12 |
 | **JWT** | JSON Web Token、本書では Bearer 認証に使用 | RFC 7519 |
 | **RFC 7807** | Problem Details for HTTP APIs、エラーレスポンス形式 | IETF |
 | **W3C Trace Context** | `traceparent` ヘッダ標準、分散トレーシング用 | W3C |
-| **IPA** | 情報処理推進機構（Information-technology Promotion Agency） | — |
+| **IPA** | 情報処理推進機構 | — |
 | **DDD** | Domain-Driven Design、本書の上流設計で採用 | Eric Evans |
 | **RLS** | Row Level Security、PostgreSQL の行レベルセキュリティ | `data-design.md` §4.1.4 |
+| **SyncQueue** | オフライン中の操作を順次同期するための FIFO キュー（UAT 用語） | UAT 新規 |
+| **Conflict Resolution** | 同一 Work Item のローカル変更とサーバ変更が衝突した際の解決プロセス | UAT 新規 |
+| **Optimistic UI** | サーバ応答を待たず即座に UI を更新し、後で同期する UX パターン | UAT 新規 |
+| **Idempotency-Key** | 同一リクエストの重複実行を防ぐための UUID キー | `api-design.md` §1.6 |
+| **WSS** | WebSocket over TLS、本書では WSS 必須 (NFR-SEC-003) | RFC 6455 |
+| **Drift** | Dart 向け type-safe SQL ライブラリ、本書でオフライン DB に使用 | drift package |
+| **SQLCipher** | SQLite の透過的暗号化拡張 | sqlcipher.org |
+| **subprotocol** | WebSocket の application-level protocol識別子、本書では `star.v1` | RFC 6455 |
+| **MVP** | Minimum Viable Product（v1.0 スコープ、本書 v1.1 は UAT） | IPA 標準 |
 
 ---
 
-## §13 既知の未解決事項（受け入れ前 拍板待ち）
+## §13 既知の未解決事項
+
+### 13.1 v1.0 から継承（一部は v1.1 で解決）
+
+| ID | 項目 | 状態 | 拍板人 |
+|---|---|---|---|
+| G-01 | `/v1/auth/login` 等の認証エンドポイント実装状況 | 保留 | Ulysses |
+| G-02 | `GET /v1/app-version` アップグレード通知 | 採用 (FR-SETTINGS-007) | SRE Lead |
+| G-03 | `STAR_HOST`（内網ドメイン / IP + ポート） | 保留 | SRE Lead |
+| **G-04** | **オフラインキャッシュ（SQLite/Drift）の V1.1 スコープ** | **✅ v1.1 で実装** | — |
+| **G-05** | **プッシュ通知（自前 WebSocket）の V1.1 スコープ** | **✅ v1.1 で自前 WS 実装** | — |
+| G-06 | Tablet / 横画面レイアウト | 保留 (V1.2) | 5 域 Lead (frontend) |
+| G-07 | iOS V2 計画での Flutter 採用継続可否 | 保留 | Ulysses |
+| **G-08** | **HTTPS / envoy 移行タイミング** | **保留 (REST は HTTP 維持、WS は WSS 必須)** | SRE Lead |
+| G-09 | Device 三重バインディング | 保留 (V1.2) | Ulysses (安全) |
+| G-10 | APK 内網 keystore 署名戦略 | 保留 | SRE Lead |
+| G-11 | APK 配布チャネル | 保留 | Ulysses + SRE Lead |
+| G-12 | 倉位置（`apps/star-mobile-flutter/` vs `frontend/mobile-flutter/`） | 保留 | 架構師 |
+| **G-13** | **WebSocket 实时推送（ポーリング代替）** | **✅ v1.1 で WS 採用** | — |
+| G-14 | 5 域独立 Lead 真实身份補簽 | 保留 (DDD Review 段階) | DDD Review Lead |
+| G-15 | WBS 新增「Flutter MVP」項目 | 保留 | Ulysses |
+
+### 13.2 v1.1 で新規追加
 
 | ID | 項目 | 拍板人 | 影響 |
 |---|---|---|---|
-| **G-01** | `/v1/auth/login` 等の認証エンドポイント実装状況 | Ulysses（架構師） | 存在しない場合 OAuth ブラウザ遷移に切り替え |
-| **G-02** | `GET /v1/app-version` アップグレード通知エンドポイント | SRE Lead | V1.1 で実装要否決定 |
-| **G-03** | `STAR_HOST`（内網ドメイン / IP + ポート） | SRE Lead | アプリ設定と Backend 側 Nginx/envoy 設定 |
-| **G-04** | オフラインキャッシュ（SQLite/Drift）の V1.1 スコープ | 5 域 Lead（work-item） | ネットワーク断絶時の挙動 |
-| **G-05** | プッシュ通知（自前 WebSocket）の V1.1 スコープ | 5 域 Lead（realtime） | リアルタイム性 |
-| **G-06** | Tablet / 横画面レイアウト | 5 域 Lead（frontend） | UX |
-| **G-07** | iOS V2 計画での Flutter 採用継続可否 | Ulysses | V2 モバイル計画統合 |
-| **G-08** | HTTPS / envoy 移行タイミング（per 9/1 13:03/13:05 JST 偏好） | SRE Lead | 内網→外網公開時 |
-| **G-09** | Device 三重バインディング（`internal-design.md:23.2`） | Ulysses（安全） | リスク評価 |
-| **G-10** | APK 内網 keystore 署名戦略 | SRE Lead | 5 域独立拍板（8/21 JST） |
-| **G-11** | APK 配布チャネル（ファイル共有 vs 自前 MDM） | Ulysses + SRE Lead | 運用フロー |
-| **G-12** | 倉位置（`apps/star-mobile-flutter/` vs `frontend/mobile-flutter/`） | 架構師 | CI / monorepo 構造 |
-| **G-13** | WebSocket 实时推送（ポーリング代替） | 5 域 Lead（realtime） | UX vs 複雑度 |
-| **G-14** | 5 域独立 Lead 真实身份補簽 | DDD Review Lead | 簽字欄 DDD Review 段階で補充 |
-| **G-15** | WBS 新增「Flutter MVP」項目 | Ulysses | `AGENTS.md` §7 WBS への組み込み |
+| **G-16** | WS サブスクリプション `resource_types` に `work_item` と `notification` が backend 実装に含まれているか | Ulysses + SRE Lead | 含まれていない場合 backend 拡張が必要（V1.1 ブロッカー） |
+| **G-17** | `idempotency_keys` サーバ側テーブル実装 | SRE Lead | オフライン同期の冪等性担保 |
+| **G-18** | WS 接続管理（接続数制限 / 不正接続検知）の backend 実装 | SRE Lead | セキュリティ + 性能 |
+| **G-19** | バッチ同期エンドポイント `/v1/sync/batch` の要否 | 架構師 + 5 域 Lead | 同期キュー逐次 vs バッチ |
+| **G-20** | 競合解決戦略（サーバ優先 / ローカル優先 / ユーザー選択） | 5 域 Lead (work-item) + PM | UX 影響大 |
+| **G-21** | オフラインキャッシュ TTL（7 日）の妥当性 | 5 域 Lead (work-item) | 業務パターン次第 |
+| **G-22** | SQLCipher 鍵管理（Keystore 連携 / ローテーション） | Ulysses (安全) | 鍵漏洩時の影響 |
+| **G-23** | WS reconnect backoff の最大リトライ回数 | SRE Lead | 暴走防止 |
+| **G-24** | 同期キュー 上限（100 件超の drop 戦略） | 5 域 Lead (work-item) | ユーザー操作消失 |
+| **G-25** | ログ送信時のサイズ上限 / 自動送信トリガ | Ulysses (安全) | プライバシー + UX |
 
 ---
 
@@ -509,11 +730,12 @@
 
 | バージョン | 日付 | 改訂人 | 改訂内容 | トリガ |
 |---|---|---|---|---|
-| v1.0 | 2026-09-02 | 架構師 (Mavis 接手 agent per DEC-008) | IPA 標準初版: §1〜§14 全章, 5.1〜5.7 機能要件 30 件, 6.1〜6.6 非機能要件 22 件, 7.1〜7.6 ユースケース 5 件, 11 既知未解決 15 件, 12 用語 14 件 | 2026-09-02 16:09 JST Ulysses 発令「要符合日本IPA标准的需求、基本设计、详细设计」, v0.1 (commit `bd4998e`) を IPA 3 段組に supersede |
+| v1.0 | 2026-09-02 16:14 JST | 架構師 (Mavis 接手 agent per DEC-008) | IPA 標準初版: read-only MVP 範囲, FR 30 件 + NFR 22 件 | 2026-09-02 15:52 JST Ulysses「完成设计文档撰写」+ 16:09 JST「要符合日本IPA标准」 |
+| **v1.1** | 2026-09-02 16:27 JST | 架構師 (Mavis 接手 agent per DEC-008) | **UAT 全面拡張**: §2 In Scope に核心写 + オフライン + 推送追加, §2 Out of Scope から該当削除, §5 FR 30→58 件 (核心写 FR-WORK-007/008/009/010/011, オフライン FR-OFFLINE-001~011, WS FR-WS-001~008, 通知 FR-NOTIF-008/009 追加), §6 NFR 22→37 件追加, §7 UC 5→8 件追加, §8 データ要件 Drift 7 テーブル追加, §9 エンドポイント 13→20 + WS 仕様, §10 ログ送信追加, §11 セキュリティ 4 脅威追加, §12 用語 14→22 件, §13 既知未解決 G-04/G-05/G-13 解決 + G-16~G-25 新規追加 | 2026-09-02 16:27 JST Ulysses 拍板 UAT 範囲 + 自建 WS 推送 (questionnaire 答: full_uat + self_ws) |
 
 ---
 
-## §15 承認欄（5 角色, AGENTS.md §3 + 8/21 JST 5 域独立）
+## §15 承認欄（5 角色）
 
 | 角色 | 簽字 | 日付 | 備註 |
 |---|---|---|---|
