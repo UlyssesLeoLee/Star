@@ -299,9 +299,9 @@ flowchart LR
 | 10 | domain-board | Kanban / Scrum 板视图 | Board, Column, Swimlane | 与 Sprint / Gantt 共享数据模型(§9,REQ-PLAN-003) | domain-work-item |
 | 11 | domain-planning | Sprint / Backlog / Roadmap | Sprint, Backlog, Roadmap | Burndown 最小必需,Velocity/CFD 控制图 V1(§9) | domain-work-item |
 | 12 | domain-relation | WorkItem 关系(阻塞/关联) | Relation, Dependency | 是甘特图依赖与冲突分析基础(REQ-COLLAB-002) | domain-work-item |
-| 13 | domain-comment | 评论 / @ 提及 / 附件 | Comment, Mention, Attachment | 不替代 Feedback(§25.1) | domain-work-item |
-| 14 | domain-search | 全文 / 符号检索 Projection | SearchIndex, SearchQuery | 不得成为业务事实源(§12,REQ-SEARCH-001) | 所有 domain-*(只读) |
-| 15 | domain-audit | 审计日志 / AI Audit Metadata | AuditEvent, AIAuditMetadata | 敏感 Prompt/Code 不默认进入普通日志(§17,§28.2) | 所有 domain-*(Append-only) |
+| 13 | domain-comment | 评论 / @ 提及 / 附件 | Comment, Mention, Attachment | 不替代 Feedback(§25.1) | domain-work-item, domain-scm |
+| 14 | domain-search | 全文 / 符号检索 Projection(只读订阅) | SearchIndex, SearchQuery | 不得成为业务事实源(§12,REQ-SEARCH-001) | 所有 domain-*(只读订阅 Projection, 非业务事实源) |
+| 15 | domain-audit | 审计日志 / AI Audit Metadata(Append-only 订阅) | AuditEvent, AIAuditMetadata | 敏感 Prompt/Code 不默认进入普通日志(§17,§28.2) | 所有 domain-*(Append-only 订阅, 2026-09-03 蓝方 #22 落档) |
 | 16 | domain-integration | 第三方平台双向同步抽象 | Integration, SyncState | 区分 Link/Mirror/Bidirectional/Platform-owned(§18.1) | domain-scm, domain-work-item |
 | 17 | domain-automation | 触发器-条件-动作规则 | Rule, Trigger, Action | MVP 不强制可视化配置器(§11,REQ-AUTO-001);Trigger 支持 Event 与 Schedule/Cron 两类,互不共用执行路径(REQ-AUTO-002,V1 候选) | domain-work-item, domain-notification |
 
@@ -314,8 +314,8 @@ flowchart LR
 | 20 | domain-project | Project 模板与配置 | Project, ProjectTemplate, ProjectPolicy | 可独立配置 Workflow/Permission/Notification/Agent Policy(REQ-TWP-003) | domain-tenant, domain-workspace |
 | 21 | domain-permission | Permission Scheme 与 RBAC | Role, Permission, PermissionScheme | Agent 操作必须 Application/Authorization 强制(§11,REQ-PERM-002) | domain-tenant |
 | 22 | domain-identity | 用户 / 设备身份 | User, Device, Credential, DeviceBinding | Device 需 Tenant+User+Project 三重绑定(§23.2) | domain-tenant |
-| 23 | domain-notification | 通知渠道与模板 | NotificationChannel, NotificationTemplate | MVP 邮件 + 站内(REQ-NOTIF-001);默认仅在需要人类决策的节点触达,不对 Agent 中间步骤逐条通知(REQ-NOTIF-002) | domain-tenant |
-| 24 | domain-collaboration | 协作(实时状态、Presence) | Presence, RealtimeSubscription | 高频 Token Stream 可不入 SaaS(§15,REQ-RT-003) | domain-work-item, domain-worktree |
+| 23 | domain-notification | 通知渠道与模板(订阅) | NotificationChannel, NotificationTemplate | MVP 邮件 + 站内(REQ-NOTIF-001);默认仅在需要人类决策的节点触达,不对 Agent 中间步骤逐条通知(REQ-NOTIF-002) | domain-tenant (订阅, 2026-09-03 蓝方 #22 落档) |
+| 24 | domain-collaboration | 协作(实时状态、Presence, 订阅) | Presence, RealtimeSubscription | 高频 Token Stream 可不入 SaaS(§15,REQ-RT-003) | domain-work-item, domain-worktree (订阅, 2026-09-03 蓝方 #22 落档) |
 | 25 | domain-local-runtime | 集群外 Local Runtime 的服务器侧 Registry / Port | Runtime, RuntimeCommand, RuntimeObservation | Local Daemon 二进制不属此 crate(§4.6.1,§23.1) | domain-worktree, domain-identity |
 
 ### 2.2 Domain 分层结论
@@ -3030,7 +3030,7 @@ pub trait TraceabilityQueryPort {
 | N.1 | Minimum Sufficient Context | §4.4.4 Token Budget, §5.5 Subject 命名 |
 | N.2 | Provenance 强制 | §4.4.5, §9.2, §5.7 |
 | N.3 | Decision Memory 独立 | §4.4.6, §A.7 状态机 |
-| N.4 | Context Priority 分级 | §4.4.4, §4.10.7 P0-P5 |
+| N.4 | Context Priority 分级 | §4.4.4, §4.10.7 P0-P4 |
 | N.5 | Active Decision 优先 | §4.4.6 DecisionMemoryPort.list_active |
 | N.6 | Handoff Context Packet | §4.2.7 HandoffContextPacket |
 | N.7 | Symbol-level 渐进 | §21.2, §30.2 MVP 范围 |

@@ -326,7 +326,7 @@ sequenceDiagram
 
 | 边界类型 | 本 Module 行为 |
 |---|---|
-| 上游依赖 | `domain-tenant`, `domain-work-item`, `domain-worktree`, `domain-feedback`, `domain-validation`, `domain-development` (SymbolIndex), `domain-agent` |
+| 上游依赖 | `domain-tenant`, `domain-work-item`, `domain-worktree`, `domain-feedback`, `domain-validation`, `domain-development` (SymbolIndex) |
 | 下游调用 | `domain-audit`, `domain-notification`, `domain-agent` |
 | 跨域事务 | `trigger_compile` 跨域只读(Application 编排) |
 | RLS 强制 | 全部 PG 表启用 RLS,Symbol Snapshot 强制 tenant_id 前缀 |
