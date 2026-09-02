@@ -1,0 +1,80 @@
+{
+  "task_id": "star-nav-completion-001",
+  "agent": "worker",
+  "brief_path": "D:\\Star\\docs\\briefs\\star-nav-completion-001.md",
+  "started_at": 1788341493.5594358,
+  "finished_at": 1788342417.0,
+  "exit_code": 0,
+  "status": "succeeded",
+  "subtasks": [
+    {
+      "id": "A",
+      "name": "i18n categoryLabel 同步",
+      "worktree": "wt/star-nav-i18n-a",
+      "branch": "wt/star-nav-i18n-a",
+      "commit": "bd918e4a149ddace1085f551e40451259399a83e",
+      "commit_short": "bd918e4",
+      "status": "succeeded",
+      "files_changed": 4,
+      "insertions": 212,
+      "deletions": 15,
+      "categoryLabel_replacements": 15,
+      "remote_entries_added": 3
+    },
+    {
+      "id": "B",
+      "name": "HeaderTab 8 张视觉对比图",
+      "worktree": "wt/star-nav-shots-b",
+      "branch": "wt/star-nav-shots-b",
+      "commit": "8c893a9207a056e3af0b815b7988d342097ab5c1",
+      "commit_short": "8c893a9",
+      "status": "succeeded",
+      "files_changed": 7,
+      "insertions": 20,
+      "deletions": 6,
+      "screenshots_generated": 8,
+      "screenshots_bytes_min": 16332,
+      "screenshots_bytes_max": 19705
+    },
+    {
+      "id": "C",
+      "name": "SubNav 复用扫尾",
+      "worktree": null,
+      "status": "skipped",
+      "reason": "no remaining work",
+      "evidence": "全仓 Select-String '<SubNav' src/app 仅 issues/page.tsx 1 处, 已在 commit f65744a 配 4 view 染色"
+    }
+  ],
+  "tests": {
+    "pnpm_test_subtask_a": {
+      "files": 41,
+      "tests": 345,
+      "status": "passed",
+      "duration_seconds": 9.05
+    },
+    "pnpm_test_subtask_b": {
+      "files": 41,
+      "tests": 345,
+      "status": "passed",
+      "duration_seconds": 9.76
+    }
+  },
+  "validation": {
+    "categoryLabel_verify": {
+      "script": "scripts/automation/_verify_i18n.py",
+      "passed": 21,
+      "failed": 0
+    },
+    "i18n_files_utf8_crlf_preserved": true,
+    "screenshots_size_min_kb": 15,
+    "dev_server_timeout_safe": true
+  },
+  "guards": {
+    "guard_1_no_push": "pass — 2 commits local",
+    "guard_9_git_evidence": "pass — git log -p --follow 实证 commit 在分支链上",
+    "guard_10_author_ulysses": "pass — git log -1 --format='%an <%ae>' = Ulysses <ulysses@mavis.local>",
+    "guard_11_missing_better_than_wrong": "pass — 子任务 C 跳过但 mark skipped",
+    "guard_19_python_automation": "pass — nav_completion_i18n.py 走 bytes-level",
+    "guard_20_dispatcher_brief": "pass — dispatcher.py 派发前 verified=True"
+  }
+}

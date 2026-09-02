@@ -68,3 +68,6 @@
 - `scripts/automation/smoke_test.py` (æ ¡éªŒè„šæœ¬, è·‘é€š 4 case)
 - `scripts/automation/registry_check.py` (æ ¡éªŒè„šæœ¬, ç´¢å¼•ä¸€è‡´æ€§)
 - `AGENTS.md` Â§4.1 å®ˆé—¨æ´¾ç”Ÿ v19/v20/v21 (å¾…è¿½åŠ , per Â§5 å®ˆé—¨åŸºçº¿)
+
+| `scripts/automation/nav_completion_i18n.py` | i18n ×Öµä 21 ´¦ categoryLabel ×Ö½Ú¼¶Ìæ»» (per star-nav-completion-001 ×ÓÈÎÎñ A) | star-nav-completion-001 ×ÓÈÎÎñ A | `bd918e4` | [ÂäµØ] UTF-8 ×Ö½Ú¼¶, 7 module ¡Á 3 lang, GBK ÏİÚåÒÑ±Ü |
+| `scripts/automation/post_merge_meta_update.py` | Ôª commit ÈÎÎñ¿¨ + ½Å±¾Ë÷Òı¸üĞÂ (per ÊØÃÅ #21) | star-nav-completion-001 Ôª commit | TBD | [ÂäµØ] GBK ×Ö½Ú¼¶ append |

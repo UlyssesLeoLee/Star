@@ -597,3 +597,17 @@ frontend/src/app/automation-debug/
 - `scripts/p0_1_actor_context_migration.py` (å®è¯: ç¬¬ 1 ä»½ P0-1 è”åŠ¨è„šæœ¬)
 - `scripts/generate_ac_matrix.py` (å®è¯: AC çŸ©é˜µç”Ÿæˆå™¨, T.1 å­é¡¹)
 - `scripts/p0_h2_3domain_migration.py` (å®è¯: H2 çœŸå®å°è¯•è„šæœ¬å…¥æ¡£)
+
+
+
+### 4.12 É¢Âä WBS ²¹È±¿Ú (per 2026-09-02 18:30 JST, Ulysses ÅÄ°å¿ª×Ó´úÀíºÍ worktree Íê³ÉËüÃÇ)
+
+
+| ÈÎÎñ | ·¶Î§ | token Ô¤Ëã | ÊµÊ© | commit | ±¸×¢ |
+|---|---|---|---|---|---|
+| star-nav-completion-001 ×ÓÈÎÎñ A (i18n categoryLabel Í¬²½) | 7 module ¡Á 3 ÓïÑÔ (zh-CN/en/ja) = 21 ´¦Ìæ»» + remote entry ĞÂ¼Ó | 0.15M | worker ×Ó´úÀí wt/star-nav-i18n-a (UTF-8 ×Ö½Ú¼¶ + CRLF ±£Õæ) | `bd918e4` (per git log -p --follow ÊµÖ¤) | brief ±ê GBK ÎóÅĞ, Êµ¼Ê UTF-8 + CRLF, worker ×ÔÊ¶±ğ×ß Python bytes-level |
+| star-nav-completion-001 ×ÓÈÎÎñ B (HeaderTab 8 ÕÅÊÓ¾õ¶Ô±ÈÍ¼) | light/dark ¡Á 4 active ×´Ì¬ (inbox/issues/agents/settings) | 0.20M | worker ×Ó´úÀí wt/star-nav-shots-b (HEADER_STATES ÅäÖÃ»¯ + dev 200s ºóÌ¨) | `8c893a9` (per git log -p --follow ÊµÖ¤) | 8 ÕÅÍ¼È« > 16KB, dev 90s timeout Ã»´¥·¢ |
+| star-nav-completion-001 ×ÓÈÎÎñ C (ÆäËû page SubNav È¾É«) | skip | 0 | È«²Ö <SubNav Êµ²âÖ» issues/page.tsx 1 ´¦, ÒÑÔÚ f65744a Åä 4 view È¾É« | ¡ª | per ÊØÃÅ #11 È±±ê±È´í±ê, mark skipped |
+
+
+**ÒÑÖªÈ±¿Ú + Ê§°ÜÄ£Ê½**: vitest pass ÊÇ±ØÒª·Ç³ä·ÖÌõ¼ş (2 worktree ¸÷ÅÜ 41 files / 345 tests pass, µ«Ã»ÅÜ e2e); 8 ÕÅ½ØÍ¼ÊÓ¾õ×ß²éÊÇÊÖ¹¤ byte ¼ì²é, Ã»ÕæÓÃÍ¼Ïñ diff; main worktree ÓĞ 12 ¸ö untracked/modified ¸ú±ğÈË WIP ³åÍ», ºÏ²¢ÓÃ stash + Move-Item Â·¾¶±Ü¿ª. 
