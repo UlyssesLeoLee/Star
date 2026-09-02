@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ALL_MODULES, type ModuleCategory, type ModuleDefinition } from "@/lib/nav/registry";
+import { ALL_MODULES, CATEGORY_STYLES, getCategoryStyles, type ModuleCategory, type ModuleDefinition } from "@/lib/nav/registry";
 import { useNavStore } from "@/lib/nav/navStore";
 import {
   Search,
@@ -35,13 +35,20 @@ export function AppMatrixDrawer() {
   const [selectedCat, setSelectedCat] = useState<CategoryId>("all");
 
   // 6 个 category tab, label/tag 走 i18n
-  const CATEGORIES: Array<{ id: CategoryId; label: string; tag: string }> = [
+  // 5 域各带独立色 (per 2026-09-02 15:42 JST 拍板), 'all' 用中性色
+  const CATEGORIES: Array<{
+    id: CategoryId;
+    label: string;
+    tag: string;
+    /** 域色 (only for 5 categories) */
+    cat?: ModuleCategory;
+  }> = [
     { id: "all", label: t.appMatrix.categories.all.label, tag: t.appMatrix.categories.all.tag },
-    { id: "core", label: t.appMatrix.categories.core.label, tag: t.appMatrix.categories.core.tag },
-    { id: "work", label: t.appMatrix.categories.work.label, tag: t.appMatrix.categories.work.tag },
-    { id: "agent", label: t.appMatrix.categories.agent.label, tag: t.appMatrix.categories.agent.tag },
-    { id: "integration", label: t.appMatrix.categories.integration.label, tag: t.appMatrix.categories.integration.tag },
-    { id: "system", label: t.appMatrix.categories.system.label, tag: t.appMatrix.categories.system.tag },
+    { id: "core", label: t.appMatrix.categories.core.label, tag: t.appMatrix.categories.core.tag, cat: "core" },
+    { id: "work", label: t.appMatrix.categories.work.label, tag: t.appMatrix.categories.work.tag, cat: "work" },
+    { id: "agent", label: t.appMatrix.categories.agent.label, tag: t.appMatrix.categories.agent.tag, cat: "agent" },
+    { id: "integration", label: t.appMatrix.categories.integration.label, tag: t.appMatrix.categories.integration.tag, cat: "integration" },
+    { id: "system", label: t.appMatrix.categories.system.label, tag: t.appMatrix.categories.system.tag, cat: "system" },
   ];
 
   // 过滤: 用翻译后的 label / description / categoryLabel 做子串匹配
@@ -133,22 +140,39 @@ export function AppMatrixDrawer() {
           </div>
 
           <div className="flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setSelectedCat(cat.id)}
-                className={clsx(
-                  "px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all duration-200 border flex items-center gap-1.5",
-                  selectedCat === cat.id
-                    ? "bg-accent/15 border-accent text-accent shadow-[0_0_12px_rgba(0,240,255,0.22)] font-bold"
-                    : "border-line bg-bg-soft/40 text-ink-dim hover:text-ink hover:bg-bg-soft"
-                )}
-              >
-                <span>{cat.label}</span>
-                <span className="font-mono text-[9px] opacity-60">({cat.tag})</span>
-              </button>
-            ))}
+            {CATEGORIES.map((cat) => {
+              // 5 域 tab 用对应色, 'all' 用 accent
+              const cs = cat.cat ? CATEGORY_STYLES[cat.cat] : null;
+              const isSelected = selectedCat === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setSelectedCat(cat.id)}
+                  data-testid={`matrix-cat-${cat.id}`}
+                  className={clsx(
+                    "px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all duration-200 border flex items-center gap-1.5",
+                    isSelected
+                      ? cs
+                        ? clsx(cs.bgActive, cs.borderActive, cs.text, "font-bold", cs.glow)
+                        : "bg-accent/15 border-accent text-accent shadow-[0_0_12px_rgba(0,240,255,0.22)] font-bold"
+                      : cs
+                        ? clsx("border-line bg-bg-soft/40", cs.text, "opacity-70 hover:opacity-100", "hover:bg-bg-soft")
+                        : "border-line bg-bg-soft/40 text-ink-dim hover:text-ink hover:bg-bg-soft"
+                  )}
+                >
+                  {cs && (
+                    <span
+                      data-testid={`matrix-cat-dot-${cat.id}`}
+                      className={clsx("size-1.5 rounded-full transition-opacity", cs.dot, isSelected ? "opacity-100" : "opacity-50")}
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span>{cat.label}</span>
+                  <span className="font-mono text-[9px] opacity-60">({cat.tag})</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -216,27 +240,40 @@ function MatrixCard({
   const mod = useModuleTranslation(m);
   const { t } = useTranslation();
   const Icon = m.icon;
+  // Jira 风格: 域分色 icon tile (per 2026-09-02 15:42 JST 拍板)
+  const cs = getCategoryStyles(m.category);
   return (
     <div
       data-testid={`matrix-card-${m.id}`}
-      className="group relative rounded-2xl border border-line bg-bg-soft/40 hover:bg-bg-soft/80 p-4.5 transition-all duration-200 hover:border-accent/50 hover:shadow-[0_8px_24px_rgba(0,0,0,0.35)] flex flex-col justify-between"
+      className="group relative rounded-2xl border border-line bg-bg-soft/40 hover:bg-bg-soft/80 p-4.5 transition-all duration-200 hover:shadow-[0_8px_24px_rgba(0,0,0,0.35)] flex flex-col justify-between"
     >
       <div>
         <div className="flex items-start justify-between gap-2 mb-2.5">
           <div className="flex items-center gap-3">
-            <div className="size-9 rounded-xl bg-accent/10 border border-accent/25 grid place-items-center text-accent shrink-0 group-hover:scale-110 group-hover:shadow-[0_0_12px_rgba(0,240,255,0.3)] transition-all duration-200">
-              <Icon size={18} />
+            {/* Jira 风格 icon tile — 10x10 圆角色块 + 域分色 + line icon */}
+            <div
+              data-testid={`matrix-card-icon-tile-${m.id}`}
+              className={clsx(
+                "size-10 rounded-xl grid place-items-center shrink-0 border transition-all duration-200 group-hover:scale-110 group-hover:rotate-3",
+                cs.bg,
+                cs.border,
+                cs.text
+              )}
+              aria-hidden="true"
+            >
+              <Icon size={20} strokeWidth={2.25} />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-ink group-hover:text-accent transition-colors">
+                <span className={clsx("text-xs font-bold text-ink transition-colors", `group-hover:${cs.text}`)}>
                   {mod.label}
                 </span>
                 <span className="font-mono text-[9px] px-1.5 py-0.2 rounded border border-line bg-bg/60 text-ink-mute font-semibold">
                   {m.code}
                 </span>
               </div>
-              <span className="text-[10px] text-ink-mute font-mono">
+              <span className={clsx("text-[10px] font-mono inline-flex items-center gap-1", cs.text, "opacity-80")}>
+                <span className={clsx("size-1 rounded-full", cs.dot)} aria-hidden="true" />
                 {mod.categoryLabel}
               </span>
             </div>

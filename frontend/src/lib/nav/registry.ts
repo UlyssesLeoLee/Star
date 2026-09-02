@@ -35,6 +35,8 @@ import {
   FolderOpen,
   Smartphone,
   RefreshCw,
+  Webhook,
+  Code2,
 } from "lucide-react";
 
 export type ModuleCategory =
@@ -55,6 +57,101 @@ export interface ModuleDefinition {
   icon: React.ElementType;
   isCore?: boolean;
   count?: number;
+}
+
+// =====================================================================
+// CATEGORY_STYLES — 5 域分色 (Jira 风格识别度)
+//
+// Rationale (per 2026-09-02 15:42 JST 拍板):
+//   - Jira Software 主页 sidebar 走的是 "彩色 icon tile + 域语义分色"
+//   - Lucide 没有 filled 变体, 但可以用 圆角色块 + line icon + 域染色
+//     制造等效的"色块底 + 图标" JIRA card 风格
+//   - 5 域色: cyan (core) / sky (work) / emerald (agent) / violet
+//     (integration) / amber (system), 跟 Atlassian Design System 主色
+//     (#0052CC / #36B37E / #6554C0 / #FF8B00) 视觉接近
+//   - 同时支持 light/dark mode (light 用 -700 / dark 用 -300/400)
+//   - bg + text + border 三组 class, 配 hover / active / glow variant
+// =====================================================================
+export interface CategoryStyle {
+  /** 色块底 (低透明) */
+  bg: string;
+  /** 色块底 (active 状态, 强透明) */
+  bgActive: string;
+  /** 前景色 (icon 主色) */
+  text: string;
+  /** 边框色 */
+  border: string;
+  /** 边框色 (active 状态, 更亮) */
+  borderActive: string;
+  /** hover glow shadow (rgba 已硬编码, 跟 Tailwind 默认色匹配) */
+  glow: string;
+  /** 小圆点 / 徽章色 (1px-4px 元素) */
+  dot: string;
+  /** 域名称 (i18n key 引用) */
+  name: string;
+}
+
+export const CATEGORY_STYLES: Record<ModuleCategory, CategoryStyle> = {
+  // Core — cyan (保留现有 accent 色系, 主品牌)
+  core: {
+    bg: "bg-cyan-500/10 dark:bg-cyan-400/10",
+    bgActive: "bg-cyan-500/20 dark:bg-cyan-400/20",
+    text: "text-cyan-700 dark:text-cyan-300",
+    border: "border-cyan-500/30 dark:border-cyan-400/30",
+    borderActive: "border-cyan-500/60 dark:border-cyan-400/60",
+    glow: "shadow-[0_0_10px_rgba(34,211,238,0.35)]",
+    dot: "bg-cyan-500 dark:bg-cyan-400",
+    name: "Core",
+  },
+  // Work — sky (Jira Software 蓝)
+  work: {
+    bg: "bg-sky-500/10 dark:bg-sky-400/10",
+    bgActive: "bg-sky-500/20 dark:bg-sky-400/20",
+    text: "text-sky-700 dark:text-sky-300",
+    border: "border-sky-500/30 dark:border-sky-400/30",
+    borderActive: "border-sky-500/60 dark:border-sky-400/60",
+    glow: "shadow-[0_0_10px_rgba(56,189,248,0.35)]",
+    dot: "bg-sky-500 dark:bg-sky-400",
+    name: "Work",
+  },
+  // Agent — emerald (Jira 活跃绿 #36B37E)
+  agent: {
+    bg: "bg-emerald-500/10 dark:bg-emerald-400/10",
+    bgActive: "bg-emerald-500/20 dark:bg-emerald-400/20",
+    text: "text-emerald-700 dark:text-emerald-300",
+    border: "border-emerald-500/30 dark:border-emerald-400/30",
+    borderActive: "border-emerald-500/60 dark:border-emerald-400/60",
+    glow: "shadow-[0_0_10px_rgba(52,211,153,0.35)]",
+    dot: "bg-emerald-500 dark:bg-emerald-400",
+    name: "Agent",
+  },
+  // Integration — violet (Confluence 紫 #6554C0)
+  integration: {
+    bg: "bg-violet-500/10 dark:bg-violet-400/10",
+    bgActive: "bg-violet-500/20 dark:bg-violet-400/20",
+    text: "text-violet-700 dark:text-violet-300",
+    border: "border-violet-500/30 dark:border-violet-400/30",
+    borderActive: "border-violet-500/60 dark:border-violet-400/60",
+    glow: "shadow-[0_0_10px_rgba(167,139,250,0.35)]",
+    dot: "bg-violet-500 dark:bg-violet-400",
+    name: "Integration",
+  },
+  // System — amber (Jira 警示橙 #FF8B00)
+  system: {
+    bg: "bg-amber-500/10 dark:bg-amber-400/10",
+    bgActive: "bg-amber-500/20 dark:bg-amber-400/20",
+    text: "text-amber-700 dark:text-amber-300",
+    border: "border-amber-500/30 dark:border-amber-400/30",
+    borderActive: "border-amber-500/60 dark:border-amber-400/60",
+    glow: "shadow-[0_0_10px_rgba(251,191,36,0.35)]",
+    dot: "bg-amber-500 dark:bg-amber-400",
+    name: "System",
+  },
+};
+
+/** 取域色卡 (缺省回退 core, 避免 undefined 错误) */
+export function getCategoryStyles(category: ModuleCategory): CategoryStyle {
+  return CATEGORY_STYLES[category] ?? CATEGORY_STYLES.core;
 }
 
 export const ALL_MODULES: ModuleDefinition[] = [
@@ -284,6 +381,26 @@ export const ALL_MODULES: ModuleDefinition[] = [
     categoryLabel: "Integration & Security",
     description: "凭据密钥保管库与模型 API Key 配置",
     icon: Key,
+  },
+  {
+    id: "developer-console",
+    label: "Developer Console",
+    code: "DEV",
+    href: "/settings/developer",
+    category: "integration",
+    categoryLabel: "Integration & Security",
+    description: "Developer API (REST + MCP) + 出站 Webhook 管理 (per 2026-09-02 14:06 JST 拍板)",
+    icon: Code2,
+  },
+  {
+    id: "webhooks",
+    label: "Webhooks",
+    code: "WHK",
+    href: "/settings/developer?tab=webhooks",
+    category: "integration",
+    categoryLabel: "Integration & Security",
+    description: "出站 Webhook endpoint + 5 域预置 vendor 模板 (Slack/Teams/Discord)",
+    icon: Webhook,
   },
   {
     id: "cli-profiles",

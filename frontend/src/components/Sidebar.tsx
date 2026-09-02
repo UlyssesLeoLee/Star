@@ -3,18 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ChevronRight,
   Radio,
   Plus,
   X,
-  Layers,
-  Sparkles,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { useNavStore } from "@/lib/nav/navStore";
-import { MODULE_MAP, type ModuleDefinition } from "@/lib/nav/registry";
+import { MODULE_MAP, getCategoryStyles, type ModuleDefinition } from "@/lib/nav/registry";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 
 export function Sidebar() {
@@ -202,6 +199,8 @@ function SidebarRow({
   const mod = useModuleTranslation(item);
   const { tx } = useTranslation();
   const Icon = item.icon;
+  // Jira 风格: 域分色 icon tile (5 域色, per 2026-09-02 15:42 JST 拍板)
+  const cs = getCategoryStyles(item.category);
   // 用 registry 静态 label 生成 testid, 避免翻译切换导致 testid 漂移
   const testIdSlug = item.label.toLowerCase().replace(/\s+/g, "-");
   return (
@@ -210,19 +209,31 @@ function SidebarRow({
         href={item.href}
         data-testid={`${dataTestIdBase}-${testIdSlug}`}
         className={clsx(
-          "relative flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200",
+          "relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all duration-200",
           active
-            ? "bg-accent/15 text-accent border border-accent/40 shadow-[0_0_16px_rgba(0,240,255,0.18)] font-semibold translate-x-0.5"
-            : "text-ink-dim hover:bg-bg-soft/80 hover:text-ink border border-transparent hover:translate-x-0.5"
+            ? "bg-bg-soft/80 text-ink border border-line shadow-soft font-semibold"
+            : "text-ink-dim hover:bg-bg-soft/60 hover:text-ink border border-transparent"
         )}
       >
-        <Icon
-          size={16}
+        {/* Jira 风格 icon tile — 8x8 圆角色块底 + 域分色 + line icon */}
+        <div
+          data-testid={`${dataTestIdBase}-icon-tile-${item.id}`}
           className={clsx(
-            "shrink-0 transition-transform duration-200 group-hover:scale-110",
-            active ? "text-accent drop-shadow-[0_0_6px_rgba(0,240,255,0.6)]" : "text-ink-dim group-hover:text-ink"
+            "size-8 rounded-lg grid place-items-center shrink-0 border transition-all duration-200 group-hover:scale-105",
+            cs.bg,
+            cs.border,
+            cs.text,
+            active && clsx(cs.bgActive, cs.borderActive, cs.glow)
           )}
-        />
+          aria-hidden="true"
+        >
+          <Icon
+            size={15}
+            strokeWidth={2.25}
+            className="transition-transform duration-200"
+          />
+        </div>
+
         <span className="flex-1 truncate tracking-tight">{mod.label}</span>
 
         <span className="text-[9px] font-mono text-ink-mute px-1.5 py-0.2 rounded border border-line/50 bg-bg/40 opacity-70 group-hover:opacity-100 transition-opacity">
@@ -236,7 +247,11 @@ function SidebarRow({
         )}
 
         {active && (
-          <ChevronRight size={12} className="text-accent animate-pulse" />
+          <span
+            data-testid={`${dataTestIdBase}-active-dot-${item.id}`}
+            className={clsx("size-1.5 rounded-full animate-pulse", cs.dot)}
+            aria-hidden="true"
+          />
         )}
       </Link>
 
