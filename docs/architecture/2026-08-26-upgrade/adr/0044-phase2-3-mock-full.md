@@ -24,10 +24,9 @@ Phase 2 (backend 真接) + Phase 3 (memgraph 真接) 全部 **MSW 端点 + 试�
 | 1 | `feat(api-mock)` | api handler stub — 5 endpoint 試応答 (POST /api/api-keys, DELETE /api/api-keys/:id, POST /api/graph/ensure-fresh, POST /api/graph/cypher, GET /api/graph/health) + P3-B B.5/B.6 备选路径 | 1 改 + 1 新 | 0.20M |
 | 2 | `feat(llm-fetch-mock)` | 真 fetch MSW 试响应 — 4 必备 LLM provider (openai/claude/gemini/minimax) 试端点 + 3 状态 (200 / 401 / 10s timeout) + retry.ts 5 重试 走真 fetch 路径 | 1 改 + 1 新 | 0.20M |
 | 3 | `feat(kms-mock)` | KMS mock — POST /api/kms/unlock /api/kms/lock 试 + frontend useKms hook stub | 1 改 + 2 新 | 0.15M |
-| 4 | `feat(memgraph-1hop-mock)` | memgraph 1-hop MSW 扩 — arch-graph fixture 13 节点 → 17 节点 (per Phase 3 1-hop 仕様, per ADR-0041 §2.1) | 1 改 | 0.15M |
-| 5 | `feat(memgraph-2hop-codeside)` | 2-hop code-side MSW — 4 节点 (2 cratemodule + 2 symbol) + 2 边 (REFERENCES / LIVES_IN) + hop_level=2 样式区别 | 1 改 | 0.10M |
-| 6 | `docs(agents)` | AGENTS.md v0.34 修订历史 (5 commit 实证 + 守门 #12 cascade) + push origin 6 commits | 1 改 | 0.10M |
-| **計** | | | | **0.90M** |
+| 4 | `feat(arch-graph-test)` | vitest 测 ArchGraphModal hop=1 vs hop=2 切换 + 节点数断言 (13 vs 17) + fixture 引用 1-hop/2-hop 区分 (per §5 修正, 1-hop 13 + 2-hop 17 fixture 已存 commit 742d377) | 1 改 + 1 新 | 0.10M |
+| 5 | `docs(agents)` | AGENTS.md v0.34 修订历史 (4 commit 实证 + 守门 #12 cascade, 含 §5 修正) + push origin 5 commits | 1 改 | 0.10M |
+| **計** | | | | **0.75M** |
 
 ---
 
@@ -80,34 +79,45 @@ Phase 2 (backend 真接) + Phase 3 (memgraph 真接) 全部 **MSW 端点 + 试�
 
 ---
 
-## §5 memgraph 1-hop MSW (commit 4)
+## §5 memgraph 1-hop + 2-hop MSW (commit 4, 合并原 commit 4+5)
 
-per ADR-0041 §2.1 节点 kind union (25 节点) + commit 742d377 arch-graph 现有 13 节点 fixture. 扩到 **17 节点** (1-hop + 2-hop code-side):
+> **v0.2 修正 (2026-09-02 09:46 JST)**: 初版 §5+§6 假设错判——MOCK_GRAPH_PHYSIS_123 (1-hop 13 节点) + MOCK_GRAPH_PHYSIS_123_2HOP (2-hop 17 节点, 含 4 节点 2-hop code-side) **已在 commit 742d377 落地** (frontend/src/mocks/data/graph.ts line 30 + 371, `git show 742d377 --stat` 实证 22 文件包含 graph.ts). 1-hop 13 节点 + 2-hop 17 节点 fixture 完整, **不需要再扩**. 原 commit 4+5 合并成 1 个 commit.
 
-| 类型 | 现 (commit 742d377) | 本 commit (扩) | 总 |
-|---|---|---|---|
-| work_item | 1 | 0 | 1 |
-| project | 1 | 0 | 1 |
-| identity | 2 | 0 | 2 |
-| worktree | 1 | 0 | 1 |
-| agent_session | 1 | 0 | 1 |
-| change_set | 1 | 0 | 1 |
-| scm_repository | 1 | 0 | 1 |
-| pull_request | 1 | 0 | 1 |
-| validation_case | 2 | 0 | 2 |
-| feedback | 1 | 0 | 1 |
-| comment | 1 | 0 | 1 |
-| cratemodule | 0 | **+2** (domain-physics-core, domain-physics-rigid-body) | 2 |
-| symbol | 0 | **+2** (RigidBody::apply_radial_impulse, PhysicsCore::step) | 2 |
-| **計** | **13** | **+4** | **17** |
+per ADR-0041 §2.1 节点 kind union (25 节点) + commit 742d377 arch-graph **既存** fixture (1-hop 13 节点 + 2-hop 17 节点, **已含** cratemodule/symbol 2-hop code-side 4 节点 + 4 边):
+
+| 类型 | 1-hop (MOCK_GRAPH_PHYSIS_123) | 2-hop (MOCK_GRAPH_PHYSIS_123_2HOP) |
+|---|---|---|
+| work_item | 1 | 1 |
+| project | 1 | 1 |
+| identity | 2 | 2 |
+| worktree | 1 | 1 |
+| agent_session | 1 | 1 |
+| change_set | 1 | 1 |
+| scm_repository | 1 | 1 |
+| pull_request | 1 | 1 |
+| validation_case | 2 | 2 |
+| feedback | 1 | 1 |
+| comment | 1 | 1 |
+| cratemodule | 0 | **2** (domain-physics-core, domain-physics-rigid-body) |
+| symbol | 0 | **2** (RigidBody::apply_radial_impulse, PhysicsCore::step) |
+| **計** | **13** | **17** |
+
+**commit 742d377 实证** (per `git show 742d377 --stat | Select-String graph.ts`):
+- `frontend/src/mocks/data/graph.ts` 已含 MOCK_GRAPH_PHYSIS_123 (line 30) + MOCK_GRAPH_PHYSIS_123_2HOP (line 371) 两个完整 fixture
+- stats: `node_count: 17, edge_count: 17, kind_breakdown: { ..., cratemodule: 2, symbol: 2 }` (line 419-424)
+
+**本 commit 4 (合并后) 范围**:
+- ① vitest 测 ArchGraphModal hop=1 vs hop=2 切换 + 节点数断言 (13 vs 17, hop_level 区分)
+- ② 已存在 1-hop/2-hop 样式差异 补 1 处: `style: { 'background-opacity': 0.2 }` for hop_level=2 (per ADR-0041 §2.3.3) — verify 已落, 不补
+- ③ 引 1-hop 13 节点在 graph payload stats.node_count = 13 (line 367), hop=2 path 走 MOCK_GRAPH_PHYSIS_123_2HOP.stats.node_count = 17 — 2 fixture 已对齐 useArchGraph hook
+
+**ArchGraphModal 现有 style 已支持 hop_level=2 样式区别** (per commit 742d377):
+- opacity 0.2 for `node[?hop_level=2]` selector
+- 不改组件, 只补 vitest 测 fixture 切换正确性
 
 ---
 
-## §6 memgraph 2-hop code-side (commit 5)
-
-- 2 cratemodule + 2 symbol + 4 边 (REFERENCES / LIVES_IN x 2 / DEPENDS_ON)
-- hop_level=2 样式: opacity 0.2 (per ADR-0041 §2.3.3)
-- ArchGraphModal 现有 style 已支持, 不改组件
+## §6 (v0.1 旧版, v0.2 合并到 §5)
 
 ---
 
@@ -130,7 +140,7 @@ per ADR-0041 §2.1 节点 kind union (25 节点) + commit 742d377 arch-graph 现
 | 1 | 真 backend 不接 | 全 mock 拍板, 等 P3-B 拍板 |
 | 2 | 真 memgraph 不接 | 全 mock 拍板, 等部署拍板 |
 | 3 | 真 KMS 不接 | 全 mock 拍板, 等 P3-B 拍板 |
-| 4 | 25 节点 全部 (現 17, 缺 8) | Phase 1 mock 限定, Phase 3 扩 |
+| 4 | 25 节点 全部 (現 17, 缺 8) | Phase 1 mock 限定, Phase 3 扩 (per §5 修正, 现 1-hop 13 + 2-hop 17 已落 commit 742d377, 缺 8 节点待 P3 真接) |
 | 5 | 4 必备 LLM 真凭证 | 全 mock 拍板, 等 P3-B 拍板 |
 
 ---
@@ -152,3 +162,4 @@ per ADR-0041 §2.1 节点 kind union (25 节点) + commit 742d377 arch-graph 现
 | バージョン | 日付 | 改訂人 | 改訂内容 | トリガ |
 |---|---|---|---|---|
 | v0.1 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 | 初版: 5 增量 commit 計画 (api handler / 真 fetch MSW / KMS / memgraph 1-hop / 2-hop code-side) + 6 文档 commit = 估 0.9M token | 2026-09-02 09:35 JST Ulysses 4 拍板 (scope opt4 + barrier opt3 + session opt1 + datainput opt3) |
+| v0.2 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 | §5+§6 修正 (错判取消) + §5 commit 4+5 合并成 1 个: vitest 测 hop 切换 + 节点数断言. 1-hop 13 节点 + 2-hop 17 节点 fixture 已存 commit 742d377 (frontend/src/mocks/data/graph.ts line 30 + 371, `git show 742d377 --stat` 实证), 不需扩. 5 commit 缩 4 commit, 估 0.75M token | 2026-09-02 09:46 JST Ulysses "1" 拍板 (撤 ADR-0044 §5+§6, commit 4+5 合并) |
