@@ -102,6 +102,16 @@ async function shoot(page, name, theme) {
   }
 
   // ---- Per 2026-09-02 18:16 JST: 截顶栏 5 tab 域色 ----
+  // Per 2026-09-02 18:31 JST brief: 4 active states x 2 themes = 8 张图
+  //   - inbox (cyan core), issues (blue work), agents (emerald agent), settings (amber system)
+  //   - light + dark mode
+  //   - 路径: docs/frontend/screenshots/nav-color-tokens/{light,dark}-header-{inbox,issues,agents,settings}.png
+  const HEADER_STATES = [
+    { id: "inbox",    path: "/inbox",    hue: "cyan core" },
+    { id: "issues",   path: "/issues",   hue: "blue work" },
+    { id: "agents",   path: "/agents",   hue: "emerald agent" },
+    { id: "settings", path: "/settings", hue: "amber system" },
+  ];
   for (const theme of ["light", "dark"]) {
     await page.evaluate((t) => {
       document.documentElement.classList.toggle("dark", t === "dark");
@@ -109,12 +119,16 @@ async function shoot(page, name, theme) {
     }, theme);
     await page.waitForTimeout(300);
 
-    // inbox active (cyan core)
-    await page.goto(`${BASE}/inbox?t=${Date.now()}`, { waitUntil: "networkidle" });
-    const headerInbox = await page.$('[data-testid="app-header"]');
-    if (headerInbox) {
-      await headerInbox.screenshot({ path: join(OUT_DIR, `${theme}-header-inbox.png`) });
-      console.log(`  ✓ ${theme}-header-inbox.png (cyan core active)`);
+    for (const state of HEADER_STATES) {
+      await page.goto(`${BASE}${state.path}?t=${Date.now()}`, { waitUntil: "networkidle" });
+      const header = await page.$('[data-testid="app-header"]');
+      if (header) {
+        const filename = `${theme}-header-${state.id}.png`;
+        await header.screenshot({ path: join(OUT_DIR, filename) });
+        console.log(`  ✓ ${filename} (${state.hue} active)`);
+      } else {
+        console.log(`  ✗ ${theme}-header-${state.id}.png — app-header not found at ${state.path}`);
+      }
     }
   }
 
