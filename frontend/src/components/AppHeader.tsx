@@ -18,7 +18,7 @@ import { useCommandBarStore } from "@/lib/commandBarStore";
 import { UserMenu } from "@/components/UserMenu";
 import { ThemeSwitcher } from "@/components/theme/ThemeSwitcher";
 import { useNavStore } from "@/lib/nav/navStore";
-import { MODULE_MAP, type ModuleDefinition } from "@/lib/nav/registry";
+import { MODULE_MAP, getCategoryStyles, type ModuleDefinition } from "@/lib/nav/registry";
 import { AppMatrixDrawer } from "@/components/nav/AppMatrixDrawer";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 
@@ -181,6 +181,10 @@ interface HeaderTabProps {
 function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
   const mod = useModuleTranslation(tab);
   const { t, tx } = useTranslation();
+  // Jira 风格: 顶栏 active 用域色 (per 2026-09-02 18:16 JST 推)
+  // 之前 active 全用 accent 青色, 跟 module 业务域脱钩
+  // 现在: Inbox=cyan, Issues/Projects/Analytics=blue, Agents=emerald, Settings=amber
+  const cs = getCategoryStyles(tab.category);
   // 用 registry 静态 label 生成 testid, 避免翻译切换导致 testid 漂移
   const testIdSlug = tab.label.toLowerCase().replace(/\s+/g, "-");
   return (
@@ -193,13 +197,14 @@ function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
         className={clsx(
           "relative px-3.5 h-16 inline-flex items-center gap-1.5 text-xs font-medium border-b-2 transition-all duration-200",
           active
-            ? "text-accent border-accent font-semibold shadow-[inset_0_-2px_14px_rgba(0,240,255,0.18)]"
+            ? // 域色 active: text 域色 + border 域色 + glow
+              clsx(cs.text, cs.borderActive, "font-semibold", cs.glow)
             : "text-ink-dim border-transparent hover:text-ink hover:border-line/60"
         )}
       >
         <span className={clsx(
           "text-[9px] font-mono transition-colors",
-          active ? "text-accent font-bold" : "text-ink-mute group-hover:text-ink-dim"
+          active ? clsx(cs.text, "font-bold") : "text-ink-mute group-hover:text-ink-dim"
         )}>
           {tab.code}
         </span>

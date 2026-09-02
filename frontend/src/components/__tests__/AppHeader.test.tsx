@@ -62,16 +62,27 @@ describe("AppHeader", () => {
     expect(screen.getByTestId("settings-gear")).toBeInTheDocument();
   });
 
-  it("marks the active tab by pathname (per §3 active 状态)", () => {
+  it("marks the active tab by pathname + applies category color (per 2026-09-02 18:16 JST Jira 风格)", () => {
     mockUsePathname.mockReturnValue("/issues");
     renderWithI18n(<AppHeader />);
     const issuesTab = screen.getByTestId("tab-issues");
     const inboxTab = screen.getByTestId("tab-inbox");
     expect(issuesTab.getAttribute("data-active")).toBe("true");
     expect(inboxTab.getAttribute("data-active")).toBe("false");
-    // active tab 应该是 accent 色 + accent border
-    expect(issuesTab.className).toMatch(/text-accent/);
-    expect(issuesTab.className).toMatch(/border-accent/);
+    // issues 是 work 域, active 用 blue-900 + border-blue-500
+    // (per 2026-09-02 18:16 JST 推: 顶栏 active 改域色, 替换旧 accent)
+    expect(issuesTab.className).toMatch(/text-blue-900/);
+    expect(issuesTab.className).toMatch(/border-blue-500/);
+  });
+
+  it("applies different category colors per tab (per 2026-09-02 18:16 JST 推 Jira 风格)", () => {
+    // inbox=core (cyan), issues=work (blue), agents=agent (emerald), settings=system (amber)
+    mockUsePathname.mockReturnValue("/inbox");
+    renderWithI18n(<AppHeader />);
+    // inbox active = cyan
+    expect(screen.getByTestId("tab-inbox").className).toMatch(/text-cyan-900/);
+    // 其他 tab inactive 用 ink-dim, 不应该有 cyan/blue/emerald/amber 域色
+    expect(screen.getByTestId("tab-issues").className).toMatch(/text-ink-dim/);
   });
 
   it("clicking ⌘K trigger calls commandBarStore.open() (per §6 + §3 右栏搜索)", () => {
