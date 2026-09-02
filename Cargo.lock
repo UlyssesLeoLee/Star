@@ -112,6 +112,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.104"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+
+[[package]]
 name = "api"
 version = "0.1.0"
 dependencies = [
@@ -2586,6 +2592,37 @@ name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
+
+[[package]]
+name = "star-api-rest"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "chrono",
+ "domain-agent",
+ "domain-feedback",
+ "domain-identity",
+ "domain-permission",
+ "domain-project",
+ "domain-tenant",
+ "domain-work-item",
+ "domain-workspace",
+ "domain-worktree",
+ "hex",
+ "hmac",
+ "serde",
+ "serde_json",
+ "sha2",
+ "star-context",
+ "star-webhook",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower",
+ "tracing",
+ "uuid",
+]
 
 [[package]]
 name = "star-cache"
