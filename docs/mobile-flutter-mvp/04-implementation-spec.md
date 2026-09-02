@@ -171,11 +171,12 @@ dependencies:
   drift: ^2.20.0
   drift_flutter: ^0.2.0
   sqlcipher_flutter_libs: ^0.6.0
+  flutter_secure_storage: ^9.2.2   # SQLCipher 鍵管理 (Phase A で必要, 03-detailed §4.8.3 参照)
   connectivity_plus: ^6.0.3
   uuid: ^4.5.0
   path_provider: ^2.1.4
   path: ^1.9.0
-  # (Phase B で dio / web_socket_channel / flutter_secure_storage 追加)
+  # (Phase B で dio / web_socket_channel 追加)
 
 dev_dependencies:
   flutter_test:
@@ -404,7 +405,7 @@ SyncState (sealed) を管理し、UI に可視化。`03-detailed-design.md` v1.2
 
 #### 概要
 
-ログ送信前 PII / token / password を自動 redact (regex + 構造化フィールド)。`03-detailed-design.md` v1.2.1 §4.x (NFR-SEC-012 対応) コード完全版 (詳細 §4.12.1 参照)。
+ログ送信前 PII / token / password を自動 redact (regex + 構造化フィールド)。**本モジュールは 03-detailed v1.2.1 に独立した section がない** (v1.1 修订履歴 + §13 Implementation Feasibility で言及のみ)、**本仕様書 §3.7 で新規定義**。NFR-SEC-012 対応。
 
 #### 依存
 
@@ -499,6 +500,8 @@ Phase A は backend 接続なし、モックデータで開発・テスト。`sc
 ---
 
 ## §5 開発環境セットアップ
+
+> **Phase A 注記**: Phase A は backend 接続なし (per Capability Audit §16.6)。`STAR_HOST` / `WSS_HOST` 環境変数は Phase B まで不要。release ビルド時の `--dart-define=STAR_HOST` は将来の Phase B 用プレースホルダ。
 
 ### 5.1 初回セットアップ手順
 
@@ -610,7 +613,6 @@ jobs:
       run:
         working-directory: apps/star-mobile-flutter
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
@@ -821,6 +823,7 @@ Phase B 着手時、本書 v1.1 として §3 を 5 モジュール追加、§6 
 | バージョン | 日付 | 改訂人 | 改訂内容 | トリガ |
 |---|---|---|---|---|
 | v1.0 | 2026-09-02 17:16 JST | 架構師 (Mavis 接手 agent per DEC-008) | IPA 4 段組 (要件→基本→詳細→実装) 最終段初版: Phase A 7 モジュール限定 (OfflineDatabase / SyncQueueService / ConflictResolver / ConnectivityWatcher / SyncStatusController / SyncBanner / LogRedactor); 倉位置 / pubspec / 開発環境 / CI / テスト / サブエージェント brief / 検証手順 / 既知制限; Phase B 5 モジュール (WS / Write / Comments / Transitions / PushEventRouter) は v1.1 保留 | 2026-09-02 17:16 JST Ulysses「撰写spec」発令; 上位 3 doc (要件/基本/詳細 v1.2.1) の IPA 4 段組 完成済を受けて実装仕様書着手 |
+| **v1.0.1** | 2026-09-02 17:22 JST | 架構師 (Mavis 接手 agent per DEC-008) | **self-review 3 件 patch**: (1) §2.3 pubspec.yaml 漏列 `flutter_secure_storage: ^9.2.2` 追加 (03-detailed §4.8.3 と整合); (2) §6.1 CI workflow `build-apk` job 重複 `actions/checkout@v4` step 削除 (YAML 修正); (3) §3.7 LogRedactor 引用 `03-detailed §4.12.1` を修正 — §4.12.1 は SyncBanner, LogRedactor は 03-detailed に独立 section なし、本仕様書 §3.7 で新規定義; 副: §5 Phase A 注記追加 (STAR_HOST 不要明示) | 2026-09-02 17:22 JST Ulysses「自审」発令; self-review skill 適用 (lens: バグ / hallucinated APIs / ripple effects / consistency / leftovers); cross-doc 検証で 3 HIGH/MEDIUM issues 発見・修正 |
 
 ---
 

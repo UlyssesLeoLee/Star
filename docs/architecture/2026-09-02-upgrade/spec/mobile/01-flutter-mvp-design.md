@@ -11,14 +11,15 @@
 > | **要件定義書** v1.2.1 | `docs/mobile-flutter-mvp/01-requirements.md` | FR-xxx 58 件 + NFR-xxx 37 件 + UC 8 件 + 既知未解決 25 件 + **§16 Capability Audit** (backend 実装状態 3 段階監査) |
 > | **基本設計書** v1.2.1 | `docs/mobile-flutter-mvp/02-basic-design.md` | 4 層 + Sync Engine 副層 + 22 コンポーネント + 5 状態機 + WS 仕様 + デプロイ + **§15 Endpoint Capability Audit** |
 > | **詳細設計書** v1.2.1 | `docs/mobile-flutter-mvp/03-detailed-design.md` | クラス詳細 12 新規モジュール完全コード + **§13 Implementation Feasibility** (Phase A 7 / Phase B 5 分離) |
-> | **実装仕様書** v1.0 | `docs/mobile-flutter-mvp/04-implementation-spec.md` | IPA 4 段組 最終段初版: Phase A 7 モジュール限定実装手順 (OfflineDatabase / SyncQueueService / ConflictResolver / ConnectivityWatcher / SyncStatusController / SyncBanner / LogRedactor) + 倉 / pubspec / 開発環境 / CI / テスト / サブエージェント brief (per 守門 #20) / 検証手順 / 既知制限 / Phase B 拡張計画 |
+> | **実装仕様書** v1.0.1 | `docs/mobile-flutter-mvp/04-implementation-spec.md` | IPA 4 段組 最終段 + self-review 3 件 patch: Phase A 7 モジュール限定実装手順 (OfflineDatabase / SyncQueueService / ConflictResolver / ConnectivityWatcher / SyncStatusController / SyncBanner / LogRedactor) + 倉 / pubspec (flutter_secure_storage 追加) / 開発環境 / CI (YAML 修正) / テスト / サブエージェント brief (per 守門 #20) / 検証手順 / 既知制限 / Phase B 拡張計画 |
 >
 > **版本演进**:
 > - v1.0 (commit `6bd6aa2`, 2026-09-02 16:14 JST): IPA 化初版, read-only MVP 範囲
 > - v1.1 (commit `81b0c13`, 2026-09-02 16:27 JST): UAT 全面拡張 (核心写 + 离线 + 自建 WS)
 > - v1.2 (commit [pending], 2026-09-02 16:54 JST): **Capability Audit 増補** (per Ulysses 16:40 JST 発令, backend 現状整合), 3 doc 合計 +20K bytes (Audit 章節)
 > - v1.2.1 (commit [pending], 2026-09-02 17:10 JST): **交差監査 7 件 patch** (per Ulysses 17:10 JST 発令, 数字・ポインタ整合)
-> - **実装仕様書 v1.0** (commit [pending], 2026-09-02 17:16 JST): **IPA 4 段組 最終段** (per Ulysses 17:16 JST「撰写spec」発令), Phase A 7 モジュール 限定, 28K bytes |
+> - **実装仕様書 v1.0** (commit `e130c1f`, 2026-09-02 17:16 JST): **IPA 4 段組 最終段** (per Ulysses 17:16 JST「撰写spec」発令), Phase A 7 モジュール 限定, 28K bytes
+> - **実装仕様書 v1.0.1** (commit [pending], 2026-09-02 17:22 JST): **self-review 3 件 patch** (per Ulysses 17:22 JST「自审」発令), §2.3 flutter_secure_storage 追加 / §6.1 YAML 重複 step 削除 / §3.7 LogRedactor 引用修正 |
 >
 > **本 doc (v0.1) 的地位**:
 > - 历史溯源记录: Pre-IPA 单 doc 形式, commit `bd4998e`
@@ -529,6 +530,7 @@ flutter build apk --release \
 | v0.4 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **SUPERSEDED 标记更新**:IPA 3 段組 v1.1 → v1.2 (Capability Audit 増補);SUPERSEDE 通知块表格版本 v1.1 → v1.2 + Audit 3 区分明示, 表注加版本演进 (v1.0 → v1.1 → v1.2) + v1.2 規模 (+20K) | 2026-09-02 16:40 JST Ulysses「app 的设计要确保能使用当前系统内已经写好的功能」発令; 3 份 IPA doc 各加 Capability Audit 章节 (01 §16 / 02 §15 / 03 §13) 整合 backend 実装現状 (22 REST 路由全部 501 / 13 MCP tool stub / WS 無し / auth 無し / SSE 4 event types のみ) |
 | v0.5 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **SUPERSEDED 标记更新**:IPA 3 段組 v1.2 → v1.2.1 (交差監査 7 件 patch);SUPERSEDE 通知块表格版本 v1.2 → v1.2.1, 表注加版本演进 v1.2.1 + 規模 (+15 lines) | 2026-09-02 17:10 JST Ulysses「交叉审核」発令; 3 份 IPA doc 間で数字・ポインタ整合性確認, 7 件不一致発見修正 (§1 旧版ポインタ v1.1→v1.2 × 2 / §5.1 ヘッダ v1.0 13→9 / v1.0 改訂履歴 13→9 / v1.1 改訂履歴 4 シーケンス→3 新規+1 拡張 / 03-detailed 6 新規→12 新規 / v1.2 改訂履歴 22 REST→20 endpoint) |
 | v0.6 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **SUPERSEDED 标记更新**:IPA 4 段組 拡張 — 実装仕様書 v1.0 (新規 28K bytes, `04-implementation-spec.md`);SUPERSEDE 通知块表格 + 1 行 (実装仕様書 v1.0 説明追加), 表注加版本演进 (v1.0 → v1.1 → v1.2 → v1.2.1 → 実装仕様書 v1.0) | 2026-09-02 17:16 JST Ulysses「撰写spec」発令; IPA 4 段組 (要件→基本→詳細→実装) 完成, Phase A 7 モジュール 限定実装仕様 (OfflineDatabase / SyncQueueService / ConflictResolver / ConnectivityWatcher / SyncStatusController / SyncBanner / LogRedactor), 倉 / pubspec / 開発環境 / CI / テスト / サブエージェント brief (per 守門 #20) / 検証手順 含む |
+| v0.7 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **SUPERSEDED 标记更新**:実装仕様書 v1.0 → v1.0.1 (self-review 3 件 patch);SUPERSEDE 通知块表格 + 表注 バージョン演进 update, 表注加 v1.0.1 + 規模 (修正) | 2026-09-02 17:22 JST Ulysses「自审」発令; self-review skill 適用, cross-doc 検証で 3 HIGH/MEDIUM issues 発見 (§2.3 flutter_secure_storage 漏列 / §6.1 YAML 重複 step / §3.7 LogRedactor 引用錯り) 修正 |
 
 ---
 
