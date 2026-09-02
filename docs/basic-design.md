@@ -284,10 +284,10 @@ flowchart LR
 |---|---|---|---|---|---|
 | 1 | domain-work-item | WorkItem 的创建 / 状态流转 / 关系 | WorkItem, Requirement, AcceptanceCriterion | WorkItem ≠ Git Branch(§44.3);1 WorkItem → 0/1/N Repository | domain-project, domain-permission |
 | 2 | domain-worktree | Worktree 一级领域对象,生命周期管理 | Worktree, ConflictState, HealthState | Worktree Status 独立于 WorkItem Status(§22.2,REQ-WF-002) | domain-scm, domain-development |
-| 3 | domain-agent | Agent Adapter 与 AgentSession 生命周期 | Agent, AgentSession, AgentPolicy | 1 AgentSession → 1 Active Worktree(§21,REQ-DEV-003) | domain-worktree, domain-feedback, domain-validation |
+| 3 | domain-agent | Agent Adapter 与 AgentSession 生命周期 | Agent, AgentSession, AgentPolicy | 1 AgentSession → 1 Active Worktree(§21,REQ-DEV-003) | domain-tenant, domain-worktree, domain-work-item, domain-permission |
 | 4 | domain-feedback | 结构化 Feedback 一级领域对象 | Feedback, FeedbackResolution | Feedback Target 覆盖 WorkItem→Diff Hunk 全粒度(§25.1) | domain-work-item, domain-worktree, domain-agent |
 | 5 | domain-context | Context Packet 生成与 Decision Memory | ContextPacket, Decision | Context Provenance 强制可追溯(§26.3) | domain-work-item, domain-worktree, domain-feedback, domain-validation |
-| 6 | domain-validation | Validation Evidence 与 Acceptance Coverage | ValidationResult, AcceptanceCoverage | AI 自我报告不构成完成(§27.3,VAL-001) | domain-work-item, domain-worktree, domain-agent |
+| 6 | domain-validation | Validation Evidence 与 Acceptance Coverage | ValidationResult, AcceptanceCoverage | AI 自我报告不构成完成(§27.3,VAL-001) | domain-work-item, domain-worktree |
 
 #### 2.1.2 支撑域(Supporting Domain)
 
