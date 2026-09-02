@@ -282,8 +282,8 @@ flowchart LR
 
 | # | Module | 一句话职责 | 主要实体 | 关键不变量 | 关键依赖 |
 |---|---|---|---|---|---|
-| 1 | domain-work-item | WorkItem 的创建 / 状态流转 / 关系 | WorkItem, Requirement, AcceptanceCriterion | WorkItem ≠ Git Branch(§44.3);1 WorkItem → 0/1/N Repository | domain-workflow, domain-project, domain-permission |
-| 2 | domain-worktree | Worktree 一级领域对象,生命周期管理 | Worktree, ConflictState, HealthState | Worktree Status 独立于 WorkItem Status(§22.2,REQ-WF-002) | domain-work-item, domain-scm, domain-development |
+| 1 | domain-work-item | WorkItem 的创建 / 状态流转 / 关系 | WorkItem, Requirement, AcceptanceCriterion | WorkItem ≠ Git Branch(§44.3);1 WorkItem → 0/1/N Repository | domain-project, domain-permission |
+| 2 | domain-worktree | Worktree 一级领域对象,生命周期管理 | Worktree, ConflictState, HealthState | Worktree Status 独立于 WorkItem Status(§22.2,REQ-WF-002) | domain-scm, domain-development |
 | 3 | domain-agent | Agent Adapter 与 AgentSession 生命周期 | Agent, AgentSession, AgentPolicy | 1 AgentSession → 1 Active Worktree(§21,REQ-DEV-003) | domain-worktree, domain-feedback, domain-validation |
 | 4 | domain-feedback | 结构化 Feedback 一级领域对象 | Feedback, FeedbackResolution | Feedback Target 覆盖 WorkItem→Diff Hunk 全粒度(§25.1) | domain-work-item, domain-worktree, domain-agent |
 | 5 | domain-context | Context Packet 生成与 Decision Memory | ContextPacket, Decision | Context Provenance 强制可追溯(§26.3) | domain-work-item, domain-worktree, domain-feedback, domain-validation |
@@ -293,11 +293,11 @@ flowchart LR
 
 | # | Module | 一句话职责 | 主要实体 | 关键不变量 | 关键依赖 |
 |---|---|---|---|---|---|
-| 7 | domain-scm | SCM Adapter 抽象与 Repository 同步 | Repository, Branch, Commit, PullRequest, Review, Pipeline | Domain 层无厂商对象(§19.1,REQ-SCM-002) | domain-work-item, domain-worktree |
+| 7 | domain-scm | SCM Adapter 抽象与 Repository 同步 | Repository, Branch, Commit, PullRequest, Review, Pipeline | Domain 层无厂商对象(§19.1,REQ-SCM-002) | domain-work-item |
 | 8 | domain-development | Development Execution 聚合层 + Repository Indexing(§20 合并入) | DevelopmentExecution, ChangeSet, Link, SymbolIndex, RepositoryContext, DevelopmentContext | ChangeSet ≠ Git Diff(§21.1);Symbol-aware Context 逐步演进(§21.2) | domain-work-item, domain-worktree, domain-agent, domain-scm |
-| 9 | domain-workflow | Workflow 定义与状态机 | WorkflowDefinition, State, Transition | Worktree Status 与 WorkItem Status 独立(REQ-WF-002) | domain-work-item |
-| 10 | domain-board | Kanban / Scrum 板视图 | Board, Column, Swimlane | 与 Sprint / Gantt 共享数据模型(§9,REQ-PLAN-003) | domain-work-item, domain-planning |
-| 11 | domain-planning | Sprint / Backlog / Roadmap | Sprint, Backlog, Roadmap | Burndown 最小必需,Velocity/CFD 控制图 V1(§9) | domain-work-item, domain-board |
+| 9 | domain-workflow | Workflow 定义与状态机 | WorkflowDefinition, State, Transition | Worktree Status 与 WorkItem Status 独立(REQ-WF-002) | 无(system_default 由本 crate seed, 2026-09-03 拍 2 单向只读投影落档) |
+| 10 | domain-board | Kanban / Scrum 板视图 | Board, Column, Swimlane | 与 Sprint / Gantt 共享数据模型(§9,REQ-PLAN-003) | domain-work-item |
+| 11 | domain-planning | Sprint / Backlog / Roadmap | Sprint, Backlog, Roadmap | Burndown 最小必需,Velocity/CFD 控制图 V1(§9) | domain-work-item |
 | 12 | domain-relation | WorkItem 关系(阻塞/关联) | Relation, Dependency | 是甘特图依赖与冲突分析基础(REQ-COLLAB-002) | domain-work-item |
 | 13 | domain-comment | 评论 / @ 提及 / 附件 | Comment, Mention, Attachment | 不替代 Feedback(§25.1) | domain-work-item |
 | 14 | domain-search | 全文 / 符号检索 Projection | SearchIndex, SearchQuery | 不得成为业务事实源(§12,REQ-SEARCH-001) | 所有 domain-*(只读) |
