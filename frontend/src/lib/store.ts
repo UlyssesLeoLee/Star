@@ -258,7 +258,7 @@ interface StoreState {
    *       3. RefactorCard.merged_at / merged_worktree_id / merged_pr_id 写入
    *   - 历史 round 不允许 (closed round 的卡只读)
    */
-  mergeRefactorCard: (roundId: Uuid, workItemId: Uuid) => "ok" | "not_found" | "not_done" | "already_merged" | "closed_round";
+  mergeRefactorCard: (roundId: Uuid, workItemId: Uuid) => "ok" | "not_found" | "not_done" | "already_merged" | "closed_round" | "worktree_terminal" | "pr_terminal";
 
   // Canvas mutations(无限画布,frontend-canvas-design.md §2)
   addCanvasElement: (element: CanvasElement) => void;
@@ -876,10 +876,21 @@ const initialState = (set: any): StoreState => ({
     })),
 
   /**
-   * Merge 单张卡 (per 2026-09-02 10:50 JST 拍板)
-   *   - 校验 + 副作用见 StoreState interface 注释
-   *   - 返回 "ok" | "not_found" | "not_done" | "already_merged" | "closed_round"
-   *     便于 UI 给反馈 (toast / inline message)
+   * Merge 单张卡 (per 2026-09-02 10:50 JST 拍板 + 10:56 JST 补缺口 #6 失败回滚)
+   *   - 校验: 仅 refactor_status === "done" 的卡可 merge
+   *   - 已 merged 幂等返回 "already_merged"
+   *   - 副作用 (per 缺口 #6: 原子化, 全部或全不):
+   *       1. WorkItem.worktree_id 存在 -> 改 Worktree.status = "merged"
+   *          (校验 worktree 不在终态 merged/closed/abandoned/archived/reverted, 否则返回 "worktree_terminal")
+   *       2. Worktree.pr_id 存在 -> 改 PullRequest.status = "merged" + merged_at
+   *          (校验 pr 不在终态 merged/closed, 否则返回 "pr_terminal")
+   *       3. RefactorCard.merged_at / merged_worktree_id / merged_pr_id 写入
+   *   - 历史 round 不允许 (closed round 的卡只读)
+   *   - 所有副作用在单个 set 块, zustand 保证原子性; 但 worktree/PR 终态校验在 set 前做,
+   *     提前拒绝避免脏写
+   *
+   *   返回值: "ok" | "not_found" | "not_done" | "already_merged" | "closed_round"
+   *           | "worktree_terminal" | "pr_terminal"
    */
   mergeRefactorCard: (roundId, workItemId) => {
     const state = useStore.getState();
@@ -891,17 +902,27 @@ const initialState = (set: any): StoreState => ({
     if (card.refactor_status !== "done") return "not_done";
     if (card.merged_at) return "already_merged";
 
-    const now = new Date().toISOString();
+    // 终态校验 (per 缺口 #6: 提前拒绝, 避免脏写)
     const wi = state.workItems.find((w) => w.id === workItemId);
     const worktreeId = wi?.worktree_id;
     const worktree = worktreeId
       ? state.worktrees.find((wt) => wt.id === worktreeId)
       : undefined;
+    const TERMINAL_WT: ReadonlyArray<WorktreeStatus> = ["merged", "closed", "abandoned", "archived", "reverted"];
+    if (worktree && TERMINAL_WT.includes(worktree.status)) {
+      return "worktree_terminal";
+    }
     const prId = worktree?.pr_id;
     const pr = prId
       ? state.pullRequests.find((p) => p.id === prId)
       : undefined;
+    const TERMINAL_PR: ReadonlyArray<PullRequestStatus> = ["merged", "closed"];
+    if (pr && TERMINAL_PR.includes(pr.status)) {
+      return "pr_terminal";
+    }
 
+    const now = new Date().toISOString();
+    // 单 set 块原子写 (zustand 事务性, 任一字段错不会半写)
     set((s: StoreState) => {
       const newWorktrees = worktree
         ? s.worktrees.map((wt) =>

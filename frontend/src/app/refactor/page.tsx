@@ -35,6 +35,11 @@ import { RefactorKpiRow } from "@/components/refactor/RefactorKpiRow";
 import { RefactorRoundHistory } from "@/components/refactor/RefactorRoundHistory";
 import { RefactorSettingsPopover } from "@/components/refactor/RefactorSettingsPopover";
 import { AddRefactorCardsDialog } from "@/components/refactor/AddRefactorCardsDialog";
+import { useRefactorToasts, RefactorToaster } from "@/components/refactor/useRefactorToasts";
+import {
+  transitionKind,
+  needsTransitionConfirm,
+} from "@/lib/refactor-state-machine";
 import type {
   Project, WorkItem, RefactorRound, RefactorBoardConfig, RefactorStatus, Uuid,
 } from "@/types/ids";
@@ -65,6 +70,8 @@ export default function RefactorPage() {
   // ---- local state ----
   const [selectedProjectId, setSelectedProjectId] = useState<string>(() => projects[0]?.id ?? "");
   const [showAddDialog, setShowAddDialog] = useState(false);
+  // toasts (per 缺口 #4 / #6, 状态机校验失败 / merge 反馈)
+  const { toasts, push: pushToast, dismiss: dismissToast } = useRefactorToasts();
 
   // ---- 选中项目 + 项目级派生数据 ----
   const selectedProject = useMemo<Project | null>(
@@ -129,9 +136,31 @@ export default function RefactorPage() {
   const handleMoveCard = useCallback(
     (workItemId: string, toStatus: RefactorStatus) => {
       if (!activeRound) return;
+      const card = activeRound.cards.find((c) => c.work_item_id === workItemId);
+      if (!card) return;
+      const fromStatus = card.refactor_status;
+      const kind = transitionKind(fromStatus, toStatus);
+      // 状态机校验 (per 缺口 #4)
+      if (kind === "invalid") {
+        pushToast("warn", `不允许从 ${fromStatus} 直接迁移到 ${toStatus}`, 4000);
+        return;
+      }
+      if (kind === "same") return;
+      // skip 跨多列需 confirm
+      if (needsTransitionConfirm(fromStatus, toStatus)) {
+        if (typeof window !== "undefined" && !window.confirm(`跨多列移动: ${fromStatus} → ${toStatus}, 确认?`)) {
+          return;
+        }
+      }
       moveRefactorCard(activeRound.id, workItemId, toStatus);
+      // 反馈
+      if (kind === "backward") {
+        pushToast("info", `已回退: ${fromStatus} → ${toStatus}`, 2000);
+      } else if (kind === "reopen") {
+        pushToast("warn", `已重开: ${fromStatus} → ${toStatus}`, 2000);
+      }
     },
-    [activeRound, moveRefactorCard],
+    [activeRound, moveRefactorCard, pushToast],
   );
 
   const handleAddCards = useCallback(
@@ -142,18 +171,39 @@ export default function RefactorPage() {
     [activeRound, addRefactorCard],
   );
 
-  // Merge 单卡 (per 2026-09-02 10:50 JST 拍板)
-  //   调 store.mergeRefactorCard, 返回状态码给 console 提示 (后续可接 toast)
+  // Merge 单卡 (per 2026-09-02 10:50 JST 拍板 + 10:56 JST 补缺口 #6 失败 toast)
   const handleMergeCard = useCallback(
     (workItemId: string) => {
       if (!activeRound) return;
       const result = mergeRefactorCard(activeRound.id, workItemId);
-      if (result !== "ok") {
-        // eslint-disable-next-line no-console
-        console.warn(`[refactor] merge ${workItemId} -> ${result}`);
+      switch (result) {
+        case "ok":
+          pushToast("ok", `已合并: ${workItemId} → main`, 3000);
+          break;
+        case "not_done":
+          pushToast("warn", "仅 done 状态的卡可合并", 3000);
+          break;
+        case "already_merged":
+          pushToast("info", "已合并过 (幂等)", 2000);
+          break;
+        case "closed_round":
+          pushToast("warn", "轮次已关闭, 不能合并", 3000);
+          break;
+        case "worktree_terminal":
+          pushToast("err", "Worktree 已是终态 (merged/closed/abandoned/archived/reverted), 拒绝合并", 4000);
+          break;
+        case "pr_terminal":
+          pushToast("err", "PR 已是终态 (merged/closed), 拒绝合并", 4000);
+          break;
+        case "not_found":
+          pushToast("err", "找不到卡", 3000);
+          break;
+        default:
+          // eslint-disable-next-line no-console
+          console.warn(`[refactor] merge ${workItemId} -> ${result}`);
       }
     },
-    [activeRound, mergeRefactorCard],
+    [activeRound, mergeRefactorCard, pushToast],
   );
 
   // 判断 work_item 是否有关联 worktree (用于 Merge 按钮 title hint 区分)
@@ -177,7 +227,12 @@ export default function RefactorPage() {
 
   // ---- 渲染 ----
   return (
-    <div className="max-w-7xl" data-testid="refactor-page">
+    <div
+      className="max-w-7xl"
+      data-testid="refactor-page"
+      role="main"
+      aria-label={t.refactor.title}
+    >
       <PageHeader
         title={t.refactor.title}
         subtitle={t.refactor.subtitle}
@@ -312,6 +367,9 @@ export default function RefactorPage() {
           <RefactorRoundHistory rounds={closedRounds} />
         </div>
       )}
+
+      {/* Toast 通知队列 (per 缺口 #4 / #6) */}
+      <RefactorToaster toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }
@@ -328,8 +386,10 @@ function ProjectSwitcher({
 }) {
   if (projects.length === 0) return null;
   return (
-    <div
+    <nav
       data-testid="refactor-project-switcher"
+      role="tablist"
+      aria-label="project switcher"
       className="flex flex-wrap items-center gap-1.5 mb-5"
     >
       {projects.map((p) => {
@@ -338,10 +398,14 @@ function ProjectSwitcher({
           <button
             key={p.id}
             type="button"
+            role="tab"
+            aria-selected={active}
+            aria-label={`${p.name} (${p.key})`}
             onClick={() => onSelect(p.id)}
             data-testid={`refactor-project-${p.id}`}
             className={clsx(
               "px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium border transition-all",
+              "focus:outline-none focus:ring-2 focus:ring-accent/60",
               active
                 ? "border-accent/60 bg-accent/15 text-accent shadow-[0_0_8px_rgba(0,240,255,0.25)]"
                 : "border-line bg-bg-soft/40 text-ink-dim hover:border-accent/40 hover:text-ink",
@@ -352,6 +416,6 @@ function ProjectSwitcher({
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }

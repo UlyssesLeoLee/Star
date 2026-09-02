@@ -348,18 +348,18 @@ export interface RefactorBoardConfig {
 
 ---
 
-## 8. 已知缺口 (per 缺标比错标安全)
+## 8. 已知缺口 (per 缺标比错标安全) — v0.2 状态
 
-| # | 缺口 | 影响 | 后续 |
+| # | 缺口 | 状态 | 备注 |
 |---|---|---|---|
-| 1 | 后端无 /refactor-rounds API (zustand persist only) | localStorage 单设备 | P3-E 加 REST/GraphQL |
-| 2 | 多人协作无 (applyRemoteChange 不覆盖 refactorRounds) | 多 tab 冲突 | Phase 2 |
-| 3 | 列添加只用 window.prompt, 缺 Drawer 形态 | 移动端体验差 | Phase Mobile |
-| 4 | refactor_status 缺 review→doing 回退校验 | 用户可乱拖 | v0.2 加状态机校验 |
-| 5 | 历史 round 的列自定义不影响已 closed round | 老数据稳定, 但新列加不到历史 | by design (snapshot) |
-| 6 | mergeRefactorCard 失败 (e.g. worktree 已被外部关) 不回滚 | 用户需手动 | v0.2 加事务 |
-| 7 | 触屏拖动 (touch events) 未适配 | 手机端用不了 | Phase Mobile |
-| 8 | ARIA live region (a11y) 未实现 | 屏幕阅读器 | v0.2 a11y pass |
+| 1 | 后端无 /refactor-rounds API (zustand persist only) | 🔴 by design | localStorage 单设备, P3-E 加 REST/GraphQL |
+| 2 | 多人协作无 (applyRemoteChange 不覆盖 refactorRounds) | 🔴 by design | 多 tab 冲突, Phase 2 |
+| 3 | 列添加用 window.prompt | 🟢 v0.2 修复 | 替换为 `AddRefactorColumnDialog` (modal, status + name 输入, 防重 + 提示内置 5 态) |
+| 4 | refactor_status 缺回退/重开校验 | 🟢 v0.2 修复 | `lib/refactor-state-machine.ts` — 6 种迁移 kind: forward / backward / reopen / skip / invalid / same / custom; UI 给 toast 反馈 |
+| 5 | 历史 round 的列自定义不影响已 closed round | 🟡 by design | snapshot 语义, 老数据稳定 |
+| 6 | mergeRefactorCard 失败不回滚 | 🟢 v0.2 修复 | (a) 提前校验 worktree/PR 终态 (返回 worktree_terminal / pr_terminal); (b) 所有副作用单 set 块, zustand 事务性; (c) UI 7 种返回码全 toast 反馈 |
+| 7 | 触屏拖动 (touch events) 未适配 | 🔴 by design | 手机端用不了, Phase Mobile |
+| 8 | ARIA live region (a11y) 未实现 | 🟢 v0.2 修复 | (a) `RefactorToaster` role=status aria-live=polite; (b) 列容器 role=region aria-label; (c) Project switcher role=tablist tab; (d) 列名 / 按钮 aria-label |
 
 ---
 
@@ -388,3 +388,4 @@ export interface RefactorBoardConfig {
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-02 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: /refactor 页面 + 5 态 todo/doing/testing/review/done + 列自定义 + 10 store action + Merge 按钮 | 2026-09-02 10:41 JST 拍板 (testing 列 + 列自定义) + 10:50 JST 拍板 (Merge 按钮) |
+| v0.2 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | 补 §8 8 项缺口中的 4 项 (#3 / #4 / #6 / #8):<br>- **#3** 替换 window.prompt 为 `AddRefactorColumnDialog` modal (status + name + 防重 + 提示)<br>- **#4** 加 `lib/refactor-state-machine.ts` (6 kind: forward/backward/reopen/skip/invalid/same/custom) + UI toast 反馈 (info/warn 区分回退 vs 重开 vs 跨列)<br>- **#6** mergeRefactorCard 加 worktree/PR 终态提前校验 (返回 worktree_terminal / pr_terminal) + 7 种返回码全 toast 反馈; 单 set 块原子写<br>- **#8** a11y: RefactorToaster role=status aria-live=polite + 列容器 role=region aria-label + Project switcher role=tablist + 列名/按钮 aria-label<br>新增文件: `AddRefactorColumnDialog.tsx` + `useRefactorToasts.tsx` + `refactor-state-machine.ts` | 2026-09-02 10:56 JST 用户发令 "补缺口" |

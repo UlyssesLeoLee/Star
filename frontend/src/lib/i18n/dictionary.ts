@@ -191,6 +191,12 @@ export interface Dictionary {
     priorityP2: string;               // "P2"
     priorityP3: string;               // "P3"
   };
+  // ── v0.5 新增 (per 2026-09-02 11:06 JST): Tooltip 漫画气泡的 i18n 配套 ──
+  // Tooltip 组件本身接受 ReactNode, 默认场景需要 3 语言兜底文案.
+  tooltip: {
+    moreInfo: string;                 // "更多信息"
+    closeAria: string;                // "关闭 (Esc)"
+  };
   // ── v0.4 新增 (per 2026-09-02 10:41 JST 拍板): Refactor Sweep 重构专项页 ──
   // 范围: 5 状态 todo/doing/testing/review/done + 通用 UI 文案 + 列自定义
   //   (RefactorStatus 翻译走 status.refactor, 跟 workItem.kind / sprint 同 shape)

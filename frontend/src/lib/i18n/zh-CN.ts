@@ -233,6 +233,11 @@ export const zhCN: Dictionary = {
     priorityP2: "P2",
     priorityP3: "P3",
   },
+  // ── v0.5 Tooltip 漫画气泡 (per 2026-09-02 11:06 JST) ──
+  tooltip: {
+    moreInfo: "更多信息",
+    closeAria: "关闭 (Esc)",
+  },
   // ── v0.4 Refactor Sweep (per 2026-09-02 10:41 JST 拍板) ──
   refactor: {
     title: "Refactor Sweep 重构专项",

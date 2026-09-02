@@ -229,6 +229,11 @@ export const en: Dictionary = {
     priorityP2: "P2",
     priorityP3: "P3",
   },
+  // ── v0.5 Tooltip manga-bubble (per 2026-09-02 11:06 JST) ──
+  tooltip: {
+    moreInfo: "More info",
+    closeAria: "Close (Esc)",
+  },
   // ── v0.4 Refactor Sweep (per 2026-09-02 10:41 JST 拍板) ──
   refactor: {
     title: "Refactor Sweep",

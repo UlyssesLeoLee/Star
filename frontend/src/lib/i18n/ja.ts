@@ -229,6 +229,11 @@ export const ja: Dictionary = {
     priorityP2: "P2",
     priorityP3: "P3",
   },
+  // ── v0.5 Tooltip 漫画フキダシ (per 2026-09-02 11:06 JST) ──
+  tooltip: {
+    moreInfo: "詳細を見る",
+    closeAria: "閉じる (Esc)",
+  },
   // ── v0.4 Refactor Sweep (per 2026-09-02 10:41 JST 拍板) ──
   refactor: {
     title: "リファクタスイープ",

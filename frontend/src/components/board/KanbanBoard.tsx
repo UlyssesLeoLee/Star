@@ -29,6 +29,7 @@ import { useState, useCallback, useMemo } from "react";
 import { clsx } from "clsx";
 import { KanbanCard } from "./KanbanCard";
 import { StatusPill } from "@/components/StatusPill";
+import { Tooltip } from "@/components/ui/tooltip";
 import { AlertTriangle, Plus, SlidersHorizontal } from "lucide-react";
 import type { Board, WorkItem, WorkItemStatus, Identity } from "@/types/ids";
 import { KANBAN_COLUMNS } from "@/mocks/data";
@@ -348,9 +349,9 @@ export function KanbanBoard({
                   </span>
                   {onRemoveColumn && (() => {
                     // per 2026-08-31 11:24 JST 拍板: 兜底列 (todo) 不可删,
-                    // 按钮置灰 + tooltip 解释, store 也会二次拒绝
+                    // 按钮置灰 + 漫画气泡 tooltip 解释, store 也会二次拒绝
                     const isFallback = isFallbackStatus(col.status);
-                    return (
+                    const removeBtn = (
                       <button
                         type="button"
                         data-testid={`kanban-column-remove-${col.status}`}
@@ -367,10 +368,18 @@ export function KanbanBoard({
                             ? "text-ink-mute/40 cursor-not-allowed text-xs leading-none px-1"
                             : "text-ink-mute hover:text-err transition-colors text-xs leading-none px-1"
                         }
-                        title={isFallback ? t.board.fallbackColumnProtected : t.board.removeColumn}
                       >
                         ✕
                       </button>
+                    );
+                    // 兜底列: 长说明走漫画气泡; 可删列: 短提示
+                    const tipText = isFallback
+                      ? t.board.fallbackColumnProtected
+                      : tx(t.board.reorderColumn, { name: col.name ?? col.status });
+                    return (
+                      <Tooltip content={tipText} side="top" delayShow={150}>
+                        {removeBtn}
+                      </Tooltip>
                     );
                   })()}
                 </div>

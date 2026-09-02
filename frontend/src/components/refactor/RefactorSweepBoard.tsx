@@ -25,6 +25,7 @@ import type {
   RefactorBoardConfig,
 } from "@/types/ids";
 import { RefactorCard } from "./RefactorCard";
+import { AddRefactorColumnDialog } from "./AddRefactorColumnDialog";
 
 export interface RefactorSweepBoardProps {
   round: RefactorRound;
@@ -53,7 +54,7 @@ export function RefactorSweepBoard({
   onMoveCard, onAddColumn, onRemoveColumn, onRenameColumn, onReorderColumns,
   onCardClick, readOnly = false, onMergeCard, hasWorktree,
 }: RefactorSweepBoardProps) {
-  const { t, tx } = useTranslation();
+  const { t } = useTranslation();
   const sortedColumns = useMemo(
     () => [...config.columns].sort((a, b) => a.position - b.position),
     [config.columns],
@@ -63,7 +64,7 @@ export function RefactorSweepBoard({
   const [dropTarget, setDropTarget] = useState<RefactorStatus | null>(null);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const handleCardDragStart = useCallback(
-    (e: React.DragEvent<HTMLDivElement>, card: RefactorCardData) => {
+    (e: React.DragEvent<HTMLElement>, card: RefactorCardData) => {
       if (readOnly) {
         e.preventDefault();
         return;
@@ -77,22 +78,22 @@ export function RefactorSweepBoard({
   // 列拖动重排
   const [draggingColIdx, setDraggingColIdx] = useState<number | null>(null);
   const [dropTargetColIdx, setDropTargetColIdx] = useState<number | null>(null);
-  const handleColDragStart = useCallback((e: React.DragEvent<HTMLDivElement>, idx: number) => {
+  const handleColDragStart = useCallback((e: React.DragEvent<HTMLElement>, idx: number) => {
     e.dataTransfer.setData("text/refactor-col-idx", String(idx));
     e.dataTransfer.effectAllowed = "move";
     setDraggingColIdx(idx);
   }, []);
-  const handleColDragOver = useCallback((e: React.DragEvent<HTMLDivElement>, idx: number) => {
+  const handleColDragOver = useCallback((e: React.DragEvent<HTMLElement>, idx: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     setDropTargetColIdx(idx);
   }, []);
-  const handleColDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>, idx: number) => {
+  const handleColDragLeave = useCallback((e: React.DragEvent<HTMLElement>, idx: number) => {
     const related = e.relatedTarget as Node | null;
     if (related && (e.currentTarget as Node).contains(related)) return;
     setDropTargetColIdx((cur) => (cur === idx ? null : cur));
   }, []);
-  const handleColDrop = useCallback((e: React.DragEvent<HTMLDivElement>, toIdx: number) => {
+  const handleColDrop = useCallback((e: React.DragEvent<HTMLElement>, toIdx: number) => {
     e.preventDefault();
     const fromIdxStr = e.dataTransfer.getData("text/refactor-col-idx");
     if (!fromIdxStr) return;
@@ -112,12 +113,12 @@ export function RefactorSweepBoard({
   }, []);
 
   // 列 drop 接收卡
-  const handleColumnDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleColumnDragOver = useCallback((e: React.DragEvent<HTMLElement>) => {
     if (readOnly) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   }, [readOnly]);
-  const handleColumnDrop = useCallback((e: React.DragEvent<HTMLDivElement>, status: RefactorStatus) => {
+  const handleColumnDrop = useCallback((e: React.DragEvent<HTMLElement>, status: RefactorStatus) => {
     if (readOnly) return;
     e.preventDefault();
     const cardId = e.dataTransfer.getData("text/refactor-card-id");
@@ -143,17 +144,11 @@ export function RefactorSweepBoard({
     setEditingCol(null);
   };
 
-  // add column prompt (status + name)
+  // add column Drawer (per 缺口 #3, 替代 window.prompt)
+  const [showAddColumn, setShowAddColumn] = useState(false);
   const handleAddColumn = useCallback(() => {
-    if (typeof window === "undefined") return;
-    const status = window.prompt(tx(t.refactor.addColumnTitle, {}))?.trim();
-    if (!status) return;
-    if (sortedColumns.some((c) => c.status === status)) {
-      window.alert(`status "${status}" 已存在`);
-      return;
-    }
-    onAddColumn(status);
-  }, [onAddColumn, sortedColumns, t, tx]);
+    setShowAddColumn(true);
+  }, []);
 
   // 自动聚焦 inline edit input
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -177,10 +172,12 @@ export function RefactorSweepBoard({
         const isDropTarget = dropTarget === col.status;
         const isColDropTarget = dropTargetColIdx === idx && draggingColIdx !== null;
         return (
-          <div
+          <section
             key={col.status}
             data-testid={`refactor-col-${col.status}`}
             data-col-idx={idx}
+            role="region"
+            aria-label={`${displayName} column, ${cards.length} cards`}
             draggable={draggingColIdx === null && !readOnly}
             onDragStart={(e) => handleColDragStart(e, idx)}
             onDragOver={(e) => {
@@ -298,7 +295,7 @@ export function RefactorSweepBoard({
                 ))
               )}
             </div>
-          </div>
+          </section>
         );
       })}
 
@@ -308,6 +305,7 @@ export function RefactorSweepBoard({
           type="button"
           onClick={handleAddColumn}
           data-testid="refactor-add-column"
+          aria-label={t.refactor.addColumn}
           className="card border-dashed border-line hover:border-accent/60 hover:bg-accent/5 flex flex-col items-center justify-center min-h-[280px] text-ink-mute hover:text-accent transition-colors"
         >
           <Plus size={18} className="mb-1.5" />
@@ -319,6 +317,18 @@ export function RefactorSweepBoard({
           </span>
         </button>
       )}
+
+      {/* 列添加弹窗 (per 缺口 #3) */}
+      <AddRefactorColumnDialog
+        open={showAddColumn}
+        onClose={() => setShowAddColumn(false)}
+        existingStatuses={sortedColumns.map((c) => c.status)}
+        onAdd={(status, name) => {
+          onAddColumn(status, name);
+          setShowAddColumn(false);
+        }}
+      />
     </div>
   );
 }
+
