@@ -2717,6 +2717,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "star-vcs"
+version = "0.1.0"
+
+[[package]]
 name = "star-webhook"
 version = "0.1.0"
 dependencies = [
