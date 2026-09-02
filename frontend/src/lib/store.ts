@@ -23,8 +23,17 @@ import type {
   Notification, NotificationStatus,
   Canvas, CanvasElement, CanvasConnector,
   Board,
+  RefactorRound, RefactorCard, RefactorColumn, RefactorBoardConfig, RefactorStatus,
+  Uuid,
 } from "@/types/ids";
 import { TODO_FALLBACK_STATUS, isFallbackStatus } from "@/components/board/constants";
+import {
+  REFACTOR_DEFAULT_BATCH_SIZE,
+  isRefactorFallbackStatus,
+  makeDefaultRefactorColumns,
+  sortRefactorColumns,
+} from "./board-refactor-constants";
+import { REFACTOR_FALLBACK_STATUS } from "@/types/ids";
 
 // =====================================================================
 // Board reconcile 工具 — 让 board.columns[].work_item_ids 始终是
@@ -138,6 +147,12 @@ interface StoreState {
   auditEvents: typeof seed.auditEvents;
   automationRules: typeof seed.automationRules;
 
+  // ── Refactor Sweep (per 2026-09-02 10:41 JST 拍板, docs/frontend/design/refactor-sweep-design.md) ──
+  /** 全局所有 refactor rounds (active + 历史) */
+  refactorRounds: RefactorRound[];
+  /** per-project 重构看板配置 (列定义 + batch_size) */
+  refactorBoardConfigs: Record<Uuid, RefactorBoardConfig>;
+
   // 5 状态机迁移 (保留 B.2.5 已实装的 6 个)
   transitionWorktree: (id: string, to: WorktreeStatus) => void;
   transitionAgent:    (id: string, to: AgentStatus) => void;
@@ -199,6 +214,52 @@ interface StoreState {
   // 删除 work-item (per 2026-08-31 12:07 JST Kanban Drawer 拍板, Drawer 加删除按钮)
   removeWorkItem: (id: string) => void;
 
+  // ── Refactor Sweep 9 个 action (per 2026-09-02 10:41 JST 拍板) ──
+  // 跟 Kanban addBoardColumn/removeBoardColumn/renameBoardColumn/reorderBoardColumns 1:1 对齐
+  // 命名沿用既有 verb+noun 风格 (add/remove/rename/reorder/move/...)
+  // 行为约束:
+  //   - 兜底 status ("todo") 不可删
+  //   - 删非兜底列: 列里卡 refactor_status 归 fallback, 数据零丢失
+  //   - close round 后只读, 不能改 cards
+  //   - 列操作只动 refactorBoardConfigs, 不动 cards
+  /** 给项目取/初始化 RefactorBoardConfig (没有则用默认 5 列 + batch_size=5) */
+  ensureRefactorBoardConfig: (projectId: Uuid) => RefactorBoardConfig;
+  /** 在末尾追加新列, status 不能跟现有重复 */
+  addRefactorColumn: (projectId: Uuid, status: RefactorStatus, name?: string) => void;
+  /** 删列; 兜底列拒绝; 列里卡全部归 fallback */
+  removeRefactorColumn: (projectId: Uuid, status: RefactorStatus) => void;
+  /** 改列名 (status 标识不变, 仅 name) */
+  renameRefactorColumn: (projectId: Uuid, status: RefactorStatus, newName: string) => void;
+  /** 拖动列重排 (fromIdx, toIdx) */
+  reorderRefactorColumns: (projectId: Uuid, fromIdx: number, toIdx: number) => void;
+  /** 重置为默认 5 列 + batch_size (用户主动 "重置" 按钮) */
+  resetRefactorColumns: (projectId: Uuid) => void;
+  /** 改 batch_size (UI 顶部设置) */
+  setRefactorBatchSize: (projectId: Uuid, size: number) => void;
+  /** 开启一轮新 round (默认 round_number = max+1, 卡初始化为 todo) */
+  openRefactorRound: (projectId: Uuid, opts?: { notes?: string; includeWorkItemIds?: Uuid[] }) => Uuid;
+  /** 关闭当前 round (closed_at = now, 只读) */
+  closeRefactorRound: (roundId: Uuid) => void;
+  /** 开启下一轮 (上一轮 done → round + 1, 全卡 reset todo, 上一轮 closed) */
+  startNextRefactorRound: (projectId: Uuid) => Uuid | null;
+  /** 移动单张卡到新 refactor_status (写 history, 跟 Kanban onTransition 行为一致) */
+  moveRefactorCard: (roundId: Uuid, workItemId: Uuid, toStatus: RefactorStatus) => void;
+  /** 加卡到当前 round (用于"添加任务"按钮) */
+  addRefactorCard: (roundId: Uuid, workItemId: Uuid) => void;
+  /** 从 round 移除卡 (用户撤回) */
+  removeRefactorCard: (roundId: Uuid, workItemId: Uuid) => void;
+  /**
+   * Merge 单张卡 (per 2026-09-02 10:50 JST 拍板)
+   *   - 校验: 仅 refactor_status === "done" 的卡可 merge
+   *   - 已 merged (merged_at 存在) 直接幂等返回
+   *   - 副作用:
+   *       1. WorkItem.worktree_id 存在 -> 改 Worktree.status = "merged"
+   *       2. Worktree.pr_id 存在 -> 改 PullRequest.status = "merged" + merged_at
+   *       3. RefactorCard.merged_at / merged_worktree_id / merged_pr_id 写入
+   *   - 历史 round 不允许 (closed round 的卡只读)
+   */
+  mergeRefactorCard: (roundId: Uuid, workItemId: Uuid) => "ok" | "not_found" | "not_done" | "already_merged" | "closed_round";
+
   // Canvas mutations(无限画布,frontend-canvas-design.md §2)
   addCanvasElement: (element: CanvasElement) => void;
   moveCanvasElement: (id: string, x: number, y: number) => void;
@@ -247,6 +308,12 @@ const initialState = (set: any): StoreState => ({
   relations: seed.relations,
   auditEvents: seed.auditEvents,
   automationRules: seed.automationRules,
+
+  // Refactor Sweep (per 2026-09-02 10:41 JST 拍板)
+  //   - 初始空数组, 由 ensureRefactorBoardConfig / openRefactorRound 首次调用时 lazy init
+  //   - per-project RefactorBoardConfig 同样 lazy init (第一次访问项目时)
+  refactorRounds: [] as RefactorRound[],
+  refactorBoardConfigs: {} as Record<Uuid, RefactorBoardConfig>,
 
   // 6 状态机 (B.2.5 已有)
   transitionWorktree: (id, to) =>
@@ -474,6 +541,406 @@ const initialState = (set: any): StoreState => ({
     set((s: StoreState) => ({
       canvases: s.canvases.map((c) => c.id === canvasId ? { ...c, viewport: { x, y, zoom } } : c),
     })),
+
+  // ===================================================================
+  // Refactor Sweep 9 个 action (per 2026-09-02 10:41 JST 拍板)
+  //   跟 Kanban addBoardColumn/removeBoardColumn/renameBoardColumn/reorderBoardColumns 1:1 对齐
+  //   兜底 status ("todo") 不可删, 删其他列时卡归 fallback, 数据零丢失
+  // ===================================================================
+
+  /** 给项目取/初始化 RefactorBoardConfig (没有则用默认 5 列 + batch_size=5) */
+  ensureRefactorBoardConfig: (projectId) => {
+    const existing = useStore.getState().refactorBoardConfigs[projectId];
+    if (existing) return existing;
+    const fresh: RefactorBoardConfig = {
+      project_id: projectId,
+      columns: makeDefaultRefactorColumns(),
+      fallback_status: REFACTOR_FALLBACK_STATUS,
+      batch_size: REFACTOR_DEFAULT_BATCH_SIZE,
+      updated_at: new Date().toISOString(),
+    };
+    set((s: StoreState) => ({
+      refactorBoardConfigs: { ...s.refactorBoardConfigs, [projectId]: fresh },
+    }));
+    return fresh;
+  },
+
+  /** 在末尾追加新列, status 不能跟现有重复 */
+  addRefactorColumn: (projectId, status, name) =>
+    set((s: StoreState) => {
+      const cfg = s.refactorBoardConfigs[projectId] ?? {
+        project_id: projectId,
+        columns: makeDefaultRefactorColumns(),
+        fallback_status: REFACTOR_FALLBACK_STATUS,
+        batch_size: REFACTOR_DEFAULT_BATCH_SIZE,
+        updated_at: new Date().toISOString(),
+      };
+      // 防重: 已存在该 status 跳过
+      if (cfg.columns.some((c) => c.status === status)) return s;
+      const newCol: RefactorColumn = {
+        status,
+        name,
+        position: cfg.columns.length,
+      };
+      return {
+        refactorBoardConfigs: {
+          ...s.refactorBoardConfigs,
+          [projectId]: {
+            ...cfg,
+            columns: sortRefactorColumns([...cfg.columns, newCol]),
+            updated_at: new Date().toISOString(),
+          },
+        },
+      };
+    }),
+
+  /** 删列; 兜底列拒绝; 列里卡全部归 fallback */
+  removeRefactorColumn: (projectId, status) =>
+    set((s: StoreState) => {
+      const cfg = s.refactorBoardConfigs[projectId];
+      if (!cfg) return s;
+      if (isRefactorFallbackStatus(status)) {
+        // eslint-disable-next-line no-console
+        console.warn(`[store] removeRefactorColumn: refused to delete fallback status "${status}"`);
+        return s;
+      }
+      if (!cfg.columns.some((c) => c.status === status)) return s;
+      // 删列: 该 status 的卡 refactor_status 归 fallback, 历史 round 同样处理
+      const fallback = REFACTOR_FALLBACK_STATUS;
+      const newRounds = s.refactorRounds.map((r) => {
+        if (r.project_id !== projectId) return r;
+        if (r.closed_at) return r; // 已关闭 round 只读
+        return {
+          ...r,
+          cards: r.cards.map((c) =>
+            c.refactor_status === status
+              ? {
+                  ...c,
+                  refactor_status: fallback,
+                  moved_at: new Date().toISOString(),
+                  history: [...c.history, { status: fallback, at: new Date().toISOString() }],
+                }
+              : c
+          ),
+        };
+      });
+      return {
+        refactorBoardConfigs: {
+          ...s.refactorBoardConfigs,
+          [projectId]: {
+            ...cfg,
+            columns: sortRefactorColumns(cfg.columns.filter((c) => c.status !== status)),
+            updated_at: new Date().toISOString(),
+          },
+        },
+        refactorRounds: newRounds,
+      };
+    }),
+
+  /** 改列名 (status 标识不变, 仅 name) */
+  renameRefactorColumn: (projectId, status, newName) =>
+    set((s: StoreState) => {
+      const cfg = s.refactorBoardConfigs[projectId];
+      if (!cfg) return s;
+      return {
+        refactorBoardConfigs: {
+          ...s.refactorBoardConfigs,
+          [projectId]: {
+            ...cfg,
+            columns: cfg.columns.map((c) =>
+              c.status === status ? { ...c, name: newName.trim() || undefined } : c
+            ),
+            updated_at: new Date().toISOString(),
+          },
+        },
+      };
+    }),
+
+  /** 拖动列重排 (fromIdx, toIdx) */
+  reorderRefactorColumns: (projectId, fromIdx, toIdx) =>
+    set((s: StoreState) => {
+      const cfg = s.refactorBoardConfigs[projectId];
+      if (!cfg) return s;
+      const cols = sortRefactorColumns(cfg.columns);
+      if (fromIdx < 0 || fromIdx >= cols.length || toIdx < 0 || toIdx >= cols.length) return s;
+      const [moved] = cols.splice(fromIdx, 1);
+      cols.splice(toIdx, 0, moved);
+      return {
+        refactorBoardConfigs: {
+          ...s.refactorBoardConfigs,
+          [projectId]: {
+            ...cfg,
+            columns: cols.map((c, i) => ({ ...c, position: i })),
+            updated_at: new Date().toISOString(),
+          },
+        },
+      };
+    }),
+
+  /** 重置为默认 5 列 + batch_size (用户主动 "重置" 按钮) */
+  resetRefactorColumns: (projectId) =>
+    set((s: StoreState) => {
+      const cfg = s.refactorBoardConfigs[projectId];
+      const baseColumns = makeDefaultRefactorColumns();
+      // 重置时, 已存在 round 内卡 refactor_status 若引用了已删 status, 归 fallback
+      const fallback = REFACTOR_FALLBACK_STATUS;
+      const newStatuses = new Set(baseColumns.map((c) => c.status));
+      const newRounds = s.refactorRounds.map((r) => {
+        if (r.project_id !== projectId) return r;
+        if (r.closed_at) return r;
+        return {
+          ...r,
+          cards: r.cards.map((c) =>
+            newStatuses.has(c.refactor_status)
+              ? c
+              : {
+                  ...c,
+                  refactor_status: fallback,
+                  moved_at: new Date().toISOString(),
+                  history: [...c.history, { status: fallback, at: new Date().toISOString() }],
+                }
+          ),
+        };
+      });
+      return {
+        refactorBoardConfigs: {
+          ...s.refactorBoardConfigs,
+          [projectId]: {
+            project_id: projectId,
+            columns: baseColumns,
+            fallback_status: REFACTOR_FALLBACK_STATUS,
+            batch_size: cfg?.batch_size ?? REFACTOR_DEFAULT_BATCH_SIZE,
+            updated_at: new Date().toISOString(),
+          },
+        },
+        refactorRounds: newRounds,
+      };
+    }),
+
+  /** 改 batch_size (UI 顶部设置) */
+  setRefactorBatchSize: (projectId, size) =>
+    set((s: StoreState) => {
+      const cfg = s.refactorBoardConfigs[projectId];
+      const safeSize = Math.max(1, Math.min(50, Math.floor(size)));
+      return {
+        refactorBoardConfigs: {
+          ...s.refactorBoardConfigs,
+          [projectId]: {
+            project_id: projectId,
+            columns: cfg?.columns ?? makeDefaultRefactorColumns(),
+            fallback_status: REFACTOR_FALLBACK_STATUS,
+            batch_size: safeSize,
+            updated_at: new Date().toISOString(),
+          },
+        },
+      };
+    }),
+
+  /** 开启一轮新 round (默认 round_number = max+1, 卡初始化为 todo) */
+  openRefactorRound: (projectId, opts) => {
+    const now = new Date().toISOString();
+    const tenantId = useStore.getState().tenants[0]?.id ?? "";
+    const existingRounds = useStore.getState().refactorRounds.filter((r) => r.project_id === projectId);
+    const maxRound = existingRounds.reduce((m, r) => Math.max(m, r.round_number), 0);
+    const newRoundNumber = maxRound + 1;
+    const newId = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `rr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+
+    // 决定入选卡: 显式传 includeWorkItemIds 用之, 否则 = 当前 project 下 status=done 的 workItems
+    let targetWIs: WorkItem[];
+    if (opts?.includeWorkItemIds && opts.includeWorkItemIds.length > 0) {
+      const idSet = new Set(opts.includeWorkItemIds);
+      targetWIs = useStore.getState().workItems.filter((w) => idSet.has(w.id) && w.project_id === projectId);
+    } else {
+      targetWIs = useStore.getState().workItems.filter(
+        (w) => w.project_id === projectId && w.status === "done"
+      );
+    }
+    // 排除已在 active round 里的卡 (避免重复入 round)
+    const activeRound = existingRounds.find((r) => !r.closed_at);
+    const activeIds = new Set(activeRound?.cards.map((c) => c.work_item_id) ?? []);
+    targetWIs = targetWIs.filter((w) => !activeIds.has(w.id));
+
+    const cards: RefactorCard[] = targetWIs.map((w) => ({
+      work_item_id: w.id,
+      work_item_key: w.key,
+      work_item_title: w.title,
+      priority: w.priority,
+      kind: w.kind,
+      refactor_status: REFACTOR_FALLBACK_STATUS,
+      entered_at: now,
+      moved_at: now,
+      history: [{ status: REFACTOR_FALLBACK_STATUS, at: now }],
+      round_number: newRoundNumber,
+    }));
+
+    const newRound: RefactorRound = {
+      id: newId,
+      tenant_id: tenantId,
+      project_id: projectId,
+      round_number: newRoundNumber,
+      notes: opts?.notes,
+      started_at: now,
+      cards,
+    };
+
+    set((s: StoreState) => ({ refactorRounds: [...s.refactorRounds, newRound] }));
+    return newId;
+  },
+
+  /** 关闭当前 round (closed_at = now, 只读) */
+  closeRefactorRound: (roundId) =>
+    set((s: StoreState) => ({
+      refactorRounds: s.refactorRounds.map((r) =>
+        r.id === roundId && !r.closed_at
+          ? { ...r, closed_at: new Date().toISOString() }
+          : r
+      ),
+    })),
+
+  /** 开启下一轮 (上一轮 active 全卡 done → round + 1, 全卡 reset todo, 上一轮 closed) */
+  startNextRefactorRound: (projectId) => {
+    const state = useStore.getState();
+    const projectRounds = state.refactorRounds.filter((r) => r.project_id === projectId);
+    const active = projectRounds.find((r) => !r.closed_at);
+    if (!active) return null;
+    // 校验: 所有卡都 done 才允许
+    const allDone = active.cards.length === 0 || active.cards.every((c) => c.refactor_status === "done");
+    if (!allDone) return null;
+    // 关闭当前 round
+    useStore.getState().closeRefactorRound(active.id);
+    // 开新 round
+    return useStore.getState().openRefactorRound(projectId);
+  },
+
+  /** 移动单张卡到新 refactor_status (写 history) */
+  moveRefactorCard: (roundId, workItemId, toStatus) =>
+    set((s: StoreState) => {
+      const now = new Date().toISOString();
+      return {
+        refactorRounds: s.refactorRounds.map((r) => {
+          if (r.id !== roundId || r.closed_at) return r;
+          return {
+            ...r,
+            cards: r.cards.map((c) =>
+              c.work_item_id === workItemId
+                ? {
+                    ...c,
+                    refactor_status: toStatus,
+                    moved_at: now,
+                    history: [...c.history, { status: toStatus, at: now }],
+                  }
+                : c
+            ),
+          };
+        }),
+      };
+    }),
+
+  /** 加卡到当前 round (用于"添加任务"按钮) */
+  addRefactorCard: (roundId, workItemId) =>
+    set((s: StoreState) => {
+      const round = s.refactorRounds.find((r) => r.id === roundId);
+      if (!round || round.closed_at) return s;
+      if (round.cards.some((c) => c.work_item_id === workItemId)) return s; // 防重
+      const wi = s.workItems.find((w) => w.id === workItemId);
+      if (!wi) return s;
+      const now = new Date().toISOString();
+      const newCard: RefactorCard = {
+        work_item_id: wi.id,
+        work_item_key: wi.key,
+        work_item_title: wi.title,
+        priority: wi.priority,
+        kind: wi.kind,
+        refactor_status: REFACTOR_FALLBACK_STATUS,
+        entered_at: now,
+        moved_at: now,
+        history: [{ status: REFACTOR_FALLBACK_STATUS, at: now }],
+        round_number: round.round_number,
+      };
+      return {
+        refactorRounds: s.refactorRounds.map((r) =>
+          r.id === roundId ? { ...r, cards: [...r.cards, newCard] } : r
+        ),
+      };
+    }),
+
+  /** 从 round 移除卡 (用户撤回) */
+  removeRefactorCard: (roundId, workItemId) =>
+    set((s: StoreState) => ({
+      refactorRounds: s.refactorRounds.map((r) => {
+        if (r.id !== roundId || r.closed_at) return r;
+        return { ...r, cards: r.cards.filter((c) => c.work_item_id !== workItemId) };
+      }),
+    })),
+
+  /**
+   * Merge 单张卡 (per 2026-09-02 10:50 JST 拍板)
+   *   - 校验 + 副作用见 StoreState interface 注释
+   *   - 返回 "ok" | "not_found" | "not_done" | "already_merged" | "closed_round"
+   *     便于 UI 给反馈 (toast / inline message)
+   */
+  mergeRefactorCard: (roundId, workItemId) => {
+    const state = useStore.getState();
+    const round = state.refactorRounds.find((r) => r.id === roundId);
+    if (!round) return "not_found";
+    if (round.closed_at) return "closed_round";
+    const card = round.cards.find((c) => c.work_item_id === workItemId);
+    if (!card) return "not_found";
+    if (card.refactor_status !== "done") return "not_done";
+    if (card.merged_at) return "already_merged";
+
+    const now = new Date().toISOString();
+    const wi = state.workItems.find((w) => w.id === workItemId);
+    const worktreeId = wi?.worktree_id;
+    const worktree = worktreeId
+      ? state.worktrees.find((wt) => wt.id === worktreeId)
+      : undefined;
+    const prId = worktree?.pr_id;
+    const pr = prId
+      ? state.pullRequests.find((p) => p.id === prId)
+      : undefined;
+
+    set((s: StoreState) => {
+      const newWorktrees = worktree
+        ? s.worktrees.map((wt) =>
+            wt.id === worktree.id
+              ? { ...wt, status: "merged" as WorktreeStatus, last_event_at: now, lock_version: wt.lock_version + 1 }
+              : wt
+          )
+        : s.worktrees;
+      const newPRs = pr
+        ? s.pullRequests.map((p) =>
+            p.id === pr.id
+              ? { ...p, status: "merged" as PullRequestStatus, merged_at: now }
+              : p
+          )
+        : s.pullRequests;
+      const newRounds = s.refactorRounds.map((r) => {
+        if (r.id !== roundId) return r;
+        return {
+          ...r,
+          cards: r.cards.map((c) =>
+            c.work_item_id === workItemId
+              ? {
+                  ...c,
+                  merged_at: now,
+                  merged_worktree_id: worktree?.id,
+                  merged_pr_id: pr?.id,
+                }
+              : c
+          ),
+        };
+      });
+      return {
+        worktrees: newWorktrees,
+        pullRequests: newPRs,
+        refactorRounds: newRounds,
+      };
+    });
+    return "ok";
+  },
 });
 
 // =====================================================================
@@ -511,6 +978,15 @@ export const useStore = create<StoreState>()(
         });
         if (drifted) {
           useStore.setState({ board: { ...state.board, columns: reconciledCols } });
+        }
+        // Refactor Sweep: 老 localStorage 数据可能没有 refactorRounds / refactorBoardConfigs,
+        // 补默认 (lazy init, 仅当字段缺失时填)
+        const cur = useStore.getState();
+        if (!Array.isArray(cur.refactorRounds)) {
+          useStore.setState({ refactorRounds: [] });
+        }
+        if (cur.refactorBoardConfigs == null || typeof cur.refactorBoardConfigs !== "object") {
+          useStore.setState({ refactorBoardConfigs: {} });
         }
       },
     }

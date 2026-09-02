@@ -1017,3 +1017,140 @@ export const CHANGESET_SM: StateMachine = {
     { from: "merged",    to: "reverted",  trigger: "user.revert" },
   ],
 };
+
+// =====================================================================
+// 28. refactor-sweep (per 2026-09-02 10:41 JST 拍板, docs/frontend/design/refactor-sweep-design.md)
+// =====================================================================
+// 重构专项页状态机与配置 — 跟 workItem 6 态独立, 不污染 workItem.status
+//
+// 设计动机 (per 拍板):
+//   1. workItem.status 已经有 6 态 (todo/in_progress/review/done/blocked/wontfix)
+//      强塞"重构中 done"会破坏主状态机语义
+//   2. 重构流程: 已 done 任务 → 进入 todo 队列 → 分批 → 走完 → 回到 todo (round + 1)
+//   3. 每张卡有独立 refactor_status, 不影响 workItem.status
+//   4. 列可自定义 (增/删/改/重排), 跟 KanbanBoard 行为 1:1 对齐
+//
+// 5 状态 (default, per 2026-09-02 10:41 JST 拍板: doing 和 review 中间加 testing):
+//   todo     — 待重构 (fallback 兜底列, 不可删, 删其他列时卡回到此)
+//   doing    — 重构中
+//   testing  — 测试中 (新增, 验证重构后回归测试)
+//   review   — 评审中
+//   done     — 本轮重构完成
+//
+// 兜底列保护 (per 2026-08-31 11:24 JST Ulysses Kanban 拍板, refactor 沿用):
+//   - todo 列不可删, ✕ 按钮置灰 + tooltip
+//   - store removeRefactorColumn 二次拒绝 fallback status
+//   - 删其他列时, 列里卡 refactor_status 全部归 todo, 保证数据零丢失
+//
+// 5 状态机 + 自定义列:
+//   - RefactorStatus 用 string 联合, 允许用户新增自定义列 (e.g. "spike" / "blocked")
+//   - 默认 5 个内置 status 写死, 防止用户删完兜底
+// =====================================================================
+
+/**
+ * RefactorStatus 5 状态 (默认)
+ *  - "todo"     兜底, 不可删
+ *  - "doing"    重构中
+ *  - "testing"  新增 (per 2026-09-02 10:41 JST 拍板)
+ *  - "review"   评审
+ *  - "done"     本轮完成
+ *  自定义列可加 string, 例如 "spike" / "blocked"
+ */
+export type RefactorStatus =
+  | "todo" | "doing" | "testing" | "review" | "done" | string;
+
+/** RefactorStatus 5 内置 status 集合 (用于 UI 默认渲染, 自定义列不在这) */
+export const REFACTOR_DEFAULT_STATUSES: readonly RefactorStatus[] = [
+  "todo", "doing", "testing", "review", "done",
+] as const;
+
+/** 兜底 status — 列不可删, 删其他列时卡回到此 */
+export const REFACTOR_FALLBACK_STATUS = "todo" as const satisfies RefactorStatus;
+
+/**
+ * RefactorColumn — 项目级重构看板列定义
+ *  - 跟 KanbanBoard 现有 `Board.columns` 形态 1:1 (status + name? + position)
+ *  - 但 position 显式存, 不依赖 store 数组顺序 (便于持久化稳定排序)
+ *  - 配 refactorBoardConfigs[project_id].columns 持久化
+ */
+export interface RefactorColumn {
+  /** 唯一标识 (status 字符串, default 5 态 + 用户自定义 string) */
+  status: RefactorStatus;
+  /** 用户改的显示名 (缺省 = useStatusLabel 翻译) */
+  name?: string;
+  /** 0-indexed 排序, 拖动重排时改此 */
+  position: number;
+  /** WIP 上限 (optional, 超过显示 warn) */
+  wip_limit?: number;
+}
+
+/**
+ * RefactorCard — round 内单卡状态
+ *  - work_item_id 关联到 store.workItems
+ *  - work_item_key / work_item_title 在入 round 时 snapshot, 任务被删/改名也不影响
+ *  - history 记录每次 refactor_status 变化, 审计用
+ *  - 当前 round_number 冗余存 (便于 UI 展示 "第 N 次重构")
+ *  - merged_at: 在 done 列点击 Merge 按钮后填, 标识 worktree/PR 已合入 main
+ *              UI 区分 "done (待 merge)" vs "done (已 merge)" 两种状态
+ *              (per 2026-09-02 10:50 JST Ulysses 拍板: done 列加 Merge 按钮)
+ */
+export interface RefactorCard {
+  work_item_id: Uuid;
+  work_item_key: string;
+  work_item_title: string;
+  /** 冗余存 workItem.priority, UI 直接用 */
+  priority?: WorkItemPriority;
+  /** 冗余存 workItem.kind, UI 直接用 */
+  kind?: WorkItemKind;
+  /** 当前 refactor 状态 */
+  refactor_status: RefactorStatus;
+  /** 当前 round 入 round 时间 */
+  entered_at: Iso8601;
+  /** 最近一次 refactor_status 迁移时间 */
+  moved_at: Iso8601;
+  /** 历史轨迹: [{status, at}, ...] (per 2026-08-26 §0 Audit 风格) */
+  history: Array<{ status: RefactorStatus; at: Iso8601 }>;
+  /** refactor round 编号 (每轮 +1) */
+  round_number: number;
+  /** Merge 触发时间 (done 列点 Merge 按钮后填, 标识 worktree→merged + PR→merged) */
+  merged_at?: Iso8601;
+  /** Merge 时的来源 worktree_id 快照 (per 2026-09-02 10:50 JST 拍板) */
+  merged_worktree_id?: Uuid;
+  /** Merge 时的 PR id 快照 (per 2026-09-02 10:50 JST 拍板) */
+  merged_pr_id?: Uuid;
+}
+
+/**
+ * RefactorRound — 一轮重构
+ *  - per project 1 个 active round
+ *  - closed_at 填了表示历史 round, 不可再改
+ *  - cards 包含本轮所有卡, 状态由 refactor_status 字段决定
+ */
+export interface RefactorRound {
+  id: Uuid;
+  tenant_id: Uuid;
+  project_id: Uuid;
+  /** 1-indexed 轮次编号 */
+  round_number: number;
+  /** 备注 (per round 可填上下文) */
+  notes?: string;
+  started_at: Iso8601;
+  closed_at?: Iso8601;
+  cards: RefactorCard[];
+}
+
+/**
+ * RefactorBoardConfig — 项目级重构看板配置
+ *  - 跟 KanbanBoard 形态 1:1, 但每个项目独立
+ *  - fallback_status 跟 REFACTOR_FALLBACK_STATUS 强一致 (不可改)
+ *  - batch_size UI 默认 5
+ */
+export interface RefactorBoardConfig {
+  project_id: Uuid;
+  columns: RefactorColumn[];
+  /** 兜底 status, 写死 "todo" 不可改 */
+  fallback_status: "todo";
+  /** 批次大小 (Pull next batch 取多少张) */
+  batch_size: number;
+  updated_at: Iso8601;
+}

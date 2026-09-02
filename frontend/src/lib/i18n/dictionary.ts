@@ -124,6 +124,8 @@ export interface Dictionary {
     sprint: Record<string, string>;
     /** WorkItemKind: bug / feature / task / story / epic (subset used in StatusPill) */
     workItemKind: Record<string, string>;
+    /** RefactorStatus: todo / doing / testing / review / done (5 态, per 2026-09-02 10:41 JST 拍板) */
+    refactor: Record<string, string>;
   };
   board: {
     columnsActive: string;            // "COLUMNS // 4 ACTIVE"
@@ -188,5 +190,77 @@ export interface Dictionary {
     priorityP1: string;               // "P1"
     priorityP2: string;               // "P2"
     priorityP3: string;               // "P3"
+  };
+  // ── v0.4 新增 (per 2026-09-02 10:41 JST 拍板): Refactor Sweep 重构专项页 ──
+  // 范围: 5 状态 todo/doing/testing/review/done + 通用 UI 文案 + 列自定义
+  //   (RefactorStatus 翻译走 status.refactor, 跟 workItem.kind / sprint 同 shape)
+  // 设计依据: docs/frontend/design/refactor-sweep-design.md
+  refactor: {
+    /** 重构专项页主标题 / 副标题 */
+    title: string;                    // "Refactor Sweep 重构专项"
+    subtitle: string;                 // "分批次对已完成任务做重构 · Jira 风格 todo→done"
+    /** 顶部 KPI 4 卡 (待办/进行中/测试中/评审中/已完成 计数) */
+    kpiTodo: string;                  // "待办"
+    kpiDoing: string;                 // "进行中"
+    kpiTesting: string;               // "测试中"
+    kpiReview: string;                // "评审中"
+    kpiDone: string;                  // "已完成"
+    /** Round / Batch 标签 */
+    roundLabel: string;               // "Round #"
+    batchLabel: string;               // "Batch"
+    currentBatch: string;             // "当前批次"
+    totalCards: string;               // "总卡数"
+    finishedCards: string;            // "已完成"
+    /** 操作按钮 */
+    openNextRound: string;            // "开启 Round #N+1"
+    openNextRoundConfirm: string;     // "确认开启下一轮?"
+    openNextRoundHint: string;        // "所有卡状态将重置为 todo, round + 1"
+    pullNextBatch: string;            // "拉下一批"
+    pullNextBatchHint: string;        // "把剩余 todo 卡补满当前批次"
+    addCards: string;                 // "添加任务"
+    addCardsTitle: string;            // "从项目已完成任务中挑选加入重构"
+    noDoneWorkItems: string;          // "当前项目暂无 status=done 的任务可重构"
+    /** 列自定义 — 跟 Kanban 行为 1:1 对齐 (per 2026-09-02 拍板) */
+    addColumn: string;                // "+ Add Column"
+    addColumnTitle: string;           // "添加新重构列 (状态名)"
+    removeColumn: string;             // "删除列"
+    renameColumn: string;             // "点击改列名"
+    dragToReorder: string;            // "拖动 ⋮⋮ 重排"
+    fallbackProtected: string;        // "兜底列 {name} 不可删除 — 删其他列时任务回到此列, 数据兜底"
+    fallbackNotRemovable: string;     // "{name} 不可删除"
+    columnsCustomizeHint: string;     // "· 拖 ⋮⋮ 重排, 点击列名改, ✕ 删"
+    /** 看板列标题 + 空状态 */
+    emptyColumn: string;              // "暂无可重构任务"
+    dropCardHere: string;             // "拖卡到此"
+    wipExceeded: string;              // "WIP 超过限制"
+    /** 历史轮次 */
+    historyTitle: string;             // "历史重构轮次"
+    historyEmpty: string;             // "尚无历史轮次"
+    historyRound: string;             // "Round #"
+    historyStarted: string;           // "开始于"
+    historyClosed: string;            // "结束于"
+    historyProgress: string;          // "{done} / {total}"
+    historyActive: string;            // "进行中"
+    /** 设置抽屉 */
+    batchSizeLabel: string;           // "每批卡数"
+    batchSizeHint: string;            // "默认 5, 推荐 3-8"
+    resetColumns: string;             // "重置为默认 5 列"
+    resetColumnsTitle: string;        // "重置后丢失自定义列与命名, 不可恢复"
+    resetColumnsConfirm: string;      // "确认重置?"
+    /** 卡片状态徽章 */
+    refactorRoundBadge: string;       // "第 N 次重构"
+    refactorMovedAt: string;          // "更新于 {time}"
+    /** 提示 */
+    roundComplete: string;            // "本轮全部完成, 可开启下一轮"
+    batchComplete: string;            // "本批全部完成"
+    nothingInProgress: string;        // "本批无进行中任务"
+    /** Merge 按钮 (per 2026-09-02 10:50 JST 拍板: done 列加 Merge 按钮, 触发 worktree + PR merge) */
+    merge: string;                    // "Merge"
+    mergeTitle: string;               // "合并到 main: 把 worktree 状态 → merged, PR → merged"
+    merged: string;                   // "已合并"
+    mergedAt: string;                 // "合并于 {time}"
+    mergeNoWorktree: string;          // "无 worktree, 仅标记已合并"
+    mergeConfirm: string;             // "确认合并?"
+    mergeInProgress: string;          // "合并中..."
   };
 }

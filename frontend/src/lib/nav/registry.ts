@@ -34,6 +34,7 @@ import {
   Monitor,
   FolderOpen,
   Smartphone,
+  RefreshCw,
 } from "lucide-react";
 
 export type ModuleCategory =
@@ -375,6 +376,19 @@ export const ALL_MODULES: ModuleDefinition[] = [
     categoryLabel: "System & Meta",
     description: "多租户隔离与资源配额控制",
     icon: Building2,
+  },
+  // ── Refactor Sweep (per 2026-09-02 10:41 JST 拍板) ──
+  // 分批对已完成任务做重构, 5 状态 todo/doing/testing/review/done 看板,
+  // 走完一轮回到 todo, 累计轮次. 跟 Kanban 一样可自定义列.
+  {
+    id: "refactor",
+    label: "Refactor Sweep",
+    code: "RFS",
+    href: "/refactor",
+    category: "work",
+    categoryLabel: "Work Management",
+    description: "分批次重构已完成任务 · Jira 风格 todo→done 循环, 列可自定义",
+    icon: RefreshCw,
   },
 ];
 
