@@ -1,0 +1,65 @@
+[package]
+name = "star-api-rest"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "STAR Developer REST API (per spec/integration/02-developer-api-and-outbound-webhook-spec.md §1.1 + §2) — 镜像 16 MCP tool + Webhook 管理端点"
+
+[[bin]]
+name = "star-api-rest"
+path = "src/main.rs"
+
+[lib]
+name = "star_api_rest"
+path = "src/lib.rs"
+
+[dependencies]
+# workspace 基础
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+
+# HTTP server (axum, 同 star-mcp 0.8)
+axum = "0.8"
+tower = { version = "0.5", features = ["util"] }
+
+# 鉴权 (HMAC-SHA256, 跟 star-webhook 共享 secret verify)
+sha2 = { workspace = true }
+hmac = { workspace = true }
+hex = { workspace = true }
+
+# Phase B.2 (Tier 1 真实数据源: tenant / identity / permission) — per star-mcp 同源
+domain-tenant = { path = "../domain-tenant" }
+domain-identity = { path = "../domain-identity" }
+domain-permission = { path = "../domain-permission" }
+# Phase B.2.5 (Tier 2 真实数据源: workspace / project / work-item)
+domain-workspace = { path = "../domain-workspace" }
+domain-project = { path = "../domain-project" }
+domain-work-item = { path = "../domain-work-item" }
+# Phase B.2.6 (Tier 3 真实数据源: worktree / agent / feedback)
+domain-worktree = { path = "../domain-worktree" }
+domain-agent = { path = "../domain-agent" }
+domain-feedback = { path = "../domain-feedback" }
+
+# Webhook 出站 (复用 star-webhook DeliveryStore/RetryPolicy, per spec §7.3)
+star-webhook = { path = "../star-webhook" }
+# Context (P0-1 联动审计 ActorContext 共享, per AGENTS.md §4.1 v16)
+star-context = { path = "../star-context" }
+# 注意: star-mcp 只有 [[bin]] 无 [lib], 不可作 path dep;
+#       共享鉴权逻辑放 star-context (per P0-1 联动审计, AGENTS.md §4.1 v16)
+
+[dev-dependencies]
+# axum::Router::oneshot 测试 helper (per star-mcp 模式)
+tower = { version = "0.5", features = ["util"] }
+
+[lints]
+workspace = true

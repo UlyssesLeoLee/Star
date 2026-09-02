@@ -53,6 +53,8 @@ members = [
     # Phase F 骨架:2026-08-27 新增 2 crate (SSE + Webhook)
     "crates/star-sse",
     "crates/star-webhook",
+    # Phase L 骨架: 2026-09-02 新增 crates/star-api-rest (Developer REST API, 22 路由 stub, 业务 P2 实装)
+    "crates/star-api-rest",
 ]
 exclude = ["target"]
 
