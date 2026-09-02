@@ -444,7 +444,7 @@ export interface GraphPayload {
 | 引用 | 路径 | 版本 |
 |---|---|---|
 | AGENTS.md | `D:/Star/AGENTS.md` | v0.15 (per commit 29692a7) |
-| HANDOFF-ST-001 | `D:/Star/HANDOFF-ST-001.md` | v0.4 |
+| HANDOFF-ST-001 | `D:/Star/..\..\..\..\reports\HANDOFF-ST-001.md` | v0.4 |
 | ADR-0040 domain-batch | `docs/architecture/2026-08-26-upgrade/adr/0040-domain-batch.md` | v0.1 |
 | ADR-0032 MCP Transport | `docs/architecture/2026-08-26-upgrade/adr/0032-mcp-transport-stdio.md` | - |
 | API Design 25 MRU | `docs/api-design.md` | - |

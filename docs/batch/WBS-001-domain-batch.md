@@ -77,7 +77,7 @@ per [BATCH-REQ-001 §7 12 AC](../requirements/batch-001.md) + [domain-batch-spec
 
 ## §5 跨 session HANDOFF 计划
 
-per [HANDOFF-ST-001 v0.4 H2-EXT 0.6-0.8M 单 session 上限实证](../../../HANDOFF-ST-001.md) (单 session 估上限 0.8M token), 1.08M 整体需跨 2-3 session 续做. 设计 4 个 HANDOFF 文档, 每个 session 收尾时落地.
+per [HANDOFF-ST-001 v0.4 H2-EXT 0.6-0.8M 单 session 上限实证](../../../..\..\reports\HANDOFF-ST-001.md) (单 session 估上限 0.8M token), 1.08M 整体需跨 2-3 session 续做. 设计 4 个 HANDOFF 文档, 每个 session 收尾时落地.
 
 | HANDOFF | session 范围 | token 估 | 累计 | 触发 |
 |---|---|---|---|---|

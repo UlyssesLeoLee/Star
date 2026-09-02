@@ -593,21 +593,21 @@ frontend/src/app/automation-debug/
 - `docs/test-design.md` v0.3 (å…„å¼Ÿ: AC çŸ©é˜µç”Ÿæˆå™¨èŒƒå¼æ¥æº)
 - `docs/frontend/design/mock-msw-handlers.md` (å…„å¼Ÿ: 5 åŸŸ MSW handler å®žè¯)
 - `PHASE-P0-1-ACTOR-CONTEXT-IMPL-REPORT.md` v0.3 (å®žè¯: 19 ä¸ª fix è„šæœ¬)
-- `HANDOFF-ST-001.md` v0.2 (å®žè¯: H2 èŒƒå›´æ‰©é‡ + å¼ºç±»åž‹é‡æž„)
+- `..\reports\HANDOFF-ST-001.md` v0.2 (å®žè¯: H2 èŒƒå›´æ‰©é‡ + å¼ºç±»åž‹é‡æž„)
 - `scripts/p0_1_actor_context_migration.py` (å®žè¯: ç¬¬ 1 ä»½ P0-1 è”åŠ¨è„šæœ¬)
 - `scripts/generate_ac_matrix.py` (å®žè¯: AC çŸ©é˜µç”Ÿæˆå™¨, T.1 å­é¡¹)
 - `scripts/p0_h2_3domain_migration.py` (å®žè¯: H2 çœŸå®žå°è¯•è„šæœ¬å…¥æ¡£)
 
 
 
-### 4.12 É¢Âä WBS ²¹È±¿Ú (per 2026-09-02 18:30 JST, Ulysses ÅÄ°å¿ª×Ó´úÀíºÍ worktree Íê³ÉËüÃÇ)
+### 4.12 É¢ï¿½ï¿½ WBS ï¿½ï¿½È±ï¿½ï¿½ (per 2026-09-02 18:30 JST, Ulysses ï¿½Ä°å¿ªï¿½Ó´ï¿½ï¿½ï¿½ï¿½ï¿½ worktree ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½)
 
 
-| ÈÎÎñ | ·¶Î§ | token Ô¤Ëã | ÊµÊ© | commit | ±¸×¢ |
+| ï¿½ï¿½ï¿½ï¿½ | ï¿½ï¿½Î§ | token Ô¤ï¿½ï¿½ | ÊµÊ© | commit | ï¿½ï¿½×¢ |
 |---|---|---|---|---|---|
-| star-nav-completion-001 ×ÓÈÎÎñ A (i18n categoryLabel Í¬²½) | 7 module ¡Á 3 ÓïÑÔ (zh-CN/en/ja) = 21 ´¦Ìæ»» + remote entry ÐÂ¼Ó | 0.15M | worker ×Ó´úÀí wt/star-nav-i18n-a (UTF-8 ×Ö½Ú¼¶ + CRLF ±£Õæ) | `bd918e4` (per git log -p --follow ÊµÖ¤) | brief ±ê GBK ÎóÅÐ, Êµ¼Ê UTF-8 + CRLF, worker ×ÔÊ¶±ð×ß Python bytes-level |
-| star-nav-completion-001 ×ÓÈÎÎñ B (HeaderTab 8 ÕÅÊÓ¾õ¶Ô±ÈÍ¼) | light/dark ¡Á 4 active ×´Ì¬ (inbox/issues/agents/settings) | 0.20M | worker ×Ó´úÀí wt/star-nav-shots-b (HEADER_STATES ÅäÖÃ»¯ + dev 200s ºóÌ¨) | `8c893a9` (per git log -p --follow ÊµÖ¤) | 8 ÕÅÍ¼È« > 16KB, dev 90s timeout Ã»´¥·¢ |
-| star-nav-completion-001 ×ÓÈÎÎñ C (ÆäËû page SubNav È¾É«) | skip | 0 | È«²Ö <SubNav Êµ²âÖ» issues/page.tsx 1 ´¦, ÒÑÔÚ f65744a Åä 4 view È¾É« | ¡ª | per ÊØÃÅ #11 È±±ê±È´í±ê, mark skipped |
+| star-nav-completion-001 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ A (i18n categoryLabel Í¬ï¿½ï¿½) | 7 module ï¿½ï¿½ 3 ï¿½ï¿½ï¿½ï¿½ (zh-CN/en/ja) = 21 ï¿½ï¿½ï¿½æ»» + remote entry ï¿½Â¼ï¿½ | 0.15M | worker ï¿½Ó´ï¿½ï¿½ï¿½ wt/star-nav-i18n-a (UTF-8 ï¿½Ö½Ú¼ï¿½ + CRLF ï¿½ï¿½ï¿½ï¿½) | `bd918e4` (per git log -p --follow ÊµÖ¤) | brief ï¿½ï¿½ GBK ï¿½ï¿½ï¿½ï¿½, Êµï¿½ï¿½ UTF-8 + CRLF, worker ï¿½ï¿½Ê¶ï¿½ï¿½ï¿½ï¿½ Python bytes-level |
+| star-nav-completion-001 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ B (HeaderTab 8 ï¿½ï¿½ï¿½Ó¾ï¿½ï¿½Ô±ï¿½Í¼) | light/dark ï¿½ï¿½ 4 active ×´Ì¬ (inbox/issues/agents/settings) | 0.20M | worker ï¿½Ó´ï¿½ï¿½ï¿½ wt/star-nav-shots-b (HEADER_STATES ï¿½ï¿½ï¿½Ã»ï¿½ + dev 200s ï¿½ï¿½Ì¨) | `8c893a9` (per git log -p --follow ÊµÖ¤) | 8 ï¿½ï¿½Í¼È« > 16KB, dev 90s timeout Ã»ï¿½ï¿½ï¿½ï¿½ |
+| star-nav-completion-001 ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ C (ï¿½ï¿½ï¿½ï¿½ page SubNav È¾É«) | skip | 0 | È«ï¿½ï¿½ <SubNav Êµï¿½ï¿½Ö» issues/page.tsx 1 ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ f65744a ï¿½ï¿½ 4 view È¾É« | ï¿½ï¿½ | per ï¿½ï¿½ï¿½ï¿½ #11 È±ï¿½ï¿½È´ï¿½ï¿½ï¿½, mark skipped |
 
 
-**ÒÑÖªÈ±¿Ú + Ê§°ÜÄ£Ê½**: vitest pass ÊÇ±ØÒª·Ç³ä·ÖÌõ¼þ (2 worktree ¸÷ÅÜ 41 files / 345 tests pass, µ«Ã»ÅÜ e2e); 8 ÕÅ½ØÍ¼ÊÓ¾õ×ß²éÊÇÊÖ¹¤ byte ¼ì²é, Ã»ÕæÓÃÍ¼Ïñ diff; main worktree ÓÐ 12 ¸ö untracked/modified ¸ú±ðÈË WIP ³åÍ», ºÏ²¢ÓÃ stash + Move-Item Â·¾¶±Ü¿ª. 
+**ï¿½ï¿½ÖªÈ±ï¿½ï¿½ + Ê§ï¿½ï¿½Ä£Ê½**: vitest pass ï¿½Ç±ï¿½Òªï¿½Ç³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (2 worktree ï¿½ï¿½ï¿½ï¿½ 41 files / 345 tests pass, ï¿½ï¿½Ã»ï¿½ï¿½ e2e); 8 ï¿½Å½ï¿½Í¼ï¿½Ó¾ï¿½ï¿½ß²ï¿½ï¿½ï¿½ï¿½Ö¹ï¿½ byte ï¿½ï¿½ï¿½, Ã»ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ diff; main worktree ï¿½ï¿½ 12 ï¿½ï¿½ untracked/modified ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ WIP ï¿½ï¿½Í», ï¿½Ï²ï¿½ï¿½ï¿½ stash + Move-Item Â·ï¿½ï¿½ï¿½Ü¿ï¿½. 

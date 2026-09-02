@@ -21,7 +21,7 @@
 |---|---|---|
 | lib 编译 | `cargo check --workspace --lib` | 0 err (跟 AGENTS.md v0.35 最新记录一致) |
 | all-targets 编译 | `cargo check --workspace --all-targets` | **~460 err, 跨 11 crate** (domain-feedback 77 / domain-integration 76 / domain-validation 66 / domain-development 63 / domain-workflow 54 / domain-worktree 51 / domain-notification 45 / star-mcp 26 / domain-relation 4 / api 1) |
-| 根因 | — | `TenantId`/`UserId` 强类型 vs `Uuid` 的 ActorContext 类型不统一, 属于 `HANDOFF-ST-001.md` H2/H2-EXT 已跟踪工作, 卡在等 Ulysses 对 domain-work-item 等的类型语义拍板 |
+| 根因 | — | `TenantId`/`UserId` 强类型 vs `Uuid` 的 ActorContext 类型不统一, 属于 `..\..\reports\HANDOFF-ST-001.md` H2/H2-EXT 已跟踪工作, 卡在等 Ulysses 对 domain-work-item 等的类型语义拍板 |
 | unwrap 计数 | `grep -ro "\.unwrap()" crates --include=*.rs \| wc -l` | 1339 处 |
 | clone 计数 | `grep -ro "\.clone()" crates --include=*.rs \| wc -l` | 730 处 |
 | tracing 埋点覆盖 | `grep -rl "tracing::" crates --include=*.rs \| wc -l` / 总 rs 文件数 | 7 / 288 文件 |
@@ -43,7 +43,7 @@
 5. 给 T3 (需人工决策) 条目**提交选项报告**, 不擅自替 Ulysses 做架构决策
 
 ### 1.2 非目标 (显式排除, 避免与现有 HANDOFF 冲突)
-- **不做** H2/H2-EXT ActorContext (`TenantId`/`UserId` vs `Uuid`) 统一 — 已由 `HANDOFF-ST-001.md` §1/§5/§8 跟踪, 卡在等 Ulysses 拍板 `domain-work-item`/`domain-identity` 类型语义, 本 spec 不重复/不越权处理
+- **不做** H2/H2-EXT ActorContext (`TenantId`/`UserId` vs `Uuid`) 统一 — 已由 `..\..\reports\HANDOFF-ST-001.md` §1/§5/§8 跟踪, 卡在等 Ulysses 拍板 `domain-work-item`/`domain-identity` 类型语义, 本 spec 不重复/不越权处理
 - **不做** `docs/batch` (domain-batch) 相关工作 — 独立 WBS 已存在
 - **不做**"事件驱动 app 集群 + 上传界面"新子系统 — 该子项目单独立 spec `docs/specs/domain-app-spec.md`(2026-09-03 起草, Q1-Q4 拍板记录见该文档状态头), 依赖本 spec 先完成 T1 打底(该 spec 编写不受阻塞, 仅其 T 任务分解受阻塞)
 - **不新增业务功能** — 本 spec 全部条目是重构, 禁止顺手加 feature

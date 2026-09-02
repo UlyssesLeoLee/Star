@@ -8,9 +8,9 @@
 
 ## §0 开工前必读 (下游 AI 进入本任务时第一步)
 
-1. 读 `docs/refactor/RF-001-spec.md` §1.2 非目标 —— **本任务不碰 H2/H2-EXT ActorContext 统一**, 那是 `HANDOFF-ST-001.md` 的范围, 两份 handoff 不要互相踩
+1. 读 `docs/refactor/RF-001-spec.md` §1.2 非目标 —— **本任务不碰 H2/H2-EXT ActorContext 统一**, 那是 `..\..\reports\HANDOFF-ST-001.md` 的范围, 两份 handoff 不要互相踩
 2. 读 `docs/refactor/WBS-001-refactor.md` §0 总览表, 认领任务前先看依赖关系 (§4 执行顺序)
-3. 重新实测 `cargo check --workspace --all-targets` err 数, **不得沿用本文档写的 ~460 这个数字** (数字有时效性, 参考 `HANDOFF-ST-001.md` Q9-T/A9 先例)
+3. 重新实测 `cargo check --workspace --all-targets` err 数, **不得沿用本文档写的 ~460 这个数字** (数字有时效性, 参考 `..\..\reports\HANDOFF-ST-001.md` Q9-T/A9 先例)
 4. 每完成一个 WBS 任务号, 回本文件对应 §1/§2 条目打勾 + commit message 标注任务号 (如 `refactor(T1.3): 注册 star-vcs 到 workspace members`)
 
 ---
@@ -19,7 +19,7 @@
 
 ### RF-T1.1 — 根目录报告文件归档
 98 个 `PHASE-*/STAR-*/QA-*/HANDOFF-ST-001/DDD-LEAD-REVIEW-PROCESS/REQUIREMENTS-THREAD-C-HANDOFF` md 文件混在根目录。
-**动作**: 按 `docs/refactor/WBS-001-refactor.md` §1 T1.1 步骤, `git mv` 到 `docs/reports/`, 同步全部内部相对链接。`HANDOFF-ST-001.md` 移动前先确认它没有正在被别的活跃 session 引用中 (检查是否有 `.worktrees/*/HANDOFF-ST-001.md` 处于未合并状态), 若有则本条先跳过, 待那些 worktree 合并/清理后再做。
+**动作**: 按 `docs/refactor/WBS-001-refactor.md` §1 T1.1 步骤, `git mv` 到 `docs/reports/`, 同步全部内部相对链接。`..\..\reports\HANDOFF-ST-001.md` 移动前先确认它没有正在被别的活跃 session 引用中 (检查是否有 `.worktrees/*/..\..\reports\HANDOFF-ST-001.md` 处于未合并状态), 若有则本条先跳过, 待那些 worktree 合并/清理后再做。
 
 ### RF-T1.2 — 根目录散件清理
 14 个已跟踪 `_*.sh/_*.py/_*.txt` + `_wt_audit/`。
@@ -43,7 +43,7 @@
 
 ### RF-T2.1 — unwrap 收敛
 **先做**: 按 crate 精确统计 (库代码 vs 测试代码), 更新 WBS §0 token 估算区间为实测值, 再动手改。
-**规则**: 落在 H2/H2-EXT 8 个 domain (per `HANDOFF-ST-001.md` §1 H2 表) 里、且 unwrap 在 ActorContext 类型转换代码路径上的, 标记"阻塞于 H2/H2-EXT"跳过, 不要顺手改。
+**规则**: 落在 H2/H2-EXT 8 个 domain (per `..\..\reports\HANDOFF-ST-001.md` §1 H2 表) 里、且 unwrap 在 ActorContext 类型转换代码路径上的, 标记"阻塞于 H2/H2-EXT"跳过, 不要顺手改。
 **gate**: 每个 crate 改完 `cargo test -p <crate> --lib` 全过才能 commit。
 
 ### RF-T2.2 — clone 审计
@@ -72,9 +72,9 @@
 
 ---
 
-## §4 边界声明 (与 `HANDOFF-ST-001.md` 的关系)
+## §4 边界声明 (与 `..\..\reports\HANDOFF-ST-001.md` 的关系)
 
-- 本 handoff (RF-001) 与 `HANDOFF-ST-001.md` (ST-001, H2/H2-EXT ActorContext 统一) 是**两条独立任务线**, 可能在同一 session 里都有下游 AI 在跑, 注意不要在同一次 commit 里混改两边范围的文件
+- 本 handoff (RF-001) 与 `..\..\reports\HANDOFF-ST-001.md` (ST-001, H2/H2-EXT ActorContext 统一) 是**两条独立任务线**, 可能在同一 session 里都有下游 AI 在跑, 注意不要在同一次 commit 里混改两边范围的文件
 - 如果执行 RF-T2.1 (unwrap 收敛) 时发现某处修复**必须**先解决 ActorContext 类型统一才能继续, 停止该处改动, 在本文件 §5 记录阻塞点, 转而处理 WBS 里其他不冲突的任务
 - 两条 handoff 都完成 T1 级别工作后, 建议下一次 session 再评估是否合并成一份统一的 `HANDOFF-ST-002.md` (避免长期维护 2 份平行文档), 但这个合并动作本身需要 Ulysses 拍板, 不在本次范围内
 

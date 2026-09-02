@@ -144,7 +144,7 @@ per [BATCH-REQ-001 §3.4 F-036 + §4 NFR-006 多租户](../../../requirements/ba
 - 5 域 (player / economy / match / social / admin) 各自有独立 DAG 视图, UI 路由 `frontend/src/app/batch/<domain>/...`
 - 跨域 DAG 视图独立, 不混合 (per 8/21 JST 拒绝兼任)
 - 跨 tenant 访问 DAG 被拒 (HTTP 403, per NFR-006)
-- 节点类型 `domain-service` 调用时, ActorContext 注入 tenant_id + workspace_ids + is_platform_operator (per [HANDOFF-ST-001 v0.4 §5.1 H2-EXT star_context 扩展](../../../HANDOFF-ST-001.md))
+- 节点类型 `domain-service` 调用时, ActorContext 注入 tenant_id + workspace_ids + is_platform_operator (per [HANDOFF-ST-001 v0.4 §5.1 H2-EXT star_context 扩展](../../../..\..\..\..\reports\HANDOFF-ST-001.md))
 
 引用: per [AGENTS.md §4 #3 v0.6 Q1-D 拍板](../../../AGENTS.md) 5 域是历史治理命名不映射 DDD; batch 5 域视图是**业务层**视图, 跟 22 crate 是**DDD bounded context**视图正交。
 
@@ -189,7 +189,7 @@ per [BATCH-REQ-001 §3.3 F-020~026 状态机/重试/幂等](../../../requirement
 | [requirements.md §13 Architecture](../../../../requirements.md) | [本 ADR §D33](#d33-domain-batch-作为-star-第-23-个-domain--crate) | K8s-native / K3s / PG / NATS 既有架构 → batch 部署 |
 | [requirements.md §14 Data Model](../../../../requirements.md) | [本 ADR §D36](#d36-持久化-8-schema-按-work--transaction--master-三分类横展开) | REQ-DATA-001/002/003 → batch 8 schema W/T/M |
 | [AGENTS.md §4 13+ 守门](../../../AGENTS.md) | [本 ADR §4 已知缺口](#§4-已知缺口) | 守门 #1+#9+#12 → ADR 写完 commit + §5 签字栏走代签 |
-| [HANDOFF-ST-001 v0.4 H2-EXT](../../../../HANDOFF-ST-001.md) | [本 ADR §D40 WBS 附录](#d40-wbs--token-预算-附录) | 0.6-0.8M 跨 session 续模式 → batch 2 phase |
+| [HANDOFF-ST-001 v0.4 H2-EXT](../../../../..\..\..\..\reports\HANDOFF-ST-001.md) | [本 ADR §D40 WBS 附录](#d40-wbs--token-预算-附录) | 0.6-0.8M 跨 session 续模式 → batch 2 phase |
 
 ---
 
@@ -238,7 +238,7 @@ per 2026-09-01 18:43 JST Ulysses 拍板 C + [STAR-OLU-001 1 SRE·周 = 1.2M toke
 | **v1 phase 2** | 多集群/多云 (NG-004 移除条件触发) + ML 编排 (NG-002 移除条件触发) | ~1.5M | 1.2 周 | 9.0M |
 | **总计** | v0 (5.0M / 4.2 周) + v1 (4.0M / 3.3 周) | **9.0M** | **7.5 周** | 9.0M |
 
-**跨 session 续 (per [HANDOFF-ST-001 v0.4 H2-EXT 0.6-0.8M 实证](../../../HANDOFF-ST-001.md))**:
+**跨 session 续 (per [HANDOFF-ST-001 v0.4 H2-EXT 0.6-0.8M 实证](../../../..\..\..\..\reports\HANDOFF-ST-001.md))**:
 - 单 session 估上限 ~0.8M token (H2 实证)
 - v0 phase 1 (2.0M) 需 3 session 续, 走 HANDOFF-BATCH-001.md 模式
 - v0 phase 2 (2.5M) 需 4 session 续

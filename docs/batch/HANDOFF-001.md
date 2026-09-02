@@ -29,7 +29,7 @@
 
 ### 2.1 续 session 启动 step-by-step
 
-1. **Step 1** `git log --oneline -10` 确认当前 HEAD (per [HANDOFF-ST-001 v0.3 §2.1](../../../HANDOFF-ST-001.md))
+1. **Step 1** `git log --oneline -10` 确认当前 HEAD (per [HANDOFF-ST-001 v0.3 §2.1](../../../..\..\reports\HANDOFF-ST-001.md))
 2. **Step 2** 读 [WBS-001 v0.1](./WBS-001-domain-batch.md) §1-§2 确认 phase 1+2 子任务列表
 3. **Step 3** 读 [domain-batch-spec v0.1 §4 Port trait + §9 T5~T6](../specs/domain-batch-spec.md) 确认 5 Port trait 签名 + 5 节点类型 enum
 4. **Step 4** 跑 `cargo check -p domain-batch --all-targets` 验证 v0 phase 1 骨架 0 err (per 守门 #1 v2 派生)

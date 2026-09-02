@@ -41,8 +41,8 @@
 
 ### T1.1 根目录报告文件归档
 1. `mkdir docs/reports`
-2. `git mv PHASE-*.md STAR-*.md QA-*.md HANDOFF-ST-001.md DDD-LEAD-REVIEW-PROCESS.md REQUIREMENTS-THREAD-C-HANDOFF.md docs/reports/`
-   - **例外**: `HANDOFF-ST-001.md` 若仍在被跨 session 活跃引用 (per 其 §8 状态), 先跟 Ulysses 确认是否此时移动会打断正在进行的 H2/H2-EXT 续接流程, 建议放最后一步单独 commit 便于 revert
+2. `git mv PHASE-*.md STAR-*.md QA-*.md ..\..\reports\HANDOFF-ST-001.md DDD-LEAD-REVIEW-PROCESS.md REQUIREMENTS-THREAD-C-HANDOFF.md docs/reports/`
+   - **例外**: `..\..\reports\HANDOFF-ST-001.md` 若仍在被跨 session 活跃引用 (per 其 §8 状态), 先跟 Ulysses 确认是否此时移动会打断正在进行的 H2/H2-EXT 续接流程, 建议放最后一步单独 commit 便于 revert
 3. 全仓 `grep -rl "\](\.\./)*\(PHASE\|STAR\|QA\|HANDOFF\)-[A-Za-z0-9.-]*\.md" --include=*.md .` 找出所有内部相对链接引用, 逐个更新路径
 4. `README.md`/`CHANGELOG.md`/`AGENTS.md` 里若有指向这些文件的链接同步更新
 
@@ -67,7 +67,7 @@
 
 ### T2.1 unwrap 收敛
 1. 第一步 (纯统计, 不改代码): 按 crate 拆分 unwrap 计数, 区分 `src/` 非测试代码 vs `#[cfg(test)]`/`tests/` 代码, 产出精确表格替换本 WBS 的估算区间
-2. 排除掉落在 H2/H2-EXT 覆盖范围 crate (`domain-feedback`/`domain-validation`/`domain-integration`/`domain-comment`/`domain-identity`/`domain-project`/`domain-tenant`/`domain-work-item`, per `HANDOFF-ST-001.md` §1 H2 表) 里、且 unwrap 出现在 ActorContext 类型转换代码路径上的条目 —— 这些标记"阻塞于 H2/H2-EXT", 跳过
+2. 排除掉落在 H2/H2-EXT 覆盖范围 crate (`domain-feedback`/`domain-validation`/`domain-integration`/`domain-comment`/`domain-identity`/`domain-project`/`domain-tenant`/`domain-work-item`, per `..\..\reports\HANDOFF-ST-001.md` §1 H2 表) 里、且 unwrap 出现在 ActorContext 类型转换代码路径上的条目 —— 这些标记"阻塞于 H2/H2-EXT", 跳过
 3. 剩余 crate 按 unwrap 数量从少到多排序, 逐个改: 可恢复错误 → `Result` + 该 crate 现有 `thiserror` enum 加变体; 真正不可能失败 (如 `Uuid::parse_str` 对着字面量常量) → 保留但加 `// SAFETY:` 注释
 4. 每个 crate 改完: `cargo test -p <crate> --lib` 全过 + `cargo clippy -p <crate> -- -D clippy::unwrap_used` (仅对该 crate 的 `src/`, 用 `#[cfg(not(test))]` 限定范围或 clippy.toml 排除 tests 目录) 0 触发 → commit
 

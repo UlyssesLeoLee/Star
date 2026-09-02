@@ -4,7 +4,7 @@
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-03 06:53 JST commit `a04c4c1` (Ulysses 真实签) 落档 3 件套 (AUDIT-001 + RF-001 + domain-app-spec), 用户发令"查阅 handoff, 制定开发计划 phase"
 > **前置依赖**:
-> - 3 份 Handoff: `HANDOFF-ST-001.md` v0.6 (H2/H2-EXT ActorContext 统一) / `HANDOFF-RF-001.md` v0.3 (代码健康度重构) / `HANDOFF-BATCH-001.md` v0.1 (domain-batch v0 phase 2 session 2)
+> - 3 份 Handoff: `docs/repor../docs/reports/HANDOFF-ST-001.md` v0.6 (H2/H2-EXT ActorContext 统一) / `HANDOFF-RF-001.md` v0.3 (代码健康度重构) / `HANDOFF-BATCH-001.md` v0.1 (domain-batch v0 phase 2 session 2)
 > - `docs/plans/post-merge-development-plan-2026-09-02.md` v0.1 (9/2 智能合并后未完成开发计划, 8 步推进路径)
 > - 9/3 commit `a04c4c1` 落档: `docs/refactor/AUDIT-001-requirements-basicdesign-specs.md` v0.1 + `docs/refactor/RF-001-spec.md` v0.3 + `docs/refactor/WBS-001-refactor.md` v0.3 + `docs/refactor/HANDOFF-001.md` v0.3 + `docs/reports/2026-09-02-audit-001-redteam-findings.md` v0.1 + `docs/specs/domain-app-spec.md` v0.1
 > - `STAR-P3-WBS-001.md` v0.2 (P3 全 5 阶段 56/64 实质收官 87.5%) + `STAR-OLU-001.md` v0.1 (1 SRE·周 = 1.2M token) + `AGENTS.md` v0.11 (24 commits 守门派生 v1-v24, 含 #19 v22/v23/v24)
@@ -57,7 +57,7 @@
 
 | # | 文档 | 版本 | 子项 | 已完成 | 阻塞 | token 估 | 9/3 增量 |
 |---|---|---|---|---|---|---|---|
-| 1 | `HANDOFF-ST-001.md` | v0.6 (9/1) | H1-H5 (1) + H2-EXT 5 (3) + 8 step 执行计划 | 1/5 + 3/5 + H1 0/1 (待 commit) | H2-2/4/5 (强类型) | ~3.8M | 无新 (9/2 plan 已含) |
+| 1 | `docs/repor../docs/reports/HANDOFF-ST-001.md` | v0.6 (9/1) | H1-H5 (1) + H2-EXT 5 (3) + 8 step 执行计划 | 1/5 + 3/5 + H1 0/1 (待 commit) | H2-2/4/5 (强类型) | ~3.8M | 无新 (9/2 plan 已含) |
 | 2 | `HANDOFF-RF-001.md` | v0.3 (9/2) | T1 5 + T2 4 + T3 3 | 0/12 启动 | T1.3 需先判定 | ~4.15-4.95M | **9/3 新 commit `a04c4c1` 落地** |
 | 3 | `HANDOFF-BATCH-001.md` | v0.1 (9/1) | T5-T8 (16 step) | 0/16 启动 | GAP-H1-04 shell 沙箱选型 | ~0.2M (估 → 0.6-1.0M) | 无新 |
 | 4 | `post-merge-dev-plan` | v0.1 (9/2) | 8 step + 3 拍板项 | 0/8 启动 | 3 项需 Ulysses 拍板 | ~4.0M | 无新 |
@@ -171,7 +171,7 @@
 4. 全部 Phase 4 子项收官
 
 **Phase 5 跨 session 续做入口** (per HANDOFF-ST-001 §5.4):
-- 新 session 第一步: 读本 plan v0.4 (本版) + HANDOFF-RF-001.md v0.3 + HANDOFF-ST-001.md v0.6 → git pull → git log --oneline -10 → cargo check --workspace --all-targets 重测 → 续 Phase 5.1 T1.1 根目录归档
+- 新 session 第一步: 读本 plan v0.4 (本版) + HANDOFF-RF-001.md v0.3 + docs/repor../docs/reports/HANDOFF-ST-001.md v0.6 → git pull → git log --oneline -10 → cargo check --workspace --all-targets 重测 → 续 Phase 5.1 T1.1 根目录归档
 - 估 session 1-3 完成 Phase 5 全部 6 子项 (1-1.5M / session per HANDOFF-ST-001 §8.2 buffer)
 
 ---

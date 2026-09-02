@@ -602,7 +602,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 - `scripts/automation/registry.md` v0.1 — 8 份基类脚本索引
 - `docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md` v0.1 — DB W/T/M 三類索引
 - `docs/data-design/ipa-detail/00-CLASSIFICATION-RULES.md` v0.1 — 跨项目 ルール手册
-- `HANDOFF-ST-001.md` v0.4 — H2 范围扩量实证
+- `docs/reports/HANDOFF-ST-001.md` v0.4 — H2 范围扩量实证
 - `PHASE-P3-A1..A8-IMPL-REPORT.md` — P3-A 8 份原始报告
 - `PHASE-P3-A9..A25-IMPL-REPORT.md` — P3-A 17 份守门补救报告
 - `PHASE-P3-A-PHASE-CLOSEOUT-REPORT.md` — P3-A 阶段收官
