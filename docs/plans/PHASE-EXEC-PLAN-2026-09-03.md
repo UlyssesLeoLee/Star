@@ -276,6 +276,8 @@
 
 ### 6.3 拍板后落地优先级 (per 拍板结果 + token-OLU 降序 + 依赖关系) — **v0.4 拍板后修订**
 
+> **v0.6 拍板落档**: 2026-09-03 07:49 JST ask_user 4-step 拍板 A+A+A+A 全部 7 项必拍板项, 详见 §6.4。
+
 | 优先级 | 任务 | token | 依赖 | 守门 | 备注 |
 |---|---|---|---|---|---|
 | ✅ 1 | T1.3 star-vcs 注册 | 0.1M | 无 | #1+#9+#12+#19 | Phase 1.2 done (commit `b7ec06e+93cf36b`) |
@@ -296,6 +298,29 @@
 - 蓝方复核 (优先级 6) ✅: 26 项定性报告 `docs/reports/2026-09-03-blue-team-26-items-review.md` v0.1 (14KB) 落档, 7 项 Ulysses 必拍板项 + 16 项蓝方代修清单 + 5 已知缺口
 - 蓝方代修 16 项 (估 0.1M token, 1 commit) 推下 session 续 (per 守门 #15 实证 6 ahead origin/main, 留 buffer)
 - 7 项拍板项必拍 Ulysses (per 14:58 JST 拍板规则), 排到 Phase 4 真人到位 + Phase 3 应用层完成之后
+
+### 6.4 7 项 Ulysses 必拍板项结果 (v0.6 拍板落档, per 2026-09-03 07:49 JST ask_user 4-step)
+
+| 拍板 # | Finding | Ulysses 选择 | 落地动作 | token | commit |
+|---|---|---|---|---|---|
+| **拍 1** (F9 25-Module 表过期) | basic-design.md §2.1 25-Module 表实际 34 crate 缺 9 | **A. 重写 §2.1 表为 34 crate** | 加 §2.1.4 (9 crosscut supporting) + §2.1.5 (10 star-* infra), 主体 §2.1.1-§2.1.3 不动 (25 logical 已在) | 0.05M | 本 commit `0a8b4f4` 起 |
+| **拍 2** (§4.9 集群 2 项: Workflow + Board/Planning) | work-item ↔ workflow 循环 + board ↔ planning 循环 | **A. 单向只读投影** — work-item → workflow 只读 + board/planning 各自独立 | 修 basic-design §2.1 row 1/9/10/11 字段 + 3 spec 附录 B 显式 "无核心依赖" | 0.1M | 跨 session 续 #2 |
+| **拍 3** (§2.3 硬禁线 2 项: Worktree/WorkItem + SCM) | §2.1 边 vs §2.3 禁线冲突 | **A. 删 §2.1 边 + 保留禁线** | 修 basic-design §2.1 row 2 (worktree 删 work-item) + row 7 (scm 删 worktree), §2.3 禁线原文不动 | 0.1M | 跨 session 续 #3 |
+| **拍 4** (spec 权威 2 项: Validation + Agent) | §2.1 表 vs spec 字段不一致 | **A. spec 权威 + 16 项代修同意** | 修 basic-design §2.1 row 3 (agent 改 work-item/permission) + row 6 (validation 改 work-item/worktree); 16 项蓝方代修 14 docs 1 commit 批量修 | 0.3M | 跨 session 续 #4 + #5 |
+
+**v0.6 拍板后总推进顺序** (按 token-OLU 降序 + 依赖关系):
+
+| 序 | 任务 | token | 依赖 | 守门 |
+|---|---|---|---|---|
+| **A** | 拍 1 加 §2.1.4 + §2.1.5 (basic-design §2.1 修订) | 0.05M | 无 | #1+#9+#12+#19 |
+| **B** | 拍 2 §4.9 集群修 (1 commit, 4 row basic-design + 3 spec 附录 B) | 0.1M | A | #1+#9+#12+#19 |
+| **C** | 拍 3 §2.1 边删 (1 commit, 2 row basic-design) | 0.1M | A | #1+#9+#12+#19 |
+| **D** | 拍 4 spec 权威 (1 commit, 2 row basic-design) | 0.1M | A | #1+#9+#12+#19 |
+| **E** | 16 项蓝方代修批量修 (1 commit, 14 docs) | 0.1M | A | #1+#9+#12+#19 |
+| **F** | AGENTS.md v0.39 docs 同步 (1 commit) | 0.05M | A-E | #12+#15 |
+| **小计** | | **~0.5M** | | |
+
+**session 预算分配**: 本 session (v0.6 拍板后) 估 0.5M token 实装 5 步骤 (A-F), 留 1.0-1.5M buffer per HANDOFF-ST-001 §8.2 (1-1.5M / session 目标). 总 A-E 6 commits 落档 (per 守门 #12 commit-time docs 同步), ahead origin/main 从 7 → 13, 离 113 饱和点 buffer 100 充足 (per 守门 #15 实证).
 
 ### 6.4 跨 session 续做建议 (per HANDOFF-ST-001 §5.4)
 
@@ -328,3 +353,4 @@
 | v0.3 | 2026-09-03 07:30 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | 4 项拍板落地实证 (本 session 完成 3 项 + 1 项 跨 session 续): **T1.3 star-vcs 注册** (commit `b7ec06e` 5 files + `93cf36b` Cargo.lock followup, cargo check 0 err 21.40s + cargo fmt 0 + cargo clippy 0 warning 1.89s, 守门 #1+#12+#19 实证); **P1 cherry-pick 4 docs** (commit `982e399` arch-graph-viewer ADR+spec + audit-onboarding ADR+spec, 4 files 1792 insertions, 守门 #1+#12+#19 实证); **stash drop 2 份** (stash@{0} Cargo.lock + stash@{1} 12 files, 全部 main HEAD 已 supersede via 6d71f39/b811800/6af1482/6bce434/8c893a9/93cf36b, 0 commit, 守门 #9 实证); **domain-app T1 启动**: 跨 session 续 (per §6.2 #4 拍板 A RF-001 T1 后); §8 修订历史 +1 行 | 2026-09-03 07:30 JST 本 session 3 项落地 + 守门 #1+#9+#12+#15+#19 跨 stage 全过 |
 | v0.4 | 2026-09-03 07:19 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **重构最后做, 其他按原 plan** 拍板落档: 2026-09-03 07:16 JST Ulysses 发令 + ask_user 2-step questionnaire 拍板 A+A (范围=Phase 2 全部 / 排到=Phase 4 之后); §2.6 新增 "Phase 5 — 重构最后" (2.3M token 6 子项, 等 Phase 4 全部 + 真人到位); §6.3 拍板后落地优先级 v0.4 修订: 本 session 立即可做 优先级 5 (H1 commit 0.01M) + 6 (蓝方复核 0.2M) + Phase 3 部分 (0.5-0.8M); 新 plan 顺序: Phase 1 余项 (1.1+1.3) → Phase 3 → Phase 4 → Phase 5 (原 Phase 2 整体), 总预算不变 ~4.0M | 2026-09-03 07:19 JST ask_user 2-step questionnaire 拍板 A+A "重构最后做, 其他按原 plan" |
 | v0.5 | 2026-09-03 07:35 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **H1 已落地 (跳过) + 蓝方复核 26 项 ✅ done**: 优先级 5 H1 实测 8/31 commit `dd27983` 已落地 (plan v0.4 §6.3 优先级 5 过时, 跳过不重做); 优先级 6 蓝方复核落档 `docs/reports/2026-09-03-blue-team-26-items-review.md` v0.1 (14KB) — 26 项定性 9 文档笔误 + 7 可批量修复 + 7 真实架构矛盾需拍板 + 3 已知缺口, 7 项 Ulysses 必拍板项按风险升序 (拍 1 = F9 25-Module 表过期 / 拍 2-7 = 6 依赖方向 §2.3 硬禁线冲突), 16 项蓝方代修清单 (估 0.1M 1 commit) 推下 session; §6.3 优先级 5+6 标 ✅ done; §8 修订历史 +1 行 | 2026-09-03 07:34 JST Ulysses 发令"立刻做" + H1 git log --oneline 实证 + 蓝方报告落档 |
+| v0.6 | 2026-09-03 07:49 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **7 项 Ulysses 必拍板项结果 A+A+A+A 拍板落档**: 拍 1 (F9) = A 重写 §2.1 表为 34 crate; 拍 2 (Workflow + Board/Planning) = A 单向只读投影; 拍 3 (Worktree/WorkItem + SCM) = A 删 §2.1 边 + 保留禁线; 拍 4 (Validation + Agent) = A spec 权威 + 16 项代修同意; §6.4 4 项拍板结果表 + 5 步骤实施顺序 A-F (拍 1 0.05M + 拍 2 0.1M + 拍 3 0.1M + 拍 4 spec 权威 0.1M + 16 项代修 0.1M + AGENTS v0.39 0.05M) 总 ~0.5M, 6 commits 落档; §8 修订历史 +1 行 | 2026-09-03 07:49 JST ask_user 4-step 拍板 4 项全 A 落档 |

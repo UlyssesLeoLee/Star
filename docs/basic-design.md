@@ -330,6 +330,43 @@ flowchart LR
 > 2. `Development Context`(§20)合并入 `domain-development`,因为 Development Context 的核心实体(`SymbolIndex` / `RepositoryContext` / `DevelopmentContext`)与 Development Execution 在同一聚合内,拆分会导致跨聚合的 Symbol-level Feedback 路由复杂化(`domain-context` 仅承担 §26 Context Compiler,职责严格区分)。
 > 3. 新增 `domain-local-runtime`,对应 §23 Local Runtime 的服务器侧 Runtime Registry / Port(注意:Local Daemon 二进制进程本身不属此 crate,见 §4.6.1)。
 
+#### 2.1.4 跨切 supporting crate (9 个, 2026-09-03 拍 1 落档补)
+
+> **触发**: 2026-09-03 ask_user 拍 1 = A. 重写 §2.1 表为 34 crate。9 个跨切 supporting crate 在 §2.1 25-Module 表中缺失, 现补列。本节不重复 §2.1.1-§2.1.3 的 25 logical domain, 仅列 9 个新跨切 supporting crate。
+
+| # | Module | 一句话职责 | 关键依赖 | Spec |
+|---|---|---|---|---|
+| 1 | domain-batch | DAG 编排 + 5 runtime_kind 分发 + 状态机/重试/幂等 | 见 `domain-batch-spec.md` | `docs/specs/domain-batch-spec.md` |
+| 2 | domain-kms | KMS 集成 (Vault / AWS KMS / LocalMockKms) | 见 `domain-kms-spec.md` | `docs/specs/domain-kms-spec.md` |
+| 3 | domain-theme | 主题系统 (Mecha Light / Neo-Tokyo Dark) | 见 `domain-theme-spec.md` | `docs/specs/domain-theme-spec.md` |
+| 4 | domain-report | 跨域报告 (CHANGELOG / changelog 5 域 DDD 边界表) | 见 `domain-report-spec.md` | `docs/specs/domain-report-spec.md` |
+| 5 | domain-dashboard | 仪表盘 (KPI / Burndown / 跨域图) | 见 `domain-dashboard-spec.md` | `docs/specs/domain-dashboard-spec.md` |
+| 6 | domain-form | 表单 (WorkItem 表单 / 表单模板) | 见 `domain-form-spec.md` | `docs/specs/domain-form-spec.md` |
+| 7 | domain-ai | AI 编排 (LLM Provider / Agent Runtime 抽象) | 见 `domain-ai-spec.md` | `docs/specs/domain-ai-spec.md` |
+| 8 | domain-cli | CLI 入口 (star-cli 主命令 + 子命令) | 见 `domain-cli-spec.md` | `docs/specs/domain-cli-spec.md` |
+| 9 | domain-agent-windows | Agent 窗口 (齿轮按钮 + AgentSettingsModal 弹窗) | 见 `domain-agent-windows-spec.md` | `docs/specs/domain-agent-windows-spec.md` |
+
+**注**: 9 个跨切 supporting crate 跟 §2.1.1-§2.1.3 的 25 logical domain **不重叠**, 是 §2.1 表未覆盖的扩展模块, 实测 `Cargo.toml` `workspace.members` 含 9 个 `domain-*` crate 但 §2.1 表只列 25 logical domain 缺 9。**未来 §2.1 重写时考虑**: 把 9 个跨切 supporting crate 提升为 §2.1.4 单列, 避免跟 §2.1.1-§2.1.3 的 25 logical 混淆。
+
+#### 2.1.5 Infrastructure supporting crate (10 个 `star-*`, 2026-09-03 拍 1 落档补)
+
+> **触发**: 同 §2.1.4, 红方挑刺 26 项 + AUDIT-001 证实 25-Module 表缺 9 + 9/3 T1.3 star-vcs 注册落地 10 个 `star-*` infrastructure crate。10 个 `star-*` 跟 §2.1.1-§2.1.4 的 34 logical/extension 都**不重叠**, 是**基础设施**层 (跨切能力 / 协议 / 编排), 不属任何 logical domain。
+
+| # | Module | 一句话职责 | 关键依赖 | Spec / 文档 |
+|---|---|---|---|---|
+| 1 | star-cache | Cache 抽象 + InMemory + Redis stub (per §21.3) | `tokio` (workspace) | `crates/star-cache/` (无独立 spec, 跟 §21.3 关联) |
+| 2 | star-cli | CLI 入口 (per `domain-cli-spec.md` 对接) | `domain-cli` + `star-mcp` | `crates/star-cli/` |
+| 3 | star-context | AGENTS.md bootstrap 生成器骨架 (Phase D) | `serde` + `uuid` (workspace) | `crates/star-context/` (per §4.13) |
+| 4 | star-saga | Saga orchestrator + Q-003 跨域协调 | `tokio` + `thiserror` (workspace) | `crates/star-saga/` (per `docs/architecture/2026-08-26-upgrade/spec/saga/01-saga-coordination-spec.md`) |
+| 5 | star-mcp | MCP Protocol stdio (16 tools + 6-field 错误模型) | `tokio` + `serde_json` (workspace) | `crates/star-mcp/` (per ADR-0032) |
+| 6 | star-sa | 4 Git Provider (GitHub / GitLab / Gitea / Bitbucket) | `reqwest` + `serde` (workspace) | `crates/star-sa/` (per ADR-0023) |
+| 7 | star-sse | Server-Sent Events (real-mode 推送) | `tokio` + `axum` (workspace) | `crates/star-sse/` |
+| 8 | star-webhook | Outbound Webhook (HMAC-SHA256 + retry/DLQ) | `sha2` + `hmac` + `hex` (workspace) | `crates/star-webhook/` (per `docs/architecture/2026-09-02-upgrade/spec/integration/02-developer-api-and-outbound-webhook-spec.md` §1.1) |
+| 9 | star-api-rest | Developer REST API (22 路由 stub, 业务 P2 实装) | 9 `domain-*` path deps + `star-webhook` + `star-context` | `crates/star-api-rest/` (per `docs/architecture/2026-09-02-upgrade/spec/integration/02-developer-api-and-outbound-webhook-spec.md` §2) |
+| 10 | star-vcs | VCS Provider cache 层 (R-007 落点, Phase D 填实) | 0 依赖 (占位) | `crates/star-vcs/` (per `docs/specs/domain-vcs-spec.md` v0.1, 9/3 落档) |
+
+**注**: 10 个 `star-*` 走独立 Spec 引用体系 (引用 `basic-design §6` 而非 §2.1/§4.x), 不在 §2.1 表 (该表只收录 22 logical domain, 8 generic + 11 supporting + 6 core) 覆盖范围内。**未来 §2.1 重写时考虑**: 跟 §2.1.4 9 跨切 supporting crate 一起, 把 10 个 `star-*` 显式列入 §2.1.5 (本节已落档), 避免 `basic-design §6 "22 logical domain + 7 supporting crate"` 跟 §2.1.4+§2.1.5 的 9+10=19 计数混淆。
+
 > **2026-08-26 Requirement 同步**(参考竞品 Multica 分析,详见《requirements.md》第 11/12/19/24 章):本设计书已同步以下变更,均为 V1/V2/Future 候选,不改变 MVP 边界与既有 Domain 划分:
 >
 > - REQ-AUTO-002:`domain-automation` 的 `Trigger` 增加 Schedule/Cron 变体(未进入本章 10 个深度设计 Module,先在本表与 §5.6 事件清单中登记)。
