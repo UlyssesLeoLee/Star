@@ -53,22 +53,32 @@ describe("SubNav (U2)", () => {
     expect(screen.getByTestId("subnav")).toBeTruthy();
   });
 
-  // ---- Test 2: active 状态 ----
-  it("applies active styling (bg-accent/12 + border-l-accent) to the active item", () => {
+  // ---- Test 2: active 状态 (per 2026-09-02 16:13 JST Jira 风格扩展) ----
+  it("applies category-colored active styling (default category=core → cyan-500)", () => {
     render(<SubNav items={items} activeId="list" />);
     const active = screen.getByTestId("subnav-item-list");
     const inactive = screen.getByTestId("subnav-item-kanban");
 
-    // active
+    // active: 默认 category=core → cyan-500/20 bg + cyan-500/50 border
     expect(active.getAttribute("data-active")).toBe("true");
-    expect(active.className).toMatch(/bg-accent/);
-    expect(active.className).toMatch(/border-l-accent/);
+    expect(active.className).toMatch(/bg-cyan-500\/20/);
+    expect(active.className).toMatch(/border-cyan-500\/50/);
+    expect(active.className).toMatch(/text-cyan-900/);
     expect(active.getAttribute("aria-current")).toBe("page");
 
-    // inactive
+    // inactive: 无域色 class
     expect(inactive.getAttribute("data-active")).toBe("false");
-    expect(inactive.className).not.toMatch(/border-l-accent/);
+    expect(inactive.className).not.toMatch(/bg-cyan-500/);
     expect(inactive.getAttribute("aria-current")).toBeNull();
+  });
+
+  // ---- Test 2b: 显式 category prop 切换域色 ----
+  it("applies work-category styling (blue-500) when category=work is passed", () => {
+    render(<SubNav items={items} activeId="list" category="work" />);
+    const active = screen.getByTestId("subnav-item-list");
+    expect(active.className).toMatch(/bg-blue-500\/20/);
+    expect(active.className).toMatch(/border-blue-500\/50/);
+    expect(active.className).toMatch(/text-blue-900/);
   });
 
   // ---- Test 3: count badge 显示 ----
@@ -99,3 +109,7 @@ describe("SubNav (U2)", () => {
     fireEvent.click(listItem);
   });
 });
+
+
+
+

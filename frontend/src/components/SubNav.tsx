@@ -26,6 +26,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
+import { getCategoryStyles, type ModuleCategory } from "@/lib/nav/registry";
 
 export interface SubNavItem {
   id: string;
@@ -44,6 +45,12 @@ export interface SubNavProps {
   activeId?: string;
   /** 顶部可选 label (per multica 风格) */
   topLabel?: string;
+  /**
+   * 域分类 (per 2026-09-02 16:13 JST Jira 风格扩展).
+   * 决定 active 项的 left border / bg / text 颜色.
+   * 默认 'core' 兼容旧调用, 新 page 应该传 page 真实所在域.
+   */
+  category?: ModuleCategory;
 }
 
 /** 默认 active 匹配: href 严格相等或子路径 */
@@ -60,8 +67,11 @@ export function SubNav({
   matchActive,
   activeId,
   topLabel,
+  category = "core",
 }: SubNavProps) {
   const pathname = usePathname();
+  // Jira 风格扩展: active 状态用域色, 默认 core (cyan) 兼容旧 page
+  const cs = getCategoryStyles(category);
 
   return (
     <aside
@@ -101,7 +111,9 @@ export function SubNav({
                   "text-label uppercase tracking-wider transition-colors",
                   "border-l-2",
                   isActive
-                    ? "bg-accent/[0.12] text-accent border-l-accent"
+                    ? // Jira 风格: active 用域色 (per 2026-09-02 16:13 JST)
+                      // 保留 multica 风格 12px uppercase, 只换色不换字号
+                      clsx(cs.bg, cs.text, cs.border, "font-semibold", cs.glow)
                     : "text-ink-dim hover:bg-bg-soft/40 hover:text-ink border-l-transparent",
                 )}
               >
@@ -109,7 +121,11 @@ export function SubNav({
                 {item.count !== undefined && (
                   <span
                     data-testid={`subnav-count-${item.id}`}
-                    className="ml-2 text-[10px] font-mono text-ink-mute"
+                    className={clsx(
+                      "ml-2 text-[10px] font-mono",
+                      isActive ? cs.text : "text-ink-mute",
+                      isActive && "opacity-80"
+                    )}
                   >
                     {item.count}
                   </span>

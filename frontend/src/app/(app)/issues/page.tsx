@@ -176,8 +176,8 @@ function IssuesPageInner() {
 
   return (
     <div className="flex h-full min-h-[calc(100vh-64px)]" data-testid="issues-page">
-      {/* Left SubNav: 4 view tabs (per §4 180px sticky) */}
-      <SubNav items={subNavItems} activeId={view} topLabel="Issues" />
+      {/* Left SubNav: 4 view tabs (per §4 180px sticky) — work 域染色 (per 2026-09-02 16:13 JST) */}
+      <SubNav items={subNavItems} activeId={view} topLabel="Issues" category="work" />
 
       {/* Main content */}
       <div className="flex-1 min-w-0 flex">
