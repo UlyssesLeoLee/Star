@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.75"
 authors = ["Star Team"]
 license = "Apache-2.0"
-description = "Star report engine: 10 report types (burndown/velocity/CFD/control/etc) over work-item / sprint / epic"
+description = "Star report engine: 22 report types (Burndown/Burnup/Velocity/CFD/Control/Cycle/Throughput/Forecast/TimeTracking/Resolution/SLA/CvR/Distribution/Workload/Version/Status/Heatmap/Recent) over work-item / sprint / version / project"
 repository = "https://github.com/UlyssesLeoLee/Star"
 
 [lints.rust]
@@ -20,7 +20,10 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
+tokio = { workspace = true }
 
 star-context = { path = "../star-context" }
+star-cache = { path = "../star-cache" }
+
 [dev-dependencies]
 tokio = { workspace = true }

@@ -863,6 +863,7 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
+ "star-cache",
  "star-context",
  "thiserror 1.0.69",
  "tokio",

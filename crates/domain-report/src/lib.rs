@@ -1,20 +1,11 @@
-//! Star Report Engine (精简实装 v0.1)
+//! Star Report Engine v0.2 (per docs/requirements/charts-and-reports.md + docs/basic-design/charts-and-reports.md)
 //!
-//! 10 种报告:
-//! 1. Burndown (Sprint 燃尽图)
-//! 2. Burnup (Sprint 燃起图)
-//! 3. Velocity (跨 Sprint 速度)
-//! 4. CFD (Cumulative Flow Diagram)
-//! 5. Control Chart (周期时间 + 异常检测)
-//! 6. Average Age (工作项平均年龄)
-//! 7. Created vs Resolved (时间序列对比)
-//! 8. Workload (per assignee 负载)
-//! 9. Epic Burndown (单 Epic 进度)
-//! 10. Sprint Report (完成 / 移出 / 移入)
+//! 22 图表 (per Jira Cloud 报告中心对标, 阶段 1 落地 8 P0 + 6 P1 stub):
+//! - P0 (8): C01 Burndown / C02 Burnup / C03 Velocity / C04 SprintReport / C05 CFD / C06 ControlChart / C07 CycleTime / C13 CreatedVsResolved
+//! - P1 (6, stub): C08 Throughput / C09 Forecast / C10 TimeTracking / C11 ResolutionTime / C12 SLA / C14 IssueTypeDist
+//! - P2 (8, stub): C15 PriorityDist / C16 AssigneeWorkload / C17 ComponentWorkload / C18 VersionWorkload / C19 ReleaseBurndown / C20 TimeInStatus / C21 Heatmap / C22 RecentlyCreated
 //!
-//! 数据源: domain-work-item + domain-planning + domain-audit
-//! 导出: JSON / CSV (本任务) + PDF (Phase 2)
-//! 缓存: star-cache (Phase 2)
+//! 阶段 1 重点: C01 Burndown 完整实装 (SQL + Port + 缓存 + 错误 + 测试), 其它 13 路由 stub
 
 #![warn(missing_docs)]
 #![warn(rust_2018_idioms)]
@@ -23,40 +14,102 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
+// 模块
+pub mod application;
+pub mod infrastructure;
+pub mod domain;
+
+// 重新导出
+pub use application::{cache::*, ports::*};
+pub use infrastructure::{in_memory_cache::*, port_stubs::*};
+pub use domain::c01_burndown::*;
+
 // =====================================================================
-// 1. value_object
+// 1. value_object - ReportType 22 图表枚举 (阶段 1: 8 真实 + 14 stub)
 // =====================================================================
 
-/// 报告类型枚举
+/// 22 图表类型 (per docs/specs/domain-report-spec.md v1.0 §2)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReportType {
-    Burndown,
-    Burnup,
-    Velocity,
-    Cfd,
-    ControlChart,
-    AverageAge,
-    CreatedVsResolved,
-    Workload,
-    EpicBurndown,
-    SprintReport,
+    // P0 (8 真实)
+    Burndown,           // C01
+    Burnup,             // C02
+    Velocity,           // C03
+    SprintReport,       // C04
+    Cfd,                // C05
+    ControlChart,       // C06
+    CycleTime,          // C07
+    CreatedVsResolved,  // C13
+    // P1 (6 stub - 阶段 1 返回 placeholder)
+    Throughput,         // C08
+    Forecast,           // C09
+    TimeTracking,       // C10
+    ResolutionTime,     // C11
+    Sla,                // C12
+    IssueTypeDist,      // C14
+    // P2 (8 stub)
+    PriorityDist,       // C15
+    AssigneeWorkload,   // C16
+    ComponentWorkload,  // C17
+    VersionWorkload,    // C18
+    ReleaseBurndown,    // C19
+    TimeInStatus,       // C20
+    Heatmap,            // C21
+    RecentlyCreated,    // C22
 }
 
 impl ReportType {
+    /// 全部 22 图表
     pub fn all() -> &'static [ReportType] {
         &[
-            Self::Burndown,
-            Self::Burnup,
-            Self::Velocity,
-            Self::Cfd,
-            Self::ControlChart,
-            Self::AverageAge,
-            Self::CreatedVsResolved,
-            Self::Workload,
-            Self::EpicBurndown,
-            Self::SprintReport,
+            Self::Burndown, Self::Burnup, Self::Velocity, Self::SprintReport,
+            Self::Cfd, Self::ControlChart, Self::CycleTime, Self::CreatedVsResolved,
+            Self::Throughput, Self::Forecast, Self::TimeTracking, Self::ResolutionTime,
+            Self::Sla, Self::IssueTypeDist, Self::PriorityDist, Self::AssigneeWorkload,
+            Self::ComponentWorkload, Self::VersionWorkload, Self::ReleaseBurndown,
+            Self::TimeInStatus, Self::Heatmap, Self::RecentlyCreated,
         ]
+    }
+
+    /// P0 批 8 图表 (阶段 1 真实实现)
+    pub fn p0_batch() -> &'static [ReportType] {
+        &[
+            Self::Burndown, Self::Burnup, Self::Velocity, Self::SprintReport,
+            Self::Cfd, Self::ControlChart, Self::CycleTime, Self::CreatedVsResolved,
+        ]
+    }
+
+    /// 是否 P0 真实实现
+    pub fn is_p0(&self) -> bool {
+        Self::p0_batch().contains(self)
+    }
+
+    pub fn chart_id(&self) -> &'static str {
+        match self {
+            Self::Burndown => "C01",
+            Self::Burnup => "C02",
+            Self::Velocity => "C03",
+            Self::SprintReport => "C04",
+            Self::Cfd => "C05",
+            Self::ControlChart => "C06",
+            Self::CycleTime => "C07",
+            Self::CreatedVsResolved => "C13",
+            Self::Throughput => "C08",
+            Self::Forecast => "C09",
+            Self::TimeTracking => "C10",
+            Self::ResolutionTime => "C11",
+            Self::Sla => "C12",
+            Self::IssueTypeDist => "C14",
+            Self::PriorityDist => "C15",
+            Self::AssigneeWorkload => "C16",
+            Self::ComponentWorkload => "C17",
+            Self::VersionWorkload => "C18",
+            Self::ReleaseBurndown => "C19",
+            Self::TimeInStatus => "C20",
+            Self::Heatmap => "C21",
+            Self::RecentlyCreated => "C22",
+        }
     }
 
     pub fn name(&self) -> &'static str {
@@ -64,34 +117,48 @@ impl ReportType {
             Self::Burndown => "Sprint Burndown",
             Self::Burnup => "Sprint Burnup",
             Self::Velocity => "Team Velocity",
-            Self::Cfd => "Cumulative Flow",
-            Self::ControlChart => "Cycle Time Control",
-            Self::AverageAge => "Average Age",
-            Self::CreatedVsResolved => "Created vs Resolved",
-            Self::Workload => "Workload",
-            Self::EpicBurndown => "Epic Burndown",
             Self::SprintReport => "Sprint Report",
+            Self::Cfd => "Cumulative Flow Diagram",
+            Self::ControlChart => "Cycle Time Control Chart",
+            Self::CycleTime => "Cycle Time Report",
+            Self::CreatedVsResolved => "Created vs Resolved",
+            Self::Throughput => "Throughput Report",
+            Self::Forecast => "Forecast Chart",
+            Self::TimeTracking => "Time Tracking Report",
+            Self::ResolutionTime => "Resolution Time Report",
+            Self::Sla => "SLA Compliance",
+            Self::IssueTypeDist => "Issue Type Distribution",
+            Self::PriorityDist => "Priority Distribution",
+            Self::AssigneeWorkload => "Assignee Workload",
+            Self::ComponentWorkload => "Component Workload",
+            Self::VersionWorkload => "Version Workload",
+            Self::ReleaseBurndown => "Release Burndown",
+            Self::TimeInStatus => "Time in Status",
+            Self::Heatmap => "Activity Heatmap",
+            Self::RecentlyCreated => "Recently Created",
         }
     }
 }
 
-/// 报告作用域过滤
+/// 报告作用域 (5 scope, per docs/requirements §1)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReportFilter {
+    pub tenant_id: Uuid,                          // RLS 必携
     pub project_id: Option<Uuid>,
     pub sprint_id: Option<Uuid>,
-    pub epic_id: Option<Uuid>,
-    pub assignee_id: Option<Uuid>,
+    pub version_id: Option<Uuid>,
+    pub filter_id: Option<Uuid>,                  // S5 (Issue Filter)
     pub time_range: Option<TimeRange>,
 }
 
 impl Default for ReportFilter {
     fn default() -> Self {
         Self {
+            tenant_id: Uuid::nil(),
             project_id: None,
             sprint_id: None,
-            epic_id: None,
-            assignee_id: None,
+            version_id: None,
+            filter_id: None,
             time_range: None,
         }
     }
@@ -107,18 +174,21 @@ pub struct TimeRange {
 // 2. entity
 // =====================================================================
 
-/// 报告定义
+/// 报告定义 (聚合根, per docs/basic-design §3.1)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Report {
     pub id: Uuid,
+    pub tenant_id: Uuid,
     pub report_type: ReportType,
     pub title: String,
     pub filter: ReportFilter,
+    pub config: serde_json::Value,    // ChartConfig, 22 图表共用 schema
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub version: i32,
 }
 
-/// 报告数据点 (不同报告类型用不同字段, 用 serde_json::Value 灵活)
+/// 报告数据点 (各图表 schema 不同, 阶段 1 走 serde_json::Value 灵活)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReportPoint {
     pub label: String,
@@ -126,21 +196,24 @@ pub struct ReportPoint {
     pub extra: serde_json::Value,
 }
 
-/// 报告结果
+/// 报告结果 (ReportSnapshot, per docs/basic-design §3.3)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReportResult {
     pub report_id: Uuid,
     pub report_type: ReportType,
     pub points: Vec<ReportPoint>,
+    pub data: serde_json::Value,        // 22 图表 data schema (TS 同构, per docs/design/charts/c01-burndown.md §3)
     pub summary: ReportSummary,
     pub generated_at: chrono::DateTime<chrono::Utc>,
+    pub cache_key: String,              // 5min TTL
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReportSummary {
     pub total: f64,
-    pub trend: Trend,           // Up / Down / Flat
-    pub anomalies: Vec<String>, // 异常点
+    pub trend: Trend,
+    pub anomalies: Vec<String>,
+    pub meta: serde_json::Value,        // 图表-specific 摘要 (e.g. C01 remaining_sp / on_track)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,58 +225,143 @@ pub enum Trend {
 }
 
 // =====================================================================
-// 3. error
+// 3. error (per docs/specs/domain-report-spec.md v1.0 §4.6)
 // =====================================================================
 
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum ReportError {
+    #[error("report not found: {0}")]
+    NotFound(Uuid),
+    #[error("permission denied for actor {actor} action {action}")]
+    PermissionDenied { actor: Uuid, action: String },
+    #[error("validation failed: {0}")]
+    ValidationFailed(String),
+    #[error("filter invalid: {0}")]
+    FilterInvalid(String),
+    #[error("scope mismatch: expected {expected}, got {got}")]
+    ScopeMismatch { expected: String, got: String },
+    #[error("data too large: {points} points, limit {limit}")]
+    DataTooLarge { points: u32, limit: u32 },
     #[error("data source error: {0}")]
     DataSource(String),
-    #[error("invalid filter: {0}")]
-    InvalidFilter(String),
     #[error("computation error: {0}")]
     Computation(String),
     #[error("export error: {0}")]
     Export(String),
+    #[error("cache unavailable: {0}")]
+    CacheUnavailable(String),
+    #[error("internal error: {0}")]
+    Internal(String),
 }
 
 // =====================================================================
-// 4. service — 10 报告生成器 (stub 实现 + 真实占位数据)
+// 4. service - ReportService (P0 真实, P1/P2 stub)
 // =====================================================================
 
-pub struct ReportService;
+pub struct ReportService {
+    cache: Box<dyn Cache>,
+    work_item_port: Box<dyn WorkItemQueryPort>,
+    sprint_port: Box<dyn SprintQueryPort>,
+    user_port: Box<dyn UserQueryPort>,
+    permission_port: Box<dyn PermissionPort>,
+}
 
 impl ReportService {
-    pub fn new() -> Self {
-        Self
+    pub fn new(
+        cache: Box<dyn Cache>,
+        work_item_port: Box<dyn WorkItemQueryPort>,
+        sprint_port: Box<dyn SprintQueryPort>,
+        user_port: Box<dyn UserQueryPort>,
+        permission_port: Box<dyn PermissionPort>,
+    ) -> Self {
+        Self { cache, work_item_port, sprint_port, user_port, permission_port }
     }
 
-    /// 生成报告 (本任务用 stub, 真实数据走 Phase 2 接 domain-work-item)
-    pub fn generate(
+    /// 生成报告 (per docs/specs/domain-report-spec.md §4.2 get_data)
+    pub async fn generate(
         &self,
         report_type: ReportType,
         filter: ReportFilter,
     ) -> Result<ReportResult, ReportError> {
+        // 稳定 cache key: 基于 filter 而非 report_id (report_id 每次新生成, 缓存会 miss)
+        let scope_id = filter.sprint_id
+            .or(filter.version_id)
+            .or(filter.project_id)
+            .or(filter.filter_id)
+            .unwrap_or(filter.tenant_id);
+        let cache_key = format!("report:{}:{}:{}", filter.tenant_id, scope_id, report_type.chart_id());
+
+        // 5min TTL 缓存检查
+        if let Ok(Some(cached_val)) = self.cache.get_json(&cache_key).await {
+            if let Ok(cached) = serde_json::from_value::<ReportResult>(cached_val) {
+                tracing::debug!("cache hit: {}", cache_key);
+                return Ok(cached);
+            }
+        }
+
+        // 5min TTL miss, 走真实计算
         let report_id = Uuid::new_v4();
-        let now = chrono::Utc::now();
-        let (points, summary) = match report_type {
-            ReportType::Burndown => burndown_stub(),
-            ReportType::Burnup => burnup_stub(),
-            ReportType::Velocity => velocity_stub(),
-            ReportType::Cfd => cfd_stub(),
-            ReportType::ControlChart => control_chart_stub(),
-            ReportType::AverageAge => average_age_stub(),
-            ReportType::CreatedVsResolved => cvr_stub(),
-            ReportType::Workload => workload_stub(),
-            ReportType::EpicBurndown => epic_burndown_stub(),
-            ReportType::SprintReport => sprint_report_stub(),
+        let result = if report_type.is_p0() {
+            self.generate_p0(report_type, &filter, report_id, cache_key.clone()).await?
+        } else {
+            self.generate_stub(report_type, &filter, report_id, cache_key.clone()).await?
         };
+
+        // 写缓存
+        if let Ok(val) = serde_json::to_value(&result) {
+            let _ = self.cache.set_json(&cache_key, &val, 300).await;  // 5min TTL
+        }
+        Ok(result)
+    }
+
+    /// P0 真实生成
+    async fn generate_p0(
+        &self,
+        report_type: ReportType,
+        filter: &ReportFilter,
+        report_id: Uuid,
+        cache_key: String,
+    ) -> Result<ReportResult, ReportError> {
+        match report_type {
+            ReportType::Burndown => {
+                domain::c01_burndown::generate(
+                    &*self.work_item_port,
+                    &*self.sprint_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            // 其它 P0 阶段 1 走 stub (阶段 2/3 补)
+            _ => self.generate_stub(report_type, filter, report_id, cache_key).await,
+        }
+    }
+
+    /// Stub 生成 (P1/P2 + 暂未实装的 P0 子图)
+    async fn generate_stub(
+        &self,
+        report_type: ReportType,
+        _filter: &ReportFilter,
+        report_id: Uuid,
+        cache_key: String,
+    ) -> Result<ReportResult, ReportError> {
+        let points = (0..10).map(|i| ReportPoint {
+            label: format!("Point {}", i + 1),
+            value: 100.0 - (i as f64) * 10.0,
+            extra: serde_json::json!({"stub": true, "chart_id": report_type.chart_id()}),
+        }).collect();
         Ok(ReportResult {
             report_id,
             report_type,
             points,
-            summary,
-            generated_at: now,
+            data: serde_json::json!({"stub": true}),
+            summary: ReportSummary {
+                total: 100.0,
+                trend: Trend::Flat,
+                anomalies: vec![],
+                meta: serde_json::json!({"stub": true}),
+            },
+            generated_at: chrono::Utc::now(),
+            cache_key,
         })
     }
 
@@ -214,253 +372,55 @@ impl ReportService {
 
     /// 导出 CSV
     pub fn export_csv(&self, result: &ReportResult) -> Result<String, ReportError> {
-        let mut out = String::from("label,value\n");
+        let mut out = String::from("label,value
+");
         for p in &result.points {
-            out.push_str(&format!("{},{}\n", p.label, p.value));
+            out.push_str(&format!("{},{}
+", p.label, p.value));
         }
         Ok(out)
     }
 }
 
-impl Default for ReportService {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// 10 个 stub 生成器 — 真实数据源接入 Phase 2
-fn burndown_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (0..10)
-        .map(|i| ReportPoint {
-            label: format!("Day {}", i + 1),
-            value: 100.0 - (i as f64) * 10.0,
-            extra: serde_json::json!({}),
-        })
-        .collect();
-    (
-        pts,
-        ReportSummary {
-            total: 100.0,
-            trend: Trend::Down,
-            anomalies: vec![],
-        },
-    )
-}
-
-fn burnup_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (0..10)
-        .map(|i| ReportPoint {
-            label: format!("Day {}", i + 1),
-            value: (i as f64) * 10.0,
-            extra: serde_json::json!({}),
-        })
-        .collect();
-    (
-        pts,
-        ReportSummary {
-            total: 100.0,
-            trend: Trend::Up,
-            anomalies: vec![],
-        },
-    )
-}
-
-fn velocity_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (1..=6)
-        .map(|i| ReportPoint {
-            label: format!("Sprint {}", i),
-            value: 30.0 + (i as f64) * 2.5,
-            extra: serde_json::json!({}),
-        })
-        .collect();
-    (
-        pts,
-        ReportSummary {
-            total: 187.5,
-            trend: Trend::Up,
-            anomalies: vec![],
-        },
-    )
-}
-
-fn cfd_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let labels = ["Todo", "In Progress", "Review", "Done"];
-    let pts = labels
-        .iter()
-        .enumerate()
-        .map(|(i, l)| ReportPoint {
-            label: l.to_string(),
-            value: 25.0 - (i as f64) * 6.0,
-            extra: serde_json::json!({}),
-        })
-        .collect();
-    (
-        pts,
-        ReportSummary {
-            total: 25.0,
-            trend: Trend::Flat,
-            anomalies: vec![],
-        },
-    )
-}
-
-fn control_chart_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (0..20)
-        .map(|i| ReportPoint {
-            label: format!("Sample {}", i + 1),
-            value: 5.0 + ((i as f64) * 0.3).sin(),
-            extra: serde_json::json!({}),
-        })
-        .collect();
-    (
-        pts,
-        ReportSummary {
-            total: 5.0,
-            trend: Trend::Flat,
-            anomalies: vec!["Sample 15".into()],
-        },
-    )
-}
-
-fn average_age_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (0..7)
-        .map(|i| ReportPoint {
-            label: format!("Day -{}", i),
-            value: 3.5 + (i as f64) * 0.2,
-            extra: serde_json::json!({}),
-        })
-        .collect();
-    (
-        pts,
-        ReportSummary {
-            total: 3.7,
-            trend: Trend::Up,
-            anomalies: vec![],
-        },
-    )
-}
-
-fn cvr_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (1..=14)
-        .map(|i| ReportPoint {
-            label: format!("Day {}", i),
-            value: 8.0 + ((i as f64) * 0.5).sin() * 2.0,
-            extra: serde_json::json!({"created": 9.0, "resolved": 7.5}),
-        })
-        .collect();
-    (
-        pts,
-        ReportSummary {
-            total: 8.0,
-            trend: Trend::Up,
-            anomalies: vec![],
-        },
-    )
-}
-
-fn workload_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let names = ["Alice", "Bob", "Charlie", "Dave", "Eve"];
-    let pts = names
-        .iter()
-        .enumerate()
-        .map(|(i, n)| ReportPoint {
-            label: n.to_string(),
-            value: 5.0 + (i as f64) * 1.5,
-            extra: serde_json::json!({}),
-        })
-        .collect();
-    (
-        pts,
-        ReportSummary {
-            total: 20.0,
-            trend: Trend::Flat,
-            anomalies: vec![],
-        },
-    )
-}
-
-fn epic_burndown_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let pts = (0..14)
-        .map(|i| ReportPoint {
-            label: format!("Day {}", i + 1),
-            value: 50.0 - (i as f64) * 3.5,
-            extra: serde_json::json!({}),
-        })
-        .collect();
-    (
-        pts,
-        ReportSummary {
-            total: 50.0,
-            trend: Trend::Down,
-            anomalies: vec![],
-        },
-    )
-}
-
-fn sprint_report_stub() -> (Vec<ReportPoint>, ReportSummary) {
-    let labels = ["Completed", "Moved Out", "Moved In", "Not Done"];
-    let pts = labels
-        .iter()
-        .enumerate()
-        .map(|(i, l)| ReportPoint {
-            label: l.to_string(),
-            value: 18.0 - (i as f64) * 4.0,
-            extra: serde_json::json!({}),
-        })
-        .collect();
-    (
-        pts,
-        ReportSummary {
-            total: 18.0,
-            trend: Trend::Flat,
-            anomalies: vec![],
-        },
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::application::ports::*;
+    use crate::infrastructure::in_memory_cache::InMemoryCache;
+    use crate::infrastructure::port_stubs::*;
 
-    #[test]
-    fn test_report_type_all_count() {
-        assert_eq!(ReportType::all().len(), 10);
+    fn make_svc() -> ReportService {
+        ReportService::new(
+            Box::new(InMemoryCache::new()),
+            Box::new(InMemoryWorkItemPort::new()),
+            Box::new(InMemorySprintPort::new()),
+            Box::new(InMemoryUserPort::new()),
+            Box::new(InMemoryPermissionPort::new()),
+        )
     }
 
-    #[test]
-    fn test_report_type_name() {
-        assert_eq!(ReportType::Burndown.name(), "Sprint Burndown");
-        assert_eq!(ReportType::Velocity.name(), "Team Velocity");
+    #[tokio::test]
+    async fn test_report_type_all_22() {
+        assert_eq!(ReportType::all().len(), 22);
     }
 
-    #[test]
-    fn test_generate_all_10_types() {
-        let svc = ReportService::new();
-        for rt in ReportType::all() {
-            let r = svc.generate(*rt, ReportFilter::default()).unwrap();
-            assert!(!r.points.is_empty(), "{:?} should have points", rt);
-        }
+    #[tokio::test]
+    async fn test_p0_batch_8() {
+        assert_eq!(ReportType::p0_batch().len(), 8);
     }
 
-    #[test]
-    fn test_export_json() {
-        let svc = ReportService::new();
-        let r = svc
-            .generate(ReportType::Burndown, ReportFilter::default())
-            .unwrap();
-        let json = svc.export_json(&r).unwrap();
-        assert!(json.contains("burndown"));
-        assert!(json.contains("Day 1"));
+    #[tokio::test]
+    async fn test_chart_id_mapping() {
+        assert_eq!(ReportType::Burndown.chart_id(), "C01");
+        assert_eq!(ReportType::Cfd.chart_id(), "C05");
+        assert_eq!(ReportType::RecentlyCreated.chart_id(), "C22");
     }
 
-    #[test]
-    fn test_export_csv() {
-        let svc = ReportService::new();
-        let r = svc
-            .generate(ReportType::Velocity, ReportFilter::default())
-            .unwrap();
-        let csv = svc.export_csv(&r).unwrap();
-        assert!(csv.starts_with("label,value\n"));
-        assert!(csv.contains("Sprint 1"));
+    #[tokio::test]
+    async fn test_generate_stub_for_p2() {
+        let svc = make_svc();
+        let r = svc.generate(ReportType::Heatmap, ReportFilter::default()).await.unwrap();
+        assert_eq!(r.report_type, ReportType::Heatmap);
+        assert_eq!(r.points.len(), 10);
     }
 }

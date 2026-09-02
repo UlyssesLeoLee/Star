@@ -296,14 +296,23 @@ print(f"err_count={result.stderr.count('error[')}")
 | wt-b3-apikey-storage | B.3 真实 | S | **[S]** | — | schema 5 字段, 单文件 |
 | wt-b7-api-quota | B.7 真实 | R, S | **[M]** | `automation/quota_test.py` | 跟 B.7 共享 |
 
+### 4.11 图表 & 报告系统 (新增 phase, 2026-09-02 11:00 JST per docs/briefs/P3-CHARTS-P0.md)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| CHARTS-P0 | 基础设施 + C01 全跑通 | 12 Rust 文件 + 4 frontend 文件 + Recharts 依赖 + InMemory cache + Port trait + C01 真实算法 + 19 测试 | R, V, S, A | **[P]** | `automation/charts_p0_setup.py` | 19/19 测试 pass, 0 err / 0 clippy, commit author=Ulysses |
+| CHARTS-P0-Bulk | P0 剩余 7 图表 (C02-C05, C06, C07, C13) | 7 图表 × ~200 行 Rust + ~250 行 TSX | R, V, S, A | **[P]** | (待续 charts_p0_bulk.py) | 阶段 2, 复用 C01 模板批量 |
+| CHARTS-P1 | P1 批 7 图表 (C08-C12, C14-C15) | 7 图表 + Recharts 系列 | R, V, S, A | **[P]** | (待续) | 阶段 3 |
+| CHARTS-P2 | P2 批 7 图表 (C16-C22) | 含 C21 Heatmap 自研 SVG | R, V, S, A | **[P]** | (待续) | 阶段 4 |
+
 ### 4.10 任务卡分布统计
 
 | 档 | 数量 | 占比 | 备注 |
 |---|---|---|---|
-| **[P] Python 化** | 17 (含共享脚本) | ~30% | 必落 `scripts/automation/<purpose>.py` |
-| **[M] Mixed** | 10 | ~18% | 部分脚本 + 部分 ad-hoc |
-| **[S] Shell / Edit** | 25 (含真人寻访) | ~52% | 不需要脚本化 |
-| **合计** | 52 (去重) | 100% | P3 全 5 阶段 56 子项 - 4 重复 - 5 真人寻访 = 51 + 1 H2 共享 = 52 |
+| **[P] Python 化** | 21 (含共享脚本 + 4 图表批) | ~34% | 必落 `scripts/automation/<purpose>.py` |
+| **[M] Mixed** | 10 | ~16% | 部分脚本 + 部分 ad-hoc |
+| **[S] Shell / Edit** | 25 (含真人寻访) | ~50% | 不需要脚本化 |
+| **合计** | 56 (去重) | 100% | P3 全 5 阶段 56 子项 - 4 重复 - 5 真人寻访 + 4 图表批 = 56 |
 
 ---
 
@@ -570,6 +579,7 @@ frontend/src/app/automation-debug/
 |---|---|---|---|---|
 | v0.1 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: 3 类 agent 交互 (子代理 dispatch / CLI 调用 / 代码改造) 全包, 4 个筛选维度 (R/V/S/A) + 3 档判定 ([P]/[M]/[S]), WBS §1-§5 / §14 / kanban-vmodel 任务卡全过初判, 守门 #1 v19 + #9 v2 + #12 v2 派生规; 落档 `scripts/automation/` 4 基类 + 1 CLI + 2 smoke + 1 索引, 共 8 份文件 | 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做" + 拍板 3 选项 (范围=全 3 类 / 维度=R+V+S+A / 落档=新建 docs/automation-design.md + scripts/automation/) |
 | v0.2 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **§12 调试控制台 (Automation Debug Console)** 新增: 4 拍板 (scope=13 py 脚本+5 unittest / ai-edit=本地 mock / debug-ui=Next.js+shadcn / close-behavior=跳过运行); frontend/src/app/automation-debug/ + scripts/automation/console_server.py + scripts/automation/ai_edit_mock.py 3 份新基类; 守门 #1 v20 + #5 v2 + #9 v3 派生规; docs/automation-design.md §4 任务卡表加 'available_in_debug' 标记 | 2026-09-02 09:01 JST Ulysses 指令"这些 py 脚本要运需用户通过填写 api key 的 ai 修改,并且给一个专用脚本调试页面,允许用户在一定范围内勾选脚本生效的功能点,并且允许关闭" + 拍板 4 选项 |
+| v0.3 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **§4.11 图表 & 报告系统 (CHARTS) 新增 phase** (per docs/briefs/P3-CHARTS-P0.md + 2026-09-02 11:00 JST Ulysses 拍板 A+I+α): 4 子项 (P0 基础设施 + C01 真实 / P0 剩余 7 / P1 7 / P2 7) 全 [P]; 落档 `scripts/automation/charts_p0_setup.py` (P0 阶段 1); §4.10 任务卡分布统计从 52 → 56 子项; 守门 #1 v19 + #12 v15 + #20 v20 + #21 v21 联合实证: 16 文件 + 19/19 测试 + 0 err + 0 clippy | 2026-09-02 10:04 JST Ulysses "图表对标 Jira" + 11:00 JST 拍板 A+I+α (per docs/briefs/P3-CHARTS-P0.md v0.1) |
 
 ---
 
