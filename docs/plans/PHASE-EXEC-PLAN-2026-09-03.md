@@ -138,6 +138,42 @@
 
 **注**: token 估包含文档同步 (per 守门 #12 commit-time docs 同步, 每项 commit 必含 docs)。**不含**真签字栏追溯 (Phase 4.2 待真人到位)。
 
+### 2.6 Phase 5 — 重构最后 (v0.4 拍板, per 2026-09-03 07:19 JST ask_user 2-step)
+
+> **v0.4 拍板触发**: 2026-09-03 07:16 JST Ulysses 发令"最后做重构, 其他按照你的计划做"。ask_user 2-step questionnaire 拍板 A+A: **重构范围 = Phase 2 全部 6 子项, 排到 Phase 4 之后 = Phase 5**。
+> 
+> **新 plan 顺序**: Phase 1 (1.1+1.3 余项) → Phase 3 (应用+基建) → Phase 4 (收尾) → **Phase 5 (重构最后, 原 Phase 2 整体)**。总预算不变 ~4.0M, Phase 4.3 真人到位 + 凭证 是 Phase 5 启动的前置 (双重依赖)。
+
+| 子项 | 任务 (原 Phase 2) | token | 依赖 | 守门 |
+|---|---|---|---|---|
+| **5.1** | RF-001 T1 全部 5 项 (根目录归档 T1.1 + 散件清理 T1.2 + 死依赖 T1.4 + lint deny T1.5, T1.3 ✅ done) | 0.75M | Phase 4.3 真人到位 (DDD Review 签字) | #1+#9+#12+#19 |
+| **5.2** | H2-EXT #4 domain-identity (DeviceId 强类型 → Uuid 重构) | 0.2M | Phase 4.3 (per 9/1 23:59 拍板 DeviceId 业务语义, 仍需 Ulysses 真人确认) | #1+#9+#12+#19 |
+| **5.3** | H2-EXT #5 domain-work-item (context.rs 删除 + port/service dead import, hostname 拍板 0 type 改) | 0.05M | Phase 5.2 (跟 H2-EXT 模式对齐) | #1+#9+#12+#19 |
+| **5.4** | RF-001 T2.4 大 crate 拆分评估报告 (3 crate, 只出报告) | 0.3M | Phase 5.1 (T1 收官后) | #1+#9+#12+#19+#22 |
+| **5.5** | RF-001 T3 全部 3 项选项报告 (DTO 去重 / Saga 覆盖 / 统一语言) | 0.7M | 无 (可与 5.1 并行) | #1+#9+#12+#19+#22 |
+| **5.6** | H2 原 3 domain service.rs 改造 (feedback/validation/integration ~150+ call sites) | 0.3M | Phase 5.2 (H2-EXT #4 完成后) | #1+#9+#12+#19 |
+| **小计** | | **~2.3M** | | |
+
+**v0.4 拍板后总 Phase 表** (替换 §2.5):
+
+| Phase | token 估 | 软参考周 | 状态 | 阻塞 |
+|---|---|---|---|---|
+| Phase 1 — 阻塞解除 | 0.4M (1.1+1.3 余 0.25M) | 0.07 周 | 🟡 余项立即 | — |
+| Phase 3 — 应用 + 基建 | 1.2M | 0.2 周 | 🟡 依赖 Phase 1 1.3 蓝方复核 | — |
+| Phase 4 — 收尾 | 0.1M + 拍板 | — | 🟡 依赖 Phase 3 + 真人 | 真人 + 凭证 |
+| **Phase 5 — 重构最后** (v0.4 新) | **2.3M** | **0.4 周** | 🟡 依赖 Phase 4 全部 + 真人 | **真人 + Phase 4.3 到位** |
+| **总计** | **~4.0M** | **~0.67 周** | | **1 拍板 (Phase 4.3 真人) + Phase 5 6 子项内部拍板 (T3 3 项)** |
+
+**Phase 5 启动条件 (per v0.4)**:
+1. Phase 4.3 5 域 Lead 真人到位 (per 8/21 JST 拒绝兼任硬约束, per 19:39 JST Mavis 代签临时, 真人到位后追溯签字)
+2. Phase 4.4 推 origin 完成 (per 守门 #1 反转 R-05, 但 github.com 443 不可达 + 无 PAT 实证 GAP-5)
+3. Phase 4.2 4 份报告签字栏 DDD Review 终审完成 (Mavis 代签 OK, 真人到位后追溯)
+4. 全部 Phase 4 子项收官
+
+**Phase 5 跨 session 续做入口** (per HANDOFF-ST-001 §5.4):
+- 新 session 第一步: 读本 plan v0.4 (本版) + HANDOFF-RF-001.md v0.3 + HANDOFF-ST-001.md v0.6 → git pull → git log --oneline -10 → cargo check --workspace --all-targets 重测 → 续 Phase 5.1 T1.1 根目录归档
+- 估 session 1-3 完成 Phase 5 全部 6 子项 (1-1.5M / session per HANDOFF-ST-001 §8.2 buffer)
+
 ---
 
 ## 3. 守门验证 (per AGENTS.md v0.11 §4 守门 13+ 派生 v1-v24)
@@ -238,18 +274,22 @@
 | 3 | 归档分支 P1 cherry-pick | **A. 现在做** (推荐) | `git show archive/auto-20260902-17ef4658:...` 看 P1 4 子项内容, 跟 main HEAD 实际 diff, 走 `git checkout` 单文件复制 (避免 cherry-pick 引发 rebase 冲突) |
 | 4 | domain-app 启动 | **A. RF-001 T1 收官后启动** (推荐) | Phase 2.1 (RF-001 T1, 0.75M) 完成后, Phase 3.1 (domain-app T1, 0.3M) 启动 |
 
-### 6.3 拍板后落地优先级 (per 拍板结果 + token-OLU 降序 + 依赖关系)
+### 6.3 拍板后落地优先级 (per 拍板结果 + token-OLU 降序 + 依赖关系) — **v0.4 拍板后修订**
 
 | 优先级 | 任务 | token | 依赖 | 守门 | 备注 |
 |---|---|---|---|---|---|
-| **1** | T1.3 star-vcs 判定 (注册) | 0.1M | 无 | #1+#9+#12+#19 | Phase 1.2, 立即可做 |
-| **2** | stash pop 评估 (per 9/2 plan §4.5 9 项) | 0.05M | 无 | #9+#12 | Phase 1.4, 立即可做 |
-| **3** | P1 cherry-pick 4 子项 (arch-graph + onboarding) | 0.3M | 无 (可与 1/2 并行) | #1+#9+#12+#19+#22 | Phase 1.4 并行, 现在做 |
-| 4 | AGENTS.md v0.12 修订 (9/3 commit 实证) | 0.05M | 无 | #12+#15 | Phase 1.5, 立即可做 |
-| 5 | RF-001 T1.1-T1.5 其余 4 项 | 0.65M | 优先级 1 (T1.3) | #1+#9+#12+#19 | Phase 2.1, 依赖 1 |
-| **小计** | | **~1.15M** | | | **本 session 目标** |
+| ✅ 1 | T1.3 star-vcs 注册 | 0.1M | 无 | #1+#9+#12+#19 | Phase 1.2 done (commit `b7ec06e+93cf36b`) |
+| ✅ 2 | stash drop 2 份 | 0.05M | 无 | #9+#12 | Phase 1.4 done (main HEAD 已 supersede) |
+| ✅ 3 | P1 cherry-pick 4 docs | 0.3M | 无 (可与 1/2 并行) | #1+#9+#12+#19 | Phase 1.4 done (commit `982e399`) |
+| ✅ 4 | AGENTS.md v0.36 + plan v0.3 docs 同步 | 0.05M | 无 | #12+#15 | Phase 1.5 done (commit `cb8c76f`) |
+| **5** | H1 commit 2 dirty files (domain-scm + domain-workspace 的 pub uuid::Uuid) | 0.01M | 无 | #1+#9+#12 | Phase 1.1, 立即可做 |
+| **6** | 蓝方复核红方挑刺 26 项 → 26 项定性 (文档笔误 vs 真实架构矛盾) | 0.2M | 无 | #1+#9+#12 | Phase 1.3, 立即可做 |
+| 7 | Phase 3 — 应用 + 基建 (domain-app T1 + domain-batch v0 phase 2 + P0-2/3/4) | 1.2M | 优先级 5+6 | #1+#9+#12+#19+#22 | Phase 3, 跟 5/6 串行 |
+| 8 | Phase 4 — 收尾 (推 origin + 签字栏 DDD Review + 真人到位) | 0.1M | 优先级 7 | #1+#12+#15 | Phase 4, 真人 + 凭证 |
+| **9** | **Phase 5 — 重构最后** (原 Phase 2 全部 6 子项) | **2.3M** | **优先级 8 (Phase 4.3 真人到位)** | #1+#9+#12+#19+#22 | **Phase 5, 跨 1-3 session 续 (v0.4 拍板)** |
+| **小计** | | **~4.0M** | | | **本 session + 跨 session 总目标** |
 
-**session 预算分配**: 启动 Phase 1.2 + 1.4 + 1.4 并行 (T1.3 + stash + P1 cherry-pick), 估 ~0.5M token. 留 1.5M buffer per HANDOFF-ST-001 §8.2 (1-1.5M / session 目标).
+**session 预算分配**: 当前 session (v0.4 拍板后) 立即可做优先级 5 (H1 commit 0.01M) + 优先级 6 (蓝方复核 0.2M) + Phase 3 部分 (估 0.5-0.8M), 留 0.5-0.8M buffer per HANDOFF-ST-001 §8.2 (1-1.5M / session 目标).
 
 ### 6.4 跨 session 续做建议 (per HANDOFF-ST-001 §5.4)
 
@@ -280,3 +320,4 @@
 | v0.1 | 2026-09-03 06:56 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | 初版: 整合 3 份 Handoff (ST-001/RF-001/BATCH-001) + 9/2 智能合并 plan + 9/3 commit `a04c4c1` 三件套 (AUDIT-001 + RF-001-spec/WBS/HANDOFF-001 + domain-app-spec + 红方挑刺); 4 Phase 分类 (阻塞解除 0.4M / 实质重构 2.3M / 应用+基建 1.2M / 收尾 0.1M) 总 ~4.0M token ~0.67 周; 6 项守门 + 6 项缺口 + 5 项子代理风险 + 4 项 Ulysses 拍板项 | 2026-09-03 06:53 JST commit `a04c4c1` 落档 8 files / 894 行 + 用户发令"查阅 handoff, 制定开发计划 phase" |
 | v0.2 | 2026-09-03 07:04 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | 4 项 Ulysses 拍板结果落档 (T1.3=A 注册 / stash=A 逐项评估 / P1=A 现在做 / domain-app=A RF-001 T1 后); §6 改写"4 项拍板结果"表 + §6.3 拍板后落地优先级 (本 session 目标 ~1.15M: T1.3 0.1M + stash 0.05M + P1 0.3M + AGENTS v0.12 0.05M + RF-001 T1 收官 0.65M); 修订历史 +1 行 | 2026-09-03 07:04 JST ask_user 4-step questionnaire 4 项全 A 拍板 |
 | v0.3 | 2026-09-03 07:30 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | 4 项拍板落地实证 (本 session 完成 3 项 + 1 项 跨 session 续): **T1.3 star-vcs 注册** (commit `b7ec06e` 5 files + `93cf36b` Cargo.lock followup, cargo check 0 err 21.40s + cargo fmt 0 + cargo clippy 0 warning 1.89s, 守门 #1+#12+#19 实证); **P1 cherry-pick 4 docs** (commit `982e399` arch-graph-viewer ADR+spec + audit-onboarding ADR+spec, 4 files 1792 insertions, 守门 #1+#12+#19 实证); **stash drop 2 份** (stash@{0} Cargo.lock + stash@{1} 12 files, 全部 main HEAD 已 supersede via 6d71f39/b811800/6af1482/6bce434/8c893a9/93cf36b, 0 commit, 守门 #9 实证); **domain-app T1 启动**: 跨 session 续 (per §6.2 #4 拍板 A RF-001 T1 后); §8 修订历史 +1 行 | 2026-09-03 07:30 JST 本 session 3 项落地 + 守门 #1+#9+#12+#15+#19 跨 stage 全过 |
+| v0.4 | 2026-09-03 07:19 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **重构最后做, 其他按原 plan** 拍板落档: 2026-09-03 07:16 JST Ulysses 发令 + ask_user 2-step questionnaire 拍板 A+A (范围=Phase 2 全部 / 排到=Phase 4 之后); §2.6 新增 "Phase 5 — 重构最后" (2.3M token 6 子项, 等 Phase 4 全部 + 真人到位); §6.3 拍板后落地优先级 v0.4 修订: 本 session 立即可做 优先级 5 (H1 commit 0.01M) + 6 (蓝方复核 0.2M) + Phase 3 部分 (0.5-0.8M); 新 plan 顺序: Phase 1 余项 (1.1+1.3) → Phase 3 → Phase 4 → Phase 5 (原 Phase 2 整体), 总预算不变 ~4.0M | 2026-09-03 07:19 JST ask_user 2-step questionnaire 拍板 A+A "重构最后做, 其他按原 plan" |
