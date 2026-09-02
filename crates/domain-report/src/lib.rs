@@ -331,7 +331,59 @@ impl ReportService {
                     report_id,
                 ).await
             }
-            // 其它 P0 阶段 1 走 stub (阶段 2/3 补)
+            ReportType::Burnup => {
+                domain::c02_burnup::generate(
+                    &*self.work_item_port,
+                    &*self.sprint_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            ReportType::Velocity => {
+                domain::c03_velocity::generate(
+                    &*self.work_item_port,
+                    &*self.sprint_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            ReportType::SprintReport => {
+                domain::c04_sprint_report::generate(
+                    &*self.work_item_port,
+                    &*self.sprint_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            ReportType::Cfd => {
+                domain::c05_cfd::generate(
+                    &*self.work_item_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            ReportType::ControlChart => {
+                domain::c06_control_chart::generate(
+                    &*self.work_item_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            ReportType::CycleTime => {
+                domain::c07_cycle_time::generate(
+                    &*self.work_item_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            ReportType::CreatedVsResolved => {
+                domain::c13_created_vs_resolved::generate(
+                    &*self.work_item_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            // P1/P2 + 暂未实装的 P0 子图走 stub
             _ => self.generate_stub(report_type, filter, report_id, cache_key).await,
         }
     }

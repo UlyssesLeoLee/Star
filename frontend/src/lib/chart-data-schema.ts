@@ -3,6 +3,13 @@
 
 export type ChartData =
   | BurndownData
+  | BurnupData
+  | VelocityData
+  | SprintReportData
+  | CfdData
+  | ControlChartData
+  | CycleTimeData
+  | CvrData
   | { stub: true; chart_id: string };
 
 /** C01 Burndown 完整 schema (与 crates/domain-report/src/domain/c01_burndown.rs::BurndownData 同构) */
@@ -10,7 +17,7 @@ export interface BurndownData {
   sprint: {
     sprint_id: string;
     name: string;
-    start_date: string;   // ISO 8601
+    start_date: string;
     end_date: string;
     total_sp: number;
     scope_change_log: ScopeChange[];
@@ -23,9 +30,111 @@ export interface BurndownData {
   summary: BurndownSummary;
 }
 
+/** C02 Burnup 完整 schema */
+export interface BurnupData {
+  sprint: {
+    sprint_id: string;
+    name: string;
+    start_date: string;
+    end_date: string;
+    total_sp: number;
+    scope_change_log: ScopeChange[];
+  };
+  series: {
+    actual: TimeSeriesPoint[];
+    scope: TimeSeriesPoint[];
+  };
+  scope_changes: ScopeChange[];
+  summary: {
+    completed_sp: number;
+    total_sp: number;
+    completion_ratio: number;
+  };
+}
+
+/** C03 Velocity */
+export interface VelocityData {
+  sprints: Array<{
+    sprint_id: string;
+    name: string;
+    committed_sp: number;
+    completed_sp: number | null;
+  }>;
+  average_completed_sp: number;
+  trend: 'increasing' | 'decreasing' | 'stable';
+}
+
+/** C04 Sprint Report */
+export interface SprintReportData {
+  sprint: { sprint_id: string; name: string };
+  groups: {
+    completed: IssueRow[];
+    carry_over: IssueRow[];
+    incomplete: IssueRow[];
+  };
+  summary: {
+    completed_count: number;
+    carry_over_count: number;
+    incomplete_count: number;
+    completed_sp: number;
+  };
+}
+
+export interface IssueRow {
+  key: string;
+  title: string;
+  issue_type: string;
+  priority: string;
+  assignee?: { name: string; avatar_url: string };
+  completed_at?: string;
+  story_points?: number;
+}
+
+/** C05 CFD */
+export interface CfdData {
+  date_range: { start: string; end: string };
+  status_categories: string[];
+  series: Array<{ day: string; counts: Record<string, number> }>;
+  total: number;
+}
+
+/** C06 Control Chart */
+export interface ControlChartData {
+  data_points: Array<{
+    workitem_id: string;
+    key: string;
+    cycle_time_days: number;
+    completed_at: string;
+    anomaly: boolean;
+    z_score: number;
+  }>;
+  reference_lines: Array<{ y_value: number; label: string; style: string }>;
+  stats: { median: number; p70: number; p85: number; p95: number; mean: number; std_dev: number };
+}
+
+/** C07 Cycle Time */
+export interface CycleTimeData {
+  buckets: Array<{ range_start: number; range_end: number; count: number; label: string }>;
+  percentiles: { p50: number; p85: number; p95: number };
+  stats: { total_count: number; median: number; mean: number };
+  bucket_size: number;
+}
+
+/** C13 Created vs Resolved */
+export interface CvrData {
+  series: Array<{ day: string; created: number; resolved: number }>;
+  summary: {
+    total_created: number;
+    total_resolved: number;
+    net_change: number;
+    backlog_trend: 'growing' | 'shrinking' | 'stable';
+  };
+  time_granularity: 'day' | 'week' | 'month';
+}
+
 export interface TimeSeriesPoint {
-  x: string;   // ISO date "2026-09-02"
-  y: number;   // 剩余 SP
+  x: string;
+  y: number;
 }
 
 export interface ScopeChange {
