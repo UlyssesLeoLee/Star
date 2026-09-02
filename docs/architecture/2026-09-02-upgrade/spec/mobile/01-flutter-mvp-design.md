@@ -8,14 +8,15 @@
 >
 > | IPA 文書 | 路径 | 役割 |
 > |---|---|---|
-> | **要件定義書** v1.2 | `docs/mobile-flutter-mvp/01-requirements.md` | FR-xxx 58 件 + NFR-xxx 37 件 + UC 8 件 + 既知未解決 25 件 + **§16 Capability Audit** (backend 実装状態 3 段階監査) |
-> | **基本設計書** v1.2 | `docs/mobile-flutter-mvp/02-basic-design.md` | 4 層 + Sync Engine 副層 + 22 コンポーネント + 5 状態機 + WS 仕様 + デプロイ + **§15 Endpoint Capability Audit** |
-> | **詳細設計書** v1.2 | `docs/mobile-flutter-mvp/03-detailed-design.md` | クラス詳細 12 新規モジュール完全コード + **§13 Implementation Feasibility** (Phase A 7 / Phase B 5 分離) |
+> | **要件定義書** v1.2.1 | `docs/mobile-flutter-mvp/01-requirements.md` | FR-xxx 58 件 + NFR-xxx 37 件 + UC 8 件 + 既知未解決 25 件 + **§16 Capability Audit** (backend 実装状態 3 段階監査) |
+> | **基本設計書** v1.2.1 | `docs/mobile-flutter-mvp/02-basic-design.md` | 4 層 + Sync Engine 副層 + 22 コンポーネント + 5 状態機 + WS 仕様 + デプロイ + **§15 Endpoint Capability Audit** |
+> | **詳細設計書** v1.2.1 | `docs/mobile-flutter-mvp/03-detailed-design.md` | クラス詳細 12 新規モジュール完全コード + **§13 Implementation Feasibility** (Phase A 7 / Phase B 5 分離) |
 >
 > **版本演进**:
 > - v1.0 (commit `6bd6aa2`, 2026-09-02 16:14 JST): IPA 化初版, read-only MVP 範囲
 > - v1.1 (commit `81b0c13`, 2026-09-02 16:27 JST): UAT 全面拡張 (核心写 + 离线 + 自建 WS)
 > - v1.2 (commit [pending], 2026-09-02 16:54 JST): **Capability Audit 増補** (per Ulysses 16:40 JST 発令, backend 現状整合), 3 doc 合計 +20K bytes (Audit 章節)
+> - v1.2.1 (commit [pending], 2026-09-02 17:10 JST): **交差監査 7 件 patch** (per Ulysses 17:10 JST 発令, 数字・ポインタ整合) |
 >
 > **本 doc (v0.1) 的地位**:
 > - 历史溯源记录: Pre-IPA 单 doc 形式, commit `bd4998e`
@@ -524,6 +525,7 @@ flutter build apk --release \
 | v0.2 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **SUPERSEDED 标记**:本 doc 已被 IPA 3 段組 (01-requirements.md + 02-basic-design.md + 03-detailed-design.md) supersede;本 doc 保留作 v0.1 考古证据;头部新增 SUPERSEDE 通知块指向 IPA 3 段 | 2026-09-02 16:09 JST Ulysses 発令「要符合日本IPA标准的需求、基本设计、详细设计」;per 守门 #1 禁回溯叙事, 保留 v0.1 commit 链 + 加 supersede 标记(不删 v0.1) |
 | v0.3 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **SUPERSEDED 标记更新**:IPA 3 段組 v1.0 → v1.1 (UAT 全面拡張);SUPERSEDE 通知块表格加版本注記 (v1.1 UAT 範囲), 表注加版本演进 (v1.0 → v1.1) + 規模 (158K bytes) | 2026-09-02 16:27 JST Ulysses 拍板 UAT 範囲 + 自建 WS 推送 (questionnaire 答: full_uat + self_ws); IPA v1.0 read-only → v1.1 UAT 全面拡張で本 doc 的 superseded 状态进一步強化 |
 | v0.4 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **SUPERSEDED 标记更新**:IPA 3 段組 v1.1 → v1.2 (Capability Audit 増補);SUPERSEDE 通知块表格版本 v1.1 → v1.2 + Audit 3 区分明示, 表注加版本演进 (v1.0 → v1.1 → v1.2) + v1.2 規模 (+20K) | 2026-09-02 16:40 JST Ulysses「app 的设计要确保能使用当前系统内已经写好的功能」発令; 3 份 IPA doc 各加 Capability Audit 章节 (01 §16 / 02 §15 / 03 §13) 整合 backend 実装現状 (22 REST 路由全部 501 / 13 MCP tool stub / WS 無し / auth 無し / SSE 4 event types のみ) |
+| v0.5 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **SUPERSEDED 标记更新**:IPA 3 段組 v1.2 → v1.2.1 (交差監査 7 件 patch);SUPERSEDE 通知块表格版本 v1.2 → v1.2.1, 表注加版本演进 v1.2.1 + 規模 (+15 lines) | 2026-09-02 17:10 JST Ulysses「交叉审核」発令; 3 份 IPA doc 間で数字・ポインタ整合性確認, 7 件不一致発見修正 (§1 旧版ポインタ v1.1→v1.2 × 2 / §5.1 ヘッダ v1.0 13→9 / v1.0 改訂履歴 13→9 / v1.1 改訂履歴 4 シーケンス→3 新規+1 拡張 / 03-detailed 6 新規→12 新規 / v1.2 改訂履歴 22 REST→20 endpoint) |
 
 ---
 

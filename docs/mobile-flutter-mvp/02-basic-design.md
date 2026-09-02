@@ -12,7 +12,7 @@
 
 ## §1 目的
 
-本文書は、Star Mobile Flutter MVP の **UAT レベル** の基本設計を定義する。要件定義書 `01-requirements.md` v1.1 で定義した要件（FR-AUTH-001〜FR-WS-008、計 58 機能要件 + 37 非機能要件）を満たすための**システムアーキテクチャ・コンポーネント構成・データフロー・外部インターフェース概要・状態遷移・デプロイメント構成**を記述する。
+本文書は、Star Mobile Flutter MVP の **UAT レベル** の基本設計を定義する。要件定義書 `01-requirements.md` v1.2 で定義した要件（FR-AUTH-001〜FR-WS-008、計 58 機能要件 + 37 非機能要件）を満たすための**システムアーキテクチャ・コンポーネント構成・データフロー・外部インターフェース概要・状態遷移・デプロイメント構成**を記述する。
 
 **v1.0 → v1.1 の主要変更点**:
 - ❌ 読み取り専用 → ✅ 核心写操作（状態遷移 / コメント / フィールド編集）
@@ -236,7 +236,7 @@ Data 層 = Remote Sources + Local Sources + Sync Engine
 
 ## §5 コンポーネント設計
 
-### 5.1 主要コンポーネント一覧（v1.0 13 → v1.1 22 個に拡張）
+### 5.1 主要コンポーネント一覧（v1.0 9 → v1.1 22 個に拡張）
 
 | コンポーネント | 責務 | 配置 | UAT 区分 |
 |---|---|---|---|
@@ -999,9 +999,10 @@ conflict_reports
 
 | バージョン | 日付 | 改訂人 | 改訂内容 | トリガ |
 |---|---|---|---|---|
-| v1.0 | 2026-09-02 16:14 JST | 架構師 (Mavis 接手 agent per DEC-008) | IPA 標準初版: read-only MVP 範囲, 4 層アーキテクチャ + 6 機能モジュール + 13 コンポーネント | v1.0 と同じ (read-only 範囲) |
-| **v1.1** | 2026-09-02 16:27 JST | 架構師 (Mavis 接手 agent per DEC-008) | **UAT 全面拡張**: §4 4 層 + Sync Engine 副層, 22 コンポーネント (WebSocketService / OfflineDatabase / SyncQueueService / ConflictResolver / ConnectivityWatcher / SyncStatusController / WorkItemWriteService / CommentsController / TransitionsController / ConflictResolutionScreen / SyncBanner / PushEventRouter / LogRedactor 新規), 4 シーケンス図追加 (WS 接続 / オフライン編集 / WS 推送 / 競合解決), 18 ドメインモデル (6 コマンド系 + 同期/競合/推送系), 20 API エンドポイント, WS エンドポイント + メッセージ形式, 3 状態機追加 (SyncState / PushState / 編集操作), セキュリティ 4 脅威追加, 性能 NFR 4 件追加 | 2026-09-02 16:27 JST Ulysses 拍板 UAT 範囲 + 自建 WS 推送 (questionnaire 答: full_uat + self_ws) |
-| **v1.2** | 2026-09-02 16:54 JST | 架構師 (Mavis 接手 agent per DEC-008) | **§15 Endpoint Capability Audit 増補**: 22 REST 路由 (v1.1 §7.1 列挙) のうち現在 backend で動作するものは 0 件 (全部 501); 詳細監査は `01-requirements.md` v1.2 §16 参照; 本書 §15 では §7.1 の各エンドポイントに「backend 実装状態」列を追加し、P2 待ち / client のみ の 2 区分を明示; 9 件の P2 backend 待ちエンドポイント (PATCH work-items, POST :transition, POST comments, /v1/auth/*, /v1/notifications, /v1/app-version, /v1/sync/batch 等) を §15.1 表に集約 | 2026-09-02 16:40 JST Ulysses「app 的设计要确保能使用当前系统内已经写好的功能」発令に対応; per 守門 #1+#8+#12 で `crates/star-api-rest/src/routes/*.rs` (commit `c8f6dc7`) を git 実証 |
+| v1.0 | 2026-09-02 16:14 JST | 架構師 (Mavis 接手 agent per DEC-008) | IPA 標準初版: read-only MVP 範囲, 4 層アーキテクチャ + 6 機能モジュール + **9 コンポーネント** | v1.0 と同じ (read-only 範囲) |
+| **v1.1** | 2026-09-02 16:27 JST | 架構師 (Mavis 接手 agent per DEC-008) | **UAT 全面拡張**: §4 4 層 + Sync Engine 副層, 22 コンポーネント (13 新規: WebSocketService / OfflineDatabase / SyncQueueService / ConflictResolver / ConnectivityWatcher / SyncStatusController / WorkItemWriteService / CommentsController / TransitionsController / ConflictResolutionScreen / SyncBanner / PushEventRouter / LogRedactor), **§5.2 4 シーケンス (3 新規 + 1 既存拡張)**: 5.2.1 ログイン+WS 接続 (拡張) / 5.2.2 オフライン編集 (新規) / 5.2.3 WS 推送 (新規) / 5.2.4 競合解決 (新規), 18 ドメインモデル (6 コマンド系 + 同期/競合/推送系), 20 API エンドポイント, WS エンドポイント + メッセージ形式, 3 状態機追加 (SyncState / PushState / 編集操作), セキュリティ 4 脅威追加, 性能 NFR 4 件追加 | 2026-09-02 16:27 JST Ulysses 拍板 UAT 範囲 + 自建 WS 推送 (questionnaire 答: full_uat + self_ws) |
+| **v1.2** | 2026-09-02 16:54 JST | 架構師 (Mavis 接手 agent per DEC-008) | **§15 Endpoint Capability Audit 増補**: 20 エンドポイント (v1.1 §7.1 列挙) のうち現在 backend で動作するものは 0 件 (全部 501); 詳細監査は `01-requirements.md` v1.2 §16 参照; 本書 §15 では §7.1 の各エンドポイントに「backend 実装状態」列を追加し、P2 待ち / client のみ の 2 区分を明示; 9 件の P2 backend 待ちエンドポイント (PATCH work-items, POST :transition, POST comments, /v1/auth/*, /v1/notifications, /v1/app-version, /v1/sync/batch 等) を §15.1 表に集約 | 2026-09-02 16:40 JST Ulysses「app 的设计要确保能使用当前系统内已经写好的功能」発令に対応; per 守門 #1+#8+#12 で `crates/star-api-rest/src/routes/*.rs` (commit `c8f6dc7`) を git 実証 |
+| **v1.2.1** | 2026-09-02 17:10 JST | 架構師 (Mavis 接手 agent per DEC-008) | **交差監査 7 件 patch**: (1) §1 旧版ポインタ v1.1→v1.2; (2) 03-detailed §1 同様; (3) §5.1 ヘッダ "v1.0 13" → "v1.0 9" (实际组件数); (4) v1.0 改訂履歴 13→9 コンポーネント; (5) v1.1 改訂履歴 "4 シーケンス" → "3 新規 + 1 既存拡張"; (6) 03-detailed v1.1 改訂履歴 "6 新規" → "12 新規"; (7) v1.2 改訂履歴 "22 REST 路由" → "20 エンドポイント" (§7.1 列挙 20 件と整合) | 2026-09-02 17:10 JST Ulysses「交叉审核」発令; 3 份 doc 間数字・ポインタ整合性確認, 7 件不一致発見・修正, FR 58 / NFR 37 / UC 8 / Drift 7 / ドメインモデル 18 / コンポーネント 22 は交差整合 |
 
 ---
 

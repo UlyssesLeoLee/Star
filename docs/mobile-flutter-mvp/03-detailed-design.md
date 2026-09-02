@@ -13,7 +13,7 @@
 
 ## §1 目的
 
-本文書は、Star Mobile Flutter MVP **UAT レベル** の詳細設計を定義する。基本設計書 `02-basic-design.md` v1.1 で定義した 4 層 + Sync Engine アーキテクチャ、22 コンポーネント、18 ドメインモデルの**実装レベルの詳細**を記述する。
+本文書は、Star Mobile Flutter MVP **UAT レベル** の詳細設計を定義する。基本設計書 `02-basic-design.md` v1.2 で定義した 4 層 + Sync Engine アーキテクチャ、22 コンポーネント、18 ドメインモデルの**実装レベルの詳細**を記述する。
 
 **v1.0 → v1.1 の主要変更点**:
 - ❌ read-only → ✅ 写操作 (PATCH / POST :transition / POST comments)
@@ -1537,8 +1537,9 @@ flutter test integration_test/
 | バージョン | 日付 | 改訂人 | 改訂内容 | トリガ |
 |---|---|---|---|---|
 | v1.0 | 2026-09-02 16:14 JST | 架構師 (Mavis 接手 agent per DEC-008) | IPA 標準初版: read-only MVP 範囲 | v1.0 と同じ (read-only 範囲) |
-| **v1.1** | 2026-09-02 16:27 JST | 架構師 (Mavis 接手 agent per DEC-008) | **UAT 全面拡張**: §3 依存追加 (drift / sqlcipher / web_socket_channel / uuid / collection / path_provider), §4 6 新規モジュール完全コード (WebSocketService / PushEventRouter / OfflineDatabase + 7 Drift テーブル / SyncQueueService / ConflictResolver / ConnectivityWatcher / WorkItemWriteService / CommentsController / TransitionsController / SyncStatusController / SyncBanner / LogRedactor), §5 3 シーケンス, §6 4 JSON スキーマ + Drift 7 テーブル DDL 完全形, §7 4 状態管理パターン, §8 pubspec.yaml + build.gradle.kts NDK 追加, §9 テスト 5 統合テストシナリオ追加 | 2026-09-02 16:27 JST Ulysses 拍板 UAT 範囲 + 自建 WS 推送 (questionnaire 答: full_uat + self_ws) |
+| **v1.1** | 2026-09-02 16:27 JST | 架構師 (Mavis 接手 agent per DEC-008) | **UAT 全面拡張**: §3 依存追加 (drift / sqlcipher / web_socket_channel / uuid / collection / path_provider), §4 **12 新規モジュール完全コード** (WebSocketService / PushEventRouter / OfflineDatabase + 7 Drift テーブル / SyncQueueService / ConflictResolver / ConnectivityWatcher / WorkItemWriteService / CommentsController / TransitionsController / SyncStatusController / SyncBanner / LogRedactor), §5 3 シーケンス (§5.4 WS 接続 / §5.5 オフライン編集 / §5.6 競合解決), §6 4 JSON スキーマ + Drift 7 テーブル DDL 完全形, §7 4 状態管理パターン, §8 pubspec.yaml + build.gradle.kts NDK 追加, §9 テスト 5 統合テストシナリオ追加 | 2026-09-02 16:27 JST Ulysses 拍板 UAT 範囲 + 自建 WS 推送 (questionnaire 答: full_uat + self_ws) |
 | **v1.2** | 2026-09-02 16:54 JST | 架構師 (Mavis 接手 agent per DEC-008) | **§13 Implementation Feasibility 増補**: v1.1 §4 で定義した 12 新規 Dart モジュールのうち client のみで実装可能な 7 個 (OfflineDatabase / SyncQueueService / ConflictResolver / ConnectivityWatcher / SyncStatusController / SyncBanner / LogRedactor) と backend 待ち 5 個 (WebSocketService / PushEventRouter / WorkItemWriteService / CommentsController / TransitionsController) を明示;Phase A (client 先行, mock) + Phase B (P2 backend 完了後, 統合) 推奨;詳細 FR 別監査は `01-requirements.md` v1.2 §16 参照 | 2026-09-02 16:40 JST Ulysses「app 的设计要确保能使用当前系统内已经写好的功能」発令に対応; per 守門 #1+#8+#12 で `crates/star-mcp/src/tools/*.rs` + `crates/star-api-rest/src/routes/*.rs` + `crates/star-sse/src/lib.rs` を git 実証 (commit `9c46a1c` / `c8f6dc7` / `d71b63f`) |
+| **v1.2.1** | 2026-09-02 17:10 JST | 架構師 (Mavis 接手 agent per DEC-008) | **交差監査 patch**: §1 旧版ポインタ v1.1→v1.2 (basic); v1.1 改訂履歴 "§4 6 新規" → "§4 12 新規" (列挙 12 件と整合) | 2026-09-02 17:10 JST Ulysses「交叉审核」発令; 02-basic 側で 6 件 patch 適用済 + 本書 2 件 patch 適用 |
 
 ---
 
