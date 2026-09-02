@@ -732,6 +732,136 @@
 |---|---|---|---|---|
 | v1.0 | 2026-09-02 16:14 JST | 架構師 (Mavis 接手 agent per DEC-008) | IPA 標準初版: read-only MVP 範囲, FR 30 件 + NFR 22 件 | 2026-09-02 15:52 JST Ulysses「完成设计文档撰写」+ 16:09 JST「要符合日本IPA标准」 |
 | **v1.1** | 2026-09-02 16:27 JST | 架構師 (Mavis 接手 agent per DEC-008) | **UAT 全面拡張**: §2 In Scope に核心写 + オフライン + 推送追加, §2 Out of Scope から該当削除, §5 FR 30→58 件 (核心写 FR-WORK-007/008/009/010/011, オフライン FR-OFFLINE-001~011, WS FR-WS-001~008, 通知 FR-NOTIF-008/009 追加), §6 NFR 22→37 件追加, §7 UC 5→8 件追加, §8 データ要件 Drift 7 テーブル追加, §9 エンドポイント 13→20 + WS 仕様, §10 ログ送信追加, §11 セキュリティ 4 脅威追加, §12 用語 14→22 件, §13 既知未解決 G-04/G-05/G-13 解決 + G-16~G-25 新規追加 | 2026-09-02 16:27 JST Ulysses 拍板 UAT 範囲 + 自建 WS 推送 (questionnaire 答: full_uat + self_ws) |
+| **v1.2** | 2026-09-02 16:54 JST | 架構師 (Mavis 接手 agent per DEC-008) | **§16 Capability Audit 増補**: v1.1 設計が現在 backend システムで実際に使用可能かを 3 段階 (✅ 完全実装 / 🟠 路由在 501 / ❌ 未実装) で監査;Ulysses 2026-09-02 16:40 JST 発令「app の設計が現在システム内の既に書かれた機能を使用できることを確保する」に対応;結論: v1.1 仮定 20 REST endpoint + WS + auth のうち**現在 backend に実装済みなのは 0 個**、MCP tool 3 個 (stdio) のみ;P2 backend 完了まで実運用不可だが設計自体は P2 完了後の姿として保持;G-XX を backend 依存 / client 環境 / 拍板待ち の 3 区分に再分類 | 2026-09-02 16:40 JST Ulysses「app 的设计要确保能使用当前系统内已经写好的功能」発令;per 守門 #1+#8+#12 (禁回溯叙事 + BAS git 实证) で backend 実装状況を直接 grep (`crates/star-api-rest/src/routes/*.rs` + `crates/star-mcp/src/tools/*.rs` + `crates/star-sse/src/lib.rs` + commit `9c46a1c`/`c8f6dc7`/`d71b63f`) した結果 22 路由全部 501 / 13 MCP tool stub / WS 無し / auth 無し / SSE 4 event types のみを実証 |
+
+---
+
+## §16 Capability Audit — Backend 現状整合 (per 2026-09-02 16:54 JST 増補)
+
+> **追加トリガ**: 2026-09-02 16:40 JST Ulysses 発令「app 的设计要确保能使用当前系统内已经写好的功能」
+> **監査方法**: backend crate ソース + git log 直接 grep (per 守門 #1+#8+#12 禁回溯叙事 + BAS git 实证)
+> **監査実行**: 2026-09-02 16:50 JST by 架構師 (Mavis 接手)
+
+### 16.1 監査サマリー
+
+| 状態 | 件数 | 該当 |
+|---|---|---|
+| ✅ **完全実装 (production 利用可)** | 3 件 | MCP tool: `get_workspace` / `get_worktree` / `get_issue` (commit `9c46a1c` 「Phase F.2 tool 真实数据源接入」) — ただし **stdio のみ**、Flutter HTTP client からは不可 |
+| 🟠 **路由在 501 業務ロジック未実装** | 22 件 | `crates/star-api-rest` 全ルート (commit `c8f6dc7` 「Phase L 骨架」), `src/routes/*.rs` 全関数 `RestError::not_implemented()` |
+| 🟡 **MCP tool stub (in-memory mock)** | 13 件 | `crates/star-mcp/src/tools/*.rs` 12 + 1 (per commit `d71b63f` 「12 tool 留 P2 缺 service」), 内部で `mock_response()` 返す |
+| 🟠 **SSE 存在 but EventType 限定** | 1 件 | `crates/star-sse/src/lib.rs:18-26` `enum EventType { MergeRequest, Pipeline, AgentState, WorktreeChange }` — **work_item / notification 無し** |
+| ❌ **完全未実装** | 多数 | WebSocket (SSE のみ) / auth (login/refresh/logout) / PATCH work-item 業務 logic / POST `:transition` / POST comments / idempotency_keys テーブル / OAuth 2.0 / Device 三重バインド |
+
+### 16.2 主要 FR 別 状態 (§5 機能要件の監査)
+
+> 監査対象: v1.1 §5 FR 58 件。**現時点で backend 動作確認できるのは 0 件 (HTTP REST 経由)**。3 件 (MCP stdio) は backend 内では動作するが Flutter から到達不可。
+
+| FR ID | 概要 | 状態 | 根拠 (git 実証) |
+|---|---|---|---|
+| FR-AUTH-001 | メール+パス ログイン | ❌ | 22 路由に `/v1/auth/login` 無し |
+| FR-AUTH-002 | access/refresh token 受領 | ❌ | login 未実装 |
+| FR-AUTH-003 | refresh token 自動更新 | ❌ | login 未実装、middleware は stub |
+| FR-AUTH-004 | refresh 失敗時 logout | ❌ | 同上 |
+| FR-AUTH-005 | ログアウト + ローカル削除 | ❌ | `/v1/auth/logout` 無し |
+| FR-AUTH-006 | Keystore 暗号化 | (client のみ) ✅ | flutter_secure_storage で実装可 |
+| FR-AUTH-007 | 未同期 SyncQueue 確認 | (client のみ) | SyncQueue 設計依存 |
+| FR-BOARD-001 | ボード閲覧 | 🟠 | `/api/v1/projects/{id}/board` 無し (22 路由に無し) |
+| FR-BOARD-002~008 | ボード UI | (client のみ) ✅ | UI 実装可 |
+| FR-WORK-001 | Work Item 詳細閲覧 | 🟠 | `/api/v1/work-items/{id}` 路由在 501 (`routes/work_items.rs:21`) |
+| FR-WORK-002~006 | 詳細 UI | (client のみ) ✅ | UI 実装可 |
+| FR-WORK-007 | PATCH 優先度/担当者/期限 | 🟠 | `/api/v1/work-items/{id}` PATCH 路由在 501 (`routes/work_items.rs:31`) |
+| FR-WORK-008 | コメント投稿 | ❌ | `/api/v1/work-items/{id}/comments` POST 無し |
+| FR-WORK-009 | 状態遷移実行 | ❌ | `/api/v1/work-items/{id}:transition` 無し |
+| FR-WORK-010 | オフライン編集 | (client のみ) ✅ | Drift + SyncQueue で実装可 |
+| FR-WORK-011 | WS 推送反映 | ❌ | WS 未実装 |
+| FR-NOTIF-001 | 通知一覧 | 🟠 | 22 路由に `/v1/notifications` 無し |
+| FR-NOTIF-002~007 | UI + 30s ポーリング | (client のみ) ✅ | UI 実装可、ポーリングは mock で動作 |
+| FR-NOTIF-008 | WS 推送 | ❌ | WS 未実装 |
+| FR-NOTIF-009 | WS 切断時 REST フォールバック | ❌ | WS 未実装 |
+| FR-OFFLINE-001~011 | オフライン全機能 | (client のみ) ✅ | Drift + SQLCipher + SyncQueue 設計のみで完結、backend 依存なし |
+| FR-WS-001~008 | WebSocket 全機能 | ❌ | WS backend 未実装 |
+| FR-PROJ / FR-SETTINGS / FR-NAV | UI + 設定 | (client のみ) ✅ | UI 実装可 |
+
+**統計**: 58 FR 中、client のみ で実装可 = **27 件 (47%)**、backend 待ち = **31 件 (53%)**
+
+### 16.3 何时使用可能か (P2 backend 依存度)
+
+| 区分 | 実運用開始条件 | 影響範囲 |
+|---|---|---|
+| 3 MCP tool (read, stdio) | **今すぐ (local agent のみ)** | Flutter HTTP client からは到達不可 (MCP stdio はローカルプロセス間通信) |
+| 22 REST 路由 (501) | P2 backend 完了後 | 13 FR 待ち (FR-BOARD-001, FR-WORK-001, FR-NOTIF-001 等) |
+| 13 MCP tool stub (mock) | P2 backend 完了後 | 該当 MCP tool 経由の FR (今回は未使用) |
+| WebSocket | backend WS 実装待ち | FR-WS-001~008, FR-NOTIF-008, FR-WORK-011 |
+| Auth (login/refresh/logout) | backend auth 実装待ち | FR-AUTH-001~005 |
+| 核心写 (PATCH / :transition / comments) | P2 完了後 (業務ロジック実装) | FR-WORK-007~009 |
+| **Client-only 機能 (オフライン/UI/キャッシュ)** | **今すぐ (Flutter 側のみで完結)** | FR-OFFLINE-001~011, FR-BOARD-002~008, FR-WORK-002~006 + 010, FR-NOTIF-002~007, FR-PROJ-001~003, FR-SETTINGS-001~008, FR-NAV-001~005, FR-AUTH-006~007 |
+
+### 16.4 G-XX 再評価 (§13 既知未解決 + 本監査による再分類)
+
+| ID | v1.1 内容 | v1.2 再評価 | 区分 |
+|---|---|---|---|
+| G-01 | `/v1/auth/login` 端点存在性 | **P2 backend 待ち** (確認済: 22 路由に無し) | backend |
+| G-02 | `/v1/app-version` | **P2 backend 待ち** | backend |
+| G-03 | `STAR_HOST` | SRE Lead 拍板 (内網環境) | client 環境 |
+| G-04 | オフラインキャッシュ | v1.1 採用 (**実装可**) | client (resolved) |
+| G-05 | 推送 (自前 WS) | **P2 backend 待ち** (SSE も work_item event 無し) | backend |
+| G-06 | Tablet / 横画面 | V1.2 候補 | 将来 |
+| G-07 | iOS V2 | 保留 | 将来 |
+| G-08 | HTTPS / envoy 移行 | MVP は HTTP 維持、WS は WSS 必須だが backend WS 自体未実装 | backend 依存 |
+| G-09 | Device 三重バインディング | V1.2 候補 | 将来 |
+| G-10 | APK 署名 | SRE Lead 拍板 | client 環境 |
+| G-11 | APK 配布チャネル | Ulysses + SRE Lead 拍板 | client 環境 |
+| G-12 | 倉位置 | 架構師 拍板 | client 環境 |
+| G-13 | WebSocket 推送 | **P2 backend 待ち** | backend |
+| G-14 | 5 域 Lead 真人補簽 | DDD Review 段階 | 将来 |
+| G-15 | WBS 新增「Flutter MVP」 | Ulysses 拍板 | 計画 |
+| G-16 | WS resource_types work_item/notification | **P2 backend 待ち** (SSE EventType も 4 つのみ) | backend |
+| G-17 | `idempotency_keys` テーブル | **P2 backend 待ち** | backend |
+| G-18 | WS 接続管理 | **P2 backend 待ち** | backend |
+| G-19 | `/v1/sync/batch` エンドポイント | **P2 backend 待ち** | backend |
+| G-20 | 競合解決戦略 | 5 域 Lead + PM 拍板 (client 設計) | client 設計 |
+| G-21 | オフラインキャッシュ TTL | 5 域 Lead 拍板 (client 設計) | client 設計 |
+| G-22 | SQLCipher 鍵管理 | Ulysses 拍板 (client 設計) | client 設計 |
+| G-23 | WS reconnect 回数 | SRE Lead 拍板 (client 設計) | client 設計 |
+| G-24 | 同期キュー 上限 | 5 域 Lead 拍板 (client 設計) | client 設計 |
+| G-25 | ログ送信サイズ | Ulysses 拍板 (client 設計) | client 設計 |
+
+**統計**: 25 G-XX 中、**P2 backend 待ち = 9 件 (36%)**、client 環境/設計 拍板 = 10 件 (40%)、将来計画 = 6 件 (24%)。
+
+### 16.5 v1.1 設計の妥当性 (本監査後の評価)
+
+> **結論**: v1.1 設計は **P2 backend 完了後の目標態** として保持する。今すぐの実装は不可だが、設計自体は妥当。
+
+**妥当な点**:
+- Client-only 機能 (UI / オフライン / キャッシュ / 競合解決) は backend 待たず実装可
+- P2 backend 完了後に v1.1 範囲がそのまま稼働する設計整合性
+- 5 域独立 Lead 構造 (per 8/21 JST) / token-OLU (per STAR-OLU-001) / IPA 標準章立て / ADR-0021 零廠商合作 等の守門と整合
+
+**修正不要の点** (v1.1 維持):
+- §5 FR 58 件 (実装可否は §16 で個別明示、設計自体は妥当)
+- §6 NFR 37 件 (性能 / セキュリティ / 保守性 目標)
+- §7 UC 8 件 (業務フロー)
+- §8 データ要件 (Drift 7 テーブル, client 完結)
+- §9 REST 20 endpoint + WS (P2 完了後に動作)
+- §10-§15 (運用 / セキュリティ / 用語 / 既知未解決 / 承認欄)
+
+**要注記の点** (運用時):
+- Mobile app 開発は P2 backend 進捗と並走可能 (client 27 FR 先行実装可)
+- 統合テストは P2 backend 完了まで mock + 単体テストで代替
+- 5 域 Lead (work-item / notification / auth / frontend) の真人補簽は backend 側と合同で P2 段階に実施
+
+### 16.6 推奨実装順序 (per 本監査)
+
+| 順序 | 区分 | 開始条件 | 推定 token |
+|---|---|---|---|
+| 1 | **Client-only 機能 27 FR 先行実装** (UI / オフライン / Drift / 競合解決) | 即時 (P2 待ち不要) | ~2.0M |
+| 2 | **P2 backend 待ち FR 9 件** (REST + WS + auth) | P2 backend 完了後 | ~3.0M |
+| 3 | **統合テスト + DDD Review** | 1 + 2 完了後 | ~0.5M |
+| **合計** | — | — | **~5.5M** (v1.1 推計 5.0-6.0M と整合) |
+
+**P2 backend との並走モデル**:
+- Phase A (即時, client 先行): 27 FR 実装、mock データで動作確認
+- Phase B (P2 完了後, 結合): 残 31 FR 実装、E2E 統合テスト、5 域 Lead 合同 DDD Review
 
 ---
 

@@ -1001,6 +1001,67 @@ conflict_reports
 |---|---|---|---|---|
 | v1.0 | 2026-09-02 16:14 JST | 架構師 (Mavis 接手 agent per DEC-008) | IPA 標準初版: read-only MVP 範囲, 4 層アーキテクチャ + 6 機能モジュール + 13 コンポーネント | v1.0 と同じ (read-only 範囲) |
 | **v1.1** | 2026-09-02 16:27 JST | 架構師 (Mavis 接手 agent per DEC-008) | **UAT 全面拡張**: §4 4 層 + Sync Engine 副層, 22 コンポーネント (WebSocketService / OfflineDatabase / SyncQueueService / ConflictResolver / ConnectivityWatcher / SyncStatusController / WorkItemWriteService / CommentsController / TransitionsController / ConflictResolutionScreen / SyncBanner / PushEventRouter / LogRedactor 新規), 4 シーケンス図追加 (WS 接続 / オフライン編集 / WS 推送 / 競合解決), 18 ドメインモデル (6 コマンド系 + 同期/競合/推送系), 20 API エンドポイント, WS エンドポイント + メッセージ形式, 3 状態機追加 (SyncState / PushState / 編集操作), セキュリティ 4 脅威追加, 性能 NFR 4 件追加 | 2026-09-02 16:27 JST Ulysses 拍板 UAT 範囲 + 自建 WS 推送 (questionnaire 答: full_uat + self_ws) |
+| **v1.2** | 2026-09-02 16:54 JST | 架構師 (Mavis 接手 agent per DEC-008) | **§15 Endpoint Capability Audit 増補**: 22 REST 路由 (v1.1 §7.1 列挙) のうち現在 backend で動作するものは 0 件 (全部 501); 詳細監査は `01-requirements.md` v1.2 §16 参照; 本書 §15 では §7.1 の各エンドポイントに「backend 実装状態」列を追加し、P2 待ち / client のみ の 2 区分を明示; 9 件の P2 backend 待ちエンドポイント (PATCH work-items, POST :transition, POST comments, /v1/auth/*, /v1/notifications, /v1/app-version, /v1/sync/batch 等) を §15.1 表に集約 | 2026-09-02 16:40 JST Ulysses「app 的设计要确保能使用当前系统内已经写好的功能」発令に対応; per 守門 #1+#8+#12 で `crates/star-api-rest/src/routes/*.rs` (commit `c8f6dc7`) を git 実証 |
+
+---
+
+## §15 Endpoint Capability Audit (per 2026-09-02 16:54 JST 増補)
+
+> **FR レベルの詳細監査は `01-requirements.md` v1.2 §16 参照**。本書では §7.1 で列挙した 20 REST エンドポイントに **backend 実装状態** を追加する。
+
+### 15.1 エンドポイント実装状態 (v1.1 §7.1 + 状態列)
+
+| # | Method | パス | 状態 | 実装時期 |
+|---|---|---|---|---|
+| 1 | POST | `/v1/auth/login` | ❌ **未実装** (22 路由に無し) | P2 backend |
+| 2 | POST | `/v1/auth/refresh` | ❌ **未実装** | P2 backend |
+| 3 | POST | `/v1/auth/logout` | ❌ **未実装** | P2 backend |
+| 4 | GET | `/v1/users/me` | ❌ **未実装** (22 路由に無し) | P2 backend |
+| 5 | GET | `/v1/tenants/current` | ❌ **未実装** | P2 backend |
+| 6 | GET | `/v1/projects/{id}/board` | ❌ **未実装** (22 路由に無し) | P2 backend |
+| 7 | GET | `/v1/work-items?project_id=...` | 🟠 **路由在 501** (per `routes/work_items.rs:11` `RestError::not_implemented()`) | P2 backend |
+| 8 | GET | `/v1/work-items/{id}` | 🟠 **路由在 501** (`routes/work_items.rs:21`) | P2 backend |
+| 9 | GET | `/v1/work-items/{id}/transitions` | ❌ **未実装** | P2 backend |
+| 10 | GET | `/v1/work-items/{id}/comments` | ❌ **未実装** (22 路由に無し) | P2 backend |
+| 11 | GET | `/v1/notifications?read=false` | ❌ **未実装** | P2 backend |
+| 12 | POST | `/v1/notifications/{id}:read` | ❌ **未実装** | P2 backend |
+| 13 | POST | `/v1/notifications/mark-all-read` | ❌ **未実装** | P2 backend |
+| 14 | PATCH | `/v1/work-items/{id}` | 🟠 **路由在 501** (`routes/work_items.rs:31` 業務ロジック未実装) | P2 backend |
+| 15 | POST | `/v1/work-items/{id}:transition` | ❌ **未実装** | P2 backend |
+| 16 | POST | `/v1/work-items/{id}/comments` | ❌ **未実装** | P2 backend |
+| 17 | GET | `/v1/work-items/{id}/attachments` | ❌ **未実装** | V1.2 候補 |
+| 18 | GET | `/v1/app-version` | ❌ **未実装** | P2 backend |
+| 19 | POST | `/v1/sync/batch` | ❌ **未実装** | P2 backend |
+| 20 | GET | `/v1/work-items/{id}/audit-events` | ❌ **未実装** | V1.2 候補 |
+
+**統計**: 20 エンドポイント中、**現在動作 0 件 (0%)**、🟠 路由在 501 業務未実装 = 3 件 (15%)、❌ 完全未実装 = 17 件 (85%)。
+
+### 15.2 代替手段 (MCP tool 経由、ただし stdio のみ)
+
+| 用途 | MCP tool | 状態 | Flutter からの到達性 |
+|---|---|---|---|
+| Work Item 詳細取得 | `get_issue` (commit `9c46a1c`) | ✅ 動作 | ❌ stdio のみ (HTTP 不可) |
+| Worktree 詳細取得 | `get_worktree` (commit `9c46a1c`) | ✅ 動作 | ❌ stdio のみ |
+| Workspace 詳細取得 | `get_workspace` (commit `9c46a1c`) | ✅ 動作 | ❌ stdio のみ |
+| その他 13 MCP tool | (search_issues / search_code / get_context / etc.) | 🟡 in-memory mock | ❌ stdio のみ |
+
+**結論**: 3 個だけ backend 動作確認できるが、Flutter HTTP client からは到達不可 (MCP stdio はローカルプロセス間通信)。**Mobile app は v1.1 範囲では P2 backend 完了まで実運用不可**。
+
+### 15.3 アーキテクチャ影響
+
+- **Client-only 機能** (UI / オフライン / Drift / 競合解決 / SyncQueue / キャッシュ): 即時実装可、v1.1 設計そのまま
+- **Backend 待ち機能** (REST 20 + WS + auth + 核心写): P2 backend 完了まで mock + 単体テストで代替
+- **統合テスト**: P2 完了まで mock server + 単体テストで代替、P2 後に E2E 統合
+
+### 15.4 並走実装モデル (推奨)
+
+| Phase | 区分 | 開始 | 工数 |
+|---|---|---|---|
+| **Phase A** | Client 27 FR 先行実装 + mock | 即時 | ~2.0M token |
+| **Phase B** | P2 backend 完了後、残 31 FR 統合 | P2 後 | ~3.0M token |
+| **Phase C** | 統合テスト + DDD Review | A+B 後 | ~0.5M token |
+
+詳細 FR 別実装可否は `01-requirements.md` v1.2 §16.2 参照。
 
 ---
 

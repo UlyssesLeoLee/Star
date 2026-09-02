@@ -1537,7 +1537,67 @@ flutter test integration_test/
 | バージョン | 日付 | 改訂人 | 改訂内容 | トリガ |
 |---|---|---|---|---|
 | v1.0 | 2026-09-02 16:14 JST | 架構師 (Mavis 接手 agent per DEC-008) | IPA 標準初版: read-only MVP 範囲 | v1.0 と同じ (read-only 範囲) |
-| **v1.1** | 2026-09-02 16:27 JST | 架構師 (Mavis 接手 agent per DEC-008) | **UAT 全面拡張**: §3 依存追加 (drift / sqlcipher / web_socket_channel / uuid / collection / path_provider), §4 6 新規モジュール完全コード (WebSocketService / PushEventRouter / OfflineDatabase / SyncQueueService / ConflictResolver / ConnectivityWatcher / WorkItemWriteService / CommentsController / TransitionsController / SyncStatusController / SyncBanner / LogRedactor), §5 3 シーケンス, §6 4 JSON スキーマ + Drift 7 テーブル DDL 完全形, §7 4 状態管理パターン, §8 pubspec.yaml + build.gradle.kts NDK 追加, §9 テスト 5 統合テストシナリオ追加 | 2026-09-02 16:27 JST Ulysses 拍板 UAT 範囲 + 自建 WS 推送 (questionnaire 答: full_uat + self_ws) |
+| **v1.1** | 2026-09-02 16:27 JST | 架構師 (Mavis 接手 agent per DEC-008) | **UAT 全面拡張**: §3 依存追加 (drift / sqlcipher / web_socket_channel / uuid / collection / path_provider), §4 6 新規モジュール完全コード (WebSocketService / PushEventRouter / OfflineDatabase + 7 Drift テーブル / SyncQueueService / ConflictResolver / ConnectivityWatcher / WorkItemWriteService / CommentsController / TransitionsController / SyncStatusController / SyncBanner / LogRedactor), §5 3 シーケンス, §6 4 JSON スキーマ + Drift 7 テーブル DDL 完全形, §7 4 状態管理パターン, §8 pubspec.yaml + build.gradle.kts NDK 追加, §9 テスト 5 統合テストシナリオ追加 | 2026-09-02 16:27 JST Ulysses 拍板 UAT 範囲 + 自建 WS 推送 (questionnaire 答: full_uat + self_ws) |
+| **v1.2** | 2026-09-02 16:54 JST | 架構師 (Mavis 接手 agent per DEC-008) | **§13 Implementation Feasibility 増補**: v1.1 §4 で定義した 12 新規 Dart モジュールのうち client のみで実装可能な 7 個 (OfflineDatabase / SyncQueueService / ConflictResolver / ConnectivityWatcher / SyncStatusController / SyncBanner / LogRedactor) と backend 待ち 5 個 (WebSocketService / PushEventRouter / WorkItemWriteService / CommentsController / TransitionsController) を明示;Phase A (client 先行, mock) + Phase B (P2 backend 完了後, 統合) 推奨;詳細 FR 別監査は `01-requirements.md` v1.2 §16 参照 | 2026-09-02 16:40 JST Ulysses「app 的设计要确保能使用当前系统内已经写好的功能」発令に対応; per 守門 #1+#8+#12 で `crates/star-mcp/src/tools/*.rs` + `crates/star-api-rest/src/routes/*.rs` + `crates/star-sse/src/lib.rs` を git 実証 (commit `9c46a1c` / `c8f6dc7` / `d71b63f`) |
+
+---
+
+## §13 Implementation Feasibility (per 2026-09-02 16:54 JST 増補)
+
+> **FR / エンドポイント レベルの詳細監査は `01-requirements.md` v1.2 §16 + `02-basic-design.md` v1.2 §15 参照**。本書では v1.1 §4 で定義した Dart モジュール 12 個を **client のみで実装可 / backend 待ち** の 2 区分に分類する。
+
+### 13.1 モジュール実装可否マトリクス
+
+| モジュール | 配置 | 状態 | Phase | 理由 |
+|---|---|---|---|---|
+| **OfflineDatabase** (Drift 7 テーブル + SQLCipher) | `lib/core/db/` | ✅ **client のみ** | **Phase A** | 純 client 完結、backend 依存なし |
+| **SyncQueueService** | `lib/core/sync/` | ✅ **client のみ** | **Phase A** | FIFO キュー + REST 呼び出し、HTTP 失敗時 retry |
+| **ConflictResolver** | `lib/core/sync/` | ✅ **client のみ** | **Phase A** | 409 Conflict 受信後の UI 提示 + ユーザー選択 |
+| **ConnectivityWatcher** | `lib/core/connectivity/` | ✅ **client のみ** | **Phase A** | connectivity_plus ラッパー |
+| **SyncStatusController** | `lib/features/settings/` | ✅ **client のみ** | **Phase A** | SyncState 管理 + 通知 |
+| **SyncBanner** | `lib/shared/widgets/` | ✅ **client のみ** | **Phase A** | 画面下部バナー UI |
+| **LogRedactor** | `lib/core/utils/` | ✅ **client のみ** | **Phase A** | regex + 構造化 redact |
+| **WebSocketService** | `lib/core/ws/` | 🟠 **backend 待ち** | **Phase B** | 接続先 `wss://...` 未実装 |
+| **PushEventRouter** | `lib/core/ws/` | 🟠 **backend 待ち** | **Phase B** | WS 受信イベントに依存 |
+| **WorkItemWriteService** | `lib/features/work_item/` | 🟠 **backend 待ち** | **Phase B** | `PATCH /v1/work-items/{id}` 501 |
+| **CommentsController** (postComment) | `lib/features/comments/` | 🟠 **backend 待ち** | **Phase B** | `POST /comments` 未実装 |
+| **TransitionsController** | `lib/features/transitions/` | 🟠 **backend 待ち** | **Phase B** | `POST :transition` 未実装 |
+
+**統計**: 12 モジュール中、Phase A (client のみ) = **7 個 (58%)**、Phase B (backend 待ち) = **5 個 (42%)**。
+
+### 13.2 Phase A 推奨実装順序 (即時着手可)
+
+```
+Week 1-2:  OfflineDatabase + Drift 7 テーブル DDL + SQLCipher 鍵管理
+Week 3:    SyncQueueService + ConflictResolver + ConnectivityWatcher
+Week 4:    SyncBanner + SyncStatusController + LogRedactor
+Week 5:    Phase A 統合テスト (mock backend, in-memory)
+```
+
+推定 token: ~2.0M (4-5 週 @ 1.2M/週 STAR-OLU-001 基線)
+
+### 13.3 Phase B 実装条件
+
+- `crates/star-api-rest` 22 路由の **業務ロジック実装** (commit `c8f6dc7` 以降の P2 段階)
+- `crates/star-mcp` 13 tool stub の **実データ化** (commit `d71b63f` 以降の P2 段階)
+- **WebSocket backend 実装** (work_item / notification event type 追加)
+- **auth 実装** (login/refresh/logout + JWT middleware)
+
+### 13.4 統合テスト戦略
+
+- **Phase A 期間**: mock backend (in-memory) で offline / sync / 競合解決シナリオをテスト
+- **Phase B 着手時**: backend P2 進捗と並走で mock + 実 backend 切替テスト
+- **Phase C (P2 完了後)**: E2E 統合テスト + 5 域 Lead 合同 DDD Review
+
+### 13.5 实施リスク評価
+
+| リスク | 影響 | 緩和策 |
+|---|---|---|
+| P2 backend 完了遅延 | Phase B 着手不可 | Phase A 単独で 27 FR 先行実装、MVP 縮小投入可能 |
+| WebSocket 仕様変更 | `WebSocketService` リファクタ | `api-design.md` §4 を参照、§13 で再評価 |
+| SQLCipher Android NDK 問題 | Drift 起動失敗 | `build.gradle.kts` NDK 25.1.8937393 固定 (per §8.2) |
+| backend 401 / 403 仕様変更 | `AuthInterceptor` リファクタ | 既存 `AuthInterceptor` 抽象化済み (§4.1.2) |
+| 5 域 Lead 真人補簽待ち | DDD Review ブロック | per 8/21 JST 5 域独立拍板、Mavis 接手代簽で進行可 |
 
 ---
 
