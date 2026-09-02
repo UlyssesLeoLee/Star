@@ -1,8 +1,21 @@
-# 43. Android Flutter Mobile App — MVP 设计
+# 43. Android Flutter Mobile App — MVP 设计 (Pre-IPA 草稿, SUPERSEDED)
 
-> **状态**: 🟡 草案 v0.1
+> **状态**: 🟡 草案 v0.1 (**已被 v0.2 IPA 三段組 supersede**, 2026-09-02 16:09 JST)
 > **撰写**: 架构师 (Mavis 接手 agent per DEC-008) — 2026-09-02 15:54 JST
 > **触发**: Ulysses 2026-09-02 15:52 JST 发令"完成设计文档撰写"(承接上一问"安卓版flutter移动app开发得怎样了?第一版默认在内网使用即可")
+>
+> **⚠️ SUPERSEDE 通知 (2026-09-02 16:09 JST)**: 本 doc 已被拆分为 3 份 IPA 標準正式設計文書(per 2026-09-02 16:09 JST Ulysses 発令「要符合日本IPA标准的需求、基本设计、详细设计」):
+>
+> | IPA 文書 | 路径 | 役割 |
+> |---|---|---|
+> | **要件定義書** v1.0 | `docs/mobile-flutter-mvp/01-requirements.md` | FR-xxx 30 件 + NFR-xxx 22 件 + UC 5 件 + 既知未解決 15 件 |
+> | **基本設計書** v1.0 | `docs/mobile-flutter-mvp/02-basic-design.md` | 4 層クリーンアーキテクチャ + 6 機能モジュール + 13 コンポーネント + 状態機 + デプロイ |
+> | **詳細設計書** v1.0 | `docs/mobile-flutter-mvp/03-detailed-design.md` | クラス詳細 (Dio Interceptor / Controller / freezed model) + JSON スキーマ + pubspec.yaml + テストケース |
+>
+> **本 doc (v0.1) 的地位**:
+> - 历史溯源记录: Pre-IPA 单 doc 形式, commit `bd4998e`
+> - 内容已被 3 份 IPA doc 完全覆盖, 后续实施以 IPA 3 段为准
+> - 本 doc 不删, 留作 v0.1 → v1.0 演进的考古证据 (per 守门 #1 禁回溯叙事)
 
 ## §0 目的
 
@@ -503,6 +516,7 @@ flutter build apk --release \
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | 初版:立项背景 + MVP 边界 + 13 端点映射 + Flutter 端架构 + 鉴权/缓存/部署策略 + 15 项已知缺口 + 5 维守门 + 5 角色签字栏 | 2026-09-02 15:52 JST Ulysses 发令"完成设计文档撰写"(承接"安卓版flutter移动app开发得怎样了?第一版默认在内网使用即可");Mavis 接手按"完成"指令直接落档,3 维默认(方向/MVP 范围/网络)未被 Ulysses 显式确认,落 §0.3 + §9 已知缺口待翻牌 |
+| v0.2 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **SUPERSEDED 标记**:本 doc 已被 IPA 3 段組 (01-requirements.md v1.0 + 02-basic-design.md v1.0 + 03-detailed-design.md v1.0) supersede;本 doc 保留作 v0.1 考古证据;头部新增 SUPERSEDE 通知块指向 IPA 3 段 | 2026-09-02 16:09 JST Ulysses 発令「要符合日本IPA标准的需求、基本设计、详细设计」;per 守门 #1 禁回溯叙事, 保留 v0.1 commit 链 + 加 supersede 标记(不删 v0.1) |
 
 ---
 
