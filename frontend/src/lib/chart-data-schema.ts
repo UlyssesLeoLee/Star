@@ -10,6 +10,13 @@ export type ChartData =
   | ControlChartData
   | CycleTimeData
   | CvrData
+  | ThroughputData
+  | ForecastData
+  | TimeTrackingData
+  | ResolutionTimeData
+  | SlaData
+  | IssueTypeDistData
+  | PriorityDistData
   | { stub: true; chart_id: string };
 
 /** C01 Burndown 完整 schema (与 crates/domain-report/src/domain/c01_burndown.rs::BurndownData 同构) */
@@ -130,6 +137,70 @@ export interface CvrData {
     backlog_trend: 'growing' | 'shrinking' | 'stable';
   };
   time_granularity: 'day' | 'week' | 'month';
+}
+
+/** C08 Throughput */
+export interface ThroughputData {
+  granularity: 'day' | 'week' | 'month';
+  series: Array<{ bucket: string; count: number }>;
+  moving_avg: Array<{ bucket: string; avg: number }>;
+  stats: { total: number; avg: number; std_dev: number };
+}
+
+/** C09 Forecast */
+export interface ForecastData {
+  historical: {
+    sprints: Array<{ name: string; completed_sp: number }>;
+    avg_velocity: number;
+  };
+  forecast: {
+    method: 'simple_avg' | 'rolling_avg' | 'linear_regression';
+    predicted_velocity: number;
+    confidence_80: [number, number];
+    confidence_95: [number, number];
+    predicted_completion_date: string;
+  };
+}
+
+/** C10 Time Tracking */
+export interface TimeTrackingData {
+  granularity: 'user' | 'project' | 'issue';
+  rows: Array<{
+    id: string;
+    name: string;
+    original_seconds: number;
+    spent_seconds: number;
+    remaining_seconds: number;
+    progress: number;
+  }>;
+  summary: { total_original: number; total_spent: number; total_remaining: number };
+}
+
+/** C11 Resolution Time */
+export interface ResolutionTimeData {
+  group_by: 'priority' | 'type' | 'assignee';
+  rows: Array<{ group: string; avg_days: number; median_days: number; count: number }>;
+}
+
+/** C12 SLA Compliance */
+export interface SlaData {
+  series: Array<{ day: string; priorities: Record<string, { met: number; total: number; compliance: number }> }>;
+  summary: { overall_compliance: number; by_priority: Record<string, number>; breaches: number };
+  target_line: number;
+}
+
+/** C14 Issue Type Distribution */
+export interface IssueTypeDistData {
+  slices: Array<{ key: string; count: number; percentage: number }>;
+  total: number;
+  status_filter: 'all' | 'open' | 'closed';
+}
+
+/** C15 Priority Distribution */
+export interface PriorityDistData {
+  slices: Array<{ key: string; count: number; percentage: number }>;
+  total: number;
+  status_filter: 'all' | 'open' | 'closed';
 }
 
 export interface TimeSeriesPoint {

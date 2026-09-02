@@ -383,7 +383,56 @@ impl ReportService {
                     report_id,
                 ).await
             }
-            // P1/P2 + 暂未实装的 P0 子图走 stub
+            ReportType::Throughput => {
+                domain::c08_throughput::generate(
+                    &*self.work_item_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            ReportType::Forecast => {
+                domain::c09_forecast::generate(
+                    &*self.work_item_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            ReportType::TimeTracking => {
+                domain::c10_time_tracking::generate(
+                    &*self.work_item_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            ReportType::ResolutionTime => {
+                domain::c11_resolution_time::generate(
+                    &*self.work_item_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            ReportType::Sla => {
+                domain::c12_sla_compliance::generate(
+                    &*self.work_item_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            ReportType::IssueTypeDist => {
+                domain::c14_issue_type_dist::generate(
+                    &*self.work_item_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            ReportType::PriorityDist => {
+                domain::c15_priority_dist::generate(
+                    &*self.work_item_port,
+                    filter,
+                    report_id,
+                ).await
+            }
+            // P2 + 暂未实装的子图走 stub
             _ => self.generate_stub(report_type, filter, report_id, cache_key).await,
         }
     }
