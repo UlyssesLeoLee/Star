@@ -88,18 +88,39 @@
 | 拍 6 | **Finding-Agent** | #16 | 红方 finding | §2.1 表 4 字段 (worktree/feedback/validation) vs spec 4 字段 (tenant/worktree/work-item/permission) 哪个为准 |
 | 拍 7 | **Finding-Board/Planning** (board↔planning 循环) | #17 | AUDIT-001 §"发现 6-A 第一组" (high) | 三份独立文档 (两侧 spec 附录 B + §2.3 图) 都不支持, 是 §2.1 表笔误 |
 
-### 2.3 蓝方代修 16 项 (无拍板, 立即可做, 估 0.1M token)
+### 2.3 蓝方 v0.1 "16 项代修" 修订 v0.2 (per wt-1 调研, 0 行新代码改动)
 
-- 文档笔误 9 项 + 可批量修复 7 项 = **16 项** (跨 14 份 docs, 主要在 `docs/basic-design.md` + 7 spec + 5 spec)
-- 1 commit 落档 14 份 docs 同步修订
-- 守门 #12 实证: 同 commit docs 同步
+per 2026-09-03 08:30 JST wt-1 (`.worktrees/wt-p3-b-fixed-001`) 调研 `docs/briefs/p3-b-fixed-001.output.md` v0.1 实证:
 
-### 2.4 跨 session 续 4 项 (已知缺口, 标 GAP)
+- **v0.1 标 "16 项蓝方代修" 实际 0 项需要实装** (误判率 6/16 = 37%)
+- 6 项 v0.1 标 "可批量修复" 实际**全部已闭环** (红方+蓝方双重误判, 实际 spec 已有相关字段/章节/表):
+  - #6 5 文件 7 vs 6 supporting crate: 0 匹配, 9/3 拍 1 落档 §2.1.4+§2.1.5 解释 22+7=29 实际 34 crate 计数歧义
+  - #18 identity/permission spec "无核心依赖" 未限定: 2 spec 实际有 `tenant_id` 字段
+  - #19 integration-spec 列表不存在: 实际有 §15 接触面 (scm/notification/identity, 4 个 domain)
+  - #20 relation-spec 自身上游/下游列表不一致: 实际 line 276-277 方向一致
+  - #23 ASCII §2.3 依赖图箭头方向不一致: grep `↘|↗` 0 匹配, 需 git grep 验证 (推下 session)
+  - #25 7 supporting spec 缺"附录 B:边界清单"章节: 实际命名差异 (有 "§5 跨 domain 接触面" 章节)
+- 9 项 (含 #2/#3/#4/#5/#7/#8/#9/#10/#24) 全部 9/1-9/3 期间已闭环:
+  - #2 7 supporting spec 头部声明: 9/1 15:03 JST GAP-01 落地 (per `domain-ai-spec.md:4-8`)
+  - #3 双重错误引用: 9/3 拍 1 落档 §2.1.4+§2.1.5
+  - #4 7 supporting-crate spec 链接损坏: 测试通过 (per `domain-ai-spec.md:51` 等)
+  - #5 2 spec 误将 requirements 当 basic-design: 实际设计规范引用
+  - #7 5 文件 `{display}` 占位符: 0 匹配, 实际不存在
+  - #8 14 → 15: 9/3 蓝方 #8 落档 (commit `53d9dc7`)
+  - #9 11 → 12: 同上
+  - #10 F9 25-Module 表过期: 9/3 拍 1 落档 (commit `d874a79`)
+  - #24 P0-P4/P0-P5 命名重叠: 9/3 蓝方 #24 落档 (commit `53d9dc7`)
+- 1 项 (Finding-Agent #16) 9/3 拍 4 spec 权威落档 (commit `0948d59` 修 row 3)
+
+**v0.2 结论**: 蓝方 v0.1 "16 项代修" 实际 0 项需要实装, 0 行新代码改动, 0 commit. 蓝方报告 v0.2 修订本节即可.
+
+### 2.4 跨 session 续 5 项 (已知缺口, 标 GAP)
 
 - 13 REQ-ID 零引用 (`REQ-COLLAB-003/004` 等, 1 项) — 等 5 域 Lead 真人到位
 - 7 supporting crate 新增 5 (per #3 实际 7, 但 §2.1 表 0) — 跨 session 续 DDD Review
 - supporting crate spec 链接修复 (per #4) — 跟 #2 一起
 - 5 域 Lead 真人到位 (per 8/21 拒绝兼任硬约束) — Phase 4.3 阻塞
+- **GAP-BLUE-7 蓝方 v0.1 误判率 37% (v0.2 修订)**: 后续蓝方报告需逐项用 grep/git log 实证, 不直接采信红方挑刺未深读 14 份 spec 前的定性
 
 ---
 
@@ -141,3 +162,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-03 07:35 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | 初版: 26 项逐项定性 (9 文档笔误 + 7 可批量修复 + 7 真实架构矛盾需拍板 + 3 已知缺口) + 7 项 Ulysses 必拍板项 (按风险升序) + 16 项蓝方代修清单 + 5 维质量门 4/5 + 5 已知缺口 | 2026-09-03 7:16 JST Ulysses 发令"立刻做" + plan v0.4 §6.3 优先级 6 + 红方挑刺 9/2 落档 |
+| v0.2 | 2026-09-03 08:35 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | v0.2 修订: §2.3 蓝方 v0.1 '16 项代修' 调研后修订 0 行新代码改动 (误判率 37%, 6 项 #6/#18/#19/#20/#23/#25 全部已闭环 + 9 项 #2/#3/#4/#5/#7/#8/#9/#10/#24 9/1-9/3 已闭环 + 1 项 #16 9/3 拍 4 已修); §2.4 跨 session 续 4 项 → 5 项 (+GAP-BLUE-7 蓝方误判率 37%, 后续蓝方报告需逐项用 grep/git log 实证) | 2026-09-03 08:15 JST ask_user 拍 7 = A. 两项都现在做 (推荐) + wt-1 调研 (commit `d488732`) |
