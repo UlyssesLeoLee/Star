@@ -116,30 +116,6 @@ async function shoot(page, name, theme) {
       await headerInbox.screenshot({ path: join(OUT_DIR, `${theme}-header-inbox.png`) });
       console.log(`  ✓ ${theme}-header-inbox.png (cyan core active)`);
     }
-
-    // issues active (blue work)
-    await page.goto(`${BASE}/issues?t=${Date.now()}`, { waitUntil: "networkidle" });
-    const headerIssues = await page.$('[data-testid="app-header"]');
-    if (headerIssues) {
-      await headerIssues.screenshot({ path: join(OUT_DIR, `${theme}-header-issues.png`) });
-      console.log(`  ✓ ${theme}-header-issues.png (blue work active)`);
-    }
-
-    // agents active (emerald agent)
-    await page.goto(`${BASE}/agents?t=${Date.now()}`, { waitUntil: "networkidle" });
-    const headerAgents = await page.$('[data-testid="app-header"]');
-    if (headerAgents) {
-      await headerAgents.screenshot({ path: join(OUT_DIR, `${theme}-header-agents.png`) });
-      console.log(`  ✓ ${theme}-header-agents.png (emerald agent active)`);
-    }
-
-    // settings active (amber system)
-    await page.goto(`${BASE}/settings?t=${Date.now()}`, { waitUntil: "networkidle" });
-    const headerSettings = await page.$('[data-testid="app-header"]');
-    if (headerSettings) {
-      await headerSettings.screenshot({ path: join(OUT_DIR, `${theme}-header-settings.png`) });
-      console.log(`  ✓ ${theme}-header-settings.png (amber system active)`);
-    }
   }
 
   await browser.close();

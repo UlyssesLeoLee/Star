@@ -85,6 +85,21 @@ describe("AppHeader", () => {
     expect(screen.getByTestId("tab-issues").className).toMatch(/text-ink-dim/);
   });
 
+  it("renders 5 tab icon tiles with category color when active (per 2026-09-02 18:23 JST 推 Jira 风格 icon)", () => {
+    mockUsePathname.mockReturnValue("/agents");
+    renderWithI18n(<AppHeader />);
+    // agents 是 agent 域, active icon tile 用 emerald-500/20 + border-emerald-500/50
+    const agentsIcon = screen.getByTestId("tab-icon-tile-agents");
+    expect(agentsIcon.className).toMatch(/bg-emerald-500\/20/);
+    expect(agentsIcon.className).toMatch(/border-emerald-500\/50/);
+    expect(agentsIcon.className).toMatch(/text-emerald-900/);
+
+    // inactive tab icon tile 应该 transparent (不染域色)
+    const inboxIcon = screen.getByTestId("tab-icon-tile-inbox");
+    expect(inboxIcon.className).not.toMatch(/bg-cyan-500/);
+    expect(inboxIcon.className).toMatch(/border-transparent/);
+  });
+
   it("clicking ⌘K trigger calls commandBarStore.open() (per §6 + §3 右栏搜索)", () => {
     renderWithI18n(<AppHeader />);
     const trigger = screen.getByTestId("command-bar-trigger");

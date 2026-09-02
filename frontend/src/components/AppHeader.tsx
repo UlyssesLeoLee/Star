@@ -181,10 +181,12 @@ interface HeaderTabProps {
 function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
   const mod = useModuleTranslation(tab);
   const { t, tx } = useTranslation();
-  // Jira 风格: 顶栏 active 用域色 (per 2026-09-02 18:16 JST 推)
-  // 之前 active 全用 accent 青色, 跟 module 业务域脱钩
+  // Jira 风格: 顶栏 active 用域色 + icon tile (per 2026-09-02 18:16 + 18:23 JST 推)
+  // 之前 active 全用 accent 青色, 跟 module 业务域脱钩, 且只用 01/02 短码
   // 现在: Inbox=cyan, Issues/Projects/Analytics=blue, Agents=emerald, Settings=amber
+  //      配 lucide icon (来自 ModuleDefinition.icon), 跟 Sidebar icon tile 风格统一
   const cs = getCategoryStyles(tab.category);
+  const Icon = tab.icon;
   // 用 registry 静态 label 生成 testid, 避免翻译切换导致 testid 漂移
   const testIdSlug = tab.label.toLowerCase().replace(/\s+/g, "-");
   return (
@@ -195,19 +197,28 @@ function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
         data-active={active ? "true" : "false"}
         aria-current={active ? "page" : undefined}
         className={clsx(
-          "relative px-3.5 h-16 inline-flex items-center gap-1.5 text-xs font-medium border-b-2 transition-all duration-200",
+          "relative px-3.5 h-16 inline-flex items-center gap-2 text-xs font-medium border-b-2 transition-all duration-200",
           active
             ? // 域色 active: text 域色 + border 域色 + glow
               clsx(cs.text, cs.borderActive, "font-semibold", cs.glow)
             : "text-ink-dim border-transparent hover:text-ink hover:border-line/60"
         )}
       >
-        <span className={clsx(
-          "text-[9px] font-mono transition-colors",
-          active ? clsx(cs.text, "font-bold") : "text-ink-mute group-hover:text-ink-dim"
-        )}>
-          {tab.code}
-        </span>
+        {/* Jira 风格 icon tile — 7x7 圆角色块 + 域分色 + line icon (per 18:23 JST 推) */}
+        <div
+          data-testid={`tab-icon-tile-${tab.id}`}
+          aria-hidden="true"
+          className={clsx(
+            "size-7 rounded-lg grid place-items-center shrink-0 border transition-all duration-200",
+            active
+              ? // active: 域色 bg + 域色 border + 域色 text + glow
+                clsx(cs.bg, cs.border, cs.text, cs.glow)
+              : // inactive: 透明 + 灰 text, hover 域色微染
+                "border-transparent text-ink-mute group-hover:text-ink-dim"
+          )}
+        >
+          <Icon size={14} strokeWidth={2.25} />
+        </div>
         <span>{mod.label}</span>
       </Link>
 
