@@ -6,7 +6,7 @@
 > **签批**：🟢 Mavis 接手代签 (per 8/27 19:39/21:59 JST 三次强化 + 12-domain-lead-roster §5)（per §7 签字栏；Mavis 接手可代签 per ADR-0033 §2.1）
 > **父文档**：[STAR × GitGit AI/IDE 零厂商适配架构升级 Plan](../../../plan/2026-08-26-upgrade-plan.md)（待归档）
 > **依赖**：[ADR-0021 Zero Vendor Cooperation](0021-zero-vendor-cooperation.md) · [ADR-0026 STAR AI Compat](0026-star-ai-compat.md) · [ADR-0027 STAR IDE Gateway](0027-star-ide-gateway.md) · [ADR-0032 MCP Transport stdio](0032-mcp-transport-stdio.md) · [ADR-0033 Agent Co-Signing Policy](0033-agent-co-signing-policy.md) · [AGENTS.md §0 一句话硬约束](../../../../AGENTS.md)
-> **关联**：[arch/03 STAR AI Compat Arch](../arch/03-star-ai-compat-arch.md) · [arch/05 GitGit Compat Arch](../arch/05-gitgit-compat-arch.md) · [arch/06 Threat Model + NFR](../arch/06-threat-model-nfr.md) · [spec/mcp/01-mcp-spec.md](../spec/mcp/01-mcp-spec.md) · [PHASE-D2-CLI-IMPL-REPORT.md](../../../../PHASE-D2-CLI-IMPL-REPORT.md) · [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../../PHASE-D3-MCP-TRANSPORT-REPORT.md) · [PHASE-D4-P1-FIX-REPORT.md](../../../../PHASE-D4-P1-FIX-REPORT.md) · [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md)
+> **关联**：[arch/03 STAR AI Compat Arch](../arch/03-star-ai-compat-arch.md) · [arch/05 GitGit Compat Arch](../arch/05-gitgit-compat-arch.md) · [arch/06 Threat Model + NFR](../arch/06-threat-model-nfr.md) · [spec/mcp/01-mcp-spec.md](../spec/mcp/01-mcp-spec.md) · [PHASE-D2-CLI-IMPL-REPORT.md](../../../../reports/PHASE-D2-CLI-IMPL-REPORT.md') · [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../../reports/PHASE-D3-MCP-TRANSPORT-REPORT.md') · [PHASE-D4-P1-FIX-REPORT.md](../../../../reports/PHASE-D4-P1-FIX-REPORT.md') · [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md')
 
 ---
 
@@ -23,10 +23,10 @@
 
 | 阶段 | 交付 | 报告 | 关键 commit |
 |---|---|---|---|
-| Phase D.2 | `star-cli` 从 stub 升级到实装（worktree / mr / submit / lease / heartbeat） | [PHASE-D2-CLI-IMPL-REPORT.md](../../../../PHASE-D2-CLI-IMPL-REPORT.md) | `8a7427d` (merge 1274725) |
-| Phase D.3 | `star-mcp` Transport stdio（16 tools + 6 字段错误模型） | [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../../PHASE-D3-MCP-TRANSPORT-REPORT.md) | `0a148b8` (merge) |
-| Phase D.4 | 18 Blocker 修复（P1-1 `--json` global / P1-2 mr named args / F-08 F-14 命名约定 / 等等 12 文件） | [PHASE-D4-P1-FIX-REPORT.md](../../../../PHASE-D4-P1-FIX-REPORT.md) | `2a0a68c` |
-| Phase D.5+ | `star-mcp` Transport Streamable HTTP + Resources/Prompts **占位** + 5 通道 Fallback Ladder | [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) | `2857e6b` (merge d0ed6d8 → 6624417) |
+| Phase D.2 | `star-cli` 从 stub 升级到实装（worktree / mr / submit / lease / heartbeat） | [PHASE-D2-CLI-IMPL-REPORT.md](../../../../reports/PHASE-D2-CLI-IMPL-REPORT.md') | `8a7427d` (merge 1274725) |
+| Phase D.3 | `star-mcp` Transport stdio（16 tools + 6 字段错误模型） | [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../../reports/PHASE-D3-MCP-TRANSPORT-REPORT.md') | `0a148b8` (merge) |
+| Phase D.4 | 18 Blocker 修复（P1-1 `--json` global / P1-2 mr named args / F-08 F-14 命名约定 / 等等 12 文件） | [PHASE-D4-P1-FIX-REPORT.md](../../../../reports/PHASE-D4-P1-FIX-REPORT.md') | `2a0a68c` |
+| Phase D.5+ | `star-mcp` Transport Streamable HTTP + Resources/Prompts **占位** + 5 通道 Fallback Ladder | [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md') | `2857e6b` (merge d0ed6d8 → 6624417) |
 | 治理 | `AGENTS.md`（188 行） + ADR-0033 代签反转（194 行） | (ADR 0033 §3.1) | `901033a` |
 
 **5 通道 + Fallback Ladder 4 级**（per [arch/03 STAR AI Compat Arch](../arch/03-star-ai-compat-arch.md) + [ADR-0026 STAR AI Compat](0026-star-ai-compat.md)）：
@@ -68,8 +68,8 @@
 ### D2. 新增 `spec/mcp/02-resources-prompts-spec.md` + `03-error-model-spec.md`（MVP 必实现）
 
 **理由**：
-- `02-resources-prompts-spec.md`：Phase D.5+ 仅在 [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) 写了 Resources/Prompts **占位骨架**（无实际 URI Template / Prompt Template），需要 1 份正式 spec 落地
-- `03-error-model-spec.md`：Phase D.3 仅 6 字段错误模型（per [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../../PHASE-D3-MCP-TRANSPORT-REPORT.md) §2 错误模型），30 标准错误码（含 6 字段 × 5 严重度 × 4 类 = 30 矩阵）需要正式 spec
+- `02-resources-prompts-spec.md`：Phase D.5+ 仅在 [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md') 写了 Resources/Prompts **占位骨架**（无实际 URI Template / Prompt Template），需要 1 份正式 spec 落地
+- `03-error-model-spec.md`：Phase D.3 仅 6 字段错误模型（per [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../../reports/PHASE-D3-MCP-TRANSPORT-REPORT.md') §2 错误模型），30 标准错误码（含 6 字段 × 5 严重度 × 4 类 = 30 矩阵）需要正式 spec
 - 两者都是 **MVP 必实现**（不进 MVP 退出条件）
 
 **形式**：
@@ -89,7 +89,7 @@
 
 **理由**：
 - `01-service-adapter-spec.md`：star-mcp 16 tools 当前直接调 VCS Core（GitGit REST + git CLI），缺乏**服务适配器抽象层**（per [arch/05 §2 GitGit Compat Arch](../arch/05-gitgit-compat-arch.md) 仅定义了 VCS 边界，未定义 service-adapter 抽象）
-- `02-sse-streaming-spec.md`：Phase D.5+ Streamable HTTP 实现了**入站** HTTP 请求，但 **SSE 流式响应**（server-push）未实现（per [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) §5 待办 #2）
+- `02-sse-streaming-spec.md`：Phase D.5+ Streamable HTTP 实现了**入站** HTTP 请求，但 **SSE 流式响应**（server-push）未实现（per [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md') §5 待办 #2）
 - `03-webhook-adapter-spec.md`：出站 Webhook（MR 创建 / Lease 过期 / 冲突检测）**未实现**（per AGENTS.md §7 待办 #4 16 tool 真实数据源接入 的派生需求）
 - 三者**不进 MVP 退出条件**（per §3 D3 行），仅做 spec + 骨架，**实装推到 Phase F**
 
@@ -153,10 +153,10 @@
 | 新 spec | 上游契约 | 下游实现 | cross-ref |
 |---|---|---|---|
 | `spec/agents/01-agent-runtime-spec.md`（D1） | ADR-0030 + ADR-0031 + arch/06 §3 NFR | `crates/star-mcp/src/agent_runtime.rs`（Phase E 新增） + `crates/star-cli/src/agent/` | spec/flows/01+02+03 实现参考（不是契约源） |
-| `spec/mcp/02-resources-prompts-spec.md`（D2） | spec/mcp/01 §1.1 ④（缓存）+ MCP 2026-07-28 §Resources/Prompts | `crates/star-mcp/src/resources.rs` + `prompts.rs`（D4） | [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) §占位骨架 |
-| `spec/mcp/03-error-model-spec.md`（D2） | spec/mcp/01 §错误模型 + spec/agent-api/01-schema.md §3.15 | `crates/star-mcp/src/error.rs`（扩展）+ `error_codes.rs`（D4） | [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../../PHASE-D3-MCP-TRANSPORT-REPORT.md) §2 6 字段错误模型 |
+| `spec/mcp/02-resources-prompts-spec.md`（D2） | spec/mcp/01 §1.1 ④（缓存）+ MCP 2026-07-28 §Resources/Prompts | `crates/star-mcp/src/resources.rs` + `prompts.rs`（D4） | [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md') §占位骨架 |
+| `spec/mcp/03-error-model-spec.md`（D2） | spec/mcp/01 §错误模型 + spec/agent-api/01-schema.md §3.15 | `crates/star-mcp/src/error.rs`（扩展）+ `error_codes.rs`（D4） | [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../../reports/PHASE-D3-MCP-TRANSPORT-REPORT.md') §2 6 字段错误模型 |
 | `spec/services/01-service-adapter-spec.md`（D3） | arch/05 §2 GitGit Compat Arch + ADR-0023 VCS Core | Phase F 接入（不进 MVP 退出条件） | arch/05 §2（已有 VCS 边界定义） |
-| `spec/services/02-sse-streaming-spec.md`（D3） | spec/mcp/01 §1.1 + MCP 2026-07-28 §Streamable HTTP §SSE | Phase F 接入（不进 MVP 退出条件） | [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) §5 待办 #2 |
+| `spec/services/02-sse-streaming-spec.md`（D3） | spec/mcp/01 §1.1 + MCP 2026-07-28 §Streamable HTTP §SSE | Phase F 接入（不进 MVP 退出条件） | [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md') §5 待办 #2 |
 | `spec/services/03-webhook-adapter-spec.md`（D3） | arch/05 §4 GitGit Webhook + ADR-0028 GitGit Compat | Phase F 接入（不进 MVP 退出条件） | AGENTS.md §7 待办 #4 派生需求 |
 | `crates/star-mcp/src/agent_runtime.rs`（D1 + D4 整合） | spec/agents/01 + spec/mcp/02 + 03 | IDE / CLI / MCP 入口 | arch/03 §3 5 通道 + ADR-0026 STAR AI Compat |
 | `agent-api/v1`（Phase D 已存在） | spec/agent-api/01-schema.md | star-mcp + star-cli + star-ide 客户端 | spec/mcp/01 §2 16 tools |
@@ -231,7 +231,7 @@ per AGENTS.md §4 #4 守门（AI 协作 token-OLU 而非人天）+ [RGS-TS-001](
 | Phase E star-mcp 实装 | 4.0-6.9M | 0.5-0.8 |
 | **总计** | **7.0-11.6M ≈ 8-13M** | **0.9-1.4 ≈ 1-2 人·周** |
 
-**对比 Phase D**（per [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) §守门）：
+**对比 Phase D**（per [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md') §守门）：
 - Phase D.5+ ≈ 1 人·周 ≈ 1M tokens（含 Streamable HTTP + Resources/Prompts 占位）
 - Phase E ≈ 1-2 人·周 ≈ 8-13M tokens（**8-13 倍 Phase D.5+**，因为加了 6 spec + 完整 Resources/Prompts + 30 错误码 + mock 6 文件 + 12 测试）
 
@@ -351,7 +351,7 @@ per [arch/05 §2 GitGit Compat Arch](../arch/05-gitgit-compat-arch.md) + AGENTS.
 - [arch/05 GitGit Compat Arch](../arch/05-gitgit-compat-arch.md) — VCS 边界
 - [arch/06 Threat Model + NFR](../arch/06-threat-model-nfr.md) — §3 NFR
 - [spec/mcp/01-mcp-spec.md](../spec/mcp/01-mcp-spec.md) — MCP MVP 规范
-- [PHASE-D2-CLI-IMPL-REPORT.md](../../../../PHASE-D2-CLI-IMPL-REPORT.md) — Phase D.2 CLI
-- [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../../PHASE-D3-MCP-TRANSPORT-REPORT.md) — Phase D.3 MCP stdio
-- [PHASE-D4-P1-FIX-REPORT.md](../../../../PHASE-D4-P1-FIX-REPORT.md) — Phase D.4 18 Blocker 修复
-- [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) — Phase D.5+ Streamable HTTP + Resources/Prompts 占位
+- [PHASE-D2-CLI-IMPL-REPORT.md](../../../../reports/PHASE-D2-CLI-IMPL-REPORT.md') — Phase D.2 CLI
+- [PHASE-D3-MCP-TRANSPORT-REPORT.md](../../../../reports/PHASE-D3-MCP-TRANSPORT-REPORT.md') — Phase D.3 MCP stdio
+- [PHASE-D4-P1-FIX-REPORT.md](../../../../reports/PHASE-D4-P1-FIX-REPORT.md') — Phase D.4 18 Blocker 修复
+- [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md') — Phase D.5+ Streamable HTTP + Resources/Prompts 占位

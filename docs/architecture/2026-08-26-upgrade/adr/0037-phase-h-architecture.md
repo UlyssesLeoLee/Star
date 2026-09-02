@@ -352,4 +352,4 @@ per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不
 - [spec/flows/06-error-recovery.md](../spec/flows/06-error-recovery.md) — 错误恢复（§3 错误码一致 → D17 property-based test 终止条件）
 - [arch/06-threat-model-nfr.md](../arch/06-threat-model-nfr.md) — 威胁模型 + NFR（§3 NFR 是 5 域 SRE Lead + Performance Lead 性能预算来源）
 - [AGENTS.md §0 一句话硬约束 + §1 代签规则 + §4 守门硬约束 + §7 待办清单](../../../../AGENTS.md)
-- [PHASE-D3-MCP-TRANSPORT-REPORT.md §2 6 字段错误模型](../../../../PHASE-D3-MCP-TRANSPORT-REPORT.md) — 错误模型基础（D18 22 handler 错误码升级到 30 错误码）
+- [PHASE-D3-MCP-TRANSPORT-REPORT.md §2 6 字段错误模型](../../../../reports/PHASE-D3-MCP-TRANSPORT-REPORT.md') — 错误模型基础（D18 22 handler 错误码升级到 30 错误码）

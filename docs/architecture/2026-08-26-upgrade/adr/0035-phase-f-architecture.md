@@ -6,7 +6,7 @@
 > **签批**：架构师（Mavis 接手 agent per DEC-008）— Mavis 接手代签（per §9 签字栏）
 > **父文档**：[STAR × GitGit AI/IDE 零厂商适配架构升级 Plan](../../../plan/2026-08-26-upgrade-plan.md)
 > **依赖**：[ADR-0033 Agent Co-Signing Policy](0033-agent-co-signing-policy.md) · [ADR-0034 Phase E Architecture](0034-phase-e-architecture.md) · [AGENTS.md §0 一句话硬约束](../../../../AGENTS.md)
-> **关联**：[spec/services/01-service-adapter-spec.md §1-§3](../spec/services/01-service-adapter-spec.md) · [spec/services/02-sse-streaming-spec.md §3](../spec/services/02-sse-streaming-spec.md) · [spec/services/03-webhook-adapter-spec.md §2-§5](../spec/services/03-webhook-adapter-spec.md) · [spec/agents/01-agent-runtime-spec.md §2 Lease 协议](../spec/agents/01-agent-runtime-spec.md) · [arch/05 §2 GitGit Compat Arch](../arch/05-gitgit-compat-arch.md) · [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md §5 待办 #2](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) · [PHASE-D3-MCP-TRANSPORT-REPORT.md §2 6 字段错误模型](../../../../PHASE-D3-MCP-TRANSPORT-REPORT.md)
+> **关联**：[spec/services/01-service-adapter-spec.md §1-§3](../spec/services/01-service-adapter-spec.md) · [spec/services/02-sse-streaming-spec.md §3](../spec/services/02-sse-streaming-spec.md) · [spec/services/03-webhook-adapter-spec.md §2-§5](../spec/services/03-webhook-adapter-spec.md) · [spec/agents/01-agent-runtime-spec.md §2 Lease 协议](../spec/agents/01-agent-runtime-spec.md) · [arch/05 §2 GitGit Compat Arch](../arch/05-gitgit-compat-arch.md) · [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md §5 待办 #2](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md') · [PHASE-D3-MCP-TRANSPORT-REPORT.md §2 6 字段错误模型](../../../../reports/PHASE-D3-MCP-TRANSPORT-REPORT.md')
 
 ---
 
@@ -108,7 +108,7 @@ Phase F 在 Phase E 基础上接 **4 Git Provider + 22 核心 domain crate + SSE
 - `spec/services/02-sse-streaming-spec.md §3 与 MCP Streamable HTTP 边界`（L89-108）未实装
 - `spec/services/02 §2 连接管理`（L45-88）定义事件类型 `progress` / `log` / `result` / `error` / `heartbeat`
 - heartbeat 30s（per `spec/services/02 §2.2 L55` "WHATWG HTML Living Standard SSE spec, proxy 默认 60s idle timeout 取 2x 倒数"）
-- 取代 [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md §5 待办 #2](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) "SSE 流式响应（server-push）未实现"
+- 取代 [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md §5 待办 #2](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md') "SSE 流式响应（server-push）未实现"
 
 **形式**：
 - 路径：`crates/star-sse/`
@@ -154,7 +154,7 @@ Phase F 在 Phase E 基础上接 **4 Git Provider + 22 核心 domain crate + SSE
 | `spec/vcs/05`（D6）↔ `spec/services/01 §1-§3` | spec/services/01 §1 SA 接口（L17-75）+ §2 协议转换（L76-101）+ §3 配置 schema（L103-142） | `crates/star-sa`（D8）4 provider 实现 | spec/services/01 §6 G-01/G-03/G-04 已知缺口（L190-193） |
 | `spec/agents/02`（D7）↔ `spec/agents/01 §2 Lease 协议` | spec/agents/01 §2 Lease 协议 L104-141（30s heartbeat / 300s TTL） | `crates/star-mcp/src/agent_runtime.rs` cache invalidate hook | spec/agents/01 §6 已知缺口 L216-228 |
 | `crates/star-sa`（D8）↔ `spec/services/01-03` | spec/services/01 全 7 节 + spec/services/03 §2 签名验证 L77-80 | 4 provider 实现 + 8 测试 | spec/services/01 §6 已知缺口 L186-196 |
-| `crates/star-sse`（D9）↔ `spec/services/02 §3` | spec/services/02 §3 与 MCP Streamable HTTP 边界 L89-108 | SSE endpoint + heartbeat 30s + 6+3 测试 | [PHASE-D5 §5 待办 #2](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) |
+| `crates/star-sse`（D9）↔ `spec/services/02 §3` | spec/services/02 §3 与 MCP Streamable HTTP 边界 L89-108 | SSE endpoint + heartbeat 30s + 6+3 测试 | [PHASE-D5 §5 待办 #2](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md') |
 | `crates/star-webhook`（D10）↔ `spec/services/03 §2-§5` | spec/services/03 §2 L65-107 + §3 L108-138 + §4 L139-164 + §5 L165-198 | HMAC + 幂等 + 路由 + 重试 + 死信 + 13 测试 | spec/services/03 §6 G-01/G-02/G-03/G-08 已知缺口 L200-211 |
 | 25 domain crate ↔ `spec/agents/02 §1` | spec/agents/02 §1 22 核心 + 3 非核心列表（D7） | `crates/star-mcp/src/agent_runtime.rs` + `crates/star-sa` 适配 | [AGENTS.md §7 #7](../../../../AGENTS.md) "25 domain-* crate 真实数据接入" |
 
@@ -304,5 +304,5 @@ per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不
 - [spec/services/03-webhook-adapter-spec.md](../spec/services/03-webhook-adapter-spec.md) — Webhook 适配（§2 HMAC + §3 幂等 + §4 路由 + §5 死信 + §6 G-02 Bitbucket 迁移）
 - [spec/agents/01-agent-runtime-spec.md](../spec/agents/01-agent-runtime-spec.md) — Agent 运行时（§2 Lease 协议 30s heartbeat / 300s TTL）
 - [AGENTS.md §0 一句话硬约束 + §4 守门硬约束 + §7 待办清单](../../../../AGENTS.md)
-- [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md §5 待办 #2](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) — SSE 未实装（star-sse 取代）
-- [PHASE-D3-MCP-TRANSPORT-REPORT.md §2 6 字段错误模型](../../../../PHASE-D3-MCP-TRANSPORT-REPORT.md) — 错误模型基础（star-sa error_mapping 升级到 30 错误码）
+- [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md §5 待办 #2](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md') — SSE 未实装（star-sse 取代）
+- [PHASE-D3-MCP-TRANSPORT-REPORT.md §2 6 字段错误模型](../../../../reports/PHASE-D3-MCP-TRANSPORT-REPORT.md') — 错误模型基础（star-sa error_mapping 升级到 30 错误码）

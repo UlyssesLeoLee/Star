@@ -7,7 +7,7 @@
 > **触发**：per ADR-0035 §8.2 Phase G 方向（缓存层 + 跨域 Saga + 性能预算收敛）/ 2026-08-27 21:59 JST 用户授权第三次强化
 > **父文档**：[STAR × GitGit AI/IDE 零厂商适配架构升级 Plan](../../../plan/2026-08-26-upgrade-plan.md)
 > **依赖**：[ADR-0033 Agent Co-Signing Policy](0033-agent-co-signing-policy.md) · [ADR-0035 Phase F Architecture](0035-phase-f-architecture.md) · [AGENTS.md §0 一句话硬约束](../../../../AGENTS.md)
-> **关联**：[spec/agents/02-data-sources-spec.md §6 #6 离线缓存策略](../spec/agents/02-data-sources-spec.md) · [spec/services/02-sse-streaming-spec.md §4 Last-Event-ID 草案](../spec/services/02-sse-streaming-spec.md) · [spec/flows/08-event-model.md §3 event 持久化](../spec/flows/08-event-model.md) · [spec/flows/07-audit-model.md §4 跨域事务](../spec/flows/07-audit-model.md) · [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md §5 待办 #3 Prompts 实际模板](../../../../PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md)
+> **关联**：[spec/agents/02-data-sources-spec.md §6 #6 离线缓存策略](../spec/agents/02-data-sources-spec.md) · [spec/services/02-sse-streaming-spec.md §4 Last-Event-ID 草案](../spec/services/02-sse-streaming-spec.md) · [spec/flows/08-event-model.md §3 event 持久化](../spec/flows/08-event-model.md) · [spec/flows/07-audit-model.md §4 跨域事务](../spec/flows/07-audit-model.md) · [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md §5 待办 #3 Prompts 实际模板](../../../../reports/PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md')
 
 ---
 
@@ -347,4 +347,4 @@ per 8/26 04:30 "缺标比错标安全" + 8/27 21:59 JST Mavis 接手代签（不
 - [spec/flows/08-event-model.md](../spec/flows/08-event-model.md) — Event 模型（§3 event 持久化）
 - [arch/06-threat-model-nfr.md](../arch/06-threat-model-nfr.md) — 威胁模型 + NFR（§3 NFR 是 5 域 SRE Lead 性能预算来源）
 - [AGENTS.md §0 一句话硬约束 + §1 代签规则 + §4 守门硬约束 + §7 待办清单](../../../../AGENTS.md)
-- [PHASE-D3-MCP-TRANSPORT-REPORT.md §2 6 字段错误模型](../../../../PHASE-D3-MCP-TRANSPORT-REPORT.md) — 错误模型基础（star-cache + star-saga 错误码升级到 30 错误码）
+- [PHASE-D3-MCP-TRANSPORT-REPORT.md §2 6 字段错误模型](../../../../reports/PHASE-D3-MCP-TRANSPORT-REPORT.md') — 错误模型基础（star-cache + star-saga 错误码升级到 30 错误码）
