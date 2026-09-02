@@ -1,8 +1,0 @@
-feat(domain-automation): v0.2 single-file rewrite (9/9 tests)
-
-合并 9 个分模块为单文件 lib.rs,实现 spec §11 (REQ-AUTO-001):
-- AutomationRule 聚合根(17 字段) + Trigger/Condition/Action/Execution 4 子实体
-- 6 条不变量:INV-AUTO-01~06 (tenant_id / project_id / Protected 动作禁止 / 限流 > 0)
-- AutomationCommandPort 4 方法 + AutomationQueryPort 3 方法 + RuleExecutor 1 方法
-- InMemoryAutomationService 真实实现,含限流滑窗 + execution 100% 写历史
-- 9 个单元测试覆盖: 创建 / Protected 拒绝 / 跨租户 / developer 拒 / 限流 / 条件评估 / 版本冲突 / 100% 历史
