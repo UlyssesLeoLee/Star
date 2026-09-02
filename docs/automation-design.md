@@ -443,34 +443,48 @@ print(f"err_count={result.stderr.count('error[')}")
                                                                        |
                                                                        v
                                                               +-------------------+
-                                                              | 13 份 Python 脚本   |
-                                                              | (8 基类 + 5 [P])   |
-                                                              | + 5 套 unittest     |
+                                                              | 14 份 Python 脚本   |
+                                                              | (6 base + 4 [P]    |
+                                                              |  + 4 unittest)     |
                                                               +-------------------+
 ```
 
-### 12.2 13 份 Python 脚本 + 5 套 unittest 清单 (per §4 任务卡表)
+### 12.2 14 份 Python 脚本 + 4 套 unittest 清单 (per §4 任务卡表 + SCRIPTS_META 1-1 对应, 含 available_in_debug 标记)
 
-| 类别 | 脚本路径 | [P]/[M]/[S] | 功能点 (用户可勾选) |
-|---|---|---|---|
-| 基类 | `scripts/automation/__init__.py` | — | (init 不可运行) |
-| 基类 | `scripts/automation/dispatcher.py` | — | `brief` / `invoke` (stub) / `verify` (stub) / `collect_output` (stub) |
-| 基类 | `scripts/automation/cli_helper/base.py` | — | `run` / `cargo` (stub) / `git` (stub) / `wt` (stub) / `with_worktree` (stub) |
-| 基类 | `scripts/automation/refactor_template.py` | — | `parse_report` / `apply` / `verify` (stub) / `rollback` (stub) / `run_full` |
-| 基类 | `scripts/automation/judge.py` | — | `judge(task_id, hits, note)` / `judge_all()` |
-| 基类 | `scripts/automation/smoke_test.py` | — | `dispatcher` / `cli_helper` / `refactor_template` / `judge` 4 case |
-| 基类 | `scripts/automation/registry_check.py` | — | (单步 check, 不可单独勾选) |
-| 基类 | `scripts/automation/cli_helper/__init__.py` | — | (init 不可运行) |
-| [P] B.5 | `scripts/automation/integration_e2e.py` | [P] | `provider=openclaw` / `provider=hermes` / `dry_run` / `audit_log` |
-| [P] C.6 | `scripts/automation/saga_e2e.py` | [P] | `fail_domain={none,player,economy,match,social,admin}` / `dry_run` / `audit_log` |
-| [P] F.6 | `scripts/automation/git_push.py` | [P] | `remote=origin` / `dry_run` / `max_scan_files=100` / `audit_log` |
-| [P] H2-1 | `scripts/automation/h2_refactor.py` | [P] | `phase=P3-H2` / `dry_run` / `audit_log` |
-| [P] 共享 | `scripts/automation/__tests__/integration_e2e_test.py` | [P] | 6 OpenClaw + 6 Hermes 12 case |
-| [P] 共享 | `scripts/automation/__tests__/saga_e2e_test.py` | [P] | 10 case (5 域 × 2) |
-| [P] 共享 | `scripts/automation/__tests__/git_push_test.py` | [P] | 5 case (dry_run + reachable + secret + token + audit) |
-| [P] 共享 | `scripts/automation/__tests__/h2_refactor_test.py` | [P] | 5 case (parse + action1 + action2 + apply + inherits) |
-| Mock | `scripts/automation/ai_edit_mock.py` | (新) | AI 修改 mock: 读脚本源码 + 产生模板建议 |
-| Server | `scripts/automation/console_server.py` | (新) | FastAPI: 13 脚本 + 5 unittest 调度 + 状态 + AI mock |
+> **重要**: 本清单跟 `console_server.py` 的 `SCRIPTS_META` 字典 1-1 对应 (14 份 = 6 base + 4 [P] + 4 unittest)。`__init__.py` × 2 + `ai_edit_mock.py` + `console_server.py` 本身不在 SCRIPTS_META 里 (是辅助文件, 不在调试页可勾选清单内)。
+
+| 类别 | 脚本路径 | [P]/[M]/[S] | available_in_debug | 功能点 (用户可勾选) |
+|---|---|---|---|---|
+| base | `scripts/automation/dispatcher.py` | — | ✓ | `brief` / `invoke` (stub) / `verify` (stub) / `collect_output` (stub) |
+| base | `scripts/automation/cli_helper/base.py` | — | ✓ | `run` / `cargo` (stub) / `git` (stub) / `wt` (stub) / `with_worktree` (stub) |
+| base | `scripts/automation/refactor_template.py` | — | ✓ | `parse_report` / `apply` / `verify` (stub) / `rollback` (stub) / `run_full` |
+| base | `scripts/automation/judge.py` | — | ✓ | `judge(task_id, hits, note)` / `judge_all()` |
+| base | `scripts/automation/smoke_test.py` | — | ✓ | `dispatcher` / `cli_helper` / `refactor_template` / `judge` 4 case |
+| base | `scripts/automation/registry_check.py` | — | ✓ | (单步 check, 不可单独勾选) |
+| [P] B.5 | `scripts/automation/integration_e2e.py` | [P] | ✓ | `provider=openclaw` / `provider=hermes` / `dry_run` / `no_dry_run_stub` / `audit_log` |
+| [P] C.6 | `scripts/automation/saga_e2e.py` | [P] | ✓ | `fail_domain={none,player,economy,match,social,admin}` / `dry_run` / `audit_log` |
+| [P] F.6 | `scripts/automation/git_push.py` | [P] | ✓ | `remote=origin` / `dry_run` / `no_dry_run_stub` / `max_scan_files` / `audit_log` |
+| [P] H2-1 | `scripts/automation/h2_refactor.py` | [P] | ✓ | `phase=P3-H2` / `dry_run` / `no_dry_run_stub` / `audit_log` |
+| unittest | `scripts/automation/__tests__/integration_e2e_test.py` | [P] | ✓ | 6 OpenClaw + 6 Hermes 12 case (per §4.1) |
+| unittest | `scripts/automation/__tests__/saga_e2e_test.py` | [P] | ✓ | 10 case (5 域 × 2 成功/失败回滚, per §4.2) |
+| unittest | `scripts/automation/__tests__/git_push_test.py` | [P] | ✓ | 5 case (dry_run + reachable + secret + token + audit, per §4.5) |
+| unittest | `scripts/automation/__tests__/h2_refactor_test.py` | [P] | ✓ | 5 case (parse + action1 + action2 + apply + inherits, per §4.6) |
+
+**辅助文件 (不在调试页可勾选清单内)**:
+- `scripts/automation/__init__.py` — 包初始化
+- `scripts/automation/cli_helper/__init__.py` — 子包初始化
+- `scripts/automation/ai_edit_mock.py` — AI 修改 mock (v0.2 新增, 被 console_server.py 调用)
+- `scripts/automation/console_server.py` — FastAPI 8080 后端 (v0.2 新增)
+- `scripts/automation/_test_console_server.py` — 7 端点 smoke 测试 (v0.2 新增)
+- `scripts/automation/_run_baseline.py` — 7 步守门基线 (v0.2 新增)
+- `frontend/src/app/automation-debug/` × 11 份 .tsx/.ts — 调试页前端 (v0.2 新增)
+- `frontend/src/components/ui/` × 7 份 shadcn fallback — 调试页组件 (v0.2 新增)
+- `frontend/src/lib/utils.ts` — cn() helper (v0.2 新增)
+
+**统计**:
+- 14 份可调试脚本 (6 base + 4 [P] + 4 unittest) — 跟 console_server.py SCRIPTS_META 1-1 对应
+- 11 份辅助文件 (5 Python + 6 前端)
+- 总计 25 份新文件 (v0.2 一并落地)
 
 ### 12.3 API 端点 (FastAPI 8080)
 
