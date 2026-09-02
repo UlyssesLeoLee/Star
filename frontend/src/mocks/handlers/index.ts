@@ -23,6 +23,7 @@ export { worktreesHandlers } from "./worktrees";
 export { commentsHandlers } from "./comments";
 export { tenantsHandlers } from "./tenants";
 export { graphHandlers } from "./graph";
+export { auditHandlers } from "./audit";
 
 import { agentsHandlers } from "./agents";
 import { analyticsHandlers } from "./analytics";
@@ -37,6 +38,7 @@ import { worktreesHandlers } from "./worktrees";
 import { commentsHandlers } from "./comments";
 import { tenantsHandlers } from "./tenants";
 import { graphHandlers } from "./graph";
+import { auditHandlers } from "./audit";
 
 export const handlers = [
   ...agentsHandlers,
@@ -52,4 +54,5 @@ export const handlers = [
   ...commentsHandlers,
   ...tenantsHandlers,
   ...graphHandlers,
+  ...auditHandlers,
 ];

@@ -184,7 +184,7 @@ export async function testKeyWithRetry(
 
     // 5 重试耗尽, 写 audit log (mock: console + localStorage)
     if (attempt === MAX_RETRY_ATTEMPTS - 1) {
-      const auditEventId = writeAuditLog(detectedKey, failed);
+      const auditEventId = await writeAuditLog(detectedKey, failed);
       return { ...failed, audit_event_id: auditEventId };
     }
 
@@ -195,19 +195,52 @@ export async function testKeyWithRetry(
   throw new Error("retry loop unreachable");
 }
 
-// ---- audit log (Phase 1 mock, Phase 2 真接 audit_audit_event 表) ----
-function writeAuditLog(key: DetectedKey, result: TestResult): string {
+// ---- audit log (Phase 2: backend 真接 + localStorage fallback, per ADR-0043 §2.4) ----
+async function writeAuditLog(key: DetectedKey, result: TestResult): Promise<string> {
   if (typeof window === "undefined") return "audit-ssr";
-  const id = `audit-${Date.now()}-${key.provider}`;
-  const entry = {
-    id,
-    action: "onboarding.test_key.failed",
+  const payload = {
     detected_key_id: key.id,
     provider: key.provider,
     label: key.label,
     attempts: result.attempt + 1,
-    status_code: result.status_code,
-    error_message: result.error_message,
+    status_code: result.status_code ?? 0,
+    error_message: result.error_message ?? "",
+    tenant_id: getTenantId(),
+  };
+  // Phase 2: 优先 POST /api/audit/onboarding-failed (per ADR-0043 §2.3)
+  try {
+    const res = await fetch("/api/audit/onboarding-failed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { audit_event_id?: string };
+      return body.audit_event_id ?? `audit-${Date.now()}`;
+    }
+  } catch {
+    // fall through to localStorage fallback
+  }
+  // fallback: localStorage (Phase 1 mock, per commit a54c79d)
+  return writeLocalStorageAuditLog(payload);
+}
+
+/** Phase 1 localStorage fallback (per commit a54c79d) */
+function writeLocalStorageAuditLog(payload: {
+  detected_key_id: string;
+  provider: string;
+  label: string;
+  attempts: number;
+  status_code: number;
+  error_message: string;
+  tenant_id: string;
+}): string {
+  if (typeof window === "undefined") return "audit-ssr";
+  const id = `audit-${Date.now()}-${payload.provider}`;
+  const entry = {
+    id,
+    action: "onboarding.test_key.failed",
+    ...payload,
     timestamp: new Date().toISOString(),
   };
   try {
@@ -218,6 +251,16 @@ function writeAuditLog(key: DetectedKey, result: TestResult): string {
     // 静默失败, 不影响主流程
   }
   return id;
+}
+
+/** tenant_id 取得 (13 類必帯, per REQ-SEC-001)
+ * Phase 1 mock: hardcode "tenant-physis-corp"
+ * Phase 2 真接: ActorContext.tenant_id (per useStore, 仓内検証待)
+ */
+function getTenantId(): string {
+  if (typeof window === "undefined") return "tenant-ssr";
+  // Phase 1 mock fallback; Phase 2 接 useStore.getState().actorContext?.tenant_id
+  return "tenant-physis-corp";
 }
 
 /** 读 audit log 列表 (供 /settings/onboarding-audit 页用, Phase 2) */

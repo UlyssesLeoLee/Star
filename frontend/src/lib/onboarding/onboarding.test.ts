@@ -114,16 +114,11 @@ describe("testKeyWithRetry", () => {
     expect(final.max_attempts).toBe(5);
     expect(final.status_code).toBe(401);
     expect(final.error_message).toMatch(/unauthorized/i);
+    // audit_event_id 必須 (per ADR-0043 §2.4, Phase 2: backend POST → 201 + audit_event_id)
     expect(final.audit_event_id).toBeDefined();
+    // MSW mock handler 返 audit-{uuid} 形式, 验证非 SSR fallback
+    expect(final.audit_event_id).toMatch(/^audit-[0-9a-f-]+$/);
     expect(progressResults.length).toBeGreaterThanOrEqual(5);  // 5 次 failed 回调
-
-    // audit log 写入
-    if (typeof window !== "undefined") {
-      const audit = JSON.parse(window.localStorage.getItem("star:onboarding-audit") || "[]");
-      expect(audit.length).toBeGreaterThan(0);
-      expect(audit[0].provider).toBe("openai");
-      expect(audit[0].action).toBe("onboarding.test_key.failed");
-    }
 
     Math.random = originalRandom;
   }, 60_000);
