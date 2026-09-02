@@ -421,6 +421,113 @@ print(f"err_count={result.stderr.count('error[')}")
 
 ---
 
+## 12. 调试控制台 (Automation Debug Console, v0.2 新增)
+
+> **触发**: 2026-09-02 09:01 JST Ulysses 指令"这些 py 脚本要运需用户通过填写 api key 的 ai 修改,并且给一个专用脚本调试页面,允许用户在一定范围内勾选脚本生效的功能点,并且允许关闭"
+> **拍板** (4 选项, per 9/1 14:58 JST 拍板决策必须用选项):
+> - scope = **全部 13 份 Python 脚本 + 5 套 unittest 调试页** (8 份基类 + 5 份 [P] 任务卡脚本 + 5 套 unittest)
+> - ai-edit-mode = **本地 mock** (不开外部 AI, 仅调用脚本生成模板建议)
+> - debug-ui = **Web UI (Next.js + shadcn + tailwind, 跨客户端浏览器)**
+> - close-behavior = **关闭 = 脚本/功能点 跳过运行 (不调用)**
+> **依赖**: §3 + §4 + §5 + §6 全部基类; frontend/ (Next.js 14 App Router) 已就绪
+
+### 12.1 架构 (3 层)
+
+```
++--------------------+      +-------------------------+      +-------------------+
+| Browser (Chrome)   |      | Next.js Frontend        |      | Python FastAPI     |
+| localhost:3000     | <--> | frontend/src/app/       | <--> | scripts/automation/|
+| Automation Debug   |      | automation-debug/       |      | console_server.py  |
+| Console UI         |      | (shadcn + tailwind)     |      | (port 8080)        |
++--------------------+      +-------------------------+      +-------------------+
+                                                                       |
+                                                                       v
+                                                              +-------------------+
+                                                              | 13 份 Python 脚本   |
+                                                              | (8 基类 + 5 [P])   |
+                                                              | + 5 套 unittest     |
+                                                              +-------------------+
+```
+
+### 12.2 13 份 Python 脚本 + 5 套 unittest 清单 (per §4 任务卡表)
+
+| 类别 | 脚本路径 | [P]/[M]/[S] | 功能点 (用户可勾选) |
+|---|---|---|---|
+| 基类 | `scripts/automation/__init__.py` | — | (init 不可运行) |
+| 基类 | `scripts/automation/dispatcher.py` | — | `brief` / `invoke` (stub) / `verify` (stub) / `collect_output` (stub) |
+| 基类 | `scripts/automation/cli_helper/base.py` | — | `run` / `cargo` (stub) / `git` (stub) / `wt` (stub) / `with_worktree` (stub) |
+| 基类 | `scripts/automation/refactor_template.py` | — | `parse_report` / `apply` / `verify` (stub) / `rollback` (stub) / `run_full` |
+| 基类 | `scripts/automation/judge.py` | — | `judge(task_id, hits, note)` / `judge_all()` |
+| 基类 | `scripts/automation/smoke_test.py` | — | `dispatcher` / `cli_helper` / `refactor_template` / `judge` 4 case |
+| 基类 | `scripts/automation/registry_check.py` | — | (单步 check, 不可单独勾选) |
+| 基类 | `scripts/automation/cli_helper/__init__.py` | — | (init 不可运行) |
+| [P] B.5 | `scripts/automation/integration_e2e.py` | [P] | `provider=openclaw` / `provider=hermes` / `dry_run` / `audit_log` |
+| [P] C.6 | `scripts/automation/saga_e2e.py` | [P] | `fail_domain={none,player,economy,match,social,admin}` / `dry_run` / `audit_log` |
+| [P] F.6 | `scripts/automation/git_push.py` | [P] | `remote=origin` / `dry_run` / `max_scan_files=100` / `audit_log` |
+| [P] H2-1 | `scripts/automation/h2_refactor.py` | [P] | `phase=P3-H2` / `dry_run` / `audit_log` |
+| [P] 共享 | `scripts/automation/__tests__/integration_e2e_test.py` | [P] | 6 OpenClaw + 6 Hermes 12 case |
+| [P] 共享 | `scripts/automation/__tests__/saga_e2e_test.py` | [P] | 10 case (5 域 × 2) |
+| [P] 共享 | `scripts/automation/__tests__/git_push_test.py` | [P] | 5 case (dry_run + reachable + secret + token + audit) |
+| [P] 共享 | `scripts/automation/__tests__/h2_refactor_test.py` | [P] | 5 case (parse + action1 + action2 + apply + inherits) |
+| Mock | `scripts/automation/ai_edit_mock.py` | (新) | AI 修改 mock: 读脚本源码 + 产生模板建议 |
+| Server | `scripts/automation/console_server.py` | (新) | FastAPI: 13 脚本 + 5 unittest 调度 + 状态 + AI mock |
+
+### 12.3 API 端点 (FastAPI 8080)
+
+| 端点 | 方法 | 描述 |
+|---|---|---|
+| `/api/scripts` | GET | 列 13 份脚本 + 5 套 unittest (含 metadata: name / path / features / status) |
+| `/api/scripts/{id}/toggle` | POST | 用户勾选/关闭脚本 (status: enabled/disabled) |
+| `/api/scripts/{id}/run` | POST | 跑脚本 (status: enabled 才能跑, 跑完返 output 头 500 字符) |
+| `/api/features/{script_id}/{feature_id}/toggle` | POST | 勾选/关闭脚本内功能点 (e.g. `provider=hermes`) |
+| `/api/ai_edit` | POST | AI 修改 mock: 读脚本源码 + 模板生成建议 (不开外部 API) |
+| `/api/status` | GET | 13 份脚本 + 5 套 unittest 状态总览 (跑 / 关闭 / AI mock 等) |
+| `/api/brief` | POST | dispatcher.brief 落档 (per 守门 #20 v2) |
+| `/docs` | GET | FastAPI 自动 swagger 文档 |
+
+### 12.4 前端 UI (Next.js 14 + shadcn + tailwind)
+
+```
+frontend/src/app/automation-debug/
+  page.tsx                          # 主页面 (ScriptSelector + RunPanel + AIEditPanel)
+  layout.tsx                        # layout
+  components/
+    ScriptSelector.tsx              # 13 份脚本 + 5 套 unittest 列表 (checkbox + 关闭开关)
+    FeatureToggles.tsx              # 脚本内功能点勾选 (e.g. provider=openclaw)
+    RunPanel.tsx                    # 跑脚本 + 显示 output (头 500 字符)
+    AIEditPanel.tsx                 # AI 修改 mock (读源码 + 模板建议, 不开外部 API)
+    StatusDashboard.tsx             # 13 份脚本 + 5 套 unittest 状态总览
+  hooks/
+    useDebugConsole.ts              # 调 FastAPI 8080
+  api/
+    scripts/route.ts                # Next.js API route (proxy → FastAPI 8080)
+```
+
+**关键交互**:
+- 用户在 `ScriptSelector` 勾选要运行的脚本 (per close-behavior=1 跳过关闭的)
+- `FeatureToggles` 显示当前脚本的功能点 (e.g. integration_e2e.py → provider=openclaw/hermes, dry_run)
+- `RunPanel` 跑脚本, 输出显示在下方 (头 500 字符避免长 output 占 token)
+- `AIEditPanel` 点 "AI 修改" → 后端读脚本源码 → 产生模板建议 (3 条 edit suggestion: add field / remove method / rename class)
+- `StatusDashboard` 13 份脚本 + 5 套 unittest 状态 (跑 / 关闭 / AI mock 次数)
+
+### 12.5 守门基线 (per §5 + 本节新增)
+
+- 守门 #1 v20: console_server.py 跑后 `cargo check --workspace --lib` 0 err (新派生, 实证 console_server 不会污染 main 编译)
+- 守门 #5 v2: 调试页 AI 修改 mock **不开外部 API**, API key 不走 UI 输入 (per ai-edit-mode=本地 mock 拍板)
+- 守门 #9 v3: 调试页 → console_server.py → 13 份脚本, 走 subprocess 替代 RPC, 跟守门 #9 实证 #3 一致 (子代理 RPC 不可靠但 subprocess 可靠)
+- 守门 #12 v3: 调试页加新基类 (console_server.py + ai_edit_mock.py) 必更新 §12 清单表 + registry.md
+- 守门 #11 实证: 缺标比错标安全, §12.6 列已知缺口
+
+### 12.6 已知缺口 (per 守门 #11)
+
+1. **AI 修改 mock 不真调外部 API** (per ai-edit-mode=本地 mock 拍板), 用户需手动 apply 模板建议
+2. **frontend/src/app/automation-debug/ 是新建目录** (per debug-ui=Web UI 拍板), 需 next dev 跟 console_server.py 双进程, 跨 session 续 npm + python 双 server 启动
+3. **13 份脚本 metadata 提取** 需从脚本源码静态分析 (import 路径 / CLI args), 模板生成可能不准, 跨 session 续改进
+4. **5 套 unittest 勾选 = 整套 enable/disable** (per §12.2 简化设计), 内部 case 不可单独勾选, 跨 session 续考虑细化
+5. **关闭语义 = 跳过运行** (per close-behavior=1 拍板), 关闭态脚本/功能点 dispatcher 仍能 brief 落档但不 invoke, audit log 标 "disabled"
+
+---
+
 ## 8. 跨项目持久 (per 守门 #4 派生规 v1-v18 + 守门 #13)
 
 - 本设计文档适用 **STAR / RGS / Physis / GVPE / 其他新项目**
@@ -448,6 +555,7 @@ print(f"err_count={result.stderr.count('error[')}")
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: 3 类 agent 交互 (子代理 dispatch / CLI 调用 / 代码改造) 全包, 4 个筛选维度 (R/V/S/A) + 3 档判定 ([P]/[M]/[S]), WBS §1-§5 / §14 / kanban-vmodel 任务卡全过初判, 守门 #1 v19 + #9 v2 + #12 v2 派生规; 落档 `scripts/automation/` 4 基类 + 1 CLI + 2 smoke + 1 索引, 共 8 份文件 | 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做" + 拍板 3 选项 (范围=全 3 类 / 维度=R+V+S+A / 落档=新建 docs/automation-design.md + scripts/automation/) |
+| v0.2 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **§12 调试控制台 (Automation Debug Console)** 新增: 4 拍板 (scope=13 py 脚本+5 unittest / ai-edit=本地 mock / debug-ui=Next.js+shadcn / close-behavior=跳过运行); frontend/src/app/automation-debug/ + scripts/automation/console_server.py + scripts/automation/ai_edit_mock.py 3 份新基类; 守门 #1 v20 + #5 v2 + #9 v3 派生规; docs/automation-design.md §4 任务卡表加 'available_in_debug' 标记 | 2026-09-02 09:01 JST Ulysses 指令"这些 py 脚本要运需用户通过填写 api key 的 ai 修改,并且给一个专用脚本调试页面,允许用户在一定范围内勾选脚本生效的功能点,并且允许关闭" + 拍板 4 选项 |
 
 ---
 
