@@ -216,7 +216,7 @@
 
 ---
 
-## 6. 4 项 Ulysses 拍板项 (per 2026-09-01 14:58 JST 拍板决策必须用选项)
+## 6. 4 项 Ulysses 拍板项 (per 2026-09-01 14:58 JST 拍板决策必须用选项) — **v0.2 拍板落档**
 
 > **拍板决策必须用 ask_user** 规则: 任何需要 Ulysses 拍板的事必须用 ask_user 给选项, 不能直接做/只问"可以吗"。本 plan 含 4 项需拍板 (per 9/2 plan §6.2 3 项 + 9/3 增量 1 项)。
 
@@ -224,24 +224,38 @@
 
 | 序 | 拍板项 | 关联 Phase | 选项 | 落地 token |
 |---|---|---|---|---|
-| 1 | **RF-001 T1.3 `star-vcs` 孤儿 crate 判定** (注册 / 删除) | Phase 1.2 | A. 注册 (新建 `docs/specs/domain-vcs-spec.md` 骨架) / B. 删除 (新建 ADR 现场算编号, 不沿用任何文档写死的数字) | 0.1M |
-| 2 | **9/2 智能合并后 stash 暂存处理** (per §4.5 9 项散落) | Phase 1.4 | A. 逐项 cherry-pick 评估 (per 9/2 plan §2.2 21 文件) / B. 全部丢弃 / C. 留 stash 跨 session 续 | 0.05M |
-| 3 | **9/2 归档分支 P1 cherry-pick** (per 9/2 plan §5.2 19 子项 P1=4 + P2=7 + P3=8) | Phase 1.4 (并行) | A. 现在做 P1 (4 子项, arch-graph + onboarding 基础, 0.3M) / B. 推迟到 Phase 2 完成后 / C. 不做 | 0.3M |
-| 4 | **domain-app-spec T 任务分解启动** (per spec v0.1 §9) | Phase 3.1 | A. RF-001 T1 收官后启动 / B. 推迟到 Phase 2 全部完成 / C. 不启动 (spec 维持 v0.1) | 0.3M |
+| 1 | **RF-001 T1.3 `star-vcs` 孤儿 crate 判定** | Phase 1.2 | A. 注册 / B. 删除 / C. 暂不处理 | 0.1M |
+| 2 | **9/2 智能合并后 stash 暂存处理** | Phase 1.4 | A. 逐项 cherry-pick 评估 / B. 全部丢弃 / C. 留 stash 跨 session 续 | 0.05M |
+| 3 | **9/2 归档分支 P1 cherry-pick** | Phase 1.4 (并行) | A. 现在做 P1 (4 子项, arch-graph + onboarding 基础) / B. 推迟到 Phase 2 完成后 / C. 不做 | 0.3M |
+| 4 | **domain-app-spec T 任务分解启动** | Phase 3.1 | A. RF-001 T1 收官后启动 / B. 推迟到 Phase 2 全部完成 / C. 不启动 | 0.3M |
 
-### 6.2 ask_user 拍板 (per 守门 + 14:58 JST 规则)
+### 6.2 拍板结果 (per 2026-09-03 07:04 JST ask_user 4-step questionnaire, 4 项全 A)
 
-本 plan 落档后, 用 `ask_user` 一次问 4 项 (per 守门 #12 + #15 实证), 让 Ulysses 一次性拍板:
+| 序 | 拍板项 | Ulysses 拍板 | 落地动作 |
+|---|---|---|---|
+| 1 | T1.3 star-vcs 判定 | **A. 注册** (推荐) | `Cargo.toml` workspace.members 加 `crates/star-vcs` + 同 commit 新建 `docs/specs/domain-vcs-spec.md` 骨架; 若 crate 本身无独立 `Cargo.toml` 或 src/ 空, 改走 B (删除) |
+| 2 | stash 暂存处理 | **A. 逐项 cherry-pick 评估** (推荐) | `git stash show stash@{0}` + `git stash show stash@{1}` 看内容, 逐项评估 (per 9/2 plan §4.5 9 项清单) |
+| 3 | 归档分支 P1 cherry-pick | **A. 现在做** (推荐) | `git show archive/auto-20260902-17ef4658:...` 看 P1 4 子项内容, 跟 main HEAD 实际 diff, 走 `git checkout` 单文件复制 (避免 cherry-pick 引发 rebase 冲突) |
+| 4 | domain-app 启动 | **A. RF-001 T1 收官后启动** (推荐) | Phase 2.1 (RF-001 T1, 0.75M) 完成后, Phase 3.1 (domain-app T1, 0.3M) 启动 |
 
-1. **T1.3 star-vcs 判定**: A 注册 / B 删除 / C 暂不处理 (再调研)
-2. **stash 暂存处理**: A 逐项 cherry-pick 评估 / B 全部丢弃 / C 留 stash 跨 session 续
-3. **归档分支 P1 cherry-pick**: A 现在做 P1 4 子项 / B 推迟到 Phase 2 完成后 / C 不做
-4. **domain-app T 任务分解启动**: A RF-001 T1 收官后启动 / B 推迟到 Phase 2 全部完成 / C 不启动
+### 6.3 拍板后落地优先级 (per 拍板结果 + token-OLU 降序 + 依赖关系)
 
-### 6.3 跨 session 续做建议 (per HANDOFF-ST-001 §5.4)
+| 优先级 | 任务 | token | 依赖 | 守门 | 备注 |
+|---|---|---|---|---|---|
+| **1** | T1.3 star-vcs 判定 (注册) | 0.1M | 无 | #1+#9+#12+#19 | Phase 1.2, 立即可做 |
+| **2** | stash pop 评估 (per 9/2 plan §4.5 9 项) | 0.05M | 无 | #9+#12 | Phase 1.4, 立即可做 |
+| **3** | P1 cherry-pick 4 子项 (arch-graph + onboarding) | 0.3M | 无 (可与 1/2 并行) | #1+#9+#12+#19+#22 | Phase 1.4 并行, 现在做 |
+| 4 | AGENTS.md v0.12 修订 (9/3 commit 实证) | 0.05M | 无 | #12+#15 | Phase 1.5, 立即可做 |
+| 5 | RF-001 T1.1-T1.5 其余 4 项 | 0.65M | 优先级 1 (T1.3) | #1+#9+#12+#19 | Phase 2.1, 依赖 1 |
+| **小计** | | **~1.15M** | | | **本 session 目标** |
 
-- **session 启动 step 1-5** (per HANDOFF-ST-001 §5.4): 读本 plan v0.1 + HANDOFF-ST-001 + AGENTS.md v0.11 → git pull → git log --oneline -10 → cargo check --workspace --all-targets 重测 (per Q9-T A9 数字时效性) → 续 Phase 1.1 H1 commit
+**session 预算分配**: 启动 Phase 1.2 + 1.4 + 1.4 并行 (T1.3 + stash + P1 cherry-pick), 估 ~0.5M token. 留 1.5M buffer per HANDOFF-ST-001 §8.2 (1-1.5M / session 目标).
+
+### 6.4 跨 session 续做建议 (per HANDOFF-ST-001 §5.4)
+
+- **session 启动 step 1-5** (per HANDOFF-ST-001 §5.4): 读本 plan v0.2 (本版) + HANDOFF-ST-001 + AGENTS.md v0.12 → git pull → git log --oneline -10 → cargo check --workspace --all-targets 重测 (per Q9-T A9 数字时效性) → 续 Phase 1.5 AGENTS.md 修订
 - **session token 预算**: 1-1.5M / session (留 25-50% buffer per HANDOFF-ST-001 §8.2)
+- **拍板后续**: Phase 2.1 (RF-001 T1 收官) 估 0.75M, 1-2 session 内收官; Phase 3.1 (domain-app T1) 估 0.3M, 紧接 Phase 2.1 之后
 
 ---
 
@@ -264,3 +278,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-03 06:56 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | 初版: 整合 3 份 Handoff (ST-001/RF-001/BATCH-001) + 9/2 智能合并 plan + 9/3 commit `a04c4c1` 三件套 (AUDIT-001 + RF-001-spec/WBS/HANDOFF-001 + domain-app-spec + 红方挑刺); 4 Phase 分类 (阻塞解除 0.4M / 实质重构 2.3M / 应用+基建 1.2M / 收尾 0.1M) 总 ~4.0M token ~0.67 周; 6 项守门 + 6 项缺口 + 5 项子代理风险 + 4 项 Ulysses 拍板项 | 2026-09-03 06:53 JST commit `a04c4c1` 落档 8 files / 894 行 + 用户发令"查阅 handoff, 制定开发计划 phase" |
+| v0.2 | 2026-09-03 07:04 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | 4 项 Ulysses 拍板结果落档 (T1.3=A 注册 / stash=A 逐项评估 / P1=A 现在做 / domain-app=A RF-001 T1 后); §6 改写"4 项拍板结果"表 + §6.3 拍板后落地优先级 (本 session 目标 ~1.15M: T1.3 0.1M + stash 0.05M + P1 0.3M + AGENTS v0.12 0.05M + RF-001 T1 收官 0.65M); 修订历史 +1 行 | 2026-09-03 07:04 JST ask_user 4-step questionnaire 4 项全 A 拍板 |
