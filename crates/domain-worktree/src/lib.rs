@@ -926,7 +926,7 @@ mod tests {
             branch: "feat/test".to_string(),
             base_branch: "main".to_string(),
             runtime_id: RuntimeId::new(),
-            owner_user_id: UserId.new(),
+            owner_user_id: UserId::new(),
         }
     }
 
