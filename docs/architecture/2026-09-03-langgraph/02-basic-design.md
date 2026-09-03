@@ -104,7 +104,7 @@
 │  │  • TaskCardManager (UI state ↔ Sub-agent state mirror)               │    │
 │  │  • AuditLogger (全 tool call / dispatch / interrupt)                 │    │
 │  │  • TokenTelemetry (per-task / per-session token 计量)                │    │
-│  │  • GuardEnforcer (AGENTS.md §4 守门 24+ 项 自动检查)                 │    │
+│  │  • GuardEnforcer (AGENTS.md §4 守门 13 main + 24 派生规 = 37 项 自动检查)                 │    │
 │  │  • UIStreamer (WebSocket / SSE / REST 3 通道)                        │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 └────────────────────────────────────────────────────────────────────────────┘
@@ -148,7 +148,7 @@
 | **C-07** | TaskCardManager | UI 状态 ↔ Sub-agent state mirror | L0/L1 | P0 |
 | **C-08** | AuditLogger | 全 tool call / dispatch / interrupt 記録 | Cross | P0 |
 | **C-09** | TokenTelemetry | token 計量 + OLU 集計 (per 守门 #4) | Cross | P1 |
-| **C-10** | GuardEnforcer | AGENTS.md §4 守门 24+ 项 自动检查 | Cross | P1 |
+| **C-10** | GuardEnforcer | AGENTS.md §4 守门 13 main + 24 派生规 = 37 项 自动检查 | Cross | P1 |
 | **C-11** | StateSchemaRegistry | LangGraph state schema 中央管理 | Cross | P1 |
 | **C-12** | InterruptManager | human-in-the-loop interrupt / resume | L0/L1 | P0 |
 | **C-13** | SubAgentRegistry | sub-agent 类型注册表 (SA-01..SA-09 + new) | L0 | P1 |
@@ -253,7 +253,8 @@ class SubAgentState(TypedDict, total=False):
 |---|---|---|---|---|
 | **SA-01** | code-review | 代码审查 (per PR/MR) | git diff, code search, comment | review-plan → review-execute → review-report |
 | **SA-02** | test-gen | 测试生成 | code search, test run | test-plan → test-execute → test-verify |
-| **SA-03** | 5-域-lead-audit | 5 域 Lead 配置审计 | 22 domain crates read | audit-plan → audit-execute (跨域) → audit-report |
+| **SA-03** | 5-域-lead-audit | 5 域 Lead 配置审计 (per UC-08, 跨 22 domain crates + 5 域治理矩阵) | 22 domain crates read | audit-plan → audit-execute (跨域) → audit-report |
+> ⚠️ **SA-03 特殊**: 唯一一个**跨域 + 治理矩阵**型 sub-agent。依赖 5 域 Lead 真人到位 (per 守门 #3 反転 Mavis 临时代签, 见 19:39 JST 授权); 真人到位后追溯签字。其余 8 个 SA 都是 task-bound 单域/单工具型。 |
 | **SA-04** | git-ops | git 操作 (worktree/commit/push) | git worktree, star CLI | ops-plan → ops-execute → ops-verify |
 | **SA-05** | doc-sync | 文档同步 (AGENTS.md / WBS / ADR) | file write, git add+commit | doc-plan → doc-execute → doc-verify |
 | **SA-06** | refactor | 代码重构 | code search, edit, test | refactor-plan → refactor-execute → refactor-verify (cargo test) |
@@ -877,7 +878,7 @@ per 要件 §3.3 NFR-S-01..06 全部継承 + 実装詳細：
 
 ```python
 class GuardEnforcer:
-    """AGENTS.md §4 守门 24+ 项 自动检查"""
+    """AGENTS.md §4 守门 13 main + 24 派生规 = 37 项 自动检查"""
     
     async def check_tool_call(self, tool_call: ToolCall) -> GuardResult:
         # 守门 #5: env var 安全
@@ -1032,7 +1033,7 @@ per 要件 §7 + 追加:
 - [ADR-0030 Agent Lease/Heartbeat/Resume](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0030-agent-lease-heartbeat-resume.md) — 11 字段 + 跨 Agent Handoff
 - [ADR-0032 MCP Transport stdio](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0032-mcp-transport-stdio.md) — 16 tools
 - [ADR-0033 代签规则反转](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0033-agent-co-signing-policy.md) — 本规则正式 ADR
-- [AGENTS.md §4 守门](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) — 24+ 项硬约束
+- [AGENTS.md §4 守门](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) — 13 main + 24 派生规 = 37 项硬约束
 - [STAR-OLU-001.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/ol/STAR-OLU-001.md) — token 基线
 - [STAR-P3-WBS-001.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/reports/STAR-P3-WBS-001.md) — P3 阶段 WBS
 - [docs/automation-design.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/automation-design.md) — agent 交互 Python 化

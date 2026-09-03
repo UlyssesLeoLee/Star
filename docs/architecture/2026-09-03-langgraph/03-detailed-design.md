@@ -144,7 +144,7 @@ star-lg/                              # 新規 crate (per 守门 #6 PowerShell o
 | **M-12** | `ui.streamer` | WebSocket / SSE 推送 | `UIStreamer.push(msg)`, `.subscribe(ws)` | — |
 | **M-13** | `cross_cutting.audit_logger` | 全 tool call 記録 | `AuditLogger.log(entry)` | db (per 守门 #13 T) |
 | **M-14** | `cross_cutting.token_telemetry` | token 計量 | `TokenTelemetry.record(call, result)` | — |
-| **M-15** | `cross_cutting.guard_enforcer` | AGENTS.md §4 守门 24+ 项 自动检查 | `GuardEnforcer.check_tool_call(call)` | — |
+| **M-15** | `cross_cutting.guard_enforcer` | AGENTS.md §4 守门 13 main + 24 派生规 = 37 项 自动检查 | `GuardEnforcer.check_tool_call(call)` | — |
 | **M-16** | `cross_cutting.interrupt_manager` | human-in-loop interrupt / resume | `InterruptManager.interrupt(id, ...)`, `.resume(id, response)` | — |
 | **M-17** | `api.app` | FastAPI app + 路由 mount | `create_app()` | api.routes_* |
 | **M-18** | `schema.registry` | State schema 中央管理 | `StateSchemaRegistry.register(version, schema)`, `.migrate(state, from_ver, to_ver)` | schema.v1, schema.migration |
@@ -1510,7 +1510,7 @@ Flush 戦略:
 | UT-11 | `report_node` | final_result 生成 | `tests/unit/test_sub_agent_base.py` |
 | UT-12 | `MemoryCheckpointer` | put / get / list / delete | `tests/unit/test_checkpoint_store.py` |
 | UT-13 | `SqliteCheckpointer` | 同上, SQLite 永続化 | `tests/unit/test_checkpoint_store.py` |
-| UT-14 | `GuardEnforcer.check_tool_call` | 24+ 守门规则 | `tests/unit/test_guard_enforcer.py` |
+| UT-14 | `GuardEnforcer.check_tool_call` | 13 main + 24 派生规 = 37 守门规则 | `tests/unit/test_guard_enforcer.py` |
 | UT-15 | `AuditLogger.log` | AuditEntry 永続化 | `tests/unit/test_audit_logger.py` |
 | UT-16 | `TokenTelemetry.record` | 計量 + OLU 集計 | `tests/unit/test_token_telemetry.py` |
 | UT-17 | `StateSchemaRegistry.migrate` | v1 → v2 upgrade | `tests/unit/test_schema_migration.py` |
@@ -1602,7 +1602,7 @@ per 01 §7 + 02 §10 + 追加:
 - [ADR-0030 Agent Lease/Heartbeat/Resume](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0030-agent-lease-heartbeat-resume.md) — 11 字段 + 跨 Agent Handoff
 - [ADR-0032 MCP Transport stdio](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0032-mcp-transport-stdio.md) — 16 tools
 - [ADR-0033 代签规则反转](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0033-agent-co-signing-policy.md)
-- [AGENTS.md §4 守门](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) — 24+ 项硬约束 (本設計書 GuardEnforcer 実装根拠)
+- [AGENTS.md §4 守门](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) — 13 main + 24 派生规 = 37 项硬约束 (本設計書 GuardEnforcer 実装根拠)
 - [docs/automation-design.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/automation-design.md) — agent 交互 Python 化 (守门 #19/#20)
 - [STAR-OLU-001.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/ol/STAR-OLU-001.md) — token 基线
 - [STAR-P3-WBS-001.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/reports/STAR-P3-WBS-001.md) — P3 阶段 WBS

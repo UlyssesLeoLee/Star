@@ -54,7 +54,7 @@ Star 项目现状（per 2026-09-03 main HEAD `e5f0503`）：
 - **gm-console frontend**（Next.js + AppShell 5-tab：Kanban / Timeline / Backlog / Agents / Worktrees）
 - **5 域 Lead 治理**（per 2026-08-21 JST 拒绝兼任硬约束）：player / economy / match / social / admin
 - **scripts/automation/**（4 真实基类 `__init__.py` / `dispatcher.py` / `cli_helper/base.py` / `refactor_template.py` + 4 utility `judge.py` / `smoke_test.py` / `registry_check.py` / `console_server.py` + N 业务脚本如 `ai_edit_mock.py` / `h2_refactor.py` / `kanban_sprint_gen.py` 等, per `scripts/automation/registry.md` v0.1）
-- **AGENTS.md §4 守门 24+ 项**（含 #1/#3/#4/#5/#6/#7/#8/#9/#10/#11/#12/#13 + 守门 #1 v1-v24 派生累积规）
+- **AGENTS.md §4 守门 13 main (#1-#13) + 24 派生规 v1-v24 = 37 全部继承**（具体含 #1/#3/#4/#5/#6/#7/#8/#9/#10/#11/#12/#13 + 守门 #1 v1-v24 派生累积规）
 
 ### 1.2 業務課題 (Business Challenges)
 
@@ -343,7 +343,7 @@ Star 项目现状（per 2026-09-03 main HEAD `e5f0503`）：
 
 ## 4. 制約事項 (Constraints)
 
-per AGENTS.md §4 守门硬约束 (24+ 项) 全部继承：
+per AGENTS.md §4 守门硬约束 (13 main + 24 派生规 = 37 项) 全部继承：
 
 | # | 约束 | 出处 |
 |---|---|---|
@@ -380,7 +380,7 @@ per AGENTS.md §4 守门硬约束 (24+ 项) 全部继承：
 | **5 域 (5 Domains)** | player / economy / match / social / admin，per 守门 #3 |
 | **22 Domain Crates** | DDD bounded context 22 個 (identity/permission/work-item/...) |
 | **DEC-008** | 一人公司 12 角色 治理模型 |
-| **守门 (Guard)** | AGENTS.md §4 硬约束 24+ 项 |
+| **守门 (Guard)** | AGENTS.md §4 硬约束 13 main + 24 派生规 = 37 项 |
 | **Mavis 接手** | Ulysses 授权的 root agent 代签身份 (per 19:39 JST) |
 | **SubAgentPool** | 子代理管理器，类型 → instance mapping |
 | **TaskCardManager** | UI 状态 ↔ Sub-agent 状態 mirror |

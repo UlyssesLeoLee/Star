@@ -706,3 +706,15 @@ per `docs/architecture/2026-09-03-langgraph/` (2026-09-03 17:51 JST 用户发令
 - **守门 #19/#20 实证**: 3 份文档落档无子代理 dispatch 调用 (root 直接 write), 无外部 API 开 (per 守门 #23); 守门 #20 派生规不适用 (无 worker 子代理调用)
 - **新增已知缺口** (per 缺标比错标): (121) PostgreSQL checkpointer 未実装 (v0.2 计划); (122) 跨仓 (Physis/RGS) RPC 未実装 (v0.3 计划); (123) 16 tool 全部 sub-agent 経由 call 化 (现 3 tool 真实接入 + 12 tool 留 P2 缺 service, per AGENTS.md §7 #2); (124) State schema v1 起点, 将来 migration 路径未定義 (v0.2 计划); (125) interrupt_response → Command(resume=...) LangGraph 0.2.x API 待 finalize (2026-09-03 時点 alpha); (126) 实装依赖 #6 DDD Review 拍板 + 5 域 Lead 真人到位 + #2 16 tool 真实接入完成
 - **可重构状态**: main HEAD 待 commit (本 v0.69 3 份 IPA 文档 + AGENTS.md §6.1 + §7 #8 + §8 v0.69 同步), AGENTS.md 修订历史 v0.68 → v0.69, 新增架构 view 子节 §6.1, 待办 #8 LangGraph 实装 初版文档完成, 实装 pending 依赖 6 阻塞项 | 2026-09-03 18:15 JST 用户发令"另起一套架构view,专门设计langgraph相关的功能" + ask_user 拍板 2 决策 + 3 份 IPA 文档落档 (148KB 总计) + AGENTS.md §6.1+§7#8+§8 v0.69 同步, 守门 #1+#9+#12+#19+#20+#22+#23+#24+#1 v3+#3 v2+#15 跨 stage 全过, ~0.08M token 估 |
+| v0.70 | 2026-09-03 19:05 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **Star-LG self-review + judgment call 落档** (per 2026-09-03 18:17 JST 用户发令"自审" + self-review skill 应用, 4 处 fix commit `326e2fc` 后用户 18:59 JST 拍板"commit" → 3 个 judgment call 落档, 守门 #1+#9+#12+#19+#20+#22+#23+#24+#1 v3+#3 v2+#15 跨 stage 全过, ~0.04M token 估):
+- **新事件触发**: 2026-09-03 18:17 JST 用户发令"自审" + 4 处 fix (`326e2fc` 45+/12-) + 18:59 JST 用户拍板"commit" → 3 个 judgment call 落档
+- **3 个 judgment call 落档** (per self-review 报告 + user 拍板"commit"):
+  1. **9 SA 类型 SA-03 特殊注解** (02-basic-design.md §2.2.2 row 后加 ⚠️ 注解): "唯一一个跨域 + 治理矩阵型 sub-agent。依赖 5 域 Lead 真人到位 (per 守门 #3 反転 Mavis 临时代签); 真人到位后追溯签字。其余 8 个 SA 都是 task-bound 单域/单工具型。" — 解决 judgment #1 (SA-03 是否特殊)
+  2. **"24+ 守门" 措辞 → "13 main + 24 派生规 = 37 全部继承"** (8 处校正): 01-requirements.md §1.1 / §4 制約 / §5 用語集 3 处 + 02-basic-design.md §1.1 図 / §1.3 组件表 / §6.3 GuardEnforcer docstring / §13 引用 4 处 + 03-detailed-design.md §1.2 模块表 / §8.1 UT-14 / §12 引用 3 处 — 解决 judgment #2 (14 制約 vs 24+ 守门 混用)
+  3. **状态遷移图 ASCII art 保留** (per GitHub 渲染 + monospace 友好, 03 §5.1-5.3 不动) — 解决 judgment #3 (ASCII vs mermaid stateDiagram-v2), 选 ASCII 因可读性 + 跨平台 一致
+- **不重写状态遷移图 → mermaid 决策原因**: 03 §5.1-5.3 ASCII 状态遷移 + 03 §4.1-4.4 mermaid sequenceDiagram = 混合风格, 已 commit `20273d5` 4 mermaid 验证 OK, ASCII 状态遷移 在 终端 / IDE / GitHub 都可读, 不需重写
+- **守门 #1 阶段 1 实证**: 纯文档无 .rs 改动, cargo check 不需要跑
+- **守门 #12 闭环**: docs 同步跨 3 文件 (01/02/03 IPA 文档), commit 引用具体行号, 不回溯叙事, 不沿用 v0.69 旧 "24+ 守门" 措辞
+- **守门 #19/#20 实证**: 落档为 root 内部工作, 无 worker dispatch, 守门 #20 不适用
+- **新增已知缺口** (per 缺标比错标): (127) 3 个 judgment call 落档后仍残留 6 项 v0.1 未実装 (per 121-126) + 实装 6 阻塞 (per v0.69 #126)
+- **可重构状态**: main HEAD 待 commit (本 v0.70 3 个 judgment call 落档), AGENTS.md 修订历史 v0.69 → v0.70, LangGraph 架构 view 文档定稿 v0.1 收官, 等 user 拍板下一步 (实装 v0.1 MVP? 推 origin? 3 决策 落档 → 收尾?) | 2026-09-03 19:05 JST 用户发令"自审" → 4 处 fix (commit `326e2fc`) → 用户 18:59 JST 拍板"commit" → 3 judgment call 落档 (SA-03 注解 + 8 处 "24+ 守门" 措辞校正 + 状态遷移图 ASCII 保留) + AGENTS.md §8 v0.70 同步, 守门 #1+#9+#12+#19+#20+#22+#23+#24+#1 v3+#3 v2+#15 跨 stage 全过, ~0.04M token 估 |
