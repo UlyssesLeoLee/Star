@@ -114,7 +114,7 @@ mod tests {
         let h = IdentityHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid.0);
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid);
         let cmd = CreateUserCommand {
             tenant_id: tid,
             email: format!("alice-{}@example.invalid", uuid::Uuid::new_v4()),
