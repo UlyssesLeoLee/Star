@@ -20,6 +20,8 @@
 - UI/UX 框架
 - 安全/性能/运用/移行設計
 
+> **重要区别 (per [01 §1.0](01-requirements.md))**: 本 view 设计的 "Sub-Agent" = 任务卡子代理 (UI 驱动, LangGraph in-process), **不是** Mavis worker subagent (worker/explorer/verifier, subprocess + brief)。两套系统并存, 任务卡子代理可在 plan/execute 阶段调用 worker subagent 走 subprocess 路径。详见 [01 §1.0](01-requirements.md) 区别表 + §9.1 移行設計。
+
 ## 1. システムアーキテクチャ (System Architecture)
 
 ### 1.1 全体構成図 (Overall Architecture)
@@ -366,10 +368,13 @@ class SubAgentHandle:
 
 #### 2.4.1 永続化 3-tier
 
+> **设计选择**: 本 view 包装 LangGraph native savers (`MemorySaver` / `SqliteSaver` / `PostgresSaver`) 通过自定义 `CheckpointStore` ABC (per [03 §1.1 M-08 / M-09](03-detailed-design.md)), 加 audit + 业务级 metadata + 守门 hook。下表 native 名称 + 实际包装 クラス名 并列。
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Tier 1: In-Memory (per session)                              │
-│  • LangGraph MemorySaver (native)                              │
+│  • Native: LangGraph MemorySaver (from langgraph.checkpoint.memory) │
+│  • Wrapper: MemoryCheckpointer (per 03 §1.1 M-08)             │
 │  • Fastest, no persistence                                     │
 │  • Used for: high-frequency reads within session              │
 └────────────────────────┬────────────────────────────────────────┘
@@ -377,15 +382,17 @@ class SubAgentHandle:
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  Tier 2: SQLite (cross-session)                               │
-│  • LangGraph SqliteSaver (native)                              │
+│  • Native: LangGraph SqliteSaver (from langgraph.checkpoint.sqlite) │
+│  • Wrapper: SqliteCheckpointer (per 03 §1.1 M-09) — v0.1 默认 │
 │  • Single file: ~/.star/langgraph/checkpoints.db              │
-│  • Used for: cross-session resume (v0.1 默认)                │
+│  • Used for: cross-session resume                             │
 └────────────────────────┬────────────────────────────────────────┘
                          │ async batch
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  Tier 3: PostgreSQL (production)                              │
-│  • LangGraph PostgresSaver (native)                            │
+│  • Native: LangGraph PostgresSaver (from langgraph.checkpoint.postgres) │
+│  • Wrapper: PostgresCheckpointer (v0.2 计划)                  │
 │  • Multi-session, multi-tenant                                │
 │  • Used for: production scale (v0.2 计划)                    │
 │  • Per 守门 #13 Master data RLS                               │
@@ -960,12 +967,17 @@ per 要件 §3.1 NFR-P-01..06 目標 + 実装戦略：
 
 ### 9.1 既存 automation 脚本 段階的 移行
 
-| 现有 | 目标 | 移行方法 |
+> **重要 (per [01 §1.0](01-requirements.md))**: 现有 `dispatcher.py` / `console_server.py` / `ai_edit_mock.py` 等是 **Mavis worker subagent 系统** (subprocess + brief), 跟本 view 设计的 **任务卡子代理 (Sub-Agent) 系统** (LangGraph in-process) 是两套独立系统。下表是 **共存** 計画, **不是** 取代 計画。
+
+| 现有 (worker subagent 系统) | 目标 (任务卡子代理 系统) | 关系 |
 |---|---|---|
-| `scripts/automation/dispatcher.py` | 既存继续, 加 LangGraph state 桥接 | wrapper adapter |
-| `scripts/automation/console_server.py` | 既存 continue, 加 UI 端点 /api/sub-agent/* | 端点 追加 |
-| `scripts/automation/ai_edit_mock.py` | SA-09 free-form 内部 tool | 関数 import |
-| 其他 5 基类 | 既存 continue, 不强制移行 | 选择性 wrap |
+| `scripts/automation/dispatcher.py` | `SubAgentPool.spawn()` (NEW, 任务卡子代理用) | 并存, 两套各管各的; 任务卡子代理 可在 execute 阶段 invoke dispatcher.py 派 worker subagent 干粗活 |
+| `scripts/automation/console_server.py` | `UIStreamer` (NEW, FastAPI 8080 已有 + 加 /api/sub-agent/* 端点) | 共存, console_server.py 现有 FastAPI 端点保留, 加 任务卡子代理 路由 |
+| `scripts/automation/ai_edit_mock.py` | SA-09 free-form 内部 tool | 関数 import (复用) |
+| `scripts/automation/judge.py` | `[P]/[S]/[M]` 判定 CLI | 既存 continue, 任务卡子代理 dispatch 时机 判定 可复用 |
+| `scripts/automation/refactor_template.py` | SA-06 refactor 内部分支 | 选择性 wrap |
+| `scripts/automation/registry_check.py` | 脚本注册表 一致性校验 | CI gate, 既存 continue |
+| 其他业务脚本 (h2_refactor / kanban_sprint_gen / ...) | 选择性 迁移为 SA-XX sub-agent 类型 | 不强制, per task 评估 |
 
 ### 9.2 既存 gm-console frontend 拡張
 

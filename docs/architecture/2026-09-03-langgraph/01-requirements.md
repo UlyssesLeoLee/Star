@@ -26,6 +26,25 @@
 
 ## 1. 業務要件 (Business Requirements)
 
+### 1.0 用語区別 (Sub-Agent vs Worker subagent)
+
+本架构 view 设计的是 **任务卡子代理 (Sub-Agent)** — UI 驱动、LangGraph 状态化的新 sub-agent 系统。**与现有 Mavis worker subagent (worker/explorer/verifier, 通过 `dispatcher.py` + brief 派发) 是两套独立的 sub-agent 系统**：
+
+| 维度 | 任务卡子代理 (Sub-Agent, 本 view 范围) | Worker subagent (现有, 本 view 范围外) |
+|---|---|---|
+| **触发** | UI 聊天栏 / 任务卡 (用户驱动) | Mavis 自动派发 (Mavis root 驱动) |
+| **生命周期** | task card 期间 (1 user session) | Mavis task 期间 (跨 session 短) |
+| **状态管理** | LangGraph checkpoint (3-tier) | brief + status.json (filesystem) |
+| **通信** | in-process asyncio (WebSocket/SSE 推流) | subprocess + RPC (per 守门 #20) |
+| **守门 #20** | 不适用 (用户驱动) | 必先 brief (per 守门 #20 派生规) |
+| **典型场景** | "H2 8 domain 改造並列で" / "5 域 Lead 配置 review" | "B.5 OpenClaw 真实接入 e2e" (Mavis 内部 task) |
+| **典型 API** | `SubAgentPool.spawn(SA-XX, ctx)` | `SubagentDispatcher.brief(task_id, content, agent)` |
+
+**关系 (per 02-basic-design.md §9.1 移行設計)**:
+- 两套系统**并存**, 任务卡子代理不取代 worker subagent
+- 任务卡子代理可以在 plan/execute 阶段**调用** worker subagent 走 subprocess 路径 (跨平台, 守门 #9 实证)
+- 现有 `dispatcher.py` / `console_server.py` 维持, 加 LangGraph state 桥接 (wrapper adapter)
+
 ### 1.1 背景 (Background)
 
 Star 项目现状（per 2026-09-03 main HEAD `e5f0503`）：
@@ -34,7 +53,7 @@ Star 项目现状（per 2026-09-03 main HEAD `e5f0503`）：
 - **16 MCP tools**（star-mcp stdio + Streamable HTTP transport）
 - **gm-console frontend**（Next.js + AppShell 5-tab：Kanban / Timeline / Backlog / Agents / Worktrees）
 - **5 域 Lead 治理**（per 2026-08-21 JST 拒绝兼任硬约束）：player / economy / match / social / admin
-- **scripts/automation/**（8 份基类 + dispatcher.py / console_server.py / ai_edit_mock.py 等）
+- **scripts/automation/**（4 真实基类 `__init__.py` / `dispatcher.py` / `cli_helper/base.py` / `refactor_template.py` + 4 utility `judge.py` / `smoke_test.py` / `registry_check.py` / `console_server.py` + N 业务脚本如 `ai_edit_mock.py` / `h2_refactor.py` / `kanban_sprint_gen.py` 等, per `scripts/automation/registry.md` v0.1）
 - **AGENTS.md §4 守门 24+ 项**（含 #1/#3/#4/#5/#6/#7/#8/#9/#10/#11/#12/#13 + 守门 #1 v1-v24 派生累积规）
 
 ### 1.2 業務課題 (Business Challenges)

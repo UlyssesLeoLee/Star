@@ -7,6 +7,8 @@
 > **依赖**：[01-requirements.md](01-requirements.md)（要件定義書）· [02-basic-design.md](02-basic-design.md)（基本設計書）· [ADR-0030](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0030-agent-lease-heartbeat-resume.md) · [ADR-0032](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0032-mcp-transport-stdio.md) · [AGENTS.md](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md)
 > **关联文档**：[01-requirements.md](01-requirements.md) · [02-basic-design.md](02-basic-design.md)
 
+> **本 view 范围** (per [01 §1.0](01-requirements.md)): 本詳細設計書涵盖的是 **任务卡子代理 (Sub-Agent)** 系统的 LangGraph 状態機 / 节点 / 边 / reducer / シーケンス図 / 状態遷移 / 永続化 / テスト設計。**不涵盖** 现有 Mavis worker subagent (worker/explorer/verifier, `dispatcher.py` + brief 派发) 系统 — 那是另一套独立 sub-agent 系统, per [01 §1.0](01-requirements.md) 区别表。
+
 ---
 
 ## 0. 目的 (Purpose)
@@ -216,7 +218,7 @@ star-lg/                              # 新規 crate (per 守门 #6 PowerShell o
 ```python
 # top_agent/graph.py
 from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint import Checkpoint
+from langgraph.checkpoint.base import Checkpoint  # 实际路径, 2026-09-03 時点
 
 class TopAgent:
     """全体代理 L0 (singleton per session)"""
@@ -1567,7 +1569,7 @@ per 01 §7 + 02 §10 + 追加:
 - token OLU telemetry 接入待 SRE Lead 真人
 - Chat Bar 既存フロントエンド統合 UI 検証未実施
 - Task Card Modal 詳細 view 未実装 (F-10 部分)
-- LangGraph SDK バージョン固定 (lock to 0.2.x)
+- LangGraph SDK バージョン固定 (lock to 0.2.x — **未实装实证**, v0.1 実装 时 需先 `uv add langgraph@latest` + `pip show langgraph` 確認 实际版本 + API 兼容性, 避免文档与 SDK 偏离)
 - 守门 #19/20 (agent 交互 Python 化 + 子代理 brief) 適用范围 在 sub-agent 起動 时机 待 DDD Review 确认
 - 既存 dispatcher.py / console_server.py との共存 過渡期
 - 16 tools 全部 sub-agent 経由 call 化 (现 3 tool 真实接入 + 12 tool 留 P2 缺 service, per AGENTS.md §7 #2)
