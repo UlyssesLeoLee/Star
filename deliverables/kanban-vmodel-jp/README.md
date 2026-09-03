@@ -67,9 +67,10 @@ npx --yes http-server -p 8917 -a 127.0.0.1
 - **進捗可視化** — 完了工数 / 計画工数バー + 日数進捗バー + 残日数
 - **Sprint 履歴** — サイドバーに計画中・進行中・完了・取消の 4 グループで一覧
 - **📊 Sprint メトリクス (P2)** — Velocity 5 本バー + Burndown 折れ線 + Sprint 履歴表 + チーム Capacity 設定
+- **📝 Sprint 仪式 (P3)** — 🎯 Goal 横幅 + 起動会テンプレ + ☀️ Daily Standup (3 問記録) + 🎉 Review (Demo 候補選択) + 🔄 Retrospective (KPT 3 列 Markdown 板 + エクスポート)
 
 > Sprint ビューは Kanban と並列モードで共存 (per `docs/briefs/kanban-sprint-view-001.md` 拍板)。
-> P2 (Velocity/Burndown 図) 実装済 / P3 (Standup/Review/Retrospective) は WBS 后续。
+> 全 3 阶段 (P1 核心 / P2 度量 / P3 仪式) 收官済。
 
 ### 🎯 カスタマイズ（ユーザー独自の強み）
 - **フェーズ追加** — ヘッダ右上の `+` ボタン → 名前・ふりがな・説明・アイコン・色を指定

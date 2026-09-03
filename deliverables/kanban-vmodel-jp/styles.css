@@ -2134,7 +2134,311 @@ img, svg { display: block; max-width: 100%; }
 }
 .capacity-form__hint strong { color: var(--text-1); }
 
+/* ==========================================================================
+   Sprint ceremonies (P3)
+   ========================================================================== */
+
+.sprint-ceremonies {
+  margin-top: 12px;
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+  max-height: 70vh;
+}
+.sprint-ceremonies__head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-1);
+}
+.sprint-ceremonies__title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-0);
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.sprint-ceremonies__hint {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: 'JetBrains Mono', monospace;
+}
+.sprint-ceremonies__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.ceremony-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex; flex-direction: column;
+  min-height: 0;
+}
+.ceremony-card--wide { grid-column: span 2; }
+.ceremony-card--goal { background: linear-gradient(135deg, rgba(34, 197, 94, 0.06) 0%, rgba(34, 211, 238, 0.04) 100%); border-color: rgba(34, 197, 94, 0.2); }
+.ceremony-card__head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-1);
+}
+.ceremony-card__head h3 {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-0);
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.ceremony-card__head h4 {
+  font-size: 11px;
+  font-weight: 600;
+  margin: 0 0 6px 0;
+  color: var(--text-1);
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.ceremony-card__sub {
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: 'JetBrains Mono', monospace;
+}
+.ceremony-card__body {
+  flex: 1;
+  display: flex; flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+.ceremony-empty {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 32px 16px;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.ceremony-empty-sm {
+  padding: 12px 8px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-3);
+  list-style: none;
+}
+
+/* Goal block */
+.goal-block {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.goal-block__label {
+  font-size: 10px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.goal-block__text {
+  font-size: 14px;
+  color: var(--text-0);
+  line-height: 1.5;
+  font-family: 'Noto Sans JP', sans-serif;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+  min-height: 32px;
+}
+.goal-block__actions {
+  display: flex; gap: 4px; flex-wrap: wrap;
+  margin-top: 4px;
+}
+.goal-block__template {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-1);
+  border-radius: 6px;
+  font-size: 11px;
+}
+.goal-block__template pre {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-1);
+  white-space: pre-wrap;
+  margin: 0 0 8px 0;
+  line-height: 1.5;
+}
+
+/* Standup form */
+.standup-form {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.standup-form__row {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.standup-form__row label {
+  font-size: 10px;
+  color: var(--text-2);
+  font-weight: 600;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.standup-form__row .form-textarea {
+  font-size: 11px;
+  resize: vertical;
+  min-height: 36px;
+}
+.standup-form__actions {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 4px;
+}
+.standup-form__hint {
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: 'JetBrains Mono', monospace;
+}
+.standup-history {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-1);
+}
+.standup-history h4 {
+  font-size: 11px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--text-1);
+}
+.standup-history__item {
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+.standup-history__item summary {
+  cursor: pointer;
+  padding: 4px 8px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-1);
+  list-style: none;
+}
+.standup-history__item summary::before { content: '▸ '; color: var(--text-3); }
+.standup-history__item[open] summary::before { content: '▾ '; }
+.standup-history__item summary:hover { background: rgba(255,255,255,0.06); }
+.standup-history__body {
+  padding: 6px 12px;
+  font-size: 10px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.standup-history__body strong { color: var(--text-1); font-family: 'Noto Sans JP', sans-serif; }
+
+/* Review */
+.review-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  min-height: 200px;
+}
+.review-col {
+  display: flex; flex-direction: column;
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 0;
+}
+.review-task-list {
+  list-style: none; padding: 0; margin: 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 100px;
+}
+.review-task {
+  padding: 4px 6px;
+  margin-bottom: 2px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.review-task:hover { background: rgba(255,255,255,0.03); }
+.review-task label {
+  display: grid;
+  grid-template-columns: auto 50px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.review-task input[type="checkbox"] { margin: 0; }
+.review-task__id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-3);
+}
+.review-task__title {
+  color: var(--text-0);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.review-task__prio {
+  font-size: 9px !important;
+  padding: 1px 4px !important;
+}
+.review-col .form-textarea {
+  font-size: 11px;
+  flex: 1;
+  resize: vertical;
+  min-height: 100px;
+}
+.review-col__hint {
+  font-size: 10px;
+  color: var(--text-2);
+  margin-top: 4px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.review-col__hint strong { color: #4ade80; }
+
+/* Retrospective (3 columns KPT) */
+.retrospective-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  min-height: 240px;
+}
+.retrospective-col {
+  display: flex; flex-direction: column;
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 0;
+  border-top-width: 3px;
+}
+.retrospective-col label {
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--text-0);
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.retrospective-textarea {
+  flex: 1;
+  font-size: 11px;
+  resize: vertical;
+  min-height: 160px;
+  font-family: 'JetBrains Mono', 'Noto Sans JP', monospace;
+}
+.retrospective-col--good { border-top-color: #22c55e; }
+.retrospective-col--improve { border-top-color: #fbbf24; }
+.retrospective-col--action { border-top-color: #3b82f6; }
+.retrospective-actions {
+  display: flex; gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-1);
+}
+
 @media (max-width: 1200px) {
+  .sprint-ceremonies__grid { grid-template-columns: 1fr; }
+  .ceremony-card--wide { grid-column: span 1; }
+  .retrospective-grid { grid-template-columns: 1fr; }
+  .review-grid { grid-template-columns: 1fr; }
   .sprint-metrics__grid { grid-template-columns: 1fr; }
   .metric-card--wide { grid-column: span 1; }
 }

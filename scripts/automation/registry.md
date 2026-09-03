@@ -36,7 +36,7 @@
 | `scripts/automation/smoke_test.py` | 4 基类 smoke 验证 (per §6.6) | CI 守门基线 step 6 | TBD | 🟢 完成 (4 case 跑通) |
 | `scripts/automation/registry_check.py` | 索引一致性校验 (per §6.7) | CI 守门基线 step 7 | TBD | 🟢 完成 (warning 不阻塞) |
 | `scripts/automation/charts_p0_setup.py` | P0 图表基础设施 + C01 完整跑通 (per docs/briefs/P3-CHARTS-P0.md) | CHARTS-P0 阶段 1 (Recharts 3 依赖 + crates/domain-report 12 Rust + frontend 4 文件 + 19/19 测试) | TBD | 🟢 完成 (16 文件写入, 19/19 测试 pass, 0 err / 0 clippy) |
-| `scripts/automation/kanban_sprint_gen.py` | kanban-vmodel-jp Sprint 视图 P1 + P2 验证 (55 项检查: app.js 函数 + index.html 结构 + styles.css class) | KANBAN-SPRINT-001 P1 (Sprint 核心) + P2 (度量) | TBD | 🟢 完成 (55/55 pass, `--strict` exit 0) |
+| `scripts/automation/kanban_sprint_gen.py` | kanban-vmodel-jp Sprint 视图 P1 + P2 + P3 验证 (93 项检查: app.js 函数 + index.html 结构 + styles.css class) | KANBAN-SPRINT-001 P1 (Sprint 核心 + Jira 設計) + P2 (度量) + P3 (仪式) | TBD | 🟢 完成 (93/93 pass, `--strict` exit 0) |
 
 **说明**:
 - 末次 commit 列填 `TBD` = 本批次 v0.1 初版, commit 落地后回填
@@ -110,3 +110,4 @@
 | v0.2 | 2026-09-03 | 架构师 (Mavis 接手 agent per DEC-008) | 新增 §5 P3-G Agent Jira 化阶段索引: 5 段 20 子项 G.1-G.20, W1 1.9M + W2-W5 4.0M, 命名空间 P3-G 跟 P3-B (OpenClaw) 9 子项共存 | 2026-09-03 11:50 JST Ulysses Jira 化指令 + 3 步 ask_user 拍板 + 守门 #21 [P] docs 同步 |
 | v0.3 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 脚本索引表 新增 `kanban_sprint_gen.py` (KANBAN-SPRINT-001 P1 Sprint 视图 验证, 43/43 pass) | 2026-09-03 13:25 JST P1 收官, 守门 #1 v19 + #21 v21 实证 |
 | v0.4 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 索引说明更新 (kanban_sprint_gen.py 43→55 项) + KANBAN-SPRINT-001 落地 P1 v0.2 Jira 設計 (per docs/briefs/kanban-sprint-view-001.md v0.2) + P2 度量 (Velocity/Burndown/History/Capacity) | 2026-09-03 13:55 JST P1 v0.2 + P2 收官, commit `947c0ef` 落地 |
+| v0.5 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 索引说明更新 (kanban_sprint_gen.py 55→93 项) + KANBAN-SPRINT-001 P3 仪式 收官 (Goal + Standup + Review + Retrospective + Markdown 导出) | 2026-09-03 14:05 JST P3 拍板 + 14:20 JST 收官, KANBAN-SPRINT-001 三阶段全部收官 |

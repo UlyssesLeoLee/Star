@@ -78,6 +78,28 @@ APP_JS_CHECKS: List[Tuple[str, str, bool]] = [
     ('cancelSprint 全件 → backlog', r"const\s+returned\s*=\s*returnSprintTasksToBacklog\(\s*s\s*\)", True),
     ('Sprint 計画 modal backlog filter (status=backlog)', r"t\.status\s*===\s*['\"]backlog['\"]", True),
     ('Sprint 計画 hint "Jira 設計"', r"Jira\s*設計", True),
+    # P2 度量
+    ('CEREMONIES_OPEN_KEY 存储 (P3)', r"CEREMONIES_OPEN_KEY\s*=\s*['\"]vmodel-ceremonies-open-v1['\"]", True),
+    ('state.ceremoniesOpen 字段 (P3)', r"state\.ceremoniesOpen", True),
+    ('recordSprintSnapshot 函数 (P2)', r"function\s+recordSprintSnapshot", True),
+    ('renderSprintMetrics 函数 (P2)', r"function\s+renderSprintMetrics", True),
+    ('renderVelocityChart 函数 (P2)', r"function\s+renderVelocityChart", True),
+    ('renderBurndownChart 函数 (P2)', r"function\s+renderBurndownChart", True),
+    ('renderSprintHistory 函数 (P2)', r"function\s+renderSprintHistory", True),
+    ('renderCapacityConfig 函数 (P2)', r"function\s+renderCapacityConfig", True),
+    ('toggleMetrics 函数 (P2)', r"function\s+toggleMetrics", True),
+    # P3 仪式
+    ('getOrInitCeremonies 函数 (P3)', r"function\s+getOrInitCeremonies", True),
+    ('saveStandup 函数 (P3)', r"function\s+saveStandup", True),
+    ('renderSprintCeremonies 函数 (P3)', r"function\s+renderSprintCeremonies", True),
+    ('renderCeremonyGoalBlock 函数 (P3)', r"function\s+renderCeremonyGoalBlock", True),
+    ('bindCeremonyEvents 函数 (P3)', r"function\s+bindCeremonyEvents", True),
+    ('toggleCeremonies 函数 (P3)', r"function\s+toggleCeremonies", True),
+    ('Standup textarea 昨日/今日/障害 (P3)', r"id=['\"]standupYesterday['\"]", True),
+    ('Sprint Goal 編集 (P3)', r"id=['\"]goalEdit['\"]", True),
+    ('Retrospective 3 列 KPT (P3)', r"retrospective-col--(good|improve|action)", True),
+    ('Retrospective Markdown 导出 (P3)', r"retrospective\.md", True),
+    ('ceremoniesToggle 事件绑定 (P3)', r"ceremoniesToggle[\s\S]{0,200}addEventListener", True),
 ]
 
 INDEX_HTML_CHECKS: List[Tuple[str, str, bool]] = [
@@ -92,6 +114,8 @@ INDEX_HTML_CHECKS: List[Tuple[str, str, bool]] = [
     ('Sprint plan modal', r'id="sprintPlanModal"', True),
     # P2 追加
     ('Sprint metrics panel (P2)', r'id="sprintMetrics"', True),
+    # P3 追加
+    ('Sprint ceremonies panel (P3)', r'id="sprintCeremonies"', True),
 ]
 
 STYLES_CSS_CHECKS: List[Tuple[str, str, bool]] = [
@@ -114,6 +138,25 @@ STYLES_CSS_CHECKS: List[Tuple[str, str, bool]] = [
     ('.plan-hint Backlog 提示', r'\.plan-hint\s*\{', True),
     ('.plan-warn 警告', r'\.plan-warn\s*\{', True),
     ('.plan-list__empty', r'\.plan-list__empty\s*\{', True),
+    # P2 度量
+    ('.sprint-metrics 容器', r'\.sprint-metrics\s*\{', True),
+    ('.metric-card 卡片', r'\.metric-card\s*\{', True),
+    ('.chart-svg SVG', r'\.chart-svg\s*\{', True),
+    ('.history-table', r'\.history-table\s*\{', True),
+    ('.capacity-form', r'\.capacity-form\s*\{', True),
+    # P3 仪式
+    ('.sprint-ceremonies 容器', r'\.sprint-ceremonies\s*\{', True),
+    ('.ceremony-card 卡片', r'\.ceremony-card\s*\{', True),
+    ('.ceremony-card--goal 样式', r'\.ceremony-card--goal', True),
+    ('.standup-form', r'\.standup-form\s*\{', True),
+    ('.standup-history 履歴', r'\.standup-history\s*\{', True),
+    ('.review-grid 2 列', r'\.review-grid\s*\{', True),
+    ('.review-task-list', r'\.review-task-list\s*\{', True),
+    ('.retrospective-grid 3 列', r'\.retrospective-grid\s*\{', True),
+    ('.retrospective-col--good 绿', r'\.retrospective-col--good', True),
+    ('.retrospective-col--improve 黄', r'\.retrospective-col--improve', True),
+    ('.retrospective-col--action 蓝', r'\.retrospective-col--action', True),
+    ('.goal-block Goal 横幅', r'\.goal-block\s*\{', True),
 ]
 
 

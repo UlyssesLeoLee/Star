@@ -14,6 +14,7 @@
   const SPRINT_STORAGE_KEY = 'vmodel-sprints-v1';
   const TEAM_CONFIG_KEY = 'vmodel-team-config-v1';
   const METRICS_OPEN_KEY = 'vmodel-metrics-open-v1';
+  const CEREMONIES_OPEN_KEY = 'vmodel-ceremonies-open-v1';
 
   /* ------------------------------------------------------------------
    * 永続化レイヤー
@@ -41,9 +42,10 @@
     filter: '',
     industry: store.load('vmodel-industry-v1', 'all'),  // all | finance | public | ec | embedded
     theme: store.load(THEME_KEY, 'dark'),
-    sprints: store.load(SPRINT_STORAGE_KEY, null) || [],  // [{id, name, goal, startDate, endDate, durationDays, status, taskIds[], dailySnapshots[], createdAt, completedAt, velocity}]
+    sprints: store.load(SPRINT_STORAGE_KEY, null) || [],  // [{id, name, goal, startDate, endDate, durationDays, status, taskIds[], dailySnapshots[], ceremonies, createdAt, completedAt, velocity}]
     teamConfig: store.load(TEAM_CONFIG_KEY, null) || { size: 3, hoursPerWeek: 40 },  // 团队规模 + 每人每周可用工时
     metricsOpen: store.load(METRICS_OPEN_KEY, false),  // Sprint 视图 metrics panel 展开状态
+    ceremoniesOpen: store.load(CEREMONIES_OPEN_KEY, false),  // Sprint 视图 ceremonies panel 展开状态
     activeSprintId: null  // id of the currently active sprint (status='active')
   };
 
@@ -512,6 +514,7 @@
     renderSprintBoard();
     renderSprintList();
     renderSprintMetrics();
+    renderSprintCeremonies();
   }
 
   function renderSprintHeader() {
@@ -552,6 +555,7 @@
           <p class="sprint-header__goal">${escapeHTML(active.goal || '—')}</p>
         </div>
         <div class="sprint-header__actions">
+          <button class="btn btn--ghost" id="ceremoniesToggle">${state.ceremoniesOpen ? '📝 仪式を隠す' : '📝 仪式'}</button>
           <button class="btn btn--ghost" id="metricsToggle">${state.metricsOpen ? '📊 メトリクスを隠す' : '📊 メトリクス'}</button>
           <button class="btn btn--ghost" id="sprintPlanBtn">📋 計画編集</button>
           <button class="btn btn--ghost" id="sprintEditBtn">✏️ 編集</button>
@@ -594,6 +598,7 @@
     document.getElementById('sprintCompleteBtn').addEventListener('click', () => completeSprint(active.id));
     document.getElementById('sprintCancelBtn').addEventListener('click', () => cancelSprint(active.id));
     document.getElementById('metricsToggle').addEventListener('click', toggleMetrics);
+    document.getElementById('ceremoniesToggle').addEventListener('click', toggleCeremonies);
   }
 
   function renderSprintBoard() {
@@ -1360,6 +1365,354 @@
     // Update button text
     const btn = document.getElementById('metricsToggle');
     if (btn) btn.textContent = state.metricsOpen ? '📊 メトリクスを隠す' : '📊 メトリクス';
+  }
+
+  /* ------------------------------------------------------------------
+   * Sprint ceremonies (P3 — 仪式)
+   * ----------------------------------------------------------------*/
+
+  // ----- Ceremony helpers -----
+  function getOrInitCeremonies(sprint) {
+    if (!sprint) return null;
+    if (!sprint.ceremonies) {
+      sprint.ceremonies = {
+        standupNotes: [],   // [{ date, yesterday, today, blockers }]
+        reviewNotes: '',    // markdown
+        demoTaskIds: [],    // completed tasks for demo
+        retrospective: { wentWell: '', toImprove: '', actions: '' }
+      };
+    }
+    return sprint.ceremonies;
+  }
+  function todayISO() { return new Date().toISOString().slice(0, 10); }
+  function formatDateJa(iso) {
+    if (!iso) return '';
+    const d = new Date(iso + 'T00:00:00');
+    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+  }
+  function getTodayStandup(ceremonies) {
+    if (!ceremonies) return null;
+    const t = todayISO();
+    return ceremonies.standupNotes.find(s => s.date === t) || null;
+  }
+  function saveStandup(ceremonies, entry) {
+    if (!ceremonies) return;
+    const idx = ceremonies.standupNotes.findIndex(s => s.date === entry.date);
+    if (idx >= 0) ceremonies.standupNotes[idx] = entry;
+    else ceremonies.standupNotes.push(entry);
+  }
+
+  // ----- Render ceremonies -----
+  function renderSprintCeremonies() {
+    const el = document.getElementById('sprintCeremonies');
+    if (!el) return;
+    el.hidden = !state.ceremoniesOpen;
+    if (el.hidden) return;
+
+    const active = getActiveSprint();
+    if (!active) {
+      el.innerHTML = `<div class="ceremony-empty">🏃 アクティブな Sprint がありません。Sprint を開始してから Daily Standup / Review / Retrospective を記録してください。</div>`;
+      return;
+    }
+    const c = getOrInitCeremonies(active);
+    const today = todayISO();
+    const todayEntry = getTodayStandup(c);
+    const sortedStandups = (c.standupNotes || []).slice().sort((a, b) => b.date.localeCompare(a.date));
+    const completedTasks = (active.taskIds || [])
+      .map(id => state.tasks[id])
+      .filter(t => t && t.status === 'done');
+    const goalBlock = renderCeremonyGoalBlock(active, c);
+
+    el.innerHTML = `
+      <div class="sprint-ceremonies__head">
+        <h2 class="sprint-ceremonies__title">📝 Sprint 仪式</h2>
+        <div class="sprint-ceremonies__hint">Daily Standup · Review · Retrospective · Goal</div>
+      </div>
+      <div class="sprint-ceremonies__grid">
+        ${goalBlock}
+        <section class="ceremony-card">
+          <header class="ceremony-card__head">
+            <h3>☀️ Daily Standup (今日 ${formatDateJa(today)})</h3>
+            <span class="ceremony-card__sub">${sortedStandups.length} 件の履歴</span>
+          </header>
+          <div class="ceremony-card__body">
+            <div class="standup-form">
+              <div class="standup-form__row">
+                <label>昨日やったこと</label>
+                <textarea class="form-textarea" id="standupYesterday" rows="2" placeholder="例: 認証 API 完成 / PR レビュー 2 件">${escapeHTML(todayEntry?.yesterday || '')}</textarea>
+              </div>
+              <div class="standup-form__row">
+                <label>今日やること</label>
+                <textarea class="form-textarea" id="standupToday" rows="2" placeholder="例: タスク CRUD API 実装 / 単体テスト">${escapeHTML(todayEntry?.today || '')}</textarea>
+              </div>
+              <div class="standup-form__row">
+                <label>障害・相談事項</label>
+                <textarea class="form-textarea" id="standupBlockers" rows="2" placeholder="例: DB スキーマレビュー待ち">${escapeHTML(todayEntry?.blockers || '')}</textarea>
+              </div>
+              <div class="standup-form__actions">
+                <span class="standup-form__hint" id="standupHint">${todayEntry ? '✅ 今日分は保存済' : '未保存'}</span>
+                <button class="task-detail__btn is-primary" id="standupSaveBtn">保存</button>
+              </div>
+            </div>
+            ${sortedStandups.length > 1 || (sortedStandups.length === 1 && sortedStandups[0].date !== today) ? `
+              <div class="standup-history">
+                <h4>📜 過去の Standup</h4>
+                ${sortedStandups.filter(s => s.date !== today).slice(0, 7).map(s => `
+                  <details class="standup-history__item">
+                    <summary>${formatDateJa(s.date)}</summary>
+                    <div class="standup-history__body">
+                      <div><strong>昨日:</strong> ${escapeHTML(s.yesterday || '—')}</div>
+                      <div><strong>今日:</strong> ${escapeHTML(s.today || '—')}</div>
+                      <div><strong>障害:</strong> ${escapeHTML(s.blockers || '—')}</div>
+                    </div>
+                  </details>
+                `).join('') || '<div class="ceremony-empty-sm">履歴なし</div>'}
+              </div>
+            ` : ''}
+          </div>
+        </section>
+        <section class="ceremony-card ceremony-card--wide">
+          <header class="ceremony-card__head">
+            <h3>🎉 Sprint Review (完了済 ${completedTasks.length} 件 / 計画 ${(active.taskIds || []).length} 件)</h3>
+            <span class="ceremony-card__sub">Sprint 完了時に Demo 候補を選択</span>
+          </header>
+          <div class="ceremony-card__body">
+            <div class="review-grid">
+              <div class="review-col">
+                <h4>✅ 完了したタスク (Demo 候補)</h4>
+                <ul class="review-task-list" id="reviewTaskList">
+                  ${completedTasks.length ? completedTasks.map(t => {
+                    const checked = (c.demoTaskIds || []).includes(t.id);
+                    return `
+                      <li class="review-task">
+                        <label>
+                          <input type="checkbox" data-demo="${t.id}" ${checked ? 'checked' : ''}>
+                          <span class="review-task__id">${t.id}</span>
+                          <span class="review-task__title">${escapeHTML(t.title)}</span>
+                          <span class="review-task__prio card__prio card__prio--${t.priority}">${t.priority}</span>
+                        </label>
+                      </li>
+                    `;
+                  }).join('') : '<li class="ceremony-empty-sm">完了したタスクがありません</li>'}
+                </ul>
+              </div>
+              <div class="review-col">
+                <h4>📝 Review Notes (Markdown)</h4>
+                <textarea class="form-textarea" id="reviewNotes" rows="8" placeholder="Demo の流れ · 参加者 · フィードバック ...">${escapeHTML(c.reviewNotes || '')}</textarea>
+                <div class="review-col__hint">選択中: <strong id="reviewDemoCount">${(c.demoTaskIds || []).length}</strong> 件 / 全 ${completedTasks.length} 件</div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="ceremony-card ceremony-card--wide">
+          <header class="ceremony-card__head">
+            <h3>🔄 Sprint Retrospective (3 列 Markdown)</h3>
+            <span class="ceremony-card__sub">Sprint 振り返り · KPT フレームワーク</span>
+          </header>
+          <div class="ceremony-card__body">
+            <div class="retrospective-grid">
+              <div class="retrospective-col retrospective-col--good">
+                <label>✅ 良かったこと (Keep)</label>
+                <textarea class="form-textarea retrospective-textarea" id="retroWentWell" rows="8" placeholder="例:
+- Daily Standup 15 分定時で回せた
+- ペアプロで属人化解消
+- 自動テスト追加で安心してリファクタ">${escapeHTML(c.retrospective.wentWell || '')}</textarea>
+              </div>
+              <div class="retrospective-col retrospective-col--improve">
+                <label>⚠️ 改善すること (Problem)</label>
+                <textarea class="form-textarea retrospective-textarea" id="retroToImprove" rows="8" placeholder="例:
+- PR レビュー待ちが長い (平均 2 日)
+- テスト書く時間がない
+- 設計レビューが後手">${escapeHTML(c.retrospective.toImprove || '')}</textarea>
+              </div>
+              <div class="retrospective-col retrospective-col--action">
+                <label>🎯 アクション (Try)</label>
+                <textarea class="form-textarea retrospective-textarea" id="retroActions" rows="8" placeholder="例:
+- レビュー SLA 24h ルール化
+- テスト書く時間を朝 30 分確保
+- 設計レビューを実装前に">${escapeHTML(c.retrospective.actions || '')}</textarea>
+              </div>
+            </div>
+            <div class="retrospective-actions">
+              <button class="task-detail__btn is-primary" id="retroSaveBtn">Retrospective を保存</button>
+              <button class="task-detail__btn" id="retroExportBtn">📋 Markdown エクスポート</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    `;
+
+    bindCeremonyEvents(active, c);
+  }
+
+  function renderCeremonyGoalBlock(sprint, c) {
+    return `
+      <section class="ceremony-card ceremony-card--goal">
+        <header class="ceremony-card__head">
+          <h3>🎯 Sprint Goal</h3>
+          <span class="ceremony-card__sub">${sprint.startDate} → ${sprint.endDate}</span>
+        </header>
+        <div class="ceremony-card__body">
+          <div class="goal-block">
+            <div class="goal-block__label">ゴール (現状)</div>
+            <div class="goal-block__text" id="goalDisplay">${escapeHTML(sprint.goal || '—')}</div>
+            <textarea class="form-textarea" id="goalEdit" rows="3" placeholder="ゴールを入力 (例: 認証 + タスク CRUD API 完成)" hidden>${escapeHTML(sprint.goal || '')}</textarea>
+            <div class="goal-block__actions">
+              <button class="task-detail__btn" id="goalEditBtn" style="font-size:11px">✏️ 編集</button>
+              <button class="task-detail__btn is-primary" id="goalSaveBtn" style="font-size:11px" hidden>💾 保存</button>
+              <button class="task-detail__btn" id="goalCancelBtn" style="font-size:11px" hidden>キャンセル</button>
+              <button class="task-detail__btn" id="goalTemplateBtn" style="font-size:11px">📋 起動テンプレ</button>
+            </div>
+            <div class="goal-block__template" id="goalTemplate" hidden>
+              <pre>📌 Sprint Planning Meeting テンプレート
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 前 Sprint 振り返り (5 min)
+   - 達成率: __% / Velocity: __h
+2. Product Owner から今 Sprint の目標提示 (5 min)
+3. チームでタスク見積もり + コミットメント (15 min)
+4. リスク・依存関係の共有 (5 min)
+5. 開始宣言 🏁</pre>
+              <button class="task-detail__btn" id="goalTemplateClose" style="font-size:11px">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function bindCeremonyEvents(sprint, c) {
+    // Standup save
+    const standupSave = document.getElementById('standupSaveBtn');
+    if (standupSave) {
+      standupSave.addEventListener('click', () => {
+        const yesterday = document.getElementById('standupYesterday').value.trim();
+        const today = document.getElementById('standupToday').value.trim();
+        const blockers = document.getElementById('standupBlockers').value.trim();
+        if (!yesterday && !today && !blockers) {
+          toast('Standup に最低 1 項目は入力してください', 'error');
+          return;
+        }
+        saveStandup(c, { date: todayISO(), yesterday, today, blockers });
+        save();
+        toast('✅ 今日分の Standup を保存');
+        const hint = document.getElementById('standupHint');
+        if (hint) { hint.textContent = '✅ 今日分は保存済'; hint.style.color = '#4ade80'; }
+      });
+    }
+
+    // Review demo checkboxes
+    const reviewTaskList = document.getElementById('reviewTaskList');
+    const reviewDemoCount = document.getElementById('reviewDemoCount');
+    if (reviewTaskList) {
+      reviewTaskList.querySelectorAll('[data-demo]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const tid = cb.dataset.demo;
+          if (cb.checked) {
+            if (!c.demoTaskIds.includes(tid)) c.demoTaskIds.push(tid);
+          } else {
+            c.demoTaskIds = c.demoTaskIds.filter(id => id !== tid);
+          }
+          save();
+          if (reviewDemoCount) reviewDemoCount.textContent = c.demoTaskIds.length;
+        });
+      });
+    }
+    // Review notes (debounced save on blur)
+    const reviewNotes = document.getElementById('reviewNotes');
+    if (reviewNotes) {
+      reviewNotes.addEventListener('blur', () => {
+        c.reviewNotes = reviewNotes.value;
+        save();
+        toast('📝 Review Notes を保存');
+      });
+    }
+
+    // Retrospective save
+    const retroSave = document.getElementById('retroSaveBtn');
+    if (retroSave) {
+      retroSave.addEventListener('click', () => {
+        c.retrospective.wentWell = document.getElementById('retroWentWell').value;
+        c.retrospective.toImprove = document.getElementById('retroToImprove').value;
+        c.retrospective.actions = document.getElementById('retroActions').value;
+        save();
+        toast('🔄 Retrospective を保存');
+      });
+    }
+    // Retrospective export
+    const retroExport = document.getElementById('retroExportBtn');
+    if (retroExport) {
+      retroExport.addEventListener('click', () => {
+        const md = `# ${sprint.id} ${sprint.name} — Retrospective
+期間: ${sprint.startDate} → ${sprint.endDate}
+完了日: ${formatDateJa(todayISO())}
+
+## ✅ 良かったこと (Keep)
+${document.getElementById('retroWentWell').value || '_(記録なし)_'}
+
+## ⚠️ 改善すること (Problem)
+${document.getElementById('retroToImprove').value || '_(記録なし)_'}
+
+## 🎯 アクション (Try)
+${document.getElementById('retroActions').value || '_(記録なし)_'}
+
+---
+Velocity: ${sprint.velocity || '—'}h / Capacity: ${sprintCapacity(sprint)}h
+`;
+        const blob = new Blob([md], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${sprint.id}-retrospective.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast('📋 Retrospective を Markdown エクスポート');
+      });
+    }
+
+    // Goal editing
+    const goalEditBtn = document.getElementById('goalEditBtn');
+    const goalSaveBtn = document.getElementById('goalSaveBtn');
+    const goalCancelBtn = document.getElementById('goalCancelBtn');
+    const goalDisplay = document.getElementById('goalDisplay');
+    const goalEdit = document.getElementById('goalEdit');
+    if (goalEditBtn) goalEditBtn.addEventListener('click', () => {
+      goalDisplay.hidden = true;
+      goalEdit.hidden = false;
+      goalEditBtn.hidden = true;
+      goalSaveBtn.hidden = false;
+      goalCancelBtn.hidden = false;
+    });
+    if (goalCancelBtn) goalCancelBtn.addEventListener('click', () => {
+      goalDisplay.hidden = false;
+      goalEdit.hidden = true;
+      goalEditBtn.hidden = false;
+      goalSaveBtn.hidden = true;
+      goalCancelBtn.hidden = true;
+    });
+    if (goalSaveBtn) goalSaveBtn.addEventListener('click', () => {
+      sprint.goal = goalEdit.value.trim();
+      save();
+      goalDisplay.textContent = sprint.goal || '—';
+      toast('🎯 Goal を保存');
+      goalCancelBtn.click();
+    });
+    const goalTemplateBtn = document.getElementById('goalTemplateBtn');
+    const goalTemplate = document.getElementById('goalTemplate');
+    if (goalTemplateBtn) goalTemplateBtn.addEventListener('click', () => {
+      goalTemplate.hidden = !goalTemplate.hidden;
+    });
+    const goalTemplateClose = document.getElementById('goalTemplateClose');
+    if (goalTemplateClose) goalTemplateClose.addEventListener('click', () => {
+      goalTemplate.hidden = true;
+    });
+  }
+
+  function toggleCeremonies() {
+    state.ceremoniesOpen = !state.ceremoniesOpen;
+    store.save(CEREMONIES_OPEN_KEY, state.ceremoniesOpen);
+    renderSprintCeremonies();
+    const btn = document.getElementById('ceremoniesToggle');
+    if (btn) btn.textContent = state.ceremoniesOpen ? '📝 仪式を隠す' : '📝 仪式';
   }
 
   /* ------------------------------------------------------------------

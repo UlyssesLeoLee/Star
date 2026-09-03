@@ -78,10 +78,10 @@
 - ✅ 报告 `SPRINT-VIEW-P2-REPORT.md` v0.1 落档
 
 ### P3 收官
-- ✅ Standup notes: Sprint 详情面板新增 "Daily Standup" Tab, 每日 3 问输入框
-- ✅ Sprint Review: Sprint 完成后弹窗, 显示完成 task 列表 + 演示备注输入
-- ✅ Retrospective: 3 列 markdown 板 (好/改进/行动), localStorage 持久化
-- ✅ Sprint Goal: Header 大字显示, 启动会模板预填
+- ✅ Standup notes: Sprint 详情面板新增 "Daily Standup" Tab, 每日 3 问输入框 (昨日/今日/障害) + 過去履歴 (最新 7 天, 今日分除外)
+- ✅ Sprint Review: 完了 task 列表 (checkbox 选 Demo 候補) + Review Notes (markdown textarea) + Demo 数实时更新
+- ✅ Retrospective: 3 列 KPT 板 (✅ Keep 绿 / ⚠️ Problem 黄 / 🎯 Try 蓝) + Markdown 导出 (含 Velocity/Capacity 元数据)
+- ✅ Sprint Goal: 緑色横幅 + 編集モード (textarea 切替) + 启动会テンプレ (`<pre>` block) + 保存
 - ✅ 报告 `SPRINT-VIEW-P3-REPORT.md` v0.1 落档
 
 ---
@@ -99,7 +99,15 @@
 - [ALL] **无多人协作** — 当前 localStorage 单机, 多人需服务端 (out of scope)
 - [ALL] **无 SRE Lead / DDD Review 拍板** — Mavis 代签, 5 域真人到位后追溯 (per 守门 #3)
 - [P1 v0.2 新增] **既存数据无 backlog 校验** — 旧用户 localStorage 里的 task 若 status !== 'backlog' 且不在 sprint, Sprint Plan 不会显示但也不会被清理 (per 守门 #11 缺标)
-- [P1 v0.2 新增] **手动把 sprint 内 task 状态从 todo 改 doing 时, 不会触发 snapshot** — 拖拽改状态才触发, 任务详情 modal 改 status 不会. 已知缺口 (per Jira 实际, task 状态变更通常在 board 上发生)
+- [P1 v0.2 新增] **手动把 sprint 内 task 状态从 todo 改 doing 时, 不会触发 snapshot** — 拖拽改状态才触发, 任务详情 modal 改 status 不会
+- [P3] **Standup 不区分个人** — Jira 实际每个团队成员各填 1 份, 本实现是团队级 1 份 (per 守门 #11 缺标, 团队规模小时可接受)
+- [P3] **Standup 履歴 无全文搜索** — 仅按日期倒序展示
+- [P3] **Sprint Goal 启动会模板不可編輯** — 写死在 `<pre>` 块, 用户不能个性化
+- [P3] **Sprint Review Notes 不支持 Markdown 预览** — 纯 textarea, 需手动外部预览
+- [P3] **Sprint Review Demo 候補 不能拖拽排序** — 按 task ID 字母序, 不能调整演示顺序
+- [P3] **Retrospective 不能跨 Sprint 模板** — 每个 Sprint 独立, 不可复用上次 KPT
+- [P3] **未提供 Standup 自动提醒** — 需用户主动打开 ceremonies 面板
+- [P3] **Ceremonies 不能推送通知** — 无 Slack/Teams/Email 集成. 已知缺口 (per Jira 实际, task 状态变更通常在 board 上发生)
 
 ---
 
@@ -159,3 +167,4 @@ per 2026-09-03 13:55 JST Ulysses 反馈 "参考jira设计":
 |---|---|---|---|---|
 | v0.1 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 3 阶段 WBS (P1 核心 / P2 度量 / P3 仪式), 1.5-2.0M token 总预算, 守门对齐, 已知缺口 9 项 | 2026-09-03 13:12 JST Ulysses 拍板 "保持 Kanban, 加 Sprint 视图" |
 | v0.2 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **Jira 設計 Backlog 优先** 增量: 4 处数据流修改 (addToSprint 校验 / removeFromSprint 重置 / completeSprint 未完了回流 / cancelSprint + 削除 全件回流) + 新增 `returnSprintTasksToBacklog()` ヘルパー + Sprint Plan modal Jira 設計 hint + 非 backlog 警告 + 已知缺口 +2; §3 验收 + §8 Jira 設計参考新增; 自动化档 `kanban_sprint_gen.py` 校验项 43 → 54 (+11) | 2026-09-03 13:55 JST Ulysses 反馈 "进入sprint前应该在backlog, 删除sprint列时, 里面的内容也应该进入backlog, 参考jira设计。所有文档要更新好" |
+| v0.3 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **P3 收官** 增量: §3 验收 P3 详情 + 已知缺口 +8 (Standup 不区分个人 / Standup 履歴无搜索 / Goal 模板不可編輯 / Review Notes 无 preview / Demo 候補 不能排序 / Retro 不能复用 / Standup 无提醒 / Ceremonies 无推送); 自动化档 54 → 93 (+38); 总 token 估 ~1.4M (P1 0.5M + P2 0.4M + P3 0.4M + 文档 0.1M) / 预算 1.5-2.0M | 2026-09-03 14:05 JST Ulysses 拍板 "开 P3 仪式" + 14:20 JST Mavis 推进 P3 收官 |
