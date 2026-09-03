@@ -1086,7 +1086,7 @@ mod tests {
 
     fn make_actor_user(_tenant_id: TenantId) -> Actor {
         Actor::User {
-            user_id: UserId.new(),
+            user_id: UserId::new(),
         }
     }
 
