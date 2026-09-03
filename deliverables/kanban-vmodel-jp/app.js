@@ -11,6 +11,7 @@
   const PHASE_STORAGE_KEY = 'vmodel-phases-v1';
   const TASK_STORAGE_KEY = 'vmodel-tasks-v1';
   const THEME_KEY = 'vmodel-theme-v1';
+  const SPRINT_STORAGE_KEY = 'vmodel-sprints-v1';
 
   /* ------------------------------------------------------------------
    * 永続化レイヤー
@@ -34,10 +35,12 @@
     phases: store.load(PHASE_STORAGE_KEY, null) || deepClone(DEFAULT_PHASES),
     tasks:  store.load(TASK_STORAGE_KEY,  null) || buildInitialTasks(),
     activePhaseId: 'P1',
-    view: 'kanban',          // kanban | list | timeline
+    view: 'kanban',          // kanban | list | timeline | sprint
     filter: '',
     industry: store.load('vmodel-industry-v1', 'all'),  // all | finance | public | ec | embedded
-    theme: store.load(THEME_KEY, 'dark')
+    theme: store.load(THEME_KEY, 'dark'),
+    sprints: store.load(SPRINT_STORAGE_KEY, null) || [],  // [{id, name, goal, startDate, endDate, durationDays, status, taskIds[], createdAt, completedAt, velocity}]
+    activeSprintId: null  // id of the currently active sprint (status='active')
   };
 
   function buildInitialTasks() {
@@ -452,6 +455,578 @@
   }
 
   /* ------------------------------------------------------------------
+   * Sprint view (P1 — 核心)
+   * ----------------------------------------------------------------*/
+
+  // ----- Sprint helpers -----
+  function getSprint(id) { return state.sprints.find(s => s.id === id); }
+  function getActiveSprint() { return state.sprints.find(s => s.status === 'active') || null; }
+  function getSprintTaskIds(sprintId) {
+    const s = getSprint(sprintId);
+    return s ? (s.taskIds || []) : [];
+  }
+  function sprintCapacity(sprint) {
+    return (sprint.taskIds || []).reduce((sum, tid) => {
+      const t = state.tasks[tid];
+      return sum + (t ? (t.estimate || 0) : 0);
+    }, 0);
+  }
+  function sprintDoneHours(sprint) {
+    return (sprint.taskIds || []).reduce((sum, tid) => {
+      const t = state.tasks[tid];
+      return sum + (t && t.status === 'done' ? (t.estimate || 0) : 0);
+    }, 0);
+  }
+  function daysRemaining(sprint) {
+    if (!sprint || !sprint.endDate) return null;
+    const end = new Date(sprint.endDate + 'T23:59:59');
+    const now = new Date();
+    return Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  }
+  function nextSprintId() {
+    const max = state.sprints.reduce((m, s) => {
+      const n = parseInt(String(s.id).replace(/^SP-/, ''), 10);
+      return isNaN(n) ? m : Math.max(m, n);
+    }, 0);
+    return 'SP-' + String(max + 1).padStart(3, '0');
+  }
+  function addDaysISO(date, days) {
+    const d = new Date(date + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+  function isTaskInActiveOrPlannedSprint(taskId) {
+    return state.sprints.some(s =>
+      (s.status === 'active' || s.status === 'planned') &&
+      (s.taskIds || []).includes(taskId)
+    );
+  }
+
+  // ----- Sprint render -----
+  function renderSprint() {
+    renderSprintHeader();
+    renderSprintBoard();
+    renderSprintList();
+  }
+
+  function renderSprintHeader() {
+    const el = document.getElementById('sprintHeader');
+    const active = getActiveSprint();
+    if (!active) {
+      el.innerHTML = `
+        <div class="sprint-empty">
+          <div class="sprint-empty__icon">🏃</div>
+          <h2 class="sprint-empty__title">アクティブなスプリントはありません</h2>
+          <p class="sprint-empty__desc">「+ 新規」からスプリントを作成して開始してください。Sprint は固定時間ボックス (1-4 週) でタスクを束ねる Scrum 方式のビューです。</p>
+          <div class="sprint-empty__actions">
+            <button class="btn btn--primary" id="sprintEmptyCreateBtn">+ 新規スプリント作成</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('sprintEmptyCreateBtn').addEventListener('click', () => openSprintEditModal(null));
+      return;
+    }
+
+    const capacity = sprintCapacity(active);
+    const done = sprintDoneHours(active);
+    const remaining = Math.max(capacity - done, 0);
+    const pct = capacity > 0 ? Math.min(Math.round((done / capacity) * 100), 100) : 0;
+    const dRem = daysRemaining(active);
+    const totalDays = active.durationDays || 14;
+    const daysPassed = Math.max(totalDays - (dRem == null ? 0 : dRem), 0);
+    const dayPct = totalDays > 0 ? Math.min(Math.round((daysPassed / totalDays) * 100), 100) : 0;
+
+    el.innerHTML = `
+      <div class="sprint-header__top">
+        <div class="sprint-header__main">
+          <div class="sprint-header__eyebrow">
+            <span class="sprint-status-badge is-active">進行中</span>
+            <span class="sprint-header__id">${active.id}</span>
+          </div>
+          <h1 class="sprint-header__name">${escapeHTML(active.name)}</h1>
+          <p class="sprint-header__goal">${escapeHTML(active.goal || '—')}</p>
+        </div>
+        <div class="sprint-header__actions">
+          <button class="btn btn--ghost" id="sprintPlanBtn">📋 計画編集</button>
+          <button class="btn btn--ghost" id="sprintEditBtn">✏️ 編集</button>
+          <button class="btn btn--ghost" id="sprintCompleteBtn">✅ 完了</button>
+          <button class="btn btn--ghost btn--danger" id="sprintCancelBtn">❌ 中止</button>
+        </div>
+      </div>
+      <div class="sprint-header__meta">
+        <div class="sprint-stat">
+          <div class="sprint-stat__label">期間</div>
+          <div class="sprint-stat__value">${active.startDate} → ${active.endDate}</div>
+        </div>
+        <div class="sprint-stat">
+          <div class="sprint-stat__label">残り日数</div>
+          <div class="sprint-stat__value ${dRem != null && dRem < 0 ? 'is-overdue' : ''}">${dRem == null ? '—' : (dRem < 0 ? `${Math.abs(dRem)} 日超過` : `${dRem} 日`)}</div>
+        </div>
+        <div class="sprint-stat">
+          <div class="sprint-stat__label">タスク</div>
+          <div class="sprint-stat__value">${active.taskIds.length} 件</div>
+        </div>
+        <div class="sprint-stat sprint-stat--wide">
+          <div class="sprint-stat__label">工数 (完了 / 総計)</div>
+          <div class="sprint-stat__value">${done}h / ${capacity}h</div>
+          <div class="sprint-bar">
+            <div class="sprint-bar__fill" style="width:${pct}%"></div>
+          </div>
+        </div>
+        <div class="sprint-stat">
+          <div class="sprint-stat__label">スプリント進捗 (日数)</div>
+          <div class="sprint-stat__value">${dayPct}%</div>
+          <div class="sprint-bar">
+            <div class="sprint-bar__fill sprint-bar__fill--time" style="width:${dayPct}%"></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('sprintPlanBtn').addEventListener('click', () => openSprintPlanModal(active.id));
+    document.getElementById('sprintEditBtn').addEventListener('click', () => openSprintEditModal(active.id));
+    document.getElementById('sprintCompleteBtn').addEventListener('click', () => completeSprint(active.id));
+    document.getElementById('sprintCancelBtn').addEventListener('click', () => cancelSprint(active.id));
+  }
+
+  function renderSprintBoard() {
+    const board = document.getElementById('sprintBoard');
+    board.innerHTML = '';
+    const active = getActiveSprint();
+    if (!active) {
+      board.innerHTML = `<div class="kanban-col" style="--c:#6b7280"><header class="kanban-col__head"><div class="kanban-col__title"><span>—</span></div></header><div class="kanban-col__body"><div class="kanban-col__empty">アクティブなスプリントなし</div></div></div>`;
+      return;
+    }
+    const cols = [
+      { id: 'backlog', name: 'バックログ', color: '#6b7280' },
+      { id: 'todo',    name: 'To Do',     color: '#3b82f6' },
+      { id: 'doing',   name: '進行中',    color: '#eab308' },
+      { id: 'review',  name: 'レビュー',  color: '#a855f7' },
+      { id: 'done',    name: '完了',      color: '#22c55e' }
+    ];
+    const sprintTasks = active.taskIds
+      .map(id => state.tasks[id])
+      .filter(Boolean);
+
+    cols.forEach(col => {
+      const colEl = document.createElement('section');
+      colEl.className = 'kanban-col';
+      colEl.style.setProperty('--c', col.color);
+      colEl.dataset.col = col.id;
+
+      const tasks = sprintTasks
+        .filter(t => t.status === col.id)
+        .filter(t => !state.filter || (t.title + ' ' + t.desc + ' ' + t.tags.join(' ')).toLowerCase().includes(state.filter.toLowerCase()));
+
+      colEl.innerHTML = `
+        <header class="kanban-col__head">
+          <div class="kanban-col__title">
+            <span class="kanban-col__dot"></span>
+            <span>${col.name}</span>
+          </div>
+          <span class="kanban-col__count">${tasks.length}</span>
+        </header>
+        <div class="kanban-col__body" data-sprint-dropzone="${col.id}">
+          ${tasks.length ? tasks.map(cardHTML).join('') : `<div class="kanban-col__empty">タスクなし</div>`}
+        </div>
+      `;
+      board.appendChild(colEl);
+    });
+
+    // Drag & drop (sprint-specific dropzones)
+    board.querySelectorAll('[data-sprint-dropzone]').forEach(zone => {
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zone.closest('.kanban-col').classList.add('is-drop-target');
+      });
+      zone.addEventListener('dragleave', () => {
+        zone.closest('.kanban-col').classList.remove('is-drop-target');
+      });
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.closest('.kanban-col').classList.remove('is-drop-target');
+        const id = e.dataTransfer.getData('text/plain');
+        const sp = getActiveSprint();
+        if (!sp) return;
+        if (id && state.tasks[id] && sp.taskIds.includes(id)) {
+          state.tasks[id].status = zone.dataset.sprintDropzone;
+          save();
+          renderSprint();
+          toast(`${id} → ${zone.dataset.sprintDropzone}`);
+        }
+      });
+    });
+
+    // Card click
+    board.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        openTaskModal(card.dataset.id);
+      });
+    });
+  }
+
+  function renderSprintList() {
+    const el = document.getElementById('sprintList');
+    if (!state.sprints.length) {
+      el.innerHTML = `<li class="sprint-list__empty">スプリントがありません。「+ 新規」で作成してください。</li>`;
+      return;
+    }
+    const groups = [
+      { key: 'active',    title: '進行中', color: '#22c55e' },
+      { key: 'planned',   title: '計画中', color: '#3b82f6' },
+      { key: 'completed', title: '完了',   color: '#94a3b8' },
+      { key: 'cancelled', title: '取消',   color: '#ef4444' }
+    ];
+    el.innerHTML = groups.map(g => {
+      const items = state.sprints.filter(s => s.status === g.key)
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      if (!items.length) return '';
+      return `
+        <li class="sprint-group">
+          <div class="sprint-group__head" style="--c:${g.color}">
+            <span class="dot"></span>
+            <span>${g.title}</span>
+            <span class="sprint-group__count">${items.length}</span>
+          </div>
+          <ul class="sprint-group__list">
+            ${items.map(s => `
+              <li class="sprint-item ${state.activeSprintId === s.id ? 'is-active' : ''}" data-sprint-id="${s.id}">
+                <div class="sprint-item__id">${s.id}</div>
+                <div class="sprint-item__main">
+                  <div class="sprint-item__name">${escapeHTML(s.name)}</div>
+                  <div class="sprint-item__meta">${s.startDate || '—'} → ${s.endDate || '—'} · ${(s.taskIds || []).length} 件</div>
+                </div>
+                ${s.status === 'completed' && s.velocity != null ? `<div class="sprint-item__vel">${s.velocity}h</div>` : ''}
+              </li>
+            `).join('')}
+          </ul>
+        </li>
+      `;
+    }).join('');
+
+    el.querySelectorAll('.sprint-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const s = getSprint(item.dataset.sprintId);
+        if (!s) return;
+        if (s.status === 'active') {
+          // 進行中は自動的に active になる
+          renderSprint();
+          toast(`${s.id}: 進行中`);
+        } else if (s.status === 'planned') {
+          startSprint(s.id);
+        } else {
+          openSprintEditModal(s.id);
+        }
+      });
+    });
+  }
+
+  // ----- Sprint CRUD -----
+  function openSprintEditModal(sprintId) {
+    const isNew = !sprintId;
+    const draft = isNew
+      ? {
+          id: nextSprintId(),
+          name: '',
+          goal: '',
+          startDate: new Date().toISOString().slice(0, 10),
+          durationDays: 14,
+          status: 'planned',
+          taskIds: [],
+          createdAt: new Date().toISOString()
+        }
+      : { ...getSprint(sprintId) };
+
+    document.getElementById('sprintEditTitle').textContent = isNew ? 'スプリント作成' : `スプリント編集: ${draft.name}`;
+    const body = document.getElementById('sprintEditBody');
+    body.innerHTML = `
+      <div class="form-group">
+        <label class="form-label">スプリント名 <span class="req">*</span></label>
+        <input class="form-input" id="seName" type="text" value="${escapeAttr(draft.name)}" placeholder="例: Sprint 1: 認証 + タスク CRUD">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ゴール (Sprint Goal)</label>
+        <textarea class="form-textarea" id="seGoal" placeholder="このスプリントで達成したいこと (例: バックエンド API の認証 + 基本 CRUD 完成)">${escapeHTML(draft.goal || '')}</textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">開始日</label>
+          <input class="form-input" id="seStart" type="date" value="${draft.startDate || ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">期間</label>
+          <select class="form-input" id="seDuration">
+            <option value="7"  ${draft.durationDays === 7  ? 'selected' : ''}>1 週間 (7日)</option>
+            <option value="10" ${draft.durationDays === 10 ? 'selected' : ''}>10 日</option>
+            <option value="14" ${draft.durationDays === 14 ? 'selected' : ''}>2 週間 (14日, 推奨)</option>
+            <option value="21" ${draft.durationDays === 21 ? 'selected' : ''}>3 週間 (21日)</option>
+            <option value="28" ${draft.durationDays === 28 ? 'selected' : ''}>4 週間 (28日)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">終了日 (自動計算)</label>
+          <input class="form-input" id="seEnd" type="text" value="${draft.endDate || addDaysISO(draft.startDate, draft.durationDays)}" disabled>
+        </div>
+      </div>
+      <div class="form-actions">
+        ${!isNew && draft.status !== 'completed' ? '<button class="task-detail__btn" id="seDeleteBtn" style="background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.3);color:#fca5a5">🗑️ 削除</button>' : ''}
+        <div style="flex:1"></div>
+        <button class="task-detail__btn" data-close="sprintEdit">キャンセル</button>
+        <button class="task-detail__btn is-primary" id="seSaveBtn">${isNew ? '作成' : '保存'}</button>
+      </div>
+    `;
+
+    // Auto-calc end date
+    const startInp = body.querySelector('#seStart');
+    const durSel = body.querySelector('#seDuration');
+    const endInp = body.querySelector('#seEnd');
+    const updateEnd = () => {
+      const s = startInp.value;
+      const d = parseInt(durSel.value, 10);
+      if (s && d) endInp.value = addDaysISO(s, d);
+    };
+    startInp.addEventListener('change', updateEnd);
+    durSel.addEventListener('change', updateEnd);
+
+    body.querySelector('#seSaveBtn').addEventListener('click', () => {
+      const name = body.querySelector('#seName').value.trim();
+      if (!name) { toast('スプリント名は必須です', 'error'); return; }
+      const startDate = body.querySelector('#seStart').value;
+      const durationDays = parseInt(body.querySelector('#seDuration').value, 10);
+      const goal = body.querySelector('#seGoal').value.trim();
+      const endDate = addDaysISO(startDate, durationDays);
+
+      if (isNew) {
+        state.sprints.push({
+          id: draft.id, name, goal, startDate, endDate, durationDays,
+          status: 'planned', taskIds: [], createdAt: new Date().toISOString()
+        });
+        toast(`スプリント ${draft.id} を作成`);
+      } else {
+        const s = getSprint(sprintId);
+        Object.assign(s, { name, goal, startDate, endDate, durationDays });
+        toast(`${s.id} を更新`);
+      }
+      save();
+      renderSprint();
+      closeSprintEditModal();
+    });
+
+    const delBtn = body.querySelector('#seDeleteBtn');
+    if (delBtn) {
+      delBtn.addEventListener('click', () => {
+        if (!confirm(`${draft.name} を削除しますか?\n配下のタスクは保持されます。`)) return;
+        state.sprints = state.sprints.filter(s => s.id !== sprintId);
+        save();
+        renderSprint();
+        closeSprintEditModal();
+        toast(`${draft.id} を削除`);
+      });
+    }
+
+    openModal('sprintEdit');
+  }
+  function closeSprintEditModal() { closeModal('sprintEdit'); }
+
+  // ----- Sprint planning (task selection) -----
+  function openSprintPlanModal(sprintId) {
+    const sprint = getSprint(sprintId);
+    if (!sprint) return;
+    document.getElementById('sprintPlanTitle').textContent = `スプリント計画: ${sprint.name}`;
+    const body = document.getElementById('sprintPlanBody');
+    const allTaskIds = Object.keys(state.tasks);
+    const inSprint = new Set(sprint.taskIds || []);
+    const inOtherSprint = new Set();
+    state.sprints.forEach(s => {
+      if (s.id === sprintId) return;
+      if (s.status === 'active' || s.status === 'planned') {
+        (s.taskIds || []).forEach(tid => inOtherSprint.add(tid));
+      }
+    });
+    const backlog = allTaskIds.filter(id => !inSprint.has(id) && !inOtherSprint.has(id));
+    const inThis = sprint.taskIds || [];
+
+    const renderCols = () => {
+      const inThisSet = new Set(sprint.taskIds || []);
+      const inOtherSet = new Set();
+      state.sprints.forEach(s => {
+        if (s.id === sprintId) return;
+        if (s.status === 'active' || s.status === 'planned') {
+          (s.taskIds || []).forEach(tid => inOtherSet.add(tid));
+        }
+      });
+
+      const cap = sprintCapacity(sprint);
+      const list = (ids) => ids
+        .map(id => state.tasks[id])
+        .filter(Boolean)
+        .map(t => {
+          const inOth = inOtherSet.has(t.id);
+          return `
+            <li class="plan-task ${inOth ? 'is-locked' : ''}" data-task-id="${t.id}" draggable="${inOth ? 'false' : 'true'}">
+              <span class="plan-task__id">${t.id}</span>
+              <span class="plan-task__title">${escapeHTML(t.title)}</span>
+              <span class="plan-task__prio card__prio card__prio--${t.priority}">${t.priority}</span>
+              <span class="plan-task__est">${t.estimate || 0}h</span>
+              <button class="plan-task__btn" data-add="${t.id}" ${inOth ? 'disabled' : ''}>${inOth ? '他 Sprint' : '追加 →'}</button>
+            </li>
+          `;
+        }).join('');
+
+      body.innerHTML = `
+        <div class="plan-grid">
+          <div class="plan-col">
+            <div class="plan-col__head">
+              <h3>📥 バックログ</h3>
+              <span class="plan-col__count">${backlog.length} 件</span>
+            </div>
+            <input class="form-input" id="planFilterBacklog" placeholder="検索…" style="margin-bottom:8px">
+            <ul class="plan-list" id="planBacklog">${list(backlog)}</ul>
+          </div>
+          <div class="plan-col">
+            <div class="plan-col__head">
+              <h3>🎯 ${sprint.id} 計画済</h3>
+              <span class="plan-col__count">${inThisSet.size} 件 / ${cap}h</span>
+            </div>
+            <ul class="plan-list" id="planInSprint">${list(Array.from(inThisSet))}</ul>
+          </div>
+        </div>
+        <div class="form-actions" style="margin-top:16px">
+          <div style="flex:1;font-size:12px;color:var(--text-3)">ドラッグ or ボタンで移動 · 他 Sprint に所属するタスクはロック</div>
+          <button class="task-detail__btn" data-close="sprintPlan">閉じる</button>
+        </div>
+      `;
+
+      // Search filter (backlog)
+      const filterInp = body.querySelector('#planFilterBacklog');
+      filterInp.addEventListener('input', () => {
+        const q = filterInp.value.toLowerCase();
+        body.querySelectorAll('#planBacklog .plan-task').forEach(li => {
+          const txt = li.textContent.toLowerCase();
+          li.hidden = q && !txt.includes(q);
+        });
+      });
+
+      // Add buttons
+      body.querySelectorAll('[data-add]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const tid = btn.dataset.add;
+          addToSprint(sprintId, tid);
+        });
+      });
+      body.querySelectorAll('[data-remove]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const tid = btn.dataset.remove;
+          removeFromSprint(sprintId, tid);
+        });
+      });
+
+      // Drag & drop
+      setupPlanDragDrop(sprintId, body);
+    };
+
+    renderCols();
+    openModal('sprintPlan');
+  }
+
+  function setupPlanDragDrop(sprintId, body) {
+    let dragId = null;
+    body.querySelectorAll('.plan-task').forEach(li => {
+      li.addEventListener('dragstart', (e) => {
+        dragId = li.dataset.taskId;
+        e.dataTransfer.setData('text/plain', dragId);
+        e.dataTransfer.effectAllowed = 'move';
+        li.classList.add('is-dragging');
+      });
+      li.addEventListener('dragend', () => li.classList.remove('is-dragging'));
+    });
+    body.querySelectorAll('.plan-list').forEach(list => {
+      list.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        list.classList.add('is-drop-target');
+      });
+      list.addEventListener('dragleave', () => list.classList.remove('is-drop-target'));
+      list.addEventListener('drop', (e) => {
+        e.preventDefault();
+        list.classList.remove('is-drop-target');
+        const tid = e.dataTransfer.getData('text/plain');
+        if (!tid) return;
+        if (list.id === 'planInSprint') {
+          addToSprint(sprintId, tid);
+        } else {
+          removeFromSprint(sprintId, tid);
+        }
+      });
+    });
+  }
+
+  function addToSprint(sprintId, taskId) {
+    const s = getSprint(sprintId);
+    if (!s) return;
+    if (s.taskIds.includes(taskId)) return;
+    if (isTaskInActiveOrPlannedSprint(taskId)) {
+      toast('他 Sprint に既に所属', 'error');
+      return;
+    }
+    s.taskIds.push(taskId);
+    save();
+    openSprintPlanModal(sprintId);
+    renderSprint();
+  }
+  function removeFromSprint(sprintId, taskId) {
+    const s = getSprint(sprintId);
+    if (!s) return;
+    s.taskIds = s.taskIds.filter(id => id !== taskId);
+    save();
+    openSprintPlanModal(sprintId);
+    renderSprint();
+  }
+
+  // ----- Sprint lifecycle -----
+  function startSprint(sprintId) {
+    if (getActiveSprint()) {
+      toast('既に進行中のスプリントがあります。先に完了/中止してください。', 'error');
+      return;
+    }
+    const s = getSprint(sprintId);
+    if (!s || s.status !== 'planned') return;
+    s.status = 'active';
+    state.activeSprintId = s.id;
+    save();
+    renderSprint();
+    toast(`🏁 ${s.id} 開始`);
+  }
+  function completeSprint(sprintId) {
+    const s = getSprint(sprintId);
+    if (!s || s.status !== 'active') return;
+    const velocity = sprintDoneHours(s);
+    const commitment = sprintCapacity(s);
+    const completed = (s.taskIds || []).filter(id => state.tasks[id] && state.tasks[id].status === 'done').length;
+    if (!confirm(`${s.id} を完了しますか?\n完了タスク: ${completed} / ${s.taskIds.length}\n完了工数: ${velocity}h / 計画 ${commitment}h`)) return;
+    s.status = 'completed';
+    s.completedAt = new Date().toISOString();
+    s.velocity = velocity;
+    state.activeSprintId = null;
+    save();
+    renderSprint();
+    toast(`✅ ${s.id} 完了 (Velocity: ${velocity}h)`);
+  }
+  function cancelSprint(sprintId) {
+    const s = getSprint(sprintId);
+    if (!s) return;
+    if (!confirm(`${s.id} を中止しますか?\n配下タスクは保持され、他 Sprint に追加可能になります。`)) return;
+    s.status = 'cancelled';
+    s.cancelledAt = new Date().toISOString();
+    if (state.activeSprintId === s.id) state.activeSprintId = null;
+    save();
+    renderSprint();
+    toast(`❌ ${s.id} 中止`);
+  }
+
+  /* ------------------------------------------------------------------
    * View switching
    * ----------------------------------------------------------------*/
   function setView(v) {
@@ -464,9 +1039,13 @@
       btn.classList.toggle('is-active', isActive);
       btn.setAttribute('aria-selected', isActive);
     });
+    // Sprint view uses full width (hide phasebar)
+    const phasebar = document.querySelector('.phasebar');
+    if (phasebar) phasebar.hidden = (v === 'sprint');
     if (v === 'kanban') renderKanban();
     if (v === 'list') renderList();
     if (v === 'timeline') renderTimeline();
+    if (v === 'sprint') renderSprint();
   }
 
   /* ------------------------------------------------------------------
@@ -837,25 +1416,33 @@
    * Modal open/close
    * ----------------------------------------------------------------*/
   function openModal(kind) {
-    const id = kind === 'aux' ? 'auxDrawer' : kind === 'task' ? 'taskModal' : 'phaseModal';
+    const id = modalIdFor(kind);
     document.getElementById(id).classList.add('is-open');
     document.body.style.overflow = 'hidden';
   }
   function closeModal(kind) {
-    const id = kind === 'aux' ? 'auxDrawer' : kind === 'task' ? 'taskModal' : 'phaseModal';
+    const id = modalIdFor(kind);
     document.getElementById(id).classList.remove('is-open');
     document.body.style.overflow = '';
+  }
+  function modalIdFor(kind) {
+    if (kind === 'aux') return 'auxDrawer';
+    if (kind === 'task') return 'taskModal';
+    if (kind === 'phase') return 'phaseModal';
+    if (kind === 'sprintEdit') return 'sprintEditModal';
+    if (kind === 'sprintPlan') return 'sprintPlanModal';
+    return 'phaseModal';
   }
   document.addEventListener('click', (e) => {
     const closer = e.target.closest('[data-close]');
     if (closer) {
       const kind = closer.dataset.close;
-      closeModal(kind === 'aux' ? 'aux' : kind === 'task' ? 'task' : 'phase');
+      closeModal(kind);
     }
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      ['aux', 'task', 'phase'].forEach(closeModal);
+      ['aux', 'task', 'phase', 'sprintEdit', 'sprintPlan'].forEach(closeModal);
       closeCtxMenu();
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -919,6 +1506,7 @@
   function save() {
     store.save(PHASE_STORAGE_KEY, state.phases);
     store.save(TASK_STORAGE_KEY, state.tasks);
+    store.save(SPRINT_STORAGE_KEY, state.sprints);
   }
 
   /* ------------------------------------------------------------------
@@ -964,7 +1552,14 @@
       if (state.view === 'kanban') renderKanban();
       else if (state.view === 'list') renderList();
       else if (state.view === 'timeline') renderTimeline();
+      else if (state.view === 'sprint') renderSprintBoard();
     });
+
+    // Sprint "新規" ボタン
+    const sprintCreateBtn = document.getElementById('sprintCreateBtn');
+    if (sprintCreateBtn) {
+      sprintCreateBtn.addEventListener('click', () => openSprintEditModal(null));
+    }
 
     document.getElementById('addTaskBtn').addEventListener('click', () => {
       addTaskToColumn('todo');
@@ -1019,7 +1614,7 @@
   }
 
   function exportJSON() {
-    const blob = new Blob([JSON.stringify({ phases: state.phases, tasks: state.tasks }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ phases: state.phases, tasks: state.tasks, sprints: state.sprints }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1043,6 +1638,9 @@
    * Init
    * ----------------------------------------------------------------*/
   function init() {
+    // Sync activeSprintId from persisted sprints
+    const activeSp = getActiveSprint();
+    state.activeSprintId = activeSp ? activeSp.id : null;
     bindEvents();
     renderAll();
   }

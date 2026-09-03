@@ -142,6 +142,10 @@
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/><circle cx="7" cy="6" r="1.5" fill="currentColor"/><circle cx="14" cy="12" r="1.5" fill="currentColor"/><circle cx="9" cy="18" r="1.5" fill="currentColor"/></svg>
               タイムライン
             </button>
+            <button class="seg__btn" data-view="sprint" role="tab" aria-selected="false">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
+              Sprint
+            </button>
           </div>
 
           <div class="stage-header__search">
@@ -187,6 +191,36 @@
       <!-- Timeline view -->
       <div class="timeline" id="timeline" data-view="timeline" hidden>
         <!-- populated by JS -->
+      </div>
+
+      <!-- Sprint view -->
+      <div class="sprint" id="sprintView" data-view="sprint" hidden>
+        <div class="sprint-body">
+          <div class="sprint-main">
+            <!-- Sprint header (name, goal, days remaining, progress) -->
+            <div class="sprint-header" id="sprintHeader">
+              <!-- populated by JS -->
+            </div>
+
+            <!-- Sprint 5-column board (reuses kanban-col styling) -->
+            <div class="kanban" id="sprintBoard">
+              <!-- populated by JS -->
+            </div>
+          </div>
+
+          <aside class="sprint-sidebar" aria-label="Sprint 一覧">
+            <div class="sprint-sidebar__head">
+              <h3 class="sprint-sidebar__title">スプリント一覧</h3>
+              <button class="btn btn--primary btn--sm" id="sprintCreateBtn" title="新規スプリント作成">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                新規
+              </button>
+            </div>
+            <ol class="sprint-list" id="sprintList">
+              <!-- populated by JS -->
+            </ol>
+          </aside>
+        </div>
       </div>
     </section>
 
@@ -303,6 +337,34 @@
     <li class="ctxmenu__sep"></li>
     <li data-act="delete" role="menuitem" class="ctxmenu__danger">🗑️ 削除</li>
   </ul>
+
+  <!-- ========================== Sprint create/edit modal ========================== -->
+  <div class="sprint-modal" id="sprintEditModal" aria-hidden="true">
+    <div class="sprint-modal__backdrop" data-close="sprintEdit"></div>
+    <div class="sprint-modal__panel" role="dialog" aria-modal="true">
+      <header class="sprint-modal__head">
+        <h2 class="sprint-modal__title" id="sprintEditTitle">スプリント作成</h2>
+        <button class="icon-btn" data-close="sprintEdit" aria-label="閉じる">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <div class="sprint-modal__body" id="sprintEditBody"></div>
+    </div>
+  </div>
+
+  <!-- ========================== Sprint planning modal (task selection) ========================== -->
+  <div class="sprint-modal sprint-modal--wide" id="sprintPlanModal" aria-hidden="true">
+    <div class="sprint-modal__backdrop" data-close="sprintPlan"></div>
+    <div class="sprint-modal__panel" role="dialog" aria-modal="true">
+      <header class="sprint-modal__head">
+        <h2 class="sprint-modal__title" id="sprintPlanTitle">スプリント計画</h2>
+        <button class="icon-btn" data-close="sprintPlan" aria-label="閉じる">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <div class="sprint-modal__body" id="sprintPlanBody"></div>
+    </div>
+  </div>
 
   <!-- ========================== Toast ========================== -->
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
