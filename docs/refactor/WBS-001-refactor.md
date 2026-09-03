@@ -11,8 +11,8 @@
 
 | # | 任务 | 档位 | 估 token | 依赖 | 同步设计文档 | 状态 |
 |---|---|---|---|---|---|---|
-| T1.1 | 根目录报告文件归档 (98 个 md → `docs/reports/`) | T1 | 0.15M | 无 | 无 (纯路径移动) | ⚪ 未开始 |
-| T1.2 | 根目录散件清理 (14 个 `_*` 文件) | T1 | 0.05M | 无 | 无 | ⚪ 未开始 |
+| T1.1 | 根目录报告文件归档 (98 个 md → `docs/reports/`) | T1 | 0.15M | 无 | 无 (纯路径移动) | ✅ 完成 (per 2026-09-04 本 session: 实测根目录 tracked .md 共 74, 除 README/CHANGELOG/AGENTS 3 项例外共 71 项 `git mv` 至 `docs/reports/`, 与 WBS 估计"98"不符, 以本次 `git ls-files` 实测为准; `HANDOFF-ST-001.md` 经查已在前份 session 移至 `docs/reports/`, 特例条款已 moot; 另有 4 项不匹配 WBS 命名 pattern 的报告文件 `P3-C-D-SELECTION-RESULT.md`/`P3-E-F-SELECTION-RESULT.md`/`RGS-LEAD-ROSTER.md`/`remediation-plan.md` 经内容核实均为拍板/报告类文档, 按 T1.1 任务标题范围一并归档; 全仓 `]\(...\)` markdown 链接语法精确正则匹配 71 个文件名 0 命中, 无需改链接) |
+| T1.2 | 根目录散件清理 (14 个 `_*` 文件) | T1 | 0.05M | 无 | 无 | ✅ 完成 (per 2026-09-03 本 session: 已追踪 `_*` 散件此前 session 已清空; 本 session 另清理 2 个新增 untracked 一次性文件 `scripts/automation/_find_fail.py` + `docs/architecture/preview/1m-orchestrator-l0-l1.html`, `git status` 验证干净) |
 | T1.3 | `star-vcs` 孤儿 crate 处理 (注册或删除) | T1 | 0.1M | 无 | `docs/specs/domain-vcs-spec.md`(新建骨架) 或新 ADR (编号现场算, 见 spec §2.4.2, **不是** 0026——已被占用) | ⚪ 未开始 |
 | T1.4 | `cargo machete`/`udeps` 死依赖清理 | T1 | 0.15M | 无 | 按需 (若依赖在某 spec 里被引用为计划依赖) | ✅ 完成 (per `docs/reports/2026-09-03-rf-001-t1-4-correction.md`: 12/12 findings 实测均为真死依赖, 订正前份报告"0 实际死依赖"误判) |
 | T1.5 | lint `warn` → `deny` (3 项) | T1 | 0.3M | T1.3 (先确定 crate 数) | 无 (强制不强制, 视情况) | 🟡 1/3 步完成 (`unreachable_pub` deny 落地 + star-mcp 31 处 unreachable pub 修复, commit `bef2d60`); `missing_docs`/`rust_2018_idioms` 未开始 |
@@ -23,7 +23,7 @@
 | T3.1 | 多协议 DTO 去重选项报告 | T3 | 0.2M | 无 | 拍板前列清单; 拍板后**必做** `docs/api-design.md` + 协议层 spec | ⚪ 未开始 |
 | T3.2 | Saga 覆盖率审计报告 | T3 | 0.2M | 无 | 拍板后**必做**同步 `docs/architecture/2026-08-26-upgrade/spec/saga/01-saga-coordination-spec.md`(主) + `docs/ddd/03-match-bc.md`; `docs/integration-design.md` 仅指针引用, 按需修正 | ⚪ 未开始 |
 | T3.3 | 领域统一语言审计报告 | T3 | 0.3M | 无 | 拍板后**必做** 新建 `docs/ubiquitous-language.md` + 各 domain spec 术语章节 | ⚪ 未开始 |
-| **小计** | | | **~4.15-4.95M** | | | **1/12 完成 + 1/12 部分完成 (per 2026-09-03 本 session 实测, 订正此前 0/12 falsely-flat 状态)** |
+| **小计** | | | **~4.15-4.95M** | | | **3/12 完成 (T1.1/T1.2/T1.4) + 1/12 部分完成 (T1.5 1/3 步) (per 2026-09-04 本 session 实测)** |
 
 > 设计文档同步的 token 已并入各任务估算, 不单列; 详细同步规则见 `docs/refactor/RF-001-spec.md` §2.4。
 
