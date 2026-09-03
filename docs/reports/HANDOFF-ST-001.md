@@ -194,7 +194,7 @@
 - domain-feedback 77 err 是 H2 原 3 domain 改造大头, 模式跟 #1 #2 #3 一样, 但 service.rs 内部 actor.user_id 当 UserId 用 / actor.tenant_id 当 TenantId 用的 call sites 更多
 
 
-**§6 v0.5 跨 session 续更新 (2026-09-03 10:45 JST, 5/6 done 但 --all-targets 76 err 推下 + 推 origin 成功)**:
+**§6 v0.5 增量更新 (2026-09-03 10:45 JST, 5/6 done 但 --all-targets 76 err 推下 + 推 origin 成功)**:
 
 | 阶段 | 状态 | commit | 守门 | buffer |
 |---|---|---|---|---|
