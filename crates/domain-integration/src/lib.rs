@@ -89,9 +89,9 @@ mod tests {
     // -------- 测试夹具 --------
 
     fn make_test_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(uuid::Uuid::new_v4(), tenant_id)
+        ActorContext::new(uuid::Uuid::new_v4(), *tenant_id.as_uuid())
             .with_role(roles::PROJECT_ADMIN)
-            .with_project(ProjectId::new())
+            .with_project(*ProjectId::new().as_uuid())
     }
 
     fn make_create_cmd(
