@@ -118,8 +118,8 @@ fn st_2_5_independent_id_types() {
 
     // 类型不同, Debug 表示不同
     assert_ne!(format!("{:?}", id_user), format!("{:?}", ws_user));
-    // as_uuid() 返回类型不一致 (identity: Uuid Copy, workspace: &Uuid)
-    assert_ne!(id_user.as_uuid(), *ws_user.as_uuid());
+    // as_uuid() 返回 Uuid Copy (H2-EXT 9/3 0:00 JST 强类型化, identity + workspace 一致)
+    assert_ne!(id_user.as_uuid(), ws_user.as_uuid());
 
     // 强类型保护: id_user 跟 ws_user 不能互转 (编译期阻止)
 }
