@@ -1154,7 +1154,7 @@ mod tests {
         let svc = InMemoryBoardService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(tenant);
+        let actor = make_actor(TenantId(tenant));
 
         let board = svc
             .create_board(
@@ -1182,7 +1182,7 @@ mod tests {
         let svc = InMemoryBoardService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(tenant);
+        let actor = make_actor(TenantId(tenant));
 
         let board = svc
             .create_board(
@@ -1221,7 +1221,7 @@ mod tests {
         let svc = InMemoryBoardService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(tenant);
+        let actor = make_actor(TenantId(tenant));
 
         let board = svc
             .create_board(
@@ -1308,7 +1308,7 @@ mod tests {
         let svc = InMemoryBoardService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(tenant);
+        let actor = make_actor(TenantId(tenant));
 
         let board = svc
             .create_board(
@@ -1364,7 +1364,7 @@ mod tests {
         let svc = InMemoryBoardService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(tenant);
+        let actor = make_actor(TenantId(tenant));
 
         let board = svc
             .create_board(
@@ -1448,7 +1448,7 @@ mod tests {
         let svc = InMemoryBoardService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(tenant);
+        let actor = make_actor(TenantId(tenant));
 
         let board = svc
             .create_board(
@@ -1515,7 +1515,7 @@ mod tests {
         let svc = InMemoryBoardService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(tenant);
+        let actor = make_actor(TenantId(tenant));
 
         let board = svc
             .create_board(
@@ -1582,7 +1582,7 @@ mod tests {
         let svc = InMemoryBoardService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(tenant);
+        let actor = make_actor(TenantId(tenant));
 
         let board = svc
             .create_board(
@@ -1641,7 +1641,7 @@ mod tests {
         let svc = InMemoryBoardService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(tenant);
+        let actor = make_actor(TenantId(tenant));
 
         // 故意造 2 个同 order 的列
         let res = svc
@@ -1726,7 +1726,7 @@ mod tests {
         let svc = InMemoryBoardService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(tenant);
+        let actor = make_actor(TenantId(tenant));
 
         let board = svc
             .create_board(
