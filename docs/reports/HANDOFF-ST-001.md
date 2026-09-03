@@ -194,6 +194,41 @@
 - domain-feedback 77 err 是 H2 原 3 domain 改造大头, 模式跟 #1 #2 #3 一样, 但 service.rs 内部 actor.user_id 当 UserId 用 / actor.tenant_id 当 TenantId 用的 call sites 更多
 
 
+**§6 v0.5 跨 session 续更新 (2026-09-03 10:45 JST, 5/6 done 但 --all-targets 76 err 推下 + 推 origin 成功)**:
+
+| 阶段 | 状态 | commit | 守门 | buffer |
+|---|---|---|---|---|
+| 守门 #1 阶段 1 (--lib 0 err) | ✅ | (per 5.1+5.2+5.3 落档) | 0 err 21.40s | — |
+| 守门 #1 阶段 2 (--all-targets 0 err) | ❌ **76 err 推下 session** | `b849894` T1.7 报告 | 25 star-mcp + 51 domain-local-runtime | 0.55-1.05M 跨 1-2 sub-session |
+| 守门 #1 阶段 3 (release test 100%) | ⏳ 跨 session 续 | — | (待 #1 #2 完成后) | — |
+| 守门 #4 cargo fmt | ✅ | (9/3 实证) | 0 | — |
+| 守门 #5 clippy | ✅ | (9/3 实证) | 0 warning 1.89s | — |
+| **推 origin** | ✅ 0/0 sync | `cb21674` | 4 commit 推完 (35a51a5 + b849894 + cb21674) | github.com 443 恢复 |
+| **Phase 5 5/6 done** | ✅ 5/6 + 5.6 推下 | `8b53300` `a825b63` `8958302` `bd4d9da` `e59b889` | 0 行代码改动报告但 --all-targets 76 err (T1.7 实证) | — |
+| **11 旧 worktree 清理** | ✅ done (0 commit 落档) | (git worktree remove 11 个, gitignored) | 守门 #9 v3 #24 | 0.01M |
+
+**下 session 入口 (2026-09-03 10:45 JST)**:
+
+```bash
+# 1. 读本 HANDOFF v0.5 §6 + AGENTS v0.48 + 9/3 收尾 6 份报告 (5.1/5.2+5.3/5.4/5.5/5.6 推下/T1.7 76 err/拍 8 部分)
+# 2. git fetch origin (验证 0/0 sync) + git log --oneline -10 (cb21674)
+# 3. cargo check --workspace --all-targets (守门 #1 实证 baseline 76 err, 不要被误导)
+# 4. 续 T1.7 76 err 修法: 4.1 star_context 加 as_local_runtime helper + lib.rs 字段适配 + 4.2 star-mcp 2 份 tests 改写 + 4.3 守门 #1 v3 派生规文字 (估 0.55-1.05M 跨 1-2 sub-session, 优先 4.1 修完消解 51 err)
+# 5. 续 5.6 H2 原 3 domain 改造 (per §5.1 #6 估 0.6-0.8M, buffer 不够跨 1-2 sub-session)
+# 6. 等 T3 3 项选项拍板 (T3.1 共享 star-dto / T3.2 ≥80% Saga 覆盖 / T3.3 ubiquitous-language.md, per AGENTS.md v0.46 §已知缺口 #28)
+# 7. 续 T1.5 切 deny 3 步修法 (per 4c41fb1 报告 估 0.3M 跨 1-2 sub-session)
+# 8. 5 域 Lead 真人到位后 DDD Review 拍板 (per 8/21 JST 拒绝兼任硬约束, 不可我方推进)
+```
+
+**新增 5 项跨 session 续 (per AGENTS.md v0.48 缺口 #32-#36)**:
+1. T1.7 76 err 修法 0.55-1.05M 跨 1-2 sub-session
+2. 11 旧 worktree cleanup commit 落档 0.01M 1 commit (守门 #9 v3 #24 实证)
+3. 5.6 H2 原 3 domain 改造跨 1-2 sub-session 续 估 0.3-1.6M
+4. T3 3 项选项等 Ulysses 拍板
+5. T1.5 切 deny 3 步修法跨 1-2 sub-session 续 估 0.3M
+
+**守门 #1 v3 派生规 (per AGENTS.md v0.48 新增)**: 闭环报告 commit 之前必跑 `cargo check --workspace --all-targets` 0 err, 不能只看 `cargo check --workspace --lib` 0 err 就报"0 行代码改动". 实证 9/3 session 5.1+5.2+5.3 报告"0 行代码改动"但 --all-targets 76 err.
+
 ---
 
 ## §7 4 项 Ulysses 拍板记录 (2026-09-01 08:32 JST, ask_user 4-step questionnaire)
