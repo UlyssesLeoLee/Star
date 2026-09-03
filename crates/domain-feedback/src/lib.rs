@@ -82,7 +82,7 @@ mod tests {
     use uuid::Uuid;
 
     fn make_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::DEVELOPER)
+        ActorContext::new(uuid::Uuid::new_v4(), *tenant_id.as_uuid()).with_role(roles::DEVELOPER)
     }
 
     fn make_create_cmd(tenant_id: TenantId, target: FeedbackTarget) -> CreateFeedbackCommand {
@@ -587,7 +587,7 @@ mod tests {
                     limit: 10,
                     offset: 0,
                 },
-                ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::DEVELOPER),
+                ActorContext::new(uuid::Uuid::new_v4(), *tenant_id.as_uuid()).with_role(roles::DEVELOPER),
             )
             .await
             .unwrap();
