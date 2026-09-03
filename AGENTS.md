@@ -195,6 +195,17 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - `0032-mcp-transport-stdio.md` — MCP Transport stdio (16 tools + 6 字段错误模型 + 6 项关键变更)
 - `0033-agent-co-signing-policy.md` — (本规则正式 ADR)
 
+### 6.1 架构 view 索引 (IPA 3 文档)
+
+per `docs/architecture/2026-09-03-langgraph/` (2026-09-03 17:51 JST 用户发令"另起一套架构view,专门设计langgraph相关的功能"落档)：
+- `01-requirements.md` — 要件定義書 (18 機能 / 4 NFR 類 / 14 制約 / 20 用語 / 5 想定シナリオ / 18 UC)
+- `02-basic-design.md` — 基本設計書 (15 component + 9 sub-agent 类型 + 3-tier checkpoint + 12 API + 守门 統合)
+- `03-detailed-design.md` — 詳細設計書 (M-18 模块 + 4 class + LangGraph node/edge/reducer + 4 シーケンス + 3 状態遷移 + 19 UT/9 IT/8 E2E/8 PT)
+
+**架构核心**: 2-level hierarchical LangGraph
+- **L0 全体代理 (Top-Level Agent)**: UI 最下行聊天栏背后, 整体控制 Star 全局各个细节 (1 instance / session, singleton, cross-session checkpoint)
+- **L1 任务卡子代理 (Sub-Agent)**: 9 类型 (SA-01..SA-09), 各 sub-agent 独立 LangGraph subgraph, 任务卡 1:1 mirror, 隔离 context + per-task checkpoint (N 並行, ≤ 50)
+
 ---
 
 ## 7. 待办 (per 当前 main HEAD `98d246e`, token 双轴 WBS per `STAR-OLU-001.md`)
@@ -212,6 +223,7 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 | 5 | 9 个 wt 是否 merge 到 main (acceptance-vcs-blockers / adr-0026-0032 / cli-mcp / api / flows / arch 等) | ~1.2M | W11 (1 周) | 8+ wt merged (git 实证) | merge 后守门 0 违反 + commit message per 守门 + DDD Review 拍板 | 无 | **部分完成** (8/9 wt 已 merge; git: `4aebed5` `8c9452e` `e7dfb30` `4b40b83` `3d0a771` `ea2a960` `88f86ee` `74cbfe6`; 剩 ~1 wt TBD 评估) |
 | 6 | 4 份报告签字栏"审批"列 DDD Review 终审 | ~0.4M | W12 (决策会议) | 0 | 4 份签字栏全填 + 修订历史 +1 + 守门 0 违反 | 无 | pending (P0 但 token 小) |
 | 7 | 推 origin (R-05 不 push 反转决策) | ~0.1M | W13 (单次 git push) | 0 | author=Ulysses + 守门 0 违反 + DDD Review 拍板 | #5, #6 | 待 Ulysses 拍板 (P1 但 token 最小) |
+| 8 | **Star LangGraph 統合アーキテクチャ (Star-LG) 初版实装** (per 2026-09-03 17:51 JST 用户发令, 3 份 IPA 文档已落档) | ~3.0M | 独立, 与 #1-#7 并行 | 0 (3 文档落档 v0.1, 实装 v0.1 启动待 P0-1/H2 阻塞解除) | 全体代理 chat bar + 任务卡子代理 MVP + checkpointing (Tier 1+2) + 9 SA 类型 stub + UI mock + 守门 統合 + e2e ≥70% | 无 | **初版文档完成, 实装 pending** (3 份 IPA 文档 `docs/architecture/2026-09-03-langgraph/` 落档; 实装依赖 #6 DDD Review 拍板 + 5 域 Lead 真人到位 + #2 16 tool 真实接入完成) |
 
 **列含义**：
 - `软参考周`: token 预算 ÷ 1.2M SRE·周上限 → 周数;**不参与 gating**,仅供"若按人类节奏"的预估 (避免日期 blocker agent 进度, per 04:23 JST 拍板)
@@ -647,3 +659,19 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - **守门 #15 实证**: ahead origin/main = 0, 离 113 饱和点 buffer 充足
 - **新增已知缺口** (per 缺标比错标): (116) 461 err 跨函数签名推下 (13+ crate); (117) --all-targets 716 err 5+ sub-session 修法; (118) 5.6 + T1.5 + T3.1 + T3.2 跨 sub-session 续做; (119) .worktrees 残留 3 项 PowerShell 永久删 (Ulysses 手动); (120) 5 域 Lead 真人到位后追溯签字
 - **可重构状态**: main HEAD `bc3cb3e` 0 ahead origin/main 0/0 sync, Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 32 处 (3 crate 0 err, 107 err 消解跨 13 crate, 461 err 跨函数签名推下) + T3.3 实施 + 5+ 项跨 sub-session 续做 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 18:00 JST 用户发令"一次性把要确认的和剩余的都搞完" + 4.2 跨 crate 推进 (43cfc5a + bc3cb3e) + 推 origin 0/0 sync + AGENTS v0.68 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
+| v0.69 | 2026-09-03 18:15 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **Star LangGraph 統合アーキテクチャ (Star-LG) 初版文档落档** (per 2026-09-03 17:51 JST 用户发令"另起一套架构view,专门设计langgraph相关的功能,需求文档、基本设计、详细设计按照日本IPA规则设计", ask_user 2 问题拍板 (1) use case: STAR 整体通用代理 + 任务卡子代理 2-level hierarchical (2) 位置: Star 主仓 `docs/architecture/2026-09-03-langgraph/` 落档, 守门 #1+#9+#12+#19+#20+#22+#23+#24+#1 v3+#3 v2+#15 跨 stage 全过, ~0.08M token 估):
+- **新事件触发**: 2026-09-03 17:51 JST 用户发令 + ask_user 拍板 + 3 份 IPA 文档落档
+- **3 份 IPA 文档落档** (日本 IPA SEC 規則 形式, 中文内容, per 用户"按照日本IPA规则设计"):
+  1. `docs/architecture/2026-09-03-langgraph/01-requirements.md` (25KB) — 要件定義書: 2-level hierarchical LangGraph 架构 (L0 全体代理 + L1 任务卡子代理) + 18 機能 / 4 NFR 類 (性能 6 / 可用性 4 / 安全 6 / 保守性 3 / 拡張性 4) / 14 制約 (AGENTS.md §4 守门 全継承) / 20 用語 / 5 想定シナリオ / 18 UC (UC-01..UC-08)
+  2. `docs/architecture/2026-09-03-langgraph/02-basic-design.md` (54KB) — 基本設計書: 15 component (TopAgent / SubAgentPool / 9 SA / 3-tier Checkpoint / McpClient / UIStreamer / TaskCardManager / AuditLogger / TokenTelemetry / GuardEnforcer / StateSchemaRegistry / InterruptManager / SubAgentRegistry / CrossDomainDispatcher / HealthCheck) + 9 sub-agent 类型 (SA-01 code-review / SA-02 test-gen / SA-03 5-域-lead-audit / SA-04 git-ops / SA-05 doc-sync / SA-06 refactor / SA-07 db-migration / SA-08 domain-dev / SA-09 free-form) + 3-tier checkpoint (Memory / SQLite / PostgreSQL) + 12 API endpoint + 守门 統合 (24+ 守门 → GuardEnforcer) + 性能/運用/移行設計
+  3. `docs/architecture/2026-09-03-langgraph/03-detailed-design.md` (69KB) — 詳細設計書: M-18 模块 (top_agent / sub_agent / checkpoints / mcp / ui / cross_cutting / api / schema / tests) + 4 主要 class (TopAgent / SubAgentPool / SubAgentHandle / CheckpointStore) + 7 top node (parse_intent / dispatch / tool_node / collect / respond / interrupt / guard_check) + 5 sub 共通 node (init / plan / execute / verify / report) + 4 edge (route_after_parse_intent / route_after_dispatch / route_after_collect / route_after_guard) + 9 subgraph (SA-01..SA-09) + 4 mermaid シーケンス図 (UC-01 dispatch / UC-04 human-in-loop / UC-06 cross-session / tool call audit+guard) + 3 状態遷移図 (Task Card / Sub-Agent / Top Agent) + 19 UT / 9 IT / 8 E2E / 8 PT テスト設計 + エラー処理 4 レベル (transient / recoverable / critical / fatal) + 永続化 3-tier + 12 既知課題
+- **AGENTS.md 同步** (per 守门 #12 缺标比错标):
+  - §6 新增 §6.1 "架构 view 索引 (IPA 3 文档)" 子节, 引用 `docs/architecture/2026-09-03-langgraph/` 3 份文档
+  - §7 待办表新增 #8 行 "Star LangGraph 統合アーキテクチャ (Star-LG) 初版实装" (~3.0M token 预算, 独立并行, 状态 "初版文档完成, 实装 pending", 依赖 #6 DDD Review + 5 域 Lead 真人 + #2 16 tool 真实接入)
+  - §8 修订历史追加 v0.69 行 (本行)
+- **架构核心 (per 用户 17:51 JST 原文)**: L0 全体代理 (Top-Level Agent) 放置在 UI 最下行聊天栏背后, 整体控制 Star 全局各个细节; L1 任务卡子代理 (Sub-Agent) 每张任务卡 = 1 个 sub-agent 窗口, 各自有独特一套作为代理的 LangGraph 设计
+- **守门 #1 阶段 1 实证**: docs 落档完成, 无代码改动, cargo check 不需要跑 (per 守门 #1 阶段 1 仅 lib, 本 v0.69 是纯文档无 .rs 改动)
+- **守门 #12 闭环**: docs 同步跨 4 文件 (3 份 IPA 文档 + AGENTS.md), commit 引用 docs 相对路径, 不回溯叙事, 不沿用 v0.68 旧叙事
+- **守门 #19/#20 实证**: 3 份文档落档无子代理 dispatch 调用 (root 直接 write), 无外部 API 开 (per 守门 #23); 守门 #20 派生规不适用 (无 worker 子代理调用)
+- **新增已知缺口** (per 缺标比错标): (121) PostgreSQL checkpointer 未実装 (v0.2 计划); (122) 跨仓 (Physis/RGS) RPC 未実装 (v0.3 计划); (123) 16 tool 全部 sub-agent 経由 call 化 (现 3 tool 真实接入 + 12 tool 留 P2 缺 service, per AGENTS.md §7 #2); (124) State schema v1 起点, 将来 migration 路径未定義 (v0.2 计划); (125) interrupt_response → Command(resume=...) LangGraph 0.2.x API 待 finalize (2026-09-03 時点 alpha); (126) 实装依赖 #6 DDD Review 拍板 + 5 域 Lead 真人到位 + #2 16 tool 真实接入完成
+- **可重构状态**: main HEAD 待 commit (本 v0.69 3 份 IPA 文档 + AGENTS.md §6.1 + §7 #8 + §8 v0.69 同步), AGENTS.md 修订历史 v0.68 → v0.69, 新增架构 view 子节 §6.1, 待办 #8 LangGraph 实装 初版文档完成, 实装 pending 依赖 6 阻塞项 | 2026-09-03 18:15 JST 用户发令"另起一套架构view,专门设计langgraph相关的功能" + ask_user 拍板 2 决策 + 3 份 IPA 文档落档 (148KB 总计) + AGENTS.md §6.1+§7#8+§8 v0.69 同步, 守门 #1+#9+#12+#19+#20+#22+#23+#24+#1 v3+#3 v2+#15 跨 stage 全过, ~0.08M token 估 |
