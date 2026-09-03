@@ -800,7 +800,7 @@ mod tests {
     async fn three_state_workflow_full_transition() {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.expect("创建成功");
         assert_eq!(wf.version, 1);
@@ -868,7 +868,7 @@ mod tests {
     async fn skip_state_rejected() {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
 
@@ -912,7 +912,7 @@ mod tests {
     async fn terminal_state_cannot_transition() {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
 
@@ -982,7 +982,7 @@ mod tests {
     async fn invalid_transition_rejected() {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
 
@@ -1020,7 +1020,7 @@ mod tests {
     async fn multi_state_workflow_with_review_and_blocked() {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let s_todo = WorkflowStateId::new();
         let s_wip = WorkflowStateId::new();
         let s_review = WorkflowStateId::new();
@@ -1188,7 +1188,7 @@ mod tests {
     async fn start_instance_uses_default_initial_state() {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
         let inst = svc
@@ -1245,7 +1245,7 @@ mod tests {
     async fn workflow_version_increment() {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd = make_three_state_workflow(tenant_id);
         let wf1 = svc.create_workflow(cmd, &actor).await.unwrap();
         assert_eq!(wf1.version, 1);
@@ -1264,7 +1264,7 @@ mod tests {
     async fn history_records_actor_and_at() {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
         let inst = svc
@@ -1311,7 +1311,7 @@ mod tests {
     async fn role_guard_blocks_non_approver() {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor_developer = make_actor(tenant_id);
+        let actor_developer = make_actor(TenantId(tenant_id));
         // 不带 project_admin 角色
         let s_todo = WorkflowStateId::new();
         let s_done = WorkflowStateId::new();
@@ -1371,7 +1371,7 @@ mod tests {
         assert!(matches!(res, Err(WorkflowError::PermissionDenied(_))));
 
         // project_admin 可以
-        let mut actor_admin = make_actor(tenant_id);
+        let mut actor_admin = make_actor(TenantId(tenant_id));
         actor_admin = actor_admin.with_role("project_admin");
         let res2 = svc
             .transition(
@@ -1393,7 +1393,7 @@ mod tests {
     async fn create_and_query_workflow() {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
 
@@ -1418,7 +1418,7 @@ mod tests {
     async fn multiple_instances_are_independent() {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd = make_three_state_workflow(tenant_id);
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
         let in_progress = wf
