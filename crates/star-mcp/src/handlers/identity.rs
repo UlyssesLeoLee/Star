@@ -116,7 +116,7 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let actor = ActorContext::new(uuid::Uuid::nil(), tid);
         let cmd = CreateUserCommand {
-            tenant_id: tid,
+            tenant_id: domain_identity::TenantId(tid),
             email: format!("alice-{}@example.invalid", uuid::Uuid::new_v4()),
             display_name: "Alice".into(),
             tenant_role: TenantRole::Developer,

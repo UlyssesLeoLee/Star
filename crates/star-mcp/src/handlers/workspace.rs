@@ -105,7 +105,7 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let owner = domain_workspace::UserId::from(uuid::Uuid::new_v4());
         let cmd = CreateWorkspaceCommand {
-            tenant_id: tid,
+            tenant_id: domain_workspace::TenantId(tid),
             workspace_key: format!("ws-{}", uuid::Uuid::new_v4()),
             name: "Acme Workspace".into(),
             description: Some("Test workspace".into()),

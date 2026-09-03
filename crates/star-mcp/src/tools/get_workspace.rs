@@ -102,7 +102,7 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let owner = domain_workspace::UserId::from(uuid::Uuid::new_v4());
         let cmd = CreateWorkspaceCommand {
-            tenant_id: tid,
+            tenant_id: domain_workspace::TenantId(tid),
             workspace_key: format!("ws-f2-{}", uuid::Uuid::new_v4()),
             name: "Phase F.2 Test WS".into(),
             description: Some("F.2 真实数据源接入测试".into()),

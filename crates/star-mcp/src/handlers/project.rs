@@ -130,13 +130,13 @@ mod tests {
         let actor = ActorContext::new(uuid::Uuid::nil(), tid).with_role("project_admin");
         let ws_id = domain_project::WorkspaceId::new();
         let cmd = CreateProjectCommand {
-            tenant_id: tid,
+            tenant_id: domain_project::TenantId(tid),
             workspace_id: ws_id,
             slug: format!("acme-proj-{}", uuid::Uuid::new_v4()),
             display_name: "Acme Project".into(),
             description: "Tier 2 试水".into(),
             project_template_id: None,
-            actor_user_id: uuid::Uuid::nil(),
+            actor_user_id: domain_project::UserId(uuid::Uuid::nil()),
         };
         let _ = ProjectTemplateId; // silence unused if not used below
         let created = svc.create_project(cmd, &actor).await.unwrap();

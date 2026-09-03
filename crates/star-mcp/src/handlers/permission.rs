@@ -123,9 +123,9 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let actor = ActorContext::new(uuid::Uuid::nil(), tid).with_role("tenant_admin");
         let cmd = CreateSchemeCommand {
-            tenant_id: tid,
+            tenant_id: domain_permission::TenantId(tid),
             name: format!("acme-scheme-{}", uuid::Uuid::new_v4()),
-            actor_user_id: uuid::Uuid::nil(),
+            actor_user_id: domain_permission::UserId(uuid::Uuid::nil()),
         };
         let created = svc.create_scheme(cmd, &actor).await.unwrap();
         // actor.tenant_id == cmd.tenant_id + with_role("tenant_admin")

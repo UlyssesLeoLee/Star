@@ -114,7 +114,7 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let actor = ActorContext::new(uuid::Uuid::nil(), tid).with_role("developer");
         let cmd = CreateWorktreeCommand {
-            tenant_id: tid,
+            tenant_id: domain_worktree::TenantId(tid),
             project_id: domain_worktree::ProjectId::new(),
             work_item_id: domain_worktree::WorkItemId::new(),
             repository_id: domain_worktree::RepositoryId::new(),

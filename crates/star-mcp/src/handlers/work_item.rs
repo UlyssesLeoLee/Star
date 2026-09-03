@@ -145,7 +145,7 @@ mod tests {
         let ws_id = domain_work_item::WorkspaceId::new();
         let proj_id = domain_work_item::ProjectId::new();
         let cmd = CreateWorkItemCommand {
-            tenant_id: tid,
+            tenant_id: domain_work_item::TenantId(tid),
             workspace_id: ws_id,
             project_id: proj_id,
             item_type: WorkItemType::Task,
