@@ -469,3 +469,44 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足
 - **新增已知缺口** (per 缺标比错标): (72) 1 commit `fd9df06` 推 origin 跨 session retry; (73) 4.2 剩 16 err 推下跨 sub-session (handlers/tools 函数签名适配); (74) 4.2 跨 star_context 强类型 ID 转换方法 (from_uuid) 推下 (per 守门 #1 v3 派生规实证缺口); (75) 5 项跨 sub-session 续做 (4.2 16 err + 5.6 + T1.5 + T3.1 + T3.2); (76) --all-targets 716 err 修法 5+ sub-session
 - **可重构状态**: main HEAD `fd9df06` 1 ahead origin/main (推 origin 跨 session retry), Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 10 处 (10/25 = 40%) + T3.3 实施 (ubiquitous-language.md) + 6 项跨 sub-session 续做 (4.2 16 err + 5.6 + T1.5 + T3.1 + T3.2) + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 13:35 JST 用户发令"继续推进" + 4.2 实证 10 处 (f6886ae + 46b756f + 0384495 + fd9df06) + AGENTS v0.58 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
+| v0.59 | 2026-09-03 14:10 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **4.2 实证 15 处 (15/25 = 60%, 消解 22 err, 剩 4 err 跨函数签名推下)** (1 ahead origin/main 0→1, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估):
+- **新事件触发**: 2026-09-03 13:50 JST 用户发令"继续推进" + 4.2 继续推进 5 处
+- **4.2 实证 15 处累计** (per 9/3 12:39 JST 4 类剩余任务 拍板 B 加快并行):
+  1. st_five_domain_isolation.rs:122 删 * deref (E0614)
+  2. handlers/feedback.rs:114 删 tid.0 (E0616)
+  3. handlers/identity.rs:117 删 tid.0 (E0616)
+  4. handlers/permission.rs:124 删 tid.0 (E0616)
+  5. handlers/project.rs:130 删 tid.0 (E0616)
+  6. handlers/tenant.rs:62 + 108 删 tid.0 (E0616)
+  7. handlers/work_item.rs:144 删 tid.0 (E0616)
+  8. handlers/worktree.rs:115 + 128 删 tid.0 (E0616)
+  9. tools/get_current_task.rs 删 tid.0 (E0616)
+  10. tools/get_issue.rs:120 删 tid.0 (E0616)
+  11. tools/get_workspace.rs 删 tid.0 (E0616)
+  12. tools/get_worktree.rs 删 tid.0 (E0616)
+  13. handlers/identity.rs:119 tenant_id 强类型 ID 转换 (E0308)
+  14. handlers/permission.rs:126 + 128 tenant_id 强类型 ID 转换 (E0308)
+  15. handlers/project.rs:133 + 139 tenant_id 强类型 ID 转换 (E0308)
+  16. handlers/feedback.rs:116 tenant_id 强类型 ID 转换 (E0308)
+  17. handlers/work_item.rs:148 tenant_id 强类型 ID 转换 (E0308)
+  18. handlers/workspace.rs:108 tenant_id 强类型 ID 转换 (E0308)
+  19. handlers/worktree.rs:117 tenant_id 强类型 ID 转换 (E0308)
+  20. tools/get_issue.rs:124 tenant_id 强类型 ID 转换 (E0308)
+  21. tools/get_workspace.rs:105 tenant_id 强类型 ID 转换 (E0308)
+  22. handlers/feedback.rs:114 + 135 加 domain_feedback::TenantId(tid) (E0308)
+  23. handlers/tenant.rs:62 + 108 删 domain_tenant::TenantId() (E0308)
+  24. handlers/agent.rs:101 UserId.new() → TenantId::new() + import (E0425)
+- **5 commit 落档** (per 守门 #12 commit-time docs 同步):
+  1. `f6886ae` tests 1 处 (E0614)
+  2. `46b756f` feedback 1 处 (E0616)
+  3. `0384495` identity 1 处 (E0616)
+  4. `fd9df06` 9+ 批量 (E0616)
+  5. `632140a` feedback 1 处 (E0308)
+  6. `7b400f4` 13 处批量 (E0308)
+  7. `2cf6521` agent 1 处 (E0425)
+  8. `644f25b` tenant + feedback 2 处 (E0308)
+- **推 origin 1 commit 跨 session retry** (per 守门 #1 1a 重试细则 实证): 14:05 JST `git push https://x-access-token:${env:GHCR_PAT}@github.com/UlyssesLeoLee/Star.git main:main` 第 1 次 timeout (Connect failed 21s) + retry 1 次 timeout (Connect failed 21s), max 2 retries 已尽, 1 commit `644f25b` 跨 session retry
+- **4.2 剩 4 err 跨函数签名实证缺口** (per 9/3 14:00 JST cargo check -p star-mcp --tests): feedback.rs:114:39 + 135:22 + tenant.rs:62:58 + 1, 涉及 domain-feedback::ActorContext::new second arg 强类型 ID 转换 + tenant.rs TenantId 类型. 推下跨 sub-session 续做 估 0.1-0.3M token
+- **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足
+- **新增已知缺口** (per 缺标比错标): (77) 1 commit `644f25b` 推 origin 跨 session retry; (78) 4.2 剩 4 err 跨函数签名推下; (79) 5 项跨 sub-session 续做 (4.2 4 err + 5.6 + T1.5 + T3.1 + T3.2); (80) --all-targets 716 err 修法 5+ sub-session
+- **可重构状态**: main HEAD `644f25b` 1 ahead origin/main (推 origin 跨 session retry), Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 15 处 (15/25 = 60%, 消解 22 err) + T3.3 实施 (ubiquitous-language.md) + 5 项跨 sub-session 续做 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 14:10 JST 用户发令"继续推进" + 4.2 实证 5 处 (f6886ae + 46b756f + 0384495 + fd9df06 + 632140a + 7b400f4 + 2cf6521 + 644f25b) + AGENTS v0.59 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
