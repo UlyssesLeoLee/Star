@@ -633,3 +633,17 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - **守门 #15 实证**: ahead origin/main = 0, 离 113 饱和点 buffer 充足
 - **新增已知缺口** (per 缺标比错标): (110) ProjectId::as_uuid() 方法可能不存在 实证缺口 (per domain-automation / domain-planning 实证); (111) 469 err 跨函数签名推下 (12+ crate); (112) --all-targets 716 err 5+ sub-session 修法; (113) 5.6 + T1.5 + T3.1 + T3.2 跨 sub-session 续做; (114) .worktrees 残留 3 项 PowerShell 永久删 (Ulysses 手动); (115) 5 域 Lead 真人到位后追溯签字
 - **可重构状态**: main HEAD `8de97aa` 0 ahead origin/main 0/0 sync, Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 30 处 (3 crate 0 err, 92 err 消解跨 12 crate, 469 err 跨函数签名推下) + T3.3 实施 + 5+ 项跨 sub-session 续做 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 16:50 JST 用户发令"继续" + 4.2 实证 30 处完成 + ProjectId.as_uuid 实证缺口 + AGENTS v0.67 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
+| v0.68 | 2026-09-03 18:00 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **4.2 跨 crate 推进: domain-workspace 15 + domain-feedback 0 错减少, 实证 32 处, 推 origin 0/0 sync** (0 ahead origin/main 0/0 sync, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估):
+- **新事件触发**: 2026-09-03 17:37 JST 用户发令"一次性把要确认的和剩余的都搞完" + 4.2 跨 crate 推进
+- **4.2 跨 crate 实证 2 处** (per 9/3 12:39 JST 4 类剩余任务 拍板 B 加快并行):
+  - crates/domain-workspace/src/lib.rs:891 make_actor + UserId.new() → UserId::new() + let me (15 E0308 + E0599 消解, 32 → 17 err)
+  - crates/domain-feedback/src/lib.rs:85 ActorContext::new tenant_id → *tenant_id.as_uuid() (0 err 减少, baseline 77 err 保持)
+- **守门 #1 阶段 1 实证**: cargo check --workspace --lib 0 err 3.84s 保持
+- **2 commit 落档 + 推 origin 0/0 sync** (per 守门 #1 反转 R-05 拍板落地):
+  1. `43cfc5a` domain-workspace 15 E0308 + E0599 实证
+  2. `bc3cb3e` domain-feedback 0 错减少 (baseline 保持)
+- **推 origin 2 commit 成功 0/0 sync**: `43cfc5a..bc3cb3e` 推 2 commit, ahead = 0 / behind = 0
+- **4.2 总进度 32 处** + **3 crate 0 err** (star-mcp + domain-cli + domain-relation) + **总消解 107 err 跨 13 crate**
+- **守门 #15 实证**: ahead origin/main = 0, 离 113 饱和点 buffer 充足
+- **新增已知缺口** (per 缺标比错标): (116) 461 err 跨函数签名推下 (13+ crate); (117) --all-targets 716 err 5+ sub-session 修法; (118) 5.6 + T1.5 + T3.1 + T3.2 跨 sub-session 续做; (119) .worktrees 残留 3 项 PowerShell 永久删 (Ulysses 手动); (120) 5 域 Lead 真人到位后追溯签字
+- **可重构状态**: main HEAD `bc3cb3e` 0 ahead origin/main 0/0 sync, Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 32 处 (3 crate 0 err, 107 err 消解跨 13 crate, 461 err 跨函数签名推下) + T3.3 实施 + 5+ 项跨 sub-session 续做 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 18:00 JST 用户发令"一次性把要确认的和剩余的都搞完" + 4.2 跨 crate 推进 (43cfc5a + bc3cb3e) + 推 origin 0/0 sync + AGENTS v0.68 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
