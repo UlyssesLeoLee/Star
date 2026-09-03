@@ -111,7 +111,7 @@ mod tests {
         let h = FeedbackHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid);
+        let actor = ActorContext::new(uuid::Uuid::nil(), domain_feedback::TenantId(tid));
         let cmd = CreateFeedbackCommand {
             tenant_id: domain_feedback::TenantId(tid),
             project_id: ProjectId::new(),
