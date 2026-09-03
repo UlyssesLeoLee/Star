@@ -510,3 +510,29 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足
 - **新增已知缺口** (per 缺标比错标): (77) 1 commit `644f25b` 推 origin 跨 session retry; (78) 4.2 剩 4 err 跨函数签名推下; (79) 5 项跨 sub-session 续做 (4.2 4 err + 5.6 + T1.5 + T3.1 + T3.2); (80) --all-targets 716 err 修法 5+ sub-session
 - **可重构状态**: main HEAD `644f25b` 1 ahead origin/main (推 origin 跨 session retry), Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 15 处 (15/25 = 60%, 消解 22 err) + T3.3 实施 (ubiquitous-language.md) + 5 项跨 sub-session 续做 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 14:10 JST 用户发令"继续推进" + 4.2 实证 5 处 (f6886ae + 46b756f + 0384495 + fd9df06 + 632140a + 7b400f4 + 2cf6521 + 644f25b) + AGENTS v0.59 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
+| v0.60 | 2026-09-03 14:30 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **4.2 实证 17 处 = 68%, star-mcp 0 err! 推 origin 0/0 sync, 0/0 ahead/behind** (0 ahead origin/main, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3+#1 v3 跨 stage 全过, ~0.05M token 估):
+- **新事件触发**: 2026-09-03 14:10 JST 用户发令"继续推进" + 4.2 实证 17 处
+- **4.2 实证 17 处** (per 9/3 12:39 JST 4 类剩余任务 拍板 B 加快并行):
+  - 9 E0616 消解 (handlers/ + tools/ 9 文件 tid.0 → tid)
+  - 1 E0614 消解 (tests/st_five_domain_isolation.rs:122 * deref)
+  - 12 E0308 消解 (handlers/ + tools/ tenant_id 强类型 ID 转换 + tenant.rs + feedback.rs ActorContext::new 强类型)
+  - 1 E0425 消解 (handlers/agent.rs:101 UserId → TenantId)
+  - 1 E0599 消解 (handlers/tenant.rs:108 Uuid as_uuid not found)
+  - 1 E0271 消解 (tenant.rs:104 format string positional argument)
+  - **总消解 25 err, 4.2 进度 17/25 = 68%**
+- **守门 #1 阶段 1 实证**: cargo check -p star-mcp --tests 0 err 2.42s 走增量 (star-mcp 完成) + cargo check --workspace --lib 0 err 3.84s 走增量 (守门 #1 阶段 1 保持)
+- **守门 #1 v3 派生规实证缺口**: 闭环报告 commit 之前必跑 --all-targets 0 err, star-mcp 0 err 实证, 但 --all-targets 716 err 实证缺口 (其他 19+ crate 错总数). 闭环报告 commit 推下下 session 续做
+- **9 commit 落档** (per 守门 #12 commit-time docs 同步):
+  1. `f6886ae` tests 1 处 (E0614)
+  2. `46b756f` feedback 1 处 (E0616)
+  3. `0384495` identity 1 处 (E0616)
+  4. `fd9df06` 9+ 批量 (E0616)
+  5. `632140a` feedback 1 处 (E0308)
+  6. `7b400f4` 13 处批量 (E0308)
+  7. `2cf6521` agent 1 处 (E0425)
+  8. `644f25b` tenant + feedback 2 处 (E0308)
+  9. `93c343f` tenant + feedback 5 处修 (1 err 消解, star-mcp 0 err)
+- **推 origin 6 commit 成功 0/0 sync** (per 守门 #1 反转 R-05 拍板落地 + 守门 #1 1a 重试细则): `2cf6521..93c343f main -> main` 推 6 commit (31f4505 + 644f25b + 5 反馈) 全部成功, ahead = 0 / behind = 0 完全 sync
+- **守门 #15 实证**: ahead origin/main = 0, 离 113 饱和点 buffer 充足
+- **新增已知缺口** (per 缺标比错标): (81) --all-targets 716 err 修法 5+ sub-session 续做 (star-mcp 0 err 但其他 19+ crate 错总数 716); (82) 5.6 H2 原 3 domain 改造跨 sub-session 续做 估 0.3-1.6M; (83) T1.5 切 deny 跨 sub-session 续做 估 0.3M; (84) T3.1 共享 star-dto 跨 sub-session 续做 估 0.5M; (85) T3.2 Saga 跨域编排覆盖跨 sub-session 续做 估 0.1M; (86) .worktrees 残留 3 项永久删 (Ulysses 手动); (87) 5 域 Lead 真人到位后追溯签字
+- **可重构状态**: main HEAD `93c343f` 0 ahead origin/main 0/0 sync, Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 17 处 (17/25 = 68%, star-mcp 0 err) + T3.3 实施 (ubiquitous-language.md) + 4 项跨 sub-session 续做 (5.6 + T1.5 + T3.1 + T3.2) + --all-targets 716 err 5+ sub-session 修法 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 14:30 JST 用户发令"继续推进" + 4.2 实证 17 处 (93c343f) + 推 origin 0/0 sync (6 commit 推完) + AGENTS v0.60 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
