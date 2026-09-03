@@ -107,7 +107,7 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 | 1 | **R-05 不 push** (反转: 2026-08-30 07:09 JST 推 origin 已落地) | 2026-08-27 11:09 JST, 反转 2026-08-30 07:09 JST | Ulysses 拍板, 反转拍板 (per ask_user push_confirm 拍板) |
 | 1a | **推 origin 重试细则** (per 2026-09-03 11:07 JST 401 实证) | 2026-09-03 11:14 JST | 守门 #1 拍板 | 推 origin 网络错误 (Recv failure / Connect failed / timeout) max 2 retries; **401 Authentication failed 不算 timeout, 跨 session 续, Ulysses 验证 $env:GHCR_PAT**; github.com 偶发中断 30s-2min 后常恢复, 不连续 retry |
 | 2 | **bc23d6c 保留** | 2026-08-27 11:09 JST | Ulysses 拍板 (commit 引用了未做过的 frontend commit hash 5181288 / b9858b2 / 6d78158 / c102fdf3 / 0b584411) |
-| 3 | **5 域独立 Lead，不接受兼任** | 2026-08-21 JST | Ulysses 拍板 (RGS 5 域 player/economy/match/social/admin) — **per 2026-08-31 22:45 JST Q1-D 拍板 (a)+(c)**: "5 域独立 Lead" 是 RGS 仓**历史治理命名** (5 位真人 Lead 问责结构), **不等于** Star 仓 22 DDD bounded context; **不建立业务子域↔DDD映射**; 文档加 disclaimer 说明两者非同一分类 (见 §5 仓库拓扑) |
+| 3 | **5 域独立 Lead，不接受兼任** | 2026-08-21 JST | Ulysses 拍板 (RGS 5 域 player/economy/match/social/admin) — **per 2026-08-31 22:45 JST Q1-D 拍板 (a)+(c)**: "5 域独立 Lead" 是 RGS 仓**历史治理命名** (5 位真人 Lead 问责结构), **不等于** Star 仓 22 DDD bounded context; **不建立业务子域↔DDD映射**; 文档加 disclaimer 说明两者非同一分类 (见 §5 仓库拓扑) — **per 2026-09-03 11:35 JST Ulysses 拍板 B 反转**: Mavis 临时代签 5 域 Lead 决策 (破 8/21 拒绝兼任硬约束, 适用所有跨域编排 + DDD Review + Saga orchestrator), author=Ulysses (per 守门 #10 + 19:39 JST 授权), 真人到位后追溯签字, 不沿用代签决策 (per 守门 #1 禁回溯叙事) |
 | 4 | **AI 协作 token-OLU 而非人天** | 2026-08-21 JST | Ulysses 拍板 (1 SRE·周 ≈ 1M tokens, 1 人·天 ≈ 100-300K tokens); STAR 独立基线 `STAR-OLU-001.md` v0.1 (1 SRE·周 = 1.2M) 2026-08-29 落档 |
 | 5 | **环境变量安全** | 2026-08-27 11:06 JST | Ulysses hard ban (禁 `Get-ChildItem env:` / `echo $VAR` / `cat .env` 等泄露 secret 操作) |
 | 6 | **PowerShell only** | 持续 | 系统约束 (非 bash, `;` 替 `&&`, `Get-ChildItem` 替 `ls -la`, `Select-String` 替 `grep`) |
@@ -351,3 +351,16 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足 (vs v0.49 0 ahead 推完, 本轮 +1 commit)
 - **新增已知缺口** (per 缺标比错标): (40) 1 commit `e3f885a` 推 origin 跨 session 续 (网络恢复后); (41) finding 3 .worktrees/ 残留 3 项 PowerShell 限制 推下下 session (Ulysses 决定: 永久删 / 移到 _archive_/ / 保留)
 - **可重构状态**: main HEAD `e3f885a` 1 ahead origin/main (推 origin 跨 session 续), Phase 5 5/6 子项 done + 4 续做项 4-5 sub-session 续 + 5 域 Lead 真人到位后 DDD Review 拍板 + 守门 #1 1a 重试细则补全 | 2026-09-03 11:20 JST 用户发令"自审" + "修好之后推进" + self-review 3 findings 修法 1+2 (e3f885a) + 修法 3 推下 PowerShell 限制 + 推 origin 1 commit 跨 session 续, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22 跨 stage 全过, ~0.05M token 估 |
+| v0.51 | 2026-09-03 11:35 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **4 阻塞项拍板落档 (A+A+A+B) + 守门 #3 v2 派生规补全 (8/21 反转 Mavis 临时代签 5 域 Lead)** (3 ahead origin/main 1→3, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2 跨 stage 全过, ~0.05M token 估):
+- **新事件触发**: 2026-09-03 11:28 JST 用户发令"阻塞项让我选择如何推进" + ask_user 4-step 拍板 4 项 A+A+A+B (per ask_a8966189e2293588718e6e08)
+- **4 项拍板落档** (per 守门 #12 commit-time docs 同步):
+  1. **阻塞项 1: 推 origin 2 commit retry** A. 跨 session 续 retry (下 session 第一件事 retry, 守门 #1 1a max 2 retries)
+  2. **阻塞项 2: .worktrees/ 残留 3 项** A. 永久删 (Ulysses 手动, Mavis 不越权, 9/1 _archive_id_rs_bak 保留)
+  3. **阻塞项 3: 6 续做项启动顺序** A. T1.7 → T3.3 → T3.1 → T3.2 → 5.6 → T1.5 (严格依赖, 1.85-3.65M 跨 4-5 sub-session)
+  4. **阻塞项 4: 5 域 Lead 真人到位** **B. Mavis 临时代签 (破守门 #3 拒绝兼任硬约束, 8/21 拍板反转)** ⚠️ 关键反转
+- **守门 #3 v2 派生规补全** (per 9/3 11:35 JST 反转落档): Mavis 临时代签 5 域 Lead 决策, 适用所有跨域编排 + DDD Review + Saga orchestrator; author=Ulysses (per 守门 #10 + 19:39 JST 授权), 修订人/审批者 Mavis 临时代签 5 域 Lead; 真人到位后追溯签字, 不沿用代签决策 (per 守门 #1 禁回溯叙事)
+- **1 commit 落档** (per 守门 #12 commit-time docs 同步):
+  1. `60b0660` 4 阻塞项拍板落档报告: `docs/reports/2026-09-03-rf-001-blockers-4items-board.md` v0.1 (8733 bytes, 8 段结构, 4 项拍板实证 + 守门 #3 反转分析 + 6 续做项严格依赖 + 推 origin 跨 session retry + .worktrees 残留 Ulysses 手动删); 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2 实证
+- **守门 #15 实证**: 3 ahead origin/main 离 113 饱和点 buffer 充足 (vs v0.50 1 ahead, 本轮 +2 commit 含 1 报告 + AGENTS v0.51 修订历史)
+- **新增已知缺口** (per 缺标比错标): (42) 推 origin 3 commit (e3f885a + 8da70c6 + 60b0660) 跨 session retry (网络恢复后); (43) .worktrees/ 残留 3 项 PowerShell 永久删 (Ulysses 手动); (44) 6 续做项 4-5 sub-session 续做 1.85-3.65M token; (45) 5 域 Lead 真人到位后 DDD Review 阶段追溯签字 (不可我方推进)
+- **可重构状态**: main HEAD `60b0660` 3 ahead origin/main (推 origin 跨 session 续), Phase 5 5/6 子项 done + 4 续做项 4-5 sub-session 续 + 5 域 Lead 真人到位后追溯签字 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策 + 守门 #1 1a 重试细则补全 | 2026-09-03 11:35 JST 用户发令"阻塞项让我选择如何推进" + ask_user 4-step 拍板 4 项 A+A+A+B (per ask_a8966189e2293588718e6e08) + 拍板落档报告 (60b0660) 1 commit + 守门 #3 v2 派生规补全, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2 跨 stage 全过, ~0.05M token 估 |
