@@ -194,6 +194,11 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - `0031-context-graph.md` — Context Graph (MVP 4 节点 + 5 关系, Phase 2+ 12+10 节点/关系)
 - `0032-mcp-transport-stdio.md` — MCP Transport stdio (16 tools + 6 字段错误模型 + 6 项关键变更)
 - `0033-agent-co-signing-policy.md` — (本规则正式 ADR)
+- `0034-jira-ification.md` — Jira 化 (per 9/3 12:00 JST 拍板, 跟 P3-B 命名空间共存)
+- `0035-0042-phase-f-i-architecture.md` — Phase F-I 架构 (per AGENTS.md §7 #8 9 个 wt 合并)
+- `0043-audit-onboarding-failed.md` — audit_audit_event WORM onboarding.failed 事件 (per 守门 #13 W/T/M, 9/2 落档)
+- `0044-star-agent-runtime-srs.md` — STAR Agent Runtime SRS Baseline (113 节, 1M logical agents, commit `5460d33` per 2026-09-03 18:25 JST)
+- `0045-star-agent-runtime-design.md` — STAR Agent Runtime Basic + Detailed Design Baseline (40KB + 52KB + 14KB, 跟 LangGraph 9/3 平行, 同期落档 per 2026-09-03 19:00 JST)
 
 ### 6.1 架构 view 索引 (IPA 3 文档)
 
@@ -205,6 +210,18 @@ per `docs/architecture/2026-09-03-langgraph/` (2026-09-03 17:51 JST 用户发令
 **架构核心**: 2-level hierarchical LangGraph
 - **L0 全体代理 (Top-Level Agent)**: UI 最下行聊天栏背后, 整体控制 Star 全局各个细节 (1 instance / session, singleton, cross-session checkpoint)
 - **L1 任务卡子代理 (Sub-Agent)**: 9 类型 (SA-01..SA-09), 各 sub-agent 独立 LangGraph subgraph, 任务卡 1:1 mirror, 隔离 context + per-task checkpoint (N 並行, ≤ 50)
+
+per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户发令"基本设计和详细设计也都到位" + 18:59 JST 拍板 A 独立目录 + A 引用 LangGraph + ADR-0045 落档)：
+- **SRS-001** = [`docs/requirements/SRS-STAR-AGENT-RUNTIME-001.md`](docs/requirements/SRS-STAR-AGENT-RUNTIME-001.md) v1.0 — Agent View 要件定義書 (113 节, 12 ✅ / 8 🟡 / 60 ⏳ / 4 ❌ N/A, 目标 1M logical agents on 16-32GB 单机) — commit `5460d33` per ADR-0044
+- `02-basic-design.md` — Agent View 基本設計書 (40KB / 12 章节: 3 层架构 L0 派发 + L1 ECS + L2 业务 / Runtime 双模式 / 9 SA Archetype 引用 / 31 domain-* 目标 / 13 Systems / NFR / G-1~G-15) — 同期落档 per ADR-0045
+- `03-detailed-design.md` — Agent View 詳細設計書 (52KB / 15 章节: 9 新建 module + 13 关键类 Rust 草案 + 2 状态机 + 4 时序图 / 5 表 schema W/T/M 严格分类 per 守门 #13 / 4 算法 / 7 错误处理 / UT 250+ / IT 70+ / E2E 10 / PT 9 套 / G-1~G-17) — 同期落档 per ADR-0045
+
+**架构核心**: Hybrid Runtime (Lightweight + ECS + Event Driven + Shared Runtime + HOT/WARM/COLD)
+- **L0 派发层**: Tokio async dispatcher + SQLite WAL TaskQueue + multiprocessing.Pool(8-16) (per 守门 #24) — 1M 任务派发无持久化缺口 G-1
+- **L1 ECS Runtime**: bevy_ecs / flecs Rust + 9 Archetype (SA-01..SA-09 引用 LangGraph 9/3 §6.1) — 选型缺口 G-2
+- **L2 业务共享池**: LLM Pool / HTTP Pool / MCP Pool / Tool Registry / Retriever Pool / Tokenizer / Prompt Registry / Rate Limiter / Circuit Breaker — P3-C 缺口 G-4
+
+**关系**: LangGraph view 跟 Agent Runtime view **平行**, 9 SA Type 是**接口**而不是实现. LangGraph subgraph 实现 SA-XX 业务逻辑, Agent Runtime ECS 提供底层 Runtime. 两者通过 Adapter 模式连接. **不**建立业务子域↔DDD bounded context 映射 (per 守门 #3 + AGENTS.md §5 仓库拓扑 disclaimer).
 
 ---
 

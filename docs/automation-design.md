@@ -384,6 +384,41 @@ print(f"err_count={result.stderr.count('error[')}")
 - `git log -p --follow docs/automation-design.md` 实证 §4.13 追加 (commit 后)
 - commit author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权)
 
+### 4.14 STAR Agent Runtime Basic + Detailed Design 落档 (2026-09-03 19:00 JST per `docs/architecture/2026-09-03-agent-runtime/`)
+
+> **触发**: 2026-09-03 18:48 JST Ulysses 发令"基本设计和详细设计也都到位" + 18:59 JST 拍板 "A. 独立目录 + A. 引用 LangGraph + ADR-0045 + 双落 docs 同步"
+> **落档文件**:
+> - `docs/architecture/2026-09-03-agent-runtime/02-basic-design.md` v0.1 (40KB, 12 章节)
+> - `docs/architecture/2026-09-03-agent-runtime/03-detailed-design.md` v0.1 (52KB, 15 章节)
+> - `docs/architecture/2026-08-26-upgrade/adr/0045-star-agent-runtime-design.md` v1.0 (14KB)
+> **依据**: 守门 #21 v21 派生规 + 守门 #12 缺标比错标 + 守门 #3 5 域单仓 + 守门 #13 DB W/T/M + 守门 #19 自动化 Python 化 + 守门 #1-#24 + 累积规 v1-v24
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| AR-1 | AR-1 | 02-basic-design.md v0.1 落档 | A | **[P]** | (纯文档, 不需脚本) | 40KB / 12 章节 (per LangGraph 9/3 02 范式), 3 层架构 (L0 派发 + L1 ECS + L2 业务) + Runtime 双模式 + 9 SA Type 引用 + 31 domain-* 目标 + 13 Systems + NFR + G-13~G-15 |
+| AR-2 | AR-2 | 03-detailed-design.md v0.1 落档 | A | **[P]** | (纯文档, 不需脚本) | 52KB / 15 章节 (per LangGraph 9/3 03 范式), 9 模块 (M-01..M-15) + 13 关键类 (Rust 草案) + 2 状态机 + 4 时序图 (UC-01..UC-04) + 5 表 schema (W/T/M 严格分类, per 守门 #13) + 4 算法 + 7 错误处理 + 4 类测试 (UT/IT/E2E/PT) + G-16~G-17 |
+| AR-3 | AR-3 | ADR-0045 落档 | A | **[P]** | (纯文档, 不需脚本) | 14KB / 7 段结构 + 5 角色签字栏 + dual-use disclaimer, 编号 0045 续 0044 |
+| AR-4 | AR-4 | automation-design.md §4.14 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #21 v21 [P] docs 同步必更新 §4 任务卡表 |
+| AR-5 | AR-5 | registry.md §5.2 同步 | A | **[P]** | (本节追加) | per 守门 #21 v21 必更新 registry |
+| AR-6 | AR-6 | AGENTS.md §6 ADR 索引 +0045 | A | **[P]** | (AGENTS.md 编辑) | per 守门 #21 ADR 索引同步 |
+| AR-7 | AR-7 | LangGraph 9/3 引用不重写 | A | **[S]** | (拍板 18:59 JST A 路径) | 9 SA Type 引用 LangGraph 9/3 §6.1, 不重写业务逻辑, 节省 0.8M token |
+| AR-8 | AR-8 | P3-B 启动 gate 阻塞 (跟 §4.13 SRS-5 一致) | — | **[S]** | — | per 2026-09-03 18:48 JST 用户发令"基本设计 + 详细设计", 跟 §4.13 SRS-5 共用阻塞条件 |
+
+**§4.14 任务卡维度判定**:
+- R (Rerunnable): 否 (纯文档落档, 不涉及重跑)
+- V (Volume): 否 (无子代理派发, 一次性写入)
+- S (Structural): 否 (不改动 scripts/automation/ 框架, 纯文档; AR-7 是拍板确认, AR-8 是依赖)
+- A (Audit-trail): **是** (守门 #21 [P] docs 同步必留痕 + 守门 #9 git 实证 + 守门 #13 DB schema 分类留痕)
+
+**§4.14 落档验证 (per 守门 #1 累积规 v1-v24, 本次纯文档不需 cargo 守门)**:
+- `git log -p --follow docs/architecture/2026-09-03-agent-runtime/02-basic-design.md` 实证 (commit 后)
+- `git log -p --follow docs/architecture/2026-09-03-agent-runtime/03-detailed-design.md` 实证 (commit 后)
+- `git log -p --follow docs/architecture/2026-08-26-upgrade/adr/0045-star-agent-runtime-design.md` 实证 (commit 后)
+- `git log -p --follow docs/automation-design.md` 实证 §4.14 追加 (commit 后)
+- `git log -p --follow scripts/automation/registry.md` 实证 §5.2 追加 (commit 后)
+- `git log -p --follow AGENTS.md` 实证 §6 ADR 索引 +0045 (commit 后)
+- commit author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权)
+
 ------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)

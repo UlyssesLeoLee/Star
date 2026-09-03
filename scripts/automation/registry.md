@@ -121,6 +121,34 @@
 | 不触发 P3-B | per 2026-09-03 18:20 JST Ulysses 拍板 | — | — | — |
 | 后续 gate | 5 域 Lead 真人 + 凭证 B.5/B.6 + KMS E.4 + HANDOFF-ST-001 §5.3 5 Blocker + P3-C/D/F 范围 | ⏳ P3-B 启动前 | — | 守门 #3 反转 B 11:35 JST |
 
+### 5.2 STAR Agent Runtime Basic + Detailed Design 索引 (新增, 2026-09-03 19:00 JST per `docs/architecture/2026-09-03-agent-runtime/`)
+
+> **触发**: 2026-09-03 18:48 JST Ulysses 发令"基本设计和详细设计也都到位" + 18:59 JST 拍板 "A. 独立目录 + A. 引用 LangGraph + ADR-0045 + 双落 docs 同步"
+> **依据**: 守门 #21 v21 [P] docs 同步必更新 registry.md 索引 + 守门 #12 缺标比错标 + 守门 #3 5 域单仓 + 守门 #13 DB W/T/M + 守门 #1 累积规 v1-v24
+> **落档文件**:
+> - `docs/architecture/2026-09-03-agent-runtime/02-basic-design.md` v0.1 (40KB / 12 章节)
+> - `docs/architecture/2026-09-03-agent-runtime/03-detailed-design.md` v0.1 (52KB / 15 章节)
+> - `docs/architecture/2026-08-26-upgrade/adr/0045-star-agent-runtime-design.md` v1.0 (14KB)
+> - `docs/automation-design.md` §4.14 (8 子项 AR-1~8)
+
+| 索引项 | 路径 / 章节 | 状态 | commit | 守门 |
+|---|---|---|---|---|
+| Basic Design | `docs/architecture/2026-09-03-agent-runtime/02-basic-design.md` v0.1 | ✅ 落档 | (待 commit) | #1 / #3 / #5 / #6 / #7 / #9 / #12 / #13 / #19 / #21 / #24 |
+| Detailed Design | `docs/architecture/2026-09-03-agent-runtime/03-detailed-design.md` v0.1 | ✅ 落档 | (待 commit) | #1 / #3 / #5 / #6 / #7 / #9 / #12 / #13 / #19 / #21 / #24 |
+| ADR-0045 决策 | `docs/architecture/2026-08-26-upgrade/adr/0045-star-agent-runtime-design.md` v1.0 | ✅ 落档 | (待 commit) | #1 / #3 / #5 / #6 / #7 / #9 / #12 / #13 / #21 / #24 |
+| automation-design §4.14 | `docs/automation-design.md` §4.14 (8 子项 AR-1~8) | ✅ 落档 | (待 commit) | #21 v21 |
+| 跟 LangGraph view 关系 | 平行, 9 SA Type 引用 §6.1 不重写 | — | — | 拍板 18:59 JST A lg-relation |
+| 3 层架构 | L0 派发 + L1 ECS + L2 业务 | — | — | 02 §2 |
+| Runtime 双模式 | Lightweight < 10 / ECS ≥ 12 + 迟滞区 10-11 | — | — | 02 §2.2 + SRS §6-§7 |
+| 9 SA Archetype | SA-01..SA-09 引用 LangGraph 9/3 §6.1, ECS 9 Archetype 映射 | — | — | 02 §3.2 |
+| 31 domain-* 目标 | 22 现有 + 9 新建 (`domain-agent` / `domain-dispatcher` / `domain-llm` / `domain-mcp` / `domain-tool` / `domain-rag` / `domain-context` / `domain-memory` / `domain-rate-limiter` / `domain-observability`) | — | — | 02 §3.5 + 03 §1.1 |
+| 13 Systems | Scheduler / Lifecycle / Event / Planner / Llm / Tool / Mcp / Retrieval / Context / Memory / Permission / Persistence / Metrics | — | — | 02 §3.4 + 03 §3 |
+| 5 表 schema | task_queue W / event_log T / agent_checkpoint T / dead_letter_queue W / tenant_quota M (per 守门 #13 W/T/M 派生) | — | — | 03 §5 |
+| 测试套 | UT 250+ / IT 70+ / E2E 10 / PT 9 套 (per SRS §64-§71) | — | — | 03 §9 |
+| 已知缺口 | G-1~G-17 (12 + 5 新加) | — | — | 守门 #12 |
+| 不触发 P3-B 启动 | per 2026-09-03 18:48 JST 用户发令, 跟 §5.1 SRS-5 共用阻塞 | — | — | — |
+| 后续 gate | 5 域 Lead 真人 + 凭证 B.5/B.6 + KMS E.4 + HANDOFF-ST-001 §5.3 5 Blocker + P3-C/D/F 范围 | ⏳ P3-B 启动前 | — | 守门 #3 反转 B 11:35 JST |
+
 ## 6. 修订历史
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
