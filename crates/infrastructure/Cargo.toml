@@ -13,9 +13,6 @@
         async-trait = { workspace = true }
         thiserror = { workspace = true }
         uuid = { workspace = true }
-        chrono = { workspace = true }
-        tokio = { workspace = true }
-sqlx = { workspace = true }
 
 star-context = { path = "../star-context" }
         [lints]

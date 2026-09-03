@@ -9,7 +9,6 @@ description = "STAR Service Adapter — 4 Git Provider 真实接入 (Phase F)"
 
 [dependencies]
 serde = { workspace = true }
-serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }

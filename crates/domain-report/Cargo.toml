@@ -22,8 +22,5 @@ async-trait = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
 
-star-context = { path = "../star-context" }
-star-cache = { path = "../star-cache" }
-
 [dev-dependencies]
 tokio = { workspace = true }
