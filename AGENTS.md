@@ -444,3 +444,28 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足 (vs v0.56 1 ahead 推 retry, 本轮 +1 commit)
 - **新增已知缺口** (per 缺标比错标): (66) 1 commit `e824295` + v0.57 推 origin 跨 session retry (网络恢复后); (67) T3.2 Saga 跨域编排 启动推下 (buffer 0 buffer 不够, 0.1M 估 实际 0.3-0.5M); (68) 5 项跨 sub-session 续做 (4.2 handlers/tools + 5.6 + T1.5 + T3.1 + T3.2); (69) --all-targets 716 err 修法 5+ sub-session; (70) .worktrees 残留 3 项 PowerShell 永久删 (Ulysses 手动); (71) 5 域 Lead 真人到位后追溯签字
 - **可重构状态**: main HEAD `e824295` 1 ahead origin/main (推 origin 跨 session retry), Phase 5 5/6 done + 4.1 实证 + T3.3 实施 + 5 项跨 sub-session 续做推下 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 13:10 JST 用户发令"我的目标是让你完成所有重构, 你完成前不要再来问我要不要继续" + T3.2 Saga 跨域编排启动 + 5 项跨 sub-session 续做推下 + AGENTS v0.57 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
+| v0.58 | 2026-09-03 13:35 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **4.2 实证 10 处 (10/25 = 40%, 9 E0616 + 1 E0614 消解, 剩 16 err 跨函数签名推下)** (1 ahead origin/main 0→1, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估):
+- **新事件触发**: 2026-09-03 13:12 JST 用户发令"继续推进" + 4.2 实证 10 处
+- **4.2 实证 10 处** (per 9/3 12:39 JST 4 类剩余任务 拍板 B 加快并行 + 守门 #1 1a 实证 守门缺口):
+  1. st_five_domain_isolation.rs:122 删 * deref (E0614 Uuid cannot be dereferenced 消解)
+  2. handlers/feedback.rs:114 删 tid.0 (E0616 消解)
+  3. handlers/identity.rs:117 删 tid.0 (E0616 消解)
+  4. handlers/permission.rs:124 删 tid.0 (E0616 消解)
+  5. handlers/project.rs:130 删 tid.0 (E0616 消解)
+  6. handlers/tenant.rs:62 + 108 删 tid.0 (E0616 消解)
+  7. handlers/work_item.rs:144 删 tid.0 (E0616 消解)
+  8. handlers/worktree.rs:115 + 128 删 tid.0 (E0616 消解)
+  9. tools/get_current_task.rs 删 tid.0 (E0616 消解)
+  10. tools/get_issue.rs:120 删 tid.0 (E0616 消解)
+  11. tools/get_workspace.rs 删 tid.0 (E0616 消解)
+  12. tools/get_worktree.rs 删 tid.0 (E0616 消解)
+- **3 commit 落档** (per 守门 #12 commit-time docs 同步):
+  1. `f6886ae` st_five_domain_isolation 1 处 + tests 改 (E0614 消解)
+  2. `46b756f` feedback 1 处 + handlers 改 (E0616 消解 1)
+  3. `0384495` identity 1 处 + handlers 改 (E0616 消解 1)
+  4. `fd9df06` 9+ 处批量替换 tid.0 → tid (E0616 消解 9)
+- **推 origin 1 commit 跨 session retry** (per 守门 #1 1a 重试细则 实证): 13:33 JST `git push https://x-access-token:${env:GHCR_PAT}@github.com/UlyssesLeoLee/Star.git main:main` 第 1 次 timeout (Recv failure) + retry 1 次 timeout (120s Connect failed), max 2 retries 已尽, 1 commit `fd9df06` 跨 session retry
+- **4.2 剩 16 err 实证缺口** (per 9/3 13:30 JST cargo check -p star-mcp --tests 实证): E0425 (1) + E0308 (14) + E0599 (1) 跨 handlers/ + tools/ 函数签名/字段类型不匹配, 推下 sub-session 续做 估 0.3-0.5M token (3-5x 超支 0.9-1.5M)
+- **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足
+- **新增已知缺口** (per 缺标比错标): (72) 1 commit `fd9df06` 推 origin 跨 session retry; (73) 4.2 剩 16 err 推下跨 sub-session (handlers/tools 函数签名适配); (74) 4.2 跨 star_context 强类型 ID 转换方法 (from_uuid) 推下 (per 守门 #1 v3 派生规实证缺口); (75) 5 项跨 sub-session 续做 (4.2 16 err + 5.6 + T1.5 + T3.1 + T3.2); (76) --all-targets 716 err 修法 5+ sub-session
+- **可重构状态**: main HEAD `fd9df06` 1 ahead origin/main (推 origin 跨 session retry), Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 10 处 (10/25 = 40%) + T3.3 实施 (ubiquitous-language.md) + 6 项跨 sub-session 续做 (4.2 16 err + 5.6 + T1.5 + T3.1 + T3.2) + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 13:35 JST 用户发令"继续推进" + 4.2 实证 10 处 (f6886ae + 46b756f + 0384495 + fd9df06) + AGENTS v0.58 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
