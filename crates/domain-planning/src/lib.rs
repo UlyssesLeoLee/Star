@@ -1290,13 +1290,13 @@ mod tests {
     fn make_admin_actor(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::PROJECT_ADMIN)
-            .with_project(project_id)
+            .with_project(*project_id.as_uuid())
     }
 
     fn make_dev_actor(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::DEVELOPER)
-            .with_project(project_id)
+            .with_project(*project_id.as_uuid())
     }
 
     fn make_create_sprint_cmd(tenant_id: TenantId, project_id: ProjectId) -> CreateSprintCommand {
@@ -1469,7 +1469,7 @@ mod tests {
         let project_id = ProjectId::new();
         let actor = ActorContext::new(Uuid::new_v4(), actor_tenant.0)
             .with_role(roles::PROJECT_ADMIN)
-            .with_project(project_id);
+            .with_project(*project_id.as_uuid());
         let cmd = CreateSprintCommand {
             tenant_id: cmd_tenant,
             project_id,
