@@ -58,6 +58,21 @@ export const ja: Dictionary = {
     footerNode: "NERV-01 // VIBE CODING NODE",
     removeFromSidebar: "サイドバーから {label} を削除",
     removeFromPinned: "ピン留めビューから {label} を削除",
+    // 折りたたみ / スコープ切替 (per 2026-09-03 12:36 JST)
+    fold: {
+      collapse: "サイドバーを折りたたむ (Ctrl+B)",
+      expand: "サイドバーを展開する (Ctrl+B)",
+      collapseShort: "折りたたみ",
+      expandShort: "展開",
+    },
+    scope: {
+      main: "メイン",
+      project: "プロジェクト",
+      mainHint: "グローバルコアムジュールに切替",
+      projectHint: "選択中プロジェクトのビューに切替",
+      projectDisabledHint: "プロジェクトスコープは /projects ルートでのみ利用可能",
+    },
+    activeHint: "現在: {scope}",
   },
   appMatrix: {
     title: "APP MATRIX // タクティカルマトリクスとナビゲーションカスタマイズ",

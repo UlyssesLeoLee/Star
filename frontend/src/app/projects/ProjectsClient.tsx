@@ -44,6 +44,7 @@
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { useStore } from "@/lib/store";
+import { useNavStore } from "@/lib/nav/navStore";
 import { PageHeader, SectionTitle, Stat } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Tabs } from "@/components/Tabs";
@@ -121,10 +122,24 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   const transitionMilestone = useStore((s) => s.transitionMilestone);
   const transitionSprint = useStore((s) => s.transitionSprint);
 
-  // ---- local state ----
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(
-    () => projects[0]?.id ?? "",
+  // ---- selectedProjectId 提升到 navStore (per 2026-09-03 12:36 JST 拍板 #1) ----
+  // - 持久化到 localStorage, 跨 page 共享, 让 Sidebar 的 project scope 能读到
+  // - 首次加载若 store 为空, 落到第一个 project
+  // - 保留原 e2e hook 暴露 setSelectedProjectId, e2e 测试不破坏
+  const selectedProjectId = useNavStore((s) => s.selectedProjectId);
+  const setSelectedProjectIdInStore = useNavStore((s) => s.setSelectedProjectId);
+  // setSelectedProjectId 包装: 若 store 空, 第一次调用会写第一个 project; 之后纯走 store
+  const setSelectedProjectId = useCallback(
+    (id: string) => {
+      setSelectedProjectIdInStore(id);
+    },
+    [setSelectedProjectIdInStore]
   );
+  useEffect(() => {
+    if (!selectedProjectId && projects.length > 0) {
+      setSelectedProjectIdInStore(projects[0].id);
+    }
+  }, [selectedProjectId, projects, setSelectedProjectIdInStore]);
   // ---- 默认 tab 来自 server (cookie + URL 已解析), 避免 SSR 闪一下 ----
   //   initialTab 由 server wrapper (page.tsx) 通过 cookies() + searchParams 算出:
   //   URL ?tab=X > ?canvas= → backlog > cookie > "kanban"

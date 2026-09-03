@@ -62,6 +62,21 @@ export const zhCN: Dictionary = {
     footerNode: "NERV-01 // VIBE CODING NODE",
     removeFromSidebar: "从左侧移除 {label}",
     removeFromPinned: "从视图移除 {label}",
+    // 折叠 / scope 切换 (per 2026-09-03 12:36 JST 拍板)
+    fold: {
+      collapse: "折叠侧栏 (Ctrl+B)",
+      expand: "展开侧栏 (Ctrl+B)",
+      collapseShort: "折叠",
+      expandShort: "展开",
+    },
+    scope: {
+      main: "主导航",
+      project: "项目专属",
+      mainHint: "切换到全局核心模块",
+      projectHint: "切换到当前选中项目的视图",
+      projectDisabledHint: "项目专属导航仅在 /projects 路径下可用",
+    },
+    activeHint: "当前: {scope}",
   },
   appMatrix: {
     title: "APP MATRIX // 战术功能矩阵与导航定制",

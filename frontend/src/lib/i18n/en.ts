@@ -58,6 +58,21 @@ export const en: Dictionary = {
     footerNode: "NERV-01 // VIBE CODING NODE",
     removeFromSidebar: "Remove {label} from sidebar",
     removeFromPinned: "Remove {label} from pinned views",
+    // Fold / scope toggle (per 2026-09-03 12:36 JST)
+    fold: {
+      collapse: "Collapse sidebar (Ctrl+B)",
+      expand: "Expand sidebar (Ctrl+B)",
+      collapseShort: "Collapse",
+      expandShort: "Expand",
+    },
+    scope: {
+      main: "Main",
+      project: "Project",
+      mainHint: "Switch to global core modules",
+      projectHint: "Switch to current selected project views",
+      projectDisabledHint: "Project scope is only available on /projects route",
+    },
+    activeHint: "Active: {scope}",
   },
   appMatrix: {
     title: "APP MATRIX // Tactical Matrix & Navigation Customization",

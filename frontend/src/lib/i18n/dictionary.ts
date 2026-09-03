@@ -73,6 +73,21 @@ export interface Dictionary {
     footerNode: string;            // "NERV-01 // VIBE CODING NODE"
     removeFromSidebar: string;     // "从左侧移除 {label}"
     removeFromPinned: string;      // "从视图移除 {label}"
+    // 折叠 / scope 切换 (per 2026-09-03 12:36 JST 拍板)
+    fold: {
+      collapse: string;            // "折叠侧栏 (Ctrl+B)"
+      expand: string;              // "展开侧栏 (Ctrl+B)"
+      collapseShort: string;       // "折叠"
+      expandShort: string;         // "展开"
+    };
+    scope: {
+      main: string;                // "主导航"
+      project: string;             // "项目专属"
+      mainHint: string;            // "切换到全局核心模块"
+      projectHint: string;         // "切换到当前选中项目的视图"
+      projectDisabledHint: string; // "项目专属导航仅在 /projects 路径下可用"
+    };
+    activeHint: string;            // "当前: {scope}"
   };
   appMatrix: {
     title: string;                 // "APP MATRIX // ..."

@@ -18,3 +18,9 @@ playwright-report/
 #   debug-mobile.spec.ts 临时调试, 不入库, 保留本地用)
 e2e/debug-*.spec.ts
 
+# ad-hoc node validation script (per 2026-09-03 12:36 JST sidebar collapse/scope:
+#   _validate-nav.mjs 临时手工跑 subNavRegistry 22/22 验证, 仓库 vitest 缺包
+#   跑不起来, 等 CI 跑 vitest 后删除)
+scripts/_validate-*.mjs
+scripts/_validate-*.mjs.bak
+

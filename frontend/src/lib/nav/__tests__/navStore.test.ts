@@ -66,3 +66,91 @@ describe("navStore customization", () => {
     expect(MODULE_MAP.has("tenant")).toBe(true);
   });
 });
+
+// =====================================================================
+// Sidebar 折叠 / scope / selectedProjectId (per 2026-09-03 12:36 JST 拍板)
+// =====================================================================
+// 持久化 key: star-nav-store:v2 (bump 自 v1, 加 3 个字段)
+// 初始默认值: fold=expanded / scope=main / selectedProjectId=""
+// =====================================================================
+describe("navStore sidebar fold/scope/selectedProjectId (v2)", () => {
+  beforeEach(() => {
+    // 重置: 手动设回 default, resetToDefault 不动 fold/scope/projectId
+    useNavStore.setState({
+      sidebarFold: "expanded",
+      sidebarScope: "main",
+      selectedProjectId: "",
+    });
+  });
+
+  it("initializes fold=expanded, scope=main, selectedProjectId=empty", () => {
+    const s = useNavStore.getState();
+    expect(s.sidebarFold).toBe("expanded");
+    expect(s.sidebarScope).toBe("main");
+    expect(s.selectedProjectId).toBe("");
+  });
+
+  it("toggleSidebarFold: expanded ↔ collapsed", () => {
+    const { toggleSidebarFold } = useNavStore.getState();
+    expect(useNavStore.getState().sidebarFold).toBe("expanded");
+    toggleSidebarFold();
+    expect(useNavStore.getState().sidebarFold).toBe("collapsed");
+    toggleSidebarFold();
+    expect(useNavStore.getState().sidebarFold).toBe("expanded");
+  });
+
+  it("setSidebarFold: explicit state setting", () => {
+    const { setSidebarFold } = useNavStore.getState();
+    setSidebarFold("collapsed");
+    expect(useNavStore.getState().sidebarFold).toBe("collapsed");
+    setSidebarFold("expanded");
+    expect(useNavStore.getState().sidebarFold).toBe("expanded");
+  });
+
+  it("setSidebarScope: main ↔ project", () => {
+    const { setSidebarScope } = useNavStore.getState();
+    setSidebarScope("project");
+    expect(useNavStore.getState().sidebarScope).toBe("project");
+    setSidebarScope("main");
+    expect(useNavStore.getState().sidebarScope).toBe("main");
+  });
+
+  it("setSelectedProjectId: persists across reads", () => {
+    const { setSelectedProjectId } = useNavStore.getState();
+    setSelectedProjectId("proj-abc-123");
+    expect(useNavStore.getState().selectedProjectId).toBe("proj-abc-123");
+  });
+
+  it("resetToDefault does NOT reset fold/scope/selectedProjectId (per 守门 #11 缺标比错标)", () => {
+    const { setSidebarFold, setSidebarScope, setSelectedProjectId, resetToDefault } = useNavStore.getState();
+    setSidebarFold("collapsed");
+    setSidebarScope("project");
+    setSelectedProjectId("proj-keep-me");
+    // reset sidebar/pinned/header 走旧逻辑
+    useNavStore.getState().toggleHeaderTab("scm"); // 改 header 后再 reset
+    resetToDefault();
+    const s = useNavStore.getState();
+    // header tab 已 reset
+    expect(s.headerTabIds).toEqual(DEFAULT_HEADER_TABS);
+    // 但 fold/scope/selectedProjectId 不动
+    expect(s.sidebarFold).toBe("collapsed");
+    expect(s.sidebarScope).toBe("project");
+    expect(s.selectedProjectId).toBe("proj-keep-me");
+  });
+
+  it("persists fold/scope/selectedProjectId via localStorage star-nav-store:v2", () => {
+    // jsdom 默认有 localStorage; 写入并模拟刷新 (重新读)
+    const { setSidebarFold, setSidebarScope, setSelectedProjectId } = useNavStore.getState();
+    setSidebarFold("collapsed");
+    setSidebarScope("project");
+    setSelectedProjectId("proj-persist-test");
+
+    // 读 localStorage 验证
+    const raw = window.localStorage.getItem("star-nav-store:v2");
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw ?? "{}");
+    expect(parsed.state.sidebarFold).toBe("collapsed");
+    expect(parsed.state.sidebarScope).toBe("project");
+    expect(parsed.state.selectedProjectId).toBe("proj-persist-test");
+  });
+});
