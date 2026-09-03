@@ -859,7 +859,7 @@ mod tests {
     async fn create_user_requires_tenant_admin() {
         let svc = InMemoryIdentityService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         let res = svc
             .create_user(
                 CreateUserCommand {
