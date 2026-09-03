@@ -1149,16 +1149,16 @@ fn endpoint_eq(a: (ResourceType, Uuid), b: (ResourceType, Uuid)) -> bool {
 mod tests {
     use super::*;
     fn tenant_a() -> TenantId {
-        uuid::Uuid::new_v4()
+        TenantId(uuid::Uuid::new_v4())
     }
     fn tenant_b() -> TenantId {
-        uuid::Uuid::new_v4()
+        TenantId(uuid::Uuid::new_v4())
     }
     fn user_a() -> UserId {
-        uuid::Uuid::new_v4()
+        UserId(uuid::Uuid::new_v4())
     }
     fn actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(user_a(), tenant_id)
+        ActorContext::new(user_a().as_uuid(), tenant_id.as_uuid())
     }
 
     // 1. 基本创建
