@@ -63,7 +63,7 @@ exclude = ["target"]
 [workspace.lints.rust]
 missing_docs = "warn"
 rust_2018_idioms = "warn"
-unreachable_pub = "warn"
+unreachable_pub = "deny"  # T1.5 step 1/3 (per WBS-001-refactor.md §1 T1.5): cargo check --workspace --lib -j 4 验证 0 err, 32.27s (per 9/3 AGENTS §4.1 v19 实证, -j 4 workaround 修正旧 "cargo workspace 互锁" 诊断)
 
 [workspace.package]
 version = "0.1.0"
