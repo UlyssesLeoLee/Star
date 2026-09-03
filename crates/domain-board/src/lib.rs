@@ -32,7 +32,6 @@
 //! invariants 独立模块。所有类型保持原可见性以便调用方平滑过渡。
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};

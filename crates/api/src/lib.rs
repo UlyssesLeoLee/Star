@@ -25,7 +25,6 @@
 //! Gateway 属最小闭环 4 角色之一(§13.1);Realtime 暂不部署(§15)
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

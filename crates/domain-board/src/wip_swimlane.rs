@@ -5,7 +5,6 @@
 //! - Saved View: 用户保存的视图 (复用 ui-3pane-arch.md §1.3 Cmd+1/2/3/4 视图族)
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idiorms)]
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

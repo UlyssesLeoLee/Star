@@ -5,7 +5,6 @@
 //! 2. Worktree 状态检测 (detached HEAD / conflict / dirty)
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use std::path::Path;
 use thiserror::Error;

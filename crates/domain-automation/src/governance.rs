@@ -10,7 +10,6 @@
 //! - 审计: 规则创建/编辑/执行/失败全记录
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -31,7 +31,6 @@
 //! - Target 必可解析(INV-FB-02,FB-003)
 
 #![allow(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 pub mod context;
 pub mod entity;

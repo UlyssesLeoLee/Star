@@ -22,7 +22,6 @@
 //! Lead 责任: collaboration Lead
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};

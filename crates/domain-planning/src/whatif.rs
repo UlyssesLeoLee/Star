@@ -5,7 +5,6 @@
 //! - 基线 (Baseline): 保存当前排程, 后续可对比差异
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

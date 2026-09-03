@@ -24,7 +24,6 @@
 //! - INV-WF-05:WorkflowInstance history 必带 actor + at(审计)
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};

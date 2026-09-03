@@ -9,7 +9,6 @@
 //! Phase 2 接 domain-cli (w17) 真实数据.
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

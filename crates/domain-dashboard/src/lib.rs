@@ -9,7 +9,6 @@
 //! Phase 2 接: react-grid-layout (前端) + 报告引擎 (后端)
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

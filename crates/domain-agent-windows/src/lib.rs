@@ -13,7 +13,6 @@
 //! - service: WindowService (开窗/关窗/添加 tab/触发上传)
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -9,7 +9,6 @@
 //! Per 2026-08-29 10:25 JST 用户拍板 "1,2,3 全部做"
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use async_trait::async_trait;
 use std::collections::HashMap;

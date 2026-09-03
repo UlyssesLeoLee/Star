@@ -11,7 +11,6 @@
 //! 真实数据接入: Phase 2 走 domain-work-item repository.
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

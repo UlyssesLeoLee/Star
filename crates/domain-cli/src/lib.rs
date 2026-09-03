@@ -14,7 +14,6 @@
 //! Phase 2 接: 真实 CLI spawn (w19 local-runtime) + 真实 HTTP API 调用 (w19)
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

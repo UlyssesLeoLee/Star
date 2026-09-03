@@ -7,7 +7,6 @@
 //! - 速率限制
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

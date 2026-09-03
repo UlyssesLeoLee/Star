@@ -10,7 +10,6 @@
 //! Per 2026-08-29 10:06 JST 用户拍板 "Phase 2 后续任务 → OpenClaw / Hermes 真实 HTTP 客户端"
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -379,12 +378,6 @@ impl LocalRuntime for RealHttpRuntime {
 
         // 启动任务
         let http = self.http.clone();
-        let active = unsafe {
-            &*(&self.active as *const _ as *const Mutex<HashMap<Uuid, mpsc::Sender<()>>>)
-        }; // 安全简化, Phase 2 用 Arc<Mutex>
-        let _ = active; // suppress unused
-        let active = Arc::new(Mutex::new(())); // 简化, 实际不用
-        let _ = active;
 
         // 推流到 mpsc: 但 ProcessHandle 不持 channel, 这里简化: 直接同步 invoke_http
         // 真实模式应该异步, 这里给 mock fallback 兼容

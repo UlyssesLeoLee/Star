@@ -8,9 +8,8 @@ license = "Apache-2.0"
 description = "Star form engine: 12 field types, conditional logic, submit actions, public form URL"
 repository = "https://github.com/UlyssesLeoLee/Star"
 
-[lints.rust]
-missing_docs = "warn"
-rust_2018_idioms = "warn"
+[lints]
+workspace = true
 
 [dependencies]
 serde = { workspace = true }

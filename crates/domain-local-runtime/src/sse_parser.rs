@@ -7,7 +7,6 @@
 //! 同时支持 SSE 注释 (`: keep-alive`) 和 [DONE] 标记.
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

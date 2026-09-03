@@ -11,7 +11,6 @@
 //! Per 2026-08-29 10:50 JST 用户拍板 "P3-A.1 启动 + 每子项 1 wt"
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use std::path::PathBuf;
 use std::process::Stdio;

@@ -16,7 +16,6 @@
 //! 受 5-min timeout 约束, 平台降级是允许的 (per P3-A.3 报告 §3 缺口 #2 + P3-A.4 #7)
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use std::collections::HashMap;
 use std::time::Duration;

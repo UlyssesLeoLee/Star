@@ -70,7 +70,6 @@
 //! - Phase H: 22 domain 全部 mock-but-functional, 真实数据接入标 `TODO: Phase H+`
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 mod d6_session;
 mod error;

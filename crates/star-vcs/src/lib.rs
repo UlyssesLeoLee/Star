@@ -18,7 +18,6 @@
 //! - 9/3 本 commit 新建 `Cargo.toml` + 注册 workspace.members + 本 `lib.rs` 包 mod cache
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 /// R-007 cache 层占位 (Phase D 填实)
 /// 详见 [`cache::VcsCache`] (当前空 struct, Phase D 替换为 `Cache<K, V>` trait + `InMemoryCache` impl)

@@ -10,7 +10,6 @@
 //! + LLM Provider 抽象 (mock + openai/anthropic 接口)
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

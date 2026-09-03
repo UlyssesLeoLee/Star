@@ -3,7 +3,6 @@
 //! per `docs/architecture/2026-08-26-upgrade/spec/cli/01-cli-spec.md` §2
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use clap::{Parser, Subcommand};
 

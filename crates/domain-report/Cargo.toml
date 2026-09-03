@@ -8,9 +8,8 @@ license = "Apache-2.0"
 description = "Star report engine: 22 report types (Burndown/Burnup/Velocity/CFD/Control/Cycle/Throughput/Forecast/TimeTracking/Resolution/SLA/CvR/Distribution/Workload/Version/Status/Heatmap/Recent) over work-item / sprint / version / project"
 repository = "https://github.com/UlyssesLeoLee/Star"
 
-[lints.rust]
-missing_docs = "warn"
-rust_2018_idioms = "warn"
+[lints]
+workspace = true
 
 [dependencies]
 serde = { workspace = true }

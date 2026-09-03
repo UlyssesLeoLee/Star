@@ -13,7 +13,6 @@
 //! - write_bootstrap 如目标文件存在 -> 拒绝 (Err(AlreadyExists)), 不覆盖
 
 #![warn(missing_docs)]
-#![warn(rust_2018_idioms)]
 
 use std::fs;
 use std::path::Path;

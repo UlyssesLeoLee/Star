@@ -8,9 +8,8 @@ license = "Apache-2.0"
 description = "Star agent task windows: 多 CLI tab 并行 + 三触发上传 (success exit / manual / polling) + worktree 绑定"
 repository = "https://github.com/UlyssesLeoLee/Star"
 
-[lints.rust]
-missing_docs = "warn"
-rust_2018_idioms = "warn"
+[lints]
+workspace = true
 
 [dependencies]
 serde = { workspace = true }
