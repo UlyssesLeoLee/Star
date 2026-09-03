@@ -205,6 +205,16 @@ impl ActorContext {
     pub fn parsed_roles(&self) -> Vec<String> {
         self.roles.iter().map(|s| s.to_ascii_lowercase()).collect()
     }
+
+    /// 构造为 Local Runtime Actor (per domain-local-runtime 5.6 H2 原 3 domain 改造, 2026-09-03)
+    ///
+    /// **语义**: 设 `is_local_runtime = true`, 返回 `self` (chained call, 类似 `with_role`)
+    /// **守门 INV-ACT-03**: `is_local_runtime == true` 时, `roles` 必含 `"agent"` (调用方保证)
+    /// **使用方**: `domain-local-runtime` `make_local_runtime_actor` (lib.rs:1065)
+    pub fn as_local_runtime(mut self) -> Self {
+        self.is_local_runtime = true;
+        self
+    }
 }
 
 impl Default for ActorContext {
