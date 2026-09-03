@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
 
-use domain_agent::{AgentError, AgentId, AgentRepository, InMemoryAgentRepository};
+use domain_agent::{AgentError, AgentId, AgentRepository, InMemoryAgentRepository, TenantId};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AgentData {
@@ -98,7 +98,7 @@ mod tests {
         let aid = AgentId::new();
         let agent = Agent {
             id: aid,
-            tenant_id: UserId.new(),
+            tenant_id: TenantId::new(),
             agent_type: AgentType::Codex,
             provider: "openai".into(),
             version: "1.0.0".into(),
