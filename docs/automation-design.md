@@ -357,7 +357,34 @@ print(f"err_count={result.stderr.count('error[')}")
 
 **§4.12 命名空间合规性 (per 守门 #21 [P] docs 同步)**: 本节是 docs 同步落地, 不需要落 `scripts/automation/<purpose>.py` (G.1-G.5 是数据设计阶段, 实施在 W2-W5 跨 stage 派生)。W2 G.13 dispatcher.py 自动注册 落地后, 同步回填本节 G.6 / G.13 行的"实证 / 备注" 列。
 
----
+### 4.13 SRS-STAR-AGENT-RUNTIME-001 Baseline 落档 (2026-09-03 18:14 JST per docs/briefs/...)
+
+> **触发**: 2026-09-03 18:14 JST Ulysses 发令"参考这个制作需求文档" + 18:20 JST 拍板 "A. commit + 落档 ADR (推荐)" + "仅文档落档, 不触发 P3-B"
+> **落档文件**: `docs/requirements/SRS-STAR-AGENT-RUNTIME-001.md` v1.0 (53KB / 113 节)
+> **ADR**: `docs/architecture/2026-08-26-upgrade/adr/0044-star-agent-runtime-srs.md` v1.0
+> **依据**: 守门 #21 v21 派生规 + 守门 #12 缺标比错标 + 守门 #3 5 域单仓 + 守门 #1-#24 + 累积规 v1-v24
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| SRS-1 | SRS-1 | SRS-STAR-AGENT-RUNTIME-001 v1.0 落档 | A | **[P]** | (纯文档, 不需脚本) | 113 节 / 53KB / 7 段结构 + 100 节正式内容, 12 已落地 / 8 部分 / 60 待 P3-B-F / 4 N/A |
+| SRS-2 | SRS-2 | ADR-0044 落档 | A | **[P]** | (纯文档, 不需脚本) | 7 段结构 + 5 角色签字栏 + dual-use disclaimer, 编号 0044 续 0043 |
+| SRS-3 | SRS-3 | automation-design.md §4.13 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #21 v21 [P] docs 同步必更新 §4 任务卡表 |
+| SRS-4 | SRS-4 | registry.md 索引更新 | A | **[S]** | (待办) | per 守门 #21 v21 [P] docs 同步必更新 registry.md, **本节 ⏳ 待 commit 前补** |
+| SRS-5 | SRS-5 | P3-B 启动 gate 阻塞 | — | **[S]** | — | per 2026-09-03 18:20 JST Ulysses 拍板 "仅文档落档, 不触发 P3-B", 等 5 域 Lead 真人 + 凭证 (B.5/B.6) + KMS (E.4) + HANDOFF-ST-001 §5.3 5 Blocker + P3-C/D/F 范围 全部到位 |
+
+**§4.13 任务卡维度判定**:
+- R (Rerunnable): 否 (纯文档落档, 不涉及重跑)
+- V (Volume): 否 (无子代理派发, 一次性写入)
+- S (Structural): 否 (不改动 scripts/automation/ 框架, 纯文档)
+- A (Audit-trail): **是** (守门 #21 [P] docs 同步必留痕 + 守门 #9 git 实证)
+
+**§4.13 落档验证 (per 守门 #1 累积规 v1-v24, 本次纯文档不需 cargo 守门)**:
+- `git log -p --follow docs/requirements/SRS-STAR-AGENT-RUNTIME-001.md` 实证 (commit 后)
+- `git log -p --follow docs/architecture/2026-08-26-upgrade/adr/0044-star-agent-runtime-srs.md` 实证 (commit 后)
+- `git log -p --follow docs/automation-design.md` 实证 §4.13 追加 (commit 后)
+- commit author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权)
+
+------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
 
