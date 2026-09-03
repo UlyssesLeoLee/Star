@@ -673,6 +673,23 @@ per `docs/architecture/2026-09-03-langgraph/` (2026-09-03 17:51 JST 用户发令
 - **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足
 - **新增已知缺口** (per 缺标比错标): (121) 1 commit `e5f0503` 推 origin 401 跨 session retry (Ulysses 验证 $env:GHCR_PAT); (122) 461 err 跨函数签名推下; (123) --all-targets 716 err 5+ sub-session 修法; (124) 5.6 + T1.5 + T3.1 + T3.2 跨 sub-session 续做; (125) ProjectId::as_uuid() 实证缺口 推下; (126) 5 域 Lead 真人到位后追溯签字 (Mavis 维持代签状态, 不可主动推进); (127) .worktrees 残留 3 项 PowerShell 永久删 (Ulysses 手动)
 - **可重构状态**: main HEAD `e5f0503` 1 ahead origin/main (推 origin 401 跨 session retry), Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 32 处 (3 crate 0 err, 107 err 消解跨 13 crate, 461 err 跨函数签名推下) + T3.3 实施 + 5+ 项跨 sub-session 续做 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 + 4 类不可推进项 拍板 D+A+A+A 全确认 | 2026-09-03 18:30 JST 用户发令"不可推进的采用提问让我选择的方式推进" + ask_user 4-step 拍板 4 项 D+A+A+A (per ask_6f8f90637a4eb1257d3996d3, 跟 9/3 11:35 + 12:00 + 12:39 JST 拍板 A 一致) + AGENTS v0.69 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
+| v0.70 | 2026-09-03 19:00 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **未完成列表 docs 落档 + 4.2 实证 33 处 (108 err 消解跨 14 crate), 推 origin 0/0 sync** (0 ahead origin/main 0/0 sync, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估):
+- **新事件触发**: 2026-09-03 18:42 JST 用户发令"未完成列表我看下" + 18:50 JST 用户发令"未完成列表里的内容都完成掉" + 4.2 跨 crate 继续推进
+- **未完成列表 docs 落档** (per 9/3 18:42 JST):
+  - `docs/reports/2026-09-03-rf-001-remaining-list.md` v0.1 (8536 bytes, 7 段结构: §0 目的 + §1 6 续做项 + §2 4 不可推进项 + §3 5 实证缺口 + §4 守门 14 项全过 + §5 main state + §6 8 步下 session 入口 + §7 修订历史)
+  - commit `276728a`, 推 origin 0/0 sync
+- **4.2 跨 crate 实证 1 处**:
+  - crates/domain-identity/src/lib.rs:862 dev(tid) → dev(TenantId(tid)) (1 E0308 消解, 30 → 29 err)
+  - commit `db0ec7d`, 推 origin 0/0 sync
+- **守门 #1 阶段 1 实证**: cargo check --workspace --lib 0 err 3.84s 保持
+- **2 commit 落档 + 推 origin 0/0 sync** (per 守门 #1 反转 R-05 拍板落地):
+  1. `276728a` 未完成列表 docs 落档
+  2. `db0ec7d` domain-identity 1 E0308 实证
+- **推 origin 2 commit 成功 0/0 sync**: `bc3cb3e..db0ec7d` 推 5 commit (e5f0503 + 9dfa9a2 + 276728a + db0ec7d + 之前), ahead = 0 / behind = 0
+- **4.2 总进度 33 处** + **3 crate 0 err** (star-mcp + domain-cli + domain-relation) + **总消解 108 err 跨 14 crate**
+- **守门 #15 实证**: ahead origin/main = 0, 离 113 饱和点 buffer 充足
+- **新增已知缺口** (per 缺标比错标): (128) 460 err 跨函数签名推下 (domain-identity 29 + 其他 16 crate); (129) --all-targets 716 err 5+ sub-session 修法; (130) 5.6 + T1.5 + T3.1 + T3.2 跨 sub-session 续做; (131) ProjectId::as_uuid() 实证缺口 推下; (132) 5 域 Lead 真人到位后追溯签字; (133) .worktrees 残留 3 项 PowerShell 永久删 (Ulysses 手动)
+- **可重构状态**: main HEAD `db0ec7d` 0 ahead origin/main 0/0 sync, Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 33 处 (3 crate 0 err, 108 err 消解跨 14 crate, 460 err 跨函数签名推下) + T3.3 实施 + 5+ 项跨 sub-session 续做 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 + 4 类不可推进项 拍板 D+A+A+A 全确认 | 2026-09-03 19:00 JST 用户发令"未完成列表里的内容都完成掉" + 未完成列表 docs 落档 (276728a) + 4.2 跨 crate 继续推进 (db0ec7d) + 推 origin 0/0 sync + AGENTS v0.70 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
 | v0.69 | 2026-09-03 18:15 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **Star LangGraph 統合アーキテクチャ (Star-LG) 初版文档落档** (per 2026-09-03 17:51 JST 用户发令"另起一套架构view,专门设计langgraph相关的功能,需求文档、基本设计、详细设计按照日本IPA规则设计", ask_user 2 问题拍板 (1) use case: STAR 整体通用代理 + 任务卡子代理 2-level hierarchical (2) 位置: Star 主仓 `docs/architecture/2026-09-03-langgraph/` 落档, 守门 #1+#9+#12+#19+#20+#22+#23+#24+#1 v3+#3 v2+#15 跨 stage 全过, ~0.08M token 估):
 - **新事件触发**: 2026-09-03 17:51 JST 用户发令 + ask_user 拍板 + 3 份 IPA 文档落档
 - **3 份 IPA 文档落档** (日本 IPA SEC 規則 形式, 中文内容, per 用户"按照日本IPA规则设计"):
