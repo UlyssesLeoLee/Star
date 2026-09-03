@@ -935,7 +935,7 @@ mod tests {
         // INV-S-02:非 Worker Projector 不可写
         let svc = InMemorySearchService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id, uuid::Uuid::new_v4());
+        let actor = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
         let res = svc
             .upsert_index(
                 sample_index_cmd(tenant_id, ResourceType::WorkItem, "x"),
@@ -970,7 +970,7 @@ mod tests {
         .await
         .unwrap();
         // 检索 "login"
-        let user = make_actor(tenant_id, uuid::Uuid::new_v4());
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
         let r = svc
             .search(
                 SearchQueryDto {
@@ -1051,7 +1051,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let user = make_actor(tenant_id, uuid::Uuid::new_v4());
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
         let mut filters = HashMap::new();
         filters.insert("resource_type".to_string(), "work_item".to_string());
         let r = svc
@@ -1117,7 +1117,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let user = make_actor(tenant_id, uuid::Uuid::new_v4());
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
         let r = svc
             .search(
                 SearchQueryDto {
@@ -1278,7 +1278,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let user = make_actor(tenant_id, uuid::Uuid::new_v4());
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
         let s = svc
             .suggest(
                 SuggestQueryDto {
@@ -1300,7 +1300,7 @@ mod tests {
     async fn search_empty_query_rejected() {
         let svc = InMemorySearchService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let user = make_actor(tenant_id, uuid::Uuid::new_v4());
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
         let res = svc
             .search(
                 SearchQueryDto {
