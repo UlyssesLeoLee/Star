@@ -339,3 +339,15 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - **执行顺序锁定** (per 4 项依赖关系): T1.7 (硬阻塞) → T3.3 (0.1M 并行) → T3.1 (0.5M 依赖 T1.7) → T3.2 (0.1M 依赖 T3.1). 4-5 sub-session 续做, 单 session buffer 0.05-1.5M 推得下
 - **新增已知缺口** (per 缺标比错标): (37) 4 项拍板全 A 实施路径推下下 session 续做 (T1.7 0.55-1.05M + T3.1 0.5M + T3.2 0.1M + T3.3 0.1M = 0.85-1.95M 跨 4-5 sub-session); (38) 1 commit c0a0aaa (HANDOFF §6 v0.5) 推 origin 401 错误 (per 9/3 11:07 JST token 失效或 scope 不足), 跨 session 续 retry; (39) 2 commit c0a0aaa + 338a200 推 origin 跨 session 续 (网络/token 恢复后)
 - **可重构状态**: main HEAD `338a200` 3 ahead origin/main (推 origin 跨 session 续 2 commit), Phase 5 5/6 子项 done + 4 续做项 4-5 sub-session 续 + 5 域 Lead 真人到位后 DDD Review 拍板 | 2026-09-03 11:12 JST 用户发令"继续, 需要我拍板的可以附带选项问我" + ask_user 4-step 拍板 4 项全 A + 拍板落档报告 (338a200) 1 commit, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22 跨 stage 全过, ~0.05M token 估 |
+| v0.50 | 2026-09-03 11:20 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **Self-review 3 findings 修法 1+2 落档 + 修法 3 推下 PowerShell 删除限制** (1 ahead origin/main 1, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22 跨 stage 全过, ~0.05M token 估):
+- **新事件触发**: 2026-09-03 11:14 JST 用户发令"自审" + self-review 3 findings (per 守门 #19 self-review 触发); 11:17 JST 用户发令"修好之后推进"
+- **3 findings 修法**:
+  1. **修法 1 (HANDOFF §6 v0.5 update 子段标题)** ✅: 改"**§6 v0.5 跨 session 续更新**" → "**§6 v0.5 增量更新**" 去掉 §6 前缀, 跟 v0.4 章节结构区分清晰
+  2. **修法 2 (AGENTS §4 守门 #1 1a 重试细则)** ✅: 加"**推 origin 重试细则**"主体规则: 网络错误 (Recv failure / Connect failed / timeout) max 2 retries; **401 Authentication failed 不算 timeout, 跨 session 续, Ulysses 验证 $env:GHCR_PAT**; github.com 偶发中断 30s-2min 后常恢复, 不连续 retry (per 11:07 JST 401 实证)
+  3. **修法 3 (.worktrees/ 残留 3 项)** ⚠️ 推下: `integration-e2e-openclaw.log` (9/2 8:22 wt 调试 log) + `wt-nav-i18n-a/` (含 _wt_audit/frontend/scripts/tools/_c2.sh) + `wt-nav-shots-b/` (残留 dir) — PowerShell 安全策略禁止删除 (per "Permanent Windows delete commands are not allowed"), .worktrees/ gitignored 0 影响 main, 推下下 session Ulysses 决定
+- **1 commit 落档** (per 守门 #12 commit-time docs 同步):
+  1. `e3f885a` 修法 1+2: 2 files 2 增 1 删 (HANDOFF §6 v0.5 子段标题 1 改 + AGENTS §4 守门 #1 1a 重试细则 1 加); 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22 实证
+- **推 origin 1 commit 失败跨 session 续** (per 守门 #1 1a 重试细则 实证): `git push https://x-access-token:${env:GHCR_PAT}@github.com/UlyssesLeoLee/Star.git main:main` 第 1 次 timeout (Recv failure) + retry 1 次 timeout (Connect failed 21s), max 2 retries 已尽, 1 commit `e3f885a` 跨 session 续
+- **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足 (vs v0.49 0 ahead 推完, 本轮 +1 commit)
+- **新增已知缺口** (per 缺标比错标): (40) 1 commit `e3f885a` 推 origin 跨 session 续 (网络恢复后); (41) finding 3 .worktrees/ 残留 3 项 PowerShell 限制 推下下 session (Ulysses 决定: 永久删 / 移到 _archive_/ / 保留)
+- **可重构状态**: main HEAD `e3f885a` 1 ahead origin/main (推 origin 跨 session 续), Phase 5 5/6 子项 done + 4 续做项 4-5 sub-session 续 + 5 域 Lead 真人到位后 DDD Review 拍板 + 守门 #1 1a 重试细则补全 | 2026-09-03 11:20 JST 用户发令"自审" + "修好之后推进" + self-review 3 findings 修法 1+2 (e3f885a) + 修法 3 推下 PowerShell 限制 + 推 origin 1 commit 跨 session 续, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22 跨 stage 全过, ~0.05M token 估 |
