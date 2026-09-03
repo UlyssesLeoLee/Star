@@ -132,7 +132,7 @@ mod tests {
         let created = svc.create_feedback(cmd, actor.clone()).await.unwrap();
         let _ = created;
         // service roundtrip (handler 简化: 跨 tenant 拒绝 → None)
-        let actor2 = ActorContext::new(uuid::Uuid::nil(), tid.0);
+        let actor2 = ActorContext::new(uuid::Uuid::nil(), tid);
         let fetched = svc.get_by_id(created.id, actor2).await.unwrap();
         assert_eq!(fetched.id, created.id);
         assert_eq!(fetched.intent, "B.2.6 test feedback");

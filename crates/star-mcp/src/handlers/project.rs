@@ -127,7 +127,7 @@ mod tests {
         let h = ProjectHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid.0).with_role("project_admin");
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid).with_role("project_admin");
         let ws_id = domain_project::WorkspaceId::new();
         let cmd = CreateProjectCommand {
             tenant_id: tid,
