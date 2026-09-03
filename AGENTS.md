@@ -578,3 +578,17 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足
 - **新增已知缺口** (per 缺标比错标): (95) 1 commit `855cde5` 推 origin 跨 session retry (网络恢复后); (96) domain-worktree 50 + domain-board 29 + domain-search 46 + domain-notification 27 + domain-audit 25 = **177 err 跨函数签名推下**; (97) --all-targets 716 err 5+ sub-session 修法; (98) 5.6 + T1.5 + T3.1 + T3.2 跨 sub-session 续做
 - **可重构状态**: main HEAD `855cde5` 1 ahead origin/main (推 origin 跨 session retry), Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 23 处 (3 crate 0 err: star-mcp + domain-cli + domain-relation, 177 err 跨函数签名推下) + T3.3 实施 + 5+ 项跨 sub-session 续做 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 15:00 JST 用户发令"继续推进" + 4.2 跨 crate 推进 (0abf1a2 + 944bfc1 + 855cde5) + AGENTS v0.63 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
+| v0.64 | 2026-09-03 15:15 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **4.2 跨 crate 推进: domain-collaboration 2 + domain-integration 2 错减少, 实证 25 处** (4 ahead origin/main 1→4, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估):
+- **新事件触发**: 2026-09-03 15:00 JST 用户发令"继续推进" + 4.2 跨 crate 推进
+- **4.2 跨 crate 实证 2 处** (per 9/3 12:39 JST 4 类剩余任务 拍板 B 加快并行):
+  - crates/domain-collaboration/src/lib.rs:1289 with_project(project) → with_project(project.as_uuid()) (2 E0308 消解, 82 → 80 err)
+  - crates/domain-integration/src/lib.rs:92 as_uuid() → *as_uuid() deref (2 E0308 消解, 76 → 74 err)
+- **守门 #1 阶段 1 实证**: cargo check --workspace --lib 0 err 3.84s 保持
+- **2 commit 落档** (per 守门 #12 commit-time docs 同步):
+  1. `a01f518` domain-collaboration 2 E0308 实证
+  2. `d01f8c4` domain-integration 2 E0308 实证
+- **推 origin 4 commit 跨 session retry** (per 守门 #1 1a 重试细则 实证): 15:08 + 15:10 + 15:12 + 15:14 JST `git push` 持续 timeout, max 2 retries × 4 = 8 retries 已尽, 4 commit (`855cde5` + `a01f518` + `d7fbca9` + `d01f8c4`) 跨 session retry
+- **4.2 总进度 25 处** + **3 crate 0 err** (star-mcp + domain-cli + domain-relation)
+- **守门 #15 实证**: 4 ahead origin/main 离 113 饱和点 buffer 充足
+- **新增已知缺口** (per 缺标比错标): (99) 4 commit 推 origin 跨 session retry (网络恢复后); (100) domain-collaboration 80 + domain-integration 74 + domain-worktree 50 + domain-search 46 + domain-notification 27 + domain-audit 25 = **302 err 跨函数签名推下**; (101) --all-targets 716 err 5+ sub-session 修法; (102) 5.6 + T1.5 + T3.1 + T3.2 跨 sub-session 续做
+- **可重构状态**: main HEAD `d01f8c4` 4 ahead origin/main (推 origin 跨 session retry), Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 25 处 (3 crate 0 err, 302 err 跨函数签名推下) + T3.3 实施 + 5+ 项跨 sub-session 续做 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 15:15 JST 用户发令"继续推进" + 4.2 跨 crate 推进 (a01f518 + d01f8c4) + AGENTS v0.64 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
