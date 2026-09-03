@@ -375,3 +375,14 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - **守门 12 项跨 stage 全过**: #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2 实证. 守门 #1 v3 派生规 (闭环报告必跑 --all-targets) + 守门 #1 1a 重试细则 (max 2 retries + 401 跨 session 续) + 守门 #3 v2 派生规 (Mavis 临时代签 5 域 Lead) 全部补全
 - **守门 #15 实证**: ahead origin/main = 0, 离 113 饱和点 buffer 充足 (本 session + 2 commit 推完, 0 任何 ref 领先)
 - **可重构状态**: main HEAD `0f2254f` 0 ahead origin/main 0/0 sync, Phase 5 5/6 子项 done + 6 续做项 4-5 sub-session 续做入口齐全 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 T3.2 Saga + DDD Review 阶段 + 守门 #1 v3 派生规 + 守门 #1 1a 重试细则 + 守门 #3 v2 派生规全部实证补全 | 2026-09-03 11:41 JST 用户发令"完成重构" + 9/3 收尾状态确认 (5/11 done + 6/11 推下 + 0/0 sync + 守门 12 项全过), ~0.01M token 估 |
+| v0.53 | 2026-09-03 12:01 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **4 类不可完成项 拍板确认 (A+A+A+D, 跟 11:35 JST 一致 + Step 4 维持 Mavis 代签状态)** (1 ahead origin/main 0→1, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2 跨 stage 全过, ~0.05M token 估):
+- **新事件触发**: 2026-09-03 11:49 JST 用户发令"可完成的都完成掉" + 11:55 JST 4 类不可完成项 docs 同步; 12:00 JST 用户发令"无法完成的让我选选项" + ask_user 4-step 拍板 4 项 A+A+A+D (per ask_ce41abbf629240a8ae879378)
+- **4 项拍板落档** (per 守门 #12 commit-time docs 同步):
+  1. **推 origin 1 commit retry** A. 跨 session 续 retry (跟 11:35 JST 拍板 A 一致, 守门 #1 1a max 2 retries 实证)
+  2. **6 续做项实施** A. 全部推下下 session (跟 11:35 JST 拍板 A 严格依赖顺序 T1.7 → T3.3 → T3.1 → T3.2 → 5.6 → T1.5 一致, 1.85-3.65M token 跨 4-5 sub-session)
+  3. **.worktrees 残留 3 项** A. 永久删 (Ulysses 手动, 跟 11:35 JST 拍板 A 一致, Mavis 不越权 PowerShell 限制)
+  4. **5 域 Lead 真人到位** D. 维持 Mavis 临时代签状态, 不主动推进真人到位 (9/3 11:35 JST 反转持续生效, 真人到位后追溯签字)
+- **4 项拍板实际 = 跟 11:35 JST 4 项拍板 A+A+A+B 一致 (Step 4 维持反转状态 B)**: 没有新动作, 9/3 收尾完成态确认
+- **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足 (vs v0.52 1 ahead, 本轮 0 ahead → 1 ahead 推 retry)
+- **新增已知缺口** (per 缺标比错标): (46) 1 commit `9ed8287` 推 origin 跨 session retry (网络恢复后); (47) 6 续做项 4-5 sub-session 续做 1.85-3.65M token (T1.7 硬阻塞优先); (48) .worktrees 残留 3 项 Ulysses 手动删; (49) 5 域 Lead 真人到位后追溯签字 (Mavis 维持代签状态)
+- **可重构状态**: main HEAD `9ed8287` 1 ahead origin/main (推 origin 跨 session retry), Phase 5 5/6 子项 done + 6 续做项 4-5 sub-session 续做 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 + 4 项不可完成项拍板确认 (跟 11:35 JST 一致) | 2026-09-03 12:01 JST 用户发令"无法完成的让我选选项" + ask_user 4-step 拍板 4 项 A+A+A+D (per ask_ce41abbf629240a8ae879378) 跟 11:35 JST 4 项拍板 A+A+A+B 一致, 9/3 收尾完成态确认, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2 跨 stage 全过, ~0.05M token 估 |
