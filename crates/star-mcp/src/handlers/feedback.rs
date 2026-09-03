@@ -111,7 +111,7 @@ mod tests {
         let h = FeedbackHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(uuid::Uuid::nil(), domain_feedback::TenantId(tid));
+        let actor = ActorContext::new(domain_feedback::UserId(uuid::Uuid::nil()), domain_feedback::TenantId(tid));
         let cmd = CreateFeedbackCommand {
             tenant_id: domain_feedback::TenantId(tid),
             project_id: ProjectId::new(),
@@ -132,7 +132,7 @@ mod tests {
         let created = svc.create_feedback(cmd, actor.clone()).await.unwrap();
         let _ = created;
         // service roundtrip (handler 简化: 跨 tenant 拒绝 → None)
-        let actor2 = ActorContext::new(uuid::Uuid::nil(), tid);
+        let actor2 = ActorContext::new(domain_feedback::UserId(uuid::Uuid::nil()), domain_feedback::TenantId(tid));
         let fetched = svc.get_by_id(created.id, actor2).await.unwrap();
         assert_eq!(fetched.id, created.id);
         assert_eq!(fetched.intent, "B.2.6 test feedback");

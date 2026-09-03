@@ -59,7 +59,7 @@ impl Resource for TenantHandler {
             uuid::Uuid::parse_str(id).map_err(|e| ResourceError::InvalidUri(e.to_string()))?,
         );
         let svc = self.service();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid);
+        let actor = ActorContext::new(uuid::Uuid::nil(), tid.as_uuid());
         match svc
             .get_tenant(GetTenantQuery { tenant_id: tid }, &actor)
             .await
@@ -101,7 +101,7 @@ mod tests {
         // 创建 1 个真实 tenant
         let tid = uuid::Uuid::new_v4();
         let cmd = CreateTenantCommand {
-            slug: format!("acme-{}"),
+            slug: format!("acme-{}", tid),
             display_name: "Acme Corp".into(),
             plan_tier: PlanTier::Pro,
         };
