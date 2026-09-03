@@ -102,6 +102,25 @@
 
 **§5 备注**: 本节是 P3-G 阶段脚本索引 init 版本, W1 5 表设计落地后, 同步回填 §1 脚本索引表 的"脚本路径"列 + "末次 commit"列。W2 G.13 dispatcher.py 自动注册 落地后, 同步 §1 dispatcher.py 行的"调用方"列 (追加 P3-G-W2 G.13)。
 
+### 5.1 SRS-STAR-AGENT-RUNTIME-001 Baseline 索引 (新增, 2026-09-03 18:25 JST per docs/requirements/SRS-STAR-AGENT-RUNTIME-001.md commit `5460d33`)
+
+> **触发**: 2026-09-03 18:14 JST Ulysses 发令"参考这个制作需求文档" + 18:20 JST 拍板 "A. commit + 落档 ADR" + "仅文档落档, 不触发 P3-B"
+> **依据**: 守门 #21 v21 [P] docs 同步必更新 registry.md 索引 + 守门 #12 缺标比错标 + 守门 #1 累积规 v1-v24
+> **落档文件**:
+> - `docs/requirements/SRS-STAR-AGENT-RUNTIME-001.md` v1.0 (53KB / 113 节, commit `5460d33`)
+> - `docs/architecture/2026-08-26-upgrade/adr/0044-star-agent-runtime-srs.md` v1.0 (12KB, commit `5460d33`)
+> - `docs/automation-design.md` §4.13 (commit `5460d33`)
+
+| 索引项 | 路径 / 章节 | 状态 | commit | 守门 |
+|---|---|---|---|---|
+| SRS 文档 | `docs/requirements/SRS-STAR-AGENT-RUNTIME-001.md` v1.0 | ✅ 落档 | `5460d33` | #1 / #3 / #5 / #6 / #7 / #9 / #12 / #21 / #24 |
+| ADR 决策 | `docs/architecture/2026-08-26-upgrade/adr/0044-star-agent-runtime-srs.md` v1.0 | ✅ 落档 | `5460d33` | #1 / #3 / #5 / #6 / #7 / #9 / #12 / #21 / #24 |
+| automation-design 同步 | `docs/automation-design.md` §4.13 (5 子项 SRS-1~5) | ✅ 落档 | `5460d33` | #21 v21 |
+| 目标量级 | 1M logical agents on 16-32GB 单机 (vs 参考 SRS 100K) | — | — | — |
+| 章节状态 | 12 ✅ / 8 🟡 / 60 ⏳ P3-B-F / 4 ❌ N/A | — | — | #12 缺标比错标 |
+| 不触发 P3-B | per 2026-09-03 18:20 JST Ulysses 拍板 | — | — | — |
+| 后续 gate | 5 域 Lead 真人 + 凭证 B.5/B.6 + KMS E.4 + HANDOFF-ST-001 §5.3 5 Blocker + P3-C/D/F 范围 | ⏳ P3-B 启动前 | — | 守门 #3 反转 B 11:35 JST |
+
 ## 6. 修订历史
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
