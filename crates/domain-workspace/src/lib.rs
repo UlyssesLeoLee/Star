@@ -888,13 +888,13 @@ mod tests {
     async fn create_workspace_success() {
         let svc = InMemoryWorkspaceService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd = CreateWorkspaceCommand {
             tenant_id,
             workspace_key: "acme".to_string(),
             name: "Acme Workspace".to_string(),
             description: Some("main".to_string()),
-            owner_user_id: UserId.new(),
+            owner_user_id: UserId::new(),
         };
         let ws = svc.create_workspace(cmd, actor.clone()).await.unwrap();
         assert_eq!(ws.version, 1);
@@ -910,13 +910,13 @@ mod tests {
     async fn invariant_01_workspace_key_conflict() {
         let svc = InMemoryWorkspaceService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd1 = CreateWorkspaceCommand {
             tenant_id,
             workspace_key: "dup".to_string(),
             name: "W1".to_string(),
             description: None,
-            owner_user_id: UserId.new(),
+            owner_user_id: UserId::new(),
         };
         svc.create_workspace(cmd1, actor.clone()).await.unwrap();
         let cmd2 = CreateWorkspaceCommand {
@@ -924,7 +924,7 @@ mod tests {
             workspace_key: "dup".to_string(),
             name: "W2".to_string(),
             description: None,
-            owner_user_id: UserId.new(),
+            owner_user_id: UserId::new(),
         };
         let res = svc.create_workspace(cmd2, actor).await;
         assert!(matches!(res, Err(WorkspaceError::InvalidState(_))));
@@ -934,13 +934,13 @@ mod tests {
     async fn invariant_03_empty_key_rejected() {
         let svc = InMemoryWorkspaceService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd = CreateWorkspaceCommand {
             tenant_id,
             workspace_key: "".to_string(),
             name: "Empty".to_string(),
             description: None,
-            owner_user_id: UserId.new(),
+            owner_user_id: UserId::new(),
         };
         let res = svc.create_workspace(cmd, actor).await;
         assert!(matches!(res, Err(WorkspaceError::InvalidState(_))));
@@ -958,7 +958,7 @@ mod tests {
                     workspace_key: "a".to_string(),
                     name: "A".to_string(),
                     description: None,
-                    owner_user_id: UserId.new(),
+                    owner_user_id: UserId::new(),
                 },
                 actor_a,
             )
@@ -974,7 +974,7 @@ mod tests {
     async fn add_and_remove_member() {
         let svc = InMemoryWorkspaceService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let ws = svc
             .create_workspace(
                 CreateWorkspaceCommand {
@@ -982,7 +982,7 @@ mod tests {
                     workspace_key: "ws".to_string(),
                     name: "WS".to_string(),
                     description: None,
-                    owner_user_id: UserId.new(),
+                    owner_user_id: UserId::new(),
                 },
                 actor.clone(),
             )
@@ -1027,7 +1027,7 @@ mod tests {
         .await
         .unwrap();
         let members = svc
-            .list_members(ws.id, make_actor(tenant_id))
+            .list_members(ws.id, make_actor(TenantId(tenant_id)))
             .await
             .unwrap();
         // owner 还在
@@ -1038,13 +1038,13 @@ mod tests {
     async fn event_bus_receives_created() {
         let (svc, mut rx) = InMemoryWorkspaceService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let cmd = CreateWorkspaceCommand {
             tenant_id,
             workspace_key: "evt".to_string(),
             name: "E".to_string(),
             description: None,
-            owner_user_id: UserId.new(),
+            owner_user_id: UserId::new(),
         };
         svc.create_workspace(cmd, actor).await.unwrap();
         let evt = rx.try_recv().expect("应收到 Created 事件");
@@ -1056,7 +1056,7 @@ mod tests {
     async fn update_workspace_version_conflict() {
         let svc = InMemoryWorkspaceService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let ws = svc
             .create_workspace(
                 CreateWorkspaceCommand {
@@ -1064,7 +1064,7 @@ mod tests {
                     workspace_key: "v".to_string(),
                     name: "V".to_string(),
                     description: None,
-                    owner_user_id: UserId.new(),
+                    owner_user_id: UserId::new(),
                 },
                 actor.clone(),
             )
