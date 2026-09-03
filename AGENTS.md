@@ -118,6 +118,7 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 | 11 | **缺标比错标安全** | 2026-08-26 JST | Ulysses 偏好 |
 | 12 | **AI 协作文档治理** | 2026-08-26 JST | 禁回溯叙事, BAS 引用实证, 子代理授权写明 |
 | 13 | **DB 三類横展開（W/T/M）強制分類** | 2026-09-01 18:30 JST | Ulysses 拍板（per ask_user 选项 1）: 所有 DB 基本设计阶段**必含** Work（短 TTL 作業中）/ Transaction（業務事実 / 監査 / Append-only）/ Master（参考 / 設定 / 慢変 SCD）三類分門別類, **100% 表覆盖**, 禁止「混在」一括列举; 混合分類（M/T / T/W）主分類单计 + §已知缺口显式列出待 DDD Review Lead 确认; 其他多分類横展（status / role / permission / policy / event / tag / category 等）按日本 IPA SEC 規則合一禁止, 全部独立列举; 適用跨项目持久（STAR / RGS / Physis / GVPE / 其他新项目基本设计阶段）; **引用基线**: `D:\Star\docs\data-design\ipa-detail\00-CLASSIFICATION-W-T-M.md` v0.1（100 表 W/T/M 三類索引实绩）+ `00-CLASSIFICATION-RULES.md` v0.1（跨项目 ルール手册 + 4 段检查清单 + 派生守门 10 条 CW-01~CW-10）; **派生规**: (a) W = 物理删除 / タイマー失効 / 短 TTL 明示 retention; (b) T = 物理删除禁止 + 監査必須 + RLS 13 類必携; (c) M = 物理删除禁止 + SCD Type 2 + RLS 13 類必携; (d) Master 100% RLS / Transaction 100% audit / Work 100% retention_period |
+| 14 | **5 域 Lead CONTENT 4 维 (决策 scope / RACI / 到位 timeline / Mavis 代签边界)** | 2026-09-03 19:43 JST | Ulysses 拍板 (per ask_user 4-step ask_4652f5d4): 决策 scope = 跨域 + 域内 (Both, 5 域 Lead 全 RACI 覆盖, per 守门 #3 反转 8/21 + 9/3 11:35 JST 拍板 B 衍生); RACI 责任 = R+A+C 完整责任 (Lead 自执行 R + 负责 A + 接受域内 C 咨询, 域外 I 通知, per 守门 #3 v2 派生规); 到位 timeline = 待定 (Mavis 长期代签, 真人到位后追溯签字, per 9/3 19:35 JST 拍板 D 维持); Mavis 代签边界 = 全部代签 (commit author + 修订人 + 审批, per 守门 #10 + 8/27 19:39 JST 授权 + 9/3 11:35 JST 守门 #3 v2 派生规) |
 
 ### 4.1 守门 #1 派生累积规 (per P3-A 25 子项实证)
 
@@ -748,3 +749,15 @@ per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户�
 - **守门 #19/#20 实证**: 落档为 root 内部工作, 无 worker dispatch, 守门 #20 不适用
 - **新增已知缺口** (per 缺标比错标): (127) 3 个 judgment call 落档后仍残留 6 项 v0.1 未実装 (per 121-126) + 实装 6 阻塞 (per v0.69 #126)
 - **可重构状态**: main HEAD 待 commit (本 v0.70 3 个 judgment call 落档), AGENTS.md 修订历史 v0.69 → v0.70, LangGraph 架构 view 文档定稿 v0.1 收官, 等 user 拍板下一步 (实装 v0.1 MVP? 推 origin? 3 决策 落档 → 收尾?) | 2026-09-03 19:05 JST 用户发令"自审" → 4 处 fix (commit `326e2fc`) → 用户 18:59 JST 拍板"commit" → 3 judgment call 落档 (SA-03 注解 + 8 处 "24+ 守门" 措辞校正 + 状态遷移图 ASCII 保留) + AGENTS.md §8 v0.70 同步, 守门 #1+#9+#12+#19+#20+#22+#23+#24+#1 v3+#3 v2+#15 跨 stage 全过, ~0.04M token 估 |
+| v0.72 | 2026-09-03 19:43 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **5 域 Lead CONTENT 4 维 拍板落档** (per 2026-09-03 19:43 JST 用户发令"5域真人的内容现在就让我选好" + ask_user 4-step ask_4652f5d4 拍板 4 项 both+rac+tbd+all-proxy, 守门 #1+#3+#9+#12+#20 跨 stage 全过, ~0.02M token 估):
+- **新事件触发**: 2026-09-03 19:43 JST 用户发令"5域真人的内容现在就让我选好" + ask_user 4-step 拍板 4 项 (跨域+域内 / R+A+C / 待定 / 全部代签)
+- **4 项 CONTENT 拍板** (per ask_4652f5d4 拍板, 跟 9/3 19:35 JST 拍板 D+D+A+B + 9/3 11:35 JST 反转 8/21 一致):
+  1. **5 域 Lead 决策 scope** = 跨域 + 域内 (Both, 5 域 Lead 全 RACI 覆盖, per 守门 #3 反转 8/21 + 9/3 11:35 JST 拍板 B 衍生)
+  2. **5 域 Lead RACI 责任** = R+A+C 完整责任 (Lead 自执行 R + 负责 A + 接受域内 C 咨询, 域外 I 通知, per 守门 #3 v2 派生规)
+  3. **5 域 Lead 真人到位 timeline** = 待定 (Mavis 长期代签, 真人到位后追溯签字, per 9/3 19:35 JST 拍板 D 维持)
+  4. **Mavis 临时代签 边界** = 全部代签 (commit author + 修订人 + 审批, per 守门 #10 + 8/27 19:39 JST 授权 + 9/3 11:35 JST 守门 #3 v2 派生规)
+- **AGENTS.md 同步** (per 守门 #12 缺标比错标): §4 守门 新增 row 14 (5 域 Lead CONTENT 4 维) + §8 修订历史 追加 v0.72 (本行)
+- **守门 #1 阶段 1 实证**: 纯文档无 .rs 改动, cargo check 不需要跑 (per 守门 #1 阶段 1 仅 lib, 本 v0.72 是纯文档)
+- **守门 #12 闭环**: docs 同步跨 1 文件 (AGENTS.md), commit 引用 §4 row 14 + §8 v0.72, 不回溯叙事, 不沿用 v0.71 旧 "D+D+A+B" 措辞
+- **新增已知缺口** (per 缺标比错标): (141) 5 域 Lead 真人到位后追溯签字 推不动 (Mavis 长期代签 不可主动推进, 跟 v0.71 #138 一致)
+- **可重构状态**: main HEAD 待 commit, AGENTS.md 修订历史 v0.71 → v0.72, §4 守门 新增 row 14 CONTENT 4 维 拍板, 5 域 Lead 真人到位后追溯签字 推不动 (per 守门 #3 反转 8/21) | 2026-09-03 19:43 JST 用户发令"5域真人的内容现在就让我选好" + ask_user 4-step 拍板 4 项 both+rac+tbd+all-proxy + AGENTS v0.72 docs 同步, 守门 #1+#3+#9+#12+#20 跨 stage 全过, ~0.02M token 估 |
