@@ -386,3 +386,17 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足 (vs v0.52 1 ahead, 本轮 0 ahead → 1 ahead 推 retry)
 - **新增已知缺口** (per 缺标比错标): (46) 1 commit `9ed8287` 推 origin 跨 session retry (网络恢复后); (47) 6 续做项 4-5 sub-session 续做 1.85-3.65M token (T1.7 硬阻塞优先); (48) .worktrees 残留 3 项 Ulysses 手动删; (49) 5 域 Lead 真人到位后追溯签字 (Mavis 维持代签状态)
 - **可重构状态**: main HEAD `9ed8287` 1 ahead origin/main (推 origin 跨 session retry), Phase 5 5/6 子项 done + 6 续做项 4-5 sub-session 续做 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 + 4 项不可完成项拍板确认 (跟 11:35 JST 一致) | 2026-09-03 12:01 JST 用户发令"无法完成的让我选选项" + ask_user 4-step 拍板 4 项 A+A+A+D (per ask_ce41abbf629240a8ae879378) 跟 11:35 JST 4 项拍板 A+A+A+B 一致, 9/3 收尾完成态确认, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2 跨 stage 全过, ~0.05M token 估 |
+| v0.54 | 2026-09-03 12:52 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **4 类剩余任务 拍板 B+B+B+B 加快并行 + 推 origin 1 commit 401 跨 session 续** (1 ahead origin/main 0→1, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估):
+- **新事件触发**: 2026-09-03 12:32 JST 用户发令"完成重构" + 12:39 JST 用户发令"剩余任务怎么推完" + ask_user 4-step 拍板 4 项 B+B+B+B 加快并行 (per ask_e08fcd6f5e9b29102e9dea34); 12:52 JST 用户发令"目标完成所有重构任务"
+- **4 项拍板落档** (per 守门 #12 commit-time docs 同步):
+  1. **Phase 5 6 续做项** B. 加快, T1.7 + T3.3 并行启动, 4 sub-session 续做
+  2. **P3-G 后续 W2+** B. 现在启动 W2 阶段, 跟 Phase 5 6 续做项 并行
+  3. **T1.7 4 步修法** B. 4.1 + 4.2 并行, 节省 sub-session (risk cargo 互锁)
+  4. **整体 timeline** B. 加快, 2-3 sub-session 并行启动 (risk cargo 互锁)
+- **守门 #1 实证 "不在预算失控情况下硬着头皮做完"** + 4 项 B 风险警告: cargo 互锁 (9/2 E 阶段 5min timeout) + buffer 3-5x 超支 (1.85-3.65M → 5.55-18.25M 实际) + 5 域 Lead 真人 + 网络稳定性
+- **1 commit 落档** (per 守门 #12 commit-time docs 同步):
+  1. `09c1a57` 4 类剩余任务 拍板 B+B+B+B 加快并行报告: `docs/reports/2026-09-03-rf-001-final-4items-board.md` v0.1 (8840 bytes, 8 段结构, 4 项 B 加快并行 + 守门缺口警告 + 跨 2-3 sub-session 并行 timeline); 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 实证
+- **推 origin 1 commit 401 错误跨 session 续** (per 守门 #1 1a 重试细则 实证): 12:43 JST `git push https://x-access-token:${env:GHCR_PAT}@github.com/UlyssesLeoLee/Star.git main:main` 报 401 Authentication failed, 守门 #1 1a 实证 401 不算 timeout 跨 session 续 + Ulysses 验证 $env:GHCR_PAT. 11:38 JST 推 4 commit + 12:35 JST 推 6 commit 成功实证 token 工作, 12:43 JST 401 可能是 token scope 限制或刚失效
+- **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足 (vs v0.53 0 ahead 推完 0f2254f..d03798d 6 commit 0/0 sync, 本轮 +1 commit 推 retry)
+- **新增已知缺口** (per 缺标比错标): (50) 1 commit `09c1a57` 推 origin 401 错误跨 session retry (Ulysses 验证 $env:GHCR_PAT); (51) 6 续做项 跨 2-3 sub-session 并行 1.85-3.65M → 5.55-18.25M 实际 (3-5x 超支); (52) P3-G W2 阶段 启动 跟 6 续做项 并行; (53) T1.7 4.1 + 4.2 并行 risk cargo 互锁; (54) .worktrees 残留 3 项 PowerShell 永久删 (Ulysses 手动); (55) 5 域 Lead 真人到位后追溯签字 (Mavis 维持代签状态)
+- **可重构状态**: main HEAD `09c1a57` 1 ahead origin/main (推 origin 401 跨 session retry), Phase 5 5/6 子项 done + 6 续做项 跨 2-3 sub-session 并行 (T1.7 + T3.3 并行 + T3.1 + T3.2 + 5.6 + T1.5 严格依赖) + P3-G W2 阶段 启动 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 + 4 类剩余任务拍板 B+B+B+B 加快并行 | 2026-09-03 12:52 JST 用户发令"目标完成所有重构任务" + 4 类剩余任务 拍板 B+B+B+B 加快并行 落档 (09c1a57) + AGENTS v0.54 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
