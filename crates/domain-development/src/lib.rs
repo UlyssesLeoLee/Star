@@ -1063,7 +1063,7 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let dev = developer(tid);
         let pa = project_admin(tid);
-        let ta = ActorContext::new(Uuid::new_v4(), tid.0).with_role("tenant_admin");
+        let ta = ActorContext::new(Uuid::new_v4(), tid).with_role("tenant_admin");
         assert!(!dev.has_role("project_admin") && !dev.has_role("developer"));
         assert!(pa.has_role("project_admin"));
         assert!(ta.has_role("tenant_admin") || ta.is_platform_admin);
