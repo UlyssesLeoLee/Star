@@ -1286,13 +1286,13 @@ mod tests {
     use super::*;
     fn make_actor(user: UserId, tenant: TenantId, project: ProjectId) -> ActorContext {
         ActorContext::new(user.0, tenant.0)
-            .with_project(project)
+            .with_project(project.as_uuid())
             .with_role("developer")
     }
 
     fn make_admin_actor(user: UserId, tenant: TenantId, project: ProjectId) -> ActorContext {
         ActorContext::new(user.0, tenant.0)
-            .with_project(project)
+            .with_project(project.as_uuid())
             .with_role("tenant_admin")
     }
 
