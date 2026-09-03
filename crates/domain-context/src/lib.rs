@@ -978,7 +978,7 @@ mod tests {
     async fn create_context_packet() {
         let svc = InMemoryContextService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let p = svc
             .create_context_packet(
                 CreateContextPacketCommand {
@@ -1010,7 +1010,7 @@ mod tests {
     async fn add_relevant_item_updates_provenance() {
         let svc = InMemoryContextService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let p = svc
             .create_context_packet(
                 CreateContextPacketCommand {
@@ -1060,7 +1060,7 @@ mod tests {
         // INV-CT-10:P5 不可进入 trusted 层
         let svc = InMemoryContextService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let p = svc
             .create_context_packet(
                 CreateContextPacketCommand {
@@ -1143,7 +1143,7 @@ mod tests {
     async fn create_decision() {
         let svc = InMemoryContextService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let d = svc
             .create_decision(
                 CreateDecisionCommand {
@@ -1170,7 +1170,7 @@ mod tests {
     async fn supersede_decision_lifecycle() {
         let svc = InMemoryContextService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let d1 = svc
             .create_decision(
                 CreateDecisionCommand {
@@ -1229,7 +1229,7 @@ mod tests {
     async fn supersede_missing_successor_rejected() {
         let svc = InMemoryContextService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let d1 = svc
             .create_decision(
                 CreateDecisionCommand {
@@ -1267,7 +1267,7 @@ mod tests {
     async fn invalidate_requires_reason() {
         let svc = InMemoryContextService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let d = svc
             .create_decision(
                 CreateDecisionCommand {
@@ -1305,7 +1305,7 @@ mod tests {
     async fn invalidate_with_reason() {
         let svc = InMemoryContextService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let d = svc
             .create_decision(
                 CreateDecisionCommand {
@@ -1348,7 +1348,7 @@ mod tests {
     async fn list_decisions_active_only() {
         let svc = InMemoryContextService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let project_id = ProjectId::new();
         let d1 = svc
             .create_decision(
@@ -1430,7 +1430,7 @@ mod tests {
         // 手工构造:provenance 缺失
         let svc = InMemoryContextService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let p = svc
             .create_context_packet(
                 CreateContextPacketCommand {
