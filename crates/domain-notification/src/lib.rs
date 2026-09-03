@@ -938,7 +938,7 @@ mod tests {
     async fn register_channel_self_only() {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let me = uuid::Uuid::new_v4();
+        let me = UserId(uuid::Uuid::new_v4());
         let other = uuid::Uuid::new_v4();
         let actor = make_actor(tenant_id, me);
         let res = svc
@@ -960,7 +960,7 @@ mod tests {
     async fn register_channel_self_ok() {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let me = uuid::Uuid::new_v4();
+        let me = UserId(uuid::Uuid::new_v4());
         let actor = make_actor(tenant_id, me);
         let ch = svc
             .register_channel(
@@ -984,7 +984,7 @@ mod tests {
         // INV-N-07 关键事件:必须发送
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let me = uuid::Uuid::new_v4();
+        let me = UserId(uuid::Uuid::new_v4());
         let actor = make_actor(tenant_id, me);
         let n = svc
             .dispatch(
@@ -1011,7 +1011,7 @@ mod tests {
         // INV-N-07 默认抑制:中间步骤不通知
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let me = uuid::Uuid::new_v4();
+        let me = UserId(uuid::Uuid::new_v4());
         let actor = make_actor(tenant_id, me);
         let res = svc
             .dispatch(
@@ -1035,7 +1035,7 @@ mod tests {
     async fn dispatch_feedback_required_breakthrough() {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let me = uuid::Uuid::new_v4();
+        let me = UserId(uuid::Uuid::new_v4());
         let actor = make_actor(tenant_id, me);
         let n = svc
             .dispatch(
@@ -1060,7 +1060,7 @@ mod tests {
     async fn dispatch_agent_session_failed_breakthrough() {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let me = uuid::Uuid::new_v4();
+        let me = UserId(uuid::Uuid::new_v4());
         let actor = make_actor(tenant_id, me);
         let n = svc
             .dispatch(
@@ -1085,7 +1085,7 @@ mod tests {
     async fn mark_read_self_only() {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let me = uuid::Uuid::new_v4();
+        let me = UserId(uuid::Uuid::new_v4());
         let actor = make_actor(tenant_id, me);
         let n = svc
             .dispatch(
@@ -1121,7 +1121,7 @@ mod tests {
     #[tokio::test]
     async fn cross_tenant_dispatch_denied() {
         let svc = InMemoryNotificationService::new();
-        let me = uuid::Uuid::new_v4();
+        let me = UserId(uuid::Uuid::new_v4());
         let actor_t = uuid::Uuid::new_v4();
         let cmd_t = uuid::Uuid::new_v4();
         let actor = make_actor(actor_t, me);
@@ -1150,7 +1150,7 @@ mod tests {
     async fn upsert_template_creates_then_updates() {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let me = uuid::Uuid::new_v4();
+        let me = UserId(uuid::Uuid::new_v4());
         let actor = make_actor(tenant_id, me);
         let project = ProjectId::new();
         let t1 = svc
@@ -1192,7 +1192,7 @@ mod tests {
     async fn list_unread_filter() {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let me = uuid::Uuid::new_v4();
+        let me = UserId(uuid::Uuid::new_v4());
         let actor = make_actor(tenant_id, me);
         let n1 = svc
             .dispatch(
