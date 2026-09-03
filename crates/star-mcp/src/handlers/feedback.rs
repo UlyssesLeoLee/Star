@@ -113,7 +113,7 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let actor = ActorContext::new(uuid::Uuid::nil(), tid);
         let cmd = CreateFeedbackCommand {
-            tenant_id: tid,
+            tenant_id: domain_feedback::TenantId(tid),
             project_id: ProjectId::new(),
             work_item_id: WorkItemId::new(),
             target: FeedbackTarget::WorkItem {
