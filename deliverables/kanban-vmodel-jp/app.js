@@ -1137,6 +1137,14 @@
     if (!el) return;
     el.hidden = !state.metricsOpen;
     if (el.hidden) return;
+    // P2 架构 fix: 缓存 (active id + completed count + teamConfig), 数据未变时跳过 re-render
+    // 触发重渲染的路径: toggleMetrics / capacity form change / 切换 sprint / 完了 sprint / setView('sprint')
+    const activeForKey = getActiveSprint();
+    const completedCountForKey = state.sprints.filter(s => s.status === 'completed').length;
+    const cfgForKey = state.teamConfig || { size: 3, hoursPerWeek: 40 };
+    const renderKey = `${activeForKey?.id || 'NONE'}|${completedCountForKey}|${cfgForKey.size}|${cfgForKey.hoursPerWeek}`;
+    if (lastMetricsRenderKey === renderKey) return;
+    lastMetricsRenderKey = renderKey;
 
     const completed = state.sprints
       .filter(s => s.status === 'completed')
@@ -1361,6 +1369,7 @@
   function toggleMetrics() {
     state.metricsOpen = !state.metricsOpen;
     store.save(METRICS_OPEN_KEY, state.metricsOpen);
+    lastMetricsRenderKey = null;  // 强制 re-render (panel 显隐切换)
     renderSprintMetrics();
     // Update button text
     const btn = document.getElementById('metricsToggle');
@@ -1403,11 +1412,20 @@
   }
 
   // ----- Render ceremonies -----
+  let lastCeremoniesRenderKey = null;  // P3 self-review fix: 防止在用户输入时 textarea 被 innerHTML 替换导致数据丢失
+  let lastMetricsRenderKey = null;     // P2 self-review fix: 同上, 防止 capacity form 输入丢失
+
   function renderSprintCeremonies() {
     const el = document.getElementById('sprintCeremonies');
     if (!el) return;
     el.hidden = !state.ceremoniesOpen;
     if (el.hidden) return;
+    // P3 架构 fix: 缓存 active sprint id, 数据未变时跳过 re-render
+    // 触发重渲染的路径: toggleCeremonies / saveStandup / saveRetro / saveGoal / 切换 sprint / setView('sprint')
+    const activeForKey = getActiveSprint();
+    const renderKey = activeForKey?.id || 'NONE';
+    if (lastCeremoniesRenderKey === renderKey) return;
+    lastCeremoniesRenderKey = renderKey;
 
     const active = getActiveSprint();
     if (!active) {
@@ -1581,6 +1599,12 @@
   }
 
   function bindCeremonyEvents(sprint, c) {
+    // P3 self-review fix: 保存后强制 re-render ceremonies panel (更新履歴列表 + hint 状态)
+    const refreshCeremonies = () => {
+      lastCeremoniesRenderKey = null;
+      renderSprintCeremonies();
+    };
+
     // Standup save
     const standupSave = document.getElementById('standupSaveBtn');
     if (standupSave) {
@@ -1595,6 +1619,7 @@
         saveStandup(c, { date: todayISO(), yesterday, today, blockers });
         save();
         toast('✅ 今日分の Standup を保存');
+        // 在 save 后只更新 hint (避免 re-render 替换 textarea 丢失用户刚保存的输入)
         const hint = document.getElementById('standupHint');
         if (hint) { hint.textContent = '✅ 今日分は保存済'; hint.style.color = '#4ade80'; }
       });
@@ -1710,6 +1735,7 @@ Velocity: ${sprint.velocity || '—'}h / Capacity: ${sprintCapacity(sprint)}h
   function toggleCeremonies() {
     state.ceremoniesOpen = !state.ceremoniesOpen;
     store.save(CEREMONIES_OPEN_KEY, state.ceremoniesOpen);
+    lastCeremoniesRenderKey = null;  // 强制 re-render (panel 显隐切换)
     renderSprintCeremonies();
     const btn = document.getElementById('ceremoniesToggle');
     if (btn) btn.textContent = state.ceremoniesOpen ? '📝 仪式を隠す' : '📝 仪式';
@@ -1734,7 +1760,13 @@ Velocity: ${sprint.velocity || '—'}h / Capacity: ${sprintCapacity(sprint)}h
     if (v === 'kanban') renderKanban();
     if (v === 'list') renderList();
     if (v === 'timeline') renderTimeline();
-    if (v === 'sprint') renderSprint();
+    if (v === 'sprint') {
+      // P3 self-review fix: 切换到 Sprint 视图时强制重渲染 ceremonies/metrics
+      // (确保切换回来时看到最新数据; 用户在原视图输入已 save 不会丢失)
+      lastCeremoniesRenderKey = null;
+      lastMetricsRenderKey = null;
+      renderSprint();
+    }
   }
 
   /* ------------------------------------------------------------------

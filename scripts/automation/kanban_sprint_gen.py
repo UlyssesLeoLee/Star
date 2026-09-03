@@ -66,7 +66,7 @@ APP_JS_CHECKS: List[Tuple[str, str, bool]] = [
     ('addToSprint 函数', r"function\s+addToSprint", True),
     ('removeFromSprint 函数', r"function\s+removeFromSprint", True),
     ('returnSprintTasksToBacklog 函数 (Jira 設計)', r"function\s+returnSprintTasksToBacklog", True),
-    ('setView 路由 sprint', r"if\s*\(\s*v\s*===\s*['\"]sprint['\"]\s*\)\s*renderSprint", True),
+    ('setView 路由 sprint', r"if\s*\(\s*v\s*===\s*['\"]sprint['\"]\s*\)[\s\S]{0,200}renderSprint", True),
     ('save 持久化 sprints', r"store\.save\(SPRINT_STORAGE_KEY", True),
     ('init 同步 activeSprintId', r"state\.activeSprintId\s*=\s*activeSp", True),
     ('exportJSON 包含 sprints', r"sprints:\s*state\.sprints", True),
@@ -100,6 +100,11 @@ APP_JS_CHECKS: List[Tuple[str, str, bool]] = [
     ('Retrospective 3 列 KPT (P3)', r"retrospective-col--(good|improve|action)", True),
     ('Retrospective Markdown 导出 (P3)', r"retrospective\.md", True),
     ('ceremoniesToggle 事件绑定 (P3)', r"ceremoniesToggle[\s\S]{0,200}addEventListener", True),
+    # Self-review fix: render cache 防止 form 数据丢失
+    ('lastCeremoniesRenderKey 缓存 (self-review)', r"lastCeremoniesRenderKey\s*=\s*renderKey", True),
+    ('lastMetricsRenderKey 缓存 (self-review)', r"lastMetricsRenderKey\s*=\s*renderKey", True),
+    ('toggleCeremonies 重置 cache (self-review)', r"lastCeremoniesRenderKey\s*=\s*null", True),
+    ('toggleMetrics 重置 cache (self-review)', r"lastMetricsRenderKey\s*=\s*null", True),
 ]
 
 INDEX_HTML_CHECKS: List[Tuple[str, str, bool]] = [
