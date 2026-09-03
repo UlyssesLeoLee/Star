@@ -12,6 +12,8 @@
   const TASK_STORAGE_KEY = 'vmodel-tasks-v1';
   const THEME_KEY = 'vmodel-theme-v1';
   const SPRINT_STORAGE_KEY = 'vmodel-sprints-v1';
+  const TEAM_CONFIG_KEY = 'vmodel-team-config-v1';
+  const METRICS_OPEN_KEY = 'vmodel-metrics-open-v1';
 
   /* ------------------------------------------------------------------
    * 永続化レイヤー
@@ -39,7 +41,9 @@
     filter: '',
     industry: store.load('vmodel-industry-v1', 'all'),  // all | finance | public | ec | embedded
     theme: store.load(THEME_KEY, 'dark'),
-    sprints: store.load(SPRINT_STORAGE_KEY, null) || [],  // [{id, name, goal, startDate, endDate, durationDays, status, taskIds[], createdAt, completedAt, velocity}]
+    sprints: store.load(SPRINT_STORAGE_KEY, null) || [],  // [{id, name, goal, startDate, endDate, durationDays, status, taskIds[], dailySnapshots[], createdAt, completedAt, velocity}]
+    teamConfig: store.load(TEAM_CONFIG_KEY, null) || { size: 3, hoursPerWeek: 40 },  // 团队规模 + 每人每周可用工时
+    metricsOpen: store.load(METRICS_OPEN_KEY, false),  // Sprint 视图 metrics panel 展开状态
     activeSprintId: null  // id of the currently active sprint (status='active')
   };
 
@@ -507,6 +511,7 @@
     renderSprintHeader();
     renderSprintBoard();
     renderSprintList();
+    renderSprintMetrics();
   }
 
   function renderSprintHeader() {
@@ -547,6 +552,7 @@
           <p class="sprint-header__goal">${escapeHTML(active.goal || '—')}</p>
         </div>
         <div class="sprint-header__actions">
+          <button class="btn btn--ghost" id="metricsToggle">${state.metricsOpen ? '📊 メトリクスを隠す' : '📊 メトリクス'}</button>
           <button class="btn btn--ghost" id="sprintPlanBtn">📋 計画編集</button>
           <button class="btn btn--ghost" id="sprintEditBtn">✏️ 編集</button>
           <button class="btn btn--ghost" id="sprintCompleteBtn">✅ 完了</button>
@@ -587,6 +593,7 @@
     document.getElementById('sprintEditBtn').addEventListener('click', () => openSprintEditModal(active.id));
     document.getElementById('sprintCompleteBtn').addEventListener('click', () => completeSprint(active.id));
     document.getElementById('sprintCancelBtn').addEventListener('click', () => cancelSprint(active.id));
+    document.getElementById('metricsToggle').addEventListener('click', toggleMetrics);
   }
 
   function renderSprintBoard() {
@@ -650,6 +657,7 @@
         if (!sp) return;
         if (id && state.tasks[id] && sp.taskIds.includes(id)) {
           state.tasks[id].status = zone.dataset.sprintDropzone;
+          recordSprintSnapshot(sp.id);
           save();
           renderSprint();
           toast(`${id} → ${zone.dataset.sprintDropzone}`);
@@ -816,12 +824,14 @@
     const delBtn = body.querySelector('#seDeleteBtn');
     if (delBtn) {
       delBtn.addEventListener('click', () => {
-        if (!confirm(`${draft.name} を削除しますか?\n配下のタスクは保持されます。`)) return;
+        if (!confirm(`${draft.name} を削除しますか?\n配下のタスクは全件 Backlog に戻します (per Jira 設計)。`)) return;
+        // Jira 設計: 削除 Sprint の全タスクは Backlog に戻る
+        const returned = returnSprintTasksToBacklog(draft);
         state.sprints = state.sprints.filter(s => s.id !== sprintId);
         save();
         renderSprint();
         closeSprintEditModal();
-        toast(`${draft.id} を削除`);
+        toast(`${draft.id} を削除 (Backlog 戻り: ${returned} 件)`);
       });
     }
 
@@ -844,7 +854,16 @@
         (s.taskIds || []).forEach(tid => inOtherSprint.add(tid));
       }
     });
-    const backlog = allTaskIds.filter(id => !inSprint.has(id) && !inOtherSprint.has(id));
+    // Jira 設計: Sprint 計画は Backlog (status === 'backlog') からのみ追加可能
+    const backlog = allTaskIds.filter(id => {
+      const t = state.tasks[id];
+      return t && t.status === 'backlog' && !inSprint.has(id) && !inOtherSprint.has(id);
+    });
+    // 計画済だが Backlog 以外の status のタスク (他 Sprint 移動後の残留) を警告
+    const notBacklogInSprint = (sprint.taskIds || []).filter(id => {
+      const t = state.tasks[id];
+      return t && t.status !== 'backlog';
+    });
     const inThis = sprint.taskIds || [];
 
     const renderCols = () => {
@@ -875,6 +894,14 @@
         }).join('');
 
       body.innerHTML = `
+        <div class="plan-hint">
+          <span class="plan-hint__icon">💡</span>
+          <span><strong>Jira 設計準拠</strong>: Sprint には Backlog 状態 (status = backlog) のタスクのみ追加できます。Kanban Board で「バックログ」列に戻してから追加してください。</span>
+        </div>
+        ${notBacklogInSprint.length ? `
+        <div class="plan-warn">
+          ⚠️ 計画済 ${notBacklogInSprint.length} 件が Backlog 以外のステータスです (Kanban Board で進行中の可能性)。Sprint 内で作業を続けられます。
+        </div>` : ''}
         <div class="plan-grid">
           <div class="plan-col">
             <div class="plan-col__head">
@@ -882,7 +909,9 @@
               <span class="plan-col__count">${backlog.length} 件</span>
             </div>
             <input class="form-input" id="planFilterBacklog" placeholder="検索…" style="margin-bottom:8px">
-            <ul class="plan-list" id="planBacklog">${list(backlog)}</ul>
+            <ul class="plan-list" id="planBacklog">
+              ${backlog.length ? list(backlog) : '<li class="plan-list__empty">📭 Backlog にタスクがありません。Kanban Board の「バックログ」列でタスクを backlog に戻すと、ここに表示されます。</li>'}
+            </ul>
           </div>
           <div class="plan-col">
             <div class="plan-col__head">
@@ -893,7 +922,7 @@
           </div>
         </div>
         <div class="form-actions" style="margin-top:16px">
-          <div style="flex:1;font-size:12px;color:var(--text-3)">ドラッグ or ボタンで移動 · 他 Sprint に所属するタスクはロック</div>
+          <div style="flex:1;font-size:12px;color:var(--text-3)">ドラッグ or ボタンで移動 · 他 Sprint に所属するタスクはロック · <strong>外したタスクは Backlog に戻ります</strong></div>
           <button class="task-detail__btn" data-close="sprintPlan">閉じる</button>
         </div>
       `;
@@ -971,8 +1000,16 @@
       toast('他 Sprint に既に所属', 'error');
       return;
     }
+    // Jira 设计: タスクは Backlog 状態 (status === 'backlog') でのみ Sprint に追加可能
+    const t = state.tasks[taskId];
+    if (!t) return;
+    if (t.status !== 'backlog') {
+      toast(`${taskId} は Backlog 状態ではありません。Kanban Board で「バックログ」列に戻してから追加してください。`, 'error');
+      return;
+    }
     s.taskIds.push(taskId);
     save();
+    recordSprintSnapshot(s.id);
     openSprintPlanModal(sprintId);
     renderSprint();
   }
@@ -980,9 +1017,27 @@
     const s = getSprint(sprintId);
     if (!s) return;
     s.taskIds = s.taskIds.filter(id => id !== taskId);
+    // Jira 设计: Sprint から外したタスクは Backlog に戻る
+    const t = state.tasks[taskId];
+    if (t) t.status = 'backlog';
     save();
+    recordSprintSnapshot(s.id);
     openSprintPlanModal(sprintId);
     renderSprint();
+  }
+
+  // ヘルパー: Sprint 内の全タスク (完了済以外) を Backlog に戻す (per Jira: 完了 Sprint の未完了タスクは Backlog に戻る)
+  function returnSprintTasksToBacklog(sprint, { onlyIncomplete = false } = {}) {
+    if (!sprint) return 0;
+    let count = 0;
+    (sprint.taskIds || []).forEach(tid => {
+      const t = state.tasks[tid];
+      if (!t) return;
+      if (onlyIncomplete && t.status === 'done') return;
+      t.status = 'backlog';
+      count++;
+    });
+    return count;
   }
 
   // ----- Sprint lifecycle -----
@@ -995,6 +1050,8 @@
     if (!s || s.status !== 'planned') return;
     s.status = 'active';
     state.activeSprintId = s.id;
+    s.dailySnapshots = [];  // reset on start
+    recordSprintSnapshot(s.id);
     save();
     renderSprint();
     toast(`🏁 ${s.id} 開始`);
@@ -1005,25 +1062,304 @@
     const velocity = sprintDoneHours(s);
     const commitment = sprintCapacity(s);
     const completed = (s.taskIds || []).filter(id => state.tasks[id] && state.tasks[id].status === 'done').length;
-    if (!confirm(`${s.id} を完了しますか?\n完了タスク: ${completed} / ${s.taskIds.length}\n完了工数: ${velocity}h / 計画 ${commitment}h`)) return;
+    const incomplete = s.taskIds.length - completed;
+    if (!confirm(`${s.id} を完了しますか?\n完了タスク: ${completed} / ${s.taskIds.length}\n完了工数: ${velocity}h / 計画 ${commitment}h\n未完了 ${incomplete} 件 は Backlog に戻します (per Jira 設計)`)) return;
     s.status = 'completed';
     s.completedAt = new Date().toISOString();
     s.velocity = velocity;
     state.activeSprintId = null;
+    // Jira 設計: 完了 Sprint の未完了タスクは Backlog に戻る
+    const returned = returnSprintTasksToBacklog(s, { onlyIncomplete: true });
     save();
     renderSprint();
-    toast(`✅ ${s.id} 完了 (Velocity: ${velocity}h)`);
+    toast(`✅ ${s.id} 完了 (Velocity: ${velocity}h, Backlog 戻り: ${returned} 件)`);
   }
   function cancelSprint(sprintId) {
     const s = getSprint(sprintId);
     if (!s) return;
-    if (!confirm(`${s.id} を中止しますか?\n配下タスクは保持され、他 Sprint に追加可能になります。`)) return;
+    if (!confirm(`${s.id} を中止しますか?\n配下タスクは全件 Backlog に戻します (per Jira 設計)。他 Sprint で再計画可能。`)) return;
     s.status = 'cancelled';
     s.cancelledAt = new Date().toISOString();
     if (state.activeSprintId === s.id) state.activeSprintId = null;
+    // Jira 設計: 中止 Sprint の全タスクは Backlog に戻る
+    const returned = returnSprintTasksToBacklog(s);
+    s.taskIds = [];
     save();
     renderSprint();
-    toast(`❌ ${s.id} 中止`);
+    toast(`❌ ${s.id} 中止 (Backlog 戻り: ${returned} 件)`);
+  }
+
+  /* ------------------------------------------------------------------
+   * Sprint metrics (P2 — 度量)
+   * ----------------------------------------------------------------*/
+
+  // ----- Snapshot helpers -----
+  function recordSprintSnapshot(sprintId) {
+    const s = getSprint(sprintId);
+    if (!s) return;
+    if (s.status !== 'active') return;
+    s.dailySnapshots = s.dailySnapshots || [];
+    const today = new Date().toISOString().slice(0, 10);
+    const totalCap = sprintCapacity(s);
+    const done = sprintDoneHours(s);
+    const remaining = Math.max(totalCap - done, 0);
+    const last = s.dailySnapshots[s.dailySnapshots.length - 1];
+    if (last && last.date === today) {
+      last.remainingHours = remaining;
+      last.doneHours = done;
+      last.totalCapacity = totalCap;
+    } else {
+      s.dailySnapshots.push({ date: today, remainingHours: remaining, doneHours: done, totalCapacity: totalCap });
+    }
+  }
+
+  function sprintCompletionPct(sprint) {
+    const total = (sprint.taskIds || []).length;
+    if (!total) return 0;
+    const done = (sprint.taskIds || []).filter(id => state.tasks[id] && state.tasks[id].status === 'done').length;
+    return Math.round((done / total) * 100);
+  }
+
+  function teamSprintCapacity(sprint) {
+    // 团队规模 × 每周可用工时 × (durationDays / 7)
+    const cfg = state.teamConfig || { size: 3, hoursPerWeek: 40 };
+    return Math.round(cfg.size * cfg.hoursPerWeek * ((sprint.durationDays || 14) / 7));
+  }
+
+  // ----- Render metrics -----
+  function renderSprintMetrics() {
+    const el = document.getElementById('sprintMetrics');
+    if (!el) return;
+    el.hidden = !state.metricsOpen;
+    if (el.hidden) return;
+
+    const completed = state.sprints
+      .filter(s => s.status === 'completed')
+      .sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
+    const active = getActiveSprint();
+
+    el.innerHTML = `
+      <div class="sprint-metrics__head">
+        <h2 class="sprint-metrics__title">📊 Sprint メトリクス</h2>
+        <div class="sprint-metrics__hint">Velocity · Burndown · 履歴 · Capacity</div>
+      </div>
+      <div class="sprint-metrics__grid">
+        <section class="metric-card">
+          <header class="metric-card__head">
+            <h3>📈 Velocity (最近 5 Sprint)</h3>
+            <span class="metric-card__sub">完了工数 (h)</span>
+          </header>
+          <div class="metric-card__body" id="velocityChart"></div>
+        </section>
+        <section class="metric-card">
+          <header class="metric-card__head">
+            <h3>📉 Burndown (現在の Sprint)</h3>
+            <span class="metric-card__sub">日次残工数 (h)</span>
+          </header>
+          <div class="metric-card__body" id="burndownChart">
+            ${active ? renderBurndownChart(active) : '<div class="metric-empty">アクティブな Sprint がありません</div>'}
+          </div>
+        </section>
+        <section class="metric-card metric-card--wide">
+          <header class="metric-card__head">
+            <h3>📋 Sprint 履歴</h3>
+            <span class="metric-card__sub">完了 Sprint 全件</span>
+          </header>
+          <div class="metric-card__body" id="sprintHistory">
+            ${renderSprintHistory(completed)}
+          </div>
+        </section>
+        <section class="metric-card">
+          <header class="metric-card__head">
+            <h3>👥 チーム Capacity</h3>
+            <span class="metric-card__sub">Sprint ごとの利用可能工数</span>
+          </header>
+          <div class="metric-card__body" id="capacityConfig">
+            ${renderCapacityConfig()}
+          </div>
+        </section>
+      </div>
+    `;
+
+    // Render velocity chart (after DOM is in place)
+    const vc = document.getElementById('velocityChart');
+    if (vc) vc.innerHTML = renderVelocityChart(completed.slice(0, 5));
+
+    // Bind capacity form
+    const sizeInp = el.querySelector('#capSize');
+    const hoursInp = el.querySelector('#capHours');
+    if (sizeInp) sizeInp.addEventListener('change', () => {
+      const n = parseInt(sizeInp.value, 10);
+      if (n > 0) { state.teamConfig.size = n; save(); renderSprintMetrics(); }
+    });
+    if (hoursInp) hoursInp.addEventListener('change', () => {
+      const n = parseInt(hoursInp.value, 10);
+      if (n > 0) { state.teamConfig.hoursPerWeek = n; save(); renderSprintMetrics(); }
+    });
+  }
+
+  function renderVelocityChart(sprints) {
+    if (!sprints.length) {
+      return '<div class="metric-empty">完了した Sprint がまだありません</div>';
+    }
+    const W = 360, H = 180, padX = 36, padY = 24;
+    const maxV = Math.max(...sprints.map(s => s.velocity || 0), 1);
+    const barW = (W - padX * 2) / sprints.length;
+    const bars = sprints.map((s, i) => {
+      const x = padX + i * barW + barW * 0.2;
+      const w = barW * 0.6;
+      const h = ((s.velocity || 0) / maxV) * (H - padY * 2);
+      const y = H - padY - h;
+      const label = (s.id || '').replace('SP-', 'S');
+      return `
+        <g>
+          <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="url(#velGrad)" class="vel-bar">
+            <title>${s.id}: ${s.velocity || 0}h / ${sprintCapacity(s)}h</title>
+          </rect>
+          <text x="${x + w/2}" y="${y - 4}" text-anchor="middle" class="vel-val">${s.velocity || 0}h</text>
+          <text x="${x + w/2}" y="${H - 6}" text-anchor="middle" class="vel-label">${label}</text>
+        </g>
+      `;
+    }).join('');
+    return `
+      <svg class="chart-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="velGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#22c55e"/>
+            <stop offset="100%" stop-color="#16a34a"/>
+          </linearGradient>
+        </defs>
+        <line x1="${padX}" y1="${H - padY}" x2="${W - padX/2}" y2="${H - padY}" stroke="rgba(255,255,255,0.1)"/>
+        <line x1="${padX}" y1="${padY}" x2="${padX}" y2="${H - padY}" stroke="rgba(255,255,255,0.05)"/>
+        <text x="${padX - 4}" y="${padY + 4}" text-anchor="end" class="chart-axis">${maxV}h</text>
+        <text x="${padX - 4}" y="${H - padY + 4}" text-anchor="end" class="chart-axis">0</text>
+        ${bars}
+      </svg>
+    `;
+  }
+
+  function renderBurndownChart(sprint) {
+    const W = 360, H = 180, padX = 36, padY = 24;
+    const total = sprintCapacity(sprint);
+    const days = sprint.durationDays || 14;
+    const start = new Date(sprint.startDate + 'T00:00:00');
+    const end = new Date(sprint.endDate + 'T23:59:59');
+    const today = new Date();
+    const elapsed = Math.max(0, Math.min(days, Math.ceil((today - start) / (1000 * 60 * 60 * 24))));
+
+    // Ideal line: linear from (0, total) to (days, 0)
+    const idealPts = [
+      { x: padX, y: padY },
+      { x: padX + (days / Math.max(days, 1)) * (W - padX - 8), y: H - padY }
+    ];
+    // Actual line: from snapshots (or build from 0..elapsed)
+    const snaps = (sprint.dailySnapshots || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    if (!snaps.length && sprint.status === 'active') {
+      // Seed an initial snapshot
+      snaps.push({ date: sprint.startDate, remainingHours: total, doneHours: 0, totalCapacity: total });
+      sprint.dailySnapshots = snaps;
+    }
+    const actualPts = snaps.map((sn, i) => {
+      const dayOffset = Math.ceil((new Date(sn.date + 'T00:00:00') - start) / (1000 * 60 * 60 * 24));
+      const x = padX + (dayOffset / Math.max(days, 1)) * (W - padX - 8);
+      const y = padY + (sn.remainingHours / Math.max(total, 1)) * (H - padY * 2);
+      return { x, y, label: sn.date, val: sn.remainingHours };
+    });
+
+    const xAxisDays = Array.from({ length: days + 1 }, (_, i) => i).filter(d => d === 0 || d === days || d % Math.ceil(days / 7) === 0);
+
+    return `
+      <svg class="chart-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <line x1="${padX}" y1="${H - padY}" x2="${W - 8}" y2="${H - padY}" stroke="rgba(255,255,255,0.1)"/>
+        <line x1="${padX}" y1="${padY}" x2="${padX}" y2="${H - padY}" stroke="rgba(255,255,255,0.05)"/>
+        <text x="${padX - 4}" y="${padY + 4}" text-anchor="end" class="chart-axis">${total}h</text>
+        <text x="${padX - 4}" y="${H - padY + 4}" text-anchor="end" class="chart-axis">0</text>
+        ${xAxisDays.map(d => {
+          const x = padX + (d / Math.max(days, 1)) * (W - padX - 8);
+          return `<text x="${x}" y="${H - padY + 12}" text-anchor="middle" class="chart-axis-sm">D${d}</text>`;
+        }).join('')}
+        <line x1="${idealPts[0].x}" y1="${idealPts[0].y}" x2="${idealPts[1].x}" y2="${idealPts[1].y}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3" class="ideal-line"/>
+        <text x="${idealPts[1].x - 4}" y="${idealPts[1].y - 4}" text-anchor="end" class="chart-legend">理想</text>
+        ${actualPts.length ? `
+          <polyline points="${actualPts.map(p => `${p.x},${p.y}`).join(' ')}" fill="none" stroke="#22d3ee" stroke-width="2" class="actual-line"/>
+          ${actualPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="#22d3ee"><title>${p.label}: 残 ${p.val}h</title></circle>`).join('')}
+        ` : ''}
+        ${elapsed > 0 ? `<line x1="${padX + (elapsed / Math.max(days, 1)) * (W - padX - 8)}" y1="${padY}" x2="${padX + (elapsed / Math.max(days, 1)) * (W - padX - 8)}" y2="${H - padY}" stroke="rgba(251, 191, 36, 0.4)" stroke-dasharray="2 2"/>` : ''}
+      </svg>
+    `;
+  }
+
+  function renderSprintHistory(sprints) {
+    if (!sprints.length) {
+      return '<div class="metric-empty">完了した Sprint がまだありません</div>';
+    }
+    return `
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>名称</th>
+            <th>期間</th>
+            <th>完了率</th>
+            <th>Velocity</th>
+            <th>達成</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sprints.map(s => {
+            const cap = sprintCapacity(s);
+            const vel = s.velocity || 0;
+            const pct = cap > 0 ? Math.min(Math.round((vel / cap) * 100), 100) : 0;
+            const achieved = pct >= 80 ? '✅' : (pct >= 50 ? '⚠️' : '❌');
+            return `
+              <tr>
+                <td class="row-id">${s.id}</td>
+                <td>${escapeHTML(s.name)}</td>
+                <td>${s.startDate} → ${s.endDate}</td>
+                <td>
+                  <div class="pct-bar"><div class="pct-bar__fill" style="width:${pct}%"></div></div>
+                  <span class="pct-num">${pct}%</span>
+                </td>
+                <td><strong>${vel}h</strong> / ${cap}h</td>
+                <td>${achieved}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function renderCapacityConfig() {
+    const cfg = state.teamConfig || { size: 3, hoursPerWeek: 40 };
+    const active = getActiveSprint();
+    const curCap = active ? teamSprintCapacity(active) : (cfg.size * cfg.hoursPerWeek * 2);
+    return `
+      <div class="capacity-form">
+        <div class="capacity-form__row">
+          <label>チーム人数</label>
+          <input class="form-input" id="capSize" type="number" min="1" max="50" value="${cfg.size}">
+        </div>
+        <div class="capacity-form__row">
+          <label>週あたり工数 (h/人)</label>
+          <input class="form-input" id="capHours" type="number" min="1" max="80" value="${cfg.hoursPerWeek}">
+        </div>
+        <div class="capacity-form__result">
+          <div class="capacity-form__formula">${cfg.size} 人 × ${cfg.hoursPerWeek}h × ${active ? (active.durationDays / 7).toFixed(1) : '2.0'} 週</div>
+          <div class="capacity-form__value">= <strong>${curCap}h</strong></div>
+        </div>
+        <div class="capacity-form__hint">現在の Sprint (${active ? active.id : 'なし'}) の Capacity = <strong>${curCap}h</strong>。Sprint 計画時の参照値です。</div>
+      </div>
+    `;
+  }
+
+  function toggleMetrics() {
+    state.metricsOpen = !state.metricsOpen;
+    store.save(METRICS_OPEN_KEY, state.metricsOpen);
+    renderSprintMetrics();
+    // Update button text
+    const btn = document.getElementById('metricsToggle');
+    if (btn) btn.textContent = state.metricsOpen ? '📊 メトリクスを隠す' : '📊 メトリクス';
   }
 
   /* ------------------------------------------------------------------
@@ -1507,6 +1843,7 @@
     store.save(PHASE_STORAGE_KEY, state.phases);
     store.save(TASK_STORAGE_KEY, state.tasks);
     store.save(SPRINT_STORAGE_KEY, state.sprints);
+    store.save(TEAM_CONFIG_KEY, state.teamConfig);
   }
 
   /* ------------------------------------------------------------------

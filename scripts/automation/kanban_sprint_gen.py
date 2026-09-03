@@ -64,11 +64,20 @@ APP_JS_CHECKS: List[Tuple[str, str, bool]] = [
     ('completeSprint 函数', r"function\s+completeSprint", True),
     ('cancelSprint 函数', r"function\s+cancelSprint", True),
     ('addToSprint 函数', r"function\s+addToSprint", True),
+    ('removeFromSprint 函数', r"function\s+removeFromSprint", True),
+    ('returnSprintTasksToBacklog 函数 (Jira 設計)', r"function\s+returnSprintTasksToBacklog", True),
     ('setView 路由 sprint', r"if\s*\(\s*v\s*===\s*['\"]sprint['\"]\s*\)\s*renderSprint", True),
     ('save 持久化 sprints', r"store\.save\(SPRINT_STORAGE_KEY", True),
     ('init 同步 activeSprintId', r"state\.activeSprintId\s*=\s*activeSp", True),
     ('exportJSON 包含 sprints', r"sprints:\s*state\.sprints", True),
     ('sprintCreateBtn 事件绑定', r"sprintCreateBtn[\s\S]{0,200}addEventListener", True),
+    # Jira 設計: Backlog first (P1 v0.2 追加)
+    ('addToSprint 校验 backlog 状态', r"t\.status\s*!==\s*['\"]backlog['\"]", True),
+    ('removeFromSprint 重置 status=backlog', r"if\s*\(\s*t\s*\)\s*t\.status\s*=\s*['\"]backlog['\"]", True),
+    ('completeSprint 未完了 → backlog (onlyIncomplete)', r"returnSprintTasksToBacklog\(\s*s\s*,\s*\{\s*onlyIncomplete", True),
+    ('cancelSprint 全件 → backlog', r"const\s+returned\s*=\s*returnSprintTasksToBacklog\(\s*s\s*\)", True),
+    ('Sprint 計画 modal backlog filter (status=backlog)', r"t\.status\s*===\s*['\"]backlog['\"]", True),
+    ('Sprint 計画 hint "Jira 設計"', r"Jira\s*設計", True),
 ]
 
 INDEX_HTML_CHECKS: List[Tuple[str, str, bool]] = [
@@ -81,6 +90,8 @@ INDEX_HTML_CHECKS: List[Tuple[str, str, bool]] = [
     ('Sprint 新規按钮', r'id="sprintCreateBtn"', True),
     ('Sprint edit modal', r'id="sprintEditModal"', True),
     ('Sprint plan modal', r'id="sprintPlanModal"', True),
+    # P2 追加
+    ('Sprint metrics panel (P2)', r'id="sprintMetrics"', True),
 ]
 
 STYLES_CSS_CHECKS: List[Tuple[str, str, bool]] = [
@@ -99,6 +110,10 @@ STYLES_CSS_CHECKS: List[Tuple[str, str, bool]] = [
     ('.plan-task', r'\.plan-task\s*\{', True),
     ('.form-row', r'\.form-row\s*\{', True),
     ('响应式 1200px', r'@media\s*\(max-width:\s*1200px\)', True),
+    # Jira 設計 P1 v0.2 追加
+    ('.plan-hint Backlog 提示', r'\.plan-hint\s*\{', True),
+    ('.plan-warn 警告', r'\.plan-warn\s*\{', True),
+    ('.plan-list__empty', r'\.plan-list__empty\s*\{', True),
 ]
 
 

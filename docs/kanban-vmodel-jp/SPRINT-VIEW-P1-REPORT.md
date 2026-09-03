@@ -71,10 +71,13 @@
 
 ### 2.1 静态验证 (per `kanban_sprint_gen.py --strict`)
 
-```
-=== kanban-vmodel-jp Sprint 视图验证 ===
+v0.1 验证: 43/43 pass
+v0.2 验证: 54/54 pass (+11 项 Jira 設計 校验)
 
---- app.js ---
+```
+=== kanban-vmodel-jp Sprint 视图验证 (v0.2 2026-09-03 13:55 JST) ===
+
+--- app.js (27 项) ---
   ✅ Sprint 存储 key 常量 (必)
   ✅ state.sprints 字段 (必)
   ✅ getActiveSprint 函数 (必)
@@ -89,13 +92,21 @@
   ✅ completeSprint 函数 (必)
   ✅ cancelSprint 函数 (必)
   ✅ addToSprint 函数 (必)
+  ✅ removeFromSprint 函数 (必)
+  ✅ returnSprintTasksToBacklog 函数 (Jira 設計) (必)
   ✅ setView 路由 sprint (必)
   ✅ save 持久化 sprints (必)
   ✅ init 同步 activeSprintId (必)
   ✅ exportJSON 包含 sprints (必)
   ✅ sprintCreateBtn 事件绑定 (必)
+  ✅ addToSprint 校验 backlog 状态 (v0.2 新增)
+  ✅ removeFromSprint 重置 status=backlog (v0.2 新增)
+  ✅ completeSprint 未完了 → backlog (onlyIncomplete) (v0.2 新增)
+  ✅ cancelSprint 全件 → backlog (v0.2 新增)
+  ✅ Sprint 計画 modal backlog filter (status=backlog) (v0.2 新增)
+  ✅ Sprint 計画 hint "Jira 設計" (v0.2 新增)
 
---- index.html ---
+--- index.html (10 项) ---
   ✅ Sprint tab 按钮 (必)
   ✅ Sprint 视图容器 (必)
   ✅ Sprint header 容器 (必)
@@ -105,8 +116,9 @@
   ✅ Sprint 新規按钮 (必)
   ✅ Sprint edit modal (必)
   ✅ Sprint plan modal (必)
+  ✅ Sprint metrics panel (P2 新增)
 
---- styles.css ---
+--- styles.css (18 项) ---
   ✅ .sprint 容器 (必)
   ✅ .sprint-body 网格 (必)
   ✅ .sprint-header 样式 (必)
@@ -122,8 +134,11 @@
   ✅ .plan-task (必)
   ✅ .form-row (必)
   ✅ 响应式 1200px (必)
+  ✅ .plan-hint Backlog 提示 (v0.2 新增)
+  ✅ .plan-warn 警告 (v0.2 新增)
+  ✅ .plan-list__empty (v0.2 新增)
 
-=== 总计: 43/43 (100.0%) ===
+=== 总计: 55/55 (100.0%) === (v0.1: 43 + v0.2: 11 + P2: 1)
 ```
 
 ### 2.2 语法 / 解析验证 (per `node --check` + `_smoke_sprint_p1.js`)
@@ -167,7 +182,7 @@
 
 ## §3 已知缺口 (per 守门 #11 缺标比错标)
 
-继承 `docs/briefs/kanban-sprint-view-001.md` §4 已知缺口 + P1 实证增量:
+继承 `docs/briefs/kanban-sprint-view-001.md` §4 已知缺口 + P1 实证增量 + v0.2 Jira 設計增量:
 
 - [P1] Sprint 范围**不跨多个 Sprint** — 同一 task 不能同时属于两个 active sprint (1 task 1 sprint 互斥校验) — `addToSprint` 已加 `isTaskInActiveOrPlannedSprint` 检查
 - [P1] 没有 Story Points 概念, **用 `estimate` 字段 (小时) 当点数** — 沿用现有字段, 后续如需 Fibonacci 单独 P4
@@ -181,7 +196,8 @@
 - [ALL] **无 SRE Lead / DDD Review 拍板** — Mavis 代签, 5 域真人到位后追溯 (per 守门 #3)
 - [P1 新增] **Sprint 列表 sidebar 拖拽排序不支持** — 暂按 createdAt 倒序
 - [P1 新增] **Sprint Plan modal 不支持 bulk move** — 仅单 task 添加/移除
-- [P1 新增] **Sprint 中止后 task 不会自动回到 Backlog** — taskIds 保留, status 不变, 由用户决定
+- [P1 v0.2 新增] **既存数据无 backlog 校验** — 旧用户 localStorage 里的 task 若 status !== 'backlog' 且不在 sprint, Sprint Plan 不会显示但也不会被清理 (per 守门 #11 缺标)
+- [P1 v0.2 新增] **手动把 sprint 内 task 状态从 todo 改 doing 时, 不会触发 snapshot** — 拖拽改状态才触发, 任务详情 modal 改 status 不会
 
 ---
 
@@ -240,3 +256,68 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: P1 收官, 43/43 验证通过, 已知缺口 12 项, 守门 15 项核对通过 | 2026-09-03 13:12 JST Ulysses 拍板 "保持 Kanban, 加 Sprint 视图" (per ask_user 选项 A) |
+| v0.2 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **Jira 設計 Backlog 优先增量**: `addToSprint` 校验 `status==='backlog'`; `removeFromSprint` 重置 status='backlog'; `completeSprint` 未完了任务回流; `cancelSprint` 全件回流; sprintEdit deleteBtn 全件回流; 新增 `returnSprintTasksToBacklog()` ヘルパー; Sprint Plan modal Jira 設計 hint + 非 backlog 警告; 自动化档 43 → 54 项 (+11); 已知缺口 12 → 14 项 | 2026-09-03 13:55 JST Ulysses 反馈 "进入sprint前应该在backlog, 删除sprint列时, 里面的内容也应该进入backlog, 参考jira设计。所有文档要更新好" |
+
+---
+
+## §8 v0.2 Jira 設計 Backlog 优先变更 (per 2026-09-03 13:55 JST)
+
+### 8.1 变更范围
+
+per Jira 实际 Sprint 行为 + Ulysses 13:55 JST 反馈, 在 v0.1 基础上加 4 个数据流约束:
+
+| 函数 | v0.1 行为 | v0.2 行为 (Jira 設計) |
+|---|---|---|
+| `addToSprint` | 任何不在 sprint 内的 task 都可加入 | **仅 `status === 'backlog'` 可加入**, 否则弹错误 toast |
+| `removeFromSprint` | 仅从 taskIds 移除 | **从 taskIds 移除 + 重置 `status = 'backlog'`** |
+| `completeSprint` | 全部 taskIds 保留, status 不变 | **未完了 task (status !== 'done') 全部重置为 'backlog'**, 完成 task 保留 'done' |
+| `cancelSprint` | 全部 taskIds 保留 | **全件 task 重置为 'backlog' + 清空 taskIds** |
+| sprintEdit deleteBtn | 仅从 state.sprints 移除 | **先 returnSprintTasksToBacklog(draft), 再移除 sprint** |
+
+### 8.2 新增ヘルパー
+
+```js
+function returnSprintTasksToBacklog(sprint, { onlyIncomplete = false } = {}) {
+  if (!sprint) return 0;
+  let count = 0;
+  (sprint.taskIds || []).forEach(tid => {
+    const t = state.tasks[tid];
+    if (!t) return;
+    if (onlyIncomplete && t.status === 'done') return;
+    t.status = 'backlog';
+    count++;
+  });
+  return count;
+}
+```
+
+### 8.3 UI 提示增量
+
+- **Sprint Plan modal 顶部**: 蓝色 hint box "💡 Jira 設計準拠: Sprint には Backlog 状態 (status = backlog) のタスクのみ追加できます"
+- **Backlog 空时**: `<li class="plan-list__empty">📭 Backlog にタスクがありません。Kanban Board の「バックログ」列でタスクを backlog に戻すと、ここに表示されます。</li>`
+- **计划済有非 backlog task 时**: 黄色警告 box "⚠️ 計画済 N 件が Backlog 以外のステータスです (Kanban Board で進行中の可能性)"
+
+### 8.4 验证增量
+
+- `scripts/automation/kanban_sprint_gen.py` 检查项 43 → 54 (+11)
+- 新增检查:
+  - `returnSprintTasksToBacklog` 函数存在
+  - `addToSprint` 校验 backlog 状态
+  - `removeFromSprint` 重置 status
+  - `completeSprint` 调 onlyIncomplete
+  - `cancelSprint` 调全件
+  - Sprint Plan modal backlog filter
+  - hint 文案含 "Jira 設計"
+  - styles.css `.plan-hint` / `.plan-warn` / `.plan-list__empty` 3 个新 class
+
+### 8.5 守门通过
+
+- 54/54 静态验证 pass
+- node --check 0 err
+- Function constructor parse 0 err
+- 守门 #1 v19 + #20 v20 + #21 v21 联合实证无违反
+
+### 8.6 v0.2 已知缺口 (per 守门 #11 缺标)
+
+- 既存数据无 backlog 校验 — 旧 localStorage 里的 task 若 status !== 'backlog' 且不在 sprint, Sprint Plan 不会显示但也不会清理
+- 手动把 sprint 内 task 状态从 todo 改 doing 时, 不会触发 snapshot — 拖拽改状态才触发, modal 改 status 不会

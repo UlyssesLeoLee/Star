@@ -57,7 +57,12 @@
 - ✅ Topbar 新增 Sprint Tab, 点击切换 Sprint 视图
 - ✅ Sprint 视图默认显示 "无活跃 Sprint" 空状态, 提供 "创建 Sprint" 按钮
 - ✅ 创建 Sprint: 名称 + 持续时间 (1-4 周) + 起始日 + Goal → localStorage `vmodel-sprints-v1`
-- ✅ Sprint Planning: Backlog 区 + Sprint 区, 拖入 / 拖出
+- ✅ **Jira 設計: Sprint 計画 Backlog 优先** (per 2026-09-03 13:55 JST Ulysses 反馈) — Sprint Plan modal 仅显示 `status === 'backlog'` 的 task; 非 backlog task 无法拖入/添加, 弹错误 toast
+- ✅ **Jira 設計: Sprint 外した task 自动回 Backlog** — `removeFromSprint` 调 `t.status = 'backlog'`
+- ✅ **Jira 設計: 中止 Sprint 全件回 Backlog** — `cancelSprint` 调 `returnSprintTasksToBacklog(s)`
+- ✅ **Jira 設計: 完了 Sprint 未完了 task 回 Backlog** — `completeSprint` 调 `returnSprintTasksToBacklog(s, {onlyIncomplete: true})`
+- ✅ **Jira 設計: 削除 Sprint 全件回 Backlog** — sprintEdit deleteBtn 调 `returnSprintTasksToBacklog(draft)`
+- ✅ Sprint Planning modal 显示 Jira 設計 hint + 计划済非 backlog 警告
 - ✅ Sprint Board: 5 列 (沿用), 仅显示 sprint 范围内 task
 - ✅ Sprint Header: 名称 / Goal / 剩余天数 / 进度条 (已完成/总估算)
 - ✅ Start/Complete/Cancel 生命周期正常, Kanban 视图不受影响
@@ -86,12 +91,38 @@
 - [P1] Sprint 范围**不跨多个 Sprint** — 同一 task 不能同时属于两个 active sprint (1 task 1 sprint)
 - [P1] 没有 Story Points 概念, **用 `estimate` 字段 (小时) 当点数** — 后续如需 Fibonacci 1/2/3/5/8/13 单独 P4
 - [P1] **Sprint 中途增删 task 不更新 velocity** — velocity 仅在 Sprint Complete 时统计
+- [P1] **Sprint Plan modal backlog 空时无 CTA** — 需手动跳回 Kanban Board 把 task 拖到「バックログ」列, 提示文案已加 (per 2026-09-03 13:55 JST)
 - [P2] Burndown 每日数据**手动**录入, 不接外部时间跟踪 (Toggl/Jira 时间日志)
 - [P2] Velocity **不区分角色** (dev/qa/devops), 单值展示
 - [P3] Standup notes **不推送**到 Slack/Teams, 仅本地
 - [P3] Retrospective **不导出 PDF**, 仅 localStorage + JSON 导出
 - [ALL] **无多人协作** — 当前 localStorage 单机, 多人需服务端 (out of scope)
 - [ALL] **无 SRE Lead / DDD Review 拍板** — Mavis 代签, 5 域真人到位后追溯 (per 守门 #3)
+- [P1 v0.2 新增] **既存数据无 backlog 校验** — 旧用户 localStorage 里的 task 若 status !== 'backlog' 且不在 sprint, Sprint Plan 不会显示但也不会被清理 (per 守门 #11 缺标)
+- [P1 v0.2 新增] **手动把 sprint 内 task 状态从 todo 改 doing 时, 不会触发 snapshot** — 拖拽改状态才触发, 任务详情 modal 改 status 不会. 已知缺口 (per Jira 实际, task 状态变更通常在 board 上发生)
+
+---
+
+## 8. Jira 設計参考
+
+per 2026-09-03 13:55 JST Ulysses 反馈 "参考jira设计":
+
+| 行为 | Jira 設計 | 本实现 (P1 v0.2) |
+|---|---|---|
+| Backlog 是独立状态 | ✅ Backlog 是 pre-sprint 区, 不属于任何 sprint | ✅ `status === 'backlog'` 任务在 Kanban 板"バックログ"列 |
+| Sprint 只能从 Backlog 拉 | ✅ Drag from Backlog to Sprint | ✅ `addToSprint` 校验 `status === 'backlog'` |
+| Sprint 内 task 有独立 status (To Do/In Progress/Done) | ✅ Sprint board 是独立视图 | ✅ Sprint board 5 列 (Backlog/ToDo/Doing/Review/Done), 沿用 Kanban 列定义 |
+| 完了 Sprint 未完了 task 回 Backlog | ✅ 自动回流 | ✅ `returnSprintTasksToBacklog(s, {onlyIncomplete: true})` |
+| 中止 Sprint 全 task 回 Backlog | ✅ 取消时回流 | ✅ `returnSprintTasksToBacklog(s)` |
+| 削除 Sprint 全 task 回 Backlog | ✅ (Jira 实际: 删除是罕见操作, 通常取消即可) | ✅ sprintEdit modal deleteBtn |
+| 移出 Sprint 单 task 回 Backlog | ✅ Drag from Sprint Board to Backlog (跨视图) | ✅ `removeFromSprint` 重置 status='backlog' |
+| Sprint velocity 自动算 | ✅ Completed story points 聚合 | ✅ `sprintDoneHours(s)` (sum of done estimate) |
+
+**Jira 限制 (本实现超越的部分)**:
+- ✅ Sprint Goal 字段 — Jira Scrum 板有
+- ✅ 起動/Review/Retrospective 仪式 — Jira Scrum 板有, 计划 P3
+- ❌ Story Points (1/2/3/5/8/13 Fibonacci) — Jira 标配, 本实现用 hours (estimate) 当 points (per 守门 #11 缺标)
+- ❌ 多人协作 / 服务端同步 — Jira 标配, 本实现 out of scope (localStorage 单机)
 
 ---
 
@@ -127,3 +158,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 3 阶段 WBS (P1 核心 / P2 度量 / P3 仪式), 1.5-2.0M token 总预算, 守门对齐, 已知缺口 9 项 | 2026-09-03 13:12 JST Ulysses 拍板 "保持 Kanban, 加 Sprint 视图" |
+| v0.2 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **Jira 設計 Backlog 优先** 增量: 4 处数据流修改 (addToSprint 校验 / removeFromSprint 重置 / completeSprint 未完了回流 / cancelSprint + 削除 全件回流) + 新增 `returnSprintTasksToBacklog()` ヘルパー + Sprint Plan modal Jira 設計 hint + 非 backlog 警告 + 已知缺口 +2; §3 验收 + §8 Jira 設計参考新增; 自动化档 `kanban_sprint_gen.py` 校验项 43 → 54 (+11) | 2026-09-03 13:55 JST Ulysses 反馈 "进入sprint前应该在backlog, 删除sprint列时, 里面的内容也应该进入backlog, 参考jira设计。所有文档要更新好" |
