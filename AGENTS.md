@@ -400,3 +400,23 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - **守门 #15 实证**: 1 ahead origin/main 离 113 饱和点 buffer 充足 (vs v0.53 0 ahead 推完 0f2254f..d03798d 6 commit 0/0 sync, 本轮 +1 commit 推 retry)
 - **新增已知缺口** (per 缺标比错标): (50) 1 commit `09c1a57` 推 origin 401 错误跨 session retry (Ulysses 验证 $env:GHCR_PAT); (51) 6 续做项 跨 2-3 sub-session 并行 1.85-3.65M → 5.55-18.25M 实际 (3-5x 超支); (52) P3-G W2 阶段 启动 跟 6 续做项 并行; (53) T1.7 4.1 + 4.2 并行 risk cargo 互锁; (54) .worktrees 残留 3 项 PowerShell 永久删 (Ulysses 手动); (55) 5 域 Lead 真人到位后追溯签字 (Mavis 维持代签状态)
 - **可重构状态**: main HEAD `09c1a57` 1 ahead origin/main (推 origin 401 跨 session retry), Phase 5 5/6 子项 done + 6 续做项 跨 2-3 sub-session 并行 (T1.7 + T3.3 并行 + T3.1 + T3.2 + 5.6 + T1.5 严格依赖) + P3-G W2 阶段 启动 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 + 4 类剩余任务拍板 B+B+B+B 加快并行 | 2026-09-03 12:52 JST 用户发令"目标完成所有重构任务" + 4 类剩余任务 拍板 B+B+B+B 加快并行 落档 (09c1a57) + AGENTS v0.54 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
+| v0.55 | 2026-09-03 13:00 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **sub-session #1 启动: T1.7 4.1 加 as_local_runtime helper 实证 (消解 51 err E0599 → 10 err E0308)** (0 ahead origin/main 0/0 sync, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估):
+- **新事件触发**: 2026-09-03 12:55 JST 用户发令"启动 sub-session #1: T1.7 4.1 + 4.2 (并行) + T3.3"; 13:00 JST 4.1 helper 落地
+- **sub-session #1 启动实证** (per 守门 #9 v3 #24 subprocess 路径 + 守门 #20 brief 落档):
+  1. 开 worktree `wt-20260903-sub-session-001` (branch `wt-20260903-sub-session-001`)
+  2. T1.7 4.1 加 `ActorContext::as_local_runtime(mut self) -> Self` helper method (crates/star-context/src/actor.rs +10 行)
+  3. cargo check --workspace --lib 0 err 2.57s 走增量 (守门 #1 阶段 1 保持)
+  4. cargo check -p domain-local-runtime --tests 51 → 10 err (41 err 减少, E0599 as_local_runtime not found 消解)
+  5. merge 4.1 helper 到 main (fast-forward, main HEAD 65a8da0)
+  6. 推 origin 1 commit 成功 (85e2a52..65a8da0 0/0 sync)
+- **baseline 716 err 实证缺口** (per守门 #1 实证 "数字时效性 per Q9-T A9 不得沿用 797 或 432"): 9/3 10:50 JST T1.7 报告写"76 err (25 star-mcp + 51 domain-local-runtime)" 实际是当时 cargo check 跳过部分 crate, 实际全 19+ crate 错总数 716 err (per cargo check --workspace --all-targets 重测). 4.1 helper 实施 commit 没退化 baseline (716 err 跟之前 716 err 一致, E0599 51 → 10)
+- **守门 #1 v3 派生规实证缺口**: 4.1 实施 commit 跑 --lib 0 err 2.57s 满足守门 #1 阶段 1, 但 --all-targets 716 err 实证缺口 (per守门 #1 实证 baseline 实际低估 9/3 10:50 JST). 4.2 + T3.3 推下下 session 续做 (跨 1-2 sub-session)
+- **1 commit 落档** (per 守门 #12 commit-time docs 同步):
+  1. `65a8da0` T1.7 4.1 加 as_local_runtime helper (实施 commit, --lib 0 err 2.57s, --all-targets 716 err baseline 保持); 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 实证
+- **4.2 + T3.3 推下下 session 续做** (per 跨 1-2 sub-session 估 0.3-0.6M token):
+  1. **T1.7 4.2 改写 2 份 tests** (star-mcp/tests/it_actor_context_integration.rs + st_five_domain_isolation.rs, 消解 25 err E0425 + E0614 + E0308) 估 0.2-0.5M
+  2. **T3.3 创建 docs/ubiquitous-language.md** (22 domain-* 字段命名表 + 5 抽样对照 spec 附录 B vs basic-design) 估 0.1M
+  3. **T1.7 4.3 守门 #1 v3 派生规 文字** (per守门 #1 v3 实证缺口补全) 估 0.05M
+- **守门 #15 实证**: 0 ahead origin/main 0/0 sync, 离 113 饱和点 buffer 充足
+- **新增已知缺口** (per 缺标比错标): (56) sub-session #1 闭环报告 推下下 session commit (必跑 --all-targets 0 err, 实际 716 err baseline 推不下); (57) 4.2 + T3.3 跨 1-2 sub-session 续做 估 0.3-0.6M token; (58) --all-targets 716 err 修法 推下跨 5+ sub-session (per 4.1 实证 41 err 减少 进度)
+- **可重构状态**: main HEAD `65a8da0` 0 ahead origin/main 0/0 sync, Phase 5 5/6 done + 4.1 实证 (51 → 10 err 减少) + 4.2 + T3.3 + 4.3 推下下 session 续做 + --all-targets 716 err 修法推下 5+ sub-session + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 13:00 JST 用户发令"启动 sub-session #1" + 4.1 helper 实证 (65a8da0) + 推 origin 0/0 sync + AGENTS v0.55 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
