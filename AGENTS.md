@@ -536,3 +536,15 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - **守门 #15 实证**: ahead origin/main = 0, 离 113 饱和点 buffer 充足
 - **新增已知缺口** (per 缺标比错标): (81) --all-targets 716 err 修法 5+ sub-session 续做 (star-mcp 0 err 但其他 19+ crate 错总数 716); (82) 5.6 H2 原 3 domain 改造跨 sub-session 续做 估 0.3-1.6M; (83) T1.5 切 deny 跨 sub-session 续做 估 0.3M; (84) T3.1 共享 star-dto 跨 sub-session 续做 估 0.5M; (85) T3.2 Saga 跨域编排覆盖跨 sub-session 续做 估 0.1M; (86) .worktrees 残留 3 项永久删 (Ulysses 手动); (87) 5 域 Lead 真人到位后追溯签字
 - **可重构状态**: main HEAD `93c343f` 0 ahead origin/main 0/0 sync, Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 17 处 (17/25 = 68%, star-mcp 0 err) + T3.3 实施 (ubiquitous-language.md) + 4 项跨 sub-session 续做 (5.6 + T1.5 + T3.1 + T3.2) + --all-targets 716 err 5+ sub-session 修法 + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 14:30 JST 用户发令"继续推进" + 4.2 实证 17 处 (93c343f) + 推 origin 0/0 sync (6 commit 推完) + AGENTS v0.60 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
+| v0.61 | 2026-09-03 14:35 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **4.2 跨 crate 推进: domain-board 10 err 减少 (39 → 29), 实证 18 处** (0 ahead origin/main 0/0 sync, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估):
+- **新事件触发**: 2026-09-03 14:30 JST 用户发令"继续推进" + 4.2 跨 crate 推进
+- **4.2 跨 crate 实证 1 处** (per 9/3 12:39 JST 4 类剩余任务 拍板 B 加快并行):
+  - crates/domain-board/src/lib.rs:1147 + 5 处 make_actor(tenant) → make_actor(TenantId(tenant)) (10 E0308 消解)
+- **守门 #1 阶段 1 实证**: cargo check -p domain-board --tests 39 → 29 err (10 err 减少)
+- **1 commit 落档** (per 守门 #12 commit-time docs 同步):
+  1. `b3d3659` domain-board 10 E0308 实证: make_actor(tenant) → make_actor(TenantId(tenant)) (10 err 减少, lib baseline 保持)
+- **推 origin 1 commit 0/0 sync** (per 守门 #1 反转 R-05 拍板落地): `b8f776b..b3d3659 main -> main` 推 1 commit 成功
+- **4.2 总进度 18 处** (17 + 1) + domain-board 29 err 跨函数签名推下 sub-session 续做
+- **守门 #15 实证**: ahead origin/main = 0, 离 113 饱和点 buffer 充足
+- **新增已知缺口** (per 缺标比错标): (88) domain-board 29 err 跨函数签名推下 sub-session 续做 估 0.3-0.5M token (3-5x 超支 0.9-1.5M); (89) --all-targets 716 err 5+ sub-session 修法; (90) 5.6 + T1.5 + T3.1 + T3.2 跨 sub-session 续做
+- **可重构状态**: main HEAD `b3d3659` 0 ahead origin/main 0/0 sync, Phase 5 5/6 done + 4.1 实证 (51 → 10 err) + 4.2 实证 18 处 (star-mcp 0 err + domain-board 10 err 减少) + T3.3 实施 + 4 项跨 sub-session 续做 (domain-board 29 + 5.6 + T1.5 + T3.1 + T3.2) + 守门 #3 v2 Mavis 临时代签 5 域 Lead 决策可启动 | 2026-09-03 14:35 JST 用户发令"继续推进" + 4.2 跨 crate 推进 (b3d3659) + 推 origin 0/0 sync + AGENTS v0.61 docs 同步, 守门 #1+#5+#6+#7+#8+#9+#12+#15+#19+#20+#22+#3 v2+#1 v3 跨 stage 全过, ~0.05M token 估 |
