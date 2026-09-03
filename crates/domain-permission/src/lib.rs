@@ -1085,7 +1085,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let admin = admin_ctx(tenant);
+        let admin = admin_ctx(TenantId(tenant));
 
         let svc = InMemoryPermissionService::new();
         // 1) 创建 scheme
@@ -1160,7 +1160,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let admin = admin_ctx(tenant);
+        let admin = admin_ctx(TenantId(tenant));
 
         let svc = InMemoryPermissionService::new();
         let scheme = svc
@@ -1200,7 +1200,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let admin = admin_ctx(tenant);
+        let admin = admin_ctx(TenantId(tenant));
 
         let svc = InMemoryPermissionService::new();
         let scheme = svc
@@ -1316,7 +1316,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let admin = admin_ctx(tenant);
+        let admin = admin_ctx(TenantId(tenant));
 
         let svc = InMemoryPermissionService::new();
         let binding = svc
@@ -1382,7 +1382,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let admin = admin_ctx(tenant);
+        let admin = admin_ctx(TenantId(tenant));
         let svc = InMemoryPermissionService::new();
         svc.grant_role(
             GrantRoleCommand {
@@ -1419,7 +1419,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let admin = admin_ctx(tenant);
+        let admin = admin_ctx(TenantId(tenant));
 
         let svc = InMemoryPermissionService::new();
         let scheme = svc
@@ -1493,7 +1493,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let admin = admin_ctx(tenant);
+        let admin = admin_ctx(TenantId(tenant));
         let svc = InMemoryPermissionService::new();
         let scheme = svc
             .create_scheme(
@@ -1568,7 +1568,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let admin = admin_ctx(tenant);
+        let admin = admin_ctx(TenantId(tenant));
         let svc = InMemoryPermissionService::new();
 
         // 1) grant role
@@ -1644,7 +1644,7 @@ mod tests {
     #[tokio::test]
     async fn create_and_get_scheme() {
         let tenant = uuid::Uuid::new_v4();
-        let admin = admin_ctx(tenant);
+        let admin = admin_ctx(TenantId(tenant));
         let svc = InMemoryPermissionService::new();
         let scheme = svc
             .create_scheme(
@@ -1678,7 +1678,7 @@ mod tests {
     async fn list_roles_for_project() {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let admin = admin_ctx(tenant);
+        let admin = admin_ctx(TenantId(tenant));
         let svc = InMemoryPermissionService::new();
         for _ in 0..3 {
             svc.grant_role(
@@ -1783,7 +1783,7 @@ mod tests {
     #[tokio::test]
     async fn invalid_rule_rejected() {
         let tenant = uuid::Uuid::new_v4();
-        let admin = admin_ctx(tenant);
+        let admin = admin_ctx(TenantId(tenant));
         let svc = InMemoryPermissionService::new();
         let scheme = svc
             .create_scheme(
