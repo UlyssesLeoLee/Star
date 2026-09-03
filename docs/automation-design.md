@@ -314,6 +314,41 @@ print(f"err_count={result.stderr.count('error[')}")
 | **[S] Shell / Edit** | 25 (含真人寻访) | ~50% | 不需要脚本化 |
 | **合计** | 56 (去重) | 100% | P3 全 5 阶段 56 子项 - 4 重复 - 5 真人寻访 + 4 图表批 = 56 |
 
+### 4.12 P3-G Agent Jira 化 (新增 phase, 2026-09-03 12:00 JST per docs/briefs/p3-g-w1.md)
+
+> **命名空间备注**: 跟现有 P3-B (OpenClaw/Hermes/API Key 集成 9 子项 per §4.1) 命名空间共存, P3-G 用 G.1-G.20 连续编号, P3-B 沿用 B.1-B.9。**不沿用 P3-B 字头, 避免命名冲突** (per 守门 #1 禁回溯叙事 + 守门 #11 缺标比错标, Mavis 主动 rename 12:05 JST)。
+> **WBS 文档**: `docs/reports/PHASE-P3-G-JIRA-IFICATION-WBS.md` v0.1
+> **Brief**: `docs/briefs/p3-g-w1.md`
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| G.1 | G.1 | user_account 实体 (M 类 SCD-2 + RLS 13 類) | R, S, A | **[P]** | (待 W2 派生 `automation/user_account_mgmt.py`) | `permission.user_account` 表, 0.4M, W1 落地 |
+| G.2 | G.2 | group + group_member (M + T) | R, S, A | **[P]** | (待续) | `permission.group` + `permission.group_member`, 0.5M |
+| G.3 | G.3 | team 实体 (M 类) | R, S | **[P]** | (待续) | `permission.team`, 0.3M, 跟 user_account 一起 |
+| G.4 | G.4 | team_member 多重隶属 + role_per_team (T) | R, S, A | **[P]** | (待续) | `permission.team_member` + `permission.role_per_team`, 0.5M |
+| G.5 | G.5 | user_account ↔ agent 关联 (双层 L1) | R, S, A | **[P]** | (待续) | `agent.user_account_link`, 0.2M |
+| G.6 | G.6 | subagent 实体 (双层 L2) | R, S, A | **[P]** | `automation/dispatcher.py` 升级 + 落 agent.subagent | 0.6M, W2 落地 |
+| G.13 | G.13 | dispatcher.py 自动注册 | R, S, A | **[P]** | `automation/dispatcher.py` 升级 | 0.2M, W2 落地, 跟 G.6 强依赖 |
+| G.9-G.20 | G.9-G.20 | 跨域协作 + 集成 + 收尾 (12 子项) | R, V, S, A | **[P]** | (待续 G.9-G.20 各自脚本) | 3.8M, W3-W5 落地, 跨 session 续 |
+
+**W1 5 子项 (G.1-G.5) 总 token**: 1.9M (per 守门 #4 软预算 1.5M 偏差 +0.4M, 软参考可接受)
+**W2-W5 15 子项 (G.6-G.20) 总 token**: 4.0M (推 origin 后走, 跨 session 续)
+**合计 6.0M ≈ 5 周** (per `STAR-OLU-001.md` 1.2M/SRE·周)
+
+**W1 守门 0 违反验证** (per 守门 #1 v1-v14 + 守门 #13 DB 三類横展開 + 守门 #21 [P] docs 同步 + 守门 #6 PowerShell only + 守门 #7 0 unsafe):
+- `cargo check --workspace --all-targets` 0 err
+- `cargo fmt --all` 0 diff
+- `cargo clippy --workspace --all-targets -- -D warnings` 0 err
+- `cargo test --workspace --release --lib` 100% pass
+- 5 新表 100% RLS + FORCE RLS + 13 類 policy
+- 5 新表 W/T/M 分类显式列 + §已知缺口 显式列 (per 守门 #13 派生规)
+- docs 同步 5 表设计 + data-design.md / basic-design.md / domain-permission-spec.md / automation-design.md §4.12 / scripts/automation/registry.md / AGENTS.md §4.1 派生 v25 全部 git 实证
+- W1 不派子代理 (per 守门 #9 #3 实证 5/5 RPC 不可靠)
+
+**§4.10 编号错位备注** (per init 阶段 9/3 12:05 JST Mavis 修订): §4.10 任务卡分布统计 实际位于 §4.11 图表&报告系统 之后, 编号顺序在文档流中错位, 但内容独立无依赖, 不影响判定。后续 §4.12+ 按文档流顺序递增。
+
+**§4.12 命名空间合规性 (per 守门 #21 [P] docs 同步)**: 本节是 docs 同步落地, 不需要落 `scripts/automation/<purpose>.py` (G.1-G.5 是数据设计阶段, 实施在 W2-W5 跨 stage 派生)。W2 G.13 dispatcher.py 自动注册 落地后, 同步回填本节 G.6 / G.13 行的"实证 / 备注" 列。
+
 ---
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
