@@ -39,7 +39,7 @@ impl Default for WorkspaceHandler {
 }
 
 impl WorkspaceHandler {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
     fn service(&self) -> &Arc<InMemoryWorkspaceService> {

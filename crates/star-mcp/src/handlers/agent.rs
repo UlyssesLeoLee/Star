@@ -37,7 +37,7 @@ impl Default for AgentHandler {
 }
 
 impl AgentHandler {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
     fn service(&self) -> &Arc<InMemoryAgentRepository> {

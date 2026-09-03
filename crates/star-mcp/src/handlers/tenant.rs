@@ -38,7 +38,7 @@ impl Default for TenantHandler {
 }
 
 impl TenantHandler {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
     fn service(&self) -> &Arc<InMemoryTenantService> {

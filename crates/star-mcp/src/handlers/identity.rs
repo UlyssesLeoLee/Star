@@ -39,7 +39,7 @@ impl Default for IdentityHandler {
 }
 
 impl IdentityHandler {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
     fn service(&self) -> &Arc<InMemoryIdentityService> {

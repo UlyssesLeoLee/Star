@@ -42,25 +42,25 @@ use tokio::task::JoinHandle;
 use uuid::Uuid;
 
 /// Session ID 类型 (per 2025-06-27 spec, opaque server-defined string)
-pub type SessionId = String;
+pub(crate) type SessionId = String;
 
 /// Event ID 类型 (per 2025-06-27 spec §1.2 SSE id: field, opaque string for Last-Event-ID)
-pub type EventId = String;
+pub(crate) type EventId = String;
 
 /// 默认 session TTL: 5 分钟 (per spec/cache/01 §4 "session 默认 300s")
-pub const DEFAULT_SESSION_TTL_MS: u64 = 5 * 60 * 1000;
+pub(crate) const DEFAULT_SESSION_TTL_MS: u64 = 5 * 60 * 1000;
 
 /// 默认 GC 间隔: 60 秒 (per spec/cache/01 §5 "过期清理建议 30-120s")
-pub const DEFAULT_GC_INTERVAL_MS: u64 = 60 * 1000;
+pub(crate) const DEFAULT_GC_INTERVAL_MS: u64 = 60 * 1000;
 
 /// 时钟 trait: 抽象 `now()` 让测试注入确定性时间
-pub trait Clock: Send + Sync {
+pub(crate) trait Clock: Send + Sync {
     /// 当前 Unix epoch milliseconds
     fn now_ms(&self) -> u64;
 }
 
 /// 系统时钟实现 (default), 用 `chrono::Utc::now()`
-pub struct SystemClock;
+pub(crate) struct SystemClock;
 
 impl Clock for SystemClock {
     fn now_ms(&self) -> u64 {
@@ -71,7 +71,7 @@ impl Clock for SystemClock {
 
 /// 单个 SSE event (server-push + session reconnect 共用)
 #[derive(Debug, Clone, Serialize)]
-pub struct ServerEvent {
+pub(crate) struct ServerEvent {
     /// Event ID (UUID-like, 客户端断线重连用 Last-Event-ID 告诉 server)
     pub id: EventId,
     /// Event 类别 (e.g. "agent_state", "decision", "resource_updated")
@@ -84,7 +84,7 @@ pub struct ServerEvent {
 
 /// Session state (per session_id, 含未确认 events 队列 + TTL 跟踪)
 #[derive(Debug, Default)]
-pub struct SessionState {
+pub(crate) struct SessionState {
     /// 已发送但未确认 events 队列 (per Last-Event-ID 重连)
     pub unacked_events: Vec<ServerEvent>,
     /// 最近 event counter (per UUID-like id generation)
@@ -95,7 +95,7 @@ pub struct SessionState {
 
 /// Session store (in-memory, per AppState, Phase E+ 持久化)
 #[derive(Clone)]
-pub struct SessionStore {
+pub(crate) struct SessionStore {
     inner: Arc<Mutex<HashMap<SessionId, SessionState>>>,
     clock: Arc<dyn Clock>,
 }
@@ -117,7 +117,7 @@ impl Default for SessionStore {
 
 impl SessionStore {
     /// 新建空 store (用系统时钟)
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),
             clock: Arc::new(SystemClock),
@@ -125,7 +125,7 @@ impl SessionStore {
     }
 
     /// 构造带自定义时钟的 store (测试用)
-    pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
+    pub(crate) fn with_clock(clock: Arc<dyn Clock>) -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),
             clock,
@@ -133,22 +133,22 @@ impl SessionStore {
     }
 
     /// 生成新 SessionId (per UUID v4, 真实唯一标识)
-    pub fn new_session_id() -> SessionId {
+    pub(crate) fn new_session_id() -> SessionId {
         format!("sess-{}", Uuid::new_v4())
     }
 
     /// 生成新 EventId (per UUID v4, server 唯一事件 ID, 客户端用 Last-Event-ID 续传)
-    pub fn new_event_id(&self, _session_id: &SessionId) -> EventId {
+    pub(crate) fn new_event_id(&self, _session_id: &SessionId) -> EventId {
         format!("evt-{}", Uuid::new_v4())
     }
 
     /// 当前时间 (从 clock 读, 测试可注入)
-    pub fn now_ms(&self) -> u64 {
+    pub(crate) fn now_ms(&self) -> u64 {
         self.clock.now_ms()
     }
 
     /// 注册 session (server-push 用, 自动 touch 活动时间为当前 clock)
-    pub fn register_session(&self, session_id: SessionId) {
+    pub(crate) fn register_session(&self, session_id: SessionId) {
         let now = self.clock.now_ms();
         let mut inner = self.inner.lock().expect("SessionStore mutex");
         let entry = inner.entry(session_id).or_default();
@@ -156,7 +156,7 @@ impl SessionStore {
     }
 
     /// 推 1 个 event 到 session (server-push 用, 存到 unacked_events 供重连, 自动 touch)
-    pub fn push_event(&self, session_id: &SessionId, event: ServerEvent) {
+    pub(crate) fn push_event(&self, session_id: &SessionId, event: ServerEvent) {
         let now = self.clock.now_ms();
         let mut inner = self.inner.lock().expect("SessionStore mutex");
         let entry = inner.entry(session_id.clone()).or_default();
@@ -165,7 +165,7 @@ impl SessionStore {
     }
 
     /// 取 session 未确认 events (重连用, 取得后清空)
-    pub fn drain_unacked(&self, session_id: &SessionId) -> Vec<ServerEvent> {
+    pub(crate) fn drain_unacked(&self, session_id: &SessionId) -> Vec<ServerEvent> {
         let mut inner = self.inner.lock().expect("SessionStore mutex");
         if let Some(session) = inner.get_mut(session_id) {
             // 重连也属于活动, touch 一次
@@ -177,7 +177,7 @@ impl SessionStore {
     }
 
     /// 列出所有 session (server-push admin endpoint 用, Phase D.7+)
-    pub fn list_sessions(&self) -> Vec<SessionId> {
+    pub(crate) fn list_sessions(&self) -> Vec<SessionId> {
         self.inner
             .lock()
             .expect("SessionStore mutex")
@@ -187,12 +187,12 @@ impl SessionStore {
     }
 
     /// session 数 (per metrics, 测试用)
-    pub fn session_count(&self) -> usize {
+    pub(crate) fn session_count(&self) -> usize {
         self.inner.lock().expect("SessionStore mutex").len()
     }
 
     /// 显式 touch session 活动时间 (per handler 心跳 / KeepAlive)
-    pub fn touch_session(&self, session_id: &SessionId) {
+    pub(crate) fn touch_session(&self, session_id: &SessionId) {
         let now = self.clock.now_ms();
         let mut inner = self.inner.lock().expect("SessionStore mutex");
         if let Some(session) = inner.get_mut(session_id) {
@@ -204,7 +204,7 @@ impl SessionStore {
     ///
     /// 返回被移除的 session 数。调用方负责: spawn_gc_task 或 admin endpoint。
     /// 0 unsafe, 1 次锁获取.
-    pub fn gc_expired(&self, ttl_ms: u64) -> usize {
+    pub(crate) fn gc_expired(&self, ttl_ms: u64) -> usize {
         let now = self.clock.now_ms();
         let mut inner = self.inner.lock().expect("SessionStore mutex");
         let before = inner.len();
@@ -229,7 +229,7 @@ impl SessionStore {
     /// );
     /// // 持有 handle 直到 server 关闭
     /// ```
-    pub fn spawn_gc_task(self: Arc<Self>, interval: Duration, ttl_ms: u64) -> JoinHandle<()> {
+    pub(crate) fn spawn_gc_task(self: Arc<Self>, interval: Duration, ttl_ms: u64) -> JoinHandle<()> {
         tokio::spawn(async move {
             let mut tick = tokio::time::interval(interval);
             // 第一次 tick 立即触发, 跳过 (避免启动时全清空)

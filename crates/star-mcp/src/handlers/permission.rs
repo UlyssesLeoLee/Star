@@ -39,7 +39,7 @@ impl Default for PermissionHandler {
 }
 
 impl PermissionHandler {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
     fn service(&self) -> &Arc<InMemoryPermissionService> {

@@ -43,7 +43,7 @@ impl Default for FeedbackHandler {
 }
 
 impl FeedbackHandler {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
     fn service(&self) -> &Arc<InMemoryFeedbackService> {
