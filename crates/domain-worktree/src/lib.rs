@@ -328,7 +328,12 @@ pub enum WorktreeError {
     NotFound(WorktreeId),
     #[error("invalid state transition: {from} -> {to}")]
     /// 17 状态机迁移非法(INV-WT-02)
-    InvalidTransition { from: String, to: String },
+    InvalidTransition {
+        /// 迁移前状态
+        from: String,
+        /// 迁移目标状态
+        to: String,
+    },
     #[error("permission denied")]
     /// 当前 Actor 无权执行该操作
     PermissionDenied,
