@@ -736,6 +736,89 @@ impl SharedPool {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MemoryRecord {
+    pub mem_id: Uuid,
+    pub agent: SubAgentArchetype,
+    pub tenant_id: Uuid,
+    pub task_id: Option<Uuid>,
+    pub key: String,
+    pub value: serde_json::Value,
+    pub ttl_sec: u32,
+    pub created_at_ms: u64,
+}
+
+pub struct MemoryStore {
+    records: Arc<RwLock<HashMap<Uuid, MemoryRecord>>>,
+    index: Arc<RwLock<HashMap<(Uuid, String), Uuid>>>,
+}
+
+impl Default for MemoryStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MemoryStore {
+    pub fn new() -> Self {
+        Self {
+            records: Arc::new(RwLock::new(HashMap::new())),
+            index: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub async fn put(&self, record: MemoryRecord) -> Uuid {
+        let mem_id = record.mem_id;
+        let key = (record.tenant_id, record.key.clone());
+        {
+            let mut index = self.index.write().await;
+            index.insert(key, mem_id);
+        }
+        let mut records = self.records.write().await;
+        records.insert(mem_id, record);
+        mem_id
+    }
+
+    pub async fn get(&self, tenant_id: Uuid, key: &str) -> Option<MemoryRecord> {
+        let index = self.index.read().await;
+        let mem_id = *index.get(&(tenant_id, key.to_string()))?;
+        drop(index);
+        let records = self.records.read().await;
+        records.get(&mem_id).cloned()
+    }
+
+    pub async fn get_by_id(&self, mem_id: Uuid) -> Option<MemoryRecord> {
+        let records = self.records.read().await;
+        records.get(&mem_id).cloned()
+    }
+
+    pub async fn delete(&self, mem_id: Uuid) -> bool {
+        let mut records = self.records.write().await;
+        let record = match records.remove(&mem_id) {
+            Some(r) => r,
+            None => return false,
+        };
+        drop(records);
+        let key = (record.tenant_id, record.key);
+        let mut index = self.index.write().await;
+        index.remove(&key);
+        true
+    }
+
+    pub async fn list_by_tenant(&self, tenant_id: Uuid) -> Vec<MemoryRecord> {
+        let records = self.records.read().await;
+        records
+            .values()
+            .filter(|r| r.tenant_id == tenant_id)
+            .cloned()
+            .collect()
+    }
+
+    pub async fn record_count(&self) -> usize {
+        self.records.read().await.len()
+    }
+}
+
 impl TokenStore {
     /// 创建空 TokenStore
     pub fn new() -> Self {
@@ -1618,5 +1701,89 @@ mod tests {
         // 不存在的资源 → PoolNotFound
         let res = p.check_available("nope/nope").await;
         assert!(matches!(res, Err(DispatchError::PoolNotFound(_))));
+    }
+
+    /// G.6 PoC test 1: MemoryStore put + get K-V 索引
+    #[tokio::test]
+    async fn memorystore_put_and_get() {
+        let ms = MemoryStore::new();
+        let tenant_id = Uuid::new_v4();
+        let mem_id = ms
+            .put(MemoryRecord {
+                mem_id: Uuid::new_v4(),
+                agent: SubAgentArchetype::CodeReview,
+                tenant_id,
+                task_id: Some(Uuid::new_v4()),
+                key: "review:pr-42:summary".into(),
+                value: serde_json::json!({"issues": 3}),
+                ttl_sec: 0,
+                created_at_ms: now_ms(),
+            })
+            .await;
+        let r = ms.get(tenant_id, "review:pr-42:summary").await.unwrap();
+        assert_eq!(r.mem_id, mem_id);
+        assert_eq!(r.value, serde_json::json!({"issues": 3}));
+    }
+
+    /// G.6 PoC test 2: MemoryStore put 同 key 覆盖
+    #[tokio::test]
+    async fn memorystore_put_overwrite_same_key() {
+        let ms = MemoryStore::new();
+        let tenant_id = Uuid::new_v4();
+        let id1 = ms
+            .put(MemoryRecord {
+                mem_id: Uuid::new_v4(),
+                agent: SubAgentArchetype::TestGen,
+                tenant_id,
+                task_id: None,
+                key: "k".into(),
+                value: serde_json::json!("v1"),
+                ttl_sec: 0,
+                created_at_ms: now_ms(),
+            })
+            .await;
+        let id2 = ms
+            .put(MemoryRecord {
+                mem_id: Uuid::new_v4(),
+                agent: SubAgentArchetype::TestGen,
+                tenant_id,
+                task_id: None,
+                key: "k".into(),
+                value: serde_json::json!("v2"),
+                ttl_sec: 0,
+                created_at_ms: now_ms(),
+            })
+            .await;
+        let r = ms.get(tenant_id, "k").await.unwrap();
+        assert_eq!(r.mem_id, id2);
+        assert_eq!(r.value, serde_json::json!("v2"));
+    }
+
+    /// G.6 PoC test 3: MemoryStore 多 tenant 隔离 + list_by_tenant + delete
+    #[tokio::test]
+    async fn memorystore_tenant_isolation_and_list() {
+        let ms = MemoryStore::new();
+        let ta = Uuid::new_v4();
+        let tb = Uuid::new_v4();
+        for (t, key) in [(ta, "k1"), (ta, "k2"), (tb, "k1")] {
+            ms.put(MemoryRecord {
+                mem_id: Uuid::new_v4(),
+                agent: SubAgentArchetype::FreeForm,
+                tenant_id: t,
+                task_id: None,
+                key: key.into(),
+                value: serde_json::json!("v"),
+                ttl_sec: 0,
+                created_at_ms: now_ms(),
+            })
+            .await;
+        }
+        assert_eq!(ms.list_by_tenant(ta).await.len(), 2);
+        assert_eq!(ms.list_by_tenant(tb).await.len(), 1);
+        let ta_records = ms.list_by_tenant(ta).await;
+        let ta_k1_mem_id = ta_records.iter().find(|r| r.key == "k1").unwrap().mem_id;
+        assert!(ms.delete(ta_k1_mem_id).await);
+        assert_eq!(ms.list_by_tenant(ta).await.len(), 1);
+        assert_eq!(ms.list_by_tenant(tb).await.len(), 1);
     }
 }
