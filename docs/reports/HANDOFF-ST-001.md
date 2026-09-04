@@ -1653,14 +1653,14 @@ b5bd5c3 feat(star-credential): V2-4 凭证审计端点 v0.0.1
 - WBS 同步: C.9 / E.5 / F.1 三处 5 域 Lead 状态 (🔴 阻塞 → 🟡 临时代签) per 9/4 18:30 JST 守门 #3 反转
 - 真人到位流程: 仍待 Ulysses 启动 (per 守门 #14 修订到位 timeline = 待定, Mavis 临时代签覆盖)
 
-### 18.6 6 待续做项 (推下 session 列表, per §5.3 缺标比错标)
+### 18.6 5 待续做项 (推下 session 列表, per §5.3 缺标比错标, G-TMO-05 已关闭 per docs/reports/G-TMO-05-SDK-FINDINGS.md v0.1)
 
 | 缺口 | 内容 | 依赖 | 状态 |
 |---|---|---|---|
 | G-DEP-01 | TMO-04/06 阻塞 P0 工具 (create_merge_request / create_worktree / search_issues) 3 tool | ~0.4-0.6M token | pending 推下 session |
 | G-DEP-02 | TMO-05 阻塞 P1 工具 (search_code / get_symbol / find_references / get_code_context) 4 tool | ~0.3-0.5M token | pending 推下 session |
 | G-TMO-04 | task_metadata DDL 落地 | per 守门 #13 c Master SCD Type 2 | pending 推下 session |
-| G-TMO-05 | LangGraph SDK 0.2.x interrupt_response API alpha 确认 (实装前先 pip show langgraph) | 验证 SDK 版本 | pending 推下 session |
+| ~~G-TMO-05~~ | ~~LangGraph SDK 0.2.x interrupt_response API alpha 确认~~ | **不适用 (per G-TMO-05-SDK-FINDINGS v0.1, Star 仓不依赖 LangGraph SDK, interrupt 走纯 Python 概念)** | **🟢 关闭** (2026-09-05 02:25 JST) |
 | 5 域 Lead 真人寻访 | per 9/4 18:30 JST 守门 #3 反转 5 子代理兼任, 真人寻访仍待 Ulysses 启动 | Ulysses 找 5 个真人 | pending |
 | 真实凭证切真 | per 9/3 11:35 JST 拍板 A, mock 备选已落地, 真实 .env / UI 填入待 Ulysses 提供 | Ulysses | pending |
 
