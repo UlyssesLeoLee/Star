@@ -369,7 +369,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   const maxY = allY.length > 0 ? Math.max(...allY.map((y, i) => y + elements[i].height)) + 100 : 800;
 
   return (
-    <div className="relative w-full h-full bg-bg overflow-hidden">
+    <div data-testid="canvas-container" className="relative w-full h-full bg-bg overflow-hidden">
       {/* Toolbar */}
       <div data-testid="canvas-toolbar" className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-bg-card border border-line rounded-md p-1 shadow-lg">
         <button onClick={() => setTool("select")} className={`btn p-1.5 ${tool === "select" ? "border-accent text-accent" : ""}`} title="Select (V)">

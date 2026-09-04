@@ -27,6 +27,7 @@ export default defineConfig({
       "e2e/remote-mobile.spec.ts", // Playwright-only spec (per 2026-09-01 PHASE-MOBILE-PWA v0.4 mobile viewport e2e)
       "e2e/debug-mobile.spec.ts", // 临时调试 spec, 仅手动跑
       "e2e/canvas-view.spec.ts", // Playwright-only spec (per 2026-09-04 canvas e2e 守门补齐, uses @playwright/test)
+      "e2e/canvas-share-export.spec.ts", // Playwright-only spec (per 2026-09-04 canvas Share/Export PNG, uses @playwright/test)
     ],
     setupFiles: ["./vitest.setup.ts"],
   },
