@@ -82,14 +82,22 @@ impl TaskStatus {
 ///   - result: 任务结果 (仅 Completed 时有值)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Task {
+    /// 任务 ID
     pub id: Uuid,
+    /// 任务名称
     pub name: String,
+    /// 任务状态
     pub status: TaskStatus,
+    /// 优先级(0-9, 0 最高)
     pub priority: u8,
+    /// 任务输入载荷
     pub payload: String,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最后更新时间
     #[serde(default)]
     pub updated_at: Option<DateTime<Utc>>,
+    /// 任务结果(仅 Completed 时有值)
     #[serde(default)]
     pub result: Option<String>,
 }
@@ -118,8 +126,11 @@ impl Task {
 /// auth 响应: access_token + expires_at
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuthToken {
+    /// 访问令牌
     pub access_token: String,
-    pub token_type: String, // 通常 "Bearer"
+    /// 令牌类型, 通常 "Bearer"
+    pub token_type: String,
+    /// 过期时间
     pub expires_at: DateTime<Utc>,
 }
 

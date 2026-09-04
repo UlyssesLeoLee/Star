@@ -37,7 +37,10 @@ pub enum FallbackReason {
     InvalidCredential(String),
     /// 整个 fallback 链用尽
     #[error("fallback chain exhausted after {attempts} attempts")]
-    Exhausted { attempts: u32 },
+    Exhausted {
+        /// 已尝试次数
+        attempts: u32,
+    },
 }
 
 impl FallbackReason {
@@ -84,11 +87,16 @@ pub enum FallbackDecision {
     StayWithApi,
     /// 降级到 CLI agent
     FallbackTo {
+        /// 降级目标 CLI kind
         cli_kind: String,
+        /// 触发降级的原因
         reason: FallbackReason,
     },
     /// 整个链用尽, 报错
-    GiveUp { reason: FallbackReason },
+    GiveUp {
+        /// 最终失败原因
+        reason: FallbackReason,
+    },
 }
 
 /// FallbackChain: API Agent 失败 → CLI Agent 降级 决策
@@ -98,6 +106,7 @@ pub struct FallbackChain {
 }
 
 impl FallbackChain {
+    /// 用指定策略构造 chain
     pub fn new(policy: FallbackPolicy) -> Self {
         Self {
             policy,

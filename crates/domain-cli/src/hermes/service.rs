@@ -34,12 +34,16 @@ use uuid::Uuid;
 /// POST /v1/tasks 请求体 (submit endpoint, 跟 B.1 OpenClaw GenerateRequest 不同)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubmitRequest {
+    /// 任务名称
     pub name: String,
+    /// 任务优先级
     pub priority: u8,
+    /// 任务载荷(序列化后的字符串)
     pub payload: String,
 }
 
 impl SubmitRequest {
+    /// 构造提交请求
     pub fn new(name: impl Into<String>, priority: u8, payload: impl Into<String>) -> Self {
         Self {
             name: name.into(),

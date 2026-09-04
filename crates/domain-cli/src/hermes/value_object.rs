@@ -37,12 +37,20 @@ pub enum RetryPolicy {
     /// 不重试 (1 次尝试)
     NoRetry,
     /// 固定间隔 (max_attempts, delay_ms)
-    FixedDelay { max_attempts: u32, delay_ms: u64 },
+    FixedDelay {
+        /// 最大重试次数
+        max_attempts: u32,
+        /// 固定重试间隔(毫秒)
+        delay_ms: u64,
+    },
     /// 指数退避 (max_attempts, initial_delay_ms, multiplier)
     /// 实际 delay = initial_delay_ms * multiplier^(attempt-1), 不带 max_delay cap
     ExponentialBackoff {
+        /// 最大重试次数
         max_attempts: u32,
+        /// 初始延迟(毫秒)
         initial_delay_ms: u64,
+        /// 每次重试延迟倍增系数
         multiplier: u32,
     },
 }

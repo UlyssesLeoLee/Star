@@ -23,12 +23,16 @@ use std::time::Duration;
 /// Hermes API 错误类型
 #[derive(Debug, thiserror::Error)]
 pub enum HermesError {
+    /// HTTP 请求失败
     #[error("HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),
+    /// API key 为空
     #[error("invalid API key (empty)")]
     InvalidKey,
+    /// API 返回非 2xx 状态码
     #[error("API returned non-2xx: status={0} body={1}")]
     NonSuccess(u16, String),
+    /// API 响应解析失败
     #[error("API response parse failed: {0}")]
     Parse(String),
 }
@@ -36,13 +40,18 @@ pub enum HermesError {
 /// Hermes 客户端配置
 #[derive(Debug, Clone)]
 pub struct HermesConfig {
+    /// API 基础 URL
     pub base_url: String,
+    /// API 密钥
     pub api_key: String,
+    /// 请求超时时长
     pub timeout: Duration,
+    /// 是否启用 mock 模式
     pub mock_mode: bool,
 }
 
 impl HermesConfig {
+    /// 构造 mock 模式配置
     pub fn new_mock() -> Self {
         Self {
             base_url: "http://localhost:8081/v1".into(),
@@ -52,6 +61,7 @@ impl HermesConfig {
         }
     }
 
+    /// 构造真实模式配置(api_key 不能为空)
     pub fn new_real(
         base_url: impl Into<String>,
         api_key: impl Into<String>,
@@ -72,41 +82,60 @@ impl HermesConfig {
 /// /v1/chat/completions 请求 (OpenAI 兼容, 跟 B.1 OpenClaw 同 schema)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenerateRequest {
+    /// 模型名称
     pub model: String,
+    /// 会话消息列表
     pub messages: Vec<ChatMessage>,
+    /// 采样温度
     #[serde(default)]
     pub temperature: Option<f32>,
+    /// 最大生成 token 数
     #[serde(default)]
     pub max_tokens: Option<u32>,
 }
 
+/// 单条会话消息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
+    /// 消息角色(如 "user" / "assistant")
     pub role: String,
+    /// 消息内容
     pub content: String,
 }
 
 /// /v1/chat/completions 响应 (OpenAI 兼容)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenerateResponse {
+    /// 响应 ID
     pub id: String,
+    /// 使用的模型名称
     pub model: String,
+    /// 生成结果列表
     pub choices: Vec<Choice>,
+    /// token 用量统计
     pub usage: Usage,
 }
 
+/// 单条生成结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Choice {
+    /// 结果索引
     pub index: u32,
+    /// 生成的消息
     pub message: ChatMessage,
+    /// 结束原因
     #[serde(default)]
     pub finish_reason: Option<String>,
 }
 
+/// token 用量统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Usage {
+    /// 提示词 token 数
     pub prompt_tokens: u32,
+    /// 生成结果 token 数
     pub completion_tokens: u32,
+    /// 总 token 数
     pub total_tokens: u32,
 }
 
@@ -117,6 +146,7 @@ pub struct HermesClient {
 }
 
 impl HermesClient {
+    /// 构造 Hermes 客户端(api_key 不能为空)
     pub fn new(config: HermesConfig) -> Result<Self, HermesError> {
         if config.api_key.is_empty() {
             return Err(HermesError::InvalidKey);
@@ -125,6 +155,7 @@ impl HermesClient {
         Ok(Self { config, http })
     }
 
+    /// 返回当前配置的引用
     pub fn config(&self) -> &HermesConfig {
         &self.config
     }
