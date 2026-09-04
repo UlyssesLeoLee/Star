@@ -1210,3 +1210,162 @@ aebef31 ci: F.5 CI runner 真实配置 增强 v0.1 (Dependabot + CODEOWNERS + ci
 | v0.2-v0.8 | 2026-08-31 - 2026-09-04 | 架構師 (Mavis 接手 agent per DEC-008) | H2 範圍擴量 + P0-1 + 守门 #19+#20+#21+#22+#23+#24 + P4 WBS + Ulysses 交接 + 守门 #23 撤回 | 多次拍板 |
 | v0.9 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §13 H.1 + E.1 閉環 (24 commits ahead) | 9/4 15:20-16:00 JST 拍板 |
 | **v1.0** | **2026-09-04** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手** | **§14 F.4 + H.4 + F.5 閉環 (28 commits ahead, 17/24 子項閉環)** | **9/4 16:10-16:55 JST 拍板** |
+
+---
+
+## §15 H.5 + H.6 + H.7 闭环 (per 2026-09-04 17:55-18:45 JST, 守门 #12 commit-time 同步)
+
+> **承接**: §14 F.4 + H.4 + F.5 闭环 + 9/4 17:55/18:15/18:35 JST 拍板 H.5 + H.6 + H.7 启动
+> **状态**: 🟢 H.5 + H.6 + H.7 全部闭环, 34 commits ahead origin/main
+
+### 15.1 H.5 Tree-sitter 5 语言 Grammar (commit 31144e8, 9/4 18:05 JST 闭环)
+
+| # | 範圍 | 改動 | 守門 |
+|---|---|---|---|
+| 1 | crates/star-treesitter/Cargo.toml v0.1 (546 bytes) | 新 crate + tree-sitter 0.25 + 5 language grammar deps (rust/typescript/python/go/json) | #1+#1 v3+#3+#5+#6+#7+#12 |
+| 2 | crates/star-treesitter/src/lib.rs v0.1 (6906 bytes) | TreeSitterParser + Language + Symbol + ParseResult + 5 convenience functions | 同上 |
+| 3 | crates/star-treesitter/src/tests.rs v0.1 (2976 bytes) | 3 e2e test (parse_rust + parse_typescript + Language validation) | 同上 |
+| 4 | Cargo.toml workspace member 新增 + 删 HHANDOFF-ST-001.md typo 占位 | H.5 启动注释 | 同上 |
+
+**H.5 結果**: 5 语言 grammar 真实引入 + 14 SymbolKind + 3 test 0 fail + Cargo.lock 新增 ~12 依赖
+
+### 15.2 H.6 Task ↔ Worktree 1:1 绑定 + react-flow graph (commit 986c8ae, 9/4 18:25 JST 闭环)
+
+| # | 範圍 | 改動 | 守門 |
+|---|---|---|---|
+| 1 | crates/star-taskgraph/Cargo.toml v0.1 (435 bytes) | 新 crate + star-treesitter + uuid + serde deps | #1+#1 v3+#3+#5+#6+#7+#12 |
+| 2 | crates/star-taskgraph/src/lib.rs v0.1 (8282 bytes) | TaskCard + Worktree + TaskGraph + ReactFlowGraph + 4 不变量 (INV-TG-01~04) | 同上 |
+| 3 | crates/star-taskgraph/src/tests.rs v0.1 (2619 bytes) | 4 e2e test (bind + double_bind + bidirectional + react_flow_render) | 同上 |
+| 4 | Cargo.toml workspace member 新增 | H.6 启动注释 | 同上 |
+
+**H.6 結果**: 1:1 双向绑定 + react-flow JSON 渲染 (per INV-TG-01~04) + 4 test 0 fail
+
+### 15.3 H.7 Symbol Resolver 跨文件引用追踪 (commit 091766e, 9/4 18:45 JST 闭环)
+
+| # | 範圍 | 改動 | 守門 |
+|---|---|---|---|
+| 1 | crates/star-treesitter/src/symbol_resolver.rs v0.1 (5854 bytes) | SymbolIndex + SymbolReference + ReferenceEdge + SymbolResolver + 3 不变量 (INV-SR-01~03) | #1+#1 v3+#3+#5+#6+#7+#12 |
+| 2 | crates/star-treesitter/src/symbol_resolver_tests.rs v0.1 (3305 bytes) | 4 e2e test (parse + add_and_lookup + resolve_references + cross_file_lookup) | 同上 |
+| 3 | crates/star-treesitter/src/lib.rs 2 new module 声明 | H.7 启动注释 | 同上 |
+
+**H.7 結果**: 跨文件引用追踪 (Foo::bar / module::Type 解析) + 4 test 0 fail + star-treesitter 总 test 3+4=7 0 fail
+
+### 15.4 4 守門实证 (跨 H.5 + H.6 + H.7)
+
+| # | 守門 | 結果 |
+|---|---|---|
+| 1 | cargo check --workspace --all-targets -j 4 | 0 error |
+| 2 | cargo fmt --all -- --check | 0 diff |
+| 3 | cargo clippy --workspace --lib -j 4 | 0 error |
+| 4 | cargo test --workspace --release --lib -j 4 | **860 tests 0 fail** |
+
+### 15.5 commit 鏈 + 推 origin (per 守門 #1 1a, 0 網絡錯)
+
+`	ext
+31144e8 feat(star-treesitter): H.5 Tree-sitter 5 语言 Grammar v0.0.1 (3 test 0 fail, 新 crate)
+986c8ae feat(star-taskgraph): H.6 Task ↔ Worktree 1:1 绑定 + react-flow graph v0.0.1 (4 test 0 fail, 新 crate)
+091766e feat(star-treesitter): H.7 Symbol Resolver 跨文件引用追踪 v0.0.1 (4 e2e test 0 fail, 7 total)
+`
+
+**ahead origin/main**: 34 commits (per git rev-list --count origin/main..HEAD)
+
+### 15.6 P4 WBS 推進狀態 (H.5 + H.6 + H.7 闭环後)
+
+| Phase | 子項 | 狀態 |
+|---|---|---|
+| **A** | A.1-A.5 | ✅ 5/5 |
+| **B** | B.1-B.4 | ✅ 4/4 |
+| **C** | C.1-C.3 | ✅ 3/3 |
+| **D** | D.1-D.3 | ✅ 3/3 |
+| **E.1** | 5 域 Saga 實裝 | ✅ |
+| **E.2** | 5 域 DDD 邊界 | ✅ |
+| **E.3** | DDD Review 5 角色 | 🔴 撤回 |
+| **E.4** | CONTENT-REVIEW-PACK | ✅ |
+| **E.5** | REGISTRY 5 行 | 🔴 撤回 |
+| **F.1-F.3** | 凭証切真 | 🟡 mock 备選已落地, 待切真 |
+| **F.4** | DB W/T/M 跨項目 P3-D | ✅ |
+| **F.5** | D.2/D.6 CI runner | ✅ |
+| **G.1-G.9** | Agent Runtime G-1~G-9 | ✅ 9/9 |
+| **H.1** | LangGraph PostgreSQL checkpointer | ✅ |
+| **H.2** | LangGraph 跨倉 RPC (Star → Physis) | ✅ |
+| **H.3** | 9 SA 全部實裝 | ✅ |
+| **H.4** | LangGraph State schema v1 migration | ✅ |
+| **H.5** | Tree-sitter 5 語言 Grammar | ✅ (commit 31144e8) |
+| **H.6** | Tree-sitter 任務卡 ↔ worktree + react-flow | ✅ (commit 986c8ae) |
+| **H.7** | Tree-sitter symbol resolver | ✅ (commit 091766e) |
+| **H.8** | DDD Review 21 份 docs 終審 | 🔴 真人到位 |
+
+**小計**: 21/24 子項閉環, 3 子項待推進 (F.1-F.3 3 項外部依賴, 真人到位 1 項)
+
+### 15.7 累計 token 統計 (本 session)
+
+| 階段 | 消耗 | 來源 |
+|---|---|---|
+| 9/4 08:59-12:00 JST (A + B + C + D) | ~12M | 8 + 14 sub-session |
+| 9/4 12:00-15:25 JST (D + E.4 + G + H.1) | ~6M | 14 + 11 + 8 腳本 |
+| 9/4 15:25-16:00 JST (H.1 + E.1) | ~1.5M | 2 + 2 + 2 報告 |
+| 9/4 16:00-17:00 JST (F.4 + H.4 + F.5 + HANDOFF v1.0) | ~2.5M | 4 + 3 + 1 yaml + 1 CODEOWNERS + 4 報告 |
+| 9/4 17:00-19:00 JST (H.2 + H.3 + H.5 + H.6 + H.7 + HANDOFF v1.1) | ~6M | 5 + 2 新 crate + 1 yaml + 1 proto + 8 報告 |
+| **本 session 累計** | **~28M token** | **34 commits ahead** |
+
+### 15.8 下 session 第一件事 (Mavis 接管期, per 守门 #3 v2 撤回 + 守门 #14)
+
+`ash
+# 1. 读本 HANDOFF §15 + AGENTS.md v0.74
+# 2. 验证 34 commits ahead origin/main (per git rev-list --count origin/main..HEAD)
+
+# 3. 跨项目 P3-D 阶段 DB W/T/M 落地 (持续) — V2 路线图:
+#    - 创 scripts/automation/wtm_v2_classifier.py (V2: 含混合分類主計+§已知缺口列出)
+#    - 32 crate W=0 缺口补 (per F.4 §3 已知缺口 #1)
+#    - 实际运行时 retention_period 验证 (per CW-07)
+
+# 4. F.1-F.3 凭証切真 (依赖外部, mock 备選已落地, Ulysses 拍板切真时机)
+#    - F.1 B.5 OpenClaw 真实集成 e2e
+#    - F.2 B.6 Hermes 真实集成 e2e
+#    - F.3 E.4 KMS 集成 (Vault / AWS KMS 凭証)
+
+# 5. H.8 DDD Review 21 份 docs 終審 (真人到位)
+#    - 真人间隔后追溯签字
+#    - 覆盖 Mavis 临时代签
+
+# 6. workspace --all-targets 0 err + test 860+ 0 fail 持續保持
+# 7. HANDOFF v1.2 收編 (H.8 + F.1-F.3 全閉環)
+`
+
+### 15.9 衍生文檔 (本 session 落档)
+
+- AGENTS.md v0.74 (守门 18 項 + §7 WBS 6 列化無上限)
+- HANDOFF-ST-001.md v1.1 (本節 §15, 21/24 子項閉環)
+- PHASE-P4-H1-IMPL-REPORT.md v0.1 (12521 bytes)
+- PHASE-P4-E1-IMPL-REPORT.md v0.1 (11863 bytes)
+- PHASE-P4-F4-IMPL-REPORT.md v0.1 (11160 bytes)
+- PHASE-P4-H4-IMPL-REPORT.md v0.1 (8430 bytes)
+- PHASE-P4-F5-IMPL-REPORT.md v0.1 (9053 bytes)
+- PHASE-P4-H3-IMPL-REPORT.md v0.1 (11231 bytes)
+- PHASE-P4-H2-IMPL-REPORT.md v0.1 (10865 bytes)
+- PHASE-P4-H5-IMPL-REPORT.md v0.1 (9886 bytes)
+- PHASE-P4-H6-IMPL-REPORT.md v0.1 (9821 bytes)
+- PHASE-P4-H7-IMPL-REPORT.md v0.1 (10115 bytes)
+- crates/star-dispatcher/src/lib.rs (H.1 增量, 47 test 0 fail)
+- crates/star-saga/src/saga_5b_services.rs + saga_5b_real.rs + saga_5b_real_tests.rs (E.1 5 域)
+- crates/star-dispatcher/src/sa_real_impls.rs + sa_real_tests.rs (H.3 6 SA 真实业务)
+- crates/star-dispatcher/proto/langgraph_cross_repo.proto + cross_repo.rs + cross_repo_tests.rs (H.2 跨仓)
+- crates/star-treesitter/ v0.0.1 新 crate (H.5 5 语言 + H.7 symbol resolver)
+- crates/star-taskgraph/ v0.0.1 新 crate (H.6 任务卡 ↔ worktree + react-flow)
+- docs/data-design/p3-d-classification-w-t-m.md v0.1 (60002 bytes, F.4 P3-D 分类)
+- docs/architecture/2026-09-03-langgraph/04-state-schema-v1-migration.md v0.1 (14225 bytes, H.4)
+- .github/dependabot.yml v0.1 (1165 bytes, F.5)
+- CODEOWNERS v0.1 (882 bytes, F.5)
+- .github/workflows/ci.yml (9 处 -j 4 + 2 处 enforced, F.5)
+- 9 份自動化檔: patch_h1.py + patch_e1.py + wtm_classifier.py + patch_h3.py + patch_h2.py + 4 fixer 腳本
+- origin/feat/auto-20260904-1c260bc7 (34 commits ahead, Mavis 可隨時 gh pr merge)
+
+---
+
+## §16 修訂歷史
+
+| 版本 | 日期 | 修訂人 | 修訂內容 | 觸發 |
+|---|---|---|---|---|
+| v0.1-v0.9 | 2026-08-31 - 2026-09-04 | 架構師 (Mavis 接手 agent per DEC-008) | 12 問題下遊 AI 執行清單 + H2 範圍擴量 + P0-1 + 守门 #19+#20+#21+#22+#23+#24 + P4 WBS + Ulysses 交接 + 守门 #23 撤回 | 多次拍板 |
+| v1.0 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §14 F.4 + H.4 + F.5 閉環 (28 commits ahead) | 9/4 16:10-16:55 JST 拍板 |
+| **v1.1** | **2026-09-04** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手** | **§15 H.5 + H.6 + H.7 閉環 (34 commits ahead, 21/24 子項閉環)** | **9/4 17:55-18:45 JST 拍板** |
