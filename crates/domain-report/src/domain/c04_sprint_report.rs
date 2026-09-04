@@ -8,44 +8,68 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Sprint Report 完整数据 schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SprintReportData {
+    /// Sprint 元数据
     pub sprint: SprintInfo,
+    /// 三分组 issue 明细
     pub groups: Groups,
+    /// 汇总统计
     pub summary: SprintReportSummary,
 }
 
+/// Sprint 基本信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SprintInfo {
+    /// Sprint ID
     pub sprint_id: Uuid,
+    /// Sprint 名称
     pub name: String,
 }
 
+/// Sprint issue 三分组
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Groups {
+    /// 已完成
     pub completed: Vec<IssueRow>,
+    /// 结转到下一 Sprint
     pub carry_over: Vec<IssueRow>,
+    /// 未完成 (移出 Sprint)
     pub incomplete: Vec<IssueRow>,
 }
 
+/// 表格行: 单个 issue
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssueRow {
+    /// issue key, e.g. "PROJ-101"
     pub key: String,
+    /// 标题
     pub title: String,
+    /// issue 类型
     pub issue_type: String,
+    /// 优先级
     pub priority: String,
+    /// 完成时间 (未完成为 None)
     pub completed_at: Option<DateTime<Utc>>,
+    /// Story Point
     pub story_points: Option<f64>,
 }
 
+/// Sprint Report 汇总统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SprintReportSummary {
+    /// 已完成数量
     pub completed_count: u32,
+    /// 结转数量
     pub carry_over_count: u32,
+    /// 未完成数量
     pub incomplete_count: u32,
+    /// 已完成 SP
     pub completed_sp: f64,
 }
 
+/// 公开入口: 异步生成 Sprint Report
 pub async fn generate(
     _work_item_port: &dyn WorkItemQueryPort,
     _sprint_port: &dyn SprintQueryPort,

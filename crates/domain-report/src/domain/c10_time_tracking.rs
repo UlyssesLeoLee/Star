@@ -6,30 +6,46 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Time Tracking 完整数据 schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeTrackingData {
+    /// 统计粒度 (e.g. "user")
     pub granularity: String,
+    /// 各行数据
     pub rows: Vec<TrackingRow>,
+    /// 汇总
     pub summary: TrackingSummary,
 }
 
+/// 单行工时跟踪数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrackingRow {
+    /// 用户/维度 ID
     pub id: String,
+    /// 展示名称
     pub name: String,
+    /// 预估工时 (秒)
     pub original_seconds: f64,
+    /// 已花费工时 (秒)
     pub spent_seconds: f64,
+    /// 剩余工时 (秒)
     pub remaining_seconds: f64,
+    /// 完成进度 (0.0-1.0)
     pub progress: f64,
 }
 
+/// 工时跟踪汇总
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrackingSummary {
+    /// 预估工时总计
     pub total_original: f64,
+    /// 已花费工时总计
     pub total_spent: f64,
+    /// 剩余工时总计
     pub total_remaining: f64,
 }
 
+/// 公开入口: 异步生成 Time Tracking Report
 pub async fn generate(
     _work_item_port: &dyn WorkItemQueryPort,
     _filter: &ReportFilter,

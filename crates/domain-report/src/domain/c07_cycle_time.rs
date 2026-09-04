@@ -8,36 +8,55 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Cycle Time 完整数据 schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CycleTimeData {
+    /// 直方图桶
     pub buckets: Vec<Bucket>,
+    /// 百分位数
     pub percentiles: Percentiles,
+    /// 统计量
     pub stats: CycleStats,
+    /// 桶大小 (天)
     pub bucket_size: u32,
 }
 
+/// 直方图单个桶
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Bucket {
+    /// 区间起点
     pub range_start: f64,
+    /// 区间终点
     pub range_end: f64,
+    /// 落在区间内的数量
     pub count: f64,
+    /// 展示标签
     pub label: String,
 }
 
+/// 百分位数
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Percentiles {
+    /// 50 百分位 (中位数)
     pub p50: f64,
+    /// 85 百分位
     pub p85: f64,
+    /// 95 百分位
     pub p95: f64,
 }
 
+/// 周期时间统计量
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CycleStats {
+    /// 样本总数
     pub total_count: u32,
+    /// 中位数
     pub median: f64,
+    /// 均值
     pub mean: f64,
 }
 
+/// 公开入口: 异步生成 Cycle Time Report
 pub async fn generate(
     _work_item_port: &dyn WorkItemQueryPort,
     _filter: &ReportFilter,
@@ -93,6 +112,7 @@ pub async fn generate(
     })
 }
 
+/// 自适应桶大小: 数据量越大, 桶越粗
 pub fn adaptive_bucket_size(data_count: usize) -> u32 {
     match data_count {
         0..=49 => 1,

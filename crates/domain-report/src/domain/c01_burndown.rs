@@ -11,50 +11,78 @@ use uuid::Uuid;
 /// Sprint 元数据 (从 SprintQueryPort 拉)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SprintMeta {
+    /// Sprint ID
     pub sprint_id: Uuid,
+    /// Sprint 名称
     pub name: String,
+    /// Sprint 开始时间
     pub start_date: DateTime<Utc>,
+    /// Sprint 结束时间
     pub end_date: DateTime<Utc>,
+    /// Sprint 总 Story Point
     pub total_sp: f64,
+    /// Sprint 期间的范围变更记录
     pub scope_change_log: Vec<ScopeChange>,
 }
 
+/// Sprint 范围变更事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScopeChange {
+    /// 变更发生时间
     pub at: DateTime<Utc>,
+    /// SP 变化量 (正 = 增加范围, 负 = 减少范围)
     pub delta_sp: f64,
+    /// 变更原因
     pub reason: String,
+    /// 变更后的总 SP
     pub new_total_sp: f64,
 }
 
 /// Burndown 完整数据 schema (与 frontend src/lib/chart-data-schema.ts 同构)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BurndownData {
+    /// Sprint 元数据
     pub sprint: SprintMeta,
+    /// 理想线 + 实际线
     pub series: BurndownSeries,
+    /// 范围变更记录
     pub scope_changes: Vec<ScopeChange>,
+    /// 汇总统计
     pub summary: BurndownSummary,
 }
 
+/// Burndown 曲线数据 (理想线 + 实际线)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BurndownSeries {
+    /// 理想燃尽线
     pub ideal: Vec<TimeSeriesPoint>,
+    /// 实际燃尽线
     pub actual: Vec<TimeSeriesPoint>,
 }
 
+/// 时间序列上的单个数据点
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeSeriesPoint {
-    pub x: String, // ISO date "2026-09-02"
-    pub y: f64,    // 剩余 SP
+    /// ISO 日期, e.g. "2026-09-02"
+    pub x: String,
+    /// 数值 (剩余 SP)
+    pub y: f64,
 }
 
+/// Burndown 汇总统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BurndownSummary {
+    /// 剩余 SP
     pub remaining_sp: f64,
+    /// 已完成 SP
     pub completed_sp: f64,
+    /// 已完成 issue 数
     pub completed_issues: u32,
+    /// 总 issue 数
     pub total_issues: u32,
+    /// 预测最终完成 SP (线性外推)
     pub predicted_completion_sp: f64,
+    /// 是否在计划轨道内
     pub on_track: bool,
 }
 
@@ -242,8 +270,11 @@ fn compute_burndown(
 /// WorkItem 简化版 (从 WorkItemQueryPort 拉)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompletedIssue {
+    /// WorkItem ID
     pub workitem_id: Uuid,
+    /// 完成时间
     pub completed_at: DateTime<Utc>,
+    /// Story Point (可能未设置)
     pub story_points: Option<f64>,
 }
 

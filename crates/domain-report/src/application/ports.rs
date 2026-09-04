@@ -34,6 +34,7 @@ pub trait WorkItemQueryPort: Send + Sync {
 /// Sprint 查询 Port
 #[async_trait]
 pub trait SprintQueryPort: Send + Sync {
+    /// 获取 Sprint 元信息
     async fn get_sprint(
         &self,
         tenant_id: Uuid,
@@ -44,19 +45,25 @@ pub trait SprintQueryPort: Send + Sync {
 /// User 查询 Port
 #[async_trait]
 pub trait UserQueryPort: Send + Sync {
+    /// 获取用户信息
     async fn get_user(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Option<UserInfo>, String>;
 }
 
+/// 用户信息
 #[derive(Debug, Clone)]
 pub struct UserInfo {
+    /// 用户 ID
     pub user_id: Uuid,
+    /// 用户名
     pub name: String,
+    /// 头像 URL
     pub avatar_url: Option<String>,
 }
 
 /// 权限校验 Port
 #[async_trait]
 pub trait PermissionPort: Send + Sync {
+    /// 校验 actor 对 resource 的 action 是否被允许
     async fn check(
         &self,
         actor_id: Uuid,

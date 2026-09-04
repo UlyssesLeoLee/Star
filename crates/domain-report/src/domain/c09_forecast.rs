@@ -6,33 +6,49 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Forecast 完整数据 schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForecastData {
+    /// 历史速度数据
     pub historical: HistoricalData,
+    /// 预测结果
     pub forecast: ForecastResult,
 }
 
+/// 历史速度数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HistoricalData {
+    /// 各历史 Sprint 速度
     pub sprints: Vec<SprintVelocity>,
+    /// 平均速度
     pub avg_velocity: f64,
 }
 
+/// 单个 Sprint 的速度数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SprintVelocity {
+    /// Sprint 名称
     pub name: String,
+    /// 完成 SP
     pub completed_sp: f64,
 }
 
+/// 预测结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForecastResult {
+    /// 预测方法, e.g. "rolling_avg"
     pub method: String,
+    /// 预测速度
     pub predicted_velocity: f64,
+    /// 80% 置信区间
     pub confidence_80: (f64, f64),
+    /// 95% 置信区间
     pub confidence_95: (f64, f64),
+    /// 预测完成日期
     pub predicted_completion_date: String,
 }
 
+/// 公开入口: 异步生成 Forecast Report
 pub async fn generate(
     _work_item_port: &dyn WorkItemQueryPort,
     _filter: &ReportFilter,

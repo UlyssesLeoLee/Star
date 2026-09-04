@@ -13,28 +13,42 @@ use uuid::Uuid;
 /// Burnup data schema (与 frontend lib/chart-data-schema.ts BurnupData 同构)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BurnupData {
+    /// Sprint 元数据
     pub sprint: SprintMeta,
+    /// 累积完成线 + 范围阶梯线
     pub series: BurnupSeries,
+    /// 范围变更记录
     pub scope_changes: Vec<ScopeChange>,
+    /// 汇总统计
     pub summary: BurnupSummary,
 }
 
+/// Burnup 曲线数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BurnupSeries {
+    /// 累积完成 SP 曲线
     pub actual: Vec<TimeSeriesPoint>, // 累积完成
-    pub scope: Vec<TimeSeriesPoint>,  // 范围阶梯 (stepAfter)
+    /// Sprint 范围阶梯曲线 (stepAfter)
+    pub scope: Vec<TimeSeriesPoint>, // 范围阶梯
 }
 
+/// 时间序列上的单个数据点
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeSeriesPoint {
+    /// ISO 日期
     pub x: String,
+    /// 数值
     pub y: f64,
 }
 
+/// Burnup 汇总统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BurnupSummary {
+    /// 已完成 SP
     pub completed_sp: f64,
+    /// 总 SP
     pub total_sp: f64,
+    /// 完成比例 (0-1)
     pub completion_ratio: f64, // 0-1
 }
 

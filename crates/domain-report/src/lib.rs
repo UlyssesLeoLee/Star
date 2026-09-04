@@ -14,8 +14,11 @@ use thiserror::Error;
 use uuid::Uuid;
 
 // 模块
+/// application 层 (ports + cache trait)
 pub mod application;
+/// domain 层 (22 图表实现)
 pub mod domain;
+/// infrastructure 层 (in-memory cache + port stubs)
 pub mod infrastructure;
 
 // 重新导出
@@ -32,30 +35,52 @@ pub use infrastructure::{in_memory_cache::*, port_stubs::*};
 #[serde(rename_all = "snake_case")]
 pub enum ReportType {
     // P0 (8 真实)
-    Burndown,          // C01
-    Burnup,            // C02
-    Velocity,          // C03
-    SprintReport,      // C04
-    Cfd,               // C05
-    ControlChart,      // C06
-    CycleTime,         // C07
+    /// Sprint Burndown 图表
+    Burndown, // C01
+    /// Sprint Burnup 图表
+    Burnup, // C02
+    /// 团队速度图表
+    Velocity, // C03
+    /// Sprint 报告
+    SprintReport, // C04
+    /// 累积流图 (CFD)
+    Cfd, // C05
+    /// 周期时间控制图
+    ControlChart, // C06
+    /// 周期时间报告
+    CycleTime, // C07
+    /// 新建 vs 已解决
     CreatedVsResolved, // C13
     // P1 (6 stub - 阶段 1 返回 placeholder)
-    Throughput,     // C08
-    Forecast,       // C09
-    TimeTracking,   // C10
+    /// 吞吐量报告
+    Throughput, // C08
+    /// 预测图表
+    Forecast, // C09
+    /// 工时跟踪报告
+    TimeTracking, // C10
+    /// 解决时间报告
     ResolutionTime, // C11
-    Sla,            // C12
-    IssueTypeDist,  // C14
+    /// SLA 合规
+    Sla, // C12
+    /// Issue 类型分布
+    IssueTypeDist, // C14
     // P2 (8 stub)
-    PriorityDist,      // C15
-    AssigneeWorkload,  // C16
+    /// 优先级分布
+    PriorityDist, // C15
+    /// 经办人工作量
+    AssigneeWorkload, // C16
+    /// 组件工作量
     ComponentWorkload, // C17
-    VersionWorkload,   // C18
-    ReleaseBurndown,   // C19
-    TimeInStatus,      // C20
-    Heatmap,           // C21
-    RecentlyCreated,   // C22
+    /// 版本工作量
+    VersionWorkload, // C18
+    /// 发布燃尽图
+    ReleaseBurndown, // C19
+    /// 状态停留时间
+    TimeInStatus, // C20
+    /// 活动热力图
+    Heatmap, // C21
+    /// 最近创建
+    RecentlyCreated, // C22
 }
 
 impl ReportType {
@@ -106,6 +131,7 @@ impl ReportType {
         Self::p0_batch().contains(self)
     }
 
+    /// 图表 ID (e.g. "C01")
     pub fn chart_id(&self) -> &'static str {
         match self {
             Self::Burndown => "C01",
@@ -133,6 +159,7 @@ impl ReportType {
         }
     }
 
+    /// 图表展示名称
     pub fn name(&self) -> &'static str {
         match self {
             Self::Burndown => "Sprint Burndown",
@@ -164,11 +191,17 @@ impl ReportType {
 /// 报告作用域 (5 scope, per docs/requirements §1)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReportFilter {
+    /// 租户 ID (RLS 必携)
     pub tenant_id: Uuid, // RLS 必携
+    /// 项目 ID (可选)
     pub project_id: Option<Uuid>,
+    /// Sprint ID (可选)
     pub sprint_id: Option<Uuid>,
+    /// 版本 ID (可选)
     pub version_id: Option<Uuid>,
+    /// Issue Filter ID (可选, S5)
     pub filter_id: Option<Uuid>, // S5 (Issue Filter)
+    /// 时间范围 (可选)
     pub time_range: Option<TimeRange>,
 }
 
@@ -185,9 +218,12 @@ impl Default for ReportFilter {
     }
 }
 
+/// 时间范围
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TimeRange {
+    /// 起始时间
     pub from: chrono::DateTime<chrono::Utc>,
+    /// 结束时间
     pub to: chrono::DateTime<chrono::Utc>,
 }
 
@@ -198,50 +234,78 @@ pub struct TimeRange {
 /// 报告定义 (聚合根, per docs/basic-design §3.1)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Report {
+    /// 报告 ID
     pub id: Uuid,
+    /// 租户 ID
     pub tenant_id: Uuid,
+    /// 图表类型
     pub report_type: ReportType,
+    /// 标题
     pub title: String,
+    /// 作用域过滤条件
     pub filter: ReportFilter,
+    /// 图表配置 (ChartConfig, 22 图表共用 schema)
     pub config: serde_json::Value, // ChartConfig, 22 图表共用 schema
+    /// 创建时间
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// 更新时间
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    /// 版本号
     pub version: i32,
 }
 
 /// 报告数据点 (各图表 schema 不同, 阶段 1 走 serde_json::Value 灵活)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReportPoint {
+    /// 展示标签
     pub label: String,
+    /// 数值
     pub value: f64,
+    /// 附加信息 (各图表自定义)
     pub extra: serde_json::Value,
 }
 
 /// 报告结果 (ReportSnapshot, per docs/basic-design §3.3)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReportResult {
+    /// 报告 ID
     pub report_id: Uuid,
+    /// 图表类型
     pub report_type: ReportType,
+    /// 数据点
     pub points: Vec<ReportPoint>,
+    /// 图表 data schema (TS 同构, per docs/design/charts/c01-burndown.md §3)
     pub data: serde_json::Value, // 22 图表 data schema (TS 同构, per docs/design/charts/c01-burndown.md §3)
+    /// 摘要
     pub summary: ReportSummary,
+    /// 生成时间
     pub generated_at: chrono::DateTime<chrono::Utc>,
+    /// 缓存 key (5min TTL)
     pub cache_key: String, // 5min TTL
 }
 
+/// 报告摘要
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReportSummary {
+    /// 总计
     pub total: f64,
+    /// 趋势
     pub trend: Trend,
+    /// 异常列表
     pub anomalies: Vec<String>,
+    /// 图表-specific 摘要 (e.g. C01 remaining_sp / on_track)
     pub meta: serde_json::Value, // 图表-specific 摘要 (e.g. C01 remaining_sp / on_track)
 }
 
+/// 趋势方向
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Trend {
+    /// 上升
     Up,
+    /// 下降
     Down,
+    /// 持平
     Flat,
 }
 
@@ -249,28 +313,55 @@ pub enum Trend {
 // 3. error (per docs/specs/domain-report-spec.md v1.0 §4.6)
 // =====================================================================
 
+/// domain-report 错误类型
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum ReportError {
+    /// 报告未找到
     #[error("report not found: {0}")]
     NotFound(Uuid),
+    /// 权限不足
     #[error("permission denied for actor {actor} action {action}")]
-    PermissionDenied { actor: Uuid, action: String },
+    PermissionDenied {
+        /// 操作者 ID
+        actor: Uuid,
+        /// 被拒绝的操作
+        action: String,
+    },
+    /// 校验失败
     #[error("validation failed: {0}")]
     ValidationFailed(String),
+    /// 过滤条件无效
     #[error("filter invalid: {0}")]
     FilterInvalid(String),
+    /// 作用域不匹配
     #[error("scope mismatch: expected {expected}, got {got}")]
-    ScopeMismatch { expected: String, got: String },
+    ScopeMismatch {
+        /// 期望的作用域
+        expected: String,
+        /// 实际的作用域
+        got: String,
+    },
+    /// 数据量过大
     #[error("data too large: {points} points, limit {limit}")]
-    DataTooLarge { points: u32, limit: u32 },
+    DataTooLarge {
+        /// 实际点数
+        points: u32,
+        /// 限制点数
+        limit: u32,
+    },
+    /// 数据源错误
     #[error("data source error: {0}")]
     DataSource(String),
+    /// 计算错误
     #[error("computation error: {0}")]
     Computation(String),
+    /// 导出错误
     #[error("export error: {0}")]
     Export(String),
+    /// 缓存不可用
     #[error("cache unavailable: {0}")]
     CacheUnavailable(String),
+    /// 内部错误
     #[error("internal error: {0}")]
     Internal(String),
 }
@@ -279,6 +370,7 @@ pub enum ReportError {
 // 4. service - ReportService (P0 真实, P1/P2 stub)
 // =====================================================================
 
+/// 报告服务 (聚合 Cache + 4 个 Port, 生成/导出报告)
 pub struct ReportService {
     cache: Box<dyn Cache>,
     work_item_port: Box<dyn WorkItemQueryPort>,
@@ -288,6 +380,7 @@ pub struct ReportService {
 }
 
 impl ReportService {
+    /// 构造 ReportService
     pub fn new(
         cache: Box<dyn Cache>,
         work_item_port: Box<dyn WorkItemQueryPort>,

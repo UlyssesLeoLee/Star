@@ -8,26 +8,38 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// CFD 完整数据 schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CfdData {
+    /// 数据覆盖的日期范围
     pub date_range: DateRange,
+    /// 状态分类列表 (堆叠顺序)
     pub status_categories: Vec<String>,
+    /// 每天各状态计数
     pub series: Vec<DayCount>,
+    /// 总计数
     pub total: f64,
 }
 
+/// 日期范围
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DateRange {
+    /// 起始日期
     pub start: String,
+    /// 结束日期
     pub end: String,
 }
 
+/// 单日各状态计数
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DayCount {
+    /// 日期
     pub day: String,
+    /// 状态 → 计数
     pub counts: std::collections::BTreeMap<String, f64>,
 }
 
+/// 公开入口: 异步生成 CFD Report
 pub async fn generate(
     _work_item_port: &dyn WorkItemQueryPort,
     _filter: &ReportFilter,

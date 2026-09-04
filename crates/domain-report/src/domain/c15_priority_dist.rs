@@ -6,20 +6,29 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Priority Distribution 完整数据 schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriorityDistData {
+    /// 各优先级占比
     pub slices: Vec<PrioritySlice>,
+    /// 总数
     pub total: f64,
+    /// 状态过滤条件 (e.g. "open")
     pub status_filter: String,
 }
 
+/// 单个优先级的分布切片
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrioritySlice {
+    /// 优先级名称
     pub key: String,
+    /// 数量
     pub count: f64,
+    /// 占比
     pub percentage: f64,
 }
 
+/// 公开入口: 异步生成 Priority Distribution Report
 pub async fn generate(
     _work_item_port: &dyn WorkItemQueryPort,
     _filter: &ReportFilter,

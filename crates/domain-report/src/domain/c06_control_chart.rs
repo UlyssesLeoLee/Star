@@ -9,40 +9,63 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Control Chart 完整数据 schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControlChartData {
+    /// 散点数据
     pub data_points: Vec<ControlPoint>,
+    /// 参考线 (中位/百分位/±3σ)
     pub reference_lines: Vec<RefLine>,
+    /// 统计量
     pub stats: ControlStats,
 }
 
+/// 散点图上的单个数据点
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControlPoint {
+    /// WorkItem ID
     pub workitem_id: Uuid,
+    /// issue key
     pub key: String,
+    /// 周期时间 (天)
     pub cycle_time_days: f64,
+    /// 完成时间
     pub completed_at: DateTime<Utc>,
+    /// 是否为异常点
     pub anomaly: bool,
+    /// Modified Z-Score
     pub z_score: f64,
 }
 
+/// 参考线
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RefLine {
+    /// 纵轴数值
     pub y_value: f64,
+    /// 标签
     pub label: String,
+    /// 线型
     pub style: String, // "solid" / "dashed" / "dotted"
 }
 
+/// 统计量汇总
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControlStats {
+    /// 中位数
     pub median: f64,
+    /// 70 百分位
     pub p70: f64,
+    /// 85 百分位
     pub p85: f64,
+    /// 95 百分位
     pub p95: f64,
+    /// 均值
     pub mean: f64,
+    /// 标准差
     pub std_dev: f64,
 }
 
+/// 公开入口: 异步生成 Control Chart Report
 pub async fn generate(
     _work_item_port: &dyn WorkItemQueryPort,
     _filter: &ReportFilter,

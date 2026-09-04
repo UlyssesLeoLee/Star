@@ -6,33 +6,49 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Throughput 完整数据 schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThroughputData {
+    /// 时间粒度 (e.g. "week")
     pub granularity: String,
+    /// 各时间桶完成数
     pub series: Vec<BucketCount>,
+    /// 移动平均线 (3 期)
     pub moving_avg: Vec<BucketAvg>,
+    /// 统计量
     pub stats: ThroughputStats,
 }
 
+/// 单个时间桶的完成计数
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BucketCount {
+    /// 时间桶标签
     pub bucket: String,
+    /// 完成计数
     pub count: f64,
 }
 
+/// 单个时间桶的移动平均值
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BucketAvg {
+    /// 时间桶标签
     pub bucket: String,
+    /// 移动平均值
     pub avg: f64,
 }
 
+/// 吞吐量统计量
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThroughputStats {
+    /// 总计数
     pub total: f64,
+    /// 均值
     pub avg: f64,
+    /// 标准差
     pub std_dev: f64,
 }
 
+/// 公开入口: 异步生成 Throughput Report
 pub async fn generate(
     _work_item_port: &dyn WorkItemQueryPort,
     _filter: &ReportFilter,

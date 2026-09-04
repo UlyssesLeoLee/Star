@@ -9,38 +9,59 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Velocity 完整数据 schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VelocityData {
+    /// 各 Sprint 的承诺/完成 SP
     pub sprints: Vec<SprintVelocity>,
+    /// 平均完成 SP
     pub average_completed_sp: f64,
+    /// 速度趋势
     pub trend: VelocityTrend,
 }
 
+/// 单个 Sprint 的承诺/完成 SP 数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SprintVelocity {
+    /// Sprint ID
     pub sprint_id: Uuid,
+    /// Sprint 名称
     pub name: String,
+    /// Sprint 开始时间
     pub start_date: DateTime<Utc>,
+    /// Sprint 结束时间
     pub end_date: DateTime<Utc>,
+    /// Sprint 状态
     pub status: SprintStatus,
+    /// 承诺 SP
     pub committed_sp: f64,
+    /// 完成 SP (None = active sprint)
     pub completed_sp: Option<f64>, // None = active sprint
 }
 
+/// Sprint 状态
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SprintStatus {
+    /// 已完成
     Completed,
+    /// 进行中
     Active,
+    /// 已计划但未开始
     Planned,
 }
 
+/// 速度趋势
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum VelocityTrend {
+    /// 上升
     Increasing,
+    /// 下降
     Decreasing,
+    /// 稳定
     Stable,
 }
 
+/// 公开入口: 异步生成 Velocity Report
 pub async fn generate(
     _work_item_port: &dyn WorkItemQueryPort,
     _sprint_port: &dyn SprintQueryPort,

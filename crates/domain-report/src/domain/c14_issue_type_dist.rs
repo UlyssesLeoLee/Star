@@ -6,20 +6,29 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Issue Type Distribution 完整数据 schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssueTypeDistData {
+    /// 各类型占比
     pub slices: Vec<TypeSlice>,
+    /// 总数
     pub total: f64,
+    /// 状态过滤条件 (e.g. "all")
     pub status_filter: String,
 }
 
+/// 单个类型的分布切片
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TypeSlice {
+    /// 类型名称
     pub key: String,
+    /// 数量
     pub count: f64,
+    /// 占比
     pub percentage: f64,
 }
 
+/// 公开入口: 异步生成 Issue Type Distribution Report
 pub async fn generate(
     _work_item_port: &dyn WorkItemQueryPort,
     _filter: &ReportFilter,

@@ -8,28 +8,42 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Created vs Resolved 完整数据 schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CvrData {
+    /// 每日序列
     pub series: Vec<DayStat>,
+    /// 汇总
     pub summary: CvrSummary,
+    /// 时间粒度 (e.g. "day")
     pub time_granularity: String,
 }
 
+/// 单日的新建/解决统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DayStat {
+    /// 日期
     pub day: String,
+    /// 新建数
     pub created: f64,
+    /// 解决数
     pub resolved: f64,
 }
 
+/// Created vs Resolved 汇总
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CvrSummary {
+    /// 新建总数
     pub total_created: f64,
+    /// 解决总数
     pub total_resolved: f64,
+    /// 净变化 (新建 - 解决)
     pub net_change: f64,
+    /// 积压趋势 ("growing" / "shrinking" / "stable")
     pub backlog_trend: String,
 }
 
+/// 公开入口: 异步生成 Created vs Resolved Report
 pub async fn generate(
     _work_item_port: &dyn WorkItemQueryPort,
     _filter: &ReportFilter,

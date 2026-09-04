@@ -15,6 +15,7 @@ pub struct InMemoryWorkItemPort {
 }
 
 impl InMemoryWorkItemPort {
+    /// 构造空的 InMemoryWorkItemPort
     pub fn new() -> Self {
         Self {
             data: RwLock::new(HashMap::new()),
@@ -64,12 +65,14 @@ pub struct InMemorySprintPort {
 }
 
 impl InMemorySprintPort {
+    /// 构造空的 InMemorySprintPort
     pub fn new() -> Self {
         Self {
             data: RwLock::new(HashMap::new()),
         }
     }
 
+    /// 测试辅助: 注入 fixture
     pub fn seed(&self, sprint: SprintMeta) {
         let mut d = self.data.write().unwrap();
         d.insert(sprint.sprint_id, sprint);
@@ -94,9 +97,11 @@ impl SprintQueryPort for InMemorySprintPort {
     }
 }
 
+/// InMemory User Port (阶段 1 恒返回 None)
 pub struct InMemoryUserPort;
 
 impl InMemoryUserPort {
+    /// 构造 InMemoryUserPort
     pub fn new() -> Self {
         Self
     }
@@ -109,9 +114,11 @@ impl UserQueryPort for InMemoryUserPort {
     }
 }
 
+/// InMemory Permission Port (阶段 1 全部放行)
 pub struct InMemoryPermissionPort;
 
 impl InMemoryPermissionPort {
+    /// 构造 InMemoryPermissionPort
     pub fn new() -> Self {
         Self
     }
