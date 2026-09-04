@@ -1,0 +1,79 @@
+// crates/star-dispatcher/proto/langgraph_cross_repo.proto
+//
+// H.2 LangGraph 跨仓 RPC service 定义 (Star -> Physis)
+// per WBS §H.2 + 守门 #19 [M] 拍板
+// per 守门 §5 disclaimer: Star 仓不引用 RGS 仓代码, 走 gRPC over HTTP 跨仓
+//
+// V2 路线图:
+//   - 当前: in-process PoC (channel + serde_json)
+//   - V2: 真实 gRPC (tonic + prost code-gen)
+//
+// 服务接口 (Star -> Physis):
+//   - DispatchTask: Star 派发 task 到 Physis
+//   - QueryState:   Star 查询 Physis runtime state
+//   - CancelTask:   Star 取消 Physis 已派发 task
+//   - HealthCheck:  跨仓健康检查
+
+syntax = "proto3";
+
+package star.cross_repo.v1;
+
+// Star -> Physis 跨仓 RPC service
+service CrossRepoService {
+  // 派发 task 到 Physis
+  rpc DispatchTask(DispatchTaskRequest) returns (DispatchTaskResponse);
+
+  // 查询 Physis runtime state
+  rpc QueryState(QueryStateRequest) returns (QueryStateResponse);
+
+  // 取消已派发 task
+  rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+
+  // 跨仓健康检查
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message DispatchTaskRequest {
+  string task_id = 1;          // task_id (UUID v4 string)
+  string tenant_id = 2;        // tenant_id
+  string kind = 3;             // e.g. "physics_sim" / "physics_query"
+  bytes payload = 4;           // JSON 序列化的 payload
+  string idempotency_key = 5;  // 必填, 防止跨仓重试重复执行
+}
+
+message DispatchTaskResponse {
+  string task_id = 1;          // Physis 分配的 task_id
+  bool accepted = 2;           // Physis 是否接受派发
+  string reason = 3;           // 拒绝原因 (accepted=false)
+}
+
+message QueryStateRequest {
+  string task_id = 1;          // Physis task_id
+}
+
+message QueryStateResponse {
+  string task_id = 1;
+  string state = 2;            // "pending" / "running" / "completed" / "failed"
+  bytes result = 3;            // 任务结果 (JSON 序列化)
+  string error = 4;            // 错误信息 (state=failed)
+}
+
+message CancelTaskRequest {
+  string task_id = 1;
+  string reason = 2;           // 取消原因
+}
+
+message CancelTaskResponse {
+  string task_id = 1;
+  bool cancelled = 2;          // Physis 是否取消成功
+}
+
+message HealthCheckRequest {
+  string source = 1;           // 来源 (e.g. "star-dispatcher")
+}
+
+message HealthCheckResponse {
+  bool healthy = 1;
+  string version = 2;          // Physis 版本
+  int64 latency_ms = 3;        // 健康检查延迟
+}
