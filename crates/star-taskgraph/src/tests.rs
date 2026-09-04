@@ -22,7 +22,10 @@ fn h6_task_card_double_bind_error() {
     let mut task = TaskCard::new("Test", "test", "tenant-1");
     task.bind_worktree("wt-1").unwrap();
     let result = task.bind_worktree("wt-2");
-    assert!(matches!(result, Err(TaskGraphError::BindingConflict { .. })));
+    assert!(matches!(
+        result,
+        Err(TaskGraphError::BindingConflict { .. })
+    ));
 }
 
 /// H.6 test 3: TaskGraph.bind 双向绑定 (1:1 per INV-TG-01)
@@ -41,9 +44,15 @@ fn h6_task_graph_bidirectional_binding() {
     assert!(result.is_ok());
 
     // 验证 task.worktree_id 设置
-    assert_eq!(graph.get_task(&task_id).unwrap().worktree_id, Some(wt_id.clone()));
+    assert_eq!(
+        graph.get_task(&task_id).unwrap().worktree_id,
+        Some(wt_id.clone())
+    );
     // 验证 worktree.task_id 设置
-    assert_eq!(graph.get_worktree(&wt_id).unwrap().task_id, Some(task_id.clone()));
+    assert_eq!(
+        graph.get_worktree(&wt_id).unwrap().task_id,
+        Some(task_id.clone())
+    );
 }
 
 /// H.6 test 4: TaskGraph.to_react_flow 渲染 (per INV-TG-03)

@@ -24,7 +24,10 @@ pub enum TaskGraphError {
     #[error("worktree not found: {0}")]
     WorktreeNotFound(String),
     #[error("binding conflict: task {task_id} already bound to worktree {existing_worktree}")]
-    BindingConflict { task_id: String, existing_worktree: String },
+    BindingConflict {
+        task_id: String,
+        existing_worktree: String,
+    },
     #[error("invalid state: {0}")]
     InvalidState(String),
 }
@@ -52,7 +55,11 @@ pub enum TaskStatus {
 }
 
 impl TaskCard {
-    pub fn new(title: impl Into<String>, kind: impl Into<String>, tenant_id: impl Into<String>) -> Self {
+    pub fn new(
+        title: impl Into<String>,
+        kind: impl Into<String>,
+        tenant_id: impl Into<String>,
+    ) -> Self {
         Self {
             task_id: Uuid::new_v4().to_string(),
             title: title.into(),
@@ -81,8 +88,8 @@ impl TaskCard {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Worktree {
     pub worktree_id: String,
-    pub path: String,        // e.g. ".worktrees/feat-auto-..."
-    pub branch: String,      // git branch
+    pub path: String,            // e.g. ".worktrees/feat-auto-..."
+    pub branch: String,          // git branch
     pub task_id: Option<String>, // 1:1 binding
 }
 
@@ -133,7 +140,11 @@ impl TaskGraph {
     /// 1:1 绑定 task 和 worktree (per INV-TG-01)
     pub fn bind(&mut self, task_id: &str, worktree_id: &str) -> Result<(), TaskGraphError> {
         // 先检查 task 是否已绑定
-        let task = self.tasks.iter_mut().find(|t| t.task_id == task_id).ok_or_else(|| TaskGraphError::TaskNotFound(task_id.into()))?;
+        let task = self
+            .tasks
+            .iter_mut()
+            .find(|t| t.task_id == task_id)
+            .ok_or_else(|| TaskGraphError::TaskNotFound(task_id.into()))?;
         if let Some(existing) = &task.worktree_id {
             return Err(TaskGraphError::BindingConflict {
                 task_id: task_id.into(),
@@ -141,7 +152,11 @@ impl TaskGraph {
             });
         }
         // 检查 worktree 是否已绑定
-        let wt = self.worktrees.iter_mut().find(|w| w.worktree_id == worktree_id).ok_or_else(|| TaskGraphError::WorktreeNotFound(worktree_id.into()))?;
+        let wt = self
+            .worktrees
+            .iter_mut()
+            .find(|w| w.worktree_id == worktree_id)
+            .ok_or_else(|| TaskGraphError::WorktreeNotFound(worktree_id.into()))?;
         if let Some(existing) = &wt.task_id {
             return Err(TaskGraphError::BindingConflict {
                 task_id: existing.clone(),
@@ -172,7 +187,10 @@ impl TaskGraph {
             nodes.push(ReactFlowNode {
                 id: format!("task-{}", i),
                 node_type: "task".into(),
-                position: Position { x: (i as f64) * 200.0, y: 0.0 },
+                position: Position {
+                    x: (i as f64) * 200.0,
+                    y: 0.0,
+                },
                 data: serde_json::json!({
                     "task_id": task.task_id,
                     "title": task.title,
@@ -186,7 +204,10 @@ impl TaskGraph {
             nodes.push(ReactFlowNode {
                 id: format!("worktree-{}", i),
                 node_type: "worktree".into(),
-                position: Position { x: (i as f64) * 200.0, y: 200.0 },
+                position: Position {
+                    x: (i as f64) * 200.0,
+                    y: 200.0,
+                },
                 data: serde_json::json!({
                     "worktree_id": wt.worktree_id,
                     "path": wt.path,
@@ -197,7 +218,12 @@ impl TaskGraph {
         // Edges: task <-> worktree bindings
         for (i, task) in self.tasks.iter().enumerate() {
             if let Some(wt_id) = &task.worktree_id {
-                if let Some((j, _)) = self.worktrees.iter().enumerate().find(|(_, w)| &w.worktree_id == wt_id) {
+                if let Some((j, _)) = self
+                    .worktrees
+                    .iter()
+                    .enumerate()
+                    .find(|(_, w)| &w.worktree_id == wt_id)
+                {
                     edges.push(ReactFlowEdge {
                         id: format!("binding-{}-{}", i, j),
                         source: format!("task-{}", i),
@@ -251,7 +277,7 @@ fn now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
-    .unwrap_or(0)
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
