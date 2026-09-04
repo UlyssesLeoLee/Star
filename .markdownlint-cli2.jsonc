@@ -13,7 +13,9 @@
     "MD037": false,         // no-space-in-emphasis: 守门表 v1-v24 / 14 维 agent_table 等含 "* /" 强调项, 关闭
     "MD040": false,         // fenced-code-language: AGENTS.md §5 仓库拓扑 ASCII 树缺 language, 关闭
     "MD055": false,         // table-pipe-style: 守门表 / 跨项目持久表 trailing-pipe 风格不统一, 关闭
-    "MD056": false          // table-column-count: 守门表 4-5 列 cell 混排, 关闭
+    "MD056": false,         // table-column-count: 守门表 4-5 列 cell 混排, 关闭
+    "MD058": false,         // blanks-around-tables: bench/perf-baseline.md §5 修订历史 表格上下文, 关闭
+    "MD022": false          // blanks-around-headings: bench/perf-baseline.md §5 标题上下文, 关闭
   },
   "globs": [
     "**/*.md",

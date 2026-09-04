@@ -142,6 +142,7 @@ jobs:
             frontend/.next
             frontend/dist
             _ARCHIVED_*.md
+          config: .markdownlint-cli2.jsonc
 
   cargo-doc:
     name: Rust doc (cargo doc --no-deps)
