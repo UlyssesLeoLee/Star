@@ -456,7 +456,10 @@ mod tests {
         let tenant_b = uuid::Uuid::new_v4();
         let actor_a = make_service_actor(TenantId(tenant_a));
         let r = svc
-            .submit_result(make_submit_cmd(TenantId(tenant_a), ValidationKind::Build), actor_a)
+            .submit_result(
+                make_submit_cmd(TenantId(tenant_a), ValidationKind::Build),
+                actor_a,
+            )
             .await
             .unwrap();
         let actor_b = make_service_actor(TenantId(tenant_b));

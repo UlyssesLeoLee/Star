@@ -1295,6 +1295,18 @@ mod tests {
             .with_role("tenant_admin")
     }
 
+    fn make_platform_admin_actor(
+        user: UserId,
+        tenant: TenantId,
+        project: ProjectId,
+    ) -> ActorContext {
+        let mut a = ActorContext::new(user.0, tenant.0)
+            .with_project(project.as_uuid())
+            .with_role("platform_admin");
+        a.is_platform_admin = true;
+        a
+    }
+
     fn make_shape(kind: ShapeKind, x: f32, y: f32, w: f32, h: f32, color: &str) -> WhiteboardShape {
         WhiteboardShape {
             id: ShapeId::new(),
@@ -1975,7 +1987,7 @@ mod tests {
         let host = uuid::Uuid::new_v4();
         let host_actor = make_actor(UserId(host), TenantId(tenant), project);
         let admin = uuid::Uuid::new_v4();
-        let admin_actor = make_admin_actor(UserId(admin), TenantId(tenant), project);
+        let admin_actor = make_platform_admin_actor(UserId(admin), TenantId(tenant), project);
         let s = svc
             .start_session(
                 StartSessionCommand {

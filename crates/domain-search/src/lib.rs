@@ -1039,13 +1039,21 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let projector = projector_actor(TenantId(tenant_id));
         svc.upsert_index(
-            sample_index_cmd(TenantId(tenant_id), ResourceType::WorkItem, "auth module refactor"),
+            sample_index_cmd(
+                TenantId(tenant_id),
+                ResourceType::WorkItem,
+                "auth module refactor",
+            ),
             &projector,
         )
         .await
         .unwrap();
         svc.upsert_index(
-            sample_index_cmd(TenantId(tenant_id), ResourceType::Comment, "auth review note"),
+            sample_index_cmd(
+                TenantId(tenant_id),
+                ResourceType::Comment,
+                "auth review note",
+            ),
             &projector,
         )
         .await
@@ -1262,13 +1270,21 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let projector = projector_actor(TenantId(tenant_id));
         svc.upsert_index(
-            sample_index_cmd(TenantId(tenant_id), ResourceType::WorkItem, "implement authentication"),
+            sample_index_cmd(
+                TenantId(tenant_id),
+                ResourceType::WorkItem,
+                "implement authentication",
+            ),
             &projector,
         )
         .await
         .unwrap();
         svc.upsert_index(
-            sample_index_cmd(TenantId(tenant_id), ResourceType::WorkItem, "authorize user"),
+            sample_index_cmd(
+                TenantId(tenant_id),
+                ResourceType::WorkItem,
+                "authorize user",
+            ),
             &projector,
         )
         .await

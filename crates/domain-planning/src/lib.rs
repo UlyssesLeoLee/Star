@@ -1638,7 +1638,10 @@ mod tests {
         let project_id = ProjectId::new();
         let actor_a = make_admin_actor(TenantId(tenant_a), project_id);
         let sprint = svc
-            .create_sprint(make_create_sprint_cmd(TenantId(tenant_a), project_id), &actor_a)
+            .create_sprint(
+                make_create_sprint_cmd(TenantId(tenant_a), project_id),
+                &actor_a,
+            )
             .await
             .unwrap();
         let tenant_b = uuid::Uuid::new_v4();

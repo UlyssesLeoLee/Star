@@ -79,7 +79,8 @@ pub use value_object::{
 
 #[cfg(test)]
 mod tests {
-    use super::*;    use crate::context::ActorContext; // P0-1 兼容: 显式覆盖 super::* 的 star_context 命名
+    use super::*;
+    use crate::context::ActorContext; // P0-1 兼容: 显式覆盖 super::* 的 star_context 命名
 
     use crate::value_object::{
         roles, ConflictStrategy, ExternalEntityId, ExternalSystemName, IntegrationRelationType,

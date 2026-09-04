@@ -75,7 +75,8 @@ pub use value_object::{
 
 #[cfg(test)]
 mod tests {
-    use super::*;    use crate::context::ActorContext; // P0-1 兼容: 显式覆盖 super::* 的 star_context 命名
+    use super::*;
+    use crate::context::ActorContext; // P0-1 兼容: 显式覆盖 super::* 的 star_context 命名
 
     use crate::entity::ConsumedByKind;
     use crate::value_object::{FeedbackTarget, Severity};
@@ -587,8 +588,7 @@ mod tests {
                     limit: 10,
                     offset: 0,
                 },
-                ActorContext::new(UserId::new(), TenantId(tenant_id))
-                    .with_role(roles::DEVELOPER),
+                ActorContext::new(UserId::new(), TenantId(tenant_id)).with_role(roles::DEVELOPER),
             )
             .await
             .unwrap();

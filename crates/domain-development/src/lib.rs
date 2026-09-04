@@ -984,7 +984,9 @@ impl DevelopmentRepository for InMemoryDevelopmentRepository {
 mod tests {
     use super::*;
     fn developer(tid: TenantId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tid.0)
+        let mut a = ActorContext::new(Uuid::new_v4(), tid.0);
+        a.roles.clear(); // 去掉默认 developer role, 让 actor_can_merge 测试可以验证 has_role("developer") == false
+        a
     }
 
     fn project_admin(tid: TenantId) -> ActorContext {

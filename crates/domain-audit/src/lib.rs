@@ -1076,7 +1076,10 @@ impl AuditQueryPort for InMemoryAuditService {
 mod tests {
     use super::*;
     fn make_admin_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role(roles::TENANT_ADMIN)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0)
+            .with_role(roles::TENANT_ADMIN)
+            .with_role("audit_reader")
+            .with_role("audit_exporter")
     }
 
     fn make_developer_actor(tenant_id: TenantId) -> ActorContext {

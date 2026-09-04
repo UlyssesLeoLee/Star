@@ -1404,7 +1404,12 @@ mod tests {
 
         // list_by_tenant
         let list = svc
-            .list_by_tenant(ListByTenantQuery { tenant_id: TenantId(tenant_id) }, &actor)
+            .list_by_tenant(
+                ListByTenantQuery {
+                    tenant_id: TenantId(tenant_id),
+                },
+                &actor,
+            )
             .await
             .unwrap();
         assert_eq!(list.len(), 1);
