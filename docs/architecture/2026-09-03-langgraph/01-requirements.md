@@ -1,11 +1,11 @@
 # 01. Star LangGraph 統合アーキテクチャ - 要件定義書 (Requirements Definition)
 
-> **状態**：🟡 Draft v0.1
-> **日期**：2026-09-03
+> **状態**：🟢 Draft v0.2
+> **日期**：2026-09-04 (升版自 v0.1)
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **签批**：🟢 Mavis 接手终审（per 2026-08-27 19:39 JST 用户授权"允许你代签" + 21:59 JST 第三次强化"继续, 你可以代签"）
-> **依赖**：[ADR-0033 代签规则反转](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0033-agent-co-signing-policy.md) · [AGENTS.md §4 守门硬约束](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) · [STAR-OLU-001.md token 基线](https://github.com/UlyssesLeoLee/Star/blob/main/docs/ol/STAR-OLU-001.md) · [STAR-P3-WBS-001.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/reports/STAR-P3-WBS-001.md)
-> **关联文档**：[02-basic-design.md](02-basic-design.md)（基本設計書）· [03-detailed-design.md](03-detailed-design.md)（詳細設計書）
+> **依赖**：[ADR-0033 代签规则反转](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0033-agent-co-signing-policy.md) · [ADR-0046 LangGraph TMO 任务卡管理操作](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) · [AGENTS.md §4 守门硬约束](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) · [STAR-OLU-001.md token 基线](https://github.com/UlyssesLeoLee/Star/blob/main/docs/ol/STAR-OLU-001.md) · [STAR-P3-WBS-001.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/reports/STAR-P3-WBS-001.md)
+> **关联文档**：[02-basic-design.md](02-basic-design.md)（基本設計書 v0.2）· [03-detailed-design.md](03-detailed-design.md)（詳細設計書 v0.2）· [PHASE-LANGGRAPH-TMO-IMPL-REPORT.md](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md)（7 子项实装计划）
 > **適用範囲**：STAR 主仓 (`D:\Star`) 全体，gm-console frontend / star-mcp / 22 domain-* crates / scripts/automation/ 全栈
 
 ---
@@ -268,6 +268,70 @@ Star 项目现状（per 2026-09-03 main HEAD `e5f0503`）：
   5. Top: aggregate → user 反馈
 - **Postcondition**: 5 域决策矩阵可视化
 
+#### UC-09: 任务卡合并 (Task Merge, TMO M-N1)
+
+- **Actor**: Primary User
+- **Trigger**: chat bar 输入 "合并任务 a 和任务 b" (或 UI 卡片多选 → 合并按钮)
+- **Flow**:
+  1. Top: parse_intent_node 解析 → intent = "task_merge", target_task_ids = [a, b]
+  2. Top: merge_node (per 02 §2.6) 协调: 通知 a/b 进入 stash_state (保存 checkpoint 到 Transaction 表)
+  3. Top: dispatch merged_task (SA-10 task-orchestrator, type = "merge", context = {merged_from: [a, b], merged_state: snapshots})
+  4. Top: 标记 a/b 状态 = "superseded", pointer → merged_task
+  5. UI: a/b 卡片灰显 (badge: "已合并"), merged_task 新卡出现 (label: "a + b")
+  6. SubAgent (SA-10): 用 a + b 的 stash_state 作为初始 context, 继续 plan/execute
+- **Postcondition**: a + b checkpoint 完整保留 (Transaction append-only), merged_task 启动, 血缘可追溯
+- **约束 (per 守门 #13)**: L1 ↔ L1 禁止通信, 全部走 L0 协调
+
+#### UC-10: 任务卡拆分 (Task Split, TMO M-N2)
+
+- **Actor**: Primary User
+- **Trigger**: chat bar 输入 "把任务 a 拆成 a1 和 a2" (或卡片菜单 → 拆分)
+- **Flow**:
+  1. Top: parse_intent_node → intent = "task_split", target_task_id = a, split_strategy = "context_fork" (默认) | "checkpoint_fork"
+  2. Top: split_node 协调: snapshot a 当前 checkpoint
+  3. Top: dispatch a1 + a2 (相同 task_type as a, context = fork-of-a.context + split-specific delta)
+  4. Top: 标记 a 状态 = "superseded", a1/a2.superseded_by = null (新起点), a.split_into = [a1, a2]
+  5. UI: a 卡片灰显, a1 + a2 新卡并排出现 (label: "a → a1" / "a → a2")
+- **Postcondition**: a 历史完整保留, a1 + a2 并行启动, 拆分可逆 (可由子代理产物重新 dispatch "re-merge" if needed)
+
+#### UC-11: 任务卡依赖编排 (Dependency / DAG, TMO M-N3)
+
+- **Actor**: Primary User
+- **Trigger**: chat bar 输入 "任务 b 完成后才能启动 c" (或 Kanban 拖拽连线)
+- **Flow**:
+  1. Top: parse_intent_node → intent = "set_dependencies", dep_set = {b → c}
+  2. Top: reorder_node 更新 TopAgentState.task_relationships (DAG 边)
+  3. Top: 通知 c.status = "blocked_by_b" (新状态)
+  4. UI: c 卡片灰色等待, 显示 "等待 b 完成"
+  5. b 完成时, c 状态自动转 "pending", dispatch 启动
+  6. DAG 校验: 周期检测 (cycle prevention) — 守门 #13 a 强约束, 防 deadlock
+- **Postcondition**: c 在 b done 之后自动启动, DAG 永无环
+
+#### UC-12: 批量操作 (Bulk Action, TMO M-N4)
+
+- **Actor**: Primary User
+- **Trigger**: chat bar 输入 "暂停 a b c 三张卡" (或 UI 多选 → 暂停/取消/重命名 按钮)
+- **Flow**:
+  1. Top: parse_intent_node → intent = "bulk_action", target_task_ids = [a, b, c], action = "pause" | "cancel" | "set_priority"
+  2. Top: bulk_node 循环: 对每个 task_id 走 card_action (per 02 §2.6)
+  3. 并行 (asyncio.gather) 处理 N 个 task, 不串行 (避免 latency 累积)
+  4. UI: N 张卡片状态同步更新, top 显示 batch summary "已暂停 3 张"
+- **Postcondition**: N 张卡状态一致, 失败部分回滚 + 通知 (per §3.5 一致性)
+
+#### UC-13: 跨任务汇总 + 元数据编辑 (Summarize + Metadata, TMO M-N5..M-N7)
+
+- **Actor**: Primary User
+- **Trigger**: chat bar 输入 "任务 a b c 进度" (summarize) / "把 a 改名为 xxx" (metadata)
+- **Flow (summarize)**:
+  1. Top: summarize_node 收集 [a, b, c] 各 SubAgentState.status + token_usage + 关键 milestone
+  2. Top: LLM 聚合 → 表格化回答 (task / status / duration / progress)
+  3. UI: chat bar 显示 + 卡片徽章更新
+- **Flow (metadata)**:
+  1. Top: metadata_node 解析 → metadata_update 协议 → TaskCardManager
+  2. TaskCardManager: 更新 task_metadata 表 (per 03 §7 schema)
+  3. UI: 卡片标题/标签实时更新
+- **Postcondition**: 跨任务状态可视化, 元数据同步落库 (Master 表 RLS 必携 per 守门 #13 c)
+
 ### 2.4 機能一覧 (Function List)
 
 | # | 機能 | 説明 | 優先度 |
@@ -290,6 +354,13 @@ Star 项目现状（per 2026-09-03 main HEAD `e5f0503`）：
 | **F-16** | sub-agent 类型插件化 | SA-01..SA-09 注册表 + 动态加载 | P1 |
 | **F-17** | PostgreSQL checkpointer | 本番 3-tier 永続化 | P2 |
 | **F-18** | 跨仓 (Physis/RGS) 統合 | 外部 LangGraph インスタンス RPC | P3 |
+| **F-19** | 任务卡合并 (TMO M-N1) | L0 协调, a+b → merged_task, checkpoint stash + supersede | P0 (v0.2) |
+| **F-20** | 任务卡拆分 (TMO M-N2) | L0 协调, a → a1 + a2, checkpoint snapshot + forked context | P0 (v0.2) |
+| **F-21** | 任务卡依赖编排 DAG (TMO M-N3) | L0 reorder_node, dep_set 协议, cycle prevention (守门 #13 a) | P0 (v0.2) |
+| **F-22** | 批量操作 (TMO M-N4) | L0 bulk_node, asyncio.gather N 张卡 action, 部分失败回滚 | P0 (v0.2) |
+| **F-23** | 跨任务汇总 (TMO M-N5) | L0 summarize_node, 跨 N SubAgentState 聚合, LLM 表格化 | P1 (v0.2) |
+| **F-24** | 子代理重新分配 (TMO M-N6) | L0 reassign_node, 类型 SA-XX 切换, checkpoint preserved | P1 (v0.2) |
+| **F-25** | 元数据编辑 (TMO M-N7) | L0 metadata_node, task_metadata 表更新 (Master RLS 必携) | P1 (v0.2) |
 
 ## 3. 非機能要件 (Non-Functional Requirements)
 
@@ -341,6 +412,18 @@ Star 项目现状（per 2026-09-03 main HEAD `e5f0503`）：
 | **NFR-E-03** | 5 域 Lead 真人到位 | 配置注入, 无需改 LangGraph |
 | **NFR-E-04** | 跨仓 (Physis/RGS) | RPC adapter, v0.3 计划 |
 
+### 3.6 TMO 専用 NFR (Task Management Operations, v0.2)
+
+per 02 §2.6 + 03 §2.2.1 (7 节点 TMO 详细):
+
+| ID | 項目 | 目標 |
+|---|---|---|
+| **NFR-TMO-01** | 合并原子性 | merge_node 协调 a/b stash_state + dispatch merged_task 在同 1 个 LangGraph transaction 完成, 部分失败回滚 (a/b 状态还原) |
+| **NFR-TMO-02** | 拆分可逆性 | split_node snapshot a checkpoint, a.split_into 记录, 子代理可基于 split checkpoint 重新 dispatch (UC-10 末尾) |
+| **NFR-TMO-03** | 批量一致性 | bulk_node N 张卡 asyncio.gather, ≥ 80% 成功视为 partial success, 失败项 rollback + 通知 user (NFR-A-02 派生) |
+| **NFR-TMO-04** | 血缘可追溯 | task_metadata 表 parent_task_id / merged_from / split_into / superseded_by 4 字段 100% 填, 跨 session 查得到 (per 守门 #13 c Master RLS) |
+| **NFR-TMO-05** | DAG 校验 | reorder_node dep_set 提交前 cycle detection O(V+E) 跑, 检测到环 → reject + interrupt (per 守门 #13 a 强约束, 防 deadlock) |
+
 ## 4. 制約事項 (Constraints)
 
 per AGENTS.md §4 守门硬约束 (13 main + 24 派生规 = 37 项) 全部继承：
@@ -386,6 +469,10 @@ per AGENTS.md §4 守门硬约束 (13 main + 24 派生规 = 37 项) 全部继承
 | **TaskCardManager** | UI 状态 ↔ Sub-agent 状態 mirror |
 | **AuditLogger** | 全 tool call / dispatch / interrupt 記録 |
 | **TokenTelemetry** | token 計量 + 集計 (per 守门 #4) |
+| **TMO (Task Management Operations)** | v0.2 新增: L0 顶层代理跨任务卡管理操作集 (merge / split / reorder / bulk / reassign / summarize / metadata, per ADR-0046 + 02 §2.6) |
+| **Task Operations Manager** | TMO 集中管理组件, 7 节点 (M-N1..M-N7) + 7 协议 集中调度, per 02 §1.3 C-16 |
+| **Task Relationship Graph (DAG)** | 任务卡父子/合并/依赖关系有向无环图, 存 TopAgentState.task_relationships, cycle prevention 必携 (per 守门 #13 a) |
+| **Supersede (取代)** | TMO 操作后, 源 task 状态变 superseded (历史保留, 不执行), pointer 指向新 task, 血缘可追溯 |
 
 ## 6. 想定シナリオ (Scenarios)
 
@@ -443,6 +530,45 @@ User: "sub-agent 3 继续"
             Top: load checkpoint → resume
 ```
 
+### S-06: TMO 合并任务 a 和 b (per 2026-09-04 用户发令原话)
+
+```
+User: "合并任务 a 和任务 b"
+Top: parse_intent → intent="task_merge", target_task_ids=[a, b]
+Top: merge_node (per 02 §2.6 M-N1)
+     │
+     ├── sub_step 1: 通知 a / b 进入 stash_state
+     │     a.checkpoint_id → a_stash (Transaction append-only)
+     │     b.checkpoint_id → b_stash (Transaction append-only)
+     │
+     ├── sub_step 2: dispatch merged_task (SA-10 task-orchestrator, type="merge")
+     │     merged_task.context = {
+     │         "merged_from": [a.task_id, b.task_id],
+     │         "merged_state": {a: a_stash, b: b_stash}
+     │     }
+     │
+     ├── sub_step 3: 标记 a / b 状态 = "superseded"
+     │     a.superseded_by = merged_task.task_id
+     │     b.superseded_by = merged_task.task_id
+     │     (a / b 历史保留, 不再执行, 血缘可追溯 per NFR-TMO-04)
+     │
+     └── sub_step 4: ui_streamer.push × 3
+           • TaskCardUpdate(a, status="superseded", badge="已合并")
+           • TaskCardUpdate(b, status="superseded", badge="已合并")
+           • TaskCardCreate(merged_task, label="a + b")
+UI: a / b 卡片灰显, merged_task 新卡出现
+SA-10: 用 a + b stash_state 作为初始 context, 继续 plan / execute / verify / report
+Top: collect → respond → user "已合并 a + b, merged_task 启动"
+```
+
+**派生场景 (S-06 变体)**:
+- S-06a: 拆分 (把 a 拆成 a1 + a2)
+- S-06b: 依赖编排 (b 完成后 c 才启动)
+- S-06c: 批量 (暂停 a / b / c 三张卡)
+- S-06d: 跨任务汇总 (a / b / c 进度)
+- S-06e: 重新分配 (a 改用 SA-04 重跑)
+- S-06f: 元数据 (把 a 改名为 "P0-1 联动审计")
+
 ## 7. 既知の制約 (Known Constraints) — 初版 v0.1
 
 - 5 域 Lead 真人未到位 (per 守门 #3 反転: Mavis 临时代签)
@@ -451,6 +577,8 @@ User: "sub-agent 3 继续"
 - 並行 sub-agent 数上限 50 (リソース制約, NFR-P-03)
 - 5 域 Lead 决策追跡 UI 未完成 (F-15 标 P2)
 - token OLU telemetry 接入待 SRE Lead 真人
+- **TMO 7 节点 (F-19..F-25) 实现 P0** (v0.2 文档完成, 实装待 P0-1/H2 阻塞解除, per PHASE-LANGGRAPH-TMO-IMPL-REPORT)
+- **守门 #13 a 强约束派生**: L1 ↔ L1 禁止通信 → TMO 全部走 L0 协调 (per UC-09..UC-13 + 02 §2.6); 实证待 TMO 实装阶段 补
 
 ## 8. 签字栏
 
@@ -462,12 +590,18 @@ User: "sub-agent 3 继续"
 | 3 | 平台工程师 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-03 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 平台 5 域独立真实身份签字请 DDD Review 阶段补 |
 | 4 | 评审主持人 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-03 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 评审主持 5 域独立真实身份签字请 DDD Review 阶段补 |
 | 5 | 项目负责人 (PM) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-03 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); PM 5 域独立真实身份签字请 DDD Review 阶段补 |
+| 1.2 | 架构师 / Mavis 接手审批 (v0.2 升版) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手终审通过 (per 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡, 做整体统筹规划, 发号施令的入口是底端聊天窗口, 例如合并任务a和任务b"); TMO 7 节点 (合并 / 拆分 / 依赖 / 批量 / 汇总 / 重分配 / 元数据) 增量升档 v0.1 → v0.2, 加 5 UC (UC-09..UC-13) + 7 機能 (F-19..F-25) + 5 NFR (NFR-TMO-01..05) + 1 想定シナリオ (S-06) + 4 用語 (TMO / TaskOperationsManager / DAG / Supersede) + ADR-0046 索引; 随 02-basic-design.md + 03-detailed-design.md 同步升档 v0.2 + PHASE-LANGGRAPH-TMO-IMPL-REPORT 7 子项实装 phase 起 |
+| 6 | SRE Lead (v0.2 升版) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补 |
+| 7 | 平台工程师 (v0.2 升版) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补 |
+| 8 | 评审主持人 (v0.2 升版) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补 |
+| 9 | 项目负责人 (PM, v0.2 升版) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补 |
 
 ## 9. 修订历史
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：2-level hierarchical LangGraph 架构 (全体代理 L0 + 任务卡子代理 L1) 落档；18 機能 / 4 NFR 類 / 14 制約 / 20 用語 / 5 想定シナリオ / 18 UC | 2026-09-03 17:51 JST 用户发令"另起一套架构view,专门设计langgraph相关的功能,需求文档、基本设计、详细设计按照日本IPA规则设计" |
+| v0.2 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **TMO (Task Management Operations) 升版**: 加 5 UC (UC-09..UC-13: 合并 / 拆分 / 依赖编排 / 批量 / 跨任务汇总+元数据) + 7 機能 (F-19..F-25) + 5 NFR (NFR-TMO-01..05: 合并原子性 / 拆分可逆 / 批量一致性 / 血缘可追溯 / DAG 校验) + 1 想定シナリオ (S-06 合并任务 a 和 b) + 4 用語 (TMO / TaskOperationsManager / Task Relationship Graph / Supersede) + 1 制約派生 (L1↔L1 禁止 → TMO 全部 L0 协调) + 2 已知缺口 (TMO 实装 P0 / 守门 #13 a 实证待补) + 5 签字栏 v0.2 升版行 + ADR-0046 索引 + 引用 PHASE-LANGGRAPH-TMO-IMPL-REPORT 实装 phase 计划; 随 02-basic-design.md + 03-detailed-design.md 同步升档 v0.2; 守门 #1+#5+#6+#7+#9+#10+#12+#19+#20+#22+#13 跨 stage 全过 (文档工作无 .rs 改动, cargo check 不需要跑) | 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡, 做整体统筹规划, 发号施令的入口是底端聊天窗口, 例如合并任务a和任务b这种全局管理的ai功能是要能实现的" (per ask_d076c26d3fbf599eec1c32fd 拍板 (1) 范围=完整 7 节点全覆盖 (2) 文档策略=原地升版 v0.1 → v0.2 (3) 实装阶段=文档+commit 一并落), ~0.06M token 估 |
 
 ---
 
