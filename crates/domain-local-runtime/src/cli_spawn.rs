@@ -30,9 +30,13 @@ use super::process::{
 /// 进程 spawn 配置
 #[derive(Debug, Clone)]
 pub struct CliSpawnConfig {
+    /// 执行的命令
     pub command: String,
+    /// 命令参数
     pub args: Vec<String>,
+    /// 环境变量
     pub env: HashMap<String, String>,
+    /// 工作目录(worktree)
     pub worktree_dir: String,
 }
 
@@ -42,12 +46,14 @@ pub struct CliSpawnConfig {
 
 /// 真实 CLI spawn 模式 (替代 DefaultLocalRuntime 的 mock spawn_cli)
 pub struct RealCliRuntime {
+    /// 是否启用 mock 回退模式
     pub mock_fallback: bool,
     /// 活跃 child 句柄 (用于取消)
     active: Arc<Mutex<HashMap<Uuid, Child>>>,
 }
 
 impl RealCliRuntime {
+    /// 创建真实 spawn 模式的 RealCliRuntime
     pub fn new() -> Self {
         Self {
             mock_fallback: false,
@@ -55,6 +61,7 @@ impl RealCliRuntime {
         }
     }
 
+    /// 创建 mock 回退模式的 RealCliRuntime
     pub fn with_mock_fallback() -> Self {
         Self {
             mock_fallback: true,
@@ -266,12 +273,16 @@ impl RealCliRuntime {
 // 3. error
 // =====================================================================
 
+/// CLI spawn 模块错误类型
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum CliSpawnError {
+    /// 命令不存在
     #[error("命令不存在: {0}")]
     CommandNotFound(String),
+    /// spawn IO 错误
     #[error("spawn IO 错误: {0}")]
     Io(String),
+    /// 权限拒绝
     #[error("权限拒绝: {0}")]
     PermissionDenied(String),
 }

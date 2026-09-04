@@ -33,10 +33,15 @@ use super::process::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum HttpMethod {
+    /// GET
     Get,
+    /// POST
     Post,
+    /// PUT
     Put,
+    /// DELETE
     Delete,
+    /// PATCH
     Patch,
 }
 
@@ -49,8 +54,11 @@ impl Default for HttpMethod {
 /// HTTP 请求体
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HttpRequest {
+    /// 请求方法
     pub method: HttpMethod,
+    /// 请求 URL
     pub url: String,
+    /// 请求头
     pub headers: HashMap<String, String>,
     /// 请求体 (JSON 序列化)
     pub body: Option<serde_json::Value>,
@@ -59,6 +67,7 @@ pub struct HttpRequest {
 }
 
 impl HttpRequest {
+    /// 创建一个 POST 请求(60s 默认超时)
     pub fn new_post(url: impl Into<String>, body: serde_json::Value) -> Self {
         Self {
             method: HttpMethod::Post,
@@ -73,9 +82,13 @@ impl HttpRequest {
 /// HTTP 响应元数据
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HttpResponse {
+    /// HTTP 状态码
     pub status: u16,
+    /// 响应头
     pub headers: HashMap<String, String>,
-    pub body: String, // 完整 body (流式累积)
+    /// 完整 body (流式累积)
+    pub body: String,
+    /// 请求延迟(毫秒)
     pub latency_ms: u64,
 }
 
@@ -89,6 +102,7 @@ pub struct HttpClient {
 }
 
 impl HttpClient {
+    /// 创建一个新的 HTTP 客户端
     pub fn new() -> Self {
         Self {
             clients: Mutex::new(HashMap::new()),
@@ -271,14 +285,19 @@ impl Default for HttpClient {
 // 3. error
 // =====================================================================
 
+/// **HttpError** — http_client 模块错误类型
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum HttpError {
+    /// HTTP 请求失败
     #[error("HTTP 请求失败: {0}")]
     Request(String),
+    /// HTTP 流读取失败
     #[error("HTTP 流读取失败: {0}")]
     Stream(String),
+    /// Client 构建失败
     #[error("Client 构建失败: {0}")]
     ClientBuild(String),
+    /// URL 格式错误
     #[error("URL 格式错误: {0}")]
     InvalidUrl(String),
 }
@@ -289,13 +308,16 @@ pub enum HttpError {
 
 /// 真实 HTTP 模式的 LocalRuntime (替换 DefaultLocalRuntime 的 mock invoke_http)
 pub struct RealHttpRuntime {
+    /// 内部 HTTP 客户端
     pub http: Arc<HttpClient>,
-    pub mock_fallback: bool, // 网络不可用时 fallback 到 mock
+    /// 网络不可用时 fallback 到 mock
+    pub mock_fallback: bool,
     /// 活跃进程
     active: Mutex<HashMap<Uuid, mpsc::Sender<()>>>, // cancel signal
 }
 
 impl RealHttpRuntime {
+    /// 创建启用 mock fallback 的运行时
     pub fn new() -> Self {
         Self {
             http: Arc::new(HttpClient::new()),
@@ -304,6 +326,7 @@ impl RealHttpRuntime {
         }
     }
 
+    /// 创建严格网络模式(无 mock fallback)的运行时
     pub fn with_strict_network() -> Self {
         Self {
             http: Arc::new(HttpClient::new()),

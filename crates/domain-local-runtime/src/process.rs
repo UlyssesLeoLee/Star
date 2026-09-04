@@ -22,41 +22,63 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProcessState {
+    /// 已创建,尚未开始运行
     Created,
+    /// 运行中
     Running,
+    /// 已完成
     Completed,
+    /// 已失败
     Failed,
+    /// 已取消
     Cancelled,
 }
 
 /// 单行输出
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OutputLine {
-    pub stream: OutputStream, // stdout / stderr
+    /// 输出流类型(stdout / stderr / system)
+    pub stream: OutputStream,
+    /// 输出内容
     pub content: String,
+    /// 输出时间
     pub at: chrono::DateTime<chrono::Utc>,
 }
 
+/// 输出流类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputStream {
+    /// 标准输出
     Stdout,
+    /// 标准错误
     Stderr,
-    System, // 进程级消息 (启动/退出)
+    /// 进程级消息 (启动/退出)
+    System,
 }
 
 /// 进程描述符
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProcessHandle {
+    /// 进程句柄 ID
     pub id: Uuid,
-    pub pid: Option<u32>, // OS PID (CLI 模式) / None (API 模式)
+    /// OS PID (CLI 模式) / None (API 模式)
+    pub pid: Option<u32>,
+    /// 执行的命令
     pub command: String,
+    /// 命令参数
     pub args: Vec<String>,
+    /// 关联的 worktree ID
     pub worktree_id: Uuid,
+    /// 当前状态
     pub state: ProcessState,
+    /// 开始时间
     pub started_at: chrono::DateTime<chrono::Utc>,
+    /// 结束时间(可选)
     pub finished_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// 退出码(可选)
     pub exit_code: Option<i32>,
+    /// 错误信息(可选)
     pub error: Option<String>,
 }
 
@@ -64,6 +86,7 @@ pub struct ProcessHandle {
 // 2. port — Runtime trait (抽象 CLI spawn + HTTP API)
 // =====================================================================
 
+/// **LocalRuntime** — 本地运行时抽象(CLI spawn + HTTP API)
 #[async_trait]
 pub trait LocalRuntime: Send + Sync {
     /// 启动 CLI 进程 (claude / codex / gemini / aider)
@@ -95,18 +118,25 @@ pub trait LocalRuntime: Send + Sync {
 // 3. error
 // =====================================================================
 
+/// **RuntimeError** — process 模块错误类型
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum RuntimeError {
+    /// 进程启动失败
     #[error("进程启动失败: {0}")]
     SpawnFailed(String),
+    /// HTTP 调用失败
     #[error("HTTP 调用失败: {0}")]
     HttpFailed(String),
+    /// 进程不存在
     #[error("进程不存在: {0}")]
     ProcessNotFound(Uuid),
+    /// 进程已结束, 不能取消
     #[error("进程已结束, 不能取消")]
     AlreadyFinished,
+    /// worktree 目录不存在
     #[error("worktree 目录不存在: {0}")]
     WorktreeDirMissing(String),
+    /// IO 错误
     #[error("IO 错误: {0}")]
     Io(String),
 }
@@ -119,6 +149,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// **DefaultLocalRuntime** — LocalRuntime 默认实现(Phase 1 为内存 mock)
 pub struct DefaultLocalRuntime {
     processes: Arc<Mutex<HashMap<Uuid, ProcessHandle>>>,
     /// mock 模式: 不真 spawn 进程, 只 stub
@@ -126,6 +157,7 @@ pub struct DefaultLocalRuntime {
 }
 
 impl DefaultLocalRuntime {
+    /// 创建 mock 模式的运行时(不真实 spawn 进程)
     pub fn new() -> Self {
         Self {
             processes: Arc::new(Mutex::new(HashMap::new())),
@@ -133,6 +165,7 @@ impl DefaultLocalRuntime {
         }
     }
 
+    /// 创建真实进程模式的运行时(Phase 2)
     pub fn with_real_processes() -> Self {
         Self {
             processes: Arc::new(Mutex::new(HashMap::new())),
