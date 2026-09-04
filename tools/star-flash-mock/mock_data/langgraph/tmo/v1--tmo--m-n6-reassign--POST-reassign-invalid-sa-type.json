@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N6",
+  "method": "POST",
+  "scenario": "reassign-invalid-sa-type",
+  "description": "TMO M-N6 error case: 无效 SA 类型 (SA-99 不存在) → 拒绝 (per 9 SA 类型白名单 SA-01..SA-09 + SA-10)",
+  "request": {
+    "operation": "reassign",
+    "target_task_id": "task-test",
+    "from_sa_type": "SA-09",
+    "to_sa_type": "SA-99"
+  },
+  "response_400": {
+    "error_code": "TMO_INVALID_SA_TYPE",
+    "error_message": "SA-99 not in registry; valid: SA-01..SA-09, SA-10",
+    "valid_types": ["SA-01", "SA-02", "SA-03", "SA-04", "SA-05", "SA-06", "SA-07", "SA-08", "SA-09", "SA-10"]
+  },
+  "fixture_assertion": {
+    "status_code": 400,
+    "error_code": "TMO_INVALID_SA_TYPE"
+  }
+}

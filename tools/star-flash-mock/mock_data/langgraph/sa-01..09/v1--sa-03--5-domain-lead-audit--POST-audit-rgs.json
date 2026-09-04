@@ -1,0 +1,28 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-03",
+  "type": "5-domain-lead-audit",
+  "method": "POST",
+  "scenario": "audit-rgs-5-domain-lead-config",
+  "description": "SA-03 5 域 Lead audit: audit 当前 5 域 Lead 配置 (player/economy/match/social/admin, per 守门 #3 + #14 + AGENTS.md §4 #3)",
+  "request": {
+    "audit_target": "5_domain_lead_config",
+    "leads": ["player", "economy", "match", "social", "admin"]
+  },
+  "response_200": {
+    "audit_id": "audit-uuid-003",
+    "lead_status": {
+      "player": {"真人到位": false, "mavis_proxy": true, "sign_count": 5},
+      "economy": {"真人到位": false, "mavis_proxy": true, "sign_count": 3},
+      "match": {"真人到位": false, "mavis_proxy": true, "sign_count": 2},
+      "social": {"真人到位": false, "mavis_proxy": true, "sign_count": 4},
+      "admin": {"真人到位": false, "mavis_proxy": true, "sign_count": 6}
+    },
+    "racy_check": "R+A 完整 (Mavis 临时代签 per 守门 #3 + #14 4 维)",
+    "violations": []
+  },
+  "fixture_assertion": {
+    "5_leads_audited": true,
+    "no_violation": true
+  }
+}

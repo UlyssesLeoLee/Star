@@ -1,0 +1,27 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-01",
+  "type": "code-review",
+  "method": "POST",
+  "scenario": "review-pr-123",
+  "description": "SA-01 code-review normal case: 审查 PR #123 (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §3 + 03-detailed-design.md §3.3.1 SA-01)",
+  "request": {
+    "pr_id": "PR-123",
+    "repo": "UlyssesLeoLee/Star",
+    "diff_size_kb": 45,
+    "review_categories": ["security", "performance", "test_coverage", "style"]
+  },
+  "response_200": {
+    "review_id": "review-uuid-001",
+    "issues_found": [
+      {"file": "crates/domain-agent/src/lib.rs", "line": 142, "severity": "P1", "category": "security", "message": "RLS 13 類必携缺 tenant_id"},
+      {"file": "tests/integration/test_x.py", "line": 89, "severity": "P2", "category": "test_coverage", "message": "edge case 未覆盖"}
+    ],
+    "approval_status": "request_changes",
+    "estimated_tokens": 8000
+  },
+  "fixture_assertion": {
+    "review_complete": true,
+    "guard_violation_detected": true
+  }
+}

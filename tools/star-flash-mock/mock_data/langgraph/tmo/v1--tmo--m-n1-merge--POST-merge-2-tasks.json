@@ -1,0 +1,37 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N1",
+  "method": "POST",
+  "scenario": "merge-2-tasks",
+  "description": "TMO M-N1 merge_node normal case: merge 2 L1 task cards (SA-09) into 1 (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6.3 M-N1)",
+  "schema_ref": "scripts/automation/task_ops/protocols.py::MergeRequest + MergeResponse",
+  "守门": ["#13 a L1↔L1 禁止 (L0 唯一协调)", "#13 d Transaction append-only (stash_checkpoint_ids)", "#13 c Master RLS 13 類必携 (merged_task 含 tenant_id)"],
+  "request": {
+    "operation": "merge",
+    "target_task_ids": ["task-alpha-7f8a9b", "task-beta-2c3d4e"],
+    "merge_strategy": "context_union",
+    "original_user_input": "合并任务 alpha 和任务 beta",
+    "actor_session_id": "session-2026-09-05-001"
+  },
+  "response_200": {
+    "superseded_tasks": ["task-alpha-7f8a9b", "task-beta-2c3d4e"],
+    "merged_task_id": "task-merged-f5a7b2",
+    "active_tmo_operation": null,
+    "global_context": {
+      "last_tmo_result": {
+        "node": "M-N1",
+        "operation": "merge",
+        "merged_count": 2,
+        "strategy": "context_union"
+      }
+    },
+    "stash_checkpoint_ids": ["stash-alpha-7f8a9b-3a", "stash-beta-2c3d4e-3a"]
+  },
+  "fixture_assertion": {
+    "merged_task_id_format": "task-merged-<6-char-base32>",
+    "superseded_tasks_count": 2,
+    "stash_append_only": true,
+    "global_context_key": "last_tmo_result"
+  }
+}

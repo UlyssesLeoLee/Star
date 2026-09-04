@@ -1,0 +1,24 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Transaction",
+  "table": "audit_event",
+  "method": "DELETE",
+  "scenario": "audit-event-delete-attempt-blocked",
+  "description": "DB Transaction 类: DELETE 尝试被拦截 (per 守门 #13 b T 物理删除禁止, 任何 DELETE FROM audit_event 应返回 ERROR + audit_log 'attempted_delete_on_T')",
+  "request": {
+    "audit_event_id": "audit-event-uuid-001",
+    "attempted_by_session_id": "session-attacker-001"
+  },
+  "response_403": {
+    "error_code": "T_PHYSICAL_DELETE_FORBIDDEN",
+    "error_message": "audit_event is WORM, physical delete not allowed",
+    "wtm_class": "Transaction",
+    "guard_id": "G-WTM-T"
+  },
+  "fixture_assertion": {
+    "status_code": 403,
+    "physical_delete_blocked": true,
+    "attempt_logged_in_audit_audit_event": true
+  }
+}

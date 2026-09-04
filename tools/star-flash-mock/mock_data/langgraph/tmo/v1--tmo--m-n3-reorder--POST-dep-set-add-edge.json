@@ -1,0 +1,31 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N3",
+  "method": "POST",
+  "scenario": "dep-set-add-edge",
+  "description": "TMO M-N3 reorder_node + DAGValidator normal case: 加 1 条 DAG 边 (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6.3 M-N3 + C-20 DAGValidator)",
+  "schema_ref": "scripts/automation/task_ops/nodes/reorder_node.py + dag_validator.py",
+  "守门": ["#13 a L0 唯一协调", "C-20 DAGValidator cycle detection"],
+  "request": {
+    "operation": "dep_set",
+    "dep_set": [["task-aaa-1", "task-bbb-2"]],
+    "actor_session_id": "session-2026-09-05-001"
+  },
+  "response_200": {
+    "edges_added": [["task-aaa-1", "task-bbb-2"]],
+    "cycle_detected": false,
+    "active_tmo_operation": null,
+    "global_context": {
+      "last_tmo_result": {
+        "node": "M-N3",
+        "operation": "dep_set",
+        "edges_added": 1
+      }
+    }
+  },
+  "fixture_assertion": {
+    "dag_valid": true,
+    "cycle_detected": false
+  }
+}

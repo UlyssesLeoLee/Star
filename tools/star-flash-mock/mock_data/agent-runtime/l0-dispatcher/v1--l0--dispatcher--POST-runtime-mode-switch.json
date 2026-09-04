@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "l0-dispatcher",
+  "type": "mode-switch",
+  "method": "POST",
+  "scenario": "runtime-mode-switch-lightweight-to-ecs",
+  "description": "L0 派发层 mode 切换: Lightweight < 10 → ECS ≥ 12, 迟滞区 10-11 保持 (per SRS-001 §6 + §7)",
+  "request": {
+    "resident_agent_count": 13,
+    "previous_mode": "lightweight",
+    "hysteresis_zone_seconds_in": 5
+  },
+  "response_200": {
+    "mode_transition": "lightweight → ecs",
+    "elapsed_seconds_in_hysteresis": 5,
+    "ecs_world_initialized": true,
+    "ecs_archetype_count": 9
+  },
+  "fixture_assertion": {
+    "mode_switch_ok": true,
+    "hysteresis_respected": true
+  }
+}

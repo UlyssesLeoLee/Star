@@ -1,0 +1,22 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N5",
+  "method": "POST",
+  "scenario": "summarize-10-tasks",
+  "description": "TMO M-N5 perf test: 10 个 task 聚合, P95 latency 应 < 500ms",
+  "request": {
+    "operation": "summarize",
+    "target_task_ids_size": 10,
+    "target_task_ids": "<<generated>>",
+    "format": "json"
+  },
+  "response_200": {
+    "summary_json": "<<generated 10-task JSON>>",
+    "elapsed_ms_target_p95": 500
+  },
+  "fixture_assertion": {
+    "perf_target_p95_ms": 500,
+    "task_count": 10
+  }
+}

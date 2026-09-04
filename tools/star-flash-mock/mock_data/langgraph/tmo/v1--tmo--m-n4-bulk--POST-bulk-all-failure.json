@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N4",
+  "method": "POST",
+  "scenario": "bulk-all-failure",
+  "description": "TMO M-N4 all failure case: 全部任务都 cyclic dep → 完全失败 + 全部回滚",
+  "request": {
+    "operation": "bulk_merge",
+    "target_task_ids": ["task-c1", "task-c2", "task-c3"]
+  },
+  "response_500": {
+    "error_code": "TMO_BULK_ALL_FAILED",
+    "success_count": 0,
+    "failure_count": 3,
+    "rollback": true,
+    "rolled_back_tasks": []
+  },
+  "fixture_assertion": {
+    "status_code": 500,
+    "success_count": 0
+  }
+}

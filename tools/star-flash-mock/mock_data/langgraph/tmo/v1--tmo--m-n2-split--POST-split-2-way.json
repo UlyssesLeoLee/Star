@@ -1,0 +1,35 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N2",
+  "method": "POST",
+  "scenario": "split-2-way",
+  "description": "TMO M-N2 split_node normal case: split 1 L1 task into 2 (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6.3 M-N2)",
+  "schema_ref": "scripts/automation/task_ops/protocols.py::SplitRequest + SplitResponse",
+  "守门": ["#13 a L0 唯一协调", "#13 d Transaction append-only (split_into 边)"],
+  "request": {
+    "operation": "split",
+    "target_task_id": "task-mono-7f8a9b",
+    "split_strategy": "context_fork",
+    "split_count": 2,
+    "actor_session_id": "session-2026-09-05-001"
+  },
+  "response_200": {
+    "superseded_tasks": ["task-mono-7f8a9b"],
+    "split_into": ["task-fork-1-a1b2c3", "task-fork-2-d4e5f6"],
+    "active_tmo_operation": null,
+    "global_context": {
+      "last_tmo_result": {
+        "node": "M-N2",
+        "operation": "split",
+        "split_count": 2
+      }
+    },
+    "stash_checkpoint_ids": ["stash-mono-7f8a9b-3a"]
+  },
+  "fixture_assertion": {
+    "split_into_count": 2,
+    "split_into_unique": true,
+    "stash_append_only": true
+  }
+}

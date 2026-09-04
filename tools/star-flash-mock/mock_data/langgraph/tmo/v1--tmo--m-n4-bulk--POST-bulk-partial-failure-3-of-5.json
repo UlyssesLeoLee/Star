@@ -1,0 +1,29 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N4",
+  "method": "POST",
+  "scenario": "bulk-partial-failure-3-of-5",
+  "description": "TMO M-N4 partial failure case: 5 任务中 2 失败 (cyclic dep + missing), 触发部分回滚 (per NFR-TMO-03 partial success ≥ 80%, 3/5=60% 触发回滚)",
+  "request": {
+    "operation": "bulk_merge",
+    "target_task_ids": ["task-001", "task-002-cycle", "task-003", "task-004-missing", "task-005"]
+  },
+  "response_207": {
+    "merged_task_id": null,
+    "success_count": 3,
+    "failure_count": 2,
+    "partial_success": false,
+    "failures": [
+      {"task_id": "task-002-cycle", "error_code": "TMO_CYCLE_DETECTED"},
+      {"task_id": "task-004-missing", "error_code": "TASK_NOT_FOUND"}
+    ],
+    "rollback": true,
+    "rolled_back_tasks": ["task-001", "task-003", "task-005"]
+  },
+  "fixture_assertion": {
+    "status_code": 207,
+    "partial_success_rate": 0.6,
+    "rollback_triggered": true
+  }
+}

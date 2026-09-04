@@ -1,0 +1,24 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Master",
+  "table": "tenant",
+  "method": "DELETE",
+  "scenario": "tenant-delete-attempt-blocked",
+  "description": "DB Master 类: DELETE 尝试被拦截 (per 守门 #13 c M 物理删除禁止, 任何 DELETE FROM tenant 应返回 ERROR + 引导走 soft_delete SCD)",
+  "request": {
+    "tenant_id": "tenant-001"
+  },
+  "response_403": {
+    "error_code": "M_PHYSICAL_DELETE_FORBIDDEN",
+    "error_message": "tenant is Master class with SCD Type 2, physical delete not allowed; use soft_delete",
+    "wtm_class": "Master",
+    "guard_id": "G-WTM-M",
+    "suggested_action": "PUT /api/tenant/:id with {active: false, valid_to: now()} (soft delete SCD Type 2)"
+  },
+  "fixture_assertion": {
+    "status_code": 403,
+    "physical_delete_blocked": true,
+    "soft_delete_suggested": true
+  }
+}

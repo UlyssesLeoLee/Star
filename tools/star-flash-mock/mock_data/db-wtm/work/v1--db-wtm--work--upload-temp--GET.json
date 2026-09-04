@@ -1,0 +1,24 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Work",
+  "table": "upload_temp",
+  "method": "GET",
+  "scenario": "upload-temp-lookup",
+  "description": "DB Work 类: upload_temp (per 守门 #13 a W = 物理删除 / 短 TTL)",
+  "request": {
+    "upload_id": "upload-temp-001"
+  },
+  "response_200": {
+    "upload_id": "upload-temp-001",
+    "file_path": "/tmp/uploads/upload-temp-001",
+    "uploaded_at": "2026-09-05T07:00:00Z",
+    "retention_period_days": 1,
+    "ttl_expires_at": "2026-09-06T07:00:00Z",
+    "physical_delete_on_expiry": true
+  },
+  "fixture_assertion": {
+    "wtm_class": "Work",
+    "retention_period_days": 1
+  }
+}

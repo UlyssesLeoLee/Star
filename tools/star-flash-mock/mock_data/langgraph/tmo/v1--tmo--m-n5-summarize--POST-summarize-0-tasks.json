@@ -1,0 +1,26 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N5",
+  "method": "POST",
+  "scenario": "summarize-0-tasks",
+  "description": "TMO M-N5 edge case: 空 task 列表 → 返回空 summary + 提示",
+  "request": {
+    "operation": "summarize",
+    "target_task_ids": []
+  },
+  "response_200": {
+    "summary_markdown": "| task_id | status | duration_ms | token_usage | guard_violations |\n|---------|--------|-------------|-------------|------------------|",
+    "summary_metrics": {
+      "total_tasks": 0,
+      "completed": 0,
+      "running": 0,
+      "failed": 0,
+      "total_token_usage": 0
+    },
+    "note": "no tasks to summarize"
+  },
+  "fixture_assertion": {
+    "empty_handling": "ok"
+  }
+}

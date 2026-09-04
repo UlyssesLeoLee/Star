@@ -1,0 +1,25 @@
+{
+  "fixture_version": "v1",
+  "module": "l2-pools",
+  "pool": "mcp-pool",
+  "method": "POST",
+  "scenario": "mcp-tool-invoke",
+  "description": "L2 MCP Pool: 16 tool 统一 façade (per ADR-0032 MCP Transport stdio + 03-detailed-design.md)",
+  "request": {
+    "tool_name": "star_mcp__workitem_list",
+    "params": {
+      "tenant_id": "tenant-001",
+      "workspace_id": "ws-001",
+      "limit": 20
+    }
+  },
+  "response_200": {
+    "tool_result_count": 15,
+    "elapsed_ms": 45,
+    "transport": "streamable_http"
+  },
+  "fixture_assertion": {
+    "tool_invocation_ok": true,
+    "elapsed_under_100ms": true
+  }
+}

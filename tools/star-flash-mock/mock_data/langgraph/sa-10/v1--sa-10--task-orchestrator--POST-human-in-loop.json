@@ -1,0 +1,24 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-10",
+  "node": "SA-10",
+  "method": "POST",
+  "scenario": "human-in-loop-interrupt",
+  "description": "SA-10 task-orchestrator human-in-the-loop: 关键 plan step (e.g. delete task) 触发 interrupt 等待用户决策 (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §1.4.2 副シナリオ)",
+  "request": {
+    "plan_id": "plan-uuid-3c4d5e",
+    "user_input": "删除任务 X",
+    "interrupt_trigger": "destructive_op"
+  },
+  "response_200": {
+    "interrupt_id": "interrupt-uuid-4d5e6f",
+    "interrupt_prompt": "确认要删除任务 X? 此操作不可撤销",
+    "pending_decision": "approve / modify / cancel",
+    "checkpoint_stash_id": "stash-3c4d5e-3a"
+  },
+  "fixture_assertion": {
+    "interrupt_triggered": true,
+    "checkpoint_preserved": true,
+    "pending_user_decision": true
+  }
+}

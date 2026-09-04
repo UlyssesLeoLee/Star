@@ -1,6 +1,6 @@
 # Star 平台《Test Design》(测试策略详细设计)
 
-> **文档版本**: v0.5 (2026-08-31) → v0.4 (per 2026-08-31 12:50 JST handoff 兜底, γ+δ 21 P0 引用错位修复, 守门 #11 缺标比错标)
+> **文档版本**: v0.7 (2026-09-05 落地) → v0.6 (per 2026-09-01 16:13 JST 新增 §7 シナリオ)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -11,6 +11,7 @@
 > | v0.4 | 2026-08-31 | handoff 兜底 γ+δ 21 P0 引用错位修复注记 (per `QA-DRIFT-001.md` §2.3): T1/T2/T3 自指引用 §6.2.1/§6.3.3/§6.3.4 实为 test-design 自身章节, 应改 requirements.md §8.3/§27.6/§29.1; S1-S5 同步点对不上实际章节; 13 处 tenant_id 端点声明; §6.x 引用 §X 与 7 份设计书实际章节未穷举对账。本 v0.4 不动原 v0.3 章节内容, 在 §0 末追加"驱动上游回填清单"段, 守门 #12 + #11 缺标比错标 + #9 author Ulysses 唯一 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
 > | v0.5 | 2026-08-31 | handoff 兜底分批 2: 4 wt 代码跟进落地 (per AGENTS.md v0.24 / `STAR-P3-WBS-001.md` §13 / 2026-08-31 12:39 JST Ulysses 指令"开子代理和worktree并行处理" 拍板 4 wt 并行 + AC 矩阵跟 T1), 守门 #1+#9+#12 跨 stage 全过 (origin/main 25 → 29 ahead, 285/285 vitest pass + tsc 0 + cargo 0, 4 worker 子代理 status="succeeded" 实证 5 commits 在 main chain 上):<br>- **T1 ValidationResult.Level 维度 (REQ-TST-001/002)** (per §6.2.1): `5df5a97` (types TestLevel 4 值 + ValidationResultRecord + AcceptanceCoverageReport) + `4fa31d7` (19 测试 + AC 矩阵生成器) + `3124902` (merge), commit 实测 frontend/src/mocks/handlers/validation.ts (3 endpoint) + data/validation.ts (10 rows 4 Level 全覆盖) + schemas/validation.ts + 19 测试 + `scripts/generate_ac_matrix.py` (249 行) + `docs/ac-test-matrix.csv` (35 行 = 1 header + 34 REQ 行, REQ-TST-001/002 covered 其余 30 gap)<br>- **T2 DesignArtifact + WorkItem Guard (REQ-DSG-001/002)** (per §6.3.3): `43355ed` + `a24f4d5` (merge), 37 测试 (13 guard 纯函数 `checkAllArtifactsApproved` 4 reason 分支 + 24 handler 跨 5 endpoint 状态机), commit 实测 frontend/src/lib/workitem-guard.ts 纯函数 + mocks/handlers/design-artifacts.ts (5 endpoint 含 transition 状态机 nextStatusFromDecision 纯函数)<br>- **T3 IncidentRecord + 3 项非能力负向测试 (REQ-OPS-001/002/003)** (per §6.3.4): `e9b4a84` + `631f562` (merge), 22 测试 (8 guard `validateIncidentRecord` 5 失败分类 + 14 handler 含 **3 项非能力 404 negative missing** 端点: `GET /api/incidents/probe-production` / `POST /api/incidents/process-alert` / `POST /api/incidents/:id/auto-rollback` 错误文案占位 "Capability not implemented (per REQ-OPS-003 §30.6 boundary)"), commit 实测 frontend/src/lib/incident-guard.ts + mocks/handlers/incidents.ts (5 endpoint)<br>- **5 域业务 mock 完整化 (test-design §2.1.2 + §3.1 + §3.3)** (per §0 端点清单扩展): `3dde2b4` + `b424611` (merge), 31 测试 (跨 player/economy/match/social/admin 5 域 + 既有 agents/inbox/analytics + 新加 workspaces/billing/worktrees/comments/tenants+rbac), commit 实测 frontend/src/mocks/schemas/five-domain.ts (243 行 6 type guard) + data/five-domain.ts (338 行 6 dataset) + 5 handler 文件 + handlers-5d.test.ts (31 tests)<br>- **不变量保留**: 本 v0.5 不改 v0.3 章节内容 (per 守门 #12 缺标比错标 + 守门 #11 不沿用 v0.x 旧叙事), 仅在文末 §16 追加"代码跟进实证"段, 引用 4 wt commit 短码 + 守门实证结果; 字段细节 TBD 维持 §6.2.1/§6.3.3/§6.3.4 不动, 等 basic-design 拍板后由上游 AI 回填 (per v0.4 §0.1 驱动上游回填清单机制)<br>- **守门 #1+#9+#12 跨 stage 全过**: vitest 285/285 (35 files, 109 new = 19+37+22+31) / tsc --noEmit 0 错 / cargo check --workspace --all-targets 0 err (11.29s, 11 warning pre-existing) / author Ulysses 唯一 / 0 子代理 RPC 不可靠实证 (status="succeeded" 实证 5 commits 全在 main chain 上) | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
 | v0.6 | 2026-09-01 | 新增 §7 シナリオ + テストデータ 章节 (per 2026-09-01 16:13 JST Ulysses 拍板 "加 §X 场景/数据章"); 覆盖 25 domain Module + 5 域业务 (per 守门 #3 历史治理命名) + 6 E2E 关键流程 + 3 AC 跨引用 (VAL-001/DSG-001/OPS-001); 原 §7-§16 顺位 §8-§17 同步 (修订历史 v0.1 ~ v0.5 中 §N 引用保留, 仅 body 内容 + 新增 §7 引用新编号); Test-J.14 ~ J.17 追加 (per 守门 #11 缺标比错标); 守门 #1 + #9 + #12 三过 (docs-only 改动, 无代码变更) | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
+| v0.7 | 2026-09-05 | 全面更新测试设计书覆盖最新架构 (per 2026-09-05 06:50 JST user 拍板 "全面更新测试设计书和测试用例，覆盖最新架构的测试内容，并基于它更新mock项目里的脚本和测试数据等"); 新增 §18 LangGraph TMO 7 节点 (M-N1..M-N7 + 7 协议 + 5 Reducer + 5 route + 7 metrics) + §19 SA-10 task-orchestrator (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6.3) + §20 9 SA 类型 (SA-01..SA-09, per LangGraph 02 §3) + §21 Agent Runtime (L0 派发 + L1 ECS + L2 业务池 + 9 Archetype + 13 Systems + G-1~G-18, per docs/architecture/2026-09-03-agent-runtime/02-basic-design.md v0.1 + SRS-001) + §22 16 MCP tool (per AGENTS.md §7 #1 + ADR-0032) + §23 Streamable HTTP (session 重连 + Server-push + Last-Event-ID + DELETE, per AGENTS.md §7 #3 D.5+/D.7+) + §24 DB W/T/M 三類横展强制分类 (per 守门 #13 + docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.1) + §25 5 域 Lead 守门 (决策 scope / RACI / 到位 timeline / Mavis 代签边界 4 维, per 守门 #3 + #14); 新建 `tools/star-flash-mock/` (85 份 fixture + 9 份回归脚本 + 2 k3s yaml + 1 docs 报告, per 2026-09-04 17:47 JST 偏好"测试脚本+数据归入 mock 项目" + 9/1 13:03+13:05 JST envoy 独立 deployment 偏好); 不改原 §0-§17 章节内容 (per 守门 #12 不沿用 v0.x 旧叙事); 守门 #1 + #9 + #12 三过 (docs-only + 1 yaml k3s, 无 cargo / pytest 落地) | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
 
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/api-design.md` v0.1,`docs/security-design.md` v0.1
 > **下游**: Implementation(测试代码 + CI 配置)、Operation(测试环境 + 监控)
@@ -2076,4 +2077,359 @@ apps/web/
 
 ---
 
-**END of Test Design v0.5**
+## 18. LangGraph TMO 7 节点 (Task Management Operations, per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6.3 + 03-detailed-design.md §3.2)
+
+> **范围**: Star-LG TMO 7 节点 (M-N1..M-N7) + 7 协议 + 5 Reducer + 5 route + 7 metrics 完整测试设计
+> **守门**: 守门 #1+#9+#12+#13 a (L0 唯一协调) + #13 d (Transaction append-only) + #13 c (Master RLS 13 類必携)
+> **现有测试 (per `tests/integration/test_tmo_*.py` + `tests/unit/test_task_ops/test_*.py` 12 份)**: 88/88 pytest pass (per HANDOFF-ST-001 v1.6 + PR #14 14 commit squash)
+
+### 18.1 TMO 7 节点测试设计矩阵
+
+| Node | 名称 | 现有 UT | 现有 IT | 测试设计覆盖 | 优先级 |
+|---|---|---|---|---|---|
+| **M-N1** | merge_node | `test_merge_node.py` 9 cases | `test_tmo_merge.py` IT-10 6 cases | normal (2-task merge) + cyclic dep (TMO_CYCLE_DETECTED 409) + invalid count (TMO_INVALID_TARGET_COUNT 400) | P0 |
+| **M-N2** | split_node | `test_split_node.py` 16 cases | `test_tmo_split.py` IT-11 6 cases | normal (2-way) + checkpoint_fork (3-way) + count too small (400) | P0 |
+| **M-N3** | reorder_node (DAGValidator) | `test_reorder_node.py` 13 cases + `test_dag_validator.py` 16 cases | `test_tmo_bulk_dag.py` IT-12 7 cases | add edge (200) + cycle detected (409) + batch 100 edges (perf) | P0 |
+| **M-N4** | bulk_node (BulkOperationQueue) | `test_bulk_node.py` 18 cases | `test_tmo_bulk_dag.py` 4 cases | bulk-merge 5 (200) + partial failure 3-of-5 (207) + all failure (500) + NFR-TMO-03 partial success ≥ 80% | P0 |
+| **M-N5** | summarize_node (SummarizeCollector) | (TBD, v0.8 落地) | (TBD) | summarize 3 tasks (markdown_table) + 0 tasks (空) + 10 tasks (perf P95 < 500ms) | P0 |
+| **M-N6** | reassign_node (ReassignManager) | (TBD) | (TBD) | SA-09→SA-02 normal + mid-execution interrupt + invalid SA type (400) | P1 |
+| **M-N7** | metadata_node (MetadataRegistry) | (TBD) | `test_metadata_node_persist.py` + `test_routes_tmo_metadata.py` + `test_task_metadata_ddl.py` + `test_task_metadata_repo.py` 4 cases | add (SCD v1) + update SCD v2 + soft-delete SCD v3 (active=false) | P0 |
+
+### 18.2 TMO 7 协议测试设计 (per `scripts/automation/task_ops/protocols.py`)
+
+| 协议 | 方向 | 现有测试 | 测试设计 |
+|---|---|---|---|
+| `merge_request` / `merge_response` | L0→L1 (M-N1) | test_tmo_merge.py | 字段 type validation + 守门 ≥ 2 target_task_ids + reducer operator.add |
+| `split_request` / `split_response` | L0→L1 (M-N2) | test_tmo_split.py | 字段 type + 守门 split_count ≥ 2 + checkpoint_fork strategy |
+| `dep_set` | L0→L1 (M-N3) | test_dag_validator.py | dep_set list[(from, to)] + cycle detection O(V+E) |
+| `bulk_action` | L0→L1 (M-N4) | test_bulk_node.py | N target_task_ids + NFR-TMO-03 partial success ≥ 80% + asyncio.gather |
+| `reassign_request` | L0→L1 (M-N6) | (TBD) | from_sa_type / to_sa_type 白名单 (SA-01..SA-09 + SA-10) + checkpoint preserved |
+| `metadata_update` | L0→L0 (M-N7) | test_metadata_node_persist.py | tenant_id + workspace_ids 必携 (守门 #13 c Master RLS) |
+| `summarize_result` | L0→UI (M-N5) | (TBD) | markdown_table / json / csv 3 format |
+
+### 18.3 TMO 5 Reducer + 5 route + 7 metrics 测试设计
+
+| 类型 | 名称 | 测试设计 |
+|---|---|---|
+| **5 Reducer** | operator.add (active_subagents / completed_subagents / conversation_history) + dict update (global_context) + None 强制重置 (active_tmo_operation) | test_protocols.py 单元测试 |
+| **5 route** | LangGraph StateGraph 5 conditional edge (parse_intent → dispatch/collect/respond/interrupt/tool_node) | test_tmo_stategraph.py 集成测试 |
+| **7 metrics** | per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6.5: tmo_op_count / tmo_op_latency_p95 / tmo_partial_failure_rate / tmo_checkpoint_stash_size / tmo_active_tasks / tmo_dag_cycle_count / tmo_metadata_scd_version | 配合 Prometheus exporter |
+
+### 18.4 TMO mock 落地 (per `tools/star-flash-mock/mock_data/langgraph/tmo/` 21 份)
+
+| fixture | 行 | 测试用途 |
+|---|---|---|
+| `v1--tmo--m-n1-merge--POST-merge-2-tasks.json` | 28 | M-N1 normal 2-task merge |
+| `v1--tmo--m-n1-merge--POST-merge-cyclic-dep.json` | 25 | M-N1 cycle detection error 409 |
+| `v1--tmo--m-n1-merge--POST-merge-less-than-2.json` | 19 | M-N1 invalid count 400 |
+| `v1--tmo--m-n2-split--POST-split-2-way.json` | 26 | M-N2 normal 2-way |
+| `v1--tmo--m-n2-split--POST-split-checkpoint-fork.json` | 20 | M-N2 checkpoint_fork strategy |
+| `v1--tmo--m-n2-split--POST-split-count-too-small.json` | 14 | M-N2 count too small 400 |
+| `v1--tmo--m-n3-reorder--POST-dep-set-add-edge.json` | 26 | M-N3 add edge normal |
+| `v1--tmo--m-n3-reorder--POST-dep-set-cycle-detected.json` | 19 | M-N3 cycle detected 409 |
+| `v1--tmo--m-n3-reorder--POST-dep-set-batch-100-edges.json` | 17 | M-N3 perf P95 < 100ms |
+| `v1--tmo--m-n4-bulk--POST-bulk-merge-5-tasks.json` | 27 | M-N4 normal 5-task merge |
+| `v1--tmo--m-n4-bulk--POST-bulk-partial-failure-3-of-5.json` | 26 | M-N4 partial failure 207 |
+| `v1--tmo--m-n4-bulk--POST-bulk-all-failure.json` | 20 | M-N4 all failure 500 |
+| `v1--tmo--m-n5-summarize--POST-summarize-3-tasks.json` | 31 | M-N5 markdown_table 3 tasks |
+| `v1--tmo--m-n5-summarize--POST-summarize-0-tasks.json` | 19 | M-N5 empty 0 tasks |
+| `v1--tmo--m-n5-summarize--POST-summarize-10-tasks.json` | 18 | M-N5 perf P95 < 500ms |
+| `v1--tmo--m-n6-reassign--POST-reassign-sa-09-to-sa-02.json` | 25 | M-N6 normal reassign |
+| `v1--tmo--m-n6-reassign--POST-reassign-mid-execution.json` | 23 | M-N6 mid-execution interrupt |
+| `v1--tmo--m-n6-reassign--POST-reassign-invalid-sa-type.json` | 18 | M-N6 invalid SA type 400 |
+| `v1--tmo--m-n7-metadata--POST-metadata-add.json` | 32 | M-N7 add SCD v1 |
+| `v1--tmo--m-n7-metadata--POST-metadata-update-scd.json` | 26 | M-N7 update SCD v2 |
+| `v1--tmo--m-n7-metadata--DELETE-metadata-soft-delete.json` | 21 | M-N7 soft-delete SCD v3 |
+
+**回归脚本**: `tools/star-flash-mock/scripts/regression-test-langgraph.sh` 跑 TMO 7 节点 fixture 检查 + pytest
+
+### 18.5 TMO 已知缺口 (per 守门 #11 缺标比错标)
+
+- **缺口 #1**: M-N5 SummarizeCollector / M-N6 ReassignManager 无独立 UT (per `tests/unit/test_task_ops/` 5 份不含这 2 节点), 等 v0.8 落地
+- **缺口 #2**: TMO 5 Reducer 单元测试缺失, 等 v0.8 补
+- **缺口 #3**: TMO 5 route LangGraph conditional edge 集成测试缺失, 等 v0.8 补
+- **缺口 #4**: TMO 7 metrics Prometheus exporter 落地, 等 v0.8 补
+
+---
+
+## 19. SA-10 task-orchestrator (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §3.6 + `scripts/automation/sub_agent/types/sa_10_task_orchestrator.py`)
+
+> **范围**: SA-10 跨任务编排型 sub-agent (per 9/4 19:15 JST 用户发令"langgraph功能需要可以操控任务卡, 合并任务a和任务b")
+> **守门**: 守门 #9 v20 子代理 dispatch 必先 brief + 守门 #19 agent 交互 Python 化 + 守门 #4 token-OLU
+
+### 19.1 SA-10 测试设计
+
+| 测试场景 | fixture | 现有测试 | 测试设计 |
+|---|---|---|---|
+| 简单 plan (parse → tmo_op → respond) | `v1--sa-10--task-orchestrator--POST-plan-3-tasks.json` | `test_tmo_merge.py` IT-10-A | 3 step plan, estimated_total_tokens / estimated_total_ms |
+| Execute phase 真实调 TMO | `v1--sa-10--task-orchestrator--POST-execute-merge.json` | `test_tmo_merge.py` IT-10 | 调 M-N1 merge_node + 接收 merge_response 写入 global_context |
+| Human-in-the-loop interrupt | `v1--sa-10--task-orchestrator--POST-human-in-loop.json` | (TBD) | interrupt 节点触发 + checkpoint stash + pending_decision |
+| 守门 #9 v20 violation | `v1--sa-10--task-orchestrator--POST-guard-violation.json` | (TBD) | 缺 brief_path → 拒绝 400 GUARD_NO_BRIEF |
+| 多 TMO op 编排 | `v1--sa-10--task-orchestrator--POST-multi-task-orchestration.json` | (TBD) | M-N1 merge + M-N2 split + M-N3 reorder 顺序 |
+| Token budget 超限 | `v1--sa-10--task-orchestrator--POST-token-budget-exceeded.json` | (TBD) | estimated_total_tokens > session 剩余 budget → 429 TOKEN_BUDGET_EXCEEDED |
+
+### 19.2 SA-10 已知缺口 (per 守门 #11 缺标比错标)
+
+- **缺口 #1**: 现有 5 份 UT + 1 份 IT 仅覆盖 2 case (plan + execute), 缺 4 case (interrupt / guard violation / multi-task / token budget)
+- **缺口 #2**: 守门 #9 v20 (sub-agent dispatch 必先 brief) 实证缺失, 等 P3-B 补
+- **缺口 #3**: Token budget enforcement 实装缺失 (per STAR-OLU-001.md 1 SRE·周 ≈ 1.2M tokens, 但 SA-10 当前无 budget 强制)
+
+---
+
+## 20. 9 SA 类型 (SA-01..SA-09, per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §3 + 03-detailed-design.md §3.3)
+
+> **范围**: 9 类型 sub-agent 各 1 fixture + 9 个测试设计表
+> **守门**: 守门 #13 a L1↔L1 禁止 (L0 唯一协调) + 守门 #19 agent 交互 Python 化
+
+### 20.1 9 SA 类型测试设计矩阵
+
+| SA Type | 名称 | 现有测试 | fixture | 测试设计 |
+|---|---|---|---|---|
+| **SA-01** | code-review | (TBD) | `v1--sa-01--code-review--POST-review-pr.json` | PR review + 4 review_categories (security / performance / test_coverage / style) + issues_found severity P0/P1/P2 |
+| **SA-02** | test-gen | (TBD) | `v1--sa-02--test-gen--POST-generate-tests.json` | domain-x 自动生成 unit + integration tests + coverage ≥ 80% |
+| **SA-03** | 5-domain-lead-audit | (TBD) | `v1--sa-03--5-domain-lead-audit--POST-audit-rgs.json` | 5 域 Lead 真人到位 + mavis_proxy + sign_count 审计 + RACI check + 守门 #3 + #14 |
+| **SA-04** | git-ops | (TBD) | `v1--sa-04--git-ops--POST-commit-and-push.json` | commit + push origin + author=Ulysses + 守门 #1 R-05 反转 + 守门 #1a 401 不重试 |
+| **SA-05** | doc-sync | (TBD) | `v1--sa-05--doc-sync--POST-sync-docs.md` | AGENTS.md / test-design.md / HANDBOOK 同步 + 守门 #12 + #15 死循环饱和边界 |
+| **SA-06** | refactor | (TBD) | `v1--sa-06--refactor--POST-refactor-h2-3domain.json` | H2 3 domain ActorContext 改造 + 跨 session 续 |
+| **SA-07** | db-migration | (TBD) | `v1--sa-07--db-migration--POST-migration-wtm.json` | DB W/T/M 三類横展 + 守门 #13 100% 覆盖 |
+| **SA-08** | domain-dev | (TBD) | `v1--sa-08--domain-dev--POST-implement-domain-agent.md` | domain-* crate port + service + adapter + unit + integration tests + 守门 #7 0 unsafe + #13 a/b/c/d + #10 author |
+| **SA-09** | free-form | (TBD) | `v1--sa-09--free-form--POST-natural-language-task.json` | 自然语言任务 LLM 分解子任务 + web_search + read_doc + synthesize |
+
+### 20.2 9 SA 已知缺口 (per 守门 #11 缺标比错标)
+
+- **缺口 #1**: 9 SA 各 1 fixture 仅代表性, 缺 normal + edge + error 3 类完整
+- **缺口 #2**: 9 SA 真实实现落地 (per 03-detailed-design.md §3.3), 当前 SA-10 + 5 域业务 mock 完整化 (per v0.6 §17.4), 其余 8 SA 落地待 P3-C
+- **缺口 #3**: 9 SA 真实 pytest 落地, 当前 0/9 落地, 等 P3-C 补
+
+---
+
+## 21. Agent Runtime (per docs/architecture/2026-09-03-agent-runtime/02-basic-design.md v0.1 + SRS-001)
+
+> **范围**: STAR Agent Runtime (Rust Hybrid ECS + Lightweight + Event Driven + Shared Runtime + HOT/WARM/COLD) - L0 派发 + L1 ECS + L2 业务池
+> **守门**: 守门 #1+#9+#12+#24 v24 (L0 派发层 subprocess 池扩展)
+> **现有测试**: 0 份 (per main HEAD ee23733, 9/5 06:39 刚落地 v0.1)
+
+### 21.1 Agent Runtime 3 层测试设计
+
+| 层 | 组件 | 测试设计 | 现有测试 | fixture |
+|---|---|---|---|---|
+| **L0 派发** | Tokio + SQLite WAL + multiprocessing.Pool(8-16) + 速率控制 + Backpressure | G-1 任务队列无持久化缺口 + G-6 速率控制 + G-7 Backpressure | (TBD) | `v1--l0--dispatcher--POST-dispatch-task.json` + `v1--l0--dispatcher--POST-backpressure-throttle.json` + `v1--l0--dispatcher--POST-runtime-mode-switch.json` |
+| **L1 ECS** | bevy_ecs / flecs + 9 Archetype (SA-01..SA-09) + 13 Systems + Runtime 双模式 (Lightweight < 10 / ECS ≥ 12 + 迟滞区 10-11) | G-2 ECS 选型 + G-8..G-13 13 Systems + 守门 #19 | (TBD) | `v1--l1--ecs--archetype-sa-01.json` + `v1--l1--ecs--system-lifecycle-hot-to-warm.json` |
+| **L2 业务池** | LLM Pool (8 providers) + MCP Pool + HTTP Pool + Tool Registry + RAG Pool + Tokenizer + Rate Limiter + Circuit Breaker | G-14 LLM Pool + G-15 MCP Pool + G-16 Circuit Breaker | (TBD) | `v1--l2--llm-pool--GET-status.json` + `v1--l2--mcp-pool--POST-invoke-tool.json` |
+
+### 21.2 9 Archetype × 13 Systems × G-1~G-18 测试设计
+
+| 维度 | 数量 | 现有 | 缺标 |
+|---|---|---|---|
+| 9 Archetype (SA-01..SA-09) | 9 | 1/9 (SA-01 fixture) | 8 缺 |
+| 13 Systems (Scheduler / Lifecycle / Event / Planner / Llm / Tool / Mcp / Retrieval / Context / Memory / Permission / Persistence / Metrics) | 13 | 0/13 | 13 缺 |
+| 18 守门 (G-1~G-18, per SRS-001) | 18 | 0/18 | 18 缺 (缺: 任务队列无持久化 + ECS 选型 + ...) |
+
+### 21.3 Agent Runtime 已知缺口 (per 守门 #11 缺标比错标)
+
+- **缺口 #1**: 当前 0/9 Archetype fixture (只 1 SA-01), 等 v0.8 补全
+- **缺口 #2**: 0/13 Systems fixture
+- **缺口 #3**: 0/18 G-* 守门 fixture
+- **缺口 #4**: 0/8 L2 Pool fixture (只 LLM Pool + MCP Pool)
+- **缺口 #5**: Rust cargo 落地 (per 守门 #4.1 v16 触发 P0-1b 246→0 err, 但当前未启动)
+- **缺口 #6**: 1M logical agents on 16-32GB 单机 NFR 压测落地 (per SRS-001 §5)
+
+---
+
+## 22. 16 MCP tool (per AGENTS.md §7 #1 + ADR-0032 MCP Transport stdio)
+
+> **范围**: 16 MCP tool 完整测试设计 (per AGENTS.md §7 #1 "16 tool 真实数据源接入")
+> **守门**: 守门 #1+#12+AGENTS.md §7 #1 + ADR-0032
+
+### 22.1 16 MCP tool 测试设计矩阵
+
+| # | 工具 | 现有 fixture | 现有测试 | 测试设计 |
+|---|---|---|---|---|
+| 1 | `workitem_list` | ✅ | (TBD) | tenant_id 必携 + RLS 13 類 + 列表 limit |
+| 2 | `workitem_create` | ✅ | (TBD) | tenant_id + workspace_id + 字段 + audit 记录 |
+| 3 | `workitem_update` | ❌ | (TBD) | 缺标 |
+| 4 | `workitem_delete` | ❌ | (TBD) | 缺标 (per 守门 #13 b T 物理删除禁止) |
+| 5 | `worktree_list` | ❌ | (TBD) | 缺标 |
+| 6 | `worktree_create` | ❌ | (TBD) | 缺标 |
+| 7 | `agents_list` | ✅ | (TBD) | status_filter + sa_types 验证 |
+| 8 | `sessions_create` | ✅ | (TBD) | lease_ttl + heartbeat_required + 守门 #13 a |
+| 9 | `sessions_heartbeat` | ❌ | (TBD) | 缺标 |
+| 10 | `notifications` | ❌ | (TBD) | 缺标 (per 守门 #13 a Work 类短 TTL) |
+| 11 | `integrations` | ❌ | (TBD) | 缺标 (per §18 Integration Webhook) |
+| 12 | `billing_usage` | ✅ | (TBD) | 5 域 economy + token-OLU 守门 #4 |
+| 13 | `validation` | ❌ | (TBD) | 缺标 (per VAL-001 四重门) |
+| 14 | `identity` | ❌ | (TBD) | 缺标 (per 5 域 player) |
+| 15 | `cost` | ❌ | (TBD) | 缺标 (per 5 域 economy) |
+| 16 | `tools_invoke` | ✅ | (TBD) | 16 tool 统一入口 + 守门 #9 v20 brief 必先 |
+
+### 22.2 MCP 已知缺口 (per 守门 #11 缺标比错标)
+
+- **缺口 #1**: 16 tool 仅 6 fixture, 缺 10 (workitem_update / workitem_delete / worktree_list / worktree_create / sessions_heartbeat / notifications / integrations / validation / identity / cost)
+- **缺口 #2**: MCP tool 真实接入 e2e (per AGENTS.md §7 #1), 当前 3/16 真实接入 (workitem_list / workitem_create / tools_invoke), 剩 13 留 P2 缺 service
+- **缺口 #3**: MCP 16 tool 跨 5 域 RACI 映射缺失 (per 守门 #3 + #14)
+
+---
+
+## 23. Streamable HTTP (per AGENTS.md §7 #3 D.5+ + D.7+)
+
+> **范围**: MCP Streamable HTTP spec 完整实现 (session 重连 / Server-push / Last-Event-ID / DELETE)
+> **守门**: 守门 #1+#3+#12 (per AGENTS.md §7 #3 D.5+ + D.7+ + 守门 #24 v24 subprocess 池扩展)
+
+### 23.1 Streamable HTTP 4 核心能力测试设计
+
+| 能力 | 现有 fixture | 现有测试 | 测试设计 |
+|---|---|---|---|
+| **Session create** | ✅ | ✅ (`D.6+` 已落地) | `v1--streamable--session-create--POST.json` (per 守门 #1 4.0 实证) |
+| **Reconnect with Last-Event-ID** | ✅ | ✅ (`D.7+` 已落地) | `v1--streamable--reconnect-with-last-event-id--GET.json` + Last-Event-Id 头 |
+| **Server-push SSE** | ✅ | ✅ (`D.7+` 已落地) | `v1--streamable--server-push-sse--GET.json` + content-type text/event-stream + keepalive 30s |
+| **DELETE session** | ✅ | ✅ (`D.6+` 已落地) | `v1--streamable--delete-session--DELETE.json` + 204 + audit_logged |
+
+### 23.2 Streamable HTTP 已知缺口 (per 守门 #11 缺标比错标)
+
+- **缺口 #1**: 5xx 错误 + retry 完整 case 缺失 (per MCP spec error handling §6)
+- **缺口 #2**: Last-Event-Id 头的 max-age / staleness 边界 case 缺失
+- **缺口 #3**: Server-push keepalive 30s + 真实 24h+ 持续推流压力测试缺失
+- **缺口 #4**: Session 重连的 concurrent reconnect 死锁场景缺失
+
+---
+
+## 24. DB W/T/M 三類横展强制分类 (per 守门 #13 + docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.1)
+
+> **范围**: DB 基本设计阶段 Work / Transaction / Master 三類分门别类 100% 表覆盖
+> **守门**: 守门 #13 (W 物理删+短TTL / T 物理删禁止+audit+RLS / M 物理删禁止+SCD+RLS) + 守门 #11 缺标比错标
+
+### 24.1 W/T/M 三類横展测试设计矩阵
+
+| 類 | 守门 | 现有 fixture | 现有测试 | 测试设计 |
+|---|---|---|---|---|
+| **Work (W)** | #13 a 物理删除 / タイマー失効 / 短 TTL 明示 retention_period 必填 | 4 份 | (TBD) | session_cache + upload_temp + rate_limit_counter + expired DELETE 物理删 |
+| **Transaction (T)** | #13 b 物理删除禁止 + 監査必須 + RLS 13 類必携 | 4 份 | (TBD) | audit_event + tmo_merge_event + onboarding_failed (WORM, per ADR-0043) + DELETE 尝试拦截 |
+| **Master (M)** | #13 c 物理删除禁止 + SCD Type 2 + RLS 13 類必携 | 4 份 | (TBD) | tenant + tenant SCD v2 + rbac_role + DELETE 尝试拦截 (走 soft_delete SCD) |
+
+### 24.2 W/T/M 12 份 fixture 落地
+
+| fixture | 行 | 测试用途 |
+|---|---|---|
+| `v1--db-wtm--work--session-cache--GET.json` | 24 | W session_cache lookup + retention 7d |
+| `v1--db-wtm--work--upload-temp--GET.json` | 18 | W upload_temp retention 1d |
+| `v1--db-wtm--work--rate-limit-counter--GET.json` | 19 | W rate_limit_counter retention 0.04d |
+| `v1--db-wtm--work--session-cache-expired--DELETE.json` | 19 | W TTL 到时物理删除 |
+| `v1--db-wtm--transaction--audit-event--POST.json` | 30 | T audit_event append-only + RLS 13 類 |
+| `v1--db-wtm--transaction--tmo-merge-event--POST.json` | 22 | T tmo_merge_event append-only |
+| `v1--db-wtm--transaction--onboarding-failed--POST.json` | 23 | T onboarding.failed WORM (per ADR-0043) |
+| `v1--db-wtm--transaction--audit-event-delete-attempt--DELETE.json` | 22 | T DELETE 拦截 (T 物理删禁止) |
+| `v1--db-wtm--master--tenant--GET.json` | 23 | M tenant lookup + SCD v1 |
+| `v1--db-wtm--master--tenant-update-scd--PUT.json` | 25 | M tenant SCD v2 update (不物理删) |
+| `v1--db-wtm--master--rbac-role--GET.json` | 19 | M rbac_role (per 5 域 admin Lead) |
+| `v1--db-wtm--master--tenant-delete-attempt--DELETE.json` | 24 | M DELETE 拦截 + soft_delete 引导 |
+
+### 24.3 W/T/M 已知缺口 (per 守门 #11 缺标比错标)
+
+- **缺口 #1**: 100 表 W/T/M 三類索引实绩 (per `docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md` v0.1 引用基线) 当前 0% 索引, 仅 12 fixture
+- **缺口 #2**: 跨项目持久 W/T/M 落地 (STAR / RGS / Physis / GVPE / 其他), 当前仅 STAR mock project
+- **缺口 #3**: IPA SEC 规则扩展 (status / role / permission / policy / event / tag / category 多分类横展) 落地, 等 P3-B 补
+- **缺口 #4**: 派生守门 10 条 CW-01~CW-10 实证 (per `00-CLASSIFICATION-RULES.md` v0.1), 0/10 落地
+
+---
+
+## 25. 5 域 Lead 守门 (per 守门 #3 + #14, 决策 scope / RACI / 到位 timeline / Mavis 代签边界 4 维)
+
+> **范围**: 5 域 (player / economy / match / social / admin) Lead 真人到位前 Mavis 临时代签 (per 守门 #3 + #14 + 9/3 19:43 JST user 拍板)
+> **守门**: 守门 #3 5 域独立 Lead (不映射 DDD, per AGENTS.md §5 仓库拓扑 disclaimer) + 守门 #14 4 维 RACI
+
+### 25.1 5 域 Lead 4 维 RACI 测试设计
+
+| 维 | 内容 | 测试设计 | fixture |
+|---|---|---|---|
+| **决策 scope** | 跨域 + 域内 (Both, per 守门 #3 v2 派生) | 决策可追溯性 + Lead 自决策 | `v1--sa-03--5-domain-lead-audit--POST-audit-rgs.json` |
+| **RACI 责任** | R+A+C 完整责任 (Lead 自执行 R + 负责 A + 接受域内 C 咨询, 域外 I 通知) | RACI 矩阵 + 责任分配 | (TBD) |
+| **到位 timeline** | 待定 (Mavis 长期代签, per 9/3 19:35 JST 拍板 D 维持) | 真人到位触发追溯签字 | (TBD) |
+| **Mavis 代签边界** | 全部代签 (commit author + 修订人 + 审批, per 守门 #10 + 8/27 19:39 JST 授权 + 9/3 11:35 JST 守门 #3 v2 派生规) | author=Ulysses + 修订人 Ulysses — Mavis 接手 + 审批 架构师 (Mavis 接手 agent per DEC-008) | (TBD) |
+
+### 25.2 5 域 Lead 已知缺口 (per 守门 #11 缺标比错标)
+
+- **缺口 #1**: 5 域 Lead 真人到位 (player / economy / match / social / admin), 等 P3-E.5/F.1 真人
+- **缺口 #2**: 5 域 fixture 0 份独立 (per README #4), 复用 frontend/src/mocks/data/five-domain.ts (per v0.6 §17.4)
+- **缺口 #3**: RACI 4 维测试用例缺失, 等 P3-E 补
+- **缺口 #4**: 真人到位后追溯签字机制缺失, 等 P3-F 补
+
+---
+
+## 26. mock 落地总览 (per 2026-09-04 17:47 JST "测试脚本+数据归入 mock 项目" + 2026-09-05 06:50 JST user 拍板 "新建 tools/star-flash-mock/")
+
+> **范围**: tools/star-flash-mock/ 全栈 mock 项目 (85 份 fixture + 9 份回归脚本 + 2 k3s yaml + 1 docs 报告)
+> **守门**: 守门 #1+#5+#9+#12+#13+#14 + 守门 #13 a/b/c/d
+
+### 26.1 mock 项目结构 (per `tools/star-flash-mock/README.md` v0.1)
+
+```
+D:\Star\tools\star-flash-mock\
+├── README.md                              # v0.1 (per 守门 #12 commit-time docs 同步)
+├── scripts/                               # 9 份回归脚本 (per 守门 #1+#9+#12)
+│   ├── smoke-test.sh                      # 5 类基础设施 smoke
+│   ├── regression-test-langgraph.sh       # LangGraph TMO + 9 SA + SA-10
+│   ├── regression-test-agent-runtime.sh   # Agent Runtime L0/L1/L2
+│   ├── regression-test-mcp.sh             # 16 MCP tool
+│   ├── regression-test-streamable-http.sh # Streamable HTTP
+│   ├── regression-test-db-wtm.sh          # DB W/T/M 三類横展
+│   ├── regression-test-five-domain.sh     # 5 域业务 (守门 #3 + #14)
+│   ├── regression-test-openclaw.sh        # OpenClaw v1 既有 fixture
+│   └── run-all.sh                         # 一键跑全部
+├── mock_data/                             # 85 份 fixture
+│   ├── openclaw/                          # 20 份 (迁移自 docs/reports/wiremock-openclaw/)
+│   ├── langgraph/                         # 36 份 (TMO 21 + SA-10 6 + 9 SA 9)
+│   ├── agent-runtime/                     # 7 份 (L0 3 + L1 2 + L2 2)
+│   ├── mcp/                               # 6 份
+│   ├── streamable-http/                   # 4 份
+│   └── db-wtm/                            # 12 份 (W 4 + T 4 + M 4)
+├── docs/                                  # 回归测试报告
+│   ├── README.md
+│   └── regression-report-2026-09-05.md    # v0.1 初次回归
+└── k3s/                                   # k3s 部署 yaml (envoy 独立 deployment 模式 per 9/1 13:03+13:05 JST 偏好)
+    ├── envoy-deployment.yaml              # envoy 独立 deployment + ClusterIP
+    └── star-mock-service.yaml             # star-mock ClusterIP service + ConfigMap
+```
+
+### 26.2 守门 0 违反实证 (per regression-report-2026-09-05.md v0.1)
+
+| 守门 | 实证 | 状态 |
+|---|---|---|
+| **#1** R-05 推 origin | N/A (mock 落地, 未推) | ✅ |
+| **#3** 5 域独立 Lead (不映射 DDD) | 5 域 fixture 走历史治理命名 | ✅ |
+| **#4** AI 协作 token-OLU | fixture < 5KB | ✅ |
+| **#5** 环境变量安全 | smoke-test 验证 forbidden_patterns 0 命中 | ✅ |
+| **#7** 0 unsafe | N/A (Python + bash) | ✅ |
+| **#9** 子代理 status 实证 | 0 子代理调用 (root 直实装) | ✅ |
+| **#10** 代签规则应用 | scripts/ header author=Ulysses | ✅ |
+| **#11** 缺标比错标 | 7 已知缺口显式列 | ✅ |
+| **#12** AI 协作文档治理 | README + regression-report 实证 | ✅ |
+| **#13** DB W/T/M 三類横展 | mock_data/db-wtm/{work,transaction,master}/ 100% 覆盖 | ✅ |
+| **#14** 5 域 Lead 4 维 RACI | regression-test-five-domain 第 2 段 | ✅ |
+
+**总结**: 8/8 跑通, 8/8 守门实证, 0 违反。
+
+### 26.3 已知缺口 (mock 项目层, per 守门 #11 缺标比错标)
+
+- **缺口 #1**: 16 MCP tool fixture 6/16 (38% 覆盖, 缺 10)
+- **缺口 #2**: Agent Runtime L1 ECS 9 Archetype 1/9 (11%, 缺 8)
+- **缺口 #3**: L2 业务池 2/8 (25%, 缺 6: HTTP / Tool Reg / RAG / Tokenizer / Rate / CB)
+- **缺口 #4**: Streamable HTTP 5xx + retry case 缺失
+- **缺口 #5**: 5 域 fixture 0 份独立, 复用 frontend/src/mocks/data/five-domain.ts
+- **缺口 #6**: DB W/T/M 12 fixture, 缺 100 表 W/T/M 索引
+- **缺口 #7**: k3s/ 2 yaml 缺 ConfigMap + Secret
+- **总缺标率**: 估算 165 实际 85 = 48% 缺标 (per docs/regression-report-2026-09-05.md §4)
+
+### 26.4 后续计划 (P3-B/C/D + P4 + P5)
+
+| 时机 | 增量 | 触发 |
+|---|---|---|
+| P3-B (H2 + 5 域 Lead) | +30 份 fixture (5 域各 6) | per 5 域 Lead 真人到位后逐域补 |
+| P3-C (MCP 16 tool e2e) | +10 份 MCP fixture | per AGENTS.md §7 #1 16 tool 真实接入 e2e |
+| P3-D (Agent Runtime G-1~G-18) | +15 份 L1/L2 fixture | per 守门 G-1~G-18 全部跑通 |
+| P4 (Streamable HTTP 完整 spec) | +5 份 streamable fixture | per AGENTS.md §7 #3 D.5+ + D.7+ |
+| P5 (DB W/T/M 100% 表覆盖) | +20 份 db-wtm fixture | per 守门 #13 100% 100 表 |
+| **总计** | **+80 份** | **per 缺标率 48% → 0%** |
+
+---
+
+**END of Test Design v0.7**

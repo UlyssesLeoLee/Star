@@ -1,0 +1,26 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-02",
+  "type": "test-gen",
+  "method": "POST",
+  "scenario": "generate-tests-domain-x",
+  "description": "SA-02 test-gen normal case: 为 domain-x 自动生成测试 (per 03-detailed-design.md §3.3.2 SA-02)",
+  "request": {
+    "target_module": "crates/domain-context",
+    "test_types": ["unit", "integration"],
+    "coverage_target_pct": 80
+  },
+  "response_200": {
+    "test_gen_id": "testgen-uuid-002",
+    "tests_generated_count": 24,
+    "files_created": [
+      "crates/domain-context/src/lib.test.rs",
+      "tests/integration/test_domain_context_x.rs"
+    ],
+    "coverage_estimated_pct": 82
+  },
+  "fixture_assertion": {
+    "tests_generated": true,
+    "coverage_target_met": true
+  }
+}

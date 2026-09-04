@@ -1,0 +1,22 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N3",
+  "method": "POST",
+  "scenario": "dep-set-batch-100-edges",
+  "description": "TMO M-N3 batch test: 100 edges 同时加入 (DAGValidator 性能压测 O(V+E) ≈ O(100) 应 < 100ms)",
+  "request": {
+    "operation": "dep_set",
+    "dep_set_size": 100,
+    "dep_set": "<<generated>>"
+  },
+  "response_200": {
+    "edges_added": 100,
+    "elapsed_ms_target": 100,
+    "cycle_detected": false
+  },
+  "fixture_assertion": {
+    "perf_target_p95_ms": 100,
+    "edges_added": 100
+  }
+}

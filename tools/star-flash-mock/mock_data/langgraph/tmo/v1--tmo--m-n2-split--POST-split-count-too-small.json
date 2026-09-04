@@ -1,0 +1,18 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N2",
+  "method": "POST",
+  "scenario": "split-count-too-small",
+  "description": "TMO M-N2 split_node error case: split_count < 2 → 拒绝 (per SplitRequest split_count default 2 守门 ≥ 2)",
+  "request": {
+    "operation": "split",
+    "target_task_id": "task-mono-7f8a9b",
+    "split_strategy": "context_fork",
+    "split_count": 1
+  },
+  "response_400": {
+    "error_code": "TMO_INVALID_SPLIT_COUNT",
+    "error_message": "split requires at least 2 split_count, got 1"
+  }
+}

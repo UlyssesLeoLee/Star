@@ -1,0 +1,20 @@
+{
+  "fixture_version": "v1",
+  "module": "streamable-http",
+  "endpoint": "DELETE /api/mcp/streamable/session/{id}",
+  "method": "DELETE",
+  "scenario": "delete-session-cleanup",
+  "description": "Streamable HTTP DELETE session 清理 (per AGENTS.md §7 #3)",
+  "request": {
+    "session_id": "streamable-session-001"
+  },
+  "response_204": {
+    "session_id": "streamable-session-001",
+    "cleaned_up": true,
+    "audit_logged": true
+  },
+  "fixture_assertion": {
+    "status_code": 204,
+    "audit_logged": true
+  }
+}

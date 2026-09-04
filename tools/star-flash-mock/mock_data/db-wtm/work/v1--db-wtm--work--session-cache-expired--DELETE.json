@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Work",
+  "table": "session_cache",
+  "method": "DELETE",
+  "scenario": "session-cache-timer-expiry-physical-delete",
+  "description": "DB Work 类: session_cache タイマー失効物理删除 (per 守门 #13 a W = 物理删除, TTL 到了 timer 触发 DELETE FROM session_cache WHERE ttl_expires_at < NOW())",
+  "request": {
+    "trigger": "timer_expiry",
+    "cutoff": "2026-09-12T00:00:00Z"
+  },
+  "response_200": {
+    "rows_deleted": 1024,
+    "physical_delete": true,
+    "audit_logged_in_master_table": false,
+    "wtm_class": "Work"
+  },
+  "fixture_assertion": {
+    "physical_delete_executed": true,
+    "audit_skipped_for_W": true
+  }
+}

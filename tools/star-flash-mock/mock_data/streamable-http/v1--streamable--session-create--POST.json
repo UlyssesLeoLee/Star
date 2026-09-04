@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "streamable-http",
+  "endpoint": "POST /api/mcp/streamable/session",
+  "method": "POST",
+  "scenario": "create-session-with-event-stream",
+  "description": "Streamable HTTP session 创建 (per AGENTS.md §7 #3 D.5+ Streamable HTTP 完整实现 + ADR-0032)",
+  "request": {
+    "client_info": {"name": "gm-console", "version": "0.6.0"},
+    "event_types": ["tool_call", "agent_dispatch", "interrupt", "checkpoint"]
+  },
+  "response_200": {
+    "session_id": "streamable-session-001",
+    "event_stream_url": "/api/mcp/streamable/session/streamable-session-001/events",
+    "last_event_id": "evt-0000-0001",
+    "expires_in_seconds": 3600
+  },
+  "fixture_assertion": {
+    "session_created": true,
+    "event_stream_url_returned": true,
+    "last_event_id_present": true
+  }
+}

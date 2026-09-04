@@ -1,0 +1,25 @@
+{
+  "fixture_version": "v1",
+  "module": "l2-pools",
+  "pool": "llm-pool",
+  "method": "GET",
+  "scenario": "llm-pool-status",
+  "description": "L2 LLM Pool status: 8 providers (per docs/architecture/2026-09-03-agent-runtime/02-basic-design.md v0.1 §2.1 共享池 + 守门 #4 token-OLU)",
+  "response_200": {
+    "pool": "llm-pool",
+    "providers": [
+      {"name": "openai-gpt-4o", "tokens_remaining": 1200000, "rate_limit_rpm": 60, "circuit_breaker": "closed"},
+      {"name": "anthropic-claude-sonnet-4-5", "tokens_remaining": 800000, "rate_limit_rpm": 50, "circuit_breaker": "closed"},
+      {"name": "google-gemini-2.5-pro", "tokens_remaining": 500000, "rate_limit_rpm": 30, "circuit_breaker": "closed"},
+      {"name": "deepseek-v3", "tokens_remaining": 2000000, "rate_limit_rpm": 100, "circuit_breaker": "closed"},
+      {"name": "ollama-local-qwen-72b", "tokens_remaining": 999999999, "rate_limit_rpm": null, "circuit_breaker": "closed"},
+      {"name": "vllm-local-llama-3.3-70b", "tokens_remaining": 999999999, "rate_limit_rpm": null, "circuit_breaker": "closed"},
+      {"name": "mock-echo", "tokens_remaining": 999999999, "rate_limit_rpm": 999, "circuit_breaker": "closed"},
+      {"name": "ai-edit-mock-local", "tokens_remaining": 999999999, "rate_limit_rpm": 999, "circuit_breaker": "closed"}
+    ]
+  },
+  "fixture_assertion": {
+    "providers_8": true,
+    "all_circuit_breakers_closed": true
+  }
+}

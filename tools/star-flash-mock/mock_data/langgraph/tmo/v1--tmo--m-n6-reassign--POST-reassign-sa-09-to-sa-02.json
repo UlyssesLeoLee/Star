@@ -1,0 +1,29 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N6",
+  "method": "POST",
+  "scenario": "reassign-sa-09-to-sa-02",
+  "description": "TMO M-N6 ReassignManager normal case: SA-09 free-form → SA-02 test-gen, checkpoint 保留 (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6.3 M-N6 + C-21)",
+  "schema_ref": "scripts/automation/task_ops/nodes/reassign_node.py",
+  "守门": ["#13 a L0 唯一协调", "checkpoint preserved across reassign"],
+  "request": {
+    "operation": "reassign",
+    "target_task_id": "task-9a8b7c",
+    "from_sa_type": "SA-09",
+    "to_sa_type": "SA-02",
+    "actor_session_id": "session-2026-09-05-001"
+  },
+  "response_200": {
+    "task_id": "task-9a8b7c",
+    "from_sa_type": "SA-09",
+    "to_sa_type": "SA-02",
+    "checkpoint_preserved": true,
+    "checkpoint_stash_id": "stash-9a8b7c-3a",
+    "active_tmo_operation": null
+  },
+  "fixture_assertion": {
+    "checkpoint_preserved": true,
+    "sa_type_changed": true
+  }
+}

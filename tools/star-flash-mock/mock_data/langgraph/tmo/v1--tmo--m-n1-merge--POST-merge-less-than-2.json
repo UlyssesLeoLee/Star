@@ -1,0 +1,25 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N1",
+  "method": "POST",
+  "scenario": "merge-less-than-2",
+  "description": "TMO M-N1 merge_node edge case: target_task_ids 仅 1 个 → 拒绝 (per protocols.py MergeRequest 守门 ≥ 2)",
+  "schema_ref": "scripts/automation/task_ops/protocols.py::MergeRequest",
+  "守门": ["protocols.py MergeRequest target_task_ids: list[str]  # ≥ 2"],
+  "request": {
+    "operation": "merge",
+    "target_task_ids": ["task-alpha-7f8a9b"],
+    "merge_strategy": "context_union"
+  },
+  "response_400": {
+    "error_code": "TMO_INVALID_TARGET_COUNT",
+    "error_message": "merge requires at least 2 target_task_ids, got 1",
+    "expected_min": 2,
+    "actual": 1
+  },
+  "fixture_assertion": {
+    "status_code": 400,
+    "error_code": "TMO_INVALID_TARGET_COUNT"
+  }
+}

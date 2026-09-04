@@ -1,0 +1,26 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-07",
+  "type": "db-migration",
+  "method": "POST",
+  "scenario": "migration-wtm-classification",
+  "description": "SA-07 db-migration: DB W/T/M 三類横展强制分类 (per 守门 #13 + docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md)",
+  "request": {
+    "migration_target": "DB 三類横展",
+    "tables_to_migrate": ["session_cache (W)", "audit_event (T)", "tenant (M)"],
+    "classification_check": true
+  },
+  "response_200": {
+    "migration_id": "migration-uuid-007",
+    "tables_migrated": 3,
+    "wtm_check_passed": {
+      "session_cache": {"class": "W", "retention_period_days": 7, "physical_delete_policy": "timer_expiry"},
+      "audit_event": {"class": "T", "rls_13_classes": true, "append_only": true, "audit_required": true},
+      "tenant": {"class": "M", "rls_13_classes": true, "scd_type": 2, "physical_delete_forbidden": true}
+    }
+  },
+  "fixture_assertion": {
+    "wtm_100_percent_covered": true,
+    "guard_13_passed": true
+  }
+}

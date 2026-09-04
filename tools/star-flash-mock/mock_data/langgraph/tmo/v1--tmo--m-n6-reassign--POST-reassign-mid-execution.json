@@ -1,0 +1,28 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N6",
+  "method": "POST",
+  "scenario": "reassign-mid-execution",
+  "description": "TMO M-N6 mid-execution case: task 正在 running 状态被 reassign → interrupt current execution + preserve checkpoint + start new SA-XX",
+  "request": {
+    "operation": "reassign",
+    "target_task_id": "task-running-5d6e7f",
+    "from_sa_type": "SA-01",
+    "to_sa_type": "SA-04"
+  },
+  "response_200": {
+    "task_id": "task-running-5d6e7f",
+    "interrupted_node": "execute_node",
+    "from_sa_type": "SA-01",
+    "to_sa_type": "SA-04",
+    "checkpoint_preserved": true,
+    "resume_required": true,
+    "checkpoint_stash_id": "stash-5d6e7f-3a"
+  },
+  "fixture_assertion": {
+    "interrupted": true,
+    "checkpoint_preserved": true,
+    "resume_required": true
+  }
+}

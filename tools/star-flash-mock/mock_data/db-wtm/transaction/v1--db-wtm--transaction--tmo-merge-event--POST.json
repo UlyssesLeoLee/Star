@@ -1,0 +1,27 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Transaction",
+  "table": "tmo_merge_event",
+  "method": "POST",
+  "scenario": "tmo-merge-event-append",
+  "description": "DB Transaction 类: tmo_merge_event append-only (per 守门 #13 b T 物理删除禁止 + #13 d T 100% audit, TMO M-N1 落地)",
+  "request": {
+    "merge_id": "merge-event-001",
+    "merged_task_id": "task-merged-f5a7b2",
+    "superseded_task_ids": ["task-alpha", "task-beta"],
+    "actor_session_id": "session-2026-09-05-001",
+    "tenant_id": "tenant-001",
+    "merge_strategy": "context_union"
+  },
+  "response_201": {
+    "merge_event_id": "tmo-merge-uuid-001",
+    "append_only_id": 12346,
+    "created_at": "2026-09-05T07:00:00Z",
+    "physical_delete_blocked": true
+  },
+  "fixture_assertion": {
+    "wtm_class": "Transaction",
+    "append_only": true
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N5",
+  "method": "POST",
+  "scenario": "summarize-3-tasks",
+  "description": "TMO M-N5 SummarizeCollector normal case: 3 个 L1 task 状态聚合 + LLM 表格化 (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6.3 M-N5 + C-22 SummarizeCollector)",
+  "schema_ref": "scripts/automation/task_ops/nodes/summarize_node.py",
+  "request": {
+    "operation": "summarize",
+    "target_task_ids": ["task-001", "task-002", "task-003"],
+    "format": "markdown_table",
+    "include_metrics": ["status", "duration_ms", "token_usage", "guard_violations"]
+  },
+  "response_200": {
+    "summary_markdown": "| task_id | status | duration_ms | token_usage | guard_violations |\n|---------|--------|-------------|-------------|------------------|\n| task-001 | completed | 12500 | 8400 | 0 |\n| task-002 | running | 0 | 3200 | 1 |\n| task-003 | failed | 8200 | 6100 | 0 |",
+    "summary_metrics": {
+      "total_tasks": 3,
+      "completed": 1,
+      "running": 1,
+      "failed": 1,
+      "total_token_usage": 17700
+    }
+  },
+  "fixture_assertion": {
+    "format": "markdown_table",
+    "include_metrics_all_present": true
+  }
+}

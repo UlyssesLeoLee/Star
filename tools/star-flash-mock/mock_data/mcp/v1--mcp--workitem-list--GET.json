@@ -1,0 +1,25 @@
+{
+  "fixture_version": "v1",
+  "module": "mcp",
+  "tool": "workitem_list",
+  "method": "GET",
+  "scenario": "list-workitems-tenant-001",
+  "description": "MCP tool: workitem_list (per ADR-0032 MCP Transport stdio + AGENTS.md §7 #1 16 tool 真实接入 e2e)",
+  "request": {
+    "tenant_id": "tenant-001",
+    "workspace_id": "ws-001",
+    "limit": 20
+  },
+  "response_200": {
+    "workitems": [
+      {"id": "WI-001", "title": "实现 TMO M-N1 merge", "status": "in_progress", "kind": "story"},
+      {"id": "WI-002", "title": "Agent Runtime G-1 守门", "status": "todo", "kind": "task"}
+    ],
+    "total": 2,
+    "elapsed_ms": 12
+  },
+  "fixture_assertion": {
+    "tenant_id_present": true,
+    "rls_13_classes_checked": true
+  }
+}

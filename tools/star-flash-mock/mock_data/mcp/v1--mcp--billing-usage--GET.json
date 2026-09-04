@@ -1,0 +1,27 @@
+{
+  "fixture_version": "v1",
+  "module": "mcp",
+  "tool": "billing_usage",
+  "method": "GET",
+  "scenario": "billing-usage-by-tenant",
+  "description": "MCP tool: billing_usage (per 5 域 economy + token-OLU 守门 #4)",
+  "request": {
+    "tenant_id": "tenant-001",
+    "period": "2026-09"
+  },
+  "response_200": {
+    "tenant_id": "tenant-001",
+    "period": "2026-09",
+    "total_tokens": 1500000,
+    "total_cost_usd": 12.50,
+    "breakdown_by_sa_type": {
+      "SA-01": {"tokens": 200000, "cost_usd": 1.50},
+      "SA-02": {"tokens": 100000, "cost_usd": 0.80},
+      "SA-08": {"tokens": 800000, "cost_usd": 6.40}
+    }
+  },
+  "fixture_assertion": {
+    "olu_per_tenant": true,
+    "sa_breakdown_present": true
+  }
+}

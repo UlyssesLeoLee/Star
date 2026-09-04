@@ -1,0 +1,26 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N1",
+  "method": "POST",
+  "scenario": "merge-cyclic-dep",
+  "description": "TMO M-N1 merge_node error case: target_task_ids 含 cyclic dependency → DAGValidator cycle detection O(V+E) 拦截 (per 03-detailed-design.md §3.2.1.1 + C-20 DAGValidator)",
+  "schema_ref": "scripts/automation/task_ops/nodes/merge_node.py + dag_validator.py",
+  "守门": ["#13 a L0 唯一协调", "C-20 DAGValidator cycle detection"],
+  "request": {
+    "operation": "merge",
+    "target_task_ids": ["task-aaa-1", "task-bbb-2", "task-ccc-3"],
+    "merge_strategy": "context_union"
+  },
+  "response_409": {
+    "error_code": "TMO_CYCLE_DETECTED",
+    "error_message": "Cycle detected in task relationship graph: task-ccc-3 → task-aaa-1 → task-bbb-2 → task-ccc-3",
+    "cycle_path": ["task-ccc-3", "task-aaa-1", "task-bbb-2", "task-ccc-3"],
+    "reject_reason": "per C-20 DAGValidator: cycle in parent_task_id / merged_from / split_into / superseded_by graph"
+  },
+  "fixture_assertion": {
+    "status_code": 409,
+    "error_code": "TMO_CYCLE_DETECTED",
+    "rollback": true
+  }
+}

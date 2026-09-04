@@ -1,0 +1,26 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-10",
+  "node": "SA-10",
+  "method": "POST",
+  "scenario": "multi-task-orchestration",
+  "description": "SA-10 跨任务编排: 1 个 SA-10 同时调 TMO M-N1 merge + M-N2 split + M-N3 reorder (per 9/4 19:15 JST 用户发令'langgraph功能需要可以操控任务卡, 合并任务a和任务b')",
+  "request": {
+    "user_input": "合并任务 a 和任务 b, 然后把任务 c 拆成 2 个, 最后重新排序依赖",
+    "subagent_plan": [
+      {"step": 1, "node": "TMO-M-N1-merge", "params": {"target": ["a", "b"]}},
+      {"step": 2, "node": "TMO-M-N2-split", "params": {"target": "c", "count": 2}},
+      {"step": 3, "node": "TMO-M-N3-reorder", "params": {"dep_set": [["c-1", "merged-ab"]]}}
+    ]
+  },
+  "response_200": {
+    "plan_id": "plan-multi-uuid",
+    "steps_count": 3,
+    "execution_mode": "sequential_orchestration",
+    "checkpoint_strategy": "stash_per_step"
+  },
+  "fixture_assertion": {
+    "multi_tmo_op": true,
+    "sequential": true
+  }
+}

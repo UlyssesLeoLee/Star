@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N3",
+  "method": "POST",
+  "scenario": "dep-set-cycle-detected",
+  "description": "TMO M-N3 + DAGValidator error case: 加边后形成 cycle → 拒绝 (per C-20 cycle detection O(V+E))",
+  "request": {
+    "operation": "dep_set",
+    "dep_set": [["task-zzz-3", "task-aaa-1"]]
+  },
+  "response_409": {
+    "error_code": "TMO_CYCLE_DETECTED",
+    "error_message": "Adding edge task-zzz-3 → task-aaa-1 would create cycle",
+    "cycle_path": ["task-aaa-1", "task-bbb-2", "task-zzz-3", "task-aaa-1"],
+    "rollback": true
+  },
+  "fixture_assertion": {
+    "status_code": 409,
+    "dag_invalid": true,
+    "rollback": true
+  }
+}

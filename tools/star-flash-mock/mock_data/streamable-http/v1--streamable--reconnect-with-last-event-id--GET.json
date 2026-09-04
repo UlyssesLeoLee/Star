@@ -1,0 +1,20 @@
+{
+  "fixture_version": "v1",
+  "module": "streamable-http",
+  "endpoint": "GET /api/mcp/streamable/session/{id}/events",
+  "method": "GET",
+  "scenario": "reconnect-with-last-event-id",
+  "description": "Streamable HTTP 重连: Last-Event-Id 头断点续传 (per AGENTS.md §7 #3 + D.7+ Server-push)",
+  "request_headers": {
+    "Last-Event-Id": "evt-0000-0123"
+  },
+  "response_200": {
+    "replay_from_event_id": "evt-0000-0123",
+    "events_replayed": 45,
+    "events_total_to_now": 168
+  },
+  "fixture_assertion": {
+    "last_event_id_respected": true,
+    "no_event_loss": true
+  }
+}

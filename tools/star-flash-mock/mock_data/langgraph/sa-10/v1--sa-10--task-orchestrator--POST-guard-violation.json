@@ -1,0 +1,24 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-10",
+  "node": "SA-10",
+  "method": "POST",
+  "scenario": "guard-violation",
+  "description": "SA-10 task-orchestrator guard violation: 守门 #9 v20 派生规 - 子代理 dispatch 必先 brief (per AGENTS.md §4 #9 v20), 未提供 brief_path → 拒绝 (per C-10 GuardEnforcer + scripts/automation/dispatcher.py brief(...))",
+  "request": {
+    "plan_id": "plan-no-brief",
+    "user_input": "并发执行 10 个任务",
+    "actor_session_id": "session-2026-09-05-001"
+  },
+  "response_400": {
+    "error_code": "GUARD_NO_BRIEF",
+    "error_message": "守门 #9 v20: 子代理 dispatch 必先 brief; missing brief_path",
+    "required_action": "call automation/dispatcher.py brief(task_id, content, agent) first, then retry",
+    "guard_id": "G-V20"
+  },
+  "fixture_assertion": {
+    "status_code": 400,
+    "guard_id": "G-V20",
+    "enforcement": "block"
+  }
+}

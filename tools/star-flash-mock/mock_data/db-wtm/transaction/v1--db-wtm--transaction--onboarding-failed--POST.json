@@ -1,0 +1,28 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Transaction",
+  "table": "onboarding_failed",
+  "method": "POST",
+  "scenario": "onboarding-failed-worm",
+  "description": "DB Transaction 类: onboarding_failed WORM (per 守门 #13 b T + ADR-0043 audit_audit_event WORM onboarding.failed 事件 9/2 落档)",
+  "request": {
+    "onboarding_session_id": "onboarding-session-001",
+    "user_id": "user-002",
+    "tenant_id": "tenant-002",
+    "failure_reason": "worktree_creation_timeout",
+    "worm_storage": true
+  },
+  "response_201": {
+    "onboarding_failed_id": "onboarding-failed-uuid-001",
+    "append_only_id": 12347,
+    "created_at": "2026-09-05T07:00:00Z",
+    "worm_storage_class": "WORM_T",
+    "physical_delete_blocked": true
+  },
+  "fixture_assertion": {
+    "wtm_class": "Transaction",
+    "worm": true,
+    "physical_delete_blocked": true
+  }
+}

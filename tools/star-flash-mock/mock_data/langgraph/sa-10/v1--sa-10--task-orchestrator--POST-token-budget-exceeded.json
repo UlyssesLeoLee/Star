@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-10",
+  "node": "SA-10",
+  "method": "POST",
+  "scenario": "token-budget-exceeded",
+  "description": "SA-10 token budget 超限: plan 估算 token > session 剩余 budget (per 守门 #4 AI 协作 token-OLU + STAR-OLU-001.md 1 SRE·周 ≈ 1.2M tokens)",
+  "request": {
+    "plan_id": "plan-huge",
+    "estimated_total_tokens": 200000
+  },
+  "response_429": {
+    "error_code": "TOKEN_BUDGET_EXCEEDED",
+    "error_message": "Plan estimated 200000 tokens exceeds remaining session budget 150000",
+    "session_budget_remaining": 150000,
+    "plan_estimated": 200000,
+    "suggested_action": "split plan into smaller sub-plans, or upgrade OLU"
+  },
+  "fixture_assertion": {
+    "status_code": 429,
+    "enforcement": "block"
+  }
+}

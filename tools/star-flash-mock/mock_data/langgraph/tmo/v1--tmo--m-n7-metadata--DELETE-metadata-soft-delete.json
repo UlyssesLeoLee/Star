@@ -1,0 +1,25 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N7",
+  "method": "DELETE",
+  "scenario": "metadata-soft-delete",
+  "description": "TMO M-N7 soft delete: 标 active=false + valid_to=now(), 不物理删 (per Master 表 物理删除禁止)",
+  "request": {
+    "operation": "metadata_delete",
+    "metadata_id": "metadata-uuid-1a2b"
+  },
+  "response_200": {
+    "metadata_id": "metadata-uuid-1a2b",
+    "scd_version": 3,
+    "valid_from": "2026-09-05T07:05:00Z",
+    "valid_to": "2026-09-05T07:05:00Z",
+    "active": false,
+    "physical_delete": false
+  },
+  "fixture_assertion": {
+    "physical_delete": false,
+    "soft_delete": true,
+    "scd_version": 3
+  }
+}

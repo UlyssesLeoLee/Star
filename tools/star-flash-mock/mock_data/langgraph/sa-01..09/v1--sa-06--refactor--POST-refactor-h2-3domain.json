@@ -1,0 +1,24 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-06",
+  "type": "refactor",
+  "method": "POST",
+  "scenario": "refactor-h2-3domain-actor-context",
+  "description": "SA-06 refactor: H2 3 domain (feedback/validation/integration) ActorContext 改造 (per AGENTS.md §4.1 v17 H2-EXT)",
+  "request": {
+    "refactor_target": "3 domain ActorContext",
+    "domains": ["feedback", "validation", "integration"],
+    "shared_module": "star_context"
+  },
+  "response_200": {
+    "refactor_id": "refactor-uuid-006",
+    "files_modified_count": 12,
+    "errors_fixed": 117,
+    "remaining_blockers": ["DeviceId 强类型重构", "H2-EXT 5 domain 类型不兼容"],
+    "est_tokens_remaining": 800000
+  },
+  "fixture_assertion": {
+    "refactor_progress": "stage_1_complete",
+    "handoff_required": true
+  }
+}

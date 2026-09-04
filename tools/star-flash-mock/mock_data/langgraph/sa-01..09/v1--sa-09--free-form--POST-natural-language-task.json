@@ -1,0 +1,24 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-09",
+  "type": "free-form",
+  "method": "POST",
+  "scenario": "natural-language-task",
+  "description": "SA-09 free-form: 自然语言任务, LLM 自己分解子任务 (per 03-detailed-design.md §3.3.9 SA-09)",
+  "request": {
+    "user_input": "调研一下 Redis 7.0 跟 6.x 在 client-side caching 的差异, 写份报告"
+  },
+  "response_200": {
+    "sa09_id": "sa09-uuid-009",
+    "subtasks_generated": [
+      {"step": 1, "action": "web_search", "query": "Redis 7.0 client-side caching"},
+      {"step": 2, "action": "read_doc", "url": "https://redis.io/docs/manual/client-side-caching/"},
+      {"step": 3, "action": "synthesize", "format": "markdown_report"}
+    ],
+    "estimated_total_tokens": 12000
+  },
+  "fixture_assertion": {
+    "free_form_decomposed": true,
+    "subtasks_count": 3
+  }
+}

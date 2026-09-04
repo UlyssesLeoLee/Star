@@ -1,0 +1,25 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N2",
+  "method": "POST",
+  "scenario": "split-checkpoint-fork",
+  "description": "TMO M-N2 split_node alt strategy: checkpoint_fork (各 fork 继承原 checkpoint history)",
+  "schema_ref": "scripts/automation/task_ops/protocols.py::SplitRequest",
+  "request": {
+    "operation": "split",
+    "target_task_id": "task-mono-with-history",
+    "split_strategy": "checkpoint_fork",
+    "split_count": 3
+  },
+  "response_200": {
+    "superseded_tasks": ["task-mono-with-history"],
+    "split_into": ["task-fork-1-xxx", "task-fork-2-yyy", "task-fork-3-zzz"],
+    "checkpoint_inheritance": "full_history_copy",
+    "stash_checkpoint_ids": ["stash-mono-with-history-3a", "stash-fork-1-xxx-3a", "stash-fork-2-yyy-3a", "stash-fork-3-zzz-3a"]
+  },
+  "fixture_assertion": {
+    "checkpoint_inheritance": "full_history_copy",
+    "split_count_match": true
+  }
+}

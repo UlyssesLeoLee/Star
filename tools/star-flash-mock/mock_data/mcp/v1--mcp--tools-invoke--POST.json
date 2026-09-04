@@ -1,0 +1,24 @@
+{
+  "fixture_version": "v1",
+  "module": "mcp",
+  "tool": "tools_invoke",
+  "method": "POST",
+  "scenario": "invoke-tool-tmo-merge",
+  "description": "MCP tool: tools_invoke 统一入口 (per ADR-0032 + 16 tool e2e)",
+  "request": {
+    "tool_name": "tmo__merge",
+    "params": {
+      "target_task_ids": ["a", "b"]
+    }
+  },
+  "response_200": {
+    "tool_invocation_id": "invoke-uuid-001",
+    "tool_result": {
+      "merged_task_id": "task-merged-f5a7b2"
+    },
+    "elapsed_ms": 120
+  },
+  "fixture_assertion": {
+    "tool_unified_entry": true
+  }
+}

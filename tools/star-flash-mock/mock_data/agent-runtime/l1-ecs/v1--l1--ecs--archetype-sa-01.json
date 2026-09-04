@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "l1-ecs",
+  "type": "archetype",
+  "archetype_id": "SA-01-code-review",
+  "method": "POST",
+  "scenario": "ecs-spawn-archetype-sa-01",
+  "description": "L1 ECS Archetype: SA-01 code-review Entity 创建 (per docs/architecture/2026-09-03-agent-runtime/02-basic-design.md v0.1 §2.1 + LangGraph 9/3 §6.1 9 Archetype 引用)",
+  "request": {
+    "archetype_id": "SA-01-code-review",
+    "components": ["agent_id", "task_ref", "context_buffer", "guard_violation_state"]
+  },
+  "response_200": {
+    "entity_id": "entity-uuid-sa01-001",
+    "components_attached": 4,
+    "world": "main",
+    "ecs_query_path": "Query<&mut CodeReviewComponent>"
+  },
+  "fixture_assertion": {
+    "archetype_spawn_ok": true,
+    "components_4_attached": true
+  }
+}

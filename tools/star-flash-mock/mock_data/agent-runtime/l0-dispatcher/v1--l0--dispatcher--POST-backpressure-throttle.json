@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "l0-dispatcher",
+  "type": "backpressure",
+  "method": "POST",
+  "scenario": "backpressure-throttle",
+  "description": "L0 派发层 backpressure 触发: 队列深度 > 1000 触发 throttling (per SRS-001 G-7 + 守门 #19 派生)",
+  "request": {
+    "task_id": "task-flood-001",
+    "queue_depth_at_request": 1024
+  },
+  "response_429": {
+    "error_code": "DISPATCHER_BACKPRESSURE",
+    "error_message": "Queue depth 1024 > threshold 1000, throttling new dispatches",
+    "retry_after_ms": 200,
+    "queue_depth": 1024,
+    "threshold": 1000
+  },
+  "fixture_assertion": {
+    "status_code": 429,
+    "backpressure_triggered": true
+  }
+}

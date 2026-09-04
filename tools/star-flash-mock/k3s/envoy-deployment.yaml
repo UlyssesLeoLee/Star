@@ -1,0 +1,80 @@
+# k3s/envoy-deployment.yaml
+# Envoy 独立 deployment 模式 (per 2026-09-01 13:05 JST user 拍板 envoy 部署模式偏好)
+# 不选 istio sidecar, 不选 nginx (per 2026-09-01 13:03 JST 偏好所有 nginx → envoy)
+# 用途: tools/star-flash-mock/ 静态资源 serving + reverse proxy + mTLS termination
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: star-mock-envoy
+  namespace: star-mock
+  labels:
+    app: star-mock
+    component: envoy
+    tier: edge
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: star-mock
+      component: envoy
+  template:
+    metadata:
+      labels:
+        app: star-mock
+        component: envoy
+    spec:
+      containers:
+        - name: envoy
+          image: envoyproxy/envoy:v1.32-latest
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+            - containerPort: 8443
+              name: https
+              protocol: TCP
+          env:
+            - name: ENVOY_UID
+              value: "0"  # 实际部署应改为非 root
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: envoy-config
+              mountPath: /etc/envoy
+            - name: mock-data
+              mountPath: /var/lib/star-mock
+              readOnly: true
+      volumes:
+        - name: envoy-config
+          configMap:
+            name: star-mock-envoy-config
+        - name: mock-data
+          configMap:
+            name: star-mock-mock-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: star-mock-envoy
+  namespace: star-mock
+  labels:
+    app: star-mock
+    component: envoy
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+    - name: https
+      port: 8443
+      targetPort: 8443
+  selector:
+    app: star-mock
+    component: envoy

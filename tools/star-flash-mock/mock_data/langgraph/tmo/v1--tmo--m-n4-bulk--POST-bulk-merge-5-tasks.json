@@ -1,0 +1,28 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N4",
+  "method": "POST",
+  "scenario": "bulk-merge-5-tasks",
+  "description": "TMO M-N4 bulk_node + BulkOperationQueue normal case: 5 个 task 一次 merge (per NFR-TMO-03 partial failure rollback + C-18 BulkOperationQueue + asyncio.gather 协调)",
+  "schema_ref": "scripts/automation/task_ops/nodes/bulk_node.py + bulk_queue.py",
+  "守门": ["#13 a L0 唯一协调", "NFR-TMO-03 partial success ≥ 80%"],
+  "request": {
+    "operation": "bulk_merge",
+    "target_task_ids": ["task-001", "task-002", "task-003", "task-004", "task-005"],
+    "merge_strategy": "context_union",
+    "actor_session_id": "session-2026-09-05-001"
+  },
+  "response_200": {
+    "merged_task_id": "task-bulk-merged-1f2a3b",
+    "superseded_tasks": ["task-001", "task-002", "task-003", "task-004", "task-005"],
+    "success_count": 5,
+    "failure_count": 0,
+    "stash_checkpoint_ids": ["stash-001-3a", "stash-002-3a", "stash-003-3a", "stash-004-3a", "stash-005-3a"]
+  },
+  "fixture_assertion": {
+    "success_count": 5,
+    "partial_success": false,
+    "rollback": false
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-10",
+  "node": "SA-10",
+  "method": "POST",
+  "scenario": "plan-3-tasks",
+  "description": "SA-10 task-orchestrator normal case: 用户说 '合并任务 a 和任务 b', 拆出 3 个 plan step (parse → merge M-N1 → respond) (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §3.6 + scripts/automation/sub_agent/types/sa_10_task_orchestrator.py)",
+  "schema_ref": "scripts/automation/sub_agent/types/sa_10_task_orchestrator.py",
+  "守门": ["#13 a L1↔L1 禁止 (SA-10 是 L0 协调 sub-agent)", "守门 #19 agent 交互 Python 化"],
+  "request": {
+    "user_input": "合并任务 a 和任务 b",
+    "intent": "dispatch",
+    "subagent_plan": [
+      {"step": 1, "node": "parse_intent", "type": "llm"},
+      {"step": 2, "node": "TMO-M-N1-merge", "type": "tmo_op", "params": {"target_task_ids": ["a", "b"]}},
+      {"step": 3, "node": "respond", "type": "llm"}
+    ]
+  },
+  "response_200": {
+    "plan_id": "plan-uuid-1a2b3c",
+    "steps_count": 3,
+    "estimated_total_tokens": 5000,
+    "estimated_total_ms": 8000,
+    "plan_markdown": "## Plan\n1. parse_intent: 解析用户 chat bar 输入\n2. TMO M-N1 merge: 合并任务 a + b\n3. respond: 汇总结果返回 chat bar"
+  },
+  "fixture_assertion": {
+    "steps_count": 3,
+    "has_tmo_op": true
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Work",
+  "table": "rate_limit_counter",
+  "method": "GET",
+  "scenario": "rate-limit-counter-lookup",
+  "description": "DB Work 类: rate_limit_counter (per 守门 #13 a W = 物理删除 / 短 TTL, L0 派发 backpressure 用)",
+  "request": {
+    "tenant_id": "tenant-001",
+    "endpoint": "/api/mcp/streamable/session"
+  },
+  "response_200": {
+    "tenant_id": "tenant-001",
+    "endpoint": "/api/mcp/streamable/session",
+    "current_count": 12,
+    "window_start": "2026-09-05T06:59:00Z",
+    "retention_period_days": 0.04,
+    "ttl_expires_at": "2026-09-05T07:00:00Z"
+  },
+  "fixture_assertion": {
+    "wtm_class": "Work",
+    "short_ttl": true
+  }
+}

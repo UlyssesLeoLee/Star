@@ -1,0 +1,18 @@
+{
+  "fixture_version": "v1",
+  "module": "streamable-http",
+  "endpoint": "GET /api/mcp/streamable/session/{id}/events",
+  "method": "GET",
+  "scenario": "server-push-sse-stream",
+  "description": "Streamable HTTP Server-Push: SSE 流持续推送 event (per AGENTS.md §7 #3 D.7+)",
+  "response_200_sse": {
+    "content_type": "text/event-stream",
+    "stream_format": "id: <evt_id>\\nevent: <type>\\ndata: <json>\\n\\n",
+    "event_types_pushed": ["tool_call", "agent_dispatch", "interrupt"],
+    "keepalive_interval_seconds": 30
+  },
+  "fixture_assertion": {
+    "sse_format_compliant": true,
+    "keepalive_present": true
+  }
+}

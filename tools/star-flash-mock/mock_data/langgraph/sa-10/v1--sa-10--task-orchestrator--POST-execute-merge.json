@@ -1,0 +1,32 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-10",
+  "node": "SA-10",
+  "method": "POST",
+  "scenario": "execute-merge",
+  "description": "SA-10 task-orchestrator execute phase: 实际调 TMO M-N1 merge_node, 接收 merge_response 写入 global_context",
+  "request": {
+    "plan_id": "plan-uuid-1a2b3c",
+    "execution_phase": "execute",
+    "current_step": 2
+  },
+  "response_200": {
+    "execution_id": "exec-uuid-2b3c4d",
+    "step_completed": 2,
+    "tmo_result": {
+      "node": "M-N1",
+      "merged_task_id": "task-merged-f5a7b2",
+      "superseded_tasks": ["task-alpha", "task-beta"]
+    },
+    "global_context_updated": {
+      "last_tmo_result": {
+        "node": "M-N1",
+        "operation": "merge"
+      }
+    }
+  },
+  "fixture_assertion": {
+    "step_completed": 2,
+    "global_context_updated": true
+  }
+}

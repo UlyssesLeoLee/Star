@@ -1,0 +1,30 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Master",
+  "table": "tenant",
+  "method": "GET",
+  "scenario": "tenant-lookup",
+  "description": "DB Master 类: tenant (per 守门 #13 c M = 物理删除禁止 + SCD Type 2 + RLS 13 類必携)",
+  "守门": ["#13 c M 物理删除禁止 + SCD Type 2", "RLS 13 類必携"],
+  "request": {
+    "tenant_id": "tenant-001"
+  },
+  "response_200": {
+    "tenant_id": "tenant-001",
+    "name": "Star Default Tenant",
+    "plan": "team",
+    "scd_version": 1,
+    "valid_from": "2026-01-01T00:00:00Z",
+    "valid_to": null,
+    "active": true,
+    "rls_13_classes_attached": true,
+    "physical_delete_forbidden": true
+  },
+  "fixture_assertion": {
+    "wtm_class": "Master",
+    "scd_type": 2,
+    "rls_13_classes": true,
+    "physical_delete_forbidden": true
+  }
+}

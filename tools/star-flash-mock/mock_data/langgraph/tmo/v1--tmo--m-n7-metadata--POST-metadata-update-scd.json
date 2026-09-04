@@ -1,0 +1,35 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N7",
+  "method": "POST",
+  "scenario": "metadata-update-scd",
+  "description": "TMO M-N7 SCD Type 2 update: 同一 metadata key 更新 → 新增 version, 老 version 标 expired (Master SCD 不物理删)",
+  "request": {
+    "operation": "metadata_update",
+    "metadata_id": "metadata-uuid-1a2b",
+    "metadata": {
+      "priority": "P1",
+      "tags": ["saga-orchestrator", "tmo-test", "priority-downgrade"],
+      "estimated_tokens": 60000
+    }
+  },
+  "response_200": {
+    "metadata_id": "metadata-uuid-1a2b",
+    "scd_version": 2,
+    "valid_from": "2026-09-05T07:00:00Z",
+    "valid_to": null,
+    "active": true,
+    "previous_version": {
+      "scd_version": 1,
+      "valid_to": "2026-09-05T07:00:00Z",
+      "active": false
+    }
+  },
+  "fixture_assertion": {
+    "scd_type": 2,
+    "new_version_created": true,
+    "old_version_expired": true,
+    "physical_delete": false
+  }
+}

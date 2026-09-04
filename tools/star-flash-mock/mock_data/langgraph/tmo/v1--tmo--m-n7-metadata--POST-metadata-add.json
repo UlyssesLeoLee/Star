@@ -1,0 +1,35 @@
+{
+  "fixture_version": "v1",
+  "module": "tmo",
+  "node": "M-N7",
+  "method": "POST",
+  "scenario": "metadata-add",
+  "description": "TMO M-N7 MetadataRegistry normal case: 添加 task_metadata (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6.3 M-N7 + C-19 MetadataRegistry + Master RLS 13 類必携)",
+  "schema_ref": "scripts/automation/task_ops/nodes/metadata_node.py + task_metadata_repo.py + task_metadata_ddl.py",
+  "守门": ["#13 c Master RLS 13 類必携 (tenant_id + workspace_ids)", "#13 c Master SCD Type 2 (历史保留, 不物理删)"],
+  "request": {
+    "operation": "metadata_add",
+    "task_id": "task-meta-1a2b3c",
+    "metadata": {
+      "priority": "P0",
+      "tags": ["saga-orchestrator", "tmo-test"],
+      "estimated_tokens": 50000
+    },
+    "tenant_id": "tenant-001",
+    "workspace_ids": ["ws-001", "ws-002"],
+    "actor_session_id": "session-2026-09-05-001"
+  },
+  "response_200": {
+    "metadata_id": "metadata-uuid-1a2b",
+    "task_id": "task-meta-1a2b3c",
+    "scd_version": 1,
+    "valid_from": "2026-09-05T06:55:00Z",
+    "valid_to": null,
+    "active": true
+  },
+  "fixture_assertion": {
+    "rls_13_classes_present": true,
+    "scd_type": 2,
+    "soft_delete": false
+  }
+}

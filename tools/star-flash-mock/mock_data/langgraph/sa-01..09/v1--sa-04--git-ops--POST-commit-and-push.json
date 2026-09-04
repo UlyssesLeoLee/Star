@@ -1,0 +1,25 @@
+{
+  "fixture_version": "v1",
+  "module": "sa-04",
+  "type": "git-ops",
+  "method": "POST",
+  "scenario": "commit-and-push",
+  "description": "SA-04 git-ops normal case: 提交 + 推 origin (per 守门 #1 R-05 反转 9/3 已落地, 推 origin 网络错误 max 2 retries per 守门 #1a)",
+  "request": {
+    "operation": "commit_and_push",
+    "files": ["crates/domain-x/src/lib.rs", "tests/integration/test_x.py"],
+    "commit_message": "feat(domain-x): 实现 X (per SA-04)",
+    "author": "Ulysses <ulysses@mavis.local>",
+    "branch": "main"
+  },
+  "response_200": {
+    "commit_sha": "abc123def456",
+    "push_status": "success",
+    "remote_url": "https://github.com/UlyssesLeoLee/Star.git",
+    "author_verified": true
+  },
+  "fixture_assertion": {
+    "commit_author": "Ulysses",
+    "push_success": true
+  }
+}

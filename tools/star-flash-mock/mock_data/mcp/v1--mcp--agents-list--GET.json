@@ -1,0 +1,22 @@
+{
+  "fixture_version": "v1",
+  "module": "mcp",
+  "tool": "agents_list",
+  "method": "GET",
+  "scenario": "list-active-agents",
+  "description": "MCP tool: agents_list (per 16 tool 真实接入 e2e)",
+  "request": {
+    "tenant_id": "tenant-001",
+    "status_filter": "active"
+  },
+  "response_200": {
+    "agents": [
+      {"agent_id": "agent-sa01-001", "sa_type": "SA-01", "state": "running", "task_ref": "WI-001"},
+      {"agent_id": "agent-sa08-002", "sa_type": "SA-08", "state": "running", "task_ref": "WI-002"}
+    ],
+    "total": 2
+  },
+  "fixture_assertion": {
+    "sa_types_correct": true
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Transaction",
+  "table": "audit_event",
+  "method": "POST",
+  "scenario": "audit-event-append",
+  "description": "DB Transaction 类: audit_event append-only (per 守门 #13 b T = 物理删除禁止 + 監査必須 + RLS 13 類必携 + ADR-0043 audit_audit_event WORM onboarding.failed)",
+  "守门": ["#13 b T 物理删除禁止", "#13 d T 100% audit", "RLS 13 類必携"],
+  "request": {
+    "event_type": "agent_dispatch",
+    "actor_session_id": "session-2026-09-05-001",
+    "actor_user_id": "user-001",
+    "tenant_id": "tenant-001",
+    "workspace_id": "ws-001",
+    "resource_kind": "task_card",
+    "resource_id": "task-001",
+    "action": "tmo.merge",
+    "result": "success",
+    "metadata": {"merged_count": 2}
+  },
+  "response_201": {
+    "audit_event_id": "audit-event-uuid-001",
+    "append_only_id": 12345,
+    "created_at": "2026-09-05T07:00:00Z",
+    "rls_13_classes_attached": true,
+    "physical_delete_blocked": true
+  },
+  "fixture_assertion": {
+    "wtm_class": "Transaction",
+    "append_only": true,
+    "physical_delete_blocked": true,
+    "rls_13_classes": true
+  }
+}

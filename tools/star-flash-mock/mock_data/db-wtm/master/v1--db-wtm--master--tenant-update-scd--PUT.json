@@ -1,0 +1,33 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Master",
+  "table": "tenant",
+  "method": "PUT",
+  "scenario": "tenant-update-scd-type-2",
+  "description": "DB Master 类: tenant SCD Type 2 update (per 守门 #13 c M 不物理删, 新增 version, 老 version 标 expired)",
+  "request": {
+    "tenant_id": "tenant-001",
+    "name": "Star Default Tenant v2",
+    "plan": "enterprise"
+  },
+  "response_200": {
+    "tenant_id": "tenant-001",
+    "scd_version": 2,
+    "valid_from": "2026-09-05T07:00:00Z",
+    "valid_to": null,
+    "active": true,
+    "previous_version": {
+      "scd_version": 1,
+      "valid_to": "2026-09-05T07:00:00Z",
+      "active": false,
+      "physical_delete": false
+    }
+  },
+  "fixture_assertion": {
+    "scd_type": 2,
+    "new_version_created": true,
+    "old_version_soft_expired": true,
+    "physical_delete": false
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "fixture_version": "v1",
+  "module": "l1-ecs",
+  "type": "lifecycle",
+  "method": "POST",
+  "scenario": "agent-lifecycle-hot-to-warm",
+  "description": "L1 ECS Lifecycle System: HOT → WARM 转换 (per SRS-001 §11-§15 HOT/WARM/COLD + 13 Systems)",
+  "request": {
+    "entity_id": "entity-uuid-sa02-002",
+    "from_state": "HOT",
+    "to_state": "WARM",
+    "trigger": "idle_5min"
+  },
+  "response_200": {
+    "entity_id": "entity-uuid-sa02-002",
+    "previous_state": "HOT",
+    "current_state": "WARM",
+    "checkpoint_persisted": true,
+    "memory_mb": 28
+  },
+  "fixture_assertion": {
+    "lifecycle_transition_ok": true,
+    "checkpoint_persisted": true
+  }
+}

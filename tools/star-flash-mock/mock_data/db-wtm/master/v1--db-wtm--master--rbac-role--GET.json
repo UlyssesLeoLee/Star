@@ -1,0 +1,27 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Master",
+  "table": "rbac_role",
+  "method": "GET",
+  "scenario": "rbac-role-lookup",
+  "description": "DB Master 类: rbac_role (per 守门 #13 c M + 5 域 admin 域独立 Lead)",
+  "request": {
+    "role_id": "role-admin-001"
+  },
+  "response_200": {
+    "role_id": "role-admin-001",
+    "name": "admin",
+    "permissions": ["tenant.read", "tenant.write", "audit.read"],
+    "scd_version": 1,
+    "valid_from": "2026-01-01T00:00:00Z",
+    "valid_to": null,
+    "active": true,
+    "physical_delete_forbidden": true
+  },
+  "fixture_assertion": {
+    "wtm_class": "Master",
+    "scd_type": 2,
+    "physical_delete_forbidden": true
+  }
+}

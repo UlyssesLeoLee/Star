@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "mcp",
+  "tool": "sessions_create",
+  "method": "POST",
+  "scenario": "create-session",
+  "description": "MCP tool: sessions_create (per ADR-0030 Agent Lease/Heartbeat/Resume)",
+  "request": {
+    "tenant_id": "tenant-001",
+    "user_id": "user-001",
+    "lease_ttl_seconds": 300
+  },
+  "response_200": {
+    "session_id": "session-2026-09-05-001",
+    "lease_id": "lease-uuid-001",
+    "lease_expires_at": "2026-09-05T07:05:00Z",
+    "heartbeat_required": true
+  },
+  "fixture_assertion": {
+    "lease_ttl_300s": true,
+    "heartbeat_required": true
+  }
+}
