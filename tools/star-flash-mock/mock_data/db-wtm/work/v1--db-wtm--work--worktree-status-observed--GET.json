@@ -1,0 +1,33 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Work",
+  "table": "worktree_status_observed",
+  "schema": "worktree",
+  "id": "T73",
+  "method": "GET",
+  "scenario": "worktree-status-observed-lookup",
+  "description": "DB W 类: worktree.worktree_status_observed (per docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.2 §2 T73)",
+  "rationale": "観測派生",
+  "守门": [
+    "#13 a/b/c/d W=物理删除+T=物理删除禁止+M=物理删除禁止+SCD"
+  ],
+  "classification_locked": true,
+  "migration_required_if_changed": true,
+  "request": {
+    "table": "worktree_status_observed",
+    "id": "worktree-worktree_status_observed-001"
+  },
+  "response_200": {
+    "id": "worktree-worktree_status_observed-001",
+    "retention_period_days": 7,
+    "ttl_expires_at": "2026-09-12T07:00:00Z",
+    "physical_delete_on_expiry": true,
+    "rls_13_classes_attached": true
+  },
+  "fixture_assertion": {
+    "wtm_class": "Work",
+    "retention_period_days": 7,
+    "physical_delete_on_expiry": true
+  }
+}

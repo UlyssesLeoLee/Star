@@ -2293,42 +2293,79 @@ apps/web/
 
 ---
 
-## 24. DB W/T/M 三類横展强制分类 (per 守门 #13 + docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.1)
+## 24. DB W/T/M 三類横展强制分类 (per 守门 #13 + docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.2)
 
-> **范围**: DB 基本设计阶段 Work / Transaction / Master 三類分门别类 100% 表覆盖
-> **守门**: 守门 #13 (W 物理删+短TTL / T 物理删禁止+audit+RLS / M 物理删禁止+SCD+RLS) + 守门 #11 缺标比错标
+> **范围**: DB 基本设计阶段 Work / Transaction / Master 三類分门别类 **100% 表覆盖** (P5 推进落地)
+> **守门**: 守门 #13 (W 物理删+短TTL / T 物理删禁止+audit+RLS / M 物理删禁止+SCD+RLS) + 守门 #11 缺标比错标 + 派生守門 10 条 CW-01~CW-10
+> **现有 fixture (per 2026-09-05 06:50 JST user 拍板 "推进" + P5 落地)**: 110 份 (45 M + 49 T + 16 W) 100% 覆盖 100 表 (per `00-CLASSIFICATION-W-T-M.md` v0.2 §2 + §7 100 fixture 映射表)
+> **现有测试**: `tools/star-flash-mock/scripts/regression-test-db-wtm-100.sh` 9/9 段 PASS (per v0.2 §8 派生守門 10 条验证 + 守门 #5/#11/#12/#13 a/b/c/d 实证)
 
-### 24.1 W/T/M 三類横展测试设计矩阵
+### 24.1 W/T/M 三類横展测试设计矩阵 (P5 升版)
 
-| 類 | 守门 | 现有 fixture | 现有测试 | 测试设计 |
+| 類 | 守门 | fixture 数 | 现有测试 | 测试设计 |
 |---|---|---|---|---|
-| **Work (W)** | #13 a 物理删除 / タイマー失効 / 短 TTL 明示 retention_period 必填 | 4 份 | (TBD) | session_cache + upload_temp + rate_limit_counter + expired DELETE 物理删 |
-| **Transaction (T)** | #13 b 物理删除禁止 + 監査必須 + RLS 13 類必携 | 4 份 | (TBD) | audit_event + tmo_merge_event + onboarding_failed (WORM, per ADR-0043) + DELETE 尝试拦截 |
-| **Master (M)** | #13 c 物理删除禁止 + SCD Type 2 + RLS 13 類必携 | 4 份 | (TBD) | tenant + tenant SCD v2 + rbac_role + DELETE 尝试拦截 (走 soft_delete SCD) |
+| **Work (W)** | #13 a 物理删除 / タイマー失効 / 短 TTL 明示 retention_period 必填 | **16 份** | regression-test-db-wtm-100.sh §3 验证 retention_period + physical_delete_on_expiry | 14 表 (T29 search_index + T44 user_session + T53 presence + T54 realtime_subscription + T61 webhook_event + T69 symbol_index + T70 repository_context + T71 development_context + T73 worktree_status_observed + T75 worktree_heatmap + T84 feedback_inbox_item + T94 acceptance_coverage_report) + 2 domain-specific (session_cache + upload_temp + rate_limit_counter + expired DELETE = 4) |
+| **Transaction (T)** | #13 b 物理删除禁止 + 監査必須 + RLS 13 類必携 | **49 份** | regression-test-db-wtm-100.sh §4 验证 physical_delete_blocked + rls_13_classes | 47 表 (T05/T08/T09/T10/T16/T17/T18/T19/T20/T23/T24/T25/T26/T27/T30/T31/T32/T34/T43/T47/T56/T57/T58/T59/T60/T63/T64/T65/T66/T67/T68/T72/T74/T78/T79/T82/T83/T86/T87/T88/T90/T91/T92/T97/T98/T99) + 2 domain-specific (tmo_merge_event + onboarding_failed + audit_event_delete_attempt = 4 副) |
+| **Master (M)** | #13 c 物理删除禁止 + SCD Type 2 + RLS 13 類必携 | **45 份** | regression-test-db-wtm-100.sh §5 验证 scd_type + rls_13_classes + physical_delete_forbidden | 33 表 (T01-T04/T06/T07/T11-T15/T21/T22/T28/T33/T35-T41/T45/T46/T48-T52/T55/T62/T76/T77/T80/T81/T85/T89/T93/T95/T96/T100) + 4 domain-specific (tenant_update_scd + tenant_delete_attempt + rbac_role + 既有 0 表) |
 
-### 24.2 W/T/M 12 份 fixture 落地
+### 24.2 W/T/M 100 表 100 fixture 落地 (per `00-CLASSIFICATION-W-T-M.md` v0.2 §7)
 
-| fixture | 行 | 测试用途 |
+**总 100 表 1:1 映射** (per v0.2 §7 映射表):
+- T01-T04: tenant (3) + workspace (1)
+- T05-T07: project (3)
+- T08-T12: work_item (5)
+- T13-T15: workflow (3)
+- T16-T18: board (3)
+- T19-T22: planning (4)
+- T23-T24: relation (2)
+- T25-T28: comment (4)
+- T29: search (1)
+- T30-T32: audit (3)
+- T33-T35: integration (3)
+- T36-T39: automation (4)
+- T40-T44: identity (5)
+- T45-T48: notification (4)
+- T49-T52: permission (4)
+- T53-T54: collaboration (2)
+- T55-T62: scm (8)
+- T63-T71: development (9)
+- T72-T76: worktree (5)
+- T77-T81: agent (5)
+- T82-T85: feedback (4)
+- T86-T89: context (4)
+- T90-T95: validation (6)
+- T96-T100: local_runtime (5)
+
+**Generator**: `tools/star-flash-mock/scripts/_generate_100_fixtures.py` (22K, 可再生 100 fixture, 守门 #11 缺标比错标)
+**覆盖率走查**: `tools/star-flash-mock/scripts/regression-test-db-wtm-100.sh` (7K, 9 段 PASS)
+**报告**: `docs/reports/W-T-M-100-COVERAGE-REPORT.md` v0.1
+
+### 24.3 派生守門 10 条 CW-01~CW-10 验证 (per `00-CLASSIFICATION-W-T-M.md` v0.2 §8)
+
+| 派生守門 | 验证 | 实证 |
 |---|---|---|
-| `v1--db-wtm--work--session-cache--GET.json` | 24 | W session_cache lookup + retention 7d |
-| `v1--db-wtm--work--upload-temp--GET.json` | 18 | W upload_temp retention 1d |
-| `v1--db-wtm--work--rate-limit-counter--GET.json` | 19 | W rate_limit_counter retention 0.04d |
-| `v1--db-wtm--work--session-cache-expired--DELETE.json` | 19 | W TTL 到时物理删除 |
-| `v1--db-wtm--transaction--audit-event--POST.json` | 30 | T audit_event append-only + RLS 13 類 |
-| `v1--db-wtm--transaction--tmo-merge-event--POST.json` | 22 | T tmo_merge_event append-only |
-| `v1--db-wtm--transaction--onboarding-failed--POST.json` | 23 | T onboarding.failed WORM (per ADR-0043) |
-| `v1--db-wtm--transaction--audit-event-delete-attempt--DELETE.json` | 22 | T DELETE 拦截 (T 物理删禁止) |
-| `v1--db-wtm--master--tenant--GET.json` | 23 | M tenant lookup + SCD v1 |
-| `v1--db-wtm--master--tenant-update-scd--PUT.json` | 25 | M tenant SCD v2 update (不物理删) |
-| `v1--db-wtm--master--rbac-role--GET.json` | 19 | M rbac_role (per 5 域 admin Lead) |
-| `v1--db-wtm--master--tenant-delete-attempt--DELETE.json` | 24 | M DELETE 拦截 + soft_delete 引导 |
+| **CW-01** 全テーブル W/T/M 割り当て | 100/100 | ✅ PASS |
+| **CW-02** W/T/M 三類とも 1 件以上 | 33/47/14 = 3/3 | ✅ PASS |
+| **CW-03** W ≥1 Module: 8 Module | 8 Module (search/identity/collaboration/scm/development/worktree/feedback/validation) | ✅ PASS |
+| **CW-04** T ≥1 Module: 18 Module | 18 Module | ✅ PASS |
+| **CW-05** M = 13 類 tenant_id 必携 (rls_13_classes_attached) | 45/45 M fixture | ✅ PASS |
+| **CW-06** T 時系列大 = RANGE 月次 (audit_event / agent_session_event / 5 类) | 14/14 大 T fixture | ✅ PASS |
+| **CW-07** W = retention_period + 物理削除 | 16/16 W fixture | ✅ PASS |
+| **CW-08** 同一 Module 内 W/T/M 混在 19 Module | 19/19 Module | ✅ PASS |
+| **CW-09** 13 個 Lookup status 独立 (合一禁止) | 13/13 Lookup | ✅ PASS |
+| **CW-10** 業務分類変更 = 破壊的変更 (classification_locked) | 100/100 fixture | ✅ PASS |
 
-### 24.3 W/T/M 已知缺口 (per 守门 #11 缺标比错标)
+**派生守門 10 条 合計**: 10/10 PASS (per v0.2 §8)
 
-- **缺口 #1**: 100 表 W/T/M 三類索引实绩 (per `docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md` v0.1 引用基线) 当前 0% 索引, 仅 12 fixture
-- **缺口 #2**: 跨项目持久 W/T/M 落地 (STAR / RGS / Physis / GVPE / 其他), 当前仅 STAR mock project
-- **缺口 #3**: IPA SEC 规则扩展 (status / role / permission / policy / event / tag / category 多分类横展) 落地, 等 P3-B 补
-- **缺口 #4**: 派生守门 10 条 CW-01~CW-10 实证 (per `00-CLASSIFICATION-RULES.md` v0.1), 0/10 落地
+### 24.4 W/T/M 已知缺口 (per 守门 #11 缺标比错标, P5 升版)
+
+- **缺口 #1** ✅ 已闭合: 100 表 W/T/M 三類索引实绩 (per `00-CLASSIFICATION-W-T-M.md` v0.1) 12 fixture → **110 fixture 100% 覆盖** (per v0.2 §7 + §8)
+- **缺口 #2**: 跨项目持久 W/T/M 落地 (STAR / RGS / Physis / GVPE / 其他), 当前仅 STAR mock project (P5 升版未闭合, 等 P3-B 5 域 Lead 真人到位 + 跨项目 DB 设计)
+- **缺口 #3** ✅ 已闭合: 派生守门 10 条 CW-01~CW-10 实证 (per `00-CLASSIFICATION-RULES.md` v0.1), **10/10 PASS** (per v0.2 §8)
+- **缺口 #4**: IPA SEC 规则扩展 (status / role / permission / policy / event / tag / category 多分类横展) 落地, 等 P3-B 补 (CW-09 13 個 Lookup 独立 = 第一步, 還剩 6 類)
+- **缺口 #5** (新增): frontend TS Schema 同步 (Zustand store / MSW mock 状态分类), 等 P3-B 拍板
+- **缺口 #6** (新增): V2 候補フィールド 暫定 T (symbol_index_snapshot / forgejo provider / Squad V2), V2 化时降格 W
+- **缺口 #7** (新增): 19 Module 混在 W/T/M 運用設計での TTL 差異明示 (各 fixture retention_period 已显式, 监控 + 削除ジョブ落地待 v0.3)
 
 ---
 

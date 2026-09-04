@@ -1,0 +1,37 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Transaction",
+  "table": "integration_sync_state",
+  "schema": "integration",
+  "id": "T34",
+  "method": "GET",
+  "scenario": "integration-sync-state",
+  "description": "DB T 类: integration.integration_sync_state (per docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.2 §2 T34)",
+  "rationale": "同期状態",
+  "守门": [
+    "#13 a/b/c/d W=物理删除+T=物理删除禁止+M=物理删除禁止+SCD"
+  ],
+  "classification_locked": true,
+  "migration_required_if_changed": true,
+  "request": {
+    "table": "integration_sync_state",
+    "id": "integration-integration_sync_state-001",
+    "actor": "session-2026-09-05-001"
+  },
+  "response_200_201": {
+    "id": "integration-integration_sync_state-001",
+    "append_only_id": 12345,
+    "created_at": "2026-09-05T07:00:00Z",
+    "actor_session_id": "session-2026-09-05-001",
+    "rls_13_classes_attached": true,
+    "physical_delete_blocked": true,
+    "partition_strategy": null
+  },
+  "fixture_assertion": {
+    "wtm_class": "Transaction",
+    "append_only": true,
+    "physical_delete_blocked": true,
+    "rls_13_classes": true
+  }
+}

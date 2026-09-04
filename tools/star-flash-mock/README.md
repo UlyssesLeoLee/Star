@@ -1,8 +1,8 @@
 # Star Mock Project (star-flash-mock)
 
-> **版本**: v0.1 (2026-09-05 JST 落地, per 2026-09-04 17:47 JST "测试脚本+数据归入 mock 项目" + 2026-09-05 06:50 JST user 拍板 "全栈覆盖 v0.7" + "新建 tools/star-flash-mock/")
-> **范围**: Star 项目全栈测试用 mock 项目 (LangGraph + Agent Runtime + 16 MCP tools + Streamable HTTP + DB W/T/M + 5 域业务 + OpenClaw v1 既有 fixture)
-> **守门**: 守门 #5 环境变量安全 / 守门 #11 缺标比错标 / 守门 #13 a W=短 TTL 物理删 / b T=append-only / c M=RLS+SCD / d T 100% audit / e M 100% RLS
+> **版本**: v0.2 (2026-09-05 JST 升版, per 2026-09-04 17:47 JST "测试脚本+数据归入 mock 项目" + 2026-09-05 06:50 JST user 拍板 "全栈覆盖 v0.7" + 2026-09-05 06:50 JST "推进" + P5 DB W/T/M 100% 表覆蓋)
+> **范围**: Star 项目全栈测试用 mock 项目 (LangGraph + Agent Runtime + 16 MCP tools + Streamable HTTP + DB W/T/M 100% 覆蓋 + 5 域业务 + OpenClaw v1 既有 fixture)
+> **守门**: 守门 #5 环境变量安全 / 守门 #11 缺标比错标 / 守门 #13 a W=短 TTL 物理删 / b T=append-only / c M=RLS+SCD / d T 100% audit / e M 100% RLS + 派生守門 10 条 CW-01~CW-10
 
 ---
 
@@ -21,7 +21,8 @@ D:\Star\tools\star-flash-mock\
 │   ├── regression-test-agent-runtime.sh   # 3. Agent Runtime L0/L1/L2
 │   ├── regression-test-mcp.sh             # 4. 16 MCP tool
 │   ├── regression-test-streamable-http.sh # 5. Streamable HTTP
-│   ├── regression-test-db-wtm.sh          # 6. DB W/T/M 三类横展
+│   ├── regression-test-db-wtm.sh          # 6. DB W/T/M 三类横展 (P5 升版: 12 fixture basic)
+│   ├── regression-test-db-wtm-100.sh      # 6b. DB W/T/M 100% 表覆蓋 (P5 升版: 100 表 + 9 段走查 + 派生守門 10 条)
 │   ├── regression-test-five-domain.sh     # 7. 5 域业务 (player/economy/match/social/admin)
 │   ├── regression-test-openclaw.sh        # 8. OpenClaw v1 既有 fixture
 │   └── run-all.sh                         # 9. 一键跑全部
@@ -37,10 +38,10 @@ D:\Star\tools\star-flash-mock\
 │   │   └── l2-pools/                      #   L2 业务共享池 (LLM/MCP/HTTP/Tool/RAG/Token/Rate/CB) - 8 份
 │   ├── mcp/                               # 16 MCP tool 端点 - 48 份
 │   ├── streamable-http/                   # Streamable HTTP (session 重连/Server-push/Last-Event-ID/DELETE) - 8 份
-│   └── db-wtm/                            # DB W/T/M 三类横展 (per 守门 #13)
-│       ├── work/                          #   Work (短 TTL 物理删, retention 显式) - 4 份
-│       ├── transaction/                   #   Transaction (append-only, audit, RLS 13 類必携) - 4 份
-│       └── master/                        #   Master (SCD Type 2, RLS 13 類必携, 不物理删) - 4 份
+│   └── db-wtm/                            # DB W/T/M 三类横展 (per 守门 #13) - 100 表 100% 覆蓋
+│       ├── work/                          #   Work (短 TTL 物理删, retention 显式) - 16 份 (P5 升版: 14 表 + 2 domain-specific)
+│       ├── transaction/                   #   Transaction (append-only, audit, RLS 13 類必携) - 49 份 (P5 升版: 47 表 + 2 domain-specific)
+│       └── master/                        #   Master (SCD Type 2, RLS 13 類必携, 不物理删) - 45 份 (P5 升版: 33 表 + 12 domain-specific)
 ├── docs/                                  # 回归测试报告
 │   ├── regression-report-2026-09-05.md
 │   └── README.md
@@ -49,7 +50,7 @@ D:\Star\tools\star-flash-mock\
     └── star-mock-service.yaml             # star-mock ClusterIP service
 ```
 
-**总 fixture 估算**: 20 (openclaw) + 21 (tmo) + 6 (sa-10) + 27 (sa-01..09) + 23 (agent-runtime) + 48 (mcp) + 8 (streamable-http) + 12 (db-wtm) = **165 份 mock fixture** + 9 份回归脚本 + 4 份 k3s yaml + 2 份 docs
+**总 fixture 估算**: 20 (openclaw) + 21 (tmo) + 6 (sa-10) + 27 (sa-01..09) + 23 (agent-runtime) + 48 (mcp) + 8 (streamable-http) + 110 (db-wtm, P5 升版) = **263 份 mock fixture** (含 100 表 W/T/M 100% 覆蓋) + 10 份回归脚本 (P5 升版: +1 db-wtm-100) + 4 份 k3s yaml + 3 份 docs (P5 升版: +1 W-T-M-100-COVERAGE-REPORT)
 
 ## 2. mock_data fixture 命名规则 (Naming Convention)
 
@@ -83,13 +84,16 @@ per 守门 #11 缺标比错标:
 
 ## 4. 已知缺口 (per 守门 #11 缺标比错标)
 
-- **缺口 #1**: 16 MCP tool 全 fixture 仅含 12 tool (tools/invoke, projects, workitems, worktrees, agents, sessions, notifications, integrations, billing, validation, identity, cost), 剩 4 tool (audit_event / scm / workspace / feedback) 等 P3-B 实装
-- **缺口 #2**: Agent Runtime L1 ECS 9 Archetype 仅 9 SA-01..SA-09 各 1 fixture, 缺 ECS Component/Event/System 详细
-- **缺口 #3**: Streamable HTTP 仅 8 fixture (session-create/reconnect/server-push/last-event-id/delete/ping/error/timeout), 缺 5xx 错误 + retry 完整 case
-- **缺口 #4**: 5 域 fixture 仅 player / economy / match / social / admin 各 1 GET, 缺 POST/PUT/DELETE 完整
-- **缺口 #5**: DB W/T/M 仅 12 fixture (4 W + 4 T + 4 M), 缺 RLS 13 類必携完整对账
-- **缺口 #6**: k3s/ 4 yaml 缺 star-mock ConfigMap + Secret (envoy + 服务配置)
-- **缺口 #7**: docs/ 回归报告仅 1 份, 缺每次跑出的 commit-time 报告
+- **缺口 #1**: 16 MCP tool 全 fixture 仅含 6 tool (workitem_list / workitem_create / tools_invoke / agents_list / sessions_create / billing_usage), 剩 10 tool (audit_event / scm / workspace / feedback / inbox / project / permission / kms / form / search) 等 P3-B 实装
+- **缺口 #2**: Agent Runtime L1 ECS 9 Archetype 仅 2 fixture (SA-01 + lifecycle), 缺 SA-02..SA-09 + System 12 类 + Component 详细
+- **缺口 #3**: Streamable HTTP 仅 4 fixture (session-create/reconnect/server-push/delete-session), 缺 5xx 错误 + retry 完整 case
+- **缺口 #4**: 5 域 fixture 仅 0 份独立 (复用 frontend/src/mocks/data/five-domain.ts per test-design v0.6 §17.4)
+- **缺口 #5** ✅ P5 升版闭合: DB W/T/M 12 fixture → **110 fixture 100% 覆蓋 100 表** (per regression-test-db-wtm-100.sh 9/9 段 PASS + 派生守門 10/10)
+- **缺口 #6**: k3s/ 2 yaml 缺 ConfigMap + Secret (envoy + 服务配置)
+- **缺口 #7**: docs/ 2 份回归报告 (P5 升版: +1 W-T-M-100-COVERAGE-REPORT), 缺每次跑出的 commit-time 报告
+- **缺口 #8** (P5 升版新增): frontend TS Schema 同步 (Zustand store / MSW mock 状态分类), 等 P3-B 拍板
+- **缺口 #9** (P5 升版新增): V2 候補フィールド 暫定 T (symbol_index_snapshot / forgejo provider / Squad V2), V2 化时降格 W
+- **缺口 #10** (P5 升版新增): 19 Module 混在 W/T/M 運用設計での TTL 差異明示 (各 fixture retention_period 已显式, 监控 + 削除ジョブ落地待 v0.3)
 
 ## 5. 跨项目引用 (per 守门 #12 + AGENTS.md §5 仓库拓扑)
 
@@ -102,3 +106,4 @@ per 守门 #11 缺标比错标:
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 脚手架 (scripts/ + mock_data/ + docs/ + k3s/) + 165 份 fixture 估算 + 9 份回归脚本 + 7 份守门落档; 迁移 docs/reports/wiremock-openclaw 20 份 → mock_data/openclaw/ | 2026-09-05 06:50 JST user 拍板 (单文件 v0.6 → v0.7 + 新建 tools/star-flash-mock/ + 全栈覆盖) |
+| v0.2 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | P5 升版: 110 fixture 落地 (45 M + 49 T + 16 W) 100% 覆蓋 100 表; +98 fixture 透过 _generate_100_fixtures.py 可再生; +regression-test-db-wtm-100.sh 9 段走查 PASS; +W-T-M-100-COVERAGE-REPORT.md v0.1; 派生守門 10 条 CW-01~CW-10 全部 PASS; 守门 #5/#11/#12/#13 a/b/c/d 0 违反 | 2026-09-05 06:50 JST user 拍板 "推进" + P5 DB W/T/M 100% 表覆蓋 (推荐) |

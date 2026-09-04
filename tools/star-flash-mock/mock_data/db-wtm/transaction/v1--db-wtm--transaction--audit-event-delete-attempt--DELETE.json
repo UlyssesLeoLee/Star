@@ -19,6 +19,7 @@
   "fixture_assertion": {
     "status_code": 403,
     "physical_delete_blocked": true,
+    "rls_13_classes": true,
     "attempt_logged_in_audit_audit_event": true
   }
 }

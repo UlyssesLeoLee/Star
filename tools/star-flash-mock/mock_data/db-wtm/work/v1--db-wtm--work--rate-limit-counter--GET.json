@@ -16,7 +16,8 @@
     "current_count": 12,
     "window_start": "2026-09-05T06:59:00Z",
     "retention_period_days": 0.04,
-    "ttl_expires_at": "2026-09-05T07:00:00Z"
+    "ttl_expires_at": "2026-09-05T07:00:00Z",
+    "physical_delete_on_expiry": true
   },
   "fixture_assertion": {
     "wtm_class": "Work",

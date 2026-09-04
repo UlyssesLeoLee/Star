@@ -1,0 +1,36 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Master",
+  "table": "provider_data_boundary",
+  "schema": "tenant",
+  "id": "T03",
+  "method": "GET",
+  "scenario": "provider-data-boundary",
+  "description": "DB M 类: tenant.provider_data_boundary (per docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.2 §2 T03)",
+  "rationale": "データ境界定義",
+  "守门": [
+    "#13 a/b/c/d W=物理删除+T=物理删除禁止+M=物理删除禁止+SCD"
+  ],
+  "classification_locked": true,
+  "migration_required_if_changed": true,
+  "request": {
+    "table": "provider_data_boundary",
+    "id": "tenant-provider_data_boundary-001"
+  },
+  "response_200": {
+    "id": "tenant-provider_data_boundary-001",
+    "scd_version": 1,
+    "valid_from": "2026-01-01T00:00:00Z",
+    "valid_to": null,
+    "active": true,
+    "rls_13_classes_attached": true,
+    "physical_delete_forbidden": true
+  },
+  "fixture_assertion": {
+    "wtm_class": "Master",
+    "scd_type": 2,
+    "rls_13_classes": true,
+    "physical_delete_forbidden": true
+  }
+}

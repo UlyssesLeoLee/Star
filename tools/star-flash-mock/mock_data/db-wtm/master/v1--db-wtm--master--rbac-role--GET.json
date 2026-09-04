@@ -22,6 +22,7 @@
   "fixture_assertion": {
     "wtm_class": "Master",
     "scd_type": 2,
+    "rls_13_classes": true,
     "physical_delete_forbidden": true
   }
 }

@@ -22,6 +22,8 @@
   },
   "fixture_assertion": {
     "wtm_class": "Transaction",
-    "append_only": true
+    "append_only": true,
+    "physical_delete_blocked": true,
+    "rls_13_classes": true
   }
 }

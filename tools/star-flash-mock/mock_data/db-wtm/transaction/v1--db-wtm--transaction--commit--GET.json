@@ -1,0 +1,37 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Transaction",
+  "table": "commit",
+  "schema": "scm",
+  "id": "T57",
+  "method": "GET",
+  "scenario": "commit-lookup",
+  "description": "DB T 类: scm.commit (per docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.2 §2 T57)",
+  "rationale": "コミット,Append-only",
+  "守门": [
+    "#13 a/b/c/d W=物理删除+T=物理删除禁止+M=物理删除禁止+SCD"
+  ],
+  "classification_locked": true,
+  "migration_required_if_changed": true,
+  "request": {
+    "table": "commit",
+    "id": "scm-commit-001",
+    "actor": "session-2026-09-05-001"
+  },
+  "response_200_201": {
+    "id": "scm-commit-001",
+    "append_only_id": 12345,
+    "created_at": "2026-09-05T07:00:00Z",
+    "actor_session_id": "session-2026-09-05-001",
+    "rls_13_classes_attached": true,
+    "physical_delete_blocked": true,
+    "partition_strategy": null
+  },
+  "fixture_assertion": {
+    "wtm_class": "Transaction",
+    "append_only": true,
+    "physical_delete_blocked": true,
+    "rls_13_classes": true
+  }
+}

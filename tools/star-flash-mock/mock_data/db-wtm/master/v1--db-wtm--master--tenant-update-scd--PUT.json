@@ -25,7 +25,10 @@
     }
   },
   "fixture_assertion": {
+    "wtm_class": "Master",
     "scd_type": 2,
+    "rls_13_classes": true,
+    "physical_delete_forbidden": true,
     "new_version_created": true,
     "old_version_soft_expired": true,
     "physical_delete": false

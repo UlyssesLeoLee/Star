@@ -1,0 +1,36 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Master",
+  "table": "workflow_transition",
+  "schema": "workflow",
+  "id": "T15",
+  "method": "GET",
+  "scenario": "workflow-transition-lookup",
+  "description": "DB M 类: workflow.workflow_transition (per docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.2 §2 T15)",
+  "rationale": "遷移ルール",
+  "守门": [
+    "#13 a/b/c/d W=物理删除+T=物理删除禁止+M=物理删除禁止+SCD"
+  ],
+  "classification_locked": true,
+  "migration_required_if_changed": true,
+  "request": {
+    "table": "workflow_transition",
+    "id": "workflow-workflow_transition-001"
+  },
+  "response_200": {
+    "id": "workflow-workflow_transition-001",
+    "scd_version": 1,
+    "valid_from": "2026-01-01T00:00:00Z",
+    "valid_to": null,
+    "active": true,
+    "rls_13_classes_attached": true,
+    "physical_delete_forbidden": true
+  },
+  "fixture_assertion": {
+    "wtm_class": "Master",
+    "scd_type": 2,
+    "rls_13_classes": true,
+    "physical_delete_forbidden": true
+  }
+}

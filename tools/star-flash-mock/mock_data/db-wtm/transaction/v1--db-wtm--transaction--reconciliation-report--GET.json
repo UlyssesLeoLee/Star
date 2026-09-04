@@ -1,0 +1,37 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Transaction",
+  "table": "reconciliation_report",
+  "schema": "local_runtime",
+  "id": "T99",
+  "method": "GET",
+  "scenario": "reconciliation-report-lookup",
+  "description": "DB T 类: local_runtime.reconciliation_report (per docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.2 §2 T99)",
+  "rationale": "調整レポート",
+  "守门": [
+    "#13 a/b/c/d W=物理删除+T=物理删除禁止+M=物理删除禁止+SCD"
+  ],
+  "classification_locked": true,
+  "migration_required_if_changed": true,
+  "request": {
+    "table": "reconciliation_report",
+    "id": "local_runtime-reconciliation_report-001",
+    "actor": "session-2026-09-05-001"
+  },
+  "response_200_201": {
+    "id": "local_runtime-reconciliation_report-001",
+    "append_only_id": 12345,
+    "created_at": "2026-09-05T07:00:00Z",
+    "actor_session_id": "session-2026-09-05-001",
+    "rls_13_classes_attached": true,
+    "physical_delete_blocked": true,
+    "partition_strategy": null
+  },
+  "fixture_assertion": {
+    "wtm_class": "Transaction",
+    "append_only": true,
+    "physical_delete_blocked": true,
+    "rls_13_classes": true
+  }
+}

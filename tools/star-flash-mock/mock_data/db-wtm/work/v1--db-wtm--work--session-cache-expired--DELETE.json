@@ -12,7 +12,9 @@
   },
   "response_200": {
     "rows_deleted": 1024,
+    "retention_period_days": 7,
     "physical_delete": true,
+    "physical_delete_on_expiry": true,
     "audit_logged_in_master_table": false,
     "wtm_class": "Work"
   },

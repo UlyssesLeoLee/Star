@@ -18,6 +18,10 @@
   },
   "fixture_assertion": {
     "status_code": 403,
+    "wtm_class": "Master",
+    "scd_type": 2,
+    "rls_13_classes": true,
+    "physical_delete_forbidden": true,
     "physical_delete_blocked": true,
     "soft_delete_suggested": true
   }

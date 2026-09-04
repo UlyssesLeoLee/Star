@@ -1,0 +1,36 @@
+{
+  "fixture_version": "v1",
+  "module": "db-wtm",
+  "class": "Master",
+  "table": "project_template",
+  "schema": "project",
+  "id": "T07",
+  "method": "GET",
+  "scenario": "project-template-lookup",
+  "description": "DB M 类: project.project_template (per docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.2 §2 T07)",
+  "rationale": "テンプレート,慢変",
+  "守门": [
+    "#13 a/b/c/d W=物理删除+T=物理删除禁止+M=物理删除禁止+SCD"
+  ],
+  "classification_locked": true,
+  "migration_required_if_changed": true,
+  "request": {
+    "table": "project_template",
+    "id": "project-project_template-001"
+  },
+  "response_200": {
+    "id": "project-project_template-001",
+    "scd_version": 1,
+    "valid_from": "2026-01-01T00:00:00Z",
+    "valid_to": null,
+    "active": true,
+    "rls_13_classes_attached": true,
+    "physical_delete_forbidden": true
+  },
+  "fixture_assertion": {
+    "wtm_class": "Master",
+    "scd_type": 2,
+    "rls_13_classes": true,
+    "physical_delete_forbidden": true
+  }
+}

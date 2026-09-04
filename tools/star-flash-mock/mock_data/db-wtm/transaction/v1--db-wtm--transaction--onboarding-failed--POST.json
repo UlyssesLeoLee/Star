@@ -23,6 +23,7 @@
   "fixture_assertion": {
     "wtm_class": "Transaction",
     "worm": true,
-    "physical_delete_blocked": true
+    "physical_delete_blocked": true,
+    "rls_13_classes": true
   }
 }
