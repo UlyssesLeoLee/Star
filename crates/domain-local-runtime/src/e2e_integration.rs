@@ -34,7 +34,9 @@ use super::subscribe_real::OutputHub;
 
 /// 平台命令夹具: sh/cmd + args 输出多行
 pub struct EchoCmd {
+    /// 可执行命令名(如 `sh` / `cmd`)
     pub cmd: String,
+    /// 命令行参数列表
     pub args: Vec<String>,
 }
 
