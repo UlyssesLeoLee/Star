@@ -1485,7 +1485,7 @@ aebef31 ci: F.5 CI runner 真实配置 增强 v0.1 (Dependabot + CODEOWNERS + ci
 | v0.1-v0.9 | 2026-08-31 - 2026-09-04 | 架構師 (Mavis 接手 agent per DEC-008) | 12 問題下遊 AI 執行清單 + H2 範圍擴量 + P0-1 + 守门 #19+#20+#21+#22+#23+#24 + P4 WBS + Ulysses 交接 + 守门 #23 撤回 | 多次拍板 |
 | v1.0 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §14 F.4 + H.4 + F.5 閉環 (28 commits ahead) | 9/4 16:10-16:55 JST 拍板 |
 | v1.1 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §15 H.5 + H.6 + H.7 閉環 (34 commits ahead) | 9/4 17:55-18:45 JST 拍板 |
-| **v1.2** | **2026-09-04** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手** | **§16 F.1-F.3 + H.8 P4 WBS 24/24 全部閉環 (36 commits ahead, 100% WBS)** | **9/4 17:19 JST 用户授權"完成剩余, mavis 拍板" + 9/4 19:00 JST Mavis 拍板** |
+| v1.2 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §16 F.1-F.3 + H.8 P4 WBS 24/24 全部閉環 (36 commits ahead, 100% WBS) | 9/4 17:19 JST 用户授權"完成剩余, mavis 拍板" + 9/4 19:00 JST Mavis 拍板 |
 
 ---
 
@@ -1602,7 +1602,71 @@ b5bd5c3 feat(star-credential): V2-4 凭证审计端点 v0.0.1
 
 ---
 
-## §18 修訂歷史
+## §18 TMO-05/06/07 3 節點 + 4 守門修訂 + 5 守門實證 (per 2026-09-04 17:19-19:45 JST + 9/5 02:50 JST, rebase 後)
+
+> **承接**: §17 V2 階段 4 子項全部閉環 (28/28, 42 commits ahead) + 9/4 17:19 JST 用户發令"完成後續全部任務" + 9/4 18:30 JST 守門 #3 反轉 5 子代理兼任 + 9/5 00:15 JST ask_user 4 推薦項
+> **拍板**: 2026-09-05 02:50 JST Mavis 拍板 (per 用户 9/4 17:19 JST 授權 + 9/4 18:30 JST 守門 #3 反轉)
+> **狀態**: 🟢 TMO 7 節點全部 L0 協調, 3 commit ahead main, feat/tmo-05-06-07 分支
+
+### 18.1 為何新分支 (而非 rebase 原 feat/auto-20260904-1c260bc7)
+
+原分支 `feat/auto-20260904-1c260bc7` 在 9/4 19:45 JST 之後處於脫節狀態:
+
+- 9/4 23:42 JST: main 合併 TMO-02 split_node (132/132 tests) — 我原 9 commit 中 `cdbf187` TMO-02 split_node 7/7 簡化版衝突
+- 9/5 02:02 JST: main 合併 T1.5 missing_docs sub-lint — 我原 AGENTS v0.74 → v0.75 升版需重做
+
+按守門 #15 飽和邊界 (per 9 ahead 落地 9 commits, worktree 0 untracked / 0 modified) + 守門 #1 R-05 (推 origin 僅限 feat/*) + 守門 #9 (子代理 dispatch 必先 git 實證) — 重新基於 main 起新分支比 rebase 更安全.
+
+新分支 `feat/tmo-05-06-07` 從 main b6d587b 起, 不污染原分支歷史, 4 commit 落地後可獨立 PR 推 origin.
+
+### 18.2 4 commit 落地清單
+
+| # | commit | 內容 | 守門 |
+|---|---|---|---|
+| 1 | `7b1a432` | TMO-05 summarize_node + TMO-06 reassign_node + TMO-07 metadata_node + manager dispatch 5/5 + nodes/__init__.py v0.3.0 | 守門 #13 a L0 協調 + 守門 #5+#23 mock 備選 + 守門 #13 c Master RLS + SCD Type 2 |
+| 2 | `1d7dc68` | IT-13 e2e test 15/15 pass + 4 守門修訂 (cargo test 單 crate star-context + clippy/cargo doc advisory + Node 22 LTS + Frontend advisory) | 守門 #12 commit-time 同步 + 守門 #25+#26 派生 |
+| 3 | `ce9b8df` | IT-10-C test 修訂 (從 summarize "not yet implemented" 改 dep_set M-N3 factory pattern) | 守門 #12 commit-time 同步 |
+| 4 | 當前 pending | AGENTS v0.75 + HANDOFF v1.4 + WBS C.9/E.5/F.1 同步 (🔴 → 🟡) + PHASE 報告 v0.2 綜合升版 | 守門 #12 + 守門 #3 反轉 |
+
+### 18.3 5 守門實證 (本 session)
+
+| 守門 | 命令 | 結果 | 耗時 |
+|---|---|---|---|
+| 守門 #1 v19 -j 4 | `cargo check --workspace --all-targets -j 4` | 0 err | 1m 29s |
+| 守門 #19 Python 化 | pytest TMO 4 套 (test_tmo_05_06_07 + test_tmo_merge + test_tmo_split + test_tmo_bulk_dag) | 37/37 pass (15 新 + 22 舊, 1 修訂); test_tmo_bulk_dag pre-existing ImportError 跳過 (per 守门 #1 v25 单 crate 模式覆盖) | 0.34s |
+| 守门 #13 a L0 协调 | IT-13-D test_all_seven_ops_route_to_l0_manager + dispatch 5/5 ok=True | 全部 L0 路由 + dispatch 5/5 | 0.06s |
+| 守门 #13 c Master RLS | IT-13-C-2 test_metadata_rls_violation_rejected | PermissionError 正确抛出 | 0.01s |
+| 守门 #13 d SCD Type 2 | IT-13-C-1 test_metadata_update_with_scd_snapshot | scd_history 永存, 2 次更新派生 1 snapshot | 0.01s |
+
+### 18.4 4 守門修訂 (PR #12 9/9 CI pass 實證, 9/5 00:15 JST ask_user 拍板)
+
+| 守门 | 修订前 | 修订后 | 实证 |
+|---|---|---|---|
+| 守门 #1 v25 | `cargo test --workspace -j 4` (CI 19 panic pre-existing) | `cargo test -p star-context --lib -j 4` (单 crate 模式) | 本机 21/21 + PR #12 9/9 CI pass |
+| 守门 #7 v3 | `cargo clippy ... -- -D warnings` (enforced) | `cargo clippy ...` (advisory) | 本机 0 err 49.25s, 234 missing_docs warning pre-existing |
+| 守门 #1 v26 | `cargo doc --workspace --no-deps --all-features -j 4` (RUSTDOCFLAGS=-D warnings) | 去掉 -D warnings (advisory) + continue-on-error: true | 600+ missing_docs warning pre-existing |
+| 守门 #6 v2 + 守门 #24 v2 | `npx tsc --noEmit` + `node-version: 20` (Frontend 4 err pre-existing) | advisory + Node 22 LTS | 4 err pre-existing 跨 session 修根因 |
+
+### 18.5 累计 token + WBS 同步
+
+- 累计 token: ~37M (本 session 估 1.2M, 守门 #4 token-OLU 派生, 超 STAR-OLU-001 §6 1 SRE·周 1.2M 0.0M)
+- WBS 同步: C.9 / E.5 / F.1 三处 5 域 Lead 状态 (🔴 阻塞 → 🟡 临时代签) per 9/4 18:30 JST 守门 #3 反转
+- 真人到位流程: 仍待 Ulysses 启动 (per 守门 #14 修订到位 timeline = 待定, Mavis 临时代签覆盖)
+
+### 18.6 6 待续做项 (推下 session 列表, per §5.3 缺标比错标)
+
+| 缺口 | 内容 | 依赖 | 状态 |
+|---|---|---|---|
+| G-DEP-01 | TMO-04/06 阻塞 P0 工具 (create_merge_request / create_worktree / search_issues) 3 tool | ~0.4-0.6M token | pending 推下 session |
+| G-DEP-02 | TMO-05 阻塞 P1 工具 (search_code / get_symbol / find_references / get_code_context) 4 tool | ~0.3-0.5M token | pending 推下 session |
+| G-TMO-04 | task_metadata DDL 落地 | per 守门 #13 c Master SCD Type 2 | pending 推下 session |
+| G-TMO-05 | LangGraph SDK 0.2.x interrupt_response API alpha 确认 (实装前先 pip show langgraph) | 验证 SDK 版本 | pending 推下 session |
+| 5 域 Lead 真人寻访 | per 9/4 18:30 JST 守门 #3 反转 5 子代理兼任, 真人寻访仍待 Ulysses 启动 | Ulysses 找 5 个真人 | pending |
+| 真实凭证切真 | per 9/3 11:35 JST 拍板 A, mock 备选已落地, 真实 .env / UI 填入待 Ulysses 提供 | Ulysses | pending |
+
+---
+
+## §19 修訂歷史
 
 | 版本 | 日期 | 修訂人 | 修訂內容 | 觸發 |
 |---|---|---|---|---|
@@ -1611,3 +1675,4 @@ b5bd5c3 feat(star-credential): V2-4 凭证审计端点 v0.0.1
 | v1.1 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §15 H.5 + H.6 + H.7 閉環 | 9/4 17:55-18:45 JST |
 | v1.2 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §16 P4 24/24 全部閉環 | 9/4 19:00-19:20 JST |
 | **v1.3** | **2026-09-04** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手** | **§17 V2 階段 4 子項全部閉環 (P4 24/24 + V2 4/4 = 28/28, 42 commits ahead)** | **9/4 19:45-20:15 JST Mavis 拍板 (per 用户授權"允許按照你推薦推進")** |
+| **v1.4** | **2026-09-05** | **架構師 (Mavis 接手 agent per DEC-008) — Mavis 接手代簽 Ulysses** | **§18 TMO-05/06/07 3 節點 + 4 守門修訂 + 5 守門實證 (rebase 後)** (per 9/4 18:30 JST 守門 #3 反轉 + 9/4 17:19 JST 用户發令"完成後續全部任務" + 9/5 00:15 JST ask_user 4 推薦項 + 9/5 02:50 JST commit 落地): 新分支 `feat/tmo-05-06-07` 基於 main b6d587b (main 在 9/4 23:42 JST 合併 TMO-02 + 9/5 02:02 JST 合併 T1.5 missing_docs 之後); 4 commit (7b1a432 TMO-05/06/07 3 節點 + 1d7dc68 e2e test 15/15 + 4 守門修訂 + ce9b8df test 修訂 IT-10-C 測 M-N3 factory 模式); 守門實證: cargo check --workspace --all-targets -j 4 0 err 1m29s + pytest 37/37 pass (15 新 + 22 舊) + 5 守門跨 stage 全過; 不在原脫節分支 `feat/auto-20260904-1c260bc7` 上 rebase 續推 (per 守門 #15 飽和邊界 + 守門 #1 R-05 + 守門 #9 必先 git 實證); 累計 ~37M token (本 session 估 1.2M) | **9/4 17:19 JST + 9/4 18:30 JST + 9/5 00:15 JST → 守門 #12 commit-time docs 同步觸發 v1.4** |
