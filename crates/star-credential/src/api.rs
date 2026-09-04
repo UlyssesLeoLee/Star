@@ -43,9 +43,11 @@ impl AppState {
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/v2/credentials", get(list_credentials).post(create_credential))
+        .route("/api/v2/credentials/import", post(import_credentials))
+        .route("/api/v2/credentials/export", get(export_credentials))
         .route("/api/v2/credentials/:id/rotate", post(rotate_credential))
         .route("/api/v2/credentials/:id/revoke", post(revoke_credential))
-        .route("/api/v2/credentials/:id/audit", get(get_audit_log))
+        .route("/api/v2/credentials/:id/audit", post(get_audit_log))
 }
 
 // === Request / Response DTOs ===
@@ -258,6 +260,59 @@ async fn get_audit_log(
     Ok(Json(views))
 }
 
+// === V2-5 批量导入/导出 ===
+
+#[derive(Debug, Deserialize)]
+pub struct ImportRequest {
+    pub credentials: Vec<CreateCredentialRequest>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ImportResponse {
+    pub imported: usize,
+    pub failed: usize,
+    pub errors: Vec<String>,
+}
+
+/// POST /api/v2/credentials/import (V2-5 批量导入)
+async fn import_credentials(
+    State(state): State<AppState>,
+    Json(req): Json<ImportRequest>,
+) -> Result<Json<ImportResponse>, (StatusCode, String)> {
+    let mut imported = 0;
+    let mut failed = 0;
+    let mut errors = vec![];
+    for (idx, c) in req.credentials.iter().enumerate() {
+        let provider = match parse_provider(&c.provider) {
+            Ok(p) => p,
+            Err(e) => { failed += 1; errors.push(format!("[{}] {}", idx, e)); continue; }
+        };
+        let metadata = CredentialMetadata {
+            display_name: c.display_name.clone(),
+            description: c.description.clone(),
+        };
+        let plaintext = CredentialPlaintext {
+            secret: c.secret.clone(),
+            base_url: c.base_url.clone(),
+            region: c.region.clone(),
+        };
+        match state.manager.store(&state.current_tenant_id, &state.current_user_id, provider, metadata, plaintext).await {
+            Ok(_) => imported += 1,
+            Err(e) => { failed += 1; errors.push(format!("[{}] {}", idx, e)); }
+        }
+    }
+    Ok(Json(ImportResponse { imported, failed, errors }))
+}
+
+/// GET /api/v2/credentials/export (V2-5 批量导出, JSON 数组不含 ciphertext)
+async fn export_credentials(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<CredentialView>>, (StatusCode, String)> {
+    let records = state.manager.list(&state.current_tenant_id, None).await;
+    let views: Vec<CredentialView> = records.into_iter().map(CredentialView::from).collect();
+    Ok(Json(views))
+}
+
 // === tests ===
 
 #[cfg(test)]
@@ -384,5 +439,50 @@ mod tests {
         assert_eq!(views.0[1].event_type, "rotate");
         assert_eq!(views.0[2].event_type, "revoke");
         assert_eq!(views.0[0].display_name_snapshot, Some("OpenClaw 审计测试".into()));
+    }
+
+    /// V2-5 批量导入: 3 个凭证 (2 valid + 1 invalid provider)
+    #[tokio::test]
+    async fn v2_import_credentials_batch() {
+        let state = make_state();
+        let req = ImportRequest {
+            credentials: vec![
+                CreateCredentialRequest {
+                    provider: "openclaw".into(), display_name: "C1".into(), description: "".into(),
+                    secret: "s1".into(), base_url: None, region: None,
+                },
+                CreateCredentialRequest {
+                    provider: "hermes".into(), display_name: "C2".into(), description: "".into(),
+                    secret: "s2".into(), base_url: None, region: None,
+                },
+                CreateCredentialRequest {
+                    provider: "invalid_provider".into(), display_name: "C3".into(), description: "".into(),
+                    secret: "s3".into(), base_url: None, region: None,
+                },
+            ],
+        };
+        let resp = import_credentials(State(state.clone()), Json(req)).await.unwrap();
+        assert_eq!(resp.0.imported, 2);
+        assert_eq!(resp.0.failed, 1);
+        assert_eq!(resp.0.errors.len(), 1);
+        assert!(resp.0.errors[0].contains("invalid_provider"));
+    }
+
+    /// V2-5 批量导出: 创建 2 个 + export 返 2
+    #[tokio::test]
+    async fn v2_export_credentials_batch() {
+        let state = make_state();
+        for c in [
+            ("openclaw", "oc_export", "OpenClaw export"),
+            ("hermes", "hm_export", "Hermes export"),
+        ] {
+            let req = CreateCredentialRequest {
+                provider: c.0.into(), display_name: c.2.into(), description: "".into(),
+                secret: c.1.into(), base_url: None, region: None,
+            };
+            create_credential(State(state.clone()), Json(req)).await.unwrap();
+        }
+        let views = export_credentials(State(state)).await.unwrap();
+        assert_eq!(views.0.len(), 2);
     }
 }
