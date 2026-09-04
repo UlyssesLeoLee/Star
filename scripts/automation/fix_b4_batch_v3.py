@@ -132,6 +132,19 @@ def fix_file(file_path, file_errs):
                 if "tenant_id" in args and "TenantId(tenant_id)" not in args:
                     new_args = re.sub(r'\btenant_id\b', 'TenantId(tenant_id)', args, count=1)
                     new = new.replace(m.group(0), f"{func_name}({new_args})")
+        # 模式 F.2: 短 helper name (admin_ctx / dev_ctx / dev) 调 short_var
+        # 通用化: 任何 helper_xxx(var) 其中 var 是局部 Uuid
+        elif re.search(r'^\s+(let|return)\s+(\w+)\s*=\s*(\w+)\((\w+)\)\s*;?$', new):
+            m = re.search(r'^\s+(let|return)\s+(\w+)\s*=\s*(\w+)\((\w+)\)\s*;?$', new)
+            if m:
+                func_name = m.group(3)
+                var = m.group(4)
+                # 排除已经是 TenantId(var) / make_xxx (模式 F 已处理)
+                if var != 'TenantId' and not func_name.startswith('make_') and not func_name.startswith('User'):
+                    # 检查 var 是不是 Uuid-like (从上下文推断)
+                    # 简化: 只改 tenant_id 模式
+                    if "tenant" in func_name.lower() or "admin" in func_name.lower() or "dev" in func_name.lower():
+                        new = new.replace(m.group(0), m.group(0).replace(f"{func_name}({var})", f"{func_name}(TenantId({var}))"))
         elif re.search(r'\b(make_\w+_actor\w*|make_\w+_user\w*)\(tenant_id\)', new):
             new = re.sub(
                 r'\b(make_\w+_actor\w*|make_\w+_user\w*)\(tenant_id\)',

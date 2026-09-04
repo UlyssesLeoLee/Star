@@ -1060,8 +1060,8 @@ mod tests {
     #[test]
     fn actor_can_merge() {
         let tid = uuid::Uuid::new_v4();
-        let dev = developer(tid);
-        let pa = project_admin(tid);
+        let dev = developer(TenantId(tid));
+        let pa = project_admin(TenantId(tid));
         let ta = ActorContext::new(Uuid::new_v4(), tid).with_role("tenant_admin");
         assert!(!dev.has_role("project_admin") && !dev.has_role("developer"));
         assert!(pa.has_role("project_admin"));
@@ -1090,7 +1090,7 @@ mod tests {
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
             .unwrap();
-        let actor = developer(tid);
+        let actor = developer(TenantId(tid));
         let cs2 = svc
             .add_file_change(
                 AddFileChangeCommand {
@@ -1122,7 +1122,7 @@ mod tests {
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
             .unwrap();
-        let actor = developer(tid);
+        let actor = developer(TenantId(tid));
         let cs = svc
             .submit(
                 SubmitChangeSetCommand {
@@ -1159,7 +1159,7 @@ mod tests {
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
             .unwrap();
-        let actor = developer(tid);
+        let actor = developer(TenantId(tid));
         let cs2 = svc
             .submit(
                 SubmitChangeSetCommand {
@@ -1181,8 +1181,8 @@ mod tests {
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
             .unwrap();
-        let dev = developer(tid);
-        let pa = project_admin(tid);
+        let dev = developer(TenantId(tid));
+        let pa = project_admin(TenantId(tid));
         let cs = svc
             .submit(
                 SubmitChangeSetCommand {
@@ -1212,8 +1212,8 @@ mod tests {
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
             .unwrap();
-        let dev = developer(tid);
-        let pa = project_admin(tid);
+        let dev = developer(TenantId(tid));
+        let pa = project_admin(TenantId(tid));
         let cs = svc
             .submit(
                 SubmitChangeSetCommand {
@@ -1245,8 +1245,8 @@ mod tests {
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
             .unwrap();
-        let dev = developer(tid);
-        let pa = project_admin(tid);
+        let dev = developer(TenantId(tid));
+        let pa = project_admin(TenantId(tid));
         let cs = svc
             .submit(
                 SubmitChangeSetCommand {
@@ -1286,8 +1286,8 @@ mod tests {
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
             .unwrap();
-        let dev = developer(tid);
-        let pa = project_admin(tid);
+        let dev = developer(TenantId(tid));
+        let pa = project_admin(TenantId(tid));
         let cs = svc
             .submit(
                 SubmitChangeSetCommand {
@@ -1325,8 +1325,8 @@ mod tests {
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
             .unwrap();
-        let dev = developer(tid);
-        let pa = project_admin(tid);
+        let dev = developer(TenantId(tid));
+        let pa = project_admin(TenantId(tid));
         let cs = svc
             .submit(
                 SubmitChangeSetCommand {
@@ -1357,7 +1357,7 @@ mod tests {
             .create_change_set(make_cmd(tid), &developer(tid))
             .await
             .unwrap();
-        let actor = developer(tid);
+        let actor = developer(TenantId(tid));
         let exec = svc
             .record_execution(
                 RecordExecutionCommand {
@@ -1380,7 +1380,7 @@ mod tests {
     async fn upsert_symbol_creates_v1() {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = developer(tid);
+        let actor = developer(TenantId(tid));
         let s = svc
             .upsert_symbol(
                 UpsertSymbolCommand {
@@ -1405,7 +1405,7 @@ mod tests {
         // INV-DEV-04:SymbolIndex version 随 file version 递增
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = developer(tid);
+        let actor = developer(TenantId(tid));
         let repo_id = RepositoryId::new();
         let cmd = UpsertSymbolCommand {
             tenant_id: TenantId(tid),
@@ -1428,8 +1428,8 @@ mod tests {
     async fn list_by_status_filters_correctly() {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
-        let dev = developer(tid);
-        let pa = project_admin(tid);
+        let dev = developer(TenantId(tid));
+        let pa = project_admin(TenantId(tid));
         // 3 个 ChangeSet:1 Draft,1 ReadyForReview,1 Approved
         let cs1 = svc
             .create_change_set(make_cmd(tid), &developer(tid))
@@ -1511,12 +1511,12 @@ mod tests {
         let svc = InMemoryDevelopmentService::new();
         let tid_a = uuid::Uuid::new_v4();
         let tid_b = uuid::Uuid::new_v4();
-        let actor_a = developer(tid_a);
+        let actor_a = developer(TenantId(tid_a));
         let cs = svc
             .create_change_set(make_cmd(tid_a), &developer(tid_a))
             .await
             .unwrap();
-        let actor_b = developer(tid_b);
+        let actor_b = developer(TenantId(tid_b));
         // 跨 tenant get 拒绝
         let res = svc
             .get_change_set(
@@ -1555,8 +1555,8 @@ mod tests {
     async fn full_lifecycle_draft_to_merged() {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
-        let dev = developer(tid);
-        let pa = project_admin(tid);
+        let dev = developer(TenantId(tid));
+        let pa = project_admin(TenantId(tid));
         // 1. Draft + add files
         let cs = svc
             .create_change_set(make_cmd(tid), &developer(tid))
@@ -1635,7 +1635,7 @@ mod tests {
     async fn not_found_returns_proper_error() {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = developer(tid);
+        let actor = developer(TenantId(tid));
         let res = svc
             .get_change_set(
                 GetChangeSetQuery {

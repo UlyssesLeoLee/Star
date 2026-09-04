@@ -868,7 +868,7 @@ mod tests {
     async fn create_work_item_basic() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
         assert_eq!(item.status, WorkItemStatus::Todo);
         assert_eq!(item.priority, Priority::High);
@@ -878,7 +878,7 @@ mod tests {
     async fn ai_task_requires_objective_invw03() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         let mut cmd = basic_cmd(tid);
         cmd.item_type = WorkItemType::AITask;
         // 缺 ai_task_data
@@ -890,7 +890,7 @@ mod tests {
     async fn ai_task_requires_repository_scope_invw03() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         let mut cmd = basic_cmd(tid);
         cmd.item_type = WorkItemType::AITask;
         cmd.ai_task_data = Some(AiTaskData {
@@ -910,7 +910,7 @@ mod tests {
     async fn ai_task_with_full_data_ok() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         let mut cmd = basic_cmd(tid);
         cmd.item_type = WorkItemType::AITask;
         cmd.ai_task_data = Some(AiTaskData {
@@ -930,7 +930,7 @@ mod tests {
     async fn transition_through_lifecycle() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
         let id = item.id;
         // TODO→IN_PROGRESS
@@ -969,7 +969,7 @@ mod tests {
     async fn transition_skip_rejected() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
         let res = svc
             .transition_status(
@@ -990,7 +990,7 @@ mod tests {
     async fn assign_user_and_agent() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
         let u = uuid::Uuid::new_v4();
         let a = AgentId::new();
@@ -1015,7 +1015,7 @@ mod tests {
     async fn parent_must_be_same_project_invw04() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         // 父项
         let parent = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
         // 子项(不同 project)
@@ -1031,9 +1031,9 @@ mod tests {
         let svc = InMemoryWorkItemService::new();
         let t1 = uuid::Uuid::new_v4();
         let t2 = uuid::Uuid::new_v4();
-        let actor1 = dev(t1);
+        let actor1 = dev(TenantId(t1));
         let item = svc.create_work_item(basic_cmd(t1), &actor1).await.unwrap();
-        let actor2 = dev(t2);
+        let actor2 = dev(TenantId(t2));
         let res = svc
             .transition_status(
                 TransitionStatusCommand {
@@ -1053,7 +1053,7 @@ mod tests {
     async fn create_requirement_and_ac() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
         let req = svc
             .create_requirement(
@@ -1088,7 +1088,7 @@ mod tests {
     async fn list_by_project_filter_terminal() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         let project = ProjectId::new();
         for _ in 0..3 {
             svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();

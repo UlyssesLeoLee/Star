@@ -1119,7 +1119,7 @@ mod tests {
         let svc = InMemoryIdentityService::new();
         let me = uuid::Uuid::new_v4();
         let other = uuid::Uuid::new_v4();
-        let actor = dev(me);
+        let actor = dev(TenantId(me));
         let res = svc
             .register_device(
                 RegisterDeviceCommand {

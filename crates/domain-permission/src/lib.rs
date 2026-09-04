@@ -1275,7 +1275,7 @@ mod tests {
         let tenant_b = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let admin_a = admin_ctx(tenant_a);
+        let admin_a = admin_ctx(TenantId(tenant_a));
 
         let svc = InMemoryPermissionService::new();
         let scheme = svc
@@ -1728,8 +1728,8 @@ mod tests {
         let tenant_b = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let admin_a = admin_ctx(tenant_a);
-        let admin_b = admin_ctx(tenant_b);
+        let admin_a = admin_ctx(TenantId(tenant_a));
+        let admin_b = admin_ctx(TenantId(tenant_b));
         let svc = InMemoryPermissionService::new();
         // 在 tenant_a 授权
         svc.grant_role(
@@ -1762,7 +1762,7 @@ mod tests {
     #[tokio::test]
     async fn non_admin_cannot_create_scheme() {
         let tenant = uuid::Uuid::new_v4();
-        let dev = dev_ctx(tenant);
+        let dev = dev_ctx(TenantId(tenant));
         let svc = InMemoryPermissionService::new();
         let res = svc
             .create_scheme(

@@ -1108,7 +1108,7 @@ mod tests {
         svc.upsert_index(cmd, &projector).await.unwrap();
         svc.delete_index(
             DeleteIndexCommand {
-                tenant_id: TenantId(tenant_id),
+                tenant_id,
                 resource_type: ResourceType::WorkItem,
                 resource_id,
             },
@@ -1145,7 +1145,7 @@ mod tests {
         let project_id = ProjectId::new();
         let entries = vec![
             UpsertIndexCommand {
-                tenant_id: TenantId(tenant_id),
+                tenant_id,
                 project_id,
                 resource_type: ResourceType::WorkItem,
                 resource_id: Uuid::new_v4(),
@@ -1155,7 +1155,7 @@ mod tests {
                 projection_version: 1,
             },
             UpsertIndexCommand {
-                tenant_id: TenantId(tenant_id),
+                tenant_id,
                 project_id,
                 resource_type: ResourceType::WorkItem,
                 resource_id: Uuid::new_v4(),
