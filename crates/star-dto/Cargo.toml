@@ -1,0 +1,18 @@
+[package]
+name = "star-dto"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Star 跨域共享 DTO 类型 (T3.1, per HANDOFF-ST-001.md v0.8 §10)"
+# v0.0.1 (T3.1 跨 sub-session 续): stub only, 4 强类型 ID 重导出 + ActorContext alias
+# v0.1.0 (T3.1 收官): 22 domain-* DTO 全量 re-export + Saga 跨域事件 DTO
+
+[dependencies]
+serde = { workspace = true }
+uuid = { workspace = true }
+star-context = { path = "../star-context" }
+
+[lints]
+workspace = true
