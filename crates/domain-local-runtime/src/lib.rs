@@ -156,6 +156,7 @@ impl MountStatus {
 /// **LocalRuntime** — 聚合根(§23.2 LRT-001/002, INV-RT-01/05)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalRuntime {
+    /// Runtime ID
     pub id: LocalRuntimeId,
     /// 必带,INV-RT-01
     pub tenant_id: TenantId,
@@ -163,6 +164,7 @@ pub struct LocalRuntime {
     pub user_id: UserId,
     /// 关联 identity device
     pub device_id: DeviceId,
+    /// 当前状态
     pub status: RuntimeStatus,
     /// 运行时版本,如 "1.0.0"
     pub version: String,
@@ -170,6 +172,7 @@ pub struct LocalRuntime {
     pub capabilities: Vec<String>,
     /// 最后心跳时间(INV-RT-04 用于超时判定)
     pub last_heartbeat: DateTime<Utc>,
+    /// 注册时间
     pub registered_at: DateTime<Utc>,
     /// 元数据(host_name / os / arch)
     pub metadata: HashMap<String, String>,
@@ -230,16 +233,22 @@ impl LocalRuntime {
 /// **WorktreeMount** — Local Runtime ↔ Worktree 挂载(实体, INV-RT-02/03)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorktreeMount {
+    /// 挂载 ID
     pub id: WorktreeMountId,
+    /// 所属 Runtime ID
     pub runtime_id: LocalRuntimeId,
+    /// 挂载的 Worktree ID
     pub worktree_id: WorktreeId,
     /// 平台相关本地路径 — 仅作引用,平台不可信(INV-RT-03 / INV-WT-04)
     pub local_path: String,
+    /// 挂载时间
     pub mounted_at: DateTime<Utc>,
+    /// 挂载状态
     pub status: MountStatus,
 }
 
 impl WorktreeMount {
+    /// 创建一个新的挂载(状态默认为 Active)
     pub fn new(runtime_id: LocalRuntimeId, worktree_id: WorktreeId, local_path: String) -> Self {
         Self {
             id: WorktreeMountId::new(),
@@ -255,17 +264,22 @@ impl WorktreeMount {
 /// **AgentExecutionContext** — Agent 在 Local Runtime 上的执行上下文(实体)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentExecutionContext {
+    /// 执行上下文 ID
     pub id: AgentExecutionContextId,
+    /// 所属 Runtime ID
     pub runtime_id: LocalRuntimeId,
+    /// 关联的 Agent Session ID
     pub agent_session_id: AgentSessionId,
     /// 工作目录(平台无关字符串,平台解析时再映射)
     pub working_dir: String,
     /// 环境变量(已 sanitize)
     pub environment: HashMap<String, String>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
 }
 
 impl AgentExecutionContext {
+    /// 创建一个新的执行上下文
     pub fn new(
         runtime_id: LocalRuntimeId,
         agent_session_id: AgentSessionId,
@@ -286,8 +300,11 @@ impl AgentExecutionContext {
 /// **RuntimeHeartbeat** — 心跳事件(Append-only)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeHeartbeat {
+    /// 心跳事件 ID
     pub id: HeartbeatId,
+    /// 所属 Runtime ID
     pub runtime_id: LocalRuntimeId,
+    /// 接收时间
     pub received_at: DateTime<Utc>,
     /// load average(1-min,可选)
     pub load_average: Option<f32>,
@@ -296,6 +313,7 @@ pub struct RuntimeHeartbeat {
 }
 
 impl RuntimeHeartbeat {
+    /// 创建一条新的心跳记录
     pub fn new(
         runtime_id: LocalRuntimeId,
         load_average: Option<f32>,
@@ -315,23 +333,31 @@ impl RuntimeHeartbeat {
 // 错误
 // =====================================================================
 
+/// **RuntimeError** — domain-local-runtime 错误类型
 #[derive(Debug, Error)]
 pub enum RuntimeError {
+    /// 资源未找到
     #[error("not found: {0}")]
     NotFound(String),
+    /// 权限拒绝
     #[error("permission denied")]
     PermissionDenied,
+    /// 跨租户访问拒绝
     #[error("cross-tenant access denied: actor tenant {0} vs resource tenant {1}")]
     CrossTenantDenied(TenantId, TenantId),
+    /// 无效状态
     #[error("invalid state: {0}")]
     InvalidState(String),
+    /// 资源冲突
     #[error("conflict: {0}")]
     Conflict(String),
+    /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
 }
 
 impl RuntimeError {
+    /// 返回错误码字符串(如 "RUNTIME_NOT_FOUND")
     pub fn code(&self) -> &'static str {
         match self {
             Self::NotFound(_) => "RUNTIME_NOT_FOUND",
@@ -348,63 +374,99 @@ impl RuntimeError {
 // 命令 / 查询 DTO
 // =====================================================================
 
+/// 注册 Runtime 命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterRuntimeCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 用户 ID
     pub user_id: UserId,
+    /// 设备 ID
     pub device_id: DeviceId,
+    /// 运行时版本
     pub version: String,
+    /// 能力清单
     pub capabilities: Vec<String>,
+    /// 元数据
     pub metadata: HashMap<String, String>,
 }
 
+/// 心跳命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeartbeatCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// Runtime ID
     pub runtime_id: LocalRuntimeId,
+    /// load average(可选)
     pub load_average: Option<f32>,
+    /// 已用内存字节数(可选)
     pub memory_used_bytes: Option<u64>,
 }
 
+/// 挂载 Worktree 命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MountWorktreeCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// Runtime ID
     pub runtime_id: LocalRuntimeId,
+    /// Worktree ID
     pub worktree_id: WorktreeId,
+    /// 本地路径
     pub local_path: String,
 }
 
+/// 卸载 Worktree 命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnmountWorktreeCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 挂载 ID
     pub mount_id: WorktreeMountId,
 }
 
+/// 创建执行上下文命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateExecContextCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// Runtime ID
     pub runtime_id: LocalRuntimeId,
+    /// Agent Session ID
     pub agent_session_id: AgentSessionId,
+    /// 工作目录
     pub working_dir: String,
+    /// 环境变量
     pub environment: HashMap<String, String>,
 }
 
+/// 获取 Runtime 查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetRuntimeQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// Runtime ID
     pub runtime_id: LocalRuntimeId,
 }
 
+/// 按用户列出 Runtime 查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListByUserQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 用户 ID
     pub user_id: UserId,
 }
 
+/// 获取心跳流查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetHeartbeatsQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// Runtime ID
     pub runtime_id: LocalRuntimeId,
+    /// 返回条数上限(可选)
     pub limit: Option<usize>,
 }
 
@@ -454,12 +516,14 @@ pub trait RuntimeCommandPort: Send + Sync {
 /// **RuntimeQueryPort** — 读操作
 #[async_trait]
 pub trait RuntimeQueryPort: Send + Sync {
+    /// 按 ID 获取 Runtime
     async fn get(
         &self,
         q: GetRuntimeQuery,
         actor: &ActorContext,
     ) -> Result<LocalRuntime, RuntimeError>;
 
+    /// 按用户列出 Runtime
     async fn list_by_user(
         &self,
         q: ListByUserQuery,
@@ -477,18 +541,26 @@ pub trait RuntimeQueryPort: Send + Sync {
 /// **RuntimeRepository** — 持久化抽象
 #[async_trait]
 pub trait RuntimeRepository: Send + Sync {
+    /// 插入 Runtime
     async fn insert_runtime(&self, r: LocalRuntime) -> Result<(), RuntimeError>;
+    /// 按 ID 获取 Runtime
     async fn get_runtime(&self, id: LocalRuntimeId) -> Result<LocalRuntime, RuntimeError>;
+    /// 更新 Runtime
     async fn update_runtime(&self, r: LocalRuntime) -> Result<(), RuntimeError>;
+    /// 按用户列出 Runtime
     async fn list_runtimes_by_user(
         &self,
         tenant_id: TenantId,
         user_id: UserId,
     ) -> Result<Vec<LocalRuntime>, RuntimeError>;
 
+    /// 插入挂载
     async fn insert_mount(&self, m: WorktreeMount) -> Result<(), RuntimeError>;
+    /// 按 ID 获取挂载
     async fn get_mount(&self, id: WorktreeMountId) -> Result<WorktreeMount, RuntimeError>;
+    /// 更新挂载
     async fn update_mount(&self, m: WorktreeMount) -> Result<(), RuntimeError>;
+    /// 列出 Runtime 下所有活跃挂载
     async fn list_active_mounts_by_runtime(
         &self,
         runtime_id: LocalRuntimeId,
@@ -500,7 +572,9 @@ pub trait RuntimeRepository: Send + Sync {
         worktree_id: WorktreeId,
     ) -> Result<Option<WorktreeMount>, RuntimeError>;
 
+    /// 插入执行上下文
     async fn insert_exec_context(&self, c: AgentExecutionContext) -> Result<(), RuntimeError>;
+    /// 按 ID 获取执行上下文
     async fn get_exec_context(
         &self,
         id: AgentExecutionContextId,
@@ -523,6 +597,7 @@ pub trait RuntimeRepository: Send + Sync {
 /// 心跳超时阈值,默认 300s
 pub const HEARTBEAT_TIMEOUT_SECONDS: u64 = 300;
 
+/// 返回默认心跳超时时长
 pub fn default_heartbeat_timeout() -> Duration {
     Duration::from_secs(HEARTBEAT_TIMEOUT_SECONDS)
 }
@@ -531,6 +606,7 @@ pub fn default_heartbeat_timeout() -> Duration {
 // InMemoryRuntimeService + Repository
 // =====================================================================
 
+/// **InMemoryRuntimeService** — 内存版 Runtime 服务(实现 RuntimeCommandPort + RuntimeQueryPort)
 pub struct InMemoryRuntimeService {
     repo: Arc<dyn RuntimeRepository>,
     /// 服务级缓存,与 repo 保持一致(便于快速 list_by_user / 状态更新)
@@ -542,6 +618,7 @@ pub struct InMemoryRuntimeService {
 }
 
 impl InMemoryRuntimeService {
+    /// 创建使用内置内存仓储的服务
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryRuntimeRepository::new()),
@@ -553,6 +630,7 @@ impl InMemoryRuntimeService {
         }
     }
 
+    /// 使用指定仓储创建服务
     pub fn with_repo(repo: Arc<dyn RuntimeRepository>) -> Self {
         Self {
             repo,
@@ -583,6 +661,7 @@ impl Default for InMemoryRuntimeService {
     }
 }
 
+/// **InMemoryRuntimeRepository** — 内存版 Runtime 仓储(测试/开发用)
 pub struct InMemoryRuntimeRepository {
     runtimes: RwLock<HashMap<LocalRuntimeId, LocalRuntime>>,
     mounts: RwLock<HashMap<WorktreeMountId, WorktreeMount>>,
@@ -591,6 +670,7 @@ pub struct InMemoryRuntimeRepository {
 }
 
 impl InMemoryRuntimeRepository {
+    /// 创建空的内存仓储
     pub fn new() -> Self {
         Self {
             runtimes: RwLock::new(HashMap::new()),
