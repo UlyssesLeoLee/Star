@@ -97,6 +97,14 @@ pub enum DispatchError {
     Aborted(Uuid, String),
     #[error("dispatcher closed")]
     DispatcherClosed,
+    /// G-5 Tenant Quota 限额超出
+    #[error("tenant {tenant_id} quota exceeded: {resource} (limit {limit}, current {current})")]
+    QuotaExceeded {
+        tenant_id: Uuid,
+        resource: String,
+        limit: u64,
+        current: u64,
+    },
 }
 
 /// **InMemory TaskQueue** (per SRS-001 G-1, v0.0.1 PoC, v0.1.0 收官 改 SQLite WAL)
@@ -463,6 +471,180 @@ pub struct TokenStore {
 impl Default for TokenStore {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// **Tenant 资源配额** (per SRS-001 §G-5 Tenant Quota, P3-D 关联 22 domain-identity)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TenantQuota {
+    /// 租户 ID
+    pub tenant_id: Uuid,
+    /// 每分钟最大 task 派发数
+    pub tasks_per_minute: u32,
+    /// 每天最大 token 数
+    pub tokens_per_day: u64,
+    /// 最大并发 in-flight task 数
+    pub max_concurrent_tasks: u32,
+    /// 最大 task 排队数
+    pub max_queued_tasks: u32,
+}
+
+impl TenantQuota {
+    /// 无限配额 (内部使用, per SystemTenant)
+    pub fn unlimited(tenant_id: Uuid) -> Self {
+        Self {
+            tenant_id,
+            tasks_per_minute: u32::MAX,
+            tokens_per_day: u64::MAX,
+            max_concurrent_tasks: u32::MAX,
+            max_queued_tasks: u32::MAX,
+        }
+    }
+}
+
+/// **Tenant 配额跟踪器** (per SRS-001 §G-5, 实时跟踪 + 限额检查)
+pub struct TenantQuotaTracker {
+    quotas: Arc<RwLock<HashMap<Uuid, TenantQuota>>>,
+    /// in-flight task 计数 (per tenant)
+    in_flight: Arc<RwLock<HashMap<Uuid, u32>>>,
+    /// 当前排队 task 计数 (per tenant)
+    queued: Arc<RwLock<HashMap<Uuid, u32>>>,
+    /// 当前分钟 task 计数 (per tenant) — 简化模型 (实际需要时间窗口)
+    tasks_this_minute: Arc<RwLock<HashMap<Uuid, u32>>>,
+}
+
+impl Default for TenantQuotaTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TenantQuotaTracker {
+    /// 创建空 tracker
+    pub fn new() -> Self {
+        Self {
+            quotas: Arc::new(RwLock::new(HashMap::new())),
+            in_flight: Arc::new(RwLock::new(HashMap::new())),
+            queued: Arc::new(RwLock::new(HashMap::new())),
+            tasks_this_minute: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// 注册 tenant 配额
+    pub async fn register(&self, quota: TenantQuota) {
+        let mut quotas = self.quotas.write().await;
+        quotas.insert(quota.tenant_id, quota);
+    }
+
+    /// 获取 tenant 配额
+    pub async fn get(&self, tenant_id: Uuid) -> Option<TenantQuota> {
+        let quotas = self.quotas.read().await;
+        quotas.get(&tenant_id).cloned()
+    }
+
+    /// 限额检查 — 验证 task 是否可以派发 (in-flight + queued + this_minute)
+    /// 返回 Ok(()) 通过, Err(QuotaExceeded) 拒绝
+    pub async fn check(&self, tenant_id: Uuid) -> Result<(), DispatchError> {
+        let quotas = self.quotas.read().await;
+        let quota = quotas
+            .get(&tenant_id)
+            .cloned()
+            .unwrap_or_else(|| TenantQuota::unlimited(tenant_id));
+        drop(quotas);
+        // in-flight check
+        let in_flight = {
+            let m = self.in_flight.read().await;
+            m.get(&tenant_id).copied().unwrap_or(0)
+        };
+        if in_flight >= quota.max_concurrent_tasks {
+            return Err(DispatchError::QuotaExceeded {
+                tenant_id,
+                resource: "max_concurrent_tasks".into(),
+                limit: quota.max_concurrent_tasks as u64,
+                current: in_flight as u64,
+            });
+        }
+        // queued check
+        let queued = {
+            let m = self.queued.read().await;
+            m.get(&tenant_id).copied().unwrap_or(0)
+        };
+        if queued >= quota.max_queued_tasks {
+            return Err(DispatchError::QuotaExceeded {
+                tenant_id,
+                resource: "max_queued_tasks".into(),
+                limit: quota.max_queued_tasks as u64,
+                current: queued as u64,
+            });
+        }
+        // tasks this minute check
+        let this_minute = {
+            let m = self.tasks_this_minute.read().await;
+            m.get(&tenant_id).copied().unwrap_or(0)
+        };
+        if this_minute >= quota.tasks_per_minute {
+            return Err(DispatchError::QuotaExceeded {
+                tenant_id,
+                resource: "tasks_per_minute".into(),
+                limit: quota.tasks_per_minute as u64,
+                current: this_minute as u64,
+            });
+        }
+        Ok(())
+    }
+
+    /// 记录 task 派发 (in-flight +1, queued +1)
+    pub async fn record_dispatch(&self, tenant_id: Uuid) {
+        {
+            let mut m = self.in_flight.write().await;
+            *m.entry(tenant_id).or_insert(0) += 1;
+        }
+        {
+            let mut m = self.queued.write().await;
+            *m.entry(tenant_id).or_insert(0) += 1;
+        }
+        {
+            let mut m = self.tasks_this_minute.write().await;
+            *m.entry(tenant_id).or_insert(0) += 1;
+        }
+    }
+
+    /// 记录 task 完成 (in-flight -1, queued -1)
+    pub async fn record_complete(&self, tenant_id: Uuid) {
+        {
+            let mut m = self.in_flight.write().await;
+            let v = m.entry(tenant_id).or_insert(0);
+            if *v > 0 {
+                *v -= 1;
+            }
+        }
+        {
+            let mut m = self.queued.write().await;
+            let v = m.entry(tenant_id).or_insert(0);
+            if *v > 0 {
+                *v -= 1;
+            }
+        }
+    }
+
+    /// 查询 in-flight
+    pub async fn in_flight_count(&self, tenant_id: Uuid) -> u32 {
+        self.in_flight
+            .read()
+            .await
+            .get(&tenant_id)
+            .copied()
+            .unwrap_or(0)
+    }
+
+    /// 查询 queued
+    pub async fn queued_count(&self, tenant_id: Uuid) -> u32 {
+        self.queued
+            .read()
+            .await
+            .get(&tenant_id)
+            .copied()
+            .unwrap_or(0)
     }
 }
 
@@ -1209,5 +1391,75 @@ mod tests {
             ts.cumulative_by_agent(SubAgentArchetype::TestGen).await,
             200
         );
+    }
+
+    /// G.5 PoC test 1: TenantQuotaTracker 注册 + 限额检查通过
+    #[tokio::test]
+    async fn tenant_quota_register_and_check() {
+        let qt = TenantQuotaTracker::new();
+        let tenant_id = Uuid::new_v4();
+        qt.register(TenantQuota {
+            tenant_id,
+            tasks_per_minute: 3,
+            tokens_per_day: 10000,
+            max_concurrent_tasks: 2,
+            max_queued_tasks: 5,
+        })
+        .await;
+        // 没记录任何 dispatch -> 限额检查通过
+        qt.check(tenant_id).await.unwrap();
+        // 1 个 dispatch -> 仍通过
+        qt.record_dispatch(tenant_id).await;
+        qt.check(tenant_id).await.unwrap();
+    }
+
+    /// G.5 PoC test 2: TenantQuota 限额超出 -> QuotaExceeded err
+    #[tokio::test]
+    async fn tenant_quota_exceeded_rejects() {
+        let qt = TenantQuotaTracker::new();
+        let tenant_id = Uuid::new_v4();
+        qt.register(TenantQuota {
+            tenant_id,
+            tasks_per_minute: 2,
+            tokens_per_day: 10000,
+            max_concurrent_tasks: 1,
+            max_queued_tasks: 5,
+        })
+        .await;
+        // 第 1 个 dispatch 通过
+        qt.record_dispatch(tenant_id).await;
+        // 第 2 个 dispatch 触发 max_concurrent_tasks 限额
+        let res = qt.check(tenant_id).await;
+        assert!(
+            matches!(res, Err(DispatchError::QuotaExceeded { ref resource, .. }) if resource == "max_concurrent_tasks")
+        );
+    }
+
+    /// G.5 PoC test 3: 多 tenant 隔离 (tenant A 限额不影响 tenant B)
+    #[tokio::test]
+    async fn tenant_quota_isolation() {
+        let qt = TenantQuotaTracker::new();
+        let tenant_a = Uuid::new_v4();
+        let tenant_b = Uuid::new_v4();
+        // tenant A 限额 1 并发
+        qt.register(TenantQuota {
+            tenant_id: tenant_a,
+            tasks_per_minute: 1,
+            tokens_per_day: 100,
+            max_concurrent_tasks: 1,
+            max_queued_tasks: 1,
+        })
+        .await;
+        // tenant B 无限额
+        qt.register(TenantQuota::unlimited(tenant_b)).await;
+        // tenant A 1 dispatch 后拒绝
+        qt.record_dispatch(tenant_a).await;
+        assert!(qt.check(tenant_a).await.is_err());
+        // tenant B 不受影响, 通过
+        qt.check(tenant_b).await.unwrap();
+        qt.record_dispatch(tenant_b).await;
+        qt.check(tenant_b).await.unwrap();
+        assert_eq!(qt.in_flight_count(tenant_a).await, 1);
+        assert_eq!(qt.in_flight_count(tenant_b).await, 1);
     }
 }
