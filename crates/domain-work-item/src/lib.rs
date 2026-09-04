@@ -937,7 +937,7 @@ mod tests {
         let s = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     work_item_id: id,
                     from: WorkItemStatus::Todo,
                     to: WorkItemStatus::InProgress,
@@ -952,7 +952,7 @@ mod tests {
         let s = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     work_item_id: id,
                     from: WorkItemStatus::InProgress,
                     to: WorkItemStatus::Done,
@@ -974,7 +974,7 @@ mod tests {
         let res = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     work_item_id: item.id,
                     from: WorkItemStatus::Todo,
                     to: WorkItemStatus::Done, // 跳态
@@ -997,7 +997,7 @@ mod tests {
         let item = svc
             .assign(
                 AssignCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     work_item_id: item.id,
                     assignee_user_id: Some(u),
                     assignee_agent_id: Some(a),
@@ -1058,7 +1058,7 @@ mod tests {
         let req = svc
             .create_requirement(
                 CreateRequirementCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     business_goal_id: None,
                     statement: "support OAuth".to_string(),
                     rationale: "industry standard".to_string(),
@@ -1071,7 +1071,7 @@ mod tests {
         let ac = svc
             .create_acceptance_criterion(
                 CreateAcceptanceCriterionCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     requirement_id: req.id,
                     work_item_id: item.id,
                     statement: "login via OAuth2".to_string(),
@@ -1096,7 +1096,7 @@ mod tests {
         let list = svc
             .list_by_project(
                 ListByProjectQuery {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     project_id: project,
                     include_terminal: false,
                 },

@@ -229,7 +229,11 @@ impl SessionStore {
     /// );
     /// // 持有 handle 直到 server 关闭
     /// ```
-    pub(crate) fn spawn_gc_task(self: Arc<Self>, interval: Duration, ttl_ms: u64) -> JoinHandle<()> {
+    pub(crate) fn spawn_gc_task(
+        self: Arc<Self>,
+        interval: Duration,
+        ttl_ms: u64,
+    ) -> JoinHandle<()> {
         tokio::spawn(async move {
             let mut tick = tokio::time::interval(interval);
             // 第一次 tick 立即触发, 跳过 (避免启动时全清空)

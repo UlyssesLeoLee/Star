@@ -939,7 +939,7 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
         let other = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let res = svc
             .register_channel(
                 RegisterChannelCommand {
@@ -960,7 +960,7 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let ch = svc
             .register_channel(
                 RegisterChannelCommand {
@@ -984,7 +984,7 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let n = svc
             .dispatch(
                 DispatchNotificationCommand {
@@ -1011,7 +1011,7 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let res = svc
             .dispatch(
                 DispatchNotificationCommand {
@@ -1035,7 +1035,7 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let n = svc
             .dispatch(
                 DispatchNotificationCommand {
@@ -1060,7 +1060,7 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let n = svc
             .dispatch(
                 DispatchNotificationCommand {
@@ -1085,7 +1085,7 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let n = svc
             .dispatch(
                 DispatchNotificationCommand {
@@ -1150,7 +1150,7 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let project = ProjectId::new();
         let t1 = svc
             .upsert_template(
@@ -1192,7 +1192,7 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let n1 = svc
             .dispatch(
                 DispatchNotificationCommand {
@@ -1228,7 +1228,7 @@ mod tests {
         // 标 n1 已读
         svc.mark_read(
             MarkReadCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 notification_id: n1.id,
                 actor_user_id: me,
             },

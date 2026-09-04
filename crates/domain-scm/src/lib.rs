@@ -1130,7 +1130,7 @@ mod tests {
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let cmd = RegisterRepositoryCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             provider: ScmProvider::Github,
             external_id: "acme/foo".to_string(),
@@ -1152,7 +1152,7 @@ mod tests {
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let cmd = RegisterRepositoryCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             provider: ScmProvider::Github,
             external_id: "acme/bar".to_string(),
@@ -1206,7 +1206,7 @@ mod tests {
         let project = ProjectId::new();
         let actor = make_developer(tenant, project);
         let cmd = RegisterRepositoryCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             provider: ScmProvider::Github,
             external_id: "z".to_string(),
@@ -1225,7 +1225,7 @@ mod tests {
         let svc = InMemoryScmService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let input = WebhookEventInput {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             repository_id: None,
             provider: ScmProvider::Github,
             event_type: WebhookEventType::Push,
@@ -1303,7 +1303,7 @@ mod tests {
         let repo = svc
             .register_repository(
                 RegisterRepositoryCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     provider: ScmProvider::Github,
                     external_id: "sync-test".to_string(),
@@ -1322,7 +1322,7 @@ mod tests {
             .update_sync_state(
                 UpdateSyncStateCommand {
                     repository_id: repo.id,
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     new_status: SyncStatus::Behind,
                     new_token: Some("etag-123".to_string()),
                 },

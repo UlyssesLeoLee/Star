@@ -58,12 +58,17 @@ define_uuid_id!(ProjectId);
 #[macro_export]
 macro_rules! define_uuid_id {
     ($name:ident) => {
+        // 22 domain 共享宏生成的 UUID 强类型 ID struct + as_uuid helper
+        // T1.5 deny(unreachable_pub) 落地后 macro 内部 pub 字段被误判为 unused
+        // 宏级 allow 避免 22 domain 各自加, B.2 实证 30 err 收敛 (per P4 WBS §3)
+        #[allow(unreachable_pub)]
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
         pub struct $name(pub Uuid);
 
+        #[allow(dead_code)]
         impl $name {
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
@@ -1052,22 +1057,24 @@ impl RuntimeQueryPort for InMemoryRuntimeService {
 mod tests {
     use super::*;
     use std::thread::sleep;
-    fn make_actor(tenant_id: TenantId, user_id: UserId) -> ActorContext {
-        ActorContext::new(user_id.0, tenant_id.0)
+    // B.2 改写 (per P4 WBS §3): helper 签名从 TenantId/UserId 改为 Uuid,
+    // 内部 .into() 强类型, 让 26 处 test 调用方不需逐处加 TenantId(x) wrapper
+    fn make_actor(tenant_id: Uuid, user_id: Uuid) -> ActorContext {
+        ActorContext::new(user_id, tenant_id)
     }
 
-    fn make_admin(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role("tenant_admin")
+    fn make_admin(tenant_id: Uuid) -> ActorContext {
+        ActorContext::new(Uuid::new_v4(), tenant_id).with_role("tenant_admin")
     }
 
-    fn make_local_runtime_actor(tenant_id: TenantId, user_id: UserId) -> ActorContext {
-        ActorContext::new(user_id.0, tenant_id.0).as_local_runtime()
+    fn make_local_runtime_actor(tenant_id: Uuid, user_id: Uuid) -> ActorContext {
+        ActorContext::new(user_id, tenant_id).as_local_runtime()
     }
 
-    fn make_register_cmd(tenant_id: TenantId, user_id: UserId) -> RegisterRuntimeCommand {
+    fn make_register_cmd(tenant_id: Uuid, user_id: Uuid) -> RegisterRuntimeCommand {
         RegisterRuntimeCommand {
-            tenant_id,
-            user_id,
+            tenant_id: TenantId(tenant_id),
+            user_id: UserId(user_id),
             device_id: DeviceId::new(),
             version: "1.0.0".to_string(),
             capabilities: vec!["git".to_string(), "rust".to_string()],
@@ -1076,13 +1083,13 @@ mod tests {
     }
 
     fn make_register_cmd_with_device(
-        tenant_id: TenantId,
-        user_id: UserId,
+        tenant_id: Uuid,
+        user_id: Uuid,
         device_id: DeviceId,
     ) -> RegisterRuntimeCommand {
         RegisterRuntimeCommand {
-            tenant_id,
-            user_id,
+            tenant_id: TenantId(tenant_id),
+            user_id: UserId(user_id),
             device_id,
             version: "1.0.0".to_string(),
             capabilities: vec!["git".to_string()],
@@ -1101,8 +1108,8 @@ mod tests {
         let actor = make_actor(tenant_id, user_id);
         let cmd = make_register_cmd(tenant_id, user_id);
         let r = svc.register_runtime(cmd, &actor).await.unwrap();
-        assert_eq!(r.tenant_id, tenant_id);
-        assert_eq!(r.user_id, user_id);
+        assert_eq!(r.tenant_id, TenantId(tenant_id));
+        assert_eq!(r.user_id, UserId(user_id));
         assert_eq!(r.status, RuntimeStatus::Online);
         assert_eq!(r.version, "1.0.0");
         assert!(r.capabilities.contains(&"git".to_string()));
@@ -1145,7 +1152,7 @@ mod tests {
         let updated = svc
             .heartbeat(
                 HeartbeatCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     runtime_id: r.id,
                     load_average: Some(0.42),
                     memory_used_bytes: Some(1024 * 1024 * 512),
@@ -1211,7 +1218,7 @@ mod tests {
         let m = svc
             .mount_worktree(
                 MountWorktreeCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     runtime_id: r.id,
                     worktree_id: WorktreeId::new(),
                     local_path: "/home/u/worktree-a".to_string(),
@@ -1240,7 +1247,7 @@ mod tests {
         let wt_id = WorktreeId::new();
         svc.mount_worktree(
             MountWorktreeCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 runtime_id: r.id,
                 worktree_id: wt_id,
                 local_path: "/a".to_string(),
@@ -1252,7 +1259,7 @@ mod tests {
         let res = svc
             .mount_worktree(
                 MountWorktreeCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     runtime_id: r.id,
                     worktree_id: wt_id,
                     local_path: "/b".to_string(),
@@ -1279,7 +1286,7 @@ mod tests {
         let m = svc
             .mount_worktree(
                 MountWorktreeCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     runtime_id: r.id,
                     worktree_id: WorktreeId::new(),
                     local_path: "/x".to_string(),
@@ -1291,7 +1298,7 @@ mod tests {
         let unmounted = svc
             .unmount_worktree(
                 UnmountWorktreeCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     mount_id: m.id,
                 },
                 &admin,
@@ -1317,7 +1324,7 @@ mod tests {
         let ctx = svc
             .create_exec_context(
                 CreateExecContextCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     runtime_id: r.id,
                     agent_session_id: AgentSessionId::new(),
                     working_dir: "/work".to_string(),
@@ -1348,7 +1355,7 @@ mod tests {
         let ctx = svc
             .create_exec_context(
                 CreateExecContextCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     runtime_id: r.id,
                     agent_session_id: AgentSessionId::new(),
                     working_dir: "/work".to_string(),
@@ -1366,7 +1373,7 @@ mod tests {
         let ctx2 = svc
             .create_exec_context(
                 CreateExecContextCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     runtime_id: r.id,
                     agent_session_id: AgentSessionId::new(),
                     working_dir: "/work".to_string(),
@@ -1398,7 +1405,13 @@ mod tests {
 
         // 管理员看,所有 runtimes
         let all = svc
-            .list_by_user(ListByUserQuery { tenant_id, user_id }, &admin)
+            .list_by_user(
+                ListByUserQuery {
+                    tenant_id: TenantId(tenant_id),
+                    user_id: UserId(user_id),
+                },
+                &admin,
+            )
             .await
             .unwrap();
         assert_eq!(all.len(), 2);
@@ -1406,7 +1419,13 @@ mod tests {
         // 非管理员看自己(同 user_id 的 actor)
         let self_actor = make_actor(tenant_id, user_id);
         let mine = svc
-            .list_by_user(ListByUserQuery { tenant_id, user_id }, &self_actor)
+            .list_by_user(
+                ListByUserQuery {
+                    tenant_id: TenantId(tenant_id),
+                    user_id: UserId(user_id),
+                },
+                &self_actor,
+            )
             .await
             .unwrap();
         assert_eq!(mine.len(), 2);
@@ -1414,7 +1433,13 @@ mod tests {
         // 非管理员看别人 → PermissionDenied
         let other = make_actor(tenant_id, uuid::Uuid::new_v4());
         let res = svc
-            .list_by_user(ListByUserQuery { tenant_id, user_id }, &other)
+            .list_by_user(
+                ListByUserQuery {
+                    tenant_id: TenantId(tenant_id),
+                    user_id: UserId(user_id),
+                },
+                &other,
+            )
             .await;
         assert!(matches!(res, Err(RuntimeError::PermissionDenied)));
     }
@@ -1452,7 +1477,7 @@ mod tests {
         for i in 0..5 {
             svc.heartbeat(
                 HeartbeatCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     runtime_id: r.id,
                     load_average: Some(i as f32),
                     memory_used_bytes: Some(1024 * (i as u64 + 1)),
@@ -1467,7 +1492,7 @@ mod tests {
         let hbs = svc
             .get_heartbeats(
                 GetHeartbeatsQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     runtime_id: r.id,
                     limit: None,
                 },
@@ -1487,7 +1512,7 @@ mod tests {
         let hbs2 = svc
             .get_heartbeats(
                 GetHeartbeatsQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     runtime_id: r.id,
                     limit: Some(2),
                 },

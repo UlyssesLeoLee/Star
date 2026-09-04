@@ -1158,7 +1158,7 @@ mod tests {
         let board = svc
             .create_board(
                 CreateBoardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "Sprint Board".to_string(),
                     description: "Default".to_string(),
@@ -1186,7 +1186,7 @@ mod tests {
         let board = svc
             .create_board(
                 CreateBoardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "B".to_string(),
                     description: String::new(),
@@ -1200,7 +1200,7 @@ mod tests {
         let col = svc
             .add_column(
                 AddColumnCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     board_id: board.id,
                     name: "Review".to_string(),
                     wip_limit: None,
@@ -1225,7 +1225,7 @@ mod tests {
         let board = svc
             .create_board(
                 CreateBoardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "B".to_string(),
                     description: String::new(),
@@ -1275,7 +1275,7 @@ mod tests {
         let moved = svc
             .move_card(
                 MoveCardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     board_id: board.id,
                     card_id: c2.id,
                     to_column: col0,
@@ -1290,7 +1290,7 @@ mod tests {
         let view = svc
             .get_view(
                 GetViewQuery {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     board_id: board.id,
                 },
                 &actor,
@@ -1312,7 +1312,7 @@ mod tests {
         let board = svc
             .create_board(
                 CreateBoardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "B".to_string(),
                     description: String::new(),
@@ -1344,7 +1344,7 @@ mod tests {
         let moved = svc
             .move_card(
                 MoveCardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     board_id: board.id,
                     card_id: c.id,
                     to_column: col2,
@@ -1368,7 +1368,7 @@ mod tests {
         let board = svc
             .create_board(
                 CreateBoardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "B".to_string(),
                     description: String::new(),
@@ -1383,7 +1383,7 @@ mod tests {
         // 限制 = 1
         svc.set_wip_limit(
             SetWipLimitCommand {
-                tenant_id: tenant,
+                tenant_id: TenantId(tenant),
                 board_id: board.id,
                 column_id: col0,
                 limit: Some(1),
@@ -1429,7 +1429,7 @@ mod tests {
         let res = svc
             .move_card(
                 MoveCardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     board_id: board.id,
                     card_id: c2.id,
                     to_column: col0,
@@ -1452,7 +1452,7 @@ mod tests {
         let board = svc
             .create_board(
                 CreateBoardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "B".to_string(),
                     description: String::new(),
@@ -1467,7 +1467,7 @@ mod tests {
         // 显式取消限制
         svc.set_wip_limit(
             SetWipLimitCommand {
-                tenant_id: tenant,
+                tenant_id: TenantId(tenant),
                 board_id: board.id,
                 column_id: col0,
                 limit: None,
@@ -1498,7 +1498,7 @@ mod tests {
         let view = svc
             .get_view(
                 GetViewQuery {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     board_id: board.id,
                 },
                 &actor,
@@ -1519,7 +1519,7 @@ mod tests {
         let board = svc
             .create_board(
                 CreateBoardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "B".to_string(),
                     description: String::new(),
@@ -1533,7 +1533,7 @@ mod tests {
         let s = svc
             .add_swimlane(
                 AddSwimlaneCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     board_id: board.id,
                     name: "By Assignee".to_string(),
                     group_by: SwimlaneGroupBy::Assignee,
@@ -1586,7 +1586,7 @@ mod tests {
         let board = svc
             .create_board(
                 CreateBoardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "B".to_string(),
                     description: String::new(),
@@ -1617,7 +1617,7 @@ mod tests {
         let view = svc
             .get_view(
                 GetViewQuery {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     board_id: board.id,
                 },
                 &actor,
@@ -1646,7 +1646,7 @@ mod tests {
         let res = svc
             .create_board(
                 CreateBoardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "Dup".to_string(),
                     description: String::new(),
@@ -1693,7 +1693,7 @@ mod tests {
         for (tid, pid, actor) in [(t1, p1, &a1), (t1, p2, &a1), (t2, p1, &a2)] {
             svc.create_board(
                 CreateBoardCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     project_id: pid,
                     name: "X".to_string(),
                     description: String::new(),
@@ -1730,7 +1730,7 @@ mod tests {
         let board = svc
             .create_board(
                 CreateBoardCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "B".to_string(),
                     description: "desc".to_string(),
@@ -1744,7 +1744,7 @@ mod tests {
         // 加 swimlane
         svc.add_swimlane(
             AddSwimlaneCommand {
-                tenant_id: tenant,
+                tenant_id: TenantId(tenant),
                 board_id: board.id,
                 name: "By Epic".to_string(),
                 group_by: SwimlaneGroupBy::Epic,
@@ -1774,7 +1774,7 @@ mod tests {
         let view = svc
             .get_view(
                 GetViewQuery {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     board_id: board.id,
                 },
                 &actor,

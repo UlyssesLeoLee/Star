@@ -16,7 +16,9 @@ pub struct InMemoryWorkItemPort {
 
 impl InMemoryWorkItemPort {
     pub fn new() -> Self {
-        Self { data: RwLock::new(HashMap::new()) }
+        Self {
+            data: RwLock::new(HashMap::new()),
+        }
     }
 
     /// 测试辅助: 注入 fixture
@@ -27,7 +29,9 @@ impl InMemoryWorkItemPort {
 }
 
 impl Default for InMemoryWorkItemPort {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
@@ -61,7 +65,9 @@ pub struct InMemorySprintPort {
 
 impl InMemorySprintPort {
     pub fn new() -> Self {
-        Self { data: RwLock::new(HashMap::new()) }
+        Self {
+            data: RwLock::new(HashMap::new()),
+        }
     }
 
     pub fn seed(&self, sprint: SprintMeta) {
@@ -71,7 +77,9 @@ impl InMemorySprintPort {
 }
 
 impl Default for InMemorySprintPort {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
@@ -88,22 +96,26 @@ impl SprintQueryPort for InMemorySprintPort {
 
 pub struct InMemoryUserPort;
 
-impl InMemoryUserPort { pub fn new() -> Self { Self } }
+impl InMemoryUserPort {
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 #[async_trait]
 impl UserQueryPort for InMemoryUserPort {
-    async fn get_user(
-        &self,
-        _tenant_id: Uuid,
-        _user_id: Uuid,
-    ) -> Result<Option<UserInfo>, String> {
+    async fn get_user(&self, _tenant_id: Uuid, _user_id: Uuid) -> Result<Option<UserInfo>, String> {
         Ok(None)
     }
 }
 
 pub struct InMemoryPermissionPort;
 
-impl InMemoryPermissionPort { pub fn new() -> Self { Self } }
+impl InMemoryPermissionPort {
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 #[async_trait]
 impl PermissionPort for InMemoryPermissionPort {

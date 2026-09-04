@@ -1108,7 +1108,7 @@ mod tests {
         svc.upsert_index(cmd, &projector).await.unwrap();
         svc.delete_index(
             DeleteIndexCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 resource_type: ResourceType::WorkItem,
                 resource_id,
             },
@@ -1145,7 +1145,7 @@ mod tests {
         let project_id = ProjectId::new();
         let entries = vec![
             UpsertIndexCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 project_id,
                 resource_type: ResourceType::WorkItem,
                 resource_id: Uuid::new_v4(),
@@ -1155,7 +1155,7 @@ mod tests {
                 projection_version: 1,
             },
             UpsertIndexCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 project_id,
                 resource_type: ResourceType::WorkItem,
                 resource_id: Uuid::new_v4(),
@@ -1186,7 +1186,7 @@ mod tests {
         let svc = InMemorySearchService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let q = SearchQuery {
             query_text: "login".to_string(),
             filters: HashMap::new(),
@@ -1220,7 +1220,7 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
         let other = uuid::Uuid::new_v4();
-        let actor_me = make_actor(tenant_id, me);
+        let actor_me = make_actor(TenantId(tenant_id), me);
         let q = SearchQuery {
             query_text: "x".to_string(),
             filters: HashMap::new(),
@@ -1242,7 +1242,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let actor_other = make_actor(tenant_id, other);
+        let actor_other = make_actor(TenantId(tenant_id), other);
         let res = svc
             .delete_saved(
                 DeleteSavedSearchCommand {

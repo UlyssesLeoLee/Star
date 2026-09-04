@@ -195,9 +195,9 @@ mod tests {
     async fn submit_seven_kinds_all_succeed() {
         let svc = InMemoryValidationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_service_actor(tenant_id);
+        let actor = make_service_actor(TenantId(tenant_id));
         for (i, kind) in ValidationKind::SOW_REQUIRED.iter().enumerate() {
-            let cmd = make_submit_cmd(tenant_id, *kind);
+            let cmd = make_submit_cmd(TenantId(tenant_id), *kind);
             let r = svc
                 .submit_result(cmd, actor.clone())
                 .await
@@ -217,8 +217,8 @@ mod tests {
     async fn invariant_04_evidence_required_reject_empty_log_ref() {
         let svc = InMemoryValidationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_service_actor(tenant_id);
-        let mut cmd = make_submit_cmd(tenant_id, ValidationKind::Build);
+        let actor = make_service_actor(TenantId(tenant_id));
+        let mut cmd = make_submit_cmd(TenantId(tenant_id), ValidationKind::Build);
         cmd.log_excerpt_ref = "   ".to_string();
         let res = svc.submit_result(cmd, actor).await;
         assert!(matches!(res, Err(ValidationError::InvalidState(_))));
@@ -230,10 +230,10 @@ mod tests {
     async fn state_transition_running_to_passed_emits_event() {
         let (svc, mut rx) = InMemoryValidationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_service_actor(tenant_id);
+        let actor = make_service_actor(TenantId(tenant_id));
         let r = svc
             .submit_result(
-                make_submit_cmd(tenant_id, ValidationKind::UnitTest),
+                make_submit_cmd(TenantId(tenant_id), ValidationKind::UnitTest),
                 actor.clone(),
             )
             .await
@@ -241,7 +241,7 @@ mod tests {
         // Running
         svc.mark_status(
             MarkValidationStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 validation_id: r.id,
                 new_status: ValidationStatus::Running,
                 failure_summary: None,
@@ -283,7 +283,7 @@ mod tests {
     async fn acceptance_coverage_100_percent_derived() {
         let svc = InMemoryValidationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_service_actor(tenant_id);
+        let actor = make_service_actor(TenantId(tenant_id));
         // 提交 3 个 PASSED Validation,关联到 3 个 AC
         let work_item = WorkItemId::new();
         for _ in 0..3 {
@@ -291,7 +291,7 @@ mod tests {
                 .submit_result(
                     SubmitValidationResultCommand {
                         work_item_id: Some(work_item),
-                        ..make_submit_cmd(tenant_id, ValidationKind::AcceptanceCheck)
+                        ..make_submit_cmd(TenantId(tenant_id), ValidationKind::AcceptanceCheck)
                     },
                     actor.clone(),
                 )
@@ -353,10 +353,10 @@ mod tests {
     async fn invariant_06_override_human_only_rejects_service() {
         let svc = InMemoryValidationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let svc_actor = make_service_actor(tenant_id);
+        let svc_actor = make_service_actor(TenantId(tenant_id));
         let r = svc
             .submit_result(
-                make_submit_cmd(tenant_id, ValidationKind::Build),
+                make_submit_cmd(TenantId(tenant_id), ValidationKind::Build),
                 svc_actor.clone(),
             )
             .await
@@ -375,7 +375,7 @@ mod tests {
         assert!(matches!(res, Err(ValidationError::PermissionDenied)));
 
         // 人类 Developer 可 Override
-        let dev_actor = make_test_actor(tenant_id);
+        let dev_actor = make_test_actor(TenantId(tenant_id));
         let ovr = svc
             .override_result(
                 OverrideValidationCommand {
@@ -397,10 +397,10 @@ mod tests {
     async fn invariant_08_evidence_storage_tenant_prefix_rejected() {
         let svc = InMemoryValidationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_service_actor(tenant_id);
+        let actor = make_service_actor(TenantId(tenant_id));
         let r = svc
             .submit_result(
-                make_submit_cmd(tenant_id, ValidationKind::Build),
+                make_submit_cmd(TenantId(tenant_id), ValidationKind::Build),
                 actor.clone(),
             )
             .await
@@ -427,7 +427,7 @@ mod tests {
     async fn invariant_09_policy_allow_ai_self_claim_rejected() {
         let svc = InMemoryValidationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
+        let actor = make_test_actor(TenantId(tenant_id));
         let res = svc
             .create_policy(
                 CreateValidationPolicyCommand {
@@ -469,13 +469,13 @@ mod tests {
     async fn validation_failed_triggers_feedback_required_event() {
         let (svc, mut rx) = InMemoryValidationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_service_actor(tenant_id);
+        let actor = make_service_actor(TenantId(tenant_id));
         let work_item = WorkItemId::new();
         let r = svc
             .submit_result(
                 SubmitValidationResultCommand {
                     work_item_id: Some(work_item),
-                    ..make_submit_cmd(tenant_id, ValidationKind::UnitTest)
+                    ..make_submit_cmd(TenantId(tenant_id), ValidationKind::UnitTest)
                 },
                 actor.clone(),
             )
@@ -483,7 +483,7 @@ mod tests {
             .unwrap();
         svc.mark_status(
             MarkValidationStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 validation_id: r.id,
                 new_status: ValidationStatus::Running,
                 failure_summary: None,
@@ -494,7 +494,7 @@ mod tests {
         .unwrap();
         svc.mark_status(
             MarkValidationStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 validation_id: r.id,
                 new_status: ValidationStatus::Failed,
                 failure_summary: Some("Test XYZ failed".to_string()),
@@ -528,19 +528,19 @@ mod tests {
     async fn ai_self_claim_requires_evidence_for_passed() {
         let svc = InMemoryValidationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_service_actor(tenant_id);
+        let actor = make_service_actor(TenantId(tenant_id));
         // is_ai_complete_claim=true 但 log_excerpt_ref 为空 → submit 即拒
-        let mut cmd = make_submit_cmd(tenant_id, ValidationKind::Build);
+        let mut cmd = make_submit_cmd(TenantId(tenant_id), ValidationKind::Build);
         cmd.is_ai_complete_claim = true;
         cmd.log_excerpt_ref = "".to_string();
         let res = svc.submit_result(cmd, actor).await;
         assert!(matches!(res, Err(ValidationError::InvalidState(_))));
 
         // 正常 submit 后尝试 mark_status=Passed 但 evidence 缺
-        let actor2 = make_service_actor(tenant_id);
+        let actor2 = make_service_actor(TenantId(tenant_id));
         let r = svc
             .submit_result(
-                make_submit_cmd(tenant_id, ValidationKind::UnitTest),
+                make_submit_cmd(TenantId(tenant_id), ValidationKind::UnitTest),
                 actor2.clone(),
             )
             .await
@@ -555,7 +555,7 @@ mod tests {
         }
         svc.mark_status(
             MarkValidationStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 validation_id: r.id,
                 new_status: ValidationStatus::Running,
                 failure_summary: None,

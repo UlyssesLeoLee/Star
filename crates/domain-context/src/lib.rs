@@ -1389,7 +1389,7 @@ mod tests {
             .unwrap();
         svc.invalidate_decision(
             InvalidateDecisionCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 decision_id: d1.id,
                 reason: "x".to_string(),
                 actor_user_id: UserId::from(actor.user_id),

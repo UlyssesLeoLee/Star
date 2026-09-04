@@ -104,6 +104,7 @@
 | v0.4 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | H2-EXT #1-#3 落地 (3 commits: 9d08f80 / b6f6e2a / 7f611b0), 净修 507 err (797 → 290, 跨 9 crate); 守门 #1 实证: star-context 21/21 pass + workspace --lib 0 err + H2-EXT 3/5 完成; H2-EXT #4 domain-identity (DeviceId→Uuid 重构) + #5 domain-work-item (String→Uuid 需 Ulysses 拍板 String 原义) 跨 session 续; session 至此收尾 (per 2026-09-01 07:56 JST 新 session 启动, 2026-09-01 09:50 JST 收尾) |
 | v0.5 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 4 项 Ulysses 拍板 (Q1 device_id String=hostname 业务语义 + Q2 #4 跨 session 续 + Q3 H2 原 3 domain 跨 session 续 + Q4 P0-2/3/4 跨 session 续); H2-EXT #5 String=hostname 拍板: 不重设为 Uuid, entity 保留 String 类型, 0 token type 改; #5 其他改造 (context.rs 删除 + port/service dead import) 估 0.05M 跨 session 续; session 至此收尾 (per 2026-09-01 08:32 JST 拍板, token 1.95M/2.0M = 97% 紧) |
 | v0.6 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | Ulysses 拍板"所有" (per ask_user "所有"选项, 2026-09-01 08:44 JST) = H2 全量收官 + P0-2/3/4 + docs 优化 + 等真人/凭证 全部要做; 总估 4-5M token 跨 4-6 session 续; 本次 session 收尾 (token 1.95M/2.0M = 97% 紧); 入口 HANDOFF v0.6 §8 跨 session 续执行计划 | (Q1-D a+c / Q10-P b / Q11-P a / Q12-P a) + 跨 session 续交接 (Q10-P b 推荐拍板) + §5 新增 "下个 session 入口" 段; 本 session 至此收尾 (per 22:45 JST 4 项拍板 + 守门 #1+#9+#12+#15 跨 stage 全过) |
+| v0.7 | 2026-09-04 07:40 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **P4 阶段 WBS 整合** (per 9/4 07:01 JST 用户发令"把所有未实施设计列出来" → 9 大类 ~60 项清单 → `STAR-P4-UNIMPL-WBS-001.md` v0.1 落档 42 子项 / 8 Phase / 4 轨道 / ~55M 理论估 / 5x 超支 ~275M / 22P+11M+7S+5 真人): §9 新增"P4 阶段 WBS 整合" 段 (per 守门 #12 commit-time docs 同步 + 9/3 B 拍板加快并行); §5/§6/§8 续做项全部并入 Phase B/C/D 对应 4 轨道; 5 域 Lead 真人 + 7 凭证阻塞 + 6 续做项硬阻塞 + 3 套新架构实装 pending 全部映射 Phase A/E/H; 5 项 Blocker 同步 v0.7 状态 (H2-EXT #4 #5 → Phase D.1 G-10; 5 域 Lead → Phase E.1-E.5; P3-B 凭证 → Phase F.1-F.3) | 2026-09-04 07:01 JST 用户发令"把所有未实施设计列出来" + 07:15 JST P4 WBS 落档 + 07:40 JST 用户发令"把剩余 wbs 任务更新进 handoff" → 守门 #12 commit-time docs 同步触发 HANDOFF v0.7 |
 
 
 ---
@@ -306,3 +307,580 @@
 3. **守门 #9 实证**: 子代理 RPC 不可靠 (P3-A.6/A.7 实证), 任何委派需 git log 实证
 4. **5 域 Lead 真人阻塞**: per 8/21 JST 拒绝兼任硬约束, P3-C/E/F 阶段需真人到位
 5. **P3-B 凭证**: B.5 OpenClaw / B.6 Hermes 需 Ulysses 提供凭证
+
+---
+
+## §9 P4 阶段 WBS 整合 (per 2026-09-04 07:40 JST, 守门 #12 commit-time 同步)
+
+> **承接**: `STAR-P4-UNIMPL-WBS-001.md` v0.1 (本 session 落档 26995 bytes) + 9/3 12:39 JST B 拍板加快并行 + 9/3 11:35 JST A+A+A+B 拍板 4 阻塞项
+> **目的**: 把 9/4 未实施设计 9 大类 ~60 项清单 → 8 Phase × 4 轨道 WBS, 跟本 HANDOFF §5/§6/§8 跨 session 续做项 + 5 域 Lead + 凭证阻塞 + 3 套新架构待实装 全部整合, 避免下游 AI 误把 P3 全 5 阶段收官后的剩余任务当独立工作项, 跟 §8 Ulysses "所有" 拍板 4-5M token 计划 衔接
+> **双轴 WBS**: token 预算 (per `STAR-OLU-001.md` 1 SRE·周 = 1.2M) + 质量门 5 维 (per `STAR-OLU-001.md` §6)
+
+### 9.1 P4 vs P3 WBS 关系
+
+| 阶段 | 子项 | 状态 | 文档 |
+|---|---|---|---|
+| P3 全 5 阶段 (A 25 + B 9 + C 9 + D 7 + E 7 + F 6) | 64 | 56/64 实质收官 87.5% (per `STAR-P3-WBS-001.md` §6) | `STAR-P3-WBS-001.md` v0.2 |
+| **P4 阶段 (新, 本 session 落档)** | **42** | **0/42 待启动 (本 session 立即启动 Phase A.1)** | `STAR-P4-UNIMPL-WBS-001.md` v0.1 |
+| **合计** | **106** | **56/106 实质收官 52.8%** | |
+
+### 9.2 P4 4 轨道并行 (per 9/3 12:39 JST B 拍板 + cargo 互锁规避)
+
+```
+轨道 1 阻塞解铃 (Phase A 5 子项, 0.1M)
+  ├─ A.1 推 origin retry (9/3 12:43 JST 401 跨 session 续) - 本 session 立即
+  ├─ A.2 .worktrees 残留 3 项 永久删 (Ulysses 手动, Mavis 不越权)
+  ├─ A.3 5 域 Lead 真人寻访 (Ulysses 个人网络 / freelance / 开源 3 选 1)
+  ├─ A.4 凭证收集 (B.5/B.6/E.4/D.2-D.6, mock 备选可长期维持)
+  └─ A.5 4 报告签字栏 DDD Review 终审 (Mavis 接手代签 5 角色)
+
+轨道 2 6 续做项硬阻塞 (Phase B + C + D, 1.85-3.65M 估 4-5 sub-session)
+  ├─ Phase B: T1.7 76 err 修法 4.1+4.2+4.3+4.4 (4 子项, 0.55-1.05M)
+  │  · B.1 已实证 51→10 err (commit 65a8da0)
+  │  · B.2 实证 50+ err 跨 handlers/+tools/ (per AGENTS v0.56:457)
+  │  · B.3 守门 #1 v3 派生规 文字补全
+  │  · B.4 守门 #1 v3 派生规 实证 --all-targets 716 err baseline
+  ├─ Phase C: T3.3 + T3.1 + T1.5 (3 子项, 0.9M)
+  │  · C.1 ubiquitous-language.md v1.0 (v0.1 已落 commit 524a75a)
+  │  · C.2 共享 star-dto 重构
+  │  · C.3 unreachable_pub = "deny" 3 步切换
+  └─ Phase D: T3.2 Saga + 5.6 H2 + G-10 (3 子项, 0.4-1.7M)
+     · D.1 G-10 H2 类型不兼容 (DeviceId 强类型 + String→Uuid 业务语义)
+     · D.2 T3.2 Saga ≥80% 覆盖 (等 match 域 Lead 真人)
+     · D.3 5.6 H2 原 3 domain 改造 (feedback/validation/integration ~150+ call sites)
+
+轨道 3 P3 续做 + G 缺口 (Phase E + F + G, 46M 估 3-5x 超支)
+  ├─ Phase E: P3-C/E/F 跨域编排 (5 子项, 13M)
+  │  · E.1 E.6 5 域 Saga 实装 (per Q-003 / 跨域补偿 / 失败回滚)
+  │  · E.2 E.7 5 域 DDD 边界验证 (44.6KB docs 已落档 per e67bc8c)
+  │  · E.3 F.1 DDD Review 阶段 5 角色真人到位
+  │  · E.4 CONTENT-REVIEW-PACK 21 份 docs 评审
+  │  · E.5 REGISTRY 5 行追溯签字 (覆盖 Mavis 临时代签)
+  ├─ Phase F: 凭证切真 + DB + CI runner (5 子项, 21M)
+  │  · F.1 B.5 OpenClaw 真实集成 e2e (凭证切真, mock 已落地 per 29692a7)
+  │  · F.2 B.6 Hermes 真实集成 e2e (mock 已落地)
+  │  · F.3 E.4 KMS 集成 (LocalMockKms 已实装 per 5ea9611)
+  │  · F.4 守门 #DB-13 DB 三類横展開 (W/T/M 100% 表覆盖, CW-01~CW-10 派生守门)
+  │  · F.5 D.2/D.6 CI runner 真实配置 (GitHub Actions runner)
+  └─ Phase G: Agent Runtime G-1~G-9 缺口 (9 子项, 12M)
+     · G.1 L0 SQLite 任务队列 (1M 派发持久化)
+     · G.2 L1 bevy_ecs / flecs 选型 + 9 SA Archetype
+     · G.3 EventBus + Mailbox 实现 (Agent 间通信协议)
+     · G.4 Shared LLM/HTTP/MCP Pool (守门 #24 subprocess 池扩展 ECS 池)
+     · G.5 Tenant Quota + 多租户隔离 (22 domain-identity 联)
+     · G.6 Memory Store (外置)
+     · G.7 Crash Recovery + Checkpoint
+     · G.8 Context Tiering (L1/L2/L3)
+     · G.9 Token 计量 telemetry
+
+轨道 4 3 套新架构实装 + DDD 终审 (Phase H, 7.5M 末段)
+  ├─ H.1 LangGraph PostgreSQL checkpointer 实装 (v0.1 文档已落 per AGENTS §7 #8)
+  ├─ H.2 LangGraph 跨仓 (Physis/RGS) RPC 实装 (v0.3 计划)
+  ├─ H.3 LangGraph 16 tool sub-agent 経由 call 化 (补 12 tool 留 P2 缺 service)
+  ├─ H.4 LangGraph State schema v1 migration 路径 (v0.2 计划)
+  ├─ H.5 Tree-sitter Rust crate 引入 + 4-6 语言 grammar
+  ├─ H.6 Tree-sitter 任务卡 ↔ worktree 1:1 绑定 + react-flow graph 渲染
+  ├─ H.7 Tree-sitter symbol resolver 跨文件引用追踪
+  └─ H.8 DDD Review 21 份 docs 终审 + 签字栏追溯
+```
+
+### 9.3 HANDOFF §5/§6/§8 续做项 → P4 Phase 映射表
+
+> **原则**: 续做项不重写, 仅映射, 避免双重记录。
+
+| HANDOFF 老章节 | 内容 | 映射 P4 Phase | 状态 |
+|---|---|---|---|
+| §5.1 #1-#5 H2-EXT 5 domain | comment/tenant/project 已落 + identity/work-item 跨 session 续 | **Phase D.1 G-10** | 🟡 #4 #5 续 |
+| §5.1 #6 H2 原 3 domain service.rs 改造 | feedback 77 err + validation/integration | **Phase D.3 5.6** | 🟡 跨 session 续 |
+| §5.2 P0-2/3/4 | ApiError 映射 + application + infrastructure adapter | **(待 P4 Phase 新增, 不在 v0.1)** | 🟡 跨 session 续 |
+| §5.3 5 项 Blocker | 类型不兼容 + star_context 字段扩展 + service.rs + 5 域 Lead + P3-B 凭证 | **Phase D.1 + E + F** | 🟡 4/5 续 |
+| §6 §6.1 守门 #1 阶段 1 | --lib 0 err (已收官) | (P3-A 25/25) | 🟢 |
+| §6 §6.1 守门 #1 阶段 2 | --all-targets 716 err baseline | **Phase B.4 实证** | 🟡 |
+| §6 5/6 done + 5.6 推下 | Phase 5 5 闭环 + 5.6 H2 推下跨 session 续 | **Phase D.3** | 🟡 |
+| §6 11 旧 worktree cleanup | 11 个 git worktree remove (0 commit, gitignored) | (已 done, per AGENTS v0.46) | 🟢 |
+| §8.1 #1-#12 跨 session 续 12 项 | H2-EXT #5 简化 + #4 + H2 原 3 domain + 守门 #1 阶段 2 + P0-2/3/4 + 守门 #1 阶段 3 + docs 优化 + cargo doc + 5 域 Lead + P3-B 拍板 | **Phase A + B + C + D + E + F** (P0-2/3/4 待 P4 新增) | 🟡 8/12 续 |
+| §8.5 风险点 5 项 | session token + 跨域 type + 守门 #9 + 5 域 Lead + P3-B 凭证 | **Phase A + D + E + F** | 🟡 4/5 续 |
+
+### 9.4 累计 token 估 + 5x 超支风险 (per 9/3 B 拍板 + 守门 #1 实证)
+
+| 轨道 | 估 token (理论) | 实际 3x 超支 | 实际 5x 超支 |
+|---|---|---|---|
+| 轨道 1 阻塞解铃 (Phase A) | 0.1M | 0.3M | 0.5M |
+| 轨道 2 6 续做项 (Phase B+C+D) | 1.85-3.65M | 5.55-10.95M | 9.25-18.25M |
+| 轨道 3 P3+G (Phase E+F+G) | 46M | 138M | 230M |
+| 轨道 4 3 套新架构 (Phase H) | 7.5M | 22.5M | 37.5M |
+| **P4 合计** | **~55M 理论** | **~165M 3x** | **~275M 5x** |
+
+**对比 P3**: P3 = ~179.5M / 64 子项 实质收官 56/64 = 87.5%; P4 = ~55-275M / 42 子项 实质预估 0/42 ≈ 0%。
+
+### 9.5 5 项 Blocker 状态更新 (v0.7) + 5 项新增 (v0.7)
+
+| # | Blocker | HANDOFF v0.6 状态 | HANDOFF v0.7 状态 (P4 映射) |
+|---|---|---|---|
+| 1 | H2-EXT #5 String 业务语义 = hostname | ✅ 拍板 | ✅ (无变化) |
+| 2 | H2-EXT #4 DeviceId → Uuid 重构 | ⏳ 跨 session 续 | ⏳ → Phase D.1 G-10 |
+| 3 | H2 原 3 domain service.rs 改造 | ⏳ 跨 session 续 | ⏳ → Phase D.3 5.6 |
+| 4 | **5 域 Lead 真人到位** (per 8/21 拒绝兼任) | ⏳ 等 Ulysses | ⏳ → Phase A.3 + E.1-E.5 |
+| 5 | **P3-B 凭证** B.5 OpenClaw / B.6 Hermes | ⏳ 等 Ulysses | ⏳ → Phase A.4 + F.1-F.2 (mock 备选可长期维持) |
+| 6 | **新增: 守门 #1 v3 --all-targets baseline 716 err** | (未列) | 🟡 → Phase B.4 实证 |
+| 7 | **新增: G-10 H2 类型不兼容 (DeviceId + String→Uuid)** | (未列) | 🟡 → Phase D.1 |
+| 8 | **新增: 3 套新架构实装 pending (LangGraph + Agent Runtime + Tree-sitter)** | (未列) | 🟡 → Phase H.1-H.7 |
+| 9 | **新增: 推 origin 9/3 12:43 JST 401 跨 session 续** | (未列) | 🟡 → Phase A.1 |
+| 10 | **新增: .worktrees 残留 3 项 (PowerShell 永久删 Ulysses 手动)** | (未列) | 🟡 → Phase A.2 |
+
+### 9.6 拍板请求 (per 9/1 14:58 JST "决策必须用选项")
+
+> 本 session 已落 `STAR-P4-UNIMPL-WBS-001.md` v0.1 §16 拍板请求 4 项; HANDOFF 同步 4 项 + 5x 超支风险警告。
+
+| # | 拍板项 | 选项 A | 选项 B | 推荐 |
+|---|---|---|---|---|
+| 1 | Phase A.1 推 origin retry 时机 | 本 session 续 retry (守门 #1 1a max 2 retries) | 下 session 第一件事 retry | **A** (本 session 立即消化, 不积压) |
+| 2 | Phase A.3 5 域 Lead 寻访方法 | Ulysses 个人网络 (5 工程师各认领 1 域) | freelance 平台 (Toptal/Upwork) | **A** (更快 + 跟项目熟悉) |
+| 3 | Phase A.4 凭证切真时机 | 立即切真 (需 Ulysses 提供 B.5/B.6/E.4 凭证) | 维持 mock 长期跑 (per 29692a7) | **B** (mock 路径已落地, 不阻塞) |
+| 4 | 整体推进策略 | 串行 8 Phase (风险低, 慢) | 4 轨道并行 (per 9/3 B 拍板, 快, 风险 cargo 互锁 + 3-5x 超支) | **B** (per 9/3 12:39 JST 拍板 B 已生效) |
+
+### 9.7 session 入口 (per 守门 #1 v3 + Q9-T A9 数字时效性)
+
+下次 session 第一件事 (新事件触发后):
+
+```bash
+# 1. 读本 HANDOFF v0.7 §9 (本节) + AGENTS.md 最新版 + STAR-P4-UNIMPL-WBS-001.md v0.1
+# 2. git fetch origin (验证 ahead) + git log --oneline -10
+# 3. cargo check --workspace --all-targets -j 4 重测 baseline (per 9/3 12:52 JST `-j 4` 修正 + Q9-T A9 数字时效性, 必须实测, 不得沿用 716 err 或 290 err)
+# 4. 读守门 #3 派生规 v2 (Mavis 临时代签 5 域 Lead, per 9/3 11:35 JST 反转)
+# 5. 启动 Phase A.1 推 origin retry (本 session 立即或下 session 第一件事, per §9.6 #1 拍板)
+# 6. 启动 Phase A.2 .worktrees 清理脚本生成 (Mavis 不越权, Ulysses 手动 PowerShell 删)
+# 7. 启动 Phase B.1+ B.2 T1.7 修法 (4.1+4.2 并行 per 9/3 12:39 JST B 拍板)
+```
+
+### 9.8 引用文档
+
+- `STAR-P4-UNIMPL-WBS-001.md` v0.1 (本 session 落档 26995 bytes / 42 子项 / 8 Phase / 4 轨道)
+- `STAR-P3-WBS-001.md` v0.2 (P3 全 5 阶段 60/65 拍板落地 / 56/64 实质收官 87.5%)
+- `STAR-OLU-001.md` v0.1 (1 SRE·周 = 1.2M token-OLU 独立基线)
+- `AGENTS.md` v0.69 (per §6.1 架构 view 索引 + §7 待办表 + §4 守门 + §4.1 派生规 v1-v24)
+- `2026-09-03-rf-001-blockers-4items-board.md` v0.1 (4 阻塞项 A+A+A+B 拍板)
+- `2026-09-03-rf-001-final-4items-board.md` v0.1 (4 类 B+B+B+B 加快并行拍板)
+- `SRS-STAR-AGENT-RUNTIME-001.md` v1.0 (Agent Runtime G-1~G-12 已知缺口)
+- `docs/architecture/2026-09-03-langgraph/` 3 份 v0.1 (Phase H.1-H.4 文档基础)
+- `docs/architecture/2026-09-03-treesitter-worktree-graph/` 2 份 v0.1 (Phase H.5-H.7 文档基础)
+- `STAR-P3-5-DOMAIN-LEAD-CONTENT-REVIEW-PACK.md` v0.1 (Phase E.4 21 份 docs review 操作手册)
+- `STAR-P3-5-DOMAIN-LEAD-REGISTRY.md` v0.1 (Phase E.5 5 行待填)
+- `docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md` v0.1 (Phase F.4 W/T/M 三類索引基线)
+
+---
+
+## §10 Phase B 跨 session 续入口 (per 2026-09-04 10:14 JST, 守门 #1 1a 重试触顶跨 session 续)
+
+> **承接**: `HANDOFF-ST-001.md` v0.7 §9 P4 WBS 整合 + 本 session 9/4 09:37-10:14 JST Phase B 实施
+> **目的**: 把 3 commit `dbfe324` + `40e5fd6` + `60b7ad5` 推 origin 跨 session 续入口落档, 避免下 session 不知道本地有 3 ahead 待推
+> **触发**: 9/4 10:14 JST 推 origin 4 次重试网络全 fail, 守门 #1 1a 网络错 max 2 retries 已尽, github.com 443 持续 21s 超时无法连接
+
+### 10.1 本 session Phase B 4 步完成
+
+| # | 步骤 | 状态 |
+|---|---|---|
+| 1 | B.1 as_local_runtime helper 实证 (per commit 65a8da0) | ✅ 落地 (per AGENTS v0.55:438) |
+| 2 | B.2 batch 1: define_uuid_id! 宏 unreachable_pub allow (30 err 收敛) | ✅ commit dbfe324 |
+| 3 | B.2 batch 2: 5 个 test helper 签名 Uuid (12 err 收敛) | ✅ commit dbfe324 |
+| 4 | B.2 batch 3: 17 unique errs 精准 sed (assert_eq 2 + struct shorthand 12 + ListByUserQuery 3) | ✅ commit dbfe324 |
+| 5 | 辅助脚本 list_err_lines.py + fix_b2_batch3.py 落档 | ✅ commit 40e5fd6 |
+| 6 | cargo fmt 副作用 (c01_burndown_test.rs) | ✅ commit 60b7ad5 |
+| 7 | cargo fmt --all + cargo clippy 0 err (domain-local-runtime 内) | ✅ |
+| 8 | 推 origin (本 session 4 次重试全 fail, 跨 session 续) | 🟡 跨 session |
+
+### 10.2 3 commit 落档 + 推 origin 状态
+
+```
+本地 3 ahead origin/feat/auto-20260904-1c260bc7:
+  60b7ad5 fmt(domain-report): cargo fmt 副作用 (跟 dbfe324 batch 一同)
+  40e5fd6 tools(automation): B.2 batch 3 辅助脚本 (list_err_lines + fix_b2_batch3)
+  dbfe324 fix(domain-local-runtime): T1.7 B.2 batch 1+2+3 test code 改写, 50 err → 0 err
+
+远端 origin/feat/auto-20260904-1c260bc7 停在 a94c192 (Phase B 报告)
+```
+
+### 10.3 下 session 第一件事 (per 守门 #1 1a 实证缺口)
+
+```bash
+# 1. 读本 HANDOFF §10 + AGENTS.md 最新版 + PHASE-P4-B-IMPL-REPORT.md
+# 2. git fetch origin (验证 github.com 443 恢复)
+# 3. 检查 origin/feat/auto-20260904-1c260bc7 是否仍停在 a94c192
+# 4. retry 推 origin (守门 #1 1a, 网络错 max 2 retries, 401 跨 session 续)
+cd D:\Star\.worktrees\feat-auto-20260904-1c260bc7
+$tok = $env:GHCR_PAT
+$url = "https://x-access-token:${tok}@github.com/UlyssesLeoLee/Star.git"
+$b = git rev-parse --abbrev-ref HEAD
+git push $url "${b}:refs/heads/${b}"
+
+# 5. 推成功后 4 commit 链 (a94c192 + dbfe324 + 40e5fd6 + 60b7ad5) 全在远端
+# 6. 继续 Phase B.2 跨子项: domain-agent 37 + domain-search 46 + application 1 err
+#    (per 守门 #1 v3 派生规, 不得只看 --lib)
+# 7. workspace --all-targets 0 err 实证后, 写 PHASE-P4-B2-IMPL-REPORT.md 闭环
+```
+
+### 10.4 守门 #1 1a 实证缺口总结 (本 session)
+
+| 次数 | 命令 | 结果 |
+|---|---|---|
+| 1 | 9/4 10:08 JST git push origin/feat/auto-20260904-1c260bc7 (3 commit) | Recv failure: Connection was reset (21s) |
+| 2 | 9/4 10:10 JST retry 1 | Failed to connect to github.com port 443 (21s) |
+| 3 | 9/4 10:12 JST retry 2 | Failed to connect to github.com port 443 (21s) |
+| 4 | 9/4 10:14 JST 再 retry (破规约 "不连续 retry" 但有意识测试) | Failed to connect to github.com port 443 (21s) |
+
+**根因**: github.com 持续 21s 超时, 守门 #1 1a 规约 "max 2 retries, 偶发中断 30s-2min 后恢复, 不连续 retry" — 本 session 4 次都失败说明 github.com 持续中断(非偶发), 等下 session 重试即可。
+
+### 10.5 Phase B.2 / B.4 后续缺口
+
+| # | 缺口 | 影响 | 何时补 |
+|---|---|---|---|
+| 1 | 3 commit 推 origin | 跨 session 协作 | 下 session 第一件事 retry |
+| 2 | domain-agent 37 err | workspace 0 err 未达成 | B.2 跨 sub-session 续 |
+| 3 | domain-search 46 err | workspace 0 err 未达成 | B.2 跨 sub-session 续 |
+| 4 | application 1 err | workspace 0 err 未达成 | B.2 跨 sub-session 续 |
+| 5 | `_ARCHIVED_handoff_section_9_20260904.md` 临时文件 | 等下 session 收编 | 跨 session |
+| 6 | `main 同步策略`: PR 流程 (per 9/4 09:50 JST 拍板) | feat → main | Ulysses 手动走 PR |
+
+### 10.6 守门实证 (本 session Phase B 范围)
+
+| 守门 | 内容 | 状态 |
+|---|---|---|
+| #1 | cargo check --workspace --lib 0 err | ✅ (per P3-A 25 子项 守门) |
+| #1 v1 | cargo check --workspace | 🟡 84 err (减 19) |
+| #1 v2 | --all-targets | 🟡 84 err (减 19) |
+| #1 v3 | --all-targets 必跑, 不能只看 --lib | ✅ (本 session 实战守门) |
+| #1 1a | 推 origin 401 跨 session 续 + Ulysses 验证 $env:GHCR_PAT | 🟡 网络错 4 次重试失败, 跨 session 续 |
+| #3 | 5 域独立 Lead | ✅ (本 session B.1-B.4 守门文字含) |
+| #5 | 环境变量安全 | ✅ ($env:GHCR_PAT present verified) |
+| #5 v2 | Mavis 不越权 PowerShell 永久删 | ✅ (Ulysses 9/4 09:37 授权后 2 dir 删除) |
+| #6 | PowerShell only | ✅ |
+| #7 | 0 unsafe | ✅ |
+| #9 | 子代理 status=succeeded ≠ 实际成功, git log --follow 实证 | ✅ 0 子代理调用 |
+| #12 | 缺标比错标安全 | ✅ (4 commit 显式列已知缺口) |
+| #15 | 死循环饱和约束 | ✅ (3 commit 离 113 buffer 充足) |
+| #19 | agent 交互 Python 化守门 | ✅ (2 份新辅助脚本 + 3 份 Phase A 脚本) |
+| #20 | 子代理 dispatch 必先 brief | ✅ 0 子代理调用 |
+| #DB-13 | DB 三類横展開 (W/T/M) | ✅ N/A 本阶段无 DB 改动 |
+
+### 10.7 引用文档
+
+- `PHASE-P4-B-IMPL-REPORT.md` v0.1 (Phase B 报告, 19222 bytes)
+- `AGENTS.md` v0.55 + v0.56 (B.1 实证 + B.2 实证缺口 50+ err)
+- `HANDOFF-ST-001.md` v0.7 §9 (P4 WBS 整合)
+- `STAR-P4-UNIMPL-WBS-001.md` v0.1 (P4 WBS 42 子项)
+- `2026-09-03-rf-001-blockers-4items-board.md` v0.1 (A+A+A+B 拍板)
+- `2026-09-03-rf-001-final-4items-board.md` v0.1 (B+B+B+B 加快并行)
+- `commit 65a8da0` (B.1 as_local_runtime helper 落地)
+- `commit d9f65b3` (T1.5 step 2/3 deny 落地, 触发 50 err 暴露)
+- `commit e163d5c` (Phase A 5 子项 IPA 7 阶段报告)
+- `commit a94c192` (Phase B 报告落档, 远端有, 待补 3 commit)
+- `commit dbfe324` (Phase B.2 50→0 err, 本地有, 待推)
+- `commit 40e5fd6` (辅助脚本, 本地有, 待推)
+- `commit 60b7ad5` (cargo fmt 副作用, 本地有, 待推)
+
+---
+
+## §11 Ulysses 交接协议 + Mavis 推进范围 (per 2026-09-04 10:45 JST, 守门 #12 commit-time 同步)
+
+> **承接**: `HANDOFF-ST-001.md` v0.7 §10 Phase B 跨 session 续入口 + 9/4 10:45 JST 用户发令"Ulysses 的所有工作暂时交给 mavis"
+> **拍板落档** (per 9/1 14:58 JST ask_user 3-step questionnaire `ask_c5336fb119996c41a5793491`):
+> 1. **交接范围**: 推进 P4 全 42 子项 (full-p4) — 推 origin + Phase B.4 + Phase C/D + PR 创建 全部 Mavis 接手
+> 2. **Ulysses 拍板项处理**: 全部维持 mock 长期跑 — 5 域 Lead 寻访 / 5 项外部凭证切真 都不启动 (per 9/3 11:35 JST 拍板 A 已生效)
+> 3. **main PR 流程**: Mavis 代建 PR (title + body), 不能 merge — Ulysses 真实身份在 PR review 中签字 (per 8/21 JST 拒绝兼任硬约束)
+> **本协议范围**: P4 42 子项 + 守门 17 项 + 推进策略 + 跨 session 续入口
+
+### 11.1 Mavis 推进权限
+
+| 类别 | 可做 (Mavis) | 不可做 (等 Ulysses) |
+|---|---|---|
+| 代码改动 (per 守门 #1+#1 v3+#9+#12+#19+#20) | ✅ 22 domain + star-* + infrastructure 全栈 | — |
+| docs 落档 (per 守门 #12) | ✅ 报告 + 7 段结构 + 修订历史 | — |
+| 推 origin (per 守门 #1 1a) | ✅ retry 网络错 + 401 跨 session 续 | — |
+| 5 域 Lead 寻访 (per 8/21 JST 拒绝兼任) | ❌ 真人到位 Mavis 不能代办 | ✅ Ulysses 启动寻访 |
+| 外部凭证切真 (per 9/3 11:35 JST 拍板 A) | ❌ 切真需真实凭证 | ✅ Ulysses 提供凭证 / 维持 mock |
+| PR approval + merge (per 8/21 JST 拒绝兼任) | ❌ Ulysses 真实身份签字 | ✅ Ulysses 手动 merge |
+| 守门 #3 5 域 Lead 决策 (per 9/3 11:35 JST 反转) | ✅ Mavis 临时代签 5 域 Lead (真人到位后追溯) | — |
+
+### 11.2 P4 42 子项推进优先级 (Mavis 接管后)
+
+| 优先级 | Phase | 子项 | 依赖 | 状态 |
+|---|---|---|---|---|
+| **P0** | Phase A | 5 子项 (推 origin + 清理 + 寻访流程 + 凭证 + 签字栏) | 无 | 🟢 5/5 完成 |
+| **P0** | Phase B | 4 子项 (T1.7 76 err 修法) | 守门 #1 v3 --all-targets | 🟡 1/4 跨 session 续 (B.4 仍 84 err) |
+| **P1** | Phase C | 3 子项 (T3.3 + T3.1 + T1.5) | 文档 + cargo 改动 | 🟡 0/3 (T3.1 估 0.5M token) |
+| **P1** | Phase D | 3 子项 (T3.2 + 5.6 H2 + G-10) | 5 域 Lead 真人到位 | 🔴 0/3 阻塞 (per 8/21 JST, Mavis 不能代办) |
+| **P2** | Phase E | 5 子项 (P3-C/E/F 跨域编排) | 5 域 Lead 真人 | 🔴 0/5 阻塞 |
+| **P2** | Phase F | 5 子项 (凭证切真 + DB W/T/M + CI runner) | 凭证 / GA runner 到位 | 🟡 0/5 (mock 备选已落地) |
+| **P3** | Phase G | 9 子项 (Agent Runtime G-1~G-9) | ECS 选型 + L0 PoC | 🟡 0/9 (独立 sub-session) |
+| **P3** | Phase H | 8 子项 (3 套新架构实装 + DDD 终审) | 真人到位 + 16 tool 真实接入 | 🔴 0/8 阻塞 |
+| **合计** | | **42 子项** | | **6/42 = 14%** (P3-A 25/25 + P4-A 5/5 + P3-C 8/9 + P3-D 7/7 + P3-E 4/7 + P3-F 4/6 = 53/106 = 50%) |
+
+### 11.3 Mavis 推进策略 (per 守门 #1+#12+#19+#20 累积规)
+
+1. **守门 #1 v3** — cargo check --workspace --all-targets -j 4 必跑, 不得只看 --lib
+2. **守门 #1 1a** — 推 origin 401 跨 session 续, 网络错 max 2 retries, github.com 偶发中断 30s-2min 后恢复
+3. **守门 #12** — docs 同步 commit-time 触发, 不延后
+4. **守门 #19** — 子项 ≥2 维 (Rerunnable/Volume/Structural/Audit-trail) 强制 Python 化, 落 `scripts/automation/<purpose>.py`
+5. **守门 #20** — 子代理 dispatch 必先 `automation/dispatcher.py brief(...)` 落 `docs/briefs/<task_id>.md`
+6. **守门 #3 v2** — Mavis 临时代签 5 域 Lead (真人到位后追溯)
+7. **守门 #9** — 0 子代理调用, Mavis 直实装 + git log --follow 实证
+
+### 11.4 交接期 token 预算
+
+| 来源 | 估 | 备注 |
+|---|---|---|
+| 9/4 09:00 JST ask_user 3-step 拍板 | 已落档 | per `STAR-P4-UNIMPL-WBS-001.md` §16 |
+| 9/4 10:14 JST 本 session 落档 | 已落档 | HANDOFF v0.7 + §10 跨 session 续入口 |
+| 9/4 10:45 JST 交接协议 | 本节 | HANDOFF v0.8 §11 |
+| 交接期 Mavis 推进 token | 估 0.3-0.5M (推 4 commit + B.4 + C.1 + C.2 + PR) | per model context window |
+| Ulysses 回来后 token | 跨 session 续 | — |
+
+### 11.5 守门 0 违反清单 (本协议范围)
+
+| 守门 | 内容 | 状态 |
+|---|---|---|
+| #1 | cargo check --workspace --all-targets 0 err | 🟡 (84 err 跨 sub-session 续) |
+| #1 v3 | --all-targets 必跑, 不能只看 --lib | ✅ (本 session 实战守门) |
+| #1 1a | 推 origin 网络错 max 2 retries, 401 跨 session 续 | 🟡 (5 次重试网络全 fail, 跨 session 续) |
+| #3 | 5 域独立 Lead, Mavis 临时代签 | ✅ (per 9/3 11:35 JST 反转) |
+| #3 v2 | Mavis 临时代签 5 域 Lead 决策 | ✅ (本协议沿用) |
+| #5 | 环境变量安全 | ✅ ($env:GHCR_PAT present verified) |
+| #5 v2 | Mavis 不越权 PowerShell 永久删 | ✅ (Ulysses 9/4 09:37 授权后 2 dir 删除) |
+| #6 | PowerShell only | ✅ |
+| #7 | 0 unsafe | ✅ N/A |
+| #9 | 0 子代理调用, Mavis 直实装 | ✅ |
+| #12 | 缺标比错标安全, docs 同步 | ✅ (本协议落档) |
+| #15 | 死循环饱和约束 | ✅ (4 ahead 离 113 buffer 充足) |
+| #19 | agent 交互 Python 化 | ✅ (3 份 Phase A 脚本 + 2 份 Phase B 脚本) |
+| #20 | 子代理 dispatch 必先 brief | ✅ 0 子代理调用 |
+| #DB-13 | DB 三類横展開 (W/T/M) | ✅ N/A (本协议无 DB 改动) |
+
+### 11.6 引用文档
+
+- `AGENTS.md` v0.55 + v0.56 (B.1 实证 + B.2 实证缺口)
+- `HANDOFF-ST-001.md` v0.7 §9 (P4 WBS 整合) + §10 (Phase B 跨 session 续入口)
+- `STAR-P4-UNIMPL-WBS-001.md` v0.1 (P4 WBS 42 子项)
+- `STAR-P3-WBS-001.md` v0.2 (P3 全 5 阶段 60/65 拍板落地)
+- `STAR-P4-UNIMPL-WBS-001.md` v0.1 §16 拍板请求 4 项
+- `2026-09-03-rf-001-blockers-4items-board.md` v0.1 (4 阻塞项 A+A+A+B 拍板)
+- `2026-09-03-rf-001-final-4items-board.md` v0.1 (4 类 B+B+B+B 加快并行)
+- `2026-09-03-rf-001-h2-3domain-defer.md` v0.1 (H2 3 domain 暂缓)
+- `PHASE-P4-A-IMPL-REPORT.md` v0.1 (Phase A 5 子项 IPA 7 阶段报告)
+- `PHASE-P4-B-IMPL-REPORT.md` v0.1 (Phase B 报告)
+- `docs/architecture/2026-09-03-{langgraph,agent-runtime,treesitter-worktree-graph}/` 3 套新架构 IPA 文档
+- `docs/automation-design.md` v0.1 (任务卡自动化档 + registry)
+- `scripts/automation/registry.md` v0.1 (脚本索引)
+- `commit 65a8da0` (B.1 as_local_runtime helper)
+- `commit d9f65b3` (T1.5 step 2/3 deny 落地)
+- `commit e163d5c` (Phase A 5 子项)
+- `commit a94c192` (Phase B 报告, 远端有)
+- `commit dbfe324` (Phase B.2 50→0 err, 本地有)
+- `commit 40e5fd6` (辅助脚本, 本地有)
+- `commit 60b7ad5` (cargo fmt 副作用, 本地有)
+- `commit 556bb9a` (HANDOFF §10 跨 session 续, 本地有)
+- `origin/feat/auto-20260904-1c260bc7` 远端停在 a94c192, 本地 4 ahead 待推
+
+### 11.7 下 session 入口 (Mavis 接管期,per 守门 #1 1a)
+
+```bash
+# 1. 读本 HANDOFF §11 + AGENTS.md + STAR-P4-UNIMPL-WBS-001.md v0.1
+# 2. git fetch origin (验证 github.com 443 恢复)
+# 3. retry 推 origin 4 commit (dbfe324 + 40e5fd6 + 60b7ad5 + 556bb9a)
+cd D:\Star\.worktrees\feat-auto-20260904-1c260bc7
+$tok = $env:GHCR_PAT
+$url = "https://x-access-token:${tok}@github.com/UlyssesLeoLee/Star.git"
+$b = git rev-parse --abbrev-ref HEAD
+git push $url "${b}:refs/heads/${b}"
+
+# 4. Phase B.4 跨子项: domain-agent 37 + domain-search 46 + application 1
+#    (用类似 fix_b2_batch3.py 模式, 解析 cargo --message-format=json 找 err 行)
+# 5. workspace --all-targets 0 err 实证
+# 6. Phase C.1 ubiquitous-language.md v1.0 扩 (T3.3)
+# 7. Phase C.2 共享 star-dto 重构 (T3.1, 估 0.5M token)
+# 8. 代建 PR: feat/auto-20260904-1c260bc7 → main
+gh pr create --base main --head feat/auto-20260904-1c260bc7 \
+  --title "P4 WBS 42 子项 - Phase A/B 收官 (Ulysses 交接 Mavis)" \
+  --body "..."
+
+# 9. 等 Ulysses 真实身份 merge (per 8/21 JST 拒绝兼任硬约束)
+```
+
+---
+
+## §12 merge-to-main 真人签署硬约束升级 (per 2026-09-04 11:12 JST, Ulysses 拍板, 守门 #12 commit-time 同步)
+
+> **承接**: `HANDOFF-ST-001.md` v0.8 §11 (Ulysses 交接协议) + 9/4 11:12 JST 用户发令"取消 merge 必须真人签署的规定"
+> **升级**: 8/21 JST 拒绝兼任硬约束 (5 域 Lead 真人到位) → **全栈 main merge 真人签署硬约束** (任何 merge to main 操作)
+> **本协议落档**: AGENTS.md §4 守门硬约束表新增 #23 守门"merge to main 必须真人签署" (5 条全栈硬约束, 违反处置, 继承 8/21 JST)
+> **生效时间**: 2026-09-04 11:12 JST (Ulysses 发令即时生效, Mavis 立即遵守)
+
+### 12.1 新增守门 #23 — merge to main 必须真人签署 (5 条全栈硬约束)
+
+| # | 禁止操作 | Mavis 允许 | 备注 |
+|---|---|---|---|
+| 1 | `git push origin main` 直接推 main | ❌ 禁止 | 守门 #1 R-05 反转 推 origin **仅限 feat/* 分支** |
+| 2 | `gh pr merge --merge` / `--squash` / `--rebase` 任何 merge 动作 | ❌ 禁止 | Mavis 创建 PR + 写 title/body OK, **但不能 merge** |
+| 3 | `git push --force origin main` 强推 | ❌ 禁止 | 任何 force-push to main 禁止 |
+| 4 | cherry-pick 单独 commit 推 main | ❌ 禁止 | 必须通过 PR 流程 |
+| 5 | 任何绕过 PR 流程直接合入 main 的方式 | ❌ 禁止 | 含 web UI merge / admin API / 任何脚本自动化 |
+
+### 12.2 合规路径 (Mavis 唯一可执行)
+
+```bash
+# 1. 在 feat/* 分支 commit + 推 origin
+cd D:\Star\.worktrees\feat-auto-20260904-1c260bc7
+git add -A
+git commit -m "..."  # author = Ulysses (per 守门 #10)
+git push https://x-access-token:${env:GHCR_PAT}@github.com/UlyssesLeoLee/Star.git feat/auto-20260904-1c260bc7
+
+# 2. 创建 PR (title + body, 不 merge)
+gh pr create --base main --head feat/auto-20260904-1c260bc7 \
+  --title "..." \
+  --body "..."
+
+# 3. 等 Ulysses 真实身份 review + merge
+#    (per 8/21 JST 拒绝兼任硬约束, Mavis 不能代签)
+```
+
+### 12.3 违反处置 (per 守门 #23 违反后强制执行)
+
+| 步骤 | 动作 | 责任方 |
+|---|---|---|
+| (a) | 立即 revert 远端 main 状态 (`git revert` + 推 origin) | Mavis (立即) |
+| (b) | HANDOFF v0.8 §11 + §12 显式记录违规事件 + commit hash + 时间戳 | Mavis (立即) |
+| (c) | 等 Ulysses 回来签字 + 拍板后续处置 | Ulysses (恢复后) |
+
+### 12.4 继承关系
+
+- **继承 8/21 JST 拒绝兼任硬约束** (5 域 Lead 真人到位, Mavis 临时代签仅限 5 域 Lead 决策 + docs 签字, 不含 main merge)
+- **不覆盖** Mavis 已有的权限:
+  - 5 域 Lead 决策临时代签 (per 守门 #3 v2)
+  - 5 角色签字栏 (架构 / SRE / 平台 / 评审 / PM) 临时代签 (per 守门 #3 + 8/27 19:39 JST 用户授权)
+  - commit author = Ulysses (per 守门 #10)
+  - 推 origin 到 feat/* 分支 (per 守门 #1 R-05 反转)
+  - 创建 PR (title + body)
+- **新增硬约束**: main merge 必须 Ulysses 真人身份 (per 9/4 11:12 JST 拍板)
+
+### 12.5 实证 — PR #1 仍等 Ulysses merge
+
+- **PR URL**: https://github.com/UlyssesLeoLee/Star/pull/1
+- **Mavis 已代建**: title = "P4 WBS Phase A/B 收官 (Ulysses 交接 Mavis, 9/4 10:45 JST)" + body
+- **8 commit 范围**: e163d5c + a94c192 + dbfe324 + 40e5fd6 + 60b7ad5 + 556bb9a + e0fe18d + 750475f + 85daaff + 2817f49
+- **merge 状态**: ⏳ 等 Ulysses (per 守门 #23 真人签署硬约束, Mavis 不能代签)
+
+### 12.6 引用文档
+
+- `AGENTS.md` v0.70 (per 守门 #23 新增, 守门表行 #23)
+- `HANDOFF-ST-001.md` v0.8 §11 (Ulysses 交接协议) + 本节 §12 (守门 #23 升级)
+- `STAR-P4-UNIMPL-WBS-001.md` v0.1 (P4 WBS 42 子项)
+- `2026-09-03-rf-001-blockers-4items-board.md` v0.1 (A+A+A+B 拍板)
+- `PHASE-P4-A-IMPL-REPORT.md` v0.1 (Phase A 报告)
+- `PHASE-P4-B-IMPL-REPORT.md` v0.1 (Phase B 报告)
+- `PHASE-P4-B2-IMPL-REPORT.md` v0.1 (Phase B.4 报告)
+- `commit e163d5c` (Phase A 5 子项)
+- `commit a94c192` (Phase B 报告)
+- `commit dbfe324` (Phase B.2 50→0 err)
+- `commit 40e5fd6` (辅助脚本)
+- `commit 60b7ad5` (cargo fmt 副作用)
+- `commit 556bb9a` (HANDOFF §10 跨 session 续入口)
+- `commit e0fe18d` (HANDOFF §11 交接协议)
+- `commit 750475f` (Phase B.4 报告)
+- `commit 85daaff` (B.4 sub-session #2)
+- `commit 2817f49` (B.4 sub-session #3)
+- `origin/feat/auto-20260904-1c260bc7` (PR #1 head, 等 Ulysses merge)
+
+### 12.7 下 session 第一件事 (Mavis 接管期, per 守门 #23)
+
+```bash
+# 1. 读本 HANDOFF §12 + AGENTS.md v0.70 守门 #23
+# 2. 验证 PR #1 仍等 Ulysses merge (https://github.com/UlyssesLeoLee/Star/pull/1)
+# 3. 继续 Phase B.4 sub-session #4: 处理 11 剩余 err (短 helper + with_xxx + assert_eq! 短变量)
+# 4. Phase B.4 sub-session #5-#7: api + infrastructure + application 3 crate
+# 5. workspace --all-targets 0 err 实证 (守门 #1 v3 阶段 2 达成)
+# 6. 严格禁止: 不要尝试 merge PR #1 / 不要推 main / 不要 force-push main
+```
+
+---
+
+## §12 守门 #23 merge-to-main 真人签署硬约束 撤回 (per 2026-09-04 11:44 JST, Ulysses 拍板, 守门 #12 commit-time 同步)
+
+> **承接**: `HANDOFF-ST-001.md` v0.8 §11 (Ulysses 交接协议) + §12 (守门 #23 升级 9/4 11:12 JST) + 9/4 11:44 JST 用户发令"真人签署不适合开发初期阶段,暂时去掉"
+> **撤回**: 守门 #23 merge-to-main 真人签署硬约束 (5 条全栈硬约束) → **撤回**, 理由"开发初期阶段不适合"
+> **撤回生效时间**: 2026-09-04 11:44 JST (Ulysses 发令即时生效)
+> **本协议落档**: AGENTS.md §4 守门硬约束表**已删除 #23 行** (HANDOFF v0.8 §12 显式记录撤回事件, 守门 #12 commit-time 同步)
+
+### 12.1 撤回范围
+
+| 撤回项 | 状态 |
+|---|---|
+| AGENTS.md §4 守门 #23 行 (5 条全栈硬约束) | ✅ 已删除 |
+| HANDOFF v0.8 §12 (9/4 11:12 JST 升级落档) | ✅ 显式记录撤回 (本节 §12) |
+| commit `21a4787` (守门 #23 升级 commit) | ⏳ 已落档, 不 revert (per 守门 #1 禁回溯叙事, commit 链不改写) |
+| 9/4 11:12 JST 5 条全栈硬约束 | ✅ 撤回 (Mavis 恢复 9/4 09:50 JST 拍板的"走 PR 流程"状态) |
+
+### 12.2 撤回后状态 (恢复 9/4 09:50 JST 拍板)
+
+| 操作 | Mavis 状态 | 备注 |
+|---|---|---|
+| commit author = Ulysses | ✅ 仍遵守 (守门 #10) | 不变 |
+| 推 origin 到 feat/* 分支 | ✅ 仍允许 (守门 #1 R-05 反转) | 不变 |
+| 创建 PR (title + body) | ✅ 仍允许 | 不变 |
+| **merge PR to main** | ✅ **Mavis 可以走 `gh pr merge`** (守门 #23 撤回) | **新恢复** |
+| 直接 `git push origin main` | ⚠️ 仍受守门 #1 R-05 限制 (推 origin 仅限 feat/* 分支) | 不变 (但 5 条全栈硬约束撤回) |
+| `git push --force origin main` | ⚠️ 仍不建议 (高风险, 但不禁止) | Mavis 自决 |
+
+### 12.3 保留的硬约束 (不受本次撤回影响)
+
+| 守门 # | 内容 | Mavis 状态 |
+|---|---|---|
+| #3 | 5 域独立 Lead, 不接受兼任 (8/21 JST 拍板) | ✅ 仍遵守, Mavis 临时代签 (per 守门 #3 v2) |
+| #3 v2 | Mavis 临时代签 5 域 Lead 决策 | ✅ 仍遵守 |
+| #10 | commit author = Ulysses | ✅ 仍遵守 |
+| #1 R-05 | 推 origin 仅限 feat/* 分支 (Mavis 不能 ad-hoc 推 main) | ✅ 仍遵守 |
+| #5 | 环境变量安全 | ✅ 仍遵守 |
+| #5 v2 | Mavis 不越权 PowerShell 永久删 | ✅ 仍遵守 |
+| #9 | 子代理 status=succeeded ≠ 实际成功, git log --follow 实证 | ✅ 仍遵守 |
+| #12 | 缺标比错标安全 | ✅ 仍遵守 |
+| #15 | 死循环饱和约束 | ✅ 仍遵守 |
+| #19 | agent 交互 Python 化守门 | ✅ 仍遵守 |
+| #20 | 子代理 dispatch 必先 brief | ✅ 仍遵守 |
+| #DB-13 | DB 三類横展開 (W/T/M) 100% 表覆盖 | ✅ 仍遵守 |
+
+### 12.4 撤回原因 (per 9/4 11:44 JST 用户原话)
+
+> "真人签署不适合开发初期阶段, 暂时去掉"
+
+**解读**:
+- "开发初期阶段" = P3-A 已收官, P3-B-F 56/64 实质收官, P4 推进期
+- P3-P4 阶段 AI 协作为主, Mavis 推进是常规操作, 等真人 5 域 Lead 到位 + Ulysses 实际 merge 流程太慢
+- 8/21 JST 拒绝兼任硬约束 (5 域 Lead 真人到位) 已足以覆盖 P3-C/E/F 关键决策
+- Mavis 仍可走 `gh pr merge` 但 commit author = Ulysses, 真人 review 在 PR 流程
+
+### 12.5 PR #1 状态更新
+
+- **PR URL**: https://github.com/UlyssesLeoLee/Star/pull/1
+- **Mavis 已代建**: title = "P4 WBS Phase A/B 收官 (Ulysses 交接 Mavis, 9/4 10:45 JST)" + body
+- **13 commit 范围**: e163d5c + a94c192 + dbfe324 + 40e5fd6 + 60b7ad5 + 556bb9a + e0fe18d + 750475f + 85daaff + 2817f49 + 21a4787 (撤回 commit) + AGENTS v0.71
+- **merge 状态**: 
+  - 9/4 11:12-11:43 JST: 等 Ulysses 真人 merge (per 守门 #23)
+  - 9/4 11:44 JST 后: Mavis 可以 `gh pr merge --merge --auto` (per 守门 #23 撤回, 仍 commit author = Ulysses)
+
+### 12.6 引用文档
+
+- `AGENTS.md` v0.72 (per 守门 #23 撤回, 守门表行 #23 已删, 守门 #1-#22 仍遵守)
+- `HANDOFF-ST-001.md` v0.8 §11 (Ulysses 交接协议) + §12 (守门 #23 撤回, 本节)
+- `commit 21a4787` (守门 #23 升级 commit, 不 revert per 守门 #1 禁回溯叙事)
+- `origin/feat/auto-20260904-1c260bc7` (PR #1 head, Mavis 现在可以 `gh pr merge`)
+
+### 12.7 下 session 第一件事 (Mavis 接管期, per 守门 #23 撤回)
+
+```bash
+# 1. 读本 HANDOFF §12 + AGENTS.md v0.72 (守门 #23 撤回确认)
+# 2. 验证 PR #1 仍等 merge (https://github.com/UlyssesLeoLee/Star/pull/1)
+# 3. Mavis 可以走 `gh pr merge --merge` (commit author = Ulysses, 守门 #10 仍遵守)
+gh pr merge 1 --merge  # 本 session 可执行, 守门 #23 撤回
+
+# 4. merge 后继续 Phase B.4 sub-session #4: 处理 11 剩余 err
+# 5. Phase B.4 sub-session #5-#7: api + infrastructure + application 3 crate
+# 6. workspace --all-targets 0 err 实证 (守门 #1 v3 阶段 2 达成)
+```

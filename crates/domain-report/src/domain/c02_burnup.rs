@@ -21,8 +21,8 @@ pub struct BurnupData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BurnupSeries {
-    pub actual: Vec<TimeSeriesPoint>,     // 累积完成
-    pub scope: Vec<TimeSeriesPoint>,      // 范围阶梯 (stepAfter)
+    pub actual: Vec<TimeSeriesPoint>, // 累积完成
+    pub scope: Vec<TimeSeriesPoint>,  // 范围阶梯 (stepAfter)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,7 +35,7 @@ pub struct TimeSeriesPoint {
 pub struct BurnupSummary {
     pub completed_sp: f64,
     pub total_sp: f64,
-    pub completion_ratio: f64,    // 0-1
+    pub completion_ratio: f64, // 0-1
 }
 
 /// 公开入口: 异步生成 Burnup Report
@@ -49,21 +49,25 @@ pub async fn generate(
     let sprint_id = filter.sprint_id.ok_or_else(|| {
         ReportError::ValidationFailed("Burnup requires sprint_id in filter".into())
     })?;
-    let sprint = sprint_port.get_sprint(filter.tenant_id, sprint_id)
+    let sprint = sprint_port
+        .get_sprint(filter.tenant_id, sprint_id)
         .await
         .map_err(|e| ReportError::DataSource(e.to_string()))?
         .ok_or_else(|| ReportError::NotFound(sprint_id))?;
 
     // 2. 拉已完成 issue
     let completed_issues = work_item_port
-        .list_completed_in_sprint(filter.tenant_id, sprint_id, sprint.start_date, sprint.end_date)
+        .list_completed_in_sprint(
+            filter.tenant_id,
+            sprint_id,
+            sprint.start_date,
+            sprint.end_date,
+        )
         .await
         .map_err(|e| ReportError::DataSource(e.to_string()))?;
 
     // 3. 计算累积完成 SP
-    let total_completed_sp: f64 = completed_issues.iter()
-        .filter_map(|i| i.story_points)
-        .sum();
+    let total_completed_sp: f64 = completed_issues.iter().filter_map(|i| i.story_points).sum();
 
     // 4. 构造 actual + scope + summary
     let burnup = compute_burnup(&sprint, &completed_issues, total_completed_sp);
@@ -85,7 +89,8 @@ pub async fn generate(
             total: sprint.total_sp,
             trend: Trend::Up,
             anomalies: vec![],
-            meta: serde_json::to_value(&burnup.summary).map_err(|e| ReportError::Internal(e.to_string()))?,
+            meta: serde_json::to_value(&burnup.summary)
+                .map_err(|e| ReportError::Internal(e.to_string()))?,
         },
         generated_at: Utc::now(),
         cache_key: format!("burnup:{}:{}", filter.tenant_id, sprint_id),
@@ -102,7 +107,8 @@ fn compute_burnup(
     let total_sp = sprint.total_sp;
 
     // 1. Actual 线: 累积完成 (单调递增)
-    let mut daily_completed: std::collections::BTreeMap<String, f64> = std::collections::BTreeMap::new();
+    let mut daily_completed: std::collections::BTreeMap<String, f64> =
+        std::collections::BTreeMap::new();
     for issue in completed_issues {
         let day_key = issue.completed_at.format("%Y-%m-%d").to_string();
         *daily_completed.entry(day_key).or_insert(0.0) += issue.story_points.unwrap_or(0.0);
@@ -144,7 +150,11 @@ fn compute_burnup(
         });
     }
 
-    let completion_ratio = if total_sp > 0.0 { total_completed_sp / total_sp } else { 0.0 };
+    let completion_ratio = if total_sp > 0.0 {
+        total_completed_sp / total_sp
+    } else {
+        0.0
+    };
 
     BurnupData {
         sprint: sprint.clone(),
@@ -178,7 +188,11 @@ mod tests {
 
     fn make_issue(day: u32, sp: f64) -> CompletedIssue {
         let completed_at = Utc.with_ymd_and_hms(2026, 9, day, 12, 0, 0).unwrap();
-        CompletedIssue { workitem_id: Uuid::new_v4(), completed_at, story_points: Some(sp) }
+        CompletedIssue {
+            workitem_id: Uuid::new_v4(),
+            completed_at,
+            story_points: Some(sp),
+        }
     }
 
     #[test]
@@ -189,15 +203,19 @@ mod tests {
         // 9/3 完成 20 SP → i=2
         // 9/5 完成 30 SP → i=4
         // 9/7 完成 10 SP → i=6
-        let issues = vec![make_issue(3, 20.0), make_issue(5, 30.0), make_issue(7, 10.0)];
+        let issues = vec![
+            make_issue(3, 20.0),
+            make_issue(5, 30.0),
+            make_issue(7, 10.0),
+        ];
         let bu = compute_burnup(&sprint, &issues, 60.0);
-        assert_eq!(bu.series.actual[0].y, 0.0);   // 9/1
-        assert_eq!(bu.series.actual[1].y, 0.0);   // 9/2
-        assert!((bu.series.actual[2].y - 20.0).abs() < 0.01);  // 9/3
-        assert!((bu.series.actual[3].y - 20.0).abs() < 0.01);  // 9/4
-        assert!((bu.series.actual[4].y - 50.0).abs() < 0.01);  // 9/5
-        assert!((bu.series.actual[5].y - 50.0).abs() < 0.01);  // 9/6
-        assert!((bu.series.actual[6].y - 60.0).abs() < 0.01);  // 9/7
+        assert_eq!(bu.series.actual[0].y, 0.0); // 9/1
+        assert_eq!(bu.series.actual[1].y, 0.0); // 9/2
+        assert!((bu.series.actual[2].y - 20.0).abs() < 0.01); // 9/3
+        assert!((bu.series.actual[3].y - 20.0).abs() < 0.01); // 9/4
+        assert!((bu.series.actual[4].y - 50.0).abs() < 0.01); // 9/5
+        assert!((bu.series.actual[5].y - 50.0).abs() < 0.01); // 9/6
+        assert!((bu.series.actual[6].y - 60.0).abs() < 0.01); // 9/7
         assert_eq!(bu.summary.completed_sp, 60.0);
         assert!((bu.summary.completion_ratio - 0.6).abs() < 0.01);
     }
@@ -216,10 +234,10 @@ mod tests {
         });
         let issues = vec![];
         let bu = compute_burnup(&sprint, &issues, 0.0);
-        assert_eq!(bu.series.scope[0].y, 100.0);  // 9/1
-        assert_eq!(bu.series.scope[3].y, 100.0);  // 9/4 (变更前)
-        assert_eq!(bu.series.scope[4].y, 80.0);   // 9/5 (变更当日)
-        assert_eq!(bu.series.scope[13].y, 80.0);  // 9/14
+        assert_eq!(bu.series.scope[0].y, 100.0); // 9/1
+        assert_eq!(bu.series.scope[3].y, 100.0); // 9/4 (变更前)
+        assert_eq!(bu.series.scope[4].y, 80.0); // 9/5 (变更当日)
+        assert_eq!(bu.series.scope[13].y, 80.0); // 9/14
     }
 
     #[test]
