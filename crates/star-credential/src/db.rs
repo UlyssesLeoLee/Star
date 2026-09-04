@@ -15,7 +15,10 @@ use std::sync::Mutex;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{CredentialError, CredentialMetadata, CredentialPlaintext, CredentialRecord, CredentialStatus, Provider};
+use crate::{
+    CredentialError, CredentialMetadata, CredentialPlaintext, CredentialRecord, CredentialStatus,
+    Provider,
+};
 use domain_kms::EncryptedBlob;
 
 #[derive(Debug, Error)]
@@ -69,7 +72,9 @@ impl CredentialDb {
     /// 内存模式 (测试用)
     pub fn in_memory() -> Result<Self, DbError> {
         let conn = Connection::open_in_memory()?;
-        let db = Self { conn: Mutex::new(conn) };
+        let db = Self {
+            conn: Mutex::new(conn),
+        };
         db.init_schema()?;
         Ok(db)
     }
@@ -77,7 +82,9 @@ impl CredentialDb {
     /// 文件模式 (生产用, per 守门 #DB-13 Master 永存)
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, DbError> {
         let conn = Connection::open(path)?;
-        let db = Self { conn: Mutex::new(conn) };
+        let db = Self {
+            conn: Mutex::new(conn),
+        };
         db.init_schema()?;
         Ok(db)
     }
@@ -169,42 +176,51 @@ impl CredentialDb {
     }
 
     /// 查 tenant 凭证
-    pub fn list_credentials(&self, tenant_id: &str, provider: Option<Provider>) -> Result<Vec<CredentialRecord>, DbError> {
+    pub fn list_credentials(
+        &self,
+        tenant_id: &str,
+        provider: Option<Provider>,
+    ) -> Result<Vec<CredentialRecord>, DbError> {
         let conn = self.conn.lock().unwrap();
         let provider_str = provider.map(|p| p.as_str().to_string());
         let mut stmt = conn.prepare(
             "SELECT id, tenant_id, user_id, provider, metadata_json, encrypted_blob_json, status, created_at_ms, updated_at_ms, deprecated_at_ms, revoked_at_ms
              FROM credential WHERE tenant_id = ?1 AND (?2 IS NULL OR provider = ?2) ORDER BY created_at_ms DESC"
         )?;
-        let records = stmt.query_map(params![tenant_id, provider_str], |row| {
-            let provider: String = row.get(3)?;
-            let provider = parse_provider(&provider).map_err(|_| rusqlite::Error::InvalidQuery)?;
-            let metadata_json: String = row.get(4)?;
-            let blob_json: String = row.get(5)?;
-            let status: String = row.get(6)?;
-            let status = parse_status(&status).map_err(|_| rusqlite::Error::InvalidQuery)?;
-            Ok(CredentialRecord {
-                id: row.get(0)?,
-                tenant_id: row.get(1)?,
-                user_id: row.get(2)?,
-                provider,
-                metadata: serde_json::from_str(&metadata_json).map_err(|_| rusqlite::Error::InvalidQuery)?,
-                encrypted_blob: serde_json::from_str(&blob_json).map_err(|_| rusqlite::Error::InvalidQuery)?,
-                status,
-                created_at_ms: row.get::<_, i64>(7)? as u64,
-                updated_at_ms: row.get::<_, i64>(8)? as u64,
-                deprecated_at_ms: row.get::<_, Option<i64>>(9)?.map(|m| m as u64),
-                revoked_at_ms: row.get::<_, Option<i64>>(10)?.map(|m| m as u64),
-            })
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
+        let records = stmt
+            .query_map(params![tenant_id, provider_str], |row| {
+                let provider: String = row.get(3)?;
+                let provider =
+                    parse_provider(&provider).map_err(|_| rusqlite::Error::InvalidQuery)?;
+                let metadata_json: String = row.get(4)?;
+                let blob_json: String = row.get(5)?;
+                let status: String = row.get(6)?;
+                let status = parse_status(&status).map_err(|_| rusqlite::Error::InvalidQuery)?;
+                Ok(CredentialRecord {
+                    id: row.get(0)?,
+                    tenant_id: row.get(1)?,
+                    user_id: row.get(2)?,
+                    provider,
+                    metadata: serde_json::from_str(&metadata_json)
+                        .map_err(|_| rusqlite::Error::InvalidQuery)?,
+                    encrypted_blob: serde_json::from_str(&blob_json)
+                        .map_err(|_| rusqlite::Error::InvalidQuery)?,
+                    status,
+                    created_at_ms: row.get::<_, i64>(7)? as u64,
+                    updated_at_ms: row.get::<_, i64>(8)? as u64,
+                    deprecated_at_ms: row.get::<_, Option<i64>>(9)?.map(|m| m as u64),
+                    revoked_at_ms: row.get::<_, Option<i64>>(10)?.map(|m| m as u64),
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(records)
     }
 
     /// 追加审计事件 (Append-only, T 类型)
     pub fn append_audit_event(&self, event: &CredentialAuditEvent) -> Result<(), DbError> {
         let conn = self.conn.lock().unwrap();
-        let metadata_snapshot_json = event.metadata_snapshot
+        let metadata_snapshot_json = event
+            .metadata_snapshot
             .as_ref()
             .map(serde_json::to_string)
             .transpose()?;
@@ -225,32 +241,37 @@ impl CredentialDb {
     }
 
     /// 查凭证的审计历史
-    pub fn list_audit_events(&self, credential_id: &str) -> Result<Vec<CredentialAuditEvent>, DbError> {
+    pub fn list_audit_events(
+        &self,
+        credential_id: &str,
+    ) -> Result<Vec<CredentialAuditEvent>, DbError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT id, credential_id, tenant_id, user_id, event_type, event_at_ms, metadata_snapshot_json
              FROM credential_audit_event WHERE credential_id = ?1 ORDER BY event_at_ms ASC"
         )?;
-        let events = stmt.query_map(params![credential_id], |row| {
-            let event_type: String = row.get(4)?;
-            let event_type = parse_event_type(&event_type).map_err(|_| rusqlite::Error::InvalidQuery)?;
-            let metadata_snapshot_json: Option<String> = row.get(6)?;
-            let metadata_snapshot = metadata_snapshot_json
-                .as_ref()
-                .map(|s| serde_json::from_str(s))
-                .transpose()
-                .map_err(|_| rusqlite::Error::InvalidQuery)?;
-            Ok(CredentialAuditEvent {
-                id: row.get(0)?,
-                credential_id: row.get(1)?,
-                tenant_id: row.get(2)?,
-                user_id: row.get(3)?,
-                event_type,
-                event_at_ms: row.get::<_, i64>(5)? as u64,
-                metadata_snapshot,
-            })
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
+        let events = stmt
+            .query_map(params![credential_id], |row| {
+                let event_type: String = row.get(4)?;
+                let event_type =
+                    parse_event_type(&event_type).map_err(|_| rusqlite::Error::InvalidQuery)?;
+                let metadata_snapshot_json: Option<String> = row.get(6)?;
+                let metadata_snapshot = metadata_snapshot_json
+                    .as_ref()
+                    .map(|s| serde_json::from_str(s))
+                    .transpose()
+                    .map_err(|_| rusqlite::Error::InvalidQuery)?;
+                Ok(CredentialAuditEvent {
+                    id: row.get(0)?,
+                    credential_id: row.get(1)?,
+                    tenant_id: row.get(2)?,
+                    user_id: row.get(3)?,
+                    event_type,
+                    event_at_ms: row.get::<_, i64>(5)? as u64,
+                    metadata_snapshot,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(events)
     }
 }
@@ -303,7 +324,10 @@ mod tests {
             tenant_id: "t1".into(),
             user_id: "u1".into(),
             provider,
-            metadata: CredentialMetadata { display_name: "Test".into(), description: "".into() },
+            metadata: CredentialMetadata {
+                display_name: "Test".into(),
+                description: "".into(),
+            },
             encrypted_blob: EncryptedBlob {
                 algorithm: "aes-256-gcm".into(),
                 dek_id: domain_kms::KeyId("dek-1".into()),
@@ -337,7 +361,8 @@ mod tests {
         let db = CredentialDb::in_memory().unwrap();
         let r = make_record(Provider::Hermes, CredentialStatus::Active);
         db.insert_credential(&r).unwrap();
-        db.update_credential_status(&r.id, CredentialStatus::Revoked, 2000, None, Some(2000)).unwrap();
+        db.update_credential_status(&r.id, CredentialStatus::Revoked, 2000, None, Some(2000))
+            .unwrap();
         let list = db.list_credentials("t1", None).unwrap();
         assert_eq!(list[0].status, CredentialStatus::Revoked);
         assert_eq!(list[0].revoked_at_ms, Some(2000));
@@ -355,7 +380,10 @@ mod tests {
             user_id: "u1".into(),
             event_type: AuditEventType::Store,
             event_at_ms: 1000,
-            metadata_snapshot: Some(CredentialMetadata { display_name: "Test".into(), description: "".into() }),
+            metadata_snapshot: Some(CredentialMetadata {
+                display_name: "Test".into(),
+                description: "".into(),
+            }),
         };
         db.append_audit_event(&event).unwrap();
         let events = db.list_audit_events(&r.id).unwrap();

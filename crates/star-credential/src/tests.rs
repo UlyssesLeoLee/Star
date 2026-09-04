@@ -22,11 +22,20 @@ async fn v2_store_and_retrieve_round_trip() {
         description: "用于 LangGraph sub-agent 派发".into(),
     };
     let id = manager
-        .store("tenant-1", "user-1", Provider::OpenClaw, metadata, make_plaintext("oc_live_secret_xxx"))
+        .store(
+            "tenant-1",
+            "user-1",
+            Provider::OpenClaw,
+            metadata,
+            make_plaintext("oc_live_secret_xxx"),
+        )
         .await
         .unwrap();
 
-    let pt = manager.retrieve("tenant-1", Provider::OpenClaw).await.unwrap();
+    let pt = manager
+        .retrieve("tenant-1", Provider::OpenClaw)
+        .await
+        .unwrap();
     assert_eq!(pt.secret, "oc_live_secret_xxx");
     assert_eq!(pt.base_url, Some("https://api.example.com/v1".to_string()));
 }
@@ -36,35 +45,109 @@ async fn v2_store_and_retrieve_round_trip() {
 async fn v2_multi_provider_isolation() {
     let manager = CredentialManager::with_local_mock_kms();
 
-    manager.store("tenant-1", "user-1", Provider::OpenClaw,
-        CredentialMetadata { display_name: "OpenClaw".into(), description: "".into() },
-        make_plaintext("oc_secret")).await.unwrap();
-    manager.store("tenant-1", "user-1", Provider::Hermes,
-        CredentialMetadata { display_name: "Hermes".into(), description: "".into() },
-        make_plaintext("hm_secret")).await.unwrap();
-    manager.store("tenant-1", "user-1", Provider::KmsVault,
-        CredentialMetadata { display_name: "Vault".into(), description: "".into() },
-        make_plaintext("vault_token_xxx")).await.unwrap();
+    manager
+        .store(
+            "tenant-1",
+            "user-1",
+            Provider::OpenClaw,
+            CredentialMetadata {
+                display_name: "OpenClaw".into(),
+                description: "".into(),
+            },
+            make_plaintext("oc_secret"),
+        )
+        .await
+        .unwrap();
+    manager
+        .store(
+            "tenant-1",
+            "user-1",
+            Provider::Hermes,
+            CredentialMetadata {
+                display_name: "Hermes".into(),
+                description: "".into(),
+            },
+            make_plaintext("hm_secret"),
+        )
+        .await
+        .unwrap();
+    manager
+        .store(
+            "tenant-1",
+            "user-1",
+            Provider::KmsVault,
+            CredentialMetadata {
+                display_name: "Vault".into(),
+                description: "".into(),
+            },
+            make_plaintext("vault_token_xxx"),
+        )
+        .await
+        .unwrap();
 
-    assert_eq!(manager.retrieve("tenant-1", Provider::OpenClaw).await.unwrap().secret, "oc_secret");
-    assert_eq!(manager.retrieve("tenant-1", Provider::Hermes).await.unwrap().secret, "hm_secret");
-    assert_eq!(manager.retrieve("tenant-1", Provider::KmsVault).await.unwrap().secret, "vault_token_xxx");
+    assert_eq!(
+        manager
+            .retrieve("tenant-1", Provider::OpenClaw)
+            .await
+            .unwrap()
+            .secret,
+        "oc_secret"
+    );
+    assert_eq!(
+        manager
+            .retrieve("tenant-1", Provider::Hermes)
+            .await
+            .unwrap()
+            .secret,
+        "hm_secret"
+    );
+    assert_eq!(
+        manager
+            .retrieve("tenant-1", Provider::KmsVault)
+            .await
+            .unwrap()
+            .secret,
+        "vault_token_xxx"
+    );
 }
 
 /// V2-1 test 3: rotate 老凭证标 deprecated, 新凭证 active
 #[tokio::test]
 async fn v2_rotate_deprecates_old() {
     let manager = CredentialManager::with_local_mock_kms();
-    manager.store("tenant-1", "user-1", Provider::OpenClaw,
-        CredentialMetadata { display_name: "OpenClaw v1".into(), description: "".into() },
-        make_plaintext("oc_v1_secret")).await.unwrap();
+    manager
+        .store(
+            "tenant-1",
+            "user-1",
+            Provider::OpenClaw,
+            CredentialMetadata {
+                display_name: "OpenClaw v1".into(),
+                description: "".into(),
+            },
+            make_plaintext("oc_v1_secret"),
+        )
+        .await
+        .unwrap();
 
-    let new_id = manager.rotate("tenant-1", "user-1", Provider::OpenClaw,
-        CredentialMetadata { display_name: "OpenClaw v2".into(), description: "用户轮换".into() },
-        make_plaintext("oc_v2_secret")).await.unwrap();
+    let new_id = manager
+        .rotate(
+            "tenant-1",
+            "user-1",
+            Provider::OpenClaw,
+            CredentialMetadata {
+                display_name: "OpenClaw v2".into(),
+                description: "用户轮换".into(),
+            },
+            make_plaintext("oc_v2_secret"),
+        )
+        .await
+        .unwrap();
 
     // retrieve 应返回新凭证 (最新 active 优先)
-    let pt = manager.retrieve("tenant-1", Provider::OpenClaw).await.unwrap();
+    let pt = manager
+        .retrieve("tenant-1", Provider::OpenClaw)
+        .await
+        .unwrap();
     assert_eq!(pt.secret, "oc_v2_secret");
 
     // 老凭证标 deprecated, 单独 retrieve 返 Deprecated 错
@@ -79,14 +162,27 @@ async fn v2_rotate_deprecates_old() {
 #[tokio::test]
 async fn v2_revoke_marks_not_deletes() {
     let manager = CredentialManager::with_local_mock_kms();
-    let id = manager.store("tenant-1", "user-1", Provider::Hermes,
-        CredentialMetadata { display_name: "Hermes 撤销".into(), description: "用户主动撤销".into() },
-        make_plaintext("hm_secret_to_revoke")).await.unwrap();
+    let id = manager
+        .store(
+            "tenant-1",
+            "user-1",
+            Provider::Hermes,
+            CredentialMetadata {
+                display_name: "Hermes 撤销".into(),
+                description: "用户主动撤销".into(),
+            },
+            make_plaintext("hm_secret_to_revoke"),
+        )
+        .await
+        .unwrap();
 
     manager.revoke(&id).await.unwrap();
 
     // retrieve 返 Revoked 错
-    let err = manager.retrieve("tenant-1", Provider::Hermes).await.unwrap_err();
+    let err = manager
+        .retrieve("tenant-1", Provider::Hermes)
+        .await
+        .unwrap_err();
     assert!(matches!(err, CredentialError::Revoked(_)));
 
     // list 仍能看到 (per INV-CR-06 物理删除禁止)

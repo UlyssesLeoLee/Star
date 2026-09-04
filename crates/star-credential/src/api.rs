@@ -19,11 +19,11 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::{
-    CredentialError, CredentialManager, CredentialMetadata,
-    CredentialPlaintext, CredentialRecord, Provider,
-};
 use crate::db::{AuditEventType, CredentialAuditEvent, CredentialDb};
+use crate::{
+    CredentialError, CredentialManager, CredentialMetadata, CredentialPlaintext, CredentialRecord,
+    Provider,
+};
 
 /// AppState (依赖注入: CredentialManager + CredentialDb + 当前 tenant_id + 当前 user_id)
 #[derive(Clone)]
@@ -35,14 +35,27 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(manager: Arc<CredentialManager>, db: Arc<CredentialDb>, tenant_id: String, user_id: String) -> Self {
-        Self { manager, db, current_tenant_id: tenant_id, current_user_id: user_id }
+    pub fn new(
+        manager: Arc<CredentialManager>,
+        db: Arc<CredentialDb>,
+        tenant_id: String,
+        user_id: String,
+    ) -> Self {
+        Self {
+            manager,
+            db,
+            current_tenant_id: tenant_id,
+            current_user_id: user_id,
+        }
     }
 }
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/api/v2/credentials", get(list_credentials).post(create_credential))
+        .route(
+            "/api/v2/credentials",
+            get(list_credentials).post(create_credential),
+        )
         .route("/api/v2/credentials/import", post(import_credentials))
         .route("/api/v2/credentials/export", get(export_credentials))
         .route("/api/v2/credentials/:id/rotate", post(rotate_credential))
@@ -166,14 +179,30 @@ async fn create_credential(
     };
     let id = state
         .manager
-        .store(&state.current_tenant_id, &state.current_user_id, provider, metadata, plaintext)
+        .store(
+            &state.current_tenant_id,
+            &state.current_user_id,
+            provider,
+            metadata,
+            plaintext,
+        )
         .await
         .map_err(map_err)?;
     // 重新查询返回 view (含 status)
-    let records = state.manager.list(&state.current_tenant_id, Some(provider)).await;
-    let view = records.into_iter().find(|r| r.id == id)
+    let records = state
+        .manager
+        .list(&state.current_tenant_id, Some(provider))
+        .await;
+    let view = records
+        .into_iter()
+        .find(|r| r.id == id)
         .map(CredentialView::from)
-        .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, "post-create lookup failed".into()))?;
+        .ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "post-create lookup failed".into(),
+            )
+        })?;
     Ok((StatusCode::CREATED, Json(view)))
 }
 
@@ -194,7 +223,9 @@ async fn rotate_credential(
 ) -> Result<Json<CredentialView>, (StatusCode, String)> {
     // 找原凭证 provider
     let records = state.manager.list(&state.current_tenant_id, None).await;
-    let original = records.iter().find(|r| r.id == id)
+    let original = records
+        .iter()
+        .find(|r| r.id == id)
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("not found: {}", id)))?;
     let provider = original.provider;
 
@@ -209,13 +240,29 @@ async fn rotate_credential(
     };
     let new_id = state
         .manager
-        .rotate(&state.current_tenant_id, &state.current_user_id, provider, metadata, plaintext)
+        .rotate(
+            &state.current_tenant_id,
+            &state.current_user_id,
+            provider,
+            metadata,
+            plaintext,
+        )
         .await
         .map_err(map_err)?;
-    let new_records = state.manager.list(&state.current_tenant_id, Some(provider)).await;
-    let view = new_records.into_iter().find(|r| r.id == new_id)
+    let new_records = state
+        .manager
+        .list(&state.current_tenant_id, Some(provider))
+        .await;
+    let view = new_records
+        .into_iter()
+        .find(|r| r.id == new_id)
         .map(CredentialView::from)
-        .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, "post-rotate lookup failed".into()))?;
+        .ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "post-rotate lookup failed".into(),
+            )
+        })?;
     Ok(Json(view))
 }
 
@@ -245,18 +292,26 @@ async fn get_audit_log(
 ) -> Result<Json<Vec<AuditEventView>>, (StatusCode, String)> {
     // 先验证凭证存在 + 属于当前 tenant
     let records = state.manager.list(&state.current_tenant_id, None).await;
-    let _ = records.iter().find(|r| r.id == id)
+    let _ = records
+        .iter()
+        .find(|r| r.id == id)
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("not found: {}", id)))?;
 
-    let events = state.db.list_audit_events(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("db: {}", e)))?;
-    let views: Vec<AuditEventView> = events.into_iter().map(|e| AuditEventView {
-        id: e.id,
-        credential_id: e.credential_id,
-        user_id: e.user_id,
-        event_type: e.event_type.as_str().to_string(),
-        event_at_ms: e.event_at_ms,
-        display_name_snapshot: e.metadata_snapshot.map(|m| m.display_name),
-    }).collect();
+    let events = state
+        .db
+        .list_audit_events(&id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("db: {}", e)))?;
+    let views: Vec<AuditEventView> = events
+        .into_iter()
+        .map(|e| AuditEventView {
+            id: e.id,
+            credential_id: e.credential_id,
+            user_id: e.user_id,
+            event_type: e.event_type.as_str().to_string(),
+            event_at_ms: e.event_at_ms,
+            display_name_snapshot: e.metadata_snapshot.map(|m| m.display_name),
+        })
+        .collect();
     Ok(Json(views))
 }
 
@@ -285,7 +340,11 @@ async fn import_credentials(
     for (idx, c) in req.credentials.iter().enumerate() {
         let provider = match parse_provider(&c.provider) {
             Ok(p) => p,
-            Err(e) => { failed += 1; errors.push(format!("[{}] {}", idx, e)); continue; }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("[{}] {}", idx, e));
+                continue;
+            }
         };
         let metadata = CredentialMetadata {
             display_name: c.display_name.clone(),
@@ -296,12 +355,29 @@ async fn import_credentials(
             base_url: c.base_url.clone(),
             region: c.region.clone(),
         };
-        match state.manager.store(&state.current_tenant_id, &state.current_user_id, provider, metadata, plaintext).await {
+        match state
+            .manager
+            .store(
+                &state.current_tenant_id,
+                &state.current_user_id,
+                provider,
+                metadata,
+                plaintext,
+            )
+            .await
+        {
             Ok(_) => imported += 1,
-            Err(e) => { failed += 1; errors.push(format!("[{}] {}", idx, e)); }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("[{}] {}", idx, e));
+            }
         }
     }
-    Ok(Json(ImportResponse { imported, failed, errors }))
+    Ok(Json(ImportResponse {
+        imported,
+        failed,
+        errors,
+    }))
 }
 
 /// GET /api/v2/credentials/export (V2-5 批量导出, JSON 数组不含 ciphertext)
@@ -339,14 +415,18 @@ mod tests {
             base_url: Some("https://api.openclaw.example.com/v1".into()),
             region: None,
         };
-        let (status, view) = create_credential(State(state.clone()), Json(req)).await.unwrap();
+        let (status, view) = create_credential(State(state.clone()), Json(req))
+            .await
+            .unwrap();
         assert_eq!(status, StatusCode::CREATED);
         assert_eq!(view.provider, "openclaw");
         assert_eq!(view.status, "active");
         assert!(!view.id.is_empty());
 
         // list
-        let q = ListQuery { provider: Some("openclaw".into()) };
+        let q = ListQuery {
+            provider: Some("openclaw".into()),
+        };
         let views = list_credentials(State(state), Query(q)).await.unwrap();
         assert_eq!(views.0.len(), 1);
     }
@@ -362,7 +442,9 @@ mod tests {
             base_url: None,
             region: None,
         };
-        let (_, v1) = create_credential(State(state.clone()), Json(req)).await.unwrap();
+        let (_, v1) = create_credential(State(state.clone()), Json(req))
+            .await
+            .unwrap();
 
         // rotate
         let rotate_req = RotateRequest {
@@ -372,16 +454,22 @@ mod tests {
             base_url: None,
             region: None,
         };
-        let v2 = rotate_credential(State(state.clone()), Path(v1.id.clone()), Json(rotate_req)).await.unwrap();
+        let v2 = rotate_credential(State(state.clone()), Path(v1.id.clone()), Json(rotate_req))
+            .await
+            .unwrap();
         assert_eq!(v2.status, "active");
         assert_ne!(v1.id, v2.id);
 
         // revoke
-        let status = revoke_credential(State(state.clone()), Path(v2.id.clone())).await.unwrap();
+        let status = revoke_credential(State(state.clone()), Path(v2.id.clone()))
+            .await
+            .unwrap();
         assert_eq!(status, StatusCode::NO_CONTENT);
 
         // list 看到 v1 deprecated + v2 revoked
-        let q = ListQuery { provider: Some("hermes".into()) };
+        let q = ListQuery {
+            provider: Some("hermes".into()),
+        };
         let views = list_credentials(State(state), Query(q)).await.unwrap();
         assert_eq!(views.0.len(), 2);
     }
@@ -415,11 +503,17 @@ mod tests {
             base_url: None,
             region: None,
         };
-        let (_, view) = create_credential(State(state.clone()), Json(req)).await.unwrap();
+        let (_, view) = create_credential(State(state.clone()), Json(req))
+            .await
+            .unwrap();
         let id = view.id.clone();
 
         // 手动注入 3 个 audit 事件 (PoC: store + rotate + revoke)
-        for evt in [AuditEventType::Store, AuditEventType::Rotate, AuditEventType::Revoke] {
+        for evt in [
+            AuditEventType::Store,
+            AuditEventType::Rotate,
+            AuditEventType::Revoke,
+        ] {
             let event = CredentialAuditEvent {
                 id: Uuid::new_v4().to_string(),
                 credential_id: id.clone(),
@@ -427,7 +521,10 @@ mod tests {
                 user_id: state.current_user_id.clone(),
                 event_type: evt,
                 event_at_ms: 1000,
-                metadata_snapshot: Some(CredentialMetadata { display_name: "OpenClaw 审计测试".into(), description: "".into() }),
+                metadata_snapshot: Some(CredentialMetadata {
+                    display_name: "OpenClaw 审计测试".into(),
+                    description: "".into(),
+                }),
             };
             state.db.append_audit_event(&event).unwrap();
         }
@@ -438,7 +535,10 @@ mod tests {
         assert_eq!(views.0[0].event_type, "store");
         assert_eq!(views.0[1].event_type, "rotate");
         assert_eq!(views.0[2].event_type, "revoke");
-        assert_eq!(views.0[0].display_name_snapshot, Some("OpenClaw 审计测试".into()));
+        assert_eq!(
+            views.0[0].display_name_snapshot,
+            Some("OpenClaw 审计测试".into())
+        );
     }
 
     /// V2-5 批量导入: 3 个凭证 (2 valid + 1 invalid provider)
@@ -448,20 +548,34 @@ mod tests {
         let req = ImportRequest {
             credentials: vec![
                 CreateCredentialRequest {
-                    provider: "openclaw".into(), display_name: "C1".into(), description: "".into(),
-                    secret: "s1".into(), base_url: None, region: None,
+                    provider: "openclaw".into(),
+                    display_name: "C1".into(),
+                    description: "".into(),
+                    secret: "s1".into(),
+                    base_url: None,
+                    region: None,
                 },
                 CreateCredentialRequest {
-                    provider: "hermes".into(), display_name: "C2".into(), description: "".into(),
-                    secret: "s2".into(), base_url: None, region: None,
+                    provider: "hermes".into(),
+                    display_name: "C2".into(),
+                    description: "".into(),
+                    secret: "s2".into(),
+                    base_url: None,
+                    region: None,
                 },
                 CreateCredentialRequest {
-                    provider: "invalid_provider".into(), display_name: "C3".into(), description: "".into(),
-                    secret: "s3".into(), base_url: None, region: None,
+                    provider: "invalid_provider".into(),
+                    display_name: "C3".into(),
+                    description: "".into(),
+                    secret: "s3".into(),
+                    base_url: None,
+                    region: None,
                 },
             ],
         };
-        let resp = import_credentials(State(state.clone()), Json(req)).await.unwrap();
+        let resp = import_credentials(State(state.clone()), Json(req))
+            .await
+            .unwrap();
         assert_eq!(resp.0.imported, 2);
         assert_eq!(resp.0.failed, 1);
         assert_eq!(resp.0.errors.len(), 1);
@@ -477,10 +591,16 @@ mod tests {
             ("hermes", "hm_export", "Hermes export"),
         ] {
             let req = CreateCredentialRequest {
-                provider: c.0.into(), display_name: c.2.into(), description: "".into(),
-                secret: c.1.into(), base_url: None, region: None,
+                provider: c.0.into(),
+                display_name: c.2.into(),
+                description: "".into(),
+                secret: c.1.into(),
+                base_url: None,
+                region: None,
             };
-            create_credential(State(state.clone()), Json(req)).await.unwrap();
+            create_credential(State(state.clone()), Json(req))
+                .await
+                .unwrap();
         }
         let views = export_credentials(State(state)).await.unwrap();
         assert_eq!(views.0.len(), 2);

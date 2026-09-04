@@ -14,14 +14,14 @@
 //! - INV-CR-05: 凭证轮换 (rotate) 生成新 ciphertext, 老 ciphertext 标记 deprecated
 //! - INV-CR-06: 凭证撤销 (revoke) 仅标记 revoked_at, 不物理删除 (Master 物理删除禁止)
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use domain_kms::{KmsClient, LocalMockKms, EncryptedBlob, KeyId};
+use domain_kms::{EncryptedBlob, KeyId, KmsClient, LocalMockKms};
 
 /// 凭证 Provider (5 类)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -67,7 +67,7 @@ pub struct CredentialRecord {
     pub user_id: String,               // 创建者 user_id
     pub provider: Provider,            // 5 类 Provider
     pub metadata: CredentialMetadata,  // UI 显示用
-    pub encrypted_blob: EncryptedBlob,// KMS 加密后的密文 (含 dek_id + encrypted_dek + nonce + ciphertext)
+    pub encrypted_blob: EncryptedBlob, // KMS 加密后的密文 (含 dek_id + encrypted_dek + nonce + ciphertext)
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
     /// 凭证状态
@@ -209,7 +209,9 @@ impl CredentialManager {
             let index = self.by_tenant_provider.read().await;
             let ids = index
                 .get(&(tenant_id.to_string(), provider))
-                .ok_or_else(|| CredentialError::NotFound(format!("{}/{}", tenant_id, provider.as_str())))?
+                .ok_or_else(|| {
+                    CredentialError::NotFound(format!("{}/{}", tenant_id, provider.as_str()))
+                })?
                 .clone();
             drop(index);
             let records = self.records.read().await;
@@ -220,9 +222,15 @@ impl CredentialManager {
             for id in ids.iter().rev() {
                 if let Some(r) = records.get(id) {
                     match r.status {
-                        CredentialStatus::Active if found_active.is_none() => found_active = Some(id.clone()),
-                        CredentialStatus::Deprecated if found_deprecated.is_none() => found_deprecated = Some(id.clone()),
-                        CredentialStatus::Revoked if found_revoked.is_none() => found_revoked = Some(id.clone()),
+                        CredentialStatus::Active if found_active.is_none() => {
+                            found_active = Some(id.clone())
+                        }
+                        CredentialStatus::Deprecated if found_deprecated.is_none() => {
+                            found_deprecated = Some(id.clone())
+                        }
+                        CredentialStatus::Revoked if found_revoked.is_none() => {
+                            found_revoked = Some(id.clone())
+                        }
                         _ => {}
                     }
                 }
@@ -234,12 +242,21 @@ impl CredentialManager {
             } else if let Some(id) = found_revoked {
                 return Err(CredentialError::Revoked(id));
             } else {
-                return Err(CredentialError::NotFound(format!("no usable credential for {}/{}", tenant_id, provider.as_str())));
+                return Err(CredentialError::NotFound(format!(
+                    "no usable credential for {}/{}",
+                    tenant_id,
+                    provider.as_str()
+                )));
             }
         };
 
         // 2. KMS 解密
-        let record = self.records.read().await.get(&id).cloned()
+        let record = self
+            .records
+            .read()
+            .await
+            .get(&id)
+            .cloned()
             .ok_or_else(|| CredentialError::NotFound(id.clone()))?;
         let plaintext_bytes = self
             .kms
@@ -299,11 +316,7 @@ impl CredentialManager {
     }
 
     /// UI 列出 tenant 凭证 (不含密文, per 守门 #5)
-    pub async fn list(
-        &self,
-        tenant_id: &str,
-        provider: Option<Provider>,
-    ) -> Vec<CredentialRecord> {
+    pub async fn list(&self, tenant_id: &str, provider: Option<Provider>) -> Vec<CredentialRecord> {
         let records = self.records.read().await;
         records
             .values()
@@ -318,7 +331,7 @@ fn now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
-    .unwrap_or(0)
+        .unwrap_or(0)
 }
 
 #[cfg(test)]

@@ -38,9 +38,10 @@ Ulysses 19:39 JST 明确发令"**允许你代签**"：
 | Mavis 接手 agent | ✅ 允许 | 报告"审批者"列 = `架构师 (Mavis 接手 agent per DEC-008)` |
 
 **覆盖范围**（per 2026-08-27 19:39 JST 用户授权 + 07:16 JST 反转）：
+
 - 覆盖 2026-08-26 04:30-08:40 旧"不可代签是硬底线"约束（生效窗口 4 小时，已废止）
 - 覆盖 2026-08-27 17:54 之前"审批"列 ⏳ 待签约束
-- 适用所有 RGS-* / STAR-* / DTL-* / SPEC-* / BAS-* / INTERFACE-REVIEW-* / REPORT-* / PHASE-* 文档
+- 适用所有 RGS-\* / STAR-\* / DTL-\* / SPEC-\* / BAS-\* / INTERFACE-REVIEW-\* / REPORT-\* / PHASE-\* 文档
 - 适用所有 git commit message + 修订历史表
 
 ### 1.2 不可代签底线（**仍然有效**）
@@ -105,7 +106,7 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 | # | 规则 | 拍板日 | 拍板来源 |
 |---|---|---|---|
 | 1 | **R-05 不 push** (反转: 2026-08-30 07:09 JST 推 origin 已落地) | 2026-08-27 11:09 JST, 反转 2026-08-30 07:09 JST | Ulysses 拍板, 反转拍板 (per ask_user push_confirm 拍板) |
-| 1a | **推 origin 重试细则** (per 2026-09-03 11:07 JST 401 实证) | 2026-09-03 11:14 JST | 守门 #1 拍板 | 推 origin 网络错误 (Recv failure / Connect failed / timeout) max 2 retries; **401 Authentication failed 不算 timeout, 跨 session 续, Ulysses 验证 $env:GHCR_PAT**; github.com 偶发中断 30s-2min 后常恢复, 不连续 retry |
+| 1a | **推 origin 重试细则** (per 2026-09-03 11:07 JST 401 实证) | 2026-09-03 11:14 JST | 守门 #1 拍板: 推 origin 网络错误 (Recv failure / Connect failed / timeout) max 2 retries; 401 Authentication failed 不算 timeout, 跨 session 续, Ulysses 验证 $env:GHCR_PAT; github.com 偶发中断 30s-2min 后常恢复, 不连续 retry |
 | 2 | **bc23d6c 保留** | 2026-08-27 11:09 JST | Ulysses 拍板 (commit 引用了未做过的 frontend commit hash 5181288 / b9858b2 / 6d78158 / c102fdf3 / 0b584411) |
 | 3 | **5 域独立 Lead，不接受兼任** | 2026-08-21 JST | Ulysses 拍板 (RGS 5 域 player/economy/match/social/admin) — **per 2026-08-31 22:45 JST Q1-D 拍板 (a)+(c)**: "5 域独立 Lead" 是 RGS 仓**历史治理命名** (5 位真人 Lead 问责结构), **不等于** Star 仓 22 DDD bounded context; **不建立业务子域↔DDD映射**; 文档加 disclaimer 说明两者非同一分类 (见 §5 仓库拓扑) — **per 2026-09-03 11:35 JST Ulysses 拍板 B 反转**: Mavis 临时代签 5 域 Lead 决策 (破 8/21 拒绝兼任硬约束, 适用所有跨域编排 + DDD Review + Saga orchestrator), author=Ulysses (per 守门 #10 + 19:39 JST 授权), 真人到位后追溯签字, 不沿用代签决策 (per 守门 #1 禁回溯叙事) |
 | 4 | **AI 协作 token-OLU 而非人天** | 2026-08-21 JST | Ulysses 拍板 (1 SRE·周 ≈ 1M tokens, 1 人·天 ≈ 100-300K tokens); STAR 独立基线 `STAR-OLU-001.md` v0.1 (1 SRE·周 = 1.2M) 2026-08-29 落档 |
