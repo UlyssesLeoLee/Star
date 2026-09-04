@@ -89,7 +89,8 @@ jobs:
 
       - name: cargo test domain-local-runtime (skip e2e)
         # e2e 在独立 job 跑, 这里只跑单元 test
-        run: cargo test -p domain-local-runtime --lib -- --skip e2e_integration -j 4
+        # 9/5 拍板 (per ask_user): -j 4 必须放在 -- 之前, 跟 star-context CI 一致 (顺序错会 Unrecognized option: 'j')
+        run: cargo test -p domain-local-runtime --lib -j 4 -- --skip e2e_integration
 
   frontend-ci:
     name: Frontend (typecheck / test / build)
