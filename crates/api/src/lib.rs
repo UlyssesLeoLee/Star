@@ -48,8 +48,11 @@ use uuid::Uuid;
 /// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
 #[async_trait]
 pub trait ApiGateway: Send + Sync {
+    /// 注册路由
     async fn register_route(&self, cmd: (), actor: ActorContext) -> Result<(), ApiError>;
+    /// 注册 WebSocket 处理器
     async fn register_ws_handler(&self, cmd: (), actor: ActorContext) -> Result<(), ApiError>;
+    /// 注册中间件
     async fn register_middleware(&self, cmd: (), actor: ActorContext) -> Result<(), ApiError>;
 }
 
@@ -58,6 +61,7 @@ pub trait ApiGateway: Send + Sync {
 /// 来源: docs/api-design.md §3 全部 / §5 Event Subject / §8 错误码
 #[async_trait]
 pub trait ApiQuery: Send + Sync {
+    /// 列出路由
     async fn list_routes(
         &self,
         _dummy: (),
@@ -97,14 +101,19 @@ pub struct RouteDescriptor {
 /// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
+    /// 资源未找到
     #[error("not found: {0}")]
     NotFound(Uuid),
+    /// 状态非法
     #[error("invalid state: {0}")]
     InvalidState(String),
+    /// 权限拒绝
     #[error("permission denied")]
     PermissionDenied,
+    /// 资源冲突
     #[error("conflict: {0}")]
     Conflict(String),
+    /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
 }
