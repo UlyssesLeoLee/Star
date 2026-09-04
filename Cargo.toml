@@ -61,6 +61,8 @@ members = [
     "crates/star-dto",
     # Phase G.1 (L0 派发 PoC) 启动: 2026-09-04 注册 crates/star-dispatcher (L0 派发层 + InMemory TaskQueue, per SRS-STAR-AGENT-RUNTIME-001 §G-1, v0.0.1 PoC stub)
     "crates/star-dispatcher",
+    # Phase H.5 (Tree-sitter 引入) 启动: 2026-09-04 注册 crates/star-treesitter (5 语言 grammar + 符号提取, per `docs/architecture/2026-09-03-treesitter-worktree-graph/01-requirements.md` §1.4, v0.0.1 PoC)
+    "crates/star-treesitter",
 ]
 exclude = ["target"]
 
