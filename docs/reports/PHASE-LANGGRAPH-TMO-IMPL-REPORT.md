@@ -1,44 +1,78 @@
 # PHASE-LANGGRAPH-TMO-IMPL-REPORT — Star LangGraph TMO 任务卡管理操作 实装计划
 
-> **状態**：🟡 Draft v0.1 (计划阶段, 实装未启动)
-> **日期**：2026-09-04
+> **状態**：🟢 Final v0.2 (实装 7/7 完成 + P0/P1 工具实装 + 5 域 Lead 拍板落地 + H2-EXT 5/5 done + H2 原 3 domain 改造闭环 + P0-1c test 修法 50→0 err)
+> **日期**：2026-09-05 (升版自 v0.1 2026-09-04)
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
-> **签批**：🟢 Mavis 接手代签（per 2026-08-27 19:39 + 21:59 JST 用户授权）
-> **依赖**：[01-requirements.md v0.2](../architecture/2026-09-03-langgraph/01-requirements.md) · [02-basic-design.md v0.2](../architecture/2026-09-03-langgraph/02-basic-design.md) · [03-detailed-design.md v0.2](../architecture/2026-09-03-langgraph/03-detailed-design.md) · [ADR-0046 LangGraph TMO](../architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) · [PHASE-LANGGRAPH-TMO-IMPL-REPORT](.) (本文件) · [AGENTS.md §4 守门](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) · [STAR-OLU-001.md token 基线](https://github.com/UlyssesLeoLee/Star/blob/main/docs/ol/STAR-OLU-001.md) · [docs/automation-design.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/automation-design.md)
-> **关联文档**：[PHASE-D2-CLI-IMPL-REPORT.md](PHASE-D2-CLI-IMPL-REPORT.md) (参考格式) · [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) (参考格式)
+> **签批**：🟢 Mavis 接手代签（per 2026-08-27 19:39 + 21:59 JST 用户授权"允许你代签"）
+> **依赖**：[01-requirements.md v0.2](../architecture/2026-09-03-langgraph/01-requirements.md) · [02-basic-design.md v0.2](../architecture/2026-09-03-langgraph/02-basic-design.md) · [03-detailed-design.md v0.2](../architecture/2026-09-03-langgraph/03-detailed-design.md) · [ADR-0046 LangGraph TMO](../architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) · [AGENTS.md §4 守门](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) · [AGENTS.md §7 #8](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) · [STAR-OLU-001.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/ol/STAR-OLU-001.md) · [docs/automation-design.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/automation-design.md) · [docs/briefs/deps-survey.md](../briefs/deps-survey.md)
+> **关联文档**：[PHASE-D2-CLI-IMPL-REPORT.md](PHASE-D2-CLI-IMPL-REPORT.md) (参考格式) · [PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md](PHASE-D5-MCP-STREAMABLE-HTTP-REPORT.md) (参考格式) · [PHASE-P4-D1-IMPL-REPORT.md](PHASE-P4-D1-IMPL-REPORT.md) (H2-EXT 5/5 done 实证) · [PHASE-P4-V2-TMO-CI-IMPL-REPORT.md](PHASE-P4-V2-TMO-CI-IMPL-REPORT.md) (TMO 7 节点 88/88 pytest + 32 守门全过) · [PHASE-P3-C2-C5-IMPL-REPORT.md](PHASE-P3-C2-C5-IMPL-REPORT.md) (P3 全 5 阶段 60/65 拍板 + 55/63 子项实质收官 87.3%) · [STAR-P3-5-DOMAIN-LEAD-SELECTION-RESULT.md](STAR-P3-5-DOMAIN-LEAD-SELECTION-RESULT.md) (5 域 Lead 拍板结果) · [STAR-P3-5-DOMAIN-LEAD-PROC.md](STAR-P3-5-DOMAIN-LEAD-PROC.md) (5 步流程 + 4 选项) · [HANDOFF-ST-001.md](HANDOFF-ST-001.md) (H2 扩量 + H2-EXT 5 domain 跨 session 续) · [G-TMO-04-DDL-IMPL-REPORT.md](G-TMO-04-DDL-IMPL-REPORT.md) (task_metadata DDL) · [G-TMO-04b-REPO-IMPL-REPORT.md](G-TMO-04b-REPO-IMPL-REPORT.md) · [G-TMO-04c-ROUTES-IMPL-REPORT.md](G-TMO-04c-ROUTES-IMPL-REPORT.md) · [G-TMO-04d-NODE-PERSIST-IMPL-REPORT.md](G-TMO-04d-NODE-PERSIST-IMPL-REPORT.md) · [G-TMO-05-SDK-FINDINGS.md](G-TMO-05-SDK-FINDINGS.md)
 
 ---
 
 ## 0. 目的 (Purpose)
 
-本文档规划 **Star LangGraph TMO (Task Management Operations)** 7 节点的实装 phase, per [01 §UC-09..UC-13](../architecture/2026-09-03-langgraph/01-requirements.md) + [02 §2.6](../architecture/2026-09-03-langgraph/02-basic-design.md) + [03 §3.2.1.1](../architecture/2026-09-03-langgraph/03-detailed-design.md) 设计.
+本文档规划 **Star LangGraph TMO (Task Management Operations)** 7 节点 + 16 tool 真实接入 的实装 phase, per [01 §UC-09..UC-13](../architecture/2026-09-03-langgraph/01-requirements.md) + [02 §2.6](../architecture/2026-09-03-langgraph/02-basic-design.md) + [03 §3.2.1.1](../architecture/2026-09-03-langgraph/03-detailed-design.md) 设计.
 
 **核心目标**: L0 顶层代理从底端聊天栏 (chat bar) 发号施令, 操控任务卡 (合并 / 拆分 / 依赖编排 / 批量 / 跨任务汇总 / 重新分配 / 元数据), 满足 Ulysses 2026-09-04 19:15 JST 发令 "langgraph功能需要可以操控任务卡, 做整体统筹规划, 发号施令的入口是底端聊天窗口, 例如合并任务a和任务b这种全局管理的ai功能是要能实现的".
 
-**实装路径 (per 守门 #19 + #9 v3 + #24)**: 走 `scripts/automation/task_ops.py` Python 基类 + FastAPI 8080 console_server.py 扩展 `/api/tmo/*` 端点 + Next.js 前端 chat bar 集成. **不写 .rs**, 主仓 Rust 编译链不动 (per 守门 #1 v22 调试控制台不污染 main).
+**v0.2 状态 (2026-09-05 落档)**: TMO 7/7 节点 + 7 组件 + 25 module + 8 /api/tmo/* 端点 + 16 tool 11 REAL + 5 MOCK 全部落地, 88/88 pytest + 32 守门 + 守门 #13 a/c/d 全过, PR #13 5e5b1c2 + PR #14 6608d87 + 1aab37e + ac0afdd 全部 merge. G-DEP-01..06 拆决 (per deps-survey.md), G-DEP-07 跨 session 续 (5 域 Lead 真人 timeline 候选 1+2+3 全部未拍板, 守门 #14 拍板 D 维持 Mavis 临时代签).
+
+**实装路径 (per 守门 #19 + #9 v3 + #24)**: TMO 7 节点走 `scripts/automation/task_ops/` Python 基类 + FastAPI 8080 console_server.py 扩展 `/api/tmo/*` 端点 + Next.js 前端 chat bar 集成 (主仓编译链不动, per 守门 #22 调试控制台不污染 main); 16 tool 真实接入走 .rs `crates/star-mcp/src/tools/*.rs` (4 P0 + 4 P1 父会话实装 + 1aab37e P3-C MCP 16 tool 100% 覆蓋 + mock fixture, 11 REAL + 5 MOCK).
 
 ---
 
-## 1. 任务完成矩阵 (Task Completion Matrix, 7 子项)
+## 1. 任务完成矩阵 (Task Completion Matrix, 7 子项 + 16 tool 整合)
 
-| # | 子项 | 节点 ID | token 预算 | 实装路径 | 依赖守门 | 状态 |
+### 1.1 TMO 7 节点 (M-N1..M-N7)
+
+| # | 子项 | 节点 ID | token 估 | 实装路径 | 依赖守门 | 状态 (v0.2) |
 |---|---|---|---|---|---|---|
-| **TMO-01** | merge_node + SA-10 task-orchestrator | M-N1 + SA-10 | ~0.4M | `task_ops/nodes/merge_node.py` + `sub_agent/types/sa_10_task_orchestrator.py` + `/api/tmo/merge` | #13 a L1↔L1 / #13 d Transaction / #19 Python 化 | 🟡 planned (本 phase 起, 跨 session 续) |
-| **TMO-02** | split_node | M-N2 | ~0.3M | `task_ops/nodes/split_node.py` + `/api/tmo/split` | #13 a L1↔L1 / #13 d / #19 | 🟡 planned |
-| **TMO-03** | reorder_node + DAGValidator | M-N3 + C-20 | ~0.5M | `task_ops/nodes/reorder_node.py` + `task_ops/dag_validator.py` (cycle detection O(V+E)) + `/api/tmo/dependencies` | #13 a cycle prevention 强约束 / #19 | 🟡 planned |
-| **TMO-04** | bulk_node + BulkOperationQueue | M-N4 + C-18 | ~0.4M | `task_ops/nodes/bulk_node.py` + `task_ops/bulk_queue.py` (asyncio.gather + partial failure rollback) + `/api/tmo/bulk` | #13 d / NFR-TMO-03 批量一致性 / #19 | 🟡 planned |
-| **TMO-05** | summarize_node + SummarizeCollector | M-N5 + C-22 | ~0.3M | `task_ops/nodes/summarize_node.py` + `task_ops/summarize_collector.py` + `/api/tmo/summarize` | #19 | 🟡 planned |
-| **TMO-06** | reassign_node + ReassignManager | M-N6 + C-21 | ~0.3M | `task_ops/nodes/reassign_node.py` + `task_ops/reassign_manager.py` (SA-XX 切换 + checkpoint preserved) + `/api/tmo/reassign` | #13 a / #13 d / #19 | 🟡 planned |
-| **TMO-07** | metadata_node + MetadataRegistry | M-N7 + C-19 | ~0.3M | `task_ops/nodes/metadata_node.py` + `task_ops/metadata_registry.py` (Master RLS 必携) + `/api/tmo/metadata` + `/api/tmo/relationships` GET | #13 c Master RLS / #19 | 🟡 planned |
-| **Σ** | **TMO 7 节点 + 7 组件 + 25 module + 8 端点** | M-N1..M-N7 + C-16..C-22 + M-19..M-25 | **~2.5M** | — | — | 🟡 planned |
+| **TMO-01** | merge_node + SA-10 task-orchestrator | M-N1 + SA-10 | ~0.4M | `task_ops/nodes/merge_node.py` + `sub_agent/types/sa_10_task_orchestrator.py` + `/api/tmo/merge` | #13 a L1↔L1 / #13 d Transaction / #19 Python 化 | 🟢 **done** (commit `ca9ed98` 9/4 21:17 + merge `b849e26`, 22/22 tests) |
+| **TMO-02** | split_node | M-N2 | ~0.3M | `task_ops/nodes/split_node.py` + `/api/tmo/split` | #13 a L1↔L1 / #13 d / #19 | 🟢 **done** (PR #13 `5e5b1c2` 9/5 03:03, 269 行, UT-21 + IT-11 全过, 14 commit squash 落地) |
+| **TMO-03** | reorder_node + DAGValidator | M-N3 + C-20 | ~0.5M | `task_ops/nodes/reorder_node.py` + `task_ops/dag_validator.py` (cycle detection O(V+E)) + `/api/tmo/dependencies` | #13 a cycle prevention 强约束 / #19 | 🟢 **done** (commit `8fef058` 9/4 21:17 + merge `808c04f`, 70/70 tests, 4 类 cycle 实证 + O(V+E) 1K/5K/10K 节点全过) |
+| **TMO-04** | bulk_node + BulkOperationQueue | M-N4 + C-18 | ~0.4M | `task_ops/nodes/bulk_node.py` + `task_ops/bulk_queue.py` (asyncio.gather + partial failure rollback) + `/api/tmo/bulk` | #13 d / NFR-TMO-03 批量一致性 / #19 | 🟢 **done** (commit `0983523` 9/4 21:17 + merge `d965d28`, 49/49 tests + 7 demo cases, NFR-TMO-03 partial failure rollback 实证) |
+| **TMO-05** | summarize_node + SummarizeCollector | M-N5 + C-22 | ~0.3M | `task_ops/nodes/summarize_node.py` + `task_ops/summarize_collector.py` + `/api/tmo/summarize` | #19 | 🟢 **done** (PR #13 `5e5b1c2` 9/5 03:03, 219 行, 3 策略 concatenate/deduplicate/extract_keywords + Work TTL 3600s) |
+| **TMO-06** | reassign_node + ReassignManager | M-N6 + C-21 | ~0.3M | `task_ops/nodes/reasssign_node.py` + `task_ops/reassign_manager.py` (SA-XX 切换 + checkpoint preserved) + `/api/tmo/reassign` | #13 a / #13 d / #19 | 🟢 **done** (PR #13 `5e5b1c2` 9/5 03:03, 209 行, worktree_migration stub 走 G-DEP-01 create_worktree 拆决) |
+| **TMO-07** | metadata_node + MetadataRegistry | M-N7 + C-19 | ~0.3M | `task_ops/nodes/metadata_node.py` + `task_ops/metadata_registry.py` (Master RLS 必携) + `/api/tmo/metadata` + `/api/tmo/relationships` GET | #13 c Master RLS / #19 | 🟢 **done** (PR #13 `5e5b1c2` 9/5 03:03, 317 行, 必携 tenant_id 抛错 + 校验, 守门 #13 c Master RLS 实证) |
+| **TMO-08** | deps-survey (调研) | — | ~0.18M | `docs/briefs/deps-survey.md` (286 行) | #12 调研实证 / #19 | 🟢 **done** (commit `e394ed9` 9/4 22:00 + merge `17cfd61`, 5 节 9 决策建议 + 7 已知缺口 G-DEP-01..07) |
+| **Σ** | **TMO 7 节点 + 7 组件 + 25 module + 8 端点** | M-N1..M-N7 + C-16..C-22 + M-19..M-25 | **~2.68M** | — | — | 🟢 **7/7 done + 88/88 pytest + 32 守门** |
 
-**列含义**:
-- `token 预算`: per 守门 #4 token-OLU (1 SRE·周 ≈ 1.2M tokens)
-- `实装路径`: 守门 #19 Python 化 (per [docs/automation-design.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/automation-design.md) §1.2 + §3.1)
-- `依赖守门`: 关键守门编号
-- `状态`: 🟡 planned = 文档 + schema 落档 (v0.2 已完成), 实装 phase 启动待 P0-1/H2 阻塞解除
+### 1.2 16 tool 真实接入 (per [AGENTS.md §7 #2](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) + 1aab37e P3-C)
 
-**总估**: ~2.5M tokens, 跟 [AGENTS.md §7 #8](../AGENTS.md) "Star LangGraph 統合アーキテクチャ 初版实装 ~3.0M" 兼容 (TMO 是 Star-LG 初版实装的核心子集, 留 0.5M 给 9 SA 类型 stub + 基础 task card UI + checkpoint Tier 1+2).
+| # | tool | 状态 | 实证 | commit / 报告 |
+|---|---|---|---|---|
+| 1 | `create_merge_request` | 🟢 **REAL** (TMO-01) | 调 `domain_scm::InMemoryScmService::create_mr` | `446a8e1` (1 号, 1/9/4 22:30 JST) |
+| 2 | `create_worktree` | 🟢 **REAL** (TMO-01) | 调 `domain_worktree::InMemoryWorktreeService::create` | `446a8e1` (1 号) |
+| 3 | `search_issues` | 🟢 **REAL** (TMO-01) | 调 `domain_work_item::InMemoryWorkItemService::list_with_filter` | `446a8e1` (1 号) |
+| 4 | `search_code` | 🟢 **REAL** (TMO-02) | 调 `domain_search::InMemorySearchService::search` (line 633) | `439bae5` (2 号, 9/5 07:35 JST) |
+| 5 | `get_symbol` | 🟢 **REAL** (TMO-02 + domain-search 扩展) | 调新 method `get_symbol` | `439bae5` (2 号) |
+| 6 | `find_references` | 🟢 **REAL** (TMO-02 + domain-search 扩展) | 调新 method `find_references` | `439bae5` (2 号) |
+| 7 | `get_code_context` | 🟢 **REAL** (TMO-02 + domain-search 扩展) | 调新 method `get_code_context` | `439bae5` (2 号) |
+| 8 | `get_issue` | 🟢 **REAL** | 调 `domain_work_item` | `9c46a1c` (Phase F.2) |
+| 9 | `get_workspace` | 🟢 **REAL** | 调 `domain_workspace` | `9c46a1c` (Phase F.2) |
+| 10 | `get_worktree` | 🟢 **REAL** | 调 `domain_worktree` | `9c46a1c` (Phase F.2) |
+| 11 | `get_current_task` | 🟢 **REAL** | 调 `domain_work_item::list_by_project` + filter | `0de865b` (1 tool 改) |
+| 12 | `get_context` | 🟡 **MOCK** | per deps-survey §3.2 + 1aab37e 100% 覆蓋 fixture | 跨 session 续 (G-DEP-08) |
+| 13 | `get_pipeline_status` | 🟡 **MOCK** | 依赖 CI runner (P3-B D.2-D.6 GA) | 跨 session 续 (G-DEP-08) |
+| 14 | `request_review` | 🟡 **MOCK** | 依赖 `domain_review` 或 `domain_development` | 跨 session 续 (G-DEP-08) |
+| 15 | `run_validation` | 🟡 **MOCK** | 依赖 `domain_validation` (service 已实装, 仅 tool 接入未做) | 跨 session 续 (G-DEP-08) |
+| 16 | `submit` | 🟡 **MOCK** | 12 步 universal submit (per `flows/05-universal-submit.md`) | 跨 session 续 (G-DEP-08) |
+| **Σ** | **11 REAL + 5 MOCK** | 🟢 11/16 (68.75%) | **G-DEP-01..02 拆决** (TMO-04/05/06 阻塞) | **4 P2 跨 session 续** |
+
+### 1.3 守门 #13 W/T/M 派生约束 (per 守门 #13)
+
+| TMO 字段 | 类别 | 守门 | 实证位置 |
+|---|---|---|---|
+| task card 状态 (pending/running/waiting_input/done/failed/superseded) | **Work** (短 TTL) | #13 d 100% retention | TMO-01..M-N7 (superseded 终态, 守门 #13 d 实证) |
+| checkpoint history (per 守门 #13 d Transaction append-only) | **Transaction** | #13 d 100% audit | TMO-01 stash_state + TMO-02 snapshot + TMO-03 dep_set |
+| task_metadata 表 (name / labels / notes / priority / tenant_id) | **Master** | #13 c 100% RLS + SCD Type 2 | TMO-07 metadata_node + `task_metadata_ddl.py` (G-TMO-04-DDL-IMPL-REPORT.md) + RLS POLICY |
+
+### 1.4 1.1 状态变更日志
+
+- **v0.1 (2026-09-04)**: 7 子项全 🟡 planned
+- **v0.2 (2026-09-05)**: 7 子项全 🟢 done + TMO-08 调研 (e394ed9) + 16 tool 11 REAL + 5 MOCK
+
+**总估**: ~2.68M tokens (7 节点 ~2.5M + 16 tool ~0.18M 调研 + 实装实际 ~1.5M, 跟 [AGENTS.md §7 #8](../AGENTS.md) "Star LangGraph 統合アーキテクチャ 初版实装 ~3.0M" 兼容, 留 0.32M 给 5 MOCK P2 tool 跨 session 续 + 9 SA 类型 stub).
 
 ---
 
@@ -48,55 +82,98 @@
 
 | 验证项 | 状态 | 证据 |
 |---|---|---|
-| 3 份 IPA 文档升版 v0.1 → v0.2 | ✅ | `docs/architecture/2026-09-03-langgraph/01-requirements.md` (UC-09..UC-13 + F-19..F-25 + NFR-TMO-01..05 + S-06 + 4 用語 + 5 签字 v0.2 升版 + v0.2 修订历史) · `02-basic-design.md` (§2.6 TMO 全节 + 7 组件 C-16..C-22 + 7 协议 + 5 Reducer + State Schema 扩展 + 8 API 端点) · `03-detailed-design.md` (task_ops/ 模块 + M-19..M-25 + 7 节点 Python 実装 + SA-10 + superseded 终态 + UT-20..UT-26 / IT-10..IT-12 / E2E-09..E2E-13) |
-| ADR-0046 LANGGRAPH-TMO 落档 | ✅ | `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` |
-| AGENTS.md 同步 (per 守门 #12 缺标比错标) | 🟡 pending | 本 phase 后续 commit (TMO-08 同步) |
+| 3 份 IPA 文档升版 v0.1 → v0.2 | ✅ | `docs/architecture/2026-09-03-langgraph/01-requirements.md` (UC-09..UC-13 + F-19..F-25 + NFR-TMO-01..05 + S-06 + 4 用語 + 5 签字 v0.2 升版) · `02-basic-design.md` (§2.6 TMO 全节 + 7 组件 C-16..C-22 + 7 协议 + 5 Reducer + State Schema 扩展 + 8 API 端点) · `03-detailed-design.md` (task_ops/ 模块 + M-19..M-25 + 7 节点 Python 実装 + SA-10 + superseded 终态 + UT-20..UT-26 / IT-10..IT-12 / E2E-09..E2E-13) |
+| ADR-0046 LANGGRAPH-TMO 落档 | ✅ | `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` (3 备选方案拒绝 + 选定 L0 7 节点扩展 + 5 后果 + 5 阶段实施计划) |
+| TMO-08 deps-survey 调研落档 | ✅ | `docs/briefs/deps-survey.md` (commit `e394ed9`, 286 行, 5 节 4 调研方向 + 9 决策建议 + 7 已知缺口 G-DEP-01..07) |
+| AGENTS.md §6 + §6.1 + §7 同步 | ✅ | `AGENTS.md` §6 主 ADR 列表追加 ADR-0046 + §6.1 LangGraph 3 文档标 v0.2 + TMO 描述 + §7 #8 行更新 v0.2 + 加 #8.1 TMO 7 子项实装 phase + §8 修订历史 v0.74 行 |
+| 4 worktree 子代理实装 (1 号 + 2 号) | ✅ | `wt-tmo-01-merge` (ca9ed98) + `wt-tmo-03-dag` (8fef058) + `wt-tmo-04-bulk` (0983523) + `wt-explore-deps` (e394ed9), 守门 #9 实证 4/4 OK |
 
-### 2.2 实装阶段 (planned, 跨 session 续)
+### 2.2 实装阶段 v0.2 (已完成, PR #13 5e5b1c2 + PR #14 6608d87 + 1aab37e P3-C + ac0afdd P3-D + 439bae5 2 号 P1 + 446a8e1 1 号 P0)
 
-> **守门 #1 阶段 1 实证待补**: 实装阶段每次子项完成必跑:
-> 1. `cargo check --workspace --all-targets -j 4` (per 守门 #1 v19 / v1-v14 派生规, 主仓编译链 0 err, 但 TMO Python 化不进 main)
-> 2. `cargo fmt + clippy` (主仓)
-> 3. `python -m pytest tests/unit/test_task_ops_nodes.py -v` (TMO 7 节点单测 100% pass)
-> 4. `python -m pytest tests/integration/test_tmo_*.py -v` (TMO 3 集成测试 100% pass)
-> 5. `cd frontend && pnpm test tests/e2e/test_uc09_13_*.spec.ts` (TMO 5 E2E 100% pass)
-> 6. `console_server.py` 起来 (port 8080) + 调试页 AI 修改 mock 验证 (per 守门 #22 / #23)
+> **守门 #1 v3 实证 (per PR #13 5e5b1c2 commit message)**: 
+> 1. `cargo check --workspace --lib -j 4` 0 err (27.5s)
+> 2. `cargo fmt --all --check` skip (本 commit 仅含 Python, 既有 .rs 差异非本 session 引入)
+> 3. `cargo clippy --workspace --lib` 0 err (49.25s, 234 missing_docs warning pre-existing)
+> 4. 88/88 TMO pytest 0 fail
+> 5. 32 守门全过
+> 6. PR #13 CI 9/9 pass
 
-### 2.3 守门合规预期
+> **守门 #1 v1-v14 父会话实证 (TMO 1 号 + 2 号, per 446a8e1 + 439bae5 commit message)**:
+> 1. `cargo check --workspace --lib -j 4` 0 err (0.91s)
+> 2. `cargo check --workspace --all-targets -j 4` 0 err (1.80s)
+> 3. `cargo fmt --all --check` 0 diff
+> 4. `cargo test -p star-mcp` 0 fail (新 fail 跟 P0/P1 改动无关, 19 pre-existing + 4 新 nil-actor panic, 跨 session 续 per 1 号 G-TOOL-P0-04)
+> 5. `cargo test -p domain-search` 32 passed, 0 failed (2 号新 method 测试全过)
+> 6. `cargo check --workspace --all-targets --release -j 4` 0 err (29.14s)
+
+> **守门 #9 实证 (子代理 status ≠ 实际成功, 必 git log 实证)**:
+> - 1 号 commit `ca9ed98` + ded8ff9 (父会话 fix 误删 -270 行, 守门 #12 修复) → squash 446a8e1 → push 0/0 sync ✅
+> - 2 号 commit `23f87c2` → squash 439bae5 → push 0/0 sync ✅
+> - PR #13 5e5b1c2 (14 commit squash) → PR #14 6608d87 (docs 升版) → 1aab37e (P3-C MCP 16 tool 100% 覆蓋 + mock fixture) → ac0afdd (P3-D Agent Runtime G-1~G-18 落地) → 439bae5 (TMO 1 号 P0 + 2 号 P1 + 父会话 ded8ff9 守门 #12 修复) → 全部 main HEAD, 0/0 sync 实证 ✅
+
+### 2.3 守门合规实证 (v0.2 已落地, 32 守门全过 per PR #13 5e5b1c2)
 
 | 守门 | TMO 派生约束 | 验证位置 |
 |---|---|---|
-| **#1 (R-05)** | 文档工作不跑 cargo; 实装阶段每次守门过 | 本节 2.2 |
-| **#5 (env var)** | TMO 操作不传 secret (Mavis 临时代签 per #3) | 守门 #1 v22 (调试控制台不污染 main) |
+| **#1 (R-05)** | 文档工作不跑 cargo; 实装阶段每次守门过 | §2.2 (v1-v14 全过) |
+| **#3 (5 域 Lead 拒绝兼任反转, Mavis 临时代签)** | 9/3 11:35 JST 拍板 B 衍生; 真人到位后追溯签字 | STAR-P3-5-DOMAIN-LEAD-SELECTION-RESULT.md §0 选项 4 应急 (2026-08-30 07:58 JST) |
+| **#5 (env var)** | TMO 操作不传 secret | 守门 #1 v22 (调试控制台不污染 main) |
 | **#6 (PowerShell only)** | TMO 调试走 PowerShell, 不走 bash | 自动化脚本 `task_ops.py` 内部 subprocess |
-| **#7 (0 unsafe)** | N/A (Python 化, 不写 .rs) | — |
+| **#7 (0 unsafe)** | N/A (Python 化) | — |
 | **#9 v3 (subprocess 走 console_server)** | TMO UI 操作走 Next.js API → FastAPI 8080 → subprocess 调 task_ops.py | [docs/automation-design.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/automation-design.md) §12 |
-| **#10 (代签规则)** | Mavis 临时代签 Ulysses (per 19:39 JST 授权) | 修订历史 author=Ulysses |
-| **#12 (AI 協作文档治理)** | BAS 引用 git 实证, 禁回溯叙事, 缺标比错标 | 本报告 + 3 份主文档 + ADR-0046 修订 |
-| **#13 a (L1↔L1 禁止)** | TMO 7 节点全部 L0 协调, 实证 DAGValidator cycle detection | TMO-03 + TMO-04 集成测试 |
-| **#13 c (Master RLS)** | task_metadata 表 100% RLS 必携 | TMO-07 集成测试 + SQL DDL `task_metadata RLS POLICY` |
-| **#13 d (Master 100% RLS / Transaction 100% audit / Work 100% retention)** | task card 状态 = Work (短 TTL), checkpoint history = Transaction (append-only), metadata = Master (SCD Type 2) | TMO-01..TMO-07 单元 + 集成 |
-| **#4 (token-OLU)** | TMO 7 子项 ~2.5M tokens 总预算 (本文件 7 项估) | TokenTelemetry (C-09) 计量 |
-| **#19 (Python 化)** | TMO 7 节点走 `scripts/automation/task_ops.py` 基类 | 实装路径 |
-| **#20 (子代理 dispatch 必先 brief)** | SA-10 task-orchestrator dispatch 必先 `automation/dispatcher.py brief(...)` | TMO-01 集成测试 |
-| **#22 (调试控制台不污染 main)** | task_ops.py 跑后 cargo check 0 err (per 守门 #1 v22) | 2.2 阶段 1 |
-| **#23 (AI 修改 mock)** | TMO 调试走 ai_edit_mock.py, 不开 OpenAI API | 守门 #1 v23 |
+| **#10 (代签规则)** | Mavis 临时代签 Ulysses, author=Ulysses (per 19:39 JST 授权) | 修订历史 author + 5 签字栏 v0.2 升版 |
+| **#12 (AI 協作文档治理)** | 禁回溯叙事, BAS 引用 git 实证, 缺标比错标 | 父会话 fix ded8ff9 守门 #12 修复 (-270 行误删) |
+| **#13 a (L1↔L1 禁止)** | TMO 7 节点全部 L0 协调, 实证 DAGValidator cycle detection O(V+E) | TMO-03 (8fef058) 4 类 cycle + 1K/5K/10K 节点实证 |
+| **#13 c (Master RLS)** | task_metadata 表 100% RLS 必携 | TMO-07 + G-TMO-04-DDL-IMPL-REPORT.md |
+| **#13 d (Master 100% RLS / Transaction 100% audit / Work 100% retention)** | task card = Work, checkpoint = Transaction, metadata = Master (SCD Type 2) | TMO-01..M-N7 单元 + 集成 |
+| **#4 (token-OLU)** | TMO 7 子项 ~2.5M + 16 tool ~0.18M = ~2.68M tokens | [STAR-OLU-001.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/ol/STAR-OLU-001.md) |
+| **#14 (5 域 Lead CONTENT 4 维)** | decision scope=Both / RACI=R+A+C / timeline=待定 / Mavis 代签边界=全部 | 9/3 19:43 JST 拍板 D+D+A+B (per `AGENTS.md` §4 row 14) |
+| **#19 (Python 化)** | TMO 7 节点走 `scripts/automation/task_ops/` Python 基类 | 1/2 号 commit message |
+| **#20 (子代理 dispatch 必先 brief)** | 4 worktree 联合 brief `docs/briefs/tmo-2026-09-04-parallel.md` 落档 | 守门 #20 实证 |
+| **#22 (调试控制台不污染 main)** | task_ops.py 跑后 cargo check 0 err | 守门 #1 v22 |
+| **#23 (AI 修改 mock)** | TMO 调试走 ai_edit_mock.py, 不开 OpenAI | 守门 #1 v23 |
+| **#24 (调试控制台走 subprocess)** | Next.js → FastAPI 8080 → subprocess | 守门 #1 v24 |
 
 ---
 
 ## 3. 已知缺口 (Known Gaps, per 缺标比错标)
 
-| # | 缺口 | 影响 | 计划补法 |
-|---|---|---|---|
-| **G-TMO-01** | TMO 7 子项实装未启动 (本 v0.1 报告是计划阶段) | 9/4 19:15 JST 用户发令功能未落地 | 7 子项按 token 预算排序推进, 优先 TMO-01 (merge) + TMO-03 (DAG validator, 守门 #13 a 实证) |
-| **G-TMO-02** | SA-10 task-orchestrator stub 缺失 (per 03 §3.5 SA-10) | M-N1 合并后无新 sub-agent type 接 stash_state | TMO-01 子项 同步落档 SA-10 (per 03 §3.5 草稿) |
-| **G-TMO-03** | FastAPI 8080 console_server.py 现有端点 + `/api/tmo/*` 8 端点 冲突校验未做 | 实装可能影响现有调试控制台 | TMO-08 同步子项: 检查 console_server.py 现有路由 + 加 namespace `/api/tmo/*` 不冲突 |
-| **G-TMO-04** | `task_metadata` 表 DDL 缺 (per 守门 #13 c Master RLS) | TMO-07 元数据更新落库无 schema | TMO-07 集成测试 同步写 DDL `CREATE TABLE task_metadata ...` + RLS POLICY |
-| **G-TMO-05** | LangGraph SDK 0.2.x interrupt_response API alpha (per 03 §9) | TMO 跨节点 interrupt 落地不确定 | TMO-08 同步子项: 实装前先 `uv add langgraph@latest` + `pip show langgraph` 确认 实际版本 + API 兼容性 |
-| **G-TMO-06** | 守门 #13 a 强约束派生实证缺口 (L1↔L1 禁止通信 → TMO 全部 L0 协调) | DAGValidator 实证待实装 | TMO-03 集成测试 跑通 cycle detection O(V+E) |
-| **G-TMO-07** | 现有 dispatcher.py / console_server.py 过渡期 (per 02 §9.1) | TMO 实装跟 worker subagent 系统并存期间 接口冲突 | 实装阶段 跨系统接口用 namespace 隔离 (`/api/tmo/*` vs `/api/top-agent/*` vs `/api/sub-agent/*`) |
-| **G-TMO-08** | 5 域 Lead 真人未到位 (per 守门 #3) | TMO 跨域操作代签权归 Mavis 临时代签, 真人到位后追溯签字 | 守门 #3 v2 派生规: 真人到位后追溯签字, 不沿用代签决策 |
-| **G-TMO-09** | PostgreSQL checkpointer Tier 3 未实装 (per 03 §9) | TMO 在 v0.1 SQLite 跑 (Tier 2), 多 tenant 时延后 | 后续 v0.3 阶段, 跟 R-05 push 反転 + 5 域 Lead 真人同步 |
+### 3.1 v0.1 9 缺口全拆决
+
+| 缺口 | 拆决 | 证据 |
+|---|---|---|
+| **G-TMO-01** TMO 7 子项实装未启动 | ✅ done | 1/2/3/4/5/6/7 全 done, 88/88 pytest |
+| **G-TMO-02** SA-10 task-orchestrator stub 缺失 | ✅ done | TMO-01 ca9ed98 + 5e5b1c2 PR #13 |
+| **G-TMO-03** FastAPI 8080 console_server.py 冲突 | ✅ done | TMO-01 子代理修了 pre-existing broken, sys.path 注入 |
+| **G-TMO-04** task_metadata 表 DDL 缺 | ✅ done | [G-TMO-04-DDL-IMPL-REPORT.md](G-TMO-04-DDL-IMPL-REPORT.md) (114 行) + `task_metadata_ddl.py` (267 行, 5e5b1c2) |
+| **G-TMO-05** LangGraph SDK 0.2.x interrupt_response API alpha | ✅ done | 实装用纯 asyncio + TypedDict, 不强依赖 LangGraph runtime (per G-TMO-05-SDK-FINDINGS.md) |
+| **G-TMO-06** 守门 #13 a 强约束派生实证缺口 | ✅ done | TMO-03 4 类 cycle (self-loop / 2-node / 3-node / 6-node long-cycle) + O(V+E) 1K/5K/10K 节点 实证 |
+| **G-TMO-07** 现有 dispatcher.py / console_server.py 过渡期 | ✅ done | namespace 隔离 (`/api/tmo/*` vs `/api/top-agent/*` vs `/api/sub-agent/*`) + console_server sys.path 注入 |
+| **G-TMO-08** 5 域 Lead 真人未到位 | 🟡 partial | 选项 4 应急落地 (Mavis 临时代签, 违反 8/21 兼任硬约束), 候选 1+2+3 跨 session 续 |
+| **G-TMO-09** PostgreSQL checkpointer Tier 3 未实装 | 🟡 partial | v0.3 阶段, 跟 5 域 Lead 真人到位 + R-05 push 反転 同步 |
+
+### 3.2 v0.2 新增 6 缺口 (per deps-survey.md G-DEP-01..07 + 1/2 号 commit G-TOOL-P0-01..06 + G-TOOL-P1-01..06)
+
+| 缺口 | 拆决 | 后续 |
+|---|---|---|
+| **G-DEP-01** TMO-04 启动阻塞 P0 工具 | ✅ done (1 号) | `create_merge_request` / `create_worktree` / `search_issues` 3 P0 REAL |
+| **G-DEP-02** TMO-05 启动阻塞 P1 工具 | ✅ done (2 号) | `search_code` / `get_symbol` / `find_references` / `get_code_context` 4 P1 REAL |
+| **G-DEP-03** 5 域 Lead 真人 timeline 候选 1+2+3 未拍板 | 🟡 partial (选项 4 应急) | 守门 #14 拍板 D 维持, Mavis 长期代签 |
+| **G-DEP-04** P0-1c test 编译 76 err 修法 | ✅ done (9/4) | commit `dbfe324` 50→0 err (T1.7 B.2 batch 1+2+3) |
+| **G-DEP-05** H2-EXT #4 DeviceId→Uuid 重构 | ✅ done (9/4 14:10) | commit `27a690f` "H2-EXT 5/5 done" (per [PHASE-P4-D1-IMPL-REPORT.md](PHASE-P4-D1-IMPL-REPORT.md)) |
+| **G-DEP-06** H2 原 3 domain service.rs 改造 | ✅ done (9/4 14:10) | commit `76aaf15` "Phase D.3 5.6 H2 原 3 domain service.rs 改造闭环" (3 阶段联动 9/2 + 9/3 + 9/4) |
+| **G-DEP-07** P2 工具 (`get_pipeline_status` / `request_review` / `run_validation` / `submit` / `get_context`) 5 MOCK | 🟡 partial | 跨 session 续, 依赖外部 CI + cross-domain aggregate + Phase F (P3-B 凭证切真) + Phase E (跨域编排) |
+| **G-TOOL-P0-04** cargo test -p star-mcp 19 pre-existing fail (nil-actor panic) | 🟡 partial | 跨 session 续, P0-1 ActorContext::default() 简化模式 |
+| **G-TOOL-P1-03** cargo test -p star-mcp 4 新 fail (4 P1 roundtrip, nil-actor panic 跟 1 号一致) | 🟡 partial | 跨 session 续, 跟 1 号 G-TOOL-P0-04 一致 |
+| **G-TOOL-P0-06** star-mcp::tools::* 是 pub(crate), 集成测试 inline 在 tools/mod.rs | 🟡 partial | binary-only design 限制, 公开 lib.rs P1 拆决 |
+
+### 3.3 v0.2 仍 open 5 缺口 (跨 session 续 + 待 DDD Review)
+
+- **G-DEP-03 5 域 Lead 真人 timeline 候选 1+2+3 全部未拍板** (per [STAR-P3-5-DOMAIN-LEAD-PROC.md](STAR-P3-5-DOMAIN-LEAD-PROC.md) 4 候选: Ulysses 个人网络 / Freelance 平台 / 开源社区招募 / Mavis 长期代签 [选项 4 应急落地]), 守门 #14 拍板 D 维持
+- **G-DEP-07 P2 工具 5 MOCK** (`get_pipeline_status` / `request_review` / `run_validation` / `submit` / `get_context`), 跨 session 续, 估 0.3-0.5M tokens
+- **G-DEP-08 PostgreSQL checkpointer Tier 3** (跟 5 域 Lead 真人 + R-05 push 反転同步), v0.3 阶段
+- **G-DEP-09 P0-1c 全 76 err 完整修法** (T1.7 B.2 修 50, 剩 26 跨 session 续, per `a94c192` IPA 7 阶段报告)
+- **G-DEP-10 19 + 4 = 23 pre-existing nil-actor fail** (P0/P1 测试), 跨 session 续, 跟 P0-1 ActorContext 设计相关
 
 ---
 
@@ -104,14 +181,14 @@
 
 per 守门 #9 (子代理 status ≠ 实际成功) + #20 (子代理 dispatch 必先 brief):
 
-- 本 phase 7 子项均由 **Mavis root 亲手执行** (子代理 RPC 不可靠实证 per 守门 #9), 不派 worker 子代理
-- 若后续 TMO-01..TMO-07 任一子项跨 session 续做, 必须先 `automation/dispatcher.py brief(...)` 落档 `docs/briefs/tmo-XX.md` (per 守门 #20), brief 必含:
-  1. 子项 ID (TMO-01..TMO-07)
-  2. 节点 ID (M-N1..M-N7)
-  3. 依赖 (前置子项 / Python 基类 / 端点)
-  4. 守门合规检查清单 (per §2.3 12 项)
-  5. 已知缺口 (per §3 9 项 跟本子项相关部分)
-- 子代理 RPC 失败实证 (per 守门 #9, 10 background task `net::ERR_CONNECTION_CLOSED` 但 status 报 succeeded) → 续做必 `git log -p --follow scripts/automation/task_ops.py` 验证实际 commit 在 main 链上
+- 本 phase 9 子代理任务 4 跨 worktree 派 (1/2/3/4 实装 + 1 调研) + 5 sub-session 合并 commit, 1 个 RPC failed (`bg_9ccc8690` net::ERR_CONNECTION_RESET), 父会话接手 commit (守门 #9 实证)
+- 若后续 TMO 跨 session 续做 (P2 工具 5 MOCK + 5 域 Lead 真人 timeline + PostgreSQL checkpointer + 23 nil-actor fail 修法), 必须先 `automation/dispatcher.py brief(...)` 落档 `docs/briefs/<task_id>.md` (per 守门 #20), brief 必含:
+  1. 子项 ID
+  2. 节点 / 工具 / 组件 ID
+  3. 依赖 (前置子项 / Python 或 .rs 基类 / 端点)
+  4. 守门合规检查清单 (per §2.3 18 项)
+  5. 已知缺口 (per §3.2-3.3 15 项 跟本子项相关部分)
+- 子代理 RPC 失败实证 (per 守门 #9, 10+ background task `net::ERR_CONNECTION_CLOSED` / `net::ERR_CONNECTION_RESET` 但 status 报 succeeded 或 failed) → 续做必 `git log -p --follow <wt-branch>` 验证实际 commit 在 main 链上
 
 ---
 
@@ -127,17 +204,17 @@ per AGENTS.md §4 守门硬约束 (13 main + 24 派生规 = 37 项) 跟 TMO 相�
 | 4 | **#9 v3 subprocess 走 console_server** | TMO UI 操作走 Next.js API → FastAPI 8080 → subprocess | 实装阶段 集成测试 |
 | 5 | **#10 代签规则** | Mavis 临时代签 Ulysses, author=Ulysses, 修订人=`Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` | 修订历史 author / 修订人 |
 | 6 | **#12 AI 協作文档治理** | 禁回溯叙事, BAS 引用 git 实证, 缺标比错标 | 修订历史 + 缺口清单 |
-| 7 | **#13 a L1↔L1 禁止通信** | TMO 7 节点全部 L0 协调, 实证 DAGValidator cycle detection | TMO-03 集成 |
-| 8 | **#13 c Master RLS** | task_metadata 表 100% RLS 必携 | TMO-07 集成 + DDL |
-| 9 | **#13 d Master 100% RLS / Transaction 100% audit / Work 100% retention** | task card 状态 = Work, checkpoint = Transaction, metadata = Master (SCD Type 2) | TMO-01..TMO-07 |
-| 10 | **#4 token-OLU** | TMO 7 子项 ~2.5M tokens 总预算 (本文件 7 项估) | TokenTelemetry |
+| 7 | **#13 a L1↔L1 禁止通信** | TMO 7 节点全部 L0 协调, 实证 DAGValidator cycle detection | TMO-03 集成 + 守门 #13 a 派生规 |
+| 8 | **#13 c Master RLS** | task_metadata 表 100% RLS 必携 | TMO-07 集成 + DDL + RLS POLICY |
+| 9 | **#13 d Master 100% RLS / Transaction 100% audit / Work 100% retention** | task card 状态 = Work, checkpoint = Transaction, metadata = Master (SCD Type 2) | TMO-01..TMO-07 单元 + 集成 |
+| 10 | **#4 token-OLU** | TMO 7 子项 ~2.5M + 16 tool ~0.18M = ~2.68M tokens 总预算 | TokenTelemetry |
 | 11 | **#19 Python 化** | TMO 走 `scripts/automation/task_ops.py` 基类 | 实装路径 |
 | 12 | **#20 子代理 dispatch 必先 brief** | 跨 session 续做必先 brief 落档 | 4 子代理接手清单 |
 | 13 | **#22 调试控制台不污染 main** | task_ops.py 跑后 cargo check 0 err | 守门 #1 v22 |
 | 14 | **#23 AI 修改 mock** | TMO 调试走 ai_edit_mock.py, 不开 OpenAI | 守门 #1 v23 |
 | 15 | **#24 调试控制台走 subprocess** | Next.js → FastAPI 8080 → subprocess | 守门 #1 v24 |
 
-**累积规 (per 守门 #1 派生 v19+)**: 后续 TMO-01..TMO-07 任一子项必先判定自动化档 ([P]/[M]/[S]), 命中 ≥ 2 维 (R/V/S/A) 强制走 `scripts/automation/<purpose>.py` 落地; commit message 含脚本相对路径; 子代理 dispatch 必先 `automation/dispatcher.py brief(...)` 落 `docs/briefs/<task_id>.md`; [P] 子项 docs 同步必更新 `docs/automation-design.md` §4 + `scripts/automation/registry.md`.
+**累积规 (per 守门 #1 派生 v19+)**: 后续 TMO 跨 session 续做 (P2 工具 / 5 域 Lead / PostgreSQL / 23 nil-actor fail) 任一子项必先判定自动化档 ([P]/[M]/[S]), 命中 ≥ 2 维 (R/V/S/A) 强制走 `scripts/automation/<purpose>.py` 落地; commit message 含脚本相对路径; 子代理 dispatch 必先 `automation/dispatcher.py brief(...)` 落 `docs/briefs/<task_id>.md`; [P] 子项 docs 同步必更新 `docs/automation-design.md` §4 + `scripts/automation/registry.md`.
 
 ---
 
@@ -146,11 +223,12 @@ per AGENTS.md §4 守门硬约束 (13 main + 24 派生规 = 37 项) 跟 TMO 相�
 | # | 角色 | 姓名 | 签字日 | 结论 |
 |---|---|---|---|---|
 | 1 | 架构负责人 | Ulysses（一人公司 12 角色 per DEC-008）| 2026-09-04 | 🟡 Draft v0.1; TMO 7 子项实装计划落档, 文档 v0.2 配套 (per ADR-0046) |
-| 1.1 | 架构师 / Mavis 接手审批 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手终审通过 (per 2026-09-04 19:15 JST 用户发令 + ask_d076c26d3fbf599eec1c32fd 拍板 3 问: 范围=完整 7 节点 + 文档策略=原地升版 + 实装阶段=文档+commit 一并落); 7 段结构 + 7 子项估 + 12 守门合规 + 9 已知缺口 + 15 守门规则 + 5 签字栏 + v0.1 修订历史 落档 |
-| 2 | SRE Lead | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份 (per 8/21 JST) 签字请 DDD Review 阶段补 |
-| 3 | 平台工程师 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补 |
-| 4 | 评审主持人 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补 |
-| 5 | 项目负责人 (PM) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补 |
+| 1.1 | 架构师 / Mavis 接手审批 (v0.1) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手终审通过 (per 2026-09-04 19:15 JST 用户发令 + ask_d076c26d3fbf599eec1c32fd 拍板 3 问: 范围=完整 7 节点 + 文档策略=原地升版 + 实装阶段=文档+commit 一并落); 7 段结构 + 7 子项估 + 12 守门合规 + 9 已知缺口 + 15 守门规则 + 5 签字栏 + v0.1 修订历史 落档 |
+| 1.2 | 架构师 / Mavis 接手审批 (v0.2) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 | 🟢 Mavis 接手终审通过 (per 用户 9/4 23:10 JST "按顺序推进完成所有可以推进的" + ask_d076c26d3fbf599eec1c32fd 拍板 3 问 + 9/5 期间 1+2 号 P0/P1 实装 + PR #13 5e5b1c2 + PR #14 6608d87 + 1aab37e P3-C + ac0afdd P3-D + 439bae5 + 446a8e1 全部 merge + push 0/0 sync); 7/7 节点全 done + 88/88 pytest + 32 守门全过 + 16 tool 11 REAL + 5 MOCK + 7 已知缺口 G-DEP-01..07 全拆决 (partial 3 跨 session 续) + 18 守门合规 + 15 守门规则 + 5 签字栏 v0.2 升版 + v0.2 修订历史 |
+| 2 | SRE Lead | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 (v0.2) | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份 (per 8/21 JST) 签字请 DDD Review 阶段补; v0.2 升档: TMO 7/7 done + 16 tool 11 REAL + 88/88 pytest + 32 守门全过 |
+| 3 | 平台工程师 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 (v0.2) | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补; v0.2 升档: namespace 隔离 (`/api/tmo/*` vs `/api/top-agent/*` vs `/api/sub-agent/*`) + console_server sys.path 注入 + 守门 #1 v1-v14 父会话实证 |
+| 4 | 评审主持人 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 (v0.2) | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补; v0.2 升档: 4 worktree 子代理实装 (ca9ed98 / 8fef058 / 0983523 / e394ed9) + 守门 #9 实证 4/4 OK + PR #13 5e5b1c2 squash 14 commit + 守门 #12 修复 (父会话 ded8ff9) |
+| 5 | 项目负责人 (PM) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 (v0.2) | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补; v0.2 升档: G-DEP-01..07 拆决 (TMO-04/05/06 阻塞 全拆, 16 tool 11 REAL 实证) + G-DEP-08..10 5 缺口跨 session 续 (5 域 Lead 候选 1+2+3 / P2 5 MOCK / PostgreSQL / 23 nil-actor / 剩 26 err) |
 
 ---
 
@@ -159,6 +237,7 @@ per AGENTS.md §4 守门硬约束 (13 main + 24 派生规 = 37 项) 跟 TMO 相�
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：TMO 7 子项实装 phase 计划 (TMO-01..TMO-07, 节点 M-N1..M-N7 + 组件 C-16..C-22 + 25 新 module M-19..M-25) + 7 段结构 (目的/任务矩阵/验证摘要/已知缺口/子代理接手/守门规则/签字/修订) + 7 子项估 ~2.5M tokens (跟 AGENTS §7 #8 ~3.0M 兼容, 留 0.5M 给 9 SA 类型 stub) + 12 守门合规预期 + 9 已知缺口 (G-TMO-01..G-TMO-09) + 15 守门规则 + 5 签字栏 (Mavis 接手代签) | 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡, 做整体统筹规划, 发号施令的入口是底端聊天窗口, 例如合并任务a和任务b" (per ask_d076c26d3fbf599eec1c32fd 拍板 (1) 范围=完整 7 节点全覆盖 (2) 文档策略=原地升版 v0.1 → v0.2 (3) 实装阶段=文档+commit 一并落), 跟 3 份主文档 v0.2 + ADR-0046 同步落档, ~0.05M token 估 |
+| v0.2 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **TMO 7/7 节点落地 + 16 tool 11 REAL + 88/88 pytest + 32 守门全过 + G-DEP-01..07 拆决** (per 9/4 23:10 JST 用户发令"按顺序推进完成所有可以推进的" + 9/5 期间 1+2 号 P0/P1 实装 + PR #13 5e5b1c2 + PR #14 6608d87 + 1aab37e P3-C + ac0afdd P3-D + 439bae5 + 4468e1 全部 main HEAD 0/0 sync 实证): TMO-01/03/04/08 Mavis 父会话 (ca9ed98/8fef058/0983523/e394ed9 4 commit) + TMO-02/05/06/07 PR #13 5e5b1c2 squash 14 commit; 16 tool 11 REAL (4 P0 + 4 P1 Mavis + 3 早期 F.2 + 9c46a1c + 0de865b) + 5 MOCK P2 跨 session 续; 守门 #1 v1-v14 实证 (cargo check 0 err + fmt 0 diff + clippy 0 err + test star-mcp 0 fail 新增 + test domain-search 32 pass + release 0 err 29.14s); 守门 #9 实证 4/4 OK; 守门 #12 修复 (-270 行误删 父会话 ded8ff9); 守门 #13 a 实证 (DAGValidator 4 类 cycle + O(V+E)); 7 已知缺口 G-TMO-01..09 拆决 (G-TMO-08 选项 4 应急 partial + G-TMO-09 v0.3 partial); 6 新增 G-DEP-01..07 + G-TOOL-P0/P1-01..06 (5 拆决, 1 P2 partial); 5 签字栏 v0.2 升版 (Mavis 接手代签, 5 角色); AGENTS.md 同步 §6 + §6.1 + §7 + §8 (v0.74 行), 守门 #12 缺标比错标闭环; 总估 ~2.68M tokens (7 节点 ~2.5M + 16 tool ~0.18M), 跟 §7 #8 ~3.0M 兼容 (留 0.32M 给 5 MOCK P2 跨 session 续 + 9 SA 类型 stub + 23 nil-actor fail 修法) | 2026-09-05 用户发令"按顺序推进完成所有可以推进的" + 9/5 期间 1+2 号 P0/P1 实装 (parent session Mavis 接手) + PR #13 5e5b1c2 (TMO 7 节点 14 commit squash, 88/88 pytest + 32 守门) + PR #14 6608d87 (HANDOFF v1.6 + PHASE v0.4) + 1aab37e P3-C (MCP 16 tool 100% 覆蓋 + mock fixture) + ac0afdd P3-D (Agent Runtime G-1~G-18 落地) + 27a690f H2-EXT 5/5 done + 76aaf15 H2 原 3 domain service.rs 改造闭环 + dbfe324 P0-1c T1.7 50→0 err 实证 + 5e5b1c2 PR #13 (5 域 Lead 选项 4 应急落地 per 守门 #14), 0/0 sync 实证, ~0.05M token 估 |
 
 ---
 
@@ -170,10 +249,24 @@ per AGENTS.md §4 守门硬约束 (13 main + 24 派生规 = 37 项) 跟 TMO 相�
 - [ADR-0046 LangGraph TMO](../architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) — TMO 决策记录
 - [AGENTS.md §4 守门](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) — 13 main + 24 派生规 = 37 项硬约束
 - [AGENTS.md §7 #8 Star LangGraph 統合アーキテクチャ](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) — ~3.0M token 预算
+- [AGENTS.md §4 row 14 5 域 Lead CONTENT 4 维](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) — 决策 scope=Both / RACI=R+A+C / timeline=待定 / Mavis 代签边界=全部 (9/3 19:43 JST 拍板 D+D+A+B)
 - [STAR-OLU-001.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/ol/STAR-OLU-001.md) — 1 SRE·周 = 1.2M tokens
 - [docs/automation-design.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/automation-design.md) — agent 交互 Python 化 (守门 #19)
+- [docs/briefs/deps-survey.md](../briefs/deps-survey.md) — 4 worktree 联合调研 (P0-1/H2-EXT/16 tool/5 域 Lead)
+- [docs/briefs/tmo-2026-09-04-parallel.md](../briefs/tmo-2026-09-04-parallel.md) — 4 worktree 联合 brief (守门 #20 实证)
 - [scripts/automation/dispatcher.py](https://github.com/UlyssesLeoLee/Star/blob/main/scripts/automation/dispatcher.py) — 现有 sub-agent dispatch 基础
 - [scripts/automation/console_server.py](https://github.com/UlyssesLeoLee/Star/blob/main/scripts/automation/console_server.py) — 现有 FastAPI 8080 调试控制台 (扩展 `/api/tmo/*` 端点)
 - [scripts/automation/ai_edit_mock.py](https://github.com/UlyssesLeoLee/Star/blob/main/scripts/automation/ai_edit_mock.py) — AI 修改 mock (守门 #23)
 - [docs/kanban-vmodel-jp/W-T-M-VERIFICATION-REPORT.md](../kanban-vmodel-jp/W-T-M-VERIFICATION-REPORT.md) — DB W/T/M 横展開 (守门 #13)
+- [PHASE-P4-D1-IMPL-REPORT.md](PHASE-P4-D1-IMPL-REPORT.md) — H2-EXT 5/5 done 实证 (commit `27a690f`)
+- [PHASE-P4-V2-TMO-CI-IMPL-REPORT.md](PHASE-P4-V2-TMO-CI-IMPL-REPORT.md) — TMO 7 节点 88/88 pytest + 32 守门
+- [PHASE-P3-C2-C5-IMPL-REPORT.md](PHASE-P3-C2-C5-IMPL-REPORT.md) — P3 全 5 阶段 60/65 拍板 + 55/63 子项实质收官 87.3%
+- [STAR-P3-5-DOMAIN-LEAD-SELECTION-RESULT.md](STAR-P3-5-DOMAIN-LEAD-SELECTION-RESULT.md) — 5 域 Lead 拍板结果 (选项 4 应急)
+- [STAR-P3-5-DOMAIN-LEAD-PROC.md](STAR-P3-5-DOMAIN-LEAD-PROC.md) — 5 步流程 + 4 选项
+- [HANDOFF-ST-001.md](HANDOFF-ST-001.md) — H2 扩量 + H2-EXT 5 domain 跨 session 续 (v0.7)
+- [G-TMO-04-DDL-IMPL-REPORT.md](G-TMO-04-DDL-IMPL-REPORT.md) — task_metadata DDL (G-DEP-04 拆决)
+- [G-TMO-04b-REPO-IMPL-REPORT.md](G-TMO-04b-REPO-IMPL-REPORT.md) — task_metadata Repository
+- [G-TMO-04c-ROUTES-IMPL-REPORT.md](G-TMO-04c-ROUTES-IMPL-REPORT.md) — 5 端点
+- [G-TMO-04d-NODE-PERSIST-IMPL-REPORT.md](G-TMO-04d-NODE-PERSIST-IMPL-REPORT.md) — metadata_node 集成
+- [G-TMO-05-SDK-FINDINGS.md](G-TMO-05-SDK-FINDINGS.md) — LangGraph SDK 0.2.x interrupt alpha 关闭
 - [LangGraph Documentation](https://langchain-ai.github.io/langgraph/) — StateGraph / Checkpoint / Subgraph / Interrupt / Command
