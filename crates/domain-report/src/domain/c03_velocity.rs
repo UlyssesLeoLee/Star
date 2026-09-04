@@ -24,7 +24,7 @@ pub struct SprintVelocity {
     pub end_date: DateTime<Utc>,
     pub status: SprintStatus,
     pub committed_sp: f64,
-    pub completed_sp: Option<f64>,  // None = active sprint
+    pub completed_sp: Option<f64>, // None = active sprint
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

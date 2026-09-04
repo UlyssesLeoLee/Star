@@ -44,11 +44,7 @@ pub trait SprintQueryPort: Send + Sync {
 /// User 查询 Port
 #[async_trait]
 pub trait UserQueryPort: Send + Sync {
-    async fn get_user(
-        &self,
-        tenant_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<Option<UserInfo>, String>;
+    async fn get_user(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Option<UserInfo>, String>;
 }
 
 #[derive(Debug, Clone)]

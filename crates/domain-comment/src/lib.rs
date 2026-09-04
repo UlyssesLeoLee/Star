@@ -786,7 +786,8 @@ mod tests {
         let svc = InMemoryCommentService::new();
         let tid = uuid::Uuid::new_v4();
         // Agent 用 as_agent 然后覆盖 tenant_id
-        let mut agent_actor = ActorContext::new(AgentId::new().as_uuid(), tid).with_agent_session(true);
+        let mut agent_actor =
+            ActorContext::new(AgentId::new().as_uuid(), tid).with_agent_session(true);
         agent_actor.tenant_id = tid;
         let mut cmd = make_cmd(tid);
         cmd.author_agent_id = Some(AgentId::new());
@@ -979,9 +980,7 @@ mod tests {
             )
             .await
             .unwrap();
-        assert!(a
-            .object_key
-            .starts_with(&format!("tenants/{}/", tid)));
+        assert!(a.object_key.starts_with(&format!("tenants/{}/", tid)));
     }
 
     #[tokio::test]

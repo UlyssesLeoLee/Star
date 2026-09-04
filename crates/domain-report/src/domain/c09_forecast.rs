@@ -19,7 +19,10 @@ pub struct HistoricalData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SprintVelocity { pub name: String, pub completed_sp: f64 }
+pub struct SprintVelocity {
+    pub name: String,
+    pub completed_sp: f64,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForecastResult {
@@ -36,25 +39,53 @@ pub async fn generate(
     report_id: Uuid,
 ) -> Result<ReportResult, ReportError> {
     let sprints = vec![
-        SprintVelocity { name: "S1".into(), completed_sp: 28.0 },
-        SprintVelocity { name: "S2".into(), completed_sp: 30.0 },
-        SprintVelocity { name: "S3".into(), completed_sp: 32.0 },
-        SprintVelocity { name: "S4".into(), completed_sp: 31.0 },
-        SprintVelocity { name: "S5".into(), completed_sp: 35.0 },
-        SprintVelocity { name: "S6".into(), completed_sp: 33.0 },
+        SprintVelocity {
+            name: "S1".into(),
+            completed_sp: 28.0,
+        },
+        SprintVelocity {
+            name: "S2".into(),
+            completed_sp: 30.0,
+        },
+        SprintVelocity {
+            name: "S3".into(),
+            completed_sp: 32.0,
+        },
+        SprintVelocity {
+            name: "S4".into(),
+            completed_sp: 31.0,
+        },
+        SprintVelocity {
+            name: "S5".into(),
+            completed_sp: 35.0,
+        },
+        SprintVelocity {
+            name: "S6".into(),
+            completed_sp: 33.0,
+        },
     ];
     let avg = sprints.iter().map(|s| s.completed_sp).sum::<f64>() / sprints.len() as f64;
-    let std_dev = (sprints.iter().map(|s| (s.completed_sp - avg).powi(2)).sum::<f64>() / sprints.len() as f64).sqrt();
+    let std_dev = (sprints
+        .iter()
+        .map(|s| (s.completed_sp - avg).powi(2))
+        .sum::<f64>()
+        / sprints.len() as f64)
+        .sqrt();
 
     let predicted_velocity = avg;
     let c80_low = avg - 1.28 * std_dev;
     let c80_high = avg + 1.28 * std_dev;
     let c95_low = avg - 1.96 * std_dev;
     let c95_high = avg + 1.96 * std_dev;
-    let predicted_date = (Utc::now() + chrono::Duration::days(28)).format("%Y-%m-%d").to_string();
+    let predicted_date = (Utc::now() + chrono::Duration::days(28))
+        .format("%Y-%m-%d")
+        .to_string();
 
     let data = ForecastData {
-        historical: HistoricalData { sprints: sprints.clone(), avg_velocity: avg },
+        historical: HistoricalData {
+            sprints: sprints.clone(),
+            avg_velocity: avg,
+        },
         forecast: ForecastResult {
             method: "rolling_avg".to_string(),
             predicted_velocity,
@@ -64,18 +95,27 @@ pub async fn generate(
         },
     };
 
-    let points: Vec<ReportPoint> = sprints.iter().map(|s| ReportPoint {
-        label: s.name.clone(),
-        value: s.completed_sp,
-        extra: serde_json::json!({}),
-    }).collect();
+    let points: Vec<ReportPoint> = sprints
+        .iter()
+        .map(|s| ReportPoint {
+            label: s.name.clone(),
+            value: s.completed_sp,
+            extra: serde_json::json!({}),
+        })
+        .collect();
 
     Ok(ReportResult {
         report_id,
         report_type: crate::ReportType::Forecast,
         points,
         data: serde_json::to_value(&data).map_err(|e| ReportError::Internal(e.to_string()))?,
-        summary: ReportSummary { total: avg, trend: Trend::Up, anomalies: vec![], meta: serde_json::to_value(&data.forecast).map_err(|e| ReportError::Internal(e.to_string()))? },
+        summary: ReportSummary {
+            total: avg,
+            trend: Trend::Up,
+            anomalies: vec![],
+            meta: serde_json::to_value(&data.forecast)
+                .map_err(|e| ReportError::Internal(e.to_string()))?,
+        },
         generated_at: Utc::now(),
         cache_key: format!("forecast:{}", report_id),
     })
@@ -90,8 +130,14 @@ mod tests {
         // < 3 sprints 应在 V2 接 SprintQueryPort 后判定
         // 阶段 1 简化为 6 sprints mock
         let sprints = vec![
-            SprintVelocity { name: "S1".into(), completed_sp: 10.0 },
-            SprintVelocity { name: "S2".into(), completed_sp: 20.0 },
+            SprintVelocity {
+                name: "S1".into(),
+                completed_sp: 10.0,
+            },
+            SprintVelocity {
+                name: "S2".into(),
+                completed_sp: 20.0,
+            },
         ];
         assert_eq!(sprints.len(), 2);
     }
@@ -105,8 +151,17 @@ mod tests {
     #[test]
     fn test_forecast_data_serde() {
         let d = ForecastData {
-            historical: HistoricalData { sprints: vec![], avg_velocity: 0.0 },
-            forecast: ForecastResult { method: "simple_avg".into(), predicted_velocity: 0.0, confidence_80: (0.0, 0.0), confidence_95: (0.0, 0.0), predicted_completion_date: "2026-10-01".into() },
+            historical: HistoricalData {
+                sprints: vec![],
+                avg_velocity: 0.0,
+            },
+            forecast: ForecastResult {
+                method: "simple_avg".into(),
+                predicted_velocity: 0.0,
+                confidence_80: (0.0, 0.0),
+                confidence_95: (0.0, 0.0),
+                predicted_completion_date: "2026-10-01".into(),
+            },
         };
         let json = serde_json::to_value(&d).unwrap();
         assert_eq!(json["forecast"]["method"], "simple_avg");

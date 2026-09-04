@@ -104,9 +104,21 @@ pub async fn generate(
 
     let s = data.summary.clone();
     let points: Vec<ReportPoint> = vec![
-        ReportPoint { label: "completed".into(), value: s.completed_count as f64, extra: serde_json::json!({}) },
-        ReportPoint { label: "carry_over".into(), value: s.carry_over_count as f64, extra: serde_json::json!({}) },
-        ReportPoint { label: "incomplete".into(), value: s.incomplete_count as f64, extra: serde_json::json!({}) },
+        ReportPoint {
+            label: "completed".into(),
+            value: s.completed_count as f64,
+            extra: serde_json::json!({}),
+        },
+        ReportPoint {
+            label: "carry_over".into(),
+            value: s.carry_over_count as f64,
+            extra: serde_json::json!({}),
+        },
+        ReportPoint {
+            label: "incomplete".into(),
+            value: s.incomplete_count as f64,
+            extra: serde_json::json!({}),
+        },
     ];
 
     Ok(ReportResult {
@@ -131,7 +143,11 @@ mod tests {
 
     #[test]
     fn test_groups_default_empty() {
-        let g = Groups { completed: vec![], carry_over: vec![], incomplete: vec![] };
+        let g = Groups {
+            completed: vec![],
+            carry_over: vec![],
+            incomplete: vec![],
+        };
         assert_eq!(g.completed.len(), 0);
     }
 
@@ -152,14 +168,22 @@ mod tests {
 
     #[test]
     fn test_summary_arithmetic() {
-        let s = SprintReportSummary { completed_count: 5, carry_over_count: 2, incomplete_count: 3, completed_sp: 25.0 };
+        let s = SprintReportSummary {
+            completed_count: 5,
+            carry_over_count: 2,
+            incomplete_count: 3,
+            completed_sp: 25.0,
+        };
         let total = s.completed_count + s.carry_over_count + s.incomplete_count;
         assert_eq!(total, 10);
     }
 
     #[test]
     fn test_sprint_info_serde() {
-        let s = SprintInfo { sprint_id: Uuid::nil(), name: "Sprint 1".into() };
+        let s = SprintInfo {
+            sprint_id: Uuid::nil(),
+            name: "Sprint 1".into(),
+        };
         let json = serde_json::to_string(&s).unwrap();
         assert!(json.contains("Sprint 1"));
     }
