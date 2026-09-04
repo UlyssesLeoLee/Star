@@ -364,7 +364,7 @@ class TestRlsMultiTenantIsolation:
             conn.close()
 
     def test_unique_constraint_on_task_id_version(self, initialized_db):
-        """IT-14-G-2: UNIQUE (task_id, version) 约束 (per SCD Type 2)"""
+        """IT-14-G-2: UNIQUE (task_id, tenant_id, workspace_id, version) 约束 (per SCD Type 2)"""
         conn = sqlite3.connect(initialized_db)
         try:
             conn.execute(
@@ -374,7 +374,7 @@ class TestRlsMultiTenantIsolation:
                 ("tm-dup", "task-dup", "tenant-A", "ws-1", "x", "[]", None, 5, 1, 1, 1000, 1000),
             )
             conn.commit()
-            # 重复 (task_id, version=1) 应被 UNIQUE 约束拒绝
+            # 重复 (task_id, tenant_id, workspace_id, version=1) 应被 UNIQUE 约束拒绝
             with pytest.raises(sqlite3.IntegrityError, match="UNIQUE constraint"):
                 conn.execute(
                     """INSERT INTO task_metadata

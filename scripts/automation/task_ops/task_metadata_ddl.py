@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS task_metadata (
     is_current INTEGER NOT NULL DEFAULT 1 CHECK (is_current IN (0, 1)),
     created_at_ms INTEGER NOT NULL,
     updated_at_ms INTEGER NOT NULL,
-    UNIQUE (task_id, version)
+    UNIQUE (task_id, tenant_id, workspace_id, version)
 )
 """.strip()
 """task_metadata Master 表 (SCD Type 2 current row, 物理删除禁止 per 守门 #13 c).
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS task_metadata (
   - created_at_ms: 首次创建 ms (epoch)
   - updated_at_ms: 最近更新 ms (epoch)
 
-唯一约束: (task_id, version), 同一 task_id + version 唯一.
+唯一约束: (task_id, tenant_id, workspace_id, version), 同一 (task + tenant + workspace) 内 version 唯一.
 """
 
 
