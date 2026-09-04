@@ -1069,6 +1069,145 @@ impl ContextStore {
     }
 }
 
+/// **SubAgentPool** (per LangGraph C-13 + L1 任务卡子代理)
+/// 跨 sub-agent 隔离 context + per-task checkpoint, N 并行 (≤ 50)
+pub struct SubAgentPool {
+    registry: SubAgentRegistry,
+    /// 当前活跃 sub-agent task 计数
+    active_count: Arc<RwLock<HashMap<SubAgentArchetype, u32>>>,
+    /// max 并行 (默认 50, per LangGraph)
+    max_parallel: u32,
+}
+
+impl Default for SubAgentPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SubAgentPool {
+    /// 创建新 SubAgentPool (max 50 并行)
+    pub fn new() -> Self {
+        Self::with_max_parallel(50)
+    }
+
+    /// 创建 max_parallel 可配 SubAgentPool
+    pub fn with_max_parallel(max_parallel: u32) -> Self {
+        Self {
+            registry: SubAgentRegistry::new(),
+            active_count: Arc::new(RwLock::new(HashMap::new())),
+            max_parallel,
+        }
+    }
+
+    /// 注册 SubAgent
+    pub async fn register(&self, agent: Arc<dyn SubAgent + Send + Sync>) {
+        self.registry.register(agent).await;
+    }
+
+    /// 派生 SubAgent 子任务 (per LangGraph 2-level hierarchical: Top Agent → SubAgent)
+    /// 检查 max_parallel 限额, 返回新 task_id
+    pub async fn spawn(
+        &self,
+        archetype: SubAgentArchetype,
+        task: &AgentTask,
+    ) -> Result<Uuid, DispatchError> {
+        // 检查 max 并行
+        let current = {
+            let m = self.active_count.read().await;
+            let total: u32 = m.values().sum();
+            total
+        };
+        if current >= self.max_parallel {
+            return Err(DispatchError::PoolExhausted {
+                resource_id: format!("subagent_pool_max_parallel_{}", self.max_parallel),
+            });
+        }
+        // 检查 archetype 注册
+        let _sa = self.registry.get(archetype).await.ok_or_else(|| {
+            DispatchError::PoolNotFound(format!("archetype_{}", archetype.name()))
+        })?;
+        // in-flight +1
+        {
+            let mut m = self.active_count.write().await;
+            *m.entry(archetype).or_insert(0) += 1;
+        }
+        Ok(task.task_id)
+    }
+
+    /// 完成 SubAgent 子任务 (in-flight -1)
+    pub async fn complete(&self, archetype: SubAgentArchetype) {
+        let mut m = self.active_count.write().await;
+        let v = m.entry(archetype).or_insert(0);
+        if *v > 0 {
+            *v -= 1;
+        }
+    }
+
+    /// 当前活跃 sub-agent 任务计数
+    pub async fn active_count(&self) -> u32 {
+        self.active_count.read().await.values().sum()
+    }
+}
+
+/// **TopAgent** (per LangGraph L0 全体代理, 1 instance singleton, cross-session checkpoint)
+pub struct TopAgent {
+    pub agent_id: String, // "top-agent" (singleton)
+    pub max_subagent_parallel: u32,
+    pool: SubAgentPool,
+    checkpoint_store: Arc<CheckpointStore>,
+}
+
+impl Default for TopAgent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TopAgent {
+    /// 创建 Top Agent (singleton)
+    pub fn new() -> Self {
+        Self {
+            agent_id: "top-agent".into(),
+            max_subagent_parallel: 50,
+            pool: SubAgentPool::new(),
+            checkpoint_store: Arc::new(CheckpointStore::new()),
+        }
+    }
+
+    /// 派生 sub-agent + 持久化 checkpoint (per cross-session)
+    pub async fn dispatch_with_checkpoint(
+        &self,
+        archetype: SubAgentArchetype,
+        task: &AgentTask,
+    ) -> Result<Uuid, DispatchError> {
+        let task_id = self.pool.spawn(archetype, task).await?;
+        // 持久化 checkpoint
+        self.checkpoint_store
+            .save(Checkpoint {
+                checkpoint_id: Uuid::new_v4(),
+                task_id,
+                tenant_id: task.tenant_id,
+                task_state: task.state,
+                context_data: task.payload.clone(),
+                completed_steps: vec![],
+                created_at_ms: now_ms(),
+            })
+            .await;
+        Ok(task_id)
+    }
+
+    /// 访问 pool (L1 任务卡子代理池)
+    pub fn pool(&self) -> &SubAgentPool {
+        &self.pool
+    }
+
+    /// 访问 checkpoint store
+    pub fn checkpoints(&self) -> &CheckpointStore {
+        &self.checkpoint_store
+    }
+}
+
 impl Mailbox {
     /// 创建空 Mailbox
     pub fn new() -> Self {
@@ -2152,5 +2291,108 @@ mod tests {
         .await;
         let list = cs.list_by_task(task_id).await;
         assert_eq!(list.len(), 3);
+    }
+
+    /// H.1 PoC test 1: SubAgentPool 注册 + spawn 限额
+    #[tokio::test]
+    async fn subagentpool_spawn_with_limit() {
+        let pool = SubAgentPool::with_max_parallel(2);
+        pool.register(Arc::new(StubSubAgent::new(SubAgentArchetype::CodeReview)))
+            .await;
+        pool.register(Arc::new(StubSubAgent::new(SubAgentArchetype::TestGen)))
+            .await;
+        // 2 个 spawn 通过
+        for i in 0..2 {
+            let task = AgentTask {
+                task_id: Uuid::new_v4(),
+                tenant_id: Uuid::new_v4(),
+                kind: "test".into(),
+                payload: serde_json::json!({"i": i}),
+                idempotency_key: format!("k{}", i),
+                created_at_ms: now_ms(),
+                state: TaskState::Pending,
+                state_history: vec![],
+            };
+            let archetype = if i == 0 {
+                SubAgentArchetype::CodeReview
+            } else {
+                SubAgentArchetype::TestGen
+            };
+            pool.spawn(archetype, &task).await.unwrap();
+        }
+        assert_eq!(pool.active_count().await, 2);
+        // 第 3 个 spawn 触发 PoolExhausted
+        let task3 = AgentTask {
+            task_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            kind: "test".into(),
+            payload: serde_json::json!({}),
+            idempotency_key: "k3".into(),
+            created_at_ms: now_ms(),
+            state: TaskState::Pending,
+            state_history: vec![],
+        };
+        let res = pool.spawn(SubAgentArchetype::CodeReview, &task3).await;
+        assert!(matches!(res, Err(DispatchError::PoolExhausted { .. })));
+    }
+
+    /// H.1 PoC test 2: SubAgentPool spawn 未知 archetype -> PoolNotFound
+    #[tokio::test]
+    async fn subagentpool_spawn_unregistered_archetype() {
+        let pool = SubAgentPool::new();
+        // 没注册任何 SA
+        let task = AgentTask {
+            task_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            kind: "x".into(),
+            payload: serde_json::json!({}),
+            idempotency_key: "k".into(),
+            created_at_ms: now_ms(),
+            state: TaskState::Pending,
+            state_history: vec![],
+        };
+        let res = pool.spawn(SubAgentArchetype::DomainDev, &task).await;
+        assert!(matches!(res, Err(DispatchError::PoolNotFound(_))));
+    }
+
+    /// H.1 PoC test 3: TopAgent (L0) + SubAgentPool (L1) 2-level 集成 + Checkpoint 持久化
+    #[tokio::test]
+    async fn topagent_l0_l1_2level_with_checkpoint() {
+        let top = TopAgent::new();
+        // L0 Top Agent 派生 L1 CodeReview + L1 TestGen
+        top.pool()
+            .register(Arc::new(StubSubAgent::new(SubAgentArchetype::CodeReview)))
+            .await;
+        top.pool()
+            .register(Arc::new(StubSubAgent::new(SubAgentArchetype::TestGen)))
+            .await;
+        // 派生 2 sub-agent task + 自动 checkpoint
+        let mut task_ids = vec![];
+        for archetype in [SubAgentArchetype::CodeReview, SubAgentArchetype::TestGen] {
+            let task_id = Uuid::new_v4();
+            let task = AgentTask {
+                task_id,
+                tenant_id: Uuid::new_v4(),
+                kind: archetype.name().into(),
+                payload: serde_json::json!({"i": task_ids.len()}),
+                idempotency_key: format!("top_k{}", task_ids.len()),
+                created_at_ms: now_ms(),
+                state: TaskState::Pending,
+                state_history: vec![],
+            };
+            top.dispatch_with_checkpoint(archetype, &task)
+                .await
+                .unwrap();
+            task_ids.push(task_id);
+        }
+        // 2 个 active sub-agent
+        assert_eq!(top.pool().active_count().await, 2);
+        // 2 个 checkpoint 持久化
+        assert_eq!(top.checkpoints().count().await, 2);
+        // 每个 task 能从 checkpoint 恢复
+        for task_id in &task_ids {
+            let cp = top.checkpoints().latest_for_task(*task_id).await.unwrap();
+            assert_eq!(cp.task_id, *task_id);
+        }
     }
 }
