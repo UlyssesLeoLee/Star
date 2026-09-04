@@ -188,16 +188,21 @@ async def test_tmo_manager_dispatch_merge():
 
 @pytest.mark.asyncio
 async def test_tmo_manager_dispatch_unknown_node_fails():
-    """IT-10-C: TaskOperationsManager.dispatch 对未实装节点返 ok=False
+    """IT-10-C: TaskOperationsManager.dispatch 对走 factory 模式的节点返 ok=False
 
-    per 2026-09-04 wt-tmo-02-split 实装后, 改用 summarize (M-N5) 测 "未实装节点 not yet implemented",
-    不用 split (M-N2 已实装, wt-tmo-02 PR)
+    per 2026-09-05 feat-tmo-05-06-07 实装后, M-N5/M-N6/M-N7 全部经 manager.dispatch (M-N1/M-N2 同样),
+    仅 M-N3 (reorder_node) + M-N4 (bulk_node) 走 factory 模式 (ReorderNode class + make_bulk_node factory),
+    manager.dispatch 对此应返 NotImplementedError.
+
+    测试目标: 验证 manager.dispatch 对 factory 模式节点正确报错 (per 02 §2.6 + 03 §3.2.1.1).
     """
     manager = TaskOperationsManager()
-    message = {"operation": "summarize", "target_task_ids": ["a", "b"]}  # M-N5 planned
+    # dep_set = M-N3 reorder_node 走 factory (ReorderNode class), 未经 manager.dispatch
+    message = {"operation": "dep_set", "dep_set": []}  # M-N3 factory 模式
     result = await manager.dispatch(message)
     assert result["ok"] is False
-    assert "not yet implemented" in result["error"]
+    # 错误信息应表明 M-N3 走 factory 模式, manager.dispatch 不支持
+    assert "factory pattern" in result["error"] or "not yet implemented" in result["error"]
 
 
 # ===== IT-10-D: 守门 #13 a 实证 (L0 唯一入口) =====
