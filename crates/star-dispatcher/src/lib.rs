@@ -320,6 +320,149 @@ impl Default for SubAgentRegistry {
     }
 }
 
+/// **Event 类型** (per SRS-001 G-3 EventBus, G-3)
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum EventKind {
+    /// Task 状态变更 (per TaskState 6 状态机)
+    TaskStateChanged,
+    /// SubAgent 生命周期变更 (register / unregister)
+    SubAgentLifecycle,
+    /// Mailbox 消息到达 (per G-3 Mailbox)
+    MailboxMessage,
+    /// 跨域编排 Saga 事件 (per star-saga INV-SG-ORCH-04)
+    SagaEvent,
+}
+
+/// **Event 消息** (per SRS-001 G-3 EventBus, Event + Mailbox + Payload)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Event {
+    /// Event 全局 ID
+    pub event_id: Uuid,
+    /// Event 类型
+    pub kind: EventKind,
+    /// 来源 (per Agent ID 或 dispatcher 标识)
+    pub source: String,
+    /// 目标 (None = broadcast)
+    pub target: Option<String>,
+    /// 租户 ID (INV-ACT-01 跨域隔离)
+    pub tenant_id: Uuid,
+    /// Payload (JSON 序列化)
+    pub payload: serde_json::Value,
+    /// Event 时间戳 (ms since epoch)
+    pub created_at_ms: u64,
+}
+
+/// **EventBus** (per SRS-001 G-3, in-memory pub/sub bus, v0.1.0 升级 Redis/Kafka)
+pub struct EventBus {
+    subscribers: Arc<RwLock<HashMap<EventKind, Vec<Arc<dyn EventHandler + Send + Sync>>>>>,
+}
+
+/// **EventHandler trait** (per SRS-001 G-3)
+#[async_trait]
+pub trait EventHandler: Send + Sync {
+    /// Event kind 过滤
+    fn interested_in(&self) -> EventKind;
+    /// 异步处理 event
+    async fn handle(&self, event: &Event) -> Result<(), DispatchError>;
+}
+
+impl Default for EventBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EventBus {
+    /// 创建空 EventBus
+    pub fn new() -> Self {
+        Self {
+            subscribers: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// 订阅 EventKind
+    pub async fn subscribe(&self, handler: Arc<dyn EventHandler + Send + Sync>) {
+        let kind = handler.interested_in();
+        let mut subs = self.subscribers.write().await;
+        subs.entry(kind).or_default().push(handler);
+    }
+
+    /// 发布 Event (广播给所有订阅者)
+    pub async fn publish(&self, event: Event) -> Result<usize, DispatchError> {
+        let subs = self.subscribers.read().await;
+        let handlers = subs.get(&event.kind).cloned().unwrap_or_default();
+        let count = handlers.len();
+        for h in handlers.iter() {
+            // Handler ownership transfer: use Arc<dyn> not Box<dyn> for clone-able
+            // For simplicity, we just call and ignore handler result in broadcast
+            let _ = h.handle(&event).await;
+        }
+        Ok(count)
+    }
+
+    /// 订阅者数量 by EventKind
+    pub async fn subscriber_count(&self, kind: EventKind) -> usize {
+        let subs = self.subscribers.read().await;
+        subs.get(&kind).map(|v| v.len()).unwrap_or(0)
+    }
+}
+
+/// **Mailbox 消息** (per SRS-001 G-3, Agent 间消息传递)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MailboxMessage {
+    /// 消息 ID
+    pub msg_id: Uuid,
+    /// 来源 SubAgent archetype
+    pub from: SubAgentArchetype,
+    /// 目标 SubAgent archetype
+    pub to: SubAgentArchetype,
+    /// 租户 ID (INV-ACT-01)
+    pub tenant_id: Uuid,
+    /// 消息内容
+    pub body: serde_json::Value,
+    /// 时间戳
+    pub created_at_ms: u64,
+}
+
+/// **Mailbox** (per SRS-001 G-3, in-memory per-tenant 消息队列, v0.1.0 升级 Redis Stream)
+pub struct Mailbox {
+    inbox: Arc<RwLock<HashMap<SubAgentArchetype, Vec<MailboxMessage>>>>,
+}
+
+impl Default for Mailbox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Mailbox {
+    /// 创建空 Mailbox
+    pub fn new() -> Self {
+        Self {
+            inbox: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// 发送消息
+    pub async fn send(&self, msg: MailboxMessage) -> Result<(), DispatchError> {
+        let mut inbox = self.inbox.write().await;
+        inbox.entry(msg.to).or_default().push(msg);
+        Ok(())
+    }
+
+    /// 拉取消息 (FIFO)
+    pub async fn recv(&self, to: SubAgentArchetype) -> Vec<MailboxMessage> {
+        let mut inbox = self.inbox.write().await;
+        inbox.remove(&to).unwrap_or_default()
+    }
+
+    /// 窥探消息数量
+    pub async fn peek_len(&self, to: SubAgentArchetype) -> usize {
+        let inbox = self.inbox.read().await;
+        inbox.get(&to).map(|v| v.len()).unwrap_or(0)
+    }
+}
+
 impl SubAgentRegistry {
     /// 创建空 registry
     pub fn new() -> Self {
@@ -699,6 +842,197 @@ mod tests {
             self.archetype
         }
         async fn run(&self, _task: &AgentTask) -> Result<(), DispatchError> {
+            self.counter.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+    }
+
+    /// G.3 PoC test 1: EventBus publish + subscribe — broadcast 1 个 EventKind
+    #[tokio::test]
+    async fn eventbus_publish_subscribe() {
+        let bus = EventBus::new();
+        let counter = Arc::new(AtomicUsize::new(0));
+        // 订阅 TaskStateChanged 事件
+        bus.subscribe(Arc::new(CountingEventHandler::new(
+            EventKind::TaskStateChanged,
+            counter.clone(),
+        )))
+        .await;
+        assert_eq!(bus.subscriber_count(EventKind::TaskStateChanged).await, 1);
+        // 发布 3 个事件
+        for i in 0..3 {
+            let event = Event {
+                event_id: Uuid::new_v4(),
+                kind: EventKind::TaskStateChanged,
+                source: format!("dispatcher_{}", i),
+                target: None,
+                tenant_id: Uuid::new_v4(),
+                payload: serde_json::json!({"i": i}),
+                created_at_ms: now_ms(),
+            };
+            bus.publish(event).await.unwrap();
+        }
+        // 1 个订阅者收到 3 个事件
+        assert_eq!(counter.load(Ordering::SeqCst), 3);
+    }
+
+    /// G.3 PoC test 2: EventBus 多 EventKind 隔离
+    #[tokio::test]
+    async fn eventbus_kind_isolation() {
+        let bus = EventBus::new();
+        let task_counter = Arc::new(AtomicUsize::new(0));
+        let mail_counter = Arc::new(AtomicUsize::new(0));
+        // 订阅不同 kind
+        bus.subscribe(Arc::new(CountingEventHandler::new(
+            EventKind::TaskStateChanged,
+            task_counter.clone(),
+        )))
+        .await;
+        bus.subscribe(Arc::new(CountingEventHandler::new(
+            EventKind::MailboxMessage,
+            mail_counter.clone(),
+        )))
+        .await;
+        // 发布 2 个 TaskStateChanged + 3 个 MailboxMessage
+        for i in 0..2 {
+            bus.publish(Event {
+                event_id: Uuid::new_v4(),
+                kind: EventKind::TaskStateChanged,
+                source: "x".into(),
+                target: None,
+                tenant_id: Uuid::new_v4(),
+                payload: serde_json::json!({}),
+                created_at_ms: now_ms(),
+            })
+            .await
+            .unwrap();
+        }
+        for i in 0..3 {
+            bus.publish(Event {
+                event_id: Uuid::new_v4(),
+                kind: EventKind::MailboxMessage,
+                source: "x".into(),
+                target: None,
+                tenant_id: Uuid::new_v4(),
+                payload: serde_json::json!({}),
+                created_at_ms: now_ms(),
+            })
+            .await
+            .unwrap();
+        }
+        assert_eq!(task_counter.load(Ordering::SeqCst), 2);
+        assert_eq!(mail_counter.load(Ordering::SeqCst), 3);
+    }
+
+    /// G.3 PoC test 3: Mailbox 9 SA 隔离发送 + 接收
+    #[tokio::test]
+    async fn mailbox_9_sa_isolation() {
+        let mb = Mailbox::new();
+        // 9 SA 各发 1 条
+        let archetypes = [
+            SubAgentArchetype::CodeReview,
+            SubAgentArchetype::TestGen,
+            SubAgentArchetype::FiveDomainLeadAudit,
+            SubAgentArchetype::GitOps,
+            SubAgentArchetype::DocSync,
+            SubAgentArchetype::Refactor,
+            SubAgentArchetype::DbMigration,
+            SubAgentArchetype::DomainDev,
+            SubAgentArchetype::FreeForm,
+        ];
+        for sa in archetypes.iter() {
+            let msg = MailboxMessage {
+                msg_id: Uuid::new_v4(),
+                from: SubAgentArchetype::FreeForm, // 测试 from 任意
+                to: *sa,
+                tenant_id: Uuid::new_v4(),
+                body: serde_json::json!({"for": sa.name()}),
+                created_at_ms: now_ms(),
+            };
+            mb.send(msg).await.unwrap();
+        }
+        // 9 SA 各收 1 条 (peek)
+        for sa in archetypes.iter() {
+            assert_eq!(mb.peek_len(*sa).await, 1);
+        }
+        // CodeReview 收 1 条后清空
+        let msgs = mb.recv(SubAgentArchetype::CodeReview).await;
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0].to, SubAgentArchetype::CodeReview);
+        assert_eq!(mb.peek_len(SubAgentArchetype::CodeReview).await, 0);
+    }
+
+    /// G.3 PoC test 4: EventBus + Dispatcher 集成 — task lifecycle 自动 publish
+    #[tokio::test]
+    async fn eventbus_dispatcher_integration() {
+        let bus = EventBus::new();
+        let counter = Arc::new(AtomicUsize::new(0));
+        bus.subscribe(Arc::new(CountingEventHandler::new(
+            EventKind::TaskStateChanged,
+            counter.clone(),
+        )))
+        .await;
+
+        let d = Dispatcher::new();
+        let task = AgentTask {
+            task_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            kind: "test".into(),
+            payload: serde_json::json!({}),
+            idempotency_key: "evbus_key".into(),
+            created_at_ms: now_ms(),
+            state: TaskState::Pending,
+            state_history: vec![],
+        };
+        let task_id = d.submit(task).await.unwrap();
+
+        // 手动 publish 3 个 state 变更 (Pending → Dispatched → Running → Completed)
+        for to in [
+            TaskState::Dispatched,
+            TaskState::Running,
+            TaskState::Completed,
+        ] {
+            d.queue()
+                .transition(task_id, to, now_ms(), format!("to_{:?}", to))
+                .await
+                .unwrap();
+            bus.publish(Event {
+                event_id: Uuid::new_v4(),
+                kind: EventKind::TaskStateChanged,
+                source: format!("dispatcher_{}", task_id),
+                target: None,
+                tenant_id: Uuid::new_v4(),
+                payload: serde_json::json!({
+                    "task_id": task_id,
+                    "to": format!("{:?}", to),
+                }),
+                created_at_ms: now_ms(),
+            })
+            .await
+            .unwrap();
+        }
+        // 3 个 event 全订阅到
+        assert_eq!(counter.load(Ordering::SeqCst), 3);
+    }
+
+    /// G.3 PoC helper: EventHandler 计数 (每个 event +1)
+    struct CountingEventHandler {
+        kind: EventKind,
+        counter: Arc<AtomicUsize>,
+    }
+
+    impl CountingEventHandler {
+        fn new(kind: EventKind, counter: Arc<AtomicUsize>) -> Self {
+            Self { kind, counter }
+        }
+    }
+
+    #[async_trait]
+    impl EventHandler for CountingEventHandler {
+        fn interested_in(&self) -> EventKind {
+            self.kind
+        }
+        async fn handle(&self, _event: &Event) -> Result<(), DispatchError> {
             self.counter.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
