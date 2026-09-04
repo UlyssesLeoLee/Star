@@ -435,6 +435,88 @@ impl Default for Mailbox {
     }
 }
 
+/// **Token 使用量记录** (per SRS-001 G-9 Token telemetry, per AGENTS.md §7 已消耗列)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TokenUsage {
+    /// Agent 类型 (per 9 SA Archetype name)
+    pub agent: SubAgentArchetype,
+    /// 租户 ID (INV-ACT-01)
+    pub tenant_id: Uuid,
+    /// 任务 ID (per AgentTask.task_id)
+    pub task_id: Uuid,
+    /// prompt token 估算
+    pub prompt_tokens: u64,
+    /// completion token 估算
+    pub completion_tokens: u64,
+    /// 记录时间戳 (ms since epoch)
+    pub recorded_at_ms: u64,
+}
+
+/// **TokenStore** (per SRS-001 G-9, in-memory token 计量 + telemetry 接口, v0.1.0 收官 接 OpenTelemetry/Prometheus)
+pub struct TokenStore {
+    records: Arc<RwLock<Vec<TokenUsage>>>,
+    /// 累计 token 计数 (prompt + completion, 按 agent + tenant 分组)
+    cumulative_by_agent: Arc<RwLock<HashMap<SubAgentArchetype, u64>>>,
+    cumulative_by_tenant: Arc<RwLock<HashMap<Uuid, u64>>>,
+}
+
+impl Default for TokenStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TokenStore {
+    /// 创建空 TokenStore
+    pub fn new() -> Self {
+        Self {
+            records: Arc::new(RwLock::new(Vec::new())),
+            cumulative_by_agent: Arc::new(RwLock::new(HashMap::new())),
+            cumulative_by_tenant: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// 记录 token 使用量
+    pub async fn record(&self, usage: TokenUsage) {
+        let total = usage.prompt_tokens + usage.completion_tokens;
+        // 累计 by agent
+        {
+            let mut by_agent = self.cumulative_by_agent.write().await;
+            *by_agent.entry(usage.agent).or_insert(0) += total;
+        }
+        // 累计 by tenant
+        {
+            let mut by_tenant = self.cumulative_by_tenant.write().await;
+            *by_tenant.entry(usage.tenant_id).or_insert(0) += total;
+        }
+        // 原始 records
+        let mut records = self.records.write().await;
+        records.push(usage);
+    }
+
+    /// 列出所有记录
+    pub async fn list(&self) -> Vec<TokenUsage> {
+        self.records.read().await.clone()
+    }
+
+    /// 累计 by agent
+    pub async fn cumulative_by_agent(&self, agent: SubAgentArchetype) -> u64 {
+        let by_agent = self.cumulative_by_agent.read().await;
+        by_agent.get(&agent).copied().unwrap_or(0)
+    }
+
+    /// 累计 by tenant
+    pub async fn cumulative_by_tenant(&self, tenant_id: Uuid) -> u64 {
+        let by_tenant = self.cumulative_by_tenant.read().await;
+        by_tenant.get(&tenant_id).copied().unwrap_or(0)
+    }
+
+    /// 记录总数
+    pub async fn record_count(&self) -> usize {
+        self.records.read().await.len()
+    }
+}
+
 impl Mailbox {
     /// 创建空 Mailbox
     pub fn new() -> Self {
@@ -1036,5 +1118,96 @@ mod tests {
             self.counter.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
+    }
+
+    /// G.9 PoC test 1: TokenStore 记录 + 累计 by agent + by tenant
+    #[tokio::test]
+    async fn tokenstore_record_and_cumulative() {
+        let ts = TokenStore::new();
+        // 3 record, 2 agent + 2 tenant
+        for i in 0..3 {
+            ts.record(TokenUsage {
+                agent: if i % 2 == 0 {
+                    SubAgentArchetype::CodeReview
+                } else {
+                    SubAgentArchetype::TestGen
+                },
+                tenant_id: if i < 2 {
+                    Uuid::new_v4() // 同一 tenant 假设 (实际不同)
+                } else {
+                    Uuid::new_v4()
+                },
+                task_id: Uuid::new_v4(),
+                prompt_tokens: 100,
+                completion_tokens: 50,
+                recorded_at_ms: now_ms(),
+            })
+            .await;
+        }
+        // 3 record 全存
+        assert_eq!(ts.record_count().await, 3);
+        // by agent: CodeReview 2 次 (i=0, 2), TestGen 1 次 (i=1), 每次 total = 150
+        assert_eq!(
+            ts.cumulative_by_agent(SubAgentArchetype::CodeReview).await,
+            300
+        );
+        assert_eq!(
+            ts.cumulative_by_agent(SubAgentArchetype::TestGen).await,
+            150
+        );
+        assert_eq!(ts.cumulative_by_agent(SubAgentArchetype::FreeForm).await, 0);
+    }
+
+    /// G.9 PoC test 2: TokenStore + Dispatcher 集成 — task 派发时 record token 估算
+    #[tokio::test]
+    async fn tokenstore_dispatcher_integration() {
+        let ts = TokenStore::new();
+        let d = Dispatcher::new();
+        let tenant_id = Uuid::new_v4();
+        // 模拟 2 task: 1 CodeReview (150 token) + 1 TestGen (200 token)
+        let mut task_ids = vec![];
+        for (kind, tokens) in [("code-review", 150u64), ("test-gen", 200u64)] {
+            let task = AgentTask {
+                task_id: Uuid::new_v4(),
+                tenant_id,
+                kind: kind.into(),
+                payload: serde_json::json!({}),
+                idempotency_key: format!("k_{}", kind),
+                created_at_ms: now_ms(),
+                state: TaskState::Pending,
+                state_history: vec![],
+            };
+            task_ids.push((d.submit(task).await.unwrap(), kind, tokens));
+        }
+        // 派发每个 task 并 record token
+        for (task_id, kind, tokens) in &task_ids {
+            let exec = CountingExecutor::new(0);
+            d.dispatch(*task_id, &exec).await.unwrap();
+            let sa = match *kind {
+                "code-review" => SubAgentArchetype::CodeReview,
+                "test-gen" => SubAgentArchetype::TestGen,
+                _ => panic!(),
+            };
+            ts.record(TokenUsage {
+                agent: sa,
+                tenant_id,
+                task_id: *task_id,
+                prompt_tokens: tokens / 2,
+                completion_tokens: tokens / 2,
+                recorded_at_ms: now_ms(),
+            })
+            .await;
+        }
+        // 累计 by tenant
+        assert_eq!(ts.cumulative_by_tenant(tenant_id).await, 350);
+        // 累计 by agent
+        assert_eq!(
+            ts.cumulative_by_agent(SubAgentArchetype::CodeReview).await,
+            150
+        );
+        assert_eq!(
+            ts.cumulative_by_agent(SubAgentArchetype::TestGen).await,
+            200
+        );
     }
 }
