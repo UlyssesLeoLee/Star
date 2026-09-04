@@ -83,7 +83,9 @@
 |---|---|---|---|
 | G-DEP-01 | TMO-04/06 阻塞 P0 工具 (create_merge_request / create_worktree / search_issues) 3 tool | ~0.4-0.6M token | 推下 session |
 | G-DEP-02 | TMO-05 阻塞 P1 工具 (search_code / get_symbol / find_references / get_code_context) 4 tool | ~0.3-0.5M token | 推下 session |
-| G-TMO-04 | task_metadata DDL 落地 | per 守门 #13 c Master SCD Type 2 | 推下 session |
+| ~~G-TMO-04~~ | ~~task_metadata DDL 落地~~ | **🟢 关闭** (per G-TMO-04-DDL-IMPL-REPORT v0.1, 4 表 W/T/M + 7 索引 + 20/20 e2e pass) | closed |
+| G-TMO-04b | metadata_node 集成 task_metadata DDL (in-memory → SQLite 持久化) | ~0.2M token | pending 推下 session |
+| G-TMO-04c | routes_tmo /api/tmo/metadata 端点 (FastAPI) | ~0.2M token | pending 推下 session |
 | ~~G-TMO-05~~ | ~~LangGraph SDK 0.2.x interrupt_response API alpha 确认~~ | **不适用 (per G-TMO-05-SDK-FINDINGS v0.1, Star 仓不依赖 LangGraph SDK, interrupt 走纯 Python 概念)** | **🟢 关闭** (2026-09-05 02:25 JST) |
 | 5 域 Lead 真人寻访 | per 9/4 18:30 JST 守门 #3 反转 5 子代理兼任, 真人寻访仍待 Ulysses 启动 | Ulysses 找 5 个真人 | pending |
 | 真实凭证切真 | per 9/3 11:35 JST 拍板 A, mock 备选已落地, 真实 .env / UI 填入待 Ulysses 提供 | Ulysses | pending |
