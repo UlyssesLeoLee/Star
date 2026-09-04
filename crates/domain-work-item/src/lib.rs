@@ -394,7 +394,12 @@ pub enum WorkItemError {
     CrossTenantDenied(TenantId, TenantId),
     #[error("invalid state transition: {from} -> {to}")]
     /// 非法的状态转换
-    InvalidTransition { from: String, to: String },
+    InvalidTransition {
+        /// 迁移前状态
+        from: String,
+        /// 迁移目标状态
+        to: String,
+    },
     #[error("AI task missing objective (INV-WI-03)")]
     /// AI 任务缺少目标(INV-WI-03)
     AiTaskMissingObjective,
