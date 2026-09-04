@@ -12,6 +12,7 @@ thiserror = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 tokio = { version = "1", features = ["sync"] }
 async-trait = "0.1"
+axum = "0.8"
 domain-kms = { path = "../domain-kms" }
 
 [lints]
