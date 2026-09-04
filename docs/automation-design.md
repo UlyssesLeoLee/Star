@@ -233,6 +233,7 @@ print(f"err_count={result.stderr.count('error[')}")
 | D.1 | D.1 | w28 切 HubCliRuntime 入口 | S | **[S]** | — | 单文件改入口 |
 | D.2 | D.2 | 跨平台 e2e 矩阵 | R, V, A | **[P]** | `automation/cross_platform_e2e.py` | windows/macos 矩阵, R+V+A, mock 备选 CI runner |
 | D.3 | D.3 | frontend e2e (Playwright) | R, V, S, A | **[P]** | `automation/playwright_runner.py` | 4 维全命中, 已实装, 落本模板 |
+| D.3.1 | D.3.1 | 无限画布 canvas-view 7 case e2e (per 2026-09-04 拍板) | S, V | **[M]** | `pnpm test:e2e -- canvas-view` | 命中 S+V 2 维, 跟 D.3 共享 playwright 跑测链, 不强制走 python (e2e spec 本身是 .ts 写, 跑测 pnpm test:e2e 是 subprocess.run 替代); 9/9 pass (1 入口 + 1 pan + 3 zoom + 1 fit + 1 highlight URL + 1 选删 + 1 minimap) per docs/briefs/canvas-e2e-guard-001.md |
 | D.4 | D.4 | realFetch error wrapper | S | **[S]** | — | 单函数包装 |
 | D.5 | D.5 | agents/analytics/inbox 3 handler real-mode | R, V, S | **[P]** | `automation/msw_switch.py` | 3 handler × real-mode switch, R+V+S (per 3dde2b4 实证) |
 | D.6 | D.6 | markdownlint + cargo doc CI job | R, A | **[M]** | `automation/ci_runner.py` | mock 备选, R+A |

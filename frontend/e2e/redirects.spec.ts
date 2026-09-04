@@ -50,11 +50,11 @@ const findRedirect = (source: string) => {
 };
 
 describe("redirects: legacy 22 routes → 6 panels", () => {
-  it("contains 27 entries (10 projects-sink + 1 /workspace/:id param + 2 issues-sink + 5 agents-sink + 6 inbox-sink + 3 settings-sink)", () => {
-    // The design brief lists 26 conceptual routes; we add 1 extra
-    // /workspace/:id path-param entry so deep links like /workspace/123
-    // also redirect to /projects/123. Total source paths = 27.
-    expect(LEGACY_REDIRECTS.length).toBe(27);
+  it("contains 26 entries (9 projects-sink + 1 /workspace/:id param + 2 issues-sink + 5 agents-sink + 6 inbox-sink + 3 settings-sink)", () => {
+    // per 2026-09-04 canvas e2e 守门 prerequisite: /canvas/:id 移出 legacy redirect 列表
+    //   (app/canvas/[id]/page.tsx 才是设计文档意图的 CanvasView Miro 详情页主入口).
+    //   从 27 entries 减到 26 entries.
+    expect(LEGACY_REDIRECTS.length).toBe(26);
   });
 
   it("/workspace → /projects (case 1)", () => {

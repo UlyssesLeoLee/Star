@@ -73,11 +73,11 @@ export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
     destination: "/projects?tab=worktrees",
     permanent: false,
   },
-  {
-    source: "/canvas/:id",
-    destination: "/projects?canvas=:id",
-    permanent: false,
-  },
+  // /canvas/:id 不在 legacy redirect 列表 (per 2026-09-04 canvas e2e 守门 prerequisite):
+  //   app/canvas/[id]/page.tsx (CanvasView Miro 详情页, per docs/frontend-canvas-design.md §2.3)
+  //   是设计文档意图的主入口, next.config.js redirects 抢先生效会让 page.tsx 永远不到达.
+  //   原 redirect "/canvas/:id" → "/projects?canvas=:id" 跟设计矛盾, 删.
+  //   (per LEGACY_REDIRECTS 注释 /workspace/:id 同样保留原因: app/workspace 目录不存在, 必须 redirect)
 
   // ── /issues sink ────────────────────────────────────────────────────
   {

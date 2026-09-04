@@ -49,6 +49,7 @@
 
 | task_id | brief 路径 | output 路径 | status.json 路径 | 调用方 |
 |---|---|---|---|---|
+| canvas-e2e-guard-001 | `docs/briefs/canvas-e2e-guard-001.md` | (本 session 直实装, root session 落地, 不派子代理 per 守门 #9 #3 实证) | — | P3-D.3.1 (无限画布 7 case e2e 守门补齐) |
 | (待续) | `docs/briefs/<task_id>.md` | `docs/briefs/<task_id>.output.md` | `docs/briefs/<task_id>.status.json` | (待续) |
 
 **说明**: 本表 v0.1 初版为空, 跨 session 续做 (H2 强类型重构 / P3-B.5/B.6 真实 e2e 等) 落档后回填。
