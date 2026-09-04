@@ -69,3 +69,8 @@ docs.untracked.bak/
 # 临时审计脚本 (一次性 Node 脚本, 跑完就丢, 不入 git)
 # 例: scripts/_audit-kanban-drift.mjs (per 2026-08-31 12:05 JST)
 scripts/_*.mjs
+
+# Python pycache
+__pycache__/
+*.pyc
+
