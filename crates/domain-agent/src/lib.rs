@@ -1393,7 +1393,7 @@ mod tests {
     async fn register_and_start_session() {
         let svc = InMemoryAgentService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let agent = svc
             .register_agent(
                 RegisterAgentCommand {
@@ -1456,7 +1456,7 @@ mod tests {
     async fn full_session_lifecycle() {
         let svc = InMemoryAgentService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let agent = svc
             .register_agent(
                 RegisterAgentCommand {
@@ -1556,7 +1556,7 @@ mod tests {
     async fn feedback_loop_transition() {
         let svc = InMemoryAgentService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let agent = svc
             .register_agent(
                 RegisterAgentCommand {
@@ -1648,7 +1648,7 @@ mod tests {
     async fn abort_from_active() {
         let svc = InMemoryAgentService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let agent = svc
             .register_agent(
                 RegisterAgentCommand {
@@ -1726,7 +1726,7 @@ mod tests {
     async fn list_by_worktree() {
         let svc = InMemoryAgentService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let agent = svc
             .register_agent(
                 RegisterAgentCommand {
@@ -1788,7 +1788,7 @@ mod tests {
     async fn create_policy_template() {
         let svc = InMemoryAgentService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let tpl = svc
             .create_policy_template(
                 CreatePolicyTemplateCommand {
@@ -1808,7 +1808,7 @@ mod tests {
     async fn record_tool_activity() {
         let svc = InMemoryAgentService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let agent = svc
             .register_agent(
                 RegisterAgentCommand {

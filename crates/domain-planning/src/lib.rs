@@ -1316,8 +1316,8 @@ mod tests {
         let svc = InMemoryPlanningService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = make_admin_actor(tenant_id, project_id);
-        let cmd = make_create_sprint_cmd(tenant_id, project_id);
+        let actor = make_admin_actor(TenantId(tenant_id), project_id);
+        let cmd = make_create_sprint_cmd(TenantId(tenant_id), project_id);
         let sprint = svc.create_sprint(cmd, &actor).await.expect("create");
         assert_eq!(sprint.status, SprintStatus::Planned);
         assert_eq!(sprint.tenant_id, tenant_id);
@@ -1331,8 +1331,8 @@ mod tests {
         let svc = InMemoryPlanningService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = make_admin_actor(tenant_id, project_id);
-        let cmd = make_create_sprint_cmd(tenant_id, project_id);
+        let actor = make_admin_actor(TenantId(tenant_id), project_id);
+        let cmd = make_create_sprint_cmd(TenantId(tenant_id), project_id);
         let sprint = svc.create_sprint(cmd, &actor).await.unwrap();
         let started = svc.start_sprint(sprint.id, &actor).await.unwrap();
         assert_eq!(started.status, SprintStatus::Active);
@@ -1347,9 +1347,9 @@ mod tests {
         let svc = InMemoryPlanningService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let admin = make_admin_actor(tenant_id, project_id);
-        let dev = make_dev_actor(tenant_id, project_id);
-        let cmd = make_create_sprint_cmd(tenant_id, project_id);
+        let admin = make_admin_actor(TenantId(tenant_id), project_id);
+        let dev = make_dev_actor(TenantId(tenant_id), project_id);
+        let cmd = make_create_sprint_cmd(TenantId(tenant_id), project_id);
         let sprint = svc.create_sprint(cmd, &admin).await.unwrap();
         // dev 不能 start
         let res = svc.start_sprint(sprint.id, &dev).await;
@@ -1365,8 +1365,8 @@ mod tests {
         let svc = InMemoryPlanningService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = make_admin_actor(tenant_id, project_id);
-        let cmd = make_create_sprint_cmd(tenant_id, project_id);
+        let actor = make_admin_actor(TenantId(tenant_id), project_id);
+        let cmd = make_create_sprint_cmd(TenantId(tenant_id), project_id);
         let sprint = svc.create_sprint(cmd, &actor).await.unwrap();
         let cancelled = svc.cancel_sprint(sprint.id, &actor).await.unwrap();
         assert_eq!(cancelled.status, SprintStatus::Cancelled);
@@ -1379,8 +1379,8 @@ mod tests {
         let svc = InMemoryPlanningService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = make_admin_actor(tenant_id, project_id);
-        let cmd = make_create_sprint_cmd(tenant_id, project_id);
+        let actor = make_admin_actor(TenantId(tenant_id), project_id);
+        let cmd = make_create_sprint_cmd(TenantId(tenant_id), project_id);
         let sprint = svc.create_sprint(cmd, &actor).await.unwrap();
         svc.start_sprint(sprint.id, &actor).await.unwrap();
         svc.complete_sprint(sprint.id, &actor).await.unwrap();
@@ -1395,8 +1395,8 @@ mod tests {
         let svc = InMemoryPlanningService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = make_admin_actor(tenant_id, project_id);
-        let cmd = make_create_sprint_cmd(tenant_id, project_id);
+        let actor = make_admin_actor(TenantId(tenant_id), project_id);
+        let cmd = make_create_sprint_cmd(TenantId(tenant_id), project_id);
         let sprint = svc.create_sprint(cmd, &actor).await.unwrap();
         let wi = WorkItemId::new();
         let item = svc
@@ -1434,7 +1434,7 @@ mod tests {
         let svc = InMemoryPlanningService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = make_admin_actor(tenant_id, project_id);
+        let actor = make_admin_actor(TenantId(tenant_id), project_id);
         let now = Utc::now();
         // 第一个 sprint
         let cmd1 = CreateSprintCommand {
@@ -1487,7 +1487,7 @@ mod tests {
         let svc = InMemoryPlanningService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = make_admin_actor(tenant_id, project_id);
+        let actor = make_admin_actor(TenantId(tenant_id), project_id);
         let m = svc
             .create_milestone(
                 CreateMilestoneCommand {
@@ -1511,7 +1511,7 @@ mod tests {
         let svc = InMemoryPlanningService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = make_admin_actor(tenant_id, project_id);
+        let actor = make_admin_actor(TenantId(tenant_id), project_id);
         let m = svc
             .create_milestone(
                 CreateMilestoneCommand {
@@ -1553,8 +1553,8 @@ mod tests {
         let svc = InMemoryPlanningService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = make_admin_actor(tenant_id, project_id);
-        let cmd = make_create_sprint_cmd(tenant_id, project_id);
+        let actor = make_admin_actor(TenantId(tenant_id), project_id);
+        let cmd = make_create_sprint_cmd(TenantId(tenant_id), project_id);
         let sprint = svc.create_sprint(cmd, &actor).await.unwrap();
         svc.start_sprint(sprint.id, &actor).await.unwrap();
         // 追加 3 个 burndown 点
@@ -1592,7 +1592,7 @@ mod tests {
         let svc = InMemoryPlanningService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = make_admin_actor(tenant_id, project_id);
+        let actor = make_admin_actor(TenantId(tenant_id), project_id);
         // 第一个 sprint:14 天
         let now = Utc::now();
         let cmd1 = CreateSprintCommand {

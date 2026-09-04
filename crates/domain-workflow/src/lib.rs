@@ -800,7 +800,7 @@ mod tests {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
-        let cmd = make_three_state_workflow(tenant_id);
+        let cmd = make_three_state_workflow(TenantId(tenant_id));
         let wf = svc.create_workflow(cmd, &actor).await.expect("创建成功");
         assert_eq!(wf.version, 1);
 
@@ -868,7 +868,7 @@ mod tests {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
-        let cmd = make_three_state_workflow(tenant_id);
+        let cmd = make_three_state_workflow(TenantId(tenant_id));
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
 
         let inst = svc
@@ -912,7 +912,7 @@ mod tests {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
-        let cmd = make_three_state_workflow(tenant_id);
+        let cmd = make_three_state_workflow(TenantId(tenant_id));
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
 
         let inst = svc
@@ -982,7 +982,7 @@ mod tests {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
-        let cmd = make_three_state_workflow(tenant_id);
+        let cmd = make_three_state_workflow(TenantId(tenant_id));
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
 
         let inst = svc
@@ -1188,7 +1188,7 @@ mod tests {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
-        let cmd = make_three_state_workflow(tenant_id);
+        let cmd = make_three_state_workflow(TenantId(tenant_id));
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
         let inst = svc
             .start_instance(
@@ -1245,7 +1245,7 @@ mod tests {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
-        let cmd = make_three_state_workflow(tenant_id);
+        let cmd = make_three_state_workflow(TenantId(tenant_id));
         let wf1 = svc.create_workflow(cmd, &actor).await.unwrap();
         assert_eq!(wf1.version, 1);
         // 整体替换 → version +1
@@ -1264,7 +1264,7 @@ mod tests {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
-        let cmd = make_three_state_workflow(tenant_id);
+        let cmd = make_three_state_workflow(TenantId(tenant_id));
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
         let inst = svc
             .start_instance(
@@ -1393,7 +1393,7 @@ mod tests {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
-        let cmd = make_three_state_workflow(tenant_id);
+        let cmd = make_three_state_workflow(TenantId(tenant_id));
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
 
         // get
@@ -1418,7 +1418,7 @@ mod tests {
         let svc = InMemoryWorkflowService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
-        let cmd = make_three_state_workflow(tenant_id);
+        let cmd = make_three_state_workflow(TenantId(tenant_id));
         let wf = svc.create_workflow(cmd, &actor).await.unwrap();
         let in_progress = wf
             .states

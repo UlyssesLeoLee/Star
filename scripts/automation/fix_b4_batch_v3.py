@@ -98,36 +98,43 @@ def fix_file(file_path, file_errs):
                 'assert_eq!(wt.tenant_id, TenantId(tenant_id));',
                 new
             )
-        # 模式 B: struct shorthand 16+ 空格, 真实 struct 构造
-        #  区别: 12 空格通常是 call site named arg (20+ 空格 in make_xxx() 内)
-        #  简化: 16+ 空格 + field name + , +  行末
-        elif re.match(r'^(\s{16,})(\w+),\s*$', new):
-            m = re.match(r'^(\s{16,})(\w+),\s*$', new)
+        # 模式 B: struct shorthand 16-19 空格 (20+ 几乎都是 call site named arg)
+        elif re.match(r'^(\s{16,19})(\w+),\s*$', new):
+            m = re.match(r'^(\s{16,19})(\w+),\s*$', new)
             indent = m.group(1)
             field_name = m.group(2)
-            # 排除 call site named arg 模式: 20+ 空格通常在 make_xxx() 内
-            if len(indent) < 20:
-                # 16-19 空格, 大概率是 struct 构造
-                if field_name in ("tenant_id", "tenant"):
-                    new = f"{indent}{field_name}: TenantId({field_name}),\n".rstrip("\n")
-                elif field_name in ("user_id", "user", "subject_user_id"):
-                    new = f"{indent}{field_name}: UserId({field_name}),\n".rstrip("\n")
-                # actor 字段是 ActorContext 类型, 不是 TenantId, 跳过
-                elif field_name == "actor":
-                    pass  # 跨 sub-session 续
-                else:
-                    # 其他 ID 字段 (project_id / workspace_id 等) 跨 session 续
-                    pass
+            # 真实 struct 构造
+            if field_name in ("tenant_id", "tenant"):
+                new = f"{indent}{field_name}: TenantId({field_name}),\n".rstrip("\n")
+            elif field_name in ("user_id", "user", "subject_user_id"):
+                new = f"{indent}{field_name}: UserId({field_name}),\n".rstrip("\n")
+            # actor 字段是 ActorContext 类型, 不是 TenantId, 跳过
+            elif field_name == "actor":
+                pass
+            else:
                 # 其他 ID 字段 (project_id / workspace_id 等) 跨 session 续
+                pass
         # 模式 D: 局部 var (tenant_id: tenant, user_id: user) → wrap
         elif re.search(r'tenant_id:\s*tenant\b', new) and "TenantId" not in new:
             new = re.sub(r'tenant_id:\s*tenant\b', 'tenant_id: TenantId(tenant)', new)
         elif re.search(r'user_id:\s*user\b', new) and "UserId" not in new:
             new = re.sub(r'user_id:\s*user\b', 'user_id: UserId(user)', new)
         # 模式 F: helper 调用 (make_actor_user(tenant_id), make_admin_actor(tenant_id))
-        elif re.search(r'(make_\w+_actor\w*|make_\w+_user\w*)\(tenant_id\)', new):
+        # 通用化: 任何 make_\w+ 调 tenant_id
+        elif re.search(r'\b(make_\w+)\((.*tenant_id.*)\)', new):
+            # 多参数版本: make_xxx(tenant_id, ...) → make_xxx(TenantId(tenant_id), ...)
+            m = re.search(r'\b(make_\w+)\((.*tenant_id.*)\)', new)
+            if m:
+                # 只 wrap 第一个 tenant_id 参数
+                func_name = m.group(1)
+                args = m.group(2)
+                # 找第一个 tenant_id (在参数列表中)
+                if "tenant_id" in args and "TenantId(tenant_id)" not in args:
+                    new_args = re.sub(r'\btenant_id\b', 'TenantId(tenant_id)', args, count=1)
+                    new = new.replace(m.group(0), f"{func_name}({new_args})")
+        elif re.search(r'\b(make_\w+_actor\w*|make_\w+_user\w*)\(tenant_id\)', new):
             new = re.sub(
-                r'(make_\w+_actor\w*|make_\w+_user\w*)\(tenant_id\)',
+                r'\b(make_\w+_actor\w*|make_\w+_user\w*)\(tenant_id\)',
                 r'\1(TenantId(tenant_id))',
                 new
             )

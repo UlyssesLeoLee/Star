@@ -1186,7 +1186,7 @@ mod tests {
         let svc = InMemorySearchService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let q = SearchQuery {
             query_text: "login".to_string(),
             filters: HashMap::new(),
@@ -1220,7 +1220,7 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
         let other = uuid::Uuid::new_v4();
-        let actor_me = make_actor(tenant_id, me);
+        let actor_me = make_actor(TenantId(tenant_id), me);
         let q = SearchQuery {
             query_text: "x".to_string(),
             filters: HashMap::new(),
@@ -1242,7 +1242,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let actor_other = make_actor(tenant_id, other);
+        let actor_other = make_actor(TenantId(tenant_id), other);
         let res = svc
             .delete_saved(
                 DeleteSavedSearchCommand {
@@ -1263,7 +1263,7 @@ mod tests {
         let projector = projector_actor(tenant_id);
         svc.upsert_index(
             sample_index_cmd(
-                tenant_id: TenantId(tenant_id),
+                tenant_id,
                 ResourceType::WorkItem,
                 "implement authentication",
             ),

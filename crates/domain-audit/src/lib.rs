@@ -1198,7 +1198,10 @@ mod tests {
             after_state: None,
             immutable_hash: None,
         };
-        let ev = svc.record(cmd, make_admin_actor(TenantId(tenant_id))).await.unwrap();
+        let ev = svc
+            .record(cmd, make_admin_actor(TenantId(tenant_id)))
+            .await
+            .unwrap();
         // 验证 AuditRecorder trait 没有 update / delete 方法
         // (编译期约束 + 运行时只能通过 mutation 改,但本服务只暴露 `record`)
         assert_eq!(svc.event_count().await, 1);
@@ -1249,7 +1252,10 @@ mod tests {
             after_state: None,
             immutable_hash: None,
         };
-        let _ = svc.record(cmd, make_admin_actor(TenantId(tenant_id))).await.unwrap();
+        let _ = svc
+            .record(cmd, make_admin_actor(TenantId(tenant_id)))
+            .await
+            .unwrap();
         // developer 不能读
         let developer = make_developer_actor(TenantId(tenant_id));
         let q = AuditListQuery {

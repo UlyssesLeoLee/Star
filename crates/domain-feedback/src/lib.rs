@@ -197,11 +197,11 @@ mod tests {
     async fn create_feedback_success_and_event() {
         let (svc, mut rx) = InMemoryFeedbackService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let target = FeedbackTarget::WorkItem {
             work_item_id: WorkItemId::new(),
         };
-        let cmd = make_create_cmd(tenant_id, target.clone());
+        let cmd = make_create_cmd(TenantId(tenant_id), target.clone());
         let f = svc.create_feedback(cmd, actor).await.expect("create OK");
         assert_eq!(f.status, FeedbackStatus::Open);
         assert_eq!(f.tenant_id, tenant_id);
@@ -227,7 +227,7 @@ mod tests {
     async fn full_six_state_chain_open_to_verified() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -282,7 +282,7 @@ mod tests {
     async fn invalid_state_transition_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -319,7 +319,7 @@ mod tests {
     async fn reject_from_open_terminal() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -357,7 +357,7 @@ mod tests {
     async fn supersede_without_successor_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -391,7 +391,7 @@ mod tests {
     async fn supersede_with_successor_ok() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f1 = svc
             .create_feedback(
                 make_create_cmd(
@@ -441,7 +441,7 @@ mod tests {
     async fn update_after_applied_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -498,7 +498,7 @@ mod tests {
     async fn delete_only_open_allowed() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -536,7 +536,7 @@ mod tests {
     async fn inbox_severity_priority_ordering() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let project_id = ProjectId::new();
 
         // P3 第一个创建,P0 最后创建
@@ -630,14 +630,14 @@ mod tests {
     async fn cross_worktree_target_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let worktree_a = WorktreeId::new();
         let worktree_b = WorktreeId::new();
         let target = FeedbackTarget::Worktree {
             worktree_id: worktree_a,
         };
         let f = svc
-            .create_feedback(make_create_cmd(tenant_id, target), actor.clone())
+            .create_feedback(make_create_cmd(TenantId(tenant_id), target), actor.clone())
             .await
             .unwrap();
         // ACK 时 actor 在 worktree_b,应被拒
@@ -664,7 +664,7 @@ mod tests {
     async fn ai_authored_feedback_records_agent_id() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let mut actor = make_actor(tenant_id);
+        let mut actor = make_actor(TenantId(tenant_id));
         actor.is_agent_session = true;
         // 不显式传 author_agent_id,service 应自动兜底
         let f = svc
@@ -691,7 +691,7 @@ mod tests {
     async fn consumed_event_projection_three_kinds() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(

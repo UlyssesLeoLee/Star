@@ -197,7 +197,7 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_service_actor(TenantId(tenant_id));
         for (i, kind) in ValidationKind::SOW_REQUIRED.iter().enumerate() {
-            let cmd = make_submit_cmd(tenant_id, *kind);
+            let cmd = make_submit_cmd(TenantId(tenant_id), *kind);
             let r = svc
                 .submit_result(cmd, actor.clone())
                 .await
@@ -218,7 +218,7 @@ mod tests {
         let svc = InMemoryValidationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_service_actor(TenantId(tenant_id));
-        let mut cmd = make_submit_cmd(tenant_id, ValidationKind::Build);
+        let mut cmd = make_submit_cmd(TenantId(tenant_id), ValidationKind::Build);
         cmd.log_excerpt_ref = "   ".to_string();
         let res = svc.submit_result(cmd, actor).await;
         assert!(matches!(res, Err(ValidationError::InvalidState(_))));
@@ -233,7 +233,7 @@ mod tests {
         let actor = make_service_actor(TenantId(tenant_id));
         let r = svc
             .submit_result(
-                make_submit_cmd(tenant_id, ValidationKind::UnitTest),
+                make_submit_cmd(TenantId(tenant_id), ValidationKind::UnitTest),
                 actor.clone(),
             )
             .await
@@ -291,7 +291,7 @@ mod tests {
                 .submit_result(
                     SubmitValidationResultCommand {
                         work_item_id: Some(work_item),
-                        ..make_submit_cmd(tenant_id, ValidationKind::AcceptanceCheck)
+                        ..make_submit_cmd(TenantId(tenant_id), ValidationKind::AcceptanceCheck)
                     },
                     actor.clone(),
                 )
@@ -356,7 +356,7 @@ mod tests {
         let svc_actor = make_service_actor(TenantId(tenant_id));
         let r = svc
             .submit_result(
-                make_submit_cmd(tenant_id, ValidationKind::Build),
+                make_submit_cmd(TenantId(tenant_id), ValidationKind::Build),
                 svc_actor.clone(),
             )
             .await
@@ -400,7 +400,7 @@ mod tests {
         let actor = make_service_actor(TenantId(tenant_id));
         let r = svc
             .submit_result(
-                make_submit_cmd(tenant_id, ValidationKind::Build),
+                make_submit_cmd(TenantId(tenant_id), ValidationKind::Build),
                 actor.clone(),
             )
             .await
@@ -475,7 +475,7 @@ mod tests {
             .submit_result(
                 SubmitValidationResultCommand {
                     work_item_id: Some(work_item),
-                    ..make_submit_cmd(tenant_id, ValidationKind::UnitTest)
+                    ..make_submit_cmd(TenantId(tenant_id), ValidationKind::UnitTest)
                 },
                 actor.clone(),
             )
@@ -530,7 +530,7 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_service_actor(TenantId(tenant_id));
         // is_ai_complete_claim=true 但 log_excerpt_ref 为空 → submit 即拒
-        let mut cmd = make_submit_cmd(tenant_id, ValidationKind::Build);
+        let mut cmd = make_submit_cmd(TenantId(tenant_id), ValidationKind::Build);
         cmd.is_ai_complete_claim = true;
         cmd.log_excerpt_ref = "".to_string();
         let res = svc.submit_result(cmd, actor).await;
@@ -540,7 +540,7 @@ mod tests {
         let actor2 = make_service_actor(TenantId(tenant_id));
         let r = svc
             .submit_result(
-                make_submit_cmd(tenant_id, ValidationKind::UnitTest),
+                make_submit_cmd(TenantId(tenant_id), ValidationKind::UnitTest),
                 actor2.clone(),
             )
             .await

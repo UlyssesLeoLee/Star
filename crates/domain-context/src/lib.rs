@@ -1038,7 +1038,7 @@ mod tests {
         };
         let p2 = svc
             .add_relevant_item(
-                tenant_id: TenantId(tenant_id),
+                tenant_id,
                 p.id,
                 RelevantBucket::RelevantRequirements,
                 Priority::P1,
@@ -1088,7 +1088,7 @@ mod tests {
         // 这里改测 ProvenanceEntry 的 included_at_layer > P4 不可能
         let res = svc
             .add_relevant_item(
-                tenant_id: TenantId(tenant_id),
+                tenant_id,
                 p.id,
                 RelevantBucket::RelevantRequirements,
                 Priority::P4,
