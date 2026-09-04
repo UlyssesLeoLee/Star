@@ -47,18 +47,22 @@ define_uuid_id!(CredentialRefId);
 // =====================================================================
 
 #[macro_export]
+/// 生成租户领域 UUID 强类型 ID 的宏,自动实现 Copy/Eq/Hash/Ord/Serialize/Display 等 trait
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 由 `define_uuid_id!` 宏生成的 UUID 强类型 ID 类型
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 UUID 强类型 ID
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回内部原始 UUID 值
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -85,24 +89,37 @@ macro_rules! define_uuid_id {
 /// Tenant(§4.1)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tenant {
+    /// 租户唯一标识
     pub id: TenantId,
+    /// 租户 URL 友好唯一 slug(INV-T-04)
     pub slug: String,
+    /// 租户显示名称
     pub display_name: String,
+    /// 租户当前状态(Active / Suspended / Deleted)
     pub status: TenantStatus,
+    /// 租户订阅套餐等级
     pub plan_tier: PlanTier,
+    /// 租户创建时间
     pub created_at: DateTime<Utc>,
+    /// 试用期结束时间(如适用)
     pub trial_ends_at: Option<DateTime<Utc>>,
+    /// 租户被暂停的时间(如适用)
     pub suspended_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 租户状态(INV-T-02:Active / Suspended / Deleted 三态)
 pub enum TenantStatus {
+    /// 正常可用状态
     Active,
+    /// 已暂停状态
     Suspended,
+    /// 已删除状态(终态)
     Deleted,
 }
 
 impl TenantStatus {
+    /// 返回状态对应的大写字符串表示
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Active => "ACTIVE",
@@ -110,19 +127,25 @@ impl TenantStatus {
             Self::Deleted => "DELETED",
         }
     }
+    /// 判断是否为终态(Deleted)
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Deleted)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 租户订阅套餐等级
 pub enum PlanTier {
+    /// 免费套餐
     Free,
+    /// 专业套餐
     Pro,
+    /// 企业套餐
     Enterprise,
 }
 
 impl PlanTier {
+    /// 返回套餐等级对应的大写字符串表示
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Free => "FREE",
@@ -135,20 +158,32 @@ impl PlanTier {
 /// TenantPolicy(§4.1)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TenantPolicy {
+    /// 策略唯一标识
     pub id: TenantPolicyId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 是否允许使用云端 AI
     pub cloud_ai_allowed: bool,
+    /// 是否限制云端 AI 使用范围
     pub cloud_ai_restricted: bool,
+    /// 是否仅允许使用本地 AI
     pub local_ai_only: bool,
+    /// 是否禁止上传代码内容
     pub no_code_upload: bool,
+    /// 是否仅允许发送元数据
     pub metadata_only: bool,
+    /// 允许使用的特定 Provider ID 白名单
     pub specific_provider_allowed: Vec<Uuid>,
+    /// 允许使用的区域列表
     pub allowed_regions: Vec<String>,
+    /// 数据驻留区域
     pub data_residency_zone: String,
+    /// 策略最后更新时间
     pub updated_at: DateTime<Utc>,
 }
 
 impl TenantPolicy {
+    /// 为指定租户生成默认 TenantPolicy
     pub fn default_for(tenant_id: TenantId) -> Self {
         Self {
             id: TenantPolicyId::new(),
@@ -169,18 +204,28 @@ impl TenantPolicy {
 /// SecurityPolicy(§4.1)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityPolicy {
+    /// 策略唯一标识
     pub id: SecurityPolicyId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 是否强制要求多因素认证
     pub require_mfa: bool,
+    /// MFA 宽限期时长(秒)
     pub mfa_grace_period_seconds: u32,
+    /// 会话最大有效期(秒)
     pub session_max_age_seconds: u32,
+    /// 刷新令牌有效期(秒)
     pub refresh_token_ttl_seconds: u32,
+    /// 每用户允许的最大设备数
     pub device_max_per_user: u32,
+    /// 设备记录有效期(秒)
     pub device_ttl_seconds: u32,
+    /// 策略最后更新时间
     pub updated_at: DateTime<Utc>,
 }
 
 impl SecurityPolicy {
+    /// 为指定租户生成默认 SecurityPolicy
     pub fn default_for(tenant_id: TenantId) -> Self {
         Self {
             id: SecurityPolicyId::new(),
@@ -199,28 +244,45 @@ impl SecurityPolicy {
 /// ProviderDataBoundary(§4.1,§5.4 Security)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderDataBoundary {
+    /// 边界记录唯一标识
     pub id: ProviderDataBoundaryId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// AI Provider ID
     pub provider_id: String,
+    /// 使用的模型 ID
     pub model_id: String,
+    /// 数据处理所在区域
     pub region: String,
+    /// 发送给 Provider 的数据种类
     pub data_sent: Vec<DataKind>,
+    /// 数据保留策略
     pub retention_policy: RetentionPolicy,
+    /// 凭据引用(仅引用 Broker,不存明文,INV-T-03)
     pub credential_ref: CredentialRefId,
+    /// 边界记录创建时间
     pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 发送给 AI Provider 的数据种类
 pub enum DataKind {
+    /// 提示词
     Prompt,
+    /// 源代码
     Code,
+    /// 代码差异
     Diff,
+    /// 符号信息
     Symbol,
+    /// 测试内容
     Test,
+    /// 构建日志
     BuildLog,
 }
 
 impl DataKind {
+    /// 返回数据种类对应的大写字符串表示
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Prompt => "PROMPT",
@@ -234,13 +296,18 @@ impl DataKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 数据保留策略
 pub enum RetentionPolicy {
+    /// 不保留(零保留)
     Zero,
+    /// 保留指定天数
     NDays(u32),
+    /// 保留至任务结束
     UntilTaskEnd,
 }
 
 impl RetentionPolicy {
+    /// 返回保留策略对应的大写字符串表示
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Zero => "ZERO",
@@ -255,20 +322,28 @@ impl RetentionPolicy {
 // =====================================================================
 
 #[derive(Debug, Error)]
+/// 租户域错误类型
 pub enum TenantError {
     #[error("not found: {0}")]
+    /// 资源未找到
     NotFound(String),
     #[error("permission denied")]
+    /// 权限不足
     PermissionDenied,
     #[error("cross-tenant access denied: tenant {0} vs required {1}")]
+    /// 跨租户访问被拒绝
     CrossTenantDenied(TenantId, TenantId),
     #[error("slug already exists: {0}")]
+    /// slug 已存在(违反 INV-T-04)
     SlugExists(String),
     #[error("invalid state: {0}")]
+    /// 状态非法,无法执行该操作
     InvalidState(String),
     #[error("conflict: {0}")]
+    /// 冲突
     Conflict(String),
     #[error("internal: {0}")]
+    /// 内部错误
     Internal(String),
 }
 
@@ -277,43 +352,66 @@ pub enum TenantError {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建租户命令
 pub struct CreateTenantCommand {
+    /// 待创建租户的 slug
     pub slug: String,
+    /// 待创建租户的显示名称
     pub display_name: String,
+    /// 待创建租户的套餐等级
     pub plan_tier: PlanTier,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 暂停租户命令
 pub struct SuspendTenantCommand {
+    /// 待暂停的租户 ID
     pub tenant_id: TenantId,
+    /// 暂停原因
     pub reason: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 更新租户策略命令
 pub struct UpdateTenantPolicyCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 新的租户策略内容
     pub policy: TenantPolicy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 更新安全策略命令
 pub struct UpdateSecurityPolicyCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 新的安全策略内容
     pub policy: SecurityPolicy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 注册 Provider 数据边界命令
 pub struct RegisterProviderBoundaryCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// AI Provider ID
     pub provider_id: String,
+    /// 使用的模型 ID
     pub model_id: String,
+    /// 数据处理所在区域
     pub region: String,
+    /// 发送给 Provider 的数据种类
     pub data_sent: Vec<DataKind>,
+    /// 数据保留策略
     pub retention_policy: RetentionPolicy,
+    /// 凭据引用
     pub credential_ref: CredentialRefId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 查询租户请求
 pub struct GetTenantQuery {
+    /// 待查询的租户 ID
     pub tenant_id: TenantId,
 }
 
@@ -322,37 +420,44 @@ pub struct GetTenantQuery {
 // =====================================================================
 
 #[async_trait]
+/// 租户命令端口(写操作)
 pub trait TenantCommandPort: Send + Sync {
+    /// 创建新租户
     async fn create_tenant(
         &self,
         cmd: CreateTenantCommand,
         actor: &ActorContext,
     ) -> Result<Tenant, TenantError>;
 
+    /// 暂停租户
     async fn suspend_tenant(
         &self,
         cmd: SuspendTenantCommand,
         actor: &ActorContext,
     ) -> Result<Tenant, TenantError>;
 
+    /// 重新激活已暂停租户
     async fn reactivate_tenant(
         &self,
         tenant_id: TenantId,
         actor: &ActorContext,
     ) -> Result<Tenant, TenantError>;
 
+    /// 更新租户策略
     async fn update_tenant_policy(
         &self,
         cmd: UpdateTenantPolicyCommand,
         actor: &ActorContext,
     ) -> Result<TenantPolicy, TenantError>;
 
+    /// 更新安全策略
     async fn update_security_policy(
         &self,
         cmd: UpdateSecurityPolicyCommand,
         actor: &ActorContext,
     ) -> Result<SecurityPolicy, TenantError>;
 
+    /// 注册 Provider 数据边界
     async fn register_provider_boundary(
         &self,
         cmd: RegisterProviderBoundaryCommand,
@@ -361,25 +466,30 @@ pub trait TenantCommandPort: Send + Sync {
 }
 
 #[async_trait]
+/// 租户查询端口(读操作)
 pub trait TenantQueryPort: Send + Sync {
+    /// 获取租户信息
     async fn get_tenant(
         &self,
         q: GetTenantQuery,
         actor: &ActorContext,
     ) -> Result<Tenant, TenantError>;
 
+    /// 获取租户策略
     async fn get_tenant_policy(
         &self,
         tenant_id: TenantId,
         actor: &ActorContext,
     ) -> Result<TenantPolicy, TenantError>;
 
+    /// 获取安全策略
     async fn get_security_policy(
         &self,
         tenant_id: TenantId,
         actor: &ActorContext,
     ) -> Result<SecurityPolicy, TenantError>;
 
+    /// 列出租户的 Provider 数据边界
     async fn list_provider_boundaries(
         &self,
         tenant_id: TenantId,
@@ -388,19 +498,30 @@ pub trait TenantQueryPort: Send + Sync {
 }
 
 #[async_trait]
+/// 租户仓储端口
 pub trait TenantRepository: Send + Sync {
+    /// 插入租户记录
     async fn insert_tenant(&self, t: Tenant) -> Result<(), TenantError>;
+    /// 按 ID 获取租户
     async fn get_tenant(&self, id: TenantId) -> Result<Tenant, TenantError>;
+    /// 按 slug 获取租户
     async fn get_tenant_by_slug(&self, slug: &str) -> Result<Option<Tenant>, TenantError>;
+    /// 更新租户记录
     async fn update_tenant(&self, t: Tenant) -> Result<(), TenantError>;
 
+    /// 插入或更新租户策略
     async fn upsert_tenant_policy(&self, p: TenantPolicy) -> Result<(), TenantError>;
+    /// 按租户 ID 获取租户策略
     async fn get_tenant_policy(&self, tid: TenantId) -> Result<TenantPolicy, TenantError>;
 
+    /// 插入或更新安全策略
     async fn upsert_security_policy(&self, p: SecurityPolicy) -> Result<(), TenantError>;
+    /// 按租户 ID 获取安全策略
     async fn get_security_policy(&self, tid: TenantId) -> Result<SecurityPolicy, TenantError>;
 
+    /// 插入 Provider 数据边界记录
     async fn insert_provider_boundary(&self, b: ProviderDataBoundary) -> Result<(), TenantError>;
+    /// 列出租户的 Provider 数据边界记录
     async fn list_provider_boundaries(
         &self,
         tid: TenantId,
@@ -411,6 +532,7 @@ pub trait TenantRepository: Send + Sync {
 // InMemoryTenantService
 // =====================================================================
 
+/// 基于内存的租户服务实现(用于测试/开发)
 pub struct InMemoryTenantService {
     repo: Arc<dyn TenantRepository>,
     tenants: Arc<RwLock<HashMap<TenantId, Tenant>>>,
@@ -420,6 +542,7 @@ pub struct InMemoryTenantService {
 }
 
 impl InMemoryTenantService {
+    /// 创建一个新的内存租户服务实例
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryTenantRepository::new()),
@@ -706,6 +829,7 @@ impl TenantQueryPort for InMemoryTenantService {
 // InMemoryTenantRepository
 // =====================================================================
 
+/// 基于内存的租户仓储实现(用于测试/开发)
 pub struct InMemoryTenantRepository {
     tenants: RwLock<HashMap<TenantId, Tenant>>,
     by_slug: RwLock<HashMap<String, TenantId>>,
@@ -715,6 +839,7 @@ pub struct InMemoryTenantRepository {
 }
 
 impl InMemoryTenantRepository {
+    /// 创建一个新的内存租户仓储实例
     pub fn new() -> Self {
         Self {
             tenants: RwLock::new(HashMap::new()),

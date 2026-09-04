@@ -20,27 +20,46 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FieldType {
+    /// 单行文本
     Text,
+    /// 多行文本
     Textarea,
+    /// 数字
     Number,
+    /// 邮箱
     Email,
+    /// URL 链接
     Url,
+    /// 电话号码
     Phone,
+    /// 日期
     Date,
+    /// 日期时间
     Datetime,
+    /// 时间
     Time,
+    /// 单选下拉
     Select,
+    /// 多选下拉
     MultiSelect,
+    /// 单选按钮
     Radio,
+    /// 复选框
     Checkbox,
+    /// 用户选择器
     UserPicker,
+    /// 多用户选择
     MultiUser,
+    /// 附件上传
     Attachment,
+    /// 富文本
     RichText,
+    /// 级联选择
     Cascader,
 }
 
 impl FieldType {
+    /// 返回全部字段类型
     pub fn all() -> &'static [FieldType] {
         &[
             Self::Text,
@@ -64,6 +83,7 @@ impl FieldType {
         ]
     }
 
+    /// 返回字段类型的展示名称
     pub fn name(&self) -> &'static str {
         match self {
             Self::Text => "Text",
@@ -91,74 +111,117 @@ impl FieldType {
 /// 字段定义
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FormField {
+    /// 提交时字段名
     pub key: String,   // 提交时字段名
+    /// UI 显示文本
     pub label: String, // UI 显示
+    /// 字段类型
     pub field_type: FieldType,
+    /// 是否必填
     pub required: bool,
+    /// 默认值
     pub default_value: Option<serde_json::Value>,
+    /// 可选项列表 (select/radio 等使用)
     pub options: Vec<FieldOption>, // for select/radio/...
+    /// 验证规则
     pub validation: FieldValidation,
+    /// 条件显示/必填规则
     pub conditional: Option<ConditionalRule>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// 字段可选项 (用于 select/radio/checkbox)
 pub struct FieldOption {
+    /// 选项值
     pub value: String,
+    /// 选项展示文本
     pub label: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+/// 字段验证规则
 pub struct FieldValidation {
+    /// 最小长度
     pub min_length: Option<u32>,
+    /// 最大长度
     pub max_length: Option<u32>,
+    /// 最小值
     pub min: Option<f64>,
+    /// 最大值
     pub max: Option<f64>,
+    /// 正则校验规则
     pub pattern: Option<String>, // regex
+    /// 自定义校验失败提示
     pub custom_message: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// 条件逻辑规则
 pub struct ConditionalRule {
+    /// 触发的动作 (显示/隐藏/必填/可选)
     pub action: ConditionalAction,
+    /// 被控制的目标字段 key
     pub field_key: String,
+    /// 比较运算符
     pub operator: CondOperator,
+    /// 用于比较的目标值
     pub value: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+/// 条件规则触发的动作类型
 pub enum ConditionalAction {
+    /// 显示字段
     Show,
+    /// 隐藏字段
     Hide,
+    /// 设为必填
     Require,
+    /// 设为非必填
     Optional,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+/// 条件比较运算符
 pub enum CondOperator {
+    /// 等于
     Eq,
+    /// 不等于
     Ne,
+    /// 属于集合
     In,
+    /// 不属于集合
     NotIn,
+    /// 包含
     Contains,
+    /// 为空
     Empty,
+    /// 不为空
     NotEmpty,
 }
 
 /// 提交动作
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SubmitAction {
+    /// 提交动作类型
     pub action_type: SubmitActionType,
+    /// 动作配置参数
     pub config: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+/// 表单提交后触发的动作类型
 pub enum SubmitActionType {
+    /// 创建工作项 (走 domain-work-item)
     CreateWorkItem,    // 走 domain-work-item
+    /// 触发自动化流程 (走 domain-automation)
     TriggerAutomation, // 走 domain-automation
+    /// 发送邮件通知 (走 domain-notification)
     SendEmail,         // 走 domain-notification
+    /// 调用 Webhook (走 star-webhook)
     CallWebhook,       // 走 star-webhook
 }
 
@@ -169,23 +232,38 @@ pub enum SubmitActionType {
 /// Form 聚合根
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Form {
+    /// 表单 ID
     pub id: Uuid,
+    /// 表单名称
     pub name: String,
+    /// 表单描述
     pub description: String,
+    /// 表单字段列表
     pub fields: Vec<FormField>,
+    /// 提交后触发的动作列表
     pub submit_actions: Vec<SubmitAction>,
+    /// 公开访问 slug
     pub public_url_slug: String, // 公开访问 slug
+    /// 访问控制配置
     pub access_control: AccessControl,
+    /// 每小时最大提交次数
     pub rate_limit_per_hour: u32,
+    /// 创建时间
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// 最后更新时间
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// 表单访问控制配置
 pub struct AccessControl {
+    /// 是否公开访问 (无需登录)
     pub public: bool,
+    /// 邮箱白名单
     pub email_whitelist: Vec<String>,
+    /// 是否需要 token 校验
     pub require_token: bool,
+    /// 访问 token
     pub token: Option<String>,
 }
 
@@ -201,6 +279,7 @@ impl Default for AccessControl {
 }
 
 impl Form {
+    /// 创建新表单
     pub fn new(name: impl Into<String>, public_url_slug: impl Into<String>) -> Self {
         let now = chrono::Utc::now();
         Self {
@@ -217,6 +296,7 @@ impl Form {
         }
     }
 
+    /// 向表单添加字段 (字段 key 重复时返回错误)
     pub fn add_field(&mut self, field: FormField) -> Result<(), FormError> {
         if self.fields.iter().any(|f| f.key == field.key) {
             return Err(FormError::DuplicateFieldKey(field.key));
@@ -235,11 +315,17 @@ impl Form {
 /// 表单提交
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FormSubmission {
+    /// 提交记录 ID
     pub id: Uuid,
+    /// 所属表单 ID
     pub form_id: Uuid,
+    /// 提交的字段值列表 (key, value)
     pub values: Vec<(String, serde_json::Value)>, // (key, value)
+    /// 提交时间
     pub submitted_at: chrono::DateTime<chrono::Utc>,
+    /// 提交者邮箱
     pub submitter_email: Option<String>,
+    /// 提交者 IP
     pub submitter_ip: Option<String>,
 }
 
@@ -248,20 +334,28 @@ pub struct FormSubmission {
 // =====================================================================
 
 #[derive(Debug, Error, Clone, PartialEq)]
+/// 表单领域错误
 pub enum FormError {
     #[error("field key 重复: {0}")]
+    /// 字段 key 重复
     DuplicateFieldKey(String),
     #[error("验证失败: {field} - {message}")]
+    /// 字段验证失败
     Validation { field: String, message: String },
     #[error("必填字段缺失: {0}")]
+    /// 必填字段缺失
     RequiredFieldMissing(String),
     #[error("速率限制: 每小时最多 {0} 次提交")]
+    /// 超出每小时提交速率限制
     RateLimited(u32),
     #[error("访问拒绝: 邮箱 {0} 不在白名单")]
+    /// 邮箱不在白名单中
     EmailNotWhitelisted(String),
     #[error("需要 token")]
+    /// 缺少必需的访问 token
     TokenRequired,
     #[error("公开 URL slug 冲突: {0}")]
+    /// 公开 URL slug 冲突
     SlugConflict(String),
 }
 
@@ -269,9 +363,11 @@ pub enum FormError {
 // 4. service
 // =====================================================================
 
+/// 表单领域服务
 pub struct FormService;
 
 impl FormService {
+    /// 创建新的 FormService 实例
     pub fn new() -> Self {
         Self
     }
@@ -321,6 +417,7 @@ impl FormService {
         Ok(())
     }
 
+    /// 根据表单名称生成 URL slug (小写、非字母数字替换为 `-`)
     pub fn generate_slug(name: &str) -> String {
         name.to_lowercase()
             .replace(|c: char| !c.is_alphanumeric() && c != '-', "-")

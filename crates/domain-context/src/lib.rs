@@ -63,14 +63,20 @@ define_uuid_id!(WorkItemId);
 /// - (P5 留给 Untrusted Content,INV-CT-10)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Priority {
+    /// P0:Trusted Human Policy,不可被低优先级裁剪,只可由新 P0 取代
     P0,
+    /// P1:Stable Architectural Truth
     P1,
+    /// P2:Verified Recent Context(任务级)
     P2,
+    /// P3:Background Reference
     P3,
+    /// P4:Soft Heuristics
     P4,
 }
 
 impl Priority {
+    /// 返回该 Priority 层级对应的字符串标识(如 "P0")
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::P0 => "P0",
@@ -91,18 +97,22 @@ impl Priority {
 // =====================================================================
 
 #[macro_export]
+/// 生成 UUID 强类型 ID 家族的宏:为 `$name` 定义包装 `Uuid` 的结构体及 `new`/`as_uuid`/`From<Uuid>`/`Display` 实现
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 领域强类型 ID (由 `define_uuid_id!` 宏统一生成)
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID (由宏统一生成)
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回底层的 UUID 值 (由宏统一生成)
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -129,23 +139,38 @@ macro_rules! define_uuid_id {
 /// ProvenanceEntry(§26.3,每个 ContextPacket relevant_* 必带)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProvenanceEntry {
+    /// 来源类型(需求/验收标准/决策/文件等)
     pub source_type: ProvenanceSourceType,
+    /// 来源实体的 UUID
     pub source_id: Uuid,
+    /// 来源内容的版本标识
     pub version: String,
+    /// 该条目被纳入 ContextPacket 时所处的 Priority 层级
     pub included_at_layer: Priority,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Provenance 来源的实体类型
 pub enum ProvenanceSourceType {
+    /// 来源于需求
     Requirement,
+    /// 来源于验收标准
     AcceptanceCriterion,
+    /// 来源于 Decision
     Decision,
+    /// 来源于反馈
     Feedback,
+    /// 来源于文件
     File,
+    /// 来源于代码符号
     Symbol,
+    /// 来源于测试
     Test,
+    /// 来源于 ADR(架构决策记录)
     Adr,
+    /// 来源于验证失败记录
     FailedValidation,
+    /// 来源于未处理的开放反馈
     OpenFeedback,
 }
 
@@ -156,59 +181,92 @@ pub enum ProvenanceSourceType {
 /// ContextPacket 聚合根(§26.2)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextPacket {
+    /// ContextPacket 唯一标识
     pub id: ContextPacketId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属项目
     pub project_id: ProjectId,
+    /// 关联的工作项
     pub work_item_id: WorkItemId,
+    /// 关联的工作树
     pub worktree_id: WorktreeId,
+    /// 关联的 Agent 会话(可选)
     pub agent_session_id: Option<Uuid>,
 
+    /// 本次任务的意图描述
     pub intent: String,
+    /// 本次任务的目标
     pub objective: String,
+    /// 允许/禁止访问的路径范围
     pub scope: Scope,
 
     /// 按 Priority 分桶(INV-CT-02)
     pub relevant_requirements: BTreeMap<Priority, Vec<ProvenanceItem>>,
+    /// 验收标准,按 Priority 分桶
     pub acceptance_criteria: BTreeMap<Priority, Vec<ProvenanceItem>>,
+    /// 相关文件,按 Priority 分桶
     pub relevant_files: BTreeMap<Priority, Vec<ProvenanceItem>>,
+    /// 相关代码符号,按 Priority 分桶
     pub relevant_symbols: BTreeMap<Priority, Vec<ProvenanceItem>>,
+    /// 架构约束,按 Priority 分桶
     pub architecture_constraints: BTreeMap<Priority, Vec<ProvenanceItem>>,
+    /// 已有决策,按 Priority 分桶
     pub existing_decisions: BTreeMap<Priority, Vec<ProvenanceItem>>,
+    /// 需保留的规则,按 Priority 分桶
     pub preserve_rules: BTreeMap<Priority, Vec<ProvenanceItem>>,
+    /// 禁止的变更,按 Priority 分桶
     pub prohibited_changes: BTreeMap<Priority, Vec<ProvenanceItem>>,
+    /// 验证失败记录列表
     pub failed_validation: Vec<ProvenanceItem>,
+    /// 未处理的开放反馈列表
     pub open_feedback: Vec<ProvenanceItem>,
 
+    /// 期望输出描述
     pub expected_output: String,
+    /// 验证步骤说明列表
     pub verification_instructions: Vec<String>,
 
+    /// Token 预算上限
     pub token_budget: u32,
+    /// 实际消耗的 Token 数
     pub actual_tokens: u32,
 
     /// 所有 Provenance 收集(INV-CT-01 必带)
     pub provenance: Vec<ProvenanceEntry>,
 
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 创建者
     pub created_by: ContextPacketCreator,
+    /// 乐观锁版本号
     pub lock_version: u32,
 }
 
 /// 包在 relevant_* 列表中的项目(必带 provenance)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProvenanceItem {
+    /// 该条目的内容文本
     pub content: String,
+    /// 该条目对应的 Provenance 记录
     pub provenance: ProvenanceEntry,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 允许/禁止访问的文件路径范围
 pub struct Scope {
+    /// 允许访问的路径列表
     pub allowed_paths: Vec<String>,
+    /// 禁止访问的路径列表
     pub forbidden_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// ContextPacket 的创建者
 pub enum ContextPacketCreator {
+    /// 由用户创建
     User(UserId),
+    /// 由系统创建,携带系统标识
     System(String),
 }
 
@@ -219,33 +277,51 @@ pub enum ContextPacketCreator {
 /// Decision 聚合根(§26.5)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Decision {
+    /// Decision 唯一标识
     pub id: DecisionId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属项目
     pub project_id: ProjectId,
+    /// 决策陈述内容
     pub statement: String,
+    /// 决策理由
     pub reason: String,
+    /// 决策适用范围
     pub scope: DecisionScope,
+    /// 决策来源
     pub source: DecisionSource,
+    /// 决策当前状态
     pub status: DecisionStatus,
     /// 必带(INV-CT-04,INV-CT-06)
     pub provenance: ProvenanceEntry,
+    /// 取代该决策的后继 Decision(若已被 Superseded)
     pub superseded_by: Option<DecisionId>,
+    /// 使该决策失效的 Decision(若已 Invalidated)
     pub invalidated_by: Option<DecisionId>,
     /// Invalidated 必带(§4.4.6)
     pub invalidation_reason: Option<String>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 创建者
     pub created_by: UserId,
+    /// 乐观锁版本号
     pub lock_version: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Decision 的生命周期状态(§A.7,§10 #9)
 pub enum DecisionStatus {
+    /// 生效中
     Active,
+    /// 已被新决策取代
     Superseded,
+    /// 已失效
     Invalidated,
 }
 
 impl DecisionStatus {
+    /// 返回状态对应的字符串标识
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Active => "ACTIVE",
@@ -253,21 +329,29 @@ impl DecisionStatus {
             Self::Invalidated => "INVALIDATED",
         }
     }
+    /// 是否处于终态(Superseded 或 Invalidated)
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Superseded | Self::Invalidated)
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// Decision 的适用范围(仓库 / 模块路径)
 pub struct DecisionScope {
+    /// 适用的仓库 ID 列表
     pub repository_ids: Vec<Uuid>,
+    /// 适用的模块路径列表
     pub module_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// Decision 的产生来源
 pub enum DecisionSource {
+    /// 来源于某次对话
     Conversation(Uuid),
+    /// 来源于某条需求
     Requirement(Uuid),
+    /// 来源于某次架构评审
     ArchitectureReview(Uuid),
 }
 
@@ -276,27 +360,39 @@ pub enum DecisionSource {
 // =====================================================================
 
 #[derive(Debug, Error)]
+/// domain-context 领域操作的错误类型
 pub enum ContextError {
+    /// 目标实体未找到
     #[error("not found: {0}")]
     NotFound(String),
+    /// 实体当前状态不允许该操作
     #[error("invalid state: {0}")]
     InvalidState(String),
+    /// 权限不足,拒绝操作
     #[error("permission denied")]
     PermissionDenied,
+    /// 跨租户访问被拒绝
     #[error("cross-tenant access denied: tenant {0} vs required {1}")]
     CrossTenantDenied(TenantId, TenantId),
+    /// 缺失 Provenance(违反 INV-CT-01)
     #[error("missing provenance (INV-CT-01): every relevant_* must carry a ProvenanceEntry")]
     MissingProvenance,
+    /// Provenance 总数与 relevant_* 条目总数不一致
     #[error("provenance total {0} does not match sum of relevant_* items")]
     ProvenanceInconsistent(usize),
+    /// 优先级层级非法(P0 不可降级,P5 Untrusted 在此处被拒绝)
     #[error("invalid priority layer: P0 cannot be reduced, but P5 untrusted is rejected here")]
     UntrustedAtTrustedLayer,
+    /// Decision 被标记为 Superseded 但未提供后继决策(违反 INV-CT-06)
     #[error("decision superseded must reference successor (INV-CT-06)")]
     SupersedeMissingSuccessor,
+    /// Decision 被标记为 Invalidated 但未提供失效原因(违反 INV-CT-06)
     #[error("decision invalidated must include reason (INV-CT-06)")]
     InvalidateMissingReason,
+    /// 数据冲突
     #[error("conflict: {0}")]
     Conflict(String),
+    /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
 }
@@ -306,58 +402,96 @@ pub enum ContextError {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建 ContextPacket 的命令
 pub struct CreateContextPacketCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属项目
     pub project_id: ProjectId,
+    /// 关联的工作项
     pub work_item_id: WorkItemId,
+    /// 关联的工作树
     pub worktree_id: WorktreeId,
+    /// 本次任务的意图描述
     pub intent: String,
+    /// 本次任务的目标
     pub objective: String,
+    /// 允许/禁止访问的路径范围
     pub scope: Scope,
+    /// 期望输出描述
     pub expected_output: String,
+    /// 验证步骤说明列表
     pub verification_instructions: Vec<String>,
+    /// Token 预算上限
     pub token_budget: u32,
+    /// 发起操作的用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建 Decision 的命令
 pub struct CreateDecisionCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属项目
     pub project_id: ProjectId,
+    /// 决策陈述内容
     pub statement: String,
+    /// 决策理由
     pub reason: String,
+    /// 决策适用范围
     pub scope: DecisionScope,
+    /// 决策来源
     pub source: DecisionSource,
+    /// 决策的 Provenance(INV-CT-04 必带)
     pub provenance: ProvenanceEntry,
+    /// 发起操作的用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 将 Decision 标记为 Superseded 的命令
 pub struct SupersedeDecisionCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 被取代的 Decision ID
     pub decision_id: DecisionId,
+    /// 取代该决策的后继 Decision ID(INV-CT-06 必带)
     pub successor_id: DecisionId,
+    /// 发起操作的用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 将 Decision 标记为 Invalidated 的命令
 pub struct InvalidateDecisionCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 被失效的 Decision ID
     pub decision_id: DecisionId,
+    /// 失效原因(INV-CT-06 必带)
     pub reason: String,
+    /// 发起操作的用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 获取单个 ContextPacket 的查询
 pub struct GetContextPacketQuery {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 待查询的 ContextPacket ID
     pub packet_id: ContextPacketId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 列出某项目下 Decision 列表的查询
 pub struct ListDecisionsQuery {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属项目
     pub project_id: ProjectId,
+    /// 是否包含已终态(Superseded / Invalidated)的决策
     pub include_terminal: bool,
 }
 
@@ -366,13 +500,16 @@ pub struct ListDecisionsQuery {
 // =====================================================================
 
 #[async_trait]
+/// Context / Decision 写操作端口
 pub trait ContextCommandPort: Send + Sync {
+    /// 创建一个新的 ContextPacket
     async fn create_context_packet(
         &self,
         cmd: CreateContextPacketCommand,
         actor: &ActorContext,
     ) -> Result<ContextPacket, ContextError>;
 
+    /// 向指定 ContextPacket 的某个 relevant_* 桶追加一条带 Provenance 的条目
     async fn add_relevant_item(
         &self,
         tenant_id: TenantId,
@@ -383,18 +520,21 @@ pub trait ContextCommandPort: Send + Sync {
         actor: &ActorContext,
     ) -> Result<ContextPacket, ContextError>;
 
+    /// 创建一个新的 Decision
     async fn create_decision(
         &self,
         cmd: CreateDecisionCommand,
         actor: &ActorContext,
     ) -> Result<Decision, ContextError>;
 
+    /// 将 Decision 标记为 Superseded
     async fn supersede_decision(
         &self,
         cmd: SupersedeDecisionCommand,
         actor: &ActorContext,
     ) -> Result<Decision, ContextError>;
 
+    /// 将 Decision 标记为 Invalidated
     async fn invalidate_decision(
         &self,
         cmd: InvalidateDecisionCommand,
@@ -403,13 +543,16 @@ pub trait ContextCommandPort: Send + Sync {
 }
 
 #[async_trait]
+/// Context / Decision 读操作端口
 pub trait ContextQueryPort: Send + Sync {
+    /// 获取指定 ID 的 ContextPacket
     async fn get_context_packet(
         &self,
         q: GetContextPacketQuery,
         actor: &ActorContext,
     ) -> Result<ContextPacket, ContextError>;
 
+    /// 列出指定项目下的 Decision
     async fn list_decisions(
         &self,
         q: ListDecisionsQuery,
@@ -418,14 +561,22 @@ pub trait ContextQueryPort: Send + Sync {
 }
 
 #[async_trait]
+/// ContextPacket / Decision 的持久化仓储端口
 pub trait ContextRepository: Send + Sync {
+    /// 插入一个新的 ContextPacket
     async fn insert_packet(&self, packet: ContextPacket) -> Result<(), ContextError>;
+    /// 按 ID 获取 ContextPacket
     async fn get_packet(&self, id: ContextPacketId) -> Result<ContextPacket, ContextError>;
+    /// 更新一个已存在的 ContextPacket
     async fn update_packet(&self, packet: ContextPacket) -> Result<(), ContextError>;
 
+    /// 插入一个新的 Decision
     async fn insert_decision(&self, decision: Decision) -> Result<(), ContextError>;
+    /// 按 ID 获取 Decision
     async fn get_decision(&self, id: DecisionId) -> Result<Decision, ContextError>;
+    /// 更新一个已存在的 Decision
     async fn update_decision(&self, decision: Decision) -> Result<(), ContextError>;
+    /// 按项目列出所有 Decision
     async fn list_decisions_by_project(
         &self,
         tenant_id: TenantId,
@@ -434,14 +585,23 @@ pub trait ContextRepository: Send + Sync {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// ContextPacket 中可追加条目的 relevant_* 桶枚举
 pub enum RelevantBucket {
+    /// 对应 relevant_requirements 桶
     RelevantRequirements,
+    /// 对应 acceptance_criteria 桶
     AcceptanceCriteria,
+    /// 对应 relevant_files 桶
     RelevantFiles,
+    /// 对应 relevant_symbols 桶
     RelevantSymbols,
+    /// 对应 architecture_constraints 桶
     ArchitectureConstraints,
+    /// 对应 existing_decisions 桶
     ExistingDecisions,
+    /// 对应 preserve_rules 桶
     PreserveRules,
+    /// 对应 prohibited_changes 桶
     ProhibitedChanges,
 }
 
@@ -449,6 +609,7 @@ pub enum RelevantBucket {
 // InMemoryContextService
 // =====================================================================
 
+/// 基于内存仓储的 ContextCommandPort / ContextQueryPort 实现
 pub struct InMemoryContextService {
     repo: Arc<dyn ContextRepository>,
     packets: Arc<RwLock<HashMap<ContextPacketId, ContextPacket>>>,
@@ -456,6 +617,7 @@ pub struct InMemoryContextService {
 }
 
 impl InMemoryContextService {
+    /// 使用默认的 InMemoryContextRepository 创建服务实例
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryContextRepository::new()),
@@ -463,6 +625,7 @@ impl InMemoryContextService {
             decisions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
+    /// 使用指定的仓储实现创建服务实例
     pub fn with_repo(repo: Arc<dyn ContextRepository>) -> Self {
         Self {
             repo,
@@ -852,12 +1015,14 @@ impl ContextQueryPort for InMemoryContextService {
 // InMemoryContextRepository
 // =====================================================================
 
+/// ContextRepository 的进程内内存实现(用于测试/本地开发)
 pub struct InMemoryContextRepository {
     packets: RwLock<HashMap<ContextPacketId, ContextPacket>>,
     decisions: RwLock<HashMap<DecisionId, Decision>>,
 }
 
 impl InMemoryContextRepository {
+    /// 创建一个空的内存仓储实例
     pub fn new() -> Self {
         Self {
             packets: RwLock::new(HashMap::new()),

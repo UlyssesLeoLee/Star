@@ -40,6 +40,7 @@ use uuid::Uuid;
 // =====================================================================
 
 #[macro_export]
+/// 定义基于 Uuid 的强类型 ID:为给定类型名生成 struct 及 new/from_uuid/as_uuid/into_uuid 等方法(由宏统一生成)
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[allow(missing_docs)]
@@ -49,18 +50,22 @@ macro_rules! define_uuid_id {
 
         impl $name {
             #[allow(dead_code)]
+            /// 生成一个新的随机 ID(由宏统一生成)
             pub fn new() -> Self {
                 Self(uuid::Uuid::new_v4())
             }
             #[allow(dead_code)]
+            /// 由已有 Uuid 构造该强类型 ID(由宏统一生成)
             pub fn from_uuid(id: uuid::Uuid) -> Self {
                 Self(id)
             }
             #[allow(dead_code)]
+            /// 获取内部 Uuid 值(由宏统一生成)
             pub fn as_uuid(&self) -> uuid::Uuid {
                 self.0
             }
             #[allow(dead_code)]
+            /// 消费自身并返回内部 Uuid(由宏统一生成)
             pub fn into_uuid(self) -> uuid::Uuid {
                 self.0
             }
@@ -145,11 +150,17 @@ impl std::fmt::Display for TriggerType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ConditionOperator {
+    /// 等于
     Equals,
+    /// 不等于
     NotEquals,
+    /// 字符串包含
     Contains,
+    /// 大于
     GreaterThan,
+    /// 小于
     LessThan,
+    /// 属于给定集合
     In,
 }
 
@@ -205,7 +216,9 @@ pub const PROTECTED_ACTIONS: &[&str] = &[
 
 /// 预定义角色字符串
 pub mod roles {
+    /// 项目管理员角色
     pub const PROJECT_ADMIN: &str = "project_admin";
+    /// 开发者角色
     pub const DEVELOPER: &str = "developer";
 }
 
@@ -237,6 +250,7 @@ pub enum AutomationError {
 }
 
 impl AutomationError {
+    /// 返回该错误对应的稳定错误码字符串
     pub fn code(&self) -> &'static str {
         match self {
             Self::NotFound(_) => "AUTOMATION_NOT_FOUND",
@@ -247,6 +261,7 @@ impl AutomationError {
             Self::Internal(_) => "AUTOMATION_INTERNAL",
         }
     }
+    /// 判断是否为服务端内部错误(5xx)
     pub fn is_server_error(&self) -> bool {
         matches!(self, Self::Internal(_))
     }
@@ -265,7 +280,9 @@ impl From<uuid::Error> for AutomationError {
 /// **AutomationTrigger**(内嵌于 Rule,7 字段)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutomationTrigger {
+    /// 触发器 ID
     pub id: TriggerId,
+    /// 触发器类型
     pub event_type: TriggerType,
     /// 资源类型过滤(如 "work_item" / "validation")
     pub resource_type: Option<String>,
@@ -278,19 +295,25 @@ pub struct AutomationTrigger {
 }
 
 impl AutomationTrigger {
+    /// AutomationTrigger 字段总数,用于结构体字段审计测试
     pub const FIELD_COUNT: usize = 7;
 }
 
 /// **AutomationCondition**(子实体,AND 关系)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutomationCondition {
+    /// 条件 ID
     pub id: ConditionId,
+    /// 待比较的事件字段名
     pub field: String,
+    /// 比较运算符
     pub operator: ConditionOperator,
+    /// 用于比较的期望值
     pub value: serde_json::Value,
 }
 
 impl AutomationCondition {
+    /// AutomationCondition 字段总数,用于结构体字段审计测试
     pub const FIELD_COUNT: usize = 4;
     /// 评估条件(简单 equality / comparison;In / Contains 由 JSON value 推断)
     pub fn evaluate(&self, event: &serde_json::Value) -> bool {
@@ -336,7 +359,9 @@ impl AutomationCondition {
 /// **AutomationAction**(子实体,5 字段)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutomationAction {
+    /// 动作 ID
     pub id: ActionId,
+    /// 动作类型
     pub action_type: ActionType,
     /// 目标资源类型(如 "notification_channel" / "user" / "webhook")
     pub target_type: String,
@@ -347,34 +372,53 @@ pub struct AutomationAction {
 }
 
 impl AutomationAction {
+    /// AutomationAction 字段总数,用于结构体字段审计测试
     pub const FIELD_COUNT: usize = 5;
 }
 
 /// **AutomationRule 聚合根**(17 字段,data-design §4.13)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutomationRule {
+    /// 规则 ID
     pub id: RuleId,
+    /// 所属租户 ID(INV-AUTO-01)
     pub tenant_id: TenantId,
+    /// 所属项目 ID(INV-AUTO-02)
     pub project_id: ProjectId,
+    /// 规则名称(项目内唯一)
     pub name: String,
+    /// 规则描述
     pub description: Option<String>,
+    /// 是否启用(INV-AUTO-03)
     pub enabled: bool,
+    /// 触发器配置
     pub trigger: AutomationTrigger,
+    /// 条件列表(AND 关系)
     pub conditions: Vec<AutomationCondition>,
+    /// 动作列表
     pub actions: Vec<AutomationAction>,
+    /// 执行优先级(数值越小越先执行)
     pub priority: i32,
     /// 每分钟最大执行次数(限流,INV-AUTO-06,默认 60)
     pub rate_limit_per_minute: u32,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最后更新时间
     pub updated_at: DateTime<Utc>,
+    /// 最后一次执行时间
     pub last_executed_at: Option<DateTime<Utc>>,
+    /// 乐观锁版本号
     pub lock_version: u32,
+    /// 创建者用户 ID
     pub created_by_user_id: UserId,
+    /// 累计执行次数
     pub execution_count: u64,
 }
 
 impl AutomationRule {
+    /// AutomationRule 字段总数,用于结构体字段审计测试
     pub const FIELD_COUNT: usize = 17;
+    /// 递增乐观锁版本号并刷新 updated_at
     pub fn bump_version(&mut self) {
         self.lock_version = self.lock_version.saturating_add(1);
         self.updated_at = Utc::now();
@@ -400,9 +444,13 @@ impl AutomationRule {
 /// **AutomationExecution**(Append-only 执行历史,11 字段)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutomationExecution {
+    /// 执行记录 ID
     pub id: ExecutionId,
+    /// 关联的规则 ID
     pub rule_id: RuleId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属项目 ID
     pub project_id: ProjectId,
     /// 触发事件 ID
     pub trigger_event_id: EventId,
@@ -414,19 +462,24 @@ pub struct AutomationExecution {
     pub result: ExecutionResult,
     /// 跳过原因(未匹配 / 限流等)
     pub skip_reason: Option<String>,
+    /// 开始执行时间
     pub started_at: DateTime<Utc>,
+    /// 执行结束时间
     pub finished_at: Option<DateTime<Utc>>,
+    /// 记录创建时间
     pub created_at: DateTime<Utc>,
     /// 用于 INV-AUTO-04:确保 100% 写入(包括 matched=false)
     pub logged: bool,
 }
 
 impl AutomationExecution {
+    /// AutomationExecution 字段总数,用于结构体字段审计测试
     pub const FIELD_COUNT: usize = 11;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+/// 规则执行结果状态
 pub enum ExecutionResult {
     /// 匹配且全部成功
     Success,
@@ -444,6 +497,7 @@ pub enum ExecutionResult {
 // 不变量(INV-AUTO-01~06)
 // =====================================================================
 
+/// 不变量检查函数签名
 pub type InvariantCheck = fn(&AutomationRule) -> Result<(), AutomationError>;
 
 /// **INV-AUTO-01** tenant_id 必非 nil
@@ -485,6 +539,7 @@ pub fn check_invariant_06_rate_limit_positive(
     Ok(())
 }
 
+/// 全部不变量检查函数列表(INV-AUTO-01~06)
 pub const ALL_INVARIANT_CHECKS: &[InvariantCheck] = &[
     check_invariant_01_tenant_id,
     check_invariant_02_project_id,
@@ -492,6 +547,7 @@ pub const ALL_INVARIANT_CHECKS: &[InvariantCheck] = &[
     check_invariant_06_rate_limit_positive,
 ];
 
+/// 依次运行给定的不变量检查,遇错即返回
 pub fn run_invariants(
     checks: &[InvariantCheck],
     rule: &AutomationRule,
@@ -507,13 +563,18 @@ pub fn run_invariants(
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 事件公共元信息(NATS 事件通用字段)
 pub struct EventMeta {
+    /// 事件唯一 ID
     pub event_id: Uuid,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 事件发生时间
     pub occurred_at: DateTime<Utc>,
 }
 
 impl EventMeta {
+    /// 构造新的事件元信息(自动生成 event_id 与 occurred_at)
     pub fn new(tenant_id: TenantId) -> Self {
         Self {
             event_id: Uuid::new_v4(),
@@ -524,21 +585,30 @@ impl EventMeta {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 规则执行完成事件
 pub struct RuleExecuted {
+    /// 事件公共元信息
     pub meta: EventMeta,
+    /// 被执行的规则 ID
     pub rule_id: RuleId,
+    /// 对应的执行记录 ID
     pub execution_id: ExecutionId,
+    /// 是否匹配触发条件
     pub matched: bool,
+    /// 执行结果状态
     pub result: ExecutionResult,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+/// Automation 域对外发布的事件枚举
 pub enum AutomationEvent {
+    /// 规则执行完成
     RuleExecuted(RuleExecuted),
 }
 
 impl AutomationEvent {
+    /// 返回该事件对应的 NATS subject
     pub fn subject(&self) -> &'static str {
         match self {
             Self::RuleExecuted(_) => "star.events.automation.rule.executed.v1",
@@ -551,39 +621,67 @@ impl AutomationEvent {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建规则命令
 pub struct CreateRuleCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属项目 ID
     pub project_id: ProjectId,
+    /// 规则名称
     pub name: String,
+    /// 规则描述
     pub description: Option<String>,
+    /// 触发器配置
     pub trigger: AutomationTrigger,
+    /// 条件列表
     pub conditions: Vec<AutomationCondition>,
+    /// 动作列表
     pub actions: Vec<AutomationAction>,
+    /// 执行优先级
     pub priority: i32,
+    /// 每分钟最大执行次数(0 表示使用默认值 60)
     pub rate_limit_per_minute: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 更新规则命令(仅更新 Some 字段,乐观锁校验)
 pub struct UpdateRuleCommand {
+    /// 待更新的规则 ID
     pub rule_id: RuleId,
+    /// 所属租户 ID(用于越权校验)
     pub tenant_id: TenantId,
+    /// 期望的当前乐观锁版本号
     pub expected_version: u32,
+    /// 新规则名称(可选)
     pub name: Option<String>,
+    /// 新规则描述(可选,双层 Option 支持显式置空)
     pub description: Option<Option<String>>,
+    /// 新启用状态(可选)
     pub enabled: Option<bool>,
+    /// 新触发器配置(可选)
     pub trigger: Option<AutomationTrigger>,
+    /// 新条件列表(可选)
     pub conditions: Option<Vec<AutomationCondition>>,
+    /// 新动作列表(可选)
     pub actions: Option<Vec<AutomationAction>>,
+    /// 新优先级(可选)
     pub priority: Option<i32>,
+    /// 新限流值(可选)
     pub rate_limit_per_minute: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 列出规则查询参数
 pub struct ListRulesQuery {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 按项目过滤(可选)
     pub project_id: Option<ProjectId>,
+    /// 是否只返回已启用规则
     pub enabled_only: bool,
+    /// 分页大小
     pub limit: u32,
+    /// 分页偏移量
     pub offset: u32,
 }
 
@@ -600,7 +698,9 @@ impl Default for ListRulesQuery {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 测试规则命令(使用样例事件干跑规则条件)
 pub struct TestRuleCommand {
+    /// 待测试的规则 ID
     pub rule_id: RuleId,
     /// 测试事件(模拟 trigger event)
     pub sample_event: serde_json::Value,
@@ -609,21 +709,25 @@ pub struct TestRuleCommand {
 /// **AutomationCommandPort**(4 个方法)
 #[async_trait]
 pub trait AutomationCommandPort: Send + Sync {
+    /// 创建自动化规则
     async fn create_rule(
         &self,
         cmd: CreateRuleCommand,
         actor: ActorContext,
     ) -> Result<AutomationRule, AutomationError>;
+    /// 更新自动化规则(乐观锁)
     async fn update_rule(
         &self,
         cmd: UpdateRuleCommand,
         actor: ActorContext,
     ) -> Result<AutomationRule, AutomationError>;
+    /// 删除自动化规则
     async fn delete_rule(
         &self,
         rule_id: RuleId,
         actor: ActorContext,
     ) -> Result<(), AutomationError>;
+    /// 使用样例事件测试规则条件是否匹配
     async fn test_rule(
         &self,
         cmd: TestRuleCommand,
@@ -634,16 +738,19 @@ pub trait AutomationCommandPort: Send + Sync {
 /// **AutomationQueryPort**(3 个方法)
 #[async_trait]
 pub trait AutomationQueryPort: Send + Sync {
+    /// 分页列出租户下的自动化规则
     async fn list_rules(
         &self,
         q: ListRulesQuery,
         actor: ActorContext,
     ) -> Result<Vec<AutomationRule>, AutomationError>;
+    /// 按 ID 获取单条自动化规则
     async fn get_rule(
         &self,
         rule_id: RuleId,
         actor: ActorContext,
     ) -> Result<AutomationRule, AutomationError>;
+    /// 列出某规则的执行历史
     async fn list_executions(
         &self,
         rule_id: RuleId,
@@ -678,6 +785,7 @@ pub struct InMemoryAutomationService {
 }
 
 impl InMemoryAutomationService {
+    /// 创建内存版 Automation 服务实例,并返回事件接收端
     pub fn new() -> (Arc<Self>, mpsc::UnboundedReceiver<AutomationEvent>) {
         let (tx, rx) = mpsc::unbounded_channel();
         let svc = Arc::new(Self {
@@ -689,12 +797,15 @@ impl InMemoryAutomationService {
         });
         (svc, rx)
     }
+    /// 创建仅用于测试的内存版 Automation 服务实例
     pub fn new_for_test() -> Arc<Self> {
         Self::new().0
     }
+    /// 返回当前规则总数
     pub async fn rule_count(&self) -> usize {
         self.rules.read().await.len()
     }
+    /// 返回当前执行历史总数
     pub async fn execution_count(&self) -> usize {
         self.executions.read().await.len()
     }

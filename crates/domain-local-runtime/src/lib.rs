@@ -56,6 +56,7 @@ define_uuid_id!(ProjectId);
 // =====================================================================
 
 #[macro_export]
+/// 定义一个基于 Uuid 的强类型 ID(生成 struct + `new`/`as_uuid`/`From<Uuid>`/`Display` 实现)
 macro_rules! define_uuid_id {
     ($name:ident) => {
         // 22 domain 共享宏生成的 UUID 强类型 ID struct + as_uuid helper
@@ -66,13 +67,16 @@ macro_rules! define_uuid_id {
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 领域强类型 ID(由 `define_uuid_id!` 宏统一生成,内部包装 Uuid)
         pub struct $name(pub Uuid);
 
         #[allow(dead_code)]
         impl $name {
+            /// 生成一个新的随机 ID(UUID v4)
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回内部原始 Uuid 值
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -110,6 +114,7 @@ pub enum RuntimeStatus {
 }
 
 impl RuntimeStatus {
+    /// 转换为大写字符串表示(如 "ONLINE")
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Online => "ONLINE",
@@ -136,6 +141,7 @@ pub enum MountStatus {
 }
 
 impl MountStatus {
+    /// 转换为大写字符串表示(如 "ACTIVE")
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Active => "ACTIVE",

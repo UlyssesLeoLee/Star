@@ -56,27 +56,44 @@ define_uuid_id!(ProjectId);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum NotificationEventType {
     // 突破抑制 - 必须发送
+    /// Validation 失败,必须通知
     ValidationFailed,
+    /// 新增 Feedback,必须通知
     FeedbackCreated,
+    /// 需要人工 Feedback 介入,必须通知
     FeedbackRequired,
+    /// Agent Session 执行失败,必须通知
     AgentSessionFailed,
+    /// Agent Session 崩溃,必须通知
     AgentSessionCrashed,
+    /// Agent Session 超时,必须通知
     AgentSessionTimeout,
+    /// Protected Action 被拒绝(越权),必须通知
     ProtectedActionDenied,
     // 抑制 - 默认不发
+    /// Agent 执行步骤开始,默认抑制
     AgentStepStarted,
+    /// Agent 执行步骤完成,默认抑制
     AgentStepCompleted,
+    /// 工具被调用,默认抑制
     ToolInvoked,
+    /// 工具调用完成,默认抑制
     ToolCompleted,
+    /// Validation 通过,默认抑制
     ValidationPassed,
+    /// 创建 WorkItem,默认抑制
     WorkItemCreated,
+    /// 更新 WorkItem,默认抑制
     WorkItemUpdated,
+    /// 新增评论,默认抑制
     CommentAdded,
     // 用户可显式订阅
+    /// 自定义事件,由用户显式订阅
     Custom,
 }
 
 impl NotificationEventType {
+    /// 返回事件类型对应的字符串标识
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::ValidationFailed => "validation.failed",
@@ -123,18 +140,22 @@ impl NotificationEventType {
 // =====================================================================
 
 #[macro_export]
+/// 生成基于 UUID 的强类型 ID 类型的宏,自动实现 new/as_uuid/From<Uuid>/Display
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 领域强类型 ID(由宏统一生成)
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成新的随机 ID(由宏统一生成)
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回内部 UUID 值(由宏统一生成)
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -161,25 +182,39 @@ macro_rules! define_uuid_id {
 /// NotificationChannel(§4.17)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NotificationChannel {
+    /// 渠道 ID
     pub id: NotificationChannelId,
+    /// 所属租户 ID(INV-N-01)
     pub tenant_id: TenantId,
+    /// 所属用户 ID
     pub user_id: UserId,
+    /// 渠道类型(Email/InApp/Slack/DingTalk)
     pub kind: ChannelKind,
+    /// 渠道地址(如邮箱地址、Webhook URL)
     pub address: String,
+    /// 是否启用
     pub enabled: bool,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最近更新时间
     pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 通知渠道类型
 pub enum ChannelKind {
+    /// 邮件渠道
     Email,
+    /// 应用内通知渠道
     InApp,
+    /// Slack 渠道(V1)
     Slack,
+    /// 钉钉渠道(V1)
     DingTalk,
 }
 
 impl ChannelKind {
+    /// 返回渠道类型对应的字符串标识
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Email => "email",
@@ -193,48 +228,80 @@ impl ChannelKind {
 /// NotificationTemplate(§4.17,Project 范围)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NotificationTemplate {
+    /// 模板 ID
     pub id: NotificationTemplateId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属项目 ID(模板为 Project 范围,INV-N-04)
     pub project_id: ProjectId,
+    /// 关联的通知事件类型
     pub event_type: NotificationEventType,
+    /// 适用的渠道类型列表
     pub channel_kinds: Vec<ChannelKind>,
+    /// 通知主题模板
     pub subject: String,
+    /// 通知正文模板
     pub body_template: String,
+    /// 是否启用
     pub enabled: bool,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最近更新时间
     pub updated_at: DateTime<Utc>,
 }
 
 /// Notification(Append-only + 状态字段,§4.17)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Notification {
+    /// 通知 ID
     pub id: NotificationId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 接收用户 ID
     pub user_id: UserId,
+    /// 触发该通知的事件类型
     pub event_type: NotificationEventType,
+    /// 关联资源类型
     pub resource_type: String,
+    /// 关联资源 ID
     pub resource_id: Uuid,
+    /// 发送所用的渠道 ID
     pub channel_id: NotificationChannelId,
+    /// 通知主题
     pub subject: String,
+    /// 通知正文
     pub body: String,
+    /// 通知当前状态
     pub status: NotificationStatus,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 发送时间(未发送为 None)
     pub sent_at: Option<DateTime<Utc>>,
+    /// 已读时间(未读为 None)
     pub read_at: Option<DateTime<Utc>>,
+    /// 已重试次数(超限进 DLQ,INV-N-06)
     pub retry_count: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 通知投递状态
 pub enum NotificationStatus {
+    /// 待发送
     Pending,
+    /// 已发送
     Sent,
+    /// 已送达
     Delivered,
+    /// 已读
     Read,
+    /// 发送失败
     Failed,
+    /// 超过最大重试次数,进入死信队列
     DeadLettered,
 }
 
 impl NotificationStatus {
+    /// 返回状态对应的字符串标识
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "PENDING",
@@ -245,6 +312,7 @@ impl NotificationStatus {
             Self::DeadLettered => "DEAD_LETTERED",
         }
     }
+    /// 是否为终态(不再重试或变更)
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Delivered | Self::Read | Self::DeadLettered)
     }
@@ -255,21 +323,30 @@ impl NotificationStatus {
 // =====================================================================
 
 #[derive(Debug, Error)]
+/// 通知领域错误
 pub enum NotificationError {
+    /// 目标资源未找到
     #[error("not found: {0}")]
     NotFound(String),
+    /// 状态不合法,操作被拒绝
     #[error("invalid state: {0}")]
     InvalidState(String),
+    /// 权限不足
     #[error("permission denied")]
     PermissionDenied,
+    /// 跨租户访问被拒绝(INV-N-01)
     #[error("cross-tenant access denied: tenant {0} vs required {1}")]
     CrossTenantDenied(TenantId, TenantId),
+    /// 事件被 INV-N-07 默认抑制策略拦截
     #[error("event suppressed by INV-N-07: {0}")]
     EventSuppressed(String),
+    /// 重试次数超限(INV-N-06)
     #[error("max retry exceeded (5), moved to DLQ")]
     MaxRetryExceeded,
+    /// 数据冲突
     #[error("conflict: {0}")]
     Conflict(String),
+    /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
 }
@@ -279,54 +356,88 @@ pub enum NotificationError {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 注册通知渠道命令
 pub struct RegisterChannelCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 渠道归属用户 ID
     pub user_id: UserId,
+    /// 渠道类型
     pub kind: ChannelKind,
+    /// 渠道地址
     pub address: String,
+    /// 执行该命令的操作者用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 新建或更新通知模板命令
 pub struct UpsertTemplateCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属项目 ID
     pub project_id: ProjectId,
+    /// 模板对应的事件类型
     pub event_type: NotificationEventType,
+    /// 适用渠道类型列表
     pub channel_kinds: Vec<ChannelKind>,
+    /// 通知主题模板
     pub subject: String,
+    /// 通知正文模板
     pub body_template: String,
+    /// 执行该命令的操作者用户 ID(需 Project/Tenant Admin,INV-N-04)
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 派发通知命令
 pub struct DispatchNotificationCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 接收用户 ID
     pub user_id: UserId,
+    /// 触发的事件类型(决定 INV-N-07 抑制策略)
     pub event_type: NotificationEventType,
+    /// 关联资源类型
     pub resource_type: String,
+    /// 关联资源 ID
     pub resource_id: Uuid,
+    /// 通知主题
     pub subject: String,
+    /// 通知正文
     pub body: String,
+    /// 事件来源(用于审计)
     pub source: String, // 用于审计
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 标记通知已读命令
 pub struct MarkReadCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 目标通知 ID
     pub notification_id: NotificationId,
+    /// 执行该命令的操作者用户 ID(仅本人可标记,INV-N-03)
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 查询单条通知
 pub struct GetNotificationQuery {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 目标通知 ID
     pub notification_id: NotificationId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 按用户查询通知列表
 pub struct ListByUserQuery {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 目标用户 ID
     pub user_id: UserId,
+    /// 是否仅返回未读通知
     pub unread_only: bool,
 }
 
@@ -335,13 +446,16 @@ pub struct ListByUserQuery {
 // =====================================================================
 
 #[async_trait]
+/// 通知命令端口(写操作)
 pub trait NotificationCommandPort: Send + Sync {
+    /// 注册通知渠道
     async fn register_channel(
         &self,
         cmd: RegisterChannelCommand,
         actor: &ActorContext,
     ) -> Result<NotificationChannel, NotificationError>;
 
+    /// 新建或更新通知模板
     async fn upsert_template(
         &self,
         cmd: UpsertTemplateCommand,
@@ -355,6 +469,7 @@ pub trait NotificationCommandPort: Send + Sync {
         actor: &ActorContext,
     ) -> Result<Notification, NotificationError>;
 
+    /// 标记通知为已读
     async fn mark_read(
         &self,
         cmd: MarkReadCommand,
@@ -363,13 +478,16 @@ pub trait NotificationCommandPort: Send + Sync {
 }
 
 #[async_trait]
+/// 通知查询端口(读操作)
 pub trait NotificationQueryPort: Send + Sync {
+    /// 获取单条通知详情
     async fn get(
         &self,
         q: GetNotificationQuery,
         actor: &ActorContext,
     ) -> Result<Notification, NotificationError>;
 
+    /// 按用户查询通知列表
     async fn list_by_user(
         &self,
         q: ListByUserQuery,
@@ -378,47 +496,60 @@ pub trait NotificationQueryPort: Send + Sync {
 }
 
 #[async_trait]
+/// 通知仓储端口
 pub trait NotificationRepository: Send + Sync {
+    /// 插入渠道记录
     async fn insert_channel(&self, channel: NotificationChannel) -> Result<(), NotificationError>;
+    /// 按 ID 获取渠道
     async fn get_channel(
         &self,
         id: NotificationChannelId,
     ) -> Result<NotificationChannel, NotificationError>;
+    /// 更新渠道记录
     async fn update_channel(&self, channel: NotificationChannel) -> Result<(), NotificationError>;
+    /// 按用户列出其所有渠道
     async fn list_channels_by_user(
         &self,
         tenant_id: TenantId,
         user_id: UserId,
     ) -> Result<Vec<NotificationChannel>, NotificationError>;
 
+    /// 插入模板记录
     async fn insert_template(
         &self,
         template: NotificationTemplate,
     ) -> Result<(), NotificationError>;
+    /// 按 ID 获取模板
     async fn get_template(
         &self,
         id: NotificationTemplateId,
     ) -> Result<NotificationTemplate, NotificationError>;
+    /// 按事件类型新建或更新模板
     async fn upsert_template_by_event(
         &self,
         template: NotificationTemplate,
     ) -> Result<(), NotificationError>;
+    /// 按项目列出所有模板
     async fn list_templates_by_project(
         &self,
         tenant_id: TenantId,
         project_id: ProjectId,
     ) -> Result<Vec<NotificationTemplate>, NotificationError>;
 
+    /// 插入通知记录
     async fn insert_notification(
         &self,
         notification: Notification,
     ) -> Result<(), NotificationError>;
+    /// 按 ID 获取通知
     async fn get_notification(&self, id: NotificationId)
         -> Result<Notification, NotificationError>;
+    /// 更新通知记录
     async fn update_notification(
         &self,
         notification: Notification,
     ) -> Result<(), NotificationError>;
+    /// 按用户列出通知,可选仅未读
     async fn list_notifications_by_user(
         &self,
         tenant_id: TenantId,
@@ -431,6 +562,7 @@ pub trait NotificationRepository: Send + Sync {
 // InMemoryNotificationService
 // =====================================================================
 
+/// 基于内存的通知领域服务实现(用于测试/MVP)
 pub struct InMemoryNotificationService {
     repo: Arc<dyn NotificationRepository>,
     channels: Arc<RwLock<HashMap<NotificationChannelId, NotificationChannel>>>,
@@ -439,6 +571,7 @@ pub struct InMemoryNotificationService {
 }
 
 impl InMemoryNotificationService {
+    /// 创建默认的内存通知服务(使用内置的内存仓储)
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryNotificationRepository::new()),
@@ -447,6 +580,7 @@ impl InMemoryNotificationService {
             notifications: Arc::new(RwLock::new(HashMap::new())),
         }
     }
+    /// 使用指定的仓储实现创建内存通知服务
     pub fn with_repo(repo: Arc<dyn NotificationRepository>) -> Self {
         Self {
             repo,
@@ -725,6 +859,7 @@ impl NotificationQueryPort for InMemoryNotificationService {
 // InMemoryNotificationRepository
 // =====================================================================
 
+/// 基于内存的通知仓储实现(用于测试/MVP)
 pub struct InMemoryNotificationRepository {
     channels: RwLock<HashMap<NotificationChannelId, NotificationChannel>>,
     templates: RwLock<HashMap<NotificationTemplateId, NotificationTemplate>>,
@@ -732,6 +867,7 @@ pub struct InMemoryNotificationRepository {
 }
 
 impl InMemoryNotificationRepository {
+    /// 创建空的内存通知仓储
     pub fn new() -> Self {
         Self {
             channels: RwLock::new(HashMap::new()),

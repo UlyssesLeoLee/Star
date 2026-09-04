@@ -95,6 +95,7 @@ pub enum AgentSessionStatus {
 }
 
 impl AgentSessionStatus {
+    /// 返回状态对应的字符串标识(用于持久化/API 序列化)
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Created => "CREATED",
@@ -190,18 +191,22 @@ pub fn check_status_transition(
 // =====================================================================
 
 #[macro_export]
+/// 生成基于 UUID 的领域强类型 ID(结构体 + new/as_uuid/From<Uuid>/Display 实现)的声明宏
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 领域强类型 ID(由 `define_uuid_id!` 宏统一生成)
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成新的随机 ID 实例(由 `define_uuid_id!` 宏统一生成)
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回内部原始 UUID 值(由 `define_uuid_id!` 宏统一生成)
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -228,30 +233,47 @@ macro_rules! define_uuid_id {
 /// Agent 适配器(§4.2.1,data-design §4.3)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Agent {
+    /// Agent 唯一标识
     pub id: AgentId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// Agent 类型(Codex/ClaudeCode/GeminiCli 等)
     pub agent_type: AgentType,
+    /// 底层 Provider 名称
     pub provider: String,
+    /// Provider 版本号
     pub version: String,
+    /// 支持的能力列表
     pub capabilities: Vec<String>,
+    /// 关联的策略模板(可选)
     pub policy_template_id: Option<AgentPolicyTemplateId>,
+    /// 是否启用
     pub enabled: bool,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最近更新时间
     pub updated_at: DateTime<Utc>,
 }
 
 /// Agent 类型(§4.2.1)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentType {
+    /// OpenAI Codex
     Codex,
+    /// Anthropic Claude Code
     ClaudeCode,
+    /// Google Gemini CLI
     GeminiCli,
+    /// OpenAI 兼容协议的第三方 Provider
     OpenAiCompatible,
+    /// 本地 Runtime
     Local,
+    /// 预留扩展类型
     Future,
 }
 
 impl AgentType {
+    /// 返回类型对应的字符串标识(用于持久化/API 序列化)
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Codex => "codex",
@@ -267,32 +289,55 @@ impl AgentType {
 /// AgentSession 聚合根(§4.2.1,§24.1,data-design §4.3)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentSession {
+    /// 会话唯一标识
     pub id: AgentSessionId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 关联的 Agent
     pub agent_id: AgentId,
+    /// 冗余存储的 Agent 类型(便于查询)
     pub agent_type: AgentType,
+    /// 冗余存储的 Provider 名称
     pub provider: String,
+    /// 冗余存储的 Provider 版本
     pub version: String,
+    /// 绑定的 Worktree(INV-AGT-02:1 会话对应 1 活跃 Worktree)
     pub worktree_id: WorktreeId,
+    /// 关联的工作项
     pub work_item_id: WorkItemId,
+    /// 当前状态(14 状态机)
     pub status: AgentSessionStatus,
+    /// 会话意图/任务描述
     pub intent: String,
+    /// 关联的上下文包(可选)
     pub context_packet_id: Option<Uuid>,
+    /// Agent 生成的执行计划(可选)
     pub plan: Option<String>,
+    /// 决策记录 ID 列表
     pub decisions: Vec<Uuid>,
+    /// 工具调用次数汇总(按工具名)
     pub tool_activity_summary: HashMap<String, u32>,
+    /// 产生的变更集 ID 列表
     pub change_set_ids: Vec<Uuid>,
+    /// 验证结果 ID 列表
     pub validation_result_ids: Vec<Uuid>,
+    /// 已消费的反馈 ID 列表
     pub feedback_consumed_ids: Vec<Uuid>,
+    /// 结果摘要(可选)
     pub result_summary: Option<String>,
+    /// 追踪引用(可选)
     pub trace_reference: Option<String>,
     /// Token 统计(JSONB-like,简化为 HashMap)
     pub token_usage: HashMap<String, u64>,
     /// 成本摘要
     pub cost_summary: HashMap<String, f64>,
+    /// 会话开始时间
     pub started_at: DateTime<Utc>,
+    /// 会话结束时间(终态时设置)
     pub ended_at: Option<DateTime<Utc>>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最近更新时间
     pub updated_at: DateTime<Utc>,
     /// 乐观锁
     pub lock_version: u32,
@@ -301,20 +346,35 @@ pub struct AgentSession {
 /// AgentPolicy(§4.2.5,§24.3,12 强制点)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentPolicy {
+    /// 允许访问的仓库列表
     pub allowed_repositories: Vec<Uuid>,
+    /// 允许访问的 Worktree 列表
     pub allowed_worktrees: Vec<WorktreeId>,
+    /// 允许访问的路径(为空表示不限制)
     pub allowed_paths: Vec<String>,
+    /// 禁止访问的路径(永远拒绝,见 enforce)
     pub forbidden_paths: Vec<String>,
+    /// 允许调用的工具列表(为空表示不限制)
     pub allowed_tools: Vec<String>,
+    /// 允许的命令类别
     pub allowed_command_categories: Vec<String>,
+    /// 网络访问策略
     pub network_access: NetworkAccess,
+    /// 密钥访问策略
     pub secret_access: SecretAccess,
+    /// 最大运行时长(秒)
     pub max_runtime_seconds: u32,
+    /// 最大上下文 Token 数
     pub max_context_tokens: u32,
+    /// 最大可变更文件数
     pub max_change_files: u32,
+    /// 最大可变更行数
     pub max_change_lines: u32,
+    /// 是否强制要求代码评审
     pub require_review: bool,
+    /// 是否强制要求测试
     pub require_test: bool,
+    /// 是否强制要求人工审批
     pub require_approval: bool,
 }
 
@@ -403,36 +463,56 @@ impl AgentPolicy {
 /// 12 强制点的检查输入
 #[derive(Debug, Clone)]
 pub struct PolicyCheck {
+    /// 待检查的文件/资源路径
     pub path: String,
+    /// 待检查的工具名
     pub tool: String,
+    /// 是否需要网络访问
     pub requires_network: bool,
+    /// 是否需要密钥访问
     pub requires_secret: bool,
+    /// 已运行时长(秒)
     pub elapsed_seconds: u32,
+    /// 已变更文件数
     pub changed_files: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 网络访问策略
 pub enum NetworkAccess {
+    /// 允许网络访问
     Allow,
+    /// 拒绝网络访问
     Deny,
+    /// 限定范围内允许网络访问
     Scoped,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 密钥访问策略
 pub enum SecretAccess {
+    /// 仅通过 Secret Broker 间接访问
     BrokerOnly,
+    /// 限定范围内允许直接访问
     Scoped,
+    /// 禁止访问密钥
     None,
 }
 
 /// AgentPolicyTemplate(§4.2.5)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentPolicyTemplate {
+    /// 模板唯一标识
     pub id: AgentPolicyTemplateId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 模板名称
     pub name: String,
+    /// 模板对应的策略内容
     pub policy: AgentPolicy,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最近更新时间
     pub updated_at: DateTime<Utc>,
 }
 
@@ -441,24 +521,34 @@ pub struct AgentPolicyTemplate {
 // =====================================================================
 
 #[derive(Debug, Error)]
+/// domain-agent 领域错误
 pub enum AgentError {
     #[error("not found: {0}")]
+    /// 资源未找到
     NotFound(String),
     #[error("invalid state transition: {from} -> {to}")]
+    /// 非法的状态迁移
     InvalidTransition { from: String, to: String },
     #[error("permission denied")]
+    /// 权限不足
     PermissionDenied,
     #[error("cross-tenant access denied: tenant {0} vs required {1}")]
+    /// 跨租户访问被拒绝
     CrossTenantDenied(TenantId, TenantId),
     #[error("policy violation: {0}")]
+    /// 违反 Agent 策略
     PolicyViolation(String),
     #[error("agent already exists: {0}")]
+    /// Agent 已存在
     AgentAlreadyExists(AgentId),
     #[error("worktree mismatch: agent session must reference active worktree (INV-AGT-02)")]
+    /// Worktree 不匹配(INV-AGT-02)
     WorktreeMismatch,
     #[error("conflict: {0}")]
+    /// 状态冲突
     Conflict(String),
     #[error("internal: {0}")]
+    /// 内部错误
     Internal(String),
 }
 
@@ -467,89 +557,146 @@ pub enum AgentError {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 注册 Agent 命令
 pub struct RegisterAgentCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 待注册的 Agent 类型
     pub agent_type: AgentType,
+    /// Provider 名称
     pub provider: String,
+    /// Provider 版本号
     pub version: String,
+    /// 支持的能力列表
     pub capabilities: Vec<String>,
+    /// 关联的策略模板(可选)
     pub policy_template_id: Option<AgentPolicyTemplateId>,
+    /// 操作发起人
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 启动 AgentSession 命令
 pub struct StartSessionCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 使用的 Agent
     pub agent_id: AgentId,
+    /// 绑定的 Worktree
     pub worktree_id: WorktreeId,
+    /// 关联的工作项
     pub work_item_id: WorkItemId,
+    /// 会话意图/任务描述
     pub intent: String,
+    /// 关联的上下文包(可选)
     pub context_packet_id: Option<Uuid>,
+    /// 操作发起人
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 迁移 AgentSession 状态命令
 pub struct TransitionStatusCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标会话
     pub session_id: AgentSessionId,
+    /// 迁移前状态
     pub from: AgentSessionStatus,
+    /// 迁移后状态
     pub to: AgentSessionStatus,
+    /// 迁移原因(可选)
     pub reason: Option<String>,
+    /// 操作发起人
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 记录工具调用活动命令
 pub struct RecordToolActivityCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标会话
     pub session_id: AgentSessionId,
+    /// 工具名
     pub tool: String,
+    /// 调用次数
     pub count: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 提交人工反馈命令
 pub struct SubmitFeedbackCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标会话
     pub session_id: AgentSessionId,
+    /// 反馈给 Agent 的指令内容
     pub agent_instruction: String,
+    /// 操作发起人
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 中止 AgentSession 命令
 pub struct AbortSessionCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标会话
     pub session_id: AgentSessionId,
+    /// 中止原因
     pub reason: String,
+    /// 操作发起人
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建策略模板命令
 pub struct CreatePolicyTemplateCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 模板名称
     pub name: String,
+    /// 策略内容
     pub policy: AgentPolicy,
+    /// 操作发起人
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 查询单个 AgentSession
 pub struct GetSessionQuery {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标会话
     pub session_id: AgentSessionId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 按 Worktree 查询 AgentSession 列表
 pub struct ListByWorktreeQuery {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标 Worktree
     pub worktree_id: WorktreeId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// AgentSession 摘要视图(用于列表查询)
 pub struct AgentSessionSummary {
+    /// 会话唯一标识
     pub id: AgentSessionId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 关联的 Agent
     pub agent_id: AgentId,
+    /// 绑定的 Worktree
     pub worktree_id: WorktreeId,
+    /// 当前状态
     pub status: AgentSessionStatus,
+    /// 会话开始时间
     pub started_at: DateTime<Utc>,
+    /// 会话结束时间(可选)
     pub ended_at: Option<DateTime<Utc>>,
 }
 
@@ -558,43 +705,51 @@ pub struct AgentSessionSummary {
 // =====================================================================
 
 #[async_trait]
+/// Agent 命令端口(写操作)
 pub trait AgentCommandPort: Send + Sync {
+    /// 注册新 Agent
     async fn register_agent(
         &self,
         cmd: RegisterAgentCommand,
         actor: &ActorContext,
     ) -> Result<Agent, AgentError>;
 
+    /// 启动新的 AgentSession
     async fn start_session(
         &self,
         cmd: StartSessionCommand,
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError>;
 
+    /// 迁移 AgentSession 状态
     async fn transition_status(
         &self,
         cmd: TransitionStatusCommand,
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError>;
 
+    /// 记录工具调用活动
     async fn record_tool_activity(
         &self,
         cmd: RecordToolActivityCommand,
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError>;
 
+    /// 提交人工反馈
     async fn submit_feedback(
         &self,
         cmd: SubmitFeedbackCommand,
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError>;
 
+    /// 中止 AgentSession
     async fn abort_session(
         &self,
         cmd: AbortSessionCommand,
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError>;
 
+    /// 创建策略模板
     async fn create_policy_template(
         &self,
         cmd: CreatePolicyTemplateCommand,
@@ -603,19 +758,23 @@ pub trait AgentCommandPort: Send + Sync {
 }
 
 #[async_trait]
+/// Agent 查询端口(读操作)
 pub trait AgentQueryPort: Send + Sync {
+    /// 查询单个 AgentSession
     async fn get_session(
         &self,
         q: GetSessionQuery,
         actor: &ActorContext,
     ) -> Result<AgentSession, AgentError>;
 
+    /// 按 Worktree 查询 AgentSession 列表
     async fn list_by_worktree(
         &self,
         q: ListByWorktreeQuery,
         actor: &ActorContext,
     ) -> Result<Vec<AgentSessionSummary>, AgentError>;
 
+    /// 查询租户下所有活跃 AgentSession
     async fn list_active_sessions(
         &self,
         tenant_id: TenantId,
@@ -624,26 +783,37 @@ pub trait AgentQueryPort: Send + Sync {
 }
 
 #[async_trait]
+/// Agent 持久化仓储端口
 pub trait AgentRepository: Send + Sync {
+    /// 新增 Agent
     async fn insert_agent(&self, agent: Agent) -> Result<(), AgentError>;
+    /// 按 ID 获取 Agent
     async fn get_agent(&self, id: AgentId) -> Result<Agent, AgentError>;
+    /// 按租户列出 Agent
     async fn list_agents(&self, tenant_id: TenantId) -> Result<Vec<Agent>, AgentError>;
 
+    /// 新增 AgentSession
     async fn insert_session(&self, session: AgentSession) -> Result<(), AgentError>;
+    /// 按 ID 获取 AgentSession
     async fn get_session(&self, id: AgentSessionId) -> Result<AgentSession, AgentError>;
+    /// 更新 AgentSession
     async fn update_session(&self, session: AgentSession) -> Result<(), AgentError>;
+    /// 按 Worktree 列出 AgentSession
     async fn list_sessions_by_worktree(
         &self,
         tenant_id: TenantId,
         worktree_id: WorktreeId,
     ) -> Result<Vec<AgentSession>, AgentError>;
+    /// 按租户列出活跃 AgentSession
     async fn list_active_sessions(
         &self,
         tenant_id: TenantId,
     ) -> Result<Vec<AgentSession>, AgentError>;
 
+    /// 新增策略模板
     async fn insert_policy_template(&self, template: AgentPolicyTemplate)
         -> Result<(), AgentError>;
+    /// 按 ID 获取策略模板
     async fn get_policy_template(
         &self,
         id: AgentPolicyTemplateId,
@@ -654,6 +824,7 @@ pub trait AgentRepository: Send + Sync {
 // InMemoryAgentService
 // =====================================================================
 
+/// 基于内存的 Agent 应用服务实现(测试/开发用途)
 pub struct InMemoryAgentService {
     repo: Arc<dyn AgentRepository>,
     agents: Arc<RwLock<HashMap<AgentId, Agent>>>,
@@ -662,6 +833,7 @@ pub struct InMemoryAgentService {
 }
 
 impl InMemoryAgentService {
+    /// 创建默认的内存服务实例(内置内存仓储)
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryAgentRepository::new()),
@@ -670,6 +842,7 @@ impl InMemoryAgentService {
             policies: Arc::new(RwLock::new(HashMap::new())),
         }
     }
+    /// 使用指定仓储创建内存服务实例
     pub fn with_repo(repo: Arc<dyn AgentRepository>) -> Self {
         Self {
             repo,
@@ -1066,6 +1239,7 @@ impl AgentQueryPort for InMemoryAgentService {
 // InMemoryAgentRepository
 // =====================================================================
 
+/// 基于内存的 Agent 仓储实现(测试/开发用途)
 pub struct InMemoryAgentRepository {
     agents: RwLock<HashMap<AgentId, Agent>>,
     sessions: RwLock<HashMap<AgentSessionId, AgentSession>>,
@@ -1073,6 +1247,7 @@ pub struct InMemoryAgentRepository {
 }
 
 impl InMemoryAgentRepository {
+    /// 创建空的内存仓储实例
     pub fn new() -> Self {
         Self {
             agents: RwLock::new(HashMap::new()),

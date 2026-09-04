@@ -45,6 +45,7 @@ pub enum CliKind {
 }
 
 impl CliKind {
+    /// 返回该 CLI Agent 类型的展示名称
     pub fn name(&self) -> &'static str {
         match self {
             Self::Claude => "Claude Code",
@@ -57,10 +58,12 @@ impl CliKind {
         }
     }
 
+    /// 判断该类型是否为 HTTP API Agent (不走 CLI spawn)
     pub fn is_api_agent(&self) -> bool {
         matches!(self, Self::OpenClaw | Self::Hermes)
     }
 
+    /// 返回 6 个内置 CLI Agent 类型列表
     pub fn all_builtin() -> &'static [CliKind] {
         &[
             Self::Claude,
@@ -84,6 +87,7 @@ pub enum ApiKeyMode {
 }
 
 impl ApiKeyMode {
+    /// 返回该存储模式的展示名称
     pub fn name(&self) -> &'static str {
         match self {
             Self::EncryptedRust => "Encrypted (Rust backend)",
@@ -95,9 +99,13 @@ impl ApiKeyMode {
 /// API Key 凭证 (后端只存 hash + label, 明文不返)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ApiKey {
+    /// API Key 记录唯一标识
     pub id: Uuid,
+    /// 所属服务商标识 (如 "anthropic" / "openai" / "openclaw" / "hermes" / "google")
     pub provider: String, // "anthropic" / "openai" / "openclaw" / "hermes" / "google"
+    /// Key 的用户自定义标签, 用于区分同一 provider 下的多个 Key
     pub label: String,
+    /// API Key 存储模式 (EncryptedRust 或 EnvironmentVar)
     pub mode: ApiKeyMode,
     /// EncryptedRust: AES-256-GCM 密文 (base64 编码)
     /// EnvironmentVar: 此字段为空, 用 env_var_name
@@ -106,11 +114,14 @@ pub struct ApiKey {
     /// EnvironmentVar 模式: env 变量名 (例: "ANTHROPIC_API_KEY")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env_var_name: Option<String>,
+    /// Key 创建时间
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// 最近一次使用时间 (未使用过时为 None)
     pub last_used_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl ApiKey {
+    /// 构造 EncryptedRust 模式的 API Key (传入已加密的密文)
     pub fn new_encrypted(
         provider: impl Into<String>,
         label: impl Into<String>,
@@ -128,6 +139,7 @@ impl ApiKey {
         }
     }
 
+    /// 构造 EnvironmentVar 模式的 API Key (只记录 env 变量名, 不存明文)
     pub fn new_env_var(
         provider: impl Into<String>,
         label: impl Into<String>,
@@ -160,31 +172,49 @@ impl ApiKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// API Key 的安全摘要 (不含明文/密文, 供前端展示)
 pub struct ApiKeySummary {
+    /// 该 API Key 的唯一标识 (与 ApiKey.id 一致)
     pub id: Uuid,
+    /// 所属服务商标识
     pub provider: String,
+    /// Key 的用户自定义标签
     pub label: String,
+    /// API Key 存储模式
     pub mode: ApiKeyMode,
+    /// EnvironmentVar 模式下的环境变量名 (EncryptedRust 模式为 None)
     pub env_var_name: Option<String>,
+    /// 创建时间
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// 最近一次使用时间
     pub last_used_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// CLI Profile (用户配置 + B.4 per-agent 字段扩展)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CliProfile {
+    /// Profile 唯一标识
     pub id: Uuid,
+    /// Profile 显示名称
     pub name: String,
+    /// 关联的 CLI Agent 类型
     pub kind: CliKind,
     /// 进程模式: 命令路径 (例: "claude" / "codex" / "aider")
     /// API 模式: 端点 URL
     pub command: String,
+    /// 命令行参数列表 (CLI 模式使用)
     pub args: Vec<String>,
+    /// 附加环境变量 (启动 CLI 进程时注入)
     pub env: std::collections::HashMap<String, String>,
+    /// Worktree 绑定策略
     pub worktree_binding: WorktreeBinding,
+    /// 绑定的 API Key ID (API 模式使用)
     pub api_key_id: Option<Uuid>, // 绑定的 API Key
+    /// 是否启用该 Profile
     pub enabled: bool,
+    /// Profile 创建时间
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// Profile 最近更新时间
     pub updated_at: chrono::DateTime<chrono::Utc>,
 
     // ---- B.4 per-agent 字段扩展 (per 2026-08-30 07:32 JST wt-b4-cliprofile-schema) ----
@@ -214,6 +244,7 @@ fn default_retry_count() -> u32 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// CLI 启动时绑定 worktree 的策略
 pub enum WorktreeBinding {
     /// 自动 (CLI 启动时用当前 worktree)
     Auto,
@@ -224,6 +255,7 @@ pub enum WorktreeBinding {
 }
 
 impl CliProfile {
+    /// 根据内置 CLI 类型构造对应的默认 Profile
     pub fn new_builtin(kind: CliKind) -> Self {
         let (name, command, default_args) = match kind {
             CliKind::Claude => (
@@ -284,42 +316,67 @@ impl CliProfile {
 /// 任务窗口 (per 2026-08-29 04:09 JST 上轮拍板: 新页面 agent-windows)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TaskWindow {
+    /// 任务窗口唯一标识
     pub id: Uuid,
+    /// 窗口显示名称
     pub name: String,
+    /// 所属 worktree ID
     pub worktree_id: Uuid,
+    /// 默认使用的 CLI Profile ID
     pub profile_id: Uuid,
+    /// 窗口下的所有任务 Tab
     pub tabs: Vec<TaskTab>,
+    /// 当前激活的 Tab ID
     pub active_tab_id: Option<Uuid>,
+    /// 窗口创建时间
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// 窗口最近更新时间
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// 任务 Tab (一个 CLI 会话实例)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TaskTab {
+    /// Tab 唯一标识
     pub id: Uuid,
+    /// 所属任务窗口 ID
     pub window_id: Uuid,
+    /// 该 Tab 使用的 CLI Profile ID
     pub profile_id: Uuid,
+    /// Tab 显示标签
     pub label: String,
+    /// Tab 当前运行状态
     pub state: TabState,
+    /// 最近输出内容 (最近 N 行, 供前端展示)
     pub last_output: String, // 最近 N 行 (前端展示)
+    /// Tab 启动时间
     pub started_at: chrono::DateTime<chrono::Utc>,
+    /// Tab 结束时间 (仍在运行则为 None)
     pub finished_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// 进程退出码 (仍在运行或未产生退出码时为 None)
     pub exit_code: Option<i32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+/// 任务 Tab 的生命周期状态
 pub enum TabState {
+    /// 已创建, 尚未启动
     Created,
+    /// 正在运行中
     Running,
+    /// 等待用户输入
     WaitingInput,
+    /// 已正常完成
     Completed,
+    /// 执行失败
     Failed,
+    /// 被用户或系统中止
     Aborted,
 }
 
 impl TaskWindow {
+    /// 创建一个新的任务窗口
     pub fn new(name: impl Into<String>, worktree_id: Uuid, profile_id: Uuid) -> Self {
         let now = chrono::Utc::now();
         Self {
@@ -334,6 +391,7 @@ impl TaskWindow {
         }
     }
 
+    /// 向窗口添加一个新 Tab (校验 ID 唯一且未超过数量上限)
     pub fn add_tab(&mut self, tab: TaskTab) -> Result<(), CliError> {
         if self.tabs.iter().any(|t| t.id == tab.id) {
             return Err(CliError::DuplicateTabId(tab.id));
@@ -347,6 +405,7 @@ impl TaskWindow {
         Ok(())
     }
 
+    /// 关闭指定 Tab, 若该 Tab 为当前激活 Tab 则重新指定激活 Tab
     pub fn close_tab(&mut self, tab_id: Uuid) -> Result<(), CliError> {
         let before = self.tabs.len();
         self.tabs.retain(|t| t.id != tab_id);
@@ -366,32 +425,46 @@ impl TaskWindow {
 // =====================================================================
 
 #[derive(Debug, Error, Clone, PartialEq)]
+/// domain-cli 领域统一错误类型
 pub enum CliError {
     #[error("CLI 启动失败: {0}")]
+    /// CLI 进程启动失败
     SpawnFailed(String),
     #[error("HTTP API 调用失败: {0}")]
+    /// HTTP API 调用失败 (API Agent 模式)
     HttpApiFailed(String),
     #[error("API Key 缺失或错误: provider={0}")]
+    /// 指定 provider 的 API Key 缺失或不存在
     ApiKeyMissing(String),
     #[error("API Key 解密失败")]
+    /// AES-256-GCM 解密失败
     DecryptionFailed,
     #[error("API Key 解密或 Base64 失败: {0}")]
+    /// Base64 解码或解密过程失败
     DecryptionOrBase64(String),
     #[error("加密失败: {0}")]
+    /// AES-256-GCM 加密失败
     EncryptionFailed(String),
     #[error("Profile 不存在: {0}")]
+    /// 指定 ID 的 CLI Profile 不存在
     ProfileNotFound(Uuid),
     #[error("Tab 不存在: {0}")]
+    /// 指定 ID 的任务 Tab 不存在
     TabNotFound(Uuid),
     #[error("Tab ID 重复: {0}")]
+    /// 添加的 Tab ID 与窗口内已有 Tab 重复
     DuplicateTabId(Uuid),
     #[error("Tab 数量超限: max {0}")]
+    /// 窗口内 Tab 数量超过上限
     TooManyTabs(usize),
     #[error("Worktree 不存在: {0}")]
+    /// 指定 ID 的 worktree 不存在
     WorktreeNotFound(Uuid),
     #[error("不支持的 CLI 类型: {0}")]
+    /// 不支持的 CLI 类型
     UnsupportedCli(String),
     #[error("环境变量不存在: {0}")]
+    /// 指定的环境变量不存在
     EnvVarMissing(String),
 }
 
@@ -400,6 +473,7 @@ pub enum CliError {
 // =====================================================================
 
 #[async_trait]
+/// CLI Adapter 端口: 统一抽象 CLI spawn 与 HTTP API 两种调用方式
 pub trait CliAdapter: Send + Sync {
     /// CLI 模式: spawn 进程
     /// API 模式: 走 HTTP
@@ -410,14 +484,20 @@ pub trait CliAdapter: Send + Sync {
         api_key: Option<&str>,
     ) -> Result<InvocationResult, CliError>;
 
+    /// 返回该 Adapter 对应的 CLI 类型
     fn kind(&self) -> CliKind;
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// CLI/API 调用结果
 pub struct InvocationResult {
+    /// 标准输出内容
     pub stdout: String,
+    /// 标准错误输出内容
     pub stderr: String,
+    /// 进程退出码
     pub exit_code: i32,
+    /// 本次调用变更的文件列表 (由 git diff 检测得出)
     pub files_changed: Vec<String>, // git diff 检测
 }
 
@@ -425,6 +505,7 @@ pub struct InvocationResult {
 // 5. service — 加密 / 解密 / 适配器路由
 // =====================================================================
 
+/// CLI 领域服务: Profile 管理 + API Key 加解密 + Adapter 路由
 pub struct CliService {
     /// 内存 store (Phase 2 替换为持久化)
     profiles: std::sync::RwLock<std::collections::HashMap<Uuid, CliProfile>>,
@@ -434,6 +515,7 @@ pub struct CliService {
 }
 
 impl CliService {
+    /// 使用给定的加密 master key 创建 CliService
     pub fn new(master_key: [u8; 32]) -> Self {
         Self {
             profiles: std::sync::RwLock::new(std::collections::HashMap::new()),
@@ -456,14 +538,17 @@ impl CliService {
         Ok(())
     }
 
+    /// 列出所有已注册的 Profile
     pub fn list_profiles(&self) -> Vec<CliProfile> {
         self.profiles.read().unwrap().values().cloned().collect()
     }
 
+    /// 按 ID 查询 Profile
     pub fn get_profile(&self, id: Uuid) -> Option<CliProfile> {
         self.profiles.read().unwrap().get(&id).cloned()
     }
 
+    /// 删除指定 ID 的 Profile
     pub fn delete_profile(&self, id: Uuid) -> Result<(), CliError> {
         self.profiles
             .write()
@@ -507,6 +592,7 @@ impl CliService {
         Ok(summary)
     }
 
+    /// 列出所有 API Key 的安全摘要
     pub fn list_api_keys(&self) -> Vec<ApiKeySummary> {
         self.api_keys
             .read()
@@ -543,6 +629,7 @@ impl CliService {
         }
     }
 
+    /// 删除指定 ID 的 API Key
     pub fn delete_api_key(&self, id: Uuid) -> Result<(), CliError> {
         self.api_keys
             .write()
@@ -559,6 +646,7 @@ use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use base64::Engine;
 
+/// 使用 AES-256-GCM 加密明文, 返回 base64(nonce || ciphertext)
 pub fn encrypt(plaintext: &str, master_key: &[u8; 32]) -> Result<String, CliError> {
     use rand::RngCore;
     let key = Key::<Aes256Gcm>::from_slice(master_key);
@@ -576,6 +664,7 @@ pub fn encrypt(plaintext: &str, master_key: &[u8; 32]) -> Result<String, CliErro
     Ok(base64::engine::general_purpose::STANDARD.encode(combined))
 }
 
+/// 解密 encrypt() 生成的 base64 密文, 还原明文
 pub fn decrypt(encoded: &str, master_key: &[u8; 32]) -> Result<String, CliError> {
     let combined = base64::engine::general_purpose::STANDARD
         .decode(encoded)

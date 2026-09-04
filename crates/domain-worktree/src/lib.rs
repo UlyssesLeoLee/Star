@@ -93,6 +93,7 @@ pub enum WorktreeStatus {
 }
 
 impl WorktreeStatus {
+    /// 转换为大写下划线字符串表示(用于日志/序列化展示)
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Created => "CREATED",
@@ -228,12 +229,14 @@ pub struct Worktree {
 /// 健康状态(独立投影)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthState {
+    /// 最后一次收到 Local Runtime 观测上报的时间
     pub last_observed_at: Option<DateTime<Utc>>,
     /// Current(< 60s) / PossiblyStale(60-300s) / Offline(>= 300s) / Unknown(< 60s 启动)
     pub staleness: Staleness,
 }
 
 impl HealthState {
+    /// 构造初始未知健康状态(尚未收到任何观测上报)
     pub fn unknown() -> Self {
         Self {
             last_observed_at: None,
@@ -242,23 +245,32 @@ impl HealthState {
     }
 }
 
+/// 心跳新鲜度等级(INV-WT-10 Stale Display)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Staleness {
+    /// 尚未收到任何观测(启动 < 60s)
     Unknown,
+    /// 最近 60s 内有观测,视为最新
     Current,
+    /// 60-300s 无观测,可能已过期
     PossiblyStale,
+    /// >= 300s 无观测,判定离线
     Offline,
 }
 
 /// 冲突状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConflictState {
+    /// 是否存在冲突
     pub has_conflicts: bool,
+    /// 与之冲突的其他 Worktree ID 列表
     pub conflicting_worktree_ids: Vec<WorktreeId>,
+    /// 最后一次检测冲突的时间
     pub last_detected_at: Option<DateTime<Utc>>,
 }
 
 impl ConflictState {
+    /// 构造无冲突的初始状态
     pub fn none() -> Self {
         Self {
             has_conflicts: false,
@@ -276,12 +288,15 @@ macro_rules! define_uuid_id {
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 领域强类型 ID (由 `define_uuid_id!` 宏统一生成)
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 取出内部原始 UUID
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -306,24 +321,34 @@ macro_rules! define_uuid_id {
 // =====================================================================
 
 #[derive(Debug, Error)]
+/// Worktree 领域操作错误
 pub enum WorktreeError {
     #[error("not found: {0}")]
+    /// 指定 ID 的 Worktree 不存在
     NotFound(WorktreeId),
     #[error("invalid state transition: {from} -> {to}")]
+    /// 17 状态机迁移非法(INV-WT-02)
     InvalidTransition { from: String, to: String },
     #[error("permission denied")]
+    /// 当前 Actor 无权执行该操作
     PermissionDenied,
     #[error("cross-tenant access denied: tenant {0} vs required {1}")]
+    /// 跨租户访问被拒绝(INV-WT-08)
     CrossTenantDenied(TenantId, TenantId),
     #[error("runtime required (INV-WT-03)")]
+    /// Worktree 未绑定 Runtime(INV-WT-03 违反)
     RuntimeRequired,
     #[error("completion gate failed: {0}")]
+    /// 7 项 Completion Gate 未通过
     CompletionGateFailed(String),
     #[error("isolation check failed: {0}")]
+    /// 隔离性校验失败
     IsolationFailed(String),
     #[error("conflict: {0}")]
+    /// 与其他 Worktree 存在冲突
     Conflict(String),
     #[error("internal: {0}")]
+    /// 内部错误
     Internal(String),
 }
 
@@ -332,70 +357,112 @@ pub enum WorktreeError {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建 Worktree 命令
 pub struct CreateWorktreeCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 所属 Project ID
     pub project_id: ProjectId,
+    /// 关联的 WorkItem ID
     pub work_item_id: WorkItemId,
+    /// 所属 Repository ID
     pub repository_id: RepositoryId,
+    /// 分支名
     pub branch: String,
+    /// 基线分支
     pub base_branch: String,
     /// INV-WT-03:Runtime 必带
     pub runtime_id: RuntimeId,
+    /// 所有者用户 ID
     pub owner_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 将 Worktree 分配给 Agent 的命令
 pub struct AssignWorktreeCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 目标 Worktree ID
     pub worktree_id: WorktreeId,
+    /// 分配的 Agent ID
     pub agent_id: AgentId,
+    /// 分配的 AgentSession ID
     pub agent_session_id: AgentSessionId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// Local Runtime 上报观测状态的命令
 pub struct RecordObservedStateCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 目标 Worktree ID
     pub worktree_id: WorktreeId,
+    /// 距离 base_branch 的 ahead 提交数
     pub ahead: u32,
+    /// 距离 base_branch 的 behind 提交数
     pub behind: u32,
+    /// 当前观测到的 AgentSession(可选)
     pub current_agent_session_id: Option<AgentSessionId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 状态机迁移命令
 pub struct TransitionStatusCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 目标 Worktree ID
     pub worktree_id: WorktreeId,
+    /// 迁移前状态(用于乐观校验)
     pub from: WorktreeStatus,
+    /// 迁移后状态
     pub to: WorktreeStatus,
+    /// 迁移原因(可选)
     pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 主动放弃 Worktree 的命令
 pub struct AbandonCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 目标 Worktree ID
     pub worktree_id: WorktreeId,
+    /// 放弃原因
     pub reason: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 按 WorkItem 查询 Worktree 列表的查询
 pub struct ListByWorkItemQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 目标 WorkItem ID
     pub work_item_id: WorkItemId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 按 Agent 查询 Worktree 列表的查询
 pub struct ListByAgentQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 目标 Agent ID
     pub agent_id: AgentId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// Worktree 列表查询返回的摘要视图
 pub struct WorktreeSummary {
+    /// 主键
     pub id: WorktreeId,
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 关联的 WorkItem ID
     pub work_item_id: WorkItemId,
+    /// 当前状态
     pub status: WorktreeStatus,
+    /// 绑定的 Runtime ID
     pub runtime_id: RuntimeId,
+    /// 更新时间
     pub updated_at: DateTime<Utc>,
 }
 
@@ -406,30 +473,35 @@ pub struct WorktreeSummary {
 /// **WorktreeCommandPort**(写操作,§3.21)
 #[async_trait]
 pub trait WorktreeCommandPort: Send + Sync {
+    /// 创建一个新的 Worktree
     async fn create_worktree(
         &self,
         cmd: CreateWorktreeCommand,
         actor: &ActorContext,
     ) -> Result<Worktree, WorktreeError>;
 
+    /// 将 Worktree 分配给指定 Agent/AgentSession
     async fn assign_to_agent(
         &self,
         cmd: AssignWorktreeCommand,
         actor: &ActorContext,
     ) -> Result<Worktree, WorktreeError>;
 
+    /// 记录 Local Runtime 上报的观测状态
     async fn record_observed_state(
         &self,
         cmd: RecordObservedStateCommand,
         actor: &ActorContext,
     ) -> Result<Worktree, WorktreeError>;
 
+    /// 执行状态机迁移
     async fn transition_status(
         &self,
         cmd: TransitionStatusCommand,
         actor: &ActorContext,
     ) -> Result<Worktree, WorktreeError>;
 
+    /// 主动放弃 Worktree
     async fn abandon(
         &self,
         cmd: AbandonCommand,
@@ -440,30 +512,35 @@ pub trait WorktreeCommandPort: Send + Sync {
 /// **WorktreeQueryPort**(读操作,§3.21)
 #[async_trait]
 pub trait WorktreeQueryPort: Send + Sync {
+    /// 按 ID 查询单个 Worktree
     async fn get_by_id(
         &self,
         id: WorktreeId,
         actor: &ActorContext,
     ) -> Result<Worktree, WorktreeError>;
 
+    /// 按 WorkItem 查询 Worktree 摘要列表
     async fn list_by_work_item(
         &self,
         q: ListByWorkItemQuery,
         actor: &ActorContext,
     ) -> Result<Vec<WorktreeSummary>, WorktreeError>;
 
+    /// 按 Agent 查询 Worktree 摘要列表
     async fn list_by_agent(
         &self,
         q: ListByAgentQuery,
         actor: &ActorContext,
     ) -> Result<Vec<WorktreeSummary>, WorktreeError>;
 
+    /// 检测与指定 Worktree 存在冲突的其他 Worktree
     async fn detect_conflicts(
         &self,
         worktree_id: WorktreeId,
         actor: &ActorContext,
     ) -> Result<Vec<WorktreeId>, WorktreeError>;
 
+    /// 生成 Repository 维度的 Worktree 状态热力图数据
     async fn heatmap(
         &self,
         repository_id: RepositoryId,
@@ -471,30 +548,41 @@ pub trait WorktreeQueryPort: Send + Sync {
     ) -> Result<HeatmapData, WorktreeError>;
 }
 
+/// Worktree 状态热力图数据(按 Repository 聚合)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeatmapData {
+    /// 所属 Repository ID
     pub repository_id: RepositoryId,
+    /// Worktree 总数
     pub total_worktrees: u32,
+    /// 按状态字符串分组的计数
     pub by_status: HashMap<String, u32>,
+    /// 生成时间
     pub generated_at: DateTime<Utc>,
 }
 
 /// Worktree Repository
 #[async_trait]
 pub trait WorktreeRepository: Send + Sync {
+    /// 插入新的 Worktree 记录
     async fn insert(&self, wt: Worktree) -> Result<(), WorktreeError>;
+    /// 按 ID 获取 Worktree
     async fn get(&self, id: WorktreeId) -> Result<Worktree, WorktreeError>;
+    /// 更新 Worktree 记录
     async fn update(&self, wt: Worktree) -> Result<(), WorktreeError>;
+    /// 按 WorkItem 列出关联的 Worktree
     async fn list_by_work_item(
         &self,
         tenant_id: TenantId,
         work_item_id: WorkItemId,
     ) -> Result<Vec<Worktree>, WorktreeError>;
+    /// 按 Agent 列出关联的 Worktree
     async fn list_by_agent(
         &self,
         tenant_id: TenantId,
         agent_id: AgentId,
     ) -> Result<Vec<Worktree>, WorktreeError>;
+    /// 按 Repository 列出关联的 Worktree
     async fn list_by_repository(
         &self,
         tenant_id: TenantId,
@@ -506,18 +594,21 @@ pub trait WorktreeRepository: Send + Sync {
 // InMemoryWorktreeService(实现)
 // =====================================================================
 
+/// 基于内存的 WorktreeCommandPort / WorktreeQueryPort 实现,供测试与本地开发使用
 pub struct InMemoryWorktreeService {
     repo: Arc<dyn WorktreeRepository>,
     store: Arc<RwLock<HashMap<WorktreeId, Worktree>>>,
 }
 
 impl InMemoryWorktreeService {
+    /// 使用默认的内存 Repository 构造服务实例
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryWorktreeRepository::new()),
             store: Arc::new(RwLock::new(HashMap::new())),
         }
     }
+    /// 使用指定的 Repository 实现构造服务实例
     pub fn with_repo(repo: Arc<dyn WorktreeRepository>) -> Self {
         Self {
             repo,
@@ -533,11 +624,13 @@ impl Default for InMemoryWorktreeService {
 }
 
 // In-memory repository
+/// 基于内存 HashMap 的 WorktreeRepository 实现
 pub struct InMemoryWorktreeRepository {
     store: RwLock<HashMap<WorktreeId, Worktree>>,
 }
 
 impl InMemoryWorktreeRepository {
+    /// 构造一个空的内存 Repository
     pub fn new() -> Self {
         Self {
             store: RwLock::new(HashMap::new()),

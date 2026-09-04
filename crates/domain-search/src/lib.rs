@@ -49,17 +49,26 @@ define_uuid_id!(WorkItemId);
 // =====================================================================
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// 可被检索的资源类型(Projection 来源)
 pub enum ResourceType {
+    /// 工作项
     WorkItem,
+    /// 评论
     Comment,
+    /// 项目
     Project,
+    /// 代码符号
     Symbol,
+    /// 反馈
     Feedback,
+    /// 决策记录
     Decision,
+    /// 架构决策记录(ADR)
     Adr,
 }
 
 impl ResourceType {
+    /// 返回资源类型对应的小写字符串标识
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::WorkItem => "work_item",
@@ -78,18 +87,22 @@ impl ResourceType {
 // =====================================================================
 
 #[macro_export]
+/// 生成基于 UUID 的领域强类型 ID(附带 new/as_uuid/From/Display 实现)
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 领域强类型 ID(由宏统一生成)
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID(由宏统一生成)
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回底层 UUID(由宏统一生成)
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -116,25 +129,40 @@ macro_rules! define_uuid_id {
 /// SearchIndex 投影(§4.15,§12)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchIndex {
+    /// SearchIndex 记录 ID
     pub id: SearchIndexId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属项目 ID
     pub project_id: ProjectId,
+    /// 索引来源的资源类型
     pub resource_type: ResourceType,
+    /// 索引来源的资源 ID
     pub resource_id: Uuid,
+    /// 全文检索文本
     pub fulltext: String,
+    /// 代码符号元数据(仅 Symbol 类型资源有值)
     pub symbol_metadata: Option<SymbolMetadata>,
+    /// 标签列表
     pub tags: Vec<String>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最近更新时间
     pub updated_at: DateTime<Utc>,
     /// 乐观版本(用于 Projector 重放)
     pub version: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 代码符号元数据(用于符号检索场景)
 pub struct SymbolMetadata {
+    /// 符号名称
     pub name: String,
+    /// 符号种类(如 function/struct/trait)
     pub kind: String,
+    /// 符号签名
     pub signature: String,
+    /// 符号所在文件路径
     pub file_path: String,
 }
 
@@ -143,35 +171,56 @@ pub struct SymbolMetadata {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 全文检索查询参数
 pub struct SearchQuery {
+    /// 查询文本
     pub query_text: String,
+    /// 过滤条件(键值对)
     pub filters: HashMap<String, String>,
+    /// 排序字段
     pub sort: Option<String>,
+    /// 返回数量上限
     pub limit: u32,
+    /// 分页偏移量
     pub offset: u32,
+    /// 发起查询的用户 ID
     pub user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 检索结果集
 pub struct SearchResult {
+    /// 命中总数
     pub total: u64,
+    /// 命中条目列表
     pub items: Vec<SearchHit>,
+    /// 分面统计
     pub facets: HashMap<String, Vec<Facet>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 单条检索命中结果
 pub struct SearchHit {
+    /// 命中资源类型
     pub resource_type: ResourceType,
+    /// 命中资源 ID
     pub resource_id: Uuid,
+    /// 相关性得分
     pub score: f64,
+    /// 高亮片段(字段名 -> 高亮文本)
     pub highlights: HashMap<String, String>,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属项目 ID
     pub project_id: ProjectId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 分面统计项
 pub struct Facet {
+    /// 分面取值
     pub value: String,
+    /// 该取值下的命中数量
     pub count: u64,
 }
 
@@ -213,16 +262,24 @@ pub struct CodeContext {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 自动补全查询参数
 pub struct SuggestQuery {
+    /// 补全前缀
     pub prefix: String,
+    /// 返回数量上限
     pub limit: u32,
+    /// 发起查询的用户 ID
     pub user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 自动补全建议项
 pub struct Suggestion {
+    /// 建议展示文本
     pub text: String,
+    /// 建议来源资源类型
     pub resource_type: ResourceType,
+    /// 建议来源资源 ID
     pub resource_id: Uuid,
 }
 
@@ -231,12 +288,19 @@ pub struct Suggestion {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 用户保存的检索条件(仅本人可见,§4.10)
 pub struct SavedSearch {
+    /// SavedSearch 记录 ID
     pub id: SavedSearchId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属用户 ID
     pub user_id: UserId,
+    /// 保存时使用的名称
     pub name: String,
+    /// 保存的查询条件
     pub query: SearchQuery,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
 }
 
@@ -245,21 +309,28 @@ pub struct SavedSearch {
 // =====================================================================
 
 #[derive(Debug, Error)]
+/// Search 领域操作错误
 pub enum SearchError {
     #[error("not found: {0}")]
+    /// 目标资源不存在
     NotFound(String),
     #[error("invalid state: {0}")]
+    /// 当前状态不允许该操作
     InvalidState(String),
     #[error("permission denied")]
+    /// 权限不足
     PermissionDenied,
     /// INV-SR-02 / INV-S-03:跨 tenant 拒绝
     #[error("cross-tenant access denied: tenant {0} vs required {1}")]
     CrossTenantDenied(TenantId, TenantId),
     #[error("invalid query: {0}")]
+    /// 查询参数非法
     InvalidQuery(String),
     #[error("conflict: {0}")]
+    /// 操作与当前状态冲突
     Conflict(String),
     #[error("internal: {0}")]
+    /// 内部错误
     Internal(String),
 }
 
@@ -268,63 +339,100 @@ pub enum SearchError {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 写入 / 更新 SearchIndex 的命令(仅 Worker Projector 可调用)
 pub struct UpsertIndexCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属项目 ID
     pub project_id: ProjectId,
+    /// 索引来源的资源类型
     pub resource_type: ResourceType,
+    /// 索引来源的资源 ID
     pub resource_id: Uuid,
+    /// 全文检索文本
     pub fulltext: String,
+    /// 代码符号元数据(仅 Symbol 类型资源有值)
     pub symbol_metadata: Option<SymbolMetadata>,
+    /// 标签列表
     pub tags: Vec<String>,
+    /// 投影版本号(用于幂等 / 乱序丢弃)
     pub projection_version: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 删除 SearchIndex 的命令(仅 Worker Projector 可调用)
 pub struct DeleteIndexCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 待删除索引对应的资源类型
     pub resource_type: ResourceType,
+    /// 待删除索引对应的资源 ID
     pub resource_id: Uuid,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 批量重建索引的命令
 pub struct BulkReindexCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属项目 ID
     pub project_id: ProjectId,
+    /// 待写入的索引条目列表
     pub entries: Vec<UpsertIndexCommand>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 批量重建索引的结果统计
 pub struct BulkReindexResult {
+    /// 新增条目数
     pub inserted: u32,
+    /// 更新条目数
     pub updated: u32,
+    /// 跳过条目数(版本落后)
     pub skipped: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 保存 SavedSearch 的命令
 pub struct SaveSearchCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 保存所属的用户 ID
     pub user_id: UserId,
+    /// 保存时使用的名称
     pub name: String,
+    /// 待保存的查询条件
     pub query: SearchQuery,
+    /// 发起操作的实际用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 删除 SavedSearch 的命令(INV-S-05:仅本人可删)
 pub struct DeleteSavedSearchCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 待删除的 SavedSearch ID
     pub saved_search_id: SavedSearchId,
+    /// 发起操作的实际用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 全文检索请求 DTO(携带租户上下文)
 pub struct SearchQueryDto {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 检索查询参数
     pub query: SearchQuery,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 自动补全请求 DTO(携带租户上下文)
 pub struct SuggestQueryDto {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 补全查询参数
     pub query: SuggestQuery,
 }
 
@@ -342,24 +450,28 @@ pub trait SearchCommandPort: Send + Sync {
         actor: &ActorContext,
     ) -> Result<SearchIndex, SearchError>;
 
+    /// 删除单条索引(由 infrastructure Adapter 调用,**不**经业务事务)
     async fn delete_index(
         &self,
         cmd: DeleteIndexCommand,
         actor: &ActorContext,
     ) -> Result<(), SearchError>;
 
+    /// 批量重建索引
     async fn bulk_reindex(
         &self,
         cmd: BulkReindexCommand,
         actor: &ActorContext,
     ) -> Result<BulkReindexResult, SearchError>;
 
+    /// 保存检索条件为 SavedSearch
     async fn save_search(
         &self,
         cmd: SaveSearchCommand,
         actor: &ActorContext,
     ) -> Result<SavedSearch, SearchError>;
 
+    /// 删除本人的 SavedSearch(INV-S-05)
     async fn delete_saved(
         &self,
         cmd: DeleteSavedSearchCommand,
@@ -368,6 +480,7 @@ pub trait SearchCommandPort: Send + Sync {
 }
 
 #[async_trait]
+/// SearchQueryPort(只读检索入口,§14 注 4)
 pub trait SearchQueryPort: Send + Sync {
     /// 全文检索(INV-SR-02 强制 tenant 隔离)
     async fn search(
@@ -427,22 +540,29 @@ pub trait SearchQueryPort: Send + Sync {
 }
 
 #[async_trait]
+/// SearchRepository(存储适配层端口,由 InMemory / 真实存储实现)
 pub trait SearchRepository: Send + Sync {
+    /// 插入一条 SearchIndex 记录
     async fn insert_index(&self, idx: SearchIndex) -> Result<(), SearchError>;
+    /// 按 ID 获取 SearchIndex
     async fn get_index(&self, id: SearchIndexId) -> Result<SearchIndex, SearchError>;
+    /// 更新一条 SearchIndex 记录
     async fn update_index(&self, idx: SearchIndex) -> Result<(), SearchError>;
+    /// 按租户 + 资源类型 + 资源 ID 查找 SearchIndex
     async fn get_index_by_resource(
         &self,
         tenant_id: TenantId,
         resource_type: ResourceType,
         resource_id: Uuid,
     ) -> Result<Option<SearchIndex>, SearchError>;
+    /// 按租户 + 资源类型 + 资源 ID 删除 SearchIndex
     async fn delete_index_by_resource(
         &self,
         tenant_id: TenantId,
         resource_type: ResourceType,
         resource_id: Uuid,
     ) -> Result<bool, SearchError>;
+    /// 执行全文检索
     async fn search(
         &self,
         tenant_id: TenantId,
@@ -451,6 +571,7 @@ pub trait SearchRepository: Send + Sync {
         limit: u32,
         offset: u32,
     ) -> Result<SearchResult, SearchError>;
+    /// 执行自动补全
     async fn suggest(
         &self,
         tenant_id: TenantId,
@@ -458,13 +579,17 @@ pub trait SearchRepository: Send + Sync {
         limit: u32,
     ) -> Result<Vec<Suggestion>, SearchError>;
 
+    /// 插入一条 SavedSearch 记录
     async fn insert_saved(&self, saved: SavedSearch) -> Result<(), SearchError>;
+    /// 按租户 + 用户列出其 SavedSearch
     async fn list_saved_by_user(
         &self,
         tenant_id: TenantId,
         user_id: UserId,
     ) -> Result<Vec<SavedSearch>, SearchError>;
+    /// 按 ID 获取 SavedSearch
     async fn get_saved(&self, id: SavedSearchId) -> Result<SavedSearch, SearchError>;
+    /// 按 ID 删除 SavedSearch
     async fn delete_saved(&self, id: SavedSearchId) -> Result<bool, SearchError>;
 }
 
@@ -472,6 +597,7 @@ pub trait SearchRepository: Send + Sync {
 // InMemorySearchService
 // =====================================================================
 
+/// 基于内存的 SearchCommandPort / SearchQueryPort 实现(测试 / 参考用)
 pub struct InMemorySearchService {
     repo: Arc<dyn SearchRepository>,
     index: Arc<RwLock<HashMap<SearchIndexId, SearchIndex>>>,
@@ -479,6 +605,7 @@ pub struct InMemorySearchService {
 }
 
 impl InMemorySearchService {
+    /// 使用默认的 InMemorySearchRepository 创建服务实例
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemorySearchRepository::new()),
@@ -486,6 +613,7 @@ impl InMemorySearchService {
             saved: Arc::new(RwLock::new(HashMap::new())),
         }
     }
+    /// 使用指定的 SearchRepository 创建服务实例
     pub fn with_repo(repo: Arc<dyn SearchRepository>) -> Self {
         Self {
             repo,
@@ -1040,12 +1168,14 @@ impl SearchQueryPort for InMemorySearchService {
 // InMemorySearchRepository
 // =====================================================================
 
+/// 基于内存 HashMap 的 SearchRepository 实现(测试 / 参考用)
 pub struct InMemorySearchRepository {
     index: RwLock<HashMap<SearchIndexId, SearchIndex>>,
     saved: RwLock<HashMap<SavedSearchId, SavedSearch>>,
 }
 
 impl InMemorySearchRepository {
+    /// 创建空的内存仓储实例
     pub fn new() -> Self {
         Self {
             index: RwLock::new(HashMap::new()),

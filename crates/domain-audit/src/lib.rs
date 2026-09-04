@@ -654,40 +654,67 @@ impl Default for AuditListQuery {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 记录 AI Audit 的输入参数(对应 9 个必答问题)
 pub struct AIAuditMetadataInput {
+    /// Q1: 会话 ID
     pub agent_session_id: AgentSessionId,
+    /// Q4: Agent ID
     pub agent_id: AgentId,
+    /// Q2: Context Packet ID(可选)
     pub context_packet_id: Option<ContextPacketId>,
+    /// Q3: ChangeSet ID(可选)
     pub change_set_id: Option<ChangeSetId>,
+    /// Q5: Worktree ID(可选)
     pub worktree_id: Option<Uuid>,
+    /// Q6: 开始时间
     pub started_at: DateTime<Utc>,
+    /// Q6: 结束时间
     pub ended_at: DateTime<Utc>,
+    /// Q7: 验证结果 ID 列表
     pub validation_result_ids: Vec<ValidationResultId>,
+    /// Q8: 已消费 Feedback ID 列表
     pub feedback_consumed_ids: Vec<FeedbackId>,
+    /// Q9: 批准人用户 ID(可选)
     pub approver_user_id: Option<UserId>,
+    /// 数据类别(Prompt / Code / Diff 等)
     pub data_categories_sent: Vec<String>,
+    /// ProviderDataBoundary 引用(可选)
     pub provider_boundary_ref: Option<ProviderDataBoundaryId>,
+    /// 风险信号列表
     pub risk_signals: Vec<String>,
+    /// Full Prompt 引用(Object Storage key,可选)
     pub full_prompt_ref: Option<String>,
+    /// Full Response 引用(可选)
     pub full_response_ref: Option<String>,
+    /// Prompt 哈希
     pub prompt_hash: String,
+    /// Response 哈希
     pub response_hash: String,
     /// Full Prompt 默认 90 天(Sensitive Code 0 天由外部策略决定;此处默认 90d,INV-AU-06)
     pub retention: Option<Duration>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 记录 AI Audit 的命令
 pub struct RecordAIAuditCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// AI Audit 元数据输入
     pub metadata: AIAuditMetadataInput,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 导出 AuditEvent 的命令
 pub struct ExportAuditCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 导出格式
     pub format: ExportFormat,
+    /// 时间范围(开始)
     pub range_start: DateTime<Utc>,
+    /// 时间范围(结束)
     pub range_end: DateTime<Utc>,
+    /// 按动作类型过滤(可选)
     pub filter_action: Option<AuditAction>,
 }
 
@@ -759,6 +786,7 @@ pub struct InMemoryAuditService {
 }
 
 impl InMemoryAuditService {
+    /// 创建新的 InMemoryAuditService 实例,并返回事件接收端
     pub fn new() -> (Arc<Self>, mpsc::UnboundedReceiver<AuditEventKind>) {
         let (tx, rx) = mpsc::unbounded_channel();
         let svc = Arc::new(Self {
@@ -771,15 +799,19 @@ impl InMemoryAuditService {
         });
         (svc, rx)
     }
+    /// 创建仅用于测试的 InMemoryAuditService 实例
     pub fn new_for_test() -> Arc<Self> {
         Self::new().0
     }
+    /// 返回当前已记录的 AuditEvent 数量
     pub async fn event_count(&self) -> usize {
         self.events.read().await.len()
     }
+    /// 返回当前已记录的 AI Audit Metadata 数量
     pub async fn ai_meta_count(&self) -> usize {
         self.ai_meta.read().await.len()
     }
+    /// 返回跨租户访问尝试的记录数量
     pub async fn cross_tenant_count(&self) -> usize {
         self.events
             .read()

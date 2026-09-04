@@ -53,18 +53,22 @@ define_uuid_id!(RepositoryId);
 // =====================================================================
 
 #[macro_export]
+/// 生成基于 Uuid 的强类型 ID 宏,统一实现 new/as_uuid/From<Uuid>/Display
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 领域强类型 ID(由 `define_uuid_id!` 宏统一生成)
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID(由宏统一生成)
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回底层 Uuid 值(由宏统一生成)
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -89,34 +93,57 @@ macro_rules! define_uuid_id {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 项目实体,隶属某个 Workspace,承载 Policy/模板等配置平面
 pub struct Project {
+    /// 项目 ID
     pub id: ProjectId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属 Workspace ID
     pub workspace_id: WorkspaceId,
+    /// 项目 slug(同一 Workspace 内唯一)
     pub slug: String,
+    /// 项目展示名称
     pub display_name: String,
+    /// 项目描述
     pub description: String,
+    /// 项目状态
     pub status: ProjectStatus,
+    /// 创建时使用的项目模板 ID(可选)
     pub project_template_id: Option<ProjectTemplateId>,
+    /// 默认工作流 ID(可选)
     pub default_workflow_id: Option<WorkflowId>,
+    /// 默认权限方案 ID(可选)
     pub default_permission_scheme_id: Option<PermissionSchemeId>,
+    /// 默认 Agent 策略 ID(可选)
     pub default_agent_policy_id: Option<AgentPolicyId>,
+    /// 默认校验策略 ID(可选)
     pub default_validation_policy_id: Option<ValidationPolicyId>,
+    /// 默认上下文策略 ID(可选)
     pub default_context_policy_id: Option<ContextPolicyId>,
+    /// 最大 Worktree 数量上限(可选)
     pub max_worktrees: Option<u32>,
+    /// 最大 Agent 会话数量上限(可选)
     pub max_agent_sessions: Option<u32>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最近更新时间
     pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 项目状态枚举
 pub enum ProjectStatus {
+    /// 活跃状态
     Active,
+    /// 已归档状态
     Archived,
+    /// 已删除状态
     Deleted,
 }
 
 impl ProjectStatus {
+    /// 返回状态对应的字符串表示
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Active => "ACTIVE",
@@ -129,25 +156,42 @@ impl ProjectStatus {
 /// ProjectPolicy(整体替换,不允许 partial)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectPolicy {
+    /// 策略 ID
     pub id: ProjectPolicyId,
+    /// 所属项目 ID
     pub project_id: ProjectId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 自定义工作流 ID(可选,覆盖项目默认值)
     pub custom_workflow_id: Option<WorkflowId>,
+    /// 权限方案 ID
     pub permission_scheme_id: PermissionSchemeId,
+    /// 通知模板 ID(可选)
     pub notification_template_id: Option<NotificationTemplateId>,
+    /// Agent 策略 ID
     pub agent_policy_id: AgentPolicyId,
+    /// Agent 最大运行时长(秒)
     pub max_runtime_seconds: u32,
+    /// 最大上下文 Token 数
     pub max_context_tokens: u32,
+    /// 校验策略 ID
     pub validation_policy_id: ValidationPolicyId,
+    /// 要求通过的测试次数
     pub required_test_passes: u32,
+    /// 默认代码仓库 ID(可选)
     pub default_repository_id: Option<RepositoryId>,
+    /// 提交是否需要人类确认
     pub commit_requires_user: bool,
+    /// 创建 PR 是否需要人类确认
     pub pr_creation_requires_user: bool,
+    /// 是否启用 Merge 人工门禁(INV-P-03)
     pub merge_gate: bool, // INV-P-03:必须人类 merge
+    /// 最近更新时间
     pub updated_at: DateTime<Utc>,
 }
 
 impl ProjectPolicy {
+    /// 生成给定项目的默认策略配置
     pub fn default_for(project_id: ProjectId, tenant_id: TenantId) -> Self {
         Self {
             id: ProjectPolicyId::new(),
@@ -171,24 +215,37 @@ impl ProjectPolicy {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 项目模板,用于创建项目时预置默认配置
 pub struct ProjectTemplate {
+    /// 模板 ID
     pub id: ProjectTemplateId,
+    /// 模板名称
     pub name: String,
+    /// 模板分类
     pub category: TemplateCategory,
+    /// 默认工作流 ID(可选)
     pub default_workflow_id: Option<WorkflowId>,
+    /// 默认权限方案 ID(可选)
     pub default_permission_scheme_id: Option<PermissionSchemeId>,
+    /// 模板版本号
     pub version: u32,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 项目模板分类
 pub enum TemplateCategory {
+    /// 软件开发类模板
     SoftwareDevelopment,
+    /// DevOps 类模板
     DevOps,
+    /// 研究类模板
     Research,
 }
 
 impl TemplateCategory {
+    /// 返回分类对应的字符串表示
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::SoftwareDevelopment => "software_development",
@@ -203,20 +260,28 @@ impl TemplateCategory {
 // =====================================================================
 
 #[derive(Debug, Error)]
+/// Project 领域错误类型
 pub enum ProjectError {
     #[error("not found: {0}")]
+    /// 资源未找到
     NotFound(String),
     #[error("permission denied")]
+    /// 权限不足
     PermissionDenied,
     #[error("cross-tenant access denied: tenant {0} vs required {1}")]
+    /// 跨租户访问被拒绝(实际租户 vs 要求租户)
     CrossTenantDenied(TenantId, TenantId),
     #[error("slug already exists in workspace: {0}")]
+    /// Slug 在该 Workspace 内已存在
     SlugExists(String),
     #[error("invalid state: {0}")]
+    /// 状态非法,无法执行该操作
     InvalidState(String),
     #[error("conflict: {0}")]
+    /// 资源冲突
     Conflict(String),
     #[error("internal: {0}")]
+    /// 内部错误
     Internal(String),
 }
 
@@ -225,40 +290,63 @@ pub enum ProjectError {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建项目命令
 pub struct CreateProjectCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 目标 Workspace ID
     pub workspace_id: WorkspaceId,
+    /// 项目 slug
     pub slug: String,
+    /// 项目展示名称
     pub display_name: String,
+    /// 项目描述
     pub description: String,
+    /// 使用的项目模板 ID(可选)
     pub project_template_id: Option<ProjectTemplateId>,
+    /// 发起操作的用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 整体替换项目策略命令(INV-P-02)
 pub struct ReplaceProjectPolicyCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 目标项目 ID
     pub project_id: ProjectId,
+    /// 待写入的完整策略
     pub policy: ProjectPolicy,
+    /// 发起操作的用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 归档项目命令
 pub struct ArchiveProjectCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 目标项目 ID
     pub project_id: ProjectId,
+    /// 发起操作的用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 查询单个项目的请求
 pub struct GetProjectQuery {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 目标项目 ID
     pub project_id: ProjectId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 按 Workspace 列出项目的请求
 pub struct ListByWorkspaceQuery {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 目标 Workspace ID
     pub workspace_id: WorkspaceId,
 }
 
@@ -267,7 +355,9 @@ pub struct ListByWorkspaceQuery {
 // =====================================================================
 
 #[async_trait]
+/// 项目命令端口(创建 / 替换策略 / 归档)
 pub trait ProjectCommandPort: Send + Sync {
+    /// 创建新项目
     async fn create_project(
         &self,
         cmd: CreateProjectCommand,
@@ -281,6 +371,7 @@ pub trait ProjectCommandPort: Send + Sync {
         actor: &ActorContext,
     ) -> Result<ProjectPolicy, ProjectError>;
 
+    /// 归档项目
     async fn archive_project(
         &self,
         cmd: ArchiveProjectCommand,
@@ -289,13 +380,16 @@ pub trait ProjectCommandPort: Send + Sync {
 }
 
 #[async_trait]
+/// 项目查询端口
 pub trait ProjectQueryPort: Send + Sync {
+    /// 获取单个项目
     async fn get_project(
         &self,
         q: GetProjectQuery,
         actor: &ActorContext,
     ) -> Result<Project, ProjectError>;
 
+    /// 获取项目策略
     async fn get_project_policy(
         &self,
         tenant_id: TenantId,
@@ -303,6 +397,7 @@ pub trait ProjectQueryPort: Send + Sync {
         actor: &ActorContext,
     ) -> Result<ProjectPolicy, ProjectError>;
 
+    /// 按 Workspace 列出项目
     async fn list_by_workspace(
         &self,
         q: ListByWorkspaceQuery,
@@ -311,22 +406,30 @@ pub trait ProjectQueryPort: Send + Sync {
 }
 
 #[async_trait]
+/// 项目仓储端口(持久化抽象)
 pub trait ProjectRepository: Send + Sync {
+    /// 插入新项目记录
     async fn insert_project(&self, p: Project) -> Result<(), ProjectError>;
+    /// 按 ID 获取项目
     async fn get_project(&self, id: ProjectId) -> Result<Project, ProjectError>;
+    /// 更新项目记录
     async fn update_project(&self, p: Project) -> Result<(), ProjectError>;
+    /// 按 Workspace 列出项目
     async fn list_by_workspace(
         &self,
         tid: TenantId,
         wid: WorkspaceId,
     ) -> Result<Vec<Project>, ProjectError>;
 
+    /// 插入或更新项目策略
     async fn upsert_project_policy(&self, p: ProjectPolicy) -> Result<(), ProjectError>;
+    /// 获取项目策略
     async fn get_project_policy(
         &self,
         project_id: ProjectId,
     ) -> Result<ProjectPolicy, ProjectError>;
 
+    /// 按 ID 获取项目模板
     async fn get_template(&self, id: ProjectTemplateId) -> Result<ProjectTemplate, ProjectError>;
 }
 
@@ -334,6 +437,7 @@ pub trait ProjectRepository: Send + Sync {
 // InMemoryProjectService
 // =====================================================================
 
+/// 基于内存的 ProjectService 实现(用于测试/开发)
 pub struct InMemoryProjectService {
     repo: Arc<dyn ProjectRepository>,
     projects: Arc<RwLock<HashMap<ProjectId, Project>>>,
@@ -341,6 +445,7 @@ pub struct InMemoryProjectService {
 }
 
 impl InMemoryProjectService {
+    /// 创建一个新的内存项目服务实例
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryProjectRepository::new()),
@@ -573,6 +678,7 @@ impl ProjectQueryPort for InMemoryProjectService {
 // InMemoryProjectRepository
 // =====================================================================
 
+/// 基于内存的 ProjectRepository 实现(用于测试/开发)
 pub struct InMemoryProjectRepository {
     projects: RwLock<HashMap<ProjectId, Project>>,
     policies: RwLock<HashMap<ProjectId, ProjectPolicy>>,
@@ -580,6 +686,7 @@ pub struct InMemoryProjectRepository {
 }
 
 impl InMemoryProjectRepository {
+    /// 创建一个新的内存项目仓储实例
     pub fn new() -> Self {
         Self {
             projects: RwLock::new(HashMap::new()),

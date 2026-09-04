@@ -49,18 +49,22 @@ define_uuid_id!(AgentId);
 // =====================================================================
 
 #[macro_export]
+/// 生成 UUID 强类型 ID 及其 `new`/`as_uuid`/`From<Uuid>`/`Display` 实现的宏
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 领域强类型 ID(由 `define_uuid_id!` 宏统一生成)
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID(由宏统一生成)
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回内部原始的 `Uuid` 值(由宏统一生成)
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -85,20 +89,35 @@ macro_rules! define_uuid_id {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 评论实体(WorkItem / PR / Discussion 上的评论,§10)
 pub struct Comment {
+    /// 评论 ID
     pub id: CommentId,
+    /// 所属租户 ID(INV-C-01)
     pub tenant_id: TenantId,
+    /// 所属项目 ID
     pub project_id: ProjectId,
+    /// 父对象类型
     pub parent_type: ParentType,
+    /// 父对象 ID(对应 WorkItem / PullRequest / Discussion 的主键)
     pub parent_id: Uuid,
+    /// 评论正文
     pub body: String,
+    /// 作者用户 ID(与 author_agent_id 二选一)
     pub author_user_id: Option<UserId>,
+    /// 作者 Agent ID(与 author_user_id 二选一)
     pub author_agent_id: Option<AgentId>,
+    /// 被 @ 提及的用户列表
     pub mentions: Vec<UserId>,
+    /// 附件 ID 列表
     pub attachment_ids: Vec<AttachmentId>,
+    /// 评论状态
     pub status: CommentStatus,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最后更新时间
     pub updated_at: DateTime<Utc>,
+    /// 软删除时间(为空表示未删除)
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
@@ -120,13 +139,18 @@ impl Comment {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 评论的父对象类型
 pub enum ParentType {
+    /// 挂在 WorkItem 上
     WorkItem,
+    /// 挂在 PullRequest 上
     PullRequest,
+    /// 挂在 Discussion 上
     Discussion,
 }
 
 impl ParentType {
+    /// 转换为小写下划线字符串表示
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::WorkItem => "work_item",
@@ -137,13 +161,18 @@ impl ParentType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 评论状态机(INV-C-02:Open / Edited / Deleted)
 pub enum CommentStatus {
+    /// 已发布,未编辑
     Open,
+    /// 已编辑
     Edited,
+    /// 已软删除
     Deleted,
 }
 
 impl CommentStatus {
+    /// 转换为大写字符串表示
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Open => "OPEN",
@@ -151,33 +180,48 @@ impl CommentStatus {
             Self::Deleted => "DELETED",
         }
     }
+    /// 是否为终态(仅 Deleted 为终态)
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Deleted)
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 评论中的 @ 提及记录
 pub struct Mention {
+    /// 提及记录 ID
     pub id: MentionId,
+    /// 所属评论 ID
     pub comment_id: CommentId,
+    /// 被提及的用户 ID
     pub user_id: UserId,
+    /// 通知发送时间(为空表示尚未通知)
     pub notified_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 评论附件
 pub struct Attachment {
+    /// 附件 ID
     pub id: AttachmentId,
+    /// 所属租户 ID(INV-C-04)
     pub tenant_id: TenantId,
+    /// 上传者用户 ID
     pub uploader_user_id: UserId,
+    /// 原始文件名
     pub filename: String,
+    /// MIME 内容类型
     pub content_type: String,
+    /// 文件大小(字节)
     pub size_bytes: u64,
     /// INV-C-04:tenant_id 前缀
     pub object_key: String,
+    /// 上传时间
     pub uploaded_at: DateTime<Utc>,
 }
 
 impl Attachment {
+    /// 校验 object_key 是否带 tenant_id 前缀(INV-C-04)
     pub fn validate_object_key(&self) -> Result<(), CommentError> {
         let prefix = format!("tenants/{}/", self.tenant_id.as_uuid());
         if !self.object_key.starts_with(&prefix) {
@@ -188,11 +232,17 @@ impl Attachment {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 评论的表情反应(INV-C-03:(comment_id, user_id, emoji) 唯一)
 pub struct Reaction {
+    /// 反应 ID
     pub id: ReactionId,
+    /// 所属评论 ID
     pub comment_id: CommentId,
+    /// 发起反应的用户 ID
     pub user_id: UserId,
+    /// 表情符号
     pub emoji: String,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
 }
 
@@ -201,14 +251,19 @@ pub struct Reaction {
 // =====================================================================
 
 #[derive(Debug, Error)]
+/// Comment 领域操作错误
 pub enum CommentError {
     #[error("not found: {0}")]
+    /// 资源未找到
     NotFound(String),
     #[error("permission denied")]
+    /// 权限不足
     PermissionDenied,
     #[error("cross-tenant access denied: tenant {0} vs required {1}")]
+    /// 跨租户访问被拒绝(实际租户 vs 要求租户)
     CrossTenantDenied(TenantId, TenantId),
     #[error("invalid state: {0}")]
+    /// 非法状态
     InvalidState(String),
     /// INV-C-04
     #[error("object_key must start with tenant_id prefix (INV-C-04)")]
@@ -217,10 +272,13 @@ pub enum CommentError {
     #[error("reaction already exists for (comment, user, emoji) (INV-C-03)")]
     ReactionExists,
     #[error("cannot edit deleted comment")]
+    /// 尝试编辑已删除的评论
     EditDeleted,
     #[error("conflict: {0}")]
+    /// 冲突
     Conflict(String),
     #[error("internal: {0}")]
+    /// 内部错误
     Internal(String),
 }
 
@@ -229,63 +287,103 @@ pub enum CommentError {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建评论命令
 pub struct CreateCommentCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 目标项目 ID
     pub project_id: ProjectId,
+    /// 父对象类型
     pub parent_type: ParentType,
+    /// 父对象 ID
     pub parent_id: Uuid,
+    /// 评论正文
     pub body: String,
+    /// 作者用户 ID(与 author_agent_id 二选一)
     pub author_user_id: Option<UserId>,
+    /// 作者 Agent ID(与 author_user_id 二选一)
     pub author_agent_id: Option<AgentId>,
+    /// 被 @ 提及的用户列表
     pub mentions: Vec<UserId>,
+    /// 附件 ID 列表
     pub attachment_ids: Vec<AttachmentId>,
+    /// 操作者用户 ID(用于权限校验)
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 编辑评论命令
 pub struct EditCommentCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 待编辑的评论 ID
     pub comment_id: CommentId,
+    /// 新的评论正文
     pub new_body: String,
+    /// 操作者用户 ID(须为原作者)
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 删除评论命令(软删除)
 pub struct DeleteCommentCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 待删除的评论 ID
     pub comment_id: CommentId,
+    /// 操作者用户 ID(须为原作者或 project_admin)
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 添加表情反应命令
 pub struct AddReactionCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 目标评论 ID
     pub comment_id: CommentId,
+    /// 发起反应的用户 ID
     pub user_id: UserId,
+    /// 表情符号
     pub emoji: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 注册评论附件命令
 pub struct RegisterAttachmentCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 上传者用户 ID
     pub uploader_user_id: UserId,
+    /// 原始文件名
     pub filename: String,
+    /// MIME 内容类型
     pub content_type: String,
+    /// 文件大小(字节)
     pub size_bytes: u64,
+    /// 对象存储 key(须带 tenant_id 前缀,INV-C-04)
     pub object_key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 按 ID 查询单条评论
 pub struct GetCommentQuery {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 待查询的评论 ID
     pub comment_id: CommentId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 按父对象列出评论
 pub struct ListByParentQuery {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 父对象类型
     pub parent_type: ParentType,
+    /// 父对象 ID
     pub parent_id: Uuid,
+    /// 是否包含已软删除的评论
     pub include_deleted: bool,
 }
 
@@ -294,31 +392,37 @@ pub struct ListByParentQuery {
 // =====================================================================
 
 #[async_trait]
+/// 评论写操作端口
 pub trait CommentCommandPort: Send + Sync {
+    /// 创建一条评论
     async fn create_comment(
         &self,
         cmd: CreateCommentCommand,
         actor: &ActorContext,
     ) -> Result<Comment, CommentError>;
 
+    /// 编辑评论正文
     async fn edit_comment(
         &self,
         cmd: EditCommentCommand,
         actor: &ActorContext,
     ) -> Result<Comment, CommentError>;
 
+    /// 软删除评论
     async fn delete_comment(
         &self,
         cmd: DeleteCommentCommand,
         actor: &ActorContext,
     ) -> Result<Comment, CommentError>;
 
+    /// 为评论添加表情反应
     async fn add_reaction(
         &self,
         cmd: AddReactionCommand,
         actor: &ActorContext,
     ) -> Result<Reaction, CommentError>;
 
+    /// 注册评论附件
     async fn register_attachment(
         &self,
         cmd: RegisterAttachmentCommand,
@@ -327,9 +431,12 @@ pub trait CommentCommandPort: Send + Sync {
 }
 
 #[async_trait]
+/// 评论读操作端口
 pub trait CommentQueryPort: Send + Sync {
+    /// 按 ID 获取单条评论
     async fn get(&self, q: GetCommentQuery, actor: &ActorContext) -> Result<Comment, CommentError>;
 
+    /// 按父对象列出评论
     async fn list_by_parent(
         &self,
         q: ListByParentQuery,
@@ -338,10 +445,15 @@ pub trait CommentQueryPort: Send + Sync {
 }
 
 #[async_trait]
+/// 评论持久化仓储端口
 pub trait CommentRepository: Send + Sync {
+    /// 插入一条新评论
     async fn insert_comment(&self, c: Comment) -> Result<(), CommentError>;
+    /// 按 ID 获取评论
     async fn get_comment(&self, id: CommentId) -> Result<Comment, CommentError>;
+    /// 更新评论
     async fn update_comment(&self, c: Comment) -> Result<(), CommentError>;
+    /// 按父对象列出评论
     async fn list_by_parent(
         &self,
         tid: TenantId,
@@ -350,7 +462,9 @@ pub trait CommentRepository: Send + Sync {
         include_deleted: bool,
     ) -> Result<Vec<Comment>, CommentError>;
 
+    /// 插入一条表情反应
     async fn insert_reaction(&self, r: Reaction) -> Result<(), CommentError>;
+    /// 检查 (comment, user, emoji) 反应是否已存在(INV-C-03)
     async fn reaction_exists(
         &self,
         cid: CommentId,
@@ -358,6 +472,7 @@ pub trait CommentRepository: Send + Sync {
         emoji: &str,
     ) -> Result<bool, CommentError>;
 
+    /// 插入一条附件记录
     async fn insert_attachment(&self, a: Attachment) -> Result<(), CommentError>;
 }
 
@@ -365,6 +480,7 @@ pub trait CommentRepository: Send + Sync {
 // InMemoryCommentService
 // =====================================================================
 
+/// 基于内存的 Comment 应用服务实现
 pub struct InMemoryCommentService {
     repo: Arc<dyn CommentRepository>,
     comments: Arc<RwLock<HashMap<CommentId, Comment>>>,
@@ -373,6 +489,7 @@ pub struct InMemoryCommentService {
 }
 
 impl InMemoryCommentService {
+    /// 创建一个空的内存 Comment 服务
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryCommentRepository::new()),
@@ -623,6 +740,7 @@ impl CommentQueryPort for InMemoryCommentService {
 // InMemoryCommentRepository
 // =====================================================================
 
+/// 基于内存的 Comment 仓储实现
 pub struct InMemoryCommentRepository {
     comments: RwLock<HashMap<CommentId, Comment>>,
     reactions: RwLock<HashMap<ReactionId, Reaction>>,
@@ -630,6 +748,7 @@ pub struct InMemoryCommentRepository {
 }
 
 impl InMemoryCommentRepository {
+    /// 创建一个空的内存 Comment 仓储
     pub fn new() -> Self {
         Self {
             comments: RwLock::new(HashMap::new()),

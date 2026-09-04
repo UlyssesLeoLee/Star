@@ -38,18 +38,22 @@ use uuid::Uuid;
 // =====================================================================
 
 #[macro_export]
+/// 生成基于 UUID 的强类型 ID:封装结构体 + 常用 trait 实现(由本宏统一定义)
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 领域强类型 ID(由 `define_uuid_id!` 宏统一生成,内部封装 UUID)
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID(由 `define_uuid_id!` 宏统一生成)
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回内部原始 UUID(由 `define_uuid_id!` 宏统一生成)
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -100,6 +104,7 @@ pub enum CollabParentType {
 }
 
 impl CollabParentType {
+    /// 转换为字符串标识(用于持久化 / API)
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::WorkItem => "WORK_ITEM",
@@ -107,6 +112,7 @@ impl CollabParentType {
             Self::Whiteboard => "WHITEBOARD",
         }
     }
+    /// 从字符串解析父实体类型(大小写/分隔符不敏感)
     pub fn from_str_opt(s: &str) -> Option<Self> {
         match s.to_ascii_lowercase().as_str() {
             "work_item" | "workitem" | "work-item" => Some(Self::WorkItem),
@@ -133,6 +139,7 @@ pub enum CollabSessionStatus {
 }
 
 impl CollabSessionStatus {
+    /// 转换为字符串标识(用于持久化 / API)
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Active => "ACTIVE",
@@ -140,6 +147,7 @@ impl CollabSessionStatus {
             Self::Ended => "ENDED",
         }
     }
+    /// 从字符串解析 Session 状态(大小写不敏感)
     pub fn from_str_opt(s: &str) -> Option<Self> {
         match s.to_ascii_lowercase().as_str() {
             "active" => Some(Self::Active),
@@ -168,6 +176,7 @@ pub struct CursorPosition {
 }
 
 impl CursorPosition {
+    /// 构造一个光标位置
     pub fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }
@@ -183,6 +192,7 @@ pub struct SelectionRange {
 }
 
 impl SelectionRange {
+    /// 构造一个选择范围
     pub fn new(start: CursorPosition, end: CursorPosition) -> Self {
         Self { start, end }
     }
@@ -335,8 +345,11 @@ impl Presence {
 /// INV-CL-03:同一 user 在同一 session 内的 color 必须稳定且唯一。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cursor {
+    /// 主键
     pub id: CursorId,
+    /// 所属 Session
     pub session_id: CollaborationSessionId,
+    /// 所属用户
     pub user_id: UserId,
     /// 屏幕/画布 x
     pub x: f32,
@@ -389,6 +402,7 @@ pub enum ShapeKind {
 }
 
 impl ShapeKind {
+    /// 转换为字符串标识(用于持久化 / API)
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Rectangle => "RECTANGLE",
@@ -398,6 +412,7 @@ impl ShapeKind {
             Self::StickyNote => "STICKY_NOTE",
         }
     }
+    /// 从字符串解析形状类型(大小写/别名不敏感)
     pub fn from_str_opt(s: &str) -> Option<Self> {
         match s.to_ascii_lowercase().as_str() {
             "rectangle" | "rect" => Some(Self::Rectangle),
@@ -413,11 +428,17 @@ impl ShapeKind {
 /// 白板上的一个形状
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhiteboardShape {
+    /// 主键
     pub id: ShapeId,
+    /// 形状类型
     pub kind: ShapeKind,
+    /// 左上角 x 坐标
     pub x: f32,
+    /// 左上角 y 坐标
     pub y: f32,
+    /// 宽度
     pub w: f32,
+    /// 高度
     pub h: f32,
     /// Text / StickyNote 才有
     pub content: Option<String>,
@@ -425,7 +446,9 @@ pub struct WhiteboardShape {
     pub color: String,
     /// 创建者
     pub created_by: UserId,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 更新时间
     pub updated_at: DateTime<Utc>,
 }
 
@@ -448,14 +471,21 @@ impl WhiteboardShape {
 /// 可作为 Session.parent 出现。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Whiteboard {
+    /// 主键
     pub id: WhiteboardId,
     /// INV-CL-02:必带
     pub tenant_id: TenantId,
+    /// 所属项目
     pub project_id: ProjectId,
+    /// 白板名称
     pub name: String,
+    /// 白板上的所有形状
     pub shapes: Vec<WhiteboardShape>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 更新时间
     pub updated_at: DateTime<Utc>,
+    /// 乐观锁
     pub version: u32,
 }
 
@@ -521,16 +551,22 @@ impl Whiteboard {
 #[derive(Debug, Error)]
 pub enum CollabError {
     #[error("not found: {0}")]
+    /// 目标资源不存在(Session / Presence / Cursor / Whiteboard / Shape)
     NotFound(String),
     #[error("permission denied")]
+    /// actor 无权执行该操作
     PermissionDenied,
     #[error("cross-tenant access denied: actor tenant {0} vs resource tenant {1}")]
+    /// 跨 tenant 访问被拒绝(INV-CL-04):(actor tenant, resource tenant)
     CrossTenantDenied(TenantId, TenantId),
     #[error("invalid state: {0}")]
+    /// 当前状态不允许该操作(如对已结束 Session 写入)
     InvalidState(String),
     #[error("conflict: {0}")]
+    /// 写入冲突(如唯一性约束 / 光标颜色不一致)
     Conflict(String),
     #[error("internal: {0}")]
+    /// 内部错误
     Internal(String),
 }
 
@@ -553,74 +589,116 @@ impl CollabError {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 发起一个协作 Session 的命令
 pub struct StartSessionCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属项目
     pub project_id: ProjectId,
+    /// 父实体类型
     pub parent_type: CollabParentType,
+    /// 父实体 UUID
     pub parent_id: Uuid,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 结束一个协作 Session 的命令
 pub struct EndSessionCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标 Session
     pub session_id: CollaborationSessionId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 更新 Presence(心跳 + 可选 cursor / selection)的命令
 pub struct UpdatePresenceCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标 Session
     pub session_id: CollaborationSessionId,
+    /// 目标用户
     pub user_id: UserId,
+    /// 可选的最新光标位置
     pub cursor_position: Option<CursorPosition>,
+    /// 可选的最新选区
     pub selection: Option<SelectionRange>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 更新 Cursor(upsert per (session, user))的命令
 pub struct UpdateCursorCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标 Session
     pub session_id: CollaborationSessionId,
+    /// 目标用户
     pub user_id: UserId,
+    /// 最新 x 坐标
     pub x: f32,
+    /// 最新 y 坐标
     pub y: f32,
+    /// 光标颜色(INV-CL-03:同一用户必须稳定)
     pub color: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 在 Whiteboard 上添加形状的命令
 pub struct AddShapeCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标白板
     pub whiteboard_id: WhiteboardId,
+    /// 待添加的形状
     pub shape: WhiteboardShape,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 更新 Whiteboard 上形状的命令
 pub struct UpdateShapeCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标白板
     pub whiteboard_id: WhiteboardId,
+    /// 待更新的形状(以 id 定位)
     pub shape: WhiteboardShape,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 删除 Whiteboard 上形状的命令
 pub struct DeleteShapeCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标白板
     pub whiteboard_id: WhiteboardId,
+    /// 待删除的形状 ID
     pub shape_id: ShapeId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 获取 Session 详情的查询
 pub struct GetSessionQuery {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标 Session
     pub session_id: CollaborationSessionId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 列出某 Session 内所有活跃 Presence 的查询
 pub struct ListActivePresencesQuery {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标 Session
     pub session_id: CollaborationSessionId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 获取 Whiteboard 的查询
 pub struct GetWhiteboardQuery {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 目标白板
     pub whiteboard_id: WhiteboardId,
 }
 
@@ -709,22 +787,29 @@ pub trait CollabQueryPort: Send + Sync {
 /// CollabRepository — 持久化抽象
 #[async_trait]
 pub trait CollabRepository: Send + Sync {
+    /// 插入一个新 Session
     async fn insert_session(&self, s: CollaborationSession) -> Result<(), CollabError>;
+    /// 按 tenant + id 获取 Session
     async fn get_session(
         &self,
         tenant_id: TenantId,
         id: CollaborationSessionId,
     ) -> Result<CollaborationSession, CollabError>;
+    /// 更新已存在的 Session
     async fn update_session(&self, s: CollaborationSession) -> Result<(), CollabError>;
 
+    /// Upsert 一条 Presence
     async fn upsert_presence(&self, p: Presence) -> Result<(), CollabError>;
+    /// 列出某 Session 下的所有 Presence
     async fn list_presences(
         &self,
         tenant_id: TenantId,
         session_id: CollaborationSessionId,
     ) -> Result<Vec<Presence>, CollabError>;
 
+    /// Upsert 一条 Cursor
     async fn upsert_cursor(&self, c: Cursor) -> Result<(), CollabError>;
+    /// 获取某 Session 内某用户的 Cursor(若存在)
     async fn get_cursor(
         &self,
         tenant_id: TenantId,
@@ -732,12 +817,15 @@ pub trait CollabRepository: Send + Sync {
         user_id: UserId,
     ) -> Result<Option<Cursor>, CollabError>;
 
+    /// 插入一个新 Whiteboard
     async fn insert_whiteboard(&self, w: Whiteboard) -> Result<(), CollabError>;
+    /// 按 tenant + id 获取 Whiteboard
     async fn get_whiteboard(
         &self,
         tenant_id: TenantId,
         id: WhiteboardId,
     ) -> Result<Whiteboard, CollabError>;
+    /// 更新已存在的 Whiteboard
     async fn update_whiteboard(&self, w: Whiteboard) -> Result<(), CollabError>;
 }
 
@@ -757,6 +845,7 @@ pub struct InMemoryCollabService {
 }
 
 impl InMemoryCollabService {
+    /// 创建一个空的内存实现(自带内存版 repo)
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryCollabRepository::new()),
@@ -768,6 +857,7 @@ impl InMemoryCollabService {
         }
     }
 
+    /// 使用外部提供的 repo 创建实现(便于接入持久化存储)
     pub fn with_repo(repo: Arc<dyn CollabRepository>) -> Self {
         Self {
             repo,
@@ -1142,6 +1232,7 @@ pub struct InMemoryCollabRepository {
 }
 
 impl InMemoryCollabRepository {
+    /// 创建一个空的内存版持久化实现
     pub fn new() -> Self {
         Self {
             sessions: RwLock::new(HashMap::new()),

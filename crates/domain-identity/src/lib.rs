@@ -48,18 +48,22 @@ define_uuid_id!(CredentialRefId);
 // =====================================================================
 
 #[macro_export]
+/// 生成 UUID 强类型 ID 及其 `new`/`as_uuid`/`From<Uuid>`/`Display` 实现的宏
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 领域强类型 ID(由宏统一生成,内部包装一个 Uuid)
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID(由宏统一生成)
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回内部的原始 Uuid 值(由宏统一生成)
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -84,28 +88,45 @@ macro_rules! define_uuid_id {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 平台用户实体,归属单一租户(INV-ID-01)
 pub struct User {
+    /// 用户主键
     pub id: UserId,
+    /// 所属租户 ID(INV-ID-01 必带)
     pub tenant_id: TenantId,
+    /// 登录邮箱,租户内唯一
     pub email: String,
+    /// 显示名称
     pub display_name: String,
+    /// 用户状态
     pub status: UserStatus,
+    /// 关联的凭证引用
     pub credential_ref: CredentialRefId,
+    /// 在租户内的角色
     pub tenant_role: TenantRole,
+    /// 是否已启用多因素认证
     pub mfa_enabled: bool,
+    /// MFA 密钥引用(启用 MFA 时存在)
     pub mfa_secret_ref: Option<CredentialRefId>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最近一次登录时间
     pub last_login_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 用户账号状态:Active / Suspended / Invited
 pub enum UserStatus {
+    /// 正常可用
     Active,
+    /// 已被停用
     Suspended,
+    /// 已邀请但未激活
     Invited,
 }
 
 impl UserStatus {
+    /// 返回状态的大写字符串表示(如 "ACTIVE")
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Active => "ACTIVE",
@@ -116,14 +137,20 @@ impl UserStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 租户内角色
 pub enum TenantRole {
+    /// 租户管理员
     TenantAdmin,
+    /// 项目管理员
     ProjectAdmin,
+    /// 开发者
     Developer,
+    /// 只读查看者
     Viewer,
 }
 
 impl TenantRole {
+    /// 返回角色的 snake_case 字符串表示(如 "tenant_admin")
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::TenantAdmin => "tenant_admin",
@@ -135,28 +162,45 @@ impl TenantRole {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 设备实体,三重绑定 tenant+user+project(INV-ID-02)
 pub struct Device {
+    /// 设备主键
     pub id: DeviceId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属用户 ID
     pub user_id: UserId,
+    /// 设备类型
     pub kind: DeviceKind,
+    /// 设备证书指纹
     pub device_cert_fingerprint: String,
+    /// 设备状态
     pub status: DeviceStatus,
+    /// 已绑定的项目 ID 列表
     pub project_ids: Vec<ProjectId>,
+    /// 注册时间
     pub registered_at: DateTime<Utc>,
+    /// 最近一次活跃时间
     pub last_seen_at: Option<DateTime<Utc>>,
+    /// 撤销时间(未撤销为 None)
     pub revoked_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 设备类型
 pub enum DeviceKind {
+    /// 本地运行时
     LocalRuntime,
+    /// 命令行客户端
     Cli,
+    /// Web 客户端
     Web,
+    /// 移动客户端
     Mobile,
 }
 
 impl DeviceKind {
+    /// 返回设备类型的 snake_case 字符串表示(如 "local_runtime")
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::LocalRuntime => "local_runtime",
@@ -168,13 +212,18 @@ impl DeviceKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 设备状态机(INV-ID-04)
 pub enum DeviceStatus {
+    /// 待激活
     Pending,
+    /// 正常可用
     Active,
+    /// 已撤销(终态)
     Revoked,
 }
 
 impl DeviceStatus {
+    /// 返回状态的大写字符串表示(如 "ACTIVE")
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "PENDING",
@@ -182,32 +231,46 @@ impl DeviceStatus {
             Self::Revoked => "REVOKED",
         }
     }
+    /// 判断是否为终态(已撤销)
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Revoked)
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 凭证实体,仅存 hash / ref,绝不存明文(INV-ID-03)
 pub struct Credential {
+    /// 凭证主键
     pub id: CredentialId,
+    /// 所属用户 ID
     pub user_id: UserId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 凭证类型
     pub kind: CredentialKind,
     /// INV-ID-03:仅 hash,绝不存明文
     pub secret_hash: String,
+    /// MFA 密钥引用
     pub mfa_secret_ref: Option<CredentialRefId>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最近一次使用时间
     pub last_used_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 凭证类型
 pub enum CredentialKind {
+    /// 密码
     Password,
+    /// API Key
     ApiKey,
+    /// OAuth 令牌
     OAuthToken,
 }
 
 impl CredentialKind {
+    /// 返回凭证类型的 snake_case 字符串表示(如 "api_key")
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Password => "password",
@@ -218,24 +281,37 @@ impl CredentialKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 设备绑定关系(tenant+user+project 三重绑定,LRT-001/002)
 pub struct DeviceBinding {
+    /// 绑定主键
     pub id: DeviceBindingId,
+    /// 关联的设备 ID
     pub device_id: DeviceId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属用户 ID
     pub user_id: UserId,
+    /// 绑定的项目 ID
     pub project_id: ProjectId,
+    /// 绑定类型
     pub binding_kind: BindingKind,
+    /// 绑定时间
     pub bound_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 设备与项目的绑定类型
 pub enum BindingKind {
+    /// 所有者
     Owner,
+    /// 贡献者
     Contributor,
+    /// 只读
     ReadOnly,
 }
 
 impl BindingKind {
+    /// 返回绑定类型的 snake_case 字符串表示(如 "read_only")
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Owner => "owner",
@@ -250,22 +326,31 @@ impl BindingKind {
 // =====================================================================
 
 #[derive(Debug, Error)]
+/// identity 领域错误
 pub enum IdentityError {
     #[error("not found: {0}")]
+    /// 目标资源不存在
     NotFound(String),
     #[error("permission denied")]
+    /// 权限不足
     PermissionDenied,
     #[error("cross-tenant access denied: tenant {0} vs required {1}")]
+    /// 跨租户访问被拒绝(当前租户 vs 要求租户)
     CrossTenantDenied(TenantId, TenantId),
     #[error("email already exists: {0}")]
+    /// 邮箱已存在
     EmailExists(String),
     #[error("device triple binding incomplete (INV-ID-02): need tenant+user+project")]
+    /// 设备三重绑定不完整(INV-ID-02)
     IncompleteBinding,
     #[error("device already revoked")]
+    /// 设备已被撤销
     DeviceAlreadyRevoked,
     #[error("conflict: {0}")]
+    /// 状态冲突
     Conflict(String),
     #[error("internal: {0}")]
+    /// 内部错误
     Internal(String),
 }
 
@@ -274,55 +359,87 @@ pub enum IdentityError {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建用户命令
 pub struct CreateUserCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 用户邮箱
     pub email: String,
+    /// 显示名称
     pub display_name: String,
+    /// 租户内角色
     pub tenant_role: TenantRole,
+    /// 凭证引用
     pub credential_ref: CredentialRefId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 注册设备命令
 pub struct RegisterDeviceCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 设备所属用户 ID
     pub user_id: UserId,
+    /// 设备类型
     pub kind: DeviceKind,
+    /// 设备证书指纹
     pub device_cert_fingerprint: String,
+    /// 待绑定的项目 ID 列表
     pub project_ids: Vec<ProjectId>,
+    /// 发起操作的用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 绑定设备到项目命令
 pub struct BindDeviceCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 待绑定的设备 ID
     pub device_id: DeviceId,
+    /// 待绑定的项目 ID
     pub project_id: ProjectId,
+    /// 绑定类型
     pub binding_kind: BindingKind,
+    /// 发起操作的用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 撤销设备命令
 pub struct RevokeDeviceCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 待撤销的设备 ID
     pub device_id: DeviceId,
+    /// 发起操作的用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 记录登录命令
 pub struct RecordLoginCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 登录的用户 ID
     pub user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 查询用户请求
 pub struct GetUserQuery {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 目标用户 ID
     pub user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 按用户列出设备请求
 pub struct ListDevicesByUserQuery {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 目标用户 ID
     pub user_id: UserId,
 }
 
@@ -331,31 +448,37 @@ pub struct ListDevicesByUserQuery {
 // =====================================================================
 
 #[async_trait]
+/// identity 领域命令端口
 pub trait IdentityCommandPort: Send + Sync {
+    /// 创建用户
     async fn create_user(
         &self,
         cmd: CreateUserCommand,
         actor: &ActorContext,
     ) -> Result<User, IdentityError>;
 
+    /// 注册设备
     async fn register_device(
         &self,
         cmd: RegisterDeviceCommand,
         actor: &ActorContext,
     ) -> Result<Device, IdentityError>;
 
+    /// 将设备绑定到项目
     async fn bind_device(
         &self,
         cmd: BindDeviceCommand,
         actor: &ActorContext,
     ) -> Result<DeviceBinding, IdentityError>;
 
+    /// 撤销设备
     async fn revoke_device(
         &self,
         cmd: RevokeDeviceCommand,
         actor: &ActorContext,
     ) -> Result<Device, IdentityError>;
 
+    /// 记录用户登录
     async fn record_login(
         &self,
         cmd: RecordLoginCommand,
@@ -364,15 +487,19 @@ pub trait IdentityCommandPort: Send + Sync {
 }
 
 #[async_trait]
+/// identity 领域查询端口
 pub trait IdentityQueryPort: Send + Sync {
+    /// 查询单个用户
     async fn get_user(&self, q: GetUserQuery, actor: &ActorContext) -> Result<User, IdentityError>;
 
+    /// 按用户列出设备
     async fn list_devices(
         &self,
         q: ListDevicesByUserQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Device>, IdentityError>;
 
+    /// 查询单个设备
     async fn get_device(
         &self,
         tenant_id: TenantId,
@@ -382,26 +509,37 @@ pub trait IdentityQueryPort: Send + Sync {
 }
 
 #[async_trait]
+/// identity 领域持久化仓储端口
 pub trait IdentityRepository: Send + Sync {
+    /// 插入用户
     async fn insert_user(&self, u: User) -> Result<(), IdentityError>;
+    /// 按 ID 查询用户
     async fn get_user(&self, id: UserId) -> Result<User, IdentityError>;
+    /// 按邮箱查询用户
     async fn get_user_by_email(
         &self,
         tenant_id: TenantId,
         email: &str,
     ) -> Result<Option<User>, IdentityError>;
+    /// 更新用户
     async fn update_user(&self, u: User) -> Result<(), IdentityError>;
 
+    /// 插入设备
     async fn insert_device(&self, d: Device) -> Result<(), IdentityError>;
+    /// 按 ID 查询设备
     async fn get_device(&self, id: DeviceId) -> Result<Device, IdentityError>;
+    /// 更新设备
     async fn update_device(&self, d: Device) -> Result<(), IdentityError>;
+    /// 按租户与用户列出设备
     async fn list_devices_by_user(
         &self,
         tid: TenantId,
         uid: UserId,
     ) -> Result<Vec<Device>, IdentityError>;
 
+    /// 插入设备绑定
     async fn insert_binding(&self, b: DeviceBinding) -> Result<(), IdentityError>;
+    /// 按设备列出绑定关系
     async fn list_bindings_by_device(
         &self,
         did: DeviceId,
@@ -412,6 +550,7 @@ pub trait IdentityRepository: Send + Sync {
 // InMemoryIdentityService
 // =====================================================================
 
+/// 基于内存的 identity 领域服务实现(测试 / 参考用途)
 pub struct InMemoryIdentityService {
     repo: Arc<dyn IdentityRepository>,
     users: Arc<RwLock<HashMap<UserId, User>>>,
@@ -420,6 +559,7 @@ pub struct InMemoryIdentityService {
 }
 
 impl InMemoryIdentityService {
+    /// 创建一个空的内存 identity 服务
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryIdentityRepository::new()),

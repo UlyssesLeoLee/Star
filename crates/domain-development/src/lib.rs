@@ -55,18 +55,22 @@ define_uuid_id!(AgentId);
 // =====================================================================
 
 #[macro_export]
+/// 定义一个基于 UUID 的领域强类型 ID 的宏,统一生成 Debug/Clone/序列化等实现
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 领域强类型 ID (由宏统一生成)
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回底层 UUID 值
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -93,40 +97,64 @@ macro_rules! define_uuid_id {
 /// ChangeSet(§8.5,聚合根)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangeSet {
+    /// ChangeSet 唯一标识
     pub id: ChangeSetId,
+    /// 所属租户 ID(INV-DEV-01 必带)
     pub tenant_id: TenantId,
+    /// 所属 worktree ID
     pub worktree_id: WorktreeId,
+    /// 关联的工作项 ID
     pub work_item_id: WorkItemId,
+    /// 发起变更的 Agent 会话(人工发起则为 None)
     pub agent_session_id: Option<AgentSessionId>,
+    /// 变更所在分支名
     pub branch: String,
+    /// 基线提交 SHA
     pub base_sha: String,
+    /// 头部提交 SHA
     pub head_sha: String,
+    /// 本次变更涉及的文件列表
     pub files: Vec<FileChange>,
+    /// 变更累计统计
     pub stats: ChangeStats,
+    /// 当前状态(§8.5 状态机)
     pub status: ChangeSetStatus,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 提交评审时间(未提交为 None)
     pub submitted_at: Option<DateTime<Utc>>,
 }
 
 /// 单个文件改动
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileChange {
+    /// 文件路径
     pub path: String,
+    /// 变更类型(新增/修改/删除/重命名)
     pub change_type: FileChangeType,
+    /// 新增行数
     pub lines_added: u32,
+    /// 删除行数
     pub lines_deleted: u32,
+    /// 重命名前的路径(仅 Renamed 类型有值)
     pub previous_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 文件改动类型
 pub enum FileChangeType {
+    /// 新增文件
     Added,
+    /// 修改文件
     Modified,
+    /// 删除文件
     Deleted,
+    /// 重命名文件
     Renamed,
 }
 
 impl FileChangeType {
+    /// 转换为大写字符串表示,用于持久化/展示
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Added => "ADDED",
@@ -140,8 +168,11 @@ impl FileChangeType {
 /// ChangeSet 累计统计
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChangeStats {
+    /// 变更文件数
     pub files_changed: u32,
+    /// 累计新增行数
     pub lines_added: u32,
+    /// 累计删除行数
     pub lines_deleted: u32,
 }
 
@@ -161,6 +192,7 @@ pub enum ChangeSetStatus {
 }
 
 impl ChangeSetStatus {
+    /// 转换为大写字符串表示,用于持久化/展示
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Draft => "DRAFT",
@@ -192,30 +224,44 @@ impl ChangeSetStatus {
 /// DevelopmentExecution(实体,记录执行细节)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DevelopmentExecution {
+    /// 执行记录唯一标识
     pub id: DevelopmentExecutionId,
+    /// 关联的 ChangeSet ID
     pub change_set_id: ChangeSetId,
+    /// 执行发起者(用户或 Agent)
     pub executed_by: ExecutionActor,
+    /// 执行时间
     pub executed_at: DateTime<Utc>,
+    /// 执行的命令
     pub command: String,
+    /// 执行结果
     pub result: ExecutionResult,
+    /// 输出日志引用(如对象存储路径)
     pub output_ref: Option<String>,
 }
 
 /// 执行者(用户或 Agent)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExecutionActor {
+    /// 由用户执行
     User(UserId),
+    /// 由 Agent 执行
     Agent(AgentId),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 执行结果状态
 pub enum ExecutionResult {
+    /// 执行成功
     Success,
+    /// 执行失败
     Failed,
+    /// 执行超时
     Timeout,
 }
 
 impl ExecutionResult {
+    /// 转换为大写字符串表示,用于持久化/展示
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Success => "SUCCESS",
@@ -228,29 +274,47 @@ impl ExecutionResult {
 /// SymbolIndex(实体,代码符号)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SymbolIndex {
+    /// 符号索引唯一标识
     pub id: SymbolIndexId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属代码仓库 ID
     pub repository_id: RepositoryId,
+    /// 符号所在文件路径
     pub file_path: String,
+    /// 符号名称
     pub symbol_name: String,
+    /// 符号种类(函数/类/结构体等)
     pub kind: SymbolKind,
+    /// 符号签名
     pub signature: String,
+    /// 符号起始行号
     pub line_start: u32,
+    /// 符号结束行号
     pub line_end: u32,
+    /// 版本号(随 file version 递增,INV-DEV-04)
     pub version: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 代码符号种类
 pub enum SymbolKind {
+    /// 函数
     Function,
+    /// 类
     Class,
+    /// 结构体
     Struct,
+    /// Trait
     Trait,
+    /// 模块
     Module,
+    /// 常量
     Constant,
 }
 
 impl SymbolKind {
+    /// 转换为大写字符串表示,用于持久化/展示
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Function => "FUNCTION",
@@ -268,20 +332,28 @@ impl SymbolKind {
 // =====================================================================
 
 #[derive(Debug, Error)]
+/// Development 域错误类型
 pub enum DevelopmentError {
     #[error("not found: {0}")]
+    /// 资源未找到
     NotFound(String),
     #[error("invalid status transition: {from} -> {to}")]
+    /// 非法状态迁移
     InvalidStatus { from: String, to: String },
     #[error("cross-tenant access denied: actor {0} vs required {1}")]
+    /// 跨租户访问被拒绝
     CrossTenantDenied(TenantId, TenantId),
     #[error("conflict: {0}")]
+    /// 数据冲突
     Conflict(String),
     #[error("permission denied: {0}")]
+    /// 权限不足
     PermissionDenied(String),
     #[error("file changes are read-only in status: {0}")]
+    /// 当前状态下文件改动只读(INV-DEV-05)
     FileChangesReadOnly(String),
     #[error("internal: {0}")]
+    /// 内部错误
     Internal(String),
 }
 
@@ -290,88 +362,135 @@ pub enum DevelopmentError {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建 ChangeSet 命令
 pub struct CreateChangeSetCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属 worktree ID
     pub worktree_id: WorktreeId,
+    /// 关联的工作项 ID
     pub work_item_id: WorkItemId,
+    /// 发起变更的 Agent 会话
     pub agent_session_id: Option<AgentSessionId>,
+    /// 变更所在分支名
     pub branch: String,
+    /// 基线提交 SHA
     pub base_sha: String,
+    /// 头部提交 SHA
     pub head_sha: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 向 ChangeSet 添加文件改动命令
 pub struct AddFileChangeCommand {
+    /// 目标 ChangeSet ID
     pub change_set_id: ChangeSetId,
+    /// 待添加的文件改动
     pub file: FileChange,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 提交 ChangeSet 评审命令
 pub struct SubmitChangeSetCommand {
+    /// 目标 ChangeSet ID
     pub change_set_id: ChangeSetId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 批准 ChangeSet 命令
 pub struct ApproveChangeSetCommand {
+    /// 目标 ChangeSet ID
     pub change_set_id: ChangeSetId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 拒绝 ChangeSet 命令
 pub struct RejectChangeSetCommand {
+    /// 目标 ChangeSet ID
     pub change_set_id: ChangeSetId,
+    /// 拒绝原因
     pub reason: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 请求修改(退回 Draft)命令
 pub struct RequestChangesCommand {
+    /// 目标 ChangeSet ID
     pub change_set_id: ChangeSetId,
+    /// 修改意见
     pub comment: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 合并 ChangeSet 命令
 pub struct MergeChangeSetCommand {
+    /// 目标 ChangeSet ID
     pub change_set_id: ChangeSetId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 记录执行结果命令
 pub struct RecordExecutionCommand {
+    /// 目标 ChangeSet ID
     pub change_set_id: ChangeSetId,
+    /// 执行发起者
     pub executed_by: ExecutionActor,
+    /// 执行的命令
     pub command: String,
+    /// 执行结果
     pub result: ExecutionResult,
+    /// 输出日志引用
     pub output_ref: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 新建或更新符号索引命令
 pub struct UpsertSymbolCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属代码仓库 ID
     pub repository_id: RepositoryId,
+    /// 符号所在文件路径
     pub file_path: String,
+    /// 符号名称
     pub symbol_name: String,
+    /// 符号种类
     pub kind: SymbolKind,
+    /// 符号签名
     pub signature: String,
+    /// 符号起始行号
     pub line_start: u32,
+    /// 符号结束行号
     pub line_end: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 查询单个 ChangeSet
 pub struct GetChangeSetQuery {
+    /// 目标 ChangeSet ID
     pub change_set_id: ChangeSetId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 按 worktree 查询 ChangeSet 列表
 pub struct ListByWorktreeQuery {
+    /// 目标 worktree ID
     pub worktree_id: WorktreeId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 按状态查询 ChangeSet 列表
 pub struct ListByStatusQuery {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 目标状态
     pub status: ChangeSetStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 查询单个符号索引
 pub struct GetSymbolQuery {
+    /// 目标符号 ID
     pub symbol_id: SymbolIndexId,
 }
 
@@ -380,55 +499,65 @@ pub struct GetSymbolQuery {
 // =====================================================================
 
 #[async_trait]
+/// Development 域命令端口(Command Port),负责 ChangeSet 状态机的所有写操作
 pub trait DevelopmentCommandPort: Send + Sync {
+    /// 创建 ChangeSet(初始状态 Draft)
     async fn create_change_set(
         &self,
         cmd: CreateChangeSetCommand,
         actor: &ActorContext,
     ) -> Result<ChangeSet, DevelopmentError>;
 
+    /// 向 Draft 状态的 ChangeSet 添加文件改动
     async fn add_file_change(
         &self,
         cmd: AddFileChangeCommand,
         actor: &ActorContext,
     ) -> Result<ChangeSet, DevelopmentError>;
 
+    /// 提交 ChangeSet 进入评审(Draft -> ReadyForReview)
     async fn submit(
         &self,
         cmd: SubmitChangeSetCommand,
         actor: &ActorContext,
     ) -> Result<ChangeSet, DevelopmentError>;
 
+    /// 批准 ChangeSet(ReadyForReview -> Approved)
     async fn approve(
         &self,
         cmd: ApproveChangeSetCommand,
         actor: &ActorContext,
     ) -> Result<ChangeSet, DevelopmentError>;
 
+    /// 拒绝 ChangeSet(ReadyForReview -> Rejected)
     async fn reject(
         &self,
         cmd: RejectChangeSetCommand,
         actor: &ActorContext,
     ) -> Result<ChangeSet, DevelopmentError>;
 
+    /// 请求修改,退回 Draft(ReadyForReview -> Draft)
     async fn request_changes(
         &self,
         cmd: RequestChangesCommand,
         actor: &ActorContext,
     ) -> Result<ChangeSet, DevelopmentError>;
 
+    /// 合并 ChangeSet(Approved -> Merged,需要 project_admin/tenant_admin,INV-DEV-02)
     async fn merge(
         &self,
         cmd: MergeChangeSetCommand,
         actor: &ActorContext,
     ) -> Result<ChangeSet, DevelopmentError>;
 
+    /// 记录一次 CI/Test/Build 执行结果
     async fn record_execution(
         &self,
         cmd: RecordExecutionCommand,
         actor: &ActorContext,
     ) -> Result<DevelopmentExecution, DevelopmentError>;
 
+    /// 新建或更新代码符号索引
     async fn upsert_symbol(
         &self,
         cmd: UpsertSymbolCommand,
@@ -437,25 +566,30 @@ pub trait DevelopmentCommandPort: Send + Sync {
 }
 
 #[async_trait]
+/// Development 域查询端口(Query Port),负责只读查询
 pub trait DevelopmentQueryPort: Send + Sync {
+    /// 查询单个 ChangeSet
     async fn get_change_set(
         &self,
         q: GetChangeSetQuery,
         actor: &ActorContext,
     ) -> Result<ChangeSet, DevelopmentError>;
 
+    /// 按 worktree 查询 ChangeSet 列表
     async fn list_by_worktree(
         &self,
         q: ListByWorktreeQuery,
         actor: &ActorContext,
     ) -> Result<Vec<ChangeSet>, DevelopmentError>;
 
+    /// 按状态查询 ChangeSet 列表
     async fn list_by_status(
         &self,
         q: ListByStatusQuery,
         actor: &ActorContext,
     ) -> Result<Vec<ChangeSet>, DevelopmentError>;
 
+    /// 查询单个符号索引
     async fn get_symbol(
         &self,
         q: GetSymbolQuery,
@@ -464,23 +598,32 @@ pub trait DevelopmentQueryPort: Send + Sync {
 }
 
 #[async_trait]
+/// Development 域仓储端口,负责持久化访问
 pub trait DevelopmentRepository: Send + Sync {
+    /// 插入新的 ChangeSet
     async fn insert_change_set(&self, cs: ChangeSet) -> Result<(), DevelopmentError>;
+    /// 更新已存在的 ChangeSet
     async fn update_change_set(&self, cs: ChangeSet) -> Result<(), DevelopmentError>;
+    /// 按 ID 获取 ChangeSet
     async fn get_change_set(&self, id: ChangeSetId) -> Result<ChangeSet, DevelopmentError>;
+    /// 按 worktree 列出 ChangeSet
     async fn list_change_sets_by_worktree(
         &self,
         worktree_id: WorktreeId,
     ) -> Result<Vec<ChangeSet>, DevelopmentError>;
+    /// 按状态列出 ChangeSet
     async fn list_change_sets_by_status(
         &self,
         tenant_id: TenantId,
         status: ChangeSetStatus,
     ) -> Result<Vec<ChangeSet>, DevelopmentError>;
 
+    /// 插入执行记录
     async fn insert_execution(&self, exec: DevelopmentExecution) -> Result<(), DevelopmentError>;
 
+    /// 新建或更新符号索引
     async fn upsert_symbol(&self, s: SymbolIndex) -> Result<(), DevelopmentError>;
+    /// 按 ID 获取符号索引
     async fn get_symbol(&self, id: SymbolIndexId) -> Result<SymbolIndex, DevelopmentError>;
     /// 同 (tenant, repo, file_path, symbol_name) 取最新符号
     async fn find_symbol_by_key(
@@ -496,6 +639,7 @@ pub trait DevelopmentRepository: Send + Sync {
 // InMemoryDevelopmentService
 // =====================================================================
 
+/// 基于内存实现的 Development 域应用服务(聚合 Command/Query Port)
 pub struct InMemoryDevelopmentService {
     repo: Arc<dyn DevelopmentRepository>,
     change_sets: Arc<RwLock<HashMap<ChangeSetId, ChangeSet>>>,
@@ -504,6 +648,7 @@ pub struct InMemoryDevelopmentService {
 }
 
 impl InMemoryDevelopmentService {
+    /// 创建一个新的内存实现服务实例
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryDevelopmentRepository::new()),
@@ -863,6 +1008,7 @@ fn transition(cs: &mut ChangeSet, next: ChangeSetStatus) -> Result<(), Developme
 // InMemoryDevelopmentRepository
 // =====================================================================
 
+/// 基于内存实现的 DevelopmentRepository(用于测试/开发环境)
 pub struct InMemoryDevelopmentRepository {
     change_sets: RwLock<HashMap<ChangeSetId, ChangeSet>>,
     executions: RwLock<HashMap<DevelopmentExecutionId, DevelopmentExecution>>,
@@ -870,6 +1016,7 @@ pub struct InMemoryDevelopmentRepository {
 }
 
 impl InMemoryDevelopmentRepository {
+    /// 创建一个新的内存实现仓储实例
     pub fn new() -> Self {
         Self {
             change_sets: RwLock::new(HashMap::new()),

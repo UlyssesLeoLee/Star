@@ -56,18 +56,22 @@ define_uuid_id!(ContextPolicyId);
 // =====================================================================
 
 #[macro_export]
+/// 定义基于 UUID 的领域强类型 ID:自动生成 $name 结构体及 new/as_uuid/From<Uuid>/Display 实现
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// 领域强类型 ID 包装类型(由 define_uuid_id! 宏统一生成)
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID(基于 UUID v4)
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回底层 UUID 值
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -92,48 +96,83 @@ macro_rules! define_uuid_id {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 工作项实体:业务核心对象,涵盖 Epic/Story/Task/Bug/Subtask/AITask 六类子类型
 pub struct WorkItem {
+    /// 工作项唯一 ID
     pub id: WorkItemId,
+    /// 所属租户 ID(INV-WI-01)
     pub tenant_id: TenantId,
+    /// 所属工作区 ID(INV-WI-01)
     pub workspace_id: WorkspaceId,
+    /// 所属项目 ID(INV-WI-01)
     pub project_id: ProjectId,
+    /// 工作项类型(Epic/Story/Task/Bug/Subtask/AITask)
     pub item_type: WorkItemType,
+    /// 标题
     pub title: String,
+    /// 详细描述
     pub description: String,
+    /// 当前状态(三态状态机 TODO/IN_PROGRESS/DONE)
     pub status: WorkItemStatus,
+    /// 指派的用户 ID(可选)
     pub assignee_user_id: Option<UserId>,
+    /// 指派的 Agent ID(可选)
     pub assignee_agent_id: Option<AgentId>,
+    /// 报告人用户 ID
     pub reporter_user_id: UserId,
+    /// 优先级
     pub priority: Priority,
+    /// 严重程度(可选,主要用于 Bug)
     pub severity: Option<Severity>,
+    /// 故事点估算(可选)
     pub story_points: Option<u32>,
+    /// 所属迭代 ID(可选)
     pub sprint_id: Option<SprintId>,
+    /// 父工作项 ID(需与本项目同 project,INV-WI-04)
     pub parent_work_item_id: Option<WorkItemId>,
+    /// 关联的需求 ID 列表
     pub requirement_ids: Vec<RequirementId>,
+    /// 关联的验收标准 ID 列表
     pub acceptance_criterion_ids: Vec<AcceptanceCriterionId>,
+    /// 关联的代码仓库 ID 列表
     pub repository_ids: Vec<RepositoryId>,
+    /// 关联的 worktree ID 列表
     pub worktree_ids: Vec<WorktreeId>,
+    /// 标签列表
     pub labels: Vec<String>,
+    /// 所属组件列表
     pub components: Vec<String>,
+    /// 截止日期(可选)
     pub due_date: Option<DateTime<Utc>>,
     /// AITask 子类型字段
     pub ai_task_data: Option<AiTaskData>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最后更新时间
     pub updated_at: DateTime<Utc>,
+    /// 乐观锁版本号
     pub lock_version: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 工作项类型枚举(§8,§36 定义的 6 类)
 pub enum WorkItemType {
+    /// 史诗
     Epic,
+    /// 用户故事
     Story,
+    /// 任务
     Task,
+    /// 缺陷
     Bug,
+    /// 子任务
     Subtask,
+    /// AI 任务(需 objective + repository_scope,INV-WI-03)
     AITask,
 }
 
 impl WorkItemType {
+    /// 返回类型对应的小写字符串标识
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Epic => "epic",
@@ -147,13 +186,18 @@ impl WorkItemType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// 工作项默认三态状态机(§7.2)
 pub enum WorkItemStatus {
+    /// 待办
     Todo,
+    /// 进行中
     InProgress,
+    /// 已完成(终态)
     Done,
 }
 
 impl WorkItemStatus {
+    /// 返回状态对应的大写字符串标识
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Todo => "TODO",
@@ -161,6 +205,7 @@ impl WorkItemStatus {
             Self::Done => "DONE",
         }
     }
+    /// 判断是否为终态(Done)
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Done)
     }
@@ -186,14 +231,20 @@ pub fn check_status_transition(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 优先级枚举
 pub enum Priority {
+    /// 低
     Low,
+    /// 中
     Medium,
+    /// 高
     High,
+    /// 紧急
     Urgent,
 }
 
 impl Priority {
+    /// 返回优先级对应的小写字符串标识
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Low => "low",
@@ -205,14 +256,20 @@ impl Priority {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 严重程度枚举(主要用于 Bug)
 pub enum Severity {
+    /// 轻微
     Minor,
+    /// 主要
     Major,
+    /// 严重
     Critical,
+    /// 阻塞
     Blocker,
 }
 
 impl Severity {
+    /// 返回严重程度对应的小写字符串标识
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Minor => "minor",
@@ -224,47 +281,77 @@ impl Severity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// AITask 子类型附加数据(INV-WI-03)
 pub struct AiTaskData {
+    /// AI 任务目标描述
     pub objective: String,
+    /// 允许操作的代码仓库范围
     pub repository_scope: Vec<RepositoryId>,
+    /// 允许修改的文件路径模式列表
     pub allowed_files: Vec<String>,
+    /// 禁止修改的文件路径模式列表
     pub forbidden_files: Vec<String>,
+    /// 关联的 Agent 策略 ID(可选)
     pub agent_policy_id: Option<AgentPolicyId>,
+    /// 关联的验证策略 ID(可选)
     pub validation_policy_id: Option<ValidationPolicyId>,
+    /// 关联的上下文策略 ID(可选)
     pub context_policy_id: Option<ContextPolicyId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 需求实体
 pub struct Requirement {
+    /// 需求唯一 ID
     pub id: RequirementId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 关联的业务目标 ID(可选)
     pub business_goal_id: Option<BusinessGoalId>,
+    /// 需求陈述
     pub statement: String,
+    /// 需求理由说明
     pub rationale: String,
+    /// 关联的工作项 ID 列表
     pub linked_work_item_ids: Vec<WorkItemId>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 验收标准实体
 pub struct AcceptanceCriterion {
+    /// 验收标准唯一 ID
     pub id: AcceptanceCriterionId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属需求 ID
     pub requirement_id: RequirementId,
+    /// 所属工作项 ID
     pub work_item_id: WorkItemId,
+    /// 验收标准陈述
     pub statement: String,
+    /// 验证覆盖状态
     pub coverage_status: CoverageStatus,
+    /// 覆盖该验收标准的验证记录 ID 列表
     pub covered_by_validation_ids: Vec<Uuid>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// 验收标准的验证覆盖状态
 pub enum CoverageStatus {
+    /// 未覆盖
     Uncovered,
+    /// 部分覆盖
     Partial,
+    /// 已覆盖
     Covered,
 }
 
 impl CoverageStatus {
+    /// 返回覆盖状态对应的大写字符串标识
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Uncovered => "UNCOVERED",
@@ -275,11 +362,17 @@ impl CoverageStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 业务目标实体
 pub struct BusinessGoal {
+    /// 业务目标唯一 ID
     pub id: BusinessGoalId,
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 业务目标名称
     pub name: String,
+    /// 业务目标描述
     pub description: String,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
 }
 
@@ -288,24 +381,34 @@ pub struct BusinessGoal {
 // =====================================================================
 
 #[derive(Debug, Error)]
+/// domain-work-item 领域错误类型
 pub enum WorkItemError {
     #[error("not found: {0}")]
+    /// 资源未找到
     NotFound(String),
     #[error("permission denied")]
+    /// 权限不足
     PermissionDenied,
     #[error("cross-tenant access denied: tenant {0} vs required {1}")]
+    /// 跨租户访问被拒绝
     CrossTenantDenied(TenantId, TenantId),
     #[error("invalid state transition: {from} -> {to}")]
+    /// 非法的状态转换
     InvalidTransition { from: String, to: String },
     #[error("AI task missing objective (INV-WI-03)")]
+    /// AI 任务缺少目标(INV-WI-03)
     AiTaskMissingObjective,
     #[error("AI task missing repository scope (INV-WI-03)")]
+    /// AI 任务缺少代码仓库范围(INV-WI-03)
     AiTaskMissingScope,
     #[error("parent work item must be in same project (INV-WI-04)")]
+    /// 父工作项与子工作项不属于同一项目(INV-WI-04)
     ParentProjectMismatch,
     #[error("conflict: {0}")]
+    /// 数据冲突(如乐观锁版本不匹配)
     Conflict(String),
     #[error("internal: {0}")]
+    /// 内部错误
     Internal(String),
 }
 
@@ -314,67 +417,111 @@ pub enum WorkItemError {
 // =====================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建工作项命令
 pub struct CreateWorkItemCommand {
+    /// 目标租户 ID
     pub tenant_id: TenantId,
+    /// 目标工作区 ID
     pub workspace_id: WorkspaceId,
+    /// 目标项目 ID
     pub project_id: ProjectId,
+    /// 工作项类型
     pub item_type: WorkItemType,
+    /// 标题
     pub title: String,
+    /// 详细描述
     pub description: String,
+    /// 优先级
     pub priority: Priority,
+    /// 严重程度(可选)
     pub severity: Option<Severity>,
+    /// 报告人用户 ID
     pub reporter_user_id: UserId,
+    /// 父工作项 ID(可选)
     pub parent_work_item_id: Option<WorkItemId>,
+    /// AITask 附加数据(可选)
     pub ai_task_data: Option<AiTaskData>,
+    /// 标签列表
     pub labels: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 状态转换命令
 pub struct TransitionStatusCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 目标工作项 ID
     pub work_item_id: WorkItemId,
+    /// 转换前状态
     pub from: WorkItemStatus,
+    /// 转换后状态
     pub to: WorkItemStatus,
+    /// 操作者用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 指派工作项命令
 pub struct AssignCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 目标工作项 ID
     pub work_item_id: WorkItemId,
+    /// 指派的用户 ID(可选)
     pub assignee_user_id: Option<UserId>,
+    /// 指派的 Agent ID(可选)
     pub assignee_agent_id: Option<AgentId>,
+    /// 操作者用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建需求命令
 pub struct CreateRequirementCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 关联的业务目标 ID(可选)
     pub business_goal_id: Option<BusinessGoalId>,
+    /// 需求陈述
     pub statement: String,
+    /// 需求理由说明
     pub rationale: String,
+    /// 操作者用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 创建验收标准命令
 pub struct CreateAcceptanceCriterionCommand {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 所属需求 ID
     pub requirement_id: RequirementId,
+    /// 所属工作项 ID
     pub work_item_id: WorkItemId,
+    /// 验收标准陈述
     pub statement: String,
+    /// 操作者用户 ID
     pub actor_user_id: UserId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 获取单个工作项查询
 pub struct GetWorkItemQuery {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 目标工作项 ID
     pub work_item_id: WorkItemId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+/// 按项目列出工作项查询
 pub struct ListByProjectQuery {
+    /// 所属租户 ID
     pub tenant_id: TenantId,
+    /// 目标项目 ID
     pub project_id: ProjectId,
+    /// 是否包含终态(Done)工作项
     pub include_terminal: bool,
 }
 
@@ -383,31 +530,37 @@ pub struct ListByProjectQuery {
 // =====================================================================
 
 #[async_trait]
+/// 工作项写命令端口(Command Port)
 pub trait WorkItemCommandPort: Send + Sync {
+    /// 创建工作项
     async fn create_work_item(
         &self,
         cmd: CreateWorkItemCommand,
         actor: &ActorContext,
     ) -> Result<WorkItem, WorkItemError>;
 
+    /// 转换工作项状态
     async fn transition_status(
         &self,
         cmd: TransitionStatusCommand,
         actor: &ActorContext,
     ) -> Result<WorkItem, WorkItemError>;
 
+    /// 指派工作项负责人
     async fn assign(
         &self,
         cmd: AssignCommand,
         actor: &ActorContext,
     ) -> Result<WorkItem, WorkItemError>;
 
+    /// 创建需求
     async fn create_requirement(
         &self,
         cmd: CreateRequirementCommand,
         actor: &ActorContext,
     ) -> Result<Requirement, WorkItemError>;
 
+    /// 创建验收标准
     async fn create_acceptance_criterion(
         &self,
         cmd: CreateAcceptanceCriterionCommand,
@@ -416,13 +569,16 @@ pub trait WorkItemCommandPort: Send + Sync {
 }
 
 #[async_trait]
+/// 工作项查询端口(Query Port)
 pub trait WorkItemQueryPort: Send + Sync {
+    /// 获取单个工作项
     async fn get(
         &self,
         q: GetWorkItemQuery,
         actor: &ActorContext,
     ) -> Result<WorkItem, WorkItemError>;
 
+    /// 按项目列出工作项
     async fn list_by_project(
         &self,
         q: ListByProjectQuery,
@@ -431,17 +587,24 @@ pub trait WorkItemQueryPort: Send + Sync {
 }
 
 #[async_trait]
+/// 工作项持久化仓储端口
 pub trait WorkItemRepository: Send + Sync {
+    /// 插入新工作项
     async fn insert(&self, w: WorkItem) -> Result<(), WorkItemError>;
+    /// 按 ID 获取工作项
     async fn get(&self, id: WorkItemId) -> Result<WorkItem, WorkItemError>;
+    /// 更新工作项
     async fn update(&self, w: WorkItem) -> Result<(), WorkItemError>;
+    /// 按租户与项目列出工作项
     async fn list_by_project(
         &self,
         tid: TenantId,
         pid: ProjectId,
     ) -> Result<Vec<WorkItem>, WorkItemError>;
 
+    /// 插入新需求
     async fn insert_requirement(&self, r: Requirement) -> Result<(), WorkItemError>;
+    /// 插入新验收标准
     async fn insert_ac(&self, ac: AcceptanceCriterion) -> Result<(), WorkItemError>;
 }
 
@@ -449,6 +612,7 @@ pub trait WorkItemRepository: Send + Sync {
 // InMemoryWorkItemService
 // =====================================================================
 
+/// WorkItemCommandPort/WorkItemQueryPort 的内存实现
 pub struct InMemoryWorkItemService {
     repo: Arc<dyn WorkItemRepository>,
     items: Arc<RwLock<HashMap<WorkItemId, WorkItem>>>,
@@ -457,6 +621,7 @@ pub struct InMemoryWorkItemService {
 }
 
 impl InMemoryWorkItemService {
+    /// 创建一个空的内存工作项服务实例
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryWorkItemRepository::new()),
@@ -812,6 +977,7 @@ impl WorkItemQueryPort for InMemoryWorkItemService {
 // InMemoryWorkItemRepository
 // =====================================================================
 
+/// WorkItemRepository 的内存实现
 pub struct InMemoryWorkItemRepository {
     items: RwLock<HashMap<WorkItemId, WorkItem>>,
     requirements: RwLock<HashMap<RequirementId, Requirement>>,
@@ -819,6 +985,7 @@ pub struct InMemoryWorkItemRepository {
 }
 
 impl InMemoryWorkItemRepository {
+    /// 创建一个空的内存工作项仓储实例
     pub fn new() -> Self {
         Self {
             items: RwLock::new(HashMap::new()),
