@@ -148,10 +148,24 @@ class TaskOperationsManager:
             if node_id == "M-N1":
                 from automation.task_ops.nodes.merge_node import merge_node
                 result = await merge_node(state=message, manager=self)
+            elif node_id == "M-N2":
+                from automation.task_ops.nodes.split_node import split_node
+                result = await split_node(state=message, manager=self)
+            elif node_id == "M-N5":
+                from automation.task_ops.nodes.summarize_node import summarize_node
+                result = await summarize_node(state=message, manager=self)
+            elif node_id == "M-N6":
+                from automation.task_ops.nodes.reassign_node import reassign_node
+                result = await reassign_node(state=message, manager=self)
+            elif node_id == "M-N7":
+                from automation.task_ops.nodes.metadata_node import metadata_node
+                result = await metadata_node(state=message, manager=self)
             else:
-                # M-N2..M-N7 待后续子项 (TMO-02..TMO-07) 实装
+                # M-N3 reorder_node + M-N4 bulk_node 走独立 factory 路径 (per wt-tmo-03 + wt-tmo-04)
+                # 不经 manager.dispatch, 直接调 _REORDER_NODE / _bulk_queue
                 raise NotImplementedError(
-                    f"TMO node {node_id} ({op}) not yet implemented (per PHASE-LANGGRAPH-TMO-IMPL-REPORT v0.1, 7 子项 phase 计划)"
+                    f"TMO node {node_id} ({op}) uses factory pattern, dispatch via manager not supported "
+                    f"(per M-N3 reorder_node / M-N4 bulk_node factory pattern, wt-tmo-03 + wt-tmo-04 实装)"
                 )
             duration_ms = (time.time() - start) * 1000
             self.audit(op, message, {"node": node_id, "result": result, "duration_ms": duration_ms})
