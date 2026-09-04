@@ -59,6 +59,8 @@ members = [
     "crates/star-vcs",
     # Phase C.2 (T3.1) 启动: 2026-09-04 注册 crates/star-dto (跨域共享 DTO 类型, per HANDOFF-ST-001.md v0.8 §10, 跨 multi-sub-session 续)
     "crates/star-dto",
+    # Phase G.1 (L0 派发 PoC) 启动: 2026-09-04 注册 crates/star-dispatcher (L0 派发层 + InMemory TaskQueue, per SRS-STAR-AGENT-RUNTIME-001 §G-1, v0.0.1 PoC stub)
+    "crates/star-dispatcher",
 ]
 exclude = ["target"]
 
