@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 try:
-    from fastapi import APIRouter, HTTPException
+    from fastapi import APIRouter, HTTPException, Query
     from pydantic import BaseModel, Field, field_validator
 except ImportError:
     print("ERROR: fastapi + pydantic not installed. pip install fastapi pydantic", file=sys.stderr)
@@ -609,3 +609,207 @@ async def get_relationships() -> dict:
         "relationships": [[u, v] for u, v in _GRAPH.edges()],
         "total": len(_GRAPH.edges()),
     }
+
+
+# ===========================================================================
+# TMO-07: /api/tmo/metadata (M-N7 + TaskMetadataRepository 持久化)
+# per G-TMO-04c, 守门 #13 c Master RLS + 守门 #13 d SCD Type 2 + 守门 #DB-13
+# ===========================================================================
+
+import os as _os  # noqa: E402
+
+_TASK_METADATA_DB_PATH: str = _os.environ.get(
+    "STAR_TASK_METADATA_DB_PATH",
+    str(_PROJECT_ROOT / "data" / "task_metadata.sqlite"),
+)
+_TASK_METADATA_DB_PATH = str(Path(_TASK_METADATA_DB_PATH).resolve())
+Path(_TASK_METADATA_DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+
+# 初始化 schema (per G-TMO-04 DDL)
+from automation.task_ops.task_metadata_ddl import init_schema as _init_task_metadata_schema  # noqa: E402
+_init_task_metadata_schema(_TASK_METADATA_DB_PATH)
+
+from automation.task_ops.task_metadata_repo import TaskMetadataRepository as _TaskMetadataRepository  # noqa: E402
+_task_metadata_repo: _TaskMetadataRepository = _TaskMetadataRepository(_TASK_METADATA_DB_PATH)
+
+
+class MetadataUpsertRequest(BaseModel):
+    """POST /api/tmo/metadata 请求体 (per M-N7 MetadataUpdate + G-TMO-04b repo)"""
+    task_id: str = Field(min_length=1, description="task card id")
+    tenant_id: str = Field(min_length=1, description="Master RLS 必携 (守门 #13 c)")
+    workspace_id: str = Field(min_length=1, description="Master RLS 必携 (守门 #13 c)")
+    metadata: dict = Field(description="metadata 字段: {name?, labels?, notes?, priority?}")
+    actor_session_id: Optional[str] = Field(default=None, description="L0 session id (audit 用)")
+
+
+class MetadataUpsertResponse(BaseModel):
+    """POST /api/tmo/metadata 响应"""
+    ok: bool
+    operation: str  # "upsert"
+    task_id: str
+    version: int
+    is_current: bool
+    name: Optional[str]
+    labels: List[str]
+    notes: Optional[str]
+    priority: int
+    updated_at_ms: int
+
+
+class MetadataGetResponse(BaseModel):
+    """GET /api/tmo/metadata/{task_id} 响应"""
+    ok: bool
+    task_id: str
+    version: int
+    name: Optional[str]
+    labels: List[str]
+    notes: Optional[str]
+    priority: int
+    created_at_ms: int
+    updated_at_ms: int
+
+
+class MetadataHistoryResponse(BaseModel):
+    """GET /api/tmo/metadata/{task_id}/history 响应 (SCD Type 2 历史)"""
+    ok: bool
+    task_id: str
+    history: List[dict]
+
+
+class MetadataAuditResponse(BaseModel):
+    """GET /api/tmo/metadata/{task_id}/audit 响应 (audit log)"""
+    ok: bool
+    task_id: str
+    audit_events: List[dict]
+
+
+@router.post("/metadata", response_model=MetadataUpsertResponse)
+async def post_metadata_upsert(req: MetadataUpsertRequest) -> MetadataUpsertResponse:
+    """POST /api/tmo/metadata — M-N7 metadata_node 持久化 (per G-TMO-04b TaskMetadataRepository)
+
+    流程:
+      1. 委托 _task_metadata_repo.upsert_metadata (走 SCD Type 2 + audit 5 类事件)
+      2. 异常 → 400 (R-12 = RLS violation, 403 forbidden; 其他 = 500)
+
+    守门:
+      - 守门 #13 a: L0 唯一入口, 跨 task metadata 操作只经 L0
+      - 守门 #13 c: tenant_id / workspace_id 必携 (Pydantic min_length=1 校验)
+      - 守门 #13 d: SCD Type 2 (旧 version is_current=0 + 新 version is_current=1 + scd snapshot)
+      - 守门 #19: Python 化, 不写 .rs
+    """
+    try:
+        record = _task_metadata_repo.upsert_metadata(
+            task_id=req.task_id,
+            tenant_id=req.tenant_id,
+            workspace_id=req.workspace_id,
+            metadata=req.metadata,
+            actor_session_id=req.actor_session_id,
+        )
+    except PermissionError as exc:
+        # 守门 #13 c Master 物理删除禁止 (虽然 upsert 不会触发, 防御性)
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return MetadataUpsertResponse(
+        ok=True,
+        operation="upsert",
+        task_id=record.task_id,
+        version=record.version,
+        is_current=record.is_current,
+        name=record.name,
+        labels=record.labels,
+        notes=record.notes,
+        priority=record.priority,
+        updated_at_ms=record.updated_at_ms,
+    )
+
+
+@router.get("/metadata/_health")
+async def get_metadata_health() -> dict:
+    """GET /api/tmo/metadata/_health — repo 状态 (per 守门 #1)
+
+    注册顺序优先于 /metadata/{task_id}, 避免 _health 被解析成 task_id.
+    """
+    return {
+        "ok": True,
+        "db_path": _TASK_METADATA_DB_PATH,
+        "ts": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/metadata/{task_id}", response_model=MetadataGetResponse)
+async def get_metadata_current(
+    task_id: str,
+    tenant_id: str = Query(..., min_length=1, description="Master RLS 必携 (守门 #13 c)"),
+    workspace_id: str = Query(..., min_length=1, description="Master RLS 必携 (守门 #13 c)"),
+) -> MetadataGetResponse:
+    """GET /api/tmo/metadata/{task_id} — 读 task 当前 metadata (is_current=1)
+
+    守门 #13 c: tenant_id + workspace_id 强制 query param 必携 (RLS 隔离)
+    """
+    record = _task_metadata_repo.get_current_metadata(
+        task_id=task_id,
+        tenant_id=tenant_id,
+        workspace_id=workspace_id,
+    )
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"task_metadata not found: task_id={task_id} tenant_id={tenant_id} workspace_id={workspace_id}",
+        )
+    return MetadataGetResponse(
+        ok=True,
+        task_id=record.task_id,
+        version=record.version,
+        name=record.name,
+        labels=record.labels,
+        notes=record.notes,
+        priority=record.priority,
+        created_at_ms=record.created_at_ms,
+        updated_at_ms=record.updated_at_ms,
+    )
+
+
+@router.get("/metadata/{task_id}/history", response_model=MetadataHistoryResponse)
+async def get_metadata_history(
+    task_id: str,
+    tenant_id: str = Query(..., min_length=1, description="Master RLS 必携 (守门 #13 c)"),
+    workspace_id: str = Query(..., min_length=1, description="Master RLS 必携 (守门 #13 c)"),
+    limit: int = Query(50, ge=1, le=500, description="history limit"),
+) -> MetadataHistoryResponse:
+    """GET /api/tmo/metadata/{task_id}/history — SCD Type 2 历史 (version DESC)"""
+    history = _task_metadata_repo.get_scd_history(
+        task_id=task_id,
+        tenant_id=tenant_id,
+        workspace_id=workspace_id,
+        limit=limit,
+    )
+    return MetadataHistoryResponse(
+        ok=True,
+        task_id=task_id,
+        history=history,
+    )
+
+
+@router.get("/metadata/{task_id}/audit", response_model=MetadataAuditResponse)
+async def get_metadata_audit(
+    task_id: str,
+    tenant_id: str = Query(..., min_length=1, description="Master RLS 必携 (守门 #13 c)"),
+    workspace_id: str = Query(..., min_length=1, description="Master RLS 必携 (守门 #13 c)"),
+    limit: int = Query(50, ge=1, le=500, description="audit limit"),
+) -> MetadataAuditResponse:
+    """GET /api/tmo/metadata/{task_id}/audit — audit log (event_at_ms DESC)"""
+    audit_events = _task_metadata_repo.get_audit_log(
+        task_id=task_id,
+        tenant_id=tenant_id,
+        workspace_id=workspace_id,
+        limit=limit,
+    )
+    return MetadataAuditResponse(
+        ok=True,
+        task_id=task_id,
+        audit_events=audit_events,
+    )
+
+
