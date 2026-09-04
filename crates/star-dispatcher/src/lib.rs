@@ -105,6 +105,12 @@ pub enum DispatchError {
         limit: u64,
         current: u64,
     },
+    /// G-4 Shared Pool 资源未找到
+    #[error("pool resource {0} not found")]
+    PoolNotFound(String),
+    /// G-4 Shared Pool 资源耗尽
+    #[error("pool resource {resource_id} exhausted (max concurrency reached)")]
+    PoolExhausted { resource_id: String },
 }
 
 /// **InMemory TaskQueue** (per SRS-001 G-1, v0.0.1 PoC, v0.1.0 收官 改 SQLite WAL)
@@ -645,6 +651,88 @@ impl TenantQuotaTracker {
             .get(&tenant_id)
             .copied()
             .unwrap_or(0)
+    }
+}
+
+/// **Shared Provider** (per SRS-001 §G-4, Shared LLM/HTTP/MCP Pool, 18 §provider/model/profile)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum ProviderKind {
+    Llm,
+    Http,
+    Mcp,
+    Rag,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PoolResource {
+    pub resource_id: String,
+    pub kind: ProviderKind,
+    pub provider: String,
+    pub model: String,
+    pub max_concurrency: u32,
+}
+
+pub struct SharedPool {
+    resources: Arc<RwLock<HashMap<String, PoolResource>>>,
+    in_use: Arc<RwLock<HashMap<String, u32>>>,
+}
+
+impl Default for SharedPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SharedPool {
+    pub fn new() -> Self {
+        Self {
+            resources: Arc::new(RwLock::new(HashMap::new())),
+            in_use: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub async fn register(&self, resource: PoolResource) {
+        let mut resources = self.resources.write().await;
+        resources.insert(resource.resource_id.clone(), resource);
+    }
+
+    pub async fn list(&self) -> Vec<PoolResource> {
+        let resources = self.resources.read().await;
+        resources.values().cloned().collect()
+    }
+
+    pub async fn check_available(&self, resource_id: &str) -> Result<bool, DispatchError> {
+        let resources = self.resources.read().await;
+        let res = resources
+            .get(resource_id)
+            .ok_or_else(|| DispatchError::PoolNotFound(resource_id.into()))?;
+        let in_use = self.in_use.read().await;
+        let current = in_use.get(resource_id).copied().unwrap_or(0);
+        Ok(current < res.max_concurrency)
+    }
+
+    pub async fn acquire(&self, resource_id: &str) -> Result<(), DispatchError> {
+        let mut in_use = self.in_use.write().await;
+        let resources = self.resources.read().await;
+        let res = resources
+            .get(resource_id)
+            .ok_or_else(|| DispatchError::PoolNotFound(resource_id.into()))?;
+        let v = in_use.entry(resource_id.to_string()).or_insert(0);
+        if *v >= res.max_concurrency {
+            return Err(DispatchError::PoolExhausted {
+                resource_id: resource_id.into(),
+            });
+        }
+        *v += 1;
+        Ok(())
+    }
+
+    pub async fn release(&self, resource_id: &str) {
+        let mut in_use = self.in_use.write().await;
+        let v = in_use.entry(resource_id.to_string()).or_insert(0);
+        if *v > 0 {
+            *v -= 1;
+        }
     }
 }
 
@@ -1461,5 +1549,74 @@ mod tests {
         qt.check(tenant_b).await.unwrap();
         assert_eq!(qt.in_flight_count(tenant_a).await, 1);
         assert_eq!(qt.in_flight_count(tenant_b).await, 1);
+    }
+
+    /// G.4 PoC test 1: SharedPool 注册 + 列出
+    #[tokio::test]
+    async fn sharedpool_register_and_list() {
+        let p = SharedPool::new();
+        p.register(PoolResource {
+            resource_id: "openai/gpt-4".into(),
+            kind: ProviderKind::Llm,
+            provider: "openai".into(),
+            model: "gpt-4".into(),
+            max_concurrency: 5,
+        })
+        .await;
+        p.register(PoolResource {
+            resource_id: "github-mcp".into(),
+            kind: ProviderKind::Mcp,
+            provider: "github".into(),
+            model: "mcp-server".into(),
+            max_concurrency: 2,
+        })
+        .await;
+        let list = p.list().await;
+        assert_eq!(list.len(), 2);
+    }
+
+    /// G.4 PoC test 2: SharedPool acquire + release 限流
+    #[tokio::test]
+    async fn sharedpool_acquire_release() {
+        let p = SharedPool::new();
+        p.register(PoolResource {
+            resource_id: "anthropic/claude-3".into(),
+            kind: ProviderKind::Llm,
+            provider: "anthropic".into(),
+            model: "claude-3".into(),
+            max_concurrency: 2,
+        })
+        .await;
+        // 2 个 acquire 通过
+        p.acquire("anthropic/claude-3").await.unwrap();
+        p.acquire("anthropic/claude-3").await.unwrap();
+        // 第 3 个 acquire 触发 PoolExhausted
+        let res = p.acquire("anthropic/claude-3").await;
+        assert!(matches!(res, Err(DispatchError::PoolExhausted { .. })));
+        // release 1 后, 可 acquire
+        p.release("anthropic/claude-3").await;
+        p.acquire("anthropic/claude-3").await.unwrap();
+    }
+
+    /// G.4 PoC test 3: SharedPool check_available 跨资源隔离
+    #[tokio::test]
+    async fn sharedpool_check_available() {
+        let p = SharedPool::new();
+        p.register(PoolResource {
+            resource_id: "rag/embeddings".into(),
+            kind: ProviderKind::Rag,
+            provider: "qdrant".into(),
+            model: "embed-v1".into(),
+            max_concurrency: 1,
+        })
+        .await;
+        // 初始可用
+        assert!(p.check_available("rag/embeddings").await.unwrap());
+        // 1 个 acquire 后耗尽
+        p.acquire("rag/embeddings").await.unwrap();
+        assert!(!p.check_available("rag/embeddings").await.unwrap());
+        // 不存在的资源 → PoolNotFound
+        let res = p.check_available("nope/nope").await;
+        assert!(matches!(res, Err(DispatchError::PoolNotFound(_))));
     }
 }
