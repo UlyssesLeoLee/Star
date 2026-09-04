@@ -839,6 +839,7 @@ impl IdentityQueryPort for InMemoryIdentityService {
 // InMemoryIdentityRepository
 // =====================================================================
 
+/// 基于内存的身份仓储实现(测试/开发用途)
 pub struct InMemoryIdentityRepository {
     users: RwLock<HashMap<UserId, User>>,
     email_index: RwLock<HashMap<(TenantId, String), UserId>>,
@@ -847,6 +848,7 @@ pub struct InMemoryIdentityRepository {
 }
 
 impl InMemoryIdentityRepository {
+    /// 创建空的内存身份仓储实例
     pub fn new() -> Self {
         Self {
             users: RwLock::new(HashMap::new()),
