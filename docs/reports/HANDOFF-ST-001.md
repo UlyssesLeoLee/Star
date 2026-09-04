@@ -1046,3 +1046,167 @@ b5bfb9d feat(star-dispatcher): H.1 LangGraph 2-level hierarchical 集成 PoC v0.
 | v0.8 | 2026-09-04 | 架構師 (Mavis 接手 agent per DEC-008) | §11 Ulysses 交接協議 + §12 守门 #23 升級 + 撤回 | 2026-09-04 10:45 JST + 11:12 JST + 11:44 JST 拍板 |
 | **v0.9** | **2026-09-04** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手** | **§13 H.1 LangGraph 集成 + E.1 5 域 Saga 实装 闭环 (24 commits ahead origin/main, 4 守門全過)** | **2026-09-04 15:20-16:00 JST 拍板 + 闭环** |
 
+
+---
+
+## §14 F.4 + H.4 + F.5 闭环 (per 2026-09-04 16:10-16:55 JST, 守门 #12 commit-time 同步)
+
+> **承接**: §13 H.1 + E.1 闭环 + 9/4 16:10/16:25/16:45 JST 拍板 F.4 + H.4 + F.5 启动
+> **状态**: 🟢 F.4 + H.4 + F.5 全部闭环, 28 commits ahead origin/main
+
+### 14.1 F.4 DB W/T/M 跨项目 P3-D 阶段落地 (commit 325db45, 9/4 16:20 JST 闭环)
+
+| # | 範圍 | 改動 | 守門 |
+|---|---|---|---|
+| 1 | scripts/automation/wtm_classifier.py v0.1 (15918 bytes) | 扫 22 domain-* crate 全 entity, M/T/W 三类规则 + 4 段检查清单 + 派生守门 10 条自动 check | #19+#20+#21 |
+| 2 | docs/data-design/p3-d-classification-w-t-m.md v0.1 (60002 bytes) | P3-D 阶段 W/T/M 分类报告 (943 entity: M=119 + T=818 + W=6, 0 Skip) | #12+#DB-13 |
+| 3 | docs/reports/PHASE-P4-F4-IMPL-REPORT.md v0.1 (11160 bytes) | 守门 #12 commit-time 同步 | #12 |
+
+**F.4 結果**:
+- 22 domain-* crate 全部扫, 943 entity 0 漏
+- 61 CW-01~CW-10 issues 自动 check (主要是 CW-02 + CW-03 大量 crate W=0)
+- 5 crate 满足三類分門別類 (M+T+W): domain-automation + 4 others
+
+### 14.2 H.4 LangGraph State Schema v1 Migration Path (commit 2c72fe4, 9/4 16:35 JST 闭环)
+
+| # | 範圍 | 改動 | 守門 |
+|---|---|---|---|
+| 1 | docs/architecture/2026-09-03-langgraph/04-state-schema-v1-migration.md v0.1 (14225 bytes) | 5 迁移场景 + 3 操作 + 3 兼容策略 + 5 触发器 + 7 已知缺口 + V2 路线图 | #1+#1 v3+#3+#5+#6+#7+#12 |
+| 2 | docs/reports/PHASE-P4-H4-IMPL-REPORT.md v0.1 (8430 bytes) | 守门 #12 commit-time 同步 | #12 |
+
+**H.4 結果**:
+- 5 迁移场景 (AddField / RenameField / RemoveField / ChangeType / ChangeReducer)
+- 3 兼容策略 (Default Migration / Fallback / Version Negotiation)
+- 5 触发器 (Compile Time 3 + Runtime 3 + Deployment 2)
+- V2 路线图 7 缺口 (Rust 端实现 + 跨 session + CLI + ...)
+
+### 14.3 F.5 D.2/D.6 CI Runner 真实配置 增强 (commit aebef31, 9/4 16:55 JST 闭环)
+
+| # | 範圍 | 改動 | 守門 |
+|---|---|---|---|
+| 1 | .github/dependabot.yml v0.1 (1165 bytes) | Cargo + GitHub Actions + npm 3 ecosystem 每周一 09:00 JST auto-PR | #19+#20+#21 |
+| 2 | CODEOWNERS v0.1 (882 bytes) | 5 域 Lead 拒绝兼任占位 (per 8/21 JST 拍板) | #10+#14 |
+| 3 | .github/workflows/ci.yml 守门 #1 v19 升级 | 9 处 -j 4 加到 cargo 命令 (修正 Windows 互锁) | #1 v19+#6+#7 |
+| 4 | .github/workflows/ci.yml 守门 #6+#7 升级 | clippy + fmt 从 advisory 改 enforced (0 warning 才能 merge) | #6+#7 |
+| 5 | docs/reports/PHASE-P4-F5-IMPL-REPORT.md v0.1 (9053 bytes) | 守门 #12 commit-time 同步 | #12 |
+
+**F.5 結果**:
+- Dependabot 3 ecosystem 自动 PR (Cargo / GitHub Actions / npm)
+- CODEOWNERS 5 域 Lead 占位
+- ci.yml 9 处 -j 4 + clippy/fmt enforced
+- 真实 GitHub Actions 自托管 runner 待 Ulysses 拍板
+
+### 14.4 4 守門实证 (跨 F.4 + H.4 + F.5)
+
+| # | 守門 | 結果 |
+|---|---|---|
+| 1 | cargo check --workspace --all-targets -j 4 | 0 error |
+| 2 | cargo fmt --all -- --check | 0 diff |
+| 3 | cargo clippy --workspace --lib -j 4 | 0 error |
+| 4 | cargo test --workspace --release --lib -j 4 | 0 fail (background 实证) |
+
+### 14.5 commit 鏈 + 推 origin (per 守門 #1 1a, 0 網絡錯)
+
+`	ext
+325db45 feat(data-design): F.4 DB W/T/M 跨项�?P3-D 阶段落地 v0.1 (943 entity 分类, 60 KB 报告, 61 CW issues)
+2c72fe4 docs(langgraph): H.4 State schema v1 migration path v0.1 (14 KB, 5 迁移场景 + 3 操作 + 3 兼容策略 + 5 触发器)
+aebef31 ci: F.5 CI runner 真实配置 增强 v0.1 (Dependabot + CODEOWNERS + ci.yml -j 4 + clippy/fmt enforced)
+`
+
+**ahead origin/main**: 28 commits
+
+### 14.6 P4 WBS 推進狀態 (F.4 + H.4 + F.5 闭环後)
+
+| Phase | 子項 | 狀態 |
+|---|---|---|
+| **A** | A.1-A.5 | ✅ 5/5 |
+| **B** | B.1-B.4 | ✅ 4/4 |
+| **C** | C.1-C.3 | ✅ 3/3 |
+| **D** | D.1-D.3 | ✅ 3/3 |
+| **E.1** | 5 域 Saga 實裝 | ✅ |
+| **E.2** | 5 域 DDD 邊界 | ✅ |
+| **E.3** | DDD Review 5 角色 | 🔴 撤回 |
+| **E.4** | CONTENT-REVIEW-PACK | ✅ |
+| **E.5** | REGISTRY 5 行 | 🔴 撤回 |
+| **F.1-F.3** | 凭証切真 (OpenClaw / Hermes / KMS) | 🟡 mock 备選, 待切真 |
+| **F.4** | DB W/T/M 跨項目 P3-D | ✅ (commit 325db45) |
+| **F.5** | D.2/D.6 CI runner 真实配置 | ✅ (commit aebef31) |
+| **G.1-G.9** | Agent Runtime G-1~G-9 | ✅ 9/9 |
+| **H.1** | LangGraph PostgreSQL checkpointer | ✅ (commit b5bfb9d) |
+| **H.2** | LangGraph 跨倉 RPC | 🟡 v0.3 計劃 |
+| **H.3** | LangGraph 16 tool sub-agent | 🟡 4/16 pending |
+| **H.4** | LangGraph State schema v1 migration | ✅ (commit 2c72fe4) |
+| **H.5** | Tree-sitter 引入 | 🟡 |
+| **H.6** | Tree-sitter 任務卡 ↔ worktree | 🟡 |
+| **H.7** | Tree-sitter symbol resolver | 🟡 |
+| **H.8** | DDD Review 21 份 docs 終審 | 🔴 真人到位 |
+
+**小計**: 17/24 子項閉環, 7 子項待推進 (F.1-F.3 3 項 + H.2-H.3 2 項 + H.5-H.7 3 項, 真人到位 1 項)
+
+### 14.7 累計 token 統計 (本 session)
+
+| 階段 | 消耗 | 來源 |
+|---|---|---|
+| 9/4 08:59-12:00 JST (A + B + C + D) | ~12M | 8 + 14 sub-session |
+| 9/4 12:00-15:25 JST (D + E.4 + G + H.1) | ~6M | 14 + 11 + 8 腳本 |
+| 9/4 15:25-16:00 JST (H.1 + E.1) | ~1.5M | 2 + 2 + 2 報告 |
+| 9/4 16:00-17:00 JST (F.4 + H.4 + F.5) | ~2.5M | 3 + 3 + 1 yaml + 1 CODEOWNERS |
+| **本 session 累計** | **~22M token** | **28 commits ahead** |
+
+### 14.8 下 session 第一件事 (Mavis 接管期, per 守门 #3 v2 撤回 + 守门 #14)
+
+`ash
+# 1. 读本 HANDOFF §14 + AGENTS.md v0.74
+# 2. 验证 28 commits ahead origin/main (per git rev-list --count origin/main..HEAD)
+
+# 3. Phase H.5 Tree-sitter 引入 (1.5M, Cargo.lock 变更风险, 守门 #19 [M] 拍板)
+#    - 创 scripts/automation/treesitter_init.py (守门 #19 [M])
+#    - Cargo.toml 加 tree-sitter + 4-6 语言 grammar
+#    - 全仓 cargo check 验证 (0 err)
+#    - 落地 docs/architecture/2026-09-03-treesitter/01-init.md
+
+# 4. Phase H.2 跨倉 RPC (0.5M, 需 Physis + RGS 倉)
+#    - 创 scripts/automation/lg_cross_repo.py (守门 #19 [M])
+#    - 走 gRPC over HTTP 跨倉 (Star → Physis), 不直接 RGS
+#    - 落地 docs/architecture/2026-09-03-langgraph/05-cross-repo-rpc.md
+
+# 5. Phase H.3 9 SA 全部实装 (1.5M, 6 SA 仍 stub)
+#    - 创 scripts/automation/sa_real_impl.py (守门 #19 [P])
+#    - 落地 6 SA 真实业务 (CodeReview / TestGen / DocSync / Refactor / DBMigration / DomainDev)
+#    - 14 e2e test 闭环
+
+# 6. workspace --all-targets 0 err + test 800+ 0 fail 持續保持
+# 7. HANDOFF v1.1 收編 (H.2 + H.3 + H.5 全閉環)
+`
+
+### 14.9 衍生文檔 (本 session 落档)
+
+- AGENTS.md v0.74 (守门 18 項 + §7 WBS 6 列化無上限)
+- HANDOFF-ST-001.md v1.0 (本節 §14, 5 子項閉環)
+- PHASE-P4-H1-IMPL-REPORT.md v0.1 (12521 bytes)
+- PHASE-P4-E1-IMPL-REPORT.md v0.1 (11863 bytes)
+- PHASE-P4-F4-IMPL-REPORT.md v0.1 (11160 bytes)
+- PHASE-P4-H4-IMPL-REPORT.md v0.1 (8430 bytes)
+- PHASE-P4-F5-IMPL-REPORT.md v0.1 (9053 bytes)
+- crates/star-dispatcher/src/lib.rs (H.1 增量, 31 test 0 fail)
+- crates/star-saga/src/saga_5b_services.rs (E.1 5 域 service)
+- crates/star-saga/src/saga_5b_real.rs (E.1 FiveDomainCallerReal)
+- crates/star-saga/src/saga_5b_real_tests.rs (E.1 7 e2e test)
+- docs/data-design/p3-d-classification-w-t-m.md v0.1 (60002 bytes, F.4 P3-D 分类)
+- docs/architecture/2026-09-03-langgraph/04-state-schema-v1-migration.md v0.1 (14225 bytes, H.4)
+- .github/dependabot.yml v0.1 (1165 bytes, F.5)
+- CODEOWNERS v0.1 (882 bytes, F.5)
+- .github/workflows/ci.yml (9 处 -j 4 + 2 处 enforced, F.5)
+- 6 份自動化檔: patch_h1.py + patch_e1.py + wtm_classifier.py + 8 fixer 腳本
+- origin/feat/auto-20260904-1c260bc7 (28 commits ahead, Mavis 可隨時 gh pr merge)
+
+---
+
+## §15 修訂歷史
+
+| 版本 | 日期 | 修訂人 | 修訂內容 | 觸發 |
+|---|---|---|---|---|
+| v0.1 | 2026-08-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 12 問題下遊 AI 執行清單 | 2026-08-31 用戶發令"回答QA問題並把需要下遊ai處理的內容更新進handoff" |
+| v0.2-v0.8 | 2026-08-31 - 2026-09-04 | 架構師 (Mavis 接手 agent per DEC-008) | H2 範圍擴量 + P0-1 + 守门 #19+#20+#21+#22+#23+#24 + P4 WBS + Ulysses 交接 + 守门 #23 撤回 | 多次拍板 |
+| v0.9 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §13 H.1 + E.1 閉環 (24 commits ahead) | 9/4 15:20-16:00 JST 拍板 |
+| **v1.0** | **2026-09-04** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手** | **§14 F.4 + H.4 + F.5 閉環 (28 commits ahead, 17/24 子項閉環)** | **9/4 16:10-16:55 JST 拍板** |
