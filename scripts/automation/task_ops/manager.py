@@ -148,8 +148,11 @@ class TaskOperationsManager:
             if node_id == "M-N1":
                 from automation.task_ops.nodes.merge_node import merge_node
                 result = await merge_node(state=message, manager=self)
+            elif node_id == "M-N2":
+                from automation.task_ops.nodes.split_node import split_node
+                result = await split_node(state=message, manager=self)
             else:
-                # M-N2..M-N7 待后续子项 (TMO-02..TMO-07) 实装
+                # M-N3..M-N7 待后续子项 (TMO-03..TMO-07) 实装
                 raise NotImplementedError(
                     f"TMO node {node_id} ({op}) not yet implemented (per PHASE-LANGGRAPH-TMO-IMPL-REPORT v0.1, 7 子项 phase 计划)"
                 )
