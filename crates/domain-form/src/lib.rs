@@ -341,7 +341,12 @@ pub enum FormError {
     DuplicateFieldKey(String),
     #[error("验证失败: {field} - {message}")]
     /// 字段验证失败
-    Validation { field: String, message: String },
+    Validation {
+        /// 校验失败的字段名
+        field: String,
+        /// 校验失败描述信息
+        message: String,
+    },
     #[error("必填字段缺失: {0}")]
     /// 必填字段缺失
     RequiredFieldMissing(String),
