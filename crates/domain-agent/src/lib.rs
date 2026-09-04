@@ -1397,7 +1397,7 @@ mod tests {
         let agent = svc
             .register_agent(
                 RegisterAgentCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_type: AgentType::Codex,
                     provider: "openai".to_string(),
                     version: "1.0".to_string(),
@@ -1409,12 +1409,12 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(agent.tenant_id, tenant_id);
+        assert_eq!(agent.tenant_id, TenantId(tenant_id));
         assert!(agent.enabled);
         let session = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_id: agent.id,
                     worktree_id: WorktreeId::new(),
                     work_item_id: WorkItemId::new(),
@@ -1434,11 +1434,11 @@ mod tests {
         let svc = InMemoryAgentService::new();
         let actor_tenant = uuid::Uuid::new_v4();
         let cmd_tenant = uuid::Uuid::new_v4();
-        let actor = make_actor(actor_tenant);
+        let actor = make_actor(TenantId(actor_tenant));
         let res = svc
             .register_agent(
                 RegisterAgentCommand {
-                    tenant_id: cmd_tenant,
+                    tenant_id: TenantId(cmd_tenant),
                     agent_type: AgentType::Codex,
                     provider: "openai".to_string(),
                     version: "1.0".to_string(),
@@ -1460,7 +1460,7 @@ mod tests {
         let agent = svc
             .register_agent(
                 RegisterAgentCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_type: AgentType::Codex,
                     provider: "openai".to_string(),
                     version: "1.0".to_string(),
@@ -1475,7 +1475,7 @@ mod tests {
         let session = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_id: agent.id,
                     worktree_id: WorktreeId::new(),
                     work_item_id: WorkItemId::new(),
@@ -1492,7 +1492,7 @@ mod tests {
         let s = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     session_id: id,
                     from: AgentSessionStatus::Created,
                     to: AgentSessionStatus::Starting,
@@ -1507,7 +1507,7 @@ mod tests {
         let s = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     session_id: id,
                     from: AgentSessionStatus::Starting,
                     to: AgentSessionStatus::Running,
@@ -1522,7 +1522,7 @@ mod tests {
         let s = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     session_id: id,
                     from: AgentSessionStatus::Running,
                     to: AgentSessionStatus::Validating,
@@ -1537,7 +1537,7 @@ mod tests {
         let s = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     session_id: id,
                     from: AgentSessionStatus::Validating,
                     to: AgentSessionStatus::Completed,
@@ -1560,7 +1560,7 @@ mod tests {
         let agent = svc
             .register_agent(
                 RegisterAgentCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_type: AgentType::ClaudeCode,
                     provider: "anthropic".to_string(),
                     version: "1.0".to_string(),
@@ -1575,7 +1575,7 @@ mod tests {
         let session = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_id: agent.id,
                     worktree_id: WorktreeId::new(),
                     work_item_id: WorkItemId::new(),
@@ -1632,7 +1632,7 @@ mod tests {
         let s = svc
             .submit_feedback(
                 SubmitFeedbackCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     session_id: id,
                     agent_instruction: "请用 Redis 实现".to_string(),
                     actor_user_id: UserId::from(actor.user_id),
@@ -1652,7 +1652,7 @@ mod tests {
         let agent = svc
             .register_agent(
                 RegisterAgentCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_type: AgentType::Codex,
                     provider: "openai".to_string(),
                     version: "1.0".to_string(),
@@ -1667,7 +1667,7 @@ mod tests {
         let session = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_id: agent.id,
                     worktree_id: WorktreeId::new(),
                     work_item_id: WorkItemId::new(),
@@ -1709,7 +1709,7 @@ mod tests {
         let s = svc
             .abort_session(
                 AbortSessionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     session_id: id,
                     reason: "user requested".to_string(),
                     actor_user_id: UserId::from(actor.user_id),
@@ -1730,7 +1730,7 @@ mod tests {
         let agent = svc
             .register_agent(
                 RegisterAgentCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_type: AgentType::Codex,
                     provider: "openai".to_string(),
                     version: "1.0".to_string(),
@@ -1774,7 +1774,7 @@ mod tests {
         let sessions = svc
             .list_by_worktree(
                 ListByWorktreeQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: wt,
                 },
                 &actor,
@@ -1792,7 +1792,7 @@ mod tests {
         let tpl = svc
             .create_policy_template(
                 CreatePolicyTemplateCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     name: "conservative".to_string(),
                     policy: AgentPolicy::conservative(),
                     actor_user_id: UserId::from(actor.user_id),
@@ -1812,7 +1812,7 @@ mod tests {
         let agent = svc
             .register_agent(
                 RegisterAgentCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_type: AgentType::Codex,
                     provider: "openai".to_string(),
                     version: "1.0".to_string(),
@@ -1827,7 +1827,7 @@ mod tests {
         let session = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_id: agent.id,
                     worktree_id: WorktreeId::new(),
                     work_item_id: WorkItemId::new(),
@@ -1842,7 +1842,7 @@ mod tests {
         let s = svc
             .record_tool_activity(
                 RecordToolActivityCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     session_id: session.id,
                     tool: "read_file".to_string(),
                     count: 3,

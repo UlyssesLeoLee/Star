@@ -1,69 +1,58 @@
 #!/usr/bin/env python3
-"""
-scripts/automation/list_err_lines.py v0.1
-Phase B.2 batch 3 工具: 从 cargo check --message-format=json 输出提取 err 位置
+"""List remaining compile errors with file:line:col + message.
+
+Usage: python list_err_lines.py [crate_filter]
 """
 import json
-import sys
 import re
+import subprocess
+import sys
 
-# 守门 #5 v2: 强制 UTF-8
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+filter_re = re.compile(sys.argv[1] if len(sys.argv) > 1 else r"^.*$")
 
-if len(sys.argv) < 2:
-    print("Usage: python list_err_lines.py <cargo-json-output-file>")
-    sys.exit(1)
-
-# 读文件(支持 Windows / 不支持 /dev/stdin)
-import io
-if sys.argv[1] in ("-", "/dev/stdin"):
-    lines = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8").read().split("\n")
-else:
-    with open(sys.argv[1], "r", encoding="utf-8") as f:
-        lines = f.read().split("\n")
+proc = subprocess.run(
+    [
+        "cargo", "check", "--workspace", "--all-targets", "-j", "4",
+        "--message-format=json",
+    ],
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+)
 
 errs = []
-for line in lines:
-    if not line.strip():
+for line in proc.stdout.splitlines():
+    line = line.strip()
+    if not line.startswith("{"):
         continue
     try:
-        msg = json.loads(line)
+        obj = json.loads(line)
     except json.JSONDecodeError:
         continue
-    if msg.get("reason") != "compiler-message":
+    if obj.get("reason") != "compiler-message":
         continue
-    m = msg.get("message", {})
-    if m.get("level") != "error":
+    msg = obj.get("message") or {}
+    if msg.get("level") != "error":
         continue
-    for span in m.get("spans", []):
-        if not span.get("is_primary"):
-            continue
-        file_name = span.get("file_name", "")
-        line_start = span.get("line_start")
-        line_end = span.get("line_end")
-        col_start = span.get("column_start")
-        col_end = span.get("column_end")
-        text_lines = span.get("text", [])
-        text = text_lines[0].get("text", "") if text_lines else ""
-        errs.append({
-            "file": file_name,
-            "line": line_start,
-            "col": col_start,
-            "text": text.strip(),
-        })
+    spans = msg.get("spans") or []
+    if not spans:
+        continue
+    sp = spans[0]
+    fn = sp.get("file_name", "")
+    if not filter_re.search(fn):
+        continue
+    errs.append((fn, sp.get("line_start"), sp.get("column_start"), msg.get("message", "")))
 
-# 按 file:line 排序去重
-seen = set()
-uniq = []
-for e in errs:
-    key = (e["file"], e["line"])
-    if key in seen:
-        continue
-    seen.add(key)
-    uniq.append(e)
+# group by file
+by_file = {}
+for fn, line, col, msg in errs:
+    by_file.setdefault(fn, []).append((line, col, msg))
 
-# 输出简短列表
-for e in uniq:
-    print(f"{e['file']}:{e['line']}:{e['col']}: {e['text'][:80]}")
-print(f"\nTOTAL: {len(uniq)} unique errs")
+print(f"Total errors: {len(errs)} across {len(by_file)} files")
+for fn, items in sorted(by_file.items()):
+    print(f"\n{fn}  ({len(items)})")
+    for line, col, msg in items[:20]:
+        snippet = msg.split("\n")[0][:200]
+        print(f"  L{line:>5}:{col:>3}  {snippet}")
+    if len(items) > 20:
+        print(f"  ... and {len(items)-20} more")

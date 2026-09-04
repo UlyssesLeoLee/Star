@@ -1289,13 +1289,13 @@ mod tests {
     fn make_admin_actor(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::PROJECT_ADMIN)
-            .with_project(*project_id.as_uuid())
+            .with_project(project_id.as_uuid())
     }
 
     fn make_dev_actor(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::DEVELOPER)
-            .with_project(*project_id.as_uuid())
+            .with_project(project_id.as_uuid())
     }
 
     fn make_create_sprint_cmd(tenant_id: TenantId, project_id: ProjectId) -> CreateSprintCommand {
@@ -1320,7 +1320,7 @@ mod tests {
         let cmd = make_create_sprint_cmd(TenantId(tenant_id), project_id);
         let sprint = svc.create_sprint(cmd, &actor).await.expect("create");
         assert_eq!(sprint.status, SprintStatus::Planned);
-        assert_eq!(sprint.tenant_id, tenant_id);
+        assert_eq!(sprint.tenant_id, TenantId(tenant_id));
         assert_eq!(sprint.project_id, project_id);
         assert!(sprint.work_item_ids.is_empty());
     }
@@ -1402,7 +1402,7 @@ mod tests {
         let item = svc
             .add_to_backlog(
                 AddToBacklogCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     sprint_id: sprint.id,
                     work_item_id: wi,
                     story_points: Some(5),
@@ -1417,7 +1417,7 @@ mod tests {
         let res = svc
             .add_to_backlog(
                 AddToBacklogCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     sprint_id: sprint.id,
                     work_item_id: wi,
                     story_points: Some(3),
@@ -1438,7 +1438,7 @@ mod tests {
         let now = Utc::now();
         // 第一个 sprint
         let cmd1 = CreateSprintCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             project_id,
             name: "A".to_string(),
             goal: "g".to_string(),
@@ -1448,7 +1448,7 @@ mod tests {
         svc.create_sprint(cmd1, &actor).await.unwrap();
         // 重叠
         let cmd2 = CreateSprintCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             project_id,
             name: "B".to_string(),
             goal: "g".to_string(),
@@ -1466,11 +1466,11 @@ mod tests {
         let actor_tenant = uuid::Uuid::new_v4();
         let cmd_tenant = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = ActorContext::new(Uuid::new_v4(), actor_tenant.0)
+        let actor = ActorContext::new(Uuid::new_v4(), actor_tenant)
             .with_role(roles::PROJECT_ADMIN)
-            .with_project(*project_id.as_uuid());
+            .with_project(project_id.as_uuid());
         let cmd = CreateSprintCommand {
-            tenant_id: cmd_tenant,
+            tenant_id: TenantId(cmd_tenant),
             project_id,
             name: "X".to_string(),
             goal: "g".to_string(),
@@ -1491,7 +1491,7 @@ mod tests {
         let m = svc
             .create_milestone(
                 CreateMilestoneCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     name: "v1.0".to_string(),
                     description: "Release".to_string(),
@@ -1502,7 +1502,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(m.status, MilestoneStatus::Open);
-        assert_eq!(m.tenant_id, tenant_id);
+        assert_eq!(m.tenant_id, TenantId(tenant_id));
     }
 
     // ----- 10. achieve_milestone -----
@@ -1515,7 +1515,7 @@ mod tests {
         let m = svc
             .create_milestone(
                 CreateMilestoneCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     name: "v1.0".to_string(),
                     description: "Release".to_string(),
@@ -1534,7 +1534,7 @@ mod tests {
     #[tokio::test]
     async fn missed_milestone() {
         let m = Milestone::new(
-            uuid::Uuid::new_v4(),
+            TenantId(uuid::Uuid::new_v4()),
             ProjectId::new(),
             "v1.0".to_string(),
             "Release".to_string(),
@@ -1561,7 +1561,7 @@ mod tests {
         for (rem, ideal) in [(100, 100), (80, 90), (60, 80)] {
             svc.append_burndown_point(
                 AppendBurndownPointCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     sprint_id: sprint.id,
                     remaining_points: rem,
                     ideal_remaining: ideal,
@@ -1574,7 +1574,7 @@ mod tests {
         let pts = svc
             .get_burndown(
                 GetBurndownQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     sprint_id: sprint.id,
                 },
                 &actor,
@@ -1596,7 +1596,7 @@ mod tests {
         // 第一个 sprint:14 天
         let now = Utc::now();
         let cmd1 = CreateSprintCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             project_id,
             name: "A".to_string(),
             goal: "g".to_string(),
@@ -1607,7 +1607,7 @@ mod tests {
         svc.start_sprint(s1.id, &actor).await.unwrap();
         // 第二个 sprint:不重叠(从 day 15 开始)
         let cmd2 = CreateSprintCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             project_id,
             name: "B".to_string(),
             goal: "g".to_string(),
@@ -1619,7 +1619,7 @@ mod tests {
         let active = svc
             .list_active_sprints(
                 ListActiveSprintQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: Some(project_id),
                 },
                 &actor,
@@ -1636,17 +1636,20 @@ mod tests {
         let svc = InMemoryPlanningService::new();
         let tenant_a = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor_a = make_admin_actor(tenant_a, project_id);
+        let actor_a = make_admin_actor(TenantId(tenant_a), project_id);
         let sprint = svc
-            .create_sprint(make_create_sprint_cmd(tenant_a, project_id), &actor_a)
+            .create_sprint(
+                make_create_sprint_cmd(TenantId(tenant_a), project_id),
+                &actor_a,
+            )
             .await
             .unwrap();
         let tenant_b = uuid::Uuid::new_v4();
-        let actor_b = ActorContext::new(Uuid::new_v4(), tenant_b.0).with_role(roles::PROJECT_ADMIN);
+        let actor_b = ActorContext::new(Uuid::new_v4(), tenant_b).with_role(roles::PROJECT_ADMIN);
         let res = svc
             .get_sprint(
                 GetSprintQuery {
-                    tenant_id: tenant_b,
+                    tenant_id: TenantId(tenant_b),
                     sprint_id: sprint.id,
                 },
                 &actor_b,

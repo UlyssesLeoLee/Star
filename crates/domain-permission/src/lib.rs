@@ -1145,9 +1145,9 @@ mod tests {
                     resource_id: None,
                     action: Action::Read,
                 },
-                &ActorContext::new(user.0, tenant.0)
+                &ActorContext::new(user, tenant)
                     .with_role("developer")
-                    .with_project(project),
+                    .with_project(project.as_uuid()),
             )
             .await
             .unwrap();
@@ -1185,7 +1185,7 @@ mod tests {
                     resource_id: None,
                     action: Action::Read,
                 },
-                &ActorContext::new(user.0, tenant.0),
+                &ActorContext::new(user, tenant),
             )
             .await
             .unwrap();
@@ -1258,9 +1258,9 @@ mod tests {
                     resource_id: None,
                     action: Action::Read,
                 },
-                &ActorContext::new(user.0, tenant.0)
+                &ActorContext::new(user, tenant)
                     .with_role("developer")
-                    .with_project(project),
+                    .with_project(project.as_uuid()),
             )
             .await
             .unwrap();
@@ -1275,13 +1275,13 @@ mod tests {
         let tenant_b = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let admin_a = admin_ctx(tenant_a);
+        let admin_a = admin_ctx(TenantId(tenant_a));
 
         let svc = InMemoryPermissionService::new();
         let scheme = svc
             .create_scheme(
                 CreateSchemeCommand {
-                    tenant_id: tenant_a,
+                    tenant_id: TenantId(tenant_a),
                     name: "s".into(),
                     actor_user_id: UserId::from(admin_a.user_id),
                 },
@@ -1290,11 +1290,11 @@ mod tests {
             .await
             .unwrap();
         // 用 tenant_b 的 actor 去 check tenant_a 的 scheme → CrossTenantDenied
-        let actor_b = ActorContext::new(user.0, tenant_b.0);
+        let actor_b = ActorContext::new(user, tenant_b);
         let res = svc
             .check(
                 CheckQuery {
-                    tenant_id: tenant_b,
+                    tenant_id: TenantId(tenant_b),
                     scheme_id: Some(scheme.id),
                     subject_user_id: UserId(user),
                     project_id: project,
@@ -1332,7 +1332,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(binding.role, Role::Developer);
-        assert_eq!(binding.user_id, user);
+        assert_eq!(binding.user_id, UserId(user));
 
         // 重复 grant → Conflict (INV-PM-03)
         let dup = svc
@@ -1476,9 +1476,9 @@ mod tests {
                     resource_id: None,
                     action: Action::Admin,
                 },
-                &ActorContext::new(user.0, tenant.0)
+                &ActorContext::new(user, tenant)
                     .with_role("developer")
-                    .with_project(project),
+                    .with_project(project.as_uuid()),
             )
             .await
             .unwrap();
@@ -1550,9 +1550,9 @@ mod tests {
                         resource_id: Some(Uuid::new_v4()),
                         action: Action::Read,
                     },
-                    &ActorContext::new(user.0, tenant.0)
+                    &ActorContext::new(user, tenant)
                         .with_role("viewer")
-                        .with_project(project),
+                        .with_project(project.as_uuid()),
                 )
                 .await
                 .unwrap();
@@ -1615,9 +1615,9 @@ mod tests {
         .await
         .unwrap();
         // 3) check 各动作
-        let actor_user = ActorContext::new(user.0, tenant.0)
+        let actor_user = ActorContext::new(user, tenant)
             .with_role("project_admin")
-            .with_project(project);
+            .with_project(project.as_uuid());
         for action in [Action::Read, Action::Write, Action::Admin] {
             let ok = svc
                 .check(
@@ -1683,7 +1683,7 @@ mod tests {
             svc.grant_role(
                 GrantRoleCommand {
                     tenant_id: TenantId(tenant),
-                    user_id: UserId.new(),
+                    user_id: UserId::new(),
                     project_id: project,
                     role: Role::Developer,
                     granted_by: UserId::from(admin.user_id),
@@ -1697,7 +1697,7 @@ mod tests {
         svc.grant_role(
             GrantRoleCommand {
                 tenant_id: TenantId(tenant),
-                user_id: UserId.new(),
+                user_id: UserId::new(),
                 project_id: ProjectId::new(),
                 role: Role::Viewer,
                 granted_by: UserId::from(admin.user_id),
@@ -1728,13 +1728,13 @@ mod tests {
         let tenant_b = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let admin_a = admin_ctx(tenant_a);
-        let admin_b = admin_ctx(tenant_b);
+        let admin_a = admin_ctx(TenantId(tenant_a));
+        let admin_b = admin_ctx(TenantId(tenant_b));
         let svc = InMemoryPermissionService::new();
         // 在 tenant_a 授权
         svc.grant_role(
             GrantRoleCommand {
-                tenant_id: tenant_a,
+                tenant_id: TenantId(tenant_a),
                 user_id: UserId(user),
                 project_id: project,
                 role: Role::Developer,
@@ -1748,7 +1748,7 @@ mod tests {
         let res = svc
             .list_roles(
                 ListRolesQuery {
-                    tenant_id: tenant_a,
+                    tenant_id: TenantId(tenant_a),
                     project_id: project,
                 },
                 &admin_b,
@@ -1762,7 +1762,7 @@ mod tests {
     #[tokio::test]
     async fn non_admin_cannot_create_scheme() {
         let tenant = uuid::Uuid::new_v4();
-        let dev = dev_ctx(tenant);
+        let dev = dev_ctx(TenantId(tenant));
         let svc = InMemoryPermissionService::new();
         let res = svc
             .create_scheme(

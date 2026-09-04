@@ -1103,13 +1103,13 @@ mod tests {
     fn make_admin(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::PROJECT_ADMIN)
-            .with_project(project_id)
+            .with_project(project_id.as_uuid())
     }
 
     fn make_developer(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::DEVELOPER)
-            .with_project(project_id)
+            .with_project(project_id.as_uuid())
     }
 
     #[test]
@@ -1128,7 +1128,7 @@ mod tests {
         let svc = InMemoryScmService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_admin(tenant, project);
+        let actor = make_admin(TenantId(tenant), project);
         let cmd = RegisterRepositoryCommand {
             tenant_id: TenantId(tenant),
             project_id: project,
@@ -1150,7 +1150,7 @@ mod tests {
         let svc = InMemoryScmService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_admin(tenant, project);
+        let actor = make_admin(TenantId(tenant), project);
         let cmd = RegisterRepositoryCommand {
             tenant_id: TenantId(tenant),
             project_id: project,
@@ -1171,9 +1171,9 @@ mod tests {
         let svc = InMemoryScmService::new_for_test();
         let tenant_a = uuid::Uuid::new_v4();
         let project_a = ProjectId::new();
-        let actor_a = make_admin(tenant_a, project_a);
+        let actor_a = make_admin(TenantId(tenant_a), project_a);
         let cmd = RegisterRepositoryCommand {
-            tenant_id: tenant_a,
+            tenant_id: TenantId(tenant_a),
             project_id: project_a,
             provider: ScmProvider::Github,
             external_id: "x".to_string(),
@@ -1186,7 +1186,7 @@ mod tests {
         let _ = svc.register_repository(cmd, actor_a).await.unwrap();
         let tenant_b = uuid::Uuid::new_v4();
         let project_b = ProjectId::new();
-        let actor_b = make_admin(tenant_b, project_b);
+        let actor_b = make_admin(TenantId(tenant_b), project_b);
         // 尝试读 tenant_a 的 repo
         let repo_id = {
             // 简单方法:扫描
@@ -1204,7 +1204,7 @@ mod tests {
         let svc = InMemoryScmService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_developer(tenant, project);
+        let actor = make_developer(TenantId(tenant), project);
         let cmd = RegisterRepositoryCommand {
             tenant_id: TenantId(tenant),
             project_id: project,
@@ -1246,14 +1246,14 @@ mod tests {
         // 单元测试 PR 状态机(不需要 service)
         let make_pr = |state: PullRequestState| PullRequest {
             id: PullRequestId::new(),
-            tenant_id: UserId.new(),
+            tenant_id: TenantId::new(),
             repository_id: RepositoryId::new(),
             external_id: "1".to_string(),
             source_branch: "feat".to_string(),
             target_branch: "main".to_string(),
             title: "T".to_string(),
             description: None,
-            author_user_id: UserId.new(),
+            author_user_id: UserId::new(),
             state,
             mergeable: false,
             merged_at: None,
@@ -1299,7 +1299,7 @@ mod tests {
         let svc = InMemoryScmService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_admin(tenant, project);
+        let actor = make_admin(TenantId(tenant), project);
         let repo = svc
             .register_repository(
                 RegisterRepositoryCommand {

@@ -1119,12 +1119,12 @@ mod tests {
         let svc = InMemoryIdentityService::new();
         let me = uuid::Uuid::new_v4();
         let other = uuid::Uuid::new_v4();
-        let actor = dev(me);
+        let actor = dev(TenantId(me));
         let res = svc
             .register_device(
                 RegisterDeviceCommand {
-                    tenant_id: other,
-                    user_id: UserId.new(),
+                    tenant_id: TenantId(other),
+                    user_id: UserId::new(),
                     kind: DeviceKind::Web,
                     device_cert_fingerprint: "abc".to_string(),
                     project_ids: vec![ProjectId::new()],

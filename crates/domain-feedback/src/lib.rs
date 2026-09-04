@@ -76,12 +76,14 @@ pub use value_object::{
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::ActorContext; // P0-1 兼容: 显式覆盖 super::* 的 star_context 命名
+
     use crate::entity::ConsumedByKind;
     use crate::value_object::{FeedbackTarget, Severity};
     use uuid::Uuid;
 
     fn make_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(uuid::Uuid::new_v4(), *tenant_id.as_uuid()).with_role(roles::DEVELOPER)
+        ActorContext::new(UserId::new(), tenant_id).with_role(roles::DEVELOPER)
     }
 
     fn make_create_cmd(tenant_id: TenantId, target: FeedbackTarget) -> CreateFeedbackCommand {
@@ -204,7 +206,7 @@ mod tests {
         let cmd = make_create_cmd(TenantId(tenant_id), target.clone());
         let f = svc.create_feedback(cmd, actor).await.expect("create OK");
         assert_eq!(f.status, FeedbackStatus::Open);
-        assert_eq!(f.tenant_id, tenant_id);
+        assert_eq!(f.tenant_id, TenantId(tenant_id));
         assert!(matches!(f.target, FeedbackTarget::WorkItem { .. }));
         assert_eq!(svc.count_feedbacks().await, 1);
 
@@ -231,7 +233,7 @@ mod tests {
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -247,7 +249,7 @@ mod tests {
             .transition_status(
                 TransitionFeedbackStatusCommand {
                     feedback_id: fid,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     from: FeedbackStatus::Open,
                     to: FeedbackStatus::Acknowledged,
                     reason: "ack".into(),
@@ -286,7 +288,7 @@ mod tests {
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -300,7 +302,7 @@ mod tests {
             .transition_status(
                 TransitionFeedbackStatusCommand {
                     feedback_id: f.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     from: FeedbackStatus::Open,
                     to: FeedbackStatus::Verified,
                     reason: "skip".into(),
@@ -323,7 +325,7 @@ mod tests {
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -336,7 +338,7 @@ mod tests {
             .transition_status(
                 TransitionFeedbackStatusCommand {
                     feedback_id: f.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     from: FeedbackStatus::Open,
                     to: FeedbackStatus::Rejected,
                     reason: "不相关".into(),
@@ -361,7 +363,7 @@ mod tests {
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -374,7 +376,7 @@ mod tests {
             .transition_status(
                 TransitionFeedbackStatusCommand {
                     feedback_id: f.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     from: FeedbackStatus::Open,
                     to: FeedbackStatus::Superseded,
                     reason: "supersede".into(),
@@ -395,7 +397,7 @@ mod tests {
         let f1 = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -407,7 +409,7 @@ mod tests {
         let f2 = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -420,7 +422,7 @@ mod tests {
             .transition_status(
                 TransitionFeedbackStatusCommand {
                     feedback_id: f1.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     from: FeedbackStatus::Open,
                     to: FeedbackStatus::Superseded,
                     reason: "supersede by f2".into(),
@@ -445,7 +447,7 @@ mod tests {
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -478,7 +480,7 @@ mod tests {
             .update_feedback(
                 UpdateFeedbackCommand {
                     feedback_id: f.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     expected_version: 3,
                     new_intent: Some("改不动".into()),
                     new_expected_behavior: None,
@@ -502,7 +504,7 @@ mod tests {
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -541,7 +543,7 @@ mod tests {
 
         // P3 第一个创建,P0 最后创建
         let mut cmd = make_create_cmd(
-            tenant_id,
+            TenantId(tenant_id),
             FeedbackTarget::WorkItem {
                 work_item_id: WorkItemId::new(),
             },
@@ -550,7 +552,7 @@ mod tests {
         cmd.severity = Severity::P3;
         svc.create_feedback(cmd, actor.clone()).await.unwrap();
         let mut cmd = make_create_cmd(
-            tenant_id,
+            TenantId(tenant_id),
             FeedbackTarget::WorkItem {
                 work_item_id: WorkItemId::new(),
             },
@@ -559,7 +561,7 @@ mod tests {
         cmd.severity = Severity::P1;
         svc.create_feedback(cmd, actor.clone()).await.unwrap();
         let mut cmd = make_create_cmd(
-            tenant_id,
+            TenantId(tenant_id),
             FeedbackTarget::WorkItem {
                 work_item_id: WorkItemId::new(),
             },
@@ -568,7 +570,7 @@ mod tests {
         cmd.severity = Severity::P0;
         svc.create_feedback(cmd, actor.clone()).await.unwrap();
         let mut cmd = make_create_cmd(
-            tenant_id,
+            TenantId(tenant_id),
             FeedbackTarget::WorkItem {
                 work_item_id: WorkItemId::new(),
             },
@@ -580,14 +582,13 @@ mod tests {
         let inbox = svc
             .inbox(
                 FeedbackInboxQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     min_severity: None,
                     limit: 10,
                     offset: 0,
                 },
-                ActorContext::new(uuid::Uuid::new_v4(), *tenant_id.as_uuid())
-                    .with_role(roles::DEVELOPER),
+                ActorContext::new(UserId::new(), TenantId(tenant_id)).with_role(roles::DEVELOPER),
             )
             .await
             .unwrap();
@@ -606,11 +607,11 @@ mod tests {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_a = uuid::Uuid::new_v4();
         let tenant_b = uuid::Uuid::new_v4();
-        let actor_a = make_actor(tenant_a);
+        let actor_a = make_actor(TenantId(tenant_a));
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_a,
+                    TenantId(tenant_a),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -619,7 +620,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let actor_b = make_actor(tenant_b);
+        let actor_b = make_actor(TenantId(tenant_b));
         let res = svc.get_by_id(f.id, actor_b).await;
         assert!(matches!(res, Err(FeedbackError::PermissionDenied)));
     }
@@ -645,7 +646,7 @@ mod tests {
             .transition_status(
                 TransitionFeedbackStatusCommand {
                     feedback_id: f.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     from: FeedbackStatus::Open,
                     to: FeedbackStatus::Acknowledged,
                     reason: "ack from other worktree".into(),
@@ -670,7 +671,7 @@ mod tests {
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -695,7 +696,7 @@ mod tests {
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
