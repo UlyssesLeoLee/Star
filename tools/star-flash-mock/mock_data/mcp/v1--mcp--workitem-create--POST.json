@@ -5,6 +5,8 @@
   "method": "POST",
   "scenario": "create-workitem",
   "description": "MCP tool: workitem_create (per 16 tool 真实接入 e2e)",
+  "table": "work_item.work_item",
+  "wtm_class": "Transaction",
   "request": {
     "tenant_id": "tenant-001",
     "workspace_id": "ws-001",
@@ -19,6 +21,8 @@
   },
   "fixture_assertion": {
     "tenant_id_present": true,
-    "creator_audit_logged": true
+    "creator_audit_logged": true,
+    "rls_13_classes": true,
+    "wtm_class": "Transaction"
   }
 }

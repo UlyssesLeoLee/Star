@@ -5,6 +5,8 @@
   "method": "POST",
   "scenario": "invoke-tool-tmo-merge",
   "description": "MCP tool: tools_invoke 统一入口 (per ADR-0032 + 16 tool e2e)",
+  "table": "(unified entry)",
+  "wtm_class": "Transaction",
   "request": {
     "tool_name": "tmo__merge",
     "params": {
@@ -19,6 +21,8 @@
     "elapsed_ms": 120
   },
   "fixture_assertion": {
-    "tool_unified_entry": true
+    "tool_unified_entry": true,
+    "rls_13_classes": true,
+    "wtm_class": "Transaction"
   }
 }

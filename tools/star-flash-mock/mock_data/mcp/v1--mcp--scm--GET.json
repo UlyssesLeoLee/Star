@@ -1,0 +1,43 @@
+{
+  "fixture_version": "v1",
+  "module": "mcp",
+  "tool": "scm",
+  "method": "GET",
+  "scenario": "list-repositories",
+  "description": "MCP tool: scm list repositories (per 5 域 match)",
+  "schema_ref": "crates/star-mcp/src/scm.rs (per 16 tool 真实接入 e2e, AGENTS.md §7 #1)",
+  "守门": [
+    "AGENTS.md §7 #1 16 tool 真实接入 e2e",
+    "#13 M Master (物理删除禁止)",
+    "ADR-0032 MCP Transport stdio"
+  ],
+  "table": "scm.repository",
+  "wtm_class": "Master",
+  "request": {
+    "tool_name": "scm",
+    "params": {
+      "tenant_id": "tenant-001",
+      "limit": 20
+    }
+  },
+  "response_200": {
+    "tool_invocation_id": "invoke-uuid-scm-001",
+    "tool_result": {
+      "items": [
+        {
+          "id": "scm-001",
+          "name": "scm_item_1"
+        }
+      ],
+      "total": 1,
+      "elapsed_ms": 25
+    },
+    "elapsed_ms": 25
+  },
+  "fixture_assertion": {
+    "tool_16_listed": true,
+    "wtm_class": "Master",
+    "tenant_id_present": true,
+    "rls_13_classes": true
+  }
+}

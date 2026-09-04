@@ -1,0 +1,43 @@
+{
+  "fixture_version": "v1",
+  "module": "mcp",
+  "tool": "workspace",
+  "method": "GET",
+  "scenario": "list-workspaces",
+  "description": "MCP tool: workspace list (per M/T 混合)",
+  "schema_ref": "crates/star-mcp/src/workspace.rs (per 16 tool 真实接入 e2e, AGENTS.md §7 #1)",
+  "守门": [
+    "AGENTS.md §7 #1 16 tool 真实接入 e2e",
+    "#13 M Master (物理删除禁止)",
+    "ADR-0032 MCP Transport stdio"
+  ],
+  "table": "workspace.workspace",
+  "wtm_class": "Master",
+  "request": {
+    "tool_name": "workspace",
+    "params": {
+      "tenant_id": "tenant-001",
+      "limit": 20
+    }
+  },
+  "response_200": {
+    "tool_invocation_id": "invoke-uuid-workspace-001",
+    "tool_result": {
+      "items": [
+        {
+          "id": "workspace-001",
+          "name": "workspace_item_1"
+        }
+      ],
+      "total": 1,
+      "elapsed_ms": 25
+    },
+    "elapsed_ms": 25
+  },
+  "fixture_assertion": {
+    "tool_16_listed": true,
+    "wtm_class": "Master",
+    "tenant_id_present": true,
+    "rls_13_classes": true
+  }
+}

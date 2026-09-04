@@ -1,0 +1,43 @@
+{
+  "fixture_version": "v1",
+  "module": "mcp",
+  "tool": "audit_event",
+  "method": "GET",
+  "scenario": "list-audit-events",
+  "description": "MCP tool: audit_event list (per 守门 #13 b T 物理删除禁止 + audit_logged)",
+  "schema_ref": "crates/star-mcp/src/audit_event.rs (per 16 tool 真实接入 e2e, AGENTS.md §7 #1)",
+  "守门": [
+    "AGENTS.md §7 #1 16 tool 真实接入 e2e",
+    "#13 T Transaction (物理删除禁止)",
+    "ADR-0032 MCP Transport stdio"
+  ],
+  "table": "audit.audit_event",
+  "wtm_class": "Transaction",
+  "request": {
+    "tool_name": "audit_event",
+    "params": {
+      "tenant_id": "tenant-001",
+      "limit": 20
+    }
+  },
+  "response_200": {
+    "tool_invocation_id": "invoke-uuid-audit_event-001",
+    "tool_result": {
+      "items": [
+        {
+          "id": "audit_event-001",
+          "name": "audit_event_item_1"
+        }
+      ],
+      "total": 1,
+      "elapsed_ms": 25
+    },
+    "elapsed_ms": 25
+  },
+  "fixture_assertion": {
+    "tool_16_listed": true,
+    "wtm_class": "Transaction",
+    "tenant_id_present": true,
+    "rls_13_classes": true
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "fixture_version": "v1",
+  "module": "mcp",
+  "tool": "search",
+  "method": "GET",
+  "scenario": "search-query",
+  "description": "MCP tool: search query (per W 类 派生重建)",
+  "schema_ref": "crates/star-mcp/src/search.rs (per 16 tool 真实接入 e2e, AGENTS.md §7 #1)",
+  "守门": [
+    "AGENTS.md §7 #1 16 tool 真实接入 e2e",
+    "#13 W Work (物理删除)",
+    "ADR-0032 MCP Transport stdio"
+  ],
+  "table": "search.search_index",
+  "wtm_class": "Work",
+  "request": {
+    "tool_name": "search",
+    "params": {
+      "tenant_id": "tenant-001",
+      "limit": 20
+    }
+  },
+  "response_200": {
+    "tool_invocation_id": "invoke-uuid-search-001",
+    "tool_result": {
+      "items": [
+        {
+          "id": "search-001",
+          "name": "search_item_1"
+        }
+      ],
+      "total": 1,
+      "elapsed_ms": 25
+    },
+    "elapsed_ms": 25
+  },
+  "fixture_assertion": {
+    "tool_16_listed": true,
+    "wtm_class": "Work",
+    "tenant_id_present": true,
+    "rls_13_classes": true
+  }
+}

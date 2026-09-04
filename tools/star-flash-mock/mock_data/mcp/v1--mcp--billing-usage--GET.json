@@ -5,6 +5,8 @@
   "method": "GET",
   "scenario": "billing-usage-by-tenant",
   "description": "MCP tool: billing_usage (per 5 域 economy + token-OLU 守门 #4)",
+  "table": "billing.usage",
+  "wtm_class": "Transaction",
   "request": {
     "tenant_id": "tenant-001",
     "period": "2026-09"
@@ -22,6 +24,8 @@
   },
   "fixture_assertion": {
     "olu_per_tenant": true,
-    "sa_breakdown_present": true
+    "sa_breakdown_present": true,
+    "rls_13_classes": true,
+    "wtm_class": "Transaction"
   }
 }

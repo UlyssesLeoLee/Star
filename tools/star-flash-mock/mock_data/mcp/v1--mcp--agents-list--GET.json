@@ -5,6 +5,8 @@
   "method": "GET",
   "scenario": "list-active-agents",
   "description": "MCP tool: agents_list (per 16 tool 真实接入 e2e)",
+  "table": "agent.agent",
+  "wtm_class": "Master",
   "request": {
     "tenant_id": "tenant-001",
     "status_filter": "active"
@@ -17,6 +19,8 @@
     "total": 2
   },
   "fixture_assertion": {
-    "sa_types_correct": true
+    "sa_types_correct": true,
+    "rls_13_classes": true,
+    "wtm_class": "Master"
   }
 }
