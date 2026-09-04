@@ -7,6 +7,7 @@ use super::entity::Theme;
 use super::error::ThemeError;
 use super::value_object::{ThemeId, ThemeScope};
 
+/// 主题仓储端口(六边形架构出站端口)
 #[async_trait]
 pub trait ThemeRepository: Send + Sync {
     /// 按 ID 查询
@@ -39,7 +40,9 @@ pub trait ThemeRepository: Send + Sync {
     async fn delete(&self, id: Uuid) -> Result<(), ThemeError>;
 }
 
+/// 主题领域事件发布端口
 #[async_trait]
 pub trait ThemeEventBus: Send + Sync {
+    /// 发布主题领域事件
     async fn publish(&self, event: super::event::ThemeEvent) -> Result<(), ThemeError>;
 }

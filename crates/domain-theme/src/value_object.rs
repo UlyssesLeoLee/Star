@@ -26,6 +26,7 @@ pub enum ThemeId {
 }
 
 impl ThemeId {
+    /// 转换为字符串标识
     pub fn as_str(&self) -> &'static str {
         match self {
             ThemeId::Light => "light",
@@ -35,6 +36,7 @@ impl ThemeId {
         }
     }
 
+    /// 是否为暗色主题
     pub fn is_dark(&self) -> bool {
         matches!(
             self,
@@ -42,6 +44,7 @@ impl ThemeId {
         )
     }
 
+    /// 内置(非扩展位)主题列表
     pub fn all_builtin() -> &'static [ThemeId] {
         &[ThemeId::Light, ThemeId::Dark]
     }
@@ -62,6 +65,7 @@ pub enum ThemeScope {
 }
 
 impl ThemeScope {
+    /// 解析优先级(数值越大优先级越高)
     pub fn priority(&self) -> u8 {
         match self {
             ThemeScope::Personal => 3, // 最高
@@ -74,12 +78,16 @@ impl ThemeScope {
 /// 设计令牌 — 颜色
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ColorToken {
-    pub name: String,       // 例: "primary", "surface", "text"
-    pub hex: String,        // 例: "#5B5BD6"
-    pub alpha: Option<f32>, // 0.0 - 1.0, None = 不透明
+    /// 令牌名称, 例: "primary", "surface", "text"
+    pub name: String,
+    /// 十六进制颜色值, 例: "#5B5BD6"
+    pub hex: String,
+    /// 透明度 0.0 - 1.0, None = 不透明
+    pub alpha: Option<f32>,
 }
 
 impl ColorToken {
+    /// 构造颜色令牌(alpha 默认不透明)
     pub fn new(name: impl Into<String>, hex: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -92,30 +100,42 @@ impl ColorToken {
 /// 设计令牌 — 间距 (4px 基础栅格)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SpacingToken {
-    pub name: String, // 例: "space-4", "space-8"
-    pub px: u32,      // 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64
+    /// 令牌名称, 例: "space-4", "space-8"
+    pub name: String,
+    /// 间距像素值, 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64
+    pub px: u32,
 }
 
 /// 设计令牌 — 圆角 (3 档)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RadiusToken {
-    pub name: String, // 例: "sm", "md", "lg"
-    pub px: u32,      // 4 / 8 / 12
+    /// 令牌名称, 例: "sm", "md", "lg"
+    pub name: String,
+    /// 圆角像素值, 4 / 8 / 12
+    pub px: u32,
 }
 
 /// 完整主题定义
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ThemeDefinition {
+    /// 主题 ID
     pub id: ThemeId,
+    /// 显示名称
     pub display_name: String,
+    /// 是否为暗色主题
     pub is_dark: bool,
+    /// 颜色令牌列表
     pub colors: Vec<ColorToken>,
+    /// 间距令牌列表
     pub spacings: Vec<SpacingToken>,
+    /// 圆角令牌列表
     pub radii: Vec<RadiusToken>,
-    pub version: u32, // INV-THEME-04: 主题升版
+    /// 主题版本号(INV-THEME-04: 主题升版)
+    pub version: u32,
 }
 
 impl ThemeDefinition {
+    /// 生成 CSS 自定义属性字符串
     pub fn to_css_variables(&self) -> String {
         let mut css = String::new();
         for color in &self.colors {
@@ -135,6 +155,7 @@ impl ThemeDefinition {
         css
     }
 
+    /// 生成 CSS 自定义属性名到值的映射表
     pub fn to_css_variables_map(&self) -> HashMap<String, String> {
         let mut m = HashMap::new();
         for c in &self.colors {

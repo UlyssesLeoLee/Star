@@ -12,12 +12,14 @@ use super::invariant::*;
 use super::port::{ThemeEventBus, ThemeRepository};
 use super::value_object::{ThemeDefinition, ThemeId, ThemeScope};
 
+/// 主题系统应用服务(三层解析编排)
 pub struct ThemeService {
     repo: Arc<dyn ThemeRepository>,
     bus: Arc<dyn ThemeEventBus>,
 }
 
 impl ThemeService {
+    /// 构造主题应用服务
     pub fn new(repo: Arc<dyn ThemeRepository>, bus: Arc<dyn ThemeEventBus>) -> Self {
         Self { repo, bus }
     }
@@ -151,6 +153,7 @@ impl ThemeService {
 }
 
 impl ScopeOwner {
+    /// 转换为对应的 ThemeScope
     pub fn scope_enum(&self) -> ThemeScope {
         match self {
             ScopeOwner::Personal { .. } => ThemeScope::Personal,
