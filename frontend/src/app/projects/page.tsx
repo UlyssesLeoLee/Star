@@ -20,8 +20,8 @@
 import ProjectsClient from "./ProjectsClient";
 import {
   readProjectsDefaultTabFromCookie,
-  resolveInitialTab,
-} from "@/lib/cookies";
+} from "@/lib/cookies.server";
+import { resolveInitialTab } from "@/lib/cookies";
 
 // Next.js 14 强制 page-level dynamic 防止静态化时拿不到 cookie
 export const dynamic = "force-dynamic";

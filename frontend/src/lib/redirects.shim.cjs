@@ -30,7 +30,9 @@ const LEGACY_REDIRECTS = [
   { source: "/collaboration", destination: "/projects?tab=worktrees", permanent: false },
   { source: "/workflow", destination: "/projects?tab=worktrees", permanent: false },
   { source: "/relation", destination: "/projects?tab=worktrees", permanent: false },
-  { source: "/canvas/:id", destination: "/projects?canvas=:id", permanent: false },
+  // /canvas/:id 不在 legacy redirect 列表 (per 2026-09-04 canvas e2e 守门 prerequisite):
+  //   app/canvas/[id]/page.tsx (CanvasView Miro 详情页) 是设计文档意图主入口.
+  //   跟 src/lib/redirects.ts 注释一致, 同步删除.
 
   // ── /issues sink ────────────────────────────────────────────────────
   { source: "/work-item", destination: "/issues?view=kanban", permanent: false },

@@ -1,20 +1,22 @@
 // =====================================================================
-// cookies.ts — 共享 cookie 工具 (server + client)
+// cookies.ts — 共享 cookie 工具 (client-safe, server-only 函数拆到 cookies.server.ts)
 //
 // 用途: projects default tab 持久化 (per 2026-09-01 16:41 JST "界面迁移全面完善"
 //   拍板 cookie-default 修法: SSR 通过 server component cookies() 读 cookie,
 //   client 切 tab 时写 cookie, 下次 SSR 拿 cookie 渲染正确默认 tab, 避免
 //   "SSR 默认 kanban → client hydration 闪一下变 timeline" 的视觉跳变)
 //
-// 设计:
+// 设计 (per 2026-09-04 baseline fix):
 //   1. PROJECTS_DEFAULT_TAB_COOKIE = "projects-default-tab" (唯一来源)
 //   2. VALID_TABS = 5 个合法 tab id (server 校验防注入)
-//   3. readServerCookie: server component 用 next/headers cookies()
-//   4. writeClientCookie: client component 用 document.cookie
+//   3. readServerCookie: 拆到 cookies.server.ts (server-only), import "server-only"
+//   4. writeClientCookie: client component 用 document.cookie (本文件)
 //   5. path=/; max-age=1y; SameSite=Lax (防 CSRF, 保持跨页一致)
+//
+// 拆分原因: Next.js 14 App Router 不允许 client component (ProjectsClient.tsx)
+//   引用任何 import "next/headers" 的文件, 即使实际不调用 server 函数. 拆出
+//   cookies.server.ts 加 import "server-only" 让 client bundle 完全不含 next/headers.
 // =====================================================================
-
-import { cookies } from "next/headers";
 
 export const PROJECTS_DEFAULT_TAB_COOKIE = "projects-default-tab";
 
@@ -30,20 +32,6 @@ export type ProjectsTabId = (typeof VALID_PROJECTS_TABS)[number];
 
 export function isValidProjectsTab(t: string | undefined | null): t is ProjectsTabId {
   return !!t && (VALID_PROJECTS_TABS as readonly string[]).includes(t);
-}
-
-/**
- * server component 读 cookie (per Next.js 14 next/headers).
- * 在 server 渲染时同步可读, SSR HTML 已经包含正确的 default tab.
- */
-export function readProjectsDefaultTabFromCookie(): ProjectsTabId | null {
-  try {
-    const c = cookies().get(PROJECTS_DEFAULT_TAB_COOKIE)?.value;
-    return isValidProjectsTab(c) ? c : null;
-  } catch {
-    // 边界: middleware 上下文外调用 cookies() 会抛 — fallback null
-    return null;
-  }
 }
 
 /**

@@ -369,9 +369,9 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   const maxY = allY.length > 0 ? Math.max(...allY.map((y, i) => y + elements[i].height)) + 100 : 800;
 
   return (
-    <div className="relative w-full h-full bg-bg overflow-hidden">
+    <div data-testid="canvas-container" className="relative w-full h-full bg-bg overflow-hidden">
       {/* Toolbar */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-bg-card border border-line rounded-md p-1 shadow-lg">
+      <div data-testid="canvas-toolbar" className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-bg-card border border-line rounded-md p-1 shadow-lg">
         <button onClick={() => setTool("select")} className={`btn p-1.5 ${tool === "select" ? "border-accent text-accent" : ""}`} title="Select (V)">
           <MousePointer2 size={14} />
         </button>
@@ -403,6 +403,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
       {/* SVG Canvas */}
       <svg
         ref={svgRef}
+        data-testid="canvas-svg"
         viewBox="0 0 1200 800"
         className="w-full h-full"
         style={{ cursor: tool === "pan" ? "grab" : "default", backgroundColor: "#0b0d10", backgroundImage: "radial-gradient(circle, #21262d 1px, transparent 1px)", backgroundSize: "20px 20px" }}
@@ -422,17 +423,25 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         </defs>
 
         {/* Frame (画布分区) */}
-        {canvas.frames.map(renderFrame)}
+        {canvas.frames.map((f) => (
+          <g key={f.id} data-testid={`canvas-frame-${f.id}`}>
+            {renderFrame(f)}
+          </g>
+        ))}
 
         {/* Connector(在 element 下面) */}
         {connectors.map(renderConnector)}
 
         {/* Element */}
-        {elements.map(renderElement)}
+        {elements.map((el) => (
+          <g key={`wrapper-${el.id}`} data-testid={`canvas-element-${el.id}`}>
+            {renderElement(el)}
+          </g>
+        ))}
       </svg>
 
       {/* Minimap */}
-      <div className="absolute bottom-3 right-3 z-20 w-40 h-28 bg-bg-card border border-line rounded-md overflow-hidden">
+      <div data-testid="canvas-minimap" className="absolute bottom-3 right-3 z-20 w-40 h-28 bg-bg-card border border-line rounded-md overflow-hidden">
         <svg viewBox={`${minX} ${minY} ${maxX - minX} ${maxY - minY}`} className="w-full h-full">
           {/* viewport rect */}
           <rect
