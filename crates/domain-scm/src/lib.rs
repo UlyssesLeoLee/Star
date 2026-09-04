@@ -1246,14 +1246,14 @@ mod tests {
         // 单元测试 PR 状态机(不需要 service)
         let make_pr = |state: PullRequestState| PullRequest {
             id: PullRequestId::new(),
-            tenant_id: UserId.new(),
+            tenant_id: UserId::new(),
             repository_id: RepositoryId::new(),
             external_id: "1".to_string(),
             source_branch: "feat".to_string(),
             target_branch: "main".to_string(),
             title: "T".to_string(),
             description: None,
-            author_user_id: UserId.new(),
+            author_user_id: UserId::new(),
             state,
             mergeable: false,
             merged_at: None,

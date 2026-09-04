@@ -1320,7 +1320,7 @@ mod tests {
         let cmd = make_create_sprint_cmd(TenantId(tenant_id), project_id);
         let sprint = svc.create_sprint(cmd, &actor).await.expect("create");
         assert_eq!(sprint.status, SprintStatus::Planned);
-        assert_eq!(sprint.tenant_id, tenant_id);
+        assert_eq!(sprint.tenant_id, TenantId(tenant_id));
         assert_eq!(sprint.project_id, project_id);
         assert!(sprint.work_item_ids.is_empty());
     }
@@ -1402,7 +1402,7 @@ mod tests {
         let item = svc
             .add_to_backlog(
                 AddToBacklogCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     sprint_id: sprint.id,
                     work_item_id: wi,
                     story_points: Some(5),
@@ -1417,7 +1417,7 @@ mod tests {
         let res = svc
             .add_to_backlog(
                 AddToBacklogCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     sprint_id: sprint.id,
                     work_item_id: wi,
                     story_points: Some(3),
@@ -1491,7 +1491,7 @@ mod tests {
         let m = svc
             .create_milestone(
                 CreateMilestoneCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     name: "v1.0".to_string(),
                     description: "Release".to_string(),
@@ -1502,7 +1502,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(m.status, MilestoneStatus::Open);
-        assert_eq!(m.tenant_id, tenant_id);
+        assert_eq!(m.tenant_id, TenantId(tenant_id));
     }
 
     // ----- 10. achieve_milestone -----
@@ -1515,7 +1515,7 @@ mod tests {
         let m = svc
             .create_milestone(
                 CreateMilestoneCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     name: "v1.0".to_string(),
                     description: "Release".to_string(),
@@ -1561,7 +1561,7 @@ mod tests {
         for (rem, ideal) in [(100, 100), (80, 90), (60, 80)] {
             svc.append_burndown_point(
                 AppendBurndownPointCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     sprint_id: sprint.id,
                     remaining_points: rem,
                     ideal_remaining: ideal,
@@ -1574,7 +1574,7 @@ mod tests {
         let pts = svc
             .get_burndown(
                 GetBurndownQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     sprint_id: sprint.id,
                 },
                 &actor,
@@ -1619,7 +1619,7 @@ mod tests {
         let active = svc
             .list_active_sprints(
                 ListActiveSprintQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: Some(project_id),
                 },
                 &actor,

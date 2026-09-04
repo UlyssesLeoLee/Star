@@ -823,7 +823,7 @@ mod tests {
             description: "details".to_string(),
             priority: Priority::High,
             severity: Some(Severity::Major),
-            reporter_user_id: UserId.new(),
+            reporter_user_id: UserId::new(),
             parent_work_item_id: None,
             ai_task_data: None,
             labels: vec!["bug".to_string()],

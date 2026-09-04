@@ -254,7 +254,7 @@ mod tests {
         let passed = svc
             .mark_status(
                 MarkValidationStatusCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     validation_id: r.id,
                     new_status: ValidationStatus::Passed,
                     failure_summary: None,
@@ -299,7 +299,7 @@ mod tests {
                 .unwrap();
             svc.mark_status(
                 MarkValidationStatusCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     validation_id: r.id,
                     new_status: ValidationStatus::Running,
                     failure_summary: None,
@@ -310,7 +310,7 @@ mod tests {
             .unwrap();
             svc.mark_status(
                 MarkValidationStatusCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     validation_id: r.id,
                     new_status: ValidationStatus::Passed,
                     failure_summary: None,
@@ -321,9 +321,9 @@ mod tests {
             .unwrap();
             svc.link_to_acceptance_criterion(
                 LinkAcceptanceEvidenceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     work_item_id: work_item,
-                    acceptance_criterion_id: UserId.new(),
+                    acceptance_criterion_id: UserId::new(),
                     validation_id: r.id,
                 },
                 actor.clone(),
@@ -364,10 +364,10 @@ mod tests {
         let res = svc
             .override_result(
                 OverrideValidationCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     validation_id: r.id,
                     reason: "test".to_string(),
-                    approver_user_id: UserId.new(),
+                    approver_user_id: UserId::new(),
                 },
                 svc_actor,
             )
@@ -379,7 +379,7 @@ mod tests {
         let ovr = svc
             .override_result(
                 OverrideValidationCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     validation_id: r.id,
                     reason: "测试覆盖".to_string(),
                     approver_user_id: dev_actor.user_id,
@@ -408,7 +408,7 @@ mod tests {
         let res = svc
             .add_evidence(
                 AddEvidenceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     validation_id: r.id,
                     evidence_type: EvidenceType::BuildLog,
                     storage_ref: "wrong-prefix/file.log".to_string(), // 缺 tenant_id
@@ -431,7 +431,7 @@ mod tests {
         let res = svc
             .create_policy(
                 CreateValidationPolicyCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: ProjectId::new(),
                     name: "bad-policy".to_string(),
                     required_kinds: vec![ValidationKind::Build],
@@ -453,12 +453,12 @@ mod tests {
         let svc = InMemoryValidationService::new_for_test();
         let tenant_a = uuid::Uuid::new_v4();
         let tenant_b = uuid::Uuid::new_v4();
-        let actor_a = make_service_actor(tenant_a);
+        let actor_a = make_service_actor(TenantId(tenant_a));
         let r = svc
             .submit_result(make_submit_cmd(tenant_a, ValidationKind::Build), actor_a)
             .await
             .unwrap();
-        let actor_b = make_service_actor(tenant_b);
+        let actor_b = make_service_actor(TenantId(tenant_b));
         let res = svc.get_result(r.id, actor_b).await;
         assert!(matches!(res, Err(ValidationError::PermissionDenied)));
     }
@@ -567,7 +567,7 @@ mod tests {
         let res = svc
             .mark_status(
                 MarkValidationStatusCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     validation_id: r.id,
                     new_status: ValidationStatus::Passed,
                     failure_summary: None,

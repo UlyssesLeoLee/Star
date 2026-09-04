@@ -1000,7 +1000,7 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(p.tenant_id, tenant_id);
+        assert_eq!(p.tenant_id, TenantId(tenant_id));
         assert_eq!(p.intent, "fix login");
         assert_eq!(p.relevant_requirements.len(), 5); // 5 个 Priority 桶
     }

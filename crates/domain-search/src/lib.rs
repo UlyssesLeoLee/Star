@@ -973,7 +973,7 @@ mod tests {
         let r = svc
             .search(
                 SearchQueryDto {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     query: SearchQuery {
                         query_text: "login".to_string(),
                         filters: HashMap::new(),
@@ -1010,7 +1010,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let user1 = make_actor(t1, uuid::Uuid::new_v4());
+        let user1 = make_actor(TenantId(t1), uuid::Uuid::new_v4());
         let r = svc
             .search(
                 SearchQueryDto {
@@ -1056,7 +1056,7 @@ mod tests {
         let r = svc
             .search(
                 SearchQueryDto {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     query: SearchQuery {
                         query_text: "auth".to_string(),
                         filters,
@@ -1108,7 +1108,7 @@ mod tests {
         svc.upsert_index(cmd, &projector).await.unwrap();
         svc.delete_index(
             DeleteIndexCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 resource_type: ResourceType::WorkItem,
                 resource_id,
             },
@@ -1120,7 +1120,7 @@ mod tests {
         let r = svc
             .search(
                 SearchQueryDto {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     query: SearchQuery {
                         query_text: "deleted".to_string(),
                         filters: HashMap::new(),
@@ -1145,7 +1145,7 @@ mod tests {
         let project_id = ProjectId::new();
         let entries = vec![
             UpsertIndexCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 project_id,
                 resource_type: ResourceType::WorkItem,
                 resource_id: Uuid::new_v4(),
@@ -1155,7 +1155,7 @@ mod tests {
                 projection_version: 1,
             },
             UpsertIndexCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 project_id,
                 resource_type: ResourceType::WorkItem,
                 resource_id: Uuid::new_v4(),
@@ -1168,7 +1168,7 @@ mod tests {
         let r = svc
             .bulk_reindex(
                 BulkReindexCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     entries,
                 },
@@ -1198,7 +1198,7 @@ mod tests {
         let saved = svc
             .save_search(
                 SaveSearchCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: me,
                     name: "my login search".to_string(),
                     query: q,
@@ -1232,7 +1232,7 @@ mod tests {
         let saved = svc
             .save_search(
                 SaveSearchCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: me,
                     name: "private".to_string(),
                     query: q,
@@ -1246,7 +1246,7 @@ mod tests {
         let res = svc
             .delete_saved(
                 DeleteSavedSearchCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     saved_search_id: saved.id,
                     actor_user_id: other,
                 },
@@ -1263,7 +1263,7 @@ mod tests {
         let projector = projector_actor(tenant_id);
         svc.upsert_index(
             sample_index_cmd(
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 ResourceType::WorkItem,
                 "implement authentication",
             ),
@@ -1281,7 +1281,7 @@ mod tests {
         let s = svc
             .suggest(
                 SuggestQueryDto {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     query: SuggestQuery {
                         prefix: "auth".to_string(),
                         limit: 10,
@@ -1303,7 +1303,7 @@ mod tests {
         let res = svc
             .search(
                 SearchQueryDto {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     query: SearchQuery {
                         query_text: "".to_string(),
                         filters: HashMap::new(),

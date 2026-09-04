@@ -204,7 +204,7 @@ mod tests {
         let cmd = make_create_cmd(TenantId(tenant_id), target.clone());
         let f = svc.create_feedback(cmd, actor).await.expect("create OK");
         assert_eq!(f.status, FeedbackStatus::Open);
-        assert_eq!(f.tenant_id, tenant_id);
+        assert_eq!(f.tenant_id, TenantId(tenant_id));
         assert!(matches!(f.target, FeedbackTarget::WorkItem { .. }));
         assert_eq!(svc.count_feedbacks().await, 1);
 

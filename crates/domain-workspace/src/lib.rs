@@ -977,7 +977,7 @@ mod tests {
         let ws = svc
             .create_workspace(
                 CreateWorkspaceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workspace_key: "ws".to_string(),
                     name: "WS".to_string(),
                     description: None,
@@ -992,7 +992,7 @@ mod tests {
             .add_member(
                 AddMemberCommand {
                     workspace_id: ws.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: new_user,
                     role: WorkspaceRole::Member,
                 },
@@ -1006,7 +1006,7 @@ mod tests {
             .add_member(
                 AddMemberCommand {
                     workspace_id: ws.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: new_user,
                     role: WorkspaceRole::Member,
                 },
@@ -1059,7 +1059,7 @@ mod tests {
         let ws = svc
             .create_workspace(
                 CreateWorkspaceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workspace_key: "v".to_string(),
                     name: "V".to_string(),
                     description: None,
@@ -1073,7 +1073,7 @@ mod tests {
             .update_workspace(
                 UpdateWorkspaceCommand {
                     workspace_id: ws.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     expected_version: 99,
                     name: Some("New".to_string()),
                     description: None,

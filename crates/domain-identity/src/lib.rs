@@ -1124,7 +1124,7 @@ mod tests {
             .register_device(
                 RegisterDeviceCommand {
                     tenant_id: other,
-                    user_id: UserId.new(),
+                    user_id: UserId::new(),
                     kind: DeviceKind::Web,
                     device_cert_fingerprint: "abc".to_string(),
                     project_ids: vec![ProjectId::new()],

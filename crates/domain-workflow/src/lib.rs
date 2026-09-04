@@ -808,7 +808,7 @@ mod tests {
         let inst = svc
             .start_instance(
                 StartInstanceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
                     actor: UserId::from(actor.user_id),
@@ -831,7 +831,7 @@ mod tests {
         let inst2 = svc
             .transition(
                 TransitionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     instance_id: inst.id,
                     to: in_progress,
                     actor: UserId::from(actor.user_id),
@@ -848,7 +848,7 @@ mod tests {
         let inst3 = svc
             .transition(
                 TransitionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     instance_id: inst2.id,
                     to: done,
                     actor: UserId::from(actor.user_id),
@@ -874,7 +874,7 @@ mod tests {
         let inst = svc
             .start_instance(
                 StartInstanceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
                     actor: UserId::from(actor.user_id),
@@ -889,7 +889,7 @@ mod tests {
         let res = svc
             .transition(
                 TransitionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     instance_id: inst.id,
                     to: done,
                     actor: UserId::from(actor.user_id),
@@ -918,7 +918,7 @@ mod tests {
         let inst = svc
             .start_instance(
                 StartInstanceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
                     actor: UserId::from(actor.user_id),
@@ -964,7 +964,7 @@ mod tests {
         let res = svc
             .transition(
                 TransitionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     instance_id: inst.id,
                     to: todo_id,
                     actor: UserId::from(actor.user_id),
@@ -988,7 +988,7 @@ mod tests {
         let inst = svc
             .start_instance(
                 StartInstanceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
                     actor: UserId::from(actor.user_id),
@@ -1002,7 +1002,7 @@ mod tests {
         let res = svc
             .transition(
                 TransitionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     instance_id: inst.id,
                     to: todo_id,
                     actor: UserId::from(actor.user_id),
@@ -1112,7 +1112,7 @@ mod tests {
         let inst = svc
             .start_instance(
                 StartInstanceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
                     actor: UserId::from(actor.user_id),
@@ -1168,7 +1168,7 @@ mod tests {
         let inst_done = svc
             .transition(
                 TransitionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     instance_id: inst.id,
                     to: s_done,
                     actor: UserId::from(actor.user_id),
@@ -1193,7 +1193,7 @@ mod tests {
         let inst = svc
             .start_instance(
                 StartInstanceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
                     actor: UserId::from(actor.user_id),
@@ -1215,7 +1215,7 @@ mod tests {
         let tenant_a = uuid::Uuid::new_v4();
         let tenant_b = uuid::Uuid::new_v4();
         let actor_a = make_actor(tenant_a);
-        let cmd = make_three_state_workflow(tenant_a);
+        let cmd = make_three_state_workflow(TenantId(tenant_a));
         let wf = svc.create_workflow(cmd, &actor_a).await.unwrap();
 
         // 跨 tenant 查询
@@ -1269,7 +1269,7 @@ mod tests {
         let inst = svc
             .start_instance(
                 StartInstanceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
                     actor: UserId::from(actor.user_id),
@@ -1287,7 +1287,7 @@ mod tests {
         let inst2 = svc
             .transition(
                 TransitionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     instance_id: inst.id,
                     to: in_progress,
                     actor: UserId::from(actor.user_id),
@@ -1346,7 +1346,7 @@ mod tests {
         let inst = svc
             .start_instance(
                 StartInstanceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
                     actor: UserId::from(actor_developer.user_id),
@@ -1359,7 +1359,7 @@ mod tests {
         let res = svc
             .transition(
                 TransitionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     instance_id: inst.id,
                     to: s_done,
                     actor: UserId::from(actor_developer.user_id),
@@ -1375,7 +1375,7 @@ mod tests {
         let res2 = svc
             .transition(
                 TransitionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     instance_id: inst.id,
                     to: s_done,
                     actor: UserId::from(actor_admin.user_id),
@@ -1430,7 +1430,7 @@ mod tests {
         let inst1 = svc
             .start_instance(
                 StartInstanceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
                     actor: UserId::from(actor.user_id),
@@ -1442,7 +1442,7 @@ mod tests {
         let inst2 = svc
             .start_instance(
                 StartInstanceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
                     actor: UserId::from(actor.user_id),
@@ -1457,7 +1457,7 @@ mod tests {
         let inst1b = svc
             .transition(
                 TransitionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     instance_id: inst1.id,
                     to: in_progress,
                     actor: UserId::from(actor.user_id),

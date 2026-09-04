@@ -1077,7 +1077,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(cs.status, ChangeSetStatus::Draft);
-        assert_eq!(cs.tenant_id, tid);
+        assert_eq!(cs.tenant_id, TenantId(tid));
         assert!(cs.submitted_at.is_none());
         assert!(cs.files.is_empty());
     }

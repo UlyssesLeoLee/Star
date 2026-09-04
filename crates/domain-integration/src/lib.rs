@@ -174,7 +174,7 @@ mod tests {
             .trigger_sync(
                 TriggerSyncCommand {
                     integration_id: integration.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     force: false,
                 },
                 actor,
@@ -303,7 +303,7 @@ mod tests {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_a = uuid::Uuid::new_v4();
         let tenant_b = uuid::Uuid::new_v4();
-        let actor_a = make_test_actor(tenant_a);
+        let actor_a = make_test_actor(TenantId(tenant_a));
         let cmd = make_create_cmd(tenant_a, IntegrationRelationType::Mirror);
         let integration = svc
             .create_integration(cmd, actor_a.clone())
@@ -364,7 +364,7 @@ mod tests {
             .pause_integration(
                 PauseIntegrationCommand {
                     integration_id: integration.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                 },
                 actor.clone(),
             )
@@ -376,7 +376,7 @@ mod tests {
             .resume_integration(
                 ResumeIntegrationCommand {
                     integration_id: integration.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                 },
                 actor,
             )
@@ -409,7 +409,7 @@ mod tests {
         let only_link = svc
             .list_by_project(
                 ListByProjectQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     source_filter: None,
                     relation_type_filter: Some(IntegrationRelationType::Link),
@@ -512,7 +512,7 @@ mod tests {
             .trigger_sync(
                 TriggerSyncCommand {
                     integration_id: integration.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     force: false,
                 },
                 actor,
@@ -550,7 +550,7 @@ mod tests {
             .update_integration(
                 UpdateIntegrationCommand {
                     integration_id: integration.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     conflict_strategy: Some(ConflictStrategy::Bidirectional {
                         platform_field: "title".to_string(),
                         external_field: "title".to_string(),
@@ -588,7 +588,7 @@ mod tests {
             svc.trigger_sync(
                 TriggerSyncCommand {
                     integration_id: integration.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     force: false,
                 },
                 actor.clone(),
@@ -606,7 +606,7 @@ mod tests {
         let history = svc
             .get_history(
                 GetHistoryQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     integration_id: integration.id,
                     limit: 10,
                     since: None,

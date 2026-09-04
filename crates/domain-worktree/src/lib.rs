@@ -1035,7 +1035,7 @@ mod tests {
         let actor_tenant = uuid::Uuid::new_v4();
         let cmd_tenant = uuid::Uuid::new_v4(); // 不同 tenant
         let actor = make_actor(actor_tenant);
-        let cmd = make_create_cmd(cmd_tenant);
+        let cmd = make_create_cmd(TenantId(cmd_tenant));
         let res = svc.create_worktree(cmd, &actor).await;
         assert!(matches!(res, Err(WorktreeError::CrossTenantDenied(_, _))));
     }
@@ -1064,7 +1064,7 @@ mod tests {
         let wt2 = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: wt.id,
                     from: WorktreeStatus::Created,
                     to: WorktreeStatus::Initializing,
@@ -1090,7 +1090,7 @@ mod tests {
         let res = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: wt.id,
                     from: WorktreeStatus::Ready,
                     to: WorktreeStatus::Assigned,
@@ -1115,7 +1115,7 @@ mod tests {
         let res = svc
             .assign_to_agent(
                 AssignWorktreeCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: wt.id,
                     agent_id: AgentId::new(),
                     agent_session_id: AgentSessionId::new(),
@@ -1139,7 +1139,7 @@ mod tests {
         let res = svc
             .record_observed_state(
                 RecordObservedStateCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: wt.id,
                     ahead: 1,
                     behind: 0,
@@ -1163,7 +1163,7 @@ mod tests {
         let abandoned = svc
             .abandon(
                 AbandonCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: wt.id,
                     reason: "需求变更".to_string(),
                 },
@@ -1201,7 +1201,7 @@ mod tests {
             current = svc
                 .transition_status(
                     TransitionStatusCommand {
-                        tenant_id,
+                        tenant_id: TenantId(tenant_id),
                         worktree_id: current.id,
                         from: w[0],
                         to: w[1],
@@ -1216,7 +1216,7 @@ mod tests {
         let res = svc
             .abandon(
                 AbandonCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: current.id,
                     reason: "test".to_string(),
                 },
@@ -1255,7 +1255,7 @@ mod tests {
         let list = svc
             .list_by_work_item(
                 ListByWorkItemQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     work_item_id: wi,
                 },
                 &actor,
@@ -1316,7 +1316,7 @@ mod tests {
         let list = svc
             .list_by_agent(
                 ListByAgentQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_id: agent,
                 },
                 &actor,
@@ -1417,7 +1417,7 @@ mod tests {
         let list = svc
             .list_by_work_item(
                 ListByWorkItemQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     work_item_id: wi,
                 },
                 &actor,

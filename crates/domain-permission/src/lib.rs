@@ -1145,7 +1145,7 @@ mod tests {
                     resource_id: None,
                     action: Action::Read,
                 },
-                &ActorContext::new(user.0, tenant.0)
+                &ActorContext::new(user, tenant)
                     .with_role("developer")
                     .with_project(project),
             )
@@ -1185,7 +1185,7 @@ mod tests {
                     resource_id: None,
                     action: Action::Read,
                 },
-                &ActorContext::new(user.0, tenant.0),
+                &ActorContext::new(user, tenant),
             )
             .await
             .unwrap();
@@ -1258,7 +1258,7 @@ mod tests {
                     resource_id: None,
                     action: Action::Read,
                 },
-                &ActorContext::new(user.0, tenant.0)
+                &ActorContext::new(user, tenant)
                     .with_role("developer")
                     .with_project(project),
             )
@@ -1290,7 +1290,7 @@ mod tests {
             .await
             .unwrap();
         // 用 tenant_b 的 actor 去 check tenant_a 的 scheme → CrossTenantDenied
-        let actor_b = ActorContext::new(user.0, tenant_b.0);
+        let actor_b = ActorContext::new(user, tenant_b);
         let res = svc
             .check(
                 CheckQuery {
@@ -1332,7 +1332,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(binding.role, Role::Developer);
-        assert_eq!(binding.user_id, user);
+        assert_eq!(binding.user_id, UserId(user));
 
         // 重复 grant → Conflict (INV-PM-03)
         let dup = svc
@@ -1476,7 +1476,7 @@ mod tests {
                     resource_id: None,
                     action: Action::Admin,
                 },
-                &ActorContext::new(user.0, tenant.0)
+                &ActorContext::new(user, tenant)
                     .with_role("developer")
                     .with_project(project),
             )
@@ -1550,7 +1550,7 @@ mod tests {
                         resource_id: Some(Uuid::new_v4()),
                         action: Action::Read,
                     },
-                    &ActorContext::new(user.0, tenant.0)
+                    &ActorContext::new(user, tenant)
                         .with_role("viewer")
                         .with_project(project),
                 )
@@ -1615,7 +1615,7 @@ mod tests {
         .await
         .unwrap();
         // 3) check 各动作
-        let actor_user = ActorContext::new(user.0, tenant.0)
+        let actor_user = ActorContext::new(user, tenant)
             .with_role("project_admin")
             .with_project(project);
         for action in [Action::Read, Action::Write, Action::Admin] {
@@ -1683,7 +1683,7 @@ mod tests {
             svc.grant_role(
                 GrantRoleCommand {
                     tenant_id: TenantId(tenant),
-                    user_id: UserId.new(),
+                    user_id: UserId::new(),
                     project_id: project,
                     role: Role::Developer,
                     granted_by: UserId::from(admin.user_id),
@@ -1697,7 +1697,7 @@ mod tests {
         svc.grant_role(
             GrantRoleCommand {
                 tenant_id: TenantId(tenant),
-                user_id: UserId.new(),
+                user_id: UserId::new(),
                 project_id: ProjectId::new(),
                 role: Role::Viewer,
                 granted_by: UserId::from(admin.user_id),

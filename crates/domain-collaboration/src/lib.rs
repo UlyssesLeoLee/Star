@@ -1305,7 +1305,7 @@ mod tests {
             h,
             content: None,
             color: color.to_string(),
-            created_by: UserId.new(),
+            created_by: UserId::new(),
             created_at: chrono::DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
             updated_at: Utc::now(),
         }
@@ -1319,7 +1319,7 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), TenantId(tenant), ProjectId(project));
         let cmd = StartSessionCommand {
             tenant_id: TenantId(tenant),
             project_id: project,
@@ -1342,7 +1342,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let actor = make_actor(user, tenant, project);
+        let actor = make_actor(UserId(user), TenantId(tenant), ProjectId(project));
         let s = svc
             .start_session(
                 StartSessionCommand {
@@ -1378,7 +1378,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let actor = make_actor(user, tenant, project);
+        let actor = make_actor(UserId(user), TenantId(tenant), ProjectId(project));
         let s = svc
             .start_session(
                 StartSessionCommand {
@@ -1422,8 +1422,8 @@ mod tests {
         let tenant_a = uuid::Uuid::new_v4();
         let tenant_b = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor_a = make_actor(uuid::Uuid::new_v4(), tenant_a, project);
-        let actor_b = make_actor(uuid::Uuid::new_v4(), tenant_b, project);
+        let actor_a = make_actor(uuid::Uuid::new_v4(), TenantId(tenant_a), ProjectId(project));
+        let actor_b = make_actor(uuid::Uuid::new_v4(), TenantId(tenant_b), ProjectId(project));
         let s = svc
             .start_session(
                 StartSessionCommand {
@@ -1458,7 +1458,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let actor = make_actor(user, tenant, project);
+        let actor = make_actor(UserId(user), TenantId(tenant), ProjectId(project));
         let s = svc
             .start_session(
                 StartSessionCommand {
@@ -1512,7 +1512,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let actor = make_actor(user, tenant, project);
+        let actor = make_actor(UserId(user), TenantId(tenant), ProjectId(project));
         let s = svc
             .start_session(
                 StartSessionCommand {
@@ -1558,7 +1558,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let actor = make_actor(user, tenant, project);
+        let actor = make_actor(UserId(user), TenantId(tenant), ProjectId(project));
         let s = svc
             .start_session(
                 StartSessionCommand {
@@ -1615,7 +1615,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let actor = make_actor(user, tenant, project);
+        let actor = make_actor(UserId(user), TenantId(tenant), ProjectId(project));
         let s = svc
             .start_session(
                 StartSessionCommand {
@@ -1667,7 +1667,7 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), TenantId(tenant), ProjectId(project));
         let wb = Whiteboard::new(tenant, project, "demo".to_string());
         let wb_id = wb.id;
         // 直接写入 in-memory store
@@ -1696,7 +1696,7 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), TenantId(tenant), ProjectId(project));
         let wb = Whiteboard::new(tenant, project, "demo".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
@@ -1740,7 +1740,7 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), TenantId(tenant), ProjectId(project));
         let wb = Whiteboard::new(tenant, project, "demo".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
@@ -1791,7 +1791,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let host = uuid::Uuid::new_v4();
-        let host_actor = make_actor(host, tenant, project);
+        let host_actor = make_actor(host, TenantId(tenant), ProjectId(project));
         let s = svc
             .start_session(
                 StartSessionCommand {
@@ -1847,7 +1847,7 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), TenantId(tenant), ProjectId(project));
         let wb = Whiteboard::new(tenant, project, "board-1".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
@@ -1862,7 +1862,7 @@ mod tests {
             .await
             .expect("get");
         assert_eq!(got.name, "board-1");
-        assert_eq!(got.tenant_id, tenant);
+        assert_eq!(got.tenant_id, TenantId(tenant));
         // 跨 tenant 拒绝
         let other_tenant = uuid::Uuid::new_v4();
         let r = svc
@@ -1885,7 +1885,7 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), TenantId(tenant), ProjectId(project));
         let wb = Whiteboard::new(tenant, project, "multi".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
@@ -1932,7 +1932,7 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
+        let actor = make_actor(uuid::Uuid::new_v4(), TenantId(tenant), ProjectId(project));
         let wb = Whiteboard::new(tenant, project, "dim".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
@@ -1973,7 +1973,7 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let host = uuid::Uuid::new_v4();
-        let host_actor = make_actor(host, tenant, project);
+        let host_actor = make_actor(host, TenantId(tenant), ProjectId(project));
         let admin = uuid::Uuid::new_v4();
         let admin_actor = make_admin_actor(admin, tenant, project);
         let s = svc
@@ -2010,9 +2010,9 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let host = uuid::Uuid::new_v4();
-        let host_actor = make_actor(host, tenant, project);
+        let host_actor = make_actor(host, TenantId(tenant), ProjectId(project));
         let other = uuid::Uuid::new_v4();
-        let other_actor = make_actor(other, tenant, project);
+        let other_actor = make_actor(other, TenantId(tenant), ProjectId(project));
         let s = svc
             .start_session(
                 StartSessionCommand {
