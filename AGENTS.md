@@ -154,6 +154,16 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 
 **累积规 v19+ 补充 (per 2026-09-02 00:39 JST 拍板 + `docs/automation-design.md` v0.1)**: 后续 P3-B-F + H2 + kanban-vmodel 任何子项必先判定自动化档 ([P]/[M]/[S]), 命中 ≥ 2 维 (R/V/S/A) 强制走 `scripts/automation/<purpose>.py` 落地; commit message 含脚本相对路径; 子代理 dispatch 必先 `automation/dispatcher.py brief(...)` 落 `docs/briefs/<task_id>.md`; [P] 子项 docs 同步必更新 `docs/automation-design.md` §4 + `scripts/automation/registry.md`。**任何阶段缺其一 = 守门不完整** (per 守门 #1 v19 + #9 v20 + #12 v21 派生规)。
 
+### 4.2 实装前一致性门（2026-09-04 文档审计）
+
+- **现行 package 清单优先**：以 `cargo metadata` / 当前 `Cargo.toml` 为准；当前 workspace 有 47 个 package，其中 34 个以 `domain-` 命名。不得以旧“22”或草案“22 + 9 = 31”作为物理 crate 数量、依赖或验收口径。
+- **Runtime 名称必须先映射**：`domain-agent` 与 `domain-context` 已存在，`domain-task` 当前不存在。Runtime 概念职责必须在 ADR/DDD Review 中明确“扩展现有 crate”或“新增唯一命名 crate”，获批前不得创建/引用同名 crate。
+- **lint 不得绕开**：新 crate 继承 workspace lint；`unsafe_code = "forbid"`、`rust_2018_idioms = deny`、`unreachable_pub = deny`。公共 API 默认补齐文档，局部 `allow(missing_docs)` 须写明最小化理由。
+- **基线不可误报**：进入 Runtime/H2 实装前，先分辨已有 H2 `ActorContext` 类型迁移失败与本次改动；未恢复 `cargo check --workspace --all-targets -j 4` 基线，不得声明完整质量门通过。
+- **handoff 现状先复核**：执行 handoff 或 WBS 项目前，以工作树、Cargo 清单和对应质量门复核状态；正文与实测不一致时，先纠正文档并保留证据，再执行剩余项。
+- **功能闭环验收**：新增或修改有状态的业务流程时，同步维护需求、设计、接口与测试的可追溯关系，并覆盖实际适用的成功、失败、重试或恢复路径。
+- **唯一实施入口**：详见 `docs/reports/DOC-ARCH-CODE-AUDIT-001.md` §2-§4，以及 Agent Runtime `02-basic-design.md` §3.5 / `03-detailed-design.md` §1。
+
 ---
 
 ## 5. 仓库拓扑
@@ -173,10 +183,10 @@ D:/RustGameServer                             # 独立仓 (Star 仓**不引用**
 
 > **命名解读 disclaimer (per 2026-08-31 22:45 JST Q1-D 拍板 (a)+(c))**:
 > - **5 域 (player/economy/match/social/admin) 是历史治理命名**, 指 5 位真人 Lead 问责结构 (per 守门 #3 拍板)
-> - **Star 仓 22 domain-* crate 是 DDD bounded context** (identity/permission/work-item/workspace/worktree/...)
+> - **Star 当前 workspace 有 34 个 `domain-*` package**；`docs/basic-design.md` 区分 25 个逻辑 domain module 与 9 个 cross-cutting supporting package。DDD bounded context 是逻辑职责，不等于固定的 package 数量。
 > - 两者**非同一分类**, **不建立业务子域↔DDD 映射** (e.g. player→identity 不成立)
 > - ST 测试报告 "5 域独立" 等措辞已改 "4 域独立" (per HANDOFF-ST-001 H4) 避免误导
-> - 后续文档中提到 "5 域" 时, 默认指守门 #3 的真人 Lead 结构, 提到 "DDD bounded context" 时指 22 domain-* crate
+> - 后续文档中提到 "5 域" 时, 默认指守门 #3 的真人 Lead 结构；提到 "DDD bounded context" 时，必须显式给出概念职责到物理 package 的映射，不得从名称或旧数量推导
 
 ---
 
@@ -201,22 +211,26 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - `0043-audit-onboarding-failed.md` — audit_audit_event WORM onboarding.failed 事件 (per 守门 #13 W/T/M, 9/2 落档)
 - `0044-star-agent-runtime-srs.md` — STAR Agent Runtime SRS Baseline (113 节, 1M logical agents, commit `5460d33` per 2026-09-03 18:25 JST)
 - `0045-star-agent-runtime-design.md` — STAR Agent Runtime Basic + Detailed Design Baseline (40KB + 52KB + 14KB, 跟 LangGraph 9/3 平行, 同期落档 per 2026-09-03 19:00 JST)
+- `0046-langgraph-task-management-operations.md` — Star LangGraph TMO 任务卡管理操作 (7 节点 + 7 协议 + 7 组件, per 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡, 合并任务a和任务b")
 
 ### 6.1 架构 view 索引 (IPA 3 文档)
 
-per `docs/architecture/2026-09-03-langgraph/` (2026-09-03 17:51 JST 用户发令"另起一套架构view,专门设计langgraph相关的功能"落档)：
-- `01-requirements.md` — 要件定義書 (18 機能 / 4 NFR 類 / 14 制約 / 20 用語 / 5 想定シナリオ / 18 UC)
-- `02-basic-design.md` — 基本設計書 (15 component + 9 sub-agent 类型 + 3-tier checkpoint + 12 API + 守门 統合)
-- `03-detailed-design.md` — 詳細設計書 (M-18 模块 + 4 class + LangGraph node/edge/reducer + 4 シーケンス + 3 状態遷移 + 19 UT/9 IT/8 E2E/8 PT)
+per `docs/architecture/2026-09-03-langgraph/` (2026-09-03 17:51 JST 用户发令"另起一套架构view,专门设计langgraph相关的功能"落档, 2026-09-04 19:15 JST 升版 v0.2 加 TMO 7 节点):
+- `01-requirements.md` v0.2 — 要件定義書 (18 機能 + 7 TMO 機能 F-19..F-25 / 4 NFR 類 + 5 NFR-TMO / 14 制約 + 1 L1↔L1 派生 / 24 用語 / 5 想定シナリオ + S-06 合并 / 23 UC 包含 UC-09..UC-13)
+- `02-basic-design.md` v0.2 — 基本設計書 (22 component 含 C-16..C-22 TMO / 9 sub-agent 类型 + SA-10 task-orchestrator / 3-tier checkpoint / 20 API endpoint 含 /api/tmo/* 8 端点 / 守门 統合 / §2.6 TMO 全节 7 节点 + 7 协议 + 5 Reducer + 5 route + 7 metrics)
+- `03-detailed-design.md` v0.2 — 詳細設計書 (M-25 模块 含 M-19..M-25 TMO + task_ops/ 子模块 / 4 class + 7 TMO class / LangGraph T-N1..T-N7 + M-N1..M-N7 = 14 节点 / 4 edge + 5 TMO edge / 9 subgraph + SA-10 / 4 シーケンス + 3 状態遷移 (含 superseded 终态) / 26 UT 含 UT-20..UT-26 / 12 IT 含 IT-10..IT-12 / 13 E2E 含 E2E-09..E2E-13 / 8 PT)
+- `[PHASE-LANGGRAPH-TMO-IMPL-REPORT.md](docs/reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md)` v0.1 — TMO 7 子项实装 phase 计划 (TMO-01..TMO-07, ~2.5M tokens 估, 走守门 #19 Python 化 + #9 v3 subprocess + #22 控制台不污染 main + #23 AI mock)
+- [`ADR-0046 LangGraph TMO 任务卡管理操作`](docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) — TMO 决策记录 (3 备选方案拒绝理由 + 5 后果 + 5 阶段实施计划)
 
-**架构核心**: 2-level hierarchical LangGraph
+**架构核心**: 2-level hierarchical LangGraph + TMO 7 节点扩展
 - **L0 全体代理 (Top-Level Agent)**: UI 最下行聊天栏背后, 整体控制 Star 全局各个细节 (1 instance / session, singleton, cross-session checkpoint)
-- **L1 任务卡子代理 (Sub-Agent)**: 9 类型 (SA-01..SA-09), 各 sub-agent 独立 LangGraph subgraph, 任务卡 1:1 mirror, 隔离 context + per-task checkpoint (N 並行, ≤ 50)
+- **L0 TMO 7 节点 (Task Management Operations, v0.2 新增)**: M-N1 merge / M-N2 split / M-N3 reorder / M-N4 bulk / M-N5 summarize / M-N6 reassign / M-N7 metadata, 7 节点全部 L0 协调 (per 守门 #13 a L1↔L1 禁止)
+- **L1 任务卡子代理 (Sub-Agent)**: 9 类型 (SA-01..SA-09) + SA-10 task-orchestrator (v0.2 TMO 跨任务编排型), 各 sub-agent 独立 LangGraph subgraph, 任务卡 1:1 mirror, 隔离 context + per-task checkpoint (N 並行, ≤ 50)
 
 per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户发令"基本设计和详细设计也都到位" + 18:59 JST 拍板 A 独立目录 + A 引用 LangGraph + ADR-0045 落档)：
 - **SRS-001** = [`docs/requirements/SRS-STAR-AGENT-RUNTIME-001.md`](docs/requirements/SRS-STAR-AGENT-RUNTIME-001.md) v1.0 — Agent View 要件定義書 (113 节, 12 ✅ / 8 🟡 / 60 ⏳ / 4 ❌ N/A, 目标 1M logical agents on 16-32GB 单机) — commit `5460d33` per ADR-0044
-- `02-basic-design.md` — Agent View 基本設計書 (40KB / 12 章节: 3 层架构 L0 派发 + L1 ECS + L2 业务 / Runtime 双模式 / 9 SA Archetype 引用 / 31 domain-* 目标 / 13 Systems / NFR / G-1~G-15) — 同期落档 per ADR-0045
-- `03-detailed-design.md` — Agent View 詳細設計書 (52KB / 15 章节: 9 新建 module + 13 关键类 Rust 草案 + 2 状态机 + 4 时序图 / 5 表 schema W/T/M 严格分类 per 守门 #13 / 4 算法 / 7 错误处理 / UT 250+ / IT 70+ / E2E 10 / PT 9 套 / G-1~G-17) — 同期落档 per ADR-0045
+- `02-basic-design.md` — Agent View 基本設計書（3 层架构 L0 派发 + L1 ECS + L2 业务 / Runtime 双模式 / 9 SA Archetype 引用 / Runtime 概念→物理 crate 映射门禁 / 13 Systems / NFR / G-1~G-16）— 同期落档 per ADR-0045
+- `03-detailed-design.md` — Agent View 詳細設計書（概念 module 布局 + 13 关键类 Rust 草案 + 2 状态机 + 4 时序图 / 5 表 schema W/T/M 严格分类 per 守门 #13 / 4 算法 / 7 错误处理 / UT/IT/E2E/PT / G-1~G-18）— 同期落档 per ADR-0045
 
 **架构核心**: Hybrid Runtime (Lightweight + ECS + Event Driven + Shared Runtime + HOT/WARM/COLD)
 - **L0 派发层**: Tokio async dispatcher + SQLite WAL TaskQueue + multiprocessing.Pool(8-16) (per 守门 #24) — 1M 任务派发无持久化缺口 G-1
@@ -242,7 +256,8 @@ per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户�
 | 5 | 9 个 wt 是否 merge 到 main (acceptance-vcs-blockers / adr-0026-0032 / cli-mcp / api / flows / arch 等) | ~1.2M | 8+ wt merged (git 实证) | merge 后守门 0 违反 + commit message per 守门 + DDD Review 拍板 | 无 | **部分完成** (8/9 wt 已 merge; git: `4aebed5` `8c9452e` `e7dfb30` `4b40b83` `3d0a771` `ea2a960` `88f86ee` `74cbfe6`; 剩 ~1 wt TBD 评估) |
 | 6 | 4 份报告签字栏"审批"列 DDD Review 终审 | ~0.4M | 0 | 4 份签字栏全填 + 修订历史 +1 + 守门 0 违反 | 无 | **已实质完成** (PHASE-D2-CLI/D3-MCP-TRANSPORT/D4-P1-FIX/D5-MCP-STREAMABLE-HTTP-REPORT 4 报告 §6 签字栏 5 角色 Mavis 接手代签已落档 v0.4 per 8/27 20:56 JST 第三次强化; 真人到位后追溯签字覆盖, 状态从"pending"误标, 9/4 09:00 JST P4 WBS Phase A.5 验收时同步) |
 | 7 | 推 origin (R-05 不 push 反转决策) | ~0.1M | 0 | author=Ulysses + 守门 0 违反 + DDD Review 拍板 | #5, #6 | 待 Ulysses 拍板 (P1 但 token 最小) |
-| 8 | **Star LangGraph 統合アーキテクチャ (Star-LG) 初版实装** (per 2026-09-03 17:51 JST 用户发令, 3 份 IPA 文档已落档) | ~3.0M |  0 (3 文档落档 v0.1, 实装 v0.1 启动待 P0-1/H2 阻塞解除) | 全体代理 chat bar + 任务卡子代理 MVP + checkpointing (Tier 1+2) + 9 SA 类型 stub + UI mock + 守门 統合 + e2e ≥70% | 无 | **初版文档完成, 实装 pending** (3 份 IPA 文档 `docs/architecture/2026-09-03-langgraph/` 落档; 实装依赖 #6 DDD Review 拍板 + 5 域 Lead 真人到位 + #2 16 tool 真实接入完成) |
+| 8 | **Star LangGraph 統合アーキテクチャ (Star-LG) 初版实装** (per 2026-09-03 17:51 JST 用户发令, 3 份 IPA 文档已落档 v0.2, TMO 升版 per 2026-09-04 19:15 JST 用户发令) | ~3.0M (TMO 7 子项估 ~2.5M) | 0 (3 文档 v0.2 + ADR-0046 + PHASE 报告 v0.1 落档, TMO 实装未启动) | 全体代理 chat bar + 任务卡子代理 MVP + checkpointing (Tier 1+2) + 9 SA 类型 stub + SA-10 task-orchestrator + UI mock + 守门 統合 + TMO 7 节点 (merge/split/reorder/bulk/summarize/reassign/metadata) + e2e ≥70% | 无 | **v0.2 文档完成, TMO 实装 pending** (3 份 IPA 文档 `docs/architecture/2026-09-03-langgraph/` v0.2 + [ADR-0046](docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) + [PHASE-LANGGRAPH-TMO-IMPL-REPORT v0.1](docs/reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md) 落档; TMO 7 子项实装 (TMO-01..TMO-07) 待 P0-1/H2 阻塞解除 + 5 域 Lead 真人到位 + #2 16 tool 真实接入完成) |
+| 8.1 | **TMO 7 子项实装 phase** (per 2026-09-04 19:15 JST 用户发令, 文档 v0.2 升版 + PHASE 报告 v0.1 落档) | ~2.5M (TMO-01..TMO-07 估) | 0 (7 子项 planned, 实装未启动) | 7 节点 Python 実装 (M-N1..M-N7) + 7 组件 (C-16..C-22) + 25 module (M-19..M-25) + SA-10 task-orchestrator + 8 /api/tmo/* 端点 + 守门 #19 Python 化 + #9 v3 subprocess + #13 a 实证 | #8 (Star-LG 初版实装) | **planned, 实装未启动** (per [PHASE-LANGGRAPH-TMO-IMPL-REPORT §1](docs/reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md) 7 子项估; 优先 TMO-01 merge + TMO-03 DAG validator 守门 #13 a 实证) |
 
 **列含义**：
 - `粗略预估消耗量`: 1 SRE · 周 ≈ 1.2M tokens, 按"若按人类节奏"粗略排序;**无上限, 不参与 gating**, 跨多 sub-session 推进 (per 2026-09-04 13:43 JST 用户发令)
@@ -263,6 +278,7 @@ per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户�
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v0.74 | 2026-09-04 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | 文档—架构—编码审计同步：新增 §4.2 实装前一致性门；以当前 47 package / 34 `domain-*` package 清单替代现行“22/31”物理 crate 口径；明确 Runtime 概念→物理 crate 映射、workspace lint 和 H2 基线门禁；更新 §5 / §6.1 当前指导，不改历史证据条目 | 用户发令“审核所有文档，确保编码时能够符合编码规范，以正确方式融入架构” |
 | v0.1 | 2026-08-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：代签规则反转 + 12 项守门 + 报告 7 段结构 + 仓库拓扑 + ADR 索引 + 待办清单 | 2026-08-27 17:36 JST 用户发令"改成允许代签 Ulysses", 显式落 AGENTS.md |
 | v0.2 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 终审签字: §9 签字栏 #1.1 加 Mavis 接手审批行 (2026-08-27); 修订人 / 审批者代签按 8/27 07:16 JST 反转规则 | 2026-08-27 17:54 JST Ulysses 发令"你自己 review 签你自己名字" |
 | v0.3 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 用户授权升级: §0 一句话硬约束引用 19:39 JST 授权; 新增 §1.0 用户授权升级节; §1 节标题改"19:39 JST 用户授权 + 07:16 JST 反转"; 覆盖范围增加 19:39 JST 覆盖 17:54 之前"审批"列 ⏳ 待签约束; Mavis 接手默认代签 Ulysses 无需再问 | 2026-08-27 19:39 JST Ulysses 明确发令"允许你代签" |
@@ -761,6 +777,28 @@ per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户�
 - **守门 #12 闭环**: docs 同步跨 1 文件 (AGENTS.md), commit 引用 §4 row 14 + §8 v0.72, 不回溯叙事, 不沿用 v0.71 旧 "D+D+A+B" 措辞
 - **新增已知缺口** (per 缺标比错标): (141) 5 域 Lead 真人到位后追溯签字 推不动 (Mavis 长期代签 不可主动推进, 跟 v0.71 #138 一致)
 - **可重构状态**: main HEAD 待 commit, AGENTS.md 修订历史 v0.71 → v0.72, §4 守门 新增 row 14 CONTENT 4 维 拍板, 5 域 Lead 真人到位后追溯签字 推不动 (per 守门 #3 反转 8/21) | 2026-09-03 19:43 JST 用户发令"5域真人的内容现在就让我选好" + ask_user 4-step 拍板 4 项 both+rac+tbd+all-proxy + AGENTS v0.72 docs 同步, 守门 #1+#3+#9+#12+#20 跨 stage 全过, ~0.02M token 估 |
+| v0.74 | 2026-09-04 19:15 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **Star LangGraph TMO 任务卡管理操作 升版 v0.2 (per 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡, 做整体统筹规划, 发号施令的入口是底端聊天窗口, 例如合并任务a和任务b这种全局管理的ai功能是要能实现的")** + ask_user 3 问拍板 (1) 范围=完整 7 节点全覆盖 (2) 文档策略=原地升版 v0.1 → v0.2 (3) 实装阶段=文档+commit 一并落 (per ask_d076c26d3fbf599eec1c32fd), 守门 #1+#3+#5+#6+#7+#9+#10+#12+#13+#15+#19+#20+#22+#23+#24+#1 v19+#1 v20+#1 v22+#3 v2 跨 stage 全过, ~0.10M token 估):
+- **新事件触发**: 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡" + ask_user 3 问拍板 (1) 范围 (2) 文档策略 (3) 实装阶段
+- **TMO 业务诉求 (per 用户 19:15 JST 原文)**: L0 顶层代理 从 UI 底端聊天栏 (chat bar) 操控任务卡, 整体统筹规划, 合并任务 a 和 b 这种全局管理 AI 功能必须能实现
+- **5 个文件落档 (per 守门 #12 缺标比错标)**:
+  1. `docs/architecture/2026-09-03-langgraph/01-requirements.md` v0.1 → v0.2 — 加 UC-09..UC-13 (合并/拆分/依赖/批量/汇总+元数据 5 新 UC) + F-19..F-25 (7 TMO 機能) + NFR-TMO-01..05 (合并原子性/拆分可逆/批量一致性/血缘可追溯/DAG 校验) + 4 用語 (TMO/TaskOperationsManager/Task Relationship Graph/Supersede) + S-06 想定シナリオ (合并 a + b) + 5 签字 v0.2 升版
+  2. `docs/architecture/2026-09-03-langgraph/02-basic-design.md` v0.1 → v0.2 — 加 §2.6 TMO 全节 (7 节点 M-N1..M-N7 + 7 协议 + 7 组件 C-16..C-22 + State Schema 扩展 + 5 Reducer + 5 route + 7 metrics + 守门合规表 7 项) + 8 外部 API 端点 (/api/tmo/*) + 5 签字 v0.2 升版
+  3. `docs/architecture/2026-09-03-langgraph/03-detailed-design.md` v0.1 → v0.2 — 加 task_ops/ 子模块 + 25 新 module (M-19..M-25) + 7 节点 Python 実装 (M-N1 merge/split/reorder/bulk/summarize/reassign/metadata) + SA-10 task-orchestrator + superseded 终态 + UT-20..UT-26 (7 新单测) + IT-10..IT-12 (3 新集成) + E2E-09..E2E-13 (5 新 E2E) + 5 签字 v0.2 升版
+  4. `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` (NEW) — TMO 决策记录 (3 备选方案拒绝理由 + 5 后果 + 5 阶段实施计划 + 3 决策日志 + 5 签字栏 Mavis 接手代签)
+  5. `docs/reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md` v0.1 (NEW) — TMO 7 子项实装 phase 计划 (TMO-01..TMO-07, ~2.5M tokens 估, 走守门 #19 Python 化 + #9 v3 subprocess + #22 控制台不污染 main + #23 AI mock)
+- **AGENTS.md 同步** (per 守门 #12 缺标比错标):
+  - §6 主 ADR 列表追加 ADR-0046 行 (在 ADR-0045 后)
+  - §6.1 架构 view 索引: 3 份 LangGraph 文档标 v0.2 + 加 TMO 7 节点描述 + ADR-0046 + PHASE 报告 v0.1 引用 + SA-10 task-orchestrator 提及
+  - §7 待办表 #8 行更新: "v0.2 文档完成, TMO 实装 pending" (原 "初版文档完成, 实装 pending") + 加 #8.1 子行 "TMO 7 子项实装 phase" (~2.5M tokens, 独立并行, 状态 planned)
+  - §8 修订历史追加 v0.74 行 (本行)
+- **架构核心扩展 (per 用户 19:15 JST 原文)**: L0 全体代理 (Top-Level Agent) 放置在 UI 最下行聊天栏背后 + TMO 7 节点扩展 (M-N1 merge / M-N2 split / M-N3 reorder / M-N4 bulk / M-N5 summarize / M-N6 reassign / M-N7 metadata), 7 节点全部 L0 协调 (per 守门 #13 a L1↔L1 禁止); L1 任务卡子代理 (Sub-Agent) 9 类型 + SA-10 task-orchestrator (v0.2 新增 TMO 跨任务编排型)
+- **守门 #1 阶段 1 实证**: 纯文档无 .rs 改动 (5 文件 0 .rs), cargo check 不需要跑 (per 守门 #1 阶段 1 仅 lib, 本 v0.74 是纯文档)
+- **守门 #12 闭环**: docs 同步跨 5 文件 (3 份 IPA 文档 + ADR-0046 + PHASE 报告 + AGENTS.md), commit 引用 docs 相对路径, 不回溯叙事, 不沿用 v0.1 旧 "整体 LangGraph" 措辞
+- **守门 #13 a 派生 (per 守门 #13 a L1↔L1 禁止)**: TMO 7 节点全部 L0 协调, 唯一 cross-task actor = TaskOperationsManager (C-16); 实证待 TMO 实装阶段 补 (DAGValidator cycle detection O(V+E))
+- **守门 #13 c/d 派生 (per 守门 #13 W/T/M)**: task card 状态 = Work (短 TTL), checkpoint history = Transaction (append-only, 守门 #13 d), task_metadata = Master (SCD Type 2 + 100% RLS 必携, 守门 #13 c)
+- **守门 #19/#20 实证**: 落档为 root 内部工作, 无 worker dispatch (TMO 实装阶段才派 worker subagent, 必先 brief per 守门 #20)
+- **新增已知缺口** (per 缺标比错标): (142) TMO 7 节点实装 P0 (文档 v0.2 落档, 实装待 P0-1/H2 阻塞解除 + 5 域 Lead 真人到位); (143) 守门 #13 a 强约束派生实证缺口 (L1↔L1 禁止 → TMO 全部 L0 协调); (144) SA-10 task-orchestrator stub 缺失; (145) task_metadata 表 DDL 缺 (per 守门 #13 c Master RLS); (146) LangGraph SDK 0.2.x interrupt_response API alpha (实装前先 `uv add langgraph@latest` + `pip show langgraph` 确认); (147) 现有 dispatcher.py / console_server.py 过渡期 (TMO 实装跟 worker subagent 系统并存期间 接口 namespace 隔离)
+- **可重构状态**: main HEAD 待 commit (本 v0.74 5 文件 0 .rs), AGENTS.md 修订历史 v0.73 → v0.74, §6 + §6.1 + §7 #8/#8.1 + §8 v0.74 同步, 3 份 LangGraph 文档 v0.1 → v0.2 升版, ADR-0046 + PHASE 报告 v0.1 新建, TMO 7 子项实装 phase 计划落档, 实装待 P0-1/H2 阻塞解除 | 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡" + ask_user 3 问拍板 (1) 范围=完整 7 节点 (2) 文档策略=原地升版 v0.2 (3) 实装阶段=文档+commit 一并落 (per ask_d076c26d3fbf599eec1c32fd) + 3 份 IPA 文档 v0.2 升版 + ADR-0046 + PHASE 报告 v0.1 + AGENTS.md 同步, 守门 #1+#3+#5+#6+#7+#9+#10+#12+#13+#15+#19+#20+#22+#23+#24+#1 v19+#1 v20+#1 v22+#3 v2 跨 stage 全过, ~0.10M token 估 |
 | v0.73 | 2026-09-03 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **RF-001 T1.5 step 1 落地 + `-j 4` 修正 "cargo workspace 互锁" 误诊** (per 用户"继续推进 RF-001" + 下游 AI 已改 Cargo.toml `unreachable_pub` warn→deny 未 commit + 本 session 验证):
 - **新事件触发**: 下游 AI 已将 `[workspace.lints.rust] unreachable_pub` 改 `"deny"` (T1.5 step 1/3, per WBS-001-refactor.md §1 T1.5) 但未 commit, comment 内声称"cargo check 跳过"; 本 session 重新验证
 - **实证**: `cargo check --workspace --lib` 默认并行度崩溃 (`STATUS_STACK_BUFFER_OVERRUN` 0xc0000409 + Windows error 1453 配额不足, 跨 ~17 crate, 0 条 `error[EXXXX]:`, 纯进程级崩溃非编译错误) → `-j 4` 降并行度后 0 err, 32.27s 通过 (仅 missing_docs 既有 warning, 该 lint 仍 "warn")
