@@ -94,16 +94,17 @@ pub use value_object::{
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::ActorContext; // P0-1 兼容: 显式覆盖 super::* 的 star_context 命名
     use crate::value_object::{
         ProjectId, TenantId, TriggeredBy, UserId, ValidationKind, ValidationStatus, WorkItemId,
     };
 
     fn make_test_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::DEVELOPER)
+        ActorContext::new(UserId::new(), tenant_id).with_role(roles::DEVELOPER)
     }
 
     fn make_service_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(uuid::Uuid::new_v4(), tenant_id).with_role(roles::SERVICE_INTERNAL)
+        ActorContext::new(UserId::new(), tenant_id).with_role(roles::SERVICE_INTERNAL)
     }
 
     fn make_submit_cmd(tenant_id: TenantId, kind: ValidationKind) -> SubmitValidationResultCommand {
@@ -323,7 +324,7 @@ mod tests {
                 LinkAcceptanceEvidenceCommand {
                     tenant_id: TenantId(tenant_id),
                     work_item_id: work_item,
-                    acceptance_criterion_id: UserId::new(),
+                    acceptance_criterion_id: uuid::Uuid::new_v4(),
                     validation_id: r.id,
                 },
                 actor.clone(),
@@ -455,7 +456,7 @@ mod tests {
         let tenant_b = uuid::Uuid::new_v4();
         let actor_a = make_service_actor(TenantId(tenant_a));
         let r = svc
-            .submit_result(make_submit_cmd(tenant_a, ValidationKind::Build), actor_a)
+            .submit_result(make_submit_cmd(TenantId(tenant_a), ValidationKind::Build), actor_a)
             .await
             .unwrap();
         let actor_b = make_service_actor(TenantId(tenant_b));

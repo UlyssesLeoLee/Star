@@ -1123,7 +1123,7 @@ mod tests {
         let res = svc
             .register_device(
                 RegisterDeviceCommand {
-                    tenant_id: other,
+                    tenant_id: TenantId(other),
                     user_id: UserId::new(),
                     kind: DeviceKind::Web,
                     device_cert_fingerprint: "abc".to_string(),

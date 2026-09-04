@@ -1147,7 +1147,7 @@ mod tests {
                 },
                 &ActorContext::new(user, tenant)
                     .with_role("developer")
-                    .with_project(project),
+                    .with_project(project.as_uuid()),
             )
             .await
             .unwrap();
@@ -1260,7 +1260,7 @@ mod tests {
                 },
                 &ActorContext::new(user, tenant)
                     .with_role("developer")
-                    .with_project(project),
+                    .with_project(project.as_uuid()),
             )
             .await
             .unwrap();
@@ -1281,7 +1281,7 @@ mod tests {
         let scheme = svc
             .create_scheme(
                 CreateSchemeCommand {
-                    tenant_id: tenant_a,
+                    tenant_id: TenantId(tenant_a),
                     name: "s".into(),
                     actor_user_id: UserId::from(admin_a.user_id),
                 },
@@ -1294,7 +1294,7 @@ mod tests {
         let res = svc
             .check(
                 CheckQuery {
-                    tenant_id: tenant_b,
+                    tenant_id: TenantId(tenant_b),
                     scheme_id: Some(scheme.id),
                     subject_user_id: UserId(user),
                     project_id: project,
@@ -1478,7 +1478,7 @@ mod tests {
                 },
                 &ActorContext::new(user, tenant)
                     .with_role("developer")
-                    .with_project(project),
+                    .with_project(project.as_uuid()),
             )
             .await
             .unwrap();
@@ -1552,7 +1552,7 @@ mod tests {
                     },
                     &ActorContext::new(user, tenant)
                         .with_role("viewer")
-                        .with_project(project),
+                        .with_project(project.as_uuid()),
                 )
                 .await
                 .unwrap();
@@ -1617,7 +1617,7 @@ mod tests {
         // 3) check 各动作
         let actor_user = ActorContext::new(user, tenant)
             .with_role("project_admin")
-            .with_project(project);
+            .with_project(project.as_uuid());
         for action in [Action::Read, Action::Write, Action::Admin] {
             let ok = svc
                 .check(
@@ -1734,7 +1734,7 @@ mod tests {
         // 在 tenant_a 授权
         svc.grant_role(
             GrantRoleCommand {
-                tenant_id: tenant_a,
+                tenant_id: TenantId(tenant_a),
                 user_id: UserId(user),
                 project_id: project,
                 role: Role::Developer,
@@ -1748,7 +1748,7 @@ mod tests {
         let res = svc
             .list_roles(
                 ListRolesQuery {
-                    tenant_id: tenant_a,
+                    tenant_id: TenantId(tenant_a),
                     project_id: project,
                 },
                 &admin_b,

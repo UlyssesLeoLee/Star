@@ -1073,7 +1073,7 @@ mod tests {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
         let cs = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         assert_eq!(cs.status, ChangeSetStatus::Draft);
@@ -1087,7 +1087,7 @@ mod tests {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
         let cs = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         let actor = developer(TenantId(tid));
@@ -1119,7 +1119,7 @@ mod tests {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
         let cs = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         let actor = developer(TenantId(tid));
@@ -1156,7 +1156,7 @@ mod tests {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
         let cs = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         let actor = developer(TenantId(tid));
@@ -1178,7 +1178,7 @@ mod tests {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
         let cs = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         let dev = developer(TenantId(tid));
@@ -1209,7 +1209,7 @@ mod tests {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
         let cs = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         let dev = developer(TenantId(tid));
@@ -1242,7 +1242,7 @@ mod tests {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
         let cs = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         let dev = developer(TenantId(tid));
@@ -1283,7 +1283,7 @@ mod tests {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
         let cs = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         let dev = developer(TenantId(tid));
@@ -1322,7 +1322,7 @@ mod tests {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
         let cs = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         let dev = developer(TenantId(tid));
@@ -1354,7 +1354,7 @@ mod tests {
         let svc = InMemoryDevelopmentService::new();
         let tid = uuid::Uuid::new_v4();
         let cs = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         let actor = developer(TenantId(tid));
@@ -1432,15 +1432,15 @@ mod tests {
         let pa = project_admin(TenantId(tid));
         // 3 个 ChangeSet:1 Draft,1 ReadyForReview,1 Approved
         let cs1 = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         let cs2 = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         let cs3 = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         svc.submit(
@@ -1513,7 +1513,7 @@ mod tests {
         let tid_b = uuid::Uuid::new_v4();
         let actor_a = developer(TenantId(tid_a));
         let cs = svc
-            .create_change_set(make_cmd(tid_a), &developer(tid_a))
+            .create_change_set(make_cmd(TenantId(tid_a)), &developer(TenantId(tid_a)))
             .await
             .unwrap();
         let actor_b = developer(TenantId(tid_b));
@@ -1534,7 +1534,7 @@ mod tests {
         let res = svc
             .create_change_set(
                 CreateChangeSetCommand {
-                    tenant_id: tid_b,
+                    tenant_id: TenantId(tid_b),
                     worktree_id: WorktreeId::new(),
                     work_item_id: WorkItemId::new(),
                     agent_session_id: None,
@@ -1559,7 +1559,7 @@ mod tests {
         let pa = project_admin(TenantId(tid));
         // 1. Draft + add files
         let cs = svc
-            .create_change_set(make_cmd(tid), &developer(tid))
+            .create_change_set(make_cmd(TenantId(tid)), &developer(TenantId(tid)))
             .await
             .unwrap();
         let cs = svc

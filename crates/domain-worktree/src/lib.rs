@@ -1034,7 +1034,7 @@ mod tests {
         let svc = InMemoryWorktreeService::new();
         let actor_tenant = uuid::Uuid::new_v4();
         let cmd_tenant = uuid::Uuid::new_v4(); // 不同 tenant
-        let actor = make_actor(actor_tenant);
+        let actor = make_actor(TenantId(actor_tenant));
         let cmd = make_create_cmd(TenantId(cmd_tenant));
         let res = svc.create_worktree(cmd, &actor).await;
         assert!(matches!(res, Err(WorktreeError::CrossTenantDenied(_, _))));
@@ -1230,14 +1230,14 @@ mod tests {
     async fn get_by_id_cross_tenant_denied() {
         let svc = InMemoryWorktreeService::new();
         let tenant_a = uuid::Uuid::new_v4();
-        let actor_a = make_actor(tenant_a);
+        let actor_a = make_actor(TenantId(tenant_a));
         let wt = svc
-            .create_worktree(make_create_cmd(tenant_a), &actor_a)
+            .create_worktree(make_create_cmd(TenantId(tenant_a)), &actor_a)
             .await
             .unwrap();
         // 另一 tenant 的 actor
         let tenant_b = uuid::Uuid::new_v4();
-        let actor_b = make_actor(tenant_b);
+        let actor_b = make_actor(TenantId(tenant_b));
         let res = svc.get_by_id(wt.id, &actor_b).await;
         assert!(matches!(res, Err(WorktreeError::CrossTenantDenied(_, _))));
     }

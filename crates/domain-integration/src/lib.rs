@@ -79,7 +79,8 @@ pub use value_object::{
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::*;    use crate::context::ActorContext; // P0-1 兼容: 显式覆盖 super::* 的 star_context 命名
+
     use crate::value_object::{
         roles, ConflictStrategy, ExternalEntityId, ExternalSystemName, IntegrationRelationType,
         IntegrationSource, IntegrationState, ProjectId, SyncStateId, TenantId, UserId,
@@ -88,9 +89,9 @@ mod tests {
     // -------- 测试夹具 --------
 
     fn make_test_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(uuid::Uuid::new_v4(), *tenant_id.as_uuid())
+        ActorContext::new(UserId::new(), tenant_id)
             .with_role(roles::PROJECT_ADMIN)
-            .with_project(*ProjectId::new().as_uuid())
+            .with_project(ProjectId::new())
     }
 
     fn make_create_cmd(
@@ -304,13 +305,13 @@ mod tests {
         let tenant_a = uuid::Uuid::new_v4();
         let tenant_b = uuid::Uuid::new_v4();
         let actor_a = make_test_actor(TenantId(tenant_a));
-        let cmd = make_create_cmd(tenant_a, IntegrationRelationType::Mirror);
+        let cmd = make_create_cmd(TenantId(tenant_a), IntegrationRelationType::Mirror);
         let integration = svc
             .create_integration(cmd, actor_a.clone())
             .await
             .expect("创建成功");
 
-        let actor_b = ActorContext::new(uuid::Uuid::new_v4(), tenant_b)
+        let actor_b = ActorContext::new(UserId::new(), TenantId(tenant_b))
             .with_role(roles::PROJECT_ADMIN)
             .with_project(integration.project_id);
         let res = svc.get_integration(integration.id, actor_b).await;

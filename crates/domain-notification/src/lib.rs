@@ -944,7 +944,7 @@ mod tests {
             .register_channel(
                 RegisterChannelCommand {
                     tenant_id: TenantId(tenant_id),
-                    user_id: other, // 试图给别人注册
+                    user_id: UserId(other), // 试图给别人注册
                     kind: ChannelKind::Email,
                     address: "x@y.com".to_string(),
                     actor_user_id: me,
@@ -1127,7 +1127,7 @@ mod tests {
         let res = svc
             .dispatch(
                 DispatchNotificationCommand {
-                    tenant_id: cmd_t,
+                    tenant_id: TenantId(cmd_t),
                     user_id: me,
                     event_type: NotificationEventType::ValidationFailed,
                     resource_type: "x".to_string(),

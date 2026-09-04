@@ -937,7 +937,7 @@ mod tests {
         let actor = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
         let res = svc
             .upsert_index(
-                sample_index_cmd(tenant_id, ResourceType::WorkItem, "x"),
+                sample_index_cmd(TenantId(tenant_id), ResourceType::WorkItem, "x"),
                 &actor,
             )
             .await;
@@ -948,22 +948,22 @@ mod tests {
     async fn projector_upsert_and_search() {
         let svc = InMemorySearchService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let projector = projector_actor(tenant_id);
+        let projector = projector_actor(TenantId(tenant_id));
         // 注入 3 个 work_item 索引
         svc.upsert_index(
-            sample_index_cmd(tenant_id, ResourceType::WorkItem, "fix login bug"),
+            sample_index_cmd(TenantId(tenant_id), ResourceType::WorkItem, "fix login bug"),
             &projector,
         )
         .await
         .unwrap();
         svc.upsert_index(
-            sample_index_cmd(tenant_id, ResourceType::WorkItem, "add OAuth"),
+            sample_index_cmd(TenantId(tenant_id), ResourceType::WorkItem, "add OAuth"),
             &projector,
         )
         .await
         .unwrap();
         svc.upsert_index(
-            sample_index_cmd(tenant_id, ResourceType::Comment, "see login PR"),
+            sample_index_cmd(TenantId(tenant_id), ResourceType::Comment, "see login PR"),
             &projector,
         )
         .await
@@ -996,25 +996,25 @@ mod tests {
         let svc = InMemorySearchService::new();
         let t1 = uuid::Uuid::new_v4();
         let t2 = uuid::Uuid::new_v4();
-        let p1 = projector_actor(t1);
-        let p2 = projector_actor(t2);
+        let p1 = projector_actor(TenantId(t1));
+        let p2 = projector_actor(TenantId(t2));
         svc.upsert_index(
-            sample_index_cmd(t1, ResourceType::WorkItem, "tenant1 doc"),
+            sample_index_cmd(TenantId(t1), ResourceType::WorkItem, "tenant1 doc"),
             &p1,
         )
         .await
         .unwrap();
         svc.upsert_index(
-            sample_index_cmd(t2, ResourceType::WorkItem, "tenant2 doc"),
+            sample_index_cmd(TenantId(t2), ResourceType::WorkItem, "tenant2 doc"),
             &p2,
         )
         .await
         .unwrap();
-        let user1 = make_actor(TenantId(t1), uuid::Uuid::new_v4());
+        let user1 = make_actor(TenantId(t1), UserId(uuid::Uuid::new_v4()));
         let r = svc
             .search(
                 SearchQueryDto {
-                    tenant_id: t1,
+                    tenant_id: TenantId(t1),
                     query: SearchQuery {
                         query_text: "doc".to_string(),
                         filters: HashMap::new(),
@@ -1030,22 +1030,22 @@ mod tests {
             .unwrap();
         // 只能看到 tenant1 的 1 条
         assert_eq!(r.total, 1);
-        assert_eq!(r.items[0].tenant_id, t1);
+        assert_eq!(r.items[0].tenant_id, TenantId(t1));
     }
 
     #[tokio::test]
     async fn search_filter_by_resource_type() {
         let svc = InMemorySearchService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let projector = projector_actor(tenant_id);
+        let projector = projector_actor(TenantId(tenant_id));
         svc.upsert_index(
-            sample_index_cmd(tenant_id, ResourceType::WorkItem, "auth module refactor"),
+            sample_index_cmd(TenantId(tenant_id), ResourceType::WorkItem, "auth module refactor"),
             &projector,
         )
         .await
         .unwrap();
         svc.upsert_index(
-            sample_index_cmd(tenant_id, ResourceType::Comment, "auth review note"),
+            sample_index_cmd(TenantId(tenant_id), ResourceType::Comment, "auth review note"),
             &projector,
         )
         .await
@@ -1078,8 +1078,8 @@ mod tests {
     async fn upsert_idempotent_old_version_skipped() {
         let svc = InMemorySearchService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let projector = projector_actor(tenant_id);
-        let cmd = sample_index_cmd(tenant_id, ResourceType::WorkItem, "v1 text");
+        let projector = projector_actor(TenantId(tenant_id));
+        let cmd = sample_index_cmd(TenantId(tenant_id), ResourceType::WorkItem, "v1 text");
         svc.upsert_index(cmd.clone(), &projector).await.unwrap();
         // 旧版本投影:跳过
         let mut old = cmd.clone();
@@ -1093,10 +1093,10 @@ mod tests {
     async fn delete_index_by_resource() {
         let svc = InMemorySearchService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let projector = projector_actor(tenant_id);
+        let projector = projector_actor(TenantId(tenant_id));
         let resource_id = Uuid::new_v4();
         let cmd = UpsertIndexCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             project_id: ProjectId::new(),
             resource_type: ResourceType::WorkItem,
             resource_id,
@@ -1141,7 +1141,7 @@ mod tests {
     async fn bulk_reindex_mixed() {
         let svc = InMemorySearchService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let projector = projector_actor(tenant_id);
+        let projector = projector_actor(TenantId(tenant_id));
         let project_id = ProjectId::new();
         let entries = vec![
             UpsertIndexCommand {
@@ -1186,29 +1186,29 @@ mod tests {
         let svc = InMemorySearchService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
-        let actor = make_actor(TenantId(tenant_id), me);
+        let actor = make_actor(TenantId(tenant_id), UserId(me));
         let q = SearchQuery {
             query_text: "login".to_string(),
             filters: HashMap::new(),
             sort: None,
             limit: 10,
             offset: 0,
-            user_id: me,
+            user_id: UserId(me),
         };
         let saved = svc
             .save_search(
                 SaveSearchCommand {
                     tenant_id: TenantId(tenant_id),
-                    user_id: me,
+                    user_id: UserId(me),
                     name: "my login search".to_string(),
                     query: q,
-                    actor_user_id: me,
+                    actor_user_id: UserId(me),
                 },
                 &actor,
             )
             .await
             .unwrap();
-        let list = svc.list_saved(tenant_id, &actor).await.unwrap();
+        let list = svc.list_saved(TenantId(tenant_id), &actor).await.unwrap();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].id, saved.id);
     }
@@ -1220,35 +1220,35 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let me = uuid::Uuid::new_v4();
         let other = uuid::Uuid::new_v4();
-        let actor_me = make_actor(TenantId(tenant_id), me);
+        let actor_me = make_actor(TenantId(tenant_id), UserId(me));
         let q = SearchQuery {
             query_text: "x".to_string(),
             filters: HashMap::new(),
             sort: None,
             limit: 10,
             offset: 0,
-            user_id: me,
+            user_id: UserId(me),
         };
         let saved = svc
             .save_search(
                 SaveSearchCommand {
                     tenant_id: TenantId(tenant_id),
-                    user_id: me,
+                    user_id: UserId(me),
                     name: "private".to_string(),
                     query: q,
-                    actor_user_id: me,
+                    actor_user_id: UserId(me),
                 },
                 &actor_me,
             )
             .await
             .unwrap();
-        let actor_other = make_actor(TenantId(tenant_id), other);
+        let actor_other = make_actor(TenantId(tenant_id), UserId(other));
         let res = svc
             .delete_saved(
                 DeleteSavedSearchCommand {
                     tenant_id: TenantId(tenant_id),
                     saved_search_id: saved.id,
-                    actor_user_id: other,
+                    actor_user_id: UserId(other),
                 },
                 &actor_other,
             )
@@ -1260,19 +1260,15 @@ mod tests {
     async fn suggest_partial_match() {
         let svc = InMemorySearchService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let projector = projector_actor(tenant_id);
+        let projector = projector_actor(TenantId(tenant_id));
         svc.upsert_index(
-            sample_index_cmd(
-                tenant_id: TenantId(tenant_id),
-                ResourceType::WorkItem,
-                "implement authentication",
-            ),
+            sample_index_cmd(TenantId(tenant_id), ResourceType::WorkItem, "implement authentication"),
             &projector,
         )
         .await
         .unwrap();
         svc.upsert_index(
-            sample_index_cmd(tenant_id, ResourceType::WorkItem, "authorize user"),
+            sample_index_cmd(TenantId(tenant_id), ResourceType::WorkItem, "authorize user"),
             &projector,
         )
         .await

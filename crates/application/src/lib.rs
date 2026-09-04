@@ -261,7 +261,10 @@ mod tests {
             device_id: None,
             is_local_runtime: false,
             is_platform_admin: false,
+            is_agent_session: false,
+            tenant_policy_id: None,
             project_ids: vec![],
+            workspace_ids: vec![],
             roles: vec!["developer".to_string()],
         };
         assert!(

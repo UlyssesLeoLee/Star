@@ -1554,13 +1554,13 @@ mod tests {
         let t1 = uuid::Uuid::new_v4();
         let t2 = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let a1 = make_actor(t1);
-        let a2 = make_actor(t2);
+        let a1 = make_actor(TenantId(t1));
+        let a2 = make_actor(TenantId(t2));
 
         let board = svc
             .create_board(
                 CreateBoardCommand {
-                    tenant_id: t1,
+                    tenant_id: TenantId(t1),
                     project_id: project,
                     name: "B".to_string(),
                     description: String::new(),
@@ -1687,8 +1687,8 @@ mod tests {
         let t2 = uuid::Uuid::new_v4();
         let p1 = ProjectId::new();
         let p2 = ProjectId::new();
-        let a1 = make_actor(t1);
-        let a2 = make_actor(t2);
+        let a1 = make_actor(TenantId(t1));
+        let a2 = make_actor(TenantId(t2));
 
         for (tid, pid, actor) in [(t1, p1, &a1), (t1, p2, &a1), (t2, p1, &a2)] {
             svc.create_board(
@@ -1708,7 +1708,7 @@ mod tests {
         let out = svc
             .list_by_project(
                 ListByProjectQuery {
-                    tenant_id: t1,
+                    tenant_id: TenantId(t1),
                     project_id: p1,
                 },
                 &a1,

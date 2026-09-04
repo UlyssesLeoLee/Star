@@ -1026,7 +1026,7 @@ mod tests {
         let s_done = WorkflowStateId::new();
         let s_blocked = WorkflowStateId::new();
         let cmd = CreateWorkflowCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             name: "Multi State".to_string(),
             states: vec![
                 WorkflowState {
@@ -1214,12 +1214,12 @@ mod tests {
         let svc = InMemoryWorkflowService::new();
         let tenant_a = uuid::Uuid::new_v4();
         let tenant_b = uuid::Uuid::new_v4();
-        let actor_a = make_actor(tenant_a);
+        let actor_a = make_actor(TenantId(tenant_a));
         let cmd = make_three_state_workflow(TenantId(tenant_a));
         let wf = svc.create_workflow(cmd, &actor_a).await.unwrap();
 
         // 跨 tenant 查询
-        let actor_b = make_actor(tenant_b);
+        let actor_b = make_actor(TenantId(tenant_b));
         let res = svc.get(wf.id, &actor_b).await;
         assert!(matches!(res, Err(WorkflowError::CrossTenantDenied(_, _))));
 
@@ -1227,7 +1227,7 @@ mod tests {
         let res2 = svc
             .start_instance(
                 StartInstanceCommand {
-                    tenant_id: tenant_b,
+                    tenant_id: TenantId(tenant_b),
                     workflow_id: wf.id,
                     work_item_id: WorkItemId::new(),
                     actor: UserId::from(actor_b.user_id),
@@ -1315,7 +1315,7 @@ mod tests {
         let s_todo = WorkflowStateId::new();
         let s_done = WorkflowStateId::new();
         let cmd = CreateWorkflowCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             name: "Approval".to_string(),
             states: vec![
                 WorkflowState {
@@ -1404,7 +1404,7 @@ mod tests {
 
         // list_by_tenant
         let list = svc
-            .list_by_tenant(ListByTenantQuery { tenant_id }, &actor)
+            .list_by_tenant(ListByTenantQuery { tenant_id: TenantId(tenant_id) }, &actor)
             .await
             .unwrap();
         assert_eq!(list.len(), 1);

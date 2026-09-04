@@ -1434,11 +1434,11 @@ mod tests {
         let svc = InMemoryAgentService::new();
         let actor_tenant = uuid::Uuid::new_v4();
         let cmd_tenant = uuid::Uuid::new_v4();
-        let actor = make_actor(actor_tenant);
+        let actor = make_actor(TenantId(actor_tenant));
         let res = svc
             .register_agent(
                 RegisterAgentCommand {
-                    tenant_id: cmd_tenant,
+                    tenant_id: TenantId(cmd_tenant),
                     agent_type: AgentType::Codex,
                     provider: "openai".to_string(),
                     version: "1.0".to_string(),

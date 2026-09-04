@@ -981,7 +981,7 @@ mod tests {
         let p = svc
             .create_context_packet(
                 CreateContextPacketCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: ProjectId::new(),
                     work_item_id: WorkItemId::new(),
                     worktree_id: WorktreeId::new(),
@@ -1013,7 +1013,7 @@ mod tests {
         let p = svc
             .create_context_packet(
                 CreateContextPacketCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: ProjectId::new(),
                     work_item_id: WorkItemId::new(),
                     worktree_id: WorktreeId::new(),
@@ -1038,7 +1038,7 @@ mod tests {
         };
         let p2 = svc
             .add_relevant_item(
-                tenant_id,
+                TenantId(tenant_id),
                 p.id,
                 RelevantBucket::RelevantRequirements,
                 Priority::P1,
@@ -1063,7 +1063,7 @@ mod tests {
         let p = svc
             .create_context_packet(
                 CreateContextPacketCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: ProjectId::new(),
                     work_item_id: WorkItemId::new(),
                     worktree_id: WorktreeId::new(),
@@ -1088,7 +1088,7 @@ mod tests {
         // 这里改测 ProvenanceEntry 的 included_at_layer > P4 不可能
         let res = svc
             .add_relevant_item(
-                tenant_id,
+                TenantId(tenant_id),
                 p.id,
                 RelevantBucket::RelevantRequirements,
                 Priority::P4,
@@ -1113,11 +1113,11 @@ mod tests {
         let svc = InMemoryContextService::new();
         let actor_t = uuid::Uuid::new_v4();
         let cmd_t = uuid::Uuid::new_v4();
-        let actor = make_actor(actor_t);
+        let actor = make_actor(TenantId(actor_t));
         let res = svc
             .create_context_packet(
                 CreateContextPacketCommand {
-                    tenant_id: cmd_t,
+                    tenant_id: TenantId(cmd_t),
                     project_id: ProjectId::new(),
                     work_item_id: WorkItemId::new(),
                     worktree_id: WorktreeId::new(),
@@ -1146,7 +1146,7 @@ mod tests {
         let d = svc
             .create_decision(
                 CreateDecisionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: ProjectId::new(),
                     statement: "use PostgreSQL".to_string(),
                     reason: "scalability".to_string(),
@@ -1173,7 +1173,7 @@ mod tests {
         let d1 = svc
             .create_decision(
                 CreateDecisionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: ProjectId::new(),
                     statement: "v1".to_string(),
                     reason: "r".to_string(),
@@ -1192,7 +1192,7 @@ mod tests {
         let d2 = svc
             .create_decision(
                 CreateDecisionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: d1.project_id,
                     statement: "v2".to_string(),
                     reason: "r2".to_string(),
@@ -1211,7 +1211,7 @@ mod tests {
         let res = svc
             .supersede_decision(
                 SupersedeDecisionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     decision_id: d1.id,
                     successor_id: d2.id,
                     actor_user_id: UserId::from(actor.user_id),
@@ -1232,7 +1232,7 @@ mod tests {
         let d1 = svc
             .create_decision(
                 CreateDecisionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: ProjectId::new(),
                     statement: "v1".to_string(),
                     reason: "r".to_string(),
@@ -1251,7 +1251,7 @@ mod tests {
         let res = svc
             .supersede_decision(
                 SupersedeDecisionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     decision_id: d1.id,
                     successor_id: DecisionId::new(), // 不存在
                     actor_user_id: UserId::from(actor.user_id),
@@ -1270,7 +1270,7 @@ mod tests {
         let d = svc
             .create_decision(
                 CreateDecisionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: ProjectId::new(),
                     statement: "v1".to_string(),
                     reason: "r".to_string(),
@@ -1289,7 +1289,7 @@ mod tests {
         let res = svc
             .invalidate_decision(
                 InvalidateDecisionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     decision_id: d.id,
                     reason: "".to_string(),
                     actor_user_id: UserId::from(actor.user_id),
@@ -1308,7 +1308,7 @@ mod tests {
         let d = svc
             .create_decision(
                 CreateDecisionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: ProjectId::new(),
                     statement: "v1".to_string(),
                     reason: "r".to_string(),
@@ -1327,7 +1327,7 @@ mod tests {
         let res = svc
             .invalidate_decision(
                 InvalidateDecisionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     decision_id: d.id,
                     reason: "superseded by ADR-024".to_string(),
                     actor_user_id: UserId::from(actor.user_id),
@@ -1352,7 +1352,7 @@ mod tests {
         let d1 = svc
             .create_decision(
                 CreateDecisionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     statement: "a".to_string(),
                     reason: "r".to_string(),
@@ -1371,7 +1371,7 @@ mod tests {
         let _d2 = svc
             .create_decision(
                 CreateDecisionCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     statement: "b".to_string(),
                     reason: "r".to_string(),
@@ -1389,7 +1389,7 @@ mod tests {
             .unwrap();
         svc.invalidate_decision(
             InvalidateDecisionCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 decision_id: d1.id,
                 reason: "x".to_string(),
                 actor_user_id: UserId::from(actor.user_id),
@@ -1401,7 +1401,7 @@ mod tests {
         let active = svc
             .list_decisions(
                 ListDecisionsQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     include_terminal: false,
                 },
@@ -1413,7 +1413,7 @@ mod tests {
         let all = svc
             .list_decisions(
                 ListDecisionsQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     include_terminal: true,
                 },
@@ -1433,7 +1433,7 @@ mod tests {
         let p = svc
             .create_context_packet(
                 CreateContextPacketCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: ProjectId::new(),
                     work_item_id: WorkItemId::new(),
                     worktree_id: WorktreeId::new(),
@@ -1457,7 +1457,7 @@ mod tests {
             provenance: sample_prov(Priority::P2),
         };
         svc.add_relevant_item(
-            tenant_id,
+            TenantId(tenant_id),
             p.id,
             RelevantBucket::RelevantRequirements,
             Priority::P2,
@@ -1469,7 +1469,7 @@ mod tests {
         let got = svc
             .get_context_packet(
                 GetContextPacketQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     packet_id: p.id,
                 },
                 &actor,
