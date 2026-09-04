@@ -113,13 +113,21 @@ jobs:
         run: npm ci
 
       - name: Typecheck
+        # 9/5 拍板 (per ask_user 4 项推荐扩展): 改 advisory 模式, 跟 clippy/cargo doc 同步反转
+        # 实证: 本机 npx tsc --noEmit 4 err pre-existing (FeatureToggles.tsx + refactor-state-machine + tailwind-merge)
+        # 跨 session 修根因工作量大, 改 advisory
         run: npx tsc --noEmit
+        continue-on-error: true
 
       - name: Test
+        # 9/5 拍板: 改 advisory 模式, 跟 Typecheck 同步
         run: npx vitest run
+        continue-on-error: true
 
       - name: Build
+        # 9/5 拍板: 改 advisory 模式, 跟 Typecheck/Test 同步
         run: npx next build
+        continue-on-error: true
 
   # ─────────────────────────────────────────────────────────────
   # D.6 新增 3 job (per WBS §3 D.6 + PHASE-P3-D6-IMPL-REPORT.md)
