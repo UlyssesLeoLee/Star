@@ -528,7 +528,12 @@ pub enum AgentError {
     NotFound(String),
     #[error("invalid state transition: {from} -> {to}")]
     /// 非法的状态迁移
-    InvalidTransition { from: String, to: String },
+    InvalidTransition {
+        /// 迁移前状态
+        from: String,
+        /// 迁移目标状态
+        to: String,
+    },
     #[error("permission denied")]
     /// 权限不足
     PermissionDenied,
