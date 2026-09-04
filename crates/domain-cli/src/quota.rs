@@ -27,7 +27,10 @@ use thiserror::Error;
 pub enum ApiError {
     /// HTTP 429 Too Many Requests (transient, 触发退避)
     #[error("rate limited (retry after {retry_after_secs}s)")]
-    RateLimited { retry_after_secs: u64 },
+    RateLimited {
+        /// 建议重试等待秒数
+        retry_after_secs: u64,
+    },
     /// HTTP 503 Service Unavailable (transient)
     #[error("service unavailable")]
     ServiceUnavailable,
@@ -45,7 +48,10 @@ pub enum ApiError {
     NotFound(String),
     /// 配额超限 (transient, 等下个窗口)
     #[error("quota exceeded for {scope}")]
-    QuotaExceeded { scope: String },
+    QuotaExceeded {
+        /// 超限的配额范围标识
+        scope: String,
+    },
     /// 其他未知错误
     #[error("unknown error: {0}")]
     Other(String),
