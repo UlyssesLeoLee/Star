@@ -1735,6 +1735,7 @@ L0 chat bar (用户输入)
 | G-DEP-02 | TMO-05 阻塞 P1 工具 (search_code / get_symbol / find_references / get_code_context) 4 tool | ~0.3-0.5M token | pending 推下 session |
 | 5 域 Lead 真人寻访 | per 9/4 18:30 JST 守门 #3 反转 5 子代理兼任, 真人寻访仍待 Ulysses 启动 | Ulysses 找 5 个真人 | pending |
 | 真实凭证切真 | per 9/3 11:35 JST 拍板 A, mock 备选已落地, 真实 .env / UI 填入待 Ulysses 提供 | Ulysses | pending |
+| ~~_ARCHIVED_*.md 临时文件收编~~ | ~~6 scratch 草稿收编~~ | **🟢 关闭** (per ARCHIVED-CLEANUP-REPORT v0.1, 6 文件 git rm + 留 git 历史证据) | closed |
 
 **注**: G-TMO-04 系列 5/5 全闭环 — 后续 G-TMO-04e+ 增量 (e.g. LLM API 接入 + task_metadata DDL migration runner) 可推下 session 续做.
 

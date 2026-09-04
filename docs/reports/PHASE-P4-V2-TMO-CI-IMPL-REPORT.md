@@ -93,7 +93,7 @@
 | Frontend pre-existing 4 err 修根因 | FeatureToggles.tsx onCheckedChange + refactor-state-machine + tailwind-merge | 推下 session | pending |
 | 600+ missing_docs warning 批量修 | per 守门 #7 v3 advisory 模式覆盖, 但根因修仍待 | 推下 session, 3-5M token | pending |
 | release flake + test_tmo_bulk_dag.py ImportError | pre-existing | 推下 session | pending |
-| _ARCHIVED_*.md 临时文件收编 | 部分已收编 | 推下 session | pending |
+| ~~_ARCHIVED_*.md 临时文件收编~~ | **🟢 关闭** (per ARCHIVED-CLEANUP-REPORT v0.1, 6 文件 git rm + 留 git 历史证据) | closed |
 | markdownlint HANDOFF-ST-001.md:70 残余 1 issue | 修无可避免重写 HANDOFF | 轻量, 可合并到 docs commit | pending |
 | HANDOFF v1.5 升版 | 综合 v0.2 + 真人到位 + V2-6 进一步升版 | 推下 session | pending |
 | 跨 session 续执行计划 | per Q10-P b 拍板 | 维持 | pending |
