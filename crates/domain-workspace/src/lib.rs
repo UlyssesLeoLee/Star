@@ -889,7 +889,7 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
         let cmd = CreateWorkspaceCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             workspace_key: "acme".to_string(),
             name: "Acme Workspace".to_string(),
             description: Some("main".to_string()),
@@ -911,7 +911,7 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
         let cmd1 = CreateWorkspaceCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             workspace_key: "dup".to_string(),
             name: "W1".to_string(),
             description: None,
@@ -919,7 +919,7 @@ mod tests {
         };
         svc.create_workspace(cmd1, actor.clone()).await.unwrap();
         let cmd2 = CreateWorkspaceCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             workspace_key: "dup".to_string(),
             name: "W2".to_string(),
             description: None,
@@ -935,7 +935,7 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
         let cmd = CreateWorkspaceCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             workspace_key: "".to_string(),
             name: "Empty".to_string(),
             description: None,
@@ -949,11 +949,11 @@ mod tests {
     async fn cross_tenant_access_denied() {
         let svc = InMemoryWorkspaceService::new_for_test();
         let tenant_a = uuid::Uuid::new_v4();
-        let actor_a = make_actor(tenant_a);
+        let actor_a = make_actor(TenantId(tenant_a));
         let ws = svc
             .create_workspace(
                 CreateWorkspaceCommand {
-                    tenant_id: tenant_a,
+                    tenant_id: TenantId(tenant_a),
                     workspace_key: "a".to_string(),
                     name: "A".to_string(),
                     description: None,
@@ -964,7 +964,7 @@ mod tests {
             .await
             .unwrap();
         let tenant_b = uuid::Uuid::new_v4();
-        let actor_b = make_actor(tenant_b);
+        let actor_b = make_actor(TenantId(tenant_b));
         let res = svc.get_by_id(ws.id, actor_b).await;
         assert!(matches!(res, Err(WorkspaceError::PermissionDenied)));
     }
@@ -977,7 +977,7 @@ mod tests {
         let ws = svc
             .create_workspace(
                 CreateWorkspaceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workspace_key: "ws".to_string(),
                     name: "WS".to_string(),
                     description: None,
@@ -992,8 +992,8 @@ mod tests {
             .add_member(
                 AddMemberCommand {
                     workspace_id: ws.id,
-                    tenant_id,
-                    user_id: new_user,
+                    tenant_id: TenantId(tenant_id),
+                    user_id: UserId(new_user),
                     role: WorkspaceRole::Member,
                 },
                 actor.clone(),
@@ -1006,8 +1006,8 @@ mod tests {
             .add_member(
                 AddMemberCommand {
                     workspace_id: ws.id,
-                    tenant_id,
-                    user_id: new_user,
+                    tenant_id: TenantId(tenant_id),
+                    user_id: UserId(new_user),
                     role: WorkspaceRole::Member,
                 },
                 actor.clone(),
@@ -1018,8 +1018,8 @@ mod tests {
         svc.remove_member(
             RemoveMemberCommand {
                 workspace_id: ws.id,
-                tenant_id,
-                user_id: new_user,
+                tenant_id: TenantId(tenant_id),
+                user_id: UserId(new_user),
             },
             actor,
         )
@@ -1039,7 +1039,7 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let actor = make_actor(TenantId(tenant_id));
         let cmd = CreateWorkspaceCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             workspace_key: "evt".to_string(),
             name: "E".to_string(),
             description: None,
@@ -1059,7 +1059,7 @@ mod tests {
         let ws = svc
             .create_workspace(
                 CreateWorkspaceCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     workspace_key: "v".to_string(),
                     name: "V".to_string(),
                     description: None,
@@ -1073,7 +1073,7 @@ mod tests {
             .update_workspace(
                 UpdateWorkspaceCommand {
                     workspace_id: ws.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     expected_version: 99,
                     name: Some("New".to_string()),
                     description: None,

@@ -1095,13 +1095,13 @@ mod tests {
     fn make_admin(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::PROJECT_ADMIN)
-            .with_project(project_id)
+            .with_project(project_id.as_uuid())
     }
 
     fn make_developer(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::DEVELOPER)
-            .with_project(project_id)
+            .with_project(project_id.as_uuid())
     }
 
     #[test]
@@ -1118,9 +1118,9 @@ mod tests {
         let svc = InMemoryAutomationService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_admin(tenant, project);
+        let actor = make_admin(TenantId(tenant), project);
         let cmd = CreateRuleCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             name: "feedback-p0".to_string(),
             description: Some("on P0 feedback".to_string()),
@@ -1155,9 +1155,9 @@ mod tests {
         let svc = InMemoryAutomationService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_admin(tenant, project);
+        let actor = make_admin(TenantId(tenant), project);
         let cmd = CreateRuleCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             name: "bad".to_string(),
             description: None,
@@ -1192,11 +1192,11 @@ mod tests {
         let svc = InMemoryAutomationService::new_for_test();
         let tenant_a = uuid::Uuid::new_v4();
         let project_a = ProjectId::new();
-        let actor_a = make_admin(tenant_a, project_a);
+        let actor_a = make_admin(TenantId(tenant_a), project_a);
         let rule = svc
             .create_rule(
                 CreateRuleCommand {
-                    tenant_id: tenant_a,
+                    tenant_id: TenantId(tenant_a),
                     project_id: project_a,
                     name: "r1".to_string(),
                     description: None,
@@ -1219,7 +1219,7 @@ mod tests {
             .unwrap();
         let tenant_b = uuid::Uuid::new_v4();
         let project_b = ProjectId::new();
-        let actor_b = make_admin(tenant_b, project_b);
+        let actor_b = make_admin(TenantId(tenant_b), project_b);
         let res = svc.get_rule(rule.id, actor_b).await;
         assert!(matches!(res, Err(AutomationError::PermissionDenied)));
     }
@@ -1229,9 +1229,9 @@ mod tests {
         let svc = InMemoryAutomationService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_developer(tenant, project);
+        let actor = make_developer(TenantId(tenant), project);
         let cmd = CreateRuleCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             name: "dev-rule".to_string(),
             description: None,
@@ -1257,9 +1257,9 @@ mod tests {
         let svc = InMemoryAutomationService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_admin(tenant, project);
+        let actor = make_admin(TenantId(tenant), project);
         let cmd = CreateRuleCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             name: "limited".to_string(),
             description: None,
@@ -1329,11 +1329,11 @@ mod tests {
         let svc = InMemoryAutomationService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_admin(tenant, project);
+        let actor = make_admin(TenantId(tenant), project);
         let rule = svc
             .create_rule(
                 CreateRuleCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "v".to_string(),
                     description: None,
@@ -1358,7 +1358,7 @@ mod tests {
             .update_rule(
                 UpdateRuleCommand {
                     rule_id: rule.id,
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     expected_version: 99,
                     name: Some("V2".to_string()),
                     description: None,
@@ -1380,11 +1380,11 @@ mod tests {
         let svc = InMemoryAutomationService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_admin(tenant, project);
+        let actor = make_admin(TenantId(tenant), project);
         let _ = svc
             .create_rule(
                 CreateRuleCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "x".to_string(),
                     description: None,

@@ -1,0 +1,16 @@
+[package]
+name = "star-taskgraph"
+version = "0.0.1"
+edition = "2021"
+description = "Star 仓 Task ↔ Worktree 1:1 绑定 + react-flow graph (per P4-H.6, 守门 #19 [P] 拍板)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+star-treesitter = { path = "../star-treesitter" }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[lints]
+workspace = true

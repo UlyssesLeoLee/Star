@@ -939,12 +939,12 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
         let other = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let res = svc
             .register_channel(
                 RegisterChannelCommand {
-                    tenant_id,
-                    user_id: other, // 试图给别人注册
+                    tenant_id: TenantId(tenant_id),
+                    user_id: UserId(other), // 试图给别人注册
                     kind: ChannelKind::Email,
                     address: "x@y.com".to_string(),
                     actor_user_id: me,
@@ -960,11 +960,11 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let ch = svc
             .register_channel(
                 RegisterChannelCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: me,
                     kind: ChannelKind::Email,
                     address: "me@x.com".to_string(),
@@ -984,11 +984,11 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let n = svc
             .dispatch(
                 DispatchNotificationCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: me,
                     event_type: NotificationEventType::ValidationFailed,
                     resource_type: "validation".to_string(),
@@ -1011,11 +1011,11 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let res = svc
             .dispatch(
                 DispatchNotificationCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: me,
                     event_type: NotificationEventType::AgentStepStarted,
                     resource_type: "agent_step".to_string(),
@@ -1035,11 +1035,11 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let n = svc
             .dispatch(
                 DispatchNotificationCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: me,
                     event_type: NotificationEventType::FeedbackRequired,
                     resource_type: "feedback".to_string(),
@@ -1060,11 +1060,11 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let n = svc
             .dispatch(
                 DispatchNotificationCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: me,
                     event_type: NotificationEventType::AgentSessionFailed,
                     resource_type: "agent_session".to_string(),
@@ -1085,11 +1085,11 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let n = svc
             .dispatch(
                 DispatchNotificationCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: me,
                     event_type: NotificationEventType::ValidationFailed,
                     resource_type: "validation".to_string(),
@@ -1105,7 +1105,7 @@ mod tests {
         let n = svc
             .mark_read(
                 MarkReadCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     notification_id: n.id,
                     actor_user_id: me,
                 },
@@ -1123,11 +1123,11 @@ mod tests {
         let me = UserId(uuid::Uuid::new_v4());
         let actor_t = uuid::Uuid::new_v4();
         let cmd_t = uuid::Uuid::new_v4();
-        let actor = make_actor(actor_t, me);
+        let actor = make_actor(TenantId(actor_t), me);
         let res = svc
             .dispatch(
                 DispatchNotificationCommand {
-                    tenant_id: cmd_t,
+                    tenant_id: TenantId(cmd_t),
                     user_id: me,
                     event_type: NotificationEventType::ValidationFailed,
                     resource_type: "x".to_string(),
@@ -1150,12 +1150,12 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let project = ProjectId::new();
         let t1 = svc
             .upsert_template(
                 UpsertTemplateCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: project,
                     event_type: NotificationEventType::ValidationFailed,
                     channel_kinds: vec![ChannelKind::Email, ChannelKind::InApp],
@@ -1170,7 +1170,7 @@ mod tests {
         let t2 = svc
             .upsert_template(
                 UpsertTemplateCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id: project,
                     event_type: NotificationEventType::ValidationFailed,
                     channel_kinds: vec![ChannelKind::Email],
@@ -1192,11 +1192,11 @@ mod tests {
         let svc = InMemoryNotificationService::new();
         let tenant_id = uuid::Uuid::new_v4();
         let me = UserId(uuid::Uuid::new_v4());
-        let actor = make_actor(tenant_id, me);
+        let actor = make_actor(TenantId(tenant_id), me);
         let n1 = svc
             .dispatch(
                 DispatchNotificationCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: me,
                     event_type: NotificationEventType::ValidationFailed,
                     resource_type: "x".to_string(),
@@ -1212,7 +1212,7 @@ mod tests {
         let _n2 = svc
             .dispatch(
                 DispatchNotificationCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: me,
                     event_type: NotificationEventType::AgentSessionFailed,
                     resource_type: "x".to_string(),
@@ -1228,7 +1228,7 @@ mod tests {
         // 标 n1 已读
         svc.mark_read(
             MarkReadCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 notification_id: n1.id,
                 actor_user_id: me,
             },
@@ -1239,7 +1239,7 @@ mod tests {
         let all = svc
             .list_by_user(
                 ListByUserQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: me,
                     unread_only: false,
                 },
@@ -1251,7 +1251,7 @@ mod tests {
         let unread = svc
             .list_by_user(
                 ListByUserQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     user_id: me,
                     unread_only: true,
                 },

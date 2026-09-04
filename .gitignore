@@ -4,6 +4,12 @@
 *.swo
 *~
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -20,6 +26,11 @@ desktop.ini
 
 # Logs
 *.log
+
+# Python cache (per 2026-09-04 TMO-04 实装, scripts/automation/ + tests/ 不入库)
+__pycache__/
+*.pyc
+*.pyo
 
 # Temporary backup
 *.bak
@@ -69,3 +80,8 @@ docs.untracked.bak/
 # 临时审计脚本 (一次性 Node 脚本, 跑完就丢, 不入 git)
 # 例: scripts/_audit-kanban-drift.mjs (per 2026-08-31 12:05 JST)
 scripts/_*.mjs
+
+# Python pycache
+__pycache__/
+*.pyc
+

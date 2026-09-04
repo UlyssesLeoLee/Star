@@ -13,7 +13,9 @@ pub struct InMemoryCache {
 
 impl InMemoryCache {
     pub fn new() -> Self {
-        Self { store: RwLock::new(HashMap::new()) }
+        Self {
+            store: RwLock::new(HashMap::new()),
+        }
     }
 }
 
@@ -71,12 +73,19 @@ mod tests {
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-    struct TestVal { x: i32, y: String }
+    struct TestVal {
+        x: i32,
+        y: String,
+    }
 
     #[tokio::test]
     async fn test_set_get() {
         let c = InMemoryCache::new();
-        let val = serde_json::to_value(TestVal { x: 1, y: "hi".into() }).unwrap();
+        let val = serde_json::to_value(TestVal {
+            x: 1,
+            y: "hi".into(),
+        })
+        .unwrap();
         c.set_json("k1", &val, 60).await.unwrap();
         let v = c.get_json("k1").await.unwrap();
         assert_eq!(v, Some(val));
@@ -85,8 +94,12 @@ mod tests {
     #[tokio::test]
     async fn test_ttl_expiry() {
         let c = InMemoryCache::new();
-        let val = serde_json::to_value(TestVal { x: 2, y: "hi".into() }).unwrap();
-        c.set_json("k2", &val, 0).await.unwrap();  // 永不过期
+        let val = serde_json::to_value(TestVal {
+            x: 2,
+            y: "hi".into(),
+        })
+        .unwrap();
+        c.set_json("k2", &val, 0).await.unwrap(); // 永不过期
         let v = c.get_json("k2").await.unwrap();
         assert!(v.is_some());
     }
@@ -94,7 +107,11 @@ mod tests {
     #[tokio::test]
     async fn test_invalidate() {
         let c = InMemoryCache::new();
-        let val = serde_json::to_value(TestVal { x: 3, y: "hi".into() }).unwrap();
+        let val = serde_json::to_value(TestVal {
+            x: 3,
+            y: "hi".into(),
+        })
+        .unwrap();
         c.set_json("k3", &val, 60).await.unwrap();
         c.invalidate("k3").await.unwrap();
         let v = c.get_json("k3").await.unwrap();

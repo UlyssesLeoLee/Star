@@ -1,0 +1,21 @@
+[package]
+name = "star-credential"
+version = "0.0.1"
+edition = "2021"
+description = "Star 仓凭证管理层 (per V2 阶段, 用户设置 UI 自填 → 后端加密 → 运行时解密, 守门 #5 env 安全 + 守门 #14 5 域 Lead CONTENT)"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+tokio = { version = "1", features = ["sync"] }
+async-trait = "0.1"
+axum = "0.8"
+rusqlite = { version = "0.32", features = ["bundled"] }
+chrono = { workspace = true }
+domain-kms = { path = "../domain-kms" }
+
+[lints]
+workspace = true

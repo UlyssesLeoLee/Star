@@ -44,7 +44,9 @@ pub async fn generate(
     report_id: Uuid,
 ) -> Result<ReportResult, ReportError> {
     // 阶段 2 简化: mock 50 issue 周期时间
-    let cycle_times: Vec<f64> = (0..50).map(|i| 1.0 + (i as f64) * 0.5 + ((i as f64 * 0.7).sin() * 1.5)).collect();
+    let cycle_times: Vec<f64> = (0..50)
+        .map(|i| 1.0 + (i as f64) * 0.5 + ((i as f64 * 0.7).sin() * 1.5))
+        .collect();
     let bucket_size = adaptive_bucket_size(cycle_times.len());
     let buckets = compute_buckets(&cycle_times, bucket_size);
     let percentiles = Percentiles {
@@ -65,11 +67,15 @@ pub async fn generate(
         bucket_size,
     };
 
-    let points: Vec<ReportPoint> = data.buckets.iter().map(|b| ReportPoint {
-        label: b.label.clone(),
-        value: b.count,
-        extra: serde_json::json!({"range": [b.range_start, b.range_end]}),
-    }).collect();
+    let points: Vec<ReportPoint> = data
+        .buckets
+        .iter()
+        .map(|b| ReportPoint {
+            label: b.label.clone(),
+            value: b.count,
+            extra: serde_json::json!({"range": [b.range_start, b.range_end]}),
+        })
+        .collect();
 
     Ok(ReportResult {
         report_id,
@@ -108,16 +114,31 @@ fn compute_buckets(cycle_times: &[f64], bucket_size: u32) -> Vec<Bucket> {
             counts[idx] += 1.0;
         }
     }
-    counts.iter().enumerate().map(|(i, &c)| Bucket {
-        range_start: i as f64 * bucket_size as f64,
-        range_end: (i + 1) as f64 * bucket_size as f64,
-        count: c,
-        label: if c > 0.0 { format!("{}-{}d", i * bucket_size as usize, (i + 1) * bucket_size as usize) } else { String::new() },
-    }).filter(|b| b.count > 0.0).collect()
+    counts
+        .iter()
+        .enumerate()
+        .map(|(i, &c)| Bucket {
+            range_start: i as f64 * bucket_size as f64,
+            range_end: (i + 1) as f64 * bucket_size as f64,
+            count: c,
+            label: if c > 0.0 {
+                format!(
+                    "{}-{}d",
+                    i * bucket_size as usize,
+                    (i + 1) * bucket_size as usize
+                )
+            } else {
+                String::new()
+            },
+        })
+        .filter(|b| b.count > 0.0)
+        .collect()
 }
 
 fn percentile(values: &[f64], p: f64) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     let mut sorted = values.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let n = sorted.len();

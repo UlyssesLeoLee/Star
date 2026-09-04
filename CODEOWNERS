@@ -1,0 +1,31 @@
+# CODEOWNERS — Star 仓
+# per 2026-09-04 F.5 CI runner 真实配置 (守门 #19 [M] 拍板)
+# 注意: 当前由 Mavis 接手代签所有 (per 守门 #10 + 8/27 19:39 JST 授权)
+# 真人到位后追溯签字覆盖 (per 守门 #1 禁回溯叙事)
+
+# Default owners: 架构师
+* @UlyssesLeoLee
+
+# 5 域 Lead 拒绝兼任 (per 8/21 JST 拍板), 真人到位后填
+# /crates/domain-player/      @player-lead
+# /crates/domain-economy/     @economy-lead
+# /crates/domain-match/       @match-lead
+# /crates/domain-social/      @social-lead
+# /crates/domain-admin/       @admin-lead
+
+# CI/CD
+/.github/ @UlyssesLeoLee
+*.yml @UlyssesLeoLee
+*.yaml @UlyssesLeoLee
+
+# 文档
+/docs/ @UlyssesLeoLee
+*.md @UlyssesLeoLee
+
+# Agent Runtime (per SRS-001)
+/crates/star-dispatcher/ @UlyssesLeoLee
+/crates/star-saga/ @UlyssesLeoLee
+/crates/star-dto/ @UlyssesLeoLee
+
+# Frontend
+/frontend/ @UlyssesLeoLee

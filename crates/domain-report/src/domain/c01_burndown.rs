@@ -44,8 +44,8 @@ pub struct BurndownSeries {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeSeriesPoint {
-    pub x: String,    // ISO date "2026-09-02"
-    pub y: f64,       // 剩余 SP
+    pub x: String, // ISO date "2026-09-02"
+    pub y: f64,    // 剩余 SP
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,14 +69,20 @@ pub async fn generate(
     let sprint_id = filter.sprint_id.ok_or_else(|| {
         ReportError::ValidationFailed("Burndown requires sprint_id in filter".into())
     })?;
-    let sprint = sprint_port.get_sprint(filter.tenant_id, sprint_id)
+    let sprint = sprint_port
+        .get_sprint(filter.tenant_id, sprint_id)
         .await
         .map_err(|e| ReportError::DataSource(e.to_string()))?
         .ok_or_else(|| ReportError::NotFound(sprint_id))?;
 
     // 2. 拉已完成 issue
     let completed_issues = work_item_port
-        .list_completed_in_sprint(filter.tenant_id, sprint_id, sprint.start_date, sprint.end_date)
+        .list_completed_in_sprint(
+            filter.tenant_id,
+            sprint_id,
+            sprint.start_date,
+            sprint.end_date,
+        )
         .await
         .map_err(|e| ReportError::DataSource(e.to_string()))?;
 
@@ -89,12 +95,16 @@ pub async fn generate(
     // 4. 计算 daily completed SP
     let total_issues = all_issues.len() as u32;
     let completed_count = completed_issues.len() as u32;
-    let total_completed_sp: f64 = completed_issues.iter()
-        .filter_map(|i| i.story_points)
-        .sum();
+    let total_completed_sp: f64 = completed_issues.iter().filter_map(|i| i.story_points).sum();
 
     // 5. 构造 ideal + actual + summary
-    let burndown = compute_burndown(&sprint, &completed_issues, total_completed_sp, total_issues, completed_count);
+    let burndown = compute_burndown(
+        &sprint,
+        &completed_issues,
+        total_completed_sp,
+        total_issues,
+        completed_count,
+    );
 
     // 6. 转 ReportPoint (向后兼容旧接口)
     let points: Vec<ReportPoint> = burndown.series.actual.iter().enumerate().map(|(i, p)| ReportPoint {
@@ -111,9 +121,14 @@ pub async fn generate(
         data: serde_json::to_value(&burndown).map_err(|e| ReportError::Internal(e.to_string()))?,
         summary: ReportSummary {
             total: sprint.total_sp,
-            trend: if burndown.summary.on_track { Trend::Down } else { Trend::Up },
+            trend: if burndown.summary.on_track {
+                Trend::Down
+            } else {
+                Trend::Up
+            },
             anomalies: vec![],
-            meta: serde_json::to_value(&burndown.summary).map_err(|e| ReportError::Internal(e.to_string()))?,
+            meta: serde_json::to_value(&burndown.summary)
+                .map_err(|e| ReportError::Internal(e.to_string()))?,
         },
         generated_at: Utc::now(),
         cache_key: format!("burndown:{}:{}", filter.tenant_id, sprint_id),
@@ -131,27 +146,34 @@ fn compute_burndown(
     // 算 Sprint 天数
     let days = (sprint.end_date - sprint.start_date).num_days() + 1;
     let total_sp = sprint.total_sp;
-    let daily_ideal_decrement = if days > 1 { total_sp / (days - 1) as f64 } else { 0.0 };
+    let daily_ideal_decrement = if days > 1 {
+        total_sp / (days - 1) as f64
+    } else {
+        0.0
+    };
 
     // 1. Ideal 线 (线性下降)
-    let ideal: Vec<TimeSeriesPoint> = (0..days).map(|i| {
-        let day = sprint.start_date + Duration::days(i);
-        TimeSeriesPoint {
-            x: day.format("%Y-%m-%d").to_string(),
-            y: (total_sp - daily_ideal_decrement * i as f64).max(0.0),
-        }
-    }).collect();
+    let ideal: Vec<TimeSeriesPoint> = (0..days)
+        .map(|i| {
+            let day = sprint.start_date + Duration::days(i);
+            TimeSeriesPoint {
+                x: day.format("%Y-%m-%d").to_string(),
+                y: (total_sp - daily_ideal_decrement * i as f64).max(0.0),
+            }
+        })
+        .collect();
 
     // 2. Actual 线 (累积完成的反向)
     // 按 completed_at date 分桶
-    let mut daily_completed: std::collections::BTreeMap<String, f64> = std::collections::BTreeMap::new();
+    let mut daily_completed: std::collections::BTreeMap<String, f64> =
+        std::collections::BTreeMap::new();
     for issue in completed_issues {
         let day_key = issue.completed_at.format("%Y-%m-%d").to_string();
         *daily_completed.entry(day_key).or_insert(0.0) += issue.story_points.unwrap_or(0.0);
     }
     let mut cumulative = 0.0;
     let mut actual: Vec<TimeSeriesPoint> = Vec::new();
-    let mut last_progress_idx: usize = 0;  // 最后一个有 SP 完成的天
+    let mut last_progress_idx: usize = 0; // 最后一个有 SP 完成的天
     for i in 0..days {
         let i_us = i as usize;
         let day = sprint.start_date + Duration::days(i);
@@ -187,8 +209,16 @@ fn compute_burndown(
 
     // 5. on_track 判定: 完成进度 ≥ 时间进度 (考虑 0.8 缓冲)
     //   用 last_progress_idx 而非 actual.len()-1, 反映"今天"位置
-    let day_progress = if days > 0 { last_progress_idx as f64 / days as f64 } else { 0.0 };
-    let completion_progress = if total_sp > 0.0 { cumulative / total_sp } else { 1.0 };
+    let day_progress = if days > 0 {
+        last_progress_idx as f64 / days as f64
+    } else {
+        0.0
+    };
+    let completion_progress = if total_sp > 0.0 {
+        cumulative / total_sp
+    } else {
+        1.0
+    };
     let on_track = completion_progress >= day_progress * 0.8;
 
     let remaining_sp = actual.last().map(|p| p.y).unwrap_or(total_sp);
@@ -237,7 +267,11 @@ mod tests {
 
     fn make_issue(day: u32, sp: f64) -> CompletedIssue {
         let completed_at = Utc.with_ymd_and_hms(2026, 9, day, 12, 0, 0).unwrap();
-        CompletedIssue { workitem_id: Uuid::new_v4(), completed_at, story_points: Some(sp) }
+        CompletedIssue {
+            workitem_id: Uuid::new_v4(),
+            completed_at,
+            story_points: Some(sp),
+        }
     }
 
     #[test]
@@ -246,7 +280,7 @@ mod tests {
         let bd = compute_burndown(&sprint, &[], 0.0, 0, 0);
         assert_eq!(bd.series.ideal.len(), 14);
         assert_eq!(bd.series.ideal[0].y, 100.0);
-        assert!(bd.series.ideal[13].y < 1.0);  // 接近 0
+        assert!(bd.series.ideal[13].y < 1.0); // 接近 0
     }
 
     #[test]
@@ -267,9 +301,17 @@ mod tests {
         let sprint = make_sprint();
         // 3 issues 完成: day 3 / 5 / 7 各 20 SP, 共 60 SP, 实际 avg 速度 60/(7-1)=10 SP/day
         // 理想 100/14=7.14 SP/day, 实际 ≥ 理想 → on_track
-        let issues = vec![make_issue(3, 20.0), make_issue(5, 20.0), make_issue(7, 20.0)];
+        let issues = vec![
+            make_issue(3, 20.0),
+            make_issue(5, 20.0),
+            make_issue(7, 20.0),
+        ];
         let bd = compute_burndown(&sprint, &issues, 60.0, 10, 3);
-        assert!(bd.summary.on_track, "expected on_track, got off_track, summary={:?}", bd.summary);
+        assert!(
+            bd.summary.on_track,
+            "expected on_track, got off_track, summary={:?}",
+            bd.summary
+        );
     }
 
     #[test]
@@ -279,7 +321,11 @@ mod tests {
         // 理想 100/14=7.14 SP/day, 实际远低 → off_track
         let issues = vec![make_issue(3, 5.0)];
         let bd = compute_burndown(&sprint, &issues, 5.0, 10, 1);
-        assert!(!bd.summary.on_track, "expected off_track, got on_track, summary={:?}", bd.summary);
+        assert!(
+            !bd.summary.on_track,
+            "expected off_track, got on_track, summary={:?}",
+            bd.summary
+        );
     }
 
     #[test]

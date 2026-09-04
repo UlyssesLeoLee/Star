@@ -823,7 +823,7 @@ mod tests {
             description: "details".to_string(),
             priority: Priority::High,
             severity: Some(Severity::Major),
-            reporter_user_id: UserId.new(),
+            reporter_user_id: UserId::new(),
             parent_work_item_id: None,
             ai_task_data: None,
             labels: vec!["bug".to_string()],
@@ -868,8 +868,11 @@ mod tests {
     async fn create_work_item_basic() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
-        let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
+        let actor = dev(TenantId(tid));
+        let item = svc
+            .create_work_item(basic_cmd(TenantId(tid)), &actor)
+            .await
+            .unwrap();
         assert_eq!(item.status, WorkItemStatus::Todo);
         assert_eq!(item.priority, Priority::High);
     }
@@ -878,8 +881,8 @@ mod tests {
     async fn ai_task_requires_objective_invw03() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
-        let mut cmd = basic_cmd(tid);
+        let actor = dev(TenantId(tid));
+        let mut cmd = basic_cmd(TenantId(tid));
         cmd.item_type = WorkItemType::AITask;
         // 缺 ai_task_data
         let res = svc.create_work_item(cmd, &actor).await;
@@ -890,8 +893,8 @@ mod tests {
     async fn ai_task_requires_repository_scope_invw03() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
-        let mut cmd = basic_cmd(tid);
+        let actor = dev(TenantId(tid));
+        let mut cmd = basic_cmd(TenantId(tid));
         cmd.item_type = WorkItemType::AITask;
         cmd.ai_task_data = Some(AiTaskData {
             objective: "fix".to_string(),
@@ -910,8 +913,8 @@ mod tests {
     async fn ai_task_with_full_data_ok() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
-        let mut cmd = basic_cmd(tid);
+        let actor = dev(TenantId(tid));
+        let mut cmd = basic_cmd(TenantId(tid));
         cmd.item_type = WorkItemType::AITask;
         cmd.ai_task_data = Some(AiTaskData {
             objective: "implement auth".to_string(),
@@ -930,14 +933,17 @@ mod tests {
     async fn transition_through_lifecycle() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
-        let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
+        let actor = dev(TenantId(tid));
+        let item = svc
+            .create_work_item(basic_cmd(TenantId(tid)), &actor)
+            .await
+            .unwrap();
         let id = item.id;
         // TODO→IN_PROGRESS
         let s = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     work_item_id: id,
                     from: WorkItemStatus::Todo,
                     to: WorkItemStatus::InProgress,
@@ -952,7 +958,7 @@ mod tests {
         let s = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     work_item_id: id,
                     from: WorkItemStatus::InProgress,
                     to: WorkItemStatus::Done,
@@ -969,12 +975,15 @@ mod tests {
     async fn transition_skip_rejected() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
-        let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
+        let actor = dev(TenantId(tid));
+        let item = svc
+            .create_work_item(basic_cmd(TenantId(tid)), &actor)
+            .await
+            .unwrap();
         let res = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     work_item_id: item.id,
                     from: WorkItemStatus::Todo,
                     to: WorkItemStatus::Done, // 跳态
@@ -990,16 +999,19 @@ mod tests {
     async fn assign_user_and_agent() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
-        let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
+        let actor = dev(TenantId(tid));
+        let item = svc
+            .create_work_item(basic_cmd(TenantId(tid)), &actor)
+            .await
+            .unwrap();
         let u = uuid::Uuid::new_v4();
         let a = AgentId::new();
         let item = svc
             .assign(
                 AssignCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     work_item_id: item.id,
-                    assignee_user_id: Some(u),
+                    assignee_user_id: Some(UserId(u)),
                     assignee_agent_id: Some(a),
                     actor_user_id: UserId::from(actor.user_id),
                 },
@@ -1007,7 +1019,7 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(item.assignee_user_id, Some(u));
+        assert_eq!(item.assignee_user_id, Some(UserId(u)));
         assert_eq!(item.assignee_agent_id, Some(a));
     }
 
@@ -1015,11 +1027,14 @@ mod tests {
     async fn parent_must_be_same_project_invw04() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         // 父项
-        let parent = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
+        let parent = svc
+            .create_work_item(basic_cmd(TenantId(tid)), &actor)
+            .await
+            .unwrap();
         // 子项(不同 project)
-        let mut cmd = basic_cmd(tid);
+        let mut cmd = basic_cmd(TenantId(tid));
         cmd.parent_work_item_id = Some(parent.id);
         cmd.project_id = ProjectId::new();
         let res = svc.create_work_item(cmd, &actor).await;
@@ -1031,13 +1046,16 @@ mod tests {
         let svc = InMemoryWorkItemService::new();
         let t1 = uuid::Uuid::new_v4();
         let t2 = uuid::Uuid::new_v4();
-        let actor1 = dev(t1);
-        let item = svc.create_work_item(basic_cmd(t1), &actor1).await.unwrap();
-        let actor2 = dev(t2);
+        let actor1 = dev(TenantId(t1));
+        let item = svc
+            .create_work_item(basic_cmd(TenantId(t1)), &actor1)
+            .await
+            .unwrap();
+        let actor2 = dev(TenantId(t2));
         let res = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id: t2,
+                    tenant_id: TenantId(t2),
                     work_item_id: item.id,
                     from: WorkItemStatus::Todo,
                     to: WorkItemStatus::InProgress,
@@ -1053,12 +1071,15 @@ mod tests {
     async fn create_requirement_and_ac() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
-        let item = svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
+        let actor = dev(TenantId(tid));
+        let item = svc
+            .create_work_item(basic_cmd(TenantId(tid)), &actor)
+            .await
+            .unwrap();
         let req = svc
             .create_requirement(
                 CreateRequirementCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     business_goal_id: None,
                     statement: "support OAuth".to_string(),
                     rationale: "industry standard".to_string(),
@@ -1071,7 +1092,7 @@ mod tests {
         let ac = svc
             .create_acceptance_criterion(
                 CreateAcceptanceCriterionCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     requirement_id: req.id,
                     work_item_id: item.id,
                     statement: "login via OAuth2".to_string(),
@@ -1088,15 +1109,17 @@ mod tests {
     async fn list_by_project_filter_terminal() {
         let svc = InMemoryWorkItemService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = dev(tid);
+        let actor = dev(TenantId(tid));
         let project = ProjectId::new();
         for _ in 0..3 {
-            svc.create_work_item(basic_cmd(tid), &actor).await.unwrap();
+            svc.create_work_item(basic_cmd(TenantId(tid)), &actor)
+                .await
+                .unwrap();
         }
         let list = svc
             .list_by_project(
                 ListByProjectQuery {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     project_id: project,
                     include_terminal: false,
                 },

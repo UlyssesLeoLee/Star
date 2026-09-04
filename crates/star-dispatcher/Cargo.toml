@@ -1,0 +1,23 @@
+[package]
+name = "star-dispatcher"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Star L0 Agent 派发层 (G.1 PoC, per SRS-STAR-AGENT-RUNTIME-001 §G-1)"
+# v0.0.1 (G.1 PoC): Tokio async dispatcher + InMemory TaskQueue + Lifecycle test
+# v0.1.0 (G.1 收官): SQLite WAL TaskQueue + 1M agents stress test
+# v0.2.0 (G.1 实战): Persistent ID + 跨 process 恢复
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+
+[lints]
+workspace = true

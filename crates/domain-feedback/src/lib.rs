@@ -76,12 +76,14 @@ pub use value_object::{
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::ActorContext; // P0-1 兼容: 显式覆盖 super::* 的 star_context 命名
+
     use crate::entity::ConsumedByKind;
     use crate::value_object::{FeedbackTarget, Severity};
     use uuid::Uuid;
 
     fn make_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(uuid::Uuid::new_v4(), *tenant_id.as_uuid()).with_role(roles::DEVELOPER)
+        ActorContext::new(UserId::new(), tenant_id).with_role(roles::DEVELOPER)
     }
 
     fn make_create_cmd(tenant_id: TenantId, target: FeedbackTarget) -> CreateFeedbackCommand {
@@ -197,14 +199,14 @@ mod tests {
     async fn create_feedback_success_and_event() {
         let (svc, mut rx) = InMemoryFeedbackService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let target = FeedbackTarget::WorkItem {
             work_item_id: WorkItemId::new(),
         };
-        let cmd = make_create_cmd(tenant_id, target.clone());
+        let cmd = make_create_cmd(TenantId(tenant_id), target.clone());
         let f = svc.create_feedback(cmd, actor).await.expect("create OK");
         assert_eq!(f.status, FeedbackStatus::Open);
-        assert_eq!(f.tenant_id, tenant_id);
+        assert_eq!(f.tenant_id, TenantId(tenant_id));
         assert!(matches!(f.target, FeedbackTarget::WorkItem { .. }));
         assert_eq!(svc.count_feedbacks().await, 1);
 
@@ -227,11 +229,11 @@ mod tests {
     async fn full_six_state_chain_open_to_verified() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -247,7 +249,7 @@ mod tests {
             .transition_status(
                 TransitionFeedbackStatusCommand {
                     feedback_id: fid,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     from: FeedbackStatus::Open,
                     to: FeedbackStatus::Acknowledged,
                     reason: "ack".into(),
@@ -282,11 +284,11 @@ mod tests {
     async fn invalid_state_transition_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -300,7 +302,7 @@ mod tests {
             .transition_status(
                 TransitionFeedbackStatusCommand {
                     feedback_id: f.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     from: FeedbackStatus::Open,
                     to: FeedbackStatus::Verified,
                     reason: "skip".into(),
@@ -319,11 +321,11 @@ mod tests {
     async fn reject_from_open_terminal() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -336,7 +338,7 @@ mod tests {
             .transition_status(
                 TransitionFeedbackStatusCommand {
                     feedback_id: f.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     from: FeedbackStatus::Open,
                     to: FeedbackStatus::Rejected,
                     reason: "不相关".into(),
@@ -357,11 +359,11 @@ mod tests {
     async fn supersede_without_successor_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -374,7 +376,7 @@ mod tests {
             .transition_status(
                 TransitionFeedbackStatusCommand {
                     feedback_id: f.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     from: FeedbackStatus::Open,
                     to: FeedbackStatus::Superseded,
                     reason: "supersede".into(),
@@ -391,11 +393,11 @@ mod tests {
     async fn supersede_with_successor_ok() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f1 = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -407,7 +409,7 @@ mod tests {
         let f2 = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -420,7 +422,7 @@ mod tests {
             .transition_status(
                 TransitionFeedbackStatusCommand {
                     feedback_id: f1.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     from: FeedbackStatus::Open,
                     to: FeedbackStatus::Superseded,
                     reason: "supersede by f2".into(),
@@ -441,11 +443,11 @@ mod tests {
     async fn update_after_applied_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -458,7 +460,7 @@ mod tests {
         svc.transition_status(
             TransitionFeedbackStatusCommand {
                 feedback_id: f.id,
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 from: FeedbackStatus::Open,
                 to: FeedbackStatus::Acknowledged,
                 reason: "ack".into(),
@@ -478,7 +480,7 @@ mod tests {
             .update_feedback(
                 UpdateFeedbackCommand {
                     feedback_id: f.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     expected_version: 3,
                     new_intent: Some("改不动".into()),
                     new_expected_behavior: None,
@@ -498,11 +500,11 @@ mod tests {
     async fn delete_only_open_allowed() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -515,7 +517,7 @@ mod tests {
         svc.transition_status(
             TransitionFeedbackStatusCommand {
                 feedback_id: f.id,
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 from: FeedbackStatus::Open,
                 to: FeedbackStatus::Acknowledged,
                 reason: "ack".into(),
@@ -536,12 +538,12 @@ mod tests {
     async fn inbox_severity_priority_ordering() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let project_id = ProjectId::new();
 
         // P3 第一个创建,P0 最后创建
         let mut cmd = make_create_cmd(
-            tenant_id,
+            TenantId(tenant_id),
             FeedbackTarget::WorkItem {
                 work_item_id: WorkItemId::new(),
             },
@@ -550,7 +552,7 @@ mod tests {
         cmd.severity = Severity::P3;
         svc.create_feedback(cmd, actor.clone()).await.unwrap();
         let mut cmd = make_create_cmd(
-            tenant_id,
+            TenantId(tenant_id),
             FeedbackTarget::WorkItem {
                 work_item_id: WorkItemId::new(),
             },
@@ -559,7 +561,7 @@ mod tests {
         cmd.severity = Severity::P1;
         svc.create_feedback(cmd, actor.clone()).await.unwrap();
         let mut cmd = make_create_cmd(
-            tenant_id,
+            TenantId(tenant_id),
             FeedbackTarget::WorkItem {
                 work_item_id: WorkItemId::new(),
             },
@@ -568,7 +570,7 @@ mod tests {
         cmd.severity = Severity::P0;
         svc.create_feedback(cmd, actor.clone()).await.unwrap();
         let mut cmd = make_create_cmd(
-            tenant_id,
+            TenantId(tenant_id),
             FeedbackTarget::WorkItem {
                 work_item_id: WorkItemId::new(),
             },
@@ -580,13 +582,13 @@ mod tests {
         let inbox = svc
             .inbox(
                 FeedbackInboxQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     min_severity: None,
                     limit: 10,
                     offset: 0,
                 },
-                ActorContext::new(uuid::Uuid::new_v4(), *tenant_id.as_uuid()).with_role(roles::DEVELOPER),
+                ActorContext::new(UserId::new(), TenantId(tenant_id)).with_role(roles::DEVELOPER),
             )
             .await
             .unwrap();
@@ -605,11 +607,11 @@ mod tests {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_a = uuid::Uuid::new_v4();
         let tenant_b = uuid::Uuid::new_v4();
-        let actor_a = make_actor(tenant_a);
+        let actor_a = make_actor(TenantId(tenant_a));
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_a,
+                    TenantId(tenant_a),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -618,7 +620,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let actor_b = make_actor(tenant_b);
+        let actor_b = make_actor(TenantId(tenant_b));
         let res = svc.get_by_id(f.id, actor_b).await;
         assert!(matches!(res, Err(FeedbackError::PermissionDenied)));
     }
@@ -629,14 +631,14 @@ mod tests {
     async fn cross_worktree_target_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let worktree_a = WorktreeId::new();
         let worktree_b = WorktreeId::new();
         let target = FeedbackTarget::Worktree {
             worktree_id: worktree_a,
         };
         let f = svc
-            .create_feedback(make_create_cmd(tenant_id, target), actor.clone())
+            .create_feedback(make_create_cmd(TenantId(tenant_id), target), actor.clone())
             .await
             .unwrap();
         // ACK 时 actor 在 worktree_b,应被拒
@@ -644,7 +646,7 @@ mod tests {
             .transition_status(
                 TransitionFeedbackStatusCommand {
                     feedback_id: f.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     from: FeedbackStatus::Open,
                     to: FeedbackStatus::Acknowledged,
                     reason: "ack from other worktree".into(),
@@ -663,13 +665,13 @@ mod tests {
     async fn ai_authored_feedback_records_agent_id() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let mut actor = make_actor(tenant_id);
+        let mut actor = make_actor(TenantId(tenant_id));
         actor.is_agent_session = true;
         // 不显式传 author_agent_id,service 应自动兜底
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },
@@ -690,11 +692,11 @@ mod tests {
     async fn consumed_event_projection_three_kinds() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let f = svc
             .create_feedback(
                 make_create_cmd(
-                    tenant_id,
+                    TenantId(tenant_id),
                     FeedbackTarget::WorkItem {
                         work_item_id: WorkItemId::new(),
                     },

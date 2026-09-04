@@ -809,7 +809,9 @@ impl TenantRepository for InMemoryTenantRepository {
 mod tests {
     use super::*;
     fn platform_admin() -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
+        let mut a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4());
+        a.is_platform_admin = true;
+        a
     }
 
     fn tenant_admin(tid: TenantId) -> ActorContext {

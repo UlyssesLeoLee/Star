@@ -80,6 +80,8 @@ pub use value_object::{
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::ActorContext; // P0-1 兼容: 显式覆盖 super::* 的 star_context 命名
+
     use crate::value_object::{
         roles, ConflictStrategy, ExternalEntityId, ExternalSystemName, IntegrationRelationType,
         IntegrationSource, IntegrationState, ProjectId, SyncStateId, TenantId, UserId,
@@ -88,9 +90,9 @@ mod tests {
     // -------- 测试夹具 --------
 
     fn make_test_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(uuid::Uuid::new_v4(), *tenant_id.as_uuid())
+        ActorContext::new(UserId::new(), tenant_id)
             .with_role(roles::PROJECT_ADMIN)
-            .with_project(*ProjectId::new().as_uuid())
+            .with_project(ProjectId::new())
     }
 
     fn make_create_cmd(
@@ -127,7 +129,7 @@ mod tests {
     async fn four_relation_types_create_success() {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
+        let actor = make_test_actor(TenantId(tenant_id));
 
         for rt in [
             IntegrationRelationType::Link,
@@ -135,7 +137,7 @@ mod tests {
             IntegrationRelationType::Bidirectional,
             IntegrationRelationType::PlatformOwned,
         ] {
-            let cmd = make_create_cmd(tenant_id, rt);
+            let cmd = make_create_cmd(TenantId(tenant_id), rt);
             let integration = svc
                 .create_integration(cmd, actor.clone())
                 .await
@@ -159,8 +161,8 @@ mod tests {
     async fn link_relation_cannot_trigger_sync() {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
-        let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Link);
+        let actor = make_test_actor(TenantId(tenant_id));
+        let cmd = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Link);
         let integration = svc
             .create_integration(cmd, actor.clone())
             .await
@@ -174,7 +176,7 @@ mod tests {
             .trigger_sync(
                 TriggerSyncCommand {
                     integration_id: integration.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     force: false,
                 },
                 actor,
@@ -189,8 +191,8 @@ mod tests {
     async fn bidirectional_without_sync_token_rejected() {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
-        let mut cmd = make_create_cmd(tenant_id, IntegrationRelationType::Bidirectional);
+        let actor = make_test_actor(TenantId(tenant_id));
+        let mut cmd = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Bidirectional);
         cmd.initial_sync_token = None; // 故意缺失 → I-004
 
         let res = svc.create_integration(cmd, actor).await;
@@ -203,8 +205,8 @@ mod tests {
     async fn bidirectional_webhook_without_source_id_skipped() {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
-        let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Bidirectional);
+        let actor = make_test_actor(TenantId(tenant_id));
+        let cmd = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Bidirectional);
         let integration = svc
             .create_integration(cmd, actor.clone())
             .await
@@ -214,7 +216,7 @@ mod tests {
         let res = svc
             .handle_webhook(HandleWebhookCommand {
                 integration_id: integration.id,
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 external_event_id: "gh-event-1".to_string(),
                 payload: r#"{"action":"opened","issue":{}}"#.to_string(),
                 signature: None,
@@ -233,8 +235,8 @@ mod tests {
     async fn bidirectional_webhook_with_source_id_succeeds() {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
-        let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Bidirectional);
+        let actor = make_test_actor(TenantId(tenant_id));
+        let cmd = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Bidirectional);
         let integration = svc
             .create_integration(cmd, actor.clone())
             .await
@@ -244,7 +246,7 @@ mod tests {
         let res = svc
             .handle_webhook(HandleWebhookCommand {
                 integration_id: integration.id,
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 external_event_id: "gh-event-2".to_string(),
                 payload: r#"{"action":"opened","source_id":"platform-uuid-123"}"#.to_string(),
                 signature: None,
@@ -261,8 +263,8 @@ mod tests {
     async fn webhook_idempotency_blocks_duplicates() {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
-        let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Mirror);
+        let actor = make_test_actor(TenantId(tenant_id));
+        let cmd = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Mirror);
         let integration = svc
             .create_integration(cmd, actor.clone())
             .await
@@ -275,7 +277,7 @@ mod tests {
         let res1 = svc
             .handle_webhook(HandleWebhookCommand {
                 integration_id: integration.id,
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 external_event_id: event_id.clone(),
                 payload: payload.clone(),
                 signature: None,
@@ -287,7 +289,7 @@ mod tests {
         let res2 = svc
             .handle_webhook(HandleWebhookCommand {
                 integration_id: integration.id,
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 external_event_id: event_id,
                 payload,
                 signature: None,
@@ -303,14 +305,14 @@ mod tests {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_a = uuid::Uuid::new_v4();
         let tenant_b = uuid::Uuid::new_v4();
-        let actor_a = make_test_actor(tenant_a);
-        let cmd = make_create_cmd(tenant_a, IntegrationRelationType::Mirror);
+        let actor_a = make_test_actor(TenantId(tenant_a));
+        let cmd = make_create_cmd(TenantId(tenant_a), IntegrationRelationType::Mirror);
         let integration = svc
             .create_integration(cmd, actor_a.clone())
             .await
             .expect("创建成功");
 
-        let actor_b = ActorContext::new(uuid::Uuid::new_v4(), tenant_b)
+        let actor_b = ActorContext::new(UserId::new(), TenantId(tenant_b))
             .with_role(roles::PROJECT_ADMIN)
             .with_project(integration.project_id);
         let res = svc.get_integration(integration.id, actor_b).await;
@@ -323,13 +325,13 @@ mod tests {
     async fn unique_constraint_enforced() {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
-        let cmd1 = make_create_cmd(tenant_id, IntegrationRelationType::Link);
+        let actor = make_test_actor(TenantId(tenant_id));
+        let cmd1 = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Link);
         svc.create_integration(cmd1.clone(), actor.clone())
             .await
             .expect("首次创建成功");
 
-        let cmd2 = make_create_cmd(tenant_id, IntegrationRelationType::Link);
+        let cmd2 = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Link);
         let res = svc.create_integration(cmd2, actor).await;
         assert!(matches!(res, Err(IntegrationError::Conflict(_))));
     }
@@ -340,8 +342,8 @@ mod tests {
     async fn url_with_plaintext_credential_rejected() {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
-        let mut cmd = make_create_cmd(tenant_id, IntegrationRelationType::Mirror);
+        let actor = make_test_actor(TenantId(tenant_id));
+        let mut cmd = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Mirror);
         cmd.external_url = "https://user:pass@github.com/acme/foo".to_string();
         let res = svc.create_integration(cmd, actor).await;
         assert!(matches!(res, Err(IntegrationError::InvalidState(_))));
@@ -353,8 +355,8 @@ mod tests {
     async fn pause_resume_state_machine() {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
-        let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Mirror);
+        let actor = make_test_actor(TenantId(tenant_id));
+        let cmd = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Mirror);
         let integration = svc
             .create_integration(cmd, actor.clone())
             .await
@@ -364,7 +366,7 @@ mod tests {
             .pause_integration(
                 PauseIntegrationCommand {
                     integration_id: integration.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                 },
                 actor.clone(),
             )
@@ -376,7 +378,7 @@ mod tests {
             .resume_integration(
                 ResumeIntegrationCommand {
                     integration_id: integration.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                 },
                 actor,
             )
@@ -392,13 +394,13 @@ mod tests {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
         let project_id = ProjectId::new();
-        let actor = make_test_actor(tenant_id).with_project(project_id);
+        let actor = make_test_actor(TenantId(tenant_id)).with_project(project_id);
         // 创建 2 个不同 relation_type
         for rt in [
             IntegrationRelationType::Link,
             IntegrationRelationType::Mirror,
         ] {
-            let mut cmd = make_create_cmd(tenant_id, rt);
+            let mut cmd = make_create_cmd(TenantId(tenant_id), rt);
             cmd.project_id = project_id;
             svc.create_integration(cmd, actor.clone())
                 .await
@@ -409,7 +411,7 @@ mod tests {
         let only_link = svc
             .list_by_project(
                 ListByProjectQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     project_id,
                     source_filter: None,
                     relation_type_filter: Some(IntegrationRelationType::Link),
@@ -430,8 +432,8 @@ mod tests {
     async fn event_bus_receives_created() {
         let (svc, mut rx) = InMemoryIntegrationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
-        let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Link);
+        let actor = make_test_actor(TenantId(tenant_id));
+        let cmd = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Link);
         svc.create_integration(cmd, actor).await.expect("ok");
 
         let evt = rx.try_recv().expect("应收到事件");
@@ -499,8 +501,8 @@ mod tests {
     async fn trigger_sync_emits_event() {
         let (svc, mut rx) = InMemoryIntegrationService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
-        let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Mirror);
+        let actor = make_test_actor(TenantId(tenant_id));
+        let cmd = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Mirror);
         let integration = svc
             .create_integration(cmd, actor.clone())
             .await
@@ -512,7 +514,7 @@ mod tests {
             .trigger_sync(
                 TriggerSyncCommand {
                     integration_id: integration.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     force: false,
                 },
                 actor,
@@ -532,14 +534,14 @@ mod tests {
     async fn configure_sets_loop_guard_token_for_bidirectional() {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_test_actor(tenant_id);
-        let mut cmd = make_create_cmd(tenant_id, IntegrationRelationType::Bidirectional);
+        let actor = make_test_actor(TenantId(tenant_id));
+        let mut cmd = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Bidirectional);
         cmd.initial_sync_token = None; // 故意缺失,后续由 configure 注入
         let res = svc.create_integration(cmd, actor.clone()).await;
         assert!(matches!(res, Err(IntegrationError::LoopGuardMissing(_))));
 
         // 用 update_integration 注入 sync_token(模拟 configure)
-        let cmd2 = make_create_cmd(tenant_id, IntegrationRelationType::Bidirectional);
+        let cmd2 = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Bidirectional);
         let integration = svc
             .create_integration(cmd2, actor.clone())
             .await
@@ -550,7 +552,7 @@ mod tests {
             .update_integration(
                 UpdateIntegrationCommand {
                     integration_id: integration.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     conflict_strategy: Some(ConflictStrategy::Bidirectional {
                         platform_field: "title".to_string(),
                         external_field: "title".to_string(),
@@ -576,8 +578,8 @@ mod tests {
     async fn get_sync_state_and_history() {
         let svc = InMemoryIntegrationService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let cmd = make_create_cmd(tenant_id, IntegrationRelationType::Mirror);
-        let actor = make_test_actor(tenant_id).with_project(cmd.project_id);
+        let cmd = make_create_cmd(TenantId(tenant_id), IntegrationRelationType::Mirror);
+        let actor = make_test_actor(TenantId(tenant_id)).with_project(cmd.project_id);
         let integration = svc
             .create_integration(cmd, actor.clone())
             .await
@@ -588,7 +590,7 @@ mod tests {
             svc.trigger_sync(
                 TriggerSyncCommand {
                     integration_id: integration.id,
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     force: false,
                 },
                 actor.clone(),
@@ -606,7 +608,7 @@ mod tests {
         let history = svc
             .get_history(
                 GetHistoryQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     integration_id: integration.id,
                     limit: 10,
                     since: None,

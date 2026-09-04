@@ -36,9 +36,30 @@ pub async fn generate(
     report_id: Uuid,
 ) -> Result<ReportResult, ReportError> {
     let rows = vec![
-        TrackingRow { id: "u1".into(), name: "Alice".into(), original_seconds: 28800.0, spent_seconds: 21600.0, remaining_seconds: 7200.0, progress: 0.75 },
-        TrackingRow { id: "u2".into(), name: "Bob".into(), original_seconds: 21600.0, spent_seconds: 14400.0, remaining_seconds: 7200.0, progress: 0.667 },
-        TrackingRow { id: "u3".into(), name: "Charlie".into(), original_seconds: 36000.0, spent_seconds: 28800.0, remaining_seconds: 7200.0, progress: 0.8 },
+        TrackingRow {
+            id: "u1".into(),
+            name: "Alice".into(),
+            original_seconds: 28800.0,
+            spent_seconds: 21600.0,
+            remaining_seconds: 7200.0,
+            progress: 0.75,
+        },
+        TrackingRow {
+            id: "u2".into(),
+            name: "Bob".into(),
+            original_seconds: 21600.0,
+            spent_seconds: 14400.0,
+            remaining_seconds: 7200.0,
+            progress: 0.667,
+        },
+        TrackingRow {
+            id: "u3".into(),
+            name: "Charlie".into(),
+            original_seconds: 36000.0,
+            spent_seconds: 28800.0,
+            remaining_seconds: 7200.0,
+            progress: 0.8,
+        },
     ];
     let total_orig: f64 = rows.iter().map(|r| r.original_seconds).sum();
     let total_spent: f64 = rows.iter().map(|r| r.spent_seconds).sum();
@@ -47,7 +68,11 @@ pub async fn generate(
     let data = TimeTrackingData {
         granularity: "user".to_string(),
         rows: rows.clone(),
-        summary: TrackingSummary { total_original: total_orig, total_spent, total_remaining: total_rem },
+        summary: TrackingSummary {
+            total_original: total_orig,
+            total_spent,
+            total_remaining: total_rem,
+        },
     };
 
     let points: Vec<ReportPoint> = rows.iter().map(|r| ReportPoint {
@@ -61,7 +86,13 @@ pub async fn generate(
         report_type: crate::ReportType::TimeTracking,
         points,
         data: serde_json::to_value(&data).map_err(|e| ReportError::Internal(e.to_string()))?,
-        summary: ReportSummary { total: total_spent, trend: Trend::Flat, anomalies: vec![], meta: serde_json::to_value(&data.summary).map_err(|e| ReportError::Internal(e.to_string()))? },
+        summary: ReportSummary {
+            total: total_spent,
+            trend: Trend::Flat,
+            anomalies: vec![],
+            meta: serde_json::to_value(&data.summary)
+                .map_err(|e| ReportError::Internal(e.to_string()))?,
+        },
         generated_at: Utc::now(),
         cache_key: format!("time_tracking:{}", report_id),
     })
@@ -72,12 +103,23 @@ mod tests {
     use super::*;
     #[test]
     fn test_tracking_progress() {
-        let r = TrackingRow { id: "x".into(), name: "X".into(), original_seconds: 100.0, spent_seconds: 25.0, remaining_seconds: 75.0, progress: 0.25 };
+        let r = TrackingRow {
+            id: "x".into(),
+            name: "X".into(),
+            original_seconds: 100.0,
+            spent_seconds: 25.0,
+            remaining_seconds: 75.0,
+            progress: 0.25,
+        };
         assert_eq!(r.progress, 0.25);
     }
     #[test]
     fn test_summary_serde() {
-        let s = TrackingSummary { total_original: 100.0, total_spent: 50.0, total_remaining: 50.0 };
+        let s = TrackingSummary {
+            total_original: 100.0,
+            total_spent: 50.0,
+            total_remaining: 50.0,
+        };
         let json = serde_json::to_string(&s).unwrap();
         assert!(json.contains("total_spent"));
     }

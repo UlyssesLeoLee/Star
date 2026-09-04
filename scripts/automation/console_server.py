@@ -176,6 +176,36 @@ def _audit(action: str, input: dict, output: dict, error: Optional[str] = None):
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
+# === TMO routes mount (per 02 §2.6.5 8 API 端点, TMO-01 实装 /api/tmo/merge) ===
+# 守门 #22: 调试控制台走 port 8080, 不污染 main 编译链
+# 守门 #24: 浏览器 → Next.js → FastAPI 8080 → subprocess
+# 守门 #13 a: L0 唯一入口, 跨 L1 task 操作只经 L0
+# per 2026-09-04 wt-tmo-02-split: 加 SCRIPTS_DIR 注入 sys.path, 让 'automation.api.routes_tmo' import 能 work
+# (console_server.py 在 scripts/automation/ 跑, 原 sys.path 只有 scripts/automation/, 找不到 automation package)
+_SCRIPTS_DIR = Path(__file__).resolve().parent.parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+try:
+    from automation.api.routes_tmo import router as tmo_router
+    app.include_router(tmo_router)
+    _audit(
+        "mount_tmo_routes",
+        {"router": "automation.api.routes_tmo", "prefix": "/api/tmo"},
+        {"mounted": True, "endpoints": [
+            "/api/tmo/merge", "/api/tmo/operations", "/api/tmo/split",
+            "/api/tmo/dependencies", "/api/tmo/reorder", "/api/tmo/graph",
+            "/api/tmo/bulk", "/api/tmo/bulk/health", "/api/tmo/relationships",
+        ]},
+    )
+except ImportError as e:
+    _audit(
+        "mount_tmo_routes_failed",
+        {"router": "automation.api.routes_tmo"},
+        {"error": str(e), "mounted": False},
+        error=str(e),
+    )
+
+
 # === 7 个 API 端点 (per §12.3) ===
 
 @app.get("/api/scripts")
@@ -318,6 +348,7 @@ def main():
     print(f"=== Automation Debug Console: http://{args.host}:{args.port} ===")
     print(f"  docs: http://{args.host}:{args.port}/docs (FastAPI swagger)")
     print(f"  scripts: {len(SCRIPTS_META)} (8 base + 4 [P] + 5 unittest)")
+    print(f"  TMO:    /api/tmo/merge (M-N1 [done]) + /api/tmo/operations (TMO-08 stub)")
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 
 

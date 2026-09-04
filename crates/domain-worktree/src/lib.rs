@@ -1021,11 +1021,11 @@ mod tests {
     async fn create_worktree_assigns_unique_id_and_initial_status() {
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
-        let cmd = make_create_cmd(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
+        let cmd = make_create_cmd(TenantId(tenant_id));
         let wt = svc.create_worktree(cmd, &actor).await.unwrap();
         assert_eq!(wt.status, WorktreeStatus::Created);
-        assert_eq!(wt.tenant_id, tenant_id);
+        assert_eq!(wt.tenant_id, TenantId(tenant_id));
         assert!(!wt.id.as_uuid().is_nil());
     }
 
@@ -1034,8 +1034,8 @@ mod tests {
         let svc = InMemoryWorktreeService::new();
         let actor_tenant = uuid::Uuid::new_v4();
         let cmd_tenant = uuid::Uuid::new_v4(); // 不同 tenant
-        let actor = make_actor(actor_tenant);
-        let cmd = make_create_cmd(cmd_tenant);
+        let actor = make_actor(TenantId(actor_tenant));
+        let cmd = make_create_cmd(TenantId(cmd_tenant));
         let res = svc.create_worktree(cmd, &actor).await;
         assert!(matches!(res, Err(WorktreeError::CrossTenantDenied(_, _))));
     }
@@ -1044,8 +1044,8 @@ mod tests {
     async fn create_worktree_runtime_required() {
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
-        let mut cmd = make_create_cmd(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
+        let mut cmd = make_create_cmd(TenantId(tenant_id));
         cmd.runtime_id = RuntimeId(Uuid::nil());
         let res = svc.create_worktree(cmd, &actor).await;
         assert!(matches!(res, Err(WorktreeError::RuntimeRequired)));
@@ -1055,16 +1055,16 @@ mod tests {
     async fn transition_status_valid() {
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let wt = svc
-            .create_worktree(make_create_cmd(tenant_id), &actor)
+            .create_worktree(make_create_cmd(TenantId(tenant_id)), &actor)
             .await
             .unwrap();
         // Created -> Initializing
         let wt2 = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: wt.id,
                     from: WorktreeStatus::Created,
                     to: WorktreeStatus::Initializing,
@@ -1081,16 +1081,16 @@ mod tests {
     async fn transition_status_from_mismatch_rejected() {
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let wt = svc
-            .create_worktree(make_create_cmd(tenant_id), &actor)
+            .create_worktree(make_create_cmd(TenantId(tenant_id)), &actor)
             .await
             .unwrap();
         // 状态是 Created,试图 from=Ready(错的)
         let res = svc
             .transition_status(
                 TransitionStatusCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: wt.id,
                     from: WorktreeStatus::Ready,
                     to: WorktreeStatus::Assigned,
@@ -1106,16 +1106,16 @@ mod tests {
     async fn assign_to_agent_requires_ready_state() {
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let wt = svc
-            .create_worktree(make_create_cmd(tenant_id), &actor)
+            .create_worktree(make_create_cmd(TenantId(tenant_id)), &actor)
             .await
             .unwrap();
         // 状态 Created,试图直接 assign(必须先 Ready)
         let res = svc
             .assign_to_agent(
                 AssignWorktreeCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: wt.id,
                     agent_id: AgentId::new(),
                     agent_session_id: AgentSessionId::new(),
@@ -1130,16 +1130,16 @@ mod tests {
     async fn record_observed_state_requires_local_runtime_actor() {
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let wt = svc
-            .create_worktree(make_create_cmd(tenant_id), &actor)
+            .create_worktree(make_create_cmd(TenantId(tenant_id)), &actor)
             .await
             .unwrap();
         // 普通 actor,应 PermissionDenied
         let res = svc
             .record_observed_state(
                 RecordObservedStateCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: wt.id,
                     ahead: 1,
                     behind: 0,
@@ -1155,15 +1155,15 @@ mod tests {
     async fn abandon_sets_abandoned() {
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let wt = svc
-            .create_worktree(make_create_cmd(tenant_id), &actor)
+            .create_worktree(make_create_cmd(TenantId(tenant_id)), &actor)
             .await
             .unwrap();
         let abandoned = svc
             .abandon(
                 AbandonCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: wt.id,
                     reason: "需求变更".to_string(),
                 },
@@ -1178,9 +1178,9 @@ mod tests {
     async fn abandon_terminal_state_rejected() {
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let wt = svc
-            .create_worktree(make_create_cmd(tenant_id), &actor)
+            .create_worktree(make_create_cmd(TenantId(tenant_id)), &actor)
             .await
             .unwrap();
         // 走完 happy path 到 Merged
@@ -1201,7 +1201,7 @@ mod tests {
             current = svc
                 .transition_status(
                     TransitionStatusCommand {
-                        tenant_id,
+                        tenant_id: TenantId(tenant_id),
                         worktree_id: current.id,
                         from: w[0],
                         to: w[1],
@@ -1216,7 +1216,7 @@ mod tests {
         let res = svc
             .abandon(
                 AbandonCommand {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     worktree_id: current.id,
                     reason: "test".to_string(),
                 },
@@ -1230,14 +1230,14 @@ mod tests {
     async fn get_by_id_cross_tenant_denied() {
         let svc = InMemoryWorktreeService::new();
         let tenant_a = uuid::Uuid::new_v4();
-        let actor_a = make_actor(tenant_a);
+        let actor_a = make_actor(TenantId(tenant_a));
         let wt = svc
-            .create_worktree(make_create_cmd(tenant_a), &actor_a)
+            .create_worktree(make_create_cmd(TenantId(tenant_a)), &actor_a)
             .await
             .unwrap();
         // 另一 tenant 的 actor
         let tenant_b = uuid::Uuid::new_v4();
-        let actor_b = make_actor(tenant_b);
+        let actor_b = make_actor(TenantId(tenant_b));
         let res = svc.get_by_id(wt.id, &actor_b).await;
         assert!(matches!(res, Err(WorktreeError::CrossTenantDenied(_, _))));
     }
@@ -1246,16 +1246,16 @@ mod tests {
     async fn list_by_work_item_filters() {
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let wi = WorkItemId::new();
-        let mut cmd = make_create_cmd(tenant_id);
+        let mut cmd = make_create_cmd(TenantId(tenant_id));
         cmd.work_item_id = wi;
         let wt1 = svc.create_worktree(cmd.clone(), &actor).await.unwrap();
         let wt2 = svc.create_worktree(cmd, &actor).await.unwrap();
         let list = svc
             .list_by_work_item(
                 ListByWorkItemQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     work_item_id: wi,
                 },
                 &actor,
@@ -1271,15 +1271,15 @@ mod tests {
     async fn list_by_agent_filters() {
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let wt = svc
-            .create_worktree(make_create_cmd(tenant_id), &actor)
+            .create_worktree(make_create_cmd(TenantId(tenant_id)), &actor)
             .await
             .unwrap();
         // 走到 Ready
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 worktree_id: wt.id,
                 from: WorktreeStatus::Created,
                 to: WorktreeStatus::Initializing,
@@ -1291,7 +1291,7 @@ mod tests {
         .unwrap();
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 worktree_id: wt.id,
                 from: WorktreeStatus::Initializing,
                 to: WorktreeStatus::Ready,
@@ -1304,7 +1304,7 @@ mod tests {
         let agent = AgentId::new();
         svc.assign_to_agent(
             AssignWorktreeCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 worktree_id: wt.id,
                 agent_id: agent,
                 agent_session_id: AgentSessionId::new(),
@@ -1316,7 +1316,7 @@ mod tests {
         let list = svc
             .list_by_agent(
                 ListByAgentQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     agent_id: agent,
                 },
                 &actor,
@@ -1330,12 +1330,12 @@ mod tests {
     async fn detect_conflicts_finds_other_active_worktrees() {
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let repo = RepositoryId::new();
-        let mut cmd1 = make_create_cmd(tenant_id);
+        let mut cmd1 = make_create_cmd(TenantId(tenant_id));
         cmd1.repository_id = repo;
         let wt1 = svc.create_worktree(cmd1, &actor).await.unwrap();
-        let mut cmd2 = make_create_cmd(tenant_id);
+        let mut cmd2 = make_create_cmd(TenantId(tenant_id));
         cmd2.repository_id = repo;
         let wt2 = svc.create_worktree(cmd2, &actor).await.unwrap();
         // wt1 检测冲突,应发现 wt2(同 repo)
@@ -1348,11 +1348,11 @@ mod tests {
     async fn heatmap_aggregates_by_status() {
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let repo = RepositoryId::new();
-        let mut cmd1 = make_create_cmd(tenant_id);
+        let mut cmd1 = make_create_cmd(TenantId(tenant_id));
         cmd1.repository_id = repo;
-        let mut cmd2 = make_create_cmd(tenant_id);
+        let mut cmd2 = make_create_cmd(TenantId(tenant_id));
         cmd2.repository_id = repo;
         svc.create_worktree(cmd1, &actor).await.unwrap();
         svc.create_worktree(cmd2, &actor).await.unwrap();
@@ -1367,10 +1367,10 @@ mod tests {
         // 同一 WorkItem 下 3 个 Worktree 不同状态同时存在
         let svc = InMemoryWorktreeService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(tenant_id);
+        let actor = make_actor(TenantId(tenant_id));
         let wi = WorkItemId::new();
         let mk = || {
-            let mut c = make_create_cmd(tenant_id);
+            let mut c = make_create_cmd(TenantId(tenant_id));
             c.work_item_id = wi;
             c
         };
@@ -1380,7 +1380,7 @@ mod tests {
         // wt2 走到 Ready
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 worktree_id: wt2.id,
                 from: WorktreeStatus::Created,
                 to: WorktreeStatus::Initializing,
@@ -1392,7 +1392,7 @@ mod tests {
         .unwrap();
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 worktree_id: wt2.id,
                 from: WorktreeStatus::Initializing,
                 to: WorktreeStatus::Ready,
@@ -1405,7 +1405,7 @@ mod tests {
         // wt3 走 abandon
         svc.abandon(
             AbandonCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 worktree_id: wt3.id,
                 reason: "不再需要".to_string(),
             },
@@ -1417,7 +1417,7 @@ mod tests {
         let list = svc
             .list_by_work_item(
                 ListByWorkItemQuery {
-                    tenant_id,
+                    tenant_id: TenantId(tenant_id),
                     work_item_id: wi,
                 },
                 &actor,

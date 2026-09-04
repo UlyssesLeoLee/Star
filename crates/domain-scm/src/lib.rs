@@ -44,6 +44,7 @@ use uuid::Uuid;
 // 强类型 ID 宏
 // =====================================================================
 
+/// 定义基于 UUID 的强类型 ID
 #[macro_export]
 macro_rules! define_uuid_id {
     ($name:ident) => {
@@ -53,18 +54,22 @@ macro_rules! define_uuid_id {
         pub struct $name(pub uuid::Uuid);
 
         impl $name {
+            /// 生成新的随机 ID
             #[allow(dead_code)]
             pub fn new() -> Self {
                 Self(uuid::Uuid::new_v4())
             }
+            /// 从已有 UUID 构造
             #[allow(dead_code)]
             pub fn from_uuid(id: uuid::Uuid) -> Self {
                 Self(id)
             }
+            /// 转换为内部 UUID(借用)
             #[allow(dead_code)]
             pub fn as_uuid(&self) -> uuid::Uuid {
                 self.0
             }
+            /// 转换为内部 UUID(消费)
             #[allow(dead_code)]
             pub fn into_uuid(self) -> uuid::Uuid {
                 self.0
@@ -211,9 +216,13 @@ impl Default for SyncStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ConflictStrategy {
+    /// 最新写入者胜出
     LatestWins,
+    /// 最先写入者胜出
     FirstWins,
+    /// 需人工介入解决冲突
     ManualReview,
+    /// 双向合并
     Bidirectional,
 }
 
@@ -247,6 +256,7 @@ pub enum PullRequestState {
 }
 
 impl PullRequestState {
+    /// 转换为状态字符串常量
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Draft => "DRAFT",
@@ -270,9 +280,13 @@ impl PullRequestState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReviewState {
+    /// 待处理
     Pending,
+    /// 已批准
     Approved,
+    /// 要求修改
     ChangesRequested,
+    /// 仅评论
     Commented,
 }
 
@@ -281,10 +295,15 @@ pub enum ReviewState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PipelineStatus {
+    /// 待运行
     Pending,
+    /// 运行中
     Running,
+    /// 成功
     Success,
+    /// 失败
     Failed,
+    /// 已取消
     Canceled,
 }
 
@@ -293,10 +312,15 @@ pub enum PipelineStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WebhookEventType {
+    /// 代码推送
     Push,
+    /// PR 相关事件
     PullRequest,
+    /// Pipeline 相关事件
     Pipeline,
+    /// 发布事件
     Release,
+    /// Issue 相关事件
     Issues,
 }
 
@@ -314,15 +338,21 @@ impl std::fmt::Display for ExternalRepositoryId {
 /// **SyncState**(值对象,内嵌于 Repository,§4.7.6)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncState {
+    /// 同步状态
     pub status: SyncStatus,
+    /// 同步 Token(用于增量同步)
     pub token: Option<String>,
+    /// 最近同步时间
     pub last_synced_at: Option<DateTime<Utc>>,
+    /// 冲突解决策略
     pub conflict_strategy: ConflictStrategy,
 }
 
 /// 预定义角色
 pub mod roles {
+    /// 项目管理员角色
     pub const PROJECT_ADMIN: &str = "project_admin";
+    /// 开发者角色
     pub const DEVELOPER: &str = "developer";
 }
 
@@ -330,6 +360,7 @@ pub mod roles {
 // 错误(§8.3 SC-001~006)
 // =====================================================================
 
+/// SCM 领域错误(§8.3 SC-001~006)
 #[derive(Debug, Error)]
 pub enum ScmError {
     /// `SC-001` 404 Repository 不存在
@@ -356,6 +387,7 @@ pub enum ScmError {
 }
 
 impl ScmError {
+    /// 返回错误对应的短代码
     pub fn code(&self) -> &'static str {
         match self {
             Self::NotFound(_) => "SCM_NOT_FOUND",
@@ -367,6 +399,7 @@ impl ScmError {
             Self::Internal(_) => "SCM_INTERNAL",
         }
     }
+    /// 是否属于服务端(5xx)错误
     pub fn is_server_error(&self) -> bool {
         matches!(self, Self::Internal(_))
     }
@@ -385,29 +418,48 @@ impl From<uuid::Error> for ScmError {
 /// **Repository 聚合根**(§4.18.1,17 字段)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Repository {
+    /// 仓库 ID
     pub id: RepositoryId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属项目
     pub project_id: ProjectId,
+    /// SCM 厂商
     pub provider: ScmProvider,
+    /// 厂商侧外部仓库 ID
     pub external_id: ExternalRepositoryId,
+    /// 仓库地址
     pub url: String,
+    /// 默认分支名
     pub default_branch: String,
+    /// 仓库所有权类型
     pub ownership: RepositoryOwnership,
+    /// 与外部 SoR 的同步状态
     pub sync_status: SyncStatus,
+    /// 同步 Token
     pub sync_token: Option<String>,
+    /// 最近同步时间
     pub last_synced_at: Option<DateTime<Utc>>,
+    /// 冲突解决策略
     pub conflict_strategy: ConflictStrategy,
     /// Credential Broker 引用(INV-SCM-05 不存明文)
     pub credential_id: Option<Uuid>,
+    /// 是否已归档
     pub is_archived: bool,
+    /// 登记该仓库的用户
     pub registered_by_user_id: UserId,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 更新时间
     pub updated_at: DateTime<Utc>,
+    /// 乐观锁版本号
     pub lock_version: u32,
 }
 
 impl Repository {
+    /// 字段数量(用于测试审计)
     pub const FIELD_COUNT: usize = 17;
+    /// 递增乐观锁版本并更新时间戳
     pub fn bump_version(&mut self) {
         self.lock_version = self.lock_version.saturating_add(1);
         self.updated_at = Utc::now();
@@ -417,73 +469,122 @@ impl Repository {
 /// **Branch**(§4.18.2,11 字段)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Branch {
+    /// 分支 ID
     pub id: BranchId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属仓库
     pub repository_id: RepositoryId,
+    /// 分支名
     pub name: String,
+    /// 头部提交
     pub head_commit_id: Option<CommitId>,
+    /// 基线提交
     pub base_commit_id: Option<CommitId>,
+    /// 是否受保护
     pub protected: bool,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 更新时间
     pub updated_at: DateTime<Utc>,
+    /// 最近一次提交时间
     pub last_commit_at: Option<DateTime<Utc>>,
+    /// 乐观锁版本号
     pub lock_version: u32,
 }
 
 impl Branch {
+    /// 字段数量(用于测试审计)
     pub const FIELD_COUNT: usize = 11;
 }
 
 /// **Commit**(§4.18.3,13 字段)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Commit {
+    /// 提交 ID
     pub id: CommitId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属仓库
     pub repository_id: RepositoryId,
+    /// 提交 SHA
     pub sha: String,
+    /// 作者
     pub author: String,
+    /// 提交者
     pub committer: String,
+    /// 提交信息
     pub message: String,
+    /// 父提交 SHA 列表
     pub parent_shas: Vec<String>,
+    /// 树对象 SHA
     pub tree_sha: String,
+    /// 关联的工作项
     pub linked_work_item_id: Option<WorkItemId>,
+    /// 作者提交时间
     pub authored_at: DateTime<Utc>,
+    /// 实际提交时间
     pub committed_at: DateTime<Utc>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 乐观锁版本号
     pub lock_version: u32,
 }
 
 impl Commit {
+    /// 字段数量(用于测试审计)
     pub const FIELD_COUNT: usize = 13;
 }
 
 /// **PullRequest**(§4.18.4,19 字段,**非聚合根**)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PullRequest {
+    /// PR ID
     pub id: PullRequestId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属仓库
     pub repository_id: RepositoryId,
+    /// 厂商侧外部 PR ID
     pub external_id: String,
+    /// 源分支
     pub source_branch: String,
+    /// 目标分支
     pub target_branch: String,
+    /// 标题
     pub title: String,
+    /// 描述
     pub description: Option<String>,
+    /// 提交者用户 ID
     pub author_user_id: UserId,
+    /// PR 状态(§7.5 状态机)
     pub state: PullRequestState,
+    /// 是否可合并
     pub mergeable: bool,
+    /// 合并时间
     pub merged_at: Option<DateTime<Utc>>,
+    /// 关闭时间
     pub closed_at: Option<DateTime<Utc>>,
+    /// 关联的 Review ID 列表
     pub review_ids: Vec<ReviewId>,
+    /// 关联的 Pipeline ID 列表
     pub pipeline_ids: Vec<PipelineId>,
+    /// 关联的工作项
     pub linked_work_item_id: Option<WorkItemId>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 更新时间
     pub updated_at: DateTime<Utc>,
+    /// PR 内容对象存储 Key
     pub content_object_key: Option<String>, // INV-SCM-06: 必带 tenant_id 前缀
+    /// 乐观锁版本号
     pub lock_version: u32,
 }
 
 impl PullRequest {
+    /// 字段数量(用于测试审计)
     pub const FIELD_COUNT: usize = 19;
+    /// 递增乐观锁版本并更新时间戳
     pub fn bump_version(&mut self) {
         self.lock_version = self.lock_version.saturating_add(1);
         self.updated_at = Utc::now();
@@ -517,59 +618,94 @@ impl PullRequest {
 /// **Review**(§4.18.5,9 字段)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Review {
+    /// Review ID
     pub id: ReviewId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属 PR
     pub pull_request_id: PullRequestId,
+    /// 评审人用户 ID
     pub reviewer_user_id: UserId,
+    /// 评审状态
     pub state: ReviewState,
+    /// 评审内容
     pub body: Option<String>,
+    /// 提交时间
     pub submitted_at: DateTime<Utc>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 乐观锁版本号
     pub lock_version: u32,
 }
 
 impl Review {
+    /// 字段数量(用于测试审计)
     pub const FIELD_COUNT: usize = 9;
 }
 
 /// **Pipeline**(§4.18.6,10 字段)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pipeline {
+    /// Pipeline ID
     pub id: PipelineId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属 PR
     pub pull_request_id: PullRequestId,
+    /// 厂商侧外部 Pipeline ID
     pub external_id: String,
+    /// 运行状态
     pub status: PipelineStatus,
+    /// 触发提交 SHA
     pub head_sha: String,
+    /// 详情链接
     pub url: Option<String>,
+    /// 开始时间
     pub started_at: Option<DateTime<Utc>>,
+    /// 结束时间
     pub finished_at: Option<DateTime<Utc>>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 乐观锁版本号
     pub lock_version: u32,
 }
 
 impl Pipeline {
+    /// 字段数量(用于测试审计)
     pub const FIELD_COUNT: usize = 10;
 }
 
 /// **WebhookEvent**(§4.18.7,11 字段,Append-only,INV-SCM-03 + INV-SCM-08)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookEvent {
+    /// 事件 ID
     pub id: WebhookEventId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属仓库(可能为 None)
     pub repository_id: Option<RepositoryId>,
+    /// SCM 厂商
     pub provider: ScmProvider,
+    /// Webhook 事件类型
     pub event_type: WebhookEventType,
+    /// 厂商侧外部事件 ID
     pub external_event_id: String,
+    /// 原始 Payload
     pub raw_payload: serde_json::Value,
+    /// 接收时间
     pub received_at: DateTime<Utc>,
+    /// 是否已处理
     pub processed: bool,
+    /// 处理完成时间
     pub processed_at: Option<DateTime<Utc>>,
+    /// Loop 防护 ID(INV-SCM-03)
     pub loop_breaker_id: Uuid,
+    /// 幂等 Key
     pub idempotency_key: String,
 }
 
 impl WebhookEvent {
+    /// 字段数量(用于测试审计)
     pub const FIELD_COUNT: usize = 11;
 }
 
@@ -577,6 +713,7 @@ impl WebhookEvent {
 // 不变量(INV-SCM-01~08)
 // =====================================================================
 
+/// 不变量校验函数类型
 pub type InvariantCheck = fn(&Repository) -> Result<(), ScmError>;
 
 /// **INV-SCM-04** Repository 必带 tenant_id + project_id
@@ -619,12 +756,14 @@ pub fn check_invariant_02_connected_only(r: &Repository) -> Result<(), ScmError>
     Ok(())
 }
 
+/// 全部不变量检查清单
 pub const ALL_INVARIANT_CHECKS: &[InvariantCheck] = &[
     check_invariant_04_tenant_project,
     check_invariant_05_credential,
     check_invariant_02_connected_only,
 ];
 
+/// 依次执行给定的不变量检查
 pub fn run_invariants(checks: &[InvariantCheck], r: &Repository) -> Result<(), ScmError> {
     for c in checks {
         c(r)?;
@@ -636,14 +775,19 @@ pub fn run_invariants(checks: &[InvariantCheck], r: &Repository) -> Result<(), S
 // 事件
 // =====================================================================
 
+/// 领域事件公共元信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventMeta {
+    /// 事件 ID
     pub event_id: Uuid,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 发生时间
     pub occurred_at: DateTime<Utc>,
 }
 
 impl EventMeta {
+    /// 构造新的事件元信息
     pub fn new(tenant_id: TenantId) -> Self {
         Self {
             event_id: Uuid::new_v4(),
@@ -653,39 +797,59 @@ impl EventMeta {
     }
 }
 
+/// 仓库已注册事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepositoryRegistered {
+    /// 事件元信息
     pub meta: EventMeta,
+    /// 仓库 ID
     pub repository_id: RepositoryId,
+    /// SCM 厂商
     pub provider: ScmProvider,
+    /// 厂商侧外部仓库 ID
     pub external_id: String,
 }
 
+/// PR 状态变更事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PullRequestStateChanged {
+    /// 事件元信息
     pub meta: EventMeta,
+    /// PR ID
     pub pr_id: PullRequestId,
+    /// 变更前状态
     pub from: PullRequestState,
+    /// 变更后状态
     pub to: PullRequestState,
 }
 
+/// Webhook 已接收事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookReceived {
+    /// 事件元信息
     pub meta: EventMeta,
+    /// Webhook 事件 ID
     pub webhook_event_id: WebhookEventId,
+    /// 厂商侧外部事件 ID
     pub external_event_id: String,
+    /// Loop 防护 ID
     pub loop_breaker_id: Uuid,
 }
 
+/// SCM 领域事件枚举
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ScmEvent {
+    /// 仓库已注册
     RepositoryRegistered(RepositoryRegistered),
+    /// PR 状态已变更
     PullRequestStateChanged(PullRequestStateChanged),
+    /// Webhook 已接收
     WebhookReceived(WebhookReceived),
 }
 
 impl ScmEvent {
+    /// 返回事件对应的消息主题
     pub fn subject(&self) -> &'static str {
         match self {
             Self::RepositoryRegistered(_) => "star.events.scm.repository.registered.v1",
@@ -699,53 +863,80 @@ impl ScmEvent {
 // 端口
 // =====================================================================
 
+/// 注册仓库命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterRepositoryCommand {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属项目
     pub project_id: ProjectId,
+    /// SCM 厂商
     pub provider: ScmProvider,
+    /// 厂商侧外部仓库 ID
     pub external_id: String,
+    /// 仓库地址
     pub url: String,
+    /// 默认分支名
     pub default_branch: String,
+    /// 仓库所有权类型
     pub ownership: RepositoryOwnership,
+    /// 冲突解决策略
     pub conflict_strategy: ConflictStrategy,
     /// Credential Broker 引用
     pub credential_id: Option<Uuid>,
 }
 
+/// 更新同步状态命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateSyncStateCommand {
+    /// 目标仓库
     pub repository_id: RepositoryId,
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 新同步状态
     pub new_status: SyncStatus,
+    /// 新同步 Token
     pub new_token: Option<String>,
 }
 
+/// Webhook 事件输入
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookEventInput {
+    /// 所属租户
     pub tenant_id: TenantId,
+    /// 所属仓库(可能为 None)
     pub repository_id: Option<RepositoryId>,
+    /// SCM 厂商
     pub provider: ScmProvider,
+    /// Webhook 事件类型
     pub event_type: WebhookEventType,
+    /// 厂商侧外部事件 ID
     pub external_event_id: String,
+    /// 原始 Payload
     pub raw_payload: serde_json::Value,
 }
 
+/// 记录 PR 状态迁移命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordPullRequestTransitionCommand {
+    /// PR ID
     pub pr_id: PullRequestId,
+    /// 目标状态
     pub new_state: PullRequestState,
+    /// 操作者上下文
     pub actor: ActorContext,
 }
 
 /// **ScmCommandPort**
 #[async_trait]
 pub trait ScmCommandPort: Send + Sync {
+    /// 注册新仓库
     async fn register_repository(
         &self,
         cmd: RegisterRepositoryCommand,
         actor: ActorContext,
     ) -> Result<Repository, ScmError>;
+    /// 更新仓库同步状态
     async fn update_sync_state(
         &self,
         cmd: UpdateSyncStateCommand,
@@ -766,16 +957,19 @@ pub trait ScmCommandPort: Send + Sync {
 /// **ScmQueryPort**
 #[async_trait]
 pub trait ScmQueryPort: Send + Sync {
+    /// 查询单个仓库
     async fn get_repository(
         &self,
         id: RepositoryId,
         actor: ActorContext,
     ) -> Result<Repository, ScmError>;
+    /// 按项目列出仓库
     async fn list_by_project(
         &self,
         project_id: ProjectId,
         actor: ActorContext,
     ) -> Result<Vec<Repository>, ScmError>;
+    /// 查询单个 PR
     async fn get_pull_request(
         &self,
         id: PullRequestId,
@@ -786,11 +980,14 @@ pub trait ScmQueryPort: Send + Sync {
 /// **ScmPort**(SCM Adapter 抽象,INV-SCM-01)
 #[async_trait]
 pub trait ScmPort: Send + Sync {
+    /// 拉取厂商侧仓库元数据
     async fn get_repository_meta(
         &self,
         external_id: ExternalRepositoryId,
     ) -> Result<Repository, ScmError>;
+    /// 列出仓库分支
     async fn list_branches(&self, repo: RepositoryId) -> Result<Vec<Branch>, ScmError>;
+    /// 列出仓库 PR
     async fn list_pull_requests(&self, repo: RepositoryId) -> Result<Vec<PullRequest>, ScmError>;
 }
 
@@ -798,6 +995,7 @@ pub trait ScmPort: Send + Sync {
 // InMemoryScmService
 // =====================================================================
 
+/// 内存版 SCM 服务实现(用于测试/开发)
 pub struct InMemoryScmService {
     repos: Arc<RwLock<HashMap<RepositoryId, Repository>>>,
     branches: Arc<RwLock<HashMap<BranchId, Branch>>>,
@@ -809,6 +1007,7 @@ pub struct InMemoryScmService {
 }
 
 impl InMemoryScmService {
+    /// 构造新服务实例及事件接收端
     pub fn new() -> (Arc<Self>, mpsc::UnboundedReceiver<ScmEvent>) {
         let (tx, rx) = mpsc::unbounded_channel();
         let svc = Arc::new(Self {
@@ -821,15 +1020,19 @@ impl InMemoryScmService {
         });
         (svc, rx)
     }
+    /// 构造仅用于测试的服务实例(丢弃事件接收端)
     pub fn new_for_test() -> Arc<Self> {
         Self::new().0
     }
+    /// 返回当前仓库数量
     pub async fn repo_count(&self) -> usize {
         self.repos.read().await.len()
     }
+    /// 返回当前 PR 数量
     pub async fn pr_count(&self) -> usize {
         self.prs.read().await.len()
     }
+    /// 返回当前 Webhook 事件数量
     pub async fn webhook_count(&self) -> usize {
         self.webhooks.read().await.len()
     }
@@ -1103,13 +1306,13 @@ mod tests {
     fn make_admin(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::PROJECT_ADMIN)
-            .with_project(project_id)
+            .with_project(project_id.as_uuid())
     }
 
     fn make_developer(tenant_id: TenantId, project_id: ProjectId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::DEVELOPER)
-            .with_project(project_id)
+            .with_project(project_id.as_uuid())
     }
 
     #[test]
@@ -1128,9 +1331,9 @@ mod tests {
         let svc = InMemoryScmService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_admin(tenant, project);
+        let actor = make_admin(TenantId(tenant), project);
         let cmd = RegisterRepositoryCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             provider: ScmProvider::Github,
             external_id: "acme/foo".to_string(),
@@ -1150,9 +1353,9 @@ mod tests {
         let svc = InMemoryScmService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_admin(tenant, project);
+        let actor = make_admin(TenantId(tenant), project);
         let cmd = RegisterRepositoryCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             provider: ScmProvider::Github,
             external_id: "acme/bar".to_string(),
@@ -1171,9 +1374,9 @@ mod tests {
         let svc = InMemoryScmService::new_for_test();
         let tenant_a = uuid::Uuid::new_v4();
         let project_a = ProjectId::new();
-        let actor_a = make_admin(tenant_a, project_a);
+        let actor_a = make_admin(TenantId(tenant_a), project_a);
         let cmd = RegisterRepositoryCommand {
-            tenant_id: tenant_a,
+            tenant_id: TenantId(tenant_a),
             project_id: project_a,
             provider: ScmProvider::Github,
             external_id: "x".to_string(),
@@ -1186,7 +1389,7 @@ mod tests {
         let _ = svc.register_repository(cmd, actor_a).await.unwrap();
         let tenant_b = uuid::Uuid::new_v4();
         let project_b = ProjectId::new();
-        let actor_b = make_admin(tenant_b, project_b);
+        let actor_b = make_admin(TenantId(tenant_b), project_b);
         // 尝试读 tenant_a 的 repo
         let repo_id = {
             // 简单方法:扫描
@@ -1204,9 +1407,9 @@ mod tests {
         let svc = InMemoryScmService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_developer(tenant, project);
+        let actor = make_developer(TenantId(tenant), project);
         let cmd = RegisterRepositoryCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             provider: ScmProvider::Github,
             external_id: "z".to_string(),
@@ -1225,7 +1428,7 @@ mod tests {
         let svc = InMemoryScmService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let input = WebhookEventInput {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             repository_id: None,
             provider: ScmProvider::Github,
             event_type: WebhookEventType::Push,
@@ -1246,14 +1449,14 @@ mod tests {
         // 单元测试 PR 状态机(不需要 service)
         let make_pr = |state: PullRequestState| PullRequest {
             id: PullRequestId::new(),
-            tenant_id: UserId.new(),
+            tenant_id: TenantId::new(),
             repository_id: RepositoryId::new(),
             external_id: "1".to_string(),
             source_branch: "feat".to_string(),
             target_branch: "main".to_string(),
             title: "T".to_string(),
             description: None,
-            author_user_id: UserId.new(),
+            author_user_id: UserId::new(),
             state,
             mergeable: false,
             merged_at: None,
@@ -1299,11 +1502,11 @@ mod tests {
         let svc = InMemoryScmService::new_for_test();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_admin(tenant, project);
+        let actor = make_admin(TenantId(tenant), project);
         let repo = svc
             .register_repository(
                 RegisterRepositoryCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     provider: ScmProvider::Github,
                     external_id: "sync-test".to_string(),
@@ -1322,7 +1525,7 @@ mod tests {
             .update_sync_state(
                 UpdateSyncStateCommand {
                     repository_id: repo.id,
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     new_status: SyncStatus::Behind,
                     new_token: Some("etag-123".to_string()),
                 },

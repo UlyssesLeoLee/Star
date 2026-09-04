@@ -26,10 +26,30 @@ pub async fn generate(
     report_id: Uuid,
 ) -> Result<ReportResult, ReportError> {
     let rows = vec![
-        GroupRow { group: "highest".into(), avg_days: 1.5, median_days: 1.0, count: 12 },
-        GroupRow { group: "high".into(), avg_days: 3.2, median_days: 2.5, count: 28 },
-        GroupRow { group: "medium".into(), avg_days: 7.5, median_days: 6.0, count: 45 },
-        GroupRow { group: "low".into(), avg_days: 14.3, median_days: 12.0, count: 18 },
+        GroupRow {
+            group: "highest".into(),
+            avg_days: 1.5,
+            median_days: 1.0,
+            count: 12,
+        },
+        GroupRow {
+            group: "high".into(),
+            avg_days: 3.2,
+            median_days: 2.5,
+            count: 28,
+        },
+        GroupRow {
+            group: "medium".into(),
+            avg_days: 7.5,
+            median_days: 6.0,
+            count: 45,
+        },
+        GroupRow {
+            group: "low".into(),
+            avg_days: 14.3,
+            median_days: 12.0,
+            count: 18,
+        },
     ];
     let data = ResolutionTimeData {
         group_by: "priority".to_string(),
@@ -37,18 +57,26 @@ pub async fn generate(
     };
 
     let total_count: u32 = rows.iter().map(|r| r.count).sum();
-    let points: Vec<ReportPoint> = rows.iter().map(|r| ReportPoint {
-        label: r.group.clone(),
-        value: r.avg_days,
-        extra: serde_json::json!({"median_days": r.median_days, "count": r.count}),
-    }).collect();
+    let points: Vec<ReportPoint> = rows
+        .iter()
+        .map(|r| ReportPoint {
+            label: r.group.clone(),
+            value: r.avg_days,
+            extra: serde_json::json!({"median_days": r.median_days, "count": r.count}),
+        })
+        .collect();
 
     Ok(ReportResult {
         report_id,
         report_type: crate::ReportType::ResolutionTime,
         points,
         data: serde_json::to_value(&data).map_err(|e| ReportError::Internal(e.to_string()))?,
-        summary: ReportSummary { total: total_count as f64, trend: Trend::Flat, anomalies: vec![], meta: serde_json::to_value(&data).map_err(|e| ReportError::Internal(e.to_string()))? },
+        summary: ReportSummary {
+            total: total_count as f64,
+            trend: Trend::Flat,
+            anomalies: vec![],
+            meta: serde_json::to_value(&data).map_err(|e| ReportError::Internal(e.to_string()))?,
+        },
         generated_at: Utc::now(),
         cache_key: format!("resolution_time:{}", report_id),
     })
@@ -59,7 +87,12 @@ mod tests {
     use super::*;
     #[test]
     fn test_group_row_count() {
-        let r = GroupRow { group: "x".into(), avg_days: 1.0, median_days: 1.0, count: 5 };
+        let r = GroupRow {
+            group: "x".into(),
+            avg_days: 1.0,
+            median_days: 1.0,
+            count: 5,
+        };
         assert_eq!(r.count, 5);
     }
 }

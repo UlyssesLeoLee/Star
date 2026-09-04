@@ -1295,6 +1295,18 @@ mod tests {
             .with_role("tenant_admin")
     }
 
+    fn make_platform_admin_actor(
+        user: UserId,
+        tenant: TenantId,
+        project: ProjectId,
+    ) -> ActorContext {
+        let mut a = ActorContext::new(user.0, tenant.0)
+            .with_project(project.as_uuid())
+            .with_role("platform_admin");
+        a.is_platform_admin = true;
+        a
+    }
+
     fn make_shape(kind: ShapeKind, x: f32, y: f32, w: f32, h: f32, color: &str) -> WhiteboardShape {
         WhiteboardShape {
             id: ShapeId::new(),
@@ -1305,7 +1317,7 @@ mod tests {
             h,
             content: None,
             color: color.to_string(),
-            created_by: UserId.new(),
+            created_by: UserId::new(),
             created_at: chrono::DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
             updated_at: Utc::now(),
         }
@@ -1319,16 +1331,16 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
+        let actor = make_actor(UserId::new(), TenantId(tenant), project);
         let cmd = StartSessionCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             parent_type: CollabParentType::WorkItem,
             parent_id: Uuid::new_v4(),
         };
         let s = svc.start_session(cmd, &actor).await.expect("start");
         assert_eq!(s.status, CollabSessionStatus::Active);
-        assert_eq!(s.tenant_id, tenant);
+        assert_eq!(s.tenant_id, TenantId(tenant));
         assert_eq!(s.project_id, project);
         assert_eq!(s.parent_type, CollabParentType::WorkItem);
     }
@@ -1342,11 +1354,11 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let actor = make_actor(user, tenant, project);
+        let actor = make_actor(UserId(user), TenantId(tenant), project);
         let s = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     parent_type: CollabParentType::Document,
                     parent_id: Uuid::new_v4(),
@@ -1358,7 +1370,7 @@ mod tests {
         let ended = svc
             .end_session(
                 EndSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     session_id: s.id,
                 },
                 &actor,
@@ -1378,11 +1390,11 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let actor = make_actor(user, tenant, project);
+        let actor = make_actor(UserId(user), TenantId(tenant), project);
         let s = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     parent_type: CollabParentType::Whiteboard,
                     parent_id: Uuid::new_v4(),
@@ -1393,7 +1405,7 @@ mod tests {
             .expect("start");
         svc.end_session(
             EndSessionCommand {
-                tenant_id: tenant,
+                tenant_id: TenantId(tenant),
                 session_id: s.id,
             },
             &actor,
@@ -1404,7 +1416,7 @@ mod tests {
         let r = svc
             .end_session(
                 EndSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     session_id: s.id,
                 },
                 &actor,
@@ -1422,12 +1434,12 @@ mod tests {
         let tenant_a = uuid::Uuid::new_v4();
         let tenant_b = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor_a = make_actor(uuid::Uuid::new_v4(), tenant_a, project);
-        let actor_b = make_actor(uuid::Uuid::new_v4(), tenant_b, project);
+        let actor_a = make_actor(UserId::new(), TenantId(tenant_a), project);
+        let actor_b = make_actor(UserId::new(), TenantId(tenant_b), project);
         let s = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id: tenant_a,
+                    tenant_id: TenantId(tenant_a),
                     project_id: project,
                     parent_type: CollabParentType::WorkItem,
                     parent_id: Uuid::new_v4(),
@@ -1440,7 +1452,7 @@ mod tests {
         let r = svc
             .get_session(
                 GetSessionQuery {
-                    tenant_id: tenant_b,
+                    tenant_id: TenantId(tenant_b),
                     session_id: s.id,
                 },
                 &actor_b,
@@ -1458,11 +1470,11 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let actor = make_actor(user, tenant, project);
+        let actor = make_actor(UserId(user), TenantId(tenant), project);
         let s = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     parent_type: CollabParentType::Document,
                     parent_id: Uuid::new_v4(),
@@ -1474,9 +1486,9 @@ mod tests {
         let p1 = svc
             .update_presence(
                 UpdatePresenceCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     session_id: s.id,
-                    user_id: user,
+                    user_id: UserId(user),
                     cursor_position: Some(CursorPosition::new(1.0, 2.0)),
                     selection: None,
                 },
@@ -1489,9 +1501,9 @@ mod tests {
         let p2 = svc
             .update_presence(
                 UpdatePresenceCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     session_id: s.id,
-                    user_id: user,
+                    user_id: UserId(user),
                     cursor_position: Some(CursorPosition::new(3.0, 4.0)),
                     selection: None,
                 },
@@ -1512,11 +1524,11 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let actor = make_actor(user, tenant, project);
+        let actor = make_actor(UserId(user), TenantId(tenant), project);
         let s = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     parent_type: CollabParentType::Document,
                     parent_id: Uuid::new_v4(),
@@ -1527,7 +1539,7 @@ mod tests {
             .expect("start");
         svc.end_session(
             EndSessionCommand {
-                tenant_id: tenant,
+                tenant_id: TenantId(tenant),
                 session_id: s.id,
             },
             &actor,
@@ -1537,9 +1549,9 @@ mod tests {
         let r = svc
             .update_presence(
                 UpdatePresenceCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     session_id: s.id,
-                    user_id: user,
+                    user_id: UserId(user),
                     cursor_position: None,
                     selection: None,
                 },
@@ -1558,11 +1570,11 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let actor = make_actor(user, tenant, project);
+        let actor = make_actor(UserId(user), TenantId(tenant), project);
         let s = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     parent_type: CollabParentType::Document,
                     parent_id: Uuid::new_v4(),
@@ -1574,9 +1586,9 @@ mod tests {
         let c1 = svc
             .update_cursor(
                 UpdateCursorCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     session_id: s.id,
-                    user_id: user,
+                    user_id: UserId(user),
                     x: 10.0,
                     y: 20.0,
                     color: "#ff0000".to_string(),
@@ -1590,9 +1602,9 @@ mod tests {
         let c2 = svc
             .update_cursor(
                 UpdateCursorCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     session_id: s.id,
-                    user_id: user,
+                    user_id: UserId(user),
                     x: 50.0,
                     y: 60.0,
                     color: "#ff0000".to_string(),
@@ -1615,11 +1627,11 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let user = uuid::Uuid::new_v4();
-        let actor = make_actor(user, tenant, project);
+        let actor = make_actor(UserId(user), TenantId(tenant), project);
         let s = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     parent_type: CollabParentType::Whiteboard,
                     parent_id: Uuid::new_v4(),
@@ -1631,9 +1643,9 @@ mod tests {
         // 首次设定 color
         svc.update_cursor(
             UpdateCursorCommand {
-                tenant_id: tenant,
+                tenant_id: TenantId(tenant),
                 session_id: s.id,
-                user_id: user,
+                user_id: UserId(user),
                 x: 0.0,
                 y: 0.0,
                 color: "#00ff00".to_string(),
@@ -1646,9 +1658,9 @@ mod tests {
         let r = svc
             .update_cursor(
                 UpdateCursorCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     session_id: s.id,
-                    user_id: user,
+                    user_id: UserId(user),
                     x: 0.0,
                     y: 0.0,
                     color: "#0000ff".to_string(),
@@ -1667,8 +1679,8 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
-        let wb = Whiteboard::new(tenant, project, "demo".to_string());
+        let actor = make_actor(UserId::new(), TenantId(tenant), project);
+        let wb = Whiteboard::new(TenantId(tenant), project, "demo".to_string());
         let wb_id = wb.id;
         // 直接写入 in-memory store
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
@@ -1676,7 +1688,7 @@ mod tests {
         let w = svc
             .add_shape(
                 AddShapeCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     whiteboard_id: wb_id,
                     shape,
                 },
@@ -1696,8 +1708,8 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
-        let wb = Whiteboard::new(tenant, project, "demo".to_string());
+        let actor = make_actor(UserId::new(), TenantId(tenant), project);
+        let wb = Whiteboard::new(TenantId(tenant), project, "demo".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
         let shape = make_shape(ShapeKind::Ellipse, 0.0, 0.0, 10.0, 20.0, "#bbb");
@@ -1705,7 +1717,7 @@ mod tests {
         let w1 = svc
             .add_shape(
                 AddShapeCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     whiteboard_id: wb_id,
                     shape,
                 },
@@ -1719,7 +1731,7 @@ mod tests {
         let w2 = svc
             .update_shape(
                 UpdateShapeCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     whiteboard_id: wb_id,
                     shape: updated.clone(),
                 },
@@ -1740,15 +1752,15 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
-        let wb = Whiteboard::new(tenant, project, "demo".to_string());
+        let actor = make_actor(UserId::new(), TenantId(tenant), project);
+        let wb = Whiteboard::new(TenantId(tenant), project, "demo".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
         let shape = make_shape(ShapeKind::Arrow, 5.0, 5.0, 15.0, 25.0, "#ddd");
         let shape_id = shape.id;
         svc.add_shape(
             AddShapeCommand {
-                tenant_id: tenant,
+                tenant_id: TenantId(tenant),
                 whiteboard_id: wb_id,
                 shape,
             },
@@ -1759,7 +1771,7 @@ mod tests {
         let w = svc
             .delete_shape(
                 DeleteShapeCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     whiteboard_id: wb_id,
                     shape_id,
                 },
@@ -1772,7 +1784,7 @@ mod tests {
         let r = svc
             .delete_shape(
                 DeleteShapeCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     whiteboard_id: wb_id,
                     shape_id,
                 },
@@ -1791,11 +1803,11 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let host = uuid::Uuid::new_v4();
-        let host_actor = make_actor(host, tenant, project);
+        let host_actor = make_actor(UserId(host), TenantId(tenant), project);
         let s = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     parent_type: CollabParentType::Document,
                     parent_id: Uuid::new_v4(),
@@ -1809,9 +1821,9 @@ mod tests {
         // host 给自己写 presence
         svc.update_presence(
             UpdatePresenceCommand {
-                tenant_id: tenant,
+                tenant_id: TenantId(tenant),
                 session_id: s.id,
-                user_id: host,
+                user_id: UserId(host),
                 cursor_position: None,
                 selection: None,
             },
@@ -1822,13 +1834,13 @@ mod tests {
         // u2 / u3 直接进 in-memory store(模拟远程 user 的 presence)
         {
             let mut map = svc.presences.write().unwrap();
-            map.insert((s.id, u2), Presence::new(s.id, u2));
-            map.insert((s.id, u3), Presence::new(s.id, u3));
+            map.insert((s.id, UserId(u2)), Presence::new(s.id, UserId(u2)));
+            map.insert((s.id, UserId(u3)), Presence::new(s.id, UserId(u3)));
         }
         let active = svc
             .list_active_presences(
                 ListActivePresencesQuery {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     session_id: s.id,
                 },
                 &host_actor,
@@ -1847,14 +1859,14 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
-        let wb = Whiteboard::new(tenant, project, "board-1".to_string());
+        let actor = make_actor(UserId::new(), TenantId(tenant), project);
+        let wb = Whiteboard::new(TenantId(tenant), project, "board-1".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
         let got = svc
             .get_whiteboard(
                 GetWhiteboardQuery {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     whiteboard_id: wb_id,
                 },
                 &actor,
@@ -1862,13 +1874,13 @@ mod tests {
             .await
             .expect("get");
         assert_eq!(got.name, "board-1");
-        assert_eq!(got.tenant_id, tenant);
+        assert_eq!(got.tenant_id, TenantId(tenant));
         // 跨 tenant 拒绝
         let other_tenant = uuid::Uuid::new_v4();
         let r = svc
             .get_whiteboard(
                 GetWhiteboardQuery {
-                    tenant_id: other_tenant,
+                    tenant_id: TenantId(other_tenant),
                     whiteboard_id: wb_id,
                 },
                 &actor,
@@ -1885,8 +1897,8 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
-        let wb = Whiteboard::new(tenant, project, "multi".to_string());
+        let actor = make_actor(UserId::new(), TenantId(tenant), project);
+        let wb = Whiteboard::new(TenantId(tenant), project, "multi".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
         let kinds = [
@@ -1899,7 +1911,7 @@ mod tests {
         for k in &kinds {
             svc.add_shape(
                 AddShapeCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     whiteboard_id: wb_id,
                     shape: make_shape(*k, 0.0, 0.0, 10.0, 10.0, "#fff"),
                 },
@@ -1911,7 +1923,7 @@ mod tests {
         let w = svc
             .get_whiteboard(
                 GetWhiteboardQuery {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     whiteboard_id: wb_id,
                 },
                 &actor,
@@ -1932,8 +1944,8 @@ mod tests {
         let svc = InMemoryCollabService::new();
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
-        let actor = make_actor(uuid::Uuid::new_v4(), tenant, project);
-        let wb = Whiteboard::new(tenant, project, "dim".to_string());
+        let actor = make_actor(UserId::new(), TenantId(tenant), project);
+        let wb = Whiteboard::new(TenantId(tenant), project, "dim".to_string());
         let wb_id = wb.id;
         svc.whiteboards.write().unwrap().insert(wb_id, wb);
         // w < 0
@@ -1941,7 +1953,7 @@ mod tests {
         let r1 = svc
             .add_shape(
                 AddShapeCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     whiteboard_id: wb_id,
                     shape: bad_w,
                 },
@@ -1954,7 +1966,7 @@ mod tests {
         let r2 = svc
             .add_shape(
                 AddShapeCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     whiteboard_id: wb_id,
                     shape: bad_h,
                 },
@@ -1973,13 +1985,13 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let host = uuid::Uuid::new_v4();
-        let host_actor = make_actor(host, tenant, project);
+        let host_actor = make_actor(UserId(host), TenantId(tenant), project);
         let admin = uuid::Uuid::new_v4();
-        let admin_actor = make_admin_actor(admin, tenant, project);
+        let admin_actor = make_platform_admin_actor(UserId(admin), TenantId(tenant), project);
         let s = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     parent_type: CollabParentType::Document,
                     parent_id: Uuid::new_v4(),
@@ -1991,7 +2003,7 @@ mod tests {
         let ended = svc
             .end_session(
                 EndSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     session_id: s.id,
                 },
                 &admin_actor,
@@ -2010,13 +2022,13 @@ mod tests {
         let tenant = uuid::Uuid::new_v4();
         let project = ProjectId::new();
         let host = uuid::Uuid::new_v4();
-        let host_actor = make_actor(host, tenant, project);
+        let host_actor = make_actor(UserId(host), TenantId(tenant), project);
         let other = uuid::Uuid::new_v4();
-        let other_actor = make_actor(other, tenant, project);
+        let other_actor = make_actor(UserId(other), TenantId(tenant), project);
         let s = svc
             .start_session(
                 StartSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     parent_type: CollabParentType::Whiteboard,
                     parent_id: Uuid::new_v4(),
@@ -2028,7 +2040,7 @@ mod tests {
         let r = svc
             .end_session(
                 EndSessionCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     session_id: s.id,
                 },
                 &other_actor,

@@ -1076,7 +1076,10 @@ impl AuditQueryPort for InMemoryAuditService {
 mod tests {
     use super::*;
     fn make_admin_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(Uuid::new_v4(), tenant_id.0).with_role(roles::TENANT_ADMIN)
+        ActorContext::new(Uuid::new_v4(), tenant_id.0)
+            .with_role(roles::TENANT_ADMIN)
+            .with_role("audit_reader")
+            .with_role("audit_exporter")
     }
 
     fn make_developer_actor(tenant_id: TenantId) -> ActorContext {
@@ -1099,8 +1102,8 @@ mod tests {
         let svc = InMemoryAuditService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
         let cmd = RecordAuditCommand {
-            tenant_id,
-            actor: make_actor_user(tenant_id),
+            tenant_id: TenantId(tenant_id),
+            actor: make_actor_user(TenantId(tenant_id)),
             action: AuditAction::WorkItemOperation,
             resource_type: "work_item".to_string(),
             resource_id: Uuid::new_v4(),
@@ -1109,7 +1112,7 @@ mod tests {
             after_state: None,
             immutable_hash: None,
         };
-        let actor = make_admin_actor(tenant_id);
+        let actor = make_admin_actor(TenantId(tenant_id));
         let ev = svc.record(cmd, actor).await.unwrap();
         assert_eq!(svc.event_count().await, 1);
         assert!(!ev.cross_tenant);
@@ -1125,7 +1128,7 @@ mod tests {
         let started = Utc::now() - chrono::Duration::seconds(30);
         let ended = Utc::now();
         let cmd = RecordAIAuditCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             metadata: AIAuditMetadataInput {
                 agent_session_id: session,
                 agent_id: agent,
@@ -1136,7 +1139,7 @@ mod tests {
                 ended_at: ended,
                 validation_result_ids: vec![ValidationResultId::new()],
                 feedback_consumed_ids: vec![FeedbackId::new()],
-                approver_user_id: Some(uuid::Uuid::new_v4()),
+                approver_user_id: Some(UserId::new()),
                 data_categories_sent: vec!["prompt".to_string(), "diff".to_string()],
                 provider_boundary_ref: Some(ProviderDataBoundaryId::new()),
                 risk_signals: vec!["medium_risk".to_string()],
@@ -1148,7 +1151,7 @@ mod tests {
             },
         };
         let meta = svc
-            .record_ai(cmd, make_admin_actor(tenant_id))
+            .record_ai(cmd, make_admin_actor(TenantId(tenant_id)))
             .await
             .unwrap();
         assert!(meta.has_complete_9_questions());
@@ -1163,7 +1166,7 @@ mod tests {
         let svc = InMemoryAuditService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
         // INV-AU-07:即使 developer 也能记录跨租户(系统强制 100% 记录)
-        let developer = make_developer_actor(tenant_id);
+        let developer = make_developer_actor(TenantId(tenant_id));
         let cmd = RecordCrossTenantAttemptCommand {
             actor_user_id: Uuid::new_v4(),
             attempted_resource_type: "work_item".to_string(),
@@ -1188,8 +1191,8 @@ mod tests {
         // 只能 record,不能 mutate
         let tenant_id = uuid::Uuid::new_v4();
         let cmd = RecordAuditCommand {
-            tenant_id,
-            actor: make_actor_user(tenant_id),
+            tenant_id: TenantId(tenant_id),
+            actor: make_actor_user(TenantId(tenant_id)),
             action: AuditAction::PermissionChange,
             resource_type: "user".to_string(),
             resource_id: Uuid::new_v4(),
@@ -1198,7 +1201,10 @@ mod tests {
             after_state: None,
             immutable_hash: None,
         };
-        let ev = svc.record(cmd, make_admin_actor(tenant_id)).await.unwrap();
+        let ev = svc
+            .record(cmd, make_admin_actor(TenantId(tenant_id)))
+            .await
+            .unwrap();
         // 验证 AuditRecorder trait 没有 update / delete 方法
         // (编译期约束 + 运行时只能通过 mutation 改,但本服务只暴露 `record`)
         assert_eq!(svc.event_count().await, 1);
@@ -1210,9 +1216,9 @@ mod tests {
     async fn export_requires_admin_or_compliance() {
         let svc = InMemoryAuditService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let developer = make_developer_actor(tenant_id);
+        let developer = make_developer_actor(TenantId(tenant_id));
         let cmd = ExportAuditCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             format: ExportFormat::Csv,
             range_start: Utc::now() - chrono::Duration::days(7),
             range_end: Utc::now(),
@@ -1221,9 +1227,9 @@ mod tests {
         let res = svc.export(cmd, developer).await;
         assert!(matches!(res, Err(AuditError::PermissionDenied)));
         // admin 应该能导出
-        let admin = make_admin_actor(tenant_id);
+        let admin = make_admin_actor(TenantId(tenant_id));
         let cmd2 = ExportAuditCommand {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             format: ExportFormat::Csv,
             range_start: Utc::now() - chrono::Duration::days(7),
             range_end: Utc::now(),
@@ -1239,8 +1245,8 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         // 先记录一个
         let cmd = RecordAuditCommand {
-            tenant_id,
-            actor: make_actor_user(tenant_id),
+            tenant_id: TenantId(tenant_id),
+            actor: make_actor_user(TenantId(tenant_id)),
             action: AuditAction::WorktreeOperation,
             resource_type: "worktree".to_string(),
             resource_id: Uuid::new_v4(),
@@ -1249,19 +1255,22 @@ mod tests {
             after_state: None,
             immutable_hash: None,
         };
-        let _ = svc.record(cmd, make_admin_actor(tenant_id)).await.unwrap();
+        let _ = svc
+            .record(cmd, make_admin_actor(TenantId(tenant_id)))
+            .await
+            .unwrap();
         // developer 不能读
-        let developer = make_developer_actor(tenant_id);
+        let developer = make_developer_actor(TenantId(tenant_id));
         let q = AuditListQuery {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             ..Default::default()
         };
         let res = svc.list_events(q, developer).await;
         assert!(matches!(res, Err(AuditError::PermissionDenied)));
         // admin 能读
-        let admin = make_admin_actor(tenant_id);
+        let admin = make_admin_actor(TenantId(tenant_id));
         let q2 = AuditListQuery {
-            tenant_id,
+            tenant_id: TenantId(tenant_id),
             ..Default::default()
         };
         let events = svc.list_events(q2, admin).await.unwrap();
@@ -1273,8 +1282,8 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let mut ev = AuditEvent {
             id: AuditEventId::new(),
-            tenant_id,
-            actor: make_actor_user(tenant_id),
+            tenant_id: TenantId(tenant_id),
+            actor: make_actor_user(TenantId(tenant_id)),
             action: AuditAction::WorkItemOperation,
             resource_type: "work_item".to_string(),
             resource_id: Uuid::new_v4(),
@@ -1297,8 +1306,8 @@ mod tests {
         let tenant_id = uuid::Uuid::new_v4();
         let mut ev = AuditEvent {
             id: AuditEventId::new(),
-            tenant_id,
-            actor: make_actor_user(tenant_id),
+            tenant_id: TenantId(tenant_id),
+            actor: make_actor_user(TenantId(tenant_id)),
             action: AuditAction::CrossTenantAttempt,
             resource_type: "work_item".to_string(),
             resource_id: Uuid::new_v4(),

@@ -15,7 +15,7 @@
 | T1.2 | 根目录散件清理 (14 个 `_*` 文件) | T1 | 0.05M | 无 | 无 | ✅ 完成 (per 2026-09-03 本 session: 已追踪 `_*` 散件此前 session 已清空; 本 session 另清理 2 个新增 untracked 一次性文件 `scripts/automation/_find_fail.py` + `docs/architecture/preview/1m-orchestrator-l0-l1.html`, `git status` 验证干净) |
 | T1.3 | `star-vcs` 孤儿 crate 处理 (注册或删除) | T1 | 0.1M | 无 | `docs/specs/domain-vcs-spec.md`(新建骨架) 或新 ADR (编号现场算, 见 spec §2.4.2, **不是** 0026——已被占用) | ✅ 完成 (per commit `b7ec06e`: 注册入 workspace.members + 同 commit 新建 `docs/specs/domain-vcs-spec.md` (101 行), 本 session 复核 `cargo check -p star-vcs` 0 err) |
 | T1.4 | `cargo machete`/`udeps` 死依赖清理 | T1 | 0.15M | 无 | 按需 (若依赖在某 spec 里被引用为计划依赖) | ✅ 完成 (per `docs/reports/2026-09-03-rf-001-t1-4-correction.md`: 12/12 findings 实测均为真死依赖, 订正前份报告"0 实际死依赖"误判) |
-| T1.5 | lint `warn` → `deny` (3 项) | T1 | 0.3M | T1.3 (先确定 crate 数) | 无 (强制不强制, 视情况) | 🟡 1/3 步完成 (`unreachable_pub` deny 落地 + star-mcp 31 处 unreachable pub 修复, commit `bef2d60`); `missing_docs`/`rust_2018_idioms` 未开始 |
+| T1.5 | lint `warn` → `deny` (3 项) | T1 | 0.3M | T1.3 (先确定 crate 数) | 无 (强制不强制, 视情况) | 🟡 2/3 步完成 (`unreachable_pub` deny, commit `bef2d60`, 后续发现 31 处回归由 `850d71c` 修复; `rust_2018_idioms` deny, commit `d9f65b3`); `missing_docs` 步**预算暴涨已按 §3 停止并记录** (per 2026-09-05 本 session 实测, 详见 §T1.5 明细段) |
 | T2.1 | unwrap 收敛 (库代码, 排除 H2/H2-EXT 相关) | T2 | 1.5-2.0M | T1.5 (lint 基线先立) | 按需: 受影响 crate 的 `docs/specs/domain-*-spec.md` 错误类型章节 | ⚪ 未开始 |
 | T2.2 | clone 审计 (热路径优先) | T2 | 0.5-0.8M | 无 (可与 T2.1 并行, 不同文件) | 按需: 仅当函数签名变化触发 spec 接口描述同步 | ⚪ 未开始 |
 | T2.3 | tracing 埋点补齐 (跨域调用路径) | T2 | 0.4M | 无 | **必做**: `docs/architecture/observability.md`(新建, 代码级埋点规范, 反向链接 `docs/operation-design.md` §6.3 后端管线) + 相关 `docs/architecture/<crate>.md` 追加小节 | ⚪ 未开始 |
@@ -23,7 +23,7 @@
 | T3.1 | 多协议 DTO 去重选项报告 | T3 | 0.2M | 无 | 拍板前列清单; 拍板后**必做** `docs/api-design.md` + 协议层 spec | ⚪ 未开始 |
 | T3.2 | Saga 覆盖率审计报告 | T3 | 0.2M | 无 | 拍板后**必做**同步 `docs/architecture/2026-08-26-upgrade/spec/saga/01-saga-coordination-spec.md`(主) + `docs/ddd/03-match-bc.md`; `docs/integration-design.md` 仅指针引用, 按需修正 | ⚪ 未开始 |
 | T3.3 | 领域统一语言审计报告 | T3 | 0.3M | 无 | 拍板后**必做** 新建 `docs/ubiquitous-language.md` + 各 domain spec 术语章节 | ⚪ 未开始 |
-| **小计** | | | **~4.15-4.95M** | | | **4/12 完成 (T1.1/T1.2/T1.3/T1.4) + 1/12 部分完成 (T1.5 1/3 步) (per 2026-09-04 本 session 实测)** |
+| **小计** | | | **~4.15-4.95M** | | | **4/12 完成 (T1.1/T1.2/T1.3/T1.4) + 1/12 部分完成 (T1.5 2/3 步, `missing_docs` 停止记录中) (per 2026-09-05 本 session 实测)** |
 
 > 设计文档同步的 token 已并入各任务估算, 不单列; 详细同步规则见 `docs/refactor/RF-001-spec.md` §2.4。
 
@@ -60,6 +60,14 @@
 1. 根 `Cargo.toml` `[workspace.lints.rust]` 三项改 `"deny"` (先在本地分支改, 不直接推)
 2. `cargo build --workspace 2>&1 | grep error` 收集触发点, 逐 crate 修 (主要是补 `missing_docs`, 少量 `unreachable_pub` 需要判断是否该私有化)
 3. 全部修完后再 commit 这次 lint 提升 (不要中间态推到 main, 否则下游 AI 新 commit 会红)
+
+**`missing_docs` 子步骤实测记录 (2026-09-05, per §3 "改动面超出预估" 停止规则触发)**:
+
+- 范围: T1.5 原估 0.3M token 覆盖 3 项 lint 合计; `missing_docs` 单项在 85 file / 3591 行缺文档的 scope 下, 两次 85-way 并行 workflow 尝试均在批次中途被账号级 5 小时 rate limit 击杀, 已测量花费 >1.3M token 才落地 1/85 个 file (`domain-batch/src/domain.rs` 120 行) —— 单项子步骤已超原 T1.5 全项预算 4 倍以上, 且未算入两次失败批次里其余部分完成但未提交的产出。
+- 根因 1 (rate limit): 5 小时会话限速为账号级、非 session 级, 主 session 与所有 workflow subagent 共享同一配额, 一次命中会同时杀死整批 `parallel()` 调用, 造成大量已完成的部分编辑仍停留在未提交状态。
+- 根因 2 (并发写入丢失): 本仓库同期有另一条独立 "TMO" (Task↔Worktree Orchestration) 工作线在同一 `main` 分支上做 `rebase` + 连续 5 次 worktree 分支 merge; 该操作序列要求/强制了干净工作区, 两次 workflow 批次遗留的未提交编辑 (含已 100% 完成的 `domain-batch/src/domain.rs`) 在此过程中丢失, 需整段重做。已提交内容 (`bef2d60`/`d9f65b3`) 不受影响。
+- 已排除的备选方案: 曾评估"收窄可见性代替补文档" (即让触发 `missing_docs` 的 `pub` 项变为非 `pub`, 从根源减少警告数), 但抽查 `domain-scm`/`domain-agent` 等 crate 后确认其 `lib.rs` 是单文件、直接声明的 `pub struct`/`pub enum`/`pub fn`(即被策展过的 domain 模型公开面), 并非通过 `pub use xxx::*` 通配符导致的"顺带公开", 因此收窄可见性不是可行杠杆, 补文档是唯一路径。
+- **纠正后的执行方式 (下次继续时使用)**: 不再一次性 85-way 并行发起; 改为逐 crate/逐 file 顺序处理, 每个 file/crate 一完成立即 `git commit`(不攒批), 把"未提交编辑因外部并发活动丢失"的风险窗口从 85 file 收窄到最多 1 file。继续前先重新跑一遍 `cargo check --workspace --lib -j 4 --keep-going --message-format=json` 拿当前 HEAD 下的准确基线(树在两次尝试之间已被外部 merge 推进, 旧行号列表失效)。
 
 ---
 
