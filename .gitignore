@@ -21,6 +21,11 @@ desktop.ini
 # Logs
 *.log
 
+# Python cache (per 2026-09-04 TMO-04 实装, scripts/automation/ + tests/ 不入库)
+__pycache__/
+*.pyc
+*.pyo
+
 # Temporary backup
 *.bak
 docs.untracked.bak/
