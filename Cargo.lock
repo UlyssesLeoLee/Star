@@ -2153,6 +2153,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "star-taskgraph"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "star-treesitter",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
 name = "star-treesitter"
 version = "0.0.1"
 dependencies = [

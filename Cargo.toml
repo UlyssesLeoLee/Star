@@ -63,6 +63,8 @@ members = [
     "crates/star-dispatcher",
     # Phase H.5 (Tree-sitter 引入) 启动: 2026-09-04 注册 crates/star-treesitter (5 语言 grammar + 符号提取, per `docs/architecture/2026-09-03-treesitter-worktree-graph/01-requirements.md` §1.4, v0.0.1 PoC)
     "crates/star-treesitter",
+    # Phase H.6 (Task ↔ Worktree 1:1 绑定 + react-flow) 启动: 2026-09-04 注册 crates/star-taskgraph (TaskCard + Worktree + 1:1 binding + react-flow JSON 渲染, v0.0.1 PoC)
+    "crates/star-taskgraph",
 ]
 exclude = ["target"]
 
