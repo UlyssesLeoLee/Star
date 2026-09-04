@@ -17,6 +17,7 @@ pub struct ThemeContext {
 }
 
 impl ThemeContext {
+    /// 构造上下文, 使用默认解析顺序(Personal > Tenant > Global)
     pub fn new(actor_id: Option<Uuid>, tenant_id: Uuid) -> Self {
         Self {
             actor_id,
@@ -31,6 +32,7 @@ impl ThemeContext {
         }
     }
 
+    /// 是否为匿名(未登录)访问
     pub fn is_anonymous(&self) -> bool {
         self.actor_id.is_none()
     }
