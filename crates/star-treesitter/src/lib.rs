@@ -17,7 +17,11 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum TreeSitterError {
     #[error("parse error at line {line}, column {column}: {message}")]
-    ParseError { line: usize, column: usize, message: String },
+    ParseError {
+        line: usize,
+        column: usize,
+        message: String,
+    },
     #[error("unsupported language: {0}")]
     UnsupportedLanguage(String),
     #[error("internal error: {0}")]
@@ -176,7 +180,9 @@ impl TreeSitterParser {
             "mod_item" => Some(SymbolKind::Module),
             "type_item" => Some(SymbolKind::TypeAlias),
             // TypeScript / Python / Go
-            "function_declaration" | "method_definition" | "function_definition" => Some(SymbolKind::Function),
+            "function_declaration" | "method_definition" | "function_definition" => {
+                Some(SymbolKind::Function)
+            }
             "class_definition" | "class_declaration" => Some(SymbolKind::Class),
             "interface_declaration" => Some(SymbolKind::Interface),
             _ => None,
@@ -212,3 +218,8 @@ pub fn parse_typescript(source: &str) -> Result<ParseResult, TreeSitterError> {
 
 #[cfg(test)]
 mod tests;
+
+/// H.7 Symbol Resolver 跨文件引用追踪 (per P4-H.7, 守门 #19 [P] 拍板)
+pub mod symbol_resolver;
+#[cfg(test)]
+mod symbol_resolver_tests;
