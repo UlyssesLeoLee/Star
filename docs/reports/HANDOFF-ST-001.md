@@ -1737,6 +1737,54 @@ L0 chat bar (用户输入)
 | 真实凭证切真 | per 9/3 11:35 JST 拍板 A, mock 备选已落地, 真实 .env / UI 填入待 Ulysses 提供 | Ulysses | pending |
 | ~~_ARCHIVED_*.md 临时文件收编~~ | ~~6 scratch 草稿收编~~ | **🟢 关闭** (per ARCHIVED-CLEANUP-REPORT v0.1, 6 文件 git rm + 留 git 历史证据) | closed |
 
+**注**: G-TMO-04 系列 5/5 全闭环 + G-TMO-05 关闭 + _ARCHIVED_*.md 收编 + 端到端流 (L0 → manager → metadata_node → repo → SQLite 4 表 W/T/M → 5 FastAPI 端点) 全部落地.
+
+### 19.6 PR #13 MERGED session 闭环 (per 2026-09-05 03:03:33 JST, 真人确认触发)
+
+> **承接**: §19.5 4 待续做项 (G-DEP-01/02 + 5 域 Lead 真人寻访 + 真实凭证切真), 仍需 Ulysses 触发或推下 session
+> **拍板**: 2026-09-05 03:00 JST Mavis 拍板 (per 9/4 12:19 JST "Ulysses 就是我, 你不要等我" + 9/4 17:36 JST 授权"允许按照你推荐推进" + ask_user merge_squash 推荐项)
+> **状态**: 🟢 PR #13 squash merge 成功, session 完全闭环
+
+#### 19.6.1 PR #13 Squash Merge 落地
+
+| 维度 | 数据 |
+|---|---|
+| PR URL | https://github.com/UlyssesLeoLee/Star/pull/13 |
+| merge commit | `5e5b1c2e7d9c90ac5a153f5a28bcf94cfa743d8b` |
+| merged at | 2026-09-04T18:03:33Z (UTC) = 2026-09-05 03:03:33 JST |
+| squash 策略 | 14 commit → 1 commit |
+| 合并内容 | TMO-05/06/07 3 节点 + 4 守门修订 + 5 守门实证 + G-TMO-04 系列 5/5 + 6 _ARCHIVED_*.md 收编 + 88/88 TMO pytest + 32+ 项守门全过 + 3 CI 修订 (markdownlint + Frontend npm ci + cargo fmt) |
+| PR CI | 9/9 pass (跨 7 实际任务 + e2e skip + CodeRabbit) |
+| 分支清理 | feat/tmo-05-06-07 worktree + branch 删除 |
+
+#### 19.6.2 累计 token 与 commit 闭环
+
+| 维度 | 累计 |
+|---|---|
+| 累计 token (本 session) | ~38M (本 session 估 1.3M, 守门 #4 token-OLU 派生, 超 STAR-OLU-001 §6 1 SRE·周 1.2M 0.1M) |
+| 累计 commit (本 session 14) | 7b1a432 (TMO-05/06/07 3 节点) / 1d7dc68 (e2e test + 4 守门修订) / ce9b8df (IT-10-C test 修订) / d9ae9fe (AGENTS v0.75 + HANDOFF v1.4 + WBS 同步) / 1ce7b5b (G-TMO-05 SDK 关闭) / 217593f (G-TMO-04 DDL) / 0aaf43d (G-TMO-04b Repository) / c7a821b (G-TMO-04c Routes) / 5c323bc (G-TMO-04d metadata_node 集成) / b99f79c (HANDOFF v1.5 + PHASE v0.3 综合升版) / 659ce11 (6 _ARCHIVED_*.md 收编) / 90baae5 (markdownlint 关闭) / 08dfbe1 (package-lock 同步) / 185ca19 (cargo fmt) |
+| 累计 PR | PR #13 squash merge 成功 (5e5b1c2) |
+| 累计 e2e test | 88/88 pass (6 套 TMO + 1 套 routes_tmo + 1 套 repo + 1 套 ddl + 1 套 node_persist) |
+| 累计守门 | 32+ 项跨 stage 全过 (18 主体 + 5 派生 + 5 修订 + 守门 #13 a/c/d + 守门 #22 + 守门 #DB-13) |
+
+#### 19.6.3 推下 session 3 缺口 (per §5.3 缺标比错标)
+
+| 缺口 | 内容 | 依赖 |
+|---|---|---|
+| G-DEP-01 | TMO-04/06 阻塞 P0 工具 (create_merge_request / create_worktree / search_issues) 3 tool | ~0.4-0.6M token |
+| G-DEP-02 | TMO-05 阻塞 P1 工具 (search_code / get_symbol / find_references / get_code_context) 4 tool | ~0.3-0.5M token |
+| 5 域 Lead 真人寻访 + 真实凭证切真 | 需 Ulysses 触发 | Ulysses 找 5 真人 + 提供 .env / UI 填入 |
+
+#### 19.6.4 下次 session 入口 (per Q10-P b 拍板)
+
+1. PR #13 已合 main (5e5b1c2), 本地 main HEAD `68fa45e` 跟 origin/main 脱节 (本地 5 commit ahead missing_docs sub-lint, 由其他 worktree 落地) — 不强推, 按需 fetch + rebase
+2. 5 域 Lead 真人到位 → 追溯签字覆盖 (per 守门 #10 + 守门 #14)
+3. G-DEP-01/02 P0/P1 工具实装 (~0.7-1.1M token, 跨 2 session)
+4. Frontend pre-existing 4 err 修根因 + 600+ missing_docs warning 批量修 (推下, ~3-5M token)
+5. HANDOFF v1.7 升版 (真人到位后, 5 域 Lead CONTENT 4 维追溯签字 + G-DEP-01/02 闭环)
+
+---
+
 **注**: G-TMO-04 系列 5/5 全闭环 — 后续 G-TMO-04e+ 增量 (e.g. LLM API 接入 + task_metadata DDL migration runner) 可推下 session 续做.
 
 ---
@@ -1752,3 +1800,4 @@ L0 chat bar (用户输入)
 | **v1.3** | **2026-09-04** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手** | **§17 V2 階段 4 子項全部閉環 (P4 24/24 + V2 4/4 = 28/28, 42 commits ahead)** | **9/4 19:45-20:15 JST Mavis 拍板 (per 用户授權"允許按照你推薦推進")** |
 | v1.4 | 2026-09-05 | 架構師 (Mavis 接手 agent per DEC-008) — Mavis 接手代簽 Ulysses | §18 TMO-05/06/07 3 節點 + 4 守門修訂 + 5 守門實證 (rebase 後) | 9/4 17:19 JST + 9/4 18:30 JST + 9/5 00:15 JST → 守門 #12 commit-time docs 同步觸發 v1.4 |
 | **v1.5** | **2026-09-05 02:39 JST** | **架構師 (Mavis 接手 agent per DEC-008) — Mavis 接手代簽 Ulysses** | **§19 G-TMO-04 系列 5/5 全閉環綜合升版 (G-TMO-04 DDL + G-TMO-04b Repository + G-TMO-04c Routes 5 端點 + G-TMO-04d metadata_node 集成 + G-TMO-05 SDK 關閉): 10 commit ahead main (累计 7b1a432 / 1d7dc68 / ce9b8df / d9ae9fe / 1ce7b5b / 217593f / 0aaf43d / c7a821b / 5c323bc + 當前 pending); 累计 88/88 TMO pytest pass (6 套: routes + repo + ddl + tmo_05_06_07 + tmo_merge + tmo_split); 32 項守門全过 (18 主體 + 5 派生 + 5 修訂 + 守門 #13 a/c/d + 守門 #22 + 守門 #DB-13); 端到端流 (L0 chat bar → TaskOperationsManager → metadata_node → TaskMetadataRepository → SQLite 4 表 W/T/M → 5 FastAPI 端點); 5 报告同步落档 (G-TMO-04 + G-TMO-04b + G-TMO-04c + G-TMO-04d + G-TMO-05); 剩余 4 待续做项 (G-DEP-01/02 + 5 域 Lead 真人 + 真实凭证切真) 推下 session; 累计 ~38M token (本 session 估 1.3M)** | **9/5 02:39 JST 自主推進 (per 9/4 17:36 JST "允許按照你推薦推進" + no-progress guard 觸發) → 守門 #12 commit-time docs 同步觸發 v1.5** |
+| **v1.6** | **2026-09-05 03:05 JST** | **架構師 (Mavis 接手 agent per DEC-008) — Mavis 接手代簽 Ulysses** | **§19.6 PR #13 SQUASH MERGED 閉環 (merge commit `5e5b1c2` + mergedAt 2026-09-04T18:03:33Z + feat/tmo-05-06-07 worktree + branch 清理): 14 commit → 1 commit, 累計 88/88 TMO pytest + 32+ 項守門 + PR CI 9/9 pass; 推下 session 3 缺口 (G-DEP-01/02 + 5 域 Lead 真人 + 真實憑證切真); 下次 session 入口 (§19.6.4): PR #13 已合 main + 5 域 Lead 追溯簽字 + G-DEP-01/02 P0/P1 工具實裝 + Frontend pre-existing 4 err 修根因 + HANDOFF v1.7 升版 (真人到位後)** | **9/5 03:00 JST ask_user merge_squash 拍板 + 9/5 03:03:33 JST PR #13 squash merge 成功 → 守門 #12 commit-time docs 同步觸發 v1.6** |
