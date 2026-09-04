@@ -128,7 +128,10 @@ mod tests {
         let body = v.get("worktree").expect("worktree field");
         let id = body.get("id").and_then(|v| v.as_str()).unwrap_or("");
         let branch = body.get("branch").and_then(|v| v.as_str()).unwrap_or("");
-        assert!(!id.contains("STAR-1024"), "应返回真实 UUID 而非 mock 'wt-STAR-1024'");
+        assert!(
+            !id.contains("STAR-1024"),
+            "应返回真实 UUID 而非 mock 'wt-STAR-1024'"
+        );
         assert_eq!(branch, "feature/STAR-1024");
     }
 

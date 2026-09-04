@@ -41,6 +41,8 @@ domain-agent = { path = "../domain-agent" }
 domain-feedback = { path = "../domain-feedback" }
 # P0 工具实装 (per docs/briefs/tool-p0-impl-001.md) — 真实数据源接入 scm
 domain-scm = { path = "../domain-scm" }
+# P1 工具实装 (per docs/briefs/tool-p1-impl-001.md) — 真实数据源接入 search
+domain-search = { path = "../domain-search" }
 uuid = { workspace = true }
 chrono = { workspace = true }
 

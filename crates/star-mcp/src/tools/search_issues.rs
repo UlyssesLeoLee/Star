@@ -154,7 +154,10 @@ mod tests {
         // 不应是 mock 硬编码 [ISSUE-1, ISSUE-2]
         let v = r.expect("real service 应返回 Ok(空 list)");
         let body = v.get("issues").expect("issues field");
-        assert!(body.as_array().unwrap().is_empty(), "应返回空 list, 非 mock ISSUE-1/2");
+        assert!(
+            body.as_array().unwrap().is_empty(),
+            "应返回空 list, 非 mock ISSUE-1/2"
+        );
     }
 
     #[tokio::test]

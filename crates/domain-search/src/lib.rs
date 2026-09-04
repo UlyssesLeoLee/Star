@@ -175,6 +175,43 @@ pub struct Facet {
     pub count: u64,
 }
 
+// =====================================================================
+// 实体 — P1 工具链 DTO (per docs/briefs/tool-p1-impl-001.md §1.2-1.4)
+// =====================================================================
+
+/// 单个符号的引用结果(per §1.2 get_symbol)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolRef {
+    pub name: String,
+    pub kind: String,
+    pub file_path: String,
+    /// P0 简化:SearchIndex 的 SymbolMetadata 不带 line, 用 0 占位
+    /// (per brief §1.2 "不改 SearchRepository, 走 InMemory cache 真实路径")
+    pub line: u32,
+    pub signature: String,
+}
+
+/// 单个引用位置(per §1.3 find_references)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReferenceRef {
+    pub name: String,
+    pub file_path: String,
+    /// P0 简化:行号 = SearchIndex fulltext 中的偏移估算
+    pub line: u32,
+    /// P0 简化:列号 = 0 占位
+    pub column: u32,
+    pub context: String,
+}
+
+/// 代码上下文窗口(per §1.4 get_code_context)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeContext {
+    pub file_path: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub snippet: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SuggestQuery {
     pub prefix: String,
@@ -352,6 +389,41 @@ pub trait SearchQueryPort: Send + Sync {
         tenant_id: TenantId,
         actor: &ActorContext,
     ) -> Result<Vec<SavedSearch>, SearchError>;
+
+    // ===== P1 工具链 (per docs/briefs/tool-p1-impl-001.md §1.2-1.4) =====
+    // 守门 #13 a L0 协调: 不改 SearchRepository (per 守门 #1 v6 cross-stage 实测),
+    // 走 InMemory cache `self.index` 直接查, 跟 search/suggest 同源
+
+    /// 查符号(per brief §1.2 get_symbol)
+    /// `file` 可选, 指定时仅返回该 file 下的符号
+    async fn get_symbol(
+        &self,
+        tenant_id: TenantId,
+        name: &str,
+        file: Option<&str>,
+        actor: &ActorContext,
+    ) -> Result<Vec<SymbolRef>, SearchError>;
+
+    /// 查引用(per brief §1.3 find_references)
+    /// 匹配 Symbol 索引 + fulltext 全文(name 不区分大小写)
+    async fn find_references(
+        &self,
+        tenant_id: TenantId,
+        name: &str,
+        file: Option<&str>,
+        actor: &ActorContext,
+    ) -> Result<Vec<ReferenceRef>, SearchError>;
+
+    /// 查代码上下文(per brief §1.4 get_code_context)
+    /// `radius` 控制 snippet 长度上下界
+    async fn get_code_context(
+        &self,
+        tenant_id: TenantId,
+        file: &str,
+        line: u32,
+        radius: u32,
+        actor: &ActorContext,
+    ) -> Result<CodeContext, SearchError>;
 }
 
 #[async_trait]
@@ -628,6 +700,78 @@ impl SearchCommandPort for InMemorySearchService {
     }
 }
 
+// P1 工具链 helper (per docs/briefs/tool-p1-impl-001.md §1.2-1.4)
+//
+// P0 简化:SearchIndex 的 fulltext 是单字符串, 没真实行号
+// (Tree-sitter / ripgrep 接入在 P2, per HANDOFF-ST-001 §5 H2-EXT 缺口).
+// 这里用启发式估算:
+//
+// - `estimate_line` = name 在 fulltext 内出现的近似行号 (按 80 字符一行)
+// - `build_context` = name 周围 ±40 字符的 snippet
+// - `build_snippet` = fulltext 在 ±radius 行附近的窗口
+// - `resource_priority` = Symbol > WorkItem > Comment > Other
+
+fn estimate_line(text: &str, name_lc: &str) -> u32 {
+    if let Some(pos) = text.to_lowercase().find(name_lc) {
+        // 行号 = 偏移 / 80 + 1 (1-based)
+        return (pos / 80 + 1) as u32;
+    }
+    0
+}
+
+fn build_context(text: &str, name: &str) -> String {
+    let name_lc = name.to_lowercase();
+    let text_lc = text.to_lowercase();
+    if let Some(pos) = text_lc.find(&name_lc) {
+        let start = pos.saturating_sub(40);
+        let end = (pos + name.len() + 40).min(text.len());
+        return text[start..end].to_string();
+    }
+    // fallback: 前 80 字符
+    text.chars().take(80).collect()
+}
+
+fn build_snippet(text: &str, line: u32, radius: u32) -> String {
+    // 把 fulltext 按 80 字符一行切, 取 [line-radius, line+radius] 范围
+    let line_width: usize = 80;
+    let start_line = line.saturating_sub(radius) as usize;
+    let end_line = (line + radius) as usize;
+    let mut out = String::new();
+    let mut idx: usize = 0;
+    let mut line_no: usize = 0;
+    for ch in text.chars() {
+        if line_no >= start_line && line_no <= end_line {
+            out.push(ch);
+        }
+        idx += 1;
+        if idx % line_width == 0 {
+            if line_no >= start_line && line_no <= end_line {
+                out.push('\n');
+            }
+            line_no += 1;
+        }
+    }
+    // 收尾:若最后一行未满 line_width 也要算一行
+    if idx % line_width != 0 {
+        if line_no >= start_line && line_no <= end_line && !out.is_empty() && !out.ends_with('\n') {
+            out.push('\n');
+        }
+    }
+    out
+}
+
+fn resource_priority(rt: &ResourceType) -> u8 {
+    match rt {
+        ResourceType::Symbol => 0,
+        ResourceType::WorkItem => 1,
+        ResourceType::Comment => 2,
+        ResourceType::Project => 3,
+        ResourceType::Feedback => 4,
+        ResourceType::Decision => 5,
+        ResourceType::Adr => 6,
+    }
+}
+
 #[async_trait]
 impl SearchQueryPort for InMemorySearchService {
     async fn search(
@@ -694,6 +838,201 @@ impl SearchQueryPort for InMemorySearchService {
             .list_saved_by_user(tenant_id, UserId::from(actor.user_id))
             .await?;
         Ok(all)
+    }
+
+    // ===== P1 工具链 (per docs/briefs/tool-p1-impl-001.md §1.2-1.4) =====
+    // 走 InMemory cache `self.index` 直接查, 不改 SearchRepository trait
+    // (per 守门 #12 minimal-broadening 派生 + 守门 #13 a L0 协调)
+
+    async fn get_symbol(
+        &self,
+        tenant_id: TenantId,
+        name: &str,
+        file: Option<&str>,
+        actor: &ActorContext,
+    ) -> Result<Vec<SymbolRef>, SearchError> {
+        if TenantId::from(actor.tenant_id) != tenant_id {
+            return Err(SearchError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                tenant_id,
+            ));
+        }
+        if name.is_empty() {
+            return Err(SearchError::InvalidQuery("name required".to_string()));
+        }
+        let name_lc = name.to_lowercase();
+        let index = self.index.read().unwrap();
+        let mut out: Vec<SymbolRef> = index
+            .values()
+            .filter(|i| i.tenant_id == tenant_id)
+            .filter(|i| i.resource_type == ResourceType::Symbol)
+            .filter_map(|i| {
+                let sym = i.symbol_metadata.as_ref()?;
+                if sym.name.to_lowercase() != name_lc {
+                    return None;
+                }
+                if let Some(file_filter) = file {
+                    if sym.file_path != file_filter {
+                        return None;
+                    }
+                }
+                Some(SymbolRef {
+                    name: sym.name.clone(),
+                    kind: sym.kind.clone(),
+                    file_path: sym.file_path.clone(),
+                    line: 0, // P0 简化:SearchIndex SymbolMetadata 不带 line
+                    signature: sym.signature.clone(),
+                })
+            })
+            .collect();
+        // 稳定排序:file_path asc, name asc (per 1 号 P0 模式)
+        out.sort_by(|a, b| {
+            (a.file_path.clone(), a.name.clone()).cmp(&(b.file_path.clone(), b.name.clone()))
+        });
+        Ok(out)
+    }
+
+    async fn find_references(
+        &self,
+        tenant_id: TenantId,
+        name: &str,
+        file: Option<&str>,
+        actor: &ActorContext,
+    ) -> Result<Vec<ReferenceRef>, SearchError> {
+        if TenantId::from(actor.tenant_id) != tenant_id {
+            return Err(SearchError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                tenant_id,
+            ));
+        }
+        if name.is_empty() {
+            return Err(SearchError::InvalidQuery("name required".to_string()));
+        }
+        let name_lc = name.to_lowercase();
+        let index = self.index.read().unwrap();
+        let mut out: Vec<ReferenceRef> = index
+            .values()
+            .filter(|i| i.tenant_id == tenant_id)
+            .filter(|i| {
+                if let Some(file_filter) = file {
+                    // file_path 既在 symbol_metadata (Symbol 资源) 也在 tags / fulltext 旁路
+                    if let Some(sym) = &i.symbol_metadata {
+                        if sym.file_path == file_filter {
+                            return true;
+                        }
+                    }
+                    if i.tags.iter().any(|t| t == file_filter) {
+                        return true;
+                    }
+                    false
+                } else {
+                    true
+                }
+            })
+            .filter(|i| {
+                // 引用匹配:fulltext 含 name, 或 symbol_metadata.name 匹配
+                let fulltext_lc = i.fulltext.to_lowercase();
+                if fulltext_lc.contains(&name_lc) {
+                    return true;
+                }
+                if let Some(sym) = &i.symbol_metadata {
+                    if sym.name.to_lowercase() == name_lc {
+                        return true;
+                    }
+                }
+                false
+            })
+            .map(|i| {
+                // P0 简化:line = fulltext 内的字符偏移 / 80 估算, column = 0
+                let line = estimate_line(&i.fulltext, &name_lc);
+                let file_path = i
+                    .symbol_metadata
+                    .as_ref()
+                    .map(|s| s.file_path.clone())
+                    .or_else(|| i.tags.iter().find(|t| t.contains('/')).cloned())
+                    .unwrap_or_else(|| "<unknown>".to_string());
+                let context = build_context(&i.fulltext, &name);
+                ReferenceRef {
+                    name: name.to_string(),
+                    file_path,
+                    line,
+                    column: 0,
+                    context,
+                }
+            })
+            .collect();
+        // 稳定排序:file_path asc, line asc
+        out.sort_by(|a, b| a.file_path.cmp(&b.file_path).then(a.line.cmp(&b.line)));
+        Ok(out)
+    }
+
+    async fn get_code_context(
+        &self,
+        tenant_id: TenantId,
+        file: &str,
+        line: u32,
+        radius: u32,
+        actor: &ActorContext,
+    ) -> Result<CodeContext, SearchError> {
+        if TenantId::from(actor.tenant_id) != tenant_id {
+            return Err(SearchError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                tenant_id,
+            ));
+        }
+        if file.is_empty() {
+            return Err(SearchError::InvalidQuery("file required".to_string()));
+        }
+        let index = self.index.read().unwrap();
+        // 找到该 file 下最相关的 SearchIndex (priority: Symbol > WorkItem > Comment > other)
+        let file_filter = file.to_string();
+        let mut candidates: Vec<&SearchIndex> = index
+            .values()
+            .filter(|i| i.tenant_id == tenant_id)
+            .filter(|i| {
+                if let Some(sym) = &i.symbol_metadata {
+                    return sym.file_path == file_filter;
+                }
+                false
+            })
+            .collect();
+        // 没找到 symbol 时, 退化到 tags/file_path 模糊匹配
+        if candidates.is_empty() {
+            candidates = index
+                .values()
+                .filter(|i| i.tenant_id == tenant_id)
+                .filter(|i| i.tags.iter().any(|t| t.contains(&file_filter)))
+                .collect();
+        }
+        // 排序:resource_type (Symbol 优先) + updated_at desc
+        candidates.sort_by(|a, b| {
+            let ord_a = resource_priority(&a.resource_type);
+            let ord_b = resource_priority(&b.resource_type);
+            ord_a.cmp(&ord_b).then(b.updated_at.cmp(&a.updated_at))
+        });
+        let picked = candidates.first().copied();
+        match picked {
+            Some(idx) => {
+                let snippet = build_snippet(&idx.fulltext, line, radius);
+                let start = line.saturating_sub(radius);
+                let end = line.saturating_add(radius);
+                Ok(CodeContext {
+                    file_path: file.to_string(),
+                    start_line: start,
+                    end_line: end,
+                    snippet,
+                })
+            }
+            None => {
+                // 无任何索引 → 返回空 context, 不报错 (跟 search 空 list 同源)
+                Ok(CodeContext {
+                    file_path: file.to_string(),
+                    start_line: line.saturating_sub(radius),
+                    end_line: line.saturating_add(radius),
+                    snippet: String::new(),
+                })
+            }
+        }
     }
 }
 
@@ -1329,6 +1668,279 @@ mod tests {
             )
             .await;
         assert!(matches!(res, Err(SearchError::InvalidQuery(_))));
+    }
+
+    // ===== P1 工具链新方法测试 (per docs/briefs/tool-p1-impl-001.md §1.2-1.4) =====
+
+    fn symbol_index_cmd(
+        tenant_id: TenantId,
+        name: &str,
+        file_path: &str,
+        fulltext: &str,
+    ) -> UpsertIndexCommand {
+        UpsertIndexCommand {
+            tenant_id,
+            project_id: ProjectId::new(),
+            resource_type: ResourceType::Symbol,
+            resource_id: Uuid::new_v4(),
+            fulltext: fulltext.to_string(),
+            symbol_metadata: Some(SymbolMetadata {
+                name: name.to_string(),
+                kind: "function".to_string(),
+                signature: format!("fn {name}()"),
+                file_path: file_path.to_string(),
+            }),
+            tags: vec![file_path.to_string()],
+            projection_version: 1,
+        }
+    }
+
+    #[tokio::test]
+    async fn get_symbol_finds_matching_name() {
+        let svc = InMemorySearchService::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let projector = projector_actor(TenantId(tenant_id));
+        svc.upsert_index(
+            symbol_index_cmd(
+                TenantId(tenant_id),
+                "authenticate_user",
+                "crates/auth/src/lib.rs",
+                "fn authenticate_user()",
+            ),
+            &projector,
+        )
+        .await
+        .unwrap();
+        svc.upsert_index(
+            symbol_index_cmd(
+                TenantId(tenant_id),
+                "logout_user",
+                "crates/auth/src/lib.rs",
+                "fn logout_user()",
+            ),
+            &projector,
+        )
+        .await
+        .unwrap();
+
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
+        let r = svc
+            .get_symbol(TenantId(tenant_id), "authenticate_user", None, &user)
+            .await
+            .unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].name, "authenticate_user");
+        assert_eq!(r[0].file_path, "crates/auth/src/lib.rs");
+    }
+
+    #[tokio::test]
+    async fn get_symbol_with_file_filter() {
+        let svc = InMemorySearchService::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let projector = projector_actor(TenantId(tenant_id));
+        svc.upsert_index(
+            symbol_index_cmd(
+                TenantId(tenant_id),
+                "foo",
+                "crates/a/src/lib.rs",
+                "fn foo()",
+            ),
+            &projector,
+        )
+        .await
+        .unwrap();
+        svc.upsert_index(
+            symbol_index_cmd(
+                TenantId(tenant_id),
+                "foo",
+                "crates/b/src/lib.rs",
+                "fn foo()",
+            ),
+            &projector,
+        )
+        .await
+        .unwrap();
+
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
+        let r = svc
+            .get_symbol(
+                TenantId(tenant_id),
+                "foo",
+                Some("crates/a/src/lib.rs"),
+                &user,
+            )
+            .await
+            .unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].file_path, "crates/a/src/lib.rs");
+    }
+
+    #[tokio::test]
+    async fn get_symbol_empty_name_rejected() {
+        let svc = InMemorySearchService::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
+        let r = svc.get_symbol(TenantId(tenant_id), "", None, &user).await;
+        assert!(matches!(r, Err(SearchError::InvalidQuery(_))));
+    }
+
+    #[tokio::test]
+    async fn get_symbol_cross_tenant_denied() {
+        let svc = InMemorySearchService::new();
+        let t1 = uuid::Uuid::new_v4();
+        let t2 = uuid::Uuid::new_v4();
+        let user_t1 = make_actor(TenantId(t1), UserId(uuid::Uuid::new_v4()));
+        let r = svc
+            .get_symbol(TenantId(t2), "anything", None, &user_t1)
+            .await;
+        assert!(matches!(r, Err(SearchError::CrossTenantDenied(_, _))));
+    }
+
+    #[tokio::test]
+    async fn find_references_matches_fulltext_and_symbol() {
+        let svc = InMemorySearchService::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let projector = projector_actor(TenantId(tenant_id));
+        // Symbol 定义
+        svc.upsert_index(
+            symbol_index_cmd(
+                TenantId(tenant_id),
+                "compute_score",
+                "crates/search/src/lib.rs",
+                "fn compute_score() { 1.0 }",
+            ),
+            &projector,
+        )
+        .await
+        .unwrap();
+        // 引用:另一个 WorkItem fulltext 含 compute_score
+        svc.upsert_index(
+            sample_index_cmd(
+                TenantId(tenant_id),
+                ResourceType::WorkItem,
+                "see compute_score in search module",
+            ),
+            &projector,
+        )
+        .await
+        .unwrap();
+
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
+        let r = svc
+            .find_references(TenantId(tenant_id), "compute_score", None, &user)
+            .await
+            .unwrap();
+        // 至少 1 个引用 (Symbol 定义本身或 WorkItem 引用)
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn find_references_with_file_filter() {
+        let svc = InMemorySearchService::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let projector = projector_actor(TenantId(tenant_id));
+        svc.upsert_index(
+            symbol_index_cmd(
+                TenantId(tenant_id),
+                "alpha",
+                "crates/x/src/lib.rs",
+                "fn alpha()",
+            ),
+            &projector,
+        )
+        .await
+        .unwrap();
+        svc.upsert_index(
+            symbol_index_cmd(
+                TenantId(tenant_id),
+                "alpha",
+                "crates/y/src/lib.rs",
+                "fn alpha()",
+            ),
+            &projector,
+        )
+        .await
+        .unwrap();
+
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
+        let r = svc
+            .find_references(
+                TenantId(tenant_id),
+                "alpha",
+                Some("crates/x/src/lib.rs"),
+                &user,
+            )
+            .await
+            .unwrap();
+        // 至少 1 个匹配, file 全部 crates/x/src/lib.rs
+        assert!(!r.is_empty());
+        for ref_ in &r {
+            assert_eq!(ref_.file_path, "crates/x/src/lib.rs");
+        }
+    }
+
+    #[tokio::test]
+    async fn find_references_empty_name_rejected() {
+        let svc = InMemorySearchService::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
+        let r = svc
+            .find_references(TenantId(tenant_id), "", None, &user)
+            .await;
+        assert!(matches!(r, Err(SearchError::InvalidQuery(_))));
+    }
+
+    #[tokio::test]
+    async fn get_code_context_returns_window_for_known_file() {
+        let svc = InMemorySearchService::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let projector = projector_actor(TenantId(tenant_id));
+        svc.upsert_index(
+            symbol_index_cmd(
+                TenantId(tenant_id),
+                "main",
+                "crates/app/src/main.rs",
+                "fn main() { println!(\"hello\"); }",
+            ),
+            &projector,
+        )
+        .await
+        .unwrap();
+
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
+        let r = svc
+            .get_code_context(TenantId(tenant_id), "crates/app/src/main.rs", 1, 3, &user)
+            .await
+            .unwrap();
+        assert_eq!(r.file_path, "crates/app/src/main.rs");
+        assert_eq!(r.start_line, 0);
+        assert_eq!(r.end_line, 4);
+    }
+
+    #[tokio::test]
+    async fn get_code_context_empty_for_unknown_file() {
+        let svc = InMemorySearchService::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
+        let r = svc
+            .get_code_context(TenantId(tenant_id), "no/such/file.rs", 10, 5, &user)
+            .await
+            .unwrap();
+        // 走 fallback 路径, 返回空 context
+        assert!(r.snippet.is_empty());
+        assert_eq!(r.start_line, 5);
+        assert_eq!(r.end_line, 15);
+    }
+
+    #[tokio::test]
+    async fn get_code_context_empty_file_rejected() {
+        let svc = InMemorySearchService::new();
+        let tenant_id = uuid::Uuid::new_v4();
+        let user = make_actor(TenantId(tenant_id), UserId(uuid::Uuid::new_v4()));
+        let r = svc
+            .get_code_context(TenantId(tenant_id), "", 1, 5, &user)
+            .await;
+        assert!(matches!(r, Err(SearchError::InvalidQuery(_))));
     }
 }
 

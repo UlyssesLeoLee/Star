@@ -336,6 +336,59 @@ impl From<domain_work_item::WorkItemError> for McpError {
     }
 }
 
+// P1 工具链 (per docs/briefs/tool-p1-impl-001.md §2.5) — `domain_search::SearchError` → `McpError`
+//
+// 跟 P0 3 个 From impl 同源:
+// - NotFound / InvalidQuery / InvalidState → Validation + retriable=false
+// - PermissionDenied / CrossTenantDenied → Policy + retriable=false
+// - Conflict → External + retriable=false
+// - Internal → Internal + retriable=true
+
+/// `domain_search::SearchError` → `McpError`
+impl From<domain_search::SearchError> for McpError {
+    fn from(e: domain_search::SearchError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_search::SearchError::NotFound(_) => (
+                error_code::RESOURCE_NOT_FOUND,
+                ErrorSourceKind::Validation,
+                false,
+            ),
+            domain_search::SearchError::InvalidState(_) => (
+                error_code::VALIDATION_FAILED,
+                ErrorSourceKind::Validation,
+                false,
+            ),
+            domain_search::SearchError::PermissionDenied => {
+                (error_code::POLICY_DENIED, ErrorSourceKind::Policy, false)
+            }
+            domain_search::SearchError::CrossTenantDenied(_, _) => {
+                (error_code::POLICY_DENIED, ErrorSourceKind::Policy, false)
+            }
+            domain_search::SearchError::InvalidQuery(_) => (
+                error_code::VALIDATION_FAILED,
+                ErrorSourceKind::Validation,
+                false,
+            ),
+            domain_search::SearchError::Conflict(_) => (
+                error_code::VALIDATION_FAILED,
+                ErrorSourceKind::External,
+                false,
+            ),
+            domain_search::SearchError::Internal(_) => {
+                (error_code::INTERNAL, ErrorSourceKind::Internal, true)
+            }
+        };
+        Self::new(
+            code,
+            format!("search: {e}"),
+            "search",
+            source_kind,
+            retriable,
+            None,
+        )
+    }
+}
+
 /// MCP 标准错误码常量(per spec + flows 累积, 共 24 个)
 ///
 /// **命名约定**(per F-06 修复 2026-08-27): SCREAMING_SNAKE_CASE 字符串, 与
