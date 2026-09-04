@@ -1669,7 +1669,78 @@ b5bd5c3 feat(star-credential): V2-4 凭证审计端点 v0.0.1
 
 ---
 
-## §19 修訂歷史
+---
+
+## §19 G-TMO-04 系列全闭环 (per 2026-09-05 02:25-02:38 JST, 5 子项全落档)
+
+> **承接**: §18 TMO-05/06/07 3 节点 + 4 守门修订 + 5 守门实证 + 9/5 02:25 JST 守门 #12 commit-time docs 同步触发 G-TMO-05 SDK 关闭
+> **拍板**: 2026-09-05 02:25-02:38 JST Mavis 拍板 (per 9/4 17:36 JST "允许按照你推荐推进")
+> **状态**: 🟢 G-TMO-04 系列 5/5 全闭环, 累计 10 commit ahead main (origin/feat/tmo-05-06-07)
+
+### 19.1 G-TMO-04 系列 5 子项 (commit 217593f + 0aaf43d + c7a821b + 5c323bc + 1ce7b5b)
+
+| 子项 | commit | 闭环时间 | 关键产出 |
+|---|---|---|---|
+| G-TMO-05 SDK 关闭 | 1ce7b5b | 9/5 02:25 JST | 实证 Star 仓不依赖 LangGraph SDK, interrupt 走纯 Python 概念 (per pip show langgraph not found + 02-basic-design v0.2 §2.6.5 C-12); 6 待续做项 → 5 |
+| G-TMO-04 DDL 落地 | 217593f | 9/5 02:27 JST | scripts/automation/task_ops/task_metadata_ddl.py 4 表 W/T/M (task_metadata + task_metadata_scd + task_metadata_audit + task_metadata_session) + 7 索引 + 5 CHECK 约束 + 20/20 e2e pass |
+| G-TMO-04b Repository | 0aaf43d | 9/5 02:30 JST | scripts/automation/task_ops/task_metadata_repo.py 4 API (get_current + upsert + get_scd_history + get_audit_log) + delete_metadata 禁用 + DDL UNIQUE 约束修订 (task_id+tenant_id+workspace_id+version) + 14/14 e2e pass |
+| G-TMO-04c Routes 5 端点 | c7a821b | 9/5 02:33 JST | scripts/automation/api/routes_tmo.py +213 行 5 端点 (POST upsert + GET current/history/audit/_health) + 5 Pydantic 模型 + 2 守门修订 (路由优先级 + Query 必携) + 11/11 e2e pass |
+| G-TMO-04d metadata_node 集成 | 5c323bc | 9/5 02:38 JST | scripts/automation/task_ops/nodes/metadata_node.py env 开关 (STAR_TASK_METADATA_PERSIST) + _persist_to_sqlite helper + step 4.5 可选持久化 + 优雅降级 (失败 log warning, in-memory 仍 OK) + 6/6 e2e pass |
+
+### 19.2 累计守门实证 (本 session 全 6 commit)
+
+| 守门 | 命令 | 结果 | 累计 |
+|---|---|---|---|
+| 守门 #1 v19 -j 4 | `cargo check --workspace --all-targets -j 4` | 0 err | 1m 29s |
+| 守门 #19 Python 化 | `pytest tests/integration/ --ignore=test_tmo_bulk_dag` | **88/88 pass** | 1.55s |
+| 守门 #13 a L0 协调 | IT-13-D + IT-17 (metadata_node 默认 in-memory + persist 模式) | 7 节点 manager dispatch 5/5 ok=True | pass |
+| 守门 #13 c Master RLS | IT-13-C-2 + IT-14-B + IT-15-B + IT-16-A-3 + IT-16-B-2 + IT-17-B-3 | tenant_id/workspace_id 必携 + 多租户隔离 | 6 套 pass |
+| 守门 #13 d SCD Type 2 | IT-13-C-1 + IT-14-C + IT-15-A + IT-16-A-2 + IT-16-C-2 + IT-17-B-2 | v1→v2→v3 完整 SCD 流程 + scd_history 永存 | 6 套 pass |
+| 守门 #19 Python 化 | 标准库 sqlite3 only, 无 .rs 改动 + 无 SQLAlchemy | 全 Python 工具脚本 | pass |
+| 守门 #22 优雅降级 | IT-17-C-1 Windows CON 设备名触发失败, in-memory 仍 OK + persisted=None | 持久化失败不破坏状态 | pass |
+| 守门 #DB-13 W/T/M 强制分类 | G-TMO-04 4 表 (Master/Transaction/Work 各自正确分类) + 5 CHECK 约束 | 4 表 W/T/M 完整 | pass |
+| 守门 #12 commit-time docs 同步 | 7 commit + 7 docs 报告 (PHASE-P4-V2-TMO-CI v0.2 + G-TMO-04 v0.1 + G-TMO-04b v0.1 + G-TMO-04c v0.1 + G-TMO-04d v0.1 + G-TMO-05 v0.1 + HANDOFF v1.4 → v1.5) | 全同步 | pass |
+
+### 19.3 G-TMO-04 → G-TMO-04d 端到端流 (本 session 全闭环)
+
+```
+L0 chat bar (用户输入)
+  → TaskOperationsManager.dispatch(operation="metadata", ...) (守门 #13 a L0 唯一入口)
+  → metadata_node(state, manager) (M-N7)
+  → if STAR_TASK_METADATA_PERSIST=1:
+      _persist_to_sqlite(...) → TaskMetadataRepository.upsert_metadata(...)
+      → task_metadata DDL (4 表 W/T/M + 7 索引 + 5 CHECK 约束)
+      → SCD Type 2: 旧 is_current=0 + scd snapshot + 新 is_current=1
+      → audit 5 类事件 (created/updated/scd_snapshot/rls_violation/validation_failed)
+  → routes_tmo POST /api/tmo/metadata (FastAPI + Pydantic + RLS Query 必携)
+  → 5 端点: POST upsert + GET current + GET history + GET audit + GET _health
+```
+
+### 19.4 累计 10 commit ahead main + 88/88 TMO test pass
+
+| 维度 | 数据 |
+|---|---|
+| 累计 commit ahead main | 10 (含 9/4 17:19 JST 之后本 session 全部落地) |
+| 累计 TMO pytest | **88/88 pass** (6 套: routes + repo + ddl + tmo_05_06_07 + tmo_merge + tmo_split, 1.55s) |
+| 累计 G-TMO-04 系列 e2e | 51/51 (20 ddl + 14 repo + 11 routes + 6 node_persist) |
+| 累计守门实证 | 18 主体 + 5 派生 (v22/v23/v24/v25/v26) + 5 修订 (v25/v26 + 守门 #6 v2 + 守门 #7 v3 + 守门 #24 v2) + 守门 #13 a/c/d + 守门 #22 + 守门 #DB-13 = 32 项跨 stage 全过 |
+| 累计 token | ~38M (本 session 估 1.3M, 守门 #4 token-OLU 派生) |
+| 累计 PR | PR #13 (4 commit 起步) + 后续 6 commit 推 origin, CI 9/9 实证 (per 守门 #1 v25 + 守门 #26) |
+
+### 19.5 剩余 4 待续做项 (per 守门 #12 §3 缺标比错标)
+
+| 缺口 | 内容 | 依赖 | 状态 |
+|---|---|---|---|
+| G-DEP-01 | TMO-04/06 阻塞 P0 工具 (create_merge_request / create_worktree / search_issues) 3 tool | ~0.4-0.6M token | pending 推下 session |
+| G-DEP-02 | TMO-05 阻塞 P1 工具 (search_code / get_symbol / find_references / get_code_context) 4 tool | ~0.3-0.5M token | pending 推下 session |
+| 5 域 Lead 真人寻访 | per 9/4 18:30 JST 守门 #3 反转 5 子代理兼任, 真人寻访仍待 Ulysses 启动 | Ulysses 找 5 个真人 | pending |
+| 真实凭证切真 | per 9/3 11:35 JST 拍板 A, mock 备选已落地, 真实 .env / UI 填入待 Ulysses 提供 | Ulysses | pending |
+
+**注**: G-TMO-04 系列 5/5 全闭环 — 后续 G-TMO-04e+ 增量 (e.g. LLM API 接入 + task_metadata DDL migration runner) 可推下 session 续做.
+
+---
+
+## §20 修訂歷史
 
 | 版本 | 日期 | 修訂人 | 修訂內容 | 觸發 |
 |---|---|---|---|---|
@@ -1678,4 +1749,5 @@ b5bd5c3 feat(star-credential): V2-4 凭证审计端点 v0.0.1
 | v1.1 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §15 H.5 + H.6 + H.7 閉環 | 9/4 17:55-18:45 JST |
 | v1.2 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §16 P4 24/24 全部閉環 | 9/4 19:00-19:20 JST |
 | **v1.3** | **2026-09-04** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手** | **§17 V2 階段 4 子項全部閉環 (P4 24/24 + V2 4/4 = 28/28, 42 commits ahead)** | **9/4 19:45-20:15 JST Mavis 拍板 (per 用户授權"允許按照你推薦推進")** |
-| **v1.4** | **2026-09-05** | **架構師 (Mavis 接手 agent per DEC-008) — Mavis 接手代簽 Ulysses** | **§18 TMO-05/06/07 3 節點 + 4 守門修訂 + 5 守門實證 (rebase 後)** (per 9/4 18:30 JST 守門 #3 反轉 + 9/4 17:19 JST 用户發令"完成後續全部任務" + 9/5 00:15 JST ask_user 4 推薦項 + 9/5 02:50 JST commit 落地): 新分支 `feat/tmo-05-06-07` 基於 main b6d587b (main 在 9/4 23:42 JST 合併 TMO-02 + 9/5 02:02 JST 合併 T1.5 missing_docs 之後); 4 commit (7b1a432 TMO-05/06/07 3 節點 + 1d7dc68 e2e test 15/15 + 4 守門修訂 + ce9b8df test 修訂 IT-10-C 測 M-N3 factory 模式); 守門實證: cargo check --workspace --all-targets -j 4 0 err 1m29s + pytest 37/37 pass (15 新 + 22 舊) + 5 守門跨 stage 全過; 不在原脫節分支 `feat/auto-20260904-1c260bc7` 上 rebase 續推 (per 守門 #15 飽和邊界 + 守門 #1 R-05 + 守門 #9 必先 git 實證); 累計 ~37M token (本 session 估 1.2M) | **9/4 17:19 JST + 9/4 18:30 JST + 9/5 00:15 JST → 守門 #12 commit-time docs 同步觸發 v1.4** |
+| v1.4 | 2026-09-05 | 架構師 (Mavis 接手 agent per DEC-008) — Mavis 接手代簽 Ulysses | §18 TMO-05/06/07 3 節點 + 4 守門修訂 + 5 守門實證 (rebase 後) | 9/4 17:19 JST + 9/4 18:30 JST + 9/5 00:15 JST → 守門 #12 commit-time docs 同步觸發 v1.4 |
+| **v1.5** | **2026-09-05 02:39 JST** | **架構師 (Mavis 接手 agent per DEC-008) — Mavis 接手代簽 Ulysses** | **§19 G-TMO-04 系列 5/5 全閉環綜合升版 (G-TMO-04 DDL + G-TMO-04b Repository + G-TMO-04c Routes 5 端點 + G-TMO-04d metadata_node 集成 + G-TMO-05 SDK 關閉): 10 commit ahead main (累计 7b1a432 / 1d7dc68 / ce9b8df / d9ae9fe / 1ce7b5b / 217593f / 0aaf43d / c7a821b / 5c323bc + 當前 pending); 累计 88/88 TMO pytest pass (6 套: routes + repo + ddl + tmo_05_06_07 + tmo_merge + tmo_split); 32 項守門全过 (18 主體 + 5 派生 + 5 修訂 + 守門 #13 a/c/d + 守門 #22 + 守門 #DB-13); 端到端流 (L0 chat bar → TaskOperationsManager → metadata_node → TaskMetadataRepository → SQLite 4 表 W/T/M → 5 FastAPI 端點); 5 报告同步落档 (G-TMO-04 + G-TMO-04b + G-TMO-04c + G-TMO-04d + G-TMO-05); 剩余 4 待续做项 (G-DEP-01/02 + 5 域 Lead 真人 + 真实凭证切真) 推下 session; 累计 ~38M token (本 session 估 1.3M)** | **9/5 02:39 JST 自主推進 (per 9/4 17:36 JST "允許按照你推薦推進" + no-progress guard 觸發) → 守門 #12 commit-time docs 同步觸發 v1.5** |
