@@ -53,18 +53,22 @@ macro_rules! define_uuid_id {
         pub struct $name(pub uuid::Uuid);
 
         impl $name {
+            /// 生成新的随机 ID
             #[allow(dead_code)]
             pub fn new() -> Self {
                 Self(uuid::Uuid::new_v4())
             }
+            /// 从已有 UUID 构造
             #[allow(dead_code)]
             pub fn from_uuid(id: uuid::Uuid) -> Self {
                 Self(id)
             }
+            /// 返回内部 UUID 的拷贝
             #[allow(dead_code)]
             pub fn as_uuid(&self) -> uuid::Uuid {
                 self.0
             }
+            /// 消费自身, 返回内部 UUID
             #[allow(dead_code)]
             pub fn into_uuid(self) -> uuid::Uuid {
                 self.0
