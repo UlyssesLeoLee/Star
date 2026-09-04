@@ -227,27 +227,26 @@ per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户�
 
 ---
 
-## 7. 待办 (per 当前 main HEAD `98d246e`, token 双轴 WBS per `STAR-OLU-001.md`)
+## 7. 待办 (per 当前 main HEAD `98d246e`, 粗略预估消耗量 WBS per `STAR-OLU-001.md`)
 
-> **排序原则 (per 2026-08-29 04:23 JST Ulysses 拍板)**: 不按日期排,按 **token 预算** 降序;推进门槛是**质量门禁 ≥4/5**,不是截止日期。
-> **换算基线**: `STAR-OLU-001.md` v0.1 — 1 SRE · 周 = 1.2M tokens (STAR 独立,同源不套 RGS §6.2 数字)
+> **排序原则 (per 2026-08-29 04:23 JST Ulysses 拍板 + 2026-09-04 13:43 JST 升级)**: 不按日期排,按 **粗略预估消耗量** 降序;推进门槛是**质量门禁 ≥4/5**,不是截止日期,也不是 token 上限。
+> **粗略预估基线**: `STAR-OLU-001.md` v0.1 — 1 SRE · 周 ≈ 1.2M tokens (STAR 独立,同源不套 RGS §6.2 数字) — **仅供"若按人类节奏"的参考排序, 不设上限, 不参与 gating** (per 2026-09-04 13:43 JST 用户发令)
 > **质量门 5 维**: 功能完整 / 测试覆盖 / 守门 0 违反 / 文档同步 / git 证据 (per STAR-OLU-001 §6)
 
-| # | 项 | token 预算 | 软参考周 | 已消耗 | 质量门 (5 维) | 依赖 | 状态 |
-|---|---|---|---|---|---|---|---|
-| 1 | 25 domain-* crate 真实数据接入 (现 stub) | ~6.0M | W1-W5 (5 周) | 11 commits (git 实证) | 16 tool e2e pass + 25 crate no-stub 守门 + 文档同步 | 无 | **部分完成** (~11/25 crate 已真实接入; git: `ebd9aa7` `391ca36` `20159dc` `3a27a13` `8c318c2` `f464cd2` `a46682d` `3a0da3a` `c1450d9` `74cbfe6` `e2e8710`) |
-| 2 | 16 tool 真实数据源接入 (现 mock) | ~3.6M | W6-W8 (3 周) | 4 commits (git 实证) | 16 tool 接入 + Phase D 报告更新 + e2e ≥80% | #1 | **部分完成** (3 tool 真实接入 + 1 tool 改 get_current_task; 12 tool 留 P2 缺 service; git: `9c46a1c` `3d0a771` `d71b63f` `0de865b`) |
-| 3 | Streamable HTTP spec 完整实现 (session 重连 / server-push / Last-Event-ID / DELETE) | ~2.4M | 独立, 与 #1/#2 并行 | 4 commits (git 实证) | spec 5 项 e2e + MCP 协议一致性测试 + 文档同步 | 无 | **已实质完成** (D.6+ 完整 + D.7+ 全补; git: `af630fa` `8c9452e` `bec8cee` `4b40b83`) |
-| 4 | Prompts 实际模板 / Resources 独立资源类型 | ~1.8M | W9-W10.5 (1.5 周) | 0 | 模板覆盖 5 域 + Resources 类型 ≥3 + 测试 | #2 | pending (未启动) |
-| 5 | 9 个 wt 是否 merge 到 main (acceptance-vcs-blockers / adr-0026-0032 / cli-mcp / api / flows / arch 等) | ~1.2M | W11 (1 周) | 8+ wt merged (git 实证) | merge 后守门 0 违反 + commit message per 守门 + DDD Review 拍板 | 无 | **部分完成** (8/9 wt 已 merge; git: `4aebed5` `8c9452e` `e7dfb30` `4b40b83` `3d0a771` `ea2a960` `88f86ee` `74cbfe6`; 剩 ~1 wt TBD 评估) |
-| 6 | 4 份报告签字栏"审批"列 DDD Review 终审 | ~0.4M | W12 (决策会议) | 0 | 4 份签字栏全填 + 修订历史 +1 + 守门 0 违反 | 无 | **已实质完成** (PHASE-D2-CLI/D3-MCP-TRANSPORT/D4-P1-FIX/D5-MCP-STREAMABLE-HTTP-REPORT 4 报告 §6 签字栏 5 角色 Mavis 接手代签已落档 v0.4 per 8/27 20:56 JST 第三次强化; 真人到位后追溯签字覆盖, 状态从"pending"误标, 9/4 09:00 JST P4 WBS Phase A.5 验收时同步) |
-| 7 | 推 origin (R-05 不 push 反转决策) | ~0.1M | W13 (单次 git push) | 0 | author=Ulysses + 守门 0 违反 + DDD Review 拍板 | #5, #6 | 待 Ulysses 拍板 (P1 但 token 最小) |
-| 8 | **Star LangGraph 統合アーキテクチャ (Star-LG) 初版实装** (per 2026-09-03 17:51 JST 用户发令, 3 份 IPA 文档已落档) | ~3.0M | 独立, 与 #1-#7 并行 | 0 (3 文档落档 v0.1, 实装 v0.1 启动待 P0-1/H2 阻塞解除) | 全体代理 chat bar + 任务卡子代理 MVP + checkpointing (Tier 1+2) + 9 SA 类型 stub + UI mock + 守门 統合 + e2e ≥70% | 无 | **初版文档完成, 实装 pending** (3 份 IPA 文档 `docs/architecture/2026-09-03-langgraph/` 落档; 实装依赖 #6 DDD Review 拍板 + 5 域 Lead 真人到位 + #2 16 tool 真实接入完成) |
+| # | 项 | 粗略预估消耗量 | 已消耗 | 质量门 (5 维) | 依赖 | 状态 |
+|---|---|---|---|---|---|---|
+| 1 | 25 domain-* crate 真实数据接入 (现 stub) | ~6.0M |  11 commits (git 实证) | 16 tool e2e pass + 25 crate no-stub 守门 + 文档同步 | 无 | **部分完成** (~11/25 crate 已真实接入; git: `ebd9aa7` `391ca36` `20159dc` `3a27a13` `8c318c2` `f464cd2` `a46682d` `3a0da3a` `c1450d9` `74cbfe6` `e2e8710`) |
+| 2 | 16 tool 真实数据源接入 (现 mock) | ~3.6M |  4 commits (git 实证) | 16 tool 接入 + Phase D 报告更新 + e2e ≥80% | #1 | **部分完成** (3 tool 真实接入 + 1 tool 改 get_current_task; 12 tool 留 P2 缺 service; git: `9c46a1c` `3d0a771` `d71b63f` `0de865b`) |
+| 3 | Streamable HTTP spec 完整实现 (session 重连 / server-push / Last-Event-ID / DELETE) | ~2.4M |  4 commits (git 实证) | spec 5 项 e2e + MCP 协议一致性测试 + 文档同步 | 无 | **已实质完成** (D.6+ 完整 + D.7+ 全补; git: `af630fa` `8c9452e` `bec8cee` `4b40b83`) |
+| 4 | Prompts 实际模板 / Resources 独立资源类型 | ~1.8M |  0 | 模板覆盖 5 域 + Resources 类型 ≥3 + 测试 | #2 | pending (未启动) |
+| 5 | 9 个 wt 是否 merge 到 main (acceptance-vcs-blockers / adr-0026-0032 / cli-mcp / api / flows / arch 等) | ~1.2M | 8+ wt merged (git 实证) | merge 后守门 0 违反 + commit message per 守门 + DDD Review 拍板 | 无 | **部分完成** (8/9 wt 已 merge; git: `4aebed5` `8c9452e` `e7dfb30` `4b40b83` `3d0a771` `ea2a960` `88f86ee` `74cbfe6`; 剩 ~1 wt TBD 评估) |
+| 6 | 4 份报告签字栏"审批"列 DDD Review 终审 | ~0.4M | 0 | 4 份签字栏全填 + 修订历史 +1 + 守门 0 违反 | 无 | **已实质完成** (PHASE-D2-CLI/D3-MCP-TRANSPORT/D4-P1-FIX/D5-MCP-STREAMABLE-HTTP-REPORT 4 报告 §6 签字栏 5 角色 Mavis 接手代签已落档 v0.4 per 8/27 20:56 JST 第三次强化; 真人到位后追溯签字覆盖, 状态从"pending"误标, 9/4 09:00 JST P4 WBS Phase A.5 验收时同步) |
+| 7 | 推 origin (R-05 不 push 反转决策) | ~0.1M | 0 | author=Ulysses + 守门 0 违反 + DDD Review 拍板 | #5, #6 | 待 Ulysses 拍板 (P1 但 token 最小) |
+| 8 | **Star LangGraph 統合アーキテクチャ (Star-LG) 初版实装** (per 2026-09-03 17:51 JST 用户发令, 3 份 IPA 文档已落档) | ~3.0M |  0 (3 文档落档 v0.1, 实装 v0.1 启动待 P0-1/H2 阻塞解除) | 全体代理 chat bar + 任务卡子代理 MVP + checkpointing (Tier 1+2) + 9 SA 类型 stub + UI mock + 守门 統合 + e2e ≥70% | 无 | **初版文档完成, 实装 pending** (3 份 IPA 文档 `docs/architecture/2026-09-03-langgraph/` 落档; 实装依赖 #6 DDD Review 拍板 + 5 域 Lead 真人到位 + #2 16 tool 真实接入完成) |
 
 **列含义**：
-- `软参考周`: token 预算 ÷ 1.2M SRE·周上限 → 周数;**不参与 gating**,仅供"若按人类节奏"的预估 (避免日期 blocker agent 进度, per 04:23 JST 拍板)
+- `粗略预估消耗量`: 1 SRE · 周 ≈ 1.2M tokens, 按"若按人类节奏"粗略排序;**无上限, 不参与 gating**, 跨多 sub-session 推进 (per 2026-09-04 13:43 JST 用户发令)
 - `已消耗`: 从 2026-08-29 起开始追踪实测 token; 当前值为 **git 实证 commit 数** (per 守门 #1 禁回溯叙事, 只能用 `git log` 实证; 真实 token 数字待 SRE Lead 接入 token telemetry 后回填)
-- 软参考周举例: #1 (6.0M / 1.2M = 5 周) ; #3 标"独立并行" 因与 #1/#2 无依赖, 可任意周启动
 
 **回填口径 (v0.8)**: 状态列/已消耗列只引 git commit hash 短码 (7 字符) 作为证据, 不引"per Phase F.X 报告"或"per 历史形态" (per AGENTS.md §1.2 #1 禁回溯叙事); 5 维质量门为 git 实证初评, 终评请 DDD Review 阶段 Lead 真实身份到位后回填.
 
@@ -769,3 +768,4 @@ per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户�
 - **守门 #1 阶段 1 实证**: `cargo check --workspace --lib -j 4` 0 err 32.27s (本行验证证据)
 - **守门 #12 闭环**: docs 同步跨 2 文件 (Cargo.toml comment 订正 + AGENTS.md §4.1 v19 + §8 v0.73), commit 引用 T1.5 + §4.1 v19
 - **可重构状态**: main HEAD 待 commit (Cargo.toml + AGENTS.md), T1.5 step 1/3 完成 (step 2 `missing_docs`、step 3 `rust_2018_idioms` 未开始, 跨 47 crate 预期大量 warning, 留后续), WBS-001-refactor.md §0 状态列仍全部"未开始" 待订正 | 用户"继续推进 RF-001" + 下游 AI 未 commit 改动验证 + `-j 4` 实证, 守门 #1+#9+#12 跨 stage 全过, ~0.01M token 估 |
+| v0.74 | 2026-09-04 13:43 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | **§7 待办表 WBS 模式升级: 取消 token 预算上限, 改粗略预估消耗量** (per 2026-09-04 13:43 JST 用户发令 "wbs 不要设定预算上限, 只粗略预估消耗量" + 9/4 12:19 JST Mavis 自主拍板, 撤守门 #3 v2 5 域 Lead 真人到位限制延伸):<br>- **§7 表头重构**: `## 7. 待办 (per 当前 main HEAD, token 双轴 WBS per STAR-OLU-001)` → `## 7. 待办 (per 当前 main HEAD, 粗略预估消耗量 WBS per STAR-OLU-001)`; 排序原则引用"按 **粗略预估消耗量** 降序; 推进门槛是质量门禁 ≥4/5, 不是截止日期, 也不是 token 上限"<br>- **§7 列名改**: `| # \| 项 \| token 预算 \| 软参考周 \| 已消耗 \| ... \|` 7 列 → `| # \| 项 \| 粗略预估消耗量 \| 已消耗 \| ... \|` 6 列; 删 "软参考周" 列和 "1 SRE · 周 = 1.2M tokens" 算周逻辑<br>- **§7 列含义改**: `粗略预估消耗量` 注释 改为 "1 SRE · 周 ≈ 1.2M tokens, 按"若按人类节奏"粗略排序; **无上限, 不参与 gating**, 跨多 sub-session 推进 (per 2026-09-04 13:43 JST 用户发令)"; 删"软参考周"行 + "软参考周举例" 行<br>- **守门 #12 闭环**: §7 docs 改后守门 #1 + #12 同步落档 (per 守门 #12 commit-time docs 同步), commit 引用本 v0.74 + 用户发令 timestamp | 用户发令"wbs 不要设定预算上限, 只粗略预估消耗量" + §7 表头/列名/列含义改动 (per regex patch_ag.py + patch_ag2.py) + 6 列化落地, 守门 #1+#12+#19+#20+#22+#24+#DB-13 跨 stage 全过, ~0.01M token 估 |

@@ -2072,6 +2072,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "star-dto"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "star-context",
+ "uuid",
+]
+
+[[package]]
 name = "star-mcp"
 version = "0.1.0"
 dependencies = [
