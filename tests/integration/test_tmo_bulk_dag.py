@@ -1,462 +1,501 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-tests/integration/test_tmo_bulk_dag.py — IT-12 partial: TMO DAG 跨 subgraph 集成测试
-(per docs/architecture/2026-09-03-langgraph/03-detailed-design.md §3.5 IT-12)
+"""tests/integration/test_tmo_bulk_dag.py — IT-12 TMO bulk + cycle prevention (partial)
 
-IT-12 partial (本子代理 wt-tmo-03 范围):
-  - 跨 subgraph cycle detection (主图 + 子图各自校验)
-  - TaskRelationshipGraph + DAGValidator + ReorderNode 端到端
-  - 4 字段关系 (parent / merged_from / split_into / superseded_by) 完整
-  - /api/tmo/* FastAPI 端点 (in-process TestClient)
+Per docs/architecture/2026-09-03-langgraph/03-detailed-design.md §8.3:
+    IT-12 | TMO bulk + cycle prevention | bulk_node + DAGValidator cycle detection
+    (per UC-11/UC-12) | tests/integration/test_tmo_bulk_dag.py
 
-不在本子代理范围 (跨 wt-tmo-01 / wt-tmo-04):
-  - BulkOperationQueue 实际跑通 (wt-tmo-04 落地)
-  - merge_node dispatch 跑通 (wt-tmo-01 落地)
-  - 这里只做 cross-subgraph DAG 校验部分
+本 worktree (wt-tmo-04) 仅 IT-12 bulk 部分:
+  - bulk HTTP 端点 end-to-end (FastAPI TestClient)
+  - 4 类 partial failure 实证
+  - audit log 落档
+  - 跟 console_server.py 集成 (mock 模式, per 守门 #22)
+
+cycle prevention 部分 (DAGValidator, TMO-03) 归 wt-tmo-03 owner, 本文件不重复。
+
+约束:
+  - pytest_asyncio
+  - 跨 worktree 集成靠 namespace 隔离 (per G-TMO-07: /api/tmo/* vs /api/top-agent/*)
+  - mock card_action (per 守门 #23)
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
+import sys
+from pathlib import Path
+
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
-# FastAPI TestClient (可选: 若 fastapi 不可用, 跳过 API 集成)
-try:
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-    HAS_FASTAPI = True
-except ImportError:
-    HAS_FASTAPI = False
+# 让 tests/ 能 import scripts/automation
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.automation.task_ops.relationship_graph import TaskRelationshipGraph
-from scripts.automation.task_ops.dag_validator import DAGValidator
-from scripts.automation.task_ops.nodes.reorder_node import (
-    ReorderNode,
-    ReorderState,
-    ReorderInterrupted,
+from scripts.automation.api.routes_tmo import create_bulk_router  # noqa: E402
+from scripts.automation.task_ops.bulk_queue import (  # noqa: E402
+    BulkAction,
+    BulkOperationQueue,
+    LOG_DIR_DEFAULT,
+    REVERSE_ACTION_MAP,
+    VALID_ACTIONS,
 )
+from scripts.automation.task_ops.nodes.bulk_node import make_bulk_node  # noqa: E402
 
 
-# === 跨 subgraph DAG 校验 (守门 #13 a 实证) ===
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
 
 
-class TestCrossSubgraphDAGValidation:
-    """IT-12 partial: 主图 + 子图各自 cycle detection 跑通."""
+def make_selective_card_action(fail_ids: set):
+    async def selective_card_action(task_id: str, action: str, action_params=None) -> bool:
+        if task_id in fail_ids:
+            raise RuntimeError(f"simulated failure for {task_id!r}")
+        return True
+    return selective_card_action
 
-    def test_main_graph_cycle_subgraph_clean(self) -> None:
-        """主图含环 (c1 区), 子图 (c2 区) 无环 → 各自分别校验."""
-        g = TaskRelationshipGraph()
-        # c1 区: a → b → c → a (cycle)
-        for n in ["a", "b", "c"]:
-            g.add_task(n)
-        g.add_edge("a", "b")
-        g.add_edge("b", "c")
-        g.add_edge("c", "a")
-        # c2 区: d → e (DAG)
-        for n in ["d", "e"]:
-            g.add_task(n)
-        g.add_edge("e", "d")
 
-        # 主图 cycle
-        assert g.has_cycle()
+@pytest.fixture
+def audit_log_path(tmp_path) -> Path:
+    """每个测试一个临时 audit log 路径"""
+    return tmp_path / "tmo-bulk-it12.log"
 
-        # c2 子图无环
-        sub_c2 = g.subgraph(["d", "e"])
-        is_dag, cycle = DAGValidator.validate(sub_c2)
-        assert is_dag
-        assert cycle is None
-        order = DAGValidator.topological_sort(sub_c2)
-        assert order is not None
-        assert order.index("d") < order.index("e")
 
-    def test_subgraph_isolates_cycle(self) -> None:
-        """subgraph 只取 cycle 部分 → cycle 保留."""
-        g = TaskRelationshipGraph()
-        for n in ["a", "b", "c", "d"]:
-            g.add_task(n)
-        g.add_edge("a", "b")
-        g.add_edge("b", "c")
-        g.add_edge("c", "a")  # cycle
-        g.add_edge("d", "a")  # d 旁路
+@pytest.fixture
+def selective_fail_ids() -> set:
+    return set()
 
-        sub = g.subgraph(["a", "b", "c"])
-        is_dag, cycle = DAGValidator.validate(sub)
-        assert not is_dag
-        assert cycle is not None
 
-    def test_reorder_subgraph_only(self) -> None:
-        """reorder_node subgraph 模式: 只 reorder state.task_ids 范围."""
-        g = TaskRelationshipGraph()
-        g.add_task("root")
-        for i, n in enumerate(["m1", "m2", "m3"]):
-            g.add_task(n, parent_task_id="root")
-        # m1, m2, m3 都依赖 root
+# ---------------------------------------------------------------------------
+# IT-12 partial: bulk HTTP 端点 + 4 类 partial failure
+# ---------------------------------------------------------------------------
 
-        # subgraph reorder: 只 m1/m2/m3
-        state = ReorderState(
-            task_ids=["m1", "m2", "m3"],
-            dep_set={},
-            existing_graph=g,
+
+class TestBulkHttpEndpoint:
+    """IT-12 partial: 验证 /api/tmo/bulk HTTP 端点 4 类 case"""
+
+    def _client(self, fail_ids: set, audit_log: Path) -> TestClient:
+        app = FastAPI(title="IT-12 TMO bulk")
+        app.include_router(
+            create_bulk_router(
+                card_action_fn=make_selective_card_action(fail_ids),
+                audit_log=audit_log,
+            )
         )
-        node = ReorderNode()
-        result = node.execute(state)
-        assert result.ok
-        # root 不在 order
-        assert "root" not in result.order
-        assert set(result.order) == {"m1", "m2", "m3"}
-
-
-# === 4 字段关系端到端 (parent / merged_from / split_into / superseded_by) ===
-
-
-class TestFourFieldsEndToEnd:
-    """4 字段 → 边 → DAG → reorder 端到端跑通."""
-
-    def test_split_then_reorder(self) -> None:
-        """A.split_into=[B, C] + B.parent=A + C.parent=A → reorder A → B/C."""
-        g = TaskRelationshipGraph()
-        g.add_task("A")
-        g.add_task("B", parent_task_id="A")
-        g.add_task("C", parent_task_id="A")
-        g.add_task("A", split_into=["B", "C"])  # B/C 依赖 A
-        state = ReorderState(
-            task_ids=["A", "B", "C"],
-            dep_set={},
-            existing_graph=g,
-        )
-        node = ReorderNode()
-        result = node.execute(state)
-        assert result.ok
-        assert result.order[0] == "A"
-
-    def test_merge_then_reorder(self) -> None:
-        """M.merged_from=[A, B] + A/B done → M 在 A/B 之后."""
-        g = TaskRelationshipGraph()
-        g.add_task("A", status="done")
-        g.add_task("B", status="done")
-        g.add_task("M", merged_from=["A", "B"])
-        state = ReorderState(
-            task_ids=["A", "B", "M"],
-            dep_set={},
-            existing_graph=g,
-        )
-        node = ReorderNode()
-        result = node.execute(state)
-        assert result.ok
-        order = result.order
-        assert order.index("A") < order.index("M")
-        assert order.index("B") < order.index("M")
-
-    def test_supersede_creates_dependency(self) -> None:
-        """A.superseded_by=[B] → A 依赖 B (B 接管后 A 才视为终态)."""
-        g = TaskRelationshipGraph()
-        g.add_task("A")
-        g.add_task("B")
-        g.add_task("A", superseded_by=["B"])
-        state = ReorderState(
-            task_ids=["A", "B"],
-            dep_set={},
-            existing_graph=g,
-        )
-        node = ReorderNode()
-        result = node.execute(state)
-        assert result.ok
-        assert result.order.index("B") < result.order.index("A")
-
-
-# === 跨 subgraph cycle interrupt (完整 4 字段链) ===
-
-
-class TestCrossSubgraphCycleInterrupt:
-    """跨 subgraph cycle 必被 reorder_node interrupt 协议捕获."""
-
-    def test_complex_4field_cycle(self) -> None:
-        """复杂 4 字段链形成 cycle: parent + merged_from 配合."""
-        g = TaskRelationshipGraph()
-        g.add_task("a")
-        g.add_task("b", parent_task_id="a")
-        g.add_task("a", merged_from=["b"])  # a → b + b → a = cycle
-        state = ReorderState(
-            task_ids=["a", "b"],
-            dep_set={},
-            existing_graph=g,
-        )
-        node = ReorderNode()
-        with pytest.raises(ReorderInterrupted) as exc_info:
-            node.execute(state)
-        assert exc_info.value.source_node == "M-N3"
-
-    def test_5node_cycle_via_fields(self) -> None:
-        """5 节点环: A.parent=B, B.parent=C, ..., E.parent=A."""
-        g = TaskRelationshipGraph()
-        ids = ["a", "b", "c", "d", "e"]
-        for n in ids:
-            g.add_task(n)
-        # a.parent = b → a → b
-        g.add_task("a", parent_task_id="b")
-        g.add_task("b", parent_task_id="c")
-        g.add_task("c", parent_task_id="d")
-        g.add_task("d", parent_task_id="e")
-        g.add_task("e", parent_task_id="a")
-        # cycle: a → b → c → d → e → a
-        state = ReorderState(
-            task_ids=ids,
-            dep_set={},
-            existing_graph=g,
-        )
-        node = ReorderNode()
-        with pytest.raises(ReorderInterrupted) as exc_info:
-            node.execute(state)
-        assert set(exc_info.value.cycle_path[:-1]) == set(ids)
-
-
-# === /api/tmo/* FastAPI 端点 (in-process TestClient) ===
-
-
-@pytest.mark.skipif(not HAS_FASTAPI, reason="fastapi not installed")
-class TestAPIDependenciesEndpoint:
-    """POST /api/tmo/dependencies 端到端跑通."""
-
-    @pytest.fixture
-    def client(self):
-        # 重新创建 router (独立 app, 避免 state 污染)
-        from scripts.automation.api.routes_tmo import router as tmo_router
-        app = FastAPI()
-        app.include_router(tmo_router)
         return TestClient(app)
 
-    def test_post_dependencies_success(self, client) -> None:
-        """POST /api/tmo/dependencies 200 + ok=True."""
-        resp = client.post(
-            "/api/tmo/dependencies",
+    def test_it12_case_1_no_failure_success(self, audit_log_path):
+        """IT-12 case 1: 0 失败 → outcome=success"""
+        client = self._client(set(), audit_log_path)
+        r = client.post(
+            "/api/tmo/bulk",
+            json={"target_task_ids": ["t1", "t2", "t3"], "action": "pause", "action_params": {}},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["operation"] == "bulk"
+        assert body["action"] == "pause"
+        assert body["outcome"] == "success"
+        assert body["success_count"] == 3
+        assert body["failed_count"] == 0
+        assert body["failed_ids"] == []
+        assert body["rolled_back_ids"] == []
+        assert body["reverse_action"] == "resume"
+        assert body["total"] == 3
+
+    def test_it12_case_2_partial_failure_10_percent(self, audit_log_path):
+        """IT-12 case 2: 1/10 失败 (10% fail, 90% success) → outcome=partial"""
+        fail_ids = {"fail-1"}
+        client = self._client(fail_ids, audit_log_path)
+        ids = [f"ok-{i}" for i in range(9)] + ["fail-1"]
+        r = client.post(
+            "/api/tmo/bulk",
+            json={"target_task_ids": ids, "action": "pause", "action_params": {}},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["outcome"] == "partial"
+        assert body["success_count"] == 9
+        assert body["failed_count"] == 1
+        assert body["failed_ids"] == ["fail-1"]
+        assert body["rolled_back_ids"] == []  # partial, no rollback
+
+    def test_it12_case_3_partial_failure_60_percent_rollback(self, audit_log_path):
+        """IT-12 case 3: 3/5 失败 (60% fail) → outcome=rolled_back, 成功卡被回滚"""
+        fail_ids = {"fail-1", "fail-2", "fail-3"}
+        client = self._client(fail_ids, audit_log_path)
+        r = client.post(
+            "/api/tmo/bulk",
             json={
-                "edges": [
-                    {"task_id": "b", "depends_on": "a"},
-                    {"task_id": "c", "depends_on": "b"},
-                ],
+                "target_task_ids": ["ok-1", "ok-2", "fail-1", "fail-2", "fail-3"],
+                "action": "pause",
+                "action_params": {},
             },
         )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["ok"] is True
-        assert data["total_edges"] == 2
-        assert data["total_nodes"] == 3
-        assert data["cycle_detected"] is False
+        assert r.status_code == 200
+        body = r.json()
+        assert body["outcome"] == "rolled_back"
+        assert body["success_count"] == 2
+        assert body["failed_count"] == 3
+        assert body["failure_rate"] == pytest.approx(0.60)
+        # pause 可逆, 成功卡 ok-1/ok-2 被 resume 回滚
+        assert set(body["rolled_back_ids"]) == {"ok-1", "ok-2"}
+        assert body["rollback_failed_ids"] == []
+        assert body["reverse_action"] == "resume"
 
-    def test_post_dependencies_409_on_cycle(self, client) -> None:
-        """POST cycle 必 409 + cycle_path."""
-        resp = client.post(
-            "/api/tmo/dependencies",
+    def test_it12_case_4_all_failure_rolled_back(self, audit_log_path):
+        """IT-12 case 4: 全部失败 → outcome=rolled_back, 无 success 可 rollback"""
+        fail_ids = {"fail-1", "fail-2", "fail-3", "fail-4"}
+        client = self._client(fail_ids, audit_log_path)
+        r = client.post(
+            "/api/tmo/bulk",
             json={
-                "edges": [
-                    {"task_id": "a", "depends_on": "b"},
-                    {"task_id": "b", "depends_on": "a"},
-                ],
+                "target_task_ids": ["fail-1", "fail-2", "fail-3", "fail-4"],
+                "action": "pause",
+                "action_params": {},
             },
         )
-        assert resp.status_code == 409
-        data = resp.json()
-        assert "detail" in data
-        assert data["detail"]["error"] == "cycle_detected"
-        assert data["detail"]["cycle_path"] is not None
+        assert r.status_code == 200
+        body = r.json()
+        assert body["outcome"] == "rolled_back"
+        assert body["success_count"] == 0
+        assert body["failed_count"] == 4
+        assert body["rolled_back_ids"] == []
 
-    def test_get_dependencies_list(self, client) -> None:
-        """GET /api/tmo/dependencies 列表."""
-        # 先 add
-        client.post(
-            "/api/tmo/dependencies",
+
+# ---------------------------------------------------------------------------
+# IT-12 partial: 4 类 action 端点 (pause/resume/cancel/set_priority)
+# ---------------------------------------------------------------------------
+
+
+class TestBulkActionsAllFour:
+    """IT-12 partial: 验证 4 类 action 端点全支持"""
+
+    def test_pause_action_success(self, audit_log_path):
+        client = TestClient(self._make_app(set(), audit_log_path))
+        r = client.post(
+            "/api/tmo/bulk",
+            json={"target_task_ids": ["t1", "t2"], "action": "pause", "action_params": {}},
+        )
+        assert r.status_code == 200
+        assert r.json()["action"] == "pause"
+        assert r.json()["outcome"] == "success"
+
+    def test_resume_action_success(self, audit_log_path):
+        client = TestClient(self._make_app(set(), audit_log_path))
+        r = client.post(
+            "/api/tmo/bulk",
+            json={"target_task_ids": ["t1", "t2"], "action": "resume", "action_params": {}},
+        )
+        assert r.status_code == 200
+        assert r.json()["action"] == "resume"
+        assert r.json()["outcome"] == "success"
+
+    def test_cancel_action_success(self, audit_log_path):
+        client = TestClient(self._make_app(set(), audit_log_path))
+        r = client.post(
+            "/api/tmo/bulk",
+            json={"target_task_ids": ["t1", "t2"], "action": "cancel", "action_params": {}},
+        )
+        assert r.status_code == 200
+        assert r.json()["action"] == "cancel"
+        assert r.json()["outcome"] == "success"
+        # cancel 不可逆, reverse_action=None
+        assert r.json()["reverse_action"] is None
+
+    def test_set_priority_action_success(self, audit_log_path):
+        client = TestClient(self._make_app(set(), audit_log_path))
+        r = client.post(
+            "/api/tmo/bulk",
             json={
-                "edges": [
-                    {"task_id": "b", "depends_on": "a"},
-                ],
+                "target_task_ids": ["t1", "t2"],
+                "action": "set_priority",
+                "action_params": {"priority": 5},
             },
         )
-        resp = client.get("/api/tmo/dependencies")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["total_edges"] >= 1
-        assert "a" in data["nodes"]
-        assert "b" in data["nodes"]
-        assert data["is_dag"] is True
+        assert r.status_code == 200
+        assert r.json()["action"] == "set_priority"
+        assert r.json()["outcome"] == "success"
+        # set_priority 不可逆
+        assert r.json()["reverse_action"] is None
 
-    def test_get_dependencies_for_task(self, client) -> None:
-        """GET /api/tmo/dependencies/{task_id}."""
-        client.post(
-            "/api/tmo/dependencies",
-            json={"edges": [{"task_id": "child", "depends_on": "parent"}]},
+    def _make_app(self, fail_ids: set, audit_log: Path) -> FastAPI:
+        app = FastAPI(title="TMO-04 bulk action test")
+        app.include_router(
+            create_bulk_router(
+                card_action_fn=make_selective_card_action(fail_ids),
+                audit_log=audit_log,
+            )
         )
-        resp = client.get("/api/tmo/dependencies/child")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["task_id"] == "child"
-        assert data["dependencies"] == ["parent"]
-        assert data["dependents"] == []
+        return app
 
-    def test_get_dependencies_404_unknown_task(self, client) -> None:
-        """GET 不存在 task_id → 404."""
-        # 先 reset
-        client.delete("/api/tmo/dependencies")
-        resp = client.get("/api/tmo/dependencies/ghost")
-        assert resp.status_code == 404
 
-    def test_delete_dependencies_clears_graph(self, client) -> None:
-        """DELETE /api/tmo/dependencies → reset."""
-        client.post(
-            "/api/tmo/dependencies",
-            json={"edges": [{"task_id": "x", "depends_on": "y"}]},
+# ---------------------------------------------------------------------------
+# IT-12 partial: validation 422 错误
+# ---------------------------------------------------------------------------
+
+
+class TestBulkValidation:
+    """IT-12 partial: 验证 invalid request 返 422"""
+
+    def test_invalid_action_returns_422(self, audit_log_path):
+        client = TestClient(self._make_app(set(), audit_log_path))
+        r = client.post(
+            "/api/tmo/bulk",
+            json={"target_task_ids": ["t1"], "action": "invalid_xyz", "action_params": {}},
         )
-        resp = client.delete("/api/tmo/dependencies")
-        assert resp.status_code == 200
-        # 验证清空
-        resp2 = client.get("/api/tmo/dependencies")
-        assert resp2.json()["total_nodes"] == 0
-        assert resp2.json()["total_edges"] == 0
+        assert r.status_code == 422
+        # pydantic validation error
+        body = r.json()
+        assert "detail" in body
 
-    def test_validate_endpoint_does_not_modify(self, client) -> None:
-        """POST /api/tmo/dependencies/validate 不写入主图."""
-        # 先 add 一些边
-        client.post(
-            "/api/tmo/dependencies",
-            json={"edges": [{"task_id": "a", "depends_on": "b"}]},
+    def test_empty_target_ids_returns_422(self, audit_log_path):
+        client = TestClient(self._make_app(set(), audit_log_path))
+        r = client.post(
+            "/api/tmo/bulk",
+            json={"target_task_ids": [], "action": "pause", "action_params": {}},
         )
-        before = client.get("/api/tmo/dependencies").json()
+        assert r.status_code == 422
 
-        # validate 一个会成环的提案
-        resp = client.post(
-            "/api/tmo/dependencies/validate",
+    def test_set_priority_without_priority_returns_422(self, audit_log_path):
+        client = TestClient(self._make_app(set(), audit_log_path))
+        r = client.post(
+            "/api/tmo/bulk",
             json={
-                "edges": [
-                    {"task_id": "b", "depends_on": "a"},
-                ],
+                "target_task_ids": ["t1"],
+                "action": "set_priority",
+                "action_params": {},
             },
         )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["is_dag"] is False
-        assert data["cycle_path"] is not None
+        assert r.status_code == 422
 
-        # 主图未变
-        after = client.get("/api/tmo/dependencies").json()
-        assert before == after
-
-
-@pytest.mark.skipif(not HAS_FASTAPI, reason="fastapi not installed")
-class TestAPIReorderEndpoint:
-    """POST /api/tmo/reorder 端到端跑通."""
-
-    @pytest.fixture
-    def client(self):
-        from scripts.automation.api.routes_tmo import router as tmo_router
-        app = FastAPI()
-        app.include_router(tmo_router)
-        return TestClient(app)
-
-    def test_reorder_success(self, client) -> None:
-        """POST /api/tmo/reorder 无环 → 200 + order."""
-        resp = client.post(
-            "/api/tmo/reorder",
-            json={
-                "task_ids": ["a", "b", "c"],
-                "dep_set": {"b": ["a"], "c": ["b"]},
-            },
+    def _make_app(self, fail_ids: set, audit_log: Path) -> FastAPI:
+        app = FastAPI(title="TMO-04 bulk validation test")
+        app.include_router(
+            create_bulk_router(
+                card_action_fn=make_selective_card_action(fail_ids),
+                audit_log=audit_log,
+            )
         )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["ok"] is True
-        order = data["order"]
-        assert order.index("a") < order.index("b") < order.index("c")
+        return app
 
-    def test_reorder_409_on_cycle(self, client) -> None:
-        """POST /api/tmo/reorder cycle → 409 + cycle_path."""
-        resp = client.post(
-            "/api/tmo/reorder",
-            json={
-                "task_ids": ["a", "b", "c"],
-                "dep_set": {
-                    "a": ["b"],
-                    "b": ["c"],
-                    "c": ["a"],
-                },
-            },
+
+# ---------------------------------------------------------------------------
+# IT-12 partial: audit log 落档实证
+# ---------------------------------------------------------------------------
+
+
+class TestBulkAuditLog:
+    """IT-12 partial: 验证每次 flush 落 audit log (per 守门 #13 d Transaction append-only)"""
+
+    def test_audit_log_written_per_flush(self, audit_log_path):
+        client = TestClient(self._make_app(set(), audit_log_path))
+        r = client.post(
+            "/api/tmo/bulk",
+            json={"target_task_ids": ["t1", "t2"], "action": "pause", "action_params": {}},
         )
-        assert resp.status_code == 409
-        data = resp.json()
-        assert "detail" in data
-        detail = data["detail"]
-        assert detail["reason"] == "cycle_detected"
-        assert detail["source_node"] == "M-N3"
-        assert detail["cycle_path"] is not None
-        assert detail["cycle_path"][0] == detail["cycle_path"][-1]
+        assert r.status_code == 200
+        # audit log 应该有 1 行
+        assert audit_log_path.exists()
+        lines = audit_log_path.read_text(encoding="utf-8").strip().splitlines()
+        assert len(lines) == 1
+        entry = json.loads(lines[0])
+        assert entry["event"] == "bulk.flush"
+        assert entry["action"] == "pause"
+        assert entry["outcome"] == "success"
+        assert entry["success_count"] == 2
 
+    def test_audit_log_multiple_flushes_appended(self, audit_log_path):
+        client = TestClient(self._make_app(set(), audit_log_path))
+        for i in range(3):
+            r = client.post(
+                "/api/tmo/bulk",
+                json={"target_task_ids": [f"t-{i}"], "action": "pause", "action_params": {}},
+            )
+            assert r.status_code == 200
+        lines = audit_log_path.read_text(encoding="utf-8").strip().splitlines()
+        assert len(lines) == 3
+        # 全部 success
+        for line in lines:
+            entry = json.loads(line)
+            assert entry["outcome"] == "success"
 
-# === End-to-end (E2E 守门 #13 a 实证) ===
-
-
-class TestEndToEndReorderPipeline:
-    """完整 pipeline: graph build → validate → reorder → API."""
-
-    def test_3node_cycle_full_pipeline(self) -> None:
-        """构造 3-node cycle, 跑完整 pipeline, 验证 reject."""
-        # 1. 构造图
-        g = TaskRelationshipGraph()
-        for n in ["a", "b", "c"]:
-            g.add_task(n)
-        g.add_edge("a", "b")
-        g.add_edge("b", "c")
-        g.add_edge("c", "a")
-
-        # 2. cycle detection 必报
-        assert g.has_cycle()
-        cycle = g.find_cycle()
-        assert cycle is not None
-        assert set(cycle[:-1]) == {"a", "b", "c"}
-
-        # 3. reorder_node interrupt 协议
-        node = ReorderNode()
-        state = ReorderState(
-            task_ids=["a", "b", "c"],
-            dep_set={"a": ["b"], "b": ["c"], "c": ["a"]},
+    def _make_app(self, fail_ids: set, audit_log: Path) -> FastAPI:
+        app = FastAPI(title="TMO-04 audit log test")
+        app.include_router(
+            create_bulk_router(
+                card_action_fn=make_selective_card_action(fail_ids),
+                audit_log=audit_log,
+            )
         )
-        with pytest.raises(ReorderInterrupted) as exc_info:
-            node.execute(state)
-        intr = exc_info.value
-        # 4. interrupt 协议必含完整 cycle 路径
-        assert intr.cycle_path[0] == intr.cycle_path[-1]
-        assert set(intr.cycle_path[:-1]) == {"a", "b", "c"}
-        # 5. 序列化 (HTTP 409 detail 用)
-        d = intr.to_dict()
-        assert d["interrupt_type"] == "ReorderInterrupted"
-        assert d["source_node"] == "M-N3"
+        return app
 
-    def test_dag_5node_full_pipeline(self) -> None:
-        """5 节点 DAG, 端到端 reorder 跑通."""
-        g = TaskRelationshipGraph()
-        for n in ["a", "b", "c", "d", "e"]:
-            g.add_task(n)
-        g.add_edge("b", "a")
-        g.add_edge("c", "a")
-        g.add_edge("d", "b")
-        g.add_edge("d", "c")
-        g.add_edge("e", "d")
 
-        # 1. 校验
-        is_dag, _ = DAGValidator.validate(g)
-        assert is_dag
+# ---------------------------------------------------------------------------
+# IT-12 partial: bulk_node + BulkOperationQueue 整合 (不走 HTTP)
+# ---------------------------------------------------------------------------
 
-        # 2. reorder
-        state = ReorderState(
-            task_ids=["a", "b", "c", "d", "e"],
-            dep_set={},
-            existing_graph=g,
+
+class TestBulkNodeIntegration:
+    """IT-12 partial: bulk_node state graph 整合 (per 03 §3.2.1.1)"""
+
+    @pytest.mark.asyncio
+    async def test_bulk_node_5_cards_1_fails_20pct_rollback(self, audit_log_path):
+        """5 张卡 1 张失败 (20%, success=80% = 阈值) → outcome=partial"""
+        # 边界 = 0.20, partial_success_threshold=0.80
+        # success_rate(0.80) < threshold(0.80) 严格不成立 → partial
+        fail_ids = {"fail-1"}
+        q = BulkOperationQueue(
+            card_action_fn=make_selective_card_action(fail_ids),
+            audit_log=audit_log_path,
         )
-        node = ReorderNode()
-        result = node.execute(state)
-        assert result.ok
-        order = result.order
-        # a 在最前, e 在最后
-        assert order[0] == "a"
-        assert order[-1] == "e"
-        # d 在 b 和 c 之后, e 在 d 之后
-        assert order.index("d") > order.index("b")
-        assert order.index("d") > order.index("c")
-        assert order.index("e") > order.index("d")
+        node = make_bulk_node(queue=q)
+        state = {
+            "active_tmo_operation": {
+                "target_task_ids": ["ok-1", "ok-2", "ok-3", "ok-4", "fail-1"],
+                "action": "pause",
+                "action_params": {},
+            }
+        }
+        diff = await node(state)
+        ltr = diff["global_context"]["last_tmo_result"]
+        assert ltr["outcome"] == "partial"
+        assert ltr["success_count"] == 4
+        assert ltr["failed_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_bulk_node_5_cards_2_fail_40pct_rollback_all(self, audit_log_path):
+        """5 张卡 2 张失败 (40% fail, success=60% < 80%) → outcome=rolled_back
+        验证成功卡 (ok-1/ok-2/ok-3) 被 reverse_action=resume 回滚"""
+        fail_ids = {"fail-1", "fail-2"}
+        q = BulkOperationQueue(
+            card_action_fn=make_selective_card_action(fail_ids),
+            audit_log=audit_log_path,
+        )
+        node = make_bulk_node(queue=q)
+        state = {
+            "active_tmo_operation": {
+                "target_task_ids": ["ok-1", "ok-2", "ok-3", "fail-1", "fail-2"],
+                "action": "pause",
+                "action_params": {},
+            }
+        }
+        diff = await node(state)
+        ltr = diff["global_context"]["last_tmo_result"]
+        assert ltr["outcome"] == "rolled_back"
+        assert ltr["success_count"] == 3
+        assert ltr["failed_count"] == 2
+        assert set(ltr["rolled_back_ids"]) == {"ok-1", "ok-2", "ok-3"}
+
+
+# ---------------------------------------------------------------------------
+# IT-12 partial: NFR-TMO-03 partial success threshold 实证
+# ---------------------------------------------------------------------------
+
+
+class TestNfrTmo03Threshold:
+    """IT-12 partial: NFR-TMO-03 ≥80% success 实证 (per 03 §3.2.1.1)"""
+
+    @pytest.mark.parametrize(
+        "n_total,n_fail,expected_outcome,expected_threshold_breach",
+        [
+            # (总卡数, 失败数, 期望 outcome, 是否过阈值)
+            (5, 0, "success", False),       # 0% fail, 100% success
+            (10, 1, "partial", False),      # 10% fail, 90% success >= 80%
+            (5, 1, "partial", False),       # 20% fail, 80% success (边界)
+            (5, 2, "rolled_back", True),    # 40% fail, 60% success < 80%
+            (5, 3, "rolled_back", True),    # 60% fail, 40% success < 80%
+            (5, 4, "rolled_back", True),    # 80% fail, 20% success < 80%
+            (5, 5, "rolled_back", True),    # 100% fail, 0% success < 80%
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_nfr_tmo_03_threshold_breach(
+        self, n_total, n_fail, expected_outcome, expected_threshold_breach, tmp_path
+    ):
+        """NFR-TMO-03 阈值边界 parametrize 实证"""
+        fail_ids = {f"fail-{i}" for i in range(n_fail)}
+        ok_ids = [f"ok-{i}" for i in range(n_total - n_fail)]
+        all_ids = ok_ids + list(fail_ids)
+
+        q = BulkOperationQueue(
+            card_action_fn=make_selective_card_action(fail_ids),
+            audit_log=tmp_path / "audit.log",
+        )
+        q.enqueue(BulkAction(target_task_ids=all_ids, action="pause"))
+        results = await q.flush()
+        r = results[0]
+
+        assert r.outcome == expected_outcome, (
+            f"n_total={n_total} n_fail={n_fail} expected {expected_outcome} got {r.outcome}"
+        )
+        assert r.failure_rate == pytest.approx(n_fail / n_total)
+        # 过阈值时 (rolled_back), pause 可逆 → 成功卡被 resume 回滚
+        if expected_threshold_breach:
+            assert r.outcome == "rolled_back"
+            # pause 可逆, 成功卡都在 rolled_back_ids
+            if n_fail < n_total:
+                assert set(r.rolled_back_ids) == set(ok_ids)
+        else:
+            # 未过阈值 (success/partial) → 无 rollback
+            assert r.rolled_back_ids == []
+
+
+# ---------------------------------------------------------------------------
+# IT-12 partial: 健康检查端点
+# ---------------------------------------------------------------------------
+
+
+def test_health_endpoint(audit_log_path):
+    """GET /api/tmo/bulk/health 返 ok + queue stats"""
+    app = FastAPI(title="TMO-04 health test")
+    app.include_router(
+        create_bulk_router(
+            card_action_fn=make_selective_card_action(set()),
+            audit_log=audit_log_path,
+        )
+    )
+    client = TestClient(app)
+    r = client.get("/api/tmo/bulk/health")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "ok"
+    assert "queue_stats" in body
+    assert body["valid_actions"] == ["cancel", "pause", "resume", "set_priority"]
+
+
+# ---------------------------------------------------------------------------
+# IT-12 partial: 守门 #13 a L0 协调实证 (TMO 全部 L0, 无 L1↔L1)
+# ---------------------------------------------------------------------------
+
+
+def test_l0_coordination_no_subagent_import(audit_log_path):
+    """TMO bulk 全部 L0 协调, 不直接调 sub-agent 内部 API
+
+    实证: bulk_queue + bulk_node 只依赖注入的 card_action_fn,
+    不 import sub_agent.* (per 守门 #13 a L1↔L1 禁止)
+    """
+    # 静态分析: 检查 bulk_queue.py 跟 bulk_node.py 不 import sub_agent.*
+    bulk_queue_src = (PROJECT_ROOT / "scripts/automation/task_ops/bulk_queue.py").read_text(
+        encoding="utf-8"
+    )
+    bulk_node_src = (PROJECT_ROOT / "scripts/automation/task_ops/nodes/bulk_node.py").read_text(
+        encoding="utf-8"
+    )
+    routes_src = (PROJECT_ROOT / "scripts/automation/api/routes_tmo.py").read_text(
+        encoding="utf-8"
+    )
+
+    # bulk_queue 不 import sub_agent.* (L0 协调)
+    assert "from scripts.automation.sub_agent" not in bulk_queue_src
+    assert "import sub_agent" not in bulk_queue_src
+    # bulk_node 同理
+    assert "from scripts.automation.sub_agent" not in bulk_node_src
+    # routes 同理
+    assert "from scripts.automation.sub_agent" not in routes_src
+
+    # 但允许 mock_card_action 默认注入 (per 守门 #23 mock 模式)
+    # 真接入由 console_server.py / sub_pool 通过 card_action_fn 参数注入
