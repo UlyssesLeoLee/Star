@@ -1,0 +1,25 @@
+{
+  "fixture_version": "v1",
+  "module": "l1-ecs",
+  "type": "system",
+  "system_name": "persistence",
+  "method": "POST",
+  "scenario": "system-persistence-exec",
+  "description": "L1 ECS System: persistence (per SRS-001 §29-§42 + agent-runtime 02)",
+  "request": {
+    "system_name": "persistence",
+    "params": {
+      "trigger": "scheduled"
+    }
+  },
+  "response_200": {
+    "system_id": "system-persistence-001",
+    "execution_status": "success",
+    "elapsed_ms": 12,
+    "entities_processed": 50
+  },
+  "fixture_assertion": {
+    "system_exec_ok": true,
+    "elapsed_under_50ms": true
+  }
+}

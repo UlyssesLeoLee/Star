@@ -1,0 +1,28 @@
+{
+  "fixture_version": "v1",
+  "module": "l1-ecs",
+  "type": "archetype",
+  "archetype_id": "SA-08",
+  "method": "POST",
+  "scenario": "ecs-spawn-domain-dev",
+  "description": "L1 ECS Archetype: SA-08 domain-dev (per docs/architecture/2026-09-03-agent-runtime/02-basic-design.md v0.1 + LangGraph 9/3 §6.1)",
+  "request": {
+    "archetype_id": "SA-08",
+    "components": [
+      "agent_id",
+      "task_ref",
+      "context_buffer",
+      "guard_violation_state"
+    ]
+  },
+  "response_200": {
+    "entity_id": "entity-uuid-sa-08-001",
+    "components_attached": 4,
+    "world": "main",
+    "ecs_query_path": "Query<&mut SA08Component>"
+  },
+  "fixture_assertion": {
+    "archetype_spawn_ok": true,
+    "components_4_attached": true
+  }
+}

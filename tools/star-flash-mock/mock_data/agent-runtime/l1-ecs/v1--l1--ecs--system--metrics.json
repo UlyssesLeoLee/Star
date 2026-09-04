@@ -1,0 +1,25 @@
+{
+  "fixture_version": "v1",
+  "module": "l1-ecs",
+  "type": "system",
+  "system_name": "metrics",
+  "method": "POST",
+  "scenario": "system-metrics-exec",
+  "description": "L1 ECS System: metrics (per SRS-001 §29-§42 + agent-runtime 02)",
+  "request": {
+    "system_name": "metrics",
+    "params": {
+      "trigger": "scheduled"
+    }
+  },
+  "response_200": {
+    "system_id": "system-metrics-001",
+    "execution_status": "success",
+    "elapsed_ms": 12,
+    "entities_processed": 50
+  },
+  "fixture_assertion": {
+    "system_exec_ok": true,
+    "elapsed_under_50ms": true
+  }
+}

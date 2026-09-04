@@ -1,0 +1,20 @@
+{
+  "fixture_version": "v1",
+  "module": "l2-pools",
+  "pool": "circuit-breaker",
+  "method": "GET",
+  "scenario": "circuit-breaker-status",
+  "description": "L2 circuit-breaker (per docs/architecture/2026-09-03-agent-runtime/02-basic-design.md v0.1 §2.1 共享池)",
+  "request": {},
+  "response_200": {
+    "pool": "circuit-breaker",
+    "status": "active",
+    "active_connections": 8,
+    "max_connections": 64,
+    "circuit_breaker": "closed"
+  },
+  "fixture_assertion": {
+    "pool_active": true,
+    "circuit_breaker_closed": true
+  }
+}

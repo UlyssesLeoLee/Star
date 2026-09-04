@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "agent-runtime",
+  "type": "guard",
+  "guard_id": "G-18",
+  "guard_name": "known_gap",
+  "category": "Cross",
+  "method": "GET",
+  "scenario": "guard-G-18-check",
+  "description": "G-18 known_gap (per SRS-001 G-1~G-18 + agent-runtime 02 + docs/test-design.md v0.7 §21)",
+  "request": {},
+  "response_200": {
+    "guard_id": "G-18",
+    "guard_name": "known_gap",
+    "category": "Cross",
+    "check_status": "pass",
+    "elapsed_ms": 5
+  },
+  "fixture_assertion": {
+    "guard_check_pass": true,
+    "elapsed_under_10ms": true
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "agent-runtime",
+  "type": "guard",
+  "guard_id": "G-3",
+  "guard_name": "lightweight_to_ecs_hysteresis",
+  "category": "L0",
+  "method": "GET",
+  "scenario": "guard-G-3-check",
+  "description": "G-3 lightweight_to_ecs_hysteresis (per SRS-001 G-1~G-18 + agent-runtime 02 + docs/test-design.md v0.7 §21)",
+  "request": {},
+  "response_200": {
+    "guard_id": "G-3",
+    "guard_name": "lightweight_to_ecs_hysteresis",
+    "category": "L0",
+    "check_status": "pass",
+    "elapsed_ms": 5
+  },
+  "fixture_assertion": {
+    "guard_check_pass": true,
+    "elapsed_under_10ms": true
+  }
+}

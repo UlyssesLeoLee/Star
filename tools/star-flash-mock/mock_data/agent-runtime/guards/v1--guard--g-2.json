@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "agent-runtime",
+  "type": "guard",
+  "guard_id": "G-2",
+  "guard_name": "ecs_archetype_selection",
+  "category": "L1",
+  "method": "GET",
+  "scenario": "guard-G-2-check",
+  "description": "G-2 ecs_archetype_selection (per SRS-001 G-1~G-18 + agent-runtime 02 + docs/test-design.md v0.7 §21)",
+  "request": {},
+  "response_200": {
+    "guard_id": "G-2",
+    "guard_name": "ecs_archetype_selection",
+    "category": "L1",
+    "check_status": "pass",
+    "elapsed_ms": 5
+  },
+  "fixture_assertion": {
+    "guard_check_pass": true,
+    "elapsed_under_10ms": true
+  }
+}

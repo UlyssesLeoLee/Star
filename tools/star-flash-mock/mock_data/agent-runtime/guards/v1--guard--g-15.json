@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "module": "agent-runtime",
+  "type": "guard",
+  "guard_id": "G-15",
+  "guard_name": "mcp_pool",
+  "category": "L2",
+  "method": "GET",
+  "scenario": "guard-G-15-check",
+  "description": "G-15 mcp_pool (per SRS-001 G-1~G-18 + agent-runtime 02 + docs/test-design.md v0.7 §21)",
+  "request": {},
+  "response_200": {
+    "guard_id": "G-15",
+    "guard_name": "mcp_pool",
+    "category": "L2",
+    "check_status": "pass",
+    "elapsed_ms": 5
+  },
+  "fixture_assertion": {
+    "guard_check_pass": true,
+    "elapsed_under_10ms": true
+  }
+}
