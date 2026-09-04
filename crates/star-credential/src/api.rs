@@ -20,21 +20,23 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::{
-    CredentialError, CredentialManager, CredentialMetadata, CredentialPlaintext, CredentialRecord,
-    Provider,
+    CredentialError, CredentialManager, CredentialMetadata,
+    CredentialPlaintext, CredentialRecord, Provider,
 };
+use crate::db::{AuditEventType, CredentialAuditEvent, CredentialDb};
 
-/// AppState (依赖注入: CredentialManager + 当前 tenant_id + 当前 user_id)
+/// AppState (依赖注入: CredentialManager + CredentialDb + 当前 tenant_id + 当前 user_id)
 #[derive(Clone)]
 pub struct AppState {
     pub manager: Arc<CredentialManager>,
+    pub db: Arc<CredentialDb>,
     pub current_tenant_id: String, // 实际从 JWT/session 提取, PoC 用 header
     pub current_user_id: String,
 }
 
 impl AppState {
-    pub fn new(manager: Arc<CredentialManager>, tenant_id: String, user_id: String) -> Self {
-        Self { manager, current_tenant_id: tenant_id, current_user_id: user_id }
+    pub fn new(manager: Arc<CredentialManager>, db: Arc<CredentialDb>, tenant_id: String, user_id: String) -> Self {
+        Self { manager, db, current_tenant_id: tenant_id, current_user_id: user_id }
     }
 }
 
@@ -43,6 +45,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/v2/credentials", get(list_credentials).post(create_credential))
         .route("/api/v2/credentials/:id/rotate", post(rotate_credential))
         .route("/api/v2/credentials/:id/revoke", post(revoke_credential))
+        .route("/api/v2/credentials/:id/audit", get(get_audit_log))
 }
 
 // === Request / Response DTOs ===
@@ -223,6 +226,38 @@ async fn revoke_credential(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Debug, Serialize)]
+pub struct AuditEventView {
+    pub id: String,
+    pub credential_id: String,
+    pub user_id: String,
+    pub event_type: String,
+    pub event_at_ms: u64,
+    pub display_name_snapshot: Option<String>,
+}
+
+/// GET /api/v2/credentials/{id}/audit (V2-4 凭证审计端点)
+async fn get_audit_log(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Vec<AuditEventView>>, (StatusCode, String)> {
+    // 先验证凭证存在 + 属于当前 tenant
+    let records = state.manager.list(&state.current_tenant_id, None).await;
+    let _ = records.iter().find(|r| r.id == id)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("not found: {}", id)))?;
+
+    let events = state.db.list_audit_events(&id).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("db: {}", e)))?;
+    let views: Vec<AuditEventView> = events.into_iter().map(|e| AuditEventView {
+        id: e.id,
+        credential_id: e.credential_id,
+        user_id: e.user_id,
+        event_type: e.event_type.as_str().to_string(),
+        event_at_ms: e.event_at_ms,
+        display_name_snapshot: e.metadata_snapshot.map(|m| m.display_name),
+    }).collect();
+    Ok(Json(views))
+}
+
 // === tests ===
 
 #[cfg(test)]
@@ -232,6 +267,7 @@ mod tests {
     fn make_state() -> AppState {
         AppState::new(
             Arc::new(crate::CredentialManager::with_local_mock_kms()),
+            Arc::new(crate::db::CredentialDb::in_memory().unwrap()),
             "tenant-test".to_string(),
             "user-test".to_string(),
         )
@@ -308,5 +344,45 @@ mod tests {
         };
         let result = create_credential(State(state), Json(req)).await;
         assert!(result.is_err());
+    }
+
+    /// V2-4 audit log 端点: 创建凭证 + 注入 store 事件 + 查 audit log
+    #[tokio::test]
+    async fn v2_audit_log_endpoint() {
+        use uuid::Uuid;
+
+        let state = make_state();
+        let req = CreateCredentialRequest {
+            provider: "openclaw".into(),
+            display_name: "OpenClaw 审计测试".into(),
+            description: "audit test".into(),
+            secret: "oc_audit_test".into(),
+            base_url: None,
+            region: None,
+        };
+        let (_, view) = create_credential(State(state.clone()), Json(req)).await.unwrap();
+        let id = view.id.clone();
+
+        // 手动注入 3 个 audit 事件 (PoC: store + rotate + revoke)
+        for evt in [AuditEventType::Store, AuditEventType::Rotate, AuditEventType::Revoke] {
+            let event = CredentialAuditEvent {
+                id: Uuid::new_v4().to_string(),
+                credential_id: id.clone(),
+                tenant_id: state.current_tenant_id.clone(),
+                user_id: state.current_user_id.clone(),
+                event_type: evt,
+                event_at_ms: 1000,
+                metadata_snapshot: Some(CredentialMetadata { display_name: "OpenClaw 审计测试".into(), description: "".into() }),
+            };
+            state.db.append_audit_event(&event).unwrap();
+        }
+
+        // GET /api/v2/credentials/{id}/audit
+        let views = get_audit_log(State(state), Path(id.clone())).await.unwrap();
+        assert_eq!(views.0.len(), 3);
+        assert_eq!(views.0[0].event_type, "store");
+        assert_eq!(views.0[1].event_type, "rotate");
+        assert_eq!(views.0[2].event_type, "revoke");
+        assert_eq!(views.0[0].display_name_snapshot, Some("OpenClaw 审计测试".into()));
     }
 }
