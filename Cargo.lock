@@ -2195,6 +2195,7 @@ dependencies = [
  "domain-identity",
  "domain-permission",
  "domain-project",
+ "domain-scm",
  "domain-tenant",
  "domain-work-item",
  "domain-workspace",

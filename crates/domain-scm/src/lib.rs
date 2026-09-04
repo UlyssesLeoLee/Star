@@ -1046,6 +1046,83 @@ impl InMemoryScmService {
         }
         Ok(())
     }
+
+    /// P0 工具链 (per docs/briefs/tool-p0-impl-001.md) — 创建 PR 草稿
+    ///
+    /// **注意**: `ScmCommandPort` trait 不含 `create_mr`(PR 主流来自 webhook),
+    /// 本方法是 `InMemoryScmService` struct 上的额外 helper, 不修改 trait 也不改 port,
+    /// 仅供 `star-mcp` P0 工具调真实 service 用.
+    ///
+    /// 行为:
+    /// - 校验 tenant + 校验目标 repository 存在
+    /// - 生成 `PullRequestId::new()` + `external_id` 形如 `"local-{uuid}"`
+    /// - 初始 `state = PullRequestState::Draft`, `mergeable = false`,
+    ///   `review_ids` / `pipeline_ids` / `linked_work_item_id` 默认空
+    /// - 锁版本 `lock_version = 1`
+    /// - 不发送事件 (避免污染 event bus 给其他 sub-session)
+    pub async fn create_mr(
+        &self,
+        input: CreateMRInput,
+        actor: ActorContext,
+    ) -> Result<PullRequest, ScmError> {
+        Self::check_tenant(&actor, input.tenant_id)?;
+        // repository 必须存在
+        {
+            let guard = self.repos.read().await;
+            let repo = guard
+                .get(&input.repository_id)
+                .ok_or(ScmError::NotFound(input.repository_id))?;
+            if repo.tenant_id != input.tenant_id {
+                return Err(ScmError::PermissionDenied("跨 tenant 拒绝".to_string()));
+            }
+        }
+        let now = Utc::now();
+        let id = PullRequestId::new();
+        let pr = PullRequest {
+            id,
+            tenant_id: input.tenant_id,
+            repository_id: input.repository_id,
+            external_id: format!("local-{}", id),
+            source_branch: input.head,
+            target_branch: input.base,
+            title: input.title,
+            description: input.description,
+            author_user_id: UserId::from_uuid(actor.user_id),
+            state: PullRequestState::Draft,
+            mergeable: false,
+            merged_at: None,
+            closed_at: None,
+            review_ids: Vec::new(),
+            pipeline_ids: Vec::new(),
+            linked_work_item_id: None,
+            created_at: now,
+            updated_at: now,
+            content_object_key: None,
+            lock_version: 1,
+        };
+        let mut guard = self.prs.write().await;
+        guard.insert(id, pr.clone());
+        Ok(pr)
+    }
+}
+
+/// P0 工具链用的 PR 创建输入 (per docs/briefs/tool-p0-impl-001.md §1.1)
+///
+/// 字段裁剪到 MCP tool 入参需要, 跟 `PullRequest` 19 字段的差额由 `InMemoryScmService::create_mr` 填充.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateMRInput {
+    /// 租户 ID (必带, per INV-SCM-04)
+    pub tenant_id: TenantId,
+    /// 所属仓库
+    pub repository_id: RepositoryId,
+    /// MR 标题
+    pub title: String,
+    /// MR 描述
+    pub description: Option<String>,
+    /// 目标分支
+    pub base: String,
+    /// 源分支
+    pub head: String,
 }
 
 impl Default for InMemoryScmService {

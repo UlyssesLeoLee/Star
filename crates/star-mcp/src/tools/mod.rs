@@ -51,6 +51,26 @@ pub(crate) fn mock_response(tool: &str, body: serde_json::Value) -> serde_json::
     outer
 }
 
+/// 构造真实响应的 helper (per docs/briefs/tool-p0-impl-001.md §1)
+///
+/// 在真实数据外层加 `schema_version` (无 `mock: true` 标记)
+/// 用于 P0 工具链 (create_merge_request / create_worktree / search_issues)
+/// 调真实 domain service 后构造响应
+pub(crate) fn real_response(tool: &str, body: serde_json::Value) -> serde_json::Value {
+    let mut outer = serde_json::json!({
+        "schema_version": SCHEMA_VERSION,
+        "tool": tool,
+    });
+    if let Some(obj) = body.as_object() {
+        if let Some(outer_obj) = outer.as_object_mut() {
+            for (k, v) in obj {
+                outer_obj.insert(k.clone(), v.clone());
+            }
+        }
+    }
+    outer
+}
+
 /// 从 `args` 拿必填字符串字段
 pub(crate) fn require_string(args: &serde_json::Value, field: &str) -> Result<String, String> {
     args.get(field)

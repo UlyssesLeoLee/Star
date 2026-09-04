@@ -39,6 +39,8 @@ domain-work-item = { path = "../domain-work-item" }
 domain-worktree = { path = "../domain-worktree" }
 domain-agent = { path = "../domain-agent" }
 domain-feedback = { path = "../domain-feedback" }
+# P0 工具实装 (per docs/briefs/tool-p0-impl-001.md) — 真实数据源接入 scm
+domain-scm = { path = "../domain-scm" }
 uuid = { workspace = true }
 chrono = { workspace = true }
 

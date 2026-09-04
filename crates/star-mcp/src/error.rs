@@ -209,6 +209,133 @@ impl From<std::io::Error> for McpError {
     }
 }
 
+// P0 工具链 (per docs/briefs/tool-p0-impl-001.md §2.5) — domain error → McpError 映射
+//
+// 三个 domain crate 的错误统一映射到 `External` source_kind + `mcp` source_module
+// (per 守门 #1 v6 cross-stage 实测, 不引入新的错误码变体, 复用 `code` 字段承载 domain 短码).
+//
+// 跨 tenant 拒绝 → 复用 `PermissionDenied` 源语义 + retriable=false.
+
+/// `domain_scm::ScmError` → `McpError`
+impl From<domain_scm::ScmError> for McpError {
+    fn from(e: domain_scm::ScmError) -> Self {
+        let code = e.code().to_string();
+        let source_kind = match &e {
+            domain_scm::ScmError::PermissionDenied(_) => ErrorSourceKind::Policy,
+            domain_scm::ScmError::InvalidState(_) => ErrorSourceKind::Validation,
+            domain_scm::ScmError::IdempotencyConflict => ErrorSourceKind::Validation,
+            _ => ErrorSourceKind::External,
+        };
+        let retriable = matches!(&e, domain_scm::ScmError::Internal(_));
+        Self::new(
+            code,
+            format!("scm: {e}"),
+            "scm",
+            source_kind,
+            retriable,
+            None,
+        )
+    }
+}
+
+/// `domain_worktree::WorktreeError` → `McpError`
+impl From<domain_worktree::WorktreeError> for McpError {
+    fn from(e: domain_worktree::WorktreeError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_worktree::WorktreeError::NotFound(_) => (
+                error_code::WORKTREE_NOT_FOUND,
+                ErrorSourceKind::Validation,
+                false,
+            ),
+            domain_worktree::WorktreeError::PermissionDenied => {
+                (error_code::POLICY_DENIED, ErrorSourceKind::Policy, false)
+            }
+            domain_worktree::WorktreeError::CrossTenantDenied(_, _) => {
+                (error_code::POLICY_DENIED, ErrorSourceKind::Policy, false)
+            }
+            domain_worktree::WorktreeError::InvalidTransition { .. } => (
+                error_code::VALIDATION_FAILED,
+                ErrorSourceKind::Validation,
+                false,
+            ),
+            domain_worktree::WorktreeError::RuntimeRequired => (
+                error_code::VALIDATION_FAILED,
+                ErrorSourceKind::Validation,
+                false,
+            ),
+            domain_worktree::WorktreeError::Conflict(_) => (
+                error_code::WORKTREE_CONFLICT,
+                ErrorSourceKind::External,
+                false,
+            ),
+            domain_worktree::WorktreeError::CompletionGateFailed(_)
+            | domain_worktree::WorktreeError::IsolationFailed(_) => (
+                error_code::VALIDATION_RUN_FAILED,
+                ErrorSourceKind::Validation,
+                false,
+            ),
+            domain_worktree::WorktreeError::Internal(_) => {
+                (error_code::INTERNAL, ErrorSourceKind::Internal, true)
+            }
+        };
+        Self::new(
+            code,
+            format!("worktree: {e}"),
+            "worktree",
+            source_kind,
+            retriable,
+            None,
+        )
+    }
+}
+
+/// `domain_work_item::WorkItemError` → `McpError`
+impl From<domain_work_item::WorkItemError> for McpError {
+    fn from(e: domain_work_item::WorkItemError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_work_item::WorkItemError::NotFound(_) => (
+                error_code::RESOURCE_NOT_FOUND,
+                ErrorSourceKind::Validation,
+                false,
+            ),
+            domain_work_item::WorkItemError::PermissionDenied => {
+                (error_code::POLICY_DENIED, ErrorSourceKind::Policy, false)
+            }
+            domain_work_item::WorkItemError::CrossTenantDenied(_, _) => {
+                (error_code::POLICY_DENIED, ErrorSourceKind::Policy, false)
+            }
+            domain_work_item::WorkItemError::InvalidTransition { .. } => (
+                error_code::VALIDATION_FAILED,
+                ErrorSourceKind::Validation,
+                false,
+            ),
+            domain_work_item::WorkItemError::AiTaskMissingObjective
+            | domain_work_item::WorkItemError::AiTaskMissingScope
+            | domain_work_item::WorkItemError::ParentProjectMismatch => (
+                error_code::VALIDATION_FAILED,
+                ErrorSourceKind::Validation,
+                false,
+            ),
+            domain_work_item::WorkItemError::Conflict(_) => (
+                error_code::VALIDATION_FAILED,
+                ErrorSourceKind::External,
+                false,
+            ),
+            domain_work_item::WorkItemError::Internal(_) => {
+                (error_code::INTERNAL, ErrorSourceKind::Internal, true)
+            }
+        };
+        Self::new(
+            code,
+            format!("work-item: {e}"),
+            "work-item",
+            source_kind,
+            retriable,
+            None,
+        )
+    }
+}
+
 /// MCP 标准错误码常量(per spec + flows 累积, 共 24 个)
 ///
 /// **命名约定**(per F-06 修复 2026-08-27): SCREAMING_SNAKE_CASE 字符串, 与

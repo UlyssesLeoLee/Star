@@ -465,6 +465,83 @@ impl InMemoryWorkItemService {
             acs: Arc::new(RwLock::new(HashMap::new())),
         }
     }
+
+    /// P0 工具链 (per docs/briefs/tool-p0-impl-001.md) — 按 query/status/project 过滤
+    ///
+    /// **注意**: `WorkItemQueryPort` trait 不含 `list_with_filter`,
+    /// 本方法是 `InMemoryWorkItemService` struct 上的额外 helper, 不修改 trait 也不改 port,
+    /// 仅供 `star-mcp::search_issues` P0 工具调真实 service 用.
+    ///
+    /// 行为:
+    /// - 校验 actor.tenant_id == filter.tenant_id (跨 tenant 拒绝)
+    /// - 角色要求: developer / project_admin / tenant_admin (跟 create_work_item 一致)
+    /// - 过滤: 全部 AND 关系
+    ///   - `query` (case-insensitive substring match on title)
+    ///   - `status` (精确匹配)
+    ///   - `project_id` (精确匹配)
+    ///   - `limit` (截断到前 N)
+    /// - 不发送事件 (避免污染 event bus)
+    pub async fn list_with_filter(
+        &self,
+        filter: WorkItemFilter,
+        actor: &ActorContext,
+    ) -> Result<Vec<WorkItem>, WorkItemError> {
+        if TenantId::from(actor.tenant_id) != filter.tenant_id {
+            return Err(WorkItemError::CrossTenantDenied(
+                TenantId::from(actor.tenant_id),
+                filter.tenant_id,
+            ));
+        }
+        if !actor.has_role("developer")
+            && !actor.has_role("project_admin")
+            && !actor.has_role("tenant_admin")
+        {
+            return Err(WorkItemError::PermissionDenied);
+        }
+        let items = self.items.read().unwrap();
+        let mut out: Vec<WorkItem> = items
+            .values()
+            .filter(|w| w.tenant_id == filter.tenant_id)
+            .filter(|w| match &filter.project_id {
+                Some(pid) => w.project_id == *pid,
+                None => true,
+            })
+            .filter(|w| match filter.status {
+                Some(s) => w.status == s,
+                None => true,
+            })
+            .filter(|w| match &filter.query {
+                Some(q) if !q.is_empty() => {
+                    let q_lower = q.to_lowercase();
+                    w.title.to_lowercase().contains(&q_lower)
+                        || w.description.to_lowercase().contains(&q_lower)
+                }
+                _ => true,
+            })
+            .cloned()
+            .collect();
+        if let Some(limit) = filter.limit {
+            out.truncate(limit);
+        }
+        Ok(out)
+    }
+}
+
+/// P0 工具链用的 work item 过滤输入 (per docs/briefs/tool-p0-impl-001.md §1.3)
+///
+/// 注: 不 derive `Default` 因为 `TenantId` 不实现 Default (per workspace 强类型 ID 设计)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkItemFilter {
+    /// 租户 ID (必带)
+    pub tenant_id: TenantId,
+    /// 自由文本 query (case-insensitive substring on title + description)
+    pub query: Option<String>,
+    /// 状态过滤
+    pub status: Option<WorkItemStatus>,
+    /// 项目过滤
+    pub project_id: Option<ProjectId>,
+    /// 限制返回条数
+    pub limit: Option<usize>,
 }
 
 impl Default for InMemoryWorkItemService {
