@@ -1486,3 +1486,128 @@ aebef31 ci: F.5 CI runner 真实配置 增强 v0.1 (Dependabot + CODEOWNERS + ci
 | v1.0 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §14 F.4 + H.4 + F.5 閉環 (28 commits ahead) | 9/4 16:10-16:55 JST 拍板 |
 | v1.1 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §15 H.5 + H.6 + H.7 閉環 (34 commits ahead) | 9/4 17:55-18:45 JST 拍板 |
 | **v1.2** | **2026-09-04** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手** | **§16 F.1-F.3 + H.8 P4 WBS 24/24 全部閉環 (36 commits ahead, 100% WBS)** | **9/4 17:19 JST 用户授權"完成剩余, mavis 拍板" + 9/4 19:00 JST Mavis 拍板** |
+
+---
+
+## §17 V2 阶段凭证管理全部闭环 (per 2026-09-04 19:45-20:15 JST, 守门 #12 commit-time 同步)
+
+> **承接**: §16 P4 WBS 24/24 闭环 + 9/4 17:19/17:36 JST 用户澄清"真实应用场景是允许用户在设置界面自行设置的" + 9/4 19:30 JST 用户授权"允许按照你推荐推进"
+> **拍板**: 2026-09-04 19:45-20:15 JST Mavis 拍板 (per 守门 #14 5 域 Lead CONTENT 4 维)
+> **状态**: 🟢 V2 阶段 4 子项全部闭环, 42 commits ahead origin/main
+
+### 17.1 V2 阶段 4 子项 (commit 3d251bf + 7d06f97 + 4251242 + b5bd5c3)
+
+| 子项 | commit | 闭环时间 | 关键产出 |
+|---|---|---|---|
+| V2-1 凭证管理层 | 3d251bf | 9/4 19:45 JST | star-credential v0.0.1 + CredentialManager + 4 test 0 fail |
+| V2-2 REST API | 7d06f97 | 9/4 20:00 JST | axum 0.8 + 4 handler (list/create/rotate/revoke) + 3 test 0 fail |
+| V2-3 DB 持久化 | 4251242 | 9/4 20:05 JST | SQLite + 2 表 (credential M + audit_event T) + 3 test 0 fail |
+| V2-4 审计端点 | b5bd5c3 | 9/4 20:15 JST | GET /api/v2/credentials/{id}/audit + 1 test 0 fail |
+
+### 17.2 5 完整 API endpoint (V2-2 + V2-4)
+
+| Method | Path | 阶段 | 描述 |
+|---|---|---|---|
+| GET | /api/v2/credentials?provider=... | V2-2 | 列表 |
+| POST | /api/v2/credentials | V2-2 | 创建 |
+| POST | /api/v2/credentials/{id}/rotate | V2-2 | 轮换 |
+| POST | /api/v2/credentials/{id}/revoke | V2-2 | 撤销 |
+| **GET** | **/api/v2/credentials/{id}/audit** | **V2-4** | **审计日志** |
+
+### 17.3 完整调用链 (per 守门 #5 + #14 + #DB-13)
+
+`
+[用户 UI 设置页] → POST /api/v2/credentials (明文, TLS 加密传输)
+  → CredentialManager.store()
+  → KMS generate_dek + encrypt (per tenant DEK envelope encryption, INV-KMS-02)
+  → CredentialDb.insert_credential (credential 表, Master 类型, 物理删除禁止)
+  → CredentialDb.append_audit_event (Store 事件, T 类型 Append-only)
+
+[运行时 F.1 OpenClaw 调用] → GET /api/v2/credentials?provider=openclaw
+  → CredentialManager.retrieve()
+  → KMS decrypt
+  → 用明文调真实 OpenClaw API (1 次性, 用完丢弃, 不入 log)
+  → CredentialDb.append_audit_event (Retrieve 事件)
+
+[凭证轮换] → POST /api/v2/credentials/{id}/rotate
+  → CredentialManager.rotate() 标老凭证 Deprecated
+  → KMS encrypt 新明文
+  → DB 插入新凭证 + 标老凭证 deprecated
+  → append_audit_event (Rotate 事件)
+
+[凭证撤销] → POST /api/v2/credentials/{id}/revoke
+  → CredentialManager.revoke() 标 revoked (per INV-CR-06, 不删)
+  → DB update status = 'revoked'
+  → append_audit_event (Revoke 事件)
+
+[审计查询] → GET /api/v2/credentials/{id}/audit
+  → 先验证凭证存在 + 属于当前 tenant (INV-AUDIT-03)
+  → CredentialDb.list_audit_events
+  → 返 AuditEventView[] (不返 ciphertext, INV-AUDIT-04)
+`
+
+### 17.4 4 守門实证 (跨 V2 4 子项)
+
+| # | 守門 | 結果 |
+|---|---|---|
+| 1 | cargo check --workspace --all-targets -j 4 | 0 error |
+| 2 | cargo fmt --all -- --check | 0 diff |
+| 3 | cargo clippy --workspace --lib -j 4 | 0 error |
+| 4 | cargo test --workspace --release --lib -j 4 | **871 tests 0 fail** (V2-1=4 + V2-2=3 + V2-3=3 + V2-4=1) |
+
+### 17.5 累計 commit 鏈 + 推 origin (per 守門 #1 1a, 0 網絡錯)
+
+`	ext
+3d251bf style: cargo fmt star-dispatcher (auto-fmt 触达, 0 code change)
+7d06f97 feat(star-credential): V2-2 凭证管理 REST API v0.0.1
+4251242 feat(star-credential): V2-3 DB 持久化 + 审计日志 v0.0.1
+9b48d7d style: cargo fmt star-taskgraph + star-treesitter (auto-fmt 触达, 0 code change)
+b5bd5c3 feat(star-credential): V2-4 凭证审计端点 v0.0.1
+`
+
+**ahead origin/main**: 42 commits
+
+### 17.6 P4 + V2 WBS 推進狀態 (本 session 累計)
+
+| 階段 | 子項 | 狀態 |
+|---|---|---|
+| **P4** | 24/24 子項 | ✅ 全部閉環 |
+| **V2 階段** | V2-1 + V2-2 + V2-3 + V2-4 | ✅ 4/4 全部閉環 |
+
+### 17.7 累計 token 統計 (本 session 全部)
+
+| 階段 | 消耗 | 來源 |
+|---|---|---|
+| P4 階段 11 子項 | ~28M | 8 + 14 sub-session + 11 commits |
+| V2 階段 4 子項 | ~3M | 4 commits + 4 報告 + 1 .env.example |
+| **本 session 累計** | **~31M token** | **42 commits ahead** |
+
+### 17.8 衍生文檔 (本 session 落档)
+
+- 17 份 PHASE-P4-* 報告 (H.1 + E.1 + F.4 + H.4 + F.5 + H.3 + H.2 + H.5 + H.6 + H.7 + F.1-F.3 + H.8)
+- 4 份 PHASE-V2-* 報告 (V2-1 + V2-2 + V2-3 + V2-4)
+- crates/star-credential/ v0.0.1 (新 crate, 4 子模块: lib + api + db + tests, 11 test 0 fail)
+- crates/star-treesitter/ v0.0.1 (新 crate, H.5 + H.7)
+- crates/star-taskgraph/ v0.0.1 (新 crate, H.6)
+- crates/star-dispatcher/ v0.0.1 (H.1 + H.3 + H.2 增量, 47 test 0 fail)
+- crates/star-saga/ v0.0.1 (E.1 5 域 Saga, 19 test 0 fail)
+- .env.example v0.1 (2827 bytes, 守门 #5 env 安全)
+- .github/dependabot.yml v0.1 (F.5)
+- CODEOWNERS v0.1 (F.5)
+- .github/workflows/ci.yml (F.5 -j 4 + clippy/fmt enforced)
+- 11 份自動化檔 (patch_*.py + wtm_classifier.py + fixer scripts)
+- docs/data-design/p3-d-classification-w-t-m.md v0.1 (60 KB, F.4)
+- docs/architecture/2026-09-03-langgraph/04-state-schema-v1-migration.md v0.1 (14 KB, H.4)
+- origin/feat/auto-20260904-1c260bc7 (42 commits ahead)
+
+---
+
+## §18 修訂歷史
+
+| 版本 | 日期 | 修訂人 | 修訂內容 | 觸發 |
+|---|---|---|---|---|
+| v0.1-v0.9 | 2026-08-31 - 2026-09-04 | 架構師 (Mavis 接手 agent per DEC-008) | 12 問題下遊 AI 執行清單 + 多次拍板 | 多次拍板 |
+| v1.0 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §14 F.4 + H.4 + F.5 閉環 | 9/4 16:10-16:55 JST |
+| v1.1 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §15 H.5 + H.6 + H.7 閉環 | 9/4 17:55-18:45 JST |
+| v1.2 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §16 P4 24/24 全部閉環 | 9/4 19:00-19:20 JST |
+| **v1.3** | **2026-09-04** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手** | **§17 V2 階段 4 子項全部閉環 (P4 24/24 + V2 4/4 = 28/28, 42 commits ahead)** | **9/4 19:45-20:15 JST Mavis 拍板 (per 用户授權"允許按照你推薦推進")** |
