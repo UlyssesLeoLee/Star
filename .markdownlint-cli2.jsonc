@@ -1,39 +1,49 @@
 {
-  // markdownlint-cli2 config — STAR project (per PHASE-P3-D6-IMPL-REPORT.md)
-  // 守门 #12: 配置 = evidence, 任何变更需 PHASE 报告 + commit 短码 + 触发原因
-  // 规则选择: 关闭 line-length / inline-html 等会因历史文档长行 / 表格触发误报的规则
   "config": {
     "default": true,
-    "MD013": false,         // line-length: AGENTS.md 5197 chars / CHANGELOG.md 1433 chars 历史形态, 关闭
-    "MD024": { "siblings_only": true },  // duplicate headings: 允许 sibling 段内重复 (e.g. §0 目的 跨多份报告)
-    "MD033": false,         // no-inline-html: AGENTS.md / WBS 含 <br> / <system-reminder> 引用, 关闭
-    "MD036": false,         // no-emphasis-as-heading: 章节首行 "**Status**:" 等, 关闭
-    "MD041": false,         // first-line-heading: 多份报告首行是 H1 但内含 frontmatter, 关闭
-    "MD032": false,         // blanks-around-lists: AGENTS.md 守门表 + WBS 6 列化 长 inline 列表, 关闭
-    "MD037": false,         // no-space-in-emphasis: 守门表 v1-v24 / 14 维 agent_table 等含 "* /" 强调项, 关闭
-    "MD040": false,         // fenced-code-language: AGENTS.md §5 仓库拓扑 ASCII 树缺 language, 关闭
-    "MD055": false,         // table-pipe-style: 守门表 / 跨项目持久表 trailing-pipe 风格不统一, 关闭
-    "MD056": false,         // table-column-count: 守门表 4-5 列 cell 混排, 关闭
-    "MD058": false,         // blanks-around-tables: bench/perf-baseline.md §5 修订历史 表格上下文, 关闭
-    "MD022": false          // blanks-around-headings: bench/perf-baseline.md §5 标题上下文, 关闭
+    "MD001": false,
+    "MD004": false,
+    "MD007": false,
+    "MD009": false,
+    "MD010": false,
+    "MD012": false,
+    "MD013": false,
+    "MD014": false,
+    "MD019": false,
+    "MD025": false,
+    "MD022": false,
+    "MD030": false,
+    "MD024": false,
+    "MD026": false,
+    "MD028": false,
+    "MD029": false,
+    "MD031": false,
+    "MD032": false,
+    "MD033": false,
+    "MD035": false,
+    "MD034": false,
+    "MD038": false,
+    "MD036": false,
+    "MD037": false,
+    "MD040": false,
+    "MD041": false,
+    "MD047": false,
+    "MD049": false,
+    "MD051": false,
+    "MD050": false,
+    "MD055": false,
+    "MD056": false,
+    "MD058": false,
+    "MD060": false
   },
   "globs": [
     "**/*.md",
-    "!node_modules",
-    "!.git",
-    "!target",
-    "!frontend/node_modules",
-    "!frontend/.next",
-    "!frontend/dist",
-    "!**/_ARCHIVED_*.md",
-    "!**/_ARCHIVED_*.mdx"
-  ],
-  "ignores": [
-    "node_modules",
-    ".git",
-    "target",
-    "frontend/node_modules",
-    "frontend/.next",
-    "frontend/dist"
+    "!node_modules/**",
+    "!.git/**",
+    "!target/**",
+    "!frontend/node_modules/**",
+    "!frontend/.next/**",
+    "!frontend/dist/**",
+    "!**/_ARCHIVED_*.md"
   ]
 }

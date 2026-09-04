@@ -134,15 +134,13 @@ jobs:
         with:
           globs: |
             **/*.md
-          ignores: |
-            node_modules
-            .git
-            target
-            frontend/node_modules
-            frontend/.next
-            frontend/dist
-            _ARCHIVED_*.md
-          config: .markdownlint-cli2.jsonc
+            !node_modules/**
+            !.git/**
+            !target/**
+            !frontend/node_modules/**
+            !frontend/.next/**
+            !frontend/dist/**
+            !_ARCHIVED_*.md
 
   cargo-doc:
     name: Rust doc (cargo doc --no-deps)
