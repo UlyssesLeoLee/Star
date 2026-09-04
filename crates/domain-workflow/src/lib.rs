@@ -939,7 +939,7 @@ mod tests {
         // 先到 DONE
         svc.transition(
             TransitionCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 instance_id: inst.id,
                 to: in_progress,
                 actor: UserId::from(actor.user_id),
@@ -950,7 +950,7 @@ mod tests {
         .unwrap();
         svc.transition(
             TransitionCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 instance_id: inst.id,
                 to: done,
                 actor: UserId::from(actor.user_id),
@@ -1123,7 +1123,7 @@ mod tests {
             .unwrap();
         svc.transition(
             TransitionCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 instance_id: inst.id,
                 to: s_wip,
                 actor: UserId::from(actor.user_id),
@@ -1134,7 +1134,7 @@ mod tests {
         .unwrap();
         svc.transition(
             TransitionCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 instance_id: inst.id,
                 to: s_blocked,
                 actor: UserId::from(actor.user_id),
@@ -1145,7 +1145,7 @@ mod tests {
         .unwrap();
         svc.transition(
             TransitionCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 instance_id: inst.id,
                 to: s_wip,
                 actor: UserId::from(actor.user_id),
@@ -1156,7 +1156,7 @@ mod tests {
         .unwrap();
         svc.transition(
             TransitionCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 instance_id: inst.id,
                 to: s_review,
                 actor: UserId::from(actor.user_id),

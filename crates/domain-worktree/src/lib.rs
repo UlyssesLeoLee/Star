@@ -1025,7 +1025,7 @@ mod tests {
         let cmd = make_create_cmd(tenant_id);
         let wt = svc.create_worktree(cmd, &actor).await.unwrap();
         assert_eq!(wt.status, WorktreeStatus::Created);
-        assert_eq!(wt.tenant_id, tenant_id);
+        assert_eq!(wt.tenant_id, TenantId(tenant_id));
         assert!(!wt.id.as_uuid().is_nil());
     }
 
@@ -1279,7 +1279,7 @@ mod tests {
         // 走到 Ready
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 worktree_id: wt.id,
                 from: WorktreeStatus::Created,
                 to: WorktreeStatus::Initializing,
@@ -1291,7 +1291,7 @@ mod tests {
         .unwrap();
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 worktree_id: wt.id,
                 from: WorktreeStatus::Initializing,
                 to: WorktreeStatus::Ready,
@@ -1304,7 +1304,7 @@ mod tests {
         let agent = AgentId::new();
         svc.assign_to_agent(
             AssignWorktreeCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 worktree_id: wt.id,
                 agent_id: agent,
                 agent_session_id: AgentSessionId::new(),
@@ -1380,7 +1380,7 @@ mod tests {
         // wt2 走到 Ready
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 worktree_id: wt2.id,
                 from: WorktreeStatus::Created,
                 to: WorktreeStatus::Initializing,
@@ -1392,7 +1392,7 @@ mod tests {
         .unwrap();
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 worktree_id: wt2.id,
                 from: WorktreeStatus::Initializing,
                 to: WorktreeStatus::Ready,
@@ -1405,7 +1405,7 @@ mod tests {
         // wt3 走 abandon
         svc.abandon(
             AbandonCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 worktree_id: wt3.id,
                 reason: "不再需要".to_string(),
             },

@@ -1228,7 +1228,7 @@ mod tests {
         // 标 n1 已读
         svc.mark_read(
             MarkReadCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 notification_id: n1.id,
                 actor_user_id: me,
             },

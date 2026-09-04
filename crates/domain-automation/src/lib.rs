@@ -1120,7 +1120,7 @@ mod tests {
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let cmd = CreateRuleCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             name: "feedback-p0".to_string(),
             description: Some("on P0 feedback".to_string()),
@@ -1157,7 +1157,7 @@ mod tests {
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let cmd = CreateRuleCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             name: "bad".to_string(),
             description: None,
@@ -1231,7 +1231,7 @@ mod tests {
         let project = ProjectId::new();
         let actor = make_developer(tenant, project);
         let cmd = CreateRuleCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             name: "dev-rule".to_string(),
             description: None,
@@ -1259,7 +1259,7 @@ mod tests {
         let project = ProjectId::new();
         let actor = make_admin(tenant, project);
         let cmd = CreateRuleCommand {
-            tenant_id: tenant,
+            tenant_id: TenantId(tenant),
             project_id: project,
             name: "limited".to_string(),
             description: None,
@@ -1333,7 +1333,7 @@ mod tests {
         let rule = svc
             .create_rule(
                 CreateRuleCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "v".to_string(),
                     description: None,
@@ -1358,7 +1358,7 @@ mod tests {
             .update_rule(
                 UpdateRuleCommand {
                     rule_id: rule.id,
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     expected_version: 99,
                     name: Some("V2".to_string()),
                     description: None,
@@ -1384,7 +1384,7 @@ mod tests {
         let _ = svc
             .create_rule(
                 CreateRuleCommand {
-                    tenant_id: tenant,
+                    tenant_id: TenantId(tenant),
                     project_id: project,
                     name: "x".to_string(),
                     description: None,

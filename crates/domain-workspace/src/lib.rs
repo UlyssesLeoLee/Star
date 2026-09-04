@@ -1018,7 +1018,7 @@ mod tests {
         svc.remove_member(
             RemoveMemberCommand {
                 workspace_id: ws.id,
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 user_id: new_user,
             },
             actor,

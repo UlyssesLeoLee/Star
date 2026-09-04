@@ -1591,7 +1591,7 @@ mod tests {
         // Created → Starting → Running → WaitingFeedback
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 session_id: id,
                 from: AgentSessionStatus::Created,
                 to: AgentSessionStatus::Starting,
@@ -1604,7 +1604,7 @@ mod tests {
         .unwrap();
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 session_id: id,
                 from: AgentSessionStatus::Starting,
                 to: AgentSessionStatus::Running,
@@ -1617,7 +1617,7 @@ mod tests {
         .unwrap();
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 session_id: id,
                 from: AgentSessionStatus::Running,
                 to: AgentSessionStatus::WaitingFeedback,
@@ -1682,7 +1682,7 @@ mod tests {
         let id = session.id;
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 session_id: id,
                 from: AgentSessionStatus::Created,
                 to: AgentSessionStatus::Starting,
@@ -1695,7 +1695,7 @@ mod tests {
         .unwrap();
         svc.transition_status(
             TransitionStatusCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 session_id: id,
                 from: AgentSessionStatus::Starting,
                 to: AgentSessionStatus::Running,
@@ -1745,7 +1745,7 @@ mod tests {
         let wt = WorktreeId::new();
         svc.start_session(
             StartSessionCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 agent_id: agent.id,
                 worktree_id: wt,
                 work_item_id: WorkItemId::new(),
@@ -1759,7 +1759,7 @@ mod tests {
         .unwrap();
         svc.start_session(
             StartSessionCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 agent_id: agent.id,
                 worktree_id: wt,
                 work_item_id: WorkItemId::new(),

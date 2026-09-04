@@ -862,7 +862,7 @@ mod tests {
         let res = svc
             .create_user(
                 CreateUserCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     email: "u@x.com".to_string(),
                     display_name: "U".to_string(),
                     tenant_role: TenantRole::Developer,
@@ -878,10 +878,10 @@ mod tests {
     async fn email_must_be_unique_in_tenant() {
         let svc = InMemoryIdentityService::new();
         let tid = uuid::Uuid::new_v4();
-        let actor = admin(tid);
+        let actor = admin(TenantId(tid));
         svc.create_user(
             CreateUserCommand {
-                tenant_id: tid,
+                tenant_id: TenantId(tid),
                 email: "dup@x.com".to_string(),
                 display_name: "A".to_string(),
                 tenant_role: TenantRole::Developer,
@@ -894,7 +894,7 @@ mod tests {
         let res = svc
             .create_user(
                 CreateUserCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     email: "dup@x.com".to_string(),
                     display_name: "B".to_string(),
                     tenant_role: TenantRole::Developer,
@@ -912,12 +912,12 @@ mod tests {
         let tid = uuid::Uuid::new_v4();
         let user = uuid::Uuid::new_v4();
         // 用 tenant_admin 避免 user_id mismatch
-        let actor = admin(tid);
+        let actor = admin(TenantId(tid));
         let res = svc
             .register_device(
                 RegisterDeviceCommand {
-                    tenant_id: tid,
-                    user_id: user,
+                    tenant_id: TenantId(tid),
+                    user_id: UserId(user),
                     kind: DeviceKind::Web,
                     device_cert_fingerprint: "abc".to_string(),
                     project_ids: vec![], // 缺 binding
@@ -933,11 +933,11 @@ mod tests {
     async fn register_device_with_binding_ok() {
         let svc = InMemoryIdentityService::new();
         let tid = uuid::Uuid::new_v4();
-        let admin = admin(tid);
+        let admin = admin(TenantId(tid));
         let user = svc
             .create_user(
                 CreateUserCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     email: "u@x.com".to_string(),
                     display_name: "U".to_string(),
                     tenant_role: TenantRole::Developer,
@@ -950,7 +950,7 @@ mod tests {
         let d = svc
             .register_device(
                 RegisterDeviceCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     user_id: user.id,
                     kind: DeviceKind::LocalRuntime,
                     device_cert_fingerprint: "abc".to_string(),
@@ -969,11 +969,11 @@ mod tests {
     async fn revoke_device() {
         let svc = InMemoryIdentityService::new();
         let tid = uuid::Uuid::new_v4();
-        let admin = admin(tid);
+        let admin = admin(TenantId(tid));
         let user = svc
             .create_user(
                 CreateUserCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     email: "u@x.com".to_string(),
                     display_name: "U".to_string(),
                     tenant_role: TenantRole::Developer,
@@ -986,7 +986,7 @@ mod tests {
         let d = svc
             .register_device(
                 RegisterDeviceCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     user_id: user.id,
                     kind: DeviceKind::Web,
                     device_cert_fingerprint: "abc".to_string(),
@@ -1000,7 +1000,7 @@ mod tests {
         let d2 = svc
             .revoke_device(
                 RevokeDeviceCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     device_id: d.id,
                     actor_user_id: UserId::from(admin.user_id),
                 },
@@ -1016,11 +1016,11 @@ mod tests {
     async fn revoke_already_revoked_rejected() {
         let svc = InMemoryIdentityService::new();
         let tid = uuid::Uuid::new_v4();
-        let admin = admin(tid);
+        let admin = admin(TenantId(tid));
         let user = svc
             .create_user(
                 CreateUserCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     email: "u@x.com".to_string(),
                     display_name: "U".to_string(),
                     tenant_role: TenantRole::Developer,
@@ -1033,7 +1033,7 @@ mod tests {
         let d = svc
             .register_device(
                 RegisterDeviceCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     user_id: user.id,
                     kind: DeviceKind::Web,
                     device_cert_fingerprint: "abc".to_string(),
@@ -1046,7 +1046,7 @@ mod tests {
             .unwrap();
         svc.revoke_device(
             RevokeDeviceCommand {
-                tenant_id: tid,
+                tenant_id: TenantId(tid),
                 device_id: d.id,
                 actor_user_id: UserId::from(admin.user_id),
             },
@@ -1057,7 +1057,7 @@ mod tests {
         let res = svc
             .revoke_device(
                 RevokeDeviceCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     device_id: d.id,
                     actor_user_id: UserId::from(admin.user_id),
                 },
@@ -1071,11 +1071,11 @@ mod tests {
     async fn bind_device_requires_tenant_match() {
         let svc = InMemoryIdentityService::new();
         let tid = uuid::Uuid::new_v4();
-        let admin = admin(tid);
+        let admin = admin(TenantId(tid));
         let user = svc
             .create_user(
                 CreateUserCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     email: "u@x.com".to_string(),
                     display_name: "U".to_string(),
                     tenant_role: TenantRole::Developer,
@@ -1088,7 +1088,7 @@ mod tests {
         let d = svc
             .register_device(
                 RegisterDeviceCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     user_id: user.id,
                     kind: DeviceKind::Web,
                     device_cert_fingerprint: "abc".to_string(),
@@ -1102,7 +1102,7 @@ mod tests {
         let res = svc
             .bind_device(
                 BindDeviceCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     device_id: d.id,
                     project_id: ProjectId::new(),
                     binding_kind: BindingKind::Contributor,
@@ -1140,11 +1140,11 @@ mod tests {
     async fn record_login_updates_last_login() {
         let svc = InMemoryIdentityService::new();
         let tid = uuid::Uuid::new_v4();
-        let admin = admin(tid);
+        let admin = admin(TenantId(tid));
         let user = svc
             .create_user(
                 CreateUserCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     email: "u@x.com".to_string(),
                     display_name: "U".to_string(),
                     tenant_role: TenantRole::Developer,
@@ -1157,7 +1157,7 @@ mod tests {
         let u = svc
             .record_login(
                 RecordLoginCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     user_id: user.id,
                 },
                 &admin,

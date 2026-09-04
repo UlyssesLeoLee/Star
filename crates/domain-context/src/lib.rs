@@ -1038,7 +1038,7 @@ mod tests {
         };
         let p2 = svc
             .add_relevant_item(
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 p.id,
                 RelevantBucket::RelevantRequirements,
                 Priority::P1,
@@ -1088,7 +1088,7 @@ mod tests {
         // 这里改测 ProvenanceEntry 的 included_at_layer > P4 不可能
         let res = svc
             .add_relevant_item(
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 p.id,
                 RelevantBucket::RelevantRequirements,
                 Priority::P4,
@@ -1389,7 +1389,7 @@ mod tests {
             .unwrap();
         svc.invalidate_decision(
             InvalidateDecisionCommand {
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 decision_id: d1.id,
                 reason: "x".to_string(),
                 actor_user_id: UserId::from(actor.user_id),

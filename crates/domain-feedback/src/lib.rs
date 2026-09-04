@@ -458,7 +458,7 @@ mod tests {
         svc.transition_status(
             TransitionFeedbackStatusCommand {
                 feedback_id: f.id,
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 from: FeedbackStatus::Open,
                 to: FeedbackStatus::Acknowledged,
                 reason: "ack".into(),
@@ -515,7 +515,7 @@ mod tests {
         svc.transition_status(
             TransitionFeedbackStatusCommand {
                 feedback_id: f.id,
-                tenant_id,
+                tenant_id: TenantId(tenant_id),
                 from: FeedbackStatus::Open,
                 to: FeedbackStatus::Acknowledged,
                 reason: "ack".into(),

@@ -1384,7 +1384,7 @@ mod tests {
         let s = svc
             .upsert_symbol(
                 UpsertSymbolCommand {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     repository_id: RepositoryId::new(),
                     file_path: "src/lib.rs".to_string(),
                     symbol_name: "add".to_string(),
@@ -1408,7 +1408,7 @@ mod tests {
         let actor = developer(tid);
         let repo_id = RepositoryId::new();
         let cmd = UpsertSymbolCommand {
-            tenant_id: tid,
+            tenant_id: TenantId(tid),
             repository_id: repo_id,
             file_path: "src/lib.rs".to_string(),
             symbol_name: "add".to_string(),
@@ -1471,7 +1471,7 @@ mod tests {
         let drafts = svc
             .list_by_status(
                 ListByStatusQuery {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     status: ChangeSetStatus::Draft,
                 },
                 &dev,
@@ -1481,7 +1481,7 @@ mod tests {
         let ready = svc
             .list_by_status(
                 ListByStatusQuery {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     status: ChangeSetStatus::ReadyForReview,
                 },
                 &dev,
@@ -1491,7 +1491,7 @@ mod tests {
         let approved = svc
             .list_by_status(
                 ListByStatusQuery {
-                    tenant_id: tid,
+                    tenant_id: TenantId(tid),
                     status: ChangeSetStatus::Approved,
                 },
                 &dev,
