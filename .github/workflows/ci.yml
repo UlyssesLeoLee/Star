@@ -25,18 +25,23 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: cargo check
-        run: cargo check --workspace --all-targets
+        # 守门 #1 v19: -j 4 修正 "cargo workspace 互锁" 误诊 (per AGENTS.md §4.1 v19)
+        # Windows 资源耗尽 0xc0000409 + 配额不足 ERROR_NO_SYSTEM_RESOURCES 跨 17 crate 触发
+        # 修法: 降并行度 -j 4, 0 err 32.27s 通过
+        run: cargo check --workspace --all-targets -j 4
 
       - name: cargo test
-        run: cargo test --workspace
+        # 守门 #1 v6: release mode test 100% pass (单 crate) + v3 check + fmt + clippy 不替代 cargo test
+        run: cargo test --workspace -j 4
 
-      - name: cargo clippy (advisory)
-        run: cargo clippy --workspace --all-targets
-        continue-on-error: true
+      - name: cargo clippy (enforced)
+        # 守门 #7 升级: 从 advisory 改 enforced, 0 warning 才能 merge
+        # 守门 #1 v19: -j 4 修正 Windows 互锁
+        run: cargo clippy --workspace --all-targets -j 4 -- -D warnings
 
-      - name: cargo fmt --check (advisory)
+      - name: cargo fmt --check (enforced)
+        # 守门 #6 升级: 从 advisory 改 enforced, 0 diff 才能 merge
         run: cargo fmt --all -- --check
-        continue-on-error: true
 
   e2e-integration:
     name: e2e Integration (P3-A.5 / wt-w32)
@@ -53,7 +58,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: cargo build domain-local-runtime
-        run: cargo build -p domain-local-runtime --lib
+        run: cargo build -p domain-local-runtime --lib -j 4
 
       - name: cargo test e2e_integration (serial)
         # --test-threads=1 避免并发 e2e 抢端口
@@ -76,11 +81,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: cargo build domain-local-runtime
-        run: cargo build -p domain-local-runtime --lib
+        # 守门 #1 v19: -j 4 修正 Windows 互锁
+        run: cargo build -p domain-local-runtime --lib -j 4
 
       - name: cargo test domain-local-runtime (skip e2e)
         # e2e 在独立 job 跑, 这里只跑单元 test
-        run: cargo test -p domain-local-runtime --lib -- --skip e2e_integration
+        run: cargo test -p domain-local-runtime --lib -- --skip e2e_integration -j 4
 
   frontend-ci:
     name: Frontend (typecheck / test / build)
@@ -155,7 +161,8 @@ jobs:
         run: echo "RUSTDOCFLAGS=-D warnings" >> $GITHUB_ENV
 
       - name: cargo doc --workspace --no-deps
-        run: cargo doc --workspace --no-deps --all-features
+        # 守门 #1 v19: -j 4 修正 Windows 互锁
+        run: cargo doc --workspace --no-deps --all-features -j 4
 
   cargo-bench-no-run:
     name: Rust bench --no-run (compile-only)
@@ -176,8 +183,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: cargo bench --workspace --no-run
-        # 当前 0 bench crate, 仍跑守门, 未来加 benches 自动校验编译
-        run: cargo bench --workspace --no-run
+        # 守门 #1 v19: -j 4 修正 Windows 互锁
+        run: cargo bench --workspace --no-run -j 4
         continue-on-error: true
         # 0 benches 时 `cargo bench --no-run` 可能因 "no targets" exit 非 0, 容忍之
         # (具体行为: cargo 对 workspace bench --no-run 0 target 会 exit 0; 显式保留 advisory)

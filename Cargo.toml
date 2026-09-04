@@ -57,6 +57,16 @@ members = [
     "crates/star-api-rest",
     # RF-001 T1.3 落点: 2026-09-03 注册 crates/star-vcs (R-007 cache 层落点, 8/27 commit 48610ff2 落档 src/cache.rs 占位, 本 commit 新建 Cargo.toml + lib.rs)
     "crates/star-vcs",
+    # Phase C.2 (T3.1) 启动: 2026-09-04 注册 crates/star-dto (跨域共享 DTO 类型, per HANDOFF-ST-001.md v0.8 §10, 跨 multi-sub-session 续)
+    "crates/star-dto",
+    # Phase G.1 (L0 派发 PoC) 启动: 2026-09-04 注册 crates/star-dispatcher (L0 派发层 + InMemory TaskQueue, per SRS-STAR-AGENT-RUNTIME-001 §G-1, v0.0.1 PoC stub)
+    "crates/star-dispatcher",
+    # Phase H.5 (Tree-sitter 引入) 启动: 2026-09-04 注册 crates/star-treesitter (5 语言 grammar + 符号提取, per `docs/architecture/2026-09-03-treesitter-worktree-graph/01-requirements.md` §1.4, v0.0.1 PoC)
+    "crates/star-treesitter",
+    # Phase H.6 (Task ↔ Worktree 1:1 绑定 + react-flow) 启动: 2026-09-04 注册 crates/star-taskgraph (TaskCard + Worktree + 1:1 binding + react-flow JSON 渲染, v0.0.1 PoC)
+    "crates/star-taskgraph",
+    # V2-1 (凭证管理层) 启动: 2026-09-04 注册 crates/star-credential (用户设置 UI 自填 → KMS 加密存储 → 运行时解密, 守门 #5 env 安全, 守门 #14 5 域 Lead CONTENT, 守门 #DB-13 W/T/M)
+    "crates/star-credential",
 ]
 exclude = ["target"]
 
