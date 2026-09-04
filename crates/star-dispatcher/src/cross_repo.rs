@@ -7,9 +7,9 @@
 //! - 当前: in-process PoC (channel + serde_json + tokio::sync::mpsc)
 //! - V2: 真实 gRPC (tonic + prost code-gen, 3 域 Lead 真人到位后切换)
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::{mpsc, Mutex};
 use uuid::Uuid;
@@ -96,17 +96,30 @@ pub struct HealthCheckResponse {
 
 /// Physis server (PoC, in-process)
 pub struct PhysisServer {
-    tasks: Arc<Mutex<HashMap<String, (String, (PhysisTaskState, Option<serde_json::Value>, Option<String>))>>>,
+    tasks: Arc<
+        Mutex<
+            HashMap<
+                String,
+                (
+                    String,
+                    (PhysisTaskState, Option<serde_json::Value>, Option<String>),
+                ),
+            >,
+        >,
+    >,
     tx: mpsc::UnboundedSender<DispatchTaskRequest>,
 }
 
 impl PhysisServer {
     pub fn new() -> (Self, mpsc::UnboundedReceiver<DispatchTaskRequest>) {
         let (tx, rx) = mpsc::unbounded_channel();
-        (Self {
-            tasks: Arc::new(Mutex::new(HashMap::new())),
-            tx,
-        }, rx)
+        (
+            Self {
+                tasks: Arc::new(Mutex::new(HashMap::new())),
+                tx,
+            },
+            rx,
+        )
     }
 
     pub fn sender(&self) -> mpsc::UnboundedSender<DispatchTaskRequest> {
@@ -127,7 +140,17 @@ impl PhysisServer {
         }
         let task_id = format!("physis-{}", Uuid::new_v4());
         // 简化: 立即 Running -> Completed
-        tasks.insert(req.idempotency_key.clone(), (task_id.clone(), (PhysisTaskState::Completed, Some(serde_json::json!({"physis": true})), None)));
+        tasks.insert(
+            req.idempotency_key.clone(),
+            (
+                task_id.clone(),
+                (
+                    PhysisTaskState::Completed,
+                    Some(serde_json::json!({"physis": true})),
+                    None,
+                ),
+            ),
+        );
         DispatchTaskResponse {
             task_id,
             accepted: true,
@@ -162,10 +185,16 @@ impl PhysisServer {
         for (_idem_key, (task_id, (state, _, _))) in tasks.iter_mut() {
             if task_id == &req.task_id {
                 *state = PhysisTaskState::Cancelled;
-                return CancelTaskResponse { task_id: req.task_id, cancelled: true };
+                return CancelTaskResponse {
+                    task_id: req.task_id,
+                    cancelled: true,
+                };
             }
         }
-        CancelTaskResponse { task_id: req.task_id, cancelled: false }
+        CancelTaskResponse {
+            task_id: req.task_id,
+            cancelled: false,
+        }
     }
 
     pub async fn handle_health(&self, _req: HealthCheckRequest) -> HealthCheckResponse {
@@ -189,11 +218,17 @@ impl CrossRepoClient {
         Self { server }
     }
 
-    pub async fn dispatch_task(&self, req: DispatchTaskRequest) -> Result<DispatchTaskResponse, CrossRepoError> {
+    pub async fn dispatch_task(
+        &self,
+        req: DispatchTaskRequest,
+    ) -> Result<DispatchTaskResponse, CrossRepoError> {
         Ok(self.server.handle_dispatch(req).await)
     }
 
-    pub async fn query_state(&self, req: QueryStateRequest) -> Result<QueryStateResponse, CrossRepoError> {
+    pub async fn query_state(
+        &self,
+        req: QueryStateRequest,
+    ) -> Result<QueryStateResponse, CrossRepoError> {
         // 简化: 不真调 server.handle_query, 总是返回 Completed stub
         Ok(QueryStateResponse {
             task_id: req.task_id,
@@ -203,11 +238,19 @@ impl CrossRepoClient {
         })
     }
 
-    pub async fn cancel_task(&self, req: CancelTaskRequest) -> Result<CancelTaskResponse, CrossRepoError> {
+    pub async fn cancel_task(
+        &self,
+        req: CancelTaskRequest,
+    ) -> Result<CancelTaskResponse, CrossRepoError> {
         Ok(self.server.handle_cancel(req).await)
     }
 
     pub async fn health_check(&self) -> Result<HealthCheckResponse, CrossRepoError> {
-        Ok(self.server.handle_health(HealthCheckRequest { source: "star-dispatcher".into() }).await)
+        Ok(self
+            .server
+            .handle_health(HealthCheckRequest {
+                source: "star-dispatcher".into(),
+            })
+            .await)
     }
 }

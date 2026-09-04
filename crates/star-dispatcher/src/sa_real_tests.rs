@@ -8,12 +8,11 @@ mod tests {
     use std::sync::Arc;
     use uuid::Uuid;
 
-    use crate::{
-        AgentTask, SubAgent, SubAgentArchetype, TaskState,
-    };
     use crate::sa_real_impls::{
-        CodeReviewAgent, TestGenAgent, DocSyncAgent, RefactorAgent, DbMigrationAgent, DomainDevAgent,
+        CodeReviewAgent, DbMigrationAgent, DocSyncAgent, DomainDevAgent, RefactorAgent,
+        TestGenAgent,
     };
+    use crate::{AgentTask, SubAgent, SubAgentArchetype, TaskState};
 
     fn make_task(payload: serde_json::Value) -> AgentTask {
         AgentTask {

@@ -6,10 +6,10 @@
 //! per 守门 #14 5 域 Lead CONTENT 4 维, Mavis 临时代签, 真人到位后追溯签字
 //! per 守门 #7 0 unsafe + 守门 #12 commit-time 同步
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use serde_json::json;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use crate::{AgentTask, DispatchError, SubAgent, SubAgentArchetype};
 
@@ -22,15 +22,21 @@ pub struct CodeReviewAgent {
 }
 
 impl CodeReviewAgent {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 #[async_trait]
 impl SubAgent for CodeReviewAgent {
-    fn archetype(&self) -> SubAgentArchetype { SubAgentArchetype::CodeReview }
+    fn archetype(&self) -> SubAgentArchetype {
+        SubAgentArchetype::CodeReview
+    }
     async fn run(&self, task: &AgentTask) -> Result<(), DispatchError> {
         let payload = &task.payload;
-        let pr_id = payload.get("pr_id").and_then(|v| v.as_str())
+        let pr_id = payload
+            .get("pr_id")
+            .and_then(|v| v.as_str())
             .ok_or_else(|| DispatchError::ExecutionFailed(task.task_id, "missing pr_id".into()))?;
         let review = json!({
             "pr_id": pr_id,
@@ -54,19 +60,30 @@ pub struct TestGenAgent {
 }
 
 impl TestGenAgent {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 #[async_trait]
 impl SubAgent for TestGenAgent {
-    fn archetype(&self) -> SubAgentArchetype { SubAgentArchetype::TestGen }
+    fn archetype(&self) -> SubAgentArchetype {
+        SubAgentArchetype::TestGen
+    }
     async fn run(&self, task: &AgentTask) -> Result<(), DispatchError> {
         let payload = &task.payload;
-        let module_path = payload.get("module_path").and_then(|v| v.as_str())
-            .ok_or_else(|| DispatchError::ExecutionFailed(task.task_id, "missing module_path".into()))?;
+        let module_path = payload
+            .get("module_path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                DispatchError::ExecutionFailed(task.task_id, "missing module_path".into())
+            })?;
         // 简化: 每个模块 5 个 test skeleton (per module 1 happy + 4 edge case)
         let test_count = 5;
-        self.generated.lock().unwrap().insert(module_path.into(), test_count);
+        self.generated
+            .lock()
+            .unwrap()
+            .insert(module_path.into(), test_count);
         Ok(())
     }
 }
@@ -80,18 +97,33 @@ pub struct DocSyncAgent {
 }
 
 impl DocSyncAgent {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 #[async_trait]
 impl SubAgent for DocSyncAgent {
-    fn archetype(&self) -> SubAgentArchetype { SubAgentArchetype::DocSync }
+    fn archetype(&self) -> SubAgentArchetype {
+        SubAgentArchetype::DocSync
+    }
     async fn run(&self, task: &AgentTask) -> Result<(), DispatchError> {
         let payload = &task.payload;
-        let doc_path = payload.get("doc_path").and_then(|v| v.as_str())
-            .ok_or_else(|| DispatchError::ExecutionFailed(task.task_id, "missing doc_path".into()))?;
-        let version = format!("v0.{}.{}", now_ms() % 100, task.task_id.to_string().chars().take(4).collect::<String>());
-        self.synced.lock().unwrap().insert(doc_path.into(), version.clone());
+        let doc_path = payload
+            .get("doc_path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                DispatchError::ExecutionFailed(task.task_id, "missing doc_path".into())
+            })?;
+        let version = format!(
+            "v0.{}.{}",
+            now_ms() % 100,
+            task.task_id.to_string().chars().take(4).collect::<String>()
+        );
+        self.synced
+            .lock()
+            .unwrap()
+            .insert(doc_path.into(), version.clone());
         Ok(())
     }
 }
@@ -105,16 +137,24 @@ pub struct RefactorAgent {
 }
 
 impl RefactorAgent {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 #[async_trait]
 impl SubAgent for RefactorAgent {
-    fn archetype(&self) -> SubAgentArchetype { SubAgentArchetype::Refactor }
+    fn archetype(&self) -> SubAgentArchetype {
+        SubAgentArchetype::Refactor
+    }
     async fn run(&self, task: &AgentTask) -> Result<(), DispatchError> {
         let payload = &task.payload;
-        let refactor_target = payload.get("refactor_target").and_then(|v| v.as_str())
-            .ok_or_else(|| DispatchError::ExecutionFailed(task.task_id, "missing refactor_target".into()))?;
+        let refactor_target = payload
+            .get("refactor_target")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                DispatchError::ExecutionFailed(task.task_id, "missing refactor_target".into())
+            })?;
         // 简化: refactor plan 包含 3 步: analyze + apply + verify
         let plan = json!({
             "target": refactor_target,
@@ -123,7 +163,10 @@ impl SubAgent for RefactorAgent {
             "steps": ["analyze", "apply", "verify"],
             "planned_at_ms": now_ms(),
         });
-        self.plans.lock().unwrap().insert(refactor_target.into(), plan);
+        self.plans
+            .lock()
+            .unwrap()
+            .insert(refactor_target.into(), plan);
         Ok(())
     }
 }
@@ -137,21 +180,36 @@ pub struct DbMigrationAgent {
 }
 
 impl DbMigrationAgent {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 #[async_trait]
 impl SubAgent for DbMigrationAgent {
-    fn archetype(&self) -> SubAgentArchetype { SubAgentArchetype::DbMigration }
+    fn archetype(&self) -> SubAgentArchetype {
+        SubAgentArchetype::DbMigration
+    }
     async fn run(&self, task: &AgentTask) -> Result<(), DispatchError> {
         let payload = &task.payload;
-        let migration_target = payload.get("migration_target").and_then(|v| v.as_str())
-            .ok_or_else(|| DispatchError::ExecutionFailed(task.task_id, "missing migration_target".into()))?;
-        let w_t_m = payload.get("w_t_m_class").and_then(|v| v.as_str())
-            .ok_or_else(|| DispatchError::ExecutionFailed(task.task_id, "missing w_t_m_class".into()))?;
+        let migration_target = payload
+            .get("migration_target")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                DispatchError::ExecutionFailed(task.task_id, "missing migration_target".into())
+            })?;
+        let w_t_m = payload
+            .get("w_t_m_class")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                DispatchError::ExecutionFailed(task.task_id, "missing w_t_m_class".into())
+            })?;
         // 守门 #DB-13: W/T/M 三类必填, 验证
         if !["W", "T", "M"].contains(&w_t_m) {
-            return Err(DispatchError::ExecutionFailed(task.task_id, format!("invalid w_t_m_class: {}", w_t_m)));
+            return Err(DispatchError::ExecutionFailed(
+                task.task_id,
+                format!("invalid w_t_m_class: {}", w_t_m),
+            ));
         }
         let migration = json!({
             "target": migration_target,
@@ -161,7 +219,10 @@ impl SubAgent for DbMigrationAgent {
             "status": "planned",
             "planned_at_ms": now_ms(),
         });
-        self.migrations.lock().unwrap().insert(migration_target.into(), migration);
+        self.migrations
+            .lock()
+            .unwrap()
+            .insert(migration_target.into(), migration);
         Ok(())
     }
 }
@@ -175,30 +236,63 @@ pub struct DomainDevAgent {
 }
 
 const DOMAIN_CRATES: &[&str] = &[
-    "domain-agent", "domain-agent-windows", "domain-ai", "domain-audit",
-    "domain-automation", "domain-batch", "domain-board", "domain-cli",
-    "domain-collaboration", "domain-comment", "domain-context", "domain-dashboard",
-    "domain-development", "domain-feedback", "domain-form", "domain-identity",
-    "domain-integration", "domain-kms", "domain-local-runtime", "domain-notification",
-    "domain-permission", "domain-planning", "domain-project", "domain-relation",
-    "domain-report", "domain-scm", "domain-search", "domain-tenant",
-    "domain-theme", "domain-validation",
+    "domain-agent",
+    "domain-agent-windows",
+    "domain-ai",
+    "domain-audit",
+    "domain-automation",
+    "domain-batch",
+    "domain-board",
+    "domain-cli",
+    "domain-collaboration",
+    "domain-comment",
+    "domain-context",
+    "domain-dashboard",
+    "domain-development",
+    "domain-feedback",
+    "domain-form",
+    "domain-identity",
+    "domain-integration",
+    "domain-kms",
+    "domain-local-runtime",
+    "domain-notification",
+    "domain-permission",
+    "domain-planning",
+    "domain-project",
+    "domain-relation",
+    "domain-report",
+    "domain-scm",
+    "domain-search",
+    "domain-tenant",
+    "domain-theme",
+    "domain-validation",
 ];
 
 impl DomainDevAgent {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 #[async_trait]
 impl SubAgent for DomainDevAgent {
-    fn archetype(&self) -> SubAgentArchetype { SubAgentArchetype::DomainDev }
+    fn archetype(&self) -> SubAgentArchetype {
+        SubAgentArchetype::DomainDev
+    }
     async fn run(&self, task: &AgentTask) -> Result<(), DispatchError> {
         let payload = &task.payload;
-        let domain_target = payload.get("domain_target").and_then(|v| v.as_str())
-            .ok_or_else(|| DispatchError::ExecutionFailed(task.task_id, "missing domain_target".into()))?;
+        let domain_target = payload
+            .get("domain_target")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                DispatchError::ExecutionFailed(task.task_id, "missing domain_target".into())
+            })?;
         // 守门 §5 disclaimer: 22 domain-* crate (DDD bounded context), 不建立业务子域↔DDD 映射
         if !DOMAIN_CRATES.contains(&domain_target) {
-            return Err(DispatchError::ExecutionFailed(task.task_id, format!("invalid domain_target: {}", domain_target)));
+            return Err(DispatchError::ExecutionFailed(
+                task.task_id,
+                format!("invalid domain_target: {}", domain_target),
+            ));
         }
         let plan = json!({
             "target": domain_target,
@@ -207,7 +301,10 @@ impl SubAgent for DomainDevAgent {
             "dev_type": "bounded_context",
             "planned_at_ms": now_ms(),
         });
-        self.plans.lock().unwrap().insert(domain_target.into(), plan);
+        self.plans
+            .lock()
+            .unwrap()
+            .insert(domain_target.into(), plan);
         Ok(())
     }
 }

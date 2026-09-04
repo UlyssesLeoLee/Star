@@ -25,9 +25,9 @@
 
 // H.3 6 SA 真实业务实现 + 12 e2e test (per P4-H.3, 守门 #19 [P] 拍板)
 pub mod cross_repo;
-pub mod sa_real_impls;
 #[cfg(test)]
 pub mod cross_repo_tests;
+pub mod sa_real_impls;
 #[cfg(test)]
 pub mod sa_real_tests;
 

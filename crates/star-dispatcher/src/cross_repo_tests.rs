@@ -9,8 +9,8 @@ mod tests {
     use uuid::Uuid;
 
     use crate::cross_repo::{
-        CrossRepoClient, DispatchTaskRequest, PhysisServer, PhysisTaskState, QueryStateRequest,
-        HealthCheckRequest,
+        CrossRepoClient, DispatchTaskRequest, HealthCheckRequest, PhysisServer, PhysisTaskState,
+        QueryStateRequest,
     };
 
     /// H.2 test 1: DispatchTask 跨仓派发 OK
@@ -60,7 +60,10 @@ mod tests {
         };
         let resp2 = client.dispatch_task(req2).await.unwrap();
         assert!(resp2.accepted);
-        assert_eq!(resp1.task_id, resp2.task_id, "idempotency_key should deduplicate");
+        assert_eq!(
+            resp1.task_id, resp2.task_id,
+            "idempotency_key should deduplicate"
+        );
     }
 
     /// H.2 test 3: QueryState 跨仓查询
@@ -83,7 +86,9 @@ mod tests {
         let physis_task_id = resp.task_id.clone();
 
         // 查询
-        let query = QueryStateRequest { task_id: physis_task_id.clone() };
+        let query = QueryStateRequest {
+            task_id: physis_task_id.clone(),
+        };
         let state = client.query_state(query).await.unwrap();
         assert_eq!(state.task_id, physis_task_id);
         assert_eq!(state.state, PhysisTaskState::Completed);

@@ -2073,6 +2073,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "star-credential"
+version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "domain-kms",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "star-dispatcher"
 version = "0.1.0"
 dependencies = [
