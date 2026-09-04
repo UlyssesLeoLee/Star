@@ -51,6 +51,16 @@ export interface AuditEventView {
   display_name_snapshot: string | null;
 }
 
+export interface ImportRequest {
+  credentials: CreateCredentialRequest[];
+}
+
+export interface ImportResponse {
+  imported: number;
+  failed: number;
+  errors: string[];
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
@@ -93,4 +103,15 @@ export const credentialsApi = {
   /** 审计日志 */
   audit: (id: string) =>
     request<AuditEventView[]>(`/credentials/${id}/audit`),
+
+  /** V2-5 批量导入 */
+  importBatch: (creds: CreateCredentialRequest[]) =>
+    request<ImportResponse>(`/credentials/import`, {
+      method: "POST",
+      body: JSON.stringify({ credentials: creds }),
+    }),
+
+  /** V2-5 批量导出 */
+  exportBatch: () =>
+    request<CredentialView[]>(`/credentials/export`),
 };
