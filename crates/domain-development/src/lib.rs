@@ -339,7 +339,12 @@ pub enum DevelopmentError {
     NotFound(String),
     #[error("invalid status transition: {from} -> {to}")]
     /// 非法状态迁移
-    InvalidStatus { from: String, to: String },
+    InvalidStatus {
+        /// 迁移前状态
+        from: String,
+        /// 迁移目标状态
+        to: String,
+    },
     #[error("cross-tenant access denied: actor {0} vs required {1}")]
     /// 跨租户访问被拒绝
     CrossTenantDenied(TenantId, TenantId),
