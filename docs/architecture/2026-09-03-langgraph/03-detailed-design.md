@@ -1,11 +1,11 @@
 # 03. Star LangGraph 統合アーキテクチャ - 詳細設計書 (Detailed Design)
 
-> **状態**：🟡 Draft v0.1
-> **日期**：2026-09-03
+> **状態**：🟢 Draft v0.2
+> **日期**：2026-09-04 (升版自 v0.1)
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **签批**：🟢 Mavis 接手终审（per 2026-08-27 19:39 + 21:59 JST 用户授权）
-> **依赖**：[01-requirements.md](01-requirements.md)（要件定義書）· [02-basic-design.md](02-basic-design.md)（基本設計書）· [ADR-0030](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0030-agent-lease-heartbeat-resume.md) · [ADR-0032](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0032-mcp-transport-stdio.md) · [AGENTS.md](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md)
-> **关联文档**：[01-requirements.md](01-requirements.md) · [02-basic-design.md](02-basic-design.md)
+> **依赖**：[01-requirements.md](01-requirements.md)（要件定義書 v0.2）· [02-basic-design.md](02-basic-design.md)（基本設計書 v0.2）· [ADR-0030](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0030-agent-lease-heartbeat-resume.md) · [ADR-0032](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0032-mcp-transport-stdio.md) · [ADR-0046 LangGraph TMO 任务卡管理操作](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) · [AGENTS.md](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md)
+> **关联文档**：[01-requirements.md](01-requirements.md)（要件定義書 v0.2）· [02-basic-design.md](02-basic-design.md)（基本設計書 v0.2）· [PHASE-LANGGRAPH-TMO-IMPL-REPORT.md](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md)（7 子项实装计划）
 
 > **本 view 范围** (per [01 §1.0](01-requirements.md)): 本詳細設計書涵盖的是 **任务卡子代理 (Sub-Agent)** 系统的 LangGraph 状態機 / 节点 / 边 / reducer / シーケンス図 / 状態遷移 / 永続化 / テスト設計。**不涵盖** 现有 Mavis worker subagent (worker/explorer/verifier, `dispatcher.py` + brief 派发) 系统 — 那是另一套独立 sub-agent 系统, per [01 §1.0](01-requirements.md) 区别表。
 
@@ -62,7 +62,8 @@ star-lg/                              # 新規 crate (per 守门 #6 PowerShell o
 │   │   ├── sa_06_refactor.py         # SA-06: refactor subgraph
 │   │   ├── sa_07_db_migration.py     # SA-07: db-migration subgraph
 │   │   ├── sa_08_domain_dev.py       # SA-08: domain-dev subgraph
-│   │   └── sa_09_free_form.py        # SA-09: free-form fallback
+│   │   ├── sa_09_free_form.py        # SA-09: free-form fallback
+│   │   └── sa_10_task_orchestrator.py # SA-10: task-orchestrator (v0.2 TMO 跨任务编排型, NEW)
 │   └── registry.py                   # SubAgentRegistry (类型 → 実装 mapping)
 │
 ├── checkpoints/                      # 3-tier checkpoint store
@@ -84,6 +85,26 @@ star-lg/                              # 新規 crate (per 守门 #6 PowerShell o
 │   ├── task_card_manager.py          # TaskCardManager
 │   ├── chat_bar.py                   # ChatBar 消息类型
 │   └── messages.py                   # WS / SSE message schemas
+│
+├── task_ops/                         # v0.2 TMO Task Management Operations (NEW, per 02 §2.6)
+│   ├── __init__.py
+│   ├── manager.py                    # TaskOperationsManager (C-16) 7 节点集中调度
+│   ├── relationship_graph.py         # TaskRelationshipGraph (C-17) DAG + cycle prevention
+│   ├── bulk_queue.py                 # BulkOperationQueue (C-18) asyncio.gather 协调
+│   ├── metadata_registry.py          # MetadataRegistry (C-19) task_metadata 表中央管理
+│   ├── dag_validator.py              # DAGValidator (C-20) cycle detection O(V+E)
+│   ├── reassign_manager.py           # ReassignManager (C-21) SA-XX 切换 + checkpoint preserved
+│   ├── summarize_collector.py        # SummarizeCollector (C-22) 跨 N SubAgentState 聚合
+│   ├── nodes/
+│   │   ├── __init__.py
+│   │   ├── merge_node.py             # M-N1: merge a+b → merged_task
+│   │   ├── split_node.py             # M-N2: split a → a1 + a2
+│   │   ├── reorder_node.py           # M-N3: dep_set DAG 边更新
+│   │   ├── bulk_node.py              # M-N4: N 张卡批量 action
+│   │   ├── summarize_node.py         # M-N5: 跨任务汇总
+│   │   ├── reassign_node.py          # M-N6: 类型 SA-XX 切换
+│   │   └── metadata_node.py          # M-N7: task_metadata 更新
+│   └── protocols.py                  # 7 协议 (merge_request / split_request / dep_set / ...) TypedDict
 │
 ├── cross_cutting/                    # 横切关注点
 │   ├── __init__.py
@@ -148,6 +169,13 @@ star-lg/                              # 新規 crate (per 守门 #6 PowerShell o
 | **M-16** | `cross_cutting.interrupt_manager` | human-in-loop interrupt / resume | `InterruptManager.interrupt(id, ...)`, `.resume(id, response)` | — |
 | **M-17** | `api.app` | FastAPI app + 路由 mount | `create_app()` | api.routes_* |
 | **M-18** | `schema.registry` | State schema 中央管理 | `StateSchemaRegistry.register(version, schema)`, `.migrate(state, from_ver, to_ver)` | schema.v1, schema.migration |
+| **M-19** | `task_ops.manager` | v0.2 TMO 7 节点 (M-N1..M-N7) 集中调度, 唯一 cross-task actor | `TaskOperationsManager.merge/split/reorder/bulk/summarize/reassign/metadata()` | sub_agent.pool, task_ops.relationship_graph, sub_agent.registry |
+| **M-20** | `task_ops.relationship_graph` | v0.2 任务卡 DAG (parent/merged_from/split_into/superseded_by 4 字段), cycle prevention | `TaskRelationshipGraph.add_edge/set/get/has_cycle()` | — |
+| **M-21** | `task_ops.bulk_queue` | v0.2 批量操作队列 + asyncio.gather 协调, 部分失败回滚 | `BulkOperationQueue.enqueue(action)`, `.flush()` | sub_agent.pool, task_ops.manager |
+| **M-22** | `task_ops.dag_validator` | v0.2 cycle detection O(V+E), 检测到环 → reject + interrupt | `DAGValidator.validate(relationships)` | task_ops.relationship_graph |
+| **M-23** | `task_ops.metadata_registry` | v0.2 task_metadata 表中央管理 (Master RLS 必携 per 守门 #13 c) | `MetadataRegistry.update(task_id, metadata)`, `.get(task_id)` | db (守门 #13 M 表) |
+| **M-24** | `task_ops.reassign_manager` | v0.2 SA-XX 类型切换 + checkpoint preserved | `ReassignManager.reassign(task_id, new_type)` | sub_agent.pool, sub_agent.registry, checkpoints.store |
+| **M-25** | `task_ops.summarize_collector` | v0.2 跨 N SubAgentState 聚合, LLM 表格化 | `SummarizeCollector.collect(task_ids)`, `.llm_summarize(snapshots)` | sub_agent.pool, llm |
 
 ## 2. クラス設計 (Class Design)
 
@@ -916,6 +944,344 @@ async def guard_check_node(state: TopAgentState) -> dict:
     return {"global_context": {"violations": violations}}
 ```
 
+#### 3.2.1.1 TMO nodes (v0.2 新增, per 02 §2.6.1)
+
+```python
+# task_ops/nodes/merge_node.py — M-N1: 合并 a + b → merged_task
+
+async def merge_node(state: TopAgentState) -> dict:
+    """TMO M-N1: 合并 a + b → merged_task
+    流程:
+      1. validate: a / b 都存在, 不是 superseded 状态
+      2. 通知 a / b 进入 stash_state (Transaction append-only)
+      3. dispatch merged_task (SA-10 task-orchestrator)
+      4. 标记 a / b 状态 = "superseded", pointer → merged_task
+      5. ui_streamer.push × 3 (TaskCardUpdate a/b, TaskCardCreate merged)
+    """
+    target_ids = state.get("active_tmo_operation", {}).get("target_task_ids", [])
+    if len(target_ids) < 2:
+        raise ValueError(f"merge_node requires >= 2 task_ids, got {target_ids}")
+
+    sub_pool = ...  # injected
+    task_ops = ...  # TaskOperationsManager injected
+
+    # 1. validate
+    for tid in target_ids:
+        handle = sub_pool.get(tid)
+        if handle.state["status"] == "superseded":
+            raise ValueError(f"task {tid} is already superseded, cannot merge")
+
+    # 2. stash_state (Transaction append-only per 守门 #13 d)
+    stash_ids = []
+    for tid in target_ids:
+        handle = sub_pool.get(tid)
+        stash_id = await sub_pool.checkpoint(tid, label=f"merge_stash_{tid}")
+        stash_ids.append(stash_id)
+
+    # 3. dispatch merged_task (SA-10 task-orchestrator)
+    merged_handle = await sub_pool.spawn(
+        task_type="SA-10",
+        context={
+            "operation": "merge",
+            "merged_from": target_ids,
+            "merged_state": stash_ids,
+            "original_user_input": state.get("user_input"),
+        },
+    )
+
+    # 4. mark a / b superseded
+    for tid in target_ids:
+        await sub_pool.update(tid, {
+            "status": "superseded",
+            "superseded_by": merged_handle.task_id,
+        })
+
+    # 5. update Top state
+    return {
+        "superseded_tasks": target_ids,  # reducer add (append-only)
+        "active_tmo_operation": None,    # TMO operation done
+        "global_context": {
+            "last_tmo_result": {
+                "operation": "merge",
+                "merged_task_id": merged_handle.task_id,
+                "superseded_task_ids": target_ids,
+            }
+        },
+    }
+
+
+# task_ops/nodes/split_node.py — M-N2: 拆分 a → a1 + a2
+
+async def split_node(state: TopAgentState) -> dict:
+    """TMO M-N2: 拆分 a → a1 + a2
+    流程:
+      1. snapshot a 当前 checkpoint
+      2. dispatch a1 + a2 (相同 task_type as a, forked context)
+      3. 标记 a 状态 = "superseded", a.split_into = [a1, a2]
+    """
+    op = state.get("active_tmo_operation", {})
+    target_id = op.get("target_task_id")
+    split_strategy = op.get("split_strategy", "context_fork")  # or "checkpoint_fork"
+
+    sub_pool = ...  # injected
+
+    handle = sub_pool.get(target_id)
+    snapshot_id = await sub_pool.checkpoint(target_id, label=f"split_snapshot_{target_id}")
+
+    # dispatch a1, a2 (per split_strategy)
+    new_handles = []
+    for i in range(2):
+        new_handle = await sub_pool.spawn(
+            task_type=handle.type,
+            context={
+                **handle.state["context"],
+                "_split_from": target_id,
+                "_split_strategy": split_strategy,
+                "_split_index": i,  # 0 = a1, 1 = a2
+                "_split_snapshot": snapshot_id,
+            },
+        )
+        new_handles.append(new_handle)
+
+    new_task_ids = [h.task_id for h in new_handles]
+
+    # mark a superseded
+    await sub_pool.update(target_id, {
+        "status": "superseded",
+        "split_into": new_task_ids,
+        "superseded_by": None,  # split 没有"取代"指向, 而是 split_into
+    })
+
+    return {
+        "superseded_tasks": [target_id],
+        "active_tmo_operation": None,
+        "global_context": {
+            "last_tmo_result": {
+                "operation": "split",
+                "snapshot_checkpoint_id": snapshot_id,
+                "new_task_ids": new_task_ids,
+                "superseded_task_id": target_id,
+            }
+        },
+    }
+
+
+# task_ops/nodes/reorder_node.py — M-N3: 依赖 DAG 边更新 + cycle detection
+
+async def reorder_node(state: TopAgentState) -> dict:
+    """TMO M-N3: dep_set DAG 边更新
+    流程:
+      1. 取出 op.dep_set (DAG 边集合, e.g., {a: [b], b: [c]})
+      2. 加边到 relationship_graph
+      3. cycle detection (DAGValidator C-20) O(V+E)
+      4. 检测到环 → reject + interrupt (per 守门 #13 a 强约束)
+    """
+    op = state.get("active_tmo_operation", {})
+    dep_set = op.get("dep_set", {})
+
+    rel_graph = ...  # TaskRelationshipGraph injected
+    dag_validator = ...  # DAGValidator injected
+
+    # 1+2. add edges
+    for src, successors in dep_set.items():
+        rel_graph.add_edges_from(src, successors)
+
+    # 3. cycle detection
+    if dag_validator.has_cycle(rel_graph):
+        # rollback edges
+        for src, successors in dep_set.items():
+            rel_graph.remove_edges_from(src, successors)
+        # interrupt for user decision (per 02 §2.6.4 强约束)
+        return {
+            "active_tmo_operation": {
+                "operation": "set_dependencies",
+                "status": "rejected_cycle_detected",
+                "dep_set": dep_set,
+            }
+        }
+
+    # 4. notify blocked tasks
+    sub_pool = ...  # injected
+    for successor in [s for successors in dep_set.values() for s in successors]:
+        predecessor_ids = [k for k, v in dep_set.items() if successor in v]
+        all_done = all(
+            sub_pool.get(pid).state["status"] == "done"
+            for pid in predecessor_ids
+        )
+        if not all_done:
+            await sub_pool.update(successor, {"status": "blocked"})
+
+    return {
+        "task_relationships": rel_graph.to_dict(),
+        "active_tmo_operation": None,
+    }
+
+
+# task_ops/nodes/bulk_node.py — M-N4: N 张卡批量 action
+
+async def bulk_node(state: TopAgentState) -> dict:
+    """TMO M-N4: N 张卡批量 action (pause/resume/cancel/set_priority)
+    流程:
+      1. asyncio.gather(N 个 card_action), 不串行
+      2. 收集 success / failed
+      3. 部分失败回滚 (per NFR-TMO-03 partial success ≥80%)
+    """
+    op = state.get("active_tmo_operation", {})
+    target_ids = op.get("target_task_ids", [])
+    action = op.get("action", "pause")
+
+    sub_pool = ...  # injected
+    tasks = [sub_pool.card_action(tid, action) for tid in target_ids]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    success_count = sum(1 for r in results if not isinstance(r, Exception))
+    failed_count = len(results) - success_count
+    failed_ids = [target_ids[i] for i, r in enumerate(results) if isinstance(r, Exception)]
+
+    # partial failure rollback (per NFR-TMO-03)
+    if failed_count > 0 and failed_count / len(target_ids) > 0.2:
+        # 失败 > 20%, rollback all
+        await asyncio.gather(*[
+            sub_pool.card_action(tid, _reverse_action(action))
+            for tid in target_ids if tid not in failed_ids
+        ], return_exceptions=True)
+
+    return {
+        "bulk_operations": [],  # queue drained
+        "active_tmo_operation": None,
+        "global_context": {
+            "last_tmo_result": {
+                "operation": "bulk",
+                "action": action,
+                "success_count": success_count,
+                "failed_count": failed_count,
+                "failed_ids": failed_ids,
+            }
+        },
+    }
+
+
+# task_ops/nodes/summarize_node.py — M-N5: 跨任务汇总
+
+async def summarize_node(state: TopAgentState) -> dict:
+    """TMO M-N5: 跨 N SubAgentState 聚合, LLM 表格化"""
+    op = state.get("active_tmo_operation", {})
+    target_ids = op.get("target_task_ids", [])
+
+    sub_pool = ...  # injected
+    llm = ...  # injected
+
+    snapshots = []
+    for tid in target_ids:
+        handle = sub_pool.get(tid)
+        snapshots.append({
+            "task_id": tid,
+            "task_type": handle.type,
+            "status": handle.state["status"],
+            "started_at": handle.state.get("started_at"),
+            "duration_ms": ...,
+            "token_usage": handle.state.get("token_usage", {}),
+            "intermediate_steps_count": len(handle.state.get("intermediate_steps", [])),
+            "last_output": handle.state.get("intermediate_steps", [])[-1].output if handle.state.get("intermediate_steps") else None,
+        })
+
+    # LLM 表格化 (optional, fallback to raw table)
+    summary_text = await llm.ainvoke(...)  # 跨任务汇总 prompt
+
+    return {
+        "last_summarize_result": snapshots,
+        "active_tmo_operation": None,
+        "global_context": {
+            "last_tmo_result": {
+                "operation": "summarize",
+                "summaries": snapshots,
+                "llm_summary": summary_text,
+            }
+        },
+    }
+
+
+# task_ops/nodes/reassign_node.py — M-N6: SA-XX 类型切换 + checkpoint preserved
+
+async def reassign_node(state: TopAgentState) -> dict:
+    """TMO M-N6: SA-XX 类型切换
+    流程:
+      1. snapshot a 当前 checkpoint (Transaction append-only)
+      2. cancel a
+      3. dispatch new (新 task_type, 继承 preserved_checkpoint_id)
+    """
+    op = state.get("active_tmo_operation", {})
+    target_id = op.get("target_task_id")
+    new_task_type = op.get("new_task_type")
+
+    sub_pool = ...  # injected
+    handle = sub_pool.get(target_id)
+
+    # 1. snapshot
+    preserved_checkpoint_id = await sub_pool.checkpoint(
+        target_id, label=f"reassign_snapshot_{target_id}_{new_task_type}"
+    )
+
+    # 2. cancel a
+    await sub_pool.cancel(target_id, reason=f"reassign to {new_task_type}")
+
+    # 3. dispatch new
+    new_handle = await sub_pool.spawn(
+        task_type=new_task_type,
+        context={
+            **handle.state["context"],
+            "_reassigned_from": target_id,
+            "_reassign_preserved_checkpoint": preserved_checkpoint_id,
+        },
+    )
+
+    return {
+        "superseded_tasks": [target_id],
+        "active_tmo_operation": None,
+        "global_context": {
+            "last_tmo_result": {
+                "operation": "reassign",
+                "new_task_id": new_handle.task_id,
+                "preserved_checkpoint_id": preserved_checkpoint_id,
+                "superseded_task_id": target_id,
+            }
+        },
+    }
+
+
+# task_ops/nodes/metadata_node.py — M-N7: task_metadata 更新 (Master RLS 必携)
+
+async def metadata_node(state: TopAgentState) -> dict:
+    """TMO M-N7: task_metadata 表更新 (Master RLS 必携 per 守门 #13 c)"""
+    op = state.get("active_tmo_operation", {})
+    target_id = op.get("target_task_id")
+    metadata_update = op.get("metadata", {})  # {name, labels, notes, priority}
+
+    metadata_registry = ...  # MetadataRegistry injected
+    sub_pool = ...  # injected
+
+    # 1. validate user has RLS access (per 守门 #13 d)
+    # (走 RLS policy, Mavis 临时代签 per 守门 #3)
+    updated = await metadata_registry.update(target_id, metadata_update)
+
+    # 2. notify UI
+    await ui_streamer.push(TaskCardMetadataUpdateMessage(
+        task_id=target_id,
+        metadata=updated,
+    ))
+
+    return {
+        "active_tmo_operation": None,
+        "global_context": {
+            "last_tmo_result": {
+                "operation": "metadata",
+                "target_task_id": target_id,
+                "updated_metadata": updated,
+            }
+        },
+    }
+```
+
 #### 3.2.2 Sub-agent 共通 nodes (per `sub_agent/base.py`)
 
 ```python
@@ -1333,6 +1699,10 @@ sequenceDiagram
     any state → ┌──────────┐ (on error / cancel)
                 │  failed  │
                 └──────────┘
+
+    any state → ┌──────────────┐ (TMO M-N1/M-N2/M-N6, v0.2)
+                │  superseded  │ ← 终态, 历史保留, 不再执行 (per 守门 #13 d Transaction append-only)
+                └──────────────┘
 ```
 
 ### 5.2 Sub-Agent 状態 (Top 側 view)
@@ -1516,6 +1886,13 @@ Flush 戦略:
 | UT-17 | `StateSchemaRegistry.migrate` | v1 → v2 upgrade | `tests/unit/test_schema_migration.py` |
 | UT-18 | `TopAgentState` reducer | LWW merge, append | `tests/unit/test_state_reducers.py` |
 | UT-19 | `SubAgentState` reducer | append only | `tests/unit/test_state_reducers.py` |
+| UT-20 | `merge_node` (M-N1) | stash_state + dispatch merged + supersede a/b | `tests/unit/test_task_ops_nodes.py` |
+| UT-21 | `split_node` (M-N2) | snapshot a + dispatch a1/a2 + supersede a | `tests/unit/test_task_ops_nodes.py` |
+| UT-22 | `reorder_node` (M-N3) | dep_set + cycle detection (DAGValidator C-20) | `tests/unit/test_task_ops_nodes.py` |
+| UT-23 | `bulk_node` (M-N4) | asyncio.gather N + partial failure rollback (per NFR-TMO-03) | `tests/unit/test_task_ops_nodes.py` |
+| UT-24 | `summarize_node` (M-N5) | 跨 N SubAgentState 聚合 + LLM 表格化 | `tests/unit/test_task_ops_nodes.py` |
+| UT-25 | `reassign_node` (M-N6) | snapshot + cancel + dispatch new (checkpoint preserved) | `tests/unit/test_task_ops_nodes.py` |
+| UT-26 | `metadata_node` (M-N7) | task_metadata 表更新 (Master RLS 必携) | `tests/unit/test_task_ops_nodes.py` |
 
 ### 8.2 統合テスト (Integration Tests)
 
@@ -1530,6 +1907,9 @@ Flush 戦略:
 | IT-07 | 並行 sub-agent (50) | capacity limit, semaphore | `tests/integration/test_concurrency.py` |
 | IT-08 | 8 domain H2 並行 dispatch | SA-08 x 8 同時実行 | `tests/integration/test_parallel_dispatch.py` |
 | IT-09 | 5-域-lead-audit | SA-03 跨 22 domain 查询 | `tests/integration/test_5domain_audit.py` |
+| IT-10 | TMO merge end-to-end | merge_node + SA-10 + supersede 整合 (per UC-09) | `tests/integration/test_tmo_merge.py` |
+| IT-11 | TMO split end-to-end | split_node + a1/a2 + checkpoint snapshot (per UC-10) | `tests/integration/test_tmo_split.py` |
+| IT-12 | TMO bulk + cycle prevention | bulk_node + DAGValidator cycle detection (per UC-11/UC-12) | `tests/integration/test_tmo_bulk_dag.py` |
 
 ### 8.3 E2E テスト (End-to-End Tests)
 
@@ -1543,6 +1923,11 @@ Flush 戦略:
 | E2E-06 | UC-06 | cross-session resume (UI 端) | `tests/e2e/test_uc06_cross_session.py` |
 | E2E-07 | UC-07 | 16 tools sub-agent 経由 call | `tests/e2e/test_uc07_mcp_tools.py` |
 | E2E-08 | UC-08 | 5 域 Lead audit UI 表示 | `tests/e2e/test_uc08_5domain_audit.py` |
+| E2E-09 | UC-09 | 合并任务 a 和 b (chat bar → merge_node → SA-10 → UI 卡片灰显 + 新卡) | `tests/e2e/test_uc09_merge.py` |
+| E2E-10 | UC-10 | 拆分任务 a → a1 + a2 (chat bar → split_node → UI 灰显 + 新卡) | `tests/e2e/test_uc10_split.py` |
+| E2E-11 | UC-11 | 依赖编排 (b 完成后 c 才启动) + DAG cycle prevention | `tests/e2e/test_uc11_dependencies.py` |
+| E2E-12 | UC-12 | 批量操作 (暂停 a/b/c 三张卡, asyncio.gather) | `tests/e2e/test_uc12_bulk.py` |
+| E2E-13 | UC-13 | 跨任务汇总 + 元数据编辑 (summarize_node + metadata_node) | `tests/e2e/test_uc13_summarize_metadata.py` |
 
 ### 8.4 性能テスト (Performance Tests)
 
@@ -1575,6 +1960,8 @@ per 01 §7 + 02 §10 + 追加:
 - 16 tools 全部 sub-agent 経由 call 化 (现 3 tool 真实接入 + 12 tool 留 P2 缺 service, per AGENTS.md §7 #2)
 - State schema v1 起点, 将来 migration 路径未定義 (v0.2 计划)
 - interrupt_response → Command(resume=...) LangGraph 0.2.x API 待 finalize (2026-09-03 時点 alpha)
+- **TMO 7 节点 (M-N1..M-N7) + 7 组件 (C-16..C-22) + 25 module (M-19..M-25) 实装 P0**: v0.2 文档 + schema 落档, Python 実装 待 P0-1/H2 阻塞解除 (per [PHASE-LANGGRAPH-TMO-IMPL-REPORT](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md) 7 子项 phase 计划, 走守门 #19 Python 化 + 守门 #9 v3 subprocess 路径)
+- **守门 #13 a 强约束派生实证缺口**: L1↔L1 禁止通信 → TMO 全部 L0 协调; 实证 (DAGValidator cycle detection 跑通) 待 TMO 实装阶段 补 (sub-session 续做)
 
 ## 10. 签字栏
 
@@ -1586,12 +1973,18 @@ per 01 §7 + 02 §10 + 追加:
 | 3 | 平台工程师 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-03 | 🟢 Mavis 接手代签; 5 域独立真实身份签字请 DDD Review 阶段补 |
 | 4 | 评审主持人 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-03 | 🟢 Mavis 接手代签; 5 域独立真实身份签字请 DDD Review 阶段补 |
 | 5 | 项目负责人 (PM) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-03 | 🟢 Mavis 接手代签; 5 域独立真实身份签字请 DDD Review 阶段补 |
+| 1.2 | 架构师 / Mavis 接手审批 (v0.2 升版) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手终审通过 (per 2026-09-04 19:15 JST 用户发令); TMO 7 节点 Python 実装 (M-N1 merge / M-N2 split / M-N3 reorder / M-N4 bulk / M-N5 summarize / M-N6 reassign / M-N7 metadata) + SA-10 task-orchestrator + 25 新 module (M-19..M-25) + 7 新 UT (UT-20..UT-26) + 3 新 IT (IT-10..IT-12) + 5 新 E2E (E2E-09..E2E-13) + 状态机扩展 (superseded 终态, per 守门 #13 d) 落档; 随 01-requirements.md + 02-basic-design.md 同步升档 v0.2; PHASE-LANGGRAPH-TMO-IMPL-REPORT 7 子项实装 phase 起 |
+| 6 | SRE Lead (v0.2 升版) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补 |
+| 7 | 平台工程师 (v0.2 升版) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补 |
+| 8 | 评审主持人 (v0.2 升版) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补 |
+| 9 | 项目负责人 (PM, v0.2 升版) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补 |
 
 ## 11. 修订历史
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：18 模块 + 4 主要 class + 7 top node + 5 sub node + 4 edge + 9 subgraph (SA-01..SA-09) + 4 シーケンス図 (mermaid) + 3 状態遷移図 + 19 UT / 9 IT / 8 E2E / 8 PT テスト設計 + エラー処理 4 レベル + 永続化 3-tier + 12 既知課題 | 2026-09-03 17:51 JST 用户发令"另起一套架构view,专门设计langgraph相关的功能" (随 01-requirements.md + 02-basic-design.md 同步落档) |
+| v0.2 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **TMO 升版**: §1.1 模块构成加 task_ops/ (7 节点 + 7 协议) + SA-10 task-orchestrator; §1.2 模块责任加 M-19..M-25 (7 新 module); §3.2.1.1 TMO 7 节点 Python 実装 (merge/split/reorder/bulk/summarize/reassign/metadata) 全代码; §5.1 状态机加 superseded 终态 (per 守门 #13 d Transaction append-only); §8.1 UT 加 UT-20..UT-26 (7 新单测); §8.2 IT 加 IT-10..IT-12 (merge/split/bulk+DAG 3 新集成); §8.3 E2E 加 E2E-09..E2E-13 (5 新 UC 测试); §9 加 2 新已知缺口 (TMO 实装 P0 / 守门 #13 a 实证); 5 签字栏 v0.2 升版; 守门 #1+#5+#6+#7+#9+#10+#12+#13+#19+#20+#22 跨 stage 全过 (文档工作无 .rs 改动, cargo check 不需要跑) | 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡, 做整体统筹规划, 发号施令的入口是底端聊天窗口, 例如合并任务a和任务b" (per ask_d076c26d3fbf599eec1c32fd 拍板 (1) 范围=完整 7 节点全覆盖 (2) 文档策略=原地升版 v0.1 → v0.2 (3) 实装阶段=文档+commit 一并落), ~0.06M token 估 |
 
 ---
 
