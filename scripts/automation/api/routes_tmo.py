@@ -155,9 +155,136 @@ async def tmo_operations() -> dict:
     return {
         "ok": True,
         "snapshot": manager.get_state_snapshot(),
-        "implemented_nodes": ["M-N1", "M-N3", "M-N4"],
-        "planned_nodes": ["M-N2", "M-N5", "M-N6", "M-N7"],
+        "implemented_nodes": ["M-N1", "M-N2", "M-N3", "M-N4"],
+        "planned_nodes": ["M-N5", "M-N6", "M-N7"],
     }
+
+
+# ===========================================================================
+# TMO-02: /api/tmo/split (wt-tmo-02-split 实装, M-N2)
+# ===========================================================================
+
+# 局部 import (避免循环依赖 + 跨 worktree namespace 隔离)
+# 注意: 用 scripts.automation 前缀, 跟 routes_tmo.py 其他 import 方式保持一致
+# (test_tmo_bulk_dag.py 用 PROJECT_ROOT 注入 sys.path, 'scripts.automation' 形式 import 才能 work)
+from scripts.automation.task_ops.nodes.split_node import (
+    DEFAULT_SPLIT_COUNT,
+    MAX_SPLIT_COUNT,
+    MIN_SPLIT_COUNT,
+    VALID_SPLIT_STRATEGIES,
+    split_node,
+)
+
+
+# Module-level singleton manager (per 02 §2.6.5 调试控制台设计)
+# 跨请求保留 sub_pool 状态, 让 e2e 测试可验证"第二次 split 同一 task 失败 (superseded 守门)"
+# 跟 _GRAPH (TMO-03) / _bulk_queue (TMO-04) 同样模式
+_SPLIT_MANAGER: Optional["TaskOperationsManager"] = None
+
+
+def _get_split_manager():
+    """获取 module-level singleton split manager (跨请求共享 sub_pool 状态)"""
+    global _SPLIT_MANAGER
+    if _SPLIT_MANAGER is None:
+        from scripts.automation.task_ops.manager import TaskOperationsManager
+        _SPLIT_MANAGER = TaskOperationsManager()
+    return _SPLIT_MANAGER
+
+
+class SplitRequestBody(BaseModel):
+    """POST /api/tmo/split 请求体 (per task_ops/protocols.py SplitRequest)"""
+    target_task_id: str = Field(..., min_length=1, description="拆分的源 task_id (a)")
+    split_strategy: Optional[str] = Field(
+        "context_fork", description="context_fork | checkpoint_fork"
+    )
+    split_count: Optional[int] = Field(
+        DEFAULT_SPLIT_COUNT,
+        ge=MIN_SPLIT_COUNT,
+        le=MAX_SPLIT_COUNT,
+        description=f"拆分份数, 守门 [{MIN_SPLIT_COUNT}, {MAX_SPLIT_COUNT}]",
+    )
+    actor_session_id: Optional[str] = Field(None, description="L0 session id")
+
+    @field_validator("split_strategy")
+    @classmethod
+    def _validate_split_strategy(cls, v: str) -> str:
+        if v not in VALID_SPLIT_STRATEGIES:
+            raise ValueError(
+                f"split_strategy must be one of {VALID_SPLIT_STRATEGIES}, got {v!r}"
+            )
+        return v
+
+
+class SplitResult(BaseModel):
+    """POST /api/tmo/split result (per 03 §3.2.1.1 last_tmo_result)"""
+    operation: str = "split"
+    target_task_id: str
+    snapshot_checkpoint_id: str
+    new_task_ids: list
+    split_strategy: str
+    split_count: int
+
+
+class SplitResponse(BaseModel):
+    ok: bool
+    node: str  # "M-N2"
+    target_task_id: Optional[str] = None
+    result: Optional[SplitResult] = None
+    ui_events: Optional[list] = None
+    error: Optional[str] = None
+    duration_ms: float
+
+
+@router.post("/split", response_model=SplitResponse)
+async def tmo_split(req: SplitRequestBody) -> SplitResponse:
+    """拆分任务卡 (M-N2, per 03 §3.2.1.1)
+
+    流程:
+      1. validate (target_id 存在 + 非 superseded + split_count ∈ [2, 8])
+      2. snapshot a 当前 checkpoint (Transaction append-only per 守门 #13 d)
+      3. dispatch a1..aN (相同 task_type as a, forked context, L0 协调 per 守门 #13 a)
+      4. mark a superseded + a.split_into = [a1..aN]
+      5. emit UI events (1 × TaskCardUpdate + N × TaskCardCreate)
+    """
+    manager = _get_split_manager()  # module-level singleton, 跨请求保留 sub_pool 状态
+
+    # mock 模式: target 不存在就 add 一个 L1 task (跟 /api/tmo/merge 行为一致)
+    try:
+        manager.sub_pool.get(req.target_task_id)
+    except KeyError:
+        manager.sub_pool.add(task_type="SA-09", task_id=req.target_task_id, initial_state={
+            "status": "running",
+            "context": {"description": f"task {req.target_task_id} mock"},
+        })
+
+    message = {
+        "operation": "split",
+        "target_task_id": req.target_task_id,
+        "split_strategy": req.split_strategy or "context_fork",
+        "split_count": req.split_count or DEFAULT_SPLIT_COUNT,
+        "actor_session_id": req.actor_session_id,
+    }
+    dispatch_result = await manager.dispatch(message)
+
+    if not dispatch_result["ok"]:
+        raise HTTPException(status_code=400, detail=dispatch_result.get("error", "split failed"))
+
+    result = dispatch_result["result"]
+    return SplitResponse(
+        ok=True,
+        node=dispatch_result["node"],
+        target_task_id=result.get("target_task_id", req.target_task_id),
+        result=SplitResult(
+            operation="split",
+            target_task_id=result.get("target_task_id", req.target_task_id),
+            snapshot_checkpoint_id=result.get("snapshot_checkpoint_id", ""),
+            new_task_ids=result.get("new_task_ids", []),
+            split_strategy=req.split_strategy or "context_fork",
+            split_count=req.split_count or DEFAULT_SPLIT_COUNT,
+        ),
+        ui_events=[UIEvent(**e) for e in result.get("ui_events", [])],
+        duration_ms=dispatch_result.get("duration_ms", 0.0),
+    )
 
 
 # ===========================================================================

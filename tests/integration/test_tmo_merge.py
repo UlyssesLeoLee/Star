@@ -188,9 +188,13 @@ async def test_tmo_manager_dispatch_merge():
 
 @pytest.mark.asyncio
 async def test_tmo_manager_dispatch_unknown_node_fails():
-    """IT-10-C: TaskOperationsManager.dispatch 对未实装节点返 ok=False"""
+    """IT-10-C: TaskOperationsManager.dispatch 对未实装节点返 ok=False
+
+    per 2026-09-04 wt-tmo-02-split 实装后, 改用 summarize (M-N5) 测 "未实装节点 not yet implemented",
+    不用 split (M-N2 已实装, wt-tmo-02 PR)
+    """
     manager = TaskOperationsManager()
-    message = {"operation": "split", "target_task_id": "x"}  # M-N2 planned, not implemented
+    message = {"operation": "summarize", "target_task_ids": ["a", "b"]}  # M-N5 planned
     result = await manager.dispatch(message)
     assert result["ok"] is False
     assert "not yet implemented" in result["error"]
