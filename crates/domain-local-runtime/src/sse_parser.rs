@@ -70,6 +70,7 @@ pub struct SseParser {
 }
 
 impl SseParser {
+    /// 构造空解析器
     pub fn new() -> Self {
         Self {
             buffer: String::new(),
@@ -155,10 +156,13 @@ fn parse_event(event: &str) -> Option<Result<SseChunk, SseParseError>> {
 // 3. error
 // =====================================================================
 
+/// SSE 解析错误
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum SseParseError {
+    /// SSE JSON 解析失败
     #[error("SSE JSON 解析失败: {0}")]
     Json(String),
+    /// SSE 格式错误
     #[error("SSE 格式错误: {0}")]
     Format(String),
 }

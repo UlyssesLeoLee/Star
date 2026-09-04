@@ -30,6 +30,7 @@ struct HubInner {
 }
 
 impl OutputHub {
+    /// 构造空 Hub
     pub fn new() -> Self {
         Self {
             inner: Arc::new(HubInner {
@@ -74,8 +75,10 @@ impl Default for OutputHub {
 
 #[derive(Debug, thiserror::Error, Clone, PartialEq)]
 pub enum SubscribeError {
+    /// 目标 process 不存在
     #[error("process 不存在: {0}")]
     ProcessNotFound(Uuid),
+    /// broadcast channel 落后(丢失部分消息)
     #[error("broadcast channel lag (落后 {0} 条消息)")]
     Lag(u64),
 }

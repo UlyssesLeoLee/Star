@@ -51,6 +51,7 @@ impl Default for HubAdapterConfig {
 }
 
 impl HubAdapterConfig {
+    /// 构造指定 channel 容量的配置(立即订阅)
     pub fn with_capacity(cap: usize) -> Self {
         Self {
             channel_capacity: cap,
@@ -65,10 +66,13 @@ impl HubAdapterConfig {
 
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum HubAdapterError {
+    /// hub 订阅失败
     #[error("hub subscribe 失败: {0}")]
     Subscribe(#[from] SubscribeError),
+    /// process id 已被注销, 无法 cancel
     #[error("process id 已被注销, 无法 cancel")]
     AlreadyUnregistered,
+    /// forwarder task 已退出
     #[error("forwarder task 已退出")]
     ForwarderGone,
 }
