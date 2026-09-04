@@ -870,6 +870,205 @@ impl TokenStore {
     }
 }
 
+/// **Checkpoint 快照** (per SRS-001 §G-7, Crash Recovery + Checkpoint)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Checkpoint {
+    /// Checkpoint ID
+    pub checkpoint_id: Uuid,
+    /// 关联任务 ID
+    pub task_id: Uuid,
+    /// 租户 ID
+    pub tenant_id: Uuid,
+    /// Checkpoint 触发时 task 状态
+    pub task_state: TaskState,
+    /// Saga context data (per star-saga SagaContext.data)
+    pub context_data: serde_json::Value,
+    /// 完成步骤列表
+    pub completed_steps: Vec<String>,
+    /// Checkpoint 时间戳
+    pub created_at_ms: u64,
+}
+
+/// **CheckpointStore** (per SRS-001 §G-7, in-memory checkpoint 持久化 PoC, v0.1.0 收官接 SQLite)
+pub struct CheckpointStore {
+    checkpoints: Arc<RwLock<HashMap<Uuid, Checkpoint>>>,
+    /// task_id -> 最新 checkpoint_id 索引
+    by_task: Arc<RwLock<HashMap<Uuid, Uuid>>>,
+}
+
+impl Default for CheckpointStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CheckpointStore {
+    pub fn new() -> Self {
+        Self {
+            checkpoints: Arc::new(RwLock::new(HashMap::new())),
+            by_task: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// 保存 checkpoint (per task 自动覆盖最新)
+    pub async fn save(&self, cp: Checkpoint) -> Uuid {
+        let cp_id = cp.checkpoint_id;
+        let task_id = cp.task_id;
+        let mut by_task = self.by_task.write().await;
+        by_task.insert(task_id, cp_id);
+        drop(by_task);
+        let mut checkpoints = self.checkpoints.write().await;
+        checkpoints.insert(cp_id, cp);
+        cp_id
+    }
+
+    /// 按 task_id 拿最新 checkpoint (per crash recovery 重启点)
+    pub async fn latest_for_task(&self, task_id: Uuid) -> Option<Checkpoint> {
+        let by_task = self.by_task.read().await;
+        let cp_id = *by_task.get(&task_id)?;
+        drop(by_task);
+        let checkpoints = self.checkpoints.read().await;
+        checkpoints.get(&cp_id).cloned()
+    }
+
+    /// 按 cp_id 拿
+    pub async fn get(&self, cp_id: Uuid) -> Option<Checkpoint> {
+        let checkpoints = self.checkpoints.read().await;
+        checkpoints.get(&cp_id).cloned()
+    }
+
+    /// checkpoint 总数
+    pub async fn count(&self) -> usize {
+        self.checkpoints.read().await.len()
+    }
+}
+
+/// **Context Tier** (per SRS-001 §G-8, L1/L2/L3 三级缓存)
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum ContextTier {
+    /// L1: 内存 hot (高频访问, per-rpc)
+    L1,
+    /// L2: 进程级 warm (per-task, in-memory + brief file)
+    L2,
+    /// L3: 持久化 cold (per §20 brief docs/briefs/<task_id>.md, 跨进程)
+    L3,
+}
+
+impl ContextTier {
+    /// 名称
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::L1 => "L1",
+            Self::L2 => "L2",
+            Self::L3 => "L3",
+        }
+    }
+}
+
+/// **Context Entry** (per SRS-001 §G-8, 三级 Context 入口)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ContextEntry {
+    pub entry_id: Uuid,
+    pub tier: ContextTier,
+    pub task_id: Uuid,
+    pub tenant_id: Uuid,
+    pub key: String,
+    pub value: serde_json::Value,
+    pub size_bytes: u64,
+    pub created_at_ms: u64,
+}
+
+/// **ContextStore** (per SRS-001 §G-8, 三级缓存 PoC, v0.1.0 收官接 Tiering 实战)
+pub struct ContextStore {
+    entries: Arc<RwLock<HashMap<(ContextTier, String), ContextEntry>>>,
+    /// 索引 (per task_id)
+    by_task: Arc<RwLock<HashMap<Uuid, Vec<String>>>>,
+}
+
+impl Default for ContextStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ContextStore {
+    pub fn new() -> Self {
+        Self {
+            entries: Arc::new(RwLock::new(HashMap::new())),
+            by_task: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// 写 Context 到指定 tier
+    pub async fn put(
+        &self,
+        tier: ContextTier,
+        task_id: Uuid,
+        tenant_id: Uuid,
+        key: &str,
+        value: serde_json::Value,
+    ) -> Uuid {
+        let entry_id = Uuid::new_v4();
+        let key_owned = key.to_string();
+        let size = value.to_string().len() as u64;
+        {
+            let mut by_task = self.by_task.write().await;
+            by_task.entry(task_id).or_default().push(key_owned.clone());
+        }
+        let entry = ContextEntry {
+            entry_id,
+            tier,
+            task_id,
+            tenant_id,
+            key: key_owned.clone(),
+            value,
+            size_bytes: size,
+            created_at_ms: now_ms(),
+        };
+        let mut entries = self.entries.write().await;
+        entries.insert((tier, key_owned), entry);
+        entry_id
+    }
+
+    /// 按 (tier, key) 读 Context
+    pub async fn get(&self, tier: ContextTier, key: &str) -> Option<ContextEntry> {
+        let entries = self.entries.read().await;
+        entries.get(&(tier, key.to_string())).cloned()
+    }
+
+    /// 升级 Context (per G-8 升级路径 L3 → L2 → L1)
+    pub async fn promote(
+        &self,
+        from: ContextTier,
+        to: ContextTier,
+        key: &str,
+    ) -> Option<ContextEntry> {
+        let mut entries = self.entries.write().await;
+        let entry = entries.remove(&(from, key.to_string()))?;
+        let mut promoted = entry;
+        promoted.tier = to;
+        entries.insert((to, key.to_string()), promoted.clone());
+        Some(promoted)
+    }
+
+    /// 列出 task 全部 Context
+    pub async fn list_by_task(&self, task_id: Uuid) -> Vec<ContextEntry> {
+        let by_task = self.by_task.read().await;
+        let keys = by_task.get(&task_id).cloned().unwrap_or_default();
+        drop(by_task);
+        let entries = self.entries.read().await;
+        let mut result = vec![];
+        for (_, _, entry) in entries
+            .iter()
+            .filter(|((_, _), e)| e.task_id == task_id)
+            .map(|((t, k), e)| (t.clone(), k.clone(), e.clone()))
+        {
+            result.push(entry);
+        }
+        result
+    }
+}
+
 impl Mailbox {
     /// 创建空 Mailbox
     pub fn new() -> Self {
@@ -1785,5 +1984,173 @@ mod tests {
         assert!(ms.delete(ta_k1_mem_id).await);
         assert_eq!(ms.list_by_tenant(ta).await.len(), 1);
         assert_eq!(ms.list_by_tenant(tb).await.len(), 1);
+    }
+
+    /// G.7 PoC test 1: CheckpointStore save + latest_for_task 恢复点
+    #[tokio::test]
+    async fn checkpoint_save_and_latest() {
+        let cs = CheckpointStore::new();
+        let task_id = Uuid::new_v4();
+        let tenant_id = Uuid::new_v4();
+        cs.save(Checkpoint {
+            checkpoint_id: Uuid::new_v4(),
+            task_id,
+            tenant_id,
+            task_state: TaskState::Running,
+            context_data: serde_json::json!({"step": 3}),
+            completed_steps: vec!["step1".into(), "step2".into()],
+            created_at_ms: now_ms(),
+        })
+        .await;
+        let latest = cs.latest_for_task(task_id).await.unwrap();
+        assert_eq!(latest.task_state, TaskState::Running);
+        assert_eq!(latest.completed_steps.len(), 2);
+    }
+
+    /// G.7 PoC test 2: CheckpointStore save 同 task 覆盖 (重启点最新)
+    #[tokio::test]
+    async fn checkpoint_overwrite_latest() {
+        let cs = CheckpointStore::new();
+        let task_id = Uuid::new_v4();
+        let tenant_id = Uuid::new_v4();
+        // 1st checkpoint
+        cs.save(Checkpoint {
+            checkpoint_id: Uuid::new_v4(),
+            task_id,
+            tenant_id,
+            task_state: TaskState::Running,
+            context_data: serde_json::json!({"step": 1}),
+            completed_steps: vec![],
+            created_at_ms: now_ms(),
+        })
+        .await;
+        // 2nd checkpoint 同 task_id
+        cs.save(Checkpoint {
+            checkpoint_id: Uuid::new_v4(),
+            task_id,
+            tenant_id,
+            task_state: TaskState::Completed,
+            context_data: serde_json::json!({"step": 5}),
+            completed_steps: vec!["s1".into(), "s2".into(), "s3".into()],
+            created_at_ms: now_ms(),
+        })
+        .await;
+        // latest 指向 2nd
+        let latest = cs.latest_for_task(task_id).await.unwrap();
+        assert_eq!(latest.task_state, TaskState::Completed);
+        assert_eq!(latest.completed_steps.len(), 3);
+    }
+
+    /// G.8 PoC test 1: ContextStore 三级缓存 put + get
+    #[tokio::test]
+    async fn contextstore_3tier_put_get() {
+        let cs = ContextStore::new();
+        let task_id = Uuid::new_v4();
+        let tenant_id = Uuid::new_v4();
+        // L1 写
+        cs.put(
+            ContextTier::L1,
+            task_id,
+            tenant_id,
+            "hot:key",
+            serde_json::json!("v_l1"),
+        )
+        .await;
+        // L2 写
+        cs.put(
+            ContextTier::L2,
+            task_id,
+            tenant_id,
+            "warm:key",
+            serde_json::json!("v_l2"),
+        )
+        .await;
+        // L3 写
+        cs.put(
+            ContextTier::L3,
+            task_id,
+            tenant_id,
+            "cold:key",
+            serde_json::json!("v_l3"),
+        )
+        .await;
+        // 按 tier get
+        let l1 = cs.get(ContextTier::L1, "hot:key").await.unwrap();
+        assert_eq!(l1.value, serde_json::json!("v_l1"));
+        assert_eq!(l1.tier, ContextTier::L1);
+        let l2 = cs.get(ContextTier::L2, "warm:key").await.unwrap();
+        assert_eq!(l2.tier, ContextTier::L2);
+        let l3 = cs.get(ContextTier::L3, "cold:key").await.unwrap();
+        assert_eq!(l3.tier, ContextTier::L3);
+    }
+
+    /// G.8 PoC test 2: ContextStore promote 升级路径 L3 -> L2 -> L1
+    #[tokio::test]
+    async fn contextstore_promote_l3_to_l1() {
+        let cs = ContextStore::new();
+        let task_id = Uuid::new_v4();
+        let tenant_id = Uuid::new_v4();
+        // 初始 L3 写
+        cs.put(
+            ContextTier::L3,
+            task_id,
+            tenant_id,
+            "k",
+            serde_json::json!(42),
+        )
+        .await;
+        // L3 -> L2
+        let p1 = cs
+            .promote(ContextTier::L3, ContextTier::L2, "k")
+            .await
+            .unwrap();
+        assert_eq!(p1.tier, ContextTier::L2);
+        // L3 没了
+        assert!(cs.get(ContextTier::L3, "k").await.is_none());
+        // L2 -> L1
+        let p2 = cs
+            .promote(ContextTier::L2, ContextTier::L1, "k")
+            .await
+            .unwrap();
+        assert_eq!(p2.tier, ContextTier::L1);
+        assert!(cs.get(ContextTier::L2, "k").await.is_none());
+        // L1 拿到
+        let l1 = cs.get(ContextTier::L1, "k").await.unwrap();
+        assert_eq!(l1.value, serde_json::json!(42));
+    }
+
+    /// G.8 PoC test 3: ContextStore list_by_task 多 tier 聚合
+    #[tokio::test]
+    async fn contextstore_list_by_task() {
+        let cs = ContextStore::new();
+        let task_id = Uuid::new_v4();
+        let tenant_id = Uuid::new_v4();
+        // 3 tier 各 1 条
+        cs.put(
+            ContextTier::L1,
+            task_id,
+            tenant_id,
+            "a",
+            serde_json::json!(1),
+        )
+        .await;
+        cs.put(
+            ContextTier::L2,
+            task_id,
+            tenant_id,
+            "b",
+            serde_json::json!(2),
+        )
+        .await;
+        cs.put(
+            ContextTier::L3,
+            task_id,
+            tenant_id,
+            "c",
+            serde_json::json!(3),
+        )
+        .await;
+        let list = cs.list_by_task(task_id).await;
+        assert_eq!(list.len(), 3);
     }
 }
