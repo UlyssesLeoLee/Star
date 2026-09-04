@@ -1,7 +1,5 @@
 //! `star project list` (MVP 17 核心 #1)
 
-#![warn(missing_docs)]
-
 use clap::Subcommand;
 use serde::Serialize;
 

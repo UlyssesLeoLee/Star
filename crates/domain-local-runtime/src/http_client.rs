@@ -9,8 +9,6 @@
 //!
 //! Per 2026-08-29 10:06 JST 用户拍板 "Phase 2 后续任务 → OpenClaw / Hermes 真实 HTTP 客户端"
 
-#![warn(missing_docs)]
-
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures_util::StreamExt;

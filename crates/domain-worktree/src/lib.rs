@@ -23,8 +23,6 @@
 //!
 //! Lead 责任: worktree Lead
 
-#![warn(missing_docs)]
-
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 

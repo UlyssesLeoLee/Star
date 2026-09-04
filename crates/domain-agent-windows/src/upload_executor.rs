@@ -8,8 +8,6 @@
 //!
 //! Per 2026-08-29 10:25 JST 用户拍板 "1,2,3 全部"
 
-#![warn(missing_docs)]
-
 use std::path::PathBuf;
 use std::process::Stdio;
 use thiserror::Error;

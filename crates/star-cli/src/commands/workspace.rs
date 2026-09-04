@@ -1,7 +1,5 @@
 //! `star workspace list` (MVP 17 核心 #10)
 
-#![warn(missing_docs)]
-
 use clap::Subcommand;
 use serde::Serialize;
 

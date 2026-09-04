@@ -9,8 +9,6 @@
 //! - 解析失败 → 退到 default(打印 stderr warning,但不阻塞)
 //! - 符合 `agent-api/v1#CurrentTask` schema
 
-#![warn(missing_docs)]
-
 use clap::Subcommand;
 
 use crate::error::StarError;

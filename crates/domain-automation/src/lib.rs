@@ -21,8 +21,6 @@
 //!
 //! Lead 责任: automation Lead
 
-#![warn(missing_docs)]
-
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};

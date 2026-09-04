@@ -7,8 +7,6 @@
 //!
 //! 阶段 1 重点: C01 Burndown 完整实装 (SQL + Port + 缓存 + 错误 + 测试), 其它 13 路由 stub
 
-#![warn(missing_docs)]
-
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;

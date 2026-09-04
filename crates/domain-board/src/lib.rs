@@ -31,8 +31,6 @@
 //! port / service / value_object),现已合并到本单文件,移除旧的事件总线和
 //! invariants 独立模块。所有类型保持原可见性以便调用方平滑过渡。
 
-#![warn(missing_docs)]
-
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 

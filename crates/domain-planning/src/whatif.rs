@@ -4,8 +4,6 @@
 //! - 信心度: Committed / Planned / Exploratory
 //! - 基线 (Baseline): 保存当前排程, 后续可对比差异
 
-#![warn(missing_docs)]
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

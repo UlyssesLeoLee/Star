@@ -1,7 +1,5 @@
 //! `star worktree ...` (MVP 17 核心 #11-#13: create / enter / status)
 
-#![warn(missing_docs)]
-
 use clap::Subcommand;
 use serde::Serialize;
 

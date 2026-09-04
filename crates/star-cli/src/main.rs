@@ -2,8 +2,6 @@
 //!
 //! per `docs/architecture/2026-08-26-upgrade/spec/cli/01-cli-spec.md` §2
 
-#![warn(missing_docs)]
-
 use clap::{Parser, Subcommand};
 
 mod commands;

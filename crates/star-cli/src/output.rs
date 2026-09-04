@@ -10,8 +10,6 @@
 //! - 顶层始终含 `schema_version: "agent-api/v1"`
 //! - 不在 lib 层做 ANSI color(mvp 不需要 `--no-color` 分支)
 
-#![warn(missing_docs)]
-
 use serde::Serialize;
 
 use crate::error::StarError;

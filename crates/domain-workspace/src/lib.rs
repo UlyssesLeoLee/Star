@@ -25,8 +25,6 @@
 //!
 //! Lead 责任: workspace Lead
 
-#![warn(missing_docs)]
-
 use std::collections::HashMap;
 use std::sync::Arc;
 

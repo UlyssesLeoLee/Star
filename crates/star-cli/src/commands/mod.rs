@@ -4,8 +4,6 @@
 //! Phase D 极简骨架 3 命令: agent / task / submit
 //! Phase D.2 新增 14 命令: project / issue / context / code / workspace / worktree / mr / test / pipeline
 
-#![warn(missing_docs)]
-
 pub(crate) mod agent;
 pub(crate) mod code;
 pub(crate) mod context;

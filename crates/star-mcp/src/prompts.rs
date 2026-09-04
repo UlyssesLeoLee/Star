@@ -27,8 +27,6 @@
 //! - `role` 必为 `"user"` 或 `"assistant"`(per spec §4)
 //! - `content.type` 必为 `"text"`(MVP 范围)
 
-#![warn(missing_docs)]
-
 use serde_json::{json, Value};
 
 use crate::error::{error_code, ErrorSourceKind, McpError};

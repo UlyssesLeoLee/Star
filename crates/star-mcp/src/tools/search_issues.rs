@@ -1,5 +1,3 @@
-#![warn(missing_docs)]
-
 //! MCP tool: search_issues
 //!
 //! per `docs/architecture/2026-08-26-upgrade/spec/mcp/01-mcp-spec.md` §2

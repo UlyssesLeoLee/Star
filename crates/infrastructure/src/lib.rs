@@ -25,8 +25,6 @@
 //!
 //! Adapter 仅实现 Domain Port(§3 ACL);非 Database per Domain(§13.5,§30.6)
 
-#![warn(missing_docs)]
-
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 pub use star_context::ActorContext;

@@ -8,8 +8,6 @@
 //!
 //! 行为不变 (mock_fallback 路径不挂 hub), 新增路径 `RealCliRuntime::with_hub(...)`.
 
-#![warn(missing_docs)]
-
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::process::Stdio;

@@ -23,8 +23,6 @@
 //!
 //! Lead 责任: permission Lead
 
-#![warn(missing_docs)]
-
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 

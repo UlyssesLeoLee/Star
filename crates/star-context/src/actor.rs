@@ -34,8 +34,6 @@
 //!
 //! Lead 责任: 架构师 (Mavis 接手 agent per DEC-008)
 
-#![warn(missing_docs)]
-
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

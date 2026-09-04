@@ -1,7 +1,5 @@
 //! `star pipeline ...` (MVP 17 核心 #18-#19: run / status) - 已合并 MVP 17
 
-#![warn(missing_docs)]
-
 use clap::Subcommand;
 
 use crate::error::StarError;

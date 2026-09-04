@@ -4,8 +4,6 @@
 //! LocalRuntime::subscribe(id) 真接 mpsc 通道 (per-process)
 //! 替代之前返回空 channel 的占位实现
 
-#![warn(missing_docs)]
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, Mutex};

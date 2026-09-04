@@ -31,8 +31,6 @@
 //! 5. **Metrics**: 无 Prometheus counters, 真实监控留 Phase D.8+
 //! 6. **Auth**: session_id 当前无 auth 绑定, 任意 client 可重连 → Phase E+ 接入 token
 
-#![warn(missing_docs)]
-
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

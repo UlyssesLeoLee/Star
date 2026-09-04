@@ -6,8 +6,6 @@
 //!
 //! 同时支持 SSE 注释 (`: keep-alive`) 和 [DONE] 标记.
 
-#![warn(missing_docs)]
-
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

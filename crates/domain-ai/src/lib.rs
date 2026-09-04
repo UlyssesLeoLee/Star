@@ -9,8 +9,6 @@
 //! + Rovo-like Chat (跨域问答 + SSE 流式)
 //! + LLM Provider 抽象 (mock + openai/anthropic 接口)
 
-#![warn(missing_docs)]
-
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

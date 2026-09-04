@@ -1,7 +1,5 @@
 //! `star code ...` (MVP 17 核心 #7-#9: search / symbol / references)
 
-#![warn(missing_docs)]
-
 use clap::Subcommand;
 use serde::Serialize;
 

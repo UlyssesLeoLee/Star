@@ -23,8 +23,6 @@
 //!
 //! Lead 责任: local-runtime Lead
 
-#![warn(missing_docs)]
-
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;

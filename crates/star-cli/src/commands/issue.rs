@@ -1,7 +1,5 @@
 //! `star issue ...` (MVP 17 核心 #2-#4: list / show / claim)
 
-#![warn(missing_docs)]
-
 use clap::Subcommand;
 use serde::Serialize;
 

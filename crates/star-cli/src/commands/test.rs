@@ -1,7 +1,5 @@
 //! `star test ...` (MVP 17 核心 #17: affected / run)
 
-#![warn(missing_docs)]
-
 use clap::Subcommand;
 
 use crate::error::StarError;

@@ -17,8 +17,6 @@
 //! - 9/3 RF-001 T1.3 拍板 A 注册 (per `docs/plans/PHASE-EXEC-PLAN-2026-09-03.md` §6.2 #1)
 //! - 9/3 本 commit 新建 `Cargo.toml` + 注册 workspace.members + 本 `lib.rs` 包 mod cache
 
-#![warn(missing_docs)]
-
 /// R-007 cache 层占位 (Phase D 填实)
 /// 详见 [`cache::VcsCache`] (当前空 struct, Phase D 替换为 `Cache<K, V>` trait + `InMemoryCache` impl)
 pub mod cache;

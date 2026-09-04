@@ -26,8 +26,6 @@
 //! - `resources/read` 返回 `{ contents: [{ uri, mimeType, text }] }` 数组(per spec §3.2)
 //! - URI scheme 必为 `<scheme>://<path>` 格式(per spec §3.1)
 
-#![warn(missing_docs)]
-
 use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::{json, Value};

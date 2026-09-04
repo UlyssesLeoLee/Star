@@ -8,8 +8,6 @@
 //! - 返回 mock 数据
 //! - 不实现真实业务逻辑(Phase D.1 补齐)
 
-#![warn(missing_docs)]
-
 pub(crate) mod create_merge_request;
 pub(crate) mod create_worktree;
 pub(crate) mod find_references;

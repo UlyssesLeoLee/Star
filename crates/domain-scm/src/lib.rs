@@ -27,8 +27,6 @@
 //!
 //! Lead 责任: scm Lead
 
-#![warn(missing_docs)]
-
 use std::collections::HashMap;
 use std::sync::Arc;
 

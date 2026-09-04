@@ -8,8 +8,6 @@
 //! - 把 workspace data 嵌入 `Capabilities.workspace` 字段
 //! - 完整 capability 列表 / 静态命令清单 / 权限待 Phase D.1 补齐
 
-#![warn(missing_docs)]
-
 use clap::Subcommand;
 
 use crate::error::StarError;

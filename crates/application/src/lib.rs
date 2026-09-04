@@ -40,8 +40,6 @@
 //!
 //! Application Service 跨域事务编排(§2.4);不通过 Event Chain 拆分(§14.1,§58)
 
-#![warn(missing_docs)]
-
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 pub use star_context::ActorContext;

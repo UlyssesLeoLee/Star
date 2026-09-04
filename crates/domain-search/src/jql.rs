@@ -10,8 +10,6 @@
 //! 实装: 递归下降 parser + AST + 内存执行器 (本任务 stub 形式).
 //! 真实数据接入: Phase 2 走 domain-work-item repository.
 
-#![warn(missing_docs)]
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;

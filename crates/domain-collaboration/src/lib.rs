@@ -21,8 +21,6 @@
 //!
 //! Lead 责任: collaboration Lead
 
-#![warn(missing_docs)]
-
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 

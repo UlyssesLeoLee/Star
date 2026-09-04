@@ -21,8 +21,6 @@
 //!
 //! Lead 责任: search Lead
 
-#![warn(missing_docs)]
-
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 

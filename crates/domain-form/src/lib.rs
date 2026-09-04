@@ -6,8 +6,6 @@
 //! - 公开 URL (无需登录)
 //! - 速率限制
 
-#![warn(missing_docs)]
-
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -112,7 +110,7 @@ impl FieldType {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FormField {
     /// 提交时字段名
-    pub key: String,   // 提交时字段名
+    pub key: String, // 提交时字段名
     /// UI 显示文本
     pub label: String, // UI 显示
     /// 字段类型
@@ -216,13 +214,13 @@ pub struct SubmitAction {
 /// 表单提交后触发的动作类型
 pub enum SubmitActionType {
     /// 创建工作项 (走 domain-work-item)
-    CreateWorkItem,    // 走 domain-work-item
+    CreateWorkItem, // 走 domain-work-item
     /// 触发自动化流程 (走 domain-automation)
     TriggerAutomation, // 走 domain-automation
     /// 发送邮件通知 (走 domain-notification)
-    SendEmail,         // 走 domain-notification
+    SendEmail, // 走 domain-notification
     /// 调用 Webhook (走 star-webhook)
-    CallWebhook,       // 走 star-webhook
+    CallWebhook, // 走 star-webhook
 }
 
 // =====================================================================

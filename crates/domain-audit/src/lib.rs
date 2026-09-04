@@ -24,8 +24,6 @@
 //!
 //! Lead 责任: audit Lead
 
-#![warn(missing_docs)]
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;

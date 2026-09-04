@@ -4,8 +4,6 @@
 //! 1. Commit message 模板 (Conventional Commits)
 //! 2. Worktree 状态检测 (detached HEAD / conflict / dirty)
 
-#![warn(missing_docs)]
-
 use std::path::Path;
 use thiserror::Error;
 use tokio::process::Command;

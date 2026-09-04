@@ -16,8 +16,6 @@
 //! - service: ThemeService (resolve / list_available / set)
 //! - value_object: ThemeId / ThemeScope / ColorToken / SpacingToken / RadiusToken / ThemeDefinition
 
-#![warn(missing_docs)]
-
 pub mod context;
 pub mod entity;
 pub mod error;

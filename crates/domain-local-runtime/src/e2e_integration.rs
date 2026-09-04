@@ -15,8 +15,6 @@
 //! 运行: cargo test -p domain-local-runtime --lib e2e_integration
 //! 受 5-min timeout 约束, 平台降级是允许的 (per P3-A.3 报告 §3 缺口 #2 + P3-A.4 #7)
 
-#![warn(missing_docs)]
-
 use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;

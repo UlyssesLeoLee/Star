@@ -9,8 +9,6 @@
 //! - 阻止动作: 全局禁用某些 Action 类型
 //! - 审计: 规则创建/编辑/执行/失败全记录
 
-#![warn(missing_docs)]
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

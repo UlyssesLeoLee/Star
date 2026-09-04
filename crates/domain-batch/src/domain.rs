@@ -610,7 +610,7 @@ pub struct Event {
     /// 事件时间戳
     pub ts: DateTime<Utc>,
     /// 因果链上游事件 ID
-    pub causation_id: Option<EventId>,   // per §D28 守门 5
+    pub causation_id: Option<EventId>, // per §D28 守门 5
     /// 关联链事件 ID
     pub correlation_id: Option<EventId>, // per §D28 守门 5
 }

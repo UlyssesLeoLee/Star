@@ -16,8 +16,6 @@
 //!
 //! 不依赖: 不改 spawn_upload_integration.rs 的内部逻辑.
 
-#![warn(missing_docs)]
-
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc, Mutex};

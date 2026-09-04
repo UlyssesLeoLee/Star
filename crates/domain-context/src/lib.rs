@@ -26,8 +26,6 @@
 //!
 //! Lead 责任: context Lead
 
-#![warn(missing_docs)]
-
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock};
 

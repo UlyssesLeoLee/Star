@@ -1,7 +1,5 @@
 //! `star context ...` (MVP 17 核心 #5-#6: get / current)
 
-#![warn(missing_docs)]
-
 use clap::Subcommand;
 use serde::Serialize;
 

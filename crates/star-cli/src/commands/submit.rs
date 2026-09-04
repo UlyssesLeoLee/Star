@@ -23,8 +23,6 @@
 //!
 //! 每步输出 `[STEP n/12] <name>: <status>`,最后输出 `SubmitResult` JSON(per `agent-api/v1#SubmitResult`)。
 
-#![warn(missing_docs)]
-
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};

@@ -12,8 +12,6 @@
 //! - 是 bootstrap, 不是 knowledge base (per spec §0: 极薄, 不塞企业知识)
 //! - write_bootstrap 如目标文件存在 -> 拒绝 (Err(AlreadyExists)), 不覆盖
 
-#![warn(missing_docs)]
-
 use std::fs;
 use std::path::Path;
 

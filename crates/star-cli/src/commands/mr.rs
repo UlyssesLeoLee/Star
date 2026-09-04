@@ -1,7 +1,5 @@
 //! `star mr ...` (MVP 17 核心 #14-#16: create / show / review)
 
-#![warn(missing_docs)]
-
 use clap::Subcommand;
 use serde::Serialize;
 

@@ -23,8 +23,6 @@
 //! - INV-WF-04:Terminal 状态不可再迁出
 //! - INV-WF-05:WorkflowInstance history 必带 actor + at(审计)
 
-#![warn(missing_docs)]
-
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 

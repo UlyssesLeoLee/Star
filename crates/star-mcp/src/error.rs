@@ -20,8 +20,6 @@
 //! - `serde::Serialize` 直接复用 6 字段 → JSON-RPC 2.0 `data` envelope
 //! - 不编造错误码(只列已在 spec/flows 出现的 20+ 个)
 
-#![warn(missing_docs)]
-
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

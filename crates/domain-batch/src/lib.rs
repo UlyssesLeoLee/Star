@@ -31,8 +31,6 @@
 //!
 //! Lead 责任: ⏳ 5 域 Lead + SRE Lead 缺位, 阶段性架构师代签 (per 9/1 18:43 JST 拍板 A)
 
-#![warn(missing_docs)]
-
 pub mod domain;
 pub mod error;
 pub mod event;

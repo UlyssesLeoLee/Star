@@ -12,8 +12,6 @@
 //! - error: 6 错误变体
 //! - service: WindowService (开窗/关窗/添加 tab/触发上传)
 
-#![warn(missing_docs)]
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

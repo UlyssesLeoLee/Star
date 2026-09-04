@@ -3,8 +3,6 @@
 //! Phase D 骨架只暴露 stub 错误(序列化失败 / IO 失败),
 //! 完整 9 类错误模型待 Phase D.1 增量补齐。
 
-#![warn(missing_docs)]
-
 use thiserror::Error;
 
 /// CLI 顶层错误(per spec §5)

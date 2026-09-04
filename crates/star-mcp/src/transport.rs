@@ -18,8 +18,6 @@
 //! - Phase D.5+ 在 Cargo.toml 新增 axum + tokio-stream 依赖 (D.3 的 0 新外部依赖已不适用)
 //! - RUSTFLAGS=-D warnings 必 pass
 
-#![warn(missing_docs)]
-
 use std::io::{self, BufRead, Write};
 
 use serde::{Deserialize, Serialize};

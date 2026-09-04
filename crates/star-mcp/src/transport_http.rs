@@ -29,8 +29,6 @@
 //! - 复用 `transport::JsonRpcRequest` / `JsonRpcSuccess` / `JsonRpcError`, 不重定义 JSON-RPC 协议
 //! - 0 new dep (用 workspace 已有 tokio mpsc + tokio_stream ReceiverStream)
 
-#![warn(missing_docs)]
-
 use std::convert::Infallible;
 use std::sync::Arc;
 use std::time::Duration;

@@ -8,8 +8,6 @@
 //!
 //! Phase 2 接 domain-cli (w17) 真实数据.
 
-#![warn(missing_docs)]
-
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
