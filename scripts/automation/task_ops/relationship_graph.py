@@ -151,6 +151,53 @@ class TaskRelationshipGraph:
 
     # === 边管理 ===
 
+    def add_children(
+        self,
+        parent_task_id: str,
+        child_task_ids: List[str],
+        strategy: str = "context_fork",
+    ) -> None:
+        """注册拆分关系 (per M-N2 split_node 调用): parent → child 边.
+
+        跟 add_task(split_into=...) 镜像, 但允许单独 update (parent 之前已 add,
+        split 节点只需在 relationship_graph 上挂 children 边).
+
+        边方向 (per 守门 #13 a + LangGraph 拓扑惯例):
+          - parent_task_id 拆分为 child_task_ids
+          - 边 child → parent (child 依赖 parent, parent 先完成)
+
+        副作用:
+          - 自动 ensure parent + children 节点存在 (隐式 add)
+          - parent.split_into 同步记录 (SCD Type 2 关系变更留痕 per 守门 #13 c)
+        """
+        # ensure parent 存在
+        if parent_task_id not in self._nodes:
+            self._nodes[parent_task_id] = TaskNode(task_id=parent_task_id)
+            self._adj.setdefault(parent_task_id, set())
+
+        for child_id in child_task_ids:
+            # ensure child 存在
+            if child_id not in self._nodes:
+                child_node = TaskNode(task_id=child_id, parent_task_id=parent_task_id)
+                self._nodes[child_id] = child_node
+                self._adj.setdefault(child_id, set())
+            else:
+                # 已有 node, 补 parent_task_id 字段 (SCD Type 2)
+                existing = self._nodes[child_id]
+                if existing.parent_task_id is None:
+                    existing.parent_task_id = parent_task_id
+            # 边: child → parent (child 依赖 parent)
+            self._adj[child_id].add(parent_task_id)
+            # parent 同步记录 split_into
+            self._nodes[parent_task_id].split_into.append(child_id)
+
+    def get_children(self, parent_task_id: str) -> List[str]:
+        """返回 parent_task_id 的所有子节点 (split 关系)."""
+        node = self._nodes.get(parent_task_id)
+        if node is None:
+            return []
+        return list(node.split_into)
+
     def add_edge(self, u: str, v: str) -> None:
         """显式添加依赖边 u → v (u 依赖 v).
 

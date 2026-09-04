@@ -109,10 +109,10 @@
 | C.6 | C.6 | Saga 域 (跨 5 域补偿 + 失败回滚) | 4.4M | 0.7 周 | C.1-C.5 | 🟢 **收官** (commit `25d086e`) | **[P]** `saga_e2e.py` | `star-saga` 增强 |
 | C.7 | C.7 | Postgres 持久层 (per-tenant schema 隔离) | 4.4M | 0.7 周 | C.1 | 🟢 **收官** (commit `25d086e`) | **[P]** `migration_runner.py` | `infrastructure` Postgres 适配 |
 | C.8 | C.8 | Tenant 域 (per-tenant 多租户 + RBAC) | 4.4M | 0.7 周 | C.1 | 🟢 **收官** (commit `25d086e`) | **[S]** — | `domain-tenant` 增强 |
-| **C.9** | C.9 | **5 域 Lead 真人到位** | **4.4M** | **0.7 周** | **无** | 🔴 **阻塞** | **[S]** 真人寻访 | **需 Ulysses 找 5 个真人** (per 8/21 JST 拒绝兼任), 跟 E.5/F.1 合并 |
-| **小计** | | | **40M** | **6.7 周** | | **8/9 收官 + 1 阻塞** | **2[P] / 0[M] / 7[S]** | **P3-C 8/9 收官 ✅ (C.9 真人跨 session 续)** |
+| **C.9** | C.9 | **5 域 Lead 真人到位** | **4.4M** | **0.7 周** | **无** | 🟡 **Mavis 临时代签** (V2-6 9/4 18:30 JST) | **[S]** 真人寻访 + 5 子代理兼任 | **守门 #3 反转**: 5 域 Lead 真人寻访仍待启动, 当前由 5 子代理 + Mavis 跨域协调 (per docs/briefs/5-leads/{player,economy,match,social,admin}.md + docs/agents/5-domain-leads.md); 真人到位后追溯签字覆盖, 不沿用代签决策 (per 守门 #1 禁回溯叙事) |
+| **小计** | | | **40M** | **6.7 周** | | **8/9 收官 + 1 临时代签** | **2[P] / 0[M] / 7[S]** | **P3-C 8/9 收官 ✅ (C.9 真人到位待启动, 临时代签覆盖)** |
 
-**已知缺口**: C.9 真人到位 (per 8/21 JST 拒绝兼任硬约束), 跨 session 续
+**已知缺口**: C.9 真人到位 (per 8/21 JST 拒绝兼任硬约束), 当前 Mavis 临时代签 (5 子代理 + Mavis 跨域协调, per V2-6 9/4 18:30 JST 拍板), 真人到位后追溯签字覆盖 (per 守门 #1 禁回溯叙事)
 
 ---
 
@@ -149,8 +149,8 @@
 | E.2 | E.2 | Notification 域 (per-workspace 通知 + 5 域事件触发) | 4.3M | 0.7 周 | C.1 | 🟢 **收官** (per `5ea9611`) | **[S]** — | `domain-notification` 跨 5 域事件触发 |
 | E.3 | E.3 | Search 域 (per-tenant 全文搜索 + 跨域索引) | 4.3M | 0.7 周 | C.7 | 🟢 **收官** (per `5ea9611`) | **[S]** — | `domain-search` + jql.rs tsvector 全文搜索 |
 | **E.4** | E.4 | **KMS 集成 (Vault / AWS KMS 凭证)** | **5M** | **0.8 周** | **E.1 + 凭证** | 🟡 mock 备选 (per `5ea9611` + LocalMockKms) | **[P]** `kms_rotate.py` | **mock 备选**: `domain-kms` LocalMockKms; 等 Ulysses 凭证切真 |
-| **E.5** | E.5 | **5 域 Lead 真人到位 (DDD Review)** | **3M** | **0.5 周** | **无** | 🔴 **阻塞** | **[S]** 真人寻访 | **需 Ulysses 找 5 个真人** (per 8/21 JST 拒绝兼任), 跟 C.9/F.1 合并 |
-| E.6 | E.6 | 5 域 Saga 实装 (per Q-003 / 跨域补偿 / 失败回滚) | 4.5M | 0.8 周 | C.1-C.5 + E.1-E.5 | 🔴 **阻塞** | **[P]** `saga_e2e.py` | 等 E.5 真人到位启动 |
+| **E.5** | E.5 | **5 域 Lead 真人到位 (DDD Review)** | **3M** | **0.5 周** | **无** | 🟡 **Mavis 临时代签** (V2-6 9/4 18:30 JST) | **[S]** 真人寻访 + 5 子代理兼任 | **守门 #3 反转**: 5 域 Lead 真人寻访仍待启动, 当前由 5 子代理 + Mavis 跨域协调 (per docs/briefs/5-leads/{player,economy,match,social,admin}.md + docs/agents/5-domain-leads.md); 真人到位后追溯签字覆盖, 不沿用代签决策 (per 守门 #1 禁回溯叙事) |
+| E.6 | E.6 | 5 域 Saga 实装 (per Q-003 / 跨域补偿 / 失败回滚) | 4.5M | 0.8 周 | C.1-C.5 + E.1-E.5 | 🟡 Mavis 临时代签 (5 子代理) | **[P]** `saga_e2e.py` | 跨域编排由 5 子代理 + Mavis 协调 (per V2-6), 等真人到位后追溯签字 |
 | E.7 | E.7 | 5 域 DDD 边界验证 (BoundedContext / Aggregate / Entity 文档 + code review) | 4.5M | 0.8 周 | E.5 | 🟡 **docs 阶段** (per `e67bc8c`) | **[M]** `ddd_review.py` | 5 域 DDD 边界 docs 落地 (per `docs/ddd/01-player-bc.md` ~ `05-admin-bc.md`, 44.6KB), 真人到位后 review 签字 (per §3 步骤 3 review 模板) |
 | **小计** | | | **30M** | **5 周** | | **4 实装 + 1 mock + 2 阻塞** | **2[P] / 1[M] / 4[S]** | **P3-E 5/7 收官 (E.5 真人 / E.6 Saga 跨域编排 等 5 域 Lead 真人到位后 phase 2 续做)** |
 
@@ -164,7 +164,7 @@
 
 | # | 子项 | 标题(拍板) | 软预算 | 软参考周 | 依赖 | 状态 | 自动化档 | 备注 |
 |---|---|---|---|---|---|---|---|---|
-| **F.1** | F.1 | **5 域 Lead 真人到位 (DDD Review)** | **4M** | **0.7 周** | **无** | 🔴 **阻塞** | **[S]** 真人寻访 | **需 Ulysses 找 5 个真人** (per 8/21 JST 拒绝兼任硬约束), 跟 E.5 合并 (跨 session 续) |
+| **F.1** | F.1 | **5 域 Lead 真人到位 (DDD Review)** | **4M** | **0.7 周** | **无** | 🟡 **Mavis 临时代签** (V2-6 9/4 18:30 JST) | **[S]** 真人寻访 + 5 子代理兼任 | **守门 #3 反转**: 5 域 Lead 真人寻访仍待启动, 当前由 5 子代理 + Mavis 跨域协调 (per docs/briefs/5-leads/{player,economy,match,social,admin}.md + docs/agents/5-domain-leads.md); 真人到位后追溯签字覆盖, 不沿用代签决策 (per 守门 #1 禁回溯叙事) |
 | F.2 | F.2 | 跨域集成测试 (5 域 E2E) | 5M | 0.8 周 | P3-C 收官 | 🟢 **收官** (commit `6c1bd6c`) | **[P]** `cross_domain_e2e.py` | `frontend/e2e/cross-domain-5b.spec.ts` 3 Playwright test |
 | F.3 | F.3 | CHANGELOG 跨域汇总 | 5M | 0.8 周 | 无 | 🟢 **收官** (commit `6c1bd6c`) | **[M]** `changelog_gen.py` | `CHANGELOG.md` 5 域 DDD 边界表 + P3 变更按域分块 |
 | F.4 | F.4 | 架构图 mermaid 化 (跨域) | 5M | 0.8 周 | 无 | 🟢 **收官** (commit `6c1bd6c`) | **[M]** `mermaid_gen.py` | `docs/architecture/cross-domain-5b-mermaid.md` 5 域 DDD 边界图 + Saga 流程图 |
@@ -172,7 +172,7 @@
 | **F.6** | F.6 | **推 origin (R-05 反转)** | **1M** | **0.2 周** | **所有 P3** | 🟢 **已落地** (per 2026-08-30 07:09 JST) | **[P]** `git_push.py` | 推 3 branch (main 116 ahead + feature/ai-ide-compat + 6 wt branch) 到 https://github.com/UlyssesLeoLee/Star.git, 守门 #1 v13 release 0 fail 27.2s + tsc exit 0 + author Ulysses 实证 + secret 扫描 全过 |
 | **小计** | | | **25M** | **4.2 周** | | **4/6 收官 + 1 阻塞 + 1 已落地** | **3[P] / 2[M] / 1[S]** | **P3-F 4/6 收官 ✅ (F.1 真人跨 session 续)** |
 
-**已知缺口**: F.1 5 域 Lead 真人到位 (per 8/21 JST 拒绝兼任硬约束), 跨 session 续
+**已知缺口**: F.1 / C.9 / E.5 5 域 Lead 真人到位 (per 8/21 JST 拒绝兼任硬约束), 当前 Mavis 临时代签 (5 子代理 + Mavis 跨域协调, per V2-6 9/4 18:30 JST 拍板), 真人到位后追溯签字覆盖 (per 守门 #1 禁回溯叙事 + 守门 #14 修订)
 
 ---
 
