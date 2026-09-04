@@ -1653,7 +1653,7 @@ b5bd5c3 feat(star-credential): V2-4 凭证审计端点 v0.0.1
 - WBS 同步: C.9 / E.5 / F.1 三处 5 域 Lead 状态 (🔴 阻塞 → 🟡 临时代签) per 9/4 18:30 JST 守门 #3 反转
 - 真人到位流程: 仍待 Ulysses 启动 (per 守门 #14 修订到位 timeline = 待定, Mavis 临时代签覆盖)
 
-### 18.6 2 待续做项 (推下 session 列表, per §5.3 缺标比错标, G-TMO-05 + G-TMO-04 + G-TMO-04b + G-TMO-04c 已关闭)
+### 18.6 1 待续做项 + 4 pending (推下 session 列表, per §5.3 缺标比错标, G-TMO-05 + G-TMO-04 + G-TMO-04b + G-TMO-04c + G-TMO-04d 已关闭)
 
 | 缺口 | 内容 | 依赖 | 状态 |
 |---|---|---|---|
@@ -1661,8 +1661,8 @@ b5bd5c3 feat(star-credential): V2-4 凭证审计端点 v0.0.1
 | G-DEP-02 | TMO-05 阻塞 P1 工具 (search_code / get_symbol / find_references / get_code_context) 4 tool | ~0.3-0.5M token | pending 推下 session |
 | ~~G-TMO-04~~ | ~~task_metadata DDL 落地~~ | **🟢 关闭** (per G-TMO-04-DDL-IMPL-REPORT v0.1) | closed |
 | ~~G-TMO-04b~~ | ~~metadata_node 集成 task_metadata DDL (in-memory → SQLite 持久化)~~ | **🟢 关闭** (per G-TMO-04b-REPO-IMPL-REPORT v0.1) | closed |
-| ~~G-TMO-04c~~ | ~~routes_tmo /api/tmo/metadata 端点 (FastAPI)~~ | **🟢 关闭** (per G-TMO-04c-ROUTES-IMPL-REPORT v0.1, 5 端点 + 11/11 e2e pass) | closed |
-| G-TMO-04d | metadata_node.py 集成 TaskMetadataRepository (call site) | ~0.1M token | pending 推下 session |
+| ~~G-TMO-04c~~ | ~~routes_tmo /api/tmo/metadata 端点 (FastAPI)~~ | **🟢 关闭** (per G-TMO-04c-ROUTES-IMPL-REPORT v0.1) | closed |
+| ~~G-TMO-04d~~ | ~~metadata_node.py 集成 TaskMetadataRepository (call site)~~ | **🟢 关闭** (per G-TMO-04d-NODE-PERSIST-IMPL-REPORT v0.1, env 开关 + 优雅降级 + 6/6 e2e pass) | closed |
 | ~~G-TMO-05~~ | ~~LangGraph SDK 0.2.x interrupt_response API alpha 确认~~ | **不适用 (per G-TMO-05-SDK-FINDINGS v0.1)** | **🟢 关闭** |
 | 5 域 Lead 真人寻访 | per 9/4 18:30 JST 守门 #3 反转 5 子代理兼任, 真人寻访仍待 Ulysses 启动 | Ulysses 找 5 个真人 | pending |
 | 真实凭证切真 | per 9/3 11:35 JST 拍板 A, mock 备选已落地, 真实 .env / UI 填入待 Ulysses 提供 | Ulysses | pending |

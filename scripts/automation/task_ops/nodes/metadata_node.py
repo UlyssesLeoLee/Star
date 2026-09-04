@@ -26,11 +26,16 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 import uuid
 from typing import Any, Dict, List, Optional, Sequence
 
 logger = logging.getLogger("task_ops.nodes.metadata_node")
+
+# 可选持久化开关 (per G-TMO-04d, 默认关闭 — 保持 in-memory 兼容)
+# 设置 STAR_TASK_METADATA_PERSIST=1 + STAR_TASK_METADATA_DB_PATH=... 启用 SQLite 持久化
+_TASK_METADATA_PERSIST: bool = os.environ.get("STAR_TASK_METADATA_PERSIST", "0") == "1"
 
 
 # ===== 常量 (per 03 §3.2.1.1 + 02 §2.6.4) =====
@@ -228,6 +233,49 @@ def _emit_ui_events(
 
 # ===== 主函数: metadata_node =====
 
+
+def _persist_to_sqlite(
+    target_id: str,
+    tenant_id: str,
+    workspace_id: str,
+    metadata: Dict[str, Any],
+    actor_session_id: Optional[str],
+) -> Dict[str, Any]:
+    """委托 TaskMetadataRepository.upsert_metadata (per G-TMO-04d + G-TMO-04b).
+
+    守门:
+      - 守门 #13 c: Master RLS 必携 tenant_id + workspace_id (Pydantic 已校验)
+      - 守门 #13 d: SCD Type 2 (旧 version is_current=0 + 新 version is_current=1) 走 repo
+      - 守门 #19: Python 化, 标准库 sqlite3
+      - 守门 #22: 调试控制台不污染 main 编译链
+    """
+    # 延迟 import (避免在 in-memory 模式加载 repo 模块, 守门 #22 不进 main 编译链)
+    from automation.task_ops.task_metadata_ddl import init_schema
+    from automation.task_ops.task_metadata_repo import TaskMetadataRepository
+
+    db_path = os.environ.get(
+        "STAR_TASK_METADATA_DB_PATH",
+        str(os.path.join(os.getcwd(), "data", "task_metadata.sqlite")),
+    )
+    init_schema(db_path)  # idempotent
+    repo = TaskMetadataRepository(db_path)
+    record = repo.upsert_metadata(
+        task_id=target_id,
+        tenant_id=tenant_id,
+        workspace_id=workspace_id,
+        metadata=metadata,
+        actor_session_id=actor_session_id,
+    )
+    audit = repo.get_audit_log(
+        task_id=target_id, tenant_id=tenant_id, workspace_id=workspace_id, limit=100,
+    )
+    return {
+        "version": record.version,
+        "scd_snapshot_id": None,  # repo 内部派生, 详细 ID 不暴露
+        "audit_count": len(audit),
+    }
+
+
 async def metadata_node(state: dict, manager) -> dict:
     """TMO M-N7: 更新 task metadata (per 03 §3.2.1.1)
 
@@ -283,6 +331,32 @@ async def metadata_node(state: dict, manager) -> dict:
     merged_state = _merge_metadata(target_id, metadata, prev_snapshot, handle)
     await sub_pool.update(target_id, merged_state)
 
+    # 步骤 4.5: 可选 SQLite 持久化 (per G-TMO-04d, STAR_TASK_METADATA_PERSIST=1 启用)
+    # 默认关闭, 保持 in-memory 兼容. 开启后委托 TaskMetadataRepository.upsert_metadata,
+    # 走 SCD Type 2 + audit 5 类事件 (per 守门 #13 d + 守门 #DB-13).
+    persist_result: Optional[Dict[str, Any]] = None
+    if _TASK_METADATA_PERSIST:
+        try:
+            persist_result = _persist_to_sqlite(
+                target_id=target_id,
+                tenant_id=tenant_id,
+                workspace_id=workspace_ids[0] if workspace_ids else "default",
+                metadata=metadata,
+                actor_session_id=actor_session_id,
+            )
+            logger.info(
+                "metadata_node persist: task=%s version=%s scd=%s",
+                target_id,
+                persist_result.get("version"),
+                persist_result.get("scd_snapshot_id"),
+            )
+        except Exception as exc:
+            # 持久化失败不应破坏 in-memory 状态 (per 守门 #22 + 守门 #19 优雅降级)
+            logger.warning(
+                "metadata_node persist failed (fallback to in-memory only): task=%s err=%s",
+                target_id, exc,
+            )
+
     # 步骤 6: emit UI events
     ui_events = _emit_ui_events(target_id, metadata)
 
@@ -294,6 +368,13 @@ async def metadata_node(state: dict, manager) -> dict:
         "ui_events": ui_events,
         "active_tmo_operation": None,
     }
+    if persist_result is not None:
+        result["persisted"] = {
+            "backend": "sqlite_task_metadata",
+            "version": persist_result.get("version"),
+            "scd_snapshot_id": persist_result.get("scd_snapshot_id"),
+            "audit_count": persist_result.get("audit_count"),
+        }
     logger.info(
         "metadata_node done: task=%s fields=%s scd_snapshot=%s",
         target_id, result["updated_fields"], scd_snapshot_id,
