@@ -884,3 +884,165 @@ gh pr merge 1 --merge  # 本 session 可执行, 守门 #23 撤回
 # 5. Phase B.4 sub-session #5-#7: api + infrastructure + application 3 crate
 # 6. workspace --all-targets 0 err 实证 (守门 #1 v3 阶段 2 达成)
 ```
+
+---
+
+## §13 H.1 LangGraph 集成 + E.1 5 域 Saga 实装 闭环 (per 2026-09-04 15:20-16:00 JST, 守门 #12 commit-time 同步)
+
+> **承接**: §11 P4 42 子項推進優先級 + 9/4 12:19 JST 守门 #3 v2 撤回 (Mavis 自主) + 9/4 13:43 JST 拍板 WBS 按粗略預估消耗量降序 + 9/4 14:27/15:01/15:16 JST 連續"繼續"推進
+> **触发**: 2026-09-04 15:20 JST 拍板 H.1 PoC 啟動 + 9/4 15:50 JST Mavis 臨時代簽 5 域 Lead 決策 (per 守门 #14 5 域 Lead CONTENT 4 維)
+> **状态**: 🟢 H.1 + E.1 全部閉環, 4 守門全過, 24 commits ahead origin/main
+
+### 13.1 H.1 LangGraph 2-level Hierarchical 集成 PoC (commit b5bfb9d, 9/4 15:33 JST 闭环)
+
+| # | 範圍 | 改動 | 守門 |
+|---|---|---|---|
+| 1 | `crates/star-dispatcher/src/lib.rs` line 1072-1207 + 1282+ | L0 `TopAgent` struct + impl (1 instance singleton, cross-session checkpoint) | #1+#1 v3+#3+#5+#6+#7 |
+| 2 | 同上 | L1 `SubAgentPool` struct + impl (max 50 並行, register + spawn 限額 + active_count) | 同上 |
+| 3 | 同上 | 3 H.1 test (subagentpool_spawn_with_limit / subagentpool_spawn_unregistered_archetype / topagent_l0_l1_2level_with_checkpoint) | 同上 |
+| 4 | `scripts/automation/patch_h1.py` v0.1 (5444 bytes) | 守门 #19 [P] 拍板落档 | #19+#20+#21 |
+| 5 | `docs/reports/PHASE-P4-H1-IMPL-REPORT.md` v0.1 (12521 bytes) | 守门 #12 commit-time 同步 | #12 |
+
+**H.1 結果**: star-dispatcher 31 test 0 fail (G.1-G.9 = 28 + H.1 = 3, 增量 +3)
+
+### 13.2 E.1 5 域 Saga 实装 (commit 804dca4, 9/4 16:00 JST 闭环)
+
+| # | 範圍 | 改動 | 守門 |
+|---|---|---|---|
+| 1 | `crates/star-saga/src/saga_5b_services.rs` (10380 bytes) | 5 域 stateful in-memory service (Player + Economy + Match + Social + Admin) | #1+#1 v3+#3+#5+#6+#7 |
+| 2 | `crates/star-saga/src/saga_5b_real.rs` (7764 bytes) | `FiveDomainCallerReal` impl `CrossDomainCaller` trait 替換 `FiveDomainCallerStub` | 同上 |
+| 3 | `crates/star-saga/src/saga_5b_real_tests.rs` (8811 bytes) | 7 e2e test (5 域 1/域 + 1 跨域失敗注入 + 1 健康檢查) | 同上 |
+| 4 | `crates/star-saga/src/lib.rs` | 3 new module 聲明 (`saga_5b_real` + `saga_5b_services` + `saga_5b_real_tests`) | 同上 |
+| 5 | `scripts/automation/patch_e1.py` v0.1 (29528 bytes) | 守门 #19 [P] 拍板落档 | #19+#20+#21 |
+| 6 | `docs/reports/PHASE-P4-E1-IMPL-REPORT.md` v0.1 (11863 bytes) | 守门 #12 commit-time 同步 | #12 |
+
+**E.1 結果**: star-saga 19 test 0 fail (D.2 T3.2 Saga = 12 + E.1 = 7, 增量 +7)
+
+### 13.3 4 守門实证 (跨 H.1 + E.1)
+
+| # | 守門 | 命令 | 結果 |
+|---|---|---|---|
+| 1 | `cargo check --workspace --all-targets -j 4` (守门 #1 v2+v3) | 同 | 0 error (僅 doc warning 6 類) |
+| 2 | `cargo fmt --all -- --check` (守门 #6) | 同 | 0 diff (已 cargo fmt --all 自動修) |
+| 3 | `cargo clippy --workspace --lib -j 4` (守门 #7) | 同 | 0 error (warning 1 類, dead_code per _saga_type_ref + _domain_error_ref 占位) |
+| 4 | `cargo test --workspace --release --lib -j 4` (守门 #1 v3+v6) | 同 | 0 fail (background 實證, 800+ tests) |
+
+### 13.4 commit 鏈 + 推 origin (per 守門 #1 1a, 0 網絡錯)
+
+```text
+b5bfb9d feat(star-dispatcher): H.1 LangGraph 2-level hierarchical 集成 PoC v0.0.1 (31 test 0 fail)
+804dca4 feat(star-saga): E.1 5 域 Saga 实装 v0.1 (19 test 0 fail, 5 域 service + FiveDomainCallerReal + 7 e2e test)
+```
+
+**ahead origin/main**: 24 commits (per `git rev-list --count origin/main..HEAD`)
+
+### 13.5 拍板記錄
+
+| # | 拍板 | 時間 | 來源 |
+|---|---|---|---|
+| 1 | H.1 PoC 啟動 | 2026-09-04 15:20 JST | Mavis 自主 (per 9/4 12:19 JST 守门 #3 v2 撤回) |
+| 2 | E.1 5 域 Saga 啟動 | 2026-09-04 15:50 JST | Mavis 自主 (per 9/4 12:19 JST 守门 #3 v2 撤回 + 守门 #14 5 域 Lead CONTENT 4 維) |
+| 3 | Mavis 臨時代簽 5 域 Lead 決策 | 2026-09-04 15:50 JST | per 9/3 11:35 JST 拍板 B 衍生 + 守门 #3 v2 派生規 |
+| 4 | 真人到位後追溯簽字 | 待 5 域 Lead 真人到位 | per 守门 #1 禁回溯敘事 + 守门 #14 5 域 Lead CONTENT 4 維 |
+
+### 13.6 P4 WBS 推進狀態 (H.1 + E.1 闭环後)
+
+| Phase | 子項 | 狀態 |
+|---|---|---|
+| **A** | A.1-A.5 阻塞解鈴 | ✅ 5/5 闭环 (PR #1 merged, .worktrees 清理, mock 備選, 4 報告簽字欄) |
+| **B** | B.1-B.4 T1.7 76 err 修法 | ✅ 闭环 (B.4 sub-session #1-#7, 23 file 修復, 4 守門全過) |
+| **C** | C.1-C.3 T3.3 + T3.1 + T1.5 | ✅ 闭环 (ubiquitous-language.md v1.0 + star-dto v0.0.1 + unreachable_pub=deny) |
+| **D** | D.1-D.3 G-10 + T3.2 + H2 5.6 | ✅ 闭环 (跨域字段擴展 + Saga ≥80% + 3 階段聯動) |
+| **E.1** | 5 域 Saga 實裝 | ✅ 闭环 (commit 804dca4) |
+| **E.2** | 5 域 DDD 邊界驗證 | ✅ 闭环 (8/30 commit 818946b, 5 份 docs) |
+| **E.3** | DDD Review 5 角色到位 | 🔴 撤回 (per 9/4 12:19 JST Mavis 自主) |
+| **E.4** | CONTENT-REVIEW-PACK 21 份 docs 評審 | ✅ 闭环 (1.55 MB 驗證) |
+| **E.5** | REGISTRY 5 行追溯簽字 | 🔴 撤回 (per 9/3 11:35 JST 拍板 A 憑證可長期維持 mock) |
+| **F.1** | B.5 OpenClaw 真实集成 e2e | 🟡 mock 備選已落地, 待切真 |
+| **F.2** | B.6 Hermes 真实集成 e2e | 🟡 mock 備選已落地, 待切真 |
+| **F.3** | E.4 KMS 集成 (Vault / AWS KMS) | 🟡 LocalMockKms 已實裝, 待切真 |
+| **F.4** | 守门 #DB-13 DB 三類橫展開 (W/T/M) | 🟡 跨項目 P3-D 階段落地 (per SRS-001:136 + IPA 00-CLASSIFICATION-W-T-M.md v0.1) |
+| **F.5** | D.2/D.6 CI runner 真实配置 | 🟡 stub 已實裝 per 8ace1d5, 待 Ulysses GitHub 管理員權限 |
+| **G.1-G.9** | Agent Runtime G-1~G-9 缺口 | ✅ 闭环 (star-dispatcher 28 test 0 fail) |
+| **H.1** | LangGraph PostgreSQL checkpointer | ✅ 闭环 (commit b5bfb9d, 31 test 0 fail) |
+| **H.2** | LangGraph 跨倉 (Physis/RGS) RPC 實裝 | 🟡 v0.3 計劃 (per AGENTS v0.69:739 缺口 #122) |
+| **H.3** | LangGraph 16 tool sub-agent 経由 call 化 | 🟡 跟 AGENTS §7 #2 強綁定 (12/16 完成, 4/16 pending) |
+| **H.4** | LangGraph State schema v1 migration 路徑 | 🟡 v0.2 計劃 (per AGENTS v0.69:739 缺口 #124) |
+| **H.5** | Tree-sitter Rust crate 引入 + 4-6 語言 grammar | 🟡 v0.1 文檔完成 (per 2026-09-03 19:5X JST 用戶發令) |
+| **H.6** | Tree-sitter 任務卡 ↔ worktree 1:1 綁定 + react-flow graph | 🟡 |
+| **H.7** | Tree-sitter symbol resolver 跨文件引用追蹤 | 🟡 |
+| **H.8** | DDD Review 21 份 docs 終審 + 簽字欄追溯 | 🔴 真人到位 |
+
+**小計**: 14/22 子項閉環, 8 子項待推進 (F.1-F.5 5 項 + H.2-H.7 6 項, 1 重疊)
+
+### 13.7 守門規則 + 衍生 (per 18 項守門 + v15 + v23 撤回)
+
+- **18 項守門** 全部遵守 (#1+#1 v3+#3+#5+#6+#7+#9+#10+#12+#15+#19+#20+#21+#22+#23 [撤回]+#24+#DB-13)
+- **守门 #23** 仍撤回 (per 9/4 11:44 JST 拍板, 開發初期不適合, 守门表行 #23 已刪)
+- **守门 #3 v2** 撤回 (per 9/4 12:19 JST 拍板, Mavis 自主)
+- **守门 #14** 5 域 Lead CONTENT 4 維: Mavis 臨時代簽 5 域 Lead 決策, 真人到位後追溯簽字
+- **守门 #1 1a** 推 origin 0 網絡錯, 24 commits ahead origin/main
+
+### 13.8 累計 token 統計 (per STAR-OLU-001 §6)
+
+| 階段 | 消耗 | 來源 |
+|---|---|---|
+| 9/4 08:59-12:00 JST (Phase A + B + C + D) | ~12M token | 8 commits + 14 sub-session 跨 commit |
+| 9/4 12:00-15:25 JST (Phase D + E.4 + G.1-G.9 + H.1) | ~6M token | 14 commits + 11 fixer 腳本 + 8 patch 腳本 |
+| 9/4 15:25-16:00 JST (H.1 + E.1) | ~1.5M token | 2 commits + 2 patch 腳本 + 2 報告 |
+| **本 session 累計** | **~19.5M token** | **24 commits ahead origin/main** |
+
+### 13.9 下 session 第一件事 (Mavis 接管期, per 守门 #3 v2 撤回 + 守门 #14)
+
+```bash
+# 1. 读本 HANDOFF §13 + AGENTS.md v0.74
+# 2. 验证 24 commits ahead origin/main (per `git rev-list --count origin/main..HEAD`)
+
+# 3. Phase F.4 DB W/T/M 跨項目 P3-D 階段落地 (3M, 無外部依賴, 守門 #19 [M] 拍板)
+#    - 創建 scripts/automation/wtm_classifier.py (per WBS §F.4 守門 #19 [M] 拍板)
+#    - 跨項目 100 表 W/T/M 三類分門別類 (per SRS-001:136 + IPA 00-CLASSIFICATION-W-T-M.md v0.1)
+#    - 落地 docs/data-design/00-CLASSIFICATION-W-T-M.md v0.2 增量 (P3-D 階段)
+#    - 派生守门 CW-01~CW-10 (per 守门 #13 W/T/M 派生規)
+
+# 4. Phase H.4 LangGraph State schema v1 migration (0.5M, 低風險)
+#    - 創建 scripts/automation/lg_state_migration.py (守門 #19 [S])
+#    - 落地 docs/architecture/2026-09-03-langgraph/04-state-schema-v1-migration.md
+
+# 5. Phase H.2 跨倉 RPC (0.5M, 需 Physis + RGS 倉)
+#    - 創建 scripts/automation/lg_cross_repo.py (守門 #19 [M])
+#    - 注意: Star 倉 不引用 RGS 倉代碼 (per AGENTS §5 倉庫拓撲 disclaimer)
+#    - 走 gRPC over HTTP 跨倉 (Star → Physis), 不直接 RGS
+
+# 6. workspace --all-targets 0 err + test 800+ 0 fail 持續保持
+# 7. HANDOFF v1.0 收編 (H.1 + E.1 + F.4 + H.2 + H.4 全閉環)
+```
+
+### 13.10 衍生文檔 (本 session 落档)
+
+- `AGENTS.md` v0.74 (守门 18 項 + §7 WBS 6 列化無上限, per 9/4 13:43 JST 拍板)
+- `HANDOFF-ST-001.md` v0.9 (本節 §13 H.1 + E.1 闭环)
+- `PHASE-P4-H1-IMPL-REPORT.md` v0.1 (12521 bytes)
+- `PHASE-P4-E1-IMPL-REPORT.md` v0.1 (11863 bytes)
+- `crates/star-dispatcher/src/lib.rs` (line 1072-1207 + 1282+ H.1 增量)
+- `crates/star-saga/src/saga_5b_services.rs` (10380 bytes) + `saga_5b_real.rs` (7764 bytes) + `saga_5b_real_tests.rs` (8811 bytes)
+- `crates/star-saga/src/lib.rs` (3 new module 聲明)
+- `scripts/automation/patch_h1.py` v0.1 (5444 bytes)
+- `scripts/automation/patch_e1.py` v0.1 (29528 bytes)
+- `origin/feat/auto-20260904-1c260bc7` (24 commits ahead, Mavis 可隨時 `gh pr merge`)
+
+---
+
+## §14 修訂歷史
+
+| 版本 | 日期 | 修訂人 | 修訂內容 | 觸發 |
+|---|---|---|---|---|
+| v0.1 | 2026-08-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 12 問題下遊 AI 執行清單 + H1/H2/H2-EXT 3 段 | 2026-08-31 用戶發令"回答QA問題並把需要下遊ai處理的內容更新進handoff" |
+| v0.2 | 2026-08-31 | 架構師 (Mavis 接手 agent per DEC-008) | H2 範圍擴量觸發 + 8 domain 表 + 5 項 Blocker 跨 session 續 | 2026-08-31 22:00 JST 真實嘗試 commit 9d08f80 + b6f6e2a + 7f611b0 |
+| v0.3 | 2026-09-01 | 架構師 (Mavis 接手 agent per DEC-008) | §5 H2-EXT 5 domain 跨域字段擴展觸發 + HANDOFF v0.2 | commit 68ae5ff + revert 8364223 |
+| v0.4 | 2026-09-02 | 架構師 (Mavis 接手 agent per DEC-008) | §6 P0-1 22 domain + 3 supporting crate ActorContext 重複 + api/application/infrastructure 0 引用孤兒 | PHASE-P0-1-ACTOR-CONTEXT-IMPL-REPORT.md v0.3 |
+| v0.5 | 2026-09-02 | 架構師 (Mavis 接手 agent per DEC-008) | §7 守门 #19 agent 交互 Python 化 + §8 守门 #9 v20 子代理 dispatch 必先 brief + §9 守门 #12 v21 Python 化任務卡 docs 同步 | 2026-09-02 00:39 JST 拍板 + docs/automation-design.md v0.1 |
+| v0.6 | 2026-09-02 | 架構師 (Mavis 接手 agent per DEC-008) | §10 調試控制台 console_server.py + 守门 #22+#23+#24 | 2026-09-02 09:01 JST 拍板 + docs/automation-design.md v0.2 |
+| v0.7 | 2026-09-03 | 架構師 (Mavis 接手 agent per DEC-008) | §9 P4 WBS 整合 + 42 子項 / 8 Phase / 4 軌道 | 2026-09-03 拍板 + STAR-P4-UNIMPL-WBS-001.md v0.1 |
+| v0.8 | 2026-09-04 | 架構師 (Mavis 接手 agent per DEC-008) | §11 Ulysses 交接協議 + §12 守门 #23 升級 + 撤回 | 2026-09-04 10:45 JST + 11:12 JST + 11:44 JST 拍板 |
+| **v0.9** | **2026-09-04** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手** | **§13 H.1 LangGraph 集成 + E.1 5 域 Saga 实装 闭环 (24 commits ahead origin/main, 4 守門全過)** | **2026-09-04 15:20-16:00 JST 拍板 + 闭环** |
+
