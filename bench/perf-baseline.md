@@ -4,12 +4,13 @@
 > **日期**：2026-08-28
 > **修订人**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**：per ADR-0036 §8 D15 / 2026-08-27 21:59 JST 用户授权
+> **修订 v0.1.1**：2026-09-05 Rust 1.98.0 → 1.98.1 (per https://blog.rust-lang.org/2026/09/03/Rust-1.98.1/ , 修 vtable UB #161441, Mavis 接手代签 Ulysses)
 
 ## §1 测试环境
 - CPU: TODO (实测填)
 - RAM: TODO
 - OS: Windows 11
-- Rust: 1.98.0
+- Rust: 1.98.1 (仓根 rust-toolchain.toml 锁)
 - workspace: 28 crates + 3 new Phase G + 3 new Phase H
 
 ## §2 性能基线指标（per ADR-0036 §2 D15）
