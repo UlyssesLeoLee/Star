@@ -36,9 +36,11 @@ use uuid::Uuid;
 // UUID 强类型 ID 宏(参考 domain-tenant / domain-permission 模式)
 // =====================================================================
 
+/// 强类型 UUID ID 宏
 #[macro_export]
 macro_rules! define_uuid_id {
     ($name:ident) => {
+        #[allow(missing_docs)]
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
@@ -46,9 +48,11 @@ macro_rules! define_uuid_id {
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成新的随机 ID
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 返回内部 UUID 的拷贝
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -198,6 +202,7 @@ impl RelationType {
 /// 端点实体删除时级联标记(INV-RL-05)。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Relation {
+    /// 关系 ID
     pub id: RelationId,
     /// 必带,INV-RL-01
     pub tenant_id: TenantId,
@@ -239,12 +244,19 @@ impl Relation {
 /// **RelationGroup** — 关系分组(§10.5 业务视图)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RelationGroup {
+    /// 分组 ID
     pub id: RelationGroupId,
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 分组名称
     pub name: String,
+    /// 分组描述
     pub description: String,
+    /// 分组内的关系 ID 列表
     pub relation_ids: Vec<RelationId>,
+    /// 创建者
     pub created_by: UserId,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
 }
 
@@ -270,20 +282,28 @@ impl RelationGroup {
 /// **RelationError** — 关系域统一错误
 #[derive(Debug, Error)]
 pub enum RelationError {
+    /// 资源未找到
     #[error("not found: {0}")]
     NotFound(String),
+    /// 权限拒绝
     #[error("permission denied")]
     PermissionDenied,
+    /// 跨租户访问拒绝
     #[error("cross-tenant access denied: actor tenant {0} vs resource tenant {1}")]
     CrossTenantDenied(TenantId, TenantId),
+    /// 自关系不允许(INV-RL-02)
     #[error("self-relation not allowed (INV-RL-02): from == to ({0}:{1})")]
     SelfRelation(ResourceType, Uuid),
+    /// 检测到关系环
     #[error("cycle detected: {0}")]
     CycleDetected(String),
+    /// 资源冲突
     #[error("conflict: {0}")]
     Conflict(String),
+    /// 无效输入
     #[error("invalid input: {0}")]
     InvalidInput(String),
+    /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
 }
@@ -311,43 +331,61 @@ impl RelationError {
 /// 创建关系命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateRelationCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 起点资源类型
     pub from_type: ResourceType,
+    /// 起点资源 ID
     pub from_id: Uuid,
+    /// 关系类型
     pub relation_type: RelationType,
+    /// 终点资源类型
     pub to_type: ResourceType,
+    /// 终点资源 ID
     pub to_id: Uuid,
+    /// 备注
     pub note: Option<String>,
 }
 
 /// 删除关系命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeleteRelationCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 关系 ID
     pub relation_id: RelationId,
 }
 
 /// 创建关系分组命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateRelationGroupCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 分组名称
     pub name: String,
+    /// 分组描述
     pub description: String,
 }
 
 /// 添加关系到分组命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddToGroupCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 分组 ID
     pub group_id: RelationGroupId,
+    /// 关系 ID
     pub relation_id: RelationId,
 }
 
 /// 按端点查询(查询 from 或 to)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListByEndpointQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 端点资源类型
     pub resource_type: ResourceType,
+    /// 端点资源 ID
     pub resource_id: Uuid,
     /// Some(true)=仅 from, Some(false)=仅 to, None=双向
     pub from_only: Option<bool>,
@@ -356,15 +394,20 @@ pub struct ListByEndpointQuery {
 /// 按关系类型查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListByTypeQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 关系类型
     pub relation_type: RelationType,
 }
 
 /// 关系图查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetGraphQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 中心资源类型
     pub resource_type: ResourceType,
+    /// 中心资源 ID
     pub resource_id: Uuid,
     /// BFS 深度(1 = 直接相邻,2 = 二跳 …),0 视作 1
     pub depth: u32,
@@ -379,30 +422,35 @@ pub struct GetGraphQuery {
 /// **RelationCommandPort** — 写操作(§3.10)
 #[async_trait]
 pub trait RelationCommandPort: Send + Sync {
+    /// 创建关系
     async fn create_relation(
         &self,
         cmd: CreateRelationCommand,
         actor: &ActorContext,
     ) -> Result<Relation, RelationError>;
 
+    /// 删除关系
     async fn delete_relation(
         &self,
         cmd: DeleteRelationCommand,
         actor: &ActorContext,
     ) -> Result<(), RelationError>;
 
+    /// 创建关系分组
     async fn create_group(
         &self,
         cmd: CreateRelationGroupCommand,
         actor: &ActorContext,
     ) -> Result<RelationGroup, RelationError>;
 
+    /// 添加关系到分组
     async fn add_to_group(
         &self,
         cmd: AddToGroupCommand,
         actor: &ActorContext,
     ) -> Result<RelationGroup, RelationError>;
 
+    /// 从分组移除关系
     async fn remove_from_group(
         &self,
         cmd: AddToGroupCommand,
@@ -413,36 +461,42 @@ pub trait RelationCommandPort: Send + Sync {
 /// **RelationQueryPort** — 读操作(§3.10)
 #[async_trait]
 pub trait RelationQueryPort: Send + Sync {
+    /// 按 ID 获取关系
     async fn get_relation(
         &self,
         id: RelationId,
         actor: &ActorContext,
     ) -> Result<Relation, RelationError>;
 
+    /// 按 from 端点列出关系
     async fn list_from(
         &self,
         q: ListByEndpointQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Relation>, RelationError>;
 
+    /// 按 to 端点列出关系
     async fn list_to(
         &self,
         q: ListByEndpointQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Relation>, RelationError>;
 
+    /// 按关系类型列出关系
     async fn list_by_type(
         &self,
         q: ListByTypeQuery,
         actor: &ActorContext,
     ) -> Result<Vec<Relation>, RelationError>;
 
+    /// 按 ID 获取分组
     async fn get_group(
         &self,
         group_id: RelationGroupId,
         actor: &ActorContext,
     ) -> Result<RelationGroup, RelationError>;
 
+    /// 获取关系图
     async fn get_graph(
         &self,
         q: GetGraphQuery,
@@ -453,37 +507,57 @@ pub trait RelationQueryPort: Send + Sync {
 /// 关系图查询结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RelationGraph {
+    /// 根节点
     pub root: GraphNode,
+    /// 图中所有节点
     pub nodes: Vec<GraphNode>,
+    /// 图中所有边
     pub edges: Vec<GraphEdge>,
+    /// BFS 深度
     pub depth: u32,
+    /// 生成时间
     pub generated_at: DateTime<Utc>,
 }
 
+/// 关系图节点(资源端点)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphNode {
+    /// 资源类型
     pub resource_type: ResourceType,
+    /// 资源 ID
     pub resource_id: Uuid,
 }
 
+/// 关系图边
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphEdge {
+    /// 关系 ID
     pub relation_id: RelationId,
+    /// 起点节点
     pub from: GraphNode,
+    /// 终点节点
     pub to: GraphNode,
+    /// 关系类型
     pub relation_type: RelationType,
 }
 
 /// **RelationRepository** — 持久化抽象
 #[async_trait]
 pub trait RelationRepository: Send + Sync {
+    /// 插入关系
     async fn insert_relation(&self, r: Relation) -> Result<(), RelationError>;
+    /// 更新关系
     async fn update_relation(&self, r: Relation) -> Result<(), RelationError>;
+    /// 按 ID 获取关系
     async fn get_relation(&self, id: RelationId) -> Result<Relation, RelationError>;
+    /// 列出租户下所有关系
     async fn list_relations(&self, tenant_id: TenantId) -> Result<Vec<Relation>, RelationError>;
 
+    /// 插入分组
     async fn insert_group(&self, g: RelationGroup) -> Result<(), RelationError>;
+    /// 更新分组
     async fn update_group(&self, g: RelationGroup) -> Result<(), RelationError>;
+    /// 按 ID 获取分组
     async fn get_group(&self, id: RelationGroupId) -> Result<RelationGroup, RelationError>;
 }
 
@@ -491,12 +565,14 @@ pub trait RelationRepository: Send + Sync {
 // InMemoryRelationRepository
 // =====================================================================
 
+/// **InMemoryRelationRepository** — 内存版关系仓储(测试/开发用)
 pub struct InMemoryRelationRepository {
     relations: RwLock<HashMap<RelationId, Relation>>,
     groups: RwLock<HashMap<RelationGroupId, RelationGroup>>,
 }
 
 impl InMemoryRelationRepository {
+    /// 创建空的内存仓储
     pub fn new() -> Self {
         Self {
             relations: RwLock::new(HashMap::new()),
@@ -567,6 +643,7 @@ impl RelationRepository for InMemoryRelationRepository {
 // InMemoryRelationService(实现)
 // =====================================================================
 
+/// **InMemoryRelationService** — 内存版关系服务(实现 RelationCommandPort + RelationQueryPort)
 pub struct InMemoryRelationService {
     repo: Arc<dyn RelationRepository>,
     relations: Arc<RwLock<HashMap<RelationId, Relation>>>,
@@ -594,6 +671,7 @@ pub struct InMemoryRelationService {
 }
 
 impl InMemoryRelationService {
+    /// 创建使用内置内存仓储的服务
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryRelationRepository::new()),
@@ -604,6 +682,7 @@ impl InMemoryRelationService {
             dedup_index: Arc::new(RwLock::new(HashMap::new())),
         }
     }
+    /// 使用指定仓储创建服务
     pub fn with_repo(repo: Arc<dyn RelationRepository>) -> Self {
         Self {
             repo,
