@@ -7,11 +7,13 @@ use std::time::{Duration, Instant};
 
 use crate::application::cache::Cache;
 
+/// 基于内存的 Cache 实现(阶段 1 简化实装, 无持久化)
 pub struct InMemoryCache {
     store: RwLock<HashMap<String, (serde_json::Value, Option<Instant>)>>,
 }
 
 impl InMemoryCache {
+    /// 创建空的内存缓存实例
     pub fn new() -> Self {
         Self {
             store: RwLock::new(HashMap::new()),

@@ -6,6 +6,7 @@
 
 use async_trait::async_trait;
 
+/// 缓存能力抽象(阶段 1 走 InMemory, Redis 留 V2)
 #[async_trait]
 pub trait Cache: Send + Sync {
     /// 取缓存, 命中返 Some(Value), miss 返 None
