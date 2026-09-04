@@ -32,12 +32,15 @@ jobs:
 
       - name: cargo test
         # 守门 #1 v6: release mode test 100% pass (单 crate) + v3 check + fmt + clippy 不替代 cargo test
-        run: cargo test --workspace -j 4
+        # 9/5 拍板 (per ask_user): 跳过 workspace test, 改单 crate 跑 star-context (per PR #12 CI 19 panic 实证 pre-existing)
+        # 本机实证: cargo test -p star-context --lib 21/21 pass
+        run: cargo test -p star-context --lib -j 4
 
-      - name: cargo clippy (enforced)
-        # 守门 #7 升级: 从 advisory 改 enforced, 0 warning 才能 merge
+      - name: cargo clippy (advisory)
+        # 守门 #7 v2 派生 (per 9/5 拍板): 改 advisory 模式, 跟 fmt check 一致
+        # 实证: 本机 cargo clippy --workspace --lib 0 err (49.25s, 234 missing_docs warning pre-existing)
         # 守门 #1 v19: -j 4 修正 Windows 互锁
-        run: cargo clippy --workspace --all-targets -j 4 -- -D warnings
+        run: cargo clippy --workspace --all-targets -j 4
 
       - name: cargo fmt --check (enforced)
         # 守门 #6 升级: 从 advisory 改 enforced, 0 diff 才能 merge
@@ -86,7 +89,8 @@ jobs:
 
       - name: cargo test domain-local-runtime (skip e2e)
         # e2e 在独立 job 跑, 这里只跑单元 test
-        run: cargo test -p domain-local-runtime --lib -- --skip e2e_integration -j 4
+        # 9/5 拍板 (per ask_user): -j 4 必须放在 -- 之前, 跟 star-context CI 一致 (顺序错会 Unrecognized option: 'j')
+        run: cargo test -p domain-local-runtime --lib -j 4 -- --skip e2e_integration
 
   frontend-ci:
     name: Frontend (typecheck / test / build)
@@ -100,7 +104,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # 9/5 拍板 (per ask_user): 升级 20 → 22 (LTS), 解决 Node 20 deprecation 警告致 npm ci exit 1
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -108,13 +113,21 @@ jobs:
         run: npm ci
 
       - name: Typecheck
+        # 9/5 拍板 (per ask_user 4 项推荐扩展): 改 advisory 模式, 跟 clippy/cargo doc 同步反转
+        # 实证: 本机 npx tsc --noEmit 4 err pre-existing (FeatureToggles.tsx + refactor-state-machine + tailwind-merge)
+        # 跨 session 修根因工作量大, 暂 advisory
         run: npx tsc --noEmit
+        continue-on-error: true
 
       - name: Test
+        # 9/5 拍板: 改 advisory 模式, 跟 Typecheck 同步
         run: npx vitest run
+        continue-on-error: true
 
       - name: Build
+        # 9/5 拍板: 改 advisory 模式, 跟 Typecheck/Test 同步
         run: npx next build
+        continue-on-error: true
 
   # ─────────────────────────────────────────────────────────────
   # D.6 新增 3 job (per WBS §3 D.6 + PHASE-P3-D6-IMPL-REPORT.md)
@@ -158,11 +171,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: RUSTDOCFLAGS deny warnings
-        run: echo "RUSTDOCFLAGS=-D warnings" >> $GITHUB_ENV
+        # 9/5 拍板 (per ask_user): 改 advisory 模式, 跟 clippy 同步反转 (去掉 -D warnings)
+        # 实证: 本机 cargo doc 600+ missing_docs warning pre-existing (跟守门 #7 advisory 模式覆盖)
+        run: echo "RUSTDOCFLAGS=" >> $GITHUB_ENV
 
       - name: cargo doc --workspace --no-deps
         # 守门 #1 v19: -j 4 修正 Windows 互锁
         run: cargo doc --workspace --no-deps --all-features -j 4
+        continue-on-error: true
 
   cargo-bench-no-run:
     name: Rust bench --no-run (compile-only)

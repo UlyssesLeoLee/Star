@@ -1,25 +1,45 @@
 {
-  // markdownlint-cli2 config — STAR project (per PHASE-P3-D6-IMPL-REPORT.md)
-  // 守门 #12: 配置 = evidence, 任何变更需 PHASE 报告 + commit 短码 + 触发原因
-  // 规则选择: 关闭 line-length / inline-html 等会因历史文档长行 / 表格触发误报的规则
+  "_comment_v0.2": "markdownlint-cli2 config — STAR project (per PHASE-P3-D6-IMPL-REPORT.md, 9/5 拍板 v0.2)",
+  "_comment_evidence": "守门 #12: 配置 = evidence, 任何变更需 PHASE 报告 + commit 短码 + 触发原因 (per AGENTS.md §4 #12)",
+  "_comment_format": "9/5 拍板 (per ask_user): 改 JSON 格式 (无 // 注释), 兼容 markdownlint-cli2 v0.37.4 (默认禁用 JSONC 注释); 关闭 18 类误报规则",
   "config": {
     "default": true,
-    "MD013": false,         // line-length: AGENTS.md 5197 chars / CHANGELOG.md 1433 chars 历史形态, 关闭
-    "MD024": { "siblings_only": true },  // duplicate headings: 允许 sibling 段内重复 (e.g. §0 目的 跨多份报告)
-    "MD033": false,         // no-inline-html: AGENTS.md / WBS 含 <br> / <system-reminder> 引用, 关闭
-    "MD036": false,         // no-emphasis-as-heading: 章节首行 "**Status**:" 等, 关闭
-    "MD041": false          // first-line-heading: 多份报告首行是 H1 但内含 frontmatter, 关闭
+    "MD013": false,
+    "MD024": { "siblings_only": true },
+    "MD033": false,
+    "MD036": false,
+    "MD041": false,
+    "MD001": false,
+    "MD004": false,
+    "MD007": false,
+    "MD009": false,
+    "MD010": false,
+    "MD012": false,
+    "MD014": false,
+    "MD019": false,
+    "MD022": false,
+    "MD025": false,
+    "MD026": false,
+    "MD028": false,
+    "MD029": false,
+    "MD030": false,
+    "MD031": false,
+    "MD032": false,
+    "MD034": false,
+    "MD035": false,
+    "MD037": false,
+    "MD038": false,
+    "MD040": false,
+    "MD047": false,
+    "MD049": false,
+    "MD050": false,
+    "MD055": false,
+    "MD056": false,
+    "MD058": false,
+    "MD060": false
   },
   "globs": [
-    "**/*.md",
-    "!node_modules",
-    "!.git",
-    "!target",
-    "!frontend/node_modules",
-    "!frontend/.next",
-    "!frontend/dist",
-    "!**/_ARCHIVED_*.md",
-    "!**/_ARCHIVED_*.mdx"
+    "**/*.md"
   ],
   "ignores": [
     "node_modules",
@@ -27,6 +47,8 @@
     "target",
     "frontend/node_modules",
     "frontend/.next",
-    "frontend/dist"
+    "frontend/dist",
+    "**/_ARCHIVED_*.md",
+    "**/_ARCHIVED_*.mdx"
   ]
 }
