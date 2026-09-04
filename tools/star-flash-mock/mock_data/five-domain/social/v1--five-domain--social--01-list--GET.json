@@ -1,0 +1,61 @@
+{
+  "fixture_version": "v1",
+  "module": "five-domain",
+  "domain": "social",
+  "case": "01-list",
+  "method": "GET",
+  "scenario": "social-01-list",
+  "description": "5 域业务 social 域 list 操作 (per docs/test-design.md v0.7 §25 + AGENTS.md §4 #3 5 域独立 Lead + #14 4 维 RACI, list scope per 守门 #14 决策 scope)",
+  "schema_ref": "frontend/src/mocks/handlers/social.ts (per test-design v0.6 §17.4 5 域业务 mock 完整化)",
+  "守门": [
+    "#3 5 域独立 Lead (不映射 DDD, per AGENTS.md §5 仓库拓扑 disclaimer)",
+    "#14 5 域 Lead CONTENT 4 维 (决策 scope / RACI / 到位 timeline / Mavis 代签边界)"
+  ],
+  "lead_status": "Mavis 代签",
+  "subdomain_list": [
+    "collaboration",
+    "notification",
+    "comment"
+  ],
+  "primary_table": "notification.notification",
+  "raci_4_dim": {
+    "决策_scope": "跨域 + 域内 (Both, per 守门 #3 v2 派生规)",
+    "RACI": "R+A+C 完整责任 (Lead 自执行 R + 负责 A + 接受域内 C 咨询, 域外 I 通知)",
+    "到位_timeline": "待定 (Mavis 长期代签, per 9/3 19:35 JST 拍板 D 维持)",
+    "Mavis_代签边界": "全部代签 (commit author + 修订人 + 审批, per 守门 #10 + 19:39 JST 授权)"
+  },
+  "five_lead_real_audit": {
+    "audit_status": "Mavis 临时代签",
+    "真人_到位": false,
+    "sign_count": 4,
+    "racy_completeness": "R+A+C 完整"
+  },
+  "request": {
+    "domain": "social",
+    "limit": 20
+  },
+  "response_200": {
+    "items": [
+      {
+        "id": "social-001",
+        "name": "social_item_1"
+      },
+      {
+        "id": "social-002",
+        "name": "social_item_2"
+      },
+      {
+        "id": "social-003",
+        "name": "social_item_3"
+      }
+    ],
+    "total": 3,
+    "scope": "域内 + 跨域",
+    "racy": "R(Lead) + A(Lead) + C(域内) + I(域外)"
+  },
+  "fixture_assertion": {
+    "case": "list",
+    "decision_scope": "Both",
+    "real_lead": false
+  }
+}
