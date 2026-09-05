@@ -115,7 +115,7 @@ jobs:
       - name: Typecheck
         # 9/5 拍板 (per ask_user 4 项推荐扩展): 改 advisory 模式, 跟 clippy/cargo doc 同步反转
         # 实证: 本机 npx tsc --noEmit 4 err pre-existing (FeatureToggles.tsx + refactor-state-machine + tailwind-merge)
-        # 跨 session 修根因工作量大, 暂 advisory
+        # 跨 session 修根因工作量大, 改 advisory
         run: npx tsc --noEmit
         continue-on-error: true
 
@@ -147,14 +147,13 @@ jobs:
         with:
           globs: |
             **/*.md
-          ignores: |
-            node_modules
-            .git
-            target
-            frontend/node_modules
-            frontend/.next
-            frontend/dist
-            _ARCHIVED_*.md
+            !node_modules/**
+            !.git/**
+            !target/**
+            !frontend/node_modules/**
+            !frontend/.next/**
+            !frontend/dist/**
+            !_ARCHIVED_*.md
 
   cargo-doc:
     name: Rust doc (cargo doc --no-deps)
@@ -170,15 +169,13 @@ jobs:
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
 
-      - name: RUSTDOCFLAGS deny warnings
-        # 9/5 拍板 (per ask_user): 改 advisory 模式, 跟 clippy 同步反转 (去掉 -D warnings)
-        # 实证: 本机 cargo doc 600+ missing_docs warning pre-existing (跟守门 #7 advisory 模式覆盖)
-        run: echo "RUSTDOCFLAGS=" >> $GITHUB_ENV
-
-      - name: cargo doc --workspace --no-deps
+      - name: cargo doc --workspace --no-deps (advisory)
+        # 守门 #1 v5: release + doc + bench --no-run 与 debug build 等价守门 (per AGENTS.md §4.1 v5)
+        # 9/5 拍板 (per ask_user): 改 advisory 模式, 跟 clippy 同步反转
+        # 实证: per WBS §0 + A.16 commit `0e6a965` release mode cargo doc 0 warning (守门 #1 v5 派生)
+        # 当前 600+ missing_docs pre-existing, 不强求
         # 守门 #1 v19: -j 4 修正 Windows 互锁
         run: cargo doc --workspace --no-deps --all-features -j 4
-        continue-on-error: true
 
   cargo-bench-no-run:
     name: Rust bench --no-run (compile-only)

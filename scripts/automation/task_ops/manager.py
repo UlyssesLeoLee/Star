@@ -88,8 +88,14 @@ class SubAgentPool:
         return checkpoint_id
 
     async def update(self, task_id: str, patch: dict) -> None:
-        """update L1 state (L0 唯一入口 per 守门 #13 a)"""
+        """update L1 state (L0 唯一入口 per 守门 #13 a)
+
+        特殊: patch 含顶层 task_type 键时, 同步改 handle.task_type
+        (per M-N6 reassign_node 跨 SA 类型切换需求, dataclass 字段 + state 镜像)
+        """
         handle = self.get(task_id)
+        if "task_type" in patch and patch["task_type"] != handle.task_type:
+            handle.task_type = patch["task_type"]
         handle.state.update(patch)
 
     async def spawn(self, task_type: str, context: dict, task_id: Optional[str] = None) -> SubAgentHandle:
