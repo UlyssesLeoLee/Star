@@ -72,7 +72,7 @@ export function AgentFilter({ agents, selectedId, auto, onChange }: AgentFilterP
         {auto && (
           <span
             data-testid="agent-filter-auto-badge"
-            className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 bg-[var(--cel-cyan,#00f0ff)] text-black border border-black"
+            className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-[var(--cel-cyan,#00f0ff)] text-black border border-black"
             title="Auto-selected as the most recently active agent"
           >
             auto

@@ -358,21 +358,21 @@ function AgentViewContent() {
           onClick={() => handleViewModeChange("core3d")}
           className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "core3d" ? "bg-[var(--cel-crimson,#ff184c)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
         >
-          <Zap size={13} className="text-[var(--cel-cyan,#00f0ff)]" /> 3D 战术核心 <span className="text-[10px] px-1.5 py-0.2 bg-black text-[var(--cel-cyan,#00f0ff)] border border-black font-mono">v3 CEL</span>
+          <Zap size={13} className="text-[var(--cel-cyan,#00f0ff)]" /> 3D 战术核心 <span className="text-[10px] px-1.5 py-0.5 bg-black text-[var(--cel-cyan,#00f0ff)] border border-black font-mono">v3 CEL</span>
         </button>
         <button
           data-testid="view-mode-canvas"
           onClick={() => handleViewModeChange("canvas")}
           className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "canvas" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
         >
-          <Sparkles size={13} /> Canvas <span className="text-[10px] px-1.5 py-0.2 bg-black text-[var(--cel-gold,#ffc400)] border border-black font-mono">v1</span>
+          <Sparkles size={13} /> Canvas <span className="text-[10px] px-1.5 py-0.5 bg-black text-[var(--cel-gold,#ffc400)] border border-black font-mono">v1</span>
         </button>
         <button
           data-testid="view-mode-roguelike"
           onClick={() => handleViewModeChange("roguelike")}
           className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "roguelike" ? "bg-[var(--cel-gold,#ffc400)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
         >
-          <Map size={13} /> Roguelike <span className="text-[10px] px-1.5 py-0.2 bg-black text-[var(--cel-gold,#ffc400)] border border-black font-mono">v2</span>
+          <Map size={13} /> Roguelike <span className="text-[10px] px-1.5 py-0.5 bg-black text-[var(--cel-gold,#ffc400)] border border-black font-mono">v2</span>
         </button>
         <button
           data-testid="view-mode-settings"

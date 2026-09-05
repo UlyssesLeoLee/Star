@@ -26,7 +26,6 @@ import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import {
   Hand, MousePointer2, ZoomIn, ZoomOut, Maximize2, GitBranch, Skull, Coins,
-  Crosshair, Shield, CheckCircle2,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
@@ -743,7 +742,8 @@ function TacticalChamferNode({
   strokeWidth?: number;
   glowColor?: string;
 }) {
-  const c = Math.max(6 * zoom, 8); // 切角大小
+  const maxChamfer = Math.min(w, h) * 0.25;
+  const c = Math.max(3, Math.min(6 * zoom, maxChamfer)); // 切角大小 (按 zoom 等比缩放, 不超 25%)
   const path = `M 0 ${c} L ${c} 0 L ${w - c} 0 L ${w} ${c} L ${w} ${h - c} L ${w - c} ${h} L ${c} ${h} L 0 ${h - c} Z`;
 
   return (
