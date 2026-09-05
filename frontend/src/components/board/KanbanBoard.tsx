@@ -232,7 +232,7 @@ export function KanbanBoard({
             type="button"
             data-testid="kanban-add-column"
             onClick={handleAddColumn}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line hover:border-accent bg-bg-soft/70 hover:bg-accent/10 text-xs font-mono text-ink-dim hover:text-accent transition-all duration-150 shadow-sm group font-semibold"
+            className="btn text-xs gap-1.5"
             title={t.board.addColumnTitle}
           >
             <Plus size={13} className="text-accent group-hover:rotate-90 transition-transform duration-200" />

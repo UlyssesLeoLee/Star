@@ -121,7 +121,7 @@ export function Sidebar() {
       data-scope={sidebarScope}
       // 桌面: 256/64 sticky; <768px: 隐藏 (由 MobileBottomNav + AppMatrixDrawer 抽屉替代, per 2026-09-01 PHASE-MOBILE-PWA)
       className={clsx(
-        "hidden md:flex shrink-0 border-r border-line bg-bg-soft/75 backdrop-blur-xl flex-col h-screen sticky top-0 select-none z-20 transition-all duration-200 ease-out",
+        "hidden md:flex shrink-0 border-r-2 border-black bg-bg-soft/95 cel-shadow backdrop-blur-xl flex-col h-screen sticky top-0 select-none z-20 transition-all duration-200 ease-out",
         SIDEBAR_WIDTH[sidebarFold]
       )}
     >

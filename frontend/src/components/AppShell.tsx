@@ -27,7 +27,7 @@ export function AppShell({ children }: AppShellProps) {
       <main
         data-testid="app-main"
         style={{ minHeight: "calc(100vh - 64px)" }}
-        className="px-6 py-5 overflow-x-auto"
+        className="px-6 sm:px-8 py-8 overflow-x-auto max-w-[1440px] mx-auto w-full"
       >
         {children}
       </main>

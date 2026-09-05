@@ -183,7 +183,7 @@ function IssuesPageInner() {
 
       {/* Main content */}
       <div className="flex-1 min-w-0 flex">
-        <div className="flex-1 min-w-0 px-6 py-5 overflow-x-auto">
+        <div className="flex-1 min-w-0 overflow-x-auto">
           <PageHeader
             title="Issues"
             subtitle={`${workItems.length} work-items — 主面板聚合 work-item / feedback / worktree / agent (per §2 6 路由设计). 4 视图切换: Kanban (拖动 transition) / List (表格) / Tree (层级) / Sprint (按 sprint 分组).`}
@@ -192,7 +192,7 @@ function IssuesPageInner() {
           />
 
           {/* 顶部 1 行: view tabs (per §5.1) + 右侧 New + Search */}
-          <div className="flex items-center justify-between mb-4 border-b border-line">
+          <div className="flex items-center justify-between mb-4 border-b-2 border-black">
             <div role="tablist" aria-label="Issue view tabs" className="flex items-center gap-0" data-testid="issues-view-tabs">
               {VIEWS.map((v) => {
                 const active = view === v.id;
@@ -341,7 +341,7 @@ function IssuesPageInner() {
         {selectedWi && (
           <aside
             data-testid="issues-detail-sidebar"
-            className="w-80 shrink-0 border-l border-line bg-bg-soft/30 overflow-y-auto"
+            className="w-80 shrink-0 border-l-2 border-black bg-[var(--cel-surface-sub,#151c2c)] overflow-y-auto cel-shadow"
             aria-label="Issue detail"
           >
             <IssuesDetailSidebar
@@ -642,7 +642,7 @@ function IssuesSprintView({
                 <div
                   key={st}
                   data-testid={`issues-sprint-col-${sprint.id}-${st}`}
-                  className="border border-line rounded p-2 min-h-[80px]"
+                  className="border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] p-2 min-h-[80px] cel-shadow"
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <StatusPill value={st} size="xs" />
