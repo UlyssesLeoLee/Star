@@ -37,6 +37,9 @@ import {
   applyRevive,
   applyRestart,
 } from "@/lib/agent-game/leveling";
+import type { GameMap, MapCell } from "@/lib/agent-game/mapgen";
+import { generateMap } from "@/lib/agent-game/mapgen";
+import { moveAgent, type MoveResult } from "@/lib/agent-game/movement";
 
 /** claimReward 戻り値 (per 拍板) */
 export type ClaimResult =
@@ -180,6 +183,10 @@ interface StoreState {
   // ── Agent Game (per 2026-09-05 11:42 JST 拍板, 拟人化游戏化) ──
   /** per-agent 游戏化状态 (level / xp / coins / hp / perks) */
   agentGameStates: Record<Uuid, AgentGameState>;
+  /** per-agent Roguelike map (per 2026-09-05 12:23 JST 拍板, ask_8a60a3bc...) */
+  agentMaps: Record<Uuid, GameMap>;
+  /** per-agent 当前在 map 上的位置 (per 拍板 #3, 4-邻接移动) */
+  agentPositions: Record<Uuid, { x: number; y: number }>;
 
   // 5 状态机迁移 (保留 B.2.5 已实装的 6 个)
   transitionWorktree: (id: string, to: WorktreeStatus) => void;
@@ -308,6 +315,12 @@ interface StoreState {
   reviveAgent: (agentId: Uuid) => { ok: boolean; reason?: string };
   /** 重开 (不扣币) */
   restartAgent: (agentId: Uuid) => void;
+  /** Roguelike: 生成 map (per 拍板 #2) */
+  generateAgentMap: (agentId: Uuid, width: number, height: number, seed: number) => GameMap;
+  /** Roguelike: 移动到 (x, y), 内部 cost + cell 效果 + 死亡检测 */
+  moveAgentOnMap: (agentId: Uuid, targetPos: { x: number; y: number }) => MoveResult;
+  /** Roguelike: 重置 map + 位置 (新一局) */
+  resetAgentMap: (agentId: Uuid) => void;
 }
 
 // =====================================================================
@@ -360,6 +373,10 @@ const initialState = (set: any): StoreState => ({
   // Agent Game (per 2026-09-05 11:42 JST 拍板)
   //   - per-agent 状态, 首次 claimReward / initAgentGame 时 lazy init
   agentGameStates: {} as Record<Uuid, AgentGameState>,
+  // Roguelike map (per 2026-09-05 12:23 JST 拍板)
+  //   - per-agent, 首次 generateAgentMap 时 lazy init
+  agentMaps: {} as Record<Uuid, GameMap>,
+  agentPositions: {} as Record<Uuid, { x: number; y: number }>,
 
   // 6 状态机 (B.2.5 已有)
   transitionWorktree: (id, to) =>
@@ -685,6 +702,64 @@ const initialState = (set: any): StoreState => ({
           ...s.agentGameStates,
           [agentId]: applyRestart(gs),
         },
+      };
+    }),
+
+  // ===================================================================
+  // Roguelike map 3 个 action (per 2026-09-05 12:23 JST 拍板)
+  //   - generateAgentMap: 程序生成 map, 设置 position = start
+  //   - moveAgentOnMap: 4-邻接 step, 触发 cost + cell 效果
+  //   - resetAgentMap: 重开一局 (新 map + 重置 position)
+  // ===================================================================
+
+  generateAgentMap: (agentId, width, height, seed) => {
+    const s = useStore.getState();
+    const wis = s.workItems.filter((w) => w.status !== "done");
+    const map = generateMap({ width, height, seed, workItems: wis });
+    useStore.setState({
+      agentMaps: { ...s.agentMaps, [agentId]: map },
+      agentPositions: { ...s.agentPositions, [agentId]: map.startPos },
+    });
+    return map;
+  },
+
+  moveAgentOnMap: (agentId, targetPos) => {
+    const s = useStore.getState();
+    const map = s.agentMaps[agentId] ?? null;
+    const pos = s.agentPositions[agentId] ?? null;
+    const gs = s.agentGameStates[agentId] ?? null;
+    const agent = s.agentSessions.find((a) => a.id === agentId);
+    if (!gs || !agent) {
+      return { ok: false as const, reason: "no_map" as const };
+    }
+    const r = moveAgent(gs, map, pos, targetPos, agent.cost_summary.budget_usd);
+    if (!r.ok) return r;
+    // 应用 state 更新
+    let newState = { ...gs, hp: r.hpAfter, coins: r.coinsAfter };
+    if (r.died) {
+      newState = applyDeath(newState);
+    }
+    useStore.setState({
+      agentGameStates: { ...s.agentGameStates, [agentId]: newState },
+      agentPositions: { ...s.agentPositions, [agentId]: targetPos },
+    });
+    return r;
+  },
+
+  resetAgentMap: (agentId) =>
+    set((s: StoreState) => {
+      const oldMap = s.agentMaps[agentId];
+      if (!oldMap) return s;
+      // 用同尺寸 + 不同 seed 重生 (Date.now 取 seed)
+      const newMap = generateMap({
+        width: oldMap.width,
+        height: oldMap.height,
+        seed: Date.now() % 0x7fffffff,
+        workItems: s.workItems.filter((w) => w.status !== "done"),
+      });
+      return {
+        agentMaps: { ...s.agentMaps, [agentId]: newMap },
+        agentPositions: { ...s.agentPositions, [agentId]: newMap.startPos },
       };
     }),
 

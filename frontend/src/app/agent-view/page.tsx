@@ -33,11 +33,14 @@ import { AgentFilter } from "@/components/agent-view/AgentFilter";
 import { GameHUD } from "@/components/agent-game/GameHUD";
 import { PerkPicker } from "@/components/agent-game/PerkPicker";
 import { DeathModal } from "@/components/agent-game/DeathModal";
+import { RoguelikeCanvas } from "@/components/agent-game/RoguelikeCanvas";
 import { useAgentGame } from "@/components/agent-game/useAgentGame";
 import { getPerkChoices } from "@/lib/agent-game/perks";
 import { PageHeader } from "@/components/PageHeader";
-import { Bot, AlertTriangle, Maximize2, Zap, Sparkles } from "lucide-react";
+import { Bot, AlertTriangle, Maximize2, Zap, Sparkles, Map, RefreshCw } from "lucide-react";
 import type { PerkId } from "@/lib/agent-game/types";
+
+type ViewMode = "canvas" | "roguelike";
 
 export default function AgentViewPage() {
   const router = useRouter();
@@ -49,9 +52,15 @@ export default function AgentViewPage() {
   const worktrees = useStore((s) => s.worktrees);
   const workItems = useStore((s) => s.workItems);
   const initAgentGame = useStore((s) => s.initAgentGame);
+  const generateAgentMap = useStore((s) => s.generateAgentMap);
+  const moveAgentOnMap = useStore((s) => s.moveAgentOnMap);
+  const resetAgentMap = useStore((s) => s.resetAgentMap);
+  const agentMaps = useStore((s) => s.agentMaps);
+  const agentPositions = useStore((s) => s.agentPositions);
 
   // URL 参数: ?agent=ag-XXX
   const urlAgentId = searchParams.get("agent");
+  const urlView = searchParams.get("view") as ViewMode | null;
 
   // 解析 current agent
   const resolution = useMemo(
@@ -72,6 +81,9 @@ export default function AgentViewPage() {
   // 拟人化游戏化 (per 2026-09-05 11:42 JST 拍板)
   const { gameState, claim, spend, revive, restart, pickPerk, init } = useAgentGame(resolution?.agentId ?? null);
 
+  // View 模式 (URL 持久化)
+  const [viewMode, setViewMode] = useState<ViewMode>(urlView === "roguelike" ? "roguelike" : "canvas");
+
   // Modal 状态
   const [pendingPerkLevel, setPendingPerkLevel] = useState<number | null>(null);
   const [deathEvent, setDeathEvent] = useState<{
@@ -84,6 +96,20 @@ export default function AgentViewPage() {
       init(resolution.agent.cost_summary.budget_usd);
     }
   }, [resolution, gameState, init]);
+
+  // 首次访问某 agent (roguelike 模式): 自动生成 map
+  useEffect(() => {
+    if (resolution && viewMode === "roguelike" && !agentMaps[resolution.agentId]) {
+      const seed = (Date.now() ^ resolution.agentId.charCodeAt(0) * 31) % 0x7fffffff;
+      generateAgentMap(resolution.agentId, 8, 6, Math.abs(seed));
+    }
+  }, [resolution, viewMode, agentMaps, generateAgentMap]);
+
+  // 切换 agent 时, 清 pendingPerk + death (避免 stale)
+  useEffect(() => {
+    setPendingPerkLevel(null);
+    setDeathEvent(null);
+  }, [resolution?.agentId]);
 
   // 派生 canvas (layout + fit-to-content viewport)
   const canvas: AgentCanvas | null = useMemo(() => {
@@ -101,6 +127,21 @@ export default function AgentViewPage() {
       derivedAt: new Date().toISOString(),
     };
   }, [resolution, worktree, relatedWorkItems]);
+
+  // View 模式切换
+  const handleViewModeChange = useCallback(
+    (mode: ViewMode) => {
+      setViewMode(mode);
+      const params = new URLSearchParams(searchParams.toString());
+      if (mode === "roguelike") {
+        params.set("view", "roguelike");
+      } else {
+        params.delete("view");
+      }
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
 
   // dropdown 切换: 更新 URL (per 拍板 #2)
   const handleAgentChange = useCallback(
@@ -153,11 +194,47 @@ export default function AgentViewPage() {
     setDeathEvent(null);
   }, [revive]);
 
-  // Restart 回调
+  // Restart 回调 (死亡 = all agents freeze, 玩家主动重开)
   const handleRestart = useCallback(() => {
     restart();
+    if (resolution) {
+      resetAgentMap(resolution.agentId);  // 重生 map, agent 回到起点
+    }
     setDeathEvent(null);
-  }, [restart]);
+  }, [restart, resetAgentMap, resolution]);
+
+  // Roguelike 移动
+  const handleRoguelikeMove = useCallback((target: { x: number; y: number }) => {
+    if (!resolution) return;
+    const r = moveAgentOnMap(resolution.agentId, target);
+    if (!r.ok) return;
+    if (r.died) {
+      const gs = useStore.getState().agentGameStates[resolution.agentId];
+      setDeathEvent({
+        agentId: resolution.agentId,
+        triggerCostRatio: r.triggerCostRatio,
+        snapshotCoins: gs?.coins ?? 0,
+        snapshotLevel: gs?.highestLevel ?? 1,
+        snapshotHp: 0,
+        canRevive: (gs?.coins ?? 0) >= 50,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    // 走到 enemy cell → 触发 claim (合并 Roguelike + 拟人化游戏化)
+    if (r.effect.kind === "enemy" && r.effect.workItemId) {
+      const claimR = claim(r.effect.workItemId);
+      if (claimR && claimR.ok && claimR.leveledUp) {
+        setPendingPerkLevel(claimR.levelsGained);
+      }
+    }
+  }, [resolution, moveAgentOnMap, claim]);
+
+  // Roguelike reset map
+  const handleRoguelikeReset = useCallback(() => {
+    if (resolution) {
+      resetAgentMap(resolution.agentId);
+    }
+  }, [resolution, resetAgentMap]);
 
   // ---- 空状态 ----
   if (agents.length === 0) {
@@ -245,17 +322,64 @@ export default function AgentViewPage() {
         </div>
       </div>
 
-      {/* Canvas */}
-      {canvas && (
-        <div className="flex-1 relative">
-          <AgentCanvasView
-            canvas={canvas}
-            agent={agent}
-            worktree={worktree}
-            gameState={gameState}
-            onClaim={handleClaim}
-          />
-        </div>
+      {/* View Mode Tab (per 2026-09-05 12:23 JST 拍板, Canvas vs Roguelike) */}
+      <div className="border-b border-line bg-bg-soft/20 px-6 py-2 flex items-center gap-2" data-testid="view-mode-tabs">
+        <button
+          data-testid="view-mode-canvas"
+          onClick={() => handleViewModeChange("canvas")}
+          className={`text-xs px-3 py-1 rounded-md transition-colors ${viewMode === "canvas" ? "bg-accent/20 text-accent border border-accent/40" : "text-ink-mute hover:bg-bg-soft"}`}
+        >
+          Canvas
+        </button>
+        <button
+          data-testid="view-mode-roguelike"
+          onClick={() => handleViewModeChange("roguelike")}
+          className={`text-xs px-3 py-1 rounded-md transition-colors flex items-center gap-1 ${viewMode === "roguelike" ? "bg-accent/20 text-accent border border-accent/40" : "text-ink-mute hover:bg-bg-soft"}`}
+        >
+          <Map size={11} /> Roguelike
+        </button>
+      </div>
+
+      {/* Content (按 viewMode 切换) */}
+      {viewMode === "canvas" ? (
+        <>
+          {canvas && (
+            <div className="flex-1 relative">
+              <AgentCanvasView
+                canvas={canvas}
+                agent={agent}
+                worktree={worktree}
+                gameState={gameState}
+                onClaim={handleClaim}
+              />
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {(() => {
+            const map = agentMaps[resolution.agentId];
+            const pos = agentPositions[resolution.agentId];
+            if (!map || !pos) {
+              return (
+                <div className="flex-1 flex items-center justify-center text-ink-mute text-xs">
+                  <RefreshCw size={12} className="animate-spin mr-1" /> 生成 Roguelike map 中...
+                </div>
+              );
+            }
+            return (
+              <RoguelikeCanvas
+                map={map}
+                position={pos}
+                agent={agent}
+                workItems={workItems}
+                onMove={handleRoguelikeMove}
+                onReset={handleRoguelikeReset}
+                canMove={gameState?.alive ?? false}
+              />
+            );
+          })()}
+        </>
       )}
 
       {/* 说明 footer */}
