@@ -41,7 +41,7 @@ export function AppHeader() {
     <>
       <header
         data-testid="app-header"
-        className="h-16 sticky top-0 z-30 border-b-2 border-black bg-bg/95 backdrop-blur-xl cel-shadow transition-all select-none"
+        className="h-16 sticky top-0 z-30 border-b-2 border-black bg-[var(--cel-surface-card,#0f1422)]/95 backdrop-blur-xl cel-shadow transition-all select-none text-[var(--cel-text-primary,#ffffff)]"
       >
         <div className="h-full px-6 flex items-center gap-4">
           {/* === Left: Workspace Switcher === */}
@@ -49,13 +49,13 @@ export function AppHeader() {
             <button
               type="button"
               data-testid="workspace-switcher"
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono text-ink-dim hover:text-ink rounded-lg hover:bg-bg-soft/70 border border-transparent hover:border-line transition-all duration-200"
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono text-[var(--cel-text-primary,#ffffff)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-all duration-150"
               aria-label={t.appHeader.workspaceSwitcher}
             >
-              <span className="size-2 rounded-sm bg-accent rotate-45 shadow-[0_0_8px_rgba(0,240,255,0.9)]" />
-              <span className="truncate max-w-[140px] font-bold text-ink tracking-tight">ACME Studio</span>
-              <span className="text-[9px] text-accent font-mono font-bold px-1.5 py-0.2 rounded bg-accent/10 border border-accent/30">CORE</span>
-              <ChevronDown size={12} className="text-ink-mute ml-0.5" />
+              <span className="size-2 bg-[var(--cel-cyan,#00f0ff)] rotate-45 border border-black" />
+              <span className="truncate max-w-[140px] font-black tracking-tight">ACME Studio</span>
+              <span className="text-[9px] text-black font-mono font-black px-1.5 py-0.2 bg-[var(--cel-gold,#ffc400)] border border-black">CORE</span>
+              <ChevronDown size={12} className="text-[var(--cel-text-secondary)] ml-0.5" />
             </button>
           </div>
 
@@ -80,7 +80,7 @@ export function AppHeader() {
               onClick={openMatrix}
               data-testid="header-add-tab"
               title={t.appHeader.addMoreTabs}
-              className="p-1.5 text-ink-mute hover:text-accent rounded-lg hover:bg-bg-soft transition-colors"
+              className="p-1.5 text-[var(--cel-text-secondary)] hover:text-[var(--cel-cyan,#00f0ff)] border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-colors"
             >
               <Plus size={13} />
             </button>
@@ -90,27 +90,48 @@ export function AppHeader() {
               data-testid="settings-gear"
               aria-label={t.ariaLabels.settings}
               className={clsx(
-                "ml-1 p-2 text-ink-dim hover:text-ink rounded-lg hover:bg-bg-soft/70 transition-colors",
-                pathname.startsWith("/settings") && "text-accent bg-accent/10 border border-accent/20"
+                "ml-1 p-2 text-[var(--cel-text-secondary)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-colors",
+                pathname.startsWith("/settings") && "text-[var(--cel-cyan,#00f0ff)] border-[var(--cel-cyan,#00f0ff)]"
               )}
             >
               <Settings size={15} />
             </Link>
           </nav>
 
-          {/* === Right: App Matrix, Theme Toggle, ⌘K, bell, status, avatar === */}
+          {/* === Right: Tactical HUD, App Matrix, Theme Toggle, ⌘K, bell, status, avatar === */}
           <div className="ml-auto flex items-center gap-3">
+            {/* Tactical HUD Telemetry (from chrono-vibe) */}
+            <div className="hidden xl:flex items-center gap-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black px-3 py-1 cel-shadow">
+              <div className="flex flex-col">
+                <div className="flex justify-between text-[9px] font-black tracking-wider text-[var(--cel-text-secondary,#94a3b8)]">
+                  <span>NEURAL SYNC 〔神経同調〕</span>
+                  <span className="text-[var(--cel-cyan,#00f0ff)] font-mono ml-2">99.8%</span>
+                </div>
+                <div className="w-28 h-1.5 bg-[#090d14] border border-black mt-0.5 relative overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-[var(--cel-cyan,#00f0ff)] via-[var(--cel-gold,#ffc400)] to-[var(--cel-crimson,#ff184c)]"
+                    style={{ width: "99.8%" }}
+                  />
+                </div>
+              </div>
+              <div className="h-5 w-px bg-black" />
+              <div className="text-right">
+                <div className="text-[8px] font-bold text-[var(--cel-text-secondary,#94a3b8)]">STATUS</div>
+                <div className="text-[10px] font-mono font-bold text-[var(--cel-gold,#ffc400)]">INV:PASS (HOLD)</div>
+              </div>
+            </div>
+
             {/* === 右上角应用菜单 / App Matrix 抽屉按钮 === */}
             <button
               type="button"
               onClick={openMatrix}
               data-testid="app-matrix-trigger"
               aria-label={t.ariaLabels.openAppMatrix}
-              className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-line bg-bg-soft/70 text-ink-dim hover:text-accent hover:border-accent transition-all duration-200 text-xs font-mono group shadow-sm hover:shadow-[0_0_14px_rgba(0,240,255,0.22)]"
+              className="flex items-center gap-1.5 px-3 h-8 border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-primary,#ffffff)] hover:text-[var(--cel-cyan,#00f0ff)] transition-all text-xs font-mono group cel-shadow"
             >
-              <LayoutGrid size={13} className="text-accent group-hover:scale-110 transition-transform duration-200" />
+              <LayoutGrid size={13} className="text-[var(--cel-cyan,#00f0ff)] group-hover:scale-110 transition-transform duration-200" />
               <span className="hidden lg:inline font-bold">{t.appHeader.allApps}</span>
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-accent/10 text-accent font-bold border border-accent/30">{t.appHeader.appsCount}</span>
+              <span className="text-[9px] px-1.5 py-0.2 bg-black text-[var(--cel-cyan,#00f0ff)] font-bold border border-black">{t.appHeader.appsCount}</span>
             </button>
 
             <ThemeSwitcher />
@@ -120,11 +141,11 @@ export function AppHeader() {
               onClick={openCommandBar}
               data-testid="command-bar-trigger"
               aria-label={t.ariaLabels.openCommandBar}
-              className="flex items-center gap-2 px-3 h-8 rounded-lg border border-line bg-bg-soft/70 text-ink-dim hover:text-ink hover:border-accent transition-all duration-200 text-xs shadow-sm hover:shadow-[0_0_12px_rgba(0,240,255,0.18)]"
+              className="flex items-center gap-2 px-3 h-8 border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-primary,#ffffff)] hover:text-white transition-all text-xs cel-shadow"
             >
-              <Search size={13} className="text-accent" />
+              <Search size={13} className="text-[var(--cel-cyan,#00f0ff)]" />
               <span className="hidden sm:inline font-medium">{t.appHeader.tacticalJump}</span>
-              <kbd className="hidden sm:inline-flex text-[10px] font-mono px-1.5 py-0.5 rounded border border-line bg-bg text-ink-mute font-semibold">
+              <kbd className="hidden sm:inline-flex text-[10px] font-mono px-1.5 py-0.5 border border-black bg-[var(--cel-surface-stage,#090d16)] text-[var(--cel-gold,#ffc400)] font-black">
                 ⌘K
               </kbd>
             </button>
@@ -133,13 +154,13 @@ export function AppHeader() {
               type="button"
               data-testid="notifications-bell"
               aria-label={tx(t.appHeader.notifications, { count: notifCount })}
-              className="relative p-2 text-ink-dim hover:text-ink rounded-lg hover:bg-bg-soft transition-colors"
+              className="relative p-2 text-[var(--cel-text-primary,#ffffff)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-colors"
             >
               <Bell size={15} />
               {notifCount > 0 && (
                 <span
                   data-testid="notifications-badge"
-                  className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-err text-white text-[10px] grid place-items-center px-1 font-mono shadow-[0_0_10px_rgba(255,51,102,0.8)] font-bold"
+                  className="absolute -top-1 -right-1 min-w-[16px] h-4 border border-black bg-[var(--cel-crimson,#ff184c)] text-black text-[9px] grid place-items-center px-1 font-mono font-black"
                 >
                   {notifCount}
                 </span>
@@ -148,11 +169,11 @@ export function AppHeader() {
 
             <div
               data-testid="realtime-status"
-              className="hidden sm:flex items-center gap-1.5 px-3 h-8 rounded-lg border border-line bg-bg-soft/50"
+              className="hidden sm:flex items-center gap-1.5 px-3 h-8 border-2 border-black bg-[var(--cel-surface-stage,#090d16)] cel-shadow"
               aria-label={t.appHeader.realtimeOnline}
             >
-              <span className="size-2 rounded-full bg-ok animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.9)]" aria-hidden="true" />
-              <span className="text-[10px] text-ink-dim font-mono tracking-wider font-bold">{t.appHeader.synced}</span>
+              <span className="size-2 bg-emerald-400 border border-black" aria-hidden="true" />
+              <span className="text-[10px] text-[var(--cel-text-secondary,#94a3b8)] font-mono tracking-wider font-bold">{t.appHeader.synced}</span>
             </div>
 
             <UserMenu />

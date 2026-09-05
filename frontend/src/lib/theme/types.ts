@@ -97,7 +97,7 @@ const STAR_RADII: RadiusToken[] = [
 export const THEMES: ThemeDefinition[] = [
   {
     id: "dark",
-    displayName: "Neo-Tokyo Dark",
+    displayName: "暗夜神格",
     isDark: true,
     colors: STAR_DARK_PALETTE,
     spacings: STAR_SPACING,
@@ -106,7 +106,7 @@ export const THEMES: ThemeDefinition[] = [
   },
   {
     id: "light",
-    displayName: "Mecha Light",
+    displayName: "少年原画",
     isDark: false,
     colors: STAR_LIGHT_PALETTE,
     spacings: STAR_SPACING,

@@ -17,8 +17,14 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div
       data-testid="app-shell"
-      className="min-h-screen bg-bg text-ink"
+      className="min-h-screen bg-[var(--cel-bg)] text-[var(--cel-text-primary)] transition-colors duration-200 relative"
     >
+      {/* 3渲2 Ambient Screentone & Glow Backdrops */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute inset-0 bg-screentone opacity-15" />
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-[var(--cel-crimson,#ff184c)] rounded-full blur-[160px] opacity-10" />
+        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-[var(--cel-cyan,#00f0ff)] rounded-full blur-[160px] opacity-10" />
+      </div>
       <AppHeader />
       {/*
         SubNav slot — U2 接管, 会在路由为 /projects /agents /analytics 时
@@ -27,7 +33,7 @@ export function AppShell({ children }: AppShellProps) {
       <main
         data-testid="app-main"
         style={{ minHeight: "calc(100vh - 64px)" }}
-        className="px-6 sm:px-8 py-8 overflow-x-auto max-w-[1440px] mx-auto w-full"
+        className="relative z-10 px-6 sm:px-8 py-8 overflow-x-auto max-w-[1440px] mx-auto w-full"
       >
         {children}
       </main>

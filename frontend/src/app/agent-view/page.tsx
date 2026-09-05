@@ -42,8 +42,14 @@ import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
 import { Bot, AlertTriangle, Maximize2, Zap, Sparkles, Map, RefreshCw, Settings } from "lucide-react";
 import type { PerkId } from "@/lib/agent-game/types";
 import { useTranslation } from "@/lib/i18n";
+import { AnimeCelShaderCanvas, CelPalette } from "@/components/effects/AnimeCelShaderCanvas";
+import {
+  CelButton3D,
+  CelToggle3D,
+  CelBeacon3D,
+} from "@/components/effects/Cel3DUI";
 
-type ViewMode = "canvas" | "roguelike" | "settings";
+type ViewMode = "canvas" | "roguelike" | "settings" | "core3d";
 
 export default function AgentViewPage() {
   const { t } = useTranslation();
@@ -89,6 +95,11 @@ export default function AgentViewPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(
     urlView === "roguelike" ? "roguelike" : urlView === "settings" ? "settings" : "canvas",
   );
+
+  // 3渲2 Cel Shader Live Parameters
+  const [celPalette, setCelPalette] = useState<CelPalette>("crimson");
+  const [celBands, setCelBands] = useState<number>(3);
+  const [autoSagaGuard, setAutoSagaGuard] = useState(true);
 
   // Modal 状态
   const [pendingPerkLevel, setPendingPerkLevel] = useState<number | null>(null);
@@ -340,33 +351,150 @@ export default function AgentViewPage() {
         </div>
       </div>
 
-      {/* View Mode Tab (per 2026-09-05 23:00 JST 拍板, 3 tab: Canvas v1 / Roguelike v2 / Agent 设置) */}
-      <div className="border-b border-line bg-bg-soft/20 px-6 py-2 flex items-center gap-2" data-testid="view-mode-tabs">
+      {/* View Mode Tab (per 2026-09-05 23:00 JST 拍板: Canvas v1 / Roguelike v2 / 3D 战术核心 v3 / Agent 设置) */}
+      <div className="border-b-2 border-black bg-[var(--cel-surface-card,#0f1422)] px-6 py-2 flex items-center gap-2 cel-shadow" data-testid="view-mode-tabs">
+        <button
+          data-testid="view-mode-core3d"
+          onClick={() => handleViewModeChange("core3d")}
+          className={`text-xs px-3 py-1 font-mono font-bold border-2 border-black transition-all flex items-center gap-1 cel-shadow ${viewMode === "core3d" ? "bg-[var(--cel-crimson,#ff184c)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
+        >
+          <Zap size={11} className="text-[var(--cel-cyan,#00f0ff)]" /> 3D 战术核心 <span className="text-[9px] px-1 bg-black text-[var(--cel-cyan,#00f0ff)]">v3 CEL</span>
+        </button>
         <button
           data-testid="view-mode-canvas"
           onClick={() => handleViewModeChange("canvas")}
-          className={`text-xs px-3 py-1 rounded-md transition-colors flex items-center gap-1 ${viewMode === "canvas" ? "bg-accent/20 text-accent border border-accent/40" : "text-ink-mute hover:bg-bg-soft"}`}
+          className={`text-xs px-3 py-1 font-mono font-bold border-2 border-black transition-all flex items-center gap-1 cel-shadow ${viewMode === "canvas" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
         >
-          <Sparkles size={11} /> Canvas <span className="text-[9px] text-ink-mute">v1</span>
+          <Sparkles size={11} /> Canvas <span className="text-[9px]">v1</span>
         </button>
         <button
           data-testid="view-mode-roguelike"
           onClick={() => handleViewModeChange("roguelike")}
-          className={`text-xs px-3 py-1 rounded-md transition-colors flex items-center gap-1 ${viewMode === "roguelike" ? "bg-accent/20 text-accent border border-accent/40" : "text-ink-mute hover:bg-bg-soft"}`}
+          className={`text-xs px-3 py-1 font-mono font-bold border-2 border-black transition-all flex items-center gap-1 cel-shadow ${viewMode === "roguelike" ? "bg-[var(--cel-gold,#ffc400)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
         >
-          <Map size={11} /> Roguelike <span className="text-[9px] text-warn">v2</span>
+          <Map size={11} /> Roguelike <span className="text-[9px]">v2</span>
         </button>
         <button
           data-testid="view-mode-settings"
           onClick={() => handleViewModeChange("settings")}
-          className={`text-xs px-3 py-1 rounded-md transition-colors flex items-center gap-1 ${viewMode === "settings" ? "bg-accent/20 text-accent border border-accent/40" : "text-ink-mute hover:bg-bg-soft"}`}
+          className={`text-xs px-3 py-1 font-mono font-bold border-2 border-black transition-all flex items-center gap-1 cel-shadow ${viewMode === "settings" ? "bg-[var(--cel-text-primary,#ffffff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
         >
           <Settings size={11} /> Agent 设置
         </button>
       </div>
 
       {/* Content (按 viewMode 切换) */}
-      {viewMode === "canvas" ? (
+      {viewMode === "core3d" ? (
+        <div className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Column: S-Class 3D NPR Cel-Shaded Terminal (7 cols) */}
+          <div className="lg:col-span-7 space-y-4">
+            <div className="card relative overflow-hidden">
+              <div className="flex items-center justify-between border-b-2 border-black pb-2.5 mb-3">
+                <div>
+                  <div className="text-[9px] font-black text-[var(--cel-gold,#ffc400)] uppercase tracking-widest font-mono">
+                    LIVE NPR SHADER // S-CLASS
+                  </div>
+                  <h3 className="text-base font-black uppercase italic tracking-wider text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
+                    {agent.name} 3D AVATAR
+                    <span className="text-[10px] font-black not-italic px-1.5 py-0.2 bg-[var(--cel-crimson,#ff184c)] text-black border border-black">
+                      神格
+                    </span>
+                  </h3>
+                </div>
+                <span className="text-xs font-mono font-bold text-[var(--cel-text-secondary,#94a3b8)]">
+                  〔戦術司令機〕
+                </span>
+              </div>
+
+              {/* Real 3D WebGL Canvas */}
+              <div className="relative w-full h-80 sm:h-96 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black overflow-hidden flex items-center justify-center group cel-shadow">
+                <div className="absolute inset-0 bg-screentone-dense opacity-20 pointer-events-none" />
+                <AnimeCelShaderCanvas
+                  palette={celPalette}
+                  bands={celBands}
+                  outlineThickness={0.05}
+                  enableHalftone={true}
+                  enableRim={true}
+                  speed={1.0}
+                  className="w-full h-full"
+                />
+                <div className="absolute top-2 left-2 flex items-center gap-1.5 z-20 pointer-events-none">
+                  <span className="size-2 rounded-full bg-[var(--cel-cyan,#00f0ff)] animate-ping" />
+                  <span className="bg-black/80 border border-[var(--cel-cyan,#00f0ff)]/40 text-[var(--cel-cyan,#00f0ff)] px-2 py-0.5 text-[9px] font-mono font-bold">
+                    GLSL_NPR_3D
+                  </span>
+                </div>
+                <div className="absolute top-2 right-2 z-20 pointer-events-none">
+                  <span className="bg-black/80 border border-[var(--cel-gold,#ffc400)]/40 text-[var(--cel-gold,#ffc400)] px-2 py-0.5 text-[9px] font-mono font-bold">
+                    {celBands}-BAND CEL
+                  </span>
+                </div>
+              </div>
+
+              {/* Palette & Bands */}
+              <div className="mt-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black p-2.5 flex items-center justify-between text-xs font-mono">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-bold text-[var(--cel-text-secondary,#94a3b8)] uppercase">PALETTE:</span>
+                  <div className="flex gap-1">
+                    {(["crimson", "cyan", "gold", "stealth"] as CelPalette[]).map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => setCelPalette(p)}
+                        className={`px-2 py-0.5 text-[9px] font-bold uppercase border border-black ${celPalette === p ? "bg-[var(--cel-crimson,#ff184c)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-slate-300"}`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] text-[var(--cel-text-secondary,#94a3b8)]">BANDS:</span>
+                  {[2, 3, 4].map((b) => (
+                    <button
+                      key={b}
+                      onClick={() => setCelBands(b)}
+                      className={`w-5 h-5 text-[9px] font-bold border border-black ${celBands === b ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-slate-400"}`}
+                    >
+                      {b}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Protocols & Actions (5 cols) */}
+          <div className="lg:col-span-5 space-y-4">
+            <div className="card">
+              <SectionTitle>Tactical Protocols 〔戦術プロトコル〕</SectionTitle>
+              <div className="space-y-3 mt-3">
+                <div className="border-2 border-black p-3 bg-[var(--cel-surface-sub,#151c2c)] cel-shadow">
+                  <CelToggle3D
+                    label="AUTONOMOUS SAGA GUARD"
+                    sublabel="IDEMPOTENT RECOVERY"
+                    checked={autoSagaGuard}
+                    onChange={setAutoSagaGuard}
+                  />
+                </div>
+                <div className="pt-2 border-t-2 border-black flex flex-col gap-2 items-center">
+                  <CelButton3D
+                    label="01 // SYNC WORKTREE"
+                    sublabel="IDEMPOTENT MERGE"
+                    variant="cyan"
+                    onClick={() => alert("【3D 战术派发】工作树同步成功：0 冲突。")}
+                  />
+                  <CelButton3D
+                    label="02 // EXECUTE STEP"
+                    sublabel="DISPATCH RUNTIME"
+                    variant="gold"
+                    onClick={handleSpend}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : viewMode === "canvas" ? (
         <>
           {canvas && (
             <div className="flex-1 relative">

@@ -129,7 +129,7 @@ export function Sidebar() {
       <div
         data-testid="sidebar-brand-block"
         className={clsx(
-          "border-b border-line shrink-0 flex items-center",
+          "border-b-2 border-black shrink-0 flex items-center bg-[var(--cel-surface-card,#0f1422)]",
           isCollapsed ? "justify-center px-2 py-4 flex-col gap-3" : "justify-between px-4 py-4"
         )}
       >
@@ -144,7 +144,7 @@ export function Sidebar() {
         >
           <div
             aria-hidden="true"
-            className="size-9 rounded-xl overflow-hidden border border-accent/40 shadow-[0_0_16px_rgba(0,240,255,0.3)] shrink-0 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-6 bg-black"
+            className="size-9 overflow-hidden border-2 border-black cel-shadow shrink-0 transition-transform duration-200 group-hover:scale-105 bg-black"
           >
             <img
               src="/sidebar-icon.png"
@@ -158,17 +158,17 @@ export function Sidebar() {
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className={clsx(
-                  "text-sm font-black tracking-tight transition-colors",
-                  isDark ? "text-slate-100 group-hover:text-cyan-300" : "text-slate-900 group-hover:text-sky-600"
+                  "text-sm font-black tracking-wider uppercase italic transition-colors",
+                  isDark ? "text-white group-hover:text-[var(--cel-cyan,#00f0ff)]" : "text-black group-hover:text-[var(--cel-crimson,#ff184c)]"
                 )}>
                   STAR
                 </span>
-                <span className="font-mono text-[9px] font-bold px-1.5 py-0.2 rounded border border-accent/40 bg-accent/10 text-accent">
-                  v0.2
+                <span className="font-mono text-[9px] font-black px-1.5 py-0.2 bg-[var(--cel-crimson,#ff184c)] text-black border border-black italic">
+                  CEL-NPR
                 </span>
               </div>
-              <div className="text-[9px] font-mono tracking-widest text-ink-mute uppercase font-medium">
-                {t.sidebar.brandTagline}
+              <div className="text-[9px] font-mono tracking-widest text-[var(--cel-text-secondary,#94a3b8)] uppercase font-bold">
+                〔統制司令部〕
               </div>
             </div>
           )}

@@ -24,5 +24,5 @@
 import { redirect } from "next/navigation";
 
 export default function RootPage(): never {
-  redirect("/chrono-vibe");
+  redirect("/inbox");
 }
