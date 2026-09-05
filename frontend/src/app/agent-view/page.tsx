@@ -34,14 +34,15 @@ import { GameHUD } from "@/components/agent-game/GameHUD";
 import { PerkPicker } from "@/components/agent-game/PerkPicker";
 import { DeathModal } from "@/components/agent-game/DeathModal";
 import { RoguelikeCanvas } from "@/components/agent-game/RoguelikeCanvas";
+import { AgentSettingsTab } from "@/components/agent-game/AgentSettingsTab";
 import { useAgentGame } from "@/components/agent-game/useAgentGame";
 import { getPerkChoices } from "@/lib/agent-game/perks";
 import { PageHeader } from "@/components/PageHeader";
 import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
-import { Bot, AlertTriangle, Maximize2, Zap, Sparkles, Map, RefreshCw } from "lucide-react";
+import { Bot, AlertTriangle, Maximize2, Zap, Sparkles, Map, RefreshCw, Settings } from "lucide-react";
 import type { PerkId } from "@/lib/agent-game/types";
 
-type ViewMode = "canvas" | "roguelike";
+type ViewMode = "canvas" | "roguelike" | "settings";
 
 export default function AgentViewPage() {
   const router = useRouter();
@@ -82,8 +83,10 @@ export default function AgentViewPage() {
   // 拟人化游戏化 (per 2026-09-05 11:42 JST 拍板)
   const { gameState, claim, spend, revive, restart, pickPerk, init } = useAgentGame(resolution?.agentId ?? null);
 
-  // View 模式 (URL 持久化)
-  const [viewMode, setViewMode] = useState<ViewMode>(urlView === "roguelike" ? "roguelike" : "canvas");
+  // View 模式 (URL 持久化, 默认 Canvas v1)
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    urlView === "roguelike" ? "roguelike" : urlView === "settings" ? "settings" : "canvas",
+  );
 
   // Modal 状态
   const [pendingPerkLevel, setPendingPerkLevel] = useState<number | null>(null);
@@ -134,10 +137,10 @@ export default function AgentViewPage() {
     (mode: ViewMode) => {
       setViewMode(mode);
       const params = new URLSearchParams(searchParams.toString());
-      if (mode === "roguelike") {
-        params.set("view", "roguelike");
-      } else {
+      if (mode === "canvas") {
         params.delete("view");
+      } else {
+        params.set("view", mode);
       }
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
@@ -335,21 +338,28 @@ export default function AgentViewPage() {
         </div>
       </div>
 
-      {/* View Mode Tab (per 2026-09-05 12:23 JST 拍板, Canvas vs Roguelike) */}
+      {/* View Mode Tab (per 2026-09-05 23:00 JST 拍板, 3 tab: Canvas v1 / Roguelike v2 / Agent 设置) */}
       <div className="border-b border-line bg-bg-soft/20 px-6 py-2 flex items-center gap-2" data-testid="view-mode-tabs">
         <button
           data-testid="view-mode-canvas"
           onClick={() => handleViewModeChange("canvas")}
-          className={`text-xs px-3 py-1 rounded-md transition-colors ${viewMode === "canvas" ? "bg-accent/20 text-accent border border-accent/40" : "text-ink-mute hover:bg-bg-soft"}`}
+          className={`text-xs px-3 py-1 rounded-md transition-colors flex items-center gap-1 ${viewMode === "canvas" ? "bg-accent/20 text-accent border border-accent/40" : "text-ink-mute hover:bg-bg-soft"}`}
         >
-          Canvas
+          <Sparkles size={11} /> Canvas <span className="text-[9px] text-ink-mute">v1</span>
         </button>
         <button
           data-testid="view-mode-roguelike"
           onClick={() => handleViewModeChange("roguelike")}
           className={`text-xs px-3 py-1 rounded-md transition-colors flex items-center gap-1 ${viewMode === "roguelike" ? "bg-accent/20 text-accent border border-accent/40" : "text-ink-mute hover:bg-bg-soft"}`}
         >
-          <Map size={11} /> Roguelike
+          <Map size={11} /> Roguelike <span className="text-[9px] text-warn">v2</span>
+        </button>
+        <button
+          data-testid="view-mode-settings"
+          onClick={() => handleViewModeChange("settings")}
+          className={`text-xs px-3 py-1 rounded-md transition-colors flex items-center gap-1 ${viewMode === "settings" ? "bg-accent/20 text-accent border border-accent/40" : "text-ink-mute hover:bg-bg-soft"}`}
+        >
+          <Settings size={11} /> Agent 设置
         </button>
       </div>
 
@@ -368,7 +378,7 @@ export default function AgentViewPage() {
             </div>
           )}
         </>
-      ) : (
+      ) : viewMode === "roguelike" ? (
         <>
           {(() => {
             const map = agentMaps[resolution.agentId];
@@ -389,10 +399,15 @@ export default function AgentViewPage() {
                 onMove={handleRoguelikeMove}
                 onReset={handleRoguelikeReset}
                 canMove={gameState?.alive ?? false}
+                agentLevel={gameState?.level ?? 1}
               />
             );
           })()}
         </>
+      ) : (
+        <div className="flex-1 min-h-0">
+          <AgentSettingsTab initialAgentId={resolution.agentId} />
+        </div>
       )}
 
       {/* 说明 footer */}

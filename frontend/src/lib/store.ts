@@ -40,6 +40,8 @@ import {
 import type { GameMap, MapCell } from "@/lib/agent-game/mapgen";
 import { generateMap } from "@/lib/agent-game/mapgen";
 import { moveAgent, type MoveResult } from "@/lib/agent-game/movement";
+import type { AgentSettings } from "@/lib/agent-game/settings";
+import { createInitialAgentSettings } from "@/lib/agent-game/settings";
 
 /** claimReward 戻り値 (per 拍板) */
 export type ClaimResult =
@@ -187,6 +189,8 @@ interface StoreState {
   agentMaps: Record<Uuid, GameMap>;
   /** per-agent 当前在 map 上的位置 (per 拍板 #3, 4-邻接移动) */
   agentPositions: Record<Uuid, { x: number; y: number }>;
+  /** per-agent API / 模型 / 提示配置 (per 2026-09-05 23:00 JST 拍板, Agent 设置 tab) */
+  agentSettings: Record<Uuid, AgentSettings>;
 
   // 5 状态机迁移 (保留 B.2.5 已实装的 6 个)
   transitionWorktree: (id: string, to: WorktreeStatus) => void;
@@ -321,6 +325,16 @@ interface StoreState {
   moveAgentOnMap: (agentId: Uuid, targetPos: { x: number; y: number }) => MoveResult;
   /** Roguelike: 重置 map + 位置 (新一局) */
   resetAgentMap: (agentId: Uuid) => void;
+
+  // Agent Settings (per 2026-09-05 23:00 JST 拍板, Agent 设置 tab)
+  /** 初始化/重置 1 个 agent 的 settings (lazy, 首次访问时) */
+  initAgentSettings: (agentId: Uuid) => void;
+  /** 局部更新 settings (per field, 自动 updatedAt) */
+  updateAgentSetting: <K extends keyof AgentSettings>(agentId: Uuid, field: K, value: AgentSettings[K]) => void;
+  /** 完整替换 settings (per form 提交) */
+  replaceAgentSettings: (agentId: Uuid, settings: AgentSettings) => void;
+  /** 切换 enabled */
+  toggleAgentEnabled: (agentId: Uuid) => void;
 }
 
 // =====================================================================
@@ -377,6 +391,9 @@ const initialState = (set: any): StoreState => ({
   //   - per-agent, 首次 generateAgentMap 时 lazy init
   agentMaps: {} as Record<Uuid, GameMap>,
   agentPositions: {} as Record<Uuid, { x: number; y: number }>,
+  // Agent Settings (per 2026-09-05 23:00 JST 拍板)
+  //   - per-agent, 首次 initAgentSettings 时 lazy init
+  agentSettings: {} as Record<Uuid, AgentSettings>,
 
   // 6 状态机 (B.2.5 已有)
   transitionWorktree: (id, to) =>
@@ -760,6 +777,56 @@ const initialState = (set: any): StoreState => ({
       return {
         agentMaps: { ...s.agentMaps, [agentId]: newMap },
         agentPositions: { ...s.agentPositions, [agentId]: newMap.startPos },
+      };
+    }),
+
+  // ===================================================================
+  // Agent Settings 4 个 action (per 2026-09-05 23:00 JST 拍板)
+  //   - initAgentSettings: lazy init per agent
+  //   - updateAgentSetting: 局部更新 (form 实时编辑)
+  //   - replaceAgentSettings: 完整替换 (form 提交)
+  //   - toggleAgentEnabled: 快速切换
+  // ===================================================================
+
+  initAgentSettings: (agentId) =>
+    set((s: StoreState) => {
+      if (s.agentSettings[agentId]) return s;  // 已 init
+      const agent = s.agentSessions.find((a) => a.id === agentId);
+      if (!agent) return s;
+      return {
+        agentSettings: {
+          ...s.agentSettings,
+          [agentId]: createInitialAgentSettings(agent),
+        },
+      };
+    }),
+
+  updateAgentSetting: (agentId, field, value) =>
+    set((s: StoreState) => {
+      const cur = s.agentSettings[agentId];
+      if (!cur) return s;
+      return {
+        agentSettings: {
+          ...s.agentSettings,
+          [agentId]: { ...cur, [field]: value, updatedAt: new Date().toISOString() },
+        },
+      };
+    }),
+
+  replaceAgentSettings: (agentId, settings) =>
+    set((s: StoreState) => ({
+      agentSettings: { ...s.agentSettings, [agentId]: { ...settings, agentId, updatedAt: new Date().toISOString() } },
+    })),
+
+  toggleAgentEnabled: (agentId) =>
+    set((s: StoreState) => {
+      const cur = s.agentSettings[agentId];
+      if (!cur) return s;
+      return {
+        agentSettings: {
+          ...s.agentSettings,
+          [agentId]: { ...cur, enabled: !cur.enabled, updatedAt: new Date().toISOString() },
+        },
       };
     }),
 
