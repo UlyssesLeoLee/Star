@@ -14,10 +14,13 @@ use thiserror::Error;
 
 use crate::{ParseResult, Symbol, SymbolKind};
 
+/// Symbol Resolver 错误
 #[derive(Debug, Error)]
 pub enum SymbolResolverError {
+    /// 引用解析错误
     #[error("reference parse error: {0}")]
     ReferenceParseError(String),
+    /// 符号未找到
     #[error("symbol not found: {0}")]
     SymbolNotFound(String),
 }
@@ -25,9 +28,13 @@ pub enum SymbolResolverError {
 /// 符号引用 (parsed from source)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SymbolReference {
-    pub raw: String,        // e.g. "domain_tenant::PlayerService::register"
-    pub parts: Vec<String>, // split: ["domain_tenant", "PlayerService", "register"]
+    /// 原始引用字符串, e.g. "domain_tenant::PlayerService::register"
+    pub raw: String,
+    /// 按 "::" 拆分的部分, e.g. ["domain_tenant", "PlayerService", "register"]
+    pub parts: Vec<String>,
+    /// 所在行号
     pub line: usize,
+    /// 所在列号
     pub column: usize,
 }
 
@@ -55,11 +62,16 @@ impl SymbolReference {
 /// 引用关系 (source -> target)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ReferenceEdge {
+    /// 源文件
     pub source_file: String,
+    /// 源引用
     pub source_ref: SymbolReference,
-    pub target_file: String, // 推测的目标文件 (e.g. "domain_tenant.rs" for "domain_tenant::Foo")
-    pub target_name: String, // 推测的目标 symbol
-    pub resolved: bool,      // 是否在已知 symbols 中找到
+    /// 推测的目标文件 (e.g. "domain_tenant.rs" for "domain_tenant::Foo")
+    pub target_file: String,
+    /// 推测的目标 symbol
+    pub target_name: String,
+    /// 是否在已知 symbols 中找到
+    pub resolved: bool,
 }
 
 /// Symbol index (跨文件 symbol 表)
@@ -71,6 +83,7 @@ pub struct SymbolIndex {
 }
 
 impl SymbolIndex {
+    /// 构造空索引
     pub fn new() -> Self {
         Self {
             symbols_by_file: HashMap::new(),
@@ -116,10 +129,12 @@ impl SymbolIndex {
             .unwrap_or_default()
     }
 
+    /// 已索引文件数
     pub fn file_count(&self) -> usize {
         self.symbols_by_file.len()
     }
 
+    /// 已索引符号总数
     pub fn symbol_count(&self) -> usize {
         self.symbols_by_file.values().map(|m| m.len()).sum()
     }
@@ -137,20 +152,24 @@ pub struct SymbolResolver {
 }
 
 impl SymbolResolver {
+    /// 构造空 resolver
     pub fn new() -> Self {
         Self {
             index: SymbolIndex::new(),
         }
     }
 
+    /// 由已有索引构造 resolver
     pub fn from_index(index: SymbolIndex) -> Self {
         Self { index }
     }
 
+    /// 取内部索引
     pub fn index(&self) -> &SymbolIndex {
         &self.index
     }
 
+    /// 取内部索引 (可变)
     pub fn index_mut(&mut self) -> &mut SymbolIndex {
         &mut self.index
     }

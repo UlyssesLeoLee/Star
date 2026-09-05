@@ -14,16 +14,23 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+/// Tree-sitter 解析错误
 #[derive(Debug, Error)]
 pub enum TreeSitterError {
+    /// 解析错误
     #[error("parse error at line {line}, column {column}: {message}")]
     ParseError {
+        /// 出错行号
         line: usize,
+        /// 出错列号
         column: usize,
+        /// 错误说明
         message: String,
     },
+    /// 不支持的语言
     #[error("unsupported language: {0}")]
     UnsupportedLanguage(String),
+    /// 内部错误
     #[error("internal error: {0}")]
     Internal(String),
 }
@@ -31,14 +38,20 @@ pub enum TreeSitterError {
 /// 支持的 5 语言
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Language {
+    /// Rust
     Rust,
+    /// TypeScript
     TypeScript,
+    /// Python
     Python,
+    /// Go
     Go,
+    /// JSON
     Json,
 }
 
 impl Language {
+    /// 转为语言标识字符串
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Rust => "rust",
@@ -49,6 +62,7 @@ impl Language {
         }
     }
 
+    /// 由语言标识字符串解析
     pub fn from_str(s: &str) -> Result<Self, TreeSitterError> {
         match s {
             "rust" => Ok(Self::Rust),
@@ -64,36 +78,59 @@ impl Language {
 /// 符号提取结果
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Symbol {
+    /// 符号类型
     pub kind: SymbolKind,
+    /// 符号名称
     pub name: String,
+    /// 所在行号
     pub line: usize,
+    /// 所在列号
     pub column: usize,
 }
 
+/// 符号类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SymbolKind {
+    /// 函数
     Function,
+    /// 结构体
     Struct,
+    /// 枚举
     Enum,
+    /// Trait
     Trait,
+    /// Impl 块
     Impl,
+    /// 常量
     Const,
+    /// 静态量
     Static,
+    /// 模块
     Module,
+    /// 类型别名
     TypeAlias,
+    /// 类
     Class,
+    /// 接口
     Interface,
+    /// 方法
     Method,
+    /// 变量
     Variable,
+    /// 其他
     Other,
 }
 
 /// 解析结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParseResult {
+    /// 源语言
     pub language: Language,
+    /// 提取的符号列表
     pub symbols: Vec<Symbol>,
+    /// 是否存在解析错误
     pub has_errors: bool,
+    /// 错误数量
     pub error_count: usize,
 }
 
@@ -103,6 +140,7 @@ pub struct TreeSitterParser {
 }
 
 impl TreeSitterParser {
+    /// 构造 parser
     pub fn new(language: Language) -> Self {
         Self { language }
     }
