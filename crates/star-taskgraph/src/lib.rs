@@ -17,17 +17,24 @@ use uuid::Uuid;
 
 use star_treesitter::{Language, Symbol, SymbolKind};
 
+/// TaskGraph 领域错误
 #[derive(Debug, Error)]
 pub enum TaskGraphError {
+    /// 任务未找到
     #[error("task not found: {0}")]
     TaskNotFound(String),
+    /// worktree 未找到
     #[error("worktree not found: {0}")]
     WorktreeNotFound(String),
+    /// 绑定冲突
     #[error("binding conflict: task {task_id} already bound to worktree {existing_worktree}")]
     BindingConflict {
+        /// 任务 ID
         task_id: String,
+        /// 已绑定的 worktree
         existing_worktree: String,
     },
+    /// 非法状态
     #[error("invalid state: {0}")]
     InvalidState(String),
 }
@@ -35,26 +42,41 @@ pub enum TaskGraphError {
 /// 任务卡 (per LangGraph L1 SubAgent)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TaskCard {
+    /// 任务 ID
     pub task_id: String,
+    /// 标题
     pub title: String,
-    pub kind: String, // SA-01..SA-09 (per SubAgentArchetype)
+    /// 任务类型 (SA-01..SA-09, per SubAgentArchetype)
+    pub kind: String,
+    /// 租户 ID
     pub tenant_id: String,
-    pub worktree_id: Option<String>, // 1:1 binding
+    /// 已绑定的 worktree ID (1:1 binding)
+    pub worktree_id: Option<String>,
+    /// 状态
     pub status: TaskStatus,
+    /// 创建时间 (毫秒时间戳)
     pub created_at_ms: u64,
-    pub symbols: Vec<Symbol>, // 从 star-treesitter 解析
+    /// 从 star-treesitter 解析出的符号
+    pub symbols: Vec<Symbol>,
 }
 
+/// 任务状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskStatus {
+    /// 待处理
     Pending,
+    /// 进行中
     Active,
+    /// 已完成
     Completed,
+    /// 失败
     Failed,
+    /// 已取消
     Cancelled,
 }
 
 impl TaskCard {
+    /// 构造任务卡
     pub fn new(
         title: impl Into<String>,
         kind: impl Into<String>,
@@ -72,6 +94,7 @@ impl TaskCard {
         }
     }
 
+    /// 绑定 worktree
     pub fn bind_worktree(&mut self, worktree_id: impl Into<String>) -> Result<(), TaskGraphError> {
         if self.worktree_id.is_some() {
             return Err(TaskGraphError::BindingConflict {
@@ -87,13 +110,18 @@ impl TaskCard {
 /// Worktree (git worktree 抽象)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Worktree {
+    /// worktree ID
     pub worktree_id: String,
-    pub path: String,            // e.g. ".worktrees/feat-auto-..."
-    pub branch: String,          // git branch
-    pub task_id: Option<String>, // 1:1 binding
+    /// 路径, e.g. ".worktrees/feat-auto-..."
+    pub path: String,
+    /// git branch
+    pub branch: String,
+    /// 已绑定的任务 ID (1:1 binding)
+    pub task_id: Option<String>,
 }
 
 impl Worktree {
+    /// 构造 worktree
     pub fn new(path: impl Into<String>, branch: impl Into<String>) -> Self {
         Self {
             worktree_id: Uuid::new_v4().to_string(),
@@ -103,6 +131,7 @@ impl Worktree {
         }
     }
 
+    /// 绑定任务
     pub fn bind_task(&mut self, task_id: impl Into<String>) -> Result<(), TaskGraphError> {
         if self.task_id.is_some() {
             return Err(TaskGraphError::BindingConflict {
@@ -122,6 +151,7 @@ pub struct TaskGraph {
 }
 
 impl TaskGraph {
+    /// 构造空 TaskGraph
     pub fn new() -> Self {
         Self {
             tasks: vec![],
@@ -129,10 +159,12 @@ impl TaskGraph {
         }
     }
 
+    /// 添加任务卡
     pub fn add_task(&mut self, task: TaskCard) {
         self.tasks.push(task);
     }
 
+    /// 添加 worktree
     pub fn add_worktree(&mut self, worktree: Worktree) {
         self.worktrees.push(worktree);
     }
@@ -169,10 +201,12 @@ impl TaskGraph {
         Ok(())
     }
 
+    /// 按 ID 查找任务卡
     pub fn get_task(&self, task_id: &str) -> Option<&TaskCard> {
         self.tasks.iter().find(|t| t.task_id == task_id)
     }
 
+    /// 按 ID 查找 worktree
     pub fn get_worktree(&self, worktree_id: &str) -> Option<&Worktree> {
         self.worktrees.iter().find(|w| w.worktree_id == worktree_id)
     }
@@ -243,32 +277,48 @@ impl Default for TaskGraph {
     }
 }
 
+/// react-flow 兼容图 (nodes + edges)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReactFlowGraph {
+    /// 节点列表
     pub nodes: Vec<ReactFlowNode>,
+    /// 边列表
     pub edges: Vec<ReactFlowEdge>,
 }
 
+/// react-flow 节点
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReactFlowNode {
+    /// 节点 ID
     pub id: String,
+    /// 节点类型
     #[serde(rename = "type")]
     pub node_type: String,
+    /// 节点坐标
     pub position: Position,
+    /// 节点数据
     pub data: serde_json::Value,
 }
 
+/// 2D 坐标
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position {
+    /// X 坐标
     pub x: f64,
+    /// Y 坐标
     pub y: f64,
 }
 
+/// react-flow 边
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReactFlowEdge {
+    /// 边 ID
     pub id: String,
+    /// 源节点 ID
     pub source: String,
+    /// 目标节点 ID
     pub target: String,
+    /// 边类型
     #[serde(rename = "type")]
     pub edge_type: String,
 }
