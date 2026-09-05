@@ -38,7 +38,7 @@ export function Tabs({
   size?: TabSize;
   ariaLabel?: string;
 }) {
-  const sizeClass = size === "sm" ? "px-2.5 py-1.5 text-xs" : size === "lg" ? "px-5 py-3 text-base" : "px-3.5 py-2 text-xs";
+  const sizeClass = size === "sm" ? "px-2.5 py-1.5 text-xs font-semibold" : size === "lg" ? "px-5 py-3 text-base font-bold" : "px-4 py-2.5 text-sm font-semibold";
 
   const handleKey = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
@@ -98,7 +98,7 @@ export function Tabs({
             {it.icon}
             <span>{it.label}</span>
             {it.badge !== undefined && (
-              <span className={clsx("ml-1 text-[9px] font-mono font-bold px-1.5 py-0 rounded-full border", badgeToneClass[tone])}>
+              <span className={clsx("ml-1.5 text-xs font-mono font-bold px-2 py-0.5 min-w-[20px] text-center rounded-full border", badgeToneClass[tone])}>
                 {it.badge}
               </span>
             )}

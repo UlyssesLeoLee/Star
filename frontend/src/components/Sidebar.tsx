@@ -158,16 +158,16 @@ export function Sidebar() {
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className={clsx(
-                  "text-sm font-black tracking-wider uppercase italic transition-colors",
+                  "text-base font-black tracking-wider uppercase italic transition-colors",
                   isDark ? "text-white group-hover:text-[var(--cel-cyan,#00f0ff)]" : "text-black group-hover:text-[var(--cel-crimson,#ff184c)]"
                 )}>
                   STAR
                 </span>
-                <span className="font-mono text-[9px] font-black px-1.5 py-0.2 bg-[var(--cel-crimson,#ff184c)] text-black border border-black italic">
+                <span className="font-mono text-[10px] font-black px-1.5 py-0.5 bg-[var(--cel-crimson,#ff184c)] text-black border border-black italic">
                   CEL-NPR
                 </span>
               </div>
-              <div className="text-[9px] font-mono tracking-widest text-[var(--cel-text-secondary,#94a3b8)] uppercase font-bold">
+              <div className="text-[11px] font-mono tracking-wider text-[var(--cel-text-secondary,#94a3b8)] uppercase font-bold">
                 〔統制司令部〕
               </div>
             </div>
@@ -411,7 +411,7 @@ function SubNavGroupList({ group, activeId, collapsed }: SubNavGroupListProps) {
       {!collapsed && (
         <div
           data-testid="sidebar-subnav-top-label"
-          className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-ink-mute"
+          className="px-2.5 py-1 text-xs font-mono uppercase tracking-wider text-ink-mute font-bold"
         >
           {group.topLabel}
         </div>
@@ -449,7 +449,7 @@ function SubNavGroupRow({ item, href, active, collapsed }: SubNavGroupRowProps) 
         data-active={active ? "true" : "false"}
         aria-current={active ? "page" : undefined}
         className={clsx(
-          "relative flex items-center rounded-xl text-xs font-medium transition-all duration-200",
+          "relative flex items-center rounded-xl text-sm font-medium transition-all duration-200",
           collapsed ? "justify-center p-1.5" : "gap-2.5 px-2.5 py-1.5",
           active
             ? "bg-bg-soft/80 text-ink border border-line shadow-soft font-semibold"
@@ -472,7 +472,7 @@ function SubNavGroupRow({ item, href, active, collapsed }: SubNavGroupRowProps) 
         {!collapsed && (
           <>
             <span className="flex-1 truncate tracking-tight">{item.label}</span>
-            <span className="text-[9px] font-mono text-ink-mute px-1.5 py-0.2 rounded border border-line/50 bg-bg/40 opacity-70 group-hover:opacity-100 transition-opacity">
+            <span className="text-[10px] font-mono text-ink-mute px-1.5 py-0.5 rounded border border-line/50 bg-bg/40 opacity-70 group-hover:opacity-100 transition-opacity font-bold">
               {item.code}
             </span>
             {active && (
@@ -602,7 +602,7 @@ function SidebarRow({
         href={item.href}
         data-testid={`${dataTestIdBase}-${testIdSlug}`}
         className={clsx(
-          "relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all duration-200",
+          "relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-sm font-medium transition-all duration-200",
           active
             ? "bg-bg-soft/80 text-ink border border-line shadow-soft font-semibold"
             : "text-ink-dim hover:bg-bg-soft/60 hover:text-ink border border-transparent"
@@ -630,12 +630,12 @@ function SidebarRow({
 
         <span className="flex-1 truncate tracking-tight">{mod.label}</span>
 
-        <span className="text-[9px] font-mono text-ink-mute px-1.5 py-0.2 rounded border border-line/50 bg-bg/40 opacity-70 group-hover:opacity-100 transition-opacity">
+        <span className="text-[10px] font-mono text-ink-mute px-1.5 py-0.5 rounded border border-line/50 bg-bg/40 opacity-70 group-hover:opacity-100 transition-opacity font-bold">
           {item.code}
         </span>
 
         {item.count !== undefined && item.count > 0 && (
-          <span className="min-w-[16px] h-4 rounded-full bg-err text-white text-[9px] font-mono grid place-items-center px-1 shadow-[0_0_8px_rgba(255,51,102,0.7)] font-bold">
+          <span className="min-w-[18px] h-4.5 rounded-full bg-err text-white text-[10px] font-mono grid place-items-center px-1 shadow-[0_0_8px_rgba(255,51,102,0.7)] font-bold">
             {item.count}
           </span>
         )}

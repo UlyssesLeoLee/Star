@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
@@ -67,7 +68,9 @@ export default function RootLayout({
         <I18nProvider>
           <Providers>
             <div className="flex min-h-screen">
-              <Sidebar />
+              <Suspense fallback={<aside className="hidden md:flex shrink-0 w-64 border-r-2 border-black bg-bg-soft/95" />}>
+                <Sidebar />
+              </Suspense>
               <div
                 className="flex-1 flex flex-col min-w-0 md:pb-0 relative"
                 style={{

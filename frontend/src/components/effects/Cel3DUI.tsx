@@ -290,7 +290,7 @@ export function CelButton3D({
           {label}
         </span>
         {sublabel && (
-          <span className="text-[8px] font-bold text-black/70 font-mono tracking-tighter uppercase -mt-0.5">
+          <span className="text-[10px] font-bold text-black/80 font-mono tracking-tight uppercase">
             {sublabel}
           </span>
         )}
@@ -462,7 +462,7 @@ export function CelToggle3D({
             </span>
           )}
           {sublabel && (
-            <span className="text-[9px] font-mono text-slate-500 tracking-tighter">
+            <span className="text-[11px] font-mono text-slate-400 tracking-tight font-semibold">
               {sublabel}
             </span>
           )}
@@ -748,7 +748,7 @@ export function CelDial3D({ value, onChange, options, className = "" }: CelDial3
       </div>
 
       <div className="flex flex-col">
-        <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">
+        <span className="text-[11px] font-mono text-slate-400 font-bold uppercase tracking-wider">
           ROTARY INDEX [{value + 1}/{options.length}]
         </span>
         <span className="text-xs font-black text-[#00f0ff] uppercase tracking-wider italic">

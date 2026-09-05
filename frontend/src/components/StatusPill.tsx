@@ -121,7 +121,7 @@ export function StatusPill({ value, size = "sm", translateAs }: StatusPillProps)
   return (
     <span className={clsx(
       "pill font-mono items-center",
-      size === "xs" ? "text-[10px] px-1.5 py-0" : "text-xs px-2 py-0.5",
+      size === "xs" ? "text-xs px-2 py-0.5" : "text-xs px-2.5 py-1 font-bold",
       cls,
     )}>
       {dot && <span className={clsx("size-1.5 rounded-full inline-block mr-1 shrink-0", dot)} />}

@@ -60,35 +60,46 @@ html, body {
 
 @layer components {
   /* ── 艺术级三渲二漫画卡片 (Swiss 8pt Grid & Optical Balance) ────────────────────────── */
+  /* ── 艺术级三渲二漫画卡片 (Swiss 8pt Grid & Optical Balance) ────────────────────────── */
   .card {
     border-radius: 0px;
-    border: 2.5px solid var(--cel-ink, #000000);
+    border: 2px solid var(--cel-ink, #000000);
     background: var(--cel-card-ramp);
-    padding: 1.5rem; /* 24px breathable margin */
+    padding: 1.25rem 1.5rem; /* 20px vert, 24px horiz optical breathing room */
     transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms ease, border-color 0.15s ease;
-    box-shadow: 6px 6px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow: 4px 4px 0px 0px var(--cel-shadow-color, #000000);
     position: relative;
   }
   .card:hover {
     transform: translate(-2px, -2px);
-    box-shadow: 8px 8px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow: 6px 6px 0px 0px var(--cel-shadow-color, #000000);
     border-color: var(--cel-cyan, #00f0ff);
+  }
+
+  /* 紧凑型卡片（看板列、小挂件、状态网格） */
+  .card-compact {
+    padding: 0.875rem 1rem;
+    box-shadow: 3px 3px 0px 0px var(--cel-shadow-color, #000000);
+  }
+  .card-compact:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0px 0px var(--cel-shadow-color, #000000);
   }
 
   /* ── 动漫三渲二战术面板 (NPR Stepped Ramp + Breathing Chamfer) ─────────────────────── */
   .anime-panel {
     position: relative;
     border-radius: 0px;
-    border: 3px solid var(--cel-ink, #000000);
+    border: 2.5px solid var(--cel-ink, #000000);
     background: var(--cel-card-ramp);
-    padding: 1.5rem; /* 24px optical gutter */
+    padding: 1.25rem 1.5rem; /* 20px / 24px optical gutter */
     transition: transform 120ms ease, box-shadow 120ms ease;
-    box-shadow: 7px 7px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow: 5px 5px 0px 0px var(--cel-shadow-color, #000000);
     clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
   }
   .anime-panel:hover {
     transform: translate(-2px, -2px);
-    box-shadow: 9px 9px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow: 7px 7px 0px 0px var(--cel-shadow-color, #000000);
     border-color: var(--cel-crimson, #ff184c);
   }
 
@@ -99,12 +110,12 @@ html, body {
     justify-content: center;
     gap: 0.375rem;
     font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 10px;
-    font-weight: 800;
+    font-size: 11px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     padding: 4px 10px;
-    height: 24px;
+    height: 26px;
     border-radius: 0px;
     border: 1.5px solid var(--cel-ink, #000000);
     color: var(--cel-cyan, #00f0ff);
@@ -120,10 +131,10 @@ html, body {
     justify-content: center;
     gap: 6px;
     font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 800;
     padding: 4px 12px;
-    height: 26px;
+    height: 28px;
     border-radius: 0px;
     border: 2px solid var(--cel-ink, #000000);
     background-color: var(--cel-crimson, #ff184c);
@@ -140,9 +151,9 @@ html, body {
     justify-content: center;
     border-radius: 0px;
     border: 1.5px solid var(--cel-ink, #000000);
-    padding: 3px 10px;
-    height: 24px;
-    font-size: 11px;
+    padding: 4px 10px;
+    height: 26px;
+    font-size: 12px;
     font-weight: 700;
     font-family: 'JetBrains Mono', monospace;
     letter-spacing: 0.02em;
@@ -163,20 +174,20 @@ html, body {
     border: 2px solid var(--cel-ink, #000000);
     background: var(--cel-surface-sub, #151c2c);
     padding: 8px 18px;
-    font-size: 12px;
-    font-weight: 800;
+    font-size: 13px;
+    font-weight: 700;
     color: var(--cel-text-primary, #ffffff);
-    box-shadow: 4px 4px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow: 3px 3px 0px 0px var(--cel-shadow-color, #000000);
     transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 100ms cubic-bezier(0.16, 1, 0.3, 1);
     line-height: 1.2;
   }
   .btn:hover {
     transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow: 5px 5px 0px 0px var(--cel-shadow-color, #000000);
     border-color: var(--cel-cyan, #00f0ff);
   }
   .btn:active {
-    transform: translate(3px, 3px) !important;
+    transform: translate(2px, 2px) !important;
     box-shadow: 0px 0px 0px #000000 !important;
   }
 
@@ -189,24 +200,24 @@ html, body {
     border-radius: 0px;
     border: 2.5px solid var(--cel-ink, #000000);
     background: linear-gradient(135deg, #ff3b69 0%, #ff3b69 40%, #ff184c 40%, #ff184c 75%, #b8002d 75%, #b8002d 100%);
-    padding: 10px 20px;
-    font-size: 13px;
-    font-weight: 900;
+    padding: 10px 22px;
+    font-size: 14px;
+    font-weight: 800;
     color: #000000;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-style: italic;
-    box-shadow: 5px 5px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow: 4px 4px 0px 0px var(--cel-shadow-color, #000000);
     transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 100ms cubic-bezier(0.16, 1, 0.3, 1);
     line-height: 1.2;
   }
   .btn-primary:hover {
     transform: translate(-2px, -2px);
-    box-shadow: 7px 7px 0px 0px var(--cel-shadow-color, #000000);
-    filter: brightness(1.1);
+    box-shadow: 6px 6px 0px 0px var(--cel-shadow-color, #000000);
+    filter: brightness(1.08);
   }
   .btn-primary:active {
-    transform: translate(4px, 4px) !important;
+    transform: translate(3px, 3px) !important;
     box-shadow: 0px 0px 0px #000000 !important;
   }
 
@@ -219,30 +230,21 @@ html, body {
     border-radius: 0px;
     border: 2px solid var(--cel-ink, #000000);
     background-color: var(--cel-surface-sub, #151c2c);
-    padding: 8px 16px;
-    font-size: 12px;
-    font-weight: 800;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 700;
     color: var(--cel-cyan, #00f0ff);
-    box-shadow: 4px 4px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow: 3px 3px 0px 0px var(--cel-shadow-color, #000000);
     transition: transform 100ms ease, box-shadow 100ms ease;
     line-height: 1.2;
   }
   .btn-primary-ghost:hover {
     transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0px 0px var(--cel-shadow-color, #000000);
-    border-color: var(--cel-cyan, #00f0ff);
-  }
-  .btn-primary-ghost:active {
-    transform: translate(3px, 3px) !important;
-    box-shadow: 0px 0px 0px #000000 !important;
-  }
-  .btn-primary-ghost:hover {
-    transform: translate(-1px, -1px);
     box-shadow: 5px 5px 0px 0px var(--cel-shadow-color, #000000);
     border-color: var(--cel-cyan, #00f0ff);
   }
   .btn-primary-ghost:active {
-    transform: translate(3px, 3px) !important;
+    transform: translate(2px, 2px) !important;
     box-shadow: 0px 0px 0px #000000 !important;
   }
   .btn-primary-ghost:disabled,
@@ -253,30 +255,30 @@ html, body {
     transform: none !important;
   }
 
-  /* ── 艺术级三销二表格 ───────────────────────────────────────────── */
+  /* ── 艺术级三渲二表格 ───────────────────────────────────────────── */
   .table {
     width: 100%;
-    font-size: 12px;
+    font-size: 13px;
     border-collapse: separate;
     border-spacing: 0;
     border: 2px solid var(--cel-ink, #000000);
-    box-shadow: 5px 5px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow: 4px 4px 0px 0px var(--cel-shadow-color, #000000);
   }
   .table th {
     border-bottom: 2px solid var(--cel-ink, #000000);
     background-color: var(--cel-surface-card, #0f1422);
-    padding: 10px 14px;
+    padding: 12px 16px;
     text-align: left;
-    font-size: 11px;
+    font-size: 12px;
     font-family: 'JetBrains Mono', monospace;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     color: var(--cel-gold, #ffc400);
   }
   .table td {
     border-bottom: 1.5px solid var(--cel-ink, #000000);
-    padding: 10px 14px;
+    padding: 12px 16px;
     color: var(--cel-text-primary, #ffffff);
     background-color: var(--cel-surface-sub, #151c2c);
   }

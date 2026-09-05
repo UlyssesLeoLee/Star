@@ -71,7 +71,7 @@ export default function AgentsPage() {
               action={
                 <div className="flex items-center gap-2">
                   <span className="anime-hud-tag">DEC-008</span>
-                  <span className="text-[10px] font-mono text-[var(--cel-text-secondary,#94a3b8)]">5 SESSIONS</span>
+                  <span className="text-xs font-mono font-bold text-[var(--cel-text-secondary,#94a3b8)]">5 SESSIONS</span>
                 </div>
               }
             >
@@ -91,9 +91,9 @@ export default function AgentsPage() {
               <tbody>
                 {agents.map((a) => (
                   <tr key={a.id} data-testid={`agent-row-${a.id}`} className="transition-colors">
-                    <td className="font-mono text-xs text-[var(--cel-cyan,#00f0ff)]">{a.id}</td>
+                    <td className="font-mono text-xs text-[var(--cel-cyan,#00f0ff)] font-bold">{a.id}</td>
                     <td className="font-bold text-sm text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
-                      <span className="size-1.5 bg-[var(--cel-crimson,#ff184c)] border border-black rotate-45" />
+                      <span className="size-2 bg-[var(--cel-crimson,#ff184c)] border border-black rotate-45" />
                       {a.name}
                     </td>
                     <td><StatusPill value={a.status} size="xs" /></td>
@@ -109,7 +109,7 @@ export default function AgentsPage() {
           <div className="card">
             <SectionTitle
               action={
-                <span className="text-[9px] font-mono text-[var(--cel-gold,#ffc400)] font-bold">
+                <span className="text-xs font-mono text-[var(--cel-gold,#ffc400)] font-bold">
                   NPR_TACTILE_SPRING
                 </span>
               }
@@ -145,7 +145,7 @@ export default function AgentsPage() {
               />
               <div className="flex items-center gap-2">
                 <CelBeacon3D status="active" size={32} title="Saga Engine Health" />
-                <span className="text-[10px] font-mono font-bold text-[var(--cel-cyan,#00f0ff)]">SAGA: ONLINE</span>
+                <span className="text-xs font-mono font-bold text-[var(--cel-cyan,#00f0ff)]">SAGA: ONLINE</span>
               </div>
             </div>
           </div>
@@ -153,8 +153,8 @@ export default function AgentsPage() {
           {/* Live Activity Feed — Styled with Manga Comms Bubble */}
           <div className="card" data-testid="live-activity-placeholder">
             <SectionTitle>Comms Stream 〔通信ログ・指令ストリーム〕</SectionTitle>
-            <div className="border-2 border-black p-3.5 bg-[var(--cel-surface-stage,#090d16)] cel-shadow text-xs space-y-2">
-              <div className="flex items-center justify-between border-b border-black pb-1.5 text-[10px] font-mono text-[var(--cel-text-secondary,#94a3b8)]">
+            <div className="border-2 border-black p-4 bg-[var(--cel-surface-stage,#090d16)] cel-shadow text-sm space-y-2.5">
+              <div className="flex items-center justify-between border-b border-black pb-1.5 text-xs font-mono text-[var(--cel-text-secondary,#94a3b8)]">
                 <span className="text-[var(--cel-crimson,#ff184c)] font-bold">// TACTICAL SPEECH STREAM</span>
                 <span>CH-01 SECURE</span>
               </div>
@@ -162,9 +162,9 @@ export default function AgentsPage() {
                 <strong className="text-[var(--cel-crimson,#ff184c)] mr-1.5">[MAVIS // 統制官]:</strong>
                 「22 DDD 领域状态机与 3渲2 NPR 着色器全节点同步。不变量持有，零脏状态泄漏，所有代理人处于高阶就绪状态！」
               </p>
-              <div className="flex items-center justify-between text-[9px] font-mono text-[var(--cel-text-secondary,#94a3b8)] pt-1">
+              <div className="flex items-center justify-between text-xs font-mono text-[var(--cel-text-secondary,#94a3b8)] pt-1">
                 <span>CONCURRENCY: 4 WORKERS</span>
-                <span className="text-[var(--cel-cyan,#00f0ff)]">STATUS: OPTIMAL</span>
+                <span className="text-[var(--cel-cyan,#00f0ff)] font-bold">STATUS: OPTIMAL</span>
               </div>
             </div>
           </div>
@@ -176,12 +176,12 @@ export default function AgentsPage() {
             {/* Top Badge */}
             <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
               <div>
-                <div className="text-[9px] font-black text-[var(--cel-gold,#ffc400)] uppercase tracking-widest font-mono">
+                <div className="text-[11px] font-black text-[var(--cel-gold,#ffc400)] uppercase tracking-widest font-mono">
                   AVATAR SPEC // S-CLASS
                 </div>
                 <h3 className="text-base font-black uppercase italic tracking-wider text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
                   AGENT CORE 3D
-                  <span className="text-[10px] font-black not-italic px-1.5 py-0.2 bg-[var(--cel-crimson,#ff184c)] text-black border border-black">
+                  <span className="text-xs font-black not-italic px-2 py-0.5 bg-[var(--cel-crimson,#ff184c)] text-black border border-black">
                     神格
                   </span>
                 </h3>
@@ -213,43 +213,43 @@ export default function AgentsPage() {
               />
 
               {/* Dynamic HUD Overlays */}
-              <div className="absolute top-2 left-2 flex items-center gap-1.5 z-20 pointer-events-none">
+              <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-20 pointer-events-none">
                 <span className="size-2 rounded-full bg-[var(--cel-cyan,#00f0ff)] animate-ping" />
-                <span className="bg-black/80 border border-[var(--cel-cyan,#00f0ff)]/40 text-[var(--cel-cyan,#00f0ff)] px-2 py-0.5 text-[9px] font-mono font-bold">
+                <span className="bg-black/85 border border-[var(--cel-cyan,#00f0ff)]/50 text-[var(--cel-cyan,#00f0ff)] px-2.5 py-1 text-[11px] font-mono font-bold">
                   REALTIME_GLSL_NPR_3D
                 </span>
               </div>
 
-              <div className="absolute top-2 right-2 z-20 pointer-events-none">
-                <span className="bg-black/80 border border-[var(--cel-gold,#ffc400)]/40 text-[var(--cel-gold,#ffc400)] px-2 py-0.5 text-[9px] font-mono font-bold">
+              <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none">
+                <span className="bg-black/85 border border-[var(--cel-gold,#ffc400)]/50 text-[var(--cel-gold,#ffc400)] px-2.5 py-1 text-[11px] font-mono font-bold">
                   {celBands}-BAND CEL RAMP
                 </span>
               </div>
 
-              <div className="absolute bottom-2 left-2 right-2 flex justify-between items-end z-20 pointer-events-none">
-                <div className="bg-black/85 border border-[#232f47] px-2 py-0.5 text-[8px] font-mono text-slate-300">
-                  INVERTED_HULL: <span className="text-[var(--cel-cyan,#00f0ff)]">5.0px INK</span>
+              <div className="absolute bottom-2.5 left-2.5 right-2.5 flex justify-between items-end z-20 pointer-events-none">
+                <div className="bg-black/90 border border-[#232f47] px-2.5 py-1 text-[10px] font-mono text-slate-200">
+                  INVERTED_HULL: <span className="text-[var(--cel-cyan,#00f0ff)] font-bold">5.0px INK</span>
                 </div>
-                <div className="bg-[var(--cel-crimson,#ff184c)] text-black font-black text-[9px] px-1.5 py-0.2 border border-black">
+                <div className="bg-[var(--cel-crimson,#ff184c)] text-black font-black text-[10px] px-2 py-0.5 border border-black">
                   LIGHT_TRACKING: ACTIVE
                 </div>
               </div>
             </div>
 
             {/* Live Palette Selector Tuning Bar */}
-            <div className="mt-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black p-2.5 space-y-2 text-xs">
+            <div className="mt-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black p-3 space-y-2.5 text-xs">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[9px] font-bold text-[var(--cel-text-secondary,#94a3b8)] uppercase font-mono">
+                <span className="text-[11px] font-bold text-[var(--cel-text-secondary,#94a3b8)] uppercase font-mono">
                   CEL PALETTE:
                 </span>
-                <div className="flex gap-1">
+                <div className="flex gap-1.5">
                   {(["crimson", "cyan", "gold", "stealth"] as CelPalette[]).map((p) => (
                     <button
                       key={p}
                       onClick={() => setCelPalette(p)}
-                      className={`px-2 py-0.5 text-[9px] font-mono font-bold uppercase border border-black transition-all ${
+                      className={`px-2.5 py-1 text-[11px] font-mono font-bold uppercase border border-black transition-all ${
                         celPalette === p
-                          ? "bg-[var(--cel-crimson,#ff184c)] text-black border-white"
+                          ? "bg-[var(--cel-crimson,#ff184c)] text-black border-white shadow-sm"
                           : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"
                       }`}
                     >
@@ -259,14 +259,14 @@ export default function AgentsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1 border-t border-black/40">
-                <span className="text-[9px] font-mono text-[var(--cel-text-secondary,#94a3b8)]">CEL BANDS:</span>
-                <div className="flex gap-1">
+              <div className="flex items-center justify-between pt-1.5 border-t border-black/40">
+                <span className="text-[11px] font-mono text-[var(--cel-text-secondary,#94a3b8)]">CEL BANDS:</span>
+                <div className="flex gap-1.5">
                   {[2, 3, 4].map((b) => (
                     <button
                       key={b}
                       onClick={() => setCelBands(b)}
-                      className={`w-5 h-5 text-[9px] font-mono font-bold border border-black flex items-center justify-center ${
+                      className={`w-6 h-6 text-[11px] font-mono font-bold border border-black flex items-center justify-center ${
                         celBands === b ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)]"
                       }`}
                     >

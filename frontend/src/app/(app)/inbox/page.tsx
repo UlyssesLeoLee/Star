@@ -65,24 +65,24 @@ export default function InboxPage() {
 
       {/* Tactical Speech Bubble Briefing Card (from chrono-vibe) */}
       <div className="card relative overflow-hidden clip-hud-corner">
-        <div className="flex items-center justify-between border-b-2 border-black pb-2 mb-3">
-          <h3 className="text-xs font-black uppercase tracking-wider text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
-            <Radio size={14} className="text-[var(--cel-crimson,#ff184c)] animate-pulse" />
+        <div className="flex items-center justify-between border-b-2 border-black pb-2.5 mb-3.5">
+          <h3 className="text-sm font-black uppercase tracking-wider text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
+            <Radio size={15} className="text-[var(--cel-crimson,#ff184c)] animate-pulse" />
             <span>TACTICAL TRANSMISSION // CHANNEL 01</span>
           </h3>
-          <span className="text-[9px] font-mono font-bold bg-black text-[var(--cel-gold,#ffc400)] px-2 py-0.5 border border-black">
+          <span className="text-xs font-mono font-bold bg-black text-[var(--cel-gold,#ffc400)] px-2.5 py-0.5 border border-black">
             HIGH PRIORITY
           </span>
         </div>
 
         <div className="border-2 border-black p-4 bg-[var(--cel-surface-stage,#090d16)] cel-shadow relative">
-          <p className="text-xs font-medium leading-relaxed text-[var(--cel-text-primary,#ffffff)]">
+          <p className="text-sm font-medium leading-relaxed text-[var(--cel-text-primary,#ffffff)]">
             <strong className="text-[var(--cel-crimson,#ff184c)] font-black mr-2">[MAVIS // 統制官]:</strong>
             「全站 3渲2 视觉构架已接入中央通信信道。所有领域状态流转均以高对比度墨线阶梯卡片呈现，零脏状态逃逸，随时执行战术派发！」
           </p>
         </div>
 
-        <div className="flex items-center justify-between text-[10px] font-mono text-[var(--cel-text-secondary,#94a3b8)] pt-3">
+        <div className="flex items-center justify-between text-xs font-mono text-[var(--cel-text-secondary,#94a3b8)] pt-3">
           <span className="flex items-center gap-1.5">
             <span className="size-2 bg-emerald-400 border border-black rotate-45" />
             COGNITIVE LOAD: 0.12 (OPTIMAL)
@@ -95,7 +95,7 @@ export default function InboxPage() {
       <div className="card">
         <SectionTitle
           action={
-            <span className="text-[10px] font-mono font-bold text-[var(--cel-gold,#ffc400)]">
+            <span className="text-xs font-mono font-bold text-[var(--cel-gold,#ffc400)]">
               {unread} UNREAD / {notifs.length} TOTAL
             </span>
           }
@@ -110,7 +110,7 @@ export default function InboxPage() {
               <li
                 key={n.id}
                 data-testid={`inbox-item-${n.id}`}
-                className={`p-3.5 border-2 border-black transition-all flex items-start gap-3.5 ${
+                className={`p-4 border-2 border-black transition-all flex items-start gap-3.5 ${
                   isRead
                     ? "bg-[var(--cel-surface-stage,#090d16)] opacity-75"
                     : "bg-[var(--cel-surface-sub,#151c2c)] cel-shadow hover:-translate-x-0.5 hover:-translate-y-0.5"
@@ -126,19 +126,19 @@ export default function InboxPage() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-mono text-[10px] font-bold text-[var(--cel-crimson,#ff184c)]">
+                    <span className="font-mono text-xs font-bold text-[var(--cel-crimson,#ff184c)]">
                       [{String(idx + 1).padStart(2, "0")}]
                     </span>
                     <StatusPill value={isRead ? "read" : "pending"} size="xs" />
                     <span className="text-sm font-bold text-[var(--cel-text-primary,#ffffff)] truncate">
                       {n.subject}
                     </span>
-                    <span className="font-mono text-[10px] text-[var(--cel-text-secondary,#94a3b8)] ml-auto shrink-0 bg-black/40 px-1.5 py-0.2 border border-black">
+                    <span className="font-mono text-xs text-[var(--cel-text-secondary,#94a3b8)] ml-auto shrink-0 bg-black/40 px-2 py-0.5 border border-black">
                       {n.ago}
                     </span>
                   </div>
 
-                  <div className="text-xs text-[var(--cel-text-secondary,#94a3b8)] leading-relaxed mt-1">
+                  <div className="text-sm text-[var(--cel-text-secondary,#94a3b8)] leading-relaxed mt-1.5">
                     {n.body}
                   </div>
                 </div>
@@ -147,7 +147,7 @@ export default function InboxPage() {
                   type="button"
                   onClick={() => toggle(n.id)}
                   aria-label={isRead ? "mark unread" : "mark read"}
-                  className="shrink-0 text-xs font-mono font-bold px-2 py-1 border border-black bg-[var(--cel-surface-stage,#090d16)] hover:bg-[var(--cel-surface-card,#0f1422)] text-[var(--cel-text-primary,#ffffff)] transition-colors"
+                  className="shrink-0 text-xs font-mono font-bold px-3 py-1.5 min-h-[32px] border-2 border-black cel-shadow bg-[var(--cel-surface-stage,#090d16)] hover:bg-[var(--cel-surface-card,#0f1422)] text-[var(--cel-text-primary,#ffffff)] transition-colors"
                 >
                   {isRead ? "UNREAD" : "READ"}
                 </button>
@@ -158,7 +158,7 @@ export default function InboxPage() {
       </div>
 
       {/* P3 Notice */}
-      <div className="card text-xs text-[var(--cel-text-secondary,#94a3b8)]">
+      <div className="card text-sm text-[var(--cel-text-secondary,#94a3b8)]">
         <SectionTitle>Notification Service — P3 规范</SectionTitle>
         <ul className="space-y-1.5 list-disc pl-4">
           <li>当前 read/unread 本地持久化，与 <span className="font-mono text-[var(--cel-cyan,#00f0ff)]">/api/notifications</span> PATCH 校验联动</li>

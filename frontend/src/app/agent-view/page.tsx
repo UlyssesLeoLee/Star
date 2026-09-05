@@ -18,7 +18,7 @@
 //   - Lv 1..10 视觉渐进 (色/大小/光环/装饰 emoji)
 // =====================================================================
 
-import { useMemo, useCallback, useEffect, useState } from "react";
+import { useMemo, useCallback, useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useStore } from "@/lib/store";
 import {
@@ -51,7 +51,7 @@ import {
 
 type ViewMode = "canvas" | "roguelike" | "settings" | "core3d";
 
-export default function AgentViewPage() {
+function AgentViewContent() {
   const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
@@ -298,9 +298,9 @@ export default function AgentViewPage() {
       <div className="border-b border-line bg-bg-soft/40 px-6 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="text-sm font-semibold shrink-0" data-testid="agent-view-title">Agent</div>
-          <div className="text-[10px] text-ink-mute font-mono truncate hidden lg:block">
+          <div className="text-xs text-ink-mute font-mono truncate hidden lg:block">
             {agent.id} · {agent.agent_kind} · {agent.current_step} · {relatedWorkItems.length} task{relatedWorkItems.length === 1 ? "" : "s"}
-            {worktree && <> · worktree <span className="text-info">{worktree.branch}</span></>}
+            {worktree && <> · worktree <span className="text-info font-bold">{worktree.branch}</span></>}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -324,10 +324,10 @@ export default function AgentViewPage() {
               data-testid="agent-view-spend-cost"
               onClick={handleSpend}
               disabled={!gameState?.alive}
-              className="btn text-[10px] py-1 px-2 disabled:opacity-50 relative"
+              className="btn text-xs py-1.5 px-3 min-h-[34px] disabled:opacity-50 relative"
               title="模拟执行 1 step (cost +$0.1)"
             >
-              <Zap size={10} /> Step
+              <Zap size={12} /> Step
             </button>
             {/* 气态粒子提示 (per 2026-09-05 拍板, 场景 4: agent 下一步 step 按钮) */}
             <GasParticlesHint
@@ -342,44 +342,44 @@ export default function AgentViewPage() {
           </span>
           <a
             href={`/board?assignee_id=&worktree_id=${agent.worktree_id}`}
-            className="btn text-[10px] py-1 px-2 hidden md:inline-flex"
+            className="btn text-xs py-1.5 px-3 min-h-[34px] hidden md:inline-flex"
             data-testid="agent-view-jump-board"
             title="在 Kanban Board 视图查看关联 work-items"
           >
-            <Maximize2 size={10} /> Kanban
+            <Maximize2 size={12} /> Kanban
           </a>
         </div>
       </div>
 
       {/* View Mode Tab (per 2026-09-05 23:00 JST 拍板: Canvas v1 / Roguelike v2 / 3D 战术核心 v3 / Agent 设置) */}
-      <div className="border-b-2 border-black bg-[var(--cel-surface-card,#0f1422)] px-6 py-2 flex items-center gap-2 cel-shadow" data-testid="view-mode-tabs">
+      <div className="border-b-2 border-black bg-[var(--cel-surface-card,#0f1422)] px-6 py-2.5 flex items-center gap-2.5 cel-shadow" data-testid="view-mode-tabs">
         <button
           data-testid="view-mode-core3d"
           onClick={() => handleViewModeChange("core3d")}
-          className={`text-xs px-3 py-1 font-mono font-bold border-2 border-black transition-all flex items-center gap-1 cel-shadow ${viewMode === "core3d" ? "bg-[var(--cel-crimson,#ff184c)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
+          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "core3d" ? "bg-[var(--cel-crimson,#ff184c)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
         >
-          <Zap size={11} className="text-[var(--cel-cyan,#00f0ff)]" /> 3D 战术核心 <span className="text-[9px] px-1 bg-black text-[var(--cel-cyan,#00f0ff)]">v3 CEL</span>
+          <Zap size={13} className="text-[var(--cel-cyan,#00f0ff)]" /> 3D 战术核心 <span className="text-[10px] px-1.5 py-0.2 bg-black text-[var(--cel-cyan,#00f0ff)] border border-black font-mono">v3 CEL</span>
         </button>
         <button
           data-testid="view-mode-canvas"
           onClick={() => handleViewModeChange("canvas")}
-          className={`text-xs px-3 py-1 font-mono font-bold border-2 border-black transition-all flex items-center gap-1 cel-shadow ${viewMode === "canvas" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
+          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "canvas" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
         >
-          <Sparkles size={11} /> Canvas <span className="text-[9px]">v1</span>
+          <Sparkles size={13} /> Canvas <span className="text-[10px] px-1.5 py-0.2 bg-black text-[var(--cel-gold,#ffc400)] border border-black font-mono">v1</span>
         </button>
         <button
           data-testid="view-mode-roguelike"
           onClick={() => handleViewModeChange("roguelike")}
-          className={`text-xs px-3 py-1 font-mono font-bold border-2 border-black transition-all flex items-center gap-1 cel-shadow ${viewMode === "roguelike" ? "bg-[var(--cel-gold,#ffc400)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
+          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "roguelike" ? "bg-[var(--cel-gold,#ffc400)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
         >
-          <Map size={11} /> Roguelike <span className="text-[9px]">v2</span>
+          <Map size={13} /> Roguelike <span className="text-[10px] px-1.5 py-0.2 bg-black text-[var(--cel-gold,#ffc400)] border border-black font-mono">v2</span>
         </button>
         <button
           data-testid="view-mode-settings"
           onClick={() => handleViewModeChange("settings")}
-          className={`text-xs px-3 py-1 font-mono font-bold border-2 border-black transition-all flex items-center gap-1 cel-shadow ${viewMode === "settings" ? "bg-[var(--cel-text-primary,#ffffff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
+          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "settings" ? "bg-[var(--cel-text-primary,#ffffff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
         >
-          <Settings size={11} /> Agent 设置
+          <Settings size={13} /> Agent 设置
         </button>
       </div>
 
@@ -391,12 +391,12 @@ export default function AgentViewPage() {
             <div className="card relative overflow-hidden">
               <div className="flex items-center justify-between border-b-2 border-black pb-2.5 mb-3">
                 <div>
-                  <div className="text-[9px] font-black text-[var(--cel-gold,#ffc400)] uppercase tracking-widest font-mono">
+                  <div className="text-[11px] font-black text-[var(--cel-gold,#ffc400)] uppercase tracking-widest font-mono">
                     LIVE NPR SHADER // S-CLASS
                   </div>
                   <h3 className="text-base font-black uppercase italic tracking-wider text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
                     {agent.name} 3D AVATAR
-                    <span className="text-[10px] font-black not-italic px-1.5 py-0.2 bg-[var(--cel-crimson,#ff184c)] text-black border border-black">
+                    <span className="text-xs font-black not-italic px-2 py-0.5 bg-[var(--cel-crimson,#ff184c)] text-black border border-black">
                       神格
                     </span>
                   </h3>
@@ -418,42 +418,42 @@ export default function AgentViewPage() {
                   speed={1.0}
                   className="w-full h-full"
                 />
-                <div className="absolute top-2 left-2 flex items-center gap-1.5 z-20 pointer-events-none">
+                <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-20 pointer-events-none">
                   <span className="size-2 rounded-full bg-[var(--cel-cyan,#00f0ff)] animate-ping" />
-                  <span className="bg-black/80 border border-[var(--cel-cyan,#00f0ff)]/40 text-[var(--cel-cyan,#00f0ff)] px-2 py-0.5 text-[9px] font-mono font-bold">
+                  <span className="bg-black/85 border border-[var(--cel-cyan,#00f0ff)]/50 text-[var(--cel-cyan,#00f0ff)] px-2.5 py-1 text-[11px] font-mono font-bold">
                     GLSL_NPR_3D
                   </span>
                 </div>
-                <div className="absolute top-2 right-2 z-20 pointer-events-none">
-                  <span className="bg-black/80 border border-[var(--cel-gold,#ffc400)]/40 text-[var(--cel-gold,#ffc400)] px-2 py-0.5 text-[9px] font-mono font-bold">
+                <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none">
+                  <span className="bg-black/85 border border-[var(--cel-gold,#ffc400)]/50 text-[var(--cel-gold,#ffc400)] px-2.5 py-1 text-[11px] font-mono font-bold">
                     {celBands}-BAND CEL
                   </span>
                 </div>
               </div>
 
               {/* Palette & Bands */}
-              <div className="mt-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black p-2.5 flex items-center justify-between text-xs font-mono">
+              <div className="mt-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black p-3 flex items-center justify-between text-xs font-mono">
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-bold text-[var(--cel-text-secondary,#94a3b8)] uppercase">PALETTE:</span>
-                  <div className="flex gap-1">
+                  <span className="text-[11px] font-bold text-[var(--cel-text-secondary,#94a3b8)] uppercase">PALETTE:</span>
+                  <div className="flex gap-1.5">
                     {(["crimson", "cyan", "gold", "stealth"] as CelPalette[]).map((p) => (
                       <button
                         key={p}
                         onClick={() => setCelPalette(p)}
-                        className={`px-2 py-0.5 text-[9px] font-bold uppercase border border-black ${celPalette === p ? "bg-[var(--cel-crimson,#ff184c)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-slate-300"}`}
+                        className={`px-2.5 py-1 text-[11px] font-bold uppercase border border-black ${celPalette === p ? "bg-[var(--cel-crimson,#ff184c)] text-black border-white" : "bg-[var(--cel-surface-sub,#151c2c)] text-slate-300"}`}
                       >
                         {p}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] text-[var(--cel-text-secondary,#94a3b8)]">BANDS:</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-[var(--cel-text-secondary,#94a3b8)]">BANDS:</span>
                   {[2, 3, 4].map((b) => (
                     <button
                       key={b}
                       onClick={() => setCelBands(b)}
-                      className={`w-5 h-5 text-[9px] font-bold border border-black ${celBands === b ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-slate-400"}`}
+                      className={`w-6 h-6 text-[11px] font-bold border border-black ${celBands === b ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-slate-400"}`}
                     >
                       {b}
                     </button>
@@ -570,5 +570,13 @@ export default function AgentViewPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function AgentViewPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-sm font-mono text-ink-dim">Loading Tactical Agent View...</div>}>
+      <AgentViewContent />
+    </Suspense>
   );
 }

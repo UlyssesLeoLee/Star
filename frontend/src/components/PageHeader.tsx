@@ -19,13 +19,13 @@ export function PageHeader({
   const desc = subtitle ?? description;
   const act = action ?? actions;
   return (
-    <div className="mb-6 flex items-end justify-between gap-4 border-b-2 border-black pb-4">
+    <div className="mb-7 flex items-end justify-between gap-4 border-b-2 border-black pb-4">
       <div>
         <div className="flex items-center gap-2.5 mb-1.5">
           {icon}
           <h1 className="text-2xl font-black text-ink tracking-tight" style={{textShadow: '3px 3px 0 var(--cel-shadow-color, #000)'}}>{title}</h1>
           {track && (
-            <span className="pill border-line text-ink-dim font-mono text-[10px] font-semibold">
+            <span className="pill border-line text-ink-dim font-mono text-xs font-semibold">
               {interpolate(t.pageHeader.trackPill, { track })}
             </span>
           )}
@@ -35,7 +35,7 @@ export function PageHeader({
             </span>
           )}
         </div>
-        {desc && <p className="text-xs text-ink-dim max-w-3xl leading-relaxed font-normal">{desc}</p>}
+        {desc && <p className="text-sm text-ink-dim max-w-3xl leading-relaxed font-normal mt-1">{desc}</p>}
       </div>
       {act && <div>{act}</div>}
     </div>
@@ -63,25 +63,25 @@ export function Stat({
   }[effectiveTone];
   return (
     <div className="card group hover:border-accent/50 hover:shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition-all duration-200">
-      <div className="text-[10px] uppercase tracking-wider text-ink-mute flex items-center justify-between font-mono font-medium">
+      <div className="text-xs uppercase tracking-wider text-ink-mute flex items-center justify-between font-mono font-bold">
         <span className="flex items-center gap-1.5">
-          {Icon && <Icon size={12} className="text-accent" />}
+          {Icon && <Icon size={13} className="text-accent" />}
           {label}
         </span>
-        <span className="opacity-0 group-hover:opacity-100 text-[8px] font-mono text-accent transition-opacity">
+        <span className="opacity-0 group-hover:opacity-100 text-[10px] font-mono text-accent transition-opacity font-bold">
           {t.pageHeader.telemetryTag}
         </span>
       </div>
       <div className={clsx("text-2xl font-bold mt-1 font-mono tracking-tight", color)}>{value}</div>
-      {hint && <div className="text-[11px] text-ink-mute mt-0.5 leading-snug">{hint}</div>}
+      {hint && <div className="text-xs text-ink-mute mt-1 leading-snug">{hint}</div>}
     </div>
   );
 }
 
 export function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-black">
-      <h2 className="text-xs uppercase tracking-wider text-ink-dim font-bold font-mono">{children}</h2>
+    <div className="flex items-center justify-between mb-4 pb-2.5 border-b-2 border-black">
+      <h2 className="text-sm uppercase tracking-wider text-ink font-black font-mono">{children}</h2>
       {action}
     </div>
   );

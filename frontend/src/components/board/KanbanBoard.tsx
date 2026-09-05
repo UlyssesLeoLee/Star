@@ -298,7 +298,7 @@ export function KanbanBoard({
                 }
               }}
               className={clsx(
-                "card min-h-[200px] transition-colors relative",
+                "card card-compact !p-3.5 min-h-[200px] transition-colors relative",
                 overWip && "border-warn/60",
                 isDropTarget && "ring-2 ring-accent bg-accent/10",
                 // 列重排 drop 高亮 (per 2026-08-29 19:09 JST)
@@ -345,7 +345,7 @@ export function KanbanBoard({
                       if (e.key === "Enter") commitEdit(col.status);
                       else if (e.key === "Escape") setEditingCol(null);
                     }}
-                    className="text-[11px] font-mono uppercase tracking-wider bg-bg-card border border-accent/60 rounded px-1.5 py-0.5 text-ink outline-none w-full"
+                    className="text-xs font-mono uppercase tracking-wider font-bold bg-bg-card border border-accent/60 rounded px-1.5 py-0.5 text-ink outline-none w-full"
                   />
                 ) : (
                   <button
@@ -353,14 +353,14 @@ export function KanbanBoard({
                     type="button"
                     onClick={() => startEdit(col.status, col.name ?? col.status)}
                     disabled={!onRenameColumn}
-                    className="text-[11px] font-mono uppercase tracking-wider text-ink hover:text-accent transition-colors text-left truncate"
+                    className="text-xs font-mono font-bold uppercase tracking-wider text-ink hover:text-accent transition-colors text-left truncate"
                     title={t.board.clickToRename}
                   >
                     {col.name ?? col.status}
                   </button>
                 )}
                 <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-[10px] text-ink-mute font-mono">
+                  <span className="text-xs text-ink-dim font-mono font-bold px-1.5 py-0.2 bg-black/10 dark:bg-black/40 border border-black/20">
                     {cards.length}
                     {col.wip_limit !== undefined && col.wip_limit < 99 && ` / ${col.wip_limit}`}
                   </span>

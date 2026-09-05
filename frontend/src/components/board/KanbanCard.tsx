@@ -97,20 +97,20 @@ export function KanbanCard({
       )}
     >
       {/* Row 1: key + story_points */}
-      <div className="flex items-center justify-between mb-1">
-        <span className="font-mono text-[10px] text-info font-medium tracking-tight flex items-center gap-1">
-          <span className="text-[9px] text-ink-mute">//</span>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="font-mono text-xs text-info font-bold tracking-tight flex items-center gap-1">
+          <span className="text-[10px] text-ink-mute font-normal">//</span>
           {workItem.key}
         </span>
         {workItem.story_points !== undefined && (
-          <span className="font-mono text-[9px] px-1 py-0.2 rounded border border-line/60 bg-bg-card text-ink-mute">
+          <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded border border-line/60 bg-bg-card text-ink-mute">
             {workItem.story_points} {t.workItem.storyPointsUnit}
           </span>
         )}
       </div>
 
       {/* Row 2: title */}
-      <div className="text-xs font-medium text-ink line-clamp-2 mb-2 leading-snug">{workItem.title}</div>
+      <div className="text-sm font-semibold text-ink line-clamp-2 mb-2 leading-snug">{workItem.title}</div>
 
       {/* Row 3: kind + status pills */}
       <div className="flex flex-wrap items-center gap-1 mb-2">
@@ -119,20 +119,20 @@ export function KanbanCard({
       </div>
 
       {/* Row 4: priority + assignee */}
-      <div className="flex items-center justify-between text-[10px] text-ink-mute pt-1 border-t border-line/40">
+      <div className="flex items-center justify-between text-xs text-ink-mute pt-1.5 border-t border-line/40">
         <span className={clsx(
-          "font-mono flex items-center gap-1 font-medium",
+          "font-mono flex items-center gap-1 font-bold",
           workItem.priority === "p0" && "text-err drop-shadow-[0_0_6px_rgba(255,51,102,0.4)]",
           workItem.priority === "p1" && "text-warn",
           workItem.priority === "p2" && "text-info",
           workItem.priority === "p3" && "text-ink-dim",
         )}>
-          <Flag size={9} />
+          <Flag size={12} />
           {priorityLabel}
         </span>
         {assignee && (
-          <span className="flex items-center gap-1 truncate max-w-[90px] font-mono text-[9px] text-ink-dim" title={assignee.display_name}>
-            <User size={9} className="text-accent" />
+          <span className="flex items-center gap-1 truncate max-w-[110px] font-mono text-xs text-ink-dim" title={assignee.display_name}>
+            <User size={12} className="text-accent" />
             <span className="truncate">{assignee.display_name}</span>
           </span>
         )}
@@ -142,7 +142,7 @@ export function KanbanCard({
       {workItem.labels.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {workItem.labels.slice(0, 2).map((l) => (
-            <span key={l} className="text-[8px] font-mono text-ink-mute px-1 rounded bg-bg-card/90 border border-line/40">
+            <span key={l} className="text-[10px] font-mono font-medium text-ink-mute px-1.5 py-0.5 rounded bg-bg-card/90 border border-line/40">
               #{l}
             </span>
           ))}

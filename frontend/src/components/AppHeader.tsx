@@ -49,12 +49,12 @@ export function AppHeader() {
             <button
               type="button"
               data-testid="workspace-switcher"
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono text-[var(--cel-text-primary,#ffffff)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-all duration-150"
+              className="flex items-center gap-2 px-3 h-9 text-xs font-mono text-[var(--cel-text-primary,#ffffff)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-all duration-150"
               aria-label={t.appHeader.workspaceSwitcher}
             >
               <span className="size-2 bg-[var(--cel-cyan,#00f0ff)] rotate-45 border border-black" />
               <span className="truncate max-w-[140px] font-black tracking-tight">ACME Studio</span>
-              <span className="text-[9px] text-black font-mono font-black px-1.5 py-0.2 bg-[var(--cel-gold,#ffc400)] border border-black">CORE</span>
+              <span className="text-[10px] text-black font-mono font-black px-1.5 py-0.5 bg-[var(--cel-gold,#ffc400)] border border-black">CORE</span>
               <ChevronDown size={12} className="text-[var(--cel-text-secondary)] ml-0.5" />
             </button>
           </div>
@@ -80,9 +80,9 @@ export function AppHeader() {
               onClick={openMatrix}
               data-testid="header-add-tab"
               title={t.appHeader.addMoreTabs}
-              className="p-1.5 text-[var(--cel-text-secondary)] hover:text-[var(--cel-cyan,#00f0ff)] border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-colors"
+              className="h-9 w-9 grid place-items-center text-[var(--cel-text-secondary)] hover:text-[var(--cel-cyan,#00f0ff)] border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-colors shrink-0"
             >
-              <Plus size={13} />
+              <Plus size={14} />
             </button>
 
             <Link
@@ -90,7 +90,7 @@ export function AppHeader() {
               data-testid="settings-gear"
               aria-label={t.ariaLabels.settings}
               className={clsx(
-                "ml-1 p-2 text-[var(--cel-text-secondary)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-colors",
+                "ml-1 h-9 w-9 grid place-items-center text-[var(--cel-text-secondary)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-colors shrink-0",
                 pathname.startsWith("/settings") && "text-[var(--cel-cyan,#00f0ff)] border-[var(--cel-cyan,#00f0ff)]"
               )}
             >
@@ -101,11 +101,11 @@ export function AppHeader() {
           {/* === Right: Tactical HUD, App Matrix, Theme Toggle, ⌘K, bell, status, avatar === */}
           <div className="ml-auto flex items-center gap-3">
             {/* Tactical HUD Telemetry (from chrono-vibe) */}
-            <div className="hidden xl:flex items-center gap-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black px-3 py-1 cel-shadow">
-              <div className="flex flex-col">
-                <div className="flex justify-between text-[9px] font-black tracking-wider text-[var(--cel-text-secondary,#94a3b8)]">
+            <div className="hidden xl:flex items-center gap-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black px-3.5 h-9 cel-shadow">
+              <div className="flex flex-col justify-center">
+                <div className="flex justify-between items-center text-[10px] font-mono font-bold tracking-wider text-[var(--cel-text-secondary,#94a3b8)]">
                   <span>NEURAL SYNC 〔神経同調〕</span>
-                  <span className="text-[var(--cel-cyan,#00f0ff)] font-mono ml-2">99.8%</span>
+                  <span className="text-[var(--cel-cyan,#00f0ff)] font-mono font-black ml-2">99.8%</span>
                 </div>
                 <div className="w-28 h-1.5 bg-[#090d14] border border-black mt-0.5 relative overflow-hidden">
                   <div
@@ -116,8 +116,8 @@ export function AppHeader() {
               </div>
               <div className="h-5 w-px bg-black" />
               <div className="text-right">
-                <div className="text-[8px] font-bold text-[var(--cel-text-secondary,#94a3b8)]">STATUS</div>
-                <div className="text-[10px] font-mono font-bold text-[var(--cel-gold,#ffc400)]">INV:PASS (HOLD)</div>
+                <div className="text-[10px] font-mono font-bold text-[var(--cel-text-secondary,#94a3b8)]">STATUS</div>
+                <div className="text-xs font-mono font-black text-[var(--cel-gold,#ffc400)]">INV:PASS</div>
               </div>
             </div>
 
@@ -127,11 +127,11 @@ export function AppHeader() {
               onClick={openMatrix}
               data-testid="app-matrix-trigger"
               aria-label={t.ariaLabels.openAppMatrix}
-              className="flex items-center gap-1.5 px-3 h-8 border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-primary,#ffffff)] hover:text-[var(--cel-cyan,#00f0ff)] transition-all text-xs font-mono group cel-shadow"
+              className="flex items-center gap-1.5 px-3 h-9 border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-primary,#ffffff)] hover:text-[var(--cel-cyan,#00f0ff)] transition-all text-xs font-mono group cel-shadow"
             >
               <LayoutGrid size={13} className="text-[var(--cel-cyan,#00f0ff)] group-hover:scale-110 transition-transform duration-200" />
               <span className="hidden lg:inline font-bold">{t.appHeader.allApps}</span>
-              <span className="text-[9px] px-1.5 py-0.2 bg-black text-[var(--cel-cyan,#00f0ff)] font-bold border border-black">{t.appHeader.appsCount}</span>
+              <span className="text-[10px] px-1.5 py-0.5 bg-black text-[var(--cel-cyan,#00f0ff)] font-bold border border-black">{t.appHeader.appsCount}</span>
             </button>
 
             <ThemeSwitcher />
@@ -141,11 +141,11 @@ export function AppHeader() {
               onClick={openCommandBar}
               data-testid="command-bar-trigger"
               aria-label={t.ariaLabels.openCommandBar}
-              className="flex items-center gap-2 px-3 h-8 border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-primary,#ffffff)] hover:text-white transition-all text-xs cel-shadow"
+              className="flex items-center gap-2 px-3 h-9 border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-primary,#ffffff)] hover:text-white transition-all text-xs cel-shadow"
             >
-              <Search size={13} className="text-[var(--cel-cyan,#00f0ff)]" />
+              <Search size={14} className="text-[var(--cel-cyan,#00f0ff)]" />
               <span className="hidden sm:inline font-medium">{t.appHeader.tacticalJump}</span>
-              <kbd className="hidden sm:inline-flex text-[10px] font-mono px-1.5 py-0.5 border border-black bg-[var(--cel-surface-stage,#090d16)] text-[var(--cel-gold,#ffc400)] font-black">
+              <kbd className="hidden sm:inline-flex text-[11px] font-mono px-2 py-0.5 border border-black bg-[var(--cel-surface-stage,#090d16)] text-[var(--cel-gold,#ffc400)] font-black">
                 ⌘K
               </kbd>
             </button>
@@ -154,13 +154,13 @@ export function AppHeader() {
               type="button"
               data-testid="notifications-bell"
               aria-label={tx(t.appHeader.notifications, { count: notifCount })}
-              className="relative p-2 text-[var(--cel-text-primary,#ffffff)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-colors"
+              className="relative h-9 w-9 grid place-items-center text-[var(--cel-text-primary,#ffffff)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-colors"
             >
               <Bell size={15} />
               {notifCount > 0 && (
                 <span
                   data-testid="notifications-badge"
-                  className="absolute -top-1 -right-1 min-w-[16px] h-4 border border-black bg-[var(--cel-crimson,#ff184c)] text-black text-[9px] grid place-items-center px-1 font-mono font-black"
+                  className="absolute -top-1.5 -right-1.5 min-w-[18px] h-4.5 border border-black bg-[var(--cel-crimson,#ff184c)] text-black text-[10px] grid place-items-center px-1 font-mono font-black"
                 >
                   {notifCount}
                 </span>
@@ -169,11 +169,11 @@ export function AppHeader() {
 
             <div
               data-testid="realtime-status"
-              className="hidden sm:flex items-center gap-1.5 px-3 h-8 border-2 border-black bg-[var(--cel-surface-stage,#090d16)] cel-shadow"
+              className="hidden sm:flex items-center gap-1.5 px-3 h-9 border-2 border-black bg-[var(--cel-surface-stage,#090d16)] cel-shadow"
               aria-label={t.appHeader.realtimeOnline}
             >
-              <span className="size-2 bg-emerald-400 border border-black" aria-hidden="true" />
-              <span className="text-[10px] text-[var(--cel-text-secondary,#94a3b8)] font-mono tracking-wider font-bold">{t.appHeader.synced}</span>
+              <span className="size-2 bg-ok border border-black" aria-hidden="true" />
+              <span className="text-xs text-[var(--cel-text-secondary,#94a3b8)] font-mono tracking-wider font-bold">{t.appHeader.synced}</span>
             </div>
 
             <UserMenu />
@@ -218,10 +218,10 @@ function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
         data-active={active ? "true" : "false"}
         aria-current={active ? "page" : undefined}
         className={clsx(
-          "relative px-3.5 h-16 inline-flex items-center gap-2 text-xs font-medium border-b-2 transition-all duration-200",
+          "relative px-3.5 h-16 inline-flex items-center gap-2 text-sm font-semibold border-b-2 transition-all duration-200",
           active
             ? // 域色 active: text 域色 + border 域色 + glow
-              clsx(cs.text, cs.borderActive, "font-semibold", cs.glow)
+              clsx(cs.text, cs.borderActive, "font-bold", cs.glow)
             : "text-ink-dim border-transparent hover:text-ink hover:border-line/60"
         )}
       >
@@ -238,7 +238,7 @@ function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
                 "border-transparent text-ink-mute group-hover:text-ink-dim"
           )}
         >
-          <Icon size={14} strokeWidth={2.25} />
+          <Icon size={15} strokeWidth={2.25} />
         </div>
         <span>{mod.label}</span>
       </Link>
@@ -255,7 +255,7 @@ function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
         data-testid={`remove-header-tab-${tab.id}`}
         className="p-0.5 ml-[-6px] mr-1 rounded hover:bg-err/20 hover:text-err text-ink-mute opacity-0 group-hover:opacity-100 transition-all duration-150 z-10"
       >
-        <X size={10} />
+        <X size={12} />
       </button>
     </div>
   );

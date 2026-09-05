@@ -213,11 +213,11 @@ export default function AnalyticsPage() {
               strokeWidth="2.5"
               className="drop-shadow-[0_0_8px_rgba(0,240,255,0.6)]"
             />
-            <text x="5" y="30" fontSize="9" fill="var(--color-text-dim)" fontFamily="monospace">{maxRemaining}</text>
-            <text x="5" y="170" fontSize="9" fill="var(--color-text-dim)" fontFamily="monospace">0</text>
-            <text x="240" y="190" fontSize="9" fill="var(--color-text-dim)" textAnchor="middle" fontFamily="monospace">// SPRINT TIMELINE (14 DAYS) //</text>
+            <text x="5" y="30" fontSize="11" fill="var(--color-text-dim)" fontFamily="monospace" fontWeight="bold">{maxRemaining}</text>
+            <text x="5" y="170" fontSize="11" fill="var(--color-text-dim)" fontFamily="monospace" fontWeight="bold">0</text>
+            <text x="240" y="190" fontSize="11" fill="var(--color-text-dim)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">// SPRINT TIMELINE (14 DAYS) //</text>
           </svg>
-          <div className="flex items-center gap-4 text-xs text-ink-dim mt-2 pt-2 border-t border-line">
+          <div className="flex items-center gap-4 text-sm text-ink-dim mt-2 pt-2 border-t border-line">
             <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-info shadow-[0_0_6px_rgba(0,240,255,0.8)]" /> 实际剩余点数 (Actual Remaining)</span>
             <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 border-t border-dashed border-ink-mute" /> 理想燃尽斜率 (Ideal Guideline)</span>
           </div>

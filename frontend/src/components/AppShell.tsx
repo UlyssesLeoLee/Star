@@ -17,7 +17,7 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div
       data-testid="app-shell"
-      className="min-h-screen bg-[var(--cel-bg)] text-[var(--cel-text-primary)] transition-colors duration-200 relative"
+      className="min-h-screen bg-bg bg-[var(--cel-bg)] text-ink text-[var(--cel-text-primary)] transition-colors duration-200 relative"
     >
       {/* 3渲2 Ambient Screentone & Glow Backdrops */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -33,7 +33,7 @@ export function AppShell({ children }: AppShellProps) {
       <main
         data-testid="app-main"
         style={{ minHeight: "calc(100vh - 64px)" }}
-        className="relative z-10 px-6 sm:px-8 py-8 overflow-x-auto max-w-[1440px] mx-auto w-full"
+        className="relative z-10 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-x-auto max-w-[1440px] mx-auto w-full"
       >
         {children}
       </main>
