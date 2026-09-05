@@ -43,6 +43,8 @@ domain-feedback = { path = "../domain-feedback" }
 domain-scm = { path = "../domain-scm" }
 # P1 工具实装 (per docs/briefs/tool-p1-impl-001.md) — 真实数据源接入 search
 domain-search = { path = "../domain-search" }
+# P2 工具实装 (per docs/briefs/tool-p2-impl-001.md) — 真实数据源接入 validation
+domain-validation = { path = "../domain-validation" }
 uuid = { workspace = true }
 chrono = { workspace = true }
 

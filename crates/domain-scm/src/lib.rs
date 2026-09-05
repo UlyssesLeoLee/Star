@@ -1003,6 +1003,13 @@ pub struct InMemoryScmService {
     webhooks: Arc<RwLock<HashMap<WebhookEventId, WebhookEvent>>>,
     /// **INV-SCM-03** Idempotency: external_event_id → webhook_event_id
     idempotency: Arc<RwLock<HashMap<String, WebhookEventId>>>,
+    // ===== P2 工具链扩展 (per docs/briefs/tool-p2-impl-001.md) =====
+    /// Pipeline 存储 (per `get_pipeline_status` P2 工具)
+    pipelines: Arc<RwLock<HashMap<PipelineId, Pipeline>>>,
+    /// Pipeline external_id 索引: external_id → PipelineId
+    pipeline_external_index: Arc<RwLock<HashMap<String, PipelineId>>>,
+    /// Review 存储 (per `request_review` P2 工具)
+    reviews: Arc<RwLock<HashMap<ReviewId, Review>>>,
     event_tx: mpsc::UnboundedSender<ScmEvent>,
 }
 
@@ -1016,6 +1023,9 @@ impl InMemoryScmService {
             prs: Arc::new(RwLock::new(HashMap::new())),
             webhooks: Arc::new(RwLock::new(HashMap::new())),
             idempotency: Arc::new(RwLock::new(HashMap::new())),
+            pipelines: Arc::new(RwLock::new(HashMap::new())),
+            pipeline_external_index: Arc::new(RwLock::new(HashMap::new())),
+            reviews: Arc::new(RwLock::new(HashMap::new())),
             event_tx: tx,
         });
         (svc, rx)
@@ -1104,6 +1114,133 @@ impl InMemoryScmService {
         guard.insert(id, pr.clone());
         Ok(pr)
     }
+
+    // =====================================================================
+    // P2 工具链扩展 (per docs/briefs/tool-p2-impl-001.md §1.2 / §1.3)
+    //
+    // 复用 `Pipeline` / `Review` entity, 加 in-memory 存储 + 索引 + helper 方法.
+    // 跟 P0 `create_mr` 同源: helper 直接挂在 InMemoryScmService struct 上,
+    // 不改 `ScmCommandPort` trait, 符合 brief §0 minimal-broadening 原则.
+    // =====================================================================
+
+    /// **P2 helper**: 注册 Pipeline (per `get_pipeline_status` 入参 `pipeline_run_id` 来源)
+    ///
+    /// - 校验 actor.tenant_id == pipeline.tenant_id (跨 tenant 拒绝)
+    /// - 存入 `pipelines` + `pipeline_external_index` 双索引
+    /// - 不发送事件 (避免污染 event bus)
+    /// - 不修改 trait, 仅供 `star-mcp::get_pipeline_status` P2 工具 + 测试 pre-populate 用
+    pub async fn register_pipeline(
+        &self,
+        pipeline: Pipeline,
+        actor: ActorContext,
+    ) -> Result<Pipeline, ScmError> {
+        Self::check_tenant(&actor, pipeline.tenant_id)?;
+        let id = pipeline.id;
+        let external_id = pipeline.external_id.clone();
+        {
+            let mut guard = self.pipelines.write().await;
+            guard.insert(id, pipeline.clone());
+        }
+        {
+            let mut idx = self.pipeline_external_index.write().await;
+            idx.insert(external_id, id);
+        }
+        Ok(pipeline)
+    }
+
+    /// **P2 helper**: 按 external_id 查 Pipeline (per `get_pipeline_status` 核心逻辑)
+    ///
+    /// - external_id = 厂商侧 ID (e.g. "PIPE-mock-001", "github-actions-run-123")
+    /// - 跨 tenant 拒绝: 找到的 pipeline 必带 actor.tenant_id
+    /// - 找不到 → ScmError::NotFound (走 `From<ScmError>` impl 映射成 McpError)
+    pub async fn find_pipeline_by_external_id(
+        &self,
+        external_id: &str,
+        actor: ActorContext,
+    ) -> Result<Pipeline, ScmError> {
+        let idx = self.pipeline_external_index.read().await;
+        let id = idx.get(external_id).copied();
+        drop(idx);
+        let id = id.ok_or_else(|| ScmError::NotFound(RepositoryId::default()))?;
+        let guard = self.pipelines.read().await;
+        let pipeline = guard
+            .get(&id)
+            .cloned()
+            .ok_or(ScmError::NotFound(RepositoryId::default()))?;
+        if pipeline.tenant_id != TenantId::from(actor.tenant_id) {
+            return Err(ScmError::PermissionDenied("跨 tenant".to_string()));
+        }
+        Ok(pipeline)
+    }
+
+    /// **P2 helper**: 在 PR 上请求评审 (per `request_review` 核心逻辑)
+    ///
+    /// - 校验 PR 存在 + 跨 tenant 拒绝
+    /// - 生成 ReviewId + Review (state=Pending, body=None)
+    /// - 追加到 PR.review_ids (per `PullRequest` 19 字段不变)
+    /// - 不发送事件 (避免污染 event bus)
+    /// - 不修改 trait, 仅供 `star-mcp::request_review` P2 工具 + 测试 pre-populate 用
+    ///
+    /// `reviewers` 是 user ID 列表 (per spec `request_review` `{mr_id, reviewers?}`)
+    /// - 空列表 → 返回空 ReviewResult (per P2 简化: 默认 list reviewers = [actor])
+    pub async fn request_review(
+        &self,
+        pr_id: PullRequestId,
+        reviewers: Vec<String>,
+        actor: ActorContext,
+    ) -> Result<ReviewResult, ScmError> {
+        // 1. 校验 PR 存在 + 跨 tenant
+        {
+            let mut guard = self.prs.write().await;
+            let pr = guard
+                .get_mut(&pr_id)
+                .ok_or(ScmError::NotFound(RepositoryId::default()))?;
+            if pr.tenant_id != TenantId::from(actor.tenant_id) {
+                return Err(ScmError::PermissionDenied("跨 tenant".to_string()));
+            }
+            // 2. 拿 reviewer 列表 (per P2 简化: 默认 actor, 显式 reviewers 覆盖)
+            let effective_reviewers = if reviewers.is_empty() {
+                vec![UserId::from_uuid(actor.user_id).0.to_string()]
+            } else {
+                reviewers.clone()
+            };
+            let now = Utc::now();
+            // 3. 为每个 reviewer 创建 1 个 Review
+            let mut created: Vec<Review> = Vec::with_capacity(effective_reviewers.len());
+            for reviewer_str in &effective_reviewers {
+                let reviewer_uuid = uuid::Uuid::parse_str(reviewer_str).unwrap_or_else(|_| {
+                    // 简化: 解析失败 → 跳过 (P2 阶段)
+                    actor.user_id
+                });
+                let id = ReviewId::new();
+                let r = Review {
+                    id,
+                    tenant_id: pr.tenant_id,
+                    pull_request_id: pr.id,
+                    reviewer_user_id: UserId::from_uuid(reviewer_uuid),
+                    state: ReviewState::Pending,
+                    body: None,
+                    submitted_at: now,
+                    created_at: now,
+                    lock_version: 1,
+                };
+                {
+                    let mut rg = self.reviews.write().await;
+                    rg.insert(id, r.clone());
+                }
+                pr.review_ids.push(id);
+                pr.bump_version();
+                created.push(r);
+            }
+            return Ok(ReviewResult {
+                pr_id: pr.id,
+                tenant_id: pr.tenant_id,
+                state: pr.state.as_str().to_string(),
+                reviewers: effective_reviewers,
+                reviews: created,
+            });
+        }
+    }
 }
 
 /// P0 工具链用的 PR 创建输入 (per docs/briefs/tool-p0-impl-001.md §1.1)
@@ -1125,6 +1262,23 @@ pub struct CreateMRInput {
     pub head: String,
 }
 
+/// P2 工具链用的 Review 请求结果 (per docs/briefs/tool-p2-impl-001.md §1.3)
+///
+/// `request_review` 调用后返回给 MCP 客户端的 payload.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewResult {
+    /// PR ID
+    pub pr_id: PullRequestId,
+    /// 租户 ID
+    pub tenant_id: TenantId,
+    /// PR 当前状态 (per PullRequestState 7 状态)
+    pub state: String,
+    /// 评审人 user ID 列表
+    pub reviewers: Vec<String>,
+    /// 实际创建的 Review 列表 (每人 1 个, state = Pending)
+    pub reviews: Vec<Review>,
+}
+
 impl Default for InMemoryScmService {
     fn default() -> Self {
         Self::new().0.as_ref().clone()
@@ -1139,6 +1293,9 @@ impl Clone for InMemoryScmService {
             prs: self.prs.clone(),
             webhooks: self.webhooks.clone(),
             idempotency: self.idempotency.clone(),
+            pipelines: self.pipelines.clone(),
+            pipeline_external_index: self.pipeline_external_index.clone(),
+            reviews: self.reviews.clone(),
             event_tx: self.event_tx.clone(),
         }
     }

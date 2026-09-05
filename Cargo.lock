@@ -2198,6 +2198,7 @@ dependencies = [
  "domain-scm",
  "domain-search",
  "domain-tenant",
+ "domain-validation",
  "domain-work-item",
  "domain-workspace",
  "domain-worktree",
