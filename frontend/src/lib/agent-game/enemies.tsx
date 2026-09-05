@@ -30,57 +30,94 @@ function getEnemyDef(type: string): typeof ENEMY_TYPES[number] {
 }
 
 /**
- * 光球 SVG (主函数)
+ * 光球 SVG (3渲2 漫画战术核心 / Enemy Orb)
  *   - 64x64 基准 (scale 倍)
- *   - 外晕 (径向渐变 + 脉冲)
- *   - 内核 (实心圆 + 高光)
- *   - 装饰环 (旋转)
+ *   - 战术瞄准括号与刻度 (Tactical Brackets)
+ *   - 二阶赛璐珞阴影硬黑墨线 (Manga Inked Outline)
+ *   - 旋转粒子与十字高光
  */
 export function EnemyOrbSVG({ type, scale = 1, dead = false, glyph }: EnemyOrbSVGProps): ReactNode {
   const def = getEnemyDef(type);
   const s = scale;
-  const fillOpacity = dead ? 0.3 : 1;
+  const fillOpacity = dead ? 0.35 : 1;
   const cx = 32 * s;
   const cy = 32 * s;
 
-  // 内核半径 (随 tier 缩放)
   const innerR = 10 * s;
   const outerR = 22 * s;
-  const ringR = 18 * s;
+  const ringR = 17 * s;
 
   return (
     <g data-testid={`enemy-orb-${type}`} data-enemy-tier={def.name} opacity={fillOpacity}>
-      {/* 外晕 (径向渐变) */}
       <defs>
         <radialGradient id={`orb-grad-${type}`}>
           <stop offset="0%" stopColor={def.glow} stopOpacity={0.8} />
-          <stop offset="50%" stopColor={def.color} stopOpacity={0.4} />
+          <stop offset="60%" stopColor={def.color} stopOpacity={0.35} />
           <stop offset="100%" stopColor={def.color} stopOpacity={0} />
         </radialGradient>
       </defs>
+
+      {/* 外晕 */}
       <circle cx={cx} cy={cy} r={outerR} fill={`url(#orb-grad-${type})`} />
 
-      {/* 装饰环 (旋转, 模拟脉动) */}
-      <circle cx={cx} cy={cy} r={ringR} fill="none" stroke={def.glow} strokeWidth={1} opacity={0.6} strokeDasharray={`${3 * s} ${3 * s}`}>
-        <animateTransform attributeName="transform" type="rotate" from={`0 ${cx} ${cy}`} to={`360 ${cx} ${cy}`} dur="6s" repeatCount="indefinite" />
+      {/* 战术瞄准十字线 (微透明) */}
+      <g stroke={def.glow} strokeWidth={1 * s} opacity={0.4}>
+        <line x1={cx - 24 * s} y1={cy} x2={cx - 14 * s} y2={cy} />
+        <line x1={cx + 14 * s} y1={cy} x2={cx + 24 * s} y2={cy} />
+        <line x1={cx} y1={cy - 24 * s} x2={cx} y2={cy - 14 * s} />
+        <line x1={cx} y1={cy + 14 * s} x2={cx} y2={cy + 24 * s} />
+      </g>
+
+      {/* 战术外环 (旋转刻度) */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={ringR}
+        fill="none"
+        stroke={def.glow}
+        strokeWidth={1.2 * s}
+        opacity={0.7}
+        strokeDasharray={`${4 * s} ${3 * s}`}
+      >
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from={`0 ${cx} ${cy}`}
+          to={`360 ${cx} ${cy}`}
+          dur="7s"
+          repeatCount="indefinite"
+        />
       </circle>
 
-      {/* 内核 */}
-      <circle cx={cx} cy={cy} r={innerR} fill={def.color} stroke={def.glow} strokeWidth={1.5} />
+      {/* 硬黑描边底层 (Cel 墨线) */}
+      <circle cx={cx} cy={cy} r={innerR + 1.5 * s} fill="#000000" />
 
-      {/* 高光 (左上方 1 小白点) */}
-      <circle cx={cx - 3 * s} cy={cy - 3 * s} r={2.5 * s} fill={COLORS.paper} opacity={0.6} />
+      {/* 内核主色 */}
+      <circle cx={cx} cy={cy} r={innerR} fill={def.color} stroke="#000000" strokeWidth={1.5 * s} />
+
+      {/* 赛璐珞高光弧 */}
+      <path
+        d={`M ${cx - 7 * s} ${cy - 2 * s} A ${7 * s} ${7 * s} 0 0 1 ${cx + 2 * s} ${cy - 7 * s}`}
+        fill="none"
+        stroke="#ffffff"
+        strokeWidth={1.8 * s}
+        strokeLinecap="round"
+        opacity={0.8}
+      />
+
+      {/* 核心光点 */}
+      <circle cx={cx - 3 * s} cy={cy - 3 * s} r={2 * s} fill="#ffffff" opacity={0.9} />
 
       {/* 字符 (e.g. "!" for boss) */}
       {glyph && (
         <text
           x={cx}
-          y={cy + 4 * s}
+          y={cy + 4.5 * s}
           textAnchor="middle"
-          fontSize={14 * s}
-          fill={COLORS.inkBlack}
-          fontWeight="bold"
-          fontFamily='"Hiragino Sans", system-ui, sans-serif'
+          fontSize={13 * s}
+          fill="#000000"
+          fontWeight="900"
+          fontFamily='"JetBrains Mono", ui-monospace, monospace'
         >
           {glyph}
         </text>

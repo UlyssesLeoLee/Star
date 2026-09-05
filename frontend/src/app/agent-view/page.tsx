@@ -37,7 +37,7 @@ import { RoguelikeCanvas } from "@/components/agent-game/RoguelikeCanvas";
 import { AgentSettingsTab } from "@/components/agent-game/AgentSettingsTab";
 import { useAgentGame } from "@/components/agent-game/useAgentGame";
 import { getPerkChoices } from "@/lib/agent-game/perks";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
 import { Bot, AlertTriangle, Maximize2, Zap, Sparkles, Map, RefreshCw, Settings } from "lucide-react";
 import type { PerkId } from "@/lib/agent-game/types";
