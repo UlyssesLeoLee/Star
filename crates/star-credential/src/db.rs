@@ -21,12 +21,16 @@ use crate::{
 };
 use domain_kms::EncryptedBlob;
 
+/// 持久化层错误
 #[derive(Debug, Error)]
 pub enum DbError {
+    /// sqlite 底层错误
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
+    /// JSON 序列化 / 反序列化错误
     #[error("serde_json error: {0}")]
     Json(#[from] serde_json::Error),
+    /// 记录未找到
     #[error("not found: {0}")]
     NotFound(String),
 }
@@ -34,25 +38,37 @@ pub enum DbError {
 /// 凭证审计事件 (T 类型, Append-only)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CredentialAuditEvent {
+    /// 事件 ID
     pub id: String,
+    /// 关联凭证 ID
     pub credential_id: String,
+    /// 租户 ID
     pub tenant_id: String,
+    /// 操作用户 ID
     pub user_id: String,
+    /// 事件类型
     pub event_type: AuditEventType,
+    /// 事件发生时间(毫秒时间戳)
     pub event_at_ms: u64,
     /// 元数据 (不含密文)
     pub metadata_snapshot: Option<CredentialMetadata>,
 }
 
+/// 审计事件类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AuditEventType {
+    /// 创建凭证
     Store,
+    /// 轮换凭证
     Rotate,
+    /// 撤销凭证
     Revoke,
+    /// 读取凭证
     Retrieve,
 }
 
 impl AuditEventType {
+    /// 转为小写字符串
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Store => "store",

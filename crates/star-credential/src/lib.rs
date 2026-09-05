@@ -39,6 +39,7 @@ pub enum Provider {
 }
 
 impl Provider {
+    /// 转为小写下划线字符串
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::OpenClaw => "openclaw",
@@ -62,13 +63,21 @@ pub struct CredentialMetadata {
 /// 加密后入库的凭证记录 (Master 类型, 守门 #DB-13)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CredentialRecord {
-    pub id: String,                    // UUID v4
-    pub tenant_id: String,             // RLS 必填 (守门 #DB-13 CW-05)
-    pub user_id: String,               // 创建者 user_id
-    pub provider: Provider,            // 5 类 Provider
-    pub metadata: CredentialMetadata,  // UI 显示用
-    pub encrypted_blob: EncryptedBlob, // KMS 加密后的密文 (含 dek_id + encrypted_dek + nonce + ciphertext)
+    /// UUID v4
+    pub id: String,
+    /// RLS 必填 (守门 #DB-13 CW-05)
+    pub tenant_id: String,
+    /// 创建者 user_id
+    pub user_id: String,
+    /// 5 类 Provider
+    pub provider: Provider,
+    /// UI 显示用
+    pub metadata: CredentialMetadata,
+    /// KMS 加密后的密文 (含 dek_id + encrypted_dek + nonce + ciphertext)
+    pub encrypted_blob: EncryptedBlob,
+    /// 创建时间(毫秒时间戳)
     pub created_at_ms: u64,
+    /// 更新时间(毫秒时间戳)
     pub updated_at_ms: u64,
     /// 凭证状态
     pub status: CredentialStatus,
@@ -78,11 +87,15 @@ pub struct CredentialRecord {
     pub revoked_at_ms: Option<u64>,
 }
 
+/// 凭证状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CredentialStatus {
+    /// 生效中
     Active,
-    Deprecated, // 被新凭证替代, 仍可解密用于回退
-    Revoked,    // 撤销, 解密返 Err
+    /// 被新凭证替代, 仍可解密用于回退
+    Deprecated,
+    /// 撤销, 解密返 Err
+    Revoked,
 }
 
 /// 凭证明文 (在内存中, 永不入 log)
@@ -99,18 +112,25 @@ pub struct CredentialPlaintext {
 /// 凭证操作错误
 #[derive(Debug, Error)]
 pub enum CredentialError {
+    /// 凭证未找到
     #[error("credential not found: {0}")]
     NotFound(String),
+    /// 凭证已撤销
     #[error("credential revoked: {0}")]
     Revoked(String),
+    /// 凭证已弃用
     #[error("credential deprecated: {0}")]
     Deprecated(String),
+    /// KMS 加密失败
     #[error("KMS encrypt error: {0}")]
     KmsEncrypt(String),
+    /// KMS 解密失败
     #[error("KMS decrypt error: {0}")]
     KmsDecrypt(String),
+    /// 明文格式非法
     #[error("invalid plaintext: {0}")]
     InvalidPlaintext(String),
+    /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
 }
