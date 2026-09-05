@@ -22,7 +22,7 @@ import type { AgentGameState } from "@/lib/agent-game/types";
 import { visualForLevel, MAX_HP } from "@/lib/agent-game/types";
 import { AgentCharacterSVG } from "@/lib/agent-game/characters";
 import { EnemyOrbForPrioritySVG } from "@/lib/agent-game/enemies";
-import { COLORS } from "@/lib/agent-game/theme";
+import { useAgentGameTheme } from "@/lib/agent-game/theme-tokens";
 import { EnergyRing, HaloArc, Stamp, GodSeal } from "@/components/agent-game/Decorations";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusPill } from "@/components/StatusPill";
@@ -30,6 +30,7 @@ import { useStore } from "@/lib/store";
 import {
   Hand, MousePointer2, ZoomIn, ZoomOut, Maximize2, Bot, GitBranch, Hash, Cpu, Skull, Coins,
 } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 interface AgentCanvasViewProps {
   canvas: AgentCanvas;
@@ -42,12 +43,15 @@ interface AgentCanvasViewProps {
 }
 
 export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }: AgentCanvasViewProps) {
+  const { t } = useTranslation();
   // 顶层订阅 workItems, 避免 renderNode 内 useStore.getState 触发 hooks 违规
   const workItems = useStore((s) => s.workItems);
   const workItemById = useMemo(
     () => new Map(workItems.map((w) => [w.id, w] as const)),
     [workItems],
   );
+  // 主题 (per 9/5 23:13 JST 拍板, 无限画布跟随 dark/light 切换)
+  const { colors, mode } = useAgentGameTheme();
   // viewport (世界坐标 + zoom)
   const [viewport, setViewport] = useState(canvas.viewport);
   const [tool, setTool] = useState<"select" | "pan">("pan"); // 默认 pan, 因为本视图只读
@@ -231,13 +235,13 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
           )}
           {/* 能量光环 (赛博朋克) */}
           <EnergyRing cx={nodeW / 2} cy={nodeH / 2} color={tierColor} radius={nodeW * 0.5} />
-          {/* 节点底色 + 边框 (墨黑底) */}
+          {/* 节点底色 + 边框 (主题切换, per 9/5 23:13 JST 拍板) */}
           <NodeRect
             w={nodeW}
             h={nodeH}
-            stroke={isSelected ? "#fbbf24" : isHovered ? "#22d3ee" : tierColor}
+            stroke={isSelected ? colors.goldGlow : isHovered ? colors.neonCyanGlow : tierColor}
             strokeWidth={(tier?.borderWidth ?? 1.5) * viewport.zoom}
-            fill={alive ? "#0d0d12" : "#1a1a1a"}
+            fill={alive ? colors.inkBlack : colors.inkDark}
             radius={12 * viewport.zoom}
           />
           {/* 角色 SVG (per 9/5 12:33 拍板, 武侠机器人) */}
@@ -260,14 +264,14 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
           {gameState && gameState.level >= 10 && (
             <GodSeal level={gameState.level} cx={14 * viewport.zoom} cy={14 * viewport.zoom} size={20 * viewport.zoom} />
           )}
-          {/* HP bar (per 9/5 11:42 拍板) */}
+          {/* HP bar (per 9/5 11:42 拍板, 主题切换) */}
           {gameState && (
             <g transform={`translate(${12 * viewport.zoom}, ${nodeH - 36 * viewport.zoom})`}>
-              <rect width={(nodeW - 24 * viewport.zoom)} height={5 * viewport.zoom} fill="#0b0d10" rx={2 * viewport.zoom} />
+              <rect width={(nodeW - 24 * viewport.zoom)} height={5 * viewport.zoom} fill={colors.inkBlack} rx={2 * viewport.zoom} />
               <rect
                 width={(nodeW - 24 * viewport.zoom) * (gameState.hp / MAX_HP)}
                 height={5 * viewport.zoom}
-                fill={gameState.hp <= 30 ? "#f85149" : tierColor}
+                fill={gameState.hp <= 30 ? colors.vermilionGlow : tierColor}
                 rx={2 * viewport.zoom}
               />
             </g>
@@ -276,7 +280,7 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
           {tier && (
             <g transform={`translate(${nodeW - 50 * viewport.zoom}, ${-12 * viewport.zoom})`}>
               <rect width={36 * viewport.zoom} height={20 * viewport.zoom} fill={tierColor} rx={4 * viewport.zoom} />
-              <text x={18 * viewport.zoom} y={14 * viewport.zoom} textAnchor="middle" fontSize={11 * viewport.zoom} fill="#0b0d10" fontWeight="bold" fontFamily="ui-monospace, monospace">
+              <text x={18 * viewport.zoom} y={14 * viewport.zoom} textAnchor="middle" fontSize={11 * viewport.zoom} fill={colors.inkBlack} fontWeight="bold" fontFamily="ui-monospace, monospace">
                 Lv{tier.level}
               </text>
             </g>
@@ -316,7 +320,7 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
           onMouseLeave={() => setHoveredNodeId(null)}
           onDoubleClick={() => onNodeDoubleClick(node.ref)}
         >
-          <NodeRect w={w} h={h} stroke={isSelected ? "#79c0ff" : isHovered ? "#2f81f7" : "#30363d"} fill="#161b22" radius={8 * viewport.zoom} />
+          <NodeRect w={w} h={h} stroke={isSelected ? colors.goldGlow : isHovered ? colors.neonCyan : colors.inkLight} fill={colors.inkDark} radius={8 * viewport.zoom} />
           <WorktreeNodeBody worktree={worktree} w={w} h={h} zoom={viewport.zoom} />
         </g>
       );
@@ -399,20 +403,20 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
     <div data-testid="agent-canvas-container" className="relative w-full h-full bg-bg overflow-hidden">
       {/* 工具栏 */}
       <div data-testid="agent-canvas-toolbar" className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-bg-card border border-line rounded-md p-1 shadow-lg">
-        <button onClick={() => setTool("select")} className={`btn p-1.5 ${tool === "select" ? "border-accent text-accent" : ""}`} title="Select (V)">
+        <button onClick={() => setTool("select")} className={`btn p-1.5 ${tool === "select" ? "border-accent text-accent" : ""}`} title={t.ariaLabels.canvasSelect}>
           <MousePointer2 size={14} />
         </button>
-        <button onClick={() => setTool("pan")} className={`btn p-1.5 ${tool === "pan" ? "border-accent text-accent" : ""}`} title="Pan (H)">
+        <button onClick={() => setTool("pan")} className={`btn p-1.5 ${tool === "pan" ? "border-accent text-accent" : ""}`} title={t.ariaLabels.canvasPan}>
           <Hand size={14} />
         </button>
         <div className="w-px h-5 bg-line" />
-        <button onClick={() => setViewport((v) => ({ ...v, zoom: Math.min(4, v.zoom * 1.2) }))} className="btn p-1.5" title="Zoom in (+)">
+        <button onClick={() => setViewport((v) => ({ ...v, zoom: Math.min(4, v.zoom * 1.2) }))} className="btn p-1.5" title={t.ariaLabels.canvasZoomIn}>
           <ZoomIn size={14} />
         </button>
-        <button onClick={() => setViewport((v) => ({ ...v, zoom: Math.max(0.1, v.zoom / 1.2) }))} className="btn p-1.5" title="Zoom out (-)">
+        <button onClick={() => setViewport((v) => ({ ...v, zoom: Math.max(0.1, v.zoom / 1.2) }))} className="btn p-1.5" title={t.ariaLabels.canvasZoomOut}>
           <ZoomOut size={14} />
         </button>
-        <button onClick={() => setViewport(canvas.viewport)} className="btn p-1.5" title="Fit to content (1)">
+        <button onClick={() => setViewport(canvas.viewport)} className="btn p-1.5" title={t.ariaLabels.canvasFit}>
           <Maximize2 size={14} />
         </button>
         <span className="text-[10px] text-ink-dim font-mono px-2" data-testid="agent-canvas-zoom">{Math.round(viewport.zoom * 100)}%</span>
@@ -426,8 +430,8 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
         className="w-full h-full"
         style={{
           cursor: tool === "pan" ? "grab" : "default",
-          backgroundColor: "#0b0d10",
-          backgroundImage: "radial-gradient(circle, #21262d 1px, transparent 1px)",
+          backgroundColor: colors.inkBlack,
+          backgroundImage: `radial-gradient(circle, ${colors.inkLight} 1px, transparent 1px)`,
           backgroundSize: "20px 20px",
         }}
         onMouseDown={onMouseDown}
@@ -473,55 +477,6 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
 
 function NodeRect({ w, h, fill, stroke, strokeWidth = 1.5, radius }: { w: number; h: number; fill: string; stroke: string; strokeWidth?: number; radius: number }) {
   return <rect width={w} height={h} fill={fill} stroke={stroke} strokeWidth={strokeWidth} rx={radius} />;
-}
-
-function AgentNodeBody({ agent, w, h, zoom, gameState }: { agent: AgentSession; w: number; h: number; zoom: number; gameState: AgentGameState | null }) {
-  // 拟人化游戏化: 在底部 tokens/cost 之上加 HP bar (per 拍板)
-  const hp = gameState?.hp ?? MAX_HP;
-  const alive = gameState?.alive ?? true;
-  const hpPct = alive ? Math.round((hp / MAX_HP) * 100) : 0;
-  return (
-    <g>
-      {/* icon */}
-      <g transform={`translate(${12 * zoom}, ${12 * zoom})`}>
-        <Bot size={16 * zoom} color={alive ? "#79c0ff" : "#6e7681"} strokeWidth={1.5} />
-      </g>
-      {/* kind */}
-      <text x={(12 + 22) * zoom} y={(12 + 12) * zoom} fontSize={10 * zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
-        {agent.agent_kind}
-      </text>
-      {/* id */}
-      <text x={12 * zoom} y={(28 + 6) * zoom} fontSize={11 * zoom} fill={alive ? "#e6edf3" : "#6e7681"} fontFamily="ui-monospace, monospace">
-        {agent.id}
-      </text>
-      {/* status pill (foreignObject) — agent 没有 StatusKind, 走 StatusPill 默认 prettify */}
-      <foreignObject x={12 * zoom} y={(40) * zoom} width={(w - 24)} height={20 * zoom}>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 * zoom }}>
-          <StatusPill value={agent.status as AgentStatus} size="xs" />
-        </div>
-      </foreignObject>
-      {/* HP bar (拟人化游戏化, per 拍板) */}
-      {gameState && (
-        <g transform={`translate(${12 * zoom}, ${h - 36 * zoom})`}>
-          <rect width={(w - 24)} height={5 * zoom} fill="#0b0d10" rx={2 * zoom} />
-          <rect width={(w - 24) * (hpPct / 100)} height={5 * zoom} fill={hpPct <= 30 ? "#f85149" : "#3fb950"} rx={2 * zoom} />
-        </g>
-      )}
-      {/* tokens + cost (底部两行) */}
-      <g transform={`translate(${12 * zoom}, ${gameState ? h - 24 * zoom : h - 28 * zoom})`}>
-        <Hash size={9 * zoom} color="#8b949e" />
-      </g>
-      <text x={26 * zoom} y={(gameState ? h - 16 * zoom : h - 20 * zoom)} fontSize={9 * zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
-        {agent.token_usage.total.toLocaleString()} tokens
-      </text>
-      <g transform={`translate(${12 * zoom}, ${gameState ? h - 10 * zoom : h - 14 * zoom})`}>
-        <Cpu size={9 * zoom} color="#8b949e" />
-      </g>
-      <text x={26 * zoom} y={(gameState ? h - 2 * zoom : h - 6 * zoom)} fontSize={9 * zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
-        ${agent.cost_summary.usd.toFixed(2)} / ${agent.cost_summary.budget_usd.toFixed(2)}
-      </text>
-    </g>
-  );
 }
 
 function WorktreeNodeBody({ worktree, w, h, zoom }: { worktree: Worktree; w: number; h: number; zoom: number }) {

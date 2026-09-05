@@ -24,6 +24,7 @@ import { MapPin, RefreshCw } from "lucide-react";
 import { AgentCharacterSVG } from "@/lib/agent-game/characters";
 import { EnemyOrbSVG, BossOrbSVG } from "@/lib/agent-game/enemies";
 import { enemyTypeForPriority } from "@/lib/agent-game/theme";
+import { useAgentGameTheme } from "@/lib/agent-game/theme-tokens";
 import { EnergyRing, HaloArc, Stamp, GodSeal } from "@/components/agent-game/Decorations";
 
 interface RoguelikeCanvasProps {
@@ -43,6 +44,7 @@ const CELL_SIZE = 88;        // 像素 (放大以容纳 64x64 character SVG)
 const GAP = 4;               // cell 间距
 
 export function RoguelikeCanvas({ map, position, agent, workItems, onMove, onReset, canMove, agentLevel = 1 }: RoguelikeCanvasProps) {
+  const { colors, mode } = useAgentGameTheme();
   const [hovered, setHovered] = useState<{ x: number; y: number } | null>(null);
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
 
@@ -87,17 +89,25 @@ export function RoguelikeCanvas({ map, position, agent, workItems, onMove, onRes
     const isHovered = hovered?.x === cell.x && hovered?.y === cell.y;
     const isSelected = selected?.x === cell.x && selected?.y === cell.y;
 
-    // 背景色 (墨黑底 + 朱红/青/金/紫/白 强调)
+    // 背景色 (跟主题切换, per 9/5 23:13 JST 拍板)
     const bg = isAgent ? "transparent" : (() => {
-      if (cell.type === "boss") return "rgba(245, 158, 11, 0.15)";  // 金
-      if (cell.type === "start") return "rgba(6, 182, 212, 0.15)";  // 霓虹青
-      if (cell.type === "enemy") return "rgba(220, 38, 38, 0.10)";   // 朱红
-      if (cell.type === "treasure") return "rgba(168, 85, 247, 0.10)"; // 紫
-      if (cell.type === "trap") return "rgba(107, 114, 128, 0.20)";   // 灰
-      return "#15151c";  // blank
+      // 用 hex + opacity 模拟主题切换 (light 模式用 rgba 透明叠加, dark 用实色)
+      const c = colors;
+      if (cell.type === "boss") return mode === "dark" ? `${c.gold}26` : `${c.gold}40`;        // 金
+      if (cell.type === "start") return mode === "dark" ? `${c.neonCyan}26` : `${c.neonCyan}33`;  // 霓虹青
+      if (cell.type === "enemy") return mode === "dark" ? `${c.vermilion}1A` : `${c.vermilion}26`; // 朱红
+      if (cell.type === "treasure") return mode === "dark" ? `${c.cyberPurple}1A` : `${c.cyberPurple}26`; // 紫
+      if (cell.type === "trap") return mode === "dark" ? `${c.ash}33` : `${c.ash}40`;          // 灰
+      return colors.inkDark;  // blank (主题切换: dark 暗, light 宣纸)
     })();
     const opacity = cell.type === "trap" ? 0.4 : 1;
-    const borderColor = isSelected ? "#fbbf24" : isNeighbor ? "#06b6d4" : isHovered ? "#22d3ee" : "#2a2a35";
+    const borderColor = isSelected
+      ? colors.goldGlow
+      : isNeighbor
+        ? colors.neonCyan
+        : isHovered
+          ? colors.neonCyanGlow
+          : colors.inkLight;  // 主题切换
     const borderWidth = isSelected ? 3 : isNeighbor ? 2 : 1;
     const cellX = cell.x * (CELL_SIZE + GAP);
     const cellY = cell.y * (CELL_SIZE + GAP);
@@ -165,7 +175,7 @@ export function RoguelikeCanvas({ map, position, agent, workItems, onMove, onRes
             y={14}
             textAnchor="middle"
             fontSize={9}
-            fill="#f8f5f0"
+            fill={colors.paper}  // 主题切换: dark=白, light=墨
             fontFamily='"SF Mono", monospace'
             fontWeight="bold"
             style={{ pointerEvents: "none" }}
@@ -180,7 +190,7 @@ export function RoguelikeCanvas({ map, position, agent, workItems, onMove, onRes
             y={CELL_SIZE - 6}
             textAnchor="middle"
             fontSize={9}
-            fill="#9ca3af"
+            fill={colors.ashLight}  // 主题切换
             fontFamily='"Hiragino Sans", system-ui, sans-serif'
             opacity={0.7}
             style={{ pointerEvents: "none" }}
@@ -195,7 +205,7 @@ export function RoguelikeCanvas({ map, position, agent, workItems, onMove, onRes
             y={CELL_SIZE - 6}
             textAnchor="middle"
             fontSize={10}
-            fill="#f59e0b"
+            fill={colors.gold}  // 主题切换
             fontWeight="bold"
             fontFamily='"Hiragino Sans", system-ui, sans-serif'
             style={{ pointerEvents: "none" }}
@@ -211,7 +221,7 @@ export function RoguelikeCanvas({ map, position, agent, workItems, onMove, onRes
   const hoveredCell = hovered ? map.cells[hovered.y]?.[hovered.x] : null;
 
   return (
-    <div data-testid="roguelike-canvas-container" className="flex flex-col h-full" style={{ background: "#0d0d12" }}>
+    <div data-testid="roguelike-canvas-container" data-theme={mode} className="flex flex-col h-full" style={{ background: colors.inkBlack }}>
       {/* 顶部信息栏 */}
       <div className="flex items-center justify-between gap-3 p-3 border-b border-line bg-bg-soft/40">
         <div className="flex items-center gap-3 text-[10px] font-mono">
@@ -223,6 +233,7 @@ export function RoguelikeCanvas({ map, position, agent, workItems, onMove, onRes
           </span>
           <span className="text-ink-mute">grid {map.width}×{map.height}</span>
           <span className="text-warn">Lv {agentLevel}</span>
+          <span className="text-ink-mute" data-testid="roguelike-theme-mode">[{mode}]</span>
         </div>
         <button
           data-testid="roguelike-reset-btn"
@@ -243,9 +254,14 @@ export function RoguelikeCanvas({ map, position, agent, workItems, onMove, onRes
             width={map.width * (CELL_SIZE + GAP)}
             height={map.height * (CELL_SIZE + GAP)}
             viewBox={`0 0 ${map.width * (CELL_SIZE + GAP)} ${map.height * (CELL_SIZE + GAP)}`}
-            style={{ backgroundColor: "#0d0d12", backgroundImage: "radial-gradient(circle, #1f1f28 1px, transparent 1px)", backgroundSize: "20px 20px", borderRadius: 8 }}
+            style={{
+              backgroundColor: colors.inkBlack,
+              backgroundImage: `radial-gradient(circle, ${colors.inkLight} 1px, transparent 1px)`,
+              backgroundSize: "20px 20px",
+              borderRadius: 8,
+            }}
           >
-            {/* 画布背板 (墨黑 + 纹理) */}
+            {/* 画布背板 (主题切换) */}
             <rect width={map.width * (CELL_SIZE + GAP)} height={map.height * (CELL_SIZE + GAP)} fill="transparent" />
             {map.cells.flat().map(renderCell)}
           </svg>
