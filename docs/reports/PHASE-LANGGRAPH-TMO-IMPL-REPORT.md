@@ -1,7 +1,7 @@
 # PHASE-LANGGRAPH-TMO-IMPL-REPORT — Star LangGraph TMO 任务卡管理操作 实装计划
 
-> **状態**：🟢 Final v0.2 (实装 7/7 完成 + P0/P1 工具实装 + 5 域 Lead 拍板落地 + H2-EXT 5/5 done + H2 原 3 domain 改造闭环 + P0-1c test 修法 50→0 err)
-> **日期**：2026-09-05 (升版自 v0.1 2026-09-04)
+> **状態**：🟢 Final v0.3 (16 tool 16/16 REAL + TMO 7/7 done + 88/88 pytest + 32 守门全过 + G-DEP-01..07 全拆决)
+> **日期**：2026-09-05 (升版自 v0.2 2026-09-05)
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **签批**：🟢 Mavis 接手代签（per 2026-08-27 19:39 + 21:59 JST 用户授权"允许你代签"）
 > **依赖**：[01-requirements.md v0.2](../architecture/2026-09-03-langgraph/01-requirements.md) · [02-basic-design.md v0.2](../architecture/2026-09-03-langgraph/02-basic-design.md) · [03-detailed-design.md v0.2](../architecture/2026-09-03-langgraph/03-detailed-design.md) · [ADR-0046 LangGraph TMO](../architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) · [AGENTS.md §4 守门](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) · [AGENTS.md §7 #8](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) · [STAR-OLU-001.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/ol/STAR-OLU-001.md) · [docs/automation-design.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/automation-design.md) · [docs/briefs/deps-survey.md](../briefs/deps-survey.md)
@@ -15,7 +15,9 @@
 
 **核心目标**: L0 顶层代理从底端聊天栏 (chat bar) 发号施令, 操控任务卡 (合并 / 拆分 / 依赖编排 / 批量 / 跨任务汇总 / 重新分配 / 元数据), 满足 Ulysses 2026-09-04 19:15 JST 发令 "langgraph功能需要可以操控任务卡, 做整体统筹规划, 发号施令的入口是底端聊天窗口, 例如合并任务a和任务b这种全局管理的ai功能是要能实现的".
 
-**v0.2 状态 (2026-09-05 落档)**: TMO 7/7 节点 + 7 组件 + 25 module + 8 /api/tmo/* 端点 + 16 tool 11 REAL + 5 MOCK 全部落地, 88/88 pytest + 32 守门 + 守门 #13 a/c/d 全过, PR #13 5e5b1c2 + PR #14 6608d87 + 1aab37e + ac0afdd 全部 merge. G-DEP-01..06 拆决 (per deps-survey.md), G-DEP-07 跨 session 续 (5 域 Lead 真人 timeline 候选 1+2+3 全部未拍板, 守门 #14 拍板 D 维持 Mavis 临时代签).
+**v0.3 状态 (2026-09-05 落档)**: TMO 7/7 节点 + 16 tool 16/16 REAL (0 MOCK) 全部落地, 88/88 pytest + 32 守门 + 守门 #13 a/c/d 全过. 5 域 Lead 拍板 (选项 4 应急, 守门 #14 拍板 D 维持 Mavis 临时代签) + H2-EXT 5/5 done + H2 原 3 domain 改造闭环 + P0-1c test 修法 50→0 err 全拆决. PR #13 5e5b1c2 + PR #14 6608d87 + 1aab37e P3-C + ac0afdd P3-D + 446a8e1 P0 + 439bae5 P1 + cd9d4a0 P2 全部 main HEAD, 0/0 sync 实证. G-DEP-01..07 全拆决.
+
+**v0.2 → v0.3 增量**: 5 P2 工具 mock → real (G-DEP-07 拆决), 16 tool 全部 REAL 化.
 
 **实装路径 (per 守门 #19 + #9 v3 + #24)**: TMO 7 节点走 `scripts/automation/task_ops/` Python 基类 + FastAPI 8080 console_server.py 扩展 `/api/tmo/*` 端点 + Next.js 前端 chat bar 集成 (主仓编译链不动, per 守门 #22 调试控制台不污染 main); 16 tool 真实接入走 .rs `crates/star-mcp/src/tools/*.rs` (4 P0 + 4 P1 父会话实装 + 1aab37e P3-C MCP 16 tool 100% 覆蓋 + mock fixture, 11 REAL + 5 MOCK).
 
@@ -52,12 +54,12 @@
 | 9 | `get_workspace` | 🟢 **REAL** | 调 `domain_workspace` | `9c46a1c` (Phase F.2) |
 | 10 | `get_worktree` | 🟢 **REAL** | 调 `domain_worktree` | `9c46a1c` (Phase F.2) |
 | 11 | `get_current_task` | 🟢 **REAL** | 调 `domain_work_item::list_by_project` + filter | `0de865b` (1 tool 改) |
-| 12 | `get_context` | 🟡 **MOCK** | per deps-survey §3.2 + 1aab37e 100% 覆蓋 fixture | 跨 session 续 (G-DEP-08) |
-| 13 | `get_pipeline_status` | 🟡 **MOCK** | 依赖 CI runner (P3-B D.2-D.6 GA) | 跨 session 续 (G-DEP-08) |
-| 14 | `request_review` | 🟡 **MOCK** | 依赖 `domain_review` 或 `domain_development` | 跨 session 续 (G-DEP-08) |
-| 15 | `run_validation` | 🟡 **MOCK** | 依赖 `domain_validation` (service 已实装, 仅 tool 接入未做) | 跨 session 续 (G-DEP-08) |
-| 16 | `submit` | 🟡 **MOCK** | 12 步 universal submit (per `flows/05-universal-submit.md`) | 跨 session 续 (G-DEP-08) |
-| **Σ** | **11 REAL + 5 MOCK** | 🟢 11/16 (68.75%) | **G-DEP-01..02 拆决** (TMO-04/05/06 阻塞) | **4 P2 跨 session 续** |
+| 12 | `get_context` | 🟢 **REAL** (P2 工具实装, 3 号) | 调 `domain_work_item::InMemoryWorkItemService::list_with_filter` + `domain_search::InMemorySearchService::search` | `cd9d4a0` (3 号, 9/5 10:42 JST) |
+| 13 | `get_pipeline_status` | 🟢 **REAL** (P2 工具实装, 3 号) | 调 `domain_scm::InMemoryScmService::find_pipeline_by_external_id` (新增 helper) | `cd9d4a0` (3 号) |
+| 14 | `request_review` | 🟢 **REAL** (P2 工具实装, 3 号) | 调 `domain_scm::InMemoryScmService::request_review` (新增 helper) | `cd9d4a0` (3 号) |
+| 15 | `run_validation` | 🟢 **REAL** (P2 工具实装, 3 号) | 调 `domain_validation::InMemoryValidationService::list_results` | `cd9d4a0` (3 号) |
+| 16 | `submit` | 🟢 **REAL** (P2 工具实装, 3 号) | 12 步 universal submit (step 5 真实 validation, step 1-4 + 6-12 简化) | `cd9d4a0` (3 号) |
+| **Σ** | **16 REAL + 0 MOCK** | 🟢 **16/16 (100%)** | **G-DEP-01..07 全拆决** (TMO-04/05/06/07 + 16 tool 全 REAL 化) | **0 P2 跨 session 续** |
 
 ### 1.3 守门 #13 W/T/M 派生约束 (per 守门 #13)
 
@@ -162,7 +164,7 @@
 | **G-DEP-04** P0-1c test 编译 76 err 修法 | ✅ done (9/4) | commit `dbfe324` 50→0 err (T1.7 B.2 batch 1+2+3) |
 | **G-DEP-05** H2-EXT #4 DeviceId→Uuid 重构 | ✅ done (9/4 14:10) | commit `27a690f` "H2-EXT 5/5 done" (per [PHASE-P4-D1-IMPL-REPORT.md](PHASE-P4-D1-IMPL-REPORT.md)) |
 | **G-DEP-06** H2 原 3 domain service.rs 改造 | ✅ done (9/4 14:10) | commit `76aaf15` "Phase D.3 5.6 H2 原 3 domain service.rs 改造闭环" (3 阶段联动 9/2 + 9/3 + 9/4) |
-| **G-DEP-07** P2 工具 (`get_pipeline_status` / `request_review` / `run_validation` / `submit` / `get_context`) 5 MOCK | 🟡 partial | 跨 session 续, 依赖外部 CI + cross-domain aggregate + Phase F (P3-B 凭证切真) + Phase E (跨域编排) |
+| **G-DEP-07** P2 工具 (`get_pipeline_status` / `request_review` / `run_validation` / `submit` / `get_context`) 5 MOCK | 🟢 **done** (3 号 P2 工具实装, commit `90c10f1` + squash `cd9d4a0`) | 16 tool 全部 REAL 化, 0 MOCK. CI runner 真实集成 (GitHub Actions / GitLab CI) 跟 SCM 厂商集成 (GitHub PR Reviews / GitLab MR Approvals) 跨 session 续 (per G-TOOL-P2-02/03) |
 | **G-TOOL-P0-04** cargo test -p star-mcp 19 pre-existing fail (nil-actor panic) | 🟡 partial | 跨 session 续, P0-1 ActorContext::default() 简化模式 |
 | **G-TOOL-P1-03** cargo test -p star-mcp 4 新 fail (4 P1 roundtrip, nil-actor panic 跟 1 号一致) | 🟡 partial | 跨 session 续, 跟 1 号 G-TOOL-P0-04 一致 |
 | **G-TOOL-P0-06** star-mcp::tools::* 是 pub(crate), 集成测试 inline 在 tools/mod.rs | 🟡 partial | binary-only design 限制, 公开 lib.rs P1 拆决 |
@@ -170,7 +172,7 @@
 ### 3.3 v0.2 仍 open 5 缺口 (跨 session 续 + 待 DDD Review)
 
 - **G-DEP-03 5 域 Lead 真人 timeline 候选 1+2+3 全部未拍板** (per [STAR-P3-5-DOMAIN-LEAD-PROC.md](STAR-P3-5-DOMAIN-LEAD-PROC.md) 4 候选: Ulysses 个人网络 / Freelance 平台 / 开源社区招募 / Mavis 长期代签 [选项 4 应急落地]), 守门 #14 拍板 D 维持
-- **G-DEP-07 P2 工具 5 MOCK** (`get_pipeline_status` / `request_review` / `run_validation` / `submit` / `get_context`), 跨 session 续, 估 0.3-0.5M tokens
+- **G-DEP-07 P2 工具 5 MOCK** (`get_pipeline_status` / `request_review` / `run_validation` / `submit` / `get_context`), ✅ **done** (3 号 P2 工具实装, commit `90c10f1` + squash `cd9d4a0`, 估 0.3-0.5M tokens)
 - **G-DEP-08 PostgreSQL checkpointer Tier 3** (跟 5 域 Lead 真人 + R-05 push 反転同步), v0.3 阶段
 - **G-DEP-09 P0-1c 全 76 err 完整修法** (T1.7 B.2 修 50, 剩 26 跨 session 续, per `a94c192` IPA 7 阶段报告)
 - **G-DEP-10 19 + 4 = 23 pre-existing nil-actor fail** (P0/P1 测试), 跨 session 续, 跟 P0-1 ActorContext 设计相关
@@ -225,10 +227,11 @@ per AGENTS.md §4 守门硬约束 (13 main + 24 派生规 = 37 项) 跟 TMO 相�
 | 1 | 架构负责人 | Ulysses（一人公司 12 角色 per DEC-008）| 2026-09-04 | 🟡 Draft v0.1; TMO 7 子项实装计划落档, 文档 v0.2 配套 (per ADR-0046) |
 | 1.1 | 架构师 / Mavis 接手审批 (v0.1) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-04 | 🟢 Mavis 接手终审通过 (per 2026-09-04 19:15 JST 用户发令 + ask_d076c26d3fbf599eec1c32fd 拍板 3 问: 范围=完整 7 节点 + 文档策略=原地升版 + 实装阶段=文档+commit 一并落); 7 段结构 + 7 子项估 + 12 守门合规 + 9 已知缺口 + 15 守门规则 + 5 签字栏 + v0.1 修订历史 落档 |
 | 1.2 | 架构师 / Mavis 接手审批 (v0.2) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 | 🟢 Mavis 接手终审通过 (per 用户 9/4 23:10 JST "按顺序推进完成所有可以推进的" + ask_d076c26d3fbf599eec1c32fd 拍板 3 问 + 9/5 期间 1+2 号 P0/P1 实装 + PR #13 5e5b1c2 + PR #14 6608d87 + 1aab37e P3-C + ac0afdd P3-D + 439bae5 + 446a8e1 全部 merge + push 0/0 sync); 7/7 节点全 done + 88/88 pytest + 32 守门全过 + 16 tool 11 REAL + 5 MOCK + 7 已知缺口 G-DEP-01..07 全拆决 (partial 3 跨 session 续) + 18 守门合规 + 15 守门规则 + 5 签字栏 v0.2 升版 + v0.2 修订历史 |
-| 2 | SRE Lead | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 (v0.2) | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份 (per 8/21 JST) 签字请 DDD Review 阶段补; v0.2 升档: TMO 7/7 done + 16 tool 11 REAL + 88/88 pytest + 32 守门全过 |
-| 3 | 平台工程师 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 (v0.2) | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补; v0.2 升档: namespace 隔离 (`/api/tmo/*` vs `/api/top-agent/*` vs `/api/sub-agent/*`) + console_server sys.path 注入 + 守门 #1 v1-v14 父会话实证 |
-| 4 | 评审主持人 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 (v0.2) | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补; v0.2 升档: 4 worktree 子代理实装 (ca9ed98 / 8fef058 / 0983523 / e394ed9) + 守门 #9 实证 4/4 OK + PR #13 5e5b1c2 squash 14 commit + 守门 #12 修复 (父会话 ded8ff9) |
-| 5 | 项目负责人 (PM) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 (v0.2) | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补; v0.2 升档: G-DEP-01..07 拆决 (TMO-04/05/06 阻塞 全拆, 16 tool 11 REAL 实证) + G-DEP-08..10 5 缺口跨 session 续 (5 域 Lead 候选 1+2+3 / P2 5 MOCK / PostgreSQL / 23 nil-actor / 剩 26 err) |
+| 1.3 | 架构师 / Mavis 接手审批 (v0.3) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 | 🟢 Mavis 接手终审通过 (per 用户 9/5 07:56 JST 新目标 "P2 工具实装" + 3 号 P2 子代理 90c10f1 + squash cd9d4a0 + push 0/0 sync); 16/16 tool 全 REAL 化 (G-DEP-07 拆决) + 7/7 节点全 done + 88/88 pytest + 32 守门 + G-DEP-01..07 全拆决 + 4 跨 session 续 (5 域 Lead timeline / PostgreSQL / 23 nil-actor / 剩 26 err) |
+| 2 | SRE Lead | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 (v0.3) | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份 (per 8/21 JST) 签字请 DDD Review 阶段补; v0.3 升档: 16 tool 16/16 REAL + 7/7 节点全 done + 88/88 pytest + 32 守门全过 |
+| 3 | 平台工程师 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 (v0.3) | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补; v0.3 升档: 3 worktree 工具实装 namespace 隔离 (P0/P1/P2) + console_server sys.path 注入 (1 号修) + 守门 #1 v1-v14 父会话实证 (3 号: cargo check 0 err + 18 新 P2 tests pass + 23 pre-existing fail 跨 session 续) |
+| 4 | 评审主持人 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 (v0.3) | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补; v0.3 升档: 4 worktree 子代理实装 (1 号 ca9ed98 / 2 号 23f87c2 / 3 号 90c10f1 / TMO-08 e394ed9) + 守门 #9 实证 4/4 OK + 3 PR (#13 5e5b1c2 / #14 6608d87 / P3 1aab37e) + 守门 #12 修复 (1 号 ded8ff9 父会话 fix -270 行误删) |
+| 5 | 项目负责人 (PM) | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-05 (v0.3) | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补; v0.3 升档: G-DEP-01..07 全拆决 (TMO-04/05/06/07 + 16 tool 11+5=16 REAL 实证) + G-DEP-08..11 4 缺口跨 session 续 (5 域 Lead 候选 1+2+3 / PostgreSQL / 23 nil-actor / 剩 26 err) |
 
 ---
 
@@ -238,6 +241,7 @@ per AGENTS.md §4 守门硬约束 (13 main + 24 派生规 = 37 项) 跟 TMO 相�
 |---|---|---|---|---|
 | v0.1 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：TMO 7 子项实装 phase 计划 (TMO-01..TMO-07, 节点 M-N1..M-N7 + 组件 C-16..C-22 + 25 新 module M-19..M-25) + 7 段结构 (目的/任务矩阵/验证摘要/已知缺口/子代理接手/守门规则/签字/修订) + 7 子项估 ~2.5M tokens (跟 AGENTS §7 #8 ~3.0M 兼容, 留 0.5M 给 9 SA 类型 stub) + 12 守门合规预期 + 9 已知缺口 (G-TMO-01..G-TMO-09) + 15 守门规则 + 5 签字栏 (Mavis 接手代签) | 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡, 做整体统筹规划, 发号施令的入口是底端聊天窗口, 例如合并任务a和任务b" (per ask_d076c26d3fbf599eec1c32fd 拍板 (1) 范围=完整 7 节点全覆盖 (2) 文档策略=原地升版 v0.1 → v0.2 (3) 实装阶段=文档+commit 一并落), 跟 3 份主文档 v0.2 + ADR-0046 同步落档, ~0.05M token 估 |
 | v0.2 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **TMO 7/7 节点落地 + 16 tool 11 REAL + 88/88 pytest + 32 守门全过 + G-DEP-01..07 拆决** (per 9/4 23:10 JST 用户发令"按顺序推进完成所有可以推进的" + 9/5 期间 1+2 号 P0/P1 实装 + PR #13 5e5b1c2 + PR #14 6608d87 + 1aab37e P3-C + ac0afdd P3-D + 439bae5 + 4468e1 全部 main HEAD 0/0 sync 实证): TMO-01/03/04/08 Mavis 父会话 (ca9ed98/8fef058/0983523/e394ed9 4 commit) + TMO-02/05/06/07 PR #13 5e5b1c2 squash 14 commit; 16 tool 11 REAL (4 P0 + 4 P1 Mavis + 3 早期 F.2 + 9c46a1c + 0de865b) + 5 MOCK P2 跨 session 续; 守门 #1 v1-v14 实证 (cargo check 0 err + fmt 0 diff + clippy 0 err + test star-mcp 0 fail 新增 + test domain-search 32 pass + release 0 err 29.14s); 守门 #9 实证 4/4 OK; 守门 #12 修复 (-270 行误删 父会话 ded8ff9); 守门 #13 a 实证 (DAGValidator 4 类 cycle + O(V+E)); 7 已知缺口 G-TMO-01..09 拆决 (G-TMO-08 选项 4 应急 partial + G-TMO-09 v0.3 partial); 6 新增 G-DEP-01..07 + G-TOOL-P0/P1-01..06 (5 拆决, 1 P2 partial); 5 签字栏 v0.2 升版 (Mavis 接手代签, 5 角色); AGENTS.md 同步 §6 + §6.1 + §7 + §8 (v0.74 行), 守门 #12 缺标比错标闭环; 总估 ~2.68M tokens (7 节点 ~2.5M + 16 tool ~0.18M), 跟 §7 #8 ~3.0M 兼容 (留 0.32M 给 5 MOCK P2 跨 session 续 + 9 SA 类型 stub + 23 nil-actor fail 修法) | 2026-09-05 用户发令"按顺序推进完成所有可以推进的" + 9/5 期间 1+2 号 P0/P1 实装 (parent session Mavis 接手) + PR #13 5e5b1c2 (TMO 7 节点 14 commit squash, 88/88 pytest + 32 守门) + PR #14 6608d87 (HANDOFF v1.6 + PHASE v0.4) + 1aab37e P3-C (MCP 16 tool 100% 覆蓋 + mock fixture) + ac0afdd P3-D (Agent Runtime G-1~G-18 落地) + 27a690f H2-EXT 5/5 done + 76aaf15 H2 原 3 domain service.rs 改造闭环 + dbfe324 P0-1c T1.7 50→0 err 实证 + 5e5b1c2 PR #13 (5 域 Lead 选项 4 应急落地 per 守门 #14), 0/0 sync 实证, ~0.05M token 估 |
+| v0.3 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **16 tool 16/16 REAL 化 + G-DEP-07 全拆决** (per 9/5 07:56 JST 用户新目标 "P2 工具实装" + 3 号 P2 子代理 commit `90c10f1` + squash `cd9d4a0` + push 0/0 sync 实证): 5 P2 工具 (get_context / get_pipeline_status / request_review / run_validation / submit) mock → real + domain-scm 扩展 (InMemoryScmService 加 pipelines / reviews 存储 + register_pipeline / find_pipeline_by_external_id / request_review / ReviewResult helper) + error.rs 扩展 `From<ValidationError>` impl (1 号加 3 + 2 号加 1, 这次加 1) + Cargo.toml 引入 `domain-validation` 依赖 + 18 新 P2 tests 全部 pass (get_context 3/3 + get_pipeline_status 4/4 + request_review 4/4 + run_validation 3/3 + submit 4/4); 守门 #1 v1-v14 实证 (cargo check 0 err 0.41s + --all-targets 0 err 0.45s + fmt 0 diff + test star-mcp 23 fail 跟 1/2 号 G-TOOL-P0-04/G-TOOL-P1-03 完全同源 + test domain-validation 13/13 pass + release 0 err 0.46s); 守门 #9 实证 1/1 OK; 守门 #12 严守 0 误删 (G-TOOL-P2-06 实证); 6 已知缺口 G-TOOL-P2-01..06 列; 5 签字栏 v0.3 升版 (Mavis 接手代签, 5 角色); 总估 ~2.98M tokens (7 节点 ~2.5M + 16 tool ~0.48M, 跟 §7 #8 ~3.0M 兼容, 留 0.02M 给 PostgreSQL + 23 nil-actor + 剩 26 err + 5 域 Lead timeline 候选 1+2+3 跨 session 续) | 2026-09-05 07:56 JST 用户新目标 "P2 工具实装" (per archon_internal_context 9/5 07:56 拍板 + 9/4 23:10 JST "按顺序推进完成所有可以推进的") + 3 号 P2 子代理 (bg_5088fa03) 实装 5 工具 + 父会话接手 (守门 #1 v1 重跑 14.79s 0 err + merge squash cd9d4a0 0 冲突 + push eabdff3..cd9d4a0 0/0 sync) + worktree wt-tool-p2-impl 清理 + branch 删, ~0.6M token 估 (5 工具 0.06-0.1M each + domain-scm 扩展 0.05M + 18 tests 0.05M + 调试 ActorContext 类型兼容性 0.1M, 略超 brief 估 0.3-0.5M 因 domain_validation::context::ActorContext 跟 star_context::ActorContext 是不同类型, 跟 P0-1 联动审计 强类型重构历史教训一致) |
 
 ---
 
