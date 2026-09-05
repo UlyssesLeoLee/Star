@@ -3,7 +3,7 @@
 > **状态**: 🟢 Active v0.1 (2026-09-05 10:43 JST 拍板落地)
 > **触发**: per 9/5 10:43 JST `ask_409cbd32edc309d71a083e2a` 用户拍板 (Q1=内推, Q2=立即启动, 推荐项)
 > **守门依据**: 守门 #3 (5 域独立 Lead, 不接受兼任) + 守门 #14 (5 域 Lead CONTENT 4 维) + 守门 #10 (代签 author=Ulysses)
-> **关联 commit**: `a367a88` (docs(recruitment): 5 域 Lead 真人 Ulysses 内推 brief v0.1 + AGENTS 守门 #14 v25 + PHASE v0.3.1)
+> **关联 commit**: 见 `git log -p --follow docs/recruitment/5-business-domain-lead-referral.md` (per 守门 #12 不写死 SHA, 用 path 稳定标识)
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 
 ---
