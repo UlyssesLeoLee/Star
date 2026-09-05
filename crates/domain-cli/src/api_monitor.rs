@@ -28,6 +28,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ApiCallStatus {
+    /// 成功
     Success,
     /// 4xx (永久错误, 不重试)
     ClientError,
@@ -58,6 +59,7 @@ pub struct ApiCallEvent {
     pub error_message: Option<String>,
     /// token 数 (per B.7 quota Usage)
     pub prompt_tokens: u32,
+    /// 补全 token 数
     pub completion_tokens: u32,
     /// 是否走了 mock 模式 (per B.1/B.6 mock_mode)
     pub is_mock: bool,
@@ -66,6 +68,7 @@ pub struct ApiCallEvent {
 }
 
 impl ApiCallEvent {
+    /// 构造新事件 (默认状态 Success)
     pub fn new(provider: impl Into<String>, endpoint: impl Into<String>) -> Self {
         Self {
             event_id: Uuid::new_v4(),
@@ -110,17 +113,24 @@ impl ApiCallEvent {
 /// Provider 聚合统计
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProviderStats {
+    /// 总调用数
     pub total_calls: u64,
+    /// 成功调用数
     pub success_calls: u64,
+    /// 错误调用数
     pub error_calls: u64,
+    /// 降级调用数
     pub fallback_calls: u64,
+    /// 累计提示词 token 数
     pub total_prompt_tokens: u64,
+    /// 累计补全 token 数
     pub total_completion_tokens: u64,
     /// 最近 1000 calls 的 latency 列表 (ms), 简化 p50/p95
     pub recent_latencies: Vec<u64>,
 }
 
 impl ProviderStats {
+    /// 成功率
     pub fn success_rate(&self) -> f64 {
         if self.total_calls == 0 {
             0.0
@@ -129,6 +139,7 @@ impl ProviderStats {
         }
     }
 
+    /// p50 延迟 (ms)
     pub fn p50_latency_ms(&self) -> u64 {
         if self.recent_latencies.is_empty() {
             return 0;
@@ -138,6 +149,7 @@ impl ProviderStats {
         sorted[sorted.len() / 2]
     }
 
+    /// p95 延迟 (ms)
     pub fn p95_latency_ms(&self) -> u64 {
         if self.recent_latencies.is_empty() {
             return 0;
@@ -147,6 +159,7 @@ impl ProviderStats {
         sorted[(sorted.len() as f64 * 0.95) as usize]
     }
 
+    /// 记录 1 次调用事件到统计
     pub fn record(&mut self, event: &ApiCallEvent) {
         self.total_calls += 1;
         match event.status {
@@ -168,6 +181,7 @@ impl ProviderStats {
 
 /// Audit Sink trait (抽象审计出口)
 pub trait AuditSink: Send + Sync {
+    /// 写入 1 条审计事件
     fn write(&self, event: &ApiCallEvent);
 }
 
@@ -177,20 +191,24 @@ pub struct InMemorySink {
 }
 
 impl InMemorySink {
+    /// 构造空 sink
     pub fn new() -> Self {
         Self {
             events: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
+    /// 获取所有已记录事件
     pub fn events(&self) -> Vec<ApiCallEvent> {
         self.events.read().unwrap().clone()
     }
 
+    /// 已记录事件数
     pub fn len(&self) -> usize {
         self.events.read().unwrap().len()
     }
 
+    /// 是否为空
     pub fn is_empty(&self) -> bool {
         self.events.read().unwrap().is_empty()
     }
@@ -215,6 +233,7 @@ pub struct ApiMonitor {
 }
 
 impl ApiMonitor {
+    /// 构造空 monitor (无 sink)
     pub fn new() -> Self {
         Self {
             sinks: Vec::new(),
@@ -222,6 +241,7 @@ impl ApiMonitor {
         }
     }
 
+    /// 构造带 1 个 sink 的 monitor
     pub fn with_sink(sink: Arc<dyn AuditSink>) -> Self {
         let mut m = Self::new();
         m.sinks.push(sink);

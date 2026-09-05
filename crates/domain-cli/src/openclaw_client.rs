@@ -22,12 +22,16 @@ use std::time::Duration;
 /// OpenClaw API 错误类型 (from B.7 quota::ApiError 兼容, 简化版)
 #[derive(Debug, thiserror::Error)]
 pub enum OpenClawError {
+    /// HTTP 请求失败
     #[error("HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),
+    /// API key 为空
     #[error("invalid API key (empty)")]
     InvalidKey,
+    /// API 返回非 2xx
     #[error("API returned non-2xx: status={0} body={1}")]
     NonSuccess(u16, String),
+    /// API 响应解析失败
     #[error("API response parse failed: {0}")]
     Parse(String),
 }
@@ -77,41 +81,60 @@ impl OpenClawConfig {
 /// /v1/chat/completions 请求 (OpenAI 兼容)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenerateRequest {
+    /// 模型名
     pub model: String,
+    /// 消息列表
     pub messages: Vec<ChatMessage>,
+    /// 温度
     #[serde(default)]
     pub temperature: Option<f32>,
+    /// 最大 token 数
     #[serde(default)]
     pub max_tokens: Option<u32>,
 }
 
+/// 聊天消息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
-    pub role: String, // "system" | "user" | "assistant"
+    /// 角色 ("system" | "user" | "assistant")
+    pub role: String,
+    /// 内容
     pub content: String,
 }
 
 /// /v1/chat/completions 响应 (OpenAI 兼容)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenerateResponse {
+    /// 响应 ID
     pub id: String,
+    /// 模型名
     pub model: String,
+    /// 候选结果列表
     pub choices: Vec<Choice>,
+    /// token 用量
     pub usage: Usage,
 }
 
+/// 候选结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Choice {
+    /// 索引
     pub index: u32,
+    /// 消息
     pub message: ChatMessage,
+    /// 结束原因
     #[serde(default)]
     pub finish_reason: Option<String>,
 }
 
+/// token 用量统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Usage {
+    /// 提示词 token 数
     pub prompt_tokens: u32,
+    /// 补全 token 数
     pub completion_tokens: u32,
+    /// 总 token 数
     pub total_tokens: u32,
 }
 
