@@ -121,7 +121,7 @@ export const zhCN: Dictionary = {
   },
   modules: {
     inbox: { label: "Inbox", description: "通知中心、@提及与审计流聚合工作台", categoryLabel: "核心工作区" },
-    issues: { label: "Issues", description: "工作项与任务看板 / 树形全景视图", categoryLabel: "工作管理" },
+    issues: { label: "Sprint", description: "Sprint + List + Tree 视图, 默认打开 Sprint", categoryLabel: "工作管理" },
     projects: { label: "Projects", description: "多面板项目工作区 (Kanban / Timeline / Backlog / Agents / Worktrees)", categoryLabel: "工作管理" },
     agents: { label: "Agents", description: "智能 Agent 运行状态、编排、会话与执行日志", categoryLabel: "Agent 编排" },
     analytics: { label: "Analytics", description: "工程效能大盘、燃尽图与遥测指标统计", categoryLabel: "工作管理" },

@@ -2,7 +2,7 @@
 // Issues Page Test (per U2 任务 — 8 测试)
 // =====================================================================
 // 8 个测试 (per spec):
-//   1. 4 view 切换 (Kanban | List | Tree | Sprint) — 4 个独立 test
+//   1. 3 view 切换 (Sprint | List | Tree) — 3 个独立 test (per 2026-09-05 19:13 JST 拍板: Kanban 已删)
 //   2. "+ New issue" button
 //   3. "🔍" 搜索 button
 //   4. 详情侧栏 (选中 work-item)
@@ -27,14 +27,15 @@ function renderWithI18n(ui: ReactNode) {
 
 // ---- mock next/navigation ----
 const mockPush = vi.fn();
-const mockPathname = vi.fn(() => "/issues");
+const mockPathname = vi.fn(() => "/sprint");
 const mockSearchParamsGet = vi.fn();
 
 const mockSearchParams = {
   get: (k: string) => mockSearchParamsGet(k),
   toString: () => {
     // 简化: 假定 get 已调用, 我们用最近一次 get 重建
-    return "view=kanban";
+    // Per 2026-09-05 19:13 JST 拍板: default = sprint (kanban 已删除)
+    return "view=sprint";
   },
   has: () => false,
   entries: () => [],
@@ -70,9 +71,9 @@ const resetStore = () => {
 describe("IssuesPage (U2)", () => {
   beforeEach(() => {
     mockPush.mockClear();
-    mockPathname.mockReturnValue("/issues");
-    mockSearchParamsGet.mockImplementation((k: string) => (k === "view" ? "kanban" : null));
-    mockSearchParams.toString = () => "view=kanban";
+    mockPathname.mockReturnValue("/sprint");
+    mockSearchParamsGet.mockImplementation((k: string) => (k === "view" ? "sprint" : null));
+    mockSearchParams.toString = () => "view=sprint";
     resetStore();
     cleanup();
   });
@@ -80,21 +81,24 @@ describe("IssuesPage (U2)", () => {
     vi.clearAllMocks();
   });
 
-  // ---- Test 1: view 切换 (Kanban default) ----
-  it("renders Kanban view by default with 4 view tabs", () => {
+  // ---- Test 1: view 切换 (Sprint default, per 2026-09-05 19:13 JST 拍板) ----
+  it("renders Sprint view by default with 3 view tabs (no Kanban)", () => {
     renderWithI18n(<IssuesPage />);
-    // 4 tabs 渲染
-    expect(screen.getByTestId("issues-view-tab-kanban")).toBeTruthy();
+    // 3 tabs 渲染 (Kanban 已删除 per 2026-09-05 19:13 JST)
+    expect(screen.getByTestId("issues-view-tab-sprint")).toBeTruthy();
     expect(screen.getByTestId("issues-view-tab-list")).toBeTruthy();
     expect(screen.getByTestId("issues-view-tab-tree")).toBeTruthy();
-    expect(screen.getByTestId("issues-view-tab-sprint")).toBeTruthy();
+    // Kanban 不应再存在
+    expect(screen.queryByTestId("issues-view-tab-kanban")).toBeNull();
 
-    // default Kanban tab aria-selected=true
-    const kanbanTab = screen.getByTestId("issues-view-tab-kanban");
-    expect(kanbanTab.getAttribute("aria-selected")).toBe("true");
+    // default Sprint tab aria-selected=true
+    const sprintTab = screen.getByTestId("issues-view-tab-sprint");
+    expect(sprintTab.getAttribute("aria-selected")).toBe("true");
 
-    // KanbanBoard 渲染
-    expect(screen.getByTestId("kanban-board")).toBeTruthy();
+    // Sprint view 渲染 (per 2026-09-05 19:13 JST 拍板: 默认 sprint)
+    expect(screen.getByTestId("issues-view-sprint")).toBeTruthy();
+    // KanbanBoard 不应再存在
+    expect(screen.queryByTestId("kanban-board")).toBeNull();
   });
 
   // ---- Test 2: view 切换 (List) ----
@@ -179,11 +183,12 @@ describe("IssuesPage (U2)", () => {
   // ---- Test 8: 新建模式 ?new=true 触发 banner ----
   it("shows new-issue banner when ?new=true is present in URL", () => {
     mockSearchParamsGet.mockImplementation((k: string) => {
-      if (k === "view") return "kanban";
+      // Per 2026-09-05 19:13 JST: view 默认 sprint, kanban 已删
+      if (k === "view") return "sprint";
       if (k === "new") return "true";
       return null;
     });
-    mockSearchParams.toString = () => "view=kanban&new=true";
+    mockSearchParams.toString = () => "view=sprint&new=true";
     renderWithI18n(<IssuesPage />);
     // banner 出现
     expect(screen.getByTestId("issues-new-banner")).toBeTruthy();

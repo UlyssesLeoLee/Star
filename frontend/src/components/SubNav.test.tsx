@@ -17,7 +17,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { SubNav, type SubNavItem } from "./SubNav";
 
 // ---- mock next/navigation ----
-const mockPathname = vi.fn(() => "/issues");
+const mockPathname = vi.fn(() => "/sprint");
 vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
@@ -25,15 +25,15 @@ vi.mock("next/navigation", () => ({
 }));
 
 const items: SubNavItem[] = [
-  { id: "kanban", label: "Kanban", href: "/issues?view=kanban" },
-  { id: "list",   label: "List",   href: "/issues?view=list",   count: 30 },
-  { id: "tree",   label: "Tree",   href: "/issues?view=tree" },
-  { id: "sprint", label: "Sprint", href: "/issues?view=sprint", count: 4 },
+  { id: "kanban", label: "Kanban", href: "/sprint?view=kanban" },
+  { id: "list",   label: "List",   href: "/sprint?view=list",   count: 30 },
+  { id: "tree",   label: "Tree",   href: "/sprint?view=tree" },
+  { id: "sprint", label: "Sprint", href: "/sprint?view=sprint", count: 4 },
 ];
 
 describe("SubNav (U2)", () => {
   beforeEach(() => {
-    mockPathname.mockReturnValue("/issues");
+    mockPathname.mockReturnValue("/sprint");
     cleanup();
   });
   afterEach(() => vi.clearAllMocks());
@@ -84,10 +84,10 @@ describe("SubNav (U2)", () => {
   // ---- Test 2c: per-item category 覆盖 SubNav-level (per 2026-09-02 17:32 JST) ----
   // 4 view 拆 4 个独立 it, 避免 vitest 多次 render 串扰
   const perItemItems: SubNavItem[] = [
-    { id: "kanban", label: "Kanban", href: "/issues?view=kanban", category: "work" },
-    { id: "list",   label: "List",   href: "/issues?view=list",   category: "agent" },
-    { id: "tree",   label: "Tree",   href: "/issues?view=tree",   category: "integration" },
-    { id: "sprint", label: "Sprint", href: "/issues?view=sprint", category: "system" },
+    { id: "kanban", label: "Kanban", href: "/sprint?view=kanban", category: "work" },
+    { id: "list",   label: "List",   href: "/sprint?view=list",   category: "agent" },
+    { id: "tree",   label: "Tree",   href: "/sprint?view=tree",   category: "integration" },
+    { id: "sprint", label: "Sprint", href: "/sprint?view=sprint", category: "system" },
   ];
 
   it("per-item: kanban (category=work) → blue-500 active", () => {
@@ -141,7 +141,7 @@ describe("SubNav (U2)", () => {
     const listItem = screen.getByTestId("subnav-item-list");
     expect(listItem.tagName.toLowerCase()).toBe("a");
     // href 包含 view=list query
-    expect(listItem.getAttribute("href")).toBe("/issues?view=list");
+    expect(listItem.getAttribute("href")).toBe("/sprint?view=list");
 
     // 点击不报错
     fireEvent.click(listItem);

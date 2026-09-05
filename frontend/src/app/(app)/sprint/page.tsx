@@ -1,20 +1,19 @@
 "use client";
 
 // =====================================================================
-// Issues Main Panel — /issues (per docs/frontend/design/ui-redesign-multica-style.md §5.1)
+// Sprint Main Panel — /sprint (per 2026-09-05 19:13 JST 拍板: 重命名自 /issues)
 // =====================================================================
-// 职责 (per U2 任务):
-//   1. 顶部 1 行: 4 tab 切换 (Kanban | List | Tree | Sprint) — 用 SubNav 组件 (左侧 180px)
+// 职责 (per U2 任务 + 2026-09-05 19:13 JST 拍板):
+//   1. 顶部 1 行: 3 tab 切换 (Sprint | List | Tree) — 不再用左侧 180px SubNav
 //   2. 右侧 1 个 "+ New issue" button + 1 个 "🔍" 搜索 button
-//   3. 中部按 view 渲染 (kanban / list / tree / sprint)
+//   3. 中部按 view 渲染 (sprint / list / tree) — Kanban view 已删除
 //   4. 右侧 (可隐藏) 320px 详情侧栏
 //   5. 接 useStore (W5 zustand)
-//   6. 接 KanbanBoard / KanbanCard (W1)
-//   7. 接 ?new=true 触发 new issue 表单 (per U1 CommandBar)
+//   6. 接 ?new=true 触发 new issue 表单 (per U1 CommandBar)
 //
 // 设计原则 (per 守门):
 //   - 不重写 store.ts (W5 维护)
-//   - 不引新依赖 (复用现有 KanbanBoard / SubNav)
+//   - 不引新依赖 (复用现有 IssuesSprintView / IssuesListView / IssuesTreeView)
 //   - 不动 Sidebar.tsx (向后兼容 W1-W4)
 //   - 不重写 22 路由 → 6 路由 redirect (U5 负责)
 //
@@ -31,8 +30,6 @@ import { useState, useMemo, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useStore } from "@/lib/store";
-import { SubNav, type SubNavItem } from "@/components/SubNav";
-import { KanbanBoard, KANBAN_COLUMNS } from "@/components/board/KanbanBoard";
 import { StatusPill } from "@/components/StatusPill";
 import { PageHeader } from "@/components/PageHeader";
 import { Plus, Search, X, Flag, User, Hash, Tag, FileText, GitBranch, ListTree, LayoutGrid, List, Calendar, ChevronRight } from "lucide-react";
@@ -40,17 +37,17 @@ import { clsx } from "clsx";
 import type { WorkItem, WorkItemStatus, Identity } from "@/types/ids";
 
 // ---- view types ----
-type View = "kanban" | "list" | "tree" | "sprint";
+// Per 2026-09-05 19:13 JST 拍板: 删 Kanban view (用户明确不需要看板), 默认打开 Sprint
+type View = "sprint" | "list" | "tree";
 
 const VIEWS: { id: View; label: string; icon: React.ReactNode }[] = [
-  { id: "kanban", label: "Kanban", icon: <LayoutGrid size={12} /> },
+  { id: "sprint", label: "Sprint", icon: <Calendar size={12} /> },
   { id: "list",   label: "List",   icon: <List size={12} /> },
   { id: "tree",   label: "Tree",   icon: <ListTree size={12} /> },
-  { id: "sprint", label: "Sprint", icon: <Calendar size={12} /> },
 ];
 
 const isView = (v: string | null): v is View =>
-  v === "kanban" || v === "list" || v === "tree" || v === "sprint";
+  v === "sprint" || v === "list" || v === "tree";
 
 // ---- helper: priority color ----
 const PRIORITY_COLOR: Record<WorkItem["priority"], string> = {
@@ -76,8 +73,9 @@ function IssuesPageInner() {
   const transitionWorkItem = useStore((s) => s.transitionWorkItem);
 
   // ---- view (URL ?view=) ----
+  // Per 2026-09-05 19:13 JST 拍板: 默认打开 Sprint
   const rawView = searchParams.get("view");
-  const view: View = isView(rawView) ? rawView : "kanban";
+  const view: View = isView(rawView) ? rawView : "sprint";
 
   // ---- new issue 模式 (?new=true) ----
   const newMode = searchParams.get("new") === "true";
@@ -102,7 +100,7 @@ function IssuesPageInner() {
     );
   }, [workItems, searchQuery]);
 
-  // ---- 状态计数 (SubNav count badge) ----
+  // ---- 状态计数 (Sprint view badge, 替代 SubNav) ----
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { todo: 0, in_progress: 0, review: 0, done: 0, blocked: 0, wontfix: 0 };
     workItems.forEach((w) => {
@@ -110,19 +108,6 @@ function IssuesPageInner() {
     });
     return counts;
   }, [workItems]);
-
-  // ---- SubNav items ----
-  // Per 2026-09-02 17:32 JST: 4 view 各 1 域色 (Jira 风格)
-  // Kanban=work (蓝) / List=agent (绿) / Tree=integration (紫) / Sprint=system (橙)
-  const subNavItems: SubNavItem[] = useMemo(
-    () => [
-      { id: "kanban", label: "Kanban", href: `${pathname}?view=kanban`, count: statusCounts.todo + statusCounts.in_progress + statusCounts.review, category: "work" },
-      { id: "list",   label: "List",   href: `${pathname}?view=list`,   count: workItems.length, category: "agent" },
-      { id: "tree",   label: "Tree",   href: `${pathname}?view=tree`,   count: workItems.filter((w) => w.kind === "epic").length, category: "integration" },
-      { id: "sprint", label: "Sprint", href: `${pathname}?view=sprint`, count: sprints.filter((s) => s.status === "active").length, category: "system" },
-    ],
-    [pathname, statusCounts, workItems.length, sprints],
-  );
 
   // ---- 切 view (改 URL) ----
   const handleSwitchView = useCallback(
@@ -178,24 +163,31 @@ function IssuesPageInner() {
 
   return (
     <div className="flex h-full min-h-[calc(100vh-64px)]" data-testid="issues-page">
-      {/* Left SubNav: 4 view tabs (per §4 180px sticky) — work 域染色 (per 2026-09-02 16:13 JST) */}
-      <SubNav items={subNavItems} activeId={view} topLabel="Issues" category="work" />
-
-      {/* Main content */}
+      {/* Per 2026-09-05 19:13 JST 拍板: 干掉 SubNav, 只留全局 Sidebar; view tabs 改顶部 */}
       <div className="flex-1 min-w-0 flex">
         <div className="flex-1 min-w-0 px-6 py-5 overflow-x-auto">
           <PageHeader
-            title="Issues"
-            subtitle={`${workItems.length} work-items — 主面板聚合 work-item / feedback / worktree / agent (per §2 6 路由设计). 4 视图切换: Kanban (拖动 transition) / List (表格) / Tree (层级) / Sprint (按 sprint 分组).`}
+            title="Sprint"
+            subtitle={`${workItems.length} work-items — Sprint 视图为主, 配合 List 表格 + Tree 层级. 默认打开 Sprint.`}
             icon={<FileText className="text-accent" size={20} />}
             count={workItems.length}
           />
 
-          {/* 顶部 1 行: view tabs (per §5.1) + 右侧 New + Search */}
-          <div className="flex items-center justify-between mb-4 border-b border-line">
-            <div role="tablist" aria-label="Issue view tabs" className="flex items-center gap-0" data-testid="issues-view-tabs">
+          {/* 顶部 1 行: view tabs (per §5.1) + 右侧 New + Search — 神作级 (per 2026-09-05 19:13 JST) */}
+          <div className="flex items-center justify-between mb-5">
+            <div
+              role="tablist"
+              aria-label="Sprint view tabs"
+              className="anime-panel anime-chamfer inline-flex items-center gap-1 p-1.5"
+              data-testid="issues-view-tabs"
+            >
               {VIEWS.map((v) => {
                 const active = view === v.id;
+                // Per view count badge
+                const viewCount =
+                  v.id === "sprint" ? sprints.filter((s) => s.status === "active").length :
+                  v.id === "list"   ? workItems.length :
+                  v.id === "tree"   ? workItems.filter((w) => w.kind === "epic").length : 0;
                 return (
                   <button
                     key={v.id}
@@ -205,15 +197,26 @@ function IssuesPageInner() {
                     data-testid={`issues-view-tab-${v.id}`}
                     onClick={() => handleSwitchView(v.id)}
                     className={clsx(
-                      "relative px-3 py-2 text-sm font-medium flex items-center gap-1.5 transition-colors",
-                      active ? "text-accent" : "text-ink-dim hover:text-ink",
+                      "relative px-4 py-2 text-sm font-semibold flex items-center gap-2 transition-all rounded-[var(--radius-md)]",
+                      active
+                        ? "text-ink-DEFAULT tab-glow"
+                        : "text-ink-dim hover:text-ink hover:bg-bg-soft/40",
                     )}
+                    style={active ? {
+                      background: "linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 14%, transparent), color-mix(in srgb, var(--color-accent-violet) 10%, transparent))",
+                      borderBottom: "2px solid var(--color-primary)",
+                    } : undefined}
                   >
                     {v.icon}
-                    {v.label}
-                    {active && (
-                      <span aria-hidden className="absolute left-0 right-0 -bottom-px h-0.5 bg-accent" />
-                    )}
+                    <span>{v.label}</span>
+                    <span
+                      className={clsx(
+                        "anime-hud-tag text-[9px]",
+                        active && "pulse-ok"
+                      )}
+                    >
+                      {viewCount}
+                    </span>
                   </button>
                 );
               })}
@@ -299,14 +302,7 @@ function IssuesPageInner() {
 
           {/* main view content */}
           <div data-testid={`issues-view-${view}`} className="min-h-[400px]">
-            {view === "kanban" && (
-              <KanbanBoard
-                board={board}
-                workItems={filtered}
-                identities={identities}
-                onTransition={handleTransition}
-              />
-            )}
+            {/* Per 2026-09-05 19:13 JST 拍板: 删 Kanban view 渲染分支 */}
             {view === "list" && (
               <IssuesListView
                 items={filtered}
@@ -330,10 +326,10 @@ function IssuesPageInner() {
 
           {/* 视图小贴士 (状态机 + 视图映射) */}
           <div className="mt-4 text-[10px] text-ink-mute font-mono">
-            {view === "kanban" && <>列对应状态: {KANBAN_COLUMNS.join(" / ")} — 拖动卡片到不同列触发 transition (WIP limit 已实装)</>}
+            {/* Per 2026-09-05 19:13 JST 拍板: 删 Kanban tip */}
             {view === "list"   && <>列表视图 — key / title / kind / status / priority / assignee, 点行选中</>}
             {view === "tree"   && <>树形视图 — epic → story → task → spike 层级 (用 kind + key 推断, Phase 2+ 接 relations)</>}
-            {view === "sprint" && <>Sprint 视图 — 按 sprint_id 分组的 Kanban, WIP 限 + 详情侧栏集成</>}
+            {view === "sprint" && <>Sprint 视图 — 按 sprint_id 分组, WIP 限 + 详情侧栏集成</>}
           </div>
         </div>
 

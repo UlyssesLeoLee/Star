@@ -108,7 +108,7 @@ async function shoot(page, name, theme) {
   //   - 路径: docs/frontend/screenshots/nav-color-tokens/{light,dark}-header-{inbox,issues,agents,settings}.png
   const HEADER_STATES = [
     { id: "inbox",    path: "/inbox",    hue: "cyan core" },
-    { id: "issues",   path: "/issues",   hue: "blue work" },
+    { id: "issues",   path: "/sprint",   hue: "blue work" },
     { id: "agents",   path: "/agents",   hue: "emerald agent" },
     { id: "settings", path: "/settings", hue: "amber system" },
   ];

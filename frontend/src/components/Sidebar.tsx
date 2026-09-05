@@ -519,8 +519,8 @@ function EmptyProjectState({ collapsed }: { collapsed: boolean }) {
 // 抽出来是为了在子组件内合法调用 useModuleTranslation (hook 不能在
 // 父组件 .map() 回调里直接调, 否则会破坏 hooks 规则).
 //
-// data-testid 仍用 registry 原 label (英文) 生成, 保证既有测试稳定
-// (sidebar-item-inbox / sidebar-item-issues / ...) 不受语言切换影响.
+// data-testid 用 registry 静态 id 生成 (per 2026-09-05 19:13 JST 拍板: label 改 Sprint 后 testid 仍稳定)
+// (sidebar-item-inbox / sidebar-item-issues / sidebar-item-projects / ...) 不受语言切换影响.
 //
 // 折叠态: 只渲染 icon tile + hover tooltip, 隐藏 label/code/count/active dot/remove btn
 // =====================================================================
@@ -548,8 +548,8 @@ function SidebarRow({
   const Icon = item.icon;
   // Jira 风格: 域分色 icon tile (5 域色, per 2026-09-02 15:42 JST 拍板)
   const cs = getCategoryStyles(item.category);
-  // 用 registry 静态 label 生成 testid, 避免翻译切换导致 testid 漂移
-  const testIdSlug = item.label.toLowerCase().replace(/\s+/g, "-");
+  // 用 registry 静态 id 生成 testid (per 2026-09-05 19:13 JST: label 改 Sprint 后 testid 仍稳定, 不会随 i18n 漂移)
+  const testIdSlug = item.id;
   const tileSize = collapsed ? "size-9" : "size-8";
 
   // 折叠态: 紧凑 tile, hover tooltip 显示 label

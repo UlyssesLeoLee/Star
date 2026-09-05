@@ -119,17 +119,18 @@ export const SUBNAV_REGISTRY: SubNavGroup[] = [
     ],
   },
   {
-    pathnamePrefix: "/issues",
-    topLabel: "Issues",
+    pathnamePrefix: "/sprint",
+    topLabel: "Sprint",
     category: "work",
     items: [
+      // Per 2026-09-05 19:13 JST 拍板: 删 Kanban view (用户明确不需要看板)
       {
-        id: "kanban",
-        label: "Kanban",
-        code: "KB",
-        icon: Trello,
-        category: "work",
-        query: "view=kanban",
+        id: "sprint",
+        label: "Sprint",
+        code: "SPR",
+        icon: Calendar,
+        category: "system",
+        query: "view=sprint",
       },
       {
         id: "list",
@@ -146,14 +147,6 @@ export const SUBNAV_REGISTRY: SubNavGroup[] = [
         icon: Workflow,
         category: "integration",
         query: "view=tree",
-      },
-      {
-        id: "sprint",
-        label: "Sprint",
-        code: "SPR",
-        icon: Calendar,
-        category: "system",
-        query: "view=sprint",
       },
     ],
   },

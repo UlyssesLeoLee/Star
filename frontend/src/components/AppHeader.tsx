@@ -187,8 +187,8 @@ function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
   //      配 lucide icon (来自 ModuleDefinition.icon), 跟 Sidebar icon tile 风格统一
   const cs = getCategoryStyles(tab.category);
   const Icon = tab.icon;
-  // 用 registry 静态 label 生成 testid, 避免翻译切换导致 testid 漂移
-  const testIdSlug = tab.label.toLowerCase().replace(/\s+/g, "-");
+  // 用 registry 静态 id 生成 testid (per 2026-09-05 19:13 JST: label 改 Sprint 后 testid 仍稳定, 不会随 i18n 漂移)
+  const testIdSlug = tab.id;
   return (
     <div className="relative group flex items-center">
       <Link

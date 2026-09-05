@@ -117,7 +117,7 @@ export const ja: Dictionary = {
   },
   modules: {
     inbox: { label: "受信箱", description: "通知、@メンション、監査ストリーム集約ハブ", categoryLabel: "コアワークスペース" },
-    issues: { label: "課題", description: "作業項目とタスクボード / ツリー概要", categoryLabel: "作業管理" },
+    issues: { label: "スプリント", description: "スプリント + リスト + ツリー表示, デフォルトはスプリント", categoryLabel: "作業管理" },
     projects: { label: "プロジェクト", description: "マルチパネルプロジェクトワークスペース (Kanban / Timeline / Backlog / Agents / Worktrees)", categoryLabel: "作業管理" },
     agents: { label: "エージェント", description: "エージェント実行状態、編成、セッション、実行ログ", categoryLabel: "Agent 编排" },
     analytics: { label: "分析", description: "エンジニアリング効果ダッシュボード、バーンダウン、テレメトリ指標", categoryLabel: "作業管理" },

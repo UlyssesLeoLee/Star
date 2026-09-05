@@ -34,9 +34,10 @@ const LEGACY_REDIRECTS = [
   //   app/canvas/[id]/page.tsx (CanvasView Miro 详情页) 是设计文档意图主入口.
   //   跟 src/lib/redirects.ts 注释一致, 同步删除.
 
-  // ── /issues sink ────────────────────────────────────────────────────
-  { source: "/work-item", destination: "/issues?view=kanban", permanent: false },
-  { source: "/worktree", destination: "/issues?view=tree", permanent: false },
+  // ── /sprint sink (per 2026-09-05 19:13 JST 拍板: /issues 重命名 /sprint) ──
+  { source: "/issues", destination: "/sprint?view=sprint", permanent: false },
+  { source: "/work-item", destination: "/sprint?view=list", permanent: false },
+  { source: "/worktree", destination: "/sprint?view=tree", permanent: false },
 
   // ── /agents sink ────────────────────────────────────────────────────
   { source: "/agent", destination: "/agents", permanent: false },

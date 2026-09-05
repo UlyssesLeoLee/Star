@@ -117,7 +117,7 @@ export const en: Dictionary = {
   },
   modules: {
     inbox: { label: "Inbox", description: "Notifications, @mentions and audit stream aggregation hub", categoryLabel: "Core Workspace" },
-    issues: { label: "Issues", description: "Work items and task board / tree overview", categoryLabel: "Work Management" },
+    issues: { label: "Sprint", description: "Sprint + List + Tree views, defaults to Sprint", categoryLabel: "Work Management" },
     projects: { label: "Projects", description: "Multi-panel project workspace (Kanban / Timeline / Backlog / Agents / Worktrees)", categoryLabel: "Work Management" },
     agents: { label: "Agents", description: "Agent runtime status, orchestration, sessions and execution logs", categoryLabel: "Agent Orchestration" },
     analytics: { label: "Analytics", description: "Engineering effectiveness dashboard, burndown and telemetry metrics", categoryLabel: "Work Management" },
