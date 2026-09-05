@@ -252,7 +252,7 @@ per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户�
 | # | 项 | 粗略预估消耗量 | 已消耗 | 质量门 (5 维) | 依赖 | 状态 |
 |---|---|---|---|---|---|---|
 | 1 | 25 domain-* crate 真实数据接入 (现 stub) | ~6.0M |  11 commits (git 实证) | 16 tool e2e pass + 25 crate no-stub 守门 + 文档同步 | 无 | **部分完成** (~11/25 crate 已真实接入; git: `ebd9aa7` `391ca36` `20159dc` `3a27a13` `8c318c2` `f464cd2` `a46682d` `3a0da3a` `c1450d9` `74cbfe6` `e2e8710`) |
-| 2 | 16 tool 真实数据源接入 (现 mock) | ~3.6M |  4 commits (git 实证) | 16 tool 接入 + Phase D 报告更新 + e2e ≥80% | #1 | **部分完成** (3 tool 真实接入 + 1 tool 改 get_current_task; 12 tool 留 P2 缺 service; git: `9c46a1c` `3d0a771` `d71b63f` `0de865b`) |
+| 2 | 16 tool 真实数据源接入 (现 mock) | ~3.6M |  8 commits (P0 3 + P1 4 + P2 5 + 1 P2 跨 session 续, 跟 5 守门 v6 883 passed 实证 + G-DEP-07 拆决) | 16 tool 接入 + Phase D 报告更新 + e2e ≥80% | #1 | ✅ **16/16 REAL 化 done** (per 2026-09-05 07:56 JST P2 工具实装 + 3 号 P2 子代理 `90c10f1` + squash `cd9d4a0` + 5 守门 v1+v3+v6+v14 0 err + 0 MOCK, PHASE v0.3 §3.2 G-DEP-07 全拆决) |
 | 3 | Streamable HTTP spec 完整实现 (session 重连 / server-push / Last-Event-ID / DELETE) | ~2.4M |  4 commits (git 实证) | spec 5 项 e2e + MCP 协议一致性测试 + 文档同步 | 无 | **已实质完成** (D.6+ 完整 + D.7+ 全补; git: `af630fa` `8c9452e` `bec8cee` `4b40b83`) |
 | 4 | Prompts 实际模板 / Resources 独立资源类型 | ~1.8M |  0 | 模板覆盖 5 域 + Resources 类型 ≥3 + 测试 | #2 | pending (未启动) |
 | 5 | 9 个 wt 是否 merge 到 main (acceptance-vcs-blockers / adr-0026-0032 / cli-mcp / api / flows / arch 等) | ~1.2M | 8+ wt merged (git 实证) | merge 后守门 0 违反 + commit message per 守门 + DDD Review 拍板 | 无 | **部分完成** (8/9 wt 已 merge; git: `4aebed5` `8c9452e` `e7dfb30` `4b40b83` `3d0a771` `ea2a960` `88f86ee` `74cbfe6`; 剩 ~1 wt TBD 评估) |
