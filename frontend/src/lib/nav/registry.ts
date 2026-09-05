@@ -326,6 +326,18 @@ export const ALL_MODULES: ModuleDefinition[] = [
     description: "人机协作反馈回路与异常预警",
     icon: MessageCircleWarning,
   },
+  {
+    // Per 2026-09-05 11:25 JST 用户发令: 无限画布形式的 agent 视图, 自动选
+    // 当前工作 agent, 关联 worktree + work-items (跟 kanban / worktree 共享 store)
+    id: "agent-view",
+    label: "Agent View",
+    code: "AV",
+    href: "/agent-view",
+    category: "agent",
+    categoryLabel: "Worktree / Agent",
+    description: "无限画布 · 当前工作 agent 关联 worktree / work-items 拓扑图",
+    icon: Bot,
+  },
 
   // ── Work Management Modules ──────────────────────────────────────
   {
