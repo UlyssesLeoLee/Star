@@ -62,26 +62,31 @@ use uuid::Uuid;
 /// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
 #[async_trait]
 pub trait ApplicationService: Send + Sync {
+    /// 创建工作项(跨域事务编排)
     async fn create_work_item_full(
         &self,
         cmd: CreateWorkItemFullCommand,
         actor: ActorContext,
     ) -> Result<WorkItem, ApplicationError>;
+    /// 注册 worktree(跨域事务编排)
     async fn register_worktree_full(
         &self,
         cmd: RegisterWorktreeFullCommand,
         actor: ActorContext,
     ) -> Result<Worktree, ApplicationError>;
+    /// 启动 Agent 会话(跨域事务编排)
     async fn start_agent_session_full(
         &self,
         cmd: StartAgentSessionFullCommand,
         actor: ActorContext,
     ) -> Result<AgentSession, ApplicationError>;
+    /// 提交反馈(跨域事务编排)
     async fn submit_feedback_full(
         &self,
         cmd: SubmitFeedbackFullCommand,
         actor: ActorContext,
     ) -> Result<Feedback, ApplicationError>;
+    /// 注册运行时(跨域事务编排)
     async fn register_runtime_full(
         &self,
         cmd: RegisterRuntimeFullCommand,
@@ -94,6 +99,7 @@ pub trait ApplicationService: Send + Sync {
 /// 来源: docs/api-design.md —
 #[async_trait]
 pub trait ApplicationQueryService: Send + Sync {
+    /// 获取工作项视图(查询端口)
     async fn get_work_item_view(
         &self,
         id: WorkItemId,
@@ -130,6 +136,7 @@ pub struct AgentSession {
     // 其它字段在 Phase 2 由具体 spec 补充
 }
 
+/// 创建工作项(跨域事务)命令占位结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateWorkItemFullCommand {
     /// 主键 UUID
@@ -139,6 +146,7 @@ pub struct CreateWorkItemFullCommand {
     // 其它字段在 Phase 2 由具体 spec 补充
 }
 
+/// 反馈占位实体
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Feedback {
     /// 主键 UUID
@@ -148,6 +156,7 @@ pub struct Feedback {
     // 其它字段在 Phase 2 由具体 spec 补充
 }
 
+/// 注册运行时命令占位结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterRuntimeFullCommand {
     /// 主键 UUID
@@ -157,6 +166,7 @@ pub struct RegisterRuntimeFullCommand {
     // 其它字段在 Phase 2 由具体 spec 补充
 }
 
+/// 注册 worktree 命令占位结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterWorktreeFullCommand {
     /// 主键 UUID
@@ -166,6 +176,7 @@ pub struct RegisterWorktreeFullCommand {
     // 其它字段在 Phase 2 由具体 spec 补充
 }
 
+/// 运行时占位实体
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Runtime {
     /// 主键 UUID
@@ -175,6 +186,7 @@ pub struct Runtime {
     // 其它字段在 Phase 2 由具体 spec 补充
 }
 
+/// 启动 Agent 会话命令占位结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StartAgentSessionFullCommand {
     /// 主键 UUID
@@ -184,6 +196,7 @@ pub struct StartAgentSessionFullCommand {
     // 其它字段在 Phase 2 由具体 spec 补充
 }
 
+/// 提交反馈命令占位结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubmitFeedbackFullCommand {
     /// 主键 UUID
@@ -193,6 +206,7 @@ pub struct SubmitFeedbackFullCommand {
     // 其它字段在 Phase 2 由具体 spec 补充
 }
 
+/// 工作项占位实体
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkItem {
     /// 主键 UUID
@@ -202,6 +216,7 @@ pub struct WorkItem {
     // 其它字段在 Phase 2 由具体 spec 补充
 }
 
+/// 工作项视图占位结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkItemView {
     /// 主键 UUID
@@ -211,6 +226,7 @@ pub struct WorkItemView {
     // 其它字段在 Phase 2 由具体 spec 补充
 }
 
+/// Worktree 占位实体
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Worktree {
     /// 主键 UUID
@@ -230,14 +246,19 @@ pub struct Worktree {
 /// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
 #[derive(Debug, thiserror::Error)]
 pub enum ApplicationError {
+    /// 未找到
     #[error("not found: {0}")]
     NotFound(Uuid),
+    /// 非法状态
     #[error("invalid state: {0}")]
     InvalidState(String),
+    /// 权限不足
     #[error("permission denied")]
     PermissionDenied,
+    /// 冲突
     #[error("conflict: {0}")]
     Conflict(String),
+    /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
 }
