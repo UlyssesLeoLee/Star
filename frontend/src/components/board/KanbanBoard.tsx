@@ -30,6 +30,7 @@ import { clsx } from "clsx";
 import { KanbanCard } from "./KanbanCard";
 import { StatusPill } from "@/components/StatusPill";
 import { Tooltip } from "@/components/ui/tooltip";
+import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
 import { AlertTriangle, Plus, SlidersHorizontal } from "lucide-react";
 import type { Board, WorkItem, WorkItemStatus, Identity } from "@/types/ids";
 import { KANBAN_COLUMNS } from "@/mocks/data";
@@ -68,6 +69,9 @@ export interface KanbanBoardProps {
   // KanbanCard 点击 -> 父组件推 Drawer (mode="view", workItemId)
   // 2026-08-31 12:07 JST 拍板: 跟 Drawer view 模式联动
   onWorkItemClick?: (workItem: WorkItem) => void;
+  // 高亮"下一步状态列" (per 2026-09-05 拍板, 场景 2: 当前用户最近 transition 卡片的下一状态列)
+  // 父组件计算后传入, 该列右上角飘气态粒子. undefined = 不高亮.
+  nextStepStatus?: WorkItemStatus | null;
 }
 
 const KANBAN_COLUMNS_LOCAL: ReadonlyArray<WorkItemStatus> = KANBAN_COLUMNS;
@@ -87,6 +91,7 @@ export function KanbanBoard({
   onReorderColumns,
   onRequestNewWorkItem,
   onWorkItemClick,
+  nextStepStatus,
 }: KanbanBoardProps) {
   const { t, tx } = useTranslation();
   const fallbackLabel = useStatusLabel("workItem", "todo");
@@ -293,7 +298,7 @@ export function KanbanBoard({
                 }
               }}
               className={clsx(
-                "card min-h-[200px] transition-colors",
+                "card min-h-[200px] transition-colors relative",
                 overWip && "border-warn/60",
                 isDropTarget && "ring-2 ring-accent bg-accent/10",
                 // 列重排 drop 高亮 (per 2026-08-29 19:09 JST)
@@ -301,6 +306,18 @@ export function KanbanBoard({
                 isColDropTarget && "ring-2 ring-cyan-400 bg-cyan-500/10",
               )}
             >
+              {/* 气态粒子提示 (per 2026-09-05 拍板, 场景 2: 下一步状态列) */}
+              {nextStepStatus === col.status && (
+                <GasParticlesHint
+                  variant="swirl"
+                  color="info"
+                  density={0.5}
+                  width={140}
+                  height={80}
+                  offsetX={-10}
+                  offsetY={-10}
+                />
+              )}
               {/* 列拖动手柄 (per 2026-08-29 19:09 JST, 把整列设为 draggable) */}
               {onReorderColumns && (
                 <div

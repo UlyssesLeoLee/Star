@@ -37,6 +37,7 @@ import { RoguelikeCanvas } from "@/components/agent-game/RoguelikeCanvas";
 import { useAgentGame } from "@/components/agent-game/useAgentGame";
 import { getPerkChoices } from "@/lib/agent-game/perks";
 import { PageHeader } from "@/components/PageHeader";
+import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
 import { Bot, AlertTriangle, Maximize2, Zap, Sparkles, Map, RefreshCw } from "lucide-react";
 import type { PerkId } from "@/lib/agent-game/types";
 
@@ -302,15 +303,27 @@ export default function AgentViewPage() {
             onChange={handleAgentChange}
           />
           {/* Spend cost 模拟 (per 拍板, 触发死亡检测) */}
-          <button
-            data-testid="agent-view-spend-cost"
-            onClick={handleSpend}
-            disabled={!gameState?.alive}
-            className="btn text-[10px] py-1 px-2 disabled:opacity-50"
-            title="模拟执行 1 step (cost +$0.1)"
-          >
-            <Zap size={10} /> Step
-          </button>
+          <span className="relative inline-block">
+            <button
+              data-testid="agent-view-spend-cost"
+              onClick={handleSpend}
+              disabled={!gameState?.alive}
+              className="btn text-[10px] py-1 px-2 disabled:opacity-50 relative"
+              title="模拟执行 1 step (cost +$0.1)"
+            >
+              <Zap size={10} /> Step
+            </button>
+            {/* 气态粒子提示 (per 2026-09-05 拍板, 场景 4: agent 下一步 step 按钮) */}
+            <GasParticlesHint
+              variant="rise"
+              color="ok"
+              density={0.45}
+              width={80}
+              height={60}
+              offsetX={-4}
+              offsetY={-22}
+            />
+          </span>
           <a
             href={`/board?assignee_id=&worktree_id=${agent.worktree_id}`}
             className="btn text-[10px] py-1 px-2 hidden md:inline-flex"

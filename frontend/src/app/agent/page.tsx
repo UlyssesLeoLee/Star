@@ -6,6 +6,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { Bot, Cpu, DollarSign, Hash } from "lucide-react";
 import { AGENT_SM, type AgentStatus } from "@/types/ids";
 import { StateMachineDiagram } from "@/components/StateMachineDiagram";
+import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
 import { useState } from "react";
 
 export default function AgentPage() {
@@ -82,7 +83,17 @@ export default function AgentPage() {
             <div className="text-[10px] uppercase tracking-wider text-ink-mute mb-1.5">Transition</div>
             <div className="flex flex-wrap gap-1.5">
               {allowed.map((to) => (
-                <button key={to} onClick={() => transitionAgent(ag.id, to as AgentStatus)} className="btn-primary">→ {to}</button>
+                <span key={to} className="relative inline-block">
+                  <button
+                    onClick={() => transitionAgent(ag.id, to as AgentStatus)}
+                    className="btn-primary relative"
+                    data-testid={`agent-transition-${to}`}
+                  >
+                    → {to}
+                  </button>
+                  {/* 气态粒子提示 (per 2026-09-05 拍板, 场景 1: 状态机下一步 transition 按钮) */}
+                  <GasParticlesHint variant="rise" color="accent" density={0.5} width={100} height={80} offsetX={-4} offsetY={-30} />
+                </span>
               ))}
             </div>
           </div>
