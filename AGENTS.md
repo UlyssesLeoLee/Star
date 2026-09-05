@@ -243,7 +243,7 @@ per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户�
 
 ---
 
-## 7. 待办 (per 当前 main HEAD `98d246e`, 粗略预估消耗量 WBS per `STAR-OLU-001.md`)
+## 7. 待办 (per 当前 main HEAD `ab91613`, 粗略预估消耗量 WBS per `STAR-OLU-001.md`)
 
 > **排序原则 (per 2026-08-29 04:23 JST Ulysses 拍板 + 2026-09-04 13:43 JST 升级)**: 不按日期排,按 **粗略预估消耗量** 降序;推进门槛是**质量门禁 ≥4/5**,不是截止日期,也不是 token 上限。
 > **粗略预估基线**: `STAR-OLU-001.md` v0.1 — 1 SRE · 周 ≈ 1.2M tokens (STAR 独立,同源不套 RGS §6.2 数字) — **仅供"若按人类节奏"的参考排序, 不设上限, 不参与 gating** (per 2026-09-04 13:43 JST 用户发令)
