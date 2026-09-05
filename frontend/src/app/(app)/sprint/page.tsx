@@ -32,6 +32,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { StatusPill } from "@/components/StatusPill";
 import { PageHeader } from "@/components/PageHeader";
+import { SprintBoardView } from "@/components/sprint/SprintBoardView";
 import { Plus, Search, X, Flag, User, Hash, Tag, FileText, GitBranch, ListTree, LayoutGrid, List, Calendar, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import type { WorkItem, WorkItemStatus, Identity } from "@/types/ids";
@@ -315,21 +316,18 @@ function IssuesPageInner() {
               <IssuesTreeView items={filtered} identities={identities} onSelect={setSelectedId} />
             )}
             {view === "sprint" && (
-              <IssuesSprintView
-                items={filtered}
-                sprints={sprints}
-                identities={identities}
-                onSelect={setSelectedId}
-              />
+              // Per 2026-09-05 19:32 JST 拍板: Sprint 对标 Jira, 全套 7 项 (Backlog + 拖动 + 创建/启动/完成/删除)
+              <SprintBoardView onSelect={setSelectedId} />
             )}
           </div>
 
           {/* 视图小贴士 (状态机 + 视图映射) */}
           <div className="mt-4 text-[10px] text-ink-mute font-mono">
             {/* Per 2026-09-05 19:13 JST 拍板: 删 Kanban tip */}
+            {/* Per 2026-09-05 19:32 JST 拍板: Sprint 对标 Jira, 7 项 (Backlog + 拖动 + 创建/启动/完成/删除) */}
             {view === "list"   && <>列表视图 — key / title / kind / status / priority / assignee, 点行选中</>}
             {view === "tree"   && <>树形视图 — epic → story → task → spike 层级 (用 kind + key 推断, Phase 2+ 接 relations)</>}
-            {view === "sprint" && <>Sprint 视图 — 按 sprint_id 分组, WIP 限 + 详情侧栏集成</>}
+            {view === "sprint" && <>Sprint 视图 — 左 Backlog 拖入右 Sprint, 启动/完成/删除/改名 + 4 列 kanban, 状态机 planned → active → completed</>}
           </div>
         </div>
 
