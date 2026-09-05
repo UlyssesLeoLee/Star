@@ -12,35 +12,51 @@ use uuid::Uuid;
 /// 工作流节点 (状态)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VizNode {
+    /// 节点 ID
     pub id: String,
+    /// 显示标签
     pub label: String,
+    /// 节点类别
     pub category: NodeCategory, // TODO/DOING/DONE
+    /// X 坐标
     pub x: f32,
+    /// Y 坐标
     pub y: f32,
 }
 
+/// 节点类别 (TODO/DOING/DONE)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum NodeCategory {
+    /// 待办
     Todo,
+    /// 进行中
     Doing,
+    /// 已完成
     Done,
 }
 
 /// 工作流边 (转换)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VizEdge {
+    /// 边 ID
     pub id: String,
+    /// 源节点 ID
     pub from: String,
+    /// 目标节点 ID
     pub to: String,
+    /// 转换名
     pub label: String, // 转换名
+    /// 转换条件 (可选)
     pub condition: Option<String>,
 }
 
 /// 工作流可视化
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WorkflowViz {
+    /// 节点集合
     pub nodes: Vec<VizNode>,
+    /// 边集合
     pub edges: Vec<VizEdge>,
 }
 

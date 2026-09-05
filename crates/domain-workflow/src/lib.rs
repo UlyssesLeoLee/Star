@@ -37,9 +37,11 @@ use uuid::Uuid;
 // ID 类型 + define_uuid_id 宏
 // =====================================================================
 
+/// 生成一个基于 Uuid 的强类型 ID 包装结构
 #[macro_export]
 macro_rules! define_uuid_id {
     ($name:ident) => {
+        /// 强类型 ID
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
@@ -47,9 +49,11 @@ macro_rules! define_uuid_id {
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 取出内部 Uuid
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -94,6 +98,7 @@ pub enum StateCategory {
 }
 
 impl StateCategory {
+    /// 转为大写下划线字符串
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Initial => "INITIAL",
@@ -117,6 +122,7 @@ pub enum TransitionTrigger {
 }
 
 impl TransitionTrigger {
+    /// 转为大写下划线字符串
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::UserAction => "USER_ACTION",
@@ -139,6 +145,7 @@ pub enum Guard {
 }
 
 impl Guard {
+    /// 转为大写下划线字符串
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::RequireRole(_) => "REQUIRE_ROLE",
@@ -239,20 +246,33 @@ pub struct StateChange {
 // 错误
 // =====================================================================
 
+/// Workflow 领域错误
 #[derive(Debug, Error)]
 pub enum WorkflowError {
+    /// 未找到
     #[error("not found: {0}")]
     NotFound(String),
+    /// 非法转换
     #[error("invalid transition: {from} -> {to}")]
-    InvalidTransition { from: String, to: String },
+    InvalidTransition {
+        /// 源状态
+        from: String,
+        /// 目标状态
+        to: String,
+    },
+    /// 缺失初始状态
     #[error("missing initial state")]
     MissingInitial,
+    /// 跨租户访问被拒绝
     #[error("cross-tenant access denied: tenant {0} vs required {1}")]
     CrossTenantDenied(TenantId, TenantId),
+    /// 权限不足
     #[error("permission denied: requires {0}")]
     PermissionDenied(String),
+    /// 冲突
     #[error("conflict: {0}")]
     Conflict(String),
+    /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
 }
@@ -261,33 +281,51 @@ pub enum WorkflowError {
 // 命令 / 查询 DTO
 // =====================================================================
 
+/// 创建 Workflow 命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateWorkflowCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 名称
     pub name: String,
+    /// 状态集合
     pub states: Vec<WorkflowState>,
+    /// 转换表
     pub transitions: Vec<Transition>,
+    /// 默认初始状态 ID
     pub default_initial_state: WorkflowStateId,
 }
 
+/// 启动 WorkflowInstance 命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StartInstanceCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 关联 Workflow
     pub workflow_id: WorkflowId,
+    /// 关联 WorkItem
     pub work_item_id: WorkItemId,
+    /// 触发者
     pub actor: UserId,
 }
 
+/// 执行状态转换命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransitionCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 关联 WorkflowInstance
     pub instance_id: WorkflowInstanceId,
+    /// 目标状态
     pub to: WorkflowStateId,
+    /// 触发者
     pub actor: UserId,
 }
 
+/// 按租户列出 Workflow 查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListByTenantQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
 }
 
@@ -295,20 +333,24 @@ pub struct ListByTenantQuery {
 // 端口(Port Traits)
 // =====================================================================
 
+/// Workflow 命令端口
 #[async_trait]
 pub trait WorkflowCommandPort: Send + Sync {
+    /// 创建 Workflow
     async fn create_workflow(
         &self,
         cmd: CreateWorkflowCommand,
         actor: &ActorContext,
     ) -> Result<Workflow, WorkflowError>;
 
+    /// 启动 WorkflowInstance
     async fn start_instance(
         &self,
         cmd: StartInstanceCommand,
         actor: &ActorContext,
     ) -> Result<WorkflowInstance, WorkflowError>;
 
+    /// 执行状态转换
     async fn transition(
         &self,
         cmd: TransitionCommand,
@@ -316,10 +358,13 @@ pub trait WorkflowCommandPort: Send + Sync {
     ) -> Result<WorkflowInstance, WorkflowError>;
 }
 
+/// Workflow 查询端口
 #[async_trait]
 pub trait WorkflowQueryPort: Send + Sync {
+    /// 获取单个 Workflow
     async fn get(&self, id: WorkflowId, actor: &ActorContext) -> Result<Workflow, WorkflowError>;
 
+    /// 按租户列出 Workflow
     async fn list_by_tenant(
         &self,
         q: ListByTenantQuery,
@@ -327,15 +372,23 @@ pub trait WorkflowQueryPort: Send + Sync {
     ) -> Result<Vec<Workflow>, WorkflowError>;
 }
 
+/// Workflow 仓库端口
 #[async_trait]
 pub trait WorkflowRepository: Send + Sync {
+    /// 插入 Workflow
     async fn insert(&self, wf: Workflow) -> Result<(), WorkflowError>;
+    /// 获取单个 Workflow
     async fn get(&self, id: WorkflowId) -> Result<Workflow, WorkflowError>;
+    /// 更新 Workflow
     async fn update(&self, wf: Workflow) -> Result<(), WorkflowError>;
+    /// 按租户列出 Workflow
     async fn list_by_tenant(&self, tenant_id: TenantId) -> Result<Vec<Workflow>, WorkflowError>;
+    /// 插入 WorkflowInstance
     async fn insert_instance(&self, inst: WorkflowInstance) -> Result<(), WorkflowError>;
+    /// 获取单个 WorkflowInstance
     async fn get_instance(&self, id: WorkflowInstanceId)
         -> Result<WorkflowInstance, WorkflowError>;
+    /// 更新 WorkflowInstance
     async fn update_instance(&self, inst: WorkflowInstance) -> Result<(), WorkflowError>;
 }
 
@@ -446,6 +499,7 @@ pub fn run_invariants(wf: &Workflow, inst: Option<&WorkflowInstance>) -> Result<
 // InMemoryWorkflowService
 // =====================================================================
 
+/// 内存态 Workflow 服务实现
 pub struct InMemoryWorkflowService {
     repo: Arc<dyn WorkflowRepository>,
     workflows: Arc<RwLock<HashMap<WorkflowId, Workflow>>>,
@@ -453,6 +507,7 @@ pub struct InMemoryWorkflowService {
 }
 
 impl InMemoryWorkflowService {
+    /// 创建新的 InMemoryWorkflowService
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryWorkflowRepository::new()),
@@ -461,6 +516,7 @@ impl InMemoryWorkflowService {
         }
     }
 
+    /// 使用指定仓库创建 InMemoryWorkflowService
     pub fn with_repo(repo: Arc<dyn WorkflowRepository>) -> Self {
         Self {
             repo,
@@ -636,12 +692,14 @@ impl WorkflowQueryPort for InMemoryWorkflowService {
 // InMemoryWorkflowRepository
 // =====================================================================
 
+/// 内存态 Workflow 仓库实现
 pub struct InMemoryWorkflowRepository {
     workflows: RwLock<HashMap<WorkflowId, Workflow>>,
     instances: RwLock<HashMap<WorkflowInstanceId, WorkflowInstance>>,
 }
 
 impl InMemoryWorkflowRepository {
+    /// 创建新的 InMemoryWorkflowRepository
     pub fn new() -> Self {
         Self {
             workflows: RwLock::new(HashMap::new()),
