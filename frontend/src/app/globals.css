@@ -7,6 +7,27 @@
 /* xterm.js v6 终端样式 (per 2026-09-01 PHASE-MOBILE-PWA v0.2 远程终端) */
 @import "@xterm/xterm/css/xterm.css";
 
+/* ─────────────────────────────────────────────────────────────────────
+ * 字体策略 (per 9/5 14:48 JST 实测修正, 原 q2-fonts_opt1 next/font 走不通)
+ *   原因: gstatic.com ECONNRESET, Noto Serif JP 87 子集全失败
+ *   改: 纯 system 字体栈, 0 网络外联, 守门 #1 v1 + #5 一并满足
+ *   后续: v0.2 PR 单独处理 woff2 自托管, 不混本次提交
+ * ─────────────────────────────────────────────────────────────────────*/
+:root {
+  /* 日漫圆体 — 跨平台 system 字体栈 */
+  --font-anime: "PingFang SC", "Microsoft YaHei", "Hiragino Sans", "Yu Gothic UI", "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif;
+  /* 战术等宽 */
+  --font-mono:  ui-monospace, "SFMono-Regular", "Cascadia Code", "JetBrains Mono", "Consolas", "Menlo", monospace;
+  /* 日文明朝体 — AI Tab 限定 */
+  --font-serif-jp: "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", serif;
+}
+
+/* 全局 body 走 anime 字体栈, 走 <html className="font-sans-jp"> 触发 */
+.font-sans-jp,
+html.font-sans-jp body {
+  font-family: var(--font-anime);
+}
+
 html {
   color-scheme: light dark;
 }
@@ -226,4 +247,56 @@ html, body {
   [data-testid="gantt-bar"]:hover .gantt-bar-handle {
     background-color: var(--color-primary-glow);
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * 神作级微交互 (per 9/5 14:41 JST 用户拍板 §4.4)
+ *   - lift-on-hover: 浮起 4px + 大投影
+ *   - pulse-ok / pulse-warn: 状态指示器光晕脉冲
+ *   - hero-fade-in: hero 进场淡入 + 上移
+ *   - pulse-dot: 在线指示点呼吸
+ * ─────────────────────────────────────────────────────────────────────*/
+@layer utilities {
+  .lift-on-hover {
+    transition:
+      transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 240ms ease;
+  }
+  .lift-on-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+  }
+  .lift-on-hover:active {
+    transform: translateY(-2px);
+  }
+
+  .pulse-ok {
+    animation: pulse-ok 1.8s ease-in-out infinite;
+  }
+  .pulse-warn {
+    animation: pulse-warn 1.2s ease-in-out infinite;
+  }
+
+  /* Tabs 选中态辉光 */
+  [data-state="active"].tab-glow {
+    box-shadow: var(--glow-accent);
+  }
+}
+
+@keyframes pulse-ok {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok-DEFAULT) 40%, transparent); }
+  50%      { box-shadow: 0 0 0 8px color-mix(in srgb, var(--ok-DEFAULT) 0%, transparent); }
+}
+@keyframes pulse-warn {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--warn-DEFAULT) 50%, transparent); }
+  50%      { box-shadow: 0 0 0 10px color-mix(in srgb, var(--warn-DEFAULT) 0%, transparent); }
+}
+@keyframes hero-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.85); }
 }

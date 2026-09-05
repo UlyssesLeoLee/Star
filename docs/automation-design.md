@@ -647,6 +647,8 @@ frontend/src/app/automation-debug/
 - 守门 #9 v3: 调试页 → console_server.py → 13 份脚本, 走 subprocess 替代 RPC, 跟守门 #9 实证 #3 一致 (子代理 RPC 不可靠但 subprocess 可靠)
 - 守门 #12 v3: 调试页加新基类 (console_server.py + ai_edit_mock.py) 必更新 §12 清单表 + registry.md
 - 守门 #11 实证: 缺标比错标安全, §12.6 列已知缺口
+- **守门 #22 v3 (v0.3 新增)**: Three.js 抽象核心走 `next/dynamic` SSR-false, 不进 main 编译链 (`cargo check --workspace --lib` 0 err 保持); 后端 console_server.py 是 Python 进程, 跟 main 解耦
+- **守门 #23 v2 (v0.3 新增)**: 调试页 "AI 修改" 维持本地 mock, 不开 OpenAI/Anthropic; Three.js 抽象核心 100% 代码生成, 0 外部贴图/3D 资源, 符合零版权约束
 
 ### 12.6 已知缺口 (per 守门 #11)
 
@@ -655,6 +657,70 @@ frontend/src/app/automation-debug/
 3. **13 份脚本 metadata 提取** 需从脚本源码静态分析 (import 路径 / CLI args), 模板生成可能不准, 跨 session 续改进
 4. **5 套 unittest 勾选 = 整套 enable/disable** (per §12.2 简化设计), 内部 case 不可单独勾选, 跨 session 续考虑细化
 5. **关闭语义 = 跳过运行** (per close-behavior=1 拍板), 关闭态脚本/功能点 dispatcher 仍能 brief 落档但不 invoke, audit log 标 "disabled"
+6. **(v0.3 新增) 自托管 woff2 字体** — 当前 Hero 标题字体用 system 圆体栈 (`PingFang SC` / `Microsoft YaHei` / `Yu Gothic UI` 等), 跨 Win/Mac/Linux 体验不一致; 后续起 v0.2 PR 用 `next/font/local` 自托管 Zen Maru Gothic + Noto Serif JP, 跨平台 0 网络外联
+7. **(v0.3 新增) pre-existing `refactor-state-machine` 缺失** — 本次升级落档最小 shim 修复, 跟 §12 无关; 后续 refactor 重构会替换该 shim (留 TODO 标记)
+8. **(v0.3 新增) `next build` static prerender 失败** — `useSearchParams()` 多个 pre-existing page 未包 Suspense (`/404`, `/settings/api-keys` 等), 跟 §12 无关; dev 模式 `next dev` 正常运行 200 OK, production build 待开 v0.2 单独修复
+
+### 12.7 视觉升档 v0.3 — "调试制御盤" Hero 头部 (per 2026-09-05 14:41-14:50 JST Ulysses 拍板)
+
+> **触发**: 2026-09-05 14:41 JST Ulysses 指令"要艺术品级别的三渲二日漫风格界面, 并且从色彩心理学, 平面设计理论等美学艺术角度让它充满 charisma 感觉, 让用户看到之后忍不住点赞, 认知负荷低但是始终信奉这是一款神作"
+>
+> **拍板** (5 选项, per 9/1 14:58 JST 拍板决策必须用选项):
+> - scope = **全套 4 commit** (Hero + 3D-style 图标 + 切角 + 微交互)
+> - fonts = **3 套全上** (日漫圆体 + 等宽 + 明朝体)
+> - 3d-render = **Three.js 真 3D 渲染**
+> - first-impression = **巨型渐变标题 + KPI 胶囊**
+> - 3d-target = **背景中漂浮的抽象核心** (100% 代码生成, 0 外部资源)
+
+#### 12.7.1 设计原则 (色彩心理学 + 平面设计理论 4 律)
+
+| 律 | 落地 |
+|---|---|
+| **对比 Contrast** | 72-96pt 巨型渐变标题 vs 11pt micro 标签, 4.5x+ 视觉权重差 |
+| **重复 Repetition** | 3 个 KPI 胶囊共享节奏 (icon + label + value), 4 个 Tab 共享节奏 (icon + 4 字 + 角标) |
+| **亲密性 Proximity** | 标题+副标题 8px 间距 (φ), KPI 胶囊间 13px (φ) |
+| **留白 White space** | hero 上下 55px (φ), 左右 34px (φ), 切角 12px |
+
+#### 12.7.2 色彩心理 (4 维)
+
+| 色 | 心理 | 用途 |
+|---|---|---|
+| 主蓝 `#1a6cf6` (light) / 电光青 `#00f0ff` (dark) | 信任 / 专业 / 专注 | Hero 渐变 / 主操作按钮 / Tab 选中态 |
+| 霓虹粉 `#e8295a` (light) / `#ff2a85` (dark) | 活力 / 即时反馈 / 警示 | 关闭态 / 错误 toast / KPI "运行中" |
+| 紫罗兰 `#7c3aed` (light) / `#a855f7` (dark) | 稀缺 / 仪式感 / 高级 | AI 修改 Tab / "NEW" 角标 / Three.js 抽象核心 |
+| 翡翠绿 `#16a34a` (light) / `#10b981` (dark) | 健康 / 成功 | KPI "健康度 A+" / SYS LIVE 指示点 |
+
+#### 12.7.3 新增文件清单 (v0.3)
+
+| 文件 | 用途 | 大小 |
+|---|---|---|
+| `frontend/src/app/automation-debug/components/HeroHeader.tsx` | Hero 头部组件 (巨型渐变标题 + 3 KPI 胶囊 + 极光渐变背景 + HUD 角标) | 7.3KB |
+| `frontend/src/app/automation-debug/components/AnimeCore3D.tsx` | Three.js 抽象核心 (环面 + 二十面体 + 12 光点, 主题色自适应) | 5.1KB |
+| `frontend/src/app/automation-debug/hooks/useCountUp.ts` | 数字滚动 hook (rAF 缓动, 700ms cubic-bezier) | 1.2KB |
+
+#### 12.7.4 修改文件清单 (v0.3)
+
+| 文件 | 修改 |
+|---|---|
+| `frontend/package.json` | +3 deps: `three@^0.169.0` `@react-three/fiber@^8.17.10` `@react-three/drei@^9.114.0` `framer-motion@^11.11.0` (peer React 18 兼容) |
+| `frontend/src/app/automation-debug/page.tsx` | 重写: 顶部 Hero + Tab 改 lucide 3D-style 图标 (ScrollText/PlayCircle/Bot/GaugeCircle) + anime-chamfer 切角 + lift-on-hover |
+| `frontend/src/app/globals.css` | +4 keyframes (pulse-ok / pulse-warn / hero-fade-in / pulse-dot) + .lift-on-hover utility + .tab-glow data-state |
+| `frontend/src/app/layout.tsx` | 字体策略: system 字体栈挂 `<html class="font-sans-jp">`, 0 网络外联 (next/font 因 fonts.gstatic ECONNRESET 降级) |
+| `frontend/src/lib/refactor-state-machine.ts` | 最小 shim (per 已知缺口 #7, pre-existing 缺失修复, 跟 §12 无关) |
+
+#### 12.7.5 验证证据 (per 守门 #1 v1 + #5 + #22 + #23)
+
+- `next dev -p 3101` 启动 `Ready in 1620ms`, 200 OK
+- 路由 `/automation-debug` HTTP 200, 50.7KB SSR HTML
+- HTML 关键字命中: `font-sans-jp` ✓ `anime-panel` ✓ `anime-chamfer` ✓ `調 試 制 御 盤` ✓ `HeroHeader` ✓ `pulse-ok` ✓ `lift-on-hover` ✓ `anime-hud-tag` ✓
+- `AnimeCore3D` SSR HTML False 是预期 (dynamic ssr:false 走客户端 hydration, 验证需 browser)
+- `cargo check --workspace --lib` 0 err 保持 (守门 #22 实证 console 不污染 main)
+
+#### 12.7.6 拍板未选 + 已知缺口 (per 缺标比错标)
+
+- **未选**: 3D 角色立绘 (q5 选 _opt1 抽象核心, 跟 _opt2 角色立绘隔离) + 跨域品牌 3D (q3 选 Three.js, 跟 _opt3 手绘 SVG 隔离)
+- **缺**: 跨平台 woff2 自托管字体 (per 已知缺口 #6)
+- **缺**: dev 验证缺 Playwright 截图 (per 已知缺口 #8, 走 dev 200 OK + HTML 关键字命中兜底)
 
 ---
 
@@ -686,6 +752,7 @@ frontend/src/app/automation-debug/
 |---|---|---|---|---|
 | v0.1 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: 3 类 agent 交互 (子代理 dispatch / CLI 调用 / 代码改造) 全包, 4 个筛选维度 (R/V/S/A) + 3 档判定 ([P]/[M]/[S]), WBS §1-§5 / §14 / kanban-vmodel 任务卡全过初判, 守门 #1 v19 + #9 v2 + #12 v2 派生规; 落档 `scripts/automation/` 4 基类 + 1 CLI + 2 smoke + 1 索引, 共 8 份文件 | 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题, 这部分的设计文档首先完善出来,筛选出哪些任务卡里的需求可以这么做" + 拍板 3 选项 (范围=全 3 类 / 维度=R+V+S+A / 落档=新建 docs/automation-design.md + scripts/automation/) |
 | v0.2 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **§12 调试控制台 (Automation Debug Console)** 新增: 4 拍板 (scope=13 py 脚本+5 unittest / ai-edit=本地 mock / debug-ui=Next.js+shadcn / close-behavior=跳过运行); frontend/src/app/automation-debug/ + scripts/automation/console_server.py + scripts/automation/ai_edit_mock.py 3 份新基类; 守门 #1 v20 + #5 v2 + #9 v3 派生规; docs/automation-design.md §4 任务卡表加 'available_in_debug' 标记 | 2026-09-02 09:01 JST Ulysses 指令"这些 py 脚本要运需用户通过填写 api key 的 ai 修改,并且给一个专用脚本调试页面,允许用户在一定范围内勾选脚本生效的功能点,并且允许关闭" + 拍板 4 选项 |
+| v0.3 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **§12.7 Hero 视觉升档 — "調 試 制 御 盤" 杂志封面级** 新增: 5 拍板 (scope=全套 4 commit / fonts=3 套 / 3d=Three.js / first-impression=巨型渐变标题+KPI / 3d-target=抽象核心); HeroHeader.tsx (7.3KB 巨型渐变标题 + 3 KPI 胶囊 + 极光渐变 + HUD 角标) + AnimeCore3D.tsx (5.1KB 100% 代码生成抽象核心) + useCountUp.ts (1.2KB 数字滚动); 守门 #22 v3 + #23 v2 新增; 字体策略降级到 system 字体栈 (next/font 因 fonts.gstatic.com ECONNRESET 失败, 0 网络外联, 后续起 v0.2 PR 自托管 woff2); 落地 3 新文件 + 5 改文件; dev 验证 `next dev -p 3101` 200 OK, 50.7KB SSR HTML, 8 项关键字命中 | 2026-09-05 14:41 JST Ulysses 指令"要艺术品级别的三渲二日漫风格界面, ... 让用户看到之后忍不住点赞" + 14:43-14:50 JST 5 选项拍板 (q1-scope_opt1 / q2-fonts_opt1 / q3-3d-icons_opt2 / q4-first-impression_opt1 / q5-3d-target_opt1) |
 | v0.3 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **§4.11 图表 & 报告系统 (CHARTS) 新增 phase** (per docs/briefs/P3-CHARTS-P0.md + 2026-09-02 11:00 JST Ulysses 拍板 A+I+α): 4 子项 (P0 基础设施 + C01 真实 / P0 剩余 7 / P1 7 / P2 7) 全 [P]; 落档 `scripts/automation/charts_p0_setup.py` (P0 阶段 1); §4.10 任务卡分布统计从 52 → 56 子项; 守门 #1 v19 + #12 v15 + #20 v20 + #21 v21 联合实证: 16 文件 + 19/19 测试 + 0 err + 0 clippy | 2026-09-02 10:04 JST Ulysses "图表对标 Jira" + 11:00 JST 拍板 A+I+α (per docs/briefs/P3-CHARTS-P0.md v0.1) |
 | v0.4 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **§4.7.1 kanban-vmodel-jp Sprint 视图 新增 phase** (per docs/briefs/kanban-sprint-view-001.md + 2026-09-03 13:12 JST Ulysses 拍板 "保持 Kanban, 加 Sprint 视图"): 3 子项 (P1 核心 / P2 度量 / P3 仪式) 全 [M]; 落档 `scripts/automation/kanban_sprint_gen.py` (P1 验证 43 项); P1 已落地 43/43 pass, 报告 `docs/kanban-vmodel-jp/SPRINT-VIEW-P1-REPORT.md` v0.1; 守门 #1 v19 + #20 v20 + #21 v21 + #22 v22 联合实证: HTML+JS+CSS 0 err + 8/8 结构 + 43/43 函数 | 2026-09-03 13:12 JST Ulysses 拍板 "保持 Kanban, 加 Sprint 视图" + 13:25 JST Mavis 推进 P1 收官 |
 | v0.5 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **§4.7.1 P1 v0.2 Jira 設計 Backlog 优先 增量** (per docs/briefs/kanban-sprint-view-001.md v0.2 + 2026-09-03 13:55 JST Ulysses 反馈 "进入sprint前应该在backlog, 删除sprint列时, 里面的内容也应该进入backlog, 参考jira设计。所有文档要更新好"): 4 处数据流修改 (addToSprint 校验 / removeFromSprint 重置 / completeSprint 未完了回流 / cancelSprint + 削除 全件回流) + 新增 `returnSprintTasksToBacklog()` ヘルパー + Sprint Plan modal Jira 設計 hint + 非 backlog 警告; 自动化档 `kanban_sprint_gen.py` 校验项 43 → 54 (+11) → 55 (+1 P2 sprintMetrics); P2 度量落地 (Velocity SVG bar + Burndown SVG line + Sprint history table + Capacity config) + `<div id="sprintMetrics">` + .sprint-metrics / .metric-card / .chart-svg / .history-table / .capacity-form CSS; 报告 SPRINT-P1-REPORT v0.2 (新增 §8 Jira 設計增量章节); 守门 #1 v19 + #20 v20 + #21 v21 + #22 v22 联合实证: 55/55 pass + 0 err | 2026-09-03 13:55 JST Ulysses Jira 設計反馈 + Mavis 推进 P1 v0.2 + P2 收官 |
