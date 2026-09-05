@@ -9,6 +9,7 @@ import { StateMachineDiagram } from "@/components/StateMachineDiagram";
 import { MessageCircleWarning, HelpCircle, CheckCircle2, XCircle, AlertCircle, ClipboardCheck, GitBranch, ArrowRight } from "lucide-react";
 import { FEEDBACK_SM, type FeedbackStatus } from "@/types/ids";
 import { clsx } from "clsx";
+import { useTranslation } from "@/lib/i18n";
 
 type FeedbackTab = "inbox" | "statemachine" | "history";
 
@@ -26,6 +27,7 @@ const severityIcon: Record<string, React.ReactNode> = {
 };
 
 export default function FeedbackPage() {
+  const { t } = useTranslation();
   const { feedbacks, transitionFeedback } = useStore();
   const [activeTab, setActiveTab] = useState<FeedbackTab>("inbox");
   const [selected, setSelected] = useState<string | null>(feedbacks[0]?.id ?? null);
@@ -49,7 +51,7 @@ export default function FeedbackPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Feedback Inbox"
+        title={t.pageTitles['/feedback'].title}
         subtitle="6 状态机 (§7.3) + INV-FB-01~02。Agent 在执行中向人类发问；人类 answer 后回到 agent 上下文。"
         icon={<MessageCircleWarning className="text-accent" size={20} />}
         track="B"

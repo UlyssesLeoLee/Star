@@ -43,11 +43,11 @@ describe("ProjectsPage", () => {
     expect(screen.getByTestId("project-switcher-prj-stargate")).toBeTruthy();
     expect(screen.getByTestId("project-switcher-prj-mobile")).toBeTruthy();
     // 5 个 tab 渲染 (Kanban / Timeline / Backlog / Agents / Worktrees)
-    expect(screen.getByRole("tab", { name: /Kanban/i })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: /Timeline/i })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: /Backlog/i })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: /Agents/i })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: /Worktrees/i })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /Kanban|看板/i })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /Timeline|时间线|甘特/i })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /Backlog|待办池|待办/i })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /Agents|Agent/i })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /Worktrees|Worktree/i })).toBeTruthy();
     // 默认 Kanban tab
     expect(screen.getByTestId("projects-kanban-tab")).toBeTruthy();
   });
@@ -61,7 +61,7 @@ describe("ProjectsPage", () => {
 
   it("Kanban tab renders KanbanBoard with project-filtered data", () => {
     renderWithI18n(<ProjectsClient initialTab="kanban" />);
-    const kanbanTab = screen.getByRole("tab", { name: /Kanban/i });
+    const kanbanTab = screen.getByRole("tab", { name: /Kanban|看板/i });
     fireEvent.click(kanbanTab);
     // kanban 4 列
     expect(screen.getByTestId("kanban-board")).toBeTruthy();
@@ -73,21 +73,21 @@ describe("ProjectsPage", () => {
 
   it("Timeline tab renders Gantt and Calendar", () => {
     renderWithI18n(<ProjectsClient initialTab="kanban" />);
-    const tlTab = screen.getByRole("tab", { name: /Timeline/i });
+    const tlTab = screen.getByRole("tab", { name: /Timeline|时间线|甘特/i });
     fireEvent.click(tlTab);
     expect(screen.getByTestId("projects-timeline-tab")).toBeTruthy();
   });
 
   it("Backlog tab renders work-items list", () => {
     renderWithI18n(<ProjectsClient initialTab="kanban" />);
-    const backlogTab = screen.getByRole("tab", { name: /Backlog/i });
+    const backlogTab = screen.getByRole("tab", { name: /Backlog|待办池|待办/i });
     fireEvent.click(backlogTab);
     expect(screen.getByTestId("projects-backlog-tab")).toBeTruthy();
   });
 
   it("Agents tab shows members table with role (mock)", () => {
     renderWithI18n(<ProjectsClient initialTab="kanban" />);
-    const agentsTab = screen.getByRole("tab", { name: /Agents/i });
+    const agentsTab = screen.getByRole("tab", { name: /Agents|Agent/i });
     fireEvent.click(agentsTab);
     expect(screen.getByTestId("projects-members-tab")).toBeTruthy();
     // 至少 1 行成员
@@ -97,7 +97,7 @@ describe("ProjectsPage", () => {
 
   it("Worktrees tab shows worktree list", () => {
     renderWithI18n(<ProjectsClient initialTab="kanban" />);
-    const wtTab = screen.getByRole("tab", { name: /Worktrees/i });
+    const wtTab = screen.getByRole("tab", { name: /Worktrees|Worktree/i });
     fireEvent.click(wtTab);
     expect(screen.getByTestId("projects-worktrees-tab")).toBeTruthy();
   });
@@ -107,7 +107,7 @@ describe("ProjectsPage", () => {
     // 切到 MOB project
     fireEvent.click(screen.getByTestId("project-switcher-prj-mobile"));
     // 切到 Kanban tab
-    fireEvent.click(screen.getByRole("tab", { name: /Kanban/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /Kanban|看板/i }));
     // 验证 4 列都有 (即使 0 卡)
     expect(screen.getByTestId("kanban-column-todo")).toBeTruthy();
   });
@@ -136,7 +136,7 @@ describe("ProjectsPage", () => {
     // 清空 cookie (可能 vitest jsdom 残留)
     document.cookie = "projects-default-tab=; path=/; max-age=0";
     // 切到 Timeline tab
-    fireEvent.click(screen.getByRole("tab", { name: /Timeline/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /Timeline|时间线|甘特/i }));
     // 验证 cookie 写入
     expect(document.cookie).toContain("projects-default-tab=timeline");
   });

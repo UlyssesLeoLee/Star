@@ -77,6 +77,7 @@ import { addDays, format, parseISO, differenceInDays } from "date-fns";
 import type {
   Board, Project, WorkItem, WorkItemStatus, Identity, Workspace, Sprint, Milestone, Iso8601,
 } from "@/types/ids";
+import { useTranslation } from "@/lib/i18n";
 
 // 5 tab 类型已迁出到 @/lib/cookies (per 2026-09-01 16:41 JST cookie-default 拍板, server 需要共享)
 const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode }> = [
@@ -99,6 +100,7 @@ function deriveRole(project: Project): "project_admin" | "developer" | "viewer" 
 }
 
 export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTabId }) {
+  const { t } = useTranslation();
   // ---- store 订阅 (zustand selectors) ----
   const projects = useStore((s) => s.projects);
   const workItems = useStore((s) => s.workItems);
@@ -406,7 +408,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
     return (
       <div className="max-w-7xl">
         <PageHeader
-          title="Projects"
+          title={t.pageTitles['/projects'].title}
           icon={<FolderTree className="text-accent" size={20} />}
           subtitle="(no projects available)"
         />
@@ -417,7 +419,7 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   return (
     <div className="max-w-7xl" data-testid="projects-page">
       <PageHeader
-        title="Projects"
+        title={t.pageTitles['/projects'].title}
         subtitle="多面板项目工作区 — Kanban / Timeline / Backlog / Agents / Worktrees 5 tab 聚合 (per 2026-08-29 22:49 JST 拍板)。"
         icon={<FolderTree className="text-accent" size={20} />}
         track="D"
@@ -680,12 +682,13 @@ function ProjectSwitcher({
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       data-testid="project-switcher"
       className="flex items-center gap-2 mb-4 overflow-x-auto"
       role="tablist"
-      aria-label="Project switcher"
+      aria-label={t.ariaLabels.projectSwitcher}
     >
       {projects.map((p) => {
         const active = p.id === selectedId;
@@ -736,6 +739,7 @@ function ProjectOverview({
     lastActivityTs: Iso8601 | undefined;
   };
 }) {
+  const { t } = useTranslation();
   const role = deriveRole(project);
   const lastActivity = kpis.lastActivityTs
     ? new Date(kpis.lastActivityTs)

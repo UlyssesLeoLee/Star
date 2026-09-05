@@ -4,8 +4,10 @@ import { useStore } from "@/lib/store";
 import { PageHeader, Stat } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { ShieldCheck } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function ValidationPage() {
+  const { t } = useTranslation();
   const cases = useStore((s) => s.validationCases);
 
   const pass = cases.filter((c) => c.result === "pass").length;
@@ -17,7 +19,7 @@ export default function ValidationPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Validation"
+        title={t.pageTitles['/validation'].title}
         subtitle="7 实体 + 5 状态机(pass/fail/skipped/feedback_required/pending) + AcceptanceCoveragePort。"
         icon={<ShieldCheck className="text-accent" size={20} />}
         track="B"

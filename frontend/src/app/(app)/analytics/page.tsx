@@ -24,8 +24,10 @@ import {
 import { addDays, format, parseISO, differenceInDays } from "date-fns";
 import { MOCK_KPI_FALLBACK, COST_SERIES_FALLBACK } from "@/mocks/data";
 import type { KpiCard, CostPoint } from "@/mocks/schemas/analytics";
+import { useTranslation } from "@/lib/i18n";
 
 function MiniLineChart({ data }: { data: ReadonlyArray<CostPoint> }) {
+  const { t } = useTranslation();
   const W = 500;
   const H = 160;
   const PAD = 16;
@@ -43,7 +45,7 @@ function MiniLineChart({ data }: { data: ReadonlyArray<CostPoint> }) {
       viewBox={`0 0 ${W} ${H}`}
       className="w-full h-48"
       role="img"
-      aria-label="Cost trend (mock)"
+      aria-label={t.ariaLabels.costTrend}
     >
       <defs>
         <linearGradient id="cost-fill-anime" x1="0" x2="0" y1="0" y2="1">
@@ -82,6 +84,7 @@ function MiniLineChart({ data }: { data: ReadonlyArray<CostPoint> }) {
 }
 
 export default function AnalyticsPage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<string>("burndown");
   const [kpi, setKpi] = useState<ReadonlyArray<KpiCard>>(MOCK_KPI_FALLBACK);
   const [costSeries, setCostSeries] = useState<ReadonlyArray<CostPoint>>(COST_SERIES_FALLBACK);
@@ -152,7 +155,7 @@ export default function AnalyticsPage() {
   return (
     <div className="max-w-7xl mx-auto" data-testid="analytics-page">
       <PageHeader
-        title="Analytics"
+        title={t.pageTitles['/analytics'].title}
         subtitle="日漫科技分析中心: 甘特图 / 燃尽图 / 成本趋势 / 速率 / 排行榜"
         icon={<BarChart3 className="text-accent" size={20} />}
         count={`${kpi.length} KPIs`}

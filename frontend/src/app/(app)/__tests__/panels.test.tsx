@@ -49,7 +49,8 @@ describe("U4 minimal panels — render smoke", () => {
   it("renders /agents without error", () => {
     renderWithI18n(<AgentsPage />);
     expect(screen.getByTestId("agents-page")).toBeInTheDocument();
-    expect(screen.getByText("Agents")).toBeInTheDocument();
+    // v0.6: zh-CN 下 page title "Agent 总览"
+    expect(screen.getByText("Agent 总览")).toBeInTheDocument();
     // 5 mock 行
     expect(screen.getByTestId("agent-row-ag-001")).toBeInTheDocument();
     expect(screen.getByTestId("agent-row-ag-005")).toBeInTheDocument();
@@ -60,7 +61,8 @@ describe("U4 minimal panels — render smoke", () => {
   it("renders /analytics without error", () => {
     renderWithI18n(<AnalyticsPage />);
     expect(screen.getByTestId("analytics-page")).toBeInTheDocument();
-    expect(screen.getByText("Analytics")).toBeInTheDocument();
+    // v0.6: zh-CN 下 page title "效能分析"
+    expect(screen.getByText("效能分析")).toBeInTheDocument();
     // KPI 4 个 (label 全部渲染)
     expect(screen.getByText("Cost (24h)")).toBeInTheDocument();
     expect(screen.getByText("Tokens (24h)")).toBeInTheDocument();
@@ -75,7 +77,8 @@ describe("U4 minimal panels — render smoke", () => {
   it("renders /inbox without error", () => {
     renderWithI18n(<InboxPage />);
     expect(screen.getByTestId("inbox-page")).toBeInTheDocument();
-    expect(screen.getByText("Inbox")).toBeInTheDocument();
+    // v0.6 (per 2026-09-05 拍板 C 全 i18n 接管): zh-CN 下 page title "收件箱"
+    expect(screen.getByText("收件箱")).toBeInTheDocument();
     // 10 mock 通知
     const list = screen.getByTestId("inbox-list");
     expect(list.querySelectorAll("li[data-testid^='inbox-item-']").length).toBe(10);
@@ -84,7 +87,8 @@ describe("U4 minimal panels — render smoke", () => {
   it("renders /settings without error (default tab = profile)", () => {
     renderWithI18n(<SettingsPage />);
     expect(screen.getByTestId("settings-page")).toBeInTheDocument();
-    expect(screen.getByText("Settings")).toBeInTheDocument();
+    // v0.6: zh-CN 下 page title "系统设置"
+    expect(screen.getByText("系统设置")).toBeInTheDocument();
     // default profile tab
     expect(screen.getByTestId("settings-panel-profile")).toBeInTheDocument();
     // 5 个 tab 通过 Tabs 渲染 — role="tablist"
@@ -93,7 +97,8 @@ describe("U4 minimal panels — render smoke", () => {
 
   it("switches /settings tab to api keys", () => {
     renderWithI18n(<SettingsPage />);
-    const apiTab = screen.getByRole("tab", { name: /API Keys/i });
+    // v0.6: zh-CN 下 tab "API 凭据"
+    const apiTab = screen.getByRole("tab", { name: /API 凭据/i });
     fireEvent.click(apiTab);
     expect(screen.getByTestId("settings-panel-apikeys")).toBeInTheDocument();
   });

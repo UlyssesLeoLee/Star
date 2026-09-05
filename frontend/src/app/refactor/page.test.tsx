@@ -57,6 +57,15 @@ vi.mock("@/lib/i18n", () => ({
         trackPill: "Track {track}",
         telemetryTag: "// TELEMETRY",
       },
+      ariaLabels: {
+        projectSwitcher: "项目切换",
+        // v0.6 (per 2026-09-05 拍板 C): 测试 mock 需含所有引用 key
+        sidebarScope: "侧栏范围",
+        openAppMatrix: "打开 APP 矩阵",
+        openCommandBar: "打开命令栏",
+        collapse: "折叠",
+        expand: "展开",
+      },
       refactor: {
         title: "Refactor Sweep 重构专项",
         subtitle: "分批次对已完成任务做重构",

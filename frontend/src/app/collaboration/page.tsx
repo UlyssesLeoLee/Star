@@ -5,8 +5,10 @@ import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Boxes, Users, FileText, Plus, MousePointer2 } from "lucide-react";
 import Link from "next/link";
+import { useTranslation } from "@/lib/i18n";
 
 export default function CollaborationPage() {
+  const { t } = useTranslation();
   const canvases = useStore((s) => s.canvases);
   const canvasElements = useStore((s) => s.canvasElements);
   const canvasConnectors = useStore((s) => s.canvasConnectors);
@@ -34,7 +36,7 @@ export default function CollaborationPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Collaboration"
+        title={t.pageTitles['/collaboration'].title}
         subtitle="无限画布(Miro 模式)与实时协作入口。每个 canvas 可关联 Worktree / WorkItem / Project,跨 25 module 双向联动。"
         icon={<Boxes className="text-accent" size={20} />}
         track="E"

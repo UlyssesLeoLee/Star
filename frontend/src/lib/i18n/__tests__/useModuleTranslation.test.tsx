@@ -72,8 +72,8 @@ describe("useModuleTranslation", () => {
         <Probe module={MOCK_INBOX} />
       </I18nProvider>
     );
-    // zh-CN 字典对 inbox: 标签 "Inbox" (技术名词保留英文), 描述中文, 分类中文
-    expect(screen.getByTestId("label").textContent).toBe("Inbox");
+    // v0.6 (per 2026-09-05 拍板 C 全 i18n 接管): zh-CN navModules 接管
+    expect(screen.getByTestId("label").textContent).toBe("收件箱");
     expect(screen.getByTestId("description").textContent).toBe(
       "通知中心、@提及与审计流聚合工作台"
     );
@@ -107,9 +107,9 @@ describe("useModuleTranslation", () => {
     });
     expect(screen.getByTestId("label").textContent).toBe("受信箱");
     expect(screen.getByTestId("description").textContent).toBe(
-      "通知、@メンション、監査ストリーム集約ハブ"
+      "通知センター・@メンション・監査ストリーム集約"
     );
-    expect(screen.getByTestId("categoryLabel").textContent).toBe("コアワークスペース");
+    expect(screen.getByTestId("categoryLabel").textContent).toBe("コア作業区");
   });
 
   it("falls back to registry values when module id is not in dictionary", () => {

@@ -4,8 +4,10 @@ import { useStore } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Network, ArrowRight } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function RelationPage() {
+  const { t } = useTranslation();
   const relations = useStore((s) => s.relations);
   const wts = useStore((s) => s.worktrees);
   const wis = useStore((s) => s.workItems);
@@ -23,7 +25,7 @@ export default function RelationPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Relation"
+        title={t.pageTitles['/relation'].title}
         subtitle="跨实体关系图(blocks / duplicates / relates_to / parent_of / cloned_from)。BFS 5 层 + 2 层 prefetch buffer。"
         icon={<Network className="text-accent" size={20} />}
         track="E"

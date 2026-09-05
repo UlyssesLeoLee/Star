@@ -9,8 +9,10 @@ import { StateMachineDiagram } from "@/components/StateMachineDiagram";
 import { WORKTREE_SM, type WorktreeStatus } from "@/types/ids";
 import { GitBranch, GitMerge, Lock, Cpu, AlertCircle } from "lucide-react";
 import { clsx } from "clsx";
+import { useTranslation } from "@/lib/i18n";
 
 export default function WorktreePage() {
+  const { t } = useTranslation();
   const { worktrees, transitionWorktree } = useStore();
   const [selected, setSelected] = useState<string>("wt-003");
 
@@ -24,7 +26,7 @@ export default function WorktreePage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Worktree"
+        title={t.pageTitles['/worktree'].title}
         subtitle="17 状态机 (§7.1) — INV-WT-01~04。每个 worktree 是 git checkout 的隔离副本,绑定 local-runtime + agent-session + PR。"
         icon={<GitBranch className="text-accent" size={20} />}
         track="B"

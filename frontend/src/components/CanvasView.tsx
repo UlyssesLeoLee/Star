@@ -19,6 +19,7 @@ import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useStore } from "@/lib/store";
 import { StatusPill } from "./StatusPill";
 import { MousePointer2, Hand, Plus, Trash2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 interface CanvasViewProps {
   canvas: Canvas;
@@ -31,6 +32,7 @@ interface CanvasViewProps {
 const STICKY_PALETTE = ["#f9d77e", "#ffb3c1", "#a3d9ff", "#b8f0c4", "#d4b3ff"];
 
 export function CanvasView({ canvas, elements, connectors, highlightElementId, readOnly = false }: CanvasViewProps) {
+  const { t } = useTranslation();
   // viewport: 世界坐标
   const [viewport, setViewport] = useState(canvas.viewport);
   const [selected, setSelected] = useState<string[]>([]);
@@ -372,29 +374,29 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     <div data-testid="canvas-container" className="relative w-full h-full bg-bg overflow-hidden">
       {/* Toolbar */}
       <div data-testid="canvas-toolbar" className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-bg-card border border-line rounded-md p-1 shadow-lg">
-        <button onClick={() => setTool("select")} className={`btn p-1.5 ${tool === "select" ? "border-accent text-accent" : ""}`} title="Select (V)">
+        <button onClick={() => setTool("select")} className={`btn p-1.5 ${tool === "select" ? "border-accent text-accent" : ""}`} title={t.ariaLabels.canvasSelect}>
           <MousePointer2 size={14} />
         </button>
-        <button onClick={() => setTool("pan")} className={`btn p-1.5 ${tool === "pan" ? "border-accent text-accent" : ""}`} title="Pan (H)">
+        <button onClick={() => setTool("pan")} className={`btn p-1.5 ${tool === "pan" ? "border-accent text-accent" : ""}`} title={t.ariaLabels.canvasPan}>
           <Hand size={14} />
         </button>
         <div className="w-px h-5 bg-line" />
-        <button onClick={() => setViewport({ ...viewport, zoom: Math.min(4, viewport.zoom * 1.2) })} className="btn p-1.5" title="Zoom in (+)">
+        <button onClick={() => setViewport({ ...viewport, zoom: Math.min(4, viewport.zoom * 1.2) })} className="btn p-1.5" title={t.ariaLabels.canvasZoomIn}>
           <ZoomIn size={14} />
         </button>
-        <button onClick={() => setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })} className="btn p-1.5" title="Zoom out (-)">
+        <button onClick={() => setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })} className="btn p-1.5" title={t.ariaLabels.canvasZoomOut}>
           <ZoomOut size={14} />
         </button>
         <button onClick={() => {
           // fit to content
           setViewport({ x: minX, y: minY, zoom: Math.min(1200 / (maxX - minX), 800 / (maxY - minY), 1) });
-        }} className="btn p-1.5" title="Fit to content (1)">
+        }} className="btn p-1.5" title={t.ariaLabels.canvasFit}>
           <Maximize2 size={14} />
         </button>
         <span className="text-[10px] text-ink-dim font-mono px-2">{Math.round(viewport.zoom * 100)}%</span>
         <div className="w-px h-5 bg-line" />
         {selected.length > 0 && !readOnly && (
-          <button onClick={() => { selected.forEach((id) => deleteCanvasElement(id)); setSelected([]); }} className="btn p-1.5 text-err" title="Delete">
+          <button onClick={() => { selected.forEach((id) => deleteCanvasElement(id)); setSelected([]); }} className="btn p-1.5 text-err" title={t.ariaLabels.canvasDelete}>
             <Trash2 size={14} />
           </button>
         )}

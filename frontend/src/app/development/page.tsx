@@ -12,8 +12,10 @@ import { Hammer, Plus, Minus, Edit3, GitBranch, History, Shield } from "lucide-r
 import { CHANGESET_SM, type ChangeSetStatus } from "@/types/ids";
 import { StateMachineDiagram } from "@/components/StateMachineDiagram";
 import { useState } from "react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function DevelopmentPage() {
+  const { t } = useTranslation();
   const { changeSets, transitionChangeSet, worktrees, auditEvents } = useStore();
   const [tab, setTab] = useState<string>("changesets");
   const [selected, setSelected] = useState<string | null>("cs-003");
@@ -24,7 +26,7 @@ export default function DevelopmentPage() {
   return (
     <div className="max-w-7xl mx-auto">
       <PageHeader
-        title="Development"
+        title={t.pageTitles['/development'].title}
         subtitle="ChangeSets 代码变更、Worktree 沙箱与研发审计日志"
         icon={<Hammer className="text-accent" size={20} />}
         track="D"

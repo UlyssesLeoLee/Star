@@ -8,8 +8,10 @@ import { AGENT_SM, type AgentStatus } from "@/types/ids";
 import { StateMachineDiagram } from "@/components/StateMachineDiagram";
 import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
 import { useState } from "react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function AgentPage() {
+  const { t } = useTranslation();
   const { agentSessions, transitionAgent } = useStore();
   const [selected, setSelected] = useState<string | null>("ag-003");
   const ag = agentSessions.find((a) => a.id === selected);
@@ -21,7 +23,7 @@ export default function AgentPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Agent Sessions"
+        title={t.pageTitles['/agent'].title}
         subtitle="14 状态机 (§7.4) + INV-AGT-N01~N14。每个 session 绑 worktree + 1 种 agent kind + token/cost 预算。"
         icon={<Bot className="text-accent" size={20} />}
         track="B"

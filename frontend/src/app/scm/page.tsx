@@ -7,8 +7,10 @@ import { GitFork, GitPullRequest } from "lucide-react";
 import { PR_SM, type PullRequestStatus } from "@/types/ids";
 import { StateMachineDiagram } from "@/components/StateMachineDiagram";
 import { useState } from "react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function ScmPage() {
+  const { t } = useTranslation();
   const repos = useStore((s) => s.repositories);
   const prs = useStore((s) => s.pullRequests);
   const { transitionPR } = useStore();
@@ -19,7 +21,7 @@ export default function ScmPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="SCM"
+        title={t.pageTitles['/scm'].title}
         subtitle="Repository / Branch / Commit / PR + 7 状态机 (§7.5) + Webhook Idempotency-Key。SCM 是 ACL 边界,所有 git 操作经 domain-scm。"
         icon={<GitFork className="text-accent" size={20} />}
         track="C"

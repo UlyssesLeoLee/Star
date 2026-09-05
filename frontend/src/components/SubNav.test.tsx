@@ -15,6 +15,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { SubNav, type SubNavItem } from "./SubNav";
+import { I18nProvider } from "@/lib/i18n";
+
+const renderWithI18n = (ui: React.ReactElement) =>
+  render(<I18nProvider>{ui}</I18nProvider>);
 
 // ---- mock next/navigation ----
 const mockPathname = vi.fn(() => "/issues");
@@ -40,7 +44,7 @@ describe("SubNav (U2)", () => {
 
   // ---- Test 1: 渲染所有 items ----
   it("renders all items with label", () => {
-    render(<SubNav items={items} activeId="kanban" />);
+    renderWithI18n(<SubNav items={items} activeId="kanban" />);
     // 4 个 item 全部渲染
     for (const item of items) {
       const el = screen.getByTestId(`subnav-item-${item.id}`);
@@ -55,7 +59,7 @@ describe("SubNav (U2)", () => {
 
   // ---- Test 2: active 状态 (per 2026-09-02 16:13 JST Jira 风格扩展) ----
   it("applies category-colored active styling (default category=core → cyan-500)", () => {
-    render(<SubNav items={items} activeId="list" />);
+    renderWithI18n(<SubNav items={items} activeId="list" />);
     const active = screen.getByTestId("subnav-item-list");
     const inactive = screen.getByTestId("subnav-item-kanban");
 
@@ -74,7 +78,7 @@ describe("SubNav (U2)", () => {
 
   // ---- Test 2b: 显式 category prop 切换域色 ----
   it("applies work-category styling (blue-500) when category=work is passed", () => {
-    render(<SubNav items={items} activeId="list" category="work" />);
+    renderWithI18n(<SubNav items={items} activeId="list" category="work" />);
     const active = screen.getByTestId("subnav-item-list");
     expect(active.className).toMatch(/bg-blue-500\/20/);
     expect(active.className).toMatch(/border-blue-500\/50/);
@@ -91,19 +95,19 @@ describe("SubNav (U2)", () => {
   ];
 
   it("per-item: kanban (category=work) → blue-500 active", () => {
-    render(<SubNav items={perItemItems} activeId="kanban" />);
+    renderWithI18n(<SubNav items={perItemItems} activeId="kanban" />);
     expect(screen.getByTestId("subnav-item-kanban").className).toMatch(/bg-blue-500\/20/);
   });
   it("per-item: list (category=agent) → emerald-500 active", () => {
-    render(<SubNav items={perItemItems} activeId="list" />);
+    renderWithI18n(<SubNav items={perItemItems} activeId="list" />);
     expect(screen.getByTestId("subnav-item-list").className).toMatch(/bg-emerald-500\/20/);
   });
   it("per-item: tree (category=integration) → violet-500 active", () => {
-    render(<SubNav items={perItemItems} activeId="tree" />);
+    renderWithI18n(<SubNav items={perItemItems} activeId="tree" />);
     expect(screen.getByTestId("subnav-item-tree").className).toMatch(/bg-violet-500\/20/);
   });
   it("per-item: sprint (category=system) → amber-500 active", () => {
-    render(<SubNav items={perItemItems} activeId="sprint" />);
+    renderWithI18n(<SubNav items={perItemItems} activeId="sprint" />);
     expect(screen.getByTestId("subnav-item-sprint").className).toMatch(/bg-amber-500\/20/);
   });
 
@@ -113,7 +117,7 @@ describe("SubNav (U2)", () => {
       { id: "a", label: "A", href: "/x?a=1" },
       { id: "b", label: "B", href: "/x?b=2" },
     ];
-    render(<SubNav items={itemsNoCategory} activeId="a" category="system" />);
+    renderWithI18n(<SubNav items={itemsNoCategory} activeId="a" category="system" />);
     const a = screen.getByTestId("subnav-item-a");
     // fallback 到 system 域色: amber
     expect(a.className).toMatch(/bg-amber-500\/20/);
@@ -121,7 +125,7 @@ describe("SubNav (U2)", () => {
 
   // ---- Test 3: count badge 显示 ----
   it("renders count badge when item.count is defined, hides when undefined", () => {
-    render(<SubNav items={items} activeId="kanban" />);
+    renderWithI18n(<SubNav items={items} activeId="kanban" />);
 
     // list count=30, sprint count=4 — 应该有 count badge
     expect(screen.getByTestId("subnav-count-list")).toBeTruthy();
@@ -136,7 +140,7 @@ describe("SubNav (U2)", () => {
 
   // ---- Test 4: 点击触发导航 (Link 行为) ----
   it("renders each item as an <a> link that navigates on click", () => {
-    render(<SubNav items={items} activeId="tree" />);
+    renderWithI18n(<SubNav items={items} activeId="tree" />);
     // 点击 list item — 默认 Next.js Link 行为 (测试中走 native navigation)
     const listItem = screen.getByTestId("subnav-item-list");
     expect(listItem.tagName.toLowerCase()).toBe("a");

@@ -384,12 +384,13 @@ function ProjectSwitcher({
   selectedId: string;
   onSelect: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   if (projects.length === 0) return null;
   return (
     <nav
       data-testid="refactor-project-switcher"
       role="tablist"
-      aria-label="project switcher"
+      aria-label={t.ariaLabels.projectSwitcher}
       className="flex flex-wrap items-center gap-1.5 mb-5"
     >
       {projects.map((p) => {

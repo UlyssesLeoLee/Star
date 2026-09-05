@@ -41,10 +41,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
 import { Bot, AlertTriangle, Maximize2, Zap, Sparkles, Map, RefreshCw, Settings } from "lucide-react";
 import type { PerkId } from "@/lib/agent-game/types";
+import { useTranslation } from "@/lib/i18n";
 
 type ViewMode = "canvas" | "roguelike" | "settings";
 
 export default function AgentViewPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -245,7 +247,7 @@ export default function AgentViewPage() {
     return (
       <div className="max-w-3xl">
         <PageHeader
-          title="Agent"
+          title={t.pageTitles['/agent-view'].title}
           subtitle="无限画布 + 当前工作 agent 筛选 + 拟人化游戏化 · 数据对应 kanban / worktree 视图"
           icon={<Bot className="text-accent" size={20} />}
           track="F"
@@ -265,7 +267,7 @@ export default function AgentViewPage() {
     return (
       <div className="max-w-3xl">
         <PageHeader
-          title="Agent"
+          title={t.pageTitles['/agent-view'].title}
           subtitle="无限画布 + 当前工作 agent 筛选 + 拟人化游戏化 · 数据对应 kanban / worktree 视图"
           icon={<Bot className="text-accent" size={20} />}
           track="F"

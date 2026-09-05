@@ -4,12 +4,14 @@ import { useStore } from "@/lib/store";
 import { ListPage } from "@/lib/page-builders";
 import { MessageSquare } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
+import { useTranslation } from "@/lib/i18n";
 
 export default function CommentPage() {
+  const { t } = useTranslation();
   const comments = useStore((s) => s.comments);
   return (
     <ListPage
-      title="Comments"
+      title={t.pageTitles['/comment'].title}
       subtitle="跨实体评论(支持 work_item / pr / context_packet / agent_session)。thread_root 用于嵌套回复,mentions 用于 @通知。"
       icon={<MessageSquare className="text-accent" size={20} />}
       track="D"

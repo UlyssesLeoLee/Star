@@ -1,0 +1,844 @@
+{
+  "page_titles": {
+    "/(app)/agents": {
+      "title": "Agents",
+      "subtitle": "agent / agent-session / lease / runtime (5 mock rows; 真实数据 P3)"
+    },
+    "/(app)/analytics": {
+      "title": "Analytics",
+      "subtitle": "日漫科技分析中心: 甘特图 / 燃尽图 / 成本趋势 / 速率 / 排行榜"
+    },
+    "/(app)/inbox": {
+      "title": "Inbox",
+      "subtitle": "notification / comment / audit (10 mock; 真实 notification service P3 缺口)"
+    },
+    "/(app)/issues": {
+      "title": "Issues"
+    },
+    "/(app)/settings": {
+      "title": "Settings",
+      "subtitle": "tenant / identity / permission / role / integration / scm (5 tabs; submit endpoint P3 缺口)"
+    },
+    "/agent": {
+      "title": "Agent Sessions",
+      "subtitle": "14 状态机 (§7.4) + INV-AGT-N01~N14。每个 session 绑 worktree + 1 种 agent kind + token/cost 预算。"
+    },
+    "/agent-view": {
+      "title": "Agent",
+      "subtitle": "无限画布 + 当前工作 agent 筛选 + 拟人化游戏化 · 数据对应 kanban / worktree 视图"
+    },
+    "/audit": {
+      "title": "Audit",
+      "subtitle": "Append-only hash chain + 9 AI 问题元数据 + cross-tenant 100% 审计。INV-AU-01~07 保证不可篡改。"
+    },
+    "/automation": {
+      "title": "Automation",
+      "subtitle": "Rule + Trigger + Condition(CEL) + Action + RuleExecutor。6 INV 保证可观测、可禁用、可审计。"
+    },
+    "/board": {
+      "title": "Board",
+      "subtitle": "Kanban 视图 + 拖动 transition + 多人协同 (2s polling)。每列定义 status + 可选 wip_limit;超限时高亮。"
+    },
+    "/collaboration": {
+      "title": "Collaboration",
+      "subtitle": "无限画布(Miro 模式)与实时协作入口。每个 canvas 可关联 Worktree / WorkItem / Project,跨 25 module 双向联动。"
+    },
+    "/context": {
+      "title": "Context",
+      "subtitle": "ContextPacket (5 字段: priority/kind/payload/provenance/decision) + Decision (3 状态) + INV-CT-01~10。token 预算决定单次 session 可加载量。"
+    },
+    "/development": {
+      "title": "Development",
+      "subtitle": "ChangeSets 代码变更、Worktree 沙箱与研发审计日志"
+    },
+    "/feedback": {
+      "title": "Feedback Inbox",
+      "subtitle": "6 状态机 (§7.3) + INV-FB-01~02。Agent 在执行中向人类发问；人类 answer 后回到 agent 上下文。"
+    },
+    "/identity": {
+      "title": "Identity & Access",
+      "subtitle": "统一身份认证、权限矩阵与多租户工作空间管理"
+    },
+    "/integration": {
+      "title": "Integrations",
+      "subtitle": "外部服务适配器 (GitHub / GitLab / Jira / Slack / Lark / Linear / Webhook)。loop_protection_key 防止 webhook 风暴。"
+    },
+    "/local-runtime": {
+      "title": "Local Runtime",
+      "subtitle": "开发机上的执行环境。device/tenant/user 三重绑定(§23.2)。policy_violations 触发审计事件。"
+    },
+    "/notification": {
+      "title": "Notifications",
+      "subtitle": "Inbox + Email + IM 渠道。INV-N-07 抑制策略:同 actor 60min 内同 kind 第 2 次自动 suppress(写入 audit)。"
+    },
+    "/permission": {
+      "title": "Permission",
+      "subtitle": "Rules-based RBAC。scheme 可绑定 project;rule 定义 (resource_kind, action, role, effect, condition CEL)。"
+    },
+    "/planning": {
+      "title": "Planning",
+      "subtitle": "Sprint 冲刺管理、排期日历与项目里程碑规划（甘特图与燃尽图已归入图表中心）"
+    },
+    "frontend/src/app/projects/ProjectsClient.tsx": {
+      "title": "Projects",
+      "subtitle": "多面板项目工作区 — Kanban / Timeline / Backlog / Agents / Worktrees 5 tab 聚合 (per 2026-08-29 22:49 JST 拍板)。"
+    },
+    "/relation": {
+      "title": "Relation",
+      "subtitle": "跨实体关系图(blocks / duplicates / relates_to / parent_of / cloned_from)。BFS 5 层 + 2 层 prefetch buffer。"
+    },
+    "/remote": {
+      "title": "远程控制",
+      "subtitle": "手机端直连 local-runtime, 三件套: 远程桌面 (noVNC) / 远程终端 (xterm.js) / 远程文件 (SFTP)"
+    },
+    "/scm": {
+      "title": "SCM",
+      "subtitle": "Repository / Branch / Commit / PR + 7 状态机 (§7.5) + Webhook Idempotency-Key。SCM 是 ACL 边界,所有 git 操作经 domain-scm。"
+    },
+    "/search": {
+      "title": "Search",
+      "subtitle": "Projection + tenant 隔离 (INV-SR-01/02)。index 不作为业务事实源(§12 REQ-SEARCH-001)。"
+    },
+    "/validation": {
+      "title": "Validation",
+      "subtitle": "7 实体 + 5 状态机(pass/fail/skipped/feedback_required/pending) + AcceptanceCoveragePort。"
+    },
+    "/workflow": {
+      "title": "Workflows",
+      "subtitle": "状态机配置:每个 project 可绑定一个 workflow。state.category 决定 work-item status 字段;transition.trigger + guard(CEL) 控制迁移。"
+    },
+    "/worktree": {
+      "title": "Worktree",
+      "subtitle": "17 状态机 (§7.1) — INV-WT-01~04。每个 worktree 是 git checkout 的隔离副本,绑定 local-runtime + agent-session + PR。"
+    }
+  },
+  "aria_labels": {
+    "frontend/src/app/(app)/agent-windows/page.tsx::title::2469": {
+      "file": "frontend/src/app/(app)/agent-windows/page.tsx",
+      "attr": "title",
+      "value": "Agent Windows"
+    },
+    "frontend/src/app/(app)/agents/page.tsx::title::1517": {
+      "file": "frontend/src/app/(app)/agents/page.tsx",
+      "attr": "title",
+      "value": "Agents"
+    },
+    "frontend/src/app/(app)/agents/page.tsx::title::1543": {
+      "file": "frontend/src/app/(app)/agents/page.tsx",
+      "attr": "title",
+      "value": "agent / agent-session / lease / runtime (5 mock rows; 真实数据 P3)"
+    },
+    "frontend/src/app/(app)/analytics/page.tsx::aria-label::1546": {
+      "file": "frontend/src/app/(app)/analytics/page.tsx",
+      "attr": "aria-label",
+      "value": "Cost trend (mock)"
+    },
+    "frontend/src/app/(app)/analytics/page.tsx::title::5434": {
+      "file": "frontend/src/app/(app)/analytics/page.tsx",
+      "attr": "title",
+      "value": "Analytics"
+    },
+    "frontend/src/app/(app)/inbox/page.tsx::title::2308": {
+      "file": "frontend/src/app/(app)/inbox/page.tsx",
+      "attr": "title",
+      "value": "Inbox"
+    },
+    "frontend/src/app/(app)/inbox/page.tsx::title::2333": {
+      "file": "frontend/src/app/(app)/inbox/page.tsx",
+      "attr": "title",
+      "value": "notification / comment / audit (10 mock; 真实 notification service P3 缺口)"
+    },
+    "frontend/src/app/(app)/issues/page.tsx::title::7708": {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "attr": "title",
+      "value": "Issues"
+    },
+    "frontend/src/app/(app)/issues/page.tsx::aria-label::8228": {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "attr": "aria-label",
+      "value": "Issue view tabs"
+    },
+    "frontend/src/app/(app)/issues/page.tsx::aria-label::9568": {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "attr": "aria-label",
+      "value": "Toggle search"
+    },
+    "frontend/src/app/(app)/issues/page.tsx::aria-label::9934": {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "attr": "aria-label",
+      "value": "Create new issue"
+    },
+    "frontend/src/app/(app)/issues/page.tsx::placeholder::10933": {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "attr": "placeholder",
+      "value": "Issue title (stub)"
+    },
+    "frontend/src/app/(app)/issues/page.tsx::aria-label::11351": {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "attr": "aria-label",
+      "value": "Dismiss new issue"
+    },
+    "frontend/src/app/(app)/issues/page.tsx::aria-label::14180": {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "attr": "aria-label",
+      "value": "Issue detail"
+    },
+    "frontend/src/app/(app)/issues/page.tsx::aria-label::26169": {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "attr": "aria-label",
+      "value": "Close detail"
+    },
+    "frontend/src/app/(app)/settings/api-keys/page.tsx::title::2319": {
+      "file": "frontend/src/app/(app)/settings/api-keys/page.tsx",
+      "attr": "title",
+      "value": "API Keys"
+    },
+    "frontend/src/app/(app)/settings/api-keys/page.tsx::placeholder::5142": {
+      "file": "frontend/src/app/(app)/settings/api-keys/page.tsx",
+      "attr": "placeholder",
+      "value": "Primary / Backup / Staging"
+    },
+    "frontend/src/app/(app)/settings/cli-profiles/page.tsx::title::2103": {
+      "file": "frontend/src/app/(app)/settings/cli-profiles/page.tsx",
+      "attr": "title",
+      "value": "CLI Profiles"
+    },
+    "frontend/src/app/(app)/settings/cli-profiles/page.tsx::title::4577": {
+      "file": "frontend/src/app/(app)/settings/cli-profiles/page.tsx",
+      "attr": "title",
+      "value": "已配置 API Key"
+    },
+    "frontend/src/app/(app)/settings/cli-profiles/page.tsx::title::4673": {
+      "file": "frontend/src/app/(app)/settings/cli-profiles/page.tsx",
+      "attr": "title",
+      "value": "未配置 API Key"
+    },
+    "frontend/src/app/(app)/settings/credentials/page.tsx::title::2416": {
+      "file": "frontend/src/app/(app)/settings/credentials/page.tsx",
+      "attr": "title",
+      "value": "凭证管理 (Credentials)"
+    },
+    "frontend/src/app/(app)/settings/credentials/page.tsx::placeholder::7209": {
+      "file": "frontend/src/app/(app)/settings/credentials/page.tsx",
+      "attr": "placeholder",
+      "value": "显示名 (e.g. 我的 OpenClaw 账号)"
+    },
+    "frontend/src/app/(app)/settings/credentials/page.tsx::placeholder::7572": {
+      "file": "frontend/src/app/(app)/settings/credentials/page.tsx",
+      "attr": "placeholder",
+      "value": "描述 (e.g. 用于 LangGraph sub-agent 派发)"
+    },
+    "frontend/src/app/(app)/settings/credentials/page.tsx::placeholder::7943": {
+      "file": "frontend/src/app/(app)/settings/credentials/page.tsx",
+      "attr": "placeholder",
+      "value": "Base URL (可选, e.g. https://api.openclaw.example.com/v1)"
+    },
+    "frontend/src/app/(app)/settings/credentials/page.tsx::placeholder::8332": {
+      "file": "frontend/src/app/(app)/settings/credentials/page.tsx",
+      "attr": "placeholder",
+      "value": "API Key / Token (TLS 加密传输, 后端 KMS 加密存储)"
+    },
+    "frontend/src/app/(app)/settings/credentials/page.tsx::placeholder::10299": {
+      "file": "frontend/src/app/(app)/settings/credentials/page.tsx",
+      "attr": "placeholder",
+      "value": "新 Secret"
+    },
+    "frontend/src/app/(app)/settings/page.tsx::title::3255": {
+      "file": "frontend/src/app/(app)/settings/page.tsx",
+      "attr": "title",
+      "value": "Settings"
+    },
+    "frontend/src/app/(app)/settings/page.tsx::title::3283": {
+      "file": "frontend/src/app/(app)/settings/page.tsx",
+      "attr": "title",
+      "value": "tenant / identity / permission / role / integration / scm (5 tabs; submit endpoint P3 缺口)"
+    },
+    "frontend/src/app/agent/page.tsx::title::1051": {
+      "file": "frontend/src/app/agent/page.tsx",
+      "attr": "title",
+      "value": "Agent Sessions"
+    },
+    "frontend/src/app/agent/page.tsx::title::1085": {
+      "file": "frontend/src/app/agent/page.tsx",
+      "attr": "title",
+      "value": "14 状态机 (§7.4) + INV-AGT-N01~N14。每个 session 绑 worktree + 1 种 agent kind + token/cost 预算。"
+    },
+    "frontend/src/app/agent-view/page.tsx::title::8820": {
+      "file": "frontend/src/app/agent-view/page.tsx",
+      "attr": "title",
+      "value": "Agent"
+    },
+    "frontend/src/app/agent-view/page.tsx::title::9545": {
+      "file": "frontend/src/app/agent-view/page.tsx",
+      "attr": "title",
+      "value": "Agent"
+    },
+    "frontend/src/app/agent-view/page.tsx::title::12298": {
+      "file": "frontend/src/app/agent-view/page.tsx",
+      "attr": "title",
+      "value": "在 Kanban Board 视图查看关联 work-items"
+    },
+    "frontend/src/app/audit/page.tsx::title::949": {
+      "file": "frontend/src/app/audit/page.tsx",
+      "attr": "title",
+      "value": "Audit"
+    },
+    "frontend/src/app/audit/page.tsx::title::974": {
+      "file": "frontend/src/app/audit/page.tsx",
+      "attr": "title",
+      "value": "Append-only hash chain + 9 AI 问题元数据 + cross-tenant 100% 审计。INV-AU-01~07 保证不可篡改。"
+    },
+    "frontend/src/app/automation/page.tsx::title::932": {
+      "file": "frontend/src/app/automation/page.tsx",
+      "attr": "title",
+      "value": "Automation"
+    },
+    "frontend/src/app/automation/page.tsx::title::962": {
+      "file": "frontend/src/app/automation/page.tsx",
+      "attr": "title",
+      "value": "Rule + Trigger + Condition(CEL) + Action + RuleExecutor。6 INV 保证可观测、可禁用、可审计。"
+    },
+    "frontend/src/app/board/page.tsx::title::6106": {
+      "file": "frontend/src/app/board/page.tsx",
+      "attr": "title",
+      "value": "Board"
+    },
+    "frontend/src/app/board/page.tsx::title::6131": {
+      "file": "frontend/src/app/board/page.tsx",
+      "attr": "title",
+      "value": "Kanban 视图 + 拖动 transition + 多人协同 (2s polling)。每列定义 status + 可选 wip_limit;超限时高亮。"
+    },
+    "frontend/src/app/canvas/[id]/page.tsx::title::3824": {
+      "file": "frontend/src/app/canvas/[id]/page.tsx",
+      "attr": "title",
+      "value": "Back"
+    },
+    "frontend/src/app/chrono-vibe/page.tsx::title::19826": {
+      "file": "frontend/src/app/chrono-vibe/page.tsx",
+      "attr": "title",
+      "value": "WT: Active Sync"
+    },
+    "frontend/src/app/chrono-vibe/page.tsx::title::21540": {
+      "file": "frontend/src/app/chrono-vibe/page.tsx",
+      "attr": "title",
+      "value": "Agent: Invariants Hold"
+    },
+    "frontend/src/app/chrono-vibe/page.tsx::title::23266": {
+      "file": "frontend/src/app/chrono-vibe/page.tsx",
+      "attr": "title",
+      "value": "Saga: Idempotent Loop"
+    },
+    "frontend/src/app/collaboration/page.tsx::title::1621": {
+      "file": "frontend/src/app/collaboration/page.tsx",
+      "attr": "title",
+      "value": "Collaboration"
+    },
+    "frontend/src/app/collaboration/page.tsx::title::1654": {
+      "file": "frontend/src/app/collaboration/page.tsx",
+      "attr": "title",
+      "value": "无限画布(Miro 模式)与实时协作入口。每个 canvas 可关联 Worktree / WorkItem / Project,跨 25 module 双向联动。"
+    },
+    "frontend/src/app/comment/page.tsx::title::323": {
+      "file": "frontend/src/app/comment/page.tsx",
+      "attr": "title",
+      "value": "Comments"
+    },
+    "frontend/src/app/context/page.tsx::title::883": {
+      "file": "frontend/src/app/context/page.tsx",
+      "attr": "title",
+      "value": "Context"
+    },
+    "frontend/src/app/context/page.tsx::title::910": {
+      "file": "frontend/src/app/context/page.tsx",
+      "attr": "title",
+      "value": "ContextPacket (5 字段: priority/kind/payload/provenance/decision) + Decision (3 状态) + INV-CT-01~10。token 预算决定单次 session 可加载量。"
+    },
+    "frontend/src/app/development/page.tsx::title::1311": {
+      "file": "frontend/src/app/development/page.tsx",
+      "attr": "title",
+      "value": "Development"
+    },
+    "frontend/src/app/development/page.tsx::title::1342": {
+      "file": "frontend/src/app/development/page.tsx",
+      "attr": "title",
+      "value": "ChangeSets 代码变更、Worktree 沙箱与研发审计日志"
+    },
+    "frontend/src/app/feedback/page.tsx::title::2356": {
+      "file": "frontend/src/app/feedback/page.tsx",
+      "attr": "title",
+      "value": "Feedback Inbox"
+    },
+    "frontend/src/app/feedback/page.tsx::title::2390": {
+      "file": "frontend/src/app/feedback/page.tsx",
+      "attr": "title",
+      "value": "6 状态机 (§7.3) + INV-FB-01~02。Agent 在执行中向人类发问；人类 answer 后回到 agent 上下文。"
+    },
+    "frontend/src/app/identity/page.tsx::title::894": {
+      "file": "frontend/src/app/identity/page.tsx",
+      "attr": "title",
+      "value": "Identity & Access"
+    },
+    "frontend/src/app/integration/page.tsx::title::394": {
+      "file": "frontend/src/app/integration/page.tsx",
+      "attr": "title",
+      "value": "Integrations"
+    },
+    "frontend/src/app/integration/page.tsx::title::426": {
+      "file": "frontend/src/app/integration/page.tsx",
+      "attr": "title",
+      "value": "外部服务适配器 (GitHub / GitLab / Jira / Slack / Lark / Linear / Webhook)。loop_protection_key 防止 webhook 风暴。"
+    },
+    "frontend/src/app/local-runtime/page.tsx::title::400": {
+      "file": "frontend/src/app/local-runtime/page.tsx",
+      "attr": "title",
+      "value": "Local Runtime"
+    },
+    "frontend/src/app/notification/page.tsx::title::723": {
+      "file": "frontend/src/app/notification/page.tsx",
+      "attr": "title",
+      "value": "Notifications"
+    },
+    "frontend/src/app/notification/page.tsx::title::756": {
+      "file": "frontend/src/app/notification/page.tsx",
+      "attr": "title",
+      "value": "Inbox + Email + IM 渠道。INV-N-07 抑制策略:同 actor 60min 内同 kind 第 2 次自动 suppress(写入 audit)。"
+    },
+    "frontend/src/app/permission/page.tsx::title::443": {
+      "file": "frontend/src/app/permission/page.tsx",
+      "attr": "title",
+      "value": "Permission"
+    },
+    "frontend/src/app/permission/page.tsx::title::473": {
+      "file": "frontend/src/app/permission/page.tsx",
+      "attr": "title",
+      "value": "Rules-based RBAC。scheme 可绑定 project;rule 定义 (resource_kind, action, role, effect, condition CEL)。"
+    },
+    "frontend/src/app/planning/page.tsx::title::2570": {
+      "file": "frontend/src/app/planning/page.tsx",
+      "attr": "title",
+      "value": "Planning"
+    },
+    "frontend/src/app/planning/page.tsx::title::2598": {
+      "file": "frontend/src/app/planning/page.tsx",
+      "attr": "title",
+      "value": "Sprint 冲刺管理、排期日历与项目里程碑规划（甘特图与燃尽图已归入图表中心）"
+    },
+    "frontend/src/app/project/page.tsx::title::320": {
+      "file": "frontend/src/app/project/page.tsx",
+      "attr": "title",
+      "value": "Projects"
+    },
+    "frontend/src/app/projects/ProjectsClient.tsx::title::17194": {
+      "file": "frontend/src/app/projects/ProjectsClient.tsx",
+      "attr": "title",
+      "value": "Projects"
+    },
+    "frontend/src/app/projects/ProjectsClient.tsx::title::17290": {
+      "file": "frontend/src/app/projects/ProjectsClient.tsx",
+      "attr": "title",
+      "value": "(no projects available)"
+    },
+    "frontend/src/app/projects/ProjectsClient.tsx::title::17455": {
+      "file": "frontend/src/app/projects/ProjectsClient.tsx",
+      "attr": "title",
+      "value": "Projects"
+    },
+    "frontend/src/app/projects/ProjectsClient.tsx::title::17483": {
+      "file": "frontend/src/app/projects/ProjectsClient.tsx",
+      "attr": "title",
+      "value": "多面板项目工作区 — Kanban / Timeline / Backlog / Agents / Worktrees 5 tab 聚合 (per 2026-08-29 22:49 JST 拍板)。"
+    },
+    "frontend/src/app/projects/ProjectsClient.tsx::aria-label::28441": {
+      "file": "frontend/src/app/projects/ProjectsClient.tsx",
+      "attr": "aria-label",
+      "value": "Project switcher"
+    },
+    "frontend/src/app/refactor/page.tsx::aria-label::15400": {
+      "file": "frontend/src/app/refactor/page.tsx",
+      "attr": "aria-label",
+      "value": "project switcher"
+    },
+    "frontend/src/app/relation/page.tsx::title::878": {
+      "file": "frontend/src/app/relation/page.tsx",
+      "attr": "title",
+      "value": "Relation"
+    },
+    "frontend/src/app/relation/page.tsx::title::906": {
+      "file": "frontend/src/app/relation/page.tsx",
+      "attr": "title",
+      "value": "跨实体关系图(blocks / duplicates / relates_to / parent_of / cloned_from)。BFS 5 层 + 2 层 prefetch buffer。"
+    },
+    "frontend/src/app/remote/desktop/[id]/page.tsx::aria-label::1069": {
+      "file": "frontend/src/app/remote/desktop/[id]/page.tsx",
+      "attr": "aria-label",
+      "value": "Back"
+    },
+    "frontend/src/app/remote/files/[id]/page.tsx::aria-label::1063": {
+      "file": "frontend/src/app/remote/files/[id]/page.tsx",
+      "attr": "aria-label",
+      "value": "Back"
+    },
+    "frontend/src/app/remote/terminal/[id]/page.tsx::aria-label::1072": {
+      "file": "frontend/src/app/remote/terminal/[id]/page.tsx",
+      "attr": "aria-label",
+      "value": "Back"
+    },
+    "frontend/src/app/scm/page.tsx::title::883": {
+      "file": "frontend/src/app/scm/page.tsx",
+      "attr": "title",
+      "value": "Repository / Branch / Commit / PR + 7 状态机 (§7.5) + Webhook Idempotency-Key。SCM 是 ACL 边界,所有 git 操作经 domain-scm。"
+    },
+    "frontend/src/app/search/page.tsx::title::601": {
+      "file": "frontend/src/app/search/page.tsx",
+      "attr": "title",
+      "value": "Search"
+    },
+    "frontend/src/app/search/page.tsx::title::627": {
+      "file": "frontend/src/app/search/page.tsx",
+      "attr": "title",
+      "value": "Projection + tenant 隔离 (INV-SR-01/02)。index 不作为业务事实源(§12 REQ-SEARCH-001)。"
+    },
+    "frontend/src/app/search/page.tsx::placeholder::1094": {
+      "file": "frontend/src/app/search/page.tsx",
+      "attr": "placeholder",
+      "value": "Search across work-items, worktrees, feedback, agent sessions..."
+    },
+    "frontend/src/app/tenant/page.tsx::title::316": {
+      "file": "frontend/src/app/tenant/page.tsx",
+      "attr": "title",
+      "value": "Tenants"
+    },
+    "frontend/src/app/validation/page.tsx::title::733": {
+      "file": "frontend/src/app/validation/page.tsx",
+      "attr": "title",
+      "value": "Validation"
+    },
+    "frontend/src/app/validation/page.tsx::title::763": {
+      "file": "frontend/src/app/validation/page.tsx",
+      "attr": "title",
+      "value": "7 实体 + 5 状态机(pass/fail/skipped/feedback_required/pending) + AcceptanceCoveragePort。"
+    },
+    "frontend/src/app/workflow/page.tsx::title::391": {
+      "file": "frontend/src/app/workflow/page.tsx",
+      "attr": "title",
+      "value": "Workflows"
+    },
+    "frontend/src/app/workflow/page.tsx::title::420": {
+      "file": "frontend/src/app/workflow/page.tsx",
+      "attr": "title",
+      "value": "状态机配置:每个 project 可绑定一个 workflow。state.category 决定 work-item status 字段;transition.trigger + guard(CEL) 控制迁移。"
+    },
+    "frontend/src/app/workspace/page.tsx::title::325": {
+      "file": "frontend/src/app/workspace/page.tsx",
+      "attr": "title",
+      "value": "Workspaces"
+    },
+    "frontend/src/app/workspace/page.tsx::title::353": {
+      "file": "frontend/src/app/workspace/page.tsx",
+      "attr": "title",
+      "value": "Workspace + Member 模型。default_branch_policy 决定 PR 合并策略(fast-forward-only / allow-non-ff)。"
+    },
+    "frontend/src/app/worktree/page.tsx::title::924": {
+      "file": "frontend/src/app/worktree/page.tsx",
+      "attr": "title",
+      "value": "Worktree"
+    },
+    "frontend/src/app/worktree/page.tsx::title::952": {
+      "file": "frontend/src/app/worktree/page.tsx",
+      "attr": "title",
+      "value": "17 状态机 (§7.1) — INV-WT-01~04。每个 worktree 是 git checkout 的隔离副本,绑定 local-runtime + agent-session + PR。"
+    },
+    "frontend/src/app/worktree/page.tsx::title::5000": {
+      "file": "frontend/src/app/worktree/page.tsx",
+      "attr": "title",
+      "value": "在 Miro 模式画布中查看 worktree node 状态(双击可跳回)"
+    },
+    "frontend/src/components/agent-view/AgentCanvasView.tsx::title::16900": {
+      "file": "frontend/src/components/agent-view/AgentCanvasView.tsx",
+      "attr": "title",
+      "value": "Select (V)"
+    },
+    "frontend/src/components/agent-view/AgentCanvasView.tsx::title::17100": {
+      "file": "frontend/src/components/agent-view/AgentCanvasView.tsx",
+      "attr": "title",
+      "value": "Pan (H)"
+    },
+    "frontend/src/components/agent-view/AgentCanvasView.tsx::title::17327": {
+      "file": "frontend/src/components/agent-view/AgentCanvasView.tsx",
+      "attr": "title",
+      "value": "Zoom in (+)"
+    },
+    "frontend/src/components/agent-view/AgentCanvasView.tsx::title::17517": {
+      "file": "frontend/src/components/agent-view/AgentCanvasView.tsx",
+      "attr": "title",
+      "value": "Zoom out (-)"
+    },
+    "frontend/src/components/agent-view/AgentCanvasView.tsx::title::17672": {
+      "file": "frontend/src/components/agent-view/AgentCanvasView.tsx",
+      "attr": "title",
+      "value": "Fit to content (1)"
+    },
+    "frontend/src/components/agent-view/AgentFilter.tsx::title::2944": {
+      "file": "frontend/src/components/agent-view/AgentFilter.tsx",
+      "attr": "title",
+      "value": "Auto-selected as the most recently active agent"
+    },
+    "frontend/src/components/agent-windows/CliTerminal.tsx::placeholder::4241": {
+      "file": "frontend/src/components/agent-windows/CliTerminal.tsx",
+      "attr": "placeholder",
+      "value": "输入 prompt (Cmd/Ctrl + Enter 运行)..."
+    },
+    "frontend/src/components/agent-windows/WindowsTabBar.tsx::aria-label::3428": {
+      "file": "frontend/src/components/agent-windows/WindowsTabBar.tsx",
+      "attr": "aria-label",
+      "value": "new tab"
+    },
+    "frontend/src/components/AppHeader.tsx::aria-label::2731": {
+      "file": "frontend/src/components/AppHeader.tsx",
+      "attr": "aria-label",
+      "value": "Primary navigation"
+    },
+    "frontend/src/components/AppHeader.tsx::aria-label::3567": {
+      "file": "frontend/src/components/AppHeader.tsx",
+      "attr": "aria-label",
+      "value": "Settings"
+    },
+    "frontend/src/components/AppHeader.tsx::aria-label::4276": {
+      "file": "frontend/src/components/AppHeader.tsx",
+      "attr": "aria-label",
+      "value": "Open App Matrix (All Modules)"
+    },
+    "frontend/src/components/AppHeader.tsx::aria-label::5161": {
+      "file": "frontend/src/components/AppHeader.tsx",
+      "attr": "aria-label",
+      "value": "Open command bar (⌘K)"
+    },
+    "frontend/src/components/board/WorkItemDetailDrawer.tsx::placeholder::20086": {
+      "file": "frontend/src/components/board/WorkItemDetailDrawer.tsx",
+      "attr": "placeholder",
+      "value": "任务描述...&#10;(Phase 2+ 接 Markdown 编辑器)"
+    },
+    "frontend/src/components/board/WorkItemDetailDrawer.tsx::placeholder::22102": {
+      "file": "frontend/src/components/board/WorkItemDetailDrawer.tsx",
+      "attr": "placeholder",
+      "value": "加 label, Enter 提交"
+    },
+    "frontend/src/components/calendar/CalendarHeader.tsx::aria-label::2448": {
+      "file": "frontend/src/components/calendar/CalendarHeader.tsx",
+      "attr": "aria-label",
+      "value": "Calendar view"
+    },
+    "frontend/src/components/CanvasView.tsx::title::16546": {
+      "file": "frontend/src/components/CanvasView.tsx",
+      "attr": "title",
+      "value": "Select (V)"
+    },
+    "frontend/src/components/CanvasView.tsx::title::16746": {
+      "file": "frontend/src/components/CanvasView.tsx",
+      "attr": "title",
+      "value": "Pan (H)"
+    },
+    "frontend/src/components/CanvasView.tsx::title::16978": {
+      "file": "frontend/src/components/CanvasView.tsx",
+      "attr": "title",
+      "value": "Zoom in (+)"
+    },
+    "frontend/src/components/CanvasView.tsx::title::17173": {
+      "file": "frontend/src/components/CanvasView.tsx",
+      "attr": "title",
+      "value": "Zoom out (-)"
+    },
+    "frontend/src/components/CanvasView.tsx::title::17446": {
+      "file": "frontend/src/components/CanvasView.tsx",
+      "attr": "title",
+      "value": "Fit to content (1)"
+    },
+    "frontend/src/components/CanvasView.tsx::title::17863": {
+      "file": "frontend/src/components/CanvasView.tsx",
+      "attr": "title",
+      "value": "Delete"
+    },
+    "frontend/src/components/charts/shared/ChartFrame.tsx::aria-label::1918": {
+      "file": "frontend/src/components/charts/shared/ChartFrame.tsx",
+      "attr": "aria-label",
+      "value": "Export as CSV"
+    },
+    "frontend/src/components/charts/shared/ChartFrame.tsx::aria-label::2229": {
+      "file": "frontend/src/components/charts/shared/ChartFrame.tsx",
+      "attr": "aria-label",
+      "value": "Export as PNG"
+    },
+    "frontend/src/components/effects/Cel3DUI.tsx::aria-label::21514": {
+      "file": "frontend/src/components/effects/Cel3DUI.tsx",
+      "attr": "aria-label",
+      "value": "Tactical Rotary Dial"
+    },
+    "frontend/src/components/gantt/GanttChart.tsx::title::24217": {
+      "file": "frontend/src/components/gantt/GanttChart.tsx",
+      "attr": "title",
+      "value": "关闭 (Esc)"
+    },
+    "frontend/src/components/MobileBottomNav.tsx::aria-label::2011": {
+      "file": "frontend/src/components/MobileBottomNav.tsx",
+      "attr": "aria-label",
+      "value": "Mobile primary navigation"
+    },
+    "frontend/src/components/MobileBottomNav.tsx::aria-label::2891": {
+      "file": "frontend/src/components/MobileBottomNav.tsx",
+      "attr": "aria-label",
+      "value": "More navigation"
+    },
+    "frontend/src/components/MobileHeader.tsx::aria-label::1463": {
+      "file": "frontend/src/components/MobileHeader.tsx",
+      "attr": "aria-label",
+      "value": "Star home"
+    },
+    "frontend/src/components/MobileHeader.tsx::aria-label::2151": {
+      "file": "frontend/src/components/MobileHeader.tsx",
+      "attr": "aria-label",
+      "value": "Search (Cmd+K)"
+    },
+    "frontend/src/components/MobileHeader.tsx::aria-label::2418": {
+      "file": "frontend/src/components/MobileHeader.tsx",
+      "attr": "aria-label",
+      "value": "Notifications"
+    },
+    "frontend/src/components/MobileHeader.tsx::aria-label::2976": {
+      "file": "frontend/src/components/MobileHeader.tsx",
+      "attr": "aria-label",
+      "value": "Open App Matrix"
+    },
+    "frontend/src/components/PwaInstallPrompt.tsx::aria-label::2516": {
+      "file": "frontend/src/components/PwaInstallPrompt.tsx",
+      "attr": "aria-label",
+      "value": "Install Star App"
+    },
+    "frontend/src/components/PwaInstallPrompt.tsx::aria-label::5018": {
+      "file": "frontend/src/components/PwaInstallPrompt.tsx",
+      "attr": "aria-label",
+      "value": "Dismiss"
+    },
+    "frontend/src/components/PwaInstallPrompt.tsx::aria-label::6212": {
+      "file": "frontend/src/components/PwaInstallPrompt.tsx",
+      "attr": "aria-label",
+      "value": "Dismiss"
+    },
+    "frontend/src/components/PwaUpdateToast.tsx::aria-label::3051": {
+      "file": "frontend/src/components/PwaUpdateToast.tsx",
+      "attr": "aria-label",
+      "value": "Dismiss"
+    },
+    "frontend/src/components/refactor/AddRefactorCardsDialog.tsx::placeholder::3619": {
+      "file": "frontend/src/components/refactor/AddRefactorCardsDialog.tsx",
+      "attr": "placeholder",
+      "value": "filter by title / key / label..."
+    },
+    "frontend/src/components/refactor/AddRefactorColumnDialog.tsx::placeholder::5627": {
+      "file": "frontend/src/components/refactor/AddRefactorColumnDialog.tsx",
+      "attr": "placeholder",
+      "value": "显示名 (e.g. Spike 调研)"
+    },
+    "frontend/src/components/remote/FileBrowser.tsx::aria-label::7620": {
+      "file": "frontend/src/components/remote/FileBrowser.tsx",
+      "attr": "aria-label",
+      "value": "Home"
+    },
+    "frontend/src/components/remote/FileBrowser.tsx::aria-label::8300": {
+      "file": "frontend/src/components/remote/FileBrowser.tsx",
+      "attr": "aria-label",
+      "value": "Parent directory"
+    },
+    "frontend/src/components/remote/FileBrowser.tsx::title::11222": {
+      "file": "frontend/src/components/remote/FileBrowser.tsx",
+      "attr": "title",
+      "value": "Upload via WS write_req (待后端实装)"
+    },
+    "frontend/src/components/remote/NoVncViewer.tsx::aria-label::4036": {
+      "file": "frontend/src/components/remote/NoVncViewer.tsx",
+      "attr": "aria-label",
+      "value": "Toggle fullscreen"
+    },
+    "frontend/src/components/remote/NoVncViewer.tsx::aria-label::8380": {
+      "file": "frontend/src/components/remote/NoVncViewer.tsx",
+      "attr": "aria-label",
+      "value": "Zoom out"
+    },
+    "frontend/src/components/remote/NoVncViewer.tsx::aria-label::8899": {
+      "file": "frontend/src/components/remote/NoVncViewer.tsx",
+      "attr": "aria-label",
+      "value": "Zoom in"
+    },
+    "frontend/src/components/Sidebar.tsx::aria-label::5563": {
+      "file": "frontend/src/components/Sidebar.tsx",
+      "attr": "aria-label",
+      "value": "Star home"
+    },
+    "frontend/src/components/Sidebar.tsx::title::7493": {
+      "file": "frontend/src/components/Sidebar.tsx",
+      "attr": "title",
+      "value": "Tactical Link Active"
+    },
+    "frontend/src/components/Sidebar.tsx::aria-label::14126": {
+      "file": "frontend/src/components/Sidebar.tsx",
+      "attr": "aria-label",
+      "value": "Sidebar scope"
+    },
+    "frontend/src/components/SubNav.tsx::aria-label::2861": {
+      "file": "frontend/src/components/SubNav.tsx",
+      "attr": "aria-label",
+      "value": "Section navigation"
+    },
+    "frontend/src/components/SubNav.tsx::aria-label::3313": {
+      "file": "frontend/src/components/SubNav.tsx",
+      "attr": "aria-label",
+      "value": "Subnav items"
+    },
+    "frontend/src/components/theme/ThemeSwitcher.tsx::aria-label::1366": {
+      "file": "frontend/src/components/theme/ThemeSwitcher.tsx",
+      "attr": "aria-label",
+      "value": "loading theme"
+    },
+    "frontend/src/lib/page-builders.tsx::placeholder::1708": {
+      "file": "frontend/src/lib/page-builders.tsx",
+      "attr": "placeholder",
+      "value": "Filter..."
+    }
+  },
+  "placeholders": {},
+  "registry_labels": {
+    "inbox": "Inbox",
+    "issues": "Issues",
+    "projects": "Projects",
+    "agents": "Agents",
+    "analytics": "Analytics",
+    "settings": "Settings",
+    "remote": "Remote Control",
+    "kanban": "Kanban Board",
+    "timeline": "Timeline & Gantt",
+    "backlog": "Backlog",
+    "agent-windows": "Agent Windows",
+    "worktree": "Worktree Manager",
+    "validation": "Validation Test",
+    "context": "Context Graph",
+    "feedback": "Agent Feedback",
+    "agent-view": "Agent View",
+    "workflow": "Workflow Engine",
+    "development": "Development Hub",
+    "planning": "Planning Hub",
+    "scm": "SCM Provider",
+    "integration": "MCP Integrations",
+    "api-keys": "API Keys & Secrets",
+    "developer-console": "Developer Console",
+    "webhooks": "Webhooks",
+    "cli-profiles": "CLI Profiles",
+    "search": "Universal Search",
+    "local-runtime": "Local Runtime",
+    "audit": "Audit Log",
+    "automation": "Automation Triggers",
+    "relation": "Entity Relations",
+    "permission": "RBAC Permissions",
+    "identity": "Identity & Members",
+    "tenant": "Tenant Admin",
+    "refactor": "Refactor Sweep"
+  }
+}

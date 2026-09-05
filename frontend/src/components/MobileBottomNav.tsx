@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "@/lib/i18n";
 
 interface NavItem {
   id: string;
@@ -62,6 +63,7 @@ const ITEMS: NavItem[] = [
 ];
 
 export function MobileBottomNav() {
+  const { t } = useTranslation();
   const pathname = usePathname() ?? "/";
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -83,7 +85,7 @@ export function MobileBottomNav() {
     <>
       <nav
         data-testid="mobile-bottom-nav"
-        aria-label="Mobile primary navigation"
+        aria-label={t.ariaLabels.mobilePrimaryNav}
         className="md:hidden fixed bottom-0 inset-x-0 border-t border-line bg-bg/95 backdrop-blur-xl"
         style={{ paddingBottom: "env(safe-area-inset-bottom)", zIndex: 9999 }}
       >
@@ -100,7 +102,7 @@ export function MobileBottomNav() {
                     onClick={() => setMoreOpen(true)}
                     data-testid={`mobile-nav-${item.id}`}
                     className="w-full h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-ink-dim hover:text-ink transition-colors"
-                    aria-label="More navigation"
+                    aria-label={t.ariaLabels.moreNav}
                   >
                     <Icon size={18} />
                     <span>{item.label}</span>

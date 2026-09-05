@@ -1,0 +1,1240 @@
+{
+  "component_hardcoded": [
+    {
+      "file": "frontend/src/components/AppHeader.tsx",
+      "line": 66,
+      "attr": "aria-label",
+      "value": "Primary navigation"
+    },
+    {
+      "file": "frontend/src/components/AppHeader.tsx",
+      "line": 91,
+      "attr": "aria-label",
+      "value": "Settings"
+    },
+    {
+      "file": "frontend/src/components/AppHeader.tsx",
+      "line": 108,
+      "attr": "aria-label",
+      "value": "Open App Matrix (All Modules)"
+    },
+    {
+      "file": "frontend/src/components/AppHeader.tsx",
+      "line": 122,
+      "attr": "aria-label",
+      "value": "Open command bar (鈱楰)"
+    },
+    {
+      "file": "frontend/src/components/CanvasView.tsx",
+      "line": 375,
+      "attr": "title",
+      "value": "Select (V)"
+    },
+    {
+      "file": "frontend/src/components/CanvasView.tsx",
+      "line": 378,
+      "attr": "title",
+      "value": "Pan (H)"
+    },
+    {
+      "file": "frontend/src/components/CanvasView.tsx",
+      "line": 382,
+      "attr": "title",
+      "value": "Zoom in (+)"
+    },
+    {
+      "file": "frontend/src/components/CanvasView.tsx",
+      "line": 385,
+      "attr": "title",
+      "value": "Zoom out (-)"
+    },
+    {
+      "file": "frontend/src/components/CanvasView.tsx",
+      "line": 391,
+      "attr": "title",
+      "value": "Fit to content (1)"
+    },
+    {
+      "file": "frontend/src/components/CanvasView.tsx",
+      "line": 397,
+      "attr": "title",
+      "value": "Delete"
+    },
+    {
+      "file": "frontend/src/components/MobileBottomNav.tsx",
+      "line": 86,
+      "attr": "aria-label",
+      "value": "Mobile primary navigation"
+    },
+    {
+      "file": "frontend/src/components/MobileBottomNav.tsx",
+      "line": 103,
+      "attr": "aria-label",
+      "value": "More navigation"
+    },
+    {
+      "file": "frontend/src/components/MobileHeader.tsx",
+      "line": 42,
+      "attr": "aria-label",
+      "value": "Star home"
+    },
+    {
+      "file": "frontend/src/components/MobileHeader.tsx",
+      "line": 64,
+      "attr": "aria-label",
+      "value": "Search (Cmd+K)"
+    },
+    {
+      "file": "frontend/src/components/MobileHeader.tsx",
+      "line": 72,
+      "attr": "aria-label",
+      "value": "Notifications"
+    },
+    {
+      "file": "frontend/src/components/MobileHeader.tsx",
+      "line": 86,
+      "attr": "aria-label",
+      "value": "Open App Matrix"
+    },
+    {
+      "file": "frontend/src/components/PwaInstallPrompt.tsx",
+      "line": 85,
+      "attr": "aria-label",
+      "value": "Install Star App"
+    },
+    {
+      "file": "frontend/src/components/PwaInstallPrompt.tsx",
+      "line": 145,
+      "attr": "aria-label",
+      "value": "Dismiss"
+    },
+    {
+      "file": "frontend/src/components/PwaInstallPrompt.tsx",
+      "line": 178,
+      "attr": "aria-label",
+      "value": "Dismiss"
+    },
+    {
+      "file": "frontend/src/components/PwaUpdateToast.tsx",
+      "line": 90,
+      "attr": "aria-label",
+      "value": "Dismiss"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.tsx",
+      "line": 143,
+      "attr": "aria-label",
+      "value": "Star home"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.tsx",
+      "line": 190,
+      "attr": "title",
+      "value": "Tactical Link Active"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.tsx",
+      "line": 346,
+      "attr": "aria-label",
+      "value": "Sidebar scope"
+    },
+    {
+      "file": "frontend/src/components/SubNav.tsx",
+      "line": 87,
+      "attr": "aria-label",
+      "value": "Section navigation"
+    },
+    {
+      "file": "frontend/src/components/SubNav.tsx",
+      "line": 98,
+      "attr": "aria-label",
+      "value": "Subnav items"
+    },
+    {
+      "file": "frontend/src/lib/page-builders.tsx",
+      "line": 53,
+      "attr": "placeholder",
+      "value": "Filter..."
+    },
+    {
+      "file": "frontend/src/components/agent-view/AgentCanvasView.tsx",
+      "line": 404,
+      "attr": "title",
+      "value": "Select (V)"
+    },
+    {
+      "file": "frontend/src/components/agent-view/AgentCanvasView.tsx",
+      "line": 407,
+      "attr": "title",
+      "value": "Pan (H)"
+    },
+    {
+      "file": "frontend/src/components/agent-view/AgentCanvasView.tsx",
+      "line": 411,
+      "attr": "title",
+      "value": "Zoom in (+)"
+    },
+    {
+      "file": "frontend/src/components/agent-view/AgentCanvasView.tsx",
+      "line": 414,
+      "attr": "title",
+      "value": "Zoom out (-)"
+    },
+    {
+      "file": "frontend/src/components/agent-view/AgentCanvasView.tsx",
+      "line": 417,
+      "attr": "title",
+      "value": "Fit to content (1)"
+    },
+    {
+      "file": "frontend/src/components/agent-view/AgentFilter.tsx",
+      "line": 76,
+      "attr": "title",
+      "value": "Auto-selected as the most recently active agent"
+    },
+    {
+      "file": "frontend/src/components/agent-windows/CliTerminal.tsx",
+      "line": 113,
+      "attr": "placeholder",
+      "value": "杈撳叆 prompt (Cmd/Ctrl + Enter 杩愯)..."
+    },
+    {
+      "file": "frontend/src/components/agent-windows/WindowsTabBar.tsx",
+      "line": 89,
+      "attr": "aria-label",
+      "value": "new tab"
+    },
+    {
+      "file": "frontend/src/components/board/WorkItemDetailDrawer.tsx",
+      "line": 490,
+      "attr": "placeholder",
+      "value": "浠诲姟鎻忚堪...&#10;(Phase 2+ 鎺?Markdown 缂栬緫鍣?"
+    },
+    {
+      "file": "frontend/src/components/board/WorkItemDetailDrawer.tsx",
+      "line": 535,
+      "attr": "placeholder",
+      "value": "鍔?label, Enter 鎻愪氦"
+    },
+    {
+      "file": "frontend/src/components/calendar/CalendarHeader.tsx",
+      "line": 89,
+      "attr": "aria-label",
+      "value": "Calendar view"
+    },
+    {
+      "file": "frontend/src/components/effects/Cel3DUI.tsx",
+      "line": 737,
+      "attr": "aria-label",
+      "value": "Tactical Rotary Dial"
+    },
+    {
+      "file": "frontend/src/components/gantt/GanttChart.tsx",
+      "line": 601,
+      "attr": "title",
+      "value": "鍏抽棴 (Esc)"
+    },
+    {
+      "file": "frontend/src/components/refactor/AddRefactorCardsDialog.tsx",
+      "line": 117,
+      "attr": "placeholder",
+      "value": "filter by title / key / label..."
+    },
+    {
+      "file": "frontend/src/components/refactor/AddRefactorColumnDialog.tsx",
+      "line": 157,
+      "attr": "placeholder",
+      "value": "鏄剧ず鍚?(e.g. Spike 璋冪爺)"
+    },
+    {
+      "file": "frontend/src/components/remote/FileBrowser.tsx",
+      "line": 199,
+      "attr": "aria-label",
+      "value": "Home"
+    },
+    {
+      "file": "frontend/src/components/remote/FileBrowser.tsx",
+      "line": 219,
+      "attr": "aria-label",
+      "value": "Parent directory"
+    },
+    {
+      "file": "frontend/src/components/remote/FileBrowser.tsx",
+      "line": 292,
+      "attr": "title",
+      "value": "Upload via WS write_req (寰呭悗绔疄瑁?"
+    },
+    {
+      "file": "frontend/src/components/remote/NoVncViewer.tsx",
+      "line": 127,
+      "attr": "aria-label",
+      "value": "Toggle fullscreen"
+    },
+    {
+      "file": "frontend/src/components/remote/NoVncViewer.tsx",
+      "line": 238,
+      "attr": "aria-label",
+      "value": "Zoom out"
+    },
+    {
+      "file": "frontend/src/components/remote/NoVncViewer.tsx",
+      "line": 250,
+      "attr": "aria-label",
+      "value": "Zoom in"
+    },
+    {
+      "file": "frontend/src/components/theme/ThemeSwitcher.tsx",
+      "line": 45,
+      "attr": "aria-label",
+      "value": "loading theme"
+    },
+    {
+      "file": "frontend/src/components/charts/shared/ChartFrame.tsx",
+      "line": 57,
+      "attr": "aria-label",
+      "value": "Export as CSV"
+    },
+    {
+      "file": "frontend/src/components/charts/shared/ChartFrame.tsx",
+      "line": 64,
+      "attr": "aria-label",
+      "value": "Export as PNG"
+    },
+    {
+      "file": "frontend/src/app/agent/page.tsx",
+      "line": 24,
+      "attr": "title",
+      "value": "Agent Sessions"
+    },
+    {
+      "file": "frontend/src/app/agent/page.tsx",
+      "line": 25,
+      "attr": "title",
+      "value": "14 鐘舵€佹満 (搂7.4) + INV-AGT-N01~N14銆傛瘡涓?session 缁?worktree + 1 绉?agent kind + token/c"
+    },
+    {
+      "file": "frontend/src/app/agent-view/page.tsx",
+      "line": 248,
+      "attr": "title",
+      "value": "Agent"
+    },
+    {
+      "file": "frontend/src/app/agent-view/page.tsx",
+      "line": 268,
+      "attr": "title",
+      "value": "Agent"
+    },
+    {
+      "file": "frontend/src/app/agent-view/page.tsx",
+      "line": 334,
+      "attr": "title",
+      "value": "鍦?Kanban Board 瑙嗗浘鏌ョ湅鍏宠仈 work-items"
+    },
+    {
+      "file": "frontend/src/app/audit/page.tsx",
+      "line": 26,
+      "attr": "title",
+      "value": "Audit"
+    },
+    {
+      "file": "frontend/src/app/audit/page.tsx",
+      "line": 27,
+      "attr": "title",
+      "value": "Append-only hash chain + 9 AI 闂鍏冩暟鎹?+ cross-tenant 100% 瀹¤銆侷NV-AU-01~07 淇濊瘉涓嶅彲绡℃敼銆?
+    },
+    {
+      "file": "frontend/src/app/automation/page.tsx",
+      "line": 34,
+      "attr": "title",
+      "value": "Automation"
+    },
+    {
+      "file": "frontend/src/app/automation/page.tsx",
+      "line": 35,
+      "attr": "title",
+      "value": "Rule + Trigger + Condition(CEL) + Action + RuleExecutor銆? INV 淇濊瘉鍙娴嬨€佸彲绂佺敤銆佸彲瀹¤銆?
+    },
+    {
+      "file": "frontend/src/app/board/page.tsx",
+      "line": 162,
+      "attr": "title",
+      "value": "Board"
+    },
+    {
+      "file": "frontend/src/app/board/page.tsx",
+      "line": 163,
+      "attr": "title",
+      "value": "Kanban 瑙嗗浘 + 鎷栧姩 transition + 澶氫汉鍗忓悓 (2s polling)銆傛瘡鍒楀畾涔?status + 鍙€?wip_limit;瓒呴檺鏃堕珮浜€?
+    },
+    {
+      "file": "frontend/src/app/chrono-vibe/page.tsx",
+      "line": 482,
+      "attr": "title",
+      "value": "WT: Active Sync"
+    },
+    {
+      "file": "frontend/src/app/chrono-vibe/page.tsx",
+      "line": 515,
+      "attr": "title",
+      "value": "Agent: Invariants Hold"
+    },
+    {
+      "file": "frontend/src/app/chrono-vibe/page.tsx",
+      "line": 548,
+      "attr": "title",
+      "value": "Saga: Idempotent Loop"
+    },
+    {
+      "file": "frontend/src/app/collaboration/page.tsx",
+      "line": 37,
+      "attr": "title",
+      "value": "Collaboration"
+    },
+    {
+      "file": "frontend/src/app/collaboration/page.tsx",
+      "line": 38,
+      "attr": "title",
+      "value": "鏃犻檺鐢诲竷(Miro 妯″紡)涓庡疄鏃跺崗浣滃叆鍙ｃ€傛瘡涓?canvas 鍙叧鑱?Worktree / WorkItem / Project,璺?25 module 鍙屽悜鑱?
+    },
+    {
+      "file": "frontend/src/app/comment/page.tsx",
+      "line": 12,
+      "attr": "title",
+      "value": "Comments"
+    },
+    {
+      "file": "frontend/src/app/context/page.tsx",
+      "line": 25,
+      "attr": "title",
+      "value": "Context"
+    },
+    {
+      "file": "frontend/src/app/development/page.tsx",
+      "line": 27,
+      "attr": "title",
+      "value": "Development"
+    },
+    {
+      "file": "frontend/src/app/development/page.tsx",
+      "line": 28,
+      "attr": "title",
+      "value": "ChangeSets 浠ｇ爜鍙樻洿銆乄orktree 娌欑涓庣爺鍙戝璁℃棩蹇?
+    },
+    {
+      "file": "frontend/src/app/feedback/page.tsx",
+      "line": 52,
+      "attr": "title",
+      "value": "Feedback Inbox"
+    },
+    {
+      "file": "frontend/src/app/feedback/page.tsx",
+      "line": 53,
+      "attr": "title",
+      "value": "6 鐘舵€佹満 (搂7.3) + INV-FB-01~02銆侫gent 鍦ㄦ墽琛屼腑鍚戜汉绫诲彂闂紱浜虹被 answer 鍚庡洖鍒?agent 涓婁笅鏂囥€?
+    },
+    {
+      "file": "frontend/src/app/identity/page.tsx",
+      "line": 24,
+      "attr": "title",
+      "value": "Identity & Access"
+    },
+    {
+      "file": "frontend/src/app/integration/page.tsx",
+      "line": 13,
+      "attr": "title",
+      "value": "Integrations"
+    },
+    {
+      "file": "frontend/src/app/integration/page.tsx",
+      "line": 14,
+      "attr": "title",
+      "value": "澶栭儴鏈嶅姟閫傞厤鍣?(GitHub / GitLab / Jira / Slack / Lark / Linear / Webhook)銆俵oop_protecti"
+    },
+    {
+      "file": "frontend/src/app/local-runtime/page.tsx",
+      "line": 13,
+      "attr": "title",
+      "value": "Local Runtime"
+    },
+    {
+      "file": "frontend/src/app/notification/page.tsx",
+      "line": 18,
+      "attr": "title",
+      "value": "Notifications"
+    },
+    {
+      "file": "frontend/src/app/notification/page.tsx",
+      "line": 19,
+      "attr": "title",
+      "value": "Inbox + Email + IM 娓犻亾銆侷NV-N-07 鎶戝埗绛栫暐:鍚?actor 60min 鍐呭悓 kind 绗?2 娆¤嚜鍔?suppress(鍐欏叆 au"
+    },
+    {
+      "file": "frontend/src/app/permission/page.tsx",
+      "line": 15,
+      "attr": "title",
+      "value": "Permission"
+    },
+    {
+      "file": "frontend/src/app/permission/page.tsx",
+      "line": 16,
+      "attr": "title",
+      "value": "Rules-based RBAC銆俿cheme 鍙粦瀹?project;rule 瀹氫箟 (resource_kind, action, role, effect"
+    },
+    {
+      "file": "frontend/src/app/planning/page.tsx",
+      "line": 74,
+      "attr": "title",
+      "value": "Planning"
+    },
+    {
+      "file": "frontend/src/app/planning/page.tsx",
+      "line": 75,
+      "attr": "title",
+      "value": "Sprint 鍐插埡绠＄悊銆佹帓鏈熸棩鍘嗕笌椤圭洰閲岀▼纰戣鍒掞紙鐢樼壒鍥句笌鐕冨敖鍥惧凡褰掑叆鍥捐〃涓績锛?
+    },
+    {
+      "file": "frontend/src/app/project/page.tsx",
+      "line": 12,
+      "attr": "title",
+      "value": "Projects"
+    },
+    {
+      "file": "frontend/src/app/projects/ProjectsClient.tsx",
+      "line": 409,
+      "attr": "title",
+      "value": "Projects"
+    },
+    {
+      "file": "frontend/src/app/projects/ProjectsClient.tsx",
+      "line": 411,
+      "attr": "title",
+      "value": "(no projects available)"
+    },
+    {
+      "file": "frontend/src/app/projects/ProjectsClient.tsx",
+      "line": 420,
+      "attr": "title",
+      "value": "Projects"
+    },
+    {
+      "file": "frontend/src/app/projects/ProjectsClient.tsx",
+      "line": 421,
+      "attr": "title",
+      "value": "澶氶潰鏉块」鐩伐浣滃尯 鈥?Kanban / Timeline / Backlog / Agents / Worktrees 5 tab 鑱氬悎 (per 2026-0"
+    },
+    {
+      "file": "frontend/src/app/projects/ProjectsClient.tsx",
+      "line": 688,
+      "attr": "aria-label",
+      "value": "Project switcher"
+    },
+    {
+      "file": "frontend/src/app/refactor/page.tsx",
+      "line": 392,
+      "attr": "aria-label",
+      "value": "project switcher"
+    },
+    {
+      "file": "frontend/src/app/relation/page.tsx",
+      "line": 26,
+      "attr": "title",
+      "value": "Relation"
+    },
+    {
+      "file": "frontend/src/app/relation/page.tsx",
+      "line": 27,
+      "attr": "title",
+      "value": "璺ㄥ疄浣撳叧绯诲浘(blocks / duplicates / relates_to / parent_of / cloned_from)銆侭FS 5 灞?+ 2 灞?
+    },
+    {
+      "file": "frontend/src/app/scm/page.tsx",
+      "line": 23,
+      "attr": "title",
+      "value": "Repository / Branch / Commit / PR + 7 鐘舵€佹満 (搂7.5) + Webhook Idempotency-Key銆係CM 鏄?
+    },
+    {
+      "file": "frontend/src/app/search/page.tsx",
+      "line": 23,
+      "attr": "title",
+      "value": "Search"
+    },
+    {
+      "file": "frontend/src/app/search/page.tsx",
+      "line": 24,
+      "attr": "title",
+      "value": "Projection + tenant 闅旂 (INV-SR-01/02)銆俰ndex 涓嶄綔涓轰笟鍔′簨瀹炴簮(搂12 REQ-SEARCH-001)銆?
+    },
+    {
+      "file": "frontend/src/app/search/page.tsx",
+      "line": 36,
+      "attr": "placeholder",
+      "value": "Search across work-items, worktrees, feedback, agent sessions..."
+    },
+    {
+      "file": "frontend/src/app/tenant/page.tsx",
+      "line": 12,
+      "attr": "title",
+      "value": "Tenants"
+    },
+    {
+      "file": "frontend/src/app/validation/page.tsx",
+      "line": 20,
+      "attr": "title",
+      "value": "Validation"
+    },
+    {
+      "file": "frontend/src/app/validation/page.tsx",
+      "line": 21,
+      "attr": "title",
+      "value": "7 瀹炰綋 + 5 鐘舵€佹満(pass/fail/skipped/feedback_required/pending) + AcceptanceCoveragePo"
+    },
+    {
+      "file": "frontend/src/app/workflow/page.tsx",
+      "line": 13,
+      "attr": "title",
+      "value": "Workflows"
+    },
+    {
+      "file": "frontend/src/app/workflow/page.tsx",
+      "line": 14,
+      "attr": "title",
+      "value": "鐘舵€佹満閰嶇疆:姣忎釜 project 鍙粦瀹氫竴涓?workflow銆俿tate.category 鍐冲畾 work-item status 瀛楁;transition"
+    },
+    {
+      "file": "frontend/src/app/workspace/page.tsx",
+      "line": 12,
+      "attr": "title",
+      "value": "Workspaces"
+    },
+    {
+      "file": "frontend/src/app/workspace/page.tsx",
+      "line": 13,
+      "attr": "title",
+      "value": "Workspace + Member 妯″瀷銆俤efault_branch_policy 鍐冲畾 PR 鍚堝苟绛栫暐(fast-forward-only / allow"
+    },
+    {
+      "file": "frontend/src/app/worktree/page.tsx",
+      "line": 27,
+      "attr": "title",
+      "value": "Worktree"
+    },
+    {
+      "file": "frontend/src/app/worktree/page.tsx",
+      "line": 28,
+      "attr": "title",
+      "value": "17 鐘舵€佹満 (搂7.1) 鈥?INV-WT-01~04銆傛瘡涓?worktree 鏄?git checkout 鐨勯殧绂诲壇鏈?缁戝畾 local-runtime +"
+    },
+    {
+      "file": "frontend/src/app/worktree/page.tsx",
+      "line": 120,
+      "attr": "title",
+      "value": "鍦?Miro 妯″紡鐢诲竷涓煡鐪?worktree node 鐘舵€?鍙屽嚮鍙烦鍥?"
+    },
+    {
+      "file": "frontend/src/app/remote/terminal/[id]/page.tsx",
+      "line": 35,
+      "attr": "aria-label",
+      "value": "Back"
+    },
+    {
+      "file": "frontend/src/app/remote/files/[id]/page.tsx",
+      "line": 35,
+      "attr": "aria-label",
+      "value": "Back"
+    },
+    {
+      "file": "frontend/src/app/remote/desktop/[id]/page.tsx",
+      "line": 35,
+      "attr": "aria-label",
+      "value": "Back"
+    },
+    {
+      "file": "frontend/src/app/canvas/[id]/page.tsx",
+      "line": 99,
+      "attr": "title",
+      "value": "Back"
+    },
+    {
+      "file": "frontend/src/app/(app)/agent-windows/page.tsx",
+      "line": 80,
+      "attr": "title",
+      "value": "Agent Windows"
+    },
+    {
+      "file": "frontend/src/app/(app)/agents/page.tsx",
+      "line": 37,
+      "attr": "title",
+      "value": "Agents"
+    },
+    {
+      "file": "frontend/src/app/(app)/agents/page.tsx",
+      "line": 38,
+      "attr": "title",
+      "value": "agent / agent-session / lease / runtime (5 mock rows; 鐪熷疄鏁版嵁 P3)"
+    },
+    {
+      "file": "frontend/src/app/(app)/analytics/page.tsx",
+      "line": 46,
+      "attr": "aria-label",
+      "value": "Cost trend (mock)"
+    },
+    {
+      "file": "frontend/src/app/(app)/analytics/page.tsx",
+      "line": 155,
+      "attr": "title",
+      "value": "Analytics"
+    },
+    {
+      "file": "frontend/src/app/(app)/inbox/page.tsx",
+      "line": 63,
+      "attr": "title",
+      "value": "Inbox"
+    },
+    {
+      "file": "frontend/src/app/(app)/inbox/page.tsx",
+      "line": 64,
+      "attr": "title",
+      "value": "notification / comment / audit (10 mock; 鐪熷疄 notification service P3 缂哄彛)"
+    },
+    {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "line": 188,
+      "attr": "title",
+      "value": "Issues"
+    },
+    {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "line": 196,
+      "attr": "aria-label",
+      "value": "Issue view tabs"
+    },
+    {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "line": 227,
+      "attr": "aria-label",
+      "value": "Toggle search"
+    },
+    {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "line": 236,
+      "attr": "aria-label",
+      "value": "Create new issue"
+    },
+    {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "line": 264,
+      "attr": "placeholder",
+      "value": "Issue title (stub)"
+    },
+    {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "line": 273,
+      "attr": "aria-label",
+      "value": "Dismiss new issue"
+    },
+    {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "line": 345,
+      "attr": "aria-label",
+      "value": "Issue detail"
+    },
+    {
+      "file": "frontend/src/app/(app)/issues/page.tsx",
+      "line": 706,
+      "attr": "aria-label",
+      "value": "Close detail"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/page.tsx",
+      "line": 93,
+      "attr": "title",
+      "value": "Settings"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/page.tsx",
+      "line": 94,
+      "attr": "title",
+      "value": "tenant / identity / permission / role / integration / scm (5 tabs; submit endpoi"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/api-keys/page.tsx",
+      "line": 72,
+      "attr": "title",
+      "value": "API Keys"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/api-keys/page.tsx",
+      "line": 129,
+      "attr": "placeholder",
+      "value": "Primary / Backup / Staging"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/cli-profiles/page.tsx",
+      "line": 43,
+      "attr": "title",
+      "value": "CLI Profiles"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/cli-profiles/page.tsx",
+      "line": 89,
+      "attr": "title",
+      "value": "宸查厤缃?API Key"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/cli-profiles/page.tsx",
+      "line": 89,
+      "attr": "title",
+      "value": "鏈厤缃?API Key"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/credentials/page.tsx",
+      "line": 79,
+      "attr": "title",
+      "value": "鍑瘉绠＄悊 (Credentials)"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/credentials/page.tsx",
+      "line": 190,
+      "attr": "placeholder",
+      "value": "鏄剧ず鍚?(e.g. 鎴戠殑 OpenClaw 璐﹀彿)"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/credentials/page.tsx",
+      "line": 197,
+      "attr": "placeholder",
+      "value": "鎻忚堪 (e.g. 鐢ㄤ簬 LangGraph sub-agent 娲惧彂)"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/credentials/page.tsx",
+      "line": 204,
+      "attr": "placeholder",
+      "value": "Base URL (鍙€? e.g. https://api.openclaw.example.com/v1)"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/credentials/page.tsx",
+      "line": 211,
+      "attr": "placeholder",
+      "value": "API Key / Token (TLS 鍔犲瘑浼犺緭, 鍚庣 KMS 鍔犲瘑瀛樺偍)"
+    },
+    {
+      "file": "frontend/src/app/(app)/settings/credentials/page.tsx",
+      "line": 250,
+      "attr": "placeholder",
+      "value": "鏂?Secret"
+    }
+  ],
+  "registry_hardcoded": [
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 162,
+      "attr": "label",
+      "module_id": "inbox",
+      "value": "Inbox"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 174,
+      "attr": "label",
+      "module_id": "issues",
+      "value": "Issues"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 186,
+      "attr": "label",
+      "module_id": "projects",
+      "value": "Projects"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 198,
+      "attr": "label",
+      "module_id": "agents",
+      "value": "Agents"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 210,
+      "attr": "label",
+      "module_id": "analytics",
+      "value": "Analytics"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 222,
+      "attr": "label",
+      "module_id": "settings",
+      "value": "Settings"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 234,
+      "attr": "label",
+      "module_id": "remote",
+      "value": "Remote Control"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 248,
+      "attr": "label",
+      "module_id": "kanban",
+      "value": "Kanban Board"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 258,
+      "attr": "label",
+      "module_id": "timeline",
+      "value": "Timeline & Gantt"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 268,
+      "attr": "label",
+      "module_id": "backlog",
+      "value": "Backlog"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 280,
+      "attr": "label",
+      "module_id": "agent-windows",
+      "value": "Agent Windows"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 290,
+      "attr": "label",
+      "module_id": "worktree",
+      "value": "Worktree Manager"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 300,
+      "attr": "label",
+      "module_id": "validation",
+      "value": "Validation Test"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 310,
+      "attr": "label",
+      "module_id": "context",
+      "value": "Context Graph"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 320,
+      "attr": "label",
+      "module_id": "feedback",
+      "value": "Agent Feedback"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 332,
+      "attr": "label",
+      "module_id": "agent-view",
+      "value": "Agent View"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 344,
+      "attr": "label",
+      "module_id": "workflow",
+      "value": "Workflow Engine"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 354,
+      "attr": "label",
+      "module_id": "development",
+      "value": "Development Hub"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 364,
+      "attr": "label",
+      "module_id": "planning",
+      "value": "Planning Hub"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 376,
+      "attr": "label",
+      "module_id": "scm",
+      "value": "SCM Provider"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 386,
+      "attr": "label",
+      "module_id": "integration",
+      "value": "MCP Integrations"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 396,
+      "attr": "label",
+      "module_id": "api-keys",
+      "value": "API Keys & Secrets"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 406,
+      "attr": "label",
+      "module_id": "developer-console",
+      "value": "Developer Console"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 416,
+      "attr": "label",
+      "module_id": "webhooks",
+      "value": "Webhooks"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 426,
+      "attr": "label",
+      "module_id": "cli-profiles",
+      "value": "CLI Profiles"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 436,
+      "attr": "label",
+      "module_id": "search",
+      "value": "Universal Search"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 448,
+      "attr": "label",
+      "module_id": "local-runtime",
+      "value": "Local Runtime"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 458,
+      "attr": "label",
+      "module_id": "audit",
+      "value": "Audit Log"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 468,
+      "attr": "label",
+      "module_id": "automation",
+      "value": "Automation Triggers"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 478,
+      "attr": "label",
+      "module_id": "relation",
+      "value": "Entity Relations"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 488,
+      "attr": "label",
+      "module_id": "permission",
+      "value": "RBAC Permissions"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 498,
+      "attr": "label",
+      "module_id": "identity",
+      "value": "Identity & Members"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 508,
+      "attr": "label",
+      "module_id": "tenant",
+      "value": "Tenant Admin"
+    },
+    {
+      "file": "frontend/src/lib/nav/registry.ts",
+      "line": 521,
+      "attr": "label",
+      "module_id": "refactor",
+      "value": "Refactor Sweep"
+    }
+  ],
+  "dict_consistency": {
+    "missing_keys": {},
+    "extra_keys": {},
+    "loaded": {
+      "zh-CN": [
+        "agent",
+        "agents",
+        "all",
+        "analytics",
+        "appHeader",
+        "appMatrix",
+        "audit",
+        "automation",
+        "backlog",
+        "board",
+        "calendar",
+        "categories",
+        "commandBar",
+        "common",
+        "context",
+        "core",
+        "development",
+        "feedback",
+        "fold",
+        "gantt",
+        "identity",
+        "inbox",
+        "integration",
+        "issues",
+        "kanban",
+        "languageSwitcher",
+        "modules",
+        "monthNames",
+        "pageHeader",
+        "permission",
+        "planning",
+        "projects",
+        "refactor",
+        "relation",
+        "remote",
+        "scm",
+        "scope",
+        "search",
+        "settings",
+        "sidebar",
+        "sprint",
+        "status",
+        "system",
+        "tenant",
+        "timeline",
+        "tooltip",
+        "userMenu",
+        "validation",
+        "weekdayNames",
+        "work",
+        "workItem",
+        "workItemKind",
+        "workflow",
+        "worktree"
+      ],
+      "en": [
+        "agent",
+        "agents",
+        "all",
+        "analytics",
+        "appHeader",
+        "appMatrix",
+        "audit",
+        "automation",
+        "backlog",
+        "board",
+        "calendar",
+        "categories",
+        "commandBar",
+        "common",
+        "context",
+        "core",
+        "development",
+        "feedback",
+        "fold",
+        "gantt",
+        "identity",
+        "inbox",
+        "integration",
+        "issues",
+        "kanban",
+        "languageSwitcher",
+        "modules",
+        "monthNames",
+        "pageHeader",
+        "permission",
+        "planning",
+        "projects",
+        "refactor",
+        "relation",
+        "remote",
+        "scm",
+        "scope",
+        "search",
+        "settings",
+        "sidebar",
+        "sprint",
+        "status",
+        "system",
+        "tenant",
+        "timeline",
+        "tooltip",
+        "userMenu",
+        "validation",
+        "weekdayNames",
+        "work",
+        "workItem",
+        "workItemKind",
+        "workflow",
+        "worktree"
+      ],
+      "ja": [
+        "agent",
+        "agents",
+        "all",
+        "analytics",
+        "appHeader",
+        "appMatrix",
+        "audit",
+        "automation",
+        "backlog",
+        "board",
+        "calendar",
+        "categories",
+        "commandBar",
+        "common",
+        "context",
+        "core",
+        "development",
+        "feedback",
+        "fold",
+        "gantt",
+        "identity",
+        "inbox",
+        "integration",
+        "issues",
+        "kanban",
+        "languageSwitcher",
+        "modules",
+        "monthNames",
+        "pageHeader",
+        "permission",
+        "planning",
+        "projects",
+        "refactor",
+        "relation",
+        "remote",
+        "scm",
+        "scope",
+        "search",
+        "settings",
+        "sidebar",
+        "sprint",
+        "status",
+        "system",
+        "tenant",
+        "timeline",
+        "tooltip",
+        "userMenu",
+        "validation",
+        "weekdayNames",
+        "work",
+        "workItem",
+        "workItemKind",
+        "workflow",
+        "worktree"
+      ]
+    }
+  }
+}

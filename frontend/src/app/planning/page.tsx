@@ -16,8 +16,10 @@ import {
   Target,
   CalendarRange,
 } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function PlanningPage() {
+  const { t } = useTranslation();
   const sprints = useStore((s) => s.sprints);
   const milestones = useStore((s) => s.milestones);
   const workItems = useStore((s) => s.workItems);
@@ -71,7 +73,7 @@ export default function PlanningPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Planning"
+        title={t.pageTitles['/planning'].title}
         subtitle="Sprint 冲刺管理、排期日历与项目里程碑规划（甘特图与燃尽图已归入图表中心）"
         icon={<Calendar className="text-accent" size={20} />}
         track="E"

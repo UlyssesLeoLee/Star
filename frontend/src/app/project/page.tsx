@@ -4,12 +4,14 @@ import { useStore } from "@/lib/store";
 import { ListPage } from "@/lib/page-builders";
 import { FolderTree } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
+import { useTranslation } from "@/lib/i18n";
 
 export default function ProjectPage() {
+  const { t } = useTranslation();
   const projects = useStore((s) => s.projects);
   return (
     <ListPage
-      title="Projects"
+      title={t.pageTitles['/projects'].title}
       subtitle="租户下的工作单元,key 用作 work-item 编号前缀(PHYSIS-123)。"
       icon={<FolderTree className="text-accent" size={20} />}
       track="D"

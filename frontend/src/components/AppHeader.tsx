@@ -63,7 +63,7 @@ export function AppHeader() {
           <nav
             className="flex items-center gap-1 overflow-x-auto scrollbar-none"
             data-testid="primary-tabs"
-            aria-label="Primary navigation"
+            aria-label={t.ariaLabels.primaryNav}
           >
             {activeHeaderTabs.map((tab) => (
               <HeaderTab
@@ -88,7 +88,7 @@ export function AppHeader() {
             <Link
               href="/settings"
               data-testid="settings-gear"
-              aria-label="Settings"
+              aria-label={t.ariaLabels.settings}
               className={clsx(
                 "ml-1 p-2 text-ink-dim hover:text-ink rounded-lg hover:bg-bg-soft/70 transition-colors",
                 pathname.startsWith("/settings") && "text-accent bg-accent/10 border border-accent/20"
@@ -105,7 +105,7 @@ export function AppHeader() {
               type="button"
               onClick={openMatrix}
               data-testid="app-matrix-trigger"
-              aria-label="Open App Matrix (All Modules)"
+              aria-label={t.ariaLabels.openAppMatrix}
               className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-line bg-bg-soft/70 text-ink-dim hover:text-accent hover:border-accent transition-all duration-200 text-xs font-mono group shadow-sm hover:shadow-[0_0_14px_rgba(0,240,255,0.22)]"
             >
               <LayoutGrid size={13} className="text-accent group-hover:scale-110 transition-transform duration-200" />
@@ -119,7 +119,7 @@ export function AppHeader() {
               type="button"
               onClick={openCommandBar}
               data-testid="command-bar-trigger"
-              aria-label="Open command bar (⌘K)"
+              aria-label={t.ariaLabels.openCommandBar}
               className="flex items-center gap-2 px-3 h-8 rounded-lg border border-line bg-bg-soft/70 text-ink-dim hover:text-ink hover:border-accent transition-all duration-200 text-xs shadow-sm hover:shadow-[0_0_12px_rgba(0,240,255,0.18)]"
             >
               <Search size={13} className="text-accent" />

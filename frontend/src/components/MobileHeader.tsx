@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { Bell, Menu, Search } from "lucide-react";
 import { useState } from "react";
 import { useNavStore } from "@/lib/nav/navStore";
+import { useTranslation } from "@/lib/i18n";
 
 const ROUTE_TITLES: { match: RegExp; title: string }[] = [
   { match: /^\/$/, title: "Star" },
@@ -24,6 +25,7 @@ const ROUTE_TITLES: { match: RegExp; title: string }[] = [
 ];
 
 export function MobileHeader() {
+  const { t } = useTranslation();
   const pathname = usePathname() ?? "/";
   const openCommandBar = useNavStore((s) => s.openMatrix);
   const [bellCount] = useState(3);
@@ -39,7 +41,7 @@ export function MobileHeader() {
       <Link
         href="/"
         data-testid="mobile-header-home"
-        aria-label="Star home"
+        aria-label={t.ariaLabels.starHome}
         className="flex items-center gap-2 min-w-0"
       >
         <span className="size-7 rounded-lg overflow-hidden border border-accent/40 shrink-0">
@@ -61,7 +63,7 @@ export function MobileHeader() {
           type="button"
           onClick={openCommandBar}
           data-testid="mobile-header-search"
-          aria-label="Search (Cmd+K)"
+          aria-label={t.ariaLabels.searchCmdK}
           className="p-2 text-ink-dim hover:text-ink rounded-lg hover:bg-bg-soft"
         >
           <Search size={17} />
@@ -69,7 +71,7 @@ export function MobileHeader() {
         <Link
           href="/notification"
           data-testid="mobile-header-bell"
-          aria-label="Notifications"
+          aria-label={t.ariaLabels.notifications}
           className="relative p-2 text-ink-dim hover:text-ink rounded-lg hover:bg-bg-soft"
         >
           <Bell size={17} />
@@ -83,7 +85,7 @@ export function MobileHeader() {
           type="button"
           onClick={openCommandBar}
           data-testid="mobile-header-menu"
-          aria-label="Open App Matrix"
+          aria-label={t.ariaLabels.openAppMatrixShort}
           className="p-2 text-ink-dim hover:text-ink rounded-lg hover:bg-bg-soft"
         >
           <Menu size={17} />

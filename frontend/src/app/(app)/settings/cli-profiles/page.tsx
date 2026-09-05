@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { Terminal, Globe, Plus, Edit2, Trash2, Check, X, RefreshCw, AlertCircle } from "lucide-react";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
+import { useTranslation } from "@/lib/i18n";
 
 interface CliProfile {
   id: string;
@@ -30,6 +31,7 @@ const PROFILES: CliProfile[] = [
 ];
 
 export default function CliProfilesPage() {
+  const { t } = useTranslation();
   const [profiles, setProfiles] = useState<CliProfile[]>(PROFILES);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -40,7 +42,7 @@ export default function CliProfilesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="CLI Profiles"
+        title={t.pageTitles['/cli-profiles'].title}
         description="管理 6 个内置 + 自定义 CLI / API Agent · {cliCount} CLI · {apiCount} API"
         actions={
           <button className="btn-primary-ghost flex items-center gap-1">
@@ -86,7 +88,7 @@ export default function CliProfilesPage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
-                  {p.hasApiKey ? <span className="text-[10px] text-[color:var(--color-success)]" title="已配置 API Key">●</span> : <span className="text-[10px] text-[color:var(--color-text-dim)]" title="未配置 API Key">○</span>}
+                  {p.hasApiKey ? <span className="text-[10px] text-[color:var(--color-success)]" title={t.ariaLabels.apiKeyConfigured}>●</span> : <span className="text-[10px] text-[color:var(--color-text-dim)]" title={t.ariaLabels.apiKeyMissing}>○</span>}
                   <button onClick={() => { setEditingId(p.id); setEditName(p.name); }} className="opacity-60 hover:opacity-100"><Edit2 size={10} /></button>
                 </div>
               </div>

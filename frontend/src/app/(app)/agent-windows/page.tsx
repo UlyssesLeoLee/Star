@@ -10,8 +10,10 @@ import { WindowsTabBar, mockTabs, type CliTab } from "@/components/agent-windows
 import { CliTerminal } from "@/components/agent-windows/CliTerminal";
 import { NewTabModal } from "@/components/agent-windows/NewTabModal";
 import { useStore } from "@/lib/store";
+import { useTranslation } from "@/lib/i18n";
 
 export default function AgentWindowsPage() {
+  const { t } = useTranslation();
   const [tabs, setTabs] = useState<CliTab[]>(mockTabs());
   const [activeTabId, setActiveTabId] = useState<string | null>("t1");
   const [modalOpen, setModalOpen] = useState(false);
@@ -77,7 +79,7 @@ export default function AgentWindowsPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-100px)]">
       <PageHeader
-        title="Agent Windows"
+        title={t.pageTitles['/agent-windows'].title}
         description="多 CLI Agent 并行任务窗口 · 三触发上传到 Worktree"
         actions={
           <div className="flex items-center gap-2">
@@ -85,7 +87,7 @@ export default function AgentWindowsPage() {
               value={selectedWorktree}
               onChange={(e) => setSelectedWorktree(e.target.value)}
               className="text-xs px-2 py-1 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)]"
-              aria-label="worktree"
+              aria-label={t.ariaLabels.worktree}
             >
               <option value="wt-physis-gvpe">Physis / GVPE</option>
               <option value="wt-saga-bench">Saga Bench</option>
@@ -93,7 +95,7 @@ export default function AgentWindowsPage() {
             </select>
             <button
               className="text-xs px-2 py-1 rounded border border-[color:var(--color-border)] hover:bg-[color:var(--color-surface-2)] flex items-center gap-1"
-              aria-label="refresh"
+              aria-label={t.ariaLabels.refresh}
             >
               <RefreshCw size={12} /> 刷新
             </button>

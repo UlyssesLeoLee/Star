@@ -18,8 +18,10 @@ import { StatusPill } from "@/components/StatusPill";
 import { Inbox, Bell } from "lucide-react";
 import { MOCK_NOTIFS_FALLBACK } from "@/mocks/data";
 import type { MockNotif } from "@/mocks/schemas/inbox";
+import { useTranslation } from "@/lib/i18n";
 
 export default function InboxPage() {
+  const { t } = useTranslation();
   const [notifs, setNotifs] = useState<ReadonlyArray<MockNotif>>(MOCK_NOTIFS_FALLBACK);
 
   // local-only read/unread toggle (per 缺标, 不联动 store)
@@ -60,7 +62,7 @@ export default function InboxPage() {
   return (
     <div className="max-w-5xl mx-auto pb-4" data-testid="inbox-page">
       <PageHeader
-        title="Inbox"
+        title={t.pageTitles['/inbox'].title}
         subtitle="notification / comment / audit (10 mock; 真实 notification service P3 缺口)"
         icon={<Inbox className="text-accent" size={20} />}
         count={`${unread} unread`}

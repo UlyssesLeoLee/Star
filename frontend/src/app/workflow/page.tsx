@@ -4,13 +4,15 @@ import { useStore } from "@/lib/store";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Workflow, ArrowRight } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function WorkflowPage() {
+  const { t } = useTranslation();
   const workflows = useStore((s) => s.workflows);
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Workflows"
+        title={t.pageTitles['/workflow'].title}
         subtitle="状态机配置:每个 project 可绑定一个 workflow。state.category 决定 work-item status 字段;transition.trigger + guard(CEL) 控制迁移。"
         icon={<Workflow className="text-accent" size={20} />}
         track="D"

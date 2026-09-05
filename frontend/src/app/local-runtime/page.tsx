@@ -4,13 +4,15 @@ import { useStore } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Server, AlertTriangle, Heart, MapPin } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function LocalRuntimePage() {
+  const { t } = useTranslation();
   const runtimes = useStore((s) => s.localRuntimes);
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Local Runtime"
+        title={t.pageTitles['/local-runtime'].title}
         subtitle="开发机上的执行环境。device/tenant/user 三重绑定(§23.2)。policy_violations 触发审计事件。"
         icon={<Server className="text-accent" size={20} />}
         track="E"

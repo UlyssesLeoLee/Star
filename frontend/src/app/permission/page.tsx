@@ -4,15 +4,17 @@ import { useStore } from "@/lib/store";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { ShieldCheck } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
+import { useTranslation } from "@/lib/i18n";
 
 export default function PermissionPage() {
+  const { t } = useTranslation();
   const schemes = useStore((s) => s.permissionSchemes);
   const rules = useStore((s) => s.permissionRules);
 
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Permission"
+        title={t.pageTitles['/permission'].title}
         subtitle="Rules-based RBAC。scheme 可绑定 project;rule 定义 (resource_kind, action, role, effect, condition CEL)。"
         icon={<ShieldCheck className="text-accent" size={20} />}
         track="D"

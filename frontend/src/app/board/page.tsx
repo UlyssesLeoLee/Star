@@ -31,6 +31,7 @@ import { KanbanFilters, type KanbanFiltersValue } from "@/components/board/Kanba
 import { useBoardSync, type BoardSyncChange } from "@/hooks/useBoardSync";
 import { Trello, RefreshCw, X } from "lucide-react";
 import type { WorkItem, WorkItemStatus } from "@/types/ids";
+import { useTranslation } from "@/lib/i18n";
 
 // 状态机下一步: todo→in_progress, in_progress→review, review→done; blocked/wontfix/done 终止
 const NEXT_STATUS: Partial<Record<WorkItemStatus, WorkItemStatus>> = {
@@ -40,6 +41,7 @@ const NEXT_STATUS: Partial<Record<WorkItemStatus, WorkItemStatus>> = {
 };
 
 export default function BoardPage() {
+  const { t } = useTranslation();
   const board = useStore((s) => s.board);
   const workItems = useStore((s) => s.workItems);
   const identities = useStore((s) => s.identities);
@@ -159,7 +161,7 @@ export default function BoardPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Board"
+        title={t.pageTitles['/board'].title}
         subtitle="Kanban 视图 + 拖动 transition + 多人协同 (2s polling)。每列定义 status + 可选 wip_limit;超限时高亮。"
         icon={<Trello className="text-accent" size={20} />}
         track="E"

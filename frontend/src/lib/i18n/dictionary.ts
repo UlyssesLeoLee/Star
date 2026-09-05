@@ -7,6 +7,16 @@
 // v0.2 (2026-08-31 补缺口) 新增: sidebar / appMatrix / commandBar /
 //   pageHeader / common / modules — 覆盖高曝光面 Sidebar / AppMatrix /
 //   CommandBar / 28 模块名 / 共用按钮文案.
+//
+// v0.6 (2026-09-05 拍板 C 全 i18n 接管) 新增 5 域横展 (per 守门 #13
+//   W/T/M 同 shape 严格):
+//     - navModules:   33 module label/categoryLabel/description
+//     - pageTitles:   28 page title/subtitle (按 route)
+//     - ariaLabels:   通用 aria-label 兜底 (key = 业务语义)
+//     - placeholders: input placeholder 兜底
+//     - categoryNames: 5 域 (core/work/agent/integration/system) 名称
+//   缺标策略: 开发环境 console.warn + 渲染 "[key]" 路径;
+//            生产 fallback en (per 守门 缺标比错标安全)
 // =====================================================================
 
 export interface CategoryDef {
@@ -18,6 +28,11 @@ export interface ModuleI18n {
   label: string;
   description: string;
   categoryLabel: string;
+}
+
+export interface PageTitleI18n {
+  title: string;
+  subtitle?: string;
 }
 
 export interface Dictionary {
@@ -284,4 +299,11 @@ export interface Dictionary {
     mergeConfirm: string;             // "确认合并?"
     mergeInProgress: string;          // "合并中..."
   };
+  // ── v0.6 (per 2026-09-05 23:09 JST 拍板 C) 新增 5 域横展 ──
+  // 跟守门 #13 W/T/M 同 shape 严格: 100% 表覆盖, 禁止"混在"一括列举.
+  navModules: Record<string, ModuleI18n>;
+  pageTitles: Record<string, PageTitleI18n>;
+  ariaLabels: Record<string, string>;
+  placeholders: Record<string, string>;
+  categoryNames: Record<"core" | "work" | "agent" | "integration" | "system", string>;
 }

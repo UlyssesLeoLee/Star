@@ -5,8 +5,10 @@ import { PageHeader, SectionTitle, Stat } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { History, Shield, Link2, Brain } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function AuditPage() {
+  const { t } = useTranslation();
   const events = useStore((s) => s.auditEvents);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showAionly, setShowAionly] = useState(false);
@@ -23,7 +25,7 @@ export default function AuditPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Audit"
+        title={t.pageTitles['/audit'].title}
         subtitle="Append-only hash chain + 9 AI 问题元数据 + cross-tenant 100% 审计。INV-AU-01~07 保证不可篡改。"
         icon={<History className="text-accent" size={20} />}
         track="E"

@@ -4,13 +4,15 @@ import { useStore } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Plug, AlertCircle, RefreshCw } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function IntegrationPage() {
+  const { t } = useTranslation();
   const integrations = useStore((s) => s.integrations);
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Integrations"
+        title={t.pageTitles['/integration'].title}
         subtitle="外部服务适配器 (GitHub / GitLab / Jira / Slack / Lark / Linear / Webhook)。loop_protection_key 防止 webhook 风暴。"
         icon={<Plug className="text-accent" size={20} />}
         track="C"

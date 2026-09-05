@@ -38,6 +38,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Plus, Search, X, Flag, User, Hash, Tag, FileText, GitBranch, ListTree, LayoutGrid, List, Calendar, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import type { WorkItem, WorkItemStatus, Identity } from "@/types/ids";
+import { useTranslation } from "@/lib/i18n";
 
 // ---- view types ----
 type View = "kanban" | "list" | "tree" | "sprint";
@@ -64,6 +65,7 @@ const PRIORITY_COLOR: Record<WorkItem["priority"], string> = {
 // Inner component — 实际 page 内容 (useSearchParams 需要 Suspense boundary)
 // =====================================================================
 function IssuesPageInner() {
+  const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -185,7 +187,7 @@ function IssuesPageInner() {
       <div className="flex-1 min-w-0 flex">
         <div className="flex-1 min-w-0 overflow-x-auto">
           <PageHeader
-            title="Issues"
+            title={t.pageTitles['/issues'].title}
             subtitle={`${workItems.length} work-items — 主面板聚合 work-item / feedback / worktree / agent (per §2 6 路由设计). 4 视图切换: Kanban (拖动 transition) / List (表格) / Tree (层级) / Sprint (按 sprint 分组).`}
             icon={<FileText className="text-accent" size={20} />}
             count={workItems.length}
@@ -193,7 +195,7 @@ function IssuesPageInner() {
 
           {/* 顶部 1 行: view tabs (per §5.1) + 右侧 New + Search */}
           <div className="flex items-center justify-between mb-4 border-b-2 border-black">
-            <div role="tablist" aria-label="Issue view tabs" className="flex items-center gap-0" data-testid="issues-view-tabs">
+            <div role="tablist" aria-label={t.ariaLabels.issueViewTabs} className="flex items-center gap-0" data-testid="issues-view-tabs">
               {VIEWS.map((v) => {
                 const active = view === v.id;
                 return (
@@ -224,7 +226,7 @@ function IssuesPageInner() {
                 data-testid="issues-search-button"
                 onClick={() => setSearchOpen((cur) => !cur)}
                 className="btn text-xs"
-                aria-label="Toggle search"
+                aria-label={t.ariaLabels.toggleSearch}
               >
                 <Search size={12} /> Search
               </button>
@@ -233,7 +235,7 @@ function IssuesPageInner() {
                 data-testid="issues-new-button"
                 onClick={() => handleSwitchView(view) /* keep view, toggle new via URL */}
                 className="btn-primary text-xs"
-                aria-label="Create new issue"
+                aria-label={t.ariaLabels.createNewIssue}
               >
                 <Plus size={12} /> New issue
               </button>
@@ -270,7 +272,7 @@ function IssuesPageInner() {
               <button
                 onClick={dismissNewMode}
                 className="text-ink-mute hover:text-ink"
-                aria-label="Dismiss new issue"
+                aria-label={t.ariaLabels.dismissNewIssue}
               >
                 <X size={14} />
               </button>
@@ -342,7 +344,7 @@ function IssuesPageInner() {
           <aside
             data-testid="issues-detail-sidebar"
             className="w-80 shrink-0 border-l-2 border-black bg-[var(--cel-surface-sub,#151c2c)] overflow-y-auto cel-shadow"
-            aria-label="Issue detail"
+            aria-label={t.ariaLabels.issueDetail}
           >
             <IssuesDetailSidebar
               workItem={selectedWi}
@@ -693,6 +695,7 @@ function IssuesDetailSidebar({
   onClose: () => void;
   onTransition: (to: WorkItemStatus) => void;
 }) {
+  const { t } = useTranslation();
   const ALLOWED: WorkItemStatus[] = ["todo", "in_progress", "review", "blocked", "done", "wontfix"];
 
   return (
@@ -703,7 +706,7 @@ function IssuesDetailSidebar({
           onClick={onClose}
           className="text-ink-mute hover:text-ink"
           data-testid="issues-detail-close"
-          aria-label="Close detail"
+          aria-label={t.ariaLabels.closeDetail}
         >
           <X size={14} />
         </button>
@@ -772,6 +775,7 @@ function Row({ label, value }: { label: React.ReactNode; value: React.ReactNode 
 // Default export — wrapper with Suspense (per Next.js 14 useSearchParams 要求)
 // =====================================================================
 export default function IssuesPage() {
+  const { t } = useTranslation();
   return (
     <Suspense
       fallback={

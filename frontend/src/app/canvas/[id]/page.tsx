@@ -9,12 +9,14 @@ import { CanvasView } from "@/components/CanvasView";
 import { PageHeader } from "@/components/PageHeader";
 import { ArrowLeft, Share2, Download, Users } from "lucide-react";
 import Link from "next/link";
+import { useTranslation } from "@/lib/i18n";
 
 interface PageProps {
   params: { id: string };
 }
 
 function CanvasPageInner({ canvasId }: { canvasId: string }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight") || undefined;
@@ -96,7 +98,7 @@ function CanvasPageInner({ canvasId }: { canvasId: string }) {
       {/* Header */}
       <div className="border-b border-line bg-bg-soft/40 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/collaboration" className="btn p-1.5" title="Back">
+          <Link href="/collaboration" className="btn p-1.5" title={t.ariaLabels.canvasBack}>
             <ArrowLeft size={14} />
           </Link>
           <div>
@@ -123,6 +125,7 @@ function CanvasPageInner({ canvasId }: { canvasId: string }) {
 }
 
 export default function CanvasPage({ params }: PageProps) {
+  const { t } = useTranslation();
   // Next.js 14.2.5: params 是 plain object (不是 Promise)
   // 原 use() unwrap 是 Next 15 API, Next 14 不支持
   // (per 2026-09-04 canvas e2e 守门 prerequisite baseline fix)

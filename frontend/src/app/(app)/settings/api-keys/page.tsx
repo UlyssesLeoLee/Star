@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { Key, Plus, Trash2, Eye, EyeOff, Lock, Globe, AlertCircle, ShieldCheck } from "lucide-react";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
+import { useTranslation } from "@/lib/i18n";
 
 interface ApiKey {
   id: string;
@@ -33,6 +34,7 @@ const PROVIDER_HINT: Record<string, string> = {
 };
 
 export default function ApiKeysPage() {
+  const { t } = useTranslation();
   const [keys, setKeys] = useState<ApiKey[]>(INITIAL);
   const [adding, setAdding] = useState(false);
   const [reveal, setReveal] = useState<Record<string, boolean>>({});
@@ -69,7 +71,7 @@ export default function ApiKeysPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="API Keys"
+        title={t.pageTitles['/api-keys'].title}
         description="双模式存储: 后端 AES-256-GCM 加密 (Encrypted) 或 环境变量 (Env Var)"
         actions={
           <button

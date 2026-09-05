@@ -4,6 +4,7 @@ import { useStore } from "@/lib/store";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { Search, Bookmark, FileText, GitBranch, MessageCircle, Cpu } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "@/lib/i18n";
 
 const ICON = {
   work_item: FileText,
@@ -13,6 +14,7 @@ const ICON = {
 };
 
 export default function SearchPage() {
+  const { t } = useTranslation();
   const hits = useStore((s) => s.searchHits);
   const saved = useStore((s) => s.savedSearches);
   const [q, setQ] = useState("");
@@ -20,7 +22,7 @@ export default function SearchPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Search"
+        title={t.pageTitles['/search'].title}
         subtitle="Projection + tenant 隔离 (INV-SR-01/02)。index 不作为业务事实源(§12 REQ-SEARCH-001)。"
         icon={<Search className="text-accent" size={20} />}
         track="B"

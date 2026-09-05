@@ -4,6 +4,7 @@ import { useStore } from "@/lib/store";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { ListTodo, FileText, Code, History as HistoryIcon, Wrench, Brain, Check, X, Clock } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 const KIND_ICON = {
   spec: <FileText size={12} className="text-info" />,
@@ -14,6 +15,7 @@ const KIND_ICON = {
 };
 
 export default function ContextPage() {
+  const { t } = useTranslation();
   const packets = useStore((s) => s.contextPackets);
   const decisions = useStore((s) => s.contextDecisions);
 
@@ -22,7 +24,7 @@ export default function ContextPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Context"
+        title={t.pageTitles['/context'].title}
         subtitle="ContextPacket (5 字段: priority/kind/payload/provenance/decision) + Decision (3 状态) + INV-CT-01~10。token 预算决定单次 session 可加载量。"
         icon={<ListTodo className="text-accent" size={20} />}
         track="B"

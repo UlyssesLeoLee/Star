@@ -4,8 +4,10 @@ import { useStore } from "@/lib/store";
 import { PageHeader, Stat, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Bell, BellOff } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function NotificationPage() {
+  const { t } = useTranslation();
   const { notifications, markNotificationRead } = useStore();
   const delivered = notifications.filter((n) => n.status === "delivered").length;
   const read = notifications.filter((n) => n.status === "read").length;
@@ -15,7 +17,7 @@ export default function NotificationPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Notifications"
+        title={t.pageTitles['/notification'].title}
         subtitle="Inbox + Email + IM 渠道。INV-N-07 抑制策略:同 actor 60min 内同 kind 第 2 次自动 suppress(写入 audit)。"
         icon={<Bell className="text-accent" size={20} />}
         track="B"

@@ -10,8 +10,10 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Monitor, Terminal as TerminalIcon, FolderOpen, Server } from "lucide-react";
 import { PushSettings } from "@/components/remote/PushSettings";
+import { useTranslation } from "@/lib/i18n";
 
 export default function RemoteHomePage() {
+  const { t } = useTranslation();
   const runtimes = useStore((s) => s.localRuntimes);
   const router = useRouter();
 
@@ -20,7 +22,7 @@ export default function RemoteHomePage() {
   return (
     <div className="max-w-5xl">
       <PageHeader
-        title="远程控制"
+        title={t.pageTitles['/remote'].title}
         subtitle="手机端直连 local-runtime, 三件套: 远程桌面 (noVNC) / 远程终端 (xterm.js) / 远程文件 (SFTP)"
         icon={<Server className="text-accent" size={20} />}
         track="M"

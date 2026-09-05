@@ -10,8 +10,10 @@ import { PageHeader, Stat, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Tabs } from "@/components/Tabs";
 import { Users, ShieldCheck, Building2, Key, CheckCircle2, AlertCircle } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export default function IdentityPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<string>("users");
   const identities = useStore((s) => s.identities);
   const tenants = useStore((s) => s.tenants);
@@ -21,7 +23,7 @@ export default function IdentityPage() {
   return (
     <div className="max-w-7xl mx-auto">
       <PageHeader
-        title="Identity & Access"
+        title={t.pageTitles['/identity'].title}
         subtitle="统一身份认证、权限矩阵与多租户工作空间管理"
         icon={<Users className="text-accent" size={20} />}
         track="D"

@@ -10,12 +10,14 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/lib/i18n";
 
 interface UpdateEvent extends CustomEvent {
   detail: { reg: ServiceWorkerRegistration };
 }
 
 export function PwaUpdateToast() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [pendingReg, setPendingReg] = useState<ServiceWorkerRegistration | null>(null);
 
@@ -87,7 +89,7 @@ export function PwaUpdateToast() {
         <button
           type="button"
           onClick={dismiss}
-          aria-label="Dismiss"
+          aria-label={t.ariaLabels.dismiss}
           className="p-1 text-ink-mute hover:text-ink shrink-0"
         >
           <X size={13} />

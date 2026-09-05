@@ -17,8 +17,10 @@ import { StatusPill } from "@/components/StatusPill";
 import { Bot, Activity } from "lucide-react";
 import { MOCK_AGENTS_FALLBACK } from "@/mocks/data";
 import type { AgentRow } from "@/mocks/schemas/agent";
+import { useTranslation } from "@/lib/i18n";
 
 export default function AgentsPage() {
+  const { t } = useTranslation();
   const [agents, setAgents] = useState<ReadonlyArray<AgentRow>>(MOCK_AGENTS_FALLBACK);
   useEffect(() => {
     fetch("/api/agents")
@@ -34,7 +36,7 @@ export default function AgentsPage() {
   return (
     <div className="max-w-7xl mx-auto" data-testid="agents-page">
       <PageHeader
-        title="Agents"
+        title={t.pageTitles['/agents'].title}
         subtitle="agent / agent-session / lease / runtime (5 mock rows; 真实数据 P3)"
         icon={<Bot className="text-accent" size={20} />}
         count={`${active} active`}

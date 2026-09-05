@@ -4,6 +4,7 @@ import { useStore } from "@/lib/store";
 import { PageHeader, SectionTitle, Stat } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Zap, Webhook, Tag, UserPlus, GitBranch, Bot, Bell } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 const TRIGGER_ICON = {
   workitem_status_changed: Tag,
@@ -24,6 +25,7 @@ const ACTION_ICON = {
 };
 
 export default function AutomationPage() {
+  const { t } = useTranslation();
   const rules = useStore((s) => s.automationRules);
   const enabled = rules.filter((r) => r.enabled).length;
   const totalFired24h = rules.reduce((s, r) => s + r.execution_count_24h, 0);
@@ -31,7 +33,7 @@ export default function AutomationPage() {
   return (
     <div className="max-w-7xl">
       <PageHeader
-        title="Automation"
+        title={t.pageTitles['/automation'].title}
         subtitle="Rule + Trigger + Condition(CEL) + Action + RuleExecutor。6 INV 保证可观测、可禁用、可审计。"
         icon={<Zap className="text-accent" size={20} />}
         track="E"

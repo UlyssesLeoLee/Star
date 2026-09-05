@@ -13,6 +13,10 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { AgentCanvasView } from "./AgentCanvasView";
 import { useStore } from "@/lib/store";
+import { I18nProvider } from "@/lib/i18n";
+
+const renderWithI18n = (ui: React.ReactElement) =>
+  render(<I18nProvider>{ui}</I18nProvider>);
 import type { AgentSession, Worktree, WorkItem, AgentCanvas } from "@/types/ids";
 import type { AgentCanvas as AgentCanvasType } from "@/lib/agent-view/types";
 
@@ -85,7 +89,7 @@ describe("AgentCanvasView", () => {
       viewport: { x: 0, y: 0, zoom: 1 },
       derivedAt: "2026-09-05T11:00:00Z",
     };
-    render(<AgentCanvasView canvas={canvas} agent={baseAgent} worktree={null} />);
+    renderWithI18n(<AgentCanvasView canvas={canvas} agent={baseAgent} worktree={null} />);
     expect(screen.getByTestId("agent-canvas-container")).toBeTruthy();
     expect(screen.getByTestId("agent-canvas-svg")).toBeTruthy();
     expect(screen.getByTestId("agent-canvas-toolbar")).toBeTruthy();
@@ -109,7 +113,7 @@ describe("AgentCanvasView", () => {
       viewport: { x: 0, y: 0, zoom: 1 },
       derivedAt: "2026-09-05T11:00:00Z",
     };
-    render(<AgentCanvasView canvas={canvas} agent={baseAgent} worktree={baseWorktree} />);
+    renderWithI18n(<AgentCanvasView canvas={canvas} agent={baseAgent} worktree={baseWorktree} />);
     expect(screen.getByTestId("agent-canvas-node-n-agent-ag-001")).toBeTruthy();
     expect(screen.getByTestId("agent-canvas-node-n-wt-wt-001")).toBeTruthy();
     expect(screen.getByTestId("agent-canvas-node-n-wi-wi-001")).toBeTruthy();
@@ -125,7 +129,7 @@ describe("AgentCanvasView", () => {
       viewport: { x: 0, y: 0, zoom: 0.8 },
       derivedAt: "2026-09-05T11:00:00Z",
     };
-    render(<AgentCanvasView canvas={canvas} agent={baseAgent} worktree={null} />);
+    renderWithI18n(<AgentCanvasView canvas={canvas} agent={baseAgent} worktree={null} />);
     expect(screen.getByTestId("agent-canvas-zoom").textContent).toBe("80%");
   });
 
@@ -139,7 +143,7 @@ describe("AgentCanvasView", () => {
       viewport: { x: 0, y: 0, zoom: 1 },
       derivedAt: "2026-09-05T11:00:00Z",
     };
-    render(<AgentCanvasView canvas={canvas} agent={baseAgent} worktree={null} />);
+    renderWithI18n(<AgentCanvasView canvas={canvas} agent={baseAgent} worktree={null} />);
     const statusbar = screen.getByTestId("agent-canvas-statusbar");
     expect(statusbar.textContent).toContain("nodes 1");
     expect(statusbar.textContent).toContain("connectors 0");

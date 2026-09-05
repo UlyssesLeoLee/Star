@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import { Download, Share, Plus, X, Smartphone } from "lucide-react";
 import { clsx } from "clsx";
+import { useTranslation } from "@/lib/i18n";
 
 type State =
   | { kind: "hidden" }
@@ -24,6 +25,7 @@ interface BeforeInstallPromptEvent extends Event {
 const STORAGE_KEY = "star:pwa-install-dismissed";
 
 export function PwaInstallPrompt() {
+  const { t } = useTranslation();
   const [state, setState] = useState<State>({ kind: "hidden" });
 
   useEffect(() => {
@@ -82,7 +84,7 @@ export function PwaInstallPrompt() {
     <div
       data-testid="pwa-install-prompt"
       role="dialog"
-      aria-label="Install Star App"
+      aria-label={t.ariaLabels.installStarApp}
       style={{
         zIndex: 9998,
         paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
@@ -142,7 +144,7 @@ export function PwaInstallPrompt() {
               <button
                 type="button"
                 onClick={() => dismiss()}
-                aria-label="Dismiss"
+                aria-label={t.ariaLabels.dismiss}
                 className="p-1 text-ink-mute hover:text-ink shrink-0"
               >
                 <X size={13} />
@@ -175,7 +177,7 @@ export function PwaInstallPrompt() {
               <button
                 type="button"
                 onClick={() => dismiss(true)}
-                aria-label="Dismiss"
+                aria-label={t.ariaLabels.dismiss}
                 className="p-1 text-ink-mute hover:text-ink shrink-0"
               >
                 <X size={13} />

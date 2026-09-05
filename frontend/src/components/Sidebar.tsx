@@ -140,7 +140,7 @@ export function Sidebar() {
             isCollapsed ? "" : "gap-3"
           )}
           data-testid="sidebar-brand"
-          aria-label="Star home"
+          aria-label={t.ariaLabels.starHome}
         >
           <div
             aria-hidden="true"
@@ -187,7 +187,7 @@ export function Sidebar() {
             <PanelLeftOpen size={14} />
           </button>
         ) : (
-          <div className="flex items-center gap-1.5" title="Tactical Link Active">
+          <div className="flex items-center gap-1.5" title={t.ariaLabels.tacticalLinkActive}>
             <button
               type="button"
               onClick={toggleSidebarFold}
@@ -343,7 +343,7 @@ function ScopeToggle({ active, projectAvailable, onChange }: ScopeToggleProps) {
       data-testid="sidebar-scope-toggle"
       data-scope={active}
       role="tablist"
-      aria-label="Sidebar scope"
+      aria-label={t.ariaLabels.sidebarScope}
       className="px-3 pt-3 pb-2 border-b border-line/60 shrink-0"
     >
       <div className="flex items-center gap-1 p-0.5 rounded-lg bg-bg-soft/40 border border-line">

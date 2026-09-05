@@ -27,6 +27,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import { getCategoryStyles, type ModuleCategory } from "@/lib/nav/registry";
+import { useTranslation } from "@/lib/i18n";
 
 export interface SubNavItem {
   id: string;
@@ -77,6 +78,7 @@ export function SubNav({
   topLabel,
   category = "core",
 }: SubNavProps) {
+  const { t } = useTranslation();
   const pathname = usePathname();
   // Jira 风格扩展: active 状态用域色, 默认 core (cyan) 兼容旧 page
   const cs = getCategoryStyles(category);
@@ -84,7 +86,7 @@ export function SubNav({
   return (
     <aside
       data-testid="subnav"
-      aria-label="Section navigation"
+      aria-label={t.ariaLabels.sectionNav}
       className="w-[180px] shrink-0 border-r-2 border-black bg-[var(--cel-surface-sub,#151c2c)] h-full sticky top-16 cel-shadow"
     >
       {topLabel && (
@@ -95,7 +97,7 @@ export function SubNav({
           {topLabel}
         </div>
       )}
-      <nav className="py-2" aria-label="Subnav items">
+      <nav className="py-2" aria-label={t.ariaLabels.subnavItems}>
         {items.map((item) => {
           const isActive = activeId !== undefined
             ? activeId === item.id

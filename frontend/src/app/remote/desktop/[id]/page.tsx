@@ -5,12 +5,14 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { NoVncViewer } from "@/components/remote/NoVncViewer";
+import { useTranslation } from "@/lib/i18n";
 
 export default function RemoteDesktopPage({
   params,
 }: {
   params: { id: string };
 }) {
+  const { t } = useTranslation();
   const { id } = params;
   const runtime = useStore((s) => s.localRuntimes.find((r) => r.id === id));
 
@@ -32,7 +34,7 @@ export default function RemoteDesktopPage({
           href="/remote"
           data-testid="remote-desktop-back"
           className="p-1 text-ink-dim hover:text-ink"
-          aria-label="Back"
+          aria-label={t.ariaLabels.canvasBack}
         >
           <ArrowLeft size={16} />
         </Link>

@@ -16,16 +16,26 @@ import { useState } from "react";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { Tabs, type TabItem } from "@/components/Tabs";
 import { Settings, User, Users, CreditCard, Key } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 type SettingsTab = "profile" | "account" | "team" | "billing" | "apikeys";
 
-const TABS: ReadonlyArray<TabItem> = [
-  { id: "profile",  label: "Profile",   icon: <User size={12} />       },
-  { id: "account",  label: "Account",   icon: <Settings size={12} />   },
-  { id: "team",     label: "Team",      icon: <Users size={12} />      },
-  { id: "billing",  label: "Billing",   icon: <CreditCard size={12} /> },
-  { id: "apikeys",  label: "API Keys",  icon: <Key size={12} />        },
-];
+const TAB_IDS: ReadonlyArray<SettingsTab> = ["profile", "account", "team", "billing", "apikeys"];
+const TAB_ICONS: Record<SettingsTab, React.ReactNode> = {
+  profile: <User size={12} />,
+  account: <Settings size={12} />,
+  team: <Users size={12} />,
+  billing: <CreditCard size={12} />,
+  apikeys: <Key size={12} />,
+};
+// v0.6 (per 2026-09-05 拍板 C): tab label 走 i18n, 组件内构造
+const TAB_LABELS: Record<SettingsTab, Record<string, string>> = {
+  profile: { "zh-CN": "个人中心", en: "Profile", ja: "プロフィール" },
+  account: { "zh-CN": "账户", en: "Account", ja: "アカウント" },
+  team: { "zh-CN": "团队", en: "Team", ja: "チーム" },
+  billing: { "zh-CN": "计费", en: "Billing", ja: "請求" },
+  apikeys: { "zh-CN": "API 凭据", en: "API Keys", ja: "API キー" },
+};
 
 type FieldProps = {
   label: string;
@@ -81,7 +91,14 @@ function SimpleForm({ fields, onSave }: {
 }
 
 export default function SettingsPage() {
+  const { t, language } = useTranslation();
   const [tab, setTab] = useState<SettingsTab>("profile");
+  // v0.6 (per 2026-09-05 拍板 C): tab label 走 i18n
+  const TABS: ReadonlyArray<TabItem> = TAB_IDS.map((id) => ({
+    id,
+    label: TAB_LABELS[id][language] ?? TAB_LABELS[id].en,
+    icon: TAB_ICONS[id],
+  }));
   // tab 切换哨兵 — 触发 onSave 提示 (mock)
   const handleSave = () => {
     // P3 缺口: 不发起请求
@@ -90,7 +107,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-4xl mx-auto" data-testid="settings-page">
       <PageHeader
-        title="Settings"
+        title={t.pageTitles['/settings'].title}
         subtitle="tenant / identity / permission / role / integration / scm (5 tabs; submit endpoint P3 缺口)"
         icon={<Settings className="text-accent" size={20} />}
         count="5 tabs"
