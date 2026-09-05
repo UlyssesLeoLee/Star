@@ -803,7 +803,7 @@ function WorktreeNodeBody({ worktree, w, h, zoom }: { worktree: Worktree; w: num
       >
         {worktree.branch}
       </text>
-      <foreignObject x={14 * zoom} y={(h - 26) * zoom} width={(w - 28)} height={20 * zoom}>
+      <foreignObject x={14 * zoom} y={(h - 26) * zoom} width={(w - 28) * zoom} height={20 * zoom}>
         <div>
           <StatusPill value={worktree.status} size="xs" />
         </div>
