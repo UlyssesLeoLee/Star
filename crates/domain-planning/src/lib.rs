@@ -40,9 +40,11 @@ use uuid::Uuid;
 // UUID 强类型 ID 宏
 // =====================================================================
 
+/// 生成一个基于 Uuid 的强类型 ID 包装结构
 #[macro_export]
 macro_rules! define_uuid_id {
     ($name:ident) => {
+        /// 强类型 ID
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
@@ -50,9 +52,11 @@ macro_rules! define_uuid_id {
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 取出内部 Uuid
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -303,10 +307,15 @@ impl Sprint {
 /// Sprint 与 WorkItem 的关联记录(带 story_points 与 added_at)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SprintBacklogItem {
+    /// 主键
     pub id: SprintBacklogItemId,
+    /// 所属 Sprint ID
     pub sprint_id: SprintId,
+    /// 关联 WorkItem ID
     pub work_item_id: WorkItemId,
+    /// 故事点数
     pub story_points: Option<u32>,
+    /// 加入时间
     pub added_at: DateTime<Utc>,
 }
 
@@ -333,15 +342,23 @@ impl SprintBacklogItem {
 /// - INV-PL-03:Milestone 必带 tenant_id
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Milestone {
+    /// 主键
     pub id: MilestoneId,
     /// INV-PL-03:必带
     pub tenant_id: TenantId,
+    /// 项目 ID
     pub project_id: ProjectId,
+    /// Milestone 名称
     pub name: String,
+    /// Milestone 描述
     pub description: String,
+    /// 截止时间
     pub due_date: DateTime<Utc>,
+    /// 状态
     pub status: MilestoneStatus,
+    /// 关联 WorkItem 列表
     pub work_item_ids: Vec<WorkItemId>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
 }
 
@@ -417,10 +434,15 @@ impl Milestone {
 /// 每个 user 在 sprint 内的承诺工时与实际工时
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Capacity {
+    /// 主键
     pub id: CapacityId,
+    /// 所属 Sprint ID
     pub sprint_id: SprintId,
+    /// 用户 ID
     pub user_id: UserId,
+    /// 承诺工时
     pub committed_hours: f32,
+    /// 实际工时
     pub actual_hours: f32,
 }
 
@@ -468,10 +490,15 @@ impl Capacity {
 /// Sprint 内每日剩余 story points 快照
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BurndownPoint {
+    /// 主键
     pub id: BurndownPointId,
+    /// 所属 Sprint ID
     pub sprint_id: SprintId,
+    /// 快照日期
     pub date: DateTime<Utc>,
+    /// 剩余 story points
     pub remaining_points: u32,
+    /// 理想剩余 story points
     pub ideal_remaining: u32,
 }
 
@@ -495,20 +522,28 @@ impl BurndownPoint {
 /// **PlanningError** — 规划域统一错误
 #[derive(Debug, Error)]
 pub enum PlanningError {
+    /// 资源未找到
     #[error("not found: {0}")]
     NotFound(String),
+    /// 权限不足
     #[error("permission denied")]
     PermissionDenied,
+    /// 跨租户访问被拒绝
     #[error("cross-tenant access denied: actor tenant {0} vs resource tenant {1}")]
     CrossTenantDenied(TenantId, TenantId),
+    /// 状态非法
     #[error("invalid state: {0}")]
     InvalidState(String),
+    /// Sprint 日期与同项目内其他 Sprint 重叠
     #[error("sprint date overlap with existing sprint {0} in same project")]
     SprintOverlap(SprintId),
+    /// 工时超出承诺容量
     #[error("capacity exceeded: {0}")]
     CapacityExceeded(String),
+    /// 数据冲突
     #[error("conflict: {0}")]
     Conflict(String),
+    /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
 }
@@ -536,60 +571,85 @@ impl PlanningError {
 /// 创建 Sprint 命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateSprintCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 项目 ID
     pub project_id: ProjectId,
+    /// Sprint 名称
     pub name: String,
+    /// Sprint 目标
     pub goal: String,
+    /// 起始时间
     pub start_date: DateTime<Utc>,
+    /// 结束时间
     pub end_date: DateTime<Utc>,
 }
 
 /// 添加 WorkItem 到 Sprint 命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddToBacklogCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// Sprint ID
     pub sprint_id: SprintId,
+    /// WorkItem ID
     pub work_item_id: WorkItemId,
+    /// 故事点数
     pub story_points: Option<u32>,
 }
 
 /// 创建 Milestone 命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateMilestoneCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 项目 ID
     pub project_id: ProjectId,
+    /// Milestone 名称
     pub name: String,
+    /// Milestone 描述
     pub description: String,
+    /// 截止时间
     pub due_date: DateTime<Utc>,
 }
 
 /// 查询:获取 Sprint
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetSprintQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// Sprint ID
     pub sprint_id: SprintId,
 }
 
 /// 查询:列出 Active Sprint
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListActiveSprintQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 项目 ID(可选,不指定则查全部)
     pub project_id: Option<ProjectId>,
 }
 
 /// 查询:获取 Burndown
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetBurndownQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// Sprint ID
     pub sprint_id: SprintId,
 }
 
 /// 追加 Burndown 点的命令(用于数据采集)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppendBurndownPointCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// Sprint ID
     pub sprint_id: SprintId,
+    /// 剩余 story points
     pub remaining_points: u32,
+    /// 理想剩余 story points
     pub ideal_remaining: u32,
 }
 
@@ -685,9 +745,13 @@ pub trait PlanningQueryPort: Send + Sync {
 /// **PlanningRepository** — 持久化抽象
 #[async_trait]
 pub trait PlanningRepository: Send + Sync {
+    /// 插入 Sprint
     async fn insert_sprint(&self, s: Sprint) -> Result<(), PlanningError>;
+    /// 获取 Sprint
     async fn get_sprint(&self, id: SprintId) -> Result<Sprint, PlanningError>;
+    /// 更新 Sprint
     async fn update_sprint(&self, s: Sprint) -> Result<(), PlanningError>;
+    /// 列出 Sprint(按 tenant / project / status 过滤)
     async fn list_sprints(
         &self,
         tenant_id: TenantId,
@@ -695,22 +759,30 @@ pub trait PlanningRepository: Send + Sync {
         status: Option<SprintStatus>,
     ) -> Result<Vec<Sprint>, PlanningError>;
 
+    /// 插入 Milestone
     async fn insert_milestone(&self, m: Milestone) -> Result<(), PlanningError>;
+    /// 获取 Milestone
     async fn get_milestone(&self, id: MilestoneId) -> Result<Milestone, PlanningError>;
+    /// 更新 Milestone
     async fn update_milestone(&self, m: Milestone) -> Result<(), PlanningError>;
+    /// 列出 Milestone(按 tenant / project 过滤)
     async fn list_milestones(
         &self,
         tenant_id: TenantId,
         project_id: Option<ProjectId>,
     ) -> Result<Vec<Milestone>, PlanningError>;
 
+    /// 插入 backlog 项
     async fn insert_backlog_item(&self, item: SprintBacklogItem) -> Result<(), PlanningError>;
+    /// 列出某 Sprint 的 backlog 项
     async fn list_backlog_items(
         &self,
         sprint_id: SprintId,
     ) -> Result<Vec<SprintBacklogItem>, PlanningError>;
 
+    /// 插入 burndown 点
     async fn insert_burndown_point(&self, point: BurndownPoint) -> Result<(), PlanningError>;
+    /// 列出某 Sprint 的 burndown 点
     async fn list_burndown_points(
         &self,
         sprint_id: SprintId,
@@ -732,6 +804,7 @@ pub struct InMemoryPlanningService {
 }
 
 impl InMemoryPlanningService {
+    /// 创建一个使用内存仓储的新 service
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryPlanningRepository::new()),
@@ -742,6 +815,7 @@ impl InMemoryPlanningService {
         }
     }
 
+    /// 使用指定的仓储实现创建 service
     pub fn with_repo(repo: Arc<dyn PlanningRepository>) -> Self {
         Self {
             repo,
@@ -772,6 +846,7 @@ pub struct InMemoryPlanningRepository {
 }
 
 impl InMemoryPlanningRepository {
+    /// 创建一个空的内存仓储
     pub fn new() -> Self {
         Self {
             sprints: RwLock::new(HashMap::new()),
