@@ -1,4 +1,4 @@
-# 5 域 Lead 真人 Ulysses 内推 Brief v0.1 (per 9/5 10:43 JST G-DEP-08 拍板)
+# 5 域 Lead 真人 Ulysses 内推 Brief v0.1 (per 9/5 10:43 JST G-DEP-03 拍板)
 
 > **状态**: 🟢 Active v0.1 (2026-09-05 10:43 JST 拍板落地)
 > **触发**: per 9/5 10:43 JST `ask_409cbd32edc309d71a083e2a` 用户拍板 (Q1=内推, Q2=立即启动, 推荐项)
