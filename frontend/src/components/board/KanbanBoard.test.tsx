@@ -28,7 +28,7 @@ function renderWithI18n(ui: ReactNode) {
 const mockRouterPush = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockRouterPush, replace: vi.fn(), prefetch: vi.fn() }),
-  usePathname: () => "/issues",
+  usePathname: () => "/sprint",
   useSearchParams: () => new URLSearchParams(),
 }));
 

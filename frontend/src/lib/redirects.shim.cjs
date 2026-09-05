@@ -34,16 +34,18 @@ const LEGACY_REDIRECTS = [
   //   app/canvas/[id]/page.tsx (CanvasView Miro 详情页) 是设计文档意图主入口.
   //   跟 src/lib/redirects.ts 注释一致, 同步删除.
 
-  // ── /issues sink ────────────────────────────────────────────────────
-  { source: "/work-item", destination: "/issues?view=kanban", permanent: false },
-  { source: "/worktree", destination: "/issues?view=tree", permanent: false },
+  // ── /sprint sink (per 2026-09-05 19:13 JST 拍板: /issues 重命名 /sprint) ──
+  { source: "/issues", destination: "/sprint?view=sprint", permanent: false },
+  { source: "/work-item", destination: "/sprint?view=list", permanent: false },
+  { source: "/worktree", destination: "/sprint?view=tree", permanent: false },
 
-  // ── /agents sink ────────────────────────────────────────────────────
-  { source: "/agent", destination: "/agents", permanent: false },
-  { source: "/validation", destination: "/agents?tab=validation", permanent: false },
-  { source: "/automation", destination: "/agents?tab=automation", permanent: false },
-  { source: "/development", destination: "/agents?tab=development", permanent: false },
-  { source: "/local-runtime", destination: "/agents?tab=runtime", permanent: false },
+  // ── /agent-view sink (per 2026-09-05 19:45 JST 拍板: /agents -> /agent-view 307 redirect) ──
+  { source: "/agent", destination: "/agent-view", permanent: false },
+  { source: "/agents", destination: "/agent-view", permanent: false },
+  { source: "/validation", destination: "/agent-view?tab=validation", permanent: false },
+  { source: "/automation", destination: "/agent-view?tab=automation", permanent: false },
+  { source: "/development", destination: "/agent-view?tab=development", permanent: false },
+  { source: "/local-runtime", destination: "/agent-view?tab=runtime", permanent: false },
 
   // ── /inbox sink ─────────────────────────────────────────────────────
   { source: "/notification", destination: "/inbox", permanent: false },

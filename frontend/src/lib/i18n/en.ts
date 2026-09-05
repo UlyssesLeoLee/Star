@@ -117,7 +117,7 @@ export const en: Dictionary = {
   },
   modules: {
     inbox: { label: "Inbox", description: "Notifications, @mentions and audit stream aggregation hub", categoryLabel: "Core Workspace" },
-    issues: { label: "Issues", description: "Work items and task board / tree overview", categoryLabel: "Work Management" },
+    issues: { label: "Sprint", description: "Sprint + List + Tree views, defaults to Sprint", categoryLabel: "Work Management" },
     projects: { label: "Projects", description: "Multi-panel project workspace (Kanban / Timeline / Backlog / Agents / Worktrees)", categoryLabel: "Work Management" },
     agents: { label: "Agents", description: "Agent runtime status, orchestration, sessions and execution logs", categoryLabel: "Agent Orchestration" },
     analytics: { label: "Analytics", description: "Engineering effectiveness dashboard, burndown and telemetry metrics", categoryLabel: "Work Management" },
@@ -359,6 +359,7 @@ export const en: Dictionary = {
     "/": { title: "Home" },
     "/inbox": { title: "Inbox", subtitle: "notification / comment / audit (10 mock; real notification service P3 gap)" },
     "/issues": { title: "Issues" },
+    "/sprint": { title: "Sprint", subtitle: "Sprint view as primary + List table + Tree hierarchy. Default opens Sprint." },
     "/agents": { title: "Agents", subtitle: "agent / agent-session / lease / runtime (5 mock rows; real data P3)" },
     "/analytics": { title: "Analytics", subtitle: "Manga-style analytics hub: Gantt / burndown / cost trend / velocity / leaderboard" },
     "/settings": { title: "Settings", subtitle: "tenant / identity / permission / role / integration / scm (5 tabs; submit endpoint P3 gap)" },

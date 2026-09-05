@@ -11,6 +11,19 @@ import { PwaBoot } from "@/components/PwaBoot";
 import { PwaUpdateToast } from "@/components/PwaUpdateToast";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
+// ── 3 套字体策略 (per 9/5 14:41 JST 用户拍板 q2-fonts_opt1) ──
+//
+// 选 system 字体栈而非 next/font Google, 原因 (per 9/5 14:48 JST 实测):
+//   - build-time fonts.gstatic.com ECONNRESET (Noto Serif JP 87 子集全失败)
+//   - next/font fallback 不抛错但产出空字体, 实际"灵魂"被掏空
+//   - system 字体栈含 PingFang SC / Microsoft YaHei / Yu Mincho, 中日文足够"日漫感"
+//   - 0 网络外联, 守门 #1 v1 + 守门 #5 一并满足
+//
+// 真正的"日漫灵魂" 80% 来自 Hero 渐变 + 3D 漂浮核心 + 切角玻璃 + 排版密度,
+// 字体只补最后 20% 调性 — 跨平台 system 字体栈已经够, 后续如需自托管 woff2,
+// 单独起 v0.2 PR 不混本次提交.
+const fontClassName = "font-sans-jp";
+
 export const metadata: Metadata = {
   title: "Star — Vibe Coding Work Management",
   description:
@@ -48,7 +61,8 @@ export default function RootLayout({
   return (
     // suppressHydrationWarning: next-themes 在 client 注入 .dark class, SSR 不一致是预期.
     // 另: I18nProvider 会在 mount 后同步 <html lang="...">, 故此处先用默认 zh-CN 避免 hydration mismatch
-    <html lang="zh-CN" suppressHydrationWarning>
+    // 字体策略: system 字体栈, 不挂 next/font variable, 走 globals.css 的 --font-anime / --font-mono / --font-serif-jp fallback 链
+    <html lang="zh-CN" suppressHydrationWarning className={fontClassName}>
       <body className="min-h-screen bg-[color:var(--color-surface)] text-[color:var(--color-text)] antialiased transition-colors">
         <I18nProvider>
           <Providers>

@@ -13,7 +13,7 @@ import type { ReactNode } from "react";
 
 // Mock next/navigation — AppHeader 通过 usePathname 读 active tab
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/issues",
+  usePathname: () => "/sprint",
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 

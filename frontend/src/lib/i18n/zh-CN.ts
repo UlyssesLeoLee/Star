@@ -127,7 +127,7 @@ export const zhCN: Dictionary = {
   },
   modules: {
     inbox: { label: "Inbox", description: "通知中心、@提及与审计流聚合工作台", categoryLabel: "核心工作区" },
-    issues: { label: "Issues", description: "工作项与任务看板 / 树形全景视图", categoryLabel: "工作管理" },
+    issues: { label: "Sprint", description: "Sprint + List + Tree 视图, 默认打开 Sprint", categoryLabel: "工作管理" },
     projects: { label: "Projects", description: "多面板项目工作区 (Kanban / Timeline / Backlog / Agents / Worktrees)", categoryLabel: "工作管理" },
     agents: { label: "Agents", description: "智能 Agent 运行状态、编排、会话与执行日志", categoryLabel: "Agent 编排" },
     analytics: { label: "Analytics", description: "工程效能大盘、燃尽图与遥测指标统计", categoryLabel: "工作管理" },
@@ -371,6 +371,7 @@ export const zhCN: Dictionary = {
     "/": { title: "首页" },
     "/inbox": { title: "收件箱", subtitle: "通知 / 评论 / 审计 (10 mock; 真实 notification service P3 缺口)" },
     "/issues": { title: "工作项" },
+    "/sprint": { title: "Sprint 视图", subtitle: "Sprint 视图为主, 配合 List 表格 + Tree 层级. 默认打开 Sprint." },
     "/agents": { title: "Agent 总览", subtitle: "agent / agent-session / lease / runtime (5 mock; 真实数据 P3)" },
     "/analytics": { title: "效能分析", subtitle: "日漫科技分析中心: 甘特图 / 燃尽图 / 成本趋势 / 速率 / 排行榜" },
     "/settings": { title: "系统设置", subtitle: "tenant / identity / permission / role / integration / scm (5 tabs; submit endpoint P3 缺口)" },

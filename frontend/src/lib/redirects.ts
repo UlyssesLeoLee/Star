@@ -79,34 +79,37 @@ export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
   //   原 redirect "/canvas/:id" → "/projects?canvas=:id" 跟设计矛盾, 删.
   //   (per LEGACY_REDIRECTS 注释 /workspace/:id 同样保留原因: app/workspace 目录不存在, 必须 redirect)
 
-  // ── /issues sink ────────────────────────────────────────────────────
+  // ── /sprint sink (per 2026-09-05 19:13 JST 拍板: /issues 重命名 /sprint) ──
+  // 老链接兜底, 新主入口 /sprint 默认 view=sprint
+  { source: "/issues", destination: "/sprint?view=sprint", permanent: false },
   {
     source: "/work-item",
-    destination: "/issues?view=kanban",
+    destination: "/sprint?view=list",
     permanent: false,
   },
-  { source: "/worktree", destination: "/issues?view=tree", permanent: false },
+  { source: "/worktree", destination: "/sprint?view=tree", permanent: false },
 
-  // ── /agents sink ────────────────────────────────────────────────────
-  { source: "/agent", destination: "/agents", permanent: false },
+  // ── /agent-view sink (per 2026-09-05 19:45 JST 拍板: /agents -> /agent-view 307 redirect) ──
+  { source: "/agent", destination: "/agent-view", permanent: false },
+  { source: "/agents", destination: "/agent-view", permanent: false },
   {
     source: "/validation",
-    destination: "/agents?tab=validation",
+    destination: "/agent-view?tab=validation",
     permanent: false,
   },
   {
     source: "/automation",
-    destination: "/agents?tab=automation",
+    destination: "/agent-view?tab=automation",
     permanent: false,
   },
   {
     source: "/development",
-    destination: "/agents?tab=development",
+    destination: "/agent-view?tab=development",
     permanent: false,
   },
   {
     source: "/local-runtime",
-    destination: "/agents?tab=runtime",
+    destination: "/agent-view?tab=runtime",
     permanent: false,
   },
 

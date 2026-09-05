@@ -1,7 +1,7 @@
 // =====================================================================
 // PanelPlaceholder — U1 占位卡片 (per design §5 + §8.1 + 任务要求)
 // =====================================================================
-// - 6 路由 /inbox /issues /projects /agents /analytics /settings 共享的 placeholder 样式
+// - 6 路由 /inbox /sprint /projects /agents /analytics /settings 共享的 placeholder 样式 (per 2026-09-05 19:13 JST 拍板: /issues -> /sprint)
 // - 显示 panel 名称 + "Pending implementation by U2/U3/U4" 文案
 // - 使用 U5 dark token (bg/border/ink/accent) — 不改 tailwind.config.ts
 // - 由 U2/U3/U4 实装时整段替换为真正的 panel 实现

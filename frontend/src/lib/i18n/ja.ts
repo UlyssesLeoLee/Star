@@ -117,7 +117,7 @@ export const ja: Dictionary = {
   },
   modules: {
     inbox: { label: "受信箱", description: "通知、@メンション、監査ストリーム集約ハブ", categoryLabel: "コアワークスペース" },
-    issues: { label: "課題", description: "作業項目とタスクボード / ツリー概要", categoryLabel: "作業管理" },
+    issues: { label: "スプリント", description: "スプリント + リスト + ツリー表示, デフォルトはスプリント", categoryLabel: "作業管理" },
     projects: { label: "プロジェクト", description: "マルチパネルプロジェクトワークスペース (Kanban / Timeline / Backlog / Agents / Worktrees)", categoryLabel: "作業管理" },
     agents: { label: "エージェント", description: "エージェント実行状態、編成、セッション、実行ログ", categoryLabel: "Agent 编排" },
     analytics: { label: "分析", description: "エンジニアリング効果ダッシュボード、バーンダウン、テレメトリ指標", categoryLabel: "作業管理" },
@@ -359,6 +359,7 @@ export const ja: Dictionary = {
     "/": { title: "ホーム" },
     "/inbox": { title: "受信箱", subtitle: "通知 / コメント / 監査 (10 mock; 真实 notification service P3 缺口)" },
     "/issues": { title: "作業項目" },
+    "/sprint": { title: "Sprint ビュー", subtitle: "Sprint ビュー为主体、List テーブルと Tree 階層を組み合わせ。デフォルトで Sprint を開く。" },
     "/agents": { title: "Agent 一覧", subtitle: "agent / agent-session / lease / runtime (5 mock; 真实データ P3)" },
     "/analytics": { title: "效能分析", subtitle: "日漫風分析センター: ガント / バーンダウン / コスト趨勢 / 速率 / ランキング" },
     "/settings": { title: "システム設定", subtitle: "tenant / identity / permission / role / integration / scm (5 tabs; submit endpoint P3 缺口)" },

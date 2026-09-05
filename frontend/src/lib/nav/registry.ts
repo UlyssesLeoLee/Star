@@ -172,13 +172,14 @@ export const ALL_MODULES: ModuleDefinition[] = [
   },
   {
     id: "issues",
-    label: "Issues",
+    label: "Sprint",
     code: "02",
-    href: "/issues",
+    href: "/sprint",
+    // Per 2026-09-05 19:13 JST 拍板: /issues 重命名 /sprint, 内部 id 保留向后兼容 (MODULE_MAP.has("issues") 测试)
     // Per 2026-09-02 16:13 JST 域分色: Issues 是工作项主面板, 归 work 域
     category: "work",
     categoryLabel: "Core Workspace",
-    description: "工作项与任务看板 / 树形全景视图",
+    description: "Sprint 视图 + 列表 + 树形全景视图, 默认打开 Sprint",
     icon: CheckSquare,
     isCore: true,
   },

@@ -2,7 +2,7 @@
 // work-item/page.test.tsx — U2 改造: redirect 到 /issues
 // =====================================================================
 // 1 个测试 (per U2 spec):
-//   1. /work-item 渲染时触发 redirect("/issues")
+//   1. /work-item 渲染时触发 redirect("/sprint")
 //
 // 已知缺口 (per 缺标比错标):
 //   - next/navigation 的 redirect() 在 server-side 抛 NEXT_REDIRECT, 在 vitest jsdom 环境
@@ -38,6 +38,6 @@ describe("work-item redirect (U2)", () => {
     // redirect 抛 NEXT_REDIRECT, 用 try/catch 接住
     expect(() => WorkItemListPage()).toThrow(/NEXT_REDIRECT/);
     expect(mockRedirect).toHaveBeenCalledTimes(1);
-    expect(mockRedirect).toHaveBeenCalledWith("/issues");
+    expect(mockRedirect).toHaveBeenCalledWith("/sprint");
   });
 });

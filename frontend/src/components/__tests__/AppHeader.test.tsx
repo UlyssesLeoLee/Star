@@ -63,7 +63,7 @@ describe("AppHeader", () => {
   });
 
   it("marks the active tab by pathname + applies category color (per 2026-09-02 18:16 JST Jira 风格)", () => {
-    mockUsePathname.mockReturnValue("/issues");
+    mockUsePathname.mockReturnValue("/sprint");
     renderWithI18n(<AppHeader />);
     const issuesTab = screen.getByTestId("tab-issues");
     const inboxTab = screen.getByTestId("tab-inbox");

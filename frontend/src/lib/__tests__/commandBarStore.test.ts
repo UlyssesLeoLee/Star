@@ -85,7 +85,7 @@ describe("useCommandBarStore (CommandBar ⌘K, per §6)", () => {
   it("pushRecent(): 去重 + 最新在前 + cap 5 (per spec 5 条限制)", () => {
     const { pushRecent } = useCommandBarStore.getState();
     pushRecent({ id: "p1", label: "Inbox",  href: "/inbox",    type: "page", at: 1 });
-    pushRecent({ id: "p2", label: "Issues", href: "/issues",   type: "page", at: 2 });
+    pushRecent({ id: "p2", label: "Issues", href: "/sprint",   type: "page", at: 2 });
     pushRecent({ id: "p3", label: "Projects", href: "/projects", type: "page", at: 3 });
     pushRecent({ id: "p4", label: "Agents", href: "/agents",   type: "page", at: 4 });
     pushRecent({ id: "p5", label: "Analytics", href: "/analytics", type: "page", at: 5 });

@@ -19,5 +19,5 @@ import { redirect } from "next/navigation";
 
 export default function WorkItemListPage() {
   // 全部 work-item 列表 → /issues (主面板, Kanban default)
-  redirect("/issues");
+  redirect("/sprint");
 }

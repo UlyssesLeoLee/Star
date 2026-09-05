@@ -38,20 +38,19 @@ describe("subNavRegistry — findSubNavGroup", () => {
     expect(group?.pathnamePrefix).toBe("/projects");
   });
 
-  it("matches /issues strict equality", () => {
-    const group = findSubNavGroup("/issues");
-    expect(group?.pathnamePrefix).toBe("/issues");
+  it("matches /sprint strict equality (per 2026-09-05 19:13 JST 拍板: /issues 重命名 /sprint, Kanban 已删)", () => {
+    const group = findSubNavGroup("/sprint");
+    expect(group?.pathnamePrefix).toBe("/sprint");
     expect(group?.items.map((i) => i.id)).toEqual([
-      "kanban",
+      "sprint",
       "list",
       "tree",
-      "sprint",
     ]);
   });
 
   it("matches /issues?view=list (query string)", () => {
-    const group = findSubNavGroup("/issues?view=list");
-    expect(group?.pathnamePrefix).toBe("/issues");
+    const group = findSubNavGroup("/sprint?view=list");
+    expect(group?.pathnamePrefix).toBe("/sprint");
   });
 
   it("returns null for non-registered pathnames", () => {
@@ -102,7 +101,7 @@ describe("subNavRegistry — findActiveSubNavItem", () => {
   });
 
   it("works for /issues with view= query param", () => {
-    const group = findSubNavGroup("/issues");
+    const group = findSubNavGroup("/sprint");
     expect(findActiveSubNavItem(group!, "?view=list")).toBe("list");
     expect(findActiveSubNavItem(group!, "?view=tree")).toBe("tree");
     expect(findActiveSubNavItem(group!, "?view=sprint")).toBe("sprint");
