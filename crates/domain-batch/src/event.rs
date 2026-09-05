@@ -23,12 +23,16 @@ use crate::{EventId, RunId, TaskId, TenantId};
 /// 事件 meta (NATS 消息头)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventMeta {
+    /// 事件 ID
     pub event_id: Uuid,
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 发生时间
     pub occurred_at: DateTime<Utc>,
 }
 
 impl EventMeta {
+    /// 创建新的事件 meta
     pub fn new(tenant_id: TenantId) -> Self {
         Self {
             event_id: Uuid::new_v4(),
@@ -124,10 +128,15 @@ impl BatchEventKind {
 /// Batch 域事件 (11 事件 + meta)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BatchEvent {
+    /// 事件 meta
     pub meta: EventMeta,
+    /// 事件类型
     pub kind: BatchEventKind,
+    /// 关联 Run ID
     pub run_id: Option<RunId>,
+    /// 关联 Task ID
     pub task_id: Option<TaskId>,
+    /// 事件负载
     pub payload: serde_json::Value,
 }
 
