@@ -201,6 +201,16 @@ interface StoreState {
   transitionMilestone: (id: string, newDueDate: string) => void;  // ISO8601
   transitionSprint:    (id: string, newStart: string, newEnd: string) => void;
 
+  // Sprint Jira-范式 7 动作 (per 2026-09-05 19:32 JST 拍板: Sprint 对标 Jira, 估 1.5-2M tokens)
+  // 状态机: planned → active → completed; cancelled 仅 planned 可达
+  createSprint: (input: { name: string; goal: string; start_date: string; end_date: string; capacity_points: number; project_id?: string }) => string; // return id
+  renameSprint: (id: string, name: string, goal: string) => void;
+  startSprint: (id: string) => void;     // planned → active
+  completeSprint: (id: string, move_uncompleted_to: 'backlog' | 'new_sprint', new_sprint?: { name: string; goal: string; start_date: string; end_date: string; capacity_points: number }) => void; // active → completed
+  deleteSprint: (id: string) => void;     // 仅 planned/cancelled; cards 回 backlog
+  addToSprint: (sprintId: string, workItemId: string) => void;       // backlog → sprint
+  removeFromSprint: (workItemId: string) => void;                    // sprint → backlog (sprint_id = undefined)
+
   // Board 列编辑 (per 2026-08-29 18:52 JST 拍板: 列可改 + 增加减少; 2026-08-31 11:24 JST
   // 强化: workItems.status 为主源, board.columns[].work_item_ids 派生; todo 兜底不可删)
   addBoardColumn:    (status: WorkItemStatus) => void;     // 在末尾追加新列, 并回填 workItems.status 匹配的 wi
@@ -520,6 +530,155 @@ const initialState = (set: any): StoreState => ({
   transitionSprint: (id, newStart, newEnd) =>
     set((s: StoreState) => ({
       sprints: s.sprints.map((sp) => sp.id === id ? { ...sp, start_date: newStart, end_date: newEnd } : sp),
+    })),
+
+  // ---- Sprint Jira-范式 7 动作 (per 2026-09-05 19:32 JST 拍板) ----
+  // 状态机: planned → active → completed; cancelled 仅 planned 可达
+  createSprint: (input) => {
+    const id = `sprint-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const now = new Date().toISOString();
+    set((s: StoreState) => ({
+      sprints: [
+        ...s.sprints,
+        {
+          id,
+          tenant_id: s.tenantId ?? "tenant-default",
+          project_id: input.project_id ?? s.projects[0]?.id ?? "project-default",
+          name: input.name,
+          goal: input.goal,
+          status: "planned" as const,
+          start_date: input.start_date,
+          end_date: input.end_date,
+          capacity_points: input.capacity_points,
+          committed_points: 0,
+          completed_points: 0,
+        },
+      ],
+      notifications: [
+        ...s.notifications,
+        {
+          id: `notif-${Date.now()}`,
+          kind: "sprint" as const,
+          title: `Sprint 创建: ${input.name}`,
+          body: input.goal,
+          at: now,
+          read: false,
+          links: [{ href: `/sprint`, label: "查看 Sprint" }],
+        },
+      ],
+    }));
+    return id;
+  },
+  renameSprint: (id, name, goal) =>
+    set((s: StoreState) => ({
+      sprints: s.sprints.map((sp) => sp.id === id ? { ...sp, name, goal } : sp),
+    })),
+  startSprint: (id) =>
+    set((s: StoreState) => {
+      // 状态机校验: planned 才能启动
+      const target = s.sprints.find((sp) => sp.id === id);
+      if (!target || target.status !== "planned") return s;
+      // 自动将 committed_points 重算 (Sprint 关联 workItem 的 story_points 之和)
+      const cards = s.workItems.filter((w) => w.sprint_id === id);
+      const committed = cards.reduce((sum, w) => sum + (w.story_points ?? 0), 0);
+      return {
+        sprints: s.sprints.map((sp) => sp.id === id ? { ...sp, status: "active" as const, committed_points: committed } : sp),
+        notifications: [
+          ...s.notifications,
+          {
+            id: `notif-${Date.now()}`,
+            kind: "sprint" as const,
+            title: `Sprint 启动: ${target.name}`,
+            body: `${cards.length} 张卡片, ${committed} story points`,
+            at: new Date().toISOString(),
+            read: false,
+            links: [{ href: `/sprint`, label: "查看 Sprint" }],
+          },
+        ],
+      };
+    }),
+  completeSprint: (id, move_uncompleted_to, new_sprint) =>
+    set((s: StoreState) => {
+      const target = s.sprints.find((sp) => sp.id === id);
+      if (!target || target.status !== "active") return s;
+      // 找到 Sprint 内未完成 cards (status !== done)
+      const uncompleted = s.workItems.filter((w) => w.sprint_id === id && w.status !== "done");
+      let newSprintId: string | undefined;
+      let updatedSprints = s.sprints;
+      if (move_uncompleted_to === "new_sprint" && new_sprint) {
+        newSprintId = `sprint-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        updatedSprints = [
+          ...updatedSprints,
+          {
+            id: newSprintId,
+            tenant_id: target.tenant_id,
+            project_id: target.project_id,
+            name: new_sprint.name,
+            goal: new_sprint.goal,
+            status: "planned" as const,
+            start_date: new_sprint.start_date,
+            end_date: new_sprint.end_date,
+            capacity_points: new_sprint.capacity_points,
+            committed_points: 0,
+            completed_points: 0,
+          },
+        ];
+      }
+      // completed_points 重算
+      const completed = s.workItems.filter((w) => w.sprint_id === id && w.status === "done")
+        .reduce((sum, w) => sum + (w.story_points ?? 0), 0);
+      // 处理未完成 cards
+      const updatedWorkItems = s.workItems.map((w) => {
+        if (w.sprint_id !== id || w.status === "done") return w;
+        if (move_uncompleted_to === "backlog") {
+          return { ...w, sprint_id: undefined };
+        }
+        // new_sprint
+        return { ...w, sprint_id: newSprintId };
+      });
+      return {
+        sprints: updatedSprints.map((sp) => sp.id === id ? { ...sp, status: "completed" as const, completed_points: completed } : sp),
+        workItems: updatedWorkItems,
+        notifications: [
+          ...s.notifications,
+          {
+            id: `notif-${Date.now()}`,
+            kind: "sprint" as const,
+            title: `Sprint 完成: ${target.name}`,
+            body: `${completed} SP 完成${uncompleted.length > 0 ? `, ${uncompleted.length} 张未完成 → ${move_uncompleted_to === "backlog" ? "Backlog" : "新 Sprint"}` : ""}`,
+            at: new Date().toISOString(),
+            read: false,
+            links: [{ href: `/sprint`, label: "查看 Sprint" }],
+          },
+        ],
+      };
+    }),
+  deleteSprint: (id) =>
+    set((s: StoreState) => {
+      const target = s.sprints.find((sp) => sp.id === id);
+      if (!target) return s;
+      // 仅 planned/cancelled 可删; active 删会丢进行中数据
+      if (target.status === "active" || target.status === "completed") return s;
+      // 关联 cards 回 backlog
+      const updatedWorkItems = s.workItems.map((w) =>
+        w.sprint_id === id ? { ...w, sprint_id: undefined } : w
+      );
+      return {
+        sprints: s.sprints.filter((sp) => sp.id !== id),
+        workItems: updatedWorkItems,
+      };
+    }),
+  addToSprint: (sprintId, workItemId) =>
+    set((s: StoreState) => ({
+      workItems: s.workItems.map((w) =>
+        w.id === workItemId ? { ...w, sprint_id: sprintId } : w
+      ),
+    })),
+  removeFromSprint: (workItemId) =>
+    set((s: StoreState) => ({
+      workItems: s.workItems.map((w) =>
+        w.id === workItemId ? { ...w, sprint_id: undefined } : w
+      ),
     })),
 
   // Board 列编辑 (per 2026-08-29 18:52 JST 拍板; 2026-08-31 11:24 JST 强化)

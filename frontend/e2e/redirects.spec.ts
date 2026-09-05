@@ -50,12 +50,14 @@ const findRedirect = (source: string) => {
 };
 
 describe("redirects: legacy 22 routes → 6 panels", () => {
-  it("contains 27 entries (9 projects-sink + 1 /workspace/:id param + 3 issues/sprint-sink + 5 agents-sink + 6 inbox-sink + 3 settings-sink)", () => {
+  it("contains 28 entries (9 projects-sink + 1 /workspace/:id param + 3 issues/sprint-sink + 6 agent-view-sink + 6 inbox-sink + 3 settings-sink)", () => {
     // per 2026-09-04 canvas e2e 守门 prerequisite: /canvas/:id 移出 legacy redirect 列表
     //   (app/canvas/[id]/page.tsx 才是设计文档意图的 CanvasView Miro 详情页主入口).
     //   从 27 entries 减到 26 entries; per 2026-09-05 19:13 JST 拍板: /issues → /sprint 重命名,
     //   27 entries 加 1 条 /issues → /sprint 兜底 = 27 entries.
-    expect(LEGACY_REDIRECTS.length).toBe(27);
+    //   per 2026-09-05 19:45 JST 拍板: /agents → /agent-view 307 redirect + /agent 也重定向到 /agent-view,
+    //   28 entries 加 1 条 /agents → /agent-view 兜底 = 28 entries.
+    expect(LEGACY_REDIRECTS.length).toBe(28);
   });
 
   it("/workspace → /projects (case 1)", () => {
@@ -134,6 +136,7 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
       "/sprint",
       "/projects",
       "/agents",
+      "/agent-view", // per 2026-09-05 19:45 JST 拍板: /agents -> /agent-view 307 redirect
       "/settings",
     ];
     for (const r of LEGACY_REDIRECTS) {
@@ -158,7 +161,7 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
     }
   });
 
-  it("all 27 entries use 307 (permanent: false) for client-friendly nav", () => {
+  it("all 28 entries use 307 (permanent: false) for client-friendly nav", () => {
     for (const r of LEGACY_REDIRECTS) {
       expect(r.permanent, `${r.source} should not be permanent`).toBe(false);
     }
