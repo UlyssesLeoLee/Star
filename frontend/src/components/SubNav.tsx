@@ -85,12 +85,12 @@ export function SubNav({
     <aside
       data-testid="subnav"
       aria-label="Section navigation"
-      className="w-[180px] shrink-0 border-r border-line bg-bg-soft/30 h-full sticky top-16"
+      className="w-[180px] shrink-0 border-r-2 border-black bg-[var(--cel-surface-sub,#151c2c)] h-full sticky top-16 cel-shadow"
     >
       {topLabel && (
         <div
           data-testid="subnav-top-label"
-          className="px-4 py-3 text-[10px] uppercase tracking-wider text-ink-mute border-b border-line"
+          className="px-4 py-3 text-[10px] uppercase tracking-wider text-ink-mute border-b-2 border-black font-mono font-bold"
         >
           {topLabel}
         </div>

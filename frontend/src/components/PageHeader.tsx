@@ -19,18 +19,18 @@ export function PageHeader({
   const desc = subtitle ?? description;
   const act = action ?? actions;
   return (
-    <div className="mb-6 flex items-end justify-between gap-4">
+    <div className="mb-6 flex items-end justify-between gap-4 border-b-2 border-black pb-4">
       <div>
         <div className="flex items-center gap-2.5 mb-1.5">
           {icon}
-          <h1 className="text-2xl font-black text-ink tracking-tight">{title}</h1>
+          <h1 className="text-2xl font-black text-ink tracking-tight" style={{textShadow: '3px 3px 0 var(--cel-shadow-color, #000)'}}>{title}</h1>
           {track && (
             <span className="pill border-line text-ink-dim font-mono text-[10px] font-semibold">
               {interpolate(t.pageHeader.trackPill, { track })}
             </span>
           )}
           {count !== undefined && (
-            <span className="pill border-accent/40 text-accent bg-accent/10 font-mono text-[10px] font-bold shadow-[0_0_8px_rgba(0,240,255,0.2)]">
+            <span className="anime-hud-tag">
               {count}
             </span>
           )}
@@ -80,7 +80,7 @@ export function Stat({
 
 export function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between mb-2.5">
+    <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-black">
       <h2 className="text-xs uppercase tracking-wider text-ink-dim font-bold font-mono">{children}</h2>
       {action}
     </div>

@@ -166,7 +166,7 @@ function IssuesPageInner() {
     <div className="flex h-full min-h-[calc(100vh-64px)]" data-testid="issues-page">
       {/* Per 2026-09-05 19:13 JST 拍板: 干掉 SubNav, 只留全局 Sidebar; view tabs 改顶部 */}
       <div className="flex-1 min-w-0 flex">
-        <div className="flex-1 min-w-0 px-6 py-5 overflow-x-auto">
+        <div className="flex-1 min-w-0 overflow-x-auto">
           <PageHeader
             title="Sprint"
             subtitle={`${workItems.length} work-items — Sprint 视图为主, 配合 List 表格 + Tree 层级. 默认打开 Sprint.`}
@@ -335,7 +335,7 @@ function IssuesPageInner() {
         {selectedWi && (
           <aside
             data-testid="issues-detail-sidebar"
-            className="w-80 shrink-0 border-l border-line bg-bg-soft/30 overflow-y-auto"
+            className="w-80 shrink-0 border-l-2 border-black bg-[var(--cel-surface-sub,#151c2c)] overflow-y-auto cel-shadow"
             aria-label="Issue detail"
           >
             <IssuesDetailSidebar
@@ -636,7 +636,7 @@ function IssuesSprintView({
                 <div
                   key={st}
                   data-testid={`issues-sprint-col-${sprint.id}-${st}`}
-                  className="border border-line rounded p-2 min-h-[80px]"
+                  className="border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] p-2 min-h-[80px] cel-shadow"
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <StatusPill value={st} size="xs" />

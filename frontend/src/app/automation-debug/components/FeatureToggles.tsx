@@ -59,7 +59,7 @@ export function FeatureToggles({ script, onToggleFeature }: Props) {
                   <Checkbox
                     id={`${script.id}-${f}`}
                     checked={enabled[f] ?? true}
-                    onCheckedChange={(checked) => handleToggle(f, !!checked)}
+                    onChange={(e) => handleToggle(f, e.target.checked)}
                   />
                   <Label
                     htmlFor={`${script.id}-${f}`}

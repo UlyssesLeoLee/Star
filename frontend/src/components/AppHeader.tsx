@@ -41,7 +41,7 @@ export function AppHeader() {
     <>
       <header
         data-testid="app-header"
-        className="h-16 sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur-xl transition-all select-none"
+        className="h-16 sticky top-0 z-30 border-b-2 border-black bg-bg/95 backdrop-blur-xl cel-shadow transition-all select-none"
       >
         <div className="h-full px-6 flex items-center gap-4">
           {/* === Left: Workspace Switcher === */}

@@ -59,175 +59,229 @@ html, body {
 ::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
 
 @layer components {
-  /* ── 艺术级漫画卡片 — 主题自适应 ────────────────────────── */
+  /* ── 艺术级三渲二漫画卡片 (Swiss 8pt Grid & Optical Balance) ────────────────────────── */
   .card {
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--color-border);
-    background-color: var(--bg-card);
-    padding: 1rem;
-    transition: box-shadow 0.2s ease, border-color 0.2s ease;
-    box-shadow: var(--shadow-sm);
+    border-radius: 0px;
+    border: 2.5px solid var(--cel-ink, #000000);
+    background: var(--cel-card-ramp);
+    padding: 1.5rem; /* 24px breathable margin */
+    transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms ease, border-color 0.15s ease;
+    box-shadow: 6px 6px 0px 0px var(--cel-shadow-color, #000000);
+    position: relative;
   }
   .card:hover {
-    box-shadow: var(--shadow-md);
-    border-color: var(--color-primary);
+    transform: translate(-2px, -2px);
+    box-shadow: 8px 8px 0px 0px var(--cel-shadow-color, #000000);
+    border-color: var(--cel-cyan, #00f0ff);
   }
 
-  /* ── 动漫战术玻璃面板 — 主题自适应 ─────────────────────── */
+  /* ── 动漫三渲二战术面板 (NPR Stepped Ramp + Breathing Chamfer) ─────────────────────── */
   .anime-panel {
     position: relative;
-    border-radius: var(--radius-xl);
-    border: 1px solid var(--color-border);
-    background-color: color-mix(in srgb, var(--bg-soft) 80%, transparent);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    padding: 1.25rem;
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
-    box-shadow: var(--shadow-sm);
+    border-radius: 0px;
+    border: 3px solid var(--cel-ink, #000000);
+    background: var(--cel-card-ramp);
+    padding: 1.5rem; /* 24px optical gutter */
+    transition: transform 120ms ease, box-shadow 120ms ease;
+    box-shadow: 7px 7px 0px 0px var(--cel-shadow-color, #000000);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
   }
   .anime-panel:hover {
-    box-shadow: var(--shadow-lg);
-    border-color: var(--color-primary);
+    transform: translate(-2px, -2px);
+    box-shadow: 9px 9px 0px 0px var(--cel-shadow-color, #000000);
+    border-color: var(--cel-crimson, #ff184c);
   }
 
-  /* ── 战术 HUD 微标签 ─────────────────────────────────────── */
+  /* ── 战术 HUD 微标签 (Manga Inked HUD Tag) ─────────────────────── */
   .anime-hud-tag {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    font-family: ui-monospace, monospace;
+    justify-content: center;
+    gap: 0.375rem;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 2px 8px;
-    border-radius: 4px;
-    border: 1px solid var(--color-hud-tag-border);
-    color: var(--color-hud-tag);
-    background-color: var(--color-hud-tag-bg);
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    height: 24px;
+    border-radius: 0px;
+    border: 1.5px solid var(--cel-ink, #000000);
+    color: var(--cel-cyan, #00f0ff);
+    background-color: var(--cel-surface-card, #0f1422);
+    box-shadow: 2px 2px 0px 0px var(--cel-shadow-color, #000000);
+    line-height: 1;
   }
 
-  /* ── 二次元发光徽章 ──────────────────────────────────────── */
+  /* ── 二次元三渲二发光徽章 ──────────────────────────────────────── */
   .anime-badge-neon {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    font-family: ui-monospace, monospace;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 11px;
-    font-weight: 600;
-    padding: 2px 10px;
-    border-radius: 9999px;
-    border: 1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
-    background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
-    color: var(--color-primary);
-    box-shadow: var(--glow-accent);
+    font-weight: 800;
+    padding: 4px 12px;
+    height: 26px;
+    border-radius: 0px;
+    border: 2px solid var(--cel-ink, #000000);
+    background-color: var(--cel-crimson, #ff184c);
+    color: #000000;
+    box-shadow: 3px 3px 0px 0px var(--cel-shadow-color, #000000);
+    font-style: italic;
+    line-height: 1;
   }
 
-  /* ── 状态胶囊 ────────────────────────────────────────────── */
+  /* ── 状态胶囊 (Stepped NPR Pill) ────────────────────────────── */
   .pill {
     display: inline-flex;
     align-items: center;
-    border-radius: 9999px;
-    border: 1px solid var(--color-border);
-    padding: 2px 10px;
-    font-size: 12px;
-    font-weight: 500;
-    font-family: ui-monospace, monospace;
-    letter-spacing: -0.01em;
-    transition: colors 0.15s ease;
+    justify-content: center;
+    border-radius: 0px;
+    border: 1.5px solid var(--cel-ink, #000000);
+    padding: 3px 10px;
+    height: 24px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.02em;
+    background-color: var(--cel-surface-sub, #151c2c);
+    box-shadow: 2px 2px 0px 0px var(--cel-shadow-color, #000000);
+    transition: transform 80ms ease;
+    line-height: 1;
   }
 
-  /* ── 战术交互按钮 ─────────────────────────────────────────── */
+  /* ── 3D 触觉战术交互按钮 (Standardized Fitts Target: min-h 40px) ───────────────────── */
   .btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
-    background-color: var(--bg-soft);
-    padding: 6px 12px;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px; /* Fitts's law optical target */
+    border-radius: 0px;
+    border: 2px solid var(--cel-ink, #000000);
+    background: var(--cel-surface-sub, #151c2c);
+    padding: 8px 18px;
     font-size: 12px;
-    font-weight: 500;
-    color: var(--color-text);
-    transition: all 0.15s ease;
+    font-weight: 800;
+    color: var(--cel-text-primary, #ffffff);
+    box-shadow: 4px 4px 0px 0px var(--cel-shadow-color, #000000);
+    transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 100ms cubic-bezier(0.16, 1, 0.3, 1);
+    line-height: 1.2;
   }
   .btn:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0px 0px var(--cel-shadow-color, #000000);
+    border-color: var(--cel-cyan, #00f0ff);
   }
-  .btn:active { transform: scale(0.98); }
+  .btn:active {
+    transform: translate(3px, 3px) !important;
+    box-shadow: 0px 0px 0px #000000 !important;
+  }
 
   .btn-primary {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-primary);
-    background-color: var(--color-primary);
-    padding: 6px 14px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--color-on-primary);
-    box-shadow: var(--glow-accent);
-    transition: all 0.15s ease;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px; /* Fitts's primary target */
+    border-radius: 0px;
+    border: 2.5px solid var(--cel-ink, #000000);
+    background: linear-gradient(135deg, #ff3b69 0%, #ff3b69 40%, #ff184c 40%, #ff184c 75%, #b8002d 75%, #b8002d 100%);
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 900;
+    color: #000000;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-style: italic;
+    box-shadow: 5px 5px 0px 0px var(--cel-shadow-color, #000000);
+    transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 100ms cubic-bezier(0.16, 1, 0.3, 1);
+    line-height: 1.2;
   }
   .btn-primary:hover {
-    background-color: color-mix(in srgb, var(--color-primary) 88%, var(--color-on-primary));
-    border-color: color-mix(in srgb, var(--color-primary) 88%, var(--color-on-primary));
+    transform: translate(-2px, -2px);
+    box-shadow: 7px 7px 0px 0px var(--cel-shadow-color, #000000);
+    filter: brightness(1.1);
   }
-  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:active {
+    transform: translate(4px, 4px) !important;
+    box-shadow: 0px 0px 0px #000000 !important;
+  }
 
-  /* ── 主色幽灵按钮 (透明底 + 主色字) ─────────────────────────
-     per 2026-08-31 11:35 JST 拍板: 保留透明底风格, 跟 .btn-primary 区分
-     适用: 次要操作 (filter chip / 切换按钮), 不抢主操作视觉 */
   .btn-primary-ghost {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    border-radius: var(--radius-md);
-    border: 1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
-    background-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
-    padding: 6px 12px;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px;
+    border-radius: 0px;
+    border: 2px solid var(--cel-ink, #000000);
+    background-color: var(--cel-surface-sub, #151c2c);
+    padding: 8px 16px;
     font-size: 12px;
-    font-weight: 600;
-    color: var(--color-primary);
-    transition: all 0.15s ease;
+    font-weight: 800;
+    color: var(--cel-cyan, #00f0ff);
+    box-shadow: 4px 4px 0px 0px var(--cel-shadow-color, #000000);
+    transition: transform 100ms ease, box-shadow 100ms ease;
+    line-height: 1.2;
   }
   .btn-primary-ghost:hover {
-    background-color: color-mix(in srgb, var(--color-primary) 22%, transparent);
-    border-color: color-mix(in srgb, var(--color-primary) 60%, transparent);
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0px 0px var(--cel-shadow-color, #000000);
+    border-color: var(--cel-cyan, #00f0ff);
   }
-  .btn-primary-ghost:active { transform: scale(0.98); }
-  /* ghost 变体的 disabled 状态 — 整组置灰 */
+  .btn-primary-ghost:active {
+    transform: translate(3px, 3px) !important;
+    box-shadow: 0px 0px 0px #000000 !important;
+  }
+  .btn-primary-ghost:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0px 0px var(--cel-shadow-color, #000000);
+    border-color: var(--cel-cyan, #00f0ff);
+  }
+  .btn-primary-ghost:active {
+    transform: translate(3px, 3px) !important;
+    box-shadow: 0px 0px 0px #000000 !important;
+  }
   .btn-primary-ghost:disabled,
   .btn-primary:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+    box-shadow: none !important;
+    transform: none !important;
   }
 
-  /* ── 艺术级表格 ───────────────────────────────────────────── */
+  /* ── 艺术级三销二表格 ───────────────────────────────────────────── */
   .table {
     width: 100%;
     font-size: 12px;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 2px solid var(--cel-ink, #000000);
+    box-shadow: 5px 5px 0px 0px var(--cel-shadow-color, #000000);
   }
   .table th {
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: 2px solid var(--cel-ink, #000000);
+    background-color: var(--cel-surface-card, #0f1422);
     padding: 10px 14px;
     text-align: left;
     font-size: 11px;
-    font-family: ui-monospace, monospace;
-    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-dim);
+    letter-spacing: 0.08em;
+    color: var(--cel-gold, #ffc400);
   }
   .table td {
-    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 40%, transparent);
+    border-bottom: 1.5px solid var(--cel-ink, #000000);
     padding: 10px 14px;
-    color: var(--color-text);
+    color: var(--cel-text-primary, #ffffff);
+    background-color: var(--cel-surface-sub, #151c2c);
   }
   .table tr:hover td {
-    background-color: color-mix(in srgb, var(--bg-soft) 50%, transparent);
+    background-color: var(--cel-surface-stage, #1a2438);
   }
 
   /* ── 黄金切角装饰 ─────────────────────────────────────────── */
@@ -300,3 +354,239 @@ html, body {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: 0.55; transform: scale(0.85); }
 }
+=======
+/* ============================================================================
+   ★ AUTHENTIC 3D-TO-2D (三渲二 CEL-SHADED NPR) GRANDMASTER STYLE ENGINE
+   Zero diffuse blur, stepped Half-Lambert lighting ramps, Inverted Hull inking,
+   Ben-Day halftone screentones, and physical 3D spring affordance.
+   ============================================================================ */
+
+/* ============================================================================
+   ★ DUAL INDEPENDENT MASTERPIECE THEME SYSTEMS (双独立艺术品级三渲二)
+   - DARK: Neo-Tokyo Manga Void (Persona 5 & ZZZ Dark)
+   - LIGHT: Shōnen Studio Archival Paper (Kill la Kill & Bleach Manga Light)
+   100% Isolated: Zero color bleed or cross-contamination between modes.
+   ============================================================================ */
+
+/* ── 1. DARK MODE SYSTEM (默认 / .theme-dark / .dark) ── */
+:root,
+html.dark,
+.theme-dark {
+  --cel-bg: #07090e;
+  --cel-surface-card: #0f1422;
+  --cel-surface-sub: #151c2c;
+  --cel-surface-stage: #090d16;
+  --cel-card-ramp: linear-gradient(145deg, #1c2640 0%, #1c2640 35%, #111c30 35%, #111c30 70%, #08101e 70%, #08101e 100%);
+  --cel-crimson: #ff184c;
+  --cel-cyan: #00f0ff;
+  --cel-gold: #ffc400;
+  --cel-ink: #000000;
+  --cel-text-primary: #ffffff;
+  --cel-text-secondary: #94a3b8;
+  --cel-screentone-dot: rgba(0, 240, 255, 0.12);
+  --cel-shadow-color: #000000;
+}
+
+/* ── 2. LIGHT MODE SYSTEM (.theme-light / html.light) ── */
+html.light,
+.theme-light {
+  --cel-bg: #f4efe6;
+  --cel-surface-card: #eae2d6;
+  --cel-surface-sub: #fbf8f3;
+  --cel-surface-stage: #e8decb;
+  --cel-card-ramp: linear-gradient(145deg, #ffffff 0%, #ffffff 38%, #eae0ce 38%, #eae0ce 72%, #d6c8b0 72%, #d6c8b0 100%);
+  --cel-crimson: #e60033;
+  --cel-cyan: #0055ff;
+  --cel-gold: #d48800;
+  --cel-ink: #0a0d14;
+  --cel-text-primary: #0a0d14;
+  --cel-text-secondary: #4a5568;
+  --cel-screentone-dot: rgba(10, 13, 20, 0.12);
+  --cel-shadow-color: #0a0d14;
+}
+
+/* 1. Comic Halftone & Screentone Patterns */
+.bg-screentone {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1.5px, transparent 1.5px);
+  background-size: 14px 14px;
+}
+
+.bg-screentone-dense {
+  background-image: radial-gradient(rgba(0, 240, 255, 0.12) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+/* 2. Stepped Cel-Shading Shadows (Pure Inked Depth, Zero Blur) */
+.cel-shadow {
+  box-shadow: 4px 4px 0px 0px var(--cel-shadow-color, #000000);
+}
+
+.cel-shadow-lg {
+  box-shadow: 7px 7px 0px 0px var(--cel-shadow-color, #000000);
+}
+
+.cel-shadow-crimson {
+  box-shadow: 5px 5px 0px 0px var(--cel-crimson);
+}
+
+.cel-shadow-cyan {
+  box-shadow: 5px 5px 0px 0px var(--cel-cyan);
+}
+
+.cel-shadow-gold {
+  box-shadow: 5px 5px 0px 0px var(--cel-gold);
+}
+
+/* 3. Manga Corner Cutouts & Dynamic Skew */
+.clip-hud-corner {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
+}
+
+.clip-hex-badge {
+  clip-path: polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%);
+}
+
+.clip-manga-tag {
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+}
+
+.skew-manga {
+  transform: skewX(-8deg);
+}
+
+.unskew-manga {
+  transform: skewX(8deg);
+}
+
+/* 4. Stepped Cel Lighting Ramps (NPR Discrete Tone Bands) */
+.cel-ramp-crimson {
+  background: linear-gradient(135deg, 
+    #ff3b69 0%, #ff3b69 40%, 
+    #ff184c 40%, #ff184c 75%, 
+    #b8002d 75%, #b8002d 100%);
+}
+
+.cel-ramp-cyan {
+  background: linear-gradient(135deg, 
+    #5df6ff 0%, #5df6ff 35%, 
+    #00f0ff 35%, #00f0ff 70%, 
+    #009bb3 70%, #009bb3 100%);
+}
+
+.cel-ramp-card {
+  background: var(--cel-card-ramp);
+}
+
+/* 5. 3D Cel Button & Interactive Kinetics */
+.cel-btn-3d {
+  position: relative;
+  transition: transform 80ms cubic-bezier(0.2, 0, 0, 1), box-shadow 80ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.cel-btn-3d:hover {
+  transform: translate(-1px, -1px);
+}
+
+.cel-btn-3d:active {
+  transform: translate(3px, 3px) !important;
+  box-shadow: 0px 0px 0px #000 !important;
+}
+
+/* 6. Awaken Burst Mode Visual Overdrive */
+.burst-active {
+  animation: burstPulse 3s infinite ease-in-out;
+}
+
+@keyframes burstPulse {
+  0%, 100% { filter: contrast(1.05) saturate(1.1); }
+  50% { filter: contrast(1.15) saturate(1.25) brightness(1.03); }
+}
+
+/* ── Light Mode Dynamic Overrides (100% Clean Separation) ── */
+html.light .bg-[#07090e],
+.theme-light .bg-[#07090e] {
+  background-color: var(--cel-bg) !important;
+}
+
+html.light .bg-[#0f1422],
+.theme-light .bg-[#0f1422] {
+  background-color: var(--cel-surface-card) !important;
+  border-color: var(--cel-ink) !important;
+}
+
+html.light .bg-[#0d121c]\/95,
+.theme-light .bg-[#0d121c]\/95 {
+  background-color: rgba(244, 239, 230, 0.95) !important;
+  border-color: var(--cel-ink) !important;
+}
+
+html.light .bg-[#151c2c],
+.theme-light .bg-[#151c2c] {
+  background-color: var(--cel-surface-sub) !important;
+  border-color: var(--cel-ink) !important;
+  color: var(--cel-text-primary) !important;
+}
+
+html.light .bg-[#090d16],
+.theme-light .bg-[#090d16] {
+  background-color: var(--cel-surface-stage) !important;
+  border-color: var(--cel-ink) !important;
+}
+
+html.light .text-white,
+.theme-light .text-white {
+  color: var(--cel-text-primary) !important;
+}
+
+html.light .text-slate-100,
+html.light .text-slate-200,
+html.light .text-slate-300,
+.theme-light .text-slate-100,
+.theme-light .text-slate-200,
+.theme-light .text-slate-300 {
+  color: var(--cel-text-primary) !important;
+}
+
+html.light .text-slate-400,
+html.light .text-slate-500,
+.theme-light .text-slate-400,
+.theme-light .text-slate-500 {
+  color: var(--cel-text-secondary) !important;
+}
+
+html.light .bg-screentone-dense,
+.theme-light .bg-screentone-dense {
+  background-image: radial-gradient(rgba(10, 13, 20, 0.15) 1px, transparent 1px) !important;
+}
+
+html.light .text-[#00f0ff],
+.theme-light .text-[#00f0ff] {
+  color: var(--cel-cyan) !important;
+}
+
+html.light .bg-[#00f0ff],
+.theme-light .bg-[#00f0ff] {
+  background-color: var(--cel-cyan) !important;
+}
+
+html.light .text-[#ff184c],
+.theme-light .text-[#ff184c] {
+  color: var(--cel-crimson) !important;
+}
+
+html.light .bg-[#ff184c],
+.theme-light .bg-[#ff184c] {
+  background-color: var(--cel-crimson) !important;
+}
+
+html.light .text-[#ffc400],
+.theme-light .text-[#ffc400] {
+  color: var(--cel-gold) !important;
+}
+
+html.light .bg-[#ffc400],
+.theme-light .bg-[#ffc400] {
+  background-color: var(--cel-gold) !important;
+}
+
+

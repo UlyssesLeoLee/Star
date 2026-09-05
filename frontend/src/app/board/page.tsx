@@ -32,6 +32,13 @@ import { useBoardSync, type BoardSyncChange } from "@/hooks/useBoardSync";
 import { Trello, RefreshCw, X } from "lucide-react";
 import type { WorkItem, WorkItemStatus } from "@/types/ids";
 
+// 状态机下一步: todo→in_progress, in_progress→review, review→done; blocked/wontfix/done 终止
+const NEXT_STATUS: Partial<Record<WorkItemStatus, WorkItemStatus>> = {
+  todo: "in_progress",
+  in_progress: "review",
+  review: "done",
+};
+
 export default function BoardPage() {
   const board = useStore((s) => s.board);
   const workItems = useStore((s) => s.workItems);
@@ -128,6 +135,20 @@ export default function BoardPage() {
     [transitionWorkItem],
   );
 
+  // ---- 下一步状态列高亮 (per 2026-09-05 拍板, 场景 2: Kanban 下一步列)
+  // 找优先级最高 (P0) + 状态非终止 的卡片的下一状态列; 找不到返 null.
+  const nextStepStatus = useMemo<WorkItemStatus | null>(() => {
+    const candidates = workItems
+      .filter((w) => w.status !== "done" && w.status !== "wontfix" && w.status !== "blocked")
+      .sort((a, b) => {
+        const order = { p0: 0, p1: 1, p2: 2, p3: 3 };
+        return order[a.priority] - order[b.priority];
+      });
+    if (candidates.length === 0) return null;
+    const top = candidates[0];
+    return NEXT_STATUS[top.status] ?? null;
+  }, [workItems]);
+
   // E2E test hook: 暴露 transition 用于自动化
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -159,6 +180,7 @@ export default function BoardPage() {
         identities={identities}
         onTransition={handleTransition}
         filter={filterFn}
+        nextStepStatus={nextStepStatus}
       />
 
       {/* 本地 sync toast (per 已知缺口 #3: W5 接管 Toaster 前, 自实现) */}

@@ -25,6 +25,7 @@ import { Search, CornerDownLeft, ArrowUp, ArrowDown, X } from "lucide-react";
 import { useCommandBarStore, type RecentItem } from "@/lib/commandBarStore";
 import { ALL_MODULES, type ModuleDefinition } from "@/lib/nav/registry";
 import { useTranslation, useModuleTranslation, type Dictionary } from "@/lib/i18n";
+import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
 
 export function CommandBar() {
   const router = useRouter();
@@ -234,7 +235,7 @@ function CommandBarItem({ module: m, isActive, onClick, onMouseEnter }: CommandB
       data-testid={`command-bar-item-${m.id}`}
       data-active={isActive ? "true" : "false"}
       className={
-        "w-full flex items-center gap-3 px-4 h-10 text-left transition-colors " +
+        "w-full flex items-center gap-3 px-4 h-10 text-left transition-colors relative " +
         (isActive
           ? "bg-accent/10 text-ink"
           : "text-ink-dim hover:bg-bg-soft/60")
@@ -249,6 +250,18 @@ function CommandBarItem({ module: m, isActive, onClick, onMouseEnter }: CommandB
       <span className="ml-auto text-[10px] text-ink-mute truncate max-w-[40%]">
         {mod.description}
       </span>
+      {/* 气态粒子提示 (per 2026-09-05 拍板, 场景 3: 当前选中命令项, 提示 Enter 执行) */}
+      {isActive && (
+        <GasParticlesHint
+          variant="pulse"
+          color="accent"
+          density={0.4}
+          width={60}
+          height={40}
+          offsetX={-2}
+          offsetY={0}
+        />
+      )}
     </button>
   );
 }
