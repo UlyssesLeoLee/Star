@@ -20,6 +20,10 @@ import type {
 import type { AgentCanvas, AgentCanvasNode, AgentCanvasConnector } from "@/lib/agent-view/types";
 import type { AgentGameState } from "@/lib/agent-game/types";
 import { visualForLevel, MAX_HP } from "@/lib/agent-game/types";
+import { AgentCharacterSVG } from "@/lib/agent-game/characters";
+import { EnemyOrbForPrioritySVG } from "@/lib/agent-game/enemies";
+import { COLORS } from "@/lib/agent-game/theme";
+import { EnergyRing, HaloArc, Stamp, GodSeal } from "@/components/agent-game/Decorations";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
@@ -209,10 +213,7 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
       // 中心化 (因为 scale 改了, 调整 translate)
       const offsetX = (w - nodeW) / 2;
       const offsetY = (h - nodeH) / 2;
-      const borderColor = !alive
-        ? "#f85149"
-        : isSelected ? "#79c0ff" : isHovered ? "#2f81f7" : (tier?.color ?? "#1f6feb");
-      const fillColor = !alive ? "#1a1a1a" : "#0d2849";
+      const tierColor = alive ? (tier?.color ?? "#06b6d4") : "#6b7280";
       return (
         <g
           key={node.id}
@@ -224,36 +225,80 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
           onMouseLeave={() => setHoveredNodeId(null)}
           onDoubleClick={() => onNodeDoubleClick(node.ref)}
         >
-          {/* Halo ring (Lv 7+ purple, Lv 9+ gold) */}
+          {/* 神侠光环 (Lv 7+) */}
           {tier && tier.level >= 7 && (
-            <rect
-              x={-6 * viewport.zoom}
-              y={-6 * viewport.zoom}
-              width={nodeW + 12 * viewport.zoom}
-              height={nodeH + 12 * viewport.zoom}
-              fill="none"
-              stroke={tier.color}
-              strokeWidth={1}
-              strokeDasharray={`${4 * viewport.zoom} ${4 * viewport.zoom}`}
-              opacity={0.5}
-              rx={16 * viewport.zoom}
-            />
+            <HaloArc level={gameState?.level ?? 1} cx={nodeW / 2} cy={nodeH / 2} size={nodeW * 0.55} />
           )}
-          <NodeRect w={nodeW} h={nodeH} stroke={borderColor} strokeWidth={(tier?.borderWidth ?? 1.5) * viewport.zoom} fill={fillColor} radius={12 * viewport.zoom} />
-          <AgentNodeBody agent={agent} w={nodeW} h={nodeH} zoom={viewport.zoom} gameState={gameState} />
+          {/* 能量光环 (赛博朋克) */}
+          <EnergyRing cx={nodeW / 2} cy={nodeH / 2} color={tierColor} radius={nodeW * 0.5} />
+          {/* 节点底色 + 边框 (墨黑底) */}
+          <NodeRect
+            w={nodeW}
+            h={nodeH}
+            stroke={isSelected ? "#fbbf24" : isHovered ? "#22d3ee" : tierColor}
+            strokeWidth={(tier?.borderWidth ?? 1.5) * viewport.zoom}
+            fill={alive ? "#0d0d12" : "#1a1a1a"}
+            radius={12 * viewport.zoom}
+          />
+          {/* 角色 SVG (per 9/5 12:33 拍板, 武侠机器人) */}
+          {gameState && (
+            <g transform={`translate(${nodeW * 0.5 - 32 * viewport.zoom}, ${nodeH * 0.4 - 32 * viewport.zoom})`}>
+              <AgentCharacterSVG
+                level={gameState.level}
+                scale={viewport.zoom}
+                dead={!alive}
+                stampText="侠"
+                showDivineHalo={gameState.level >= 7}
+              />
+            </g>
+          )}
+          {/* 印章 (Lv 5+) */}
+          {gameState && gameState.level >= 5 && (
+            <Stamp text="M" cx={nodeW - 14 * viewport.zoom} cy={14 * viewport.zoom} color={tierColor} size={16 * viewport.zoom} />
+          )}
+          {/* 神印 (Lv 10) */}
+          {gameState && gameState.level >= 10 && (
+            <GodSeal level={gameState.level} cx={14 * viewport.zoom} cy={14 * viewport.zoom} size={20 * viewport.zoom} />
+          )}
+          {/* HP bar (per 9/5 11:42 拍板) */}
+          {gameState && (
+            <g transform={`translate(${12 * viewport.zoom}, ${nodeH - 36 * viewport.zoom})`}>
+              <rect width={(nodeW - 24 * viewport.zoom)} height={5 * viewport.zoom} fill="#0b0d10" rx={2 * viewport.zoom} />
+              <rect
+                width={(nodeW - 24 * viewport.zoom) * (gameState.hp / MAX_HP)}
+                height={5 * viewport.zoom}
+                fill={gameState.hp <= 30 ? "#f85149" : tierColor}
+                rx={2 * viewport.zoom}
+              />
+            </g>
+          )}
           {/* Lv 徽章 (右上角) */}
           {tier && (
-            <g transform={`translate(${nodeW - 30 * viewport.zoom}, ${-10 * viewport.zoom})`}>
-              <rect width={28 * viewport.zoom} height={20 * viewport.zoom} fill={tier.color} rx={4 * viewport.zoom} />
-              <text x={14 * viewport.zoom} y={14 * viewport.zoom} textAnchor="middle" fontSize={11 * viewport.zoom} fill="#0b0d10" fontWeight="bold" fontFamily="ui-monospace, monospace">
+            <g transform={`translate(${nodeW - 50 * viewport.zoom}, ${-12 * viewport.zoom})`}>
+              <rect width={36 * viewport.zoom} height={20 * viewport.zoom} fill={tierColor} rx={4 * viewport.zoom} />
+              <text x={18 * viewport.zoom} y={14 * viewport.zoom} textAnchor="middle" fontSize={11 * viewport.zoom} fill="#0b0d10" fontWeight="bold" fontFamily="ui-monospace, monospace">
                 Lv{tier.level}
               </text>
             </g>
           )}
-          {/* 死亡 skull overlay */}
+          {/* id (底部) */}
+          {gameState && (
+            <text
+              x={nodeW * 0.5}
+              y={nodeH - 14 * viewport.zoom}
+              textAnchor="middle"
+              fontSize={9 * viewport.zoom}
+              fill="#9ca3af"
+              fontFamily='"SF Mono", monospace'
+              style={{ pointerEvents: "none" }}
+            >
+              {agent.id} · {agent.agent_kind}
+            </text>
+          )}
+          {/* 死亡 skull overlay (centered) */}
           {!alive && (
-            <g transform={`translate(${nodeW / 2 - 12 * viewport.zoom}, ${nodeH / 2 - 12 * viewport.zoom})`}>
-              <Skull size={24 * viewport.zoom} color="#f85149" strokeWidth={1.5} />
+            <g transform={`translate(${nodeW / 2 - 16 * viewport.zoom}, ${nodeH / 2 - 16 * viewport.zoom})`}>
+              <Skull size={32 * viewport.zoom} color="#f85149" strokeWidth={1.5} />
             </g>
           )}
         </g>
@@ -292,7 +337,20 @@ export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }:
           onMouseLeave={() => setHoveredNodeId(null)}
           onDoubleClick={() => onNodeDoubleClick(node.ref)}
         >
-          <NodeRect w={w} h={h} stroke={isSelected ? "#79c0ff" : isHovered ? "#2f81f7" : "#30363d"} fill="#161b22" radius={6 * viewport.zoom} />
+          <NodeRect w={w} h={h} stroke={isSelected ? "#fbbf24" : isHovered ? "#22d3ee" : "#2a2a35"} fill="#15151c" radius={6 * viewport.zoom} />
+          {/* 光球 (per 9/5 12:33 拍板, 敌人视觉) */}
+          {wi.status !== "done" && (
+            <g transform={`translate(${w * 0.5 - 24 * viewport.zoom}, ${6 * viewport.zoom}) scale(${0.7 * viewport.zoom})`}>
+              <EnemyOrbForPrioritySVG priority={wi.priority} />
+            </g>
+          )}
+          {/* 完成后, 光球变暗, 显示 "已击败" 状态 */}
+          {wi.status === "done" && (
+            <g transform={`translate(${w * 0.5 - 12 * viewport.zoom}, ${6 * viewport.zoom})`} opacity={0.4}>
+              <circle r={12 * viewport.zoom} fill="#3fb950" />
+              <text x={0} y={4 * viewport.zoom} textAnchor="middle" fontSize={14 * viewport.zoom} fill="#0b0d10" fontFamily="ui-monospace, monospace" fontWeight="bold">✓</text>
+            </g>
+          )}
           <WorkItemNodeBody wi={wi} w={w} h={h} zoom={viewport.zoom} />
           {/* Claim button (foreignObject HTML 按钮) */}
           {canClaim && (
