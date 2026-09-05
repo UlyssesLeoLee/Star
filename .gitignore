@@ -85,3 +85,10 @@ scripts/_*.mjs
 __pycache__/
 *.pyc
 
+# Historical accidentally-committed blank files at repo root
+# (per 2026-09-05 cleanup: Module/PG were 0-byte placeholders from
+#  ab47337 'chore: update Cargo.lock' + a04c4c1 '903' pre-2026 commits;
+#  deleted in same commit. Keep this block to prevent regression.)
+/Module
+/PG
+
