@@ -13,21 +13,30 @@ use uuid::Uuid;
 // 1. WIP 限制
 // =====================================================================
 
+/// WIP (在制品) 限制
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WipLimit {
+    /// 列 ID
     pub column_id: String,
+    /// 最大允许数量
     pub max_items: u32,
+    /// 当前数量
     pub current_count: u32,
 }
 
+/// WIP 限制检查结果
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum WipAction {
+    /// 允许
     Allow,
+    /// 告警但允许
     Warn,
+    /// 拒绝
     Block,
 }
 
+/// WIP 限制检查器
 pub struct WipGuard;
 
 impl WipGuard {
@@ -60,24 +69,35 @@ impl WipGuard {
 // 2. 泳道
 // =====================================================================
 
+/// 泳道分组维度
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SwimlaneGroupBy {
+    /// 按经办人分组
     Assignee,
+    /// 按史诗分组
     Epic,
+    /// 按标签分组
     Label,
+    /// 按优先级分组
     Priority,
+    /// 按自定义字段分组
     Custom,
 }
 
+/// 泳道
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Swimlane {
+    /// 分组维度
     pub group_by: SwimlaneGroupBy,
-    pub custom_field: Option<String>, // for Custom
+    /// 自定义字段名 (仅 Custom 分组时使用)
+    pub custom_field: Option<String>,
+    /// 是否折叠
     pub collapsed: bool,
 }
 
 impl Swimlane {
+    /// 构造泳道
     pub fn new(group_by: SwimlaneGroupBy) -> Self {
         Self {
             group_by,
@@ -91,47 +111,74 @@ impl Swimlane {
 // 3. Saved View
 // =====================================================================
 
+/// 用户保存的视图
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SavedView {
+    /// 视图 ID
     pub id: Uuid,
+    /// 视图名称
     pub name: String,
+    /// 所有者用户 ID
     pub owner_id: Uuid,
+    /// 租户 ID
     pub tenant_id: Uuid,
+    /// 所属看板 ID
     pub board_id: Uuid,
+    /// 布局
     pub layout: ViewLayout,
+    /// 过滤条件
     pub filters: ViewFilters,
+    /// 显示密度
     pub density: ViewDensity,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 更新时间
     pub updated_at: DateTime<Utc>,
 }
 
+/// 视图布局 (对应 Cmd+1/2/3/4 视图族)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ViewLayout {
-    Board,    // Cmd+1
-    Timeline, // Cmd+2
-    List,     // Cmd+3
-    Overview, // Cmd+4
+    /// 看板视图 (Cmd+1)
+    Board,
+    /// 时间线视图 (Cmd+2)
+    Timeline,
+    /// 列表视图 (Cmd+3)
+    List,
+    /// 概览视图 (Cmd+4)
+    Overview,
 }
 
+/// 视图过滤条件
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct ViewFilters {
+    /// 按经办人过滤
     pub assignee: Option<Uuid>,
+    /// 按史诗过滤
     pub epic: Option<Uuid>,
+    /// 按标签过滤
     pub label: Option<String>,
+    /// 按优先级过滤
     pub priority: Option<String>,
+    /// 按到期天数过滤
     pub due_within_days: Option<u32>,
 }
 
+/// 显示密度
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ViewDensity {
-    Compact,     // 默认: 14px 字体
-    Comfortable, // 16px 字体
-    Focus,       // 18px 字体
+    /// 紧凑 (默认: 14px 字体)
+    Compact,
+    /// 舒适 (16px 字体)
+    Comfortable,
+    /// 聚焦 (18px 字体)
+    Focus,
 }
 
 impl SavedView {
+    /// 构造 saved view
     pub fn new(
         name: impl Into<String>,
         owner_id: Uuid,
@@ -154,6 +201,7 @@ impl SavedView {
         }
     }
 
+    /// 视图对应的键盘快捷键
     pub fn shortcut(&self) -> &'static str {
         match self.layout {
             ViewLayout::Board => "Cmd+1",
@@ -168,9 +216,11 @@ impl SavedView {
 // 4. BoardService (WIP + 泳道 + Saved View 聚合)
 // =====================================================================
 
+/// 看板服务 (WIP + 泳道 + Saved View 聚合)
 pub struct BoardService;
 
 impl BoardService {
+    /// 构造服务
     pub fn new() -> Self {
         Self
     }
