@@ -62,6 +62,7 @@ impl HubAdapterConfig {
 // 2. error
 // =====================================================================
 
+/// hub adapter 模块错误类型
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum HubAdapterError {
     /// hub 订阅失败
