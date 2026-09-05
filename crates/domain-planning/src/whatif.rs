@@ -13,27 +13,42 @@ use uuid::Uuid;
 // 1. What-if 沙盒
 // =====================================================================
 
+/// What-if 沙盒场景 (Plan 副本, 不影响原数据)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WhatIfScenario {
+    /// 场景 ID
     pub id: Uuid,
+    /// 场景名称
     pub name: String,
+    /// 来源 Plan ID (只读)
     pub source_plan_id: Uuid, // 来源 Plan (只读)
+    /// 排程调整列表
     pub schedule_adjustments: Vec<ScheduleAdjustment>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 创建者
     pub created_by: Uuid,
 }
 
+/// 单项排程调整
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScheduleAdjustment {
+    /// 工作项 ID
     pub work_item_id: Uuid,
+    /// 原始开始时间
     pub original_start: DateTime<Utc>,
+    /// 原始结束时间
     pub original_end: DateTime<Utc>,
+    /// 调整后开始时间
     pub new_start: DateTime<Utc>,
+    /// 调整后结束时间
     pub new_end: DateTime<Utc>,
+    /// 调整原因 ("delay", "accelerate", "reassign")
     pub reason: String, // "delay", "accelerate", "reassign"
 }
 
 impl WhatIfScenario {
+    /// 创建新的 what-if 场景
     pub fn new(name: impl Into<String>, source_plan_id: Uuid, actor: Uuid) -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -75,15 +90,20 @@ impl WhatIfScenario {
 // 2. 信心度
 // =====================================================================
 
+/// 排程信心度
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Confidence {
+    /// 高: 在 active sprint 或 next sprint
     Committed,   // 高: 在 active sprint 或 next sprint
+    /// 中: backlog-refined, 未 sprint-scheduled
     Planned,     // 中: backlog-refined, 未 sprint-scheduled
+    /// 低: 仅方向性承诺
     Exploratory, // 低: 仅方向性承诺
 }
 
 impl Confidence {
+    /// 返回信心度对应的展示颜色
     pub fn color(&self) -> &'static str {
         match self {
             Self::Committed => "#3D8B5F",   // 绿
@@ -92,6 +112,7 @@ impl Confidence {
         }
     }
 
+    /// 返回信心度的中文名称
     pub fn name_zh(&self) -> &'static str {
         match self {
             Self::Committed => "已承诺",
@@ -105,17 +126,25 @@ impl Confidence {
 // 3. 基线
 // =====================================================================
 
+/// 排程基线 (保存当前排程, 后续可对比差异)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Baseline {
+    /// 基线 ID
     pub id: Uuid,
+    /// 基线名称
     pub name: String,
+    /// 所属 Plan ID
     pub plan_id: Uuid,
+    /// Plan 当前状态的 JSON 快照
     pub snapshot: serde_json::Value, // Plan 当前状态的 JSON 快照
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 创建者
     pub created_by: Uuid,
 }
 
 impl Baseline {
+    /// 创建新的基线
     pub fn new(
         name: impl Into<String>,
         plan_id: Uuid,
@@ -133,17 +162,25 @@ impl Baseline {
     }
 }
 
+/// 基线 vs 当前状态的差异
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BaselineDiff {
+    /// 基线 ID
     pub baseline_id: Uuid,
+    /// 当前状态快照
     pub current: serde_json::Value,
+    /// 变更列表
     pub changes: Vec<BaselineChange>,
 }
 
+/// 单个字段的基线变更
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BaselineChange {
+    /// 变更字段名
     pub field: String,
+    /// 旧值
     pub old_value: serde_json::Value,
+    /// 新值
     pub new_value: serde_json::Value,
 }
 
@@ -151,9 +188,11 @@ pub struct BaselineChange {
 // 4. WhatIfService 聚合
 // =====================================================================
 
+/// What-if 沙盒 + 信心度 + 基线聚合服务
 pub struct WhatIfService;
 
 impl WhatIfService {
+    /// 创建新的 WhatIfService
     pub fn new() -> Self {
         Self
     }

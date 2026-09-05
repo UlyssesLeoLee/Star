@@ -20,19 +20,30 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GadgetType {
-    IssueStats,     // 按 status/type/priority 统计
-    Burndown,       // 接 domain-report
-    Velocity,       // 接 domain-report
-    MyWork,         // assigned to me
-    RecentActivity, // 接 domain-audit
-    DueSoon,        // 按 due 排序
-    JqlTable,       // 自定义 JQL 结果
-    Markdown,       // 富文本
-    Iframe,         // 嵌入 (Confluence/Notion)
-    Clock,          // Sprint 倒计时
+    /// 按 status/type/priority 统计
+    IssueStats,
+    /// 接 domain-report
+    Burndown,
+    /// 接 domain-report
+    Velocity,
+    /// assigned to me
+    MyWork,
+    /// 接 domain-audit
+    RecentActivity,
+    /// 按 due 排序
+    DueSoon,
+    /// 自定义 JQL 结果
+    JqlTable,
+    /// 富文本
+    Markdown,
+    /// 嵌入 (Confluence/Notion)
+    Iframe,
+    /// Sprint 倒计时
+    Clock,
 }
 
 impl GadgetType {
+    /// 全部 Gadget 类型
     pub fn all() -> &'static [GadgetType] {
         &[
             Self::IssueStats,
@@ -48,6 +59,7 @@ impl GadgetType {
         ]
     }
 
+    /// 该类型的默认尺寸
     pub fn default_size(&self) -> GadgetSize {
         match self {
             Self::IssueStats | Self::Burndown | Self::Velocity => GadgetSize { w: 3, h: 2 },
@@ -62,18 +74,24 @@ impl GadgetType {
 /// Gadget 尺寸 (12-grid)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GadgetSize {
-    pub w: u8, // 1-12
-    pub h: u8, // 1-4
+    /// 宽度 (1-12)
+    pub w: u8,
+    /// 高度 (1-4)
+    pub h: u8,
 }
 
 /// Dashboard 共享作用域
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DashboardScope {
-    Personal, // 个人
-    Team,     // 团队 (走 domain-permission)
-    Project,  // 项目
-    Global,   // 全公司 (admin only)
+    /// 个人
+    Personal,
+    /// 团队 (走 domain-permission)
+    Team,
+    /// 项目
+    Project,
+    /// 全公司 (admin only)
+    Global,
 }
 
 // =====================================================================
@@ -83,35 +101,54 @@ pub enum DashboardScope {
 /// Gadget 实例
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Gadget {
+    /// Gadget ID
     pub id: Uuid,
+    /// Gadget 类型
     pub gadget_type: GadgetType,
+    /// 标题
     pub title: String,
+    /// 网格位置
     pub position: GadgetPosition,
+    /// 尺寸
     pub size: GadgetSize,
-    pub config: serde_json::Value, // 类型相关配置
+    /// 类型相关配置
+    pub config: serde_json::Value,
 }
 
+/// Gadget 网格位置
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GadgetPosition {
-    pub x: u8, // 0-11
-    pub y: u8, // 0-N
+    /// X 坐标 (0-11)
+    pub x: u8,
+    /// Y 坐标 (0-N)
+    pub y: u8,
 }
 
 /// Dashboard 聚合根
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Dashboard {
+    /// Dashboard ID
     pub id: Uuid,
+    /// 名称
     pub name: String,
+    /// 共享作用域
     pub scope: DashboardScope,
+    /// 所有者用户 ID
     pub owner_id: Uuid,
+    /// 租户 ID
     pub tenant_id: Uuid,
+    /// Gadget 列表
     pub gadgets: Vec<Gadget>,
+    /// 是否 wallboard 全屏模式
     pub wallboard_mode: bool,
+    /// 创建时间
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// 更新时间
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl Dashboard {
+    /// 构造 Dashboard
     pub fn new(
         name: impl Into<String>,
         scope: DashboardScope,
@@ -132,6 +169,7 @@ impl Dashboard {
         }
     }
 
+    /// 添加 gadget (上限 20)
     pub fn add_gadget(&mut self, gadget: Gadget) -> Result<(), DashboardError> {
         if self.gadgets.len() >= 20 {
             return Err(DashboardError::TooManyGadgets(20));
@@ -141,6 +179,7 @@ impl Dashboard {
         Ok(())
     }
 
+    /// 移除 gadget
     pub fn remove_gadget(&mut self, id: Uuid) -> Result<(), DashboardError> {
         let before = self.gadgets.len();
         self.gadgets.retain(|g| g.id != id);
@@ -151,6 +190,7 @@ impl Dashboard {
         Ok(())
     }
 
+    /// 开启 wallboard 全屏模式
     pub fn enable_wallboard(&mut self) {
         self.wallboard_mode = true;
         self.updated_at = chrono::Utc::now();
@@ -161,18 +201,26 @@ impl Dashboard {
 // 3. error
 // =====================================================================
 
+/// Dashboard 领域错误
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum DashboardError {
+    /// Gadget 数量超限
     #[error("too many gadgets: max {0}")]
     TooManyGadgets(usize),
+    /// Gadget 未找到
     #[error("gadget not found: {0}")]
     GadgetNotFound(Uuid),
+    /// 非法网格位置
     #[error("invalid gadget position: x={0} (max 11), y={1}")]
     InvalidPosition(u8, u8),
+    /// 权限不足
     #[error("permission denied: actor {actor} cannot {action} {scope:?}")]
     PermissionDenied {
+        /// 操作者
         actor: String,
+        /// 尝试的操作
         action: String,
+        /// 目标作用域
         scope: DashboardScope,
     },
 }
@@ -181,9 +229,11 @@ pub enum DashboardError {
 // 4. service
 // =====================================================================
 
+/// Dashboard 服务
 pub struct DashboardService;
 
 impl DashboardService {
+    /// 构造服务
     pub fn new() -> Self {
         Self
     }

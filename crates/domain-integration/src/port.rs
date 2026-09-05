@@ -83,21 +83,27 @@ pub struct ConfigureIntegrationCommand {
 /// `PauseIntegrationCommand`(暂停 Integration)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PauseIntegrationCommand {
+    /// Integration ID
     pub integration_id: IntegrationId,
+    /// 租户 ID
     pub tenant_id: TenantId,
 }
 
 /// `ResumeIntegrationCommand`(恢复 Integration)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResumeIntegrationCommand {
+    /// Integration ID
     pub integration_id: IntegrationId,
+    /// 租户 ID
     pub tenant_id: TenantId,
 }
 
 /// `TriggerSyncCommand`(手动触发同步)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TriggerSyncCommand {
+    /// Integration ID
     pub integration_id: IntegrationId,
+    /// 租户 ID
     pub tenant_id: TenantId,
     /// 强制刷新(忽略 last_synced_at)
     pub force: bool,
@@ -106,7 +112,9 @@ pub struct TriggerSyncCommand {
 /// `HandleWebhookCommand`(处理入站 Webhook)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HandleWebhookCommand {
+    /// Integration ID
     pub integration_id: IntegrationId,
+    /// 租户 ID
     pub tenant_id: TenantId,
     /// 外部事件 ID(用于幂等)
     pub external_event_id: String,
@@ -123,7 +131,9 @@ pub struct HandleWebhookCommand {
 /// `ListByProjectQuery`(列出 Project 下的 Integration)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListByProjectQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// Project ID
     pub project_id: ProjectId,
     /// 按 source 过滤(None = 全部)
     pub source_filter: Option<IntegrationSource>,
@@ -138,7 +148,9 @@ pub struct ListByProjectQuery {
 /// `GetHistoryQuery`(列出 SyncState 历史)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetHistoryQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// Integration ID
     pub integration_id: IntegrationId,
     /// 限制返回条数
     pub limit: u32,
@@ -240,12 +252,16 @@ pub trait IntegrationQueryPort: Send + Sync {
 pub trait IntegrationRepository: Send + Sync {
     /// Integration CRUD
     async fn insert_integration(&self, integration: &Integration) -> Result<(), IntegrationError>;
+    /// 按 ID 查找 Integration
     async fn find_integration_by_id(
         &self,
         id: IntegrationId,
     ) -> Result<Option<Integration>, IntegrationError>;
+    /// 更新 Integration
     async fn update_integration(&self, integration: &Integration) -> Result<(), IntegrationError>;
+    /// 删除 Integration
     async fn delete_integration(&self, id: IntegrationId) -> Result<(), IntegrationError>;
+    /// 按 Project 列出 Integration(按 source/relation_type/state 过滤)
     async fn list_integrations_by_project(
         &self,
         tenant_id: TenantId,
@@ -258,10 +274,12 @@ pub trait IntegrationRepository: Send + Sync {
 
     /// SyncState CRUD
     async fn insert_sync_state(&self, sync_state: &SyncState) -> Result<(), IntegrationError>;
+    /// 查找最新一条 SyncState
     async fn find_latest_sync_state(
         &self,
         integration_id: IntegrationId,
     ) -> Result<Option<SyncState>, IntegrationError>;
+    /// 列出 SyncState 历史
     async fn list_sync_states(
         &self,
         integration_id: IntegrationId,

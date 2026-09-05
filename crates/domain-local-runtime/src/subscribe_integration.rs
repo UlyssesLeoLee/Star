@@ -30,9 +30,13 @@ use super::subscribe_real::{route_output_to_hub, OutputHub, SubscribeError};
 /// 进程 spawn 配置 (与 cli_spawn::CliSpawnConfig 同形; 此处独立声明以避免改 trait)
 #[derive(Debug, Clone)]
 pub struct HubSpawnConfig {
+    /// 执行的命令
     pub command: String,
+    /// 命令参数
     pub args: Vec<String>,
+    /// 环境变量
     pub env: std::collections::HashMap<String, String>,
+    /// 工作目录(worktree)
     pub worktree_dir: String,
 }
 
@@ -42,13 +46,16 @@ pub struct HubSpawnConfig {
 
 /// 带 OutputHub 的 CLI runtime; spawn 立即把 stdout/stderr 桥接到 hub
 pub struct HubCliRuntime {
+    /// 关联的 OutputHub 实例
     pub hub: OutputHub,
+    /// 是否启用 mock 回退模式
     pub mock_fallback: bool,
     /// 活跃 child 句柄 (用于 cancel)
     active: Arc<Mutex<HashMap<Uuid, Child>>>,
 }
 
 impl HubCliRuntime {
+    /// 创建真实 spawn 模式的 HubCliRuntime
     pub fn new(hub: OutputHub) -> Self {
         Self {
             hub,
@@ -57,6 +64,7 @@ impl HubCliRuntime {
         }
     }
 
+    /// 创建 mock 回退模式的 HubCliRuntime
     pub fn with_mock_fallback(hub: OutputHub) -> Self {
         Self {
             hub,
@@ -295,6 +303,7 @@ impl LocalRuntime for HubCliRuntime {
 /// - `subscribe`: 旧 trait 兼容, 单消费者 per call
 /// - `subscribe_broadcast`: 多消费者 per process, UI tab 共享输出
 impl HubCliRuntime {
+    /// 直接从 hub 拿 broadcast::Receiver, 供多消费者共享订阅同一进程输出
     pub async fn subscribe_broadcast(
         &self,
         id: Uuid,
@@ -307,10 +316,13 @@ impl HubCliRuntime {
 // 3. error (本模块附加变体; RuntimeError::SpawnFailed 兜底)
 // =====================================================================
 
+/// hub 集成模块错误类型
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum HubIntegrationError {
+    /// hub subscribe 失败
     #[error("hub subscribe 失败: {0}")]
     Subscribe(#[from] SubscribeError),
+    /// runtime 错误
     #[error("runtime 错误: {0}")]
     Runtime(#[from] RuntimeError),
 }

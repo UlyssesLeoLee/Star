@@ -34,6 +34,7 @@ pub enum TriggerMode {
 }
 
 impl TriggerMode {
+    /// 返回触发模式的中文名称
     pub fn name(&self) -> &'static str {
         match self {
             Self::OnSuccessExit => "成功退出时自动上传",
@@ -46,25 +47,41 @@ impl TriggerMode {
 /// 上传任务 (单次 commit)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UploadTask {
+    /// 任务 ID
     pub id: Uuid,
+    /// 所属 window ID
     pub window_id: Uuid,
+    /// 所属 tab ID
     pub tab_id: Uuid,
+    /// 所属 worktree ID
     pub worktree_id: Uuid,
+    /// 触发方式
     pub trigger: TriggerMode,
+    /// 变更文件列表
     pub files_changed: Vec<String>,
+    /// commit 信息
     pub commit_message: String,
+    /// 任务状态
     pub status: UploadStatus,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 完成时间
     pub completed_at: Option<DateTime<Utc>>,
+    /// 错误信息 (若有)
     pub error: Option<String>,
 }
 
+/// 上传任务状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UploadStatus {
+    /// 等待处理
     Pending,
+    /// 正在 commit
     Committing,
+    /// 已完成
     Completed,
+    /// 已失败
     Failed,
 }
 
@@ -75,45 +92,73 @@ pub enum UploadStatus {
 /// 任务窗口 (per Tab 上独立 CLI session)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TaskWindow {
+    /// window ID
     pub id: Uuid,
+    /// window 名称
     pub name: String,
+    /// 所属 worktree ID
     pub worktree_id: Uuid,
+    /// 默认 profile ID
     pub default_profile_id: Uuid,
+    /// tab 列表
     pub tabs: Vec<TaskTab>,
+    /// 当前激活的 tab ID
     pub active_tab_id: Option<Uuid>,
+    /// 上传触发模式
     pub upload_trigger: TriggerMode,
+    /// 轮询间隔 (秒), 仅 TriggerMode::Polling 使用
     pub polling_interval_sec: u32, // for TriggerMode::Polling
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 最近更新时间
     pub updated_at: DateTime<Utc>,
 }
 
 /// 任务 Tab
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TaskTab {
+    /// tab ID
     pub id: Uuid,
+    /// 所属 window ID
     pub window_id: Uuid,
+    /// profile ID
     pub profile_id: Uuid,
+    /// tab 标签
     pub label: String,
+    /// tab 状态
     pub state: TabState,
+    /// 最近 N 行输出 (前端展示, 限 200 行)
     pub last_output: String, // 最近 N 行 (前端展示, 限 200 行)
+    /// 开始时间
     pub started_at: DateTime<Utc>,
+    /// 结束时间
     pub finished_at: Option<DateTime<Utc>>,
+    /// 退出码
     pub exit_code: Option<i32>,
+    /// 变更文件列表
     pub files_changed: Vec<String>,
 }
 
+/// Tab 运行状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TabState {
+    /// 已创建
     Created,
+    /// 运行中
     Running,
+    /// 等待输入
     WaitingInput,
+    /// 已完成
     Completed,
+    /// 已失败
     Failed,
+    /// 已中止
     Aborted,
 }
 
 impl TaskWindow {
+    /// 创建新的任务窗口
     pub fn new(
         name: impl Into<String>,
         worktree_id: Uuid,
@@ -135,6 +180,7 @@ impl TaskWindow {
         }
     }
 
+    /// 添加新 tab (最多 20 个)
     pub fn add_tab(
         &mut self,
         profile_id: Uuid,
@@ -162,6 +208,7 @@ impl TaskWindow {
         Ok(self.tabs.last().unwrap())
     }
 
+    /// 关闭指定 tab
     pub fn close_tab(&mut self, tab_id: Uuid) -> Result<(), WindowError> {
         let before = self.tabs.len();
         self.tabs.retain(|t| t.id != tab_id);
@@ -175,6 +222,7 @@ impl TaskWindow {
         Ok(())
     }
 
+    /// 更新指定 tab 的状态与退出码
     pub fn update_tab_state(
         &mut self,
         tab_id: Uuid,
@@ -203,20 +251,28 @@ impl TaskWindow {
 // 3. error
 // =====================================================================
 
+/// 任务窗口模块错误类型
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum WindowError {
+    /// Tab 不存在
     #[error("Tab 不存在: {0}")]
     TabNotFound(Uuid),
+    /// Window 不存在
     #[error("Window 不存在: {0}")]
     WindowNotFound(Uuid),
+    /// Tab 数量超限
     #[error("Tab 数量超限: max {0}")]
     TooManyTabs(usize),
+    /// Worktree 不存在
     #[error("Worktree 不存在: {0}")]
     WorktreeNotFound(Uuid),
+    /// 上传失败
     #[error("上传失败: {0}")]
     UploadFailed(String),
+    /// 触发模式不匹配
     #[error("触发模式不匹配: 期望 {0:?}, 实际 {1:?}")]
     TriggerMismatch(TriggerMode, TriggerMode),
+    /// 未指定 profile_id
     #[error("未指定 profile_id")]
     ProfileIdMissing,
 }
@@ -225,6 +281,7 @@ pub enum WindowError {
 // 4. service — WindowService
 // =====================================================================
 
+/// 任务窗口服务 (开窗/关窗/添加 tab/触发上传)
 pub struct WindowService {
     /// 内存 store
     windows: std::sync::RwLock<std::collections::HashMap<Uuid, TaskWindow>>,
@@ -233,8 +290,10 @@ pub struct WindowService {
     cli_port: Option<Arc<dyn CliPort>>,
 }
 
+/// CLI 执行端口 (Phase 2 接 w19 local-runtime)
 #[async_trait::async_trait]
 pub trait CliPort: Send + Sync {
+    /// 执行 CLI 命令
     async fn run_cli(
         &self,
         profile_id: Uuid,
@@ -243,16 +302,21 @@ pub trait CliPort: Send + Sync {
     ) -> Result<RunResult, WindowError>;
 }
 
+/// CLI 执行结果
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RunResult {
+    /// 标准输出
     pub stdout: String,
+    /// 退出码
     pub exit_code: i32,
+    /// 变更文件列表
     pub files_changed: Vec<String>,
 }
 
 use std::sync::Arc;
 
 impl WindowService {
+    /// 创建新的 WindowService
     pub fn new() -> Self {
         Self {
             windows: std::sync::RwLock::new(std::collections::HashMap::new()),
@@ -261,17 +325,20 @@ impl WindowService {
         }
     }
 
+    /// 设置 CLI 端口
     pub fn with_cli_port(mut self, port: Arc<dyn CliPort>) -> Self {
         self.cli_port = Some(port);
         self
     }
 
+    /// 打开新窗口
     pub fn open_window(&self, window: TaskWindow) -> Result<Uuid, WindowError> {
         let id = window.id;
         self.windows.write().unwrap().insert(id, window);
         Ok(id)
     }
 
+    /// 关闭指定窗口
     pub fn close_window(&self, id: Uuid) -> Result<(), WindowError> {
         self.windows
             .write()
@@ -281,10 +348,12 @@ impl WindowService {
         Ok(())
     }
 
+    /// 获取指定窗口
     pub fn get_window(&self, id: Uuid) -> Option<TaskWindow> {
         self.windows.read().unwrap().get(&id).cloned()
     }
 
+    /// 按 worktree 列出窗口
     pub fn list_windows_by_worktree(&self, worktree_id: Uuid) -> Vec<TaskWindow> {
         self.windows
             .read()
@@ -358,6 +427,7 @@ impl WindowService {
         triggered
     }
 
+    /// 列出所有上传任务
     pub fn list_upload_tasks(&self) -> Vec<UploadTask> {
         self.upload_tasks.read().unwrap().clone()
     }
@@ -580,6 +650,8 @@ mod tests {
     }
 }
 
+/// 上传执行器 (成功退出后自动 commit)
 pub mod upload_executor;
 
+/// commit message 模板生成
 pub mod commit_template;

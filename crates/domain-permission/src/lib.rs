@@ -52,9 +52,11 @@ define_uuid_id!(WorkItemId);
 // UUID 强类型 ID 宏(参考 domain-worktree / domain-tenant 模式)
 // =====================================================================
 
+/// 生成一个基于 Uuid 的强类型 ID 包装结构
 #[macro_export]
 macro_rules! define_uuid_id {
     ($name:ident) => {
+        /// 强类型 ID
         #[derive(
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
@@ -62,9 +64,11 @@ macro_rules! define_uuid_id {
         pub struct $name(pub Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID
             pub fn new() -> Self {
                 Self(Uuid::new_v4())
             }
+            /// 取出内部 Uuid
             pub fn as_uuid(&self) -> Uuid {
                 self.0
             }
@@ -241,6 +245,7 @@ impl Effect {
 /// **PermissionRule** — Scheme 内单条规则(值对象,§4.8)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PermissionRule {
+    /// 主键
     pub id: PermissionRuleId,
     /// 主体类型
     pub subject_type: SubjectType,
@@ -309,10 +314,13 @@ impl PermissionRule {
 /// **PermissionScheme** — 聚合根(§4.8)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PermissionScheme {
+    /// 主键
     pub id: PermissionSchemeId,
     /// 必带,INV-PM-01
     pub tenant_id: TenantId,
+    /// 名称
     pub name: String,
+    /// 规则列表
     pub rules: Vec<PermissionRule>,
     /// 创建时间
     pub created_at: DateTime<Utc>,
@@ -367,12 +375,19 @@ impl PermissionScheme {
 /// **RoleBinding** — User × Project × Role 绑定(实体,§4.8,INV-PM-03 唯一)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleBinding {
+    /// 主键
     pub id: RoleBindingId,
+    /// 用户 ID
     pub user_id: UserId,
+    /// 项目 ID
     pub project_id: ProjectId,
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 角色
     pub role: Role,
+    /// 授权者
     pub granted_by: UserId,
+    /// 授权时间
     pub granted_at: DateTime<Utc>,
 }
 
@@ -390,16 +405,22 @@ impl RoleBinding {
 /// **PermissionError** — 权限域统一错误
 #[derive(Debug, Error)]
 pub enum PermissionError {
+    /// 未找到
     #[error("not found: {0}")]
     NotFound(String),
+    /// 权限拒绝
     #[error("permission denied")]
     PermissionDenied,
+    /// 跨租户访问被拒绝
     #[error("cross-tenant access denied: actor tenant {0} vs resource tenant {1}")]
     CrossTenantDenied(TenantId, TenantId),
+    /// 非法规则
     #[error("invalid rule: {0}")]
     InvalidRule(String),
+    /// 冲突
     #[error("conflict: {0}")]
     Conflict(String),
+    /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
 }
@@ -422,58 +443,88 @@ impl PermissionError {
 // 命令 / 查询 DTO
 // =====================================================================
 
+/// 创建 PermissionScheme 命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateSchemeCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 名称
     pub name: String,
     /// 创建者(用于 grant_by 之类的派生)
     pub actor_user_id: UserId,
 }
 
+/// 授予角色命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GrantRoleCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 用户 ID
     pub user_id: UserId,
+    /// 项目 ID
     pub project_id: ProjectId,
+    /// 角色
     pub role: Role,
+    /// 授权者
     pub granted_by: UserId,
 }
 
+/// 撤销角色命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RevokeRoleCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 用户 ID
     pub user_id: UserId,
+    /// 项目 ID
     pub project_id: ProjectId,
 }
 
+/// 上插规则命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpsertRuleCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 所属 Scheme ID
     pub scheme_id: PermissionSchemeId,
+    /// 规则
     pub rule: PermissionRule,
 }
 
+/// 权限检查查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CheckQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
     /// Scheme id(可选;若 None 则不基于 scheme,纯 RoleBinding + Admin 默认)
     pub scheme_id: Option<PermissionSchemeId>,
+    /// 被检查的主体用户 ID
     pub subject_user_id: UserId,
+    /// 项目 ID
     pub project_id: ProjectId,
+    /// 资源类型
     pub resource_type: ResourceType,
+    /// 资源 ID
     pub resource_id: Option<Uuid>,
+    /// 动作
     pub action: Action,
 }
 
+/// 列出角色绑定查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListRolesQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 项目 ID
     pub project_id: ProjectId,
 }
 
+/// 获取 Scheme 查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetSchemeQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// Scheme ID
     pub scheme_id: PermissionSchemeId,
 }
 
@@ -484,24 +535,28 @@ pub struct GetSchemeQuery {
 /// **PermissionCommandPort** — 写操作(§3.8)
 #[async_trait]
 pub trait PermissionCommandPort: Send + Sync {
+    /// 创建 PermissionScheme
     async fn create_scheme(
         &self,
         cmd: CreateSchemeCommand,
         actor: &ActorContext,
     ) -> Result<PermissionScheme, PermissionError>;
 
+    /// 授予角色
     async fn grant_role(
         &self,
         cmd: GrantRoleCommand,
         actor: &ActorContext,
     ) -> Result<RoleBinding, PermissionError>;
 
+    /// 撤销角色
     async fn revoke_role(
         &self,
         cmd: RevokeRoleCommand,
         actor: &ActorContext,
     ) -> Result<(), PermissionError>;
 
+    /// 上插规则
     async fn upsert_rule(
         &self,
         cmd: UpsertRuleCommand,
@@ -512,14 +567,17 @@ pub trait PermissionCommandPort: Send + Sync {
 /// **PermissionQueryPort** — 读操作(§3.8)
 #[async_trait]
 pub trait PermissionQueryPort: Send + Sync {
+    /// 权限检查
     async fn check(&self, q: CheckQuery, actor: &ActorContext) -> Result<bool, PermissionError>;
 
+    /// 列出角色绑定
     async fn list_roles(
         &self,
         q: ListRolesQuery,
         actor: &ActorContext,
     ) -> Result<Vec<RoleBinding>, PermissionError>;
 
+    /// 获取单个 Scheme
     async fn get_scheme(
         &self,
         q: GetSchemeQuery,
@@ -530,18 +588,24 @@ pub trait PermissionQueryPort: Send + Sync {
 /// **PermissionRepository** — 持久化抽象
 #[async_trait]
 pub trait PermissionRepository: Send + Sync {
+    /// 插入 Scheme
     async fn insert_scheme(&self, s: PermissionScheme) -> Result<(), PermissionError>;
+    /// 获取单个 Scheme
     async fn get_scheme(&self, id: PermissionSchemeId)
         -> Result<PermissionScheme, PermissionError>;
+    /// 更新 Scheme
     async fn update_scheme(&self, s: PermissionScheme) -> Result<(), PermissionError>;
 
+    /// 插入角色绑定
     async fn insert_binding(&self, b: RoleBinding) -> Result<(), PermissionError>;
+    /// 移除角色绑定
     async fn remove_binding(
         &self,
         tenant_id: TenantId,
         user_id: UserId,
         project_id: ProjectId,
     ) -> Result<(), PermissionError>;
+    /// 列出角色绑定
     async fn list_bindings(
         &self,
         tenant_id: TenantId,
@@ -689,6 +753,7 @@ fn default_decide_without_scheme(roles: &[Role], action: Action) -> bool {
 // InMemoryPermissionService
 // =====================================================================
 
+/// 内存态 Permission 服务实现
 pub struct InMemoryPermissionService {
     repo: Arc<dyn PermissionRepository>,
     schemes: Arc<RwLock<HashMap<PermissionSchemeId, PermissionScheme>>>,
@@ -696,6 +761,7 @@ pub struct InMemoryPermissionService {
 }
 
 impl InMemoryPermissionService {
+    /// 创建新的 InMemoryPermissionService
     pub fn new() -> Self {
         Self {
             repo: Arc::new(InMemoryPermissionRepository::new()),
@@ -704,6 +770,7 @@ impl InMemoryPermissionService {
         }
     }
 
+    /// 使用指定仓库创建 InMemoryPermissionService
     pub fn with_repo(repo: Arc<dyn PermissionRepository>) -> Self {
         Self {
             repo,
@@ -971,12 +1038,14 @@ impl PermissionQueryPort for InMemoryPermissionService {
 // InMemoryPermissionRepository
 // =====================================================================
 
+/// 内存态 Permission 仓库实现
 pub struct InMemoryPermissionRepository {
     schemes: RwLock<HashMap<PermissionSchemeId, PermissionScheme>>,
     bindings: RwLock<HashMap<(UserId, ProjectId), RoleBinding>>,
 }
 
 impl InMemoryPermissionRepository {
+    /// 创建新的 InMemoryPermissionRepository
     pub fn new() -> Self {
         Self {
             schemes: RwLock::new(HashMap::new()),

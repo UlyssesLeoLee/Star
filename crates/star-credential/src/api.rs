@@ -28,13 +28,18 @@ use crate::{
 /// AppState (依赖注入: CredentialManager + CredentialDb + 当前 tenant_id + 当前 user_id)
 #[derive(Clone)]
 pub struct AppState {
+    /// 凭证管理器
     pub manager: Arc<CredentialManager>,
+    /// 凭证审计数据库
     pub db: Arc<CredentialDb>,
-    pub current_tenant_id: String, // 实际从 JWT/session 提取, PoC 用 header
+    /// 当前 tenant_id (实际从 JWT/session 提取, PoC 用 header)
+    pub current_tenant_id: String,
+    /// 当前 user_id
     pub current_user_id: String,
 }
 
 impl AppState {
+    /// 构造 AppState
     pub fn new(
         manager: Arc<CredentialManager>,
         db: Arc<CredentialDb>,
@@ -50,6 +55,7 @@ impl AppState {
     }
 }
 
+/// 构造凭证管理 V2 REST API 路由
 pub fn router() -> Router<AppState> {
     Router::new()
         .route(
@@ -65,30 +71,48 @@ pub fn router() -> Router<AppState> {
 
 // === Request / Response DTOs ===
 
+/// 列表查询参数
 #[derive(Debug, Deserialize)]
 pub struct ListQuery {
+    /// 按 provider 过滤(可选)
     pub provider: Option<String>,
 }
 
+/// 创建凭证请求体
 #[derive(Debug, Deserialize)]
 pub struct CreateCredentialRequest {
+    /// Provider 字符串 (如 "openclaw")
     pub provider: String,
+    /// 显示名
     pub display_name: String,
+    /// 描述
     pub description: String,
+    /// 明文密钥
     pub secret: String,
+    /// 可选 base_url
     pub base_url: Option<String>,
+    /// 可选 region
     pub region: Option<String>,
 }
 
+/// 凭证视图(不含密文,供 UI 显示)
 #[derive(Debug, Serialize)]
 pub struct CredentialView {
+    /// 凭证 ID
     pub id: String,
+    /// Provider 字符串
     pub provider: String,
+    /// 显示名
     pub display_name: String,
+    /// 状态字符串
     pub status: String,
+    /// 创建时间(毫秒时间戳)
     pub created_at_ms: u64,
+    /// 更新时间(毫秒时间戳)
     pub updated_at_ms: u64,
+    /// 弃用时间(毫秒时间戳,可选)
     pub deprecated_at_ms: Option<u64>,
+    /// 撤销时间(毫秒时间戳,可选)
     pub revoked_at_ms: Option<u64>,
 }
 
@@ -206,12 +230,18 @@ async fn create_credential(
     Ok((StatusCode::CREATED, Json(view)))
 }
 
+/// 凭证轮换请求体
 #[derive(Debug, Deserialize)]
 pub struct RotateRequest {
+    /// 新显示名
     pub display_name: String,
+    /// 新描述
     pub description: String,
+    /// 新明文密钥
     pub secret: String,
+    /// 新 base_url
     pub base_url: Option<String>,
+    /// 新 region
     pub region: Option<String>,
 }
 
@@ -275,13 +305,20 @@ async fn revoke_credential(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// 审计事件视图
 #[derive(Debug, Serialize)]
 pub struct AuditEventView {
+    /// 事件 ID
     pub id: String,
+    /// 关联凭证 ID
     pub credential_id: String,
+    /// 操作用户 ID
     pub user_id: String,
+    /// 事件类型字符串
     pub event_type: String,
+    /// 事件发生时间(毫秒时间戳)
     pub event_at_ms: u64,
+    /// 事件发生时的显示名快照(可选)
     pub display_name_snapshot: Option<String>,
 }
 
@@ -317,15 +354,21 @@ async fn get_audit_log(
 
 // === V2-5 批量导入/导出 ===
 
+/// 批量导入请求体
 #[derive(Debug, Deserialize)]
 pub struct ImportRequest {
+    /// 待导入凭证列表
     pub credentials: Vec<CreateCredentialRequest>,
 }
 
+/// 批量导入响应
 #[derive(Debug, Serialize)]
 pub struct ImportResponse {
+    /// 成功导入数
     pub imported: usize,
+    /// 失败数
     pub failed: usize,
+    /// 失败详情列表
     pub errors: Vec<String>,
 }
 

@@ -40,6 +40,7 @@ use uuid::Uuid;
 // 强类型 ID 宏
 // =====================================================================
 
+/// 生成一个基于 Uuid 的强类型 ID 包装结构
 #[macro_export]
 macro_rules! define_uuid_id {
     ($name:ident) => {
@@ -49,18 +50,22 @@ macro_rules! define_uuid_id {
         pub struct $name(pub uuid::Uuid);
 
         impl $name {
+            /// 生成一个新的随机 ID
             #[allow(dead_code)]
             pub fn new() -> Self {
                 Self(uuid::Uuid::new_v4())
             }
+            /// 从已有 Uuid 构造
             #[allow(dead_code)]
             pub fn from_uuid(id: uuid::Uuid) -> Self {
                 Self(id)
             }
+            /// 取出内部 Uuid 引用
             #[allow(dead_code)]
             pub fn as_uuid(&self) -> uuid::Uuid {
                 self.0
             }
+            /// 消耗自身取出内部 Uuid
             #[allow(dead_code)]
             pub fn into_uuid(self) -> uuid::Uuid {
                 self.0
@@ -174,10 +179,15 @@ impl std::fmt::Display for AuditAction {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Actor {
     /// 用户执行
-    User { user_id: UserId },
+    User {
+        /// 用户 ID
+        user_id: UserId,
+    },
     /// Agent 执行(必须同时有 session_id 才能回答 INV-AU-02)
     Agent {
+        /// Agent 会话 ID
         session_id: AgentSessionId,
+        /// Agent ID
         agent_id: AgentId,
     },
     /// 系统后台
@@ -219,6 +229,7 @@ pub enum AuditError {
 }
 
 impl AuditError {
+    /// 返回错误码字符串
     pub fn code(&self) -> &'static str {
         match self {
             Self::NotFound(_) => "AUDIT_NOT_FOUND",
@@ -228,6 +239,7 @@ impl AuditError {
             Self::Internal(_) => "AUDIT_INTERNAL",
         }
     }
+    /// 是否为服务端错误(5xx)
     pub fn is_server_error(&self) -> bool {
         matches!(self, Self::Internal(_))
     }
@@ -273,13 +285,16 @@ pub struct AuditEvent {
 }
 
 impl AuditEvent {
+    /// 字段总数
     pub const FIELD_COUNT: usize = 11;
 }
 
 /// **AIAuditMetadata**(9 个必答问题,basic-design §6.7)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AIAuditMetadata {
+    /// 主键
     pub id: AIAuditMetadataId,
+    /// 租户 ID
     pub tenant_id: TenantId,
     /// Q1: 谁要求 AI 做什么? — actor
     pub agent_session_id: AgentSessionId,
@@ -293,6 +308,7 @@ pub struct AIAuditMetadata {
     pub worktree_id: Option<Uuid>,
     /// Q6: 什么时间?
     pub started_at: DateTime<Utc>,
+    /// 结束时间
     pub ended_at: DateTime<Utc>,
     /// Q7: 哪些验证通过? — Validation Result IDs
     pub validation_result_ids: Vec<ValidationResultId>,
@@ -316,6 +332,7 @@ pub struct AIAuditMetadata {
     pub response_hash: String,
     /// 保留期限(默认 90 天,INV-AU-06)
     pub retention_until: DateTime<Utc>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
 }
 
@@ -337,6 +354,7 @@ impl AIAuditMetadata {
             && self.response_hash.len() == 64
     }
 
+    /// 是否已过保留期限
     pub fn is_expired(&self, now: DateTime<Utc>) -> bool {
         self.retention_until < now
     }
@@ -345,7 +363,9 @@ impl AIAuditMetadata {
 /// **AuditExportJob**(导出异步任务,INV-AU-07)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditExportJob {
+    /// 主键
     pub id: AuditExportJobId,
+    /// 租户 ID
     pub tenant_id: TenantId,
     /// 导出格式
     pub format: ExportFormat,
@@ -361,14 +381,19 @@ pub struct AuditExportJob {
     pub status: ExportStatus,
     /// 下载 URL(完成后填充)
     pub download_url: Option<String>,
+    /// 创建时间
     pub created_at: DateTime<Utc>,
+    /// 完成时间
     pub completed_at: Option<DateTime<Utc>>,
 }
 
+/// 导出格式
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ExportFormat {
+    /// CSV
     Csv,
+    /// Parquet
     Parquet,
 }
 
@@ -378,12 +403,17 @@ impl Default for ExportFormat {
     }
 }
 
+/// 导出任务状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ExportStatus {
+    /// 等待执行
     Pending,
+    /// 执行中
     Running,
+    /// 已完成
     Completed,
+    /// 已失败
     Failed,
 }
 
@@ -391,6 +421,7 @@ pub enum ExportStatus {
 // 不变量(INV-AU-01~07)
 // =====================================================================
 
+/// 不变量检查函数签名
 pub type InvariantCheck = fn(&AuditEvent) -> Result<(), AuditError>;
 
 /// **INV-AU-02** 必填字段校验(tenant_id / actor / target 必填)
@@ -491,6 +522,7 @@ pub fn check_invariant_04_no_sensitive_plaintext(ev: &AuditEvent) -> Result<(), 
     Ok(())
 }
 
+/// 全部不变量检查列表
 pub const ALL_INVARIANT_CHECKS: &[InvariantCheck] = &[
     check_invariant_02_required_fields,
     check_invariant_03_immutable_hash,
@@ -498,6 +530,7 @@ pub const ALL_INVARIANT_CHECKS: &[InvariantCheck] = &[
     check_invariant_04_no_sensitive_plaintext,
 ];
 
+/// 跑指定的不变量检查列表
 pub fn run_invariants(checks: &[InvariantCheck], ev: &AuditEvent) -> Result<(), AuditError> {
     for c in checks {
         c(ev)?;
@@ -554,14 +587,19 @@ pub fn compute_immutable_hash(
 // 事件(NATS 主题 payload)
 // =====================================================================
 
+/// 事件 meta (NATS 消息头)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventMeta {
+    /// 事件 ID
     pub event_id: Uuid,
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 发生时间
     pub occurred_at: DateTime<Utc>,
 }
 
 impl EventMeta {
+    /// 创建新的事件 meta
     pub fn new(tenant_id: TenantId) -> Self {
         Self {
             event_id: Uuid::new_v4(),
@@ -571,30 +609,44 @@ impl EventMeta {
     }
 }
 
+/// 审计事件已记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditRecorded {
+    /// 事件 meta
     pub meta: EventMeta,
+    /// 关联 AuditEvent ID
     pub audit_event_id: AuditEventId,
+    /// 动作
     pub action: AuditAction,
 }
 
+/// 跨租户访问尝试
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrossTenantAttempted {
+    /// 事件 meta
     pub meta: EventMeta,
+    /// 关联 AuditEvent ID
     pub audit_event_id: AuditEventId,
+    /// 尝试者用户 ID
     pub actor_user_id: Uuid,
+    /// 尝试访问的资源类型
     pub attempted_resource_type: String,
+    /// 尝试访问的资源 ID
     pub attempted_resource_id: Uuid,
 }
 
+/// 审计域事件类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AuditEventKind {
+    /// 审计事件已记录
     Recorded(AuditRecorded),
+    /// 跨租户访问尝试
     CrossTenantAttempted(CrossTenantAttempted),
 }
 
 impl AuditEventKind {
+    /// NATS subject
     pub fn subject(&self) -> &'static str {
         match self {
             Self::Recorded(_) => "star.events.audit.event.recorded.v1",
@@ -607,34 +659,54 @@ impl AuditEventKind {
 // 端口(Port traits)
 // =====================================================================
 
+/// 记录审计事件命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordAuditCommand {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 触发者
     pub actor: Actor,
+    /// 动作
     pub action: AuditAction,
+    /// 目标类型
     pub resource_type: String,
+    /// 目标 ID
     pub resource_id: Uuid,
+    /// 上下文引用
     pub context_refs: Vec<Uuid>,
+    /// 修改前
     pub before_state: Option<serde_json::Value>,
+    /// 修改后
     pub after_state: Option<serde_json::Value>,
     /// 预计算 hash(若为 None 则本 crate 内部计算)
     pub immutable_hash: Option<String>,
 }
 
+/// 记录跨租户访问尝试命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordCrossTenantAttemptCommand {
+    /// 尝试者用户 ID
     pub actor_user_id: Uuid,
+    /// 尝试访问的资源类型
     pub attempted_resource_type: String,
+    /// 尝试访问的资源 ID
     pub attempted_resource_id: Uuid,
 }
 
+/// 列出审计事件查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditListQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 分页大小
     pub limit: u32,
+    /// 分页偏移
     pub offset: u32,
+    /// 按动作过滤
     pub action: Option<AuditAction>,
+    /// 起始时间
     pub since: Option<DateTime<Utc>>,
+    /// 结束时间
     pub until: Option<DateTime<Utc>>,
 }
 

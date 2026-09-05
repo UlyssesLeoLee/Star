@@ -66,6 +66,7 @@ macro_rules! define_uuid_id {
             Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
         )]
         #[serde(transparent)]
+        /// UUID 强类型 ID
         pub struct $name(pub Uuid);
 
         impl $name {
@@ -550,7 +551,9 @@ pub struct GetViewQuery {
 /// **BoardView** — 看板视图快照(§11.1)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoardView {
+    /// 看板
     pub board: Board,
+    /// 卡片列表
     pub cards: Vec<BoardCard>,
 }
 
@@ -621,18 +624,26 @@ pub trait BoardQueryPort: Send + Sync {
 /// **BoardRepository** — 持久化抽象
 #[async_trait]
 pub trait BoardRepository: Send + Sync {
+    /// 插入看板
     async fn insert_board(&self, b: &Board) -> Result<(), BoardError>;
+    /// 查询看板
     async fn get_board(&self, id: BoardId) -> Result<Option<Board>, BoardError>;
+    /// 更新看板
     async fn update_board(&self, b: &Board) -> Result<(), BoardError>;
+    /// 按项目列出看板
     async fn list_boards_by_project(
         &self,
         tenant_id: TenantId,
         project_id: ProjectId,
     ) -> Result<Vec<Board>, BoardError>;
 
+    /// 插入卡片
     async fn insert_card(&self, b: BoardId, c: &BoardCard) -> Result<(), BoardError>;
+    /// 更新卡片
     async fn update_card(&self, b: BoardId, c: &BoardCard) -> Result<(), BoardError>;
+    /// 删除卡片
     async fn delete_card(&self, b: BoardId, c: BoardCardId) -> Result<(), BoardError>;
+    /// 列出看板下所有卡片
     async fn list_cards(&self, b: BoardId) -> Result<Vec<BoardCard>, BoardError>;
 }
 

@@ -51,18 +51,22 @@ macro_rules! define_uuid_id {
         pub struct $name(pub uuid::Uuid);
 
         impl $name {
+            /// 生成新的随机 ID
             #[allow(dead_code)]
             pub fn new() -> Self {
                 Self(uuid::Uuid::new_v4())
             }
+            /// 从已有 `Uuid` 构造
             #[allow(dead_code)]
             pub fn from_uuid(id: uuid::Uuid) -> Self {
                 Self(id)
             }
+            /// 取内部 `Uuid`(借用)
             #[allow(dead_code)]
             pub fn as_uuid(&self) -> uuid::Uuid {
                 self.0
             }
+            /// 取内部 `Uuid`(消费 self)
             #[allow(dead_code)]
             pub fn into_uuid(self) -> uuid::Uuid {
                 self.0
@@ -441,7 +445,9 @@ pub struct CreateWorkspaceCommand {
 /// UpdateWorkspace 命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateWorkspaceCommand {
+    /// Workspace ID
     pub workspace_id: WorkspaceId,
+    /// 租户 ID
     pub tenant_id: TenantId,
     /// 乐观锁(必填,防止覆盖并发修改)
     pub expected_version: u32,
@@ -454,25 +460,35 @@ pub struct UpdateWorkspaceCommand {
 /// AddMember 命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddMemberCommand {
+    /// Workspace ID
     pub workspace_id: WorkspaceId,
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 被添加成员的用户 ID
     pub user_id: UserId,
+    /// 成员角色
     pub role: WorkspaceRole,
 }
 
 /// RemoveMember 命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoveMemberCommand {
+    /// Workspace ID
     pub workspace_id: WorkspaceId,
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 被移除成员的用户 ID
     pub user_id: UserId,
 }
 
 /// ListWorkspace 查询
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListWorkspaceQuery {
+    /// 租户 ID
     pub tenant_id: TenantId,
+    /// 分页大小
     pub limit: u32,
+    /// 分页偏移
     pub offset: u32,
 }
 
@@ -518,22 +534,26 @@ pub trait WorkspaceCommandPort: Send + Sync {
 /// Workspace 查询端口
 #[async_trait]
 pub trait WorkspaceQueryPort: Send + Sync {
+    /// 按 ID 查询 Workspace
     async fn get_by_id(
         &self,
         id: WorkspaceId,
         viewer: ActorContext,
     ) -> Result<Workspace, WorkspaceError>;
+    /// 按业务键查询 Workspace
     async fn get_by_key(
         &self,
         tenant_id: TenantId,
         workspace_key: &str,
         viewer: ActorContext,
     ) -> Result<Workspace, WorkspaceError>;
+    /// 分页列出 Workspace
     async fn list_workspaces(
         &self,
         q: ListWorkspaceQuery,
         viewer: ActorContext,
     ) -> Result<Vec<Workspace>, WorkspaceError>;
+    /// 列出 Workspace 成员
     async fn list_members(
         &self,
         workspace_id: WorkspaceId,

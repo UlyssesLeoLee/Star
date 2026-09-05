@@ -25,9 +25,13 @@ use super::process::{OutputLine, OutputStream, ProcessHandle, ProcessState, Runt
 /// 集成配置
 #[derive(Debug, Clone)]
 pub struct IntegrationConfig {
+    /// worktree 目录路径
     pub worktree_dir: PathBuf,
+    /// commit 作者名
     pub author_name: String,
+    /// commit 作者邮箱
     pub author_email: String,
+    /// 是否自动 push
     pub auto_push: bool,
     /// 自动 commit 的最小文件数 (避免空 commit)
     pub min_files_for_commit: u32,
@@ -51,11 +55,17 @@ impl Default for IntegrationConfig {
 /// 集成结果
 #[derive(Debug, Clone, PartialEq)]
 pub struct IntegrationResult {
+    /// 是否已 spawn
     pub spawned: bool,
+    /// 进程退出码
     pub exit_code: Option<i32>,
+    /// 已 commit 的文件列表
     pub files_committed: Vec<String>,
+    /// commit sha (若已 commit)
     pub commit_sha: Option<String>,
+    /// 是否已 push
     pub pushed: bool,
+    /// 错误信息 (若有)
     pub error: Option<String>,
 }
 
@@ -63,16 +73,22 @@ pub struct IntegrationResult {
 // 2. error
 // =====================================================================
 
+/// spawn-upload 集成模块错误类型
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum IntegrationError {
+    /// worktree 目录不存在
     #[error("worktree 目录不存在: {0}")]
     WorktreeDirMissing(String),
+    /// git status 失败
     #[error("git status 失败: {0}")]
     GitStatus(String),
+    /// git commit 失败
     #[error("git commit 失败: {0}")]
     GitCommit(String),
+    /// git push 失败
     #[error("git push 失败: {0}")]
     GitPush(String),
+    /// 非零退出码, 跳过 commit
     #[error("非零退出码 {0}, 跳过 commit")]
     NonZeroExit(i32),
 }
@@ -81,6 +97,7 @@ pub enum IntegrationError {
 // 3. service — SpawnUploadIntegrator
 // =====================================================================
 
+/// spawn 完成后自动 upload (git add + commit + push) 的集成器
 pub struct SpawnUploadIntegrator {
     config: IntegrationConfig,
     /// 推流通知 (Phase 2 串联 subscribe_real hub)
@@ -88,14 +105,17 @@ pub struct SpawnUploadIntegrator {
 }
 
 impl SpawnUploadIntegrator {
+    /// 用指定配置构造集成器
     pub fn new(config: IntegrationConfig) -> Self {
         Self { config, tx: None }
     }
 
+    /// 用默认配置构造集成器
     pub fn with_default() -> Self {
         Self::new(IntegrationConfig::default())
     }
 
+    /// 设置推流通知 sender
     pub fn with_sender(mut self, tx: tokio::sync::mpsc::Sender<OutputLine>) -> Self {
         self.tx = Some(tx);
         self

@@ -22,12 +22,16 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LlmProvider {
-    Mock,   // 内置 mock (无外部 API)
-    OpenAI, // 接口预留
+    /// 内置 mock (无外部 API)
+    Mock,
+    /// 接口预留
+    OpenAI,
+    /// Anthropic
     Anthropic,
 }
 
 impl LlmProvider {
+    /// 提供方显示名
     pub fn name(&self) -> &'static str {
         match self {
             Self::Mock => "Mock",
@@ -40,9 +44,13 @@ impl LlmProvider {
 /// 模型配置
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModelConfig {
+    /// LLM 提供方
     pub provider: LlmProvider,
+    /// 模型名
     pub model_name: String,
+    /// 最大 token 数
     pub max_tokens: u32,
+    /// 温度
     pub temperature: f32,
 }
 
@@ -61,14 +69,20 @@ impl Default for ModelConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentRole {
+    /// Workflow Builder
     WorkflowBuilder,
+    /// Work Readiness Checker
     WorkReadinessChecker,
+    /// Report Insight
     ReportInsight,
+    /// JQL Generator
     JqlGenerator,
+    /// Rovo Chat
     RovoChat,
 }
 
 impl AgentRole {
+    /// 角色显示名
     pub fn name(&self) -> &'static str {
         match self {
             Self::WorkflowBuilder => "Workflow Builder",
@@ -87,39 +101,60 @@ impl AgentRole {
 /// AI 请求
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AiRequest {
+    /// 请求 ID
     pub id: Uuid,
+    /// Agent 角色
     pub role: AgentRole,
+    /// 提示词
     pub prompt: String,
+    /// 上下文
     pub context: serde_json::Value,
+    /// 模型配置
     pub model_config: ModelConfig,
+    /// 发起用户 ID
     pub user_id: Option<Uuid>,
+    /// 租户 ID
     pub tenant_id: Uuid,
+    /// 创建时间
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// AI 响应
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AiResponse {
+    /// 对应的请求 ID
     pub request_id: Uuid,
+    /// Agent 角色
     pub role: AgentRole,
+    /// 响应内容
     pub content: String,
-    pub structured: Option<serde_json::Value>, // 结构化输出 (e.g. Workflow JSON)
+    /// 结构化输出 (e.g. Workflow JSON)
+    pub structured: Option<serde_json::Value>,
+    /// 消耗的 token 数
     pub tokens_used: u32,
+    /// 延迟 (毫秒)
     pub latency_ms: u32,
+    /// 创建时间
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// Prompt 模板
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PromptTemplate {
+    /// 模板 ID
     pub id: Uuid,
+    /// 关联的 Agent 角色
     pub role: AgentRole,
+    /// 模板名称
     pub name: String,
-    pub template: String, // 含 {{var}} 占位
+    /// 模板内容 (含 {{var}} 占位)
+    pub template: String,
+    /// 版本号
     pub version: u32,
 }
 
 impl PromptTemplate {
+    /// 用变量渲染模板
     pub fn render(&self, vars: &std::collections::HashMap<String, String>) -> String {
         let mut out = self.template.clone();
         for (k, v) in vars {
@@ -133,9 +168,12 @@ impl PromptTemplate {
 // 3. port
 // =====================================================================
 
+/// LLM 提供方抽象
 #[async_trait]
 pub trait LlmProviderPort: Send + Sync {
+    /// 同步补全
     async fn complete(&self, request: &AiRequest) -> Result<AiResponse, AiError>;
+    /// 流式补全
     async fn stream(
         &self,
         request: &AiRequest,
@@ -146,11 +184,13 @@ pub trait LlmProviderPort: Send + Sync {
 // 4. service — 3 Agent + JQL AI + Rovo Chat
 // =====================================================================
 
+/// AI 服务 (3 Agent + JQL AI + Rovo Chat)
 pub struct AiService {
     provider: Box<dyn LlmProviderPort>,
 }
 
 impl AiService {
+    /// 构造服务
     pub fn new(provider: Box<dyn LlmProviderPort>) -> Self {
         Self { provider }
     }
@@ -242,14 +282,19 @@ impl AiService {
 // 5. error
 // =====================================================================
 
+/// AI 领域错误
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum AiError {
+    /// LLM 提供方错误
     #[error("LLM provider error: {0}")]
     Provider(String),
+    /// 限流
     #[error("rate limited")]
     RateLimited,
+    /// 非法响应
     #[error("invalid response: {0}")]
     InvalidResponse(String),
+    /// 数据隔离违规
     #[error("data isolation violation: 客户数据不得参与训练")]
     DataIsolation,
 }
@@ -258,6 +303,7 @@ pub enum AiError {
 // 6. Mock LLM Provider (默认, 无外部 API 依赖)
 // =====================================================================
 
+/// 内置 mock LLM 提供方 (无外部 API 依赖)
 pub struct MockLlmProvider;
 
 #[async_trait]

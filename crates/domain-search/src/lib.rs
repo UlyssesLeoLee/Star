@@ -229,33 +229,44 @@ pub struct Facet {
 /// 单个符号的引用结果(per §1.2 get_symbol)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SymbolRef {
+    /// 符号名称
     pub name: String,
+    /// 符号类型
     pub kind: String,
+    /// 文件路径
     pub file_path: String,
     /// P0 简化:SearchIndex 的 SymbolMetadata 不带 line, 用 0 占位
     /// (per brief §1.2 "不改 SearchRepository, 走 InMemory cache 真实路径")
     pub line: u32,
+    /// 签名
     pub signature: String,
 }
 
 /// 单个引用位置(per §1.3 find_references)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReferenceRef {
+    /// 符号名称
     pub name: String,
+    /// 文件路径
     pub file_path: String,
     /// P0 简化:行号 = SearchIndex fulltext 中的偏移估算
     pub line: u32,
     /// P0 简化:列号 = 0 占位
     pub column: u32,
+    /// 上下文文本
     pub context: String,
 }
 
 /// 代码上下文窗口(per §1.4 get_code_context)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeContext {
+    /// 文件路径
     pub file_path: String,
+    /// 起始行号
     pub start_line: u32,
+    /// 结束行号
     pub end_line: u32,
+    /// 代码片段
     pub snippet: String,
 }
 

@@ -71,6 +71,7 @@ impl Default for OutputHub {
 // 2. error
 // =====================================================================
 
+/// subscribe 模块错误类型
 #[derive(Debug, thiserror::Error, Clone, PartialEq)]
 pub enum SubscribeError {
     /// 目标 process 不存在

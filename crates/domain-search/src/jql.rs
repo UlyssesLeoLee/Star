@@ -19,77 +19,117 @@ use uuid::Uuid;
 // AST
 // =====================================================================
 
+/// JQL 表达式 AST 节点
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum JqlExpr {
+    /// 逻辑与
     And(Box<JqlExpr>, Box<JqlExpr>),
+    /// 逻辑或
     Or(Box<JqlExpr>, Box<JqlExpr>),
+    /// 逻辑非
     Not(Box<JqlExpr>),
+    /// 字段比较
     Comparison(Comparison),
+    /// 函数调用
     Function(FuncCall),
+    /// IN 集合判断
     In(JqlField, Vec<JqlValue>),
+    /// IS EMPTY 判断
     Empty(JqlField),
+    /// IS NULL 判断
     Null(JqlField),
+    /// ORDER BY 排序
     OrderBy(Vec<OrderByItem>),
 }
 
+/// 字段比较表达式
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Comparison {
+    /// 比较字段
     pub field: JqlField,
+    /// 比较运算符
     pub op: CmpOp,
+    /// 比较目标值
     pub value: JqlValue,
 }
 
+/// 比较运算符
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CmpOp {
+    /// 等于
     Eq,
+    /// 不等于
     Ne,
+    /// 大于
     Gt,
+    /// 大于等于
     Ge,
+    /// 小于
     Lt,
+    /// 小于等于
     Le,
+    /// 模糊匹配
     Like,
+    /// 模糊不匹配
     NotLike,
 }
 
+/// 函数调用表达式
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FuncCall {
-    pub name: String, // currentUser / now / membersOf
+    /// 函数名 (currentUser / now / membersOf)
+    pub name: String,
+    /// 调用参数
     pub args: Vec<JqlValue>,
 }
 
+/// ORDER BY 单项
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OrderByItem {
+    /// 排序字段
     pub field: JqlField,
+    /// 排序方向
     pub direction: SortDir,
 }
 
+/// 排序方向
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SortDir {
+    /// 升序
     Asc,
+    /// 降序
     Desc,
 }
 
+/// JQL 字段名
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct JqlField(pub String);
 
 impl JqlField {
+    /// 构造字段名
     pub fn new(s: impl Into<String>) -> Self {
         Self(s.into())
     }
+    /// 取字段名字符串
     pub fn as_str(&self) -> &str {
         &self.0
     }
 }
 
+/// JQL 值 (比较/函数参数的运行时值)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum JqlValue {
+    /// 字符串值
     String(String),
+    /// 数字值
     Number(f64),
+    /// 布尔值
     Bool(bool),
+    /// 列表值
     List(Vec<JqlValue>),
     /// 由 currentUser() / now() 等函数在执行时解析
     Unresolved(String),
@@ -99,12 +139,14 @@ pub enum JqlValue {
 // Parser (递归下降)
 // =====================================================================
 
+/// JQL 递归下降解析器
 pub struct JqlParser<'a> {
     input: &'a [u8],
     pos: usize,
 }
 
 impl<'a> JqlParser<'a> {
+    /// 构造解析器
     pub fn new(input: &'a str) -> Self {
         Self {
             input: input.as_bytes(),
@@ -112,6 +154,7 @@ impl<'a> JqlParser<'a> {
         }
     }
 
+    /// 解析 JQL 表达式
     pub fn parse(&mut self) -> Result<JqlExpr, JqlError> {
         self.skip_ws();
         let mut left = self.parse_or()?;
@@ -401,15 +444,20 @@ impl<'a> JqlParser<'a> {
 // 执行器 (内存 stub)
 // =====================================================================
 
+/// 待匹配的工作项行 (内存 stub)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WorkItemRow {
+    /// 工作项 ID
     pub id: Uuid,
+    /// 字段值映射
     pub fields: HashMap<String, JqlValue>,
 }
 
+/// JQL 内存执行器
 pub struct JqlExecutor;
 
 impl JqlExecutor {
+    /// 对内存行集执行 JQL 表达式, 返回匹配的工作项 ID 列表
     pub fn execute(
         expr: &JqlExpr,
         rows: &[WorkItemRow],
@@ -568,10 +616,17 @@ fn regex_match(pattern: &str, text: &str) -> bool {
 // error
 // =====================================================================
 
+/// JQL 解析错误
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum JqlError {
+    /// 解析失败
     #[error("parse error at pos {pos}: {message}")]
-    Parse { pos: usize, message: String },
+    Parse {
+        /// 出错位置
+        pos: usize,
+        /// 错误说明
+        message: String,
+    },
 }
 
 #[cfg(test)]
