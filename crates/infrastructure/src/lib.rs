@@ -47,26 +47,31 @@ use uuid::Uuid;
 /// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
 #[async_trait]
 pub trait AdapterRegistry: Send + Sync {
+    /// 注册 PostgreSQL adapter
     async fn register_postgres_adapter(
         &self,
         cmd: (),
         actor: ActorContext,
     ) -> Result<(), InfrastructureError>;
+    /// 注册 NATS adapter
     async fn register_nats_adapter(
         &self,
         cmd: (),
         actor: ActorContext,
     ) -> Result<(), InfrastructureError>;
+    /// 注册 ObjectStorage adapter
     async fn register_object_storage_adapter(
         &self,
         cmd: (),
         actor: ActorContext,
     ) -> Result<(), InfrastructureError>;
+    /// 注册 SCM adapter
     async fn register_scm_adapter(
         &self,
         cmd: (),
         actor: ActorContext,
     ) -> Result<(), InfrastructureError>;
+    /// 注册 Agent adapter
     async fn register_agent_adapter(
         &self,
         cmd: (),
@@ -79,6 +84,7 @@ pub trait AdapterRegistry: Send + Sync {
 /// 来源: docs/api-design.md —
 #[async_trait]
 pub trait AdapterQuery: Send + Sync {
+    /// 列出已注册的 adapter
     async fn list_registered_adapters(
         &self,
         _dummy: (),
@@ -118,14 +124,19 @@ pub struct AdapterDescriptor {
 /// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
 #[derive(Debug, thiserror::Error)]
 pub enum InfrastructureError {
+    /// 未找到
     #[error("not found: {0}")]
     NotFound(Uuid),
+    /// 非法状态
     #[error("invalid state: {0}")]
     InvalidState(String),
+    /// 权限不足
     #[error("permission denied")]
     PermissionDenied,
+    /// 冲突
     #[error("conflict: {0}")]
     Conflict(String),
+    /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
 }
