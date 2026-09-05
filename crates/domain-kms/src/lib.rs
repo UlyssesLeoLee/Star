@@ -57,9 +57,11 @@ impl std::fmt::Display for KeyId {
 }
 
 impl KeyId {
+    /// 构造密钥 ID
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
     }
+    /// 取字符串引用
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -90,12 +92,21 @@ pub struct EncryptedBlob {
 /// KMS 操作错误
 #[derive(Debug, Error)]
 pub enum KmsError {
+    /// 密钥未找到
     #[error("key not found: {0}")]
     KeyNotFound(KeyId),
+    /// 访问被拒绝
     #[error("access denied: tenant {tenant} cannot access key {key}")]
-    AccessDenied { tenant: TenantId, key: KeyId },
+    AccessDenied {
+        /// 尝试访问的租户
+        tenant: TenantId,
+        /// 目标密钥
+        key: KeyId,
+    },
+    /// 密文非法
     #[error("invalid ciphertext: {0}")]
     InvalidCiphertext(String),
+    /// 内部错误
     #[error("internal error: {0}")]
     Internal(String),
 }
@@ -136,9 +147,13 @@ pub trait KmsClient: Send + Sync {
 /// KMS 健康状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KmsHealth {
+    /// 当前模式
     pub mode: KmsMode,
+    /// 主密钥 ID
     pub master_key_id: KeyId,
+    /// 密钥数量
     pub key_count: u32,
+    /// 最近一次轮换时间
     pub last_rotation: DateTime<Utc>,
 }
 
@@ -180,6 +195,7 @@ pub struct LocalMockKms {
 }
 
 impl LocalMockKms {
+    /// 构造新 mock KMS(随机生成主密钥, 不持久化)
     pub fn new() -> Self {
         use rand::RngCore;
         let mut key = [0u8; 32];
@@ -196,6 +212,7 @@ impl LocalMockKms {
         }
     }
 
+    /// 取主密钥 ID
     pub fn master_key_id(&self) -> &KeyId {
         &self.master_key_id
     }
