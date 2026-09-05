@@ -18,20 +18,26 @@ import type {
   AgentSession, Worktree, WorkItem, AgentStatus, WorkItemStatus,
 } from "@/types/ids";
 import type { AgentCanvas, AgentCanvasNode, AgentCanvasConnector } from "@/lib/agent-view/types";
+import type { AgentGameState } from "@/lib/agent-game/types";
+import { visualForLevel, MAX_HP } from "@/lib/agent-game/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import {
-  Hand, MousePointer2, ZoomIn, ZoomOut, Maximize2, Bot, GitBranch, Hash, Cpu,
+  Hand, MousePointer2, ZoomIn, ZoomOut, Maximize2, Bot, GitBranch, Hash, Cpu, Skull, Coins,
 } from "lucide-react";
 
 interface AgentCanvasViewProps {
   canvas: AgentCanvas;
   agent: AgentSession;
   worktree: Worktree | null;
+  /** 拟人化游戏化 (per 2026-09-05 11:42 JST 拍板) */
+  gameState: AgentGameState | null;
+  /** 领奖回调 (work-item done + 未领奖时) */
+  onClaim?: (workItemId: string) => void;
 }
 
-export function AgentCanvasView({ canvas, agent, worktree }: AgentCanvasViewProps) {
+export function AgentCanvasView({ canvas, agent, worktree, gameState, onClaim }: AgentCanvasViewProps) {
   // 顶层订阅 workItems, 避免 renderNode 内 useStore.getState 触发 hooks 违规
   const workItems = useStore((s) => s.workItems);
   const workItemById = useMemo(
@@ -194,19 +200,62 @@ export function AgentCanvasView({ canvas, agent, worktree }: AgentCanvasViewProp
     const isHovered = hoveredNodeId === node.id;
 
     if (node.ref.kind === "agent") {
+      // 拟人化游戏化视觉 (per 拍板 #3, Lv 1..10 渐进)
+      const tier = gameState ? visualForLevel(gameState.level) : null;
+      const alive = gameState?.alive ?? true;
+      const scale = tier?.scale ?? 1;
+      const nodeW = w * scale;
+      const nodeH = h * scale;
+      // 中心化 (因为 scale 改了, 调整 translate)
+      const offsetX = (w - nodeW) / 2;
+      const offsetY = (h - nodeH) / 2;
+      const borderColor = !alive
+        ? "#f85149"
+        : isSelected ? "#79c0ff" : isHovered ? "#2f81f7" : (tier?.color ?? "#1f6feb");
+      const fillColor = !alive ? "#1a1a1a" : "#0d2849";
       return (
         <g
           key={node.id}
           data-testid={`agent-canvas-node-${node.id}`}
-          transform={`translate(${posX}, ${posY})`}
+          transform={`translate(${posX + offsetX}, ${posY + offsetY})`}
           style={{ cursor: "pointer" }}
           onMouseDown={(e) => onNodeClick(e, node.id)}
           onMouseEnter={() => setHoveredNodeId(node.id)}
           onMouseLeave={() => setHoveredNodeId(null)}
           onDoubleClick={() => onNodeDoubleClick(node.ref)}
         >
-          <NodeRect w={w} h={h} stroke={isSelected ? "#79c0ff" : isHovered ? "#2f81f7" : "#1f6feb"} fill="#0d2849" radius={12 * viewport.zoom} />
-          <AgentNodeBody agent={agent} w={w} h={h} zoom={viewport.zoom} />
+          {/* Halo ring (Lv 7+ purple, Lv 9+ gold) */}
+          {tier && tier.level >= 7 && (
+            <rect
+              x={-6 * viewport.zoom}
+              y={-6 * viewport.zoom}
+              width={nodeW + 12 * viewport.zoom}
+              height={nodeH + 12 * viewport.zoom}
+              fill="none"
+              stroke={tier.color}
+              strokeWidth={1}
+              strokeDasharray={`${4 * viewport.zoom} ${4 * viewport.zoom}`}
+              opacity={0.5}
+              rx={16 * viewport.zoom}
+            />
+          )}
+          <NodeRect w={nodeW} h={nodeH} stroke={borderColor} strokeWidth={(tier?.borderWidth ?? 1.5) * viewport.zoom} fill={fillColor} radius={12 * viewport.zoom} />
+          <AgentNodeBody agent={agent} w={nodeW} h={nodeH} zoom={viewport.zoom} gameState={gameState} />
+          {/* Lv 徽章 (右上角) */}
+          {tier && (
+            <g transform={`translate(${nodeW - 30 * viewport.zoom}, ${-10 * viewport.zoom})`}>
+              <rect width={28 * viewport.zoom} height={20 * viewport.zoom} fill={tier.color} rx={4 * viewport.zoom} />
+              <text x={14 * viewport.zoom} y={14 * viewport.zoom} textAnchor="middle" fontSize={11 * viewport.zoom} fill="#0b0d10" fontWeight="bold" fontFamily="ui-monospace, monospace">
+                Lv{tier.level}
+              </text>
+            </g>
+          )}
+          {/* 死亡 skull overlay */}
+          {!alive && (
+            <g transform={`translate(${nodeW / 2 - 12 * viewport.zoom}, ${nodeH / 2 - 12 * viewport.zoom})`}>
+              <Skull size={24 * viewport.zoom} color="#f85149" strokeWidth={1.5} />
+            </g>
+          )}
         </g>
       );
     }
@@ -230,6 +279,8 @@ export function AgentCanvasView({ canvas, agent, worktree }: AgentCanvasViewProp
     if (node.ref.kind === "work_item") {
       const wi = workItemById.get(node.ref.workItemId);
       if (!wi) return null;
+      // 拟人化游戏化: 完成后可领奖 (status=done + 未领过)
+      const canClaim = onClaim && wi.status === "done" && gameState?.alive && !gameState.lastClaimAt[wi.id];
       return (
         <g
           key={node.id}
@@ -243,6 +294,27 @@ export function AgentCanvasView({ canvas, agent, worktree }: AgentCanvasViewProp
         >
           <NodeRect w={w} h={h} stroke={isSelected ? "#79c0ff" : isHovered ? "#2f81f7" : "#30363d"} fill="#161b22" radius={6 * viewport.zoom} />
           <WorkItemNodeBody wi={wi} w={w} h={h} zoom={viewport.zoom} />
+          {/* Claim button (foreignObject HTML 按钮) */}
+          {canClaim && (
+            <foreignObject
+              x={2 * viewport.zoom}
+              y={h - 18 * viewport.zoom}
+              width={w - 4 * viewport.zoom}
+              height={16 * viewport.zoom}
+            >
+              <button
+                data-testid={`claim-btn-${wi.id}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClaim!(wi.id);
+                }}
+                className="w-full h-full text-[9px] flex items-center justify-center gap-1 rounded bg-warn/20 border border-warn/50 text-warn hover:bg-warn/30 font-mono"
+                style={{ pointerEvents: "all" }}
+              >
+                <Coins size={9} /> Claim
+              </button>
+            </foreignObject>
+          )}
         </g>
       );
     }
@@ -341,23 +413,27 @@ export function AgentCanvasView({ canvas, agent, worktree }: AgentCanvasViewProp
 
 // ---- 节点组件 (内部, 不用 export) ----
 
-function NodeRect({ w, h, fill, stroke, radius }: { w: number; h: number; fill: string; stroke: string; radius: number }) {
-  return <rect width={w} height={h} fill={fill} stroke={stroke} strokeWidth={1.5} rx={radius} />;
+function NodeRect({ w, h, fill, stroke, strokeWidth = 1.5, radius }: { w: number; h: number; fill: string; stroke: string; strokeWidth?: number; radius: number }) {
+  return <rect width={w} height={h} fill={fill} stroke={stroke} strokeWidth={strokeWidth} rx={radius} />;
 }
 
-function AgentNodeBody({ agent, w, h, zoom }: { agent: AgentSession; w: number; h: number; zoom: number }) {
+function AgentNodeBody({ agent, w, h, zoom, gameState }: { agent: AgentSession; w: number; h: number; zoom: number; gameState: AgentGameState | null }) {
+  // 拟人化游戏化: 在底部 tokens/cost 之上加 HP bar (per 拍板)
+  const hp = gameState?.hp ?? MAX_HP;
+  const alive = gameState?.alive ?? true;
+  const hpPct = alive ? Math.round((hp / MAX_HP) * 100) : 0;
   return (
     <g>
       {/* icon */}
       <g transform={`translate(${12 * zoom}, ${12 * zoom})`}>
-        <Bot size={16 * zoom} color="#79c0ff" strokeWidth={1.5} />
+        <Bot size={16 * zoom} color={alive ? "#79c0ff" : "#6e7681"} strokeWidth={1.5} />
       </g>
       {/* kind */}
       <text x={(12 + 22) * zoom} y={(12 + 12) * zoom} fontSize={10 * zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
         {agent.agent_kind}
       </text>
       {/* id */}
-      <text x={12 * zoom} y={(28 + 6) * zoom} fontSize={11 * zoom} fill="#e6edf3" fontFamily="ui-monospace, monospace">
+      <text x={12 * zoom} y={(28 + 6) * zoom} fontSize={11 * zoom} fill={alive ? "#e6edf3" : "#6e7681"} fontFamily="ui-monospace, monospace">
         {agent.id}
       </text>
       {/* status pill (foreignObject) — agent 没有 StatusKind, 走 StatusPill 默认 prettify */}
@@ -366,17 +442,24 @@ function AgentNodeBody({ agent, w, h, zoom }: { agent: AgentSession; w: number; 
           <StatusPill value={agent.status as AgentStatus} size="xs" />
         </div>
       </foreignObject>
+      {/* HP bar (拟人化游戏化, per 拍板) */}
+      {gameState && (
+        <g transform={`translate(${12 * zoom}, ${h - 36 * zoom})`}>
+          <rect width={(w - 24)} height={5 * zoom} fill="#0b0d10" rx={2 * zoom} />
+          <rect width={(w - 24) * (hpPct / 100)} height={5 * zoom} fill={hpPct <= 30 ? "#f85149" : "#3fb950"} rx={2 * zoom} />
+        </g>
+      )}
       {/* tokens + cost (底部两行) */}
-      <g transform={`translate(${12 * zoom}, ${h - 28 * zoom})`}>
+      <g transform={`translate(${12 * zoom}, ${gameState ? h - 24 * zoom : h - 28 * zoom})`}>
         <Hash size={9 * zoom} color="#8b949e" />
       </g>
-      <text x={26 * zoom} y={(h - 20 * zoom)} fontSize={9 * zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
+      <text x={26 * zoom} y={(gameState ? h - 16 * zoom : h - 20 * zoom)} fontSize={9 * zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
         {agent.token_usage.total.toLocaleString()} tokens
       </text>
-      <g transform={`translate(${12 * zoom}, ${h - 14 * zoom})`}>
+      <g transform={`translate(${12 * zoom}, ${gameState ? h - 10 * zoom : h - 14 * zoom})`}>
         <Cpu size={9 * zoom} color="#8b949e" />
       </g>
-      <text x={26 * zoom} y={(h - 6 * zoom)} fontSize={9 * zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
+      <text x={26 * zoom} y={(gameState ? h - 2 * zoom : h - 6 * zoom)} fontSize={9 * zoom} fill="#8b949e" fontFamily="ui-monospace, monospace">
         ${agent.cost_summary.usd.toFixed(2)} / ${agent.cost_summary.budget_usd.toFixed(2)}
       </text>
     </g>

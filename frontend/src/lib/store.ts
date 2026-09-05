@@ -26,6 +26,30 @@ import type {
   RefactorRound, RefactorCard, RefactorColumn, RefactorBoardConfig, RefactorStatus,
   Uuid,
 } from "@/types/ids";
+import type { AgentGameState, PerkId } from "@/lib/agent-game/types";
+import {
+  createInitialGameState,
+  computeClaim,
+  applyClaim,
+  applyPerkChoice,
+  applyCostSpend,
+  applyDeath,
+  applyRevive,
+  applyRestart,
+} from "@/lib/agent-game/leveling";
+
+/** claimReward 戻り値 (per 拍板) */
+export type ClaimResult =
+  | { ok: true; xp: number; coins: number; leveledUp: boolean; levelsGained: number; isMaxLevel: boolean }
+  | { ok: false; reason: "work_item_not_found" | "already_claimed" | "not_done" | "agent_dead" };
+
+/** spendCost 戻り値 (per 拍板) */
+export type SpendResult =
+  | { ok: true; died: boolean; hpAfter: number; triggerCostRatio: number }
+  | { ok: false; reason: "agent_not_found" };
+
+/** reviveAgent 戻り値 */
+export type ReviveResult = { ok: true } | { ok: false; reason: string };
 import { TODO_FALLBACK_STATUS, isFallbackStatus } from "@/components/board/constants";
 import {
   REFACTOR_DEFAULT_BATCH_SIZE,
@@ -153,6 +177,10 @@ interface StoreState {
   /** per-project 重构看板配置 (列定义 + batch_size) */
   refactorBoardConfigs: Record<Uuid, RefactorBoardConfig>;
 
+  // ── Agent Game (per 2026-09-05 11:42 JST 拍板, 拟人化游戏化) ──
+  /** per-agent 游戏化状态 (level / xp / coins / hp / perks) */
+  agentGameStates: Record<Uuid, AgentGameState>;
+
   // 5 状态机迁移 (保留 B.2.5 已实装的 6 个)
   transitionWorktree: (id: string, to: WorktreeStatus) => void;
   transitionAgent:    (id: string, to: AgentStatus) => void;
@@ -266,6 +294,20 @@ interface StoreState {
   deleteCanvasElement: (id: string) => void;
   addCanvasConnector: (connector: CanvasConnector) => void;
   setCanvasViewport: (canvasId: string, x: number, y: number, zoom: number) => void;
+
+  // Agent Game (per 2026-09-05 11:42 JST 拍板, 拟人化游戏化)
+  /** 初始化/重置某 agent 的 game state (Lv 1, HP 满, perks 清零) */
+  initAgentGame: (agentId: Uuid, budgetUsd: number) => void;
+  /** 领取 work-item 完成奖励 (xp + coins), 内部触发升级和死亡检测 */
+  claimReward: (agentId: Uuid, workItemId: Uuid) => ClaimResult;
+  /** 选 perk (5 选 1, 升级时调) */
+  choosePerk: (agentId: Uuid, perkId: PerkId) => void;
+  /** 消耗 cost (HP 扣血, 可能触发死亡) */
+  spendCost: (agentId: Uuid, costDelta: number) => SpendResult;
+  /** 复活 (扣 50 金币, 重置 Lv 1) */
+  reviveAgent: (agentId: Uuid) => { ok: boolean; reason?: string };
+  /** 重开 (不扣币) */
+  restartAgent: (agentId: Uuid) => void;
 }
 
 // =====================================================================
@@ -314,6 +356,10 @@ const initialState = (set: any): StoreState => ({
   //   - per-project RefactorBoardConfig 同样 lazy init (第一次访问项目时)
   refactorRounds: [] as RefactorRound[],
   refactorBoardConfigs: {} as Record<Uuid, RefactorBoardConfig>,
+
+  // Agent Game (per 2026-09-05 11:42 JST 拍板)
+  //   - per-agent 状态, 首次 claimReward / initAgentGame 时 lazy init
+  agentGameStates: {} as Record<Uuid, AgentGameState>,
 
   // 6 状态机 (B.2.5 已有)
   transitionWorktree: (id, to) =>
@@ -541,6 +587,106 @@ const initialState = (set: any): StoreState => ({
     set((s: StoreState) => ({
       canvases: s.canvases.map((c) => c.id === canvasId ? { ...c, viewport: { x, y, zoom } } : c),
     })),
+
+  // ===================================================================
+  // Agent Game 7 个 action (per 2026-09-05 11:42 JST 拍板, 拟人化游戏化)
+  //   - lazy init: 首次访问某 agent 时自动建 game state
+  //   - claimReward 内部触发 applyClaim / applyDeath (cost 触发死亡)
+  //   - choosePerk 调 applyPerkChoice 累积
+  //   - 复活 / 重开 走 守门 #9 v9 派生规, 不静默 commit
+  // ===================================================================
+
+  initAgentGame: (agentId, budgetUsd) =>
+    set((s: StoreState) => ({
+      agentGameStates: {
+        ...s.agentGameStates,
+        [agentId]: createInitialGameState(agentId, budgetUsd),
+      },
+    })),
+
+  claimReward: (agentId, workItemId) => {
+    const s = useStore.getState();
+    const gs = s.agentGameStates[agentId] ?? createInitialGameState(agentId, 0);
+    const wi = s.workItems.find((w) => w.id === workItemId);
+    if (!wi) return { ok: false, reason: "work_item_not_found" } as const;
+    if (gs.lastClaimAt[workItemId]) return { ok: false, reason: "already_claimed" } as const;
+    if (wi.status !== "done") return { ok: false, reason: "not_done" } as const;
+    if (!gs.alive) return { ok: false, reason: "agent_dead" } as const;
+    const reward = computeClaim(wi, gs.perks, Math.random());
+    const r = applyClaim(gs, reward.xp, reward.coins, Math.random());
+    const finalState = {
+      ...r.state,
+      lastClaimAt: { ...gs.lastClaimAt, [workItemId]: new Date().toISOString() },
+    };
+    useStore.setState({
+      agentGameStates: { ...s.agentGameStates, [agentId]: finalState },
+    });
+    return {
+      ok: true as const,
+      xp: reward.xp,
+      coins: reward.coins,
+      leveledUp: r.leveledUp,
+      levelsGained: r.levelsGained,
+      isMaxLevel: r.isMaxLevel,
+    };
+  },
+
+  choosePerk: (agentId, perkId) =>
+    set((s: StoreState) => {
+      const gs = s.agentGameStates[agentId];
+      if (!gs || !gs.alive) return s;
+      return {
+        agentGameStates: {
+          ...s.agentGameStates,
+          [agentId]: applyPerkChoice(gs, perkId),
+        },
+      };
+    }),
+
+  spendCost: (agentId, costDelta) => {
+    const s = useStore.getState();
+    const gs = s.agentGameStates[agentId] ?? createInitialGameState(agentId, 0);
+    const agent = s.agentSessions.find((a) => a.id === agentId);
+    if (!agent) return { ok: false, died: false, reason: "agent_not_found" } as const;
+    const r = applyCostSpend(gs, costDelta, agent.cost_summary.budget_usd);
+    let finalState = r.state;
+    if (r.died) {
+      finalState = applyDeath(r.state);
+    }
+    useStore.setState({
+      agentGameStates: { ...s.agentGameStates, [agentId]: finalState },
+    });
+    return {
+      ok: true as const,
+      died: r.died,
+      hpAfter: finalState.hp,
+      triggerCostRatio: r.triggerCostRatio,
+    };
+  },
+
+  reviveAgent: (agentId) => {
+    const s = useStore.getState();
+    const gs = s.agentGameStates[agentId];
+    if (!gs) return { ok: false, reason: "not_initialized" };
+    const r = applyRevive(gs);
+    if (!r.ok) return { ok: false, reason: r.reason ?? "unknown" };
+    useStore.setState({
+      agentGameStates: { ...s.agentGameStates, [agentId]: r.state },
+    });
+    return { ok: true };
+  },
+
+  restartAgent: (agentId) =>
+    set((s: StoreState) => {
+      const gs = s.agentGameStates[agentId];
+      if (!gs) return s;
+      return {
+        agentGameStates: {
+          ...s.agentGameStates,
+          [agentId]: applyRestart(gs),
+        },
+      };
+    }),
 
   // ===================================================================
   // Refactor Sweep 9 个 action (per 2026-09-02 10:41 JST 拍板)
