@@ -23,9 +23,13 @@ use crate::{TriggerMode, UploadStatus, UploadTask};
 /// 上传执行配置
 #[derive(Debug, Clone)]
 pub struct UploadConfig {
+    /// worktree 目录路径
     pub worktree_dir: PathBuf,
+    /// commit 作者名
     pub author_name: String,
+    /// commit 作者邮箱
     pub author_email: String,
+    /// 是否 commit 后自动 push
     pub auto_push: bool, // 是否 commit 后自动 push
 }
 
@@ -43,8 +47,11 @@ impl Default for UploadConfig {
 /// 上传执行结果
 #[derive(Debug, Clone)]
 pub struct UploadResult {
+    /// commit sha
     pub commit_sha: String,
+    /// 已 commit 的文件列表
     pub files_committed: Vec<String>,
+    /// 是否已 push
     pub pushed: bool,
 }
 
@@ -52,20 +59,28 @@ pub struct UploadResult {
 // 2. error
 // =====================================================================
 
+/// 上传执行模块错误类型
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum UploadError {
+    /// git 状态检查失败
     #[error("git 状态检查失败: {0}")]
     GitStatus(String),
+    /// git add 失败
     #[error("git add 失败: {0}")]
     GitAdd(String),
+    /// git commit 失败
     #[error("git commit 失败: {0}")]
     GitCommit(String),
+    /// git push 失败
     #[error("git push 失败: {0}")]
     GitPush(String),
+    /// worktree 目录不存在
     #[error("worktree 目录不存在: {0}")]
     WorktreeDirMissing(String),
+    /// 没有文件变更
     #[error("没有文件变更: {0}")]
     NoChanges(String),
+    /// 触发模式不匹配
     #[error("触发模式不匹配: 期望 {0:?}")]
     TriggerMismatch(TriggerMode),
 }
@@ -74,15 +89,18 @@ pub enum UploadError {
 // 3. service — UploadExecutor
 // =====================================================================
 
+/// 上传执行器 (git add + commit)
 pub struct UploadExecutor {
     config: UploadConfig,
 }
 
 impl UploadExecutor {
+    /// 用指定配置构造执行器
     pub fn new(config: UploadConfig) -> Self {
         Self { config }
     }
 
+    /// 用默认配置构造执行器
     pub fn with_default() -> Self {
         Self::new(UploadConfig::default())
     }

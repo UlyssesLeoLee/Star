@@ -16,19 +16,30 @@ use uuid::Uuid;
 /// Conventional Commits 类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CommitType {
-    Feat,     // 新功能
-    Fix,      // bug 修复
-    Docs,     // 文档
-    Style,    // 格式
-    Refactor, // 重构
-    Perf,     // 性能
-    Test,     // 测试
-    Chore,    // 杂项
-    Build,    // 构建
-    Ci,       // CI
+    /// 新功能
+    Feat,
+    /// bug 修复
+    Fix,
+    /// 文档
+    Docs,
+    /// 格式
+    Style,
+    /// 重构
+    Refactor,
+    /// 性能
+    Perf,
+    /// 测试
+    Test,
+    /// 杂项
+    Chore,
+    /// 构建
+    Build,
+    /// CI
+    Ci,
 }
 
 impl CommitType {
+    /// 返回 Conventional Commits 类型字符串
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Feat => "feat",
@@ -44,6 +55,7 @@ impl CommitType {
         }
     }
 
+    /// 返回该类型对应的 emoji
     pub fn emoji(&self) -> &'static str {
         match self {
             Self::Feat => "✨",
@@ -62,12 +74,17 @@ impl CommitType {
 
 /// Scope (可选, e.g. feat(w16-cli))
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct CommitScope(pub String);
+pub struct CommitScope(
+    /// scope 字符串
+    pub String,
+);
 
 impl CommitScope {
+    /// 构造新的 scope
     pub fn new(s: impl Into<String>) -> Self {
         Self(s.into())
     }
+    /// 返回 scope 字符串引用
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -76,11 +93,17 @@ impl CommitScope {
 /// Commit 模板
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommitTemplate {
+    /// commit 类型
     pub commit_type: CommitType,
+    /// scope (可选)
     pub scope: Option<CommitScope>,
+    /// 标题 (<= 72 字符)
     pub subject: String, // <= 72 字符
+    /// 正文 (可选)
     pub body: Option<String>,
+    /// footer (可选)
     pub footer: Option<String>,
+    /// 是否 breaking change (! 标记)
     pub breaking: bool, // ! 标记
 }
 
@@ -97,21 +120,25 @@ impl CommitTemplate {
         }
     }
 
+    /// 设置 scope
     pub fn with_scope(mut self, scope: CommitScope) -> Self {
         self.scope = Some(scope);
         self
     }
 
+    /// 设置正文
     pub fn with_body(mut self, body: impl Into<String>) -> Self {
         self.body = Some(body.into());
         self
     }
 
+    /// 设置 footer
     pub fn with_footer(mut self, footer: impl Into<String>) -> Self {
         self.footer = Some(footer.into());
         self
     }
 
+    /// 设置 breaking change 标记
     pub fn breaking(mut self, breaking: bool) -> Self {
         self.breaking = breaking;
         self
@@ -259,13 +286,21 @@ impl CommitTemplateBuilder {
 /// Worktree 状态
 #[derive(Debug, Clone, PartialEq)]
 pub struct WorktreeStatus {
+    /// worktree 路径
     pub path: String,
+    /// 当前分支名 (detached 时为 None)
     pub branch: Option<String>,
+    /// 是否 detached HEAD
     pub detached: bool,
+    /// 是否有未提交变更
     pub dirty: bool,
+    /// 领先上游的 commit 数
     pub ahead: u32,
+    /// 落后上游的 commit 数
     pub behind: u32,
+    /// 未解决的 merge 冲突文件列表
     pub conflicts: Vec<String>,
+    /// 最近一次 commit SHA
     pub last_commit_sha: Option<String>,
 }
 
@@ -276,12 +311,16 @@ impl WorktreeStatus {
     }
 }
 
+/// worktree 状态检测模块错误类型
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum WorktreeError {
+    /// git 命令执行失败
     #[error("git 命令失败: {0}")]
     GitFailed(String),
+    /// worktree 目录不存在
     #[error("worktree 目录不存在: {0}")]
     NotFound(String),
+    /// 非 git 仓库
     #[error("git rev-parse 失败: {0}")]
     NotARepository(String),
 }
