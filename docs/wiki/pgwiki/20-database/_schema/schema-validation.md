@@ -1,6 +1,6 @@
 ---
 title: "schema.validation"
-generated: "2026-09-06T01:19:56Z"
+generated: "2026-09-06T02:52:23Z"
 node_type: "db-schema"
 schema: "validation"
 owner_crate: "domain-validation"

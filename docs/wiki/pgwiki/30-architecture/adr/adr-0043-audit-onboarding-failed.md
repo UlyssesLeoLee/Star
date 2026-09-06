@@ -1,6 +1,6 @@
 ---
 title: "ADR-0043: audit-onboarding-failed — 既有 audit_audit_event への onboarding.failed イベント追加"
-generated: "2026-09-06T01:19:56Z"
+generated: "2026-09-06T02:52:23Z"
 node_type: "adr"
 adr_number: "0043"
 adr_slug: "audit-onboarding-failed"

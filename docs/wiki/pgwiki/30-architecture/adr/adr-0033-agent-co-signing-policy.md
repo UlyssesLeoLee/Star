@@ -1,6 +1,6 @@
 ---
 title: "ADR-0033: Agent 代签规则反转 (Co-Signing Policy Reversal)"
-generated: "2026-09-06T01:19:56Z"
+generated: "2026-09-06T02:52:23Z"
 node_type: "adr"
 adr_number: "0033"
 adr_slug: "agent-co-signing-policy"

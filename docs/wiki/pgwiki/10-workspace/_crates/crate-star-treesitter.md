@@ -1,6 +1,6 @@
 ---
 title: "star-treesitter"
-generated: "2026-09-06T01:19:56Z"
+generated: "2026-09-06T02:52:23Z"
 node_type: "crate"
 crate_name: "star-treesitter"
 arch_view: "2026-09-03-treesitter-worktree-graph"

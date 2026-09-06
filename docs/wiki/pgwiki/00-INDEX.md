@@ -1,6 +1,6 @@
 ---
 title: "pgwiki 总目录"
-generated: "2026-09-06T01:19:57Z"
+generated: "2026-09-06T02:52:23Z"
 node_type: "moc-root"
 ---
 
@@ -8,7 +8,7 @@ node_type: "moc-root"
 
 # pgwiki 总目录 (D:/Star Obsidian Vault)
 
-**生成时间**: 2026-09-06T01:19:57Z
+**生成时间**: 2026-09-06T02:52:23Z
 **节点数**: 181 (crate + table + ADR + view + 根级)
 **crate**: 52
 **DB table**: 93

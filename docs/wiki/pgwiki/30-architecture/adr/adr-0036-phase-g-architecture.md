@@ -1,6 +1,6 @@
 ---
 title: "ADR-0036: Phase G 数据层 + 缓存 + Saga 架构"
-generated: "2026-09-06T01:19:56Z"
+generated: "2026-09-06T02:52:23Z"
 node_type: "adr"
 adr_number: "0036"
 adr_slug: "phase-g-architecture"

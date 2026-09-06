@@ -1,6 +1,6 @@
 ---
 title: "domain-relation"
-generated: "2026-09-06T01:19:56Z"
+generated: "2026-09-06T02:52:22Z"
 node_type: "crate"
 crate_name: "domain-relation"
 arch_view: "2026-08-26-upgrade"

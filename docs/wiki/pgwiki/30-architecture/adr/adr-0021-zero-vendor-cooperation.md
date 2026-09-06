@@ -1,6 +1,6 @@
 ---
 title: "ADR-0021: Zero Vendor Cooperation Principle"
-generated: "2026-09-06T01:19:56Z"
+generated: "2026-09-06T02:52:23Z"
 node_type: "adr"
 adr_number: "0021"
 adr_slug: "zero-vendor-cooperation"

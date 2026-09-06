@@ -711,14 +711,10 @@ def generate():
         node_type="cross-deps",
     )
     # schema-to-crate.md
-    s2c_lines = ["# Schema -> Crate 映射", "", "**依据**: 守门 #13 W/T/M + AGENTS.md §6.1 命名解读 disclaimer + ADR-0044", "", "| Schema | 主责 crate | 表数 |", "|---|---|---|"]
-    for schema in schemas:
-        n = sum(1 for s, t, _ in tables if s == schema)
-        crt = SCHEMA_TO_CRATE.get(schema, "(无)")
-        s2c_lines.append(f"| `{schema}` | [[{crate_name_to_wiki(crt)}]] | {n} |" if crt != "(无)" else f"| `{schema}` | (无) | {n} |")
+    s2c_lines = ["# Schema -> Crate 提议映射(待 DDD Review 拍板,非权威)", "", "> **⚠️ 重要 disclaimer** (per 2026-09-06 11:47 JST Ulysses 拍板 + AGENTS.md §5 仓库拓扑 disclaimer + 守门 #3 拒绝兼任):", ">", "> 本表是**程序实际拓扑**的观察:`scripts/automation/pgwiki_index.py` 的 `SCHEMA_TO_CRATE` 常量直接来自历史 schema name ↔ crate name 命名重合。**不等于** DDD bounded context 划分。", ">", "> **真实情况**:Star 当前 workspace 有 35 个 `domain-*` crate + 17 个其它 crate,docs/architecture 描述了 DDD 设计意图。两者**不**建立 1:1 映射。", ">", "> **行动**:DDD Review 阶段由 Lead 复核本表,确认是否调整 SCHEMA_TO_CRATE 常量 / 修订 docswiki 叙事。", "", "**依据**: 守门 #13 W/T/M + AGENTS.md §6.1 命名解读 disclaimer + ADR-0044", "", "| Schema | 提议主责 crate | 表数 |", "|---|---|---|"]
     write_node(
         PGWIKI_ROOT / "40-crosscutting" / "schema-to-crate.md",
-        title="Schema → Crate 映射",
+        title="Schema → Crate 提议映射(待 DDD Review 拍板)",
         body="\n".join(s2c_lines),
         node_type="cross-schema-crate",
     )
@@ -800,6 +796,16 @@ def generate():
         "automation_files": len(auto_files),
     }
 
+    # 调用 audit 生成 50-issues/(per 2026-09-06 11:47 JST 拍板:对照暴露问题)
+    try:
+        import subprocess
+        subprocess.run(
+            [sys.executable, str(SCRIPTS_ROOT / "automation" / "pgwiki_audit.py")],
+            check=False, capture_output=True, text=True,
+        )
+    except Exception as e:
+        print(f"[warn] pgwiki_audit.py 调用失败: {e}")
+
     # ---- .obsidian 配置 ----
     obs = PGWIKI_ROOT / ".obsidian"
     obs.mkdir(parents=True, exist_ok=True)
@@ -843,7 +849,17 @@ def validate():
             total_links += 1
             # Obsidian 兼容:支持 "dir/file" 路径或裸 "file"
             target_short = target.split("/")[-1] if "/" in target else target
-            if target in all_nodes or target_short in all_nodes:
+            target_strip = target_short.rstrip(".md")
+            if target in all_nodes or target_short in all_nodes or target_strip in all_nodes:
+                continue
+            # 外部 vault 引用(`docswiki-XXX` / `bcwiki-XXX` 不在本库,不报死链)
+            if target.startswith("docswiki-") or target.startswith("bcwiki-"):
+                continue
+            # 跨库 raw path(`30-architecture/...` 但带 trailing slash)→ 跳过
+            if target.endswith("/"):
+                continue
+            # 目录指向(无对应 MOC 节点,但目录本身存在)→ 跳过
+            if (PGWIKI_ROOT / target).is_dir():
                 continue
             dead.append((p.relative_to(PGWIKI_ROOT), target))
     print(f"[validate] 总链接 {total_links} 个,死链 {len(dead)} 个")

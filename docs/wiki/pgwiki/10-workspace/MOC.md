@@ -1,6 +1,6 @@
 ---
 title: "Workspace MOC"
-generated: "2026-09-06T01:19:56Z"
+generated: "2026-09-06T02:52:23Z"
 node_type: "moc"
 ---
 
@@ -72,4 +72,4 @@ Star 主仓 (`D:/Star`) 当前 workspace 含 **52 个 crate**。
 
 ## Scripts
 - [[scripts-root]] (52 个根级脚本)
-- [[scripts-automation]] (91 个 automation 子目录脚本)
+- [[scripts-automation]] (92 个 automation 子目录脚本)

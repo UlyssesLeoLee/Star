@@ -1,6 +1,6 @@
 ---
 title: "ADR-0045: STAR Agent Runtime Basic + Detailed Design Baseline 落档"
-generated: "2026-09-06T01:19:57Z"
+generated: "2026-09-06T02:52:23Z"
 node_type: "adr"
 adr_number: "0045"
 adr_slug: "star-agent-runtime-design"
