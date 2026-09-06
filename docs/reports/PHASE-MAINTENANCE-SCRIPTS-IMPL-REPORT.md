@@ -1,10 +1,10 @@
 # PHASE-MAINTENANCE-SCRIPTS-IMPL-REPORT
 
-> **Phase**: Maintenance Scripts 集中化 + 实际验证修复
-> **Period**: 2026-09-06 13:21 JST ~ 19:09 JST
+> **Phase**: Maintenance Scripts 集中化 + 实际验证修复 + /agent-view hydration 修复
+> **Period**: 2026-09-06 13:21 JST ~ 19:26 JST
 > **Branch**: `feat/auto-20260906-3b4aed04`
-> **Commits**: `d61a8f0`, `1618dea`, `bc5eb88`, `61acf5e`
-> **Status**: 🟢 Phase Closed (3/3 套脚本就位 + 实测 PASS, 待集群接入)
+> **Commits**: `d61a8f0`, `1618dea`, `bc5eb88`, `61acf5e`, `c9c36dc`, `a35eb94`
+> **Status**: 🟢 Phase Closed (3/3 套脚本 + 1 个 frontend bug 全修)
 
 ---
 
@@ -119,6 +119,32 @@ npm error Missing: @react-three/drei@9.122.0 from lock file
 
 ---
 
+## §2.6 第三轮修复: /agent-view hydration mismatch (19:18 JST)
+
+触发: 用户实测发现 /agent-view 主画布区空白, 底部 "2 errors" 红条.
+
+**根因** (in-app browser console 实证):
+```
+Error: Expected server HTML to contain a matching <div> in <span>
+    at GasParticlesHint (frontend/src/components/effects/GasParticlesHint.tsx:39)
+```
+
+`GasParticlesHint` 用 `typeof window === "undefined"` 判定 SSR 边界——在 React 18 + Next.js 14 streaming SSR 阶段不可靠, 触发整页 hydration 失败 → Suspense fallback cascade → 主画布空白.
+
+**修法** (commit `a35eb94`): 改 `useState(false) + useEffect` 标记 mounted 模式 (社区共识), server + 第一次 client render 都返回 null, mount 后才返回真 div.
+
+**Diff**: +8/-3, 1 file (`frontend/src/components/effects/GasParticlesHint.tsx`).
+
+**实证** (in-app browser):
+- 修改前: 主画布空白 + 2 errors 红条 + console 4 条 hydration error
+- 修改后: 节点 (COMMAND UNIT ag-007 / DATABASE feat/presence-cursor) + 边 + mini-map 全渲染, ALL GREEN, console filter "Hydration" 0 entries
+
+**衍生守门**:
+- 任何 `typeof window` 判定的 SSR-safe wrapper, 后续都改 `useState` mounted 模式
+- DDD Review 阶段扫一遍其他 `dynamic({ ssr: false })` 组件, 看有没有同类问题
+
+---
+
 ## §3 已知缺口 (per 缺标比错标)
 
 | # | 缺口 | 影响 | 修法 / 拍板需求 |
@@ -185,4 +211,5 @@ npm error Missing: @react-three/drei@9.122.0 from lock file
 |---|---|---|---|
 | v0.1 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 初稿: 3 套脚本 + lock 修复 + T1/T2/T3 验证 | 2026-09-06 17:09 JST 完成 T1' 真验证后落档 |
 | v0.2 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 第二轮回归 R1'/R2'/R3': 修 2 个真 bug (smart pull + ensure helm), 加 G7-G9 已知缺口, §2.5 新增 | 2026-09-06 19:09 JST 完成 commit 61acf5e + R2''/R3' 实测后落档 |
-| (后续) | (待 SRE Lead / 5 域 Lead 到位) | G1-G5 缺口补完后 v0.3 | 拍板 Dockerfile + chart 模板后 |
+| v0.3 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 第三轮修复: /agent-view hydration mismatch (commit a35eb94), §2.6 新增, 衍生守门 ("typeof window 改 useState mounted 模式") | 2026-09-06 19:26 JST 完成 in-app browser 实证 + commit a35eb94 后落档 |
+| (后续) | (待 SRE Lead / 5 域 Lead 到位) | G1-G5 缺口补完后 v0.4 | 拍板 Dockerfile + chart 模板后 |
