@@ -7,6 +7,9 @@
 // - SubNav 由 U2 接管 (per spec 任务分工), 留 placeholder comment
 // - fullBleed: 无限画布类页面 (/agent-view) 跳过 main 的 padding/max-width,
 //   自己管理 h-[calc(100vh-4rem)] 布局 (per 2026-09-06 导航栏遮挡修复)
+// - wide: 保留 padding + 正常滚动, 但去掉 max-w-[1440px] mx-auto 居中 —
+//   宽屏下 mx-auto 会在 sidebar 右侧留出很大的左侧空白 (per 2026-09-07 反馈:
+//   项目页面左边距过大, 应接近 agent-view 的贴边观感, 但仍需正常文档滚动/不能 overflow-hidden)
 // =====================================================================
 import { ReactNode } from "react";
 import { AppHeader } from "./AppHeader";
@@ -14,9 +17,10 @@ import { AppHeader } from "./AppHeader";
 export interface AppShellProps {
   children: ReactNode;
   fullBleed?: boolean;
+  wide?: boolean;
 }
 
-export function AppShell({ children, fullBleed = false }: AppShellProps) {
+export function AppShell({ children, fullBleed = false, wide = false }: AppShellProps) {
   return (
     <div
       data-testid="app-shell"
@@ -39,7 +43,9 @@ export function AppShell({ children, fullBleed = false }: AppShellProps) {
         className={
           fullBleed
             ? "relative z-10 overflow-hidden w-full"
-            : "relative z-10 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-x-auto max-w-[1440px] mx-auto w-full"
+            : wide
+              ? "relative z-10 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-x-auto w-full"
+              : "relative z-10 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-x-auto max-w-[1440px] mx-auto w-full"
         }
       >
         {children}
