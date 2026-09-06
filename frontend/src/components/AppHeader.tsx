@@ -211,14 +211,14 @@ function HeaderTab({ module: tab, active, onRemove }: HeaderTabProps) {
   // 用 registry 静态 id 生成 testid (per 2026-09-05 19:13 JST: label 改 Sprint 后 testid 仍稳定, 不会随 i18n 漂移)
   const testIdSlug = tab.id;
   return (
-    <div className="relative group flex items-center">
+    <div className="relative group flex items-center shrink-0">
       <Link
         href={tab.href}
         data-testid={`tab-${testIdSlug}`}
         data-active={active ? "true" : "false"}
         aria-current={active ? "page" : undefined}
         className={clsx(
-          "relative px-3.5 h-16 inline-flex items-center gap-2 text-sm font-semibold border-b-2 transition-all duration-200",
+          "relative px-3.5 h-16 inline-flex items-center gap-2 text-sm font-semibold border-b-2 transition-all duration-200 shrink-0 whitespace-nowrap",
           active
             ? // 域色 active: text 域色 + border 域色 + glow
               clsx(cs.text, cs.borderActive, "font-bold", cs.glow)

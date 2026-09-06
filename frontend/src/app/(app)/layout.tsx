@@ -11,8 +11,18 @@
 "use client";
 
 import { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 
+// 无限画布类页面 — 跳过 main 的 padding/max-width (per fullBleed 设计)
+const FULL_BLEED_PREFIXES = ["/agent-view"];
+// 宽屏页面 — 保留 padding 但去掉 max-w-[1440px] mx-auto 居中, 避免宽屏下
+// 左侧出现过大留白 (per 2026-09-07 反馈: 项目页面左边距过大, 应接近 agent-view 贴边观感)
+const WIDE_PREFIXES = ["/projects"];
+
 export default function AppLayout({ children }: { children: ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+  const pathname = usePathname();
+  const fullBleed = FULL_BLEED_PREFIXES.some((p) => pathname?.startsWith(p));
+  const wide = WIDE_PREFIXES.some((p) => pathname?.startsWith(p));
+  return <AppShell fullBleed={fullBleed} wide={wide}>{children}</AppShell>;
 }
