@@ -1,0 +1,945 @@
+{
+  "nodes": [
+    {
+      "id": "cargo-metadata",
+      "type": "text",
+      "text": "cargo metadata\n52 crate 实测\n(per 守门 #1 v19 + §4.2)",
+      "x": 0,
+      "y": -300,
+      "width": 300,
+      "height": 100,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-tenant",
+      "type": "text",
+      "text": "domain-tenant",
+      "x": -800,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-identity",
+      "type": "text",
+      "text": "domain-identity",
+      "x": -650,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-permission",
+      "type": "text",
+      "text": "domain-permission",
+      "x": -500,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-workspace",
+      "type": "text",
+      "text": "domain-workspace",
+      "x": -350,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-project",
+      "type": "text",
+      "text": "domain-project",
+      "x": -200,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-work-item",
+      "type": "text",
+      "text": "domain-work-item",
+      "x": -50,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-worktree",
+      "type": "text",
+      "text": "domain-worktree",
+      "x": 100,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-agent",
+      "type": "text",
+      "text": "domain-agent",
+      "x": 250,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-feedback",
+      "type": "text",
+      "text": "domain-feedback",
+      "x": 400,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-decision",
+      "type": "text",
+      "text": "domain-decision",
+      "x": 550,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-scm",
+      "type": "text",
+      "text": "domain-scm",
+      "x": -800,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-validation",
+      "type": "text",
+      "text": "domain-validation",
+      "x": -650,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-automation",
+      "type": "text",
+      "text": "domain-automation",
+      "x": -500,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-search",
+      "type": "text",
+      "text": "domain-search",
+      "x": -350,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-policy",
+      "type": "text",
+      "text": "domain-policy",
+      "x": -200,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-notification",
+      "type": "text",
+      "text": "domain-notification",
+      "x": -50,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-context",
+      "type": "text",
+      "text": "domain-context",
+      "x": 100,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-resume",
+      "type": "text",
+      "text": "domain-resume",
+      "x": 250,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-audit",
+      "type": "text",
+      "text": "domain-audit",
+      "x": 400,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-integration",
+      "type": "text",
+      "text": "domain-integration",
+      "x": 550,
+      "y": 0,
+      "width": 140,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-more-14",
+      "type": "text",
+      "text": ".. +18 more",
+      "x": 600,
+      "y": 0,
+      "width": 160,
+      "height": 50,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-mcp",
+      "type": "text",
+      "text": "star-mcp\n(49 src)",
+      "x": -800,
+      "y": 200,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-api-rest",
+      "type": "text",
+      "text": "star-api-rest\n(20 src)",
+      "x": -480,
+      "y": 200,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-cli",
+      "type": "text",
+      "text": "star-cli\n(16 src)",
+      "x": -160,
+      "y": 200,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-saga",
+      "type": "text",
+      "text": "star-saga\n(11 src)",
+      "x": 160,
+      "y": 200,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-sa",
+      "type": "text",
+      "text": "star-sa\n(6 src)",
+      "x": 480,
+      "y": 200,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-dispatcher",
+      "type": "text",
+      "text": "star-dispatcher\n(5 src)",
+      "x": -800,
+      "y": 300,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-cache",
+      "type": "text",
+      "text": "star-cache\n(4 src)",
+      "x": -480,
+      "y": 300,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-credential",
+      "type": "text",
+      "text": "star-credential\n(4 src)",
+      "x": -160,
+      "y": 300,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-treesitter",
+      "type": "text",
+      "text": "star-treesitter\n(4 src)",
+      "x": 160,
+      "y": 300,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-context",
+      "type": "text",
+      "text": "star-context\n(3 src)",
+      "x": 480,
+      "y": 300,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-sse",
+      "type": "text",
+      "text": "star-sse\n(3 src)",
+      "x": -800,
+      "y": 400,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-webhook",
+      "type": "text",
+      "text": "star-webhook\n(3 src)",
+      "x": -480,
+      "y": 400,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-taskgraph",
+      "type": "text",
+      "text": "star-taskgraph\n(2 src)",
+      "x": -160,
+      "y": 400,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-vcs",
+      "type": "text",
+      "text": "star-vcs\n(2 src)",
+      "x": 160,
+      "y": 400,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-dto",
+      "type": "text",
+      "text": "star-dto\n(1 src)",
+      "x": 480,
+      "y": 400,
+      "width": 300,
+      "height": 70,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "api",
+      "type": "text",
+      "text": "api\n(REST 入口)",
+      "x": -400,
+      "y": 600,
+      "width": 200,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "application",
+      "type": "text",
+      "text": "application\n(Application Layer)",
+      "x": -100,
+      "y": 600,
+      "width": 200,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "infrastructure",
+      "type": "text",
+      "text": "infrastructure\n(Infra 聚合)",
+      "x": 200,
+      "y": 600,
+      "width": 200,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-dispatcher-design",
+      "type": "text",
+      "text": "domain-dispatcher-design",
+      "x": 600,
+      "y": 0,
+      "width": 180,
+      "height": 60,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-llm-design",
+      "type": "text",
+      "text": "domain-llm-design",
+      "x": 800,
+      "y": 0,
+      "width": 180,
+      "height": 60,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-mcp-design",
+      "type": "text",
+      "text": "domain-mcp-design",
+      "x": 1000,
+      "y": 0,
+      "width": 180,
+      "height": 60,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-tool-design",
+      "type": "text",
+      "text": "domain-tool-design",
+      "x": 1200,
+      "y": 0,
+      "width": 180,
+      "height": 60,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-rag-design",
+      "type": "text",
+      "text": "domain-rag-design",
+      "x": 600,
+      "y": 80,
+      "width": 180,
+      "height": 60,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-memory-design",
+      "type": "text",
+      "text": "domain-memory-design",
+      "x": 800,
+      "y": 80,
+      "width": 180,
+      "height": 60,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-rate-limiter-design",
+      "type": "text",
+      "text": "domain-rate-limiter-design",
+      "x": 1000,
+      "y": 80,
+      "width": 180,
+      "height": 60,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-observability-design",
+      "type": "text",
+      "text": "domain-observability-design",
+      "x": 1200,
+      "y": 80,
+      "width": 180,
+      "height": 60,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "pgwiki-broker-32",
+      "type": "text",
+      "text": "pgwiki 50-issues\nbroker-arch 32\n(全正确)",
+      "x": 600,
+      "y": 300,
+      "width": 240,
+      "height": 80,
+      "color": "7",
+      "label": "layer=node"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-cargo-domain-tenant",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-tenant",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-identity",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-identity",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-permission",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-permission",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-workspace",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-workspace",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-project",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-project",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-work-item",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-work-item",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-worktree",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-worktree",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-agent",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-agent",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-feedback",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-feedback",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-decision",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-decision",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-scm",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-scm",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-validation",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-validation",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-automation",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-automation",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-search",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-search",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-policy",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-policy",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-notification",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-notification",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-context",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-context",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-resume",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-resume",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-audit",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-audit",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-integration",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-integration",
+      "toSide": "left",
+      "label": "domain-*"
+    },
+    {
+      "id": "e-cargo-domain-more",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "domain-more-14",
+      "toSide": "left",
+      "label": "+14"
+    },
+    {
+      "id": "e-cargo-star-mcp",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-mcp",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-api-rest",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-api-rest",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-cli",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-cli",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-saga",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-saga",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-sa",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-sa",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-dispatcher",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-dispatcher",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-cache",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-cache",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-credential",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-credential",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-treesitter",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-treesitter",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-context",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-context",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-sse",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-sse",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-webhook",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-webhook",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-taskgraph",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-taskgraph",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-vcs",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-vcs",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-star-dto",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "star-dto",
+      "toSide": "left",
+      "label": "star-*"
+    },
+    {
+      "id": "e-cargo-api",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "api",
+      "toSide": "left",
+      "label": "other"
+    },
+    {
+      "id": "e-cargo-application",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "application",
+      "toSide": "left",
+      "label": "other"
+    },
+    {
+      "id": "e-cargo-infrastructure",
+      "fromNode": "cargo-metadata",
+      "fromSide": "right",
+      "toNode": "infrastructure",
+      "toSide": "left",
+      "label": "other"
+    },
+    {
+      "id": "e-domain-dispatcher-design-broker",
+      "fromNode": "domain-dispatcher-design",
+      "fromSide": "right",
+      "toNode": "pgwiki-broker-32",
+      "toSide": "left",
+      "label": "in broker-arch"
+    },
+    {
+      "id": "e-domain-llm-design-broker",
+      "fromNode": "domain-llm-design",
+      "fromSide": "right",
+      "toNode": "pgwiki-broker-32",
+      "toSide": "left",
+      "label": "in broker-arch"
+    },
+    {
+      "id": "e-domain-mcp-design-broker",
+      "fromNode": "domain-mcp-design",
+      "fromSide": "right",
+      "toNode": "pgwiki-broker-32",
+      "toSide": "left",
+      "label": "in broker-arch"
+    },
+    {
+      "id": "e-domain-tool-design-broker",
+      "fromNode": "domain-tool-design",
+      "fromSide": "right",
+      "toNode": "pgwiki-broker-32",
+      "toSide": "left",
+      "label": "in broker-arch"
+    },
+    {
+      "id": "e-domain-rag-design-broker",
+      "fromNode": "domain-rag-design",
+      "fromSide": "right",
+      "toNode": "pgwiki-broker-32",
+      "toSide": "left",
+      "label": "in broker-arch"
+    },
+    {
+      "id": "e-domain-memory-design-broker",
+      "fromNode": "domain-memory-design",
+      "fromSide": "right",
+      "toNode": "pgwiki-broker-32",
+      "toSide": "left",
+      "label": "in broker-arch"
+    },
+    {
+      "id": "e-domain-rate-limiter-design-broker",
+      "fromNode": "domain-rate-limiter-design",
+      "fromSide": "right",
+      "toNode": "pgwiki-broker-32",
+      "toSide": "left",
+      "label": "in broker-arch"
+    },
+    {
+      "id": "e-domain-observability-design-broker",
+      "fromNode": "domain-observability-design",
+      "fromSide": "right",
+      "toNode": "pgwiki-broker-32",
+      "toSide": "left",
+      "label": "in broker-arch"
+    },
+    {
+      "id": "e-conflict-dispatcher",
+      "fromNode": "domain-dispatcher-design",
+      "fromSide": "right",
+      "toNode": "star-dispatcher",
+      "toSide": "left",
+      "label": "命名冲突"
+    },
+    {
+      "id": "e-conflict-mcp",
+      "fromNode": "domain-mcp-design",
+      "fromSide": "right",
+      "toNode": "star-mcp",
+      "toSide": "left",
+      "label": "命名冲突"
+    },
+    {
+      "id": "e-conflict-context",
+      "fromNode": "star-context",
+      "fromSide": "right",
+      "toNode": "domain-context",
+      "toSide": "left",
+      "label": "命名冲突"
+    }
+  ]
+}

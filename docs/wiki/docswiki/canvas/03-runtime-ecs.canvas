@@ -1,0 +1,535 @@
+{
+  "nodes": [
+    {
+      "id": "S4",
+      "type": "text",
+      "text": "S4 Runtime 02",
+      "x": 0,
+      "y": -500,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S5",
+      "type": "text",
+      "text": "S5 Runtime 03",
+      "x": 200,
+      "y": -500,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "Lightweight",
+      "type": "text",
+      "text": "Lightweight\n< 10 Agent",
+      "x": -200,
+      "y": -300,
+      "width": 200,
+      "height": 80,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "Hysteresis",
+      "type": "text",
+      "text": "Hysteresis\n10-11",
+      "x": 0,
+      "y": -300,
+      "width": 200,
+      "height": 80,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "ECS-Mode",
+      "type": "text",
+      "text": "ECS Mode\n≥ 12 Agent",
+      "x": 200,
+      "y": -300,
+      "width": 200,
+      "height": 80,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "L0-Dispatch",
+      "type": "text",
+      "text": "L0 派发层\n7 组件",
+      "x": -400,
+      "y": -100,
+      "width": 260,
+      "height": 100,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "L1-ECS",
+      "type": "text",
+      "text": "L1 ECS\n9 Archetype + 12 Comp + 13 Sys",
+      "x": 0,
+      "y": -100,
+      "width": 320,
+      "height": 100,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "L2-Pool",
+      "type": "text",
+      "text": "L2 业务共享池\nLLM/MCP/HTTP/Tool/RAG/...",
+      "x": 400,
+      "y": -100,
+      "width": 320,
+      "height": 100,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-dispatcher",
+      "type": "text",
+      "text": "domain-dispatcher",
+      "x": -500,
+      "y": 150,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-llm",
+      "type": "text",
+      "text": "domain-llm",
+      "x": -300,
+      "y": 150,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-mcp",
+      "type": "text",
+      "text": "domain-mcp",
+      "x": -100,
+      "y": 150,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-tool",
+      "type": "text",
+      "text": "domain-tool",
+      "x": 100,
+      "y": 150,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-rag",
+      "type": "text",
+      "text": "domain-rag",
+      "x": 300,
+      "y": 150,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-context",
+      "type": "text",
+      "text": "domain-context",
+      "x": -500,
+      "y": 250,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-memory",
+      "type": "text",
+      "text": "domain-memory",
+      "x": -300,
+      "y": 250,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-rate-limiter",
+      "type": "text",
+      "text": "domain-rate-limiter",
+      "x": -100,
+      "y": 250,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-observability",
+      "type": "text",
+      "text": "domain-observability",
+      "x": 100,
+      "y": 250,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-agent",
+      "type": "text",
+      "text": "domain-agent",
+      "x": 300,
+      "y": 250,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-01",
+      "type": "text",
+      "text": "SA-01",
+      "x": -200,
+      "y": 400,
+      "width": 90,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-02",
+      "type": "text",
+      "text": "SA-02",
+      "x": -100,
+      "y": 400,
+      "width": 90,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-03",
+      "type": "text",
+      "text": "SA-03",
+      "x": 0,
+      "y": 400,
+      "width": 90,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-04",
+      "type": "text",
+      "text": "SA-04",
+      "x": 100,
+      "y": 400,
+      "width": 90,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-05",
+      "type": "text",
+      "text": "SA-05",
+      "x": 200,
+      "y": 400,
+      "width": 90,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-06",
+      "type": "text",
+      "text": "SA-06",
+      "x": -200,
+      "y": 500,
+      "width": 90,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-07",
+      "type": "text",
+      "text": "SA-07",
+      "x": -100,
+      "y": 500,
+      "width": 90,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-08",
+      "type": "text",
+      "text": "SA-08",
+      "x": 0,
+      "y": 500,
+      "width": 90,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-09",
+      "type": "text",
+      "text": "SA-09",
+      "x": 100,
+      "y": 500,
+      "width": 90,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-S4-RT",
+      "fromNode": "S4",
+      "fromSide": "right",
+      "toNode": "L0-Dispatch",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-S4-L1",
+      "fromNode": "S4",
+      "fromSide": "right",
+      "toNode": "L1-ECS",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-S4-L2",
+      "fromNode": "S4",
+      "fromSide": "right",
+      "toNode": "L2-Pool",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-S5-L1",
+      "fromNode": "S5",
+      "fromSide": "right",
+      "toNode": "L1-ECS",
+      "toSide": "left",
+      "label": "refines"
+    },
+    {
+      "id": "e-Mode-L0",
+      "fromNode": "Lightweight",
+      "fromSide": "right",
+      "toNode": "L0-Dispatch",
+      "toSide": "left",
+      "label": "Tokio async"
+    },
+    {
+      "id": "e-Mode-L1",
+      "fromNode": "ECS-Mode",
+      "fromSide": "right",
+      "toNode": "L1-ECS",
+      "toSide": "left",
+      "label": "9 Archetype"
+    },
+    {
+      "id": "e-Mode-H",
+      "fromNode": "Lightweight",
+      "fromSide": "right",
+      "toNode": "Hysteresis",
+      "toSide": "left",
+      "label": "10-11"
+    },
+    {
+      "id": "e-H-Mode",
+      "fromNode": "Hysteresis",
+      "fromSide": "right",
+      "toNode": "ECS-Mode",
+      "toSide": "left",
+      "label": "12 持续 30s"
+    },
+    {
+      "id": "e-L0-L1",
+      "fromNode": "L0-Dispatch",
+      "fromSide": "right",
+      "toNode": "L1-ECS",
+      "toSide": "left",
+      "label": "Tokio task 派发"
+    },
+    {
+      "id": "e-L1-L2",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "L2-Pool",
+      "toSide": "left",
+      "label": "业务请求"
+    },
+    {
+      "id": "e-L1-domain-dispatcher",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "domain-dispatcher",
+      "toSide": "left",
+      "label": "映射"
+    },
+    {
+      "id": "e-L1-domain-llm",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "domain-llm",
+      "toSide": "left",
+      "label": "映射"
+    },
+    {
+      "id": "e-L1-domain-mcp",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "domain-mcp",
+      "toSide": "left",
+      "label": "映射"
+    },
+    {
+      "id": "e-L1-domain-tool",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "domain-tool",
+      "toSide": "left",
+      "label": "映射"
+    },
+    {
+      "id": "e-L1-domain-rag",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "domain-rag",
+      "toSide": "left",
+      "label": "映射"
+    },
+    {
+      "id": "e-L1-domain-context",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "domain-context",
+      "toSide": "left",
+      "label": "映射"
+    },
+    {
+      "id": "e-L1-domain-memory",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "domain-memory",
+      "toSide": "left",
+      "label": "映射"
+    },
+    {
+      "id": "e-L1-domain-rate-limiter",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "domain-rate-limiter",
+      "toSide": "left",
+      "label": "映射"
+    },
+    {
+      "id": "e-L1-domain-observability",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "domain-observability",
+      "toSide": "left",
+      "label": "映射"
+    },
+    {
+      "id": "e-L1-domain-agent",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "domain-agent",
+      "toSide": "left",
+      "label": "映射"
+    },
+    {
+      "id": "e-L1-SA-01",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "SA-01",
+      "toSide": "left",
+      "label": "Archetype"
+    },
+    {
+      "id": "e-L1-SA-02",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "SA-02",
+      "toSide": "left",
+      "label": "Archetype"
+    },
+    {
+      "id": "e-L1-SA-03",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "SA-03",
+      "toSide": "left",
+      "label": "Archetype"
+    },
+    {
+      "id": "e-L1-SA-04",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "SA-04",
+      "toSide": "left",
+      "label": "Archetype"
+    },
+    {
+      "id": "e-L1-SA-05",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "SA-05",
+      "toSide": "left",
+      "label": "Archetype"
+    },
+    {
+      "id": "e-L1-SA-06",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "SA-06",
+      "toSide": "left",
+      "label": "Archetype"
+    },
+    {
+      "id": "e-L1-SA-07",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "SA-07",
+      "toSide": "left",
+      "label": "Archetype"
+    },
+    {
+      "id": "e-L1-SA-08",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "SA-08",
+      "toSide": "left",
+      "label": "Archetype"
+    },
+    {
+      "id": "e-L1-SA-09",
+      "fromNode": "L1-ECS",
+      "fromSide": "right",
+      "toNode": "SA-09",
+      "toSide": "left",
+      "label": "Archetype"
+    }
+  ]
+}

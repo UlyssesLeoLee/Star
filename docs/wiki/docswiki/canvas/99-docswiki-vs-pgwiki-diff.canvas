@@ -1,0 +1,420 @@
+{
+  "nodes": [
+    {
+      "id": "00-design-topology",
+      "type": "text",
+      "text": "\n00 主图\n(设计应有)",
+      "x": 0,
+      "y": 0,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "01-ui-agent-view",
+      "type": "text",
+      "text": "\n01 AgentView\n(派生视图)",
+      "x": 320,
+      "y": 0,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "02-orchestration-langgraph",
+      "type": "text",
+      "text": "\n02 LangGraph\n(应有)",
+      "x": 640,
+      "y": 0,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "03-runtime-ecs",
+      "type": "text",
+      "text": "\n03 Runtime\n(应有)",
+      "x": 960,
+      "y": 0,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "04-domain-crates",
+      "type": "text",
+      "text": "\n04 Domain\n22+9 目标",
+      "x": 0,
+      "y": 0,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "05-persistence-checkpoint",
+      "type": "text",
+      "text": "\n05 Persistence\n5 PG 表",
+      "x": 320,
+      "y": 0,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "06-data-flow",
+      "type": "text",
+      "text": "\n06 DataFlow\n7 流",
+      "x": 640,
+      "y": 0,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "README",
+      "type": "text",
+      "text": "\nREADME 索引",
+      "x": 960,
+      "y": 0,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "pgwiki-10-workspace-MOC",
+      "type": "text",
+      "text": "pgwiki-10-workspace-MOC\n10-workspace\n52 crate",
+      "x": 0,
+      "y": 200,
+      "width": 240,
+      "height": 100,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "pgwiki-20-database-MOC",
+      "type": "text",
+      "text": "pgwiki-20-database-MOC\n20-database\n25 schema/93 表",
+      "x": 280,
+      "y": 200,
+      "width": 240,
+      "height": 100,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "pgwiki-30-architecture-MOC",
+      "type": "text",
+      "text": "pgwiki-30-architecture-MOC\n30-architecture\n28 ADR",
+      "x": 560,
+      "y": 200,
+      "width": 240,
+      "height": 100,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "pgwiki-40-crosscutting-dependencies",
+      "type": "text",
+      "text": "pgwiki-40-crosscutting-dependencies\n40-crosscutting\ndeps + gates",
+      "x": 840,
+      "y": 200,
+      "width": 240,
+      "height": 100,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "pgwiki-50-issues-MOC",
+      "type": "text",
+      "text": "pgwiki-50-issues-MOC\n50-issues\n6 问题",
+      "x": 1120,
+      "y": 200,
+      "width": 240,
+      "height": 100,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "ADR-0021..0047",
+      "type": "text",
+      "text": "28 ADR\n0021..0047\n(共同)",
+      "x": 0,
+      "y": 400,
+      "width": 280,
+      "height": 100,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "cargo-52",
+      "type": "text",
+      "text": "cargo members\n52 (vs 22+9=31 设计)",
+      "x": 400,
+      "y": 400,
+      "width": 240,
+      "height": 100,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "schema-93",
+      "type": "text",
+      "text": "DB tables\n93 (vs 5 设计 Tier 3)",
+      "x": 700,
+      "y": 400,
+      "width": 240,
+      "height": 100,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "broker-32",
+      "type": "text",
+      "text": "broker arch\n32 (未实装)",
+      "x": 1000,
+      "y": 400,
+      "width": 240,
+      "height": 100,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "S1..S7",
+      "type": "text",
+      "text": "7 源头\n(共同)",
+      "x": 600,
+      "y": -100,
+      "width": 280,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-00-design-topology-S17",
+      "fromNode": "00-design-topology",
+      "fromSide": "right",
+      "toNode": "S1..S7",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-00-design-topology-ADR",
+      "fromNode": "00-design-topology",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-01-ui-agent-view-S17",
+      "fromNode": "01-ui-agent-view",
+      "fromSide": "right",
+      "toNode": "S1..S7",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-01-ui-agent-view-ADR",
+      "fromNode": "01-ui-agent-view",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-02-orchestration-langgraph-S17",
+      "fromNode": "02-orchestration-langgraph",
+      "fromSide": "right",
+      "toNode": "S1..S7",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-02-orchestration-langgraph-ADR",
+      "fromNode": "02-orchestration-langgraph",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-03-runtime-ecs-S17",
+      "fromNode": "03-runtime-ecs",
+      "fromSide": "right",
+      "toNode": "S1..S7",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-03-runtime-ecs-ADR",
+      "fromNode": "03-runtime-ecs",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-04-domain-crates-S17",
+      "fromNode": "04-domain-crates",
+      "fromSide": "right",
+      "toNode": "S1..S7",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-04-domain-crates-ADR",
+      "fromNode": "04-domain-crates",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-05-persistence-checkpoint-S17",
+      "fromNode": "05-persistence-checkpoint",
+      "fromSide": "right",
+      "toNode": "S1..S7",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-05-persistence-checkpoint-ADR",
+      "fromNode": "05-persistence-checkpoint",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-06-data-flow-S17",
+      "fromNode": "06-data-flow",
+      "fromSide": "right",
+      "toNode": "S1..S7",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-06-data-flow-ADR",
+      "fromNode": "06-data-flow",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-README-S17",
+      "fromNode": "README",
+      "fromSide": "right",
+      "toNode": "S1..S7",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-README-ADR",
+      "fromNode": "README",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-pgwiki-10-workspace-MOC-ADR",
+      "fromNode": "pgwiki-10-workspace-MOC",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-pgwiki-20-database-MOC-ADR",
+      "fromNode": "pgwiki-20-database-MOC",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-pgwiki-30-architecture-MOC-ADR",
+      "fromNode": "pgwiki-30-architecture-MOC",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-pgwiki-40-crosscutting-dependencies-ADR",
+      "fromNode": "pgwiki-40-crosscutting-dependencies",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-pgwiki-50-issues-MOC-ADR",
+      "fromNode": "pgwiki-50-issues-MOC",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "cites"
+    },
+    {
+      "id": "e-cargo-ADR",
+      "fromNode": "cargo-52",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "fact"
+    },
+    {
+      "id": "e-schema-ADR",
+      "fromNode": "schema-93",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "fact"
+    },
+    {
+      "id": "e-broker-ADR",
+      "fromNode": "broker-32",
+      "fromSide": "right",
+      "toNode": "ADR-0021..0047",
+      "toSide": "left",
+      "label": "broker"
+    },
+    {
+      "id": "e-cargo-issues",
+      "fromNode": "cargo-52",
+      "fromSide": "right",
+      "toNode": "pgwiki-50-issues-MOC",
+      "toSide": "left",
+      "label": "exposes"
+    },
+    {
+      "id": "e-schema-issues",
+      "fromNode": "schema-93",
+      "fromSide": "right",
+      "toNode": "pgwiki-50-issues-MOC",
+      "toSide": "left",
+      "label": "exposes"
+    },
+    {
+      "id": "e-broker-issues",
+      "fromNode": "broker-32",
+      "fromSide": "right",
+      "toNode": "pgwiki-50-issues-MOC",
+      "toSide": "left",
+      "label": "exposes"
+    }
+  ]
+}

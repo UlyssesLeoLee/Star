@@ -1,0 +1,427 @@
+{
+  "nodes": [
+    {
+      "id": "S1",
+      "type": "text",
+      "text": "S1",
+      "x": 0,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S2",
+      "type": "text",
+      "text": "S2",
+      "x": 260,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S3",
+      "type": "text",
+      "text": "S3",
+      "x": 520,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S4",
+      "type": "text",
+      "text": "S4",
+      "x": 780,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S5",
+      "type": "text",
+      "text": "S5",
+      "x": 1040,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S6",
+      "type": "text",
+      "text": "S6",
+      "x": 1300,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S7",
+      "type": "text",
+      "text": "S7",
+      "x": 1560,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "View-AgentView",
+      "type": "text",
+      "text": "View-AgentView\n(派生视图)",
+      "x": 0,
+      "y": -200,
+      "width": 300,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "View-LangGraph",
+      "type": "text",
+      "text": "View-LangGraph\n(2-level hierarchical)",
+      "x": 400,
+      "y": -200,
+      "width": 300,
+      "height": 100,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "View-AgentRuntime",
+      "type": "text",
+      "text": "View-AgentRuntime\n(L0/L1/L2)",
+      "x": 800,
+      "y": -200,
+      "width": 300,
+      "height": 100,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-AGV-9",
+      "type": "text",
+      "text": "M-AGV-9\npage.tsx",
+      "x": -200,
+      "y": 0,
+      "width": 240,
+      "height": 80,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-01",
+      "type": "text",
+      "text": "C-01\nTopAgent",
+      "x": 200,
+      "y": 0,
+      "width": 240,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-16",
+      "type": "text",
+      "text": "C-16\nTaskOpsMgr",
+      "x": 400,
+      "y": 0,
+      "width": 240,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-04",
+      "type": "text",
+      "text": "C-04\nCheckpoint",
+      "x": 600,
+      "y": 0,
+      "width": 240,
+      "height": 80,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-05",
+      "type": "text",
+      "text": "C-05\nMcpClient",
+      "x": 800,
+      "y": 0,
+      "width": 240,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "Comp-AgentIdentity",
+      "type": "text",
+      "text": "Comp-AgentIdentity",
+      "x": 1000,
+      "y": 0,
+      "width": 240,
+      "height": 80,
+      "color": "3",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-tenant",
+      "type": "text",
+      "text": "domain-tenant",
+      "x": 200,
+      "y": 200,
+      "width": 240,
+      "height": 80,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-agent",
+      "type": "text",
+      "text": "domain-agent",
+      "x": 400,
+      "y": 200,
+      "width": 240,
+      "height": 80,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-worktree",
+      "type": "text",
+      "text": "domain-worktree",
+      "x": 600,
+      "y": 200,
+      "width": 240,
+      "height": 80,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "PG-checkpoints",
+      "type": "text",
+      "text": "PG-checkpoints (T)",
+      "x": 800,
+      "y": 200,
+      "width": 240,
+      "height": 80,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "PG-checkpoint_metadata",
+      "type": "text",
+      "text": "PG-checkpoint_metadata (M)",
+      "x": 1000,
+      "y": 200,
+      "width": 240,
+      "height": 80,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "Envoy",
+      "type": "text",
+      "text": "Envoy\n(独立 deployment)",
+      "x": 800,
+      "y": 400,
+      "width": 260,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "k3s",
+      "type": "text",
+      "text": "k3s",
+      "x": 1080,
+      "y": 400,
+      "width": 180,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-1",
+      "fromNode": "S1",
+      "fromSide": "right",
+      "toNode": "View-AgentView",
+      "toSide": "left",
+      "label": "per 守门 #3"
+    },
+    {
+      "id": "e-2",
+      "fromNode": "S2",
+      "fromSide": "right",
+      "toNode": "View-LangGraph",
+      "toSide": "left",
+      "label": "per 守门 #3"
+    },
+    {
+      "id": "e-3",
+      "fromNode": "S3",
+      "fromSide": "right",
+      "toNode": "View-LangGraph",
+      "toSide": "left",
+      "label": "per 守门 #3"
+    },
+    {
+      "id": "e-4",
+      "fromNode": "S4",
+      "fromSide": "right",
+      "toNode": "View-AgentRuntime",
+      "toSide": "left",
+      "label": "per 守门 #3"
+    },
+    {
+      "id": "e-5",
+      "fromNode": "S5",
+      "fromSide": "right",
+      "toNode": "View-AgentRuntime",
+      "toSide": "left",
+      "label": "per 守门 #3"
+    },
+    {
+      "id": "e-6",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-tenant",
+      "toSide": "left",
+      "label": "Tier 1"
+    },
+    {
+      "id": "e-7",
+      "fromNode": "S7",
+      "fromSide": "right",
+      "toNode": "PG-checkpoints",
+      "toSide": "left",
+      "label": "5 表 W/T/M"
+    },
+    {
+      "id": "e-8",
+      "fromNode": "View-AgentView",
+      "fromSide": "right",
+      "toNode": "M-AGV-9",
+      "toSide": "left",
+      "label": "派生视图"
+    },
+    {
+      "id": "e-9",
+      "fromNode": "View-LangGraph",
+      "fromSide": "right",
+      "toNode": "C-01",
+      "toSide": "left",
+      "label": "L0 整体"
+    },
+    {
+      "id": "e-10",
+      "fromNode": "View-LangGraph",
+      "fromSide": "right",
+      "toNode": "C-16",
+      "toSide": "left",
+      "label": "TMO 7 节点"
+    },
+    {
+      "id": "e-11",
+      "fromNode": "View-LangGraph",
+      "fromSide": "right",
+      "toNode": "C-04",
+      "toSide": "left",
+      "label": "3-tier checkpoint"
+    },
+    {
+      "id": "e-12",
+      "fromNode": "View-LangGraph",
+      "fromSide": "right",
+      "toNode": "C-05",
+      "toSide": "left",
+      "label": "MCP 16 tools"
+    },
+    {
+      "id": "e-13",
+      "fromNode": "View-AgentRuntime",
+      "fromSide": "right",
+      "toNode": "Comp-AgentIdentity",
+      "toSide": "left",
+      "label": "L1 ECS"
+    },
+    {
+      "id": "e-14",
+      "fromNode": "C-01",
+      "fromSide": "right",
+      "toNode": "C-16",
+      "toSide": "left",
+      "label": "TMO 协调"
+    },
+    {
+      "id": "e-15",
+      "fromNode": "C-04",
+      "fromSide": "right",
+      "toNode": "PG-checkpoints",
+      "toSide": "left",
+      "label": "Memory→SQLite→PG"
+    },
+    {
+      "id": "e-16",
+      "fromNode": "C-04",
+      "fromSide": "right",
+      "toNode": "PG-checkpoint_metadata",
+      "toSide": "left",
+      "label": "SCD Type 2"
+    },
+    {
+      "id": "e-17",
+      "fromNode": "Comp-AgentIdentity",
+      "fromSide": "right",
+      "toNode": "domain-agent",
+      "toSide": "left",
+      "label": "L1 跟 22 domain 映射"
+    },
+    {
+      "id": "e-18",
+      "fromNode": "domain-tenant",
+      "fromSide": "right",
+      "toNode": "domain-agent",
+      "toSide": "left",
+      "label": "依赖 Tier 1→3"
+    },
+    {
+      "id": "e-19",
+      "fromNode": "domain-worktree",
+      "fromSide": "right",
+      "toNode": "domain-agent",
+      "toSide": "left",
+      "label": "依赖 Tier 2→3"
+    },
+    {
+      "id": "e-20",
+      "fromNode": "PG-checkpoints",
+      "fromSide": "right",
+      "toNode": "Envoy",
+      "toSide": "left",
+      "label": "mTLS fronting"
+    },
+    {
+      "id": "e-21",
+      "fromNode": "Envoy",
+      "fromSide": "right",
+      "toNode": "k3s",
+      "toSide": "left",
+      "label": "deploy"
+    }
+  ]
+}

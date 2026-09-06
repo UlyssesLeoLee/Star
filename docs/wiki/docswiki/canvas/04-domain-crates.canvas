@@ -1,0 +1,659 @@
+{
+  "nodes": [
+    {
+      "id": "S6",
+      "type": "text",
+      "text": "S6 22 domain 接入",
+      "x": 0,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-Tier1",
+      "type": "text",
+      "text": "Tier 1",
+      "x": -400,
+      "y": -100,
+      "width": 140,
+      "height": 80,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-tenant",
+      "type": "text",
+      "text": "domain-tenant",
+      "x": -200,
+      "y": -100,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-identity",
+      "type": "text",
+      "text": "domain-identity",
+      "x": 0,
+      "y": -100,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-permission",
+      "type": "text",
+      "text": "domain-permission",
+      "x": 200,
+      "y": -100,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-Tier2",
+      "type": "text",
+      "text": "Tier 2",
+      "x": -400,
+      "y": 0,
+      "width": 140,
+      "height": 80,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-workspace",
+      "type": "text",
+      "text": "domain-workspace",
+      "x": -200,
+      "y": 0,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-project",
+      "type": "text",
+      "text": "domain-project",
+      "x": 0,
+      "y": 0,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-work-item",
+      "type": "text",
+      "text": "domain-work-item",
+      "x": 200,
+      "y": 0,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-Tier3",
+      "type": "text",
+      "text": "Tier 3",
+      "x": -400,
+      "y": 100,
+      "width": 140,
+      "height": 80,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-worktree",
+      "type": "text",
+      "text": "domain-worktree",
+      "x": -200,
+      "y": 100,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-agent",
+      "type": "text",
+      "text": "domain-agent",
+      "x": 0,
+      "y": 100,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-feedback",
+      "type": "text",
+      "text": "domain-feedback",
+      "x": 200,
+      "y": 100,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-decision",
+      "type": "text",
+      "text": "domain-decision",
+      "x": 400,
+      "y": 100,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-Tier4",
+      "type": "text",
+      "text": "Tier 4",
+      "x": -400,
+      "y": 200,
+      "width": 140,
+      "height": 80,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-scm",
+      "type": "text",
+      "text": "domain-scm",
+      "x": -200,
+      "y": 200,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-validation",
+      "type": "text",
+      "text": "domain-validation",
+      "x": 0,
+      "y": 200,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-automation",
+      "type": "text",
+      "text": "domain-automation",
+      "x": 200,
+      "y": 200,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-search",
+      "type": "text",
+      "text": "domain-search",
+      "x": 400,
+      "y": 200,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-Tier5",
+      "type": "text",
+      "text": "Tier 5",
+      "x": -400,
+      "y": 300,
+      "width": 140,
+      "height": 80,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-policy",
+      "type": "text",
+      "text": "domain-policy",
+      "x": -200,
+      "y": 300,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-notification",
+      "type": "text",
+      "text": "domain-notification",
+      "x": 0,
+      "y": 300,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-context",
+      "type": "text",
+      "text": "domain-context",
+      "x": 200,
+      "y": 300,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-resume",
+      "type": "text",
+      "text": "domain-resume",
+      "x": 400,
+      "y": 300,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-Tier6",
+      "type": "text",
+      "text": "Tier 6",
+      "x": -400,
+      "y": 400,
+      "width": 140,
+      "height": 80,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-audit",
+      "type": "text",
+      "text": "domain-audit",
+      "x": -200,
+      "y": 400,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-integration",
+      "type": "text",
+      "text": "domain-integration",
+      "x": 0,
+      "y": 400,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-event",
+      "type": "text",
+      "text": "domain-event",
+      "x": 200,
+      "y": 400,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-flow",
+      "type": "text",
+      "text": "domain-flow",
+      "x": 400,
+      "y": 400,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-lease",
+      "type": "text",
+      "text": "domain-lease",
+      "x": 600,
+      "y": 400,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-dispatcher",
+      "type": "text",
+      "text": "domain-dispatcher\n★ 新建",
+      "x": 800,
+      "y": -200,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-llm",
+      "type": "text",
+      "text": "domain-llm\n★ 新建",
+      "x": 1000,
+      "y": -200,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-mcp",
+      "type": "text",
+      "text": "domain-mcp\n★ 新建",
+      "x": 1200,
+      "y": -200,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-tool",
+      "type": "text",
+      "text": "domain-tool\n★ 新建",
+      "x": 800,
+      "y": -100,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-rag",
+      "type": "text",
+      "text": "domain-rag\n★ 新建",
+      "x": 1000,
+      "y": -100,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-context",
+      "type": "text",
+      "text": "domain-context\n★ 新建",
+      "x": 1200,
+      "y": -100,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-memory",
+      "type": "text",
+      "text": "domain-memory\n★ 新建",
+      "x": 800,
+      "y": 0,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-rate-limiter",
+      "type": "text",
+      "text": "domain-rate-limiter\n★ 新建",
+      "x": 1000,
+      "y": 0,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-observability",
+      "type": "text",
+      "text": "domain-observability\n★ 新建",
+      "x": 1200,
+      "y": 0,
+      "width": 180,
+      "height": 70,
+      "color": "2",
+      "label": "layer=node"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-S6-domain-tenant",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-tenant",
+      "toSide": "left",
+      "label": "per Tier 1"
+    },
+    {
+      "id": "e-S6-domain-identity",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-identity",
+      "toSide": "left",
+      "label": "per Tier 1"
+    },
+    {
+      "id": "e-S6-domain-permission",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-permission",
+      "toSide": "left",
+      "label": "per Tier 1"
+    },
+    {
+      "id": "e-S6-domain-workspace",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-workspace",
+      "toSide": "left",
+      "label": "per Tier 2"
+    },
+    {
+      "id": "e-S6-domain-project",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-project",
+      "toSide": "left",
+      "label": "per Tier 2"
+    },
+    {
+      "id": "e-S6-domain-work-item",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-work-item",
+      "toSide": "left",
+      "label": "per Tier 2"
+    },
+    {
+      "id": "e-S6-domain-worktree",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-worktree",
+      "toSide": "left",
+      "label": "per Tier 3"
+    },
+    {
+      "id": "e-S6-domain-agent",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-agent",
+      "toSide": "left",
+      "label": "per Tier 3"
+    },
+    {
+      "id": "e-S6-domain-feedback",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-feedback",
+      "toSide": "left",
+      "label": "per Tier 3"
+    },
+    {
+      "id": "e-S6-domain-decision",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-decision",
+      "toSide": "left",
+      "label": "per Tier 3"
+    },
+    {
+      "id": "e-S6-domain-scm",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-scm",
+      "toSide": "left",
+      "label": "per Tier 4"
+    },
+    {
+      "id": "e-S6-domain-validation",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-validation",
+      "toSide": "left",
+      "label": "per Tier 4"
+    },
+    {
+      "id": "e-S6-domain-automation",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-automation",
+      "toSide": "left",
+      "label": "per Tier 4"
+    },
+    {
+      "id": "e-S6-domain-search",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-search",
+      "toSide": "left",
+      "label": "per Tier 4"
+    },
+    {
+      "id": "e-S6-domain-policy",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-policy",
+      "toSide": "left",
+      "label": "per Tier 5"
+    },
+    {
+      "id": "e-S6-domain-notification",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-notification",
+      "toSide": "left",
+      "label": "per Tier 5"
+    },
+    {
+      "id": "e-S6-domain-context",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-context",
+      "toSide": "left",
+      "label": "per Tier 5"
+    },
+    {
+      "id": "e-S6-domain-resume",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-resume",
+      "toSide": "left",
+      "label": "per Tier 5"
+    },
+    {
+      "id": "e-S6-domain-audit",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-audit",
+      "toSide": "left",
+      "label": "per Tier 6"
+    },
+    {
+      "id": "e-S6-domain-integration",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-integration",
+      "toSide": "left",
+      "label": "per Tier 6"
+    },
+    {
+      "id": "e-S6-domain-event",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-event",
+      "toSide": "left",
+      "label": "per Tier 6"
+    },
+    {
+      "id": "e-S6-domain-flow",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-flow",
+      "toSide": "left",
+      "label": "per Tier 6"
+    },
+    {
+      "id": "e-S6-domain-lease",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "domain-lease",
+      "toSide": "left",
+      "label": "per Tier 6"
+    },
+    {
+      "id": "e-T1-T2",
+      "fromNode": "T-Tier1",
+      "fromSide": "right",
+      "toNode": "T-Tier2",
+      "toSide": "left",
+      "label": "依赖"
+    },
+    {
+      "id": "e-T2-T3",
+      "fromNode": "T-Tier2",
+      "fromSide": "right",
+      "toNode": "T-Tier3",
+      "toSide": "left",
+      "label": "依赖"
+    },
+    {
+      "id": "e-T3-T4",
+      "fromNode": "T-Tier3",
+      "fromSide": "right",
+      "toNode": "T-Tier4",
+      "toSide": "left",
+      "label": "依赖"
+    },
+    {
+      "id": "e-T4-T5",
+      "fromNode": "T-Tier4",
+      "fromSide": "right",
+      "toNode": "T-Tier5",
+      "toSide": "left",
+      "label": "依赖"
+    },
+    {
+      "id": "e-T5-T6",
+      "fromNode": "T-Tier5",
+      "fromSide": "right",
+      "toNode": "T-Tier6",
+      "toSide": "left",
+      "label": "依赖"
+    }
+  ]
+}

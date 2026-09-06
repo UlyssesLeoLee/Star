@@ -224,6 +224,7 @@ def main():
             n = sum(1 for f in DB_TABLES.glob(f"{s}_*.md"))
             body += f"| `{s}` | {n} | 无 | ?(DDD Review 阶段拍)|\n"
         body += f"\n**生成时间**: {now}\n**来源**: `pgwiki_audit.py` Issue 1\n"
+        body += f"\n## Counters\n\n```json\n{json.dumps({'orphan_schemas': len(orphan_schemas), 'orphan_list': orphan_schemas}, ensure_ascii=False)}\n```\n"
         write_issue("00-orphan-schemas.md", "Orphan Schemas(有表无 crate 映射)", body)
     else:
         print("[audit] 0 orphan schemas")
@@ -237,6 +238,7 @@ def main():
         crt = SCHEMA_TO_CRATE[s]
         body += f"| `{s}` | `{crt}` | 0 | DDD Review 阶段确认是否落地 schema 设计,或撤映射|\n"
     body += f"\n**生成时间**: {now}\n**来源**: `pgwiki_audit.py` Issue 2\n"
+    body += f"\n## Counters\n\n```json\n{json.dumps({'placeholder_schemas': len(placeholder_schemas), 'placeholder_list': placeholder_schemas}, ensure_ascii=False)}\n```\n"
     write_issue("01-placeholder-schemas.md", "Placeholder Schemas(crate 在,schema 表未落地)", body)
 
     # Issue 3
@@ -248,6 +250,7 @@ def main():
         for c, why in empty_crates:
             body += f"| `{c}` | {why} |\n"
         body += f"\n**生成时间**: {now}\n**来源**: `pgwiki_audit.py` Issue 3\n"
+        body += f"\n## Counters\n\n```json\n{json.dumps({'empty_crates': len(empty_crates), 'empty_list': empty_crates}, ensure_ascii=False)}\n```\n"
         write_issue("02-empty-crates.md", "Empty Crates(workspace 列出但 src 空)", body)
     else:
         print("[audit] 0 empty crates")
@@ -274,6 +277,7 @@ def main():
             snippet_str = evidences[0][1] if evidences else "(无)"
             body += f"| `{c}` | {adr_list} | `{snippet_str}` |\n"
         body += f"\n**生成时间**: {now}\n**来源**: `pgwiki_audit.py` Issue 4\n"
+        body += f"\n## Counters\n\n```json\n{json.dumps({'broker_adr': len(broker_adr), 'broker_adr_list': broker_adr}, ensure_ascii=False)}\n```\n"
         write_issue("03-broker-adr-refs.md", "Broker ADR Refs(ADR 引用但 crate 不存在)", body)
     else:
         print("[audit] 0 broker ADR refs")
@@ -287,6 +291,7 @@ def main():
         for c in broker_arch:
             body += f"| `{c}` |\n"
         body += f"\n**生成时间**: {now}\n**来源**: `pgwiki_audit.py` Issue 5\n"
+        body += f"\n## Counters\n\n```json\n{json.dumps({'broker_arch': len(broker_arch), 'broker_arch_list': broker_arch}, ensure_ascii=False)}\n```\n"
         write_issue("04-broker-arch-refs.md", "Broker Arch View Refs", body)
 
     # Issue 6
@@ -335,6 +340,7 @@ def main():
         if designed_str:
             body += f"|  |  | **设计意图(workspace 未实装)**: {designed_str} |  |  |\n"
     body += f"\n**生成时间**: {now}\n**来源**: `pgwiki_audit.py` Issue 7\n"
+    body += f"\n## Counters\n\n```json\n{json.dumps({'docswiki_contrast': True, 'topic_count': len(docswiki_vs_pgwiki)}, ensure_ascii=False)}\n```\n"
     write_issue("07-docswiki-vs-pgwiki.md", "docswiki vs pgwiki 对照表", body)
 
     # Issue 8: fake deps

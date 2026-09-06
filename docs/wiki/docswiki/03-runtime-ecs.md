@@ -1,11 +1,59 @@
+---
+title: '03 — Agent Runtime 拓扑 (L0/L1/L2)'
+date: 2026-09-06
+source: 8 拓扑文件 + 7 设计源头 (S1-S7) + 152 节点笔记
+status: obsidian-wiki-baseline
+classification: obsidian-wiki
+version: 0.2
+revision: 'v0.2 @ 2026-09-06 Ulysses(per 19:39 JST)— Mavis 接手; v0.1 @ 2026-09-06 初版 (1 索引 + 7 拓扑)'
+supersedes: null
+in-topology: ["S4", "S5", "View-AgentRuntime", "Comp-AgentIdentity", "Comp-AgentState", "Comp-LifecycleState", "Comp-ContextRef", "Comp-MemoryRef", "Comp-ModelRef", "Comp-ToolPolicyRef", "Comp-McpPolicyRef", "Comp-PermissionRef", "Comp-TokenBudget", "Comp-Priority", "Comp-MailboxRef", "Sys-Scheduler", "Sys-Lifecycle", "Sys-Event", "Sys-Planner", "Sys-Llm", "Sys-Tool", "Sys-Mcp", "Sys-Retrieval", "Sys-Context", "Sys-Memory", "Sys-Permission", "Sys-Persistence", "Sys-Metrics", "domain-dispatcher", "domain-llm", "domain-mcp", "domain-tool", "domain-rag", "domain-context", "domain-memory", "domain-rate-limiter", "domain-observability", "domain-agent"]
+related: ["00-design-topology", "02-orchestration-langgraph", "04-domain-crates", "05-persistence-checkpoint"]
+see-also: ["S4", "S5", "View-AgentRuntime"]
+guards:
+  - id: '#1'
+    name: 0 unsafe + 0 err
+    evidence: mermaid 语法自检, git 提交
+  - id: '#3'
+    name: 5 域独立 Lead / 3 view 平行
+    evidence: View-AgentView / View-LangGraph / View-AgentRuntime [[wikilink]]
+  - id: '#7'
+    name: 0 unsafe
+    evidence: 纯 markdown, 无代码
+  - id: '#11'
+    name: 缺标比错标
+    evidence: 每图末「已知缺口」显式列
+  - id: '#12'
+    name: AI 協作文档治理
+    evidence: 0 回溯叙事, 395+ 处 file:line 引用
+  - id: '#19'
+    name: agent 交互 Python 化
+    evidence: scripts/automation/obsidian_topology_linkify.py
+  - id: '#10'
+    name: 代签规则应用
+    evidence: author=Ulysses (per 19:39 JST 授权)
+tags:
+  - runtime
+  - ecs
+  - tokio
+  - obsidian-wiki
+  - design-topology
+  - obsidian-wiki
+  - design-topology
+---
+
+
+
+
+
 # 03 — Agent Runtime 拓扑 (L0 派发 + L1 ECS + L2 业务共享池)
 
-> **数据源**: S4 [`docs/architecture/2026-09-03-agent-runtime/02-basic-design.md`](../../architecture/2026-09-03-agent-runtime/02-basic-design.md) + S5 [`docs/architecture/2026-09-03-agent-runtime/03-detailed-design.md`](../../architecture/2026-09-03-agent-runtime/03-detailed-design.md)
+> **数据源**: [[S4]] [`docs/architecture/2026-09-03-agent-runtime/02-basic-design.md`](../../architecture/2026-09-03-agent-runtime/02-basic-design.md) + [[S5]] [`docs/architecture/2026-09-03-agent-runtime/03-detailed-design.md`](../../architecture/2026-09-03-agent-runtime/03-detailed-design.md)
 > **范围**: Agent Runtime Core (Rust), 3 层架构 (L0 派发 + L1 ECS + L2 业务共享池), Runtime 双模式 (Lightweight / ECS), 9 SA Archetype, 13 Systems, 12 ECS Components, 31 domain-* crate 目标
 
 ---
 
-## 1. 3 层 + Runtime 双模式 (per S4 §2.1 + §2.2)
+## 1. 3 层 + Runtime 双模式 (per [[S4]] §2.1 + §2.2)
 
 ```mermaid
 flowchart TB
@@ -72,7 +120,7 @@ flowchart TB
 
 ---
 
-## 2. L0 派发层组件 (per S4 §3.1 L169-178)
+## 2. L0 派发层组件 (per [[S4]] §3.1 L169-178)
 
 ```mermaid
 flowchart LR
@@ -94,11 +142,11 @@ flowchart LR
     D --> OB
 ```
 
-**L0 性能目标 (per S4 §6.1 L524)**: L0 派发延迟 < 100ms p95.
+**L0 性能目标 (per [[S4]] §6.1 L524)**: L0 派发延迟 < 100ms p95.
 
 ---
 
-## 3. L1 ECS 12 Components (per S4 §3.2 L183-196)
+## 3. L1 ECS 12 Components (per [[S4]] §3.2 L183-196)
 
 ```mermaid
 classDiagram
@@ -209,7 +257,7 @@ classDiagram
 
 ---
 
-## 4. L1 ECS 13 Systems (per S4 §3.4 L218-232)
+## 4. L1 ECS 13 Systems (per [[S4]] §3.4 L218-232)
 
 ```mermaid
 flowchart TB
@@ -250,7 +298,7 @@ flowchart TB
 
 ---
 
-## 5. Runtime 双模式状态机 (per S5 §3.1-§3.2)
+## 5. Runtime 双模式状态机 (per [[S5]] §3.1-§3.2)
 
 ```mermaid
 stateDiagram-v2
@@ -275,11 +323,11 @@ stateDiagram-v2
     end note
 ```
 
-**模式切换一致性 (per S4 §2.2 L155 + SRS §83)**: 不丢 Event / 不重复 Tool / 不丢 Agent State / 不丢 ContextRef / 不重复 LLM 请求. 零停机迁移.
+**模式切换一致性 (per [[S4]] §2.2 L155 + SRS §83)**: 不丢 Event / 不重复 Tool / 不丢 Agent State / 不丢 ContextRef / 不重复 LLM 请求. 零停机迁移.
 
 ---
 
-## 6. Agent 状态机 (per S5 §3.1)
+## 6. Agent 状态机 (per [[S5]] §3.1)
 
 ```mermaid
 stateDiagram-v2
@@ -307,7 +355,7 @@ stateDiagram-v2
 
 ---
 
-## 7. Lifecycle HOT/WARM/COLD 状态机 (per S5 §3.2)
+## 7. Lifecycle HOT/WARM/COLD 状态机 (per [[S5]] §3.2)
 
 ```mermaid
 stateDiagram-v2
@@ -336,7 +384,7 @@ stateDiagram-v2
 
 ---
 
-## 8. 31 domain-* crate 目标映射 (per S4 §3.5 + S5 §1.1)
+## 8. 31 domain-* crate 目标映射 (per [[S4]] §3.5 + [[S5]] §1.1)
 
 ```mermaid
 flowchart LR
@@ -384,11 +432,11 @@ flowchart LR
     N7 --> L2
 ```
 
-**总计**: 22 + 9 = 31 domain-* crate 目标 (per S4 §3.5 L254 + S5 §1.2 L95).
+**总计**: 22 + 9 = 31 domain-* crate 目标 (per [[S4]] §3.5 L254 + [[S5]] §1.2 L95).
 
 ---
 
-## 9. ECS 框架选型 (per S5 §1.3)
+## 9. ECS 框架选型 (per [[S5]] §1.3)
 
 | 维度 | bevy_ecs | flecs | 自研 Minimal ECS |
 |---|---|---|---|
@@ -401,11 +449,11 @@ flowchart LR
 | STAR 适用 | ✅ 适合 9 Archetype 业务 | ✅ 适合 1M Entity 列存 | ⚠️ 维护成本高 |
 | **P3-B 选型建议** | **★ 推荐** (Rust 生态成熟) | 备选 (低开销) | 备选 (极简) |
 
-**P3-B 选型决策**: 拍板后填入 (per S4 §9 G-2 已知缺口).
+**P3-B 选型决策**: 拍板后填入 (per [[S4]] §9 G-2 已知缺口).
 
 ---
 
-## 10. Runtime API (per S4 §5.1 L443-457)
+## 10. Runtime API (per [[S4]] §5.1 L443-457)
 
 ```mermaid
 classDiagram
@@ -457,7 +505,7 @@ classDiagram
 
 ---
 
-## 11. NFR 性能目标 (per S4 §6.1 L518-527)
+## 11. NFR 性能目标 (per [[S4]] §6.1 L518-527)
 
 | NFR | 目标 | 测量 |
 |---|---|---|
@@ -475,13 +523,94 @@ classDiagram
 
 ## 已知缺口 (per 守门 #11)
 
-- **G-1**: bevy_ecs / flecs 选型未拍板 (per S4 §9 G-2 已知缺口)
-- **G-2**: EventBus + Mailbox 未实现 (per S4 §9 G-3)
-- **G-3**: Shared LLM/HTTP/MCP Pool 未落地 (per S4 §9 G-4)
-- **G-4**: Crash Recovery + Checkpoint 协议未完成 (per S4 §9 G-7)
-- **G-5**: Token 计量 telemetry 真实数据缺 (per S4 §9 G-9)
-- **G-6**: 守门 #1 v18 H2 跨 session 续 (5 domain 类型不兼容, per S4 §9 G-10)
-- **G-7**: 9 SA Type × ECS Archetype 业务逻辑兼容性 (per S4 §9 G-13)
-- **G-8**: Process Pool 跟 Tokio 协作的 runtime 隔离 (per S4 §9 G-14)
-- **G-9**: Tenant Quota 跟 Priority 冲突解决 (per S4 §9 G-15)
+- **G-1**: bevy_ecs / flecs 选型未拍板 (per [[S4]] §9 G-2 已知缺口)
+- **G-2**: EventBus + Mailbox 未实现 (per [[S4]] §9 G-3)
+- **G-3**: Shared LLM/HTTP/MCP Pool 未落地 (per [[S4]] §9 G-4)
+- **G-4**: Crash Recovery + Checkpoint 协议未完成 (per [[S4]] §9 G-7)
+- **G-5**: Token 计量 telemetry 真实数据缺 (per [[S4]] §9 G-9)
+- **G-6**: 守门 #1 v18 H2 跨 session 续 (5 domain 类型不兼容, per [[S4]] §9 G-10)
+- **G-7**: 9 SA Type × ECS Archetype 业务逻辑兼容性 (per [[S4]] §9 G-13)
+- **G-8**: Process Pool 跟 Tokio 协作的 runtime 隔离 (per [[S4]] §9 G-14)
+- **G-9**: Tenant Quota 跟 Priority 冲突解决 (per [[S4]] §9 G-15)
 - **G-10**: 5 域 Lead 真人未到位, RACI 暂以 Mavis 临时代签 (per 守门 #14 v2)
+
+
+
+
+
+
+## Obsidian 双向链 (Bidirectional Links, v0.2 NEW)
+
+> **拍板 (per 2026-09-06 17:13 JST 用户)**: docswiki 8 份转 Obsidian Wiki 风格, 完整集 frontmatter 13 字段, 节点→节点 + 源→拓扑双向链
+
+### 1. 出现在本拓扑的节点 (in-topology)
+
+- [[S4]]
+- [[S5]]
+- [[View-AgentRuntime]]
+- [[Comp-AgentIdentity]]
+- [[Comp-AgentState]]
+- [[Comp-LifecycleState]]
+- [[Comp-ContextRef]]
+- [[Comp-MemoryRef]]
+- [[Comp-ModelRef]]
+- [[Comp-ToolPolicyRef]]
+- [[Comp-McpPolicyRef]]
+- [[Comp-PermissionRef]]
+- [[Comp-TokenBudget]]
+- [[Comp-Priority]]
+- [[Comp-MailboxRef]]
+- [[Sys-Scheduler]]
+- [[Sys-Lifecycle]]
+- [[Sys-Event]]
+- [[Sys-Planner]]
+- [[Sys-Llm]]
+- [[Sys-Tool]]
+- [[Sys-Mcp]]
+- [[Sys-Retrieval]]
+- [[Sys-Context]]
+- [[Sys-Memory]]
+- [[Sys-Permission]]
+- [[Sys-Persistence]]
+- [[Sys-Metrics]]
+- [[domain-dispatcher]]
+- [[domain-llm]]
+- [[domain-mcp]]
+- [[domain-tool]]
+- [[domain-rag]]
+- [[domain-context]]
+- [[domain-memory]]
+- [[domain-rate-limiter]]
+- [[domain-observability]]
+- [[domain-agent]]
+
+### 2. 横向相关 (related)
+
+- [[00-design-topology]]
+- [[02-orchestration-langgraph]]
+- [[04-domain-crates]]
+- [[05-persistence-checkpoint]]
+
+### 3. 参见 (see-also)
+
+- [[S4]]
+- [[S5]]
+- [[View-AgentRuntime]]
+
+### 4. Obsidian Canvas
+
+- 配套 `.canvas` 文件: `docs/wiki/docswiki/canvas/03-runtime-ecs.canvas`
+- Obsidian Canvas 插件打开, 节点按 sub-graph 分色, 边显式标
+
+### 5. 节点笔记索引
+
+- 152 份节点笔记位于 `docs/wiki/docswiki/nodes/`
+- 节点 ID = 文件名 (e.g. `C-01.md` / `domain-tenant.md` / `M-N1.md`)
+
+### 6. 守门实证 (本段 v0.2 NEW)
+
+- 0 回溯叙事 (per 守门 #12)
+- 100% 文档实证 (per 守门 #12)
+- 缺标比错标 (per 守门 #11)
+- 3 view 平行, 不建立业务子域↔DDD 映射 (per 守门 #3)
+- 修订 author = Ulysses (per 守门 #10 + 8/27 19:39 JST 授权)

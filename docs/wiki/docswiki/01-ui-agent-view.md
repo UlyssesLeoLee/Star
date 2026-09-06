@@ -1,12 +1,59 @@
+---
+title: '01 — Agent View 拓扑 (派生视图)'
+date: 2026-09-06
+source: 8 拓扑文件 + 7 设计源头 (S1-S7) + 152 节点笔记
+status: obsidian-wiki-baseline
+classification: obsidian-wiki
+version: 0.2
+revision: 'v0.2 @ 2026-09-06 Ulysses(per 19:39 JST)— Mavis 接手; v0.1 @ 2026-09-06 初版 (1 索引 + 7 拓扑)'
+supersedes: null
+in-topology: ["S1", "View-AgentView", "M-AGV-1", "M-AGV-2", "M-AGV-3", "M-AGV-4", "M-AGV-5", "M-AGV-6", "M-AGV-7", "M-AGV-8", "M-AGV-9", "M-AGV-10", "domain-worktree", "domain-work-item"]
+related: ["00-design-topology", "02-orchestration-langgraph"]
+see-also: ["S1", "View-AgentView"]
+guards:
+  - id: '#1'
+    name: 0 unsafe + 0 err
+    evidence: mermaid 语法自检, git 提交
+  - id: '#3'
+    name: 5 域独立 Lead / 3 view 平行
+    evidence: View-AgentView / View-LangGraph / View-AgentRuntime [[wikilink]]
+  - id: '#7'
+    name: 0 unsafe
+    evidence: 纯 markdown, 无代码
+  - id: '#11'
+    name: 缺标比错标
+    evidence: 每图末「已知缺口」显式列
+  - id: '#12'
+    name: AI 協作文档治理
+    evidence: 0 回溯叙事, 395+ 处 file:line 引用
+  - id: '#19'
+    name: agent 交互 Python 化
+    evidence: scripts/automation/obsidian_topology_linkify.py
+  - id: '#10'
+    name: 代签规则应用
+    evidence: author=Ulysses (per 19:39 JST 授权)
+tags:
+  - ui
+  - agent-view
+  - obsidian-wiki
+  - design-topology
+  - obsidian-wiki
+  - design-topology
+---
+
+
+
+
+
 # 01 — Agent View 拓扑 (派生视图)
 
-> **数据源**: S1 [`docs/design/BD-AGENT-VIEW-001.md`](../../design/BD-AGENT-VIEW-001.md)
+> **数据源**: [[S1]] [`docs/design/BD-AGENT-VIEW-001.md`](../../design/BD-AGENT-VIEW-001.md)
 > **范围**: frontend/src/app/agent-view + frontend/src/lib/agent-view + frontend/src/components/agent-view
 > **核心**: 3-tier UI / 10 模块 / 7 派生纯函数 / 3 类节点 + connector
 
 ---
 
-## 1. 3-Tier 架构 (per S1 §2.1)
+## 1. 3-Tier 架构 (per [[S1]] §2.1)
 
 ```mermaid
 flowchart TB
@@ -62,7 +109,7 @@ flowchart TB
 
 ---
 
-## 2. 派生链 (Derivation Chain, per S1 §2.3 L146-174)
+## 2. 派生链 (Derivation Chain, per [[S1]] §2.3 L146-174)
 
 ```mermaid
 flowchart LR
@@ -112,7 +159,7 @@ flowchart LR
 
 ---
 
-## 3. 模块依赖图 (per S1 §6.2 L516-540)
+## 3. 模块依赖图 (per [[S1]] §6.2 L516-540)
 
 ```mermaid
 flowchart TD
@@ -148,11 +195,11 @@ flowchart TD
     M10 -.->|"Bot icon"| M9
 ```
 
-**依赖方向**: 单向, 无循环 (per S1 §6.2 L542-546).
+**依赖方向**: 单向, 无循环 (per [[S1]] §6.2 L542-546).
 
 ---
 
-## 4. 布局算法 (per S1 §3.2 L201-275)
+## 4. 布局算法 (per [[S1]] §3.2 L201-275)
 
 ```mermaid
 flowchart TD
@@ -179,7 +226,7 @@ flowchart TD
 
 ---
 
-## 5. 画布状态机 (per S1 §5.1 L417-437)
+## 5. 画布状态机 (per [[S1]] §5.1 L417-437)
 
 ```mermaid
 stateDiagram-v2
@@ -194,7 +241,7 @@ stateDiagram-v2
 
 ---
 
-## 6. 节点视觉规格 (per S1 §7.2 L627-633)
+## 6. 节点视觉规格 (per [[S1]] §7.2 L627-633)
 
 | 节点 | 尺寸 | 背景 | 边框 (默认/hover/select) | 内容 |
 |---|---|---|---|---|
@@ -202,7 +249,7 @@ stateDiagram-v2
 | **worktree** | 240×80 | `#161b22` | `#30363d` / `#2f81f7` / `#79c0ff` | GitBranch icon + "worktree" + branch + status pill |
 | **work_item** | 180×64 | `#161b22` | `#30363d` / `#2f81f7` / `#79c0ff` | key + title + status pill + priority |
 
-**Connector 颜色** (per S1 §4.3.3 L378-386):
+**Connector 颜色** (per [[S1]] §4.3.3 L378-386):
 - `in_progress` → `#2f81f7` (info blue)
 - `review` → `#d29922` (warn amber)
 - `blocked` → `#f85149` (err red)
@@ -212,7 +259,7 @@ stateDiagram-v2
 
 ---
 
-## 7. 路由表 (per S1 §9.1 L724-734)
+## 7. 路由表 (per [[S1]] §9.1 L724-734)
 
 | 路径 | Method | Handler | 用途 |
 |---|---|---|---|
@@ -226,7 +273,7 @@ stateDiagram-v2
 
 ---
 
-## 8. 异常处理 (per S1 §5.3 L484-493)
+## 8. 异常处理 (per [[S1]] §5.3 L484-493)
 
 | # | 异常 | 触发 | 处理 | 返回 |
 |---|---|---|---|---|
@@ -241,9 +288,63 @@ stateDiagram-v2
 
 ## 已知缺口 (per 守门 #11)
 
-- **G-1**: 不画入 MCP/Star-LG 后端 (per S1 §0 dual-use 提醒, Agent View 是 SPA in-memory, 0 外部服务)
-- **G-2**: 不画入 zustand store 内部 action (per S1 §9.2 L744 NFR-7 只读, 不调 action)
-- **G-3**: 不画入 minimap 点击跳转 (per S1 §1.2 缺口 #6)
-- **G-4**: 不画入 i18n agent/worktree status 字典 (per S1 §1.2 缺口 #5)
-- **G-5**: 不画入 canvas 持久化 (per S1 §1.2 缺口 #3)
-- **G-6**: 不画入 minimap 节点位置 click handler (per S1 §1.2 缺口 #6)
+- **G-1**: 不画入 MCP/Star-LG 后端 (per [[S1]] §0 dual-use 提醒, Agent View 是 SPA in-memory, 0 外部服务)
+- **G-2**: 不画入 zustand store 内部 action (per [[S1]] §9.2 L744 NFR-7 只读, 不调 action)
+- **G-3**: 不画入 minimap 点击跳转 (per [[S1]] §1.2 缺口 #6)
+- **G-4**: 不画入 i18n agent/worktree status 字典 (per [[S1]] §1.2 缺口 #5)
+- **G-5**: 不画入 canvas 持久化 (per [[S1]] §1.2 缺口 #3)
+- **G-6**: 不画入 minimap 节点位置 click handler (per [[S1]] §1.2 缺口 #6)
+
+
+
+
+
+
+## Obsidian 双向链 (Bidirectional Links, v0.2 NEW)
+
+> **拍板 (per 2026-09-06 17:13 JST 用户)**: docswiki 8 份转 Obsidian Wiki 风格, 完整集 frontmatter 13 字段, 节点→节点 + 源→拓扑双向链
+
+### 1. 出现在本拓扑的节点 (in-topology)
+
+- [[S1]]
+- [[View-AgentView]]
+- [[M-AGV-1]]
+- [[M-AGV-2]]
+- [[M-AGV-3]]
+- [[M-AGV-4]]
+- [[M-AGV-5]]
+- [[M-AGV-6]]
+- [[M-AGV-7]]
+- [[M-AGV-8]]
+- [[M-AGV-9]]
+- [[M-AGV-10]]
+- [[domain-worktree]]
+- [[domain-work-item]]
+
+### 2. 横向相关 (related)
+
+- [[00-design-topology]]
+- [[02-orchestration-langgraph]]
+
+### 3. 参见 (see-also)
+
+- [[S1]]
+- [[View-AgentView]]
+
+### 4. Obsidian Canvas
+
+- 配套 `.canvas` 文件: `docs/wiki/docswiki/canvas/01-ui-agent-view.canvas`
+- Obsidian Canvas 插件打开, 节点按 sub-graph 分色, 边显式标
+
+### 5. 节点笔记索引
+
+- 152 份节点笔记位于 `docs/wiki/docswiki/nodes/`
+- 节点 ID = 文件名 (e.g. `C-01.md` / `domain-tenant.md` / `M-N1.md`)
+
+### 6. 守门实证 (本段 v0.2 NEW)
+
+- 0 回溯叙事 (per 守门 #12)
+- 100% 文档实证 (per 守门 #12)
+- 缺标比错标 (per 守门 #11)
+- 3 view 平行, 不建立业务子域↔DDD 映射 (per 守门 #3)
+- 修订 author = Ulysses (per 守门 #10 + 8/27 19:39 JST 授权)

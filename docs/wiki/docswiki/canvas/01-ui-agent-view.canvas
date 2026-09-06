@@ -1,0 +1,220 @@
+{
+  "nodes": [
+    {
+      "id": "S1",
+      "type": "text",
+      "text": "S1 BD-AGENT-VIEW-001",
+      "x": 0,
+      "y": -300,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-AGV-9",
+      "type": "text",
+      "text": "M-AGV-9\npage.tsx\n(root)",
+      "x": 0,
+      "y": -100,
+      "width": 260,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-AGV-6",
+      "type": "text",
+      "text": "M-AGV-6\nAgentCanvasView\n(SVG)",
+      "x": -300,
+      "y": 100,
+      "width": 240,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-AGV-8",
+      "type": "text",
+      "text": "M-AGV-8\nAgentFilter\n(dropdown)",
+      "x": 300,
+      "y": 100,
+      "width": 240,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-AGV-2",
+      "type": "text",
+      "text": "M-AGV-2\nselectors.ts\n(7 pure fns)",
+      "x": -200,
+      "y": 300,
+      "width": 240,
+      "height": 80,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-AGV-3",
+      "type": "text",
+      "text": "M-AGV-3\nlayout.ts\n(2 pure fns)",
+      "x": 200,
+      "y": 300,
+      "width": 240,
+      "height": 80,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-AGV-1",
+      "type": "text",
+      "text": "M-AGV-1\ntypes.ts\n(leaf)",
+      "x": 0,
+      "y": 450,
+      "width": 240,
+      "height": 80,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "Store",
+      "type": "text",
+      "text": "zustand store\nagentSessions/worktrees/workItems",
+      "x": 0,
+      "y": 600,
+      "width": 300,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-worktree",
+      "type": "text",
+      "text": "domain-worktree\n(1:1 关联)",
+      "x": -400,
+      "y": 600,
+      "width": 240,
+      "height": 80,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "domain-work-item",
+      "type": "text",
+      "text": "domain-work-item\n(1:N via wt_id)",
+      "x": 400,
+      "y": 600,
+      "width": 240,
+      "height": 80,
+      "color": "2",
+      "label": "layer=node"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-s1",
+      "fromNode": "S1",
+      "fromSide": "right",
+      "toNode": "M-AGV-9",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-1",
+      "fromNode": "M-AGV-9",
+      "fromSide": "right",
+      "toNode": "M-AGV-6",
+      "toSide": "left",
+      "label": "render"
+    },
+    {
+      "id": "e-2",
+      "fromNode": "M-AGV-9",
+      "fromSide": "right",
+      "toNode": "M-AGV-8",
+      "toSide": "left",
+      "label": "render"
+    },
+    {
+      "id": "e-3",
+      "fromNode": "M-AGV-9",
+      "fromSide": "right",
+      "toNode": "M-AGV-2",
+      "toSide": "left",
+      "label": "useMemo"
+    },
+    {
+      "id": "e-4",
+      "fromNode": "M-AGV-9",
+      "fromSide": "right",
+      "toNode": "M-AGV-3",
+      "toSide": "left",
+      "label": "useMemo"
+    },
+    {
+      "id": "e-5",
+      "fromNode": "M-AGV-9",
+      "fromSide": "right",
+      "toNode": "M-AGV-1",
+      "toSide": "left",
+      "label": "types"
+    },
+    {
+      "id": "e-6",
+      "fromNode": "M-AGV-9",
+      "fromSide": "right",
+      "toNode": "Store",
+      "toSide": "left",
+      "label": "useStore 订阅"
+    },
+    {
+      "id": "e-7",
+      "fromNode": "M-AGV-6",
+      "fromSide": "right",
+      "toNode": "M-AGV-1",
+      "toSide": "left",
+      "label": "types"
+    },
+    {
+      "id": "e-8",
+      "fromNode": "M-AGV-8",
+      "fromSide": "right",
+      "toNode": "M-AGV-2",
+      "toSide": "left",
+      "label": "selected"
+    },
+    {
+      "id": "e-9",
+      "fromNode": "M-AGV-2",
+      "fromSide": "right",
+      "toNode": "M-AGV-1",
+      "toSide": "left",
+      "label": "deps"
+    },
+    {
+      "id": "e-10",
+      "fromNode": "M-AGV-3",
+      "fromSide": "right",
+      "toNode": "M-AGV-1",
+      "toSide": "left",
+      "label": "deps"
+    },
+    {
+      "id": "e-11",
+      "fromNode": "Store",
+      "fromSide": "right",
+      "toNode": "domain-worktree",
+      "toSide": "left",
+      "label": "reads"
+    },
+    {
+      "id": "e-12",
+      "fromNode": "Store",
+      "fromSide": "right",
+      "toNode": "domain-work-item",
+      "toSide": "left",
+      "label": "reads"
+    }
+  ]
+}
