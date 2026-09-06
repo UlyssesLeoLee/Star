@@ -58,12 +58,60 @@ if ($GitStatus) {
     exit 1
 }
 
-Write-Host "[1/5] git pull --ff-only ..." -ForegroundColor Cyan
-git pull --ff-only
-if ($LASTEXITCODE -ne 0) {
-    throw "git pull 失败, exit code: $LASTEXITCODE"
+# ---- 1.5. git 同步 (smart pull) ----
+# 替代原 git pull --ff-only, 处理 3 种常见场景 (per 9/6 18:50 JST 实证):
+#   (a) 有 upstream, 落后 origin       -> git pull --ff-only
+#   (b) 有 upstream, 领先 origin       -> 报 ahead N, 提示先 push (守门 #1 R-05)
+#   (c) 无 upstream (worktree 新建)     -> git fetch origin, 比对 main, 报告状态
+Write-Host "[1/5] git 同步 (smart pull) ..." -ForegroundColor Cyan
+
+$Upstream = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
+$HasUpstream = ($LASTEXITCODE -eq 0)
+
+if ($HasUpstream) {
+    $LeftRight = (git rev-list --left-right --count "$Upstream...HEAD" 2>$null) -split '\s+'
+    $Behind    = [int]$LeftRight[0]
+    $Ahead     = [int]$LeftRight[1]
+    Write-Host "  upstream : $Upstream"
+    Write-Host "  ahead    : $Ahead, behind : $Behind"
+
+    if ($Behind -gt 0 -and $Ahead -eq 0) {
+        Write-Host "  落后 origin $Behind commit, 跑 git pull --ff-only ..." -ForegroundColor Cyan
+        git pull --ff-only
+        if ($LASTEXITCODE -ne 0) {
+            throw "git pull --ff-only 失败, exit code: $LASTEXITCODE"
+        }
+        Write-Host "  pull 完成" -ForegroundColor Green
+    } elseif ($Ahead -gt 0 -and $Behind -eq 0) {
+        Write-Host "  本地领先 origin $Ahead commit, 守门 #1 R-05 不自动 push" -ForegroundColor Yellow
+    } elseif ($Ahead -gt 0 -and $Behind -gt 0) {
+        throw "本地跟 origin 分叉 (ahead $Ahead, behind $Behind), 需要手动 rebase 或 merge"
+    } else {
+        Write-Host "  跟 origin 一致" -ForegroundColor Green
+    }
+} else {
+    Write-Host "  当前分支无 upstream (per 9/6 18:50 JST 实证: worktree 新建分支常见)" -ForegroundColor Yellow
+    Write-Host "  拉 origin fetch 拿最新, 报告 ahead/behind main ..." -ForegroundColor Cyan
+    git fetch origin 2>&1 | Out-Null
+    $FetchOk = $LASTEXITCODE
+    if ($FetchOk -ne 0) {
+        Write-Host "  git fetch origin 失败 (exit $FetchOk), 跳过 sync 继续" -ForegroundColor Yellow
+    } else {
+        $MainSha = git rev-parse --verify origin/main 2>$null
+        if ($MainSha) {
+            $LeftRight = (git rev-list --left-right --count "origin/main...HEAD" 2>$null) -split '\s+'
+            $Behind    = [int]$LeftRight[0]
+            $Ahead     = [int]$LeftRight[1]
+            Write-Host "  比对 origin/main: ahead $Ahead, behind $Behind" -ForegroundColor Cyan
+            if ($Behind -gt 0) {
+                Write-Host "  origin/main 有 $Behind commit 还没合, 手动 rebase / merge" -ForegroundColor Yellow
+            } else {
+                Write-Host "  本地领先 origin/main, 守门 #1 R-05 不自动 push" -ForegroundColor Yellow
+            }
+        }
+    }
 }
-Write-Host "[1/5] git pull 完成" -ForegroundColor Green
+Write-Host "[1/5] git 同步检查完成" -ForegroundColor Green
 
 # ---- 2. 探测工具链 ----
 Write-Host ""
@@ -78,10 +126,54 @@ function Test-Cmd($name) {
     return $cmd.Source
 }
 
+function Resolve-HelmExe {
+    # 解决 helm 在 PATH 里找不到的实际问题 (per 9/6 18:48 JST 实证):
+    #   winget install Helm 写到注册表 user PATH, 但:
+    #     (a) Windows PATH 限制 2047 字符, user PATH 超长会截断末尾
+    #     (b) MiniMax Code 等长驻进程不重读注册表, child 拿不到
+    #   修法: 探测 4 个常见 helm 安装位置, 用绝对路径直接调
+    $Candidates = @(
+        "C:\Program Files\helm\helm.exe",
+        "C:\tools\helm\helm.exe",
+        "$env:USERPROFILE\scoop\apps\helm\current\bin\helm.exe",
+        "C:\Users\leo19\AppData\Local\Microsoft\WinGet\Packages\Helm.Helm_Microsoft.Winget.Source_8wekyb3d8bbwe\windows-amd64\helm.exe"
+    )
+    # 加 user PATH 里所有含 helm 的目录
+    $userPath = [System.Environment]::GetEnvironmentVariable("PATH","User")
+    foreach ($d in ($userPath -split ';')) {
+        if ($d -and (Test-Path (Join-Path $d "helm.exe"))) {
+            $Candidates += (Join-Path $d "helm.exe")
+        }
+    }
+    foreach ($c in $Candidates | Select-Object -Unique) {
+        if (Test-Path $c) { return $c }
+    }
+    return $null
+}
+
 $kubectl = Test-Cmd 'kubectl'
-$helm    = Test-Cmd 'helm'
+
+# helm 单独处理: 先试 PATH, 找不到再找候选位置
+$helmExe = $null
+$helmFromPath = Get-Command helm -ErrorAction SilentlyContinue
+if ($helmFromPath) {
+    $helmExe = $helmFromPath.Source
+} else {
+    $Resolved = Resolve-HelmExe
+    if ($Resolved) {
+        $helmExe = $Resolved
+        Write-Host "  (helm 不在 PATH, 找到候选: $helmExe)" -ForegroundColor Yellow
+    } else {
+        Write-Host "ERROR: helm 不在 PATH, 候选位置也找不到" -ForegroundColor Red
+        Write-Host "  候选:" -ForegroundColor Yellow
+        Write-Host "    - C:\Program Files\helm\helm.exe" -ForegroundColor Yellow
+        Write-Host "    - winget install Helm.Helm" -ForegroundColor Yellow
+        Write-Host "    - scoop install helm" -ForegroundColor Yellow
+        exit 1
+    }
+}
 Write-Host "  kubectl : $kubectl" -ForegroundColor DarkGray
-Write-Host "  helm    : $helm" -ForegroundColor DarkGray
+Write-Host "  helm    : $helmExe" -ForegroundColor DarkGray
 
 # 探测 KUBECONFIG
 $KubeConfig = $env:KUBECONFIG
@@ -148,7 +240,7 @@ if ($LASTEXITCODE -ne 0) {
     kubectl --kubeconfig "$KubeConfig" create namespace star-system
 }
 
-helm upgrade --install star $ChartDir `
+& $helmExe upgrade --install star $ChartDir `
     --namespace star-system `
     --kubeconfig "$KubeConfig" `
     --wait --timeout 5m
