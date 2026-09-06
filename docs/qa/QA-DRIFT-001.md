@@ -39,7 +39,7 @@
 | DRIFT-α-001 | `/projects` 5 tab 命名：设计 `list/board/gantt/calendar/workflow` vs 实装 `kanban/timeline/backlog/agents/worktrees` | ui-redesign-multica-style.md §2 line 22-29 | `app/projects/page.tsx:76` TAB_ITEMS | 选 1 个权威版本（5 tab 已 23:03 JST 拍板），同步 3-pane + multica 文档 |
 | DRIFT-α-002 | `Cmd+1/2/3/4` 4 view vs 实装 5 tab | ui-3pane-arch.md §1.3 line 145-156 | `app/projects/page.tsx:76` | 改 1.3 写"5 tab 实装 (per 23:03 JST 拍板)" |
 | DRIFT-α-003 | `/board → /projects?tab=board` redirect 目标 tab=board 不存在 | `lib/redirects.ts:48` | `app/projects/page.tsx:137` | redirect → tab=kanban |
-| DRIFT-α-004 | 4 redirect 目标（scm/collaboration/workflow/relation）全无对应 tab | `lib/redirects.ts:54-72` | `app/projects/page.tsx:137` | 选 1 权威；推荐 → tab=worktrees |
+| DRIFT-α-004 | 4 redirect 目标（scm/collaboration/workflow/relation）全无对应 tab | `lib/redirects.ts:54-72` | `app/projects/page.tsx:137` | ✅ **已修复** (2026-09-06, `ux/frontend-drift-fix`)：实测 4 个 redirect 现均指向 `?tab=worktrees`，与 `TAB_ITEMS` 实际接受的 tab id 一致，无残留死链 |
 | DRIFT-α-005 | `/canvas/:id` deep link 失联 | `lib/redirects.ts:75-78` | `app/projects/page.tsx:132-140` useSearchParams 只接 `?tab` | projects 解析 `?canvas=` + 渲染 CanvasView |
 | DRIFT-α-020 | `?K` 全局搜索：openCommandBar 设 isOpen=true 但 CommandBar 组件不存在 | frontend-internal-04 §1.1 | `lib/commandBarStore.ts:71` | 实装 `<CommandBar>` 组件 |
 | DRIFT-α-029 | 同 DRIFT-α-020（重复计数 / 合并到 020） | — | — | — |
@@ -76,13 +76,13 @@
 ### 3.1 组件 / 路由结构（α P1 = 10 条）
 
 DRIFT-α-006: settings 7 tab（multica §2）vs 5 tab（实际）
-DRIFT-α-007: settings redirect 4 目标 tab 跟 page 5 tab id 不一致
+DRIFT-α-007: settings redirect 4 目标 tab 跟 page 5 tab id 不一致 — ✅ **已修复** (2026-09-06, `ux/frontend-drift-fix`)：`settings/page.tsx` 原硬编码 `useState("profile")` 完全不读 `?tab=`，改为直接从 `searchParams` 派生（同 `sprint/page.tsx` idiom），深链与浏览器前进/后退恢复正常；4 个未实装的目标 tab（permissions/members/workspace/integrations）仍落 profile，属 P2 功能缺口非路由 wiring bug，不在本次修复范围
 DRIFT-α-008: analytics 5 K 维度 vs 5 图表 tab
-DRIFT-α-009: collaboration StatsPage vs canvas placeholder
+DRIFT-α-009: collaboration StatsPage vs canvas placeholder — ✅ **部分已修复** (2026-09-06, `ux/frontend-drift-fix`)：`/canvas/:id` 本身可达但无任何 UI 入口（无 nav registry 项、无 `/canvas` 索引路由、`/collaboration` 画廊被 redirect 拦截）；已在 Worktrees tab 补一条 project-scoped canvas 链接（对应 seed 里真实的 `ref_kind="project"` 关系）。`/collaboration` 画廊本身仍被 redirect 覆盖 — 未处理，原乖离条目的"collaboration 入口名 vs canvas 实装"矛盾未完全解决
 DRIFT-α-010: 25 route 1:1 vs 22 平铺 + 5 (app) group 双层 IA
 DRIFT-α-013: frontend-internal-01 路由图与实际双层 IA 不一致
 DRIFT-α-016: StateMachineDiagram 6 SM 自检（FD-01 已知 bug）
-DRIFT-α-017: ADR-FE-013 状态色统一（KanbanCard / GanttBar 直接 className）
+DRIFT-α-017: ADR-FE-013 状态色统一（KanbanCard / GanttBar 直接 className）— ✅ **GanttBar 部分已修复** (2026-09-06, `ux/frontend-drift-fix`)：`GanttBar.tsx` 的 status→color 表原有 2 处硬编码 hex 值与 `StatusPill.tsx` 的权威色表不一致（`planned` 应蓝实灰、`active` 应绿实蓝，均已核对 `StatusPill` COLOR map 逐条修正），并补了 CSS var fallback；`KanbanCard.tsx` 的直接 className 内联色码**未处理**，原乖离条目未完全解决
 DRIFT-α-019: store 双源（in-memory + MSW fetch 4 panel）
 DRIFT-α-021: page 直接 useStore.setState 违反 §3.1 硬约束（5 page）
 
@@ -239,3 +239,4 @@ DRIFT-β-013: Feedback 终态（closed vs resolved）
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-08-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：4 子代理对账（α/β/γ/δ 实战测，3 RPC failed 1 succeeded），103 条乖离汇总（α 31 / β 17 / γ 27 / δ 28），32 P0 必答 + 23 P1 重要 + 27 P2 选答 向上游 AI 提问清单 | 2026-08-31 11:47 JST 用户发令"代码是否存在和设计书乖离，测试设计书是否和其他设计书存在乖离，如有则整理进 qa 文档向上游 ai 提问，开子代理和 worktree 并行处理" |
+| v0.2 | 2026-09-06 | Claude (frontend UX 修复 session, worktree `ux/frontend-drift-fix` → merged `main` @ `c42a368`) | 标注 4 条 α 乖离修复状态：DRIFT-α-004（redirect → tab=worktrees 已一致）✅ 完全解决；DRIFT-α-007（settings `?tab=` 深链改从 URL 派生）✅ 完全解决（4 个未实装 tab 仍 P2 缺口，非本次范围）；DRIFT-α-009（canvas 无 UI 入口，补 project-scoped 链接）⚠ 部分解决（`/collaboration` 画廊仍被 redirect 拦截，未处理）；DRIFT-α-017（GanttBar 状态色核对 StatusPill 修正 2 处硬编码 + planned/active 校验中新发现修复）⚠ 部分解决（`KanbanCard.tsx` 内联色码未处理）。验证：542 测试通过（54 文件）+ `tsc --noEmit` 净（2 条无关既存错误）；浏览器视觉验证未做（Chrome extension 本 session 未连上，2 次尝试均失败）。改动详见 commit `c42a368` | 用户发令"优化界面UX"（Auto Mode 下自主定范围）+ 后续"merge，并更新相关文档" |
