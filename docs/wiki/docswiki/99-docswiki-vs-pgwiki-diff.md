@@ -8,7 +8,7 @@ version: 0.2
 revision: 'v0.2 @ 2026-09-06 Ulysses(per 19:39 JST)— Mavis 接手; v0.1 @ 2026-09-06 初版 (1 索引 + 7 拓扑)'
 supersedes: null
 in-topology: ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "View-AgentView", "View-LangGraph", "View-AgentRuntime", "domain-tenant", "domain-agent", "domain-context"]
-related: ["00-design-topology", "01-ui-agent-view", "02-orchestration-langgraph", "03-runtime-ecs", "04-domain-crates", "05-persistence-checkpoint", "06-data-flow"]
+related: ["00-design-topology", "01-ui-agent-view", "02-orchestration-langgraph", "03-runtime-ecs", "04-domain-crates", "05-persistence-checkpoint", "06-data-flow", "99-pg-broker-audit"]
 see-also: ["S4", "S5", "S7"]
 guards:
   - id: '#1'
@@ -41,6 +41,7 @@ tags:
   - obsidian-wiki
   - design-topology
 ---
+
 
 
 # 99 — docswiki vs pgwiki 差异分析
@@ -367,6 +368,7 @@ per [[pgwiki-50-issues-04-broker-arch-refs]]:
 - 修订 author = Ulysses (per 守门 #10 + 8/27 19:39 JST 授权)
 
 
+
 ## Obsidian 双向链 (Bidirectional Links, v0.2 NEW)
 
 > **拍板 (per 2026-09-06 17:13 JST 用户)**: docswiki 8 份转 Obsidian Wiki 风格, 完整集 frontmatter 13 字段, 节点→节点 + 源→拓扑双向链
@@ -396,6 +398,7 @@ per [[pgwiki-50-issues-04-broker-arch-refs]]:
 - [[04-domain-crates]]
 - [[05-persistence-checkpoint]]
 - [[06-data-flow]]
+- [[99-pg-broker-audit]]
 
 ### 3. 参见 (see-also)
 

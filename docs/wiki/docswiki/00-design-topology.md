@@ -42,6 +42,7 @@ tags:
 ---
 
 
+
 # 00 — 设计应有的工程总览 (Design Topology Overview)
 
 > **目的**: 主图 — 把 4 个设计源头汇聚成「设计应有的工程」一张总览图, 用于跟实际工程实现的拓扑对比.
@@ -310,6 +311,7 @@ flowchart TB
 - **G-3**: mobile-flutter-mvp (per `docs/architecture/2026-09-02-upgrade/spec/mobile/`) 未整合
 - **G-4**: Phase E-I 9 个 worktree merge (per AGENTS.md §7 #8) 的演进 commit 不画
 - **G-5**: 5 域 Lead 真人未到位, 5 域 RACI 暂以 Mavis 临时代签占位 (per 守门 #14 v2)
+
 
 
 

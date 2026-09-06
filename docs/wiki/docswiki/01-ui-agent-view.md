@@ -42,6 +42,7 @@ tags:
 ---
 
 
+
 # 01 — Agent View 拓扑 (派生视图)
 
 > **数据源**: [[S1]] [`docs/design/BD-AGENT-VIEW-001.md`](../../design/BD-AGENT-VIEW-001.md)
@@ -291,6 +292,7 @@ stateDiagram-v2
 - **G-4**: 不画入 i18n agent/worktree status 字典 (per [[S1]] §1.2 缺口 #5)
 - **G-5**: 不画入 canvas 持久化 (per [[S1]] §1.2 缺口 #3)
 - **G-6**: 不画入 minimap 节点位置 click handler (per [[S1]] §1.2 缺口 #6)
+
 
 
 

@@ -370,6 +370,50 @@ def all_nodes():
     for d in domain_crates:
         nodes.append(Node(d[0], d[0], "domain", "Cross", d[1], d[2], "M/T/W 混合 per 设计", d[3], [], [], None, ["04-domain-crates"]))
 
+    # ---------- 15 个 star-* crate (per `cargo metadata` 2026-09-06 18:46 JST 实测) ----------
+    star_crates = [
+        ("star-mcp", "MCP server (16 tools + transport_http + handlers + sa_real_impls), 49 src 文件", "crates/star-mcp/src/", "已实装 P0"),
+        ("star-api-rest", "REST API (per spec/rest/01), 20 src 文件", "crates/star-api-rest/src/", "已实装 P0"),
+        ("star-cli", "CLI (per 守门 #6 PowerShell only), 16 src 文件", "crates/star-cli/src/", "已实装 P1"),
+        ("star-saga", "Saga 协调 (per spec/saga/01 5 步流程), 11 src 文件", "crates/star-saga/src/", "已实装 P0"),
+        ("star-sa", "Sub-Agent (per S2 §1.1 + S4 §2.1 9 SA Archetype), 6 src 文件", "crates/star-sa/src/", "已实装 P0"),
+        ("star-dispatcher", "L0 派发 (per S4 §3.1, enqueue/get/list/transition/submit API), 5 src 文件", "crates/star-dispatcher/src/", "已实装 P0"),
+        ("star-cache", "Cache (per spec/cache/01 §4 TTL 表), 4 src 文件", "crates/star-cache/src/", "已实装 P1"),
+        ("star-credential", "Credential (per 守门 #5 环境变量安全), 4 src 文件", "crates/star-credential/src/", "已实装 P1"),
+        ("star-treesitter", "Tree-sitter (per 2026-09-03 treesitter-worktree-graph view), 4 src 文件", "crates/star-treesitter/src/", "已实装 P1"),
+        ("star-context", "ActorContext (per H2 star_context 9/3 P0-1), 3 src 文件", "crates/star-context/src/", "已实装 P0"),
+        ("star-sse", "SSE 推送 (per spec/services/02), 3 src 文件", "crates/star-sse/src/", "已实装 P0"),
+        ("star-webhook", "Webhook (per spec/services/03), 3 src 文件", "crates/star-webhook/src/", "已实装 P0"),
+        ("star-taskgraph", "Task Graph (per BATCH-REQ-001 v0.1.2 + ADR-0040), 2 src 文件", "crates/star-taskgraph/src/", "已实装 P1"),
+        ("star-vcs", "VCS (per ADR-0023 GitGit + 4 Provider), 2 src 文件", "crates/star-vcs/src/", "已实装 P0"),
+        ("star-dto", "DTO 共享, 1 src 文件", "crates/star-dto/src/", "已实装 P1"),
+    ]
+    for s in star_crates:
+        nodes.append(Node(s[0], s[0], "runtime", "Cross", s[1], s[2], "-", s[3], [], [], None, ["04-domain-crates", "99-pg-broker-audit"]))
+
+    # ---------- 3 个 other crate (per `cargo metadata` 2026-09-06 18:46 JST 实测) ----------
+    other_crates = [
+        ("api", "REST 入口 (per spec/rest/01)", "crates/api/src/", "已实装 P0"),
+        ("application", "Application Layer (per S4 §2.1)", "crates/application/src/", "已实装 P0"),
+        ("infrastructure", "Infrastructure 聚合", "crates/infrastructure/src/", "已实装 P0"),
+    ]
+    for o in other_crates:
+        nodes.append(Node(o[0], o[0], "platform", "Cross", o[1], o[2], "-", o[3], [], [], None, ["04-domain-crates", "99-pg-broker-audit"]))
+
+    # ---------- 9 个 docswiki 列的"应新建" domain crate (设计意图, 0/9 实装 per `cargo metadata`) ----------
+    design_only = [
+        ("domain-dispatcher-design", "★ 设计意图 0/9 实装, 跟已实装 star-dispatcher 命名冲突, 待重命名 (per §7 dual-namespace + ADR-0048)", "S5 §1.1", "TBD"),
+        ("domain-llm-design", "★ 设计意图 0/9 实装, 命名无冲突, 待 P3-C 实装", "S5 §1.1", "TBD"),
+        ("domain-mcp-design", "★ 设计意图 0/9 实装, 跟已实装 star-mcp 命名冲突, 待重命名", "S5 §1.1", "TBD"),
+        ("domain-tool-design", "★ 设计意图 0/9 实装, 命名无冲突, 待 P3-C 实装", "S5 §1.1", "TBD"),
+        ("domain-rag-design", "★ 设计意图 0/9 实装, 命名无冲突, 待 P3-E 实装", "S5 §1.1", "TBD"),
+        ("domain-memory-design", "★ 设计意图 0/9 实装, 命名无冲突, 待 P3-D 实装", "S5 §1.1", "TBD"),
+        ("domain-rate-limiter-design", "★ 设计意图 0/9 实装, 命名无冲突, 待 P3-B 实装", "S5 §1.1", "TBD"),
+        ("domain-observability-design", "★ 设计意图 0/9 实装, 命名无冲突, 待 P3-B 实装", "S5 §1.1", "TBD"),
+    ]
+    for d in design_only:
+        nodes.append(Node(d[0], d[0], "domain", "Cross", d[1], d[2], "-", d[3], [], [], None, ["04-domain-crates", "99-pg-broker-audit"]))
+
     # ---------- 5 张 PG 表 (per S7 §3.2) ----------
     pg_tables = [
         ("PG-checkpoints", "checkpoints (T)", "Transaction (append-only), 物理删除禁止, RLS 13 類必携", "S7 §3.2 L78", "T"),

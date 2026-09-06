@@ -360,6 +360,48 @@ def canvas_06_dataflow() -> dict:
     return {"nodes": nodes, "edges": edges}
 
 
+def canvas_99_broker() -> dict:
+    """99 — pgwiki broker 审计 (dual-namespace 拆解)."""
+    nodes = []
+    edges = []
+    # 中心: cargo metadata
+    nodes.append(node("cargo-metadata", "cargo metadata\n52 crate 实测\n(per 守门 #1 v19 + §4.2)", x=0, y=-300, w=300, h=100, color="6"))
+    # domain-* 34 (绿)
+    domain_list = ["domain-tenant", "domain-identity", "domain-permission", "domain-workspace", "domain-project", "domain-work-item", "domain-worktree", "domain-agent", "domain-feedback", "domain-decision", "domain-scm", "domain-validation", "domain-automation", "domain-search", "domain-policy", "domain-notification", "domain-context", "domain-resume", "domain-audit", "domain-integration", "domain-event", "domain-flow", "domain-ai", "domain-batch", "domain-board", "domain-cli", "domain-collaboration", "domain-comment", "domain-dashboard", "domain-development", "domain-form", "domain-kms", "domain-local-runtime", "domain-planning", "domain-relation", "domain-report", "domain-theme", "domain-workflow"]
+    for i, d in enumerate(domain_list[:20]):  # 限 20 避免过载
+        nodes.append(node(d, d, x=-800 + (i % 10) * 150, y=0, w=140, h=50, color="2"))
+    nodes.append(node("domain-more-14", f".. +{len(domain_list)-20} more", x=600, y=0, w=160, h=50, color="2"))
+    # star-* 15 (橙)
+    star_list = ["star-mcp", "star-api-rest", "star-cli", "star-saga", "star-sa", "star-dispatcher", "star-cache", "star-credential", "star-treesitter", "star-context", "star-sse", "star-webhook", "star-taskgraph", "star-vcs", "star-dto"]
+    for i, s in enumerate(star_list):
+        nodes.append(node(s, f"{s}\n({['49','20','16','11','6','5','4','4','4','3','3','3','2','2','1'][i]} src)", x=-800 + (i % 5) * 320, y=200 + (i // 5) * 100, w=300, h=70, color="3"))
+    # other 3 (紫)
+    nodes.append(node("api", "api\n(REST 入口)", x=-400, y=600, w=200, h=80, color="6"))
+    nodes.append(node("application", "application\n(Application Layer)", x=-100, y=600, w=200, h=80, color="6"))
+    nodes.append(node("infrastructure", "infrastructure\n(Infra 聚合)", x=200, y=600, w=200, h=80, color="6"))
+    # 设计意图 9 (红 - 警示)
+    design_only = ["domain-dispatcher-design", "domain-llm-design", "domain-mcp-design", "domain-tool-design", "domain-rag-design", "domain-memory-design", "domain-rate-limiter-design", "domain-observability-design"]
+    for i, d in enumerate(design_only):
+        nodes.append(node(d, d, x=600 + (i % 4) * 200, y=0 + (i // 4) * 80, w=180, h=60, color="1"))
+    # broker 32 (灰)
+    nodes.append(node("pgwiki-broker-32", "pgwiki 50-issues\nbroker-arch 32\n(全正确)", x=600, y=300, w=240, h=80, color="7"))
+    # 边
+    for d in domain_list[:20]:
+        edges.append(edge(f"e-cargo-{d}", "cargo-metadata", d, "domain-*"))
+    edges.append(edge("e-cargo-domain-more", "cargo-metadata", "domain-more-14", "+14"))
+    for s in star_list:
+        edges.append(edge(f"e-cargo-{s}", "cargo-metadata", s, "star-*"))
+    for o in ["api", "application", "infrastructure"]:
+        edges.append(edge(f"e-cargo-{o}", "cargo-metadata", o, "other"))
+    for d in design_only:
+        edges.append(edge(f"e-{d}-broker", d, "pgwiki-broker-32", "in broker-arch"))
+    # 命名冲突
+    edges.append(edge("e-conflict-dispatcher", "domain-dispatcher-design", "star-dispatcher", "命名冲突"))
+    edges.append(edge("e-conflict-mcp", "domain-mcp-design", "star-mcp", "命名冲突"))
+    edges.append(edge("e-conflict-context", "star-context", "domain-context", "命名冲突"))
+    return {"nodes": nodes, "edges": edges}
+
+
 def canvas_99_diff() -> dict:
     """99 — docswiki vs pgwiki 差异 (主色蓝/绿, 共同紫)."""
     nodes = []
@@ -450,6 +492,7 @@ CANVAS_FUNCS = {
     "05-persistence-checkpoint.canvas": canvas_05_persistence,
     "06-data-flow.canvas": canvas_06_dataflow,
     "99-docswiki-vs-pgwiki-diff.canvas": canvas_99_diff,
+    "99-pg-broker-audit.canvas": canvas_99_broker,
     "README.canvas": canvas_readme,
 }
 

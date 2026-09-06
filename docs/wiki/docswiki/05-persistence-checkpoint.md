@@ -43,6 +43,7 @@ tags:
 ---
 
 
+
 # 05 — 3-Tier Checkpoint + 5 张表 W/T/M 分类拓扑
 
 > **数据源**: [[S2]] §2.4 [LangGraph 02 §2.4](../../architecture/2026-09-03-langgraph/02-basic-design.md) + [[S7]] [ADR-0047 PostgreSQL Checkpointer Tier 3](../../architecture/2026-08-26-upgrade/adr/0047-postgresql-checkpointer-tier3.md)
@@ -264,6 +265,7 @@ flowchart LR
 - **G-4**: PostgreSQL Tier 3 实装未启动 (per [[S7]] §4 启动条件 缺 1)
 - **G-5**: Tier 切换策略 (Tier 1 → Tier 2 → Tier 3) 落地代码未拍板 (per [[S7]] §3.1 L67 提及)
 - **G-6**: Backup / Restore 详细方案未展开 (per [[S2]] §2.4.3 L399 提及)
+
 
 
 

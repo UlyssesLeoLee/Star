@@ -43,6 +43,7 @@ tags:
 ---
 
 
+
 # 03 — Agent Runtime 拓扑 (L0 派发 + L1 ECS + L2 业务共享池)
 
 > **数据源**: [[S4]] [`docs/architecture/2026-09-03-agent-runtime/02-basic-design.md`](../../architecture/2026-09-03-agent-runtime/02-basic-design.md) + [[S5]] [`docs/architecture/2026-09-03-agent-runtime/03-detailed-design.md`](../../architecture/2026-09-03-agent-runtime/03-detailed-design.md)
@@ -530,6 +531,7 @@ classDiagram
 - **G-8**: Process Pool 跟 Tokio 协作的 runtime 隔离 (per [[S4]] §9 G-14)
 - **G-9**: Tenant Quota 跟 Priority 冲突解决 (per [[S4]] §9 G-15)
 - **G-10**: 5 域 Lead 真人未到位, RACI 暂以 Mavis 临时代签 (per 守门 #14 v2)
+
 
 
 

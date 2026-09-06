@@ -64,8 +64,8 @@ TOPOLOGY_FILES = {
     "04-domain-crates.md": {
         "title": "04 — 22 domain-* crate 拓扑 (Tier 1-6)",
         "tags": ["domain", "rust-crate", "tier-architecture", "obsidian-wiki", "design-topology"],
-        "in-topology": ["S6", "domain-tenant", "domain-identity", "domain-permission", "domain-workspace", "domain-project", "domain-work-item", "domain-worktree", "domain-agent", "domain-feedback", "domain-decision", "domain-scm", "domain-validation", "domain-automation", "domain-search", "domain-policy", "domain-notification", "domain-context", "domain-resume", "domain-audit", "domain-integration", "domain-event", "domain-flow", "domain-lease"],
-        "related": ["00-design-topology", "03-runtime-ecs"],
+        "in-topology": ["S6", "domain-tenant", "domain-identity", "domain-permission", "domain-workspace", "domain-project", "domain-work-item", "domain-worktree", "domain-agent", "domain-feedback", "domain-decision", "domain-scm", "domain-validation", "domain-automation", "domain-search", "domain-policy", "domain-notification", "domain-context", "domain-resume", "domain-audit", "domain-integration", "domain-event", "domain-flow", "domain-lease", "star-mcp", "star-api-rest", "star-cli", "star-saga", "star-sa", "star-dispatcher", "star-cache", "star-credential", "star-treesitter", "star-context", "star-sse", "star-webhook", "star-taskgraph", "star-vcs", "star-dto", "api", "application", "infrastructure", "domain-dispatcher-design", "domain-llm-design", "domain-mcp-design", "domain-tool-design", "domain-rag-design", "domain-memory-design", "domain-rate-limiter-design", "domain-observability-design"],
+        "related": ["00-design-topology", "03-runtime-ecs", "99-pg-broker-audit"],
         "see-also": ["S6"],
     },
     "05-persistence-checkpoint.md": {
@@ -86,8 +86,15 @@ TOPOLOGY_FILES = {
         "title": "99 — docswiki vs pgwiki 差异分析 (Diff Report)",
         "tags": ["cross-wiki", "diff-report", "design-vs-reality", "obsidian-wiki", "design-topology"],
         "in-topology": ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "View-AgentView", "View-LangGraph", "View-AgentRuntime", "domain-tenant", "domain-agent", "domain-context"],
-        "related": ["00-design-topology", "01-ui-agent-view", "02-orchestration-langgraph", "03-runtime-ecs", "04-domain-crates", "05-persistence-checkpoint", "06-data-flow"],
+        "related": ["00-design-topology", "01-ui-agent-view", "02-orchestration-langgraph", "03-runtime-ecs", "04-domain-crates", "05-persistence-checkpoint", "06-data-flow", "99-pg-broker-audit"],
         "see-also": ["S4", "S5", "S7"],
+    },
+    "99-pg-broker-audit.md": {
+        "title": "99 — pgwiki 50-issues 交叉验证 (Broker Audit 修正)",
+        "tags": ["pgwiki-audit", "dual-namespace", "cargo-metadata", "docswiki-defect", "obsidian-wiki", "design-topology"],
+        "in-topology": ["S4", "S5", "S6", "star-mcp", "star-dispatcher", "star-context", "star-saga", "star-sa", "star-cli", "star-api-rest", "star-cache", "star-credential", "star-treesitter", "star-sse", "star-webhook", "star-taskgraph", "star-vcs", "star-dto", "api", "application", "infrastructure", "domain-dispatcher-design", "domain-llm-design", "domain-mcp-design", "domain-tool-design", "domain-rag-design", "domain-memory-design", "domain-rate-limiter-design", "domain-observability-design"],
+        "related": ["04-domain-crates", "99-docswiki-vs-pgwiki-diff"],
+        "see-also": ["S4", "S5"],
     },
 }
 
