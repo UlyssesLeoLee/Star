@@ -1,10 +1,10 @@
 # PHASE-MAINTENANCE-SCRIPTS-IMPL-REPORT
 
-> **Phase**: Maintenance Scripts 集中化 + 实际验证修复 + /agent-view hydration 修复
-> **Period**: 2026-09-06 13:21 JST ~ 19:26 JST
+> **Phase**: Maintenance Scripts 集中化 + 实际验证修复 + hydration 全面修复
+> **Period**: 2026-09-06 13:21 JST ~ 20:14 JST
 > **Branch**: `feat/auto-20260906-3b4aed04`
-> **Commits**: `d61a8f0`, `1618dea`, `bc5eb88`, `61acf5e`, `c9c36dc`, `a35eb94`
-> **Status**: 🟢 Phase Closed (3/3 套脚本 + 1 个 frontend bug 全修)
+> **Commits**: `d61a8f0`, `1618dea`, `bc5eb88`, `61acf5e`, `c9c36dc`, `a35eb94`, `e026a20` (merge main), `a7e6f47`, `fc075fd`
+> **Status**: 🟢 Phase Closed (3/3 套脚本 + 3 个 hydration bug 全修 + merge main 同步)
 
 ---
 
@@ -145,6 +145,38 @@ Error: Expected server HTML to contain a matching <div> in <span>
 
 ---
 
+## §2.7 第四轮: merge main + 全仓 hydration 扫描 (19:34 ~ 20:14 JST)
+
+**merge main** (commit `e026a20`): 5 个 main ahead commit 全部合过来, 0 冲突, 全是 docs(wiki) + feat(automation) 不碰 frontend CSS.
+
+**全仓 hydration 扫描** (per 9/6 19:42 JST 用户拍板 "扫全仓"):
+- 工具: PowerShell grep 扫 81 处 client component 用 Date.now / Math.random / window.* / useSearchParams
+- 真风险 1 处 (修: commit `fc075fd`):
+  - **local-runtime/page.tsx:41** className 用 `Date.now() - new Date(...) > 60_000` 渲染期, server t0 vs client t0+1s 可能跨 60_000 边界 → text-warn/text-ok mismatch
+  - 修法: useState `now` + useEffect setInterval 1s ticker, mount 前 now = 0 强制 text-ok
+- False alarm 4 处 (经人工 review 排除):
+  - **I18nProvider localStorage 5 处**: 已用 mounted gate 模式 (line 86-92 注释明确禁止 useState 初值读 storage)
+  - **agent-view seed line 126**: 在 useEffect 内调用, SSR 不跑
+  - **tooltip vw/vh line 102-103**: 在 useLayoutEffect `measure` callback 内, SSR 不跑
+  - **tooltip useRef Math.random() id**: useRef 初值不渲染到 DOM
+
+**累计 hydration 修复** (per 2026-09-06 20:14 JST):
+1. `a35eb94` GasParticlesHint typeof window 判定 (commit a35eb94)
+2. `a7e6f47` AgentViewContent derivedAt useMemo 内 new Date() (commit a7e6f47)
+3. `fc075fd` local-runtime page className Date.now() (commit fc075fd)
+
+**统一模板** (per 3 次修复实证):
+```tsx
+const [mounted, setMounted] = useState(false);
+useEffect(() => { setMounted(true); }, []);
+if (!mounted) return <safe-fallback/>;
+// or: value = mounted ? computeReal() : defaultValue;
+```
+
+**根因总结**: React 18 + Next.js 14 streaming SSR 下, useState/useMemo 内的 `new Date() / Date.now() / Math.random()` 在 server t0 跟 client t0+δ 必然不同, 直接走 render 必 mismatch. mounted gate 模式让 first render 跟 server 一致, mount 后再走真实值.
+
+---
+
 ## §3 已知缺口 (per 缺标比错标)
 
 | # | 缺口 | 影响 | 修法 / 拍板需求 |
@@ -212,4 +244,5 @@ Error: Expected server HTML to contain a matching <div> in <span>
 | v0.1 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 初稿: 3 套脚本 + lock 修复 + T1/T2/T3 验证 | 2026-09-06 17:09 JST 完成 T1' 真验证后落档 |
 | v0.2 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 第二轮回归 R1'/R2'/R3': 修 2 个真 bug (smart pull + ensure helm), 加 G7-G9 已知缺口, §2.5 新增 | 2026-09-06 19:09 JST 完成 commit 61acf5e + R2''/R3' 实测后落档 |
 | v0.3 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 第三轮修复: /agent-view hydration mismatch (commit a35eb94), §2.6 新增, 衍生守门 ("typeof window 改 useState mounted 模式") | 2026-09-06 19:26 JST 完成 in-app browser 实证 + commit a35eb94 后落档 |
-| (后续) | (待 SRE Lead / 5 域 Lead 到位) | G1-G5 缺口补完后 v0.4 | 拍板 Dockerfile + chart 模板后 |
+| v0.4 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 第四轮: merge main (5 ahead commit) + 全仓 hydration 扫描 (81 处, 1 真风险修 / 4 false alarm 排除) + commit a7e6f47 + fc075fd, §2.7 新增, 3 次 hydration 修复统一模板 | 2026-09-06 20:14 JST 完成 in-app browser 实证 + commit fc075fd 后落档 |
+| (后续) | (待 SRE Lead / 5 域 Lead 到位) | G1-G5 缺口补完后 v0.5 | 拍板 Dockerfile + chart 模板后 |
