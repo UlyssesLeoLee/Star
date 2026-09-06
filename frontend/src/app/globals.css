@@ -80,11 +80,11 @@ html, body {
   /* 紧凑型卡片（看板列、小挂件、状态网格） */
   .card-compact {
     padding: 0.875rem 1rem;
-    box-shadow: 3px 3px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 3px 3px 0px 0px var(--cel-shadow-color, #000000);
   }
   .card-compact:hover {
     transform: translate(-1px, -1px);
-    box-shadow: 5px 5px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 5px 5px 0px 0px var(--cel-shadow-color, #000000);
   }
 
   /* ── 动漫三渲二战术面板 (NPR Stepped Ramp + Breathing Chamfer) ─────────────────────── */
@@ -264,7 +264,7 @@ html, body {
     border-collapse: separate;
     border-spacing: 0;
     border: 2px solid var(--cel-ink, #000000);
-    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), 4px 4px 0px 0px var(--cel-shadow-color, #000000);
+    box-shadow: 4px 4px 0px 0px var(--cel-shadow-color, #000000);
   }
   .table th {
     border-bottom: 2px solid var(--cel-ink, #000000);
@@ -323,7 +323,7 @@ html, body {
   }
   .lift-on-hover:hover {
     transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: inset 1px 1px 0 0 var(--cel-bevel-hi), inset -1px -1px 0 0 var(--cel-bevel-lo), 8px 8px 0px 0px var(--cel-shadow-color, #000000);
   }
   .lift-on-hover:active {
     transform: translateY(-2px);
@@ -498,7 +498,7 @@ html.light,
 
 .cel-btn-3d:active {
   transform: translate(3px, 3px) !important;
-  box-shadow: 0px 0px 0px #000 !important;
+  box-shadow: inset -1px -1px 0 0 var(--cel-bevel-lo) !important;
 }
 
 /* 6. Awaken Burst Mode Visual Overdrive */
