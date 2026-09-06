@@ -102,6 +102,30 @@ describe("ProjectsPage", () => {
     expect(screen.getByTestId("projects-worktrees-tab")).toBeTruthy();
   });
 
+  // per DRIFT-α-009 修复: canvas/[id] 之前无任何可达入口 (原 /collaboration
+  // 已被 legacy redirect 拦截), 补一个真实可达的 project-scoped 链接。
+  // 默认选中的 prj-physis 关联 seed 里唯一的 ref_kind="project" canvas
+  // (canvas-001), 这条测试锁的是"确实渲染出一条可点的 /canvas/canvas-001 链接",
+  // 而不只是代码路径存在但从不命中数据。
+  it("Worktrees tab shows a working canvas link for the selected project (DRIFT-α-009)", () => {
+    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+    // navStore.selectedProjectId 跨测试持久化 (per 2026-09-03 拍板), 显式选回
+    // prj-physis 而非依赖默认值, 避免前面测试切过 project 导致这条测试脆弱
+    fireEvent.click(screen.getByTestId("project-switcher-prj-physis"));
+    fireEvent.click(screen.getByRole("tab", { name: /Worktrees|Worktree/i }));
+    const links = screen.getByTestId("project-canvas-links");
+    const link = screen.getByTestId("project-canvas-link-canvas-001");
+    expect(links).toBeTruthy();
+    expect(link.getAttribute("href")).toBe("/canvas/canvas-001");
+  });
+
+  it("Worktrees tab hides the canvas link block for a project with no linked canvas", () => {
+    renderWithI18n(<ProjectsClient initialTab="kanban" />);
+    fireEvent.click(screen.getByTestId("project-switcher-prj-stargate"));
+    fireEvent.click(screen.getByRole("tab", { name: /Worktrees|Worktree/i }));
+    expect(screen.queryByTestId("project-canvas-links")).toBeNull();
+  });
+
   it("switching to mobile project shows fewer work-items in Kanban", () => {
     renderWithI18n(<ProjectsClient initialTab="kanban" />);
     // 切到 MOB project
