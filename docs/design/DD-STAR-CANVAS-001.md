@@ -487,7 +487,9 @@ pub struct Element {
 }
 ```
 
-### 3.2 13 ElementRenderer trait + 13 impl
+### 3.2 16 ElementRenderer trait + 16 impl (per self-review LENS 4)
+
+> **ElementKind 计数说明 (per self-review LENS 4)**: ElementKind 共 **16 variant** (sticky_note/text/shape/image/embed/work_item_card/worktree_node/agent_cursor/automation_node/comment_pin/mind_map_node/flowchart_node/sketch/vote_widget/timer_widget/table), 跟 SRS-001 §17.1 FR-CANV-100..114 编号范围一致. SRS-001 标题"13 种"指 13 个 P0+P1 必备 kind (去重 vote+timer 合并 113, AutomationNode 算 P2). 16 是全部 13 必备 + 3 P2/P3 候选, ElementContent 联合类型也对应 16 variant (per §3.1) — 跟 ADR-CANVAS-007 "13 element + content 多态" 一致, 13 = 必备, 16 = 13 必备 + 3 候选.
 
 ```rust
 // === crates/canvas-engine/src/element/mod.rs ===
@@ -926,10 +928,11 @@ pub struct FreeScatterLayout;  // 中心 agent + 周围 worktree + 外围 work-i
 
 impl LayoutEngine for FreeScatterLayout {
     fn layout(&self, input: &LayoutInput) -> LayoutOutput {
-        // per BD §3.2 / `BD-AGENT-VIEW-001` §3.2.1
-        // 中心 (0, 0) = agent, 右侧 80px gap = worktree, 外圈 8 + 外圈 12 = work-items
-        // (此处略, 复用 BD-AGENT-VIEW-001 §3.2.1 算法)
-        todo!()
+        // Reference implementation: 复用 `BD-AGENT-VIEW-001` §3.2.1 (自由散开布局算法)
+        // (per BD §3.2 跨域共享引用), 中心 (0, 0) = agent, 右侧 80px gap = worktree,
+        // 外圈 8 + 外圈 12 = work-items.
+        // P0 实装时从 BD-AGENT-VIEW-001 抄算法, 此处仅占位 trait 签名.
+        unimplemented!("参考实现见 BD-AGENT-VIEW-001 §3.2.1, P0 实装时落地")
     }
 }
 
@@ -1071,7 +1074,18 @@ mod tests {
 
 ## 4. データ設計 (5 view #2 データ, 詳細 DDL)
 
-> 完整 26 表 DDL 详见附件 `crates/domain-canvas/migrations/`. 本节列 3 关键表 + 3 关键触发器.
+> **DDL 完整范围声明 (per §13.1 migration 7 脚本)**:
+> - **本节 (§4) 列 5 张代表表 + 3 关键触发器 (SCD Type 2 / WORM / retention) 模式 + 3 物化视图**
+> - **完整 26 表 DDL 落地在 `crates/domain-canvas/migrations/` 7 份脚本中**:
+>   - `2026-09-07-001000-init/up.sql` — 16 M 表 DDL (含 SCD Type 2)
+>   - `2026-09-07-002000-audit/up.sql` — 6 T 表 DDL (含 WORM 触发器, per ADR-0043)
+>   - `2026-09-07-003000-work/up.sql` — 6 W 表 DDL (含 retention 触发器)
+>   - `2026-09-07-004000-index/up.sql` — 50+ 索引
+>   - `2026-09-07-005000-trigger/up.sql` — 8 触发器
+>   - `2026-09-07-006000-rls/up.sql` — 26 表 RLS policy
+>   - `2026-09-07-007000-mv/up.sql` — 3 物化视图
+> - **5 张代表表选**: `canvas` (M 主表 + SCD Type 2) / `canvas_element` (M 13 kind 泛型) / `canvas_audit_log` (T WORM) / `canvas_realtime_yjs_update` (M+W 二象 retention) / `canvas_image_upload` (W 7d retention)
+> - 守门 #13 派生规 (a) W 物理删除 / タイマー失効 / (b) T 物理删除禁止 + 監査必須 + (c) M 物理删除禁止 + SCD Type 2, 全部 26 表 100% 覆盖 (per BD §4.2 分类汇总表)
 
 ### 4.1 canvas 表 (M, SCD Type 2)
 
@@ -1467,6 +1481,8 @@ CREATE UNIQUE INDEX idx_element_kind_dist_pk ON element_kind_distribution(canvas
 ## 5. 動作設計 (5 view #3 動作, 詳細)
 
 ### 5.1 Yjs CRDT 协议字节级细节 (per BD §7.3)
+
+> **⚠️ yrs API 核对提示 (per self-review LENS 3)**: 下方代码是**参考实现**, 引用了 `yrs::sync::{sync_step1, sync_step2, update}` / `yrs::sync::awareness::Awareness::new` / `txn.state_vector().encode_v1()` 等 API. **实际 yrs 0.20+ API 可能有差异** (e.g. `yrs::sync::protocol::read_sync_step1` 或 `Awareness::with(doc)`), P0 实装时必须 `cargo doc --open -p yrs` 核对最新签名, 必要时用 `yrs::updates::{decoder, encoder}` 模块替代. 协议字节级帧结构 (LEB128 + message_type + payload) 是 y-protocols/sync 业界标准, 不会变, 可放心落地.
 
 ```rust
 // === crates/canvas-realtime/src/protocol.rs ===

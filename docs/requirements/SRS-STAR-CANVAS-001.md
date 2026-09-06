@@ -695,7 +695,7 @@ STAR 无限画布 (Infinite Canvas) 是一套面向团队协作场景的 Web 端
 
 ## §17 元素系统 (Element System) — 4 子节, 40 FR
 
-### §17.1 13 种 Element 类型
+### §17.1 13 必备 + 3 候选 Element 类型 (共 16 variant)
 
 #### FR-CANV-100 便利贴 (Sticky Note)
 

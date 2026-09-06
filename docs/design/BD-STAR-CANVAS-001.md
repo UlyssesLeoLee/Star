@@ -1586,7 +1586,7 @@ Phase 2 (P0 启动, 4 周后):
 | ADR-0045 | STAR Agent Runtime Basic + Detailed Design Baseline | ✅ |
 | ADR-0046 | LangGraph TMO 任务卡管理操作 | ✅ |
 | ADR-0047 | PostgreSQL Checkpointer Tier 3 (production) | ✅ |
-| **ADR-0048 (新)** | **STAR 无限画布 SRS + Basic Design Baseline (本 BD 关联, per 2026-09-06 13:21 JST 拍板)** | 🟡 DDD Review |
+| **ADR-STAR-CANVAS (待拍板)** | **STAR 无限画布 SRS + Basic + Detailed Design Baseline (本 BD 关联, per 2026-09-06 13:21 JST 拍板, 待 P0 DDD Review 拍板命名后落档)** | 🟡 P0 DDD Review |
 
 ---
 
