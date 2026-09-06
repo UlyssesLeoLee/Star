@@ -51,7 +51,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "[1/3] git pull 完成" -ForegroundColor Green
 
-# ---- 3. npm ci ----
+# ---- 3. npm ci (with fallback) ----
 $FrontendDir = Join-Path $RepoRoot 'frontend'
 $LockFile    = Join-Path $FrontendDir 'package-lock.json'
 if (-not (Test-Path $LockFile)) {
@@ -64,14 +64,32 @@ Write-Host ""
 Write-Host "[2/3] frontend/ npm ci (锁文件同步) ..." -ForegroundColor Cyan
 Push-Location $FrontendDir
 try {
-    npm ci
-    if ($LASTEXITCODE -ne 0) {
-        throw "npm ci 失败, exit code: $LASTEXITCODE"
+    $CiOk = $false
+    npm ci 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        $CiOk = $true
+    } else {
+        # Fallback: npm ci 失败 (典型: package.json 比 lock 新, lock 不同步)
+        # 触发自动 npm install 修 lock, 再重试一次
+        Write-Host "  npm ci 失败 (exit $LASTEXITCODE), 触发 fallback: npm install 修 lock + retry" -ForegroundColor Yellow
+        Write-Host "  (per 9/6 17:07 JST 实际验证: Sprint commit ef2bc80 加依赖没重生 lock)" -ForegroundColor Yellow
+        npm install --no-audit --no-fund
+        if ($LASTEXITCODE -ne 0) {
+            throw "npm install 失败, exit code: $LASTEXITCODE (修 lock 重试都失败, 需要手动介入)"
+        }
+        Write-Host "  npm install 完成, 锁已修复, 重试 npm ci ..." -ForegroundColor Cyan
+        npm ci
+        if ($LASTEXITCODE -ne 0) {
+            throw "npm ci 重试仍失败, exit code: $LASTEXITCODE"
+        }
+        $CiOk = $true
     }
 } finally {
     Pop-Location
 }
-Write-Host "[2/3] npm ci 完成" -ForegroundColor Green
+if ($CiOk) {
+    Write-Host "[2/3] npm ci 完成" -ForegroundColor Green
+}
 
 # ---- 4. 提示下一步 ----
 Write-Host ""
