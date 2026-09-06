@@ -1,11 +1,55 @@
+---
+title: '05 — 3-Tier Checkpoint + 5 张表 W/T/M 拓扑'
+date: 2026-09-06
+source: 8 拓扑文件 + 7 设计源头 (S1-S7) + 152 节点笔记
+status: obsidian-wiki-baseline
+classification: obsidian-wiki
+version: 0.2
+revision: 'v0.2 @ 2026-09-06 Ulysses(per 19:39 JST)— Mavis 接手; v0.1 @ 2026-09-06 初版 (1 索引 + 7 拓扑)'
+supersedes: null
+in-topology: ["S7", "PG-checkpoints", "PG-checkpoint_writes", "PG-checkpoint_summaries", "PG-checkpoint_metadata", "PG-audit_audit_event", "C-04", "M-N1", "M-N2", "M-N3", "M-N4", "M-N5", "M-N6", "M-N7"]
+related: ["00-design-topology", "02-orchestration-langgraph", "06-data-flow"]
+see-also: ["S7"]
+guards:
+  - id: '#1'
+    name: 0 unsafe + 0 err
+    evidence: mermaid 语法自检, git 提交
+  - id: '#3'
+    name: 5 域独立 Lead / 3 view 平行
+    evidence: View-AgentView / View-LangGraph / View-AgentRuntime [[wikilink]]
+  - id: '#7'
+    name: 0 unsafe
+    evidence: 纯 markdown, 无代码
+  - id: '#11'
+    name: 缺标比错标
+    evidence: 每图末「已知缺口」显式列
+  - id: '#12'
+    name: AI 協作文档治理
+    evidence: 0 回溯叙事, 395+ 处 file:line 引用
+  - id: '#19'
+    name: agent 交互 Python 化
+    evidence: scripts/automation/obsidian_topology_linkify.py
+  - id: '#10'
+    name: 代签规则应用
+    evidence: author=Ulysses (per 19:39 JST 授权)
+tags:
+  - persistence
+  - checkpoint
+  - w-t-m-classification
+  - obsidian-wiki
+  - design-topology
+  - obsidian-wiki
+  - design-topology
+---
+
 # 05 — 3-Tier Checkpoint + 5 张表 W/T/M 分类拓扑
 
-> **数据源**: S2 §2.4 [LangGraph 02 §2.4](../../architecture/2026-09-03-langgraph/02-basic-design.md) + S7 [ADR-0047 PostgreSQL Checkpointer Tier 3](../../architecture/2026-08-26-upgrade/adr/0047-postgresql-checkpointer-tier3.md)
+> **数据源**: [[S2]] §2.4 [LangGraph 02 §2.4](../../architecture/2026-09-03-langgraph/02-basic-design.md) + [[S7]] [ADR-0047 PostgreSQL Checkpointer Tier 3](../../architecture/2026-08-26-upgrade/adr/0047-postgresql-checkpointer-tier3.md)
 > **核心约束**: per 守门 #13 DB 三類横展開 (W/T/M) 強制分類, 100% 表覆盖, 禁混合分類
 
 ---
 
-## 1. 3-Tier Checkpoint 拓扑 (per S2 §2.4 + S7 §1.2)
+## 1. 3-Tier Checkpoint 拓扑 (per [[S2]] §2.4 + [[S7]] §1.2)
 
 ```mermaid
 flowchart TB
@@ -33,7 +77,7 @@ flowchart TB
 
 ---
 
-## 2. PostgreSQL Tier 3: 5 张表 W/T/M 严格分类 (per S7 §3.2 + 守门 #13 d)
+## 2. PostgreSQL Tier 3: 5 张表 W/T/M 严格分类 (per [[S7]] §3.2 + 守门 #13 d)
 
 ```mermaid
 erDiagram
@@ -100,17 +144,17 @@ erDiagram
 
 ---
 
-## 3. 5 张表 W/T/M 分类 (per S7 §3.2 + 守门 #13 d 派生约束)
+## 3. 5 张表 W/T/M 分类 (per [[S7]] §3.2 + 守门 #13 d 派生约束)
 
 | # | 表名 | 分类 | 物理删除 | 审计 | RLS | 触发 |
 |---|---|---|---|---|---|---|
-| **1** | `checkpoints` | **T** Transaction (append-only) | ❌ 禁止 | ✅ 必携 | 13 類必携 | per S7 §3.2 L78 |
-| **2** | `checkpoint_writes` | **T** Transaction (append-only) | ❌ 禁止 | ✅ 必携 | 13 類必携 | per S7 §3.2 L79 |
-| **3** | `checkpoint_summaries` | **T** Transaction (append-only) | ❌ 禁止 | ✅ 必携 | 13 類必携 | per S7 §3.2 L80 |
-| **4** | `checkpoint_metadata` | **M** Master (SCD Type 2) | ❌ 禁止 | ✅ 必携 | 13 類必携 | per S7 §3.2 L81 |
-| **5** | `audit_audit_event` | **T** Transaction (WORM) | ❌ 禁止 | ✅ 必携 (自身) | 13 類必携 | per S7 §3.2 L82 + ADR-0043 |
+| **1** | `checkpoints` | **T** Transaction (append-only) | ❌ 禁止 | ✅ 必携 | 13 類必携 | per [[S7]] §3.2 L78 |
+| **2** | `checkpoint_writes` | **T** Transaction (append-only) | ❌ 禁止 | ✅ 必携 | 13 類必携 | per [[S7]] §3.2 L79 |
+| **3** | `checkpoint_summaries` | **T** Transaction (append-only) | ❌ 禁止 | ✅ 必携 | 13 類必携 | per [[S7]] §3.2 L80 |
+| **4** | `checkpoint_metadata` | **M** Master (SCD Type 2) | ❌ 禁止 | ✅ 必携 | 13 類必携 | per [[S7]] §3.2 L81 |
+| **5** | `audit_audit_event` | **T** Transaction (WORM) | ❌ 禁止 | ✅ 必携 (自身) | 13 類必携 | per [[S7]] §3.2 L82 + ADR-0043 |
 
-**派生守门 (per 守门 #13 d + S7 §3.2 L85-88)**:
+**派生守门 (per 守门 #13 d + [[S7]] §3.2 L85-88)**:
 - (a) T = 物理删除禁止 + 監査必須 + RLS 13 類必携 ✅
 - (b) M = 物理删除禁止 + SCD Type 2 + RLS 13 類必携 ✅ (`checkpoint_metadata` 用 `valid_from`/`valid_to`)
 - (c) 100% 表覆盖, 0 表遗漏 ✅ (5/5 严格分类)
@@ -118,26 +162,26 @@ erDiagram
 
 ---
 
-## 4. 12 Reducer 跨 Tier 整合 (per S7 §3.3 L92-107)
+## 4. 12 Reducer 跨 Tier 整合 (per [[S7]] §3.3 L92-107)
 
 | Channel | Reducer | PostgreSQL 存储 | 备注 |
 |---|---|---|---|
-| `active_subagents` | `operator.add` (append) | `checkpoint_writes.channel='active_subagents'` 顺序 append | per S7 §3.3 L96 |
-| `completed_subagents` | `operator.add` (append) | 同上 | per S7 §3.3 L97 |
-| `conversation_history` | `operator.add` (append) | 同上 | per S7 §3.3 L98 |
-| `intermediate_steps` | `operator.add` (append) | 同上 | per S7 §3.3 L99 |
-| `global_context` | custom merge (LWW per key) | `checkpoint_metadata` SCD Type 2 (`key=global_context.{namespace}`) | per S7 §3.3 L100 |
-| `last_response` | replace (last-write-wins) | `checkpoints.state.last_response` 字段 | per S7 §3.3 L101 |
-| `interrupt_id` | replace | `checkpoints.state.interrupt_id` 字段 | per S7 §3.3 L102 |
-| `task_relationships` | custom merge (DAG 边 union) | `checkpoint_metadata.key='task_relationships'` SCD Type 2 | per S7 §3.3 L103 |
-| `superseded_tasks` | `operator.add` (append) | `checkpoint_writes.channel='superseded_tasks'` 顺序 append | per S7 §3.3 L104 |
-| `bulk_operations` | queue (FIFO) | `checkpoint_writes.channel='bulk_operations'` 顺序 append | per S7 §3.3 L105 |
-| `last_summarize_result` | replace | `checkpoint_summaries` 最新行 (per thread_id) | per S7 §3.3 L106 |
-| `active_tmo_operation` | replace | `checkpoint_metadata.key='active_tmo_operation'` SCD Type 2 | per S7 §3.3 L107 |
+| `active_subagents` | `operator.add` (append) | `checkpoint_writes.channel='active_subagents'` 顺序 append | per [[S7]] §3.3 L96 |
+| `completed_subagents` | `operator.add` (append) | 同上 | per [[S7]] §3.3 L97 |
+| `conversation_history` | `operator.add` (append) | 同上 | per [[S7]] §3.3 L98 |
+| `intermediate_steps` | `operator.add` (append) | 同上 | per [[S7]] §3.3 L99 |
+| `global_context` | custom merge (LWW per key) | `checkpoint_metadata` SCD Type 2 (`key=global_context.{namespace}`) | per [[S7]] §3.3 L100 |
+| `last_response` | replace (last-write-wins) | `checkpoints.state.last_response` 字段 | per [[S7]] §3.3 L101 |
+| `interrupt_id` | replace | `checkpoints.state.interrupt_id` 字段 | per [[S7]] §3.3 L102 |
+| `task_relationships` | custom merge (DAG 边 union) | `checkpoint_metadata.key='task_relationships'` SCD Type 2 | per [[S7]] §3.3 L103 |
+| `superseded_tasks` | `operator.add` (append) | `checkpoint_writes.channel='superseded_tasks'` 顺序 append | per [[S7]] §3.3 L104 |
+| `bulk_operations` | queue (FIFO) | `checkpoint_writes.channel='bulk_operations'` 顺序 append | per [[S7]] §3.3 L105 |
+| `last_summarize_result` | replace | `checkpoint_summaries` 最新行 (per thread_id) | per [[S7]] §3.3 L106 |
+| `active_tmo_operation` | replace | `checkpoint_metadata.key='active_tmo_operation'` SCD Type 2 | per [[S7]] §3.3 L107 |
 
 ---
 
-## 5. TMO 7 节点跟 PostgreSQL 交互 (per S7 §3.4 L109-119)
+## 5. TMO 7 节点跟 PostgreSQL 交互 (per [[S7]] §3.4 L109-119)
 
 ```mermaid
 flowchart LR
@@ -167,15 +211,15 @@ flowchart LR
     MN7 -->|"metadata 任意 key SCD Type 2 新版"| CKM
 ```
 
-**整合原则 (per 守门 #13 a 强约束)**: TMO 7 节点全部 L0 协调, 跨 sub-agent 写共享 `checkpoints` 表需 RLS 校验, 防止 L1↔L1 直接写 (per S7 §3.4 L121).
+**整合原则 (per 守门 #13 a 强约束)**: TMO 7 节点全部 L0 协调, 跨 sub-agent 写共享 `checkpoints` 表需 RLS 校验, 防止 L1↔L1 直接写 (per [[S7]] §3.4 L121).
 
 ---
 
-## 6. Tier 3 启动条件 (per S7 §4 L152-164)
+## 6. Tier 3 启动条件 (per [[S7]] §4 L152-164)
 
 **PostgreSQL Tier 3 装装阶段启动 = 3 条件全满足**:
 
-1. **5 域 Lead 真人至少 1 人到位** (T3 触发, per 5-business-domain-lead-referral.md §1.2 T3 = 2026-09-19 ~ 2026-09-26)
+1. **5 域 Lead 真人至少 1 人到位** (T3 触发, per 5-business-[[domain-lead-referral]].md §1.2 T3 = 2026-09-19 ~ 2026-09-26)
 2. **R-05 push 反転确认** (8/30 07:09 JST 已落地, 不阻塞)
 3. **设计阶段落地** (本 ADR + schema + migration + Tier 切换策略 + 5 域 Lead RACI 确认) → **当前状态 ✅**
 
@@ -188,7 +232,7 @@ flowchart LR
 
 ---
 
-## 7. 配置 & 部署 (per S7 §3.5 L123-132)
+## 7. 配置 & 部署 (per [[S7]] §3.5 L123-132)
 
 | 维度 | 内容 |
 |---|---|
@@ -201,21 +245,71 @@ flowchart LR
 
 ---
 
-## 8. 备选方案拒绝理由 (per S7 §5 L168-194)
+## 8. 备选方案拒绝理由 (per [[S7]] §5 L168-194)
 
 | 备选 | 优势 | 劣势 | 决策 |
 |---|---|---|---|
-| **A: CockroachDB (分布式 NewSQL)** | 全球分布式, 强一致, multi-region | 跟 LangGraph PostgresSaver 不直接兼容; 运维成本高 3x; Star 仓 single-region k3s 部署不需要 | ❌ 拒绝 (per S7 §5.1 L176) |
-| **B: TiDB (分布式 NewSQL)** | MySQL 兼容, HTAP | LangGraph PostgresSaver 走 MySQL 协议需 adapter; TiDB schema 迁移复杂; 跟 9/1 13:03 JST envoy 偏好整合度低 | ❌ 拒绝 (per S7 §5.2 L184) |
-| **C: 仅 SQLite Tier 2 升级 (不加 PostgreSQL)** | 简单, 不需 PG 运维 | 不能跨 session 续, 不能 5 域 Lead RACI 协调 | ❌ 拒绝 (per S7 §5.3 L192) |
+| **A: CockroachDB (分布式 NewSQL)** | 全球分布式, 强一致, multi-region | 跟 LangGraph PostgresSaver 不直接兼容; 运维成本高 3x; Star 仓 single-region k3s 部署不需要 | ❌ 拒绝 (per [[S7]] §5.1 L176) |
+| **B: TiDB (分布式 NewSQL)** | MySQL 兼容, HTAP | LangGraph PostgresSaver 走 MySQL 协议需 adapter; TiDB schema 迁移复杂; 跟 9/1 13:03 JST envoy 偏好整合度低 | ❌ 拒绝 (per [[S7]] §5.2 L184) |
+| **C: 仅 SQLite Tier 2 升级 (不加 PostgreSQL)** | 简单, 不需 PG 运维 | 不能跨 session 续, 不能 5 域 Lead RACI 协调 | ❌ 拒绝 (per [[S7]] §5.3 L192) |
 
 ---
 
 ## 已知缺口 (per 守门 #11)
 
-- **G-1**: `migrations/checkpoints/V001__initial.sql` 具体 DDL 未落地 (per S7 §3.5 L128 引用, P3-D 实装)
-- **G-2**: 13 類 RLS policy 详细 SQL 未列出 (per S7 §3.2 L78-82 引用, 待 5 域 Lead admin 域拍板)
-- **G-3**: 5 域 Lead 真人未到位, RACI 暂以 Mavis 临时代签 (per S7 §3.6 L136-147)
-- **G-4**: PostgreSQL Tier 3 实装未启动 (per S7 §4 启动条件 缺 1)
-- **G-5**: Tier 切换策略 (Tier 1 → Tier 2 → Tier 3) 落地代码未拍板 (per S7 §3.1 L67 提及)
-- **G-6**: Backup / Restore 详细方案未展开 (per S2 §2.4.3 L399 提及)
+- **G-1**: `migrations/checkpoints/V001__initial.sql` 具体 DDL 未落地 (per [[S7]] §3.5 L128 引用, P3-D 实装)
+- **G-2**: 13 類 RLS policy 详细 SQL 未列出 (per [[S7]] §3.2 L78-82 引用, 待 5 域 Lead admin 域拍板)
+- **G-3**: 5 域 Lead 真人未到位, RACI 暂以 Mavis 临时代签 (per [[S7]] §3.6 L136-147)
+- **G-4**: PostgreSQL Tier 3 实装未启动 (per [[S7]] §4 启动条件 缺 1)
+- **G-5**: Tier 切换策略 (Tier 1 → Tier 2 → Tier 3) 落地代码未拍板 (per [[S7]] §3.1 L67 提及)
+- **G-6**: Backup / Restore 详细方案未展开 (per [[S2]] §2.4.3 L399 提及)
+
+
+## Obsidian 双向链 (Bidirectional Links, v0.2 NEW)
+
+> **拍板 (per 2026-09-06 17:13 JST 用户)**: docswiki 8 份转 Obsidian Wiki 风格, 完整集 frontmatter 13 字段, 节点→节点 + 源→拓扑双向链
+
+### 1. 出现在本拓扑的节点 (in-topology)
+
+- [[S7]]
+- [[PG-checkpoints]]
+- [[PG-checkpoint_writes]]
+- [[PG-checkpoint_summaries]]
+- [[PG-checkpoint_metadata]]
+- [[PG-audit_audit_event]]
+- [[C-04]]
+- [[M-N1]]
+- [[M-N2]]
+- [[M-N3]]
+- [[M-N4]]
+- [[M-N5]]
+- [[M-N6]]
+- [[M-N7]]
+
+### 2. 横向相关 (related)
+
+- [[00-design-topology]]
+- [[02-orchestration-langgraph]]
+- [[06-data-flow]]
+
+### 3. 参见 (see-also)
+
+- [[S7]]
+
+### 4. Obsidian Canvas
+
+- 配套 `.canvas` 文件: `docs/wiki/docswiki/canvas/05-persistence-checkpoint.canvas`
+- Obsidian Canvas 插件打开, 节点按 sub-graph 分色, 边显式标
+
+### 5. 节点笔记索引
+
+- 152 份节点笔记位于 `docs/wiki/docswiki/nodes/`
+- 节点 ID = 文件名 (e.g. `C-01.md` / `domain-tenant.md` / `M-N1.md`)
+
+### 6. 守门实证 (本段 v0.2 NEW)
+
+- 0 回溯叙事 (per 守门 #12)
+- 100% 文档实证 (per 守门 #12)
+- 缺标比错标 (per 守门 #11)
+- 3 view 平行, 不建立业务子域↔DDD 映射 (per 守门 #3)
+- 修订 author = Ulysses (per 守门 #10 + 8/27 19:39 JST 授权)

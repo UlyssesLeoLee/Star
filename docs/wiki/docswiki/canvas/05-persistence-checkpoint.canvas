@@ -1,0 +1,369 @@
+{
+  "nodes": [
+    {
+      "id": "S7",
+      "type": "text",
+      "text": "S7 PG Checkpointer Tier 3",
+      "x": 0,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-04",
+      "type": "text",
+      "text": "C-04 CheckpointStore\n(3-tier ABC)",
+      "x": 0,
+      "y": -200,
+      "width": 280,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "Tier-1-Memory",
+      "type": "text",
+      "text": "Tier 1 Memory\n(MemorySaver)",
+      "x": -300,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "Tier-2-SQLite",
+      "type": "text",
+      "text": "Tier 2 SQLite\n(SqliteSaver, v0.1 default)",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "Tier-3-PG",
+      "type": "text",
+      "text": "Tier 3 PostgreSQL\n(PostgresSaver, v0.2 production)",
+      "x": 300,
+      "y": 0,
+      "width": 240,
+      "height": 80,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "PG-checkpoints",
+      "type": "text",
+      "text": "checkpoints (T)",
+      "x": -400,
+      "y": 200,
+      "width": 180,
+      "height": 80,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "PG-checkpoint_writes",
+      "type": "text",
+      "text": "checkpoint_writes (T)",
+      "x": -200,
+      "y": 200,
+      "width": 180,
+      "height": 80,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "PG-checkpoint_summaries",
+      "type": "text",
+      "text": "checkpoint_summaries (T)",
+      "x": 0,
+      "y": 200,
+      "width": 180,
+      "height": 80,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "PG-checkpoint_metadata",
+      "type": "text",
+      "text": "checkpoint_metadata (M)\nSCD Type 2",
+      "x": 200,
+      "y": 200,
+      "width": 180,
+      "height": 80,
+      "color": "2",
+      "label": "layer=node"
+    },
+    {
+      "id": "PG-audit_audit_event",
+      "type": "text",
+      "text": "audit_audit_event (T WORM)\nper ADR-0043",
+      "x": 400,
+      "y": 200,
+      "width": 180,
+      "height": 80,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N1",
+      "type": "text",
+      "text": "M-N1",
+      "x": -400,
+      "y": 400,
+      "width": 120,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N2",
+      "type": "text",
+      "text": "M-N2",
+      "x": -270,
+      "y": 400,
+      "width": 120,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N3",
+      "type": "text",
+      "text": "M-N3",
+      "x": -140,
+      "y": 400,
+      "width": 120,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N4",
+      "type": "text",
+      "text": "M-N4",
+      "x": -10,
+      "y": 400,
+      "width": 120,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N5",
+      "type": "text",
+      "text": "M-N5",
+      "x": 120,
+      "y": 400,
+      "width": 120,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N6",
+      "type": "text",
+      "text": "M-N6",
+      "x": 250,
+      "y": 400,
+      "width": 120,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N7",
+      "type": "text",
+      "text": "M-N7",
+      "x": 380,
+      "y": 400,
+      "width": 120,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-S7-PG-checkpoints",
+      "fromNode": "S7",
+      "fromSide": "right",
+      "toNode": "PG-checkpoints",
+      "toSide": "left",
+      "label": "per §3.2"
+    },
+    {
+      "id": "e-T3-PG-checkpoints",
+      "fromNode": "Tier-3-PG",
+      "fromSide": "right",
+      "toNode": "PG-checkpoints",
+      "toSide": "left",
+      "label": "writes"
+    },
+    {
+      "id": "e-S7-PG-checkpoint_writes",
+      "fromNode": "S7",
+      "fromSide": "right",
+      "toNode": "PG-checkpoint_writes",
+      "toSide": "left",
+      "label": "per §3.2"
+    },
+    {
+      "id": "e-T3-PG-checkpoint_writes",
+      "fromNode": "Tier-3-PG",
+      "fromSide": "right",
+      "toNode": "PG-checkpoint_writes",
+      "toSide": "left",
+      "label": "writes"
+    },
+    {
+      "id": "e-S7-PG-checkpoint_summaries",
+      "fromNode": "S7",
+      "fromSide": "right",
+      "toNode": "PG-checkpoint_summaries",
+      "toSide": "left",
+      "label": "per §3.2"
+    },
+    {
+      "id": "e-T3-PG-checkpoint_summaries",
+      "fromNode": "Tier-3-PG",
+      "fromSide": "right",
+      "toNode": "PG-checkpoint_summaries",
+      "toSide": "left",
+      "label": "writes"
+    },
+    {
+      "id": "e-S7-PG-checkpoint_metadata",
+      "fromNode": "S7",
+      "fromSide": "right",
+      "toNode": "PG-checkpoint_metadata",
+      "toSide": "left",
+      "label": "per §3.2"
+    },
+    {
+      "id": "e-T3-PG-checkpoint_metadata",
+      "fromNode": "Tier-3-PG",
+      "fromSide": "right",
+      "toNode": "PG-checkpoint_metadata",
+      "toSide": "left",
+      "label": "writes"
+    },
+    {
+      "id": "e-S7-PG-audit_audit_event",
+      "fromNode": "S7",
+      "fromSide": "right",
+      "toNode": "PG-audit_audit_event",
+      "toSide": "left",
+      "label": "per §3.2"
+    },
+    {
+      "id": "e-T3-PG-audit_audit_event",
+      "fromNode": "Tier-3-PG",
+      "fromSide": "right",
+      "toNode": "PG-audit_audit_event",
+      "toSide": "left",
+      "label": "writes"
+    },
+    {
+      "id": "e-C04-T1",
+      "fromNode": "C-04",
+      "fromSide": "right",
+      "toNode": "Tier-1-Memory",
+      "toSide": "left",
+      "label": "default"
+    },
+    {
+      "id": "e-C04-T2",
+      "fromNode": "C-04",
+      "fromSide": "right",
+      "toNode": "Tier-2-SQLite",
+      "toSide": "left",
+      "label": "default"
+    },
+    {
+      "id": "e-C04-T3",
+      "fromNode": "C-04",
+      "fromSide": "right",
+      "toNode": "Tier-3-PG",
+      "toSide": "left",
+      "label": "T3 启动"
+    },
+    {
+      "id": "e-T1-T2",
+      "fromNode": "Tier-1-Memory",
+      "fromSide": "right",
+      "toNode": "Tier-2-SQLite",
+      "toSide": "left",
+      "label": "async flush"
+    },
+    {
+      "id": "e-T2-T3",
+      "fromNode": "Tier-2-SQLite",
+      "fromSide": "right",
+      "toNode": "Tier-3-PG",
+      "toSide": "left",
+      "label": "5 域 Lead T3 触发"
+    },
+    {
+      "id": "e-M-N1-T3",
+      "fromNode": "M-N1",
+      "fromSide": "right",
+      "toNode": "Tier-3-PG",
+      "toSide": "left",
+      "label": "writes"
+    },
+    {
+      "id": "e-M-N2-T3",
+      "fromNode": "M-N2",
+      "fromSide": "right",
+      "toNode": "Tier-3-PG",
+      "toSide": "left",
+      "label": "writes"
+    },
+    {
+      "id": "e-M-N3-T3",
+      "fromNode": "M-N3",
+      "fromSide": "right",
+      "toNode": "Tier-3-PG",
+      "toSide": "left",
+      "label": "writes"
+    },
+    {
+      "id": "e-M-N4-T3",
+      "fromNode": "M-N4",
+      "fromSide": "right",
+      "toNode": "Tier-3-PG",
+      "toSide": "left",
+      "label": "writes"
+    },
+    {
+      "id": "e-M-N5-T3",
+      "fromNode": "M-N5",
+      "fromSide": "right",
+      "toNode": "Tier-3-PG",
+      "toSide": "left",
+      "label": "writes"
+    },
+    {
+      "id": "e-M-N6-T3",
+      "fromNode": "M-N6",
+      "fromSide": "right",
+      "toNode": "Tier-3-PG",
+      "toSide": "left",
+      "label": "writes"
+    },
+    {
+      "id": "e-M-N7-T3",
+      "fromNode": "M-N7",
+      "fromSide": "right",
+      "toNode": "Tier-3-PG",
+      "toSide": "left",
+      "label": "writes"
+    }
+  ]
+}

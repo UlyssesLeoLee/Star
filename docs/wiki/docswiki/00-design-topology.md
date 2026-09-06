@@ -1,7 +1,50 @@
+---
+title: '00 — 设计应有的工程总览'
+date: 2026-09-06
+source: 8 拓扑文件 + 7 设计源头 (S1-S7) + 152 节点笔记
+status: obsidian-wiki-baseline
+classification: obsidian-wiki
+version: 0.2
+revision: 'v0.2 @ 2026-09-06 Ulysses(per 19:39 JST)— Mavis 接手; v0.1 @ 2026-09-06 初版 (1 索引 + 7 拓扑)'
+supersedes: null
+in-topology: ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "View-AgentView", "View-LangGraph", "View-AgentRuntime"]
+related: ["01-ui-agent-view", "02-orchestration-langgraph", "03-runtime-ecs", "04-domain-crates", "05-persistence-checkpoint", "06-data-flow"]
+see-also: ["S2", "S4", "S7"]
+guards:
+  - id: '#1'
+    name: 0 unsafe + 0 err
+    evidence: mermaid 语法自检, git 提交
+  - id: '#3'
+    name: 5 域独立 Lead / 3 view 平行
+    evidence: View-AgentView / View-LangGraph / View-AgentRuntime [[wikilink]]
+  - id: '#7'
+    name: 0 unsafe
+    evidence: 纯 markdown, 无代码
+  - id: '#11'
+    name: 缺标比错标
+    evidence: 每图末「已知缺口」显式列
+  - id: '#12'
+    name: AI 協作文档治理
+    evidence: 0 回溯叙事, 395+ 处 file:line 引用
+  - id: '#19'
+    name: agent 交互 Python 化
+    evidence: scripts/automation/obsidian_topology_linkify.py
+  - id: '#10'
+    name: 代签规则应用
+    evidence: author=Ulysses (per 19:39 JST 授权)
+tags:
+  - overview
+  - master-topology
+  - obsidian-wiki
+  - design-topology
+  - obsidian-wiki
+  - design-topology
+---
+
 # 00 — 设计应有的工程总览 (Design Topology Overview)
 
 > **目的**: 主图 — 把 4 个设计源头汇聚成「设计应有的工程」一张总览图, 用于跟实际工程实现的拓扑对比.
-> **数据源**: S1-S7 (per [README.md §1](./README.md))
+> **数据源**: [[S1]]-[[S7]] (per [README.md §1](./README.md))
 > **设计视角**: 3 视图 (Agent View / LangGraph view / Agent Runtime view) + 22 domain crate + 3-tier checkpoint + 5 张表
 
 ---
@@ -248,13 +291,13 @@ flowchart TB
 
 | 层级 | 节点 | 来源 |
 |---|---|---|
-| UI Tier | 8 (3 Agent View + 3 LG Frontend + 1 Shared + 1 App Shell) | S1 + S2 |
-| Orchestration Tier | 18 (TopAgent + TopNodes + TMO 3 + SA + Cross 8) | S2 + S3 |
-| Runtime Tier | 17 (Mode 3 + L0 6 + L1 3 + L2 7-3) | S4 + S5 |
-| Domain Crates | 7 (T1-T6 + New9) | S6 + S5 |
-| Persistence | 9 (3 tier + 5 表 + ABC) | S2 §2.4 + S7 |
-| Platform | 3 (Envoy + k3s + mTLS) | S7 §3.5 |
-| 设计源头 | 7 | S1-S7 |
+| UI Tier | 8 (3 Agent View + 3 LG Frontend + 1 Shared + 1 App Shell) | [[S1]] + [[S2]] |
+| Orchestration Tier | 18 (TopAgent + TopNodes + TMO 3 + SA + Cross 8) | [[S2]] + [[S3]] |
+| Runtime Tier | 17 (Mode 3 + L0 6 + L1 3 + L2 7-3) | [[S4]] + [[S5]] |
+| Domain Crates | 7 (T1-T6 + New9) | [[S6]] + [[S5]] |
+| Persistence | 9 (3 tier + 5 表 + ABC) | [[S2]] §2.4 + [[S7]] |
+| Platform | 3 (Envoy + k3s + mTLS) | [[S7]] §3.5 |
+| 设计源头 | 7 | [[S1]]-[[S7]] |
 | **总节点** | **~69** | (避免单图过载, ≤ 100 上限) |
 
 ---
@@ -266,3 +309,54 @@ flowchart TB
 - **G-3**: mobile-flutter-mvp (per `docs/architecture/2026-09-02-upgrade/spec/mobile/`) 未整合
 - **G-4**: Phase E-I 9 个 worktree merge (per AGENTS.md §7 #8) 的演进 commit 不画
 - **G-5**: 5 域 Lead 真人未到位, 5 域 RACI 暂以 Mavis 临时代签占位 (per 守门 #14 v2)
+
+
+## Obsidian 双向链 (Bidirectional Links, v0.2 NEW)
+
+> **拍板 (per 2026-09-06 17:13 JST 用户)**: docswiki 8 份转 Obsidian Wiki 风格, 完整集 frontmatter 13 字段, 节点→节点 + 源→拓扑双向链
+
+### 1. 出现在本拓扑的节点 (in-topology)
+
+- [[S1]]
+- [[S2]]
+- [[S3]]
+- [[S4]]
+- [[S5]]
+- [[S6]]
+- [[S7]]
+- [[View-AgentView]]
+- [[View-LangGraph]]
+- [[View-AgentRuntime]]
+
+### 2. 横向相关 (related)
+
+- [[01-ui-agent-view]]
+- [[02-orchestration-langgraph]]
+- [[03-runtime-ecs]]
+- [[04-domain-crates]]
+- [[05-persistence-checkpoint]]
+- [[06-data-flow]]
+
+### 3. 参见 (see-also)
+
+- [[S2]]
+- [[S4]]
+- [[S7]]
+
+### 4. Obsidian Canvas
+
+- 配套 `.canvas` 文件: `docs/wiki/docswiki/canvas/00-design-topology.canvas`
+- Obsidian Canvas 插件打开, 节点按 sub-graph 分色, 边显式标
+
+### 5. 节点笔记索引
+
+- 152 份节点笔记位于 `docs/wiki/docswiki/nodes/`
+- 节点 ID = 文件名 (e.g. `C-01.md` / `domain-tenant.md` / `M-N1.md`)
+
+### 6. 守门实证 (本段 v0.2 NEW)
+
+- 0 回溯叙事 (per 守门 #12)
+- 100% 文档实证 (per 守门 #12)
+- 缺标比错标 (per 守门 #11)
+- 3 view 平行, 不建立业务子域↔DDD 映射 (per 守门 #3)
+- 修订 author = Ulysses (per 守门 #10 + 8/27 19:39 JST 授权)

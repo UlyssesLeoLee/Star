@@ -1,0 +1,671 @@
+{
+  "nodes": [
+    {
+      "id": "S2",
+      "type": "text",
+      "text": "S2 LangGraph 02",
+      "x": -600,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S3",
+      "type": "text",
+      "text": "S3 LangGraph 03",
+      "x": -400,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-01",
+      "type": "text",
+      "text": "C-01\nTopAgent",
+      "x": -400,
+      "y": -200,
+      "width": 240,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-N1",
+      "type": "text",
+      "text": "T-N1",
+      "x": -700,
+      "y": -50,
+      "width": 80,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-N2",
+      "type": "text",
+      "text": "T-N2",
+      "x": -610,
+      "y": -50,
+      "width": 80,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-N3",
+      "type": "text",
+      "text": "T-N3",
+      "x": -520,
+      "y": -50,
+      "width": 80,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-N4",
+      "type": "text",
+      "text": "T-N4",
+      "x": -430,
+      "y": -50,
+      "width": 80,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-N5",
+      "type": "text",
+      "text": "T-N5",
+      "x": -340,
+      "y": -50,
+      "width": 80,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-N6",
+      "type": "text",
+      "text": "T-N6",
+      "x": -250,
+      "y": -50,
+      "width": 80,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "T-N7",
+      "type": "text",
+      "text": "T-N7",
+      "x": -160,
+      "y": -50,
+      "width": 80,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-16",
+      "type": "text",
+      "text": "C-16\nTaskOpsManager",
+      "x": 200,
+      "y": -200,
+      "width": 260,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N1",
+      "type": "text",
+      "text": "M-N1",
+      "x": 80,
+      "y": -50,
+      "width": 70,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N2",
+      "type": "text",
+      "text": "M-N2",
+      "x": 160,
+      "y": -50,
+      "width": 70,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N3",
+      "type": "text",
+      "text": "M-N3",
+      "x": 240,
+      "y": -50,
+      "width": 70,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N4",
+      "type": "text",
+      "text": "M-N4",
+      "x": 320,
+      "y": -50,
+      "width": 70,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N5",
+      "type": "text",
+      "text": "M-N5",
+      "x": 400,
+      "y": -50,
+      "width": 70,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N6",
+      "type": "text",
+      "text": "M-N6",
+      "x": 480,
+      "y": -50,
+      "width": 70,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N7",
+      "type": "text",
+      "text": "M-N7",
+      "x": 560,
+      "y": -50,
+      "width": 70,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-02",
+      "type": "text",
+      "text": "C-02\nSubAgentPool",
+      "x": 600,
+      "y": -200,
+      "width": 220,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-01",
+      "type": "text",
+      "text": "SA-01",
+      "x": 400,
+      "y": 20,
+      "width": 60,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-02",
+      "type": "text",
+      "text": "SA-02",
+      "x": 470,
+      "y": 20,
+      "width": 60,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-03",
+      "type": "text",
+      "text": "SA-03",
+      "x": 540,
+      "y": 20,
+      "width": 60,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-04",
+      "type": "text",
+      "text": "SA-04",
+      "x": 610,
+      "y": 20,
+      "width": 60,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-05",
+      "type": "text",
+      "text": "SA-05",
+      "x": 680,
+      "y": 20,
+      "width": 60,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-06",
+      "type": "text",
+      "text": "SA-06",
+      "x": 750,
+      "y": 20,
+      "width": 60,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-07",
+      "type": "text",
+      "text": "SA-07",
+      "x": 820,
+      "y": 20,
+      "width": 60,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-08",
+      "type": "text",
+      "text": "SA-08",
+      "x": 890,
+      "y": 20,
+      "width": 60,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-09",
+      "type": "text",
+      "text": "SA-09",
+      "x": 960,
+      "y": 20,
+      "width": 60,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-10",
+      "type": "text",
+      "text": "SA-10",
+      "x": 1030,
+      "y": 20,
+      "width": 60,
+      "height": 50,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-04",
+      "type": "text",
+      "text": "C-04\nCheckpointStore",
+      "x": -600,
+      "y": 200,
+      "width": 220,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-05",
+      "type": "text",
+      "text": "C-05\nMcpClient",
+      "x": -300,
+      "y": 200,
+      "width": 220,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-08",
+      "type": "text",
+      "text": "C-08\nAuditLogger",
+      "x": 0,
+      "y": 200,
+      "width": 220,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-10",
+      "type": "text",
+      "text": "C-10\nGuardEnforcer",
+      "x": 300,
+      "y": 200,
+      "width": 220,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-12",
+      "type": "text",
+      "text": "C-12\nInterruptManager",
+      "x": 600,
+      "y": 200,
+      "width": 240,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-06",
+      "type": "text",
+      "text": "C-06\nUIStreamer",
+      "x": 900,
+      "y": 200,
+      "width": 220,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-T-N1-C01",
+      "fromNode": "T-N1",
+      "fromSide": "right",
+      "toNode": "C-01",
+      "toSide": "left",
+      "label": "L0 node"
+    },
+    {
+      "id": "e-T-N2-C01",
+      "fromNode": "T-N2",
+      "fromSide": "right",
+      "toNode": "C-01",
+      "toSide": "left",
+      "label": "L0 node"
+    },
+    {
+      "id": "e-T-N3-C01",
+      "fromNode": "T-N3",
+      "fromSide": "right",
+      "toNode": "C-01",
+      "toSide": "left",
+      "label": "L0 node"
+    },
+    {
+      "id": "e-T-N4-C01",
+      "fromNode": "T-N4",
+      "fromSide": "right",
+      "toNode": "C-01",
+      "toSide": "left",
+      "label": "L0 node"
+    },
+    {
+      "id": "e-T-N5-C01",
+      "fromNode": "T-N5",
+      "fromSide": "right",
+      "toNode": "C-01",
+      "toSide": "left",
+      "label": "L0 node"
+    },
+    {
+      "id": "e-T-N6-C01",
+      "fromNode": "T-N6",
+      "fromSide": "right",
+      "toNode": "C-01",
+      "toSide": "left",
+      "label": "L0 node"
+    },
+    {
+      "id": "e-T-N7-C01",
+      "fromNode": "T-N7",
+      "fromSide": "right",
+      "toNode": "C-01",
+      "toSide": "left",
+      "label": "L0 node"
+    },
+    {
+      "id": "e-S2-C01",
+      "fromNode": "S2",
+      "fromSide": "right",
+      "toNode": "C-01",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-S3-C01",
+      "fromNode": "S3",
+      "fromSide": "right",
+      "toNode": "C-01",
+      "toSide": "left",
+      "label": "refines"
+    },
+    {
+      "id": "e-C01-C16",
+      "fromNode": "C-01",
+      "fromSide": "right",
+      "toNode": "C-16",
+      "toSide": "left",
+      "label": "TMO 协调"
+    },
+    {
+      "id": "e-M-N1-C16",
+      "fromNode": "M-N1",
+      "fromSide": "right",
+      "toNode": "C-16",
+      "toSide": "left",
+      "label": "TMO 7 节点"
+    },
+    {
+      "id": "e-M-N2-C16",
+      "fromNode": "M-N2",
+      "fromSide": "right",
+      "toNode": "C-16",
+      "toSide": "left",
+      "label": "TMO 7 节点"
+    },
+    {
+      "id": "e-M-N3-C16",
+      "fromNode": "M-N3",
+      "fromSide": "right",
+      "toNode": "C-16",
+      "toSide": "left",
+      "label": "TMO 7 节点"
+    },
+    {
+      "id": "e-M-N4-C16",
+      "fromNode": "M-N4",
+      "fromSide": "right",
+      "toNode": "C-16",
+      "toSide": "left",
+      "label": "TMO 7 节点"
+    },
+    {
+      "id": "e-M-N5-C16",
+      "fromNode": "M-N5",
+      "fromSide": "right",
+      "toNode": "C-16",
+      "toSide": "left",
+      "label": "TMO 7 节点"
+    },
+    {
+      "id": "e-M-N6-C16",
+      "fromNode": "M-N6",
+      "fromSide": "right",
+      "toNode": "C-16",
+      "toSide": "left",
+      "label": "TMO 7 节点"
+    },
+    {
+      "id": "e-M-N7-C16",
+      "fromNode": "M-N7",
+      "fromSide": "right",
+      "toNode": "C-16",
+      "toSide": "left",
+      "label": "TMO 7 节点"
+    },
+    {
+      "id": "e-C01-C02",
+      "fromNode": "C-01",
+      "fromSide": "right",
+      "toNode": "C-02",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-C02-SA",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "C-02",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-C02-SA-01",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "SA-01",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-C02-SA-02",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "SA-02",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-C02-SA-03",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "SA-03",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-C02-SA-04",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "SA-04",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-C02-SA-05",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "SA-05",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-C02-SA-06",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "SA-06",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-C02-SA-07",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "SA-07",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-C02-SA-08",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "SA-08",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-C02-SA-09",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "SA-09",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-C02-SA-10",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "SA-10",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-SA-C05",
+      "fromNode": "SA-01",
+      "fromSide": "right",
+      "toNode": "C-05",
+      "toSide": "left",
+      "label": "MCP tool"
+    },
+    {
+      "id": "e-C10-C05",
+      "fromNode": "C-10",
+      "fromSide": "right",
+      "toNode": "C-05",
+      "toSide": "left",
+      "label": "guard"
+    },
+    {
+      "id": "e-C08-C05",
+      "fromNode": "C-08",
+      "fromSide": "right",
+      "toNode": "C-05",
+      "toSide": "left",
+      "label": "audit"
+    },
+    {
+      "id": "e-C12-C02",
+      "fromNode": "C-12",
+      "fromSide": "right",
+      "toNode": "C-02",
+      "toSide": "left",
+      "label": "interrupt"
+    },
+    {
+      "id": "e-C04-S2",
+      "fromNode": "S2",
+      "fromSide": "right",
+      "toNode": "C-04",
+      "toSide": "left",
+      "label": "defines"
+    },
+    {
+      "id": "e-C06-C01",
+      "fromNode": "C-06",
+      "fromSide": "right",
+      "toNode": "C-01",
+      "toSide": "left",
+      "label": "stream"
+    }
+  ]
+}

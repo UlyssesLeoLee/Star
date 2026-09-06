@@ -1,0 +1,385 @@
+{
+  "nodes": [
+    {
+      "id": "S1",
+      "type": "text",
+      "text": "S1",
+      "x": 0,
+      "y": -400,
+      "width": 180,
+      "height": 60,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S2",
+      "type": "text",
+      "text": "S2",
+      "x": 220,
+      "y": -400,
+      "width": 180,
+      "height": 60,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S3",
+      "type": "text",
+      "text": "S3",
+      "x": 440,
+      "y": -400,
+      "width": 180,
+      "height": 60,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S4",
+      "type": "text",
+      "text": "S4",
+      "x": 660,
+      "y": -400,
+      "width": 180,
+      "height": 60,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S5",
+      "type": "text",
+      "text": "S5",
+      "x": 880,
+      "y": -400,
+      "width": 180,
+      "height": 60,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S6",
+      "type": "text",
+      "text": "S6",
+      "x": 1100,
+      "y": -400,
+      "width": 180,
+      "height": 60,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S7",
+      "type": "text",
+      "text": "S7",
+      "x": 1320,
+      "y": -400,
+      "width": 180,
+      "height": 60,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "00-design-topology",
+      "type": "text",
+      "text": "\n00 主图",
+      "x": 0,
+      "y": 0,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "01-ui-agent-view",
+      "type": "text",
+      "text": "\n01 AgentView",
+      "x": 320,
+      "y": 0,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "02-orchestration-langgraph",
+      "type": "text",
+      "text": "\n02 LangGraph",
+      "x": 640,
+      "y": 0,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "03-runtime-ecs",
+      "type": "text",
+      "text": "\n03 Runtime",
+      "x": 960,
+      "y": 0,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "04-domain-crates",
+      "type": "text",
+      "text": "\n04 Domain",
+      "x": 0,
+      "y": 150,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "05-persistence-checkpoint",
+      "type": "text",
+      "text": "\n05 Persistence",
+      "x": 320,
+      "y": 150,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "06-data-flow",
+      "type": "text",
+      "text": "\n06 DataFlow",
+      "x": 640,
+      "y": 150,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "README",
+      "type": "text",
+      "text": "\nREADME 索引",
+      "x": 960,
+      "y": 150,
+      "width": 280,
+      "height": 100,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "nodes",
+      "type": "text",
+      "text": "152 节点笔记\ndocs/wiki/docswiki/nodes/",
+      "x": 400,
+      "y": 200,
+      "width": 300,
+      "height": 100,
+      "color": "7",
+      "label": "layer=node"
+    },
+    {
+      "id": "canvases",
+      "type": "text",
+      "text": "8 .canvas 文件\ndocs/wiki/docswiki/canvas/",
+      "x": 400,
+      "y": 350,
+      "width": 300,
+      "height": 100,
+      "color": "7",
+      "label": "layer=node"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-S1-00",
+      "fromNode": "S1",
+      "fromSide": "right",
+      "toNode": "00-design-topology",
+      "toSide": "left",
+      "label": "→ 拓扑"
+    },
+    {
+      "id": "e-S2-00",
+      "fromNode": "S2",
+      "fromSide": "right",
+      "toNode": "00-design-topology",
+      "toSide": "left",
+      "label": "→ 拓扑"
+    },
+    {
+      "id": "e-S3-00",
+      "fromNode": "S3",
+      "fromSide": "right",
+      "toNode": "00-design-topology",
+      "toSide": "left",
+      "label": "→ 拓扑"
+    },
+    {
+      "id": "e-S4-00",
+      "fromNode": "S4",
+      "fromSide": "right",
+      "toNode": "00-design-topology",
+      "toSide": "left",
+      "label": "→ 拓扑"
+    },
+    {
+      "id": "e-S5-00",
+      "fromNode": "S5",
+      "fromSide": "right",
+      "toNode": "00-design-topology",
+      "toSide": "left",
+      "label": "→ 拓扑"
+    },
+    {
+      "id": "e-S6-00",
+      "fromNode": "S6",
+      "fromSide": "right",
+      "toNode": "00-design-topology",
+      "toSide": "left",
+      "label": "→ 拓扑"
+    },
+    {
+      "id": "e-S7-00",
+      "fromNode": "S7",
+      "fromSide": "right",
+      "toNode": "00-design-topology",
+      "toSide": "left",
+      "label": "→ 拓扑"
+    },
+    {
+      "id": "e-00-design-topology-nodes",
+      "fromNode": "00-design-topology",
+      "fromSide": "right",
+      "toNode": "nodes",
+      "toSide": "left",
+      "label": "refers to"
+    },
+    {
+      "id": "e-00-design-topology-canvases",
+      "fromNode": "00-design-topology",
+      "fromSide": "right",
+      "toNode": "canvases",
+      "toSide": "left",
+      "label": "paired"
+    },
+    {
+      "id": "e-01-ui-agent-view-nodes",
+      "fromNode": "01-ui-agent-view",
+      "fromSide": "right",
+      "toNode": "nodes",
+      "toSide": "left",
+      "label": "refers to"
+    },
+    {
+      "id": "e-01-ui-agent-view-canvases",
+      "fromNode": "01-ui-agent-view",
+      "fromSide": "right",
+      "toNode": "canvases",
+      "toSide": "left",
+      "label": "paired"
+    },
+    {
+      "id": "e-02-orchestration-langgraph-nodes",
+      "fromNode": "02-orchestration-langgraph",
+      "fromSide": "right",
+      "toNode": "nodes",
+      "toSide": "left",
+      "label": "refers to"
+    },
+    {
+      "id": "e-02-orchestration-langgraph-canvases",
+      "fromNode": "02-orchestration-langgraph",
+      "fromSide": "right",
+      "toNode": "canvases",
+      "toSide": "left",
+      "label": "paired"
+    },
+    {
+      "id": "e-03-runtime-ecs-nodes",
+      "fromNode": "03-runtime-ecs",
+      "fromSide": "right",
+      "toNode": "nodes",
+      "toSide": "left",
+      "label": "refers to"
+    },
+    {
+      "id": "e-03-runtime-ecs-canvases",
+      "fromNode": "03-runtime-ecs",
+      "fromSide": "right",
+      "toNode": "canvases",
+      "toSide": "left",
+      "label": "paired"
+    },
+    {
+      "id": "e-04-domain-crates-nodes",
+      "fromNode": "04-domain-crates",
+      "fromSide": "right",
+      "toNode": "nodes",
+      "toSide": "left",
+      "label": "refers to"
+    },
+    {
+      "id": "e-04-domain-crates-canvases",
+      "fromNode": "04-domain-crates",
+      "fromSide": "right",
+      "toNode": "canvases",
+      "toSide": "left",
+      "label": "paired"
+    },
+    {
+      "id": "e-05-persistence-checkpoint-nodes",
+      "fromNode": "05-persistence-checkpoint",
+      "fromSide": "right",
+      "toNode": "nodes",
+      "toSide": "left",
+      "label": "refers to"
+    },
+    {
+      "id": "e-05-persistence-checkpoint-canvases",
+      "fromNode": "05-persistence-checkpoint",
+      "fromSide": "right",
+      "toNode": "canvases",
+      "toSide": "left",
+      "label": "paired"
+    },
+    {
+      "id": "e-06-data-flow-nodes",
+      "fromNode": "06-data-flow",
+      "fromSide": "right",
+      "toNode": "nodes",
+      "toSide": "left",
+      "label": "refers to"
+    },
+    {
+      "id": "e-06-data-flow-canvases",
+      "fromNode": "06-data-flow",
+      "fromSide": "right",
+      "toNode": "canvases",
+      "toSide": "left",
+      "label": "paired"
+    },
+    {
+      "id": "e-README-nodes",
+      "fromNode": "README",
+      "fromSide": "right",
+      "toNode": "nodes",
+      "toSide": "left",
+      "label": "refers to"
+    },
+    {
+      "id": "e-README-canvases",
+      "fromNode": "README",
+      "fromSide": "right",
+      "toNode": "canvases",
+      "toSide": "left",
+      "label": "paired"
+    },
+    {
+      "id": "e-canvases-nodes",
+      "fromNode": "canvases",
+      "fromSide": "right",
+      "toNode": "nodes",
+      "toSide": "left",
+      "label": "drag"
+    }
+  ]
+}

@@ -1,0 +1,321 @@
+{
+  "nodes": [
+    {
+      "id": "S2",
+      "type": "text",
+      "text": "S2 LangGraph 02",
+      "x": -400,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "S4",
+      "type": "text",
+      "text": "S4 Runtime 02",
+      "x": 400,
+      "y": -400,
+      "width": 240,
+      "height": 80,
+      "color": "6",
+      "label": "layer=node"
+    },
+    {
+      "id": "User",
+      "type": "text",
+      "text": "User",
+      "x": -600,
+      "y": -100,
+      "width": 80,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "ChatBar",
+      "type": "text",
+      "text": "Chat Bar\n(UI)",
+      "x": -400,
+      "y": -100,
+      "width": 160,
+      "height": 80,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "API",
+      "type": "text",
+      "text": "Backend API\n(FastAPI)",
+      "x": -200,
+      "y": -100,
+      "width": 180,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-01",
+      "type": "text",
+      "text": "C-01 TopAgent\n(L0)",
+      "x": 0,
+      "y": -100,
+      "width": 200,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-02",
+      "type": "text",
+      "text": "C-02 SubAgentPool",
+      "x": 200,
+      "y": -100,
+      "width": 200,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "SA-08",
+      "type": "text",
+      "text": "SA-08\ndomain-dev",
+      "x": 400,
+      "y": -100,
+      "width": 160,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-05",
+      "type": "text",
+      "text": "C-05 McpClient",
+      "x": 600,
+      "y": -100,
+      "width": 200,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "star-mcp",
+      "type": "text",
+      "text": "star-mcp\n16 tools",
+      "x": 800,
+      "y": -100,
+      "width": 160,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-04",
+      "type": "text",
+      "text": "C-04 Checkpoint",
+      "x": 200,
+      "y": 200,
+      "width": 200,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "WS",
+      "type": "text",
+      "text": "WebSocket\nstream",
+      "x": -200,
+      "y": 200,
+      "width": 180,
+      "height": 80,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "Card",
+      "type": "text",
+      "text": "Task Card Modal",
+      "x": -400,
+      "y": 200,
+      "width": 160,
+      "height": 80,
+      "color": "4",
+      "label": "layer=node"
+    },
+    {
+      "id": "C-16",
+      "type": "text",
+      "text": "C-16 TaskOpsManager",
+      "x": 400,
+      "y": 200,
+      "width": 240,
+      "height": 80,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "M-N1",
+      "type": "text",
+      "text": "M-N1 merge",
+      "x": 400,
+      "y": 350,
+      "width": 140,
+      "height": 60,
+      "color": "5",
+      "label": "layer=node"
+    },
+    {
+      "id": "PG-checkpoints",
+      "type": "text",
+      "text": "PG-checkpoints (T)",
+      "x": 600,
+      "y": 350,
+      "width": 200,
+      "height": 60,
+      "color": "1",
+      "label": "layer=node"
+    },
+    {
+      "id": "L1-ECS",
+      "type": "text",
+      "text": "L1 ECS\n(Agent Runtime)",
+      "x": 800,
+      "y": 200,
+      "width": 200,
+      "height": 80,
+      "color": "3",
+      "label": "layer=node"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-1",
+      "fromNode": "User",
+      "fromSide": "right",
+      "toNode": "ChatBar",
+      "toSide": "left",
+      "label": "input"
+    },
+    {
+      "id": "e-2",
+      "fromNode": "ChatBar",
+      "fromSide": "right",
+      "toNode": "API",
+      "toSide": "left",
+      "label": "POST /api/top-agent/dispatch"
+    },
+    {
+      "id": "e-3",
+      "fromNode": "API",
+      "fromSide": "right",
+      "toNode": "C-01",
+      "toSide": "left",
+      "label": "invoke"
+    },
+    {
+      "id": "e-4",
+      "fromNode": "C-01",
+      "fromSide": "right",
+      "toNode": "C-02",
+      "toSide": "left",
+      "label": "spawn"
+    },
+    {
+      "id": "e-5",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "SA-08",
+      "toSide": "left",
+      "label": "sub-agent"
+    },
+    {
+      "id": "e-6",
+      "fromNode": "SA-08",
+      "fromSide": "right",
+      "toNode": "C-05",
+      "toSide": "left",
+      "label": "AuditedMcpToolNode"
+    },
+    {
+      "id": "e-7",
+      "fromNode": "C-05",
+      "fromSide": "right",
+      "toNode": "star-mcp",
+      "toSide": "left",
+      "label": "stdio/Streamable"
+    },
+    {
+      "id": "e-8",
+      "fromNode": "C-01",
+      "fromSide": "right",
+      "toNode": "C-04",
+      "toSide": "left",
+      "label": "save"
+    },
+    {
+      "id": "e-9",
+      "fromNode": "C-04",
+      "fromSide": "right",
+      "toNode": "PG-checkpoints",
+      "toSide": "left",
+      "label": "Tier 3"
+    },
+    {
+      "id": "e-10",
+      "fromNode": "C-01",
+      "fromSide": "right",
+      "toNode": "WS",
+      "toSide": "left",
+      "label": "push"
+    },
+    {
+      "id": "e-11",
+      "fromNode": "WS",
+      "fromSide": "right",
+      "toNode": "Card",
+      "toSide": "left",
+      "label": "stream"
+    },
+    {
+      "id": "e-12",
+      "fromNode": "User",
+      "fromSide": "right",
+      "toNode": "Card",
+      "toSide": "left",
+      "label": "click"
+    },
+    {
+      "id": "e-13",
+      "fromNode": "C-01",
+      "fromSide": "right",
+      "toNode": "C-16",
+      "toSide": "left",
+      "label": "TMO"
+    },
+    {
+      "id": "e-14",
+      "fromNode": "C-16",
+      "fromSide": "right",
+      "toNode": "M-N1",
+      "toSide": "left",
+      "label": "merge"
+    },
+    {
+      "id": "e-15",
+      "fromNode": "M-N1",
+      "fromSide": "right",
+      "toNode": "PG-checkpoints",
+      "toSide": "left",
+      "label": "write"
+    },
+    {
+      "id": "e-16",
+      "fromNode": "C-02",
+      "fromSide": "right",
+      "toNode": "L1-ECS",
+      "toSide": "left",
+      "label": "9 Archetype"
+    }
+  ]
+}

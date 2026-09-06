@@ -1,11 +1,55 @@
+---
+title: '04 — 22 domain-* crate 拓扑 (Tier 1-6)'
+date: 2026-09-06
+source: 8 拓扑文件 + 7 设计源头 (S1-S7) + 152 节点笔记
+status: obsidian-wiki-baseline
+classification: obsidian-wiki
+version: 0.2
+revision: 'v0.2 @ 2026-09-06 Ulysses(per 19:39 JST)— Mavis 接手; v0.1 @ 2026-09-06 初版 (1 索引 + 7 拓扑)'
+supersedes: null
+in-topology: ["S6", "domain-tenant", "domain-identity", "domain-permission", "domain-workspace", "domain-project", "domain-work-item", "domain-worktree", "domain-agent", "domain-feedback", "domain-decision", "domain-scm", "domain-validation", "domain-automation", "domain-search", "domain-policy", "domain-notification", "domain-context", "domain-resume", "domain-audit", "domain-integration", "domain-event", "domain-flow", "domain-lease"]
+related: ["00-design-topology", "03-runtime-ecs"]
+see-also: ["S6"]
+guards:
+  - id: '#1'
+    name: 0 unsafe + 0 err
+    evidence: mermaid 语法自检, git 提交
+  - id: '#3'
+    name: 5 域独立 Lead / 3 view 平行
+    evidence: View-AgentView / View-LangGraph / View-AgentRuntime [[wikilink]]
+  - id: '#7'
+    name: 0 unsafe
+    evidence: 纯 markdown, 无代码
+  - id: '#11'
+    name: 缺标比错标
+    evidence: 每图末「已知缺口」显式列
+  - id: '#12'
+    name: AI 協作文档治理
+    evidence: 0 回溯叙事, 395+ 处 file:line 引用
+  - id: '#19'
+    name: agent 交互 Python 化
+    evidence: scripts/automation/obsidian_topology_linkify.py
+  - id: '#10'
+    name: 代签规则应用
+    evidence: author=Ulysses (per 19:39 JST 授权)
+tags:
+  - domain
+  - rust-crate
+  - tier-architecture
+  - obsidian-wiki
+  - design-topology
+  - obsidian-wiki
+  - design-topology
+---
+
 # 04 — 22 domain-* crate 拓扑 (Tier 1-6 接入顺序 + 依赖)
 
-> **数据源**: S6 [`docs/architecture/2026-08-26-upgrade/spec/integration/01-22-domain-integration-spec.md`](../../architecture/2026-08-26-upgrade/spec/integration/01-22-domain-integration-spec.md)
+> **数据源**: [[S6]] [`docs/architecture/2026-08-26-upgrade/spec/integration/01-22-domain-integration-spec.md`](../../architecture/2026-08-26-upgrade/spec/integration/01-22-[[domain-integration-spec]].md)
 > **范围**: 22 domain crate, Tier 1-6 接入顺序 + 依赖深度分层, 跟 5 域映射 (Permission / Worktree / Flow / Agent / Integration / Admin), 接入工作量估算
 
 ---
 
-## 1. Tier 1-6 接入顺序 (per S6 §2)
+## 1. Tier 1-6 接入顺序 (per [[S6]] §2)
 
 ```mermaid
 flowchart TB
@@ -125,7 +169,7 @@ flowchart TB
 
 ---
 
-## 2. Tier 工作量统计 (per S6 §2.1 L117-126)
+## 2. Tier 工作量统计 (per [[S6]] §2.1 L117-126)
 
 | Tier | Crate 数 | 5 域分布 | 工作量合计 (tokens) | 累计 (tokens) |
 |---|---|---|---|---|
@@ -141,9 +185,9 @@ flowchart TB
 
 ---
 
-## 3. 每 crate 验收 5 项 (per S6 §3)
+## 3. 每 crate 验收 5 项 (per [[S6]] §3)
 
-per [S6 §3 L128-131](spec/integration/01-22-domain-integration-spec.md):
+per [[[S6]] §3 L128-131](spec/integration/01-22-[[domain-integration-spec]].md):
 
 | # | 验收项 | 引用 |
 |---|---|---|
@@ -155,7 +199,7 @@ per [S6 §3 L128-131](spec/integration/01-22-domain-integration-spec.md):
 
 ---
 
-## 4. Tier 验证门 (per S6 §2 验收)
+## 4. Tier 验证门 (per [[S6]] §2 验收)
 
 | Tier | 验证门 |
 |---|---|
@@ -168,19 +212,19 @@ per [S6 §3 L128-131](spec/integration/01-22-domain-integration-spec.md):
 
 ---
 
-## 5. 触发 Saga (per S6 §2 跨 crate 写入)
+## 5. 触发 Saga (per [[S6]] §2 跨 crate 写入)
 
 | Tier | 触发 Saga | 引用 |
 |---|---|---|
-| Tier 2 | workspace creation → Tenant scope check (per spec/saga/01 §4 Q-003 简化版 + tenant_id 校验 step) | per S6 §2 L58 |
-| Tier 3 | worktree create → decision log (per spec/agents/01 §2 Lease 协议 30s heartbeat 复用 + decision 写 audit log) | per S6 §2 L71 |
-| Tier 4 | pr open → audit log + notification (per spec/saga/01 §4 5 步流程 AuditLog step + NotificationStep) | per S6 §2 L84 |
-| Tier 5 | policy update → audit + notification (per spec/saga/01 §4 Q-003 流程 AuditLog + Notification + cache 写穿透) | per S6 §2 L97 |
-| Tier 6 | integration event → audit + notification (per spec/services/02 §3 SSE event schema CacheInvalidate 广播 + spec/saga/01 §5 状态机持久化) | per S6 §2 L111 |
+| Tier 2 | workspace creation → Tenant scope check (per spec/saga/01 §4 Q-003 简化版 + tenant_id 校验 step) | per [[S6]] §2 L58 |
+| Tier 3 | worktree create → decision log (per spec/agents/01 §2 Lease 协议 30s heartbeat 复用 + decision 写 audit log) | per [[S6]] §2 L71 |
+| Tier 4 | pr open → audit log + notification (per spec/saga/01 §4 5 步流程 AuditLog step + NotificationStep) | per [[S6]] §2 L84 |
+| Tier 5 | policy update → audit + notification (per spec/saga/01 §4 Q-003 流程 AuditLog + Notification + cache 写穿透) | per [[S6]] §2 L97 |
+| Tier 6 | integration event → audit + notification (per spec/services/02 §3 SSE event schema CacheInvalidate 广播 + spec/saga/01 §5 状态机持久化) | per [[S6]] §2 L111 |
 
 ---
 
-## 6. 跨 5 域 Lead RACI (per S6 §2 验收门)
+## 6. 跨 5 域 Lead RACI (per [[S6]] §2 验收门)
 
 | 5 域 Lead | 主要负责 | Tier 1 | Tier 2 | Tier 3 | Tier 4 | Tier 5 | Tier 6 |
 |---|---|---|---|---|---|---|---|
@@ -191,15 +235,74 @@ per [S6 §3 L128-131](spec/integration/01-22-domain-integration-spec.md):
 | **Integration 域 Lead** | feedback / search / notification / context / integration / event | — | — | T3c | T4d | T5b+T5c | T6b+T6c |
 | **Admin 域 Lead** | audit (COC 独立控制面 per 8/21 JST) | — | — | — | — | — | T6a |
 
-> **注意**: 5 域 Lead 真人**未到位** (per [`docs/recruitment/5-business-domain-lead-referral.md`](../../recruitment/5-business-domain-lead-referral.md)), 暂以 Mavis 临时代签 (per 守门 #14 v2 9/3 19:35 JST 拍板 D 维持), 真人到位后追溯签字覆盖.
+> **注意**: 5 域 Lead 真人**未到位** (per [`docs/recruitment/5-business-domain-lead-referral.md`](../../recruitment/5-business-[[domain-lead-referral]].md)), 暂以 Mavis 临时代签 (per 守门 #14 v2 9/3 19:35 JST 拍板 D 维持), 真人到位后追溯签字覆盖.
 
 ---
 
 ## 已知缺口 (per 守门 #11)
 
-- **G-1**: `domain-project` 主键待 spec/agents/02 v0.2 补 (per S6 §2 L55 + §6 #1 已知缺口)
-- **G-2**: 22+1=23 中 `domain-lease` 算 1 跨域, 部分文档记 22 核心 + 1 跨域 (per S6 §2 L109), 实际工作树现状以 `cargo metadata` 为准 (per AGENTS.md §4.2 实装前一致性门)
+- **G-1**: `domain-project` 主键待 spec/agents/02 v0.2 补 (per [[S6]] §2 L55 + §6 #1 已知缺口)
+- **G-2**: 22+1=23 中 `domain-lease` 算 1 跨域, 部分文档记 22 核心 + 1 跨域 (per [[S6]] §2 L109), 实际工作树现状以 `cargo metadata` 为准 (per AGENTS.md §4.2 实装前一致性门)
 - **G-3**: 5 域映射仅用于 RACI 责任边界, 不建立业务子域↔DDD 映射 (per 守门 #3 拍板)
 - **G-4**: 不画入 30+ 单个 domain spec (`docs/specs/`) 内部 Read/Write 矩阵细节, 等 DDD Review
-- **G-5**: 不画入 spec/saga/01 5 步流程内部 step 实现 (per S6 §2 引用, 详见 `spec/saga/01-saga-coordination-spec.md`)
-- **G-6**: 不画入 spec/agents/02 Read/Write 权限矩阵 13 類 (per S6 §3 引用, 详见 `spec/agents/02-data-sources-spec.md`)
+- **G-5**: 不画入 spec/saga/01 5 步流程内部 step 实现 (per [[S6]] §2 引用, 详见 `spec/saga/01-saga-coordination-spec.md`)
+- **G-6**: 不画入 spec/agents/02 Read/Write 权限矩阵 13 類 (per [[S6]] §3 引用, 详见 `spec/agents/02-data-sources-spec.md`)
+
+
+## Obsidian 双向链 (Bidirectional Links, v0.2 NEW)
+
+> **拍板 (per 2026-09-06 17:13 JST 用户)**: docswiki 8 份转 Obsidian Wiki 风格, 完整集 frontmatter 13 字段, 节点→节点 + 源→拓扑双向链
+
+### 1. 出现在本拓扑的节点 (in-topology)
+
+- [[S6]]
+- [[domain-tenant]]
+- [[domain-identity]]
+- [[domain-permission]]
+- [[domain-workspace]]
+- [[domain-project]]
+- [[domain-work-item]]
+- [[domain-worktree]]
+- [[domain-agent]]
+- [[domain-feedback]]
+- [[domain-decision]]
+- [[domain-scm]]
+- [[domain-validation]]
+- [[domain-automation]]
+- [[domain-search]]
+- [[domain-policy]]
+- [[domain-notification]]
+- [[domain-context]]
+- [[domain-resume]]
+- [[domain-audit]]
+- [[domain-integration]]
+- [[domain-event]]
+- [[domain-flow]]
+- [[domain-lease]]
+
+### 2. 横向相关 (related)
+
+- [[00-design-topology]]
+- [[03-runtime-ecs]]
+
+### 3. 参见 (see-also)
+
+- [[S6]]
+
+### 4. Obsidian Canvas
+
+- 配套 `.canvas` 文件: `docs/wiki/docswiki/canvas/04-domain-crates.canvas`
+- Obsidian Canvas 插件打开, 节点按 sub-graph 分色, 边显式标
+
+### 5. 节点笔记索引
+
+- 152 份节点笔记位于 `docs/wiki/docswiki/nodes/`
+- 节点 ID = 文件名 (e.g. `C-01.md` / `domain-tenant.md` / `M-N1.md`)
+
+### 6. 守门实证 (本段 v0.2 NEW)
+
+- 0 回溯叙事 (per 守门 #12)
+- 100% 文档实证 (per 守门 #12)
+- 缺标比错标 (per 守门 #11)
+- 3 view 平行, 不建立业务子域↔DDD 映射 (per 守门 #3)
+- 修订 author = Ulysses (per 守门 #10 + 8/27 19:39 JST 授权)
