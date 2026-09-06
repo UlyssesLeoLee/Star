@@ -21,6 +21,12 @@ import type { Config } from "tailwindcss";
 // =====================================================================
 
 const config: Config = {
+  // next-themes drives <html class="dark|light"> with enableSystem=false
+  // (per ThemeProvider.tsx) — darkMode must key off that class, not OS
+  // prefers-color-scheme (Tailwind's 'media' default), or dark: variants
+  // (e.g. CATEGORY_STYLES in lib/nav/registry.ts) silently desync from the
+  // in-app theme and render the wrong light/dark color pairing.
+  darkMode: "class",
   content: ["./src/**/*.{ts,tsx,mdx}", "./e2e/**/*.{ts,tsx}"],
   theme: {
     extend: {
