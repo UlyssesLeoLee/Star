@@ -1,10 +1,10 @@
 # PHASE-MAINTENANCE-SCRIPTS-IMPL-REPORT
 
-> **Phase**: Maintenance Scripts 集中化 + 实际验证修复 + hydration 全面修复
-> **Period**: 2026-09-06 13:21 JST ~ 20:14 JST
+> **Phase**: Maintenance Scripts 集中化 + 实际验证修复 + hydration 全面修复 + nav 统一已知缺口
+> **Period**: 2026-09-06 13:21 JST ~ 20:25 JST
 > **Branch**: `feat/auto-20260906-3b4aed04`
-> **Commits**: `d61a8f0`, `1618dea`, `bc5eb88`, `61acf5e`, `c9c36dc`, `a35eb94`, `e026a20` (merge main), `a7e6f47`, `fc075fd`
-> **Status**: 🟢 Phase Closed (3/3 套脚本 + 3 个 hydration bug 全修 + merge main 同步)
+> **Commits**: `d61a8f0`, `1618dea`, `bc5eb88`, `61acf5e`, `c9c36dc`, `a35eb94`, `e026a20` (merge main), `a7e6f47`, `fc075fd`, `ea945e9`
+> **Status**: 🟡 Phase Soft-closed (3/3 套脚本 + 3 个 hydration bug 全修, G10 nav 统一延后)
 
 ---
 
@@ -190,6 +190,7 @@ if (!mounted) return <safe-fallback/>;
 | G7 | helm.exe 在 WinGet 包目录 (版本号路径), 不在常规位置 (per 9/6 18:48 JST 实证) | 脚本要 hard-code 4 个候选 + user PATH 扫 | 已修: Resolve-HelmExe 函数 (commit 61acf5e) |
 | G8 | Windows PATH 限制 2047 字符, user PATH 超长末尾被截断 (per 9/6 18:48 JST 实证 user PATH 2204 → 截断) | G7 间接修复: ensure helm 走绝对路径, 不依赖 shell PATH | 已规避 (commit 61acf5e) |
 | G9 | MiniMax Code 等长驻进程不重读注册表, child 进程拿不到新 user PATH (per 9/6 18:48 JST 实证) | 即使修 user PATH 也无效, 必须重启宿主 | 外部问题, 报告加 G9 标 N/A |
+| G10 | 顶部 nav 跨 page 不统一 (per 9/6 20:24 JST 实证): (a) /inbox 走 (app) 路由组 → 有 AppHeader, 溢出 1440px 右边界; (b) /projects /agent-view /audit 30+ 根目录 page → 没 AppHeader; (c) AppHeader 是否 render 取决于 (app) 路由组, 不在 root layout, 任何 page-level nav 改动都要分两条路走 | 影响: 各 page 视觉/交互不一致, active 高亮不同步, 跨 page 难做统一快捷键 | 后续 DDD Review 阶段: 选项 A 全量统一 (30+ page 迁 + AppHeader 修溢出) 估 1-2h, 选项 B 保留 (app) 只修溢出 30min, 9/6 20:24 JST 用户拍板先不干 |
 
 ---
 
@@ -245,4 +246,5 @@ if (!mounted) return <safe-fallback/>;
 | v0.2 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 第二轮回归 R1'/R2'/R3': 修 2 个真 bug (smart pull + ensure helm), 加 G7-G9 已知缺口, §2.5 新增 | 2026-09-06 19:09 JST 完成 commit 61acf5e + R2''/R3' 实测后落档 |
 | v0.3 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 第三轮修复: /agent-view hydration mismatch (commit a35eb94), §2.6 新增, 衍生守门 ("typeof window 改 useState mounted 模式") | 2026-09-06 19:26 JST 完成 in-app browser 实证 + commit a35eb94 后落档 |
 | v0.4 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 第四轮: merge main (5 ahead commit) + 全仓 hydration 扫描 (81 处, 1 真风险修 / 4 false alarm 排除) + commit a7e6f47 + fc075fd, §2.7 新增, 3 次 hydration 修复统一模板 | 2026-09-06 20:14 JST 完成 in-app browser 实证 + commit fc075fd 后落档 |
-| (后续) | (待 SRE Lead / 5 域 Lead 到位) | G1-G5 缺口补完后 v0.5 | 拍板 Dockerfile + chart 模板后 |
+| v0.5 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 第五轮: nav 统一讨论, 用户拍板先不干, 加 G10 已知缺口 (AppHeader 路由组不一致 + 溢出) | 2026-09-06 20:25 JST in-app browser 截图 + 4 选项拍板后落档 |
+| (后续) | (待 SRE Lead / 5 域 Lead / DDD Review) | G1-G5 + G10 缺口补完后 v0.6 | 拍板 Dockerfile + chart + nav 统一后 |
