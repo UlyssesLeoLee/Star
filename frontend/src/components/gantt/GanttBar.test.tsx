@@ -25,11 +25,16 @@ describe("GanttBar", () => {
       status: Parameters<typeof GanttBar>[0]["item"]["status"];
       expected: string;
     }> = [
-      { status: "todo", expected: "rgb(110, 118, 129)" },        // #6e7681
-      { status: "in_progress", expected: "rgb(47, 129, 247)" },  // #2f81f7
-      { status: "done", expected: "rgb(63, 185, 80)" },          // #3fb950
-      { status: "blocked", expected: "rgb(248, 81, 73)" },       // #f85149
-      { status: "review", expected: "rgb(210, 153, 34)" },       // #d29922
+      { status: "todo", expected: "var(--ink-mute, #475569)" },
+      { status: "in_progress", expected: "var(--info-DEFAULT, #58a6ff)" },
+      { status: "done", expected: "var(--ok-DEFAULT, #10b981)" },
+      { status: "blocked", expected: "var(--err-DEFAULT, #ff3366)" },
+      { status: "review", expected: "var(--warn-DEFAULT, #f59e0b)" },
+      // per DRIFT-α-017: active/planned 原硬编码与 StatusPill (sprint/page.tsx:628
+      // 渲染同一个 SprintStatus 字段) 不一致, 已修正 — 这两条锁定修正后的值
+      { status: "active", expected: "var(--ok-DEFAULT, #10b981)" },
+      { status: "planned", expected: "var(--info-DEFAULT, #58a6ff)" },
+      { status: "cancelled", expected: "var(--ink-mute, #475569)" },
     ];
 
     for (const { status, expected } of statuses) {
@@ -45,7 +50,7 @@ describe("GanttBar", () => {
       const el = container.querySelector('[data-testid="gantt-bar"]') as HTMLElement;
       expect(el, `bar for status=${status} should render`).toBeTruthy();
       expect(el.dataset.barStatus).toBe(status);
-      // jsdom normalizes color to rgb()
+      // per DRIFT-α-017: 引用 theme.css 语义色变量而非硬编码 hex, jsdom 不解析 var()
       expect(el.style.backgroundColor).toBe(expected);
       unmount();
     }
@@ -63,7 +68,7 @@ describe("GanttBar", () => {
       />,
     );
     const el = container.querySelector('[data-testid="gantt-bar"]') as HTMLElement;
-    expect(el.style.backgroundColor).toBe("rgb(248, 81, 73)"); // #f85149
+    expect(el.style.backgroundColor).toBe("var(--err-DEFAULT, #ff3366)");
     expect(el.dataset.barCritical).toBe("true");
   });
 

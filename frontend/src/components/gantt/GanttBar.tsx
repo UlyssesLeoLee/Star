@@ -7,16 +7,26 @@
 // 因为 HTML5 native drag 的 ghost image 限制难以做到 "拖动时实时改 style.left"
 // (per W2 任务 §1 GanttBar "拖动时实时改 `style.left/style.width`")
 //
-// 颜色按 status (per W2 任务):
-//   todo        -> 灰 #6e7681
-//   in_progress -> 蓝 #2f81f7
-//   done        -> 绿 #3fb950
-//   blocked     -> 红 #f85149
-//   review      -> 黄 #d29922
-//   active      -> 蓝 (sprint active 复用)
-//   completed   -> 绿 (sprint completed 复用)
-//   planned     -> 灰
-//   cancelled   -> 黑
+// 颜色按 status (per W2 任务, per DRIFT-α-017 修复 2026-09-06: 硬编码 hex 改
+// 引用 theme.css 语义色变量, 与 StatusPill 同源, 随亮暗主题联动。categories 逐个
+// 对照 StatusPill.tsx 的 COLOR map 核实, 非猜测; 2 处原硬编码与 StatusPill 不一致,
+// 已按 StatusPill 修正 (sprint/page.tsx:628 用 <StatusPill value={sprint.status}/>
+// 渲染同一份 SprintStatus 字段, 是可验证的现存不一致, 非臆测):
+//   todo        -> 灰   var(--ink-mute)    (= StatusPill todo)
+//   in_progress -> 蓝   var(--info-DEFAULT) (= StatusPill in_progress)
+//   done        -> 绿   var(--ok-DEFAULT)   (StatusPill 无 done key, 比照 completed/resolved)
+//   blocked     -> 红   var(--err-DEFAULT)  (= StatusPill blocked)
+//   review      -> 黄   var(--warn-DEFAULT) (= StatusPill review_required)
+//   active      -> 绿 (SprintStatus, = StatusPill active; 原硬编码复用 in_progress 蓝是 bug, 已修正)
+//   completed   -> 绿 (SprintStatus, = StatusPill completed)
+//   planned     -> 蓝 (SprintStatus, = StatusPill planned; 原硬编码灰是 bug, 已修正)
+//   cancelled/wontfix -> 灰 (= StatusPill cancelled/wontfix)
+//
+// active/completed 同为绿 (StatusPill 本身也是这样, 靠 pill 里的文字区分):
+// StatusPill 永远和状态文字一起渲染, GanttBar 条内默认只显示 item.label
+// (sprint 名, 不是状态), 且时间线没有 "today" 参照线, 纯拖同色会真分不清 —
+// 所以 variant="sprint" 的条追加 " · <status>" 文字后缀兜底 (溢出走已有的
+// ellipsis, 不影响短名字), milestone/work-item 条不动 (空间不够/未走此配色)。
 // =====================================================================
 
 import { useState, useRef, useCallback } from "react";
@@ -24,10 +34,7 @@ import { addDays, differenceInDays, format, parseISO } from "date-fns";
 import toast from "react-hot-toast";
 import type { WorkItemStatus, SprintStatus } from "@/types/ids";
 
-export type GanttBarStatus =
-  | WorkItemStatus
-  | SprintStatus
-  | "active" /* sprint 状态 alias, 与 in_progress 同色 */;
+export type GanttBarStatus = WorkItemStatus | SprintStatus;
 
 export interface GanttBarItem {
   id: string;
@@ -54,17 +61,20 @@ export interface GanttBarProps {
   onCheckConflict?: (newStart: string, newEnd: string) => string | null;
 }
 
+// fallback 值取自 theme.css .dark 块 (per DRIFT-α-017 修复) — var() 未定义时
+// (理论上不会发生, 但避免 invalid var() 无 fallback 导致 background-color
+// 在 computed-value 阶段整体失效, bar 变透明) 兜底成同色系而非默认蓝
 const STATUS_COLOR: Record<string, string> = {
-  todo: "#6e7681",
-  in_progress: "#2f81f7",
-  done: "#3fb950",
-  blocked: "#f85149",
-  review: "#d29922",
-  wontfix: "#30363d",
-  active: "#2f81f7",
-  completed: "#3fb950",
-  planned: "#6e7681",
-  cancelled: "#30363d",
+  todo: "var(--ink-mute, #475569)",
+  in_progress: "var(--info-DEFAULT, #58a6ff)",
+  done: "var(--ok-DEFAULT, #10b981)",
+  blocked: "var(--err-DEFAULT, #ff3366)",
+  review: "var(--warn-DEFAULT, #f59e0b)",
+  wontfix: "var(--ink-mute, #475569)",
+  active: "var(--ok-DEFAULT, #10b981)",
+  completed: "var(--ok-DEFAULT, #10b981)",
+  planned: "var(--info-DEFAULT, #58a6ff)",
+  cancelled: "var(--ink-mute, #475569)",
 };
 
 const STATUS_TEXT: Record<string, string> = {
@@ -218,7 +228,7 @@ export function GanttBar(props: GanttBarProps) {
   // milestone 用菱形 (CSS clip-path) — 视觉区别
   // (isMilestone 已在 useCallback 之前声明, 见上行)
 
-  const bg = isCritical ? "#f85149" : (STATUS_COLOR[item.status] ?? "#6e7681");
+  const bg = isCritical ? "var(--err-DEFAULT, #ff3366)" : (STATUS_COLOR[item.status] ?? "var(--ink-mute, #475569)");
   const text = STATUS_TEXT[item.status] ?? String(item.status);
 
   const isDragging = isDraggingRef.current || dragDelta !== 0 || resizeWidth !== 0;
@@ -339,7 +349,7 @@ export function GanttBar(props: GanttBarProps) {
         />
       )}
       <span style={isMilestone ? { display: "block", transform: "rotate(-45deg)" } : undefined}>
-        {item.label}
+        {variant === "sprint" ? `${item.label} · ${text}` : item.label}
       </span>
     </div>
   );

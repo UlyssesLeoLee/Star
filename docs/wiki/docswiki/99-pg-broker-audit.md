@@ -7,7 +7,7 @@ classification: obsidian-wiki
 version: 0.2
 revision: 'v0.2 @ 2026-09-06 Ulysses(per 19:39 JST)— Mavis 接手; v0.1 @ 2026-09-06 初版 (1 索引 + 7 拓扑)'
 supersedes: null
-in-topology: ["S4", "S5", "S6", "star-mcp", "star-dispatcher", "star-context", "star-saga", "star-sa", "star-cli", "star-api-rest", "star-cache", "star-credential", "star-treesitter", "star-sse", "star-webhook", "star-taskgraph", "star-vcs", "star-dto", "api", "application", "infrastructure", "domain-dispatcher-design", "domain-llm-design", "domain-mcp-design", "domain-tool-design", "domain-rag-design", "domain-memory-design", "domain-rate-limiter-design", "domain-observability-design"]
+in-topology: ["S4", "S5", "S6", "star-mcp", "star-dispatcher", "star-context", "star-saga", "star-sa", "star-cli", "star-api-rest", "star-cache", "star-credential", "star-treesitter", "star-sse", "star-webhook", "star-taskgraph", "star-vcs", "star-dto", "api", "application", "infrastructure", "domain-dispatcher-design", "domain-llm-design", "domain-mcp-design", "domain-tool-design", "domain-rag-design", "domain-context-design", "domain-memory-design", "domain-rate-limiter-design", "domain-observability-design"]
 related: ["04-domain-crates", "99-docswiki-vs-pgwiki-diff", "99-verifier-report"]
 see-also: ["S4", "S5"]
 guards:
@@ -42,6 +42,9 @@ tags:
   - obsidian-wiki
   - design-topology
 ---
+
+
+
 
 
 
@@ -282,6 +285,9 @@ tags:
 
 
 
+
+
+
 ## Obsidian 双向链 (Bidirectional Links, v0.2 NEW)
 
 > **拍板 (per 2026-09-06 17:13 JST 用户)**: docswiki 8 份转 Obsidian Wiki 风格, 完整集 frontmatter 13 字段, 节点→节点 + 源→拓扑双向链
@@ -314,6 +320,7 @@ tags:
 - [[domain-mcp-design]]
 - [[domain-tool-design]]
 - [[domain-rag-design]]
+- [[domain-context-design]]
 - [[domain-memory-design]]
 - [[domain-rate-limiter-design]]
 - [[domain-observability-design]]

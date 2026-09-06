@@ -10,9 +10,20 @@
 //      缺失: Workspace / Members / Permissions / Runtimes / Skills (P2)
 //   4. left sidebar 嵌套导航 P2
 //   5. light mode (per §7) P3
+//
+// per DRIFT-α-007 修复 (2026-09-06): 原实现完全不读 URL ?tab= (硬编码
+// useState("profile")), 导致 /permission /identity /tenant /integration
+// 等 legacy redirect 及任何 /settings?tab=X 深链无论目标为何一律静默落
+// 在 Profile. 现直接从 searchParams 派生 tab (与 sprint/page.tsx 的
+// view 派生同款, 不用 useState 镜像 URL — 避免浏览器前进/后退时 URL
+// 已变但本地 state 未变的脱节), 命中已实装 5 tab 之一时正确深链;
+// 未实装的 4 个目标 (permissions/members/workspace/integrations, 见上
+// 已知缺口 #3) 仍落 Profile — 这些 tab 本身不存在, 不在本次 UX 修复范围
+// (P2 功能缺口, 非路由 wiring bug).
 // =====================================================================
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { Tabs, type TabItem } from "@/components/Tabs";
 import { Settings, User, Users, CreditCard, Key } from "lucide-react";
@@ -90,9 +101,23 @@ function SimpleForm({ fields, onSave }: {
   );
 }
 
-export default function SettingsPage() {
+function isSettingsTab(v: string | null): v is SettingsTab {
+  return v != null && (TAB_IDS as ReadonlyArray<string>).includes(v);
+}
+
+function SettingsPageInner() {
   const { t, language } = useTranslation();
-  const [tab, setTab] = useState<SettingsTab>("profile");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // per DRIFT-α-007: tab 直接从 URL 派生, 深链优先读 ?tab=, 未命中已实装 tab 时落 profile
+  const rawTab = searchParams.get("tab");
+  const tab: SettingsTab = isSettingsTab(rawTab) ? rawTab : "profile";
+  const setTab = (id: SettingsTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", id);
+    router.push(`${pathname}?${params.toString()}`);
+  };
   // v0.6 (per 2026-09-05 拍板 C): tab label 走 i18n
   const TABS: ReadonlyArray<TabItem> = TAB_IDS.map((id) => ({
     id,
@@ -180,5 +205,20 @@ export default function SettingsPage() {
         </ul>
       </div>
     </div>
+  );
+}
+
+// Default export — wrapper with Suspense (per Next.js useSearchParams 要求, 与 sprint/page.tsx 同款)
+export default function SettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-6 text-ink-mute text-sm" data-testid="settings-page-loading">
+          加载 Settings...
+        </div>
+      }
+    >
+      <SettingsPageInner />
+    </Suspense>
   );
 }

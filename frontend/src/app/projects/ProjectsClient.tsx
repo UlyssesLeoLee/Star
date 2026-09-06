@@ -43,6 +43,7 @@
 // =====================================================================
 
 import { useMemo, useState, useCallback, useEffect } from "react";
+import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { useNavStore } from "@/lib/nav/navStore";
 import { PageHeader, SectionTitle, Stat } from "@/components/PageHeader";
@@ -118,6 +119,14 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   const reorderBoardColumns = useStore((s) => s.reorderBoardColumns);
   const changeSets = useStore((s) => s.changeSets);
   const worktrees = useStore((s) => s.worktrees);
+  // per DRIFT-α-009 修复 (2026-09-06): /canvas/:id 详情页可达但无入口 —
+  // 唯一原生入口 /collaboration 已被 legacy redirect 指向本页 (per redirects.ts),
+  // 但 /collaboration 的 canvas gallery 内容并未随之迁移过来。canvas/page.tsx 亦
+  // 无 index route (仅 [id]), 且 canvas 从未加入 nav registry (ALL_MODULES),
+  // 故当前无法从任何导航路径发现一个具体 canvas id。
+  // 用 ref_kind === "project" 关联当前 project 的 canvas (seed 数据里 canvas-001
+  // 实际关联 prj-physis, 验证过这不是空跑) 补一个可达链接。
+  const canvases = useStore((s) => s.canvases);
   const repositories = useStore((s) => s.repositories);
   const pullRequests = useStore((s) => s.pullRequests);
   const transitionWorkItem = useStore((s) => s.transitionWorkItem);
@@ -188,6 +197,11 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
   const projectWorktrees = useMemo(
     () => worktrees.filter((w) => w.project_id === selectedProjectId),
     [worktrees, selectedProjectId],
+  );
+  // per DRIFT-α-009 修复: 当前 project 关联的 canvas (ref_kind === "project")
+  const projectCanvases = useMemo(
+    () => canvases.filter((c) => c.ref_kind === "project" && c.ref_id === selectedProjectId),
+    [canvases, selectedProjectId],
   );
   // 任务依赖关系 (per MS Project task link, 2026-08-29 17:33 JST)
   // 过滤: from_id / to_id 是本项目的 work_item / sprint / milestone
@@ -620,6 +634,24 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
         <div data-testid="projects-worktrees-tab" className="space-y-2">
           <DomainMarker domain="admin" label="admin 域 (RBAC/permission/tenant)" />
           <div className="text-xs font-mono text-ink-mute">Worktrees — per project_id 过滤 ({projectWorktrees.length} 总数)</div>
+          {projectCanvases.length > 0 && (
+            <div
+              data-testid="project-canvas-links"
+              className="flex flex-wrap items-center gap-2 text-[10px] font-mono"
+            >
+              <span className="text-ink-mute">Canvas:</span>
+              {projectCanvases.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/canvas/${c.id}`}
+                  data-testid={`project-canvas-link-${c.id}`}
+                  className="text-accent hover:underline"
+                >
+                  {c.title || c.id}
+                </Link>
+              ))}
+            </div>
+          )}
           {projectWorktrees.length === 0 ? (
             <div className="text-xs text-ink-mute italic">(no worktrees)</div>
           ) : (

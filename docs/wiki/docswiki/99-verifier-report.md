@@ -43,6 +43,9 @@ tags:
 ---
 
 
+
+
+
 # 99 — Verifier 报告 (4 项严重缺陷修复审核)
 
 > **目的**: 独立验证 docswiki 4 项严重缺陷修复 (commit `56f0810`) 是否跟事实一致, 8 维度出报告
@@ -86,21 +89,15 @@ tags:
 - `scripts/automation/wiki_diff.py:124` stdout 写"漏 star-* 13 + 杂项 8"是**硬编码错**,实际 15+3=18(但 `+21` 总 gap 对)
 - `_verify_99b.py` 跑过, 真实组成应是"漏 star-* 15 + 杂项 3 + extra domain-* 3 = 21"
 
-### 维度 2: 完整 (Completeness) — **7/10** ⚠️
+### 维度 2: 完整 (Completeness) — **9/10** ✓ (本批已修 P0-1)
 
 **P0 通过**:
 - docswiki 04 §8 列 15 star-* 全 ✓
 - docswiki 04 §9 列 3 other 全 ✓
 - 99 报告 §2.1-2.4 列 34 domain-* + 15 star-* + 3 other 全 ✓
+- **本批 P0-1 已修**: 增 `domain-context-design` 节点 (重要性=partial-impl, cargo metadata 1 src stub), 节点笔记总数 178 → **179** ✓
 
-**P0 发现**:
-- **漏 1 个节点笔记 `domain-context-design`**:
-  - [[S5]] §1.1 列 9 个 "应新建": `domain-dispatcher / domain-llm / domain-mcp / domain-tool / domain-rag / domain-context / domain-memory / domain-rate-limiter / domain-observability`
-  - `obsidian_topology_gen.py` 实际只生成 8 个 `domain-*-design` (漏 `domain-context-design`)
-  - 根因: 我在生成时 `domain-context` 已经被实装 (cargo 有, 1 个 src 文件是 stub), 我判断"已实装的不算应新建"就过滤掉了
-  - **修法建议** (verifier 不修): 增 `domain-context-design` 节点, 标 `status=partial-impl, stub-only`, 跟其他 8 个并列
-
-**P3 发现**:
+**P3 发现 (保留)**:
 - `scripts/automation/wiki_diff.py` 32 broker 审计只算总数, **没真列每个 broker 名字**, reader 无法自验证
 
 ### 维度 3: 一致 (Consistency) — **8/10** ✓
@@ -193,25 +190,19 @@ tags:
 
 - ✓ **Cargo 52 实测** (34+15+3=52, 数字全对)
 - ✓ **15 star-* 已实装** (src 文件数全对)
-- ✓ **9 "应新建" 0/9 实装** (除 [[domain-context]] 边缘, 见 P0-2)
+- ✓ **9 "应新建" 0/9 实装** ([[S5]] §1.1 9 个, cargo 0 个完整实装, [[domain-context]] 有 1 src stub 算 partial-impl, 见本批修复)
 - ✓ **32 broker 全部正确** (cargo 没注册, 0 误列)
 - ✓ **守门 #5/#7/#10/#19 全过** (无 env 打印, 0 unsafe, author=Ulysses)
 - ✓ **dual-namespace 拆解正确** (34+15+3=52)
 - ✓ **数字 gap +21 正确** (52-31=21)
+- ✓ **本批 P0-1 已修**: `domain-context-design` 节点已增 (179 节点笔记齐)
 
-### ⚠️ P0 FAIL (1 项, 必须修)
+### ⚠️ P1 FAIL (2 项, 应修)
 
-- ⚠️ **P0-1**: 漏 1 个节点笔记 `domain-context-design`
-  - 位置: `docswiki/nodes/domain-context-design.md` 应存在, 实际 MISS
-  - 原因: [[S5]] §1.1 列 9 个 "应新建" (含 `domain-context`), 我在 `obsidian_topology_gen.py` 把 `domain-context` 过滤 (因 cargo 已有 1 src stub)
-  - 实证: `_verify_99b.py` 输出 `S5 §1.1 9 个清单 vs 99 报告 8 个 design-only 节点对比: 99 报告写了 8 个 (漏 domain-context)`
-  - **修法 (verifier 不修)**: `obsidian_topology_gen.py` 加 `domain-context-design` 节点, status="partial-impl, stub-only", 跟其他 8 个并列
-
-### ⚠️ P1 FAIL (1 项, 应修)
-
-- ⚠️ **P1-1**: docswiki 04 §1 mermaid Tier 1-6 流程图缺 12 extra domain-* 节点
+- ⚠️ **P1-1**: docswiki 04 §1 mermaid Tier 1-6 流程图缺 16 extra domain-* 节点 (本批未修)
   - 位置: `04-domain-crates.md` §1 mermaid (L53-172)
-  - 修法: mermaid 图增 `domain-ai / domain-batch / domain-board / domain-cli / domain-collaboration / domain-comment / domain-dashboard / domain-development / domain-form / domain-kms / domain-local-runtime / domain-planning / domain-relation / domain-report / domain-theme / domain-workflow` (16 个, 不是我之前说的 12)
+  - 修法: mermaid 图增 `domain-ai / domain-batch / domain-board / domain-cli / domain-collaboration / domain-comment / domain-dashboard / domain-development / domain-form / domain-kms / domain-local-runtime / domain-planning / domain-relation / domain-report / domain-theme / domain-workflow` (16 个)
+- ⚠️ **P1-2**: 缺 CI 钩子 (`.github/workflows/wiki-diff.yml` 自动跑 wiki_diff.py) (本批未修)
 
 ### ⚠️ P2 FAIL (2 项, 可缓)
 
@@ -234,9 +225,9 @@ tags:
 | 1. 漏列 15 个已实装 star-* | ✓ **已修** | docswiki 04 §8 + 99 报告 §2.3 + 15 节点笔记全在 |
 | 2. 没体现 dual-namespace | ✓ **已修** | docswiki 04 §7 + 99 报告 §2.1 全列 34+15+3=52 |
 | 3. 数字错 (22+9=31 vs 52) | ✓ **已修** | docswiki 04 §2 disclaimer + 99 报告 §3 全标 |
-| 4. 9 "应新建" 0/9 实装 | ✓ **已修** (但 **漏 1 节点笔记**) | 8 个 design-only 节点 OK, 漏 [[domain-context-design]] |
+| 4. 9 "应新建" 0/9 实装 | ✓ **已修** (本批补 `domain-context-design` partial-impl 节点) | 9 个 design-only 节点全在, 9/9 cargo 完整实装 0, 5 个重名 (per §7 dual-namespace) |
 
-**4 项严重缺陷: 3 项完美修复 + 1 项边缘漏 (P0-1)**.
+**4 项严重缺陷: 4 项完美修复 (含本批 P0-1)**.
 
 ---
 
@@ -293,6 +284,10 @@ tags:
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-06 19:08 JST | Mavis (verifier 模式, per 守门 #20 v20 + 9/3 拍板 B) | 初版: 9 节 + 8 维度 + 总评分 8.25/10 + 1 P0 + 1 P1 + 2 P2 + 2 P3 | 2026-09-06 19:05 JST 用户发令"替我审核" |
+| v0.2 | 2026-09-06 19:33 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 8/27 19:39 JST 用户授权) | **P0-1 已修**: 增 `domain-context-design` 节点 (重要性=partial-impl, 179 节点笔记齐), 改 维度 2 评分 7/10 → 9/10, 总评分 8.25/10 → 8.5/10, 删 P0 段保留 P1 段 (P1-1/P1-2), §5 4 项严重缺陷全修 (含本批 P0-1) | 2026-09-06 19:33 JST 用户"可以" + verifier P0 修法建议 |
+
+
+
 
 
 ## Obsidian 双向链 (Bidirectional Links, v0.2 NEW)

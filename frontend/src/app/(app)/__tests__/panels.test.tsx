@@ -18,10 +18,24 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import type { ReactNode } from "react";
 
 // next/navigation mock — AppRouterContext 避免 import 真实 next
+// per DRIFT-α-007 修复验证: settings/page.tsx 现直接从 searchParams 派生 tab
+// (不再有本地 useState 镜像), 需要 mock 能读/写同一份 params 才能测 URL 深链 +
+// setTab 产生的 href — 用 vi.hoisted 避免 mock factory 引用 TDZ 变量
+const { mockPush, getMockSearchParams, setMockSearchParams } = vi.hoisted(() => {
+  let params = new URLSearchParams();
+  return {
+    mockPush: vi.fn((href: string) => {
+      const qIndex = href.indexOf("?");
+      params = new URLSearchParams(qIndex >= 0 ? href.slice(qIndex + 1) : "");
+    }),
+    getMockSearchParams: () => params,
+    setMockSearchParams: (next: URLSearchParams) => { params = next; },
+  };
+});
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ push: mockPush, replace: vi.fn(), back: vi.fn() }),
   usePathname: () => "/test",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => getMockSearchParams(),
 }));
 
 import AgentsPage from "../agents/page";
@@ -41,6 +55,8 @@ describe("U4 minimal panels — render smoke", () => {
     if (typeof window !== "undefined") {
       window.localStorage.clear();
     }
+    setMockSearchParams(new URLSearchParams());
+    mockPush.mockClear();
   });
   afterEach(() => {
     cleanup();
@@ -96,10 +112,32 @@ describe("U4 minimal panels — render smoke", () => {
   });
 
   it("switches /settings tab to api keys", () => {
-    renderWithI18n(<SettingsPage />);
+    const { rerender } = renderWithI18n(<SettingsPage />);
     // v0.6: zh-CN 下 tab "API 凭据"
     const apiTab = screen.getByRole("tab", { name: /API 凭据/i });
     fireEvent.click(apiTab);
+    // per DRIFT-α-007: tab 纯从 URL 派生 (无本地 state), 点击先触发 router.push
+    // 写入正确的 ?tab=apikeys ...
+    expect(mockPush).toHaveBeenCalledWith("/test?tab=apikeys");
+    // ...真实 App Router 会在 push 后重渲染同一棵树, mock 的 push 已把新
+    // params 写回 getMockSearchParams() 读的那份状态 — 这里手动 rerender
+    // 模拟那次重渲染, 断言面板真的切到了 apikeys (而不只是 push 参数对了)
+    rerender(<I18nProvider initialLanguage="zh-CN"><SettingsPage /></I18nProvider>);
     expect(screen.getByTestId("settings-panel-apikeys")).toBeInTheDocument();
+  });
+
+  it("deep-links /settings?tab=billing straight to the Billing panel", () => {
+    // per DRIFT-α-007 修复核心验证: URL ?tab= 优先于默认 profile
+    setMockSearchParams(new URLSearchParams("tab=billing"));
+    renderWithI18n(<SettingsPage />);
+    expect(screen.getByTestId("settings-panel-billing")).toBeInTheDocument();
+  });
+
+  it("falls back to profile when /settings?tab= is not one of the 5 implemented tabs", () => {
+    // per DRIFT-α-007 已知缺口 #3: permissions/members/workspace/integrations
+    // 4 个 legacy redirect 目标 tab 本身未实装, 未命中时应落 profile 而非崩溃
+    setMockSearchParams(new URLSearchParams("tab=permissions"));
+    renderWithI18n(<SettingsPage />);
+    expect(screen.getByTestId("settings-panel-profile")).toBeInTheDocument();
   });
 });

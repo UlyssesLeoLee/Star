@@ -7,8 +7,8 @@ classification: obsidian-wiki
 version: 0.2
 revision: 'v0.2 @ 2026-09-06 Ulysses(per 19:39 JST)— Mavis 接手; v0.1 @ 2026-09-06 初版 (1 索引 + 7 拓扑)'
 supersedes: null
-in-topology: ["S6", "domain-tenant", "domain-identity", "domain-permission", "domain-workspace", "domain-project", "domain-work-item", "domain-worktree", "domain-agent", "domain-feedback", "domain-decision", "domain-scm", "domain-validation", "domain-automation", "domain-search", "domain-policy", "domain-notification", "domain-context", "domain-resume", "domain-audit", "domain-integration", "domain-event", "domain-flow", "domain-lease", "star-mcp", "star-api-rest", "star-cli", "star-saga", "star-sa", "star-dispatcher", "star-cache", "star-credential", "star-treesitter", "star-context", "star-sse", "star-webhook", "star-taskgraph", "star-vcs", "star-dto", "api", "application", "infrastructure", "domain-dispatcher-design", "domain-llm-design", "domain-mcp-design", "domain-tool-design", "domain-rag-design", "domain-memory-design", "domain-rate-limiter-design", "domain-observability-design"]
-related: ["00-design-topology", "03-runtime-ecs", "99-pg-broker-audit"]
+in-topology: ["S6", "domain-tenant", "domain-identity", "domain-permission", "domain-workspace", "domain-project", "domain-work-item", "domain-worktree", "domain-agent", "domain-feedback", "domain-decision", "domain-scm", "domain-validation", "domain-automation", "domain-search", "domain-policy", "domain-notification", "domain-context", "domain-resume", "domain-audit", "domain-integration", "domain-event", "domain-flow", "domain-lease", "star-mcp", "star-api-rest", "star-cli", "star-saga", "star-sa", "star-dispatcher", "star-cache", "star-credential", "star-treesitter", "star-context", "star-sse", "star-webhook", "star-taskgraph", "star-vcs", "star-dto", "api", "application", "infrastructure", "domain-dispatcher-design", "domain-llm-design", "domain-mcp-design", "domain-tool-design", "domain-rag-design", "domain-context-design", "domain-memory-design", "domain-rate-limiter-design", "domain-observability-design"]
+related: ["00-design-topology", "03-runtime-ecs", "99-pg-broker-audit", "99-verifier-report"]
 see-also: ["S6"]
 guards:
   - id: '#1'
@@ -41,6 +41,9 @@ tags:
   - obsidian-wiki
   - design-topology
 ---
+
+
+
 
 
 
@@ -318,6 +321,9 @@ per [[[S6]] §3 L128-131](spec/integration/01-22-[[domain-integration-spec]].md)
 
 
 
+
+
+
 ## Obsidian 双向链 (Bidirectional Links, v0.2 NEW)
 
 > **拍板 (per 2026-09-06 17:13 JST 用户)**: docswiki 8 份转 Obsidian Wiki 风格, 完整集 frontmatter 13 字段, 节点→节点 + 源→拓扑双向链
@@ -371,6 +377,7 @@ per [[[S6]] §3 L128-131](spec/integration/01-22-[[domain-integration-spec]].md)
 - [[domain-mcp-design]]
 - [[domain-tool-design]]
 - [[domain-rag-design]]
+- [[domain-context-design]]
 - [[domain-memory-design]]
 - [[domain-rate-limiter-design]]
 - [[domain-observability-design]]
@@ -380,6 +387,7 @@ per [[[S6]] §3 L128-131](spec/integration/01-22-[[domain-integration-spec]].md)
 - [[00-design-topology]]
 - [[03-runtime-ecs]]
 - [[99-pg-broker-audit]]
+- [[99-verifier-report]]
 
 ### 3. 参见 (see-also)
 
