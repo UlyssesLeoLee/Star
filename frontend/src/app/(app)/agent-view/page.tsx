@@ -33,23 +33,16 @@ import { AgentFilter } from "@/components/agent-view/AgentFilter";
 import { GameHUD } from "@/components/agent-game/GameHUD";
 import { PerkPicker } from "@/components/agent-game/PerkPicker";
 import { DeathModal } from "@/components/agent-game/DeathModal";
-import { RoguelikeCanvas } from "@/components/agent-game/RoguelikeCanvas";
 import { AgentSettingsTab } from "@/components/agent-game/AgentSettingsTab";
 import { useAgentGame } from "@/components/agent-game/useAgentGame";
 import { getPerkChoices } from "@/lib/agent-game/perks";
-import { PageHeader, SectionTitle } from "@/components/PageHeader";
+import { PageHeader } from "@/components/PageHeader";
 import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
-import { Bot, AlertTriangle, Maximize2, Zap, Sparkles, Map, RefreshCw, Settings } from "lucide-react";
+import { Bot, AlertTriangle, Maximize2, Zap, Sparkles, Settings } from "lucide-react";
 import type { PerkId } from "@/lib/agent-game/types";
 import { useTranslation } from "@/lib/i18n";
-import { AnimeCelShaderCanvas, CelPalette } from "@/components/effects/AnimeCelShaderCanvas";
-import {
-  CelButton3D,
-  CelToggle3D,
-  CelBeacon3D,
-} from "@/components/effects/Cel3DUI";
 
-type ViewMode = "canvas" | "roguelike" | "settings" | "core3d";
+type ViewMode = "canvas" | "settings";
 
 function AgentViewContent() {
   const { t } = useTranslation();
@@ -62,11 +55,6 @@ function AgentViewContent() {
   const worktrees = useStore((s) => s.worktrees);
   const workItems = useStore((s) => s.workItems);
   const initAgentGame = useStore((s) => s.initAgentGame);
-  const generateAgentMap = useStore((s) => s.generateAgentMap);
-  const moveAgentOnMap = useStore((s) => s.moveAgentOnMap);
-  const resetAgentMap = useStore((s) => s.resetAgentMap);
-  const agentMaps = useStore((s) => s.agentMaps);
-  const agentPositions = useStore((s) => s.agentPositions);
 
   // URL 参数: ?agent=ag-XXX
   const urlAgentId = searchParams.get("agent");
@@ -93,13 +81,8 @@ function AgentViewContent() {
 
   // View 模式 (URL 持久化, 默认 Canvas v1)
   const [viewMode, setViewMode] = useState<ViewMode>(
-    urlView === "roguelike" ? "roguelike" : urlView === "settings" ? "settings" : "canvas",
+    urlView === "settings" ? "settings" : "canvas",
   );
-
-  // 3渲2 Cel Shader Live Parameters
-  const [celPalette, setCelPalette] = useState<CelPalette>("crimson");
-  const [celBands, setCelBands] = useState<number>(3);
-  const [autoSagaGuard, setAutoSagaGuard] = useState(true);
 
   // Modal 状态
   const [pendingPerkLevel, setPendingPerkLevel] = useState<number | null>(null);
@@ -113,14 +96,6 @@ function AgentViewContent() {
       init(resolution.agent.cost_summary.budget_usd);
     }
   }, [resolution, gameState, init]);
-
-  // 首次访问某 agent (roguelike 模式): 自动生成 map
-  useEffect(() => {
-    if (resolution && viewMode === "roguelike" && !agentMaps[resolution.agentId]) {
-      const seed = (Date.now() ^ resolution.agentId.charCodeAt(0) * 31) % 0x7fffffff;
-      generateAgentMap(resolution.agentId, 8, 6, Math.abs(seed));
-    }
-  }, [resolution, viewMode, agentMaps, generateAgentMap]);
 
   // 切换 agent 时, 清 pendingPerk + death (避免 stale)
   useEffect(() => {
@@ -214,44 +189,8 @@ function AgentViewContent() {
   // Restart 回调 (死亡 = all agents freeze, 玩家主动重开)
   const handleRestart = useCallback(() => {
     restart();
-    if (resolution) {
-      resetAgentMap(resolution.agentId);  // 重生 map, agent 回到起点
-    }
     setDeathEvent(null);
-  }, [restart, resetAgentMap, resolution]);
-
-  // Roguelike 移动
-  const handleRoguelikeMove = useCallback((target: { x: number; y: number }) => {
-    if (!resolution) return;
-    const r = moveAgentOnMap(resolution.agentId, target);
-    if (!r.ok) return;
-    if (r.died) {
-      const gs = useStore.getState().agentGameStates[resolution.agentId];
-      setDeathEvent({
-        agentId: resolution.agentId,
-        triggerCostRatio: r.triggerCostRatio,
-        snapshotCoins: gs?.coins ?? 0,
-        snapshotLevel: gs?.highestLevel ?? 1,
-        snapshotHp: 0,
-        canRevive: (gs?.coins ?? 0) >= 50,
-        timestamp: new Date().toISOString(),
-      });
-    }
-    // 走到 enemy cell → 触发 claim (合并 Roguelike + 拟人化游戏化)
-    if (r.effect.kind === "enemy" && r.effect.workItemId) {
-      const claimR = claim(r.effect.workItemId);
-      if (claimR && claimR.ok && claimR.leveledUp) {
-        setPendingPerkLevel(claimR.levelsGained);
-      }
-    }
-  }, [resolution, moveAgentOnMap, claim]);
-
-  // Roguelike reset map
-  const handleRoguelikeReset = useCallback(() => {
-    if (resolution) {
-      resetAgentMap(resolution.agentId);
-    }
-  }, [resolution, resetAgentMap]);
+  }, [restart]);
 
   // ---- 空状态 ----
   if (agents.length === 0) {
@@ -293,7 +232,7 @@ function AgentViewContent() {
 
   const { agent } = resolution;
   return (
-    <div className="-mx-6 -mt-5 h-[calc(100vh-3.5rem)] flex flex-col">
+    <div className="h-full flex flex-col">
       {/* Header */}
       <div className="border-b border-line bg-bg-soft/40 px-6 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
@@ -351,28 +290,14 @@ function AgentViewContent() {
         </div>
       </div>
 
-      {/* View Mode Tab (per 2026-09-05 23:00 JST 拍板: Canvas v1 / Roguelike v2 / 3D 战术核心 v3 / Agent 设置) */}
+      {/* View Mode Tab (per 2026-09-06 拍板: Canvas v1 / Agent 设置 — 3D 战术核心 + Roguelike 移除) */}
       <div className="border-b-2 border-black bg-[var(--cel-surface-card,#0f1422)] px-6 py-2.5 flex items-center gap-2.5 cel-shadow" data-testid="view-mode-tabs">
-        <button
-          data-testid="view-mode-core3d"
-          onClick={() => handleViewModeChange("core3d")}
-          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "core3d" ? "bg-[var(--cel-crimson,#ff184c)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
-        >
-          <Zap size={13} className="text-[var(--cel-cyan,#00f0ff)]" /> 3D 战术核心 <span className="text-[10px] px-1.5 py-0.5 bg-black text-[var(--cel-cyan,#00f0ff)] border border-black font-mono">v3 CEL</span>
-        </button>
         <button
           data-testid="view-mode-canvas"
           onClick={() => handleViewModeChange("canvas")}
           className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "canvas" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
         >
           <Sparkles size={13} /> Canvas <span className="text-[10px] px-1.5 py-0.5 bg-black text-[var(--cel-gold,#ffc400)] border border-black font-mono">v1</span>
-        </button>
-        <button
-          data-testid="view-mode-roguelike"
-          onClick={() => handleViewModeChange("roguelike")}
-          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "roguelike" ? "bg-[var(--cel-gold,#ffc400)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
-        >
-          <Map size={13} /> Roguelike <span className="text-[10px] px-1.5 py-0.5 bg-black text-[var(--cel-gold,#ffc400)] border border-black font-mono">v2</span>
         </button>
         <button
           data-testid="view-mode-settings"
@@ -384,117 +309,7 @@ function AgentViewContent() {
       </div>
 
       {/* Content (按 viewMode 切换) */}
-      {viewMode === "core3d" ? (
-        <div className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: S-Class 3D NPR Cel-Shaded Terminal (7 cols) */}
-          <div className="lg:col-span-7 space-y-4">
-            <div className="card relative overflow-hidden">
-              <div className="flex items-center justify-between border-b-2 border-black pb-2.5 mb-3">
-                <div>
-                  <div className="text-[11px] font-black text-[var(--cel-gold,#ffc400)] uppercase tracking-widest font-mono">
-                    LIVE NPR SHADER // S-CLASS
-                  </div>
-                  <h3 className="text-base font-black uppercase italic tracking-wider text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
-                    {agent.name} 3D AVATAR
-                    <span className="text-xs font-black not-italic px-2 py-0.5 bg-[var(--cel-crimson,#ff184c)] text-black border border-black">
-                      神格
-                    </span>
-                  </h3>
-                </div>
-                <span className="text-xs font-mono font-bold text-[var(--cel-text-secondary,#94a3b8)]">
-                  〔戦術司令機〕
-                </span>
-              </div>
-
-              {/* Real 3D WebGL Canvas */}
-              <div className="relative w-full h-80 sm:h-96 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black overflow-hidden flex items-center justify-center group cel-shadow">
-                <div className="absolute inset-0 bg-screentone-dense opacity-20 pointer-events-none" />
-                <AnimeCelShaderCanvas
-                  palette={celPalette}
-                  bands={celBands}
-                  outlineThickness={0.05}
-                  enableHalftone={true}
-                  enableRim={true}
-                  speed={1.0}
-                  className="w-full h-full"
-                />
-                <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-20 pointer-events-none">
-                  <span className="size-2 rounded-full bg-[var(--cel-cyan,#00f0ff)] animate-ping" />
-                  <span className="bg-black/85 border border-[var(--cel-cyan,#00f0ff)]/50 text-[var(--cel-cyan,#00f0ff)] px-2.5 py-1 text-[11px] font-mono font-bold">
-                    GLSL_NPR_3D
-                  </span>
-                </div>
-                <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none">
-                  <span className="bg-black/85 border border-[var(--cel-gold,#ffc400)]/50 text-[var(--cel-gold,#ffc400)] px-2.5 py-1 text-[11px] font-mono font-bold">
-                    {celBands}-BAND CEL
-                  </span>
-                </div>
-              </div>
-
-              {/* Palette & Bands */}
-              <div className="mt-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black p-3 flex items-center justify-between text-xs font-mono">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-[var(--cel-text-secondary,#94a3b8)] uppercase">PALETTE:</span>
-                  <div className="flex gap-1.5">
-                    {(["crimson", "cyan", "gold", "stealth"] as CelPalette[]).map((p) => (
-                      <button
-                        key={p}
-                        onClick={() => setCelPalette(p)}
-                        className={`px-2.5 py-1 text-[11px] font-bold uppercase border border-black ${celPalette === p ? "bg-[var(--cel-crimson,#ff184c)] text-black border-white" : "bg-[var(--cel-surface-sub,#151c2c)] text-slate-300"}`}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-[var(--cel-text-secondary,#94a3b8)]">BANDS:</span>
-                  {[2, 3, 4].map((b) => (
-                    <button
-                      key={b}
-                      onClick={() => setCelBands(b)}
-                      className={`w-6 h-6 text-[11px] font-bold border border-black ${celBands === b ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-slate-400"}`}
-                    >
-                      {b}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Protocols & Actions (5 cols) */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className="card">
-              <SectionTitle>Tactical Protocols 〔戦術プロトコル〕</SectionTitle>
-              <div className="space-y-3 mt-3">
-                <div className="border-2 border-black p-3 bg-[var(--cel-surface-sub,#151c2c)] cel-shadow">
-                  <CelToggle3D
-                    label="AUTONOMOUS SAGA GUARD"
-                    sublabel="IDEMPOTENT RECOVERY"
-                    checked={autoSagaGuard}
-                    onChange={setAutoSagaGuard}
-                  />
-                </div>
-                <div className="pt-2 border-t-2 border-black flex flex-col gap-2 items-center">
-                  <CelButton3D
-                    label="01 // SYNC WORKTREE"
-                    sublabel="IDEMPOTENT MERGE"
-                    variant="cyan"
-                    onClick={() => alert("【3D 战术派发】工作树同步成功：0 冲突。")}
-                  />
-                  <CelButton3D
-                    label="02 // EXECUTE STEP"
-                    sublabel="DISPATCH RUNTIME"
-                    variant="gold"
-                    onClick={handleSpend}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : viewMode === "canvas" ? (
+      {viewMode === "canvas" ? (
         <>
           {canvas && (
             <div className="flex-1 relative">
@@ -507,32 +322,6 @@ function AgentViewContent() {
               />
             </div>
           )}
-        </>
-      ) : viewMode === "roguelike" ? (
-        <>
-          {(() => {
-            const map = agentMaps[resolution.agentId];
-            const pos = agentPositions[resolution.agentId];
-            if (!map || !pos) {
-              return (
-                <div className="flex-1 flex items-center justify-center text-ink-mute text-xs">
-                  <RefreshCw size={12} className="animate-spin mr-1" /> 生成 Roguelike map 中...
-                </div>
-              );
-            }
-            return (
-              <RoguelikeCanvas
-                map={map}
-                position={pos}
-                agent={agent}
-                workItems={workItems}
-                onMove={handleRoguelikeMove}
-                onReset={handleRoguelikeReset}
-                canMove={gameState?.alive ?? false}
-                agentLevel={gameState?.level ?? 1}
-              />
-            );
-          })()}
         </>
       ) : (
         <div className="flex-1 min-h-0">

@@ -11,8 +11,14 @@
 "use client";
 
 import { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 
+// 无限画布类页面 — 跳过 main 的 padding/max-width (per fullBleed 设计)
+const FULL_BLEED_PREFIXES = ["/agent-view"];
+
 export default function AppLayout({ children }: { children: ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+  const pathname = usePathname();
+  const fullBleed = FULL_BLEED_PREFIXES.some((p) => pathname?.startsWith(p));
+  return <AppShell fullBleed={fullBleed}>{children}</AppShell>;
 }

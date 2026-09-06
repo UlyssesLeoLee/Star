@@ -5,15 +5,18 @@
 // - 暗色背景 bg-bg (#0b0d10 per tailwind.config.ts)
 // - 不接受 className — 强制样式 (per multica 严格规范)
 // - SubNav 由 U2 接管 (per spec 任务分工), 留 placeholder comment
+// - fullBleed: 无限画布类页面 (/agent-view) 跳过 main 的 padding/max-width,
+//   自己管理 h-[calc(100vh-4rem)] 布局 (per 2026-09-06 导航栏遮挡修复)
 // =====================================================================
 import { ReactNode } from "react";
 import { AppHeader } from "./AppHeader";
 
 export interface AppShellProps {
   children: ReactNode;
+  fullBleed?: boolean;
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, fullBleed = false }: AppShellProps) {
   return (
     <div
       data-testid="app-shell"
@@ -32,8 +35,12 @@ export function AppShell({ children }: AppShellProps) {
       */}
       <main
         data-testid="app-main"
-        style={{ minHeight: "calc(100vh - 64px)" }}
-        className="relative z-10 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-x-auto max-w-[1440px] mx-auto w-full"
+        style={fullBleed ? { height: "calc(100vh - 64px)" } : { minHeight: "calc(100vh - 64px)" }}
+        className={
+          fullBleed
+            ? "relative z-10 overflow-hidden w-full"
+            : "relative z-10 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-x-auto max-w-[1440px] mx-auto w-full"
+        }
       >
         {children}
       </main>
