@@ -82,7 +82,7 @@ export function AppMatrixDrawer() {
     >
       <div
         data-testid="app-matrix-modal"
-        className="w-full max-w-5xl max-h-[86vh] rounded-3xl border border-line bg-bg-card/95 shadow-2xl flex flex-col overflow-hidden backdrop-blur-2xl animate-in zoom-in-95 duration-200"
+        className="w-full max-w-5xl max-h-[86vh] border-2 border-[var(--cel-ink)] bg-bg-card/95 shadow-[10px_10px_0px_0px_var(--cel-ink),0_25px_50px_-12px_rgba(0,0,0,0.45)] flex flex-col overflow-hidden backdrop-blur-2xl animate-in zoom-in-95 duration-200"
       >
         {/* === Header (黄金分割比例顶部区域) === */}
         <div className="px-6 py-4.5 border-b border-line flex items-center justify-between bg-bg-soft/70">
@@ -110,7 +110,7 @@ export function AppMatrixDrawer() {
               type="button"
               onClick={resetToDefault}
               title={t.appMatrix.resetDefaultTitle}
-              className="px-3 py-1.5 text-xs font-mono text-ink-mute hover:text-ink rounded-lg border border-line hover:bg-bg-soft flex items-center gap-1.5 transition-colors"
+              className="px-3 py-1.5 text-xs font-mono text-ink-mute hover:text-ink border-2 border-[var(--cel-ink)] hover:bg-bg-soft flex items-center gap-1.5 transition-colors cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
             >
               <RotateCcw size={12} />
               <span>{t.appMatrix.resetDefault}</span>
@@ -245,7 +245,7 @@ function MatrixCard({
   return (
     <div
       data-testid={`matrix-card-${m.id}`}
-      className="group relative rounded-2xl border border-line bg-bg-soft/40 hover:bg-bg-soft/80 p-4.5 transition-all duration-200 hover:shadow-[0_8px_24px_rgba(0,0,0,0.35)] flex flex-col justify-between"
+      className="group relative border-2 border-line hover:border-[var(--cel-ink)] bg-bg-soft/40 hover:bg-bg-soft/80 p-4.5 transition-all duration-200 shadow-[2px_2px_0px_0px_var(--cel-ink)] hover:shadow-[4px_4px_0px_0px_var(--cel-ink),0_8px_24px_rgba(0,0,0,0.25)] hover:-translate-x-0.5 hover:-translate-y-0.5 flex flex-col justify-between"
     >
       <div>
         <div className="flex items-start justify-between gap-2 mb-2.5">

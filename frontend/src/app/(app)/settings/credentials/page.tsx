@@ -94,7 +94,7 @@ export default function CredentialsPage() {
         {PROVIDERS.map((p) => (
           <div
             key={p}
-            className="p-3 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)]"
+            className="p-3 border-2 border-[var(--cel-ink)] bg-[color:var(--color-surface)] cel-shadow"
           >
             <div className="flex items-center gap-2 mb-1.5">
               <Lock size={14} className="text-[color:var(--color-success)]" />
@@ -117,7 +117,7 @@ export default function CredentialsPage() {
           {credentials.map((c) => (
             <div
               key={c.id}
-              className="p-3 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)] flex items-center justify-between"
+              className="p-3 border-2 border-[var(--cel-ink)] bg-[color:var(--color-surface)] cel-shadow flex items-center justify-between"
             >
               <div className="flex-1">
                 <div className="flex items-center gap-2">
@@ -171,7 +171,7 @@ export default function CredentialsPage() {
 
       {/* Create modal (inline) */}
       {adding && (
-        <div className="p-4 rounded-md border border-[color:var(--color-primary)] bg-[color:var(--color-surface-2)] space-y-3">
+        <div className="p-4 border-2 border-[color:var(--color-primary)] bg-[color:var(--color-surface-2)] shadow-[4px_4px_0px_0px_var(--color-primary)] space-y-3">
           <h3 className="text-sm font-semibold">新增凭证</h3>
           <div className="grid grid-cols-2 gap-2">
             <select
@@ -227,7 +227,7 @@ export default function CredentialsPage() {
 
       {/* Rotate modal */}
       {rotating && (
-        <div className="p-4 rounded-md border border-[color:var(--color-warning)] bg-[color:var(--color-surface-2)] space-y-3">
+        <div className="p-4 border-2 border-[color:var(--color-warning)] bg-[color:var(--color-surface-2)] shadow-[4px_4px_0px_0px_var(--color-warning)] space-y-3">
           <h3 className="text-sm font-semibold">轮换凭证</h3>
           <p className="text-[10px] text-[color:var(--color-text-dim)]">原凭证将标 Deprecated, 新凭证 Active</p>
           <div className="grid grid-cols-2 gap-2">
@@ -273,7 +273,7 @@ export default function CredentialsPage() {
 function AuditLogView({ credentialId, onClose }: { credentialId: string; onClose: () => void }) {
   const { data: events = [], isLoading } = useAuditLog(credentialId);
   return (
-    <div className="p-4 rounded-md border border-[color:var(--color-info)] bg-[color:var(--color-surface-2)] space-y-3">
+    <div className="p-4 border-2 border-[color:var(--color-info)] bg-[color:var(--color-surface-2)] shadow-[4px_4px_0px_0px_var(--color-info)] space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <ShieldCheck size={14} /> 审计日志 (4 事件: store / rotate / revoke / retrieve)

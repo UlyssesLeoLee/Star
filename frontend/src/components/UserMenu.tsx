@@ -131,7 +131,7 @@ export function UserMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 mt-2 w-64 rounded-lg border border-line bg-bg-card shadow-2xl z-50 overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+          className="absolute right-0 mt-2 w-64 border-2 border-[var(--cel-ink)] bg-bg-card shadow-[6px_6px_0px_0px_var(--cel-ink),0_20px_40px_-10px_rgba(0,0,0,0.4)] z-50 overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
         >
           {/* 用户信息区 */}
           <div className="px-3.5 py-3 border-b border-line bg-bg-soft/70">

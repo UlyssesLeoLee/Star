@@ -373,7 +373,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   return (
     <div data-testid="canvas-container" className="relative w-full h-full bg-bg overflow-hidden">
       {/* Toolbar */}
-      <div data-testid="canvas-toolbar" className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-bg-card border border-line rounded-md p-1 shadow-lg">
+      <div data-testid="canvas-toolbar" className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-bg-card border-2 border-[var(--cel-ink)] rounded-md p-1 cel-shadow">
         <button onClick={() => setTool("select")} className={`btn p-1.5 ${tool === "select" ? "border-accent text-accent" : ""}`} title={t.ariaLabels.canvasSelect}>
           <MousePointer2 size={14} />
         </button>
@@ -443,7 +443,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
       </svg>
 
       {/* Minimap */}
-      <div data-testid="canvas-minimap" className="absolute bottom-3 right-3 z-20 w-40 h-28 bg-bg-card border border-line rounded-md overflow-hidden">
+      <div data-testid="canvas-minimap" className="absolute bottom-3 right-3 z-20 w-40 h-28 bg-bg-card border-2 border-[var(--cel-ink)] rounded-md overflow-hidden cel-shadow">
         <svg viewBox={`${minX} ${minY} ${maxX - minX} ${maxY - minY}`} className="w-full h-full">
           {/* viewport rect */}
           <rect

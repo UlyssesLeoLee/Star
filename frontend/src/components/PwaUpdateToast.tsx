@@ -51,7 +51,7 @@ export function PwaUpdateToast() {
       data-testid="pwa-update-toast"
       role="status"
       aria-live="polite"
-      className="fixed bottom-20 md:bottom-6 left-3 right-3 md:left-auto md:right-6 md:max-w-sm rounded-2xl border border-accent/40 bg-bg-soft/95 backdrop-blur-xl p-3 shadow-[0_0_24px_rgba(0,240,255,0.18)]"
+      className="fixed bottom-20 md:bottom-6 left-3 right-3 md:left-auto md:right-6 md:max-w-sm border-2 border-[var(--cel-ink)] bg-bg-soft/95 backdrop-blur-xl p-3 shadow-[6px_6px_0px_0px_var(--cel-ink),0_0_24px_rgba(0,240,255,0.18)]"
       style={{
         zIndex: 9997,
         paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
@@ -71,7 +71,7 @@ export function PwaUpdateToast() {
               type="button"
               onClick={apply}
               data-testid="pwa-update-apply"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/20 border border-accent/40 text-accent text-xs font-semibold hover:bg-accent/30 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/20 border-2 border-[var(--cel-ink)] text-accent text-xs font-semibold hover:bg-accent/30 transition-colors cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
             >
               <RefreshCw size={11} />
               立即刷新

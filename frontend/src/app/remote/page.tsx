@@ -64,7 +64,7 @@ export default function RemoteHomePage() {
               <Link
                 href={`/remote/desktop/${r.id}`}
                 data-testid={`remote-desktop-${r.id}`}
-                className="flex flex-col items-center gap-1 px-3 py-2.5 rounded-lg border border-line bg-bg-soft/40 hover:border-accent/40 hover:text-accent text-ink-dim transition-colors"
+                className="flex flex-col items-center gap-1 px-3 py-2.5 border-2 border-[var(--cel-ink)] bg-bg-soft/40 hover:text-accent text-ink-dim transition-colors cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
                 onClick={(e) => {
                   if (r.status === "offline") {
                     e.preventDefault();
@@ -78,7 +78,7 @@ export default function RemoteHomePage() {
               <Link
                 href={`/remote/terminal/${r.id}`}
                 data-testid={`remote-terminal-${r.id}`}
-                className="flex flex-col items-center gap-1 px-3 py-2.5 rounded-lg border border-line bg-bg-soft/40 hover:border-accent/40 hover:text-accent text-ink-dim transition-colors"
+                className="flex flex-col items-center gap-1 px-3 py-2.5 border-2 border-[var(--cel-ink)] bg-bg-soft/40 hover:text-accent text-ink-dim transition-colors cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
               >
                 <TerminalIcon size={16} />
                 <span className="text-[10px] font-mono">Terminal</span>
@@ -86,7 +86,7 @@ export default function RemoteHomePage() {
               <Link
                 href={`/remote/files/${r.id}`}
                 data-testid={`remote-files-${r.id}`}
-                className="flex flex-col items-center gap-1 px-3 py-2.5 rounded-lg border border-line bg-bg-soft/40 hover:border-accent/40 hover:text-accent text-ink-dim transition-colors"
+                className="flex flex-col items-center gap-1 px-3 py-2.5 border-2 border-[var(--cel-ink)] bg-bg-soft/40 hover:text-accent text-ink-dim transition-colors cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
               >
                 <FolderOpen size={16} />
                 <span className="text-[10px] font-mono">Files</span>

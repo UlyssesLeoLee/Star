@@ -64,7 +64,7 @@ function Field({ label, value, placeholder, type = "text", onChange }: FieldProp
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border border-line bg-bg-soft px-2.5 py-1.5 text-sm text-ink font-mono placeholder:text-ink-mute focus:border-accent focus:outline-none"
+        className="w-full border-2 border-[var(--cel-ink)] bg-bg-soft px-2.5 py-1.5 text-sm text-ink font-mono placeholder:text-ink-mute focus:border-accent focus:outline-none"
       />
     </label>
   );

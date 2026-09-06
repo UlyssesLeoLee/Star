@@ -90,7 +90,7 @@ export function PwaInstallPrompt() {
         paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
       }}
       className={clsx(
-        "fixed rounded-2xl border border-accent/40 bg-bg-soft/95 backdrop-blur-xl shadow-[0_0_24px_rgba(0,240,255,0.18)]",
+        "fixed border-2 border-[var(--cel-ink)] bg-bg-soft/95 backdrop-blur-xl shadow-[6px_6px_0px_0px_var(--cel-ink),0_0_24px_rgba(0,240,255,0.18)]",
         // 移动端: 底部 16, 让出 bottom nav; 桌面: 右下角 24
         "bottom-20 left-3 right-3 md:bottom-6 md:left-auto md:right-6 md:max-w-sm",
       )}
@@ -126,7 +126,7 @@ export function PwaInstallPrompt() {
                       }
                     }}
                     data-testid="pwa-install-accept"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/20 border border-accent/40 text-accent text-xs font-semibold hover:bg-accent/30"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/20 border-2 border-[var(--cel-ink)] text-accent text-xs font-semibold hover:bg-accent/30 cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
                   >
                     <Download size={11} />
                     安装
@@ -207,7 +207,7 @@ export function PwaInstallPrompt() {
               type="button"
               onClick={() => dismiss(true)}
               data-testid="pwa-install-ios-dismiss"
-              className="w-full mt-3 py-1.5 rounded-lg border border-line text-[11px] text-ink-dim hover:text-ink"
+              className="w-full mt-3 py-1.5 border-2 border-[var(--cel-ink)] text-[11px] text-ink-dim hover:text-ink cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
             >
               我知道了
             </button>

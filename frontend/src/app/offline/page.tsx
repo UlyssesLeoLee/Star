@@ -28,14 +28,14 @@ export default function OfflinePage() {
               window.location.reload();
             }
           }}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-accent/40 bg-accent/10 text-accent text-sm font-semibold hover:bg-accent/20 transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 border-2 border-[var(--cel-ink)] bg-accent/10 text-accent text-sm font-semibold hover:bg-accent/20 transition-colors cel-btn-3d shadow-[3px_3px_0px_0px_var(--cel-ink)]"
         >
           <RefreshCw size={15} />
           重新加载
         </button>
         <Link
           href="/"
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-line bg-bg-soft text-ink-dim text-sm font-medium hover:text-ink hover:border-accent/40 transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 border-2 border-[var(--cel-ink)] bg-bg-soft text-ink-dim text-sm font-medium hover:text-ink transition-colors cel-btn-3d shadow-[3px_3px_0px_0px_var(--cel-ink)]"
         >
           返回首页
         </Link>

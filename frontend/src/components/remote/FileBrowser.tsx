@@ -277,7 +277,7 @@ export function FileBrowser({ runtimeId, hostname }: FileBrowserProps) {
           type="button"
           onClick={() => void connectAndList(cwd)}
           data-testid="files-refresh"
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-line text-[11px] font-mono text-ink-dim hover:text-ink"
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 border-2 border-[var(--cel-ink)] text-[11px] font-mono text-ink-dim hover:text-ink cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
         >
           <RefreshCw size={12} /> 刷新
         </button>
@@ -285,8 +285,8 @@ export function FileBrowser({ runtimeId, hostname }: FileBrowserProps) {
           type="button"
           data-testid="files-upload"
           className={clsx(
-            "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-[11px] font-mono",
-            "border-line text-ink-mute cursor-not-allowed",
+            "flex-1 flex items-center justify-center gap-1.5 py-1.5 border-2 text-[11px] font-mono",
+            "border-[var(--cel-ink)] text-ink-mute cursor-not-allowed opacity-60",
           )}
           disabled
           title="Upload via WS write_req (待后端实装)"
@@ -296,7 +296,7 @@ export function FileBrowser({ runtimeId, hostname }: FileBrowserProps) {
         <button
           type="button"
           data-testid="files-download"
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-line text-[11px] font-mono text-ink-dim hover:text-ink"
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 border-2 border-[var(--cel-ink)] text-[11px] font-mono text-ink-dim hover:text-ink cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
         >
           <Download size={12} /> 下载
         </button>
@@ -309,7 +309,7 @@ export function FileBrowser({ runtimeId, hostname }: FileBrowserProps) {
           onClick={() => setPreview({ open: false, name: "", content: "" })}
         >
           <div
-            className="relative w-full md:max-w-2xl max-h-[80vh] bg-bg-soft border-t md:border border-line rounded-t-2xl md:rounded-2xl p-4 overflow-y-auto"
+            className="relative w-full md:max-w-2xl max-h-[80vh] bg-bg-soft border-t-2 md:border-2 border-[var(--cel-ink)] p-4 overflow-y-auto shadow-[0_-8px_0px_0px_var(--cel-ink)] md:shadow-[8px_8px_0px_0px_var(--cel-ink),0_25px_50px_-12px_rgba(0,0,0,0.4)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">

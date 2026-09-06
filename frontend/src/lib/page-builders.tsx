@@ -51,7 +51,7 @@ export function ListPage<T extends { id: string }>({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Filter..."
-            className="rounded-md border border-line bg-bg-soft px-3 py-1 text-sm placeholder:text-ink-mute focus:outline-none focus:border-accent w-64"
+            className="border-2 border-[var(--cel-ink)] bg-bg-soft px-3 py-1 text-sm placeholder:text-ink-mute focus:outline-none focus:border-accent w-64"
           />
         </div>
         <table className="table">

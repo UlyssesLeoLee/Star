@@ -132,7 +132,7 @@ export function CommandBar() {
     >
       <div
         data-testid="command-bar-panel"
-        className="w-full max-w-2xl mx-4 rounded-xl border border-line bg-[color:var(--color-surface)] shadow-2xl overflow-hidden"
+        className="w-full max-w-2xl mx-4 border-2 border-[var(--cel-ink)] bg-[color:var(--color-surface)] cel-shadow-lg overflow-hidden"
         onKeyDown={onListKeyDown}
       >
         {/* 搜索框 */}

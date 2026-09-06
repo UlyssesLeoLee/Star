@@ -89,11 +89,11 @@ export function KanbanCard({
       onDragEnd={onDragEnd}
       onClick={handleClick}
       className={clsx(
-        "p-3 border-2 border-black border-l-4 bg-[var(--cel-surface-sub,#151c2c)]",
-        "hover:bg-[var(--cel-surface-stage,#1a2438)] hover:-translate-x-0.5 hover:-translate-y-0.5 cursor-pointer select-none",
+        "p-3 border-2 border-[var(--cel-ink)] border-l-4 bg-[var(--cel-surface-sub)]",
+        "hover:bg-[var(--cel-surface-stage)] hover:-translate-x-0.5 hover:-translate-y-0.5 cursor-pointer select-none",
         "transition-all duration-100 cel-shadow",
         pColor,
-        isDragging && "opacity-50 ring-2 ring-[var(--cel-cyan,#00f0ff)] shadow-[0_0_15px_rgba(0,240,255,0.4)]",
+        isDragging && "opacity-50 ring-2 ring-[var(--cel-cyan)] shadow-[0_0_15px_rgba(0,240,255,0.4)]",
       )}
     >
       {/* Row 1: key + story_points */}

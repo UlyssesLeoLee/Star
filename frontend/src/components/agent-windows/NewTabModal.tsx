@@ -45,7 +45,7 @@ export function NewTabModal({ onClose, onCreate }: NewTabModalProps) {
       aria-modal="true"
     >
       <div
-        className="w-[480px] rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-[var(--shadow-lg)] overflow-hidden"
+        className="w-[480px] border-2 border-[var(--cel-ink)] bg-[color:var(--color-surface)] shadow-[8px_8px_0px_0px_var(--cel-ink),0_25px_50px_-12px_rgba(0,0,0,0.4)] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -103,7 +103,7 @@ export function NewTabModal({ onClose, onCreate }: NewTabModalProps) {
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               autoFocus
-              className="w-full text-sm rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 focus:outline-none focus:border-[color:var(--color-primary)]"
+              className="w-full text-sm border-2 border-[var(--cel-ink)] bg-[color:var(--color-surface)] cel-shadow px-3 py-2 focus:outline-none focus:border-[color:var(--color-primary)]"
             />
             <div className="flex items-center justify-between mt-4">
               <button

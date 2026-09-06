@@ -181,7 +181,7 @@ export function NoVncViewer({
             <button
               type="button"
               onClick={connect}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 border-2 border-[var(--cel-ink)] text-xs cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
             >
               <RefreshCw size={12} />
               重试
@@ -272,7 +272,7 @@ user@${hostname}:~$ ▮
                 key={b.key}
                 type="button"
                 data-testid={`novnc-key-${b.key}`}
-                className="px-2.5 py-1.5 rounded-lg border border-line text-[11px] font-mono text-ink-dim hover:text-ink active:scale-95"
+                className="px-2.5 py-1.5 border-2 border-[var(--cel-ink)] text-[11px] font-mono text-ink-dim hover:text-ink active:scale-95 cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
               >
                 {b.label}
               </button>

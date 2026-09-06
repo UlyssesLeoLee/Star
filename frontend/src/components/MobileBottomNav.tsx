@@ -86,7 +86,7 @@ export function MobileBottomNav() {
       <nav
         data-testid="mobile-bottom-nav"
         aria-label={t.ariaLabels.mobilePrimaryNav}
-        className="md:hidden fixed bottom-0 inset-x-0 border-t border-line bg-bg/95 backdrop-blur-xl"
+        className="md:hidden fixed bottom-0 inset-x-0 border-t-2 border-[var(--cel-ink)] bg-bg/95 backdrop-blur-xl shadow-[0_-3px_0px_0px_var(--cel-ink)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)", zIndex: 9999 }}
       >
         <ul className="grid grid-cols-5 h-14">
@@ -119,7 +119,7 @@ export function MobileBottomNav() {
                   >
                     <Icon
                       size={18}
-                      className={active ? "drop-shadow-[0_0_6px_rgba(0,240,255,0.6)]" : ""}
+                      className={active ? "drop-shadow-[2px_2px_0_rgba(0,240,255,0.9)]" : ""}
                     />
                     <span>{item.label}</span>
                   </Link>
@@ -139,7 +139,7 @@ export function MobileBottomNav() {
         >
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <div
-            className="relative w-full max-h-[80vh] overflow-y-auto rounded-t-2xl border-t border-line bg-bg-soft p-4 pb-8"
+            className="relative w-full max-h-[80vh] overflow-y-auto rounded-t-2xl border-t-2 border-[var(--cel-ink)] bg-bg-soft p-4 pb-8 shadow-[0_-4px_0px_0px_var(--cel-ink)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-12 h-1 bg-line rounded-full mx-auto mb-4" />
@@ -153,7 +153,7 @@ export function MobileBottomNav() {
                     href={it.href}
                     onClick={() => setMoreOpen(false)}
                     data-testid={`mobile-more-${it.href.replace(/\W+/g, "-")}`}
-                    className="block px-3 py-3 rounded-xl border border-line bg-bg/50 text-xs text-ink-dim hover:text-ink hover:border-accent/40 transition-colors text-center"
+                    className="block px-3 py-3 rounded-xl border-2 border-line bg-bg/50 text-xs text-ink-dim hover:text-ink hover:border-accent/40 transition-colors text-center shadow-[2px_2px_0px_0px_var(--cel-shadow-color)]"
                   >
                     {it.label}
                   </Link>

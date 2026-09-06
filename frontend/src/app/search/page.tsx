@@ -36,7 +36,7 @@ export default function SearchPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search across work-items, worktrees, feedback, agent sessions..."
-            className="w-full rounded-md border border-line bg-bg-soft pl-9 pr-3 py-2 text-sm placeholder:text-ink-mute focus:outline-none focus:border-accent"
+            className="w-full border-2 border-[var(--cel-ink)] bg-bg-soft pl-9 pr-3 py-2 text-sm placeholder:text-ink-mute focus:outline-none focus:border-accent"
           />
         </div>
         <div className="mt-2 text-[10px] text-ink-mute">

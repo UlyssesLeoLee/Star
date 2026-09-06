@@ -112,7 +112,7 @@ export function CliTerminal({ tab, onRun, onCancel, onUpload, onClear }: CliTerm
             }}
             placeholder="输入 prompt (Cmd/Ctrl + Enter 运行)..."
             rows={2}
-            className="flex-1 text-sm rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 resize-none focus:outline-none focus:border-[color:var(--color-primary)]"
+            className="flex-1 text-sm border-2 border-[var(--cel-ink)] bg-[color:var(--color-surface)] cel-shadow px-3 py-2 resize-none focus:outline-none focus:border-[color:var(--color-primary)]"
           />
           <div className="flex flex-col gap-1 text-[10px] text-[color:var(--color-text-dim)]">
             <span>{prompt.length} 字符</span>
