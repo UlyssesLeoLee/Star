@@ -43,6 +43,7 @@ tags:
   - design-topology
 ---
 
+
 # 06 — 跨 View 关键数据流 (Data Flow Topology)
 
 > **数据源**: [[S2]] §4.2 交互フロー [LangGraph 02 §4.2](../../architecture/2026-09-03-langgraph/02-basic-design.md) + [[S3]] §4 时序图 [LangGraph 03 §4](../../architecture/2026-09-03-langgraph/03-detailed-design.md) + [[S4]] [Agent Runtime 02](../../architecture/2026-09-03-agent-runtime/02-basic-design.md)
@@ -357,6 +358,7 @@ flowchart TB
 - **G-4**: Backpressure Overflow Policy (per [[S5]] §6.3) 详细算法不画
 - **G-5**: Multi-tenant isolation 13 類 RLS (per 守门 #13 d) 实施细节不画
 - **G-6**: 5 域 Lead 真人未到位, RACI 跨域流暂以 Mavis 临时代签 (per 守门 #14 v2)
+
 
 
 ## Obsidian 双向链 (Bidirectional Links, v0.2 NEW)

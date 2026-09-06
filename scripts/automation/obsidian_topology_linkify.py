@@ -26,7 +26,7 @@ TOPOLOGY_FILES = {
         "tags": ["index", "obsidian-wiki", "design-topology"],
         "in-topology": [],
         "related": ["S1", "S2", "S3", "S4", "S5", "S6", "S7"],
-        "see-also": ["00-design-topology"],
+        "see-also": ["00-design-topology", "99-docswiki-vs-pgwiki-diff"],
     },
     "00-design-topology.md": {
         "title": "00 — 设计应有的工程总览",
@@ -82,6 +82,13 @@ TOPOLOGY_FILES = {
         "related": ["00-design-topology", "02-orchestration-langgraph", "03-runtime-ecs", "05-persistence-checkpoint"],
         "see-also": ["S2", "S4"],
     },
+    "99-docswiki-vs-pgwiki-diff.md": {
+        "title": "99 — docswiki vs pgwiki 差异分析 (Diff Report)",
+        "tags": ["cross-wiki", "diff-report", "design-vs-reality", "obsidian-wiki", "design-topology"],
+        "in-topology": ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "View-AgentView", "View-LangGraph", "View-AgentRuntime", "domain-tenant", "domain-agent", "domain-context"],
+        "related": ["00-design-topology", "01-ui-agent-view", "02-orchestration-langgraph", "03-runtime-ecs", "04-domain-crates", "05-persistence-checkpoint", "06-data-flow"],
+        "see-also": ["S4", "S5", "S7"],
+    },
 }
 
 # 节点 ID 模式 - 用于 [[wikilink]] 替换
@@ -113,6 +120,8 @@ NODE_ID_PATTERNS = [
     (r'\b(View-[A-Z][a-zA-Z]+)\b', r'[[\1]]'),
     # S1-S7 源头
     (r'\b(S[1-7])\b', r'[[\1]]'),
+    # pgwiki 主题 MOC
+    (r'\b(pgwiki-[\w\-]+)\b', r'[[\1]]'),
     # domain-* (注意不能破坏 markdown link `domain-foo`)
     (r'(?<!\[`)\b(domain-[a-z\-]+)\b(?![`\]])', r'[[\1]]'),
 ]

@@ -360,6 +360,51 @@ def canvas_06_dataflow() -> dict:
     return {"nodes": nodes, "edges": edges}
 
 
+def canvas_99_diff() -> dict:
+    """99 — docswiki vs pgwiki 差异 (主色蓝/绿, 共同紫)."""
+    nodes = []
+    edges = []
+    # docswiki 8 份主题 (蓝)
+    dw_files = ["00-design-topology", "01-ui-agent-view", "02-orchestration-langgraph", "03-runtime-ecs", "04-domain-crates", "05-persistence-checkpoint", "06-data-flow", "README"]
+    dw_titles = {
+        "00-design-topology": "00 主图\n(设计应有)",
+        "01-ui-agent-view": "01 AgentView\n(派生视图)",
+        "02-orchestration-langgraph": "02 LangGraph\n(应有)",
+        "03-runtime-ecs": "03 Runtime\n(应有)",
+        "04-domain-crates": "04 Domain\n22+9 目标",
+        "05-persistence-checkpoint": "05 Persistence\n5 PG 表",
+        "06-data-flow": "06 DataFlow\n7 流",
+        "README": "README 索引",
+    }
+    for i, f in enumerate(dw_files):
+        nodes.append(node(f, f"\n{dw_titles[f]}", x=(i % 4) * 320, y=0, w=280, h=100, color="4"))
+    # pgwiki 5 主题 (绿)
+    pw_themes = [("pgwiki-10-workspace-MOC", "10-workspace\n52 crate", 0), ("pgwiki-20-database-MOC", "20-database\n25 schema/93 表", 1), ("pgwiki-30-architecture-MOC", "30-architecture\n28 ADR", 2), ("pgwiki-40-crosscutting-dependencies", "40-crosscutting\ndeps + gates", 3), ("pgwiki-50-issues-MOC", "50-issues\n6 问题", 4)]
+    for label, text, i in pw_themes:
+        nodes.append(node(label, label + "\n" + text, x=(i % 5) * 280, y=200, w=240, h=100, color="2"))
+    # 共同 28 ADR (紫)
+    nodes.append(node("ADR-0021..0047", "28 ADR\n0021..0047\n(共同)", x=0, y=400, w=280, h=100, color="6"))
+    # 量化对比 (红 - 警示)
+    nodes.append(node("cargo-52", "cargo members\n52 (vs 22+9=31 设计)", x=400, y=400, w=240, h=100, color="1"))
+    nodes.append(node("schema-93", "DB tables\n93 (vs 5 设计 Tier 3)", x=700, y=400, w=240, h=100, color="1"))
+    nodes.append(node("broker-32", "broker arch\n32 (未实装)", x=1000, y=400, w=240, h=100, color="1"))
+    # 来源
+    nodes.append(node("S1..S7", "7 源头\n(共同)", x=600, y=-100, w=280, h=80, color="6"))
+    # 边
+    for f in dw_files:
+        edges.append(edge(f"e-{f}-S17", f, "S1..S7", "defines"))
+        edges.append(edge(f"e-{f}-ADR", f, "ADR-0021..0047", "cites"))
+    for label, text, i in pw_themes:
+        edges.append(edge(f"e-{label}-ADR", label, "ADR-0021..0047", "cites"))
+    edges.append(edge("e-cargo-ADR", "cargo-52", "ADR-0021..0047", "fact"))
+    edges.append(edge("e-schema-ADR", "schema-93", "ADR-0021..0047", "fact"))
+    edges.append(edge("e-broker-ADR", "broker-32", "ADR-0021..0047", "broker"))
+    edges.append(edge("e-cargo-issues", "cargo-52", "pgwiki-50-issues-MOC", "exposes"))
+    edges.append(edge("e-schema-issues", "schema-93", "pgwiki-50-issues-MOC", "exposes"))
+    edges.append(edge("e-broker-issues", "broker-32", "pgwiki-50-issues-MOC", "exposes"))
+    return {"nodes": nodes, "edges": edges}
+
+
 def canvas_readme() -> dict:
     """README — 索引图."""
     nodes = []
@@ -404,6 +449,7 @@ CANVAS_FUNCS = {
     "04-domain-crates.canvas": canvas_04_domain,
     "05-persistence-checkpoint.canvas": canvas_05_persistence,
     "06-data-flow.canvas": canvas_06_dataflow,
+    "99-docswiki-vs-pgwiki-diff.canvas": canvas_99_diff,
     "README.canvas": canvas_readme,
 }
 

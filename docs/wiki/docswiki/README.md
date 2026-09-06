@@ -9,7 +9,7 @@ revision: 'v0.2 @ 2026-09-06 Ulysses(per 19:39 JST)— Mavis 接手; v0.1 @ 2026
 supersedes: null
 in-topology: []
 related: ["S1", "S2", "S3", "S4", "S5", "S6", "S7"]
-see-also: ["00-design-topology"]
+see-also: ["00-design-topology", "99-docswiki-vs-pgwiki-diff"]
 guards:
   - id: '#1'
     name: 0 unsafe + 0 err
@@ -39,6 +39,7 @@ tags:
   - obsidian-wiki
   - design-topology
 ---
+
 
 # 设计应有的工程拓扑 (Design Topology)
 
@@ -135,6 +136,7 @@ LangGraph view ([[S2]]/[[S3]])        Agent Runtime view ([[S4]]/[[S5]])        
 | v0.1 | 2026-09-06 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 7 份拓扑文件 + 7 源头 + 守门 4 项 + 已知缺口 5 项 | 2026-09-06 10:06 JST 用户发令"根据文档里的设计制作设计拓扑,如实根据设计内容制作图谱,而不是文档的层级结构" |
 
 
+
 ## Obsidian 双向链 (Bidirectional Links, v0.2 NEW)
 
 > **拍板 (per 2026-09-06 17:13 JST 用户)**: docswiki 8 份转 Obsidian Wiki 风格, 完整集 frontmatter 13 字段, 节点→节点 + 源→拓扑双向链
@@ -156,6 +158,7 @@ _无_
 ### 3. 参见 (see-also)
 
 - [[00-design-topology]]
+- [[99-docswiki-vs-pgwiki-diff]]
 
 ### 4. Obsidian Canvas
 

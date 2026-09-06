@@ -42,6 +42,7 @@ tags:
   - design-topology
 ---
 
+
 # 04 — 22 domain-* crate 拓扑 (Tier 1-6 接入顺序 + 依赖)
 
 > **数据源**: [[S6]] [`docs/architecture/2026-08-26-upgrade/spec/integration/01-22-domain-integration-spec.md`](../../architecture/2026-08-26-upgrade/spec/integration/01-22-[[domain-integration-spec]].md)
@@ -247,6 +248,7 @@ per [[[S6]] §3 L128-131](spec/integration/01-22-[[domain-integration-spec]].md)
 - **G-4**: 不画入 30+ 单个 domain spec (`docs/specs/`) 内部 Read/Write 矩阵细节, 等 DDD Review
 - **G-5**: 不画入 spec/saga/01 5 步流程内部 step 实现 (per [[S6]] §2 引用, 详见 `spec/saga/01-saga-coordination-spec.md`)
 - **G-6**: 不画入 spec/agents/02 Read/Write 权限矩阵 13 類 (per [[S6]] §3 引用, 详见 `spec/agents/02-data-sources-spec.md`)
+
 
 
 ## Obsidian 双向链 (Bidirectional Links, v0.2 NEW)
