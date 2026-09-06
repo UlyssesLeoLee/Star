@@ -44,6 +44,8 @@ tags:
 
 
 
+
+
 # 04 — 22 domain-* crate 拓扑 (Tier 1-6 接入顺序 + 依赖)
 
 > **数据源**: [[S6]] [`docs/architecture/2026-08-26-upgrade/spec/integration/01-22-domain-integration-spec.md`](../../architecture/2026-08-26-upgrade/spec/integration/01-22-[[domain-integration-spec]].md)
@@ -310,6 +312,8 @@ per [[[S6]] §3 L128-131](spec/integration/01-22-[[domain-integration-spec]].md)
 | **application** | Application Layer (per [[S4]] §2.1) | ✗ [[S4]] 漏 (虽然 [[S4]] 提 Application Layer 但没说是 crate) |
 | **infrastructure** | Infrastructure 聚合 | ✗ [[S4]] 漏 |
 - **G-6**: 不画入 spec/agents/02 Read/Write 权限矩阵 13 類 (per [[S6]] §3 引用, 详见 `spec/agents/02-data-sources-spec.md`)
+
+
 
 
 

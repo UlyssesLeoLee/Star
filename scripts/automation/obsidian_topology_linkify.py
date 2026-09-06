@@ -93,8 +93,15 @@ TOPOLOGY_FILES = {
         "title": "99 — pgwiki 50-issues 交叉验证 (Broker Audit 修正)",
         "tags": ["pgwiki-audit", "dual-namespace", "cargo-metadata", "docswiki-defect", "obsidian-wiki", "design-topology"],
         "in-topology": ["S4", "S5", "S6", "star-mcp", "star-dispatcher", "star-context", "star-saga", "star-sa", "star-cli", "star-api-rest", "star-cache", "star-credential", "star-treesitter", "star-sse", "star-webhook", "star-taskgraph", "star-vcs", "star-dto", "api", "application", "infrastructure", "domain-dispatcher-design", "domain-llm-design", "domain-mcp-design", "domain-tool-design", "domain-rag-design", "domain-memory-design", "domain-rate-limiter-design", "domain-observability-design"],
-        "related": ["04-domain-crates", "99-docswiki-vs-pgwiki-diff"],
+        "related": ["04-domain-crates", "99-docswiki-vs-pgwiki-diff", "99-verifier-report"],
         "see-also": ["S4", "S5"],
+    },
+    "99-verifier-report.md": {
+        "title": "99 — Verifier 报告 (4 项严重缺陷修复审核)",
+        "tags": ["verifier-report", "independent-audit", "8-dimension", "obsidian-wiki", "design-topology"],
+        "in-topology": ["S4", "S5", "S6", "star-mcp", "star-dispatcher", "star-context", "star-saga", "domain-context"],
+        "related": ["99-pg-broker-audit", "99-docswiki-vs-pgwiki-diff", "04-domain-crates"],
+        "see-also": ["S4", "S5", "S6"],
     },
 }
 
