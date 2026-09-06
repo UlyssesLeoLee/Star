@@ -12,18 +12,19 @@
  * 神作感来源:
  *   - 巨型日文标题 "調 試 制 御 盤" + 渐变文字 (墨色 → 主蓝 → 紫)
  *   - 3 颗金属感 KPI 胶囊 (主蓝 / 紫 / 翡翠) 替代单调 Card 标题
- *   - 背景渐变 + Three.js 漂浮 3D 核心 (AnimeCore3D 动态注入)
+ *   - 背景渐变 + 像素机器人 (PixelAgentCanvas) 主展示 (per 9/6 12:34 JST)
  *   - HUD 战术角标 (SYS / LIVE / 版本) 制造工业仪表盘语言
  */
 
 import dynamic from "next/dynamic";
 import { Sparkles, Zap, Cpu, Activity } from "lucide-react";
 
-// Three.js 走 dynamic SSR-false (per 守门 #22: 控制台不污染 main 编译链 + SSR)
-const AnimeCore3D = dynamic(() => import("./AnimeCore3D"), {
-  ssr: false,
-  loading: () => null,
-});
+// 像素机器人 (per 9/6 12:34 JST 用户发令 "agent 界面像素风游戏角色机器人, 移动攻击动画, 页游水准")
+// 走 dynamic SSR-false (per 守门 #22: 控制台不污染 main 编译链 + SSR)
+const PixelAgentCanvas = dynamic(
+  () => import("./PixelAgentCanvas").then(m => m.PixelAgentCanvas),
+  { ssr: false, loading: () => null },
+);
 
 interface KpiPillProps {
   icon: React.ReactNode;
@@ -89,8 +90,14 @@ export function HeroHeader({ scriptCount, testCount = 5, runningCount = 0 }: Her
         paddingRight: "var(--space-7)",    // 34px 右 (φ)
       }}
     >
-      {/* 3D 抽象核心 — 背景层, 主题自适应颜色 */}
-      <AnimeCore3D />
+      {/* 像素机器人 — 背景层, 主题自适应颜色 (per 9/6 12:34 JST 用户拍板) */}
+      <div
+        aria-hidden
+        className="absolute -right-12 top-1/2 -translate-y-1/2 -z-10 pointer-events-none"
+        style={{ opacity: 0.32 }}
+      >
+        <PixelAgentCanvas autoDemo className="pointer-events-auto" />
+      </div>
 
       {/* 极光渐变 (4 个色块叠加, 透明度极低, 不抢戏) */}
       <div
@@ -155,7 +162,7 @@ export function HeroHeader({ scriptCount, testCount = 5, runningCount = 0 }: Her
         </div>
 
         {/* KPI 胶囊组 — 工业仪表盘语言 */}
-        <div className="flex gap-[13px] flex-wrap">
+        <div className="flex gap-[13px] flex-wrap items-center">
           <KpiPill
             icon={<Zap className="w-4 h-4" />}
             label="运行中"
@@ -175,6 +182,20 @@ export function HeroHeader({ scriptCount, testCount = 5, runningCount = 0 }: Her
             tone="ok"
             pulse
           />
+          {/* 像素机器人主展示 — agent 区域主视觉 (per 9/6 12:34 JST 用户拍板) */}
+          <div
+            className="anime-panel anime-chamfer lift-on-hover p-2 shrink-0"
+            style={{
+              background: "color-mix(in srgb, var(--color-bg-soft) 60%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--color-primary) 28%, transparent)",
+            }}
+            title="PIXEL AGENT — idle / move / attack 动画"
+          >
+            <PixelAgentCanvas autoDemo />
+            <div className="text-[8px] font-mono uppercase tracking-widest text-ink-mute text-center mt-1">
+              PIXEL AGENT
+            </div>
+          </div>
         </div>
       </div>
 
