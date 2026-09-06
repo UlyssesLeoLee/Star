@@ -55,7 +55,7 @@ tags:
 
 ## 1. 描述
 
-★ 设计意图 0/9 实装, 跟已实装 star-dispatcher 命名冲突, 待重命名 (per §7 dual-namespace + ADR-0048)
+★ 设计意图, 跟已实装 star-dispatcher 命名冲突, 待重命名 (per §7 dual-namespace + ADR-0048)
 
 **文档来源**: S5 §1.1
 

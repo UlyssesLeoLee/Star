@@ -1,11 +1,11 @@
 ---
-id: domain-observability-design
-title: domain-observability-design
+id: domain-context-design
+title: domain-context-design
 date: 2026-09-06
-source: 'S5 §1.1'
+source: 'S5 §1.1 + cargo metadata 1 src stub'
 status: design-baseline
 classification: -
-importance: TBD
+importance: partial
 layer: domain
 view: Cross
 related: []
@@ -13,7 +13,7 @@ see-also: []
 version: 0.1
 revision: '['04-domain-crates', '99-pg-broker-audit']'
 supersedes: null
-in-topology: ["domain-observability-design"]
+in-topology: ["domain-context-design"]
 guards:
   - id: '#1'
     name: 0 unsafe + 0 err
@@ -44,24 +44,24 @@ tags:
   - cross-view
   - obsidian-wiki
   - design-topology
-  - id/domain-observability-design
+  - id/domain-context-design
 ---
 
-# domain-observability-design — domain-observability-design
+# domain-context-design — domain-context-design
 
 > **节点类型**: domain / Cross
-> **重要度**: TBD
+> **重要度**: partial
 > **守门分类**: -
 
 ## 1. 描述
 
-★ 设计意图, 命名无冲突, 待 P3-B 实装
+★ partial-impl: cargo metadata 已有 1 src stub (crates/domain-context/src/), 但 S5 §1.1 仍列'应新建', 待跟已实装 star-context 合并或重命名 (per §7 dual-namespace + ADR-0048)
 
-**文档来源**: S5 §1.1
+**文档来源**: S5 §1.1 + cargo metadata 1 src stub
 
 ## 2. 出现在拓扑 (in-topology)
 
-- [[domain-observability-design]]
+- [[domain-context-design]]
 
 ## 3. 上下游 (related)
 

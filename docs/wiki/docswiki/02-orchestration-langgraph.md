@@ -47,6 +47,9 @@ tags:
 
 
 
+
+
+
 # 02 — LangGraph Orchestration 拓扑 (L0 + TMO + L1 SA + Cross-Cutting)
 
 > **数据源**: [[S2]] [`docs/architecture/2026-09-03-langgraph/02-basic-design.md`](../../architecture/2026-09-03-langgraph/02-basic-design.md) + [[S3]] [`docs/architecture/2026-09-03-langgraph/03-detailed-design.md`](../../architecture/2026-09-03-langgraph/03-detailed-design.md)
@@ -464,6 +467,9 @@ classDiagram
 - **G-4**: 不画入 9 SA × ECS Archetype 业务逻辑具体实现 (per [[S4]] §3.5 G-13 已知缺口)
 - **G-5**: 22 domain 真实数据接入状态 (部分接入) 不画 (per AGENTS.md §7 #1 11/25 部分)
 - **G-6**: 5 域 Lead 真人未到位, [[SA-03]] audit 暂以 Mavis 临时代签 (per 守门 #14 v2)
+
+
+
 
 
 

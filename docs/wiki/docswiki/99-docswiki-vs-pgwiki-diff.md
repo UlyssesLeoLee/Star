@@ -46,6 +46,9 @@ tags:
 
 
 
+
+
+
 # 99 — docswiki vs pgwiki 差异分析
 
 > **目的**: 把 [[00-design-topology|docswiki]] 7 份叙事 (设计应有) 跟 [[pgwiki-50-issues-07-docswiki-vs-pgwiki|pgwiki]] 212 节点 (实际工程) 做差异分析, 暴露"叙事 vs 事实" gap.
@@ -368,6 +371,9 @@ per [[pgwiki-50-issues-04-broker-arch-refs]]:
 - 缺标比错标 (per 守门 #11)
 - 3 view 平行, 不建立业务子域↔DDD 映射 (per 守门 #3)
 - 修订 author = Ulysses (per 守门 #10 + 8/27 19:39 JST 授权)
+
+
+
 
 
 

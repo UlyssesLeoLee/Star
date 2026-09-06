@@ -400,16 +400,17 @@ def all_nodes():
     for o in other_crates:
         nodes.append(Node(o[0], o[0], "platform", "Cross", o[1], o[2], "-", o[3], [], [], None, ["04-domain-crates", "99-pg-broker-audit"]))
 
-    # ---------- 9 个 docswiki 列的"应新建" domain crate (设计意图, 0/9 实装 per `cargo metadata`) ----------
+    # ---------- 9 个 docswiki 列的"应新建" domain crate (S5 §1.1 9 个清单, 0/9 完整实装 per `cargo metadata`, 但 domain-context 有 1 src stub 算 partial-impl) ----------
     design_only = [
-        ("domain-dispatcher-design", "★ 设计意图 0/9 实装, 跟已实装 star-dispatcher 命名冲突, 待重命名 (per §7 dual-namespace + ADR-0048)", "S5 §1.1", "TBD"),
-        ("domain-llm-design", "★ 设计意图 0/9 实装, 命名无冲突, 待 P3-C 实装", "S5 §1.1", "TBD"),
-        ("domain-mcp-design", "★ 设计意图 0/9 实装, 跟已实装 star-mcp 命名冲突, 待重命名", "S5 §1.1", "TBD"),
-        ("domain-tool-design", "★ 设计意图 0/9 实装, 命名无冲突, 待 P3-C 实装", "S5 §1.1", "TBD"),
-        ("domain-rag-design", "★ 设计意图 0/9 实装, 命名无冲突, 待 P3-E 实装", "S5 §1.1", "TBD"),
-        ("domain-memory-design", "★ 设计意图 0/9 实装, 命名无冲突, 待 P3-D 实装", "S5 §1.1", "TBD"),
-        ("domain-rate-limiter-design", "★ 设计意图 0/9 实装, 命名无冲突, 待 P3-B 实装", "S5 §1.1", "TBD"),
-        ("domain-observability-design", "★ 设计意图 0/9 实装, 命名无冲突, 待 P3-B 实装", "S5 §1.1", "TBD"),
+        ("domain-dispatcher-design", "★ 设计意图, 跟已实装 star-dispatcher 命名冲突, 待重命名 (per §7 dual-namespace + ADR-0048)", "S5 §1.1", "TBD"),
+        ("domain-llm-design", "★ 设计意图, 命名无冲突, 待 P3-C 实装", "S5 §1.1", "TBD"),
+        ("domain-mcp-design", "★ 设计意图, 跟已实装 star-mcp 命名冲突, 待重命名", "S5 §1.1", "TBD"),
+        ("domain-tool-design", "★ 设计意图, 命名无冲突, 待 P3-C 实装", "S5 §1.1", "TBD"),
+        ("domain-rag-design", "★ 设计意图, 命名无冲突, 待 P3-E 实装", "S5 §1.1", "TBD"),
+        ("domain-context-design", "★ partial-impl: cargo metadata 已有 1 src stub (crates/domain-context/src/), 但 S5 §1.1 仍列'应新建', 待跟已实装 star-context 合并或重命名 (per §7 dual-namespace + ADR-0048)", "S5 §1.1 + cargo metadata 1 src stub", "partial"),
+        ("domain-memory-design", "★ 设计意图, 命名无冲突, 待 P3-D 实装", "S5 §1.1", "TBD"),
+        ("domain-rate-limiter-design", "★ 设计意图, 命名无冲突, 待 P3-B 实装", "S5 §1.1", "TBD"),
+        ("domain-observability-design", "★ 设计意图, 命名无冲突, 待 P3-B 实装", "S5 §1.1", "TBD"),
     ]
     for d in design_only:
         nodes.append(Node(d[0], d[0], "domain", "Cross", d[1], d[2], "-", d[3], [], [], None, ["04-domain-crates", "99-pg-broker-audit"]))
