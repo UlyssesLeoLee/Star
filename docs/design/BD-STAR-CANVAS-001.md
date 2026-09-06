@@ -1,6 +1,28 @@
 # BD-STAR-CANVAS-001
 
-> **STAR 无限画布 基本設計書 v0.1** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
+> **⚠️ SUPERSEDED 2026-09-07 JST ⚠️**
+>
+> **本 BD v0.1 (commit `68c200c`) 已被全面推翻重写。**
+>
+> **推翻原因**: 2026-09-07 06:47 JST 用户拍板, 产品方向从"Miro 风协作画布"调整为"画布里的弹幕 Roguelike 游戏 + 3渲2 像素风机器人角色"。
+>
+> **替代文档**: [`docs/design/BD-STAR-CANVAS-GAME-001.md`](./BD-STAR-CANVAS-GAME-001.md) v0.1
+>
+> **保留**: 3 crate 架构骨架 (canvas-engine / domain-canvas / canvas-realtime) + Yjs CRDT, 仅 crate 内容改写 + 新增 `canvas-game` 第 4 crate
+>
+> **作废**: 13 ElementRenderer + 8 大功能域 + 5 角色 RACI 65 单元 + Frame as Slide + 5 格式导出 + 10 模板 + WCAG 2.1 AA 40+ 快捷键
+>
+> **状态**: ~~Design Baseline~~ → **SUPERSEDED 2026-09-07**, 请参阅 BD-STAR-CANVAS-GAME-001.md v0.1
+>
+> ---
+>
+> 以下为原 v0.1 内容, 仅作历史归档参考, 不再使用。
+>
+> ---
+>
+> # BD-STAR-CANVAS-001 (v0.1 SUPERSEDED, 仅归档)
+>
+> > **STAR 无限画布 基本設計書 v0.1 (SUPERSEDED)** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
 > - 状态: Design Baseline
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース

@@ -1,6 +1,28 @@
 # DD-STAR-CANVAS-001
 
-> **STAR 无限画布 詳細設計書 v0.1** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート)
+> **⚠️ SUPERSEDED 2026-09-07 JST ⚠️**
+>
+> **本 DD v0.1 (commit `03033a3`) 已被全面推翻重写。**
+>
+> **推翻原因**: 2026-09-07 06:47 JST 用户拍板, 产品方向从"Miro 风协作画布"调整为"画布里的弹幕 Roguelike 游戏 + 3渲2 像素风机器人角色"。
+>
+> **替代文档**: [`docs/design/DD-STAR-CANVAS-GAME-001.md`](./DD-STAR-CANVAS-GAME-001.md) v0.1
+>
+> **保留**: 3 crate 模块树骨架 (canvas-engine / domain-canvas / canvas-realtime) + Yjs 协议 + RLS 13 类 + WORM 触发器 + SCD Type 2
+>
+> **作废**: 13 ElementRenderer Rust impl + 5 角色 RACI 65 单元完整 Rust 矩阵 + axum handler 13 REST 端点 + 7 MCP 工具 + 5 middleware 完整 Rust 代码
+>
+> **状态**: ~~Detailed Design Baseline~~ → **SUPERSEDED 2026-09-07**, 请参阅 DD-STAR-CANVAS-GAME-001.md v0.1
+>
+> ---
+>
+> 以下为原 v0.1 内容, 仅作历史归档参考, 不再使用。
+>
+> ---
+>
+> # DD-STAR-CANVAS-001 (v0.1 SUPERSEDED, 仅归档)
+>
+> > **STAR 无限画布 詳細設計書 v0.1 (SUPERSEDED)** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート)
 >
 > - 状态: Detailed Design Baseline
 > - 目标阶段: 詳細設計 → 実装 → 単体テスト → 結合テスト → リリース

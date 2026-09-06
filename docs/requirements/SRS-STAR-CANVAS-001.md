@@ -1,8 +1,42 @@
 # SRS-STAR-CANVAS-001
 
-> **STAR 无限画布 软件需求规格说明书 v0.1**
+> **⚠️ SUPERSEDED 2026-09-07 JST ⚠️**
 >
-> - 状态: Requirements Baseline Draft (需求基线草案)
+> **本 SRS v0.1 (commit `9a2e6e0` + `934d456` self-review fix) 已被全面推翻重写。**
+>
+> **推翻原因**: 2026-09-07 06:47 JST 用户拍板, 产品方向从"Miro 风协作画布"调整为"画布里的弹幕 Roguelike 游戏 + 3渲2 像素风机器人角色"。
+>
+> **替代文档**: [`docs/requirements/SRS-STAR-CANVAS-GAME-001.md`](./SRS-STAR-CANVAS-GAME-001.md) v0.1 (per 2026-09-07 用户发令"无限画布应该是可以在canvas里玩的弹幕Roughlike游戏")
+>
+> **保留的架构部分** (per 2026-09-07 06:47 JST 用户拍板 "保留架构 + 加游戏层"):
+> - 3 crate 架构: `canvas-engine` (跨域共享) + `domain-canvas` (业务域) + `canvas-realtime` (CRDT 后端) 全部保留
+> - 新增第 4 crate: `canvas-game` (游戏引擎: 角色/弹幕/战斗/3D sprite, 仅机器人走 3D)
+> - Yjs CRDT 实时协作: 保留 (双人/多人合作 Roguelike 协作)
+>
+> **作废的部分**:
+> - 8 大功能域 (画布引擎 / 13 element / 模板 / 演示 / 导入导出 / 5 角色权限 RACI / 40+ 快捷键 / WCAG 2.1 AA) 全部作废
+> - "对标 Miro 完整 800+ 需求点" 目标作废
+> - 5 角色 × 13 资源 RACI 65 单元矩阵作废
+> - 10 模板 + Frame as Slide 演示模式作废
+> - PNG / PDF / SVG / JSON / Miro RTB 5 格式导入导出作废
+>
+> **保留的少量元素** (在新 SRS 中重新定义):
+> - 无限画布坐标系 + viewport pan/zoom/culling 基础 (canvas-engine crate 复用)
+> - 12 element 中 5 个保留为画布装饰 (sticky_note / text / shape / image / embed), 其 7 个 (work_item_card / worktree_node / agent_cursor / automation_node / comment_pin / mind_map_node / flowchart_node) 改写为"游戏关卡/敌人/道具/技能"
+>
+> **状态**: ~~Requirements Baseline Draft~~ → **SUPERSEDED 2026-09-07**, 请参阅 SRS-STAR-CANVAS-GAME-001.md v0.1
+>
+> ---
+>
+> 以下为原 v0.1 内容, 仅作历史归档参考, 不再使用。
+>
+> ---
+>
+> # SRS-STAR-CANVAS-001 (v0.1 SUPERSEDED, 仅归档)
+>
+> > **STAR 无限画布 软件需求规格说明书 v0.1** (SUPERSEDED)
+> >
+> > - 状态: ~~Requirements Baseline Draft (需求基线草案)~~ SUPERSEDED
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 核心语言 (后端): Rust (workspace 已 47 crate, 守门 #1 v12 100% 守门覆盖)
 > - 核心语言 (前端): TypeScript + Next.js 14.2.5 (App Router, 已落地)
