@@ -96,6 +96,12 @@ function AgentViewContent() {
     urlView === "roguelike" ? "roguelike" : urlView === "settings" ? "settings" : "canvas",
   );
 
+  // Mount-gate for derivedAt 时间戳 (per 2026-09-06 19:42 JST hydration 修复):
+  //   server render 时 derivedAt = null (避免 server t0 vs client t0+1s mismatch)
+  //   useEffect mount 后才设 true, 此时 useMemo 重新计算填真实时间
+  const [canvasHydrated, setCanvasHydrated] = useState(false);
+  useEffect(() => { setCanvasHydrated(true); }, []);
+
   // 3渲2 Cel Shader Live Parameters
   const [celPalette, setCelPalette] = useState<CelPalette>("crimson");
   const [celBands, setCelBands] = useState<number>(3);
@@ -141,9 +147,11 @@ function AgentViewContent() {
       nodes: layout.nodes,
       connectors: layout.connectors,
       viewport: fitToContentViewport(layout.bbox, 1200, 800, 60),
-      derivedAt: new Date().toISOString(),
+      // SSR 阶段 derivedAt = null (避免 hydration mismatch: server t0 vs client t0+1s)
+      // client mount 后 useEffect 补真实时间 (per 9/6 19:42 JST 修复)
+      derivedAt: canvasHydrated ? new Date().toISOString() : null,
     };
-  }, [resolution, worktree, relatedWorkItems]);
+  }, [resolution, worktree, relatedWorkItems, canvasHydrated]);
 
   // View 模式切换
   const handleViewModeChange = useCallback(
@@ -546,7 +554,7 @@ function AgentViewContent() {
           V/H 切换 select/pan · +/- 缩放 · 1 适配 · 双击节点跳详情 · 完成 work-item 点 💰 Claim 升级 · 点 Step 消耗 cost
         </span>
         <span>
-          nodes {canvas?.nodes.length ?? 0} · connectors {canvas?.connectors.length ?? 0} · derived {canvas?.derivedAt.slice(11, 19) ?? "—"}
+          nodes {canvas?.nodes.length ?? 0} · connectors {canvas?.connectors.length ?? 0} · derived {canvas?.derivedAt ? canvas.derivedAt.slice(11, 19) : "—"}
         </span>
       </div>
 
