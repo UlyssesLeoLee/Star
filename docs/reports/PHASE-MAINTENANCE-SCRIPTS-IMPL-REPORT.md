@@ -1,10 +1,10 @@
 # PHASE-MAINTENANCE-SCRIPTS-IMPL-REPORT
 
 > **Phase**: Maintenance Scripts 集中化 + 实际验证修复
-> **Period**: 2026-09-06 13:21 JST ~ 17:09 JST
+> **Period**: 2026-09-06 13:21 JST ~ 19:09 JST
 > **Branch**: `feat/auto-20260906-3b4aed04`
-> **Commits**: `d61a8f0`, `1618dea`, `bc5eb88`
-> **Status**: 🟢 Phase Closed (前端 1/3 套全通, 后端 1/3 套待集群接入)
+> **Commits**: `d61a8f0`, `1618dea`, `bc5eb88`, `61acf5e`
+> **Status**: 🟢 Phase Closed (3/3 套脚本就位 + 实测 PASS, 待集群接入)
 
 ---
 
@@ -83,17 +83,39 @@ npm error Missing: @react-three/drei@9.122.0 from lock file
 
 **Fallback 修法** (commit bc5eb88): `update-frontend.ps1` 加 fallback 链 `npm ci → npm install (修 lock) → npm ci (重试)`, 后续撞同类问题自动修复。
 
-### T3 更新后端 (k3s) — ❌ SKIP (集群不可达)
+### T3 更新后端 (k3s) — ❌ SKIP (集群不可达) → ✅ R3' PASS (错误处理路径)
 
-**环境探测** (14:17 JST):
+**环境探测** (14:17 JST + 18:48 JST):
 - kubectl ✅ (Docker Desktop 内置, client v1.32+)
 - helm ✅ (winget install 4.2.4, 已装)
 - ~/.kube/config ✅ 存在 (11227 bytes, 指向 `https://127.0.0.1:52551` = Docker Desktop k8s)
 - **Docker Desktop k8s 当前未启动** → `kubectl cluster-info` 报 `connectex: No connection could be made`
 
-**结论**: 工具齐但集群不可达, 脚本实际跑会卡在 `kubectl cluster-info` 失败 + `helm upgrade` 失败, 行为正确 (异常退出 + exit 1) 但意义不大。
+**18:48 JST 实证新问题**: helm.exe 装在 `C:\Users\leo19\AppData\Local\Microsoft\WinGet\Packages\Helm.Helm_Microsoft.Winget.Source_8wekyb3d8bbwe\windows-amd64\helm.exe`, winget 把目录写进 user PATH, 但**新进程找不到**。根因 2 因素叠加:
+1. **Windows PATH 限制 2047 字符**, 本机 user PATH 实测 2204 字符, 末尾 helm 目录**被 Windows 截断**
+2. **MiniMax Code 等长驻进程不重读注册表**, 即使 user PATH 修了, child 进程仍拿不到
+
+**R3' 真验证** (19:09 JST, commit 61acf5e 后): smart pull 走 worktree no-upstream 路径 (ahead 5 / behind 1 报告), ensure helm 找到 winget 装的 v4.2.4, kubectl cluster-info 报 connectex 失败, 脚本干净 exit 1。
+
+**结论**: 工具就位 + 错误处理路径完整, 实际跑通到"集群不可达"边界。等 Docker Desktop k8s 启用后, 同一脚本能直接跑通完整链路。
 
 **本机起 k3s cluster 不在 Phase 范围** (per 守门: 1 套 = 工具就位, 起集群是 deployment 范畴, 不属 maintenance/)。
+
+---
+
+## §2.5 第二轮回归 (R1'/R2'/R3', 18:50 ~ 19:09 JST)
+
+触发原因: 启动后新版 (= commit 61acf5e) 跑回归, 发现 2 个真实 bug, 修后再验。
+
+| 测试 | 第一次 | 修复 | 第二次 | 结果 |
+|---|---|---|---|---|
+| R1' start-frontend | ✅ PASS (next dev 14.2.5, 6.3s Ready) | 无 | — | **PASS** |
+| R2' update-frontend | ❌ FAIL: `git pull --ff-only` exit 1 (无 upstream) | smart pull 3 场景 (a/b/c) | ✅ PASS: 报告 ahead 5 / behind 1, 继续 npm ci | **PASS** |
+| R3' update-backend-k3s | 同 R2' 同样问题 + helm 找不到 | 同 R2' smart pull + ensure helm 4 候选位置 | ✅ PASS: helm 4.2.4 找到, kubectl cluster-info 报 connectex 失败 (符合预期) | **PASS** |
+
+**R2' / R3' 安全门实证**: 第一次跑都因为"工作区有未提交改动"被脚本拒了, 说明 `git status --porcelain` 检查正确生效; 改完后 commit 61acf5e, 再跑都通过。
+
+**R2' 设计选择**: ahead 5 / behind 1 是**分叉**状态, 但脚本只 warn 不 throw。这是正确选择——update 脚本应该容许用户后续手动 rebase / merge, 不强加策略。如果用户想要 strict, 守门 #1 R-05 已覆盖 "不自动 push"。
 
 ---
 
@@ -107,7 +129,9 @@ npm error Missing: @react-three/drei@9.122.0 from lock file
 | G4 | helm chart templates 只有 _helpers / NOTES / secret, 缺 deployment/service/configmap/hpa | helm upgrade 实际装不完整 | 需 Phase F-I 拍板 chart 完整结构 |
 | G5 | ingress className: nginx (违反 9/1 13:03 JST nginx→envoy 拍板) | 边缘层架构不一致 | 5 域 Lead 拍板 (per 守门 #25 v2 内推) |
 | G6 | T1 真验证时发现 lock 失步 (commit 1618dea 已修 + bc5eb88 fallback 已加) | 同类问题未来会自愈, 但要警惕"silent lock regen" 副作用 | 已加 fallback, DDD Review 跟踪 |
-| G7 | winget 装 helm 没自动写 shim, 当前 session PATH 手动加, 重启 shell 后需重设 | 临时不便 | `scoop install helm` 或用户 PATH 配置 |
+| G7 | helm.exe 在 WinGet 包目录 (版本号路径), 不在常规位置 (per 9/6 18:48 JST 实证) | 脚本要 hard-code 4 个候选 + user PATH 扫 | 已修: Resolve-HelmExe 函数 (commit 61acf5e) |
+| G8 | Windows PATH 限制 2047 字符, user PATH 超长末尾被截断 (per 9/6 18:48 JST 实证 user PATH 2204 → 截断) | G7 间接修复: ensure helm 走绝对路径, 不依赖 shell PATH | 已规避 (commit 61acf5e) |
+| G9 | MiniMax Code 等长驻进程不重读注册表, child 进程拿不到新 user PATH (per 9/6 18:48 JST 实证) | 即使修 user PATH 也无效, 必须重启宿主 | 外部问题, 报告加 G9 标 N/A |
 
 ---
 
@@ -160,4 +184,5 @@ npm error Missing: @react-three/drei@9.122.0 from lock file
 | v | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
 | v0.1 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 初稿: 3 套脚本 + lock 修复 + T1/T2/T3 验证 | 2026-09-06 17:09 JST 完成 T1' 真验证后落档 |
-| (后续) | (待 SRE Lead / 5 域 Lead 到位) | G1-G5 缺口补完后 v0.2 | 拍板 Dockerfile + chart 模板后 |
+| v0.2 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 | 第二轮回归 R1'/R2'/R3': 修 2 个真 bug (smart pull + ensure helm), 加 G7-G9 已知缺口, §2.5 新增 | 2026-09-06 19:09 JST 完成 commit 61acf5e + R2''/R3' 实测后落档 |
+| (后续) | (待 SRE Lead / 5 域 Lead 到位) | G1-G5 缺口补完后 v0.3 | 拍板 Dockerfile + chart 模板后 |
