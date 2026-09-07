@@ -1,6 +1,6 @@
 //! crates/star-taskgraph — Task ↔ Worktree 1:1 绑定 + react-flow graph
 //!
-//! H.6 任务卡 ↔ worktree 1:1 绑定 + react-flow graph 渲染 (per P4-H.6, 守门 #19 [P] 拍板)
+//! H.6 任务卡 ↔ worktree 1:1 绑定 + react-flow graph 渲染 (per P4-H.6, 守门 #19 \[P\] 拍板)
 //! per `docs/architecture/2026-09-03-treesitter-worktree-graph/01-requirements.md` §1.4
 //!
 //! 关键不变量 (per §1.4):
