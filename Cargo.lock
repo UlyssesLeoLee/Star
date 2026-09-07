@@ -938,6 +938,8 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "domain-comment",
+ "domain-notification",
  "serde",
  "star-context",
  "thiserror 1.0.69",
