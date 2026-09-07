@@ -352,7 +352,12 @@ impl LocalRuntime for RealHttpRuntime {
         _worktree_dir: &str,
     ) -> Result<ProcessHandle, RuntimeError> {
         // 真实 CLI spawn 由 Phase 2 单独的 w22 实现, 这里只返回 mock
-        Err(RuntimeError::SpawnFailed("CLI spawn in RealHttpRuntime not implemented; use DefaultLocalRuntime::with_real_processes() in Phase 2".into()))
+        // (per P4-WBS Phase H.2 拍板启动)
+        // 注意: #[deprecated] 在 Rust stable 不能放在 trait impl 方法上
+        // 改用结构化 RuntimeError::SpawnFailed(feature=..., suggestion=...) 表达 deprecation
+        Err(RuntimeError::SpawnFailed(format!(
+            "feature=cli_spawn_in_real_runtime, suggestion=use DefaultLocalRuntime::with_real_processes() in Phase 2, current_phase=P3, p4_phase=H.2"
+        )))
     }
 
     async fn invoke_http(

@@ -27,7 +27,13 @@ impl Provider for BitbucketProvider {
         Ok(vec![])
     }
     async fn get_repo(&self, _owner: &str, _name: &str) -> Result<Repo, ProviderError> {
-        Err(ProviderError::NotFound("not implemented".into()))
+        // Phase F 远端 API 暂未实装 (per P4-WBS Phase H.2 拍板启动)
+        // 注意: #[deprecated] 在 Rust stable 不能放在 trait impl 方法上
+        // 改用结构化 ProviderError::NotImplemented { feature, suggestion } 表达 deprecation
+        Err(ProviderError::NotImplemented {
+            feature: "bitbucket_api_get_repo".into(),
+            suggestion: "use LocalProvider for tests, real impl pending P4-WBS Phase H.2".into(),
+        })
     }
     async fn list_branches(&self, _owner: &str, _repo: &str) -> Result<Vec<Branch>, ProviderError> {
         Ok(vec![])
