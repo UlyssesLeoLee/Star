@@ -15,15 +15,26 @@
 //! 运行: cargo test -p domain-local-runtime --lib e2e_integration
 //! 受 5-min timeout 约束, 平台降级是允许的 (per P3-A.3 报告 §3 缺口 #2 + P3-A.4 #7)
 
+#[cfg(test)]
 use std::collections::HashMap;
+#[cfg(test)]
 use std::time::Duration;
+#[cfg(test)]
 use uuid::Uuid;
 
+#[cfg(test)]
 use super::process::{LocalRuntime, OutputLine, OutputStream, ProcessState};
+#[cfg(test)]
 use super::spawn_upload_hub::{HubAdapterConfig, HubIntegratorAdapter};
+#[cfg(test)]
 use super::spawn_upload_integration::SpawnUploadIntegrator;
-use super::sse_parser::{SseChunk, SseParser};
+use super::sse_parser::SseChunk;
+#[cfg(test)]
+#[cfg(test)]
+use super::sse_parser::SseParser;
+#[cfg(test)]
 use super::subscribe_integration::HubCliRuntime;
+#[cfg(test)]
 use super::subscribe_real::OutputHub;
 
 // =====================================================================
