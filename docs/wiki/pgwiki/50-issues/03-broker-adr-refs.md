@@ -1,6 +1,6 @@
 ---
 title: "Broker ADR Refs(ADR 引用但 crate 不存在)"
-generated: "2026-09-06T09:12:11Z"
+generated: "2026-09-07T11:36:27Z"
 node_type: "audit-issue"
 ---
 
@@ -20,7 +20,7 @@ node_type: "audit-issue"
 | `star-lsp-proxy` | 0027-star-ide-gateway.md | `- LSP Proxy（`star-lsp-proxy`）MVP 阶段不实现；Phase 2 再加（per arch/04 §6）` |
 | `star-optional` | 0025-vendor-adapter-anti-contamination.md | `- workspace 多了一层（`star-optional`）` |
 
-**生成时间**: 2026-09-06T09:12:11Z
+**生成时间**: 2026-09-07T11:36:27Z
 **来源**: `pgwiki_audit.py` Issue 4
 
 ## Counters

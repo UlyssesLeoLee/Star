@@ -1,6 +1,6 @@
 ---
 title: "Placeholder Schemas(crate 在,schema 表未落地)"
-generated: "2026-09-06T09:12:11Z"
+generated: "2026-09-07T11:39:18Z"
 node_type: "audit-issue"
 ---
 
@@ -13,14 +13,13 @@ node_type: "audit-issue"
 
 | Schema | 占位 crate | 实际表数 | 建议 |
 |---|---|---|---|
-| `kms` | `domain-kms` | 0 | DDD Review 阶段确认是否落地 schema 设计,或撤映射|
 
-**生成时间**: 2026-09-06T09:12:11Z
+**生成时间**: 2026-09-07T11:39:18Z
 **来源**: `pgwiki_audit.py` Issue 2
 
 ## Counters
 
 ```json
-{"placeholder_schemas": 1, "placeholder_list": ["kms"]}
+{"placeholder_schemas": 0, "placeholder_list": []}
 ```
 

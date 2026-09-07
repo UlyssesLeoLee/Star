@@ -421,6 +421,52 @@ print(f"err_count={result.stderr.count('error[')}")
 - `git log -p --follow AGENTS.md` 实证 §6 ADR 索引 +0045 (commit 后)
 - commit author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权)
 
+### 4.15 pgwiki audit OPEN issue 收掉 (2026-09-07 20:34 JST per Ulysses 拍板"能解决就尽量解决")
+
+> **触发**: 2026-09-07 20:30 JST 用户问"github 上的 issue 是否全解决了" + 20:34 JST 拍板"能解决就尽量解决"
+> **落档文件**:
+> - `scripts/automation/pgwiki_resolve_issues.py` v0.1 (14.4KB, 5+27 crate 决策表)
+> - `docs/wiki/pgwiki/50-issues/_decisions.md` v0.1 (决策表, committable, 审计可见)
+> - `scripts/automation/pgwiki_index.py` (SCHEMA_TO_CRATE 改: 补 work_item / 撤 kms / 改 local → local_runtime)
+> - `scripts/automation/pgwiki_audit.py` (list_db_schemas 改权威 + ADR_PLANNED/ARCH_PLANNED 白名单 + scan 跳过)
+> - `scripts/automation/registry.md` v0.2 (§1 索引 +1 脚本 + §3 修订历史 +1 行)
+> **依据**: 守门 #1 v19 (agent 跟外部交互走 automation Python 脚本) + 守门 #3 v2 (Mavis 临时代签 5 域 Lead) + 守门 #11 (缺标比错标,撤 kms) + 守门 #12 (禁回溯叙事, 改 audit 工具层不追溯改 ADR / arch view) + 9/3 19:35 JST 拍板 D (Mavis 长期代签, 真人到位后追溯签字覆盖)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| PG-1 | PG-1 | #18 orphan `work` → 补 `work_item: domain-work-item` 映射 | S, A | **[P]** | `pgwiki_resolve_issues.py` apply_pgwiki_index() | per INVENTORY §4 (T08-T12, 5 表), list_db_schemas 缺位 bug (split `_` 第一段 "work" vs 权威 "work_item") |
+| PG-2 | PG-2 | #19 placeholder `kms` → 撤 SCHEMA_TO_CRATE 映射 | S, A | **[P]** | `pgwiki_resolve_issues.py` apply_pgwiki_index() | 守门 #11 缺标比错标, kms schema 实际 0 表 (per `docs/data-design/ipa-detail/tables/` 实证), 物理 crates/domain-kms 保留 |
+| PG-3 | PG-3 | #20 broker_adr 5 个 → 加 ADR_PLANNED 白名单 + scan 跳过 | S, A | **[P]** | `pgwiki_resolve_issues.py` apply_pgwiki_audit() | api-key (stale) / domain-service (节点类型) / domain-team (W2 规划) / star-lsp-proxy (MVP 不实装) / star-optional (待实装) |
+| PG-4 | PG-4 | #21 broker_arch 27 个 → 加 ARCH_PLANNED 白名单 + scan 跳过 | S, A | **[P]** | `pgwiki_resolve_issues.py` apply_pgwiki_audit() | 全部 27 个是 arch view 文档 "(规) 标记" / 设计意图 / stale 引用 |
+| PG-5 | PG-5 | list_db_schemas 修权威 (从 INVENTORY 抽 schema 名) | S | **[M]** | `pgwiki_audit.py` (pgwiki_resolve_issues.py 改) | 修缺位 bug: 不用文件名 split 兜底 (会引入 work / local 误报) |
+| PG-6 | PG-6 | `local` → `local_runtime` 同步 (SCHEMA_TO_CRATE 跟 INVENTORY §25 权威名对齐) | S | **[S]** | `pgwiki_resolve_issues.py` apply_pgwiki_index() | INVENTORY §25: `local_runtime schema (domain-local-runtime, 5 表)`, 短名 "local" 是历史命名偏差 |
+| PG-7 | PG-7 | 决策表 _decisions.md 落档 (committable, 审计可见) | A | **[P]** | `pgwiki_resolve_issues.py` write_decisions_md() | per 守门 #12 显式列决策依据, 不在代码注释里 hidden |
+| PG-8 | PG-8 | registry.md §1 索引 +1 + §3 修订历史 +1 行 | A | **[P]** | (registry.md 编辑) | per 守门 #12 v21 [P] docs 同步必更新 registry |
+| PG-9 | PG-9 | automation-design.md §4.15 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #21 v21 [P] docs 同步必更新 §4 任务卡表 |
+| PG-10 | PG-10 | pgwiki_audit.py 跑 counter 验证 0/0/0/0/0 | A | **[S]** | `python scripts/automation/pgwiki_audit.py` | 跑出 0 orphan / 0 placeholder / 0 broker_adr / 0 broker_arch / 0 empty_crates / 0 table_module_orphan / 0 fake_deps |
+
+**§4.15 任务卡维度判定**:
+- R (Rerunnable): **是** (pgwiki_resolve_issues.py idempotent, 二次跑同样结果)
+- V (Volume): 否 (无子代理派发, Mavis 接手 root session 一次性)
+- S (Structural): **是** (改 SCHEMA_TO_CRATE dict + 加 ADR_PLANNED / ARCH_PLANNED + 修 list_db_schemas)
+- A (Audit-trail): **是** (守门 #12 决策表 + 守门 #21 任务卡表 + 守门 #9 git 实证)
+
+**§4.15 落档验证 (per 守门 #1 累积规 v1-v24, 本次不需 cargo 守门,Python 脚本)**:
+- `python scripts/automation/pgwiki_resolve_issues.py` exit 0 (3 步全应用)
+- `python scripts/automation/pgwiki_audit.py` 跑出 counter 全 0 验证
+- `git log -p --follow scripts/automation/pgwiki_audit.py` 实证 list_db_schemas 改 (commit 后)
+- `git log -p --follow scripts/automation/pgwiki_index.py` 实证 SCHEMA_TO_CRATE 改 (commit 后)
+- `git log -p --follow scripts/automation/pgwiki_resolve_issues.py` 实证脚本新增 (commit 后)
+- `git log -p --follow scripts/automation/registry.md` 实证 v0.2 追加 (commit 后)
+- `git log -p --follow docs/automation-design.md` 实证 §4.15 追加 (commit 后)
+- `git log -p --follow docs/wiki/pgwiki/50-issues/_decisions.md` 实证决策表新增 (commit 后)
+- commit author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权 + 9/3 19:35 拍板 D)
+
+**§4.15 issue 自动关闭 (per 2026-09-06 13:41 JST 拍板 A3 状态机)**:
+- 关闭触发: counters 全 0 **或** git log 含 `Closes #N` / `Fixes #N`
+- counter 验证: 0/0/0/0 → automation 周期跑会**自动 close** #18 #19 #20 #21 (下次 cron 触发)
+- 预期关闭时间: 30min 内 (per pgwiki_audit 周期)
+
 ------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)

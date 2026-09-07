@@ -38,13 +38,63 @@ CRATES = REPO / "crates"
 SCHEMA_TO_CRATE = {
     "tenant": "domain-tenant", "permission": "domain-permission", "scm": "domain-scm",
     "agent": "domain-agent", "identity": "domain-identity", "validation": "domain-validation",
-    "planning": "domain-planning", "local": "domain-local-runtime", "worktree": "domain-worktree",
+    "planning": "domain-planning", "worktree": "domain-worktree",
     "comment": "domain-comment", "context": "domain-context", "project": "domain-project",
     "board": "domain-board", "audit": "domain-audit", "workflow": "domain-workflow",
     "feedback": "domain-feedback", "notification": "domain-notification",
     "integration": "domain-integration", "collaboration": "domain-collaboration",
     "relation": "domain-relation", "workspace": "domain-workspace", "search": "domain-search",
-    "automation": "domain-automation", "kms": "domain-kms", "development": "domain-development",
+    "automation": "domain-automation", "development": "domain-development",
+    "work_item": "domain-work-item",  # per INVENTORY §4 (T08-T12)
+    "local_runtime": "domain-local-runtime",  # per INVENTORY §25 权威名
+    # kms 已撤 (per 2026-09-07 20:34 JST Mavis 接手拍板,守门 #11 缺标比错标)
+}
+
+
+
+# ============================================================
+# 规划中 / 已声明不实装 / 节点类型 白名单
+# (per 2026-09-07 20:34 JST Mavis 接手拍板 + 守门 #3 v2 Mavis 临时代签)
+# 显式列,committable,审计可见;不掩盖,不是"无脑 skip"
+# 详细决策: docs/wiki/pgwiki/50-issues/_decisions.md
+# ============================================================
+ADR_PLANNED = {
+    "api-key": "grep 0 匹配 (audit 误报,stale 引用,本次 5/27 同时清理)",
+    "domain-service": "ADR-0040 §3 节点类型名 (LangGraph 抽象),非 crate",
+    "domain-team": "ADR-0034 §6.4 W2 Jira 化决策,22 DDD bounded context 待 DDD Review 拍板",
+    "star-lsp-proxy": "ADR-0027 §2.3 'MVP 不实装,Phase 2'",
+    "star-optional": "ADR-0025 §3 'workspace 多一层,待实装'"
+}
+
+ARCH_PLANNED = {
+    "api-key": "audit 误报,grep 全仓 0 匹配 (stale 引用)",
+    "domain-backpressure": "agent-runtime 02-basic-design §3 L2 业务共享池 (规) 标记",
+    "domain-cb": "agent-runtime 02-basic-design (规) 标记,circuit breaker 池",
+    "domain-dispatcher": "agent-runtime 02-basic-design (规) 标记,任务派发池",
+    "domain-graph-agent": "agent-runtime / langgraph view 设计意图,Graph Agent 实体",
+    "domain-http": "agent-runtime (规) HTTP Pool",
+    "domain-memory": "agent-runtime (规) Memory Pool",
+    "domain-observability": "agent-runtime (规) Observability Pool",
+    "domain-ops-rbac": "ops 域 RBAC 抽象,DDD Review 拍板",
+    "domain-policy": "agent-runtime (规) Policy Engine",
+    "domain-prompt": "agent-runtime (规) Prompt Registry",
+    "domain-provider": "agent-runtime (规) Provider Pool (LLM/HTTP/MCP)",
+    "domain-queue": "agent-runtime (规) TaskQueue",
+    "domain-rag": "agent-runtime (规) RAG Pool",
+    "domain-rate-limiter": "agent-runtime (规) Rate Limiter",
+    "domain-retry": "agent-runtime (规) Retry 策略",
+    "domain-service": "agent-runtime (规) 节点类型抽象,非 crate",
+    "domain-team": "Jira 化 W2 规划,per ADR-0034",
+    "star-cache-readonly": "audit 误报,grep 全仓 0 匹配 (stale 引用)",
+    "star-ide-gateway": "per ADR-0027 §2 'star-ide-gateway' 路径别名引用,实际实现归 star-mcp",
+    "star-lsp-proxy": "per ADR-0027 §2.3 'MVP 不实装,Phase 2'",
+    "star-mcp-readwrite": "per ADR-0032 设计意图,MCP stdio / Streamable HTTP 双模",
+    "star-optional": "per ADR-0025 §3 'workspace 多一层,待实装'",
+    "star-postgres": "per ADR-0047 PostgreSQL Checkpointer Tier 3,启动 = 5 域 Lead 真人 T3 至少 1 人到位 (per 守门 #14 v2 + 9/5 拍板)",
+    "star-redis": "Redis Pool 设计意图,跟 star-postgres 同等 (T3 启动)",
+    "star-rest": "REST adapter 设计意图,per ADR-0029 Universal Submit",
+    "star-sa-cluster": "Sub-agent Cluster 设计意图,per LangGraph view §2 SA-01..SA-09",
+    "star-system": "System 共享层设计意图,per agent-runtime 02-basic-design"
 }
 
 
@@ -63,10 +113,16 @@ def parse_cargo_members():
 
 
 def list_db_schemas():
+    """权威 schema 名从 INVENTORY.md §N 抽(per 守门 #12 BAS 实证)。
+
+    仅用 INVENTORY 权威,不用文件名 split 兜底(per 9/7 20:34 JST 修 #18 "work" 缺位 bug):
+    文件名 split 会把 `work_item_*.md` split 成 "work" (无对应 schema 段),
+    把 `local_runtime_*.md` split 成 "local",引入误报 orphan。
+    """
     out = set()
-    for f in DB_TABLES.glob("*.md"):
-        s = f.stem.split("_", 1)[0]
-        out.add(s)
+    inv = (DB_DETAIL / "00-INVENTORY.md").read_text(encoding="utf-8", errors="replace")
+    for m in re.finditer(r"^## \d+\.\s+(\w+)\s+schema", inv, re.MULTILINE):
+        out.add(m.group(1))
     return out
 
 
@@ -97,6 +153,9 @@ def scan_adrs_for_crate_refs():
     refs = {r for r in refs if not any(r.endswith(suf) or suf in r for suf in bad_suffix)}
     # 再过滤带特殊字符(像 \u00a0 等)+ 长度<5 的怪引用
     refs = {r for r in refs if r.replace("-", "").isalnum() and len(r) >= 5}
+    # 跳过规划中 / 已声明不实装 / 节点类型 (per 9/3 19:35 拍板 D Mavis 临时代签)
+    # 决策依据: docs/wiki/pgwiki/50-issues/_decisions.md §#20
+    refs = refs - set(ADR_PLANNED.keys())
     return refs
 
 
@@ -113,6 +172,9 @@ def scan_arch_views_for_crate_refs():
                   "-gateway-arch", "compat-arch", "-runtime-srs", "compat")
     refs = {r for r in refs if not any(r.endswith(suf) or suf in r for suf in bad_suffix)}
     refs = {r for r in refs if r.replace("-", "").isalnum() and len(r) >= 5}
+    # 跳过规划中 / 已声明不实装 (per 9/3 19:35 拍板 D Mavis 临时代签)
+    # 决策依据: docs/wiki/pgwiki/50-issues/_decisions.md §#21
+    refs = refs - set(ARCH_PLANNED.keys())
     return refs
 
 

@@ -1,6 +1,6 @@
 ---
 title: "Orphan Schemas(有表无 crate 映射)"
-generated: "2026-09-06T09:12:11Z"
+generated: "2026-09-07T11:37:02Z"
 node_type: "audit-issue"
 ---
 
@@ -13,14 +13,14 @@ node_type: "audit-issue"
 
 | Schema | DB 文件数 | pgwiki 节点 | 应主责 crate(需 DDD Review 拍板)|
 |---|---|---|---|
-| `work` | 5 | 无 | ?(DDD Review 阶段拍)|
+| `local_runtime` | 4 | 无 | ?(DDD Review 阶段拍)|
 
-**生成时间**: 2026-09-06T09:12:11Z
+**生成时间**: 2026-09-07T11:37:02Z
 **来源**: `pgwiki_audit.py` Issue 1
 
 ## Counters
 
 ```json
-{"orphan_schemas": 1, "orphan_list": ["work"]}
+{"orphan_schemas": 1, "orphan_list": ["local_runtime"]}
 ```
 

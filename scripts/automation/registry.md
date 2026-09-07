@@ -37,6 +37,7 @@
 | `scripts/automation/registry_check.py` | 索引一致性校验 (per §6.7) | CI 守门基线 step 7 | TBD | 🟢 完成 (warning 不阻塞) |
 | `scripts/automation/charts_p0_setup.py` | P0 图表基础设施 + C01 完整跑通 (per docs/briefs/P3-CHARTS-P0.md) | CHARTS-P0 阶段 1 (Recharts 3 依赖 + crates/domain-report 12 Rust + frontend 4 文件 + 19/19 测试) | TBD | 🟢 完成 (16 文件写入, 19/19 测试 pass, 0 err / 0 clippy) |
 | `scripts/automation/kanban_sprint_gen.py` | kanban-vmodel-jp Sprint 视图 P1 + P2 + P3 验证 (93 项检查: app.js 函数 + index.html 结构 + styles.css class) | KANBAN-SPRINT-001 P1 (Sprint 核心 + Jira 設計) + P2 (度量) + P3 (仪式) | TBD | 🟢 完成 (93/93 pass, `--strict` exit 0) |
+| `scripts/automation/pgwiki_resolve_issues.py` | 一次性收掉 4 个 OPEN pgwiki audit issue (#18-#21) — 补 work_item 映射 + 撤 kms + ADR/ARCH 规划白名单 (per 2026-09-07 20:34 JST 拍板) | pgwiki-audit-issue-resolution-001 (本次 5+27 crate 决策) | TBD | 🟢 完成 (counter 全 0 验证: 0 orphan / 0 placeholder / 0 broker_adr / 0 broker_arch) |
 
 **说明**:
 - 末次 commit 列填 `TBD` = 本批次 v0.1 初版, commit 落地后回填
@@ -62,6 +63,7 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: 8 份脚本索引 (__init__.py × 2 + dispatcher + cli_helper/base + refactor_template + judge + smoke_test + registry_check), 任务卡调用方映射, 状态 🟢/🟡 分档 | 2026-09-02 00:39 JST 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档" + 守门 #12 派生 v2 |
+| v0.2 | 2026-09-07 | 架构师 (Mavis 接手 agent per DEC-008) | +1 份脚本: `pgwiki_resolve_issues.py` (pgwiki 4 OPEN issue 一次性收掉: #18 补 work_item / #19 撤 kms / #20 5 个 ADR_PLANNED / #21 27 个 ARCH_PLANNED, counter 全 0 验证) | 2026-09-07 20:34 JST Ulysses 拍板 "能解决就尽量解决" |
 
 ---
 

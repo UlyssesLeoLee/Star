@@ -299,7 +299,7 @@ SCHEMA_TO_CRATE = {
     "identity": "domain-identity",
     "validation": "domain-validation",
     "planning": "domain-planning",
-    "local": "domain-local-runtime",  # runtime schema
+    "local_runtime": "domain-local-runtime",  # runtime schema (per INVENTORY §25 权威名)
     "worktree": "domain-worktree",
     "comment": "domain-comment",
     "context": "domain-context",
@@ -307,6 +307,7 @@ SCHEMA_TO_CRATE = {
     "board": "domain-board",
     "audit": "domain-audit",
     "workflow": "domain-workflow",
+    "work_item": "domain-work-item",  # per INVENTORY §4 (T08-T12)
     "feedback": "domain-feedback",
     "notification": "domain-notification",
     "integration": "domain-integration",
@@ -315,7 +316,7 @@ SCHEMA_TO_CRATE = {
     "workspace": "domain-workspace",
     "search": "domain-search",
     "automation": "domain-automation",
-    "kms": "domain-kms",
+    # kms 已撤 (per 2026-09-07 20:34 JST Mavis 接手拍板,守门 #11 缺标比错标)
     "development": "domain-development",
 }
 
