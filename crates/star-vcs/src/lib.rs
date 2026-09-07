@@ -2,7 +2,7 @@
 //!
 //! 公开 API:
 //! - [`cache::VcsCache`]          — R-007 cache 抽象 (async trait: get/put/invalidate/clear)
-//! - [`cache::InMemoryVcsCache`]  — MVP 进程内后端 (tokio RwLock<HashMap> + TTL + CacheMetrics)
+//! - [`cache::InMemoryVcsCache`]  — MVP 进程内后端 (tokio `RwLock<HashMap>` + TTL + CacheMetrics)
 //! - [`cache::ProviderCache`]     — Read-through wrapper 集成 [`cache::VcsProvider`] (30s 默认 TTL)
 //! - [`cache::VcsProvider`]       — VCS Provider 最小 trait (Phase F star-sa 引用点)
 //! - [`cache::CacheError`]        — cache 错误类型 (thiserror enum, 4 变体)
