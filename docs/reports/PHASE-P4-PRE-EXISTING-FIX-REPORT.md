@@ -37,7 +37,7 @@
 | `620cc71` | mcp fix #3 | get_symbol 加 nil-actor check | 🟢 完成 | +24/-7 | `620cc71` |
 | `620cc71` | mcp fix #4 | search_code 加 nil-actor check | 🟢 完成 | +30/-7 | `620cc71` |
 | `620cc71` | 派生补 | tools/mod.rs 加 check_actor_tenant helper + error.rs 加 ACTOR_SESSION_INVALID | 🟢 完成 | +30/-9 (helper + error) | `620cc71` |
-| `TBD` | docs | 本报告 docs/reports/PHASE-P4-PRE-EXISTING-FIX-REPORT.md v0.1 (7 段) | 🟢 完成 | TBD | TBD |
+| `159ab7b` | docs | 本报告 docs/reports/PHASE-P4-PRE-EXISTING-FIX-REPORT.md v0.1 (7 段) | 🟢 完成 | +126/-0 line (1 file) | `159ab7b` |
 
 总计: **9 files** (3 frontend + 6 mcp + 1 docs report), **+160 lines / -50 lines** 净 +110.
 
