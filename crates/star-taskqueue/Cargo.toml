@@ -1,0 +1,28 @@
+[package]
+name = "star-taskqueue"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "STAR L0 SQLite WAL Task Queue (Phase G.1) — per SRS-STAR-AGENT-RUNTIME-001 §G-1"
+
+# G.1 (per `docs/briefs/next-session/OPT-NEXT-04-phase-g.md` §3.1):
+# v0.1.0 — SQLite WAL TaskQueue + 1M agents stress test
+# v0.2.0 — Persistent ID + 跨 process 恢复
+# 短 TTL 作業中, completed tasks expire (per 守门 #13 a W 派生规)
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+# SQLite via rusqlite (sync, wrapped in spawn_blocking for tokio)
+rusqlite = { version = "0.32", default-features = false, features = ["bundled"] }
+
+[lints]
+workspace = true

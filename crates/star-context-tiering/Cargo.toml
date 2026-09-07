@@ -1,0 +1,25 @@
+[package]
+name = "star-context-tiering"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "STAR Context Tiering (Phase G.8) — L0/L1/L2 上下文分层 (per AGENTS §6.1)"
+
+# G.8 (per `docs/briefs/next-session/OPT-NEXT-04-phase-g.md` §3.8 + AGENTS §6.1):
+# - L0/L1/L2 上下文分层
+# - L0: 全局会话上下文 (top-level, singleton)
+# - L1: 任务卡子代理上下文 (per-subagent, isolated)
+# - L2: 业务共享池上下文 (LLM Pool / HTTP Pool / MCP Pool etc.)
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+
+[lints]
+workspace = true

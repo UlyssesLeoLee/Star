@@ -1,0 +1,27 @@
+[package]
+name = "star-memory"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "STAR Memory Store (Phase G.6) — 短/长期 memory 分层, W 短 TTL + T append-only 派生"
+
+# G.6 (per `docs/briefs/next-session/OPT-NEXT-04-phase-g.md` §3.6):
+# - 短/长期 memory 分层 (per SRS-001 §3)
+# 守门 #13 W/T 派生:
+# - short_term (ring buffer): W (短 TTL, eviction 自动)
+# - long_term (key-value): T (append-only 审计, 物理删除禁止)
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+
+[lints]
+workspace = true

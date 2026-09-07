@@ -1,0 +1,25 @@
+[package]
+name = "star-telemetry"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "STAR Token Telemetry (Phase G.9) — token 计量 + Prometheus 导出"
+
+# G.9 (per `docs/briefs/next-session/OPT-NEXT-04-phase-g.md` §3.9 + AGENTS §6.1):
+# - Token 计量: per agent / per call
+# - Metrics export: Prometheus / OpenTelemetry (Prometheus 实装, OTel stub)
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+
+[lints]
+workspace = true

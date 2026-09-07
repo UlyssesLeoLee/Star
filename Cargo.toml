@@ -72,7 +72,18 @@ members = [
     "crates/domain-llm",
     "crates/domain-mcp",
     "crates/domain-tool",
-
+    # Phase G.1 (L0 SQLite 任务队列) 启动: 2026-09-07 注册 crates/star-taskqueue (SQLite WAL TaskQueue, per SRS-STAR-AGENT-RUNTIME-001 §G-1, 守门 #13 a W 派生, Mavis 临时代签 5 域 Lead 决策 per 9/3 11:35 JST 反转)
+    "crates/star-taskqueue",
+    # Phase G.3 (EventBus + Mailbox) 启动: 2026-09-07 注册 crates/star-eventbus (in-process pub/sub + Mailbox 3 模式, 守门 #13 a L0 协调 派生)
+    "crates/star-eventbus",
+    # Phase G.5 (Tenant Quota) 启动: 2026-09-07 注册 crates/star-quota (compute / storage / LLM token 配额, 守门 #13 d M 派生 SCD Type 2 + 13 類 RLS)
+    "crates/star-quota",
+    # Phase G.6 (Memory Store) 启动: 2026-09-07 注册 crates/star-memory (短/长期 memory 分层, 守门 #13 W 短 TTL + T append-only 派生)
+    "crates/star-memory",
+    # Phase G.8 (Context Tiering) 启动: 2026-09-07 注册 crates/star-context-tiering (L0/L1/L2 上下文分层, per AGENTS §6.1)
+    "crates/star-context-tiering",
+    # Phase G.9 (Token Telemetry) 启动: 2026-09-07 注册 crates/star-telemetry (token 计量 + Prometheus 导出)
+    "crates/star-telemetry",
 ]
 exclude = ["target"]
 

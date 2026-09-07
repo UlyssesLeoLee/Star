@@ -1,0 +1,28 @@
+[package]
+name = "star-eventbus"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "STAR EventBus + Mailbox (Phase G.3) — in-process pub/sub + at-most-once / at-least-once / exactly-once"
+
+# G.3 (per `docs/briefs/next-session/OPT-NEXT-04-phase-g.md` §3.3):
+# - in-process pub/sub (tokio mpsc 通道)
+# - Mailbox 3 模式: at-most-once / at-least-once / exactly-once
+# - 跨进程 via Redis stream (Phase G+ stub)
+# 守门 #13 a L0 协调 派生: 事件 bus 是 L0 协调设施, 不允许 L1↔L1 直连 (per TMO-03 实证)
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tokio-util = "0.7"
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+futures-util = { workspace = true }
+
+[lints]
+workspace = true
