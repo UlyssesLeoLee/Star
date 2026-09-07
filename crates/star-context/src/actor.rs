@@ -183,9 +183,37 @@ impl ActorContext {
         self.is_tenant_admin() || self.project_ids.contains(&project_id)
     }
 
+    /// 是否可访问指定 Workspace (per domain-project, H2-EXT 扩展, Phase D.1)
+    ///
+    /// **规则**: tenant_admin 永远可访问, 或 actor.workspace_ids 包含 workspace_id
+    pub fn is_in_workspace(&self, workspace_id: Uuid) -> bool {
+        self.is_tenant_admin() || self.workspace_ids.contains(&workspace_id)
+    }
+
+    /// 是否已绑定 TenantPolicy (per domain-tenant, H2-EXT 扩展, Phase D.1)
+    ///
+    /// **规则**: `tenant_policy_id` 非 nil Uuid
+    pub fn has_tenant_policy(&self) -> bool {
+        self.tenant_policy_id.map_or(false, |p| !p.is_nil())
+    }
+
     /// 追加 Project (链式构造)
     pub fn with_project(mut self, project_id: Uuid) -> Self {
         self.project_ids.push(project_id);
+        self
+    }
+
+    /// 追加 Workspace (链式构造, per domain-project H2-EXT Phase D.1)
+    pub fn with_workspace(mut self, workspace_id: Uuid) -> Self {
+        if !self.workspace_ids.contains(&workspace_id) {
+            self.workspace_ids.push(workspace_id);
+        }
+        self
+    }
+
+    /// 设置 TenantPolicy (链式构造, per domain-tenant H2-EXT Phase D.1)
+    pub fn with_tenant_policy(mut self, tenant_policy_id: Uuid) -> Self {
+        self.tenant_policy_id = Some(tenant_policy_id);
         self
     }
 
@@ -391,7 +419,10 @@ mod tests {
 
         let b = a.as_local_runtime();
         assert!(b.is_local_runtime, "as_local_runtime 后应设 true");
-        assert!(b.is_local_runtime(), "is_local_runtime() helper 也应返回 true");
+        assert!(
+            b.is_local_runtime(),
+            "is_local_runtime() helper 也应返回 true"
+        );
     }
 
     #[test]
@@ -434,5 +465,80 @@ mod tests {
         let query_tid = Uuid::new_v4();
         let a = ActorContext::nil_actor_with_tenant(actor_tid);
         assert_ne!(a.tenant_id, query_tid, "跨 tenant 校验应触发");
+    }
+
+    // ===== D.1 Phase D H2-EXT helper tests (per HANDOFF v1.0 §5 D.1) =====
+
+    #[test]
+    fn d1_is_in_workspace_via_workspace_ids() {
+        let w = Uuid::new_v4();
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_workspace(w);
+        assert!(a.is_in_workspace(w));
+        assert!(!a.is_in_workspace(Uuid::new_v4())); // 未授权
+    }
+
+    #[test]
+    fn d1_is_in_workspace_via_tenant_admin() {
+        // tenant_admin 永远可访问任意 workspace
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_role(roles::TENANT_ADMIN);
+        assert!(a.is_in_workspace(Uuid::new_v4()));
+    }
+
+    #[test]
+    fn d1_is_in_workspace_no_workspace_returns_false_for_non_admin() {
+        // 非 admin + 无 workspace_id 绑定 → false
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4());
+        assert!(!a.is_in_workspace(Uuid::new_v4()));
+    }
+
+    #[test]
+    fn d1_with_workspace_idempotent() {
+        // 重复添加同一 workspace_id 不应重复
+        let w = Uuid::new_v4();
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
+            .with_workspace(w)
+            .with_workspace(w);
+        assert_eq!(a.workspace_ids.iter().filter(|id| **id == w).count(), 1);
+    }
+
+    #[test]
+    fn d1_has_tenant_policy_default_false() {
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4());
+        assert!(!a.has_tenant_policy());
+    }
+
+    #[test]
+    fn d1_has_tenant_policy_after_set() {
+        let p = Uuid::new_v4();
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_tenant_policy(p);
+        assert!(a.has_tenant_policy());
+        assert_eq!(a.tenant_policy_id, Some(p));
+    }
+
+    #[test]
+    fn d1_has_tenant_policy_treats_nil_as_false() {
+        // 显式设 nil UUID 视为"无策略", 避免 INV-ACT 误判
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4()).with_tenant_policy(Uuid::nil());
+        assert!(!a.has_tenant_policy());
+    }
+
+    #[test]
+    fn d1_workspace_ids_default_empty() {
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4());
+        assert!(a.workspace_ids.is_empty());
+        assert!(a.tenant_policy_id.is_none());
+    }
+
+    #[test]
+    fn d1_serde_roundtrip_with_workspace_and_tenant_policy() {
+        let w = Uuid::new_v4();
+        let p = Uuid::new_v4();
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
+            .with_workspace(w)
+            .with_tenant_policy(p);
+        let json = serde_json::to_string(&a).unwrap();
+        let b: ActorContext = serde_json::from_str(&json).unwrap();
+        assert_eq!(a.workspace_ids, b.workspace_ids);
+        assert_eq!(a.tenant_policy_id, b.tenant_policy_id);
     }
 }
