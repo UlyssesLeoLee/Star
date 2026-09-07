@@ -117,6 +117,9 @@ sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
 
+# Regex (per OPT-NEXT-06-code-stub §3.4 domain-form + domain-search 实装)
+regex = "1"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

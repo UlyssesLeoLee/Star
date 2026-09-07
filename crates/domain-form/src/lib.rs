@@ -451,11 +451,19 @@ fn validate_field(f: &FormField, v: &serde_json::Value) -> Option<String> {
     None
 }
 
-fn regex_lite(_p: &str) -> Result<(), ()> {
-    Ok(())
-} // stub
-fn re_is_match(_re: &(), _s: &str) -> bool {
-    true
+/// **v0 phase 2 实装** (per OPT-NEXT-06-code-stub §3.4 domain-form 2 regex): 编译 regex 模式
+///
+/// 替换原 stub `regex_lite(_p)` 永远返回 `Ok(())`, 现在用 `regex` crate 真实编译.
+/// 错误时返回 `Err(())` 表示 pattern 非法 (供 validate_field 上层提示).
+fn regex_lite(p: &str) -> Result<regex::Regex, ()> {
+    regex::Regex::new(p).map_err(|_| ())
+}
+
+/// **v0 phase 2 实装** (per OPT-NEXT-06-code-stub §3.4 domain-form 2 regex): 判断字符串是否匹配 regex
+///
+/// 替换原 stub `re_is_match(_re, _s)` 永远返回 `true`, 现在用真实 regex matching.
+fn re_is_match(re: &regex::Regex, s: &str) -> bool {
+    re.is_match(s)
 }
 
 impl Default for FormService {
@@ -566,5 +574,63 @@ mod tests {
             f.public_url("https://star.example.com"),
             "https://star.example.com/forms/contact"
         );
+    }
+
+    /// **v0 phase 2 实装** (per OPT-NEXT-06-code-stub §3.4 domain-form 2 regex):
+    /// 真实 regex 匹配 (替换原 stub 永远 true / 永远 Ok)
+    #[test]
+    fn test_regex_lite_real_impl() {
+        // 1. 有效 pattern 编译成功
+        let re = regex_lite(r"^[a-z0-9]+@[a-z]+\.[a-z]{2,}$");
+        assert!(re.is_ok());
+        // 2. 匹配 email 形式
+        let re = re.unwrap();
+        assert!(re_is_match(&re, "test@example.com"));
+        assert!(!re_is_match(&re, "not-an-email"));
+        assert!(!re_is_match(&re, "missing@dot"));
+    }
+
+    /// 非法 regex 模式应返 Err
+    #[test]
+    fn test_regex_lite_invalid_pattern() {
+        // 未闭合的字符类
+        assert!(regex_lite(r"[unclosed").is_err());
+    }
+
+    /// validate_field 走真 regex 路径 (per lib.rs:444-448 注释)
+    #[test]
+    fn test_validate_field_uses_real_regex() {
+        let field = FormField {
+            key: "code".into(),
+            label: "Code".into(),
+            field_type: FieldType::Text,
+            required: false,
+            default_value: None,
+            options: vec![],
+            validation: FieldValidation {
+                pattern: Some(r"^[A-Z]{3}-\d{4}$".to_string()),
+                ..Default::default()
+            },
+            conditional: None,
+        };
+        // 1. 匹配 pattern
+        assert!(validate_field(&field, &serde_json::json!("ABC-1234")).is_none());
+        // 2. 不匹配 pattern → 返错误
+        let r = validate_field(&field, &serde_json::json!("abc-1234"));
+        assert!(r.is_some());
+        assert!(r.unwrap().contains("不匹配 pattern"));
+        // 3. 非法 pattern 应被 regex_lite 拒 (Err → 不阻断)
+        let bad_field = FormField {
+            validation: FieldValidation {
+                pattern: Some("[unclosed".to_string()),
+                ..Default::default()
+            },
+            ..field.clone()
+        };
+        // 非法 pattern → regex_lite 返 Err → 上层不阻断 (行为同 v0 phase 1 stub 风格,
+        // 但 v0 phase 2 实际是 regex crate 编译失败, 不会静默通过)
+        let r = validate_field(&bad_field, &serde_json::json!("anything"));
+        // 当前实现: regex_lite Err → 跳过 regex 检查, validate_field 返 None (合法)
+        assert!(r.is_none(), "invalid pattern should not block validation");
     }
 }

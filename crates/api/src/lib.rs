@@ -76,6 +76,21 @@ pub trait ApiQuery: Send + Sync {
 // 类型别名与命令/查询/返回类型占位
 // =====================================================================
 /// **命令 / 查询 / 跨 crate 类型占位结构**(Phase 1 骨架:最小字段集)
+///
+/// **v0 phase 2 标记** (per OPT-NEXT-06-code-stub §3.4 3 supporting crate 占位,
+/// per `application/src/lib.rs:127-128` 注释 "Phase 2 由具体 spec 在 `domain-*` 内补全字段;
+/// `crates/application` 等 supporting crate 的占位则在 Phase 2 删除, 改为 `use domain_xxx::*;` 引用"):
+///
+/// - `crates/application` 占位结构: 12 个 (AgentSession + CreateWorkItemFullCommand + Feedback
+///   + RegisterRuntimeFullCommand + RegisterWorktreeFullCommand + Runtime
+///   + StartAgentSessionFullCommand + SubmitFeedbackFullCommand + WorkItem
+///   + WorkItemView + Worktree + WorkItemId type alias)
+/// - `crates/api` 占位结构: ~12 个 (RouteDescriptor + ... 同模式)
+/// - `crates/infrastructure` 占位结构: ~12 个 (StorageDescriptor + ... 同模式)
+///
+/// P2 阶段 worker 子代理实装时按 "use domain_xxx::*;" 引用替换 (派前必先
+/// `automation/dispatcher.py brief(...)` 落 `docs/briefs/<task_id>.md`, per AGENTS.md §4 #20 守门派生).
+/// 当前保留为 P2 阶段前置可编译骨架 (守门 #1 v6 单 crate 100% pass 实证).
 
 /// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
 /// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。
