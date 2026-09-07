@@ -2,9 +2,9 @@
 //!
 //! Per 2026-08-29 10:25 JST Phase 2 候选 1:
 //! 解析 OpenAI-compatible ChatCompletion 流式响应 (data: {json}\n\n)
-//! 提取 choices[0].delta.content
+//! 提取 `choices[0].delta.content`
 //!
-//! 同时支持 SSE 注释 (`: keep-alive`) 和 [DONE] 标记.
+//! 同时支持 SSE 注释 (`: keep-alive`) 和 `[DONE]` 标记.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -179,7 +179,7 @@ pub fn inv_01_data_not_empty(event: &str) -> bool {
     false
 }
 
-/// INV-SSE-02: [DONE] 哨兵表示流结束
+/// INV-SSE-02: `[DONE]` 哨兵表示流结束
 pub fn inv_02_done_sentinel(event: &str) -> bool {
     event.contains("data: [DONE]")
 }
