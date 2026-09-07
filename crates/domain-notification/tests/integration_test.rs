@@ -17,6 +17,13 @@ use domain_notification::{
     NotificationError, NotificationEventType, NotificationQueryPort, NotificationStatus, ProjectId,
     RegisterChannelCommand, TenantId, UpsertTemplateCommand, UserId,
 };
+use domain_permission::{
+    Action, CheckQuery, CreateSchemeCommand, Effect, GrantRoleCommand, InMemoryPermissionService,
+    PermissionCommandPort, PermissionError, PermissionQueryPort, PermissionRule, PermissionScheme,
+    ProjectId as PermProjectId, ResourceType, Role, SubjectType, TenantId as PermTenantId,
+    UpsertRuleCommand, UserId as PermUserId,
+};
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// IT fixture: 普通 user actor (per INV-N-03 仅本人可读/可标记)
@@ -591,4 +598,262 @@ async fn it_v3_mark_read_terminal_state() {
         )
         .await;
     assert!(matches!(res, Err(NotificationError::InvalidState(_))));
+}
+
+// =====================================================================
+// V4: actor 联动 domain-permission check() (per P1-4, 9/7 19:38 JST 派发)
+// =====================================================================
+//
+// 替换字面量 role (`with_role("project_admin")`) 改为先过 PermissionService::check()
+// 再调业务 service。本节演示"actor → permission check → service call"完整闭环,
+// 5 个 IT 覆盖: Allow / 默认 Deny / Viewer 拒绝 / Admin 兜底 / 跨 tenant。
+// 通知域用 ResourceType::AgentSession 作为资源锚 (per 守门 #13 ResourceType enum 6 项)。
+
+/// V4 helper: scheme + Developer × AgentSession × Write = Allow
+async fn setup_dev_notif_write_allow(
+    perm_svc: &InMemoryPermissionService,
+    tenant_id: Uuid,
+    actor: &ActorContext,
+) -> PermissionScheme {
+    let scheme = perm_svc
+        .create_scheme(
+            CreateSchemeCommand {
+                tenant_id: PermTenantId(tenant_id),
+                name: "notif-default".to_string(),
+                actor_user_id: PermUserId::from(actor.user_id),
+            },
+            actor,
+        )
+        .await
+        .expect("scheme create");
+
+    perm_svc
+        .upsert_rule(
+            UpsertRuleCommand {
+                tenant_id: PermTenantId(tenant_id),
+                scheme_id: scheme.id,
+                rule: PermissionRule {
+                    id: domain_permission::PermissionRuleId::new(),
+                    subject_type: SubjectType::Role,
+                    subject_id: None,
+                    role: Some(Role::Developer),
+                    resource_type: ResourceType::AgentSession,
+                    resource_id: None,
+                    actions: vec![Action::Write, Action::Read],
+                    effect: Effect::Allow,
+                },
+            },
+            actor,
+        )
+        .await
+        .expect("rule upsert");
+    scheme
+}
+
+/// V4 helper: 调 check("notification.dispatch") = AgentSession/Write
+async fn check_notification_dispatch(
+    perm_svc: &InMemoryPermissionService,
+    scheme_id: Option<domain_permission::PermissionSchemeId>,
+    tenant_id: Uuid,
+    project_id: ProjectId,
+    user_id: Uuid,
+    actor: &ActorContext,
+) -> Result<bool, PermissionError> {
+    perm_svc
+        .check(
+            CheckQuery {
+                tenant_id: PermTenantId(tenant_id),
+                scheme_id,
+                subject_user_id: PermUserId::from(user_id),
+                project_id: PermProjectId::from(project_id.as_uuid()),
+                resource_type: ResourceType::AgentSession,
+                resource_id: None,
+                action: Action::Write,
+            },
+            actor,
+        )
+        .await
+}
+
+/// **IT-V4-1**: Developer role + Allow 规则 → check("notification.dispatch") = true → dispatch 成功
+#[tokio::test]
+async fn it_v4_perm_check_allow_then_dispatch() {
+    let perm_svc: Arc<InMemoryPermissionService> = InMemoryPermissionService::new_for_test();
+    let svc = InMemoryNotificationService::new();
+    let tenant_id = Uuid::new_v4();
+    let project_id = ProjectId::new();
+    let admin_actor = make_admin_actor(tenant_id);
+
+    let scheme = setup_dev_notif_write_allow(&perm_svc, tenant_id, &admin_actor).await;
+
+    let dev_user = Uuid::new_v4();
+    perm_svc
+        .grant_role(
+            GrantRoleCommand {
+                tenant_id: PermTenantId(tenant_id),
+                user_id: PermUserId::from(dev_user),
+                project_id: PermProjectId::from(project_id.as_uuid()),
+                role: Role::Developer,
+                granted_by: PermUserId::from(admin_actor.user_id),
+            },
+            &admin_actor,
+        )
+        .await
+        .expect("grant Developer");
+
+    let dev_actor = ActorContext::new(dev_user, tenant_id);
+    let allowed = check_notification_dispatch(
+        &perm_svc,
+        Some(scheme.id),
+        tenant_id,
+        project_id,
+        dev_user,
+        &dev_actor,
+    )
+    .await
+    .expect("check 必成功");
+    assert!(
+        allowed,
+        "Developer + Allow 规则 → notification.dispatch 必 allow"
+    );
+
+    // 联动业务:register_channel + dispatch 必成功
+    let ch = svc
+        .register_channel(basic_channel_cmd(tenant_id, dev_user), &dev_actor)
+        .await
+        .expect("register_channel 必成功");
+    assert_eq!(ch.user_id, UserId::from(dev_user));
+    let n = svc
+        .dispatch(
+            basic_dispatch_cmd(tenant_id, dev_user, NotificationEventType::ValidationFailed),
+            &dev_actor,
+        )
+        .await
+        .expect("dispatch 必成功");
+    assert_eq!(n.user_id, UserId::from(dev_user));
+}
+
+/// **IT-V4-2**: 无 role binding → check() 默认 Deny (INV-PM-05)
+#[tokio::test]
+async fn it_v4_perm_check_default_deny_no_role() {
+    let perm_svc: Arc<InMemoryPermissionService> = InMemoryPermissionService::new_for_test();
+    let tenant_id = Uuid::new_v4();
+    let project_id = ProjectId::new();
+    let admin_actor = make_admin_actor(tenant_id);
+    let scheme = setup_dev_notif_write_allow(&perm_svc, tenant_id, &admin_actor).await;
+
+    let dev_user = Uuid::new_v4();
+    let dev_actor = ActorContext::new(dev_user, tenant_id);
+    let allowed = check_notification_dispatch(
+        &perm_svc,
+        Some(scheme.id),
+        tenant_id,
+        project_id,
+        dev_user,
+        &dev_actor,
+    )
+    .await
+    .expect("check 必成功");
+    assert!(!allowed, "无 role binding → 默认 Deny (INV-PM-05)");
+}
+
+/// **IT-V4-3**: Viewer role → check() 拒绝 Write
+#[tokio::test]
+async fn it_v4_perm_check_viewer_write_denied() {
+    let perm_svc: Arc<InMemoryPermissionService> = InMemoryPermissionService::new_for_test();
+    let tenant_id = Uuid::new_v4();
+    let project_id = ProjectId::new();
+    let admin_actor = make_admin_actor(tenant_id);
+    let scheme = setup_dev_notif_write_allow(&perm_svc, tenant_id, &admin_actor).await;
+
+    let viewer_user = Uuid::new_v4();
+    perm_svc
+        .grant_role(
+            GrantRoleCommand {
+                tenant_id: PermTenantId(tenant_id),
+                user_id: PermUserId::from(viewer_user),
+                project_id: PermProjectId::from(project_id.as_uuid()),
+                role: Role::Viewer,
+                granted_by: PermUserId::from(admin_actor.user_id),
+            },
+            &admin_actor,
+        )
+        .await
+        .expect("grant Viewer");
+
+    let viewer_actor = ActorContext::new(viewer_user, tenant_id);
+    let allowed = check_notification_dispatch(
+        &perm_svc,
+        Some(scheme.id),
+        tenant_id,
+        project_id,
+        viewer_user,
+        &viewer_actor,
+    )
+    .await
+    .expect("check 必成功");
+    assert!(!allowed, "Viewer × Write → 必 deny");
+}
+
+/// **IT-V4-4**: Tenant admin + scheme_id=None → default 兜底 allow
+#[tokio::test]
+async fn it_v4_perm_check_tenant_admin_default_allow() {
+    let perm_svc: Arc<InMemoryPermissionService> = InMemoryPermissionService::new_for_test();
+    let tenant_id = Uuid::new_v4();
+    let project_id = ProjectId::new();
+    let admin_user = Uuid::new_v4();
+    let admin_actor = ActorContext::new(admin_user, tenant_id).with_role("tenant_admin");
+
+    perm_svc
+        .grant_role(
+            GrantRoleCommand {
+                tenant_id: PermTenantId(tenant_id),
+                user_id: PermUserId::from(admin_user),
+                project_id: PermProjectId::from(project_id.as_uuid()),
+                role: Role::TenantAdmin,
+                granted_by: PermUserId::from(admin_user),
+            },
+            &admin_actor,
+        )
+        .await
+        .expect("grant TenantAdmin");
+
+    // scheme_id = None → default_decide_without_scheme(admin) = true
+    let allowed = check_notification_dispatch(
+        &perm_svc,
+        None,
+        tenant_id,
+        project_id,
+        admin_user,
+        &admin_actor,
+    )
+    .await
+    .expect("check 必成功");
+    assert!(allowed, "TenantAdmin + scheme=None → 必 allow (默认策略)");
+}
+
+/// **IT-V4-5**: 跨 tenant actor 调 check() → CrossTenantDenied
+#[tokio::test]
+async fn it_v4_perm_check_cross_tenant_rejected() {
+    let perm_svc: Arc<InMemoryPermissionService> = InMemoryPermissionService::new_for_test();
+    let tenant_a = Uuid::new_v4();
+    let tenant_b = Uuid::new_v4();
+    let project_id = ProjectId::new();
+    let admin_a = make_admin_actor(tenant_a);
+    let scheme = setup_dev_notif_write_allow(&perm_svc, tenant_a, &admin_a).await;
+
+    let admin_b = make_admin_actor(tenant_b);
+    let res = check_notification_dispatch(
+        &perm_svc,
+        Some(scheme.id),
+        tenant_b,
+        project_id,
+        admin_b.user_id,
+        &admin_b,
+    )
+    .await;
+    assert!(
+        matches!(res, Err(PermissionError::CrossTenantDenied(_, _))),
+        "跨 tenant check → CrossTenantDenied (守门 #13 c)"
+    );
 }

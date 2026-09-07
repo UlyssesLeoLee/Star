@@ -19,6 +19,7 @@ tokio = { workspace = true }
 star-context = { path = "../star-context" }
 [dev-dependencies]
 tokio = { workspace = true }
+domain-permission = { path = "../domain-permission" }
 
 [lints]
 workspace = true
