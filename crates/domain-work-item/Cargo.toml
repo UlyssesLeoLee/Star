@@ -18,6 +18,9 @@ tokio = { workspace = true }
 star-context = { path = "../star-context" }
 [dev-dependencies]
 tokio = { workspace = true }
+# 跨域 saga IT (per 2026-09-07 P1-3, 3 write-heavy 域跨域联动)
+domain-comment = { path = "../domain-comment" }
+domain-notification = { path = "../domain-notification" }
 
 [lints]
 workspace = true
