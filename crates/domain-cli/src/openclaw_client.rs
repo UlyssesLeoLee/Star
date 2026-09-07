@@ -39,7 +39,7 @@ pub enum OpenClawError {
 /// OpenClaw 客户端配置
 #[derive(Debug, Clone)]
 pub struct OpenClawConfig {
-    /// base URL (mock 模式用 wiremock / ms, 真实模式用 https://api.openclaw.dev/v1)
+    /// base URL (mock 模式用 wiremock / ms, 真实模式用 <https://api.openclaw.dev/v1>)
     pub base_url: String,
     /// API key (env: OPENCLAW_API_KEY)
     pub api_key: String,
