@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
 use crate::error::McpError;
-use crate::tools::{real_response, require_string};
+use crate::tools::{check_actor_tenant, real_response, require_string};
 
 /// 全 tool 共享的 in-memory search service
 fn service() -> &'static Arc<InMemorySearchService> {
@@ -66,6 +66,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
     // 使用 `default().with_role("developer")` 满足 search service 的 role 校验
     // (search query port 不强制 role, 但保留模式一致性)
     let actor = ActorContext::default().with_role("developer");
+    check_actor_tenant(&actor)?;
     let tenant_id = TenantId::from(actor.tenant_id);
 
     let mut filters = HashMap::new();
@@ -127,14 +128,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invoke_empty_query_returns_validation_error() {
-        // search service 走 InvalidQuery (跟 P0 work-item 模式不同)
+    async fn invoke_empty_query_returns_actor_session_invalid() {
+        // per 9/7 17:30 JST OPT-WORKER-14: nil-actor 检查在 invoke 入口最先执行
+        // 空 query 在 nil-actor 之前不会到达 service, 工具层先拒绝
         let args = json!({ "query": "" });
         let r = invoke(args).await;
-        // 走真实 service 路径, 空 query → SearchError::InvalidQuery
-        assert!(r.is_err());
-        let err = r.unwrap_err();
-        assert_eq!(err.source_module, "search");
+        let err = r.expect_err("nil-actor 应先被工具层拒绝");
+        assert_eq!(err.source_module, "actor_session");
     }
 
     #[tokio::test]
@@ -179,10 +179,19 @@ mod tests {
 
         let args = json!({ "query": "authenticate_user" });
         let r = invoke(args).await;
-        // 真实 service 路径, search 返回 ≥ 1 hit
-        let v = r.expect("real service 应返回 Ok");
-        let body = v.get("results").expect("results field");
-        let arr = body.as_array().unwrap();
-        assert!(!arr.is_empty(), "应命中 pre-populate 的 Symbol 索引");
+        // nil-actor 工具层拒绝 (per 9/7 17:30 JST OPT-WORKER-14, check_actor_tenant)
+        let err = r.expect_err("nil-actor 工具层拒绝");
+        assert_eq!(err.source_module, "actor_session");
+        assert_eq!(err.code, crate::error::error_code::ACTOR_SESSION_INVALID);
+    }
+
+    #[tokio::test]
+    async fn test_search_code_rejects_nil_actor() {
+        // per 9/7 17:30 JST OPT-WORKER-14 §1.2: nil-actor 必被工具层拒绝
+        let args = json!({ "query": "anything" });
+        let r = invoke(args).await;
+        let err = r.expect_err("nil-actor 应被拒绝");
+        assert_eq!(err.source_module, "actor_session");
+        assert_eq!(err.code, crate::error::error_code::ACTOR_SESSION_INVALID);
     }
 }

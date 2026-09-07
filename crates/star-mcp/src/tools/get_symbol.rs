@@ -23,7 +23,7 @@ use serde_json::{json, Value};
 use std::sync::{Arc, OnceLock};
 
 use crate::error::McpError;
-use crate::tools::{real_response, require_string};
+use crate::tools::{check_actor_tenant, real_response, require_string};
 
 /// 全 tool 共享的 in-memory search service
 fn service() -> &'static Arc<InMemorySearchService> {
@@ -46,6 +46,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
 
     // nil-tenant actor + default() 走跨 tenant 拒绝 (跟 1 号 P0 一致)
     let actor = ActorContext::default().with_role("developer");
+    check_actor_tenant(&actor)?;
     let tenant_id = TenantId::from(actor.tenant_id);
 
     let symbols = service()
@@ -88,12 +89,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invoke_empty_name_returns_search_invalid_query() {
-        // service 端校验, 走真实 search path → SearchError::InvalidQuery
+    async fn invoke_empty_name_returns_actor_session_invalid() {
+        // per 9/7 17:30 JST OPT-WORKER-14: nil-actor 检查在 invoke 入口最先执行
+        // 空 name 在 nil-actor 之前不会到达 service, 工具层先拒绝
         let args = json!({ "name": "" });
         let r = invoke(args).await;
-        let err = r.expect_err("应返回 search InvalidQuery");
-        assert_eq!(err.source_module, "search");
+        let err = r.expect_err("nil-actor 应先被工具层拒绝");
+        assert_eq!(err.source_module, "actor_session");
     }
 
     #[tokio::test]
@@ -127,10 +129,19 @@ mod tests {
 
         let args = json!({ "name": "foo" });
         let r = invoke(args).await;
-        // 真实 service 路径, 不应是 mock
-        // nil-tenant actor → 跨 tenant 拒绝 (跟 1 号 P0 模式一致)
-        // → SearchError → McpError(source_module="search")
-        let err = r.expect_err("nil-actor 跨 tenant 拒绝");
-        assert_eq!(err.source_module, "search");
+        // nil-actor 工具层拒绝 (per 9/7 17:30 JST OPT-WORKER-14, check_actor_tenant)
+        let err = r.expect_err("nil-actor 工具层拒绝");
+        assert_eq!(err.source_module, "actor_session");
+        assert_eq!(err.code, crate::error::error_code::ACTOR_SESSION_INVALID);
+    }
+
+    #[tokio::test]
+    async fn test_get_symbol_rejects_nil_actor() {
+        // per 9/7 17:30 JST OPT-WORKER-14 §1.2: nil-actor 必被工具层拒绝
+        let args = json!({ "name": "anything" });
+        let r = invoke(args).await;
+        let err = r.expect_err("nil-actor 应被拒绝");
+        assert_eq!(err.source_module, "actor_session");
+        assert_eq!(err.code, crate::error::error_code::ACTOR_SESSION_INVALID);
     }
 }
