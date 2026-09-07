@@ -299,7 +299,7 @@ pub fn router(state: AppState) -> Router {
 
 | Struct | 字段 (MVP 关键) | 派生 / 注解 |
 |---|---|---|
-| `HelmRelease` | name, namespace, chart, revision, status, last_deployed_at, canary_weight | 2 unit tests |
+| `HelmRelease` | name, namespace, chart, revision, status, last_deployed_at, canary_weight | 1 unit test (list_stub) |
 | `CanaryRequest` | release_name, canary_weight (0-100), target_revision | 1 unit test |
 | `RollbackRequest` | release_name, target_revision | 跟 canary 共用 ack |
 | `LogEntry` | id (Uuid), source, level, message, timestamp, trace_id | 1 unit test |
@@ -320,7 +320,9 @@ pub fn router(state: AppState) -> Router {
 2. `is_enabled()` — bool, false 时被 ladder 跳过
 3. `analyze_log()` — async, 返 `Result<LogAnalysis, OpsError>`
 
-### 3.2 4 級 Ladder 状態 (per ADR-0026 §2.2 + §2.3)
+### 3.2 4 級 Ladder 状態 (参考 ADR-0026 Ladder 模式, 概念复用)
+
+> **重要**: ADR-0026 §2.2 的 4 級是 **Coding Agent 接入 STAR** 的通道 (MCP/CLI/REST/Git Only), 跟本详设的 **Ops Console 分析 log 的 AI 通道** (mock/openai/anthropic/兜底) 是**两套独立的 Ladder**, 概念同形 (优先级 + 回退) 但通道不同。本详设**不**直接套用 ADR-0026 §2.2 的通道定义, 仅复用"按优先级回退"的设计模式。
 
 ```
 ┌─────────────────────────────────────────┐
@@ -702,13 +704,14 @@ Anthropic stub 同 pattern。
 | `BadRequest` | 400 | 守門 #6 v2 (frontend typecheck advisory) | JSON 解析失败 / 字段缺 |
 | `Internal` | 500 | 守門 #7 0 unsafe | subprocess 失败 / DB 错误 / 解析错 |
 
-### 6.2 Ladder retriable 规则 (per §2.3)
+### 6.2 Ladder retriable 规则 (per §2.3 + 实证代码 `matches!(e, OpsError::Internal(_))`)
 
+**MVP 现状** (commit `03d7d43` + `7934131` 实证):
 - `OpsError::Internal(_)` → retriable, 继续下一通道
 - `OpsError::NotImplemented(_)` → **非** retriable, 直接返 (避免 L2/L3 永远 NOT_IMPLEMENTED 卡死)
 - `OpsError::BadRequest(_)` → **非** retriable, 直接返
 - `OpsError::Unauthorized(_)` → **非** retriable, 直接返
-- `OpsError::RateLimited(_)` → retriable, 继续下一通道
+- `OpsError::RateLimited(_)` → **非** retriable (MVP), 直接返; 实装 tower-governor 后可改 retriable
 
 ### 6.3 6-field 错误响应 (per §2.1)
 
@@ -788,7 +791,7 @@ T/M 类: 物理删除禁止, SCD Type 2 (`valid_from` + `valid_to` + `is_current
 
 | 层 | 数量 | 文件 | 状态 |
 |---|---|---|---|
-| **UT (Unit Test)** | 9 | error.rs (5) + cluster.rs (2) + log.rs (2) + metrics.rs (1) + mock.rs (3, 含 1 重复字段 test) | ✅ 15/15 pass |
+| **UT (Unit Test)** | 11 | error.rs (3) + cluster.rs (2) + log.rs (2) + metrics.rs (1) + mock.rs (3) | ✅ 15/15 pass |
 | **IT (Integration Test)** | 0 | (MVP 阶段无, [M] 阶段加 DB/跨 crate IT) | ⏳ 待 [M] |
 | **E2E (End-to-End Test)** | 4 | ops_api.rs: cluster_list / metrics_summary / healthz / log_analysis (走 tower::oneshot) | ✅ 4/4 pass |
 | **PT (Performance Test)** | 0 | (MVP 阶段无, [M] 阶段加 P95 < 100ms 守门) | ⏳ 待 [M] |
@@ -802,8 +805,8 @@ T/M 类: 物理删除禁止, SCD Type 2 (`valid_from` + `valid_to` + `is_current
 | `not_implemented_returns_501` | error.rs:121 | OpsError::not_implemented → 6-field body (code, source_kind, hint) |
 | `unauthorized_returns_401_with_policy_source` | error.rs:131 | OpsError::Unauthorized → source_kind=Policy |
 | `rate_limited_is_retriable` | error.rs:139 | OpsError::RateLimited → retriable=true |
-| `list_stub_returns_one_helm_release` | cluster.rs:85 | 1 条 stub, status=Healthy |
-| `canary_request_validates_weight_range` | cluster.rs:92 | canary_weight 0-100 验证 (MVP 简化为 struct) |
+| `list_stub_returns_one_helm_release` | cluster.rs:85 | HelmRelease 1 条 stub, status=Healthy |
+| `canary_request_validates_weight_range` | cluster.rs:92 | **CanaryRequest** (非 HelmRelease) canary_weight 0-100 验证 (MVP 简化为 struct) |
 | `log_entry_stub_has_error_level` | log.rs:96 | stub 1 条 ERROR log + trace_id |
 | `log_analysis_stub_confidence_below_threshold` | log.rs:104 | **守門 #23**: mock confidence < 0.5 |
 | `summary_stub_returns_five_kpis` | metrics.rs:73 | 5 KPI hardcoded |
