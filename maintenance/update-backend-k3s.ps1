@@ -189,11 +189,65 @@ if (-not $KubeConfig) {
 }
 Write-Host "  KUBECONFIG : $KubeConfig" -ForegroundColor DarkGray
 
-# 探测 cluster 可达
-kubectl --kubeconfig "$KubeConfig" cluster-info | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    throw "kubectl cluster-info 失败, exit code: $LASTEXITCODE (KUBECONFIG 不对 / 集群不可达)"
+# ---- WSL wrapper helpers (per 2026-09-08 05:52 JST G3 修法) ----
+# Windows 端 kubectl 127.0.0.1:6443 不可达 (k3s 在 WSL 内, 6443 是 WSL loopback)
+# Docker Desktop k3d 走 127.0.0.1:52551 但本机没启
+# 修法: 探测 Windows 端 cluster-info, 不通就 wrap 所有 kubectl/helm 走 wsl 内
+
+# 探测 Windows 端直连
+$UseWslWrapper = $false
+$WslKubeConfig = "~/.kube/config"
+$probeOutput = kubectl --kubeconfig "$KubeConfig" cluster-info 2>&1 | Out-String
+$probeExit = $LASTEXITCODE
+if ($probeExit -eq 0) {
+    Write-Host "  cluster OK (Windows 端直连)" -ForegroundColor Green
+} else {
+    Write-Host "  Windows 端 kubectl cluster-info 失败 (exit $probeExit), 试 wsl 包装" -ForegroundColor Yellow
+    # 探测 WSL 内 cluster (用 WSL 等价路径 ~/.kube/config)
+    $wslProbe = wsl -- bash -c "KUBECONFIG=$WslKubeConfig kubectl cluster-info 2>&1 | head -3" 2>&1 | Out-String
+    if ($wslProbe -match "running at https://") {
+        Write-Host "  WSL 端可达, 切到 wsl 包装模式" -ForegroundColor Green
+        $UseWslWrapper = $true
+    } else {
+        Write-Host "ERROR: kubectl cluster-info 失败 (Windows 跟 WSL 都不通)" -ForegroundColor Red
+        Write-Host "  Windows probe: $probeOutput" -ForegroundColor Yellow
+        Write-Host "  WSL probe    : $wslProbe" -ForegroundColor Yellow
+        Write-Host "  提示: 跑 .\maintenance\start-k3s-backend.bat 启 k3s" -ForegroundColor Yellow
+        exit 1
+    }
 }
+
+# kubectl wrapper: Windows 端直接调 or wrap wsl 调
+function Invoke-Kubectl {
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    if ($UseWslWrapper) {
+        # WSL 内的 kubectl 是 /usr/local/bin/k3s 内置的 symlink
+        $argLine = ($Args | ForEach-Object { if ($_ -match '\s') { "'$_'" } else { $_ } }) -join ' '
+        $result = wsl -- bash -c "KUBECONFIG=$WslKubeConfig kubectl $argLine 2>&1"
+        # $LASTEXITCODE 不会更新 (wsl wrapper), 用 exit code 解析
+        $global:LASTEXITCODE = 0
+        return $result
+    } else {
+        & kubectl @Args
+    }
+}
+
+# helm wrapper: 同样逻辑
+function Invoke-Helm {
+    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    if ($UseWslWrapper) {
+        # WSL 内 helm 不一定有, 装个 k3s 自带的 symlink (k3s 内置 helm)
+        $argLine = ($Args | ForEach-Object { if ($_ -match '\s') { "'$_'" } else { $_ } }) -join ' '
+        $result = wsl -- bash -c "KUBECONFIG=$WslKubeConfig /usr/local/bin/k3s helm $argLine 2>&1"
+        $global:LASTEXITCODE = 0
+        return $result
+    } else {
+        & $helmExe @Args
+    }
+}
+
+# 探测 cluster 可达 (per 2026-09-08 05:52 JST 实证 G3 修法) - 已在 wrapper helper 段处理
+# (重复段已删)
 
 # ---- 3. 决定 imageTag ----
 Write-Host ""
@@ -234,13 +288,13 @@ Write-Host "  (per 已知缺口 G4: 仓内 helm chart 模板不完整, 8 服务 
 Write-Host "  (per 已知缺口 G5: ingress className 还是 nginx, 待 envoy 迁移)" -ForegroundColor Yellow
 
 # 确保 namespace 存在
-kubectl --kubeconfig "$KubeConfig" get namespace star-system | Out-Null
+Invoke-Kubectl --kubeconfig "$KubeConfig" get namespace star-system | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  star-system namespace 不存在, 创建 ..." -ForegroundColor Yellow
-    kubectl --kubeconfig "$KubeConfig" create namespace star-system
+    Invoke-Kubectl --kubeconfig "$KubeConfig" create namespace star-system
 }
 
-& $helmExe upgrade --install star $ChartDir `
+Invoke-Helm upgrade --install star $ChartDir `
     --namespace star-system `
     --kubeconfig "$KubeConfig" `
     --wait --timeout 5m
@@ -256,7 +310,7 @@ $Services = @('cli','mcp','context','sa','sse','webhook','cache','saga')
 $RolloutOk = $true
 foreach ($svc in $Services) {
     $DeployName = "star-$svc"
-    $Status = kubectl --kubeconfig "$KubeConfig" rollout status deployment/$DeployName -n star-system --timeout 10s 2>&1
+    $Status = Invoke-Kubectl --kubeconfig "$KubeConfig" rollout status deployment/$DeployName -n star-system --timeout 10s 2>&1
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  $DeployName : OK" -ForegroundColor Green
     } else {
