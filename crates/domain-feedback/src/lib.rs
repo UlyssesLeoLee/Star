@@ -32,7 +32,6 @@
 
 #![allow(missing_docs)]
 
-pub mod context;
 pub mod entity;
 pub mod error;
 pub mod event;
@@ -42,8 +41,6 @@ pub mod port;
 pub mod service;
 pub mod value_object;
 
-pub use star_context::ActorContext; // 收敛到 star_context 权威版本 (per P0-1 联动协作)
-                                    // 注: 子模块 context::ActorContext 仍然在 context namespace, 域内用 use crate::context::ActorContext 引用
 pub use entity::{
     ConsumedByKind, EvidenceKind, Feedback, FeedbackConsumedEvent, FeedbackInboxItem,
     FeedbackResolution, ResolutionEvidence, ResolutionEvidenceRef,
@@ -66,6 +63,7 @@ pub use port::{
     TransitionFeedbackStatusCommand, UpdateFeedbackCommand,
 };
 pub use service::InMemoryFeedbackService;
+pub use star_context::ActorContext; // Phase D.3 收敛: 全仓唯一权威 ActorContext (per P0-1 联动协作)
 pub use value_object::{
     roles, AcceptanceCriterionId, AgentId, AgentSessionId, BuildId, CommitId, DecisionId,
     FeedbackId, FeedbackResolutionId, FeedbackStatus, FeedbackTarget, FeedbackType, LineRange,
@@ -76,14 +74,14 @@ pub use value_object::{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::ActorContext; // P0-1 兼容: 显式覆盖 super::* 的 star_context 命名
+    use crate::ActorContext; // P0-1 兼容: 显式覆盖 super::* 的 star_context 命名
 
     use crate::entity::ConsumedByKind;
     use crate::value_object::{FeedbackTarget, Severity};
     use uuid::Uuid;
 
-    fn make_actor(tenant_id: TenantId) -> ActorContext {
-        ActorContext::new(UserId::new(), tenant_id).with_role(roles::DEVELOPER)
+    fn make_actor(tenant_id: Uuid) -> ActorContext {
+        ActorContext::new(Uuid::new_v4(), tenant_id).with_role(roles::DEVELOPER)
     }
 
     fn make_create_cmd(tenant_id: TenantId, target: FeedbackTarget) -> CreateFeedbackCommand {
@@ -199,7 +197,7 @@ mod tests {
     async fn create_feedback_success_and_event() {
         let (svc, mut rx) = InMemoryFeedbackService::new();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(TenantId(tenant_id));
+        let actor = make_actor(tenant_id);
         let target = FeedbackTarget::WorkItem {
             work_item_id: WorkItemId::new(),
         };
@@ -229,7 +227,7 @@ mod tests {
     async fn full_six_state_chain_open_to_verified() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(TenantId(tenant_id));
+        let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -284,7 +282,7 @@ mod tests {
     async fn invalid_state_transition_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(TenantId(tenant_id));
+        let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -321,7 +319,7 @@ mod tests {
     async fn reject_from_open_terminal() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(TenantId(tenant_id));
+        let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -359,7 +357,7 @@ mod tests {
     async fn supersede_without_successor_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(TenantId(tenant_id));
+        let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -393,7 +391,7 @@ mod tests {
     async fn supersede_with_successor_ok() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(TenantId(tenant_id));
+        let actor = make_actor(tenant_id);
         let f1 = svc
             .create_feedback(
                 make_create_cmd(
@@ -443,7 +441,7 @@ mod tests {
     async fn update_after_applied_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(TenantId(tenant_id));
+        let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -500,7 +498,7 @@ mod tests {
     async fn delete_only_open_allowed() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(TenantId(tenant_id));
+        let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -538,7 +536,7 @@ mod tests {
     async fn inbox_severity_priority_ordering() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(TenantId(tenant_id));
+        let actor = make_actor(tenant_id);
         let project_id = ProjectId::new();
 
         // P3 第一个创建,P0 最后创建
@@ -588,7 +586,7 @@ mod tests {
                     limit: 10,
                     offset: 0,
                 },
-                ActorContext::new(UserId::new(), TenantId(tenant_id)).with_role(roles::DEVELOPER),
+                ActorContext::new(Uuid::new_v4(), tenant_id).with_role(roles::DEVELOPER),
             )
             .await
             .unwrap();
@@ -607,7 +605,7 @@ mod tests {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_a = uuid::Uuid::new_v4();
         let tenant_b = uuid::Uuid::new_v4();
-        let actor_a = make_actor(TenantId(tenant_a));
+        let actor_a = make_actor(tenant_a);
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -620,7 +618,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let actor_b = make_actor(TenantId(tenant_b));
+        let actor_b = make_actor(tenant_b);
         let res = svc.get_by_id(f.id, actor_b).await;
         assert!(matches!(res, Err(FeedbackError::PermissionDenied)));
     }
@@ -631,7 +629,7 @@ mod tests {
     async fn cross_worktree_target_rejected() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(TenantId(tenant_id));
+        let actor = make_actor(tenant_id);
         let worktree_a = WorktreeId::new();
         let worktree_b = WorktreeId::new();
         let target = FeedbackTarget::Worktree {
@@ -665,7 +663,7 @@ mod tests {
     async fn ai_authored_feedback_records_agent_id() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let mut actor = make_actor(TenantId(tenant_id));
+        let mut actor = make_actor(tenant_id);
         actor.is_agent_session = true;
         // 不显式传 author_agent_id,service 应自动兜底
         let f = svc
@@ -692,7 +690,7 @@ mod tests {
     async fn consumed_event_projection_three_kinds() {
         let svc = InMemoryFeedbackService::new_for_test();
         let tenant_id = uuid::Uuid::new_v4();
-        let actor = make_actor(TenantId(tenant_id));
+        let actor = make_actor(tenant_id);
         let f = svc
             .create_feedback(
                 make_create_cmd(
@@ -749,5 +747,30 @@ mod tests {
             FeedbackStatus::Superseded,
         ];
         assert_eq!(stats.len(), 6);
+    }
+
+    // -------- 16. Phase D.3 H2 跨域字段访问 (per OPT-NEXT-01-phase-d.md §3 D.3) --------
+
+    #[test]
+    fn d3_h2_cross_domain_field_workspace_ids_accessible() {
+        // 跨域字段: actor.workspace_ids (per domain-project H2-EXT 扩展) 域内可读
+        let tid = Uuid::new_v4();
+        let ws1 = Uuid::new_v4();
+        let ws2 = Uuid::new_v4();
+        let mut actor = ActorContext::new(Uuid::new_v4(), tid).with_role(roles::DEVELOPER);
+        actor.workspace_ids.push(ws1);
+        actor.workspace_ids.push(ws2);
+        assert!(actor.workspace_ids.contains(&ws1));
+        assert!(actor.workspace_ids.contains(&ws2));
+    }
+
+    #[test]
+    fn d3_h2_cross_domain_field_tenant_policy_id_accessible() {
+        // 跨域字段: actor.tenant_policy_id (per domain-tenant H2-EXT 扩展) 域内可读
+        let tid = Uuid::new_v4();
+        let policy_id = Uuid::new_v4();
+        let mut actor = ActorContext::new(Uuid::new_v4(), tid);
+        actor.tenant_policy_id = Some(policy_id);
+        assert_eq!(actor.tenant_policy_id, Some(policy_id));
     }
 }
