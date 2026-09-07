@@ -40,16 +40,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\star-flash-mock\script
 | 3 | port-forward 在 wsl 临时 VTL 销毁时被 kill | PowerShell `wsl -d Ubuntu -- bash -lc "..."` 退出时回收所有子进程 | 必须走 systemd user service (本目录 `k3s-portforward.service`), 不要靠 `nohup`/`setsid`/`Start-Process` 手动后台 |
 | 4 | `k3s crictl` 默认 root 拥有, leo19 读不到 | `/etc/rancher/k3s/k3s.yaml` 是 root 写的 | kubectl 走 `KUBECONFIG=~/.kube/config` (leo19 拥有), 不读系统 k3s.yaml. apply/diff 用此路径 |
 
-## 4. 脚本来源 (per 守门 #1 禁回溯叙事 + §4 实证)
-
-| 脚本 | 来源 | commit 引用 |
-|---|---|---|
-| `start-k3s-backend.ps1` | `C:\Users\leo19\AppData\Local\Temp\lf-backup-start-k3s-backend.ps1` (2026-09-08 05:34 JST, 7032 字节) | 本 commit 落档, 原 Temp 文件保留作历史形态 |
-| `start-k3s-backend.bat` | `C:\Users\leo19\AppData\Local\Temp\lf-backup-start-k3s-backend.bat` (2026-09-08 05:32 JST, 1685 字节) | 同上, 原 Temp `orphan-start-k3s-backend.bat` 5:32 同份 |
-| `k3s-portforward.service` | `C:\Users\leo19\AppData\Local\Temp\k3s-portforward.service` (2026-09-08 07:46 JST 落档, 375 字节) | 同上 |
-| `verify-k3s-uat-3000.ps1` | Mavis 接手写 (per 守门 #1 v27/v28/v29 派生规, 5 步走 3000 验证) | 本 commit 落档 (7cb1e1d 之后) |
-| `verify-k3s-uat-3000.bat` | Mavis 接手写 (pwsh 包装, 跟 start-k3s-backend.bat 风格一致) | 同上 |
-
 ## 4.5 验证流程 (per 守门 #1 v27/v28/v29 派生规)
 
 `verify-k3s-uat-3000.ps1` 5 步, 失败即停:
@@ -62,6 +52,36 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\star-flash-mock\script
 | 3 | — | rollout restart deployment (用 daocloud 镜像) | 4 | 查 deployment spec image 字段 |
 | 4 | — | pod Ready (60s 预算) | 5 | `kubectl describe pod` 看 events |
 | 5 | v29 | enable port-forward service + curl 3000 | 6 | 查 systemd service / port-forward log |
+
+## 4.6 Playwright UAT 截图 (verify-k3s-uat-3000.ps1 PASSED 之后)
+
+UAT 闭环最后一步, 3 case 守门 (per frontend/e2e/uat-3000-restore.spec.ts):
+
+| Case | 守门 | 验证 |
+|---|---|---|
+| UAT-S26 | HTTP 200 | 3000 响应 200, body 含 "not found" (envoy direct_response) |
+| UAT-S27 | 渲染 | Playwright 渲染后 body.textContent 非空, 浏览器看到文本 (不再黑屏) |
+| UAT-S28 | 截图 | test-results/uat-3000-restore/screenshot.png 存在, Ulysses 视觉确认 |
+
+```bash
+# 前置: verify-k3s-uat-3000.ps1 5 步全过
+
+# 装 Playwright 浏览器 (一次性, 守门 #6 不可 auto-install, 需用户确认)
+# cd frontend && pnpm install && pnpm exec playwright install chromium
+
+# 跑 UAT 闭环 3 case
+cd frontend && pnpm test:e2e -- uat-3000-restore
+# 预期: 3/3 passed, screenshot.png 生成
+```
+
+| 脚本 | 来源 | commit 引用 |
+|---|---|---|
+| `start-k3s-backend.ps1` | `C:\Users\leo19\AppData\Local\Temp\lf-backup-start-k3s-backend.ps1` (2026-09-08 05:34 JST, 7032 字节) | 本 commit 落档, 原 Temp 文件保留作历史形态 |
+| `start-k3s-backend.bat` | `C:\Users\leo19\AppData\Local\Temp\lf-backup-start-k3s-backend.bat` (2026-09-08 05:32 JST, 1685 字节) | 同上, 原 Temp `orphan-start-k3s-backend.bat` 5:32 同份 |
+| `k3s-portforward.service` | `C:\Users\leo19\AppData\Local\Temp\k3s-portforward.service` (2026-09-08 07:46 JST 落档, 375 字节) | 同上 |
+| `verify-k3s-uat-3000.ps1` | Mavis 接手写 (per 守门 #1 v27/v28/v29 派生规, 5 步走 3000 验证) | 本 commit 落档 (7cb1e1d 之后) |
+| `verify-k3s-uat-3000.bat` | Mavis 接手写 (pwsh 包装, 跟 start-k3s-backend.bat 风格一致) | 同上 |
+| `frontend/e2e/uat-3000-restore.spec.ts` | Mavis 接手写 (Playwright 3 case: S26 HTTP 200 + S27 渲染 + S28 截图, 闭环最后一步) | 本 commit 落档 |
 
 ## 5. 守门引用
 
