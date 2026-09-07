@@ -70,6 +70,7 @@
 //! - Phase H: 22 domain 全部 mock-but-functional, 真实数据接入标 `TODO: Phase H+`
 
 mod d6_session;
+mod discovery;
 mod error;
 mod handlers;
 mod middleware;
