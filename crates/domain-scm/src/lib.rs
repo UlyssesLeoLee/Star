@@ -1180,7 +1180,7 @@ impl InMemoryScmService {
     /// - 不修改 trait, 仅供 `star-mcp::request_review` P2 工具 + 测试 pre-populate 用
     ///
     /// `reviewers` 是 user ID 列表 (per spec `request_review` `{mr_id, reviewers?}`)
-    /// - 空列表 → 返回空 ReviewResult (per P2 简化: 默认 list reviewers = [actor])
+    /// - 空列表 → 返回空 ReviewResult (per P2 简化: 默认 list reviewers = `[actor]`)
     pub async fn request_review(
         &self,
         pr_id: PullRequestId,

@@ -54,7 +54,7 @@ define_uuid_id!(ContextPolicyId);
 // =====================================================================
 
 #[macro_export]
-/// 定义基于 UUID 的领域强类型 ID:自动生成 $name 结构体及 new/as_uuid/From<Uuid>/Display 实现
+/// 定义基于 UUID 的领域强类型 ID:自动生成 $name 结构体及 new/as_uuid/`From<Uuid>`/Display 实现
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(

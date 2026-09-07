@@ -563,7 +563,7 @@ pub(crate) fn handle_resources_list(req: &JsonRpcRequest) -> Result<JsonRpcSucce
 
 /// 处理 `resources/read` 请求
 ///
-/// 期望 params = { "uri": "<scheme>://<path>" }
+/// 期望 params = { "uri": `"<scheme>://<path>"` }
 pub(crate) async fn handle_resources_read(
     req: &JsonRpcRequest,
 ) -> Result<JsonRpcSuccess, JsonRpcError> {

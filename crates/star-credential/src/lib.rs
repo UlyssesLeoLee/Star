@@ -140,7 +140,7 @@ pub struct CredentialManager {
     kms: Arc<dyn KmsClient>,
     /// 内存索引: id -> CredentialRecord
     records: Arc<RwLock<HashMap<String, CredentialRecord>>>,
-    /// 索引: (tenant_id, provider) -> Vec<id> (一个 tenant 可有多个 OpenClaw 凭证)
+    /// 索引: (tenant_id, provider) -> `Vec<id>` (一个 tenant 可有多个 OpenClaw 凭证)
     by_tenant_provider: Arc<RwLock<HashMap<(String, Provider), Vec<String>>>>,
 }
 
@@ -154,7 +154,7 @@ impl CredentialManager {
         }
     }
 
-    /// 默认 + LocalMockKms (per 守门 #19 [M] 拍板 F.3 mock maturity)
+    /// 默认 + LocalMockKms (per 守门 #19 \[M\] 拍板 F.3 mock maturity)
     pub fn with_local_mock_kms() -> Self {
         Self::new(Arc::new(LocalMockKms::new()))
     }

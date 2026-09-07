@@ -13,7 +13,7 @@
 //! - INV-SG-ORCH-01: SagaState 状态机 6 状态 (per `PHASE-P3-E6-SAGA-IMPL-REPORT.md` §1)
 //! - INV-SG-ORCH-02: step 失败自动触发 Compensating → Compensated 状态转移 (per SagaOrchestrator.execute line 50-55)
 //! - INV-SG-ORCH-03: idempotency_key 注入 — step 执行走 `step:` 前缀, 补偿走 `compensate:` 前缀 (per `step_executor.rs` `4660ebb` + `compensation.rs` `b0f88b2`, 守门 #11 缺标比错标安全 反向: 补比缺好)
-//! - INV-SG-ORCH-04: Saga 状态 map 内存级 (per SagaOrchestrator.states Arc<RwLock<HashMap>>), 待 match 域 Lead 真人补: 持久化 (per process 重启 + per saga 重启)
+//! - INV-SG-ORCH-04: Saga 状态 map 内存级 (per SagaOrchestrator.states `Arc<RwLock<HashMap>>`), 待 match 域 Lead 真人补: 持久化 (per process 重启 + per saga 重启)
 //!
 //! Lead 责任: match 域 Lead (待真人到位)
 

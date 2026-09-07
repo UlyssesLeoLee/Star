@@ -1,7 +1,7 @@
 //! crates/star-dispatcher/src/cross_repo.rs
 //!
 //! H.2 LangGraph 跨仓 RPC (Star -> Physis) PoC
-//! per WBS §H.2 + 守门 #19 [M] 拍板 + 守门 §5 disclaimer (Star 仓 不引用 RGS 仓 代码)
+//! per WBS §H.2 + 守门 #19 \[M\] 拍板 + 守门 §5 disclaimer (Star 仓 不引用 RGS 仓 代码)
 //!
 //! 实现策略 (per 守门 #1 轻量化 + V2 路线图):
 //! - 当前: in-process PoC (channel + serde_json + tokio::sync::mpsc)

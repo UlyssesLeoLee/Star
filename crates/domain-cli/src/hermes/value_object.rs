@@ -95,7 +95,7 @@ impl RetryPolicy {
 /// Hermes 客户端配置
 #[derive(Debug, Clone)]
 pub struct HermesConfig {
-    /// base URL (mock 模式用 wiremock / ms, 真实模式用 https://api.hermes.dev/v1)
+    /// base URL (mock 模式用 wiremock / ms, 真实模式用 <https://api.hermes.dev/v1>)
     pub base_url: String,
     /// API key (env: HERMES_API_KEY)
     pub api_key: String,

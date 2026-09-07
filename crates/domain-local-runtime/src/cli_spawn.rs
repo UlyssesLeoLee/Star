@@ -3,7 +3,7 @@
 //! 实现 `LocalRuntime::spawn_cli` 真实模式:
 //! - tokio::process::Command spawn
 //! - stdout/stderr 双流 tokio::select! 并行读
-//! - 实时推 mpsc<OutputLine>
+//! - 实时推 `mpsc<OutputLine>`
 //! - 进程退出码 + 取消支持
 //!
 //! Per 2026-08-29 10:25 JST 用户拍板 "1,2,3 全部做"

@@ -1,4 +1,4 @@
-//! crates/star-treesitter — Tree-sitter 集成 (per P4-H.5, 守门 #19 [M] 拍板)
+//! crates/star-treesitter — Tree-sitter 集成 (per P4-H.5, 守门 #19 \[M\] 拍板)
 //!
 //! 提供 5 语言 (Rust / TypeScript / Python / Go / JSON) 语法解析 + 符号提取.
 //! per `docs/architecture/2026-09-03-treesitter-worktree-graph/01-requirements.md` §1.4
@@ -257,7 +257,7 @@ pub fn parse_typescript(source: &str) -> Result<ParseResult, TreeSitterError> {
 #[cfg(test)]
 mod tests;
 
-/// H.7 Symbol Resolver 跨文件引用追踪 (per P4-H.7, 守门 #19 [P] 拍板)
+/// H.7 Symbol Resolver 跨文件引用追踪 (per P4-H.7, 守门 #19 \[P\] 拍板)
 pub mod symbol_resolver;
 #[cfg(test)]
 mod symbol_resolver_tests;

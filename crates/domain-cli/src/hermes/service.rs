@@ -6,7 +6,7 @@
 //!
 //! 5 endpoint (per Hermes task queue spec):
 //!   - **auth**    POST   /v1/auth/token       → AuthToken
-//!   - **query**   GET    /v1/tasks?status=... → Vec<Task>
+//!   - **query**   GET    /v1/tasks?status=... → `Vec<Task>`
 //!   - **submit**  POST   /v1/tasks            → Task (status=Pending)
 //!   - **status**  GET    /v1/tasks/{id}       → Task (updated status)
 //!   - **cancel**  DELETE /v1/tasks/{id}       → CancelResponse
@@ -120,7 +120,7 @@ impl HermesClient {
 
     /// GET /v1/tasks
     ///
-    /// mock 模式: 返回 mock Vec<Task> (1 个 pending + 1 个 running)
+    /// mock 模式: 返回 mock `Vec<Task>` (1 个 pending + 1 个 running)
     /// 真实模式: GET base_url + "/tasks" + query params
     pub async fn query(&self, req: &QueryRequest) -> Result<Vec<Task>, HermesError> {
         if matches!(self.config.mode, HermesMode::Mock) {
