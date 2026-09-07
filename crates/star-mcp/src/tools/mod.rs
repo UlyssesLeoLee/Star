@@ -84,3 +84,34 @@ pub(crate) fn optional_string(args: &serde_json::Value, field: &str) -> Option<S
         .and_then(serde_json::Value::as_str)
         .map(str::to_string)
 }
+
+/// 检查 actor 是否有非 nil tenant_id
+///
+/// per 9/7 17:30 JST OPT-WORKER-14: 4 P1 search tool (find_references /
+/// get_code_context / get_symbol / search_code) invoke 入口加 nil-actor 检查.
+/// nil-tenant actor 表示调用方未提供 tenant 上下文, 应该用
+/// `ActorContext::nil_actor_with_tenant(tenant_id)` 显式设置.
+///
+/// 不通过时返 `ACTOR_SESSION_INVALID` 错误 (跟 domain-service 行为一致, 拒绝 nil tenant).
+pub(crate) fn check_actor_tenant(
+    actor: &domain_search::ActorContext,
+) -> Result<(), crate::error::McpError> {
+    use crate::error::error_code;
+    use crate::error::ErrorSourceKind;
+
+    if actor.tenant_id.is_nil() {
+        return Err(crate::error::McpError::new(
+            error_code::ACTOR_SESSION_INVALID,
+            "actor session has nil tenant_id; cannot proceed with cross-tenant request"
+                .to_string(),
+            "actor_session",
+            ErrorSourceKind::UserInput,
+            false,
+            Some(
+                "use ActorContext::nil_actor_with_tenant(tenant_id) before invoke to set explicit tenant"
+                    .to_string(),
+            ),
+        ));
+    }
+    Ok(())
+}

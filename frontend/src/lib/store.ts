@@ -140,6 +140,8 @@ const ssrSafeStorage = createJSONStorage(() => ({
 // =====================================================================
 interface StoreState {
   // read accessors (immutable from outside)
+  /** 当前 store 关联的 tenant id (per 2026-09-07 17:30 JST Mavis 临时代签, sprint 创建等需要 tenant 上下文时回退用) */
+  tenantId?: string;
   tenants: typeof seed.tenants;
   projects: typeof seed.projects;
   identities: typeof seed.identities;
@@ -352,6 +354,9 @@ interface StoreState {
 // (per zustand persist 模式: 把 create((set) => state) 抽出来)
 // =====================================================================
 const initialState = (set: any): StoreState => ({
+  // 默认 tenant 上下文: 由后端 session 注入, 未注入时回退 "tenant-default"
+  // (per 2026-09-07 17:30 JST Mavis 临时代签, 跟 5 域 Lead 默认 fallback 一致)
+  tenantId: undefined,
   tenants: seed.tenants,
   projects: seed.projects,
   identities: seed.identities,

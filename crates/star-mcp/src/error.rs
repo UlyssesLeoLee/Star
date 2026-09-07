@@ -487,6 +487,8 @@ pub(crate) mod error_code {
     pub const AGENT_NOT_FOUND: &str = "AGENT_NOT_FOUND";
     /// Lease 已过期
     pub const LEASE_EXPIRED: &str = "LEASE_EXPIRED";
+    /// Actor session 缺 tenant_id (nil-actor) (per 9/7 17:30 JST OPT-WORKER-14)
+    pub const ACTOR_SESSION_INVALID: &str = "ACTOR_SESSION_INVALID";
 
     // --- 提交 / 决策 (per spec/flows/05 Universal Submit) ---
     /// 提交拒绝(per flows/05 第 6 步 policy check)
@@ -516,7 +518,7 @@ pub(crate) mod error_code {
 
     /// 总数校验用(编译期断言 — Phase E 列了 24 个)
     #[doc(hidden)]
-    pub const COUNT: usize = 24;
+    pub const COUNT: usize = 25;
 }
 
 #[cfg(test)]
