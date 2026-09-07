@@ -5,7 +5,6 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::context::ActorContext;
 use crate::entity::{
     Feedback, FeedbackConsumedEvent, FeedbackInboxItem, FeedbackResolution, ResolutionEvidence,
     ResolutionEvidenceRef,
@@ -15,6 +14,7 @@ use crate::value_object::{
     AgentId, AgentSessionId, FeedbackId, FeedbackResolutionId, FeedbackStatus, FeedbackTarget,
     FeedbackType, ProjectId, Severity, TenantId, UserId, WorkItemId,
 };
+use crate::ActorContext;
 
 // =====================================================================
 // 命令 DTO

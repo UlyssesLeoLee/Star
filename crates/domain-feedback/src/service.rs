@@ -16,7 +16,6 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-use crate::context::ActorContext;
 use crate::entity::{
     ConsumedByKind, Feedback, FeedbackConsumedEvent, FeedbackInboxItem, FeedbackResolution,
     ResolutionEvidence, ResolutionEvidenceRef,
@@ -34,8 +33,9 @@ use crate::port::{
 };
 use crate::value_object::{
     AgentId, FeedbackId, FeedbackResolutionId, FeedbackStatus, FeedbackTarget, Severity, TenantId,
-    WorkItemId,
+    UserId, WorkItemId,
 };
+use crate::ActorContext;
 
 // =====================================================================
 // InMemoryFeedbackService
@@ -75,7 +75,7 @@ impl InMemoryFeedbackService {
 
     /// tenant 校验(INV-FB-06)
     fn check_tenant(actor: &ActorContext, expected: TenantId) -> Result<(), FeedbackError> {
-        if actor.tenant_id != expected {
+        if actor.tenant_id != expected.0 {
             return Err(FeedbackError::PermissionDenied);
         }
         Ok(())
@@ -146,7 +146,7 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
             expected_behavior: cmd.expected_behavior,
             preserve: cmd.preserve,
             prohibit: cmd.prohibit,
-            author_user_id: actor.user_id,
+            author_user_id: UserId(actor.user_id),
             author_agent_id: author_agent,
             acceptance_criteria_id: cmd.acceptance_criteria_id,
             predecessor_id: cmd.predecessor_id,
@@ -169,7 +169,7 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
         // 发布 created 事件
         let evt = FeedbackEvent::Created(FeedbackCreated {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 actor_agent_id: f.author_agent_id.map(|a| a.into_uuid()),
                 ..EventMeta::new(cmd.tenant_id)
             },
@@ -198,7 +198,7 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
         if f.tenant_id != cmd.tenant_id {
             return Err(FeedbackError::PermissionDenied);
         }
-        if f.author_user_id != actor.user_id && !actor.is_tenant_admin() {
+        if f.author_user_id.0 != actor.user_id && !actor.is_tenant_admin() {
             return Err(FeedbackError::PermissionDenied);
         }
         // 仅 OPEN/ACKNOWLEDGED 可改
@@ -241,10 +241,10 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
             .get(&id)
             .ok_or(FeedbackError::NotFound(id))?
             .clone();
-        if f.tenant_id != actor.tenant_id {
+        if f.tenant_id.0 != actor.tenant_id {
             return Err(FeedbackError::PermissionDenied);
         }
-        if f.author_user_id != actor.user_id && !actor.is_tenant_admin() {
+        if f.author_user_id.0 != actor.user_id && !actor.is_tenant_admin() {
             return Err(FeedbackError::PermissionDenied);
         }
         // FB-005:仅 OPEN 可删
@@ -301,7 +301,7 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
 
         // 发布对应事件
         let meta = EventMeta {
-            actor_user_id: Some(actor.user_id.into_uuid()),
+            actor_user_id: Some(actor.user_id),
             actor_agent_id: f.author_agent_id.map(|a| a.into_uuid()),
             ..EventMeta::new(cmd.tenant_id)
         };
@@ -309,7 +309,7 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
             FeedbackStatus::Acknowledged => FeedbackEvent::Acknowledged(FeedbackAcknowledged {
                 meta,
                 feedback_id: f.id,
-                consumed_by_agent_session_id: actor.user_id.into_uuid(), // 简化:实际为 agent_session_id
+                consumed_by_agent_session_id: actor.user_id, // 简化:实际为 agent_session_id
             }),
             FeedbackStatus::Applied => FeedbackEvent::Applied(FeedbackApplied {
                 meta,
@@ -362,7 +362,7 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
             id: FeedbackResolutionId::new(),
             tenant_id: cmd.tenant_id,
             feedback_id: cmd.feedback_id,
-            resolver_user_id: actor.user_id,
+            resolver_user_id: UserId(actor.user_id),
             resolver_agent_id: cmd.resolver_agent_id,
             resolved_status: cmd.target_status,
             evidence_refs: cmd.evidence_refs,
@@ -392,7 +392,7 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
             .map_err(FeedbackError::InvalidState)?;
         let evt = FeedbackEvent::Applied(FeedbackApplied {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 ..EventMeta::new(tenant_id)
             },
             feedback_id: f.id,
@@ -420,7 +420,7 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
             .map_err(FeedbackError::InvalidState)?;
         let evt = FeedbackEvent::Verified(FeedbackVerified {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 ..EventMeta::new(tenant_id)
             },
             feedback_id: f.id,
@@ -478,7 +478,7 @@ impl FeedbackQueryPort for InMemoryFeedbackService {
             .get(&id)
             .ok_or(FeedbackError::NotFound(id))?
             .clone();
-        if f.tenant_id != viewer.tenant_id {
+        if f.tenant_id.0 != viewer.tenant_id {
             return Err(FeedbackError::PermissionDenied);
         }
         Ok(f)
@@ -489,7 +489,7 @@ impl FeedbackQueryPort for InMemoryFeedbackService {
         q: ListFeedbackQuery,
         viewer: ActorContext,
     ) -> Result<Vec<Feedback>, FeedbackError> {
-        if viewer.tenant_id != q.tenant_id {
+        if viewer.tenant_id != q.tenant_id.0 {
             return Err(FeedbackError::PermissionDenied);
         }
         let feedbacks = self.feedbacks.read().expect("lock");
@@ -518,7 +518,7 @@ impl FeedbackQueryPort for InMemoryFeedbackService {
         q: FeedbackInboxQuery,
         viewer: ActorContext,
     ) -> Result<Vec<FeedbackInboxItem>, FeedbackError> {
-        if viewer.tenant_id != q.tenant_id {
+        if viewer.tenant_id != q.tenant_id.0 {
             return Err(FeedbackError::PermissionDenied);
         }
         let feedbacks = self.feedbacks.read().expect("lock");
@@ -568,7 +568,7 @@ impl FeedbackQueryPort for InMemoryFeedbackService {
         let f = feedbacks
             .get(&feedback_id)
             .ok_or(FeedbackError::NotFound(feedback_id))?;
-        if f.tenant_id != viewer.tenant_id {
+        if f.tenant_id.0 != viewer.tenant_id {
             return Err(FeedbackError::PermissionDenied);
         }
         drop(feedbacks);
@@ -589,7 +589,7 @@ impl FeedbackQueryPort for InMemoryFeedbackService {
         let f = feedbacks
             .get(&feedback_id)
             .ok_or(FeedbackError::NotFound(feedback_id))?;
-        if f.tenant_id != viewer.tenant_id {
+        if f.tenant_id.0 != viewer.tenant_id {
             return Err(FeedbackError::PermissionDenied);
         }
         drop(feedbacks);

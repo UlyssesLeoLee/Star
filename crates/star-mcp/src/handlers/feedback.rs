@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
 
-use domain_feedback::context::ActorContext;
+use domain_feedback::ActorContext;
 use domain_feedback::{
     FeedbackError, FeedbackId, FeedbackQueryPort, InMemoryFeedbackService, TenantId, UserId,
 };
@@ -65,7 +65,7 @@ impl Resource for FeedbackHandler {
         let svc = self.service();
         // handler 简化: actor.tenant_id = nil → PermissionDenied → None
         // (真实 production 需 URI 改 2 段承载 tenant, 与 B.2.5 workspace 同模式)
-        let actor = ActorContext::new(UserId::new(), domain_feedback::TenantId::new());
+        let actor = ActorContext::nil_actor_with_tenant(uuid::Uuid::new_v4());
         match svc.get_by_id(fb_id, actor).await {
             Ok(f) => Ok(Some(FeedbackData {
                 feedback_id: f.id.to_string(),
@@ -111,10 +111,7 @@ mod tests {
         let h = FeedbackHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(
-            domain_feedback::UserId(uuid::Uuid::nil()),
-            domain_feedback::TenantId(tid),
-        );
+        let actor = ActorContext::nil_actor_with_tenant(tid);
         let cmd = CreateFeedbackCommand {
             tenant_id: domain_feedback::TenantId(tid),
             project_id: ProjectId::new(),
@@ -135,10 +132,7 @@ mod tests {
         let created = svc.create_feedback(cmd, actor.clone()).await.unwrap();
         let _ = created;
         // service roundtrip (handler 简化: 跨 tenant 拒绝 → None)
-        let actor2 = ActorContext::new(
-            domain_feedback::UserId(uuid::Uuid::nil()),
-            domain_feedback::TenantId(tid),
-        );
+        let actor2 = ActorContext::nil_actor_with_tenant(tid);
         let fetched = svc.get_by_id(created.id, actor2).await.unwrap();
         assert_eq!(fetched.id, created.id);
         assert_eq!(fetched.intent, "B.2.6 test feedback");
