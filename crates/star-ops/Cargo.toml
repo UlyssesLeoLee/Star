@@ -1,0 +1,51 @@
+[package]
+name = "star-ops"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "STAR Ops Console (MVP-骨架: 4 tab + 8 REST stub + Hybrid AI mock) — per docs/requirements/SRS-STAR-OPS-001.md v0.1"
+
+[[bin]]
+name = "star-ops"
+path = "src/main.rs"
+
+[lib]
+name = "star_ops"
+path = "src/lib.rs"
+
+[dependencies]
+# workspace 基础
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# HTTP server (跟 star-mcp / star-api-rest 同版本)
+axum = "0.8"
+tower = { version = "0.5", features = ["util"] }
+
+# Async trait for ops_ai::AiChannel
+async-trait = { workspace = true }
+
+# 跨 crate 复用 (P0-1 联动审计共享 ActorContext, per AGENTS.md §4.2 v16)
+star-context = { path = "../star-context" }
+
+# 实装阶段再引入 (per SRS-001 §10.2)
+# kube = { version = "0.95" }        # K8s client (F-01)
+# reqwest = { version = "0.12" }     # 真实 LLM 通道 (F-02)
+# walkdir = "2"                      # F-04 文档扫描
+
+[dev-dependencies]
+# axum::Router::oneshot 测试 helper (per star-mcp 模式)
+tower = { version = "0.5", features = ["util"] }
+
+[lints]
+workspace = true

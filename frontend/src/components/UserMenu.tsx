@@ -27,6 +27,7 @@ import {
   Cpu,
   Globe,
   Check,
+  Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -227,6 +228,18 @@ export function UserMenu() {
               <span className="text-[9px] font-mono text-ink-mute">
                 {t.userMenu.apiKeysMode}
               </span>
+            </Link>
+            {/* === 运维入口 (2026-09-08 Phase OPS-INTRY) === */}
+            <Link
+              href="/ops"
+              role="menuitem"
+              data-testid="user-menu-ops"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-3.5 py-1.5 text-xs text-ink hover:bg-bg-soft hover:text-accent transition-colors"
+            >
+              <Wrench size={13} className="text-info" />
+              <span className="flex-1">{t.userMenu.ops}</span>
+              <span className="text-[9px] font-mono text-ok">NEW</span>
             </Link>
           </div>
 

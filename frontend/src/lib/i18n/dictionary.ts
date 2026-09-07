@@ -54,6 +54,8 @@ export interface Dictionary {
     cliProfilesCount: string;
     apiKeys: string;
     apiKeysMode: string;
+    /** v0.7 (2026-09-08 Phase OPS-INTRY) 新增: 运维入口 */
+    ops: string;
     profile: string;
     settings: string;
     signOut: string;
@@ -306,4 +308,32 @@ export interface Dictionary {
   ariaLabels: Record<string, string>;
   placeholders: Record<string, string>;
   categoryNames: Record<"core" | "work" | "agent" | "integration" | "system", string>;
+  /** v0.7 (2026-09-08 Phase OPS-INTRY) 新增: Ops Console 4 tab 翻译 */
+  opsConsole: {
+    pageTitle: string;
+    pageSubtitle: string;
+    tabCluster: string;
+    tabLogAI: string;
+    tabMetrics: string;
+    tabDocs: string;
+    comingSoon: string;
+    /** F-01 Cluster */
+    clusterTitle: string;
+    clusterReleases: string;
+    clusterCanary: string;
+    clusterRollback: string;
+    clusterStatus: string;
+    /** F-02 Log AI */
+    logAITitle: string;
+    logAIUpload: string;
+    logAIAnalysis: string;
+    logAIChannelMock: string;
+    logAINeedsReview: string;
+    /** F-03 Metrics */
+    metricsTitle: string;
+    metricsKPI: string;
+    /** F-04 Docs */
+    docsTitle: string;
+    docsCategory: string;
+  };
 }
