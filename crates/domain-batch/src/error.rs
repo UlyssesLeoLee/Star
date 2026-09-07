@@ -85,9 +85,27 @@ pub enum BatchError {
     /// `BA-016` 500 DB 写入失败 (走 `batch_event` 记录失败)
     #[error("database error: {0}")]
     Database(String),
+    /// **v0 phase 2 不变量校验失败** (per OPT-NEXT-06-code-stub §3.2 4 不变量实装)
+    ///
+    /// 用于 INV-BA-01/05/12 等"非标准 BA-xxx"校验错误, 跟 BATCH-REQ-001 §8 16 错误码互补.
+    /// HTTP 422.
+    #[error("validation failed: {0}")]
+    ValidationFailed(String),
     /// 内部错误
     #[error("internal error: {0}")]
     Internal(String),
+    /// **P2 阶段未实装标记** (per OPT-NEXT-06 47 stub 实装, per `docs/briefs/next-session/OPT-NEXT-06-code-stub.md` §3.2)
+    ///
+    /// per OPT-WORKER-01 模式: `Error::NotImplemented { feature, suggestion }`
+    /// 比 `Internal("stub")` 提供更明确的客户端体验 (feature 字段 + 可执行建议).
+    /// P2 阶段 worker 子代理实装时按 feature 名替换为真实实装 (派前必先 `automation/dispatcher.py brief(...)`).
+    #[error("not implemented: feature={feature}; suggestion={suggestion}")]
+    NotImplemented {
+        /// 未实装的功能名 (e.g. `"BatchCommandPort::create_task"`)
+        feature: String,
+        /// 可执行的修复建议 (e.g. `"Wait for Phase M+ worker delegation per AGENTS.md §4 #20"`)
+        suggestion: String,
+    },
 }
 
 /// Batch 错误码字符串 (供 API/日志用)
@@ -129,6 +147,10 @@ pub enum BatchErrorCode {
     Database,
     /// 内部
     Internal,
+    /// P2 阶段未实装 (per OPT-NEXT-06 47 stub 实装)
+    NotImplemented,
+    /// v0 phase 2 不变量校验失败
+    ValidationFailed,
 }
 
 impl BatchError {
@@ -154,6 +176,8 @@ impl BatchError {
             Self::EngineOverloaded => "BATCH_ENGINE_OVERLOADED",
             Self::Database(_) => "BATCH_DATABASE_ERROR",
             Self::Internal(_) => "BATCH_INTERNAL",
+            Self::NotImplemented { .. } => "BATCH_NOT_IMPLEMENTED",
+            Self::ValidationFailed(_) => "BATCH_VALIDATION_FAILED",
         }
     }
 
@@ -181,7 +205,8 @@ impl BatchError {
             Self::InvalidDagSchema(_)
             | Self::DagCycle(_)
             | Self::InvalidNodeTypeConfig(_)
-            | Self::InvalidCron(_) => 422,
+            | Self::InvalidCron(_)
+            | Self::ValidationFailed(_) => 422,
             Self::NodeTypeNotApproved(_) => 403,
             Self::TaskNameConflict(_) | Self::RunAlreadyRunning(_) => 409,
             Self::NodeTimeout(_) => 408,
@@ -190,6 +215,8 @@ impl BatchError {
             | Self::Database(_)
             | Self::Internal(_) => 500,
             Self::EngineOverloaded => 503,
+            // P2 阶段未实装 → 501 (对齐 REST 错误模型 per `star-api-rest/src/error.rs`)
+            Self::NotImplemented { .. } => 501,
         }
     }
 }
@@ -203,6 +230,27 @@ impl From<uuid::Error> for BatchError {
 impl From<serde_json::Error> for BatchError {
     fn from(e: serde_json::Error) -> Self {
         Self::Internal(format!("json error: {e}"))
+    }
+}
+
+impl BatchError {
+    /// 构造 NotImplemented 错误的便捷方法 (per OPT-WORKER-01 模式)
+    ///
+    /// per `docs/briefs/next-session/OPT-NEXT-06-code-stub.md` §3.2 + `OPT-WORKER-01` 模式,
+    /// P2 阶段 worker 子代理实装前, NoopBatchService 全部 16 方法走此构造.
+    ///
+    /// # Example
+    /// ```ignore
+    /// return Err(BatchError::not_implemented(
+    ///     "BatchCommandPort::create_task",
+    ///     "Phase M+ worker delegation per AGENTS.md §4 #20",
+    /// ));
+    /// ```
+    pub fn not_implemented(feature: impl Into<String>, suggestion: impl Into<String>) -> Self {
+        Self::NotImplemented {
+            feature: feature.into(),
+            suggestion: suggestion.into(),
+        }
     }
 }
 
@@ -231,5 +279,18 @@ mod tests {
         assert_eq!(err.code(), "BATCH_ENGINE_OVERLOADED");
         assert_eq!(err.http_status(), 503);
         assert!(err.is_server_error());
+    }
+
+    #[test]
+    fn not_implemented_helper() {
+        let err = BatchError::not_implemented("BatchCommandPort::create_task", "Phase M+");
+        assert_eq!(err.code(), "BATCH_NOT_IMPLEMENTED");
+        assert_eq!(err.http_status(), 501);
+        // NotImplemented 不是 server error (是 client-side 501, 跟 Internal 区分)
+        assert!(!err.is_server_error());
+        // 错误信息含 feature + suggestion
+        let s = format!("{err}");
+        assert!(s.contains("BatchCommandPort::create_task"));
+        assert!(s.contains("Phase M+"));
     }
 }
