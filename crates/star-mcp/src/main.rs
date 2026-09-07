@@ -32,7 +32,7 @@
 //! - **22 domain handler** (`crates/star-mcp/src/handlers/*.rs`): 每个 handler 暴露 URI pattern
 //!   (e.g. `agent://{id}` / `worktree://{id}`) + cache TTL + mock-but-functional read
 //! - `Resource` trait (`crates/star-mcp/src/resources.rs`): typed `Resource<Data = X>`
-//! - `DynResource` trait: type-erased (Box<dyn DynResource>) 注册到 `ResourcesHandler::domains`
+//! - `DynResource` trait: type-erased (`Box<dyn DynResource>`) 注册到 `ResourcesHandler::domains`
 //! - `KeyBuilder` (`spec/cache/01` §3 L119-126): cache key 格式化
 //! - `ResourceError`: handler 内部错误 → 映射到 6-field `McpError`
 //! - 全部 mock-but-functional (per AGENTS.md 缺标比错标安全守门 + Phase E mock 标记):
