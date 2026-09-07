@@ -94,8 +94,11 @@ ARCH_PLANNED = {
     "star-redis": "Redis Pool 设计意图,跟 star-postgres 同等 (T3 启动)",
     "star-rest": "REST adapter 设计意图,per ADR-0029 Universal Submit",
     "star-sa-cluster": "Sub-agent Cluster 设计意图,per LangGraph view §2 SA-01..SA-09",
-    "star-system": "System 共享层设计意图,per agent-runtime 02-basic-design"
+    "star-system": "System 共享层设计意图,per agent-runtime 02-basic-design",
+    "star-mcp-idem-middleware": "Star-EI 02-basic-design §6.2 C-12, star-mcp crate 内 middleware 子模块 (crates/star-mcp/src/middleware/idempotency.rs), audit 误把模块路径当 crate",
+    "star-mutex": "Star-EI 03-detailed-design §1 '22 domain crate 基础设施' 规划, workspace 未实装, 等 DDD Review 拍板"
 }
+
 
 
 def parse_cargo_members():

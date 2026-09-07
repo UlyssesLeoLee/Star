@@ -1,6 +1,6 @@
 ---
 title: "docswiki vs pgwiki 对照表"
-generated: "2026-09-07T11:39:18Z"
+generated: "2026-09-07T12:41:12Z"
 node_type: "audit-issue"
 ---
 
@@ -30,7 +30,7 @@ node_type: "audit-issue"
 |  |  | **设计意图(workspace 未实装)**: `domain-lead-referral`, `star-checkpoints` |  |  |
 | [[docswiki-06-data-flow]] | 数据流 | [[crate-domain-tenant]], [[crate-star-mcp]] | [[40-crosscutting/dependencies]] | 已实装 2 / 设计意图 0 |
 
-**生成时间**: 2026-09-07T11:39:18Z
+**生成时间**: 2026-09-07T12:41:12Z
 **来源**: `pgwiki_audit.py` Issue 7
 
 ## Counters

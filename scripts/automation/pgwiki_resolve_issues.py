@@ -96,6 +96,9 @@ ARCH_PLANNED = {
     "star-rest": "REST adapter 设计意图,per ADR-0029 Universal Submit",
     "star-sa-cluster": "Sub-agent Cluster 设计意图,per LangGraph view §2 SA-01..SA-09",
     "star-system": "System 共享层设计意图,per agent-runtime 02-basic-design",
+    # 2026-09-07 21:39 JST Star-EI view 引入 (per c32d876 STAR-P3-WBS-001 v0.7 §14.9)
+    "star-mcp-idem-middleware": "Star-EI 02-basic-design §6.2 C-12, star-mcp crate 内 middleware 子模块 (crates/star-mcp/src/middleware/idempotency.rs), audit 误把模块路径当 crate",
+    "star-mutex": "Star-EI 03-detailed-design §1 '22 domain crate 基础设施' 规划, workspace 未实装, 等 DDD Review 拍板",
 }
 
 
@@ -202,6 +205,16 @@ ARCH_PLANNED = ''' + json.dumps(ARCH_PLANNED, ensure_ascii=False, indent=4) + ''
         r'(    refs = \{r for r in refs if r\.replace\("-", ""\)\.isalnum\(\) and len\(r\) >= 5\}\n    return refs\n\n\n\n# =+)',
         r'\1    # 跳过规划中 / 已声明不实装 (per 9/3 19:35 拍板 D)\n    refs = refs - set(ARCH_PLANNED.keys())\n    return refs\n\n\n# =+)',
         text,
+    )
+
+    # 4.5 sync inline ARCH_PLANNED / ADR_PLANNED blocks (idempotent sync from
+    #     pgwiki_resolve_issues.py source-of-truth, per 9/7 21:40 JST 增量需求)
+    text = re.sub(
+        r'ADR_PLANNED = \{.*?\n\}\n\nARCH_PLANNED = \{.*?\n\}\n',
+        lambda m: 'ADR_PLANNED = ' + json.dumps(ADR_PLANNED, ensure_ascii=False, indent=4) + '\n\nARCH_PLANNED = ' + json.dumps(ARCH_PLANNED, ensure_ascii=False, indent=4) + '\n\n',
+        text,
+        count=1,
+        flags=re.DOTALL,
     )
 
     if text == orig:

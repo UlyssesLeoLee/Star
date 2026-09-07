@@ -1,6 +1,6 @@
 ---
 title: "pgwiki audit OPEN issue 决策表"
-generated: "2026-09-07T11:39:17Z"
+generated: "2026-09-07T12:41:12Z"
 generator: "scripts/automation/pgwiki_resolve_issues.py"
 作者: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 修订: 2026-09-07 20:34 JST 初版
@@ -67,6 +67,8 @@ Per 2026-09-07 20:34 JST Ulysses 拍板"能解决就尽量解决",本表列 4 �
 | `star-rest` | 加 `ARCH_PLANNED` 白名单 | REST adapter 设计意图,per ADR-0029 Universal Submit |
 | `star-sa-cluster` | 加 `ARCH_PLANNED` 白名单 | Sub-agent Cluster 设计意图,per LangGraph view §2 SA-01..SA-09 |
 | `star-system` | 加 `ARCH_PLANNED` 白名单 | System 共享层设计意图,per agent-runtime 02-basic-design |
+| `star-mcp-idem-middleware` | 加 `ARCH_PLANNED` 白名单 | Star-EI 02-basic-design §6.2 C-12, star-mcp crate 内 middleware 子模块 (crates/star-mcp/src/middleware/idempotency.rs), audit 误把模块路径当 crate |
+| `star-mutex` | 加 `ARCH_PLANNED` 白名单 | Star-EI 03-detailed-design §1 '22 domain crate 基础设施' 规划, workspace 未实装, 等 DDD Review 拍板 |
 
 ## ADR / arch view 文档**不改** (守门 #12 + #8)
 
