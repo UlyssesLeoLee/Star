@@ -58,6 +58,24 @@ spec:
           configMap:
             name: star-mock-mock-data
 ---
+# P0 热修 (per 2026-09-08 07:36 JST UAT 实证): 显式声明 mock-data CM
+# 原 yaml 在 volumes 引用 star-mock-mock-data, 但缺 ConfigMap 定义, pod Pending 4m 因 FailedMount
+# 修法: 补一个空 ConfigMap 占位 (跟 envoy-config 同样声明在同 yaml, apply 时一次性带上)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: star-mock-mock-data
+  namespace: star-mock
+  labels:
+    app: star-mock
+data:
+  README: |
+    star-flash-mock 静态资源占位 CM
+    实际数据可由 tools/star-flash-mock/mock_data/ 灌入:
+      kubectl -n star-mock create cm star-mock-mock-data \
+        --from-file=tools/star-flash-mock/mock_data/
+  .placeholder: "true"
+---
 apiVersion: v1
 kind: Service
 metadata:

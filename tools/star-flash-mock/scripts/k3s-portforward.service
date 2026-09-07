@@ -1,0 +1,15 @@
+[Unit]
+Description=k3s port-forward star-mock-envoy 3000:8080
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=leo19
+Environment=KUBECONFIG=/home/leo19/.kube/config
+ExecStart=/usr/local/bin/kubectl -n star-mock port-forward svc/star-mock-envoy 3000:8080 --address 0.0.0.0
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
