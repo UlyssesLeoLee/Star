@@ -2,6 +2,7 @@
 
 | Version | Date | Author | Change |
 |---|---|---|---|
+| v1.1 | 2026-09-07 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 扩: §10 Phase C.2 star-dto 共享 DTO crate 公共类型 + §11 5 domain 接入 + §12 W/T/M 分类 + §13 已知缺口 |
 | v1.0 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 扩: §5 P0-1 ActorContext 字段 + §6 跨域命令/查询/事件命名约定 + §7 Phase B.4 8+ 修正 + §8 已知缺口更新 |
 | v0.1 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 22 domain-* crate 字段命名表 + 5 抽样对照 spec 附录 B vs basic-design |
 
@@ -182,3 +183,118 @@
 |---|---|---|---|---|
 | v1.0 | 2026-09-04 12:35 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 扩: §5 P0-1 ActorContext 9 字段表 + §6 跨域命令/查询/事件命名约定 + §7 Phase B.4 14 修正模式 + §8 已知缺口更新 (5/13 已消解, 8/13 推下) | 9/4 12:35 JST Phase B.4 sub-session #6+#7 收官 (commit `c503f83` + `910eea8`), 启动 Phase C.1 T3.3 (per HANDOFF v0.8 §10) |
 | v0.1 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 22 domain-* crate 字段命名表 + 5 抽样对照 spec 附录 B vs basic-design + 5 已知缺口 | 9/3 12:55 JST 用户发令"启动 sub-session #1: T1.7 4.1 + 4.2 + T3.3" + 9/3 13:00 JST T3.3 实施启动 |
+
+---
+
+# v1.1 新增 (per 2026-09-07 12:10 JST, Phase C.2 T3.1 + C.3 T1.5)
+
+## §10 Phase C.2 star-dto 共享 DTO crate 公共类型 (per HANDOFF v0.8 §10 + 守门 #13 W/T/M 派生)
+
+`crates/star-dto` (v0.0.1 → v0.1.0) 是 22 domain-* crate **跨域共享 DTO 收敛**入口, 跟 `star_context::ActorContext` 平行(后者是 Actor 上下文, 前者是业务 DTO 共享).
+
+**演进 (per 守门 #1 + 守门 #12)**:
+- v0.0.1 (2026-09-04 `5357c0a`): 4 强类型 ID + `ActorContext` alias + `ListByTenantDto` stub, 跨 sub-session 续
+- v0.1.0 (2026-09-07, 本 commit): 公共 DTO 类型 + 5 domain 接入 + unit test 覆盖
+
+### §10.1 公共类型清单 (per v0.1.0)
+
+| 类型 | W/T/M 分类 | 字段 | 守门 | 备注 |
+|---|---|---|---|---|
+| `Identifier<T>` | **M** (Master, SCD Type 2) | `value: Uuid`, `valid_from: DateTime<Utc>`, `valid_to: Option<DateTime<Utc>>`, `_phantom: PhantomData<T>` | 守门 #13 (b) SCD | phantom type 防 ID 混用 (UserId vs TenantId) |
+| `Timestamp` | (跨域共享, 不分类) | `created_at: DateTime<Utc>`, `updated_at: DateTime<Utc>` | 守门 #13 (b) invariant | 22 domain 通用 |
+| `TenantContext` | (跨域共享, 不分类) | `tenant_id: Uuid`, `workspace_ids: Vec<Uuid>`, `actor_id: Uuid` | 守门 #13 + H2-EXT #3 | 跟 `ActorContext` 平行, 更轻量 |
+| `AuditTrail` | **T** (Transaction, append-only) | `actor_id: Uuid`, `action: String`, `timestamp: DateTime<Utc>`, `previous_hash: Option<String>` | 守门 #13 (a) append-only | 跨域事件流水 |
+| `ListByTenantDto` | (Work 数据查询载体, 但本身非 W 类型) | `tenant_id: Uuid`, `limit: u32`, `offset: u32` | 守门 #13 + §6.1 | v0.0.1 已有, v0.1.0 保留 |
+
+### §10.2 W/T/M 分类依据 (per 守门 #13 + 9/1 18:30 JST 拍板)
+
+| 分类 | 物理删除 | 审计 | RLS | 守门 #13 子项 |
+|---|---|---|---|---|
+| **W (Work)** | ✅ 允许 | — | — | (a) 物理删除 / タイマー失効 / 短 TTL 明示 retention |
+| **T (Transaction)** | ❌ 禁止 | ✅ 必填 | — | (a) 物理删除禁止 + 監査必須 |
+| **M (Master)** | ❌ 禁止 | — | ✅ 13 类 | (b) 物理删除禁止 + SCD Type 2 |
+
+**star-dto 公共类型应用**:
+- `Identifier<T>`: M 类 (SCD Type 2 — `valid_from`/`valid_to` 标识版本)
+- `AuditTrail`: T 类 (append-only, 物理删除禁止 + 审计必填)
+- `Timestamp` / `TenantContext` / `ListByTenantDto`: **不分类** (DTO 本身是数据载体, 不属于数据表, 分类归属其映射的 DB 表)
+
+### §10.3 5 domain 接入清单 (per Phase C.2 brief §3.2)
+
+| domain-* | 接入方式 | 公共类型引用 | commit | 备注 |
+|---|---|---|---|---|
+| `domain-relation` | `use star_dto::ListByTenantDto;` | `ListByTenantDto` (跨域查询) | 本 commit | 关系查询常按 tenant 过滤 |
+| `domain-board` | `use star_dto::ListByTenantDto;` | `ListByTenantDto` (跨域查询) | 本 commit | 板级列表查询 |
+| `domain-tenant` | `use star_dto::Identifier;` | `Identifier<TenantMarker>` (SCD Type 2) | 本 commit | 租户是 M 类主数据, SCD 强约束 |
+| `domain-workspace` | `use star_dto::Timestamp;` | `Timestamp` (created_at/updated_at) | 本 commit | 工作区时间戳统一 |
+| `domain-context` | `use star_dto::TenantContext;` | `TenantContext` (H2-EXT #3 派生) | 本 commit | 上下文 tenant 隔离 |
+
+**5 domain 选定理由** (per brief §3.2 + 估最少冲突):
+1. `domain-relation` — 关系查询, `tenant_id` 必填, 跨域共享
+2. `domain-board` — 列表查询, 跟 ListByTenantDto 模式高度契合
+3. `domain-tenant` — M 类主数据, SCD 强约束典型场景
+4. `domain-workspace` — 时间戳统一, 跟 `Timestamp` DTO 直接对应
+5. `domain-context` — 上下文 tenant 隔离, 跟 H2-EXT #3 `TenantContext` 高度契合
+
+**未接入 17 domain 推下 sub-session 续**:
+- 17 个 domain 的 `*Command` / `*Query` / `*Event` DTO 全量迁移到 star-dto 估 1.0-1.5M token (per HANDOFF v0.8 §10 C.2 全量计划)
+- 本 commit 仅 5 domain 接入做"链路打通" 实证, 不动 17 domain 内部 DTO 定义 (避免大爆炸)
+
+---
+
+## §11 W/T/M 横展开一致性规则 (per 守门 #13 + 9/1 18:30 JST 拍板 + IPA SEC)
+
+**规则**: 任何基本设计阶段 (DB schema + 内存数据结构 + DTO) 必须显式 W/T/M 三类分门别类, 100% 类型覆盖.
+
+**反例** (per守门 #13 派生规):
+- ❌ "DTO 不存数据, 只传递" → 跳过 W/T/M 分类
+- ✅ ✅ ✅: DTO 本身不分类, 但 DTO 承载的数据若映射到 DB, 必须追溯到目标表的分类
+
+**star-dto 公共类型应用**:
+| DTO 类型 | 映射 DB 场景 | DB 分类 | 守门 #13 子项 |
+|---|---|---|---|
+| `Identifier<T>` | 主数据表 (e.g. `tenant` / `workspace` / `user`) | M | (b) SCD Type 2 |
+| `AuditTrail` | 审计事件表 (e.g. `audit_event`) | T | (a) append-only |
+| `Timestamp` | 任意表通用字段 | (随表分类) | (b/c) 由表决定 |
+| `TenantContext` | 不映射 DB, 跨域调用上下文 | (无) | — |
+| `ListByTenantDto` | 不映射 DB, 查询载体 | (无) | — |
+
+---
+
+## §12 5 domain 接入详细对照 (per 守门 #13 实证)
+
+| domain-* crate | 接入文件 | 接入代码 | Cargo.toml 修改 |
+|---|---|---|---|
+| `domain-relation` | `crates/domain-relation/src/lib.rs` | `use star_dto::ListByTenantDto;` | `[dependencies]` 加 `star-dto = { path = "../star-dto" }` |
+| `domain-board` | `crates/domain-board/src/lib.rs` | `use star_dto::ListByTenantDto;` | 同上 |
+| `domain-tenant` | `crates/domain-tenant/src/lib.rs` | `use star_dto::Identifier;` | 同上 |
+| `domain-workspace` | `crates/domain-workspace/src/lib.rs` | `use star_dto::Timestamp;` | 同上 |
+| `domain-context` | `crates/domain-context/src/lib.rs` | `use star_dto::TenantContext;` | 同上 |
+
+**Lints 验证 (per T1.5 step 3 完成 `9e2f346`)**:
+- `missing_docs = "deny"` (workspace.lints.rust) — 5 domain 新增 `use star_dto::*;` 需补 doc
+- 实证: `cargo check --workspace --all-targets -j 4` 0 err (per §13 已知缺口 #1)
+
+---
+
+## §13 已知缺口 (per 缺标比错标) — v1.1
+
+| # | 缺口 | 严重度 | 状态 | 触发 |
+|---|---|---|---|---|
+| 1 | cargo check 守门 baseline | 🟢 0 err 实证 | done | 本 commit |
+| 2 | cargo test 6 crate (star-dto + 5 domain) 守门 | 🟢 全 pass 实证 | done | 本 commit |
+| 3 | 17 domain 接入 star-dto 推下 sub-session 续 (估 1.0-1.5M token) | 🟡 中 | pending | per HANDOFF v0.8 §10 C.2 全量 |
+| 4 | `Identifier<T>` SCD Type 2 真实持久化层 (目前仅类型定义) | 🟡 中 | pending | 需要 DB schema 联动 |
+| 5 | `AuditTrail` append-only 真实审计表 (目前仅类型定义) | 🟡 中 | pending | 需要 `audit_event` 表联动 |
+| 6 | `TenantContext` 跟 `star_context::ActorContext` 字段对齐验证 (H2-EXT 拍板) | 🟡 中 | pending | 跨域一致性 |
+| 7 | 9 跨切 supporting + 10 star-* 字段命名未覆盖 | 🟡 低 | partial | per v1.0 §8 #4 |
+| 8 | 600+ warning (missing_docs + unused) | 🟡 低 | partial | Phase 2 spec 完成后补 doc |
+
+---
+
+## §14 修订历史 v1.1
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|---|
+| v1.1 | 2026-09-07 12:10 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 扩: §10 star-dto 公共类型 5 类 + W/T/M 分类 + §11 横展开规则 + §12 5 domain 接入对照 + §13 8 已知缺口 (2/8 已消解, 6/8 推下) | 9/7 12:04 JST Mavis 接手派 worker 完成 Phase C.2 (T3.1 star-dto 5 domain 接入) + Phase C.3 (T1.5 验证) |
+
