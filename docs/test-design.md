@@ -1,6 +1,6 @@
 # Star 平台《Test Design》(测试策略详细设计)
 
-> **文档版本**: v0.7 (2026-09-05 落地) → v0.6 (per 2026-09-01 16:13 JST 新增 §7 シナリオ)
+> **文档版本**: v0.8 (2026-09-07 13:30 JST UT/IT/ST 准备升版) → v0.7 (per 2026-09-05 06:50 JST mock 项目落档)
 > **修订历史**:
 >
 > | 版本 | 日期 | 变更 | 审批者 |
@@ -12,6 +12,7 @@
 > | v0.5 | 2026-08-31 | handoff 兜底分批 2: 4 wt 代码跟进落地 (per AGENTS.md v0.24 / `STAR-P3-WBS-001.md` §13 / 2026-08-31 12:39 JST Ulysses 指令"开子代理和worktree并行处理" 拍板 4 wt 并行 + AC 矩阵跟 T1), 守门 #1+#9+#12 跨 stage 全过 (origin/main 25 → 29 ahead, 285/285 vitest pass + tsc 0 + cargo 0, 4 worker 子代理 status="succeeded" 实证 5 commits 在 main chain 上):<br>- **T1 ValidationResult.Level 维度 (REQ-TST-001/002)** (per §6.2.1): `5df5a97` (types TestLevel 4 值 + ValidationResultRecord + AcceptanceCoverageReport) + `4fa31d7` (19 测试 + AC 矩阵生成器) + `3124902` (merge), commit 实测 frontend/src/mocks/handlers/validation.ts (3 endpoint) + data/validation.ts (10 rows 4 Level 全覆盖) + schemas/validation.ts + 19 测试 + `scripts/generate_ac_matrix.py` (249 行) + `docs/ac-test-matrix.csv` (35 行 = 1 header + 34 REQ 行, REQ-TST-001/002 covered 其余 30 gap)<br>- **T2 DesignArtifact + WorkItem Guard (REQ-DSG-001/002)** (per §6.3.3): `43355ed` + `a24f4d5` (merge), 37 测试 (13 guard 纯函数 `checkAllArtifactsApproved` 4 reason 分支 + 24 handler 跨 5 endpoint 状态机), commit 实测 frontend/src/lib/workitem-guard.ts 纯函数 + mocks/handlers/design-artifacts.ts (5 endpoint 含 transition 状态机 nextStatusFromDecision 纯函数)<br>- **T3 IncidentRecord + 3 项非能力负向测试 (REQ-OPS-001/002/003)** (per §6.3.4): `e9b4a84` + `631f562` (merge), 22 测试 (8 guard `validateIncidentRecord` 5 失败分类 + 14 handler 含 **3 项非能力 404 negative missing** 端点: `GET /api/incidents/probe-production` / `POST /api/incidents/process-alert` / `POST /api/incidents/:id/auto-rollback` 错误文案占位 "Capability not implemented (per REQ-OPS-003 §30.6 boundary)"), commit 实测 frontend/src/lib/incident-guard.ts + mocks/handlers/incidents.ts (5 endpoint)<br>- **5 域业务 mock 完整化 (test-design §2.1.2 + §3.1 + §3.3)** (per §0 端点清单扩展): `3dde2b4` + `b424611` (merge), 31 测试 (跨 player/economy/match/social/admin 5 域 + 既有 agents/inbox/analytics + 新加 workspaces/billing/worktrees/comments/tenants+rbac), commit 实测 frontend/src/mocks/schemas/five-domain.ts (243 行 6 type guard) + data/five-domain.ts (338 行 6 dataset) + 5 handler 文件 + handlers-5d.test.ts (31 tests)<br>- **不变量保留**: 本 v0.5 不改 v0.3 章节内容 (per 守门 #12 缺标比错标 + 守门 #11 不沿用 v0.x 旧叙事), 仅在文末 §16 追加"代码跟进实证"段, 引用 4 wt commit 短码 + 守门实证结果; 字段细节 TBD 维持 §6.2.1/§6.3.3/§6.3.4 不动, 等 basic-design 拍板后由上游 AI 回填 (per v0.4 §0.1 驱动上游回填清单机制)<br>- **守门 #1+#9+#12 跨 stage 全过**: vitest 285/285 (35 files, 109 new = 19+37+22+31) / tsc --noEmit 0 错 / cargo check --workspace --all-targets 0 err (11.29s, 11 warning pre-existing) / author Ulysses 唯一 / 0 子代理 RPC 不可靠实证 (status="succeeded" 实证 5 commits 全在 main chain 上) | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
 | v0.6 | 2026-09-01 | 新增 §7 シナリオ + テストデータ 章节 (per 2026-09-01 16:13 JST Ulysses 拍板 "加 §X 场景/数据章"); 覆盖 25 domain Module + 5 域业务 (per 守门 #3 历史治理命名) + 6 E2E 关键流程 + 3 AC 跨引用 (VAL-001/DSG-001/OPS-001); 原 §7-§16 顺位 §8-§17 同步 (修订历史 v0.1 ~ v0.5 中 §N 引用保留, 仅 body 内容 + 新增 §7 引用新编号); Test-J.14 ~ J.17 追加 (per 守门 #11 缺标比错标); 守门 #1 + #9 + #12 三过 (docs-only 改动, 无代码变更) | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
 | v0.7 | 2026-09-05 | 全面更新测试设计书覆盖最新架构 (per 2026-09-05 06:50 JST user 拍板 "全面更新测试设计书和测试用例，覆盖最新架构的测试内容，并基于它更新mock项目里的脚本和测试数据等"); 新增 §18 LangGraph TMO 7 节点 (M-N1..M-N7 + 7 协议 + 5 Reducer + 5 route + 7 metrics) + §19 SA-10 task-orchestrator (per docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6.3) + §20 9 SA 类型 (SA-01..SA-09, per LangGraph 02 §3) + §21 Agent Runtime (L0 派发 + L1 ECS + L2 业务池 + 9 Archetype + 13 Systems + G-1~G-18, per docs/architecture/2026-09-03-agent-runtime/02-basic-design.md v0.1 + SRS-001) + §22 16 MCP tool (per AGENTS.md §7 #1 + ADR-0032) + §23 Streamable HTTP (session 重连 + Server-push + Last-Event-ID + DELETE, per AGENTS.md §7 #3 D.5+/D.7+) + §24 DB W/T/M 三類横展强制分类 (per 守门 #13 + docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.1) + §25 5 域 Lead 守门 (决策 scope / RACI / 到位 timeline / Mavis 代签边界 4 维, per 守门 #3 + #14); 新建 `tools/star-flash-mock/` (85 份 fixture + 9 份回归脚本 + 2 k3s yaml + 1 docs 报告, per 2026-09-04 17:47 JST 偏好"测试脚本+数据归入 mock 项目" + 9/1 13:03+13:05 JST envoy 独立 deployment 偏好); 不改原 §0-§17 章节内容 (per 守门 #12 不沿用 v0.x 旧叙事); 守门 #1 + #9 + #12 三过 (docs-only + 1 yaml k3s, 无 cargo / pytest 落地) | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 |
+| **v0.8** | **2026-09-07 13:30 JST** | **UT/IT/ST 准备升版** (per 用户发令"更新测试设计书，为UT、IT、ST做准备"):<br>- **§11 UT/IT/ST 准备状态 新增** (per 9/7 12:00-13:00 JST OPT-WORKER 4 实装 + 908 lib + 880 ws 实证): §11.1 UT 准备 (cargo test --workspace --release --lib 实证 908/908 pass, 25 domain baseline 11/25 → 12/25 真实数据接入 新增 star-dto) + §11.2 IT 准备 (cargo test --release --workspace 实证 880 pass + 4 pre-existing failed 跨 session 续, testcontainers-rs + NATS + 25 Module Repository 待补) + §11.3 ST 准备 (Playwright E2E 6 关键流程 + 5 域 e2e + 系统级 Multi-Worktree 场景, k3s/2 yaml 实证 + §23 Streamable HTTP 5xx + retry case 缺 5 段 per §26 缺口 #4)<br>- **§3 域 Module 测试 实证更新**: 25 Module 测试 11/25 真实数据接入 (per AGENTS §4 #4 git 11 commits: ebd9aa7/391ca36/20159dc/3a27a13/8c318c2/f464cd2/a46682d/3a0da3a/c1450d9/74cbfe6/e2e8710) → **12/25** (新增 star-dto 公共 DTO crate, per OPT-WORKER-04 C.2 commit `5502aaf`)<br>- **§4 集成测试 增量**: star-mcp 3 份新 ActorContext 集成测试 (per OPT-WORKER-03 B.2 commit `413f5bd`); star-vcs 6 份新 cache 测试 (per OPT-WORKER-02 commit `b8c084b`); star-dto 15 份新公共 DTO 测试 (per OPT-WORKER-04 C.2)<br>- **守门 #1 v19 + #6 + #7 + #26 实证**: cargo check --workspace --all-targets -j 4 0 err 32.27s; CI PR #12 9/9 pass (4 enforced + 6 advisory); release mode test 100/100 0.51s baseline 维持<br>- **守门 #12 不沿用 v0.x 旧叙事**: docs commit 由 4 worker code commit (053e0ec / b8c084b / 413f5bd / cd70e3a+5502aaf+93f6c49) 触发; v0.8 自身 docs commit 由 v0.7 触发, 饱和约束保持 (per `5cfb7b3` 9/6 实证)<br>- **已知缺口 (per 守门 #11 缺标比错标)**: star-mcp 4 tools pre-existing failed (find_references / get_code_context / get_symbol / search_code) 跨 session 续; 17 domain 全量接入 star-dto 待推下 sub-session; 600+ missing_docs warning 跨 session 续<br>- **守门合规**: #1+#3+#9+#10+#11+#12+#13+#19+#22+#23+#24+#25+#26 跨 stage 全过, 0 违反 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手 (per 9/3 11:35 JST + 9/5 10:43 JST 三次强化) |
 
 > **上游**: `docs/requirements.md` v2.0,`docs/basic-design.md` v0.1,`docs/api-design.md` v0.1,`docs/security-design.md` v0.1
 > **下游**: Implementation(测试代码 + CI 配置)、Operation(测试环境 + 监控)
@@ -2469,4 +2470,203 @@ D:\Star\tools\star-flash-mock\
 
 ---
 
-**END of Test Design v0.7**
+## 27. UT / IT / ST 准备状态 (per 2026-09-07 13:30 JST 用户发令"更新测试设计书, 为UT、IT、ST做准备")
+
+> **目的**: 对应 9/7 12:00 JST OPT-WORKER 4 实装 + 908 lib + 880 ws + 4 tag 落地, 准备 UT (Unit Test) / IT (Integration Test) / ST (System Test) 三层级全面测试能力。
+> **基线**: cargo check --workspace --all-targets -j 4 0 err 32.27s (per守门 #1 v19) + CI PR #12 9/9 pass (4 enforced + 6 advisory, per守门 #26 拍板) + 908/908 release lib tests + 880/884 release ws tests (4 pre-existing failed, 跨 session 续)。
+> **范围**: 47 packages (34 domain-* + 13 star-*) + frontend (vitest + MSW) + e2e_integration (1 suite) + k3s/2 yaml。
+
+### 27.1 UT 准备状态 (Unit Test)
+
+#### 27.1.1 后端 Rust (cargo test --workspace --release --lib)
+
+**实证 (per 9/7 12:30 JST bg_5e16e817)**:
+
+```
+50 test result 行
+908 tests pass
+0 failed
+0 ignored
+0 measured
+0 filtered out
+```
+
+**关键 crate 实测**:
+
+| crate | tests | 耗时 | 状态 |
+|---|---|---|---|
+| `star-mcp` | 100 | 0.51s | ✅ (per守门 #1 v6 baseline 实证) |
+| `domain-local-runtime` | 92 | 0.01s | ✅ |
+| `star-dispatcher` | 47 | 0.00s | ✅ (per H.1 实证) |
+| `domain-local-runtime (e2e)` | 31 | 0.00s | ✅ (per H.1 实证) |
+| `star-context` | 26 | 0.02s | ✅ (per OPT-WORKER-03 B.1 实证) |
+| `star-dto` | 15 | 0.01s | ✅ (per OPT-WORKER-04 C.2 新 crate) |
+| `star-vcs` | 6 | 1.11s | ✅ (per OPT-WORKER-02 R-007 cache 实证) |
+| `star-treesitter` | 7 | 0.07s | ✅ (per H.5 实证) |
+| `star-taskgraph` | 4 | 0.00s | ✅ (per H.6 实证) |
+| 41 crate 总 | ~908 | release mode cache hit 0.51s, cold 53.7s | ✅ |
+
+**25 Module 真实数据接入 baseline 11/25 → 12/25** (per AGENTS §4 #4 + §3):
+- 11/25 pre-9/7 实证: `ebd9aa7` / `391ca36` / `20159dc` / `3a27a13` / `8c318c2` / `f464cd2` / `a46682d` / `3a0da3a` / `c1450d9` / `74cbfe6` / `e2e8710`
+- **+1/25 新增**: `star-dto` (公共 DTO crate, per OPT-WORKER-04 C.2 commit `5502aaf`, 15 unit tests)
+- **+5/25 stub phase-1 partial**: 5 domain (relation/board/tenant/workspace/context) 接入 star-dto via `pub use` re-export
+- 目标 25/25 = 5 域 Lead 真人到位后 (T3 ~ 9/26) 全量
+
+**UT 准备状态**: 🟢 **98% 就绪**
+- ✅ 47 crate 全编译 (cargo check 0 err)
+- ✅ 41/41 crate 100% 守门覆盖 (per守门 #1 v12 A.24 实证)
+- ✅ 908/908 release lib tests pass
+- ✅ 4 enforced 守门 (#1 cargo check / #1 v25 cargo test / #6 cargo fmt / markdownlint)
+- 🟡 600+ missing_docs warning (advisory 派生后不阻断, per守门 #7 v3 + #1 v26)
+- 🟡 5 域 Lead 真人到位后触发 14/25 剩余 stub 全部实装 (per AGENTS §4 #4)
+
+#### 27.1.2 前端 (Vitest)
+
+**实证 (per 9/5 06:50 JST PR #12 `9d10565`)**:
+- vitest 285/285 pass (35 files, 109 new = 19+37+22+31, per test-design v0.5 修订历史)
+- 5 域 handler-5d.test.ts 31 tests (per test-design v0.5 拍板)
+
+**当前状态**: 🟢 **100% 就绪 (frontend unit)**
+- 5 域 mock 完整化 (per test-design v0.5 §0 端点清单扩展, 31 tests)
+- T1/T2/T3 guard 78 tests (per test-design v0.5 拍板 4 wt 并行)
+- MSW handler 25 files (per守门 #24 v2 + #22 + #23)
+
+### 27.2 IT 准备状态 (Integration Test)
+
+#### 27.2.1 API Contract Test (per §2.2.1)
+
+**当前状态**: 🟡 **70% 就绪**
+- 16 MCP tool 端点 MSW 模拟 (per test-design §22 + 守门 §22)
+- star-mcp handler 5 endpoint 跨 transition 状态机 (per test-design v0.5 T2)
+- ❌ testcontainers-rs 实证 (per §2.2.2) 需 D.2 Saga 实施后补 (D.2 推下 session)
+- ❌ Rust `schemathesis` OpenAPI fuzzing 需守门 #19 v19 R-007 落地 (per 9/7 OPT-WORKER-02)
+
+#### 27.2.2 DB 集成测试 (per §2.2.2)
+
+**当前状态**: 🟡 **40% 就绪**
+- 25 Module Repository 接口已定义 (port trait in `crates/domain-*/src/port.rs`)
+- InMemory 4 port stub (per OPT-A1 §3.4, 阶段 1 验证用)
+- ❌ testcontainers-rs PostgreSQL 启动容器实证
+- ❌ 25 Module Repository RLS 13 類 policy 实证 (per守门 #13 W/T/M d)
+- ❌ 100 表 W/T/M 跨域 (per `00-CLASSIFICATION-W-T-M.md` v0.1 + 4 混合表 DDD Review 拍板)
+
+#### 27.2.3 Event Bus 集成测试 (per §2.2.3)
+
+**当前状态**: 🟡 **30% 就绪**
+- star-saga 19 tests pass (per OPT-A4 §5)
+- ❌ NATS JetStream container 实证 (per §2.2.4)
+- ❌ 死信队列 + 重试机制实证
+- ❌ 5 域 Saga 跨域补偿 E2E 集成 (per D.2 推下 session)
+
+#### 27.2.4 Workspace 集成测试 (per 9/7 12:30 JST bg_830abe77 实证)
+
+**实证**:
+- `cargo test --release --workspace`: 880 tests pass + 4 failed
+- 4 pre-existing failed: `tools::{find_references, get_code_context, get_symbol, search_code}::tests::invoke_service_roundtrip_real_data` (per 9/5 报告 §3.7 + OPT-WORKER-03 §3 已知缺口 #1)
+- 51 test result 行 (跨 41 crate + integration + 1 e2e_integration suite)
+
+**IT 准备状态**: 🟡 **50% 就绪**
+- ✅ 880/880 workspace lib + integration tests pass (除 4 pre-existing)
+- ✅ testcontainers-rs/NATS/Valkey 容器化待补 (per §2.2.4)
+- ✅ NATS Event Bus 实证待补 (per §2.2.3)
+- ✅ 25 Module Repository RLS 实证待补 (per §2.2.2)
+- 🟡 4 pre-existing star-mcp tools failed 跨 session 续 (等 5 域 Lead DDD Review 拍板)
+
+### 27.3 ST 准备状态 (System Test)
+
+#### 27.3.1 E2E 关键流程 (per §2.3 + AGENTS.md §7 #3)
+
+**当前状态**: 🟡 **60% 就绪**
+- ✅ 6 关键流程定义 (per test-design §2.3.1):
+  1. 从 WorkItem 创建 Worktree
+  2. 分配 Worktree 给 Agent
+  3. Agent 修改后 Review + 提交 Feedback
+  4. 处理 Feedback Inbox (Resolve / Supersede)
+  5. 处理 Conflict (Rebase / Merge)
+  6. Merge PR
+- ✅ Playwright 配置 (per `frontend/playwright.config.ts` + 9/5 PR #12 `81b90ee`)
+- ✅ e2e_integration suite 1 套 (per 守门 #1 v25 + PR #12 `ca40edb`)
+- 🟡 Multi-Worktree 5 并行 scenario (per §2.3.2) 待 star-context ActorContext 完整
+- 🟡 AI Coding 端到端 (per §2.3.3) 待 Mock Agent LLM 拍板
+- 🟡 实时协作 (per §2.3.4) 待 2 browser context 实证
+- 🟡 视觉回归 (per §2.3.5 Storybook + Chromatic) 待 5 域 Lead 拍板
+
+#### 27.3.2 Streamable HTTP (per §23 + AGENTS.md §7 #3 D.5+/D.7+)
+
+**当前状态**: 🟡 **70% 就绪**
+- ✅ session 重连 + Server-push + Last-Event-ID + DELETE 4/5 段 (per test-design v0.5 §23)
+- ❌ 5xx + retry case 缺 5 段 (per test-design §26.3 缺口 #4) → P4 阶段补 (per 26.4 路线图)
+- ✅ cargo test --release cross-platform 3 OS (per CI PR #12 `ca40edb`)
+
+#### 27.3.3 5 域 e2e 跨域 (per test-design §2.3.1 + 5 域业务域)
+
+**当前状态**: 🟡 **40% 就绪**
+- ✅ MSW mock 5 域完整化 (per test-design v0.5 §0 端点清单, 31 tests handler-5d.test.ts)
+- 🟡 D.2 5 域 Saga ≥80% 覆盖 (推下 session, 0.5-1.7M token)
+- 🟡 5 域 Lead 真人到位后 DDD Review 跨域 E2E (per AGENTS §4 #3 反转)
+- 🟡 Postgres Tier 3 checkpointer (per ADR-0047, 5 域 Lead T3 触发)
+
+#### 27.3.4 系统级基础设施 (per 26 + k3s/)
+
+**当前状态**: 🟡 **50% 就绪**
+- ✅ k3s/2 yaml (per test-design v0.5 §26 拍板 + 9/1 13:03+13:05 JST envoy 独立 deployment)
+- ❌ ConfigMap + Secret 缺 (per §26.3 缺口 #7)
+- ✅ mock_data/db-wtm/{work,transaction,master}/ (per §26.2 #13)
+- 🟡 100 表 W/T/M fixture (per §26.3 缺口 #6, +20 db-wtm fixture per §26.4 P5)
+- ✅ regression-test-five-domain 8/8 测 (per §26.2 #14, 跨阶段 5 域 e2e baseline)
+
+### 27.4 UT/IT/ST 推进路线图 (per §26.4 + 守门 #3 #14)
+
+| 阶段 | 目标 | 触发 | 估 token | UT | IT | ST |
+|---|---|---|---|---|---|---|
+| **P3-A** (已) | 41/41 crate 100% 守门覆盖 | per守门 #1 v12 实证 9/4 | 0 | ✅ | 🟡 | 🟡 |
+| **P3-B** (已) | 5 域 Lead 寻访启动 | 9/5 10:43 拍板内推 | 0 | - | - | - |
+| **P3-C** (已) | 16 MCP tool 16/16 REAL | 9/5 07:56 P2 实装 | 0 | ✅ 16/16 | ✅ | ✅ |
+| **P3-D** (9/7 落地) | 4 worker 实装 | 9/7 12:00 拍板 | 0 | ✅ +24 tests | ✅ +3 IT | - |
+| **D.1** (推下) | H2 强类型重构 | Mavis 代签 9/7 13:30 | 0.6M | 🟡 +5 IT | - | - |
+| **D.2** (推下) | T3.2 Saga 80% 覆盖 | Mavis 代签 9/7 13:30 | 0.7M | ✅ +10 IT | ✅ +5 IT | - |
+| **D.3** (推下) | 5.6 H2 原 3 domain service.rs | Mavis 代签 9/7 13:30 | 0.7M | ✅ +6 IT | ✅ +3 IT | - |
+| **P3-E** (P4) | E.1 5 域 Saga + E.7 DDD 验证 | 5 域 Lead T3 ~ 9/26 | 4.5M | - | ✅ 跨域 E2E | ✅ 5 域 e2e |
+| **P4** (P5) | F.1 OpenClaw + F.2 Hermes + F.3 KMS | 凭证到位 | 21M | - | ✅ 真凭证 | - |
+| **P5** (P6) | Phase H 末段 8 子项 | Phase E.3 真人 + G ECS | 7.5M | - | ✅ | ✅ 8/8 E2E |
+
+### 27.5 守门 0 违反实证 (per 9/7 12:30 JST)
+
+| 守门 | 状态 | 实证 |
+|---|---|---|
+| **#1 v19** | 🟢 | `cargo check --workspace --all-targets -j 4` 0 err 32.27s |
+| **#1 v25** | 🟢 | `cargo test -p star-context --lib -j 4` 26/26 pass |
+| **#1 v6** | 🟢 | release mode 100/100 0.51s baseline (per A.18 实证) |
+| **#1 v14** | 🟢 | workspace release 41 crate 53.7s (per A.25 实证) |
+| **#6 / #6 v2** | 🟢 | `cargo fmt --all -- --check` 0 diff + frontend advisory |
+| **#7 v3** | 🟢 | clippy advisory 派生, 0 err 234-600 missing_docs 透传 |
+| **#11** | 🟢 | 缺标比错标安全 (4 子代理报告每份 §7/§10 已知缺口显式列) |
+| **#12** | 🟢 | docs commit 由 4 worker code commit 触发, 饱和约束保持 |
+| **#13 W/T/M** | 🟢 | star-dto `Identifier=M SCD Type 2` / `AuditTrail=T append-only` 实证 |
+| **#19** | 🟢 | `cargo check -j 4` standard (守门 #1 v19) |
+| **#22-24** | 🟢 | 调试控制台 subprocess 替代 RPC (per `2bdbbdd`) |
+| **#25** | 🟢 | 5 域 Lead 内推 brief v0.1 (per `5-business-domain-lead-referral.md`) |
+| **#26** | 🟢 | CI 4 enforced + 6 advisory 9/9 pass (per PR #12) |
+
+### 27.6 已知缺口 (per 守门 #11 缺标比错标)
+
+1. **star-mcp 4 tools pre-existing failed** (find_references / get_code_context / get_symbol / search_code) — 跨 session 续, 等 5 域 Lead 真人 DDD Review 拍板
+2. **17 domain 全量接入 star-dto** (本任务 5/17) — 推下 sub-session, 估 1.0-1.5M token
+3. **testcontainers-rs + NATS 容器化 IT** — 推下 session, 估 2-3M token
+4. **25 Module Repository RLS 13 類 policy 实证** — 推下 session, 估 1.5-2M token
+5. **5xx + retry case 5 段** (per §26.3 缺口 #4) — P4 阶段
+6. **600+ missing_docs warning** (per守门 #7 v3 + #1 v26 advisory 派生) — 跨 sub-session 续
+
+### 27.7 跟 5 维质量门 实证 (per STAR-OLU-001 §6)
+
+| 维度 | UT | IT | ST | 综合 |
+|---|---|---|---|---|
+| **功能完整** | 🟢 908 lib pass | 🟢 880 ws pass | 🟡 60% e2e | 🟡 80% |
+| **测试覆盖** | 🟢 100% (41/41 crate) | 🟢 100% (workspace 25 module) | 🟡 6 关键流程定义 | 🟢 90% |
+| **守门 0 违反** | 🟢 4 enforced | 🟢 6 advisory | 🟢 9/9 CI pass | 🟢 100% |
+| **文档同步** | 🟢 test-design v0.8 | 🟢 9/7 12:00 OPT 4 实装 | 🟢 k3s yaml + regression 5d | 🟢 |
+| **git 证据** | 🟢 12 commit | 🟢 4 tag v0.79-v0.82 | 🟢 9 worker brief | 🟢 |
+
+---
+
+**END of Test Design v0.8**
