@@ -12,7 +12,11 @@ description = "Star 跨域共享 DTO 类型 (T3.1, per HANDOFF-ST-001.md v0.8 §
 [dependencies]
 serde = { workspace = true }
 uuid = { workspace = true }
+chrono = { workspace = true }
 star-context = { path = "../star-context" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

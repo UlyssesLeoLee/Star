@@ -547,6 +547,7 @@ dependencies = [
  "chrono",
  "serde",
  "star-context",
+ "star-dto",
  "thiserror 1.0.69",
  "tokio",
  "uuid",
@@ -606,6 +607,7 @@ dependencies = [
  "chrono",
  "serde",
  "star-context",
+ "star-dto",
  "thiserror 1.0.69",
  "tokio",
  "uuid",
@@ -790,6 +792,7 @@ dependencies = [
  "chrono",
  "serde",
  "star-context",
+ "star-dto",
  "thiserror 1.0.69",
  "tokio",
  "uuid",
@@ -844,6 +847,7 @@ dependencies = [
  "chrono",
  "serde",
  "star-context",
+ "star-dto",
  "thiserror 1.0.69",
  "tokio",
  "uuid",
@@ -908,6 +912,7 @@ dependencies = [
  "chrono",
  "serde",
  "star-context",
+ "star-dto",
  "thiserror 1.0.69",
  "tokio",
  "uuid",
@@ -2178,7 +2183,9 @@ dependencies = [
 name = "star-dto"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "serde",
+ "serde_json",
  "star-context",
  "uuid",
 ]

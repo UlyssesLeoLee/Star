@@ -17,6 +17,7 @@ chrono = { workspace = true }
 tokio = { workspace = true }
 
 star-context = { path = "../star-context" }
+star-dto = { path = "../star-dto" }
 [dev-dependencies]
 tokio = { workspace = true }
 

@@ -32,6 +32,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 pub use star_context::ActorContext;
+pub use star_dto::Timestamp;
 use thiserror::Error;
 use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
