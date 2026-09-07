@@ -189,7 +189,7 @@ pub fn check_status_transition(
 // =====================================================================
 
 #[macro_export]
-/// 生成基于 UUID 的领域强类型 ID(结构体 + new/as_uuid/From<Uuid>/Display 实现)的声明宏
+/// 生成基于 UUID 的领域强类型 ID(结构体 + new/as_uuid/`From<Uuid>`/Display 实现)的声明宏
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
