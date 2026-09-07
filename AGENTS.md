@@ -245,7 +245,7 @@ per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户�
 
 ---
 
-## 7. 待办 (per 当前 main HEAD `7d37cb9`, 粗略预估消耗量 WBS per `STAR-OLU-001.md`)
+## 7. 待办 (per 当前 main HEAD `ef31568`, 粗略预估消耗量 WBS per `STAR-OLU-001.md`)
 
 > **排序原则 (per 2026-08-29 04:23 JST Ulysses 拍板 + 2026-09-04 13:43 JST 升级)**: 不按日期排,按 **粗略预估消耗量** 降序;推进门槛是**质量门禁 ≥4/5**,不是截止日期,也不是 token 上限。
 > **粗略预估基线**: `STAR-OLU-001.md` v0.1 — 1 SRE · 周 ≈ 1.2M tokens (STAR 独立,同源不套 RGS §6.2 数字) — **仅供"若按人类节奏"的参考排序, 不设上限, 不参与 gating** (per 2026-09-04 13:43 JST 用户发令)
@@ -267,6 +267,7 @@ per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户�
 | 11 | **P1-3 + P1-4 跨域 saga + actor 联动 permission (19:38 JST)** | ~0.5M | 4 commit + 2 merge + 2 tag (v0.96.0 + v0.96.1) | 12 跨域 IT (S1/S2/S3 × 4 维) + 16 V4 IT (3 域 actor 联动 permission check()) | #10 | **P1-3 + P1-4 全 done** (99 IT + 16 V4 IT 落地, 4 域 cargo test 136/136 pass) |
 | 12 | **G-DEP dispatcher + P1-5 BLOCKER 报告 (19:38 JST Round 2)** | ~0.3M | 2 commit + 2 merge + 2 tag (v0.97.0 + v0.97.1) | dispatcher.py 3 方法实装 + BLOCKER 报告 (T1.5 已 done per 9/5) | #10-#11 | **G-DEP + P1-5 全 done** (dispatcher invoke/verify/collect_output 实装, 5 verify 路径实测; P1-5 closed as BLOCKER, T1.5 9/5 commit 9e2f346 已落地 24 commits) |
 | 13 | **P0 依赖真人 Lead 拍板 (20:25 JST)** | ~0.05M (3 brief 落档) | 3 docs commit (5 域 Lead + SRE Lead + DDD Review Lead brief) | 3 内推 brief 落档 (Ulysses 内推, 跟 5 域 Lead 同 pattern) | #1-#12 | **3 群组全部并行启动落地** (3 brief commit `51449a3` + `7d37cb9` + `5域 v0.1`); 驱动 9/10 P0 缺陷 (CW-04/06/07/10 + G.2 + 5 域 role hierarchy + (d) 治理 4 域 + G.4/G.7 + 4 ADR 追溯签字); T0-T5 6 周 timeline; 真人到位后追溯签字覆盖 |
+| 14 | **(b) P1-5 BLOCKER 后续: 35 doc warning + 198 unused warning 修 (20:34 JST 派发)** | ~0.5M | 18 doc fix commit + 3 unused fix commit + 2 Star-EI 排他幂等 docs commit (9/7 20:45 JST 用户发令 排他与幂等 架构 view) | 17 doc warning crates (1 per crate) + 3 unused warning crates (43+19+15 = 77 unused) | #1-#13 | **35 doc warning 全修 (29 → 0), 198 unused 修 39% (77/198, 跨 session BLOCKER 121)**; git: 22 commit; cargo check 0 err 28.76s post-merge; 2 tag 已 push: v0.98.0 (doc 全修) + v0.98.1 (unused partial 39%) |
 
 **列含义**：
 - `粗略预估消耗量`: 1 SRE · 周 ≈ 1.2M tokens, 按"若按人类节奏"粗略排序;**无上限, 不参与 gating**, 跨多 sub-session 推进 (per 2026-09-04 13:43 JST 用户发令)
