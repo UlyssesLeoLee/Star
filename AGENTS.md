@@ -126,7 +126,7 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 |---|---|---|
 | v1 | `cargo check --lib` 单 crate 不够, 必 `cargo check --workspace --lib` | A.9 实证 21 err |
 | v2 | `--workspace --lib` 不够, 必 `--all-targets` 含 tests | A.10 实证 9 err |
-| v3 | check + fmt + clippy 不替代 cargo test | A.13 元守门发现 e2e 死锁 |
+| v3 | check + fmt + clippy 不替代 cargo test, 必实证 `--all-targets` 跨 sub-session 0 err 收敛 | A.13 元守门发现 e2e 死锁 + 2026-09-07 0 err 17.03s 实证 (`413f5bd`) |
 | v4 | 单 crate 100% pass ≠ workspace pass | A.14+A.15 实证 4 crate 160 vs workspace 5-min timeout |
 | v5 | release + doc + bench `--no-run` 与 debug build 等价守门 | A.16 实证全 0 err |
 | v6 | release mode test 100% pass (单 crate) | A.18 实证 100/100, 0.51s |
