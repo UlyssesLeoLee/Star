@@ -445,17 +445,18 @@ async fn it_v3_reaction_different_emoji_allowed() {
         .unwrap();
 
     for emoji in ["👍", "🎉", "❤️"] {
-        svc.add_reaction(
-            AddReactionCommand {
-                tenant_id: TenantId(tenant_id),
-                comment_id: c.id,
-                user_id: UserId::from(user),
-                emoji: emoji.to_string(),
-            },
-            &actor,
-        )
-        .await
-        .expect(&format!("emoji {} 必成功", emoji));
+        let res = svc
+            .add_reaction(
+                AddReactionCommand {
+                    tenant_id: TenantId(tenant_id),
+                    comment_id: c.id,
+                    user_id: UserId::from(user),
+                    emoji: emoji.to_string(),
+                },
+                &actor,
+            )
+            .await;
+        assert!(res.is_ok(), "emoji {} 必成功, got: {:?}", emoji, res);
     }
 }
 
