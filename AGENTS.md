@@ -245,7 +245,7 @@ per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户�
 
 ---
 
-## 7. 待办 (per 当前 main HEAD `5fe1b9d`, 粗略预估消耗量 WBS per `STAR-OLU-001.md`)
+## 7. 待办 (per 当前 main HEAD `e97b7c5`, 粗略预估消耗量 WBS per `STAR-OLU-001.md`)
 
 > **排序原则 (per 2026-08-29 04:23 JST Ulysses 拍板 + 2026-09-04 13:43 JST 升级)**: 不按日期排,按 **粗略预估消耗量** 降序;推进门槛是**质量门禁 ≥4/5**,不是截止日期,也不是 token 上限。
 > **粗略预估基线**: `STAR-OLU-001.md` v0.1 — 1 SRE · 周 ≈ 1.2M tokens (STAR 独立,同源不套 RGS §6.2 数字) — **仅供"若按人类节奏"的参考排序, 不设上限, 不参与 gating** (per 2026-09-04 13:43 JST 用户发令)
@@ -253,7 +253,7 @@ per `docs/architecture/2026-09-03-agent-runtime/` (2026-09-03 18:48 JST 用户�
 
 | # | 项 | 粗略预估消耗量 | 已消耗 | 质量门 (5 维) | 依赖 | 状态 |
 |---|---|---|---|---|---|---|
-| 1 | 25 domain-* crate 真实数据接入 (现 stub) | ~6.0M |  11 commits (git 实证) | 16 tool e2e pass + 25 crate no-stub 守门 + 文档同步 | 无 | **部分完成** (~11/25 crate 已真实接入; git: `ebd9aa7` `391ca36` `20159dc` `3a27a13` `8c318c2` `f464cd2` `a46682d` `3a0da3a` `c1450d9` `74cbfe6` `e2e8710`) |
+| 1 | 25 domain-* crate 真实数据接入 (现 stub) | ~6.0M (已消耗 ~0.8M) |  15 commits (git 实证) — 11 历史 + 4 P3-B sub-batch 1 (9/7 19:00 JST 拍板 a) | 16 tool e2e pass + 25 crate no-stub 守门 + 文档同步 | 无 | **15/25 done (10/25 缺口)** — Sub-batch 1 read-heavy 4 域 done (workspace/project/board/permission, 26 IT + 52 unit = 78 pass per `e97b7c5` merge); git: `ebd9aa7` `391ca36` `20159dc` `3a27a13` `8c318c2` `f464cd2` `a46682d` `3a0da3a` `c1450d9` `74cbfe6` `e2e8710` `7f9f52a` `06862fc` `5ae17ca` `04e106c`; 剩余 3 sub-batch: (b) write-heavy 3 域 (work-item/comment/notification) + (c) 业务核心 3 域 (scm/worktree/validation) + (d) 治理 4 域 (audit/tenant/relation/kms) = 10 域, 估 2.0M token; 已知缺口 CW-04 (T audit 联动等 SRE Lead) + 5 域 role hierarchy (等 DDD Review Lead) |
 | 2 | 16 tool 真实数据源接入 (现 mock) | ~3.6M |  8 commits (P0 3 + P1 4 + P2 5 + 1 P2 跨 session 续, 跟 5 守门 v6 883 passed 实证 + G-DEP-07 拆决) | 16 tool 接入 + Phase D 报告更新 + e2e ≥80% | #1 | ✅ **16/16 REAL 化 done** (per 2026-09-05 07:56 JST P2 工具实装 + 3 号 P2 子代理 `90c10f1` + squash `cd9d4a0` + 5 守门 v1+v3+v6+v14 0 err + 0 MOCK, PHASE v0.3 §3.2 G-DEP-07 全拆决) |
 | 3 | Streamable HTTP spec 完整实现 (session 重连 / server-push / Last-Event-ID / DELETE) | ~2.4M |  4 commits (git 实证) | spec 5 项 e2e + MCP 协议一致性测试 + 文档同步 | 无 | **已实质完成** (D.6+ 完整 + D.7+ 全补; git: `af630fa` `8c9452e` `bec8cee` `4b40b83`) |
 | 4 | Prompts 实际模板 / Resources 独立资源类型 | ~1.8M |  brief v0.1 准备完成 (per 2026-09-05 11:40 JST `ask_0363dc3a6c46e120bf1854cc` 拍板, 3 子项 A 5 域 prompt / B Resources RLS 13 類 / C 5 域 e2e 测试) | 模板覆盖 5 域 + Resources 类型 ≥3 + 测试 | #2 | **brief 准备完成, 实装待 Ulysses 拍板启动** (当前: prompts.rs 756 行 + resources.rs 931 行 5 functional prompt + 4 generic resources partial 落地; 缺口: 5 域 specific 模板 + RLS 13 類 必携 + 5 域 e2e 测试; 估 ~1.8M token 3 子项拆解) |
