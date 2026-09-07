@@ -1,6 +1,8 @@
 # PHASE-K3S-STAR-MOCK-IMPL-REPORT
 
-> **文档版本**: v0.4 (2026-09-08 08:25 JST)
+> **文档版本**: v0.5 (2026-09-08 08:28 JST)
+> **v0.4 变更**: + §9.4.1 v30 候选规 9 次时序观测实证表 (4 次 restart 死锁 + 5 次自动恢复, 模式: restart 后 1-2min 死锁, 不 restart 后 2-5min 自愈, 唯一稳定恢复 = wsl --shutdown). 让 v30 候选不是空想, 有 git 实证.
+> **v0.5 变更**: + §9.4.1 表加 1 行 (10:27:56 WSL Stopped 终态, v30 触发信号确认). Mavis 探到 WSL 整个停了, wsl -l -v 显式 Stopped, wsl -d Ubuntu 命令全报 "localhost N/...WSL" 错. 这是 v30 候选里说的"WSL host 半死"终态, 必 Ulysses 手动 wsl --shutdown + 重新打开 wsl 终端.
 > **v0.2 变更**: + §8 续做记录: 镜像拉到 daocloud, 但 k3s kubelet 半死 (container runtime 通信断), 新 pod 100% 起不来; port-forward service 已在 v0.2 期间 disable 避免 auto-restart 浪费 CPU; 等 Ulysses 手动重启 k3s (sudo systemctl restart k3s) 才能续做. v0.2 commit 把 envoy-deployment.yaml image path 改 daocloud 永久落档.
 > **v0.3 变更**: + §9 v0.3 实战记录: Ulysses 静默期间多次 `sudo systemctl restart k3s`, k3s systemd 反复重启 (pid 183 → 215 → 230 → 14380), kubelet 多次 "Skipping pod sync" + "Started kubelet" 交替; verify-k3s-uat-3000.ps1 第一次跑 5min 内 21 条 "Skipping pod sync" fail (exit 2); 脚本 v1.0 → v1.1 调优 (时间窗 +n 200 → --since "5 min ago", 关键字 kubelet.*Running → Started kubelet); 调优后 WSL host 整个半死 (5 个 wsl bash 调用全空输出 + exit 1, 6443 仍 LISTEN PID 14380 但不响应); **新症状 = WSL host 死锁, 不是 k3s daemon 死**; 修复: Ulysses 必 `wsl --shutdown` + 重启 WSL distro, 不可代理.
 > **v0.4 变更**: + §9.4.1 v30 候选规 9 次时序观测实证表 (4 次 restart 死锁 + 5 次自动恢复, 模式: restart 后 1-2min 死锁, 不 restart 后 2-5min 自愈, 唯一稳定恢复 = wsl --shutdown). 让 v30 候选不是空想, 有 git 实证.
@@ -162,6 +164,7 @@
 | v0.2 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §8 续做记录 (k3s kubelet 半死, container runtime 通信断, 镜像已落 daocloud 但新 pod 起不来, port-forward service disable); envoy-deployment.yaml image path 改 daocloud 永久落档 | 2026-09-08 08:04-08:08 JST 续做 (sudo 实际是 sudoers 白名单非配额, 但 k3s 内部状态破裂) |
 | v0.3 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §9 v0.3 实战记录 (Ulysses 静默期多次 restart k3s, kubelet pid 183→215→230→14380 反复; verify v1.0 fail exit 2 后调优 v1.1 (时间窗 +n 200 → --since "5 min ago", 关键字 kubelet.*Running → Started kubelet); 但 5 个 wsl bash 调用全空 + exit 1 = WSL host 死锁症状, 6443 仍 LISTEN 但不响应; Ulysses 必 wsl --shutdown 重启 distro) | 2026-09-08 08:14-08:18 JST 静默期 Ulysses 多次 sudo systemctl restart k3s, 触发 WSL host 死锁 |
 | v0.4 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §9.4.1 v30 候选规 9 次时序观测实证表 (4 次 restart 死锁 + 5 次自动恢复, 模式: restart 后 1-2min 死锁, 不 restart 后 2-5min 自愈, 唯一稳定恢复 = wsl --shutdown); 让 v30 候选不是空想, 有 git 实证 | 2026-09-08 08:14-08:25 JST 持续观测 wsl host 反复死锁, 9 次时序数据落档 |
+| v0.5 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §9.4.1 表加 1 行 (10:27:56 WSL Stopped 终态, v30 触发信号确认); Mavis 探到 WSL 整个停 (wsl -l -v 显式 Stopped + wsl -d Ubuntu 命令全报 "localhost N/...WSL" 错); 这是 v30 候选里说的"WSL host 半死"终态, 必 Ulysses 手动 wsl --shutdown | 2026-09-08 08:28 JST WSL 整个停, v30 触发 |
 
 ---
 
@@ -287,6 +290,7 @@ cd frontend && pnpm test:e2e -- uat-3000-restore
 | 08:24:03 | 3 (Mavis 探) | 半死 | LISTEN | 3 个 wsl 命令全空 + exit 1 |
 | 08:25:05 | (恢复) | OK (1 次) | LISTEN | whoami 又空, 反复死锁 |
 | 08:25:10 | (探) | 半死 | LISTEN | exit 1 |
+| 08:27:56 | 0 (mavis 不再 restart) | **Stopped** (终态) | LISTEN pid 14380 (Windows 进程还活) | `wsl -l -v` 显式 Stopped, wsl -d Ubuntu 报 "localhost N/...WSL" 错; **v30 触发**: WSL 整个停, 必 `wsl --shutdown` + 重新打开 wsl 终端, mavis 不能代理 |
 
 **模式**: 每次 restart k3s, wsl host 1-2min 内死锁(系统调用挂起, wsl bash 空输出); 不 restart 时 2-5min 后自动恢复. **唯一稳定恢复路径 = `wsl --shutdown` + 重启 distro** (Windows 端回收 wsl VM 资源).
 
