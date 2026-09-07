@@ -1,4 +1,17 @@
 //! 基础设施: 4 Port in-memory stub (阶段 1, 真实实现待 V2 接 domain-work-item 等)
+//!
+//! **v0 phase 2 stub** (per OPT-NEXT-06-code-stub §3.3 4 port stub):
+//! 4 Port (`InMemoryWorkItemPort` / `InMemorySprintPort` / `InMemoryUserPort` /
+//! `InMemoryPermissionPort`) 当前实现用于单元测试 + 阶段 1 集成测试,
+//! V2 阶段 worker 子代理实装真实数据源:
+//!
+//! - `InMemoryWorkItemPort` → V2 接 `domain-work-item` (per守门 #4 25 domain-* 真实数据接入)
+//! - `InMemorySprintPort` → V2 接 `domain-planning` Sprint 聚合
+//! - `InMemoryUserPort` → V2 接 `domain-identity` User
+//! - `InMemoryPermissionPort` → V2 接 `domain-permission` (per RLS 13 类必携, 守门 #13)
+//!
+//! P2 阶段 worker 子代理实装时按 feature 名 (e.g. `ReportPort::WorkItemQueryPort`)
+//! 替换为真实数据接入, 派前必先 `automation/dispatcher.py brief(...)`.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
