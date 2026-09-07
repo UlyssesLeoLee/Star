@@ -14,7 +14,7 @@
 //! |---|---|---|
 //! | `user_id` | 双版共有 | 当前用户 UUID (各 domain 转 `UserId` 强类型) |
 //! | `tenant_id` | 双版共有 | 当前租户 UUID (各 domain 转 `TenantId`) |
-//! | `project_ids` | 双版共有 | 当前 Project IDs (Vec<Uuid>, 各 domain 转 `ProjectId`) |
+//! | `project_ids` | 双版共有 | 当前 Project IDs (`Vec<Uuid>`, 各 domain 转 `ProjectId`) |
 //! | `roles` | 双版共有 | 角色字符串 (`Vec<String>`) — 字符串与 domain 强类型 `Role` 枚举转换 |
 //! | `device_id` | api 版独有 | Local Runtime 三重绑定 (per ADR-0024) |
 //! | `is_local_runtime` | permission 版独有 | Agent 自身 subject 标志 |
