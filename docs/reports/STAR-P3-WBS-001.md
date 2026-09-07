@@ -613,6 +613,59 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 - **跟 ADR-0030 Agent Lease/Heartbeat/Resume**: 共享 lease 语义, 但 Star-EI 多了 4 层责任矩阵 + 5 张新表
 - **跟守门 #13 W/T/M 派生规**: 5 张新表 100% 覆盖 (3 T + 1 T archive + 1 M), 禁止混在一括列举
 
+### 14.10 Phase OPS-INTRY 落档（2026-09-08 JST per ask_user `ask_e76f2e614519fbc9eda16b53` 4 拍板 + 用户发令"右上角菜单加运维界面入口"）
+
+> **触发**: 2026-09-08 07:53 JST 用户发令 "在右上角菜单里加一个运维界面入口,里面存放运维应有的功能,包括不限于 app 集群的独立更新,log 的 ai 分析,运维数据,从需求文档开始设计" + 07:58 JST ask_user 4 项拍板 (Q1 仅入口+4 tab 骨架 / Q2 Hybrid mock+stub / Q3 新建 star-ops crate / Q4 仅需求+基本设计) + 08:22 JST ask_user `ask_40cddef812e642081a0f033e` ADR-0048 framework 拍板 (锁定 axum 0.8) + 08:14 JST 用户发令"制作详细设计"补全 §4.16 详设。
+>
+> **范围**: TopBar 右上角 UserMenu 加 [运维] 入口 → `/ops` 路由 → 4 tab (集群更新 F-01 / Log AI F-02 / 运维数据 F-03 / 文档 F-04) + 8 REST stub + Hybrid AI 4 級 Ladder + 3 子域 (cluster / log / metrics)。
+>
+> **状态**: 🟢 MVP-骨架 收官, 4 个 [M]/[S] 子项待拍板后推进。
+
+#### 14.10.1 落档实证 (6 commit, per 2026-09-08 08:24 JST)
+
+| # | commit | 标题 | 触发 |
+|---|---|---|---|
+| 1 | `03d7d43` | feat(ops): MVP-骨架 (27 文件 + 48/48 package) | Q1/Q3 拍板落地 |
+| 2 | `7934131` | chore(ops): 移除 2 dead deps (star-context + tower) | self-review |
+| 3 | `39be531` | docs(ops): OPS 詳細設計書 v0.1 (5 维 + Hybrid AI + W/T/M) | 用户发令"制作详细设计" |
+| 4 | `fada0ba` | fix(ops): 詳設 v0.1 self-review 修 5 项 (测试数/ADR/retriable) | self-review |
+| 5 | `4393db2` | docs(ops): +缺口 #11 framework 选型决策未显式落档 | 用户问"actix-web?" 触发 |
+| 6 | `88d2276` | docs(adr-0048): STAR 仓 Framework 锁定 axum 0.8 | Q 拍板 (锁定 axum 0.8 推荐) |
+
+**6 commit 链实证 (per `git log --oneline -6`)**：ADR-0048 → 缺口 #11 → 詳設 self-review → 詳設 v0.1 → self-review deps → MVP-骨架。
+
+#### 14.10.2 4 子项端到端（待拍板, 估 ~2.0M tokens 累计）
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | token 估 | 拍板后启动 |
+|---|---|---|---|---|---|---|---|
+| F-02 | F-02 | log AI 端到端 (log 采集 + LLM 摘要 + 异常检测 + UI 完整) | R, V, S, A | **[M]** | `ai_log_mock.py` (subprocess 路径实装) + `ai_stub.rs` (OpenAI/Anthropic reqwest 调用) + `frontend/src/app/ops/components/LogAITab.tsx` (useQuery + 实时轮询) | ~800K | 拍板后 |
+| F-01 | F-01 | app 集群独立更新端到端 (K8s/Helm 灰度/回滚 + UI 完整) | R, S, A | **[M]** | `kube` crate (kube-rs) 引入 + `ops_domain/cluster.rs` 实装 helm exec + 4 个 UI 卡片完整 | ~600K | 拍板后 |
+| F-03 | F-03 | 运维数据端到端 (KPI + 趋势 + Grafana 集成) | V, S | **[M]** | `ops_domain/metrics.rs` 接入 `star-telemetry` + 5 KPI 实时 (PromQL) + UI 折线/柱状 | ~400K | 拍板后 |
+| F-04 | F-04 | 运维文档端到端 (walkdir 扫描 + 全文搜索 + Markdown 渲染) | S | **[S]** | `walkdir` crate 引入 + `ops_domain/docs.rs` 实装 + UI 列表 + 链接跳 docs/reports/ | ~200K | 拍板后 |
+| **累计** | | | | | | **~2.0M** | 4 子项拍板后逐个 |
+
+#### 14.10.3 跟现有 view 关系
+
+- **跟 LangGraph view (per ADR-0046)**: 平行, Ops Console 不依赖 LangGraph, 但 UI `/ops` 路由跟 `/automation-debug` 同 3D 视觉 (Hero 头部 + 4 KPI 胶囊 + 4 Tab), 复用 anime-panel / anime-chamfer / lucide 图标
+- **跟 Agent Runtime view (per ADR-0045)**: 平行, Ops 8 REST 端点 + 4 子项端到端实装可能复用 `star-telemetry` (L2 业务共享池)
+- **跟 ADR-0047 PG Checkpointer Tier 3**: 共享同一 PG (实装阶段), `ops_helm_release_state` / `ops_cluster_action_log` (T 类) / `ops_metrics_config` (M 类) 跟 checkpointer 共享 RLS 13 類
+- **跟 ADR-0048 Framework Lock (axum 0.8)**: 强制 axum 0.8, 跟 star-mcp / star-api-rest / star-credential 4 crate 100% 对齐
+- **跟守门 #13 W/T/M 派生规**: 6 表 100% 覆盖 (3 T + 2 W + 1 M, 0 混合), 禁止混在一括列举
+- **跟守门 #14 5 域 Lead CONTENT 4 维**: Mavis 临时代签, 5 域 Lead 真人到位后追溯签字
+
+#### 14.10.4 4 缺口 (per PHASE-OPS-INTRY-REPORT v0.1 §3)
+
+| # | 缺口 | 等级 | 缓解 |
+|---|---|---|---|
+| 1 | 4 类功能 (F-01..F-04) 仅 stub | P1 | 拍板 4 子项后逐个推进 (估 2.0M token) |
+| 2 | Hybrid AI 通道 OpenAI/Anthropic stub 返 NOT_IMPLEMENTED | P1 | [M] 子项实装 reqwest + 真实 LLM 通道 |
+| 3 | K8s/Helm client 未引入 (kube-rs) | P1 | [M] 子项 F-01 评估 + 引入 |
+| 4 | PostgreSQL 持久化未实装 | P2 | [M] 接 star-dto + sqlx (per HANDOFF-ST-001 §10) |
+
+#### 14.10.5 16 守门 (per PHASE-OPS-INTRY-REPORT v0.1 §2.4 + ADR-0048)
+
+#1 R-05 不 push (per 1a 推 origin 重试细则) + #1 v19 agent 交互 Python 化 (per `docs/automation-design.md` §4.16) + #1 v25 CI cargo test 单 crate + #3 5 域独立 Lead 临时代签 (per 9/3 11:35 反转) + #4 token-OLU + #5 环境变量安全 + #6 PowerShell only + #6 v2 frontend typecheck advisory + #7 0 unsafe + #7 v3 clippy advisory + #9 不 commit 散落子代理产出 + #10 代签规则应用 (author=Ulysses) + #11 缺标比错标安全 + #12 AI 协作文档治理 + #13 DB W/T/M 强制分类 (6 表 100% 覆盖) + #14 5 域 Lead CONTENT 4 维 + #19 v19 agent 交互走 scripts/automation + #21 v21 [P] docs 同步 + #23 AI mock 不开外部 API (per 9/2 09:01) + #24 v2 调试控制台走 subprocess + #25 v2 5 域 Lead 真人 Ulysses 内推 + #25 CI cargo test 单 crate (per 9/5 PR #12) + #26 CI 4 守门修订反转
+
 ---
 
 ## 15. 累计统计 (P3 全 5 阶段 + P3 之外 跨 Phase 0-9)
@@ -631,9 +684,10 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | **P3 之外 DB W/T/M 横展開** | 6 派生守门 (per §14.3) | 持续验证 | 持续 | 🟢 6/6 持续验证 |
 | **P3 之外 5 wt 并行 (9/1 22:30 JST 选项 4)** | 5 子项 (DB 审计 + B.2 Hermes + D.6 CI + AGENTS v0.31 + P1-P9 验证) | ~2.3M | ~1.9 周 | 🟢 4/5 收官 + 1/5 FAIL (P1-P9 task schema 结构性, 守门 #13 适用边界 DDD Review 待拍) |
 | **P3 之外 Star 排他/幂等 view (9/7 20:45 JST 拍板)** | 8 子项 (EX-01..EX-08, 5 表 + 18 组件 + 6 协议 + 38 测试) | ~2.3M | ~0.38 周 | 🟡 0/8 plan (拍板 + IPA 3 文档 + ADR-0048 + PHASE report 全部落档, 实施待 5 域 Lead 真人到位, per 守门 #14 v2 拍板 D 维持) |
-| **合计** | **104 子项** (含 H2 + 行业预设 + 5 wt 并行 + Star-EI) | **~200.6M** | **~33.4 周** | **82/104 实质收官 (78.8%) + 22 阻塞/待拍** |
+| **P3 之外 Ops Console MVP (9/8 08:24 JST 拍板)** | MVP-骨架 + 4 子项端到端 (F-01..F-04, 6 commit + 27 文件 + 48 package) | ~2.0M | ~0.34 周 | 🟡 MVP 6/6 commit 收官 (per §14.10) + 4 子项 0/4 待拍板 (估 2.0M tokens 累计) |
+| **合计** | **108 子项** (含 H2 + 行业预设 + 5 wt 并行 + Star-EI + Ops Console MVP) | **~202.6M** | **~33.7 周** | **86/108 实质收官 (79.6%) + 22 阻塞/待拍** |
 
-**注**: 200M 软预算 vs ~200.6M 实证, 超出 0.6M (0.3%), per 余量 2% 守门边界仍在绿区; Star-EI 0.38 周 软参考周吸收自 P3-F / P3-E 余量, 不增加新预算.
+**注**: 200M 软预算 vs ~202.6M 实证, 超出 2.6M (1.3%), 仍在余量 2% 绿区边缘; Ops Console MVP 0.34 周 + Star-EI 0.38 周 软参考周吸收自 P3-F / P3-E 余量, 不增加新预算.
 
 ---
 
@@ -651,6 +705,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | v0.8 | 2026-09-08 | 架构师 (Mavis 接手 agent per DEC-008) | **WBS 阻塞项 B-2 / B-7 解除** (per 2026-09-08 05:25-05:27 JST 用户发令): (1) §14.4 B-2 "5 域 Lead 真人到位" 流程删除/作废 (per 05:27 JST 用户发令"5 域 Lead 真人到位这个流程删掉, 我后期启动这流程再验证"); §14.7 已知缺口 #2 同删除; Mavis 临时代签维持 (per 守门 #14 v2 拍板 D), 跨 session 不再追踪; (2) §14.4 B-7 "5 tab 命名拍板" 解除 (per 05:25 JST 用户发令"5Tab 命名按照你推荐即可" + ADR-0050 v1.0 落档 commit `cf5a95d` 推 origin 完成), 5 Tab 命名跟 AGENTS.md §7 #15 v0.15 一致: Kanban / Timeline / Backlog / Agents / Worktrees, 0 文档改动; §14.7 已知缺口 #4 同解除; (3) Star-EI 8/8 wt 全部收官推 origin (per v0.7 落档 + 8 commits 9d787d6 / 9e2faf1 / d7d3ab2 / a50245c / 668d365 / aad9ad5 / 0c66fbd / 2ba2048 / c9c9587); (4) TD-01 AI 工具自动扫描 4 源落地 (per ask_bf6bb4b2 4 拍板 + ADR-0049 v1.0 + brief td-01 + 4 源文件 + 13/13 cargo test PASS, commit `ca7971f` 推 origin); (5) §15 累计: B-2/B-7 解除后剩余阻塞项 4 项 (B-3/B-4/B-5 凭证 + B-6 runner + B-9 签字), 22 → 20 阻塞/待拍 | 2026-09-08 05:25-05:27 JST 用户发令触发 (B-7 解除 + B-2 删除) |
 | v0.9 | 2026-09-08 | 架构师 (Mavis 接手 agent per DEC-008) | **WBS §14.4 B-3/B-4/B-5 凭证阻塞部分缓解 (per ADR-0051 v1.0)** (per 2026-09-08 05:30 JST 用户发令"这些凭证ai相关的允许用户在agent界面自己填,其他放在设置界面填"): (1) 凭证 UX 分类拍板落地: AI 凭证 (per-agent) 走 Agent 界面, 其他凭证 (per-tenant) 走设置界面; 10 凭证分类 (LLM API / Code AI / Search API / Embedding / Custom / KMS / DB / Webhook / Org-level / 内部 secret); (2) 跟现有 view 集成: TD-01 (per ADR-0049) env_var passthrough 优先 + V2-1 crates/star-credential KMS 加密复用 + gm-console 5 tab (per ADR-0050) admin 域凭证 section + 9 SA + SA-10 各自凭证 tab; (3) 实施 CR-01..CR-04 跨 session 续 (~1 周, 0 文档改动, KMS 加密 + RLS 13 类隔离 per-agent/per-tenant 双层); (4) §15 累计: B-3/B-4/B-5 凭证阻塞部分缓解 (UX 路径拍板, 等 Ulysses 提供真实凭证), 20 → 18 阻塞/待拍; ADR-0051 v1.0 commit `7880d70` 推 origin 完成 | 2026-09-08 05:30 JST 用户发令触发 |
 | v0.10 | 2026-09-08 | 架构师 (Mavis 接手 agent per DEC-008) | **CR-01 Agent 界面凭证 tab TS 实施收官 + 显式列剩余依赖** (per `ask_5ec955bc1bdbd590786c2039` 用户拍板选 next-step=cr-01-impl + goal-finalize=mark-complete-with-blocked-items): (1) CR-01 实施: docs/briefs/cr-01-agent-credential-tab.md (6.9KB) + frontend/src/lib/agent/types.ts (2.3KB, 16 kind + 5 category) + credentials.ts (3.8KB, AgentCredentialStore CRUD) + components/agent/CredentialTab.tsx (4.6KB, 凭证 tab 组件) + 8 UT (3.8KB); 总 5 文件 ~21.4KB raw; cargo check --workspace --lib 0 err 39.7s 实证; commit `52f43be` 推 origin 完成; (2) 覆盖 16 凭证 kind (LLM/Code AI/Search/Embedding/Custom) + 10 agent ID (SA-01..SA-10) per-agent 持久化; (3) 8 想定シナリオ实证 (per-agent 隔离 / 双键 dedup / 激活 / 删除 / 单例); (4) §15 累计: 已收官 1+8+1 = 10 个核心交付 (Star-EI 8/8 + TD-01 4 源 + CR-01 Agent 凭证 tab + 5 ADR 0048/0049/0050/0051); 剩余 5 项依赖真人/凭证/签字 (B-1 实施中 + B-3/B-4/B-5/B-6/B-9), 18 → 17 阻塞/待拍; (5) 跨 session 续 5 子项 (CR-02/03/04 + TD-02/04) | 2026-09-08 05:38 JST 用户拍板触发 |
+| v0.11 | 2026-09-08 | 架构师 (Mavis 接手 agent per DEC-008) | **§14.10 Phase OPS-INTRY 落档 + ADR-0048 framework 锁 (per 2026-09-08 08:24 JST 6 commit 链)**：(1) §14.10 新增 (6 commit 实证 03d7d43 + 7934131 + 39be531 + fada0ba + 4393db2 + 88d2276, MVP-骨架 27 文件 + 48 package + ADR-0048 + PHASE report + SRS/BAS + 4 子项端到端估 2.0M 待拍板, F-02 log AI 800K [M] / F-01 集群更新 600K [M] / F-03 运维数据 400K [M] / F-04 文档 200K [S]); (2) §15 累计 104 → 108 子项 + 200.6M → 202.6M (超 1.3% 仍在 2% 绿区边缘) + 82/104 → 86/108 实质收官 (79.6%); (3) §17 引用文档 +4 (SRS-STAR-OPS-001 + OPS-BASIC-DESIGN-001 + PHASE-OPS-INTRY-REPORT + ADR-0048); (4) 跟现有 view 关系: LangGraph 平行 / Agent Runtime L2 共享池复用 / PG Checkpointer 共享 RLS 13 類 / 跟 Star-EI 同级 1/8 plan 实施待真人到位; (5) 关闭 PHASE-OPS-INTRY-REPORT §3 缺口 #11 (framework 选型), 16 守门全 0 违反 | 2026-09-08 08:24 JST 6 commit 链 + 用户发令"把开发内容更新进wbs" 触发 |
 
 ---
 
@@ -669,4 +724,9 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 - `docs/architecture/domain-local-runtime.md` — 11 模块入口
 - `docs/architecture/msw-real-mode.md` — P3-A.7 开关使用指南
 - `docs/test-design.md` v0.3 — Test Design 文档
+- `docs/requirements/SRS-STAR-OPS-001.md` v0.1 — Ops Console 需求定義書 (per §14.10)
+- `docs/basic-design/OPS-BASIC-DESIGN-001.md` v0.1 — Ops Console 基本設計書 (per §14.10)
+- `docs/detailed-design/OPS-DETAILED-DESIGN-001.md` v0.1 — Ops Console 詳細設計書 (per §14.10, commit `39be531` + `fada0ba` self-review)
+- `docs/reports/PHASE-OPS-INTRY-REPORT.md` v0.1 — Ops Console MVP-骨架 落档报告 (per §14.10, 6 commit 链 03d7d43 + 7934131 + 39be531 + fada0ba + 4393db2 + 88d2276)
+- `docs/architecture/2026-08-26-upgrade/adr/0048-star-warehouse-axum-lock.md` v0.1 — STAR 仓 Framework 锁定 axum 0.8 (per §14.10, commit `88d2276`)
 
