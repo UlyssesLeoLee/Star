@@ -546,7 +546,7 @@ mod tests {
 
     #[test]
     fn test_http_client_creation() {
-        let client = HttpClient::new();
+        let _client = HttpClient::new();
         let req = HttpRequest::new_post(
             "https://api.example.com/v1/chat/completions",
             serde_json::json!({"a": 1}),
@@ -586,7 +586,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_invoke_http_strict_unsupported() {
-        let rt = RealHttpRuntime::with_strict_network();
+        let _rt = RealHttpRuntime::with_strict_network();
         // strict 模式无 mock fallback, 实际网络调用需真实 API
         // 这里仅检查 URL 路径构造
         let url = "https://api.openclaw.dev/v1";

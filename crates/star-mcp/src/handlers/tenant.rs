@@ -11,8 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
 
 use domain_tenant::{
-    ActorContext, GetTenantQuery, InMemoryTenantService, TenantCommandPort, TenantError, TenantId,
-    TenantQueryPort, UserId,
+    ActorContext, GetTenantQuery, InMemoryTenantService, TenantError, TenantId, TenantQueryPort,
 };
 #[allow(unused_imports)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,7 +83,7 @@ impl Resource for TenantHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use domain_tenant::{CreateTenantCommand, PlanTier};
+    use domain_tenant::{CreateTenantCommand, PlanTier, TenantCommandPort};
 
     #[tokio::test]
     async fn read_test_invalid_uuid() {

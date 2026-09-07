@@ -4,7 +4,7 @@
 
 use crate::application::ports::{SprintQueryPort, WorkItemQueryPort};
 use crate::{ReportError, ReportFilter, ReportPoint, ReportResult, ReportSummary, Trend};
-use chrono::{DateTime, Datelike, Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -167,7 +167,7 @@ pub async fn generate(
 fn compute_burndown(
     sprint: &SprintMeta,
     completed_issues: &[CompletedIssue],
-    total_completed_sp: f64,
+    _total_completed_sp: f64,
     total_issues: u32,
     completed_count: u32,
 ) -> BurndownData {

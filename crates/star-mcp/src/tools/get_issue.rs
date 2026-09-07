@@ -15,7 +15,7 @@
 //! - 跨 tenant 拒绝 (handler 简化设计: actor.tenant_id = nil) → 同上
 
 use domain_work_item::{
-    ActorContext, InMemoryWorkItemService, TenantId, WorkItemId, WorkItemQueryPort,
+    ActorContext, InMemoryWorkItemService, WorkItemId, WorkItemQueryPort,
 };
 use serde_json::{json, Value};
 use std::sync::{Arc, OnceLock};
@@ -31,6 +31,9 @@ fn service() -> &'static Arc<InMemoryWorkItemService> {
 
 /// 测试 hook:取共享 service 句柄用于 pre-populate
 #[cfg(test)]
+#[allow(dead_code)] // test hook for integration tests (per P1-5 cleanup, awaiting integration test wiring)
+#[cfg(test)]
+
 pub(crate) fn service_for_test() -> &'static Arc<InMemoryWorkItemService> {
     service()
 }

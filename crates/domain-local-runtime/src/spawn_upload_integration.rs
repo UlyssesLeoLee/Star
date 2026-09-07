@@ -14,9 +14,12 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use thiserror::Error;
 use tokio::process::Command;
+#[cfg(test)]
 use uuid::Uuid;
 
-use super::process::{OutputLine, OutputStream, ProcessHandle, ProcessState, RuntimeError};
+use super::process::{OutputLine, OutputStream, ProcessHandle};
+#[cfg(test)]
+use super::process::{ProcessState};
 
 // =====================================================================
 // 1. value_object

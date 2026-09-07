@@ -11,9 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
 
 use domain_feedback::ActorContext;
-use domain_feedback::{
-    FeedbackError, FeedbackId, FeedbackQueryPort, InMemoryFeedbackService, TenantId, UserId,
-};
+use domain_feedback::{FeedbackError, FeedbackId, FeedbackQueryPort, InMemoryFeedbackService};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct FeedbackData {

@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
 
-use domain_agent::{AgentError, AgentId, AgentRepository, InMemoryAgentRepository, TenantId};
+use domain_agent::{AgentError, AgentId, AgentRepository, InMemoryAgentRepository};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AgentData {
@@ -82,7 +82,7 @@ impl Resource for AgentHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use domain_agent::{Agent, AgentType};
+    use domain_agent::{Agent, AgentType, TenantId};
 
     #[tokio::test]
     async fn read_test_invalid_uuid() {

@@ -457,7 +457,9 @@ pub struct ReportService {
     cache: Box<dyn Cache>,
     work_item_port: Box<dyn WorkItemQueryPort>,
     sprint_port: Box<dyn SprintQueryPort>,
+    #[allow(dead_code)] // reserved for V2 P2+ chart wiring (per P1-5 cleanup, awaiting caller)
     user_port: Box<dyn UserQueryPort>,
+    #[allow(dead_code)] // reserved for V2 P2+ chart wiring (per P1-5 cleanup, awaiting caller)
     permission_port: Box<dyn PermissionPort>,
 }
 
@@ -536,7 +538,7 @@ impl ReportService {
         report_type: ReportType,
         filter: &ReportFilter,
         report_id: Uuid,
-        cache_key: String,
+        _cache_key: String,
     ) -> Result<ReportResult, ReportError> {
         match report_type {
             ReportType::Burndown => {
@@ -639,11 +641,7 @@ impl ReportService {
                 domain::c22_recently_created::generate(&*self.work_item_port, filter, report_id)
                     .await
             }
-            // 暂未实装的子图走 stub (例如 P3 阶段的扩展图表)
-            _ => {
-                self.generate_stub(report_type, filter, report_id, cache_key)
-                    .await
-            }
+            // 暂未实装的子图走 stub (例如 P3 阶段的扩展图表) - all 22 variants covered, no _ needed
         }
     }
 
@@ -703,9 +701,6 @@ impl ReportService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::application::ports::*;
-    use crate::infrastructure::in_memory_cache::InMemoryCache;
-    use crate::infrastructure::port_stubs::*;
 
     fn make_svc() -> ReportService {
         ReportService::new(

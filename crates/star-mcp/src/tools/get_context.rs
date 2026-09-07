@@ -26,7 +26,7 @@ use domain_search::{
     SearchQueryPort, TenantId,
 };
 use domain_work_item::{
-    InMemoryWorkItemService, TenantId as WorkItemTenantId, WorkItemFilter, WorkItemQueryPort,
+    InMemoryWorkItemService, TenantId as WorkItemTenantId, WorkItemFilter,
 };
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -48,12 +48,16 @@ fn search_service() -> &'static Arc<InMemorySearchService> {
 }
 
 /// 测试 hook: 取共享 service 句柄用于 pre-populate
+#[allow(dead_code)] // test hook for integration tests (per P1-5 cleanup, awaiting integration test wiring)
 #[cfg(test)]
+
 pub(crate) fn work_item_service_for_test() -> &'static Arc<InMemoryWorkItemService> {
     work_item_service()
 }
 
+#[allow(dead_code)] // test hook for integration tests (per P1-5 cleanup, awaiting integration test wiring)
 #[cfg(test)]
+
 pub(crate) fn search_service_for_test() -> &'static Arc<InMemorySearchService> {
     search_service()
 }
@@ -147,7 +151,6 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use domain_search::SearchCommandPort;
     use domain_work_item::{
         CreateWorkItemCommand, Priority, UserId, WorkItemCommandPort, WorkItemType,
     };

@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
 
 use domain_permission::{
-    ActorContext, GetSchemeQuery, InMemoryPermissionService, PermissionCommandPort,
-    PermissionError, PermissionQueryPort, PermissionSchemeId, TenantId, UserId,
+    ActorContext, GetSchemeQuery, InMemoryPermissionService, PermissionError, PermissionQueryPort,
+    PermissionSchemeId, TenantId,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,7 +107,7 @@ impl Resource for PermissionHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use domain_permission::CreateSchemeCommand;
+    use domain_permission::{CreateSchemeCommand, PermissionCommandPort};
 
     #[tokio::test]
     async fn read_invalid_uri_format() {

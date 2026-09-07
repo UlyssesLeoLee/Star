@@ -89,6 +89,7 @@ pub enum HubAdapterError {
 /// - forwarder_handle: 后台 forwarder task
 /// - shutdown_tx: 用于通知 forwarder 退出
 pub struct HubIntegratorAdapter {
+    #[allow(dead_code)] // reserved for Phase 2 hub-centric refactor (per P1-5 cleanup, awaiting Phase 2 wiring)
     hub: OutputHub,
     process_id: Uuid,
     integrator: Arc<SpawnUploadIntegrator>,

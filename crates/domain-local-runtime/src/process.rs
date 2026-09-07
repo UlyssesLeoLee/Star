@@ -94,16 +94,16 @@ pub trait LocalRuntime: Send + Sync {
         &self,
         command: &str,
         args: &[String],
-        env: &std::collections::HashMap<String, String>,
-        worktree_dir: &str,
+        _env: &std::collections::HashMap<String, String>,
+        _worktree_dir: &str,
     ) -> Result<ProcessHandle, RuntimeError>;
 
     /// HTTP API 调用 (openclaw / hermes)
     async fn invoke_http(
         &self,
         url: &str,
-        api_key: Option<&str>,
-        prompt: &str,
+        _api_key: Option<&str>,
+        _prompt: &str,
         model: Option<&str>,
     ) -> Result<ProcessHandle, RuntimeError>;
 
@@ -186,8 +186,8 @@ impl LocalRuntime for DefaultLocalRuntime {
         &self,
         command: &str,
         args: &[String],
-        env: &std::collections::HashMap<String, String>,
-        worktree_dir: &str,
+        _env: &std::collections::HashMap<String, String>,
+        _worktree_dir: &str,
     ) -> Result<ProcessHandle, RuntimeError> {
         if self.mock {
             // mock 模式: 立即返回一个已完成的 handle, 输出 "mock executed: <command>"
@@ -220,8 +220,8 @@ impl LocalRuntime for DefaultLocalRuntime {
     async fn invoke_http(
         &self,
         url: &str,
-        api_key: Option<&str>,
-        prompt: &str,
+        _api_key: Option<&str>,
+        _prompt: &str,
         model: Option<&str>,
     ) -> Result<ProcessHandle, RuntimeError> {
         if self.mock {

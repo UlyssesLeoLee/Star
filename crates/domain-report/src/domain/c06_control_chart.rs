@@ -145,7 +145,7 @@ pub fn detect_anomalies(cycle_times: &[f64]) -> (Vec<ControlPoint>, ControlStats
     }
 
     let median = percentile(cycle_times, 50.0);
-    let mut deviations: Vec<f64> = cycle_times.iter().map(|x| (x - median).abs()).collect();
+    let deviations: Vec<f64> = cycle_times.iter().map(|x| (x - median).abs()).collect();
     let mad = percentile(&deviations, 50.0);
     let mean = cycle_times.iter().sum::<f64>() / n as f64;
     let std_dev = (cycle_times.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64).sqrt();
