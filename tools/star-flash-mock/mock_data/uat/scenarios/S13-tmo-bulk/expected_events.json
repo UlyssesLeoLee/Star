@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S13-tmo-bulk",
+  "events": [
+    {
+      "event_type": "tmo.bulk.partial_failure",
+      "node": "M-N4",
+      "event_id": "evt-2026-09-07-014"
+    }
+  ]
+}

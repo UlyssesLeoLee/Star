@@ -1,0 +1,10 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S23-rbac-scheme",
+  "events": [
+    {
+      "event_type": "rbac.role.created",
+      "event_id": "evt-2026-09-07-026"
+    }
+  ]
+}

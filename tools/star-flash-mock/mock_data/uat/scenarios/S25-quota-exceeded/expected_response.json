@@ -1,0 +1,13 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S25-quota-exceeded",
+  "class": "Work",
+  "response_429": {
+    "quota_check_id": "quota-uat-2026-09-07-001",
+    "quota_exceeded": true,
+    "current_usage": 1100000,
+    "quota_limit": 1000000,
+    "retry_after_seconds": 3600,
+    "retention_period_seconds": 86400
+  }
+}

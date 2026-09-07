@@ -1,0 +1,18 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S11-tmo-split",
+  "class": "Transaction",
+  "node": "M-N2",
+  "response_200": {
+    "original_task_id": "task-large-001",
+    "new_task_ids": [
+      "task-split-001-a",
+      "task-split-001-b"
+    ],
+    "split_strategy": "context_half",
+    "stash_checkpoint_ids": [
+      "stash-task-large-001-split-2-way"
+    ],
+    "stash_append_only": true
+  }
+}

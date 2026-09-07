@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S22-multitenant-isolation",
+  "class": "Transaction",
+  "response_200": {
+    "isolation_check_id": "iso-uat-2026-09-07-001",
+    "rls_bypass_succeeded": false,
+    "tenant_id": "t-acme",
+    "rows_accessed": 0,
+    "violation": null
+  }
+}

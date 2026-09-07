@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S15-tmo-reassign",
+  "class": "Transaction",
+  "tables": {
+    "transaction.tmo_reassign_log": {
+      "insert_count": 1,
+      "append_only": true,
+      "sa_handoff": true
+    }
+  }
+}

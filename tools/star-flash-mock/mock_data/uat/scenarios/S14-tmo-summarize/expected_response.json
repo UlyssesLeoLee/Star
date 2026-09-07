@@ -1,0 +1,13 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S14-tmo-summarize",
+  "class": "Transaction",
+  "node": "M-N5",
+  "response_200": {
+    "summarized_count": 3,
+    "summary_text": "3 个 L1 任务摘要: 跨域反馈 + 验证 + 合并",
+    "original_token_count": 4500,
+    "summary_token_count": 320,
+    "compression_ratio": 0.071
+  }
+}

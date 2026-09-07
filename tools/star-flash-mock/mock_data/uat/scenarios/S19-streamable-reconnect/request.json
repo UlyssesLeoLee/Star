@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S19-streamable-reconnect",
+  "class": "Transaction",
+  "method": "GET",
+  "endpoint": "/api/mcp/streamable/session/{id}/events",
+  "request": {
+    "session_id": "streamable-uat-2026-09-07-001",
+    "last_event_id": "evt-2026-09-07-019"
+  }
+}

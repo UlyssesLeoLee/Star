@@ -1,0 +1,13 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S02-worktree-create",
+  "class": "Master",
+  "method": "POST",
+  "endpoint": "/api/worktrees",
+  "request": {
+    "project_id": "proj-uat-001",
+    "branch": "feat/uat-s02",
+    "work_item_id": "wi-uat-2026-09-07-001",
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

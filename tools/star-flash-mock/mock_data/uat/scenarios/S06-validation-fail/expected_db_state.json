@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S06-validation-fail",
+  "class": "Work",
+  "tables": {
+    "work.validation_result": {
+      "insert_count": 1,
+      "retention_period": "1d"
+    }
+  }
+}

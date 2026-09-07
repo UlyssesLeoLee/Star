@@ -1,0 +1,16 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S02-worktree-create",
+  "class": "Master",
+  "tables": {
+    "master.worktree": {
+      "insert_count": 1,
+      "scd_type": 2,
+      "physical_delete_forbidden": true
+    },
+    "transaction.worktree_event": {
+      "insert_count": 1,
+      "event_type": "worktree.created"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S11-tmo-split",
+  "events": [
+    {
+      "event_type": "tmo.split.completed",
+      "node": "M-N2",
+      "event_id": "evt-2026-09-07-012"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S07-conflict-detect",
+  "class": "Work",
+  "method": "POST",
+  "endpoint": "/api/worktrees/{id}/conflict-detect",
+  "request": {
+    "worktree_id": "wt-uat-2026-09-07-003",
+    "target_branch": "main",
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S24-audit-worm",
+  "class": "Transaction",
+  "method": "POST",
+  "endpoint": "/api/audit/event",
+  "request": {
+    "event_type": "audit.onboarding.failed",
+    "actor_session_id": "session-2026-09-07-001",
+    "worm_required": true
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S08-rebase-merge",
+  "events": [
+    {
+      "event_type": "worktree.merged",
+      "event_id": "evt-2026-09-07-009"
+    }
+  ]
+}

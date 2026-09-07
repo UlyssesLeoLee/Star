@@ -1,0 +1,13 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S24-audit-worm",
+  "class": "Transaction",
+  "tables": {
+    "transaction.audit_event": {
+      "insert_count": 1,
+      "append_only": true,
+      "worm_locked": true,
+      "retention_period": "2y"
+    }
+  }
+}

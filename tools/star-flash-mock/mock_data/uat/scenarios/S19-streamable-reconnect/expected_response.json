@@ -1,0 +1,20 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S19-streamable-reconnect",
+  "class": "Transaction",
+  "response_200": {
+    "last_event_id": "evt-2026-09-07-019",
+    "resume_from": "evt-2026-09-07-019",
+    "events": [
+      {
+        "id": "evt-2026-09-07-020",
+        "type": "agent_dispatch"
+      },
+      {
+        "id": "evt-2026-09-07-021",
+        "type": "interrupt"
+      }
+    ],
+    "transport": "streamable-http"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S25-quota-exceeded",
+  "class": "Work",
+  "method": "POST",
+  "endpoint": "/api/quotas/check",
+  "request": {
+    "tenant_id": "t-acme",
+    "quota_type": "llm_tokens",
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

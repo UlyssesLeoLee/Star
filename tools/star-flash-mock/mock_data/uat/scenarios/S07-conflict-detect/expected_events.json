@@ -1,0 +1,10 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S07-conflict-detect",
+  "events": [
+    {
+      "event_type": "conflict.detected",
+      "event_id": "evt-2026-09-07-008"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S13-tmo-bulk",
+  "class": "Transaction",
+  "tables": {
+    "transaction.tmo_bulk_log": {
+      "insert_count": 1,
+      "append_only": true
+    }
+  }
+}

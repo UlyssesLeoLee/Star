@@ -1,0 +1,16 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S01-workitem-create",
+  "class": "Transaction",
+  "tables": {
+    "transaction.workitem": {
+      "insert_count": 1,
+      "append_only": true,
+      "audit_required": true
+    },
+    "transaction.workitem_event": {
+      "insert_count": 1,
+      "event_type": "workitem.created"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S13-tmo-bulk",
+  "class": "Transaction",
+  "node": "M-N4",
+  "response_207": {
+    "succeeded_count": 3,
+    "failed_count": 2,
+    "succeeded": [
+      "task-001",
+      "task-002",
+      "task-003"
+    ],
+    "failed": [
+      "task-004",
+      "task-005"
+    ],
+    "failure_reasons": [
+      "task-004: cyclic dep",
+      "task-005: invalid SA type"
+    ]
+  }
+}

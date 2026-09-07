@@ -1,0 +1,20 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S16-tmo-metadata",
+  "class": "Master",
+  "node": "M-N7",
+  "method": "POST",
+  "endpoint": "/api/tmo/metadata",
+  "request": {
+    "operation": "add",
+    "target_task_id": "task-uat-002",
+    "metadata": {
+      "priority": "high",
+      "tags": [
+        "uat",
+        "cross-domain"
+      ]
+    },
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S18-streamable-push",
+  "class": "Transaction",
+  "response_200_sse": {
+    "content_type": "text/event-stream",
+    "stream_format": "id: <evt_id>\\nevent: <type>\\ndata: <json>\\n\\n",
+    "event_types_pushed": [
+      "tool_call",
+      "agent_dispatch",
+      "interrupt"
+    ],
+    "keepalive_interval_seconds": 30
+  }
+}

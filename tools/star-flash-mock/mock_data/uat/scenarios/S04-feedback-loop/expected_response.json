@@ -1,0 +1,13 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S04-feedback-loop",
+  "class": "Transaction",
+  "response_201": {
+    "feedback_id": "fb-uat-2026-09-07-001",
+    "from_domain": "player",
+    "to_domain": "social",
+    "status": "received",
+    "racy": "R(玩家域 Lead) + A(玩家域 Lead) + C(社会域 Lead) + I(其他域 Lead)",
+    "raci_complete": true
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S09-merge-request",
+  "events": [
+    {
+      "event_type": "mr.opened",
+      "event_id": "evt-2026-09-07-010"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S02-worktree-create",
+  "events": [
+    {
+      "event_type": "worktree.created",
+      "event_id": "evt-2026-09-07-002",
+      "worktree_id": "wt-uat-2026-09-07-001",
+      "timestamp": "2026-09-07T15:00:00Z"
+    }
+  ]
+}

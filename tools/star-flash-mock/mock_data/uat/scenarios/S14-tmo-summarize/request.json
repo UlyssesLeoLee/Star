@@ -1,0 +1,17 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S14-tmo-summarize",
+  "class": "Transaction",
+  "node": "M-N5",
+  "method": "POST",
+  "endpoint": "/api/tmo/summarize",
+  "request": {
+    "operation": "summarize",
+    "target_task_ids": [
+      "task-summary-001",
+      "task-summary-002",
+      "task-summary-003"
+    ],
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

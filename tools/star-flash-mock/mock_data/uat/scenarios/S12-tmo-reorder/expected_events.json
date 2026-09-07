@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S12-tmo-reorder",
+  "events": [
+    {
+      "event_type": "tmo.reorder.completed",
+      "node": "M-N3",
+      "event_id": "evt-2026-09-07-013"
+    }
+  ]
+}

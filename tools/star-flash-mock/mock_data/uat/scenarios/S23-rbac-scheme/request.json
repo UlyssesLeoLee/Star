@@ -1,0 +1,17 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S23-rbac-scheme",
+  "class": "Master",
+  "method": "POST",
+  "endpoint": "/api/rbac/roles",
+  "request": {
+    "tenant_id": "t-acme",
+    "role_name": "uat-reviewer",
+    "permissions": [
+      "workitem.read",
+      "workitem.write",
+      "worktree.review"
+    ],
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

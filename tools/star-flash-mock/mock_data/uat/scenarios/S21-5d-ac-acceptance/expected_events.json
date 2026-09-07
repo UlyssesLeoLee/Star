@@ -1,0 +1,10 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S21-5d-ac-acceptance",
+  "events": [
+    {
+      "event_type": "uat.5d.audit.completed",
+      "event_id": "evt-2026-09-07-024"
+    }
+  ]
+}

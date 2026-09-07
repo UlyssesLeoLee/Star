@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S23-rbac-scheme",
+  "class": "Master",
+  "tables": {
+    "master.rbac_role": {
+      "insert_count": 1,
+      "scd_type": 2,
+      "physical_delete_forbidden": true
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S18-streamable-push",
+  "class": "Transaction",
+  "method": "GET",
+  "endpoint": "/api/mcp/streamable/session/{id}/events",
+  "request": {
+    "session_id": "streamable-uat-2026-09-07-001",
+    "headers": {
+      "Accept": "text/event-stream"
+    }
+  }
+}

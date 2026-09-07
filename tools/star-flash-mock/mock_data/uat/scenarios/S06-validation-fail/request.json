@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S06-validation-fail",
+  "class": "Work",
+  "method": "POST",
+  "endpoint": "/api/validation",
+  "request": {
+    "worktree_id": "wt-uat-2026-09-07-002",
+    "validation_type": "ci",
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

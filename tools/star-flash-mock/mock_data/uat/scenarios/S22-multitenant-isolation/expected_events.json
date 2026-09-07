@@ -1,0 +1,10 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S22-multitenant-isolation",
+  "events": [
+    {
+      "event_type": "tenant.isolation.verified",
+      "event_id": "evt-2026-09-07-025"
+    }
+  ]
+}

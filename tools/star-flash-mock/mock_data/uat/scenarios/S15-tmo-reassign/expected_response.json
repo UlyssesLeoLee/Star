@@ -1,0 +1,13 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S15-tmo-reassign",
+  "class": "Transaction",
+  "node": "M-N6",
+  "response_200": {
+    "task_id": "task-uat-001",
+    "from_sa": "SA-09",
+    "to_sa": "SA-02",
+    "reassignment_status": "ok",
+    "checkpoint_handoff": true
+  }
+}

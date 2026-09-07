@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S22-multitenant-isolation",
+  "class": "Transaction",
+  "tables": {
+    "transaction.isolation_audit_log": {
+      "insert_count": 1,
+      "append_only": true
+    }
+  }
+}

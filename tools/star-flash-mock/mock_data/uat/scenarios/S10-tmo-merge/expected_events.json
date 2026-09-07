@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S10-tmo-merge",
+  "events": [
+    {
+      "event_type": "tmo.merge.completed",
+      "node": "M-N1",
+      "event_id": "evt-2026-09-07-011"
+    }
+  ]
+}

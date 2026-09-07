@@ -1,0 +1,15 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S12-tmo-reorder",
+  "class": "Transaction",
+  "tables": {
+    "transaction.tmo_reorder_log": {
+      "insert_count": 1,
+      "append_only": true
+    },
+    "master.task_dep": {
+      "update_count": 2,
+      "scd_type": 2
+    }
+  }
+}
