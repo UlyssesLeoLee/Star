@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 
-use crate::context::ActorContext;
 use crate::entity::{
     AcceptanceCoverage, AcceptanceCoverageReport, EvidenceDownloadURL, ValidationEvidence,
     ValidationOverride, ValidationPolicy, ValidationResult,
@@ -40,6 +39,7 @@ use crate::value_object::{
     ValidationKind, ValidationOverrideId, ValidationPolicyId, ValidationStatus, WorkItemId,
     WorktreeId,
 };
+use crate::ActorContext;
 
 /// InMemory ValidationService
 pub struct InMemoryValidationService {
@@ -90,7 +90,7 @@ impl InMemoryValidationService {
     }
 
     fn check_tenant(actor: &ActorContext, expected: TenantId) -> Result<(), ValidationError> {
-        if actor.tenant_id != expected {
+        if actor.tenant_id != expected.0 {
             return Err(ValidationError::PermissionDenied);
         }
         Ok(())
@@ -175,7 +175,7 @@ impl ValidationCommandPort for InMemoryValidationService {
         // 发布 Submitted 事件
         let evt = ValidationEvent::Submitted(ValidationResultSubmitted {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 ..EventMeta::new(cmd.tenant_id)
             },
             validation_id: r.id,
@@ -234,7 +234,7 @@ impl ValidationCommandPort for InMemoryValidationService {
             ValidationStatus::Passed => {
                 let evt = ValidationEvent::Passed(ValidationPassed {
                     meta: EventMeta {
-                        actor_user_id: Some(actor.user_id.into_uuid()),
+                        actor_user_id: Some(actor.user_id),
                         ..EventMeta::new(cmd.tenant_id)
                     },
                     validation_id: result.id,
@@ -246,7 +246,7 @@ impl ValidationCommandPort for InMemoryValidationService {
             ValidationStatus::Failed => {
                 let evt = ValidationEvent::Failed(ValidationFailed {
                     meta: EventMeta {
-                        actor_user_id: Some(actor.user_id.into_uuid()),
+                        actor_user_id: Some(actor.user_id),
                         ..EventMeta::new(cmd.tenant_id)
                     },
                     validation_id: result.id,
@@ -259,7 +259,7 @@ impl ValidationCommandPort for InMemoryValidationService {
                 if let Some(wi) = result.work_item_id {
                     let evt = ValidationEvent::FeedbackRequired(FeedbackRequired {
                         meta: EventMeta {
-                            actor_user_id: Some(actor.user_id.into_uuid()),
+                            actor_user_id: Some(actor.user_id),
                             ..EventMeta::new(cmd.tenant_id)
                         },
                         work_item_id: wi,
@@ -314,7 +314,7 @@ impl ValidationCommandPort for InMemoryValidationService {
 
         let evt = ValidationEvent::Overridden(ValidationOverridden {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 ..EventMeta::new(cmd.tenant_id)
             },
             override_id: ovr.id,
@@ -382,7 +382,7 @@ impl ValidationCommandPort for InMemoryValidationService {
 
         let evt = ValidationEvent::AcceptanceCoverageLinked(AcceptanceCoverageLinked {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 ..EventMeta::new(cmd.tenant_id)
             },
             coverage_id: result.id,
@@ -406,7 +406,7 @@ impl ValidationCommandPort for InMemoryValidationService {
         if total > 0 && covered == total {
             let evt = ValidationEvent::CoverageAchieved(AcceptanceCoverageAchieved {
                 meta: EventMeta {
-                    actor_user_id: Some(actor.user_id.into_uuid()),
+                    actor_user_id: Some(actor.user_id),
                     ..EventMeta::new(cmd.tenant_id)
                 },
                 work_item_id: cmd.work_item_id,
@@ -464,7 +464,7 @@ impl ValidationCommandPort for InMemoryValidationService {
 
         let evt = ValidationEvent::EvidenceLinked(EvidenceLinked {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 ..EventMeta::new(cmd.tenant_id)
             },
             evidence_id: cmd.evidence_id,
@@ -555,7 +555,7 @@ impl ValidationQueryPort for InMemoryValidationService {
         q: ListValidationQuery,
         viewer: ActorContext,
     ) -> Result<Vec<ValidationResult>, ValidationError> {
-        if viewer.tenant_id != q.tenant_id {
+        if viewer.tenant_id != q.tenant_id.0 {
             return Err(ValidationError::PermissionDenied);
         }
         let results = self.results.read().expect("lock");
@@ -590,7 +590,7 @@ impl ValidationQueryPort for InMemoryValidationService {
             .get(&id)
             .ok_or(ValidationError::NotFound(id))?
             .clone();
-        if r.tenant_id != viewer.tenant_id {
+        if r.tenant_id.0 != viewer.tenant_id {
             return Err(ValidationError::PermissionDenied);
         }
         Ok(r)
@@ -606,7 +606,7 @@ impl ValidationQueryPort for InMemoryValidationService {
             .get(&id)
             .ok_or(ValidationError::NotFound(ValidationId::default()))?
             .clone();
-        if e.tenant_id != viewer.tenant_id {
+        if e.tenant_id.0 != viewer.tenant_id {
             return Err(ValidationError::PermissionDenied);
         }
         Ok(EvidenceDownloadURL {
@@ -633,7 +633,7 @@ impl ValidationQueryPort for InMemoryValidationService {
             if c.work_item_id != work_item_id {
                 continue;
             }
-            if c.tenant_id != viewer.tenant_id {
+            if c.tenant_id.0 != viewer.tenant_id {
                 return Err(ValidationError::PermissionDenied);
             }
             total += 1;
@@ -647,7 +647,7 @@ impl ValidationQueryPort for InMemoryValidationService {
         }
         Ok(AcceptanceCoverageReport {
             work_item_id,
-            tenant_id: viewer.tenant_id,
+            tenant_id: TenantId(viewer.tenant_id),
             total_criteria: total,
             covered,
             partial,
@@ -664,7 +664,7 @@ impl ValidationQueryPort for InMemoryValidationService {
         let policies = self.policies.read().expect("lock");
         Ok(policies
             .values()
-            .filter(|p| p.tenant_id == viewer.tenant_id)
+            .filter(|p| p.tenant_id.0 == viewer.tenant_id)
             .cloned()
             .collect())
     }
@@ -681,7 +681,7 @@ impl ValidationQueryPort for InMemoryValidationService {
             .cloned()
             .collect();
         for e in &out {
-            if e.tenant_id != viewer.tenant_id {
+            if e.tenant_id.0 != viewer.tenant_id {
                 return Err(ValidationError::PermissionDenied);
             }
         }

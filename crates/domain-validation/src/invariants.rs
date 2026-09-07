@@ -107,11 +107,9 @@ pub fn check_invariant_05_full_coverage_required(
 
 /// **INV-VL-06**:actor 必须为人类(非 service / agent)
 pub fn check_invariant_06_override_human_only(
-    actor: &crate::context::ActorContext,
+    actor: &crate::ActorContext,
 ) -> Result<(), ValidationError> {
-    if actor.is_service_internal()
-        || actor.has_role(roles::DEVELOPER) && actor.user_id.as_uuid().is_nil()
-    {
+    if actor.is_service_internal() || actor.has_role(roles::DEVELOPER) && actor.user_id.is_nil() {
         return Err(ValidationError::PermissionDenied);
     }
     // 简化:必须非 service_internal
