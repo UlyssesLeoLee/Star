@@ -16,7 +16,7 @@ use uuid::Uuid;
 pub async fn generate(
     _work_item_port: &dyn WorkItemQueryPort,
     _filter: &ReportFilter,
-    report_id: Uuid,
+    _report_id: Uuid,
 ) -> Result<crate::ReportResult, ReportError> {
     Err(ReportError::not_implemented(
         "ReportType::C16_AssigneeWorkload",

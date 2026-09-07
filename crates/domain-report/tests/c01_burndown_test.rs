@@ -3,7 +3,6 @@
 //! 5 单元 + 1 集成 (RLS 边界 + cache invalidation)
 
 use chrono::{TimeZone, Utc};
-use domain_report::application::ports::*;
 use domain_report::domain::c01_burndown::{CompletedIssue, SprintMeta};
 use domain_report::infrastructure::in_memory_cache::InMemoryCache;
 use domain_report::infrastructure::port_stubs::*;
@@ -199,7 +198,7 @@ async fn test_c01_cache_hit_invalidation() {
         .generate(ReportType::Burndown, filter.clone())
         .await
         .unwrap();
-    let t1 = r1.generated_at;
+    let _t1 = r1.generated_at;
 
     // 第二次: 命中缓存 (5min TTL), generated_at 不变
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;

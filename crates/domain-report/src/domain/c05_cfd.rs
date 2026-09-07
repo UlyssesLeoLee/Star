@@ -4,7 +4,7 @@
 
 use crate::application::ports::WorkItemQueryPort;
 use crate::{ReportError, ReportFilter, ReportPoint, ReportResult, ReportSummary, Trend};
-use chrono::{DateTime, Utc};
+use chrono::{Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

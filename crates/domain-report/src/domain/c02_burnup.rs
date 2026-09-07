@@ -6,7 +6,7 @@
 use crate::application::ports::{SprintQueryPort, WorkItemQueryPort};
 use crate::domain::c01_burndown::{CompletedIssue, ScopeChange, SprintMeta};
 use crate::{ReportError, ReportFilter, ReportPoint, ReportResult, ReportSummary, Trend};
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
