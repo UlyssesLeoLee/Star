@@ -22,9 +22,13 @@ wsl -d Ubuntu -- bash -lc 'KUBECONFIG=~/.kube/config kubectl apply -f /mnt/d/Sta
 # 3. 装 port-forward 守护 (1 次性, 重启 wsl 自动拉起)
 wsl -d Ubuntu -- bash -lc 'mkdir -p ~/.config/systemd/user; cp /mnt/d/Star/.worktrees/feat-auto-20260908-204a1a91/tools/star-flash-mock/scripts/k3s-portforward.service ~/.config/systemd/user/; XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user daemon-reload; XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user enable --now k3s-portforward.service; loginctl enable-linger leo19'
 
-# 4. 验证 3000
-curl -i http://localhost:3000
-# 预期: status=200, body="not found" (envoy direct_response 404 配置, 表明 3000 通 + envoy 在听)
+# 4. (Ulysses 手动, 守门 v28) k3s 重启后等 60s
+wsl -d Ubuntu -- bash -lc 'sudo systemctl restart k3s; sleep 60'
+
+# 5. 验证 3000 (UAT 闭环, 5 步走 v27/v28/v29)
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\star-flash-mock\scripts\verify-k3s-uat-3000.ps1
+# 预期: 5 步全过, 末尾 "==== 3000 端口 UAT 验证 PASSED ===="
+# 任何一步 fail, exit code 1-6 对应 §0 错误码, 提示修法
 ```
 
 ## 3. 已知卡点 (per 2026-09-08 07:36 JST 实证)
@@ -43,6 +47,21 @@ curl -i http://localhost:3000
 | `start-k3s-backend.ps1` | `C:\Users\leo19\AppData\Local\Temp\lf-backup-start-k3s-backend.ps1` (2026-09-08 05:34 JST, 7032 字节) | 本 commit 落档, 原 Temp 文件保留作历史形态 |
 | `start-k3s-backend.bat` | `C:\Users\leo19\AppData\Local\Temp\lf-backup-start-k3s-backend.bat` (2026-09-08 05:32 JST, 1685 字节) | 同上, 原 Temp `orphan-start-k3s-backend.bat` 5:32 同份 |
 | `k3s-portforward.service` | `C:\Users\leo19\AppData\Local\Temp\k3s-portforward.service` (2026-09-08 07:46 JST 落档, 375 字节) | 同上 |
+| `verify-k3s-uat-3000.ps1` | Mavis 接手写 (per 守门 #1 v27/v28/v29 派生规, 5 步走 3000 验证) | 本 commit 落档 (7cb1e1d 之后) |
+| `verify-k3s-uat-3000.bat` | Mavis 接手写 (pwsh 包装, 跟 start-k3s-backend.bat 风格一致) | 同上 |
+
+## 4.5 验证流程 (per 守门 #1 v27/v28/v29 派生规)
+
+`verify-k3s-uat-3000.ps1` 5 步, 失败即停:
+
+| 步 | 守门 | 验证项 | 失败 exit code | 修复 |
+|---|---|---|---|---|
+| 0 | — | WSL distro Ubuntu 可达 | 1 | `wsl -d Ubuntu echo test` |
+| 1 | v27 | `journalctl -u k3s | grep -c "Skipping pod sync"` = 0 | 2 | `sudo systemctl restart k3s; sleep 60` 重跑 |
+| 2 | v28 | kubelet Running 出现 + `crictl ps` 非空 | 3 | sleep 120s 重试 |
+| 3 | — | rollout restart deployment (用 daocloud 镜像) | 4 | 查 deployment spec image 字段 |
+| 4 | — | pod Ready (60s 预算) | 5 | `kubectl describe pod` 看 events |
+| 5 | v29 | enable port-forward service + curl 3000 | 6 | 查 systemd service / port-forward log |
 
 ## 5. 守门引用
 
