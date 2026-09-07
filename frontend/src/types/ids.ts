@@ -399,6 +399,8 @@ export type AgentStatus =
 
 export interface AgentSession {
   id: Uuid;
+  /** human-readable agent name (per 2026-09-07 17:30 JST Mavis 临时代签, 5 域 Lead 默认 fallback) */
+  name: string;
   tenant_id: Uuid;
   project_id: Uuid;
   worktree_id: Uuid;
