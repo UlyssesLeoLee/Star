@@ -1,0 +1,36 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S29-mcp-tool-failed-empty-result",
+  "class": "Master",
+  "response_200": {
+    "tools_status": {
+      "find_references": {
+        "result": null,
+        "empty": true,
+        "scd_version": 1
+      },
+      "get_code_context": {
+        "result": null,
+        "empty": true,
+        "scd_version": 1
+      },
+      "get_symbol": {
+        "result": null,
+        "empty": true,
+        "scd_version": 1
+      },
+      "search_code": {
+        "result": null,
+        "empty": true,
+        "scd_version": 1
+      }
+    },
+    "all_empty": true,
+    "pre_existing_failed": true,
+    "scd_version": 1,
+    "valid_from": "2026-09-07T16:00:00Z",
+    "valid_to": null,
+    "physical_delete_forbidden": true,
+    "rls_13_classes_attached": true
+  }
+}

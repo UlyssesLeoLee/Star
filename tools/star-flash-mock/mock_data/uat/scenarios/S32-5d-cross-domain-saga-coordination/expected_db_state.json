@@ -1,0 +1,13 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S32-5d-cross-domain-saga-coordination",
+  "class": "Transaction",
+  "tables": {
+    "transaction.saga_log": {
+      "insert_count": 5,
+      "append_only": true,
+      "audit_required": true,
+      "saga_id": "saga-uat-2026-09-07-001"
+    }
+  }
+}

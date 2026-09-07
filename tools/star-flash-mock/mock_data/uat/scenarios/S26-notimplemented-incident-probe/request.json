@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S26-notimplemented-incident-probe",
+  "class": "Work",
+  "method": "GET",
+  "endpoint": "/api/incidents/probe-production",
+  "request": {
+    "capability": "probe-production",
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

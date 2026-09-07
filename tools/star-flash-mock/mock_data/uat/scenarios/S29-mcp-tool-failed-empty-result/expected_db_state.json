@@ -1,0 +1,18 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S29-mcp-tool-failed-empty-result",
+  "class": "Master",
+  "tables": {
+    "master.mcp_tool_state": {
+      "update_count": 4,
+      "scd_type": 2,
+      "physical_delete_forbidden": true,
+      "tools": [
+        "find_references",
+        "get_code_context",
+        "get_symbol",
+        "search_code"
+      ]
+    }
+  }
+}

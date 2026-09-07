@@ -1,0 +1,18 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S33-mavis-proxy-real-person-signoff",
+  "class": "Master",
+  "method": "POST",
+  "endpoint": "/api/five-domain/mavis-sign-off",
+  "request": {
+    "domains": [
+      "player",
+      "economy",
+      "match",
+      "social",
+      "admin"
+    ],
+    "mavis_sign_type": "Mavis 临时代签",
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S31-async-timeout-5d-concurrent",
+  "class": "Transaction",
+  "tables": {
+    "transaction.five_domain_concurrent_audit": {
+      "insert_count": 5,
+      "append_only": true,
+      "audit_required": true,
+      "domains": [
+        "player",
+        "economy",
+        "match",
+        "social",
+        "admin"
+      ]
+    }
+  }
+}

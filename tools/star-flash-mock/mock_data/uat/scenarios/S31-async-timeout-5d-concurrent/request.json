@@ -1,0 +1,18 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S31-async-timeout-5d-concurrent",
+  "class": "Transaction",
+  "method": "POST",
+  "endpoint": "/api/five-domain/concurrent-update",
+  "request": {
+    "domains": [
+      "player",
+      "economy",
+      "match",
+      "social",
+      "admin"
+    ],
+    "timeout_warning_threshold_ms": 5000,
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

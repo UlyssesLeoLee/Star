@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S27-notimplemented-incident-alert",
+  "class": "Work",
+  "response_404": {
+    "error": "Capability not implemented (per REQ-OPS-003 §30.6 boundary)",
+    "capability": "process-alert",
+    "note": "TBD: error message schema per basic-design §30.6",
+    "retention_period_seconds": 86400
+  }
+}

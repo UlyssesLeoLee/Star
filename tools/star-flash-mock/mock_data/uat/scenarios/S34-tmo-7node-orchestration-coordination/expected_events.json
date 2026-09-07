@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S34-tmo-7node-orchestration-coordination",
+  "events": [
+    {
+      "event_type": "tmo.7node.orchestration.completed",
+      "event_id": "evt-2026-09-07-037",
+      "nodes": 7,
+      "l0_coordinated": true
+    }
+  ]
+}

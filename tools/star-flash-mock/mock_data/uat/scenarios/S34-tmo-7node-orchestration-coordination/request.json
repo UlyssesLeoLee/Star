@@ -1,0 +1,41 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S34-tmo-7node-orchestration-coordination",
+  "class": "Transaction",
+  "method": "POST",
+  "endpoint": "/api/tmo/orchestrate",
+  "request": {
+    "tmo_nodes": [
+      {
+        "id": "M-N1",
+        "op": "merge"
+      },
+      {
+        "id": "M-N2",
+        "op": "split"
+      },
+      {
+        "id": "M-N3",
+        "op": "reorder"
+      },
+      {
+        "id": "M-N4",
+        "op": "bulk"
+      },
+      {
+        "id": "M-N5",
+        "op": "summarize"
+      },
+      {
+        "id": "M-N6",
+        "op": "reassign"
+      },
+      {
+        "id": "M-N7",
+        "op": "metadata"
+      }
+    ],
+    "l0_coordination": true,
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

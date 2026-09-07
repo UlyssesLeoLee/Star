@@ -1,0 +1,45 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S32-5d-cross-domain-saga-coordination",
+  "class": "Transaction",
+  "method": "POST",
+  "endpoint": "/api/five-domain/saga/coordinate",
+  "request": {
+    "saga_id": "saga-uat-2026-09-07-001",
+    "domains": [
+      "player",
+      "economy",
+      "match",
+      "social",
+      "admin"
+    ],
+    "steps": [
+      {
+        "step": 1,
+        "domain": "player",
+        "action": "validate"
+      },
+      {
+        "step": 2,
+        "domain": "economy",
+        "action": "charge"
+      },
+      {
+        "step": 3,
+        "domain": "match",
+        "action": "dispatch"
+      },
+      {
+        "step": 4,
+        "domain": "social",
+        "action": "notify"
+      },
+      {
+        "step": 5,
+        "domain": "admin",
+        "action": "audit"
+      }
+    ],
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

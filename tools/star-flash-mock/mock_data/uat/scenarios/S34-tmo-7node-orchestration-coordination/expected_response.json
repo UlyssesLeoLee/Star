@@ -1,0 +1,21 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S34-tmo-7node-orchestration-coordination",
+  "class": "Transaction",
+  "response_200": {
+    "tmo_orchestration_id": "tmo-uat-2026-09-07-001",
+    "tmo_nodes_executed": 7,
+    "l0_coordinated": true,
+    "l1_to_l1_prohibited": true,
+    "nodes_status": {
+      "M-N1_merge": "ok",
+      "M-N2_split": "ok",
+      "M-N3_reorder": "ok",
+      "M-N4_bulk": "ok",
+      "M-N5_summarize": "ok",
+      "M-N6_reassign": "ok",
+      "M-N7_metadata": "ok"
+    },
+    "audit_logged": true
+  }
+}

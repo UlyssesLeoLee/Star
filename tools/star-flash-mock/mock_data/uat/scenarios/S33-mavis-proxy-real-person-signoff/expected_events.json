@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S33-mavis-proxy-real-person-signoff",
+  "events": [
+    {
+      "event_type": "mavis.signoff.recorded",
+      "event_id": "evt-2026-09-07-036",
+      "domains": 5,
+      "real_person_pending": true
+    }
+  ]
+}

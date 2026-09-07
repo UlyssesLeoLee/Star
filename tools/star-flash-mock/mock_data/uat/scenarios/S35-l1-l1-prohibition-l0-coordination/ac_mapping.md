@@ -1,0 +1,4 @@
+# S35 AC 跨引
+- AC: docs/architecture/2026-09-03-langgraph/02-basic-design.md v0.2 §2.6 + ADR-0046 (L1↔L1 禁止, L0 协调)
+- 跨引: docs/uat-design.md §8.3 协作预期覆盖矩阵 (5 L1↔L1 禁止 L0 协调)
+- 守门: #13 a L0 唯一协调 + 守门 #13 a L1↔L1 禁止 (TMO-03 4 类 cycle + O(V+E))

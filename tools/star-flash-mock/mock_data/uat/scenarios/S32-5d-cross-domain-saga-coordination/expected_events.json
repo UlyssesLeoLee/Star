@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S32-5d-cross-domain-saga-coordination",
+  "events": [
+    {
+      "event_type": "saga.cross_domain.completed",
+      "event_id": "evt-2026-09-07-035",
+      "steps": 5,
+      "l0_coordinated": true
+    }
+  ]
+}

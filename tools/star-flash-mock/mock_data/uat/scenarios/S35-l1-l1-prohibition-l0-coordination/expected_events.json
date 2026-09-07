@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S35-l1-l1-prohibition-l0-coordination",
+  "events": [
+    {
+      "event_type": "l1_l1.prohibition.enforced",
+      "event_id": "evt-2026-09-07-038",
+      "l0_routed": 5,
+      "l1_direct_routed": 0
+    }
+  ]
+}
