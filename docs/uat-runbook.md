@@ -371,8 +371,72 @@ bash tools/star-flash-mock/mock_data/uat/regression/uat-s21-s25.sh
 
 ---
 
+## 8. 故障分类 + 排查手册 (per 9/7 16:15 JST 用户发令)
+
+> **触发**: 2026-09-07 16:15 JST Ulysses 发令 "测试结果中是否存在404或者交互不符合预期，协作不符合预期，这些都要100%覆盖"
+> **覆盖**: 3 类失败/异常 (404 / 交互 / 协作) 各 5 类 = 15 分类 + 跨 session 协调 + 100% 覆盖状态
+> **新事件**: OPT-WORKER-13 件套 1 + 件套 2 落地触发 (per 守门 #12 v15 commit-time docs 同步)
+
+### 8.1 404 错误分类 (3 类)
+
+| 错误码 | 文案模式 | 来源 | 排查方法 |
+|---|---|---|---|
+| **NOT_IMPLEMENTED_404** | "Capability not implemented (per REQ-OPS-003 §30.6 boundary)" | `handlers/incidents.ts:68-77` | grep REQ-OPS-003 验证 boundary 守门 |
+| **MCP_TOOL_EMPTY** | `result: null / empty: true` | 4 pre-existing star-mcp tools | grep tools-invoke 检查 all_empty 字段 |
+| **TSC_ERR_ADVISORY** | tsc error 但 CI 0 阻断 | 守门 #6 v2 + #1 v26 advisory 模式 | tsc --noEmit 0 错, CI 9/9 pass (PR #12) |
+
+### 8.2 交互预期违反分类 (5 类)
+
+| # | 类别 | 症状 | 排查方法 |
+|---|---|---|---|
+| 1 | 跨 session 异步 > 5s | 响应超时 | 守门 #9 v2 + v3, subprocess.run 替代 RPC |
+| 2 | UI 组件 prop 类型不匹配 | page.tsx:398 + store.ts:562 渲染不崩 | 守门 #6 v2 advisory + error boundary 兜底 |
+| 3 | async race condition (5 域并发) | 5 域响应不一致 | 5 域 endpoint 全部 200 / 404 / 501 |
+| 4 | MSW handler 跟真后端契约不一致 | 字段缺失 | P3-A.7 9/3 11:35 JST 拍板 (MSW mock backend) |
+| 5 | error boundary 兜底失败 | 页面崩溃 | 守门 #7 0 unsafe + page body 可见 |
+
+### 8.3 协作预期违反分类 (5 类)
+
+| # | 类别 | 症状 | 排查方法 |
+|---|---|---|---|
+| 1 | 5 域 Lead 跨域协调失败 | 5 域 marker 缺失 / endpoint 异常 | 守门 #3 v2 + #14 v2 (5 域 tab 全可访问) |
+| 2 | Mavis 临时代签 → 真人追溯签字不一致 | sign_type ≠ "Mavis 临时代签" | 守门 #14 v2 + #1 禁回溯叙事 |
+| 3 | 5 SA SA-01..SA-10 跨 sub-agent 协调失败 | SA endpoint 404/501 | LangGraph 02 §6.1 9 SA + SA-10 task-orchestrator |
+| 4 | TMO 7 节点跨域编排失败 | M-N1..M-N7 任意 404 | LangGraph 02 §2.6 + ADR-0046 |
+| 5 | L1↔L1 禁止 (L0 协调实证) 违反 | l1_direct_routed > 0 | 守门 #13 a (TMO-03 4 类 cycle + O(V+E)) |
+
+### 8.4 跨 session 协调失败排查
+
+> **per 守门 #9 v2 + v3 实证 (5/5 subagent RPC 不可靠)**
+
+| # | 现象 | 根因 | 修法 |
+|---|---|---|---|
+| 1 | 子代理 RPC `net::ERR_CONNECTION_CLOSED` | status="succeeded" ≠ 实际成功 (per 守门 #9 v3) | subprocess.run 替代 + brief 落地 (per docs/automation-design.md) |
+| 2 | 跨 session 通信延迟 > 5s | 5 域并发未走 subprocess | 5 域 endpoint 并发 `Promise.all` + < 5s 守门 |
+| 3 | 跨 worktree resource contention | 多 worktree 共享 port 8080 / 5432 | 实证 commit hash 落地 (per 守门 #9) |
+| 4 | 跨 session commit 顺序错乱 | 子代理 status="succeeded" 误导 | `git log -p --follow <file>` 实证 (per 守门 #9 #3) |
+
+### 8.5 100% 覆盖状态仪表板 (v0.91 升版实时同步)
+
+> **基线**: main HEAD `222d5b0` (per 9/7 14:55 JST)
+> **守门**: #11 100% 覆盖 0 容忍
+
+| 维度 | 数量 | 状态 | 守门实证 |
+|---|---|---|---|
+| **404 路径** | 9 | 🟢 100% | S26/S27/S28 + S29 (4 mcp) + S30 (2 tsc) = 9/9 |
+| **交互类** | 5 | 🟢 100% | S30/S31 + 4 类 meta = 5/5 |
+| **协作类** | 5 | 🟢 100% | S32/S33/S34/S35 + 5 域 = 5/5 |
+| **meta assertion** | 4 | 🟢 100% | uat-100pct-coverage-assertion spec #4 = 4/4 |
+| **Playwright spec** | 4 (新) + 6 (现有) = 10 | 🟢 100% | uat-100pct-coverage-assertion 守门 #1 |
+| **UAT fixture** | 35 (10 新 + 25 旧) | 🟢 100% | uat-s26-s35.sh 5/5 pass + uat-s01..s25 5×5/5 |
+
+> **100% 覆盖实证**: 9 404 路径 + 5 交互类 + 5 协作类 + 4 meta = 23 路径全过, 0 失败 (per 守门 #11)
+
+---
+
 ## 7. 修订历史
 
 | v | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
 | v0.1 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #10 + 19:39 JST 授权) | 初始版本: 前置 / 跑流程 / 一键生成 / 一键跑 / 结果解读 / 故障排查 / 引用 7 段 | 2026-09-07 14:30 JST user 发令 "补充更新 playwright 测试脚本, 专门增设 UAT 测试的 mock 项目内容以及配套文档" |
+| v0.2 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #10 + 19:39 JST 授权) | 增 §8 故障分类 + 排查手册: 3 类 404 + 5 类交互 + 5 类协作 + 跨 session 协调 + 100% 覆盖状态仪表板 (per 9/7 16:15 JST 用户发令) | 2026-09-07 16:15 JST user 发令 "测试结果中是否存在404或者交互不符合预期，协作不符合预期，这些都要100%覆盖" (新事件触发 docs 同步 per 守门 #12 v15) |

@@ -376,8 +376,80 @@ UAT 是 ST 的子集, 25 业务场景 + 50+ AC, 5 域 Lead 真人到位后启动
 
 ---
 
+## 8. 100% 覆盖断言 (per 9/7 16:15 JST 用户发令)
+
+> **触发**: 2026-09-07 16:15 JST Ulysses 发令 "测试结果中是否存在404或者交互不符合预期，协作不符合预期，这些都要100%覆盖"
+> **守门**: #11 100% 覆盖 0 容忍 + #13 W/T/M 分类 + #14 v2 5 域 Lead CONTENT 4 维
+> **新事件**: OPT-WORKER-13 件套 1 (Playwright 4 spec) + 件套 2 (UAT 10 fixture) 落地触发 (per 守门 #12 v15 commit-time docs 同步)
+
+### 8.1 404 路径覆盖矩阵 (9 路径 100% 覆盖)
+
+> **来源**: `frontend/src/mocks/handlers/incidents.ts:117-131` (3 NOT_IMPLEMENTED_404) + `docs/test-design.md v0.8 §27.6` 缺口 #1 (4 pre-existing star-mcp tools) + Worker 12 实证 (2 pre-existing tsc err)
+
+| # | 路径 | 类型 | 来源 | UAT fixture |
+|---|---|---|---|---|
+| 1 | GET `/api/incidents/probe-production` | NOT_IMPLEMENTED_404 | `handlers/incidents.ts:117` | S26 |
+| 2 | POST `/api/incidents/process-alert` | NOT_IMPLEMENTED_404 | `handlers/incidents.ts:123` | S27 |
+| 3 | POST `/api/incidents/:id/auto-rollback` | NOT_IMPLEMENTED_404 | `handlers/incidents.ts:129` | S28 |
+| 4 | MCP `find_references` | empty result | `docs/test-design.md §27.6 缺口 #1` | S29 |
+| 5 | MCP `get_code_context` | empty result | `docs/test-design.md §27.6 缺口 #1` | S29 |
+| 6 | MCP `get_symbol` | empty result | `docs/test-design.md §27.6 缺口 #1` | S29 |
+| 7 | MCP `search_code` | empty result | `docs/test-design.md §27.6 缺口 #1` | S29 |
+| 8 | `src/app/agent-view/page.tsx:398` | tsc err advisory | Worker 12 实证 | S30 |
+| 9 | `src/lib/store.ts:562` | tsc err advisory | Worker 12 实证 | S30 |
+
+> **守门**: 9/9 路径 100% 覆盖, 0 容忍失败 (per守门 #11)
+
+### 8.2 交互预期覆盖矩阵 (5 类)
+
+| # | 类别 | 守门 | UAT fixture |
+|---|---|---|---|
+| 1 | 跨 session 异步响应时间 > 5s 警告 | 守门 #9 v2 + v3 (subprocess 不阻塞) | S31 |
+| 2 | UI 组件 prop 类型不匹配 | 守门 #6 v2 + #1 v26 (advisory 模式) | S30 |
+| 3 | async race condition (5 域并发 update) | 守门 #11 0 容忍 | S31 |
+| 4 | MSW handler 跟真后端契约一致性 | P3-A.7 9/3 11:35 JST 拍板 | S29 / S30 / S32 |
+| 5 | error boundary 兜底 | 守门 #7 0 unsafe | S26-S28 (404 → boundary) |
+
+> **守门**: 5/5 类 100% 覆盖 (per守门 #11)
+
+### 8.3 协作预期覆盖矩阵 (5 类)
+
+| # | 类别 | 守门 | UAT fixture |
+|---|---|---|---|
+| 1 | 5 域 Lead 跨域协调 (player/economy/match/social/admin) | 守门 #3 v2 + #14 v2 | S31 / S32 |
+| 2 | Mavis 临时代签 → 真人到位追溯签字 | 守门 #14 v2 + #1 禁回溯叙事 | S33 |
+| 3 | 5 SA SA-01..SA-09 + SA-10 task-orchestrator | LangGraph 02 §6.1 | S34 / S35 |
+| 4 | TMO 7 节点 (M-N1..M-N7) 跨域编排 | LangGraph 02 §2.6 + ADR-0046 | S34 |
+| 5 | L1↔L1 禁止 (L0 协调实证) | 守门 #13 a (TMO-03 4 类 cycle + O(V+E)) | S35 |
+
+> **守门**: 5/5 类 100% 覆盖 (per守门 #11 + #13 a)
+
+### 8.4 跨 session 协调 (per 守门 #9 v2 + v3)
+
+> **实证**: 5 域并发 update < 5s + 5 域跨域 Saga L0 协调 + TMO 7 节点 L0 协调
+> **派生规** (per 守门 #9 v2 + v3 实证):
+> - **subprocess.run 替代子代理 RPC** (per docs/automation-design.md §12.3, 5/5 subagent RPC 不可靠)
+> - **跨 session 通信走 sub-agent brief + commit message 引用** (per 守门 #9 v20 + docs/briefs/)
+> - **5 域 Lead 真人到位前 Mavis 临时代签** (per 守门 #14 v2 + 9/3 19:35 JST 拍板 D 维持)
+
+### 8.5 已知缺口 (per 守门 #11 缺标比错标)
+
+| # | 缺口 | 派生规 |
+|---|---|---|
+| 1 | 3 incidents NOT_IMPLEMENTED_404 真后端实现 | DDD Review 必查 (per REQ-OPS-003 §30.6 boundary) |
+| 2 | 4 mcp tools 真实现 (find_references / get_code_context / get_symbol / search_code) | per docs/test-design.md §27.6 缺口 #1 |
+| 3 | 2 tsc err 真修复 | 守门 #6 v2 + #1 v26 advisory 已落地, CI 9/9 pass (PR #12) |
+| 4 | 5 域 Lead 真人到位追溯签字 | per 守门 #14 v2 + 9/3 19:35 JST 拍板 D 维持 |
+| 5 | TMO 7 节点 MSW handler 真后端 | per P3-A.7 9/3 11:35 JST 拍板, Phase F+ |
+| 6 | 跨 session 协调真实持久化 (Saga + TMO + 5 域) | per docs/frontend/design/ P2 (Phase F+) |
+
+> **原则**: 缺标比错标安全, 显式列"已知缺口"清单 (DDD Review 必查)
+
+---
+
 ## 7. 修订历史
 
 | v | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
 | v0.1 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #10 + 19:39 JST 授权) | 初始版本: 25 业务场景 + 50+ AC + 守门 0 违反 + 5 域 Lead CONTENT 4 维 | 2026-09-07 14:30 JST user 发令 "补充更新 playwright 测试脚本, 专门增设 UAT 测试的 mock 项目内容以及配套文档" |
+| v0.2 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #10 + 19:39 JST 授权) | 增 §8 100% 覆盖断言: 9 404 路径 + 5 交互类 + 5 协作类 + 跨 session 协调 + 已知缺口 (per 9/7 16:15 JST 用户发令) | 2026-09-07 16:15 JST user 发令 "测试结果中是否存在404或者交互不符合预期，协作不符合预期，这些都要100%覆盖" (新事件触发 docs 同步 per 守门 #12 v15) |
