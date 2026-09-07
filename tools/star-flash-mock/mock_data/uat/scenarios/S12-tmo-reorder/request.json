@@ -1,0 +1,22 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S12-tmo-reorder",
+  "class": "Transaction",
+  "node": "M-N3",
+  "method": "POST",
+  "endpoint": "/api/tmo/reorder",
+  "request": {
+    "operation": "dep_set",
+    "edges": [
+      {
+        "from": "task-A",
+        "to": "task-B"
+      },
+      {
+        "from": "task-B",
+        "to": "task-C"
+      }
+    ],
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

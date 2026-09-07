@@ -1,0 +1,10 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S20-streamable-delete",
+  "class": "Transaction",
+  "method": "DELETE",
+  "endpoint": "/api/mcp/streamable/session/{id}",
+  "request": {
+    "session_id": "streamable-uat-2026-09-07-001"
+  }
+}

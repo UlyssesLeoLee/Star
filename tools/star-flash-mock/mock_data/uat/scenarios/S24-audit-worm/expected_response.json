@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S24-audit-worm",
+  "class": "Transaction",
+  "response_201": {
+    "audit_event_id": "audit-evt-uat-2026-09-07-001",
+    "worm_locked": true,
+    "retention_period_seconds": 63072000,
+    "physical_delete_forbidden": true,
+    "tamper_proof": true
+  }
+}

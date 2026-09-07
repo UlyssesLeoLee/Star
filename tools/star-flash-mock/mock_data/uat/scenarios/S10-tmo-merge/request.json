@@ -1,0 +1,17 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S10-tmo-merge",
+  "class": "Transaction",
+  "node": "M-N1",
+  "method": "POST",
+  "endpoint": "/api/tmo/merge",
+  "request": {
+    "operation": "merge",
+    "target_task_ids": [
+      "task-alpha-7f8a9b",
+      "task-beta-2c3d4e"
+    ],
+    "merge_strategy": "context_union",
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

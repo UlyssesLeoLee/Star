@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S01-workitem-create",
+  "events": [
+    {
+      "event_type": "workitem.created",
+      "event_id": "evt-2026-09-07-001",
+      "actor_session_id": "session-2026-09-07-001",
+      "timestamp": "2026-09-07T15:00:00Z"
+    }
+  ]
+}

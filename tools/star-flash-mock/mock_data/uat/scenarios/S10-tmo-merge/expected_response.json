@@ -1,0 +1,19 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S10-tmo-merge",
+  "class": "Transaction",
+  "node": "M-N1",
+  "response_200": {
+    "superseded_tasks": [
+      "task-alpha-7f8a9b",
+      "task-beta-2c3d4e"
+    ],
+    "merged_task_id": "task-merged-uat-f5a7b2",
+    "active_tmo_operation": null,
+    "stash_checkpoint_ids": [
+      "stash-alpha-7f8a9b-3a",
+      "stash-beta-2c3d4e-3a"
+    ],
+    "stash_append_only": true
+  }
+}

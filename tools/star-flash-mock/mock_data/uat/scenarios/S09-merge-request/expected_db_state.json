@@ -1,0 +1,15 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S09-merge-request",
+  "class": "Transaction",
+  "tables": {
+    "transaction.merge_request": {
+      "insert_count": 1,
+      "append_only": true
+    },
+    "transaction.merge_request_event": {
+      "insert_count": 1,
+      "event_type": "mr.opened"
+    }
+  }
+}

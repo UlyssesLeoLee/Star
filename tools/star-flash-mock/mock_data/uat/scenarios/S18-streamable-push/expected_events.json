@@ -1,0 +1,14 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S18-streamable-push",
+  "events": [
+    {
+      "event_type": "streamable.push.tool_call",
+      "event_id": "evt-2026-09-07-019"
+    },
+    {
+      "event_type": "streamable.push.agent_dispatch",
+      "event_id": "evt-2026-09-07-020"
+    }
+  ]
+}

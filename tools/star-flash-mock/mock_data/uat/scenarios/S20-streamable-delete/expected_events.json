@@ -1,0 +1,10 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S20-streamable-delete",
+  "events": [
+    {
+      "event_type": "streamable.session.deleted",
+      "event_id": "evt-2026-09-07-023"
+    }
+  ]
+}

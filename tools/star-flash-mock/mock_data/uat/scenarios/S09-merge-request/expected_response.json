@@ -1,0 +1,14 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S09-merge-request",
+  "class": "Transaction",
+  "response_201": {
+    "merge_request_id": "mr-uat-2026-09-07-001",
+    "status": "open",
+    "reviewers": [
+      "ag-001",
+      "ag-002"
+    ],
+    "audit_logged": true
+  }
+}

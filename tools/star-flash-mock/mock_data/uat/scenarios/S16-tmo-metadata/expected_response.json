@@ -1,0 +1,20 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S16-tmo-metadata",
+  "class": "Master",
+  "node": "M-N7",
+  "response_200": {
+    "task_id": "task-uat-002",
+    "scd_version": 2,
+    "metadata": {
+      "priority": "high",
+      "tags": [
+        "uat",
+        "cross-domain"
+      ]
+    },
+    "valid_from": "2026-09-07T15:00:00Z",
+    "valid_to": null,
+    "active": true
+  }
+}

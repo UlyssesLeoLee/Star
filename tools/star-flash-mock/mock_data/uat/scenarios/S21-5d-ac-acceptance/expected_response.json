@@ -1,0 +1,18 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S21-5d-ac-acceptance",
+  "class": "Transaction",
+  "response_200": {
+    "audit_id": "audit-uat-2026-09-07-001",
+    "domains_audited": 5,
+    "ac_pass": 25,
+    "ac_total": 25,
+    "raci_4_dim": {
+      "decision_scope": "跨域 + 域内 (Both, per 守门 #3 v2 派生规)",
+      "raci": "R+A+C 完整责任",
+      "timeline": "待定 (Mavis 长期代签)",
+      "mavis_sign_boundary": "全部代签"
+    },
+    "audit_logged": true
+  }
+}

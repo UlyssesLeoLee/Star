@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S14-tmo-summarize",
+  "events": [
+    {
+      "event_type": "tmo.summarize.completed",
+      "node": "M-N5",
+      "event_id": "evt-2026-09-07-015"
+    }
+  ]
+}

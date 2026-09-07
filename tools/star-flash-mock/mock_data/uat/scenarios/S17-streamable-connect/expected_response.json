@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S17-streamable-connect",
+  "class": "Transaction",
+  "response_201": {
+    "session_id": "streamable-uat-2026-09-07-001",
+    "created_at": "2026-09-07T15:00:00Z",
+    "transport": "streamable-http",
+    "sse_supported": true,
+    "audit_logged": true
+  }
+}

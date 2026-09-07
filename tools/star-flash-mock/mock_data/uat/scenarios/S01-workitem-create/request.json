@@ -1,0 +1,13 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S01-workitem-create",
+  "class": "Transaction",
+  "method": "POST",
+  "endpoint": "/api/mcp/workitem-create",
+  "request": {
+    "title": "[UAT-S01] 5 域 cross-domain 跨域反馈",
+    "description": "player → social → admin 跨域",
+    "domain": "social",
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

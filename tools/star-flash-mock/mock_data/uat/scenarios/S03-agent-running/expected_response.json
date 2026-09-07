@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S03-agent-running",
+  "class": "Transaction",
+  "response_200": {
+    "agent_session_id": "ag-session-uat-2026-09-07-001",
+    "status": "running",
+    "started_at": "2026-09-07T15:00:05Z",
+    "worktree_id": "wt-uat-2026-09-07-001"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S25-quota-exceeded",
+  "events": [
+    {
+      "event_type": "quota.exceeded",
+      "event_id": "evt-2026-09-07-028"
+    }
+  ]
+}

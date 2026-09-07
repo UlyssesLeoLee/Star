@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S25-quota-exceeded",
+  "class": "Work",
+  "tables": {
+    "work.quota_counter": {
+      "update_count": 1,
+      "retention_period": "1d",
+      "exceeded": true
+    }
+  }
+}

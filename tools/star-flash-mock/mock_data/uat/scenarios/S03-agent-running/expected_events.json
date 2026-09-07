@@ -1,0 +1,14 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S03-agent-running",
+  "events": [
+    {
+      "event_type": "agent.started",
+      "event_id": "evt-2026-09-07-003"
+    },
+    {
+      "event_type": "agent.running",
+      "event_id": "evt-2026-09-07-004"
+    }
+  ]
+}

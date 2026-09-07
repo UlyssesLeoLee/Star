@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S20-streamable-delete",
+  "class": "Transaction",
+  "tables": {
+    "transaction.streamable_session": {
+      "update_count": 1,
+      "active": false,
+      "physical_delete_forbidden": true
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S17-streamable-connect",
+  "class": "Transaction",
+  "tables": {
+    "transaction.streamable_session": {
+      "insert_count": 1,
+      "append_only": true
+    }
+  }
+}

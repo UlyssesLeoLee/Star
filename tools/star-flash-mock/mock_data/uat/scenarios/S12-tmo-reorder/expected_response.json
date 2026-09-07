@@ -1,0 +1,18 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S12-tmo-reorder",
+  "class": "Transaction",
+  "node": "M-N3",
+  "response_200": {
+    "edges_added": 2,
+    "cycle_detected": false,
+    "topo_order": [
+      "task-A",
+      "task-B",
+      "task-C"
+    ],
+    "stash_checkpoint_ids": [
+      "stash-dep-set-2-edges"
+    ]
+  }
+}

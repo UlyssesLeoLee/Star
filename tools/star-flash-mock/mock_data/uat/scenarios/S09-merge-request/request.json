@@ -1,0 +1,16 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S09-merge-request",
+  "class": "Transaction",
+  "method": "POST",
+  "endpoint": "/api/merge-requests",
+  "request": {
+    "worktree_id": "wt-uat-2026-09-07-005",
+    "title": "[UAT-S09] 5 域跨域合并",
+    "reviewers": [
+      "ag-001",
+      "ag-002"
+    ],
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S02-worktree-create",
+  "class": "Master",
+  "response_201": {
+    "id": "wt-uat-2026-09-07-001",
+    "project_id": "proj-uat-001",
+    "branch": "feat/uat-s02",
+    "work_item_id": "wi-uat-2026-09-07-001",
+    "status": "active",
+    "scd_version": 1,
+    "valid_from": "2026-09-07T15:00:00Z",
+    "valid_to": null,
+    "rls_13_classes_attached": true
+  }
+}

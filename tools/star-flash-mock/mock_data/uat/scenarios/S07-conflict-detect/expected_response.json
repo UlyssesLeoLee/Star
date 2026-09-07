@@ -1,0 +1,14 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S07-conflict-detect",
+  "class": "Work",
+  "response_200": {
+    "conflict_detected": true,
+    "conflict_files": [
+      "src/lib/store.ts",
+      "src/mocks/handlers/agents.ts"
+    ],
+    "conflict_count": 2,
+    "retention_period_seconds": 3600
+  }
+}

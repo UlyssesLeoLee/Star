@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S03-agent-running",
+  "class": "Transaction",
+  "method": "POST",
+  "endpoint": "/api/agents/{id}/run",
+  "request": {
+    "agent_id": "ag-uat-001",
+    "worktree_id": "wt-uat-2026-09-07-001",
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

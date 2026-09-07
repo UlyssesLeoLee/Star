@@ -1,0 +1,14 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S06-validation-fail",
+  "class": "Work",
+  "response_200": {
+    "validation_id": "val-uat-2026-09-07-002",
+    "result": "fail",
+    "failure_reasons": [
+      "test_failed:5",
+      "lint_error:2"
+    ],
+    "retention_period_seconds": 86400
+  }
+}

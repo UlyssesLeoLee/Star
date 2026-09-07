@@ -1,0 +1,13 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S22-multitenant-isolation",
+  "class": "Transaction",
+  "method": "POST",
+  "endpoint": "/api/tenants/{id}/isolation-check",
+  "request": {
+    "tenant_id": "t-acme",
+    "cross_tenant_id": "t-beta",
+    "isolation_test": "rls_bypass_attempt",
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

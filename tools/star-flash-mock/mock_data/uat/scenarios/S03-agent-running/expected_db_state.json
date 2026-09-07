@@ -1,0 +1,18 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S03-agent-running",
+  "class": "Transaction",
+  "tables": {
+    "transaction.agent_session": {
+      "insert_count": 1,
+      "append_only": true
+    },
+    "transaction.agent_session_event": {
+      "insert_count": 2,
+      "events": [
+        "agent.started",
+        "agent.running"
+      ]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S16-tmo-metadata",
+  "events": [
+    {
+      "event_type": "tmo.metadata.added",
+      "node": "M-N7",
+      "event_id": "evt-2026-09-07-017"
+    }
+  ]
+}

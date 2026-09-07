@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S18-streamable-push",
+  "class": "Transaction",
+  "tables": {
+    "transaction.streamable_event": {
+      "insert_count": "N (continuous)",
+      "append_only": true
+    }
+  }
+}

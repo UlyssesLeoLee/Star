@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S04-feedback-loop",
+  "events": [
+    {
+      "event_type": "feedback.cross_domain",
+      "from": "player",
+      "to": "social",
+      "event_id": "evt-2026-09-07-005"
+    }
+  ]
+}

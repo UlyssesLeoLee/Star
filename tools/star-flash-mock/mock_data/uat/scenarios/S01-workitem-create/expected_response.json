@@ -1,0 +1,14 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S01-workitem-create",
+  "class": "Transaction",
+  "response_201": {
+    "id": "wi-uat-2026-09-07-001",
+    "title": "[UAT-S01] 5 域 cross-domain 跨域反馈",
+    "status": "open",
+    "domain": "social",
+    "created_at": "2026-09-07T15:00:00Z",
+    "creator": "session-2026-09-07-001",
+    "audit_logged": true
+  }
+}

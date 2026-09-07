@@ -1,0 +1,10 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S19-streamable-reconnect",
+  "events": [
+    {
+      "event_type": "streamable.resume",
+      "event_id": "evt-2026-09-07-022"
+    }
+  ]
+}

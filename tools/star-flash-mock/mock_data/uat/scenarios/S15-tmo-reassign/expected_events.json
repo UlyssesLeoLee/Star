@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S15-tmo-reassign",
+  "events": [
+    {
+      "event_type": "tmo.reassign.completed",
+      "node": "M-N6",
+      "event_id": "evt-2026-09-07-016"
+    }
+  ]
+}

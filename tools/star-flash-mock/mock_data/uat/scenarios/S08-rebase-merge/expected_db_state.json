@@ -1,0 +1,16 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S08-rebase-merge",
+  "class": "Transaction",
+  "tables": {
+    "master.worktree": {
+      "update_count": 1,
+      "scd_version_after": 2,
+      "physical_delete_forbidden": true
+    },
+    "transaction.worktree_event": {
+      "insert_count": 1,
+      "event_type": "worktree.merged"
+    }
+  }
+}

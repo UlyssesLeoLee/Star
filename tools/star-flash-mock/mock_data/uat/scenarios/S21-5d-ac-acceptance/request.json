@@ -1,0 +1,18 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S21-5d-ac-acceptance",
+  "class": "Transaction",
+  "method": "POST",
+  "endpoint": "/api/five-domain/audit/uat",
+  "request": {
+    "domains": [
+      "player",
+      "economy",
+      "match",
+      "social",
+      "admin"
+    ],
+    "audit_type": "uat_acceptance",
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

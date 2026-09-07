@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S16-tmo-metadata",
+  "class": "Master",
+  "tables": {
+    "master.task_metadata": {
+      "insert_count": 1,
+      "scd_type": 2,
+      "physical_delete_forbidden": true
+    }
+  }
+}

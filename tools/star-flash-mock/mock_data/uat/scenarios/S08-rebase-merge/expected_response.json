@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S08-rebase-merge",
+  "class": "Transaction",
+  "response_200": {
+    "rebase_status": "ok",
+    "merge_commit": "abc123def",
+    "scd_version": 2,
+    "audit_logged": true
+  }
+}

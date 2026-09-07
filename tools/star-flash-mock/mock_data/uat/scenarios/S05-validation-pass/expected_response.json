@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S05-validation-pass",
+  "class": "Work",
+  "response_200": {
+    "validation_id": "val-uat-2026-09-07-001",
+    "result": "pass",
+    "retention_period_seconds": 86400,
+    "ttl": "short"
+  }
+}

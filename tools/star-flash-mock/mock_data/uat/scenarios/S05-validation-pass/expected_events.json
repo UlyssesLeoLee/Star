@@ -1,0 +1,10 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S05-validation-pass",
+  "events": [
+    {
+      "event_type": "validation.passed",
+      "event_id": "evt-2026-09-07-006"
+    }
+  ]
+}
