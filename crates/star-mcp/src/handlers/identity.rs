@@ -114,7 +114,8 @@ mod tests {
         let h = IdentityHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid);
+        // B.2 修法: 用有效 user_id + tenant_admin role (不用 Uuid::nil(), 触发 INV-ACT-01 panic)
+        let actor = ActorContext::new(uuid::Uuid::new_v4(), tid).with_role("tenant_admin");
         let cmd = CreateUserCommand {
             tenant_id: domain_identity::TenantId(tid),
             email: format!("alice-{}@example.invalid", uuid::Uuid::new_v4()),

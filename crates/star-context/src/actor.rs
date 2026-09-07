@@ -212,6 +212,20 @@ impl ActorContext {
         self.is_local_runtime = true;
         self
     }
+
+    /// 构造"无主 actor"(user_id 为 nil, tenant_id 由调用方指定)
+    ///
+    /// **用途**: handler 简化设计下, URI 只传 resource_id 不传 user_id 时,
+    ///   主动构造"无主 actor" 触发 service 跨 tenant 拒绝 → PermissionDenied
+    ///   (per B.2 修法: handlers/ + tools/ 23 份 tests 改写, 2026-09-07).
+    /// **守门**: 不走 `ActorContext::new(Uuid::nil(), _)` (触发 INV-ACT-01 panic),
+    ///   改走 `ActorContext::default()` + 设 `tenant_id` 字段.
+    /// **不变量**: user_id = nil (无主), tenant_id = 调用方指定
+    pub fn nil_actor_with_tenant(tenant_id: Uuid) -> Self {
+        let mut a = Self::default();
+        a.tenant_id = tenant_id;
+        a
+    }
 }
 
 impl Default for ActorContext {
@@ -366,5 +380,59 @@ mod tests {
         assert_eq!(roles::VIEWER, "viewer");
         assert_eq!(roles::AGENT, "agent");
         assert_eq!(roles::SERVICE_INTERNAL, "service_internal");
+    }
+
+    // ===== B.1 Phase B T1.7 as_local_runtime 实证 (per OPT-WORKER-03 B.1, 2026-09-07) =====
+
+    #[test]
+    fn b1_as_local_runtime_sets_is_local_runtime_true() {
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4());
+        assert!(!a.is_local_runtime, "默认应为 false");
+
+        let b = a.as_local_runtime();
+        assert!(b.is_local_runtime, "as_local_runtime 后应设 true");
+        assert!(b.is_local_runtime(), "is_local_runtime() helper 也应返回 true");
+    }
+
+    #[test]
+    fn b1_as_local_runtime_chains() {
+        let user = Uuid::new_v4();
+        let tenant = Uuid::new_v4();
+        let a = ActorContext::new(user, tenant)
+            .with_role("agent")
+            .as_local_runtime();
+
+        assert_eq!(a.user_id, user);
+        assert_eq!(a.tenant_id, tenant);
+        assert!(a.is_local_runtime);
+        assert!(a.has_role("agent"));
+        assert!(a.has_role("developer")); // default role preserved
+    }
+
+    #[test]
+    fn b1_as_local_runtime_idempotent() {
+        // 二次调用不应破坏状态
+        let a = ActorContext::new(Uuid::new_v4(), Uuid::new_v4())
+            .as_local_runtime()
+            .as_local_runtime();
+        assert!(a.is_local_runtime);
+    }
+
+    #[test]
+    fn b2_nil_actor_with_tenant_sets_tenant_keeps_user_nil() {
+        let tid = Uuid::new_v4();
+        let a = ActorContext::nil_actor_with_tenant(tid);
+        assert_eq!(a.tenant_id, tid);
+        assert!(a.user_id.is_nil(), "user_id 应为 nil (无主)");
+        assert!(a.roles.is_empty());
+    }
+
+    #[test]
+    fn b2_nil_actor_with_tenant_triggers_cross_tenant_check() {
+        // 跨 tenant 校验: actor.tenant_id != expected → PermissionDenied
+        let actor_tid = Uuid::new_v4();
+        let query_tid = Uuid::new_v4();
+        let a = ActorContext::nil_actor_with_tenant(actor_tid);
+        assert_ne!(a.tenant_id, query_tid, "跨 tenant 校验应触发");
     }
 }
