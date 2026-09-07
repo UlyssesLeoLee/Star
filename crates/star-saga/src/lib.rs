@@ -22,9 +22,13 @@
 pub mod compensation;
 pub mod compensation_strategy;
 pub mod idempotency_store;
+pub mod manager;
+pub mod retry_policy;
 pub mod saga_5b_call;
 pub mod saga_5b_real;
 pub mod saga_5b_real_tests;
+pub mod saga_5b_sagas;
+pub mod saga_5b_sagas_tests;
 pub mod saga_5b_services;
 pub mod saga_orchestrator;
 pub mod saga_step;
@@ -93,10 +97,13 @@ pub use compensation_strategy::{
     DefaultCompensationStrategy,
 };
 pub use idempotency_store::{IdempotencyStore, InMemoryIdempotencyStore};
+pub use manager::{SagaInstance, SagaInstanceState, SagaManager, SagaManagerError};
+pub use retry_policy::{RetryPolicy, RetryPolicyError};
 pub use saga_5b_call::{
     CrossDomainCallError, CrossDomainCallResult, CrossDomainCaller, CrossDomainCallerHealth,
     DomainHealth, FiveDomainCallerStub,
 };
+pub use saga_5b_sagas::{FiveDomainSaga, SagaDefinition};
 pub use saga_orchestrator::SagaOrchestrator;
 pub use saga_step::{
     CallId, CrossDomainCall, IdempotencyKey, SagaId, SagaStep as SagaStepData, SagaStepStatus,
