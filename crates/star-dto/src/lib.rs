@@ -43,7 +43,7 @@ pub use star_context::ActorContext as DtoActorContext;
 // §1 M 类 (Master, SCD Type 2) — Identifier<T>
 // =====================================================================
 
-/// **Identifier<T>** — 跨域共享的 phantom-typed 强类型 ID (M 类, SCD Type 2)
+/// **`Identifier<T>`** — 跨域共享的 phantom-typed 强类型 ID (M 类, SCD Type 2)
 ///
 /// **W/T/M 分类**: M (Master, per 守门 #13 (b))
 ///
