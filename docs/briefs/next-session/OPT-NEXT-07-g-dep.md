@@ -3,7 +3,8 @@
 **Agent**: worker
 **Phase**: OPT-P4-NEXT-SESSION
 **Created**: 2026-09-07 12:30 JST
-**Status**: 🟡 等待 P3-F #5 触发
+**Status**: 🟢 4/4 done (G-DEP-01/02/04/05 全部实装, 9/5 已 done in main, 9/7 OPT-WORKER-10 复核验证)
+**Last updated**: 2026-09-07 18:43 JST (Mavis 接手代签, per守门 #10 + 8/27 19:39 JST 授权)
 **Author**: 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签
 
 ---
@@ -34,13 +35,19 @@
 
 ## 2. 依赖 (per 9/5 PHASE-LANGGRAPH-TMO-IMPL-REPORT §3.3)
 
-| # | 依赖 | 状态 |
-|---|---|---|
-| 1 | TMO-04/06 manager dispatch 实证 (per `manager.dispatch 5/5 ok=True`) | 🟢 完成 (per `feat/tmo-05-06-07` commit `7b1a432`) |
-| 2 | TMO-05 manager dispatch 实证 | 🟢 完成 |
-| 3 | LangGraph SDK 0.2.x interrupt_response API (G-DEP-05) | 🟢 完成 (per `G-TMO-05-SDK-FINDINGS.md`) |
-| 4 | 凭证切真 (per B.5 OpenClaw / B.6 Hermes) | 🟡 mock 备选可维持 (per 9/3 11:35 JST 拍板 A) |
-| 5 | P3-F #5 拍板 (TMO 实装触发) | 🟡 等待 |
+| # | 依赖 | 状态 | 实证 commit (per守门 #12) |
+|---|---|---|---|
+| 1 | TMO-04/06 manager dispatch 实证 | 🟢 完成 | `7b1a432` (feat/tmo-05-06-07) |
+| 2 | TMO-05 manager dispatch 实证 | 🟢 完成 | (per #1 同 commit) |
+| 3 | LangGraph SDK 0.2.x interrupt_response API (G-DEP-05) | 🟢 完成 | `G-TMO-05-SDK-FINDINGS.md` (纯 asyncio + TypedDict) |
+| 4 | 凭证切真 (per B.5 OpenClaw / B.6 Hermes) | 🟡 mock 备选可维持 (per 9/3 11:35 JST 拍板 A) | — |
+| 5 | G-DEP-01 P0 工具实装 (3 tool) | 🟢 **done** | `446a8e1` (create_merge_request / create_worktree / search_issues) |
+| 6 | G-DEP-02 P1 工具实装 (4 tool) | 🟢 **done** | `439bae5` (search_code / get_symbol / find_references / get_code_context) |
+| 7 | G-DEP-04 task_metadata DDL | 🟢 完成 (per brief §1, 早于 9/5) | `5e5b1c2` (task_metadata DDL + RLS POLICY) |
+| 8 | G-DEP-05 SDK findings | 🟢 完成 (per brief §1) | `G-TMO-05-SDK-FINDINGS.md` |
+
+**完成 commit 总数**: 2 commit (per守门 #20 1 per file group) per OPT-WORKER-10
+**OPT-WORKER-10 状态**: ❌ brief stale → ✅ 已 main 在 `446a8e1` + `439bae5` 落地, 跳过实施, 报告已落档
 
 ## 3. 实施路径
 
@@ -83,9 +90,18 @@ cd D:/Star/.worktrees/wt-opt-g-dep
 - TMO manager.dispatch 5/5 不全 → 报告 + 拍板 (per TMO-05/06 实证)
 - 仍失败: 报告具体错误, 不 commit
 
-## 8. 状态
+## 8. 状态 (更新于 2026-09-07 18:43 JST)
 
-🟢 **可启动** (P3-F #5 触发, 等 Ulysses 拍板)
+🟢 **全部完成** (4/4 done per 9/5 main + 9/7 OPT-WORKER-10 复核):
+- G-DEP-01: `446a8e1` (3 P0 工具)
+- G-DEP-02: `439bae5` (4 P1 工具)
+- G-DEP-04: `5e5b1c2` (task_metadata DDL + RLS, 早于 9/5)
+- G-DEP-05: `G-TMO-05-SDK-FINDINGS.md` (纯 asyncio + TypedDict)
+
+**brief 关闭条件**: 全部 4 子项已 done, 本 brief 已实质完成, 关闭。
+
+**已知缺口** (per守门 #11 缺标比错标):
+- 凭证切真 (B.5 OpenClaw / B.6 Hermes) 推 5 域 Lead T3 启动 (per 9/3 11:35 JST 拍板 A)
 
 ## 9. 引用
 

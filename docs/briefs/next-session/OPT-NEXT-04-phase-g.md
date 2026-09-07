@@ -3,7 +3,8 @@
 **Agent**: worker
 **Phase**: OPT-P4-NEXT-SESSION
 **Created**: 2026-09-07 12:30 JST
-**Status**: 🟡 等待 ECS 选型 + 22 domain-identity 联动
+**Status**: 🟢 7/9 done (G.1/3/4-mock/5/6/8/9) | 🟡 2/9 推下 session (G.2 ECS 选型 + G.7 Crash Recovery)
+**Last updated**: 2026-09-07 18:43 JST (Mavis 接手代签, per守门 #10 + 8/27 19:39 JST 授权)
 **Author**: 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签
 
 ---
@@ -27,14 +28,22 @@
 
 ## 2. 依赖 (per SRS-001 G-1~G-9)
 
-| # | 依赖 | 状态 |
-|---|---|---|
-| 1 | L0 SQLite 任务队列 schema (per G-1 PoC) | 🟡 partial (per `68ae5ff` star_context 阶段 1) |
-| 2 | L1 ECS 选型 (bevy_ecs / flecs / 自实现) | 🔴 阻塞 (待 DDD Review 拍板) |
-| 3 | 22 domain-identity 联动 (G-2 实证) | 🟡 partial (per OPT-A1 §3.5 占位) |
-| 4 | LLM/HTTP/MCP Pool 后端 (G-4) | 🟢 凭证 mock 备选 (per `29692a7` + `5ea9611`) |
-| 5 | Tenant Quota schema (G-5) | 🟢 100/100 表 W/T/M 已分类 |
-| 6 | Crash Recovery persistence (G-7) | 🔴 阻塞 (G-DEP-08 PostgreSQL Tier 3 待 5 域 Lead T3) |
+| # | 依赖 | 状态 | 实证 commit (per守门 #12) |
+|---|---|---|---|
+| 1 | L0 SQLite 任务队列 schema (G-1) | 🟢 **done** (star-taskqueue) | `38d417e` (G.1 L0 SQLite WAL + 6 状态机) |
+| 2 | L1 ECS 选型 (G-2) | 🔴 阻塞 (待 DDD Review 拍板, **推下 session**) | — |
+| 3 | 22 domain-identity 联动 (G-2 实证) | 🟡 partial (per OPT-A1 §3.5 占位, 依赖 G-2 选型) | — |
+| 4 | LLM/HTTP/MCP Pool (G-4) | 🟢 mock 备选落地 (per `053e0ec` improve 7 backend error) | `053e0ec` (provider/http_client/in_memory_backend 改进) |
+| 5 | Tenant Quota schema (G-5) | 🟢 **done** (star-quota) | `53becc9` (G.5 3 资源 + SCD Type 2 + 13 類 RLS) |
+| 6 | Crash Recovery persistence (G-7) | 🔴 阻塞 (G-DEP-08 PostgreSQL Tier 3 待 5 域 Lead T3) | — |
+| 7 | EventBus (G-3) | 🟢 **done** (star-eventbus) | `c5a7897` (G.3 EventBus + Mailbox 3 模式) |
+| 8 | Memory Store (G-6) | 🟢 **done** (star-memory) | `82e834b` (G.6 Memory Store 短期/长期 W+T) |
+| 9 | Context Tiering (G-8) | 🟢 **done** (star-context-tiering) | `391e7cf` (G.8 L0/L1/L2 上下文分层) |
+| 10 | Token 计量 telemetry (G-9) | 🟢 **done** (star-telemetry) | `821d702` (G.9 Token 计量 + Prometheus/OTel 导出) |
+
+**完成 commit 总数**: 6 commit (per守门 #20 1 per file group) + 1 merge `c4f991f`
+**测试实证**: 47 tests pass (30 unit + 17 IT)
+**cargo check**: 0 err 1.19s 实证 (per守门 #1 v19)
 
 ## 3. 实施路径
 
@@ -107,9 +116,20 @@ cd D:/Star/.worktrees/wt-opt-phase-g
 
 ECS 选型阻塞 → 报告 + 拍板启动 (per `STAR-P4-OPT-WBS-001.md` §4.2 #5)
 
-## 8. 状态
+## 8. 状态 (更新于 2026-09-07 18:43 JST)
 
-🟡 **推下 session** (ECS 选型 + 22 domain-identity 联动触发, 时间不固定)
+🟢 **主体完成** (7/9 done per commit `c4f991f` merge 14:36 JST):
+- G.1 L0 SQLite 任务队列 → star-taskqueue (`38d417e`)
+- G.3 EventBus + Mailbox → star-eventbus (`c5a7897`)
+- G.4 Shared Pool (mock 备选) → provider/http_client/in_memory_backend (`053e0ec`)
+- G.5 Tenant Quota → star-quota (`53becc9`)
+- G.6 Memory Store → star-memory (`82e834b`)
+- G.8 Context Tiering → star-context-tiering (`391e7cf`)
+- G.9 Token 计量 telemetry → star-telemetry (`821d702`)
+
+🟡 **推下 session** (2/9 阻塞, 等外部拍板):
+- G.2 ECS 选型 — 等 DDD Review 拍板 (bevy_ecs vs flecs vs 自实现)
+- G.7 Crash Recovery — 等 5 域 Lead T3 (~ 2026-09-26 JST) + ADR-0047 PostgreSQL Tier 3 启动 (per G-DEP-08 拍板)
 
 ## 9. 引用
 
