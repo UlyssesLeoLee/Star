@@ -30,13 +30,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # HTTP server (跟 star-mcp / star-api-rest 同版本)
 axum = "0.8"
-tower = { version = "0.5", features = ["util"] }
 
 # Async trait for ops_ai::AiChannel
 async-trait = { workspace = true }
 
-# 跨 crate 复用 (P0-1 联动审计共享 ActorContext, per AGENTS.md §4.2 v16)
-star-context = { path = "../star-context" }
+# star-context ActorContext 复用 — 实装 [M] 子项时启用 (per AGENTS.md §4.2 v16),
+# MVP-骨架阶段不引入 (per SRS-001 §3.2 "不做什么" 缺标比错标安全)
 
 # 实装阶段再引入 (per SRS-001 §10.2)
 # kube = { version = "0.95" }        # K8s client (F-01)
