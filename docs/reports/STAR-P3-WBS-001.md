@@ -557,6 +557,61 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 8. **守门 #1 fmt 1 diff pre-existing** — `domain-comment/src/lib.rs:787` `with_agent_session(true)` 格式微差, H2 v18 阶段 1 落地后 follow-up
 9. **deliverables/kanban-vmodel-jp/server.log.err 持久 file lock** — `skip-worktree` 临时绕过, 真因 (node/next dev server 句柄) 跨 session 续查
 10. **5 wt 落地后 fmt diff 未修** — 子项 3 (D.6) 子代理 cargo check 阶段 fmt check 0, 跨 merge 后 main 上 domain-comment 1 diff 暴露 H2 v18 follow-up, 子项 3 scope 不覆盖 (per 子代理 brief 限定), H2 phase 2 跨 session 续
+11. **Star 排他与幂等架构 view (Star-EI) 8 子项 plan 状态** — 拍板 + IPA 3 文档 v1.0 + ADR-0048 v1.0 + PHASE report v0.1 全部落档 (per commit `dab77f1` + `8165f7e`, 9/7 推 origin 完成), 实施进入"装装"阶段需 5 域 Lead 真人 T3 至少 1 人到位 (per 守门 #14 v2 拍板 D 维持), 跨 session 续
+
+### 14.9 Star 排他与幂等架构 view (Star-EI) 8 子项实施 (per 2026-09-07 20:45 JST 用户发令 + 9/7 20:55 JST `ask_37d138ffb93a12279b35a46e` 4 推荐项拍板)
+
+> **触发**: 2026-09-07 20:45 JST Ulysses 指令"多用户、多agent的排他和幂等设计要做到位, 专门制作一套架构view, 用于排他设计, 需求文档和基本设计以及详细设计按部就班制作出来" + 9/7 21:08 JST 指令"包括此功能在内的后续开发计划更新进wbs"
+>
+> **范围**: 新建独立架构 view `2026-09-07-exclusion-idempotency/`, 跟 `2026-09-03-langgraph/` + `2026-09-03-agent-runtime/` 平行 + 互补, 专门处理"多用户 + 多 agent"竞争场景下的排他 (exclusion) 与幂等 (idempotency).
+>
+> **4 拍板项** (per `ask_37d138ffb93a12279b35a46e`):
+> - D-01 锁服务 = PostgreSQL advisory lock (跟 ADR-0047 PG checkpointer Tier 3 共享, 0 额外组件)
+> - D-02 幂等键 = 双键 (client_uuid + business_hash, 缺失自动 fallback)
+> - D-03 跨层架构 = 4 层 (UI / L0 TopAgent / L1 SubAgent / Domain 22 crate) 全栈
+> - D-04 view 命名 = `2026-09-07-exclusion-idempotency/`
+>
+> **落档 commit**: `dab77f1` (ADR-0048 + IPA 3 文档, 4 files +2975 行) + `8165f7e` (PHASE report v0.1, 1 file +205 行), 9/7 推 origin 完成 (per 守门 #1 反转 2026-08-30 07:09 JST)
+>
+> **守门合规** (per `docs/architecture/2026-09-07-exclusion-idempotency/03-detailed-design.md` §5):
+> - 5 张新表 100% 覆盖 (3 T + 1 T archive + 1 M) per 守门 #13 a/c/d
+> - RLS 13 类 100% 必携 (per 守门 #13 c)
+> - audit trigger 100% 必携 (per 守门 #13 d + ADR-0043 WORM)
+> - exclusion_policy_master SCD Type 2 (per 守门 #13 c)
+> - 守门 #13 a L0 协调 L1↔L1 (L2 SubAgent 不能直接调 L3 Domain 互抢, 必须经 L1 TopAgent 派发)
+>
+> **8 子项** (per `PHASE-EXCLUSION-IDEMPOTENCY-IMPL-REPORT.md` v0.1 §1.1):
+
+| # | 子项 | 内容 | token 估 | 软参考周 | 依赖 | 状态 | 自动化档 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| **EX-01** | 5 张新表 DDL + RLS 13 类 | idempotency_keys (T) / lease_log (T) / advisory_lock_audit (T) / idempotency_keys_archive (T) / exclusion_policy_master (M, SCD Type 2) + RLS 13 类 + audit trigger | **~0.2M** | **0.03 周** | 5 域 Lead 到位 | 🟡 **plan** | **[M]** `schema_migration.py` | `docs/migrations/2026-09-07-exclusion-rls.sql` + `2026-09-07-audit-trigger.sql` |
+| **EX-02** | star-mutex 共享 crate (Rust) | `crates/star-mutex/` 5 module (M-08 DomainMutex / M-09 StarMutexAdapter / M-10 LockAuditLogger / M-11 ExclusionPolicyLoader / M-12 TraceIdPropagator) + 2 module (M-13 VersionCAS / M-14 PgAdvisoryLock) + 1 proc-macro | **~0.3M** | **0.05 周** | EX-01 | 🟡 **plan** | **[M]** `rust_module_gen.py` | 22 domain crate 通过 `domain_mutex` proc-macro 接入 |
+| **EX-03** | L0 DispatchLockManager (Python) | `scripts/automation/exclusion/dispatch_lock.py` + `idempotency_key_store.py` + 双键 dedup | **~0.3M** | **0.05 周** | EX-01 | 🟡 **plan** | **[P]** `subagent_dispatcher.py` | per 守门 #19 Python 化 + #9 v3 |
+| **EX-04** | L1 SubAgentLock (Python) | `scripts/automation/exclusion/subagent_lock.py` + `lock_watcher.py` + lease + heartbeat 30s | **~0.3M** | **0.05 周** | EX-01 | 🟡 **plan** | **[P]** `subagent_dispatcher.py` | per 守门 #19 + #9 v3 |
+| **EX-05** | UI IdempotencyManager (TypeScript) | `frontend/src/lib/exclusion/{idempotency,lock_status,trace_propagator,business_hash}.ts` + 3 component (LockStatusBadge / LockStatusPanel / LockConflictToast) | **~0.2M** | **0.03 周** | EX-03 | 🟡 **plan** | **[M]** `frontend_module_gen.py` | gm-console AppShell 集成 |
+| **EX-06** | star-mcp 16 tool 幂等改造 (Rust) | `crates/star-mcp/src/middleware/idempotency.rs` + 16 tool 加 Idempotency-Key 解析 + 写 idempotency_keys 表 | **~0.4M** | **0.07 周** | EX-02 + EX-03 | 🟡 **plan** | **[M]** `mcp_idem_wrapper.py` | 跟 ADR-0032 MCP Transport stdio 一致 + 16 tool RACI 5 域分摊待拍 |
+| **EX-07** | 4 层统一可观测性 (Python) | `scripts/automation/exclusion/lock_metric_exporter.py` (5 Prometheus 指标) + `lock_leak_alerter.py` (24h 1h 阈值) + `archive_cron.py` (24h 归档) + `console_server.py` 扩展 `/api/exclusion/*` 8 端点 | **~0.3M** | **0.05 周** | EX-01..EX-06 | 🟡 **plan** | **[P]** `metrics_exporter.py` | per 守门 #22 控制台不污染 main + #23 AI mock |
+| **EX-08** | 集成测试 + 性能压测 (Py + Rust + TS) | 18 UT + 8 IT + 12 E2E (S-01..S-08 8 想定シナリオ + 4 跨层) + S-08 1000 并发压测 + 守门 #1 4 步实证 (check/fmt/clippy/test --workspace) | **~0.3M** | **0.05 周** | EX-01..EX-07 | 🟡 **plan** | **[P]** `e2e_runner.py` | 守门 #1 v25 cargo test 跳过 workspace, 单 crate 测 |
+| **小计** | | **5 表 + 18 组件 + 6 协议 + 38 测试** | **~2.3M** | **~0.38 周** | — | **0/8 plan** | **3 [P] / 4 [M] / 0 [S] / 0 共享** | 触发条件: 5 域 Lead T3 至少 1 人到位 (per 守门 #14 v2 拍板 D 维持) |
+
+**8 缺口 (per `PHASE-EXCLUSION-IDEMPOTENCY-IMPL-REPORT.md` v0.1 §3 G-EI-01..G-EI-08, 缺标比错标)**:
+- G-EI-01: 5 域 Lead 真人未到位, 实施进入"装装"阶段触发条件需 DDD Review Lead 拍板
+- G-EI-02: PG 跨 cluster 锁不支持 (备选 D-01 v2 = Etcd 引入)
+- G-EI-03: 锁 schema 演进走 DDD Review 拍板, 5 张新表 DDL 需 PG 容量规划
+- G-EI-04: 双键 dedup 业务主键 hash 算法版本兼容 (e.g. work_item 主键从 UUID 改 (tenant, work_id) 复合)
+- G-EI-05: 锁泄漏告警阈值 (24h 1h) 需 SRE Lead 拍板
+- G-EI-06: 锁 metric 5 项 + Grafana dashboard 需 SRE Lead 评审
+- G-EI-07: 16 tool 幂等改造涉及 5 域 Lead RACI 责任分配
+- G-EI-08: 排他/幂等 view 跟 LangGraph / Agent Runtime 集成点 (e.g. 16 tool 幂等跟 Agent Runtime LLM/HTTP/MCP 池调用)
+
+**16 守门** (per `PHASE-EXCLUSION-IDEMPOTENCY-IMPL-REPORT.md` v0.1 §5): #1 4 守门 + #1 v25 cargo test 跳过 workspace + #5/#6/#7 + #9 v3 子代理走 subprocess + #10 author=Ulysses + #11 缺标比错标 + #12 AI 协作文档治理 + #13 W/T/M 严格分类 + #13 a L0 协调 + #13 c Master 100% RLS + #13 d Transaction 100% audit + #14 v2 5 域 Lead 临时代签 + #15 守门 #12 死循环饱和 + #19 Python 化 + #22 控制台不污染 main + #23 AI mock
+
+**跟现有 view 关系**:
+- **跟 LangGraph view (per ADR-0046)**: 平行 + 互补, Star-EI 复用 L0/L1 分层, 但多了 UI 客户端层 + Domain 业务行锁层
+- **跟 Agent Runtime view (per ADR-0045)**: 平行 + 互补, 不依赖 Agent Runtime, 但 16 tool 幂等改造 (EX-06) 跟 Agent Runtime 共享 LLM/HTTP/MCP 池调用
+- **跟 ADR-0047 PG Checkpointer Tier 3**: 共享同一 PG, 锁服务 `pg_try_advisory_xact_lock` 跟 checkpointer 事务隔离 (锁在事务内, checkpointer 跨事务)
+- **跟 ADR-0030 Agent Lease/Heartbeat/Resume**: 共享 lease 语义, 但 Star-EI 多了 4 层责任矩阵 + 5 张新表
+- **跟守门 #13 W/T/M 派生规**: 5 张新表 100% 覆盖 (3 T + 1 T archive + 1 M), 禁止混在一括列举
 
 ---
 
@@ -575,9 +630,10 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | **P3 之外 H2 范围扩量** | 5 子项 (per §14.2) | ~3.8M | ~0.63 周 | 🟡 1/5 阶段 1 + 3/5 H2-EXT + 1 阻塞 (强类型) |
 | **P3 之外 DB W/T/M 横展開** | 6 派生守门 (per §14.3) | 持续验证 | 持续 | 🟢 6/6 持续验证 |
 | **P3 之外 5 wt 并行 (9/1 22:30 JST 选项 4)** | 5 子项 (DB 审计 + B.2 Hermes + D.6 CI + AGENTS v0.31 + P1-P9 验证) | ~2.3M | ~1.9 周 | 🟢 4/5 收官 + 1/5 FAIL (P1-P9 task schema 结构性, 守门 #13 适用边界 DDD Review 待拍) |
-| **合计** | **96 子项** (含 H2 + 行业预设 + 5 wt 并行) | **~198.3M** | **~33 周** | **82/96 实质收官 (85.4%) + 14 阻塞/待拍** |
+| **P3 之外 Star 排他/幂等 view (9/7 20:45 JST 拍板)** | 8 子项 (EX-01..EX-08, 5 表 + 18 组件 + 6 协议 + 38 测试) | ~2.3M | ~0.38 周 | 🟡 0/8 plan (拍板 + IPA 3 文档 + ADR-0048 + PHASE report 全部落档, 实施待 5 域 Lead 真人到位, per 守门 #14 v2 拍板 D 维持) |
+| **合计** | **104 子项** (含 H2 + 行业预设 + 5 wt 并行 + Star-EI) | **~200.6M** | **~33.4 周** | **82/104 实质收官 (78.8%) + 22 阻塞/待拍** |
 
-**注**: 200M 软预算 vs ~198.3M 实证, 余 1.7M 缓冲 (per 余量 2% 守门边界)。
+**注**: 200M 软预算 vs ~200.6M 实证, 超出 0.6M (0.3%), per 余量 2% 守门边界仍在绿区; Star-EI 0.38 周 软参考周吸收自 P3-F / P3-E 余量, 不增加新预算.
 
 ---
 
@@ -591,6 +647,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | v0.4 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 5 wt 并行收官后增量回填: 4/5 子项 🟢 (DB 100% 表 818706e + D.6 CI 7 job f4fd1c2 + AGENTS v0.31 287d9a0 + B.2 Hermes 696e274 57/57 test) + 1/5 子项 ❌ (P1-P9 task schema 0/147 = 0% 标 887ff3c 守门 #13 适用边界 DDD Review 拍板) + §15 累计 96 子项 82/96 实质收官 (85.4%) + §14.8 新增 (5 wt 收官实证段) | 2026-09-01 22:30 JST Ulysses "开子代理和 worktree 并行处理 wbs 任务" 触发 |
 | v0.5 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 5 wt 收官后 4 项拍板落地: (1) 强类型 ID 选项 1 全量 Uuid 强类型 2.5M / 0.4 周 启 H2-2/H2-4/H2-5; (2) 5 域 Lead 真人 选项 2 Mavis 内部代签 临时, 跨 session 续找真人追溯签字 (per 8/27 19:39 JST 用户授权); (3) 守门 #13 适用边界 选项 1 仅 Backend PG (INVENTORY 100/100 PASS), task schema 保持现状, 子项 5 FAIL 结论"结构性 NOT in scope"; (4) 推 origin 选项 1 现在推 main (55 ahead, ae03b74) + H2 强类型优先 9/2 9:00 JST 启 wt | 2026-09-01 23:59 JST Ulysses 4 项拍板全收触发 |
 | v0.6 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **agent 交互 Python 化** (per `docs/automation-design.md` v0.1 + 9/2 00:39 JST 拍板): §1-§5 + §14.2 任务卡加"自动化档"列 ([P]/[M]/[S]), 4 维打分 (Rerunnable / Volume / Structural / Audit-trail); §7.1 自动化档汇总 20 [P] / 6 [M] / 17 [S] / 20 共享脚本; §8 守门规则新增 #6 "任务卡自动化档强制落档"; 引用 `docs/automation-design.md` v0.1 + `scripts/automation/` 8 份基类骨架 (dispatcher / cli_helper / refactor_template / judge / smoke_test / registry_check + 2 __init__); 守门 #1 v19 + #9 v2 + #12 v2 派生规 (本文件落档后追加 AGENTS.md) | 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题" + 拍板 (范围=全 3 类 / 维度=R+V+S+A / 落档=新建 docs/automation-design.md + scripts/automation/) |
+| v0.7 | 2026-09-07 | 架构师 (Mavis 接手 agent per DEC-008) | **§14.9 Star 排他与幂等架构 view (Star-EI) 8 子项实施** (per 9/7 20:45 JST 用户发令"多用户、多agent的排他和幂等设计要做到位" + 9/7 21:08 JST 指令"包括此功能在内的后续开发计划更新进wbs" + 9/7 20:55 JST `ask_37d138ffb93a12279b35a46e` 4 推荐项拍板): 新增 §14.9 (8 子项 EX-01..EX-08, ~2.3M tokens / ~0.38 周, 3 [P] / 4 [M] / 0 [S] 自动化档, 16 守门, 8 缺口 G-EI-01..G-EI-08, 拍板 + IPA 3 文档 v1.0 + ADR-0048 v1.0 + PHASE report v0.1 全部落档 commit `dab77f1` + `8165f7e` 9/7 推 origin 完成, 0/8 plan 实施待 5 域 Lead T3 至少 1 人到位 per 守门 #14 v2 拍板 D 维持); §14.7 已知缺口 #11 新增; §15 累计 96 → 104 子项 + 198.3M → 200.6M (超 0.3% 仍在余量 2% 绿区) + 82/96 → 82/104 实质收官 85.4% → 78.8% + 14 → 22 阻塞/待拍; 引用 4 拍板项 (D-01 PG advisory / D-02 双键 / D-03 4 层 / D-04 view 名) + 5 张新表 W/T/M 严格 + 跟 LangGraph/Agent Runtime/ADR-0047/ADR-0030/守门 #13 关系 | 2026-09-07 21:08 JST 用户指令"包括此功能在内的后续开发计划更新进wbs" 触发 |
 
 ---
 
