@@ -66,7 +66,7 @@ impl Resource for WorktreeHandler {
         let svc = self.service();
         // handler 简化: actor.tenant_id = nil → CrossTenantDenied → None
         // (真实 production 需 URI 改 2 段承载 tenant, 与 B.2.5 workspace 同模式)
-        let actor = ActorContext::new(uuid::Uuid::nil(), uuid::Uuid::new_v4());
+        let actor = ActorContext::nil_actor_with_tenant(uuid::Uuid::new_v4());
         match svc.get_by_id(wt_id, &actor).await {
             Ok(w) => Ok(Some(WorktreeData {
                 worktree_id: w.id.to_string(),
@@ -112,7 +112,7 @@ mod tests {
         let h = WorktreeHandler::new();
         let svc = h.service();
         let tid = uuid::Uuid::new_v4();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid).with_role("developer");
+        let actor = ActorContext::nil_actor_with_tenant(tid).with_role("developer");
         let cmd = CreateWorktreeCommand {
             tenant_id: domain_worktree::TenantId(tid),
             project_id: domain_worktree::ProjectId::new(),
@@ -125,7 +125,7 @@ mod tests {
         };
         let created = svc.create_worktree(cmd, &actor).await.unwrap();
         // service roundtrip (handler 简化设计: 跨 tenant 拒绝 → None)
-        let actor2 = ActorContext::new(uuid::Uuid::nil(), tid);
+        let actor2 = ActorContext::nil_actor_with_tenant(tid);
         let fetched = svc.get_by_id(created.id, &actor2).await.unwrap();
         assert_eq!(fetched.id, created.id);
         assert!(fetched.branch.starts_with("feature/b2.6-"));

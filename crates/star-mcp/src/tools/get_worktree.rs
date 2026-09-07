@@ -40,7 +40,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
     let worktree_id = WorktreeId::from(wt_uuid);
 
     // handler 简化:nil tenant actor 触发跨 tenant 拒绝 → validation "not found"
-    let actor = ActorContext::new(uuid::Uuid::nil(), uuid::Uuid::new_v4());
+    let actor = ActorContext::nil_actor_with_tenant(uuid::Uuid::new_v4());
 
     let wt = service()
         .get_by_id(worktree_id, &actor)

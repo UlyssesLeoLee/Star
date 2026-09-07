@@ -41,7 +41,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
     let ws_id = WorkspaceId::from(ws_uuid);
 
     // handler 简化: nil tenant actor 触发跨 tenant 拒绝 → validation "not found"
-    let actor = ActorContext::new(uuid::Uuid::nil(), uuid::Uuid::new_v4());
+    let actor = ActorContext::nil_actor_with_tenant(uuid::Uuid::new_v4());
 
     let ws = service()
         .get_by_id(ws_id, actor)

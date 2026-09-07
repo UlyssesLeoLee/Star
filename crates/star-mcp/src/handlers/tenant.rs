@@ -59,7 +59,7 @@ impl Resource for TenantHandler {
             uuid::Uuid::parse_str(id).map_err(|e| ResourceError::InvalidUri(e.to_string()))?,
         );
         let svc = self.service();
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid.as_uuid());
+        let actor = ActorContext::nil_actor_with_tenant(tid.as_uuid());
         match svc
             .get_tenant(GetTenantQuery { tenant_id: tid }, &actor)
             .await
@@ -105,7 +105,10 @@ mod tests {
             display_name: "Acme Corp".into(),
             plan_tier: PlanTier::Pro,
         };
-        let actor = ActorContext::new(uuid::Uuid::nil(), tid);
+        // B.2 修法: 用有效 user_id + is_platform_admin (不用 Uuid::nil(), 触发 INV-ACT-01 panic)
+        // per domain-tenant create_tenant requires is_platform_admin
+        let mut actor = ActorContext::new(uuid::Uuid::new_v4(), tid);
+        actor.is_platform_admin = true;
         let created = svc.create_tenant(cmd, &actor).await.unwrap();
         // 通过 handler 读回
         let d = h.read(&created.id.to_string()).await.unwrap().unwrap();

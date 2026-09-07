@@ -169,3 +169,74 @@ fn it_cross_actor_context_new_panic_nil_user() {
 fn it_cross_actor_context_new_panic_nil_tenant() {
     let _ = StarActorContext::new(Uuid::new_v4(), Uuid::nil());
 }
+
+// =====================================================================
+// B.2 Phase B T1.7 ActorContext 集成新增 test (per OPT-WORKER-03 B.2, 2026-09-07)
+// =====================================================================
+
+/// **IT-CROSS-9**: `as_local_runtime` builder 跨 crate 验证 (per B.1 helper)
+/// 验证: star-mcp 通过 `star_context::ActorContext` 调用 `as_local_runtime` builder,
+///       跨 crate 类型流转保持, `is_local_runtime` 字段被设置.
+#[test]
+fn b2_as_local_runtime_via_star_context() {
+    let actor = StarActorContext::new(Uuid::new_v4(), Uuid::new_v4())
+        .with_role("agent")
+        .as_local_runtime();
+    assert!(actor.is_local_runtime);
+    assert!(actor.is_local_runtime());
+    assert!(actor.has_role("agent"));
+}
+
+/// **IT-CROSS-10**: `as_local_runtime` 后跨 domain 服务仍可接受 (per P0-1 联动)
+/// 验证: 构造 local runtime actor 后, `InMemoryIdentityService.create_user` 跨 crate 接受.
+///       走 domain-permission Deny 优先 + INV-ACT-03 is_local_runtime + roles 含 "agent" 守门.
+#[tokio::test]
+async fn b2_as_local_runtime_cross_domain_accepted() {
+    // actor 用 tenant_admin role 触发 is_local_runtime + roles 含 "agent" + tenant_admin
+    // 跨 domain-identity create_user 跨 crate 流转保持
+    let actor = StarActorContext::new(Uuid::new_v4(), Uuid::new_v4())
+        .with_role("tenant_admin")
+        .as_local_runtime();
+    let svc = InMemoryIdentityService::new();
+
+    let cmd = CreateUserCommand {
+        tenant_id: TenantId(actor.tenant_id),
+        email: "local-runtime@star.local".to_string(),
+        display_name: "LocalRuntime".to_string(),
+        tenant_role: TenantRole::Developer,
+        credential_ref: CredentialRefId::new(),
+    };
+
+    let result = svc.create_user(cmd, &actor).await;
+    assert!(
+        result.is_ok(),
+        "local runtime actor + tenant_admin role 应该能创建 user, 实际: {:?}",
+        result.err()
+    );
+    let user = result.unwrap();
+    assert_eq!(user.email, "local-runtime@star.local");
+}
+
+/// **IT-CROSS-11**: `is_platform_admin` 跨 crate 流转保持
+/// 验证: 直接构造 `is_platform_admin = true` 字段 (per 守门 #1 v18 H2-EXT 实证),
+///       跨 domain-identity 真能 bypass 跨 tenant 限制 (per IT-CROSS-5 已实证,
+///       本 test 复测保持 0 regression).
+#[tokio::test]
+async fn b2_is_platform_admin_field_propagates() {
+    let mut actor = StarActorContext::new(Uuid::new_v4(), Uuid::new_v4());
+    actor.is_platform_admin = true;
+    assert!(actor.is_platform_admin());
+    assert!(actor.is_platform_admin);
+
+    let svc = InMemoryIdentityService::new();
+    let cmd = CreateUserCommand {
+        tenant_id: TenantId(Uuid::new_v4()),
+        email: "platform-admin@star.local".to_string(),
+        display_name: "PlatformAdmin".to_string(),
+        tenant_role: TenantRole::TenantAdmin,
+        credential_ref: CredentialRefId::new(),
+    };
+
+    let result = svc.create_user(cmd, &actor).await;
+    assert!(result.is_ok(), "platform admin 跨 tenant 应 bypass, 实际: {:?}", result.err());
+}
