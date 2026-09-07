@@ -1,6 +1,6 @@
 # ADR-0047: Star LangGraph PostgreSQL Checkpointer Tier 3 (Production)
 
-> **状态**：🟡 Draft v0.1 (per 2026-09-05 10:58 JST G-DEP-08 拍板落地)
+> **状态**：🟢 Accepted v0.2 (per 2026-09-07 14:30 JST OPT-NEXT-08 拍板, 守门 #12 docs 触发 + 守门 #10 author=Ulysses) (per 2026-09-05 10:58 JST G-DEP-08 拍板落地)
 > **日期**：2026-09-05
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **签批**：🟢 Mavis 接手终审（per 2026-08-27 19:39 + 21:59 JST 用户授权"允许你代签"）
@@ -270,6 +270,35 @@ per [PHASE v0.3.1 §3.3 G-DEP-08 跨 session 续](../../../reports/PHASE-LANGGRA
 
 ---
 
+
+
+---
+
+## 5.5. 实施状态 (per OPT-NEXT-08 v0.2 拍板, 守门 #12 docs 触发)
+
+> **本节由 OPT-NEXT-08 (2026-09-07 14:30 JST) 升版 v0.1 → v0.2 时落地, 提供实施证据链**
+
+| 维度 | 内容 |
+|---|---|
+| **决策 scope** | PostgreSQL Checkpointer Tier 3 (Production) |
+| **目标 crate / 落地位置** | `PostgresCheckpointer wrapper (待 5 域 Lead 真人 T3 到位装装)` |
+| **落地 commit (per `git log -p --follow`)** | 无 commit (等 5 域 Lead T3 到位 启动 E-1) |
+| **守门 #1 v19** | `cargo check --workspace --all-targets -j 4` 0 err 32.27s (per 9/3 RF-001 T1.5 step 1 验证) |
+| **守门 #3 v2** | Mavis 临时代签 5 域 Lead 决策 (per 9/3 11:35 JST 拍板 B), author=Ulysses (per 守门 #10) |
+| **守门 #4.2** | Runtime 名称实装前一致性门 — 本 ADR 落档即满足"概念→物理 crate"映射, 后续实装前必先 ADR 拍板 |
+| **守门 #10** | commit author = `Ulysses <ulysses@mavis.local>` (per 8/27 19:39 JST + 21:59 JST 三次强化) |
+| **守门 #12** | docs 同步 = 实施前 git log --follow 实证; 缺标比错标安全 (per 8/26 JST) |
+| **守门 #13 W/T/M** | 本 ADR 不涉及 DB schema 分类 (架构原则 / 决策类), 不触发 W/T/M 横展開 |
+| **守门 #14 v2** | 5 域 Lead CONTENT 4 维 (决策 scope / RACI / 到位 timeline / Mavis 代签边界) 已显式列出 (per 9/3 19:43 JST) |
+
+**实施完成度**:
+- ✅ ADR 决策本身落地 (本节"决策"内容)
+- ⏳ 后续实装 = 等 P3-B/F/H 拍板启动 + 5 域 Lead 真人到位 (per ADR §"签字栏" DDD Review 阶段补)
+
+**已知缺口 (per 守门 #11 缺标比错标)**:
+- 5 域 Lead 真人到位前, 实施由 Mavis 临时代签 (per 9/3 11:35 JST 拍板 B), 真人到位后追溯签字
+- 本 ADR 实施状态只反映 commit / 守门 0 违反 实证, 不反映 22 domain 业务实装进展 (per P3-A H2 阶段 11/25 实证)
+
 ## 10. 签字栏 (per 守门 #10 + 8/27 19:39/21:59 JST 三次强化 + 9/3 19:35 JST 拍板 D 维持)
 
 | # | 角色 | 姓名 | 签字日 | 结论 |
@@ -288,4 +317,5 @@ per [PHASE v0.3.1 §3.3 G-DEP-08 跨 session 续](../../../reports/PHASE-LANGGRA
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v0.2 | 2026-09-07 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | OPT-NEXT-08 升版 v0.1 → v0.2: 新增 §5.5 实施状态 (scope/crate/commit/守门 0 违反 实证) + 修订历史 v0.2 行 (per 守门 #10 author=Ulysses + 守门 #12 docs 触发 + 守门 #11 缺标比错标) | 2026-09-07 14:30 JST OPT-NEXT-08 拍板, 23 草案 ADR 一次性升版 |
 | v0.1 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: PostgreSQL Checkpointer Tier 3 (production) 设计 (per 2026-09-05 10:58 JST `ask_4f3523425caaa325695be6bd` G-DEP-08 拍板推荐项): 5 张表 schema (per 守门 #13 W/T/M 严格分类, 4 Transaction + 1 Master) + PostgresCheckpointer wrapper (per 03 §1.1 M-25) + 12 Reducer channel 跨 Tier 序列化 + TMO 7 节点整合 (M-N1..M-N7) + 5 域 RACI 边界 + 5 阶段装装拆解 (E-1..E-5, 估 ~1.0-1.5M token) + 10 已知缺口 (per 缺标比错标) + 14 守门合规 + 5 签字栏 (Mavis 接手代签); 启动条件 = 5 域 Lead 真人 T3 至少 1 人到位 (2026-09-26 ~ 2026-10-17 JST); 关联: PHASE v0.3.1 §3.3 G-DEP-08 跨 session 续 + 5-business-domain-lead-referral.md v0.1 G-DEP-03 拍板落地 | G-DEP-08 prep work (per 9/1 14:58 JST 拍板决策必须用选项, Q1 选项 1 推荐项) |

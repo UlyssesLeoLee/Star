@@ -1,6 +1,6 @@
 # ADR-0038: Phase I Production Rollout 架构
 
-> **状态**：Draft v0.1
+> **状态**：🟢 Accepted v0.2 (per 2026-09-07 14:30 JST OPT-NEXT-08 拍板, 守门 #12 docs 触发 + 守门 #10 author=Ulysses)
 > **日期**：2026-08-28
 > **修订人**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手代签
 > **审批**：架构师（Mavis 接手 agent per DEC-008）
@@ -71,6 +71,35 @@ Phase I 完成后 Star production ready:
 
 MVP v1 production → Phase J = business rollout (客户接入 + 培训)
 
+
+
+---
+
+## 5.5. 实施状态 (per OPT-NEXT-08 v0.2 拍板, 守门 #12 docs 触发)
+
+> **本节由 OPT-NEXT-08 (2026-09-07 14:30 JST) 升版 v0.1 → v0.2 时落地, 提供实施证据链**
+
+| 维度 | 内容 |
+|---|---|
+| **决策 scope** | Phase I 架构 (production rollout + K8s + 监控 SLA) |
+| **目标 crate / 落地位置** | `star-* (production)` |
+| **落地 commit (per `git log -p --follow`)** | 无 commit (Phase I 等 MVP v1 ready) |
+| **守门 #1 v19** | `cargo check --workspace --all-targets -j 4` 0 err 32.27s (per 9/3 RF-001 T1.5 step 1 验证) |
+| **守门 #3 v2** | Mavis 临时代签 5 域 Lead 决策 (per 9/3 11:35 JST 拍板 B), author=Ulysses (per 守门 #10) |
+| **守门 #4.2** | Runtime 名称实装前一致性门 — 本 ADR 落档即满足"概念→物理 crate"映射, 后续实装前必先 ADR 拍板 |
+| **守门 #10** | commit author = `Ulysses <ulysses@mavis.local>` (per 8/27 19:39 JST + 21:59 JST 三次强化) |
+| **守门 #12** | docs 同步 = 实施前 git log --follow 实证; 缺标比错标安全 (per 8/26 JST) |
+| **守门 #13 W/T/M** | 本 ADR 不涉及 DB schema 分类 (架构原则 / 决策类), 不触发 W/T/M 横展開 |
+| **守门 #14 v2** | 5 域 Lead CONTENT 4 维 (决策 scope / RACI / 到位 timeline / Mavis 代签边界) 已显式列出 (per 9/3 19:43 JST) |
+
+**实施完成度**:
+- ✅ ADR 决策本身落地 (本节"决策"内容)
+- ⏳ 后续实装 = 等 P3-B/F/H 拍板启动 + 5 域 Lead 真人到位 (per ADR §"签字栏" DDD Review 阶段补)
+
+**已知缺口 (per 守门 #11 缺标比错标)**:
+- 5 域 Lead 真人到位前, 实施由 Mavis 临时代签 (per 9/3 11:35 JST 拍板 B), 真人到位后追溯签字
+- 本 ADR 实施状态只反映 commit / 守门 0 违反 实证, 不反映 22 domain 业务实装进展 (per P3-A H2 阶段 11/25 实证)
+
 ## §9 签字栏
 | 角色 | 姓名 | 签字日 | 结论 |
 |------|------|--------|------|
@@ -84,6 +113,7 @@ MVP v1 production → Phase J = business rollout (客户接入 + 培训)
 ## §10 修订历史
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |------|------|--------|----------|------|
+| v0.2 | 2026-09-07 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | OPT-NEXT-08 升版 v0.1 → v0.2: 新增 §5.5 实施状态 (scope/crate/commit/守门 0 违反 实证) + 修订历史 v0.2 行 (per 守门 #10 author=Ulysses + 守门 #12 docs 触发 + 守门 #11 缺标比错标) | 2026-09-07 14:30 JST OPT-NEXT-08 拍板, 23 草案 ADR 一次性升版 |
 | v0.1 | 2026-08-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：5 决策 D21-D25 + 12 域 Lead + token-OLU 12-19M | ADR-0037 §8 Phase I |
 
 ## §11 引用文档

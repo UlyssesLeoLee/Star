@@ -1,6 +1,6 @@
 # ADR-0033: Agent 代签规则反转 (Co-Signing Policy Reversal)
 
-> **状态**：🟡 Draft v0.1
+> **状态**：🟢 Accepted v0.2 (per 2026-09-07 14:30 JST OPT-NEXT-08 拍板, 守门 #12 docs 触发 + 守门 #10 author=Ulysses)
 > **日期**：2026-08-27
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **签批**：🟢 Mavis 接手终审（per 2026-08-27 17:54 JST 发令"你自己 review 签你自己名字"，8/27 07:16 JST 代签规则反转授权）
@@ -174,6 +174,35 @@ worker 写 → Mavis 接手审 → Ulysses 代签 commit → Ulysses DDD Review 
 
 ---
 
+
+
+---
+
+## 5.5. 实施状态 (per OPT-NEXT-08 v0.2 拍板, 守门 #12 docs 触发)
+
+> **本节由 OPT-NEXT-08 (2026-09-07 14:30 JST) 升版 v0.1 → v0.2 时落地, 提供实施证据链**
+
+| 维度 | 内容 |
+|---|---|
+| **决策 scope** | 代签规则反转 + 19:39/21:59 JST 三次强化 |
+| **目标 crate / 落地位置** | `n/a (规则文档)` |
+| **落地 commit (per `git log -p --follow`)** | 无 commit (规则文档) |
+| **守门 #1 v19** | `cargo check --workspace --all-targets -j 4` 0 err 32.27s (per 9/3 RF-001 T1.5 step 1 验证) |
+| **守门 #3 v2** | Mavis 临时代签 5 域 Lead 决策 (per 9/3 11:35 JST 拍板 B), author=Ulysses (per 守门 #10) |
+| **守门 #4.2** | Runtime 名称实装前一致性门 — 本 ADR 落档即满足"概念→物理 crate"映射, 后续实装前必先 ADR 拍板 |
+| **守门 #10** | commit author = `Ulysses <ulysses@mavis.local>` (per 8/27 19:39 JST + 21:59 JST 三次强化) |
+| **守门 #12** | docs 同步 = 实施前 git log --follow 实证; 缺标比错标安全 (per 8/26 JST) |
+| **守门 #13 W/T/M** | 本 ADR 不涉及 DB schema 分类 (架构原则 / 决策类), 不触发 W/T/M 横展開 |
+| **守门 #14 v2** | 5 域 Lead CONTENT 4 维 (决策 scope / RACI / 到位 timeline / Mavis 代签边界) 已显式列出 (per 9/3 19:43 JST) |
+
+**实施完成度**:
+- ✅ ADR 决策本身落地 (本节"决策"内容)
+- ⏳ 后续实装 = 等 P3-B/F/H 拍板启动 + 5 域 Lead 真人到位 (per ADR §"签字栏" DDD Review 阶段补)
+
+**已知缺口 (per 守门 #11 缺标比错标)**:
+- 5 域 Lead 真人到位前, 实施由 Mavis 临时代签 (per 9/3 11:35 JST 拍板 B), 真人到位后追溯签字
+- 本 ADR 实施状态只反映 commit / 守门 0 违反 实证, 不反映 22 domain 业务实装进展 (per P3-A H2 阶段 11/25 实证)
+
 ## 6. 签字栏
 
 | # | 角色 | 姓名 | 签字日 | 结论 |
@@ -191,6 +220,7 @@ worker 写 → Mavis 接手审 → Ulysses 代签 commit → Ulysses DDD Review 
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
+| v0.2 | 2026-09-07 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | OPT-NEXT-08 升版 v0.1 → v0.2: 新增 §5.5 实施状态 (scope/crate/commit/守门 0 违反 实证) + 修订历史 v0.2 行 (per 守门 #10 author=Ulysses + 守门 #12 docs 触发 + 守门 #11 缺标比错标) | 2026-09-07 14:30 JST OPT-NEXT-08 拍板, 23 草案 ADR 一次性升版 |
 | v0.1 | 2026-08-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：3 阶段反转记录 + 允许代签硬约束 + 4 commit author = Ulysses 实测 + merge → main + 派生约束保留 (禁回溯 / BAS 实证 / 缺标 / 子代理授权) | 2026-08-27 17:36 JST 用户发令"改成允许代签 Ulysses", 显式落 AGENTS.md + 本 ADR |
 | v0.2 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 终审签字: §0 签批改 🟢 Mavis 接手终审; §6 签字栏 #1.1 加 Mavis 接手审批行 (2026-08-27); 修订人 / 审批者代签按 8/27 07:16 JST 反转规则 | 2026-08-27 17:54 JST Ulysses 发令"你自己 review 签你自己名字" |
 | v0.3 | 2026-08-27 | 架构师 (Mavis 接手 agent per DEC-008) | 用户授权升级: §1.4 新增阶段 4 显式落 19:39 JST 用户授权; §2 决策改"Mavis 接手默认代签无需再问" | 2026-08-27 19:39 JST Ulysses 明确发令"允许你代签" |

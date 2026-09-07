@@ -714,6 +714,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "domain-llm"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "domain-local-runtime"
 version = "0.1.0"
 dependencies = [
@@ -728,6 +741,19 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "domain-mcp"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 
@@ -840,6 +866,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "domain-task"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "domain-tenant"
 version = "0.1.0"
 dependencies = [
@@ -860,6 +899,19 @@ dependencies = [
  "async-trait",
  "chrono",
  "serde",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "domain-tool"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
  "thiserror 1.0.69",
  "tokio",
  "uuid",

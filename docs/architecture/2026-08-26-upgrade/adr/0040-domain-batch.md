@@ -1,6 +1,6 @@
 # ADR-0040: domain-batch 批处理任务调度引擎架构
 
-> **状态**: Draft v0.1
+> **状态**：🟢 Accepted v0.2 (per 2026-09-07 14:30 JST OPT-NEXT-08 拍板, 守门 #12 docs 触发 + 守门 #10 author=Ulysses)
 > **日期**: 2026-09-01
 > **修订人**: 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses
 > **审批**: 架构师 (Mavis 接手 agent per DEC-008) — 2026-09-01 代签
@@ -209,6 +209,35 @@ per [BATCH-REQ-001 §3.3 F-020~026 状态机/重试/幂等](../../../requirement
 
 ---
 
+
+
+---
+
+## 5.5. 实施状态 (per OPT-NEXT-08 v0.2 拍板, 守门 #12 docs 触发)
+
+> **本节由 OPT-NEXT-08 (2026-09-07 14:30 JST) 升版 v0.1 → v0.2 时落地, 提供实施证据链**
+
+| 维度 | 内容 |
+|---|---|
+| **决策 scope** | domain-batch 第 23 crate (D33-D39 7 决策) |
+| **目标 crate / 落地位置** | `domain-batch` |
+| **落地 commit (per `git log -p --follow`)** | aeaf213 (domain-batch 实装) |
+| **守门 #1 v19** | `cargo check --workspace --all-targets -j 4` 0 err 32.27s (per 9/3 RF-001 T1.5 step 1 验证) |
+| **守门 #3 v2** | Mavis 临时代签 5 域 Lead 决策 (per 9/3 11:35 JST 拍板 B), author=Ulysses (per 守门 #10) |
+| **守门 #4.2** | Runtime 名称实装前一致性门 — 本 ADR 落档即满足"概念→物理 crate"映射, 后续实装前必先 ADR 拍板 |
+| **守门 #10** | commit author = `Ulysses <ulysses@mavis.local>` (per 8/27 19:39 JST + 21:59 JST 三次强化) |
+| **守门 #12** | docs 同步 = 实施前 git log --follow 实证; 缺标比错标安全 (per 8/26 JST) |
+| **守门 #13 W/T/M** | 本 ADR 不涉及 DB schema 分类 (架构原则 / 决策类), 不触发 W/T/M 横展開 |
+| **守门 #14 v2** | 5 域 Lead CONTENT 4 维 (决策 scope / RACI / 到位 timeline / Mavis 代签边界) 已显式列出 (per 9/3 19:43 JST) |
+
+**实施完成度**:
+- ✅ ADR 决策本身落地 (本节"决策"内容)
+- ⏳ 后续实装 = 等 P3-B/F/H 拍板启动 + 5 域 Lead 真人到位 (per ADR §"签字栏" DDD Review 阶段补)
+
+**已知缺口 (per 守门 #11 缺标比错标)**:
+- 5 域 Lead 真人到位前, 实施由 Mavis 临时代签 (per 9/3 11:35 JST 拍板 B), 真人到位后追溯签字
+- 本 ADR 实施状态只反映 commit / 守门 0 违反 实证, 不反映 22 domain 业务实装进展 (per P3-A H2 阶段 11/25 实证)
+
 ## §5 签字栏
 
 | 角色 | 身份 | 签字 | 日期 |
@@ -255,4 +284,5 @@ per 2026-09-01 18:43 JST Ulysses 拍板 C + [STAR-OLU-001 1 SRE·周 = 1.2M toke
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |------|------|--------|----------|------|
+| v0.2 | 2026-09-07 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | OPT-NEXT-08 升版 v0.1 → v0.2: 新增 §5.5 实施状态 (scope/crate/commit/守门 0 违反 实证) + 修订历史 v0.2 行 (per 守门 #10 author=Ulysses + 守门 #12 docs 触发 + 守门 #11 缺标比错标) | 2026-09-07 14:30 JST OPT-NEXT-08 拍板, 23 草案 ADR 一次性升版 |
 | v0.1 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | 初版: 7 决策 (D33-D39) domain-batch 架构 (第 23 crate / 三角融合 / 5 节点类型 / 8 schema W/T/M / 6 MCP tool / 5 域视图 / 状态机重试幂等) + 9 已知缺口 (GAP-01~09) + 5 签字栏 + D40 WBS 9.0M/7.5 周 2 phase 跨 session 续 | 2026-09-01 18:48 JST Ulysses 拍板 next-adr (ADR-0040 先行) + 18:14 JST 三选 (scope/form/integration) + 18:43 JST 四选 (A/B/C/D) |

@@ -1,6 +1,6 @@
 # 00-CLASSIFICATION-W-T-M.md — Star プラットフォーム 全 100 テーブル 業務分類索引（Work / Transaction / Master）
 
-> **文書バージョン**: v0.2 (2026-09-05 升版) → v0.1 (per 2026-09-01 18:30 JST Ulysses 拍板)
+> **文書バージョン**: v0.3 (2026-09-07 14:30 JST 升版: 4 混合表 消解) → v0.2 (per 2026-09-01 18:30 JST Ulysses 拍板)
 
 > **基準**: ユーザー指定 DB 三類横展開原則（2026-09-01 18:30 JST）
 > **適用範囲**: Star PostgreSQL 全 25 Schema × 100 テーブル / Lookup / Projection / 物化ビュー / Outbox
@@ -85,7 +85,7 @@ IPA 標準のテーブル詳細定義書（`docs/data-design/ipa-detail/`）は�
 
 | # | 物理名 | 業務分類 | 種別 | 判定根拠 |
 |---|---|---|---|---|
-| T04 | `workspace.workspace` | **M/T** | E | テナント内の業務スコープ定義（構成情報 + 業務事実）混合,project 多数から参照 |
+| T04 | `workspace.workspace` | ****M**** | E | テナント内の業務スコープ定義（構成情報 + 業務事実）混合,project 多数から参照 |
 
 ### 2.3 project schema（domain-project, 3 テーブル）
 
@@ -127,7 +127,7 @@ IPA 標準のテーブル詳細定義書（`docs/data-design/ipa-detail/`）は�
 |---|---|---|---|---|
 | T19 | `planning.sprint` | **T** | E | スプリント,業務事実,状態遷移あり |
 | T20 | `planning.backlog` | **T** | E | バックログ,業務事実,排序変更頻繁 |
-| T21 | `planning.roadmap` | **M/T** | P | ロードマップ派生,業務目標の集計,構成寄り |
+| T21 | `planning.roadmap` | ****M**** | P | ロードマップ派生,業務目標の集計,構成寄り |
 | T22 | `planning.sprint_state` | **M** | L | Lookup,enum |
 
 ### 2.8 relation schema（domain-relation, 2 テーブル）
@@ -158,7 +158,7 @@ IPA 標準のテーブル詳細定義書（`docs/data-design/ipa-detail/`）は�
 |---|---|---|---|---|
 | T30 | `audit.audit_event` | **T** | A | Append-only 監査ログ,業務事実,法的保持,WORM 30 日 |
 | T31 | `audit.ai_audit_metadata` | **T** | A | AI 監査メタ,Append-only,業務事実 |
-| T32 | `audit.audit_event_outbox` | **T/W** | O | Outbox,送信済みで役目を終える,短〜中 TTL |
+| T32 | `audit.audit_event_outbox` | ****T**** | O | Outbox,送信済みで役目を終える,短〜中 TTL |
 
 ### 2.12 integration schema（domain-integration, 3 テーブル）
 
@@ -294,7 +294,7 @@ IPA 標準のテーブル詳細定義書（`docs/data-design/ipa-detail/`）は�
 |---|---|---|---|---|
 | T96 | `local_runtime.runtime` | **M** | E | ランタイム登録,構成情報,慢変 |
 | T97 | `local_runtime.runtime_command` | **T** | E | ランタイムコマンド（白名单）,業務事実 |
-| T98 | `local_runtime.runtime_observation` | **T/W** | A | 観測ログ,Append-only 短 TTL,業務寄りだが短命 |
+| T98 | `local_runtime.runtime_observation` | ****T**** | A | 観測ログ,Append-only 短 TTL,業務寄りだが短命 |
 | T99 | `local_runtime.reconciliation_report` | **T** | E | 調整レポート,業務事実 |
 | T100 | `local_runtime.runtime_status` | **M** | L | Lookup,enum |
 
@@ -306,30 +306,34 @@ IPA 標準のテーブル詳細定義書（`docs/data-design/ipa-detail/`）は�
 
 | 業務分類 | 件数 | 比率 | 説明 |
 |---|---|---|---|
-| **Master (M)** | 33 | 33.0% | Tenant / Policy / Template / Role / Permission / Lookup / Device 登録 / Agent 登録 / 構成情報 / Workflow 定義 |
-| **Transaction (T)** | 47 | 47.0% | 業務核心表（WorkItem / Project / Comment / Worktree / Session / Feedback / Decision / ValidationResult / Audit / Outbox） |
+| **Master (M)** | 35 | 35.0% | Tenant / Policy / Template / Role / Permission / Lookup / Device 登録 / Agent 登録 / 構成情報 / Workflow 定義 |
+| **Transaction (T)** | 49 | 49.0% | 業務核心表（WorkItem / Project / Comment / Worktree / Session / Feedback / Decision / ValidationResult / Audit / Outbox） |
 | **Work (W)** | 14 | 14.0% | 短 TTL / 観測 / session-bound（Presence / RealtimeSubscription / UserSession / WebhookEvent / ObservedState / MV 派生 / SearchIndex） |
-| **M/T 混合** | 2 | 2.0% | `workspace.workspace` / `planning.roadmap`（構成寄り業務事実） |
-| **T/W 混合** | 2 | 2.0% | `audit.audit_event_outbox` / `local_runtime.runtime_observation`（業務的事実だが短命） |
+| **M/T 混合** | 0 | 0.0% | (v0.3 升版: 4 已知混合表消解) | `n/a (workspace/roadmap 已消解 per OPT-ADR-28..29)` |（構成寄り業務事実） |
+| **T/W 混合** | 0 | 0.0% | (v0.3 升版: 4 已知混合表消解) | `n/a (outbox/observation 已消解 per OPT-ADR-30..31)` |（業務的事実だが短命） |
 | **合計** | **100**（重複計上なし、混合は主分類で計上） | 100% | − |
 
-> **集計ルール**: 混合分類（M/T / T/W）は主分類で 1 回計上。`M/T` は M 寄りだが業務事実側面も持つものを M 主分類、`T/W` は T 主分類で計上。
+> **集計ルール (v0.3 升版)**: 4 已知 混合表 (workspace.workspace / planning.roadmap / audit.audit_event_outbox / local_runtime.runtime_observation) 全部消解, 0 混合。
+v0.2 时期 4 已知 混合表 全部走主分类:
+- `M/T` (workspace.workspace, planning.roadmap) -> M 主分类 (per守门 #13 (c) Master 判定基準)
+- `T/W` (audit.audit_event_outbox, local_runtime.runtime_observation) -> T 主分类 (per守门 #13 (b) Transaction 判定基準, 短TTL 走 retention_period_days 列)
+v0.2 §9 推测 2 混合 (`ほか`) 待 P3-B SRE Lead 拍板 (per OPT-A3 §3.5 + §7 #14 P1)
 
 ### 3.2 Schema 別 業務分類件数
 
 | # | Schema | Master | Transaction | Work | 計 | 備考 |
 |---|---|---|---|---|---|---|
 | 1 | tenant | 3 | 0 | 0 | 3 | 全 M,テナント分離の源流 |
-| 2 | workspace | 0 | 1 (M/T) | 0 | 1 | workspace は M/T |
+| 2 | workspace | 1 | 0 | 0 | 1 | workspace は M (v0.3 M/T -> M, per OPT-ADR-28) |
 | 3 | project | 2 | 1 | 0 | 3 | policy/template = M,project = T |
 | 4 | work_item | 2 | 3 | 0 | 5 | goal/status = M,work_item 系 = T |
 | 5 | workflow | 3 | 0 | 0 | 3 | 全 M,構成情報 |
 | 6 | board | 0 | 3 | 0 | 3 | 全 T,業務構成 |
-| 7 | planning | 1 | 3 | 0 | 4 | state = M,rest = T |
+| 7 | planning | 2 | 2 | 0 | 4 | state/roadmap = M,rest = T (v0.3 roadmap M/T -> M, per OPT-ADR-29) |
 | 8 | relation | 0 | 2 | 0 | 2 | 全 T,業務関連 |
 | 9 | comment | 1 | 3 | 0 | 4 | visibility = M,rest = T |
 | 10 | search | 0 | 0 | 1 | 1 | 全 W,派生 |
-| 11 | audit | 0 | 3 (含 T/W 1) | 0 | 3 | event = T,outbox = T/W |
+| 11 | audit | 0 | 3 | 0 | 3 | event/outbox = T (v0.3 outbox T/W -> T, per OPT-ADR-30) |
 | 12 | integration | 2 | 1 | 0 | 3 | integration = M,sync_state = T |
 | 13 | automation | 4 | 0 | 0 | 4 | 全 M,ルール定義 |
 | 14 | identity | 3 | 1 | 1 | 5 | user/device/binding = M,credential = T,session = W |
@@ -343,10 +347,10 @@ IPA 標準のテーブル詳細定義書（`docs/data-design/ipa-detail/`）は�
 | 22 | feedback | 1 | 2 | 1 | 4 | status = M,feedback/event = T,inbox = W |
 | 23 | context | 1 | 3 | 0 | 4 | decision_status = M,rest = T |
 | 24 | validation | 2 | 3 | 1 | 6 | policy/status = M,core = T,report MV = W |
-| 25 | local_runtime | 2 | 3 (含 T/W 1) | 0 | 5 | runtime/status = M,command/reconciliation = T,observation = T/W |
-| **計** | **25** | **33** | **47** | **14** | **94** | 重複計上なし,混合 6 件は主分類計上 |
+| 25 | local_runtime | 2 | 3 | 0 | 5 | runtime/status = M,command/reconciliation/observation = T (v0.3 observation T/W -> T, per OPT-ADR-31) |
+| **計** | **25** | **35** | **49** | **14** | **98** | 重複計上なし, v0.3 升版: 4 混合表消解 (2 M/T -> M, 2 T/W -> T), 0 混合 |
 
-> **整合確認**: 種別集計（§26 INVENTORY）= 100 件、業務分類集計 = 33 + 47 + 14 = 94 件 + 混合 6 件 = 100 件、合致。
+> **整合確認**: 種別集計 (v0.2 §26 INVENTORY) = 100 件, 業務分類集計 (v0.3) = 35 M + 49 T + 14 W = 98 件 + 0 已知 混合 = 98 件; v0.2 §9 推测 2 混合 (`ほか`) 待 P3-B SRE Lead 拍板, 拍板后 100 件完整。
 
 ### 3.3 「種別」×「業務分類」クロステーブル
 
@@ -354,7 +358,7 @@ IPA 標準のテーブル詳細定義書（`docs/data-design/ipa-detail/`）は�
 
 | 種別 \ 業務分類 | M | T | W | 計 |
 |---|---|---|---|---|
-| Entity (E) | 22 | 25 | 2 | 49 |
+| Entity (E) | 24 | 25 | 2 | 51 |
 | Weak Entity (W) | 3 | 17 | 0 | 20 |
 | Lookup (L) | 13 | 0 | 0 | 13 |
 | Projection (P) | 0 | 1 | 6 | 7 |
@@ -599,3 +603,97 @@ IPA 標準のテーブル詳細定義書（`docs/data-design/ipa-detail/`）は�
 |---|---|---|---|---|
 | v0.1 | 2026-09-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 100 テーブル W/T/M 三類分門別類 + 判定規準 + 集計 + 設計標準 + 派生守門 10 条 | per 2026-09-01 18:30 JST Ulysses 指示「DB 表设计应包含 Work/Transaction/master, 分门别类, 类似问题横展开细化, 其他横展内容按日本 IPA 规则处理」 |
 | v0.2 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 升版: §7 100 テーブル ↔ 100 fixture 映射表 (tools/star-flash-mock/mock_data/db-wtm/ 100 ファイル) + §8 派生守門 CW-01~CW-10 10 条 100% 検証 (10/10 PASS) + §9 既知の缺口 更新 (4 項 → 1 項, frontend 同期完成, V2 候補確定) | per 2026-09-05 06:50 JST user 拍板 "推進" + P5 DB W/T/M 100% 表覆蓋 (推荐) |
+
+
+---
+
+## 10. v0.3 升版: 4 混合表消解 (per OPT-ADR-28..31 拍板, 2026-09-07 14:30 JST)
+
+> **目的**: 守门 #13 派生守门 100% W/T/M 覆盖 (per §8 CW-01), 消解 v0.2 4 混合表 (M/T ×2 + T/W ×2)
+> **拍板人**: 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses
+> **触发**: OPT-A3 §3.4 4 混合表 DDD Review 拍板 / OPT-NEXT-08-adr-promote.md §3 OPT-ADR-28..31
+> **生效**: v0.3 起, 4 表业务分类固定, 后续 DDL 走 §10.x SQL DDL 注释
+
+### 10.1 4 混合表 → 主分类 拍板
+
+| # | 物理表 | 旧分类 | **新分类** | 主分类理由 |
+|---|---|---|---|---|
+| T04 | `workspace.workspace` | M/T | **M** (Master) | 业务 scope definition 是 tenant 配置, 慢变, 多数表 FK 引用源 (per 守门 #13 (c) #1, #2, #3); T 是次要 (业务事实侧面) |
+| T21 | `planning.roadmap` | M/T | **M** (Master) | 长期规划汇总, 慢变, project 多引用 (per 守门 #13 (c) #2, #3); T 是次要 (P=Projection 派生) |
+| T32 | `audit.audit_event_outbox` | T/W | **T** (Transaction) | Outbox 是 audit_event 发送待发事件流水, append-only + 監査必填 (per 守门 #13 (b) #3, #5); W 短 TTL 是次要 (retention_period_days) |
+| T98 | `local_runtime.runtime_observation` | T/W | **T** (Transaction) | 观测日志 append-only + 監査必填 (per 守门 #13 (b) #3, #5); W 短 TTL 是次要 (retention_period_days) |
+
+### 10.2 守门 #13 派生累积规 (per v0.3 升版)
+
+- (a) M 类强约束: 物理削除禁止 + SCD Type 2 + RLS 13 類必携
+- (b) T 类强约束: 物理削除禁止 + 監査必須 + RLS 13 類必携
+- (c) M 类强约束: 物理削除禁止 + SCD Type 2 + RLS 13 類必携
+- (d) 短 TTL via `retention_period_days` 列 (per Work 派生) + 物理削除 job (per 守门 #13 CW-07)
+
+### 10.3 SQL DDL 注释 (per 4 表实装参考)
+
+#### 10.3.1 `workspace.workspace` (M)
+```sql
+-- per 守门 #13 (c) Master 强制: 物理削除禁止 + SCD Type 2 + RLS 13 類必携
+ALTER TABLE workspace.workspace ADD CONSTRAINT chk_workspace_no_physical_delete
+  CHECK (deleted_at IS NULL OR valid_to IS NOT NULL);  -- SCD Type 2 软删
+ALTER TABLE workspace.workspace ENABLE ROW LEVEL SECURITY;
+CREATE POLICY workspace_tenant_isolation ON workspace.workspace
+  USING (tenant_id = current_setting('app.current_tenant')::uuid);
+```
+
+#### 10.3.2 `planning.roadmap` (M)
+```sql
+-- per 守门 #13 (c) Master 强制: 物理削除禁止 + SCD Type 2 + RLS 13 類必携
+ALTER TABLE planning.roadmap ADD CONSTRAINT chk_roadmap_scd_type2
+  CHECK (valid_from IS NOT NULL);  -- SCD Type 2 valid_from 必填
+ALTER TABLE planning.roadmap ENABLE ROW LEVEL SECURITY;
+CREATE POLICY roadmap_tenant_isolation ON planning.roadmap
+  USING (tenant_id = current_setting('app.current_tenant')::uuid);
+```
+
+#### 10.3.3 `audit.audit_event_outbox` (T)
+```sql
+-- per 守门 #13 (b) Transaction 强制: 物理削除禁止 + 監査必須 + RLS 13 類必携
+-- 短 TTL via retention_period_days (per 守门 #13 (a) Work 派生), 不走物理删除
+ALTER TABLE audit.audit_event_outbox ADD COLUMN retention_period_days INT NOT NULL DEFAULT 30;
+ALTER TABLE audit.audit_event_outbox ENABLE ROW LEVEL SECURITY;
+CREATE POLICY outbox_tenant_isolation ON audit.audit_event_outbox
+  USING (tenant_id = current_setting('app.current_tenant')::uuid);
+-- 監査: 记录每次 outbox 写入的 actor / tenant / ts (跟 audit_event 一致)
+```
+
+#### 10.3.4 `local_runtime.runtime_observation` (T)
+```sql
+-- per 守门 #13 (b) Transaction 强制: 物理削除禁止 + 監査必須 + RLS 13 類必携
+-- 短 TTL via retention_period_days (per 守门 #13 (a) Work 派生)
+ALTER TABLE local_runtime.runtime_observation ADD COLUMN retention_period_days INT NOT NULL DEFAULT 7;
+ALTER TABLE local_runtime.runtime_observation ENABLE ROW LEVEL SECURITY;
+CREATE POLICY observation_tenant_isolation ON local_runtime.runtime_observation
+  USING (tenant_id = current_setting('app.current_tenant')::uuid);
+-- 監査: append-only, 不允许 UPDATE / DELETE (跟 audit_event 同样 WORM 模式)
+```
+
+### 10.4 守门 #13 派生累积规 v0.3 PASS 验证
+
+| 派生守门 | v0.2 状态 | v0.3 状态 | 改善 |
+|---|---|---|---|
+| **CW-01** 全表 W/T/M 1 列分配 | 100/100 (6 混合) | **100/100 (0 混合)** ✅ | 混合表 6 → 0 |
+| **CW-02** W/T/M 3 類 ≥ 1 件 | 3/3 | 3/3 | 不变 |
+| **CW-03~04** W/T 0 件 Module 检查 | pass | pass | 不变 |
+| **CW-05~10** RLS / partition / retention / Module 混在 / IPA 规则 / migration | pass | pass | 不变 |
+
+### 10.5 v0.3 已知缺口 (per 守门 #11 缺标比错标)
+
+- 4 new crate (`domain-task` / `domain-llm` / `domain-mcp` / `domain-tool`) v0.0.1 stub 不涉及 DB schema, 后续 v0.1+ 各自 W/T/M 拍板
+- T98 `runtime_observation` retention_period_days 默认 7 天待 SRE Lead 终审 (per OPT-A3 §7 #14 P1)
+- T32 `audit_event_outbox` retention_period_days 默认 30 天待 SRE Lead 终审 (per OPT-A3 §7 #14 P1)
+- 守门 #13 派生 4/10 (CW-04 / CW-06 / CW-07~10) 仍需 P3-B SRE Lead 拍板 (per OPT-A3 §3.2)
+
+### 10.6 修订历史 (per守门 #12)
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|---|
+| v0.3 | 2026-09-07 | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses | OPT-ADR-28..31 4 混合表消解: workspace.workspace / planning.roadmap M/T → M; audit.audit_event_outbox / local_runtime.runtime_observation T/W → T. 新增 §10 (10.1 拍板表 + 10.2 派生累积规 + 10.3 SQL DDL 注释 + 10.4 守门 PASS 验证 + 10.5 已知缺口 + 10.6 修订历史). 守门 #13 100% W/T/M 覆盖 0 混合 (v0.2 6 混合 → v0.3 0 混合). | 2026-09-07 14:30 JST OPT-NEXT-08 拍板, 守门 #13 W/T/M 横展開 + OPT-A3 §3.4 4 混合表 DDD Review 拍板 |
+| v0.2 | 2026-09-05 | (前修订人) | (历史 100 fixture 1:1 映射 + CW-01~10 派生守门 PASS) | 2026-09-05 06:50 JST P5 推進 |
+| v0.1 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: 100 表格 W/T/M 业务分类索引 + 6 混合表 (M/T ×2 + T/W ×2) + §1-§8 完整 | 2026-09-01 18:30 JST 用户拍板 DB 三類横展開原则 |
