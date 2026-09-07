@@ -44,6 +44,9 @@ fn validation_service() -> &'static Arc<InMemoryValidationService> {
 
 /// 测试 hook
 #[cfg(test)]
+#[allow(dead_code)] // test hook for integration tests (per P1-5 cleanup, awaiting integration test wiring)
+#[cfg(test)]
+
 pub(crate) fn validation_service_for_test() -> &'static Arc<InMemoryValidationService> {
     validation_service()
 }
@@ -371,8 +374,8 @@ mod tests {
     use super::*;
     use domain_validation::ActorContext as VActorContext;
     use domain_validation::{
-        InMemoryValidationService, MarkValidationStatusCommand, SubmitValidationResultCommand,
-        TenantId as VTenantId, UserId as VUserId, ValidationCommandPort, ValidationKind,
+        MarkValidationStatusCommand, SubmitValidationResultCommand,
+        TenantId as VTenantId, ValidationCommandPort, ValidationKind,
         WorkItemId,
     };
 

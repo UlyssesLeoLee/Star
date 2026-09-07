@@ -23,7 +23,7 @@
 
 use domain_validation::ActorContext;
 use domain_validation::{
-    InMemoryValidationService, ListValidationQuery, TenantId, ValidationKind, ValidationQueryPort,
+    InMemoryValidationService, ListValidationQuery, ValidationKind, ValidationQueryPort,
     ValidationStatus,
 };
 use serde_json::{json, Value};
@@ -40,6 +40,9 @@ fn service() -> &'static Arc<InMemoryValidationService> {
 
 /// 测试 hook: 取共享 service 句柄用于 pre-populate
 #[cfg(test)]
+#[allow(dead_code)] // test hook for integration tests (per P1-5 cleanup, awaiting integration test wiring)
+#[cfg(test)]
+
 pub(crate) fn service_for_test() -> &'static Arc<InMemoryValidationService> {
     service()
 }

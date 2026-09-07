@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
 
 use domain_identity::{
-    ActorContext, GetUserQuery, IdentityCommandPort, IdentityError, IdentityQueryPort,
-    InMemoryIdentityService, TenantId, UserId,
+    ActorContext, GetUserQuery, IdentityError, IdentityQueryPort, InMemoryIdentityService, TenantId,
+    UserId,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,7 +99,9 @@ impl Resource for IdentityHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use domain_identity::{CreateUserCommand, CredentialRefId, TenantRole};
+    use domain_identity::{
+        CreateUserCommand, CredentialRefId, IdentityCommandPort, TenantRole,
+    };
 
     #[tokio::test]
     async fn read_invalid_uri_format() {

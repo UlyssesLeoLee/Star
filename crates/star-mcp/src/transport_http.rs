@@ -47,7 +47,7 @@ use axum::{
 use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
-use tokio_stream::{iter, wrappers::ReceiverStream, StreamExt};
+use tokio_stream::{iter, wrappers::ReceiverStream};
 
 use crate::d6_session::{
     ServerEvent, SessionStore, DEFAULT_GC_INTERVAL_MS, DEFAULT_SESSION_TTL_MS,
@@ -70,6 +70,7 @@ struct AppState {
     /// Session store (per server-push + reconnect, 持久化 in-memory + TTL GC)
     session_store: Arc<SessionStore>,
     /// Resources handler (per DELETE /resources/{id}, mock delete)
+    #[allow(dead_code)] // reserved for Phase D.8+ real persistence (per P1-5 cleanup, awaiting caller)
     resources_handler: Arc<ResourcesHandler>,
 }
 
@@ -123,6 +124,7 @@ pub(crate) async fn run_http_server(bind_addr: &str) -> Result<(), McpError> {
     Ok(())
 }
 
+#[allow(dead_code)] // helper for tests/integration (per P1-5 cleanup, awaiting caller)
 fn build_router() -> Router {
     build_router_with_state(AppState::new())
 }

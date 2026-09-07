@@ -33,6 +33,9 @@ fn service() -> &'static Arc<InMemorySearchService> {
 
 /// 测试 hook
 #[cfg(test)]
+#[allow(dead_code)] // test hook for integration tests (per P1-5 cleanup, awaiting integration test wiring)
+#[cfg(test)]
+
 pub(crate) fn service_for_test() -> &'static Arc<InMemorySearchService> {
     service()
 }

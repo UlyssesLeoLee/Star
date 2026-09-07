@@ -13,12 +13,12 @@
 //! 5. 5 域 PermissionScheme 独立持有
 //! 6. 5 域跨域编排 (Saga 模式验证)
 
-use domain_identity::{ActorContext, InMemoryIdentityService, TenantId, UserId};
+use domain_identity::{InMemoryIdentityService, UserId};
 use domain_permission::{
     InMemoryPermissionService, PermissionScheme, PermissionSchemeId, TenantId as PermTenantId,
 };
 use domain_workspace::{
-    InMemoryWorkspaceService, TenantId as WsTenantId, UserId as WsUserId, WorkspaceId,
+    InMemoryWorkspaceService, UserId as WsUserId, WorkspaceId,
 };
 use domain_worktree::InMemoryWorktreeService;
 use star_context::ActorContext as StarActorContext;

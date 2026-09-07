@@ -86,6 +86,7 @@ pub(crate) struct SessionState {
     /// 已发送但未确认 events 队列 (per Last-Event-ID 重连)
     pub unacked_events: Vec<ServerEvent>,
     /// 最近 event counter (per UUID-like id generation)
+    #[allow(dead_code)] // reserved for Phase D.7+ SSE event ordering (per P1-5 cleanup)
     pub last_event_counter: u64,
     /// 最近活动时间 (Unix ms, per TTL GC)
     pub last_activity_ms: u64,
@@ -123,6 +124,7 @@ impl SessionStore {
     }
 
     /// 构造带自定义时钟的 store (测试用)
+    #[allow(dead_code)] // test helper (per P1-5 cleanup, awaiting integration test usage)
     pub(crate) fn with_clock(clock: Arc<dyn Clock>) -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),
@@ -175,6 +177,7 @@ impl SessionStore {
     }
 
     /// 列出所有 session (server-push admin endpoint 用, Phase D.7+)
+    #[allow(dead_code)] // reserved for Phase D.7+ admin endpoint (per P1-5 cleanup)
     pub(crate) fn list_sessions(&self) -> Vec<SessionId> {
         self.inner
             .lock()
@@ -185,11 +188,13 @@ impl SessionStore {
     }
 
     /// session 数 (per metrics, 测试用)
+    #[allow(dead_code)] // reserved for metrics (per P1-5 cleanup, awaiting integration test usage)
     pub(crate) fn session_count(&self) -> usize {
         self.inner.lock().expect("SessionStore mutex").len()
     }
 
     /// 显式 touch session 活动时间 (per handler 心跳 / KeepAlive)
+    #[allow(dead_code)] // reserved for heartbeat handler (per P1-5 cleanup)
     pub(crate) fn touch_session(&self, session_id: &SessionId) {
         let now = self.clock.now_ms();
         let mut inner = self.inner.lock().expect("SessionStore mutex");

@@ -113,7 +113,7 @@ impl Resource for ProjectHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use domain_project::{CreateProjectCommand, ProjectCommandPort, ProjectTemplateId, UserId};
+    use domain_project::{CreateProjectCommand, ProjectCommandPort, ProjectTemplateId};
 
     #[tokio::test]
     async fn read_invalid_uri_format() {

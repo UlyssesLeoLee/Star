@@ -283,6 +283,7 @@ impl ResourcesHandler {
     ///
     /// 参数 `id` 可以是 `scheme://path` (完整 URI) 或仅 path (e.g. `wt-STAR-1024`).
     /// 若 `id` 不含 `://`, 视为 path, scheme 默认走 4 核心之一 (per list()).
+    #[allow(dead_code)] // reserved for Phase D.8+ real persistence (per P1-5 cleanup, awaiting caller)
     pub async fn delete(&self, id: &str) -> Result<Value, McpError> {
         // 1. URI 格式校验
         if id.is_empty() {

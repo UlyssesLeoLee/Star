@@ -20,7 +20,7 @@
 //!   用 list() 取全集后 filter status=IN_PROGRESS 取首 (P2 缺口, 真实 index 留 Phase F.4+)
 
 use domain_work_item::{
-    ActorContext, InMemoryWorkItemService, ListByProjectQuery, ProjectId, UserId,
+    ActorContext, InMemoryWorkItemService, ListByProjectQuery, ProjectId,
     WorkItemQueryPort, WorkItemStatus,
 };
 use serde_json::{json, Value};

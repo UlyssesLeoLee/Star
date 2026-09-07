@@ -25,7 +25,7 @@
 
 use domain_worktree::{
     ActorContext, CreateWorktreeCommand, InMemoryWorktreeService, ProjectId, RepositoryId,
-    RuntimeId, TenantId, UserId, WorkItemId, WorktreeCommandPort, WorktreeStatus,
+    RuntimeId, TenantId, UserId, WorkItemId, WorktreeCommandPort,
 };
 use serde_json::{json, Value};
 use std::sync::{Arc, OnceLock};
@@ -41,6 +41,9 @@ fn service() -> &'static Arc<InMemoryWorktreeService> {
 
 /// 测试 hook: 取共享 service 句柄用于 pre-populate
 #[cfg(test)]
+#[allow(dead_code)] // test hook for integration tests (per P1-5 cleanup, awaiting integration test wiring)
+#[cfg(test)]
+
 pub(crate) fn service_for_test() -> &'static Arc<InMemoryWorktreeService> {
     service()
 }
@@ -103,7 +106,6 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use domain_worktree::WorktreeCommandPort;
 
     #[tokio::test]
     async fn invoke_missing_issue_id_returns_validation_error() {
