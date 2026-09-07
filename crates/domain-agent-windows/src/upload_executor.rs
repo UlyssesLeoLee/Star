@@ -2,8 +2,8 @@
 //!
 //! 实现 `WindowService.trigger_upload` 的真实执行:
 //! - git status 检查
-//! - git add <files>
-//! - git commit -m "<message>" (作者 Ulysses 代行)
+//! - git add `<files>`
+//! - git commit -m `"<message>"` (作者 Ulysses 代行)
 //! - 状态流转 Pending → Committing → Completed/Failed
 //!
 //! Per 2026-08-29 10:25 JST 用户拍板 "1,2,3 全部"
