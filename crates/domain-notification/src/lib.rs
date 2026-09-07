@@ -138,7 +138,7 @@ impl NotificationEventType {
 // =====================================================================
 
 #[macro_export]
-/// 生成基于 UUID 的强类型 ID 类型的宏,自动实现 new/as_uuid/From<Uuid>/Display
+/// 生成基于 UUID 的强类型 ID 类型的宏,自动实现 new/as_uuid/`From<Uuid>`/Display
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
