@@ -1,6 +1,6 @@
 //! crates/star-treesitter/src/symbol_resolver.rs
 //!
-//! H.7 Tree-sitter Symbol Resolver 跨文件引用追踪 (per P4-H.7, 守门 #19 [P] 拍板)
+//! H.7 Tree-sitter Symbol Resolver 跨文件引用追踪 (per P4-H.7, 守门 #19 \[P\] 拍板)
 //! per `docs/architecture/2026-09-03-treesitter-worktree-graph/01-requirements.md` §1.4
 //!
 //! 关键不变量 (per §1.4):
