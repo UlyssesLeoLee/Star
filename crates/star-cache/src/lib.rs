@@ -23,6 +23,15 @@ use thiserror::Error;
 /// 缓存错误 (per spec/cache/01 §6 — 5 类错误)
 #[derive(Debug, Error)]
 pub enum CacheError {
+    /// Backend 暂未实装 (Phase G+ stub)。
+    /// Phase G+ 完整实装 (per P4-WBS Phase G.4 拍板启动)
+    #[error("not_implemented: feature={feature}, suggestion={suggestion}")]
+    NotImplemented {
+        /// 未实装的特性名 (e.g. "in_memory_incr")
+        feature: String,
+        /// 推荐替代方案 (含 current_phase / p4_phase 标签)
+        suggestion: String,
+    },
     /// 连接错误 (e.g. Redis URL unset / 拨号失败)
     #[error("connection: {0}")]
     Connection(String),

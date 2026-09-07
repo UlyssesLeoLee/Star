@@ -18,6 +18,15 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ProviderError {
+    /// Provider 远端 API 调用未实装 (Phase F+ stub)。
+    /// Phase F 接入真实网络 (per P4-WBS Phase H.2 拍板启动)
+    #[error("not_implemented: feature={feature}, suggestion={suggestion}")]
+    NotImplemented {
+        /// 未实装的特性名 (e.g. "github_api_get_repo")
+        feature: String,
+        /// 推荐替代方案 (含 P4 phase 标签)
+        suggestion: String,
+    },
     #[error("auth: {0}")]
     Auth(String),
     #[error("not_found: {0}")]

@@ -78,10 +78,14 @@ impl CacheBackend for InMemoryBackend {
     }
 
     async fn incr(&self, _key: &str, _delta: i64) -> Result<i64, CacheError> {
-        // Phase G+ 实装 — 当前为 stub
-        Err(CacheError::Other(
-            "incr not implemented for in-memory".into(),
-        ))
+        // Phase G+ 实装 — 当前为 stub (per P4-WBS Phase G.4 拍板启动)
+        // 注意: #[deprecated] 在 Rust stable 不能放在 trait impl 方法上
+        // 改用结构化 CacheError::NotImplemented { feature, suggestion } 表达 deprecation
+        Err(CacheError::NotImplemented {
+            feature: "in_memory_incr".into(),
+            suggestion: "use RedisBackend for atomic incr support, current_phase=P3, p4_phase=G.4"
+                .into(),
+        })
     }
 
     async fn expire(&self, _key: &str, _ttl_sec: u32) -> Result<(), CacheError> {
