@@ -1,6 +1,6 @@
 ---
 title: "domain-feedback"
-generated: "2026-09-06T02:52:22Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "crate"
 crate_name: "domain-feedback"
 arch_view: "2026-08-26-upgrade"

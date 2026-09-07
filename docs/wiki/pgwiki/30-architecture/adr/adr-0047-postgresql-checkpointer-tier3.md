@@ -1,6 +1,6 @@
 ---
 title: "ADR-0047: Star LangGraph PostgreSQL Checkpointer Tier 3 (Production)"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "adr"
 adr_number: "0047"
 adr_slug: "postgresql-checkpointer-tier3"

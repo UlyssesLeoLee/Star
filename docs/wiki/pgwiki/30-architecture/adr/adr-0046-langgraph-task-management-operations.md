@@ -1,6 +1,6 @@
 ---
 title: "ADR-0046: Star LangGraph TMO 任务卡管理操作 (Task Management Operations)"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "adr"
 adr_number: "0046"
 adr_slug: "langgraph-task-management-operations"

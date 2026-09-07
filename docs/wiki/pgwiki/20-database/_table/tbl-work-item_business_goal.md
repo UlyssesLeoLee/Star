@@ -1,6 +1,6 @@
 ---
 title: "work.item_business_goal"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "db-table"
 schema: "work"
 table: "item_business_goal"

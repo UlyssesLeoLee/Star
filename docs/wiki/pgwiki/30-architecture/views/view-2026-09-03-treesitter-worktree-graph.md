@@ -1,6 +1,6 @@
 ---
 title: "view: 2026-09-03-treesitter-worktree-graph"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "arch-view"
 view_name: "2026-09-03-treesitter-worktree-graph"
 ---

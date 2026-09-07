@@ -1,6 +1,6 @@
 ---
 title: "ADR-0039: Worktree Orchestration 跨域协作架构"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "adr"
 adr_number: "0039"
 adr_slug: "worktree-orchestration-cross-domain"

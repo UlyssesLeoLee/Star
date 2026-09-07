@@ -1,6 +1,6 @@
 ---
 title: "质量门 4 维"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "cross-quality"
 ---
 

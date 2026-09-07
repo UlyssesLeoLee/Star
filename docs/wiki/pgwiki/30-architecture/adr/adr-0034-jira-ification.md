@@ -1,6 +1,6 @@
 ---
 title: "ADR-0034: Agent Jira 化 (P3-G 阶段)"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "adr"
 adr_number: "0034"
 adr_slug: "jira-ification"

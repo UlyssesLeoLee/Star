@@ -1,6 +1,6 @@
 ---
 title: "schema.integration"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "db-schema"
 schema: "integration"
 owner_crate: "domain-integration"

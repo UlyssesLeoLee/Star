@@ -1,6 +1,6 @@
 ---
 title: "permission.role_per_team"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "db-table"
 schema: "permission"
 table: "role_per_team"

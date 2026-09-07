@@ -1,6 +1,6 @@
 ---
 title: "ADR-0040: domain-batch 批处理任务调度引擎架构"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "adr"
 adr_number: "0040"
 adr_slug: "domain-batch"

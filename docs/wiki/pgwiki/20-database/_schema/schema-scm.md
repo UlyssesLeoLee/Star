@@ -1,6 +1,6 @@
 ---
 title: "schema.scm"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "db-schema"
 schema: "scm"
 owner_crate: "domain-scm"

@@ -1,6 +1,6 @@
 ---
 title: "star-vcs"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "crate"
 crate_name: "star-vcs"
 arch_view: "2026-09-03-treesitter-worktree-graph"

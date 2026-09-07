@@ -1,6 +1,6 @@
 ---
 title: "ADR-0026: STAR AI 兼容性架构"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "adr"
 adr_number: "0026"
 adr_slug: "star-ai-compat"

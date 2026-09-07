@@ -1,6 +1,6 @@
 ---
 title: "domain-worktree"
-generated: "2026-09-06T02:52:22Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "crate"
 crate_name: "domain-worktree"
 arch_view: "2026-09-03-treesitter-worktree-graph"

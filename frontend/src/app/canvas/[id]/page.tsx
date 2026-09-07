@@ -94,7 +94,7 @@ function CanvasPageInner({ canvasId }: { canvasId: string }) {
   }
 
   return (
-    <div className="-mx-6 -mt-5 h-[calc(100vh-3.5rem)] flex flex-col">
+    <div className="w-full h-[calc(100vh-5rem)] flex flex-col">
       {/* Header */}
       <div className="border-b border-line bg-bg-soft/40 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">

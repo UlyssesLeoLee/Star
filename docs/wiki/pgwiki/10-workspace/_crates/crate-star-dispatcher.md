@@ -1,6 +1,6 @@
 ---
 title: "star-dispatcher"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "crate"
 crate_name: "star-dispatcher"
 arch_view: "2026-09-03-langgraph"

@@ -1,6 +1,6 @@
 ---
 title: "ADR-0034: Phase E 整体架构决策 (Spec 增量 + star-mcp 实装)"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "adr"
 adr_number: "0034"
 adr_slug: "phase-e-architecture"

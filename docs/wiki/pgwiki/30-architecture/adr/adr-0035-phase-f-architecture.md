@@ -1,6 +1,6 @@
 ---
 title: "ADR-0035: Phase F 真实数据源接入架构"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "adr"
 adr_number: "0035"
 adr_slug: "phase-f-architecture"

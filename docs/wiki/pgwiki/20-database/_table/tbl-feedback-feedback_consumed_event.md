@@ -1,6 +1,6 @@
 ---
 title: "feedback.feedback_consumed_event"
-generated: "2026-09-06T02:52:23Z"
+generated: "2026-09-06T04:43:04Z"
 node_type: "db-table"
 schema: "feedback"
 table: "feedback_consumed_event"
