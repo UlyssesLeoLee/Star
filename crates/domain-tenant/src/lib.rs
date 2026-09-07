@@ -26,6 +26,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 pub use star_context::ActorContext;
+pub use star_dto::Identifier;
 use thiserror::Error;
 use uuid::Uuid;
 
