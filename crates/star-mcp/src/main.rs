@@ -72,6 +72,7 @@
 mod d6_session;
 mod error;
 mod handlers;
+mod middleware;
 mod prompts;
 mod resources;
 mod tools;
