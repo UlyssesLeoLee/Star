@@ -494,7 +494,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | # | 阻塞项 | 阻塞阶段 | 需 Ulysses 拍板 | 备注 |
 |---|---|---|---|---|
 | B-1 | **强类型 ID 重构** (DeviceId→Uuid / device_id String→Uuid) | H2-4 → H2-2 → H2-5 | 🟢 **9/1 23:59 JST 选项 1 拍板: 全量 Uuid 强类型 一次性重构 (2.5M / 0.4 周)** | 9/2 9:00 JST 启 wt |
-| B-2 | **5 域 Lead 真人到位** (RGS 5 域历史治理命名) | P3-C.9 / P3-E.5 / P3-F.1 + H2-2 | 🟡 **9/1 23:59 JST 选项 2 拍板: Mavis 内部代签 临时, 跨 session 续找真人追溯** | 违反 8/21 JST 拒绝兼任硬约束, per 8/27 19:39 JST 用户授权临时授权 |
+| B-2 | ~~**5 域 Lead 真人到位** (RGS 5 域历史治理命名)~~ | ~~P3-C.9 / P3-E.5 / P3-F.1 + H2-2~~ | 🗑️ **删除/作废 (per 2026-09-08 05:27 JST 用户发令"5 域 Lead 真人到位这个流程删掉, 我后期启动这流程再验证")** | 用户后期自己启动这流程, Mavis 临时代签维持 (per 守门 #14 v2 拍板 D), 跨 session 不再追踪 |
 | B-3 | B.5 OpenClaw 真实 endpoint + API key | P3-B.5 | 凭证 (mock 备选已落地 per `29692a7`) | wiremock 模式可降级为 🟡 占位 |
 | B-4 | B.6 Hermes 真实 endpoint + API key | P3-B.6 | 凭证 (mock 备选已落地 per `29692a7`) | 同 B-3 |
 | B-5 | E.4 KMS 凭证 (Vault / AWS KMS) | P3-E.4 | 凭证 (LocalMockKms mock 备选已落地 per `5ea9611`) | |
@@ -522,9 +522,9 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 ### 14.7 已知缺口 (per 缺标比错标, 显式列)
 
 1. **H2 强类型 ID 重构** (DeviceId / device_id) 业务语义拍板 — 阻塞 H2-2 / H2-4 / H2-5
-2. **3 域 Lead 真人到位** (per 8/21 JST 拒绝兼任) — 跨 session 续
+2. ~~**3 域 Lead 真人到位** (per 8/21 JST 拒绝兼任) — 跨 session 续~~ 🗑️ **删除/作废 (per 2026-09-08 05:27 JST 用户发令"5 域 Lead 真人到位这个流程删掉, 我后期启动这流程再验证")**
 3. **B.5 / B.6 / E.4 真实凭证** — mock 备选已落地，等切真
-4. **5 tab 命名拍板** (UI 端) — 问卷待 Ulysses 决策
+4. ~~**5 tab 命名拍板** (UI 端) — 问卷待 Ulysses 决策~~ ✅ **已解除 (per ADR-0050 v1.0, 2026-09-08 05:25 JST)**
 5. **推 origin final-action 确认** — 外部可见，需显式确认
 
 ### 14.8 5 wt 并行收官实证 (per 2026-09-01 22:30 JST 选项 4 all_parallel, 选项 1 per-item-1wt)
@@ -647,7 +647,8 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | v0.4 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 5 wt 并行收官后增量回填: 4/5 子项 🟢 (DB 100% 表 818706e + D.6 CI 7 job f4fd1c2 + AGENTS v0.31 287d9a0 + B.2 Hermes 696e274 57/57 test) + 1/5 子项 ❌ (P1-P9 task schema 0/147 = 0% 标 887ff3c 守门 #13 适用边界 DDD Review 拍板) + §15 累计 96 子项 82/96 实质收官 (85.4%) + §14.8 新增 (5 wt 收官实证段) | 2026-09-01 22:30 JST Ulysses "开子代理和 worktree 并行处理 wbs 任务" 触发 |
 | v0.5 | 2026-09-01 | 架构师 (Mavis 接手 agent per DEC-008) | 5 wt 收官后 4 项拍板落地: (1) 强类型 ID 选项 1 全量 Uuid 强类型 2.5M / 0.4 周 启 H2-2/H2-4/H2-5; (2) 5 域 Lead 真人 选项 2 Mavis 内部代签 临时, 跨 session 续找真人追溯签字 (per 8/27 19:39 JST 用户授权); (3) 守门 #13 适用边界 选项 1 仅 Backend PG (INVENTORY 100/100 PASS), task schema 保持现状, 子项 5 FAIL 结论"结构性 NOT in scope"; (4) 推 origin 选项 1 现在推 main (55 ahead, ae03b74) + H2 强类型优先 9/2 9:00 JST 启 wt | 2026-09-01 23:59 JST Ulysses 4 项拍板全收触发 |
 | v0.6 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | **agent 交互 Python 化** (per `docs/automation-design.md` v0.1 + 9/2 00:39 JST 拍板): §1-§5 + §14.2 任务卡加"自动化档"列 ([P]/[M]/[S]), 4 维打分 (Rerunnable / Volume / Structural / Audit-trail); §7.1 自动化档汇总 20 [P] / 6 [M] / 17 [S] / 20 共享脚本; §8 守门规则新增 #6 "任务卡自动化档强制落档"; 引用 `docs/automation-design.md` v0.1 + `scripts/automation/` 8 份基类骨架 (dispatcher / cli_helper / refactor_template / judge / smoke_test / registry_check + 2 __init__); 守门 #1 v19 + #9 v2 + #12 v2 派生规 (本文件落档后追加 AGENTS.md) | 2026-09-02 00:39 JST Ulysses 指令"所有涉及与 agent 交互的功能点,都应该尽可能使用 python 脚本,避免长上下文的中间内容丢失损耗忽略问题" + 拍板 (范围=全 3 类 / 维度=R+V+S+A / 落档=新建 docs/automation-design.md + scripts/automation/) |
-| v0.7 | 2026-09-07 | 架构师 (Mavis 接手 agent per DEC-008) | **§14.9 Star 排他与幂等架构 view (Star-EI) 8 子项实施** (per 9/7 20:45 JST 用户发令"多用户、多agent的排他和幂等设计要做到位" + 9/7 21:08 JST 指令"包括此功能在内的后续开发计划更新进wbs" + 9/7 20:55 JST `ask_37d138ffb93a12279b35a46e` 4 推荐项拍板): 新增 §14.9 (8 子项 EX-01..EX-08, ~2.3M tokens / ~0.38 周, 3 [P] / 4 [M] / 0 [S] 自动化档, 16 守门, 8 缺口 G-EI-01..G-EI-08, 拍板 + IPA 3 文档 v1.0 + ADR-0048 v1.0 + PHASE report v0.1 全部落档 commit `dab77f1` + `8165f7e` 9/7 推 origin 完成, 0/8 plan 实施待 5 域 Lead T3 至少 1 人到位 per 守门 #14 v2 拍板 D 维持); §14.7 已知缺口 #11 新增; §15 累计 96 → 104 子项 + 198.3M → 200.6M (超 0.3% 仍在余量 2% 绿区) + 82/96 → 82/104 实质收官 85.4% → 78.8% + 14 → 22 阻塞/待拍; 引用 4 拍板项 (D-01 PG advisory / D-02 双键 / D-03 4 层 / D-04 view 名) + 5 张新表 W/T/M 严格 + 跟 LangGraph/Agent Runtime/ADR-0047/ADR-0030/守门 #13 关系 | 2026-09-07 21:08 JST 用户指令"包括此功能在内的后续开发计划更新进wbs" 触发 |
+| v0.7 | 2026-09-07 | 架构师 (Mavis 接手 agent per DEC-008) | **§14.9 Star 排他与幂等架构 view (Star-EI) 8 子项实施** (per 9/7 20:45 JST 用户发令"多用户、多agent的排他和幂等设计要做到位" + 9/7 21:08 JST 用户指令"包括此功能在内的后续开发计划更新进wbs" + 9/7 20:55 JST `ask_37d138ffb93a12279b35a46e` 4 推荐项拍板): 新增 §14.9 (8 子项 EX-01..EX-08, ~2.3M tokens / ~0.38 周, 3 [P] / 4 [M] / 0 [S] 自动化档, 16 守门, 8 缺口 G-EI-01..G-EI-08, 拍板 + IPA 3 文档 v1.0 + ADR-0048 v1.0 + PHASE report v0.1 全部落档 commit `dab77f1` + `8165f7e` 9/7 推 origin 完成, 0/8 plan 实施待 5 域 Lead T3 至少 1 人到位 per 守门 #14 v2 拍板 D 维持); §14.7 已知缺口 #11 新增; §15 累计 96 → 104 子项 + 198.3M → 200.6M (超 0.3% 仍在余量 2% 绿区) + 82/96 → 82/104 实质收官 85.4% → 78.8% + 14 → 22 阻塞/待拍; 引用 4 拍板项 (D-01 PG advisory / D-02 双键 / D-03 4 层 / D-04 view 名) + 5 张新表 W/T/M 严格 + 跟 LangGraph/Agent Runtime/ADR-0047/ADR-0030/守门 #13 关系 | 2026-09-07 21:08 JST 用户指令"包括此功能在内的后续开发计划更新进wbs" 触发 |
+| v0.8 | 2026-09-08 | 架构师 (Mavis 接手 agent per DEC-008) | **WBS 阻塞项 B-2 / B-7 解除** (per 2026-09-08 05:25-05:27 JST 用户发令): (1) §14.4 B-2 "5 域 Lead 真人到位" 流程删除/作废 (per 05:27 JST 用户发令"5 域 Lead 真人到位这个流程删掉, 我后期启动这流程再验证"); §14.7 已知缺口 #2 同删除; Mavis 临时代签维持 (per 守门 #14 v2 拍板 D), 跨 session 不再追踪; (2) §14.4 B-7 "5 tab 命名拍板" 解除 (per 05:25 JST 用户发令"5Tab 命名按照你推荐即可" + ADR-0050 v1.0 落档 commit `cf5a95d` 推 origin 完成), 5 Tab 命名跟 AGENTS.md §7 #15 v0.15 一致: Kanban / Timeline / Backlog / Agents / Worktrees, 0 文档改动; §14.7 已知缺口 #4 同解除; (3) Star-EI 8/8 wt 全部收官推 origin (per v0.7 落档 + 8 commits 9d787d6 / 9e2faf1 / d7d3ab2 / a50245c / 668d365 / aad9ad5 / 0c66fbd / 2ba2048 / c9c9587); (4) TD-01 AI 工具自动扫描 4 源落地 (per ask_bf6bb4b2 4 拍板 + ADR-0049 v1.0 + brief td-01 + 4 源文件 + 13/13 cargo test PASS, commit `ca7971f` 推 origin); (5) §15 累计: B-2/B-7 解除后剩余阻塞项 4 项 (B-3/B-4/B-5 凭证 + B-6 runner + B-9 签字), 22 → 20 阻塞/待拍 | 2026-09-08 05:25-05:27 JST 用户发令触发 (B-7 解除 + B-2 删除) |
 
 ---
 
