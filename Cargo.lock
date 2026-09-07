@@ -2151,6 +2151,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "star-context-tiering"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "star-credential"
 version = "0.0.1"
 dependencies = [
@@ -2191,6 +2203,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "star-eventbus"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "star-mcp"
 version = "0.1.0"
 dependencies = [
@@ -2216,6 +2243,34 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tower",
+ "uuid",
+]
+
+[[package]]
+name = "star-memory"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "star-quota"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
  "uuid",
 ]
 
@@ -2259,6 +2314,35 @@ dependencies = [
  "serde_json",
  "star-treesitter",
  "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "star-taskqueue"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "star-telemetry"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
  "uuid",
 ]
 
