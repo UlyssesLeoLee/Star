@@ -51,7 +51,7 @@ define_uuid_id!(RepositoryId);
 // =====================================================================
 
 #[macro_export]
-/// 生成基于 Uuid 的强类型 ID 宏,统一实现 new/as_uuid/From<Uuid>/Display
+/// 生成基于 Uuid 的强类型 ID 宏,统一实现 new/as_uuid/`From<Uuid>`/Display
 macro_rules! define_uuid_id {
     ($name:ident) => {
         #[derive(
