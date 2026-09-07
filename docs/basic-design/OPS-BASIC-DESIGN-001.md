@@ -17,6 +17,8 @@
 
 **MVP 范围** (per SRS-001 §3.1): 入口 + 4 tab 骨架 + 8 REST stub + Hybrid AI mock + crates/star-ops 48 package。
 
+**Framework 选型**: **axum 0.8** (per ADR-0048, 跟既有 4 crate `star-mcp` / `star-api-rest` / `star-credential` / `star-ops` 100% 对齐, 拒绝 actix-web / warp / rocket / hyper 直用, 跟 RGS 仓独立 per AGENTS.md §5)
+
 **不**做 (per SRS-001 §3.2): 4 类功能端到端 / 真实 K8s/Helm / 真实 LLM / 持久化 / 跨域编排 / 详設 (跳)。
 
 ---

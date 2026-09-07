@@ -21,6 +21,7 @@
 - **5 維** 設計: モジュール / クラス / 時序 / 状態遷移 / テスト
 - **W/T/M 6 表 100% カバー** (守門 #13) — データ永続化 §7 で詳細
 - **Hybrid AI 4 級 Ladder** (per ADR-0026 §2.2) — §3 で詳細
+- **Framework 選型** (per ADR-0048): **axum 0.8**, 跟既有 4 crate (star-mcp / star-api-rest / star-credential / star-ops) 100% 對齐, 跟 RGS 仓独立
 - **不做什么** (per SRS-001 §3.2): 跨域编排 / 真实 K8s / 真实 LLM / OAuth 2.0 / 詳設で OpenAPI utoipa 自動生成
 
 ---

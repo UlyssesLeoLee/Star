@@ -128,7 +128,7 @@
 | 8 | 前端 pre-existing `agent-view/page.tsx:115` TS2322 错 | P3 | 跟本 phase 无关, 留 baseline 修复 |
 | 9 | 5 域 Lead 真人未到位, Mavis 长期代签 | 中 | 真人到位后追溯签字 (per 守门 #14 + 9/3 19:35 JST 拍板 D) |
 | 10 | i18n 文案 MVP 简化版 (3 语言完整但 token 缺) | P3 | [S] 子项校对 |
-| 11 | **Framework 选型决策未在设计文档显式落档** (per 2026-09-08 08:19 JST self-review 触发) — star-ops 选 axum 0.8 是默认跟 star-mcp / star-api-rest / star-credential 既有 3 处对齐, 但没显式 ADR 章节写"为什么不是 actix-web"; 4 域 follow-up 拍板如果改 framework, 缺溯源依据 | P2 | (a) 跟用户确认 star 仓是否锁定 axum, 还是 RGS 仓 actix-web 风格可能 carry-over; (b) 拍板后落 ADR-0048 (Framework Selection) |
+| 11 | **Framework 选型决策未在设计文档显式落档** (per 2026-09-08 08:19 JST self-review 触发) — star-ops 选 axum 0.8 是默认跟 star-mcp / star-api-rest / star-credential 既有 3 处对齐, 但没显式 ADR 章节写"为什么不是 actix-web"; 4 域 follow-up 拍板如果改 framework, 缺溯源依据 | P2 | (a) 跟用户确认 star 仓是否锁定 axum, 还是 RGS 仓 actix-web 风格可能 carry-over; (b) 拍板后落 ADR-0048 (Framework Selection) | ✅ 已拍板 ADR-0048 v0.1 (per ask_user `ask_40cddef812e642081a0f033e` 2026-09-08 08:22 JST 锁定 axum 0.8), 关闭此缺口 |
 
 ---
 
@@ -185,3 +185,4 @@
 | 版本 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
 | v0.1 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版 MVP-骨架 落档 (27 文件改动, 15/15 test pass, 守门 15 维全 0 违反) | ask_user `ask_e76f2e614519fbc9eda16b53` 拍板 4 项 + 2026-09-08 07:53 JST 用户发令 |
+| v0.2 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 关闭 §3 已知缺口 #11 (Framework 选型决策未显式落档) + ADR-0048 引用 + 签字栏更新 | ask_user `ask_40cddef812e642081a0f033e` 拍板 "锁定 axum 0.8 (推荐)" + 2026-09-08 08:19 JST 用户问"目前的框架用的不是actix-web吗" |
