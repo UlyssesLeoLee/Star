@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
         - name: envoy
-          image: envoyproxy/envoy:v1.32-latest
+          image: docker.m.daocloud.io/envoyproxy/envoy:v1.32-latest  # daocloud mirror (per 2026-09-08 08:04 JST 实证 docker.io 拉超时)
           ports:
             - containerPort: 8080
               name: http

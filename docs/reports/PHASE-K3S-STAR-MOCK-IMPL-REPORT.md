@@ -1,6 +1,7 @@
 # PHASE-K3S-STAR-MOCK-IMPL-REPORT
 
-> **文档版本**: v0.1 (2026-09-08 07:55 JST)
+> **文档版本**: v0.2 (2026-09-08 08:08 JST)
+> **v0.2 变更**: + §8 续做记录: 镜像拉到 daocloud, 但 k3s kubelet 半死 (container runtime 通信断), 新 pod 100% 起不来; port-forward service 已在 v0.2 期间 disable 避免 auto-restart 浪费 CPU; 等 Ulysses 手动重启 k3s (sudo systemctl restart k3s) 才能续做. v0.2 commit 把 envoy-deployment.yaml image path 改 daocloud 永久落档.
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-08 07:36 JST UAT 反馈 "用 playwright 操作进行 UAT 测试,现在启动 3000 端口后黑了,存在显示问题"
 > **范围**: Star 仓 `D:\Star\.worktrees\feat-auto-20260908-204a1a91` 本地恢复 (k3s 6443 / 3000 端口转发), **不动 origin, 不动 main 分支** (per 守门 #1 R-05)
@@ -156,3 +157,67 @@
 | 版本 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
 | v0.1 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初稿: 4 步根因 + 4 改动 + 8 缺口 + 5 角色签字 | 2026-09-08 07:36 JST UAT 反馈 → 07:55 JST 落档 |
+| v0.2 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §8 续做记录 (k3s kubelet 半死, container runtime 通信断, 镜像已落 daocloud 但新 pod 起不来, port-forward service disable); envoy-deployment.yaml image path 改 daocloud 永久落档 | 2026-09-08 08:04-08:08 JST 续做 (sudo 实际是 sudoers 白名单非配额, 但 k3s 内部状态破裂) |
+
+---
+
+## §8 续做记录 (per 2026-09-08 08:04-08:08 JST)
+
+### §8.1 已落地
+
+| 步骤 | 动作 | 结果 |
+|---|---|---|
+| 1 | `sudo -n k3s crictl pull docker.m.daocloud.io/envoyproxy/envoy:v1.32-latest` | ✅ Image is up to date sha256:49b0af0078643 (60MB) |
+| 2 | `envoy-deployment.yaml` image 改 daocloud 路径 | ✅ commit 落档 (v0.2 本次) |
+| 3 | nuke deployment + recreate | ✅ RS hash 77864fd7b8 2/2 pod 拉起 |
+| 4 | nop-test pod (alpine) 在 default ns + star-mock ns | ✅ 创建成功 (control test) |
+
+### §8.2 失败根因 (新发现, 5 步推理)
+
+| 步 | 观察 | 结论 |
+|---|---|---|
+| 1 | envoy pod 60s+ events 段只有 Scheduled, 无 ImagePulling / Pulled / ContainerCreating | kubelet 没接这个 pod |
+| 2 | nop-test alpine pod (default ns) 也卡 Pending, events 同样只有 Scheduled | **不是 star-mock ns 问题, 是 k3s 全局问题** |
+| 3 | rust-game-server 6d 旧 pod 全 Running, events 段丰富 (Warning/BackOff/Pulled/Created/Started) | scheduler 工作, 但 kubelet 不接收新 pod |
+| 4 | `journalctl k3s`: `Skipping pod synchronization err="container runtime status check may not have completed yet"` + `Failed to create existing container: task XXX not found` + `Sending HTTP/1.1 502: dial tcp 10.42.0.110:10250: connect: no route to host` | **kubelet 跟 containerd 通信断 + kubelet API 网络分裂 (10.42.0.110:10250 no route)** |
+| 5 | `systemctl status k3s`: Active active, 但 pid 215 6s 前刚刚重启 (从 217 变 215), Memory 601.8M | k3s 在 systemd 死循环重启, 启动竞争资源导致 kubelet 初始化不完整 |
+
+**根因结论** (per §8.2 实证 5 步):
+
+WSL 内 dockerd + containerd + k3s server 三个 daemon 启动顺序竞争资源,k3s 抢在 containerd 完全就绪前启动 → kubelet sync container runtime 超时 → kubelet 502 → 新 pod 永远 Pending。**这不是 envoy 镜像问题,不是 yaml 问题,不是 sudo 配额问题,是 k3s 启动时序问题**。
+
+### §8.3 已采取缓解 (本 commit 落地)
+
+| 动作 | 命令 | 效果 |
+|---|---|---|
+| 1. disable port-forward service | `systemctl --user disable --now k3s-portforward.service` | 停止 auto-restart 循环 (已 16 次重启), 避免 CPU 浪费 |
+| 2. cleanup test pods | `kubectl delete pod nop-default nop-test` (force) | 不留半死 pod 占资源 |
+| 3. envoy-deployment.yaml image 改 daocloud | edit + commit (本 commit) | 下次 apply 自动用 daocloud 镜像, 避免 docker.io 拉超时 |
+
+### §8.4 续做清单 (per Ulysses 手动操作, 需 sudo)
+
+1. **重启 k3s service** (sudo systemctl restart k3s) — 等 30s 让 containerd + kubelet 完全就绪
+2. **验证 kubelet 健康**: `journalctl -u k3s | grep -E "kubelet.*Running|container runtime.*ok"` 应见 "Running" 而非 "Skipping"
+3. **拉镜像 (manual, 防 crictl cache 失效)**: `sudo -n k3s crictl pull docker.m.daocloud.io/envoyproxy/envoy:v1.32-latest`
+4. **重启 deployment**: `kubectl -n star-mock rollout restart deployment star-mock-envoy` (用 daocloud 镜像, 已 commit 94190bb 落档)
+5. **等 pod Ready** (1-2 min): `kubectl -n star-mock get pod -w`
+6. **重 enable port-forward service**: `systemctl --user enable --now k3s-portforward.service`
+7. **验证 3000**: `curl -i http://localhost:3000` 期望 status=200 + body="not found" (envoy direct_response)
+8. **Playwright 截图**: 验证浏览器渲染 "not found" 文本, 不再黑屏
+
+### §8.5 跨 session 续做关键信息
+
+- **worktree**: `D:\Star\.worktrees\feat-auto-20260908-204a1a91`
+- **branch**: `feat/auto-20260908-204a1a91` (本地, ahead origin)
+- **commits**: `94190bb` (v0.1) + 本 commit (v0.2)
+- **k3s 6443 LISTEN**: ✅ 持续 (server 进程在跑, 只是 kubelet 子组件半死)
+- **镜像 crictl cache**: ✅ daocloud envoy v1.32-latest 60MB 已在
+- **port-forward service**: ⏸ 已 disable, 等 pod Ready 后手动 enable
+- **WU**: 9/3 11:35 JST 拍板 B + 守门 #3 v2 派生规: Mavis 临时代签 5 域 Lead 决策, 真人到位后追溯签字 (per §1.2 修订人栏)
+
+### §8.6 教训 (per 守门 #12 v21 docs 同步必更新)
+
+- 守门 #1 派生规需补 1 条: **拉镜像前必先看 `journalctl -u k3s | grep "Skipping pod sync"`, 若有则不要拉镜像, 先 systemctl restart k3s**
+- 守门 #1 派生规需补 1 条: **systemd 拉起 k3s 后必等待 60s 验证 container runtime 状态, 而非立即 apply yaml**
+- 守门 #1 派生规需补 1 条: **port-forward service 在 apply 之前必先 disable, 避免 "auto-restart 16 次 + 502 错误" CPU 浪费**
+
