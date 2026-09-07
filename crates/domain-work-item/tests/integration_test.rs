@@ -63,7 +63,10 @@ async fn it_v0_create_get_list_lifecycle() {
     // create
     let mut cmd = basic_task_cmd(tenant_id);
     cmd.project_id = project_id;
-    let item = svc.create_work_item(cmd, &actor).await.expect("create 必成功");
+    let item = svc
+        .create_work_item(cmd, &actor)
+        .await
+        .expect("create 必成功");
     assert_eq!(item.status, WorkItemStatus::Todo);
     assert_eq!(item.priority, Priority::High);
     assert_eq!(item.lock_version, 1);
@@ -432,7 +435,10 @@ async fn it_v3_requirement_and_ac_chain() {
         .unwrap();
     assert_eq!(ac.work_item_id, item.id);
     assert_eq!(ac.requirement_id, req.id);
-    assert_eq!(ac.coverage_status, domain_work_item::CoverageStatus::Uncovered);
+    assert_eq!(
+        ac.coverage_status,
+        domain_work_item::CoverageStatus::Uncovered
+    );
 }
 
 /// **IT-V3-5**: AITask 全字段 OK 创建成功 (RepositoryId 强类型校验)
@@ -457,6 +463,9 @@ async fn it_v3_ai_task_with_full_data_ok() {
     let item = svc.create_work_item(cmd, &actor).await.unwrap();
     assert!(matches!(item.item_type, WorkItemType::AITask));
     let ai_data = item.ai_task_data.unwrap();
-    assert_eq!(ai_data.objective, "migrate session storage from in-memory to redis");
+    assert_eq!(
+        ai_data.objective,
+        "migrate session storage from in-memory to redis"
+    );
     assert_eq!(ai_data.repository_scope.len(), 1);
 }

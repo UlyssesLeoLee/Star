@@ -13,16 +13,11 @@
 
 use domain_comment::{
     ActorContext, AddReactionCommand, AgentId, AttachmentId, CommentCommandPort, CommentError,
-    CommentQueryPort, CommentStatus, CreateCommentCommand, DeleteCommentCommand, EditCommentCommand,
-    GetCommentQuery, InMemoryCommentService, ListByParentQuery, ParentType, ProjectId,
-    RegisterAttachmentCommand, TenantId, UserId,
+    CommentQueryPort, CommentStatus, CreateCommentCommand, DeleteCommentCommand,
+    EditCommentCommand, GetCommentQuery, InMemoryCommentService, ListByParentQuery, ParentType,
+    ProjectId, RegisterAttachmentCommand, TenantId, UserId,
 };
 use uuid::Uuid;
-
-/// IT fixture: developer 角色 actor
-fn make_dev_actor(tenant_id: Uuid) -> ActorContext {
-    ActorContext::new(Uuid::new_v4(), tenant_id).with_role("developer")
-}
 
 /// IT fixture: project_admin 角色 actor (per INV-C-06 delete_comment 可代作者删)
 fn make_admin_actor(tenant_id: Uuid) -> ActorContext {
@@ -62,7 +57,10 @@ async fn it_v0_create_get_list_lifecycle() {
     let mut cmd = basic_comment_cmd(tenant_id, author);
     cmd.parent_id = parent_id;
     cmd.body = "looks good to me".to_string();
-    let c = svc.create_comment(cmd, &actor).await.expect("create 必成功");
+    let c = svc
+        .create_comment(cmd, &actor)
+        .await
+        .expect("create 必成功");
     assert_eq!(c.status, CommentStatus::Open);
     assert_eq!(c.body, "looks good to me");
 

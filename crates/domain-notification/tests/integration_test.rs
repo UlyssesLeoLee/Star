@@ -14,8 +14,8 @@
 use domain_notification::{
     ActorContext, ChannelKind, DispatchNotificationCommand, GetNotificationQuery,
     InMemoryNotificationService, ListByUserQuery, MarkReadCommand, NotificationCommandPort,
-    NotificationError, NotificationEventType, NotificationQueryPort, NotificationStatus,
-    ProjectId, RegisterChannelCommand, TenantId, UpsertTemplateCommand, UserId,
+    NotificationError, NotificationEventType, NotificationQueryPort, NotificationStatus, ProjectId,
+    RegisterChannelCommand, TenantId, UpsertTemplateCommand, UserId,
 };
 use uuid::Uuid;
 
@@ -41,7 +41,11 @@ fn basic_channel_cmd(tid: Uuid, user: Uuid) -> RegisterChannelCommand {
 }
 
 /// IT fixture: 基础 dispatch 命令
-fn basic_dispatch_cmd(tid: Uuid, user: Uuid, evt: NotificationEventType) -> DispatchNotificationCommand {
+fn basic_dispatch_cmd(
+    tid: Uuid,
+    user: Uuid,
+    evt: NotificationEventType,
+) -> DispatchNotificationCommand {
     DispatchNotificationCommand {
         tenant_id: TenantId(tid),
         user_id: UserId::from(user),
@@ -326,7 +330,10 @@ async fn it_v2_cross_tenant_register_channel_rejected() {
     let mut cmd = basic_channel_cmd(cmd_tenant, user); // 显式 cmd 另一个 tenant
     cmd.actor_user_id = UserId::from(user);
     let res = svc.register_channel(cmd, &actor).await;
-    assert!(matches!(res, Err(NotificationError::CrossTenantDenied(_, _))));
+    assert!(matches!(
+        res,
+        Err(NotificationError::CrossTenantDenied(_, _))
+    ));
 }
 
 /// **IT-V2-2**: 跨 tenant dispatch 被拒
@@ -344,7 +351,10 @@ async fn it_v2_cross_tenant_dispatch_rejected() {
             &actor,
         )
         .await;
-    assert!(matches!(res, Err(NotificationError::CrossTenantDenied(_, _))));
+    assert!(matches!(
+        res,
+        Err(NotificationError::CrossTenantDenied(_, _))
+    ));
 }
 
 /// **IT-V2-3**: 跨 tenant get 被拒
@@ -374,7 +384,10 @@ async fn it_v2_cross_tenant_get_rejected() {
             &actor_b,
         )
         .await;
-    assert!(matches!(res, Err(NotificationError::CrossTenantDenied(_, _))));
+    assert!(matches!(
+        res,
+        Err(NotificationError::CrossTenantDenied(_, _))
+    ));
 }
 
 // =====================================================================
