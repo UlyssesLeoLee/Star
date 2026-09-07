@@ -21,7 +21,7 @@
 //! - **0 mock 硬编码** (per P0/P1 派生规, run_validation mock 旧 0/0/0 必须替换)
 //! - 默认走 7 类 SOW Validation (per `ValidationKind::SOW_REQUIRED`)
 
-use domain_validation::context::ActorContext;
+use domain_validation::ActorContext;
 use domain_validation::{
     InMemoryValidationService, ListValidationQuery, TenantId, ValidationKind, ValidationQueryPort,
     ValidationStatus,
@@ -91,13 +91,10 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
         .unwrap_or_else(|| ValidationKind::SOW_REQUIRED.to_vec());
 
     // nil-tenant actor 触发跨 tenant 拒绝 (跟 P0/P1 一致)
-    // 使用 `ActorContext::new(nil_user, nil_tenant).with_role("service_internal")` 满足 validation service 的 role 校验
-    let actor = ActorContext::new(
-        domain_validation::UserId::new(),
-        domain_validation::TenantId(uuid::Uuid::nil()),
-    )
-    .with_role("service_internal");
-    let tenant_id = actor.tenant_id;
+    // 用 `ActorContext::nil_actor_with_tenant` (B.2 helper) 绕开 star_context::new 的 INV-ACT-01 校验
+    let actor =
+        ActorContext::nil_actor_with_tenant(uuid::Uuid::nil()).with_role("service_internal");
+    let tenant_id = domain_validation::TenantId(actor.tenant_id);
 
     // 按首个 kind + worktree_id 过滤, 拿首个匹配的 ValidationResult
     // (P2 简化: 不并发提交 7 类新 ValidationResult, 而是 list 已有结果)
@@ -164,7 +161,7 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use domain_validation::context::ActorContext as VActorContext;
+    use domain_validation::ActorContext as VActorContext;
     use domain_validation::{
         MarkValidationStatusCommand, SubmitValidationResultCommand, ValidationCommandPort,
         WorkItemId,
@@ -208,11 +205,8 @@ mod tests {
         // pre-populate: 1 个 PASSED Validation
         let svc = service();
         let tid = uuid::Uuid::new_v4();
-        let actor = VActorContext::new(
-            domain_validation::UserId::new(),
-            domain_validation::TenantId(tid),
-        )
-        .with_role(domain_validation::roles::SERVICE_INTERNAL);
+        let actor = VActorContext::new(uuid::Uuid::new_v4(), tid)
+            .with_role(domain_validation::roles::SERVICE_INTERNAL);
 
         let r1 = svc
             .submit_result(

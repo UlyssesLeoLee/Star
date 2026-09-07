@@ -26,7 +26,7 @@
 //! - **0 mock 硬编码** (per P0/P1 派生规, 但 submit 12 步内部允许 step 6-12 简化)
 //! - 默认走 12 步 universal submit (per flows/05 §2)
 
-use domain_validation::context::ActorContext;
+use domain_validation::ActorContext;
 use domain_validation::{
     InMemoryValidationService, ListValidationQuery, ValidationQueryPort, ValidationStatus,
 };
@@ -165,12 +165,10 @@ pub(crate) async fn invoke(args: Value) -> Result<Value, McpError> {
     }
 
     // ===== 5. validation (真实 service) =====
-    let actor = ActorContext::new(
-        domain_validation::UserId::new(),
-        domain_validation::TenantId(uuid::Uuid::nil()),
-    )
-    .with_role("service_internal");
-    let tenant_id = actor.tenant_id;
+    // nil-tenant actor 触发跨 tenant 拒绝; 用 B.2 helper 绕开 star_context::new 的 INV-ACT-01 校验
+    let actor =
+        ActorContext::nil_actor_with_tenant(uuid::Uuid::nil()).with_role("service_internal");
+    let tenant_id = domain_validation::TenantId(actor.tenant_id);
     let q = ListValidationQuery {
         tenant_id,
         work_item_id: None,
@@ -371,7 +369,7 @@ fn step_check_diff() -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use domain_validation::context::ActorContext as VActorContext;
+    use domain_validation::ActorContext as VActorContext;
     use domain_validation::{
         InMemoryValidationService, MarkValidationStatusCommand, SubmitValidationResultCommand,
         TenantId as VTenantId, UserId as VUserId, ValidationCommandPort, ValidationKind,
@@ -433,7 +431,7 @@ mod tests {
         // pre-populate 1 个 PASSED Validation, 走 step 5 真实 service
         let svc = validation_service();
         let tid = uuid::Uuid::new_v4();
-        let actor = VActorContext::new(VUserId::new(), VTenantId(tid))
+        let actor = VActorContext::new(uuid::Uuid::new_v4(), tid)
             .with_role(domain_validation::roles::SERVICE_INTERNAL);
         let r1 = svc
             .submit_result(

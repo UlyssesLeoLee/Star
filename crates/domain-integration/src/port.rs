@@ -13,13 +13,13 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::context::ActorContext;
 use crate::entity::{Integration, SyncState};
 use crate::error::IntegrationError;
 use crate::value_object::{
     ConflictStrategy, ExternalEntityId, ExternalSystemName, IntegrationId, IntegrationRelationType,
     IntegrationSource, IntegrationState, ProjectId, TenantId, UserId,
 };
+use crate::ActorContext;
 
 // =====================================================================
 // 命令 DTO

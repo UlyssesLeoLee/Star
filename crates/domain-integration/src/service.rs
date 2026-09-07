@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 
-use crate::context::ActorContext;
 use crate::entity::{Integration, MappingConfig, SyncDirection, SyncState};
 use crate::error::IntegrationError;
 use crate::event::{EventMeta, IntegrationEvent};
@@ -26,8 +25,9 @@ use crate::port::{
 };
 use crate::value_object::{
     ConflictStrategy, ExternalEntityId, ExternalSystemName, IntegrationId, IntegrationRelationType,
-    IntegrationSource, IntegrationState, ProjectId, SyncOutcome, SyncStateId, TenantId,
+    IntegrationSource, IntegrationState, ProjectId, SyncOutcome, SyncStateId, TenantId, UserId,
 };
+use crate::ActorContext;
 
 // =====================================================================
 // InMemoryIntegrationService
@@ -90,7 +90,7 @@ impl InMemoryIntegrationService {
 
     /// 校验 actor 与命令的 tenant_id 一致
     fn check_tenant(actor: &ActorContext, expected: TenantId) -> Result<(), IntegrationError> {
-        if actor.tenant_id != expected {
+        if actor.tenant_id != expected.0 {
             return Err(IntegrationError::PermissionDenied);
         }
         Ok(())
@@ -234,7 +234,7 @@ impl IntegrationCommandPort for InMemoryIntegrationService {
             retry_count: 0,
             credential_id: cmd.credential_id,
             enabled: true,
-            created_by_user_id: actor.user_id,
+            created_by_user_id: UserId(actor.user_id),
             created_at: now,
             updated_at: now,
             lock_version: 1,
@@ -249,7 +249,7 @@ impl IntegrationCommandPort for InMemoryIntegrationService {
         // 事件总线广播
         let event = IntegrationEvent::IntegrationCreated(crate::event::IntegrationCreated {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 ..EventMeta::new(cmd.tenant_id)
             },
             integration_id: integration.id,
@@ -319,7 +319,7 @@ impl IntegrationCommandPort for InMemoryIntegrationService {
         let event =
             IntegrationEvent::IntegrationStateChanged(crate::event::IntegrationStateChanged {
                 meta: EventMeta {
-                    actor_user_id: Some(actor.user_id.into_uuid()),
+                    actor_user_id: Some(actor.user_id),
                     ..EventMeta::new(cmd.tenant_id)
                 },
                 integration_id: updated.id,
@@ -351,7 +351,7 @@ impl IntegrationCommandPort for InMemoryIntegrationService {
         let event =
             IntegrationEvent::IntegrationStateChanged(crate::event::IntegrationStateChanged {
                 meta: EventMeta {
-                    actor_user_id: Some(actor.user_id.into_uuid()),
+                    actor_user_id: Some(actor.user_id),
                     ..EventMeta::new(cmd.tenant_id)
                 },
                 integration_id: updated.id,
@@ -414,7 +414,7 @@ impl IntegrationCommandPort for InMemoryIntegrationService {
             processed_count: 0,
             skipped_count: 0,
             conflict_count: 0,
-            triggered_by_user_id: Some(actor.user_id),
+            triggered_by_user_id: Some(UserId(actor.user_id)),
             created_at: now,
         };
 
@@ -423,7 +423,7 @@ impl IntegrationCommandPort for InMemoryIntegrationService {
         // 事件总线:SyncTriggered
         let event = IntegrationEvent::SyncTriggered(crate::event::SyncTriggered {
             meta: EventMeta {
-                actor_user_id: Some(actor.user_id.into_uuid()),
+                actor_user_id: Some(actor.user_id),
                 ..EventMeta::new(cmd.tenant_id)
             },
             integration_id: integration.id,
@@ -557,8 +557,8 @@ impl IntegrationQueryPort for InMemoryIntegrationService {
             .get(&id)
             .cloned()
             .ok_or(IntegrationError::NotFound(id))?;
-        check_invariant_03_tenant_required(&integration, viewer.tenant_id)?;
-        if !viewer.can_access_project(integration.project_id) {
+        check_invariant_03_tenant_required(&integration, TenantId(viewer.tenant_id))?;
+        if !viewer.can_access_project(*integration.project_id) {
             return Err(IntegrationError::PermissionDenied);
         }
         Ok(integration)
@@ -569,14 +569,14 @@ impl IntegrationQueryPort for InMemoryIntegrationService {
         q: ListByProjectQuery,
         viewer: ActorContext,
     ) -> Result<Vec<Integration>, IntegrationError> {
-        if !viewer.can_access_project(q.project_id) {
+        if !viewer.can_access_project(*q.project_id) {
             return Err(IntegrationError::PermissionDenied);
         }
         let store = self.integrations.read().expect("integrations lock");
         let list: Vec<Integration> = store
             .values()
             .filter(|i| {
-                if i.tenant_id != viewer.tenant_id {
+                if i.tenant_id.0 != viewer.tenant_id {
                     return false;
                 }
                 if i.project_id != q.project_id {
@@ -620,8 +620,8 @@ impl IntegrationQueryPort for InMemoryIntegrationService {
                 .cloned()
                 .ok_or(IntegrationError::NotFound(id))?
         };
-        check_invariant_03_tenant_required(&integration, viewer.tenant_id)?;
-        if !viewer.can_access_project(integration.project_id) {
+        check_invariant_03_tenant_required(&integration, TenantId(viewer.tenant_id))?;
+        if !viewer.can_access_project(*integration.project_id) {
             return Err(IntegrationError::PermissionDenied);
         }
 
@@ -650,7 +650,7 @@ impl IntegrationQueryPort for InMemoryIntegrationService {
                 .ok_or(IntegrationError::NotFound(q.integration_id))?
         };
         check_invariant_03_tenant_required(&integration, q.tenant_id)?;
-        if !viewer.can_access_project(integration.project_id) {
+        if !viewer.can_access_project(*integration.project_id) {
             return Err(IntegrationError::PermissionDenied);
         }
 
