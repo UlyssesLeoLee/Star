@@ -21,6 +21,8 @@ tokio = { workspace = true }
 # 跨域 saga IT (per 2026-09-07 P1-3, 3 write-heavy 域跨域联动)
 domain-comment = { path = "../domain-comment" }
 domain-notification = { path = "../domain-notification" }
+# actor 联动 permission check() (per 2026-09-07 P1-4)
+domain-permission = { path = "../domain-permission" }
 
 [lints]
 workspace = true
