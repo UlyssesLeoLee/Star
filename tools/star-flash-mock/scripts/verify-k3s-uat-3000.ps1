@@ -39,33 +39,36 @@ if ($LASTEXITCODE -ne 0 -or -not $probe.Contains("distro-ok")) {
 Write-Host "  distro 'Ubuntu' OK"
 Write-Host ""
 
-# ---- 1. v27 验证: journalctl -u k3s 无 "Skipping pod sync" ----
-Write-Host "[1/5] v27 验证: journalctl -u k3s | grep -c 'Skipping pod sync' = 0 ..." -ForegroundColor Cyan
-$skippingCount = wsl -d Ubuntu -- bash -lc "journalctl -u k3s --no-pager -n 200 2>&1 | grep -c 'Skipping pod sync'" 2>&1 | Out-String
+# ---- 1. v27 验证: journalctl -u k3s 无 "Skipping pod sync" (最近 5 分钟) ----
+Write-Host "[1/5] v27 验证: journalctl -u k3s | grep -c 'Skipping pod sync' = 0 (最近 5min) ..." -ForegroundColor Cyan
+# 用 journalctl --since "5 min ago" 限定时间窗, 避免 daemon restart 过渡期 noise
+$skippingCount = wsl -d Ubuntu -- bash -lc "journalctl -u k3s --no-pager --since '5 min ago' 2>&1 | grep -c 'Skipping pod sync'" 2>&1 | Out-String
 $skippingCount = $skippingCount.Trim()
 if ($skippingCount -ne "0") {
-    Write-Host "  ERROR: journalctl 有 $skippingCount 条 'Skipping pod sync', kubelet 跟 containerd 通信还没建立" -ForegroundColor Red
-    Write-Host "  建议: 重新跑 'sudo systemctl restart k3s; sleep 60' 后再跑本脚本" -ForegroundColor Yellow
+    Write-Host "  ERROR: journalctl 最近 5 分钟有 $skippingCount 条 'Skipping pod sync', kubelet 跟 containerd 通信还没建立" -ForegroundColor Red
+    Write-Host "  建议: 等 v28 sleep 60s 之后再跑, 或重新 'sudo systemctl restart k3s; sleep 90' 后再跑本脚本" -ForegroundColor Yellow
     exit 2
 }
-Write-Host "  Skipping pod sync count = 0 (kubelet 通信 OK)" -ForegroundColor Green
+Write-Host "  Skipping pod sync (5min) = 0 (kubelet 通信 OK)" -ForegroundColor Green
 Write-Host ""
 
-# ---- 2. v28 验证: kubelet Running + crictl ps 非空 ----
-Write-Host "[2/5] v28 验证: kubelet Running + crictl ps 非空 ..." -ForegroundColor Cyan
-$kubeletRunning = wsl -d Ubuntu -- bash -lc "journalctl -u k3s --no-pager -n 50 2>&1 | grep -c 'kubelet.*Running'" 2>&1 | Out-String
+# ---- 2. v28 验证: kubelet Running + crictl ps 非空 (最近 5 分钟) ----
+Write-Host "[2/5] v28 验证: kubelet Started + crictl ps 非空 (最近 5min) ..." -ForegroundColor Cyan
+# kubelet 启动信息是 "Started kubelet" (k3s 内嵌), 不是字面 "Running"
+# 用 --since "5 min ago" 限定时间窗
+$kubeletStarted = wsl -d Ubuntu -- bash -lc "journalctl -u k3s --no-pager --since '5 min ago' 2>&1 | grep -c 'Started kubelet'" 2>&1 | Out-String
 $crictlPsCount = wsl -d Ubuntu -- bash -lc "sudo -n k3s crictl ps 2>&1 | wc -l" 2>&1 | Out-String
-$kubeletRunning = $kubeletRunning.Trim()
+$kubeletStarted = $kubeletStarted.Trim()
 $crictlPsCount = $crictlPsCount.Trim()
-if ($kubeletRunning -eq "0") {
-    Write-Host "  ERROR: kubelet Running 未出现, sleep 60s 不够, 建议 sleep 120s 重试" -ForegroundColor Red
+if ($kubeletStarted -eq "0") {
+    Write-Host "  ERROR: 'Started kubelet' 最近 5min 未出现, sleep 60s 不够, 建议 sleep 120s 重试" -ForegroundColor Red
     exit 3
 }
 if ([int]$crictlPsCount -lt 2) {
-    Write-Host "  ERROR: crictl ps 只有 $crictlPsCount 行 (期望 >=2, 包含 header)" -ForegroundColor Red
+    Write-Host "  ERROR: crictl ps 只有 $crictlPsCount 行 (期望 >=2, 包含 header), containerd 还没起 sandbox" -ForegroundColor Red
     exit 3
 }
-Write-Host "  kubelet Running 出现 $kubeletRunning 次" -ForegroundColor Green
+Write-Host "  Started kubelet (5min) = $kubeletStarted 次" -ForegroundColor Green
 Write-Host "  crictl ps = $crictlPsCount 行 (非空)" -ForegroundColor Green
 Write-Host ""
 

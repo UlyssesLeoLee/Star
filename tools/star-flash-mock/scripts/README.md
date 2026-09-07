@@ -47,11 +47,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\star-flash-mock\script
 | 步 | 守门 | 验证项 | 失败 exit code | 修复 |
 |---|---|---|---|---|
 | 0 | — | WSL distro Ubuntu 可达 | 1 | `wsl -d Ubuntu echo test` |
-| 1 | v27 | `journalctl -u k3s | grep -c "Skipping pod sync"` = 0 | 2 | `sudo systemctl restart k3s; sleep 60` 重跑 |
-| 2 | v28 | kubelet Running 出现 + `crictl ps` 非空 | 3 | sleep 120s 重试 |
+| 1 | v27 | `journalctl -u k3s --since "5 min ago" | grep -c "Skipping pod sync"` = 0 | 2 | `sudo systemctl restart k3s; sleep 90` 重跑 |
+| 2 | v28 | `journalctl --since "5 min ago" | grep "Started kubelet"` 出现 + `crictl ps` >= 2 行 | 3 | sleep 120s 重试 |
 | 3 | — | rollout restart deployment (用 daocloud 镜像) | 4 | 查 deployment spec image 字段 |
 | 4 | — | pod Ready (60s 预算) | 5 | `kubectl describe pod` 看 events |
 | 5 | v29 | enable port-forward service + curl 3000 | 6 | 查 systemd service / port-forward log |
+
+**v1.0 v1.1 修订说明 (per 2026-09-08 08:16-08:18 JST 实证 3 次失败后调优)**:
+- 步 1 + 步 2 时间窗从 `-n 200` (固定 200 行) 改 `--since "5 min ago"` (5 分钟时间窗), 因为 daemon restart 过渡期 + 反复 restart 会产生历史 noise
+- 步 2 关键字从 "kubelet.*Running" 改 "Started kubelet" (k3s 内嵌 kubelet 实际写 "Started kubelet", 不是 "Running")
+- WSL host 半死症状: `wsl -d Ubuntu -- whoami` 5 次连续返回空输出 + exit 1, 但 6443 端口仍 LISTEN (PID 14380 表明 k3s API 进程在, 但不响应 WSL 内部 bash 调用); **修复**: `wsl --shutdown` + 手动重启 WSL distro (Ulysses 必做)
 
 ## 4.6 Playwright UAT 截图 (verify-k3s-uat-3000.ps1 PASSED 之后)
 

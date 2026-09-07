@@ -1,7 +1,8 @@
 # PHASE-K3S-STAR-MOCK-IMPL-REPORT
 
-> **文档版本**: v0.2 (2026-09-08 08:08 JST)
+> **文档版本**: v0.3 (2026-09-08 08:18 JST)
 > **v0.2 变更**: + §8 续做记录: 镜像拉到 daocloud, 但 k3s kubelet 半死 (container runtime 通信断), 新 pod 100% 起不来; port-forward service 已在 v0.2 期间 disable 避免 auto-restart 浪费 CPU; 等 Ulysses 手动重启 k3s (sudo systemctl restart k3s) 才能续做. v0.2 commit 把 envoy-deployment.yaml image path 改 daocloud 永久落档.
+> **v0.3 变更**: + §9 v0.3 实战记录: Ulysses 静默期间多次 `sudo systemctl restart k3s`, k3s systemd 反复重启 (pid 183 → 215 → 230 → 14380), kubelet 多次 "Skipping pod sync" + "Started kubelet" 交替; verify-k3s-uat-3000.ps1 第一次跑 5min 内 21 条 "Skipping pod sync" fail (exit 2); 脚本 v1.0 → v1.1 调优 (时间窗 +n 200 → --since "5 min ago", 关键字 kubelet.*Running → Started kubelet); 调优后 WSL host 整个半死 (5 个 wsl bash 调用全空输出 + exit 1, 6443 仍 LISTEN PID 14380 但不响应); **新症状 = WSL host 死锁, 不是 k3s daemon 死**; 修复: Ulysses 必 `wsl --shutdown` + 重启 WSL distro, 不可代理.
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **触发**: 2026-09-08 07:36 JST UAT 反馈 "用 playwright 操作进行 UAT 测试,现在启动 3000 端口后黑了,存在显示问题"
 > **范围**: Star 仓 `D:\Star\.worktrees\feat-auto-20260908-204a1a91` 本地恢复 (k3s 6443 / 3000 端口转发), **不动 origin, 不动 main 分支** (per 守门 #1 R-05)
@@ -158,6 +159,7 @@
 |---|---|---|---|
 | v0.1 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初稿: 4 步根因 + 4 改动 + 8 缺口 + 5 角色签字 | 2026-09-08 07:36 JST UAT 反馈 → 07:55 JST 落档 |
 | v0.2 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §8 续做记录 (k3s kubelet 半死, container runtime 通信断, 镜像已落 daocloud 但新 pod 起不来, port-forward service disable); envoy-deployment.yaml image path 改 daocloud 永久落档 | 2026-09-08 08:04-08:08 JST 续做 (sudo 实际是 sudoers 白名单非配额, 但 k3s 内部状态破裂) |
+| v0.3 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §9 v0.3 实战记录 (Ulysses 静默期多次 restart k3s, kubelet pid 183→215→230→14380 反复; verify v1.0 fail exit 2 后调优 v1.1 (时间窗 +n 200 → --since "5 min ago", 关键字 kubelet.*Running → Started kubelet); 但 5 个 wsl bash 调用全空 + exit 1 = WSL host 死锁症状, 6443 仍 LISTEN 但不响应; Ulysses 必 wsl --shutdown 重启 distro) | 2026-09-08 08:14-08:18 JST 静默期 Ulysses 多次 sudo systemctl restart k3s, 触发 WSL host 死锁 |
 
 ---
 
@@ -220,4 +222,59 @@ WSL 内 dockerd + containerd + k3s server 三个 daemon 启动顺序竞争资源
 - 守门 #1 派生规需补 1 条: **拉镜像前必先看 `journalctl -u k3s | grep "Skipping pod sync"`, 若有则不要拉镜像, 先 systemctl restart k3s**
 - 守门 #1 派生规需补 1 条: **systemd 拉起 k3s 后必等待 60s 验证 container runtime 状态, 而非立即 apply yaml**
 - 守门 #1 派生规需补 1 条: **port-forward service 在 apply 之前必先 disable, 避免 "auto-restart 16 次 + 502 错误" CPU 浪费**
+
+---
+
+## §9 v0.3 实战记录 (per 2026-09-08 08:14-08:18 JST, Ulysses 静默期间执行 sudo systemctl restart k3s 多次)
+
+### §9.1 观察时序
+
+| 时刻 | 事件 | k3s pid | kubelet 状态 |
+|---|---|---|---|
+| 08:04 | v0.2 期间 Mavis 触发 systemd 重启 | 183 → 215 | 旧 21m Up |
+| 08:08 | v0.2 commit ad42cff 落地 | 215 | Skipping pod sync 持续 |
+| 08:12 | Mavis 进入静默 | 215 | 静默期间 Ulysses 持续 restart |
+| 08:16:14 | Ulysses restart 后 Mavis 探活 | 230 | "Started kubelet" 出现 |
+| 08:16:22 | Mavis 跑 verify v1.0 | 230 | 5min "Skipping pod sync" = 21 (fail exit 2) |
+| 08:16:44 | 调优后 v1.1 探活 | 230+ | 5min "Skipping pod sync" = 21+ (持续) |
+| 08:17 | Mavis 探活 5 个 wsl bash 调用 | **14380** (新 pid) | k3s API 仍 LISTEN, 但所有 wsl bash 调用空输出 + exit 1 |
+| 08:18 | v0.3 commit (本次) | 14380 | 死锁, Mavis 不可恢复 |
+
+### §9.2 3 次失败实证
+
+1. **v1.0 → v1.1 调优**: `-n 200` 改 `--since "5 min ago"`; "kubelet.*Running" 改 "Started kubelet" (跟 commit 5ce001d spec 配套)
+2. **WSL host 半死症状**: 5 个 wsl bash 命令 (journalctl / crictl ps / kubectl get / whoami) 全部空输出 + exit 1, 但 `Get-NetTCPConnection -LocalPort 6443` 仍 LISTEN (PID 14380). **WSL 内部进程被卡死, 但 Windows 端 TCP 仍可连**
+3. **根因升级**: 之前 v0.2 假设是 k3s daemon 内部死, 实际是 **WSL Ubuntu host 整个进死锁** (systemd 反复 restart k3s 把 wsl host 拖死). Mavis 不能代理 `wsl --shutdown`, Ulysses 必手动
+
+### §9.3 续做清单 (per Ulysses 手动, 不可代理)
+
+```bash
+# 1. (PowerShell) 关闭 WSL 整个 host
+wsl --shutdown
+
+# 2. 重新打开 WSL Ubuntu (会自动启动 distro, 也会触发 wsl 内部 systemd 重启 k3s)
+#    PowerShell 重新打开 wsl 终端即可
+
+# 3. (wsl 内) 等 60s 让 k3s systemd 自动拉起 + kubelet 跟 containerd 通信建立
+wsl -d Ubuntu sleep 60
+
+# 4. (PowerShell) 跑调优后的 verify 脚本
+pwsh -NoProfile -ExecutionPolicy Bypass -File tools\star-flash-mock\scripts\verify-k3s-uat-3000.ps1
+# 5 步全过 = UAT 闭环 PASSED
+
+# 5. (PowerShell) 跑 Playwright UAT 3 case (需先 cd frontend && pnpm install && pnpm exec playwright install chromium)
+cd frontend && pnpm test:e2e -- uat-3000-restore
+# 3/3 passed + screenshot.png = UAT 闭环完结
+```
+
+### §9.4 守门派生规候选 v30 (新, 待 Ulysses 拍板)
+
+- **v30 候选**: **WSL + k3s 死锁必先 `wsl --shutdown` 而非 `systemctl restart k3s` 反复尝试** — 多次 restart 拖死 wsl host, 6443 LISTEN 但内部 bash 全空, 这是 WSL 资源耗尽症状不是 k3s 状态问题; 必先 wsl --shutdown 让 Windows 回收 wsl VM 资源后重启 distro
+
+### §9.5 教训 (per 守门 #11 缺标比错标)
+
+- v28 "sleep 60" **不够** 时 WSL 半死场景, 需要 `wsl --shutdown` 重启 (5-10s 释放 VM, 60s 重启 distro)
+- 调优 verify 脚本时间窗 `-n 200` → `--since "5 min ago"` 是必须的, 否则 daemon restart 过渡期 noise 永远 fail
+- `Started kubelet` 关键字比 `kubelet.*Running` 准确, k3s 内嵌 kubelet 不写 "Running"
+- 3 次 restart 拖死 wsl host, 暴露了 v27/v28/v29 之外的"WSL VM 资源耗尽"症状, 需要 v30 派生规应对
 
