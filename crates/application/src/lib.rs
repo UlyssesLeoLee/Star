@@ -123,6 +123,17 @@ pub trait ApplicationQueryService: Send + Sync {
 pub type WorkItemId = Uuid;
 
 /// **命令 / 查询 / 跨 crate 类型占位结构**(Phase 1 骨架:最小字段集)
+///
+/// **v0 phase 2 标记** (per OPT-NEXT-06-code-stub §3.4 3 supporting crate 占位):
+/// `crates/application` / `crates/api` / `crates/infrastructure` 共 3 supporting crate,
+/// 12 + 12 + 12 ≈ 36 占位结构, P2 阶段 worker 子代理按 `use domain_xxx::*;` 引用替换.
+///
+/// 关联 issue: per `OPT-A1-code-todo-scan.output.md` §3.5 line 128 P1 重要
+/// "占位结构 (Phase 1 骨架)" 模式, 3 supporting crate 统一 Phase 2 删除.
+///
+/// P2 阶段 worker 子代理实装时按 feature 名 (e.g. `application::AgentSession`)
+/// 替换为真实引用, 派前必先 `automation/dispatcher.py brief(...)` 落
+/// `docs/briefs/<task_id>.md` (per AGENTS.md §4 #20 守门派生).
 
 /// Phase 2 由具体 spec 在 `domain-*` 内补全字段;`crates/application` 等
 /// supporting crate 的占位则在 Phase 2 删除,改为 `use domain_xxx::*;` 引用。

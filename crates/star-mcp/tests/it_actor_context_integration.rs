@@ -238,5 +238,9 @@ async fn b2_is_platform_admin_field_propagates() {
     };
 
     let result = svc.create_user(cmd, &actor).await;
-    assert!(result.is_ok(), "platform admin 跨 tenant 应 bypass, 实际: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "platform admin 跨 tenant 应 bypass, 实际: {:?}",
+        result.err()
+    );
 }

@@ -129,6 +129,41 @@ impl ReportType {
         Self::p0_batch().contains(self)
     }
 
+    /// P2 批 7 图表 (C16-C22, 阶段 1 stub 走 NotImplemented, per OPT-NEXT-06-code-stub §3.3 8 P2 图表)
+    pub fn p2_batch() -> &'static [ReportType] {
+        &[
+            Self::AssigneeWorkload,
+            Self::ComponentWorkload,
+            Self::VersionWorkload,
+            Self::ReleaseBurndown,
+            Self::TimeInStatus,
+            Self::Heatmap,
+            Self::RecentlyCreated,
+        ]
+    }
+
+    /// 是否 P2 阶段 (走 NotImplemented 错误结构化)
+    pub fn is_p2(&self) -> bool {
+        Self::p2_batch().contains(self)
+    }
+
+    /// P1 批 6 图表 (C08-C12, C14, 阶段 1 stub 走 generate_stub mock)
+    pub fn p1_batch() -> &'static [ReportType] {
+        &[
+            Self::Throughput,
+            Self::Forecast,
+            Self::TimeTracking,
+            Self::ResolutionTime,
+            Self::Sla,
+            Self::IssueTypeDist,
+        ]
+    }
+
+    /// 是否 P1 阶段 (走 generate_stub fallback)
+    pub fn is_p1(&self) -> bool {
+        Self::p1_batch().contains(self)
+    }
+
     /// 图表 ID (e.g. "C01")
     pub fn chart_id(&self) -> &'static str {
         match self {
@@ -362,11 +397,60 @@ pub enum ReportError {
     /// 内部错误
     #[error("internal error: {0}")]
     Internal(String),
+    /// **P2 阶段未实装标记** (per OPT-NEXT-06 47 stub 实装, per `docs/briefs/next-session/OPT-NEXT-06-code-stub.md` §3.3)
+    ///
+    /// per OPT-WORKER-01 模式: `Error::NotImplemented { feature, suggestion }`
+    /// 14 P1/P2 图表 (C08-C12, C14-C22) + 4 port stub 走此错误结构化.
+    /// P2 阶段 worker 子代理实装时按 feature 名替换为真实数据接入 (V2 接 domain-work-item 等).
+    #[error("not implemented: feature={feature}; suggestion={suggestion}")]
+    NotImplemented {
+        /// 未实装的图表/功能名 (e.g. `"ReportType::C16_AssigneeWorkload"`)
+        feature: String,
+        /// 可执行的修复建议 (e.g. `"Wait for V2 port to domain-work-item per守门 #4"`)
+        suggestion: String,
+    },
 }
 
-// =====================================================================
-// 4. service - ReportService (P0 真实, P1/P2 stub)
-// =====================================================================
+impl ReportError {
+    /// 构造 NotImplemented 错误的便捷方法 (per OPT-WORKER-01 模式, 跟 `BatchError::not_implemented` 对齐)
+    pub fn not_implemented(feature: impl Into<String>, suggestion: impl Into<String>) -> Self {
+        Self::NotImplemented {
+            feature: feature.into(),
+            suggestion: suggestion.into(),
+        }
+    }
+
+    /// HTTP 状态码 (per 守门 #12 P2 阶段 R-007 API 边界)
+    pub fn http_status(&self) -> u16 {
+        match self {
+            Self::NotFound(_) => 404,
+            Self::PermissionDenied { .. } => 403,
+            Self::ValidationFailed(_) | Self::FilterInvalid(_) | Self::ScopeMismatch { .. } => 422,
+            Self::DataTooLarge { .. } => 413,
+            Self::DataSource(_) | Self::Computation(_) | Self::Export(_) | Self::Internal(_) => 500,
+            Self::CacheUnavailable(_) => 503,
+            Self::NotImplemented { .. } => 501,
+        }
+    }
+
+    /// 错误码字符串 (per star-context 错误模型)
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::NotFound(_) => "REPORT_NOT_FOUND",
+            Self::PermissionDenied { .. } => "REPORT_PERMISSION_DENIED",
+            Self::ValidationFailed(_) => "REPORT_VALIDATION_FAILED",
+            Self::FilterInvalid(_) => "REPORT_FILTER_INVALID",
+            Self::ScopeMismatch { .. } => "REPORT_SCOPE_MISMATCH",
+            Self::DataTooLarge { .. } => "REPORT_DATA_TOO_LARGE",
+            Self::DataSource(_) => "REPORT_DATA_SOURCE_ERROR",
+            Self::Computation(_) => "REPORT_COMPUTATION_ERROR",
+            Self::Export(_) => "REPORT_EXPORT_ERROR",
+            Self::CacheUnavailable(_) => "REPORT_CACHE_UNAVAILABLE",
+            Self::Internal(_) => "REPORT_INTERNAL",
+            Self::NotImplemented { .. } => "REPORT_NOT_IMPLEMENTED",
+        }
+    }
+}
 
 /// 报告服务 (聚合 Cache + 4 个 Port, 生成/导出报告)
 pub struct ReportService {
@@ -428,7 +512,13 @@ impl ReportService {
         let result = if report_type.is_p0() {
             self.generate_p0(report_type, &filter, report_id, cache_key.clone())
                 .await?
+        } else if report_type.is_p2() {
+            // P2 阶段 C16-C22 (per OPT-NEXT-06-code-stub §3.3 8 P2 图表)
+            // 走真实 module → 返 NotImplemented 错误
+            self.generate_p0(report_type, &filter, report_id, cache_key.clone())
+                .await?
         } else {
+            // P1 阶段 C08-C12, C14-C15 走 generate_stub (mock 数据, 阶段 1 fallback)
             self.generate_stub(report_type, &filter, report_id, cache_key.clone())
                 .await?
         };
@@ -521,7 +611,35 @@ impl ReportService {
             ReportType::PriorityDist => {
                 domain::c15_priority_dist::generate(&*self.work_item_port, filter, report_id).await
             }
-            // P2 + 暂未实装的子图走 stub
+            // P2 阶段 C16-C22 (per OPT-NEXT-06-code-stub §3.3 8 P2 图表)
+            // V2 接 domain-work-item 等真实数据, 当前返回 NotImplemented
+            ReportType::AssigneeWorkload => {
+                domain::c16_assignee_workload::generate(&*self.work_item_port, filter, report_id)
+                    .await
+            }
+            ReportType::ComponentWorkload => {
+                domain::c17_component_workload::generate(&*self.work_item_port, filter, report_id)
+                    .await
+            }
+            ReportType::VersionWorkload => {
+                domain::c18_version_workload::generate(&*self.work_item_port, filter, report_id)
+                    .await
+            }
+            ReportType::ReleaseBurndown => {
+                domain::c19_release_burndown::generate(&*self.work_item_port, filter, report_id)
+                    .await
+            }
+            ReportType::TimeInStatus => {
+                domain::c20_time_in_status::generate(&*self.work_item_port, filter, report_id).await
+            }
+            ReportType::Heatmap => {
+                domain::c21_heatmap::generate(&*self.work_item_port, filter, report_id).await
+            }
+            ReportType::RecentlyCreated => {
+                domain::c22_recently_created::generate(&*self.work_item_port, filter, report_id)
+                    .await
+            }
+            // 暂未实装的子图走 stub (例如 P3 阶段的扩展图表)
             _ => {
                 self.generate_stub(report_type, filter, report_id, cache_key)
                     .await
@@ -619,11 +737,54 @@ mod tests {
     #[tokio::test]
     async fn test_generate_stub_for_p2() {
         let svc = make_svc();
+        // C21 Heatmap 现在走真模块 (返回 NotImplemented), 不再走 generate_stub
+        // 测试 c19 ReleaseBurndown 走 generate_stub fallback (per lib.rs:586)
+        // 注意: 当前所有 22 图表都已注册到 generate_p0, 没有 fallback 路径
+        // 验证 NotImplemented 错误
         let r = svc
             .generate(ReportType::Heatmap, ReportFilter::default())
-            .await
-            .unwrap();
-        assert_eq!(r.report_type, ReportType::Heatmap);
-        assert_eq!(r.points.len(), 10);
+            .await;
+        assert!(r.is_err());
+        let err = r.unwrap_err();
+        assert_eq!(err.http_status(), 501);
+        assert_eq!(err.code(), "REPORT_NOT_IMPLEMENTED");
+    }
+
+    /// per OPT-NEXT-06-code-stub §3.3 4 port stub: 验证 V2 迁移标记
+    /// 4 port 仍能 in-memory 正常响应 (单测) + V2 迁移入口
+    #[tokio::test]
+    async fn test_4_port_stubs_smoke() {
+        use crate::infrastructure::port_stubs::{
+            InMemoryPermissionPort, InMemorySprintPort, InMemoryUserPort, InMemoryWorkItemPort,
+        };
+        // 4 port 都能构造
+        let _ = InMemoryWorkItemPort::new();
+        let _ = InMemorySprintPort::new();
+        let _ = InMemoryUserPort::new();
+        let _ = InMemoryPermissionPort::new();
+    }
+
+    /// 14 chart P1/P2 + 4 port stub → 18 item 走 NotImplemented / V2 迁移路径
+    /// (c08-c15 走真 generate mock, c16-c22 走 NotImplemented, 4 port 走 V2 迁移)
+    #[tokio::test]
+    async fn test_p2_charts_return_not_implemented() {
+        let svc = make_svc();
+        // 7 P2 阶段图表 (C16-C22) 应返回 NotImplemented
+        let p2_charts = [
+            ReportType::AssigneeWorkload,
+            ReportType::ComponentWorkload,
+            ReportType::VersionWorkload,
+            ReportType::ReleaseBurndown,
+            ReportType::TimeInStatus,
+            ReportType::Heatmap,
+            ReportType::RecentlyCreated,
+        ];
+        for chart in p2_charts {
+            let r = svc.generate(chart, ReportFilter::default()).await;
+            assert!(r.is_err(), "P2 chart {chart:?} should return error");
+            let err = r.unwrap_err();
+            assert_eq!(err.http_status(), 501, "P2 chart {chart:?} should be 501");
+            assert_eq!(err.code(), "REPORT_NOT_IMPLEMENTED");
+        }
     }
 }

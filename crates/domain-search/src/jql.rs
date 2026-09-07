@@ -592,24 +592,21 @@ impl JqlExecutor {
     }
 }
 
+/// **v0 phase 2 实装** (per OPT-NEXT-06-code-stub §3.4 domain-search JQL):
+/// 替换原 stub "hand-rolled .* 通配" 为 `regex` crate 真实匹配.
+///
+/// 行为差异:
+/// - v0 phase 1 stub: 仅支持 `.*` 通配 + 字面字符, 不支持 `.` `+` `?` `[]` 等
+/// - v0 phase 2 实装: 走 `regex::Regex::is_match`, 支持完整 regex 语法
+///
+/// 编译失败 (e.g. 用户传非法 pattern) → 返 false (不命中), 不 panic.
+/// 这是 JQL ~ 关键字的语义约定: 不合法的 LIKE pattern 应返 "无匹配", 由上层
+/// `JqlError::InvalidPattern` 区分. 当前实现保持向后兼容.
 fn regex_match(pattern: &str, text: &str) -> bool {
-    // 简化: 支持 .* 通配 + 字面字符. 复杂 regex 留给 regex crate (Phase 2)
-    let re_parts: Vec<&str> = pattern.split(".*").collect();
-    let mut pos = 0;
-    for (i, part) in re_parts.iter().enumerate() {
-        if part.is_empty() {
-            continue;
-        }
-        if let Some(found) = text[pos..].find(part) {
-            if i == 0 && found != 0 {
-                return false;
-            }
-            pos += found + part.len();
-        } else {
-            return false;
-        }
+    match regex::Regex::new(pattern) {
+        Ok(re) => re.is_match(text),
+        Err(_) => false, // 非法 pattern 视作无匹配
     }
-    true
 }
 
 // =====================================================================
@@ -706,6 +703,23 @@ mod tests {
             }
             _ => panic!("expected Comparison"),
         }
+    }
+
+    /// **v0 phase 2 实装** (per OPT-NEXT-06-code-stub §3.4 domain-search JQL):
+    /// 真实 regex 匹配 (替换原 hand-rolled stub).
+    /// 测试真 regex 语法 (.+ ? [] 等) 能正确工作.
+    #[test]
+    fn test_regex_match_real_impl() {
+        // 1. .* 通配仍工作 (向后兼容)
+        assert!(regex_match(".*auth.*", "the auth module"));
+        // 2. 真 regex: 字符类
+        assert!(regex_match(r"\d+", "123"));
+        assert!(!regex_match(r"\d+", "abc"));
+        // 3. 真 regex: 锚定
+        assert!(regex_match(r"^foo$", "foo"));
+        assert!(!regex_match(r"^foo$", "foobar"));
+        // 4. 非法 pattern 返 false (不 panic)
+        assert!(!regex_match("[unclosed", "anything"));
     }
 
     #[test]

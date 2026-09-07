@@ -95,9 +95,9 @@ impl WhatIfScenario {
 #[serde(rename_all = "lowercase")]
 pub enum Confidence {
     /// 高: 在 active sprint 或 next sprint
-    Committed,   // 高: 在 active sprint 或 next sprint
+    Committed, // 高: 在 active sprint 或 next sprint
     /// 中: backlog-refined, 未 sprint-scheduled
-    Planned,     // 中: backlog-refined, 未 sprint-scheduled
+    Planned, // 中: backlog-refined, 未 sprint-scheduled
     /// 低: 仅方向性承诺
     Exploratory, // 低: 仅方向性承诺
 }
