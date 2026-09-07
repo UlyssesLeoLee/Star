@@ -1,0 +1,16 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S29-mcp-tool-failed-empty-result",
+  "events": [
+    {
+      "event_type": "mcp.tool.empty_result.verified",
+      "event_id": "evt-2026-09-07-032",
+      "tools": [
+        "find_references",
+        "get_code_context",
+        "get_symbol",
+        "search_code"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S30-tsc-err-render-fallback",
+  "events": [
+    {
+      "event_type": "tsc.err.render_fallback.verified",
+      "event_id": "evt-2026-09-07-033",
+      "locations": [
+        "src/app/agent-view/page.tsx:398",
+        "src/lib/store.ts:562"
+      ]
+    }
+  ]
+}

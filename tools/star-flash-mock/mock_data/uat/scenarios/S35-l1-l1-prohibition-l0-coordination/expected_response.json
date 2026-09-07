@@ -1,0 +1,16 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S35-l1-l1-prohibition-l0-coordination",
+  "class": "Transaction",
+  "response_200": {
+    "l1_l1_check_id": "l1l1-uat-2026-09-07-001",
+    "l1_pairs_checked": 5,
+    "l1_to_l1_direct_prohibited": true,
+    "l0_coordination_enforced": true,
+    "l0_routed": 5,
+    "l1_direct_routed": 0,
+    "cycle_detected": false,
+    "complexity": "O(V+E)",
+    "audit_logged": true
+  }
+}

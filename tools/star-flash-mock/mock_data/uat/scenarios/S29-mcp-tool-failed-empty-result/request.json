@@ -1,0 +1,16 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S29-mcp-tool-failed-empty-result",
+  "class": "Master",
+  "method": "POST",
+  "endpoint": "/api/mcp/tools-invoke",
+  "request": {
+    "tools": [
+      "find_references",
+      "get_code_context",
+      "get_symbol",
+      "search_code"
+    ],
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

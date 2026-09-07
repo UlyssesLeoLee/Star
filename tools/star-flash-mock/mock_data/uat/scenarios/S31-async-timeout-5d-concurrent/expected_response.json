@@ -1,0 +1,14 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S31-async-timeout-5d-concurrent",
+  "class": "Transaction",
+  "response_200": {
+    "concurrent_update_id": "concur-uat-2026-09-07-001",
+    "domains_updated": 5,
+    "elapsed_ms": 0,
+    "timeout_warning_triggered": false,
+    "coordination_consistent": true,
+    "l0_coordinated": true,
+    "audit_logged": true
+  }
+}

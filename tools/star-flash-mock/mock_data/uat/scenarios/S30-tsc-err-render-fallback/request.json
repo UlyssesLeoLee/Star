@@ -1,0 +1,14 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S30-tsc-err-render-fallback",
+  "class": "Transaction",
+  "method": "GET",
+  "endpoint": "/agent-view",
+  "request": {
+    "actor_session_id": "session-2026-09-07-001",
+    "tsc_err_locations": [
+      "src/app/agent-view/page.tsx:398",
+      "src/lib/store.ts:562"
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S34-tmo-7node-orchestration-coordination",
+  "class": "Transaction",
+  "tables": {
+    "transaction.tmo_orchestration_log": {
+      "insert_count": 7,
+      "append_only": true,
+      "audit_required": true,
+      "nodes": [
+        "M-N1",
+        "M-N2",
+        "M-N3",
+        "M-N4",
+        "M-N5",
+        "M-N6",
+        "M-N7"
+      ]
+    }
+  }
+}

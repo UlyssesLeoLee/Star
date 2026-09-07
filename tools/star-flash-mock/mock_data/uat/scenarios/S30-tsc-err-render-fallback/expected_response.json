@@ -1,0 +1,14 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S30-tsc-err-render-fallback",
+  "class": "Transaction",
+  "response_200": {
+    "page": "agent-view",
+    "tsc_err_advisory_mode": true,
+    "guard_v2_advisory": true,
+    "ci_pr_12_pass": "9/9",
+    "error_boundary_triggered": false,
+    "fallback_ui": false,
+    "audit_logged": true
+  }
+}

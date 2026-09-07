@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S31-async-timeout-5d-concurrent",
+  "events": [
+    {
+      "event_type": "five_domain.concurrent.completed",
+      "event_id": "evt-2026-09-07-034",
+      "domains": 5,
+      "l0_coordinated": true
+    }
+  ]
+}

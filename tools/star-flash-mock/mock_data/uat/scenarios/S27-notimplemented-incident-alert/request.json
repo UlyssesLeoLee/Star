@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S27-notimplemented-incident-alert",
+  "class": "Work",
+  "method": "POST",
+  "endpoint": "/api/incidents/process-alert",
+  "request": {
+    "alert_id": "alert-2026-09-07-001",
+    "severity": "high",
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

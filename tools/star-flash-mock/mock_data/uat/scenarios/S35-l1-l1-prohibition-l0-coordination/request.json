@@ -1,0 +1,33 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S35-l1-l1-prohibition-l0-coordination",
+  "class": "Transaction",
+  "method": "POST",
+  "endpoint": "/api/tmo/l1-l1-check",
+  "request": {
+    "l1_pairs": [
+      [
+        "SA-01",
+        "SA-02"
+      ],
+      [
+        "SA-03",
+        "SA-04"
+      ],
+      [
+        "SA-05",
+        "SA-06"
+      ],
+      [
+        "SA-07",
+        "SA-08"
+      ],
+      [
+        "SA-09",
+        "SA-10"
+      ]
+    ],
+    "l0_coordination_required": true,
+    "actor_session_id": "session-2026-09-07-001"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S33-mavis-proxy-real-person-signoff",
+  "class": "Master",
+  "tables": {
+    "master.mavis_signoff_history": {
+      "insert_count": 5,
+      "scd_type": 2,
+      "physical_delete_forbidden": true,
+      "domains": [
+        "player",
+        "economy",
+        "match",
+        "social",
+        "admin"
+      ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S35-l1-l1-prohibition-l0-coordination",
+  "class": "Transaction",
+  "tables": {
+    "transaction.l1_l1_prohibition_audit": {
+      "insert_count": 5,
+      "append_only": true,
+      "audit_required": true,
+      "l0_routed": 5,
+      "l1_direct_routed": 0
+    }
+  }
+}

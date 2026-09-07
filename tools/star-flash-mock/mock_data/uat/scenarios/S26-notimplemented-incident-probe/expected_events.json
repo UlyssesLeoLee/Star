@@ -1,0 +1,11 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S26-notimplemented-incident-probe",
+  "events": [
+    {
+      "event_type": "capability.probe-production.rejected",
+      "event_id": "evt-2026-09-07-029",
+      "boundary": "REQ-OPS-003 §30.6"
+    }
+  ]
+}

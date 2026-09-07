@@ -1,0 +1,21 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S33-mavis-proxy-real-person-signoff",
+  "class": "Master",
+  "response_201": {
+    "sign_off_id": "signoff-uat-2026-09-07-001",
+    "domains_signed": 5,
+    "mavis_proxy_sign": true,
+    "mavis_sign_type": "Mavis 临时代签",
+    "commit_author": "Ulysses <ulysses@mavis.local>",
+    "approval": "架构师 (Mavis 接手 agent per DEC-008)",
+    "revised_by": "Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手",
+    "real_person_signoff_pending": true,
+    "real_person_timeline": "待定 (per 9/3 19:35 JST 拍板 D 维持)",
+    "scd_version": 1,
+    "valid_from": "2026-09-07T16:00:00Z",
+    "valid_to": null,
+    "physical_delete_forbidden": true,
+    "rls_13_classes_attached": true
+  }
+}

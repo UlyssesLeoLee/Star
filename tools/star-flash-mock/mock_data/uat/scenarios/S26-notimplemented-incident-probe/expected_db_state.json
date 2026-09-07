@@ -1,0 +1,12 @@
+{
+  "fixture_version": "v1",
+  "scenario": "S26-notimplemented-incident-probe",
+  "class": "Work",
+  "tables": {
+    "work.negative_result_cache": {
+      "insert_count": 1,
+      "retention_period": "1d",
+      "key": "probe-production:404"
+    }
+  }
+}
