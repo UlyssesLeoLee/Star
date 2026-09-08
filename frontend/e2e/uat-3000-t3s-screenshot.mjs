@@ -11,7 +11,7 @@
 import { chromium } from '@playwright/test';
 import { writeFileSync, existsSync } from 'fs';
 
-const URL_3000 = 'http://localhost:3000';
+const URL_3000 = 'http://localhost:3001';  // 改 3001 (避开 5176 netsh portproxy 冲突, 跑 star 真实 frontend Next.js dev)
 const MODE = process.env.MODE || 'navigate-then-wait';
 
 async function navigateThenWait() {
