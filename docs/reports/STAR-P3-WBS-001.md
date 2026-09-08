@@ -668,6 +668,94 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 
 ---
 
+### 14.11 Agent Relationship Graph (ARG) 阶段（per 2026-09-08 22:35 JST `ask_7d7ffcac2353adad7d3f6f69` 4 拍板 + 9/9 用户发令"基本设计也做一下" + 9/9 "自审" + 9/9 "加入wbs"）
+
+> **背景 (per 9/8 22:35 JST 用户原话)**: "agent 界面内, 各个 agent 之间可以有图论数据库那种 edge, 可以设置 agent 之间的关系, 这种关系可以反映到它们之间的协作和工作内容中... 我希望 agent 之间的关系可以对它们的工作产生益处, 创造不同的 agents 团队, 通过不同团队配置的组合, 实现更加丰富的成就"
+>
+> **拍板落地** (per `ask_7d7ffcac2353adad7d3f6f69` 4 拍板):
+> - **scope** = 新建 `SRS-AGENT-RELATIONSHIP-001.md` (独立 SRS, 跨 LangGraph + Agent Runtime view 平行)
+> - **backend** = **Memgraph** (图数据库, Bolt 7687 + HTTP 7444, Docker compose 启动, 数据卷持久化)
+> - **关系类型** = 4 核心 + 6 扩展 = **10 类** (delegates_to / consults / collaborates_with / reports_to / mentors / peer_reviews / stand_in_for / shadows / challenges / trusts, 参考人类同事关系丰富化)
+> - **成就系统** = **完整版** (关系 + 协作行为 + 产出质量 3 维度, ≥20 成就, 8 COMMON + 7 RARE + 3 EPIC + 2 LEGENDARY)
+>
+> **3 文档落档** (per 9/8-9/9 跨 session 落档):
+> - `docs/requirements/SRS-AGENT-RELATIONSHIP-001.md` v0.1 (663 行) — commit `0bacaeb` (9/8 22:39 JST)
+> - `docs/design/BD-AGENT-RELATIONSHIP-001.md` v0.1 (1088 行) — commit `464a646` (9/9 00:11 JST)
+> - `docs/design/DD-AGENT-RELATIONSHIP-001.md` v0.1.1 (1919+392=2311 行) — commit `49c8938` (v0.1) + `a697284` (self-review v0.1.1)
+>
+> **5-tier 架构 + 24 组件 + 4 新 crate** (per BD §2):
+> - UI Tier: `frontend/src/app/agent-relationships/` 新路由 + Agent View 1 tab 集成
+> - API Tier: `crates/api/src/arg/` 13 REST + 1 WebSocket
+> - Data Tier: **`crates/arg/` 新 crate** (Agent/Edge/Template/Achievement models + Memgraph client + 6 子模块)
+> - Bridge Tier: **`crates/arg-bridge/` 新 crate** (MemGraphEventListener / LangGraphStateUpdater PyO3 / PeriodFlushWorker / OfflineQueue sled)
+> - Effect Tier: **`crates/arg-effect/` 新 crate** (ARGDispatchRouter / ARGContextInjector / ARGTrustEngine / ARGOutputEvaluator / ARGAchievementEngine)
+>
+> **自动化档** (per `docs/automation-design.md` v0.1 §4 维打分 R/V/S/A): 4 [P] / 3 [M] / 3 [S] / 1 真人寻访 = 11 子项
+
+| # | 子项 | 标题(拍板) | 软预算 | 软参考周 | 依赖 | 状态 | 自动化档 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| **ARG.1** | ARG.1 | **crates/arg 6 子模块** (Agent/Edge/Template/Achievement models + MemgraphClient + EdgeOps + TemplateOps + cypher_cache + migration) | **6M** | **1 周** | **G-1 Memgraph 客户端 crate 调研** | 🟡 docs 阶段 (per DD §3.1 + §4 详细设计落档) | **[P]** `memgraph_setup.py` + `arg_seed.py` | W1 第一件事, Docker compose 启动 + 5 表 SQL schema + 52 UT; 守门 #1 v25 cargo test -p star-arg --lib -j 4 100% pass |
+| **ARG.2** | ARG.2 | **crates/arg-bridge 4 子模块** (MemgraphEventListener / LangGraphStateUpdater / PeriodFlushWorker / OfflineQueue) | **4M** | **0.7 周** | ARG.1 | 🟡 docs 阶段 (per DD §3.1 + §4.10-4.11) | **[P]** `arg_bridge_test.py` | W2, 同步桥协议 (Memgraph Bolt subscription + EventBus + 30s 周期 flush + sled 离线降级) + 10 UT; 守门 #1 v25 单 crate 模式 |
+| **ARG.3** | ARG.3 | **crates/arg-effect 5 子模块** (ARGDispatchRouter / ARGContextInjector / ARGTrustEngine / ARGOutputEvaluator / ARGAchievementEngine) | **5M** | **0.8 周** | ARG.1 + ARG.2 + 守门 #3 v2 5 域 Lead 拍板 D | 🟡 docs 阶段 (per DD §3.1 + §4.5-4.9) | **[P]** `arg_dispatch_test.py` | W3, 4 维度 effect (dispatch 路由 / 上下文共享 / 信任度 / 产出评估) + 8 拓扑成就 Cypher 模板 (G-6 闭环) + 10 套 challenges 双向论证 prompt (G-5 闭环) + L0↔L1 PyO3 协议 (G-3 闭环) + 18 UT |
+| **ARG.4** | ARG.4 | **crates/api/src/arg/ 13 REST + 1 WebSocket + RLS 13 类** | **3M** | **0.5 周** | ARG.1 | 🟡 docs 阶段 (per DD §4.12) | **[M]** `arg_api_test.py` | W4, 13 端点 (CRUD agents + CRUD edges + graph + templates/instantiate + 2 achievements) + 1 WS `/ws/arg/events` + 10 IT |
+| **ARG.5** | ARG.5 | **frontend/src/app/agent-relationships/ 5 UI 组件 + zustand store 5 channel** | **3M** | **0.5 周** | ARG.4 | 🟡 docs 阶段 (per DD §4.13) | **[M]** `arg_ui_test.py` | W4, RelationshipEditor / RelationshipView / AchievementWall / EdgeTypeSelector / TemplateGallery + useARGStore 5 channel (agents/edges/templates/achievements/events) |
+| **ARG.6** | ARG.6 | **30 UT 完整落地 (crates/arg 24 + crates/arg-bridge 10 + crates/arg-effect 18, 但去重后 = 52 UT per DD §10.1)** | **2M** | **0.3 周** | ARG.1-3 | 🟡 docs 阶段 (per DD §10.1 完整列表) | **[S]** — | P3-D W1, cargo test -p star-arg --lib -j 4 100% pass, 守门 #1 v25 实证 |
+| **ARG.7** | ARG.7 | **10 IT + 8 E2E + 4 PT 端到端实装** (拖拽建边 / Dispatch 路由 / Consults / 协作並行 / Stand-in fallback / Trust skip verify / 成就解锁 / 离线重连 + 4 PT 性能指标) | **3M** | **0.5 周** | ARG.1-6 | 🟡 docs 阶段 (per DD §10.2-§10.4) | **[M]** `arg_e2e_test.py` | P3-D W2, 74 测试用例完整落地, 8 E2E (含前端 Playwright 拖拽) + 4 PT (边创建 P95 < 200ms / Cypher P95 < 500ms / 事件推送 < 100ms / 成就评估 P95 < 1s) |
+| **ARG.8** | ARG.8 | **7 行为成就 + 5 产出质量成就 evaluator 落地** (8 拓扑已在 ARG.3 落地) | **2M** | **0.3 周** | ARG.3 + ARG.7 | 🟡 docs 阶段 (per BD §7.4 + DD §3.2.4) | **[M]** `arg_behavior_eval.py` | P3-E W1, 3 evaluator 并行 + 异步触发 + SSE 推送; 20 成就完整闭环 (8 拓扑 + 7 行为 + 5 产出) |
+| **ARG.9** | ARG.9 | **PHASE-ARG-IMPL-REPORT.md v0.1 实施报告** (per AGENTS.md §3 7 段结构) | **0.5M** | **0.1 周** | ARG.1-8 收官 | 🟡 docs 阶段 (待 P3-C~P3-E 实装) | **[S]** — | P3-E 收官时落档, 含 5 守门维度实证 + 跨 session 续做清单 |
+| **ARG.10** | ARG.10 | **DDD Review (G-9 跟 TMO 9 节点边界 + G-4 trusts 跳过 verify 安全审计 + G-10 Schema V2 迁移路径)** | **1M** | **0.2 周** | ARG.1-3 docs 落档 | 🟡 docs 阶段 (per DD §13 G-9/G-4/G-10) | **[S]** — | 5 域 Lead 真人到位 (per 守门 #14 v2 拍板 D 维持) 后 DDD Review 拍板, 缺口 G-9 关键 (ARG 跟 TMO 任务卡 DAG 边界) |
+| **ARG.11** | ARG.11 | **5 域 Lead 真人到位 (追溯签字覆盖修订历史)** | **0.5M** | **0.1 周** | ARG.1-10 收官 | 🟡 真人寻访 (per 守门 #14 v2 拍板 D) | **[S]** 真人寻访 | 跨 session 续, 真人到位后追溯签字覆盖 Mavis 临时代签 (per 守门 #1 禁回溯叙事) |
+| **小计** | | | **~30M** | **5 周** | | **0/11 实质收官 + 11/11 docs 阶段** | **4[P] / 3[M] / 3[S] / 1 真人** | **ARG 阶段 0/11 收官 (per 9/8-9/9 跨 2 session 落档 SRS+BD+DD 三件套 + commit 4 个, 实施待启动)** |
+
+**已知缺口 (per 缺标比错标, per DD §13 已落档 8 项)**:
+1. **G-1** Memgraph 客户端 crate (`r2d2-memgraph`) 待调研, 候选: 自实现 (Bolt protocol) / 用 `memgraph-client` 社区 — P3-C W1 第一件事
+2. **G-2** k3s 部署 yaml 待写, Docker compose 模板可写 — P3-C W2
+3. **G-3** ~~L0↔L1 通信协议 + ARG 集成~~ — **本 DD §5 已闭环** (PyO3 binding + 5 Reducer + 4 effect 维度集成代码)
+4. **G-4** trusts 跳过 verify 安全审计 (建议 trust_score ≥ 0.9 + agent 类型白名单双约束) — DDD Review 拍板
+5. **G-5** ~~challenges 双向论证 prompt 模板 10 套~~ — **本 DD §7 已闭环** (5 decision_type × 2 trust_tier 组合)
+6. **G-6** ~~8 拓扑成就 Cypher 模板~~ — **本 DD §6 已闭环** (TOP-001..TOP-008 完整 Cypher)
+7. **G-7** Memgraph HA 集群 (单点故障, replica set) — 后续阶段
+8. **G-8** 5 域 Lead 真人到位 timeline — 真人到位时 (per 守门 #14 v2 拍板 D 维持)
+9. **G-9** 跟 TMO 9 节点 (任务卡 DAG) 边界梳理 — DDD Review 拍板
+10. **G-10** ARG Schema V2 迁移路径 (V1 → V2 加新关系类型时怎么处理存量数据) — P3-E 写 `arg_migration` v1→v2 脚本
+11. **G-11** 成就可分享的 PNG 导出 + 描述 JSON + 周报模板 — 后续阶段
+12. **G-12** ARG 跟 RGS 仓的独立边界 (per AGENTS.md §5 仓库拓扑硬约束, Star 仓不引用 RGS 5 域镜像作为业务源头) — 持续合规
+
+**ARG 跟现有 view 关系** (per BD §1.3 + DD §1.2):
+- **不取代** LangGraph 任务卡 DAG (TMO 9 节点, 那是任务编排) — G-9 边界梳理
+- **不取代** Agent View 画布 (SRS-AGENT-VIEW-001, 那是单体可视化) — ARG 是其 1 tab 视角
+- **不取代** Agent Runtime ECS (那是底层 Runtime)
+- **新增** agent 之间的 social 层 (Memgraph 持久化 + in-process LangGraph 同步桥)
+
+**4 effect 维度真实影响协作** (per 用户原话"对工作产生益处"):
+- **Dispatch 路由** (`ARGDispatchRouter`): Lead 收到任务按 outgoing delegates_to 自动 spawn Worker, 失败按 stand_in_for fallback
+- **上下文共享** (`ARGContextInjector`): mentee 启动拉 mentor 历史决策, shadow 静默订阅, token 节省 20-40%
+- **信任度加权** (`ARGTrustEngine`): trust_score ≥ 0.8 + trusts 边 weight ≥ 0.7 跳过 verify, 节省 15% token
+- **产出评估** (`ARGOutputEvaluator`): challenges 强制双向论证, peer_reviews 阈值 ≥ 0.8
+
+**20 成就 3 维度稀有度分布** (per BD §7.4):
+- **8 拓扑** (TOPOLOGY): 4 COMMON + 3 RARE + 1 EPIC
+- **7 行为** (BEHAVIOR): 3 COMMON + 2 RARE + 1 EPIC + 1 LEGENDARY
+- **5 产出** (OUTPUT): 1 COMMON + 2 RARE + 1 EPIC + 1 LEGENDARY
+- **总计 20**: 8C (40%) + 7R (35%) + 3E (20%) + 2L (5%), 按维度给不同用户引导路径
+
+**守门合规** (per DD §12.1):
+- #1 + #1 v15 (docs 同步饱和: 9/8 用户发令"做 ARG" + 9/9 "基本设计" + 9/9 "自审" + 9/9 "加入wbs" = 4 次新事件触发, 不算饱和违规)
+- #1 v19 (自动化档判定 ≥ 2 维 [P] 强制 Python 化): 4 子项必先 `scripts/automation/<purpose>.py` 落地
+- #1 v25 (cargo test 单 crate 模式): `cargo test -p star-arg --lib -j 4` 单 crate 100% pass
+- #3 (5 域独立 Lead, 跨域边强制 consults 而非 delegates_to): ARG 关系定义时 enforce
+- #5 (env 安全, Memgraph 连接串走 env, 不打印)
+- #6 (PowerShell only, ARG 部署脚本 PowerShell)
+- #7 (0 unsafe, `unsafe_code = "forbid"` per workspace lints)
+- #9 (子代理 RPC 不可靠, ARG 同步走 in-process 推 + 周期 flush, 不用 RPC)
+- #10 (代签规则, ARG 关系修改 author = Ulysses per 9/8 15:19 第 6 次强化)
+- #12 (Python 化任务卡, [P] 子项 docs 同步必更新 `docs/automation-design.md` §4 + `scripts/automation/registry.md`)
+- #13 (W/T/M 三类横展开, 5 表全部分类: agents=Master / edges=Master / audit=Transaction / template_instances=Work TTL 30d / events=Transaction / unlocks=Transaction)
+- #14 v2 (5 域 Lead 拍板 D, Mavis 临时代签, 真人到位后追溯签字)
+- #19 v19 (守门 #12 死循环饱和边界, 4 次新事件触发都允许)
+
+---
+
 ## 15. 累计统计 (P3 全 5 阶段 + P3 之外 跨 Phase 0-9)
 
 | 阶段 | 子项 | token 预算 | 软参考周 | 实证状态 |
@@ -690,9 +778,15 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | **P3 之外 UT-IT-51 端到端实装 (9/8 17:20 JST 拍板)** | TEST-DESIGN §2 UT 26 + §3 IT 23 派生缺口实装 (F-02 log AI 起点, 跟 F-05 ops-log.sql 3 表联动 it_ddl_path_consistency 1 项, 跨 4 模块 + Hybrid AI + 6-field 错误码 + healthz/readyz/RateLimit/并发/DB 集成 2 项) | ~2.05M | ~0.34 周 | 🟢 **1/1 子项 100% 收官** (per 2026-09-08 17:50 JST PR #32 MERGED, 18 files +2498/-7, 2 新 IT 文件 it_cross_module.rs + it_db_integration.rs; commit `92bbcd6` squash merge; 67/67 lib + 42/42 IT = 109/109 PASS 5 项守门全 PASS) |
 | **P3 之外 IT-5-GAPS 端到端实装 (9/8 18:40 JST 拍板)** | §3 IT 5 已知缺口 DDD Review 必查实装 (真实 PG 容器化 + RLS 13 類 cross-tenant 隔离 + Ladder L2 fallback + rate limit middleware 60 req/min + graceful shutdown axum::serve with_shutdown) | ~1.5M | ~0.25 周 | 🟢 **1/1 子项 100% 收官** (per 2026-09-08 19:30 JST PR #33 MERGED, 8 files +2100/-14, 5 缺口 + 1 派生; commit `77be968` squash merge; 67/67 lib + 48/48 IT = 115/115 PASS 5 项守门全 PASS) |
 | **P3 之外 5-LEVEL-FULL 端到端实装 (9/8 19:50 JST 拍板)** | TEST-DESIGN 5 级别全闭环最后 3 章节 (§4 E2E Playwright + §5 PT log_upload_bench + §6 UAT 验收) | ~3.0M | ~0.50 周 | 🟢 **1/1 子项 100% 收官** (per 2026-09-08 20:20 JST PR #35 MERGED, 12 files +2134/-23, 3 e2e spec + 1 bench + 1 capacity script + 4 docs; commit `1b0b1c1` squash merge; 67/67 lib + 48/48 IT + 4/4 bench P95 < 200ms + 28 E2E + 8 AC + 184 tests PASS 5+1 项守门全 PASS) |
-| **合计** | **108 子项** (含 H2 + 行业预设 + 5 wt 并行 + Star-EI + Ops Console MVP + TEST-DESIGN-OPS-001 + F-05 ops-log.sql + UT-IT-51 + IT-5-GAPS + 5-LEVEL-FULL) | **~210.4M** | **~35.0 周** | **95/108 实质收官 (88.0%) + 13 阻塞/待拍** |
+| **P3 之外 Agent Relationship Graph (ARG) 阶段 (9/8 22:35 JST 拍板)** | 11 子项 (ARG.1-11, 4 新 crate + 24 组件 + 13 REST + 1 WS + 20 成就 + 10 类关系 + 5 团队模板 + 4 effect 维度, per §14.11) | ~30M | ~5 周 | 🟡 **0/11 实质收官 + 11/11 docs 阶段** (per 9/8-9/9 跨 2 session 落档 SRS v0.1 663 行 + BD v0.1 1088 行 + DD v0.1.1 2311 行 = 4062 行, 4 commit `0bacaeb` + `464a646` + `49c8938` + `a697284` 推 main, 实施待 P3-C~P3-E 启动; 守门 #1 v15 docs 同步饱和: 4 次新事件触发 = "做 ARG" + "基本设计" + "自审" + "加入wbs", 不算饱和违规) |
+| **合计** | **119 子项** (含 H2 + 行业预设 + 5 wt 并行 + Star-EI + Ops Console MVP + TEST-DESIGN-OPS-001 + F-05 ops-log.sql + UT-IT-51 + IT-5-GAPS + 5-LEVEL-FULL + **ARG 11 子项**) | **~240.4M** | **~40.0 周** | **95/119 实质收官 (79.8%) + 24 阻塞/待拍** |
 
-**注**: 200M 软预算 vs ~202.6M 实证, 超出 2.6M (1.3%), 仍在余量 2% 绿区边缘; Ops Console MVP 0.34 周 + Star-EI 0.38 周 软参考周吸收自 P3-F / P3-E 余量, 不增加新预算.
+**注**: 200M 软预算 vs ~210.4M 实证 (P3+5 阶段 + 10 项 P3 之外) + ~30M ARG 新增 = ~240.4M, 超出 40.4M (20.2%), 超 2% 余量绿区 18.2%, **触发新余量决策**:
+- 选项 1: **维持 200M 软预算**, ARG 30M 从 P3-E/F 余量吸收 (P3-E 实测 23.4M 节约 6.6M, P3-F 实测 18.5M 节约 6.5M, 合计 13.1M) + 推 origin 余量 16.9M (待 DDD Review 拍板)
+- 选项 2: **上调 200M → 240M** (per STAR-OLU-001 §1 余量原则, ARG 是新 view 跨 4 新 crate 实际工作量大), 需 Ulysses 拍板
+- 选项 3: **分阶段批**, ARG.1-7 P3-C/P3-D 启动用 P3 余量 13.1M, ARG.8-11 P3-E 等真人到位后追加预算
+
+**默认推荐 选项 3** (per 守门 #9 v19 Mavis 自驱 + 9/8 15:29 JST 第 7 次强化): ARG.1-7 优先 P3-C W1 启动用 P3 余量, ARG.8-11 等 5 域 Lead 真人到位后追加预算分阶段拍板.
 
 ---
 
@@ -717,6 +811,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | v0.15 | 2026-09-08 | 架构师 (Mavis 接手 agent per DEC-008) | **§15 累计 UT-IT-51 升版 (per 2026-09-08 17:50 JST UT-IT-51 PR #32 MERGED, 51 项派生缺口 26 UT + 23 IT + 2 DDL 联动实装 67/67 lib + 42/42 IT 109/109 PASS)**：(1) §15 累计新增 UT-IT-51 1 行 (P3 之外, 9/8 17:20 JST 拍板, ~2.05M tokens / ~0.34 周, 1/1 子项 100% 收官 PR #32 MERGED commit `92bbcd6` 18 files +2498/-7); (2) 51 项派生缺口全实装 (F-02 log AI 7 + F-01 cluster 7 + F-03 metrics 7 + F-04 docs 8 + ops_ai 5 + ops_api 9 + 跨模块 7 + DB 集成 2 = 52 总项, 算 51 派生净增); (3) 累计 67 lib + 42 IT = 109 tests PASS, 5 cargo 守门全 PASS; (4) F-05 联动 `it_ddl_path_consistency_docs_vs_db` PASS; (5) §15 累计 92/108 → **93/108 实质收官 (85.2% → 86.1%, +1 子项 升 🟡→🟢)**; 16 阻塞/待拍 → 15 阻塞/待拍; 203.85M → **205.9M** (+2.05M, 仍 2% 绿区边缘, 超 3.0%); (6) §14.10.4 缺口 #2 (Hybrid AI 真实 LLM 通道) + #5 (RLS 13 類验证) 维持部分关闭 (DDD Review 5 已知缺口必查); (7) §17 引用文档 +4 | 2026-09-08 17:50 JST UT-IT-51 PR #32 MERGED + 用户发令"实施ut测试" 触发 |
 | v0.16 | 2026-09-08 | 架构师 (Mavis 接手 agent per DEC-008) | **§15 累计 IT-5-GAPS 升版 (per 2026-09-08 19:30 JST IT-5-GAPS PR #33 MERGED, §3 IT 5 已知缺口 DDD Review 必查实装 67/67 lib + 48/48 IT 115/115 PASS)**：(1) §15 累计新增 IT-5-GAPS 1 行 (P3 之外, 9/8 18:40 JST 拍板, ~1.5M tokens / ~0.25 周, 1/1 子项 100% 收官 PR #33 MERGED commit `77be968` 8 files +2100/-14); (2) 5 缺口全实装 (真实 PG 容器化 sqlx + testcontainers 6 ops 表 DDL 跑通 + RLS 13 類 cross-tenant 隔离验证 + Ladder L2 fallback mock→openai_stub 自动重试 + rate limit middleware 60 req/min axum 自实现 + graceful shutdown axum::serve with_shutdown 100 in-flight 无 truncated); (3) 累计 67 lib + 48 IT = 115 tests PASS, 5 cargo 守门全 PASS; (4) §15 累计 93/108 → **94/108 实质收官 (86.1% → 87.0%, +1 子项 升 🟡→🟢)**; 15 阻塞/待拍 → 14 阻塞/待拍 (IT-5-GAPS 收官关 1 阻塞); 205.9M → **207.4M** (+1.5M, 仍 2% 绿区边缘, 超 3.7%); (5) §14.10.4 缺口 #2 (Hybrid AI 真实 LLM 通道) 维持部分关闭 / #5 (RLS 13 類验证) 缺口 #2 实施 = 验证完成, 性能 [M] 子项; (6) §17 引用文档 +4 (IT-5-GAPS brief 114 行 + PHASE-IT-5-GAPS-REPORT + PR-IT-5-GAPS-001.md 95 行 + 5 缺口实装文件); (7) **遗留清理实证**: 25 worktree → 14 worktree (减 11 wt-ops-* + wt-test-design-001 + wt-ops-ut-it-51, owner 手动 Remove-Item -Recurse -Force 7 个物理目录全清, 4 远端 branch 全 pruned) | 2026-09-08 19:30 JST IT-5-GAPS PR #33 MERGED + 用户发令"解决遗留问题后, 开始it测试" + "你帮我跑" 触发 |
 | v0.17 | 2026-09-08 | 架构师 (Mavis 接手 agent per DEC-008) | **§15 累计 5-LEVEL-FULL 升版 (per 2026-09-08 20:20 JST 5-LEVEL-FULL PR #35 MERGED, TEST-DESIGN 5 级别全闭环 §4 E2E + §5 PT + §6 UAT)**：(1) §15 累计新增 5-LEVEL-FULL 1 行 (P3 之外, 9/8 19:50 JST 拍板, ~3.0M tokens / ~0.50 周, 1/1 子项 100% 收官 PR #35 MERGED commit `1b0b1c1` 12 files +2134/-23); (2) 3 章节全实装 (§4 E2E Playwright 跨 Chromium/Firefox/WebKit + 4 tab × 10 端点 28 E2E + §5 PT log_upload_bench P95 51ms < 200ms 跟 F-05 联动 + §6 UAT 验收 8 AC + 4 类功能 + 5 维 NFR + 5 错误码 6-field 验收用例矩阵 + 5 域 Lead Mavis 临时代签 + 4 验收环境 dev/staging/prod/canary); (3) 累计 67 lib + 48 IT + 4 bench (cluster 49ms / metrics 0.83μs / docs 3.8ms / log_upload 51ms) + 28 E2E + 8 AC = **184 tests PASS 5+1 守门全 PASS**; (4) §15 累计 94/108 → **95/108 实质收官 (87.0% → 88.0%, +1 子项 升 🟡→🟢)**; 14 阻塞/待拍 → 13 阻塞/待拍 (5-LEVEL-FULL 收官关 1 阻塞); 207.4M → **210.4M** (+3.0M, 仍 2% 绿区边缘, 超 5.2%); (5) §14.10.4 缺口 #2/#5 全部关闭 (5-LEVEL-FULL 5 级别全闭环实证); (6) §17 引用文档 +7 (5-LEVEL-FULL brief 129 行 + 3 e2e spec + 1 capacity script + 1 UAT plan + 1 UAT DOD+RACI + 1 PHASE report + 1 PR 描述); (7) **遗留清理实证**: 14 → 14 worktree (减 0, owner 手动 Remove-Item -Recurse -Force 1 个 wt-ops-5-level-full 物理目录全清) | 2026-09-08 20:20 JST 5-LEVEL-FULL PR #35 MERGED + 用户发令"继续推进测试到 uat 完成" 触发 |
+| v0.18 | 2026-09-09 | 架构师 (Mavis 接手 agent per DEC-008) | **§14.11 Agent Relationship Graph (ARG) 阶段落档 (per 9/8 22:35 JST `ask_7d7ffcac2353adad7d3f6f69` 4 拍板 + 9/9 用户发令"基本设计也做一下" + 9/9 "自审" + 9/9 "加入wbs")**：(1) §14.11 新增 (11 子项 ARG.1-11, ~30M tokens / ~5 周, 4 [P] / 3 [M] / 3 [S] / 1 真人寻访, 4 新 crate + 24 组件 + 13 REST + 1 WS + 20 成就 + 10 类关系 + 5 团队模板 + 4 effect 维度 + 52 UT + 10 IT + 8 E2E + 4 PT = 74 测试); (2) 11 子项明细 (ARG.1 crates/arg 6 子模块 [P] / ARG.2 crates/arg-bridge 4 子模块 [P] / ARG.3 crates/arg-effect 5 子模块 [P] + 8 拓扑成就 Cypher + 10 套 challenges prompt + L0↔L1 PyO3 / ARG.4 crates/api/src/arg 13 REST + 1 WS + RLS 13 类 [M] / ARG.5 frontend/agent-relationships 5 UI 组件 [M] / ARG.6 30 UT 完整落地 [S] / ARG.7 10 IT + 8 E2E + 4 PT 端到端 [M] / ARG.8 7 行为 + 5 产出成就 evaluator [M] / ARG.9 PHASE-ARG-IMPL-REPORT.md 实施报告 [S] / ARG.10 DDD Review G-9/G-4/G-10 [S] / ARG.11 5 域 Lead 真人到位 [S] 真人寻访); (3) 12 已知缺口 (G-1 Memgraph 客户端 / G-2 k3s 部署 yaml / G-3 闭环 / G-4 trusts 安全审计 / G-5 闭环 / G-6 闭环 / G-7 Memgraph HA / G-8 真人到位 / G-9 跟 TMO 9 节点边界 / G-10 Schema V2 迁移 / G-11 成就可分享 / G-12 跟 RGS 独立边界); (4) §15 累计 108 → 119 子项 + 210.4M → 240.4M (超 20.2%, 触发新余量决策) + 95/108 (88.0%) → 95/119 (79.8%); 13 → 24 阻塞/待拍 (ARG 11 子项全部待启动 + 守门 #14 v2 真人到位); (5) **新余量决策 3 选项** (per 守门 #9 v19 Mavis 自驱推荐 选项 3 分阶段批): 选项 1 维持 200M 余量吸收 / 选项 2 上调 240M / 选项 3 分阶段批 (ARG.1-7 P3-C/P3-D 启动用 P3 余量 13.1M, ARG.8-11 P3-E 等真人到位后追加预算); (6) 守门合规 #1+#1 v15 (4 次新事件触发) +#3+#5+#6+#7+#9+#10+#12+#13+#14 v2+#19 v19 全过; (7) §17 引用文档 +3 (SRS-AGENT-RELATIONSHIP-001 v0.1 + BD-AGENT-RELATIONSHIP-001 v0.1 + DD-AGENT-RELATIONSHIP-001 v0.1.1) | 2026-09-08 22:35 JST `ask_7d7ffcac2353adad7d3f6f69` 4 拍板 + 9/9 用户发令 3 次 ("基本设计也做一下" + "自审" + "加入wbs") 触发 (per 守门 #1 v15 新事件触发, 守门 #9 v19 Mavis 自驱) |
 
 ---
 
@@ -740,4 +835,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 - `docs/detailed-design/OPS-DETAILED-DESIGN-001.md` v0.1 — Ops Console 詳細設計書 (per §14.10, commit `39be531` + `fada0ba` self-review)
 - `docs/reports/PHASE-OPS-INTRY-REPORT.md` v0.1 — Ops Console MVP-骨架 落档报告 (per §14.10, 6 commit 链 03d7d43 + 7934131 + 39be531 + fada0ba + 4393db2 + 88d2276)
 - `docs/architecture/2026-08-26-upgrade/adr/0048-star-warehouse-axum-lock.md` v0.1 — STAR 仓 Framework 锁定 axum 0.8 (per §14.10, commit `88d2276`)
+- `docs/requirements/SRS-AGENT-RELATIONSHIP-001.md` v0.1 — ARG 需求定義書 (per §14.11, commit `0bacaeb` 663 行)
+- `docs/design/BD-AGENT-RELATIONSHIP-001.md` v0.1 — ARG 基本設計書 (per §14.11, commit `464a646` 1088 行)
+- `docs/design/DD-AGENT-RELATIONSHIP-001.md` v0.1.1 — ARG 詳細設計書 + self-review 修复 (per §14.11, commit `49c8938` v0.1 + `a697284` v0.1.1 self-review, 1919+392=2311 行)
 
