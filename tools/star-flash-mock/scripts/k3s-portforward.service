@@ -11,5 +11,9 @@ ExecStart=/usr/local/bin/kubectl -n star-mock port-forward svc/star-mock-envoy 3
 Restart=on-failure
 RestartSec=5
 
+# v3.0 备选 (per 2026-09-08 15:30 JST v3.1 sustained): kubectl port-forward spdy tunnel cluster-level 仍不工作
+# (v30 候选 c 实证 cluster-level 限制). 用 proxy 模式 fallback (跟 v1.1 c113c90 实证, 链路通 body=apiserver paths)
+# 改成: ExecStart=/usr/local/bin/kubectl -n star-mock proxy --port=3000 --address=0.0.0.0 --accept-hosts=.* --kubeconfig=/home/leo19/.kube/config
+
 [Install]
 WantedBy=default.target
