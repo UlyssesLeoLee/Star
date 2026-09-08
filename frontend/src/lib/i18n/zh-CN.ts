@@ -465,7 +465,7 @@ export const zhCN: Dictionary = {
   // ── v0.7 (2026-09-08 Phase OPS-INTRY) 新增: Ops Console 4 tab 翻译 ──
   opsConsole: {
     pageTitle: "运维控制台",
-    pageSubtitle: "集群 / Log AI / 运维数据 / 文档 4 类功能入口 (MVP-骨架, 4 tab 占位)",
+    pageSubtitle: "集群 / Log AI / 运维数据 / 文档 4 类功能入口 (F-02 端到端实装)",
     tabCluster: "集群更新",
     tabLogAI: "Log AI 分析",
     tabMetrics: "运维数据",
@@ -481,6 +481,19 @@ export const zhCN: Dictionary = {
     logAIAnalysis: "AI 分析结果",
     logAIChannelMock: "AI 通道: mock (本地, 守门 #23 不开外部 API)",
     logAINeedsReview: "需人工 review (confidence < 0.5)",
+    // F-02 端到端 LogAITab 组件 i18n (2026-09-08 拍板)
+    logAIUploadTitle: "上传 Log 到 AI 通道",
+    logAISourceLabel: "来源 (source)",
+    logAILevelFilterLabel: "级别过滤 (level_filter)",
+    logAIContentLabel: "日志内容 (1MB 限制, 守门 #5 v2)",
+    logAIUploadBtn: "上传并分析",
+    logAIUploading: "上传中...",
+    logAIUploadOk: "上传成功",
+    logAIErrorPrefix: "错误",
+    logAIAnalysisTitle: "AI 分析结果",
+    logAIConfidenceLabel: "置信度",
+    logAIAnomaliesLabel: "异常",
+    logAISuggestionsLabel: "建议",
     metricsTitle: "F-03 运维数据",
     metricsKPI: "5 KPI 概览",
     docsTitle: "F-04 运维文档",

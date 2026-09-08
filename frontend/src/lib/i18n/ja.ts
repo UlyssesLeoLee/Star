@@ -451,7 +451,7 @@ export const ja: Dictionary = {
   // ── v0.7 (2026-09-08 Phase OPS-INTRY) Ops Console 4 タブ ──
   opsConsole: {
     pageTitle: "運用コンソール",
-    pageSubtitle: "クラスタ / Log AI / 運用データ / ドキュメント 4 つの入口 (MVP スケルトン)",
+    pageSubtitle: "クラスタ / Log AI / 運用データ / ドキュメント 4 つの入口 (F-02 エンドツーエンド)",
     tabCluster: "クラスタ",
     tabLogAI: "Log AI",
     tabMetrics: "運用データ",
@@ -467,6 +467,19 @@ export const ja: Dictionary = {
     logAIAnalysis: "AI 分析結果",
     logAIChannelMock: "AI チャネル: mock (ローカル, 守门 #23 外部 API 不使用)",
     logAINeedsReview: "人手レビュー要 (confidence < 0.5)",
+    // F-02 エンドツーエンド LogAITab i18n (2026-09-08)
+    logAIUploadTitle: "Log を AI チャネルへアップロード",
+    logAISourceLabel: "ソース",
+    logAILevelFilterLabel: "レベルフィルタ",
+    logAIContentLabel: "ログ内容 (1MB 制限, 守门 #5 v2)",
+    logAIUploadBtn: "アップロード & 分析",
+    logAIUploading: "アップロード中...",
+    logAIUploadOk: "アップロード成功",
+    logAIErrorPrefix: "エラー",
+    logAIAnalysisTitle: "AI 分析結果",
+    logAIConfidenceLabel: "信頼度",
+    logAIAnomaliesLabel: "異常",
+    logAISuggestionsLabel: "提案",
     metricsTitle: "F-03 運用データ",
     metricsKPI: "5 KPI 概要",
     docsTitle: "F-04 運用ドキュメント",
