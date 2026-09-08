@@ -23,6 +23,7 @@ import { Server, Brain, BarChart3, FileText, Wrench, Sparkles, Activity } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "@/lib/i18n";
 import { LogAITab } from "./components/LogAITab";
+import { ClusterTab } from "./components/ClusterTab";
 
 export default function OpsPage() {
   const { t } = useTranslation();
@@ -104,16 +105,7 @@ export default function OpsPage() {
         </TabsList>
 
         <TabsContent value="cluster" className="mt-[21px]">
-          <PlaceholderCard
-            title={t.opsConsole.clusterTitle}
-            tag="F-01"
-            items={[
-              t.opsConsole.clusterReleases,
-              t.opsConsole.clusterCanary,
-              t.opsConsole.clusterRollback,
-              t.opsConsole.clusterStatus,
-            ]}
-          />
+          <ClusterTab />
         </TabsContent>
 
         <TabsContent value="logai" className="mt-[21px]">

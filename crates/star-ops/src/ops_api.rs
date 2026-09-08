@@ -23,7 +23,7 @@ use uuid::Uuid;
 use crate::error::OpsError;
 use crate::ops_ai::default_ladder;
 use crate::ops_domain::{
-    cluster::{CanaryRequest, HelmRelease, RollbackRequest},
+    cluster::{CanaryRequest, HelmActionAck, HelmRelease, RollbackRequest},
     log::{LogAnalysis, LogEntry, LogLevel},
     metrics::OpsMetric,
 };
@@ -111,112 +111,148 @@ pub fn router(state: AppState) -> Router {
 // ============ F-01 Cluster ============
 
 async fn cluster_list() -> impl IntoResponse {
-    let releases = HelmRelease::list_stub();
-    let total = releases.len();
-    Json(OpsResponse {
-        data: releases,
-        meta: OpsMeta {
-            stub: true,
-            total: Some(total),
-            hint: Some("F-01 实装阶段接入 kube-rs".to_string()),
-            ai_channel: None,
-            analysis_triggered: None,
-            needs_review: None,
-            entry_count: None,
-            phase: None,
-        },
-    })
+    match HelmRelease::list_releases().await {
+        Ok(releases) => {
+            let total = releases.len();
+            Json(OpsResponse {
+                data: releases,
+                meta: OpsMeta {
+                    stub: false,
+                    total: Some(total),
+                    hint: Some(
+                        "F-01 端到端, helm_canary_mock.sh subprocess (守門 #1 R-05)".to_string(),
+                    ),
+                    ai_channel: None,
+                    analysis_triggered: None,
+                    needs_review: None,
+                    entry_count: None,
+                    phase: None,
+                },
+            })
+        }
+        Err(e) => Json(OpsResponse {
+            data: Vec::<HelmRelease>::new(),
+            meta: OpsMeta {
+                stub: false,
+                total: Some(0),
+                hint: Some(format!("F-01 端到端失败: {} (守門 #1 R-05)", e)),
+                ai_channel: None,
+                analysis_triggered: None,
+                needs_review: None,
+                entry_count: None,
+                phase: None,
+            },
+        }),
+    }
 }
 
 async fn cluster_canary(
     Json(req): Json<CanaryRequest>,
-) -> Result<Json<OpsResponse<CanaryAck>>, OpsError> {
-    // MVP: 仅 record, 不实装 helm exec
-    Ok(Json(OpsResponse {
-        data: CanaryAck {
-            action_id: Uuid::new_v4(),
-            status: "Pending".to_string(),
-        },
-        meta: OpsMeta {
-            stub: true,
-            total: None,
-            hint: Some(format!(
-                "canary {}% → revision {:?} (MVP 仅 record, 不实装 helm upgrade)",
-                req.canary_weight, req.target_revision
-            )),
-            ai_channel: None,
-            analysis_triggered: None,
-            needs_review: None,
-            entry_count: None,
-            phase: None,
-        },
-    }))
+) -> Result<Json<OpsResponse<HelmActionAck>>, OpsError> {
+    // 守門 #5 v2: 1MB body 限制 (RequestBodyLimitLayer 整体应用)
+    // 守門 #1 R-05: helm_canary_mock.sh subprocess, 真实 K8s 切换 owner 拍板
+    HelmRelease::trigger_canary(&req)
+        .await
+        .map(|ack| {
+            Json(OpsResponse {
+                data: ack,
+                meta: OpsMeta {
+                    stub: false,
+                    total: None,
+                    hint: Some(format!(
+                        "canary {}% → revision {:?}",
+                        req.canary_weight, req.target_revision
+                    )),
+                    ai_channel: None,
+                    analysis_triggered: None,
+                    needs_review: None,
+                    entry_count: None,
+                    phase: Some("canary".to_string()),
+                },
+            })
+        })
+        .map_err(|e| OpsError::Internal(format!("canary 失败: {} (守門 #1 R-05)", e)))
 }
 
 async fn cluster_rollback(
     Json(req): Json<RollbackRequest>,
-) -> Result<Json<OpsResponse<CanaryAck>>, OpsError> {
-    Ok(Json(OpsResponse {
-        data: CanaryAck {
-            action_id: Uuid::new_v4(),
-            status: "Pending".to_string(),
-        },
-        meta: OpsMeta {
-            stub: true,
-            total: None,
-            hint: Some(format!(
-                "rollback to revision {} (MVP 仅 record)",
-                req.target_revision
-            )),
-            ai_channel: None,
-            analysis_triggered: None,
-            needs_review: None,
-            entry_count: None,
-            phase: None,
-        },
-    }))
-}
-
-#[derive(Serialize)]
-struct CanaryAck {
-    action_id: Uuid,
-    status: String,
+) -> Result<Json<OpsResponse<HelmActionAck>>, OpsError> {
+    HelmRelease::rollback(&req)
+        .await
+        .map(|ack| {
+            Json(OpsResponse {
+                data: ack,
+                meta: OpsMeta {
+                    stub: false,
+                    total: None,
+                    hint: Some(format!("rollback to revision {}", req.target_revision)),
+                    ai_channel: None,
+                    analysis_triggered: None,
+                    needs_review: None,
+                    entry_count: None,
+                    phase: Some("rollback".to_string()),
+                },
+            })
+        })
+        .map_err(|e| OpsError::Internal(format!("rollback 失败: {} (守門 #1 R-05)", e)))
 }
 
 #[derive(Serialize)]
 struct ClusterStatus {
     release_name: String,
     phase: String,
-    replicas: Replicas,
-}
-
-#[derive(Serialize)]
-struct Replicas {
-    ready: u32,
-    desired: u32,
+    revision: u32,
+    canary_weight: u8,
+    mock: bool,
 }
 
 async fn cluster_status() -> impl IntoResponse {
-    Json(OpsResponse {
-        data: ClusterStatus {
-            release_name: "star-mcp".to_string(),
-            phase: "Healthy".to_string(),
-            replicas: Replicas {
-                ready: 3,
-                desired: 3,
+    let release_name = "star-mcp";
+    match HelmRelease::status(release_name).await {
+        Ok(output) => {
+            let status = output.status.clone();
+            Json(OpsResponse {
+                data: ClusterStatus {
+                    release_name: output.release_name,
+                    phase: status.clone(),
+                    revision: output.revision,
+                    canary_weight: output.canary_weight,
+                    mock: output.mock,
+                },
+                meta: OpsMeta {
+                    stub: false,
+                    total: None,
+                    hint: Some(
+                        "F-01 端到端, helm_canary_mock.sh status (守門 #1 R-05)".to_string(),
+                    ),
+                    ai_channel: None,
+                    analysis_triggered: None,
+                    needs_review: None,
+                    entry_count: None,
+                    phase: Some(status),
+                },
+            })
+        }
+        Err(e) => Json(OpsResponse {
+            data: ClusterStatus {
+                release_name: release_name.to_string(),
+                phase: "Unknown".to_string(),
+                revision: 0,
+                canary_weight: 0,
+                mock: true,
             },
-        },
-        meta: OpsMeta {
-            stub: true,
-            total: None,
-            hint: Some("F-01 实装阶段接入 kubectl get pods".to_string()),
-            ai_channel: None,
-            analysis_triggered: None,
-            needs_review: None,
-            entry_count: None,
-            phase: Some("Healthy".to_string()),
-        },
-    })
+            meta: OpsMeta {
+                stub: false,
+                total: None,
+                hint: Some(format!("F-01 端到端失败: {} (守門 #1 R-05)", e)),
+                ai_channel: None,
+                analysis_triggered: None,
+                needs_review: None,
+                entry_count: None,
+                phase: Some("Unknown".to_string()),
+            },
+        }),
+    }
 }
 
 // ============ F-02 LogAI ============
