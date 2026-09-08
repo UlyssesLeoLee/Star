@@ -859,7 +859,7 @@ T/M 类: 物理删除禁止, SCD Type 2 (`valid_from` + `valid_to` + `is_current
 
 | # | 課題 | 等级 | 触发条件 | 缓解 |
 |---|---|---|---|---|
-| 1 | 4 类功能 (F-01..F-04) 仅 stub | P1 | MVP 阶段默认 | 拍板 4 子项后逐个推进 (估 2.0M token) |
+| 1 | 4 类功能 (F-01..F-04) 仅 stub | P1 | MVP 阶段默认 | 拍板 4 子项后逐个推进 (F-01 600K + F-02 800K + F-03 400K + F-04 200K = 2.0M token, per WBS §14.10.2) |
 | 2 | Hybrid AI 通道 OpenAI/Anthropic stub 返 NOT_IMPLEMENTED | P1 | api_key 未配置 | [M] 子项 F-02 实装 reqwest + 真实 LLM 通道 |
 | 3 | 真实 LLM API key 未配置, mock 兜底 | P2 | MVP 简化为 None | [M] 接 star-credential 加密存储 |
 | 4 | K8s/Helm client 未引入 (kube-rs) | P1 | F-01 端到端需求 | [M] 子项 F-01 评估 + 引入 kube = "0.95" |
@@ -868,7 +868,7 @@ T/M 类: 物理删除禁止, SCD Type 2 (`valid_from` + `valid_to` + `is_current
 | 7 | frontend `/ops/page.tsx` 4 tab 占位卡片无 API 调用 | P2 | MVP 简化为静态 | [M] 阶段加 useQuery + retry |
 | 8 | 守門 #1 v20 (调试控制台不污染 main) — `ai_log_mock.py` 走 subprocess 但**不**通过 console_server.py (per 守門 #9 v3 实证) | P3 | MVP 简化 | [M] 阶段可选接 console_server.py 统一入口 |
 | 9 | 5 域 Lead 真人未到位, Mavis 长期代签 | 中 | 持续 | 真人到位后追溯签字 (per 守門 #14 + 9/3 19:35 JST 拍板 D) |
-| 10 | i18n 3 语言 MVP 简化版, 部分 key 缺 token | P3 | 拍板 Q1 范围 | [S] 子项校对 |
+| 10 | i18n 3 语言 userMenu + opsConsole 共 40 keys 100% 完整 (per PR-23 交叉审核 A12 实证), 其他 modules 缺标按守門 #11 策略 [S] 子项校对 | P3 | 范围限定, 避免评审误读 | [S] 子项校对 |
 
 ### 9.2 设计决策 (待 [M]/[S] 子项拍板重审)
 

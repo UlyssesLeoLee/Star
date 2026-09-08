@@ -60,9 +60,9 @@
 | 命令 | 结果 | 耗时 |
 |---|---|---|
 | `cargo check -p star-ops --all-targets -j 4` | **0 err** | 0.77s |
-| `cargo test -p star-ops --lib -j 4` | **15/15 pass** (5 unit + 10 e2e) | 0.00s |
+| `cargo test -p star-ops --lib -j 4` | **15/15 pass** (5 unit + 4 e2e + 3 mock + 2 cluster + 1 metrics) | 0.00s |
 | `cargo fmt -p star-ops --check` | **0 err** | <0.1s |
-| `cargo clippy -p star-ops --all-targets -j 4` | **0 err** (star-ops), 2 pre-existing warnings in `star-context` (跟本 phase 无关) | 2.20s |
+| `cargo clippy -p star-ops --all-targets -j 4` | **0 err** (star-ops), 8 pre-existing warnings in `star-dispatcher` + 1 in `star-saga` (跟本 phase 无关) | 2.20s |
 | `cargo check --workspace --all-targets -j 4` | **0 err** (1m 19s, workspace 47 → 48 package 实证) | 79s |
 
 ### 2.2 Frontend 守门 (per 守门 #6 v2 advisory)
@@ -79,7 +79,7 @@
 |---|---|
 | `python scripts/automation/ai_log_mock.py` (stdin 注入测试 log) | exit 0, 3ms 延迟, 3 anomalies 正确抽取, confidence 永远 0.42 < 0.5 (守门 #23 派生规 ✅) |
 
-### 2.4 守门 15 维 全 0 违反 (per AGENTS.md §4 累积规)
+### 2.4 守门 16 维 全 0 违反 (per AGENTS.md §4 累积规)
 
 | # | 守门 | 状态 |
 |---|---|---|
@@ -184,5 +184,5 @@
 
 | 版本 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
-| v0.1 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版 MVP-骨架 落档 (27 文件改动, 15/15 test pass, 守门 15 维全 0 违反) | ask_user `ask_e76f2e614519fbc9eda16b53` 拍板 4 项 + 2026-09-08 07:53 JST 用户发令 |
+| v0.1 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版 MVP-骨架 落档 (27 文件改动, 15/15 test pass, 守门 16 维全 0 违反) | ask_user `ask_e76f2e614519fbc9eda16b53` 拍板 4 项 + 2026-09-08 07:53 JST 用户发令 |
 | v0.2 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 关闭 §3 已知缺口 #11 (Framework 选型决策未显式落档) + ADR-0048 引用 + 签字栏更新 | ask_user `ask_40cddef812e642081a0f033e` 拍板 "锁定 axum 0.8 (推荐)" + 2026-09-08 08:19 JST 用户问"目前的框架用的不是actix-web吗" |
