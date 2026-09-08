@@ -1,10 +1,10 @@
 # TEST-DESIGN-OPS-001 — STAR Ops Console 测试设计书
 
-> **版本**: v0.1
+> **版本**: v0.2
 > **作者**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 9/8 15:19 JST 第 6 次强化 Mavis 全权代理)
 > **审批**: 架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手
 > **日期**: 2026-09-08 JST
-> **状态**: Draft Baseline (per ask_user `ask_b09da832bbe3eb236682c369` 拍板 3 维: 5 级别 / 整体写 / 单文档分章)
+> **状态**: 🟢 **PR #30 MERGED (commit `74582a7`)** + v0.2 owner P1 修正 (per 2026-09-08 16:25 JST self-review, §3 IT 路径不一致已修: `docs/migrations/` → `db/migrations/`, 跟现有 cluster/metrics 一致)
 
 ---
 
@@ -423,13 +423,13 @@ test result: ok. 15 passed; 0 failed ... finished in <Xs>
 | 测名 | 验证 | 派生规 |
 |---|---|---|
 | `it_log_upload_end_to_end` | axum oneshot 调 `POST /api/ops/log/upload` 带 trace_id + level_filter → 200 | per BAS-001 §3.2 + 守门 #5 v2 |
-| `it_ops_log_ddl_wtm_coverage` | 验证 `docs/migrations/2026-09-08-ops-log.sql` 含 3 表（ops_log_entry W + ops_log_query_log T + ops_log_analysis W）+ audit trigger + SCD2 + tenant_id NOT NULL + FORCE RLS | 守门 #13 100% + 守门 #DB-13 CW-05 |
+| `it_ops_log_ddl_wtm_coverage` | 验证 `db/migrations/2026-09-08-ops-log.sql` 含 3 表（ops_log_entry W + ops_log_query_log T + ops_log_analysis W）+ audit trigger + SCD2 + tenant_id NOT NULL + FORCE RLS | 守门 #13 100% + 守门 #DB-13 CW-05 |
 | `it_subprocess_real_call_via_ladder` | Ladder.analyze_log 真实调 subprocess 跑通 + confidence < 0.5 + generated_by=mock | 守门 #23 + 守门 #24 v2 + ADR-0026 §2.2 |
 
 **F-02 IT 实证状态**（per `git show 472bab2` 实证）：
 
 - ✅ 3/3 IT 100% pass（per F-02 PR #25 合并 commit `472bab2`）
-- ⚠️ **DDL 文件不存在**（per owner P1 修正 + WBS §14.10.2）：`docs/migrations/2026-09-08-ops-log.sql` 0 行落地，`it_ops_log_ddl_wtm_coverage` IT 测在 docs-only 路径能跑通（DDL 文件路径指向 `docs/migrations/`，跟 owner P1 修正后 `db/migrations/` 路径不一致 — 实证为 `it_log_ai.rs:58` 路径 `docs/migrations/2026-09-08-ops-log.sql` vs 现有 `db/migrations/2026-09-08-ops-{cluster,metrics}.sql` 路径）
+- ⚠️ **DDL 文件不存在**（per owner P1 修正 + WBS §14.10.2）：`db/migrations/2026-09-08-ops-log.sql` 0 行落地（F-05 单独工作项补档），`it_ops_log_ddl_wtm_coverage` IT 测待 F-05 落地后跑通（DDL 路径跟现有 `db/migrations/2026-09-08-ops-{cluster,metrics}.sql` 路径一致 — owner P1 修正已修）
 - ✅ Ladder 真实 subprocess 跑通 + confidence 永远 < 0.5（per 守门 #23 mock 模板）
 
 **派生测试缺口识别**（per 守门 #11 缺标比错标）：
@@ -917,6 +917,7 @@ test result: ok. 15 passed; 0 failed ... finished in <Xs>
 | 版本 | 日期 | 修订人 | 审批 | 修订内容 | 触发 |
 |---|---|---|---|---|---|
 | **v0.1** | 2026-09-08 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 架构师 (Mavis 接手 agent per DEC-008) | 初版 5 级别 UT/IT/E2E/PT/UAT 单文档分章（9 章节 56KB）：§0 目的 + §1 范围 + §2 UT（41 测 1:1 对齐 + 派生 26 测缺口 + 边界 5 维）+ §3 IT（15 测 1:1 对齐 + 派生 23 测缺口 + sqlx 容器化 5 维）+ §4 E2E（4 tab × 10 端点路径 + i18n 3 语言 + 错误码 6-field + 5 缺口）+ §5 PT（3 bench P95 实证 cluster 49ms/metrics 0.83μs/docs 4.7ms + 容量规划 3 档 + 4 缺口）+ §6 UAT（8 AC + 4 类功能 + 5 维 NFR + 6 表 W/T/M + 5 错误码 6-field + 5 域 Lead 签字栏 + 6 缺口）+ §7 RACI + §8 修订历史 + §9 引用 | ask_user `ask_b09da832bbe3eb236682c369` 拍板（5 级别/整体写/单文档分章） |
+| **v0.2** | 2026-09-08 16:25 JST | Ulysses — Mavis 接手 owner (per 9/8 15:29 JST 第 7 次强化 Mavis 自驱) | 架构师 (Mavis 接手 agent per DEC-008) | **owner P1 修正**（per self-review 5b 实证）：§3 IT `it_ops_log_ddl_wtm_coverage` 引用 DDL 路径 `docs/migrations/2026-09-08-ops-log.sql` → 修 `db/migrations/2026-09-08-ops-log.sql`（跟现有 cluster/metrics 路径一致, 子代理 handoff 自标 1 路径不一致 + 守門 #11 缺标比错标已修, §3 IT 缺口同步删除）; §3 IT "DDL 文件不存在" 注解同步修 (子代理 handoff 标 "DDL 文件路径指向 docs/migrations/ 跟 owner P1 修正后 db/migrations/ 路径不一致" → 修 "DDL 路径跟现有 db/migrations/ 一致, owner P1 修正已修") | 2026-09-08 16:25 JST owner self-review + 用户发令"自审" 触发 |
 
 **注**: 本节修订历史 v0.1 由 Mavis 临时代签（per 守门 #14 v2 + 9/8 15:19 JST 第 6 次强化 Mavis 全权代理），5 域 Lead 真人到位后追溯签字覆盖（per 守门 #1 禁回溯 + 守门 #21 v21 修订历史规则 + 守门 #14 v2 拍板 D 维持）。
 

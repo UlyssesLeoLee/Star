@@ -48,13 +48,14 @@ fn bench_cluster_canary(c: &mut Criterion) {
     c.bench_function("cluster_canary_subprocess", |b| {
         b.iter(|| {
             let _ = rt.block_on(async {
-                let _ack = star_ops::ops_domain::cluster::HelmRelease::trigger_canary(&CanaryRequest {
-                    release_name: black_box("star-mcp".to_string()),
-                    canary_weight: black_box(10),
-                    target_revision: black_box(Some(4)),
-                })
-                .await
-                .expect("trigger_canary must succeed");
+                let _ack =
+                    star_ops::ops_domain::cluster::HelmRelease::trigger_canary(&CanaryRequest {
+                        release_name: black_box("star-mcp".to_string()),
+                        canary_weight: black_box(10),
+                        target_revision: black_box(Some(4)),
+                    })
+                    .await
+                    .expect("trigger_canary must succeed");
             });
         });
     });
@@ -66,9 +67,10 @@ fn bench_cluster_status(c: &mut Criterion) {
     c.bench_function("cluster_status_subprocess", |b| {
         b.iter(|| {
             let _ = rt.block_on(async {
-                let _status = star_ops::ops_domain::cluster::HelmRelease::status(black_box("star-mcp"))
-                    .await
-                    .expect("status must succeed");
+                let _status =
+                    star_ops::ops_domain::cluster::HelmRelease::status(black_box("star-mcp"))
+                        .await
+                        .expect("status must succeed");
             });
         });
     });
