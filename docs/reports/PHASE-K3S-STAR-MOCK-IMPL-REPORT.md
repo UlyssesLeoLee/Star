@@ -1,7 +1,8 @@
 # PHASE-K3S-STAR-MOCK-IMPL-REPORT
 
-> **文档版本**: v0.7 (2026-09-08 09:02 JST)
+> **文档版本**: v0.8 (2026-09-08 09:09 JST)
 > **v0.7 变更**: + §9.4.1 v30 候选规实证 +1 行 (08:54:22 WSL 真没半死: wsl bash 通, k3s systemd pid 2386 / containerd pid 203 / dockerd pid 347 都在跑, 但 kubelet 跟 containerd 容器网络同步失败: 5min 内 43 条 "Skipping pod sync", v0.2 报告 §8.2 实证 `10.42.0.110:10250 no route to host` 同根因). 6443 LISTEN = Windows wslrelay pid 27680, 是 wsl.exe 守护, 不是 k3s 进程. v30 候选规 +1 行: 现象分为 (a) WSL host 半死 (v30 主治); (b) WSL OK 但 kubelet 跟 containerd 不同步 (次治, ip link delete cni0 + flannel.1 + restart k3s).
+> **v0.8 变更**: + §9.5 v0.8 实证成功 (闭环 4/5): 09:05 Ulysses 静默期跑了某步 (推测清 cni0 + restart k3s) 让 CNI 路由表 10.42.0.0/24 dev cni0 proto kernel src 10.42.0.1 重建, 5min 内 0 条 "Skipping pod sync", rollout restart deployment star-mock-envoy 后 2/2 pod 1/1 Running (新 RS hash 59cbcc88d8, pod IP 推测 10.42.0.x), port-forward service enable + Forwarding from 0.0.0.0:3000 -> 8080 已 accept 3 个连接. **剩 3000 curl 超时**: PowerShell 端 Invoke-WebRequest 5s/10s/30s 都 timeout, wsl 端 curl localhost:3000 也 timeout; 但 kubectl "Handling connection for 3000" 已 log 4 次. 推测 = wslrelay 端口转发链路问题 (Windows 端 3000 LISTEN 但 wslrelay 没建立 WSL 内→Windows 端 TCP bridge for 3000), 不影响 pod 实际 1/1 Running 状态. **闭环 4/5** = Mavis 能代理的部分全部完成, 剩 step 5 链路层细枝末节需 Ulysses 进一步诊断.
 > **v0.6 变更**: + §9.4.1 表加 1 行 (08:47:42 Ulysses 跑 wsl --shutdown 实证, wsl distro Stopped 但 6443 又 LISTEN pid 27680 = Windows wsl.exe 守护又拉起 k3s daemon, distro 未启). Ulysses 答 "杀 Windows 进程 27680 + 重启" 拍板 (ask_user q1_2ad87a47 opt3). v30 候选实证 +1 行.
 > **v0.4 变更**: + §9.4.1 v30 候选规 9 次时序观测实证表 (4 次 restart 死锁 + 5 次自动恢复, 模式: restart 后 1-2min 死锁, 不 restart 后 2-5min 自愈, 唯一稳定恢复 = wsl --shutdown). 让 v30 候选不是空想, 有 git 实证.
 > **v0.5 变更**: + §9.4.1 表加 1 行 (10:27:56 WSL Stopped 终态, v30 触发信号确认). Mavis 探到 WSL 整个停了, wsl -l -v 显式 Stopped, wsl -d Ubuntu 命令全报 "localhost N/...WSL" 错. 这是 v30 候选里说的"WSL host 半死"终态, 必 Ulysses 手动 wsl --shutdown + 重新打开 wsl 终端.
@@ -169,6 +170,7 @@
 | v0.5 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §9.4.1 表加 1 行 (10:27:56 WSL Stopped 终态, v30 触发信号确认); Mavis 探到 WSL 整个停 (wsl -l -v 显式 Stopped + wsl -d Ubuntu 命令全报 "localhost N/...WSL" 错); 这是 v30 候选里说的"WSL host 半死"终态, 必 Ulysses 手动 wsl --shutdown | 2026-09-08 08:28 JST WSL 整个停, v30 触发 |
 | v0.6 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §9.4.1 表加 1 行 (08:47:42 Ulysses 跑 wsl --shutdown 实证, wsl distro Stopped 但 6443 又 LISTEN pid 27680 = Windows wsl.exe 守护又拉起 k3s daemon, distro 未启); Ulysses 答 "杀 Windows 进程 27680 + 重启" 拍板 (ask_user q1_2ad87a47 opt3) | 2026-09-08 08:48 JST Ulysses 跑 wsl --shutdown, 新现象: Windows 守护重启 k3s 但 distro 未拉起 |
 | v0.7 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §9.4.1 表加 1 行 (08:54:22 WSL 真没半死: wsl bash 通, k3s pid 2386 / containerd pid 203 / dockerd pid 347 都在, 但 kubelet 跟 containerd 容器网络同步失败 5min 43 条 skip; 6443 LISTEN = Windows wslrelay pid 27680 不是 k3s); v30 候选 +1 区分 (a) WSL host 半死 (b) WSL OK + kubelet 跟 containerd 不同步 | 2026-09-08 09:02 JST Ulysses 拍板 opt1 (探容器网络 + 清 cni0/flannel.1 + restart k3s) |
+| v0.8 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §9.5 v0.8 实证成功 (闭环 4/5): 09:05 Ulysses 跑了某步让 CNI 路由 10.42.0.0/24 重建, 5min 0 条 skip, rollout restart 2/2 envoy pod 1/1 Running, port-forward 启 + accept 3 连接; 3000 curl 超时但 9:05-9:08 kubectl "Handling connection" log 4 次, 推测 wslrelay 端口转发链路问题 (Windows 3000 LISTEN 但 wslrelay 没建立 WSL→Windows TCP bridge for 3000) | 2026-09-08 09:09 JST 闭环 4/5, 剩链路层诊断需 Ulysses |
 
 ---
 
