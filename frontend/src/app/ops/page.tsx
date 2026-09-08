@@ -25,6 +25,7 @@ import { useTranslation } from "@/lib/i18n";
 import { LogAITab } from "./components/LogAITab";
 import { ClusterTab } from "./components/ClusterTab";
 import { MetricsTab } from "./components/MetricsTab";
+import { DocsTab } from "./components/DocsTab";
 
 export default function OpsPage() {
   const { t } = useTranslation();
@@ -118,11 +119,7 @@ export default function OpsPage() {
         </TabsContent>
 
         <TabsContent value="docs" className="mt-[21px]">
-          <PlaceholderCard
-            title={t.opsConsole.docsTitle}
-            tag="F-04"
-            items={[t.opsConsole.docsCategory]}
-          />
+          <DocsTab />
         </TabsContent>
       </Tabs>
     </div>

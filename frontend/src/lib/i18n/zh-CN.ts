@@ -506,5 +506,13 @@ export const zhCN: Dictionary = {
     metricsTrendHint: "趋势实装在 [M] 子项 (5 KPI 历史曲线 + sparkline)",
     docsTitle: "F-04 运维文档",
     docsCategory: "分类",
+    // F-04 端到端 DocsTab 组件 i18n (2026-09-08 拍板)
+    docsSubtitle: "5 类文档 (SRS / BAS / DET / 报告 / 其他), 走 walkdir 扫描 docs/ 4 子目录 (守門 #1 R-05)",
+    docsCategorySrs: "需求规格 (SRS)",
+    docsCategoryBas: "基本设计 (BAS)",
+    docsCategoryDet: "详细设计 (DET)",
+    docsCategoryReport: "报告 (PHASE / PR / 风险 / 修复)",
+    docsCategoryOther: "其他 (briefs / adr / architecture 等)",
+    docsEmpty: "该类别暂无可用文档",
   },
 };
