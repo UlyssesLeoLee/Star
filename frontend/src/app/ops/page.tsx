@@ -1,23 +1,28 @@
 "use client";
 
 /**
- * /ops — Ops Console (MVP-骨架)
+ * /ops — Ops Console (F-02 端到端实装)
  * (per docs/requirements/SRS-STAR-OPS-001.md v0.1
- *  + docs/basic-design/OPS-BASIC-DESIGN-001.md v0.1)
+ *  + docs/basic-design/OPS-BASIC-DESIGN-001.md v0.1
+ *  + docs/briefs/ops-f02-log-ai-impl.md)
  *
- * 4 tab 占位: 集群更新 (F-01) / Log AI (F-02) / 运维数据 (F-03) / 文档 (F-04)
- * 后端走 star-ops binary (port 8090), MVP 返 200 + stub meta
+ * 4 tab: 集群更新 (F-01) / Log AI (F-02, 端到端) / 运维数据 (F-03) / 文档 (F-04)
+ * 后端走 star-ops binary (port 8090), F-02 已端到端实装 (mock subprocess)
+ *   - /api/ops/log/upload (trace_id 传递 + level_filter + 1MB 限制)
+ *   - /api/ops/log/analysis/{id} (Ladder 真实调 ai_log_mock.py)
  *
- * Phase OPS-INTRY (2026-09-08):
+ * Phase OPS-INTRY → OPS-F02-E2E (2026-09-08):
  *   - Hero 头部 + 4 KPI 胶囊 (per automation-debug 视觉一致)
- *   - 4 Tab 切换 + 占位卡片 (per 拍板 Q1 范围: 仅入口 + 4 空壳页面)
- *   - 真实 API 契约由 curl 验证 (8 REST stub)
+ *   - 4 Tab 切换
+ *   - F-02 LogAITab 端到端实装 (useMutation + useQuery 5s 轮询 + i18n 3 语言)
+ *   - 守门 #23: confidence < 0.5 必标 needs_review
  */
 
 import { useState } from "react";
 import { Server, Brain, BarChart3, FileText, Wrench, Sparkles, Activity } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "@/lib/i18n";
+import { LogAITab } from "./components/LogAITab";
 
 export default function OpsPage() {
   const { t } = useTranslation();
@@ -112,17 +117,7 @@ export default function OpsPage() {
         </TabsContent>
 
         <TabsContent value="logai" className="mt-[21px]">
-          <PlaceholderCard
-            title={t.opsConsole.logAITitle}
-            tag="F-02"
-            items={[
-              t.opsConsole.logAIUpload,
-              t.opsConsole.logAIAnalysis,
-              t.opsConsole.logAIChannelMock,
-              t.opsConsole.logAINeedsReview,
-            ]}
-            accent="violet"
-          />
+          <LogAITab />
         </TabsContent>
 
         <TabsContent value="metrics" className="mt-[21px]">

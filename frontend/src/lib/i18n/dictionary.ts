@@ -323,12 +323,25 @@ export interface Dictionary {
     clusterCanary: string;
     clusterRollback: string;
     clusterStatus: string;
-    /** F-02 Log AI */
+    /** F-02 Log AI (F-02 端到端实装) */
     logAITitle: string;
     logAIUpload: string;
     logAIAnalysis: string;
     logAIChannelMock: string;
     logAINeedsReview: string;
+    /** F-02 LogAITab 端到端 i18n (2026-09-08 F-02 端到端拍板) */
+    logAIUploadTitle: string;
+    logAISourceLabel: string;
+    logAILevelFilterLabel: string;
+    logAIContentLabel: string;
+    logAIUploadBtn: string;
+    logAIUploading: string;
+    logAIUploadOk: string;
+    logAIErrorPrefix: string;
+    logAIAnalysisTitle: string;
+    logAIConfidenceLabel: string;
+    logAIAnomaliesLabel: string;
+    logAISuggestionsLabel: string;
     /** F-03 Metrics */
     metricsTitle: string;
     metricsKPI: string;

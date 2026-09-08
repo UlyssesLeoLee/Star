@@ -23,7 +23,7 @@ use uuid::Uuid;
 
 use domain_kms::{EncryptedBlob, KeyId, KmsClient, LocalMockKms};
 
-/// 凭证 Provider (5 类)
+/// 凭证 Provider (5 类 + F-02 2 类 LLM provider)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Provider {
     /// OpenClaw (LLM agent 编排, B.5)
@@ -36,6 +36,10 @@ pub enum Provider {
     KmsAws,
     /// KMS: 本地 mock (per 5ea9611, F.3 默认)
     KmsLocalMock,
+    /// LLM: OpenAI (F-02 OpenAI 通道, 2026-09-08 拍板扩展)
+    LlmOpenAi,
+    /// LLM: Anthropic (F-02 Anthropic 通道, 2026-09-08 拍板扩展)
+    LlmAnthropic,
 }
 
 impl Provider {
@@ -47,6 +51,8 @@ impl Provider {
             Self::KmsVault => "kms_vault",
             Self::KmsAws => "kms_aws",
             Self::KmsLocalMock => "kms_local_mock",
+            Self::LlmOpenAi => "llm_openai",
+            Self::LlmAnthropic => "llm_anthropic",
         }
     }
 }

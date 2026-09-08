@@ -4,6 +4,8 @@
 //! L1: mock (默认) → L2: OpenAI → L3: Anthropic → L4: mock (兜底, 永远可用)
 //!
 //! 守门 #23: confidence < 0.5 必标 "需人工 review" (在 analyze_log 内统一处理)
+//! 守门 #6 v2: retriable 规则 — Internal + RateLimited 都 retriable, 走下一通道
+//!            (per OPS-DETAILED §6.2 ladder retriable 派生)
 
 use tracing::{info, warn};
 
@@ -20,6 +22,14 @@ impl Ladder {
     /// 构造 Ladder, 通道按 L1→L2→L3→L4 顺序
     pub fn new(channels: Vec<Box<dyn AiChannel>>) -> Self {
         Self { channels }
+    }
+
+    /// 判断错误是否 retriable (per 守门 #6 v2)
+    /// - Internal: retriable (per error.rs 6-field, retriable=true)
+    /// - RateLimited: retriable (per error.rs 6-field, retriable=true; 60 req/min 等)
+    /// - NotImplemented / Unauthorized / BadRequest: 非 retriable
+    pub fn is_retriable(err: &OpsError) -> bool {
+        matches!(err, OpsError::Internal(_) | OpsError::RateLimited(_))
     }
 
     /// 走 Ladder 分析 log, 第一个成功通道返回结果
@@ -46,13 +56,13 @@ impl Ladder {
                     return Ok(analysis);
                 }
                 Err(e) => {
-                    warn!(channel = ch.name(), err = %e, "AI 通道失败, 回退");
-                    if matches!(e, OpsError::Internal(_)) {
-                        // retriable error, 继续下一个通道
+                    warn!(channel = ch.name(), err = %e, retriable = Self::is_retriable(&e), "AI 通道失败, 回退");
+                    if Self::is_retriable(&e) {
+                        // 守门 #6 v2: Internal + RateLimited 都 retriable, 继续下一通道
                         last_err = Some(e);
                         continue;
                     } else {
-                        // 非 retriable (如 NOT_IMPLEMENTED), 直接返
+                        // 非 retriable (NotImplemented / Unauthorized / BadRequest), 直接返
                         return Err(e);
                     }
                 }
@@ -60,5 +70,44 @@ impl Ladder {
         }
 
         Err(last_err.unwrap_or_else(OpsError::no_channel_available))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_retriable_internal() {
+        let err = OpsError::Internal("network".to_string());
+        assert!(Ladder::is_retriable(&err));
+    }
+
+    #[test]
+    fn is_retriable_rate_limited() {
+        // 守门 #6 v2: RateLimited 改 retriable (派生)
+        let err = OpsError::RateLimited("60 req/min exceeded".to_string());
+        assert!(
+            Ladder::is_retriable(&err),
+            "RateLimited 必 retriable (per 守门 #6 v2)"
+        );
+    }
+
+    #[test]
+    fn is_not_retriable_not_implemented() {
+        let err = OpsError::NotImplemented("test".to_string());
+        assert!(!Ladder::is_retriable(&err));
+    }
+
+    #[test]
+    fn is_not_retriable_unauthorized() {
+        let err = OpsError::Unauthorized("test".to_string());
+        assert!(!Ladder::is_retriable(&err));
+    }
+
+    #[test]
+    fn is_not_retriable_bad_request() {
+        let err = OpsError::BadRequest("test".to_string());
+        assert!(!Ladder::is_retriable(&err));
     }
 }

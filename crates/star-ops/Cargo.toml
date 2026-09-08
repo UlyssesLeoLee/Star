@@ -31,6 +31,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # HTTP server (跟 star-mcp / star-api-rest 同版本)
 axum = "0.8"
 
+# HTTP client (F-02 真实 LLM 通道, OpenAI/Anthropic)
+reqwest = { workspace = true }
+
+# 凭证加密 (F-02 LLM API key 走 star-credential KMS, 守门 #5 v2)
+star-credential = { path = "../star-credential" }
+
 # Async trait for ops_ai::AiChannel
 async-trait = { workspace = true }
 
@@ -39,12 +45,21 @@ async-trait = { workspace = true }
 
 # 实装阶段再引入 (per SRS-001 §10.2)
 # kube = { version = "0.95" }        # K8s client (F-01)
-# reqwest = { version = "0.12" }     # 真实 LLM 通道 (F-02)
 # walkdir = "2"                      # F-04 文档扫描
 
 [dev-dependencies]
 # axum::Router::oneshot 测试 helper (per star-mcp 模式)
 tower = { version = "0.5", features = ["util"] }
+
+# F-02 端到端 IT 雏形 (per 守门 #1 v25)
+# axum::body::Body 测试用
+# reqwest::Client IT 调 ops_api HTTP
+# criterion bench (per 守门 #7 v3 PT 雏形 P95 < 200ms)
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "log_upload_bench"
+harness = false
 
 [lints]
 workspace = true

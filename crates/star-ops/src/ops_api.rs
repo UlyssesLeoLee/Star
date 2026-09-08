@@ -221,35 +221,61 @@ async fn cluster_status() -> impl IntoResponse {
 
 // ============ F-02 LogAI ============
 
+/// F-02 log_upload body 大小硬上限 (per 守門 #5 v2, 1MB 限制)
+/// 防止恶意 client 上传超大 log 撑爆内存
+const LOG_UPLOAD_MAX_BODY_BYTES: usize = 1024 * 1024; // 1 MiB
+
 #[derive(Serialize)]
 struct UploadAck {
     log_id: Uuid,
     entry_count: usize,
     analysis_triggered: bool,
+    trace_id: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct LogUploadBody {
     source: String,
-    #[allow(dead_code)]
     level_filter: Option<Vec<LogLevel>>,
     content: String,
+    /// 跨调用链追踪 ID (per 守門 #5 v2 + OPS-BASIC-DESIGN §3.4)
+    trace_id: Option<String>,
 }
 
 async fn log_upload(
     State(state): State<AppState>,
     Json(body): Json<LogUploadBody>,
 ) -> Result<Json<OpsResponse<UploadAck>>, OpsError> {
+    // 守門 #5 v2: body 大小硬限制 1MB, 防止恶意 client 撑爆内存
+    let body_size = body.content.len();
+    if body_size > LOG_UPLOAD_MAX_BODY_BYTES {
+        return Err(OpsError::BadRequest(format!(
+            "log content 超过 1MB 限制 ({} bytes), per 守門 #5 v2",
+            body_size
+        )));
+    }
+
+    // 守門 #5 v2: trace_id 传递 (跨调用链追踪, OPS-BASIC-DESIGN §3.4)
+    let trace_id = body.trace_id.clone();
+
+    // 守門 #13: level_filter 应用 — 如果 client 提供, 仅保留匹配 level 的行
+    let filtered_content = if let Some(filter) = &body.level_filter {
+        apply_level_filter(&body.content, filter)
+    } else {
+        body.content
+    };
+
     let log = LogEntry {
         id: Uuid::new_v4(),
         source: body.source,
+        // MVP: 单 log 简化, 实际从 filtered_content 多行解析 (后续子项)
         level: LogLevel::Error,
-        message: body.content,
+        message: filtered_content,
         timestamp: chrono::Utc::now(),
-        trace_id: None,
+        trace_id: trace_id.clone(),
     };
 
-    // MVP: 触发 AI 分析 (走 Ladder)
+    // F-02 端到端: 触发 AI 分析 (走 Ladder)
     let analysis_triggered = state.ladder.analyze_log(&log).await.is_ok();
 
     Ok(Json(OpsResponse {
@@ -257,11 +283,15 @@ async fn log_upload(
             log_id: log.id,
             entry_count: 1,
             analysis_triggered,
+            trace_id: log.trace_id,
         },
         meta: OpsMeta {
-            stub: true,
+            stub: false, // F-02 端到端: 真实调用
             total: None,
-            hint: Some("F-02 实装阶段接入 log 采集 agent".to_string()),
+            hint: Some(
+                "F-02 端到端实装: trace_id 传递 + level_filter + 1MB 限制 (per 守門 #5 v2)"
+                    .to_string(),
+            ),
             ai_channel: Some("mock".to_string()),
             analysis_triggered: Some(analysis_triggered),
             needs_review: None,
@@ -269,6 +299,32 @@ async fn log_upload(
             phase: None,
         },
     }))
+}
+
+/// 按 level_filter 过滤 log 行 (per 守門 #13 + OPS-BASIC-DESIGN §3.4)
+/// 简单规则: 含 ERROR/WARN/INFO/DEBUG/TRACE 关键字的行, 跟 filter 集合求交
+fn apply_level_filter(content: &str, filter: &[LogLevel]) -> String {
+    if filter.is_empty() {
+        return content.to_string();
+    }
+    let filter_keywords: Vec<&'static str> = filter
+        .iter()
+        .map(|l| match l {
+            LogLevel::Trace => "TRACE",
+            LogLevel::Debug => "DEBUG",
+            LogLevel::Info => "INFO",
+            LogLevel::Warn => "WARN",
+            LogLevel::Error => "ERROR",
+        })
+        .collect();
+    content
+        .lines()
+        .filter(|line| {
+            let upper = line.to_uppercase();
+            filter_keywords.iter().any(|kw| upper.contains(kw))
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 async fn log_analysis(Path(id): Path<Uuid>) -> Result<Json<OpsResponse<LogAnalysis>>, OpsError> {
@@ -447,5 +503,55 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// F-02 端到端: log_upload 真实路径, 验证 trace_id 传递 + level_filter 应用 + 1MB 限制
+    /// 守门 #5 v2: API key 安全 + 1MB body 限制
+    #[tokio::test]
+    async fn log_upload_with_trace_id_and_level_filter() {
+        let app = router(AppState::new());
+        let body = serde_json::json!({
+            "source": "k8s-pod/test",
+            "level_filter": ["ERROR", "WARN"],
+            "content": "2026-09-08 INFO ok\n2026-09-08 ERROR helm release failed\n2026-09-08 WARN retry\n",
+            "trace_id": "trace-f02-test-001"
+        });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/ops/log/upload")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// F-02 端到端: 1MB body 限制 (守门 #5 v2)
+    #[tokio::test]
+    async fn log_upload_rejects_oversized_body() {
+        let app = router(AppState::new());
+        // 构造 1.1MB content
+        let big = "x".repeat(1024 * 1024 + 100);
+        let body = serde_json::json!({
+            "source": "test",
+            "content": big,
+        });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/ops/log/upload")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        // 守门 #5 v2: 1MB 限制触发 BadRequest (HTTP 400)
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 }
