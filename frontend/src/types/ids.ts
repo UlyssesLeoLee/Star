@@ -892,81 +892,92 @@ export interface StateMachine {
 }
 
 export const WORKTREE_SM: StateMachine = {
+  // 17 状态 (per crates/domain-worktree/src/lib.rs:56-91 WorktreeStatus enum)
+  // 真实状态名 = PascalCase 后端 enum variant; 前端展示用 snake_case
   name: "Worktree 17 状态机",
   states: [
-    "initializing", "cloning", "syncing",
-    "active", "dirty", "behind", "diverged", "conflict",
-    "committing", "pushing", "ci_running", "review_requested",
-    "merged", "closed", "abandoned", "archived", "reverted",
+    "created", "initializing", "ready", "assigned", "agent_running",
+    "committing", "completed", "ready_for_review", "reviewing",
+    "changes_requested", "fixing", "merged", "archived",
+    "abandoned", "blocked", "conflicted", "stale",
   ],
-  initial: "initializing",
+  initial: "created",
   invariant_ids: ["INV-WT-01", "INV-WT-02", "INV-WT-03", "INV-WT-04"],
+  // transitions 按后端状态机 + 7 项 Completion Gate 业务流推断, 真实 can_transition_to 在 backend
   transitions: [
-    { from: "initializing", to: "cloning", trigger: "git.clone.start" },
-    { from: "cloning",      to: "syncing", trigger: "git.clone.done" },
-    { from: "syncing",      to: "active",  trigger: "sync.complete" },
-    { from: "active",       to: "dirty",   trigger: "file.modified" },
-    { from: "active",       to: "behind",  trigger: "remote.advanced" },
-    { from: "behind",       to: "diverged",trigger: "local.commit.pushed" },
-    { from: "diverged",     to: "conflict",trigger: "merge.attempt" },
-    { from: "conflict",     to: "active",  trigger: "conflict.resolved" },
-    { from: "dirty",        to: "committing", trigger: "user.commit" },
-    { from: "committing",   to: "pushing", trigger: "commit.complete" },
-    { from: "pushing",      to: "ci_running", trigger: "push.complete" },
-    { from: "ci_running",   to: "review_requested", trigger: "ci.pass" },
-    { from: "ci_running",   to: "dirty",  trigger: "ci.fail" },
-    { from: "review_requested", to: "merged", trigger: "pr.approved.merge" },
-    { from: "review_requested", to: "closed", trigger: "pr.closed" },
-    { from: "merged",       to: "reverted", trigger: "revert.commit" },
-    { from: "merged",       to: "archived", trigger: "user.archive" },
-    { from: "active",       to: "abandoned", trigger: "user.abandon" },
+    { from: "created",          to: "initializing",    trigger: "runtime.register" },
+    { from: "initializing",     to: "ready",           trigger: "runtime.confirmed" },
+    { from: "ready",            to: "assigned",        trigger: "agent.dispatch" },
+    { from: "assigned",         to: "agent_running",   trigger: "agent.started" },
+    { from: "agent_running",    to: "committing",      trigger: "user.commit" },
+    { from: "committing",       to: "completed",       trigger: "commit.done" },
+    { from: "completed",        to: "ready_for_review",trigger: "validation.7gate.pass" },
+    { from: "ready_for_review", to: "reviewing",       trigger: "human.review.start" },
+    { from: "reviewing",        to: "changes_requested",trigger: "review.changes" },
+    { from: "reviewing",        to: "merged",          trigger: "review.approved.merge" },
+    { from: "changes_requested",to: "fixing",          trigger: "agent.repick" },
+    { from: "fixing",           to: "ready_for_review",trigger: "fix.submitted" },
+    { from: "merged",           to: "archived",        trigger: "user.archive" },
+    { from: "merged",           to: "abandoned",       trigger: "user.abandon" },
+    { from: "assigned",         to: "blocked",         trigger: "dependency.block" },
+    { from: "blocked",          to: "assigned",        trigger: "dependency.clear" },
+    { from: "assigned",         to: "conflicted",      trigger: "wt22.conflict" },
+    { from: "conflicted",       to: "assigned",        trigger: "wt22.resolved" },
+    { from: "agent_running",    to: "stale",           trigger: "observed.lost>300s" },
+    { from: "stale",            to: "assigned",        trigger: "observed.reconnect" },
   ],
 };
 
 export const AGENT_SM: StateMachine = {
+  // 14 状态 (per crates/domain-agent/src/lib.rs:64-93 AgentSessionStatus enum)
+  // 真实状态名 = PascalCase 后端 enum variant; 前端展示用 snake_case
   name: "AgentSession 14 状态机",
   states: [
-    "queued", "spawning", "initializing",
-    "compiling_context", "planning", "executing",
-    "awaiting_feedback", "awaiting_human", "awaiting_tool",
-    "validating", "paused", "completed", "failed", "cancelled",
+    "created", "starting", "running",
+    "waiting_tool", "tool_running", "tool_completed",
+    "waiting_feedback", "feedback_received", "validating",
+    "completed", "failed", "aborted", "crashed", "timeout",
   ],
-  initial: "queued",
+  initial: "created",
   invariant_ids: ["INV-AGT-N01", "INV-AGT-N02", "INV-AGT-N07", "INV-AGT-N14"],
   transitions: [
-    { from: "queued",            to: "spawning",          trigger: "scheduler.dispatch" },
-    { from: "spawning",          to: "initializing",      trigger: "runtime.spawn.ok" },
-    { from: "initializing",      to: "compiling_context", trigger: "init.complete" },
-    { from: "compiling_context", to: "planning",          trigger: "context.ready" },
-    { from: "planning",          to: "executing",         trigger: "plan.approved" },
-    { from: "executing",         to: "awaiting_feedback", trigger: "feedback.request" },
-    { from: "awaiting_feedback", to: "executing",         trigger: "feedback.received" },
-    { from: "executing",         to: "awaiting_human",    trigger: "human.decision.required" },
-    { from: "awaiting_human",    to: "executing",         trigger: "human.decided" },
-    { from: "executing",         to: "awaiting_tool",     trigger: "tool.call" },
-    { from: "awaiting_tool",     to: "executing",         trigger: "tool.returned" },
-    { from: "executing",         to: "validating",        trigger: "agent.done" },
-    { from: "validating",        to: "completed",         trigger: "validation.pass" },
-    { from: "validating",        to: "failed",            trigger: "validation.fail" },
-    { from: "executing",         to: "paused",            trigger: "user.pause" },
-    { from: "paused",            to: "executing",         trigger: "user.resume" },
-    { from: "queued",            to: "cancelled",         trigger: "user.cancel" },
-    { from: "executing",         to: "cancelled",         trigger: "user.cancel" },
+    { from: "created",            to: "starting",          trigger: "runtime.dispatch" },
+    { from: "starting",           to: "running",           trigger: "runtime.spawn.ok" },
+    { from: "running",            to: "waiting_tool",      trigger: "tool.call" },
+    { from: "waiting_tool",       to: "tool_running",      trigger: "tool.start" },
+    { from: "tool_running",       to: "tool_completed",    trigger: "tool.return" },
+    { from: "tool_completed",     to: "running",           trigger: "llm.resume" },
+    { from: "running",            to: "waiting_feedback",  trigger: "feedback.request" },
+    { from: "waiting_feedback",   to: "feedback_received", trigger: "feedback.received" },
+    { from: "feedback_received",  to: "running",           trigger: "llm.resume" },
+    { from: "running",            to: "validating",        trigger: "agent.done" },
+    { from: "validating",         to: "completed",         trigger: "validation.pass" },
+    { from: "validating",         to: "failed",            trigger: "validation.fail" },
+    { from: "running",            to: "aborted",           trigger: "user.abort" },
+    { from: "running",            to: "crashed",           trigger: "runtime.crash" },
+    { from: "running",            to: "timeout",           trigger: "watchdog.expire" },
   ],
 };
 
 export const FEEDBACK_SM: StateMachine = {
+  // 6 状态 (per crates/domain-feedback/src/value_object.rs:65-78 FeedbackStatus enum)
+  // can_transition_to 限制: Open→Acknowledged; Acknowledged→Applied; Applied→Verified;
+  //   {Open|Acknowledged|Applied}→Rejected; {Open|Acknowledged|Applied|Verified}→Superseded
   name: "Feedback 6 状态机",
-  states: ["open", "acknowledged", "in_progress", "resolved", "wontfix", "reopened"],
+  states: ["open", "acknowledged", "applied", "verified", "rejected", "superseded"],
   initial: "open",
-  invariant_ids: ["INV-FB-01", "INV-FB-02"],
+  invariant_ids: ["INV-FB-01", "INV-FB-02", "INV-FB-04"],
   transitions: [
-    { from: "open",         to: "acknowledged", trigger: "human.ack" },
-    { from: "acknowledged", to: "in_progress",  trigger: "agent.start" },
-    { from: "in_progress",  to: "resolved",     trigger: "fix.deployed" },
-    { from: "in_progress",  to: "wontfix",      trigger: "user.wontfix" },
-    { from: "resolved",     to: "reopened",     trigger: "regression.detected" },
-    { from: "reopened",     to: "in_progress",  trigger: "agent.repick" },
+    { from: "open",         to: "acknowledged", trigger: "agent.pull" },
+    { from: "acknowledged", to: "applied",      trigger: "changeset.submitted" },
+    { from: "applied",      to: "verified",     trigger: "validation.pass" },
+    { from: "open",         to: "rejected",     trigger: "user.reject" },
+    { from: "acknowledged", to: "rejected",     trigger: "user.reject" },
+    { from: "applied",      to: "rejected",     trigger: "user.reject" },
+    { from: "open",         to: "superseded",   trigger: "newer.feedback" },
+    { from: "acknowledged", to: "superseded",   trigger: "newer.feedback" },
+    { from: "applied",      to: "superseded",   trigger: "newer.feedback" },
+    { from: "verified",     to: "superseded",   trigger: "newer.feedback" },
   ],
 };
 
@@ -992,32 +1003,31 @@ export const PR_SM: StateMachine = {
 };
 
 export const WORKITEM_SM: StateMachine = {
-  name: "WorkItem 6 状态 (默认 3 态 + 扩展)",
-  states: ["todo", "in_progress", "review", "blocked", "done", "wontfix"],
+  // 3 状态 (per crates/domain-work-item/src/lib.rs:188-195 WorkItemStatus enum, §7.2 默认三态)
+  // "review/blocked/wontfix" 属工作流扩展, 不在默认三态内, 通过 Workflow 引擎独立状态机表达
+  name: "WorkItem 3 状态机 (默认三态,§7.2)",
+  states: ["todo", "in_progress", "done"],
   initial: "todo",
-  invariant_ids: ["INV-PM-01", "INV-PM-02", "INV-PM-03"],
+  invariant_ids: ["INV-WI-01", "INV-WI-02", "INV-WI-03"],
   transitions: [
     { from: "todo",        to: "in_progress", trigger: "user.start" },
-    { from: "in_progress", to: "review",      trigger: "pr.opened" },
-    { from: "in_progress", to: "blocked",     trigger: "blocker.detected" },
-    { from: "blocked",     to: "in_progress", trigger: "blocker.cleared" },
-    { from: "review",      to: "in_progress", trigger: "review.changes_requested" },
-    { from: "review",      to: "done",        trigger: "pr.merged" },
-    { from: "in_progress", to: "wontfix",     trigger: "user.wontfix" },
+    { from: "in_progress", to: "done",        trigger: "user.complete" },
   ],
 };
 
 export const CHANGESET_SM: StateMachine = {
+  // 5 状态 (per crates/domain-development/src/lib.rs:179-... ChangeSetStatus enum)
+  // 真实状态名 = PascalCase 后端 enum variant; 前端展示用 snake_case
+  // Approved/Rejected/Merged 为终态 (per is_terminal)
   name: "ChangeSet 5 状态机 (INV-DEV-01~05)",
-  states: ["draft", "applied", "merged", "abandoned", "reverted"],
+  states: ["draft", "ready_for_review", "approved", "rejected", "merged"],
   initial: "draft",
   invariant_ids: ["INV-DEV-01", "INV-DEV-02", "INV-DEV-03", "INV-DEV-04", "INV-DEV-05"],
   transitions: [
-    { from: "draft",     to: "applied",   trigger: "user.apply" },
-    { from: "applied",   to: "merged",    trigger: "pr.merged" },
-    { from: "applied",   to: "reverted",  trigger: "user.revert" },
-    { from: "draft",     to: "abandoned", trigger: "user.abandon" },
-    { from: "merged",    to: "reverted",  trigger: "user.revert" },
+    { from: "draft",            to: "ready_for_review", trigger: "user.submit" },
+    { from: "ready_for_review", to: "approved",         trigger: "review.approved" },
+    { from: "ready_for_review", to: "rejected",         trigger: "review.rejected" },
+    { from: "approved",         to: "merged",           trigger: "pr.merged" },
   ],
 };
 
