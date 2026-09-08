@@ -1,5 +1,5 @@
 # =====================================================================
-# wipecluster-and-recover.ps1 — WipeCluster 全流程 (per 2026-09-08 13:26 JST UAT 闭环)
+# wipecluster-and-recover.ps1 — WipeCluster 全流程 (per 2026-09-08 13:26 JST UAT 闭环, v2.1 纠错)
 # =====================================================================
 # 目的: 修复 k3s cluster 内部网络层损坏 (v30 (c) 症状: kubectl port-forward
 #       / NodePort 100% 不通), 重建 k3s 后再 apply star-mock envoy pod
@@ -8,8 +8,13 @@
 # 设计原则 (per 守门):
 #   - 幂等: 每步可单独 re-run
 #   - 失败即停: 任一步 fail 立即退出
-#   - 守门 #5: 全程不打印 env 变量值 (只 invoke)
+#   - 守门 #5: 全程不打印 env 变量值 (只 invoke, MAVIS_AUTO_WIPE 模式 stdin pipe sudo)
 #   - 守门 #6: PowerShell only
+#
+# v2.1 纠错 (per Ulysses 14:21 JST 反馈): Ulysses 不用 Docker Desktop, 用 k3s.
+#   WSL Ubuntu 里装的是 apt 包 docker.io + containerd (Ubuntu 24.04 apt 仓库标准包).
+#   真根因 = apt 装 containerd 跟 k3s embedded containerd 抢 /run/containerd/containerd.sock.
+#   修法: 临时停 apt containerd, 不要 disable, 停完能再 start. (v31 候选落地)
 #
 # 前置 (Ulysses 必先做):
 #   - 默认模式 (Mavis 不可代理): Ulysses 必在 admin PowerShell 跑 WipeCluster

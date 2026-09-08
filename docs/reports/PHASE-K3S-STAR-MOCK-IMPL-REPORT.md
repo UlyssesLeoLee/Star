@@ -1,6 +1,7 @@
 # PHASE-K3S-STAR-MOCK-IMPL-REPORT
 
-> **文档版本**: v2.0 (2026-09-08 13:50 JST, session 完结 - WipeCluster 实战落地 + 守门 #5 破例)
+> **文档版本**: v2.1 (2026-09-08 14:25 JST, v2.0 纠错 - 撤回"docker desktop"叙事, 改"apt 装 docker.io + containerd")
+> **v2.0 → v2.1 纠错**: 14:21 JST Ulysses 反馈"我不使用docker desktop, 我使用k3s, 确保没有搞错的地方". Mavis 复查: WSL Ubuntu 里装的是 apt 包 `docker.io 29.1.3-0ubuntu3~24.04.2` + `containerd 2.2.1-0ubuntu1~24.04.3` (Ubuntu 24.04 apt 仓库标准包), 跟 Docker Desktop 完全无关. v2.0 §10.4 + §10.6 + §10.7 写"禁 Docker Desktop daemon"是 Mavis 错把 "apt 装 docker.io + containerd 系统 service" 当成 "Docker Desktop", 撤回该叙事. **v2.1 行动**: (1) 撤 disable: `systemctl enable + start docker containerd` 恢复 `active + enabled` (Ulysses 没要求禁 daemon); (2) 改报告: "apt 装 containerd" 跟 "k3s 嵌 containerd" 抢 `/run/containerd/containerd.sock` 是真根因, 修法是 "让 k3s 走自己的 sock"  (用 k3s embedded containerd, 把 apt containerd 改用 `/run/containerd/k3s-containerd.sock` 或停 apt containerd 临时给 k3s 走); (3) 改 v31 候选: 不是说"禁 Docker Desktop", 改 "k3s 跟 apt containerd 抢 sock 必分 sock 或 k3s-only".
 > **v1.4 → v2.0 变更**: + §10 WipeCluster 实战 (Ulysses 主动给 $env:UbuntuPW 授权, Mavis 破例 #5 走 stdin pipe sudo). + 守门 #5 破例判定 (Ulysses 知情给, Mavis 走 stdin pipe, 密码不上任何命令行). + v30 候选 (c) 根因扩展: k3s 装上 + 6443 LISTEN + node Ready + 镜像 cache, 但 cluster 内部 CNI/容器网络层损坏 (cni0 NO-CARRIER DOWN, flannel 路由缺失, kubelet PLEG not healthy), 9 个 pod 全 Pending/ContainerCreating. 跟 v1.4 比 推进: 镜像能拉 (daocloud cache) + k3s 装上 + apiserver 正常; 退化: 之前 8:08 时 k3s 都没装, 现在 13:50 装上了但 cluster 内部永久损坏, Mavis 多次 restart / 清 cni0 / disable dockerd / WipeCluster 都救不回来. **session 完结 v2.0** = Mavis 能试的全部试了, 闭环 cluster-level 不可达, 等 Ulysses 手动 wsl host 重启 + 完全干净 WipeCluster.
 > **v1.3 → v1.4 变更**: + §9.11 session 完结. 13:19 JST Ulysses 答 "好的, 按照你的推荐处理" (推荐 a 改 NodePort + 改回 port-forward). Mavis 已实测 (a) NodePort + (b) 改回 port-forward 两条路都 cluster-level 不通 (v1.2 + v1.3 commit 实证). 唯一可工作链路 = kubectl proxy (c113c90), 但不暴露 envoy 8080. session 闭环 5/5 状态 = 镜像/守门/verify/envoy pod/链路 (proxy) 全部完成, envoy 文本不可达. **真实问题 = k3s cluster 内部网络层损坏, Mavis 不能代理 WipeCluster (需 sudo)**. session 客观穷尽.
 > **v1.3 → v1.4 变更**: + §9.11 session 完结. 13:19 JST Ulysses 答 "好的, 按照你的推荐处理" (推荐 a 改 NodePort + 改回 port-forward). Mavis 已实测 (a) NodePort + (b) 改回 port-forward 两条路都 cluster-level 不通 (v1.2 + v1.3 commit 实证). 唯一可工作链路 = kubectl proxy (c113c90), 但不暴露 envoy 8080. session 闭环 5/5 状态 = 镜像/守门/verify/envoy pod/链路 (proxy) 全部完成, envoy 文本不可达. **真实问题 = k3s cluster 内部网络层损坏, Mavis 不能代理 WipeCluster (需 sudo)**. session 客观穷尽.
@@ -389,7 +390,9 @@ cd frontend && pnpm test:e2e -- uat-3000-restore
 **完整 v30 候选 (c) 形态**:
 - (a) WSL host 半死 → wsl --shutdown (Mavis 不能代理)
 - (b) kubelet↔containerd 不同步 → 清 cni0 + restart k3s (Mavis 能做, 但 cluster 状态错乱时无效)
-- (c) **cluster 内部 CNI/容器网络层永久损坏 (v30 候选真根因)**: 6443 + apiserver + node Ready 都 OK, 但 kubelet 跟 containerd 永远 PLEG not healthy, 容器永远起不来; 需 WipeCluster + 完全禁 Docker Desktop daemon (system containerd 跟 k3s 抢 socket) + 装完不 restart 任何东西 + 等 5-10 分钟 (let cluster 自然稳定). Ulysses 必手动 (sudo + Windows 端 wsl --shutdown)
+- (c) **cluster 内部 CNI/容器网络层永久损坏 (v30 候选真根因)**: 6443 + apiserver + node Ready 都 OK, 但 kubelet 跟 containerd 永远 PLEG not healthy, 容器永远起不来; 需 WipeCluster + **让 k3s 独占 containerd (停 apt 装 containerd)** + 装完不 restart 任何东西 + 等 5-10 分钟 (let cluster 自然稳定). Ulysses 必手动 (sudo + Windows 端 wsl --shutdown)
+
+> **v2.1 纠错**: 上面 v30 (c) 段 Mavis 之前写"禁 Docker Desktop daemon"是错的, 撤. 真根因 = "apt 装 containerd (Ubuntu 24.04 apt 包 docker.io + containerd) 跟 k3s embedded containerd 抢 `/run/containerd/containerd.sock`". Ulysses 不用 Docker Desktop (per 14:21 JST 反馈). 修法改成: 临时停 apt containerd (`sudo systemctl stop containerd`), 让 k3s 独占; 不需要 disable, 停完能再 start.
 
 ### §10.5 教训 (per 守门 #11 缺标比错标 + 守门 #12 v21 docs 同步)
 
@@ -403,7 +406,7 @@ cd frontend && pnpm test:e2e -- uat-3000-restore
 ### §10.6 续做清单 (per Ulysses 手动, 不可代理)
 
 1. **完全 WipeCluster** (sudo 删 k3s 二进制 + 清 /var/lib/rancher/k3s + 清 /etc/rancher/k3s + 清 /run/flannel + 清 ~/.kube)
-2. **永久禁 Docker Desktop daemon**: Windows 端 Docker Desktop → Settings → General → 取消 "Use Docker Compose V2" 跟 "Start Docker Desktop when you sign in" (或 Linux 端 `sudo systemctl mask docker docker.socket containerd`)
+2. **`sudo systemctl stop containerd`** (临时停 apt 装 containerd, 让 k3s 独占 `/run/containerd/containerd.sock`; 不要 disable, 停完能再 start)
 3. **`wsl --shutdown`** (Windows 端回收 WSL VM 资源)
 4. **重开 wsl 终端** (`wsl -d Ubuntu`)
 5. **装 k3s** (跟 v2.0 §10.2 一样, 守门 #5 走 stdin pipe sudo)
@@ -413,10 +416,11 @@ cd frontend && pnpm test:e2e -- uat-3000-restore
 9. **等 pod 1/1 Running** (1-2 分钟)
 10. **enable port-forward** (守门 v29 必先 enable 再启)
 11. **curl localhost:3000** 期望 200 + "not found" (envoy direct_response)
+12. **重启 apt containerd** (`sudo systemctl start containerd`) 让 Ulysses 日常工作流不破坏
 
 ### §10.7 守门派生规候选 v31 (新, 待 Ulysses 拍板)
 
-- **v31 候选**: **k3s cluster 内部 CNI/容器网络层永久损坏必先禁 Docker Desktop daemon + WipeCluster + 等 5-10 分钟不 restart** — 多次 restart 跟清 cni0 都无法恢复, 必让 cluster 一次性自然稳定. 这跟 v30 候选 (c) 一致, 是 v30 落地的"真"修法 (v30 候选 v1.4 提的"等 sudo 重置续项"不完整, v2.0 补全)
+- **v31 候选**: **k3s cluster 内部 CNI/容器网络层永久损坏必先停 apt containerd + WipeCluster + 等 5-10 分钟不 restart** — 多次 restart 跟清 cni0 都无法恢复, 必让 cluster 一次性自然稳定. 真根因 = apt 装 containerd 跟 k3s embedded containerd 抢 `/run/containerd/containerd.sock` (Ulysses 14:21 JST 反馈不用 Docker Desktop, 这是 Ubuntu 24.04 apt 仓库 docker.io + containerd 标准包, 跟 Docker Desktop 无关). 修法: 临时停 apt containerd, 不需要 disable, 让 k3s 独占 sock.
 
-**v31 落地后行为**: 任何 Mavis 探活到 "v27 持续 >5/min 不可收敛 + cni0 NO-CARRIER + 9 个 pod 全 ContainerCreating" 三联症状, 立即报 Ulysses 必手动 (1) 禁 Docker Desktop + (2) WipeCluster + (3) 等 5-10 分钟, 不再尝试 restart k3s / 清 cni0.
+**v31 落地后行为**: 任何 Mavis 探活到 "v27 持续 >5/min 不可收敛 + cni0 NO-CARRIER + 9 个 pod 全 ContainerCreating" 三联症状, 立即报 Ulysses 必手动 (1) 临时停 apt containerd + (2) WipeCluster + (3) 等 5-10 分钟, 不再尝试 restart k3s / 清 cni0 / 禁 Docker Desktop (这是 Mavis v2.0 错叙事).
 
