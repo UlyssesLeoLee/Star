@@ -68,22 +68,53 @@ pub struct HelmActionAck {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HelmMockOutput {
     pub status: String,
+    /// mock 脚本对 list/canary/rollback 用 `release`, 这里用 alias 兼容
+    #[serde(alias = "release")]
     pub release_name: String,
+    /// list 返 revision, canary/rollback 用 target_revision (String). 缺省 0
+    #[serde(default)]
     pub revision: u32,
+    #[serde(default)]
     pub canary_weight: u8,
+    #[serde(default)]
     pub detail: String,
+    #[serde(default)]
     pub mock: bool,
 }
 
 /// 调 helm_canary_mock.sh subprocess (守门 #19 v19 + #24 v2 + 守门 #1 R-05)
 async fn run_helm_mock(action: &str, args: &[&str]) -> Result<HelmMockOutput, String> {
     use tokio::process::Command;
-    let script = format!(
-        "{}/scripts/automation/helm_canary_mock.sh",
-        env!("CARGO_MANIFEST_DIR").replace("crates/star-ops", "")
-    );
-    let mut cmd = Command::new("bash");
-    cmd.arg(&script).arg(action);
+    // 派生 worktree_root: CARGO_MANIFEST_DIR = ".../crates/star-ops" → 向上 2 级
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let worktree_root = std::path::Path::new(manifest_dir)
+        .parent()
+        .and_then(|p| p.parent())
+        .ok_or_else(|| "worktree root 派生失败".to_string())?;
+    let script = worktree_root
+        .join("scripts")
+        .join("automation")
+        .join("helm_canary_mock.sh");
+    // 路径转 forward slash (MSYS bash 接受, 避免 backslash escape 问题)
+    let script_str = script.to_string_lossy().replace('\\', "/");
+
+    // 解析 bash (Windows 优先 Git bash, 避免 WSL bash.exe 干扰)
+    let bash = if cfg!(windows) {
+        let candidates = [
+            "C:/Program Files/Git/bin/bash.exe",
+            "C:/Program Files/Git/usr/bin/bash.exe",
+        ];
+        candidates
+            .iter()
+            .find(|p| std::path::Path::new(p).exists())
+            .copied()
+            .unwrap_or("bash")
+    } else {
+        "bash"
+    };
+
+    let mut cmd = Command::new(bash);
+    cmd.arg(&script_str).arg(action);
     for a in args {
         cmd.arg(a);
     }
