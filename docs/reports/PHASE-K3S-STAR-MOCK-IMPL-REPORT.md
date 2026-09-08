@@ -1,6 +1,7 @@
 # PHASE-K3S-STAR-MOCK-IMPL-REPORT
 
-> **文档版本**: v0.6 (2026-09-08 08:48 JST)
+> **文档版本**: v0.7 (2026-09-08 09:02 JST)
+> **v0.7 变更**: + §9.4.1 v30 候选规实证 +1 行 (08:54:22 WSL 真没半死: wsl bash 通, k3s systemd pid 2386 / containerd pid 203 / dockerd pid 347 都在跑, 但 kubelet 跟 containerd 容器网络同步失败: 5min 内 43 条 "Skipping pod sync", v0.2 报告 §8.2 实证 `10.42.0.110:10250 no route to host` 同根因). 6443 LISTEN = Windows wslrelay pid 27680, 是 wsl.exe 守护, 不是 k3s 进程. v30 候选规 +1 行: 现象分为 (a) WSL host 半死 (v30 主治); (b) WSL OK 但 kubelet 跟 containerd 不同步 (次治, ip link delete cni0 + flannel.1 + restart k3s).
 > **v0.6 变更**: + §9.4.1 表加 1 行 (08:47:42 Ulysses 跑 wsl --shutdown 实证, wsl distro Stopped 但 6443 又 LISTEN pid 27680 = Windows wsl.exe 守护又拉起 k3s daemon, distro 未启). Ulysses 答 "杀 Windows 进程 27680 + 重启" 拍板 (ask_user q1_2ad87a47 opt3). v30 候选实证 +1 行.
 > **v0.4 变更**: + §9.4.1 v30 候选规 9 次时序观测实证表 (4 次 restart 死锁 + 5 次自动恢复, 模式: restart 后 1-2min 死锁, 不 restart 后 2-5min 自愈, 唯一稳定恢复 = wsl --shutdown). 让 v30 候选不是空想, 有 git 实证.
 > **v0.5 变更**: + §9.4.1 表加 1 行 (10:27:56 WSL Stopped 终态, v30 触发信号确认). Mavis 探到 WSL 整个停了, wsl -l -v 显式 Stopped, wsl -d Ubuntu 命令全报 "localhost N/...WSL" 错. 这是 v30 候选里说的"WSL host 半死"终态, 必 Ulysses 手动 wsl --shutdown + 重新打开 wsl 终端.
@@ -167,6 +168,7 @@
 | v0.4 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §9.4.1 v30 候选规 9 次时序观测实证表 (4 次 restart 死锁 + 5 次自动恢复, 模式: restart 后 1-2min 死锁, 不 restart 后 2-5min 自愈, 唯一稳定恢复 = wsl --shutdown); 让 v30 候选不是空想, 有 git 实证 | 2026-09-08 08:14-08:25 JST 持续观测 wsl host 反复死锁, 9 次时序数据落档 |
 | v0.5 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §9.4.1 表加 1 行 (10:27:56 WSL Stopped 终态, v30 触发信号确认); Mavis 探到 WSL 整个停 (wsl -l -v 显式 Stopped + wsl -d Ubuntu 命令全报 "localhost N/...WSL" 错); 这是 v30 候选里说的"WSL host 半死"终态, 必 Ulysses 手动 wsl --shutdown | 2026-09-08 08:28 JST WSL 整个停, v30 触发 |
 | v0.6 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §9.4.1 表加 1 行 (08:47:42 Ulysses 跑 wsl --shutdown 实证, wsl distro Stopped 但 6443 又 LISTEN pid 27680 = Windows wsl.exe 守护又拉起 k3s daemon, distro 未启); Ulysses 答 "杀 Windows 进程 27680 + 重启" 拍板 (ask_user q1_2ad87a47 opt3) | 2026-09-08 08:48 JST Ulysses 跑 wsl --shutdown, 新现象: Windows 守护重启 k3s 但 distro 未拉起 |
+| v0.7 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | + §9.4.1 表加 1 行 (08:54:22 WSL 真没半死: wsl bash 通, k3s pid 2386 / containerd pid 203 / dockerd pid 347 都在, 但 kubelet 跟 containerd 容器网络同步失败 5min 43 条 skip; 6443 LISTEN = Windows wslrelay pid 27680 不是 k3s); v30 候选 +1 区分 (a) WSL host 半死 (b) WSL OK + kubelet 跟 containerd 不同步 | 2026-09-08 09:02 JST Ulysses 拍板 opt1 (探容器网络 + 清 cni0/flannel.1 + restart k3s) |
 
 ---
 
@@ -294,6 +296,7 @@ cd frontend && pnpm test:e2e -- uat-3000-restore
 | 08:25:10 | (探) | 半死 | LISTEN | exit 1 |
 | 08:27:56 | 0 (mavis 不再 restart) | **Stopped** (终态) | LISTEN pid 14380 (Windows 进程还活) | `wsl -l -v` 显式 Stopped, wsl -d Ubuntu 报 "localhost N/...WSL" 错; **v30 触发**: WSL 整个停, 必 `wsl --shutdown` + 重新打开 wsl 终端, mavis 不能代理 |
 | 08:47:42 | (ulysses 跑 wsl --shutdown) | Stopped | (6443 后又 LISTEN pid 27680 = Windows wsl.exe 守护又拉起 k3s daemon) | Ulysses 报告 "我执行了 wsl --shutdown", mavis 探活: wsl -l -v 仍 Stopped (distro 未拉起), 6443 又 LISTEN pid 27680 = Windows 端 wsl.exe 重启了 k3s 进程但 distro 未启. **需 Ulysses 再手动打开 wsl 终端** (`wsl -d Ubuntu`) 拉起 distro, 之后 mavis 接 verify v1.1 |
+| 08:54:22 | 0 (Ulysses wsl 终端拉起 distro 后, k3s systemd 已启) | Running | LISTEN pid 27680 (Windows wslrelay) | wsl bash 探活: k3s pid 2386 + containerd pid 203 + dockerd pid 347 都在跑, **WSL 没半死**; 但 journalctl -u k3s 5min 内 43 条 "Skipping pod sync" (v27 fail exit 2); 根因 = kubelet 跟 containerd 容器网络同步失败, 跟 v0.2 报告 §8.2 实证 `10.42.0.110:10250 no route to host` 同源; 6443 LISTEN 但 wslrelay 持有, 不是 k3s. Ulysses 拍板 opt1 (探容器网络 + 清 cni0/flannel.1 + restart k3s) |
 
 **模式**: 每次 restart k3s, wsl host 1-2min 内死锁(系统调用挂起, wsl bash 空输出); 不 restart 时 2-5min 后自动恢复. **唯一稳定恢复路径 = `wsl --shutdown` + 重启 distro** (Windows 端回收 wsl VM 资源).
 
