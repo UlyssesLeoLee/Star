@@ -451,7 +451,7 @@ export const en: Dictionary = {
   // ── v0.7 (2026-09-08 Phase OPS-INTRY) Ops Console 4 tab ──
   opsConsole: {
     pageTitle: "Ops Console",
-    pageSubtitle: "Cluster / Log AI / Metrics / Docs — 4 entry points (MVP skeleton, 4 tabs placeholder)",
+    pageSubtitle: "Cluster / Log AI / Metrics / Docs — 4 entry points (F-02 end-to-end)",
     tabCluster: "Cluster",
     tabLogAI: "Log AI",
     tabMetrics: "Metrics",
@@ -467,6 +467,19 @@ export const en: Dictionary = {
     logAIAnalysis: "AI Analysis Result",
     logAIChannelMock: "AI channel: mock (local, Gate #23 no external API)",
     logAINeedsReview: "Needs human review (confidence < 0.5)",
+    // F-02 end-to-end LogAITab i18n (2026-09-08)
+    logAIUploadTitle: "Upload Log to AI Channel",
+    logAISourceLabel: "Source",
+    logAILevelFilterLabel: "Level filter",
+    logAIContentLabel: "Log content (1MB limit, Gate #5 v2)",
+    logAIUploadBtn: "Upload & Analyze",
+    logAIUploading: "Uploading...",
+    logAIUploadOk: "Upload OK",
+    logAIErrorPrefix: "Error",
+    logAIAnalysisTitle: "AI Analysis Result",
+    logAIConfidenceLabel: "Confidence",
+    logAIAnomaliesLabel: "Anomalies",
+    logAISuggestionsLabel: "Suggestions",
     metricsTitle: "F-03 Ops Metrics",
     metricsKPI: "5 KPI Overview",
     docsTitle: "F-04 Ops Docs",
