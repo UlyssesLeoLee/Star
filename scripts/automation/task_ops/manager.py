@@ -30,7 +30,7 @@ from typing import Any, Awaitable, Callable, Optional
 
 logger = logging.getLogger("task_ops.manager")
 
-# TMO 7 操作类型 → 节点 ID 映射 (per 02 §2.6.3 路由表)
+# TMO 8 操作类型 → 节点 ID 映射 (per 02 §2.6.3 路由表 v0.3 + ADR-0049 加入 create)
 OPERATION_TO_NODE: dict[str, str] = {
     "merge": "M-N1",
     "split": "M-N2",
@@ -39,6 +39,7 @@ OPERATION_TO_NODE: dict[str, str] = {
     "summarize": "M-N5",
     "reassign": "M-N6",
     "metadata": "M-N7",
+    "create": "M-N8",  # per ADR-0049 + 2026-09-09 04:57 JST 用户拍板核心功能
 }
 
 
@@ -108,6 +109,64 @@ class SubAgentPool:
         })
         return handle
 
+    def has_agent(self, agent_id: str) -> bool:
+        """检查 agent 是否在 L0 池中有效注册 (per 拍板: '存在有效 agent' 强约束)
+
+        PoC mock 模式: 检查 _agents dict (per ADR-0049 v0.1 内存版 SubAgentPool)
+        真实接入 star_context.sub_agent.registry 时, 走 registry.has(agent_id)
+
+        Returns:
+            True if agent_id 在 L0 池中注册, False otherwise
+        """
+        # PoC: 接受任何非空 agent_id (mock), 真实接入时替换为 registry.has()
+        return bool(agent_id and agent_id.strip())
+
+    async def dispatch(
+        self,
+        agent_id: str,
+        sa_type: str,
+        task_id: str,
+        worktree_id: str,
+        tenant_id: str,
+    ) -> str:
+        """dispatch SA-XX sub-agent (per ADR-0049 M-N8 拍板: 自动接管, 5s 内任务卡 in_progress)
+
+        流程:
+          1. 验证 agent_id 有效 (per 守门 #13 a L0 唯一入口)
+          2. 创建 AgentSession (per INV-WT-07 1 Worktree → 0..N AgentSession)
+          3. spawn L1 sub-agent (per M-N8 create_node 协调)
+          4. 返 agent_session_id (L0 唯一签发, UI 端可轮询状态)
+
+        PoC mock 模式: 内存版, 真实接入 star_context.sub_agent.pool 时替换
+
+        Returns:
+            agent_session_id (新签发, 格式 "ags-{uuid8}")
+        """
+        if not self.has_agent(agent_id):
+            raise ValueError(
+                f"SubAgentPool.dispatch: agent_id {agent_id!r} not registered "
+                f"(per 拍板: '存在有效 agent' 强约束)"
+            )
+
+        agent_session_id = f"ags-{uuid.uuid4().hex[:8]}"
+        # PoC: 内存版, 真实 AgentSession 走 G-WT-01 DB 接入
+        context = {
+            "agent_id": agent_id,
+            "sa_type": sa_type,
+            "task_id": task_id,
+            "worktree_id": worktree_id,
+            "tenant_id": tenant_id,
+            "agent_session_id": agent_session_id,
+            "status": "running",
+            "started_at_ms": int(time.time() * 1000),
+        }
+        await self.spawn(task_type=sa_type, context=context, task_id=task_id)
+        logger.info(
+            f"SubAgentPool.dispatch: agent_session={agent_session_id} "
+            f"sa={sa_type} task={task_id} wt={worktree_id} tenant={tenant_id}"
+        )
+        return agent_session_id
+
 
 @dataclass
 class TaskOperationsManager:
@@ -166,6 +225,10 @@ class TaskOperationsManager:
             elif node_id == "M-N7":
                 from automation.task_ops.nodes.metadata_node import metadata_node
                 result = await metadata_node(state=message, manager=self)
+            elif node_id == "M-N8":
+                # M-N8 create_node (per ADR-0049 + 2026-09-09 04:57 JST 用户拍板核心功能)
+                # 走独立 _create_task 路径, 因为 create_node 需要 worktree_registry (TMO 7 节点无此依赖)
+                result = await self._create_task(message)
             else:
                 # M-N3 reorder_node + M-N4 bulk_node 走独立 factory 路径 (per wt-tmo-03 + wt-tmo-04)
                 # 不经 manager.dispatch, 直接调 _REORDER_NODE / _bulk_queue
@@ -187,3 +250,107 @@ class TaskOperationsManager:
             "sub_pool": {tid: {"task_type": h.task_type, "state": h.state, "checkpoint_count": len(h.checkpoints)} for tid, h in self.sub_pool._handles.items()},
             "audit_count": len(self.audit_log),
         }
+
+    # ============================================================
+    # M-N8 create_node 入口 (per ADR-0049 + 2026-09-09 04:57 JST 拍板)
+    # ============================================================
+
+    async def create(self, request: dict) -> dict:
+        """M-N8 公开入口 — UI (sprint/+ New issue / board/+ New issue) 调用
+
+        流程 (per 拍板 trigger-location_opt1):
+          1. 校验 request (CreateTaskRequest 字段)
+          2. 委托 dispatch() → create_node (M-N8)
+          3. 返 CreateTaskResponse (task_id + worktree_id + agent_session_id + status 流)
+
+        Args:
+            request: CreateTaskRequest dict, 见 protocols.py
+
+        Returns:
+            {"ok": True, "node": "M-N8", "result": CreateTaskResponse, "duration_ms": int}
+            或 {"ok": False, "node": "M-N8", "error": str, "duration_ms": int}
+        """
+        return await self.dispatch(request)
+
+    async def _create_task(self, request: dict) -> dict:
+        """M-N8 create_node 内部协调
+
+        职责:
+          1. 调 create_node 真实工作
+          2. 协调 worktree_registry (PoC 内存版, 真实 DB 推 G-WT-01)
+          3. 协调 metadata_registry (per M-N7 协同, 创建即有 metadata)
+          4. 返 CreateTaskResponse
+
+        Args:
+            request: CreateTaskRequest dict (同 create())
+
+        Returns:
+            CreateTaskResponse dict, 见 protocols.py
+        """
+        from automation.task_ops.nodes.create_node import create_node
+        # PoC 内存版 registry (per ADR-0049 v0.1, 真实 DB 推 G-WT-01)
+        worktree_registry = self._get_or_create_worktree_registry()
+        metadata_registry = self._get_or_create_metadata_registry()
+
+        return await create_node(
+            sub_agent_pool=self.sub_pool,
+            worktree_registry=worktree_registry,
+            metadata_registry=metadata_registry,
+            request=request,
+        )
+
+    def _get_or_create_worktree_registry(self) -> "WorktreeRegistry":
+        """获取或创建 worktree_registry (PoC 内存版)
+
+        真实接入: per G-WT-01, 替换为 db.worktree_repo
+        """
+        if not hasattr(self, "_worktree_registry"):
+            self._worktree_registry = WorktreeRegistry()
+        return self._worktree_registry
+
+    def _get_or_create_metadata_registry(self) -> "TaskMetadataRepository | None":
+        """获取或创建 metadata_registry (PoC 内存版, per M-N7 协同)
+
+        真实接入: per G-WT-01, 替换为 db.task_metadata_repo
+        """
+        if not hasattr(self, "_metadata_registry"):
+            # TaskMetadataRepository 已存在 (per task_metadata_repo.py)
+            try:
+                from automation.task_ops.task_metadata_repo import TaskMetadataRepository
+                # PoC: SQLite 内存版, 真实 DB 路径推 G-WT-01
+                self._metadata_registry = TaskMetadataRepository(":memory:")
+            except ImportError:
+                # 真实 task_metadata_repo 不存在时, 走 None (create_node 内已容错)
+                self._metadata_registry = None
+        return self._metadata_registry
+
+
+@dataclass
+class WorktreeRegistry:
+    """Worktree 内存注册表 (per ADR-0049 v0.1 + 守门 #13 d Transaction append-only)
+
+    PoC: 内存版, 真实 DB 推 G-WT-01 (per HANDOFF-ST-001 H2 阻塞解除后启动)
+    约束: 物理删除禁止 (per 守门 #13 d Transaction), 仅追加 + 状态机推进
+    """
+    _worktrees: dict = field(default_factory=dict)
+
+    def add(self, worktree: dict) -> None:
+        """添加 worktree (L0 唯一入口)"""
+        wt_id = worktree["id"]
+        if wt_id in self._worktrees:
+            raise ValueError(f"worktree {wt_id} already exists (per 守门 #13 d 物理删除禁止)")
+        self._worktrees[wt_id] = worktree
+
+    def update(self, wt_id: str, patch: dict) -> None:
+        """更新 worktree 状态 (per 17 状态机推进)"""
+        if wt_id not in self._worktrees:
+            raise KeyError(f"worktree {wt_id} not found")
+        self._worktrees[wt_id].update(patch)
+
+    def get(self, wt_id: str) -> dict:
+        if wt_id not in self._worktrees:
+            raise KeyError(f"worktree {wt_id} not found")
+        return self._worktrees[wt_id]
+
+    def list(self) -> list[dict]:
+        return list(self._worktrees.values())

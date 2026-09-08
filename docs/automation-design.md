@@ -514,6 +514,59 @@ print(f"err_count={result.stderr.count('error[')}")
 - counter 验证: 0/0/0/0 → automation 周期跑会**自动 close** #18 #19 #20 #21 (下次 cron 触发)
 - 预期关闭时间: 30min 内 (per pgwiki_audit 周期)
 
+### 4.17 ADR-0049 任务卡自动 worktree + agent 接管 (2026-09-09 04:57 JST per Ulysses 拍板核心功能)
+
+> **触发**: 2026-09-09 04:57 JST Ulysses 发令"在面板或者sprint创建任务卡的时候，如果是存在有效agent的任务，应该要求agent自动创建并关联新的worktree，用langgraph实现，这是整个软件的核心功能"
+> **联动**: 守门 #19 v19 (Python 化 ≥2 维) + 守门 #9 v20 (子代理 dispatch 必先 brief) + 守门 #21 ([P] 子项 docs 同步) + 守门 #22 (调试控制台不污染 main 编译) + 守门 #13 a (L0 唯一入口) + 守门 #13 c (Master RLS) + 守门 #13 d (Transaction 100% audit) + 守门 #10 + 8/27 19:39 JST (代签)
+> **落档文件**:
+> - `docs/architecture/2026-08-26-upgrade/adr/0049-task-card-auto-worktree-agent.md` v0.1 (新, 300 行, 7 段结构 per AGENTS.md §3)
+> - `docs/reports/PHASE-AUTO-WORKTREE-IMPL-REPORT.md` v0.1 (新, 7 子项 phase 计划 + 8 已知缺口显式列 per 守门 #11)
+> - `docs/briefs/adr-0049-task-card-auto-worktree.md` v0.1 (新, 守门 #20 dispatcher brief 实证)
+> - `scripts/automation/task_ops/nodes/create_node.py` v0.1 (新, 270 行, M-N8 第 8 节点)
+> - `scripts/automation/_mock_git_worktree.py` v0.1 (新, 100 行, 守门 #22 mock shell wrapper)
+> - `scripts/automation/task_ops/protocols.py` +90 行 (CreateTaskRequest/Response + TMOMessage v0.3)
+> - `scripts/automation/task_ops/manager.py` +100 行 (OPERATION_TO_NODE["create"]=M-N8 + SubAgentPool.has_agent/dispatch + WorktreeRegistry + create() + _create_task)
+> - `frontend/src/lib/store.ts` +90 行 (createWorkItem + isAgentAssignee + pickSaTypeForKind + dispatchTmoCreate)
+> - `frontend/src/types/ids.ts` +15 行 (IdentityType + Identity.type 字段)
+> - `scripts/automation/registry.md` v0.6 (§1 脚本索引 + §5.3 ADR-0049 段落 + §6 v0.6 修订历史)
+
+| 任务卡 | 路径 / 子项 | 状态 | 落档 commit | 守门 |
+|---|---|---|---|---|
+| M-N8-01 create_node.py | `scripts/automation/task_ops/nodes/create_node.py` v0.1 (270 行) | 🟢 v0.1 落档 | TBD | #1 / #13 / #19 / #22 |
+| M-N8-02 protocols.py | `scripts/automation/task_ops/protocols.py` +90 行 | 🟢 v0.1 落档 | TBD | #1 / #13 / #19 |
+| M-N8-03 manager.py | `scripts/automation/task_ops/manager.py` +100 行 | 🟢 v0.1 落档 | TBD | #1 / #13 / #19 |
+| M-N8-04 _mock_git_worktree.py | `scripts/automation/_mock_git_worktree.py` v0.1 (100 行) | 🟢 v0.1 落档 | TBD | #1 / #22 |
+| M-N8-05 frontend store.ts | `frontend/src/lib/store.ts` +90 行 | 🟢 v0.1 落档 | TBD | #1 / #19 / #20 |
+| M-N8-06 ADR-0049 | `docs/architecture/2026-08-26-upgrade/adr/0049-task-card-auto-worktree-agent.md` v0.1 | 🟢 v0.1 落档 | TBD | #10 / #11 / #12 |
+| M-N8-07 PHASE-REPORT | `docs/reports/PHASE-AUTO-WORKTREE-IMPL-REPORT.md` v0.1 | 🟢 v0.1 落档 | TBD | #11 / #12 / #21 |
+| 拍板决策 | 触发器=前端 store (opt1) / worktree 关联=1:1 (opt1) / agent 接管=自动 (opt1) / 落档=ADR+PHASE (opt1), 4 推荐项全选 | 🟢 已拍板 | — | 9/1 14:58 + 9/5 04:03 + 9/8 16:08 守门 |
+| Smoke test | 83ms 内 full happy path: human reject + missing tenant reject + task_id + worktree_id + agent_session_id + AgentRunning + audit 3 条 | 🟢 通过 | TBD | #1 v3 |
+| Frontend typecheck | worktree 隔离环境无 node_modules, PR CI 实证 (per 守门 #1 v25 CI 改单 crate 跳 workspace) | ⏳ PR CI 实证 | — | #1 v25 |
+| console_server.py 端点 | `/api/tmo/create` POST endpoint 实装 (走守门 #9 v3 subprocess) | ⏳ P-AUTO-WT-01 子项 (~30K tokens 估) | — | #1 / #9 v3 / #22 |
+| E2E UC-14 | `tests/e2e/test_uc14_auto_worktree.py` (5s 任务卡 in_progress 实证) | ⏳ P-AUTO-WT-02 子项 (~50K tokens 估) | — | #1 / #3 / #11 |
+| 后续 gate | HANDOFF-ST-001 §5.3 5 Blocker + G-WT-01 DB 接入 + G-WT-02 真 git 集成 | ⏳ 跨 session 续 | — | #1 v17 / #3 |
+
+**§4.17 拍板决策明细 (per 2026-09-09 04:57 JST ask_user 4 推荐项全选)**:
+- **Q1 触发器位置** = 前端 store.createWorkItem 内嵌 (推荐)
+  - 理由: 改动小, 跟 W5 store 维护责任对齐; 不重写 store (W5 维护)
+- **Q2 worktree 关联** = 1 WorkItem → 1 Worktree (推荐)
+  - 理由: 跟 ARG §14.11 worktree-as-agent-anchor + INV-WT-07 一致; UI 简单
+- **Q3 agent 接管** = 自动接管: worktree ready → 起 AgentSession (推荐)
+  - 理由: 5s 内任务卡 in_progress, 跟守门 #1 v22 console 模式一致; 用户体感强
+- **Q4 落档范围** = ADR-0049 + PHASE-REPORT 一次性收口 (推荐)
+  - 理由: 跨 3 crate 改动, 走守门 #19 + #20 + #21 完整路径
+
+**§4.17 跟 TMO v0.2 关系 (per ADR-0046)**:
+- TMO 7 节点 (M-N1..M-N7) + 新 M-N8 = TMO 8 节点
+- 协议联合类型 `TMOMessage` 从 7 协议升 v0.3 (8 协议: + CreateTaskRequest)
+- 路由表 `OPERATION_TO_NODE` 加 `create: M-N8`
+- 守门 #13 a L1↔L1 禁止派生: M-N8 跟 M-N1..M-N7 同层 L0 协调, 不破 5 域 Lead 独立 + DAG 派生
+
+**§4.17 跟 Agent Runtime 关系 (per ADR-0045)**:
+- 9 SA Archetype (SA-01..SA-09 + SA-10 task-orchestrator) 是接口
+- `pickSaTypeForKind(kind)` 映射: bug→SA-04 / story→SA-02 / epic→SA-03 / task→SA-01
+- SubAgentPool 内存版 (PoC) 跟 ADR-0045 Hybrid Runtime L1 ECS 平行, 后续 ECS 接入替换 (per §3 已知缺口 #4)
+
 ------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
@@ -852,6 +905,7 @@ frontend/src/app/automation-debug/
 | v0.6 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **§4.7.1 P3 仪式 收官 增量** (per docs/briefs/kanban-sprint-view-001.md v0.3 + 2026-09-03 14:05 JST Ulysses 拍板 "开 P3 仪式"): P3 子项 P1/P2 状态改为 🟢 已落地; 落档 SCRIPTS/CEREMONIES (Goal 横幅 + Standup 3 問 + Review Demo 候補 + Retrospective KPT 3 列 + Markdown 导出) + `<div id="sprintCeremonies">` + .sprint-ceremonies / .ceremony-card / .goal-block / .standup-form / .review-grid / .retrospective-grid / .retrospective-col--good/improve/action ~300 行 CSS; 报告 SPRINT-VIEW-P3-REPORT.md v0.1 (12 项已知缺口 + 18 项守门核对); 自动化档 `kanban_sprint_gen.py` 校验项 55 → 93 (+38); 守门 #1 v19 + #20 v20 + #21 v21 联合实证: 93/93 pass + 0 err; 累计 token 估 ~1.4M / 预算 1.5-2.0M; KANBAN-SPRINT-001 3 阶段全部收官 | 2026-09-03 14:05 JST Ulysses P3 拍板 + 14:20 JST Mavis 推进 P3 收官 |
 | v0.7 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **§4.7.1 P4 路由重命名 + Kanban 删除** (per 2026-09-05 19:13 JST Ulysses 反馈 "ISSUES 界面内容不对, 也不应该有两个纵向导航. ISSUES 界面不需要有看板, 默认打开 Sprint"): 4 拍板 (Kanban=完全删 / SubNav=干掉 / 内容=排版重排 / 路由=/issues→/sprint); 落档: 路由文件夹 (app)/issues → (app)/sprint 重命名; 删 Kanban view 渲染分支 + SubNav 组件引用; 顶部 Tabs 改 anime-panel 玻璃 + 角标计数 + 选中辉光; default view = sprint; redirects.ts + redirects.shim.cjs 加 /issues → /sprint 兜底; 12 个文件批量改路径; i18n × 3 (en/ja/zh-CN) label 改 "Sprint"; navStore id 保留 "issues" 字符串向后兼容 (MODULE_MAP test); vitest 8/8 pass (3.39s); dev `/sprint` 200 OK 72.5KB + 7 关键字命中 (Sprint/anime-panel/anime-chamfer/tab-glow/SubNav-False/Kanban-not-in-UI) | 2026-09-05 19:13 JST Ulysses "ISSUES 界面内容不对" + 4 选项拍板 + 19:14 JST "全部重命名 + redirect (推 A)" |
 | v0.8 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **§4.7.1 P5 Sprint 对标 Jira 全套 7 项** (per 2026-09-05 19:32 JST Ulysses 反馈 "Sprint 界面对标 jira 的功能, 应该是创建之后放在 backlog, 允许用户拖任务卡进 Sprint, backlog 任务卡应该是列表. 整体应该和 jira 一样, 包括启动 Sprint 在内"): 3 拍板 (scope=全套 7 / drag=@dnd-kit 跨区 / state=复用 store.transitionSprint); 落档: store.ts 加 7 个 sprint action (createSprint/renameSprint/startSprint/completeSprint/deleteSprint/addToSprint/removeFromSprint, 状态机 planned→active→completed + cancelled); `components/sprint/SprintBoardView.tsx` 新增 31.7KB (Backlog 左 30% + Sprint 栈 右 70% + @dnd-kit 跨区拖动 + 创建/启动/完成/删除 dialog + 4 列 kanban + 进度条 + 容量超限警告); `app/(app)/sprint/page.tsx` 接 SprintBoardView 替代旧 IssuesSprintView; package.json 加 3 deps (@dnd-kit/core 6.3.1 / sortable 8.0.0 / utilities 3.2.2); vitest 511/511 pass (52/52 files, 21.40s); dev `/sprint` 200 OK 115.3KB + 3 关键字命中 (sprint-board-view/sprint-backlog/issues-view-sprint) | 2026-09-05 19:32 JST Ulysses "Sprint 对标 jira" + 3 选项拍板 + 20:00 JST "1" 推进 |
+| v0.9 | 2026-09-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **§4.17 ADR-0049 任务卡自动 worktree + agent 接管 落档 (核心功能激活, per 2026-09-09 04:57 JST Ulysses 拍板)**: 4 推荐项全选 (触发器=前端 store / worktree 关联=1:1 / agent 接管=自动 / 落档=ADR+PHASE 一次性); 落档: ADR-0049 (300 行 7 段结构) + PHASE-AUTO-WORKTREE-IMPL-REPORT (7 子项 phase + 8 已知缺口) + dispatcher brief (守门 #20); TMO 第 8 节点 M-N8 create_node.py (270 行, 守门 #13 a L0 唯一入口 + 守门 #13 d Transaction + 守门 #13 c Master RLS + 守门 #22 mock) + protocols.py (+90 行 CreateTaskRequest/Response) + manager.py (+100 行 OPERATION_TO_NODE["create"]=M-N8 + WorktreeRegistry + SubAgentPool.has_agent/dispatch) + _mock_git_worktree.py (100 行, 守门 #22 mock shell) + frontend store.ts (+90 行 createWorkItem + isAgentAssignee + pickSaTypeForKind + dispatchTmoCreate) + frontend types/ids.ts (+15 行 IdentityType + Identity.type); 83ms smoke test 通过 (human reject + missing tenant reject + full happy path: task_id + worktree_id + agent_session_id + AgentRunning + audit 3 条); 守门 #19 v19 + #20 + #21 + #22 + #10 + 8/27 19:39 JST + 9/8 15:19 JST 联合实证; 累计估算 ~600K tokens (本期 v0.1 落档), 后续 P-AUTO-WT-01 (console_server 8080 端点 ~30K) + P-AUTO-WT-02 (E2E UC-14 ~50K) 跨 session 续 | 2026-09-09 04:57 JST Ulysses 拍板核心功能 + 守门 #19 v19 + #20 + #21 实证 |
 
 ---
 

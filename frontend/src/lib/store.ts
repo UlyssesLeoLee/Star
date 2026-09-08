@@ -251,6 +251,25 @@ interface StoreState {
     worktree_id?: string;
   }) => string; // 返回新生成的 work-item id
 
+  // ===================================================================
+  // createWorkItem — 任务卡创建入口 (per ADR-0049 + 2026-09-09 04:57 JST 拍板)
+  //   核心功能: 检测 assignee 是 agent → 调 LangGraph M-N8 create_node
+  //   自动建 worktree + 起 AgentSession + 任务卡 auto in_progress
+  //
+  // 调用方: frontend/src/app/(app)/sprint/page.tsx +New issue,
+  //         frontend/src/app/board/page.tsx +Add task
+  //
+  // 行为:
+  //   1. 若 assignee_id 是 human / 空 → 走 addWorkItem 普通流程
+  //   2. 若 assignee_id 是有效 agent → 走 LangGraph M-N8 create_node
+  //      - 异步 fire-and-forget (5s 内任务卡 in_progress, UI 不阻塞)
+  //      - worktree_id + agent_session_id 回填到 workItem
+  //   3. 返 work-item id (同 addWorkItem)
+  //
+  // 错误处理: TMO 调用失败 → fallback 走 addWorkItem 普通流程 (per 缺标比错标)
+  // ===================================================================
+  createWorkItem: (input: Parameters<StoreState["addWorkItem"]>[0]) => Promise<string>;
+
   // 原地更新 workItem 单字段 (per 2026-08-31 12:07 JST Kanban Drawer 拍板)
   //   - 只改指定字段, 其他字段不变
   //   - 改 status 走 reconcileBoard 同步 board.columns
@@ -353,7 +372,7 @@ interface StoreState {
 // 初始 state factory — 每次 store create 都重置成 seed
 // (per zustand persist 模式: 把 create((set) => state) 抽出来)
 // =====================================================================
-const initialState = (set: any): StoreState => ({
+const initialState = (set: any, get?: any): StoreState => ({
   // 默认 tenant 上下文: 由后端 session 注入, 未注入时回退 "tenant-default"
   // (per 2026-09-07 17:30 JST Mavis 临时代签, 跟 5 域 Lead 默认 fallback 一致)
   tenantId: undefined,
@@ -507,6 +526,73 @@ const initialState = (set: any): StoreState => ({
       };
     });
     return newId;
+  },
+  // ===================================================================
+  // createWorkItem — 任务卡创建入口 (per ADR-0049 + 2026-09-09 04:57 JST 拍板)
+  // 行为:
+  //   1. 检测 assignee (isAgentAssignee) 是否为有效 agent
+  //   2. agent → 走 LangGraph TMO M-N8 create_node (异步 fire-and-forget)
+  //   3. human/空 → 走 addWorkItem 普通流程
+  //   4. TMO 失败 → fallback addWorkItem (per 缺标比错标)
+  //
+  // 真实实现需要 console_server.py 8080 跑通 + TMO M-N8 已就绪
+  // (per 守门 #19 v19 Python 化, 走 console_server.py subprocess 而非 RPC)
+  // ===================================================================
+  createWorkItem: async (input) => {
+    const state = get();
+    const assigneeId = input.assignee_id;
+
+    // 1) 检测 assignee 是否为有效 agent
+    const isAgent = isAgentAssignee(assigneeId, state.identities);
+    if (!isAgent) {
+      // human / 空 → 普通 addWorkItem
+      return get().addWorkItem(input);
+    }
+
+    // 2) agent → 走 LangGraph TMO M-N8 create_node
+    try {
+      const tmoResp = await dispatchTmoCreate({
+        title: input.title,
+        kind: input.kind,
+        priority: input.priority,
+        sprint_id: input.sprint_id,
+        project_id: input.project_id,
+        tenant_id: input.tenant_id,
+        workspace_ids: [input.tenant_id], // PoC: 1 workspace per tenant
+        assignee_id: assigneeId,
+        assignee_type: "agent",
+        sa_type: pickSaTypeForKind(input.kind), // per ADR-0046 §6.1
+        actor_session_id: undefined, // TODO: 接入 L0 chat bar session
+      });
+
+      if (!tmoResp.ok) {
+        // TMO 失败 → fallback 普通流程 (per 缺标比错标)
+        console.warn(
+          `[createWorkItem] TMO M-N8 failed, fallback to addWorkItem: ${tmoResp.error}`,
+        );
+        return get().addWorkItem(input);
+      }
+
+      // 3) TMO 成功 → 走 addWorkItem + 回填 worktree_id + agent_session_id + status=in_progress
+      const r = tmoResp.result;
+      return get().addWorkItem({
+        ...input,
+        status: (r.task_status ?? "in_progress") as WorkItemStatus,
+        worktree_id: r.worktree_id,
+        // agent_session_id 暂存 description 后段 (per W5 store 暂未加独立字段)
+        description: [
+          input.description ?? "",
+          `\n\n> 🤖 Agent 接管 (TMO M-N8, ${new Date().toISOString()})`,
+          `> worktree: ${r.worktree_id}`,
+          `> agent_session: ${r.agent_session_id}`,
+          `> worktree_status: ${r.worktree_status}`,
+        ].filter(Boolean).join("\n"),
+      });
+    } catch (err) {
+      // TMO RPC 失败 (console_server.py 8080 不可达) → fallback
+      console.warn(`[createWorkItem] TMO RPC error, fallback:`, err);
+      return get().addWorkItem(input);
+    }
   },
   // 原地更新 workItem 单字段 (per 2026-08-31 12:07 JST Kanban Drawer 拍板)
   //   - title / description / priority / kind / assignee_id / labels / worktree_id: 直接 set
@@ -1417,11 +1503,121 @@ const initialState = (set: any): StoreState => ({
 });
 
 // =====================================================================
+// M-N8 helper (per ADR-0049 + 2026-09-09 04:57 JST 拍板核心功能)
+// isAgentAssignee / pickSaTypeForKind / dispatchTmoCreate
+// 跟 store 自身一致保持模块作用域, 不外露
+// =====================================================================
+
+/**
+ * 判断 assignee_id 是否为有效 agent (per ADR-0049 + IdentityType)
+ *
+ * 判定规则 (per 守门 #19 v19 + 拍板: '存在有效 agent'):
+ *   1. identities 中存在该 id, 且 type === "agent" 且 status === "active"
+ *   2. identities 中不存在但 id 形如 "agent-*" (mock 阶段, 真实接入 L0 agent registry)
+ *
+ * Returns: true if agent + active, false otherwise
+ */
+function isAgentAssignee(
+  assigneeId: string | undefined,
+  identities: ReadonlyArray<{ id: Uuid; type?: "human" | "agent"; status: string }>,
+): boolean {
+  if (!assigneeId) return false;
+  // 1) 查 identities 注册表
+  const found = identities.find((i) => i.id === assigneeId);
+  if (found) {
+    return found.type === "agent" && found.status === "active";
+  }
+  // 2) PoC mock: id 形如 "agent-*" 视为有效 agent
+  // 真实接入 L0 agent registry 后, 这里改为 registry.has(assigneeId)
+  return assigneeId.startsWith("agent-");
+}
+
+/**
+ * 根据 task kind 选 SA-XX archetype (per ADR-0046 §6.1 + ADR-0049 v0.1)
+ *
+ * 映射:
+ *   bug       → SA-04 (bug-fix)
+ *   story     → SA-02 (story-implement)
+ *   epic      → SA-03 (epic-decompose)
+ *   task (default) → SA-01 (task-generic)
+ */
+function pickSaTypeForKind(kind: string | undefined): string {
+  switch (kind) {
+    case "bug":   return "SA-04";
+    case "story": return "SA-02";
+    case "epic":  return "SA-03";
+    case "task":
+    default:      return "SA-01";
+  }
+}
+
+/**
+ * 调用 LangGraph TMO M-N8 create_node (per ADR-0049)
+ *
+ * 走 console_server.py 8080 路径 (per 守门 #9 v3 subprocess + 守门 #19 v19 Python 化)
+ * 真实端点: POST http://localhost:8080/api/tmo/create (per ADR-0046 §2.6 8 API 端点)
+ *
+ * PoC: 走 fetch + console_server.py 8080, 失败抛错由 caller fallback
+ *
+ * Returns: CreateTaskResponse-like dict
+ */
+async function dispatchTmoCreate(payload: {
+  title: string;
+  kind?: string;
+  priority?: string;
+  sprint_id?: string;
+  project_id?: string;
+  tenant_id: string;
+  workspace_ids: string[];
+  assignee_id: string;
+  assignee_type: "agent";
+  sa_type: string;
+  actor_session_id?: string;
+}): Promise<{ ok: true; result: {
+  task_id: string;
+  worktree_id: string;
+  agent_session_id: string;
+  task_status: string;
+  worktree_status: string;
+  checkpoint_id: string;
+  created_at_ms: number;
+  in_progress_at_ms: number;
+  actor_session_id?: string;
+} } | { ok: false; error: string }> {
+  const endpoint =
+    (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_TMO_ENDPOINT) ||
+    "http://localhost:8080/api/tmo/create";
+
+  try {
+    const resp = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ operation: "create", ...payload }),
+      // 5s timeout (per 拍板: 5s 内任务卡 in_progress)
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!resp.ok) {
+      return { ok: false, error: `TMO HTTP ${resp.status}: ${await resp.text().catch(() => "")}` };
+    }
+    const data = await resp.json();
+    if (!data?.result) {
+      return { ok: false, error: "TMO response missing 'result' field" };
+    }
+    return { ok: true, result: data.result };
+  } catch (err) {
+    return {
+      ok: false,
+      error: `TMO dispatch failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+// =====================================================================
 // 创建带 persist 包装的 store
 // =====================================================================
 export const useStore = create<StoreState>()(
   persist(
-    (set) => initialState(set),
+    (set, get) => initialState(set, get),
     {
       name: "star-store:v1",
       storage: ssrSafeStorage,

@@ -173,3 +173,78 @@ TMOMessage = MergeRequest | SplitRequest | DepSet | BulkAction | ReassignRequest
 
 TMO_OPERATION_TYPES = ("merge", "split", "dep_set", "bulk_action", "reassign", "metadata", "summarize")
 """TMO 7 操作类型字面量 (per 02 §2.6.3 路由表)"""
+
+
+# ===== M-N8 create_request (per ADR-0049 + 2026-09-09 04:57 JST 用户拍板核心功能) =====
+
+class CreateTaskRequest(TypedDict, total=False):
+    """UI → L0 任务卡创建请求 (M-N8 create_node)
+
+    触发场景 (per 拍板):
+      - 前端 board/+ New issue 选 assignee = agent
+      - 前端 sprint/+ New issue 选 assignee = agent
+      - 走 store.createWorkItem 内嵌 (per 拍板 trigger-location_opt1)
+      - 走 manager.create() 路由到 create_node (per 守门 #13 a L0 唯一入口)
+
+    字段:
+      operation: 固定 "create"
+      title (str, required): 任务卡标题
+      kind (str, optional): task / bug / story / epic, default "task"
+      priority (str, optional): p0/p1/p2/p3, default "p2"
+      sprint_id (str, optional): sprint 关联 (per frontend sprint 视图)
+      project_id (str, optional): project 关联 (per frontend board 视图)
+      tenant_id (str, required): Master RLS 必携 (per 守门 #13 c)
+      workspace_ids (list[str], optional): 多 workspace 隔离 (per H2-EXT 5 domain)
+      assignee_id (str, required): 当前是 agent id (per 拍板: 仅 agent 触发)
+      assignee_type (str, required): 固定 "agent" (人类任务走普通 store.createWorkItem)
+      sa_type (str, optional): SA-01..SA-10 (per ADR-0046 §6.1), default "SA-01"
+      actor_session_id (str, optional): 创建者 session_id (per L0 chat bar)
+    """
+    operation: Literal["create"]
+    title: str
+    kind: str  # default "task"
+    priority: str  # default "p2"
+    sprint_id: Optional[str]
+    project_id: Optional[str]
+    tenant_id: str  # Master RLS 必携
+    workspace_ids: list[str]
+    assignee_id: str  # 当前是 agent id
+    assignee_type: Literal["agent"]  # 拍板: 仅 agent 触发
+    sa_type: str  # default "SA-01"
+    actor_session_id: Optional[str]
+
+
+class CreateTaskResponse(TypedDict, total=False):
+    """M-N8 create_node → UI 响应
+
+    字段:
+      operation: 固定 "create"
+      task_id (str): 新建 WorkItem id (Work 类型, 短 TTL 30d per 守门 #13 a)
+      worktree_id (str): 新建 Worktree id (per INV-WT-08 必带 tenant_id)
+      agent_session_id (str): 新建 AgentSession id (per INV-WT-07 1 Worktree → 0..N AgentSession)
+      worktree_status (str): "AgentRunning" (出口, 已自动接管)
+      task_status (str): "in_progress" (出口, 已自动接管)
+      checkpoint_id (str): stash checkpoint id (Transaction append-only)
+      created_at_ms (int): 创建时间戳 ms
+      in_progress_at_ms (int): 任务卡 in_progress 时间戳 ms (per 拍板 5s 内)
+      actor_session_id (str): 创建者 session_id
+    """
+    operation: Literal["create"]
+    task_id: str
+    worktree_id: str
+    agent_session_id: str
+    worktree_status: str  # "AgentRunning"
+    task_status: str  # "in_progress"
+    checkpoint_id: str
+    created_at_ms: int
+    in_progress_at_ms: int
+    actor_session_id: Optional[str]
+
+
+# ===== 协议联合类型更新 (M-N8 加入) =====
+
+TMOMessage = MergeRequest | SplitRequest | DepSet | BulkAction | ReassignRequest | MetadataUpdate | SummarizeResult | CreateTaskRequest
+"""所有 TMO 8 协议的联合类型, 用于 TMO 路由判定 (v0.3 加入 M-N8 per ADR-0049)"""
+
+TMO_OPERATION_TYPES = ("merge", "split", "dep_set", "bulk_action", "reassign", "metadata", "summarize", "create")
+"""TMO 8 操作类型字面量 (per 02 §2.6.3 路由表 v0.3 + ADR-0049 加入 create)"""
