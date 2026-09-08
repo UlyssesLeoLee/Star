@@ -629,4 +629,69 @@ mod tests {
         // 守门 #5 v2: 1MB 限制触发 BadRequest (HTTP 400)
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
+
+    // ============ UT-IT-51 §2.3 Phase 1 F-02 派生缺口 (per brief §2.1) ============
+
+    /// 派生 #2: 缺必填字段 `content` 返 400 (跟 `log_upload_with_trace_id_and_level_filter` 互补)
+    /// 守门 #6 v2 + BAS-001 §3.5: schema 校验走 axum Json extractor, 缺字段自动 400
+    #[tokio::test]
+    async fn log_upload_missing_content_field_returns_400() {
+        let app = router(AppState::new());
+        // body 故意缺 content 字段
+        let body = serde_json::json!({
+            "source": "k8s-pod/test",
+            "level_filter": ["ERROR"],
+            "trace_id": "trace-f02-missing-content-001"
+        });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/ops/log/upload")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        // axum Json extractor 对缺字段返 422 (UnprocessableEntity) 或 400
+        let status = response.status();
+        assert!(
+            status == StatusCode::BAD_REQUEST || status == StatusCode::UNPROCESSABLE_ENTITY,
+            "缺 content 字段必返 4xx, got {}",
+            status
+        );
+    }
+
+    /// 派生 #3: level_filter 非法值 (e.g. "FOO") 返 400 (跟 level_filter 派生规 #2 互补)
+    /// 守门 #6 v2 + LogLevel enum 5 态: Trace/Debug/Info/Warn/Error
+    #[tokio::test]
+    async fn log_upload_invalid_level_filter_returns_400() {
+        let app = router(AppState::new());
+        // level_filter 故意传非法值 "FOO" (不是 LogLevel 5 态之一)
+        let body = serde_json::json!({
+            "source": "k8s-pod/test",
+            "level_filter": ["FOO"],
+            "content": "2026-09-08 ERROR test failure",
+            "trace_id": "trace-f02-invalid-level-001"
+        });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/ops/log/upload")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        // axum Json extractor 对 enum 非法值返 422 或 400
+        let status = response.status();
+        assert!(
+            status == StatusCode::BAD_REQUEST || status == StatusCode::UNPROCESSABLE_ENTITY,
+            "level_filter 非法值必返 4xx, got {}",
+            status
+        );
+    }
 }
