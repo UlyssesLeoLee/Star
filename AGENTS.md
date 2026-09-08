@@ -216,6 +216,7 @@ per `docs/architecture/2026-08-26-upgrade/adr/`：
 - `0045-star-agent-runtime-design.md` — STAR Agent Runtime Basic + Detailed Design Baseline (40KB + 52KB + 14KB, 跟 LangGraph 9/3 平行, 同期落档 per 2026-09-03 19:00 JST)
 - `0046-langgraph-task-management-operations.md` — Star LangGraph TMO 任务卡管理操作 (7 节点 + 7 协议 + 7 组件, per 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡, 合并任务a和任务b")
 - `0047-postgresql-checkpointer-tier3.md` — PostgreSQL Checkpointer Tier 3 (production) 设计 (5 张表 schema per 守门 #13 W/T/M 严格 + PostgresCheckpointer wrapper + 12 Reducer 跨 Tier + TMO 7 节点整合 + 5 域 RACI + 5 阶段装装拆解 E-1..E-5, 启动 = 5 域 Lead 真人 T3 至少 1 人到位, per 2026-09-05 10:58 JST G-DEP-08 拍板)
+- `0048-star-warehouse-axum-lock.md` — STAR 仓 Web Framework 锁定 axum 0.8 (跟既有 4 crate 对齐, 拒绝 actix-web / warp / rocket / hyper 直用, 跟 RGS 仓独立, per 2026-09-08 08:22 JST ask_user `ask_40cddef812e642081a0f033e` 拍板)
 
 ### 6.1 架构 view 索引 (IPA 3 文档)
 

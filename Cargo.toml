@@ -48,6 +48,8 @@ members = [
     # Phase G 骨架:2026-08-27 新增 crates/star-saga (Saga orchestrator + Q-003 跨域协调)
     "crates/star-saga",
     "crates/star-mcp",
+    # Phase OPS-INTRY: 2026-09-08 新增 crates/star-ops (Ops Console MVP-骨架, per SRS-STAR-OPS-001.md v0.1)
+    "crates/star-ops",
     # Phase F 骨架: 2026-08-27 新增 crates/star-sa (4 Git Provider)
     "crates/star-sa",
     # Phase F 骨架:2026-08-27 新增 2 crate (SSE + Webhook)
