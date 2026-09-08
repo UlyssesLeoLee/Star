@@ -662,14 +662,18 @@ flowchart LR
 
 | 错误码 | UI 表现 |
 |---|---|
-| `SEC-001` (跨 tenant) | 红色 banner 顶部固定,3 秒后消失,点击跳 Dashboard |
-| `WF-403` (effect=deny) | 按钮 disabled + tooltip 显示"无权限:<rule summary>" |
-| `WF-409` (InvalidTransition) | toast 黄色 + revert SM 状态 |
-| `API-429` (rate limit) | toast 黄色 + Retry-After 倒计时 |
-| `API-500` | 红色 banner + "上报 Sentry" 按钮(V1 候选) |
-| `SC-001` (lock_version 不一致) | toast 黄色 + 重新 fetch + 高亮 stale 字段 |
+| `SEC-007` (Cross-Tenant Access Forbidden) | 红色 banner 顶部固定,3 秒后消失,点击跳 Dashboard |
+| `SEC-002` (Tenant Mismatch) | toast 红色 + 清掉本地 tenant context + 跳 Login |
+| `SEC-003` (Project Access Denied) | 按钮 disabled + tooltip 显示"无 Project 权限:<project name>" |
+| `SEC-004` (Role Permission Denied) | 按钮 disabled + tooltip 显示"无权限:<rule summary>" |
+| `LRT-008` (Runtime Heartbeat Lost) | toast 黄色 + 重新连接中 spinner |
+| `HTTP 429` (RFC 6585 rate limit, 无业务码) | toast 黄色 + Retry-After 倒计时 |
+| `HTTP 500` (RFC 7231, 无业务码) | 红色 banner + "上报 Sentry" 按钮(V1 候选) |
+| `INV-WI-NN` (Stale Version / lock_version 不一致) | toast 黄色 + 重新 fetch + 高亮 stale 字段 |
 
-**MVP**: 实现 `WF-409` 与 `SEC-001` 的 toast/banner,其他 V1 候选。
+> **修正说明**(per `docs/detailed-design-feedback.md` DD-05): 本表先前 6 个码(`SEC-001`/`WF-403`/`WF-409`/`API-429`/`API-500`/`SC-001`)在 `api-design.md` 全文 0 命中,本轮按 §8 真实错误码字典重写;`SEC-001` = 401 Not Authenticated(不是跨 tenant,跨 tenant 应是 `SEC-007`);原 `WF-*`/`API-*`/`SC-*` 前缀在仓库内无对应业务码,改用 SEC-* + LRT-* + 通用 HTTP + INV-* 引用。
+
+**MVP**: 实现 `SEC-007` 与 `INV-WI-NN` 的 toast/banner,其他 V1 候选。
 
 ### 8.3 加载/空/错 三态
 
