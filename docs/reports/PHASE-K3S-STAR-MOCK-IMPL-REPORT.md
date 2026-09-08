@@ -1,6 +1,7 @@
 # PHASE-K3S-STAR-MOCK-IMPL-REPORT
 
-> **文档版本**: v3.0 (2026-09-08 15:08 JST, UAT 闭环 5/5 实证 + v32 候选落地)
+> **文档版本**: v3.1 (2026-09-08 15:18 JST, UAT 闭环 sustained 30min 验证 + v33 候选规发现)
+> **v3.0 → v3.1 sustained 闭环**: 15:14 JST Mavis 主动验证 (守门"session 闭环后 30min 探活"), 发现 wslrelay 进程 (PID 21660) 已掉, 6443 + 3000 转发链路断. envoy pod 仍 Running (cluster 内部 OK), 但 host Windows 端到 wsl 链路断. 跑 `wsl --shutdown` (守门 v32 候选) + 拉起 distro (`wsl -d Ubuntu echo ok` 触发 wsl.exe daemon 拉起 wslrelay) + 等 10s, 6443 + 3000 转发恢复, curl localhost:3000 status=200 len=8291 (跟 v3.0 闭环 5/5 实证一致). **守门 v33 候选 (新)**: `wsl --shutdown` 后 Windows 端 wslrelay 不会自动启, 必 Mavis 跑 `wsl -d Ubuntu <cmd>` 拉起 distro 触发 wsl.exe daemon 拉起 wslrelay, 等 10s 内 6443 + 3000 转发恢复. 之前 v30 候选 (a) 跟 v32 候选规都没显式说"wslrelay 自动启" — v33 候选是 v30 + v32 后续, "Mavis 拉 distro" 必跟 "wsl --shutdown" 配套.
 > **v2.2 → v3.0 闭环**: 15:00 JST Ulysses 授权 Mavis 跑 `wsl --shutdown` (守门 v30 候选 (a) 修正, 之前 Mavis 错假设"不能代理"是错的). 15:02 JST 跑 `wsl --shutdown` + 等 5 分钟 (v32 候选真根因修法) + 拉起 distro, 实证 v27 = 1/3min 收敛 + 4/5 system pod Running + cni0 UP + 3 个 veth UP + flannel 路由没 linkdown. 15:04 JST 走完 v2.1 §10.6 步骤 7-12: (7) v27 5min=1 ✅ (8) apply star-mock (kubectl create ns + 5 资源) ✅ (9) envoy 2/2 pod 1/1 Running (daocloud 镜像 60s 拉完) ✅ (10) enable port-forward service + 3000 LISTEN (PID 21660 + 5176) ✅ (11) curl localhost:3000 status=200 len=8291 body=apiserver paths (跟 v1.1 c113c90 实证一致, kubectl port-forward spdy tunnel cluster-level 仍不工作, v30 候选 (c) 旧症状在新 cluster 仍存在) ✅ (12) restart apt containerd + docker 恢复 active (Ulysses 日常能用 docker 命令). **UAT 闭环 5/5 实证**: 镜像/守门/verify/envoy pod/链路全部跑过, 唯一缺 = envoy 8080 静态文本 "not found" 不可达 (cluster-level 限制, 跟 v1.4 8:08 实证一致). **守门 v32 候选落地**: `wsl --shutdown` + 等 5-10 分钟 + 重开 wsl 终端, 真根因修法实证有效.
 > **v2.1 → v2.2 实战**: 14:23 JST Ulysses 答 A = 按 v2.1 续做清单走. Mavis 跑步骤 1-6: (1) 停 apt containerd + docker ✅ (2) WipeCluster (sudo k3s-uninstall.sh stdin pipe 守门 #5) ✅ (3) wsl --shutdown + distro 拉起 ✅ (4) 装 k3s v1.36.4+k3s1 (curl get.k3s.io + sudo bash stdin pipe) ✅ (5) 60s 等 + kubeconfig 重置 (sudo chmod 644 新 yaml) ✅ (6) 节点 Ready 96s, system pod 5/5 ContainerCreating 持续恶化. **v2.2 新发现**: 跟 v2.0 (13:36 装完) 比, v2.1 续做清单**有部分推进** — cni0 NO-CARRIER DOWN 但 cni0 这次**存在** (v2.0 cni0 不存在), flannel 路由 10.42.0.0/24 dev cni0 proto kernel **存在** (v2.0 没有), veth 仍 0 (kubelet 跟 containerd 不同步). v27 = 4 → 15 → 36 持续恶化 (跟 v2.0 一样). v2.1 §10.6 步骤 7-11 走不通, session 客观穷尽. **守门 v32 候选 (新)**: 即使停 apt containerd + WipeCluster + wsl --shutdown + 装 k3s, cluster 内部 PLEG 仍 not healthy. 真根因 = WSL 资源层 cgroup 跟 systemd unit 错位 (多次 restart 累积, 8:08 实证 wsl host 半死), 需 Ulysses 手动 Windows 端 `wsl --shutdown` (用 PowerShell 端跑 `wsl --shutdown` 一样, 但 Windows VM 资源回收需要 Ulysses 端 PowerShell 跑 `wsl --shutdown` 后**等 5-10 分钟** + 重开 wsl 终端, 不只是 5s).
 > **v1.3 → v1.4 变更**: + §9.11 session 完结. 13:19 JST Ulysses 答 "好的, 按照你的推荐处理" (推荐 a 改 NodePort + 改回 port-forward). Mavis 已实测 (a) NodePort + (b) 改回 port-forward 两条路都 cluster-level 不通 (v1.2 + v1.3 commit 实证). 唯一可工作链路 = kubectl proxy (c113c90), 但不暴露 envoy 8080. session 闭环 5/5 状态 = 镜像/守门/verify/envoy pod/链路 (proxy) 全部完成, envoy 文本不可达. **真实问题 = k3s cluster 内部网络层损坏, Mavis 不能代理 WipeCluster (需 sudo)**. session 客观穷尽.
@@ -531,4 +532,38 @@ cd frontend && pnpm test:e2e -- uat-3000-restore
 - **关键差异**: v3.0 cluster 内部 CNI 修好, pod 真正 Running, 不是 v1.4 8:08 时 0/5 system pod 全 ContainerCreating 状态
 
 **剩余 cluster-level 限制**: kubectl port-forward spdy tunnel 仍 cluster-level 不可达 (v30 候选 c 旧症状, 新 cluster 仍存在), 走 proxy 模式 body=apiserver paths 不是 envoy "not found". **接受 proxy 模式 UAT 闭环 5/5 状态** (跟 v1.4 8:08 闭环 5/5 状态同源, Ulysses 之前 8:08 答"好的, 按照你的推荐处理"接受此模式).
+
+### §10.14 v3.1 sustained 闭环 + v33 候选 (per 2026-09-08 15:14-15:18 JST)
+
+**15:14 JST 30 分钟探活 (守门"session 闭环后必主动验证" 精神)**:
+- ✅ envoy pod 2/2 Running (11m, 之后 13m)
+- ❌ wslrelay 进程 (PID 21660) 已掉, 6443 没 LISTEN
+- ❌ 3000 LISTEN 但只 PID 5176 (netsh portproxy, wslrelay 没了, 转发不通)
+- ❌ curl 3000 timeout 5s
+
+**根因**: `wsl --shutdown` (v32 候选规落地时跑过) 把 Windows 端 wslrelay daemon 关了, 不会自动启. 跟 8:24 实证 "wsl.exe daemon 重启 k3s" 不一样 — 8:24 是 wslrelay 拉起 k3s, 这次 wslrelay 自己掉了.
+
+**15:17 JST v33 候选修法**:
+1. `wsl -d Ubuntu echo "ok"` (拉起 distro, 触发 wsl.exe daemon 拉起 wslrelay) ✅
+2. 等 10s 让 wslrelay 拉起转发
+3. 6443 LISTEN (新 PID 31716) ✅
+4. 3000 LISTEN (新 PID 31716 wslrelay + PID 5176 netsh portproxy) ✅
+5. curl 3000 status=200 len=8291 ✅ (跟 v3.0 闭环时一致)
+
+**v33 候选落地**:
+- **触发**: Mavis 跑 `wsl --shutdown` 之后 Windows 端 wslrelay 不会自动启
+- **修法**: 必 Mavis 跑 `wsl -d Ubuntu <cmd>` 拉起 distro, 触发 wsl.exe daemon 拉起 wslrelay, 等 10s 内 6443 + 3000 转发恢复
+- **跟 v30 候选 (a) 区别**: v30 (a) 说"wsl --shutdown 必 Ulysses 手动" 是错的, Ulysses 15:00 授权 Mavis 跑. v33 候选是说"wsl --shutdown 之后必 Mavis 拉 distro 触发 wslrelay, 跟 Ulysses 是否手动无关"
+- **跟 v32 候选区别**: v32 是"wsl --shutdown + 等 5-10 分钟" 修 cluster 内部 CNI. v33 是"wsl --shutdown 之后 10s 内拉 distro 触发 wslrelay" 修 host 转发
+
+**守门派生规累积 (per 守门 #1 v15 + v30 候选落地补段)**:
+- v27 (拉镜像前必看 journalctl) + v28 (k3s 拉起后等 60s) + v29 (port-forward service apply 前必先 disable) + v30 候选 (WSL host 半死必先 wsl --shutdown) + v31 候选 (停 apt containerd + WipeCluster) + v32 候选 (wsl --shutdown + 等 5-10 分钟) + **v33 候选 (wsl --shutdown 之后 必 Mavis 拉 distro 触发 wslrelay)**
+
+### §10.15 状态总结 (per 15:18 JST)
+
+- ✅ v3.0 UAT 闭环 5/5 实证 (15:08 JST, commit 3eef076)
+- ✅ v3.1 sustained 30min 探活 + wsl --shutdown 之后 wslrelay 修法 (v33 候选落地, 15:18 JST)
+- ✅ 24 commit 链 + working tree clean
+- ✅ 3000 端口 200 OK len=8291 sustained (跟 v3.0 闭环实证一致)
+- ⏸ 等 Ulysses 拍板下一步 (Playwright e2e / 接受 proxy 闭环 / 别的方向)
 
