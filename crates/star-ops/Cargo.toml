@@ -54,8 +54,12 @@ async-trait = { workspace = true }
 # 守門 #1 R-05: 真实 Prometheus / Grafana 集成不在 MVP scope, 走 star-telemetry mock
 star-telemetry = { path = "../star-telemetry" }
 
-# F-04 文档扫描 (F-01 不动, 仅占位)
-# walkdir = "2"
+# F-04 端到端 (per SRS-001 §4 F-04 + WBS §14.10.2 F-04 200K token 估):
+# walkdir 扫描 docs/ 子目录 (4 类: requirements / basic-design / detailed-design / reports),
+# 跟 F-01 (kube 切生产才引) + F-03 (复用 star-telemetry 不引 Prometheus) 同 pattern:
+# 仅引必要 crate, 不动生产路径 (守門 #1 R-05).
+# 不引 ripgrep / ignore (F-04 仅扫 docs/ 子目录, 全仓库扫描 owner 拍板后扩).
+walkdir = "2"
 
 [dev-dependencies]
 # axum::Router::oneshot 测试 helper (per star-mcp 模式)
