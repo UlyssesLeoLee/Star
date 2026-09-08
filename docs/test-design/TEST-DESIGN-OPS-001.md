@@ -167,6 +167,201 @@ bench PT:    3 bench P95 < 200ms 实证 (cluster 49ms / metrics 0.83μs / docs 4
 
 ---
 
-**Status**: 🟡 §0-§1 草稿落地, 等 §2-§6 续做 (per 6 commit 链 wt1→wt6)
+## §2 UT 单元测试（per 守门 #1 v25 单 crate cargo test --lib）
 
-> **本文档分章**: 5 大章节 §UT/§IT/§E2E/§PT/§UAT + §0 目的 + §1 范围 + §7 RACI + §8 修订历史 + §9 引用 = 9 章节. 后续 commit wt2-wt5 续 §2-§8, wt6 写 PHASE 报告 + PR 描述.
+### 2.1 测试目标与覆盖率基线
+
+**目标**：验证 `crates/star-ops` 4 模块（`error` + `ops_api` + `ops_domain` + `ops_ai`）的纯函数 / 单元行为符合 OPS-BASIC-DESIGN §3-§5 契约，覆盖以下维度：
+
+| 维度 | 目标 | 实证 |
+|---|---|---|
+| 行覆盖率 | ≥ 80% (lib 路径) | 41/41 lib test 100% pass (实证 2026-09-08 `cargo test -p star-ops --lib`) |
+| 分支覆盖率 | ≥ 70% (lib 路径) | per `cargo tarpaulin` / `cargo llvm-cov` 后续 [M] 子项引入 |
+| 错误码 6-field 必填率 | 100% | per error.rs 5 variant + `to_body` 完整覆盖 |
+| 边界条件 | 必跑 5 维（空/最大/最小/无效输入/并发） | per §2.5 边界条件矩阵 |
+| Mock 路径守门 #1 R-05 | 100% 不接生产 | per §2.6 错误路径覆盖 |
+
+**实证锚点**（per 守门 #1 v25 单 crate + 守门 #9 v20 git 实证可查）：
+
+```
+$ cargo test -p star-ops --lib -j 4
+running 41 tests
+... (41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out)
+test result: ok. 41 passed; 0 failed ... finished in 0.92s
+```
+
+### 2.2 4 模块测试矩阵（41 测 1:1 对齐）
+
+#### 2.2.1 `error` 模块（3 测，per `src/error.rs:147-175`）
+
+| 测名 | 验证 | 派生规 |
+|---|---|---|
+| `not_implemented_returns_501` | `NotImplemented` variant → `code=NOT_IMPLEMENTED` + `source_kind=Internal` + `retriable=false` + `hint=Some(...)` | 守门 #6 6-field 完整 + 守门 #12 实证 |
+| `unauthorized_returns_401_with_policy_source` | `Unauthorized` variant → `code=UNAUTHORIZED` + `source_kind=Policy` + `retriable=false` | 守门 #6 + 守门 #14 v2 策略层 |
+| `rate_limited_is_retriable` | `RateLimited` variant → `code=RATE_LIMITED` + `retriable=true` (per 守门 #6 v2 派生) | 守门 #6 v2 派生 + 60 req/min |
+
+**派生测试缺口识别**（per 守门 #11 缺标比错标）：
+
+- ⚠️ `bad_request_returns_400_with_validation_source`（缺）：`BadRequest` variant 无 UT 覆盖，per BAS-001 §3.5 应有 `source_kind=Validation` 验证。[M] 子项补
+- ⚠️ `internal_returns_500_with_internal_source`（缺）：`Internal` variant 无 UT 覆盖，per BAS-001 §3.5 应有 `source_kind=Internal` + `retriable=true` 验证。[M] 子项补
+- ⚠️ `ops_error_into_response_status_mapping`（缺）：5 variant → HTTP status code 映射（501/401/429/400/500）无 UT 覆盖，per `IntoResponse` impl。[M] 子项补
+
+**累计缺 3 测**（per 守门 #11）：DDD Review 必查。
+
+#### 2.2.2 `ops_domain` 模块（11 测，per BAS-001 §3.1-3.4）
+
+| 测名 | 模块 | 验证 | 派生规 |
+|---|---|---|---|
+| `release_status_from_str_works` | `cluster` | `ReleaseStatus` 字符串 → enum 解析（5 状态） | 守门 #6 + 状态机 |
+| `helm_action_ack_serde` | `cluster` | `HelmActionAck` 序列化/反序列化 | 守门 #6 6-field + axum 0.8 JSON |
+| `canary_request_validates_weight_range` | `cluster` | `CanaryRequest.canary_weight` ∈ [0, 100] 校验 | 守门 #11 边界 + 业务规则 |
+| `list_stub_returns_one_helm_release` | `cluster` | `HelmRelease::list_releases()` 返 1 条 stub | per BAS-001 §3.1 MVP stub |
+| `doc_category_short_name_returns_5_labels` | `docs` | 5 类别 short name（SRS/BAS/DDS/REPORT/OTHER） | per F-04 5 子域 |
+| `doc_ref_stub_returns_two_refs` | `docs` | `DocRef::stub()` 返 2 条硬编码 | per BAS-001 §3.4 MVP stub |
+| `doc_category_from_path_classifies_four_subdirs` | `docs` | 4 子目录（requirements/ basic-design/ detailed-design/ reports/）→ 4 类别 | per F-04 walkdir 真实路径 |
+| `doc_scanner_finds_phase_f03_report` | `docs` | `DocScanner.list()` 找到 F-03 PHASE 报告 | per F-04 真实 walkdir |
+| `doc_scanner_list_finds_at_least_four_subsections` | `docs` | `DocScanner.list()` ≥ 4 docs | per F-04 5 子域 |
+| `log_entry_stub_has_error_level` | `log` | `LogEntry::stub()` level=Error | per BAS-001 §3.2 |
+| `log_analysis_stub_confidence_below_threshold` | `log` | `LogAnalysis::stub()` confidence < 0.5 触发 needs_review | 守门 #23 + 0.5 阈值 |
+| `summary_stub_returns_five_kpis` | `metrics` | `MetricsAggregator::summary_stub()` 返 5 KPI | per BAS-001 §3.3 |
+| `summary_empty_state_returns_five_kpis` | `metrics` | `MetricsAggregator` 空状态返 5 KPI（0 值） | per F-03 端到端 |
+| `summary_returns_five_kpis_via_telemetry` | `metrics` | 真实调 `star-telemetry` 5 KPI 接入 | per F-03 端到端 + 守门 #1 R-05 mock |
+
+**派生测试缺口识别**（per 守门 #11 缺标比错标）：
+
+- ⚠️ `release_status_from_str_invalid_returns_err`（缺）：`ReleaseStatus::from_str` 无效输入应返 Err 而非 panic。[M] 子项补
+- ⚠️ `canary_request_validates_target_revision_range`（缺）：`target_revision` 边界（0/负数/超大）无 UT 覆盖。[M] 子项补
+- ⚠️ `apply_level_filter_empty_filter_returns_full_content`（缺）：`ops_api::apply_level_filter`（`src/ops_api.rs:345-367`）空 filter 行为无 UT 覆盖（仅 IT 实证）。[M] 子项补
+- ⚠️ `log_analysis_stub_confidence_above_threshold_no_review`（缺）：confidence ≥ 0.5 不触发 needs_review 分支无 UT 覆盖。[M] 子项补
+- ⚠️ `summary_aggregator_telemetry_call_count`（缺）：`MetricsAggregator` 调 `star-telemetry` 次数断言（应 = 5 KPI）无 UT 覆盖。[M] 子项补
+
+**累计缺 5 测**（per 守门 #11）：DDD Review 必查。
+
+#### 2.2.3 `ops_ai` 模块（16 测，per BAS-001 §5 + ADR-0026 §2.2）
+
+| 测名 | 模块 | 验证 | 派生规 |
+|---|---|---|---|
+| `is_retriable_internal` | `ladder` | `Internal` 错误 → retriable=true | 守门 #6 v2 |
+| `is_retriable_rate_limited` | `ladder` | `RateLimited` 错误 → retriable=true | 守门 #6 v2 派生 |
+| `is_not_retriable_not_implemented` | `ladder` | `NotImplemented` 错误 → retriable=false | 守门 #6 |
+| `is_not_retriable_unauthorized` | `ladder` | `Unauthorized` 错误 → retriable=false | 守门 #6 |
+| `is_not_retriable_bad_request` | `ladder` | `BadRequest` 错误 → retriable=false | 守门 #6 |
+| `mock_channel_always_enabled` | `mock` | `MockChannel::is_enabled()` 永真（L4 兜底） | 守门 #23 L1 兜底 |
+| `mock_analyze_info_log_produces_no_anomaly` | `mock` | INFO log → no anomaly | 守门 #23 mock 模板 |
+| `mock_analyze_error_log_produces_anomaly` | `mock` | ERROR log → 1 anomaly | 守门 #23 mock 模板 |
+| `call_subprocess_stub_real_invocation` | `mock` | subprocess 真实调 `ai_log_mock.py` 跑通 | 守门 #24 v2 subprocess |
+| `openai_stub_is_disabled_without_api_key` | `openai_stub` | 无 API key → is_enabled=false | 守门 #5 v2 + L2 |
+| `openai_stub_is_enabled_with_api_key` | `openai_stub` | 有 API key → is_enabled=true | 守门 #5 v2 + L2 |
+| `openai_stub_builder_builds_with_api_key` | `openai_stub` | Builder 模式构建 + 透传 api_key | 守门 #5 v2 |
+| `openai_stub_no_network_mode_returns_stub_analysis` | `openai_stub` | 无网络模式返 stub `LogAnalysis` | per DDS-001 §3.2 |
+| `anthropic_stub_is_disabled_without_api_key` | `anthropic_stub` | 同 OpenAI | 守门 #5 v2 + L3 |
+| `anthropic_stub_is_enabled_with_api_key` | `anthropic_stub` | 同 OpenAI | 守门 #5 v2 + L3 |
+| `anthropic_stub_builder_builds_with_api_key` | `anthropic_stub` | 同 OpenAI | 守门 #5 v2 |
+| `anthropic_stub_no_network_mode_returns_stub_analysis` | `anthropic_stub` | 同 OpenAI | per DDS-001 §3.2 |
+
+**派生测试缺口识别**（per 守门 #11 缺标比错标）：
+
+- ⚠️ `ladder_analyze_log_first_channel_succeeds`（缺）：L1 mock 成功直接返回，无下一通道尝试的 UT 覆盖。[M] 子项补
+- ⚠️ `ladder_analyze_log_fallback_to_next_channel`（缺）：L1 失败 retriable → L2 兜底，无 UT 覆盖。[M] 子项补
+- ⚠️ `ladder_analyze_log_non_retriable_returns_immediately`（缺）：L1 失败 non-retriable 直接返错，无 UT 覆盖。[M] 子项补
+- ⚠️ `ladder_analyze_log_all_channels_disabled_returns_no_channel`（缺）：所有通道 disable → `no_channel_available` 错误，无 UT 覆盖。[M] 子项补
+- ⚠️ `mock_analyze_warn_log_produces_one_anomaly`（缺）：WARN log anomaly 模板（mock 模板仅 INFO/ERROR 覆盖）。[M] 子项补
+- ⚠️ `mock_confidence_below_threshold_triggers_needs_review`（缺）：mock 模板 confidence 0.42 < 0.5 触发 needs_review 的独立 UT。[M] 子项补
+- ⚠️ `openai_stub_analyze_log_returns_not_implemented`（缺）：OpenAI stub `analyze_log` 应返 `NotImplemented`，无 UT 覆盖。[M] 子项补
+- ⚠️ `anthropic_stub_analyze_log_returns_not_implemented`（缺）：同 OpenAI stub。[M] 子项补
+
+**累计缺 8 测**（per 守门 #11）：DDD Review 必查。
+
+#### 2.2.4 `ops_api` 模块（7 测，per BAS-001 §3.1-3.5）
+
+| 测名 | 验证 | 派生规 |
+|---|---|---|
+| `cluster_list_returns_one_release` | `GET /api/ops/cluster/releases` → 200 + 1 release | per BAS-001 §3.1 |
+| `metrics_summary_returns_five_kpis` | `GET /api/ops/metrics/summary` → 200 | per BAS-001 §3.3 |
+| `metrics_summary_real_returns_5_kpis_with_stub_false` | 200 + 5 KPI names + `meta.stub=false` + hint 含 "star-telemetry" | per F-03 端到端 + 守门 #1 R-05 |
+| `healthz_returns_200` | `GET /healthz` → 200 OK | per BAS-001 §6.2 livenessProbe |
+| `log_analysis_returns_stub` | `GET /api/ops/log/analysis/{id}` → 200 + stub | per BAS-001 §3.2 |
+| `log_upload_with_trace_id_and_level_filter` | POST + trace_id 透传 + level_filter 应用 | per 守门 #5 v2 + F-02 |
+| `log_upload_rejects_oversized_body` | POST 1.1MB content → 400 BadRequest | per 守门 #5 v2 1MB 限制 |
+
+**派生测试缺口识别**（per 守门 #11 缺标比错标）：
+
+- ⚠️ `cluster_canary_returns_200_with_action_id`（缺）：`POST /api/ops/cluster/canary` 端点无 UT 覆盖（仅 IT 实证）。[M] 子项补
+- ⚠️ `cluster_rollback_returns_200_with_action_id`（缺）：`POST /api/ops/cluster/rollback` 端点无 UT 覆盖。[M] 子项补
+- ⚠️ `cluster_status_returns_release_name_phase`（缺）：`GET /api/ops/cluster/status` 端点无 UT 覆盖（仅 IT 实证）。[M] 子项补
+- ⚠️ `docs_list_returns_walkdir_real_results`（缺）：`GET /api/ops/docs` 端点无 UT 覆盖（仅 IT 实证）。[M] 子项补
+- ⚠️ `readyz_returns_200`（缺）：`GET /readyz` 端点无 UT 覆盖（仅 healthz 覆盖）。[M] 子项补
+- ⚠️ `log_upload_missing_content_field_returns_400`（缺）：缺必填字段 `content` 返 400 的 UT 覆盖。[M] 子项补
+- ⚠️ `log_upload_invalid_level_filter_returns_400`（缺）：`level_filter` 非法值（如 `"FOO"`）返 400 的 UT 覆盖。[M] 子项补
+- ⚠️ `ops_api_routes_count_equals_ten_plus_health`（缺）：路由计数（10 + 2 health = 12）无 UT 覆盖。[M] 子项补
+- ⚠️ `ops_response_meta_serialization`（缺）：`OpsResponse<T>` + `OpsMeta` 序列化（含 None vs Some）无 UT 覆盖。[M] 子项补
+- ⚠️ `cluster_canary_invalid_canary_weight_returns_400`（缺）：`canary_weight > 100` 返 400 的 UT 覆盖（IT 实证在 it_cluster_update.rs）。[M] 子项补
+
+**累计缺 10 测**（per 守门 #11）：DDD Review 必查。
+
+### 2.3 覆盖率目标与缺口统计
+
+| 模块 | 现有测数 | 缺口测数 | 覆盖率目标 | 优先级 |
+|---|---|---|---|---|
+| `error` | 3 | 3 | 100% (5 variant × 6-field 全覆盖) | P0 |
+| `ops_domain` | 14 (cluster 4 + docs 5 + log 2 + metrics 3) | 5 | ≥ 85% | P0 |
+| `ops_ai` | 16 (ladder 5 + mock 3 + openai 4 + anthropic 4) | 8 | ≥ 85% | P1 |
+| `ops_api` | 7 | 10 | ≥ 80% (含 10 端点 + health) | P0 |
+| **累计** | **41** | **26** | **平均 ≥ 80%** | — |
+
+**覆盖率工具**（per 守门 #1 v25 单 crate 派生）：
+
+- MVP 阶段: `cargo test -p star-ops --lib -j 4` 100% pass 为主，**不强制覆盖率 %**
+- 实装阶段: 引入 `cargo tarpaulin` 或 `cargo llvm-cov`，CI 必跑覆盖率门禁（per [M] 子项拍板）
+
+### 2.4 边界条件矩阵（5 维必跑）
+
+| 维度 | 测试方法 | 必跑测数（估） |
+|---|---|---|
+| **空输入** | `""` 空字符串 / `vec![]` / `None` / `Uuid::nil()` | 6 (per 6 端点 + 4 域 stub) |
+| **最大输入** | 1MB log content / `canary_weight=100` / 完整 trace_id | 4 (per F-02 + F-01) |
+| **最小输入** | 0 / `canary_weight=0` / 单字符 source | 3 (per F-01 + F-02) |
+| **无效输入** | `ReleaseStatus::from_str("invalid")` / `level_filter=["FOO"]` / 缺 content 字段 | 6 (per 6 端点 schema 校验) |
+| **并发** | 100/1000/5000 用户同时 POST `/api/ops/log/upload` (per 容量规划 §5.6) | 3 (per PT 容量规划 100/1000/5000) |
+
+**累计边界条件 5 维 × 估 4 测 = 20 测**（per 守门 #11 缺标比错标）：MVP 阶段至少跑 空 + 无效 2 维，实装阶段补 最大 + 最小 + 并发 3 维。
+
+### 2.5 错误路径覆盖（per BAS-001 §3.5 + 守门 #6 v2 6-field）
+
+| 错误码 | HTTP Status | source_kind | retriable | 必跑测 | MVP 实证 |
+|---|---|---|---|---|---|
+| `NOT_IMPLEMENTED` | 501 | Internal | false | `not_implemented_returns_501` | ✅ |
+| `UNAUTHORIZED` | 401 | Policy | false | `unauthorized_returns_401_with_policy_source` | ✅ |
+| `RATE_LIMITED` | 429 | Policy | **true** (per 守门 #6 v2 派生) | `rate_limited_is_retriable` | ✅ |
+| `BAD_REQUEST` | 400 | Validation | false | ⚠️ 缺（per §2.2.1） | ❌ |
+| `INTERNAL` | 500 | Internal | true | ⚠️ 缺（per §2.2.1） | ❌ |
+
+**MVP-骨架阶段错误路径现状**（per 守门 #11 缺标比错标）：
+
+- ✅ 5/5 错误码 enum 完整
+- ✅ 3/5 错误码 6-field UT 覆盖（NOT_IMPLEMENTED / UNAUTHORIZED / RATE_LIMITED）
+- ⚠️ 2/5 错误码 6-field UT 缺（BAD_REQUEST / INTERNAL）：DDD Review 必查
+- ✅ Ladder retriable 规则 5 测覆盖（5 variant × is_retriable）
+- ⚠️ 5 variant → HTTP status code 映射无独立 UT：DDD Review 必查
+
+### 2.6 守门合规清单（per AGENTS.md §4 + 守门 #1 v25）
+
+| 守门 | 验证方式 | MVP 实证 |
+|---|---|---|
+| 守门 #1 v25 单 crate | `cargo test -p star-ops --lib -j 4` | ✅ 41/41 pass |
+| 守门 #6 6-field | error.rs 5 variant + `to_body` 完整 | ✅ enum 完整，UT 缺 2 测 |
+| 守门 #7 0 unsafe | `grep -rn "unsafe" src/` 应为 0（除 `// SAFETY:` 注释） | ✅ 0 unsafe 实证（per F-01/F-03/F-04 commit） |
+| 守门 #12 AI 协作文档 | BAS/DDS 引用必 `git log --follow` 实证 | ✅ 本节全 git 实证 |
+| 守门 #23 AI mock 不开外部 API | `mock.rs` 仅 subprocess，无 `reqwest` 实证 | ✅ `Cargo.toml` 0 reqwest 实证 |
+
+### 2.7 本章小结
+
+- **实证 41/41 lib test 100% pass**（per 守门 #1 v25 单 crate）
+- **派生缺口 26 测**（error 3 + ops_domain 5 + ops_ai 8 + ops_api 10）：DDD Review 必查
+- **边界条件 5 维**：MVP 阶段跑 空 + 无效 2 维，实装阶段补 3 维
+- **错误路径 5/5 错误码 enum 完整，3/5 UT 覆盖**：DDD Review 必查 2 缺口
+- **守门 #1+#6+#7+#12+#23 跨节全过，0 违反**
+
+---
+
+**Status**: 🟡 §0-§2 草稿落地, 等 §3-§6 续做 (per 6 commit 链 wt2 done, wt3-wt5 续 §3-§8)
