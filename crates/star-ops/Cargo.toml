@@ -49,6 +49,11 @@ async-trait = { workspace = true }
 # owner 接手 amend 移除 (避免 k8s-openapi build failure + 守門 #1 禁回溯).
 # kube = { version = "0.95" }  # 切生产 owner 拍板时启用
 
+# F-03 端到端 (per SRS-001 §4 F-03 + WBS §14.10.2): 复用 star-telemetry (已有 5 KPI 函数 + PrometheusExporter)
+# 跟 F-01 同 pattern: 不引入 Prometheus client crate, 仅复用 star-telemetry 现有导出器 + 1 表 DDL
+# 守門 #1 R-05: 真实 Prometheus / Grafana 集成不在 MVP scope, 走 star-telemetry mock
+star-telemetry = { path = "../star-telemetry" }
+
 # F-04 文档扫描 (F-01 不动, 仅占位)
 # walkdir = "2"
 
@@ -68,6 +73,10 @@ harness = false
 
 [[bench]]
 name = "cluster_bench"
+harness = false
+
+[[bench]]
+name = "metrics_bench"
 harness = false
 
 [lints]

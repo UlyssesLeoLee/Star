@@ -345,6 +345,14 @@ export interface Dictionary {
     /** F-03 Metrics */
     metricsTitle: string;
     metricsKPI: string;
+    metricsLoading: string;
+    metricsCardCpu: string;
+    metricsCardMem: string;
+    metricsCardTasks: string;
+    metricsCardMcp: string;
+    metricsCardLlm: string;
+    metricsTrendTitle: string;
+    metricsTrendHint: string;
     /** F-04 Docs */
     docsTitle: string;
     docsCategory: string;

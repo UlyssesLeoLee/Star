@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "@/lib/i18n";
 import { LogAITab } from "./components/LogAITab";
 import { ClusterTab } from "./components/ClusterTab";
+import { MetricsTab } from "./components/MetricsTab";
 
 export default function OpsPage() {
   const { t } = useTranslation();
@@ -113,11 +114,7 @@ export default function OpsPage() {
         </TabsContent>
 
         <TabsContent value="metrics" className="mt-[21px]">
-          <PlaceholderCard
-            title={t.opsConsole.metricsTitle}
-            tag="F-03"
-            items={[t.opsConsole.metricsKPI]}
-          />
+          <MetricsTab />
         </TabsContent>
 
         <TabsContent value="docs" className="mt-[21px]">
