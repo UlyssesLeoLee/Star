@@ -7,9 +7,12 @@
 > |---|---|---|---|
 > | v0.1 | 2026-08-25 | 初始版本 | — |
 > | v0.2 | 2026-08-26 | 同步 basic-design 5f1ea5b(REQ-AUTO-002 / REQ-NOTIF-002 / REQ-SCM-003 / AgentSession token+cost / Skill-Playbook+Squad V2 候选) | — |
+> | v0.2.1 | 2026-09-08 | 补 Mock-first 范围声明(per `docs/detailed-design-feedback.md` DD-12): 当前 `crates/api` 仅 162 行 Port trait 骨架,本设计书 §3 ~ §8 端点/事件/错误码均未在 `crates/api` 实装;**端点规模 vs 实装差距的策略性声明** | 架构师 (Mavis 接手 agent per DEC-008) |
 > **上游基本設計書**: `D:\Star-worktrees\api-design\docs\basic-design.md` v0.1(下文以 §N 引用 N 为 basic-design.md 的章节号;`§R-N` 形式引用 requirements.md v2.0 的章节号)
 > **上游要件定義書**: `D:\Star-worktrees\api-design\docs\requirements.md` v2.0
 > **文档定位**: 详细设计阶段第一件产物,定义 SaaS Control Plane 对外所有接口契约(REST + WebSocket + Event Stream);后续 Data Design / Security Design / Runtime Design / Integration Design / AI Design / Test Design / Operation Design 均依赖本设计输入
+
+> **当前实装范围声明(Mock-first 过渡期)**(per `docs/detailed-design-feedback.md` DD-12, 2026-09-08): 本设计书 §3 ~ §8 端点/事件/错误码均**未在 `crates/api` 实装**。当前 `crates/api/src/lib.rs` 仅 **162 行** Port trait 骨架(无真实 handler);`crates/*/src` 共 **38 个 `domain-*` crate**,其中领域层(state machine / 不变量校验 / 单测)**已实装**,handler 层留作 V1 阶段实装。**本声明是已知过渡状态,非缺陷**;前端通过 `frontend/src/lib/seed.ts`(~50KB)+ Zustand store 跑 Mock-first,完整接口在 V1 切真后端时按本设计书落地;跨文档避免被反复当成"api-design.md 已过期/无人维护"的误读,详见 `frontend-design.md` ADR-FE-002/003/004 + `docs/detailed-design-feedback.md` DD-12。
 
 ---
 
