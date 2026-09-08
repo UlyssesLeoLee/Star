@@ -542,7 +542,10 @@ Local Runtime 详情页必须显示:
 - `device_id` 设备指纹 hash
 - `tenant_id` 一致性
 - `user_id` 登录态
-- `mount_root` 是否在 policy.allowlist
+- `version` 运行时版本
+- `capabilities` 能力清单
+- `last_heartbeat` 心跳时间(INV-RT-04 判定超时)
+- `metadata.host_name` / `metadata.os` / `metadata.arch`
 
 任何 mismatch → status=compromised + audit.policy_violation 红色高亮。
 
@@ -569,7 +572,7 @@ Local Runtime 详情页必须显示:
 | `Integration` | `integration` | kind / status / loop_protection_key | REQ-INT-001 |
 | `Notification` | `notification` | channel / status / suppression_reason | INV-N-07 |
 | `SearchHit` | `search_hit` | score / kind | INV-SR-01/02 |
-| `LocalRuntime` | `local_runtime` | status / mount_root / policy_violations | INV-LR-01~05 |
+| `LocalRuntime` | `local_runtime` | status / version / capabilities / last_heartbeat / metadata | INV-LR-01~05 |
 | `PresenceCursor` | `presence_cursor` | x / y / selection | §7.6 |
 | `AuditEvent` | `audit_event` | category / prev_hash / hash / ai_metadata | INV-AU-01~07 |
 | `AutomationRule` | `automation_rule` | trigger / condition / actions | INV-AUTO-01~06 |
