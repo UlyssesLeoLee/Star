@@ -365,3 +365,92 @@ fn it_ddl_path_consistency_docs_vs_db() {
     // 派生文档: docs/migrations/2026-09-08-ops-log.sql 旧版可保留 (向后兼容)
     // 官方权威路径 = db/migrations/ (跟 F-01/F-03 一致)
 }
+
+// ============ IT-5-GAPS 缺口 #3 实装 (per IT-5-GAPS-IMPL brief §2.1) ============
+
+/// IT-5-GAPS 缺口 #3: Ladder L2 fallback 触发 (per IT-5-GAPS-IMPL brief §2.1)
+/// 跟 UT-IT-51 §2.3 #17 + #18 派生缺口互补: #17/18 走 L1 mock 永远成功路径
+/// 缺口 #3 显式构造 L1 mock 返回 retriable Internal → 触发 L2 openai_stub 兜底
+/// 守门 #6 v2: retriable 错误 (Internal + RateLimited) 走下一通道
+/// 守门 #23: AI mock 不开外部 API (OpenAI stub no_network_mode=true 永远 Ok)
+/// 派生文档: 守門 #11 缺标比错标 — [M] 阶段缺 L2/L3 真实 LLM 调通 (per 已知缺口 #1 E2E 衍生)
+#[tokio::test]
+async fn it_ladder_l2_fallback_when_mock_fails() {
+    use chrono::Utc;
+    use star_ops::ops_ai::ladder::Ladder;
+    use star_ops::ops_ai::openai_stub::OpenAiStub;
+    use star_ops::ops_ai::AiChannel;
+    use star_ops::ops_domain::log::{LogAnalysis, LogEntry, LogLevel};
+
+    // 1. 构造自定义 L1 mock 永远返 Internal (retriable)
+    //    per 守門 #6 v2: Internal 是 retriable, Ladder 必走下一通道
+    struct AlwaysFailMockChannel;
+    #[async_trait::async_trait]
+    impl AiChannel for AlwaysFailMockChannel {
+        fn name(&self) -> &'static str {
+            "always_fail_mock"
+        }
+        fn is_enabled(&self) -> bool {
+            true
+        }
+        async fn analyze_log(
+            &self,
+            _log: &LogEntry,
+        ) -> Result<LogAnalysis, star_ops::error::OpsError> {
+            // 守門 #6 v2: Internal 必 retriable
+            Err(star_ops::error::OpsError::Internal(
+                "mock subprocess 模拟失败 (per IT-5-GAPS 缺口 #3)".to_string(),
+            ))
+        }
+    }
+
+    // 2. L2 = OpenAiStub (with_api_key → is_enabled=true, no_network_mode=true 永远 Ok)
+    //    per 守門 #23: AI mock 不开外部 API
+    let openai = OpenAiStub::with_api_key("sk-test-it-5-gaps");
+    assert!(openai.is_enabled(), "OpenAiStub 配 api_key 必 enabled");
+
+    // 3. L3 = AnthropicStub (with_api_key → is_enabled=true, no_network_mode=true 永远 Ok)
+    use star_ops::ops_ai::anthropic_stub::AnthropicStub;
+    let anthropic = AnthropicStub::with_api_key("sk-test-anthropic-it-5-gaps");
+    assert!(
+        anthropic.is_enabled(),
+        "AnthropicStub 配 api_key 必 enabled"
+    );
+
+    // 4. 构造 L1 always_fail + L2 openai + L3 anthropic
+    let ladder = Ladder::new(vec![
+        Box::new(AlwaysFailMockChannel),
+        Box::new(openai),
+        Box::new(anthropic),
+    ]);
+
+    // 5. 准备 log
+    let log = LogEntry {
+        id: uuid::Uuid::new_v4(),
+        source: "k8s-pod/it-5-gaps-fallback".to_string(),
+        level: LogLevel::Error,
+        message: "2026-09-08 ERROR IT-5-GAPS L2 fallback test".to_string(),
+        timestamp: Utc::now(),
+        trace_id: Some("trace-it-5-gaps-fallback-001".to_string()),
+    };
+
+    // 6. 调 Ladder.analyze_log → L1 fail retriable → 走 L2 openai_stub
+    let analysis = ladder
+        .analyze_log(&log)
+        .await
+        .expect("Ladder 必返 Ok (L2 fallback 兜底)");
+
+    // 7. 验证: 必走 L2 openai_stub (per IT-5-GAPS 缺口 #3 L2 fallback 触发)
+    assert_eq!(
+        analysis.generated_by, "openai_stub",
+        "L1 mock fail retriable → 必走 L2 openai_stub, got: {}",
+        analysis.generated_by
+    );
+    // 守门 #23: stub 阶段 confidence < 0.5
+    assert!(
+        analysis.confidence < 0.5,
+        "L2 stub 阶段 confidence 必 < 0.5, got {}",
+        analysis.confidence
+    );
+    // 派生文档: 守門 #11 缺标比错标 — [M] 阶段 L2 切真实 OpenAI API (per 守門 #23)
+}
