@@ -71,6 +71,16 @@ tower = { version = "0.5", features = ["util"] }
 # criterion bench (per 守门 #7 v3 PT 雏形 P95 < 200ms)
 criterion = { version = "0.5", features = ["html_reports"] }
 
+# IT-5-GAPS 缺口 #1 + 缺口 #2: 真实 PG 连接 (per IT-5-GAPS-IMPL brief §2.1)
+# 复用 workspace 声明的 sqlx (database crate), 加 postgres 特性 (PG driver)
+# 守门 #1 R-05: 不连真 PG prod, 只连测试 PG (WSL 本地 / CI 临时容器)
+# 守门 #5 v2: 测试 PG 密码走 STAR_OPS_TEST_PG_URL env, 不入源码
+sqlx = { workspace = true }
+
+# IT-5-GAPS 缺口 #5: graceful shutdown (per IT-5-GAPS-IMPL brief §2.1)
+# tokio-util 提供 CancellationToken, 跟 axum::serve::with_graceful_shutdown 联动
+tokio-util = { version = "0.7", features = ["rt"] }
+
 [[bench]]
 name = "log_upload_bench"
 harness = false
