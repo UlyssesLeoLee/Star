@@ -12,24 +12,29 @@
 #   - 守门 #6: PowerShell only
 #
 # 前置 (Ulysses 必先做):
-#   - 此脚本需要 admin PowerShell 跑 (sudo 不可代理)
-#   - 或者拆成 2 步: admin PowerShell 跑 WipeCluster (Step 1-3), 非 admin 跑
-#     后续 apply (Step 4+)
+#   - 默认模式 (Mavis 不可代理): Ulysses 必在 admin PowerShell 跑 WipeCluster
+#     Step 2 (sudo k3s-uninstall.sh + k3s install), 跑完按 y 确认
+#   - Mavis 自动化模式 (Ulysses 主动给 $env:UbuntuPW 授权时): 设
+#     $env:MAVIS_AUTO_WIPE = "1" 后跑此脚本, 脚本自动用 $env:UbuntuPW pipe stdin 跑
+#     sudo (守门 #5 形式: 密码不打印, 只 invoke)
 #
 # 跟 start-k3s-backend.ps1 关系:
 #   - start-k3s-backend.ps1: 启 k3s server (WipeCluster 后必跑)
 #   - wipecluster-and-recover.ps1: 删 k3s 重建 (Mavis 推荐 A 路径)
 #
-# 用法 (admin PowerShell):
-#   1. wsl -d Ubuntu  # 打开 wsl 终端
-#   2. sudo /usr/local/bin/k3s-uninstall.sh
-#   3. exit  # 退 wsl
-#   4. wsl -d Ubuntu -- sudo /usr/local/bin/k3s install
-#   5. sleep 60
-#   6. wsl -d Ubuntu -- sudo systemctl status k3s
-#   7. (Mavis 跑) pwsh -File tools\star-flash-mock\scripts\verify-k3s-uat-3000.ps1
-#   8. (Mavis 跑) pkill kubectl port-forward (if needed)
-#   9. (Mavis 跑) curl -i http://localhost:3000  (期望 200 + "not found")
+# 用法 1 (默认手动, admin PowerShell):
+#   1. pwsh -File tools\star-flash-mock\scripts\wipecluster-and-recover.ps1
+#   2. 按提示手动跑:
+#        wsl -d Ubuntu
+#        sudo /usr/local/bin/k3s-uninstall.sh
+#        exit
+#        wsl -d Ubuntu -- sudo /usr/local/bin/k3s install
+#   3. 按 y 继续, 脚本自动跑 Step 3-9
+#
+# 用法 2 (Mavis 自动化, Ulysses 已授权 $env:UbuntuPW):
+#   1. $env:MAVIS_AUTO_WIPE = "1"
+#   2. pwsh -File tools\star-flash-mock\scripts\wipecluster-and-recover.ps1
+#   3. 脚本自动跑 WipeCluster (Step 2 用 $env:UbuntuPW pipe stdin 跑 sudo) + 重建验证
 #
 # 关键事实 (per 2026-09-08 K3S-v2 实战):
 #   - k3s containerd 不需要重启 (k3s install 自带 containerd 启动)
@@ -55,22 +60,62 @@ if ($LASTEXITCODE -ne 0 -or -not $probe.Contains("distro-ok")) {
 Write-Host "  distro 'Ubuntu' OK"
 Write-Host ""
 
-# ---- 2. WipeCluster (Mavis 不能代理 sudo, 必 Ulysses admin PowerShell 跑) ----
-Write-Host "[2/9] ⚠️  必手动: WipeCluster 重建 k3s (Mavis 不能代理 sudo)" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "  Ulysses 必在 admin PowerShell 跑以下命令:" -ForegroundColor Yellow
-Write-Host "    wsl -d Ubuntu" -ForegroundColor Yellow
-Write-Host "    sudo /usr/local/bin/k3s-uninstall.sh  # 卸载 k3s (会清空 /var/lib/rancher/k3s)" -ForegroundColor Yellow
-Write-Host "    exit  # 退 wsl 回到 PowerShell" -ForegroundColor Yellow
-Write-Host "    wsl -d Ubuntu -- sudo /usr/local/bin/k3s install  # 重新装 k3s" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "  跑完按任意键继续 (Ulysses 跑完后请按 y 确认):" -ForegroundColor Yellow
-$confirm = Read-Host "  Confirm (y/n)"
-if ($confirm -ne 'y') {
-    Write-Host "  Aborted by user" -ForegroundColor Yellow
-    exit 2
+# ---- 2. WipeCluster (默认手动, $env:MAVIS_AUTO_WIPE=1 时自动用 $env:UbuntuPW pipe sudo) ----
+Write-Host "[2/9] WipeCluster 重建 k3s (uninstall + install) ..." -ForegroundColor Cyan
+
+if ($env:MAVIS_AUTO_WIPE -eq "1") {
+    # 自动化模式: $env:UbuntuPW | wsl ... bash -lc "read -s SUDO_PW; echo $SUDO_PW | sudo -S ..."
+    # 密码完全不上任何命令行 (ps / wsl 命令行 / wsl bash 命令行 都不出现),
+    # 只走 stdin pipe 到 wsl 内的 read -s, 守门 #5 严守
+    if ([string]::IsNullOrEmpty($env:UbuntuPW)) {
+        Write-Host "  ERROR: \$env:MAVIS_AUTO_WIPE=1 但 \$env:UbuntuPW 未设, 退回手动模式" -ForegroundColor Red
+        $env:MAVIS_AUTO_WIPE = ""
+    } else {
+        Write-Host "  模式: MAVIS_AUTO_WIPE (密码 stdin pipe 形式, 守门 #5 严守)" -ForegroundColor Green
+        Write-Host "  2a/2: 卸载 k3s (k3s-uninstall.sh) ..."
+
+        $env:UbuntuPW | wsl -d Ubuntu --user root -- bash -lc "read -r SUDO_PW; echo \"\$SUDO_PW\" | sudo -S /usr/local/bin/k3s-uninstall.sh 2>&1; echo \"--uninst-exit=\$?--\"" 2>&1 | Tee-Object -Variable uninstOut | Out-Null
+        Write-Host "  uninstall output (含 exit marker):"
+        Write-Host $uninstOut
+        if ($uninstOut -notmatch "--uninst-exit=0--") {
+            Write-Host "  ERROR: k3s-uninstall 失败 (exit marker 非 0)" -ForegroundColor Red
+            exit 2
+        }
+        Write-Host "  uninstall OK"
+        Write-Host ""
+
+        Write-Host "  2b/2: 重装 k3s (k3s install) ..."
+        $env:UbuntuPW | wsl -d Ubuntu --user root -- bash -lc "read -r SUDO_PW; echo \"\$SUDO_PW\" | sudo -S /usr/local/bin/k3s install 2>&1; echo \"--inst-exit=\$?--\"" 2>&1 | Tee-Object -Variable instOut | Out-Null
+        Write-Host "  install output (含 exit marker):"
+        Write-Host $instOut
+        if ($instOut -notmatch "--inst-exit=0--") {
+            Write-Host "  ERROR: k3s install 失败 (exit marker 非 0)" -ForegroundColor Red
+            exit 2
+        }
+        Write-Host "  install OK"
+        Write-Host ""
+    }
 }
-Write-Host ""
+
+if ($env:MAVIS_AUTO_WIPE -ne "1") {
+    Write-Host "  ⚠️  必手动: WipeCluster 重建 k3s (Mavis 不能代理 sudo)" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  Ulysses 必在 admin PowerShell 跑以下命令:" -ForegroundColor Yellow
+    Write-Host "    wsl -d Ubuntu" -ForegroundColor Yellow
+    Write-Host "    sudo /usr/local/bin/k3s-uninstall.sh  # 卸载 k3s" -ForegroundColor Yellow
+    Write-Host "    exit  # 退 wsl" -ForegroundColor Yellow
+    Write-Host "    wsl -d Ubuntu -- sudo /usr/local/bin/k3s install  # 重新装 k3s" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  或设 \$env:MAVIS_AUTO_WIPE=1 走自动模式 (需 \$env:UbuntuPW 已设)" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  跑完按任意键继续 (Ulysses 跑完后请按 y 确认):" -ForegroundColor Yellow
+    $confirm = Read-Host "  Confirm (y/n)"
+    if ($confirm -ne 'y') {
+        Write-Host "  Aborted by user" -ForegroundColor Yellow
+        exit 2
+    }
+    Write-Host ""
+}
 
 # ---- 3. 等 60s + 验证 k3s 拉起 ----
 Write-Host "[3/9] 等 60s 让 k3s systemd 自动拉起 + kubelet 跟 containerd 同步 (守门 v28) ..." -ForegroundColor Cyan
