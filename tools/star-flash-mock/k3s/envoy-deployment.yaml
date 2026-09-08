@@ -24,15 +24,25 @@ spec:
         app: star-mock
         component: envoy
     spec:
+      # v5.4 (per 2026-09-08 21:23 JST Ulysses 拍板 A "Deployment hostNetwork: true"):
+      # pod 直接跟 node 网络命名空间共享, 绕开 pod network namespace 隔离.
+      # 之前 v5.3 NodePort 30800 配上了但 curl fail, 根因 = klipper bind wsl VM 0.0.0.0:30800
+      # 但 envoy pod 8080 在 pod 独立 namespace, wslrelay NAT 跟 klipper 30800 桥接不通.
+      # 改 hostNetwork: true 后 envoy 跟 wsl VM 共享 0.0.0.0:8080, klipper 跟 wslrelay 桥接 OK.
+      # 跟 v2 §9 Envoy 独立 deployment 一致.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: envoy
           image: docker.m.daocloud.io/envoyproxy/envoy:v1.32-latest  # daocloud mirror (per 2026-09-08 08:04 JST 实证 docker.io 拉超时)
           ports:
             - containerPort: 8080
               name: http
+              hostPort: 8080
               protocol: TCP
             - containerPort: 8443
               name: https
+              hostPort: 8443
               protocol: TCP
           env:
             - name: ENVOY_UID
