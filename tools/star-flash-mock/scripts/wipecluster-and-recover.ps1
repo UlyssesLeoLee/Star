@@ -74,7 +74,7 @@ if ($env:MAVIS_AUTO_WIPE -eq "1") {
         Write-Host "  模式: MAVIS_AUTO_WIPE (密码 stdin pipe 形式, 守门 #5 严守)" -ForegroundColor Green
         Write-Host "  2a/2: 卸载 k3s (k3s-uninstall.sh) ..."
 
-        $env:UbuntuPW | wsl -d Ubuntu --user root -- bash -lc "read -r SUDO_PW; echo \"\$SUDO_PW\" | sudo -S /usr/local/bin/k3s-uninstall.sh 2>&1; echo \"--uninst-exit=\$?--\"" 2>&1 | Tee-Object -Variable uninstOut | Out-Null
+        $env:UbuntuPW | wsl -d Ubuntu -- bash -lc "read -r SUDO_PW; echo \"\$SUDO_PW\" | sudo -S /usr/local/bin/k3s-uninstall.sh 2>&1; echo \"--uninst-exit=\$?--\"" 2>&1 | Tee-Object -Variable uninstOut | Out-Null
         Write-Host "  uninstall output (含 exit marker):"
         Write-Host $uninstOut
         if ($uninstOut -notmatch "--uninst-exit=0--") {
@@ -85,7 +85,7 @@ if ($env:MAVIS_AUTO_WIPE -eq "1") {
         Write-Host ""
 
         Write-Host "  2b/2: 重装 k3s (k3s install) ..."
-        $env:UbuntuPW | wsl -d Ubuntu --user root -- bash -lc "read -r SUDO_PW; echo \"\$SUDO_PW\" | sudo -S /usr/local/bin/k3s install 2>&1; echo \"--inst-exit=\$?--\"" 2>&1 | Tee-Object -Variable instOut | Out-Null
+        $env:UbuntuPW | wsl -d Ubuntu -- bash -lc "read -r SUDO_PW; echo \"\$SUDO_PW\" | sudo -S /usr/local/bin/k3s install 2>&1; echo \"--inst-exit=\$?--\"" 2>&1 | Tee-Object -Variable instOut | Out-Null
         Write-Host "  install output (含 exit marker):"
         Write-Host $instOut
         if ($instOut -notmatch "--inst-exit=0--") {
