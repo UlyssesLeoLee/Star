@@ -64,35 +64,37 @@ Write-Host ""
 Write-Host "[2/9] WipeCluster 重建 k3s (uninstall + install) ..." -ForegroundColor Cyan
 
 if ($env:MAVIS_AUTO_WIPE -eq "1") {
-    # 自动化模式: $env:UbuntuPW | wsl ... bash -lc "read -s SUDO_PW; echo $SUDO_PW | sudo -S ..."
-    # 密码完全不上任何命令行 (ps / wsl 命令行 / wsl bash 命令行 都不出现),
-    # 只走 stdin pipe 到 wsl 内的 read -s, 守门 #5 严守
+    # 自动化模式: $env:UbuntuPW | wsl -d Ubuntu -- sudo -S ...
+    # 密码完全不上任何命令行 (ps / wsl 命令行都不出现),
+    # 只走 stdin pipe 到 wsl 内 sudo -S, 守门 #5 严守
+    # (实测: 嵌 bash -lc 复杂 quoting 在 WSL host 半死时触发 NAT 子组件 EOF 错,
+    #  改 sudo -S 直连 (no bash -lc) 0 err, 2026-09-08 13:33 JST 实证)
     if ([string]::IsNullOrEmpty($env:UbuntuPW)) {
         Write-Host "  ERROR: \$env:MAVIS_AUTO_WIPE=1 但 \$env:UbuntuPW 未设, 退回手动模式" -ForegroundColor Red
         $env:MAVIS_AUTO_WIPE = ""
     } else {
-        Write-Host "  模式: MAVIS_AUTO_WIPE (密码 stdin pipe 形式, 守门 #5 严守)" -ForegroundColor Green
+        Write-Host "  模式: MAVIS_AUTO_WIPE (stdin pipe + sudo -S 直连, 守门 #5 严守)" -ForegroundColor Green
         Write-Host "  2a/2: 卸载 k3s (k3s-uninstall.sh) ..."
 
-        $env:UbuntuPW | wsl -d Ubuntu -- bash -lc "read -r SUDO_PW; echo \"\$SUDO_PW\" | sudo -S /usr/local/bin/k3s-uninstall.sh 2>&1; echo \"--uninst-exit=\$?--\"" 2>&1 | Tee-Object -Variable uninstOut | Out-Null
-        Write-Host "  uninstall output (含 exit marker):"
-        Write-Host $uninstOut
-        if ($uninstOut -notmatch "--uninst-exit=0--") {
-            Write-Host "  ERROR: k3s-uninstall 失败 (exit marker 非 0)" -ForegroundColor Red
+        $env:UbuntuPW | wsl -d Ubuntu -- sudo -S /usr/local/bin/k3s-uninstall.sh 2>&1 | Tee-Object -Variable uninstOut | Out-Null
+        Write-Host "  uninstall output (last 5 行):"
+        @($uninstOut | Select-Object -Last 5) | ForEach-Object { Write-Host "    $_" }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  ERROR: k3s-uninstall 失败 exit=$LASTEXITCODE" -ForegroundColor Red
             exit 2
         }
-        Write-Host "  uninstall OK"
+        Write-Host "  uninstall OK (exit=$LASTEXITCODE)"
         Write-Host ""
 
         Write-Host "  2b/2: 重装 k3s (k3s install) ..."
-        $env:UbuntuPW | wsl -d Ubuntu -- bash -lc "read -r SUDO_PW; echo \"\$SUDO_PW\" | sudo -S /usr/local/bin/k3s install 2>&1; echo \"--inst-exit=\$?--\"" 2>&1 | Tee-Object -Variable instOut | Out-Null
-        Write-Host "  install output (含 exit marker):"
-        Write-Host $instOut
-        if ($instOut -notmatch "--inst-exit=0--") {
-            Write-Host "  ERROR: k3s install 失败 (exit marker 非 0)" -ForegroundColor Red
+        $env:UbuntuPW | wsl -d Ubuntu -- sudo -S /usr/local/bin/k3s install 2>&1 | Tee-Object -Variable instOut | Out-Null
+        Write-Host "  install output (last 5 行):"
+        @($instOut | Select-Object -Last 5) | ForEach-Object { Write-Host "    $_" }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  ERROR: k3s install 失败 exit=$LASTEXITCODE" -ForegroundColor Red
             exit 2
         }
-        Write-Host "  install OK"
+        Write-Host "  install OK (exit=$LASTEXITCODE)"
         Write-Host ""
     }
 }
