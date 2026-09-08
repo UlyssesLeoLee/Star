@@ -69,7 +69,7 @@ tower = { version = "0.5", features = ["util"] }
 # axum::body::Body 测试用
 # reqwest::Client IT 调 ops_api HTTP
 # criterion bench (per 守门 #7 v3 PT 雏形 P95 < 200ms)
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 
 [[bench]]
 name = "log_upload_bench"

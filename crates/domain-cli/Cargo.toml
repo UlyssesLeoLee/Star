@@ -20,9 +20,9 @@ chrono = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
 # 加密 (AES-256-GCM for API Key)
-aes-gcm = "0.10"
-base64 = "0.22"
-rand = "0.8"
+aes-gcm = "0.11"
+base64 = "0.23"
+rand = "0.10"
 # HTTP 客户端 (B.1 OpenClaw + B.6 Hermes HTTP 客户端实装, per 2026-08-30 07:25 / 07:28 JST)
 reqwest = { workspace = true }
 
