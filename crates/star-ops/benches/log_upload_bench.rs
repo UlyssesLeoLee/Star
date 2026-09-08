@@ -117,23 +117,19 @@ fn bench_log_entry_construction(c: &mut Criterion) {
     for size in [100, 1_000, 10_000].iter() {
         let msg = "x".repeat(*size);
         group.throughput(Throughput::Bytes(*size as u64));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            size,
-            |b, &size| {
-                b.iter(|| {
-                    let entry = LogEntry {
-                        id: Uuid::new_v4(),
-                        source: black_box("bench".to_string()),
-                        level: LogLevel::Error,
-                        message: black_box(msg.clone()),
-                        timestamp: Utc::now(),
-                        trace_id: None,
-                    };
-                    let _ = black_box(entry);
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            b.iter(|| {
+                let entry = LogEntry {
+                    id: Uuid::new_v4(),
+                    source: black_box("bench".to_string()),
+                    level: LogLevel::Error,
+                    message: black_box(msg.clone()),
+                    timestamp: Utc::now(),
+                    trace_id: None,
+                };
+                let _ = black_box(entry);
+            });
+        });
     }
 
     group.finish();
