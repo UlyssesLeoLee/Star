@@ -8,6 +8,6 @@ pub mod cluster;
 pub mod log;
 pub mod metrics;
 
-pub use cluster::{CanaryRequest, HelmRelease, ReleaseStatus, RollbackRequest};
+pub use cluster::{CanaryRequest, HelmActionAck, HelmMockOutput, HelmRelease, ReleaseStatus, RollbackRequest};
 pub use log::{LogAnalysis, LogEntry, LogLevel};
 pub use metrics::{OpsMetric, TrendDirection};
