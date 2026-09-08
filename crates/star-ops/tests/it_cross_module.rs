@@ -247,7 +247,7 @@ async fn it_graceful_shutdown_drains_in_flight_requests() {
     assert_eq!(response.status(), StatusCode::OK);
 }
 
-// ============ IT-5-GAPS 缺口 #4 实装 (per IT-5-GAPS-IMPL brief §2.1) ============
+// ============ IT-5-GAPS 缺口 #4 + 缺口 #5 实装 (per IT-5-GAPS-IMPL brief §2.1) ============
 
 /// IT-5-GAPS 缺口 #4: rate limit middleware 60 req/min (per IT-5-GAPS-IMPL brief §2.1)
 /// 跟 UT-IT-51 #46 派生缺口互补: #46 走 MVP 无限流路径, 缺口 #4 实装真限流 middleware
@@ -408,5 +408,152 @@ async fn it_rate_limit_middleware_60_rpm() {
         response.status(),
         StatusCode::OK,
         "新窗口必 200 (per 守門 #6 v2 60s 窗口重置)"
+    );
+}
+
+/// IT-5-GAPS 缺口 #5: graceful shutdown (per IT-5-GAPS-IMPL brief §2.1)
+/// 跟 UT-IT-51 #49 派生缺口互补: #49 走 MVP 无 graceful shutdown 路径, 缺口 #5 实装真 shutdown
+/// 守門 #1 R-05: K8s deployment graceful shutdown 派生
+/// 实现: axum 0.8 `axum::serve` + `with_graceful_shutdown(CancellationToken)`
+/// 派生文档: 守門 #11 缺标比错标 — [M] 阶段缺 in-flight count + max wait timeout (per 缺口 [M] 阶段)
+#[tokio::test]
+async fn it_graceful_shutdown_drains_in_flight() {
+    use std::time::Duration;
+    use tokio::net::TcpListener;
+    use tokio::time::sleep;
+    use tokio_util::sync::CancellationToken;
+
+    // 1. 启动 server on random port with graceful_shutdown
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let addr = listener.local_addr().expect("local_addr");
+    let app = router(AppState::new());
+    let cancel = CancellationToken::new();
+    let cancel_for_signal = cancel.clone();
+
+    let server_handle = tokio::spawn(async move {
+        axum::serve(listener, app.into_make_service())
+            .with_graceful_shutdown(async move {
+                cancel_for_signal.cancelled().await;
+            })
+            .await
+            .expect("server must run");
+    });
+
+    // 2. 用 reqwest client 走真实 TCP, 模拟 50 in-flight 并发请求
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .expect("client");
+
+    let mut handles = Vec::with_capacity(50);
+    for i in 0..50 {
+        let client = client.clone();
+        let url = format!("http://{}/healthz", addr);
+        handles.push(tokio::spawn(async move {
+            let resp = client.get(&url).send().await;
+            (i, resp)
+        }));
+    }
+
+    // 3. 短暂 sleep 让所有 in-flight 请求进 server
+    sleep(Duration::from_millis(50)).await;
+
+    // 4. 触发 graceful shutdown
+    cancel.cancel();
+
+    // 5. 等待所有 in-flight 请求完成 (无 truncated)
+    let mut success_count = 0;
+    let mut truncated_count = 0;
+    for h in handles {
+        match h.await.expect("task not panic") {
+            (i, Ok(resp)) => {
+                let status = resp.status();
+                if status.is_success() {
+                    success_count += 1;
+                } else {
+                    eprintln!("in-flight request {} got status {}", i, status);
+                    truncated_count += 1;
+                }
+            }
+            (i, Err(e)) => {
+                eprintln!("in-flight request {} failed: {}", i, e);
+                truncated_count += 1;
+            }
+        }
+    }
+    // 守門 #1 R-05: in-flight 请求必全部完成 (无 truncated)
+    assert_eq!(
+        success_count, 50,
+        "50 in-flight 必全部 200 (per 守門 #1 R-05 graceful shutdown), success={} truncated={}",
+        success_count, truncated_count
+    );
+
+    // 6. 等待 server task 完成 (graceful shutdown 完成, listener 关闭)
+    server_handle.await.expect("server task");
+
+    // 7. shutdown 后新请求必失败 (server 已关, per 守門 #1 R-05)
+    //    补强: 新请求在 server 完全关后必失败 (跟 it_graceful_shutdown_blocks_new_requests_after_signal 互补)
+    let new_resp = client
+        .get(format!("http://{}/healthz", addr))
+        .timeout(Duration::from_secs(1))
+        .send()
+        .await;
+    assert!(
+        new_resp.is_err(),
+        "shutdown 后新请求必失败 (server 已关, per 守門 #1 R-05), got Ok: {:?}",
+        new_resp
+    );
+}
+
+/// IT-5-GAPS 缺口 #5 补强: shutdown 后新请求 connection refused 实证
+/// (跟 it_graceful_shutdown_drains_in_flight 互补, 显式验证 graceful shutdown 全流程)
+#[tokio::test]
+async fn it_graceful_shutdown_blocks_new_requests_after_signal() {
+    use std::time::Duration;
+    use tokio::net::TcpListener;
+    use tokio_util::sync::CancellationToken;
+
+    // 1. 启动 server
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+    let addr = listener.local_addr().expect("local_addr");
+    let app = router(AppState::new());
+    let cancel = CancellationToken::new();
+    let cancel_for_signal = cancel.clone();
+
+    let server_handle = tokio::spawn(async move {
+        axum::serve(listener, app.into_make_service())
+            .with_graceful_shutdown(async move {
+                cancel_for_signal.cancelled().await;
+            })
+            .await
+            .expect("server must run");
+    });
+
+    // 2. 先发 1 个请求验证 server 可达
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("client");
+    let resp = client
+        .get(format!("http://{}/healthz", addr))
+        .send()
+        .await
+        .expect("reachable");
+    assert!(resp.status().is_success(), "pre-shutdown 请求必 200");
+
+    // 3. 触发 shutdown
+    cancel.cancel();
+    // 4. 等 server 关
+    server_handle.await.expect("server task");
+
+    // 5. shutdown 后新请求必 connection refused / timeout
+    let post_shutdown = client
+        .get(format!("http://{}/healthz", addr))
+        .timeout(Duration::from_millis(500))
+        .send()
+        .await;
+    assert!(
+        post_shutdown.is_err(),
+        "shutdown 后新请求必失败 (per 守門 #1 R-05 graceful shutdown), got Ok"
     );
 }
