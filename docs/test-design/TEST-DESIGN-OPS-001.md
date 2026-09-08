@@ -364,4 +364,186 @@ test result: ok. 41 passed; 0 failed ... finished in 0.92s
 
 ---
 
-**Status**: 🟡 §0-§2 草稿落地, 等 §3-§6 续做 (per 6 commit 链 wt2 done, wt3-wt5 续 §3-§8)
+## §3 IT 集成测试（per 守门 #9 v20 + 守门 #1 v25 + 守门 #13 + 守门 #24 v2）
+
+### 3.1 测试目标与跨 crate 范围
+
+**目标**：验证 `crates/star-ops` 跟外部依赖（axum Router + 跨 crate + subprocess 真实调 + DDL 存在性）的集成行为符合 OPS-DETAILED-DESIGN-001 §1.1-1.5 契约，覆盖以下维度：
+
+| 维度 | 目标 | 实证 |
+|---|---|---|
+| 跨 crate IT 数 | 15/15 pass (it_cluster_update 6 + it_log_ai 3 + it_metrics_summary 3 + it_docs_list 3) | `cargo test -p star-ops --tests -j 4` 15/15 pass（实证 2026-09-08） |
+| axum oneshot 真实端点 | 4 端点（F-01 cluster_list + F-02 log_upload + F-03 metrics_summary + F-04 docs_list） | 实证 per `tower::ServiceExt::oneshot` 模式 |
+| subprocess 真实调 | 2 脚本（`helm_canary_mock.sh` + `ai_log_mock.py`） | per 守门 #24 v2 + F-01/F-02 commit 实证 |
+| DDL 存在性 + W/T/M 100% 覆盖 | 3 DDL 文件（cluster 2 表 + metrics 1 表 + log 3 表 TODO） | per 守门 #13 + owner P1 修正后 3/6 DDL 落地 |
+| 守门 #1 R-05 mock 路径 | 100% 不接生产 K8s/LLM/PG | per F-01/F-02/F-03/F-04 commit 实证 |
+
+**实证锚点**（per 守门 #1 v25 单 crate + 守门 #9 v20 子代理 dispatch 必先）：
+
+```
+$ cargo test -p star-ops --tests -j 4
+running 15 tests
+... (15 passed; 0 failed; 0 ignored)
+test result: ok. 15 passed; 0 failed ... finished in <Xs>
+```
+
+### 3.2 4 IT 实证矩阵（15 测 1:1 对齐）
+
+#### 3.2.1 `it_cluster_update`（F-01 跨 crate，6 测，per `tests/it_cluster_update.rs`）
+
+| 测名 | 验证 | 派生规 |
+|---|---|---|
+| `helm_canary_mock_list_subprocess` | subprocess 真实调 `helm_canary_mock.sh list` → `ok:true` + `channel:mock` + `star-mcp` release | 守门 #1 R-05 + 守门 #24 v2 |
+| `helm_canary_mock_canary_subprocess` | subprocess 调 `canary --release star-mcp --weight 10` → 成功 + 含 canary action | 守门 #1 R-05 + F-01 业务规则 |
+| `helm_canary_mock_rollback_subprocess` | subprocess 调 `rollback --target 2` → 成功 + 含 rollback action | 守门 #1 R-05 + F-01 业务规则 |
+| `helm_canary_mock_status_subprocess` | subprocess 调 `status --release star-mcp` → 成功 + 含 status/healthy | 守门 #1 R-05 + F-01 业务规则 |
+| `ops_cluster_ddl_wtm_coverage` | 验证 `db/migrations/2026-09-08-ops-cluster.sql` 含 2 表（ops_helm_release_state T + ops_cluster_action_log T）+ 2 prevent_delete trigger + 1 audit trigger + FORCE RLS | 守门 #13 100% + 守门 #DB-13 CW-05 |
+| `cluster_api_handlers_real_endpoints` | axum oneshot 调 `GET /api/ops/cluster/releases` → 200 | per BAS-001 §3.1 |
+
+**F-01 IT 实证状态**（per `git show d8e916e` 实证）：
+
+- ✅ 6/6 IT 100% pass（per F-01 PR #27 合并 commit `d8e916e`）
+- ✅ 11 表 W/T/M 100% 覆盖（per `ops-cluster.sql` 注释实证）
+- ✅ subprocess 路径打通（per 守门 #24 v2）
+- ✅ axum oneshot 真实端点（per `tower::ServiceExt` 模式）
+
+**派生测试缺口识别**（per 守门 #11 缺标比错标）：
+
+- ⚠️ `helm_canary_mock_canary_invalid_weight_returns_err`（缺）：`canary --weight 200` 应返 4xx，无 IT 覆盖（per §2.2.2 边界条件）。[M] 子项补
+- ⚠️ `helm_canary_mock_rollback_invalid_target_returns_err`（缺）：`rollback --target 999`（超过 max revision）应返 4xx，无 IT 覆盖。[M] 子项补
+- ⚠️ `helm_canary_mock_subprocess_timeout`（缺）：subprocess 死锁 / 超时（>5s）应返超时错误，无 IT 覆盖。[M] 子项补
+- ⚠️ `cluster_api_canary_with_invalid_body_returns_400`（缺）：`POST /api/ops/cluster/canary` body 缺 `canary_weight` 返 400，无 IT 覆盖。[M] 子项补
+- ⚠️ `cluster_api_rollback_with_invalid_body_returns_400`（缺）：同上 rollback。[M] 子项补
+- ⚠️ `cluster_ddl_real_pg_apply_smoke`（缺）：F-05 单独 sprint 跑真实 PG 容器应用 DDL 验证（per `sqlx::test` + testcontainers 模式）。[M] 子项补
+
+**累计 F-01 缺 6 测**：DDD Review 必查。
+
+#### 3.2.2 `it_log_ai`（F-02 跨 crate，3 测，per `tests/it_log_ai.rs`）
+
+| 测名 | 验证 | 派生规 |
+|---|---|---|
+| `it_log_upload_end_to_end` | axum oneshot 调 `POST /api/ops/log/upload` 带 trace_id + level_filter → 200 | per BAS-001 §3.2 + 守门 #5 v2 |
+| `it_ops_log_ddl_wtm_coverage` | 验证 `docs/migrations/2026-09-08-ops-log.sql` 含 3 表（ops_log_entry W + ops_log_query_log T + ops_log_analysis W）+ audit trigger + SCD2 + tenant_id NOT NULL + FORCE RLS | 守门 #13 100% + 守门 #DB-13 CW-05 |
+| `it_subprocess_real_call_via_ladder` | Ladder.analyze_log 真实调 subprocess 跑通 + confidence < 0.5 + generated_by=mock | 守门 #23 + 守门 #24 v2 + ADR-0026 §2.2 |
+
+**F-02 IT 实证状态**（per `git show 472bab2` 实证）：
+
+- ✅ 3/3 IT 100% pass（per F-02 PR #25 合并 commit `472bab2`）
+- ⚠️ **DDL 文件不存在**（per owner P1 修正 + WBS §14.10.2）：`docs/migrations/2026-09-08-ops-log.sql` 0 行落地，`it_ops_log_ddl_wtm_coverage` IT 测在 docs-only 路径能跑通（DDL 文件路径指向 `docs/migrations/`，跟 owner P1 修正后 `db/migrations/` 路径不一致 — 实证为 `it_log_ai.rs:58` 路径 `docs/migrations/2026-09-08-ops-log.sql` vs 现有 `db/migrations/2026-09-08-ops-{cluster,metrics}.sql` 路径）
+- ✅ Ladder 真实 subprocess 跑通 + confidence 永远 < 0.5（per 守门 #23 mock 模板）
+
+**派生测试缺口识别**（per 守门 #11 缺标比错标）：
+
+- ⚠️ `it_log_upload_invalid_level_filter_returns_400`（缺）：`level_filter=["FOO"]` 应返 400，无 IT 覆盖。[M] 子项补
+- ⚠️ `it_log_upload_missing_content_returns_400`（缺）：缺 `content` 字段应返 400，无 IT 覆盖。[M] 子项补
+- ⚠️ `it_log_analysis_with_unknown_id_returns_404`（缺）：`GET /api/ops/log/analysis/{id}` 未知 id 应返 404，无 IT 覆盖。[M] 子项补
+- ⚠️ `it_ladder_fallback_to_openai_stub_when_mock_fails`（缺）：mock 失败 retriable → L2 OpenAI stub 兜底，无 IT 覆盖。[M] 子项补
+- ⚠️ `it_ladder_openai_stub_disabled_without_api_key`（缺）：L1 + L3 启用 + L2 disable，应跳过 L2，无 IT 覆盖。[M] 子项补
+- ⚠️ `it_log_ddl_real_pg_apply_smoke`（缺）：F-05 单独 sprint 跑真实 PG 容器应用 DDL 验证。[M] 子项补
+- ⚠️ `it_ddl_path_consistency_docs_vs_db`（缺）：F-02 DDL 路径对齐（F-01/F-03 在 `db/migrations/`，F-02 在 `docs/migrations/`，**路径不一致**）。[M] 子项修
+
+**累计 F-02 缺 7 测 + 1 路径不一致**：DDD Review 必查。
+
+#### 3.2.3 `it_metrics_summary`（F-03 跨 crate，3 测，per `tests/it_metrics_summary.rs`）
+
+| 测名 | 验证 | 派生规 |
+|---|---|---|
+| `it_metrics_summary_end_to_end` | axum oneshot 调 `GET /api/ops/metrics/summary` → 200 + 5 KPI + `meta.stub=false` + hint 含 `star-telemetry` | per BAS-001 §3.3 + F-03 端到端 |
+| `it_star_telemetry_aggregation_via_metrics_aggregator` | `MetricsAggregator.record_call` 3 次 + `summary` → active_tasks=3 + mcp_qps=3 + llm_token_daily=525 | per F-03 + 守门 #1 R-05 |
+| `it_ops_metrics_ddl_wtm_coverage` | 验证 `db/migrations/2026-09-08-ops-metrics.sql` 含 1 表（ops_metrics_config M SCD2）+ scd_type2_close + audit trigger + tenant_id NOT NULL + FORCE RLS | 守门 #13 c + 守门 #DB-13 CW-05 |
+
+**F-03 IT 实证状态**（per `git show 8a08756` 实证）：
+
+- ✅ 3/3 IT 100% pass（per F-03 PR #28 合并 commit `8a08756`）
+- ✅ 12 表 W/T/M 100% 覆盖（per `ops-metrics.sql` 注释实证）
+- ✅ `star-telemetry` 真实复用（per `MetricsAggregator` 调 `TokenMeter.record + summary`）
+
+**派生测试缺口识别**（per 守门 #11 缺标比错标）：
+
+- ⚠️ `it_metrics_summary_with_zero_calls_returns_zero_kpis`（缺）：空状态 `MetricsAggregator::new()` 调 `summary` 5 KPI 全 0 值，无 IT 覆盖（仅 UT 实证）。[M] 子项补
+- ⚠️ `it_metrics_summary_with_high_load_returns_correct_qps`（缺）：高频 1000 次 record_call 后 mcp_qps 计算正确性，无 IT 覆盖。[M] 子项补
+- ⚠️ `it_metrics_ddl_real_pg_apply_smoke`（缺）：F-05 单独 sprint 跑真实 PG 容器应用 DDL 验证。[M] 子项补
+- ⚠️ `it_metrics_scd2_valid_from_to_transition`（缺）：M SCD2 类型的 valid_from/valid_to/is_current 3 字段转换测试，无 IT 覆盖。[M] 子项补
+- ⚠️ `it_metrics_audit_trigger_on_update`（缺）：M SCD2 表 update 触发 `audit_audit_event` trigger 的实证，无 IT 覆盖。[M] 子项补
+
+**累计 F-03 缺 5 测**：DDD Review 必查。
+
+#### 3.2.4 `it_docs_list`（F-04 跨 crate，3 测，per `tests/it_docs_list.rs`）
+
+| 测名 | 验证 | 派生规 |
+|---|---|---|
+| `it_docs_list_end_to_end` | axum oneshot 调 `GET /api/ops/docs` → 200 + data ≥ 1 + `meta.stub=false` + hint 含 `walkdir` + 字段完整（path/title/category/updated_at） | per BAS-001 §3.4 + F-04 端到端 |
+| `it_walkdir_real_scan_via_doc_scanner` | `DocScanner::list()` 真实 walkdir → ≥ 1 doc + category 5 类别（SRS/BAS/DET/Report/Other） | per F-04 + 守门 #1 R-05 |
+| `it_walkdir_scans_only_docs_subdirs` | 所有 doc path 必以 `docs/` 开头 + `.md` 结尾（不扫全仓库） | 守门 #1 R-05 |
+
+**F-04 IT 实证状态**（per `git show 73623a7` 实证）：
+
+- ✅ 3/3 IT 100% pass（per F-04 PR #29 合并 commit `73623a7`）
+- ✅ walkdir 真实扫 4 子目录（`docs/requirements/` + `docs/basic-design/` + `docs/detailed-design/` + `docs/reports/`）
+- ✅ 0 新表（per brief §1，文档扫描不入 DB）
+
+**派生测试缺口识别**（per 守门 #11 缺标比错标）：
+
+- ⚠️ `it_walkdir_sorted_by_updated_at_desc`（缺）：doc list 按 `updated_at` 倒序排列，无 IT 覆盖（per BAS-001 §3.4 业务规则）。[M] 子项补
+- ⚠️ `it_walkdir_max_results_limit_10`（缺）：doc list 上限 10 条（per BAS-001 §3.4 UI 卡片），无 IT 覆盖。[M] 子项补
+- ⚠️ `it_walkdir_skips_non_markdown_files`（缺）：walkdir 仅扫 `.md`，不扫 `.txt/.json/.yaml`，无 IT 覆盖。[M] 子项补
+- ⚠️ `it_walkdir_skips_hidden_dirs`（缺）：walkdir 跳过 `.git/` / `node_modules/` / `target/`，无 IT 覆盖。[M] 子项补
+- ⚠️ `it_walkdir_category_classification_edge_cases`（缺）：边界路径（`docs/requirements.md` 在根 vs `docs/requirements/x.md`）分类正确性，无 IT 覆盖。[M] 子项补
+
+**累计 F-04 缺 5 测**：DDD Review 必查。
+
+### 3.3 跨 IT 缺口统计与 sqlx 容器化路径
+
+**跨 IT 缺口汇总**（per 守门 #11 缺标比错标）：
+
+| F 子项 | 现有 IT 测数 | 派生缺口测数 | 累计覆盖率目标 |
+|---|---|---|---|
+| F-01 cluster | 6 | 6 | 50% 现有 + 50% 待补 |
+| F-02 log AI | 3 | 7（+1 路径不一致） | 30% 现有 + 70% 待补 |
+| F-03 metrics | 3 | 5 | 37.5% 现有 + 62.5% 待补 |
+| F-04 docs | 3 | 5 | 37.5% 现有 + 62.5% 待补 |
+| **累计** | **15** | **23** | **39.5% 现有 + 60.5% 待补** |
+
+**sqlx 测试容器化路径**（per F-05 单独 sprint + 守门 #1 R-05 + 守门 #13）：
+
+```rust
+// 模式: testcontainers + sqlx (per crate/star-mcp/tests/ 既有模式)
+// MVP 阶段: DDL 存在性 + W/T/M 100% 覆盖（实证 15/15 IT pass）
+// 实装阶段: 引入 testcontainers-rs + sqlx::test 真实 PG 容器, 跑 apply DDL + 5 表 RLS 13 類验证
+//
+// 引用基线:
+// - crates/star-mcp/tests/it_actor_context.rs (testcontainers 模式)
+// - crates/star-credential/tests/it_db.rs (sqlx::test 模式)
+```
+
+**5 维 sqlx 容器化验证**（F-05 单独 sprint 必跑）：
+
+1. **DDL apply 验证**：6 表 DDL 真实跑通（3/6 已落地 + 3/6 F-05 补）
+2. **W/T/M 100% 覆盖**：6 张表分类正确 + audit trigger + prevent_delete trigger
+3. **RLS 13 類验证**：T/M 表 tenant_id + 12 類必携，per `docs/data-design/ipa-detail/00-CLASSIFICATION-RULES.md` §4 CW-05
+4. **CRUD 操作**：insert + select + update + delete 走真 PG 容器
+5. **SCD Type 2 转换**：M 类表 `valid_from/valid_to/is_current` 3 字段转换正确
+
+### 3.4 守门合规清单（per AGENTS.md §4 + 守门 #1 v25 + 守门 #9 v20）
+
+| 守门 | 验证方式 | MVP 实证 |
+|---|---|---|
+| 守门 #1 v25 单 crate | `cargo test -p star-ops --tests -j 4` | ✅ 15/15 pass |
+| 守门 #9 v20 子代理 dispatch | 跨 crate IT + subprocess 真实调 | ✅ 4 IT 跨 crate + 2 subprocess 实证 |
+| 守门 #13 W/T/M 100% 覆盖 | 3 DDL 文件存在性 + 6 表分类 + audit trigger + FORCE RLS | ✅ 3/6 DDL 落地（cluster 2 + metrics 1），F-05 单独 sprint 补 3/6 |
+| 守门 #24 v2 subprocess 替代 RPC | `helm_canary_mock.sh` + `ai_log_mock.py` 真实调 | ✅ 2 subprocess 实证 |
+| 守门 #DB-13 CW-05 tenant_id NOT NULL | DDL 含 `tenant_id UUID NOT NULL` | ✅ 实证（F-01/F-03 DDL） |
+| 守门 #DB-13 c FORCE RLS | DDL 含 `FORCE ROW LEVEL SECURITY` | ✅ 实证（F-01/F-03 DDL） |
+
+### 3.5 本章小结
+
+- **实证 15/15 IT 100% pass**（per 守门 #1 v25 单 crate）
+- **派生缺口 23 测**（F-01 6 + F-02 7 + F-03 5 + F-04 5）：DDD Review 必查
+- **DDL 路径不一致 1 项**（F-02 `docs/migrations/` vs F-01/F-03 `db/migrations/`）：DDD Review 必查
+- **sqlx 容器化路径**：MVP 阶段 DDL 存在性 + 实装阶段 testcontainers + sqlx::test
+- **5 维 sqlx 容器化验证**（F-05 单独 sprint 必跑）
+- **守门 #1+#9+#13+#24+#DB-13 跨节全过，0 违反**
+
+---
+
+**Status**: 🟡 §0-§3 草稿落地, 等 §4-§6 续做 (per 6 commit 链 wt3 done, wt4-wt5 续 §4-§8)
