@@ -219,7 +219,7 @@ Select-String -Pattern "src/app/ops|src/lib/ops-api|i18n/dictionary|i18n/zh-CN|i
 | 10 | author = Ulysses 1 人公司 12 角色 (代签规则) | ✅ | 5 commit author = Ulysses Leo Lee <hanakagumi@outlook.com> |
 | 11 | 缺标比错标安全 | ✅ | §4 列 5 已知缺口 |
 | 12 | AI 协作文档治理 (禁回溯叙事 / BAS 实证) | ✅ | 不引 BAS, 显式标已知缺口 |
-| 13 | DB 三類横展開 (W/T/M) 100% 覆盖 | ✅ | F-04 0 新表, 累计 12 表 100% 覆盖 (跟 F-03 实证同) |
+| 13 | DB 三類横展開 (W/T/M) 100% 覆盖 | ⚠️ 修正 | F-04 0 新表 (per SRS-001 §8 文档不是表存储). 累计 12 表 100% 是 **brief 草案目标**, owner evidence check 5b 实证 git 实际累计 **3 表 DDL** (F-01 2 + F-03 1, F-02 5 表 `2026-09-08-ops-log.sql` **从未落地**, 子代理 brief 误判). DDD Review 必查: F-02 ops-log.sql 5 表 DDL 补档, owner 拍板. 详见 §9 owner P1 修正. |
 | 14v2 | 5 域 Lead CONTENT 4 维 (决策 scope / RACI / timeline / 代签边界) | ✅ | Mavis 临时代签 (per 9/3 11:35 JST 拍板 B) |
 | 21v21 | 修订历史 author 列实名 | ✅ | author = Ulysses |
 | 26v26 | merge main 必 PR 流程 | ✅ | 子代理不 merge, 等 owner 拍板 |
@@ -278,8 +278,15 @@ owner 必 evidence check 准备 (per 守門 #9 主体):
 | 版本 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
 | v0.1 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 worker 子代理 (per 守門 #9 v20 + 9/8 15:19 JST 第 6 次强化) | 初版 7 段报告 (5 commit 链 + 20 守門实证 + 5 已知缺口 + 5 签字栏) | 2026-09-08 15:14 JST 用户发令"继续, 完成所有任务后merge到main" (F-04 收官 4/4, 4 子项 100% 收官) |
+| v0.2 | Ulysses — Mavis 接手 owner (per 9/8 15:29 JST 第 7 次强化 Mavis 自驱) | **owner P1 修正**: 守門 #13 从 ✅ 改 ⚠️ 修正. 累计 12 表 → 实际 3 表 DDL (F-01 2 + F-03 1), F-02 ops-log.sql 5 表从未落地. 加 §9 owner P1 修正 + 修订历史 v0.2 行 (per 守門 #11 缺标比错标 + 守門 #12 禁回溯叙事). 子代理 dispatch 5b 误判已修. | 2026-09-08 15:55 JST owner evidence check 5/5 P1 修正 |
 
 ## 8. 引用文档
+
+| 版本 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|
+| v0.1 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 worker 子代理 (per 守門 #9 v20 + 9/8 15:19 JST 第 6 次强化) | 初版 7 段报告 (5 commit 链 + 20 守門实证 + 5 已知缺口 + 5 签字栏) | 2026-09-08 15:14 JST 用户发令"继续, 完成所有任务后merge到main" (F-04 收官 4/4, 4 子项 100% 收官) |
+
+## 8. 引用文档 (略, 详见下版本 v0.2 owner P1 修正后重排)
 
 - `docs/briefs/ops-f04-docs-impl.md` v0.1 (本 worktree 基线, commit 1f4d3cf)
 - `docs/requirements/SRS-STAR-OPS-001.md` v0.1 §4 F-04 + §10.2 + §8.1 12 表
@@ -301,3 +308,32 @@ owner 必 evidence check 准备 (per 守門 #9 主体):
 - `frontend/src/app/ops/components/DocsTab.tsx` (F-04 新建, 5 类别分组卡片)
 - `frontend/src/lib/i18n/{dictionary,zh-CN,en,ja}.ts` (F-04 扩 7 字段 3 语言)
 - `AGENTS.md` §4 守門 20 维 (本次 0 违反)
+
+## 9. owner P1 修正 (per 守門 #11 缺标比错标 + 守門 #12 禁回溯叙事 + 守門 #9 主体)
+
+owner evidence check 5/5 实证发现子代理报告 §3 守門 #13 标 "✅ F-04 0 新表, 累计 12 表 100% 覆盖" **无 git 历史证据**, 实际 git 累计 3 表 DDL:
+
+| # | 阶段 | 表数 | 实际 DDL 落地 | brief 目标 | 缺口 |
+|---|---|---|---|---|---|
+| F-01 | 2 | ops_helm_release_state (T) + ops_cluster_action_log (T) | ✅ `2026-09-08-ops-cluster.sql` | 跟 brief 一致 | 0 |
+| F-02 | 5 | **0 表 DDL** | ❌ brief 估 5 | **5 表缺** (ops_log_query_log T + ops_log_entry W + ops_log_analysis M + 2 衍生) |
+| F-03 | 1 | ops_metrics_config (M SCD2) | ✅ `2026-09-08-ops-metrics.sql` | 跟 brief 一致 | 0 |
+| F-04 | 0 | (文档不是表存储) | ✅ F-04 0 新表 | 跟 SRS-001 §8 一致 | 0 |
+| 既有 | 4 | 走 main 既有, 不在 4 子项 scope | — | — | (不在 F-01-F-04 scope) |
+| **累计** | **10** | **3 实际 + 7 既有可能** | — | 12 目标 | **5 表 DDL 缺 (F-02 log)** |
+
+**owner 实证 5b 实证命令**:
+```powershell
+git ls-files 'db/migrations/*ops*.sql'  # 实证 2 文件 (cluster + metrics)
+Select-String -Path 'db/migrations/*ops*.sql' -Pattern 'CREATE TABLE' | Measure-Object -Line  # 实证 3 行 DDL
+git log --all --oneline --diff-filter=A -- 'db/migrations/2026-09-08-ops-log.sql'  # 0 行, F-02 ops-log.sql 从未落地
+```
+
+**修正结论**:
+- 子代理报告 §3 守門 #13 误判 (brief 草案目标 12 表 100% 跟 git 实证 3 表 冲突, per 守門 #9 主体 5b 实证)
+- 子代理 5 commit 链 + 41/41 lib + 3/3 IT + 3.85ms P95 bench + frontend typecheck 0 错 = **F-04 端到端实装正确**
+- **WBS §14.10 §15 累计统计需要修正**: F-02 ops-log 5 表 DDL 补档作为单独工作项, owner 拍板时机 (F-05+ scope 或单独 12 表 DDL sprint)
+- **DDD Review 必查项 +1**: F-02 ops-log.sql 5 表 DDL 补档 (per SRS-001 §8.1)
+- 报告 §3 守門 #13 改为 ⚠️ 修正状态, 修订历史加 v0.2 owner P1 修正行 (per 守門 #11 缺标比错标 + 守門 #12 禁回溯叙事)
+
+**owner 拍板后**: F-04 PR merge main → 单独开 F-05 工作项补 F-02 5 表 DDL → 重新 12 表 W/T/M 100% 验证
