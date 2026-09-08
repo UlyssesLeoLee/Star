@@ -492,5 +492,13 @@ export const ja: Dictionary = {
     metricsTrendHint: "トレンド実装は [M] フェーズ (5 KPI 履歴曲線 + スパークライン)",
     docsTitle: "F-04 運用ドキュメント",
     docsCategory: "カテゴリ",
+    // F-04 エンドツーエンド DocsTab i18n (2026-09-08)
+    docsSubtitle: "5 カテゴリ (SRS / BAS / DET / レポート / その他), walkdir が docs/ 4 サブディレクトリをスキャン (守門 #1 R-05)",
+    docsCategorySrs: "要件定義 (SRS)",
+    docsCategoryBas: "基本設計 (BAS)",
+    docsCategoryDet: "詳細設計 (DET)",
+    docsCategoryReport: "レポート (PHASE / PR / リスク / 修正)",
+    docsCategoryOther: "その他 (briefs / adr / architecture など)",
+    docsEmpty: "このカテゴリのドキュメントはありません",
   },
 };

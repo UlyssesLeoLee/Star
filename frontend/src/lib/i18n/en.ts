@@ -492,5 +492,13 @@ export const en: Dictionary = {
     metricsTrendHint: "Trend impl in [M] phase (5 KPI history curves + sparkline)",
     docsTitle: "F-04 Ops Docs",
     docsCategory: "Category",
+    // F-04 end-to-end DocsTab i18n (2026-09-08)
+    docsSubtitle: "5 categories (SRS / BAS / DET / Report / Other), walkdir scans docs/ 4 subdirs (Gate #1 R-05)",
+    docsCategorySrs: "Requirements (SRS)",
+    docsCategoryBas: "Basic Design (BAS)",
+    docsCategoryDet: "Detailed Design (DET)",
+    docsCategoryReport: "Reports (PHASE / PR / Risk / Fix)",
+    docsCategoryOther: "Other (briefs / adr / architecture etc.)",
+    docsEmpty: "No documents in this category",
   },
 };
