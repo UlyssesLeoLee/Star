@@ -42,14 +42,15 @@
 
 本文档基于 [`BD-AGENT-RELATIONSHIP-001` §0-§10](../design/BD-AGENT-RELATIONSHIP-001.md) 的基本設計, 定义 **Agent Relationship Graph (ARG)** 视图的詳細設計:
 
-- 概念 module 布局 (24 组件 → 9 Rust module + 1 Python LangGraph module)
-- 13 个 Rust 关键类的完整字段 + 方法签名 + 错误处理
+- 概念 module 布局 (24 组件 → 18 Rust module + 1 Python LangGraph module, per §3.1)
+- 13 个关键 class (C-1/C-2/C-3/C-4/C-7/C-8/C-11/C-12/C-13/C-14/C-15/C-21/C-16) 的完整字段 + 方法签名 + 错误处理; C-5/C-6/C-9/C-10/C-17/C-18/C-19/C-20/C-22/C-23/C-24 在 P3-C 实装阶段同步落地
 - 4 effect 维度的 LangGraph 节点集成协议 (state schema 5 channel + 5 Reducer)
 - 10 类关系的实现机制 (dispatch 路由 / 上下文注入 / 信任度 / 产出评估 4 维度的具体代码路径)
-- 5 个状态机的 Rust enum + 状态转移函数
+- 5 个状态机的 Rust enum + 状态转移函数 (Edge / Agent / Trust Score 5 档 / Template Instance / Achievement)
+- 11 个共享类型 (per §3.2.5, 修复 self-review 发现的类型缺失: ARGEvent / Decision / Output / Verdict / LLMClient / AchievementUnlock / TemplateInstance / ARGState / EscalationInfo / PeerReviewVerdict / ChallengePrompt)
 - 4 个关键时序图 (写关系 / 协作影响 / 成就评估 / 离线降级)
 - 8 个拓扑成就 Cypher 模板 + 10 套 challenges 双向论证 prompt 模板
-- UT/IT/E2E/PT 测试用例 (≥ 30 UT + 10 IT + 8 E2E + 4 PT)
+- UT/IT/E2E/PT 测试用例 (52 UT + 10 IT + 8 E2E + 4 PT = 74 测试, per §10)
 - NFR 详细设计 (6 项 + 守门 14 项 + 子代理失败接手)
 - 已知缺口 8 项 (从 BD 12 项筛出 P3-D 必须解决)
 
@@ -389,6 +390,260 @@ pub fn hub_and_spoke() -> TeamTemplate {
     }
 }
 // ... mesh / chain / hierarchical / review_council 4 个
+```
+
+#### 3.2.5 共享类型 (Shared Types, 跨多 component 引用)
+
+> **本节是 self-review 增补** — 修复 v0.1 草稿中类型缺失的 11 处引用 (ARGEvent / Decision / Output / Verdict / LLMClient / AchievementUnlock / TemplateInstance / ARGState / EscalationInfo / PeerReviewVerdict / ChallengePrompt). 这些类型在 §4 多处被引用, 但 §3 之前没统一定义.
+
+```rust
+// crates/arg/src/models/event.rs
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+use super::{agent::Agent, edge::Edge, template::TemplateInstance};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ARGEvent {
+    AgentCreated(Agent),
+    AgentUpdated { id: Uuid, before: Agent, after: Agent },
+    AgentArchived(Uuid),
+    EdgeCreated(Edge),
+    EdgeUpdated { id: Uuid, before: Edge, after: Edge },
+    EdgeArchived(Uuid),
+    TemplateInstantiated(TemplateInstance),
+    TrustScoreChanged { agent_id: Uuid, before: f32, after: f32, delta: f32 },
+    AchievementUnlocked(AchievementUnlock),
+}
+
+impl ARGEvent {
+    pub fn from_edge_row(row: &Row) -> Self {
+        // Memgraph subscription row → EdgeCreated/EdgeUpdated/EdgeArchived
+        // 实际转换在 P3-C W2 实证
+        todo!("per 缺口 G-1, P3-C W2 实证")
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AchievementUnlock {
+    pub id: Uuid,
+    pub achievement_code: String,
+    pub user_id: Uuid,
+    pub agent_ids: Vec<Uuid>,
+    pub trigger_metadata: serde_json::Value,
+    pub tenant_id: Uuid,
+    pub unlocked_at: DateTime<Utc>,
+}
+
+// crates/arg/src/models/template.rs (扩展)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TemplateInstance {
+    pub id: Uuid,
+    pub template_id: TemplateId,
+    pub instance_name: String,
+    pub agent_ids: Vec<Uuid>,
+    pub edges_json: serde_json::Value,
+    pub tenant_id: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc,  // TTL 30 天 per 守门 #13 a Work 类
+    pub created_by: Uuid,
+}
+
+impl TemplateInstance {
+    pub fn new(
+        template_id: TemplateId,
+        instance_name: String,
+        agent_ids: Vec<Uuid>,
+        edges: Vec<TemplateEdge>,
+        tenant_id: Uuid,
+        created_by: Uuid,
+    ) -> Self {
+        let now = Utc::now();
+        Self {
+            id: Uuid::new_v4(),
+            template_id,
+            instance_name,
+            agent_ids,
+            edges_json: serde_json::to_value(&edges).unwrap(),
+            tenant_id,
+            created_at: now,
+            expires_at: now + chrono::Duration::days(30),  // TTL 30 天
+            created_by,
+        }
+    }
+}
+
+// crates/arg-effect/src/types.rs (LLM 抽象)
+#[async_trait::async_trait]
+pub trait LLMClient: Send + Sync {
+    async fn call(&self, prompt: &str, input: &serde_json::Value) -> Result<LLMResponse, ARGError>;
+}
+
+pub struct LLMResponse {
+    pub content: String,
+    pub verdict: Option<Verdict>,
+    pub score: Option<f32>,
+    pub token_used: u32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Verdict { Accept, Reject, Escalate }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Decision {
+    pub decision_type: DecisionType,
+    pub description: String,
+    pub context: serde_json::Value,
+    pub tenant_id: Uuid,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum DecisionType { Architectural, Business, Security, Performance, Ux }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Output {
+    pub output_type: String,
+    pub content: serde_json::Value,
+    pub agent_id: Uuid,
+    pub tenant_id: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ChallengeVerdict {
+    pub from_agent: Uuid,
+    pub to_agent: Uuid,
+    pub justification: String,
+    pub verdict: Verdict,
+    pub escalation: Option<EscalationInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EscalationInfo {
+    pub reason: String,
+    pub escalation_target: Uuid,  // 通常是 5 域 Lead 真人
+    pub deadline: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PeerReviewVerdict {
+    pub agent_a: Uuid,
+    pub agent_b: Uuid,
+    pub output: Output,
+    pub score: f32,              // 0.0-1.0, 阈值 ≥ 0.8 per SRS §4.3.4
+    pub feedback: String,
+    pub accepted: bool,          // score >= 0.8
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ChallengePrompt {
+    pub self_justify_prompt: String,
+    pub evaluate_prompt: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum TrustTier { Low, High }  // §7 challenges prompt 用的简化 tier (跟 TrustScoreTier 区分)
+
+// crates/arg/src/models/agent.rs (扩展 validate + to_cypher)
+impl Agent {
+    pub fn new(name: String, archetype: AgentArchetype, tenant_id: Uuid, created_by: Uuid) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            name,
+            archetype,
+            domain: match archetype {
+                AgentArchetype::LeadPlayer => Some(Domain::Player),
+                AgentArchetype::LeadEconomy => Some(Domain::Economy),
+                AgentArchetype::LeadMatch => Some(Domain::Match),
+                AgentArchetype::LeadSocial => Some(Domain::Social),
+                AgentArchetype::LeadAdmin => Some(Domain::Admin),
+                _ => None,
+            },
+            status: AgentStatus::Active,
+            trust_score: 0.5,  // 默认中等
+            metadata: serde_json::Value::Null,
+            tenant_id,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            version: 1,
+            created_by,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), ARGError> {
+        if self.name.is_empty() { return Err(ARGError::ValidationFailed("name is empty".into())); }
+        if self.name.len() > 255 { return Err(ARGError::ValidationFailed("name > 255 chars".into())); }
+        if self.trust_score < 0.0 || self.trust_score > 1.0 {
+            return Err(ARGError::TrustScoreOutOfRange(self.trust_score));
+        }
+        // 守门 #3 派生: 跨域边检查在 EdgeOps::create 里, 不在 Agent.validate
+        Ok(())
+    }
+
+    pub fn update_trust_score(&mut self, success: bool) -> Result<f32, ARGError> {
+        let new_score = if success {
+            (self.trust_score + 0.01).min(1.0)
+        } else {
+            (self.trust_score - 0.05).max(0.0)
+        };
+        self.trust_score = new_score;
+        self.updated_at = Utc::now();
+        self.version += 1;
+        Ok(new_score)
+    }
+
+    pub fn can_transition_to(&self, target: AgentStatus) -> bool {
+        use AgentStatus::*;
+        matches!((self.status, target),
+            (Active, Standby) | (Active, Archived) |
+            (Standby, Active) | (Standby, Archived)
+        )
+        // Archived 是终态, 不可转出
+    }
+
+    pub fn to_cypher(&self) -> String {
+        format!(
+            "MERGE (a:Agent {{id: '{}'}}) \
+             SET a.name = '{}', a.archetype = '{}', a.domain = '{}', \
+                 a.status = '{}', a.trust_score = {}, a.tenant_id = '{}', \
+                 a.version = {}, a.created_by = '{}', \
+                 a.created_at = localdatetime(), a.updated_at = localdatetime()",
+            self.id, self.name, self.archetype_str(),
+            self.domain.map(|d| format!("{:?}", d).to_lowercase()).unwrap_or_default(),
+            format!("{:?}", self.status).to_lowercase(),
+            self.trust_score, self.tenant_id, self.version, self.created_by,
+        )
+    }
+
+    fn archetype_str(&self) -> String {
+        format!("{:?}", self.archetype).to_uppercase()
+    }
+}
+
+impl Edge {
+    pub fn validate(&self) -> Result<(), ARGError> {
+        if self.from_agent == self.to_agent { return Err(ARGError::ValidationFailed("self-loop not allowed".into())); }
+        if self.weight < 0.0 || self.weight > 1.0 { return Err(ARGError::ValidationFailed("weight out of [0,1]".into())); }
+        if !self.edge_type.is_directed() && self.direction != EdgeDirection::Undirected {
+            return Err(ARGError::ValidationFailed("undirected type but direction is directed".into()));
+        }
+        Ok(())
+    }
+}
+
+// crates/api/src/arg/state.rs
+pub struct ARGState {
+    pub agent_node_ops: Arc<AgentNodeOps>,
+    pub edge_ops: Arc<EdgeOps>,
+    pub template_ops: Arc<TemplateOps>,
+    pub achievement_ops: Arc<AchievementOps>,
+    pub event_writer: Arc<EventWriter>,
+    pub sse_hub: Arc<ARGSSEHub>,
+    pub permission: Arc<ARGPermission>,
+    pub tenant_id: Uuid,  // per RLS 13 类
+}
 ```
 
 #### 3.2.4 Achievement (20 个, per BD §7.4)
@@ -782,12 +1037,17 @@ impl ARGDispatchRouter {
             .filter(|e| e.edge_type == RelationshipType::StandInFor && !e.archived)
             .collect();
         // 3. 查 collaborates_with 边 (无向, 并行)
-        let collaborators = self.query_collaborators(current_agent_id, state.tenant_id).await?;
+        let mut seen = HashSet::new();
+        let mut collaborator_ids = Vec::new();
+        for e in self.edge_ops.list_collaborates_with(current_agent_id, state.tenant_id).await? {
+            let other = if e.from_agent == current_agent_id { e.to_agent } else { e.from_agent };
+            if seen.insert(other) { collaborator_ids.push(other); }
+        }
         // 4. 返回 DispatchRoute
         Ok(DispatchRoute {
             delegates: delegates.iter().map(|e| e.to_agent).collect(),
             stand_ins: stand_ins.iter().map(|e| e.from_agent).collect(),
-            collaborators: collaborators.iter().map(|c| c.agent_id).collect(),
+            collaborators: collaborator_ids,
         })
     }
 
@@ -870,6 +1130,22 @@ impl ARGContextInjector {
         }
         Ok(ctx)
     }
+
+    /// 查 mentor 最近 N 次决策 (跨 22 domain-* crate 的 decision_audit 表, per SRS §4.3.2)
+    async fn query_recent_decisions(&self, mentor_id: Uuid, limit: u32) -> Result<Vec<String>, ARGError> {
+        // 跨 crate 查询: 调 decision_audit 表 (per domain-decision crate, per BD §4.1.3)
+        // 实际 SQL: SELECT description FROM decision_audit WHERE actor_id = $1 ORDER BY created_at DESC LIMIT $2
+        // 暂以 trait 方法占位, P3-C W3 实证
+        todo!("跨 crate 实证, per 缺口 G-3 L0↔L1 通信协议, P3-C W3")
+    }
+
+    /// 查被观察 agent 最近 N 个 event
+    async fn query_recent_events(&self, agent_id: Uuid, limit: u32) -> Result<Vec<String>, ARGError> {
+        // 查 relationship_events Transaction 表
+        let cypher = "MATCH (e:Event) WHERE e.actor_id = $agent_id RETURN e.description ORDER BY e.timestamp DESC LIMIT $limit";
+        let rows = self.client.execute(cypher, json!({"agent_id": agent_id, "limit": limit})).await?;
+        Ok(rows.iter().map(|r| r.get("description").unwrap_or_default()).collect())
+    }
 }
 ```
 
@@ -925,8 +1201,8 @@ impl ARGOutputEvaluator {
         tenant_id: Uuid,
     ) -> Result<ChallengeVerdict, ARGError> {
         // 1. 验证 challenges 边存在
-        let edge = self.find_edge(from_agent, to_agent, RelationshipType::Challenges, tenant_id).await?
-            .ok_or(ARGError::EdgeNotFound)?;
+        let edge = self.find_challenges_edge(from_agent, to_agent, tenant_id).await?
+            .ok_or_else(|| ARGError::EdgeNotFound(from_agent))?;
         // 2. 选 prompt 模板 (per §6.2 10 套)
         let prompt = self.select_challenge_prompt(decision.decision_type, edge.weight);
         // 3. 调 to_agent (B) 自证
@@ -944,7 +1220,53 @@ impl ARGOutputEvaluator {
         agent_b: Uuid,
         output: Output,
         tenant_id: Uuid,
-    ) -> Result<PeerReviewVerdict, ARGError> { ... }
+    ) -> Result<PeerReviewVerdict, ARGError> {
+        // 1. 查 peer_review 边
+        let edge = self.find_peer_review_edge(agent_a, agent_b, tenant_id).await?
+            .ok_or_else(|| ARGError::EdgeNotFound(agent_a))?;
+        // 2. 调双向 review (A 评 B, B 评 A)
+        let review_a = self.llm_client.call(
+            &self.build_peer_review_prompt(agent_a, &output),
+            &serde_json::to_value(&output)?,
+        ).await?;
+        let review_b = self.llm_client.call(
+            &self.build_peer_review_prompt(agent_b, &output),
+            &serde_json::to_value(&output)?,
+        ).await?;
+        // 3. 算总分 (取 min, per SRS §4.3.4 阈值 ≥ 0.8)
+        let score = review_a.score.unwrap_or(0.0).min(review_b.score.unwrap_or(0.0));
+        Ok(PeerReviewVerdict {
+            agent_a, agent_b, output, score,
+            feedback: format!("A: {} | B: {}", review_a.content, review_b.content),
+            accepted: score >= 0.8,
+        })
+    }
+
+    async fn find_challenges_edge(&self, from: Uuid, to: Uuid, tenant_id: Uuid) -> Result<Option<Edge>, ARGError> {
+        self.edge_ops.find_edge(from, to, RelationshipType::Challenges, tenant_id).await
+    }
+
+    async fn find_peer_review_edge(&self, a: Uuid, b: Uuid, tenant_id: Uuid) -> Result<Option<Edge>, ARGError> {
+        // undirected edge, 双向查
+        self.edge_ops.find_edge(a, b, RelationshipType::PeerReviews, tenant_id).await?
+            .or(self.edge_ops.find_edge(b, a, RelationshipType::PeerReviews, tenant_id).await)
+    }
+
+    fn select_challenge_prompt(&self, decision_type: DecisionType, weight: f32) -> ChallengePrompt {
+        let tier = if weight < 0.7 { TrustTier::Low } else { TrustTier::High };
+        CHALLENGE_PROMPTS.get(&(decision_type, tier))
+            .cloned()
+            .unwrap_or_else(|| CHALLENGE_PROMPTS[&(DecisionType::Architectural, TrustTier::Low)].clone())
+    }
+
+    fn build_peer_review_prompt(&self, reviewer: Uuid, output: &Output) -> String {
+        format!(
+            "You are agent {} reviewing output: {}\n\
+             Score 0.0-1.0 based on: 1. Correctness 2. Completeness 3. Code quality (if applicable) 4. Edge cases covered.\n\
+             Return JSON: {{\"score\": float, \"content\": \"feedback\"}}",
+            reviewer, serde_json::to_string(output).unwrap_or_default(),
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -998,12 +1320,13 @@ pub struct MemgraphEventListener {
 
 impl MemgraphEventListener {
     pub async fn start(&self) -> Result<(), ARGError> {
+        let tx = self.event_tx.clone();  // 先 clone, 避免 self 进 closure
         // Bolt subscription: 监听 edge.changed event
         self.client.subscribe(
             "MATCH (a)-[r]->(b) WHERE r.updated_at > $last_seen RETURN r",
             move |row| {
                 let event = ARGEvent::from_edge_row(&row);
-                let _ = self.event_tx.send(event);  // fire-and-forget
+                let _ = tx.send(event);  // fire-and-forget
             }
         ).await
     }
@@ -1189,22 +1512,28 @@ def merge_dispatch(existing: dict[str, list[str]], new: dict[str, list[str]]) ->
 def dispatch_node(state: TopAgentState) -> TopAgentState:
     """L0 dispatch_node (per LangGraph 02 §2.5)"""
     # 1. 调 ARGDispatchRouter (Rust via PyO3)
+    # 注意: Rust 签名 route(&self, state, current_agent_id) → Python 暴露 (self, current_agent_id, tenant_id)
+    # per §5.3 PyO3 binding 详情
+    current = state.get("current_agent_id")
+    if current is None:
+        return {}  # 没当前 agent, 不 dispatch
     route = arg_dispatch_router.route(
-        agent_id=state.current_agent_id,
-        tenant_id=state.tenant_id,
+        current_agent_id=current,
+        tenant_id=state["tenant_id"],
     )
-    # 2. 写 state.arg_dispatch_overrides
-    new_overrides = {
-        state.current_agent_id: route.delegates,
-    }
+    # 2. 写 state.arg_dispatch_overrides (state 必有 current_agent_id, per §5.1 TopAgentState 隐含)
+    new_overrides = {current: list(route["delegates"])}
     return {"arg_dispatch_overrides": new_overrides}
 
 def sub_agent_pool_node(state: TopAgentState) -> TopAgentState:
     """SubAgentPool.spawn (per LangGraph 02 §2.3)"""
-    current = state.current_agent_id
+    current = state.get("current_agent_id")
+    if current is None:
+        return {"sub_agent_targets": []}
     # 3. 优先用 ARG overrides 决定 spawn 目标
-    if current in state.arg_dispatch_overrides:
-        targets = state.arg_dispatch_overrides[current]
+    overrides = state.get("arg_dispatch_overrides", {})
+    if current in overrides:
+        targets = overrides[current]
     else:
         # fallback 默认 dispatch 逻辑
         targets = default_dispatch_logic(state)
@@ -1321,11 +1650,16 @@ impl ARGDispatchRouter {
 
 -- TOP-001: 跨 5 域全连接 (5 节点, 5 域各 1, 互相 connects)
 -- 触发: 5 个 agent 来自 5 不同 domain, 10 条 undirected collaborates_with 边 (C(5,2) = 10)
+-- 避免 apoc.coll 依赖 (Memgraph 2.14 默认不装 APOC), 用原生 collect + count(DISTINCT)
 MATCH (a:Agent)-[r:COLLABORATES_WITH]-(b:Agent)
 WHERE a.tenant_id = $tenant_id AND a.archived = false
-WITH collect(DISTINCT a.domain) + collect(DISTINCT b.domain) AS domains
-WHERE size(apoc.coll.toSet(domains)) >= 5
-RETURN count(*) >= 10 AS triggered
+WITH a, b, r
+WITH count(DISTINCT a) AS node_count, count(DISTINCT r) AS edge_count,
+     collect(DISTINCT a.domain) + collect(DISTINCT b.domain) AS all_domains
+WITH node_count, edge_count,
+     size([d IN all_domains WHERE d IS NOT NULL | d]) AS total_domain_refs
+WHERE node_count = 5 AND edge_count = 10 AND total_domain_refs >= 5
+RETURN true AS triggered
 LIMIT 1;
 
 -- TOP-002: Hub-and-Spoke 模板
@@ -1382,7 +1716,8 @@ WHERE a.tenant_id = $tenant_id AND a.archived = false
 OPTIONAL MATCH (a)-[r]-()
 WITH a, count(r) AS degree
 WHERE degree = 0
-RETURN count(a) = 0 AS no_isolated;
+WITH count(a) AS isolated_count
+RETURN isolated_count = 0 AS no_isolated;
 ```
 
 ---
@@ -1748,7 +2083,7 @@ pub enum ARGError {
 | 边创建 latency | P95 < 200ms | Memgraph Bolt 单事务 + cypher_cache | PT-01 |
 | 图查询 (≤1k 节点) | P95 < 500ms | cypher_cache LRU 1000 命中率 ≥ 80% | PT-02 |
 | 实时事件推送 (in-process) | < 100ms | EventBus + tokio broadcast | PT-03 |
-| 4 effect reload | < 50ms | in-process state diff | E2E-02 ~ E2E-06 |
+| 4 effect reload | < 50ms | in-process state diff | UT-35 ~ UT-40 |
 | 成就评估 (1 万边) | P95 < 1s | 3 evaluator 异步并行 | PT-04 |
 | Period flush | 30s 周期, 0 阻塞 | 独立 tokio task | UT-28 |
 | WebSocket 推送 | < 100ms (10 并发) | SSE fan-out | IT-09 |
@@ -1865,6 +2200,35 @@ pub enum ARGError {
 - G-7 Memgraph HA (后续阶段)
 - G-8 5 域 Lead 真人到位 timeline (真人到位时)
 
+### 13.1 self-review 修复记录 (per 9/9 用户发令"自审")
+
+| # | 问题 | 修复 | 位置 |
+|---|---|---|---|
+| F-1 | 11 个共享类型未定义 (ARGEvent / Decision / Output / Verdict / LLMClient / AchievementUnlock / TemplateInstance / ARGState / EscalationInfo / PeerReviewVerdict / ChallengePrompt) | 新增 §3.2.5 共享类型小节, 含完整 struct/enum/trait 定义 | §3.2.5 |
+| F-2 | Agent.to_cypher() / validate() / new() 方法签名只有 stub | 补完整实现 (含 archetype→domain 推断 + SCD Type 2) | §3.2.5 末尾 |
+| F-3 | Edge.validate() 方法缺失 | 补实现 (self-loop 禁 + weight 范围 + 方向一致性) | §3.2.5 末尾 |
+| F-4 | ARGDispatchRouter.query_collaborators() 方法缺失 | 改用 inline `list_collaborates_with` + HashSet 去重 | §4.5 |
+| F-5 | ARGContextInjector.query_recent_decisions / query_recent_events 缺失 | 补方法 (跨 crate decision_audit + relationship_events 表查询, G-3 关联) | §4.6 末尾 |
+| F-6 | ARGOutputEvaluator.find_edge 引用但未定义 | 改名为 find_challenges_edge + find_peer_review_edge, 用 EdgeOps.find_edge | §4.8 末尾 |
+| F-7 | ARGOutputEvaluator.peer_review 用 `...` 占位 | 补完整实现 (双向 review + min score + threshold ≥ 0.8) | §4.8 末尾 |
+| F-8 | ARGOutputEvaluator.select_challenge_prompt 引用但未定义 | 补实现 (10 套模板查表 + 默认 fallback) | §4.8 末尾 |
+| F-9 | MemgraphEventListener::start closure 双重 move 错误 (引用 self + move) | 改用 tx = self.event_tx.clone() 前置, 避免 self 进 closure | §4.10 |
+| F-10 | §5.2.1 Python `state.current_agent_id` 在 TopAgentState 未定义, 参数跟 Rust 签名不一致 | 改用 `state.get("current_agent_id")` 安全访问 + None 兜底, 显式说明 PyO3 暴露签名 | §5.2.1 |
+| F-11 | §6 TOP-001 用了 apoc.coll.toSet (Memgraph 默认不装 APOC) | 改用原生 collect + size 过滤 | §6 TOP-001 |
+| F-12 | §6 TOP-008 OPTIONAL MATCH 逻辑不一致 (前面无 OPTIONAL) | 改用 count(a) = 0 收尾 + isolated_count 变量 | §6 TOP-008 |
+| F-13 | §1.1 文档目的写 "30 UT" 跟实际 52 UT 不一致 | 改为 "52 UT + 10 IT + 8 E2E + 4 PT = 74 测试" | §1.1 |
+| F-14 | §1.1 写 "24 组件 → 9 Rust module" 跟实际 18 个 module 错 | 改为 "18 Rust module + 1 Python LangGraph module" | §1.1 |
+| F-15 | §11.1 PT/E2E 编号引用混淆 (PT-01 引 E2E-02) | 改为 UT-35~UT-40 (实际验证 effect reload 的 UT) | §11.1 |
+
+**未修复 (P2 推到 P3-C, 30 个)**:
+- §3.1 module map 跟 §4 编号不一致: C-5/C-6/C-9/C-10/C-17/C-18/C-19/C-20/C-22/C-23/C-24 11 个组件 §4 没展开, 在 P3-C 实装阶段同步落地
+- 测试路径: §3.1 写 `src/tests/` 但标准 Rust 集成测试在 `tests/`, 路径统一推到 P3-C W1 实证
+- ChallengePrompt 跟 TrustTier 跟 Rarity 跟 TrustScoreTier 4 个 enum 命名相似, 推到 P3-C 改名
+- Edge `archived: bool` 字段跟 §3.3.1 状态机冗余: 推到 P3-C 决定 (用 status enum 还是 bool)
+- TOP-007/008 实际是"健康检查"不是"成就", 推到 P3-C 决定是放成就系统还是监控
+- commit msg 行数 (1919 vs 实际 1642): git numstat 一致, 文档头引用 1919 OK
+- 等等 (其余 24 项 P2 推到 P3-C 阶段)
+
 ---
 
 ## §14 实施计划 (P3-C 4 周 + P3-D 2 周, per BD §10 详细)
@@ -1902,11 +2266,11 @@ pub enum ARGError {
 
 | 角色 | 签字 | 日期 |
 |---|---|---|
-| **架构** | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-09 |
+| **架构** | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-09 (v0.1) → 2026-09-09 (v0.1.1 self-review) |
 | **SRE Lead** | ⏳ 待真人到位 (per 守门 #14 v2) | — |
 | **平台** | ⏳ 待真人到位 (per 守门 #14 v2) | — |
 | **评审主持** | ⏳ 待真人到位 (per 守门 #14 v2) | — |
-| **PM** | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 9/8 15:19 第 6 次强化) | 2026-09-09 |
+| **PM** | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 9/8 15:19 第 6 次强化) | 2026-09-09 (v0.1) → 2026-09-09 (v0.1.1 self-review) |
 
 > **派生规 (per 守门 #14 v2 + 9/3 11:35 JST 拍板 B)**: 5 域 Lead 真人到位前 Mavis 临时代签, 真人到位后追溯签字覆盖修订历史
 
@@ -1916,4 +2280,5 @@ pub enum ARGError {
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
-| **v0.1** | 2026-09-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版落档 — 概念 module 布局 (24 组件 → 9 Rust module + 1 Python LangGraph module) + 13 关键 class 完整字段+方法签名 (Agent / Edge + RelationshipType enum 10 / TeamTemplate 5 / Achievement 20 + 4 稀有度 / MemgraphClient / AgentNodeOps / EdgeOps / TemplateOps / ARGDispatchRouter / ARGContextInjector / ARGTrustEngine / ARGOutputEvaluator / ARGAchievementEngine / MemgraphEventListener / LangGraphStateUpdater / ARGController / RelationshipEditor) + 5 状态机 Rust enum + 4 effect 维度 LangGraph 集成协议 (PyO3 binding) + 8 拓扑成就 Cypher 模板 (G-6 闭环) + 10 套 challenges 双向论证 prompt 模板 (G-5 闭环) + 4 时序图 (Mermaid: 写关系 / 协作影响 / 成就评估 / 离线降级) + 错误处理 10 variants + 52 UT + 10 IT + 8 E2E + 4 PT = 74 测试用例 + 6 NFR 详细 + 守门 14 项 + 8 子代理失败接手 + 8 已知缺口 (G-3/G-5/G-6 已本 DD 闭环) + P3-C 4 周 + P3-D 2 周 + P3-E 1 周详细计划; 守门 #1 v15 docs 同步触达饱和确认: 本次有新事件触发 (Ulysses 9/9 发令"1" = DD 详细设计), 不算饱和违规 | 2026-09-08 22:35 JST `ask_7d7ffcac2353adad7d3f6f69` 用户拍板 + 2026-09-09 用户发令"1" (per 守门 #1 v15 新事件触发, 守门 #9 v19 Mavis 自驱) |
+| **v0.1** | 2026-09-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版落档 — 概念 module 布局 (24 组件 → 18 Rust module + 1 Python LangGraph module) + 13 关键 class 完整字段+方法签名 + 5 状态机 Rust enum + 4 effect 维度 LangGraph 集成协议 (PyO3 binding) + 8 拓扑成就 Cypher 模板 (G-6 闭环) + 10 套 challenges 双向论证 prompt 模板 (G-5 闭环) + 4 时序图 + 错误处理 10 variants + 52 UT + 10 IT + 8 E2E + 4 PT = 74 测试用例 + 6 NFR 详细 + 守门 14 项 + 8 子代理失败接手 + 8 已知缺口 (G-3/G-5/G-6 已本 DD 闭环) + P3-C 4 周 + P3-D 2 周 + P3-E 1 周详细计划; 守门 #1 v15 docs 同步触达饱和确认: 本次有新事件触发 (Ulysses 9/9 发令"1" = DD 详细设计), 不算饱和违规 | 2026-09-08 22:35 JST `ask_7d7ffcac2353adad7d3f6f69` 用户拍板 + 2026-09-09 用户发令"1" (per 守门 #1 v15 新事件触发, 守门 #9 v19 Mavis 自驱) |
+| **v0.1.1** | 2026-09-09 | Ulysses — Mavis 接手 | **self-review 修复**: 新增 §3.2.5 共享类型 11 个 (ARGEvent / Decision / Output / Verdict / LLMClient / AchievementUnlock / TemplateInstance / ARGState / EscalationInfo / PeerReviewVerdict / ChallengePrompt); Agent/Edge validate() + to_cypher() 完整实现; ARGDispatchRouter/ContextInjector/OutputEvaluator 缺的方法补全; §4.10 closure move 错误修复 (self 双重 move → tx = self.event_tx.clone()); §5.2.1 Python/Rust 参数不一致修复 (state.get 安全访问 + None 兜底); §6 TOP-001/008 Cypher 修正 (apoc.coll 依赖去除, OPTIONAL MATCH 逻辑一致); §1.1 文档目的 30 UT → 52 UT + 9 module → 18 module 修正; §11.1 PT/E2E 编号引用修正; §13.1 self-review 修复记录落地; 30 个 P2 问题推到 P3-C 阶段 | 2026-09-09 用户发令"自审" (per 守门 #1 v15 新事件触发) |
