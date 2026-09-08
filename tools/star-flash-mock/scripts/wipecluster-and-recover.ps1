@@ -87,9 +87,21 @@ if ($env:MAVIS_AUTO_WIPE -eq "1") {
         Write-Host ""
 
         Write-Host "  2b/2: 重装 k3s (k3s install) ..."
-        $env:UbuntuPW | wsl -d Ubuntu -- sudo -S /usr/local/bin/k3s install 2>&1 | Tee-Object -Variable instOut | Out-Null
-        Write-Host "  install output (last 5 行):"
-        @($instOut | Select-Object -Last 5) | ForEach-Object { Write-Host "    $_" }
+        Write-Host "    (k3s uninstall 会把 /usr/local/bin/k3s binary 也删, install 改用 get.k3s.io 重装)"
+
+        # 2b-1: 下载 install 脚本 (leo19 跑, 不需 sudo)
+        $curlOut = wsl -d Ubuntu -- curl -sfL https://get.k3s.io -o /tmp/k3s-install.sh 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  ERROR: get.k3s.io 下载失败 exit=$LASTEXITCODE" -ForegroundColor Red
+            Write-Host "  $curlOut" -ForegroundColor Red
+            exit 2
+        }
+        Write-Host "    downloaded /tmp/k3s-install.sh"
+
+        # 2b-2: sudo 跑 install (stdin pipe 密码, 守门 #5)
+        $env:UbuntuPW | wsl -d Ubuntu -- sudo -S bash /tmp/k3s-install.sh 2>&1 | Tee-Object -Variable instOut | Out-Null
+        Write-Host "  install output (last 8 行):"
+        @($instOut | Select-Object -Last 8) | ForEach-Object { Write-Host "    $_" }
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  ERROR: k3s install 失败 exit=$LASTEXITCODE" -ForegroundColor Red
             exit 2
