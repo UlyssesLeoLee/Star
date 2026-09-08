@@ -356,5 +356,13 @@ export interface Dictionary {
     /** F-04 Docs */
     docsTitle: string;
     docsCategory: string;
+    /** F-04 DocsTab 端到端 i18n (2026-09-08 F-04 端到端拍板) */
+    docsSubtitle: string;
+    docsCategorySrs: string;
+    docsCategoryBas: string;
+    docsCategoryDet: string;
+    docsCategoryReport: string;
+    docsCategoryOther: string;
+    docsEmpty: string;
   };
 }
