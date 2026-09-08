@@ -233,4 +233,28 @@ mod tests {
             );
         }
     }
+
+    // ============ UT-IT-51 §2.3 Phase 5 ops_ai 派生缺口 (per brief §2.1) ============
+
+    /// 派生 #19: mock 通道 100% 成功 (跟 baseline mock_channel_always_enabled 互补)
+    /// 守门 #23: L1 mock 兜底, 永远 enabled + 永远 Ok
+    #[tokio::test]
+    async fn mock_channel_always_succeeds() {
+        let ch = MockChannel;
+        let log = LogEntry {
+            id: uuid::Uuid::new_v4(),
+            source: "test".to_string(),
+            level: LogLevel::Error,
+            message: "2026-09-08 ERROR test failure".to_string(),
+            timestamp: chrono::Utc::now(),
+            trace_id: None,
+        };
+        // 走 mock_analyze 路径 (subprocess 可能失败, 走兜底)
+        // L1 mock 兜底必返 Ok
+        let result = ch.analyze_log(&log).await;
+        assert!(result.is_ok(), "L1 mock 兜底必 100% Ok");
+        let analysis = result.expect("Ok");
+        assert_eq!(analysis.generated_by, "mock", "L1 必返 mock 通道");
+        assert!(analysis.confidence < 0.5, "mock confidence 必 < 0.5");
+    }
 }

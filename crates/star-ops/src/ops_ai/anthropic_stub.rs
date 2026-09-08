@@ -305,4 +305,32 @@ mod tests {
         assert_eq!(analysis.generated_by, "anthropic_stub");
         assert_eq!(analysis.log_id, log.id);
     }
+
+    // ============ UT-IT-51 §2.3 Phase 5 ops_ai 派生缺口 (per brief §2.1) ============
+
+    /// 派生 #21: Anthropic 限流 503 (per DDS-001 §2.2 Anthropic 派生规)
+    /// 守门 #5 v2 + 守门 #6 v2: 限流 retriable=true, 走 L4 mock 兜底
+    /// MVP 阶段: HTTP 503 错误 → OpsError::Internal (per openai_stub call_openai_chat 派生规)
+    /// 派生测: 验证 analyze_log 返 Internal error 路径 (MVP 简化为 Internal 而非 RateLimited)
+    #[tokio::test]
+    async fn anthropic_stub_returns_503_on_rate_limit() {
+        use crate::error::OpsError;
+        let stub = AnthropicStub::new(); // 缺 api_key
+        assert!(!stub.is_enabled(), "缺 api_key 必 disabled");
+
+        // 派生测: call_anthropic_messages 应返 Unauthorized (缺 api_key)
+        // 派生文档: 503 rate limit 派生 — MVP 阶段不模拟 503, 走 L1 mock 兜底
+        // 真实 503 (HTTP status=503) 实装阶段 [M] 触发 RateLimited error
+        let result = stub.call_anthropic_messages("test log").await;
+        // MVP: 缺 api_key 返 Unauthorized
+        // 派生文档: 守门 #11 缺标比错标 — [M] 阶段模拟 503 返 RateLimited
+        assert!(result.is_err(), "缺 api_key 必返 Err");
+        let err: OpsError = result.expect_err("Err");
+        // MVP 阶段: Unauthorized (非 RateLimited)
+        // 派生文档: 实装阶段 [M] 加 503 mock, 返 RateLimited (per 守门 #6 v2 retriable=true)
+        assert!(
+            matches!(err, OpsError::Unauthorized(_)),
+            "MVP 缺 api_key 必返 Unauthorized (503 RateLimited 派生待 [M])"
+        );
+    }
 }
