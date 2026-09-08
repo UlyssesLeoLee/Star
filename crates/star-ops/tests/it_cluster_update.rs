@@ -321,3 +321,72 @@ async fn it_cluster_status_handles_concurrent_requests() {
         "100 并发 cluster_status 全 200 (mock 派生)"
     );
 }
+
+// ============ UT-IT-51 §3.3 Phase 6 ops_api IT 派生缺口 (per brief §5 wt6) ============
+
+/// 派生: cluster_api_canary 缺 canary_weight 返 4xx (per DDS-001 §2.2 派生规)
+/// 守門 #6 v2: schema 校验 端到端
+#[tokio::test]
+async fn cluster_api_canary_with_invalid_body_returns_400() {
+    use axum::http::StatusCode;
+    use serde_json::json;
+    use star_ops::ops_api::{router, AppState};
+    use tower::ServiceExt;
+
+    let app = router(AppState::new());
+    // body 故意缺 canary_weight 字段
+    let body = json!({
+        "release_name": "star-mcp",
+        "target_revision": null
+    });
+    let response = app
+        .oneshot(
+            axum::http::Request::builder()
+                .method("POST")
+                .uri("/api/ops/cluster/canary")
+                .header("content-type", "application/json")
+                .body(axum::body::Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    assert!(
+        status == StatusCode::BAD_REQUEST || status == StatusCode::UNPROCESSABLE_ENTITY,
+        "缺 canary_weight 必返 4xx, got {}",
+        status
+    );
+}
+
+/// 派生: cluster_api_rollback 缺 target_revision 返 4xx (per DDS-001 §2.2 派生规)
+/// 守門 #6 v2: schema 校验 端到端
+#[tokio::test]
+async fn cluster_api_rollback_with_invalid_body_returns_400() {
+    use axum::http::StatusCode;
+    use serde_json::json;
+    use star_ops::ops_api::{router, AppState};
+    use tower::ServiceExt;
+
+    let app = router(AppState::new());
+    // body 故意缺 target_revision 字段
+    let body = json!({
+        "release_name": "star-mcp"
+    });
+    let response = app
+        .oneshot(
+            axum::http::Request::builder()
+                .method("POST")
+                .uri("/api/ops/cluster/rollback")
+                .header("content-type", "application/json")
+                .body(axum::body::Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    assert!(
+        status == StatusCode::BAD_REQUEST || status == StatusCode::UNPROCESSABLE_ENTITY,
+        "缺 target_revision 必返 4xx, got {}",
+        status
+    );
+}

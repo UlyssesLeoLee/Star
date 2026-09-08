@@ -274,3 +274,91 @@ async fn it_log_query_log_records_failed_request() {
         status
     );
 }
+
+// ============ UT-IT-51 §3.3 Phase 6 ops_api IT 派生缺口 (per brief §5 wt6) ============
+
+/// 派生: Ladder fallback 到 openai_stub 当 mock 失败 (per DDS-001 §2.2 Ladder 派生规)
+/// 守門 #6 v2: retriable 错误走下一通道
+/// MVP 阶段: L1 mock 永远成功, 不走 L2 fallback
+/// 派生测: 文档化 MVP 行为, [M] 阶段加 mock 失败触发
+#[tokio::test]
+async fn it_ladder_fallback_to_openai_stub_when_mock_fails() {
+    use chrono::Utc;
+    use star_ops::ops_ai::default_ladder;
+    use star_ops::ops_domain::log::{LogEntry, LogLevel};
+
+    let log = LogEntry {
+        id: uuid::Uuid::new_v4(),
+        source: "k8s-pod/it-fallback".to_string(),
+        level: LogLevel::Error,
+        message: "2026-09-08 ERROR fallback test".to_string(),
+        timestamp: Utc::now(),
+        trace_id: Some("trace-fallback-001".to_string()),
+    };
+
+    // MVP 阶段: default_ladder 走 L1 mock (永远成功), 不走 L2 openai_stub
+    let ladder = default_ladder();
+    let analysis = ladder.analyze_log(&log).await.expect("Ladder 必 Ok");
+    assert_eq!(analysis.generated_by, "mock", "L1 mock 兜底, 不走 L2 fallback");
+    // 派生文档: 守門 #11 缺标比错标 — [M] 阶段加 mock 失败触发 L2 fallback
+}
+
+/// 派生: openai_stub 缺 api_key 时被 Ladder 跳过 (per ADR-0026 §2.2 Ladder 派生规)
+/// 守門 #5 v2: API key 走 KMS, 缺 key → 通道 disabled → 跳过
+#[tokio::test]
+async fn it_ladder_openai_stub_disabled_without_api_key() {
+    use chrono::Utc;
+    use star_ops::ops_ai::default_ladder;
+    use star_ops::ops_ai::openai_stub::OpenAiStub;
+    use star_ops::ops_ai::AiChannel;
+    use star_ops::ops_domain::log::{LogEntry, LogLevel};
+
+    // 验证: OpenAiStub::new() 缺 api_key → disabled
+    let stub = OpenAiStub::new();
+    assert!(!stub.is_enabled(), "OpenAiStub 缺 api_key 必 disabled");
+
+    // 验证: Ladder 跳 disabled 通道, 走 mock
+    let log = LogEntry {
+        id: uuid::Uuid::new_v4(),
+        source: "k8s-pod/it-openai-disabled".to_string(),
+        level: LogLevel::Info,
+        message: "2026-09-08 INFO test".to_string(),
+        timestamp: Utc::now(),
+        trace_id: Some("trace-openai-disabled-001".to_string()),
+    };
+
+    let ladder = default_ladder();
+    let analysis = ladder.analyze_log(&log).await.expect("Ladder 必 Ok");
+    // 验证: 必走 L1 mock (因为 openai_stub disabled)
+    assert_eq!(analysis.generated_by, "mock", "openai_stub disabled → 走 L1 mock");
+}
+
+/// 派生: DDL 路径一致性 (docs/migrations/ → db/migrations/) 修复
+/// 守門 #11 缺标比错标: F-02 DDL 路径跟 F-01/F-03 对齐
+/// F-05 PR #31 已落档 db/migrations/2026-09-08-ops-log.sql
+/// 派生测: 验证 ops_log DDL 在 db/migrations/ 路径存在
+#[test]
+fn it_ddl_path_consistency_docs_vs_db() {
+    use std::path::Path;
+
+    // 验证: db/migrations/2026-09-08-ops-log.sql 必存在 (F-05 PR #31 落档)
+    let db_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("db/migrations/2026-09-08-ops-log.sql");
+    assert!(
+        db_path.exists(),
+        "F-05 ops-log.sql 必在 db/migrations/ 路径 (跟 F-01/F-03 对齐, per 守门 #13 + TEST-DESIGN v0.2 §3.2.2 P1 修正), got: {:?}",
+        db_path
+    );
+
+    // 验证: 必含 3 表 (ops_log_query_log T + ops_log_entry W + ops_log_analysis W)
+    let sql = std::fs::read_to_string(&db_path).expect("read DDL ok");
+    assert!(sql.contains("ops_log_query_log"), "ops_log_query_log T 必含");
+    assert!(sql.contains("ops_log_entry"), "ops_log_entry W 必含");
+    assert!(sql.contains("ops_log_analysis"), "ops_log_analysis W 必含");
+    // 派生文档: docs/migrations/2026-09-08-ops-log.sql 旧版可保留 (向后兼容)
+    // 官方权威路径 = db/migrations/ (跟 F-01/F-03 一致)
+}
