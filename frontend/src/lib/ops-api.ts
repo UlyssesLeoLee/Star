@@ -262,10 +262,18 @@ export async function getAnalysis(
 
 // ============ F-03 Metrics (1 端点) ============
 
+/** 趋势方向 (3 态, per ops_api.rs::metrics::TrendDirection) */
+export type TrendDirection = "rising" | "stable" | "falling";
+
+/** 运维指标 (per OPS-BASIC-DESIGN §3.3 + star-telemetry 5 KPI) */
 export interface OpsMetric {
   name: string;
   value: number;
   unit: string;
+  /** 趋势方向: rising / stable / falling */
+  trend: TrendDirection;
+  /** 最后更新时间 (ISO 8601 UTC) */
+  last_updated: string;
 }
 
 export async function metricsSummary(): Promise<OpsResponse<OpsMetric[]>> {
