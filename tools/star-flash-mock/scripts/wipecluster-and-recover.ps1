@@ -74,19 +74,30 @@ if ($env:MAVIS_AUTO_WIPE -eq "1") {
         $env:MAVIS_AUTO_WIPE = ""
     } else {
         Write-Host "  模式: MAVIS_AUTO_WIPE (stdin pipe + sudo -S 直连, 守门 #5 严守)" -ForegroundColor Green
-        Write-Host "  2a/2: 卸载 k3s (k3s-uninstall.sh) ..."
 
-        $env:UbuntuPW | wsl -d Ubuntu -- sudo -S /usr/local/bin/k3s-uninstall.sh 2>&1 | Tee-Object -Variable uninstOut | Out-Null
-        Write-Host "  uninstall output (last 5 行):"
-        @($uninstOut | Select-Object -Last 5) | ForEach-Object { Write-Host "    $_" }
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ERROR: k3s-uninstall 失败 exit=$LASTEXITCODE" -ForegroundColor Red
-            exit 2
+        # 0: 探 k3s 是否已装 (幂等: 已装走 uninstall+install, 未装直接 install)
+        $whichK3s = wsl -d Ubuntu -- bash -lc "command -v k3s" 2>&1 | Out-String
+        $k3sInstalled = $whichK3s.Trim().EndsWith("/k3s")
+        Write-Host "  0/2: k3s installed: $k3sInstalled ($($whichK3s.Trim()))"
+
+        if ($k3sInstalled) {
+            Write-Host "  2a/2: 卸载 k3s (k3s-uninstall.sh) ..."
+
+            $env:UbuntuPW | wsl -d Ubuntu -- sudo -S /usr/local/bin/k3s-uninstall.sh 2>&1 | Tee-Object -Variable uninstOut | Out-Null
+            Write-Host "  uninstall output (last 5 行):"
+            @($uninstOut | Select-Object -Last 5) | ForEach-Object { Write-Host "    $_" }
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "  ERROR: k3s-uninstall 失败 exit=$LASTEXITCODE" -ForegroundColor Red
+                exit 2
+            }
+            Write-Host "  uninstall OK (exit=$LASTEXITCODE)"
+            Write-Host ""
+        } else {
+            Write-Host "  2a/2: 跳过 (k3s 未装, 直接 install)"
+            Write-Host ""
         }
-        Write-Host "  uninstall OK (exit=$LASTEXITCODE)"
-        Write-Host ""
 
-        Write-Host "  2b/2: 重装 k3s (k3s install) ..."
+        Write-Host "  2b/2: 重装 k3s (get.k3s.io) ..."
         Write-Host "    (k3s uninstall 会把 /usr/local/bin/k3s binary 也删, install 改用 get.k3s.io 重装)"
 
         # 2b-1: 下载 install 脚本 (leo19 跑, 不需 sudo)
