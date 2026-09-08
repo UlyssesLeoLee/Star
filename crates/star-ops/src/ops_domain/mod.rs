@@ -12,4 +12,4 @@ pub use cluster::{
     CanaryRequest, HelmActionAck, HelmMockOutput, HelmRelease, ReleaseStatus, RollbackRequest,
 };
 pub use log::{LogAnalysis, LogEntry, LogLevel};
-pub use metrics::{OpsMetric, TrendDirection};
+pub use metrics::{MetricsAggregator, OpsMetric, TrendDirection};

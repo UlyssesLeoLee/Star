@@ -25,7 +25,7 @@ use crate::ops_ai::default_ladder;
 use crate::ops_domain::{
     cluster::{CanaryRequest, HelmActionAck, HelmRelease, RollbackRequest},
     log::{LogAnalysis, LogEntry, LogLevel},
-    metrics::OpsMetric,
+    metrics::MetricsAggregator,
 };
 
 /// 顶层响应包装: data + meta (per star-api-rest 模式)
@@ -67,16 +67,19 @@ impl<T: Serialize> OpsResponse<T> {
     }
 }
 
-/// App state (MVP 简单版本, 仅 Ladder)
+/// App state (MVP 简单版本, Ladder + MetricsAggregator)
 #[derive(Clone)]
 pub struct AppState {
     pub ladder: std::sync::Arc<crate::ops_ai::ladder::Ladder>,
+    /// F-03 端到端: 调 star-telemetry 真实采 5 KPI
+    pub metrics: std::sync::Arc<MetricsAggregator>,
 }
 
 impl AppState {
     pub fn new() -> Self {
         Self {
             ladder: std::sync::Arc::new(default_ladder()),
+            metrics: std::sync::Arc::new(MetricsAggregator::new()),
         }
     }
 }
@@ -385,15 +388,22 @@ async fn log_analysis(Path(id): Path<Uuid>) -> Result<Json<OpsResponse<LogAnalys
 
 // ============ F-03 Metrics ============
 
-async fn metrics_summary() -> impl IntoResponse {
-    let metrics = OpsMetric::summary_stub();
+/// F-03 端到端: metrics_summary 真实调 MetricsAggregator.summary (复用 star-telemetry 5 KPI)
+/// 守門 #1 R-05: mock 路径, 真实 Prometheus / Grafana 切生产 owner 拍板
+/// 守門 #5 v2: API key 走 KMS (F-02 star-credential 已落)
+async fn metrics_summary(State(state): State<AppState>) -> impl IntoResponse {
+    // 调 MetricsAggregator 真实采 5 KPI (per OPS-BASIC-DESIGN §3.3 + brief §2.1)
+    let metrics = state.metrics.summary().await;
     let total = metrics.len();
     Json(OpsResponse {
         data: metrics,
         meta: OpsMeta {
-            stub: true,
+            stub: false, // F-03 端到端: 真实调 star-telemetry
             total: Some(total),
-            hint: Some("F-03 实装阶段接 star-telemetry".to_string()),
+            hint: Some(
+                "F-03 端到端, star-telemetry TokenMeter + PrometheusExporter (守門 #1 R-05)"
+                    .to_string(),
+            ),
             ai_channel: None,
             analysis_triggered: None,
             needs_review: None,
@@ -506,6 +516,55 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// F-03 端到端: 验证 metrics_summary 真实返回 star-telemetry 5 KPI + meta.stub=false
+    /// 守門 #1 R-05: mock 路径, 真实 Prometheus / Grafana 切生产 owner 拍板
+    #[tokio::test]
+    async fn metrics_summary_real_returns_5_kpis_with_stub_false() {
+        use axum::body::to_bytes;
+        let app = router(AppState::new());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/ops/metrics/summary")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        // 验证 body 真实返 5 KPI + stub=false
+        let body_bytes = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("body readable");
+        let body: serde_json::Value =
+            serde_json::from_slice(&body_bytes).expect("body is JSON");
+        let data = body["data"].as_array().expect("data is array");
+        assert_eq!(data.len(), 5, "F-03 端到端必返 5 KPI");
+
+        let names: Vec<String> = data
+            .iter()
+            .map(|m| m["name"].as_str().unwrap().to_string())
+            .collect();
+        for n in ["cpu_avg", "mem_avg", "active_tasks", "mcp_qps", "llm_token_daily"] {
+            assert!(names.contains(&n.to_string()), "缺 KPI: {}", n);
+        }
+
+        assert_eq!(
+            body["meta"]["stub"].as_bool(),
+            Some(false),
+            "F-03 端到端 stub 必为 false"
+        );
+        assert!(
+            body["meta"]["hint"]
+                .as_str()
+                .unwrap_or("")
+                .contains("star-telemetry"),
+            "F-03 端到端 hint 必含 star-telemetry"
+        );
     }
 
     #[tokio::test]
