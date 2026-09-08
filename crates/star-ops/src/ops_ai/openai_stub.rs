@@ -13,7 +13,7 @@
 
 use async_trait::async_trait;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tracing::{debug, warn};
 
 use crate::error::OpsError;
@@ -307,7 +307,3 @@ mod tests {
         assert_eq!(analysis.log_id, log.id);
     }
 }
-
-// 占位 serde Serialize derive (避免 unused import 警告, Anomaly 已有 Serialize)
-#[allow(dead_code)]
-fn _ensure_serialize_imported<S: Serialize>() {}
