@@ -41,6 +41,7 @@
 | `scripts/automation/ai_log_mock.py` | Log AI 分析 mock (per 守门 #23 不开外部 API) — 输入 log 文本 → 输出 {summary, anomalies, suggestions, confidence=0.42, generated_by="mock"}; 守门 #23 派生规: confidence 永远 < 0.5, needs_review=true | OPS-INTRY (F-02 Log AI 端到端 / star-ops::ops_ai::mock 走 subprocess 路径实装时启用) | TBD | 🟢 完成 (subprocess 跑通 3ms, 3 anomalies 正确抽取) |
 | `scripts/automation/memgraph_setup.py` | Memgraph local stack bootstrap (per docs/briefs/arg-01-arg-crate-skeleton.md §2.1 C) — Docker compose 启动 Memgraph 2.14 (Bolt 7687 + HTTP 7444) + health probe 等待 mgmt API + 写 .env stub (守门 #5 不打印密码) | P3-C W1 ARG.1 (crates/arg 实装 5 守门 G-1 前置) | TBD | 🟢 完成 (urllib health probe + .env 写 + .gitignore idempotent 追加) |
 | `scripts/automation/arg_seed.py` | ARG seed fixture 生成 (per WBS §14.11 ARG.1) — 5 域 Lead + 9 SA + 10 demo = 24 节点, 5 consults + 5 reports_to = 10 边, 落 JSON 给 arg-bridge W2 用 | P3-C W1 ARG.1 (种子 fixture) + P3-C W2 ARG.2 (arg-bridge 落库) | TBD | 🟢 完成 (24 节点 + 10 边 实证, env 检查不打印值 per 守门 #5) |
+| `scripts/automation/arg_api_test.py` | ARG API tier IT 端到端 (per WBS §14.11 ARG.4) — 10 IT 验证 14 routes (13 REST + 1 WebSocket), 守门 #1 v19 [M] 子项 Python 化; 起临时 axum 测试 server (subprocess 路径 per 守门 #9 v3) + stdlib WS 兜底 (无 websockets 库依赖) | P3-C W4 ARG.4 (crates/api 14 routes 端到端验证) + 后续 P3-C W5 (ARG.5 frontend e2e 复用) | TBD | 🟢 完成 (10/10 IT pass: 8 REST + 2 WS, env $env:ARG_TEST_PORT 不打印, exit 0) |
 
 **说明**:
 - 末次 commit 列填 `TBD` = 本批次 v0.1 初版, commit 落地后回填
@@ -185,6 +186,35 @@
 | 5 守门实证 | check + fmt + clippy + test + build | ✅ 实证 0 err | (待 commit) | #1 累积规 v1-v5 |
 | 32 UT 实证 | cargo test -p star-arg --tests -j 4 | ✅ 100% pass | (待 commit) | #1 v25 |
 | 后续 gate | ARG.2 (arg-bridge) / ARG.3 (arg-effect) / ARG.4 (api/arg) 派新子代理 | ⏳ 触发 | — | — |
+
+### 5.4 ARG.4 (P3-C W4) crates/api/src/arg/ 13 REST + 1 WebSocket + RLS 13 类 索引 (新增, 2026-09-09 04:38 JST per `docs/briefs/arg-04-api-13rest-1ws.md`)
+
+> **触发**: 2026-09-09 04:38 JST 用户发令"开子代理和worktree并行处理并在完成后merge到main" + `ask_8d5083148d6e0566b520988e` 拍板 (scope=ARG.1+ARG.4 / budget=选项3分阶段批 / merge=串行merge走守门)
+> **依据**: 守门 #21 v21 [M] docs 同步必更新 registry.md 索引 + 守门 #1 v19 (M 子项 Python 化) + 守门 #5 (env 安全) + 守门 #14 v2 (5 域 Lead Mavis 临时代签)
+> **落档文件**:
+> - `crates/api/src/arg/` 新建 (mod.rs + controller.rs + sse_hub.rs + permission.rs + dto.rs, ~10K 字节 + 24 UT)
+> - `crates/api/Cargo.toml` 追加 3 行 (`axum = "0.8"` + `serde_json` + `star-arg = { path = "../arg" }`)
+> - `crates/api/src/lib.rs` 追加 `pub mod arg;` 1 行
+> - `scripts/automation/arg_api_test.py` v0.1 (~580 行, 10 IT 端到端 + 临时 axum server)
+> - `docs/automation-design.md` §4.18 (本节 + 9 子项 ARG-4.1..9)
+> - `docs/reports/PHASE-ARG-04-IMPL-REPORT.md` v0.1 (per AGENTS.md §3 7 段结构)
+
+| 索引项 | 路径 / 章节 | 状态 | commit | 守门 |
+|---|---|---|---|---|
+| 14 routes (13 REST + 1 WS) | `crates/api/src/arg/controller.rs` `arg_routes(state)` | ✅ 落档 | (待 commit) | #1 v15 + #7 + #14 v2 + #19 v19 |
+| ARGState 8 字段 | `crates/api/src/arg/mod.rs` `ARGState` struct | ✅ 落档 | (待 commit) | #3 5 域 Lead + #13 RLS 13 類 |
+| DTO 11+5 字段 | `crates/api/src/arg/dto.rs` `CreateEdgeRequest` + `UpdateEdgeRequest` + `EdgeFilter` + `MyUnlocksFilter` + 4 filters | ✅ 落档 | (待 commit) | #12 + #13 |
+| 6 角色 RLS | `crates/api/src/arg/permission.rs` `ARGPermission` + `check_tenant()` + `require_role()` + `require_any_role()` | ✅ 落档 | (待 commit) | #14 v2 拍板 D (Lead 独占) |
+| 6 事件 WebSocket | `crates/api/src/arg/sse_hub.rs` `ARGSSEHub` (broadcast::Sender 256 cap) + `sse_hub()` WS upgrade handler | ✅ 落档 | (待 commit) | #9 v3 subprocess + #14 v2 |
+| Cargo.toml | 追加 3 行 (axum 0.8 + serde_json + star-arg) | ✅ 落档 | (待 commit) | #1 v1 + ADR-0048 axum 0.8 lock |
+| lib.rs | 追加 `pub mod arg;` | ✅ 落档 | (待 commit) | #1 |
+| 24 UT 实证 | cargo test -p api --lib -j 4 | ✅ 100% pass (24 tests, 0 failed, 0.00s) | (待 commit) | #1 v25 |
+| 5 守门实证 | check + fmt + clippy + test + build | ✅ 实证 0 err (1 pre-existing warning in lib.rs:100 跟 ARG.4 无关) | (待 commit) | #1 累积规 v1-v5 |
+| 10 IT 端到端 | python scripts/automation/arg_api_test.py | ✅ exit 0 + 10/10 PASS (8 REST + 2 WS) | (待 commit) | #1 v19 + #5 + #9 v3 |
+| 跟 LangGraph view 关系 | API tier 跟 LangGraph view / Agent Runtime view 平行, 14 routes 暴露 9 SA Type 数据给 frontend | — | — | #1 v15 + #19 v19 |
+| 跟 ARG.1 关系 | ARG.1 暴露 star_arg::ops::{AgentNodeOps, EdgeOps, TemplateOps, AchievementOps, EventWriter}, ARG.4 包成 14 routes (per DD §3.2.5 + §4.12) | — | — | 拍板 9/8 16:00 JST |
+| 缺标比错标 | ARG.1 MemGraphClient 仍是 stub (G-1), controller 调用 ops 接受 stub 返回, 504/502 返 ApiError::Upstream (per §5) | — | — | #12 缺标比错标 |
+| 后续 gate | ARG.5 (frontend P3-C W4) / ARG.6 (RGS 集成 P3-D) 派新子代理 | ⏳ 触发 | — | — |
 
 ## 6. 修订历史
 

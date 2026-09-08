@@ -30,6 +30,13 @@ pub use star_context::ActorContext;
 use uuid::Uuid;
 
 // =====================================================================
+// ARG.4 (P3-C W4): crates/api/src/arg — 13 REST + 1 WebSocket
+// per docs/design/DD-AGENT-RELATIONSHIP-001.md v0.1.1 §4.12
+// 守门 #14 v2 (5 域 Lead Mavis 临时代签) + #12 v21 ([M] docs 同步)
+// =====================================================================
+pub mod arg;
+
+// =====================================================================
 // 实体(Entity / Aggregate Root)
 // =====================================================================
 // (本 crate 为 supporting 层,无业务实体 — 实体由 domain-* crate 拥有)
