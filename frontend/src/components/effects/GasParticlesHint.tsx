@@ -20,6 +20,7 @@
 // =====================================================================
 
 import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
 import type { GasVariant, GasColor } from "./GasParticlesField";
 
 // 真正用 R3F + 自定义 shader 的子组件, ssr: false 隔离 Next.js prerender
@@ -58,9 +59,13 @@ export function GasParticlesHint({
   offsetY = -8,
   className,
 }: GasParticlesHintProps) {
-  // SSR 阶段直接不渲染 div, 客户端 mount 后再判定 + 渲染
-  // (per 守门 #1: SSR 安全第一, 避免 hydration mismatch)
-  if (typeof window === "undefined") return null;
+  // Mount-gate: server + first client render 都返回 null, useEffect 后才返回真元素
+  // (per 2026-09-06 19:18 JST 实证: /agent-view hydration 失败 trace 是 div/span 不匹配
+  //  根因: typeof window 判定在 React 18 + Next.js 14 hydration 阶段不可靠, 改用
+  //  useState 标记 mounted 是社区共识)
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
 
   // reduced-motion / touch 设备 / active=false 直接不渲染
   const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;

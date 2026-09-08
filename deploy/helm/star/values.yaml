@@ -4,7 +4,7 @@
 # Global
 global:
   imageRegistry: ghcr.io/ulysses-lee-lee
-  imageTag: latest  # TODO: Phase I+ 实测 tag
+  imageTag: git-b0a93db  # TODO: Phase I+ 实测 tag
   namespace: star-system
   tenantNamespace: star-tenant-{id}
 

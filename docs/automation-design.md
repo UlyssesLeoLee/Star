@@ -462,6 +462,53 @@ print(f"err_count={result.stderr.count('error[')}")
 - `git log -p --follow docs/wiki/pgwiki/50-issues/_decisions.md` 实证决策表新增 (commit 后)
 - commit author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权 + 9/3 19:35 拍板 D)
 
+### 4.16 Phase OPS-INTRY 落档 (2026-09-08 07:53 JST per ask_user `ask_e76f2e614519fbc9eda16b53` 拍板)
+
+> **触发**: 2026-09-08 07:53 JST 用户发令 "在右上角菜单里加一个运维界面入口, 里面存放运维应有的功能" + 07:58 JST 拍板 4 项 (Q1 仅入口+4 tab 骨架 / Q2 Hybrid mock+stub / Q3 新建 star-ops crate / Q4 仅需求+基本设计)
+> **落档文件**:
+> - `docs/requirements/SRS-STAR-OPS-001.md` v0.1 (22.8KB, 12 节, 4 tab + 8 stub + Hybrid AI + W/T/M 6 表)
+> - `docs/basic-design/OPS-BASIC-DESIGN-001.md` v0.1 (17.8KB, 9 节, 组件 + 8 REST 契约 + AI 4 级 Ladder)
+> - `crates/star-ops/` 新建 (Cargo.toml + lib.rs + main.rs + error.rs + ops_api.rs + ops_domain/{cluster,log,metrics}.rs + ops_ai/{mock,openai_stub,anthropic_stub,ladder}.rs) — workspace 47 → 48 package
+> - `frontend/src/app/ops/page.tsx` 新建 (4 tab 骨架, 跟 automation-debug 同 3D 视觉)
+> - `frontend/src/components/UserMenu.tsx` line ~219 加 Wrench 入口
+> - `frontend/src/lib/i18n/{dictionary,zh-CN,en,ja}.ts` 加 `userMenu.ops` + `opsConsole` 顶层 (3 语言)
+> - `scripts/automation/ai_log_mock.py` v0.1 (守门 #23 不开外部 API, 跑通 3ms, confidence=0.42)
+> - `scripts/automation/registry.md` §1 +1 行
+> - `Cargo.toml` members +1 行 (crates/star-ops)
+> **依据**: 守门 #1 (workspace 守门) + 守门 #3 (5 域独立 Lead, Mavis 临时代签 per 9/3 11:35) + 守门 #4 (token-OLU, 估 2.0M 实装) + 守门 #6 (frontend typecheck advisory per v2) + 守门 #7 (0 unsafe, clippy advisory per v3) + 守门 #10 (commit author=Ulysses) + 守门 #11 (缺标比错标, 4 tab 显式列) + 守门 #13 (W/T/M 6 表 100% 覆盖) + 守门 #19 v19 (agent 交互走 automation 脚本) + 守门 #21 v21 ([P] docs 同步 §4 任务卡表 + registry.md) + 守门 #23 (AI mock, 不开外部 API) + 守门 #24 v2 (subprocess 替代 RPC) + 守门 #1 v25 (cargo test 单 crate per CI 实证)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| OPS-1 | OPS-1 | 需求 SRS-STAR-OPS-001 落档 (4 tab + 8 stub + Hybrid AI) | S, A | **[P]** | (本节追加) | per 守门 #19 v19 [P] docs 同步必更新 §4 + registry.md |
+| OPS-2 | OPS-2 | 基本设计 OPS-BASIC-DESIGN-001 落档 (组件 + 8 REST 契约 + AI Ladder) | S, A | **[P]** | (本节追加) | per 守门 #4.2 唯一实施入口: 47 → 48 package |
+| OPS-3 | OPS-3 | crates/star-ops 新建 (Cargo.toml + lib + main + 9 模块) | R, V, S | **[P]** | `automation/dispatcher.py` (无 brief, Mavis 接手直接落地) | 15/15 test pass, 0 err, 0.51s |
+| OPS-4 | OPS-4 | UserMenu.tsx 加 Wrench 入口 (line 219) + 4 tab 路由 | S | **[S]** | (frontend 编辑) | per automation-debug 同 3D 视觉, 守门 #6 v2 advisory |
+| OPS-5 | OPS-5 | i18n 3 语言 (zh-CN/en/ja) 加 userMenu.ops + opsConsole | S, A | **[S]** | (frontend 编辑) | 缺标比错标, 3 语言完整覆盖 |
+| OPS-6 | OPS-6 | ai_log_mock.py 落档 (守门 #23 不开外部 API) | R, A | **[P]** | `ai_log_mock.py` (新基类) | 跑通 3ms, confidence 永远 0.42 < 0.5 |
+| OPS-7 | OPS-7 | registry.md §1 +1 行 + automation-design.md §4.16 追加 | A | **[P]** | (registry.md + automation-design.md 编辑) | per 守门 #21 v21 [P] docs 同步 |
+| OPS-8 | OPS-8 | 守门实证: cargo check + cargo test + cargo fmt + cargo clippy + frontend typecheck | R, A | **[M]** | (cargo / npm run typecheck) | per 守门 #1 v25 (单 crate 实证) + 守门 #6 v2 (advisory) |
+
+**§4.16 任务卡维度判定**:
+- R (Rerunnable): **是** (cargo check 0 err + cargo test 15/15 pass 可重放)
+- V (Volume): 否 (无子代理派发, Mavis 接手 root session 一次性)
+- S (Structural): **是** (新建 crates/star-ops 7 模块 + 3 语言 i18n + 4 tab 路由结构)
+- A (Audit-trail): **是** (SRS + BAS + 报告 7 段 + 修订历史 + git 实证)
+
+**§4.16 落档验证 (per 守门 #1 累积规 v1-v25, 本次必跑)**:
+- `cargo check -p star-ops --all-targets -j 4` 0 err
+- `cargo test -p star-ops --lib -j 4` 15/15 pass
+- `cargo fmt -p star-ops --check` 0 err
+- `cargo clippy -p star-ops --all-targets -j 4` 0 err (advisory per 守门 #7 v3)
+- `npm run typecheck` (待跑)
+- `python scripts/automation/ai_log_mock.py` exit 0, 跑通 3ms
+- `git log -p --follow crates/star-ops/` 实证新建 (commit 后)
+- `git log -p --follow frontend/src/app/ops/page.tsx` 实证新建 (commit 后)
+- `git log -p --follow scripts/automation/ai_log_mock.py` 实证新建 (commit 后)
+- `git log -p --follow docs/automation-design.md` 实证 §4.16 追加 (commit 后)
+- `git log -p --follow docs/requirements/SRS-STAR-OPS-001.md` 实证新建 (commit 后)
+- `git log -p --follow docs/basic-design/OPS-BASIC-DESIGN-001.md` 实证新建 (commit 后)
+- commit author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权 + 9/3 19:35 拍板 D + 9/3 11:35 守门 #3 v2)
+
 **§4.15 issue 自动关闭 (per 2026-09-06 13:41 JST 拍板 A3 状态机)**:
 - 关闭触发: counters 全 0 **或** git log 含 `Closes #N` / `Fixes #N`
 - counter 验证: 0/0/0/0 → automation 周期跑会**自动 close** #18 #19 #20 #21 (下次 cron 触发)
