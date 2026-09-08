@@ -75,5 +75,9 @@ harness = false
 name = "cluster_bench"
 harness = false
 
+[[bench]]
+name = "metrics_bench"
+harness = false
+
 [lints]
 workspace = true
