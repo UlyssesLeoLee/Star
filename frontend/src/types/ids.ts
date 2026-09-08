@@ -1031,6 +1031,20 @@ export const CHANGESET_SM: StateMachine = {
   ],
 };
 
+export const DECISION_SM: StateMachine = {
+  // 3 状态 (per crates/domain-context/src/lib.rs:313-320 DecisionStatus enum, §A.7 §10#9)
+  // 终态 = Superseded / Invalidated; Active 为唯一活跃态
+  name: "Decision 3 状态机 (§A.7,§10#9)",
+  states: ["active", "superseded", "invalidated"],
+  initial: "active",
+  invariant_ids: ["INV-DC-N01", "INV-DC-N02"],
+  transitions: [
+    { from: "active",     to: "superseded",  trigger: "newer.decision.applied" },
+    { from: "active",     to: "invalidated", trigger: "constraint.broken" },
+    { from: "active",     to: "invalidated", trigger: "user.invalidate" },
+  ],
+};
+
 // =====================================================================
 // 28. refactor-sweep (per 2026-09-02 10:41 JST 拍板, docs/frontend/design/refactor-sweep-design.md)
 // =====================================================================
