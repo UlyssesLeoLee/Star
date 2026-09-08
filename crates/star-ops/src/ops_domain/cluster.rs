@@ -87,7 +87,10 @@ async fn run_helm_mock(action: &str, args: &[&str]) -> Result<HelmMockOutput, St
     for a in args {
         cmd.arg(a);
     }
-    let output = cmd.output().await.map_err(|e| format!("subprocess 调起失败: {}", e))?;
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| format!("subprocess 调起失败: {}", e))?;
     if !output.status.success() {
         return Err(format!(
             "helm_canary_mock.sh exit {}: stderr={}",
@@ -116,10 +119,20 @@ impl HelmRelease {
 
     /// 触发灰度 (F-01 端到端, 调 helm_canary_mock.sh canary)
     pub async fn trigger_canary(req: &CanaryRequest) -> Result<HelmActionAck, String> {
-        let target_rev = req.target_revision.map(|r| r.to_string()).unwrap_or_else(|| "latest".to_string());
+        let target_rev = req
+            .target_revision
+            .map(|r| r.to_string())
+            .unwrap_or_else(|| "latest".to_string());
         let output = run_helm_mock(
             "canary",
-            &["--release", &req.release_name, "--weight", &req.canary_weight.to_string(), "--target", &target_rev],
+            &[
+                "--release",
+                &req.release_name,
+                "--weight",
+                &req.canary_weight.to_string(),
+                "--target",
+                &target_rev,
+            ],
         )
         .await?;
         let ts = chrono::Utc::now().timestamp();
@@ -134,7 +147,12 @@ impl HelmRelease {
     pub async fn rollback(req: &RollbackRequest) -> Result<HelmActionAck, String> {
         let output = run_helm_mock(
             "rollback",
-            &["--release", &req.release_name, "--target", &req.target_revision.to_string()],
+            &[
+                "--release",
+                &req.release_name,
+                "--target",
+                &req.target_revision.to_string(),
+            ],
         )
         .await?;
         let ts = chrono::Utc::now().timestamp();

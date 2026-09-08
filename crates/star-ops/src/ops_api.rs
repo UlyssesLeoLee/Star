@@ -119,7 +119,9 @@ async fn cluster_list() -> impl IntoResponse {
                 meta: OpsMeta {
                     stub: false,
                     total: Some(total),
-                    hint: Some("F-01 端到端, helm_canary_mock.sh subprocess (守門 #1 R-05)".to_string()),
+                    hint: Some(
+                        "F-01 端到端, helm_canary_mock.sh subprocess (守門 #1 R-05)".to_string(),
+                    ),
                     ai_channel: None,
                     analysis_triggered: None,
                     needs_review: None,
@@ -157,7 +159,10 @@ async fn cluster_canary(
                 meta: OpsMeta {
                     stub: false,
                     total: None,
-                    hint: Some(format!("canary {}% → revision {:?}", req.canary_weight, req.target_revision)),
+                    hint: Some(format!(
+                        "canary {}% → revision {:?}",
+                        req.canary_weight, req.target_revision
+                    )),
                     ai_channel: None,
                     analysis_triggered: None,
                     needs_review: None,
@@ -217,7 +222,9 @@ async fn cluster_status() -> impl IntoResponse {
                 meta: OpsMeta {
                     stub: false,
                     total: None,
-                    hint: Some("F-01 端到端, helm_canary_mock.sh status (守門 #1 R-05)".to_string()),
+                    hint: Some(
+                        "F-01 端到端, helm_canary_mock.sh status (守門 #1 R-05)".to_string(),
+                    ),
                     ai_channel: None,
                     analysis_triggered: None,
                     needs_review: None,
