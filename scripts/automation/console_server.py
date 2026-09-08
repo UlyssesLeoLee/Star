@@ -195,6 +195,9 @@ try:
             "/api/tmo/merge", "/api/tmo/operations", "/api/tmo/split",
             "/api/tmo/dependencies", "/api/tmo/reorder", "/api/tmo/graph",
             "/api/tmo/bulk", "/api/tmo/bulk/health", "/api/tmo/relationships",
+            "/api/tmo/metadata", "/api/tmo/metadata/{task_id}", "/api/tmo/metadata/{task_id}/history",
+            "/api/tmo/metadata/{task_id}/audit",
+            "/api/tmo/create",  # M-N8 任务卡创建 + 自动 worktree + agent 接管 (per ADR-0049 + P-AUTO-WT-01)
         ]},
     )
 except ImportError as e:
@@ -348,7 +351,7 @@ def main():
     print(f"=== Automation Debug Console: http://{args.host}:{args.port} ===")
     print(f"  docs: http://{args.host}:{args.port}/docs (FastAPI swagger)")
     print(f"  scripts: {len(SCRIPTS_META)} (8 base + 4 [P] + 5 unittest)")
-    print(f"  TMO:    /api/tmo/merge (M-N1 [done]) + /api/tmo/operations (TMO-08 stub)")
+    print(f"  TMO:    /api/tmo/merge (M-N1 [done]) + /api/tmo/operations (TMO-08 stub) + /api/tmo/create (M-N8 [done] per ADR-0049)")
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 
 

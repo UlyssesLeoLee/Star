@@ -42,6 +42,8 @@
 | `scripts/automation/memgraph_setup.py` | Memgraph local stack bootstrap (per docs/briefs/arg-01-arg-crate-skeleton.md §2.1 C) — Docker compose 启动 Memgraph 2.14 (Bolt 7687 + HTTP 7444) + health probe 等待 mgmt API + 写 .env stub (守门 #5 不打印密码) | P3-C W1 ARG.1 (crates/arg 实装 5 守门 G-1 前置) | TBD | 🟢 完成 (urllib health probe + .env 写 + .gitignore idempotent 追加) |
 | `scripts/automation/arg_seed.py` | ARG seed fixture 生成 (per WBS §14.11 ARG.1) — 5 域 Lead + 9 SA + 10 demo = 24 节点, 5 consults + 5 reports_to = 10 边, 落 JSON 给 arg-bridge W2 用 | P3-C W1 ARG.1 (种子 fixture) + P3-C W2 ARG.2 (arg-bridge 落库) | TBD | 🟢 完成 (24 节点 + 10 边 实证, env 检查不打印值 per 守门 #5) |
 | `scripts/automation/arg_api_test.py` | ARG API tier IT 端到端 (per WBS §14.11 ARG.4) — 10 IT 验证 14 routes (13 REST + 1 WebSocket), 守门 #1 v19 [M] 子项 Python 化; 起临时 axum 测试 server (subprocess 路径 per 守门 #9 v3) + stdlib WS 兜底 (无 websockets 库依赖) | P3-C W4 ARG.4 (crates/api 14 routes 端到端验证) + 后续 P3-C W5 (ARG.5 frontend e2e 复用) | TBD | 🟢 完成 (10/10 IT pass: 8 REST + 2 WS, env $env:ARG_TEST_PORT 不打印, exit 0) |
+| `scripts/automation/task_ops/nodes/create_node.py` | TMO M-N8 create_node (per ADR-0049 + 2026-09-09 04:57 JST 用户拍板核心功能) — 任务卡创建时检测有效 agent → 自动建 worktree (1:1 per 拍板) + dispatch SA-XX sub-agent + 任务卡 auto in_progress (5s 内可见); 守门 #13 a L0 唯一入口 + 守门 #13 d Transaction append-only + 守门 #22 mock 异步 | AUTO-WORKTREE-001 任务卡创建流程 (board/+New issue + sprint/+New issue) | TBD | 🟢 v0.1 完成 (83ms smoke test 通过: human reject + missing tenant reject + full happy path) |
+| `scripts/automation/_mock_git_worktree.py` | mock git worktree add CLI (per 守门 #22 不污染 main 编译) — M-N8 create_node 异步 fire-and-forget 调用; 真实 Git 集成推 G-WT-02 (H2 阻塞解除后启动) | M-N8 create_node (per 守门 #22 派生规) | TBD | 🟢 v0.1 完成 (subprocess 跑通, 写 .MOCK_WORKTREE 标记) |
 
 **说明**:
 - 末次 commit 列填 `TBD` = 本批次 v0.1 初版, commit 落地后回填
@@ -216,6 +218,32 @@
 | 缺标比错标 | ARG.1 MemGraphClient 仍是 stub (G-1), controller 调用 ops 接受 stub 返回, 504/502 返 ApiError::Upstream (per §5) | — | — | #12 缺标比错标 |
 | 后续 gate | ARG.5 (frontend P3-C W4) / ARG.6 (RGS 集成 P3-D) 派新子代理 | ⏳ 触发 | — | — |
 
+### 5.4 ADR-0049 任务卡自动 worktree + agent 接管 (新引入, 2026-09-09 04:57 JST per Ulysses 拍板核心功能)
+
+> **触发**: 2026-09-09 04:57 JST Ulysses 发令"在面板或者sprint创建任务卡的时候，如果是存在有效agent的任务，应该要求agent自动创建并关联新的worktree，用langgraph实现，这是整个软件的核心功能"
+> **联动**: 守门 #19 v19 (Python 化 ≥2 维) + 守门 #9 v20 (子代理 dispatch 必先 brief) + 守门 #21 ([P] 子项 docs 同步) + 守门 #22 (调试控制台不污染 main 编译) + 守门 #13 a (L0 唯一入口) + 守门 #13 c (Master RLS) + 守门 #13 d (Transaction 100% audit)
+> **落档文件**:
+> - `docs/architecture/2026-08-26-upgrade/adr/0049-task-card-auto-worktree-agent.md` (新, 300 行, 7 段结构 per AGENTS.md §3)
+> - `docs/reports/PHASE-AUTO-WORKTREE-IMPL-REPORT.md` (新, 7 子项 phase 计划)
+> - `docs/briefs/adr-0049-task-card-auto-worktree.md` (新, 守门 #20 dispatcher brief 实证)
+> - `docs/automation-design.md` §4.15 (TBD, 加 [P] 任务卡表)
+
+| 任务卡 | 路径 / 子项 | 状态 | 落档 commit | 守门 |
+|---|---|---|---|---|
+| M-N8-01 create_node.py | `scripts/automation/task_ops/nodes/create_node.py` v0.1 (270 行) | 🟢 v0.1 落档 | TBD | #1 / #13 / #19 / #22 |
+| M-N8-02 protocols.py | `scripts/automation/task_ops/protocols.py` +90 行 (CreateTaskRequest/Response + TMOMessage v0.3) | 🟢 v0.1 落档 | TBD | #1 / #13 / #19 |
+| M-N8-03 manager.py | `scripts/automation/task_ops/manager.py` +100 行 (OPERATION_TO_NODE["create"]=M-N8 + SubAgentPool.has_agent/dispatch + WorktreeRegistry + create() + _create_task) | 🟢 v0.1 落档 | TBD | #1 / #13 / #19 |
+| M-N8-04 _mock_git_worktree.py | `scripts/automation/_mock_git_worktree.py` v0.1 (100 行, 守门 #22 mock shell wrapper) | 🟢 v0.1 落档 | TBD | #1 / #22 |
+| M-N8-05 frontend store.ts | `frontend/src/lib/store.ts` +90 行 (createWorkItem + isAgentAssignee + pickSaTypeForKind + dispatchTmoCreate + IdentityType) | 🟢 v0.1 落档 | TBD | #1 / #19 / #20 |
+| M-N8-06 ADR-0049 | `docs/architecture/2026-08-26-upgrade/adr/0049-task-card-auto-worktree-agent.md` v0.1 (300 行, 7 段结构) | 🟢 v0.1 落档 | TBD | #10 / #11 / #12 |
+| M-N8-07 PHASE-REPORT | `docs/reports/PHASE-AUTO-WORKTREE-IMPL-REPORT.md` v0.1 (8 已知缺口显式列, per 守门 #11) | 🟢 v0.1 落档 | TBD | #11 / #12 / #21 |
+| 拍板决策 | 触发器=前端 store (opt1) / worktree 关联=1:1 (opt1) / agent 接管=自动 (opt1) / 落档=ADR+PHASE (opt1), 4 推荐项全选 | 🟢 已拍板 | — | 9/1 14:58 + 9/5 04:03 + 9/8 16:08 守门 |
+| Smoke test | 83ms 内 full happy path: human reject + missing tenant reject + task_id + worktree_id + agent_session_id + AgentRunning + audit 3 条 | 🟢 通过 | TBD | #1 v3 |
+| Frontend typecheck | worktree 隔离环境无 node_modules, PR CI 实证 (per 守门 #1 v25 CI 改单 crate 跳 workspace) | ⏳ PR CI 实证 | — | #1 v25 |
+| console_server.py 端点 | `/api/tmo/create` POST endpoint 实装 (走守门 #9 v3 subprocess) | ⏳ P-AUTO-WT-01 子项 (~30K tokens 估) | — | #1 / #9 v3 / #22 |
+| E2E UC-14 | `tests/e2e/test_uc14_auto_worktree.py` (5s 任务卡 in_progress 实证) | ⏳ P-AUTO-WT-02 子项 (~50K tokens 估) | — | #1 / #3 / #11 |
+| 后续 gate | HANDOFF-ST-001 §5.3 5 Blocker (H2-EXT #4 #5 类型不兼容 + 5 域 Lead 真人) + G-WT-01 DB 接入 + G-WT-02 真 git 集成 | ⏳ 跨 session 续 | — | #1 v17 / #3 |
+
 ## 6. 修订历史
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
@@ -226,3 +254,5 @@
 | v0.4 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 索引说明更新 (kanban_sprint_gen.py 43→55 项) + KANBAN-SPRINT-001 落地 P1 v0.2 Jira 設計 (per docs/briefs/kanban-sprint-view-001.md v0.2) + P2 度量 (Velocity/Burndown/History/Capacity) | 2026-09-03 13:55 JST P1 v0.2 + P2 收官, commit `947c0ef` 落地 |
 | v0.5 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 索引说明更新 (kanban_sprint_gen.py 55→93 项) + KANBAN-SPRINT-001 P3 仪式 收官 (Goal + Standup + Review + Retrospective + Markdown 导出) | 2026-09-03 14:05 JST P3 拍板 + 14:20 JST 收官, KANBAN-SPRINT-001 三阶段全部收官 |
 | v0.6 | 2026-09-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 脚本索引表 新增 `memgraph_setup.py` (Memgraph Docker compose + health probe) + `arg_seed.py` (24 节点 + 10 边 fixture); 新增 §5.3 ARG.1 crates/arg 6 子模块骨架实装 索引 (16 行覆盖 Cargo.toml / lib / error / 10 models / 3 client / 5 ops / 3 query / llm / 7 tests + workspace + 2 脚本 + docs 同步 + 5 守门 + 32 UT) | 2026-09-09 04:38 JST 用户发令"开子代理和worktree并行处理" + `ask_8d5083148d6e0566b520988e` 拍板 (scope=ARG.1+ARG.4), ARG.1 子项 5 守门 0 err + 32 UT 100% pass 实证, 守门 #1 v19 + #12 v21 + #14 v2 联合 |
+| v0.7 | 2026-09-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 脚本索引表 新增 `task_ops/nodes/create_node.py` (M-N8, TMO 第 8 节点, 任务卡创建自动 worktree + agent 接管, 83ms smoke pass) + `_mock_git_worktree.py` (守门 #22 mock shell); §5.4 新增 ADR-0049 任务卡自动 worktree 索引 (4 推荐项拍板, 7 子项 v0.1 落档, 8 项已知缺口显式列) | 2026-09-09 04:57 JST Ulysses 拍板核心功能 + 守门 #19 v19 + #20 + #21 实证 |
+| v0.8 | 2026-09-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 脚本索引表 新增 `api/routes_tmo.py` 加 POST /api/tmo/create 端点 (M-N8 HTTP 接入, P-AUTO-WT-01 收官, 123ms HTTP 5s 阈值) + `tests/e2e/python/test_uc14_auto_worktree.py` (5/5 维 E2E 全过: happy / SA 映射 / human 拒 / missing tenant 拒 / 1:1 attach); §5.4 ADR-0049 增量 (3 已知缺口 #7 #8 #9 从 ⏳ 改 ✅); 修复 pre-existing split_node stale import (路由层 4 常量本地化) | 2026-09-09 08:13 JST "推进" 拍板 + 守门 #9 v3 + #20 + #21 + #22 实证 |

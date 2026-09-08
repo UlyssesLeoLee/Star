@@ -158,12 +158,21 @@ export interface Project {
 export type IdentityProvider =
   | "password" | "github" | "gitlab" | "google" | "saml-sso" | "local-runtime-device";
 
+// =====================================================================
+// Identity Type (per ADR-0049 + 2026-09-09 04:57 JST 用户拍板)
+// human = 真人用户; agent = LangGraph / Runtime / TMO 自动化代理
+// store.createWorkItem 检测到 assignee 是 agent 时, 走 M-N8 自动 worktree
+// =====================================================================
+export type IdentityType = "human" | "agent";
+
 export interface Identity {
   id: Uuid;
   tenant_id: Uuid;
   email: string;
   display_name: string;
   provider: IdentityProvider;
+  /** 身份类型 (per ADR-0049): human = 真人, agent = 自动化代理 */
+  type?: IdentityType;
   status: "active" | "invited" | "disabled";
   mfa_enabled: boolean;
   last_login_at?: Iso8601;
