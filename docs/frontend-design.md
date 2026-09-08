@@ -713,7 +713,7 @@ MVP 实现:仅 Error 态用 alert;Loading/Empty 用 `<Empty/>` 占位 + 文案�
 ### ADR-FE-003: Mock-first(Seed + Zustand)优先级高于 OpenAPI client
 **状态**: Accepted
 **决策**: MVP 用 in-memory seed;V1 切真后端时换 fetch
-**理由**: backend 25 module 仅 `domain-api` crate 是骨架 Port trait,无真实 handler;前端先行可暴露 UX 缺陷
+**理由**: backend 38 个 `domain-*` crate 已有状态机/不变量校验/单测,真实业务逻辑在领域层;唯一骨架是 `crates/api`(162 行 REST handler Port trait, `crates/api/src/lib.rs` 实测),无真实 handler;前端 Mock-first 先行可暴露 UX 缺陷,等 V1 阶段在 `crates/api` 实装 handler 再切真后端
 **后果**: 切后端时需重写 `lib/store.ts` 内部实现(由 set 改为 fetch),UI 不动
 
 ### ADR-FE-004: 所有 Page 标 "use client"
