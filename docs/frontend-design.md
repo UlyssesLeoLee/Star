@@ -563,14 +563,14 @@ Local Runtime 详情页必须显示:
 | `ChangeSet` | `changeset` | status / symbol_index | INV-DEV-01~05 |
 | `Sprint` / `Milestone` | `sprint` / `milestone` | capacity / committed / progress | REQ-PLN-001 |
 | `Board` | `board` | columns / wip_limit | REQ-BOARD-001 |
-| `Worktree` | `worktree` | branch / status / lock_version | INV-WT-01~04 |
+| `Worktree` | `worktree` | branch / status / version | INV-WT-01~04 |
 | `AgentSession` | `agent_session` | status / token_usage / cost_summary | INV-AGT-N01~N14 |
 | `Feedback` | `feedback` | status / severity / question | INV-FB-01~02 |
 | `ContextPacket` | `context_packet` | priority / kind / provenance | INV-CT-01~10 |
 | `ValidationCase` | `validation_case` | result / coverage / feedback_id | REQ-VAL-001 |
 | `Repository` / `PullRequest` | `repository` / `pull_request` | status / webhook_idempotency_key | INV-SCM-01~08 |
 | `Integration` | `integration` | kind / status / loop_protection_key | REQ-INT-001 |
-| `Notification` | `notification` | channel / status / suppression_reason | INV-N-07 |
+| `Notification` | `notification` | channel / status / event_type / sent_at | INV-N-07 |
 | `SearchHit` | `search_hit` | score / kind | INV-SR-01/02 |
 | `LocalRuntime` | `local_runtime` | status / version / capabilities / last_heartbeat / metadata | INV-LR-01~05 |
 | `PresenceCursor` | `presence_cursor` | x / y / selection | §7.6 |
