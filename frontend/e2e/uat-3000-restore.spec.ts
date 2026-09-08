@@ -48,24 +48,29 @@ test.describe('UAT 业务流程 6: 3000 端口恢复 (UAT-S26..S28, per 2026-09-
   test('UAT-S27: 浏览器渲染 localhost:3000 看到文本内容 (不是纯黑/纯白)', async ({ page }) => {
     await page.goto(UAT_3000_URL, { waitUntil: 'load', timeout: 10000 });
 
-    // 1. 页面 title 不为空
-    const title = await page.title();
-    expect(title.length).toBeGreaterThan(0);
+    // v3.0 修法 (per 2026-09-08 15:30 JST v3.1 sustained 闭环 + Playwright 实战):
+    // proxy 模式返回 application/json, 没有 <title> HTML 元素, page.title() 是空字符串
+    // 不强求 title, 验证 body textContent 即可 (envoy direct_response "not found" 或 apiserver paths JSON)
 
-    // 2. body 元素可见
+    // 1. body 元素可见
     const body = page.locator('body');
     await expect(body).toBeVisible();
 
-    // 3. body 文本内容非空 (envoy 返回 "not found" 文本)
+    // 2. body 文本内容非空 (envoy "not found" 文本 或 apiserver paths JSON 都有内容)
     const bodyText = await body.textContent();
     expect(bodyText?.length).toBeGreaterThan(0);
 
-    // 4. 关键断言: 不是空 body (空 body = 黑屏)
+    // 3. 关键断言: 不是空 body (空 body = 黑屏)
     expect(bodyText).not.toBe('');
     expect(bodyText?.trim()).not.toBe('');
 
+    // 4. body 包含期望文本 (not found 或 apiserver paths 关键标识)
+    const hasEnvoyNotFound = bodyText?.includes('not found');
+    const hasApiserverPaths = bodyText?.includes('"/api"');
+    expect(hasEnvoyNotFound || hasApiserverPaths).toBe(true);
+
     // 5. background-color 不是纯黑 (浏览器默认 transparent, 但 body 元素至少要有 layout)
-    // 不强求 backgroundColor 检查, 因为 envoy 返回的 text/html 浏览器渲染可能 inherit default
+    // 不强求 backgroundColor 检查, 因为 proxy 返回 JSON 浏览器渲染纯文本
   });
 
   // === 守门 3: 截图保存 (给 Ulysses 视觉确认) ===
