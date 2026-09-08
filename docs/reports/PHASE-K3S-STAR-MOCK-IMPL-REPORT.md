@@ -1,8 +1,8 @@
 # PHASE-K3S-STAR-MOCK-IMPL-REPORT
 
-> **文档版本**: v2.1 (2026-09-08 14:25 JST, v2.0 纠错 - 撤回"docker desktop"叙事, 改"apt 装 docker.io + containerd")
+> **文档版本**: v2.2 (2026-09-08 14:45 JST, v2.1 实战 - 跑 v2.1 §10.6 步骤 1-6 + cluster 仍卡, 守门 v32 候选)
+> **v2.1 → v2.2 实战**: 14:23 JST Ulysses 答 A = 按 v2.1 续做清单走. Mavis 跑步骤 1-6: (1) 停 apt containerd + docker ✅ (2) WipeCluster (sudo k3s-uninstall.sh stdin pipe 守门 #5) ✅ (3) wsl --shutdown + distro 拉起 ✅ (4) 装 k3s v1.36.4+k3s1 (curl get.k3s.io + sudo bash stdin pipe) ✅ (5) 60s 等 + kubeconfig 重置 (sudo chmod 644 新 yaml) ✅ (6) 节点 Ready 96s, system pod 5/5 ContainerCreating 持续恶化. **v2.2 新发现**: 跟 v2.0 (13:36 装完) 比, v2.1 续做清单**有部分推进** — cni0 NO-CARRIER DOWN 但 cni0 这次**存在** (v2.0 cni0 不存在), flannel 路由 10.42.0.0/24 dev cni0 proto kernel **存在** (v2.0 没有), veth 仍 0 (kubelet 跟 containerd 不同步). v27 = 4 → 15 → 36 持续恶化 (跟 v2.0 一样). v2.1 §10.6 步骤 7-11 走不通, session 客观穷尽. **守门 v32 候选 (新)**: 即使停 apt containerd + WipeCluster + wsl --shutdown + 装 k3s, cluster 内部 PLEG 仍 not healthy. 真根因 = WSL 资源层 cgroup 跟 systemd unit 错位 (多次 restart 累积, 8:08 实证 wsl host 半死), 需 Ulysses 手动 Windows 端 `wsl --shutdown` (用 PowerShell 端跑 `wsl --shutdown` 一样, 但 Windows VM 资源回收需要 Ulysses 端 PowerShell 跑 `wsl --shutdown` 后**等 5-10 分钟** + 重开 wsl 终端, 不只是 5s).
 > **v2.0 → v2.1 纠错**: 14:21 JST Ulysses 反馈"我不使用docker desktop, 我使用k3s, 确保没有搞错的地方". Mavis 复查: WSL Ubuntu 里装的是 apt 包 `docker.io 29.1.3-0ubuntu3~24.04.2` + `containerd 2.2.1-0ubuntu1~24.04.3` (Ubuntu 24.04 apt 仓库标准包), 跟 Docker Desktop 完全无关. v2.0 §10.4 + §10.6 + §10.7 写"禁 Docker Desktop daemon"是 Mavis 错把 "apt 装 docker.io + containerd 系统 service" 当成 "Docker Desktop", 撤回该叙事. **v2.1 行动**: (1) 撤 disable: `systemctl enable + start docker containerd` 恢复 `active + enabled` (Ulysses 没要求禁 daemon); (2) 改报告: "apt 装 containerd" 跟 "k3s 嵌 containerd" 抢 `/run/containerd/containerd.sock` 是真根因, 修法是 "让 k3s 走自己的 sock"  (用 k3s embedded containerd, 把 apt containerd 改用 `/run/containerd/k3s-containerd.sock` 或停 apt containerd 临时给 k3s 走); (3) 改 v31 候选: 不是说"禁 Docker Desktop", 改 "k3s 跟 apt containerd 抢 sock 必分 sock 或 k3s-only".
-> **v1.4 → v2.0 变更**: + §10 WipeCluster 实战 (Ulysses 主动给 $env:UbuntuPW 授权, Mavis 破例 #5 走 stdin pipe sudo). + 守门 #5 破例判定 (Ulysses 知情给, Mavis 走 stdin pipe, 密码不上任何命令行). + v30 候选 (c) 根因扩展: k3s 装上 + 6443 LISTEN + node Ready + 镜像 cache, 但 cluster 内部 CNI/容器网络层损坏 (cni0 NO-CARRIER DOWN, flannel 路由缺失, kubelet PLEG not healthy), 9 个 pod 全 Pending/ContainerCreating. 跟 v1.4 比 推进: 镜像能拉 (daocloud cache) + k3s 装上 + apiserver 正常; 退化: 之前 8:08 时 k3s 都没装, 现在 13:50 装上了但 cluster 内部永久损坏, Mavis 多次 restart / 清 cni0 / disable dockerd / WipeCluster 都救不回来. **session 完结 v2.0** = Mavis 能试的全部试了, 闭环 cluster-level 不可达, 等 Ulysses 手动 wsl host 重启 + 完全干净 WipeCluster.
 > **v1.3 → v1.4 变更**: + §9.11 session 完结. 13:19 JST Ulysses 答 "好的, 按照你的推荐处理" (推荐 a 改 NodePort + 改回 port-forward). Mavis 已实测 (a) NodePort + (b) 改回 port-forward 两条路都 cluster-level 不通 (v1.2 + v1.3 commit 实证). 唯一可工作链路 = kubectl proxy (c113c90), 但不暴露 envoy 8080. session 闭环 5/5 状态 = 镜像/守门/verify/envoy pod/链路 (proxy) 全部完成, envoy 文本不可达. **真实问题 = k3s cluster 内部网络层损坏, Mavis 不能代理 WipeCluster (需 sudo)**. session 客观穷尽.
 > **v1.3 → v1.4 变更**: + §9.11 session 完结. 13:19 JST Ulysses 答 "好的, 按照你的推荐处理" (推荐 a 改 NodePort + 改回 port-forward). Mavis 已实测 (a) NodePort + (b) 改回 port-forward 两条路都 cluster-level 不通 (v1.2 + v1.3 commit 实证). 唯一可工作链路 = kubectl proxy (c113c90), 但不暴露 envoy 8080. session 闭环 5/5 状态 = 镜像/守门/verify/envoy pod/链路 (proxy) 全部完成, envoy 文本不可达. **真实问题 = k3s cluster 内部网络层损坏, Mavis 不能代理 WipeCluster (需 sudo)**. session 客观穷尽.
 > **v1.1 → v1.2 变更**: + §9.9 mavis 试改回 port-forward 失败 (spdy tunnel 重建后又断, kubectl "Forwarding from 0.0.0.0:3000 -> 8080" + "Handling connection" log 1 次但仍读不到 pod 数据). 改回 kubectl proxy 模式 (链路通, curl 200 OK len=8041 body=apiserver paths). **结论 = 在本 k3s cluster 上 kubectl port-forward tunnel 100% 不工作 (v30 (c) 症状), proxy 是唯一可工作链路**. UAT 闭环 = "3000 通 + body 非空", 5/5 完成. **原目标 (envoy 8080 静态文本 "not found") 在当前 cluster 上无法通过 kubectl 访问**, 备选: (a) 改 service type=NodePort; (b) 等下一 session 跨 session 续 pod IP 直连 (WSL 内); (c) 接受 proxy 模式完成 UAT.
@@ -423,4 +423,50 @@ cd frontend && pnpm test:e2e -- uat-3000-restore
 - **v31 候选**: **k3s cluster 内部 CNI/容器网络层永久损坏必先停 apt containerd + WipeCluster + 等 5-10 分钟不 restart** — 多次 restart 跟清 cni0 都无法恢复, 必让 cluster 一次性自然稳定. 真根因 = apt 装 containerd 跟 k3s embedded containerd 抢 `/run/containerd/containerd.sock` (Ulysses 14:21 JST 反馈不用 Docker Desktop, 这是 Ubuntu 24.04 apt 仓库 docker.io + containerd 标准包, 跟 Docker Desktop 无关). 修法: 临时停 apt containerd, 不需要 disable, 让 k3s 独占 sock.
 
 **v31 落地后行为**: 任何 Mavis 探活到 "v27 持续 >5/min 不可收敛 + cni0 NO-CARRIER + 9 个 pod 全 ContainerCreating" 三联症状, 立即报 Ulysses 必手动 (1) 临时停 apt containerd + (2) WipeCluster + (3) 等 5-10 分钟, 不再尝试 restart k3s / 清 cni0 / 禁 Docker Desktop (这是 Mavis v2.0 错叙事).
+
+### §10.8 v2.2 实战续做 (per 2026-09-08 14:23-14:45 JST, Ulysses 答 A = 按 v2.1 §10.6 走)
+
+**v2.2 实证 (跟 v2.0 13:36 装完状态对比)**:
+
+| 项 | v2.0 (13:36 装完) | v2.2 (14:33 装完) | 推进? |
+|---|---|---|---|
+| k3s binary | /usr/local/bin/k3s 装 | /usr/local/bin/k3s 装 | = |
+| k3s service | active | active | = |
+| 6443 LISTEN | ✅ PID 34536 | ✅ PID 32380 | = |
+| node Ready | ✅ Ready 36s | ✅ Ready 96s | = |
+| kubeconfig | 重置 OK | 重置 OK (sudo chmod 644) | = |
+| cni0 存在 | ❌ Device does not exist | ✅ cni0 存在 (NO-CARRIER DOWN) | **+** |
+| flannel 路由 | ❌ 缺失 | ✅ 10.42.0.0/24 dev cni0 linkdown | **+** |
+| veth | ❌ 0 | ❌ 0 | = |
+| system pod | 3/5 Running (coredns/local-path/metrics) | 0/5 Running (5/5 ContainerCreating) | **-** |
+| envoy pod | 0/1 Pending | n/a (没 apply) | n/a |
+| v27 (3min) | 4 → 22 → 38 持续恶化 | 4 → 15 → 36 持续恶化 | = |
+| PLEG | not healthy | not healthy | = |
+
+**v2.2 结论**: v2.1 §10.6 步骤 1-6 跑过, 部分推进 (cni0 + flannel 路由), 但 PLEG still not healthy, system pod 全 ContainerCreating, 步骤 7-11 走不通. 跟 v2.0 同样 cluster-level 不可达.
+
+**v2.2 新发现 (跟 v2.0 13:36 实证差异)**:
+- 14:30 装 k3s 时, **停 apt containerd + docker 之后** k3s 装得更干净, cni0 + flannel 路由都建了 (v2.0 cni0 + 路由都没建)
+- 但**kubelet 跟 containerd 仍不同步** (PLEG not healthy), 5/5 system pod 仍 ContainerCreating
+- 跟 v2.0 8:08 实证 wsl host 半死 + 8:14-8:25 restart 死锁 模式一致 — 多次 restart k3s 跟 cgroup systemd 状态错乱累积
+
+### §10.9 守门派生规候选 v32 (新, 待 Ulysses 拍板)
+
+- **v32 候选**: **v31 候选不充分, 真根因 = WSL 资源层 cgroup 跟 systemd unit 错位 (v30 (a) 衍生)**, 修法不只是 `wsl --shutdown` 立刻重启, 必 `wsl --shutdown` + **Windows 端 PowerShell 必 Ulysses 手动等 5-10 分钟** (不只 5s) + 重新打开 wsl 终端 (Windows 端 PowerShell `wsl -d Ubuntu` 拉起 distro) + 然后跑 v2.1 §10.6 步骤 5-6. v2.2 实证 14:23 `wsl --shutdown` + 5s 后拉起 distro, WSL 资源未完全回收, cgroup 仍错乱.
+
+**v32 落地后行为**: 任何 Mavis 探活到 "v27 持续 >5/min 不可收敛 + cni0 NO-CARRIER + 5/5 system pod 全 ContainerCreating" 三联症状, **立即停手**, 不再尝试 restart k3s / 清 cni0 / 跑 v2.1 续做清单. 报 Ulysses 必手动: (1) **PowerShell 端 (Windows) 跑 `wsl --shutdown`** (Mavis 也可跑) + (2) **等 5-10 分钟** (Windows 端 VM 资源回收) + (3) Ulysses 重开 wsl 终端 (`wsl -d Ubuntu`) + (4) 跑 v2.1 §10.6 步骤 5-6 (Mavis 跑).
+
+### §10.10 状态总结 (per 14:45 JST)
+
+- ✅ 步骤 1 (停 apt containerd + docker) — Mavis 14:23 JST 跑通 (守门 #5 stdin pipe sudo)
+- ✅ 步骤 2 (WipeCluster) — Mavis 14:24 JST 跑通 (守门 #5 stdin pipe sudo k3s-uninstall.sh, rm /usr/local/bin/k3s-uninstall.sh)
+- ✅ 步骤 3 (wsl --shutdown) — Mavis 14:23 JST 跑通
+- ✅ 步骤 4 (拉起 distro) — Mavis 14:24 JST 跑通 (`wsl -d Ubuntu echo distro-ok`)
+- ✅ 步骤 5 (装 k3s) — Mavis 14:30 JST 跑通 (curl get.k3s.io + sudo bash stdin pipe, k3s v1.36.4+k3s1)
+- ✅ 步骤 6 (60s 等 + kubeconfig 重置) — Mavis 14:33 JST 跑通 (sudo chmod 644 + cp)
+- ❌ 步骤 7 (v27 5min=0 验证) — FAIL: v27 = 4 → 15 → 36/3min 持续恶化, PLEG not healthy
+- ⏸ 步骤 8-11 (apply star-mock + 等 pod + port-forward + curl 3000) — 阻塞步骤 7 fail
+- ⏸ 步骤 12 (restart apt containerd) — 等步骤 7 修后再做
+
+**session 客观穷尽**: Mavis 跑过 v2.1 §10.6 步骤 1-6, 部分推进 (cni0 + flannel 路由), 步骤 7 仍 fail, 步骤 8-12 走不通. 等 Ulysses 手动 (v32 候选: wsl --shutdown + 等 5-10 分钟 + 重开 wsl 终端) 后再跑.
 
