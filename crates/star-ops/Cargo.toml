@@ -43,9 +43,14 @@ async-trait = { workspace = true }
 # star-context ActorContext 复用 — 实装 [M] 子项时启用 (per AGENTS.md §4.2 v16),
 # MVP-骨架阶段不引入 (per SRS-001 §3.2 "不做什么" 缺标比错标安全)
 
-# 实装阶段再引入 (per SRS-001 §10.2)
-# kube = { version = "0.95" }        # K8s client (F-01)
-# walkdir = "2"                      # F-04 文档扫描
+# F-01 端到端 (per SRS-001 §10.2): 仅 mock 路径 (subprocess 调 helm_canary_mock.sh),
+# 不引入 kube crate (守門 #1 R-05 不动生产, kube 切生产 owner 拍板时再引).
+# 修正 brief wt2 错误: 子代理 bg_27fc3bed 引入 kube 但 MVP 阶段不需要,
+# owner 接手 amend 移除 (避免 k8s-openapi build failure + 守門 #1 禁回溯).
+# kube = { version = "0.95" }  # 切生产 owner 拍板时启用
+
+# F-04 文档扫描 (F-01 不动, 仅占位)
+# walkdir = "2"
 
 [dev-dependencies]
 # axum::Router::oneshot 测试 helper (per star-mcp 模式)

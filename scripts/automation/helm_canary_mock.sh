@@ -110,7 +110,7 @@ cmd_canary() {
     case "$1" in
       -r|--release)   release="$2"; shift 2 ;;
       -w|--weight)    weight="$2";  shift 2 ;;
-      -R|--revision)  revision="$2"; shift 2 ;;
+      -R|--revision|--target)  revision="$2"; shift 2 ;;
       *) log_err "canary: 未知参数 $1"; return 1 ;;
     esac
   done
@@ -155,7 +155,7 @@ cmd_rollback() {
   while [ $# -gt 0 ]; do
     case "$1" in
       -r|--release)   release="$2"; shift 2 ;;
-      -R|--revision)  revision="$2"; shift 2 ;;
+      -R|--revision|--target)  revision="$2"; shift 2 ;;
       *) log_err "rollback: 未知参数 $1"; return 1 ;;
     esac
   done
