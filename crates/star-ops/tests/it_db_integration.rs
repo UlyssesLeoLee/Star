@@ -7,10 +7,10 @@
 // - MVP 阶段: 仅 DDL 文件存在性 + schema 验证 (mock 模式)
 // - 真实 PG 容器化 [M] 子项 DDD Review 拍板 (per brief §2.2)
 //
-// IT-5-GAPS 缺口 #1 实装 (per IT-5-GAPS-IMPL brief §2.1):
+// IT-5-GAPS 缺口 #1 + 缺口 #2 实装 (per IT-5-GAPS-IMPL brief §2.1):
 // - 真实 PG 容器化 (per 守门 #1 R-05): 走 STAR_OPS_TEST_PG_URL env (WSL PG / CI 临时容器)
 // - sqlx + testcontainers 模式 (testcontainers 走 CI 端, WSL PG 走本地开发端, per IT-5-GAPS 拍板)
-// - 6 ops 表 DDL 真实跑通 (F-01 2 + F-02 3 + F-03 1)
+// - 6 ops 表 DDL 真实跑通 (F-01 2 + F-02 3 + F-03 1) + RLS 13 類 cross-tenant 隔离
 //
 // 守门实证:
 // - 守门 #1 R-05: 仅连测试 PG, 不连真 PG prod
@@ -200,7 +200,7 @@ fn it_rls_13_categories_enforced() {
 }
 
 // =============================================================================
-// IT-5-GAPS 缺口 #1 实装 (per IT-5-GAPS-IMPL brief §2.1)
+// IT-5-GAPS 缺口 #1 + 缺口 #2 实装 (per IT-5-GAPS-IMPL brief §2.1)
 // 真实 PG 测试 (走 STAR_OPS_TEST_PG_URL env, 跟 testcontainers 等价的本地 dev 路径)
 // 守门 #1 R-05: 测试 PG (WSL 本地 / CI 临时容器) 不算 prod, 但 owner 显式 STAR_OPS_TEST_PG_URL 才启
 // 守门 #5 v2: 测试 PG 密码仅走 env, 不入源码, 不打印
