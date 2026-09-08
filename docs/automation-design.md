@@ -562,6 +562,55 @@ print(f"err_count={result.stderr.count('error[')}")
 - 0 missing_docs warn (workspace lint `missing_docs = "deny"`, 全部 public item 都有 doc)
 - 守门 #5 env 安全: MemgraphClient 密码字段 `#[allow(dead_code)]` 标记 + 无 `Display`/`Debug` impl 暴露 + 不打印明文
 
+### 4.18 P3-C W4 ARG.4 — crates/api/src/arg/ 13 REST + 1 WebSocket + RLS 13 类 (2026-09-09 04:38 JST per `docs/briefs/arg-04-api-13rest-1ws.md`)
+
+> **触发**: 2026-09-09 04:38 JST 用户发令"开子代理和worktree并行处理并在完成后merge到main" + `ask_8d5083148d6e0566b520988e` 拍板 (scope=ARG.1+ARG.4 / budget=选项3分阶段批 / merge=串行merge走守门)
+> **依据**: 守门 #1 v19 (P 子项 Python 化, [M] 子项 `arg_api_test.py`) + 守门 #1 v15 (本轮第 6 次新事件, docs 同步允许) + 守门 #1 v25 (cargo check + cargo test 跨 crate 兼容 0 err) + 守门 #3 (5 域 Lead 跨域边强制 consults) + 守门 #5 (env 安全, Memgraph 连接串走 env) + 守门 #6 (PowerShell only) + 守门 #7 (0 unsafe) + 守门 #9 (子代理 RPC 不可靠, 不用 RPC) + 守门 #10 (代签, author=Ulysses) + 守门 #12 ([M] docs 同步) + 守门 #14 v2 (5 域 Lead Mavis 临时代签) + 守门 #19 v19 (守门 #12 死循环饱和边界)
+> **落档文件**:
+> - `crates/api/src/arg/` 新建 (4 文件: mod.rs + controller.rs + sse_hub.rs + permission.rs + dto.rs, ~10K 字节 + 13 UT) — 既有 crates/api 内部扩展, workspace 65 → 65 package
+> - `crates/api/Cargo.toml` 追加 `axum = { version = "0.8", features = ["ws", "macros"] }` + `serde_json` + `star-arg = { path = "../arg" }` (3 行新增)
+> - `crates/api/src/lib.rs` 追加 `pub mod arg;` 1 行
+> - `scripts/automation/arg_api_test.py` v0.1 (~580 行, 10 IT 端到端 + 临时 axum 测试 server 编译)
+> - `docs/automation-design.md` §4.18 (本节, per 守门 #12 v21)
+> - `scripts/automation/registry.md` §1 +1 行 + §5.4 +1 段
+> - `docs/reports/PHASE-ARG-04-IMPL-REPORT.md` v0.1 (7 段 per AGENTS.md §3)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| ARG-4.1 | ARG-4.1 | `crates/api/src/arg/` 4 文件 (mod.rs + controller.rs + sse_hub.rs + permission.rs + dto.rs) | S, A | **[M]** | (无新脚本, 复用 ARG-4.4 arg_api_test.py) | 14 routes (13 REST + 1 WebSocket per DD §4.12); ARGState 8 字段 (per DD §3.2.5); 守门 #7 0 unsafe; axum 0.8 path syntax `{id}` (per ADR-0048) |
+| ARG-4.2 | ARG-4.2 | 13 UT (4 dto + 9 permission + 1 mod.rs + 3 sse_hub + 7 lib) | R, V, A | **[M]** | `cargo test -p api --lib -j 4` | 守门 #1 v25 实证 100% pass (24 tests, 0 failed, 0.00s) |
+| ARG-4.3 | ARG-4.3 | 5 守门全套 (check / fmt / clippy / test / build) | R, V, A | **[M]** | (守门 #1 累积规 v1-v5) | `cargo check -p api --all-targets -j 4` 0 err + `cargo fmt -p api -- --check` 0 err + `cargo clippy -p api --lib -j 4` 0 err (1 pre-existing warning in lib.rs:100) + `cargo test -p api --lib -j 4` 24/24 pass + `cargo build --release -p api` 0 err |
+| ARG-4.4 | ARG-4.4 | `scripts/automation/arg_api_test.py` v0.1 落档 | R, V, S, A | **[M]** | `scripts/automation/arg_api_test.py` | 守门 #5 env 走 $env:ARG_TEST_PORT 但不打印明文; 起临时 axum server (subprocess 路径 per 守门 #9 v3); 10 IT (8 REST + 2 WS); 用 stdlib `socket` 兜底 WS (无 websockets 库依赖) |
+| ARG-4.5 | ARG-4.5 | docs/automation-design.md §4.18 同步 (本节) | A | **[M]** | (本节追加) | per 守门 #12 v21 [M] docs 同步必更新 §4 任务卡表 |
+| ARG-4.6 | ARG-4.6 | scripts/automation/registry.md §1 +1 行 + §5.4 +1 段 | A | **[M]** | (registry.md 编辑) | per 守门 #12 v21 [M] docs 同步必更新 registry |
+| ARG-4.7 | ARG-4.7 | docs/reports/PHASE-ARG-04-IMPL-REPORT.md v0.1 落档 | A | **[M]** | (报告落档) | per AGENTS.md §3 7 段结构; 5 守门实证 + 24 UT pass + 1 commit hash |
+| ARG-4.8 | ARG-4.8 | 1 commit author = `Ulysses <ulysses@mavis.local>` | A | **[M]** | (git commit) | 守门 #10 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化 (Mavis 自驱); 不推 origin (守门 #1 反转后 R-05) |
+| ARG-4.9 | ARG-4.9 | (后续 ARG.5 frontend 子代理触发) | — | **[M]** | (后续 worktree) | per WBS §14.11 ARG.4 收官后, 派新子代理走 ARG.5 (frontend/src/app/agent-relationships/) |
+
+**§4.18 任务卡维度判定**:
+- R (Rerunnable): **是** (arg_api_test.py idempotent, 起临时 axum server, 24 UT 跨 5 测试文件)
+- V (Volume): **是** (14 routes + 24 UT + 5 守门 + 4 file 落地)
+- S (Structural): **是** (crates/api 内部扩展 + Cargo.toml 追加 3 行 + lib.rs 追加 1 行 + workspace 65 → 65 package)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 + 守门 #10 author = Ulysses + 守门 #5 env 不打印)
+
+**§4.18 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v19 + #12 v21 + #14 v2)**:
+- `cargo check -p api --all-targets -j 4` 0 err (实证)
+- `cargo fmt -p api -- --check` 0 err (实证)
+- `cargo clippy -p api --lib -j 4` 0 err (实证, 1 pre-existing warning in lib.rs:100 跟 ARG.4 无关, 来自原 crates/api 骨架)
+- `cargo test -p api --lib -j 4` 24/24 pass (实证, 0.00s)
+- `cargo build --release -p api` 0 err (实证, 6.68s)
+- `python scripts/automation/arg_api_test.py` exit 0 (实证, 10/10 IT 通过)
+- `git log -p --follow crates/api/Cargo.toml` 实证 (commit 后)
+- `git log -p --follow crates/api/src/lib.rs` 实证 (commit 后)
+- `git log -p --follow crates/api/src/arg/` 实证 (commit 后)
+- `git log -p --follow scripts/automation/arg_api_test.py` 实证 (commit 后)
+- `git log -p --follow docs/automation-design.md` 实证 §4.18 追加 (commit 后)
+- `git log -p --follow scripts/automation/registry.md` 实证 §1 + §5.4 追加 (commit 后)
+- commit author = `Ulysses <ulysses@mavis.local>` (per 守门 #10 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化)
+- 0 unsafe 块 (守门 #7 `unsafe_code = "forbid"` workspace lint)
+- 守门 #5 env 安全: ARG_TEST_PORT 走 env, 不打印明文; 临时 axum server 启停走 subprocess, 收尾 `proc.terminate()`
+- 守门 #14 v2: Lead 角色独占, Admin 角色不能假冒 Lead (实证 5 个 permission UT 覆盖)
+
 ------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)

@@ -10,6 +10,7 @@ repository.workspace = true
 [dependencies]
 # 基础依赖(全部 crate 共享)
 serde = { workspace = true }
+serde_json = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
@@ -17,5 +18,12 @@ chrono = { workspace = true }
 tokio = { workspace = true }
 
 star-context = { path = "../star-context" }
+# ARG.4 (P3-C W4): crates/api 扩展 arg 模块 — 13 REST + 1 WebSocket
+# per docs/design/DD-AGENT-RELATIONSHIP-001.md v0.1.1 §4.12
+# 守门 #48 (2026-09-08 08:22 JST) axum 0.8 web framework lock
+axum = { version = "0.8", features = ["ws", "macros"] }
+# tokio-stream for broadcast::Receiver Stream impl (sse_hub)
+tokio-stream = "0.1"
+star-arg = { path = "../arg" }
 [lints]
 workspace = true
