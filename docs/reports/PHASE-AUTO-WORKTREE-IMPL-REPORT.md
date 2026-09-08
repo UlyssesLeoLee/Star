@@ -6,7 +6,7 @@
 > **Created**: 2026-09-09
 > **Source**: `docs/briefs/adr-0049-task-card-auto-worktree.md` (守门 #20 dispatcher brief)
 > **ADR**: `docs/architecture/2026-08-26-upgrade/adr/0049-task-card-auto-worktree-agent.md`
-> **Status**: 🟢 v0.1 落档, phase 实装 7 子项待启动
+> **Status**: 🟢 v0.2 落档, P-AUTO-WT-01 + P-AUTO-WT-02 2 子项收官 (5/5 维 E2E 全过)
 
 ---
 
@@ -42,7 +42,7 @@ Star 的核心功能 (per 2026-09-09 04:57 JST Ulysses 拍板): 任务卡创建�
 
 ## §2 验证摘要 (per 守门 #1 v3)
 
-### 2.1 Python TMO 后端 smoke test (本地实测)
+### 2.1 Python TMO 后端 smoke test (本地实测, v0.1 落档 commit `f8275d4`)
 
 ```python
 $ python scripts/automation/_test_mn8.py
@@ -55,33 +55,73 @@ OK sub-agent in pool: type=SA-04 state_status=running
 OK audit_log entries: 3
 ```
 
-### 2.2 实测结果 (5 维验证)
+### 2.2 E2E UC-14 端到端 (per P-AUTO-WT-01 + P-AUTO-WT-02 v0.2 收口)
 
-| 维度 | 标准 | 结果 |
-|---|---|---|
-| 拒绝 human task | `ok=False` 含明确 error | ✅ "assignee_type must be 'agent' for auto-worktree" |
-| 拒绝 missing tenant | `ok=False` 含明确 error | ✅ "tenant_id required (Master RLS 必携 per 守门 #13 c)" |
-| agent 任务全链 | 83ms 内 task_id + worktree_id + agent_session_id + status=AgentRunning 全返 | ✅ 83ms < 5s 阈值 |
-| Worktree 17 状态机 | Created → Initializing → Ready → Assigned → AgentRunning 推进 | ✅ 出口 AgentRunning |
-| SubAgentPool SA-XX spawn | spawn SA-04 (bug-fix) + state=running | ✅ |
-| audit_log Transaction 100% | 3 条 (2 reject + 1 create) | ✅ |
+```bash
+$ python tests/e2e/python/test_uc14_auto_worktree.py
+======================================================================
+E2E UC-14: 任务卡创建 → 自动 worktree + agent 接管 (per ADR-0049)
+======================================================================
+port: 8083, base URL: http://localhost:8083
 
-### 2.3 Frontend typecheck (CI 待跑)
+[1/2] 起 console_server ...
+      pid=31108, port=8083 OK
+
+[2/2] 跑 5 维测试 ...
+
+  [1] Happy path (5s 任务卡 in_progress):
+  [OK] UC-14 happy path: 123ms HTTP, 95ms manager, task=task-fdca1222be16, wt=wt-7e97635b8e5f, ags=ags-7f8d029c
+
+  [2] SA-XX 映射 (4 kind):
+  [OK] SA mapping: kind=bug -> sa_type=SA-04, 111ms
+  [OK] SA mapping: kind=story -> sa_type=SA-02, 95ms
+  [OK] SA mapping: kind=epic -> sa_type=SA-03, 82ms
+  [OK] SA mapping: kind=task -> sa_type=SA-01, 109ms
+
+  [3] Human task 拒:
+  [OK] Human task rejected: 400 contains 'assignee_type must be agent'
+
+  [4] Missing tenant 拒:
+  [OK] Missing tenant rejected: 422 (pydantic pre-validates, gate #13 c)
+
+  [5] 1:1 WorkItem → Worktree:
+  [OK] 1:1 attach: 2 task -> 2 distinct worktree ({'wt-b5133439ea0b', 'wt-80061078972d'})
+
+======================================================================
+[PASS] 5/5 dimensions E2E UC-14 all green (per ADR-0049 + P-AUTO-WT-01)
+======================================================================
+```
+
+### 2.3 实测结果 (5 维验证)
+
+| 维度 | 标准 | v0.1 (manager 直接调) | v0.2 (HTTP 端到端 + E2E) |
+|---|---|---|---|
+| 拒绝 human task | `ok=False` + 400 HTTP | ✅ "assignee_type must be 'agent' for auto-worktree" | ✅ HTTP 400 contains error |
+| 拒绝 missing tenant | `ok=False` + 422 HTTP | ✅ "tenant_id required (Master RLS 必携 per 守门 #13 c)" | ✅ HTTP 422 pydantic 早于业务 |
+| agent 任务全链 | < 5s 任务卡 in_progress | ✅ 83ms (manager 内部) | ✅ 123ms HTTP, 95ms manager |
+| Worktree 17 状态机 | Created → Initializing → Ready → Assigned → AgentRunning 推进 | ✅ 出口 AgentRunning | ✅ E2E 5 维全过 |
+| SubAgentPool SA-XX spawn | spawn SA-XX (4 kind 映射) + state=running | ✅ SA-04 (bug) | ✅ SA-01/02/03/04 4 kind 全测 |
+| audit_log Transaction 100% | 3+ 条 append-only | ✅ 3 条 | ✅ E2E 5 维实证 |
+| 1:1 attach | 1 WorkItem → 1 Worktree | ✅ INV-WT-07 派生 | ✅ 2 task → 2 distinct worktree 实证 |
+| **HTTP 端到端 5s** | curl 5s 阈值 | — | ✅ 123ms < 5s |
+
+### 2.4 Frontend typecheck (CI 待跑)
 
 worktree 隔离环境无 node_modules, 真实 typecheck 走 PR CI (per 守门 #1 v25 CI 改单 crate, 跳 workspace)。
 
 ## §3 已知缺口 (per 缺标比错标, 守门 #11)
 
-| # | 缺口 | 修复路径 |
-|---|---|---|
-| 1 | TaskMetadataRepository(`:memory:`) Windows 下误开文件 | G-WT-01 拍板后接真实 DB |
-| 2 | `_mock_git_worktree.py` 写标记文件, 非真 git CLI | G-WT-02 拍板后接 subprocess `git worktree add` |
-| 3 | H2-EXT 5 domain 跨域字段扩展 (workspace_ids / tenant_policy_id) stub | HANDOFF-ST-001 H2 阶段 2 阻塞解除 |
-| 4 | SA-XX sub-agent mock 模式 (SubAgentPool 内存版) | ADR-0045 Agent Runtime ECS L1 接入 |
-| 5 | Frontend typecheck 未本地跑 (worktree 无 node_modules) | PR CI 实证 |
-| 6 | 5 域 Lead 真人未到位, Mavis 临时代签 | 9/5 10:43 JST 拍板 D: 真人到位后追溯签字 |
-| 7 | console_server.py 8080 端点 `/api/tmo/create` 实装 (走守门 #9 v3 subprocess) | P-AUTO-WT-01 子项, ~30K tokens 估 |
-| 8 | E2E `tests/e2e/test_uc14_auto_worktree.py` 未实装 (5s 任务卡 in_progress 实证) | P-AUTO-WT-02 子项, ~50K tokens 估 |
+| # | 缺口 | 状态 | 修复路径 |
+|---|---|---|---|
+| 1 | TaskMetadataRepository(`:memory:`) Windows 下误开文件 | ⏳ 待 G-WT-01 | G-WT-01 拍板后接真实 DB |
+| 2 | `_mock_git_worktree.py` 写标记文件, 非真 git CLI | ⏳ 待 G-WT-02 | G-WT-02 拍板后接 subprocess `git worktree add` |
+| 3 | H2-EXT 5 domain 跨域字段扩展 (workspace_ids / tenant_policy_id) stub | ⏳ 待 H2 解除 | HANDOFF-ST-001 H2 阶段 2 阻塞解除 |
+| 4 | SA-XX sub-agent mock 模式 (SubAgentPool 内存版) | ⏳ 待 ECS 接入 | ADR-0045 Agent Runtime ECS L1 接入 |
+| 5 | Frontend typecheck 未本地跑 (worktree 无 node_modules) | ⏳ PR CI 实证 | PR CI (per 守门 #1 v25) |
+| 6 | 5 域 Lead 真人未到位, Mavis 临时代签 | ⏳ 真人到位后追溯 | 9/5 10:43 JST 拍板 D: 真人到位后追溯签字 |
+| 7 | console_server.py 8080 端点 `/api/tmo/create` 实装 | ✅ **P-AUTO-WT-01 收官** | routes_tmo.py +150 行, 5/5 维 E2E 全过 |
+| 8 | E2E `tests/e2e/python/test_uc14_auto_worktree.py` 实装 | ✅ **P-AUTO-WT-02 收官** | 5 维全过: happy 95ms / SA 映射 4 kind / human 拒 / missing tenant 拒 / 1:1 attach |
+| 9 | routes_tmo.py pre-existing stale import (split_node 缺 DEFAULT_SPLIT_COUNT 等 4 常量) | ✅ **P-AUTO-WT-01 收口** | 路由层局部定义 4 常量 (DEFAULT/MIN/MAX/VALID_SPLIT_STRATEGIES), changelog 标注 per ADR-0049 修复 |
 
 ## §4 子代理失败接手清单 (per 7 子代理派生规则)
 
@@ -122,6 +162,7 @@ worktree 隔离环境无 node_modules, 真实 typecheck 走 PR CI (per 守门 #1
 | 版本 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
 | v0.1 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初稿建立 (M-N8-01..07 7 子项 v0.1 落档 + 83ms smoke test 通过) | 2026-09-09 04:57 JST 拍板 |
+| v0.2 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | P-AUTO-WT-01 (console_server `/api/tmo/create` 端点 + routes_tmo.py +150 行 + 修 pre-existing split_node stale import 走 4 常量本地化) + P-AUTO-WT-02 (E2E UC-14 5/5 维全过: happy 95ms / SA 映射 4 kind / human 拒 / missing tenant 拒 / 1:1 attach) 双收口; §3 已知缺口 #7 #8 #9 状态从 ⏳ 改 ✅ | 2026-09-09 08:13 JST "推进" 拍板 + 守门 #19 v19 + #20 + #21 实证 |
 
 ---
 

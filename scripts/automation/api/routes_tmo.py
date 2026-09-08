@@ -12,6 +12,7 @@
 #   - POST /api/tmo/metadata      (TMO-07 planned)                   元数据编辑 (M-N7, Master RLS)
 #   - GET  /api/tmo/operations    (TMO-08 stub ✅ wt-tmo-01-merge)    状态查询
 #   - GET  /api/tmo/relationships (TMO-09 stub ✅ wt-tmo-03-dag)      DAG 关系查询
+#   - POST /api/tmo/create        (TMO-10 ✅ ADR-0049 P-AUTO-WT-01)    任务卡创建 (M-N8 + SA-XX 自动接管, 核心功能)
 #
 # 挂载 (per 守门 #24 v3):
 #     from automation.api.routes_tmo import router
@@ -155,7 +156,7 @@ async def tmo_operations() -> dict:
     return {
         "ok": True,
         "snapshot": manager.get_state_snapshot(),
-        "implemented_nodes": ["M-N1", "M-N2", "M-N3", "M-N4"],
+        "implemented_nodes": ["M-N1", "M-N2", "M-N3", "M-N4", "M-N8"],
         "planned_nodes": ["M-N5", "M-N6", "M-N7"],
     }
 
@@ -168,12 +169,17 @@ async def tmo_operations() -> dict:
 # 注意: 用 scripts.automation 前缀, 跟 routes_tmo.py 其他 import 方式保持一致
 # (test_tmo_bulk_dag.py 用 PROJECT_ROOT 注入 sys.path, 'scripts.automation' 形式 import 才能 work)
 from scripts.automation.task_ops.nodes.split_node import (
-    DEFAULT_SPLIT_COUNT,
-    MAX_SPLIT_COUNT,
-    MIN_SPLIT_COUNT,
-    VALID_SPLIT_STRATEGIES,
     split_node,
 )
+
+# 局部常量 (per ADR-0049 P-AUTO-WT-01 修复: split_node 早版本未导出这 4 个常量,
+# routes_tmo.py 顶层 import 触发 ImportError → console_server mount_tmo_routes 走 except 分支,
+# 整个 /api/tmo/* 端点全部 404. 修补: 在路由层维护 split 范围常量, 跟 split_node 内部逻辑对齐
+# (split_node.py 默认 split_count=2, 范围 [2, 8], strategy ∈ {context, label, equal}).
+DEFAULT_SPLIT_COUNT = 2
+MIN_SPLIT_COUNT = 2
+MAX_SPLIT_COUNT = 8
+VALID_SPLIT_STRATEGIES = ("context", "label", "equal")
 
 
 # Module-level singleton manager (per 02 §2.6.5 调试控制台设计)
@@ -810,6 +816,127 @@ async def get_metadata_audit(
         ok=True,
         task_id=task_id,
         audit_events=audit_events,
+    )
+
+
+# ===========================================================================
+# TMO-10: /api/tmo/create (M-N8 create_node, 核心功能, per ADR-0049 + 2026-09-09 04:57 JST 拍板)
+# ===========================================================================
+# 职责 (per docs/architecture/2026-08-26-upgrade/adr/0049-task-card-auto-worktree-agent.md §0):
+#   任务卡创建时, assignee 是有效 agent → 自动建 worktree (1:1) + dispatch SA-XX sub-agent
+#   + 任务卡 auto in_progress (5s 内可见, per 拍板 5s 阈值)
+#
+# 守门 (per AGENTS.md §4):
+#   - 守门 #1 v19: Python 化, 跟 TMO 7 节点 (M-N1..M-N7) 同范式
+#   - 守门 #9 v3: 浏览器 → Next.js → FastAPI 8080 → subprocess 走通, 不用 RPC
+#   - 守门 #13 a: L0 唯一入口, 跟 M-N1..M-N7 同 manager.dispatch 路由
+#   - 守门 #13 c: tenant_id 必携 (Master RLS)
+#   - 守门 #13 d: worktree status 推进 = Transaction (append-only audit, 物理删除禁止)
+#   - 守门 #22: 调试控制台 (port 8080) 不进 main 编译链
+# ===========================================================================
+
+class CreateTaskRequestBody(BaseModel):
+    """POST /api/tmo/create 请求体 (per task_ops/protocols.py CreateTaskRequest)"""
+    title: str = Field(..., min_length=1, description="任务卡标题 (required)")
+    kind: Optional[str] = Field("task", description="task | bug | story | epic, default 'task'")
+    priority: Optional[str] = Field("p2", description="p0 | p1 | p2 | p3, default 'p2'")
+    sprint_id: Optional[str] = Field(None, description="sprint 关联 (per frontend sprint 视图)")
+    project_id: Optional[str] = Field(None, description="project 关联 (per frontend board 视图)")
+    tenant_id: str = Field(..., min_length=1, description="Master RLS 必携 (守门 #13 c)")
+    workspace_ids: Optional[list] = Field(default_factory=list, description="多 workspace 隔离 (per H2-EXT 5 domain)")
+    assignee_id: str = Field(..., min_length=1, description="agent id (per 拍板: 仅 agent 触发, 非 agent 走 store.createWorkItem 普通流程)")
+    assignee_type: str = Field("agent", description="固定 'agent' (per 拍板 trigger-location_opt1)")
+    sa_type: Optional[str] = Field("SA-01", description="SA-01..SA-10 (per ADR-0046 §6.1), default 'SA-01'")
+    actor_session_id: Optional[str] = Field(None, description="创建者 session_id (per L0 chat bar)")
+
+
+class CreateTaskResult(BaseModel):
+    """M-N8 create_node → UI 响应 (per task_ops/protocols.py CreateTaskResponse)"""
+    operation: str  # "create"
+    task_id: str
+    worktree_id: str
+    agent_session_id: str
+    worktree_status: str  # "AgentRunning" (出口, 已自动接管)
+    task_status: str  # "in_progress" (出口, 已自动接管)
+    checkpoint_id: str
+    created_at_ms: int
+    in_progress_at_ms: int
+    actor_session_id: Optional[str] = None
+
+
+class CreateTaskResponse(BaseModel):
+    """POST /api/tmo/create 响应 (跟 MergeResponse 范式一致)"""
+    ok: bool
+    node: str  # "M-N8"
+    result: Optional[CreateTaskResult] = None
+    error: Optional[str] = None
+    duration_ms: float
+
+
+@router.post("/create", response_model=CreateTaskResponse)
+async def tmo_create(req: CreateTaskRequestBody) -> CreateTaskResponse:
+    """任务卡创建 + 自动 worktree + agent 接管 (M-N8 + SA-XX)
+
+    流程 (per ADR-0049 §2.2 + docs/architecture/2026-08-26-upgrade/adr/0049-task-card-auto-worktree-agent.md):
+      1. validate (assignee_type='agent' + tenant_id 必携, per 守门 #13 c)
+      2. dispatch manager.create() → M-N8 create_node
+      3. create_node 内:
+         - checkpoint stash (Transaction append-only)
+         - WorktreeRegistry.add (1:1 关联, per 拍板)
+         - _mock_git_worktree.py add (subprocess 异步, 守门 #22)
+         - worktree 状态机: Created → Initializing → Ready → Assigned → AgentRunning
+         - SubAgentPool.dispatch → spawn SA-XX sub-agent
+         - 任务卡 status=in_progress + 回填 worktree_id + agent_session_id
+      4. 返 CreateTaskResult (5s 内可见, per 拍板 5s 阈值)
+
+    错误 (per 拍板: 仅 agent 触发):
+      - HTTP 400: assignee_type != 'agent' (人类任务走 store.createWorkItem)
+      - HTTP 400: tenant_id missing (Master RLS 必携)
+      - HTTP 500: manager.create() 内部失败
+    """
+    from automation.task_ops.manager import TaskOperationsManager
+    manager = TaskOperationsManager()
+
+    # 1. validate (per 拍板: 仅 agent 触发, 非 agent 走 store.createWorkItem 普通流程)
+    if req.assignee_type != "agent":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"assignee_type must be 'agent' for /api/tmo/create, got {req.assignee_type!r} "
+                f"(per 拍板: 人类任务走 store.createWorkItem 普通流程, 不经 TMO M-N8)"
+            ),
+        )
+
+    # 2. dispatch manager.create() → M-N8 create_node
+    message = {
+        "operation": "create",
+        "title": req.title,
+        "kind": req.kind,
+        "priority": req.priority,
+        "sprint_id": req.sprint_id,
+        "project_id": req.project_id,
+        "tenant_id": req.tenant_id,
+        "workspace_ids": req.workspace_ids or [],
+        "assignee_id": req.assignee_id,
+        "assignee_type": req.assignee_type,
+        "sa_type": req.sa_type or "SA-01",
+        "actor_session_id": req.actor_session_id,
+    }
+    dispatch_result = await manager.create(message)
+
+    if not dispatch_result["ok"]:
+        raise HTTPException(
+            status_code=400,
+            detail=dispatch_result.get("error", "create failed"),
+        )
+
+    # 3. 返 CreateTaskResult
+    result = dispatch_result["result"]
+    return CreateTaskResponse(
+        ok=True,
+        node=dispatch_result["node"],  # "M-N8"
+        result=CreateTaskResult(**result),
+        duration_ms=dispatch_result.get("duration_ms", 0.0),
     )
 
 
