@@ -31,6 +31,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # HTTP server (跟 star-mcp / star-api-rest 同版本)
 axum = "0.8"
 
+# HTTP client (F-02 真实 LLM 通道, OpenAI/Anthropic)
+reqwest = { workspace = true }
+
+# 凭证加密 (F-02 LLM API key 走 star-credential KMS, 守门 #5 v2)
+star-credential = { path = "../star-credential" }
+
 # Async trait for ops_ai::AiChannel
 async-trait = { workspace = true }
 
@@ -39,7 +45,6 @@ async-trait = { workspace = true }
 
 # 实装阶段再引入 (per SRS-001 §10.2)
 # kube = { version = "0.95" }        # K8s client (F-01)
-# reqwest = { version = "0.12" }     # 真实 LLM 通道 (F-02)
 # walkdir = "2"                      # F-04 文档扫描
 
 [dev-dependencies]
