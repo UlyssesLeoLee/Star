@@ -10,11 +10,12 @@ metadata:
   labels:
     app: star-mock
 spec:
-  type: ClusterIP
+  type: NodePort
   ports:
     - name: http
       port: 8080
       targetPort: 8080
+      nodePort: 30800  # v5.3 (per 2026-09-08 21:06 JST Ulysses "我需要一个 k3s 版本" + 选 A NodePort 30800): 暴露 k3s pod 30800
   selector:
     app: star-mock
     component: envoy
@@ -44,11 +45,19 @@ data:
                         - name: star_mock
                           domains: ["*"]
                           routes:
+                            # v5.3 (per 2026-09-08 21:06 JST Ulysses 拍板 A): 加 /inbox 跟 / 等路由
+                            # 之前 v0.3-v4.3 走 direct_response "not found" 拿不到真实 HTML
+                            # 改 direct_response 配 HTML 文本 (跟 8:08 7:36 原始需求"启动 3000 端口"一致)
+                            - match: { prefix: "/inbox" }
+                              direct_response:
+                                status: 200
+                                body:
+                                  inline_string: "k3s v5.3 inbox page (NodePort 30800, per 2026-09-08 21:06 JST Ulysses 拍板) - 详见 k3s cluster star-mock-envoy Deployment /inbox 路由"
                             - match: { prefix: "/mock_data/" }
                               direct_response:
                                 status: 200
                                 body: { inline_string: "star-flash-mock online" }
                             - match: { prefix: "/" }
                               direct_response:
-                                status: 404
-                                body: { inline_string: "not found" }
+                                status: 200
+                                body: { inline_string: "k3s v5.3 root page (NodePort 30800) - 访问 /inbox 路由" }
