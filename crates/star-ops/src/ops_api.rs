@@ -520,8 +520,7 @@ mod tests {
         let body_bytes = to_bytes(response.into_body(), 1024 * 1024)
             .await
             .expect("body readable");
-        let body: serde_json::Value =
-            serde_json::from_slice(&body_bytes).expect("body is JSON");
+        let body: serde_json::Value = serde_json::from_slice(&body_bytes).expect("body is JSON");
         let data = body["data"].as_array().expect("data is array");
         assert_eq!(data.len(), 5, "F-03 端到端必返 5 KPI");
 
@@ -529,7 +528,13 @@ mod tests {
             .iter()
             .map(|m| m["name"].as_str().unwrap().to_string())
             .collect();
-        for n in ["cpu_avg", "mem_avg", "active_tasks", "mcp_qps", "llm_token_daily"] {
+        for n in [
+            "cpu_avg",
+            "mem_avg",
+            "active_tasks",
+            "mcp_qps",
+            "llm_token_daily",
+        ] {
             assert!(names.contains(&n.to_string()), "缺 KPI: {}", n);
         }
 

@@ -226,7 +226,9 @@ async fn it_cluster_canary_validates_weight_range() {
                 .method("POST")
                 .uri("/api/ops/cluster/canary")
                 .header("content-type", "application/json")
-                .body(axum::body::Body::from(serde_json::to_vec(&req_boundary).unwrap()))
+                .body(axum::body::Body::from(
+                    serde_json::to_vec(&req_boundary).unwrap(),
+                ))
                 .unwrap(),
         )
         .await

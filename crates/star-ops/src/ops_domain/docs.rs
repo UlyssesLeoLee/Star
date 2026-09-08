@@ -310,11 +310,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&tmp);
         let _ = std::fs::create_dir_all(&tmp.join("docs/requirements"));
         // 写一个正常 .md
-        std::fs::write(
-            tmp.join("docs/requirements/SRS-test.md"),
-            "# Test\n",
-        )
-        .expect("write ok");
+        std::fs::write(tmp.join("docs/requirements/SRS-test.md"), "# Test\n").expect("write ok");
 
         let scanner = DocScanner { root: tmp.clone() };
         let docs = scanner.list();

@@ -44,8 +44,7 @@ async fn it_metrics_summary_end_to_end() {
     let body_bytes = to_bytes(response.into_body(), 1024 * 1024)
         .await
         .expect("body readable");
-    let body: serde_json::Value =
-        serde_json::from_slice(&body_bytes).expect("body is JSON");
+    let body: serde_json::Value = serde_json::from_slice(&body_bytes).expect("body is JSON");
     let data = body["data"].as_array().expect("data is array");
     assert_eq!(data.len(), 5, "F-03 端到端必返 5 KPI");
 
@@ -53,7 +52,13 @@ async fn it_metrics_summary_end_to_end() {
         .iter()
         .map(|m| m["name"].as_str().unwrap().to_string())
         .collect();
-    for n in ["cpu_avg", "mem_avg", "active_tasks", "mcp_qps", "llm_token_daily"] {
+    for n in [
+        "cpu_avg",
+        "mem_avg",
+        "active_tasks",
+        "mcp_qps",
+        "llm_token_daily",
+    ] {
         assert!(names.contains(&n.to_string()), "缺 KPI: {}", n);
     }
 
@@ -100,7 +105,10 @@ async fn it_star_telemetry_aggregation_via_metrics_aggregator() {
         .iter()
         .find(|m| m.name == "llm_token_daily")
         .unwrap();
-    assert_eq!(tokens.value, 525.0, "llm_token_daily 必 = sum(input+output)");
+    assert_eq!(
+        tokens.value, 525.0,
+        "llm_token_daily 必 = sum(input+output)"
+    );
 }
 
 /// F-03 端到端 IT: 1 表 DDL 存在性检查 (跨 crate IT, 不实跑 SQL)
@@ -186,7 +194,11 @@ async fn it_metrics_summary_handles_star_telemetry_failure() {
     // 模拟 telemetry 调用失败 — 走默认实现, 不接外部 Prometheus
     // 派生测: 验证 summary 必返 5 KPI, 不 panic
     let metrics = agg.summary().await;
-    assert_eq!(metrics.len(), 5, "telemetry 失败时 summary 必返 5 KPI (mock 兜底)");
+    assert_eq!(
+        metrics.len(),
+        5,
+        "telemetry 失败时 summary 必返 5 KPI (mock 兜底)"
+    );
 
     // 派生文档: 守门 #11 缺标比错标 — [M] 阶段加 telemetry failure handling
     // 实证: star-telemetry mock 永远 Ok, 派生测验证兜底路径

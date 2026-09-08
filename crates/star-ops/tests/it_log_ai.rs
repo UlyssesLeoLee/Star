@@ -183,10 +183,7 @@ async fn it_log_analysis_returns_anomaly_on_error_log() {
     };
 
     let ladder = default_ladder();
-    let analysis = ladder
-        .analyze_log(&log)
-        .await
-        .expect("Ladder 必返 Ok");
+    let analysis = ladder.analyze_log(&log).await.expect("Ladder 必返 Ok");
 
     // 守门 #23: ERROR log 触发至少 1 anomaly (subprocess 模板或 in-process mock)
     // 注意: subprocess ai_log_mock.py 的模板可能返 0 anomaly, 但 mock_analyze 必返 1
@@ -221,10 +218,7 @@ async fn it_log_analysis_returns_no_anomaly_on_info_log() {
     };
 
     let ladder = default_ladder();
-    let analysis = ladder
-        .analyze_log(&log)
-        .await
-        .expect("Ladder 必返 Ok");
+    let analysis = ladder.analyze_log(&log).await.expect("Ladder 必返 Ok");
 
     // 守门 #23: INFO log 走 L1 mock 兜底时, in-process mock_analyze 返 0 anomaly
     // (subprocess ai_log_mock.py 可能返任意结果, 我们只验证 L1 走通)
@@ -299,7 +293,10 @@ async fn it_ladder_fallback_to_openai_stub_when_mock_fails() {
     // MVP 阶段: default_ladder 走 L1 mock (永远成功), 不走 L2 openai_stub
     let ladder = default_ladder();
     let analysis = ladder.analyze_log(&log).await.expect("Ladder 必 Ok");
-    assert_eq!(analysis.generated_by, "mock", "L1 mock 兜底, 不走 L2 fallback");
+    assert_eq!(
+        analysis.generated_by, "mock",
+        "L1 mock 兜底, 不走 L2 fallback"
+    );
     // 派生文档: 守門 #11 缺标比错标 — [M] 阶段加 mock 失败触发 L2 fallback
 }
 
@@ -330,7 +327,10 @@ async fn it_ladder_openai_stub_disabled_without_api_key() {
     let ladder = default_ladder();
     let analysis = ladder.analyze_log(&log).await.expect("Ladder 必 Ok");
     // 验证: 必走 L1 mock (因为 openai_stub disabled)
-    assert_eq!(analysis.generated_by, "mock", "openai_stub disabled → 走 L1 mock");
+    assert_eq!(
+        analysis.generated_by, "mock",
+        "openai_stub disabled → 走 L1 mock"
+    );
 }
 
 /// 派生: DDL 路径一致性 (docs/migrations/ → db/migrations/) 修复
@@ -356,7 +356,10 @@ fn it_ddl_path_consistency_docs_vs_db() {
 
     // 验证: 必含 3 表 (ops_log_query_log T + ops_log_entry W + ops_log_analysis W)
     let sql = std::fs::read_to_string(&db_path).expect("read DDL ok");
-    assert!(sql.contains("ops_log_query_log"), "ops_log_query_log T 必含");
+    assert!(
+        sql.contains("ops_log_query_log"),
+        "ops_log_query_log T 必含"
+    );
     assert!(sql.contains("ops_log_entry"), "ops_log_entry W 必含");
     assert!(sql.contains("ops_log_analysis"), "ops_log_analysis W 必含");
     // 派生文档: docs/migrations/2026-09-08-ops-log.sql 旧版可保留 (向后兼容)

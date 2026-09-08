@@ -137,10 +137,7 @@ mod tests {
             fn is_enabled(&self) -> bool {
                 true
             }
-            async fn analyze_log(
-                &self,
-                _log: &LogEntry,
-            ) -> Result<LogAnalysis, OpsError> {
+            async fn analyze_log(&self, _log: &LogEntry) -> Result<LogAnalysis, OpsError> {
                 self.call_count.fetch_add(1, Ordering::SeqCst);
                 Err(OpsError::Internal(format!("{} 失败", self.name)))
             }
@@ -206,10 +203,7 @@ mod tests {
             fn is_enabled(&self) -> bool {
                 self.enabled
             }
-            async fn analyze_log(
-                &self,
-                _log: &LogEntry,
-            ) -> Result<LogAnalysis, OpsError> {
+            async fn analyze_log(&self, _log: &LogEntry) -> Result<LogAnalysis, OpsError> {
                 self.call_count.fetch_add(1, Ordering::SeqCst);
                 Ok(LogAnalysis {
                     log_id: uuid::Uuid::nil(),
@@ -248,11 +242,7 @@ mod tests {
 
         let result = ladder.analyze_log(&log).await.expect("Ladder 必返 Ok");
         // 验证: 跳过 disabled 通道, 走 enabled 通道
-        assert_eq!(
-            counter1.load(Ordering::SeqCst),
-            0,
-            "disabled 通道必不被调"
-        );
+        assert_eq!(counter1.load(Ordering::SeqCst), 0, "disabled 通道必不被调");
         assert_eq!(counter2.load(Ordering::SeqCst), 1, "enabled 通道必被调");
         assert_eq!(result.generated_by, "enabled", "必返 enabled 通道结果");
     }
