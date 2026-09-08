@@ -22,7 +22,7 @@
 //! - **INV-SCM-07** `PullRequest.state` 状态机严格按 §7.5 迁移
 //! - **INV-SCM-08** Webhook 入站 100% 写 Audit
 //!
-//! ## PR 状态机(7 状态,§7.5)
+//! ## PR 状态机(8 状态,§7.5)
 //! DRAFT → OPEN → REVIEWING → CHANGES_REQUESTED → APPROVED → MERGEABLE → MERGED → CLOSED
 //!
 //! Lead 责任: scm Lead
@@ -230,7 +230,7 @@ impl Default for ConflictStrategy {
     }
 }
 
-/// **PR 状态**(7 状态机,§7.5)
+/// **PR 状态**(8 状态机,§7.5)
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

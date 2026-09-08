@@ -971,22 +971,23 @@ export const FEEDBACK_SM: StateMachine = {
 };
 
 export const PR_SM: StateMachine = {
-  name: "PR 7 状态机",
+  name: "PR 8 状态机",
   states: [
-    "draft", "open", "ci_failed", "review_required",
-    "approved", "merged", "closed",
+    "draft", "open", "reviewing", "changes_requested",
+    "approved", "mergeable", "merged", "closed",
   ],
   initial: "draft",
   invariant_ids: ["INV-SCM-05", "INV-SCM-06", "INV-SCM-07", "INV-SCM-08"],
   transitions: [
-    { from: "draft",           to: "open",             trigger: "ready_for_review" },
-    { from: "open",            to: "ci_failed",        trigger: "ci.fail" },
-    { from: "ci_failed",       to: "open",             trigger: "fix.push" },
-    { from: "open",            to: "review_required",  trigger: "review.requested" },
-    { from: "review_required", to: "approved",         trigger: "review.approved" },
-    { from: "review_required", to: "open",             trigger: "review.changes_requested" },
-    { from: "approved",        to: "merged",           trigger: "user.merge" },
-    { from: "open",            to: "closed",           trigger: "user.close" },
+    { from: "draft",            to: "open",              trigger: "ready_for_review" },
+    { from: "open",             to: "reviewing",         trigger: "review.started" },
+    { from: "reviewing",        to: "changes_requested", trigger: "review.changes_requested" },
+    { from: "reviewing",        to: "approved",          trigger: "review.approved" },
+    { from: "changes_requested", to: "reviewing",        trigger: "fix.pushed" },
+    { from: "approved",         to: "mergeable",         trigger: "ci.gate.pass" },
+    { from: "mergeable",        to: "merged",            trigger: "user.merge" },
+    { from: "open",             to: "closed",            trigger: "user.close" },
+    { from: "reviewing",        to: "closed",            trigger: "user.close" },
   ],
 };
 

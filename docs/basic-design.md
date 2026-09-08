@@ -2734,7 +2734,7 @@ DRAFT → OPEN → REVIEWING
 | Feedback | 6 | 3 (User / Agent / Application) | A.3 |
 | AgentSession | 14 | 4 (SaaS / Local / Agent / Timeout) | A.4 |
 | ValidationResult | 6 | 2 (CI / Local) | A.5 |
-| PullRequest | 7 | 2 (User / Webhook) | A.6 |
+| PullRequest | 8 | 2 (User / Webhook) | A.6 |
 | Decision | 3 | 2 (User / System) | A.7 |
 
 ---
