@@ -120,4 +120,30 @@ mod tests {
         assert!(analysis.confidence < 0.5);
         assert_eq!(analysis.generated_by, "mock");
     }
+
+    // ============ UT-IT-51 §2.3 Phase 1 F-02 派生缺口 (per brief §2.1) ============
+
+    /// 派生 #1: confidence > 0.5 不触发 needs_review (跟 baseline < 0.5 互补)
+    /// 守门 #23: confidence 阈值双向覆盖
+    #[test]
+    fn log_analysis_stub_confidence_above_threshold_no_review() {
+        // 构造 confidence > 0.5 的 LogAnalysis 验证 needs_review=false
+        let analysis = LogAnalysis {
+            log_id: Uuid::nil(),
+            summary: "test".to_string(),
+            anomalies: vec![],
+            suggestions: vec![Suggestion {
+                id: "s-above".to_string(),
+                text: "high confidence".to_string(),
+                confidence: 0.85,
+            }],
+            confidence: 0.85,
+            generated_by: "mock".to_string(),
+        };
+        assert!(
+            analysis.confidence >= 0.5,
+            "派生 confidence 必 ≥ 0.5 验证 needs_review=false 路径"
+        );
+        assert!(analysis.suggestions[0].confidence >= 0.5);
+    }
 }

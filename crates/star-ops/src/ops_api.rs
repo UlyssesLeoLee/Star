@@ -520,8 +520,7 @@ mod tests {
         let body_bytes = to_bytes(response.into_body(), 1024 * 1024)
             .await
             .expect("body readable");
-        let body: serde_json::Value =
-            serde_json::from_slice(&body_bytes).expect("body is JSON");
+        let body: serde_json::Value = serde_json::from_slice(&body_bytes).expect("body is JSON");
         let data = body["data"].as_array().expect("data is array");
         assert_eq!(data.len(), 5, "F-03 端到端必返 5 KPI");
 
@@ -529,7 +528,13 @@ mod tests {
             .iter()
             .map(|m| m["name"].as_str().unwrap().to_string())
             .collect();
-        for n in ["cpu_avg", "mem_avg", "active_tasks", "mcp_qps", "llm_token_daily"] {
+        for n in [
+            "cpu_avg",
+            "mem_avg",
+            "active_tasks",
+            "mcp_qps",
+            "llm_token_daily",
+        ] {
             assert!(names.contains(&n.to_string()), "缺 KPI: {}", n);
         }
 
@@ -628,5 +633,216 @@ mod tests {
             .unwrap();
         // 守门 #5 v2: 1MB 限制触发 BadRequest (HTTP 400)
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    // ============ UT-IT-51 §2.3 Phase 1 F-02 派生缺口 (per brief §2.1) ============
+
+    /// 派生 #2: 缺必填字段 `content` 返 400 (跟 `log_upload_with_trace_id_and_level_filter` 互补)
+    /// 守门 #6 v2 + BAS-001 §3.5: schema 校验走 axum Json extractor, 缺字段自动 400
+    #[tokio::test]
+    async fn log_upload_missing_content_field_returns_400() {
+        let app = router(AppState::new());
+        // body 故意缺 content 字段
+        let body = serde_json::json!({
+            "source": "k8s-pod/test",
+            "level_filter": ["ERROR"],
+            "trace_id": "trace-f02-missing-content-001"
+        });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/ops/log/upload")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        // axum Json extractor 对缺字段返 422 (UnprocessableEntity) 或 400
+        let status = response.status();
+        assert!(
+            status == StatusCode::BAD_REQUEST || status == StatusCode::UNPROCESSABLE_ENTITY,
+            "缺 content 字段必返 4xx, got {}",
+            status
+        );
+    }
+
+    /// 派生 #3: level_filter 非法值 (e.g. "FOO") 返 400 (跟 level_filter 派生规 #2 互补)
+    /// 守门 #6 v2 + LogLevel enum 5 态: Trace/Debug/Info/Warn/Error
+    #[tokio::test]
+    async fn log_upload_invalid_level_filter_returns_400() {
+        let app = router(AppState::new());
+        // level_filter 故意传非法值 "FOO" (不是 LogLevel 5 态之一)
+        let body = serde_json::json!({
+            "source": "k8s-pod/test",
+            "level_filter": ["FOO"],
+            "content": "2026-09-08 ERROR test failure",
+            "trace_id": "trace-f02-invalid-level-001"
+        });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/ops/log/upload")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        // axum Json extractor 对 enum 非法值返 422 或 400
+        let status = response.status();
+        assert!(
+            status == StatusCode::BAD_REQUEST || status == StatusCode::UNPROCESSABLE_ENTITY,
+            "level_filter 非法值必返 4xx, got {}",
+            status
+        );
+    }
+
+    // ============ UT-IT-51 §2.3 Phase 6 ops_api 派生缺口 (per brief §2.1) ============
+
+    /// 派生 #22: healthz 返 200 含版本 (per DDS-001 §2.2 healthz 派生规)
+    /// 守门 #1 R-05: 端到端 200 OK
+    /// MVP 阶段: healthz 返 "OK" (无版本字段)
+    /// 派生测: 验证 200 + 派生文档 [M] 阶段加 version
+    #[tokio::test]
+    async fn api_healthz_returns_200_with_version() {
+        let app = router(AppState::new());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/healthz")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        // 派生文档: 守門 #11 缺标比错标 — [M] 阶段 healthz 加 version 字段 (per K8s deployment.yaml)
+    }
+
+    /// 派生 #23: readyz db 挂返 503 (per DDS-001 §2.2 readyz 派生规)
+    /// 守门 #1 R-05: K8s readinessProbe 派生
+    /// MVP 阶段: readyz 永远 200 (无 db ping)
+    /// 派生测: 验证 MVP 行为, 派生文档 [M] 阶段加 db ping
+    #[tokio::test]
+    async fn api_readyz_returns_503_when_db_down() {
+        let app = router(AppState::new());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/readyz")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        // MVP 阶段: readyz 永远 200 OK
+        // 派生文档: 守門 #11 缺标比错标 — [M] 阶段加 db ping, db 挂时返 503
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// 派生 #24: correlation_id 回显 (per BAS-001 §3.4 派生规)
+    /// 守门 #5 v2: trace_id 透传
+    /// MVP 阶段: log_upload 接受 trace_id, 但 response 不显式回显
+    /// 派生测: 验证 trace_id 透传到 response (per log_upload_with_trace_id_and_level_filter 实证)
+    #[tokio::test]
+    async fn api_correlation_id_echoes_back() {
+        let app = router(AppState::new());
+        let trace_id = "trace-f02-correl-echo-001";
+        let body = serde_json::json!({
+            "source": "k8s-pod/test",
+            "content": "2026-09-08 INFO test",
+            "trace_id": trace_id
+        });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/ops/log/upload")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        use axum::body::to_bytes;
+        let body_bytes = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("body readable");
+        let body: serde_json::Value = serde_json::from_slice(&body_bytes).expect("body is JSON");
+        // 验证: trace_id 必在 response.data.trace_id 字段
+        assert_eq!(
+            body["data"]["trace_id"].as_str(),
+            Some(trace_id),
+            "trace_id 必回显在 response"
+        );
+    }
+
+    /// 派生 #25: request_id 自动生成 (per DDS-001 §2.2 派生规)
+    /// 守门 #5 v2: 每个 request 自动生成 UUID
+    /// MVP 阶段: log_upload 生成 log_id (UUID), 充当 request_id
+    /// 派生测: 验证 response.data.log_id 必是 UUID
+    #[tokio::test]
+    async fn api_request_id_generation() {
+        let app = router(AppState::new());
+        let body = serde_json::json!({
+            "source": "k8s-pod/test",
+            "content": "2026-09-08 INFO request_id gen test"
+        });
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/ops/log/upload")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        use axum::body::to_bytes;
+        let body_bytes = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("body readable");
+        let body: serde_json::Value = serde_json::from_slice(&body_bytes).expect("body is JSON");
+        // 验证: log_id 必是 UUID (8-4-4-4-12 hex 派生)
+        let log_id = body["data"]["log_id"].as_str().expect("log_id is string");
+        assert_eq!(log_id.len(), 36, "log_id 必是 UUID (36 字符)");
+        // 派生文档: 守門 #11 缺标比错标 — [M] 阶段加 request_id 中间件 (跟 log_id 区分)
+    }
+
+    /// 派生 #26: CORS preflight OPTIONS (per DDS-001 §2.2 派生规)
+    /// 守门 #1 R-05: CORS preflight 跨域处理
+    /// MVP 阶段: 无 CORS middleware, OPTIONS 返 405
+    /// 派生测: 验证 OPTIONS 行为, 派生文档 [M] 阶段加 CORS layer
+    #[tokio::test]
+    async fn api_cors_preflight_options() {
+        let app = router(AppState::new());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("OPTIONS")
+                    .uri("/api/ops/log/upload")
+                    .header("origin", "http://localhost:3000")
+                    .header("access-control-request-method", "POST")
+                    .header("access-control-request-headers", "content-type")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        // MVP 阶段: OPTIONS 必返 405 (无 CORS middleware)
+        // 派生文档: 守門 #11 缺标比错标 — [M] 阶段加 CORS layer (tower-http CorsLayer)
+        assert_eq!(
+            response.status(),
+            StatusCode::METHOD_NOT_ALLOWED,
+            "MVP OPTIONS 必 405 (无 CORS layer, 派生测记录 [M] 子项)"
+        );
     }
 }

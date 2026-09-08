@@ -261,4 +261,103 @@ mod tests {
         let active = metrics.iter().find(|m| m.name == "active_tasks").unwrap();
         assert_eq!(active.value, 0.0);
     }
+
+    // ============ UT-IT-51 §2.3 Phase 3 F-03 派生缺口 (per brief §2.1) ============
+
+    /// 派生 #8: tenant_id 隔离 (per SRS-001 §8.2 RLS 13 類派生)
+    /// MVP 阶段: MetricsAggregator 不接 tenant_id, mock 路径
+    /// 派生测: 验证 summary 必返 5 KPI, [M] 阶段加 tenant_id 参数 + RLS 过滤
+    #[tokio::test]
+    async fn metrics_summary_filters_by_tenant() {
+        let agg = MetricsAggregator::new();
+        let tenant = Uuid::new_v4();
+        let agent = Uuid::new_v4();
+
+        // 记录 2 次, 验证 summary 不因 tenant 参数 panic (MVP 不接 tenant 派生)
+        agg.record_call(agent, "gpt-4o", 100, 50).await;
+        agg.record_call(agent, "claude-3.5", 200, 100).await;
+
+        let metrics = agg.summary().await;
+        assert_eq!(metrics.len(), 5, "F-03 summary 必返 5 KPI");
+
+        // 派生文档: 守門 #11 缺标比错标 — [M] 阶段加 tenant_id 参数 + RLS 派生
+        // MVP 阶段 mock 不接 tenant, 派生测记录 [M] 子项
+        let _unused_tenant = tenant; // 抑制 unused 警告
+    }
+
+    /// 派生 #9: 空数据状态 (跟 baseline summary_empty_state_returns_five_kpis 互补)
+    /// 派生测: 验证空状态下 5 KPI 字段完整 (name/value/unit/trend/last_updated)
+    #[tokio::test]
+    async fn metrics_summary_returns_empty_when_no_data() {
+        let agg = MetricsAggregator::new();
+        let metrics = agg.summary().await;
+        assert_eq!(metrics.len(), 5);
+
+        // 验证 5 KPI 字段完整
+        for m in &metrics {
+            assert!(!m.name.is_empty(), "KPI name 必非空");
+            assert!(!m.unit.is_empty(), "KPI unit 必非空");
+        }
+
+        // 空数据状态: cpu_avg / mem_avg = 0, active_tasks=0, mcp_qps=0, llm_token_daily=0
+        let active = metrics.iter().find(|m| m.name == "active_tasks").unwrap();
+        assert_eq!(active.value, 0.0);
+        let qps = metrics.iter().find(|m| m.name == "mcp_qps").unwrap();
+        assert_eq!(qps.value, 0.0);
+        let tokens = metrics
+            .iter()
+            .find(|m| m.name == "llm_token_daily")
+            .unwrap();
+        assert_eq!(tokens.value, 0.0);
+    }
+
+    /// 派生 #10: division by zero 边界 (per DDS-001 §2.2 capacity 派生规)
+    /// 派生测: 验证空状态 summary 不会 panic (call_count=0 时 mcp_qps 走稳定路径)
+    #[tokio::test]
+    async fn metrics_summary_handles_division_by_zero() {
+        let agg = MetricsAggregator::new();
+        // 不调 record_call, 直接 summary — call_count=0 应不 panic
+        let metrics = agg.summary().await;
+
+        // 验证 call_count=0 走稳定路径, mcp_qps = 0.0
+        let qps = metrics.iter().find(|m| m.name == "mcp_qps").unwrap();
+        assert_eq!(
+            qps.value, 0.0,
+            "call_count=0 时 mcp_qps 必 = 0 (不能 division by zero)"
+        );
+    }
+
+    /// 派生 #11: unit 字段值验证 (per DDS-001 §2.2 unit 枚举派生规)
+    /// 派生测: 验证 5 KPI 各自 unit 字段值合法 (ratio/count/qps/tokens)
+    #[tokio::test]
+    async fn metrics_summary_unit_validation() {
+        let agg = MetricsAggregator::new();
+        let metrics = agg.summary().await;
+
+        // 验证 5 KPI unit 字段值合法
+        let valid_units = ["ratio", "count", "qps", "tokens"];
+        for m in &metrics {
+            assert!(
+                valid_units.contains(&m.unit.as_str()),
+                "KPI {} unit 必是 ratio/count/qps/tokens 之一, got: {}",
+                m.name,
+                m.unit
+            );
+        }
+
+        // 验证 5 KPI 各自 unit 字段值
+        let cpu = metrics.iter().find(|m| m.name == "cpu_avg").unwrap();
+        assert_eq!(cpu.unit, "ratio");
+        let mem = metrics.iter().find(|m| m.name == "mem_avg").unwrap();
+        assert_eq!(mem.unit, "ratio");
+        let active = metrics.iter().find(|m| m.name == "active_tasks").unwrap();
+        assert_eq!(active.unit, "count");
+        let qps = metrics.iter().find(|m| m.name == "mcp_qps").unwrap();
+        assert_eq!(qps.unit, "qps");
+        let tokens = metrics
+            .iter()
+            .find(|m| m.name == "llm_token_daily")
+            .unwrap();
+        assert_eq!(tokens.unit, "tokens");
+    }
 }

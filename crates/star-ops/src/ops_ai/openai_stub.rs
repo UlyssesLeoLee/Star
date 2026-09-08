@@ -306,4 +306,28 @@ mod tests {
         assert_eq!(analysis.generated_by, "openai_stub");
         assert_eq!(analysis.log_id, log.id);
     }
+
+    // ============ UT-IT-51 §2.3 Phase 5 ops_ai 派生缺口 (per brief §2.1) ============
+
+    /// 派生 #20: OpenAI 缺 api_key 返 401 (per DDS-001 §2.2 OpenAI 派生规)
+    /// 守门 #5 v2: API key 走 star-credential KMS, MVP 简化为 None
+    /// MVP 阶段: 缺 api_key → 返 Unauthorized error (OpsError)
+    /// 派生测: 验证 Unauthorized error 含 "OpenAI api_key 未配置"
+    #[test]
+    fn openai_stub_returns_401_without_api_key() {
+        let stub = OpenAiStub::new();
+        assert!(!stub.is_enabled(), "缺 api_key 必 disabled");
+
+        // 派生测: call_openai_chat 应返 Unauthorized error
+        // 同步测 (call_openai_chat 是 async, 我们用 tokio runtime)
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let result = rt.block_on(stub.call_openai_chat("test log"));
+        assert!(result.is_err(), "缺 api_key 必返 Err");
+        let err = result.expect_err("Err");
+        // 验证: 返 Unauthorized (401 派生规)
+        assert!(
+            matches!(err, crate::error::OpsError::Unauthorized(_)),
+            "缺 api_key 必返 Unauthorized error (401 派生规)"
+        );
+    }
 }

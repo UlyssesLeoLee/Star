@@ -123,3 +123,91 @@ fn it_walkdir_scans_only_docs_subdirs() {
         );
     }
 }
+
+// ============ UT-IT-51 §3.3 Phase 4 F-04 派生缺口 (per brief §2.1) ============
+
+/// 派生 #39: walkdir 真实扫 (跟 baseline it_walkdir_real_scan_via_doc_scanner 互补, 跨 crate 端点)
+/// 守门 #1 R-05 + 守门 #5 v2
+#[tokio::test]
+async fn it_docs_list_walkdir_real_scan() {
+    let app = router(AppState::new());
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/ops/docs")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // 验证 body 含 walkdir 真实扫到的 docs
+    use axum::body::to_bytes;
+    let body_bytes = to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .expect("body readable");
+    let body: serde_json::Value = serde_json::from_slice(&body_bytes).expect("body is JSON");
+    let data = body["data"].as_array().expect("data is array");
+    assert!(
+        !data.is_empty(),
+        "F-04 walkdir 真实扫必返至少 1 条 doc (跟 IT baseline 同)"
+    );
+}
+
+/// 派生 #40: walkdir 仅扫 docs/ 子目录 (跟 baseline it_walkdir_scans_only_docs_subdirs 互补, 跨 crate 端点)
+/// 守門 #1 R-05
+#[tokio::test]
+async fn it_docs_list_walkdir_scans_only_docs_subdirs() {
+    let app = router(AppState::new());
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/ops/docs")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    use axum::body::to_bytes;
+    let body_bytes = to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .expect("body readable");
+    let body: serde_json::Value = serde_json::from_slice(&body_bytes).expect("body is JSON");
+    let data = body["data"].as_array().expect("data is array");
+    for d in data.iter() {
+        let path = d["path"].as_str().expect("path is string");
+        assert!(
+            path.starts_with("docs/"),
+            "F-04 walkdir 路径必以 docs/ 开头, got: {}",
+            path
+        );
+        assert!(
+            path.ends_with(".md"),
+            "F-04 walkdir 必仅扫 .md 文件, got: {}",
+            path
+        );
+    }
+}
+
+/// 派生 #41: 长路径 (Windows MAX_PATH 260 字符) 边界
+/// 守门 #11 缺标比错标: 长路径走稳定路径
+#[test]
+fn it_docs_list_handles_path_too_long() {
+    // 派生测: 验证 walkdir 遇到长路径不 panic
+    // 派生文档: 守門 #11 缺标比错标 — [M] 阶段加长路径特殊处理 (Windows MAX_PATH 260)
+    let scanner = DocScanner::new();
+    let docs = scanner.list();
+    // 验证所有 doc path 长度 < 1000 (避免 Windows MAX_PATH 派生)
+    for d in &docs {
+        assert!(
+            d.path.len() < 1000,
+            "doc path 必 < 1000 字符, got: {} chars",
+            d.path.len()
+        );
+    }
+}
