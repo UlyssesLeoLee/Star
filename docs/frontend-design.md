@@ -626,7 +626,7 @@ flowchart LR
 
 | Module | NATS Subject 前缀 | 前端订阅动作 |
 |---|---|---|
-| worktree | `star.worktree.*` | worktree 列表 + 选中行状态机高亮 |
+| worktree | `star.events.{tenant_id}.worktree.worktree.*` | worktree 列表 + 选中行状态机高亮 |
 | agent | `star.agent.*` | agent 列表 + 选中行 token gauge 更新 |
 | feedback | `star.feedback.*` | feedback inbox + 未读计数 |
 | context | `star.context.*` | context packet 列表 + decision pending 红点 |

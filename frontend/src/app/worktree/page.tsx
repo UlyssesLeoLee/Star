@@ -133,7 +133,7 @@ export default function WorktreePage() {
                   <Cpu size={10} /> 1 worktree ↔ 1 active agent session
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <AlertCircle size={10} /> 状态切换会触发 NATS event star.worktree.*
+                  <AlertCircle size={10} /> 状态切换会触发 NATS event `star.events.{tenant_id}.worktree.worktree.*`
                 </div>
               </div>
             </div>
