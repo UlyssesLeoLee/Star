@@ -514,6 +514,54 @@ print(f"err_count={result.stderr.count('error[')}")
 - counter 验证: 0/0/0/0 → automation 周期跑会**自动 close** #18 #19 #20 #21 (下次 cron 触发)
 - 预期关闭时间: 30min 内 (per pgwiki_audit 周期)
 
+### 4.17 P3-C W1 ARG.1 — crates/arg 6 子模块骨架实装 (2026-09-09 04:38 JST per `docs/briefs/arg-01-arg-crate-skeleton.md`)
+
+> **触发**: 2026-09-09 04:38 JST 用户发令"开子代理和worktree并行处理并在完成后merge到main" + `ask_8d5083148d6e0566b520988e` 拍板 (scope=ARG.1+ARG.4 / budget=选项3分阶段批 / merge=串行merge走守门)
+> **依据**: 守门 #1 v19 (P 子项 Python 化) + 守门 #1 v15 (新事件 docs 同步允许) + 守门 #1 v25 (cargo test -p star-arg --lib -j 4 100% pass) + 守门 #5 (env 安全) + 守门 #6 (PowerShell only) + 守门 #7 (0 unsafe) + 守门 #10 (author = Ulysses) + 守门 #12 ([P] docs 同步) + 守门 #13 (W/T/M 5 表分类) + 守门 #14 v2 (5 域 Lead Mavis 临时代签)
+> **落档文件**:
+> - `crates/arg/` 新建 (Cargo.toml + lib.rs + error.rs + llm.rs + 10 models + 3 client + 5 ops + 3 query = 30 src + 7 tests = 37 文件) — workspace 65 → 66 package
+> - `scripts/automation/memgraph_setup.py` v0.1 (Docker compose 启动 Memgraph + health probe + .env stub, 守门 #5 不打印密码)
+> - `scripts/automation/arg_seed.py` v0.1 (种子 5 域 Lead + 9 SA + 10 demo = 24 节点, 5 consults + 5 reports_to = 10 边)
+> - `docs/automation-design.md` §4.17 (本节, per 守门 #12 v21)
+> - `scripts/automation/registry.md` §1 +2 行 + §5.3 +1 行
+> - `docs/reports/PHASE-ARG-01-IMPL-REPORT.md` v0.1 (7 段 per AGENTS.md §3)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| ARG-1 | ARG-1 | `crates/arg` 6 子模块 (models / client / ops / query / llm + error) | S, A | **[P]** | `scripts/automation/memgraph_setup.py` (Docker compose) + `arg_seed.py` (种子 fixture) | Cargo workspace 65 → 66 package; 守门 #7 `unsafe_code = "forbid"` 0 unsafe; 30 src + 7 tests = 37 文件 |
+| ARG-2 | ARG-2 | 30 UT (5+8+5+6+4+2+2 = 32, 含 brief 自加 4 trust_score + 2 event) | R, V, A | **[P]** | `cargo test -p star-arg --tests -j 4` | 守门 #1 v25 实证 100% pass (lib test 1 + 32 integration test = 33 全 pass, 0 failed) |
+| ARG-3 | ARG-3 | 5 守门全套 (check / fmt / clippy / test / build) | R, V, A | **[P]** | (守门 #1 累积规 v1-v5) | `cargo check --workspace --lib -j 4` 0 err + `cargo fmt -p star-arg --check` 0 err + `cargo clippy -p star-arg --all-targets -j 4 -- -D warnings` 0 err + `cargo test -p star-arg --tests -j 4` 100% + `cargo build --release -p star-arg` 0 err |
+| ARG-4 | ARG-4 | 数据模型 16 + 14 + 10 + 5 + 20 + 5 + 9 = 79 字段 | S, A | **[P]** | (per DD §3.2 / §3.3 / §9.1) | Agent 16 / Edge 14 / RelationshipType 10 / TeamTemplate 5 / Achievement 20 / TrustScoreTier 5 / ARGEvent 9 / ARGError 10 + Decision/DecisionType/Output/Verdict/EscalationInfo/PeerReviewVerdict/ChallengeVerdict/ChallengePrompt/LLMClient/LLMResponse/TemplateInstance/AchievementUnlock 全 (per DD §3.2.5 self-review 修复) |
+| ARG-5 | ARG-5 | memgraph_setup.py + arg_seed.py 落档 | R, V, S, A | **[P]** | `scripts/automation/memgraph_setup.py` + `arg_seed.py` | 守门 #5 env 走 $env:MEMGRAPH_BOLT_URL 不打印明文; arg_seed 落 JSON fixture 给 arg-bridge W2 用; health probe 用 urllib 而非 docker exec (避免外部依赖) |
+| ARG-6 | ARG-6 | docs/automation-design.md §4.17 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #12 v21 [P] docs 同步必更新 §4 任务卡表 |
+| ARG-7 | ARG-7 | scripts/automation/registry.md §1 +2 行 + §5.3 +1 行 | A | **[P]** | (registry.md 编辑) | per 守门 #12 v21 [P] docs 同步必更新 registry |
+| ARG-8 | ARG-8 | docs/reports/PHASE-ARG-01-IMPL-REPORT.md v0.1 落档 | A | **[P]** | (报告落档) | per AGENTS.md §3 7 段结构; 5 守门实证 + 32 UT pass + 1 commit hash |
+| ARG-9 | ARG-9 | 1 commit author = `Ulysses <ulysses@mavis.local>` | A | **[P]** | (git commit) | 守门 #10 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化 (Mavis 自驱); 不推 origin (守门 #1 反转后 R-05) |
+| ARG-10 | ARG-10 | (后续 ARG.2 / ARG.3 / ARG.4 子代理并行触发) | — | **[P]** | (后续 worktree) | per WBS §14.11 ARG.1 收官后, 派新子代理走 ARG.2 (arg-bridge) / ARG.3 (arg-effect) / ARG.4 (api/arg 扩展) |
+
+**§4.17 任务卡维度判定**:
+- R (Rerunnable): **是** (arg_seed.py idempotent, memgraph_setup.py 走 docker compose, cargo test 单 crate 模式)
+- V (Volume): **是** (24 节点 + 10 边 + 32 UT 跨 7 测试文件)
+- S (Structural): **是** (新建 crates/arg 6 子模块 + workspace 65 → 66 package + Cargo.toml 追加 1 行)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 + 守门 #10 author = Ulysses + 守门 #5 env 不打印)
+
+**§4.17 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v19 + #12 v21 + #14 v2)**:
+- `cargo check --workspace --lib -j 4` 0 err (实证)
+- `cargo fmt -p star-arg -- --check` 0 err (实证, 仅 crates/arg 检查, 旧 star-mutex 已有差异不在本任务 scope)
+- `cargo clippy -p star-arg --all-targets -j 4 -- -D warnings` 0 err (实证)
+- `cargo test -p star-arg --tests -j 4` 100% pass (33 tests: 1 lib + 6 achievement + 5 agent + 2 cypher_cache + 8 edge_ops + 2 event + 5 template_ops + 4 trust_score)
+- `cargo build --release -p star-arg` 0 err (9.09s, 实证)
+- `python scripts/automation/arg_seed.py --output /tmp/test.json` exit 0 + 24 节点 + 10 边
+- `git log -p --follow crates/arg/Cargo.toml` 实证 (commit 后)
+- `git log -p --follow scripts/automation/memgraph_setup.py` 实证 (commit 后)
+- `git log -p --follow scripts/automation/arg_seed.py` 实证 (commit 后)
+- `git log -p --follow docs/automation-design.md` 实证 §4.17 追加 (commit 后)
+- `git log -p --follow scripts/automation/registry.md` 实证 §1 + §5.3 追加 (commit 后)
+- commit author = `Ulysses <ulysses@mavis.local>` (per 守门 #10 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化)
+- 0 unsafe 块 (守门 #7 `unsafe_code = "forbid"` workspace lint)
+- 0 missing_docs warn (workspace lint `missing_docs = "deny"`, 全部 public item 都有 doc)
+- 守门 #5 env 安全: MemgraphClient 密码字段 `#[allow(dead_code)]` 标记 + 无 `Display`/`Debug` impl 暴露 + 不打印明文
+
 ------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)

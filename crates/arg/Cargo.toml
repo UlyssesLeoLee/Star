@@ -1,0 +1,22 @@
+[package]
+name = "star-arg"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "STAR Agent Relationship Graph (ARG) Data Tier — per docs/design/DD-AGENT-RELATIONSHIP-001.md v0.1.1"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true }

@@ -2959,6 +2959,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "star-arg"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "star-cache"
 version = "0.1.0"
 dependencies = [

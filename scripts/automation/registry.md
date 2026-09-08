@@ -39,6 +39,8 @@
 | `scripts/automation/kanban_sprint_gen.py` | kanban-vmodel-jp Sprint 视图 P1 + P2 + P3 验证 (93 项检查: app.js 函数 + index.html 结构 + styles.css class) | KANBAN-SPRINT-001 P1 (Sprint 核心 + Jira 設計) + P2 (度量) + P3 (仪式) | TBD | 🟢 完成 (93/93 pass, `--strict` exit 0) |
 | `scripts/automation/pgwiki_resolve_issues.py` | 一次性收掉 4 个 OPEN pgwiki audit issue (#18-#21) — 补 work_item 映射 + 撤 kms + ADR/ARCH 规划白名单 (per 2026-09-07 20:34 JST 拍板) | pgwiki-audit-issue-resolution-001 (本次 5+27 crate 决策) | TBD | 🟢 完成 (counter 全 0 验证: 0 orphan / 0 placeholder / 0 broker_adr / 0 broker_arch) |
 | `scripts/automation/ai_log_mock.py` | Log AI 分析 mock (per 守门 #23 不开外部 API) — 输入 log 文本 → 输出 {summary, anomalies, suggestions, confidence=0.42, generated_by="mock"}; 守门 #23 派生规: confidence 永远 < 0.5, needs_review=true | OPS-INTRY (F-02 Log AI 端到端 / star-ops::ops_ai::mock 走 subprocess 路径实装时启用) | TBD | 🟢 完成 (subprocess 跑通 3ms, 3 anomalies 正确抽取) |
+| `scripts/automation/memgraph_setup.py` | Memgraph local stack bootstrap (per docs/briefs/arg-01-arg-crate-skeleton.md §2.1 C) — Docker compose 启动 Memgraph 2.14 (Bolt 7687 + HTTP 7444) + health probe 等待 mgmt API + 写 .env stub (守门 #5 不打印密码) | P3-C W1 ARG.1 (crates/arg 实装 5 守门 G-1 前置) | TBD | 🟢 完成 (urllib health probe + .env 写 + .gitignore idempotent 追加) |
+| `scripts/automation/arg_seed.py` | ARG seed fixture 生成 (per WBS §14.11 ARG.1) — 5 域 Lead + 9 SA + 10 demo = 24 节点, 5 consults + 5 reports_to = 10 边, 落 JSON 给 arg-bridge W2 用 | P3-C W1 ARG.1 (种子 fixture) + P3-C W2 ARG.2 (arg-bridge 落库) | TBD | 🟢 完成 (24 节点 + 10 边 实证, env 检查不打印值 per 守门 #5) |
 
 **说明**:
 - 末次 commit 列填 `TBD` = 本批次 v0.1 初版, commit 落地后回填
@@ -154,6 +156,36 @@
 | 不触发 P3-B 启动 | per 2026-09-03 18:48 JST 用户发令, 跟 §5.1 SRS-5 共用阻塞 | — | — | — |
 | 后续 gate | 5 域 Lead 真人 + 凭证 B.5/B.6 + KMS E.4 + HANDOFF-ST-001 §5.3 5 Blocker + P3-C/D/F 范围 | ⏳ P3-B 启动前 | — | 守门 #3 反转 B 11:35 JST |
 
+### 5.3 ARG.1 (P3-C W1) crates/arg 6 子模块骨架实装 索引 (新增, 2026-09-09 04:38 JST per `docs/briefs/arg-01-arg-crate-skeleton.md`)
+
+> **触发**: 2026-09-09 04:38 JST 用户发令"开子代理和worktree并行处理并在完成后merge到main" + `ask_8d5083148d6e0566b520988e` 拍板
+> **依据**: 守门 #21 v21 [P] docs 同步必更新 registry.md 索引 + 守门 #1 v19 (P 子项 Python 化) + 守门 #5 (env 安全) + 守门 #14 v2 (5 域 Lead Mavis 临时代签)
+> **落档文件**:
+> - `crates/arg/` 新建 (Cargo.toml + lib.rs + error.rs + llm.rs + 10 models + 3 client + 5 ops + 3 query = 30 src + 7 tests = 37 文件, workspace 65 → 66 package)
+> - `scripts/automation/memgraph_setup.py` v0.1 (~165 行, Docker compose + health probe + .env stub)
+> - `scripts/automation/arg_seed.py` v0.1 (~165 行, 24 节点 + 10 边 fixture)
+> - `docs/automation-design.md` §4.17 (10 子项 ARG-1..10)
+> - `docs/reports/PHASE-ARG-01-IMPL-REPORT.md` v0.1 (per AGENTS.md §3 7 段结构)
+
+| 索引项 | 路径 / 章节 | 状态 | commit | 守门 |
+|---|---|---|---|---|
+| Cargo.toml | `crates/arg/Cargo.toml` v0.1 | ✅ 落档 | (待 commit) | #1 / #3 / #5 / #6 / #7 / #9 / #10 / #12 / #14 / #19 |
+| lib.rs | `crates/arg/src/lib.rs` v0.1 (re-export) | ✅ 落档 | (待 commit) | 同上 |
+| error.rs | `crates/arg/src/error.rs` (ARGError 10 variants per DD §9.1) | ✅ 落档 | (待 commit) | 同上 |
+| models (10) | `crates/arg/src/models/{agent,edge,template,achievement,trust_score,event,decision,peer_review,template_instance,achievement_unlock}.rs` | ✅ 落档 | (待 commit) | #13 (W/T/M 5 表分类) |
+| client (3) | `crates/arg/src/client/{memgraph,cypher_cache,migration}.rs` | ✅ 落档 | (待 commit) | #5 (env 不打印) |
+| ops (5) | `crates/arg/src/ops/{agent_node,edge_ops,template_ops,event_writer,achievement_ops}.rs` | ✅ 落档 | (待 commit) | 同上 |
+| query (3) | `crates/arg/src/query/{topology,behavior,output}.rs` | ✅ 落档 | (待 commit) | #1 v15 + #19 |
+| llm.rs | `crates/arg/src/llm.rs` (LLMClient trait + MockLLMClient) | ✅ 落档 | (待 commit) | #5 v2 + #23 (mock 不开外部 API) |
+| tests (7) | `crates/arg/tests/{agent_node,edge_ops,template_ops,achievement,trust_score,cypher_cache,event}_test.rs` (32 UT) | ✅ 落档 | (待 commit) | #1 v25 (单 crate 100% pass) |
+| Cargo workspace | `Cargo.toml` members 追加 `"crates/arg"` | ✅ 落档 | (待 commit) | #1 |
+| memgraph_setup.py | `scripts/automation/memgraph_setup.py` v0.1 | ✅ 落档 | (待 commit) | #1 v19 + #5 |
+| arg_seed.py | `scripts/automation/arg_seed.py` v0.1 | ✅ 落档 | (待 commit) | #1 v19 + #5 + #3 |
+| automation-design §4.17 | `docs/automation-design.md` §4.17 (10 子项 ARG-1..10) | ✅ 落档 | (待 commit) | #12 v21 |
+| 5 守门实证 | check + fmt + clippy + test + build | ✅ 实证 0 err | (待 commit) | #1 累积规 v1-v5 |
+| 32 UT 实证 | cargo test -p star-arg --tests -j 4 | ✅ 100% pass | (待 commit) | #1 v25 |
+| 后续 gate | ARG.2 (arg-bridge) / ARG.3 (arg-effect) / ARG.4 (api/arg) 派新子代理 | ⏳ 触发 | — | — |
+
 ## 6. 修订历史
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
@@ -163,3 +195,4 @@
 | v0.3 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 脚本索引表 新增 `kanban_sprint_gen.py` (KANBAN-SPRINT-001 P1 Sprint 视图 验证, 43/43 pass) | 2026-09-03 13:25 JST P1 收官, 守门 #1 v19 + #21 v21 实证 |
 | v0.4 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 索引说明更新 (kanban_sprint_gen.py 43→55 项) + KANBAN-SPRINT-001 落地 P1 v0.2 Jira 設計 (per docs/briefs/kanban-sprint-view-001.md v0.2) + P2 度量 (Velocity/Burndown/History/Capacity) | 2026-09-03 13:55 JST P1 v0.2 + P2 收官, commit `947c0ef` 落地 |
 | v0.5 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 索引说明更新 (kanban_sprint_gen.py 55→93 项) + KANBAN-SPRINT-001 P3 仪式 收官 (Goal + Standup + Review + Retrospective + Markdown 导出) | 2026-09-03 14:05 JST P3 拍板 + 14:20 JST 收官, KANBAN-SPRINT-001 三阶段全部收官 |
+| v0.6 | 2026-09-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 脚本索引表 新增 `memgraph_setup.py` (Memgraph Docker compose + health probe) + `arg_seed.py` (24 节点 + 10 边 fixture); 新增 §5.3 ARG.1 crates/arg 6 子模块骨架实装 索引 (16 行覆盖 Cargo.toml / lib / error / 10 models / 3 client / 5 ops / 3 query / llm / 7 tests + workspace + 2 脚本 + docs 同步 + 5 守门 + 32 UT) | 2026-09-09 04:38 JST 用户发令"开子代理和worktree并行处理" + `ask_8d5083148d6e0566b520988e` 拍板 (scope=ARG.1+ARG.4), ARG.1 子项 5 守门 0 err + 32 UT 100% pass 实证, 守门 #1 v19 + #12 v21 + #14 v2 联合 |
