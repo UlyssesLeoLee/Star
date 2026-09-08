@@ -415,56 +415,36 @@ async fn metrics_summary(State(state): State<AppState>) -> impl IntoResponse {
 
 // ============ F-04 Docs ============
 
-#[derive(Serialize)]
-struct DocsList {
-    data: Vec<DocRef>,
-    meta: DocsMeta,
-}
-
-#[derive(Serialize)]
-struct DocRef {
-    path: String,
-    title: String,
-    category: String,
-    updated_at: String,
-}
-
-#[derive(Serialize)]
-struct DocsMeta {
-    stub: bool,
-    total: usize,
-}
-
+/// F-04 docs_list 真实调 DocScanner (per brief §2.1 + 守門 #1 R-05)
+/// 守門 #1 R-05: 仅扫 docs/ 4 子目录 (requirements/ basic-design/ detailed-design/ reports/)
+/// 守門 #5 v2: walkdir 不入凭证 (无外部 API, 仅本机文件 IO)
 async fn docs_list() -> impl IntoResponse {
-    let docs = vec![
-        DocRef {
-            path: "docs/requirements/SRS-STAR-OPS-001.md".to_string(),
-            title: "STAR Ops Console SRS".to_string(),
-            category: "SRS".to_string(),
-            updated_at: "2026-09-08T07:53:00Z".to_string(),
-        },
-        DocRef {
-            path: "docs/basic-design/OPS-BASIC-DESIGN-001.md".to_string(),
-            title: "STAR Ops Console 基本设计".to_string(),
-            category: "BAS".to_string(),
-            updated_at: "2026-09-08T07:53:00Z".to_string(),
-        },
-    ];
+    // F-04 端到端: 调 DocScanner 真实 walkdir 扫描, 不用 stub
+    let scanner = crate::ops_domain::docs::DocScanner::new();
+    let docs = scanner.list();
     let total = docs.len();
+
+    // 返 5 类别计数 (per brief §2.1, 给 UI 分类显示)
+    let mut by_category: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
+    for d in &docs {
+        *by_category.entry(d.category.clone()).or_insert(0) += 1;
+    }
+
     Json(OpsResponse {
-        data: DocsList {
-            data: docs,
-            meta: DocsMeta { stub: true, total },
-        },
+        data: docs,
         meta: OpsMeta {
-            stub: true,
+            stub: false, // F-04 端到端: 真实 walkdir 扫描
             total: Some(total),
-            hint: Some("F-04 实装阶段接 walkdir 扫描".to_string()),
+            hint: Some(format!(
+                "F-04 端到端, walkdir 扫描 docs/ 4 子目录 ({} 类, 守門 #1 R-05 不动生产)",
+                by_category.len()
+            )),
             ai_channel: None,
             analysis_triggered: None,
             needs_review: None,
             entry_count: None,
-            phase: None,
+            phase: Some("walkdir".to_string()),
         },
     })
 }
