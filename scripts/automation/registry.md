@@ -42,6 +42,7 @@
 | `scripts/automation/memgraph_setup.py` | Memgraph local stack bootstrap (per docs/briefs/arg-01-arg-crate-skeleton.md §2.1 C) — Docker compose 启动 Memgraph 2.14 (Bolt 7687 + HTTP 7444) + health probe 等待 mgmt API + 写 .env stub (守门 #5 不打印密码) | P3-C W1 ARG.1 (crates/arg 实装 5 守门 G-1 前置) | TBD | 🟢 完成 (urllib health probe + .env 写 + .gitignore idempotent 追加) |
 | `scripts/automation/arg_seed.py` | ARG seed fixture 生成 (per WBS §14.11 ARG.1) — 5 域 Lead + 9 SA + 10 demo = 24 节点, 5 consults + 5 reports_to = 10 边, 落 JSON 给 arg-bridge W2 用 | P3-C W1 ARG.1 (种子 fixture) + P3-C W2 ARG.2 (arg-bridge 落库) | TBD | 🟢 完成 (24 节点 + 10 边 实证, env 检查不打印值 per 守门 #5) |
 | `scripts/automation/arg_api_test.py` | ARG API tier IT 端到端 (per WBS §14.11 ARG.4) — 10 IT 验证 14 routes (13 REST + 1 WebSocket), 守门 #1 v19 [M] 子项 Python 化; 起临时 axum 测试 server (subprocess 路径 per 守门 #9 v3) + stdlib WS 兜底 (无 websockets 库依赖) | P3-C W4 ARG.4 (crates/api 14 routes 端到端验证) + 后续 P3-C W5 (ARG.5 frontend e2e 复用) | TBD | 🟢 完成 (10/10 IT pass: 8 REST + 2 WS, env $env:ARG_TEST_PORT 不打印, exit 0) |
+| `scripts/automation/arg_bridge_test.py` | ARG.2 (P3-C W2) Bridge Tier IT 端到端 (per docs/briefs/arg-02-arg-bridge-crate.md) — 10 IT (3 listener + 3 flush + 4 offline) 实证 5 守门 (cargo test/check/fmt/clippy/build) + 5 file-content checks (no unsafe / workspace 注册 / sled 依赖 / 5 协议 schema / 4 子模块); 走 subprocess.run 调 cargo test 端到端 (守门 #9 v3); 不打印 env 值 (守门 #5) | P3-C W2 ARG.2 (crates/arg-bridge 4 子模块 + 10 UT 端到端验证) | TBD | 🟢 v0.1 完成 (10 main UT + 3 extras + 5 守门实证, 0 unsafe 块) |
 | `scripts/automation/task_ops/nodes/create_node.py` | TMO M-N8 create_node (per ADR-0049 + 2026-09-09 04:57 JST 用户拍板核心功能) — 任务卡创建时检测有效 agent → 自动建 worktree (1:1 per 拍板) + dispatch SA-XX sub-agent + 任务卡 auto in_progress (5s 内可见); 守门 #13 a L0 唯一入口 + 守门 #13 d Transaction append-only + 守门 #22 mock 异步 | AUTO-WORKTREE-001 任务卡创建流程 (board/+New issue + sprint/+New issue) | TBD | 🟢 v0.1 完成 (83ms smoke test 通过: human reject + missing tenant reject + full happy path) |
 | `scripts/automation/_mock_git_worktree.py` | mock git worktree add CLI (per 守门 #22 不污染 main 编译) — M-N8 create_node 异步 fire-and-forget 调用; 真实 Git 集成推 G-WT-02 (H2 阻塞解除后启动) | M-N8 create_node (per 守门 #22 派生规) | TBD | 🟢 v0.1 完成 (subprocess 跑通, 写 .MOCK_WORKTREE 标记) |
 
@@ -244,6 +245,37 @@
 | E2E UC-14 | `tests/e2e/test_uc14_auto_worktree.py` (5s 任务卡 in_progress 实证) | ⏳ P-AUTO-WT-02 子项 (~50K tokens 估) | — | #1 / #3 / #11 |
 | 后续 gate | HANDOFF-ST-001 §5.3 5 Blocker (H2-EXT #4 #5 类型不兼容 + 5 域 Lead 真人) + G-WT-01 DB 接入 + G-WT-02 真 git 集成 | ⏳ 跨 session 续 | — | #1 v17 / #3 |
 
+### 5.5 ARG.2 (P3-C W2) crates/arg-bridge 4 子模块骨架实装 索引 (新增, 2026-09-10 06:53 JST per `docs/briefs/arg-02-arg-bridge-crate.md`)
+
+> **触发**: 2026-09-10 06:53 JST 用户发令"按顺序推进" (per 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #14 v3 Mavis 永久代签 + 守门 #1 v15 docs 同步饱和第 44 次新事件触发仍允许)
+> **依据**: 守门 #21 v21 [P] docs 同步必更新 registry.md 索引 + 守门 #1 v19 (P 子项 Python 化) + 守门 #5 (env 安全) + 守门 #7 (0 unsafe) + 守门 #14 v2 (5 域 Lead Mavis 临时代签)
+> **落档文件**:
+> - `crates/arg-bridge/` 新建 (Cargo.toml + lib.rs + 4 子模块 + 4 tests = 16 文件, workspace 67 → 68 package)
+> - `Cargo.toml` workspace members 追加 `"crates/arg-bridge"` + sled 0.34 dep
+> - `scripts/automation/arg_bridge_test.py` v0.1 (~370 行, 10 IT 端到端 + 5 守门 + 5 file-content check)
+> - `docs/automation-design.md` §4.20 (10 子项 ARG-2.1..10)
+> - `docs/reports/PHASE-ARG-02-IMPL-REPORT.md` v0.1 (per AGENTS.md §3 7 段结构)
+
+| 索引项 | 路径 / 章节 | 状态 | commit | 守门 |
+|---|---|---|---|---|
+| Cargo.toml | `crates/arg-bridge/Cargo.toml` v0.1 (8 dep + 2 dev-dep) | ✅ 落档 | (待 commit) | #1 / #7 / #14 v2 / #19 |
+| lib.rs | `crates/arg-bridge/src/lib.rs` (re-export 6 module + 5 type) | ✅ 落档 | (待 commit) | 同上 |
+| error.rs | `crates/arg-bridge/src/error.rs` (BridgeError 6 variants per arch §1.1) | ✅ 落档 | (待 commit) | 同上 |
+| protocol.rs | `crates/arg-bridge/src/protocol.rs` (5 协议 schema + BridgeEnvelope + 5 BridgeEnvelopeKind variants) | ✅ 落档 | (待 commit) | #12 + #13 (W/T/M 派生) |
+| memgraph_listener.rs | `crates/arg-bridge/src/memgraph_listener.rs` (MemgraphEventListener + broadcast::Sender + epoch + publish) | ✅ 落档 | (待 commit) | #5 (env) + #9 v3 (fire-and-forget) |
+| langgraph_updater.rs | `crates/arg-bridge/src/langgraph_updater.rs` (LangGraphStateUpdater + LangGraphStateStore + 5 ReducerKind) | ✅ 落档 | (待 commit) | #7 + #9 v3 |
+| period_flush.rs | `crates/arg-bridge/src/period_flush.rs` (PeriodFlushWorker + 30s 周期 + 256 batch cap + idempotency) | ✅ 落档 | (待 commit) | #7 + #9 v3 |
+| offline_queue.rs | `crates/arg-bridge/src/offline_queue.rs` (sled 0.34 嵌入 + 10 000 cap + 7 day TTL) | ✅ 落档 | (待 commit) | #7 + #13 a W 派生 |
+| tests (4 文件) | `crates/arg-bridge/tests/{listener,flush,offline,langgraph}_test.rs` (10 main UT + 3 extras = 13 tests) | ✅ 落档 | (待 commit) | #1 v25 (单 crate 100% pass) |
+| Cargo workspace | `Cargo.toml` members 追加 `"crates/arg-bridge"` + `sled = "0.34"` 2 行 | ✅ 落档 | (待 commit) | #1 |
+| arg_bridge_test.py | `scripts/automation/arg_bridge_test.py` v0.1 | ✅ 落档 | (待 commit) | #1 v19 + #5 + #9 v3 |
+| automation-design §4.20 | `docs/automation-design.md` §4.20 (10 子项 ARG-2.1..10) | ✅ 落档 | (待 commit) | #12 v21 |
+| 5 守门实证 | check + fmt + clippy + test + build | ✅ 实证 0 err | (待 commit) | #1 累积规 v1-v5 |
+| 10 UT 实证 | cargo test -p star-arg-bridge --tests -j 4 | ✅ 100% pass (10/10 main + 3/3 extras) | (待 commit) | #1 v25 |
+| 跟 ARG.1 关系 | ARG.1 暴露 `star_arg::models::*` + `star_arg::client::MemgraphClient`, ARG.2 通过 `star-arg` workspace path 引用 (per DD §4.10-§4.11) | — | — | #14 v2 拍板 D |
+| 5 Reducer 跟 LangGraph 关系 | 5 ReducerKind 跟 DD §5.1 5 Reducer 一一对应 (`merge_arg_agents` / `merge_arg_edges` / `merge_trust_scores` / `merge_dispatch` / `add`); 真实 PyO3 集成在 ARG.3 L0↔L1 协议 (per 守门 #9 v3) | — | — | 拍板 9/8 16:00 JST |
+| 后续 gate | ARG.3 (arg-effect 5 子模块) / ARG.4 (api/arg 13 REST 已知 merge @ `1d894ab`) / ARG.5 (frontend agent-relationships/) 派新子代理 | ⏳ 触发 | — | — |
+
 ## 6. 修订历史
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
@@ -256,3 +288,4 @@
 | v0.6 | 2026-09-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 脚本索引表 新增 `memgraph_setup.py` (Memgraph Docker compose + health probe) + `arg_seed.py` (24 节点 + 10 边 fixture); 新增 §5.3 ARG.1 crates/arg 6 子模块骨架实装 索引 (16 行覆盖 Cargo.toml / lib / error / 10 models / 3 client / 5 ops / 3 query / llm / 7 tests + workspace + 2 脚本 + docs 同步 + 5 守门 + 32 UT) | 2026-09-09 04:38 JST 用户发令"开子代理和worktree并行处理" + `ask_8d5083148d6e0566b520988e` 拍板 (scope=ARG.1+ARG.4), ARG.1 子项 5 守门 0 err + 32 UT 100% pass 实证, 守门 #1 v19 + #12 v21 + #14 v2 联合 |
 | v0.7 | 2026-09-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 脚本索引表 新增 `task_ops/nodes/create_node.py` (M-N8, TMO 第 8 节点, 任务卡创建自动 worktree + agent 接管, 83ms smoke pass) + `_mock_git_worktree.py` (守门 #22 mock shell); §5.4 新增 ADR-0049 任务卡自动 worktree 索引 (4 推荐项拍板, 7 子项 v0.1 落档, 8 项已知缺口显式列) | 2026-09-09 04:57 JST Ulysses 拍板核心功能 + 守门 #19 v19 + #20 + #21 实证 |
 | v0.8 | 2026-09-09 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 脚本索引表 新增 `api/routes_tmo.py` 加 POST /api/tmo/create 端点 (M-N8 HTTP 接入, P-AUTO-WT-01 收官, 123ms HTTP 5s 阈值) + `tests/e2e/python/test_uc14_auto_worktree.py` (5/5 维 E2E 全过: happy / SA 映射 / human 拒 / missing tenant 拒 / 1:1 attach); §5.4 ADR-0049 增量 (3 已知缺口 #7 #8 #9 从 ⏳ 改 ✅); 修复 pre-existing split_node stale import (路由层 4 常量本地化) | 2026-09-09 08:13 JST "推进" 拍板 + 守门 #9 v3 + #20 + #21 + #22 实证 |
+| v0.9 | 2026-09-10 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | §1 脚本索引表 新增 `arg_bridge_test.py` (ARG.2 P3-C W2 Bridge Tier IT 端到端, 10 UT + 3 extras + 5 守门 + 5 file-content checks, 走 subprocess.run + Python 进程内解析 cargo test 输出, 守门 #9 v3 + #1 v19 + #5 + #7 + #12 v21 联合实证); §5.5 新增 ARG.2 crates/arg-bridge 4 子模块骨架实装 索引 (16 文件 + 10 UT + 1 脚本 + 1 报告 + 1 commit hash 落档) | 2026-09-10 06:53 JST 用户发令"按顺序推进" (per 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #14 v3 Mavis 永久代签 + 守门 #1 v15 docs 同步饱和第 44 次新事件触发仍允许) |

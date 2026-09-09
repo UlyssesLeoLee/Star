@@ -92,6 +92,8 @@ members = [
     "crates/star-mutex",
     # Phase P3-C (2026-09-09) 新增 crates/arg (ARG Data Tier, per docs/design/DD-AGENT-RELATIONSHIP-001.md v0.1.1)
     "crates/arg",
+    # ARG.2 (P3-C W2): 2026-09-10 新增 crates/arg-bridge (ARG Bridge Tier: MemgraphEventListener + LangGraphStateUpdater + PeriodFlushWorker + OfflineQueue, per docs/architecture/2026-09-03-arg/06-arg-02-arg-bridge.md v0.50, Mavis 临时代签 5 域 Lead 决策 per 9/3 11:35 JST 反转 + 守门 #13 a L0 协调 + 守门 #5 env 安全)
+    "crates/arg-bridge",
 ]
 exclude = ["target"]
 
@@ -138,6 +140,9 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-r
 
 # Tracing
 tracing = "0.1"
+
+# Embedded key-value store (per ARG.2 OfflineQueue, 守门 #13 a W 派生)
+sled = "0.34"
 
 # 加密(Phase F webhook 签名验证使用)
 sha2 = "0.10"
