@@ -49,6 +49,7 @@ pub const API_PREFIX: &str = "/api/v1";
 /// 包含:
 /// - 16 MCP tool REST 镜像路由
 /// - 6 Webhook 管理端点
+/// - 8 §14.9 Star-EI 路由 (per brief v0.53, EX-01..08 跨 session 续 stub)
 /// - 鉴权中间件 (`AuthLayer` stub)
 /// - 限流中间件 (`RateLimitLayer` stub)
 /// - 审计中间件 (`AuditLayer` stub)
@@ -56,6 +57,16 @@ pub const API_PREFIX: &str = "/api/v1";
 /// v0.47 §14.12 IV OAuth2 5 endpoints 路由 wire (per brief v0.47 §3.1):
 /// - OAuth2 routes 单独由 `build_router_with_oauth(state)` 提供 (需要 OAuth2State)
 /// - 默认 build_router 不含 OAuth2 路由 (向后兼容现有测试)
+///
+/// v0.53 §14.9 Star-EI 8 路由 wire (per brief v0.53 §3):
+/// - `GET  /exclusion/idempotency-keys`  — EX-01 5 张新表查询
+/// - `POST /exclusion/mutex`              — EX-02 star-mutex 锁申请
+/// - `POST /exclusion/dispatch-locks`     — EX-03 L0 调度锁
+/// - `POST /exclusion/subagent-locks`     — EX-04 L1 SubAgent 锁
+/// - `GET  /exclusion/ui-state`           — EX-05 UI 幂等状态
+/// - `POST /exclusion/tool-idem`          — EX-06 16 tool 幂等检查
+/// - `GET  /exclusion/metrics`            — EX-07 4 层可观测性
+/// - `POST /exclusion/test-runs`          — EX-08 测试运行启动
 pub fn build_router() -> Router {
     let api = Router::new()
         // ── 16 MCP tool REST 镜像 (per spec §2.2) — 相对 nest prefix 路径 ──────
@@ -113,6 +124,31 @@ pub fn build_router() -> Router {
         .route(
             "/webhooks/deliveries/{delivery_id}/replay",
             post(routes::webhooks::replay_delivery),
+        )
+        // ── 8 §14.9 Star-EI 路由 (per brief v0.53 §3, 5 域 Lead 拍板 临时代签) ──
+        // 全部 501 not_implemented 跨 session 占位, 跟 OAuth2 introspect 同模式
+        .route(
+            "/exclusion/idempotency-keys",
+            get(routes::ex_01::list_idempotency_keys),
+        )
+        .route("/exclusion/mutex", post(routes::ex_02::acquire_mutex))
+        .route(
+            "/exclusion/dispatch-locks",
+            post(routes::ex_03::acquire_dispatch_lock),
+        )
+        .route(
+            "/exclusion/subagent-locks",
+            post(routes::ex_04::acquire_subagent_lock),
+        )
+        .route("/exclusion/ui-state", get(routes::ex_05::get_ui_state))
+        .route(
+            "/exclusion/tool-idem",
+            post(routes::ex_06::check_tool_idempotency),
+        )
+        .route("/exclusion/metrics", get(routes::ex_07::get_metrics))
+        .route(
+            "/exclusion/test-runs",
+            post(routes::ex_08::start_test_run),
         );
 
     Router::new()
@@ -149,6 +185,8 @@ pub fn build_oauth_router() -> axum::Router<auth::oauth::OAuth2State> {
 ///
 /// `build_router_with_oauth(oauth_state)` 提供完整 REST + OAuth2 routing,
 /// 适用于生产部署和集成测试.
+///
+/// v0.53 §14.9 Star-EI 8 路由 同样 wire (跟 v0.47 OAuth2 模式一致, per brief v0.53 §3)
 pub fn build_router_with_oauth(oauth_state: auth::oauth::OAuth2State) -> Router {
     let oauth_router = build_oauth_router();
     Router::new()
@@ -209,6 +247,30 @@ pub fn build_router_with_oauth(oauth_state: auth::oauth::OAuth2State) -> Router 
                 .route(
                     "/webhooks/deliveries/{delivery_id}/replay",
                     post(routes::webhooks::replay_delivery),
+                )
+                // ── 8 §14.9 Star-EI 路由 (per brief v0.53 §3) ──────────
+                .route(
+                    "/exclusion/idempotency-keys",
+                    get(routes::ex_01::list_idempotency_keys),
+                )
+                .route("/exclusion/mutex", post(routes::ex_02::acquire_mutex))
+                .route(
+                    "/exclusion/dispatch-locks",
+                    post(routes::ex_03::acquire_dispatch_lock),
+                )
+                .route(
+                    "/exclusion/subagent-locks",
+                    post(routes::ex_04::acquire_subagent_lock),
+                )
+                .route("/exclusion/ui-state", get(routes::ex_05::get_ui_state))
+                .route(
+                    "/exclusion/tool-idem",
+                    post(routes::ex_06::check_tool_idempotency),
+                )
+                .route("/exclusion/metrics", get(routes::ex_07::get_metrics))
+                .route(
+                    "/exclusion/test-runs",
+                    post(routes::ex_08::start_test_run),
                 ),
         )
         .merge(oauth_router.with_state(oauth_state))
