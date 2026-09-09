@@ -38,11 +38,12 @@ import { useAgentGame } from "@/components/agent-game/useAgentGame";
 import { getPerkChoices } from "@/lib/agent-game/perks";
 import { PageHeader } from "@/components/PageHeader";
 import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
-import { Bot, AlertTriangle, Maximize2, Zap, Sparkles, Settings } from "lucide-react";
+import { Bot, AlertTriangle, Maximize2, Zap, Sparkles, Settings, Network } from "lucide-react";
 import type { PerkId } from "@/lib/agent-game/types";
 import { useTranslation } from "@/lib/i18n";
+import { AgentViewTab } from "@/app/(app)/agent-relationships/AgentViewTab";
 
-type ViewMode = "canvas" | "settings";
+type ViewMode = "canvas" | "settings" | "relationships";
 
 function AgentViewContent() {
   const { t } = useTranslation();
@@ -83,7 +84,11 @@ function AgentViewContent() {
   // per a539816: core3d/roguelike 模式已被删 (跟 sidebar 重复, 9/7 02:38 JST 用户拍板),
   // 残留 celPalette/celBands/autoSagaGuard state 是死代码, 跟 useState 行一起砍掉
   const [viewMode, setViewMode] = useState<ViewMode>(
-    urlView === "settings" ? "settings" : "canvas",
+    urlView === "settings"
+      ? "settings"
+      : urlView === "relationships"
+        ? "relationships"
+        : "canvas",
   );
 
   // Mount-gate for derivedAt 时间戳 (per 2026-09-06 19:42 JST hydration 修复):
@@ -310,6 +315,13 @@ function AgentViewContent() {
           <Sparkles size={13} /> Canvas <span className="text-[10px] px-1.5 py-0.5 bg-black text-[var(--cel-gold,#ffc400)] border border-black font-mono">v1</span>
         </button>
         <button
+          data-testid="view-mode-relationships"
+          onClick={() => handleViewModeChange("relationships")}
+          className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "relationships" ? "bg-[var(--cel-cyan,#00f0ff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
+        >
+          <Network size={13} /> Relationship
+        </button>
+        <button
           data-testid="view-mode-settings"
           onClick={() => handleViewModeChange("settings")}
           className={`text-sm px-4 py-1.5 font-mono font-bold border-2 border-black transition-all flex items-center gap-1.5 cel-shadow ${viewMode === "settings" ? "bg-[var(--cel-text-primary,#ffffff)] text-black" : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"}`}
@@ -333,6 +345,10 @@ function AgentViewContent() {
             </div>
           )}
         </>
+      ) : viewMode === "relationships" ? (
+        <div className="flex-1 min-h-0 overflow-auto p-4">
+          <AgentViewTab />
+        </div>
       ) : (
         <div className="flex-1 min-h-0">
           <AgentSettingsTab initialAgentId={resolution.agentId} />
