@@ -1,0 +1,75 @@
+# envoy bootstrap config (per v0.44 §14.12 III envoy 容器化实施, brief §3.1 configmap.yaml)
+# 包含 admin + listeners + clusters 占位 (0 业务路由, 跨 session 续)
+# 选型: envoyproxy/envoy:v1.31.0 (官方 upstream image, 跟 §6.1 守门 #1 实证一致)
+# 守门 #5 v2: bootstrap config 不含 secret, cert 在 file_system_http filter 阶段挂载 (跨 session 续)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: envoy-bootstrap
+  namespace: star-system
+  labels:
+    app: envoy
+    app.kubernetes.io/name: envoy
+    app.kubernetes.io/component: config
+data:
+  # envoy.yaml - bootstrap config (v0.44 阶段 0 业务路由, 跨 session 续)
+  envoy.yaml: |
+    admin:
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 15001
+
+    # readiness listener (per brief §1 已知, admin port 15001 + readiness port 15090)
+    static_resources:
+      listeners:
+        - name: readiness_listener
+          address:
+            socket_address:
+              address: 0.0.0.0
+              port_value: 15090
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: readiness
+                    route_config:
+                      name: readiness_routes
+                      virtual_hosts:
+                        - name: readiness_vhost
+                          domains: ["*"]
+                          routes:
+                            - match:
+                                prefix: "/ready"
+                              direct_response:
+                                status: 200
+                                body:
+                                  inline_string: "OK\n"
+                            - match:
+                                prefix: "/healthz"
+                              direct_response:
+                                status: 200
+                                body:
+                                  inline_string: "OK\n"
+                    http_filters:
+                      - name: envoy.filters.http.router
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+      # clusters placeholder (跨 session 续, 业务路由待 v0.45+ 落地)
+      clusters:
+        - name: star_api_rest_cluster
+          connect_timeout: 5s
+          type: STRICT_DNS
+          load_assignment:
+            cluster_name: star_api_rest_cluster
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: star-api-rest
+                          port_value: 8081
+          # placeholder health check (v0.44 阶段不接, 跨 session 续)
+          health_checks: []
