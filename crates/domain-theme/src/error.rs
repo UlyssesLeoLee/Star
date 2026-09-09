@@ -45,3 +45,24 @@ pub enum ThemeError {
     #[error("serialization error: {0}")]
     Serialization(String),
 }
+
+impl ThemeError {
+    /// 错误码(per H5 一致化,跟 CommentError / FeedbackError / IntegrationError / ValidationError 对齐)
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::NotFound(_) => "THEME_NOT_FOUND",
+            Self::DuplicateId { .. } => "THEME_DUPLICATE_ID",
+            Self::IncompleteDefinition(_) => "THEME_INCOMPLETE_DEFINITION",
+            Self::InvalidHex(_) => "THEME_INVALID_HEX",
+            Self::InvalidSpacing(_) => "THEME_INVALID_SPACING",
+            Self::PermissionDenied { .. } => "THEME_PERMISSION_DENIED",
+            Self::Storage(_) => "THEME_STORAGE",
+            Self::Serialization(_) => "THEME_SERIALIZATION",
+        }
+    }
+
+    /// 是否服务端错误(per H5 一致化,跟 CommentError / FeedbackError / IntegrationError / ValidationError 对齐)
+    pub fn is_server_error(&self) -> bool {
+        matches!(self, Self::Storage(_) | Self::Serialization(_))
+    }
+}
