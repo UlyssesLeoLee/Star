@@ -4,14 +4,18 @@
 //! per `docs/requirements/SRS-STAR-OPS-001.md` §5
 //! per `docs/basic-design/OPS-BASIC-DESIGN-001.md` §5
 //!
-//! MVP-骨架:
-//! - `mock` 通道: subprocess 调 `scripts/automation/ai_log_mock.py` (守门 #23 + 守门 #24 v2)
-//! - `openai_stub`: trait impl, 真实调用 `// TODO`, 返 NOT_IMPLEMENTED
-//! - `anthropic_stub`: 同上
-//! - `ladder`: 4 级回退 (per ADR-0026 §2.2)
+//! v0.36 Hybrid 4 通道 + mock 兜底 (per 9/9 17:09 JST 用户拍板"gemini优先 其他也都接 minimax也接"):
+//! - `gemini` (优先): Gemini 1.5 Flash (per 9/9 17:09 JST 拍板)
+//! - `openai_stub`: OpenAI gpt-4o-mini
+//! - `anthropic_stub`: Anthropic claude-3-5-sonnet
+//! - `minimax`: MiniMax (per 9/9 17:09 JST 拍板"minimax也接", OpenAI 兼容)
+//! - `mock` (兜底): subprocess 调 `scripts/automation/ai_log_mock.py` (守门 #23 + 守门 #24 v2)
+//! - `ladder`: 5 级 Fallback (per ADR-0026 §2.2 + Gemini 优先)
 
 pub mod anthropic_stub;
+pub mod gemini;
 pub mod ladder;
+pub mod minimax;
 pub mod mock;
 pub mod openai_stub;
 
@@ -33,11 +37,15 @@ pub trait AiChannel: Send + Sync {
     async fn analyze_log(&self, log: &LogEntry) -> Result<LogAnalysis, OpsError>;
 }
 
-/// 构建默认 Ladder (mock 永远首位, 其他通道按配置启用)
+/// 构造默认 Ladder (per ADR-0026 §2.2 + 9/9 17:09 JST 用户拍板"gemini优先 其他也都接 minimax也接")
+/// 优先级顺序: Gemini > OpenAI > Anthropic > MiniMax > mock (兜底, 永远可用)
+/// mock 永远末位, 保证 Fallback Ladder 总是有兜底
 pub fn default_ladder() -> ladder::Ladder {
     ladder::Ladder::new(vec![
-        Box::new(mock::MockChannel),
+        Box::new(gemini::GeminiChannel::default()),
         Box::new(openai_stub::OpenAiStub::default()),
         Box::new(anthropic_stub::AnthropicStub::default()),
+        Box::new(minimax::MiniMaxChannel::default()),
+        Box::new(mock::MockChannel),
     ])
 }
