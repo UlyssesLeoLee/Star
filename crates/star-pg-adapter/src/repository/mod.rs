@@ -305,3 +305,24 @@ mod tests {
         _check_methods::<PgOpsMetricsConfigRepository>();
     }
 }
+
+// ==========================================
+// v0.42 5 Repository 续推 (per 9/9 19:33 JST 用户拍板"5/6 Repository 续推" + 守门 #9 v19 Mavis 自驱)
+// 守门 #13 W/T/M 100% 覆盖: T=3 (ops_helm_release_state + ops_cluster_action_log + ops_log_query_log) + W=2 (ops_log_entry TTL 7d + ops_log_analysis TTL 30d) + M=1 (ops_metrics_config 已收 v0.39)
+// ==========================================
+
+pub mod ops_cluster_action_log;
+pub mod ops_helm_release_state;
+pub mod ops_log_analysis;
+pub mod ops_log_entry;
+pub mod ops_log_query_log;
+
+pub use ops_cluster_action_log::{
+    OpsClusterActionLog, OpsClusterActionLogRepository, PgOpsClusterActionLogRepository,
+};
+pub use ops_helm_release_state::{
+    OpsHelmReleaseState, OpsHelmReleaseStateRepository, PgOpsHelmReleaseStateRepository,
+};
+pub use ops_log_analysis::{OpsLogAnalysis, OpsLogAnalysisRepository, PgOpsLogAnalysisRepository};
+pub use ops_log_entry::{OpsLogEntry, OpsLogEntryRepository, PgOpsLogEntryRepository};
+pub use ops_log_query_log::{OpsLogQueryLog, OpsLogQueryLogRepository, PgOpsLogQueryLogRepository};
