@@ -41,16 +41,141 @@ impl RestError {
             hint: "Wait for P2 phase implementation, or check spec at docs/architecture/2026-09-02-upgrade/spec/integration/02-developer-api-and-outbound-webhook-spec.md".to_string(),
         }
     }
+
+    /// 校验失败 (e.g. UUID 解析失败, 缺字段)
+    pub fn validation(message: impl Into<String>, hint: impl Into<String>) -> Self {
+        Self {
+            code: "VALIDATION_FAILED".to_string(),
+            message: message.into(),
+            source_module: "star-api-rest".to_string(),
+            source_kind: "Validation".to_string(),
+            retriable: false,
+            hint: hint.into(),
+        }
+    }
+}
+
+/// `domain_work_item::WorkItemError` → `RestError` (per star-mcp::error.rs 模式简化, source_kind = String)
+impl From<domain_work_item::WorkItemError> for RestError {
+    fn from(e: domain_work_item::WorkItemError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_work_item::WorkItemError::NotFound(_) => {
+                ("RESOURCE_NOT_FOUND", "Validation", false)
+            }
+            domain_work_item::WorkItemError::PermissionDenied => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_work_item::WorkItemError::CrossTenantDenied(_, _) => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_work_item::WorkItemError::InvalidTransition { .. } => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            domain_work_item::WorkItemError::AiTaskMissingObjective
+            | domain_work_item::WorkItemError::AiTaskMissingScope
+            | domain_work_item::WorkItemError::ParentProjectMismatch => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            domain_work_item::WorkItemError::Conflict(_) => {
+                ("VALIDATION_FAILED", "External", false)
+            }
+            domain_work_item::WorkItemError::Internal(_) => {
+                ("INTERNAL", "Internal", true)
+            }
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("work-item: {e}"),
+            source_module: "domain-work-item".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the work-item id + tenant + role (developer/project_admin/tenant_admin)".to_string(),
+        }
+    }
+}
+
+/// `domain_workspace::WorkspaceError` → `RestError`
+impl From<domain_workspace::WorkspaceError> for RestError {
+    fn from(e: domain_workspace::WorkspaceError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_workspace::WorkspaceError::NotFound(_) => {
+                ("RESOURCE_NOT_FOUND", "Validation", false)
+            }
+            domain_workspace::WorkspaceError::PermissionDenied => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_workspace::WorkspaceError::InvalidState(_) => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            domain_workspace::WorkspaceError::Conflict(_) => {
+                ("WORKSPACE_CONFLICT", "External", false)
+            }
+            domain_workspace::WorkspaceError::Internal(_) => {
+                ("INTERNAL", "Internal", true)
+            }
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("workspace: {e}"),
+            source_module: "domain-workspace".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the workspace id + tenant + role (workspace_admin/tenant_admin)".to_string(),
+        }
+    }
+}
+
+/// `domain_worktree::WorktreeError` → `RestError`
+impl From<domain_worktree::WorktreeError> for RestError {
+    fn from(e: domain_worktree::WorktreeError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_worktree::WorktreeError::NotFound(_) => {
+                ("WORKTREE_NOT_FOUND", "Validation", false)
+            }
+            domain_worktree::WorktreeError::PermissionDenied => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_worktree::WorktreeError::CrossTenantDenied(_, _) => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_worktree::WorktreeError::InvalidTransition { .. } => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            domain_worktree::WorktreeError::RuntimeRequired => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            domain_worktree::WorktreeError::Conflict(_) => {
+                ("WORKTREE_CONFLICT", "External", false)
+            }
+            domain_worktree::WorktreeError::CompletionGateFailed(_)
+            | domain_worktree::WorktreeError::IsolationFailed(_) => {
+                ("VALIDATION_RUN_FAILED", "Validation", false)
+            }
+            domain_worktree::WorktreeError::Internal(_) => {
+                ("INTERNAL", "Internal", true)
+            }
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("worktree: {e}"),
+            source_module: "domain-worktree".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the worktree id + tenant + role (developer)".to_string(),
+        }
+    }
 }
 
 impl IntoResponse for RestError {
     fn into_response(self) -> axum::response::Response {
-        // per spec §2.4: 业务端点未实装 → 501
-        // P2 阶段按 source_kind 映射真实 HTTP status
-        let status = if self.code == "NOT_IMPLEMENTED" {
-            StatusCode::NOT_IMPLEMENTED
-        } else {
-            StatusCode::INTERNAL_SERVER_ERROR
+        // per spec §2.4: code → HTTP status 映射
+        let status = match self.code.as_str() {
+            "NOT_IMPLEMENTED" => StatusCode::NOT_IMPLEMENTED,
+            "VALIDATION_FAILED" | "VALIDATION_RUN_FAILED" => StatusCode::BAD_REQUEST,
+            "RESOURCE_NOT_FOUND" | "WORKTREE_NOT_FOUND" => StatusCode::NOT_FOUND,
+            "POLICY_DENIED" => StatusCode::FORBIDDEN,
+            "WORKTREE_CONFLICT" => StatusCode::CONFLICT,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         (status, Json(serde_json::json!({ "error": self }))).into_response()
     }

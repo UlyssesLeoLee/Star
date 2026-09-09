@@ -128,6 +128,7 @@ mod tests {
     use super::*;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
+    use serde_json::Value;
     use tower::ServiceExt;
 
     /// 路由注册 (build_router 不 panic) 烟雾测试
@@ -151,9 +152,10 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
-    /// 业务端点当前返 501 Not Implemented (P2 阶段 worker 子代理实装时改断言)
+    /// 业务端点现状: Phase I Batch 1 接线后, work-items 真实返回 (200 + JSON),
+    /// 不是 501 (per `docs/briefs/star-api-rest-phase-i-batch-1.md`)
     #[tokio::test]
-    async fn business_endpoint_returns_501_not_implemented() {
+    async fn business_endpoint_returns_real_data_after_phase_i_batch_1() {
         let app = build_router();
         let resp = app
             .oneshot(
@@ -164,6 +166,74 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_IMPLEMENTED);
+        // Phase I Batch 1 真实接线后, /work-items 走 `routes::work_items::search`
+        // → `InMemoryWorkItemService::list_with_filter` → 200 + JSON {data: {query, total, issues}}
+        // (空 query + nil-tenant actor 走真实 service 路径, 返回空 list)
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body_bytes = axum::body::to_bytes(resp.into_body(), 1024)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body_bytes).unwrap();
+        assert!(body.get("data").is_some(), "data field missing");
+        let data = body.get("data").unwrap();
+        assert!(data.get("query").is_some(), "data.query missing");
+        assert!(data.get("total").is_some(), "data.total missing");
+        assert!(data.get("issues").is_some(), "data.issues missing");
+        let issues = data.get("issues").unwrap().as_array().unwrap();
+        assert_eq!(issues.len(), 0, "fresh service should return empty list");
+    }
+
+    /// Phase I Batch 1 实证: POST /worktrees 真实调用 `InMemoryWorktreeService::create_worktree`
+    /// 返回 200 + 真实 worktree 实体 (不是 mock `wt-STAR-1024` 字符串)
+    #[tokio::test]
+    async fn post_worktrees_returns_real_worktree_after_phase_i_batch_1() {
+        let app = build_router();
+        let body_json = serde_json::json!({
+            "work_item_id": "STAR-1024",
+            "branch_name": "feature/STAR-1024"
+        });
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/worktrees")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body_json).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body_bytes = axum::body::to_bytes(resp.into_body(), 4096)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body_bytes).unwrap();
+        assert!(body.get("data").is_some(), "data field missing");
+        let data = body.get("data").unwrap();
+        let worktree = data.get("worktree").expect("worktree field");
+        let id = worktree.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        let branch = worktree.get("branch").and_then(|v| v.as_str()).unwrap_or("");
+        // 真实 service 应返回真实 UUID, 不是 mock `wt-STAR-1024` 字符串
+        assert!(!id.contains("STAR-1024"), "should return real UUID, not mock 'wt-STAR-1024'");
+        assert_eq!(branch, "feature/STAR-1024");
+    }
+
+    /// Phase I Batch 1 实证: GET /workspaces/{id} 真实调用 `InMemoryWorkspaceService::get_by_id`
+    /// 缺 id 路径走 404 (跨 tenant 拒绝 → validation → 跟 star-mcp 简化模式一致)
+    #[tokio::test]
+    async fn get_workspaces_returns_404_for_missing_id_after_phase_i_batch_1() {
+        let app = build_router();
+        let missing = uuid::Uuid::new_v4();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/v1/workspaces/{missing}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        // nil-tenant actor 走真实 service → 跨 tenant 拒绝 → NotFound → 404
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 }
