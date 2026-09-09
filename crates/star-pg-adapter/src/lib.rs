@@ -22,6 +22,8 @@ use std::time::Duration;
 use thiserror::Error;
 use tracing::{debug, info, warn};
 
+pub mod repository;
+
 /// PG 适配器错误 (跟 v0.30 6-field 错误模型一致)
 #[derive(Debug, Error)]
 pub enum PgAdapterError {
