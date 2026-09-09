@@ -252,26 +252,111 @@ pub struct Worktree {
 // =====================================================================
 
 /// **Application 错误**
+/// **Application 错误**(6 字段, per AGENTS.md §3 + star-mcp::error.rs 模式, 跟 ApiError 同源)
 ///
-/// 来源: docs/api-design.md §8 (错误码)
-/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
-#[derive(Debug, thiserror::Error)]
-pub enum ApplicationError {
-    /// 未找到
-    #[error("not found: {0}")]
-    NotFound(Uuid),
-    /// 非法状态
-    #[error("invalid state: {0}")]
-    InvalidState(String),
-    /// 权限不足
-    #[error("permission denied")]
-    PermissionDenied,
-    /// 冲突
-    #[error("conflict: {0}")]
-    Conflict(String),
-    /// 内部错误
-    #[error("internal: {0}")]
-    Internal(String),
+/// v0.29 改造: 从 5-variant enum 升级到 6-field struct (per self-review §3 "6-field ApiError / ApplicationError 改造")
+/// - `code` (SCREAMING_SNAKE_CASE)
+/// - `message` (human-readable)
+/// - `source_module` (`"application"`)
+/// - `source_kind` (`internal` / `external` / `policy` / `validation` / `user_input` / `timeout`)
+/// - `retriable` (bool)
+/// - `hint` (可执行修复提示)
+#[derive(Debug, thiserror::Error, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[error("{code}: {message} (source={source_module}/{source_kind}, retriable={retriable})")]
+pub struct ApplicationError {
+    /// 错误码,SCREAMING_SNAKE_CASE (e.g. `"NOT_FOUND"` / `"INVALID_STATE"`)
+    pub code: String,
+    /// 人类可读错误描述
+    pub message: String,
+    /// 错误来源模块,本 crate 固定 `"application"`
+    pub source_module: String,
+    /// 错误来源分类 (`internal` / `external` / `policy` / `validation` / `user_input` / `timeout`)
+    pub source_kind: String,
+    /// 是否可重试 (`true` = 客户端应重试, `false` = 不可重试)
+    pub retriable: bool,
+    /// 可执行修复提示 (面向调用方)
+    pub hint: String,
+}
+
+impl ApplicationError {
+    /// 通用构造器
+    pub fn new(
+        code: impl Into<String>,
+        message: impl Into<String>,
+        source_module: impl Into<String>,
+        source_kind: impl Into<String>,
+        retriable: bool,
+        hint: impl Into<String>,
+    ) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+            source_module: source_module.into(),
+            source_kind: source_kind.into(),
+            retriable,
+            hint: hint.into(),
+        }
+    }
+
+    /// 快捷: 资源未找到
+    pub fn not_found(resource: &str) -> Self {
+        Self::new(
+            "RESOURCE_NOT_FOUND",
+            format!("{resource} not found"),
+            "application",
+            "validation",
+            false,
+            "Provide a valid resource id",
+        )
+    }
+
+    /// 快捷: 状态非法
+    pub fn invalid_state(message: impl Into<String>, hint: impl Into<String>) -> Self {
+        Self::new(
+            "VALIDATION_FAILED",
+            message,
+            "application",
+            "validation",
+            false,
+            hint,
+        )
+    }
+
+    /// 快捷: 权限拒绝
+    pub fn permission_denied(message: impl Into<String>) -> Self {
+        Self::new(
+            "POLICY_DENIED",
+            message,
+            "application",
+            "policy",
+            false,
+            "Check role + tenant + permission scope",
+        )
+    }
+
+    /// 快捷: 资源冲突
+    pub fn conflict(message: impl Into<String>) -> Self {
+        Self::new(
+            "CONFLICT",
+            message,
+            "application",
+            "external",
+            false,
+            "Resolve conflict and retry",
+        )
+    }
+
+    /// 快捷: 内部错误
+    pub fn internal(message: impl Into<String>) -> Self {
+        Self::new(
+            "INTERNAL",
+            message,
+            "application",
+            "internal",
+            true,
+            "Retry with backoff; if persistent, contact support",
+        )
+    }
 }
 
 // =====================================================================
@@ -283,15 +368,20 @@ impl From<domain_work_item::WorkItemError> for ApplicationError {
     fn from(e: domain_work_item::WorkItemError) -> Self {
         use domain_work_item::WorkItemError::*;
         match e {
-            NotFound(_) => ApplicationError::NotFound(Uuid::nil()),
-            PermissionDenied => ApplicationError::PermissionDenied,
-            CrossTenantDenied(_, _) => ApplicationError::PermissionDenied,
-            InvalidTransition { .. } => ApplicationError::InvalidState(e.to_string()),
-            AiTaskMissingObjective | AiTaskMissingScope | ParentProjectMismatch => {
-                ApplicationError::InvalidState(e.to_string())
+            NotFound(_) => ApplicationError::not_found("work-item"),
+            PermissionDenied => ApplicationError::permission_denied("work-item: permission denied"),
+            CrossTenantDenied(_, _) => {
+                ApplicationError::permission_denied("work-item: cross-tenant")
             }
-            Conflict(_) => ApplicationError::Conflict(e.to_string()),
-            Internal(_) => ApplicationError::Internal(e.to_string()),
+            InvalidTransition { .. } => ApplicationError::invalid_state(
+                e.to_string(),
+                "Check work-item state machine transitions",
+            ),
+            AiTaskMissingObjective | AiTaskMissingScope | ParentProjectMismatch => {
+                ApplicationError::invalid_state(e.to_string(), "Check work-item invariants")
+            }
+            Conflict(_) => ApplicationError::conflict(e.to_string()),
+            Internal(_) => ApplicationError::internal(e.to_string()),
         }
     }
 }
@@ -300,11 +390,13 @@ impl From<domain_workspace::WorkspaceError> for ApplicationError {
     fn from(e: domain_workspace::WorkspaceError) -> Self {
         use domain_workspace::WorkspaceError::*;
         match e {
-            NotFound(_) => ApplicationError::NotFound(Uuid::nil()),
-            PermissionDenied => ApplicationError::PermissionDenied,
-            InvalidState(_) => ApplicationError::InvalidState(e.to_string()),
-            Conflict(_) => ApplicationError::Conflict(e.to_string()),
-            Internal(_) => ApplicationError::Internal(e.to_string()),
+            NotFound(_) => ApplicationError::not_found("workspace"),
+            PermissionDenied => ApplicationError::permission_denied("workspace: permission denied"),
+            InvalidState(_) => {
+                ApplicationError::invalid_state(e.to_string(), "Check workspace state")
+            }
+            Conflict(_) => ApplicationError::conflict(e.to_string()),
+            Internal(_) => ApplicationError::internal(e.to_string()),
         }
     }
 }
@@ -313,16 +405,23 @@ impl From<domain_worktree::WorktreeError> for ApplicationError {
     fn from(e: domain_worktree::WorktreeError) -> Self {
         use domain_worktree::WorktreeError::*;
         match e {
-            NotFound(_) => ApplicationError::NotFound(Uuid::nil()),
-            PermissionDenied => ApplicationError::PermissionDenied,
-            CrossTenantDenied(_, _) => ApplicationError::PermissionDenied,
-            InvalidTransition { .. } => ApplicationError::InvalidState(e.to_string()),
-            RuntimeRequired => ApplicationError::InvalidState(e.to_string()),
-            Conflict(_) => ApplicationError::Conflict(e.to_string()),
-            CompletionGateFailed(_) | IsolationFailed(_) => {
-                ApplicationError::InvalidState(e.to_string())
+            NotFound(_) => ApplicationError::not_found("worktree"),
+            PermissionDenied => ApplicationError::permission_denied("worktree: permission denied"),
+            CrossTenantDenied(_, _) => {
+                ApplicationError::permission_denied("worktree: cross-tenant")
             }
-            Internal(_) => ApplicationError::Internal(e.to_string()),
+            InvalidTransition { .. } => ApplicationError::invalid_state(
+                e.to_string(),
+                "Check worktree 17-state-machine transitions",
+            ),
+            RuntimeRequired => {
+                ApplicationError::invalid_state(e.to_string(), "Provide runtime_id (INV-WT-03)")
+            }
+            Conflict(_) => ApplicationError::conflict(e.to_string()),
+            CompletionGateFailed(_) | IsolationFailed(_) => {
+                ApplicationError::invalid_state(e.to_string(), "Check worktree completion gate")
+            }
+            Internal(_) => ApplicationError::internal(e.to_string()),
         }
     }
 }
@@ -331,12 +430,14 @@ impl From<domain_search::SearchError> for ApplicationError {
     fn from(e: domain_search::SearchError) -> Self {
         use domain_search::SearchError::*;
         match e {
-            NotFound(_) => ApplicationError::NotFound(Uuid::nil()),
-            PermissionDenied => ApplicationError::PermissionDenied,
-            CrossTenantDenied(_, _) => ApplicationError::PermissionDenied,
-            InvalidState(_) | InvalidQuery(_) => ApplicationError::InvalidState(e.to_string()),
-            Conflict(_) => ApplicationError::Conflict(e.to_string()),
-            Internal(_) => ApplicationError::Internal(e.to_string()),
+            NotFound(_) => ApplicationError::not_found("search-index"),
+            PermissionDenied => ApplicationError::permission_denied("search: permission denied"),
+            CrossTenantDenied(_, _) => ApplicationError::permission_denied("search: cross-tenant"),
+            InvalidState(_) | InvalidQuery(_) => {
+                ApplicationError::invalid_state(e.to_string(), "Check query syntax + filters")
+            }
+            Conflict(_) => ApplicationError::conflict(e.to_string()),
+            Internal(_) => ApplicationError::internal(e.to_string()),
         }
     }
 }
@@ -345,12 +446,14 @@ impl From<domain_scm::ScmError> for ApplicationError {
     fn from(e: domain_scm::ScmError) -> Self {
         use domain_scm::ScmError::*;
         match e {
-            NotFound(_) => ApplicationError::NotFound(Uuid::nil()),
-            PermissionDenied(_) => ApplicationError::PermissionDenied,
-            InvalidState(_) => ApplicationError::InvalidState(e.to_string()),
-            Conflict(_) | IdempotencyConflict => ApplicationError::Conflict(e.to_string()),
-            ProviderError(_) => ApplicationError::Internal(e.to_string()),
-            Internal(_) => ApplicationError::Internal(e.to_string()),
+            NotFound(_) => ApplicationError::not_found("scm-repository"),
+            PermissionDenied(_) => ApplicationError::permission_denied("scm: permission denied"),
+            InvalidState(_) => {
+                ApplicationError::invalid_state(e.to_string(), "Check scm resource state")
+            }
+            Conflict(_) | IdempotencyConflict => ApplicationError::conflict(e.to_string()),
+            ProviderError(_) => ApplicationError::internal(format!("scm provider error: {e}")),
+            Internal(_) => ApplicationError::internal(e.to_string()),
         }
     }
 }
@@ -359,12 +462,18 @@ impl From<domain_validation::ValidationError> for ApplicationError {
     fn from(e: domain_validation::ValidationError) -> Self {
         use domain_validation::ValidationError::*;
         match e {
-            NotFound(_) => ApplicationError::NotFound(Uuid::nil()),
-            PermissionDenied => ApplicationError::PermissionDenied,
-            InvalidState(_) => ApplicationError::InvalidState(e.to_string()),
-            Conflict(_) => ApplicationError::Conflict(e.to_string()),
-            InvariantViolated(_) => ApplicationError::InvalidState(e.to_string()),
-            Internal(_) => ApplicationError::Internal(e.to_string()),
+            NotFound(_) => ApplicationError::not_found("validation"),
+            PermissionDenied => {
+                ApplicationError::permission_denied("validation: permission denied")
+            }
+            InvalidState(_) => {
+                ApplicationError::invalid_state(e.to_string(), "Check validation state")
+            }
+            Conflict(_) => ApplicationError::conflict(e.to_string()),
+            InvariantViolated(_) => {
+                ApplicationError::invalid_state(e.to_string(), "Check validation invariants")
+            }
+            Internal(_) => ApplicationError::internal(e.to_string()),
         }
     }
 }
@@ -408,7 +517,9 @@ mod tests {
         use domain_work_item::WorkItemError;
         let e = WorkItemError::NotFound("work-item-uuid".to_string());
         let app_err: ApplicationError = e.into();
-        assert!(matches!(app_err, ApplicationError::NotFound(_)), "expected NotFound");
+        assert_eq!(app_err.code, "RESOURCE_NOT_FOUND");
+        assert_eq!(app_err.source_module, "application");
+        assert_eq!(app_err.source_kind, "validation");
     }
 
     #[test]
@@ -416,7 +527,8 @@ mod tests {
         use domain_workspace::WorkspaceError;
         let e = WorkspaceError::PermissionDenied;
         let app_err: ApplicationError = e.into();
-        assert!(matches!(app_err, ApplicationError::PermissionDenied), "expected PermissionDenied");
+        assert_eq!(app_err.code, "POLICY_DENIED");
+        assert_eq!(app_err.source_kind, "policy");
     }
 
     #[test]
@@ -427,7 +539,8 @@ mod tests {
             to: "ABANDONED".to_string(),
         };
         let app_err: ApplicationError = e.into();
-        assert!(matches!(app_err, ApplicationError::InvalidState(_)), "expected InvalidState");
+        assert_eq!(app_err.code, "VALIDATION_FAILED");
+        assert_eq!(app_err.source_kind, "validation");
     }
 
     #[test]
@@ -435,7 +548,8 @@ mod tests {
         use domain_search::SearchError;
         let e = SearchError::NotFound("index-missing".to_string());
         let app_err: ApplicationError = e.into();
-        assert!(matches!(app_err, ApplicationError::NotFound(_)), "expected NotFound");
+        assert_eq!(app_err.code, "RESOURCE_NOT_FOUND");
+        assert_eq!(app_err.source_kind, "validation");
     }
 
     #[test]
@@ -443,7 +557,8 @@ mod tests {
         use domain_scm::ScmError;
         let e = ScmError::IdempotencyConflict;
         let app_err: ApplicationError = e.into();
-        assert!(matches!(app_err, ApplicationError::Conflict(_)), "expected Conflict");
+        assert_eq!(app_err.code, "CONFLICT");
+        assert_eq!(app_err.source_kind, "external");
     }
 
     #[test]
@@ -451,6 +566,26 @@ mod tests {
         use domain_validation::ValidationError;
         let e = ValidationError::Internal("validator crashed".to_string());
         let app_err: ApplicationError = e.into();
-        assert!(matches!(app_err, ApplicationError::Internal(_)), "expected Internal");
+        assert_eq!(app_err.code, "INTERNAL");
+        assert_eq!(app_err.source_kind, "internal");
+        assert!(app_err.retriable, "internal errors should be retriable");
+    }
+
+    /// v0.29 新增: 验证 6-field 结构完整 (code / message / source_module / source_kind / retriable / hint)
+    #[test]
+    fn application_error_6_field_structure_is_complete() {
+        let e = ApplicationError::not_found("test-resource");
+        assert!(!e.code.is_empty());
+        assert!(!e.message.is_empty());
+        assert!(!e.source_module.is_empty());
+        assert!(!e.source_kind.is_empty());
+        assert!(!e.hint.is_empty());
+        let json = serde_json::to_string(&e).expect("serialize");
+        assert!(json.contains("\"code\""));
+        assert!(json.contains("\"message\""));
+        assert!(json.contains("\"source_module\""));
+        assert!(json.contains("\"source_kind\""));
+        assert!(json.contains("\"retriable\""));
+        assert!(json.contains("\"hint\""));
     }
 }

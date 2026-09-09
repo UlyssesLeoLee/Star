@@ -115,10 +115,15 @@ pub struct RouteDescriptor {
 // Error
 // =====================================================================
 
-/// **Api 错误**
+/// **Api 错误**(6 字段, per AGENTS.md §3 + spec/api-design.md §8 + star-mcp::error.rs 模式)
 ///
-/// 来源: docs/api-design.md §8 (错误码)
-/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`.
+/// v0.29 改造: 从 5-variant enum 升级到 6-field struct (per self-review §3 "6-field ApiError / ApplicationError 改造")
+/// - `code` (SCREAMING_SNAKE_CASE, e.g. `"RESOURCE_NOT_FOUND"`)
+/// - `message` (human-readable, 不暴露 secret)
+/// - `source_module` (e.g. `"api"` / `"domain-work-item"`)
+/// - `source_kind` (per `star-mcp::error::ErrorSourceKind`: `internal` / `external` / `policy` / `validation` / `user_input` / `timeout`)
+/// - `retriable` (bool, true → client 可重试)
+/// - `hint` (可执行修复提示)
 ///
 /// P0-2 (per WBS §14.15) 加 6 个 domain error → ApiError From impls:
 /// - `domain_work_item::WorkItemError` (NotFound / PermissionDenied / InvalidState / Internal)
@@ -127,43 +132,124 @@ pub struct RouteDescriptor {
 /// - `domain_search::SearchError` (NotFound / PermissionDenied / InvalidState / Conflict / Internal)
 /// - `domain_scm::ScmError` (NotFound / PermissionDenied / InvalidState / Conflict / ProviderError / Internal)
 /// - `domain_validation::ValidationError` (NotFound / PermissionDenied / InvalidState / Conflict / Internal)
-#[derive(Debug, thiserror::Error)]
-pub enum ApiError {
-    /// 资源未找到
-    #[error("not found: {0}")]
-    NotFound(Uuid),
-    /// 状态非法
-    #[error("invalid state: {0}")]
-    InvalidState(String),
-    /// 权限拒绝
-    #[error("permission denied")]
-    PermissionDenied,
-    /// 资源冲突
-    #[error("conflict: {0}")]
-    Conflict(String),
-    /// 内部错误
-    #[error("internal: {0}")]
-    Internal(String),
+#[derive(Debug, thiserror::Error, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[error("{code}: {message} (source={source_module}/{source_kind}, retriable={retriable})")]
+pub struct ApiError {
+    /// 标准化错误码(SCREAMING_SNAKE_CASE)
+    pub code: String,
+    /// 人类可读消息
+    pub message: String,
+    /// 错误来源模块
+    pub source_module: String,
+    /// 错误分类(per star-mcp::error::ErrorSourceKind 6 标准值)
+    pub source_kind: String,
+    /// 客户端是否可重试
+    pub retriable: bool,
+    /// 可执行修复提示
+    pub hint: String,
+}
+
+impl ApiError {
+    /// 通用构造器
+    pub fn new(
+        code: impl Into<String>,
+        message: impl Into<String>,
+        source_module: impl Into<String>,
+        source_kind: impl Into<String>,
+        retriable: bool,
+        hint: impl Into<String>,
+    ) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+            source_module: source_module.into(),
+            source_kind: source_kind.into(),
+            retriable,
+            hint: hint.into(),
+        }
+    }
+
+    /// 快捷: 资源未找到 (404, code=`RESOURCE_NOT_FOUND`, source_kind=`validation`, retriable=false)
+    pub fn not_found(resource: &str) -> Self {
+        Self::new(
+            "RESOURCE_NOT_FOUND",
+            format!("{resource} not found"),
+            "api",
+            "validation",
+            false,
+            "Provide a valid resource id",
+        )
+    }
+
+    /// 快捷: 状态非法 (400, code=`VALIDATION_FAILED`, source_kind=`validation`, retriable=false)
+    pub fn invalid_state(message: impl Into<String>, hint: impl Into<String>) -> Self {
+        Self::new(
+            "VALIDATION_FAILED",
+            message,
+            "api",
+            "validation",
+            false,
+            hint,
+        )
+    }
+
+    /// 快捷: 权限拒绝 (403, code=`POLICY_DENIED`, source_kind=`policy`, retriable=false)
+    pub fn permission_denied(message: impl Into<String>) -> Self {
+        Self::new(
+            "POLICY_DENIED",
+            message,
+            "api",
+            "policy",
+            false,
+            "Check role + tenant + permission scope",
+        )
+    }
+
+    /// 快捷: 资源冲突 (409, code=`CONFLICT`, source_kind=`external`, retriable=false)
+    pub fn conflict(message: impl Into<String>) -> Self {
+        Self::new(
+            "CONFLICT",
+            message,
+            "api",
+            "external",
+            false,
+            "Resolve conflict and retry",
+        )
+    }
+
+    /// 快捷: 内部错误 (500, code=`INTERNAL`, source_kind=`internal`, retriable=true)
+    pub fn internal(message: impl Into<String>) -> Self {
+        Self::new(
+            "INTERNAL",
+            message,
+            "api",
+            "internal",
+            true,
+            "Retry with backoff; if persistent, contact support",
+        )
+    }
 }
 
 // =====================================================================
 // P0-2 ApiError 映射 (per WBS §14.15, H2 done 后 unblock 启动)
-// 6 个 domain error → ApiError From impls
+// 6 个 domain error → ApiError From impls (v0.29 升级: 走 6-field struct 构造器)
 // =====================================================================
 
 impl From<domain_work_item::WorkItemError> for ApiError {
     fn from(e: domain_work_item::WorkItemError) -> Self {
         use domain_work_item::WorkItemError::*;
         match e {
-            NotFound(_) => ApiError::NotFound(Uuid::nil()),
-            PermissionDenied => ApiError::PermissionDenied,
-            CrossTenantDenied(_, _) => ApiError::PermissionDenied,
-            InvalidTransition { .. } => ApiError::InvalidState(e.to_string()),
-            AiTaskMissingObjective | AiTaskMissingScope | ParentProjectMismatch => {
-                ApiError::InvalidState(e.to_string())
+            NotFound(_) => ApiError::not_found("work-item"),
+            PermissionDenied => ApiError::permission_denied("work-item: permission denied"),
+            CrossTenantDenied(_, _) => ApiError::permission_denied("work-item: cross-tenant"),
+            InvalidTransition { .. } => {
+                ApiError::invalid_state(e.to_string(), "Check work-item state machine transitions")
             }
-            Conflict(_) => ApiError::Conflict(e.to_string()),
-            Internal(_) => ApiError::Internal(e.to_string()),
+            AiTaskMissingObjective | AiTaskMissingScope | ParentProjectMismatch => {
+                ApiError::invalid_state(e.to_string(), "Check work-item invariants")
+            }
+            Conflict(_) => ApiError::conflict(e.to_string()),
+            Internal(_) => ApiError::internal(e.to_string()),
         }
     }
 }
@@ -172,11 +258,11 @@ impl From<domain_workspace::WorkspaceError> for ApiError {
     fn from(e: domain_workspace::WorkspaceError) -> Self {
         use domain_workspace::WorkspaceError::*;
         match e {
-            NotFound(_) => ApiError::NotFound(Uuid::nil()),
-            PermissionDenied => ApiError::PermissionDenied,
-            InvalidState(_) => ApiError::InvalidState(e.to_string()),
-            Conflict(_) => ApiError::Conflict(e.to_string()),
-            Internal(_) => ApiError::Internal(e.to_string()),
+            NotFound(_) => ApiError::not_found("workspace"),
+            PermissionDenied => ApiError::permission_denied("workspace: permission denied"),
+            InvalidState(_) => ApiError::invalid_state(e.to_string(), "Check workspace state"),
+            Conflict(_) => ApiError::conflict(e.to_string()),
+            Internal(_) => ApiError::internal(e.to_string()),
         }
     }
 }
@@ -185,16 +271,21 @@ impl From<domain_worktree::WorktreeError> for ApiError {
     fn from(e: domain_worktree::WorktreeError) -> Self {
         use domain_worktree::WorktreeError::*;
         match e {
-            NotFound(_) => ApiError::NotFound(Uuid::nil()),
-            PermissionDenied => ApiError::PermissionDenied,
-            CrossTenantDenied(_, _) => ApiError::PermissionDenied,
-            InvalidTransition { .. } => ApiError::InvalidState(e.to_string()),
-            RuntimeRequired => ApiError::InvalidState(e.to_string()),
-            Conflict(_) => ApiError::Conflict(e.to_string()),
-            CompletionGateFailed(_) | IsolationFailed(_) => {
-                ApiError::InvalidState(e.to_string())
+            NotFound(_) => ApiError::not_found("worktree"),
+            PermissionDenied => ApiError::permission_denied("worktree: permission denied"),
+            CrossTenantDenied(_, _) => ApiError::permission_denied("worktree: cross-tenant"),
+            InvalidTransition { .. } => ApiError::invalid_state(
+                e.to_string(),
+                "Check worktree 17-state-machine transitions",
+            ),
+            RuntimeRequired => {
+                ApiError::invalid_state(e.to_string(), "Provide runtime_id (INV-WT-03)")
             }
-            Internal(_) => ApiError::Internal(e.to_string()),
+            Conflict(_) => ApiError::conflict(e.to_string()),
+            CompletionGateFailed(_) | IsolationFailed(_) => {
+                ApiError::invalid_state(e.to_string(), "Check worktree completion gate")
+            }
+            Internal(_) => ApiError::internal(e.to_string()),
         }
     }
 }
@@ -203,12 +294,14 @@ impl From<domain_search::SearchError> for ApiError {
     fn from(e: domain_search::SearchError) -> Self {
         use domain_search::SearchError::*;
         match e {
-            NotFound(_) => ApiError::NotFound(Uuid::nil()),
-            PermissionDenied => ApiError::PermissionDenied,
-            CrossTenantDenied(_, _) => ApiError::PermissionDenied,
-            InvalidState(_) | InvalidQuery(_) => ApiError::InvalidState(e.to_string()),
-            Conflict(_) => ApiError::Conflict(e.to_string()),
-            Internal(_) => ApiError::Internal(e.to_string()),
+            NotFound(_) => ApiError::not_found("search-index"),
+            PermissionDenied => ApiError::permission_denied("search: permission denied"),
+            CrossTenantDenied(_, _) => ApiError::permission_denied("search: cross-tenant"),
+            InvalidState(_) | InvalidQuery(_) => {
+                ApiError::invalid_state(e.to_string(), "Check query syntax + filters")
+            }
+            Conflict(_) => ApiError::conflict(e.to_string()),
+            Internal(_) => ApiError::internal(e.to_string()),
         }
     }
 }
@@ -217,12 +310,12 @@ impl From<domain_scm::ScmError> for ApiError {
     fn from(e: domain_scm::ScmError) -> Self {
         use domain_scm::ScmError::*;
         match e {
-            NotFound(_) => ApiError::NotFound(Uuid::nil()),
-            PermissionDenied(_) => ApiError::PermissionDenied,
-            InvalidState(_) => ApiError::InvalidState(e.to_string()),
-            Conflict(_) | IdempotencyConflict => ApiError::Conflict(e.to_string()),
-            ProviderError(_) => ApiError::Internal(e.to_string()),
-            Internal(_) => ApiError::Internal(e.to_string()),
+            NotFound(_) => ApiError::not_found("scm-repository"),
+            PermissionDenied(_) => ApiError::permission_denied("scm: permission denied"),
+            InvalidState(_) => ApiError::invalid_state(e.to_string(), "Check scm resource state"),
+            Conflict(_) | IdempotencyConflict => ApiError::conflict(e.to_string()),
+            ProviderError(_) => ApiError::internal(format!("scm provider error: {e}")),
+            Internal(_) => ApiError::internal(e.to_string()),
         }
     }
 }
@@ -231,12 +324,14 @@ impl From<domain_validation::ValidationError> for ApiError {
     fn from(e: domain_validation::ValidationError) -> Self {
         use domain_validation::ValidationError::*;
         match e {
-            NotFound(_) => ApiError::NotFound(Uuid::nil()),
-            PermissionDenied => ApiError::PermissionDenied,
-            InvalidState(_) => ApiError::InvalidState(e.to_string()),
-            Conflict(_) => ApiError::Conflict(e.to_string()),
-            InvariantViolated(_) => ApiError::InvalidState(e.to_string()),
-            Internal(_) => ApiError::Internal(e.to_string()),
+            NotFound(_) => ApiError::not_found("validation"),
+            PermissionDenied => ApiError::permission_denied("validation: permission denied"),
+            InvalidState(_) => ApiError::invalid_state(e.to_string(), "Check validation state"),
+            Conflict(_) => ApiError::conflict(e.to_string()),
+            InvariantViolated(_) => {
+                ApiError::invalid_state(e.to_string(), "Check validation invariants")
+            }
+            Internal(_) => ApiError::internal(e.to_string()),
         }
     }
 }
@@ -280,7 +375,10 @@ mod tests {
         use domain_work_item::WorkItemError;
         let e = WorkItemError::NotFound("work-item-uuid".to_string());
         let api: ApiError = e.into();
-        assert!(matches!(api, ApiError::NotFound(_)), "expected NotFound");
+        assert_eq!(api.code, "RESOURCE_NOT_FOUND");
+        assert_eq!(api.source_module, "api");
+        assert_eq!(api.source_kind, "validation");
+        assert!(!api.retriable);
     }
 
     #[test]
@@ -288,7 +386,9 @@ mod tests {
         use domain_work_item::WorkItemError;
         let e = WorkItemError::PermissionDenied;
         let api: ApiError = e.into();
-        assert!(matches!(api, ApiError::PermissionDenied), "expected PermissionDenied");
+        assert_eq!(api.code, "POLICY_DENIED");
+        assert_eq!(api.source_kind, "policy");
+        assert!(!api.retriable);
     }
 
     #[test]
@@ -296,7 +396,8 @@ mod tests {
         use domain_workspace::WorkspaceError;
         let e = WorkspaceError::Conflict("dup key".to_string());
         let api: ApiError = e.into();
-        assert!(matches!(api, ApiError::Conflict(_)), "expected Conflict");
+        assert_eq!(api.code, "CONFLICT");
+        assert_eq!(api.source_kind, "external");
     }
 
     #[test]
@@ -304,7 +405,8 @@ mod tests {
         use domain_worktree::WorktreeError;
         let e = WorktreeError::RuntimeRequired;
         let api: ApiError = e.into();
-        assert!(matches!(api, ApiError::InvalidState(_)), "expected InvalidState");
+        assert_eq!(api.code, "VALIDATION_FAILED");
+        assert_eq!(api.source_kind, "validation");
     }
 
     #[test]
@@ -312,7 +414,8 @@ mod tests {
         use domain_search::SearchError;
         let e = SearchError::InvalidQuery("bad query".to_string());
         let api: ApiError = e.into();
-        assert!(matches!(api, ApiError::InvalidState(_)), "expected InvalidState");
+        assert_eq!(api.code, "VALIDATION_FAILED");
+        assert_eq!(api.source_kind, "validation");
     }
 
     #[test]
@@ -320,7 +423,9 @@ mod tests {
         use domain_scm::ScmError;
         let e = ScmError::ProviderError("upstream timeout".to_string());
         let api: ApiError = e.into();
-        assert!(matches!(api, ApiError::Internal(_)), "expected Internal (provider error → internal)");
+        assert_eq!(api.code, "INTERNAL");
+        assert_eq!(api.source_kind, "internal");
+        assert!(api.retriable, "provider errors should be retriable");
     }
 
     #[test]
@@ -328,6 +433,26 @@ mod tests {
         use domain_validation::ValidationError;
         let e = ValidationError::InvariantViolated("INV-VL-01 broken".to_string());
         let api: ApiError = e.into();
-        assert!(matches!(api, ApiError::InvalidState(_)), "expected InvalidState");
+        assert_eq!(api.code, "VALIDATION_FAILED");
+        assert_eq!(api.source_kind, "validation");
+    }
+
+    /// v0.29 新增: 验证 6-field 结构完整 (code / message / source_module / source_kind / retriable / hint)
+    #[test]
+    fn api_error_6_field_structure_is_complete() {
+        let e = ApiError::not_found("test-resource");
+        assert!(!e.code.is_empty(), "code required");
+        assert!(!e.message.is_empty(), "message required");
+        assert!(!e.source_module.is_empty(), "source_module required");
+        assert!(!e.source_kind.is_empty(), "source_kind required");
+        assert!(!e.hint.is_empty(), "hint required");
+        // Serialize 6 字段 (JSON 验证)
+        let json = serde_json::to_string(&e).expect("serialize");
+        assert!(json.contains("\"code\""));
+        assert!(json.contains("\"message\""));
+        assert!(json.contains("\"source_module\""));
+        assert!(json.contains("\"source_kind\""));
+        assert!(json.contains("\"retriable\""));
+        assert!(json.contains("\"hint\""));
     }
 }
