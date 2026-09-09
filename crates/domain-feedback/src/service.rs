@@ -91,7 +91,7 @@ impl InMemoryFeedbackService {
     ) -> Result<(), FeedbackError> {
         if let FeedbackTarget::Worktree { worktree_id } = target {
             if let Some(actor_wt) = actor_worktree_id {
-                if worktree_id.as_uuid() != &actor_wt {
+                if worktree_id.as_uuid() != actor_wt {
                     return Err(FeedbackError::CrossWorktree);
                 }
             }
@@ -289,7 +289,7 @@ impl FeedbackCommandPort for InMemoryFeedbackService {
         // 跨 Worktree 校验(actor.worktree_id)
         if let Some(actor_wt) = cmd.actor_worktree_id {
             if let FeedbackTarget::Worktree { worktree_id } = &f.target {
-                if worktree_id.as_uuid() != &actor_wt {
+                if worktree_id.as_uuid() != actor_wt {
                     return Err(FeedbackError::CrossWorktree);
                 }
             }

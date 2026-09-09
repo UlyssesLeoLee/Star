@@ -23,8 +23,8 @@ macro_rules! define_uuid_id {
                 Self(id)
             }
             /// 取内部 UUID 引用。
-            pub fn as_uuid(&self) -> &uuid::Uuid {
-                &self.0
+            pub fn as_uuid(&self) -> uuid::Uuid {
+                self.0
             }
             /// 取出内部 UUID(consume)。
             pub fn into_uuid(self) -> uuid::Uuid {

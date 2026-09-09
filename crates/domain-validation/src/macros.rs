@@ -16,8 +16,8 @@ macro_rules! define_uuid_id {
             pub fn from_uuid(id: uuid::Uuid) -> Self {
                 Self(id)
             }
-            pub fn as_uuid(&self) -> &uuid::Uuid {
-                &self.0
+            pub fn as_uuid(&self) -> uuid::Uuid {
+                self.0
             }
             pub fn into_uuid(self) -> uuid::Uuid {
                 self.0
