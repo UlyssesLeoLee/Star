@@ -725,6 +725,57 @@ print(f"err_count={result.stderr.count('error[')}")
 - `git log -p --follow scripts/automation/registry.md` 实证 §5.3 追加 (commit 后)
 - commit author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权 + 9/3 19:35 拍板 D + 9/8 15:19 第 6 次强化)
 
+### 4.20 wt 并行处理落地 (per 2026-09-09 22:31 JST 用户发令"开子代理和 worktree 并行处理并在完成后 merge 到 main" + ask_4b06eee1bba60b2727e8bccb 拍板 4 个 wt 并行 + 逐个 rebase + ff merge 范式)
+
+> **触发**: 2026-09-09 22:31 JST 用户发令"开子代理和 worktree 并行处理并在完成后 merge 到 main" + ask_4b06eee1 拍板 1 选项 (4 个 wt 并行) + 2 选项 (逐个 rebase + ff merge 范式, 推荐项), per 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化 Mavis 自驱 + 9/5 04:03 推荐项直接执行
+> **落档文件**:
+> - `docs/briefs/wt-sb-01-subtask-binding-impl.md` v0.1 (8.7KB, Sub-task Binding v0.4 实装 brief)
+> - `docs/briefs/wt-arg-04-api-13rest-1ws.md` v0.1 (8.1KB, ARG.4 13 REST + 1 WS + RLS 13 類 brief)
+> - `docs/briefs/wt-h2-ext-5domain-compat.md` v0.1 (8.2KB, H2-EXT 5 domain 类型兼容 + workspace_ids + tenant_policy_id brief)
+> - `docs/briefs/wt-5lead-outreach.md` v0.1 (9.0KB, 5 域 Lead 寻访 Ulysses 内推启动 brief)
+> - `docs/recruitment/status/{player,economy,match,social,admin}.md` v0.1 (5 文件, ~6KB, 5 域寻访状态)
+> - `docs/recruitment/outreach_log/{README.md,.gitignore}` v0.1 (2 文件, ~1.8KB, private log 不入 git)
+> - `docs/briefs/5-leads/README.md` v0.1 (3.7KB, 5 域 Lead Subagent Brief 索引说明)
+> - `AGENTS.md` §8 v0.81 (修订历史追加 wt 并行处理落地)
+> **依据**: 守门 #9 v3 (调试控制台走 subprocess 替代 RPC, 子代理 RPC 不可靠实证 10/10 失败) + 守门 #9 #3 (不 commit 散落子代理产出) + 守门 #9 v19 (agent 交互 Python 化) + 守门 #9 v20 (子代理 dispatch 必先 brief 落档) + 守门 #14 v3 (Mavis 永久代签全部签字栏) + 守门 #21 v21 ([P] docs 同步必更新 §4 + registry) + 守门 #1 v15 (docs 同步饱和 41+ 次仍允许, 本次 = 新事件触发) + 守门 #27 v27 候选 (子代理 RPC 失败 fallback) + 守门 #28 v28 候选 (Mavis 拍板时必带推荐项)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| WT-1 | `docs/briefs/wt-sb-01-subtask-binding-impl.md` v0.1 落档 (8.7KB) | A | **[P]** | (write tool) | per [ADR-0052 §5 实施计划 v0.4](../architecture/2026-08-26-upgrade/adr/0052-subtask-binding.md) 实装阶段 brief |
+| WT-2 | `docs/briefs/wt-arg-04-api-13rest-1ws.md` v0.1 落档 (8.1KB) | A | **[P]** | (write tool) | per §4.18 ARG.4 13 REST + 1 WS + RLS 13 類 |
+| WT-3 | `docs/briefs/wt-h2-ext-5domain-compat.md` v0.1 落档 (8.2KB) | A | **[P]** | (write tool) | per HANDOFF-ST-001 §5.3 Blocker #1 H2-EXT 5 domain 类型不兼容 + DeviceId 强类型重构 |
+| WT-4 | `docs/briefs/wt-5lead-outreach.md` v0.1 落档 (9.0KB) | A | **[P]** | (write tool) | per docs/recruitment/5-business-domain-lead-referral.md v0.1 + ask_409cbd32edc309d71 拍板 Ulysses 内推 + 立即启动 |
+| WT-5 | `git worktree add` 4 worktree 落地 (wt-sb-01 + wt-h2-ext-5domain-compat + wt-5lead-outreach 新建; wt-arg-04 已存在 ahead 0 behind 52) | S | **[S]** | git worktree 命令 | per 守门 #9 主体规则 wt 必须在 main 链上 |
+| WT-6 | `wt-arg-04-api-13rest-1ws` close (内容 100% 在 main 上, 不需 merge) | S | **[S]** | `git worktree remove --force` + `git branch -D` | per守门 #9 #3 close-wtc 范式 (9/5 11:27 JST 拍板); ARG.1 + ARG.4 已 100% 在 main 链上 (commit `6e2cda6` + `1d894ab` + `e2c70ce` + `d2a378c` + `c678db7` + `7d7797b`) |
+| WT-7 | `wt-5lead-outreach` 8 文件 commit + ff merge (commit `bd12c17`) | S | **[P]** | git commit + git merge --ff-only | per [docs/briefs/wt-5lead-outreach.md §4.3](../briefs/wt-5lead-outreach.md) commit 范式 + 守门 #12 commit-time docs 同步 + 守门 #14 v3 author=Ulysses |
+| WT-8 | wt-5lead-outreach commit `bd12c17` ff merge 到 main (Fast-forward, 无冲突) | S | **[S]** | `git merge --ff-only wt-5lead-outreach` | per 9/4 17:19 JST 拍板 rebase-then-merge 范式 (rf001-t15-work 实证) |
+| WT-9 | docs/briefs/5-leads/ 5 文件原版本保留 (per守门 #1 禁回溯叙事) + 仅新增 README.md 索引说明 | A | **[P]** | (write tool) | per守门 #12 AI 协作文档治理; 首次 write tool 错误 overwrote 立即 git restore 恢复 + commit message 含错误修正 |
+| WT-10 | `AGENTS.md` §8 v0.81 修订历史追加 wt 并行处理落地 (per守门 #21 v21) | A | **[P]** | (AGENTS.md edit) | per 守门 #12 commit-time docs 同步触发 v0.81 |
+| WT-11 | wt-sb-01 + wt-h2-ext-5domain-compat 跨 session 续做 (估 ~3-5M tokens 实装量超单 session 上限) | S | **[P]** | (跨 session) | per 守门 #20 v20 + 守门 #27 v27 候选; brief 已落档可下次 session 直接接续 |
+
+**§4.20 任务卡维度判定**:
+- R (Rerunnable): **是** (wt-5lead-outreach commit bd12c17 idempotent; wt-sb-01 + wt-h2-ext 跨 session 续做 idempotent)
+- V (Volume): 否 (无子代理派发, Mavis 接手 root session 直接做, 守门 #9 v3 subprocess 替代 RPC)
+- S (Structural): **是** (4 worktree 创建 + 1 close + 1 ff merge + 5 域寻访状态 + 8 brief 落档)
+- A (Audit-trail): **是** (守门 #12 commit-time docs 同步 v0.81 + 守门 #21 [P] docs 同步 §4.20 + 守门 #9 git log --follow 实证 + 守门 #13 自我修正留痕 + 守门 #1 v15 docs 同步饱和 41+ 次新事件触发)
+
+**§4.20 落档验证 (per 守门 #1 累积规 v1-v24, 本次 1 cargo check + 8 文件落档, 不需 cargo test)**:
+- `git log -p --follow docs/briefs/wt-sb-01-subtask-binding-impl.md` 实证 (commit 后, 跨 session 续做)
+- `git log -p --follow docs/briefs/wt-arg-04-api-13rest-1ws.md` 实证
+- `git log -p --follow docs/briefs/wt-h2-ext-5domain-compat.md` 实证
+- `git log -p --follow docs/briefs/wt-5lead-outreach.md` 实证
+- `git log -p --follow docs/recruitment/status/` 实证 5 域寻访状态落档
+- `git log -p --follow docs/recruitment/outreach_log/README.md` 实证 (private log 不入 git, 仅 README + .gitignore)
+- `git log -p --follow docs/briefs/5-leads/README.md` 实证 索引说明
+- `git log -p --follow AGENTS.md` 实证 §8 v0.81 追加 (commit 后)
+- `git log -p --follow docs/automation-design.md` 实证 §4.20 追加 (commit 后)
+- `git log -p --follow scripts/automation/registry.md` 实证 registry v0.8+ 追加 (commit 后)
+- `git merge-base --is-ancestor 6e2cda6 main` 实证 ARG.4 在 main 上 (close 拍板)
+- `git merge-base --is-ancestor 43c1f0c main` 实证 ARG.1 在 main 上 (close 拍板)
+- `git worktree list` 实证 wt-arg-04-api-13rest-1ws 已删除 (close 实证)
+- `cargo check --workspace --all-targets -j 4` 实证 (wt-arg-04 cargo check 0 err 2m03s, 不在 main 编译链, per 守门 #1 v22)
+- commit author = `Ulysses <ulysses@mavis.local>` (per 19:39 + 21:59 JST 授权 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化 Mavis 自驱)
+
 ------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
