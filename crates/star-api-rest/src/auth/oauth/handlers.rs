@@ -52,7 +52,7 @@ pub struct OAuth2State {
 
 #[derive(Debug, Deserialize)]
 pub struct AuthorizeQuery {
-    pub response_type: String,        // "code"
+    pub response_type: String, // "code"
     pub client_id: String,
     pub redirect_uri: String,
     pub scope: Option<String>,
@@ -77,10 +77,12 @@ pub async fn authorize_handler(
     // 查找 client
     let client = state
         .client_repo
-        .find_by_client_id(Uuid::nil(), &params.client_id)  // 简化: tenant_id=nil
+        .find_by_client_id(Uuid::nil(), &params.client_id) // 简化: tenant_id=nil
         .await
         .map_err(|e| OAuthHandlerError::Internal(format!("find client: {}", e)))?
-        .ok_or_else(|| OAuthHandlerError::InvalidClient(format!("client_id {}", params.client_id)))?;
+        .ok_or_else(|| {
+            OAuthHandlerError::InvalidClient(format!("client_id {}", params.client_id))
+        })?;
 
     // 验证 redirect_uri (简化: 单 URI)
     if !client.redirect_uris.contains(&params.redirect_uri) {
@@ -147,21 +149,21 @@ pub async fn authorize_handler(
 
 #[derive(Debug, Deserialize)]
 pub struct TokenRequest {
-    pub grant_type: String,           // "authorization_code" / "client_credentials" / "refresh_token"
-    pub code: Option<String>,         // for authorization_code
+    pub grant_type: String, // "authorization_code" / "client_credentials" / "refresh_token"
+    pub code: Option<String>, // for authorization_code
     pub redirect_uri: Option<String>, // for authorization_code
     pub code_verifier: Option<String>, // PKCE
     pub client_id: Option<String>,
     pub client_secret: Option<String>,
-    pub scope: Option<String>,        // for client_credentials
+    pub scope: Option<String>,         // for client_credentials
     pub refresh_token: Option<String>, // for refresh_token
 }
 
 #[derive(Debug, Serialize)]
 pub struct TokenResponse {
     pub access_token: String,
-    pub token_type: String,           // "Bearer"
-    pub expires_in: i64,              // seconds
+    pub token_type: String, // "Bearer"
+    pub expires_in: i64,    // seconds
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_token: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -170,8 +172,8 @@ pub struct TokenResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct BasicAuth {
-    pub username: String,  // client_id
-    pub password: String,  // client_secret
+    pub username: String, // client_id
+    pub password: String, // client_secret
 }
 
 /// POST /oauth/token
@@ -367,7 +369,11 @@ async fn issue_tokens(
         tenant_id,
         token_hash: sha256_hex(&claims.jti.to_string()),
         client_id: client_id.to_string(),
-        user_id: if user_uuid.is_nil() { None } else { Some(user_uuid) },
+        user_id: if user_uuid.is_nil() {
+            None
+        } else {
+            Some(user_uuid)
+        },
         grant_type: grant_type.to_string(),
         scope: scope.to_string(),
         expires_at: access_exp,
@@ -576,15 +582,9 @@ pub enum OAuthHandlerError {
 impl IntoResponse for OAuthHandlerError {
     fn into_response(self) -> axum::response::Response {
         let (status, error, description) = match self {
-            OAuthHandlerError::InvalidRequest(d) => {
-                (StatusCode::BAD_REQUEST, "invalid_request", d)
-            }
-            OAuthHandlerError::InvalidClient(d) => {
-                (StatusCode::UNAUTHORIZED, "invalid_client", d)
-            }
-            OAuthHandlerError::InvalidGrant(d) => {
-                (StatusCode::BAD_REQUEST, "invalid_grant", d)
-            }
+            OAuthHandlerError::InvalidRequest(d) => (StatusCode::BAD_REQUEST, "invalid_request", d),
+            OAuthHandlerError::InvalidClient(d) => (StatusCode::UNAUTHORIZED, "invalid_client", d),
+            OAuthHandlerError::InvalidGrant(d) => (StatusCode::BAD_REQUEST, "invalid_grant", d),
             OAuthHandlerError::UnauthorizedClient(d) => {
                 (StatusCode::BAD_REQUEST, "unauthorized_client", d)
             }

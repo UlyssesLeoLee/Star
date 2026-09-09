@@ -59,15 +59,15 @@ impl BearerError {
     /// WWW-Authenticate header value (per RFC 6750 §3)
     pub fn www_authenticate(&self) -> String {
         match self {
-            BearerError::MissingHeader => format!(
-                r#"Bearer realm="star-api-rest", error="invalid_request""#
-            ),
-            BearerError::InvalidFormat => format!(
-                r#"Bearer realm="star-api-rest", error="invalid_request""#
-            ),
-            BearerError::InvalidToken(_) => format!(
-                r#"Bearer realm="star-api-rest", error="invalid_token""#
-            ),
+            BearerError::MissingHeader => {
+                format!(r#"Bearer realm="star-api-rest", error="invalid_request""#)
+            }
+            BearerError::InvalidFormat => {
+                format!(r#"Bearer realm="star-api-rest", error="invalid_request""#)
+            }
+            BearerError::InvalidToken(_) => {
+                format!(r#"Bearer realm="star-api-rest", error="invalid_token""#)
+            }
             BearerError::ExpiredToken => format!(
                 r#"Bearer realm="star-api-rest", error="invalid_token", error_description="token expired""#
             ),
@@ -75,9 +75,9 @@ impl BearerError {
                 r#"Bearer realm="star-api-rest", error="insufficient_scope", scope="{}""#,
                 scope
             ),
-            BearerError::ServerError(_) => format!(
-                r#"Bearer realm="star-api-rest", error="server_error""#
-            ),
+            BearerError::ServerError(_) => {
+                format!(r#"Bearer realm="star-api-rest", error="server_error""#)
+            }
         }
     }
 }
@@ -102,12 +102,7 @@ impl IntoResponse for BearerError {
             },
         });
         let www_auth = self.www_authenticate();
-        (
-            status,
-            [(header::WWW_AUTHENTICATE, www_auth)],
-            Json(body),
-        )
-            .into_response()
+        (status, [(header::WWW_AUTHENTICATE, www_auth)], Json(body)).into_response()
     }
 }
 
