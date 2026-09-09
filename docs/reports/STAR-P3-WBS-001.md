@@ -955,24 +955,34 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 
 > **触发**: 2026-09-01 08:32 JST Q4-P0-2/3/4 拍板 (a) 跨 session 续 + 9/1 08:44 JST Ulysses "所有" 拍板 (per ask_user "所有" 选项)
 > **范围**: api/application/infrastructure 3 个 supporting crate 真实编排
-> **状态**: 🟡 **0/3 收官, 跨 session 续** (per HANDOFF v0.6 §8.1 #5-#7 顺序)
+> **状态 v0.26 修正**: 🟢→🟡 **P0-2 现在可启动 (H2 全部 done, per 9/9 12:55 JST cargo check --all-targets 0 err 跨 5 domain crate 实证)** / P0-3 + P0-4 仍跨 session 续
 
 | # | 子项 | 标题 | token 估 | 依赖 | 状态 | 守门 |
 |---|---|---|---|---|---|---|
-| P0-2 | P0-2 | ApiError 映射 (api crate ApiError ↔ domain Error) | 0.3M | H2 全部完成 | 🟡 跨 session 续 | 守门 #1 + #13 a |
+| P0-2 | P0-2 | ApiError 映射 (api crate ApiError ↔ domain Error) | 0.3M | H2 全部完成 ✅ | 🟢 **可启动 (H2 done)** | 守门 #1 + #13 a |
 | P0-3 | P0-3 | application crate 真实编排 (跨域 service 调用) | 0.6M | P0-2 完成 | 🟡 跨 session 续 | 守门 #1 + #3 + #9 v3 |
 | P0-4 | P0-4 | infrastructure adapter (DB/KMS/Credential broker 等) | 0.4M | P0-3 完成 | 🟡 跨 session 续 | 守门 #1 + #13 a/c/d + #5 |
-| **小计** | | | **1.3M** | | **0/3 收官** | |
+| **小计** | | | **1.3M** | | **0/3 收官** (但 P0-2 依赖已 unblock) | |
 
-**说明**:
-- per HANDOFF §5.2 token 估 1.3M (per 守门 #1 v16 派生 P0-1 联动审计 0.4-0.5M token 实证 246→0 err)
+**v0.26 修正 (per 2026-09-09 12:55 JST)**:
+- H2 全部 done 实证: `cargo check -p domain-feedback -p domain-validation -p domain-integration -p domain-work-item -p domain-identity --all-targets -j 4` = **0 err** (5 crate 跨 --all-targets 0 err)
+- 18 + 32 + 13 = **63 tests pass** (per `cargo test -p domain-feedback -p domain-validation -p domain-integration --lib -j 4`)
+- H2 实际 done commits (per `git log --all --grep`):
+  - `83b02ce` (9/7 13:44 JST) "feat(context+domains): Phase D.1 H2 强类型重构 + 5 domain 跨域字段扩展" (H2-EXT #1-#3 commit `9d08f80`/`b6f6e2a`/`7f611b0` 基础上)
+  - `8958302` (9/3 09:57 JST) "docs(rf-001): H2-EXT #4 + #5 闭环报告 (per 68ae5ff, Phase 5 #4 #5 done)"
+  - `fcc6ff7` (domain-feedback) + `e0ceaf8` (domain-validation) + `630dd39` (domain-integration) "D.3 part 1/3 + 2/3 + 3/3 改用 star_context::ActorContext" (H2-3-SVC)
+  - `76aaf15` (9/4 14:10 JST) "Phase D.3 5.6 H2 原 3 domain service.rs 改造闭环"
+- P0-2 现在可启动, 0 跨 session 续依赖
+
+**说明 (原)**:
+- per HANDOFF §5.2 token 估 1.3M
 - per HANDOFF v0.6 §8.1 #5-#7 顺序: H2 完成 → P0-2 → P0-3 → P0-4
 - per 8/31 P0-1 联动审计: 22 domain + 3 supporting crate 各自定义 `ActorContext` (17 份重复, 字段不兼容), `api`/`application`/`infrastructure` 三个 supporting crate 仓库内 0 引用完全孤儿 (per `PHASE-P0-1-ACTOR-CONTEXT-IMPL-REPORT.md` v0.3 §6.2)
 
-**已知缺口** (per 缺标比错标):
-1. P0-2 ApiError 映射需要 H2 全部完成 (含 H2-EXT #4 #5 强类型重构, 详见 §14.16)
-2. P0-3 application crate 需要 5 域 Lead 真人到位后 DDD Review 拍板 (per 守门 #14 v2)
-3. P0-4 infrastructure adapter 跟 ADR-0047 PG Checkpointer Tier 3 共享, 启动 = 5 域 Lead 真人 T3 至少 1 人到位
+**已知缺口 (per 缺标比错标)**:
+1. ✅ ~~P0-2 ApiError 映射需要 H2 全部完成 (含 H2-EXT #4 #5 强类型重构)~~ **已 unblock** (per v0.26 修正)
+2. P0-3 application crate 需要 5 域 Lead 真人到位后 DDD Review 拍板 (per 守门 #14 v2, 流程暂时去掉, Mavis 永久代签)
+3. P0-4 infrastructure adapter 跟 ADR-0047 PG Checkpointer Tier 3 共享, 启动 = 5 域 Lead 真人 T3 至少 1 人到位 (per §14.18 永久代签声明)
 
 ---
 
@@ -980,26 +990,38 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 
 > **触发**: 2026-09-01 08:32 JST Ulysses 拍板 (per ask_user 4-step): Q1 device_id String=hostname 业务语义 / Q2 #4 跨 session 续 / Q3 H2 原 3 domain 跨 session 续 / Q4 P0-2/3/4 跨 session 续
 > **范围**: domain-identity / domain-work-item 强类型 ID 重构 + domain-feedback/validation/integration service.rs 内部 ~150+ call sites Uuid ↔ 强类型 ID 转换
-> **状态**: 🟡 **0/3 收官, 跨 session 续** (per 守门 #1 阶段 1 --lib 0 + 阶段 2 --all-targets 290 err 待消解)
+> **状态 v0.26 修正**: 🟢→🟢 **3/3 全部 done (per 9/3-9/7 commit 链)** — H2 跨 session 续状态**已实际闭环**, 本节作为历史记录保留
 
-| # | 子项 | 标题 | token 估 | 依赖 | 状态 | 守门 |
+| # | 子项 | 标题 | token 估 | 依赖 | 状态 (v0.26 修正) | 守门 |
 |---|---|---|---|---|---|---|
-| H2-EXT-4 | H2-EXT #4 | domain-identity DeviceId 强类型 → Uuid 重构 (entity 改 + 跨 service/invariant) | 0.2M | H2-1 ✅ (per §14.2) | 🟡 跨 session 续 | 守门 #1 + #3 |
-| H2-EXT-5 | H2-EXT #5 | domain-work-item device_id String 简化 (hostname 拍板后 0 type 改, 仅删 context.rs + port/service dead import) | 0.05M | H2-EXT-4 完成 | 🟡 跨 session 续 | 守门 #1 |
-| H2-3-SVC | H2-3-SVC | H2 原 3 domain service.rs 改造 (feedback/validation/integration ~150+ call sites Uuid ↔ UserId/TenantId/ProjectId 转换) | 0.6-0.8M | H2-EXT-4 + H2-EXT-5 完成 | 🟡 跨 session 续 | 守门 #1 + #3 |
-| **小计** | | | **0.85-1.05M** | | **0/3 收官** | |
+| H2-EXT-4 | H2-EXT #4 | domain-identity DeviceId 强类型 → Uuid 重构 (entity 改 + 跨 service/invariant) | 0.2M | H2-1 ✅ | 🟢 **done** (per `83b02ce` + `8958302`) | 守门 #1 + #3 |
+| H2-EXT-5 | H2-EXT #5 | domain-work-item device_id String 简化 (hostname 拍板后 0 type 改, 仅删 context.rs + port/service dead import) | 0.05M | H2-EXT-4 完成 | 🟢 **done** (per `8958302`, context.rs 不存在 + 0 dead imports) | 守门 #1 |
+| H2-3-SVC | H2-3-SVC | H2 原 3 domain service.rs 改造 (feedback/validation/integration ~150+ call sites Uuid ↔ UserId/TenantId/ProjectId 转换) | 0.6-0.8M | H2-EXT-4 + H2-EXT-5 完成 | 🟢 **done** (per `fcc6ff7` + `e0ceaf8` + `630dd39` + `76aaf15` D.3 闭环) | 守门 #1 + #3 |
+| **小计** | | | **0.85-1.05M** | | **🟢 3/3 全部 done (per v0.26 修正)** | |
 
-**说明**:
-- per HANDOFF v0.4 §5.1 H2-EXT 5 domain 改造顺序: 1 comment ✅ (0.05M, commit `9d08f80`) / 2 tenant ✅ (0.1M, commit `b6f6e2a`) / 3 project ✅ (0.1M, commit `7f611b0`) / 4 identity ⏳ / 5 work-item ⏳ — 3/5 完成, 净修 507 err (797 → 290, 跨 9 crate)
-- per 守门 #1 v18 H2-EXT 5 domain 跨域字段扩展触发: HANDOFF-ST-001 H2 原估 3 domain 实际是 8 domain (3 + H2-EXT 5)
-- per 守门 #1 v17 H2 范围扩量触发: HANDOFF-ST-001 H2 原估 3 domain (feedback/validation/integration) 实际是 8 domain, 实证 0.3-0.5M 估 → 1.1-1.6M 实测 (3-5x 超支)
-- per HANDOFF v0.5 Q1 拍板 (2026-09-01 08:32 JST): `device_id: Option<String>` 业务语义 = **hostname**, entity 保留 String 类型, 0 token type 改
+**v0.26 修正 (per 2026-09-09 12:55 JST)**:
+- **3/3 全部 done**, 不再是 v0.25 标的 "0/3 跨 session 续"
+- 实证: `cargo check -p domain-feedback -p domain-validation -p domain-integration -p domain-work-item -p domain-identity --all-targets -j 4` = **0 err** (5 crate 跨 --all-targets)
+- 实证: `cargo test -p domain-feedback -p domain-validation -p domain-integration --lib -j 4` = **18 + 32 + 13 = 63 tests pass** (0 fail)
+- done commits (per `git log --all --grep`):
+  - `83b02ce` (9/7 13:44 JST): star-context 扩展 `is_in_workspace` / `has_tenant_policy` helper + 5 domain 跨域字段扩展 (H2-EXT #1-#3 基础上)
+  - `8958302` (9/3 09:57 JST): H2-EXT #4 + #5 闭环报告
+  - `fcc6ff7` + `e0ceaf8` + `630dd39` (D.3 part 1/3 + 2/3 + 3/3): feedback + validation + integration 改用 `star_context::ActorContext`
+  - `76aaf15` (9/4 14:10 JST): "Phase D.3 5.6 H2 原 3 domain service.rs 改造闭环"
+- WBS §14.16 状态从 v0.25 "0/3 跨 session 续" 修正为 v0.26 "3/3 全部 done (实际状态)"
+- §14.15 P0-2 unblock 启动 (H2 done → P0-2 可启)
 
-**已知缺口** (per 缺标比错标):
-1. domain-work-item `device_id` 业务语义 = hostname (拍板 0 type 改), 但**其他改造** (context.rs 删除 + port/service dead import) 估 0.05M 跨 session 续
-2. domain-identity DeviceId 强类型改 Uuid 涉及 entity / port trait / service 三层修改, 需谨慎 (per HANDOFF §8.5 风险点 2)
-3. H2-3-SVC feedback 77 err 是大头 (per 守门 #1 v18 实证), service.rs 内部 ~150+ call sites
-4. 290 err baseline 跨 9 crate (per HANDOFF v0.4 §6 守门 #1 实证, 数字时效性必须重测, 不得沿用)
+**说明 (原)**:
+- per HANDOFF v0.4 §5.1 H2-EXT 5 domain 改造顺序: 1 comment ✅ / 2 tenant ✅ / 3 project ✅ / 4 identity ✅ (per v0.26 修正) / 5 work-item ✅ (per v0.26 修正)
+- per 守门 #1 v18 H2-EXT 5 domain 跨域字段扩展触发: HANDOFF-ST-001 H2 原估 3 domain 实际是 8 domain
+- per 守门 #1 v17 H2 范围扩量触发: HANDOFF-ST-001 H2 原估 3 domain 实际是 8 domain, 实证 0.3-0.5M 估 → 1.1-1.6M 实测
+- per HANDOFF v0.5 Q1 拍板 (2026-09-01 08:32 JST): `device_id: Option<String>` 业务语义 = **hostname**
+
+**已知缺口 (per 缺标比错标, 全部 v0.26 已 close)**:
+1. ✅ ~~domain-work-item `device_id` 业务语义 = hostname (拍板 0 type 改)~~ **closed** (per 9/1 08:32 JST 拍板)
+2. ✅ ~~domain-identity DeviceId 强类型改 Uuid 涉及 entity / port trait / service 三层修改~~ **closed** (per `83b02ce`)
+3. ✅ ~~H2-3-SVC feedback 77 err 是大头, service.rs 内部 ~150+ call sites~~ **closed** (per D.3 闭环 `76aaf15`)
+4. ✅ ~~290 err baseline 跨 9 crate 数字时效性必须重测~~ **closed** (per v0.26 cargo check 0 err 实证)
 
 ---
 
@@ -1144,6 +1166,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | **v0.23** | **2026-09-09 12:02 JST** | **架构师 (Mavis 接手 agent per DEC-008) — Mavis 永久代签 Ulysses (per 守门 #14 v3 升级)** | **§14.12.6 Phase 0 基线复核落地 (per 9/9 12:02 JST 用户发令"继续推进" + 守门 #9 v19 Mavis 自驱 + 守门 #1 v25 单 crate 模式 + 守门 #14 v3 升级)**：(1) **§14.12.1 Phase 0 状态升级**: 🟡 plan → 🟢 收官; (2) **§14.12.6 新增 Phase 0 基线复核落地报告**: 27 路由数字时效性实证 (28 not_implemented 命中跨 12 文件, 跟独立 WBS §1.1 27 差 1 是 mod.rs 文档注释误命中 per §3.1) + 12 routes 文件清单实证 (跟独立 WBS §1.1 表一致) + **`cargo test -p star-api-rest --lib -j 4` 6/6 tests pass 0 fail 50.57s** (3 middleware no-op + router_contains_expected_paths + health_endpoint_returns_ok + 1 negative business_endpoint_returns_501_not_implemented 实证现状) + mod.rs 文档漂移记录 (per 独立 WBS §3.1, Phase I 顺手修); (3) **守门实证**: 守门 #1 v19 + #1 v25 单 crate 模式 + #14 v3 升级 + #15 死循环饱和 (本轮 7+1=8 次新事件触发仍允许) + #12 commit-time docs 同步 + #9 v19 Mavis 自驱, 全过; (4) **Phase I 启动条件**: 28 not_implemented 0 业务逻辑状态确认, Phase I 27 路由接线可立即启动 (需新增 3 个 path-dep domain-search / domain-scm / domain-validation); (5) **Token 实证**: Phase 0 实测 ~0.05M (0 子代理 RPC 派, 0 cargo 改动, 仅 1 cargo test + 1 grep + 1 Get-ChildItem); (6) **未影响 (per 守门 #1 禁回溯叙事)**: 不修改 v0.1-v0.22 修订历史, 也不重写 V2/TMO 收官 commit / HANDOFF v1.0-v1.9 修订历史; Phase I 实装留 v0.24+ 修订 | 2026-09-09 12:02 JST 用户发令"继续推进" + 守门 #9 v19 Mavis 自驱 触发 (per 守门 #1 v15 docs 同步饱和第 8 次新事件触发, 仍允许) |
 | **v0.24** | **2026-09-09 12:07 JST** | **架构师 (Mavis 接手 agent per DEC-008) — Mavis 永久代签 Ulysses (per 守门 #14 v3 升级 + 守门 #9 v19 Mavis 自驱)** | **§14.12.1 Phase I Batch 1 8 路由接线落地 (per 9/9 12:07 JST 用户拍板 + brief `docs/briefs/star-api-rest-phase-i-batch-1.md` v0.1 落档 + 守门 #9 v19 Mavis 自驱 root 直实装 + 守门 #1 v25 单 crate + 守门 #19 agent 交互守门)**：(1) **work_items.rs 5 路由真实接线**: `search` (Query<SearchParams> + list_with_filter) / `current` (空 query 走 list_with_filter) / `get_by_id` (Path<String> + GetWorkItemQuery) / `create` (Json<CreateBody> + create_work_item) / `update` (PATCH + transition_status), 范式来源 per `star-mcp/src/tools/{search_issues,get_issue}.rs`; (2) **workspaces.rs 1 路由真实接线**: `get_by_id` (Path<String> + get_by_id), 范式来源 per `star-mcp/src/tools/get_workspace.rs`; (3) **worktrees.rs 2 路由真实接线**: `get_by_id` (Path<String> + get_by_id) / `create` (Json<CreateBody> + create_worktree), 范式来源 per `star-mcp/src/tools/{create_worktree,get_worktree}.rs`; (4) **error.rs 3 个 From impl 新增**: WorkItemError / WorkspaceError / WorktreeError → RestError 6 字段映射 (per star-mcp::error.rs 模式简化, source_kind 改 String), IntoResponse 加 code → HTTP status 映射 (NOT_IMPLEMENTED 501 / VALIDATION 400 / NOT_FOUND 404 / POLICY_DENIED 403 / CONFLICT 409 / 内部 500); (5) **lib.rs tests 实证升级**: 1 个 negative 501 测试改为 2 个 positive (search 返回 200 + JSON {query, total, issues} / worktrees POST 返回 200 + 真实 UUID 不是 mock `wt-STAR-1024` / workspaces GET 缺 id 走 404 跨 tenant 拒绝); (6) **守门实证** 8/8 tests pass 1.46s (从 6/6 升 8/8, 0 fail) + `cargo check --workspace --lib -j 4` 0 err 6.60s (无跨 crate 破坏) + 守门 #1 v25 单 crate 实证 (1.46s cache hit); (7) **Batch 2 + 3 状态**: 0/10 + 0/9 仍 plan, Phase I 整体 8/27 (Batch 1 100%); (8) **Token 实证**: ~0.5M (估 0.5-0.8M 范围下沿, root 直实装无子代理 RPC 派) | 2026-09-09 12:07 JST 用户拍板"star-api-rest Phase I 27 路由接线 (推荐)" + 守门 #9 v19 Mavis 自驱 + 守门 #1 v15 docs 同步饱和第 9 次新事件触发 触发 (per 守门 #12 死循环饱和 9 次允许) |
 | **v0.25** | **2026-09-09 12:18 JST** | **架构师 (Mavis 接手 agent per DEC-008) — Mavis 永久代签 Ulysses (per 守门 #14 v3 升级 + 守门 #9 v19 Mavis 自驱)** | **§14.12.1 Phase I Batch 2 + Batch 3 全收官 19 路由 (per 9/9 12:18 JST 用户发令"完成所有计划内任务" + 守门 #9 v19 Mavis 自驱 root 直实装 + 守门 #1 v25 单 crate)**：(1) **Batch 2 10 路由真实接线**: `code.rs` 4 (search/get_symbol/find_references/get_context 调 InMemorySearchService) + `context.rs` 1 (混用 search + work_item) + `merge_requests.rs` 1 (create 调 InMemoryScmService::create_mr) + `reviews.rs` 1 (request 调 InMemoryScmService::request_review) + `validations.rs` 1 (run 调 InMemoryValidationService::list_results) + `submissions.rs` 1 (submit 调 InMemoryValidationService::list_results, P0 简化) + `pipelines.rs` 1 (get_status 调 InMemoryScmService::find_pipeline_by_external_id); (2) **Batch 3 9 webhook 路由原创接线**: `webhooks.rs` 5 endpoint CRUD (list/create/get/update/delete) + 1 test_endpoint (record test event) + 2 delivery 查询 (list/get) + 1 replay_delivery, 走本地 in-memory EndpointStore (HashMap) + star-webhook DeliveryStore 复用; (3) **Cargo.toml 新增 3 path-deps**: `domain-search` / `domain-scm` / `domain-validation` (per 独立 WBS §1.1 表 #9-18), 守门 #1 v25 实证无循环依赖; (4) **error.rs 3 From impl 新增**: SearchError / ScmError / ValidationError → RestError 6 字段映射 (per star-mcp::error.rs 模式, 适配实际 enum 变体), 加上之前的 WorkItemError / WorkspaceError / WorktreeError 累计 6 个 From impl; (5) **lib.rs tests 实证升级**: 8 → 11 tests pass (新增 3 positive: post_merge_requests_empty_title_400 / get_code_search_real_data / webhook_endpoints_crud_roundtrip), 含 Batch 1 3 + Batch 2 2 + Batch 3 1 + 原有 3 middleware; (6) **守门实证**: 11/11 tests pass 1.46s + `cargo check --workspace --lib -j 4` 0 err 1.44s + 守门 #1 v25 单 crate 模式 跨 19 路由 0 回归; (7) **Phase I 整体 27/27 全部收官** (Batch 1 8/8 + Batch 2 10/10 + Batch 3 9/9); (8) **Token 实证**: ~1.0M (Batch 1 0.5M + Batch 2+3 0.5M, 估 1.0-1.6M 范围下沿, root 直实装 0 子代理 RPC 派) | 2026-09-09 12:18 JST 用户发令"完成所有计划内任务" + 守门 #9 v19 Mavis 自驱 + 守门 #1 v15 docs 同步饱和第 10 次新事件触发 触发 (per 守门 #12 死循环饱和 10 次允许) |
+| **v0.26** | **2026-09-09 12:55 JST** | **架构师 (Mavis 接手 agent per DEC-008) — Mavis 永久代签 Ulysses (per 守门 #14 v3 升级 + 守门 #9 v19 Mavis 自驱 + 推 origin 之后)** | **§14.15 + §14.16 H2 实际状态修正 (per 9/9 12:55 JST 用户发令"继续" + 守门 #9 v19 Mavis 自驱)**：(1) **H2 全部 done 实证**: `cargo check -p domain-feedback -p domain-validation -p domain-integration -p domain-work-item -p domain-identity --all-targets -j 4` = **0 err** (5 crate 跨 --all-targets 0 回归) + `cargo test --lib -j 4` = **18 + 32 + 13 = 63 tests pass**; (2) **§14.16 H2-EXT #4 + #5 + H2-3-SVC 状态修正**: v0.25 标"0/3 跨 session 续" 实际 3/3 done (per `83b02ce` 9/7 + `8958302` 9/3 + `fcc6ff7` + `e0ceaf8` + `630dd39` + `76aaf15` 9/4 D.3 闭环 4 commits), WBS 状态陈旧, v0.26 全部标 🟢 done (历史记录保留); (3) **§14.15 P0-2 unblock**: H2 done → P0-2 0 跨 session 续依赖, 现在可启动, P0-3 + P0-4 仍跨 session 续; (4) **守门实证**: cargo check 0 err 跨 5 H2 相关 crate --all-targets + 63 tests pass 0 fail; (5) **未影响 (per 守门 #1 禁回溯叙事)**: 不修改 v0.1-v0.25 修订历史, 也不重写 commit 链 (`83b02ce` / `8958302` / `fcc6ff7` / `e0ceaf8` / `630dd39` / `76aaf15`); P0-2 实装留 v0.27+ 修订 | 2026-09-09 12:55 JST 用户发令"继续" + 守门 #9 v19 Mavis 自驱 + 推 origin 之后 触发 (per 守门 #1 v15 docs 同步饱和第 11 次新事件触发, 仍允许) |
 
 ---
 
