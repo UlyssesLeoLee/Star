@@ -62,9 +62,7 @@ impl From<domain_work_item::WorkItemError> for RestError {
             domain_work_item::WorkItemError::NotFound(_) => {
                 ("RESOURCE_NOT_FOUND", "Validation", false)
             }
-            domain_work_item::WorkItemError::PermissionDenied => {
-                ("POLICY_DENIED", "Policy", false)
-            }
+            domain_work_item::WorkItemError::PermissionDenied => ("POLICY_DENIED", "Policy", false),
             domain_work_item::WorkItemError::CrossTenantDenied(_, _) => {
                 ("POLICY_DENIED", "Policy", false)
             }
@@ -79,9 +77,7 @@ impl From<domain_work_item::WorkItemError> for RestError {
             domain_work_item::WorkItemError::Conflict(_) => {
                 ("VALIDATION_FAILED", "External", false)
             }
-            domain_work_item::WorkItemError::Internal(_) => {
-                ("INTERNAL", "Internal", true)
-            }
+            domain_work_item::WorkItemError::Internal(_) => ("INTERNAL", "Internal", true),
         };
         Self {
             code: code.to_string(),
@@ -89,7 +85,8 @@ impl From<domain_work_item::WorkItemError> for RestError {
             source_module: "domain-work-item".to_string(),
             source_kind: source_kind.to_string(),
             retriable,
-            hint: "Check the work-item id + tenant + role (developer/project_admin/tenant_admin)".to_string(),
+            hint: "Check the work-item id + tenant + role (developer/project_admin/tenant_admin)"
+                .to_string(),
         }
     }
 }
@@ -110,9 +107,7 @@ impl From<domain_workspace::WorkspaceError> for RestError {
             domain_workspace::WorkspaceError::Conflict(_) => {
                 ("WORKSPACE_CONFLICT", "External", false)
             }
-            domain_workspace::WorkspaceError::Internal(_) => {
-                ("INTERNAL", "Internal", true)
-            }
+            domain_workspace::WorkspaceError::Internal(_) => ("INTERNAL", "Internal", true),
         };
         Self {
             code: code.to_string(),
@@ -120,7 +115,8 @@ impl From<domain_workspace::WorkspaceError> for RestError {
             source_module: "domain-workspace".to_string(),
             source_kind: source_kind.to_string(),
             retriable,
-            hint: "Check the workspace id + tenant + role (workspace_admin/tenant_admin)".to_string(),
+            hint: "Check the workspace id + tenant + role (workspace_admin/tenant_admin)"
+                .to_string(),
         }
     }
 }
@@ -132,9 +128,7 @@ impl From<domain_worktree::WorktreeError> for RestError {
             domain_worktree::WorktreeError::NotFound(_) => {
                 ("WORKTREE_NOT_FOUND", "Validation", false)
             }
-            domain_worktree::WorktreeError::PermissionDenied => {
-                ("POLICY_DENIED", "Policy", false)
-            }
+            domain_worktree::WorktreeError::PermissionDenied => ("POLICY_DENIED", "Policy", false),
             domain_worktree::WorktreeError::CrossTenantDenied(_, _) => {
                 ("POLICY_DENIED", "Policy", false)
             }
@@ -144,16 +138,12 @@ impl From<domain_worktree::WorktreeError> for RestError {
             domain_worktree::WorktreeError::RuntimeRequired => {
                 ("VALIDATION_FAILED", "Validation", false)
             }
-            domain_worktree::WorktreeError::Conflict(_) => {
-                ("WORKTREE_CONFLICT", "External", false)
-            }
+            domain_worktree::WorktreeError::Conflict(_) => ("WORKTREE_CONFLICT", "External", false),
             domain_worktree::WorktreeError::CompletionGateFailed(_)
             | domain_worktree::WorktreeError::IsolationFailed(_) => {
                 ("VALIDATION_RUN_FAILED", "Validation", false)
             }
-            domain_worktree::WorktreeError::Internal(_) => {
-                ("INTERNAL", "Internal", true)
-            }
+            domain_worktree::WorktreeError::Internal(_) => ("INTERNAL", "Internal", true),
         };
         Self {
             code: code.to_string(),
@@ -170,27 +160,19 @@ impl From<domain_worktree::WorktreeError> for RestError {
 impl From<domain_search::SearchError> for RestError {
     fn from(e: domain_search::SearchError) -> Self {
         let (code, source_kind, retriable) = match &e {
-            domain_search::SearchError::NotFound(_) => {
-                ("RESOURCE_NOT_FOUND", "Validation", false)
-            }
+            domain_search::SearchError::NotFound(_) => ("RESOURCE_NOT_FOUND", "Validation", false),
             domain_search::SearchError::InvalidState(_) => {
                 ("VALIDATION_FAILED", "Validation", false)
             }
-            domain_search::SearchError::PermissionDenied => {
-                ("POLICY_DENIED", "Policy", false)
-            }
+            domain_search::SearchError::PermissionDenied => ("POLICY_DENIED", "Policy", false),
             domain_search::SearchError::CrossTenantDenied(_, _) => {
                 ("POLICY_DENIED", "Policy", false)
             }
             domain_search::SearchError::InvalidQuery(_) => {
                 ("VALIDATION_FAILED", "Validation", false)
             }
-            domain_search::SearchError::Conflict(_) => {
-                ("VALIDATION_FAILED", "External", false)
-            }
-            domain_search::SearchError::Internal(_) => {
-                ("INTERNAL", "Internal", true)
-            }
+            domain_search::SearchError::Conflict(_) => ("VALIDATION_FAILED", "External", false),
+            domain_search::SearchError::Internal(_) => ("INTERNAL", "Internal", true),
         };
         Self {
             code: code.to_string(),
@@ -198,7 +180,8 @@ impl From<domain_search::SearchError> for RestError {
             source_module: "domain-search".to_string(),
             source_kind: source_kind.to_string(),
             retriable,
-            hint: "Check query + filters + tenant + role (developer/system:search-projector)".to_string(),
+            hint: "Check query + filters + tenant + role (developer/system:search-projector)"
+                .to_string(),
         }
     }
 }
@@ -207,27 +190,13 @@ impl From<domain_search::SearchError> for RestError {
 impl From<domain_scm::ScmError> for RestError {
     fn from(e: domain_scm::ScmError) -> Self {
         let (code, source_kind, retriable) = match &e {
-            domain_scm::ScmError::NotFound(_) => {
-                ("SCM_NOT_FOUND", "Validation", false)
-            }
-            domain_scm::ScmError::PermissionDenied(_) => {
-                ("POLICY_DENIED", "Policy", false)
-            }
-            domain_scm::ScmError::InvalidState(_) => {
-                ("VALIDATION_FAILED", "Validation", false)
-            }
-            domain_scm::ScmError::Conflict(_) => {
-                ("SCM_CONFLICT", "External", false)
-            }
-            domain_scm::ScmError::IdempotencyConflict => {
-                ("SCM_CONFLICT", "External", false)
-            }
-            domain_scm::ScmError::ProviderError(_) => {
-                ("SCM_PROVIDER_ERROR", "External", true)
-            }
-            domain_scm::ScmError::Internal(_) => {
-                ("INTERNAL", "Internal", true)
-            }
+            domain_scm::ScmError::NotFound(_) => ("SCM_NOT_FOUND", "Validation", false),
+            domain_scm::ScmError::PermissionDenied(_) => ("POLICY_DENIED", "Policy", false),
+            domain_scm::ScmError::InvalidState(_) => ("VALIDATION_FAILED", "Validation", false),
+            domain_scm::ScmError::Conflict(_) => ("SCM_CONFLICT", "External", false),
+            domain_scm::ScmError::IdempotencyConflict => ("SCM_CONFLICT", "External", false),
+            domain_scm::ScmError::ProviderError(_) => ("SCM_PROVIDER_ERROR", "External", true),
+            domain_scm::ScmError::Internal(_) => ("INTERNAL", "Internal", true),
         };
         Self {
             code: code.to_string(),
@@ -253,15 +222,11 @@ impl From<domain_validation::ValidationError> for RestError {
             domain_validation::ValidationError::InvalidState(_) => {
                 ("VALIDATION_FAILED", "Validation", false)
             }
-            domain_validation::ValidationError::Conflict(_) => {
-                ("VL_CONFLICT", "External", false)
-            }
+            domain_validation::ValidationError::Conflict(_) => ("VL_CONFLICT", "External", false),
             domain_validation::ValidationError::InvariantViolated(_) => {
                 ("VL_INVARIANT_VIOLATED", "Validation", false)
             }
-            domain_validation::ValidationError::Internal(_) => {
-                ("INTERNAL", "Internal", true)
-            }
+            domain_validation::ValidationError::Internal(_) => ("INTERNAL", "Internal", true),
         };
         Self {
             code: code.to_string(),
@@ -269,7 +234,8 @@ impl From<domain_validation::ValidationError> for RestError {
             source_module: "domain-validation".to_string(),
             source_kind: source_kind.to_string(),
             retriable,
-            hint: "Check the validation id + tenant + role (developer/service_internal)".to_string(),
+            hint: "Check the validation id + tenant + role (developer/service_internal)"
+                .to_string(),
         }
     }
 }

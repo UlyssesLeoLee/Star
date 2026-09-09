@@ -12,7 +12,7 @@
 //! - V3 (事件总线): WorkspaceCreated + MemberAdded + MemberRemoved 全部入流
 
 use domain_workspace::{
-    AddMemberCommand, ActorContext, CreateWorkspaceCommand, InMemoryWorkspaceService,
+    ActorContext, AddMemberCommand, CreateWorkspaceCommand, InMemoryWorkspaceService,
     ListWorkspaceQuery, RemoveMemberCommand, TenantId, UpdateWorkspaceCommand, UserId,
     WorkspaceCommandPort, WorkspaceError, WorkspaceEvent, WorkspaceQueryPort, WorkspaceRole,
 };
@@ -191,7 +191,10 @@ async fn it_v1_member_add_list_remove() {
     .await
     .unwrap();
 
-    let after_remove = svc.list_members(ws.id, make_admin_actor(tenant_id)).await.unwrap();
+    let after_remove = svc
+        .list_members(ws.id, make_admin_actor(tenant_id))
+        .await
+        .unwrap();
     assert_eq!(after_remove.len(), 1);
 }
 

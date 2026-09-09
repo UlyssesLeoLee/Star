@@ -17,10 +17,10 @@
 //! - **WebhookEvent**: T 类 Transaction (Append-only, INV-SCM-08)
 
 use domain_scm::{
-    ActorContext, ConflictStrategy, CreateMRInput, InMemoryScmService, ProjectId,
-    PullRequestState, RegisterRepositoryCommand, RepositoryOwnership, ScmCommandPort, ScmError,
-    ScmEvent, ScmProvider, ScmQueryPort, SyncStatus, TenantId, UpdateSyncStateCommand,
-    WebhookEventInput, WebhookEventType,
+    ActorContext, ConflictStrategy, CreateMRInput, InMemoryScmService, ProjectId, PullRequestState,
+    RegisterRepositoryCommand, RepositoryOwnership, ScmCommandPort, ScmError, ScmEvent,
+    ScmProvider, ScmQueryPort, SyncStatus, TenantId, UpdateSyncStateCommand, WebhookEventInput,
+    WebhookEventType,
 };
 use uuid::Uuid;
 
@@ -65,10 +65,7 @@ async fn it_v0_register_get_list_lifecycle() {
     assert_eq!(fetched.external_id.0, "acme/foo");
 
     // list_by_project
-    let list = svc
-        .list_by_project(project_id, actor)
-        .await
-        .unwrap();
+    let list = svc.list_by_project(project_id, actor).await.unwrap();
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].id, repo.id);
     assert_eq!(svc.repo_count().await, 1);
@@ -139,7 +136,9 @@ async fn it_v0_duplicate_register_conflict() {
         conflict_strategy: ConflictStrategy::LatestWins,
         credential_id: Some(Uuid::new_v4()),
     };
-    svc.register_repository(base(), actor.clone()).await.unwrap();
+    svc.register_repository(base(), actor.clone())
+        .await
+        .unwrap();
     let res = svc.register_repository(base(), actor).await;
     assert!(matches!(res, Err(ScmError::Conflict(_))));
 }

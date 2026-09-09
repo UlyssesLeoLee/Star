@@ -31,9 +31,9 @@ use domain_notification::{
     UserId as NotifUserId,
 };
 use domain_work_item::{
-    ActorContext, CreateWorkItemCommand, InMemoryWorkItemService, Priority, ProjectId,
-    TenantId, TransitionStatusCommand, UserId, WorkItemCommandPort, WorkItemQueryPort,
-    WorkItemStatus, WorkItemType, WorkspaceId,
+    ActorContext, CreateWorkItemCommand, InMemoryWorkItemService, Priority, ProjectId, TenantId,
+    TransitionStatusCommand, UserId, WorkItemCommandPort, WorkItemQueryPort, WorkItemStatus,
+    WorkItemType, WorkspaceId,
 };
 use uuid::Uuid;
 
@@ -223,7 +223,10 @@ async fn it_s1_v2_cross_tenant_comment_rejected() {
     cmd.project_id = CommentProjectId::from(item.project_id.as_uuid());
     let res = c_svc.create_comment(cmd, &actor_b).await;
     assert!(
-        matches!(res, Err(domain_comment::CommentError::CrossTenantDenied(_, _))),
+        matches!(
+            res,
+            Err(domain_comment::CommentError::CrossTenantDenied(_, _))
+        ),
         "跨 tenant comment 必拒, got: {:?}",
         res
     );
@@ -424,7 +427,8 @@ async fn it_s2_v0_comment_mention_dispatches_notification() {
     assert_eq!(c.mentions.len(), 1);
 
     // L0 编排: 派发 mention notification
-    let dispatched = l0_dispatch_mention_notifications(&c_svc, &n_svc, c.id, tenant_id, &n_actor).await;
+    let dispatched =
+        l0_dispatch_mention_notifications(&c_svc, &n_svc, c.id, tenant_id, &n_actor).await;
     assert_eq!(dispatched.len(), 1, "1 mention → 1 notification");
 
     // 验证: mentioned user 的 inbox 有 1 条
@@ -439,7 +443,11 @@ async fn it_s2_v0_comment_mention_dispatches_notification() {
         )
         .await
         .unwrap();
-    assert_eq!(inbox.len(), 1, "mentioned user 收到 1 条 mention notification");
+    assert_eq!(
+        inbox.len(),
+        1,
+        "mentioned user 收到 1 条 mention notification"
+    );
     assert_eq!(inbox[0].event_type, NotificationEventType::FeedbackCreated);
 }
 
@@ -470,7 +478,8 @@ async fn it_s2_v1_no_mention_no_notification() {
     assert!(c.mentions.is_empty());
 
     // L0 编排: 0 mention → 0 notification
-    let dispatched = l0_dispatch_mention_notifications(&c_svc, &n_svc, c.id, tenant_id, &n_actor).await;
+    let dispatched =
+        l0_dispatch_mention_notifications(&c_svc, &n_svc, c.id, tenant_id, &n_actor).await;
     assert_eq!(dispatched.len(), 0, "0 mention → 0 notification dispatched");
 }
 
@@ -522,7 +531,8 @@ async fn it_s2_v2_multiple_mentions_dispatch_to_each() {
     };
     let c = c_svc.create_comment(cmd, &c_actor).await.unwrap();
 
-    let dispatched = l0_dispatch_mention_notifications(&c_svc, &n_svc, c.id, tenant_id, &n_actor).await;
+    let dispatched =
+        l0_dispatch_mention_notifications(&c_svc, &n_svc, c.id, tenant_id, &n_actor).await;
     assert_eq!(dispatched.len(), 3, "3 mention → 3 notification");
 
     // 每人 inbox 1 条
@@ -592,7 +602,10 @@ async fn it_s2_v3_cross_tenant_mention_rejected() {
     assert!(
         matches!(
             res,
-            Err(domain_notification::NotificationError::CrossTenantDenied(_, _))
+            Err(domain_notification::NotificationError::CrossTenantDenied(
+                _,
+                _
+            ))
         ),
         "跨 tenant 派发 mention notification 必拒, got: {:?}",
         res
@@ -715,7 +728,8 @@ async fn it_s3_v0_workitem_status_change_dispatches_to_assignee() {
         .unwrap();
 
     // L0 编排: 派发 notification 给 assignee
-    let dispatched = l0_dispatch_workitem_status_change(&wi_svc, &n_svc, item.id, tenant_id, &n_actor).await;
+    let dispatched =
+        l0_dispatch_workitem_status_change(&wi_svc, &n_svc, item.id, tenant_id, &n_actor).await;
     assert_eq!(dispatched.len(), 1, "1 assignee → 1 notification");
 
     // assignee inbox 验证
@@ -766,7 +780,8 @@ async fn it_s3_v1_workitem_no_assignee_no_notification() {
         .unwrap();
 
     // L0 编排: 无 assignee → 0 notification
-    let dispatched = l0_dispatch_workitem_status_change(&wi_svc, &n_svc, item.id, tenant_id, &n_actor).await;
+    let dispatched =
+        l0_dispatch_workitem_status_change(&wi_svc, &n_svc, item.id, tenant_id, &n_actor).await;
     assert_eq!(
         dispatched.len(),
         0,
@@ -929,7 +944,10 @@ async fn it_s3_v3_cross_tenant_status_notification_rejected() {
     assert!(
         matches!(
             res,
-            Err(domain_notification::NotificationError::CrossTenantDenied(_, _))
+            Err(domain_notification::NotificationError::CrossTenantDenied(
+                _,
+                _
+            ))
         ),
         "跨 tenant status notification 必拒, got: {:?}",
         res

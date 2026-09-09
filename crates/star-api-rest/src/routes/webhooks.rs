@@ -65,7 +65,13 @@ impl EndpointStore {
     pub fn list(&self) -> Vec<WebhookEndpoint> {
         self.inner.read().unwrap().values().cloned().collect()
     }
-    pub fn update(&self, id: &str, url: Option<String>, event_types: Option<Vec<String>>, active: Option<bool>) -> Option<WebhookEndpoint> {
+    pub fn update(
+        &self,
+        id: &str,
+        url: Option<String>,
+        event_types: Option<Vec<String>>,
+        active: Option<bool>,
+    ) -> Option<WebhookEndpoint> {
         let mut g = self.inner.write().unwrap();
         let ep = g.get_mut(id)?;
         if let Some(u) = url {
@@ -166,9 +172,7 @@ pub async fn create_endpoint(
 // ── 3. get_endpoint ────────────────────────────────────────────────
 
 /// `GET /api/v1/webhooks/endpoints/{id}`
-pub async fn get_endpoint(
-    Path(id): Path<String>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn get_endpoint(Path(id): Path<String>) -> Result<Json<RestResponse<Value>>, RestError> {
     match endpoints().get(&id) {
         Some(ep) => Ok(Json(RestResponse::ok(json!({ "endpoint": ep })))),
         None => Err(RestError::validation(
@@ -225,9 +229,7 @@ pub async fn delete_endpoint(
 /// `POST /api/v1/webhooks/endpoints/{id}/test`
 ///
 /// 发送测试事件: 记录一个测试 delivery 到 DeliveryStore, 标记 Pending 态.
-pub async fn test_endpoint(
-    Path(id): Path<String>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn test_endpoint(Path(id): Path<String>) -> Result<Json<RestResponse<Value>>, RestError> {
     let ep = endpoints().get(&id).ok_or_else(|| {
         RestError::validation(
             format!("endpoint not found: {id}"),

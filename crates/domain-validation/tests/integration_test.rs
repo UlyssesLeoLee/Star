@@ -20,9 +20,9 @@
 use domain_validation::{
     AcceptanceCriterionId, ActorContext, AddEvidenceCommand, CreateValidationPolicyCommand,
     EvidenceType, InMemoryValidationService, LinkAcceptanceEvidenceCommand, ListValidationQuery,
-    MarkValidationStatusCommand, OverrideValidationCommand, ProjectId, SubmitValidationResultCommand,
-    TenantId, UserId, ValidationCommandPort, ValidationError, ValidationEvent, ValidationKind,
-    ValidationQueryPort, ValidationStatus, WorkItemId,
+    MarkValidationStatusCommand, OverrideValidationCommand, ProjectId,
+    SubmitValidationResultCommand, TenantId, UserId, ValidationCommandPort, ValidationError,
+    ValidationEvent, ValidationKind, ValidationQueryPort, ValidationStatus, WorkItemId,
 };
 use uuid::Uuid;
 
@@ -64,7 +64,10 @@ async fn it_v0_submit_get_list_lifecycle() {
     let actor = make_service_internal(tenant_id);
 
     let r = svc
-        .submit_result(make_submit_cmd(TenantId(tenant_id), ValidationKind::Build), actor.clone())
+        .submit_result(
+            make_submit_cmd(TenantId(tenant_id), ValidationKind::Build),
+            actor.clone(),
+        )
         .await
         .unwrap();
     assert_eq!(r.status, ValidationStatus::Pending);
@@ -123,7 +126,10 @@ async fn it_v1_state_machine_running_to_passed() {
     let tenant_id = Uuid::new_v4();
     let actor = make_service_internal(tenant_id);
     let r = svc
-        .submit_result(make_submit_cmd(TenantId(tenant_id), ValidationKind::Lint), actor.clone())
+        .submit_result(
+            make_submit_cmd(TenantId(tenant_id), ValidationKind::Lint),
+            actor.clone(),
+        )
         .await
         .unwrap();
     assert_eq!(r.status, ValidationStatus::Pending);
@@ -235,7 +241,10 @@ async fn it_v1_link_ac_requires_passed_status() {
     let tenant_id = Uuid::new_v4();
     let actor = make_service_internal(tenant_id);
     let r = svc
-        .submit_result(make_submit_cmd(TenantId(tenant_id), ValidationKind::UnitTest), actor.clone())
+        .submit_result(
+            make_submit_cmd(TenantId(tenant_id), ValidationKind::UnitTest),
+            actor.clone(),
+        )
         .await
         .unwrap();
     // Pending 状态直接 link 必拒
@@ -303,7 +312,10 @@ async fn it_v2_cross_tenant_get_rejected() {
     let tenant_a = Uuid::new_v4();
     let actor_a = make_service_internal(tenant_a);
     let r = svc
-        .submit_result(make_submit_cmd(TenantId(tenant_a), ValidationKind::Build), actor_a)
+        .submit_result(
+            make_submit_cmd(TenantId(tenant_a), ValidationKind::Build),
+            actor_a,
+        )
         .await
         .unwrap();
 
@@ -357,14 +369,20 @@ async fn it_v3_event_bus_submitted_and_passed() {
     let tenant_id = Uuid::new_v4();
     let actor = make_service_internal(tenant_id);
     let r = svc
-        .submit_result(make_submit_cmd(TenantId(tenant_id), ValidationKind::Lint), actor.clone())
+        .submit_result(
+            make_submit_cmd(TenantId(tenant_id), ValidationKind::Lint),
+            actor.clone(),
+        )
         .await
         .unwrap();
 
     // Submitted 事件
     let evt1 = rx.try_recv().expect("应收到 Submitted 事件");
     assert!(matches!(evt1, ValidationEvent::Submitted(_)));
-    assert_eq!(evt1.subject(), "star.events.validation.validation_result.submitted.v1");
+    assert_eq!(
+        evt1.subject(),
+        "star.events.validation.validation_result.submitted.v1"
+    );
 
     // → Running
     svc.mark_status(
@@ -397,7 +415,10 @@ async fn it_v3_event_bus_submitted_and_passed() {
         if let Ok(e) = rx.try_recv() {
             if matches!(e, ValidationEvent::Passed(_)) {
                 found_passed = true;
-                assert_eq!(e.subject(), "star.events.validation.validation_result.passed.v1");
+                assert_eq!(
+                    e.subject(),
+                    "star.events.validation.validation_result.passed.v1"
+                );
                 break;
             }
         }
@@ -412,7 +433,10 @@ async fn it_v3_evidence_storage_ref_requires_tenant_prefix() {
     let tenant_id = Uuid::new_v4();
     let actor = make_service_internal(tenant_id);
     let r = svc
-        .submit_result(make_submit_cmd(TenantId(tenant_id), ValidationKind::Build), actor.clone())
+        .submit_result(
+            make_submit_cmd(TenantId(tenant_id), ValidationKind::Build),
+            actor.clone(),
+        )
         .await
         .unwrap();
     let res = svc

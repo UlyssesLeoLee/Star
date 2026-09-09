@@ -92,3 +92,7 @@ __pycache__/
 /Module
 /PG
 
+# Runtime data (per 2026-09-09 散落 dirty 整理, 守门 #11 缺标比错标: 不入 git)
+/data/
+
+
