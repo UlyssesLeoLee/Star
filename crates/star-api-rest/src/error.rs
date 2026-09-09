@@ -166,6 +166,114 @@ impl From<domain_worktree::WorktreeError> for RestError {
     }
 }
 
+/// `domain_search::SearchError` → `RestError`
+impl From<domain_search::SearchError> for RestError {
+    fn from(e: domain_search::SearchError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_search::SearchError::NotFound(_) => {
+                ("RESOURCE_NOT_FOUND", "Validation", false)
+            }
+            domain_search::SearchError::InvalidState(_) => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            domain_search::SearchError::PermissionDenied => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_search::SearchError::CrossTenantDenied(_, _) => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_search::SearchError::InvalidQuery(_) => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            domain_search::SearchError::Conflict(_) => {
+                ("VALIDATION_FAILED", "External", false)
+            }
+            domain_search::SearchError::Internal(_) => {
+                ("INTERNAL", "Internal", true)
+            }
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("search: {e}"),
+            source_module: "domain-search".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check query + filters + tenant + role (developer/system:search-projector)".to_string(),
+        }
+    }
+}
+
+/// `domain_scm::ScmError` → `RestError`
+impl From<domain_scm::ScmError> for RestError {
+    fn from(e: domain_scm::ScmError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_scm::ScmError::NotFound(_) => {
+                ("SCM_NOT_FOUND", "Validation", false)
+            }
+            domain_scm::ScmError::PermissionDenied(_) => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_scm::ScmError::InvalidState(_) => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            domain_scm::ScmError::Conflict(_) => {
+                ("SCM_CONFLICT", "External", false)
+            }
+            domain_scm::ScmError::IdempotencyConflict => {
+                ("SCM_CONFLICT", "External", false)
+            }
+            domain_scm::ScmError::ProviderError(_) => {
+                ("SCM_PROVIDER_ERROR", "External", true)
+            }
+            domain_scm::ScmError::Internal(_) => {
+                ("INTERNAL", "Internal", true)
+            }
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("scm: {e}"),
+            source_module: "domain-scm".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the SCM resource id + tenant + role (project_admin/developer)".to_string(),
+        }
+    }
+}
+
+/// `domain_validation::ValidationError` → `RestError`
+impl From<domain_validation::ValidationError> for RestError {
+    fn from(e: domain_validation::ValidationError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_validation::ValidationError::NotFound(_) => {
+                ("RESOURCE_NOT_FOUND", "Validation", false)
+            }
+            domain_validation::ValidationError::PermissionDenied => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_validation::ValidationError::InvalidState(_) => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            domain_validation::ValidationError::Conflict(_) => {
+                ("VL_CONFLICT", "External", false)
+            }
+            domain_validation::ValidationError::InvariantViolated(_) => {
+                ("VL_INVARIANT_VIOLATED", "Validation", false)
+            }
+            domain_validation::ValidationError::Internal(_) => {
+                ("INTERNAL", "Internal", true)
+            }
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("validation: {e}"),
+            source_module: "domain-validation".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the validation id + tenant + role (developer/service_internal)".to_string(),
+        }
+    }
+}
+
 impl IntoResponse for RestError {
     fn into_response(self) -> axum::response::Response {
         // per spec §2.4: code → HTTP status 映射

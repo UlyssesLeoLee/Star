@@ -236,4 +236,143 @@ mod tests {
         // nil-tenant actor 走真实 service → 跨 tenant 拒绝 → NotFound → 404
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
+
+    /// Phase I Batch 2 实证: POST /merge-requests 真实调用 `InMemoryScmService::create_mr`
+    /// 空 title → validation 400 (handler 显式检查, 非 axum 422 解析错)
+    #[tokio::test]
+    async fn post_merge_requests_empty_title_returns_400_after_phase_i_batch_2() {
+        let app = build_router();
+        let body_json = serde_json::json!({
+            "title": "",
+            "base": "main",
+            "head": "feature/test",
+            "repository_id": uuid::Uuid::new_v4().to_string()
+        });
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/merge-requests")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body_json).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        // 空 title → handler 显式 validation → 400
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    /// Phase I Batch 2 实证: GET /code/search?q=foo 真实调用 `InMemorySearchService::search`
+    /// 返回 200 + JSON {query, total, results, limit}
+    #[tokio::test]
+    async fn get_code_search_returns_real_data_after_phase_i_batch_2() {
+        let app = build_router();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/code/search?q=authenticate")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        // 真实 service 路径, 空 list → 200
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body_bytes = axum::body::to_bytes(resp.into_body(), 4096)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body_bytes).unwrap();
+        assert!(body.get("data").is_some(), "data field missing");
+        let data = body.get("data").unwrap();
+        assert!(data.get("query").is_some(), "data.query missing");
+        assert!(data.get("total").is_some(), "data.total missing");
+        assert!(data.get("results").is_some(), "data.results missing");
+    }
+
+    /// Phase I Batch 3 实证: webhook endpoint CRUD 自洽 (POST 201/GET 200/PATCH 200/DELETE 200)
+    #[tokio::test]
+    async fn webhook_endpoints_crud_roundtrip_after_phase_i_batch_3() {
+        let app = build_router();
+        // 1. POST 创建
+        let body_json = serde_json::json!({
+            "url": "https://example.com/hook",
+            "secret": "shhh",
+            "event_types": ["push", "pull_request"],
+            "active": true
+        });
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/webhooks/endpoints")
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body_json).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body_bytes = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
+        let body: Value = serde_json::from_slice(&body_bytes).unwrap();
+        let ep = body.get("data").unwrap().get("endpoint").unwrap();
+        let id = ep.get("id").and_then(|v| v.as_str()).unwrap().to_string();
+        assert!(!id.is_empty(), "endpoint id missing");
+
+        // 2. GET 取回
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/v1/webhooks/endpoints/{id}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // 3. PATCH 更新
+        let patch_json = serde_json::json!({ "active": false });
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/v1/webhooks/endpoints/{id}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&patch_json).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // 4. DELETE 删除
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri(format!("/api/v1/webhooks/endpoints/{id}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // 5. GET 应该返回 400 (id 已删, 找不到)
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/v1/webhooks/endpoints/{id}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
 }

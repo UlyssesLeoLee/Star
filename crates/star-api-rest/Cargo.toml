@@ -48,6 +48,11 @@ domain-work-item = { path = "../domain-work-item" }
 domain-worktree = { path = "../domain-worktree" }
 domain-agent = { path = "../domain-agent" }
 domain-feedback = { path = "../domain-feedback" }
+# Phase I Batch 2 (per `STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` §1.1 表 #9-18)
+# 10 路由接线: code 4 + context 1 + merge_requests 1 + reviews 1 + validations 1 + submissions 1 + pipelines 1
+domain-search = { path = "../domain-search" }
+domain-scm = { path = "../domain-scm" }
+domain-validation = { path = "../domain-validation" }
 
 # Webhook 出站 (复用 star-webhook DeliveryStore/RetryPolicy, per spec §7.3)
 star-webhook = { path = "../star-webhook" }
