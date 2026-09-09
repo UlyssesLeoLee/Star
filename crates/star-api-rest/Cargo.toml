@@ -26,6 +26,8 @@ tokio = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 tracing = { workspace = true }
+# v0.41 §14.12 IV OAuth2 + JWT 鉴权 (per 2026-09-09 19:20 JST 拍板)
+jsonwebtoken = { workspace = true }
 
 # HTTP server (axum, 同 star-mcp 0.8)
 axum = "0.8"

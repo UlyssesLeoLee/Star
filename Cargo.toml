@@ -113,6 +113,8 @@ repository = "https://github.com/UlyssesLeoLee/Star"
 # 异步运行时与异步 trait
 tokio = { version = "1.40", features = ["full"] }
 async-trait = "0.1"
+# JWT 鉴权 (per §14.12 IV OAuth2 + JWT 拍板 2026-09-09 19:20 JST)
+jsonwebtoken = "9"
 
 # 序列化
 serde = { version = "1", features = ["derive"] }
