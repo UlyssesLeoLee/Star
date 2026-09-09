@@ -30,7 +30,7 @@ tracing = { workspace = true }
 jsonwebtoken = { workspace = true }
 
 # HTTP server (axum, 同 star-mcp 0.8)
-axum = "0.8"
+axum = { version = "0.8", features = ["macros"] }
 tower = { version = "0.5", features = ["util"] }
 
 # 鉴权 (HMAC-SHA256, 跟 star-webhook 共享 secret verify)
@@ -42,6 +42,10 @@ hex = { workspace = true }
 ring = "0.17"
 base64 = "0.22"
 async-trait = "0.1"
+# v0.47 §14.12 IV OAuth2 真实 RSA 2048 keygen (per brief v0.47 §3.1)
+rsa = { version = "0.9", features = ["pem"] }
+rand = "0.8"
+pkcs8 = { version = "0.10", features = ["pem"] }
 star-pg-adapter = { path = "../star-pg-adapter" }
 
 # Phase B.2 (Tier 1 真实数据源: tenant / identity / permission) — per star-mcp 同源

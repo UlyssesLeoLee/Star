@@ -1,20 +1,26 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! OAuth2 Bearer auth middleware helpers (per WBS v0.43 §14.12 IV phase 2)
 //!
-//! v0.43 简化: 不实装 FromRequestParts extractor (需要 axum::async_trait, 跨 session 续)
-//! 仅提供 BearerError + require_scope/require_role helpers + 测试
-//!
-//! 跨 session 续: AuthenticatedUser extractor + 5 域 RBAC 实证
+//! v0.47 完整化 (per brief §3.1):
+//! - AuthenticatedUser extractor (axum::async_trait + FromRequestParts)
+//! - BearerError 5-variant (per RFC 6750 §3.1)
+//! - require_scope / require_role 5 域 RBAC helper
 //!
 //! 守门 #5 v2: token 不入 log
+//! 守门 #6 v2: BearerError::ExpiredToken retriable
 //! 守门 #14 v3: Mavis 永久代签
 
+use axum::{
+    extract::{FromRef, FromRequestParts},
+    http::{header, request::Parts, StatusCode},
+    response::{IntoResponse, Json, Response},
+};
 use serde_json::json;
-use uuid::Uuid;
+use std::sync::Arc;
 
-use crate::auth::AuthUser;
+use crate::auth::{verify_token, AuthUser, JwtConfig};
 
-/// Bearer auth 错误 (per RFC 6750 §3.1)
+/// Bearer auth 错误 (per RFC 6750 §3.1, 6-variant)
 #[derive(Debug)]
 pub enum BearerError {
     /// 缺 Authorization 头
@@ -27,6 +33,9 @@ pub enum BearerError {
     ExpiredToken,
     /// 5 域 RBAC 拒绝 (per 5 域 Lead 拍板, Mavis 临时代签)
     InsufficientScope(String),
+    /// 服务端内部错误 (e.g. JWT config 缺, DB 查 access_token 失败)
+    /// per 守门 #5 v2: 错误详情不入 log response, 仅 error code
+    ServerError(String),
 }
 
 impl BearerError {
@@ -38,6 +47,7 @@ impl BearerError {
             BearerError::InvalidToken(_) => "BEARER_INVALID_TOKEN",
             BearerError::ExpiredToken => "BEARER_TOKEN_EXPIRED",
             BearerError::InsufficientScope(_) => "BEARER_INSUFFICIENT_SCOPE",
+            BearerError::ServerError(_) => "BEARER_SERVER_ERROR",
         }
     }
 
@@ -45,13 +55,116 @@ impl BearerError {
     pub fn is_retriable(&self) -> bool {
         matches!(self, BearerError::ExpiredToken)
     }
+
+    /// WWW-Authenticate header value (per RFC 6750 §3)
+    pub fn www_authenticate(&self) -> String {
+        match self {
+            BearerError::MissingHeader => format!(
+                r#"Bearer realm="star-api-rest", error="invalid_request""#
+            ),
+            BearerError::InvalidFormat => format!(
+                r#"Bearer realm="star-api-rest", error="invalid_request""#
+            ),
+            BearerError::InvalidToken(_) => format!(
+                r#"Bearer realm="star-api-rest", error="invalid_token""#
+            ),
+            BearerError::ExpiredToken => format!(
+                r#"Bearer realm="star-api-rest", error="invalid_token", error_description="token expired""#
+            ),
+            BearerError::InsufficientScope(scope) => format!(
+                r#"Bearer realm="star-api-rest", error="insufficient_scope", scope="{}""#,
+                scope
+            ),
+            BearerError::ServerError(_) => format!(
+                r#"Bearer realm="star-api-rest", error="server_error""#
+            ),
+        }
+    }
 }
 
-/// BearerToken 持有者 (helper struct, 跨 session 续 axum extractor)
+impl IntoResponse for BearerError {
+    fn into_response(self) -> Response {
+        let status = match self {
+            BearerError::MissingHeader | BearerError::InvalidFormat => StatusCode::UNAUTHORIZED,
+            BearerError::InvalidToken(_) | BearerError::ExpiredToken => StatusCode::UNAUTHORIZED,
+            BearerError::InsufficientScope(_) => StatusCode::FORBIDDEN,
+            BearerError::ServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        let body = json!({
+            "error": self.code(),
+            "error_description": match &self {
+                BearerError::MissingHeader => "missing Authorization header".to_string(),
+                BearerError::InvalidFormat => "Authorization header must be 'Bearer <token>'".to_string(),
+                BearerError::InvalidToken(d) => format!("invalid token: {}", d),
+                BearerError::ExpiredToken => "token expired".to_string(),
+                BearerError::InsufficientScope(s) => format!("insufficient scope: {}", s),
+                BearerError::ServerError(_) => "internal server error".to_string(),
+            },
+        });
+        let www_auth = self.www_authenticate();
+        (
+            status,
+            [(header::WWW_AUTHENTICATE, www_auth)],
+            Json(body),
+        )
+            .into_response()
+    }
+}
+
+/// BearerToken 持有者 (helper struct, 给 axum extractor 用)
 pub struct BearerToken(pub String);
 
-/// AuthenticatedUser 持有者 (placeholder, 跨 session 续 axum extractor)
+/// AuthenticatedUser (axum extractor, 给 handler 注入 AuthUser)
+///
+/// 用法 (per brief §3.1):
+/// ```ignore
+/// async fn handler(user: AuthenticatedUser) -> impl IntoResponse {
+///     let user_id = user.0.user_id;
+///     ...
+/// }
+/// ```
 pub struct AuthenticatedUser(pub AuthUser);
+
+/// Axum extractor 状态: 需要 JwtConfig
+impl<S> FromRequestParts<S> for AuthenticatedUser
+where
+    S: Send + Sync,
+    Arc<JwtConfig>: axum::extract::FromRef<S>,
+{
+    type Rejection = BearerError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        // 1. 提取 Authorization 头
+        let auth_header = parts
+            .headers
+            .get(header::AUTHORIZATION)
+            .ok_or(BearerError::MissingHeader)?
+            .to_str()
+            .map_err(|_| BearerError::InvalidFormat)?;
+
+        // 2. 解析 "Bearer <token>"
+        let token = auth_header
+            .strip_prefix("Bearer ")
+            .ok_or(BearerError::InvalidFormat)?
+            .trim();
+        if token.is_empty() {
+            return Err(BearerError::InvalidFormat);
+        }
+
+        // 3. 提取 JwtConfig from state
+        let jwt_config = Arc::<JwtConfig>::from_ref(state);
+
+        // 4. 验签
+        let claims = match verify_token(jwt_config.as_ref(), token) {
+            Ok(c) => c,
+            Err(crate::auth::JwtError::Expired) => return Err(BearerError::ExpiredToken),
+            Err(crate::auth::JwtError::Missing) => return Err(BearerError::MissingHeader),
+            Err(e) => return Err(BearerError::InvalidToken(format!("{:?}", e.code()))),
+        };
+
+        Ok(AuthenticatedUser(claims.to_auth_user()))
+    }
+}
 
 /// Require scope helper (5 域 RBAC, per 守门 #14 v3 5 域 Lead 拍板 跨 session 续)
 pub fn require_scope(user: &AuthUser, required: &str) -> Result<(), BearerError> {
@@ -74,6 +187,7 @@ pub fn require_role(user: &AuthUser, role: &str) -> Result<(), BearerError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
 
     #[test]
     fn require_scope_grants_matching_scope() {
@@ -125,6 +239,10 @@ mod tests {
             BearerError::InsufficientScope("x".to_string()).code(),
             "BEARER_INSUFFICIENT_SCOPE"
         );
+        assert_eq!(
+            BearerError::ServerError("x".to_string()).code(),
+            "BEARER_SERVER_ERROR"
+        );
     }
 
     #[test]
@@ -134,8 +252,38 @@ mod tests {
         assert!(!BearerError::InvalidFormat.is_retriable());
         assert!(!BearerError::InvalidToken("x".to_string()).is_retriable());
         assert!(!BearerError::InsufficientScope("x".to_string()).is_retriable());
+        assert!(!BearerError::ServerError("x".to_string()).is_retriable());
+    }
+
+    #[test]
+    fn www_authenticate_header_per_rfc6750() {
+        // per RFC 6750 §3 WWW-Authenticate 格式
+        assert!(BearerError::MissingHeader
+            .www_authenticate()
+            .contains("Bearer"));
+        assert!(BearerError::ExpiredToken
+            .www_authenticate()
+            .contains("invalid_token"));
+        assert!(BearerError::InsufficientScope("admin".to_string())
+            .www_authenticate()
+            .contains("admin"));
+    }
+
+    #[test]
+    fn bearer_error_into_response_status_codes() {
+        // per RFC 6750 status mapping
+        use axum::response::IntoResponse;
+        let resp = BearerError::MissingHeader.into_response();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        let resp = BearerError::InvalidFormat.into_response();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        let resp = BearerError::InvalidToken("x".to_string()).into_response();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        let resp = BearerError::ExpiredToken.into_response();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        let resp = BearerError::InsufficientScope("admin".to_string()).into_response();
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let resp = BearerError::ServerError("x".to_string()).into_response();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }
-
-// 占位符避免 unused warning
-const _PLACEHOLDER: () = ();
