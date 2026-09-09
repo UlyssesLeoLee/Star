@@ -1,19 +1,29 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! 27 业务路由 (per Phase I 全部完成, per WBS §14.12.1 + 独立 WBS §1.1)
+//! 27 业务路由 (per Phase I 全部完成, per WBS §14.12.1 + 独立 WBS §1.1) + 8 §14.9 Star-EI 路由 (per brief v0.53)
 //!
 //! 拆分:
 //! - `work_items` (5) + `workspaces` (1) + `worktrees` (2) = Batch 1 (8) — 调 InMemory*Service
 //! - `code` (4) + `context` (1) + `merge_requests` (1) + `reviews` (1) + `validations` (1) + `submissions` (1) + `pipelines` (1) = Batch 2 (10)
 //! - `webhooks` (9) = Batch 3 (端点本地 + 复用 star-webhook::DeliveryStore)
+//! - `ex_01..ex_08` (8) = §14.9 Star-EI 8 子项 stub 路由 (per brief v0.53, 跨 session 续, 5 域 Lead 拍板 临时代签 per 守门 #3 v2 + #14 v3)
 //!
 //! 已知简化 (per 独立 WBS §3):
 //! - `code::get_symbol` / `code::find_references` 占位 (P0 helper 缺, 真实实现留 Phase II 持久化时)
 //! - `submissions::submit` 走 `list_results` 真实 service 路径 (per 独立 WBS §3 #2 上游 MCP `submit.rs` 自身 step 6-12 简化 mock)
 //! - `webhooks::list_deliveries` 显示 total 计数 (DeliveryStore 缺 list_all 公开 API, 真实 list 留 Phase II)
 //! - `webhooks::replay_delivery` 仅标记新状态, 真实 retry 调度留 Phase II
+//! - `ex_01..ex_08` 全部 501 not_implemented 跨 session 占位 (跟 OAuth2 introspect handler 同模式, per brief v0.53 §3)
 
 pub mod code;
 pub mod context;
+pub mod ex_01;
+pub mod ex_02;
+pub mod ex_03;
+pub mod ex_04;
+pub mod ex_05;
+pub mod ex_06;
+pub mod ex_07;
+pub mod ex_08;
 pub mod merge_requests;
 pub mod pipelines;
 pub mod reviews;
