@@ -51,6 +51,10 @@ pub const API_PREFIX: &str = "/api/v1";
 /// - 鉴权中间件 (`AuthLayer` stub)
 /// - 限流中间件 (`RateLimitLayer` stub)
 /// - 审计中间件 (`AuditLayer` stub)
+///
+/// v0.47 §14.12 IV OAuth2 5 endpoints 路由 wire (per brief v0.47 §3.1):
+/// - OAuth2 routes 单独由 `build_router_with_oauth(state)` 提供 (需要 OAuth2State)
+/// - 默认 build_router 不含 OAuth2 路由 (向后兼容现有测试)
 pub fn build_router() -> Router {
     let api = Router::new()
         // ── 16 MCP tool REST 镜像 (per spec §2.2) — 相对 nest prefix 路径 ──────
@@ -113,6 +117,79 @@ pub fn build_router() -> Router {
     Router::new()
         .route("/api/v1/health", get(routes::health))
         .nest("/api/v1", api)
+        .layer(axum::middleware::from_fn(middleware::auth::auth_layer_stub))
+        .layer(axum::middleware::from_fn(
+            middleware::rate_limit::rate_limit_layer_stub,
+        ))
+        .layer(axum::middleware::from_fn(
+            middleware::audit::audit_layer_stub,
+        ))
+}
+
+/// OAuth2 5 endpoints router (per brief v0.47 §3.1)
+///
+/// Routes:
+/// - GET  /oauth/authorize       — Authorization Code flow (RFC 6749 §4.1.1 + RFC 7636 PKCE)
+/// - POST /oauth/token           — Code exchange + Client Credentials + Refresh (RFC 6749 §4.1.3, §4.4, §6)
+/// - GET  /.well-known/jwks.json — Public key JWKS (RFC 7517 §5)
+/// - POST /oauth/introspect      — Token introspection (RFC 7662 §2.1)
+/// - POST /oauth/revoke          — Token revocation (RFC 7009 §2.1)
+pub fn build_oauth_router() -> axum::Router<auth::oauth::OAuth2State> {
+    use auth::oauth::handlers;
+    axum::Router::new()
+        .route("/oauth/authorize", get(handlers::authorize_handler))
+        .route("/oauth/token", post(handlers::token_handler))
+        .route(
+            "/.well-known/jwks.json",
+            get(handlers::jwks_handler),
+        )
+        .route("/oauth/introspect", post(handlers::introspect_handler))
+        .route("/oauth/revoke", post(handlers::revoke_handler))
+}
+
+/// 组合 router: REST API + OAuth2 5 endpoints (per brief v0.47 §3.1)
+///
+/// `build_router_with_oauth(oauth_state)` 提供完整 REST + OAuth2 routing,
+/// 适用于生产部署和集成测试.
+pub fn build_router_with_oauth(
+    oauth_state: auth::oauth::OAuth2State,
+) -> Router {
+    let oauth_router = build_oauth_router();
+    Router::new()
+        .route("/api/v1/health", get(routes::health))
+        .nest("/api/v1", Router::new()
+            .route("/work-items", get(routes::work_items::search))
+            .route("/work-items/current", get(routes::work_items::current))
+            .route("/work-items/{id}", get(routes::work_items::get_by_id))
+            .route("/work-items", post(routes::work_items::create))
+            .route("/work-items/{id}", patch(routes::work_items::update))
+            .route("/workspaces/{id}", get(routes::workspaces::get_by_id))
+            .route("/worktrees", post(routes::worktrees::create))
+            .route("/worktrees/{id}", get(routes::worktrees::get_by_id))
+            .route("/code/search", get(routes::code::search))
+            .route("/code/symbols/{id}", get(routes::code::get_symbol))
+            .route(
+                "/code/symbols/{id}/references",
+                get(routes::code::find_references),
+            )
+            .route("/code/context", get(routes::code::get_context))
+            .route("/context", get(routes::context::get))
+            .route("/merge-requests", post(routes::merge_requests::create))
+            .route("/reviews", post(routes::reviews::request))
+            .route("/validations", post(routes::validations::run))
+            .route("/pipelines/{id}", get(routes::pipelines::get_status))
+            .route("/submissions", post(routes::submissions::submit))
+            .route("/webhooks/endpoints", get(routes::webhooks::list_endpoints))
+            .route("/webhooks/endpoints", post(routes::webhooks::create_endpoint))
+            .route("/webhooks/endpoints/{id}", get(routes::webhooks::get_endpoint))
+            .route("/webhooks/endpoints/{id}", patch(routes::webhooks::update_endpoint))
+            .route("/webhooks/endpoints/{id}", delete(routes::webhooks::delete_endpoint))
+            .route("/webhooks/endpoints/{id}/test", post(routes::webhooks::test_endpoint))
+            .route("/webhooks/deliveries", get(routes::webhooks::list_deliveries))
+            .route("/webhooks/deliveries/{delivery_id}", get(routes::webhooks::get_delivery))
+            .route("/webhooks/deliveries/{delivery_id}/replay", post(routes::webhooks::replay_delivery))
+        )
+        .merge(oauth_router.with_state(oauth_state))
         .layer(axum::middleware::from_fn(middleware::auth::auth_layer_stub))
         .layer(axum::middleware::from_fn(
             middleware::rate_limit::rate_limit_layer_stub,

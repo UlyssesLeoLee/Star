@@ -16,13 +16,14 @@
 //!
 //! 跨 session 续: user login flow (consents screen) + 真实 DB-backed introspect + bcrypt client_secret + 5 域 RBAC 实证
 
-// v0.43 §14.12 IV OAuth2 server phase 2 (per 2026-09-09 20:20 JST 用户拍板 both flows)
-// handlers.rs 跨 session 续 (struct 字段完整化 + ring/aws-lc-rs RSA keygen 实证)
-// pub mod handlers;
+// v0.47 §14.12 IV OAuth2 server phase 2 (per 2026-09-09 22:18 JST 用户发令 worktree 收官)
+// 5 endpoints + middleware extractor + 5 域 RBAC scope helper 完整化
+pub mod handlers;
 pub mod keypair;
 pub mod middleware;
 pub mod pkce;
 
+pub use handlers::{OAuth2State, OAuthHandlerError};
 pub use keypair::{Jwk, Jwks, KeyPairError, OAuthKeyManager, OAuthKeyPair};
 pub use middleware::{require_role, require_scope, AuthenticatedUser, BearerError, BearerToken};
 pub use pkce::{verify_pkce, PkceError};

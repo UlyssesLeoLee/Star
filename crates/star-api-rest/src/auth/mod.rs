@@ -198,14 +198,4 @@ impl Claims {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// 派生 #28: 生成测试用 RS256 key pair (per openssl rsa)
-    /// 守门 #5 v2: 测试用 key 仅在 test 编译期间存在, 不入源码
-    fn test_keys() -> (String, String) {
-        // 使用 jsonwebtoken 内置的 rsa_pem_key 生成测试 key
-        // 实际生产中用 openssl 生成 + 走 env var
-        let priv_pem = String::new();
-        let pub_pem = String::new();
-        (priv_pem, pub_pem)
-    }
 }
