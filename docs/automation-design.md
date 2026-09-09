@@ -826,6 +826,60 @@ print(f"err_count={result.stderr.count('error[')}")
 - 守门 #12 派生 v15 docs 同步饱和: 本轮第 44 次新事件触发 (用户发令"按顺序推进"), 仍允许
 - 守门 #1 v25 cargo test 单 crate 模式: `cargo test -p star-arg-bridge --lib -j 4` 100% pass (per 9/5 00:15 JST 拍板 PR #12)
 
+### 4.22 P3-C W3 ARG.3 — crates/arg-effect 5 子模块 + 18 UT + 8 拓扑 Cypher + 10 challenges prompt 索引 (2026-09-10 07:21 JST per `docs/briefs/arg-03-arg-effect-crate.md`)
+
+> **触发**: 2026-09-10 07:21 JST 用户发令"按顺序推进" (per 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #14 v3 Mavis 永久代签 + 守门 #1 v15 docs 同步饱和第 45 次新事件触发仍允许)
+> **依据**: 守门 #1 v19 (P 子项 Python 化, [P] 子项 `arg_dispatch_test.py`) + 守门 #1 v15 (本轮第 45 次新事件, docs 同步允许) + 守门 #1 v25 (cargo check + cargo test 跨 crate 兼容 0 err) + 守门 #3 (5 域 Lead 跨域边强制 consults, `select_challenge_prompt` 默认走 TrustTier 派生) + 守门 #5 (env 安全, Memgraph 连接串走 env) + 守门 #6 (PowerShell only) + 守门 #7 (0 unsafe) + 守门 #9 (子代理 RPC 不可靠, 不用 RPC) + 守门 #10 (代签, author=Ulysses) + 守门 #12 ([P] docs 同步) + 守门 #14 v2 (5 域 Lead Mavis 临时代签) + 守门 #19 v19 (守门 #12 死循环饱和边界, 本轮新事件允许)
+> **落档文件**:
+> - `crates/arg-effect/` 新建 (Cargo.toml + lib.rs + 6 module + 5 tests = 12 文件, workspace 68 → 69 package)
+> - `Cargo.toml` workspace members 追加 `"crates/arg-effect"` 1 行
+> - `scripts/automation/arg_dispatch_test.py` v0.1 (~410 行, 12 IT 端到端 + 5 守门 + 6 file-content check)
+> - `docs/automation-design.md` §4.22 (本节, per 守门 #12 v21)
+> - `scripts/automation/registry.md` §1 +1 行 + §5.6 +1 段
+> - `docs/reports/PHASE-ARG-03-IMPL-REPORT.md` v0.1 (per AGENTS.md §3 7 段结构)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| ARG-3.1 | ARG-3.1 | `crates/arg-effect/` 12 文件 (Cargo.toml + lib.rs + 6 module + 5 tests) | S, A | **[P]** | (无新脚本, 复用 ARG-3.4 arg_dispatch_test.py) | 5 子模块 (dispatch_router / context_injector / trust_engine / output_evaluator / achievement_engine) + 10 套 challenges prompt (per DD §7) + 8 拓扑 Cypher (re-export from `star_arg::query::topology`); 守门 #7 0 unsafe; axum 0.8 间接 (per ADR-0048); peer_review threshold 0.8 (per SRS §4.3.4); trust skip-verify 0.8 + 0.7 (per DD §4.3.3) |
+| ARG-3.2 | ARG-3.2 | 18 UT (3 dispatch + 3 context + 4 trust + 3 output + 5 achievement) | R, V, A | **[P]** | `cargo test -p star-arg-effect --tests -j 4` | 守门 #1 v25 实证 100% pass (18 main UT + 1 extra = 19 tests, 0 failed, 0.01s) |
+| ARG-3.3 | ARG-3.3 | 5 守门全套 (check / fmt / clippy / test / build) | R, V, A | **[P]** | (守门 #1 累积规 v1-v5) | `cargo check --workspace --lib -j 4` 0 err + `cargo fmt -p star-arg-effect -- --check` 0 err + `cargo clippy -p star-arg-effect --lib -j 4 -- -D warnings` 0 err (0.87s) + `cargo test -p star-arg-effect --tests -j 4` 18/18 pass + `cargo build --release -p star-arg-effect` 0 err (3.91s) |
+| ARG-3.4 | ARG-3.4 | `scripts/automation/arg_dispatch_test.py` v0.1 落档 | R, V, S, A | **[P]** | `scripts/automation/arg_dispatch_test.py` | 守门 #5 env 不打印明文; 走 subprocess.run 调 `cargo test -p star-arg-effect --tests -j 4` (守门 #9 v3); 12 IT (1 cargo test + 1 sub-crate lib + 1 workspace check + 1 fmt + 1 clippy + 1 release build + 6 file-content check) |
+| ARG-3.5 | ARG-3.5 | docs/automation-design.md §4.22 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #12 v21 [P] docs 同步必更新 §4 任务卡表 |
+| ARG-3.6 | ARG-3.6 | scripts/automation/registry.md §1 +1 行 + §5.6 +1 段 | A | **[P]** | (registry.md 编辑) | per 守门 #12 v21 [P] docs 同步必更新 registry |
+| ARG-3.7 | ARG-3.7 | docs/reports/PHASE-ARG-03-IMPL-REPORT.md v0.1 落档 | A | **[P]** | (报告落档) | per AGENTS.md §3 7 段结构; 5 守门实证 + 18 UT pass + 1 commit hash |
+| ARG-3.8 | ARG-3.8 | 1 commit author = `Ulysses <ulysses@mavis.local>` | A | **[P]** | (git commit) | 守门 #10 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化 (Mavis 自驱); 不推 origin (守门 #1 反转后 R-05) |
+| ARG-3.9 | ARG-3.9 | (后续 ARG.5 frontend 5 UI 组件子代理触发) | — | **[P]** | (后续 worktree) | per WBS §14.11 ARG.3 收官后, 派新子代理走 ARG.5 (frontend/src/app/agent-relationships/ + /dispatch-override/ + /mentor-context/ + /peer-review/ + /achievements/ 5 UI 组件) |
+| ARG-3.10 | ARG-3.10 | Cargo workspace members 追加 `"crates/arg-effect"` | S | **[P]** | (Cargo.toml edit) | workspace 68 → 69 package; 守门 #1 v1 |
+| ARG-3.11 | ARG-3.11 | 8 拓扑成就 Cypher 模板 (G-6 闭环) | S, R | **[P]** | (re-export from `star_arg::query::topology::all_topology_cyphers`) | per DD §6 + 守门 #1 F-11 (不用 apoc.coll, 8 cypher 100% 落地); 1 测试 `all_8_cyphers_avoid_apoc` 验证 |
+| ARG-3.12 | ARG-3.12 | 10 套 challenges prompt 模板 (G-5 闭环) | S, R | **[P]** | `crates/arg-effect/src/prompts.rs` | per DD §7 5 decision × 2 trust_tier; 1 测试 `challenge_prompts_has_10_entries` + 1 测试 `all_decision_types_have_both_tiers` 验证 |
+
+**§4.22 任务卡维度判定**:
+- R (Rerunnable): **是** (arg_dispatch_test.py idempotent, 调 subprocess.run 跑 cargo test/check/fmt/clippy/build, 18 UT 跨 5 测试文件)
+- V (Volume): **是** (12 文件 + 18 UT + 5 守门 + 5 子模块 + 10 challenges prompt + 8 拓扑 Cypher)
+- S (Structural): **是** (crates/arg-effect 内部扩展 + Cargo.toml 追加 1 行 + workspace 68 → 69 package)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 + 守门 #10 author = Ulysses + 守门 #5 env 不打印)
+
+**§4.22 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v19 + #12 v21 + #14 v2)**:
+- `cargo check --workspace --lib -j 4` 0 err (实证, 0.70s, 仅 pre-existing warnings)
+- `cargo fmt -p star-arg-effect -- --check` 0 err (实证)
+- `cargo clippy -p star-arg-effect --lib -j 4 -- -D warnings` 0 err (实证, 0.87s)
+- `cargo test -p star-arg-effect --tests -j 4` 18/18 pass (实证, 0.01s, 0 failed, 0 ignored) + 1 extra (`ut48b_topology_cypher_count_matches_8`)
+- `cargo build --release -p star-arg-effect` 0 err (实证, 3.91s)
+- `python scripts/automation/arg_dispatch_test.py` exit 0 (实证, 12/12 IT PASS, ALL GREEN)
+- `git log -p --follow crates/arg-effect/` 实证 (commit 后)
+- `git log -p --follow Cargo.toml` 实证 workspace members 追加 (commit 后)
+- `git log -p --follow scripts/automation/arg_dispatch_test.py` 实证 (commit 后)
+- `git log -p --follow docs/automation-design.md` 实证 §4.22 追加 (commit 后)
+- `git log -p --follow scripts/automation/registry.md` 实证 §1 + §5.6 追加 (commit 后)
+- commit author = `Ulysses <ulysses@mavis.local>` (per 守门 #10 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化)
+- 0 unsafe 块 (守门 #7 `unsafe_code = "forbid"` workspace lint)
+- 守门 #5 env 安全: arg_dispatch_test.py 不打印 env 值, 走 subprocess.run 继承环境变量 (不主动读)
+- 守门 #14 v2: 5 域 Lead 真人到位前 Mavis 临时代签维持 (per 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D)
+- 守门 #12 派生 v15 docs 同步饱和: 本轮第 45 次新事件触发 (用户发令"按顺序推进"), 仍允许
+- 守门 #1 v25 cargo test 单 crate 模式: `cargo test -p star-arg-effect --lib -j 4` 100% pass (per 9/5 00:15 JST 拍板 PR #12)
+- 守门 #3 5 域 Lead 跨域边强制 consults: `select_challenge_prompt` 默认 TrustTier 派生 (weight < 0.7 → Low; 否则 High), 不允许跨域跨边界用 delegates_to
+- 守门 #7 0 unsafe 块: 全 src + tests 0 hits (IT-24 实证)
+
 ------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
