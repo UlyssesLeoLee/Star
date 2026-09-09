@@ -15,15 +15,13 @@ use crate::error::RestError;
 use crate::response::RestResponse;
 
 /// 全 handler 共享的 in-memory workspace service
-fn service() -> &'static Arc<InMemoryWorkspaceService> {
+pub(crate) fn service() -> &'static Arc<InMemoryWorkspaceService> {
     static SVC: OnceLock<Arc<InMemoryWorkspaceService>> = OnceLock::new();
     SVC.get_or_init(InMemoryWorkspaceService::new_for_test)
 }
 
 /// `GET /api/v1/workspaces/{id}`
-pub async fn get_by_id(
-    Path(id): Path<String>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn get_by_id(Path(id): Path<String>) -> Result<Json<RestResponse<Value>>, RestError> {
     let uuid = Uuid::parse_str(&id).map_err(|e| {
         RestError::validation(
             format!("invalid workspace_id UUID: {e}"),
@@ -32,9 +30,7 @@ pub async fn get_by_id(
     })?;
     // nil-tenant actor 走 service.get_by_id → 跨 tenant 拒绝 → 404 (跟 star-mcp `get_workspace` 简化模式)
     let actor = ActorContext::default();
-    let ws = service()
-        .get_by_id(WorkspaceId::from(uuid), actor)
-        .await?;
+    let ws = service().get_by_id(WorkspaceId::from(uuid), actor).await?;
     Ok(Json(RestResponse::ok(json!({
         "workspace": {
             "id": ws.id.to_string(),

@@ -16,7 +16,7 @@ use crate::error::RestError;
 use crate::response::RestResponse;
 
 /// 全 handler 共享的 in-memory SCM service
-fn service() -> &'static Arc<InMemoryScmService> {
+pub(crate) fn service() -> &'static Arc<InMemoryScmService> {
     static SVC: OnceLock<Arc<InMemoryScmService>> = OnceLock::new();
     SVC.get_or_init(|| InMemoryScmService::new_for_test())
 }
@@ -43,10 +43,7 @@ pub async fn request(
     Json(body): Json<RequestBody>,
 ) -> Result<Json<RestResponse<Value>>, RestError> {
     let pr_uuid = Uuid::parse_str(&body.mr_id).map_err(|e| {
-        RestError::validation(
-            format!("invalid mr_id UUID: {e}"),
-            "Provide a valid UUID",
-        )
+        RestError::validation(format!("invalid mr_id UUID: {e}"), "Provide a valid UUID")
     })?;
     let pr_id = PullRequestId::from_uuid(pr_uuid);
     let reviewers = body.reviewers.unwrap_or_default();

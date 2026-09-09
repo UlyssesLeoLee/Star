@@ -16,7 +16,7 @@ use crate::error::RestError;
 use crate::response::RestResponse;
 
 /// 全 handler 共享的 in-memory SCM service
-fn service() -> &'static Arc<InMemoryScmService> {
+pub(crate) fn service() -> &'static Arc<InMemoryScmService> {
     static SVC: OnceLock<Arc<InMemoryScmService>> = OnceLock::new();
     SVC.get_or_init(|| InMemoryScmService::new_for_test())
 }
@@ -36,9 +36,7 @@ pub struct CreateBody {
 }
 
 /// `POST /api/v1/merge-requests`
-pub async fn create(
-    Json(body): Json<CreateBody>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn create(Json(body): Json<CreateBody>) -> Result<Json<RestResponse<Value>>, RestError> {
     if body.title.is_empty() {
         return Err(RestError::validation(
             "title is required".to_string(),

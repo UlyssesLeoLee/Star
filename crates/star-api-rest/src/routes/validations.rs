@@ -19,7 +19,7 @@ use crate::error::RestError;
 use crate::response::RestResponse;
 
 /// 全 handler 共享的 in-memory validation service
-fn service() -> &'static Arc<InMemoryValidationService> {
+pub(crate) fn service() -> &'static Arc<InMemoryValidationService> {
     static SVC: OnceLock<Arc<InMemoryValidationService>> = OnceLock::new();
     SVC.get_or_init(|| InMemoryValidationService::new_for_test())
 }
@@ -59,9 +59,7 @@ fn parse_kind(s: &str) -> Option<ValidationKind> {
 }
 
 /// `POST /api/v1/validations`
-pub async fn run(
-    Json(body): Json<RunBody>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn run(Json(body): Json<RunBody>) -> Result<Json<RestResponse<Value>>, RestError> {
     let worktree_id = body
         .worktree_id
         .as_deref()

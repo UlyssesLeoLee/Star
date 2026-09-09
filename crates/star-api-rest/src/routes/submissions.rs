@@ -22,7 +22,7 @@ use crate::error::RestError;
 use crate::response::RestResponse;
 
 /// 全 handler 共享的 in-memory validation service
-fn service() -> &'static Arc<InMemoryValidationService> {
+pub(crate) fn service() -> &'static Arc<InMemoryValidationService> {
     static SVC: OnceLock<Arc<InMemoryValidationService>> = OnceLock::new();
     SVC.get_or_init(|| InMemoryValidationService::new_for_test())
 }
@@ -46,9 +46,7 @@ fn status_str(s: ValidationStatus) -> &'static str {
 }
 
 /// `POST /api/v1/submissions`
-pub async fn submit(
-    Json(body): Json<SubmitBody>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn submit(Json(body): Json<SubmitBody>) -> Result<Json<RestResponse<Value>>, RestError> {
     let worktree_uuid = Uuid::parse_str(&body.worktree_id).map_err(|e| {
         RestError::validation(
             format!("invalid worktree_id UUID: {e}"),

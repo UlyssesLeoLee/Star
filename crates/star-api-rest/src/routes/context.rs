@@ -6,10 +6,7 @@
 
 use std::sync::{Arc, OnceLock};
 
-use axum::{
-    extract::Query,
-    Json,
-};
+use axum::{extract::Query, Json};
 use domain_search::{
     ActorContext, InMemorySearchService, SearchQuery, SearchQueryDto, SearchQueryPort, TenantId,
     UserId,
@@ -23,7 +20,7 @@ use crate::error::RestError;
 use crate::response::RestResponse;
 
 /// 全 handler 共享的 in-memory search service
-fn search_service() -> &'static Arc<InMemorySearchService> {
+pub(crate) fn search_service() -> &'static Arc<InMemorySearchService> {
     static SVC: OnceLock<Arc<InMemorySearchService>> = OnceLock::new();
     SVC.get_or_init(|| Arc::new(InMemorySearchService::new()))
 }
@@ -47,10 +44,7 @@ pub async fn get(
     // 校验 id 是合法 UUID (per star-mcp get_context 守门)
     if !id.is_empty() {
         Uuid::parse_str(&id).map_err(|e| {
-            RestError::validation(
-                format!("invalid id UUID: {e}"),
-                "Provide a valid UUID",
-            )
+            RestError::validation(format!("invalid id UUID: {e}"), "Provide a valid UUID")
         })?;
     }
 

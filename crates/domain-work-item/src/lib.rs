@@ -633,6 +633,12 @@ impl InMemoryWorkItemService {
             acs: Arc::new(RwLock::new(HashMap::new())),
         }
     }
+    /// 测试隔离: 清空所有内存存储 (per self-review §1, v0.31 step 3/3 OnceLock 共享 state)
+    pub fn reset(&self) {
+        self.items.write().unwrap().clear();
+        self.requirements.write().unwrap().clear();
+        self.acs.write().unwrap().clear();
+    }
 
     /// P0 工具链 (per docs/briefs/tool-p0-impl-001.md) — 按 query/status/project 过滤
     ///

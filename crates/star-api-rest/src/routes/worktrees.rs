@@ -7,14 +7,10 @@
 
 use std::sync::{Arc, OnceLock};
 
-use axum::{
-    extract::Path,
-    Json,
-};
+use axum::{extract::Path, Json};
 use domain_worktree::{
     ActorContext, CreateWorktreeCommand, InMemoryWorktreeService, ProjectId, RepositoryId,
-    RuntimeId, TenantId, UserId, WorkItemId, WorktreeCommandPort, WorktreeId,
-    WorktreeQueryPort,
+    RuntimeId, TenantId, UserId, WorkItemId, WorktreeCommandPort, WorktreeId, WorktreeQueryPort,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -24,15 +20,13 @@ use crate::error::RestError;
 use crate::response::RestResponse;
 
 /// 全 handler 共享的 in-memory worktree service
-fn service() -> &'static Arc<InMemoryWorktreeService> {
+pub(crate) fn service() -> &'static Arc<InMemoryWorktreeService> {
     static SVC: OnceLock<Arc<InMemoryWorktreeService>> = OnceLock::new();
     SVC.get_or_init(|| Arc::new(InMemoryWorktreeService::new()))
 }
 
 /// `GET /api/v1/worktrees/{id}`
-pub async fn get_by_id(
-    Path(id): Path<String>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn get_by_id(Path(id): Path<String>) -> Result<Json<RestResponse<Value>>, RestError> {
     let uuid = Uuid::parse_str(&id).map_err(|e| {
         RestError::validation(
             format!("invalid worktree_id UUID: {e}"),
@@ -40,9 +34,7 @@ pub async fn get_by_id(
         )
     })?;
     let actor = ActorContext::default().with_role("developer");
-    let wt = service()
-        .get_by_id(WorktreeId::from(uuid), &actor)
-        .await?;
+    let wt = service().get_by_id(WorktreeId::from(uuid), &actor).await?;
     Ok(Json(RestResponse::ok(json!({
         "worktree": {
             "id": wt.id.to_string(),
@@ -76,9 +68,7 @@ pub struct CreateBody {
 ///
 /// 接受 JSON body (work_item_id + branch_name + agent_session_id), 跟 star-mcp `create_worktree` 范式一致.
 /// query param `?issue_id=...` 兼容性: 客户端可直接传 work_item_id 字段 (跟 MCP issue_id 兼容).
-pub async fn create(
-    Json(body): Json<CreateBody>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn create(Json(body): Json<CreateBody>) -> Result<Json<RestResponse<Value>>, RestError> {
     let issue_id = body.work_item_id;
     let branch = body
         .branch_name
@@ -87,8 +77,7 @@ pub async fn create(
     let actor = ActorContext::default().with_role("developer");
     let tenant_id = TenantId::from(actor.tenant_id);
     let project_id = ProjectId::new();
-    let work_item_uuid =
-        Uuid::parse_str(&issue_id).unwrap_or_else(|_| Uuid::new_v4());
+    let work_item_uuid = Uuid::parse_str(&issue_id).unwrap_or_else(|_| Uuid::new_v4());
     let work_item_id = WorkItemId::from(work_item_uuid);
     let repository_id = RepositoryId::new();
     let runtime_id = RuntimeId::new();

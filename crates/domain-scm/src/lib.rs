@@ -1028,6 +1028,17 @@ impl InMemoryScmService {
         });
         (svc, rx)
     }
+    /// 测试隔离: 清空所有内存存储 (per self-review §1, v0.31 step 3/3 OnceLock 共享 state)
+    pub async fn reset(&self) {
+        self.repos.write().await.clear();
+        self.branches.write().await.clear();
+        self.prs.write().await.clear();
+        self.webhooks.write().await.clear();
+        self.idempotency.write().await.clear();
+        self.pipelines.write().await.clear();
+        self.pipeline_external_index.write().await.clear();
+        self.reviews.write().await.clear();
+    }
     /// 构造仅用于测试的服务实例(丢弃事件接收端)
     pub fn new_for_test() -> Arc<Self> {
         Self::new().0

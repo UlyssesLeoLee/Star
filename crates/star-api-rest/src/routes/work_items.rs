@@ -32,7 +32,7 @@ use crate::error::RestError;
 use crate::response::RestResponse;
 
 /// 全 handler 共享的 in-memory work item service (LazyLock 等价, per star-mcp 模式)
-fn service() -> &'static Arc<InMemoryWorkItemService> {
+pub(crate) fn service() -> &'static Arc<InMemoryWorkItemService> {
     static SVC: OnceLock<Arc<InMemoryWorkItemService>> = OnceLock::new();
     SVC.get_or_init(|| Arc::new(InMemoryWorkItemService::new()))
 }
@@ -143,9 +143,7 @@ pub async fn current() -> Result<Json<RestResponse<Value>>, RestError> {
 }
 
 /// `GET /api/v1/work-items/{id}`
-pub async fn get_by_id(
-    Path(id): Path<String>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn get_by_id(Path(id): Path<String>) -> Result<Json<RestResponse<Value>>, RestError> {
     let uuid = Uuid::parse_str(&id).map_err(|e| {
         RestError::validation(
             format!("invalid work item id UUID: {e}"),
@@ -220,17 +218,22 @@ fn parse_priority(s: &str) -> Result<Priority, RestError> {
 }
 
 /// `POST /api/v1/work-items`
-pub async fn create(
-    Json(body): Json<CreateBody>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
-    let project_id = Uuid::parse_str(&body.project_id)
-        .map_err(|e| RestError::validation(format!("invalid project_id: {e}"), "Provide a valid UUID"))?;
-    let workspace_id = Uuid::parse_str(&body.workspace_id)
-        .map_err(|e| RestError::validation(format!("invalid workspace_id: {e}"), "Provide a valid UUID"))?;
-    let tenant_id = Uuid::parse_str(&body.tenant_id)
-        .map_err(|e| RestError::validation(format!("invalid tenant_id: {e}"), "Provide a valid UUID"))?;
-    let reporter_user_id = Uuid::parse_str(&body.reporter_user_id)
-        .map_err(|e| RestError::validation(format!("invalid reporter_user_id: {e}"), "Provide a valid UUID"))?;
+pub async fn create(Json(body): Json<CreateBody>) -> Result<Json<RestResponse<Value>>, RestError> {
+    let project_id = Uuid::parse_str(&body.project_id).map_err(|e| {
+        RestError::validation(format!("invalid project_id: {e}"), "Provide a valid UUID")
+    })?;
+    let workspace_id = Uuid::parse_str(&body.workspace_id).map_err(|e| {
+        RestError::validation(format!("invalid workspace_id: {e}"), "Provide a valid UUID")
+    })?;
+    let tenant_id = Uuid::parse_str(&body.tenant_id).map_err(|e| {
+        RestError::validation(format!("invalid tenant_id: {e}"), "Provide a valid UUID")
+    })?;
+    let reporter_user_id = Uuid::parse_str(&body.reporter_user_id).map_err(|e| {
+        RestError::validation(
+            format!("invalid reporter_user_id: {e}"),
+            "Provide a valid UUID",
+        )
+    })?;
 
     let cmd = CreateWorkItemCommand {
         tenant_id: TenantId(tenant_id),
@@ -276,10 +279,18 @@ pub async fn update(
             "Provide a valid UUID",
         )
     })?;
-    let from = parse_status(&body.from)
-        .ok_or_else(|| RestError::validation(format!("invalid from status: {}", body.from), "Use TODO / IN_PROGRESS / DONE"))?;
-    let to = parse_status(&body.status)
-        .ok_or_else(|| RestError::validation(format!("invalid to status: {}", body.status), "Use TODO / IN_PROGRESS / DONE"))?;
+    let from = parse_status(&body.from).ok_or_else(|| {
+        RestError::validation(
+            format!("invalid from status: {}", body.from),
+            "Use TODO / IN_PROGRESS / DONE",
+        )
+    })?;
+    let to = parse_status(&body.status).ok_or_else(|| {
+        RestError::validation(
+            format!("invalid to status: {}", body.status),
+            "Use TODO / IN_PROGRESS / DONE",
+        )
+    })?;
     let tenant_id = uuid::Uuid::nil();
     let actor = ActorContext::default().with_role("developer");
     let cmd = TransitionStatusCommand {

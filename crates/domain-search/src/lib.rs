@@ -630,6 +630,11 @@ impl InMemorySearchService {
             saved: Arc::new(RwLock::new(HashMap::new())),
         }
     }
+    /// 测试隔离: 清空所有内存存储 (per self-review §1, v0.31 step 3/3 OnceLock 共享 state)
+    pub fn reset(&self) {
+        self.index.write().unwrap().clear();
+        self.saved.write().unwrap().clear();
+    }
 }
 
 impl Default for InMemorySearchService {

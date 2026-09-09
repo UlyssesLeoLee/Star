@@ -588,6 +588,11 @@ impl InMemoryWorkspaceService {
     pub fn new_for_test() -> Arc<Self> {
         Self::new().0
     }
+    /// 测试隔离: 清空所有内存存储 (per self-review §1, v0.31 step 3/3 OnceLock 共享 state)
+    pub async fn reset(&self) {
+        self.workspaces.write().await.clear();
+        self.members.write().await.clear();
+    }
     /// Workspace 数量(测试断言)
     pub async fn count(&self) -> usize {
         self.workspaces.read().await.len()

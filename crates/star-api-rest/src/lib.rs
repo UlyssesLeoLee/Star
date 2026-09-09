@@ -132,6 +132,27 @@ mod tests {
     use serde_json::Value;
     use tower::ServiceExt;
 
+    /// 测试隔离: 清空 11 个 OnceLock 共享 state (per self-review §1 + v0.31 step 3/3)
+    /// 跨 10 routes file 共享 6 个 InMemory*Service
+    /// - std::sync::RwLock (sync reset): work_items / worktrees / code / context / validations / submissions / webhooks::endpoints
+    /// - tokio::sync::RwLock (async reset): workspaces / merge_requests / reviews / pipelines
+    /// - 不含: webhooks::deliveries (复用 `star_webhook::DeliveryStore`, 缺 reset, 留 P1)
+    async fn reset_all_state() {
+        // sync reset (std::sync::RwLock)
+        routes::work_items::service().reset();
+        routes::worktrees::service().reset();
+        routes::code::service().reset();
+        routes::context::search_service().reset();
+        routes::validations::service().reset();
+        routes::submissions::service().reset();
+        routes::webhooks::endpoints().reset();
+        // async reset (tokio::sync::RwLock)
+        routes::workspaces::service().reset().await;
+        routes::merge_requests::service().reset().await;
+        routes::reviews::service().reset().await;
+        routes::pipelines::service().reset().await;
+    }
+
     /// 路由注册 (build_router 不 panic) 烟雾测试
     #[test]
     fn router_contains_expected_paths() {
@@ -157,6 +178,7 @@ mod tests {
     /// 不是 501 (per `docs/briefs/star-api-rest-phase-i-batch-1.md`)
     #[tokio::test]
     async fn business_endpoint_returns_real_data_after_phase_i_batch_1() {
+        reset_all_state().await;
         let app = build_router();
         let resp = app
             .oneshot(
@@ -171,9 +193,7 @@ mod tests {
         // → `InMemoryWorkItemService::list_with_filter` → 200 + JSON {data: {query, total, issues}}
         // (空 query + nil-tenant actor 走真实 service 路径, 返回空 list)
         assert_eq!(resp.status(), StatusCode::OK);
-        let body_bytes = axum::body::to_bytes(resp.into_body(), 1024)
-            .await
-            .unwrap();
+        let body_bytes = axum::body::to_bytes(resp.into_body(), 1024).await.unwrap();
         let body: Value = serde_json::from_slice(&body_bytes).unwrap();
         assert!(body.get("data").is_some(), "data field missing");
         let data = body.get("data").unwrap();
@@ -188,6 +208,7 @@ mod tests {
     /// 返回 200 + 真实 worktree 实体 (不是 mock `wt-STAR-1024` 字符串)
     #[tokio::test]
     async fn post_worktrees_returns_real_worktree_after_phase_i_batch_1() {
+        reset_all_state().await;
         let app = build_router();
         let body_json = serde_json::json!({
             "work_item_id": "STAR-1024",
@@ -205,17 +226,21 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let body_bytes = axum::body::to_bytes(resp.into_body(), 4096)
-            .await
-            .unwrap();
+        let body_bytes = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
         let body: Value = serde_json::from_slice(&body_bytes).unwrap();
         assert!(body.get("data").is_some(), "data field missing");
         let data = body.get("data").unwrap();
         let worktree = data.get("worktree").expect("worktree field");
         let id = worktree.get("id").and_then(|v| v.as_str()).unwrap_or("");
-        let branch = worktree.get("branch").and_then(|v| v.as_str()).unwrap_or("");
+        let branch = worktree
+            .get("branch")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         // 真实 service 应返回真实 UUID, 不是 mock `wt-STAR-1024` 字符串
-        assert!(!id.contains("STAR-1024"), "should return real UUID, not mock 'wt-STAR-1024'");
+        assert!(
+            !id.contains("STAR-1024"),
+            "should return real UUID, not mock 'wt-STAR-1024'"
+        );
         assert_eq!(branch, "feature/STAR-1024");
     }
 
@@ -223,6 +248,7 @@ mod tests {
     /// 缺 id 路径走 404 (跨 tenant 拒绝 → validation → 跟 star-mcp 简化模式一致)
     #[tokio::test]
     async fn get_workspaces_returns_404_for_missing_id_after_phase_i_batch_1() {
+        reset_all_state().await;
         let app = build_router();
         let missing = uuid::Uuid::new_v4();
         let resp = app
@@ -242,6 +268,7 @@ mod tests {
     /// 空 title → validation 400 (handler 显式检查, 非 axum 422 解析错)
     #[tokio::test]
     async fn post_merge_requests_empty_title_returns_400_after_phase_i_batch_2() {
+        reset_all_state().await;
         let app = build_router();
         let body_json = serde_json::json!({
             "title": "",
@@ -268,6 +295,7 @@ mod tests {
     /// 返回 200 + JSON {query, total, results, limit}
     #[tokio::test]
     async fn get_code_search_returns_real_data_after_phase_i_batch_2() {
+        reset_all_state().await;
         let app = build_router();
         let resp = app
             .oneshot(
@@ -280,9 +308,7 @@ mod tests {
             .unwrap();
         // 真实 service 路径, 空 list → 200
         assert_eq!(resp.status(), StatusCode::OK);
-        let body_bytes = axum::body::to_bytes(resp.into_body(), 4096)
-            .await
-            .unwrap();
+        let body_bytes = axum::body::to_bytes(resp.into_body(), 4096).await.unwrap();
         let body: Value = serde_json::from_slice(&body_bytes).unwrap();
         assert!(body.get("data").is_some(), "data field missing");
         let data = body.get("data").unwrap();
@@ -294,9 +320,10 @@ mod tests {
     /// Phase I Batch 3 实证: webhook endpoint CRUD 自洽 (POST 201/GET 200/PATCH 200/DELETE 200)
     #[tokio::test]
     async fn webhook_endpoints_crud_roundtrip_after_phase_i_batch_3() {
-        // 测试隔离: 每次测试前清空 shared `OnceLock<EndpointStore>` 状态
+        // 测试隔离: 每次测试前清空 shared `OnceLock<...>` 状态
         // (per self-review §1 "OnceLock<...> 全局单例在测试间共享状态", v0.27 修)
-        routes::webhooks::endpoints().reset();
+        // v0.31 step 3/3: 升级为 reset_all_state() helper, 覆盖 11 个 store (含 endpoints)
+        reset_all_state().await;
         let app = build_router();
         // 1. POST 创建
         let body_json = serde_json::json!({

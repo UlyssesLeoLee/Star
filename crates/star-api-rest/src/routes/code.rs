@@ -26,7 +26,7 @@ use crate::error::RestError;
 use crate::response::RestResponse;
 
 /// 全 handler 共享的 in-memory search service
-fn service() -> &'static Arc<InMemorySearchService> {
+pub(crate) fn service() -> &'static Arc<InMemorySearchService> {
     static SVC: OnceLock<Arc<InMemorySearchService>> = OnceLock::new();
     SVC.get_or_init(|| Arc::new(InMemorySearchService::new()))
 }
@@ -97,9 +97,7 @@ pub async fn search(
 
 /// `GET /api/v1/code/symbols/{id}`
 /// 简化: 通过 search 兜底返回空 (P0 helper `get_symbol` per star-mcp 范式, 真实实现留 Phase II 持久化时)
-pub async fn get_symbol(
-    Path(id): Path<String>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn get_symbol(Path(id): Path<String>) -> Result<Json<RestResponse<Value>>, RestError> {
     let _uuid = Uuid::parse_str(&id).map_err(|e| {
         RestError::validation(
             format!("invalid symbol id UUID: {e}"),

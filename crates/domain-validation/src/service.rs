@@ -68,6 +68,15 @@ impl InMemoryValidationService {
         });
         (svc, rx)
     }
+    /// 测试隔离: 清空所有内存存储 (per self-review §1, v0.31 step 3/3 OnceLock 共享 state)
+    pub fn reset(&self) {
+        self.results.write().unwrap().clear();
+        self.evidences.write().unwrap().clear();
+        self.evidence_links.write().unwrap().clear();
+        self.coverages.write().unwrap().clear();
+        self.policies.write().unwrap().clear();
+        self.overrides.write().unwrap().clear();
+    }
 
     pub fn new_for_test() -> Arc<Self> {
         Self::new().0

@@ -6,10 +6,7 @@
 
 use std::sync::{Arc, OnceLock};
 
-use axum::{
-    extract::Path,
-    Json,
-};
+use axum::{extract::Path, Json};
 use domain_scm::{ActorContext, InMemoryScmService};
 use serde_json::{json, Value};
 
@@ -17,7 +14,7 @@ use crate::error::RestError;
 use crate::response::RestResponse;
 
 /// 全 handler 共享的 in-memory SCM service
-fn service() -> &'static Arc<InMemoryScmService> {
+pub(crate) fn service() -> &'static Arc<InMemoryScmService> {
     static SVC: OnceLock<Arc<InMemoryScmService>> = OnceLock::new();
     SVC.get_or_init(|| InMemoryScmService::new_for_test())
 }
@@ -33,9 +30,7 @@ fn pipeline_status_str(s: domain_scm::PipelineStatus) -> &'static str {
 }
 
 /// `GET /api/v1/pipelines/{id}` (id = external_id, e.g. "PIPE-xxx")
-pub async fn get_status(
-    Path(id): Path<String>,
-) -> Result<Json<RestResponse<Value>>, RestError> {
+pub async fn get_status(Path(id): Path<String>) -> Result<Json<RestResponse<Value>>, RestError> {
     if id.is_empty() {
         return Err(RestError::validation(
             "pipeline_run_id is required".to_string(),
