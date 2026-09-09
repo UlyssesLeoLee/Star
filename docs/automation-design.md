@@ -680,6 +680,51 @@ print(f"err_count={result.stderr.count('error[')}")
 - `pickSaTypeForKind(kind)` 映射: bug→SA-04 / story→SA-02 / epic→SA-03 / task→SA-01
 - SubAgentPool 内存版 (PoC) 跟 ADR-0045 Hybrid Runtime L1 ECS 平行, 后续 ECS 接入替换 (per §3 已知缺口 #4)
 
+### 4.19 Sub-task Binding 路径落地 (TMO 7 → 8 节点增量扩展, 2026-09-09 21:53 JST per ask_1df6987367ccc00928b65ee3 拍板)
+
+> **触发**: 2026-09-09 21:53 JST 用户发令 "现在是否适合具有子代理功能, 通过在父任务卡交互下命令, 创建绑定子任务, 子任务有专属子代理? 如果没有, 制定需求和基本设计详细设计" + ask_1df6987367ccc00928b65ee3 拍板 1 选项 "3 份新文档 + ADR-0052 升 v0.3 (推荐)", per 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化 Mavis 自驱 + 9/5 04:03 推荐项直接执行
+> **落档文件**:
+> - `docs/architecture/2026-09-09-subtask-binding/01-requirements.md` v0.1 (31.5KB, UC-14..UC-18 + F-26..F-32 + NFR-SB-01..05 + 3 表 W/T/M + 7 已知缺口 G-SB-1..7)
+> - `docs/architecture/2026-09-09-subtask-binding/02-basic-design.md` v0.1 (31.5KB, 8 组件 C-23..C-30 + 1 节点 M-N8 spawn_subtask_node + 1 协议 spawn_subtask + 5 Reducer R-08..R-12 + 1 外部 API 端点 POST /api/tmo/spawn_subtask + 14 守门合规矩阵 + v3x 5 候选)
+> - `docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md` v0.1 (55.1KB, 8 module M-26..M-33 + 7 步 Python 実装 + 7 UT-27..UT-33 + 3 IT-13..IT-15 + 5 E2E-14..E2E-18 + 3 表 DDL sub_task_binding/sub_task_runtime/task_quota_config + 14 守门合规检查)
+> - `docs/architecture/2026-08-26-upgrade/adr/0052-subtask-binding.md` v1.0 (26.7KB, 11 节结构: 背景/决策/备选/后果/实施/决策日志/签字栏/修订历史/引用, 4 备选方案 + 选定 D M-N8 L0 StateGraph 增量扩展 + 7 正面后果 + 6 负面风险 + 5 中和措施 + 5 阶段实施计划 + 4 决策日志 + 5 签字栏)
+> - `docs/reports/PHASE-SUBTASK-BINDING-IMPL-REPORT.md` v0.1 (23.1KB, 7 段结构 + 21 子项任务完成矩阵 ✅ 5/21 + 🟡 4/21 + ⏳ 12/21 + 14 守门合规矩阵 + v3x 5 候选 + 10 已知缺口 + 7 子代理失败接手 + 24 守门 + 24 累积规)
+> **依据**: 守门 #13 a (L1↔L1 禁止 → M-N8 全部 L0 协调) + 守门 #13 c/d (DB W/T/M 3 表 100% 覆盖, RLS 13 類必携) + 守门 #7 (0 unsafe, C-24 ExclusiveBindingGuard 编译期 + 运行期双层守门) + 守门 #19 v19 (agent 交互 Python 化, 走 `scripts/automation/task_ops.py spawn_subtask`) + 守门 #20 v20 (子代理 dispatch 必先 brief 落档) + 守门 #21 v21 ([P] docs 同步必更新 §4 任务卡表 + registry) + 守门 #22 v22 (调试控制台不污染 main) + 守门 #23 v23 (AI mock 不开 OpenAI) + 守门 #24 v24 (subprocess 替代 RPC, console_server.py 8080) + 守门 #1 v15 死循环饱和边界 (本次 = docs 同步新事件触发, +1 不违反) + 守门 #1 v19 + 守门 #9 v3 守门 #1 v20 + 守门 #12 v21 (Python 化 3 件套联动) + 守门 #14 v3 Mavis 永久代签 (5 签字栏全部代签)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| SB-1 | SB-1 | `docs/architecture/2026-09-09-subtask-binding/01-requirements.md` v0.1 落档 (31.5KB) | A | **[P]** | (write tool) | per 用户 2026-09-09 21:53 JST 发令 + ask_1df6987367ccc00928b65ee3 拍板 1 选项 (推荐) |
+| SB-2 | SB-2 | `docs/architecture/2026-09-09-subtask-binding/02-basic-design.md` v0.1 落档 (31.5KB) | A | **[P]** | (write tool) | per [ADR-0052 §2.1 8 节点 + 2.3 8 组件 + 2.5 5 Reducer + 2.6 1 外部 API 端点](../architecture/2026-08-26-upgrade/adr/0052-subtask-binding.md) |
+| SB-3 | SB-3 | `docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md` v0.1 落档 (55.1KB) | A | **[P]** | (write tool) | per [03 §1 8 module M-26..M-33 + §3.3.1.1 7 步 Python 実装 + §4 测试矩阵 + §5 3 表 DDL](../architecture/2026-09-09-subtask-binding/03-detailed-design.md) |
+| SB-4 | SB-4 | `docs/architecture/2026-08-26-upgrade/adr/0052-subtask-binding.md` v1.0 落档 (26.7KB) | A | **[P]** | (write tool) | per ADR-0052 11 节结构 + 4 备选方案 + 选定 D + 7 正面后果 + 6 负面风险 + 5 中和措施 + 5 阶段实施计划 + 4 决策日志 + 5 签字栏 |
+| SB-5 | SB-5 | `docs/reports/PHASE-SUBTASK-BINDING-IMPL-REPORT.md` v0.1 落档 (23.1KB) | A | **[P]** | (write tool) | per [7 段结构 + 21 子项任务完成矩阵 + 14 守门合规矩阵 + v3x 5 候选 + 10 已知缺口 + 7 子代理失败接手](../reports/PHASE-SUBTASK-BINDING-IMPL-REPORT.md) |
+| SB-6 | SB-6 | `AGENTS.md` §6 ADR 列表追加 ADR-0052 + §6.1 架构 view 索引追加 Sub-task Binding 5 文件 + §8 修订历史追加 v0.80 | A | **[P]** | (AGENTS.md edit) | per 守门 #21 v21 [P] docs 同步 + 守门 #12 commit-time docs 同步触发 v0.80 |
+| SB-7 | SB-7 | `docs/automation-design.md` §4.19 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #21 v21 [P] docs 同步必更新 §4 任务卡表 |
+| SB-8 | SB-8 | `scripts/automation/registry.md` §5.3 同步 (Sub-task Binding 8 module 索引) | A | **[P]** | (registry.md 编辑) | per 守门 #21 v21 [P] docs 同步必更新 registry |
+| SB-9 | SB-9 | LangGraph 02-basic-design v0.2 → v0.3 升版 (引用 M-N8 + C-23..C-30) | S | **[M]** | (LangGraph 02 edit) | per [ADR-0052 §5 实施计划 v0.3 升版阶段](../architecture/2026-08-26-upgrade/adr/0052-subtask-binding.md) |
+| SB-10 | SB-10 | LangGraph 03-detailed-design v0.2 → v0.3 升版 (引用 M-26..M-33 + 4 binding 字段 + 9 API 端点) | S | **[M]** | (LangGraph 03 edit) | per [ADR-0052 §5 实施计划 v0.3 升版阶段](../architecture/2026-08-26-upgrade/adr/0052-subtask-binding.md) |
+| SB-11 | SB-11 | 实装 M-26..M-33 8 module (per [03 §3.3.1.1 7 步 Python 実装](../architecture/2026-09-09-subtask-binding/03-detailed-design.md)) | S, R | **[P]** | `task_ops/spawn_subtask/` 子目录 8 module | 待 P3-B 启动 + P0-1/H2 阻塞解除 + 5 域 Lead 真人到位后跨 session 续做 (per [ADR-0052 §5 实施计划 v0.4 实装阶段](../architecture/2026-08-26-upgrade/adr/0052-subtask-binding.md)) |
+| SB-12 | SB-12 | UI TaskCard 右键 spawn 入口 + C-30 UISpawnSubtaskModal (Next.js 15) + 9 API 端点 POST /api/tmo/spawn_subtask (FastAPI console_server.py) | S | **[P]** | `frontend/src/app/tasks/components/SpawnSubtaskModal.tsx` + `frontend/src/app/api/tmo/spawn_subtask/route.ts` | per [03 §3.3.9 UISpawnSubtaskModal C-30](../architecture/2026-09-09-subtask-binding/03-detailed-design.md) + 守门 #24 v24 subprocess 替代 RPC |
+| SB-13 | SB-13 | 3 表 DDL 落地 (PostgreSQL Schema: sub_task_binding Transaction + sub_task_runtime Work + task_quota_config Master SCD2 + RLS 13 類) | S | **[P]** | DB migration script | per [03 §5 3 表 DDL](../architecture/2026-09-09-subtask-binding/03-detailed-design.md) + 守门 #13 c/d W/T/M 派生规 (a)(b)(c)(d) 全部落档 |
+| SB-14 | SB-14 | 5 E2E + 3 IT + 7 UT 测试套件 (E2E-14..E2E-18 + IT-13..IT-15 + UT-27..UT-33) | A, R | **[P]** | `tests/e2e/test_e2e_14..18.py` + `tests/it/test_it_13..15.py` + `tests/ut/test_ut_27..33.py` | per [03 §4 测试矩阵 E2E-14 (NFR-SB-01 ≤ 200ms) + E2E-15 (NFR-SB-02 不可绕过) + E2E-16 (NFR-SB-03 ≤ 1s) + E2E-17 (UI 入口) + E2E-18 (quota + lifecycle + audit 完整)](../architecture/2026-09-09-subtask-binding/03-detailed-design.md) |
+
+**§4.19 任务卡维度判定**:
+- R (Rerunnable): **是** (3 份 IPA + 报告 全部 idempotent, 二次生成同结果)
+- V (Volume): 否 (无子代理派发, Mavis 接手 root session 一次性)
+- S (Structural): **是** (8 module 增量 + 4 binding 字段 + 3 表 DDL + 8 组件 C-23..C-30 + 5 Reducer R-08..R-12 + 1 节点 M-N8)
+- A (Audit-trail): **是** (守门 #21 v21 [P] docs 同步 + 守门 #12 决策表 + 守门 #9 git 实证 + 守门 #13 DB schema 分类留痕)
+
+**§4.19 落档验证 (per 守门 #1 累积规 v1-v24, 本次纯文档不需 cargo 守门)**:
+- `git log -p --follow docs/architecture/2026-09-09-subtask-binding/01-requirements.md` 实证 (commit 后)
+- `git log -p --follow docs/architecture/2026-09-09-subtask-binding/02-basic-design.md` 实证 (commit 后)
+- `git log -p --follow docs/architecture/2026-09-09-subtask-binding/03-detailed-design.md` 实证 (commit 后)
+- `git log -p --follow docs/architecture/2026-08-26-upgrade/adr/0052-subtask-binding.md` 实证 (commit 后)
+- `git log -p --follow docs/reports/PHASE-SUBTASK-BINDING-IMPL-REPORT.md` 实证 (commit 后)
+- `git log -p --follow AGENTS.md` 实证 §6 ADR + §6.1 架构 view + §8 v0.80 同步 (commit 后)
+- `git log -p --follow docs/automation-design.md` 实证 §4.19 追加 (commit 后)
+- `git log -p --follow scripts/automation/registry.md` 实证 §5.3 追加 (commit 后)
+- commit author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权 + 9/3 19:35 拍板 D + 9/8 15:19 第 6 次强化)
+
 ------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
