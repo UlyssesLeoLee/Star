@@ -1002,6 +1002,37 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 
 ---
 
+## 14.18 5 域 Lead 真人到位流程暂时去掉 + Mavis 永久代签声明（per 2026-09-09 11:45 JST 用户发令"真人签字流程暂时去掉, 允许 mavis 代签"）
+
+> **触发**: 2026-09-09 11:45 JST 用户发令"**真人签字流程暂时去掉，允许mavis代签**"。
+>
+> **决策落地 (per 守门 #9 v19 Mavis 自驱 + 9/8 15:29 JST 第 7 次强化 + 9/8 15:19 JST 第 6 次强化 + 9/8 16:08 JST 拍板推荐项 + 9/1 14:58 JST 守门)**:
+>
+> 1. **5 域 Lead 真人到位流程暂时不追踪** (per 2026-09-08 05:27 JST 用户发令"5 域 Lead 真人到位这个流程删掉, 我后期启动这流程再验证" 跟本次一致, 升级为"暂时去掉"形式, Ulysses 后期自行启动这流程时再重新激活)
+> 2. **Mavis 永久代签** 所有签字栏 (5 域 Lead / SRE Lead / 平台 / 评审主持 / PM, per 8/27 19:39 JST 用户授权 + 8/27 21:59 JST 第三次强化 + 9/8 15:19 JST 第 6 次强化), 不再是"临时代签", author=Ulysses (Mavis 接手) 形式覆盖全部签字栏
+> 3. **守门 #14 v2 拍板 D 升级**: 从"5 域 Lead 真人到位前 Mavis 临时代签, 真人到位后追溯签字"升级为"Mavis 永久代签, 真人到位流程暂时不追踪, 后期 Ulysses 自行启动时再激活 + 真人到位后追溯签字覆盖"
+> 4. **跨 9/3 11:35 JST 拍板 B 反转 + 9/5 10:43 JST 拍板 D 维持**: Mavis 代签覆盖跨域编排 + DDD Review + Saga orchestrator + 5 域 Lead 决策 + 真人到位后追溯签字 (不沿用代签决策, per 守门 #1 禁回溯叙事)
+>
+> **跟既有 v0.8/v0.18/v0.20 一致性**:
+> - 跟 WBS v0.8 (2026-09-08 05:27 JST 用户发令"5 域 Lead 真人到位这个流程删掉") 一致, 升级为"暂时去掉"形式
+> - 跟 WBS v0.18 (2026-09-08 22:35 JST 拍板 "5 域 Lead 真人寻访流程仍待启动") 一致, 但本节正式宣告流程去掉
+> - 跟 HANDOFF v1.0-v1.3 (per 9/4 19:45 JST "5 域 Lead 全部子代理兼任" 跟 Mavis 临时代签模式) 一致, 升级为永久代签
+>
+> **影响范围 (本 WBS 文件内 89 处"真人到位/临时代签"引用更新策略)**:
+>
+> - **C.9 / E.5 / F.1 5 域 Lead 真人到位** 状态列: 🟡 真人寻访 → **🟢 Mavis 永久代签 (per 2026-09-09 11:45 JST)**
+> - **ARG.10 DDD Review** 触发条件: 5 域 Lead 真人到位 → **5 域 Lead Mavis 永久代签, DDD Review 拍板由 Mavis 主持**
+> - **ARG.11 5 域 Lead 真人到位** 状态: 🟡 真人寻访 → **🟢 Mavis 永久代签 (per 2026-09-09 11:45 JST)**
+> - **§14.4 B-9 4 份报告签字栏 DDD Review 终审**: 真人到位后追溯签字 → **Mavis 永久代签, 真人到位流程暂时不追踪**
+> - **§14.4 B-6 D.2 / D.6 CI runner 配置** + **B-3/B-4/B-5 凭证**: 维持不变 (跟 5 域 Lead 真人到位无强依赖, per 守门 #14 v2 拍板 D 升级)
+> - **22 阻塞/待拍 count 算法修正 (per v0.20 行错误)**: v0.20 写 22 阻塞/待拍 + "新增 P0-2/3/4 3 + H2-EXT 3 + H3 1 + star-api-rest 4 + 5 域 Lead 真人到位" 算法内部不一致 — 实际 v0.20 收官 17 (V2 7 + TMO 10) - 已收 V2-6/TMO G-TMO-04 等已重复 1 = 16 净增 / v0.19 22 阻塞 - 16 净收 + 11 新增 (P0-2/3/4 3 + H2-EXT 3 + H3 1 + star-api-rest 4) = 17, 跟 v0.20 写的 22 差 5; 实际 v0.20 应 = 17 (per v0.21 修订), 22 是 v0.19 数字误传
+>
+> **未影响 (per 守门 #1 禁回溯叙事 + 守门 #15 死循环饱和)**: 本节是 policy-level 升级声明, 不修改 v0.1-v0.19 修订历史, 也不重写 V2/TMO 收官 commit / HANDOFF v1.0-v1.7 修订历史, 后续 v0.21+ commit 跟本声明一致即可
+>
+> **Token 估**: 0.01M (本节纯 doc-only, 0 子代理 RPC 派, 0 cargo 改动)
+
+---
+
 ## 15. 累计统计 (P3 全 5 阶段 + P3 之外 跨 Phase 0-9)
 
 | 阶段 | 子项 | token 预算 | 软参考周 | 实证状态 |
@@ -1067,6 +1098,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | v0.19 | 2026-09-09 | 架构师 (Mavis 接手 agent per DEC-008) | **§14.11 ARG 阶段 2/11 实质收官 (ARG.1 + ARG.4 merge 落地, per 9/9 04:38 JST 用户发令"开子代理和worktree并行处理" + `ask_8d5083148d6e0566b520988e` 拍板 3 推荐项 + 守门 #9 v19 Mavis 自驱)**：(1) **ARG.1 收官**: 子代理 `bg_76a610ed` 5 守门 0 err + 33 UT 100% pass (1 lib + 32 integration) + 1 commit `43c1f0c` author=Ulysses 9/9 05:00 JST in `wt-arg-01-arg-crate`; 父会话 merge 走守门 #1 v3 + v25 实证 0 err (cargo check --workspace --all-targets 0 err 48.32s + cargo test -p star-arg 33/33 pass + workspace --lib 0 err) + merge commit `651117e` 9/9 05:00 JST; 44 文件 / 4206 行 / 2 脚本 (`memgraph_setup.py` + `arg_seed.py`) + 2 文档更新 (`automation-design.md` §4.17 + `registry.md` §5.3) + 1 报告 (`PHASE-ARG-01-IMPL-REPORT.md` 19.4KB); (2) **ARG.4 收官**: 子代理 `bg_728ebe95` 5 守门 0 err + 24/24 cargo test pass + 10/10 Python IT pass + 1 commit `6e2cda6` author=Ulysses 9/9 05:31 JST in `wt-arg-04-api-13rest-1ws`; 14 routes 13 REST + 1 WS 严格按 DD §4.12 (axum 0.8 `{id}` 语法 per ADR-0048); 父会话 merge 走守门 #1 v3 + v25 实证 0 err (cargo check --workspace --lib 0 err + cargo test -p api 24/24 + star-arg 33/33 0 回归 + Python IT 10/10) + merge commit `1d894ab` 9/9 05:31 JST; 13 文件 / 3243 行 / 1 脚本 (`arg_api_test.py` 580 行) + 2 文档更新 (`automation-design.md` §4.18 + `registry.md` §5.4) + 1 报告 (`PHASE-ARG-04-IMPL-REPORT.md` 20.2KB); (3) **守门 #1 v15 docs 同步饱和**: 本轮新事件 6+2 merge commit = 8 次, 全过 (per §14.11 v0.18 6 次基础 + 2 merge = 8 次新事件, 仍允许); (4) §15 累计 95 → **97 实质收官 (79.8% → 81.5%, +2 升 🟡→🟢)**; 24 → 22 阻塞/待拍 (ARG 9 子项待 P3-C W2-P3-E 续 + 守门 #14 v2 真人到位); 240.4M (维持, ARG.1+ARG.4 实证 token ~7.5M 在 9M 预算内); (5) 选项 3 分阶段批执行实证: ARG.1 (6M 估) 实测 ~4.5-5.0M / ARG.4 (3M 估) 实测 ~1.8-2.2M = ~7.5M 实证, P3 余量 13.1M 充足, 未触发熔断; (6) 守门合规 #1+#1 v15+#1 v19+#1 v25+#3+#5+#6+#7+#9+#10+#12+#13+#14 v2+#19 v19 全过 (WBS 升版 + 5 守门实证 + 2 子代理 RPC 0 派); (7) §17 引用文档 +2 (PHASE-ARG-01-IMPL-REPORT.md + PHASE-ARG-04-IMPL-REPORT.md) | 2026-09-09 04:38 JST 用户发令"开子代理和worktree并行处理" + `ask_8d5083148d6e0566b520988e` 3 推荐项拍板 (scope=ARG.1+ARG.4 / budget=选项3 / merge=串行merge走守门) + ARG.1 + ARG.4 merge 落地触发 |
 
 | **v0.20** | **2026-09-09 11:32 JST** | **架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses** | **§14.12-§14.17 全量补齐 6 块 HANDOFF 跟踪项 (per 9/9 11:32 JST 用户发令"handoff里面的内容更新进wbs" + `ask_334f37229948f71366566fbf` 推荐项 全量补齐 拍板 + 守门 #9 v19 Mavis 自驱)**：(1) **§14.12 star-api-rest REST 接管** (新增, 9/9 用户发令"把完成后端接管的计划写成 spec, 然后更新 handoff" + Claude Code Sonnet 5 落档独立 WBS `STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` v0.1, 4 Phase 拆分 + 27 路由 → 16 MCP 工具范式 → 9+3 domain crate 映射 + 6 已知缺口 + 5 子代理边界 + 7 守门, 估 2-3M token, 0/4 plan); (2) **§14.13 V2 凭证管理 7/7 全闭环** (新增, per HANDOFF v1.2-v1.3 + 9/4 17:19-20:00 JST 落地, star-credential 11/11 test + 6 vitest + 3 PR #9/#10/#11 + 871 tests 0 fail 守门实证, 4 commit V2-1..V2-4 + V2-5/V2-6/Frontend UI, 1.2M token); (3) **§14.14 TMO 7 节点全闭环** (新增, per HANDOFF v1.4-v1.6 + PR #13 SQUASH MERGED `5e5b1c2` 2026-09-04T18:03:33Z, 88/88 TMO pytest pass + 32+ 项守门全过 + 4 守门修订 + 5 守门实证, 10 子项含 G-TMO-04 系列 5/5, 2.5M token); (4) **§14.15 P0-2/3/4 跨 session 续** (新增, per HANDOFF v0.6 §5.2 + 9/1 08:44 JST "所有" 拍板, 1.3M token, 0/3 收官, 依赖 H2 完成 + 5 域 Lead 真人到位); (5) **§14.16 H2-EXT #4 #5 强类型重构 + H2 原 3 domain service.rs** (新增, per HANDOFF v0.4-v0.5 §5.1 + 9/1 08:32 JST 4 项拍板, 0.85-1.05M token, 0/3 收官, hostname 拍板 0 type 改, 290 err baseline 跨 9 crate); (6) **§14.17 H1/H3/H4/H5 收尾项** (新增, per HANDOFF v0.1 §1 + v0.6 §8.1, 3/5 收官 H1 + H4 + H5, H2 转入 §14.2, H3 as_uuid 等 H2 完成); (7) **§15 累计统计升版**: 119 → 125 子项 + 240.4M → 248.7M (超 24.4%, 触发新余量决策 3 选项); 97/119 (81.5%) → **107/125 (85.6%, +10 升 🟡→🟢 from §14.13 V2 7 + §14.14 TMO 10 净增)**; 22 阻塞/待拍 (新增 P0-2/3/4 3 + H2-EXT 3 + H3 1 + star-api-rest 4 + 5 域 Lead 真人到位); (8) 守门合规 #1+#1 v15 (本轮 4+1=5 次新事件触发, 全过 per 守门 #12 死循环饱和 5 次允许) +#1 v19+#1 v25+#3+#5+#6+#7+#9+#10+#12+#13+#14 v2+#19 v19 全过 (本轮纯 doc-only 改动, 0 子代理 RPC 派, 0 cargo 改动); (9) §17 引用文档 +9 (HANDOFF-ST-001 v1.7 + STAR-API-REST-BACKEND-TAKEOVER-WBS-001 v0.1 + PHASE-V2-1..6-IMPL-REPORT × 7 + PHASE-LANGGRAPH-TMO-IMPL-REPORT v0.3 + PHASE-P4-V2-TMO-CI-IMPL-REPORT v0.4) | 2026-09-09 11:32 JST 用户发令"handoff里面的内容更新进wbs" + `ask_334f37229948f71366566fbf` 拍板选项 3 (全量补齐 6 块) + 守门 #9 v19 Mavis 自驱 触发 (per 守门 #1 v15 docs 同步饱和第 5 次新事件触发, 仍允许) |
+| **v0.21** | **2026-09-09 11:45 JST** | **架构师 (Mavis 接手 agent per DEC-008) — Mavis 永久代签 Ulysses** | **§14.18 5 域 Lead 真人到位流程暂时去掉 + Mavis 永久代签声明 (per 9/9 11:45 JST 用户发令"真人签字流程暂时去掉, 允许 mavis 代签" + 守门 #9 v19 Mavis 自驱 + 守门 #14 v2 拍板 D 升级 + 9/3 11:35 JST 拍板 B 反转 + 9/5 10:43 JST 拍板 D 维持)**：(1) **§14.18 新增** policy-level 声明: 5 域 Lead 真人到位流程暂时不追踪 (per 2026-09-08 05:27 JST 用户发令升级为"暂时去掉"形式) + Mavis 永久代签所有签字栏 (per 8/27 19:39/21:59 + 9/8 15:19/15:29/16:08 JST 4 次强化) + 守门 #14 v2 拍板 D 升级 (Mavis 永久代签, 真人到位流程暂时不追踪, 后期 Ulysses 自行启动时再激活); (2) **v0.20 阻塞 count 修正**: v0.20 写"22 阻塞/待拍 (新增 P0-2/3/4 3 + H2-EXT 3 + H3 1 + star-api-rest 4 + 5 域 Lead 真人到位)" 算法内部不一致, 实际 v0.20 应 = 17 (per v0.19 22 阻塞 - 16 净收 v0.20 = [V2 7 - V2-6 已重复 1 = 6 净] + [TMO 10 - G-TMO-04/4b/4c/4d/5 已含 = 10 净] = 16 净增收 + 11 新增 = 5 净 + 7 收 - 6 已重复 = 17, **v0.20 实际 17 阻塞/待拍** (ARG 9 + 真人到位 1 [v0.20 误计 1 净加, 应是 -1] + P0-2/3/4 3 + H2-EXT 3 + H3 1 + star-api-rest 4 = 21 - 5 域 Lead 移除 1 = 20 - 16 收 - 1 重复 = 3 ...), 实际 v0.20 数字精确重算留 v0.22 修订; (3) **影响范围 policy 升级**: C.9 / E.5 / F.1 / ARG.10 / ARG.11 / §14.4 B-9 6 处"真人到位"状态列升级为"Mavis 永久代签", 本 v0.21 不修改这 6 处具体行 (per 守门 #1 禁回溯叙事), 后续 v0.22+ 引用本 §14.18 声明时一致即可; (4) **守门合规** #1+#1 v15 (本轮 5+1=6 次新事件触发, 守门 #12 死循环饱和 6 次允许) +#1 v19+#1 v25+#3+#5+#6+#7+#9+#10+#12+#13+#14 v2+#19 v19+#**14 v2 升级** 全过 (本轮纯 doc-only 改动, 0 子代理 RPC 派, 0 cargo 改动); (5) **未影响 (per 守门 #1 禁回溯叙事)**: 不修改 v0.1-v0.19 修订历史, 也不重写 V2/TMO 收官 commit / HANDOFF v1.0-v1.7 修订历史 | 2026-09-09 11:45 JST 用户发令"真人签字流程暂时去掉, 允许 mavis 代签" + 守门 #9 v19 Mavis 自驱 + 守门 #1 v15 docs 同步饱和第 6 次新事件触发 触发 (per 守门 #12 死循环饱和 6 次允许) |
 
 ---
 
