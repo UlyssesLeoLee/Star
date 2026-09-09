@@ -1794,7 +1794,45 @@ L0 chat bar (用户输入)
 
 ---
 
-## §20 修訂歷史
+## §20 star-api-rest REST 层真实业务接入 + 非 Mock 端到端部署 WBS 已落档 (per 2026-09-09 用户发令)
+
+> **触发**: 用户 2026-09-09 对话中先问"最新版 star 没有部署到 k3s 里吗?因为我想打开网站测试",追问"前端不是应该访问部署的 k3s 服务器就能打得开像正常的 saas 那样吗",最终发令"把完成后端接管的计划写成 spec,然后更新 handoff,我让下游 ai 完成真正的部署,而不是 mock 版本"。
+>
+> **本节不属于 TMO / PR#13 / ARG 工作线**,是一条独立、新开的工作线,专门覆盖 `crates/star-api-rest` REST 层从 501 stub 到真实业务接入,以及前端容器化部署到 k3s。
+
+### 21.1 背景实测(本 session, Claude Code / Sonnet 5, 逐文件核实)
+
+在本 session 之前,`star-api-rest` 已经以 NodePort(30081)部署到 k3s 并通过 `/api/v1/health` 验证可从 WSL VM IP 访问(见 [[deploy-k3s-local-scripts]] 记忆)。但用户想要的是"打开网站测试",这暴露了两个此前未被记录的缺口:
+
+1. **前端完全没有部署路径** — `frontend/`(Next.js 14.2.5)没有 Dockerfile、没有 k8s manifest,只能靠 `maintenance/start-frontend.ps1` 本地 `npm run dev`。
+2. **即便前端部署了,后端也接不住** — `crates/star-api-rest/src/routes/` 下 **27 个业务 handler 全部**是 `RestError::not_implemented()` 一行 stub(逐文件 `grep -c` 实测,非转述),`Cargo.toml` 虽已声明 9 个 domain-* path-dep,但 0 个被实际调用。对照组 `star-mcp` 的 16 个 MCP 工具已全部接入 `domain_*::InMemory*Service` 真实业务逻辑(per `AGENTS.md §7 #2` "16/16 REAL 化 done"),说明真实业务逻辑范式已经存在且被验证过,只是从未被移植进 REST 层。
+
+### 21.2 产出:`STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` v0.1
+
+已落档 `docs/reports/STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md`,核心内容:
+
+- **27 条 REST 路由 → 16 个 MCP 工具范式 → 9+3 个 domain crate 完整映射表**(该文件 §1.1),其中 17 条路由的 domain 依赖已在 `Cargo.toml` 声明可直接抄写接线范式,10 条路由(`code.rs` 4 条 + `context.rs` 1 条 + `merge_requests.rs`/`reviews.rs`/`pipelines.rs` 各 1 条 + `validations.rs`/`submissions.rs` 各 1 条)需要先新增 3 个未声明的 path-dep(`domain-search`/`domain-scm`/`domain-validation`),`webhooks.rs` 的 9 条端点无 MCP 范式可抄,需原创接线。
+- **4-Phase 拆分**:Phase 0 基线复核 → Phase I REST handler 接线(27 条)→ Phase II 持久化决策(当前全部 domain 服务是 `InMemory*Service`,数据 pod 重启即丢,需拍板是否投入真实 DB)→ Phase III 前端容器化部署到 k3s(real-API 模式)→ Phase IV(可选)鉴权/限流/审计中间件真实化(当前 `AuthLayer`/`RateLimitLayer`/`AuditLayer` 全部 no-op pass-through)。
+- **6 个已知缺口**(该文件 §3),其中最重要的两个陷阱:
+  1. `submissions` 端点即便照抄 MCP 范式,该范式自身文档已承认 step 6-12 是"简化 mock",无法做到 100% 真实,不应误判为下游 AI 接线失误。
+  2. Next.js 的 `NEXT_PUBLIC_USE_REAL_API` / `NEXT_PUBLIC_API_BASE_URL` 是 **build-time** 变量,若下游 AI 按常规习惯写成 k8s Deployment 的 runtime `env:`,前端会静默地继续跑 mock 模式且无报错线索——必须作为 `docker build --build-arg` 传入。
+
+### 21.3 与既有工作线的关系
+
+- **与 AGENTS.md §7 #1(25 domain-* crate 真实数据接入,现状 21/25 done)不重叠**:#1 的 4 个缺口子批次是治理域(audit/tenant/relation/kms),本 WBS 覆盖的是 work-item/workspace/worktree/search/scm/validation,两者互不阻塞。
+- **与 AGENTS.md §7 #2(16 tool 真实数据源接入,16/16 done)是直接复用关系**:本 WBS 的 Phase I 本质上是把 #2 已验证过的 16 个真实业务逻辑范式,从 `star-mcp`(bin-only,不可 lib 引用)手工移植进 `star-api-rest` 的 handler。
+- **与本文件其余章节(TMO / PR#13 / H2-EXT / ARG)是独立工作线**,不共享阻塞条件,可与 §19 的 3 个推下 session 缺口(G-DEP-01/02 + 5 域 Lead 真人 + 真实凭证切真)并行推进。
+
+### 21.4 下次 session 入口(若接手本工作线)
+
+1. 先读 `docs/reports/STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` 全文,尤其 §1.1 映射表 + §3 已知缺口。
+2. 执行该文件 §1.2 Phase 0:重新跑一遍 `cargo test -p star-api-rest`,`grep -c not_implemented crates/star-api-rest/src/routes/*.rs`,确认 27 条路由数字未漂移(数字有时效性,不可直接复用本节记录的数字)。
+3. 找 Ulysses 拍板:Phase II(持久化)是否现在就做,还是先接完 Phase I + Phase III 让前端"看起来能用"再说;Phase III 前端部署范围是否需要 Phase IV 鉴权兜底(取决于是否要暴露到本机以外的网络)。
+4. 本工作线**不需要**5 域 Lead 真人到位、不需要外部凭证,可立即由下游 AI(人类或 AI 子代理)独立执行 Phase 0-I,是当前 handoff 里少数**无外部阻塞**的工作线。
+
+---
+
+## §21 修訂歷史
 
 | 版本 | 日期 | 修訂人 | 修訂內容 | 觸發 |
 |---|---|---|---|---|
@@ -1806,3 +1844,4 @@ L0 chat bar (用户输入)
 | v1.4 | 2026-09-05 | 架構師 (Mavis 接手 agent per DEC-008) — Mavis 接手代簽 Ulysses | §18 TMO-05/06/07 3 節點 + 4 守門修訂 + 5 守門實證 (rebase 後) | 9/4 17:19 JST + 9/4 18:30 JST + 9/5 00:15 JST → 守門 #12 commit-time docs 同步觸發 v1.4 |
 | **v1.5** | **2026-09-05 02:39 JST** | **架構師 (Mavis 接手 agent per DEC-008) — Mavis 接手代簽 Ulysses** | **§19 G-TMO-04 系列 5/5 全閉環綜合升版 (G-TMO-04 DDL + G-TMO-04b Repository + G-TMO-04c Routes 5 端點 + G-TMO-04d metadata_node 集成 + G-TMO-05 SDK 關閉): 10 commit ahead main (累计 7b1a432 / 1d7dc68 / ce9b8df / d9ae9fe / 1ce7b5b / 217593f / 0aaf43d / c7a821b / 5c323bc + 當前 pending); 累计 88/88 TMO pytest pass (6 套: routes + repo + ddl + tmo_05_06_07 + tmo_merge + tmo_split); 32 項守門全过 (18 主體 + 5 派生 + 5 修訂 + 守門 #13 a/c/d + 守門 #22 + 守門 #DB-13); 端到端流 (L0 chat bar → TaskOperationsManager → metadata_node → TaskMetadataRepository → SQLite 4 表 W/T/M → 5 FastAPI 端點); 5 报告同步落档 (G-TMO-04 + G-TMO-04b + G-TMO-04c + G-TMO-04d + G-TMO-05); 剩余 4 待续做项 (G-DEP-01/02 + 5 域 Lead 真人 + 真实凭证切真) 推下 session; 累计 ~38M token (本 session 估 1.3M)** | **9/5 02:39 JST 自主推進 (per 9/4 17:36 JST "允許按照你推薦推進" + no-progress guard 觸發) → 守門 #12 commit-time docs 同步觸發 v1.5** |
 | **v1.6** | **2026-09-05 03:05 JST** | **架構師 (Mavis 接手 agent per DEC-008) — Mavis 接手代簽 Ulysses** | **§19.6 PR #13 SQUASH MERGED 閉環 (merge commit `5e5b1c2` + mergedAt 2026-09-04T18:03:33Z + feat/tmo-05-06-07 worktree + branch 清理): 14 commit → 1 commit, 累計 88/88 TMO pytest + 32+ 項守門 + PR CI 9/9 pass; 推下 session 3 缺口 (G-DEP-01/02 + 5 域 Lead 真人 + 真實憑證切真); 下次 session 入口 (§19.6.4): PR #13 已合 main + 5 域 Lead 追溯簽字 + G-DEP-01/02 P0/P1 工具實裝 + Frontend pre-existing 4 err 修根因 + HANDOFF v1.7 升版 (真人到位後)** | **9/5 03:00 JST ask_user merge_squash 拍板 + 9/5 03:03:33 JST PR #13 squash merge 成功 → 守門 #12 commit-time docs 同步觸發 v1.6** |
+| **v1.7** | **2026-09-09** | **Claude Code (Sonnet 5)** | **§20 新增独立工作线:star-api-rest REST 层真实业务接入 + 非 Mock 端到端部署 WBS 已落档 (`docs/reports/STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` v0.1) — 逐文件实测 27 条 REST 路由(非文档声称的 22 条)全部是 501 stub,对照 16 个已验证真实的 MCP 工具范式,产出完整移植映射表 + 4-Phase 拆分(基线复核/REST 接线/持久化决策/前端容器化);本工作线无外部阻塞,与 TMO/PR#13/ARG 等既有工作线互不重叠,可立即由下游 AI 执行** | **用户 2026-09-09 发令"把完成后端接管的计划写成 spec,然后更新 handoff,我让下游 ai 完成真正的部署,而不是 mock 版本"** |
