@@ -7,7 +7,7 @@
 use std::sync::{Arc, OnceLock};
 
 use axum::Json;
-use domain_scm::{ActorContext, InMemoryScmService, PullRequestId, ScmCommandPort};
+use domain_scm::{ActorContext, InMemoryScmService, PullRequestId};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;

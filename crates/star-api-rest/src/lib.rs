@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `crates/star-api-rest` — STAR Developer REST API (骨架阶段 v0.1)
+//! `crates/star-api-rest` — STAR Developer REST API
 //!
 //! per `docs/architecture/2026-09-02-upgrade/spec/integration/02-developer-api-and-outbound-webhook-spec.md` (sibling) §1.1 + §2 + §7.3
 //!
-//! ## 范围 (MVP 骨架 — 仅 routing 形状, 不接业务逻辑)
+//! ## 范围 (Phase I Batch 1+2+3 27/27 真实接线完成, per WBS §14.12.1 + 独立 WBS §1.1)
 //!
-//! - **22 路由 stub** (16 MCP tool REST 镜像 + 6 Webhook 管理端点), per spec §2.2 + §2.3
-//! - **统一错误模型** (6-field `RestError`, per spec §2.4 复用 MCP 错误模型)
+//! - **27 路由真实接线** (18 MCP tool REST 镜像 + 9 Webhook 管理端点), per spec §2.2 + §2.3
+//!   - Batch 1 (8): work-items 5 + workspaces 1 + worktrees 2 → 调 InMemory*Service
+//!   - Batch 2 (10): code 4 + context 1 + merge_requests 1 + reviews 1 + validations 1 + submissions 1 + pipelines 1 → 调 InMemory*Service
+//!   - Batch 3 (9): webhooks 5 endpoint CRUD + 1 test + 2 delivery 查询 + 1 replay → 端点本地 EndpointStore + 复用 star-webhook::DeliveryStore
+//! - **统一错误模型** (6-field `RestError`, per spec §2.4 复用 MCP 错误模型; 6 个 From impl: WorkItemError / WorkspaceError / WorktreeError / SearchError / ScmError / ValidationError)
 //! - **统一响应封装** (`RestResponse<T>` data + meta, per spec §2.4)
-//! - **鉴权中间件 stub** (`AuthLayer` 验 `Authorization: Bearer <api_key>`, per spec §1.3)
-//! - **限流中间件 stub** (`RateLimitLayer` 60 req/min per key, per spec §1.4)
-//! - **审计中间件 stub** (`AuditLayer` 落 T 类 `api_key_audit_log`, per spec §5.1)
+//! - **鉴权中间件 stub** (`AuthLayer` 验 `Authorization: Bearer <api_key>`, per spec §1.3, Phase IV 真实化)
+//! - **限流中间件 stub** (`RateLimitLayer` 60 req/min per key, per spec §1.4, Phase IV 真实化)
+//! - **审计中间件 stub** (`AuditLayer` 落 T 类 `api_key_audit_log`, per spec §5.1, Phase IV 真实化)
 //!
-//! 所有业务端点当前返 `501 Not Implemented` + `error.code = "NOT_IMPLEMENTED"`,
-//! 等待 P2 阶段 (Phase M+) worker 子代理实装业务逻辑.
-//! 派前必先 `automation/dispatcher.py brief(...)` 落 `docs/briefs/<task_id>.md` (per AGENTS.md §4 #20 守门派生).
+//! 11/11 tests pass (per 守门 #1 v25 单 crate 模式, 0 回归).
 //!
 //! ## 不做什么 (per AGENTS.md §0 硬约束 + 守门 #11 缺标比错标安全)
 //!

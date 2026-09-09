@@ -263,14 +263,10 @@ pub async fn test_endpoint(
 
 /// `GET /api/v1/webhooks/deliveries`
 pub async fn list_deliveries() -> Result<Json<RestResponse<Value>>, RestError> {
-    // 简化: 通过 len + get 拼接, 不引入 list_all (避免 star-webhook trait 改动)
-    let store = deliveries();
-    let total = store.len().await;
-    let mut items: Vec<WebhookEvent> = Vec::with_capacity(total);
-    // 由于 DeliveryStore 没有 list_all 公开 API, 这里只能展示 total 计数.
-    // 真实 list 留 Phase II 持久化时 star-webhook 加 list_all method.
+    // 简化: 通过 len 展示 total 计数, 不引入 list_all (避免 star-webhook trait 改动)
+    let total = deliveries().len().await;
     Ok(Json(RestResponse::ok(json!({
-        "deliveries": items,
+        "deliveries": [],
         "total": total,
         "note": "Phase I Batch 3 简化: list 显示 total 计数, 详细 list 留 Phase II 持久化时",
     }))))
