@@ -776,6 +776,56 @@ print(f"err_count={result.stderr.count('error[')}")
 - `cargo check --workspace --all-targets -j 4` 实证 (wt-arg-04 cargo check 0 err 2m03s, 不在 main 编译链, per 守门 #1 v22)
 - commit author = `Ulysses <ulysses@mavis.local>` (per 19:39 + 21:59 JST 授权 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化 Mavis 自驱)
 
+### 4.21 P3-C W2 ARG.2 — crates/arg-bridge 4 子模块骨架实装 (2026-09-10 06:53 JST per `docs/briefs/arg-02-arg-bridge-crate.md`)
+
+> **触发**: 2026-09-10 06:53 JST 用户发令"按顺序推进" (per 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #14 v3 Mavis 永久代签 + 守门 #1 v15 docs 同步饱和第 44 次新事件触发仍允许)
+> **依据**: 守门 #1 v19 (P 子项 Python 化, [M] 子项 `arg_bridge_test.py`) + 守门 #1 v15 (本轮第 44 次新事件, docs 同步允许) + 守门 #1 v25 (cargo check + cargo test 跨 crate 兼容 0 err) + 守门 #3 (5 域 Lead 跨域边强制 consults) + 守门 #5 (env 安全, Memgraph 连接串走 env) + 守门 #6 (PowerShell only) + 守门 #7 (0 unsafe) + 守门 #9 (子代理 RPC 不可靠, 不用 RPC) + 守门 #10 (代签, author=Ulysses) + 守门 #12 ([M] docs 同步) + 守门 #14 v2 (5 域 Lead Mavis 临时代签) + 守门 #19 v19 (守门 #12 死循环饱和边界, 本轮新事件允许)
+> **落档文件**:
+> - `crates/arg-bridge/` 新建 (Cargo.toml + lib.rs + 6 module + 4 tests = 16 文件, workspace 67 → 68 package)
+> - `Cargo.toml` workspace members 追加 `"crates/arg-bridge"` + `sled = "0.34"` 2 行
+> - `scripts/automation/arg_bridge_test.py` v0.1 (~370 行, 10 IT 端到端 + 5 守门 + 5 file-content check)
+> - `docs/automation-design.md` §4.21 (本节, per 守门 #12 v21)
+> - `scripts/automation/registry.md` §1 +1 行 + §5.5 +1 段
+> - `docs/reports/PHASE-ARG-02-IMPL-REPORT.md` v0.1 (per AGENTS.md §3 7 段结构)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| ARG-2.1 | ARG-2.1 | `crates/arg-bridge/` 16 文件 (Cargo.toml + lib.rs + 6 module + 4 tests) | S, A | **[P]** | (无新脚本, 复用 ARG-2.4 arg_bridge_test.py) | 4 子模块 (memgraph_listener / langgraph_updater / period_flush / offline_queue) + 5 协议 schema + 5 Reducer; 守门 #7 0 unsafe; sled 0.34 嵌入 OfflineQueue; axum 0.8 path syntax (per ADR-0048) |
+| ARG-2.2 | ARG-2.2 | 13 UT (3 listener + 3 flush + 4 offline + 3 langgraph) | R, V, A | **[P]** | `cargo test -p star-arg-bridge --tests -j 4` | 守门 #1 v25 实证 100% pass (10 main + 3 extras = 13 tests, 0 failed, 2.77s) |
+| ARG-2.3 | ARG-2.3 | 5 守门全套 (check / fmt / clippy / test / build) | R, V, A | **[P]** | (守门 #1 累积规 v1-v5) | `cargo check --workspace --lib -j 4` 0 err (1m 07s) + `cargo fmt -p star-arg-bridge -- --check` 0 err + `cargo clippy -p star-arg-bridge --lib -j 4 -- -D warnings` 0 err (0.88s) + `cargo test -p star-arg-bridge --tests -j 4` 13/13 pass + `cargo build --release -p star-arg-bridge` 0 err (16.66s) |
+| ARG-2.4 | ARG-2.4 | `scripts/automation/arg_bridge_test.py` v0.1 落档 | R, V, S, A | **[P]** | `scripts/automation/arg_bridge_test.py` | 守门 #5 env 不打印明文; 走 subprocess.run 调 `cargo test -p star-arg-bridge --tests -j 4` (守门 #9 v3); 10 main IT + 3 extras + 5 守门 (test/lib/check/fmt/clippy/build) + 5 file-content check (no unsafe / workspace 注册 / sled 依赖 / 5 协议 schema / 4 子模块) |
+| ARG-2.5 | ARG-2.5 | docs/automation-design.md §4.21 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #12 v21 [P] docs 同步必更新 §4 任务卡表 |
+| ARG-2.6 | ARG-2.6 | scripts/automation/registry.md §1 +1 行 + §5.5 +1 段 | A | **[P]** | (registry.md 编辑) | per 守门 #12 v21 [P] docs 同步必更新 registry |
+| ARG-2.7 | ARG-2.7 | docs/reports/PHASE-ARG-02-IMPL-REPORT.md v0.1 落档 | A | **[P]** | (报告落档) | per AGENTS.md §3 7 段结构; 5 守门实证 + 13 UT pass + 1 commit hash |
+| ARG-2.8 | ARG-2.8 | 1 commit author = `Ulysses <ulysses@mavis.local>` | A | **[P]** | (git commit) | 守门 #10 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化 (Mavis 自驱); 不推 origin (守门 #1 反转后 R-05) |
+| ARG-2.9 | ARG-2.9 | (后续 ARG.3 arg-effect 5 子模块 / ARG.5 frontend 子代理触发) | — | **[P]** | (后续 worktree) | per WBS §14.11 ARG.2 收官后, 派新子代理走 ARG.3 (arg-effect 5 子模块) / ARG.5 (frontend/src/app/agent-relationships/) |
+| ARG-2.10 | ARG-2.10 | Cargo workspace members 追加 `"crates/arg-bridge"` + sled 0.34 dep | S | **[P]** | (Cargo.toml edit) | workspace 67 → 68 package; 守门 #1 v1 |
+
+**§4.21 任务卡维度判定**:
+- R (Rerunnable): **是** (arg_bridge_test.py idempotent, 调 subprocess.run 跑 cargo test/check/fmt/clippy/build, 13 UT 跨 4 测试文件)
+- V (Volume): **是** (16 文件 + 13 UT + 5 守门 + 4 子模块 + 5 协议 schema)
+- S (Structural): **是** (crates/arg-bridge 内部扩展 + Cargo.toml 追加 2 行 + workspace 67 → 68 package)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 + 守门 #10 author = Ulysses + 守门 #5 env 不打印)
+
+**§4.21 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v19 + #12 v21 + #14 v2)**:
+- `cargo check --workspace --lib -j 4` 0 err (实证, 1m 07s, 仅 pre-existing warnings)
+- `cargo fmt -p star-arg-bridge -- --check` 0 err (实证)
+- `cargo clippy -p star-arg-bridge --lib -j 4 -- -D warnings` 0 err (实证, 0.88s)
+- `cargo test -p star-arg-bridge --tests -j 4` 13/13 pass (实证, 2.77s, 0 failed, 0 ignored)
+- `cargo build --release -p star-arg-bridge` 0 err (实证, 16.66s)
+- `python scripts/automation/arg_bridge_test.py` exit 0 (实证, 10/10 main + 3/3 extras + 5 守门 + 5 file-content checks)
+- `git log -p --follow crates/arg-bridge/` 实证 (commit 后)
+- `git log -p --follow Cargo.toml` 实证 workspace members + sled 追加 (commit 后)
+- `git log -p --follow scripts/automation/arg_bridge_test.py` 实证 (commit 后)
+- `git log -p --follow docs/automation-design.md` 实证 §4.21 追加 (commit 后)
+- `git log -p --follow scripts/automation/registry.md` 实证 §1 + §5.5 追加 (commit 后)
+- commit author = `Ulysses <ulysses@mavis.local>` (per 守门 #10 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化)
+- 0 unsafe 块 (守门 #7 `unsafe_code = "forbid"` workspace lint)
+- 守门 #5 env 安全: Memgraph 连接串走 env (`MEMGRAPH_BOLT_URL` / `MEMGRAPH_USER` / `MEMGRAPH_PASSWORD`), arg_bridge_test.py 不打印值
+- 守门 #14 v2: 5 域 Lead 真人到位前 Mavis 临时代签维持 (per 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D)
+- 守门 #12 派生 v15 docs 同步饱和: 本轮第 44 次新事件触发 (用户发令"按顺序推进"), 仍允许
+- 守门 #1 v25 cargo test 单 crate 模式: `cargo test -p star-arg-bridge --lib -j 4` 100% pass (per 9/5 00:15 JST 拍板 PR #12)
+
 ------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
