@@ -322,6 +322,212 @@ SPECS = [HELM_RELEASE, CLUSTER_ACTION_LOG, LOG_QUERY_LOG, LOG_ENTRY, LOG_ANALYSI
 
 
 # ============================================
+# v0.43 OAuth2 server 4 表 (per 9/9 20:20 JST 用户拍板 both flows)
+# ============================================
+
+# oauth_clients (M, SCD Type 2, 跟 ops_metrics_config 模式一致)
+OAUTH_CLIENTS = {
+    "name": "OAuthClient",
+    "table": "oauth_clients",
+    "wtm": "M",
+    "rbac_13": True,
+    "fields": [
+        ("id", "Uuid", "主键 (复合 PK id+valid_from)"),
+        ("tenant_id", "Uuid", "租户 ID (RLS 必携)"),
+        ("client_id", "String", "公开 client_id (e.g. star-frontend-spa)"),
+        ("client_secret_hash", "Option<String>", "bcrypt 哈希 (confidential 才有)"),
+        ("client_name", "String", "显示名"),
+        ("client_type", "String", "public/confidential"),
+        ("redirect_uris", "Vec<String>", "redirect URI 列表 (public auth code 需要)"),
+        ("allowed_scopes", "Vec<String>", "允许的 scope (e.g. read/write/admin)"),
+        ("allowed_grant_types", "Vec<String>", "authorization_code/client_credentials/refresh_token"),
+        ("require_pkce", "bool", "强制 PKCE (public 默认 TRUE)"),
+        ("require_authentication", "bool", "需要 client_secret (confidential 默认 TRUE)"),
+        ("owner_user_id", "Uuid", "注册人"),
+        ("valid_from", "DateTime<Utc>", "SCD Type 2 生效起始"),
+        ("valid_to", "Option<DateTime<Utc>>", "SCD Type 2 生效结束"),
+        ("created_at", "DateTime<Utc>", "创建时间"),
+        ("updated_at", "DateTime<Utc>", "更新时间"),
+        ("source_module", "String", "star_api_rest::auth::oauth"),
+        ("source_kind", "String", "master"),
+    ],
+    "rls_extra": [],
+    "methods": [
+        ("find_by_client_id",
+         ["tenant_id: Uuid", "client_id: &str"],
+         "Result<Option<OAuthClient>, PgAdapterError>",
+         "find_by_client_id"),
+        ("list_current",
+         ["tenant_id: Uuid"],
+         "Result<Vec<OAuthClient>, PgAdapterError>",
+         "list_current"),
+        ("insert_new_version",
+         ["client: &OAuthClient"],
+         "Result<(), PgAdapterError>",
+         "insert_new_version"),
+    ],
+    "sql_find": """            SELECT {select_cols}
+            FROM oauth_clients
+            WHERE tenant_id = $1 AND client_id = $2 AND valid_to IS NULL""",
+    "sql_list": """            SELECT {select_cols}
+            FROM oauth_clients
+            WHERE tenant_id = $1 AND valid_to IS NULL
+            ORDER BY client_name""",
+    "sql_upsert": """            INSERT INTO oauth_clients
+                ({insert_cols})
+            VALUES ({placeholders})""",
+}
+
+# oauth_authorization_codes (T, WORM, 短期)
+OAUTH_AUTH_CODES = {
+    "name": "OAuthAuthorizationCode",
+    "table": "oauth_authorization_codes",
+    "wtm": "T",
+    "rbac_13": True,
+    "fields": [
+        ("id", "Uuid", "主键"),
+        ("tenant_id", "Uuid", "租户 ID (RLS 必携)"),
+        ("code_hash", "String", "sha256(code) 哈希 (守门 #5 v2 不存明文)"),
+        ("client_id", "String", "客户端 ID"),
+        ("user_id", "Uuid", "授权人 (RLS 13 類)"),
+        ("redirect_uri", "String", "redirect URI"),
+        ("scope", "String", "scope 字符串 (空格分隔)"),
+        ("code_challenge", "String", "PKCE code_challenge"),
+        ("code_challenge_method", "String", "plain/S256"),
+        ("expires_at", "DateTime<Utc>", "10 分钟过期"),
+        ("consumed_at", "Option<DateTime<Utc>>", "兑换时间 (WORM 派生)"),
+        ("created_at", "DateTime<Utc>", "创建时间"),
+        ("source_module", "String", "star_api_rest::auth::oauth"),
+        ("source_kind", "String", "audit"),
+    ],
+    "rls_extra": [],
+    "methods": [
+        ("find_by_code_hash",
+         ["tenant_id: Uuid", "code_hash: &str"],
+         "Result<Option<OAuthAuthorizationCode>, PgAdapterError>",
+         "find_by_code_hash"),
+        ("mark_consumed",
+         ["tenant_id: Uuid", "code_hash: &str", "consumed_at: DateTime<Utc>"],
+         "Result<(), PgAdapterError>",
+         "mark_consumed"),
+        ("insert",
+         ["code: &OAuthAuthorizationCode"],
+         "Result<(), PgAdapterError>",
+         "insert"),
+    ],
+    "sql_find": """            SELECT {select_cols}
+            FROM oauth_authorization_codes
+            WHERE tenant_id = $1 AND code_hash = $2 AND consumed_at IS NULL
+              AND expires_at > NOW()""",
+    "sql_update": """            UPDATE oauth_authorization_codes
+            SET consumed_at = $3
+            WHERE tenant_id = $1 AND code_hash = $2 AND consumed_at IS NULL""",
+    "sql_insert": """            INSERT INTO oauth_authorization_codes
+                ({insert_cols})
+            VALUES ({placeholders})""",
+}
+
+# oauth_access_tokens (T, append-only)
+OAUTH_ACCESS_TOKENS = {
+    "name": "OAuthAccessToken",
+    "table": "oauth_access_tokens",
+    "wtm": "T",
+    "rbac_13": True,
+    "fields": [
+        ("id", "Uuid", "主键"),
+        ("tenant_id", "Uuid", "租户 ID (RLS 必携)"),
+        ("token_hash", "String", "sha256(jti) 哈希 (守门 #5 v2)"),
+        ("client_id", "String", "客户端 ID"),
+        ("user_id", "Option<Uuid>", "用户 (client_credentials grant 为 NULL)"),
+        ("grant_type", "String", "authorization_code/client_credentials/refresh_token"),
+        ("scope", "String", "scope 字符串"),
+        ("expires_at", "DateTime<Utc>", "过期时间"),
+        ("revoked_at", "Option<DateTime<Utc>>", "撤销时间 (WORM 派生)"),
+        ("created_at", "DateTime<Utc>", "创建时间"),
+        ("source_module", "String", "star_api_rest::auth::oauth"),
+        ("source_kind", "String", "audit"),
+    ],
+    "rls_extra": [],
+    "methods": [
+        ("find_by_token_hash",
+         ["tenant_id: Uuid", "token_hash: &str"],
+         "Result<Option<OAuthAccessToken>, PgAdapterError>",
+         "find_by_token_hash"),
+        ("revoke",
+         ["tenant_id: Uuid", "token_hash: &str", "revoked_at: DateTime<Utc>"],
+         "Result<(), PgAdapterError>",
+         "revoke"),
+        ("insert",
+         ["token: &OAuthAccessToken"],
+         "Result<(), PgAdapterError>",
+         "insert"),
+    ],
+    "sql_find": """            SELECT {select_cols}
+            FROM oauth_access_tokens
+            WHERE tenant_id = $1 AND token_hash = $2 AND revoked_at IS NULL
+              AND expires_at > NOW()""",
+    "sql_update": """            UPDATE oauth_access_tokens
+            SET revoked_at = $3
+            WHERE tenant_id = $1 AND token_hash = $2 AND revoked_at IS NULL""",
+    "sql_insert": """            INSERT INTO oauth_access_tokens
+                ({insert_cols})
+            VALUES ({placeholders})""",
+}
+
+# oauth_refresh_tokens (T, WORM)
+OAUTH_REFRESH_TOKENS = {
+    "name": "OAuthRefreshToken",
+    "table": "oauth_refresh_tokens",
+    "wtm": "T",
+    "rbac_13": True,
+    "fields": [
+        ("id", "Uuid", "主键"),
+        ("tenant_id", "Uuid", "租户 ID (RLS 必携)"),
+        ("token_hash", "String", "sha256(token) 哈希"),
+        ("client_id", "String", "客户端 ID"),
+        ("user_id", "Uuid", "用户 (仅 auth code flow 有)"),
+        ("access_token_id", "Uuid", "关联的 access_token ID"),
+        ("scope", "String", "scope 字符串"),
+        ("expires_at", "DateTime<Utc>", "30 天过期"),
+        ("revoked_at", "Option<DateTime<Utc>>", "撤销时间"),
+        ("created_at", "DateTime<Utc>", "创建时间"),
+        ("source_module", "String", "star_api_rest::auth::oauth"),
+        ("source_kind", "String", "audit"),
+    ],
+    "rls_extra": [],
+    "methods": [
+        ("find_by_token_hash",
+         ["tenant_id: Uuid", "token_hash: &str"],
+         "Result<Option<OAuthRefreshToken>, PgAdapterError>",
+         "find_by_token_hash"),
+        ("revoke",
+         ["tenant_id: Uuid", "token_hash: &str", "revoked_at: DateTime<Utc>"],
+         "Result<(), PgAdapterError>",
+         "revoke"),
+        ("insert",
+         ["token: &OAuthRefreshToken"],
+         "Result<(), PgAdapterError>",
+         "insert"),
+    ],
+    "sql_find": """            SELECT {select_cols}
+            FROM oauth_refresh_tokens
+            WHERE tenant_id = $1 AND token_hash = $2 AND revoked_at IS NULL
+              AND expires_at > NOW()""",
+    "sql_update": """            UPDATE oauth_refresh_tokens
+            SET revoked_at = $3
+            WHERE tenant_id = $1 AND token_hash = $2 AND revoked_at IS NULL""",
+    "sql_insert": """            INSERT INTO oauth_refresh_tokens
+                ({insert_cols})
+            VALUES ({placeholders})""",
+}
+
+
+SPECS_OAUTH = [OAUTH_CLIENTS, OAUTH_AUTH_CODES, OAUTH_ACCESS_TOKENS, OAUTH_REFRESH_TOKENS]
+SPECS_OPS = [HELM_RELEASE, CLUSTER_ACTION_LOG, LOG_QUERY_LOG, LOG_ENTRY, LOG_ANALYSIS]
+SPECS = SPECS_OPS + SPECS_OAUTH
+
+
+# ============================================
 # 模板生成
 # ============================================
 
@@ -403,6 +609,9 @@ def parse_bind_expr(pname: str, ptype: str) -> str:
     # Copy 类型: 走值
     if ptype in ("i32", "i64", "u32", "u64", "bool", "f32", "f64", "Uuid"):
         return pname
+    # Vec<T>: 走引用
+    if ptype.startswith("Vec<"):
+        return f"&{pname}"
     # 非 Copy 类型: 走引用
     return f"&{pname}"
 
@@ -461,19 +670,22 @@ def gen_impl(spec: dict) -> str:
                 lines.append("        Ok(rows)")
             lines.append("    }")
         else:
-            # INSERT / UPSERT 类
-            if "upsert" in mname:
+            # INSERT / UPSERT / UPDATE 类
+            if "upsert" in mname or "insert_new_version" in mname:
                 sql_key = "sql_upsert"
+            elif "mark_consumed" in mname or "revoke" in mname:
+                sql_key = "sql_update"
             else:
                 sql_key = "sql_insert"
             sql = spec[sql_key].format(insert_cols=insert_cols, placeholders=placeholders)
 
-            # 找 &T 引用参数 (upsert/insert 都是 &Struct)
+            # 找 &StructName 引用参数 (insert 类), 排除 &str / &Vec<T>
             ref_arg = None
-            for pname, ptype in params:
-                if ptype.startswith("&"):
-                    ref_arg = pname
-                    break
+            if sql_key != "sql_update":
+                for pname, ptype in params:
+                    if ptype.startswith("&") and ptype != "&str" and not ptype.startswith("&Vec<"):
+                        ref_arg = pname
+                        break
 
             lines.append(f"    async fn {mname}(&self, {margs}) -> {mret} {{")
             lines.append("        sqlx::query(")
@@ -481,13 +693,20 @@ def gen_impl(spec: dict) -> str:
             lines.append(f"            {sql}")
             lines.append("            \"#,")
             lines.append("        )")
-            # 按 struct 字段顺序 bind
             if ref_arg:
+                # INSERT / UPSERT: 按 struct 字段顺序 bind
                 for fname, ftype, _ in get_all_fields(spec):
                     if ftype in ("i32", "i64", "u32", "u64", "bool", "f32", "f64"):
                         lines.append(f"        .bind({ref_arg}.{fname})")
+                    elif ftype.startswith("Vec<"):
+                        lines.append(f"        .bind(&{ref_arg}.{fname})")
                     else:
                         lines.append(f"        .bind(&{ref_arg}.{fname})")
+            else:
+                # UPDATE: 按参数顺序 bind
+                for pname, ptype in params:
+                    bind = parse_bind_expr(pname, ptype)
+                    lines.append(f"        .bind({bind})")
             lines.append("        .execute(&self.pool)")
             lines.append("        .await")
             lines.append(f"        .map_err(|e| PgAdapterError::Query(format!(\"{mname}: {{}}\", e)))?;")

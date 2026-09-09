@@ -3085,7 +3085,9 @@ name = "star-api-rest"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
+ "base64",
  "chrono",
  "domain-agent",
  "domain-feedback",
@@ -3102,10 +3104,12 @@ dependencies = [
  "hex",
  "hmac",
  "jsonwebtoken",
+ "ring",
  "serde",
  "serde_json",
  "sha2",
  "star-context",
+ "star-pg-adapter",
  "star-webhook",
  "thiserror 1.0.69",
  "tokio",

@@ -27,6 +27,7 @@
 
 #![allow(missing_docs)] // 骨架阶段, 业务端点 P2 实装时补
 
+pub mod auth;
 pub mod error;
 pub mod middleware;
 pub mod response;

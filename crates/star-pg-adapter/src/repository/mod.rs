@@ -326,3 +326,24 @@ pub use ops_helm_release_state::{
 pub use ops_log_analysis::{OpsLogAnalysis, OpsLogAnalysisRepository, PgOpsLogAnalysisRepository};
 pub use ops_log_entry::{OpsLogEntry, OpsLogEntryRepository, PgOpsLogEntryRepository};
 pub use ops_log_query_log::{OpsLogQueryLog, OpsLogQueryLogRepository, PgOpsLogQueryLogRepository};
+
+// ==========================================
+// v0.43 OAuth2 server 4 Repository (per 9/9 20:20 JST 用户拍板 both flows)
+// 守门 #13 W/T/M 100% 覆盖: M=1 (oauth_clients SCD2) + T=3 (auth_codes WORM + access_tokens + refresh_tokens WORM)
+// ==========================================
+
+pub mod oauth_access_tokens;
+pub mod oauth_authorization_codes;
+pub mod oauth_clients;
+pub mod oauth_refresh_tokens;
+
+pub use oauth_access_tokens::{
+    OAuthAccessToken, OAuthAccessTokenRepository, PgOAuthAccessTokenRepository,
+};
+pub use oauth_authorization_codes::{
+    OAuthAuthorizationCode, OAuthAuthorizationCodeRepository, PgOAuthAuthorizationCodeRepository,
+};
+pub use oauth_clients::{OAuthClient, OAuthClientRepository, PgOAuthClientRepository};
+pub use oauth_refresh_tokens::{
+    OAuthRefreshToken, OAuthRefreshTokenRepository, PgOAuthRefreshTokenRepository,
+};
