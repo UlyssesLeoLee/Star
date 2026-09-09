@@ -275,6 +275,101 @@ pub enum ApplicationError {
 }
 
 // =====================================================================
+// P0-3 ApplicationError 映射 (per WBS §14.15, 跟 P0-2 ApiError 映射同模式)
+// 6 个 domain error → ApplicationError From impls
+// =====================================================================
+
+impl From<domain_work_item::WorkItemError> for ApplicationError {
+    fn from(e: domain_work_item::WorkItemError) -> Self {
+        use domain_work_item::WorkItemError::*;
+        match e {
+            NotFound(_) => ApplicationError::NotFound(Uuid::nil()),
+            PermissionDenied => ApplicationError::PermissionDenied,
+            CrossTenantDenied(_, _) => ApplicationError::PermissionDenied,
+            InvalidTransition { .. } => ApplicationError::InvalidState(e.to_string()),
+            AiTaskMissingObjective | AiTaskMissingScope | ParentProjectMismatch => {
+                ApplicationError::InvalidState(e.to_string())
+            }
+            Conflict(_) => ApplicationError::Conflict(e.to_string()),
+            Internal(_) => ApplicationError::Internal(e.to_string()),
+        }
+    }
+}
+
+impl From<domain_workspace::WorkspaceError> for ApplicationError {
+    fn from(e: domain_workspace::WorkspaceError) -> Self {
+        use domain_workspace::WorkspaceError::*;
+        match e {
+            NotFound(_) => ApplicationError::NotFound(Uuid::nil()),
+            PermissionDenied => ApplicationError::PermissionDenied,
+            InvalidState(_) => ApplicationError::InvalidState(e.to_string()),
+            Conflict(_) => ApplicationError::Conflict(e.to_string()),
+            Internal(_) => ApplicationError::Internal(e.to_string()),
+        }
+    }
+}
+
+impl From<domain_worktree::WorktreeError> for ApplicationError {
+    fn from(e: domain_worktree::WorktreeError) -> Self {
+        use domain_worktree::WorktreeError::*;
+        match e {
+            NotFound(_) => ApplicationError::NotFound(Uuid::nil()),
+            PermissionDenied => ApplicationError::PermissionDenied,
+            CrossTenantDenied(_, _) => ApplicationError::PermissionDenied,
+            InvalidTransition { .. } => ApplicationError::InvalidState(e.to_string()),
+            RuntimeRequired => ApplicationError::InvalidState(e.to_string()),
+            Conflict(_) => ApplicationError::Conflict(e.to_string()),
+            CompletionGateFailed(_) | IsolationFailed(_) => {
+                ApplicationError::InvalidState(e.to_string())
+            }
+            Internal(_) => ApplicationError::Internal(e.to_string()),
+        }
+    }
+}
+
+impl From<domain_search::SearchError> for ApplicationError {
+    fn from(e: domain_search::SearchError) -> Self {
+        use domain_search::SearchError::*;
+        match e {
+            NotFound(_) => ApplicationError::NotFound(Uuid::nil()),
+            PermissionDenied => ApplicationError::PermissionDenied,
+            CrossTenantDenied(_, _) => ApplicationError::PermissionDenied,
+            InvalidState(_) | InvalidQuery(_) => ApplicationError::InvalidState(e.to_string()),
+            Conflict(_) => ApplicationError::Conflict(e.to_string()),
+            Internal(_) => ApplicationError::Internal(e.to_string()),
+        }
+    }
+}
+
+impl From<domain_scm::ScmError> for ApplicationError {
+    fn from(e: domain_scm::ScmError) -> Self {
+        use domain_scm::ScmError::*;
+        match e {
+            NotFound(_) => ApplicationError::NotFound(Uuid::nil()),
+            PermissionDenied(_) => ApplicationError::PermissionDenied,
+            InvalidState(_) => ApplicationError::InvalidState(e.to_string()),
+            Conflict(_) | IdempotencyConflict => ApplicationError::Conflict(e.to_string()),
+            ProviderError(_) => ApplicationError::Internal(e.to_string()),
+            Internal(_) => ApplicationError::Internal(e.to_string()),
+        }
+    }
+}
+
+impl From<domain_validation::ValidationError> for ApplicationError {
+    fn from(e: domain_validation::ValidationError) -> Self {
+        use domain_validation::ValidationError::*;
+        match e {
+            NotFound(_) => ApplicationError::NotFound(Uuid::nil()),
+            PermissionDenied => ApplicationError::PermissionDenied,
+            InvalidState(_) => ApplicationError::InvalidState(e.to_string()),
+            Conflict(_) => ApplicationError::Conflict(e.to_string()),
+            InvariantViolated(_) => ApplicationError::InvalidState(e.to_string()),
+            Internal(_) => ApplicationError::Internal(e.to_string()),
+        }
+    }
+}
+
+// =====================================================================
 // 单元测试占位
 // =====================================================================
 
@@ -301,5 +396,61 @@ mod tests {
             !actor.tenant_id.is_nil(),
             "tenant_id must be non-nil (§6.1,REQ-SEC-001)"
         );
+    }
+
+    // -----------------------------------------------------------------
+    // P0-3 ApplicationError 映射测试 (per WBS §14.15)
+    // 6 个 From impl 各 1 个 positive 验证 (domain error → ApplicationError variant 映射)
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn work_item_error_not_found_maps_to_application_not_found() {
+        use domain_work_item::WorkItemError;
+        let e = WorkItemError::NotFound("work-item-uuid".to_string());
+        let app_err: ApplicationError = e.into();
+        assert!(matches!(app_err, ApplicationError::NotFound(_)), "expected NotFound");
+    }
+
+    #[test]
+    fn workspace_error_permission_denied_maps_to_application_permission_denied() {
+        use domain_workspace::WorkspaceError;
+        let e = WorkspaceError::PermissionDenied;
+        let app_err: ApplicationError = e.into();
+        assert!(matches!(app_err, ApplicationError::PermissionDenied), "expected PermissionDenied");
+    }
+
+    #[test]
+    fn worktree_error_invalid_transition_maps_to_application_invalid_state() {
+        use domain_worktree::WorktreeError;
+        let e = WorktreeError::InvalidTransition {
+            from: "CREATED".to_string(),
+            to: "ABANDONED".to_string(),
+        };
+        let app_err: ApplicationError = e.into();
+        assert!(matches!(app_err, ApplicationError::InvalidState(_)), "expected InvalidState");
+    }
+
+    #[test]
+    fn search_error_not_found_maps_to_application_not_found() {
+        use domain_search::SearchError;
+        let e = SearchError::NotFound("index-missing".to_string());
+        let app_err: ApplicationError = e.into();
+        assert!(matches!(app_err, ApplicationError::NotFound(_)), "expected NotFound");
+    }
+
+    #[test]
+    fn scm_error_idempotency_conflict_maps_to_application_conflict() {
+        use domain_scm::ScmError;
+        let e = ScmError::IdempotencyConflict;
+        let app_err: ApplicationError = e.into();
+        assert!(matches!(app_err, ApplicationError::Conflict(_)), "expected Conflict");
+    }
+
+    #[test]
+    fn validation_error_internal_maps_to_application_internal() {
+        use domain_validation::ValidationError;
+        let e = ValidationError::Internal("validator crashed".to_string());
+        let app_err: ApplicationError = e.into();
+        assert!(matches!(app_err, ApplicationError::Internal(_)), "expected Internal");
     }
 }

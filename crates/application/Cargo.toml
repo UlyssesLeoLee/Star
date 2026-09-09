@@ -17,5 +17,13 @@ chrono = { workspace = true }
 tokio = { workspace = true }
 
 star-context = { path = "../star-context" }
+# P0-3: application crate 真实编排 (per WBS §14.15, 0.6M, 跟 P0-2 同模式)
+# 6 domain crate From impls (跟 P0-2 ApiError 映射对称, 守门 #13 a 实证)
+domain-work-item = { path = "../domain-work-item" }
+domain-workspace = { path = "../domain-workspace" }
+domain-worktree = { path = "../domain-worktree" }
+domain-search = { path = "../domain-search" }
+domain-scm = { path = "../domain-scm" }
+domain-validation = { path = "../domain-validation" }
 [lints]
 workspace = true
