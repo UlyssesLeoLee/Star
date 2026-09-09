@@ -114,7 +114,7 @@ repository = "https://github.com/UlyssesLeoLee/Star"
 tokio = { version = "1.40", features = ["full"] }
 async-trait = "0.1"
 # JWT 鉴权 (per §14.12 IV OAuth2 + JWT 拍板 2026-09-09 19:20 JST)
-jsonwebtoken = "9"
+jsonwebtoken = "11"
 
 # 序列化
 serde = { version = "1", features = ["derive"] }
@@ -126,7 +126,7 @@ bytes = "1"
 futures-util = "0.3"
 
 # 错误
-thiserror = "1"
+thiserror = "2"
 anyhow = "1"
 
 # ID / 时间
@@ -140,8 +140,8 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-r
 tracing = "0.1"
 
 # 加密(Phase F webhook 签名验证使用)
-sha2 = "0.10"
-hmac = "0.12"
+sha2 = "0.11"
+hmac = "0.13"
 hex = "0.4"
 
 # Regex (per OPT-NEXT-06-code-stub §3.4 domain-form + domain-search 实装)

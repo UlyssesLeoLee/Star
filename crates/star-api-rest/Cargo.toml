@@ -40,7 +40,7 @@ hex = { workspace = true }
 
 # v0.43 §14.12 IV OAuth2 server (per 2026-09-09 20:20 JST 用户拍板 both flows)
 ring = "0.17"
-base64 = "0.22"
+base64 = "0.23"
 async-trait = "0.1"
 star-pg-adapter = { path = "../star-pg-adapter" }
 
