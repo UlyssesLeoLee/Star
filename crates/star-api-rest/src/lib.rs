@@ -294,6 +294,9 @@ mod tests {
     /// Phase I Batch 3 实证: webhook endpoint CRUD 自洽 (POST 201/GET 200/PATCH 200/DELETE 200)
     #[tokio::test]
     async fn webhook_endpoints_crud_roundtrip_after_phase_i_batch_3() {
+        // 测试隔离: 每次测试前清空 shared `OnceLock<EndpointStore>` 状态
+        // (per self-review §1 "OnceLock<...> 全局单例在测试间共享状态", v0.27 修)
+        routes::webhooks::endpoints().reset();
         let app = build_router();
         // 1. POST 创建
         let body_json = serde_json::json!({

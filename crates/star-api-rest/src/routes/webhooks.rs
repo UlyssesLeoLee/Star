@@ -50,6 +50,11 @@ impl EndpointStore {
             inner: Arc::new(RwLock::new(HashMap::new())),
         }
     }
+    /// 测试隔离: 清空所有 endpoint (per self-review §1 "OnceLock<...> 全局单例在测试间共享状态")
+    #[cfg(test)]
+    pub fn reset(&self) {
+        self.inner.write().unwrap().clear();
+    }
     pub fn insert(&self, ep: WebhookEndpoint) {
         let mut g = self.inner.write().unwrap();
         g.insert(ep.id.clone(), ep);
@@ -85,12 +90,12 @@ impl EndpointStore {
 
 use std::sync::OnceLock;
 static ENDPOINTS: OnceLock<EndpointStore> = OnceLock::new();
-fn endpoints() -> &'static EndpointStore {
+pub(crate) fn endpoints() -> &'static EndpointStore {
     ENDPOINTS.get_or_init(EndpointStore::new)
 }
 
 static DELIVERIES: OnceLock<Arc<DeliveryStore>> = OnceLock::new();
-fn deliveries() -> &'static Arc<DeliveryStore> {
+pub(crate) fn deliveries() -> &'static Arc<DeliveryStore> {
     DELIVERIES.get_or_init(|| Arc::new(DeliveryStore::new()))
 }
 
