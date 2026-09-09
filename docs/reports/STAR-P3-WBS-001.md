@@ -756,6 +756,252 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 
 ---
 
+## 14.12 star-api-rest REST 层真实业务接入 + 端到端部署（per 2026-09-09 用户发令 + HANDOFF-ST-001.md v1.7 §20）
+
+> **触发**: 2026-09-09 用户发令"把完成后端接管的计划写成 spec, 然后更新 handoff, 我让下游 ai 完成真正的部署, 而不是 mock 版本"。
+> **承接**: `docs/reports/STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` v0.1 (Claude Code Sonnet 5 逐文件实测落档) — **本节是主 WBS 同步登记, 详细 plan 落上面那份独立 WBS 文档**。
+> **范围**: `crates/star-api-rest` REST 层 27 个业务 handler 从 501 stub 接线到真实业务逻辑 + 前端容器化部署到 k3s。
+> **状态**: 🟡 **plan 阶段 (0/4 收官)** - 4-Phase 拆分待 Ulysses 拍板 + 下游 AI 执行。
+> **跟现有工作线关系**: 与 TMO / PR#13 / ARG / H2-EXT / P0-2/3/4 **互不重叠**, 本工作线无外部阻塞, 可立即由下游 AI 执行 Phase 0-I。
+
+### 14.12.1 4-Phase 任务矩阵（per 独立 WBS §1.2）
+
+| # | Phase | 主题 | 涉及路由 | 复杂度 | 状态 |
+|---|---|---|---|---|---|
+| 0 | **Phase 0** | 基线复核（数字时效性, 必跑） | — | 极低 | 🟡 plan |
+| 1 | **Phase I** | REST handler 接线 (17 已有 dep + 10 需新增 3 dep) | 27 | 中 | 🟡 plan |
+| 2 | **Phase II** | 持久化决策（in-memory vs 真实 DB） | — | 高（可推迟） | 🟡 待拍板 |
+| 3 | **Phase III** | 前端容器化 + k3s 部署 (real-API 模式) | — | 中 | 🟡 plan |
+| 4 | **Phase IV** | 鉴权/限流/审计中间件真实化（可选） | — | 中 | 🟡 待拍板 |
+
+### 14.12.2 27 路由 → 16 MCP 工具范式 → 9+3 domain crate 映射（per 独立 WBS §1.1）
+
+| # | 路由 | 范式来源 | 支撑 domain crate | Cargo.toml 声明? |
+|---|---|---|---|---|
+| 1-5 | `/work-items` 5 端点 | `search_issues.rs` / `get_current_task.rs` / `get_issue.rs` | `domain-work-item::InMemoryWorkItemService` | ✅ 已声明 |
+| 6 | `/workspaces/{id}` | `get_workspace.rs` | `domain-workspace::InMemoryWorkspaceService` | ✅ |
+| 7-8 | `/worktrees` 2 端点 | `create_worktree.rs` / `get_worktree.rs` | `domain-worktree::InMemoryWorktreeService` | ✅ |
+| 9-12 | `/code/search` / `/code/symbols/{id}` / `/code/symbols/{id}/references` / `/code/context` | `search_code.rs` / `get_symbol.rs` / `find_references.rs` / `get_code_context.rs` | `domain-search::InMemorySearchService` | ❌ **未声明, 需新增** |
+| 13 | `/context` | `get_context.rs` (混用) | `domain-search` + `domain-work-item` | ❌ `domain-search` 未声明 |
+| 14-16 | `/merge-requests` / `/reviews` / `/pipelines/{id}` | `create_merge_request.rs` / `request_review.rs` / `get_pipeline_status.rs` | `domain-scm::InMemoryScmService` | ❌ **未声明, 需新增** |
+| 17-18 | `/validations` / `/submissions` | `run_validation.rs` / `submit.rs` (后者 step 6-12 简化 mock) | `domain-validation::InMemoryValidationService` | ❌ **未声明, 需新增** |
+| 19-27 | webhooks 9 端点 | **无对应 MCP 工具** (原创接线) | `star-webhook::DeliveryStore` / `RetryPolicy` | ✅ 已声明但无范式 |
+
+**统计**: 17 条已有 dep 覆盖 (#1-8 + #19-27) + 10 条需新增 3 个 path-dep (`domain-search` / `domain-scm` / `domain-validation`)
+
+### 14.12.3 6 已知缺口（per 独立 WBS §3 缺标比错标）
+
+1. **文档漂移**: `lib.rs`/`mod.rs` 文档声称"22 路由 (16 MCP + 6 webhook)", 实测 27 (18 + 9) - 顺手修
+2. **submissions 端点先天只能部分真实**: 抄的 `submit.rs` 自身 step 6-12 简化 mock, 接线后依然不是 100% 真实
+3. **持久化是全局缺口**: 全部 27 路由的 domain 服务都是 `InMemory*Service`, pod 重启即丢
+4. **鉴权是不设防的**: `AuthLayer`/`RateLimitLayer`/`AuditLayer` 全部 no-op pass-through
+5. **AGENTS.md §7 #1 21/25 done**: 4 缺口是治理域 (audit/tenant/relation/kms), 跟本 WBS 不重叠
+6. **`NEXT_PUBLIC_*` 是 build-time, 不是 runtime**: 必须用 `docker build --build-arg` 传入, 不能写 k8s Deployment `env:`
+
+### 14.12.4 5 子代理边界（per 独立 WBS §4）
+
+| 子代理 | 范围 | 失败时如何判断 |
+|---|---|---|
+| A | Phase 0 基线复核 | 真的跑了 `cargo test -p star-api-rest`, 不能只看 exit code |
+| B | Phase I 批次 1 (work-items/workspaces/worktrees, 8 条) | `git log -p --follow` 实证改动落到 `routes/*.rs` |
+| C | Phase I 批次 2 (code/context/merge-requests/reviews/validations/pipelines/submissions, 10 条 + 3 新 dep) | `cargo build -p star-api-rest` 0 err 确认无循环依赖 |
+| D | Phase I 批次 3 (webhooks 9 条, 原创接线) | 9 端点 CRUD 语义自洽 + 子代理自写集成测试 |
+| E | Phase III 前端容器化 | 真实浏览器/curl 验证页面数据非 mock, 不能只看 `Running` |
+
+### 14.12.5 7 守门（per 独立 WBS §5）
+
+本文件是计划, 不实施任何代码改动 | Phase I 接线时必须逐条对照 §1.1 表格 MCP 工具文件, 禁止凭空重写 | 新增 path-dep 后必须 `cargo check --workspace` 确认无循环依赖 | 任何"看起来完成"的路由验收标准是真实 curl/集成测试返回非 501 + 返回体可验证 | 持久化/鉴权如暂不做, 必须在交付说明里显式写明, 不能默默略过 | 前端 `NEXT_PUBLIC_*` 变量必须用 `docker build --build-arg` 传入, 不能写 k8s Deployment runtime `env:` | Phase 完成后报告必须遵循 AGENTS.md §3 7 段结构
+
+**Token 估**: ~2-3M (Phase 0-I 估 1.5-2M, Phase III 估 0.5-1M, Phase II/IV 视拍板)
+
+---
+
+## 14.13 V2 凭证管理阶段 7/7 全闭环（per HANDOFF-ST-001 v1.2-v1.3 + 9/4 17:19-20:00 JST + PR #9/#10/#11）
+
+> **触发**: 2026-09-04 17:19 JST 用户授权"完成剩余, mavis 拍板" + 9/4 19:00 JST 凭证 V2 阶段启动
+> **范围**: `crates/star-credential` 新 crate + REST API + DB 持久化 + 审计端点 + 批量导入导出 + 5 子代理 + Frontend UI
+> **状态**: 🟢 **7/7 全部闭环** (per 9/4 20:00 JST, HANDOFF 升 v1.3 表征 V2 阶段收口 + 42 commits 累计)
+
+| # | 子项 | 标题 | commit | 落地时间 | 关键产出 | 状态 |
+|---|---|---|---|---|---|---|
+| V2-1 | V2-1 | 凭证管理层 (CredentialManager) | `3d251bf` | 9/4 19:45 JST | star-credential v0.0.1 + CredentialManager + 4 test 0 fail + KMS Local mock + SQLite WAL + tenant RLS 派生 | 🟢 收官 |
+| V2-2 | V2-2 | REST API | `7d06f97` | 9/4 20:00 JST | axum 0.8 + 4 handler (list/create/rotate/revoke) + 3 test 0 fail | 🟢 收官 |
+| V2-3 | V2-3 | DB 持久化 | `4251242` | 9/4 20:05 JST | SQLite + 2 表 (credential M + audit_event T) + 3 test 0 fail | 🟢 收官 |
+| V2-4 | V2-4 | 审计端点 | `b5bd5c3` | 9/4 20:15 JST | GET /api/v2/credentials/{id}/audit + 1 test 0 fail | 🟢 收官 |
+| V2-5 | V2-5 | 批量导入导出 | (per V2-1..V2-4 合并) | 9/4 19:45-20:15 JST | import/export endpoint + format adapter | 🟢 收官 |
+| V2-6 | V2-6 | 5 子代理 + Mavis 跨域协调 | (per 9/4 18:30 守门 #3 反转 + 9/4 19:45 5 域 Lead 全部子代理兼任) | 9/4 19:45 JST | 5 域 Lead 子代理兼任 (per 守门 #3 9/4 18:30 JST 反转 + 守门 #14 修订), Mavis 跨域协调模式 | 🟢 收官 |
+| **Frontend UI** | — | 凭证管理 UI (gm-console 集成) | (per PR #11) | 9/4 20:00 JST | 6 vitest + Agent 界面 / 设置界面 双入口 (per ADR-0051 v1.0 UX 分类) | 🟢 收官 |
+| **小计** | | | **4 commit (V2-1..V2-4) + 3 PR (#9/#10/#11)** | | **star-credential 11/11 test + 6 vitest** | **🟢 7/7 收官 ✅** |
+
+**5 完整 API endpoint** (per `PHASE-V2-*` 报告):
+
+| Method | Path | 来源 | 用途 |
+|---|---|---|---|
+| GET | /api/v2/credentials?provider=... | V2-2 | 列表 |
+| POST | /api/v2/credentials | V2-2 | 创建 |
+| POST | /api/v2/credentials/{id}/rotate | V2-2 | 轮换 |
+| POST | /api/v2/credentials/{id}/revoke | V2-2 | 撤销 |
+| **GET** | **/api/v2/credentials/{id}/audit** | **V2-4** | **审计日志** |
+
+**守门实证** (per 9/4 20:00 JST): `cargo test --workspace --release --lib -j 4` = **871 tests 0 fail** (V2-1=4 + V2-2=3 + V2-3=3 + V2-4=1)
+
+**Token 估**: ~1.2M (估 1.0M, 实测 1.2M, 1.2x 超支)
+
+**已知缺口** (per 缺标比错标):
+1. 5 域 Lead 真人寻访流程仍待启动 (per 守门 #14 v2 拍板 D 维持, Mavis 临时代签)
+2. 真实凭证切真待 Ulysses 提供 (B-3/B-4/B-5 凭证, per §14.4)
+3. 跟前 WBS §14.4 阻塞项 #5/#6/#7 联动 — V2-6 5 子代理兼任是临时方案, 真人到位后追溯签字
+
+**跟现有 view 关系** (per ADR-0051 v1.0):
+- 凭证 UX 分类: AI 凭证 (per-agent) 走 Agent 界面, 其他凭证 (per-tenant) 走设置界面
+- 10 凭证分类: LLM API / Code AI / Search API / Embedding / Custom / KMS / DB / Webhook / Org-level / 内部 secret
+- 跟 TD-01 (per ADR-0049) env_var passthrough 优先 + gm-console 5 tab (per ADR-0050) admin 域凭证 section + 9 SA + SA-10 各自凭证 tab 集成
+
+---
+
+## 14.14 TMO 7 节点阶段全闭环（per HANDOFF-ST-001 v1.4-v1.6 + PR #13 SQUASH MERGED `5e5b1c2` 2026-09-04T18:03:33Z）
+
+> **触发**: 2026-09-04 17:19-19:45 JST TMO-02/05/06/07 4 节点骨架落地 + 9/5 00:15 JST 4 推荐项 (守门修订) + 9/5 03:00 JST ask_user merge_squash 拍板
+> **范围**: TMO 7 节点 (T-01..T-07) + G-TMO-04 DDL + G-TMO-04b Repository + G-TMO-04c Routes + G-TMO-04d metadata_node 集成 + G-TMO-05 SDK 关闭
+> **状态**: 🟢 **TMO 7 节点全 L0 协调, PR #13 SQUASH MERGED `5e5b1c2` 2026-09-04T18:03:33Z, 88/88 TMO pytest pass + 32+ 项守门全过**
+
+### 14.14.1 TMO 7 节点 + G-TMO-04 系列 5/5 全闭环（per HANDOFF v1.5 + 9/5 02:39 JST）
+
+| # | 子项 | 标题 | 关键 commit | 守门 |
+|---|---|---|---|---|
+| TMO-01 | TMO-01 | TaskOperationsManager 入口 (per T-N7) | (per 9/4 之前) | 守门 #13 a L0 协调 |
+| TMO-02 | TMO-02 | split_node | `cdbf187` (9/4 23:42 main) | 7/7 pass + 132/132 tests |
+| TMO-05 | TMO-05 | summarize_node | `7b1a432` (9/5) | 守门 #13 a L0 协调 + #5+#23 mock 备选 |
+| TMO-06 | TMO-06 | reassign_node | `7b1a432` (9/5) | 守门 #13 a L0 协调 |
+| TMO-07 | TMO-07 | metadata_node | `7b1a432` (9/5) | 守门 #13 a + #13 c Master RLS + SCD Type 2 |
+| G-TMO-04 | G-TMO-04 | task_metadata DDL | `217593f` (9/5) | 4 表 W/T/M + 7 索引 + 5 CHECK 约束, 守门 #13 c + #13 d SCD Type 2 + #DB-13 强制分类, 20/20 e2e pass |
+| G-TMO-04b | G-TMO-04b | TaskMetadataRepository | `0aaf43d` (9/5) | 4 API + SCD Type 2 + RLS + Master 物理删除禁止 + DDL UNIQUE 修订, 14/14 e2e pass + 71/71 全 5 套 TMO pass |
+| G-TMO-04c | G-TMO-04c | routes_tmo /api/tmo/metadata | `c7a821b` (9/5) | POST upsert + GET current/history/audit/_health 5 端点 + 5 Pydantic 模型, 守门 #13 a/c/d + #19 + #22, 11/11 e2e pass + 82/82 全 6 套 TMO pass |
+| G-TMO-04d | G-TMO-04d | metadata_node 集成 | `5c323bc` (9/5) | TaskMetadataRepository (env 开关 + 优雅降级 + SCD + RLS), 6/6 e2e pass + 88/88 全 7 套 TMO pass |
+| G-TMO-05 | G-TMO-05 | SDK 关闭 (FINDINGS) | `1ce7b5b` (9/5) | Star 不用 LangGraph SDK, interrupt 走纯 Python 概念 per pip show not found + 02-basic-design v0.2 §2.6.5 C-12 |
+| **小计** | | | **10 commit (跨 3 worktree 合并)** | **88/88 TMO pytest pass + 32+ 项守门** |
+
+### 14.14.2 PR #12 + #13 落地（per 9/5 00:15-03:05 JST）
+
+| PR | commit | 内容 | CI |
+|---|---|---|---|
+| **PR #12** | `cdbf187` + `3a0f1d5` + `81b90ee` + `f753f1c` + `0c447c5` + `ca40edb` + `76baafb` (6 commit + merge `bc51de7`) | TMO-02/05/06/07 4 节点 + 1 e2e = 7/7 pass + 98/98 pytest 0 regression | **9/9 CI 全 pass** (3 cross-platform + Frontend + Markdown lint + Rust + Rust bench + Rust doc + CodeRabbit) |
+| **PR #13** | SQUASH MERGED `5e5b1c2` 2026-09-04T18:03:33Z (14 commit → 1 commit) | feat/tmo-05-06-07 worktree + branch 清理 + G-TMO-04 系列 5/5 | **9/9 CI 全 pass + 88/88 TMO pytest + 32+ 项守门** |
+
+### 14.14.3 4 守门修订（per 9/5 00:15 JST ask_user 4 推荐项）
+
+1. **守门 #1 v25 CI cargo test 改单 crate**: `cargo test --workspace -j 4` → `cargo test -p star-context --lib -j 4`, 跳 workspace (per PR #12 CI 实证)
+2. **守门 #7 v3 cargo clippy 改 advisory**: `-- -D warnings` → advisory, 跟 fmt check 一致
+3. **守门 #1 v26 cargo doc 改 advisory**: 去掉 RUSTDOCFLAGS=-D warnings, 跟 clippy 同步反转
+4. **守门 #24 v2 Setup Node.js**: node-version 20 → 22 LTS, 解决 Node 20 deprecation 警告致 npm ci exit 1
+5. **守门 #6 v2 Frontend typecheck/test/build 改 advisory**: `continue-on-error: true`
+
+**实证**: PR #12 9/9 CI 全 pass + 本机 21/21 pass (cargo check) + 0 err 57.77s (clippy)
+
+### 14.14.4 5 守门实证（per 9/5 02:50 JST + HANDOFF v1.5）
+
+1. **守门 #13 a L0 协调**: TMO 7 节点全部 L0 协调, 禁止 L1↔L1 直抢
+2. **守门 #5+#23 mock**: TMO-05/06/07 走 mock subprocess 路径, 不开 OpenAI/Anthropic
+3. **守门 #13 c Master RLS**: 4 表 Master 100% RLS 13 類 + SCD Type 2
+4. **守门 #13 d Transaction audit**: audit_event T 类 100% 物理删除禁止 + 監査必須
+5. **守门 #22+#DB-13**: 调试控制台不污染 main 编译 + DB W/T/M 强制分类
+
+**Token 估**: ~2.5M (TMO-02/05/06/07 估 1.0M + G-TMO-04 系列估 1.5M, 实测 2.5M)
+
+### 14.14.5 4 待续做项 (per 9/5 推下 session)
+
+1. G-DEP-01/02 P0/P1 工具实装 (per `PHASE-LANGGRAPH-TMO-IMPL-REPORT.md` v0.3 缺口)
+2. 5 域 Lead 真人到位 (per 守门 #14 v2 拍板 D 维持)
+3. 真实凭证切真 (per §14.4 B-3/B-4/B-5)
+4. Frontend pre-existing 4 err 修根因
+
+### 14.14.6 跟现有 view 关系
+
+- **跟 LangGraph view (per ADR-0046)**: 平行, TMO 7 节点全 L0 协调, 9 SA + SA-10 各自凭证 tab
+- **跟 Agent Runtime view (per ADR-0045)**: TMO 7 节点跑在 L0 派发层 (Tokio async dispatcher)
+- **跟 ADR-0047 PG Checkpointer Tier 3**: 共享同一 PG, task_metadata 4 表 W/T/M 跟 checkpointer 共享 RLS 13 類
+- **跟守门 #13 a**: TMO 7 节点全部 L0 协调, 禁止 L1↔L1 直抢 (跟 ARG 关系图类型 enforce)
+
+---
+
+## 14.15 P0-2/3/4 ApiError + application + infrastructure 跨 session 续（per HANDOFF-ST-001 v0.6 §5.2 + 9/1 08:44 JST "所有" 拍板）
+
+> **触发**: 2026-09-01 08:32 JST Q4-P0-2/3/4 拍板 (a) 跨 session 续 + 9/1 08:44 JST Ulysses "所有" 拍板 (per ask_user "所有" 选项)
+> **范围**: api/application/infrastructure 3 个 supporting crate 真实编排
+> **状态**: 🟡 **0/3 收官, 跨 session 续** (per HANDOFF v0.6 §8.1 #5-#7 顺序)
+
+| # | 子项 | 标题 | token 估 | 依赖 | 状态 | 守门 |
+|---|---|---|---|---|---|---|
+| P0-2 | P0-2 | ApiError 映射 (api crate ApiError ↔ domain Error) | 0.3M | H2 全部完成 | 🟡 跨 session 续 | 守门 #1 + #13 a |
+| P0-3 | P0-3 | application crate 真实编排 (跨域 service 调用) | 0.6M | P0-2 完成 | 🟡 跨 session 续 | 守门 #1 + #3 + #9 v3 |
+| P0-4 | P0-4 | infrastructure adapter (DB/KMS/Credential broker 等) | 0.4M | P0-3 完成 | 🟡 跨 session 续 | 守门 #1 + #13 a/c/d + #5 |
+| **小计** | | | **1.3M** | | **0/3 收官** | |
+
+**说明**:
+- per HANDOFF §5.2 token 估 1.3M (per 守门 #1 v16 派生 P0-1 联动审计 0.4-0.5M token 实证 246→0 err)
+- per HANDOFF v0.6 §8.1 #5-#7 顺序: H2 完成 → P0-2 → P0-3 → P0-4
+- per 8/31 P0-1 联动审计: 22 domain + 3 supporting crate 各自定义 `ActorContext` (17 份重复, 字段不兼容), `api`/`application`/`infrastructure` 三个 supporting crate 仓库内 0 引用完全孤儿 (per `PHASE-P0-1-ACTOR-CONTEXT-IMPL-REPORT.md` v0.3 §6.2)
+
+**已知缺口** (per 缺标比错标):
+1. P0-2 ApiError 映射需要 H2 全部完成 (含 H2-EXT #4 #5 强类型重构, 详见 §14.16)
+2. P0-3 application crate 需要 5 域 Lead 真人到位后 DDD Review 拍板 (per 守门 #14 v2)
+3. P0-4 infrastructure adapter 跟 ADR-0047 PG Checkpointer Tier 3 共享, 启动 = 5 域 Lead 真人 T3 至少 1 人到位
+
+---
+
+## 14.16 H2-EXT #4 #5 强类型 ID 重构 + H2 原 3 domain service.rs 改造（per HANDOFF-ST-001 v0.4-v0.5 §5.1 + 9/1 08:32 JST 4 项拍板）
+
+> **触发**: 2026-09-01 08:32 JST Ulysses 拍板 (per ask_user 4-step): Q1 device_id String=hostname 业务语义 / Q2 #4 跨 session 续 / Q3 H2 原 3 domain 跨 session 续 / Q4 P0-2/3/4 跨 session 续
+> **范围**: domain-identity / domain-work-item 强类型 ID 重构 + domain-feedback/validation/integration service.rs 内部 ~150+ call sites Uuid ↔ 强类型 ID 转换
+> **状态**: 🟡 **0/3 收官, 跨 session 续** (per 守门 #1 阶段 1 --lib 0 + 阶段 2 --all-targets 290 err 待消解)
+
+| # | 子项 | 标题 | token 估 | 依赖 | 状态 | 守门 |
+|---|---|---|---|---|---|---|
+| H2-EXT-4 | H2-EXT #4 | domain-identity DeviceId 强类型 → Uuid 重构 (entity 改 + 跨 service/invariant) | 0.2M | H2-1 ✅ (per §14.2) | 🟡 跨 session 续 | 守门 #1 + #3 |
+| H2-EXT-5 | H2-EXT #5 | domain-work-item device_id String 简化 (hostname 拍板后 0 type 改, 仅删 context.rs + port/service dead import) | 0.05M | H2-EXT-4 完成 | 🟡 跨 session 续 | 守门 #1 |
+| H2-3-SVC | H2-3-SVC | H2 原 3 domain service.rs 改造 (feedback/validation/integration ~150+ call sites Uuid ↔ UserId/TenantId/ProjectId 转换) | 0.6-0.8M | H2-EXT-4 + H2-EXT-5 完成 | 🟡 跨 session 续 | 守门 #1 + #3 |
+| **小计** | | | **0.85-1.05M** | | **0/3 收官** | |
+
+**说明**:
+- per HANDOFF v0.4 §5.1 H2-EXT 5 domain 改造顺序: 1 comment ✅ (0.05M, commit `9d08f80`) / 2 tenant ✅ (0.1M, commit `b6f6e2a`) / 3 project ✅ (0.1M, commit `7f611b0`) / 4 identity ⏳ / 5 work-item ⏳ — 3/5 完成, 净修 507 err (797 → 290, 跨 9 crate)
+- per 守门 #1 v18 H2-EXT 5 domain 跨域字段扩展触发: HANDOFF-ST-001 H2 原估 3 domain 实际是 8 domain (3 + H2-EXT 5)
+- per 守门 #1 v17 H2 范围扩量触发: HANDOFF-ST-001 H2 原估 3 domain (feedback/validation/integration) 实际是 8 domain, 实证 0.3-0.5M 估 → 1.1-1.6M 实测 (3-5x 超支)
+- per HANDOFF v0.5 Q1 拍板 (2026-09-01 08:32 JST): `device_id: Option<String>` 业务语义 = **hostname**, entity 保留 String 类型, 0 token type 改
+
+**已知缺口** (per 缺标比错标):
+1. domain-work-item `device_id` 业务语义 = hostname (拍板 0 type 改), 但**其他改造** (context.rs 删除 + port/service dead import) 估 0.05M 跨 session 续
+2. domain-identity DeviceId 强类型改 Uuid 涉及 entity / port trait / service 三层修改, 需谨慎 (per HANDOFF §8.5 风险点 2)
+3. H2-3-SVC feedback 77 err 是大头 (per 守门 #1 v18 实证), service.rs 内部 ~150+ call sites
+4. 290 err baseline 跨 9 crate (per HANDOFF v0.4 §6 守门 #1 实证, 数字时效性必须重测, 不得沿用)
+
+---
+
+## 14.17 H1/H3/H4/H5 收尾项 4 子项（per HANDOFF-ST-001 v0.1 §1 + v0.6 §8.1）
+
+> **触发**: 2026-08-31 用户发令"回答QA问题并把需要下游ai处理的内容更新进handoff", 上游 AI 拆出 H1-H5 下游 AI 可执行项
+> **范围**: H1 commit 2 dirty files / H3 as_uuid() 统一 / H4 ST 报告 5→4 域措辞 / H5 --all-targets 重测
+> **状态**: 🟡 **3/4 已落地 (H1 + H4 + H5), 1 跨 session 续 (H3)** + H2 已在 §14.2 跟踪
+
+| # | 子项 | 标题 | 状态 | 关键产出 / commit | 守门 |
+|---|---|---|---|---|---|
+| H1 | H1 | commit 2 个待落地文件 (domain-scm + domain-workspace lib.rs `define_uuid_id!` 宏字段改 `pub uuid::Uuid`) | 🟢 收官 | (per HANDOFF v0.1 §1 H1, 跨 session 已 commit, 闭环 Q3-D) | 守门 #8 + #10 author=Ulysses |
+| H2 | H2 | ActorContext 收敛 8 domain (per 守门 #1 v17+v18) | 🟡 §14.2 H2-1..H2-5 跟踪 | 详见 §14.2 | 守门 #1 + #3 + #4 |
+| H3 | H3 | 22 domain 强类型 ID `as_uuid()` 统一返回 `Uuid` (per Q4-I/A4) | 🟡 跨 session 续 | 待办: 22 个 `as_uuid()` 当前返回 `Uuid` vs `&Uuid` 不一致, 统一改为 `Uuid` (Copy, 非引用); `define_uuid_id!` 宏注释加 `From<Uuid>` 推荐主构造 | 守门 #1 |
+| H4 | H4 | ST 报告"5 域独立" → "4 域独立" 措辞 (per Q8-T/A8) | 🟢 收官 | 已修改 `PHASE-ST-001-REPORT.md` 等引用"5 域独立"验证结果处, 改为"4 域独立" (identity/permission/workspace/worktree); 跟 AGENTS.md §5 disclaimer 一致 | 守门 #12 |
+| H5 | H5 | `cargo check --workspace --all-targets` 重新实测 + 立项跟踪 (per Q9-T/A9) | 🟢 收官 (持续) | HANDOFF v0.1 968 err (23 crate) / v0.4 432 err (13 crate) / v0.6 290 err (9 crate) / 76 err (per 9/3 T1.7); 数字时效性每次重测, 已立项 Phase B.4 / D.3 等 | 守门 #1 + #15 死循环饱和 |
+| **小计** | | | **3/5 收官 + 2 跨 session 续** | | |
+
+**说明**:
+- per HANDOFF v0.1 §1 H1-H5 下游 AI 可执行项; H2 转入 §14.2 (per 守门 #1 v17+v18 H2 范围扩量触发)
+- per HANDOFF v0.6 §2 已核实闭环, 无需下游 AI 动作: Q5-I `_unused_user` 现象是 rust-analyzer IDE 过渡态 + Q7-T `domain-identity` PermissionDenied 先于 CrossTenantDenied 是有意最小信息暴露防御设计
+- per HANDOFF v0.3 §3 4 项 Ulysses 拍板结果 (Q1-D a+c / Q10-P b / Q11-P a / Q12-P a) 已在 AGENTS.md §4 + §5 落地
+
+**已知缺口** (per 缺标比错标):
+1. H3 as_uuid() 统一需要 H2 全部完成 (含 H2-EXT #4 #5) 后才能保证无类型冲突
+2. H5 --all-targets 数字持续时效性, 任何后续 PHASE 报告引用前必须重测 (per Q9-T A9)
+
+---
+
 ## 15. 累计统计 (P3 全 5 阶段 + P3 之外 跨 Phase 0-9)
 
 | 阶段 | 子项 | token 预算 | 软参考周 | 实证状态 |
@@ -779,14 +1025,20 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | **P3 之外 IT-5-GAPS 端到端实装 (9/8 18:40 JST 拍板)** | §3 IT 5 已知缺口 DDD Review 必查实装 (真实 PG 容器化 + RLS 13 類 cross-tenant 隔离 + Ladder L2 fallback + rate limit middleware 60 req/min + graceful shutdown axum::serve with_shutdown) | ~1.5M | ~0.25 周 | 🟢 **1/1 子项 100% 收官** (per 2026-09-08 19:30 JST PR #33 MERGED, 8 files +2100/-14, 5 缺口 + 1 派生; commit `77be968` squash merge; 67/67 lib + 48/48 IT = 115/115 PASS 5 项守门全 PASS) |
 | **P3 之外 5-LEVEL-FULL 端到端实装 (9/8 19:50 JST 拍板)** | TEST-DESIGN 5 级别全闭环最后 3 章节 (§4 E2E Playwright + §5 PT log_upload_bench + §6 UAT 验收) | ~3.0M | ~0.50 周 | 🟢 **1/1 子项 100% 收官** (per 2026-09-08 20:20 JST PR #35 MERGED, 12 files +2134/-23, 3 e2e spec + 1 bench + 1 capacity script + 4 docs; commit `1b0b1c1` squash merge; 67/67 lib + 48/48 IT + 4/4 bench P95 < 200ms + 28 E2E + 8 AC + 184 tests PASS 5+1 项守门全 PASS) |
 | **P3 之外 Agent Relationship Graph (ARG) 阶段 (9/8 22:35 JST 拍板)** | 11 子项 (ARG.1-11, 4 新 crate + 24 组件 + 13 REST + 1 WS + 20 成就 + 10 类关系 + 5 团队模板 + 4 effect 维度, per §14.11) | ~30M | ~5 周 | 🟡→🟢 **2/11 实质收官 (ARG.1 + ARG.4) + 9/11 docs 阶段** (per 9/9 04:38 JST 用户发令"开子代理和worktree并行处理" + `ask_8d5083148d6e0566b520988e` 拍板 3 推荐项; ARG.1 commit `43c1f0c` + merge `651117e` 2026-09-09 05:00 JST, 5 守门 0 err + 33 UT 100% pass + 44 文件/4206 行 + 2 脚本; ARG.4 commit `6e2cda6` + merge `1d894ab` 2026-09-09 05:31 JST, 5 守门 0 err + 24/24 cargo test pass + 10/10 Python IT pass + 13 文件/3243 行 + 14 routes 13 REST + 1 WS) |
-| **合计** | **119 子项** (含 H2 + 行业预设 + 5 wt 并行 + Star-EI + Ops Console MVP + TEST-DESIGN-OPS-001 + F-05 ops-log.sql + UT-IT-51 + IT-5-GAPS + 5-LEVEL-FULL + **ARG 11 子项**) | **~240.4M** | **~40.0 周** | **97/119 实质收官 (81.5%, +2 升 🟡→🟢) + 22 阻塞/待拍 (ARG 9 子项待 P3-C W2-P3-E 续 + 守门 #14 v2 真人到位)** |
+| **P3 之外 star-api-rest REST 接管 (9/9 用户发令)** | 4 Phase (Phase 0 基线 + Phase I 27 REST 接线 + Phase II 持久化 + Phase III 前端容器化 + Phase IV 鉴权, per §14.12) | ~2-3M | ~0.4 周 | 🟡 **0/4 plan 阶段** (per 9/9 用户发令"把完成后端接管的计划写成 spec, 然后更新 handoff, 我让下游 ai 完成真正的部署"; 独立 WBS `STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` v0.1 落档, Claude Code Sonnet 5 逐文件实测 27 路由 + 16 MCP 工具范式 + 9+3 domain crate 映射) |
+| **P3 之外 V2 凭证管理阶段 (9/4 17:19 JST 用户授权)** | 7 子项 (V2-1..V2-6 + Frontend UI, star-credential 新 crate, per §14.13) | ~1.2M | ~0.2 周 | 🟢 **7/7 全部闭环** (per 9/4 20:00 JST, HANDOFF 升 v1.3 表征 V2 阶段收口 + 42 commits 累计; star-credential 11/11 test + 6 vitest + 3 PR #9/#10/#11 + KMS Local mock + SQLite WAL + tenant RLS 派生; 871 tests 0 fail 守门实证) |
+| **P3 之外 TMO 7 节点阶段 (9/4 17:19 JST)** | 10 子项 (TMO-01..TMO-07 + G-TMO-04 DDL + G-TMO-04b Repository + G-TMO-04c Routes + G-TMO-04d 集成 + G-TMO-05 SDK 关闭, per §14.14) | ~2.5M | ~0.4 周 | 🟢 **10/10 全闭环** (per 9/5 03:03:33 JST PR #13 SQUASH MERGED `5e5b1c2`; 88/88 TMO pytest pass + 32+ 项守门全过; 4 守门修订 + 5 守门实证) |
+| **P3 之外 P0-2/3/4 ApiError + application + infrastructure (9/1 08:44 JST "所有" 拍板)** | 3 子项 (P0-2 + P0-3 + P0-4, per §14.15) | ~1.3M | ~0.2 周 | 🟡 **0/3 跨 session 续** (per HANDOFF v0.6 §5.2 + §8.1 #5-#7 顺序: H2 完成 → P0-2 → P0-3 → P0-4; 依赖 H2 全部完成 + 5 域 Lead 真人到位) |
+| **P3 之外 H2-EXT #4 #5 强类型重构 + H2 原 3 domain service.rs (9/1 08:32 JST 拍板)** | 3 子项 (H2-EXT-4 + H2-EXT-5 + H2-3-SVC, per §14.16) | ~0.85-1.05M | ~0.15 周 | 🟡 **0/3 跨 session 续** (per HANDOFF v0.4 §5.1 + v0.5 Q1 hostname 拍板; 290 err baseline 跨 9 crate, 数字时效性必须重测) |
+| **P3 之外 H1/H3/H4/H5 收尾项 (8/31 上游 AI 拆出)** | 5 子项 (H1 commit + H2 转入 §14.2 + H3 as_uuid + H4 ST 措辞 + H5 --all-targets 重测, per §14.17) | ~0.3M | ~0.05 周 | 🟡 **3/5 收官 (H1 + H4 + H5) + 2 跨 session 续 (H2 已 §14.2 / H3 等 H2 完成)** |
+| **合计** | **125 子项** (含 H2 + 行业预设 + 5 wt 并行 + Star-EI + Ops Console MVP + TEST-DESIGN-OPS-001 + F-05 ops-log.sql + UT-IT-51 + IT-5-GAPS + 5-LEVEL-FULL + ARG 11 子项 + **star-api-rest 4 Phase + V2 7 子项 + TMO 10 子项 + P0-2/3/4 3 子项 + H2-EXT 3 子项 + H1-H5 5 子项**) | **~248.7M** | **~41.4 周** | **107/125 实质收官 (85.6%, +10 升 🟡→🟢 from §14.13 V2 7 + §14.14 TMO 10) + 22 阻塞/待拍 (ARG 9 子项 + P0-2/3/4 3 + H2-EXT 3 + H3 1 + Star-EI 8 plan + 5 域 Lead 真人到位)** |
 
-**注**: 200M 软预算 vs ~210.4M 实证 (P3+5 阶段 + 10 项 P3 之外) + ~30M ARG 新增 = ~240.4M, 超出 40.4M (20.2%), 超 2% 余量绿区 18.2%, **触发新余量决策**:
-- 选项 1: **维持 200M 软预算**, ARG 30M 从 P3-E/F 余量吸收 (P3-E 实测 23.4M 节约 6.6M, P3-F 实测 18.5M 节约 6.5M, 合计 13.1M) + 推 origin 余量 16.9M (待 DDD Review 拍板)
-- 选项 2: **上调 200M → 240M** (per STAR-OLU-001 §1 余量原则, ARG 是新 view 跨 4 新 crate 实际工作量大), 需 Ulysses 拍板
-- 选项 3: **分阶段批**, ARG.1-7 P3-C/P3-D 启动用 P3 余量 13.1M, ARG.8-11 P3-E 等真人到位后追加预算
+**注**: 200M 软预算 vs ~210.4M 实证 (P3+5 阶段 + 10 项 P3 之外) + ~30M ARG 新增 + ~1.2M V2 + ~2.5M TMO + ~1.3M P0-2/3/4 + ~0.85-1.05M H2-EXT + ~0.3M H1-H5 + ~2-3M star-api-rest = ~248.7M, 超出 48.7M (24.4%), 超 2% 余量绿区 22.4%, **触发新余量决策**:
+- 选项 1: **维持 200M 软预算**, 新增 ~8M 从 P3-E/F 余量吸收 (P3-E 实测 23.4M 节约 6.6M, P3-F 实测 18.5M 节约 6.5M, 合计 13.1M)
+- 选项 2: **上调 200M → 250M** (per STAR-OLU-001 §1 余量原则, V2/TMO/star-api-rest 是新阶段实际工作量大), 需 Ulysses 拍板
+- 选项 3: **分阶段批**, V2/TMO 已收官, P0-2/3/4 + H2-EXT + star-api-rest + H1-H5 跨 session 续做, 触发 = 5 域 Lead 真人到位 (per 守门 #14 v2 拍板 D 维持)
 
-**默认推荐 选项 3** (per 守门 #9 v19 Mavis 自驱 + 9/8 15:29 JST 第 7 次强化): ARG.1-7 优先 P3-C W1 启动用 P3 余量, ARG.8-11 等 5 域 Lead 真人到位后追加预算分阶段拍板.
+**默认推荐 选项 3** (per 守门 #9 v19 Mavis 自驱 + 9/8 15:29 JST 第 7 次强化): 已收官阶段不动 (V2/TMO), 跨 session 续做项等 5 域 Lead 真人到位后追加预算分阶段拍板.
 
 ---
 
@@ -813,6 +1065,8 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | v0.17 | 2026-09-08 | 架构师 (Mavis 接手 agent per DEC-008) | **§15 累计 5-LEVEL-FULL 升版 (per 2026-09-08 20:20 JST 5-LEVEL-FULL PR #35 MERGED, TEST-DESIGN 5 级别全闭环 §4 E2E + §5 PT + §6 UAT)**：(1) §15 累计新增 5-LEVEL-FULL 1 行 (P3 之外, 9/8 19:50 JST 拍板, ~3.0M tokens / ~0.50 周, 1/1 子项 100% 收官 PR #35 MERGED commit `1b0b1c1` 12 files +2134/-23); (2) 3 章节全实装 (§4 E2E Playwright 跨 Chromium/Firefox/WebKit + 4 tab × 10 端点 28 E2E + §5 PT log_upload_bench P95 51ms < 200ms 跟 F-05 联动 + §6 UAT 验收 8 AC + 4 类功能 + 5 维 NFR + 5 错误码 6-field 验收用例矩阵 + 5 域 Lead Mavis 临时代签 + 4 验收环境 dev/staging/prod/canary); (3) 累计 67 lib + 48 IT + 4 bench (cluster 49ms / metrics 0.83μs / docs 3.8ms / log_upload 51ms) + 28 E2E + 8 AC = **184 tests PASS 5+1 守门全 PASS**; (4) §15 累计 94/108 → **95/108 实质收官 (87.0% → 88.0%, +1 子项 升 🟡→🟢)**; 14 阻塞/待拍 → 13 阻塞/待拍 (5-LEVEL-FULL 收官关 1 阻塞); 207.4M → **210.4M** (+3.0M, 仍 2% 绿区边缘, 超 5.2%); (5) §14.10.4 缺口 #2/#5 全部关闭 (5-LEVEL-FULL 5 级别全闭环实证); (6) §17 引用文档 +7 (5-LEVEL-FULL brief 129 行 + 3 e2e spec + 1 capacity script + 1 UAT plan + 1 UAT DOD+RACI + 1 PHASE report + 1 PR 描述); (7) **遗留清理实证**: 14 → 14 worktree (减 0, owner 手动 Remove-Item -Recurse -Force 1 个 wt-ops-5-level-full 物理目录全清) | 2026-09-08 20:20 JST 5-LEVEL-FULL PR #35 MERGED + 用户发令"继续推进测试到 uat 完成" 触发 |
 | v0.18 | 2026-09-09 | 架构师 (Mavis 接手 agent per DEC-008) | **§14.11 Agent Relationship Graph (ARG) 阶段落档 (per 9/8 22:35 JST `ask_7d7ffcac2353adad7d3f6f69` 4 拍板 + 9/9 用户发令"基本设计也做一下" + 9/9 "自审" + 9/9 "加入wbs")**：(1) §14.11 新增 (11 子项 ARG.1-11, ~30M tokens / ~5 周, 4 [P] / 3 [M] / 3 [S] / 1 真人寻访, 4 新 crate + 24 组件 + 13 REST + 1 WS + 20 成就 + 10 类关系 + 5 团队模板 + 4 effect 维度 + 52 UT + 10 IT + 8 E2E + 4 PT = 74 测试); (2) 11 子项明细 (ARG.1 crates/arg 6 子模块 [P] / ARG.2 crates/arg-bridge 4 子模块 [P] / ARG.3 crates/arg-effect 5 子模块 [P] + 8 拓扑成就 Cypher + 10 套 challenges prompt + L0↔L1 PyO3 / ARG.4 crates/api/src/arg 13 REST + 1 WS + RLS 13 类 [M] / ARG.5 frontend/agent-relationships 5 UI 组件 [M] / ARG.6 30 UT 完整落地 [S] / ARG.7 10 IT + 8 E2E + 4 PT 端到端 [M] / ARG.8 7 行为 + 5 产出成就 evaluator [M] / ARG.9 PHASE-ARG-IMPL-REPORT.md 实施报告 [S] / ARG.10 DDD Review G-9/G-4/G-10 [S] / ARG.11 5 域 Lead 真人到位 [S] 真人寻访); (3) 12 已知缺口 (G-1 Memgraph 客户端 / G-2 k3s 部署 yaml / G-3 闭环 / G-4 trusts 安全审计 / G-5 闭环 / G-6 闭环 / G-7 Memgraph HA / G-8 真人到位 / G-9 跟 TMO 9 节点边界 / G-10 Schema V2 迁移 / G-11 成就可分享 / G-12 跟 RGS 独立边界); (4) §15 累计 108 → 119 子项 + 210.4M → 240.4M (超 20.2%, 触发新余量决策) + 95/108 (88.0%) → 95/119 (79.8%); 13 → 24 阻塞/待拍 (ARG 11 子项全部待启动 + 守门 #14 v2 真人到位); (5) **新余量决策 3 选项** (per 守门 #9 v19 Mavis 自驱推荐 选项 3 分阶段批): 选项 1 维持 200M 余量吸收 / 选项 2 上调 240M / 选项 3 分阶段批 (ARG.1-7 P3-C/P3-D 启动用 P3 余量 13.1M, ARG.8-11 P3-E 等真人到位后追加预算); (6) 守门合规 #1+#1 v15 (4 次新事件触发) +#3+#5+#6+#7+#9+#10+#12+#13+#14 v2+#19 v19 全过; (7) §17 引用文档 +3 (SRS-AGENT-RELATIONSHIP-001 v0.1 + BD-AGENT-RELATIONSHIP-001 v0.1 + DD-AGENT-RELATIONSHIP-001 v0.1.1) | 2026-09-08 22:35 JST `ask_7d7ffcac2353adad7d3f6f69` 4 拍板 + 9/9 用户发令 3 次 ("基本设计也做一下" + "自审" + "加入wbs") 触发 (per 守门 #1 v15 新事件触发, 守门 #9 v19 Mavis 自驱) |
 | v0.19 | 2026-09-09 | 架构师 (Mavis 接手 agent per DEC-008) | **§14.11 ARG 阶段 2/11 实质收官 (ARG.1 + ARG.4 merge 落地, per 9/9 04:38 JST 用户发令"开子代理和worktree并行处理" + `ask_8d5083148d6e0566b520988e` 拍板 3 推荐项 + 守门 #9 v19 Mavis 自驱)**：(1) **ARG.1 收官**: 子代理 `bg_76a610ed` 5 守门 0 err + 33 UT 100% pass (1 lib + 32 integration) + 1 commit `43c1f0c` author=Ulysses 9/9 05:00 JST in `wt-arg-01-arg-crate`; 父会话 merge 走守门 #1 v3 + v25 实证 0 err (cargo check --workspace --all-targets 0 err 48.32s + cargo test -p star-arg 33/33 pass + workspace --lib 0 err) + merge commit `651117e` 9/9 05:00 JST; 44 文件 / 4206 行 / 2 脚本 (`memgraph_setup.py` + `arg_seed.py`) + 2 文档更新 (`automation-design.md` §4.17 + `registry.md` §5.3) + 1 报告 (`PHASE-ARG-01-IMPL-REPORT.md` 19.4KB); (2) **ARG.4 收官**: 子代理 `bg_728ebe95` 5 守门 0 err + 24/24 cargo test pass + 10/10 Python IT pass + 1 commit `6e2cda6` author=Ulysses 9/9 05:31 JST in `wt-arg-04-api-13rest-1ws`; 14 routes 13 REST + 1 WS 严格按 DD §4.12 (axum 0.8 `{id}` 语法 per ADR-0048); 父会话 merge 走守门 #1 v3 + v25 实证 0 err (cargo check --workspace --lib 0 err + cargo test -p api 24/24 + star-arg 33/33 0 回归 + Python IT 10/10) + merge commit `1d894ab` 9/9 05:31 JST; 13 文件 / 3243 行 / 1 脚本 (`arg_api_test.py` 580 行) + 2 文档更新 (`automation-design.md` §4.18 + `registry.md` §5.4) + 1 报告 (`PHASE-ARG-04-IMPL-REPORT.md` 20.2KB); (3) **守门 #1 v15 docs 同步饱和**: 本轮新事件 6+2 merge commit = 8 次, 全过 (per §14.11 v0.18 6 次基础 + 2 merge = 8 次新事件, 仍允许); (4) §15 累计 95 → **97 实质收官 (79.8% → 81.5%, +2 升 🟡→🟢)**; 24 → 22 阻塞/待拍 (ARG 9 子项待 P3-C W2-P3-E 续 + 守门 #14 v2 真人到位); 240.4M (维持, ARG.1+ARG.4 实证 token ~7.5M 在 9M 预算内); (5) 选项 3 分阶段批执行实证: ARG.1 (6M 估) 实测 ~4.5-5.0M / ARG.4 (3M 估) 实测 ~1.8-2.2M = ~7.5M 实证, P3 余量 13.1M 充足, 未触发熔断; (6) 守门合规 #1+#1 v15+#1 v19+#1 v25+#3+#5+#6+#7+#9+#10+#12+#13+#14 v2+#19 v19 全过 (WBS 升版 + 5 守门实证 + 2 子代理 RPC 0 派); (7) §17 引用文档 +2 (PHASE-ARG-01-IMPL-REPORT.md + PHASE-ARG-04-IMPL-REPORT.md) | 2026-09-09 04:38 JST 用户发令"开子代理和worktree并行处理" + `ask_8d5083148d6e0566b520988e` 3 推荐项拍板 (scope=ARG.1+ARG.4 / budget=选项3 / merge=串行merge走守门) + ARG.1 + ARG.4 merge 落地触发 |
+
+| **v0.20** | **2026-09-09 11:32 JST** | **架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses** | **§14.12-§14.17 全量补齐 6 块 HANDOFF 跟踪项 (per 9/9 11:32 JST 用户发令"handoff里面的内容更新进wbs" + `ask_334f37229948f71366566fbf` 推荐项 全量补齐 拍板 + 守门 #9 v19 Mavis 自驱)**：(1) **§14.12 star-api-rest REST 接管** (新增, 9/9 用户发令"把完成后端接管的计划写成 spec, 然后更新 handoff" + Claude Code Sonnet 5 落档独立 WBS `STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` v0.1, 4 Phase 拆分 + 27 路由 → 16 MCP 工具范式 → 9+3 domain crate 映射 + 6 已知缺口 + 5 子代理边界 + 7 守门, 估 2-3M token, 0/4 plan); (2) **§14.13 V2 凭证管理 7/7 全闭环** (新增, per HANDOFF v1.2-v1.3 + 9/4 17:19-20:00 JST 落地, star-credential 11/11 test + 6 vitest + 3 PR #9/#10/#11 + 871 tests 0 fail 守门实证, 4 commit V2-1..V2-4 + V2-5/V2-6/Frontend UI, 1.2M token); (3) **§14.14 TMO 7 节点全闭环** (新增, per HANDOFF v1.4-v1.6 + PR #13 SQUASH MERGED `5e5b1c2` 2026-09-04T18:03:33Z, 88/88 TMO pytest pass + 32+ 项守门全过 + 4 守门修订 + 5 守门实证, 10 子项含 G-TMO-04 系列 5/5, 2.5M token); (4) **§14.15 P0-2/3/4 跨 session 续** (新增, per HANDOFF v0.6 §5.2 + 9/1 08:44 JST "所有" 拍板, 1.3M token, 0/3 收官, 依赖 H2 完成 + 5 域 Lead 真人到位); (5) **§14.16 H2-EXT #4 #5 强类型重构 + H2 原 3 domain service.rs** (新增, per HANDOFF v0.4-v0.5 §5.1 + 9/1 08:32 JST 4 项拍板, 0.85-1.05M token, 0/3 收官, hostname 拍板 0 type 改, 290 err baseline 跨 9 crate); (6) **§14.17 H1/H3/H4/H5 收尾项** (新增, per HANDOFF v0.1 §1 + v0.6 §8.1, 3/5 收官 H1 + H4 + H5, H2 转入 §14.2, H3 as_uuid 等 H2 完成); (7) **§15 累计统计升版**: 119 → 125 子项 + 240.4M → 248.7M (超 24.4%, 触发新余量决策 3 选项); 97/119 (81.5%) → **107/125 (85.6%, +10 升 🟡→🟢 from §14.13 V2 7 + §14.14 TMO 10 净增)**; 22 阻塞/待拍 (新增 P0-2/3/4 3 + H2-EXT 3 + H3 1 + star-api-rest 4 + 5 域 Lead 真人到位); (8) 守门合规 #1+#1 v15 (本轮 4+1=5 次新事件触发, 全过 per 守门 #12 死循环饱和 5 次允许) +#1 v19+#1 v25+#3+#5+#6+#7+#9+#10+#12+#13+#14 v2+#19 v19 全过 (本轮纯 doc-only 改动, 0 子代理 RPC 派, 0 cargo 改动); (9) §17 引用文档 +9 (HANDOFF-ST-001 v1.7 + STAR-API-REST-BACKEND-TAKEOVER-WBS-001 v0.1 + PHASE-V2-1..6-IMPL-REPORT × 7 + PHASE-LANGGRAPH-TMO-IMPL-REPORT v0.3 + PHASE-P4-V2-TMO-CI-IMPL-REPORT v0.4) | 2026-09-09 11:32 JST 用户发令"handoff里面的内容更新进wbs" + `ask_334f37229948f71366566fbf` 拍板选项 3 (全量补齐 6 块) + 守门 #9 v19 Mavis 自驱 触发 (per 守门 #1 v15 docs 同步饱和第 5 次新事件触发, 仍允许) |
 
 ---
 
@@ -841,4 +1095,15 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 - `docs/design/DD-AGENT-RELATIONSHIP-001.md` v0.1.1 — ARG 詳細設計書 + self-review 修复 (per §14.11, commit `49c8938` v0.1 + `a697284` v0.1.1 self-review, 1919+392=2311 行)
 - `docs/reports/PHASE-ARG-01-IMPL-REPORT.md` v0.1 — ARG.1 实装报告 (per §14.11, commit `43c1f0c` + merge `651117e`, 19.4KB)
 - `docs/reports/PHASE-ARG-04-IMPL-REPORT.md` v0.1 — ARG.4 实装报告 (per §14.11, commit `6e2cda6` + merge `1d894ab`, 20.2KB)
+- `docs/reports/HANDOFF-ST-001.md` v1.7 — HANDOFF 跟踪表最新 (per §14.12-§14.17 全量补齐, 含 v1.7 §20 star-api-rest 接管 + v1.0-v1.6 V2/TMO/H1-H5/P0-2/3/4 收尾项)
+- `docs/reports/STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` v0.1 — star-api-rest REST 层真实业务接入 + 端到端部署 WBS (per §14.12, Claude Code Sonnet 5 落档, 4 Phase 拆分 + 27 路由 → 16 MCP 工具范式 → 9+3 domain crate 映射)
+- `docs/reports/PHASE-V2-1-IMPL-REPORT.md` v0.1 — V2-1 凭证管理层实装报告 (per §14.13, commit `3d251bf`, 9/4 19:45 JST)
+- `docs/reports/PHASE-V2-2-IMPL-REPORT.md` v0.1 — V2-2 REST API 实装报告 (per §14.13, commit `7d06f97`, 9/4 20:00 JST, axum 0.8)
+- `docs/reports/PHASE-V2-2-FULL-IMPL-REPORT.md` v0.1 — V2-2 完整版实装报告 (per §14.13, 9/4 20:00 JST)
+- `docs/reports/PHASE-V2-3-IMPL-REPORT.md` v0.1 — V2-3 DB 持久化实装报告 (per §14.13, commit `4251242`, 9/4 20:05 JST, SQLite)
+- `docs/reports/PHASE-V2-4-IMPL-REPORT.md` v0.1 — V2-4 审计端点实装报告 (per §14.13, commit `b5bd5c3`, 9/4 20:15 JST)
+- `docs/reports/PHASE-V2-5-IMPL-REPORT.md` v0.1 — V2-5 批量导入导出实装报告 (per §14.13, 9/4 19:45-20:15 JST)
+- `docs/reports/PHASE-V2-6-IMPL-REPORT.md` v0.1 — V2-6 5 子代理 + Mavis 跨域协调实装报告 (per §14.13, 9/4 19:45 JST, per 守门 #3 反转 + 守门 #14 修订)
+- `docs/reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md` v0.3 — TMO 7 节点 + 4 守门修订综合实装报告 (per §14.14, 9/5 02:39 JST 升版, 88/88 TMO pytest + 32+ 项守门全过 + PR #13 SQUASH MERGED `5e5b1c2`)
+- `docs/reports/PHASE-P4-V2-TMO-CI-IMPL-REPORT.md` v0.4 — P4 V2 + TMO + CI 综合实装报告 (per §14.14, 9/5 02:50 JST)
 
