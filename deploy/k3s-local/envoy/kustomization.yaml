@@ -1,0 +1,31 @@
+# envoy kustomization (per v0.44 §14.12 III envoy 容器化实施, brief §3.1 kustomization.yaml)
+# 顶层 kustomize 整合 4 resource (deployment + service + configmap + serviceaccount)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# namespace: star-system (跟 star-api-rest-deploy.yaml 一致, 守门 #11 缺标比错标)
+namespace: star-system
+
+# 4 resource (per brief §3.1, 跨 session 续可加 HPA / NetworkPolicy)
+resources:
+  - serviceaccount.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+
+# 公共 labels (per kubernetes 标签最佳实践 + 守门 #3 显式声明)
+# 用 labels: 替代 deprecated commonLabels: (per kustomize 5.x)
+labels:
+  - includeSelectors: true  # 同步 deployment selector (v0.44 阶段 1 replica 不滚动, 守门 #11 缺标比错标)
+    pairs:
+      app.kubernetes.io/name: envoy
+      app.kubernetes.io/component: proxy
+      app.kubernetes.io/part-of: star-system
+      app.kubernetes.io/managed-by: kustomize
+      app.kubernetes.io/version: "1.31.0"
+
+# settings (kustomize build output)
+generatorOptions:
+  disableNameSuffixHash: true  # 显式关闭 hash suffix (ConfigMap / Service 不滚动更新)
+  labels:
+    includeSelectors: "false"  # 跨 resource 不重复 selector labels (deployment selector 单独维护, 守门 #11 缺标比错标)

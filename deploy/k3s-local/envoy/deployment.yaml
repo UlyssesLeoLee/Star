@@ -1,0 +1,105 @@
+# envoy Deployment (per v0.44 §14.12 III envoy 容器化实施, brief §3.1 deployment.yaml)
+# 独立 deployment 模式 (per 9/1 13:03 JST 用户拍板"所有 nginx → envoy" + 13:05 JST 拍板"独立部署, not istio sidecar")
+# 1 replica + ClusterIP service (per brief §3.1)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: envoy
+  namespace: star-system
+  labels:
+    app: envoy
+    app.kubernetes.io/name: envoy
+    app.kubernetes.io/component: proxy
+    app.kubernetes.io/part-of: star-system
+spec:
+  replicas: 1
+  # 显式 selector 锁定 (避免跟其他 proxy 混淆, 守门 #11 缺标比错标)
+  selector:
+    matchLabels:
+      app: envoy
+  strategy:
+    type: Recreate  # 单 replica + 端口 15001/15090 不能并行, 用 Recreate
+  template:
+    metadata:
+      labels:
+        app: envoy
+        app.kubernetes.io/name: envoy
+        app.kubernetes.io/component: proxy
+        app.kubernetes.io/part-of: star-system
+        app.kubernetes.io/version: "1.31.0"
+        # 显式拒绝 sidecar 自动注入 (per 9/1 13:05 JST 拍板"独立部署, not istio sidecar")
+        star.agent/inject: "false"
+        sidecar.istio.io/inject: "false"
+    spec:
+      serviceAccountName: envoy
+      # 显式不挂 sidecar (守门 #3 不允许兼任 + 9/1 13:05 JST 拍板)
+      containers:
+        - name: envoy
+          image: envoyproxy/envoy:v1.31.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - "/usr/local/bin/envoy"
+            - "--config-path"
+            - "/etc/envoy/envoy.yaml"
+            - "--log-level"
+            - "info"
+            - "--service-cluster"
+            - "envoy-star-system"
+          ports:
+            # admin port (per brief §1 已知)
+            - name: admin
+              containerPort: 15001
+              protocol: TCP
+            # readiness port (per brief §1 已知)
+            - name: readiness
+              containerPort: 15090
+              protocol: TCP
+          # future: business listener (15000/8443) 跨 session 续, 业务路由待 v0.45+ 落地
+          env:
+            # 守门 #5 v2: envoy 不打印 secret
+            - name: ENVOY_LOG_LEVEL
+              value: "info"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: readiness
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: readiness
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # 资源限制 (跟其他 svc 一致, 守门 #11 缺标比错标)
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          # 安全上下文 (per ADR-0021 Zero Vendor Cooperation + workspace lint safe-by-default)
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532  # envoy nonroot user (uid=65532 in official image)
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: envoy-config
+              mountPath: /etc/envoy
+              readOnly: true
+      volumes:
+        - name: envoy-config
+          configMap:
+            name: envoy-bootstrap
+            items:
+              - key: envoy.yaml
+                path: envoy.yaml
