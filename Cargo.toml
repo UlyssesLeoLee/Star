@@ -94,6 +94,8 @@ members = [
     "crates/arg",
     # ARG.2 (P3-C W2): 2026-09-10 新增 crates/arg-bridge (ARG Bridge Tier: MemgraphEventListener + LangGraphStateUpdater + PeriodFlushWorker + OfflineQueue, per docs/architecture/2026-09-03-arg/06-arg-02-arg-bridge.md v0.50, Mavis 临时代签 5 域 Lead 决策 per 9/3 11:35 JST 反转 + 守门 #13 a L0 协调 + 守门 #5 env 安全)
     "crates/arg-bridge",
+    # ARG.3 (P3-C W3): 2026-09-10 新增 crates/arg-effect (ARG Effect Tier: ARGDispatchRouter / ARGContextInjector / ARGTrustEngine / ARGOutputEvaluator / ARGAchievementEngine + 10 套 challenges prompt + 8 拓扑 Cypher, per docs/architecture/2026-09-03-arg/07-arg-03-5-sa-impl.md v0.50, 守门 #1 v19 [P] 必先 `scripts/automation/arg_dispatch_test.py` + 守门 #7 0 unsafe + 守门 #13 跨域边强制 consults)
+    "crates/arg-effect",
 ]
 exclude = ["target"]
 
