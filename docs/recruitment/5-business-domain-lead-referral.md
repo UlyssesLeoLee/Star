@@ -1,6 +1,6 @@
-# 5 域 Lead 真人 Ulysses 内推 Brief v0.1 (per 9/5 10:43 JST G-DEP-03 拍板)
+# 5 域 Lead 真人 Ulysses 内推 Brief v0.2 (per 9/10 07:24 JST 拍板 v0.54 brief 派发 + 5 域 Lead brief × 5 doc + 6 周 timeline 落档)
 
-> **状态**: 🟢 Active v0.1 (2026-09-05 10:43 JST 拍板落地)
+> **状态**: 🟢 Active v0.2 (2026-09-10 07:24 JST brief v0.54 派发落地)
 > **触发**: per 9/5 10:43 JST `ask_409cbd32edc309d71a083e2a` 用户拍板 (Q1=内推, Q2=立即启动, 推荐项)
 > **守门依据**: 守门 #3 (5 域独立 Lead, 不接受兼任) + 守门 #14 (5 域 Lead CONTENT 4 维) + 守门 #10 (代签 author=Ulysses)
 > **关联 commit**: 见 `git log -p --follow docs/recruitment/5-business-domain-lead-referral.md` (per 守门 #12 不写死 SHA, 用 path 稳定标识)
@@ -177,3 +177,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 5 域 Lead 真人 Ulysses 内推 brief (per 9/5 10:43 JST `ask_409cbd32edc309d71a083e2a` 用户拍板 Q1=内推+Q2=立即启动) | G-DEP-08 跨 session 续落地 |
+| v0.2 | 2026-09-10 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | v0.2 完整化: 5 域 Lead brief × 5 doc 落档 (player/economy/match/social/admin) + 6 周 timeline T0-T5 (per docs/briefs/v0.54-5lead-outreach.md §3 + §3.2, 5 域 brief 25,657 字 + timeline 6,424 字 共 32,081 字 ≥ 3,000 字门槛) | brief v0.54 派发落地 + 9/10 07:24 JST 用户发令"继续" + 守门 #14 v3 永久代签 |
