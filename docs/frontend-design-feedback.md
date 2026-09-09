@@ -1,5 +1,7 @@
 # Frontend Design 詳細設計書 Review Feedback（基于后端功能审核）
 
+> **当前修复状态复核（2026-09-08）**：`docs/reports/2026-09-08-audit-003-detailed-design.md` 对本文档 16 项 Finding 中的 9 项做了当前状态复核，结果 8/9 原样未修复（仅 FD-13 已修复）。这些"实装 vs 详设"层面的乖离已重新整理进 `docs/detailed-design-feedback.md`（DD-01~DD-08 对应 FD-01/FD-01B/FD-15/FD-04/FD-03/FD-07/FD-08/FD-02），本文档保持原始产出内容不变，仅作追加说明。
+>
 > **审核对象**: `docs/frontend-design.md` v0.1（2026-08-26，884 行）
 > **审核基线（按优先级）**: `crates/domain-*/src/**/*.rs`（后端实际功能，最高优先级）> `docs/specs/domain-*.md` > `docs/api-design.md` v0.2 / `docs/basic-design.md` v0.1（frontend-design.md 自行声明的上游）> `frontend/src/`（前端实施现状）
 > **审核方法**: 逐条核对 frontend-design.md 中一切"与 backend 严格一致 / 1:1 对应"的断言（状态机状态数与状态名、错误码、NATS Subject、字段投影、组件目录、MVP 承诺）是否在对应 `crates/domain-*` 源码中可验证；backend 功能 → 是否有对应前端需求覆盖（反向覆盖检查）；以及文档内部自相矛盾。审核不改写被审文档，仅产出 Finding。
