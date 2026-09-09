@@ -768,7 +768,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 
 | # | Phase | 主题 | 涉及路由 | 复杂度 | 状态 |
 |---|---|---|---|---|---|
-| 0 | **Phase 0** | 基线复核（数字时效性, 必跑） | — | 极低 | 🟡 plan |
+| 0 | **Phase 0** | 基线复核（数字时效性, 必跑） | — | 极低 | 🟢 **收官** (per 2026-09-09 12:02 JST, 详见 §14.12.6) |
 | 1 | **Phase I** | REST handler 接线 (17 已有 dep + 10 需新增 3 dep) | 27 | 中 | 🟡 plan |
 | 2 | **Phase II** | 持久化决策（in-memory vs 真实 DB） | — | 高（可推迟） | 🟡 待拍板 |
 | 3 | **Phase III** | 前端容器化 + k3s 部署 (real-API 模式) | — | 中 | 🟡 plan |
@@ -813,6 +813,33 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 本文件是计划, 不实施任何代码改动 | Phase I 接线时必须逐条对照 §1.1 表格 MCP 工具文件, 禁止凭空重写 | 新增 path-dep 后必须 `cargo check --workspace` 确认无循环依赖 | 任何"看起来完成"的路由验收标准是真实 curl/集成测试返回非 501 + 返回体可验证 | 持久化/鉴权如暂不做, 必须在交付说明里显式写明, 不能默默略过 | 前端 `NEXT_PUBLIC_*` 变量必须用 `docker build --build-arg` 传入, 不能写 k8s Deployment runtime `env:` | Phase 完成后报告必须遵循 AGENTS.md §3 7 段结构
 
 **Token 估**: ~2-3M (Phase 0-I 估 1.5-2M, Phase III 估 0.5-1M, Phase II/IV 视拍板)
+
+### 14.12.6 Phase 0 基线复核落地 (per 2026-09-09 12:02 JST, per 守门 #14 v3 升级后 Mavis 自驱推进)
+
+> **触发**: 2026-09-09 12:02 JST 用户发令"全部永久代签, 直到我修改策略为止, 继续推进" + 守门 #9 v19 Mavis 自驱。
+
+| 验证项 | 命令 | 结果 |
+|---|---|---|
+| **27 路由数字时效性** | `grep -c not_implemented crates/star-api-rest/src/routes/*.rs` (per 文件 + 总计) | **28 总命中, 跨 12 文件** (跟独立 WBS §1.1 27 差 1, 差 1 是 `mod.rs` 文档注释误命中, per §3.1 已知; 实际业务 handler 27 路由 0 业务逻辑, 跟独立 WBS 27 一致) |
+| **12 routes 文件清单** | `Get-ChildItem crates/star-api-rest/src/routes/*.rs` | code.rs / context.rs / merge_requests.rs / mod.rs / pipelines.rs / reviews.rs / submissions.rs / validations.rs / webhooks.rs / work_items.rs / workspaces.rs / worktrees.rs (跟独立 WBS §1.1 表一致) |
+| **`cargo test -p star-api-rest --lib -j 4`** | (per 守门 #1 v25 单 crate 模式) | **6/6 tests pass, 0 fail, 50.57s** (含 `audit_layer_passes_through` / `rate_limit_layer_passes_through` / `auth_layer_passes_through` 3 middleware no-op + `router_contains_expected_paths` + `health_endpoint_returns_ok` + `business_endpoint_returns_501_not_implemented` 1 个 negative 测试确认现状) |
+| **`mod.rs` 文档漂移 (per 独立 WBS §3.1)** | 读 mod.rs 第 4 行 | 文档注释"标准端点, 不含 22 业务路由"过时, 实际 27 (跟独立 WBS §3.1 一致, Phase I 顺手修) |
+
+**守门实证** (per 守门 #1 v19 + #1 v25 单 crate):
+- 守门 #1 单 crate cargo test: 6/6 pass 50.57s
+- 守门 #1 #1 v19 自驱推进: 不等用户拍板, Mavis 拿到 §14.18 永久代签授权后立即推进
+- 守门 #14 v3 升级: 真人到位流程不阻塞 Phase 0 推进
+- 守门 #15 死循环饱和: 8+1=9 次新事件触发 (per v0.22 + v1.9 + Phase 0), 仍允许
+- 守门 #12 commit-time docs 同步: 本节是 Phase 0 落档报告, commit 含本节
+
+**已知缺口 (per 缺标比错标)**:
+1. mod.rs 文档漂移 (per 独立 WBS §3.1): "22 业务路由"已过期, 实际 27, Phase I 顺手修
+2. 6 tests 全部 no-op 实证, 0 业务逻辑测试 (因为 27 handler 全是 501 stub) — Phase I 接线后单元测试从 6 增到 27+ 真实业务断言
+3. 28 not_implemented 命中含 1 处 mod.rs 文档注释 (per 独立 WBS §3.1 跟 §14.12.6 上表注一致)
+
+**Token 实证**: Phase 0 实测 ~0.05M (per 守门 #9 v19 + 守门 #14 v3 升级后 Mavis 自驱跑, 0 子代理 RPC 派, 0 cargo 改动, 仅 1 cargo test + 1 grep + 1 Get-ChildItem)
+
+**Phase I 启动条件** (per §14.12.5 守门 #3): 27 路由接线需新增 3 个 path-dep (`domain-search` / `domain-scm` / `domain-validation`), Phase 0 实证 28 not_implemented 0 业务逻辑 状态确认, Phase I 可立即启动。
 
 ---
 
@@ -1114,6 +1141,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | **v0.20** | **2026-09-09 11:32 JST** | **架构师 (Mavis 接手 agent per DEC-008) — Mavis 接手代签 Ulysses** | **§14.12-§14.17 全量补齐 6 块 HANDOFF 跟踪项 (per 9/9 11:32 JST 用户发令"handoff里面的内容更新进wbs" + `ask_334f37229948f71366566fbf` 推荐项 全量补齐 拍板 + 守门 #9 v19 Mavis 自驱)**：(1) **§14.12 star-api-rest REST 接管** (新增, 9/9 用户发令"把完成后端接管的计划写成 spec, 然后更新 handoff" + Claude Code Sonnet 5 落档独立 WBS `STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` v0.1, 4 Phase 拆分 + 27 路由 → 16 MCP 工具范式 → 9+3 domain crate 映射 + 6 已知缺口 + 5 子代理边界 + 7 守门, 估 2-3M token, 0/4 plan); (2) **§14.13 V2 凭证管理 7/7 全闭环** (新增, per HANDOFF v1.2-v1.3 + 9/4 17:19-20:00 JST 落地, star-credential 11/11 test + 6 vitest + 3 PR #9/#10/#11 + 871 tests 0 fail 守门实证, 4 commit V2-1..V2-4 + V2-5/V2-6/Frontend UI, 1.2M token); (3) **§14.14 TMO 7 节点全闭环** (新增, per HANDOFF v1.4-v1.6 + PR #13 SQUASH MERGED `5e5b1c2` 2026-09-04T18:03:33Z, 88/88 TMO pytest pass + 32+ 项守门全过 + 4 守门修订 + 5 守门实证, 10 子项含 G-TMO-04 系列 5/5, 2.5M token); (4) **§14.15 P0-2/3/4 跨 session 续** (新增, per HANDOFF v0.6 §5.2 + 9/1 08:44 JST "所有" 拍板, 1.3M token, 0/3 收官, 依赖 H2 完成 + 5 域 Lead 真人到位); (5) **§14.16 H2-EXT #4 #5 强类型重构 + H2 原 3 domain service.rs** (新增, per HANDOFF v0.4-v0.5 §5.1 + 9/1 08:32 JST 4 项拍板, 0.85-1.05M token, 0/3 收官, hostname 拍板 0 type 改, 290 err baseline 跨 9 crate); (6) **§14.17 H1/H3/H4/H5 收尾项** (新增, per HANDOFF v0.1 §1 + v0.6 §8.1, 3/5 收官 H1 + H4 + H5, H2 转入 §14.2, H3 as_uuid 等 H2 完成); (7) **§15 累计统计升版**: 119 → 125 子项 + 240.4M → 248.7M (超 24.4%, 触发新余量决策 3 选项); 97/119 (81.5%) → **107/125 (85.6%, +10 升 🟡→🟢 from §14.13 V2 7 + §14.14 TMO 10 净增)**; 22 阻塞/待拍 (新增 P0-2/3/4 3 + H2-EXT 3 + H3 1 + star-api-rest 4 + 5 域 Lead 真人到位); (8) 守门合规 #1+#1 v15 (本轮 4+1=5 次新事件触发, 全过 per 守门 #12 死循环饱和 5 次允许) +#1 v19+#1 v25+#3+#5+#6+#7+#9+#10+#12+#13+#14 v2+#19 v19 全过 (本轮纯 doc-only 改动, 0 子代理 RPC 派, 0 cargo 改动); (9) §17 引用文档 +9 (HANDOFF-ST-001 v1.7 + STAR-API-REST-BACKEND-TAKEOVER-WBS-001 v0.1 + PHASE-V2-1..6-IMPL-REPORT × 7 + PHASE-LANGGRAPH-TMO-IMPL-REPORT v0.3 + PHASE-P4-V2-TMO-CI-IMPL-REPORT v0.4) | 2026-09-09 11:32 JST 用户发令"handoff里面的内容更新进wbs" + `ask_334f37229948f71366566fbf` 拍板选项 3 (全量补齐 6 块) + 守门 #9 v19 Mavis 自驱 触发 (per 守门 #1 v15 docs 同步饱和第 5 次新事件触发, 仍允许) |
 | **v0.21** | **2026-09-09 11:45 JST** | **架构师 (Mavis 接手 agent per DEC-008) — Mavis 永久代签 Ulysses** | **§14.18 5 域 Lead 真人到位流程暂时去掉 + Mavis 永久代签声明 (per 9/9 11:45 JST 用户发令"真人签字流程暂时去掉, 允许 mavis 代签" + 守门 #9 v19 Mavis 自驱 + 守门 #14 v2 拍板 D 升级 + 9/3 11:35 JST 拍板 B 反转 + 9/5 10:43 JST 拍板 D 维持)**：(1) **§14.18 新增** policy-level 声明: 5 域 Lead 真人到位流程暂时不追踪 (per 2026-09-08 05:27 JST 用户发令升级为"暂时去掉"形式) + Mavis 永久代签所有签字栏 (per 8/27 19:39/21:59 + 9/8 15:19/15:29/16:08 JST 4 次强化) + 守门 #14 v2 拍板 D 升级 (Mavis 永久代签, 真人到位流程暂时不追踪, 后期 Ulysses 自行启动时再激活); (2) **v0.20 阻塞 count 修正**: v0.20 写"22 阻塞/待拍 (新增 P0-2/3/4 3 + H2-EXT 3 + H3 1 + star-api-rest 4 + 5 域 Lead 真人到位)" 算法内部不一致, 实际 v0.20 应 = 17 (per v0.19 22 阻塞 - 16 净收 v0.20 = [V2 7 - V2-6 已重复 1 = 6 净] + [TMO 10 - G-TMO-04/4b/4c/4d/5 已含 = 10 净] = 16 净增收 + 11 新增 = 5 净 + 7 收 - 6 已重复 = 17, **v0.20 实际 17 阻塞/待拍** (ARG 9 + 真人到位 1 [v0.20 误计 1 净加, 应是 -1] + P0-2/3/4 3 + H2-EXT 3 + H3 1 + star-api-rest 4 = 21 - 5 域 Lead 移除 1 = 20 - 16 收 - 1 重复 = 3 ...), 实际 v0.20 数字精确重算留 v0.22 修订; (3) **影响范围 policy 升级**: C.9 / E.5 / F.1 / ARG.10 / ARG.11 / §14.4 B-9 6 处"真人到位"状态列升级为"Mavis 永久代签", 本 v0.21 不修改这 6 处具体行 (per 守门 #1 禁回溯叙事), 后续 v0.22+ 引用本 §14.18 声明时一致即可; (4) **守门合规** #1+#1 v15 (本轮 5+1=6 次新事件触发, 守门 #12 死循环饱和 6 次允许) +#1 v19+#1 v25+#3+#5+#6+#7+#9+#10+#12+#13+#14 v2+#19 v19+#**14 v2 升级** 全过 (本轮纯 doc-only 改动, 0 子代理 RPC 派, 0 cargo 改动); (5) **未影响 (per 守门 #1 禁回溯叙事)**: 不修改 v0.1-v0.19 修订历史, 也不重写 V2/TMO 收官 commit / HANDOFF v1.0-v1.7 修订历史 | 2026-09-09 11:45 JST 用户发令"真人签字流程暂时去掉, 允许 mavis 代签" + 守门 #9 v19 Mavis 自驱 + 守门 #1 v15 docs 同步饱和第 6 次新事件触发 触发 (per 守门 #12 死循环饱和 6 次允许) |
 | **v0.22** | **2026-09-09 12:02 JST** | **架构师 (Mavis 接手 agent per DEC-008) — Mavis 永久代签 Ulysses (per 守门 #14 v3 升级 + 9/9 12:02 JST 第 8 次强化)** | **§14.18 升级为"全部永久代签"声明 (per 9/9 12:02 JST 用户发令"全部永久代签, 直到我修改策略为止, 继续推进" + 守门 #9 v19 Mavis 自驱 + 9/8 15:29 JST 第 7 次强化 + 9/1 14:58 JST 守门)**：(1) **§14.18 标题 + 内容升级**: 从"5 域 Lead 永久代签"扩到"**全部永久代签**" (5 域 Lead / SRE Lead / 平台 / 评审主持 / PM + 真人到位相关引用 + 5 域 Lead 寻访流程 + DDD Review 5 角色 + 任何未来新增的签字栏), 直到 Ulysses 明确发令修改策略为止; (2) **守门 #14 v2 拍板 D 升级为 v3**: 从"5 域 Lead 真人到位前 Mavis 临时代签"升级为"**Mavis 永久代签全部签字栏, 真人到位流程暂时不追踪, 直到 Ulysses 明确发令修改策略为止**"; (3) **"继续推进" 含义**: Mavis 拿到全部永久代签授权后, 不再被动等真人到位触发, 主动推进 §14.12 star-api-rest Phase 0 → §14.15 P0-2 → §14.16 H2-EXT #4 等可立即推进项, 真人到位流程不阻塞任何决策点; (4) **新守门 #14 v3 派生规**: 5 域 Lead 寻访流程 = 已作废, 不在 WBS 任何阻塞表 / 累计统计 / 修订历史中出现; 后续 PHASE-* / RGS-* / STAR-* 报告签字栏直接写 Mavis 永久代签, author=Ulysses (Mavis 接手), 不再标"临时代签"或"真人到位后追溯"; 后续 v0.22+ WBS 升版默认遵循本节, 不再单独声明 Mavis 永久代签 (per 守门 #1 禁重复叙事); (5) **守门合规** #1+#1 v15 (本轮 6+1=7 次新事件触发, 守门 #12 死循环饱和 7 次允许) +#1 v19+#1 v25+#3+#5+#6+#7+#9+#10+#12+#13+#14 v2→v3+#19 v19 全过 (本轮纯 doc-only 改动, 0 子代理 RPC 派, 0 cargo 改动); (6) **未影响 (per 守门 #1 禁回溯叙事)**: 不修改 v0.1-v0.20 修订历史, 也不重写 V2/TMO 收官 commit / HANDOFF v1.0-v1.7 修订历史 | 2026-09-09 12:02 JST 用户发令"全部永久代签, 直到我修改策略为止, 继续推进" + 守门 #9 v19 Mavis 自驱 + 9/8 15:29 JST 第 7 次强化 触发 (per 守门 #1 v15 docs 同步饱和第 7 次新事件触发, 仍允许) |
+| **v0.23** | **2026-09-09 12:02 JST** | **架构师 (Mavis 接手 agent per DEC-008) — Mavis 永久代签 Ulysses (per 守门 #14 v3 升级)** | **§14.12.6 Phase 0 基线复核落地 (per 9/9 12:02 JST 用户发令"继续推进" + 守门 #9 v19 Mavis 自驱 + 守门 #1 v25 单 crate 模式 + 守门 #14 v3 升级)**：(1) **§14.12.1 Phase 0 状态升级**: 🟡 plan → 🟢 收官; (2) **§14.12.6 新增 Phase 0 基线复核落地报告**: 27 路由数字时效性实证 (28 not_implemented 命中跨 12 文件, 跟独立 WBS §1.1 27 差 1 是 mod.rs 文档注释误命中 per §3.1) + 12 routes 文件清单实证 (跟独立 WBS §1.1 表一致) + **`cargo test -p star-api-rest --lib -j 4` 6/6 tests pass 0 fail 50.57s** (3 middleware no-op + router_contains_expected_paths + health_endpoint_returns_ok + 1 negative business_endpoint_returns_501_not_implemented 实证现状) + mod.rs 文档漂移记录 (per 独立 WBS §3.1, Phase I 顺手修); (3) **守门实证**: 守门 #1 v19 + #1 v25 单 crate 模式 + #14 v3 升级 + #15 死循环饱和 (本轮 7+1=8 次新事件触发仍允许) + #12 commit-time docs 同步 + #9 v19 Mavis 自驱, 全过; (4) **Phase I 启动条件**: 28 not_implemented 0 业务逻辑状态确认, Phase I 27 路由接线可立即启动 (需新增 3 个 path-dep domain-search / domain-scm / domain-validation); (5) **Token 实证**: Phase 0 实测 ~0.05M (0 子代理 RPC 派, 0 cargo 改动, 仅 1 cargo test + 1 grep + 1 Get-ChildItem); (6) **未影响 (per 守门 #1 禁回溯叙事)**: 不修改 v0.1-v0.22 修订历史, 也不重写 V2/TMO 收官 commit / HANDOFF v1.0-v1.9 修订历史; Phase I 实装留 v0.24+ 修订 | 2026-09-09 12:02 JST 用户发令"继续推进" + 守门 #9 v19 Mavis 自驱 触发 (per 守门 #1 v15 docs 同步饱和第 8 次新事件触发, 仍允许) |
 
 ---
 
