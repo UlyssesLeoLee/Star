@@ -1,0 +1,59 @@
+# Star 后端实际可部署部分的直接 k8s manifest (per 2026-09-08 实证)
+# 不走 deploy/helm/star chart: 该 chart 是已知 stub (G4, 只有
+# NOTES.txt/_helpers.tpl/secret.yaml), 8 服务里目前只有 star-api-rest 是
+# 真实可跑的 axum HTTP server (fn main 绑端口 + serve); 其余
+# context/sa/sse/webhook/cache/saga 只有 lib crate 没有 main.rs,
+# star-cli/star-ops 是 CLI/ops 工具, 不适合当长驻 Deployment 跑。
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: star-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: star-api-rest
+  namespace: star-system
+  labels:
+    app: star-api-rest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: star-api-rest
+  template:
+    metadata:
+      labels:
+        app: star-api-rest
+    spec:
+      containers:
+        - name: star-api-rest
+          image: star-api-rest:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8081
+          env:
+            - name: STAR_API_REST_BIND_ADDR
+              value: "0.0.0.0:8081"
+          readinessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: star-api-rest
+  namespace: star-system
+spec:
+  selector:
+    app: star-api-rest
+  ports:
+    - port: 8081
+      targetPort: 8081

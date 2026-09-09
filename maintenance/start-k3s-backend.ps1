@@ -24,7 +24,12 @@
 #   - 前置依赖: start-k3s-backend 完成后才能跑 update-backend-k3s
 # =====================================================================
 
-$ErrorActionPreference = 'Stop'
+# 注意: 不用 'Stop'. 本脚本所有错误判定都手动查 $LASTEXITCODE + exit 1,
+# 'Stop' 会导致 wsl.exe 打到 stderr 的良性警告(如 "localhost 代理未镜像到 WSL")
+# 被 PowerShell 当成终止性 NativeCommandError,脚本在 k3s 其实正常时也会假死
+# (per 2026-09-08 实证: [0/5] 探测 distro 步骤误报失败)
+$ErrorActionPreference = 'Continue'
+$env:WSL_UTF8 = '1'
 
 # ---- 0. 探测 WSL distro 状态 ----
 Write-Host ""

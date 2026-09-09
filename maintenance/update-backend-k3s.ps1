@@ -34,7 +34,13 @@
 #   - 不改 image registry (values.yaml global.imageRegistry, 需手动维护)
 # =====================================================================
 
-$ErrorActionPreference = 'Stop'
+# 注意: 不用 'Stop' (per start-k3s-backend.ps1 同款修法 2026-09-08 实证) —
+# wsl.exe 打到 stderr 的良性警告("localhost 代理未镜像到 WSL")会被当成终止性
+# NativeCommandError, 抢在脚本自己的 throw/exit 1 判定之前就把进程杀了.
+# 脚本里所有真正的错误判定用的是显式 throw / $LASTEXITCODE 检查, 不依赖
+# $ErrorActionPreference, 改成 'Continue' 不影响这些判定.
+$ErrorActionPreference = 'Continue'
+$env:WSL_UTF8 = '1'
 
 # ---- 0. 切到仓库根 ----
 $RepoRoot = Split-Path -Parent $PSScriptRoot
@@ -217,15 +223,32 @@ if ($probeExit -eq 0) {
     }
 }
 
+# wsl 包装通用: 传进来的 --kubeconfig <windows路径> 在 WSL 里不存在,
+# 剥掉它, 统一用 WSL 侧 KUBECONFIG=$WslKubeConfig (per 2026-09-08 实证修法)
+function Strip-KubeconfigArg {
+    param([string[]]$InArgs)
+    $out = @()
+    $skip = $false
+    foreach ($a in $InArgs) {
+        if ($skip) { $skip = $false; continue }
+        if ($a -eq '--kubeconfig') { $skip = $true; continue }
+        $out += $a
+    }
+    return $out
+}
+
 # kubectl wrapper: Windows 端直接调 or wrap wsl 调
 function Invoke-Kubectl {
     param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
     if ($UseWslWrapper) {
         # WSL 内的 kubectl 是 /usr/local/bin/k3s 内置的 symlink
-        $argLine = ($Args | ForEach-Object { if ($_ -match '\s') { "'$_'" } else { $_ } }) -join ' '
-        $result = wsl -- bash -c "KUBECONFIG=$WslKubeConfig kubectl $argLine 2>&1"
-        # $LASTEXITCODE 不会更新 (wsl wrapper), 用 exit code 解析
-        $global:LASTEXITCODE = 0
+        $CleanArgs = Strip-KubeconfigArg $Args
+        $argLine = ($CleanArgs | ForEach-Object { if ($_ -match '\s') { "'$_'" } else { $_ } }) -join ' '
+        $result = wsl -- bash -c "KUBECONFIG=$WslKubeConfig kubectl $argLine" 2>&1 | Out-String
+        # per 2026-09-08 实证: $LASTEXITCODE 在 wsl -- bash -c 之后是真实可用的
+        # (之前硬编成 0 会让 namespace 创建 / helm upgrade 失败判定永远走"成功"分支)
+        $ExitCode = $LASTEXITCODE
+        $global:LASTEXITCODE = $ExitCode
         return $result
     } else {
         & kubectl @Args
@@ -236,10 +259,13 @@ function Invoke-Kubectl {
 function Invoke-Helm {
     param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
     if ($UseWslWrapper) {
-        # WSL 内 helm 不一定有, 装个 k3s 自带的 symlink (k3s 内置 helm)
-        $argLine = ($Args | ForEach-Object { if ($_ -match '\s') { "'$_'" } else { $_ } }) -join ' '
-        $result = wsl -- bash -c "KUBECONFIG=$WslKubeConfig /usr/local/bin/k3s helm $argLine 2>&1"
-        $global:LASTEXITCODE = 0
+        # WSL 内没有 "k3s helm" 子命令 (实测 "No help topic for 'helm'"),
+        # 改用装在 ~/.local/bin/helm 的独立 helm 二进制 (per 2026-09-08 实证修法)
+        $CleanArgs = Strip-KubeconfigArg $Args
+        $argLine = ($CleanArgs | ForEach-Object { if ($_ -match '\s') { "'$_'" } else { $_ } }) -join ' '
+        $result = wsl -- bash -c "KUBECONFIG=$WslKubeConfig ~/.local/bin/helm $argLine" 2>&1 | Out-String
+        $ExitCode = $LASTEXITCODE
+        $global:LASTEXITCODE = $ExitCode
         return $result
     } else {
         & $helmExe @Args
