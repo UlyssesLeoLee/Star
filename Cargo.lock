@@ -3111,6 +3111,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "sqlx",
  "star-context",
  "star-pg-adapter",
  "star-webhook",

@@ -162,9 +162,7 @@ fn compute_kid(public_pem: &[u8]) -> String {
 }
 
 /// 从 RSA public key 提取 JWK n/e 组件 (RFC 7518 §6.1)
-fn extract_jwk_components(
-    public_key: &RsaPublicKey,
-) -> Result<(String, String), KeyPairError> {
+fn extract_jwk_components(public_key: &RsaPublicKey) -> Result<(String, String), KeyPairError> {
     let n = public_key.n().to_bytes_be();
     let e = public_key.e().to_bytes_be();
     let n_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&n);
@@ -279,7 +277,11 @@ mod tests {
         assert!(!jwk.n.is_empty());
         assert!(!jwk.e.is_empty());
         // RSA 2048 modulus 应该是 256 字节 base64url = ~342 chars
-        assert!(jwk.n.len() > 300, "RSA 2048 modulus too short: {}", jwk.n.len());
+        assert!(
+            jwk.n.len() > 300,
+            "RSA 2048 modulus too short: {}",
+            jwk.n.len()
+        );
         // Standard public exponent 65537 = AQAB
         assert_eq!(jwk.e, "AQAB");
     }
@@ -325,7 +327,11 @@ mod tests {
         // 真实 RSA keygen 每次产生不同的 kid
         let kp1 = OAuthKeyPair::generate().expect("gen1");
         let kp2 = OAuthKeyPair::generate().expect("gen2");
-        assert_ne!(kp1.kid(), kp2.kid(), "real keygen should produce unique kids");
+        assert_ne!(
+            kp1.kid(),
+            kp2.kid(),
+            "real keygen should produce unique kids"
+        );
         assert_ne!(kp1.jwk_n, kp2.jwk_n, "real keygen should produce unique n");
     }
 
