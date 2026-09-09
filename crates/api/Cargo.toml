@@ -18,6 +18,14 @@ chrono = { workspace = true }
 tokio = { workspace = true }
 
 star-context = { path = "../star-context" }
+# P0-2: ApiError 映射 (per WBS §14.15, 0.3M, H2 done 后 unblock 启动)
+# 6 domain crate From impls (WorkItemError / WorkspaceError / WorktreeError / SearchError / ScmError / ValidationError)
+domain-work-item = { path = "../domain-work-item" }
+domain-workspace = { path = "../domain-workspace" }
+domain-worktree = { path = "../domain-worktree" }
+domain-search = { path = "../domain-search" }
+domain-scm = { path = "../domain-scm" }
+domain-validation = { path = "../domain-validation" }
 # ARG.4 (P3-C W4): crates/api 扩展 arg 模块 — 13 REST + 1 WebSocket
 # per docs/design/DD-AGENT-RELATIONSHIP-001.md v0.1.1 §4.12
 # 守门 #48 (2026-09-08 08:22 JST) axum 0.8 web framework lock

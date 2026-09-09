@@ -118,7 +118,15 @@ pub struct RouteDescriptor {
 /// **Api 错误**
 ///
 /// 来源: docs/api-design.md §8 (错误码)
-/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`。
+/// 5 个标准变体;具体错误码在 Phase 2 由本 enum 派生 + 实现 `Into<ApiError>`.
+///
+/// P0-2 (per WBS §14.15) 加 6 个 domain error → ApiError From impls:
+/// - `domain_work_item::WorkItemError` (NotFound / PermissionDenied / InvalidState / Internal)
+/// - `domain_workspace::WorkspaceError` (NotFound / PermissionDenied / InvalidState / Conflict / Internal)
+/// - `domain_worktree::WorktreeError` (NotFound / PermissionDenied / InvalidState / Conflict / RuntimeRequired / Internal)
+/// - `domain_search::SearchError` (NotFound / PermissionDenied / InvalidState / Conflict / Internal)
+/// - `domain_scm::ScmError` (NotFound / PermissionDenied / InvalidState / Conflict / ProviderError / Internal)
+/// - `domain_validation::ValidationError` (NotFound / PermissionDenied / InvalidState / Conflict / Internal)
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
     /// 资源未找到
@@ -136,6 +144,101 @@ pub enum ApiError {
     /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
+}
+
+// =====================================================================
+// P0-2 ApiError 映射 (per WBS §14.15, H2 done 后 unblock 启动)
+// 6 个 domain error → ApiError From impls
+// =====================================================================
+
+impl From<domain_work_item::WorkItemError> for ApiError {
+    fn from(e: domain_work_item::WorkItemError) -> Self {
+        use domain_work_item::WorkItemError::*;
+        match e {
+            NotFound(_) => ApiError::NotFound(Uuid::nil()),
+            PermissionDenied => ApiError::PermissionDenied,
+            CrossTenantDenied(_, _) => ApiError::PermissionDenied,
+            InvalidTransition { .. } => ApiError::InvalidState(e.to_string()),
+            AiTaskMissingObjective | AiTaskMissingScope | ParentProjectMismatch => {
+                ApiError::InvalidState(e.to_string())
+            }
+            Conflict(_) => ApiError::Conflict(e.to_string()),
+            Internal(_) => ApiError::Internal(e.to_string()),
+        }
+    }
+}
+
+impl From<domain_workspace::WorkspaceError> for ApiError {
+    fn from(e: domain_workspace::WorkspaceError) -> Self {
+        use domain_workspace::WorkspaceError::*;
+        match e {
+            NotFound(_) => ApiError::NotFound(Uuid::nil()),
+            PermissionDenied => ApiError::PermissionDenied,
+            InvalidState(_) => ApiError::InvalidState(e.to_string()),
+            Conflict(_) => ApiError::Conflict(e.to_string()),
+            Internal(_) => ApiError::Internal(e.to_string()),
+        }
+    }
+}
+
+impl From<domain_worktree::WorktreeError> for ApiError {
+    fn from(e: domain_worktree::WorktreeError) -> Self {
+        use domain_worktree::WorktreeError::*;
+        match e {
+            NotFound(_) => ApiError::NotFound(Uuid::nil()),
+            PermissionDenied => ApiError::PermissionDenied,
+            CrossTenantDenied(_, _) => ApiError::PermissionDenied,
+            InvalidTransition { .. } => ApiError::InvalidState(e.to_string()),
+            RuntimeRequired => ApiError::InvalidState(e.to_string()),
+            Conflict(_) => ApiError::Conflict(e.to_string()),
+            CompletionGateFailed(_) | IsolationFailed(_) => {
+                ApiError::InvalidState(e.to_string())
+            }
+            Internal(_) => ApiError::Internal(e.to_string()),
+        }
+    }
+}
+
+impl From<domain_search::SearchError> for ApiError {
+    fn from(e: domain_search::SearchError) -> Self {
+        use domain_search::SearchError::*;
+        match e {
+            NotFound(_) => ApiError::NotFound(Uuid::nil()),
+            PermissionDenied => ApiError::PermissionDenied,
+            CrossTenantDenied(_, _) => ApiError::PermissionDenied,
+            InvalidState(_) | InvalidQuery(_) => ApiError::InvalidState(e.to_string()),
+            Conflict(_) => ApiError::Conflict(e.to_string()),
+            Internal(_) => ApiError::Internal(e.to_string()),
+        }
+    }
+}
+
+impl From<domain_scm::ScmError> for ApiError {
+    fn from(e: domain_scm::ScmError) -> Self {
+        use domain_scm::ScmError::*;
+        match e {
+            NotFound(_) => ApiError::NotFound(Uuid::nil()),
+            PermissionDenied(_) => ApiError::PermissionDenied,
+            InvalidState(_) => ApiError::InvalidState(e.to_string()),
+            Conflict(_) | IdempotencyConflict => ApiError::Conflict(e.to_string()),
+            ProviderError(_) => ApiError::Internal(e.to_string()),
+            Internal(_) => ApiError::Internal(e.to_string()),
+        }
+    }
+}
+
+impl From<domain_validation::ValidationError> for ApiError {
+    fn from(e: domain_validation::ValidationError) -> Self {
+        use domain_validation::ValidationError::*;
+        match e {
+            NotFound(_) => ApiError::NotFound(Uuid::nil()),
+            PermissionDenied => ApiError::PermissionDenied,
+            InvalidState(_) => ApiError::InvalidState(e.to_string()),
+            Conflict(_) => ApiError::Conflict(e.to_string()),
+            InvariantViolated(_) => ApiError::InvalidState(e.to_string()),
+            Internal(_) => ApiError::Internal(e.to_string()),
+        }
+    }
 }
 
 // =====================================================================
@@ -165,5 +268,66 @@ mod tests {
             !actor.tenant_id.is_nil(),
             "tenant_id must be non-nil (§6.1,REQ-SEC-001)"
         );
+    }
+
+    // -----------------------------------------------------------------
+    // P0-2 ApiError 映射测试 (per WBS §14.15)
+    // 6 个 From impl 各 1 个 positive 验证 (domain error → ApiError variant 映射)
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn work_item_error_not_found_maps_to_api_not_found() {
+        use domain_work_item::WorkItemError;
+        let e = WorkItemError::NotFound("work-item-uuid".to_string());
+        let api: ApiError = e.into();
+        assert!(matches!(api, ApiError::NotFound(_)), "expected NotFound");
+    }
+
+    #[test]
+    fn work_item_error_permission_denied_maps_to_api_permission_denied() {
+        use domain_work_item::WorkItemError;
+        let e = WorkItemError::PermissionDenied;
+        let api: ApiError = e.into();
+        assert!(matches!(api, ApiError::PermissionDenied), "expected PermissionDenied");
+    }
+
+    #[test]
+    fn workspace_error_conflict_maps_to_api_conflict() {
+        use domain_workspace::WorkspaceError;
+        let e = WorkspaceError::Conflict("dup key".to_string());
+        let api: ApiError = e.into();
+        assert!(matches!(api, ApiError::Conflict(_)), "expected Conflict");
+    }
+
+    #[test]
+    fn worktree_error_runtime_required_maps_to_api_invalid_state() {
+        use domain_worktree::WorktreeError;
+        let e = WorktreeError::RuntimeRequired;
+        let api: ApiError = e.into();
+        assert!(matches!(api, ApiError::InvalidState(_)), "expected InvalidState");
+    }
+
+    #[test]
+    fn search_error_invalid_query_maps_to_api_invalid_state() {
+        use domain_search::SearchError;
+        let e = SearchError::InvalidQuery("bad query".to_string());
+        let api: ApiError = e.into();
+        assert!(matches!(api, ApiError::InvalidState(_)), "expected InvalidState");
+    }
+
+    #[test]
+    fn scm_error_provider_error_maps_to_api_internal() {
+        use domain_scm::ScmError;
+        let e = ScmError::ProviderError("upstream timeout".to_string());
+        let api: ApiError = e.into();
+        assert!(matches!(api, ApiError::Internal(_)), "expected Internal (provider error → internal)");
+    }
+
+    #[test]
+    fn validation_error_invariant_violated_maps_to_api_invalid_state() {
+        use domain_validation::ValidationError;
+        let e = ValidationError::InvariantViolated("INV-VL-01 broken".to_string());
+        let api: ApiError = e.into();
+        assert!(matches!(api, ApiError::InvalidState(_)), "expected InvalidState");
     }
 }
