@@ -1,0 +1,6 @@
+# 5 域 Lead 内推 contact log 私有目录 (不入 git)
+# per 守门 #5 env 安全 (8/27 11:06 JST hard ban) + 守门 #12 AI 协作文档治理
+# 真人 Lead 联系方式 (email / phone) 不入 commit
+*
+!.gitignore
+!README.md
