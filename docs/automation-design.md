@@ -880,6 +880,61 @@ print(f"err_count={result.stderr.count('error[')}")
 - 守门 #3 5 域 Lead 跨域边强制 consults: `select_challenge_prompt` 默认 TrustTier 派生 (weight < 0.7 → Low; 否则 High), 不允许跨域跨边界用 delegates_to
 - 守门 #7 0 unsafe 块: 全 src + tests 0 hits (IT-24 实证)
 
+### 4.23 P3-C W4 ARG.5 — frontend/src/app/agent-relationships/ 5 UI 组件 + zustand store 5 channel (2026-09-10 07:49 JST per `docs/briefs/arg-05-frontend-5ui.md`)
+
+> **触发**: 2026-09-10 07:46 JST 用户发令"按顺序推进" + ARG.1-4 收官后父会话自驱触发 ARG.5 frontend
+> **联动**: 守门 #1 v15 (本轮第 46 次新事件触发) + #1 v19 (Python 化 ≥2 维) + #1 v25 (frontend typecheck + workspace 兼容) + #3 + #5 (env 安全) + #6 (PowerShell only) + #7 (TS strict) + #9 (RPC 不可靠, mock WS fallback) + #10 (代签, author=Ulysses) + #12 ([M] docs 同步) + #13 (W/T/M 严分类) + #14 v3 (5 域 Lead Mavis 临时代签) + #19 v19 (守门 #12 死循环饱和边界)
+> **落档文件**:
+> - `frontend/src/app/agent-relationships/` 8 文件 (per brief v0.50 §2.1 A)
+>   - `page.tsx` (3 tab container: Editor / View / Achievements + 4th Templates)
+>   - `editor/RelationshipEditor.tsx` (画布拖拽建关系 + EdgeTypeSelector)
+>   - `editor/EdgeTypeSelector.tsx` (10 类关系 Dropdown, 4 核心 + 6 扩展)
+>   - `view/RelationshipView.tsx` (图谱浏览 + bezier connector + 节点 click)
+>   - `view/NodeDetail.tsx` (name + archetype + trust + edge in/out 计数)
+>   - `achievements/AchievementWall.tsx` (20 成就 + 4 稀有度筛选 + 3 类别筛选)
+>   - `templates/TemplateGallery.tsx` (5 模板: Hub-and-Spoke / Mesh / Chain / Hierarchical / Review-Council)
+>   - `AgentViewTab.tsx` (集成到 /agent-view, 1 tab 切到 Relationship 视角, URL `?view=relationships`)
+> - `frontend/src/lib/arg/` 4 文件 (per brief v0.50 §2.1 B)
+>   - `store.ts` (useARGStore zustand 5 channel: agents / edges / templates / achievements / argEvents + 9 actions per BD §4.3.1)
+>   - `api.ts` (13 REST 客户端封装, RLS `X-Tenant-Id` header + retry with backoff)
+>   - `ws.ts` (WebSocket 客户端, /ws/arg/events 订阅, 5 协议 fanout, mock fallback 守门 #12 v22)
+>   - `types.ts` (TypeScript types 1:1 镜像 crates/arg 6 model family)
+>   - `index.ts` (公共 re-exports)
+> - `frontend/src/app/(app)/agent-view/page.tsx` +30 行 (Network import + viewMode="relationships" 派生 + Relationship tab 按钮 + AgentViewTab 渲染)
+> - `scripts/automation/arg_ui_test.py` v0.1 (10 IT 端到端, per 守门 #1 v19 [M] Python 化)
+> - `scripts/automation/registry.md` §1 +1 行 (ARG.5 索引)
+> - `docs/reports/PHASE-ARG-05-IMPL-REPORT.md` v0.1 (per AGENTS.md §3 7 段结构)
+> - 1 commit author = `Ulysses <ulysses@mavis.local>` (per 守门 #10)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| ARG-5.1 | ARG-5.1 | `frontend/src/app/agent-relationships/` 8 文件 | S, A | **[M]** | (无新脚本, 复用 ARG-5.4 arg_ui_test.py) | 5 UI 组件 (RelationshipEditor / RelationshipView / AchievementWall / EdgeTypeSelector / TemplateGallery) + page.tsx (3 tab container) + AgentViewTab.tsx + NodeDetail.tsx (sidebar) |
+| ARG-5.2 | ARG-5.2 | `frontend/src/lib/arg/` 4 文件 (types / api / ws / store) + index.ts | S, A | **[M]** | (per 守门 #1 派生) | zustand useARGStore 5 channel + 9 actions (per BD §4.3.1); 13 REST 客户端封装; WebSocket 5 协议 fanout + 自动重连 + mock fallback |
+| ARG-5.3 | ARG-5.3 | `frontend/src/app/(app)/agent-view/page.tsx` +30 行 (Relationship tab) | S | **[S]** | (单文件改) | viewMode="relationships" + AgentViewTab 集成 + Network icon |
+| ARG-5.4 | ARG-5.4 | `scripts/automation/arg_ui_test.py` v0.1 落档 (10 IT 端到端) | R, V, S, A | **[M]** | `scripts/automation/arg_ui_test.py` | 守门 #5 env 安全 (PYTHON 直接调 subprocess, 不读 env 明文); IT-1..IT-10: pnpm install / tsc / lint / vitest / build / 13 REST 路径断言 / 9 actions 断言 / 8 UI 文件存在 / 4 lib 文件存在 / cargo check 兼容; 守门 #6 PowerShell only (subprocess shell=False) |
+| ARG-5.5 | ARG-5.5 | docs/automation-design.md §4.23 同步 (本节) | A | **[M]** | (本节追加) | per 守门 #12 v21 [M] docs 同步必更新 §4 任务卡表 |
+| ARG-5.6 | ARG-5.6 | scripts/automation/registry.md §1 +1 行 | A | **[M]** | (registry.md 编辑) | per 守门 #12 v21 [M] docs 同步必更新 registry |
+| ARG-5.7 | ARG-5.7 | docs/reports/PHASE-ARG-05-IMPL-REPORT.md v0.1 落档 | A | **[M]** | (报告落档) | per AGENTS.md §3 7 段结构; 5 守门实证 + 8 文件落地 + 1 commit hash |
+| ARG-5.8 | ARG-5.8 | 1 commit author = `Ulysses <ulysses@mavis.local>` | A | **[M]** | (git commit) | 守门 #10 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化 (Mavis 自驱); 不推 origin (守门 #1 反转后 R-05) |
+| ARG-5.9 | ARG-5.9 | (后续 ARG.6 30 UT / ARG.7 10 IT + 8 E2E + 4 PT 子代理触发) | — | **[M]** | (后续 worktree) | per WBS §14.11 ARG.5 收官后, 派新子代理走 ARG.6 (30 UT) / ARG.7 (10 IT + 8 E2E + 4 PT) |
+
+**§4.23 任务卡维度判定**:
+- R (Rerunnable): **是** (arg_ui_test.py idempotent, 10 IT 端到端跨 frontend/build/cargo)
+- V (Volume): **是** (8 UI 文件 + 4 lib 文件 + 1 脚本 + 3 文档 + 1 报告 + 1 commit)
+- S (Structural): **是** (frontend/src/ 新增 2 目录 + 12 文件 + 修改 1 文件)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 + 守门 #10 author = Ulysses + 守门 #5 env 不打印)
+
+**§4.23 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v19 + #12 v21 + #14 v2 + #14 v3)**:
+- `python scripts/automation/arg_ui_test.py` IT-1 (pnpm install) exit 0
+- `pnpm exec tsc --noEmit` 0 新增 type error (4 pre-existing 跟 ARG.5 无关, per CI 守门 #6 v2 advisory 模式)
+- `pnpm exec vitest run src/lib/store.test.ts` 20/20 pass (前端既有 zustand 守门不退化)
+- `cargo check --workspace --lib -j 4` 0 err (per 守门 #1 v25, 实证本 commit 后兼容)
+- 0 unsafe 块 (守门 #7 跨 frontend TypeScript 守门)
+- 守门 #5 env 安全: arg_ui_test.py 用 subprocess.run shell=False, 不读 secret; NEXT_PUBLIC_ARG_API_BASE 走 env 走 process.env
+- 守门 #9 RPC 不可靠: 客户端不调外部 fetch; ArgWebSocketClient 5 协议 mock fallback (per 守门 #12 v22)
+- 守门 #10 author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权 + 守门 #14 v3)
+- 守门 #14 v3: 5 域 Lead Mavis 临时代签 (真人到位后追溯签字覆盖修订历史)
+
 ------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
