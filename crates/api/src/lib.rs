@@ -337,6 +337,24 @@ impl From<domain_validation::ValidationError> for ApiError {
 }
 
 // =====================================================================
+// P0-4 infrastructure adapter 映射 (per WBS §14.15 P0-4 收官, 跟 P0-2/3 同模式)
+// 1 个 InfrastructureError 5-variant → ApiError 6-field struct From impl
+// =====================================================================
+
+impl From<infrastructure::InfrastructureError> for ApiError {
+    fn from(e: infrastructure::InfrastructureError) -> Self {
+        use infrastructure::InfrastructureError::*;
+        match e {
+            NotFound(_) => ApiError::not_found("infrastructure"),
+            InvalidState(msg) => ApiError::invalid_state(msg, "Check infrastructure adapter state"),
+            PermissionDenied => ApiError::permission_denied("infrastructure: permission denied"),
+            Conflict(msg) => ApiError::conflict(format!("infrastructure conflict: {msg}")),
+            Internal(msg) => ApiError::internal(format!("infrastructure: {msg}")),
+        }
+    }
+}
+
+// =====================================================================
 // 单元测试占位
 // =====================================================================
 
@@ -454,5 +472,40 @@ mod tests {
         assert!(json.contains("\"source_kind\""));
         assert!(json.contains("\"retriable\""));
         assert!(json.contains("\"hint\""));
+    }
+
+    // -----------------------------------------------------------------
+    // P0-4 infrastructure adapter 错误映射测试 (per WBS §14.15 P0-4 收官)
+    // 1 个 From impl 5-variant → ApiError 6-field struct 验证
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn infrastructure_error_not_found_maps_to_api_not_found() {
+        use infrastructure::InfrastructureError;
+        let e = InfrastructureError::NotFound(uuid::Uuid::new_v4());
+        let api: ApiError = e.into();
+        assert_eq!(api.code, "RESOURCE_NOT_FOUND");
+        assert_eq!(api.source_module, "api");
+        assert_eq!(api.source_kind, "validation");
+        assert!(!api.retriable);
+    }
+
+    #[test]
+    fn infrastructure_error_conflict_maps_to_api_conflict() {
+        use infrastructure::InfrastructureError;
+        let e = InfrastructureError::Conflict("dup key".to_string());
+        let api: ApiError = e.into();
+        assert_eq!(api.code, "CONFLICT");
+        assert_eq!(api.source_kind, "external");
+    }
+
+    #[test]
+    fn infrastructure_error_internal_maps_to_api_internal() {
+        use infrastructure::InfrastructureError;
+        let e = InfrastructureError::Internal("connection lost".to_string());
+        let api: ApiError = e.into();
+        assert_eq!(api.code, "INTERNAL");
+        assert_eq!(api.source_kind, "internal");
+        assert!(api.retriable, "internal errors should be retriable");
     }
 }

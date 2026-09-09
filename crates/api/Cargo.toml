@@ -26,6 +26,8 @@ domain-worktree = { path = "../domain-worktree" }
 domain-search = { path = "../domain-search" }
 domain-scm = { path = "../domain-scm" }
 domain-validation = { path = "../domain-validation" }
+# P0-4: infrastructure adapter 错误映射 (per WBS §14.15 P0-4 收官, 0.6M, 跟 P0-2/3 同模式)
+infrastructure = { path = "../infrastructure" }
 # ARG.4 (P3-C W4): crates/api 扩展 arg 模块 — 13 REST + 1 WebSocket
 # per docs/design/DD-AGENT-RELATIONSHIP-001.md v0.1.1 §4.12
 # 守门 #48 (2026-09-08 08:22 JST) axum 0.8 web framework lock

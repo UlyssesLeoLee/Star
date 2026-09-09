@@ -26,5 +26,7 @@ domain-worktree = { path = "../domain-worktree" }
 domain-search = { path = "../domain-search" }
 domain-scm = { path = "../domain-scm" }
 domain-validation = { path = "../domain-validation" }
+# P0-4: infrastructure adapter 错误映射 (per WBS §14.15 P0-4 收官, 跟 P0-2/3 同模式)
+infrastructure = { path = "../infrastructure" }
 [lints]
 workspace = true
