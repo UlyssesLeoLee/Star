@@ -13,9 +13,9 @@
 
 use domain_project::{
     ActorContext, ArchiveProjectCommand, CreateProjectCommand, GetProjectQuery,
-    InMemoryProjectService, ListByWorkspaceQuery, ProjectError, ProjectPolicy, ProjectStatus,
-    ProjectTemplateId, ReplaceProjectPolicyCommand, ProjectCommandPort, ProjectQueryPort,
-    TenantId, UserId, WorkspaceId,
+    InMemoryProjectService, ListByWorkspaceQuery, ProjectCommandPort, ProjectError, ProjectPolicy,
+    ProjectQueryPort, ProjectStatus, ProjectTemplateId, ReplaceProjectPolicyCommand, TenantId,
+    UserId, WorkspaceId,
 };
 use uuid::Uuid;
 
