@@ -519,8 +519,10 @@ mod tests {
     async fn mock_oauth2_state() -> auth::oauth::OAuth2State {
         use auth::oauth::{keypair::OAuthKeyManager, OAuth2State};
         use star_pg_adapter::repository::{
-            PgOAuthAccessTokenRepository, PgOAuthAuthorizationCodeRepository,
-            PgOAuthClientRepository, PgOAuthRefreshTokenRepository,
+            OAuthAccessTokenRepository, OAuthAuthorizationCodeRepository, OAuthClientRepository,
+            OAuthRefreshTokenRepository, PgOAuthAccessTokenRepository,
+            PgOAuthAuthorizationCodeRepository, PgOAuthClientRepository,
+            PgOAuthRefreshTokenRepository,
         };
         use std::sync::Arc;
 
@@ -544,10 +546,14 @@ mod tests {
         OAuth2State {
             key_manager,
             jwt_config,
-            client_repo: Arc::new(PgOAuthClientRepository::new(pool.clone())),
-            auth_code_repo: Arc::new(PgOAuthAuthorizationCodeRepository::new(pool.clone())),
-            access_token_repo: Arc::new(PgOAuthAccessTokenRepository::new(pool.clone())),
-            refresh_token_repo: Arc::new(PgOAuthRefreshTokenRepository::new(pool)),
+            client_repo: Arc::new(PgOAuthClientRepository::new(pool.clone()))
+                as Arc<dyn OAuthClientRepository>,
+            auth_code_repo: Arc::new(PgOAuthAuthorizationCodeRepository::new(pool.clone()))
+                as Arc<dyn OAuthAuthorizationCodeRepository>,
+            access_token_repo: Arc::new(PgOAuthAccessTokenRepository::new(pool.clone()))
+                as Arc<dyn OAuthAccessTokenRepository>,
+            refresh_token_repo: Arc::new(PgOAuthRefreshTokenRepository::new(pool))
+                as Arc<dyn OAuthRefreshTokenRepository>,
         }
     }
 

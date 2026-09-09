@@ -25,8 +25,7 @@ use sha2::{Digest, Sha256};
 use star_pg_adapter::repository::{
     OAuthAccessToken, OAuthAccessTokenRepository, OAuthAuthorizationCode,
     OAuthAuthorizationCodeRepository, OAuthClientRepository, OAuthRefreshToken,
-    OAuthRefreshTokenRepository, PgOAuthAccessTokenRepository, PgOAuthAuthorizationCodeRepository,
-    PgOAuthClientRepository, PgOAuthRefreshTokenRepository,
+    OAuthRefreshTokenRepository,
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -36,14 +35,18 @@ use super::pkce;
 use crate::auth::{issue_token, JwtConfig};
 
 /// OAuth2 state (axum extension)
+///
+/// 仓库采用 trait object (`Arc<dyn ...>`) 以便集成测试挂 mock 仓库 (per brief v0.51 §3):
+/// - 生产路径: `Arc::new(PgOAuthXxxRepository::new(pool))` → 走真实 PG
+/// - 测试路径: `Arc::new(MockOAuthXxxRepository::new())` → in-memory state, 不连 PG
 #[derive(Clone)]
 pub struct OAuth2State {
     pub key_manager: Arc<OAuthKeyManager>,
     pub jwt_config: Arc<JwtConfig>,
-    pub client_repo: Arc<PgOAuthClientRepository>,
-    pub auth_code_repo: Arc<PgOAuthAuthorizationCodeRepository>,
-    pub access_token_repo: Arc<PgOAuthAccessTokenRepository>,
-    pub refresh_token_repo: Arc<PgOAuthRefreshTokenRepository>,
+    pub client_repo: Arc<dyn OAuthClientRepository>,
+    pub auth_code_repo: Arc<dyn OAuthAuthorizationCodeRepository>,
+    pub access_token_repo: Arc<dyn OAuthAccessTokenRepository>,
+    pub refresh_token_repo: Arc<dyn OAuthRefreshTokenRepository>,
 }
 
 // ============================================

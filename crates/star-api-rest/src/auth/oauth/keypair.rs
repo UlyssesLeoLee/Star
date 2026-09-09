@@ -341,4 +341,59 @@ mod tests {
         let priv_key = kp.private_key().expect("parse back");
         assert_eq!(priv_key.size(), 256); // RSA 2048 = 256 bytes
     }
+
+    /// v0.51 brief §3.2: 真实 RSA 2048 keygen 实证.
+    ///
+    /// Validates that `generate()` produces a real PKCS#8 v1 PEM private key
+    /// (per RFC 5958) and a matching SPKI public PEM, both of which can be
+    /// re-parsed by the `rsa` crate and round-trip through `from_pem`.
+    #[test]
+    fn real_keygen_produces_valid_pem() {
+        // 1) 真实 RSA 2048 keygen (走 rsa 0.9 + pkcs8 0.10, per brief v0.51 §3.2)
+        let kp = OAuthKeyPair::generate().expect("real RSA 2048 keygen must succeed");
+
+        // 2) private PEM 必须是 PKCS#8 (BEGIN PRIVATE KEY 头), 不是 PKCS#1 (BEGIN RSA PRIVATE KEY)
+        let priv_pem = kp.private_pem();
+        assert!(
+            priv_pem.contains("-----BEGIN PRIVATE KEY-----"),
+            "private PEM must be PKCS#8: {}",
+            &priv_pem[..60.min(priv_pem.len())]
+        );
+        assert!(
+            !priv_pem.contains("-----BEGIN RSA PRIVATE KEY-----"),
+            "private PEM must NOT be PKCS#1"
+        );
+        assert!(
+            priv_pem.contains("-----END PRIVATE KEY-----"),
+            "private PEM must have END marker"
+        );
+
+        // 3) public PEM 必须是 SPKI (BEGIN PUBLIC KEY), 不是 X.509 (BEGIN CERTIFICATE)
+        let pub_pem = kp.public_pem();
+        assert!(
+            pub_pem.contains("-----BEGIN PUBLIC KEY-----"),
+            "public PEM must be SPKI"
+        );
+        assert!(
+            pub_pem.contains("-----END PUBLIC KEY-----"),
+            "public PEM must have END marker"
+        );
+
+        // 4) PEM → RsaPrivateKey 走 pkcs8 PEM parser, 验证 DER 编码合法
+        let priv_key = kp.private_key().expect("pkcs8 PEM re-parse");
+        assert_eq!(priv_key.size(), 256, "RSA 2048 = 256 bytes");
+
+        // 5) PEM → RsaPublicKey 走 SPKI parser, 验证 DER 编码合法
+        use rsa::pkcs8::DecodePublicKey;
+        let pub_key = RsaPublicKey::from_public_key_pem(pub_pem)
+            .expect("SPKI PEM re-parse");
+        assert_eq!(pub_key.size(), 256, "RSA 2048 public = 256 bytes");
+
+        // 6) from_pem round-trip: 同一对 PEM 应该能 re-load 产生相同的 kid + jwk n/e
+        let kp2 = OAuthKeyPair::from_pem(priv_pem.to_string(), pub_pem.to_string())
+            .expect("from_pem round-trip");
+        assert_eq!(kp.kid(), kp2.kid(), "kid must be stable across reload");
+        assert_eq!(kp.to_jwk().unwrap().n, kp2.to_jwk().unwrap().n, "n stable");
+        assert_eq!(kp.to_jwk().unwrap().e, kp2.to_jwk().unwrap().e, "e stable");
+    }
 }
