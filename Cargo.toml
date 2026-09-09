@@ -50,6 +50,8 @@ members = [
     "crates/star-mcp",
     # Phase OPS-INTRY: 2026-09-08 新增 crates/star-ops (Ops Console MVP-骨架, per SRS-STAR-OPS-001.md v0.1)
     "crates/star-ops",
+    # v0.38: PG 持久化 adapter (per WBS v0.37 §14.10.4 缺口 #4 app 端 PG 持久化, F-05b 立新工作项)
+    "crates/star-pg-adapter",
     # Phase F 骨架: 2026-08-27 新增 crates/star-sa (4 Git Provider)
     "crates/star-sa",
     # Phase F 骨架:2026-08-27 新增 2 crate (SSE + Webhook)

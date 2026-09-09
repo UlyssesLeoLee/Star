@@ -1,0 +1,28 @@
+[package]
+name = "star-pg-adapter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "STAR PostgreSQL Adapter (F-05b v0.37 立新工作项, 跨 session 续 0.5-1M tokens connection pool + migration runner)"
+
+[dependencies]
+# workspace 共享
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+# PostgreSQL 驱动 (workspace 已有, 共享)
+sqlx = { workspace = true }
+# UUID + chrono (workspace 已有)
+uuid = { workspace = true }
+chrono = { workspace = true }
+# tracing
+tracing = "0.1"
+
+[lints]
+workspace = true
