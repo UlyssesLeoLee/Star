@@ -10,7 +10,7 @@
 
 ## 0. 使用说明
 
-本文档只收录 QA-DRIFT-001.md §8.4 中判定为 **"已消解" / "已解锁"**（即答案已确定、无需 Ulysses 再拍板）的条目。**待 Ulysses 拍板**的 3 项（Q3 / Q5 / Q8+Q12，详见 QA-DRIFT-001.md §8.4.8）不在此列，需人工决策后才能派生执行任务。
+本文档收录 QA-DRIFT-001.md §8.4 中判定为 **"已消解" / "已解锁" / "已裁决"**（即答案已确定，无论是 Ulysses 直接拍板还是 2026-09-10 起改由 AI 代理拍板）的条目。原"待 Ulysses 拍板"的 3 项（Q3 / Q5 / Q8+Q12）已于 2026-09-10 由 AI 代理按 QA-DRIFT-001.md §8.4.8 已列明的推荐选项裁决（per Ulysses 指令"不再需要真人拍板流程，全部改为 ai 代理"），派生为下方 D5-D7，不再单列"不在本清单内"章节。
 
 ---
 
@@ -44,6 +44,21 @@
 **验证**：改完后 `grep -n "§6.2.1\|§6.3.3\|§6.3.4" docs/test-design.md` 应仅剩历史修订记录段（§0 revision history 保留原始措辞，不回溯改写，per 守门 #1 禁回溯叙事），正文引用段应全部指向 requirements.md 实际章节。
 **风险**：低，纯文本同步，不改测试逻辑本身。
 
+### D5 — IA 文档补全（22 顶级 + 6 (app) group，Q3 裁决派生）
+**背景**（per QA-DRIFT-001 §8.4.8 Q3 已裁决，选项 a）：基准取**当前路由**（含 09-05 JST sprint/agent-view 重命名后状态），非 v0.1 审计时旧路由。
+**动作**：核实当前 `frontend/app` 路由树，补齐"22 顶级 + 6 (app) group"IA 文档（对应位置：`ui-redesign-multica-style.md` 或其指定的 IA 章节），命名以重命名后的 sprint/agent-view 为准。
+**风险**：中，需先枚举当前实际路由树再落文档，避免凭记忆臆造（per 守门 #11 缺标比错标）。
+
+### D6 — /analytics tab 命名同步（Q5 裁决派生）
+**背景**（per QA-DRIFT-001 §8.4.8 Q5 已裁决，code-authoritative）：权威命名为 Burndown/Gantt/Cost/Velocity/Leaderboard。
+**动作**：检索设计书中 /analytics tab 命名的旧称，统一改为上述 5 个 code-authoritative 名称。
+**风险**：低，纯文本同步。
+
+### D7 — Local Runtime 状态数同步（Q8+Q12 裁决派生）
+**背景**（per QA-DRIFT-001 §8.4.8 Q8+Q12 已裁决，选项 A）：5 态（registered/online/offline/compromised/revoked）为最终版；复核确认现行 test-design.md/frontend-design.md HEAD 均已无"8 边界状态"具名枚举，无真实功能缺口。
+**动作**：检索 `docs/specs/domain-local-runtime-spec.md`（及其余仍引用"8 边界状态"字样的位置，若有）统一改为 5 态，并注明 RuntimeCommand 白名单仍为 8 种（不同概念，不可混淆：RuntimeCommand=8 种命令，RuntimeStatus=5 种状态）。
+**风险**：低-中，需先 `grep -rn "8.*边界\|8 种边界"` 全库确认无遗漏引用，再统一替换，避免误改 RuntimeCommand 的合法"8 种"表述。
+
 ### H1 — Q14-32（19 条 test-design vs requirements P0）批量核实
 **背景**（per §8.4.4 D4）：requirements.md 的 3 个关键锚点已确认存在，其余引用号需逐条核实。
 **方法**：
@@ -65,15 +80,15 @@
 
 ---
 
-## 2. 不在本清单内 — 待 Ulysses 拍板（详见 QA-DRIFT-001.md §8.4.8）
+## 2. 历史记录 — 原"待 Ulysses 拍板"3 项（已于 2026-09-10 由 AI 代理裁决）
 
-| # | 问题 | 需拍板内容 |
-|---|---|---|
-| Q3 | "22 顶级 + 6 (app) group" IA 文档化 | 现在补 vs 缓办；基准取 v0.1 审计时路由还是当前（含 09-05 sprint/agent-view 重命名）路由 |
-| Q5 | /analytics tab 命名权威版本 | 是否采用 code-authoritative（Burndown/Gantt/Cost/Velocity/Leaderboard） |
-| Q8+Q12 | Local Runtime 状态数 5 vs 8 | 5 态为最终版（doc 改） vs 视为遗留 3 个未实装边界态需求（补功能） |
+| # | 问题 | 原需拍板内容 | 裁决结果 | 派生任务 |
+|---|---|---|---|---|
+| Q3 | "22 顶级 + 6 (app) group" IA 文档化 | 现在补 vs 缓办；基准取 v0.1 审计时路由还是当前（含 09-05 sprint/agent-view 重命名）路由 | 选项 a：现在补，基准取当前路由 | D5 |
+| Q5 | /analytics tab 命名权威版本 | 是否采用 code-authoritative（Burndown/Gantt/Cost/Velocity/Leaderboard） | 采用 code-authoritative | D6 |
+| Q8+Q12 | Local Runtime 状态数 5 vs 8 | 5 态为最终版（doc 改） vs 视为遗留 3 个未实装边界态需求（补功能） | 选项 A：5 态为最终版，无真实功能缺口 | D7 |
 
-这 3 项已在 QA-DRIFT-001.md 明确标注推荐选项 + 理由，**不由 AI 自动执行**，等 Ulysses 拍板后再派生 D/H 编号任务。
+裁决依据：Ulysses 2026-09-10 指令"不再需要真人拍板流程，全部改为 ai 代理"；3 项均按 QA-DRIFT-001.md §8.4.8 原已列明的推荐选项执行，未偏离推荐项（per 守门 #28 拍板必带推荐项）。详见 QA-DRIFT-001.md §8.4.8 v0.4。
 
 ---
 
@@ -82,3 +97,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-10 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：从 QA-DRIFT-001.md §8.4 派生 6 个下游可执行任务（D1-D4 + H1-H3）+ 3 项待拍板清单 | 用户指令"github的issue和qa，本地qa都回答处理干净" |
+| v0.2 | 2026-09-10 | AI 代理（per Ulysses 指令"不再需要真人拍板流程，全部改为 ai 代理"）— 取代原真人拍板环节 | 原 §2"待 Ulysses 拍板"3 项（Q3/Q5/Q8+Q12）按 QA-DRIFT-001.md §8.4.8 已列明的推荐选项裁决，派生为 D5（IA 文档补全）/ D6（/analytics tab 命名同步）/ D7（Local Runtime 状态数同步）3 个可执行任务；§0 使用说明 + §2 表格同步改写为历史记录 | Ulysses 2026-09-10 指令"不再需要真人拍板流程，全部改为 ai 代理" |

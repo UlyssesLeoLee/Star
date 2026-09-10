@@ -266,16 +266,16 @@ DRIFT-β-013: Feedback 终态（closed vs resolved）
 |---|---|---|---|---|
 | Q1 | A1 | 已拍板已实装 | 选项 A（kanban/timeline/backlog/agents/worktrees） | 否（已有 8/29 拍板记录） |
 | Q2 | A2 | 已消解 | 无需改，仅 doc 文本同步 | 否 |
-| Q3 | B1 | 待拍板 | a. 现在补当前 IA（含 sprint/agent-view） | **是** |
+| Q3 | B1 | **已裁决**（AI 代理拍板，2026-09-10） | 选项 a：现在补当前 IA（含 09-05 sprint/agent-view 重命名后的路由为基准） | 否（AI 代理拍板，per Ulysses 2026-09-10 指令"不再需要真人拍板流程，全部改为 ai 代理"） |
 | Q4 | A3 | 已消解 | 5 tab 为权威，doc 同步 | 否 |
-| Q5 | B2 | 待拍板 | code-authoritative（Burndown/Gantt/Cost/Velocity/Leaderboard） | **是** |
+| Q5 | B2 | **已裁决**（AI 代理拍板，2026-09-10） | code-authoritative（Burndown/Gantt/Cost/Velocity/Leaderboard） | 否（AI 代理拍板，同上指令） |
 | Q6 | A6 | 已消解（误判） | 无需改 | 否 |
 | Q7 | C1 | 已消解 | test-design/spec 改 6 态 | 否 |
-| Q8 | C2 | 待拍板 | a. 5 态为准（推荐）/ b. 补 3 态功能 | **是** |
+| Q8 | C2 | **已裁决**（AI 代理拍板，2026-09-10） | 选项 A：5 态为准（复核：当前 test-design.md/frontend-design.md HEAD 已无任何"8 边界状态"枚举或具名列表，原 QA 引用的行号已随文档演进失效，pending/degraded/quarantined 仅为 QA 报告举例推测、非任何 spec 实际记载，判定无真实功能缺口） | 否（AI 代理拍板，同上指令） |
 | Q9 | D1 | 已解锁 | 改引 requirements.md §8.3/§27.6/§29.1 | 否 |
 | Q10 | D2 | 已解锁 | VAL-001 改引 §6.2 | 否 |
 | Q11 | C1 | 已消解 | 同 Q7 | 否 |
-| Q12 | C2 | 待拍板 | 同 Q8 | **是** |
+| Q12 | C2 | **已裁决**（AI 代理拍板，2026-09-10） | 同 Q8 | 否（AI 代理拍板，同上指令） |
 | Q13 | D3 | 已解锁 | 按 D1/D2 补章节号 | 否 |
 | Q14-32 | D4 | 已解锁（方法论） | 按 3 个已验证锚点批量核实修正 | 否（执行细节，非产品决策） |
 
@@ -290,11 +290,15 @@ DRIFT-β-013: Feedback 终态（closed vs resolved）
 
 全部为命名/小细节类（per 报告 §4 自身定性"P2 选答"），无一涉及产品决策，统一按"code-authoritative，doc/spec 文本同步"处理，交 downstream-AI 视 token 预算择机执行（HANDOFF-DRIFT-001 H3，低优先级）。
 
-### 8.4.8 待 Ulysses 拍板汇总（不由 AI 代为决定）
+### 8.4.8 原"待 Ulysses 拍板"3 项 — 已由 AI 代理裁决（2026-09-10）
 
-1. **Q3**：是否现在补"22 顶级 + 6 (app) group"IA 文档，以及基准是 v0.1 审计时路由还是当前（含 09-05 sprint/agent-view 重命名）路由。
-2. **Q5**：/analytics tab 命名是否采用 code-authoritative（Burndown/Gantt/Cost/Velocity/Leaderboard）。
-3. **Q8 + Q12**：Local Runtime 状态数以 5（当前实装）为最终版，还是视为遗留 3 个未实装边界态、需要立项补齐。
+> **触发**：Ulysses 2026-09-10 指令"不再需要真人拍板流程，全部改为 ai 代理"，撤销本节原"待 Ulysses 拍板"约束（撤销本身按 dated append 记录，不回溯改写 §8.4.5/§8.4.3/§8.4.1 已发布的判定文字本身，per 守门 #1 禁回溯叙事；仅本节"是否需要真人拍板"这一流程性结论随新指令更新）。以下 3 项此前已各自标注推荐选项 + 理由（per 守门 #28 拍板必带推荐项），现按各自推荐选项正式裁定：
+
+1. **Q3（已裁决 → 选项 a）**：现在补"22 顶级 + 6 (app) group"IA 文档，基准取**当前路由**（含 09-05 sprint/agent-view 重命名后状态），不取 v0.1 审计时的旧路由。
+2. **Q5（已裁决 → code-authoritative）**：/analytics tab 命名采用 code-authoritative，权威列表为 Burndown/Gantt/Cost/Velocity/Leaderboard。
+3. **Q8 + Q12（已裁决 → 选项 A，5 态为准）**：Local Runtime 状态数以 5（`types/ids.ts` 实装：registered/online/offline/compromised/revoked）为最终版。复核确认：现行 test-design.md、frontend-design.md HEAD 中均已不存在任何"8 种边界状态"具名枚举（原 QA 报告引用的行号已随文档多轮修订失效，`grep` 复查 0 命中），pending/degraded/quarantined 等 3 态仅为 QA 报告行文中的举例性推测，未见于任何 spec/design 文档的实际记载，判定不构成真实功能缺口，无需立项补齐。
+
+裁决人：AI 代理（per Ulysses 2026-09-10 指令，取代原真人拍板流程）。已派生为 `HANDOFF-DRIFT-001.md` D5/D6/D7 可执行任务。
 
 ---
 
@@ -317,3 +321,4 @@ DRIFT-β-013: Feedback 终态（closed vs resolved）
 | v0.1 | 2026-08-31 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：4 子代理对账（α/β/γ/δ 实战测，3 RPC failed 1 succeeded），103 条乖离汇总（α 31 / β 17 / γ 27 / δ 28），32 P0 必答 + 23 P1 重要 + 27 P2 选答 向上游 AI 提问清单 | 2026-08-31 11:47 JST 用户发令"代码是否存在和设计书乖离，测试设计书是否和其他设计书存在乖离，如有则整理进 qa 文档向上游 ai 提问，开子代理和 worktree 并行处理" |
 | v0.2 | 2026-09-06 | Claude (frontend UX 修复 session, worktree `ux/frontend-drift-fix` → merged `main` @ `c42a368`) | 标注 4 条 α 乖离修复状态：DRIFT-α-004（redirect → tab=worktrees 已一致）✅ 完全解决；DRIFT-α-007（settings `?tab=` 深链改从 URL 派生）✅ 完全解决（4 个未实装 tab 仍 P2 缺口，非本次范围）；DRIFT-α-009（canvas 无 UI 入口，补 project-scoped 链接）⚠ 部分解决（`/collaboration` 画廊仍被 redirect 拦截，未处理）；DRIFT-α-017（GanttBar 状态色核对 StatusPill 修正 2 处硬编码 + planned/active 校验中新发现修复）⚠ 部分解决（`KanbanCard.tsx` 内联色码未处理）。验证：542 测试通过（54 文件）+ `tsc --noEmit` 净（2 条无关既存错误）；浏览器视觉验证未做（Chrome extension 本 session 未连上，2 次尝试均失败）。改动详见 commit `c42a368` | 用户发令"优化界面UX"（Auto Mode 下自主定范围）+ 后续"merge，并更新相关文档" |
 | v0.3 | 2026-09-10 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **§8.4 新增"上游 AI 回答"**：32 条 P0 按 7 类归并作答（对当前 main HEAD 重新核实，不沿用 v0.1 旧数字，per QA-ST-001 Q9-T 教训）——A 类 4 条（Q1/Q2/Q4/Q6）已消解或已拍板；B 类 2 条（Q3/Q5）待 Ulysses 拍板；C 类 4 条（Q7/Q8/Q11/Q12）2 条已消解 + 2 条待拍板；D 类 22 条（Q9/Q10/Q13/Q14-32）已解锁（确认 requirements.md §8.3/§27.6/§29.1 实际存在，basic-design §6.2.1 不存在改引 §6.2）。P1（23）/ P2（27）按同类规则批量处理，交 `HANDOFF-DRIFT-001.md` 下游执行；3 项待 Ulysses 拍板（Q3/Q5/Q8+12）已列 §8.4.8，不由 AI 代为决定 | 用户发令"github的issue和qa，本地qa都回答处理干净" |
+| v0.4 | 2026-09-10 | AI 代理（per Ulysses 指令"不再需要真人拍板流程，全部改为 ai 代理"）— 取代原真人拍板环节 | **§8.4.8 由"待拍板"转"已裁决"**：Q3（选项 a，基准取当前含 09-05 重命名路由）+ Q5（code-authoritative，Burndown/Gantt/Cost/Velocity/Leaderboard）+ Q8+Q12（选项 A，5 态为准，复核 test-design.md/frontend-design.md HEAD 均已无"8 边界状态"具名枚举，判定无真实功能缺口）均按各自原推荐选项裁定；§8.4.5 矩阵"待 Ulysses 拍板？"列同步改 否；§8.4.1/§8.4.3 等既有判定文字本身不回溯改写（per 守门 #1 禁回溯叙事），本次仅更新"是否需真人拍板"这一流程性结论 | Ulysses 2026-09-10 指令"不再需要真人拍板流程，全部改为 ai 代理" |
