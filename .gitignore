@@ -41,6 +41,12 @@ docs.untracked.bak/
 .env.*
 !.env.example
 
+# v0.89 P0-4 Stage 3.5 platform_admin password secret workflow (per v0.88 已知缺口 (b))
+# - .env.star-platform-admin-password 已被 .env.* 通配覆盖 (P0-4 阶段占位, P2 阶段由 scripts/secrets/platform_admin_password_gen.py 生成)
+# - *.sealed.yaml.tmp: P2 阶段 sealed-secrets CLI 加密中间文件 (kubeseal 临时输出)
+# - 真正的 SealedSecret 已加密, 可入 git (per bitnami-labs/sealed-secrets 设计, 加密后才入 git)
+*.sealed.yaml.tmp
+
 # Nested worktrees (managed by `git worktree`, not part of source tree)
 /.worktrees/
 
