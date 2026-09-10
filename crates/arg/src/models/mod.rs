@@ -26,6 +26,8 @@ pub mod template;
 pub mod template_instance;
 /// Trust score 5 档 enum + transfer function, per DD §3.3.3.
 pub mod trust_score;
+/// `TrustAuditLog` (WORM append-only per 守门 #13 d + ADR-0043), per DDD-REVIEW-AGENT-RELATIONSHIP-001 §1.2 G-4 拍板.
+pub mod trust_audit;
 
 pub use achievement::{Achievement, AchievementCategory, Rarity, UnlockCondition};
 pub use achievement_unlock::AchievementUnlock;
@@ -37,3 +39,4 @@ pub use peer_review::{ChallengePrompt, ChallengeVerdict, PeerReviewVerdict};
 pub use template::{TeamTemplate, TemplateCategory, TemplateEdge, TemplateId};
 pub use template_instance::TemplateInstance;
 pub use trust_score::{update_trust_score, TrustScoreTier};
+pub use trust_audit::TrustAuditLog;
