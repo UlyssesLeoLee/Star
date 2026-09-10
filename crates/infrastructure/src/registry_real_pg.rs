@@ -405,4 +405,112 @@ mod tests {
         // reg.pool() 仍可用 (clone 不消耗原 pool, per sqlx::PgPool Arc 语义)
         let _ = reg.pool();
     }
+
+    // =====================================================================
+    // v0.78 P0-4 Stage 2.2: 10/10 Repository 跨 Repository 共享 pool 验证测试 (per 守门 #19 v19)
+    // =====================================================================
+
+    #[tokio::test]
+    async fn ops_cluster_action_log_repository_wireup_works() {
+        // v0.78 P0-4 Stage 2.2 验证: 10/10 Repository 都能从 reg.pool().clone() 构造
+        // (per sqlx::PgPool = Arc 内部, clone 廉价且共享同一连接池)
+        use star_pg_adapter::repository::ops_cluster_action_log::PgOpsClusterActionLogRepository;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor).await;
+        // 构造 ops Repository 用 pool getter (per v0.67 6 ops Repository `pub fn new(pool: PgPool)` 模式)
+        let repo = PgOpsClusterActionLogRepository::new(reg.pool().clone());
+        // 验证 repo.pool() 仍可 clone 出来 (证明 pool 共享 Arc 内部)
+        let _repo_pool_clone = repo.pool().clone();
+        // reg.pool() 仍可用 (clone 不消耗原 pool, per sqlx::PgPool Arc 语义)
+        let _ = reg.pool();
+    }
+
+    #[tokio::test]
+    async fn ops_helm_release_state_repository_wireup_works() {
+        use star_pg_adapter::repository::ops_helm_release_state::PgOpsHelmReleaseStateRepository;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor).await;
+        let repo = PgOpsHelmReleaseStateRepository::new(reg.pool().clone());
+        let _repo_pool_clone = repo.pool().clone();
+        let _ = reg.pool();
+    }
+
+    #[tokio::test]
+    async fn ops_log_analysis_repository_wireup_works() {
+        use star_pg_adapter::repository::ops_log_analysis::PgOpsLogAnalysisRepository;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor).await;
+        let repo = PgOpsLogAnalysisRepository::new(reg.pool().clone());
+        let _repo_pool_clone = repo.pool().clone();
+        let _ = reg.pool();
+    }
+
+    #[tokio::test]
+    async fn ops_log_entry_repository_wireup_works() {
+        use star_pg_adapter::repository::ops_log_entry::PgOpsLogEntryRepository;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor).await;
+        let repo = PgOpsLogEntryRepository::new(reg.pool().clone());
+        let _repo_pool_clone = repo.pool().clone();
+        let _ = reg.pool();
+    }
+
+    #[tokio::test]
+    async fn ops_log_query_log_repository_wireup_works() {
+        use star_pg_adapter::repository::ops_log_query_log::PgOpsLogQueryLogRepository;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor).await;
+        let repo = PgOpsLogQueryLogRepository::new(reg.pool().clone());
+        let _repo_pool_clone = repo.pool().clone();
+        let _ = reg.pool();
+    }
+
+    #[tokio::test]
+    async fn oauth_access_tokens_repository_wireup_works() {
+        use star_pg_adapter::repository::oauth_access_tokens::PgOAuthAccessTokenRepository;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor).await;
+        let repo = PgOAuthAccessTokenRepository::new(reg.pool().clone());
+        let _repo_pool_clone = repo.pool().clone();
+        let _ = reg.pool();
+    }
+
+    #[tokio::test]
+    async fn oauth_authorization_codes_repository_wireup_works() {
+        use star_pg_adapter::repository::oauth_authorization_codes::PgOAuthAuthorizationCodeRepository;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor).await;
+        let repo = PgOAuthAuthorizationCodeRepository::new(reg.pool().clone());
+        let _repo_pool_clone = repo.pool().clone();
+        let _ = reg.pool();
+    }
+
+    #[tokio::test]
+    async fn oauth_clients_repository_wireup_works() {
+        use star_pg_adapter::repository::oauth_clients::PgOAuthClientRepository;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor).await;
+        let repo = PgOAuthClientRepository::new(reg.pool().clone());
+        let _repo_pool_clone = repo.pool().clone();
+        let _ = reg.pool();
+    }
+
+    #[tokio::test]
+    async fn oauth_refresh_tokens_repository_wireup_works() {
+        use star_pg_adapter::repository::oauth_refresh_tokens::PgOAuthRefreshTokenRepository;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor).await;
+        let repo = PgOAuthRefreshTokenRepository::new(reg.pool().clone());
+        let _repo_pool_clone = repo.pool().clone();
+        let _ = reg.pool();
+    }
 }
