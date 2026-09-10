@@ -6,7 +6,7 @@
 > 核心功能 = **管理 agent + 游戏化**, 避免过度冗余
 > 6 阶段拍板: 17:00 旧 12 大类 50 项 Miro 全面对标 (撤回) → 17:08 双核心 → 17:21 ARG 图论构造 (A11) → 17:34 多人编辑 (A12, v0.63 反转) → 18:00 基于需求文档制作基本设计文档 (BD) → 18:25 完善详细设计文档 (本 DD)
 >
-> - 状态: 🟡 Draft v0.1
+> - 状态: 🟡 Draft **v0.1.1** (v0.1.1 协调性检查修复落档)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联需求: [`docs/requirements/SRS-CANVAS-001.md`](../requirements/SRS-CANVAS-001.md) v1.1 (58KB, 18:00 JST root 写, 双核心 78 项索引)
 > - 关联基本設計: [`docs/design/BD-CANVAS-001.md`](../design/BD-CANVAS-001.md) v0.1 (50KB, 18:00 JST root 写, 5 view 跨域 + 14 张表 W/T/M 100% 覆盖)
@@ -32,7 +32,7 @@
 | 作成日 | 2026-09-10 |
 | 作成者 | Ulysses — Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手) |
-| 关联 commit | 待生成 (v0.1.1 修复版落档后) |
+| 关联 commit | `fb89e4a` (10 files / 8,160 insertions, 第 74 次新事件, 含 v0.1.1 修复版) + `153441a` (§4.29 + registry v0.14, 第 75 次新事件) |
 | 关联文档 | `SRS-CANVAS-001.md` v1.1 + `BD-CANVAS-001.md` v0.1 (本批派生) + `DD-CANVAS-{AGENT,GAMIFY}-001.md` v0.1 (本批派生) + `DD-AGENT-RELATIONSHIP-001.md` v0.1 (94KB 模板) |
 | 平行 DD | `DD-AGENT-VIEW-001.md` (待补, 9/5 落档) |
 
