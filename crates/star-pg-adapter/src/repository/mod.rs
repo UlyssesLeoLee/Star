@@ -44,3 +44,12 @@ pub use oauth_clients::{OAuthClient, OAuthClientRepository, PgOAuthClientReposit
 pub use oauth_refresh_tokens::{
     OAuthRefreshToken, OAuthRefreshTokenRepository, PgOAuthRefreshTokenRepository,
 };
+
+// ==========================================
+// v0.82 P0-4 Stage 3.1 = multi-tenant routing DDL 持久化 (per v0.81 已知缺口 (a))
+// 守门 #13 c M SCD Type 2 + 守门 #13 d T AuditEvent WORM + 守门 #13 b 物理删除禁止
+// ==========================================
+
+pub mod tenant_pool;
+
+pub use tenant_pool::{PgTenantPoolRepository, TenantPool, TenantPoolRepository};
