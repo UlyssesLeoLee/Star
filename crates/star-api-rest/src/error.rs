@@ -525,15 +525,152 @@ impl From<domain_cli::hermes::HermesError> for RestError {
     }
 }
 
+/// `domain_tenant::TenantError` → `RestError` (per v0.60 P0-2 Stage 3, WBS §14.15)
+impl From<domain_tenant::TenantError> for RestError {
+    fn from(e: domain_tenant::TenantError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_tenant::TenantError::NotFound(_) => ("TENANT_NOT_FOUND", "Validation", false),
+            domain_tenant::TenantError::PermissionDenied => ("POLICY_DENIED", "Policy", false),
+            domain_tenant::TenantError::CrossTenantDenied(_, _) => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_tenant::TenantError::SlugExists(_) => ("TENANT_SLUG_EXISTS", "External", false),
+            domain_tenant::TenantError::InvalidState(_) => {
+                ("TENANT_INVALID_STATE", "Validation", false)
+            }
+            domain_tenant::TenantError::Conflict(_) => ("TENANT_CONFLICT", "External", false),
+            domain_tenant::TenantError::Internal(_) => ("INTERNAL", "Internal", true),
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("tenant: {e}"),
+            source_module: "domain-tenant".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the tenant id + slug + role (tenant_admin/platform_admin)".to_string(),
+        }
+    }
+}
+
+/// `domain_identity::IdentityError` → `RestError` (per v0.60 P0-2 Stage 3, WBS §14.15)
+impl From<domain_identity::IdentityError> for RestError {
+    fn from(e: domain_identity::IdentityError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_identity::IdentityError::NotFound(_) => {
+                ("IDENTITY_NOT_FOUND", "Validation", false)
+            }
+            domain_identity::IdentityError::PermissionDenied => ("POLICY_DENIED", "Policy", false),
+            domain_identity::IdentityError::CrossTenantDenied(_, _) => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_identity::IdentityError::EmailExists(_) => {
+                ("IDENTITY_EMAIL_EXISTS", "External", false)
+            }
+            domain_identity::IdentityError::IncompleteBinding => {
+                ("IDENTITY_INCOMPLETE_BINDING", "Validation", false)
+            }
+            domain_identity::IdentityError::DeviceAlreadyRevoked => {
+                ("IDENTITY_DEVICE_REVOKED", "External", false)
+            }
+            domain_identity::IdentityError::Conflict(_) => ("IDENTITY_CONFLICT", "External", false),
+            domain_identity::IdentityError::Internal(_) => ("INTERNAL", "Internal", true),
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("identity: {e}"),
+            source_module: "domain-identity".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the user id + email + tenant + role (developer/platform_admin)"
+                .to_string(),
+        }
+    }
+}
+
+/// `domain_permission::PermissionError` → `RestError` (per v0.60 P0-2 Stage 3, WBS §14.15)
+impl From<domain_permission::PermissionError> for RestError {
+    fn from(e: domain_permission::PermissionError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_permission::PermissionError::NotFound(_) => {
+                ("PERMISSION_NOT_FOUND", "Validation", false)
+            }
+            domain_permission::PermissionError::PermissionDenied => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_permission::PermissionError::CrossTenantDenied(_, _) => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_permission::PermissionError::InvalidRule(_) => {
+                ("PERMISSION_INVALID_RULE", "Validation", false)
+            }
+            domain_permission::PermissionError::Conflict(_) => {
+                ("PERMISSION_CONFLICT", "External", false)
+            }
+            domain_permission::PermissionError::Internal(_) => ("INTERNAL", "Internal", true),
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("permission: {e}"),
+            source_module: "domain-permission".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the permission rule + role + scope (project_admin/tenant_admin/developer)"
+                .to_string(),
+        }
+    }
+}
+
+/// `domain_project::ProjectError` → `RestError` (per v0.60 P0-2 Stage 3, WBS §14.15)
+impl From<domain_project::ProjectError> for RestError {
+    fn from(e: domain_project::ProjectError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_project::ProjectError::NotFound(_) => ("PROJECT_NOT_FOUND", "Validation", false),
+            domain_project::ProjectError::PermissionDenied => ("POLICY_DENIED", "Policy", false),
+            domain_project::ProjectError::CrossTenantDenied(_, _) => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_project::ProjectError::SlugExists(_) => {
+                ("PROJECT_SLUG_EXISTS", "External", false)
+            }
+            domain_project::ProjectError::InvalidState(_) => {
+                ("PROJECT_INVALID_STATE", "Validation", false)
+            }
+            domain_project::ProjectError::Conflict(_) => ("PROJECT_CONFLICT", "External", false),
+            domain_project::ProjectError::Internal(_) => ("INTERNAL", "Internal", true),
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("project: {e}"),
+            source_module: "domain-project".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint:
+                "Check the project id + slug + workspace + tenant + role (project_admin/developer)"
+                    .to_string(),
+        }
+    }
+}
+
 impl IntoResponse for RestError {
     fn into_response(self) -> axum::response::Response {
         // per spec §2.4: code → HTTP status 映射
         let status = match self.code.as_str() {
             "NOT_IMPLEMENTED" => StatusCode::NOT_IMPLEMENTED,
             "VALIDATION_FAILED" | "VALIDATION_RUN_FAILED" => StatusCode::BAD_REQUEST,
-            "RESOURCE_NOT_FOUND" | "WORKTREE_NOT_FOUND" | "FB_NOT_FOUND" | "COMMENT_NOT_FOUND" => {
-                StatusCode::NOT_FOUND
-            }
+            "RESOURCE_NOT_FOUND"
+            | "WORKTREE_NOT_FOUND"
+            | "FB_NOT_FOUND"
+            | "COMMENT_NOT_FOUND"
+            | "AGENT_NOT_FOUND"
+            | "THEME_NOT_FOUND"
+            | "BATCH_TASK_NOT_FOUND"
+            | "BATCH_RUN_NOT_FOUND"
+            | "BATCH_NODE_NOT_FOUND"
+            | "BATCH_NODE_TYPE_NOT_FOUND"
+            | "TENANT_NOT_FOUND"
+            | "IDENTITY_NOT_FOUND"
+            | "PERMISSION_NOT_FOUND"
+            | "PROJECT_NOT_FOUND" => StatusCode::NOT_FOUND,
             "BATCH_UNAUTHENTICATED" => StatusCode::UNAUTHORIZED,
             "POLICY_DENIED" | "FB_PERMISSION_DENIED" | "AGENT_WORKTREE_MISMATCH" => {
                 StatusCode::FORBIDDEN
@@ -547,7 +684,15 @@ impl IntoResponse for RestError {
             | "BATCH_TASK_NAME_CONFLICT"
             | "BATCH_RUN_ALREADY_RUNNING"
             | "AGENT_CONFLICT"
-            | "AGENT_ALREADY_EXISTS" => StatusCode::CONFLICT,
+            | "AGENT_ALREADY_EXISTS"
+            | "TENANT_CONFLICT"
+            | "TENANT_SLUG_EXISTS"
+            | "IDENTITY_CONFLICT"
+            | "IDENTITY_EMAIL_EXISTS"
+            | "IDENTITY_DEVICE_REVOKED"
+            | "PERMISSION_CONFLICT"
+            | "PROJECT_CONFLICT"
+            | "PROJECT_SLUG_EXISTS" => StatusCode::CONFLICT,
             "BATCH_NODE_TIMEOUT" => StatusCode::REQUEST_TIMEOUT,
             "BATCH_ENGINE_OVERLOADED" => StatusCode::SERVICE_UNAVAILABLE,
             "FB_INVALID_STATE_TRANSITION"
@@ -566,7 +711,11 @@ impl IntoResponse for RestError {
             | "BATCH_INVALID_NODE_TYPE_CONFIG"
             | "BATCH_INVALID_CRON"
             | "BATCH_VALIDATION_FAILED"
-            | "AGENT_INVALID_TRANSITION" => StatusCode::UNPROCESSABLE_ENTITY,
+            | "AGENT_INVALID_TRANSITION"
+            | "TENANT_INVALID_STATE"
+            | "IDENTITY_INCOMPLETE_BINDING"
+            | "PERMISSION_INVALID_RULE"
+            | "PROJECT_INVALID_STATE" => StatusCode::UNPROCESSABLE_ENTITY,
             "INTERNAL"
             | "BATCH_NODE_EXECUTION_FAILED"
             | "BATCH_WORKER_LEASE_LOST"

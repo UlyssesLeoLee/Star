@@ -68,6 +68,9 @@ domain-comment = { path = "../domain-comment" }
 domain-batch = { path = "../domain-batch" }
 domain-theme = { path = "../domain-theme" }
 domain-cli = { path = "../domain-cli" }
+# v0.60 P0-2 Stage 3 (per WBS §14.15): tenant + identity + permission + project 域 From<DomainError> for RestError 映射
+# domain-tenant + domain-identity + domain-permission 已在 Phase B.2 中定义 (lines 52-54)
+# domain-project 已在 Phase B.2.5 中定义 (line 57)
 # Phase I Batch 2 (per `STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` §1.1 表 #9-18)
 # 10 路由接线: code 4 + context 1 + merge_requests 1 + reviews 1 + validations 1 + submissions 1 + pipelines 1
 domain-search = { path = "../domain-search" }
