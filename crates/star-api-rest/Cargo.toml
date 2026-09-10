@@ -60,6 +60,9 @@ domain-work-item = { path = "../domain-work-item" }
 domain-worktree = { path = "../domain-worktree" }
 domain-agent = { path = "../domain-agent" }
 domain-feedback = { path = "../domain-feedback" }
+# v0.58 P0-2 Stage 1 (per WBS §14.15): integration + comment 域 From<DomainError> for RestError 映射
+domain-integration = { path = "../domain-integration" }
+domain-comment = { path = "../domain-comment" }
 # Phase I Batch 2 (per `STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` §1.1 表 #9-18)
 # 10 路由接线: code 4 + context 1 + merge_requests 1 + reviews 1 + validations 1 + submissions 1 + pipelines 1
 domain-search = { path = "../domain-search" }

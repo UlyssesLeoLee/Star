@@ -103,7 +103,10 @@ async fn integration_authorize_returns_302_with_code_after_v0_51() {
         location.starts_with(redirect_uri),
         "redirect target wrong: {location}"
     );
-    assert!(location.contains("code="), "missing code in location: {location}");
+    assert!(
+        location.contains("code="),
+        "missing code in location: {location}"
+    );
     assert!(
         location.contains("state=xyz"),
         "missing state echo in location: {location}"
@@ -296,13 +299,8 @@ async fn integration_revoke_returns_200_after_v0_51() {
     assert_eq!(resp.status(), StatusCode::OK, "revoke must 200");
 
     // No body bytes for 200 (per handler signature `Result<StatusCode, _>`).
-    let body_bytes = axum::body::to_bytes(resp.into_body(), 1)
-        .await
-        .unwrap();
-    assert!(
-        body_bytes.is_empty(),
-        "revoke 200 should have empty body"
-    );
+    let body_bytes = axum::body::to_bytes(resp.into_body(), 1).await.unwrap();
+    assert!(body_bytes.is_empty(), "revoke 200 should have empty body");
 }
 
 /// End-to-end authorize → token roundtrip, exercising the full PKCE flow.

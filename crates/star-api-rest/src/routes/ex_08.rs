@@ -44,9 +44,7 @@ pub struct TestRunRequest {
 /// - 调 `scripts/automation/exclusion/e2e_runner.py` (per 守门 #19 [P] e2e_runner.py)
 /// - 18 UT + 8 IT + 12 E2E + 1 1000 并发压测 = 38 测试
 /// - 守门 #1 v25 单 crate 模式 (per cargo test 跳过 workspace, 4 步实证)
-pub async fn start_test_run(
-    Json(req): Json<TestRunRequest>,
-) -> (StatusCode, Json<Value>) {
+pub async fn start_test_run(Json(req): Json<TestRunRequest>) -> (StatusCode, Json<Value>) {
     let _ = req; // stub 阶段不实际使用
     (
         StatusCode::NOT_IMPLEMENTED,
