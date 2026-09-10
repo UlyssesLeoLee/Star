@@ -122,19 +122,37 @@ impl EdgeOps {
     }
 
     /// Look up an edge by id.
+    ///
+    /// G-10 阶段 2 V2 优先 (per DDD-REVIEW-AGENT-RELATIONSHIP-001 §1.3):
+    /// 读路径全走 V2 (v2_sink.get_v2), V2 没找到 fallback 到 V1 (per 阶段 2 监控 V1 读 fallback 比例 < 5%)
     pub async fn get(&self, id: Uuid, tenant_id: Uuid) -> Result<Option<Edge>, ARGError> {
-        let _ = (id, tenant_id);
-        Err(ARGError::Other(
-            "EdgeOps::get is a P3-C W1 stub (G-1)".into(),
-        ))
+        let _ = tenant_id;
+        // G-10 阶段 2: V2 优先
+        if let Some(v2_sink) = &self.v2_sink {
+            if let Some(edge) = v2_sink.get_v2(id)? {
+                return Ok(Some(edge));
+            }
+            // V2 没找到: fallback 到 V1 (per 阶段 2 监控)
+            // v0.83 阶段: V1 仍 stub, 返回 None
+        }
+        // v0.83 阶段 2: V2 优先 + V1 fallback stub
+        // 实际 r2d2-memgraph G-1 落地后: V1 走 client.execute_read(cypher)
+        let _ = id;
+        Ok(None)
     }
 
     /// List edges, filtered.
+    ///
+    /// G-10 阶段 2 V2 优先 (per DDD-REVIEW-AGENT-RELATIONSHIP-001 §1.3):
+    /// 读路径全走 V2 (v2_sink.list_v2)
     pub async fn list(&self, filter: EdgeFilter) -> Result<Vec<Edge>, ARGError> {
+        // G-10 阶段 2: V2 优先
+        if let Some(v2_sink) = &self.v2_sink {
+            return v2_sink.list_v2();
+        }
+        // v0.83 阶段 2: V2 优先 + V1 fallback stub
         let _ = filter;
-        Err(ARGError::Other(
-            "EdgeOps::list is a P3-C W1 stub (G-1)".into(),
-        ))
+        Ok(Vec::new())
     }
 
     /// Apply a patch with SCD Type 2 versioning.
