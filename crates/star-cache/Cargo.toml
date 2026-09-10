@@ -11,6 +11,8 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
+# Valkey / Redis client (per spec/cache/01 §2.3 选型决定 redis-rs 0.27+)
+redis = { workspace = true }
 
 [lints]
 workspace = true
