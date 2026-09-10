@@ -69,6 +69,34 @@ class DispatchBlockedError(Exception):
         self.rule_id = rule_id
 
 
+class BlockedByCommentError(Exception):
+    """任务卡 BLOCK 留言阻断子代理 dispatch 抛此异常 (per 守门 v33 + #27 + #9 v20).
+
+    包含阻断留言 ID + actor + body 摘要.
+    """
+    def __init__(self, message: str, blocking_comments: Optional[list] = None):
+        super().__init__(message)
+        self.blocking_comments = blocking_comments or []
+
+
+@dataclass
+class Comment:
+    """任务卡留言条目 (per 守门 v33 §1.2 schema).
+
+    存储: docs/briefs/<task_id>.comments.jsonl (JSON Lines, append-only, per 守门 #13 T).
+    """
+    id: str
+    ts: str
+    author: str
+    actor_role: str          # orchestrator/sub-agent/architect/user/Ulysses
+    body: str
+    mentions: list = field(default_factory=list)
+    blocks: bool = False
+    tags: list = field(default_factory=list)
+    parent_comment_id: Optional[str] = None
+    refs: list = field(default_factory=list)
+
+
 @dataclass
 class TaskHandle:
     """子代理任务句柄 (per §3.1 invoke 返)"""
@@ -113,21 +141,29 @@ class SubagentDispatcher:
     # === 4 个核心方法 (per §3.1 范式) ===
 
     def brief(self, task_id: str, content: str, agent: str) -> Path:
-        """落地 brief → docs/briefs/<task_id>.md"""
+        """落地 brief → docs/briefs/<task_id>.md + 拉 @<task_id> 留言 append "Read COMMENTS" 段.
+
+        Per 守门 #9 v20 + 守门 v33 §1.4:
+            brief 必含 "Read COMMENTS" 段, 列所有 @<this_task> 的留言.
+        """
         brief_path = self.briefs_dir / f"{task_id}.md"
+        # 拉所有 @<task_id> 留言 (per 守门 v33 §1.4)
+        comments_section = self._render_comments_section(task_id)
         brief_path.write_text(
             f"# Brief: {task_id}\n\n"
             f"**Agent**: {agent}\n"
             f"**Phase**: {self.phase}\n"
             f"**Created**: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-            f"---\n\n{content}\n",
+            f"---\n\n{content}\n\n"
+            f"## 6. Read COMMENTS (任务卡留言, 必读, per 守门 v33)\n\n"
+            f"{comments_section}\n",
             encoding="utf-8",
         )
         self._audit(
             action="brief",
             task_id=task_id,
             input={"agent": agent, "content_len": len(content)},
-            output={"brief_path": str(brief_path)},
+            output={"brief_path": str(brief_path), "comments_count": len(self.list_comments(task_id))},
         )
         return brief_path
 
@@ -147,8 +183,21 @@ class SubagentDispatcher:
             阻断危险操作 (rm -rf /, sudo, GitHub PAT leak, etc).
             disable 方式: env var STAR_PRE_TOOL_USE_GUARD=0.
             软依赖: guardian import 失败 → fail-open 跳过 (per FR-6.1).
+
+        Comment BLOCK 留言 (per 守门 v33 §1.4 + #27 + #9 v20):
+            invoke 前必扫任务卡 BLOCK 留言, 有 → 抛 BlockedByCommentError, 不 invoke.
+            缺留言文件 → 0 留言 = 0 BLOCK, 继续 (per 缺标比错标 #11).
         """
         task_id = brief_path.stem
+
+        # === Comment BLOCK 留言检查 (per 守门 v33 §1.4) ===
+        blocking = self.check_blocked(task_id)
+        if blocking:
+            blocking_summaries = [f"{c.id} by {c.author}: {c.body[:80]}" for c in blocking]
+            raise BlockedByCommentError(
+                f"Task {task_id} blocked by {len(blocking)} comment(s): {'; '.join(blocking_summaries)}",
+                blocking_comments=blocking,
+            )
 
         # === PreToolUse hook (per FR-1.2 + NFR-S-4) ===
         if os.environ.get("STAR_PRE_TOOL_USE_GUARD", "1") != "0":
@@ -580,6 +629,140 @@ class SubagentDispatcher:
         return output_path
 
     # === 内部 ===
+
+    # === 任务卡留言机制 (per 守门 v33 + 守门 #9 v20 + 守门 #27) ===
+
+    def _comments_path(self, task_id: str) -> Path:
+        """docs/briefs/<task_id>.comments.jsonl 物理路径 (per 守门 v33 §1.1)."""
+        return self.briefs_dir / f"{task_id}.comments.jsonl"
+
+    def comment(
+        self,
+        task_id: str,
+        body: str,
+        author: str = "Mavis",
+        actor_role: str = "orchestrator",
+        mentions: Optional[list] = None,
+        blocks: bool = False,
+        tags: Optional[list] = None,
+        parent_comment_id: Optional[str] = None,
+        refs: Optional[list] = None,
+    ) -> Comment:
+        """写 1 条 append-only 留言到 <task_id>.comments.jsonl (per 守门 v33 §1.1).
+
+        Args:
+            task_id: 任务 ID (mention 跟这个 ID 匹配时被 @ 触发)
+            body: 留言内容
+            author: 留言作者 (默认 Mavis, per 守门 #14 v3 永久代签)
+            actor_role: orchestrator/sub-agent/architect/user/Ulysses
+            mentions: @mention 的其他 task_id 列表 (触发 brief 拉留言)
+            blocks: True → 阻断 dispatch (per 守门 v33 §1.3)
+            tags: e.g. ["requirement", "follow-up"]
+            parent_comment_id: 父留言 ID (线程嵌套)
+            refs: 引用其他文档/commit (审计链)
+        """
+        comments_path = self._comments_path(task_id)
+        # 必含 task_id 自身在 mentions (方便后续 brief 拉)
+        mentions = list(mentions or [])
+        if task_id not in mentions:
+            mentions.append(task_id)
+        # 生成 comment_id (简单计数器)
+        existing = self.list_comments(task_id)
+        comment_id = f"comment_{len(existing) + 1:03d}"
+        c = Comment(
+            id=comment_id,
+            ts=time.strftime("%Y-%m-%dT%H:%M:%S") + f".{int((time.time()%1)*1000):03d}+09:00",
+            author=author,
+            actor_role=actor_role,
+            body=body,
+            mentions=mentions,
+            blocks=blocks,
+            tags=list(tags or []),
+            parent_comment_id=parent_comment_id,
+            refs=list(refs or []),
+        )
+        # append-only 写 (per 守门 #13 T)
+        comments_path.parent.mkdir(parents=True, exist_ok=True)
+        with comments_path.open("a", encoding="utf-8", errors="replace") as f:
+            f.write(json.dumps(asdict(c), ensure_ascii=False, separators=(",", ":")) + "\n")
+        self._audit(
+            action="comment",
+            task_id=task_id,
+            input={"comment_id": comment_id, "blocks": blocks, "mentions": mentions},
+            output={"body_len": len(body), "comments_count": len(existing) + 1},
+        )
+        return c
+
+    def list_comments(self, task_id: str) -> list:
+        """读所有留言 (per 守门 v33 §1.4). 缺文件 → 0 留言 (per 缺标比错标 #11)."""
+        comments_path = self._comments_path(task_id)
+        if not comments_path.exists():
+            return []
+        out = []
+        try:
+            for line in comments_path.read_text(encoding="utf-8", errors="replace").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    d = json.loads(line)
+                    out.append(Comment(
+                        id=d.get("id", ""),
+                        ts=d.get("ts", ""),
+                        author=d.get("author", ""),
+                        actor_role=d.get("actor_role", ""),
+                        body=d.get("body", ""),
+                        mentions=d.get("mentions", []),
+                        blocks=d.get("blocks", False),
+                        tags=d.get("tags", []),
+                        parent_comment_id=d.get("parent_comment_id"),
+                        refs=d.get("refs", []),
+                    ))
+                except (json.JSONDecodeError, TypeError):
+                    continue
+        except OSError as e:
+            print(f"[WARN] read comments failed for {task_id}: {e}", file=sys.stderr)
+        return out
+
+    def check_blocked(self, task_id: str) -> list:
+        """返回所有 blocks=True 的留言 (per 守门 v33 §1.4)."""
+        return [c for c in self.list_comments(task_id) if c.blocks]
+
+    def mark_read(self, task_id: str, comment_id: str) -> bool:
+        """标记 1 条留言已读 (per 守门 v33 §1.6 commit message `comments-read:` 字段).
+
+        实现: append 1 条 'read-receipt' 留言 (元留言, parent_comment_id 指向原留言).
+        不修改原留言, 保持 append-only (per 守门 #13 T).
+        """
+        comments_path = self._comments_path(task_id)
+        if not comments_path.exists():
+            return False
+        for c in self.list_comments(task_id):
+            if c.id == comment_id:
+                self.comment(
+                    task_id=task_id,
+                    body=f"read-receipt for {comment_id}",
+                    author="sub-agent-ack",
+                    actor_role="sub-agent",
+                    parent_comment_id=comment_id,
+                    tags=["read-receipt"],
+                )
+                return True
+        return False
+
+    def _render_comments_section(self, task_id: str) -> str:
+        """生成 brief 第 6 段 "Read COMMENTS" 内容 (per 守门 v33 §1.5)."""
+        comments = self.list_comments(task_id)
+        if not comments:
+            return "(无任务卡留言)"
+        lines = []
+        for c in comments:
+            tag_str = " ".join(f"#{t}" for t in c.tags) if c.tags else ""
+            block_marker = " [BLOCK]" if c.blocks else ""
+            lines.append(
+                f"- {c.id} by {c.author} ({c.actor_role}) @ {c.ts}{block_marker}{(' ' + tag_str) if tag_str else ''}: {c.body[:200]}"
+            )
+        return "\n".join(lines)
 
     def _audit(
         self,
