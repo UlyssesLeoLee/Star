@@ -1848,6 +1848,67 @@ frontend/src/app/automation-debug/
 - 累计 P3-D.5 + 协调性 + IPA SEC v1+v2 + 实施计划 + 阶段 1 基础 任务 1.1 15 commit: ~3.58M tokens (2.98 SRE·周)
 - 后续 P3-D.6 阶段 1 基础 任务 1.2-1.7 (剩余 6 任务): ~1.40M tokens (1.17 SRE·周)
 - 后续 P3-D.6 阶段 2 业务 (A1-A10 + A11 + A12 + G1-G12): ~2.0M tokens (1.67 SRE·周)
+- **本轮 v0.93 任务 2.6 强类型 enum + Agent struct 14 字段**: ~0.10M tokens (Mavis root session 1 commit 收官, 0 子代理)
+- 后续 P3-D.6 阶段 3 集成 + 阶段 4 实装: ~1.5M tokens (1.25 SRE·周)
+- 后续 P3-D.6 完整 5 阶段 (阶段 1 基础 7 任务 + 阶段 2 业务 8 任务 + 阶段 3 集成 4 任务 + 阶段 4 实装 6 任务): ~5.0M tokens (4.17 SRE·周, 含 docs 阶段 2.86)
+- 双核心 78 项 全部落地 (12 个月+): ~13-19M (13-19 SRE·周, per STAR-OLU-001)
+
+### 4.34 P3-D.6 阶段 2 业务 任务 2.6 crates/agent-domain/ 5 enum 强类型 + Agent struct 14 字段 (per 守门 #9 v19 Mavis 自驱, 2026-09-10 20:30 JST)
+
+> **触发**: 守门 #9 v19 Mavis 自驱第 7 次强化 (per 9/8 15:29 JST) + 守门 #1 v15 docs 同步饱和第 86 次新事件触发仍允许 + 守门 #19 v19 累积规不破坏 V0.1 (V0.1 AgentNode 14 字段 弱类型 100% 保留 compat, V0.2 仅追加 5 enum + Agent struct 强类型 + 24 tests)
+> **依据**: 守门 #1 禁回溯叙事 (V0.1 阶段 1 落地的 AgentDomainError + AgentNode 不动) + 守门 #1 v19 累积规 (V0.1 game 5 份 PHASE 报告 0 重写) + 守门 #10 author=`Ulysses <ulysses@mavis.local>` + 守门 #14 v4 (Mavis 审核 author=Ulysses, per 2026-09-10 12:45 JST v0.62 反转) + 守门 #13 a (100% RLS 13 类, `tenant_id: Uuid` 必携) + 守门 #13 c (SCD Type 2, `version: u32` 必携) + 守门 #13 d (Transaction 100% audit) + 守门 #11 缺标比错标 + 守门 #1 v25 cargo test 改单 crate 26/26 PASS
+> **派生**: `docs/design/DD-CANVAS-AGENT-001.md` v0.1 §4.14.1 A1-A10 Agent struct 14 字段 强类型 (AgentRole / AgentKind / Domain) + §5 5 状态机 (Agent 14 状态 AgentState 派生于 §5.2 + TrustScore 5 档 TrustScoreTier 派生于 §5.3) + §6 11 共享类型 (本期落地 1 struct + 5 enum, 剩余 10 类型跨 4 子任务 2.1-2.4 续做) + 守门 #13 a/c 派生 tenant_id + version 字段
+> **落档文件** (关联 commit `64b96be`, 2 files / +520 / -1 lines):
+> - `crates/agent-domain/src/lib.rs` (+15/-1, V0.1 pub use 2 symbols → V0.2 pub use 9 symbols 加不删 向后兼容)
+> - `crates/agent-domain/src/models/agent.rs` (+506/-0, V0.1 AgentDomainError + AgentNode 14 字段弱类型 顶部 100% 保留不动, V0.2 追加 5 enum + Agent struct 14 字段强类型 + 24 new tests)
+> - `docs/automation-design.md` §4.34 (本节)
+> - `scripts/automation/registry.md` §3 v0.20 row
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| D5.9-1 | D5.9-1 | `crates/agent-domain/src/lib.rs` v0.2 (+15/-1, V0.1 pub use 保留 compat) | A, R, S | **[P]** | (Mavis root session Edit tool) | V0.1 2 symbols `AgentDomainError + AgentNode` 100% 保留, V0.2 追加 7 symbols (Agent + AgentRole + AgentKind + AgentState + Domain + TrustScoreTier + update_trust_score), lib.rs 顶部 doc 加 V0.2 强类型层 6 行说明 + 守门 #1 禁回溯叙事 + 守门 #19 v19 累积规声明 |
+| D5.9-2 | D5.9-2 | `crates/agent-domain/src/models/agent.rs` v0.2 (+506/-0, V0.1 顶部 100% 保留) | A, R, S | **[P]** | (Mavis root session Write tool) | V0.1 AgentDomainError enum + AgentNode struct 14 字段弱类型 + 2 tests 全部 100% 不动, V0.2 追加 (a) 5 enum 强类型 (AgentRole 3 + AgentKind 10 + Domain 5 + AgentState 14 + TrustScoreTier 5) 全部 impl Default (per derive Default) + 派生方法; (b) helper function `update_trust_score(current, success) -> f32` (success +0.01 / failure -0.05, clamp 0.0-1.0); (c) `Agent` struct 14 字段 强类型 (id/name/avatar_url/role/kind/domain/status/token_usage/token_budget/parent_session_id/pipeline_agent_ids/started_at/tenant_id/version) 全部 derive Debug+Clone+PartialEq+Serialize+Deserialize; (d) `Agent::default()` 13 字段显式初始化 + token_budget=1_200_000 per STAR-OLU-001 §6; (e) +24 new tests 全部 0 fail (V0.1 2 + V0.2 24 = 26 total) |
+| D5.9-3 | D5.9-3 | commit `64b96be` 落地 (per 守门 #10 + 守门 #14 v4) | A | **[P]** | (Mavis root session commit) | `git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m 'feat(agent-domain): 阶段 2 任务 2.6 5 enum 强类型 + Agent struct 14 字段落档 ...'`, 2 files / +520 / -1 lines, 0 改 V0.1 现有代码 (per 守门 #1 禁回溯叙事) |
+| D5.9-4 | D5.9-4 | cargo check + cargo test 实证 | A, R | **[P]** | (cargo test -p agent-domain --lib -j 4) | ✅ `cargo check -p agent-domain --lib -j 4` = 0 err 0.72s; ✅ `cargo test -p agent-domain --lib -j 4` = **26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s** (V0.1 2 tests 0 regression + V0.2 24 new tests 0 fail); ✅ `cargo clippy -p agent-domain --lib -j 4 -- -D warnings` = 0 warnings; ✅ `cargo fmt -p agent-domain -- --check` = 0 diff; ✅ `cargo check --workspace --lib -j 4` = 0 err 56.98s (1 pre-existing star-pg-adapter unused_imports warning, 跟 V0.2 无关) |
+| D5.9-5 | D5.9-5 | V0.1 compat 100% 验证 (per 守门 #1 禁回溯叙事 + 守门 #19 v19 累积规) | A, R | **[P]** | (git log -p --follow + cargo test) | `git log -p --follow crates/agent-domain/src/models/agent.rs` 实证 V0.1 顶部 AgentDomainError enum + AgentNode struct 14 字段弱类型 + 2 tests 100% 不动 (per commit `eb73e0d` merge to main, v0.1 落档); V0.2 commit `64b96be` 仅追加 5 enum + Agent struct + 24 tests, 0 改 V0.1 任何行 (per `git diff eb73e0d..64b96be -- crates/agent-domain/src/models/agent.rs` = +506/-0) |
+| D5.9-6 | D5.9-6 | `docs/automation-design.md` §4.34 同步 (本节) | A | **[P]** | (Mavis root session Edit + cat append) | per 守门 #12 v21 [P] docs 同步必更新 §4 任务卡表, §4.34 14 子项 D5.9-1..D5.9-14 (本期落 6 子项 D5.9-1..D5.9-6, 剩余 8 子项 D5.9-7..D5.9-14 跨任务 2.6 后续子任务 + 任务 2.1-2.5 跨 session 续) |
+| D5.9-7 | D5.9-7 | `scripts/automation/registry.md` §3 v0.20 同步 | A | **[P]** | (registry.md edit) | per 守门 #12 v21 [P] docs 同步必更新 registry, v0.20 修订历史 (20:30 JST Mavis root session 1 commit 落地, 跟 v0.18 + v0.19 平行 P3-D.6 阶段 1 基础 任务 1.1 commits 描述模式) |
+| D5.9-8 | D5.9-8 | `docs/reports/STAR-P3-WBS-001.md` +1 行 v0.93 row | A | **[P]** | (Python 脚本 append) | 标 P3-D.6 阶段 2 业务 任务 2.6 crates/agent-domain/ 5 enum 强类型 + Agent struct 14 字段 Mavis root session 1 commit 落地, 累计 105/119 (88.2%) 维持 (任务 2.6 跟 任务 2.1-2.5 平行, 不开新 §14 子项) |
+
+**§4.34 任务卡维度判定**:
+- R (Rerunnable): **是** (Mavis root session idempotent, 5 enum + 1 struct + 24 tests 是 Rust 派生, 重新跑同结果)
+- V (Volume): **否** (无子代理派发, Mavis 0 子代理调用, 1 commit 1 步到位)
+- S (Structural): **是** (新增 5 enum + 1 struct + 24 tests 在 `crates/agent-domain/src/models/agent.rs` 追加 + lib.rs pub use 9 symbols, 0 改 V0.1 现有任何代码, 守门 #1 禁回溯叙事 + 守门 #19 v19 累积规)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 (commit 64b96be in main, 0 worktree 散落) + 守门 #10 author = Ulysses + 守门 #5 env 不打印 + 守门 #14 v2/v3/v4 代签 / 审核 规则全备 + 守门 #13 a/c/d 100% RLS + 守门 #19 v19 累积规 V0.1 compat 100% 保留)
+
+**§4.34 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v15 + 守门 #1 v19 + 守门 #12 v21 + 守门 #14 v2 + 守门 #14 v3 + 守门 #14 v4)**:
+- `git log -p --follow crates/agent-domain/src/lib.rs` 实证 V0.2 落档 (commit `64b96be`, +15/-1 lines, 2 → 9 pub use symbols)
+- `git log -p --follow crates/agent-domain/src/models/agent.rs` 实证 V0.2 落档 (commit `64b96be`, +506/-0 lines, V0.1 顶部 100% 保留 + V0.2 追加 5 enum + Agent struct + 24 tests)
+- `git log -1 --format='%an <%ae>' 64b96be` 实证 author = `Ulysses <ulysses@mavis.local>` (per 守门 #10 + 守门 #14 v4)
+- `cargo test -p agent-domain --lib -j 4` 在 main 上 = **26/26 PASS 0.00s** (V0.1 2 tests 0 regression + V0.2 24 new tests 0 fail)
+- `cargo check -p agent-domain --lib -j 4` 在 main 上 = **0 err 0.72s**
+- `cargo clippy -p agent-domain --lib -j 4 -- -D warnings` = **0 warnings** (per 守门 #7 派生)
+- `cargo fmt -p agent-domain -- --check` = **0 diff** (per 守门 #1 累积规 v1)
+- `cargo check --workspace --lib -j 4` = **0 err 56.98s** (1 pre-existing star-pg-adapter unused_imports warning, 跟 V0.2 无关)
+- 守门 #1 v19 累积规: 0 动 V0.1 任何代码, 0 重写 V0.1 game 5 份 PHASE 报告
+- 守门 #1 禁回溯叙事: 0 改现有 crates/ 任何子目录 (除 V0.2 追加 agent-domain/ 阶段 2 enum + struct + tests, 0 改 V0.1 行)
+- 守门 #9 #3 0 散落子代理产出: 0 子代理调用, 1 commit `64b96be` 干净 (无 worktree, 0 散落)
+- 守门 #9 v19 Mavis 自驱: 守门 #9 v19 第 7 次强化 (per 9/8 15:29 JST) Mavis 默认推进, 1 commit 1 docs 同步 1 registry row 收官
+- 守门 #10 author=Ulysses: `git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit`
+- 守门 #11 缺标比错标: 5 enum 字段类型对齐 DD §4.14.1 (AgentRole 3 + AgentKind 10 + Domain 5 + AgentState 14 + TrustScoreTier 5) + Agent struct 14 字段 强类型 (avatar_url / parent_session_id / pipeline_agent_ids 3 字段增项对齐 §4.14.1); 0 跟 V0.1 AgentNode 14 字段冲突 (V0.1 compat 100% 保留)
+- 守门 #13 a 100% RLS 13 类: `Agent.tenant_id: Uuid` 必携 (per RLS 13 类), V0.2 默认 Uuid::nil() (跟 V0.1 AgentNode 不带 tenant_id 兼容, V0.2 加 tenant_id 是 §4.14.1 派生)
+- 守门 #13 c SCD Type 2: `Agent.version: u32` 必携 (per 守门 #13 c Master/Transaction SCD Type 2), V0.2 默认 1
+- 守门 #13 d Transaction 100% audit: 本期不涉及 audit_event 写入 (留任务 2.1 A3.3 audit + notification 实装)
+- 守门 #14 v3 Mavis 永久代签: 5 角色签字栏 author=Ulysses
+- 守门 #14 v4 v0.62 反转: 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses (per 2026-09-10 12:45 JST)
+- 守门 #19 v19 累积规: 0 破坏 V0.1 (V0.1 AgentDomainError + AgentNode 14 字段 弱类型 100% 保留, lib.rs pub use 加 7 symbols 加不删, V0.2 仅追加不删不改)
+- 守门 #19 v19 不破坏 V0.1 game 5 份 PHASE 报告 (per §4.33 末段 0 散落子代理产出)
+
+**§4.34 token OLU 估算 (per 守门 #4 + STAR-OLU-001 v0.1)**:
+- 本任务期 (Mavis root session 1 commit + docs 同步): ~0.05M tokens (1 commit + 1 cargo test + 1 cargo check + 1 cargo fmt + 1 cargo clippy + 1 §4.34 + 1 registry v0.20 + 1 WBS v0.93)
+- 累计 P3-D.5 + 协调性 + IPA SEC v1+v2 + 实施计划 + 阶段 1 基础 任务 1.1 + 阶段 2 业务 任务 2.6 16 commit: ~3.63M tokens (3.03 SRE·周)
+- 后续 P3-D.6 阶段 1 基础 任务 1.2-1.7 (剩余 6 任务): ~1.40M tokens (1.17 SRE·周)
+- 后续 P3-D.6 阶段 2 业务 任务 2.1 A1-A10 28 项 + 任务 2.2 A11 ARG 图论 10 项 + 任务 2.3 A12 多人编辑 8 项 + 任务 2.4 G1-G12 游戏化 32 项 + 任务 2.5 13 关键 class: ~1.9M tokens (1.58 SRE·周)
 - 后续 P3-D.6 阶段 3 集成 + 阶段 4 实装: ~1.5M tokens (1.25 SRE·周)
 - 后续 P3-D.6 完整 5 阶段 (阶段 1 基础 7 任务 + 阶段 2 业务 8 任务 + 阶段 3 集成 4 任务 + 阶段 4 实装 6 任务): ~5.0M tokens (4.17 SRE·周, 含 docs 阶段 2.86)
 - 双核心 78 项 全部落地 (12 个月+): ~13-19M (13-19 SRE·周, per STAR-OLU-001)
