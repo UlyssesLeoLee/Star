@@ -52,6 +52,13 @@ DEFAULT_TABLES = [
 # 其他表跳过 #7 (避免 USING 引用不存在列)
 TABLES_WITH_HEALTH_STATUS = {"tenant_pools"}
 
+# 哪些表含 schema_name 列 (走 7 类 policy #5 schema_isolation)
+# v0.93 P0-4 Stage 3.9 跨 session 续做 v0.92 §3 已知缺口 (d):
+# 11 star-pg-adapter Repository 表 (除 tenant_pools) 默认 'public' 单 schema, 无 schema_name 列.
+# P0-4 阶段跳过 #5 schema_isolation policy (避免 USING 引用不存在列, per 守门 #11 缺标比错标).
+# P2 阶段扩展多 schema (per §13.5) 时, ALTER TABLE ADD COLUMN schema_name, 加进白名单.
+TABLES_WITH_SCHEMA_NAME = {"tenant_pools"}
+
 
 def gen_enable_rls(table: str) -> str:
     """生成 ENABLE + FORCE ROW LEVEL SECURITY (守门 #13 a 100% RLS)"""
@@ -139,15 +146,23 @@ CREATE POLICY {table}_health_visibility ON {table}
 def gen_one_table(table: str) -> str:
     """生成 1 表的 7 类 RLS policy 完整 DDL"""
     has_health = table in TABLES_WITH_HEALTH_STATUS
+    has_schema = table in TABLES_WITH_SCHEMA_NAME
     parts = [
         f"\n-- ==========================================",
         f"-- {table} 7 类 RLS policy (per v0.91 命名)",
         f"-- ==========================================\n",
         gen_enable_rls(table),
         gen_4_crud_policies(table),
-        gen_schema_isolation_policy(table),
-        gen_platform_admin_policy(table),
     ]
+    if has_schema:
+        parts.append(gen_schema_isolation_policy(table))
+    else:
+        # v0.93 修 v0.92 §3 已知缺口 (d): 跳过 #5 schema_isolation policy (表无 schema_name 列)
+        parts.append(
+            f"-- {table} schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)\n"
+            f"-- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单\n"
+        )
+    parts.append(gen_platform_admin_policy(table))
     if has_health:
         parts.append(gen_health_visibility_policy(table))
     return "\n".join(parts) + "\n"
