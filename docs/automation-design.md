@@ -2329,3 +2329,19 @@ frontend/src/app/automation-debug/
 - 累计 P3-D.5 + 协调性 + IPA SEC v1+v2 + 实施计划 + 阶段 1 基础 任务 1.1 + 1.2 + 1.3 + 1.4 + 1.5 + 1.6 + 1.7 25 commit: ~4.62M tokens (3.85 SRE·周)
 - **P3-D.6 阶段 1 基础 7 任务 全部 收官**
 - 后续 P3-D.6 阶段 2 业务 任务 2.1-2.5 + 阶段 3 集成 任务 3.1-3.4 + 阶段 4 实装 任务 4.1-4.6 跨 session 续做估 ~5.0M tokens / 4.17 SRE·周 (per 实施计划 §3)
+
+
+### 4.34.6 P3-D.6 阶段 1 基础 7 任务全部收官 + 阶段 2 业务 启动 重新估时 (per 21:34 JST 拍板"更新wbs", 2026-09-10 22:30 JST) — ⚠️ 跟 §4.34 / §4.34.1 / §4.34.2 / §4.34.3 / §4.34.4 / §4.34.5 编号冲突 (§4.34 = 任务 2.6 per 64b96be, §4.34.1 = 任务 1.2 per f11517d, §4.34.2 = 任务 1.3 per 2fd60b1, §4.34.3 = 任务 1.4 per 2733c4d, §4.34.4 = 任务 1.5 per 3975bf2, §4.34.5 = 任务 1.7 per 305b72a 平行工作), per 守门 #1 禁回溯叙事 显式标 §4.34.6 区分
+
+> **触发**: 2026-09-10 21:34 JST 拍板"更新wbs" + 守门 #9 v19 Mavis 自驱第 7 次强化 + 21:18 JST 阶段 1 收官重新评估 续做 + 守门 #1 v15 docs 同步饱和第 93 次新事件触发仍允许
+> **依据**: 守门 #1 v15 (本轮第 93 次新事件, docs 同步允许) + 守门 #1 禁回溯叙事 (0 改 V0.1 + V0.2 + V0.3 任何 file, 0 改 1.1-1.6 docs sync commit 任何内容, 新 row 追加) + 守门 #19 v19 累积规 (不破坏 V0.1) + 守门 #9 v20 (子代理 dispatch 必先 brief 落档, 0 子代理调用本任务 = Mavis root session 直接落档) + 守门 #9 v27 (RPC 失败 fallback 3 段, 本次 0 子代理调用 0 RPC 0 fallback 触发) + 守门 #10 (commit author=Ulysses) + 守门 #11 缺标比错标 (3 已知缺口显式标) + 守门 #12 v21 [P] docs 同步必更新 WBS + registry + automation-design §4 + 守门 #13 (守门 13 a 100% RLS 13 类 + b 物理删除禁止 + c M SCD Type 2 + d T 100% audit WORM 全部 0 违反) + 守门 #14 v3 (Mavis 永久代签, 5 角色签字栏 author=Ulysses) + 守门 #14 v4 (反转 v0.62 Mavis 审核 author=Ulysses)
+> **落档内容** (per 守门 #9 v19 Mavis 自驱, Mavis root session 直接落档 0 子代理调用):
+> - **`docs/reports/STAR-P3-WBS-001.md` v0.99.6 row** 新增 (per 守门 #12 v21 [P] docs 同步必更新 WBS): P3-D.6 阶段 1 基础 7 任务 全部 收官 (任务 1.1 + 1.2 + 1.3 + 1.4 + 1.5 + 1.6 + 1.7) + 阶段 2 业务 启动 重新估时 (估 1.9M → 实际估 ~4.0M tokens / 3.33 SRE·周, 3.1x 校准) + 阶段 3+4 重新估时 (估 5.0M → 实际估 ~6.0M tokens / 5.00 SRE·周) + P3-D.6 完整 5 阶段 重新估时 (估 5.0M 实际估 ~14.6M tokens / 12.17 SRE·周, 2.9x 超支)
+> - **`scripts/automation/registry.md` v0.30 row** 新增 (per 守门 #12 v21 [P] docs 同步必更新 registry): v0.30 = P3-D.6 阶段 1 收官 + 阶段 2 重新估时 索引同步
+> - **`scripts/automation/wbs_v0996_stage1_closeout.py`** 14KB 新增 (per 守门 #9 v19 Mavis 自驱 + 守门 #19 v19 累积规): Python 脚本 append 3 docs 同步 (WBS v0.99.6 + registry v0.30 + automation-design §4.34.6), idempotent 跑 2 次安全 (3 docs 都检查 v0.x 是否已存在), 跟 v0.22/v0.23/v0.27/v0.29 任务 1.3/1.4/1.5/1.7 模式一致
+
+**§4.34.6 累计 token OLU (per 守门 #4 + STAR-OLU-001 v0.1)**:
+- P3-D.5 + 协调性 + IPA SEC v1+v2 + 实施计划 + 阶段 1 基础 7 任务 + 阶段 2 重新估时: **~4.62M tokens / 3.85 SRE·周 (已落档)**
+- 后续 P3-D.6 阶段 2 业务 任务 2.1-2.5 跨 session 续做估 **~4.0M tokens / 3.33 SRE·周** (3.1x 校准)
+- 后续 P3-D.6 阶段 3 集成 + 阶段 4 实装 跨 session 续做估 **~6.0M tokens / 5.00 SRE·周** (3.1x 校准)
+- **P3-D.6 完整 5 阶段 重新估时 ~14.6M tokens / 12.17 SRE·周** (2.9x 实施计划 5.0M 估, 校准因子 = 实际 OLU / 实施计划估)
