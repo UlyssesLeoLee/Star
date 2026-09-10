@@ -19,13 +19,21 @@
 
 pub mod handoff;
 pub mod models;
+pub mod parent_child;
+pub mod pipeline;
 pub mod status_sync;
 pub mod topology;
+pub mod workitem_assoc;
+pub mod worktree_assoc;
 
 pub use handoff::{HandoffConnector, HandoffError};
 pub use models::agent::{
     update_trust_score, Agent, AgentDomainError, AgentKind, AgentNode, AgentRole, AgentState,
     Domain, TrustScoreTier,
 };
+pub use parent_child::{ParentChildConnector, ParentChildError};
+pub use pipeline::{PipelineConnector, PipelineError};
 pub use status_sync::{StatusSync, StatusSyncError};
 pub use topology::{DomainFrame, FrameError};
+pub use workitem_assoc::{WorkItemAssocError, WorkItemDragIn};
+pub use worktree_assoc::{WorktreeAssocError, WorktreeRing};
