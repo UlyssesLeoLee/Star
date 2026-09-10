@@ -63,6 +63,19 @@ except ImportError:
     verify_comment = None
     is_authoritative_actor = None
 
+try:
+    from guardian.sandbox import (
+        SandboxLimits,
+        make_default_sandbox_limits,
+        run_with_sandbox,
+    )
+    _SANDBOX_AVAILABLE = True
+except ImportError:
+    _SANDBOX_AVAILABLE = False
+    SandboxLimits = None
+    make_default_sandbox_limits = None
+    run_with_sandbox = None
+
 ROOT_DEFAULT = Path(__file__).resolve().parent.parent.parent
 BRIEFS_DIR_DEFAULT = ROOT_DEFAULT / "docs" / "briefs"
 REPORTS_DIR_DEFAULT = ROOT_DEFAULT / "docs" / "reports"
@@ -176,7 +189,14 @@ class SubagentDispatcher:
         )
         return brief_path
 
-    def invoke(self, brief_path: Path, timeout: int = 600, agent: Optional[str] = None) -> TaskHandle:
+    def invoke(
+        self,
+        brief_path: Path,
+        timeout: int = 600,
+        agent: Optional[str] = None,
+        sandbox_limits: Optional[object] = None,
+        use_sandbox: bool = True,
+    ) -> TaskHandle:
         """invoke 子代理 (subprocess 模式, per G-DEP 9/7 19:38 JST 实装)
 
         agent: 显式传 agent name, 避免解析 brief 文本的脆性
@@ -196,6 +216,13 @@ class SubagentDispatcher:
         Comment BLOCK 留言 (per 守门 v33 §1.4 + #27 + #9 v20):
             invoke 前必扫任务卡 BLOCK 留言, 有 → 抛 BlockedByCommentError, 不 invoke.
             缺留言文件 → 0 留言 = 0 BLOCK, 继续 (per 缺标比错标 #11).
+
+        Sandbox (per plan-031 Phase C + 守门 v0.2 sandbox):
+            use_sandbox=True (默认) + sandbox_limits=None → 默认 limits
+            (memory=1GB, cpu=50%, max_procs=100, kill_on_parent_exit=True).
+            use_sandbox=False → 走旧 subprocess.run 路径, 不限制.
+            sandbox_limits=SandboxLimits(...) → 自定义 limits.
+            软依赖: guardian.sandbox 不可用 / 非 Windows → 走 subprocess.run 路径 (per 守门 #1 fail-open).
         """
         task_id = brief_path.stem
 
@@ -272,28 +299,60 @@ class SubagentDispatcher:
         # subprocess 替代 RPC (per 守门 #24 v2 + G-DEP 9/7 19:38 JST 实装)
         # 标准库 only, list-mode 无 shell=True 跨平台
         cmd = ["mavis", "task", "dispatch", task_id, str(brief_path), "--agent", agent]
+        # Sandbox (per plan-031 Phase C + 守门 v0.2 sandbox):
+        # use_sandbox=True (默认) + sandbox_limits=None → 默认 limits (memory=1GB, cpu=50%)
+        # use_sandbox=False → 走旧 subprocess.run 路径
+        # sandbox_limits=SandboxLimits(...) → 自定义 limits
+        use_sandbox_this = use_sandbox and _SANDBOX_AVAILABLE
+        effective_limits = None
+        if use_sandbox_this:
+            if sandbox_limits is None:
+                effective_limits = make_default_sandbox_limits()
+            else:
+                effective_limits = sandbox_limits
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                check=False,
-                cwd=ROOT_DEFAULT,
-            )
-            handle.exit_code = result.returncode
-            handle.status = "succeeded" if result.returncode == 0 else "failed"
-            self._audit(
-                action="invoke_subprocess",
-                task_id=task_id,
-                input={"cmd": cmd, "timeout": timeout},
-                output={
-                    "exit_code": result.returncode,
-                    "status": handle.status,
-                    "stdout_tail": result.stdout[-500:] if result.stdout else "",
-                    "stderr_tail": result.stderr[-500:] if result.stderr else "",
-                },
-            )
+            if use_sandbox_this and effective_limits is not None:
+                with run_with_sandbox(
+                    cmd,
+                    timeout=timeout,
+                    cwd=ROOT_DEFAULT,
+                    limits=effective_limits,
+                ) as result:
+                    handle.exit_code = result.returncode
+                    handle.status = "succeeded" if result.returncode == 0 else "failed"
+                    self._audit(
+                        action="invoke_subprocess_sandboxed",
+                        task_id=task_id,
+                        input={"cmd": cmd, "timeout": timeout, "limits": asdict(effective_limits)},
+                        output={
+                            "exit_code": result.returncode,
+                            "status": handle.status,
+                            "stdout_tail": (result.stdout or "")[-500:],
+                            "stderr_tail": (result.stderr or "")[-500:],
+                        },
+                    )
+            else:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    check=False,
+                    cwd=ROOT_DEFAULT,
+                )
+                handle.exit_code = result.returncode
+                handle.status = "succeeded" if result.returncode == 0 else "failed"
+                self._audit(
+                    action="invoke_subprocess",
+                    task_id=task_id,
+                    input={"cmd": cmd, "timeout": timeout},
+                    output={
+                        "exit_code": result.returncode,
+                        "status": handle.status,
+                        "stdout_tail": result.stdout[-500:] if result.stdout else "",
+                        "stderr_tail": result.stderr[-500:] if result.stderr else "",
+                    },
+                )
         except FileNotFoundError:
             # mavis CLI 不存在 (per 已知缺口 #2, 9/7 19:46 JST 现状)
             # fallback: status="deferred", 不阻塞后续 verify/collect_output
@@ -302,7 +361,7 @@ class SubagentDispatcher:
             self._audit(
                 action="invoke_subprocess",
                 task_id=task_id,
-                input={"cmd": cmd, "timeout": timeout},
+                input={"cmd": cmd, "timeout": timeout, "use_sandbox": use_sandbox_this},
                 output={"status": "deferred", "reason": "mavis CLI not found on PATH"},
                 error="FileNotFoundError: mavis CLI not on PATH (per 已知缺口 #2)",
             )
@@ -312,7 +371,7 @@ class SubagentDispatcher:
             self._audit(
                 action="invoke_subprocess",
                 task_id=task_id,
-                input={"cmd": cmd, "timeout": timeout},
+                input={"cmd": cmd, "timeout": timeout, "use_sandbox": use_sandbox_this},
                 output={"status": "timeout"},
                 error=f"TimeoutExpired after {timeout}s: {e}",
             )
