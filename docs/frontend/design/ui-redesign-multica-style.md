@@ -20,7 +20,7 @@
 **重定向 4 修复 (per 2026-08-31 12:48 JST handoff 兜底, `commit 4614267`)**:
 - `/board` → `/projects?tab=kanban` (旧 tab=board 不存在, 改 kanban)
 - `/scm /collaboration /workflow /relation` 4 redirect → `/projects?tab=worktrees` (旧 tab=workflow/relations 不存在, 改 worktrees)
-- `/canvas/:id` → `/projects?canvas=:id` (deep link 修复, projects page useSearchParams 解析)
+- `/canvas/:id` 独立路由 `app/canvas/[id]/page.tsx` (per 2026-09-04 canvas e2e 守门 prerequisite 注记; 不走 `?canvas=` 查询参数, 独立可测路由)
 
 **不改原 v0.1 §1-§10 内容**: 保留 v0.1 拍板时的设计思路 (multica 风格), 拍板后实装变更 (5 tab + 4 redirect) 在 §0.1 增量追加, 不回溯原段 (per 守门 #12 不沿用 v0.x 旧叙事 + #11 缺标比错标安全)。
 
@@ -42,7 +42,7 @@
 |---|---|---|
 | **/inbox** | notification / comment / audit | 通知 inbox + 实时 @ 提及 + 审计 feed |
 | **/issues** | work-item / feedback / worktree / agent / decision / automation | 主面板 — Kanban / List / Tree view 切换 |
-| **/projects** | project / workspace / planning / board / workflow / canvas | 5 tab: list / board / gantt / calendar / workflow |
+| **/projects** | project / workspace / planning / board / workflow / canvas | 5 tab: kanban / timeline / backlog / agents / worktrees (per 2026-08-29 22:49 JST 拍板, 见 §0.1 实装注记) |
 | **/agents** | agent / agent-session / lease / resume / runtime | agent 列表 + 状态机 + lease/heartbeat |
 | **/analytics** | dashboard / metric / cost / burndown | 5 维 dashboard + cost 报表 |
 | **/settings** | tenant / identity / permission / role / integration / scm | 配置 + 集成 + 权限 |
