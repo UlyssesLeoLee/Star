@@ -1,19 +1,24 @@
-        [package]
-        name = "infrastructure"
-        version.workspace = true
-        edition.workspace = true
-        rust-version.workspace = true
-        license.workspace = true
-        authors.workspace = true
-        repository.workspace = true
+[package]
+name = "infrastructure"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
 
-        [dependencies]
-        # 基础依赖(全部 crate 共享)
-        serde = { workspace = true }
-        async-trait = { workspace = true }
-        thiserror = { workspace = true }
-        uuid = { workspace = true }
+[dependencies]
+# 基础依赖(全部 crate 共享)
+serde = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
 
 star-context = { path = "../star-context" }
-        [lints]
-        workspace = true
+
+[dev-dependencies]
+# v0.66 P0-4 InMemoryAdapterRegistry 测试用 (block_on 同步执行 async fn)
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true
