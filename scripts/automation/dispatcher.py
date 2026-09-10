@@ -447,18 +447,67 @@ class SubagentDispatcher:
             )
             return False
 
+        # v33 v0.3 增强: commit message 必含 `comments-read:` 字段 (软约束, per 守门 v33 §1.4)
+        # 权威 actor 写的留言未读 → audit log warn, verify 仍 True (per 缺标比错标 #11 软约束)
+        comments_read_ok, comments_warnings = self._verify_comments_read(task_id, parts[0])
+
         self._audit(
             action="verify",
             task_id=task_id,
-            input={"branch": branch},
+            input={"branch": branch, "commit_hash": parts[0]},
             output={
                 "verified": True,
                 "commit_hash": parts[0],
                 "commit_subject": parts[1],
                 "commit_count": len(commits),
+                "comments_read_check": {
+                    "ok": comments_read_ok,
+                    "warnings": comments_warnings,
+                },
             },
         )
         return True
+
+    def _verify_comments_read(self, task_id: str, commit_hash: str) -> tuple:
+        """检查 commit message 含 `comments-read:` 字段 (per 守门 v33 v0.3 §1.4).
+
+        Returns:
+            (ok, warnings): ok=True 表示字段存在 + 权威留言全覆盖, warnings 是缺漏列表.
+            软约束: 不阻断 verify 流程, 仅 audit log warn.
+        """
+        import re
+        # 读 commit message body
+        try:
+            result = subprocess.run(
+                ["git", "log", "-1", "--format=%B", commit_hash],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+                cwd=ROOT_DEFAULT,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+            return False, [f"git log 读 commit message 失败: {e}"]
+        if result.returncode != 0:
+            return False, [f"git log exit={result.returncode}"]
+        commit_msg = result.stdout
+        # 提取 comments-read 字段
+        m = re.search(r"comments-read:\s*([^\n]+)", commit_msg)
+        if not m:
+            return False, ["commit message 缺 `comments-read:` 字段 (per 守门 v33 v0.3 §1.4)"]
+        # 解析读过的 id 集合
+        read_ids = {s.strip() for s in m.group(1).split(",") if s.strip()}
+        # 任务卡权威留言 (per 守门 v33 §1.3 + #14 v3)
+        AUTHORITATIVE_ROLES = {"Ulysses", "architect", "Mavis"}
+        must_read = [c for c in self.list_comments(task_id) if c.actor_role in AUTHORITATIVE_ROLES]
+        must_read_ids = {c.id for c in must_read}
+        missing = must_read_ids - read_ids
+        if not must_read_ids:
+            # 无权威留言 → 通过
+            return True, []
+        if missing:
+            return False, [f"权威留言未读: {sorted(missing)} (per 守门 v33 v0.3 §1.4)"]
+        return True, []
 
     def collect_output(self, task_id: str) -> Path:
         """收子代理 output (per G-DEP 9/7 19:38 JST 实装)
