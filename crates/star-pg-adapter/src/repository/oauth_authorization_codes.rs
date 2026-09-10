@@ -95,6 +95,13 @@ impl PgOAuthAuthorizationCodeRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
+    /// 拿共享 PgPool 引用 (v0.75 P0-4 Stage 2.1.2 扩展: 4 oauth_* Repository wire-up)
+    ///
+    /// 用于 application crate 跨域编排时多个 Repository 共享同一 pool
+    /// (per sqlx::PgPool = Arc 内部, clone 廉价).
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
 }
 
 #[async_trait::async_trait]
