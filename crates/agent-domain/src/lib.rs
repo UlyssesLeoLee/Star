@@ -17,15 +17,20 @@
 
 #![warn(missing_docs)]
 
+pub mod cluster;
+pub mod cross_ref;
 pub mod handoff;
 pub mod models;
 pub mod parent_child;
 pub mod pipeline;
+pub mod settings_integration;
 pub mod status_sync;
 pub mod topology;
 pub mod workitem_assoc;
 pub mod worktree_assoc;
 
+pub use cluster::{ClusterError, ClusterSortFilter};
+pub use cross_ref::{CrossRef, CrossRefError, CrossRefTarget};
 pub use handoff::{HandoffConnector, HandoffError};
 pub use models::agent::{
     update_trust_score, Agent, AgentDomainError, AgentKind, AgentNode, AgentRole, AgentState,
@@ -33,6 +38,7 @@ pub use models::agent::{
 };
 pub use parent_child::{ParentChildConnector, ParentChildError};
 pub use pipeline::{PipelineConnector, PipelineError};
+pub use settings_integration::{AgentSettings, AgentSettingsTab, SettingsError};
 pub use status_sync::{StatusSync, StatusSyncError};
 pub use topology::{DomainFrame, FrameError};
 pub use workitem_assoc::{WorkItemAssocError, WorkItemDragIn};
