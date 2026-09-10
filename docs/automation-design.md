@@ -1519,3 +1519,52 @@ frontend/src/app/automation-debug/
 - 累计 P3-D.5 全部 3 commit: ~1.41M tokens (4f56979 0.91M + 73d490f 0.05M + 396833a 0.45M, 1.18 SRE·周)
 - 后续 P0 阶段 (3 个月内, 36 项 P0) ~3-5M
 - 双核心 78 项 全部落地 (12 个月+) ~13-19M (13-19 SRE·周, per STAR-OLU-001)
+
+
+### 4.28 P3-D.5 BD 基本设计文档三份落档 (per 18:00 JST Ulysses 拍板"基于需求文档制作基本设计文档", 2026-09-10 18:10 JST)
+
+> **触发**: 2026-09-10 18:00 JST Ulysses 拍板"基于需求文档制作基本设计文档" + 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #14 v3 Mavis 永久代签 + 守门 #1 v15 docs 同步饱和第 72 次新事件触发仍允许
+> **依据**: 守门 #1 v15 (本轮第 72 次新事件, docs 同步允许) + 守门 #1 v19 (0 子代理调用, 0 散落子代理产出, 仅 task tool 派 2 worker) + 守门 #1 禁回溯叙事 (不重写 4 SRS commit 4f56979 / 73d490f / 396833a / f35b3f5, BD 是新方向) + 守门 #3 (5 域 Lead ≠ Star 22 DDD disclaimer) + 守门 #9 #3 (0 子代理调用实装期) + 守门 #9 v19 (Mavis 自驱, 18:00 JST 拍板 → 18:10 JST 1 commit ~10 分钟) + 守门 #9 v20 (子代理 dispatch 必先 brief 落档, 3 份 brief 已落 `docs/briefs/bd-canvas-{total,agent,gamify}-001.md`) + 守门 #9 v27 (RPC 失败 fallback 3 段, 子代理 invoke → verify → collect_output, 真实验证文件 + 字节数 + 段数 + 14 张表 W/T/M) + 守门 #10 (代签, author=Ulysses) + 守门 #11 (缺标比错标, 43+ 已知缺口显式列) + 守门 #12 (BAS 引用必 git log --follow 实证) + 守门 #13 (DB W/T/M 100% 覆盖, 29 张表 跨域) + 守门 #14 v2/v3/v4 代签 / 审核 规则全备 + 守门 #15 (docs 同步饱和, 本 commit 1 次, 上次 commit f7d0932 是第 72 次, 本 commit 第 73 次) + 守门 #23 v2 (G5 sticky note 聚类走 mock 接口, 真实 LLM 留 P2)
+> **落档文件** (关联 commit `f7d0932`, 3 files / 4141 insertions):
+> - `docs/design/BD-CANVAS-001.md` v0.1 (50,274 bytes ~50KB, 18:04 JST root 写, 总册跨域 BD, 10 段 IPA SEC 模板, 5 view 跨域, 14 张表 W/T/M 100% 覆盖 + 29 张表跨域汇总, 32 API 端点 + 5 WebSocket, 6 类 NFR, 19 守门 + 26 派生规, 12 已知缺口 ≥ 8, 5 角色签字栏, 4 阶段拍板 + 5 守门拍板, v0.63 反转 14 处 + 多人编辑是要的 8 处)
+> - `docs/design/BD-CANVAS-AGENT-001.md` v0.1 (105,821 bytes ~103KB, 1,731 行, 18:07 JST 子代理 1 写, 专题 agent 管理 BD, 10 段模板, A1-A12 46 项, 5 view 跨域, 14 张表 W/T/M 100% 覆盖, 23 API 端点 + 5 WebSocket, 19 已知缺口 ≥ 8 含 3 P0 阻塞, A11 1:1 派生自 BD-AGENT-RELATIONSHIP-001 v0.1, A12 1:1 派生自 frontend-canvas-design.md §4.1 模式 A + §4.6 PresenceCursor)
+> - `docs/design/BD-CANVAS-GAMIFY-001.md` v0.1 (111,370 bytes ~109KB, 1,751 行, 18:07 JST 子代理 2 写, 专题游戏化 BD, 10 段模板 + 11 个 §N 标题, G1-G12 32 项, 5 view 跨域, **15 张表 W/T/M 100% 覆盖 0 混在 (Master 5 + Transaction 4 + Work 6)**, 22 API 端点 + 2 WebSocket, 12 已知缺口 含 DDD Review 必查 #11 + #12, **G12 派生自 V0.1 game 5 份 PHASE 报告 (Roguelike + Manga + Theme + Settings + Game, 9/5 落地 125 tests pass) 仅画布集成引用**, **G5 sticky note 聚类 AI 必走 mock 接口 per 守门 #23 v2 (49 次引用锁 mock 路径)**, 守门 19/19 跨域覆盖)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| D5.3-1 | D5.3-1 | `docs/design/BD-CANVAS-001.md` v0.1 (50KB) | A | **[P]** | (root Write tool) | 10 段 + 5 view 跨域 + 14 张表 W/T/M 100% 覆盖 + 32 API 端点 + 6 类 NFR + 19 守门 + 12 已知缺口; 跨域汇总不重复 2 专题 BD |
+| D5.3-2 | D5.3-2 | `docs/design/BD-CANVAS-AGENT-001.md` v0.1 (103KB) | A | **[P]** | (worker 子代理 1 Write tool, bg_98f425fd) | 10 段 + 附录 A + 附录 B + 46 FR (A1-A12) + 16 NFR + 66 AC + 25 US + 19 已知缺口 (含 A12 多人编辑 8 缺口) + 14 张表 W/T/M + 23 API 端点 + 5 WebSocket + A11 1:1 派生自 BD-AGENT-RELATIONSHIP-001 v0.1 + A12 1:1 派生自 V0.1 §4.1 + §4.6 |
+| D5.3-3 | D5.3-3 | `docs/design/BD-CANVAS-GAMIFY-001.md` v0.1 (109KB) | A | **[P]** | (worker 子代理 2 Write tool, bg_f5625885) | 10 段 + 11 个 §N 标题 + 32 FR (G1-G12) + 15 张表 W/T/M 100% 覆盖 0 混在 + 22 API 端点 + 2 WebSocket + 12 已知缺口 (含 DDD Review 必查 #11 + #12) + G12 派生自 V0.1 game 5 份 PHASE 报告 + G5 走 mock 接口 per 守门 #23 v2 (49 次引用) |
+| D5.3-4 | D5.3-4 | `scripts/automation/registry.md` §2 +3 行 + §3 v0.13 | A | **[P]** | (registry.md edit) | per 守门 #12 v21 [P] docs 同步必更新 registry, 3 索引 (bd-canvas-total-001 + bd-canvas-agent-001 + bd-canvas-gamify-001) + v0.13 修订历史 (18:00 JST 拍板"基于需求文档制作基本设计文档") |
+| D5.3-5 | D5.3-5 | `docs/automation-design.md` §4.28 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #12 v21 [P] docs 同步必更新 §4 任务卡表 |
+| D5.3-6 | D5.3-6 | 1 commit author = `Ulysses <ulysses@mavis.local>` (commit `f7d0932`) | A | **[P]** | (git commit) | 守门 #10 + 8/27 19:39 JST 授权 + 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 Mavis 审核 author=Ulysses; 不推 origin (守门 #1 反转后 R-05) |
+
+**§4.28 任务卡维度判定**:
+- R (Rerunnable): **是** (1 commit idempotent, 3 files / 4141 insertions, 0 子代理调用)
+- V (Volume): **是** (3 BD 共 262KB / 4,141 行, 78 项 FR + 30 段 + 43+ 已知缺口, 跨 1 总册 + 2 专题)
+- S (Structural): **是** (3 BD 各 10 段 + 附录 + 29 张表 W/T/M + 32 API 端点 + 5 角色签字栏)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 (commit f7d0932) + 守门 #10 author = Ulysses + 守门 #5 env 不打印 + 守门 #9 #3 0 子代理调用 + 守门 #9 v20 brief 落档 + 守门 #9 v27 verify + 守门 #14 v2/v3/v4 代签 / 审核 规则全备 + 守门 #1 禁回溯叙事 不重写 SRS)
+
+**§4.28 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v19 + #12 v21 + #14 v2 + #14 v3 + #14 v4)**:
+- `git log -p --follow docs/design/BD-CANVAS-001.md` 实证 v0.1 落档 (commit `f7d0932`, 50KB)
+- `git log -p --follow docs/design/BD-CANVAS-AGENT-001.md` 实证 v0.1 落档 (commit `f7d0932`, 105KB)
+- `git log -p --follow docs/design/BD-CANVAS-GAMIFY-001.md` 实证 v0.1 落档 (commit `f7d0932`, 111KB)
+- 子代理 1 真实产出验证: BD-AGENT 105,821 bytes / 1,731 行 / 13 段 + 附录 A + 附录 B / 46 FR + 16 NFR + 66 AC + 25 US / 14 张表 W/T/M 100% 覆盖 / 19 已知缺口 (per 守门 #9 v27 3 段 fallback verify 阶段)
+- 子代理 2 真实产出验证: BD-GAMIFY 111,370 bytes / 1,751 行 / 11 个 §N 标题 / 32 FR / 15 张表 W/T/M 100% 覆盖 0 混在 (Master 5 + Transaction 4 + Work 6) / 12 已知缺口 / G5 mock 接口 49 次引用 (per 守门 #9 v27 3 段 fallback verify 阶段)
+- 守门 #1 v19: 0 子代理调用 (实装期), 仅用 task tool 派 2 worker (子代理 1 v1.2 重写 bg_98f425fd + 子代理 2 v1.2 重写 bg_f5625885)
+- 守门 #9 #3: 0 子代理调用 (实装期), 不派二级子代理
+- 守门 #9 v19: Mavis 自驱, 拍板后立即执行 (18:00 JST 拍板 → 18:02 JST 撤回 + 重派 ~2 分钟, 18:07 JST 子代理完成 ~7 分钟, 18:10 JST 1 commit 3 文件 ~3 分钟)
+- 守门 #10 author = `Ulysses <ulysses@mavis.local>` (per 8/27 19:39 JST 授权 + 守门 #14 v3 Mavis 永久代签)
+- 守门 #11 缺标比错标: AGENT §8 已知缺口 19 个 + GAMIFY §8 12 个 + 总册 §8 12 个, 共 43+ 已知缺口显式列, 0 隐藏
+- 守门 #13 DB W/T/M: 总册 14 张表 (A11 7 + A12 7) + GAMIFY 15 张表 (Master 5 + Transaction 4 + Work 6) = **29 张表 100% 覆盖 跨域汇总**
+- 守门 #14 v3: 5 角色签字栏全 Mavis 接手代签 (修订人 + 审批者 author=Ulysses)
+- 守门 #14 v4: 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses (per 2026-09-10 12:45 JST v0.62 反转)
+- 守门 #1 禁回溯叙事: 不重写 4 SRS commit, BD 是新方向, 不回写 SRS
+- 守门 #23 v2 AI 第三方 API 禁止: GAMIFY G5 sticky note 聚类走 mock 接口, 守门 #23 v2 49 次引用锁 mock 路径, 真实 LLM 留 P2
+
+**§4.28 token OLU 估算 (per 守门 #4 + STAR-OLU-001 v0.1)**:
+- 本 BD 撰写期 (root + 2 worker): ~0.5M tokens
+- 累计 P3-D.5 全部 8 commit (4 SRS + 1 总册 BD + 2 专题 BD + 1 任务卡同步): ~2.96M tokens (2.47 SRE·周, 累计 4 commit + 1 任务卡 = 8 commit)
+- 后续 P3-D 详细设计 (DD, 3 份): ~0.6M tokens (3 子代理并行)
+- 后续 P3-D.6 启动实装 (P0 36 项): ~3-5M tokens
+- 双核心 78 项 全部落地 (12 个月+): ~13-19M (13-19 SRE·周, per STAR-OLU-001)
