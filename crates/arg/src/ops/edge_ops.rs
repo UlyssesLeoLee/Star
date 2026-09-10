@@ -52,6 +52,8 @@ pub struct EdgeOps {
     trust_audit: Option<Arc<TrustAuditOps>>,
     /// Optional V2EdgeSink for G-10 阶段 1 双写 (per DDD-REVIEW §1.3)
     v2_sink: Option<Arc<dyn V2EdgeSink>>,
+    /// G-10 阶段 4 V1 退役标记 (v0.85): true = V1 读完全禁用 (per阶段 4 监控 1 周 0 V1 读)
+    v1_archive_completed: bool,
 }
 
 impl EdgeOps {
@@ -62,6 +64,7 @@ impl EdgeOps {
             event_writer,
             trust_audit: None,
             v2_sink: None,
+            v1_archive_completed: false,
         }
     }
 
@@ -74,6 +77,12 @@ impl EdgeOps {
     /// Attach V2EdgeSink for G-10 阶段 1 双写 (per DDD-REVIEW §1.3)
     pub fn with_v2_sink(mut self, v2_sink: Arc<dyn V2EdgeSink>) -> Self {
         self.v2_sink = Some(v2_sink);
+        self
+    }
+
+    /// Mark V1 archive completed (per G-10 阶段 4 V1 退役 1 周)
+    pub fn mark_v1_archive_completed(mut self) -> Self {
+        self.v1_archive_completed = true;
         self
     }
 
@@ -131,6 +140,8 @@ impl EdgeOps {
     ///
     /// G-10 阶段 2 V2 优先 (per DDD-REVIEW-AGENT-RELATIONSHIP-001 §1.3):
     /// 读路径全走 V2 (v2_sink.get_v2), V2 没找到 fallback 到 V1 (per 阶段 2 监控 V1 读 fallback 比例 < 5%)
+    ///
+    /// G-10 阶段 4 V1 退役 (v0.85): 当 v1_archive_completed = true, V1 fallback 完全禁用, 0 V1 读
     pub async fn get(&self, id: Uuid, tenant_id: Uuid) -> Result<Option<Edge>, ARGError> {
         let _ = tenant_id;
         // G-10 阶段 2: V2 优先
@@ -140,6 +151,10 @@ impl EdgeOps {
             }
             // V2 没找到: fallback 到 V1 (per 阶段 2 监控)
             // v0.83 阶段: V1 仍 stub, 返回 None
+        }
+        // G-10 阶段 4 (v0.85): V1 退役后, V1 读完全禁用
+        if self.v1_archive_completed {
+            return Ok(None);
         }
         // v0.83 阶段 2: V2 优先 + V1 fallback stub
         // 实际 r2d2-memgraph G-1 落地后: V1 走 client.execute_read(cypher)
@@ -151,10 +166,16 @@ impl EdgeOps {
     ///
     /// G-10 阶段 2 V2 优先 (per DDD-REVIEW-AGENT-RELATIONSHIP-001 §1.3):
     /// 读路径全走 V2 (v2_sink.list_v2)
+    ///
+    /// G-10 阶段 4 V1 退役 (v0.85): 当 v1_archive_completed = true, V1 fallback 完全禁用
     pub async fn list(&self, filter: EdgeFilter) -> Result<Vec<Edge>, ARGError> {
         // G-10 阶段 2: V2 优先
         if let Some(v2_sink) = &self.v2_sink {
             return v2_sink.list_v2();
+        }
+        // G-10 阶段 4 (v0.85): V1 退役后, V1 读完全禁用
+        if self.v1_archive_completed {
+            return Ok(Vec::new());
         }
         // v0.83 阶段 2: V2 优先 + V1 fallback stub
         let _ = filter;
