@@ -257,20 +257,21 @@ pub struct Worktree {
 /// v0.29 改造: 从 5-variant enum 升级到 6-field struct (per self-review §3 "6-field ApiError / ApplicationError 改造")
 /// - `code` (SCREAMING_SNAKE_CASE)
 /// - `message` (human-readable)
-/// - `source_module` (`"application"`)
-/// - `source_kind` (`internal` / `external` / `policy` / `validation` / `user_input` / `timeout`)
+/// - `source_module` (跟 P0-2 star-api-rest 6-field 对齐, per v0.65 v0.62 反转后修复:
+///   caller 传入, e.g. `"domain-feedback"` / `"domain-validation"` / `"infrastructure"`)
+/// - `source_kind` (跟 P0-2 + spec 对齐, TitleCase: `Validation` / `Policy` / `External` / `Internal`)
 /// - `retriable` (bool)
 /// - `hint` (可执行修复提示)
 #[derive(Debug, thiserror::Error, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[error("{code}: {message} (source={source_module}/{source_kind}, retriable={retriable})")]
 pub struct ApplicationError {
-    /// 错误码,SCREAMING_SNAKE_CASE (e.g. `"NOT_FOUND"` / `"INVALID_STATE"`)
+    /// 错误码,SCREAMING_SNAKE_CASE (e.g. `"NOT_FOUND"` / `"INVALID_STATE"` / `"FB_NOT_FOUND"`)
     pub code: String,
     /// 人类可读错误描述
     pub message: String,
-    /// 错误来源模块,本 crate 固定 `"application"`
+    /// 错误来源模块 (per v0.65 修复: caller 传入, e.g. `"domain-feedback"` / `"infrastructure"`)
     pub source_module: String,
-    /// 错误来源分类 (`internal` / `external` / `policy` / `validation` / `user_input` / `timeout`)
+    /// 错误来源分类 (TitleCase: `Validation` / `Policy` / `External` / `Internal`)
     pub source_kind: String,
     /// 是否可重试 (`true` = 客户端应重试, `false` = 不可重试)
     pub retriable: bool,

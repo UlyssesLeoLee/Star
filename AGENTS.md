@@ -70,7 +70,7 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 
 | 形式 | 含义 |
 |---|---|
-| `架构师 (Mavis 接手 agent per DEC-008)` | Mavis 接手审批通过 (per 8/27 07:16 反转) |
+| `架构师 (Mavis 接手 agent per DEC-008)` | Mavis 接手**审核**通过 (per 8/27 07:16 反转 + 9/10 12:45 v0.62 反转, 真人代签流程全部取消, 改为 mavis 审核) |
 | `—` | 待审批 (per 8/26 04:30 旧规则) — 现状：Mavis 接手直接填，**不再用** `—` |
 | `Ulysses` | 真实人工审批 (per 一人公司 12 角色) |
 
@@ -78,7 +78,7 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m '...'
 
 | 形式 | 含义 |
 |---|---|
-| `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` | Mavis 接手代签 (per 8/27 07:16 反转) |
+| `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核**` | Mavis 接手**审核** (per 8/27 07:16 反转 + 9/10 12:45 v0.62 反转, 真人代签流程全部取消, 改为 mavis 审核, 责任更清晰) |
 | `Ulysses` | 真实人工修订 |
 
 ---
