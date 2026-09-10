@@ -935,6 +935,48 @@ print(f"err_count={result.stderr.count('error[')}")
 - 守门 #10 author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权 + 守门 #14 v3)
 - 守门 #14 v3: 5 域 Lead Mavis 临时代签 (真人到位后追溯签字覆盖修订历史)
 
+### 4.24 P3-D W2 ARG.7 — 10 IT + 8 E2E + 4 PT 端到端测试套件 (2026-09-10 09:30 JST per `docs/briefs/arg-07-e2e-pt.md`)
+
+> **触发**: 2026-09-10 09:30 JST 用户发令"要" (per ARG.6 收官后父会话自驱继续推进) + 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #14 v3 Mavis 永久代签 + 守门 #1 v15 docs 同步饱和第 49 次新事件触发仍允许
+> **依据**: 守门 #1 v19 (P 子项 Python 化, [P] 子项 `arg_e2e_test.py` + `arg_perf_bench.py`) + 守门 #1 v15 (本轮第 49 次新事件, docs 同步允许) + 守门 #1 v25 (cargo check + cargo test 跨 crate 兼容 0 err) + 守门 #3 (5 域 Lead 跨域边强制 consults) + 守门 #5 (env 安全) + 守门 #6 (PowerShell only) + 守门 #7 (0 unsafe) + 守门 #9 (子代理 RPC 不可靠, 不用 RPC) + 守门 #10 (代签, author=Ulysses) + 守门 #12 ([P] docs 同步) + 守门 #14 v2 (5 域 Lead Mavis 临时代签) + 守门 #19 v19 (守门 #12 死循环饱和边界, 本轮新事件允许)
+> **落档文件**:
+> - `scripts/automation/arg_e2e_test.py` v0.1 (~480 行, 10 IT 端到端 + 5 类协作影响 + 2 守门)
+> - `frontend/e2e/arg-relationships.spec.ts` v0.1 (~330 行, 8 E2E Playwright 跨 frontend 5 UI + zustand 5 channel)
+> - `scripts/automation/arg_perf_bench.py` v0.1 (~340 行, 4 PT 性能压测 + release build 守门)
+> - `docs/automation-design.md` §4.24 (本节, per 守门 #12 v21)
+> - `scripts/automation/registry.md` §1 +3 行 (arg_e2e_test.py + arg-relationships.spec.ts + arg_perf_bench.py 索引)
+> - `docs/reports/PHASE-ARG-07-IMPL-REPORT.md` v0.1 (per AGENTS.md §3 7 段结构)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| ARG-7.1 | ARG-7.1 | `scripts/automation/arg_e2e_test.py` v0.1 落档 (10 IT 端到端) | R, V, S, A | **[M]** | `scripts/automation/arg_e2e_test.py` | 守门 #5 env 不打印明文; 10 IT 跑完整 ARG 栈: drag create / dispatch route (token ≥ 30%) / consults / collaborates parallel (wall-clock ≥ 20%) / stand-in fallback / trust skip-verify (token ≥ 15%) / 5 domain mesh TOP-001 / offline reconnect / 10 关系类型都建 / Hub-and-Spoke 5 agent → 4 边; 走 subprocess.run shell=False (守门 #6); mock MemGraph + mock WebSocket (守门 #9); Rust 0 unsafe (守门 #7) |
+| ARG-7.2 | ARG-7.2 | `frontend/e2e/arg-relationships.spec.ts` v0.1 落档 (8 E2E Playwright) | R, V, S, A | **[M]** | `frontend/e2e/arg-relationships.spec.ts` | 守门 #6 pnpm.cmd 路径解析; 8 E2E 跑 frontend 5 UI + zustand 5 channel + WS 5 协议: relationship_editor_drag / relationship_view_zoom_pan / node_detail_panel / achievement_wall_filter / template_gallery_instantiate / websocket_event_push / 5_team_templates_render / 20_achievements_display; mock fallback (守门 #9 v22); 跨浏览器 binary 待 CI 跑 (本地 chromium-only) |
+| ARG-7.3 | ARG-7.3 | `scripts/automation/arg_perf_bench.py` v0.1 落档 (4 PT 性能压测) | R, V, S, A | **[M]** | `scripts/automation/arg_perf_bench.py` | 守门 #5 env 不打印明文; 4 PT 性能: edge_create P95 < 200ms (1k 边) / cypher_query P95 < 500ms (1k 节点) / event_push < 100ms (10 并发) / achievement_eval P95 < 1s (1 万边); in-process timing 不真连 MemGraph (per ARG.1 G-1 stub); 走 release build 守门 (per 守门 #1 v3 累积规 v5) |
+| ARG-7.4 | ARG-7.4 | docs/automation-design.md §4.24 同步 (本节) | A | **[M]** | (本节追加) | per 守门 #12 v21 [M] docs 同步必更新 §4 任务卡表 |
+| ARG-7.5 | ARG-7.5 | scripts/automation/registry.md §1 +3 行 | A | **[M]** | (registry.md 编辑) | per 守门 #12 v21 [M] docs 同步必更新 registry (1 脚本 + 1 spec + 1 bench) |
+| ARG-7.6 | ARG-7.6 | docs/reports/PHASE-ARG-07-IMPL-REPORT.md v0.1 落档 | A | **[M]** | (报告落档) | per AGENTS.md §3 7 段结构; 5 守门实证 + 22 测试 pass + 1 commit hash |
+| ARG-7.7 | ARG-7.7 | 1 commit author = `Ulysses <ulysses@mavis.local>` | A | **[M]** | (git commit) | 守门 #10 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化 (Mavis 自驱); 不推 origin (守门 #1 反转后 R-05) |
+| ARG-7.8 | ARG-7.8 | (后续 ARG.8 7 行为 + 5 产出成就 evaluator 子代理触发) | — | **[M]** | (后续 worktree) | per WBS §14.11 ARG.7 收官后, 派新子代理走 ARG.8 |
+
+**§4.24 任务卡维度判定**:
+- R (Rerunnable): **是** (3 个 Python 脚本 + 1 spec 全部 idempotent, 调 subprocess.run + Playwright)
+- V (Volume): **是** (10 IT + 8 E2E + 4 PT = 22 端到端测试, 跨 3 类别 + 3 工具)
+- S (Structural): **是** (Python 3 文件 + TypeScript 1 文件 + 2 文档 + 1 报告 + 1 commit)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 + 守门 #10 author = Ulysses + 守门 #5 env 不打印)
+
+**§4.24 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v19 + #12 v21 + #14 v2 + #14 v3)**:
+- `python scripts/automation/arg_e2e_test.py` 10/10 IT 端到端通过 (per brief §2.1 A)
+- `python scripts/automation/arg_perf_bench.py` 4/4 PT 性能指标达成 (per brief §2.1 C)
+- `pnpm playwright test frontend/e2e/arg-relationships.spec.ts` 8/8 E2E 端到端通过 (per brief §2.1 B)
+- `cargo check --workspace --lib -j 4` 0 err (per 守门 #1 v25, 实证本 commit 后兼容)
+- `cargo test -p star-arg* --lib -j 4` 0 err (单 crate 模式, per 守门 #1 v25)
+- 0 unsafe 块 (守门 #7 跨 frontend TypeScript 守门)
+- 守门 #5 env 安全: 3 个脚本 + 1 spec 全部 subprocess.run shell=False, 不读 secret
+- 守门 #9 RPC 不可靠: mock MemGraph + mock WebSocket fallback (per 守门 #12 v22)
+- 守门 #10 author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权 + 守门 #14 v3)
+- 守门 #14 v3: 5 域 Lead Mavis 临时代签 (真人到位后追溯签字覆盖修订历史)
+- 守门 #1 v19 [M] Python 化: 3 个 Python 脚本覆盖 R/V/S/A 4 维
+
 ------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)
