@@ -2213,6 +2213,48 @@ frontend/src/app/automation-debug/
 
 **commit author=Ulysses** (per 守门 #10 + 守门 #14 v4)
 
+
+
+### §4.34.6 P3-D.6 阶段 1 收官 + 阶段 2 启动重新评估 (v0.99.4 row, per 守门 #12 v21 [P] docs 同步必更新 §4 任务卡)
+
+**触发**: per Ulysses 2026-09-10 21:18 JST 发令"所有先进分支合并到 main 之后, 根据文档和代码状态重新评估更新 wbs"
+
+**评估内容**:
+- (a) git 同步: HEAD = origin/main = `4185dc4` (本地 = origin, 0 ahead 0 behind)
+- (b) worktree 状态: 50 行, 1 STALE `wt-ex-02-star-mutex` + 44 ACTIVE (实际都 merge 了, 实体残留需清理)
+- (c) 守门 v3x 状态: 6 active (v27/v28/v29/v32/v33/v34) + 2 obsolete (v30/v31) + 3 候选 (v35/v36 落档 v0.1 + v37 待)
+- (d) PreToolUse 安全拦截层 v0.1 (commit `29b1b93`): 5 module + 15 规则 + 226 tests
+- (e) v33 任务卡留言机制 v0.1+v0.2+v0.3: 4 module + 智能解除 + verify 软约束 (250+ tests)
+- (f) v0.62 + v0.63 反转 (commit `e053447`): 14 docs/recruitment/** + 2 守门 obsolete 标
+- (g) v25b 重号修复 (commit `b360135`): 守门 v3x 激活门槛 (d) 同步
+- (h) v34 拍板激活 (commit `1843511`): 30min sustained 探活
+- (i) v35 + v36 候选 (commit `6d06091` + `4185dc4`): GPG 签名 + audit 索引
+
+**收口 (P3-D.6 阶段 1 5/7 收)**:
+- ✅ 任务 1.1 agent-domain: `eb73e0d` 之前
+- ✅ 任务 1.2 arg-bridge extend: `fd33ffb` 之前
+- ✅ 任务 1.3 canvas-collab: 之前
+- ✅ 任务 1.4 api 2 module: `2733c4d`
+- ✅ 任务 1.5 bff+envoy: `3975bf2`
+- ⏳ 任务 1.6 14+15 tables: 3 brief 21:13-21:15 落档, 未实装 (估 0.30M tokens)
+- ⏳ 任务 1.7 25 module cross: brief 21:15 落档, 未实装 (估 0.20M tokens)
+
+**v1.01 5 已知缺口** (per 守门 #11 缺标比错标):
+- #1 dev env 无 Docker (P0-4 阶段 0 实跑): ⏳ 仍 缺口, 等 P2 阶段 worker 实跑
+- #2 rls_7_policy_gen.py 跨 26 表 idempotent 验证: ⏳ 仍 缺口, P2 阶段 worker 实跑补
+- #3 PLATFORM_ADMIN password 部署 + sealed-secrets controller 安装: ⏳ 仍 缺口, P2 阶段 worker 实跑
+- #4 端到端测试 5 守门 0 违反: ⏳ 仍 缺口, P2 阶段 worker 实跑补
+- #5 cargo fmt pre-existing baseline: ✅ 闭合 (per commit `a1466aa` v1.03, 31 file +224/-149)
+
+**待办** (per 守门 #11 缺标比错标):
+- (1) 派 worker 子代理实装任务 1.6 (14+15 tables DDL, brief 已落档)
+- (2) 派 worker 子代理实装任务 1.7 (25 module 跨接口定型, brief 已落档)
+- (3) 50 worktree 清理 (1 STALE + 44 ACTIVE 实体残留)
+- (4) 守门 v35 (GPG 签名) + v36 (audit 索引) 拍板激活
+- (5) PreToolUse 守门 v0.2 子代理 sandbox (P0 阻塞)
+- (6) P2 阶段 worker 子代理实跑触发 (等守门 #1 v15 + 4 守门满足)
+
+**作者**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 反转 v0.62 Mavis 审核 author=Ulysses)
 ### §4.34.5 v1.03 cargo fmt baseline fix 任务卡 (2026-09-10 21:00 JST 落档)
 
 **关联 commit**: `eeedd7b` (push origin `9d79eb4..eeedd7b main -> main`)
