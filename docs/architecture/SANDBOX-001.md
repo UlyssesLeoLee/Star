@@ -18,7 +18,7 @@
 3. 派生无限子进程 (fork bomb)
 4. 父进程退出后子进程残留 (zombie process tree)
 
-Phase C sandbox P0 给子代理 subprocess 加 **运行时安全护栏**, 跟 5 域 Lead 真人到位前 Mavis 临时代签决策 (per 守门 #14 v3) 配套 — 代签决策 + 沙箱隔离 = 双重安全网。
+Phase C sandbox P0 给子代理 subprocess 加 **运行时安全护栏**, 跟 5 域 Lead 真人到位前 Mavis 临时代签决策 (per 守门 #14 v3) 配套 — 代签决策 + 沙箱隔离 = 双重安全网 — **⚠️ OBSOLETE per v0.64 反转 2026-09-10 22:35 JST** (per Ulysses "等待真人的流程去掉, 全部 ai 处理" 指令): 5 域 Lead 真人到位 timeline = 永久 obsolete, Mavis 全权处理 0 临时代签 (直接 永久代签 per 守门 #14 v3 + v0.62 + v0.63 + v0.64 反转叠加).
 
 ---
 

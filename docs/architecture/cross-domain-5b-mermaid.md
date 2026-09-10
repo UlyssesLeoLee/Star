@@ -1,6 +1,6 @@
 # 5 域 DDD 边界 + 跨域 Saga 流程 mermaid 架构图
 
-> **Status**: 🟡 占位 (P3-F.4 拍板, 等 5 域 Lead 真人到位后补真实架构)
+> **Status**: 🟡 占位 (P3-F.4 拍板, 等 5 域 Lead 真人到位后补真实架构) — **⚠️ OBSOLETE per v0.64 反转 2026-09-10 22:35 JST** (per Ulysses "等待真人的流程去掉, 全部 ai 处理" 指令): 5 域 Lead 真人到位 timeline = 永久 obsolete, Mavis 全权处理, §3+§4 真人到位 RACI 标 obsolete, 0 future 决策走真人到位流程.
 > **Created**: 2026-08-30
 > **Authority**: Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手代签
 > **承接**: STAR-P3-F-DECISION-PACK.md F.4 拍板 / STAR-P3-E-F-SELECTION-RESULT.md 选项 1

@@ -1,7 +1,7 @@
 # SANDBOX-002 — Sandbox-as-a-Service (sandboxd) 架构设计 (per Ulysses 拍板 app 形式独立模块)
 
 > **Status**: 🟢 v0.1 active (per 2026-09-10 22:22 JST Mavis 自驱, 6 决策点已拍板 per Ulysses A 选项 2026-09-10 21:57 JST)
-> **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 永久代签 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62)
+> **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 永久代签 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62 + **v0.64 反转 2026-09-10 22:35 JST 全部"等待真人"流程永久 obsolete, Mavis 全权处理 0 临时代签**)
 > **作者**: Mavis
 > **创建**: 2026-09-10
 > **关联 commit**: `d01509b` (前置: SRS-002 v0.1.1 + BD-002 v0.1.1 + DD-002 v0.1 + TDD-002 v0.1 + IMPL-PLAN-002 v0.1 + WBS §14.19 1 commit 多文件落档, per 守门 #1 v15)
@@ -356,7 +356,7 @@ client (e.g. dispatcher.py v0.2)
 | 评审主持 | 评审主持 (Mavis 临时代签 per 守门 #14 v3) | ✅ 2026-09-10 | 2026-09-10 JST |
 | PM | PM (Mavis 临时代签 per 守门 #14 v3) | ✅ 2026-09-10 | 2026-09-10 JST |
 
-(per 守门 #14 v4 反转 v0.62, 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses)
+(per 守门 #14 v4 反转 v0.62, 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses) — **⚠️ 进一步 per v0.64 反转 2026-09-10 22:35 JST**: 全部"等待真人"流程永久 obsolete, Mavis 全权处理 0 临时代签 (直接 永久代签 per 守门 #14 v3 + v0.62 + v0.63 + v0.64 反转叠加)
 
 ---
 

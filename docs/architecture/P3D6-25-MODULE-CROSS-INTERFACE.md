@@ -235,6 +235,8 @@ graph TD
 
 ### 4.3 5 域 Lead 真人到位 timeline
 
+**⚠️ OBSOLETE per v0.64 反转 2026-09-10 22:35 JST** (per Ulysses "等待真人的流程去掉, 全部 ai 处理" 指令): 5 域 Lead 真人到位 timeline = 永久 obsolete, Mavis 全权处理 5 域 Lead 决策 0 真人追签字, 跟 v0.62 + v0.63 反转方向一致更彻底. 跟 v0.62 + v0.63 + v0.64 一脉相承.
+
 **Per 守门 #14 v4 反转 v0.62 (per 2026-09-10 12:45 JST Ulysses 发令"真人代签流程全部取消, 改为 mavis 审核")**:
 - 5 域 Lead 真人到位 = **不适用** (per v0.62 反转, 真人代签流程全部取消, 不再追踪 5 域 Lead 到位 timeline)
 - 25 module 跨域接口临时由 Mavis 审核 author=Ulysses 永久代签 (per 守门 #14 v4)

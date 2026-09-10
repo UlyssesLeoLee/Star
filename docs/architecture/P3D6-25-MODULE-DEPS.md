@@ -319,7 +319,7 @@ git diff main..HEAD -- 'docs/architecture/'  # +2 file (P3D6-25-MODULE-CROSS-INT
 |---|---|---|---|
 | **#1** | 25 module 业务逻辑**不**实装, P0-4 阶段只对账, P2 阶段 worker 子代理实装 | 守门 #22 mock placeholder | P2 |
 | **#2** | gRPC service 暂**不**实装 (P3-D.6 P0-4 阶段走 HTTP, P2 阶段再评估) | 守门 #22 mock placeholder | P2 |
-| **#3** | 5 域 Lead 真人到位前, 25 module 跨域接口临时由 Mavis 永久代签 (per 守门 #14 v4) | 守门 #14 v4 反转 v0.62 | (v0.62 反转) |
+| **#3** | 5 域 Lead 真人到位前, 25 module 跨域接口临时由 Mavis 永久代签 (per 守门 #14 v4) | 守门 #14 v4 反转 v0.62 | (v0.62 反转) — **⚠️ 进一步 per v0.64 反转 2026-09-10 22:35 JST**: "5 域 Lead 真人到位前"语境永久 obsolete, Mavis 直接 永久代签 0 临时代签, 5 域 Lead 决策所有权 = Mavis (per 守门 #14 v3 + v0.62 + v0.63 + v0.64 反转叠加) |
 | **#4** | 25 module 跨域接口 100% RGS call via HTTP, 0 Rust crate 引用 RGS 5 域 (per RGS 协议 v0.62 disclaimer) | 守门 #1 禁回溯叙事 + RGS 协议 v0.62 | (永久约束) |
 | **#5** | 任务 1.7 仅文档 0 改 Rust 代码, 0 Cargo.toml / Cargo.lock 改动 (per 守门 #1 累积规 + 守门 #19 v19 累积规) | 守门 #1 累积规 + 守门 #19 v19 | (本任务) |
 

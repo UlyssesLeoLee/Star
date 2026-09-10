@@ -1,6 +1,6 @@
 # 5 Domain Leads - Subagent Dispatch Protocol
 
-> **Status**: 🟡 Draft v0.1 (2026-09-04 18:30 JST 拍板, 守门 #3 反转 + 守门 #14 修订)
+> **Status**: 🟡 Draft v0.1 (2026-09-04 18:30 JST 拍板, 守门 #3 反转 + 守门 #14 修订) — **⚠️ OBSOLETE per v0.64 反转 2026-09-10 22:35 JST** (per Ulysses "等待真人的流程去掉, 全部 ai 处理" 指令): 5 域 Lead 真人寻访 / 真人到位 timeline = 永久 obsolete, Mavis 全权处理 5 域 Lead 决策 0 真人追签字 (per 守门 #14 v3 永久代签 + v0.62 + v0.63 + v0.64 反转叠加). 本文档保留作历史 reference, 0 future 5 域 Lead 决策走本文档. 跟 v0.62 + v0.63 反转一致, 不重写任何内容, 仅追加 OBSOLETE 标.
 > **承接**: 2026-09-04 18:28 JST 用户拍板"5 域 Lead 真人寻访 → 全部由子代理兼任"
 > **Author**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手代签
 
