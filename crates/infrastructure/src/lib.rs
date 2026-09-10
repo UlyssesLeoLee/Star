@@ -93,6 +93,34 @@ pub trait AdapterRegistry: Send + Sync {
         cmd: RegisterPostgresAdapterCmd,
         actor: ActorContext,
     ) -> Result<AdapterDescriptor, InfrastructureError>;
+
+    /// **注册 NATS adapter (v2, P0-4 Stage 2.4 spec 重构)**
+    async fn register_nats_adapter_v2(
+        &self,
+        cmd: RegisterNatsAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError>;
+
+    /// **注册 ObjectStorage adapter (v2, P0-4 Stage 2.4 spec 重构)**
+    async fn register_object_storage_adapter_v2(
+        &self,
+        cmd: RegisterObjectStorageAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError>;
+
+    /// **注册 SCM adapter (v2, P0-4 Stage 2.4 spec 重构)**
+    async fn register_scm_adapter_v2(
+        &self,
+        cmd: RegisterScmAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError>;
+
+    /// **注册 Agent adapter (v2, P0-4 Stage 2.4 spec 重构)**
+    async fn register_agent_adapter_v2(
+        &self,
+        cmd: RegisterAgentAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError>;
 }
 
 /// **RegisterPostgresAdapterCmd** (v0.79 P0-4 Stage 2.3 spec 重构)
@@ -122,6 +150,113 @@ impl RegisterPostgresAdapterCmd {
         if self.pg_url.trim().is_empty() {
             return Err(InfrastructureError::InvalidState(
                 "pg_url 必填非空 (per RegisterPostgresAdapterCmd spec)".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+// =====================================================================
+// v0.80 P0-4 Stage 2.4: 4 register_*_adapter v2 spec 重构 (per v0.79 已知缺口 (b))
+// =====================================================================
+
+/// **RegisterNatsAdapterCmd** (v0.80 P0-4 Stage 2.4 spec 重构)
+///
+/// NATS 消息总线 adapter 注册命令, 替代 v1 `cmd: ()` placeholder.
+#[derive(Debug, Clone)]
+pub struct RegisterNatsAdapterCmd {
+    /// NATS 连接 URL (必填, e.g. nats://nats.star.svc.cluster.local:4222)
+    pub nats_url: String,
+    /// Queue group (可选, NATS queue subscription 模式)
+    pub queue_group: Option<String>,
+    /// 最大重连次数 (None = 不限)
+    pub max_reconnects: Option<u32>,
+}
+
+impl RegisterNatsAdapterCmd {
+    /// 必填字段校验 (per 守门 #11 缺标比错标, 返 Err 而非 panic)
+    pub fn validate(&self) -> Result<(), InfrastructureError> {
+        if self.nats_url.trim().is_empty() {
+            return Err(InfrastructureError::InvalidState(
+                "nats_url 必填非空 (per RegisterNatsAdapterCmd spec)".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// **RegisterObjectStorageAdapterCmd** (v0.80 spec)
+///
+/// S3-like Object Storage adapter 注册命令, 替代 v1 `cmd: ()` placeholder.
+#[derive(Debug, Clone)]
+pub struct RegisterObjectStorageAdapterCmd {
+    /// Bucket 名称 (必填, per S3 bucket 模型)
+    pub bucket: String,
+    /// Region (可选, e.g. us-east-1)
+    pub region: Option<String>,
+    /// Endpoint URL (可选, e.g. minio.star.svc.cluster.local:9000; None = AWS S3)
+    pub endpoint: Option<String>,
+}
+
+impl RegisterObjectStorageAdapterCmd {
+    /// 必填字段校验 (per 守门 #11 缺标比错标, 返 Err 而非 panic)
+    pub fn validate(&self) -> Result<(), InfrastructureError> {
+        if self.bucket.trim().is_empty() {
+            return Err(InfrastructureError::InvalidState(
+                "bucket 必填非空 (per RegisterObjectStorageAdapterCmd spec)".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// **RegisterScmAdapterCmd** (v0.80 spec)
+///
+/// SCM (Git provider) adapter 注册命令, 替代 v1 `cmd: ()` placeholder.
+#[derive(Debug, Clone)]
+pub struct RegisterScmAdapterCmd {
+    /// SCM provider (必填, e.g. github / gitlab / bitbucket)
+    pub provider: String,
+    /// Base URL (可选, None = provider 默认; e.g. enterprise GitHub)
+    pub base_url: Option<String>,
+    /// Access token (必填敏感字段, per 守门 #5 v2 env 安全: 不用 env var 偷)
+    pub token: String,
+}
+
+impl RegisterScmAdapterCmd {
+    /// 必填字段校验 (per 守门 #11 缺标比错标, 返 Err 而非 panic)
+    pub fn validate(&self) -> Result<(), InfrastructureError> {
+        if self.provider.trim().is_empty() {
+            return Err(InfrastructureError::InvalidState(
+                "provider 必填非空 (per RegisterScmAdapterCmd spec)".to_string(),
+            ));
+        }
+        if self.token.trim().is_empty() {
+            return Err(InfrastructureError::InvalidState(
+                "token 必填非空 (per RegisterScmAdapterCmd spec, 守门 #5 v2)".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// **RegisterAgentAdapterCmd** (v0.80 spec)
+///
+/// Agent runtime adapter 注册命令, 替代 v1 `cmd: ()` placeholder.
+#[derive(Debug, Clone)]
+pub struct RegisterAgentAdapterCmd {
+    /// Runtime mode (必填, per Local Runtime 5.6: local / remote / hybrid)
+    pub runtime_mode: String,
+    /// Model ID (可选, e.g. gpt-4 / claude-3)
+    pub model_id: Option<String>,
+}
+
+impl RegisterAgentAdapterCmd {
+    /// 必填字段校验 (per 守门 #11 缺标比错标, 返 Err 而非 panic)
+    pub fn validate(&self) -> Result<(), InfrastructureError> {
+        if self.runtime_mode.trim().is_empty() {
+            return Err(InfrastructureError::InvalidState(
+                "runtime_mode 必填非空 (per RegisterAgentAdapterCmd spec)".to_string(),
             ));
         }
         Ok(())
