@@ -5,6 +5,11 @@
 //! `outgoing_edges` / `incoming_edges` / `find_edge`. The `create` path
 //! runs `Edge::validate()` first so it can be unit-tested without a
 //! live Memgraph.
+//!
+//! G-4 集成 (per DDD-REVIEW-AGENT-RELATIONSHIP-001 §1.2 拍板):
+//! 如果设置 trust_audit (per `with_trust_audit`), `create` 对
+//! `RelationshipType::Trusts` 关系自动应用 4 重审计 + 写 WORM audit log
+//! (per 守门 #13 d Transaction 100% audit + ADR-0043).
 
 use std::sync::Arc;
 use uuid::Uuid;
@@ -14,6 +19,7 @@ use crate::error::ARGError;
 use crate::models::edge::{Edge, RelationshipType};
 
 use super::event_writer::EventWriter;
+use super::trust_audit::TrustAuditOps;
 
 /// Filter used by [`EdgeOps::list`].
 #[derive(Debug, Clone, Default)]
@@ -41,6 +47,8 @@ pub struct EdgePatch {
 pub struct EdgeOps {
     client: Arc<MemgraphClient>,
     event_writer: Arc<EventWriter>,
+    /// Optional TrustAuditOps for G-4 4 重审计 integration (per DDD-REVIEW §1.2)
+    trust_audit: Option<Arc<TrustAuditOps>>,
 }
 
 impl EdgeOps {
@@ -49,12 +57,33 @@ impl EdgeOps {
         Self {
             client,
             event_writer,
+            trust_audit: None,
         }
     }
 
+    /// Attach TrustAuditOps for G-4 4 重审计 (per DDD-REVIEW §1.2)
+    pub fn with_trust_audit(mut self, trust_audit: Arc<TrustAuditOps>) -> Self {
+        self.trust_audit = Some(trust_audit);
+        self
+    }
+
     /// Validate the edge, write it and append an `EdgeCreated` event.
+    ///
+    /// G-4 集成 (per DDD-REVIEW-AGENT-RELATIONSHIP-001 §1.2): 如果 trust_audit 已设置
+    /// 且 edge.edge_type == Trusts, 自动调用 4 重审计 (阈值 0.95 + mutual + evidence + multi-source)
+    /// + 写 WORM audit log. 如果 4 重审计失败, 返回 Err(ARGError) 不创建 edge.
     pub async fn create(&self, edge: Edge) -> Result<Edge, ARGError> {
         edge.validate()?;
+
+        // G-4 集成: Trusts 关系自动应用 4 重审计 (per DDD-REVIEW §1.2)
+        if edge.edge_type == RelationshipType::Trusts {
+            if let Some(audit_ops) = &self.trust_audit {
+                let _audit_log = audit_ops.audit_trust_relationship(&edge)?;
+                // 4 重审计通过, 继续走 create 路径
+            }
+            // trust_audit 未设置时, 跳过审计 (保持向后兼容, per 守门 #1 禁回溯叙事)
+        }
+
         let cypher = format!(
             "MATCH (a:Agent {{id: $from}}), (b:Agent {{id: $to}}) \
              CREATE (a)-[r:{} {{id: $id, weight: $weight, ...}}]->(b) \
