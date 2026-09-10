@@ -1,8 +1,9 @@
 # k3s/envoy-business-config.yaml
-# v0.71 envoy 业务路由 + TLS 自动签发 ConfigMap
+# v0.71+v0.73 envoy 业务路由 + TLS 自动签发 + HTTP→HTTPS 强制重定向 ConfigMap
 # Envoy 独立 deployment 模式 (per 2026-09-01 13:05 JST user 拍板 envoy 部署模式偏好)
 # 业务路由: /mock_data/mcp/* + /mock_data/five-domain/* + /mock_data/langgraph/* + /mock_data/db-wtm/* + /api/v1/*
 # TLS 终止: 8443 port (HTTPS), self-signed cert (per gen_tls_certs.sh, 90 天自动续期)
+# HTTP→HTTPS 强制重定向 (per v0.73): 308 永久重定向 HTTP→HTTPS, 保留 path + query
 # 不选 istio sidecar, 不选 nginx (per 2026-09-01 13:03 JST 偏好所有 nginx → envoy)
 ---
 apiVersion: v1
@@ -13,7 +14,7 @@ metadata:
   labels:
     app: star-mock
     component: envoy
-    version: v0.71
+    version: v0.73
 data:
   # Envoy bootstrap config (per envoy v1.32-latest docs)
   # 业务路由: file_system HTTP filter 托管 mock_data/ + cluster 代理 api/v1/*
@@ -25,7 +26,7 @@ data:
           port_value: 9901
     static_resources:
       listeners:
-        # HTTP listener (8080) - 业务路由
+        # HTTP listener (8080) - 业务路由 + HTTP→HTTPS 强制重定向 (per v0.73)
         - name: listener_http
           address:
             socket_address: { address: 0.0.0.0, port_value: 8080 }
@@ -41,43 +42,19 @@ data:
                       virtual_hosts:
                         - name: star_mock_business
                           domains: ["*"]
+                          # HTTP→HTTPS 强制重定向 (per v0.73): 整 virtual_host 重定向到 HTTPS
+                          require_tls: ALL
                           routes:
-                            # 业务路由 1: MCP mock data (16 files, per 16 MCP tools)
-                            - match: { prefix: "/mock_data/mcp/" }
-                              direct_response:
-                                status: 200
-                                body: { filename: "/var/lib/star-mock/mcp/{{ regex_replace(request.path, '^/mock_data/mcp/', '') }}" }
-                                # 用 file_system_body 替代, 见下 filter
-                            # 业务路由 2: 5-domain mock data (5 files)
-                            - match: { prefix: "/mock_data/five-domain/" }
-                              direct_response:
-                                status: 200
-                                body: { filename: "/var/lib/star-mock/five-domain/{{ regex_replace(request.path, '^/mock_data/five-domain/', '') }}" }
-                            # 业务路由 3: langgraph mock data (3 files)
-                            - match: { prefix: "/mock_data/langgraph/" }
-                              direct_response:
-                                status: 200
-                                body: { filename: "/var/lib/star-mock/langgraph/{{ regex_replace(request.path, '^/mock_data/langgraph/', '') }}" }
-                            # 业务路由 4: db-wtm mock data (3 files)
-                            - match: { prefix: "/mock_data/db-wtm/" }
-                              direct_response:
-                                status: 200
-                                body: { filename: "/var/lib/star-mock/db-wtm/{{ regex_replace(request.path, '^/mock_data/db-wtm/', '') }}" }
-                            # 业务路由 5: agent-runtime mock data (3 files)
-                            - match: { prefix: "/mock_data/agent-runtime/" }
-                              direct_response:
-                                status: 200
-                                body: { filename: "/var/lib/star-mock/agent-runtime/{{ regex_replace(request.path, '^/mock_data/agent-runtime/', '') }}" }
-                            # 业务路由 6: 根路径健康检查
                             - match: { prefix: "/" }
-                              direct_response:
-                                status: 200
-                                body: { inline_string: "star-mock-envoy v0.71 online\nmock data: mcp (16) + five-domain (5) + langgraph (3) + db-wtm (3) + agent-runtime (3)\nTLS listener: 8443" }
+                              redirect:
+                                https_redirect: true
+                                # 308 永久重定向, 浏览器缓存 redirect, 后续直接走 HTTPS
+                                redirect_response_code: MOVED_PERMANENTLY
                     http_filters:
                       - name: envoy.filters.http.router
                         typed_config:
                           "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-        # HTTPS listener (8443) - TLS 终止 (per gen_tls_certs.sh 自签 cert, 90 天自动续期)
+        # HTTPS listener (8443) - TLS 终止 + 业务路由 (per v0.73, 业务路由全部移到 HTTPS)
         - name: listener_https
           address:
             socket_address: { address: 0.0.0.0, port_value: 8443 }
@@ -100,13 +77,39 @@ data:
                     route_config:
                       name: star_mock_routes_https
                       virtual_hosts:
-                        - name: star_mock_https
+                        - name: star_mock_https_business
                           domains: ["*"]
                           routes:
+                            # 业务路由 1: MCP mock data (16 files, per 16 MCP tools)
+                            - match: { prefix: "/mock_data/mcp/" }
+                              direct_response:
+                                status: 200
+                                body: { filename: "/var/lib/star-mock/mcp/{{ regex_replace(request.path, '^/mock_data/mcp/', '') }}" }
+                            # 业务路由 2: 5-domain mock data (5 files)
+                            - match: { prefix: "/mock_data/five-domain/" }
+                              direct_response:
+                                status: 200
+                                body: { filename: "/var/lib/star-mock/five-domain/{{ regex_replace(request.path, '^/mock_data/five-domain/', '') }}" }
+                            # 业务路由 3: langgraph mock data (3 files)
+                            - match: { prefix: "/mock_data/langgraph/" }
+                              direct_response:
+                                status: 200
+                                body: { filename: "/var/lib/star-mock/langgraph/{{ regex_replace(request.path, '^/mock_data/langgraph/', '') }}" }
+                            # 业务路由 4: db-wtm mock data (3 files)
+                            - match: { prefix: "/mock_data/db-wtm/" }
+                              direct_response:
+                                status: 200
+                                body: { filename: "/var/lib/star-mock/db-wtm/{{ regex_replace(request.path, '^/mock_data/db-wtm/', '') }}" }
+                            # 业务路由 5: agent-runtime mock data (3 files)
+                            - match: { prefix: "/mock_data/agent-runtime/" }
+                              direct_response:
+                                status: 200
+                                body: { filename: "/var/lib/star-mock/agent-runtime/{{ regex_replace(request.path, '^/mock_data/agent-runtime/', '') }}" }
+                            # 业务路由 6: 根路径健康检查 (HTTPS only after v0.73 redirect)
                             - match: { prefix: "/" }
                               direct_response:
                                 status: 200
-                                body: { inline_string: "star-mock-envoy v0.71 TLS online\nself-signed cert (per gen_tls_certs.sh)\nauto-renew 90 days" }
+                                body: { inline_string: "star-mock-envoy v0.73 online (HTTPS only)\nmock data: mcp (16) + five-domain (5) + langgraph (3) + db-wtm (3) + agent-runtime (3)\nTLS listener: 8443 (self-signed cert, per gen_tls_certs.sh)\nHTTP→HTTPS redirect: 308 (per v0.73)" }
                     http_filters:
                       - name: envoy.filters.http.router
                         typed_config:
