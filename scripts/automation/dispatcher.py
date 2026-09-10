@@ -725,8 +725,32 @@ class SubagentDispatcher:
         return out
 
     def check_blocked(self, task_id: str) -> list:
-        """返回所有 blocks=True 的留言 (per 守门 v33 §1.4)."""
-        return [c for c in self.list_comments(task_id) if c.blocks]
+        """返回未解除的 blocks=True 留言 (per 守门 v33 v0.2 §1.4 + 已知缺口 #3).
+
+        解除规则 (v0.2 智能):
+            BLOCK 留言 c_blocks 有解除留言 c_resolve (c_resolve.parent_comment_id == c_blocks.id
+            AND c_resolve.blocks is False AND c_resolve.actor_role in {"Ulysses", "architect", "Mavis"})
+            → c_blocks 视为已解除, 不返
+
+        其他未解除 BLOCK 留言 (actor_role = "sub-agent" 等非权威) → 仍返.
+        """
+        all_comments = self.list_comments(task_id)
+        blocking = [c for c in all_comments if c.blocks]
+        if not blocking:
+            return []
+        # 权威 actor 列表 (per 守门 #14 v3 + 守门 v33 §1.3)
+        AUTHORITATIVE_ROLES = {"Ulysses", "architect", "Mavis"}
+        # 收集解除留言 (parent_comment_id 指向某条 BLOCK + blocks=False + 权威 actor)
+        resolved_ids = set()
+        for c in all_comments:
+            if (
+                c.blocks is False
+                and c.parent_comment_id is not None
+                and c.actor_role in AUTHORITATIVE_ROLES
+            ):
+                resolved_ids.add(c.parent_comment_id)
+        # 返未解除的 BLOCK
+        return [c for c in blocking if c.id not in resolved_ids]
 
     def mark_read(self, task_id: str, comment_id: str) -> bool:
         """标记 1 条留言已读 (per 守门 v33 §1.6 commit message `comments-read:` 字段).
