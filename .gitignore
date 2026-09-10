@@ -109,6 +109,10 @@ _v093_*.md
 _v0991_*.md
 # Transient v0.24 WBS row scratch (per 2026-09-10 A.5 housekeeping, content already in WBS)
 _v024_*.md
+# Transient v0.32 registry row scratch (per 2026-09-10 Phase C housekeeping, content already in registry.md)
+_v032_*.md
+# Transient v0.99.7 WBS row scratch (per 2026-09-10 cross-session housekeeping, content already in WBS)
+_v0997_*.md
 # Transient v0.63 obsolete recruitment one-shot helper (per 2026-09-10 A.5 housekeeping, already executed e053447)
 _v063_*.py
 # Pytest status.json artifacts (per 2026-09-10 A.5 housekeeping, test_*.status.json from dispatcher hook tests, status="deferred")
