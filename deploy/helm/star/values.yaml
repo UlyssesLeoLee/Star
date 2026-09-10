@@ -45,9 +45,9 @@ cache:
   enabled: true
   replicas: 2
   port: 8085
-  redis:
-    enabled: false  # TODO: Phase I+ 切换
-    url: redis://redis-master:6379
+  valkey:
+    enabled: false  # TODO: Phase I+ 切换 (per 架构选型: Valkey 替代 Redis)
+    url: valkey://valkey-master:6379
 saga:
   enabled: true
   replicas: 2
@@ -111,7 +111,7 @@ secrets:
   bitbucketAppPassword: ""
   giteaToken: ""
   webhookSecret: ""
-  redisUrl: ""
+  valkeyUrl: ""
 
 # Monitoring (per spec/observability/01)
 monitoring:

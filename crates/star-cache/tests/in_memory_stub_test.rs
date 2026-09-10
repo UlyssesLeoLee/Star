@@ -16,8 +16,8 @@ async fn in_memory_incr_returns_not_implemented() {
         }) => {
             assert_eq!(feature, "in_memory_incr");
             assert!(
-                suggestion.contains("RedisBackend"),
-                "suggestion should reference RedisBackend: {suggestion}"
+                suggestion.contains("ValkeyBackend"),
+                "suggestion should reference ValkeyBackend: {suggestion}"
             );
             assert!(
                 suggestion.contains("p4_phase=G.4"),
@@ -32,10 +32,10 @@ async fn in_memory_incr_returns_not_implemented() {
 fn cache_error_not_implemented_display() {
     let err = CacheError::NotImplemented {
         feature: "in_memory_incr".into(),
-        suggestion: "use RedisBackend".into(),
+        suggestion: "use ValkeyBackend".into(),
     };
     let s = err.to_string();
     assert!(s.contains("not_implemented"));
     assert!(s.contains("in_memory_incr"));
-    assert!(s.contains("use RedisBackend"));
+    assert!(s.contains("use ValkeyBackend"));
 }

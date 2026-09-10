@@ -10,7 +10,7 @@ description = "STAR EventBus + Mailbox (Phase G.3) — in-process pub/sub + at-m
 # G.3 (per `docs/briefs/next-session/OPT-NEXT-04-phase-g.md` §3.3):
 # - in-process pub/sub (tokio mpsc 通道)
 # - Mailbox 3 模式: at-most-once / at-least-once / exactly-once
-# - 跨进程 via Redis stream (Phase G+ stub)
+# - 跨进程 via Valkey stream (Phase G+ stub) — 选型替代 Redis (per docs/operation-design.md §4.4)
 # 守门 #13 a L0 协调 派生: 事件 bus 是 L0 协调设施, 不允许 L1↔L1 直连 (per TMO-03 实证)
 
 [dependencies]

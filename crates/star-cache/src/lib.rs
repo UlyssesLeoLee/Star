@@ -4,17 +4,19 @@
 //! 提供统一的缓存抽象：
 //! - `CacheBackend` trait 覆盖 6 个核心操作（get / set / del / exists / incr / expire）
 //! - `InMemoryBackend` (per spec/cache/01 §5) — Tokio RwLock + HashMap + TTL 过期
-//! - `RedisBackend` (per spec/cache/01 §5) — Phase G+ stub，仅占位 URL 解析
+//! - `ValkeyBackend` (per spec/cache/01 §5) — Phase G+ stub, 占位 URL 解析
+//!   选型 Valkey 替代 Redis (per docs/operation-design.md §4.4 + data-design.md §13.1):
+//!   Redis 7.4+ 改 RSALv2/SSPL 不再 OSI 开源, Valkey (LF) 保持 BSD-3-Clause
 //! - `KeyBuilder` (per spec/cache/01 §3) — 三类键名规范（resource / list / field）
 //!
-//! 缺标比错标安全：Redis backend 当前为 Phase G+ stub，所有方法返回 CacheError::Other。
+//! 缺标比错标安全：Valkey backend 当前为 Phase G+ stub，所有方法返回 CacheError::Other。
 
 /// 统一键名构造器 (per spec/cache/01 §3)
 pub mod cache_trait;
 /// 进程内 LRU 后端 (per spec/cache/01 §5)
 pub mod in_memory_backend;
-/// Redis 后端 (per spec/cache/01 §5) — Phase G+ stub
-pub mod redis_backend;
+/// Valkey 后端 (per spec/cache/01 §5) — Phase G+ stub (替代原 RedisBackend, 选型见模块注释)
+pub mod valkey_backend;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -32,7 +34,7 @@ pub enum CacheError {
         /// 推荐替代方案 (含 current_phase / p4_phase 标签)
         suggestion: String,
     },
-    /// 连接错误 (e.g. Redis URL unset / 拨号失败)
+    /// 连接错误 (e.g. Valkey URL unset / 拨号失败)
     #[error("connection: {0}")]
     Connection(String),
     /// 键不存在
@@ -66,8 +68,8 @@ impl CacheError {
 pub enum Backend {
     /// 进程内 LRU (测试 + 单实例)
     InMemory,
-    /// 分布式 Redis (生产)
-    Redis,
+    /// 分布式 Valkey (生产) — 替代 Redis (per docs/operation-design.md §4.4)
+    Valkey,
 }
 
 /// 缓存后端 trait (per spec/cache/01 §4 — 6 个核心方法)
@@ -89,4 +91,4 @@ pub trait CacheBackend: Send + Sync {
 
 pub use cache_trait::KeyBuilder;
 pub use in_memory_backend::InMemoryBackend;
-pub use redis_backend::RedisBackend;
+pub use valkey_backend::ValkeyBackend;

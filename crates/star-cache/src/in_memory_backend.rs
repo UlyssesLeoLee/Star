@@ -83,7 +83,7 @@ impl CacheBackend for InMemoryBackend {
         // 改用结构化 CacheError::NotImplemented { feature, suggestion } 表达 deprecation
         Err(CacheError::NotImplemented {
             feature: "in_memory_incr".into(),
-            suggestion: "use RedisBackend for atomic incr support, current_phase=P3, p4_phase=G.4"
+            suggestion: "use ValkeyBackend for atomic incr support, current_phase=P3, p4_phase=G.4"
                 .into(),
         })
     }

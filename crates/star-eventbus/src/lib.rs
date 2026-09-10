@@ -8,7 +8,7 @@
 //! - `Mailbox`: 3 模式投递保证
 //!   - `AtMostOnce` (W 短 TTL 作业中, 完成即丢)
 //!   - `AtLeastOnce` (T append-only 审计, 重试至 ack)
-//!   - `ExactlyOnce` (T 持久化去重, 需 backend Redis/Postgres, 当前 in-process dedup)
+//!   - `ExactlyOnce` (T 持久化去重, 需 backend Valkey/Postgres, 当前 in-process dedup)
 //!
 //! **守门 #13 a 派生**: 事件 bus 是 L0 协调设施, 禁止 L1↔L1 直连
 //! (per TMO-03 实证 — 跨 L1 子任务通信必须经 L0 EventBus, 不允许子代理相互直发)
