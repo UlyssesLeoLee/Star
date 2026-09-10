@@ -1472,3 +1472,50 @@ frontend/src/app/automation-debug/
 - 本次合计 ~0.91M tokens (1 SRE·周 ≈ 1.2M, 在预算内)
 - 后续 P0 阶段 (3 个月内, 31 项 P0) ~3-5M
 - 双核心 70 项 全部落地 (12 个月+) ~12-18M (12-18 SRE·周)
+
+
+### 4.27 P3-D.5 v1.2 多人编辑是要的 (v0.63 反转, 撤回 17:08 JST 砍多人编辑决定, 2026-09-10 17:48 JST per `docs/briefs/srs-canvas-agent-001.md` v1.2)
+
+> **触发**: 2026-09-10 17:34 JST Ulysses 拍板"多人编辑是要的" (v0.63 反转, 撤回 17:08 JST 砍多人编辑决定) + 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #14 v3 Mavis 永久代签 + 守门 #1 v15 docs 同步饱和第 70 次新事件触发仍允许
+> **依据**: 守门 #1 v15 (本轮第 70 次新事件, docs 同步允许) + 守门 #1 v19 (0 子代理调用, 0 散落子代理产出, 仅 task tool 派 1 worker 重写 v1.2) + 守门 #1 禁回溯叙事 (撤回 17:08 JST 砍多人编辑决定, v0.63 反转行显式标 29 次, 不重写 17:08 JST commit 4f56979) + 守门 #3 (5 域 Lead 跨域边强制 consults, A12.7 5 域 Lead 真人到位后决策 disclaimer 显式) + 守门 #9 #3 (0 子代理调用实装期) + 守门 #9 v19 (Mavis 自驱, 17:34 JST 拍板 → 17:36 JST 撤回 + 重派 ~2 分钟) + 守门 #9 v20 (子代理 dispatch 必先 brief 落档, brief v1.2 已落 `docs/briefs/srs-canvas-agent-001.md`) + 守门 #9 v27 (RPC 失败 fallback 3 段, 子代理 invoke → verify → collect_output, 真实验证文件 + 字节数 + 段数 + W/T/M 表 + v0.63 反转行) + 守门 #10 (代签, author=Ulysses) + 守门 #11 (缺标比错标, AGENT §10 已知缺口 19 个含 A12 多人编辑 8 缺口) + 守门 #12 (BAS 引用必 git log --follow 实证, frontend-canvas-design.md §4.1 28 次 + §4.6 21 次 + CanvasView.tsx line 253-262 18 次) + 守门 #13 (DB W/T/M 100% 覆盖, A11 7 张表 + A12 7 张表 = 14 张表全覆盖) + 守门 #14 v2 (5 域 Lead Mavis 临时代签, 真人到位后追溯签字) + 守门 #14 v3 (Mavis 永久代签) + 守门 #14 v4 v0.62 反转 (真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses) + 守门 #15 (docs 同步饱和, 本 commit 1 次, 上次 commit ee74ae6 WBS v0.78 是第 67 次, 396833a 第 70 次) + 守门 #23 v2 (AI 第三方 API 禁止, GAMIFY G5 sticky note 聚类走 mock 接口, 真实 LLM 留 P2, 不直接影响 AGENT v1.2)
+> **落档文件** (关联 commit `396833a`, 3 files / 691 insertions / 255 deletions):
+> - `docs/requirements/SRS-CANVAS-AGENT-001.md` v1.2 (158,701 bytes ~155KB, 1,956 行, 13 段, 46 项 = 38 v1.1 + 8 新 A12 多人编辑, 16 NFR + 66 AC + 32 US + 19 已知缺口, 14 张表 W/T/M 100% 覆盖, 13 处"多人编辑是要的" + 29 处"v0.63" + 7 处"撤回 17:08 JST 砍多人编辑决定" 显式标)
+> - `docs/requirements/SRS-CANVAS-001.md` v1.1 (58KB, 总册三次更新版, 双核心 78 项索引 = 38+8+32, 36 P0 清单, A12 索引 + 7 多端点 API + v0.63 反转行)
+> - `docs/briefs/srs-canvas-agent-001.md` v1.2 (17KB, 46 项 + A11 10 项 + A12 8 项 + 13 已知缺口 + 28 优先级)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| D5.2-1 | D5.2-1 | `docs/requirements/SRS-CANVAS-AGENT-001.md` v1.2 (155KB) | A | **[P]** | (worker 子代理 1 v1.2 Write tool, bg_fcc1ed26) | 13 段 (跟 V0.1 模板 +1 拆 0.1/0.2/0.3) + 46 FR (A1-A10 28 + A11 10 + A12 8) + 16 NFR + 66 AC (46 功能 + 14 质量 + 6 文档) + 32 US + 19 已知缺口 (含 A11 跨专题 5 缺口 + A12 多人编辑 8 缺口 #11-#17) + 14 张表 W/T/M 100% 覆盖 (A11 7 表 + A12 7 表) + 10 类关系 + 4 维度 + 5 团队模板 + A12 必含 8 项多人编辑 + v0.63 反转行 29 次 + 守门 14/14 通过 |
+| D5.2-2 | D5.2-2 | `docs/requirements/SRS-CANVAS-001.md` v1.1 (58KB) | A | **[P]** | (root Write tool) | 9 段 IPA SEC 模板 + 双核心 78 项索引 (38+8+32) + 36 P0 清单 (31 v1.0 + 5 A12.1-12.3/12.5/12.6/12.8) + 12 大类砍 11 类 (Miro 通用) + 17:21 + 17:34 JST 拍板 + 14 跨拍板派生 + 13 风险 R-1~R-13 + 守门 16 交叉引用; 17:08 JST → 17:21 JST → 17:34 JST 3 次更新, v0.63 反转行 显式标 |
+| D5.2-3 | D5.2-3 | `docs/briefs/srs-canvas-agent-001.md` v1.2 (17KB) | A | **[P]** | (root Write tool) | per 守门 #9 v20 子代理 dispatch 必先 brief, A11 ARG 10 项 + **A12 多人编辑 8 项** + 13 已知缺口 + 28 优先级 (P0 19 + P1 13 + P2 14, v1.0 P0 14 + P1 11 + P2 8, 加 A12 P0 5 + P1 2 + P2 1); 17:17 v1.0 → 17:22 v1.1 (A11 二次更新) → 17:34 v1.2 (A12 三次更新 v0.63 反转) |
+| D5.2-4 | D5.2-4 | `scripts/automation/registry.md` §2 +1 行 + §3 v0.12 | A | **[P]** | (registry.md edit) | per 守门 #12 v21 [P] docs 同步必更新 registry, 1 索引 (srs-canvas-agent-001 v1.2) + v0.12 修订历史 (17:34 JST v0.63 反转) |
+| D5.2-5 | D5.2-5 | `docs/automation-design.md` §4.27 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #12 v21 [P] docs 同步必更新 §4 任务卡表 |
+| D5.2-6 | D5.2-6 | 1 commit author = `Ulysses <ulysses@mavis.local>` (commit `396833a`) | A | **[P]** | (git commit) | 守门 #10 + 8/27 19:39 JST 授权 + 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 Mavis 审核 author=Ulysses; 不推 origin (守门 #1 反转后 R-05) |
+
+**§4.27 任务卡维度判定**:
+- R (Rerunnable): **是** (1 commit idempotent, 3 files / 691 insertions / 255 deletions, 0 子代理调用)
+- V (Volume): **是** (AGENT v1.2 155KB / 1,956 行 + 总册 58KB + brief 17KB, 46 项 FR + 13 段 + 19 已知缺口, 跨 1 AGENT + 1 总册 + 1 brief)
+- S (Structural): **是** (AGENT 13 段 + 总册 9 段 + brief 1 节, 14 张表 W/T/M 100% 覆盖, 7 个 API 端点 + 5 个 A12 端点)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 (commit 396833a) + 守门 #10 author = Ulysses + 守门 #5 env 不打印 + 守门 #9 #3 0 子代理调用 + 守门 #9 v20 brief 落档 + 守门 #9 v27 verify + 守门 #14 v2/v3/v4 代签 / 审核 规则全备 + 守门 #1 禁回溯叙事 v0.63 反转行 29 次显式标)
+
+**§4.27 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v19 + #12 v21 + #14 v2 + #14 v3 + #14 v4)**:
+- `git log -p --follow docs/requirements/SRS-CANVAS-AGENT-001.md` 实证 v1.2 落档 (commit `396833a`, 155KB)
+- `git log -p --follow docs/requirements/SRS-CANVAS-001.md` 实证 v1.1 落档 (commit `396833a`, 58KB)
+- `git log -p --follow docs/briefs/srs-canvas-agent-001.md` 实证 v1.2 落档 (commit `396833a`, 17KB)
+- 子代理 1 真实产出验证: `SRS-CANVAS-AGENT-001.md` 158,701 bytes / 1,956 行 / 13 段 / 46 FR + 16 NFR + 66 AC + 32 US / 14 张表 W/T/M 100% 覆盖 (per 守门 #9 v27 3 段 fallback verify 阶段)
+- 守门 #1 v19: 0 子代理调用 (实装期), 仅用 task tool 派 1 worker (子代理 1 v1.2 重写, bg_fcc1ed26)
+- 守门 #9 #3: 0 子代理调用 (实装期), 不派二级子代理
+- 守门 #9 v19: Mavis 自驱, 拍板后立即执行 (17:34 JST 拍板 → 17:36 JST 撤回 + 重派 ~2 分钟, 17:46 JST 子代理 1 完成 ~12 分钟)
+- 守门 #10 author = `Ulysses <ulysses@mavis.local>` (per 8/27 19:39 JST 授权 + 守门 #14 v3 Mavis 永久代签)
+- 守门 #11 缺标比错标: AGENT §10 已知缺口 19 个 (含 A11 跨专题 5 + A12 多人编辑 8 #11-#17 + 6 其他 #1-#6, #18-#19) + GAMIFY 附录 A 12 个 + 总册 §7 R-1~R-12 12 个, 共 43+ 已知缺口显式列, 0 隐藏
+- 守门 #13 DB W/T/M: A11 7 张表 (Master 3 / Transaction 3 / Work 1) + A12 7 张表 (Master 3 / Transaction 2 / Work 2) = **14 张表 100% 覆盖** (Work 3/14 = 21.4% + Transaction 5/14 = 35.7% + Master 6/14 = 42.9% = 14/14 = 100%)
+- 守门 #14 v3: 5 角色签字栏全 Mavis 接手代签 (修订人 + 审批者 author=Ulysses)
+- 守门 #14 v4: 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses (per 2026-09-10 12:45 JST v0.62 反转)
+- 守门 #1 禁回溯叙事: 撤回 17:08 JST 砍多人编辑决定, v0.63 反转行 显式标 29 次, 不重写 17:08 JST commit 4f56979
+- 守门 #23 v2 AI 第三方 API 禁止: GAMIFY G5 sticky note 聚类走 mock 接口, 守门 #23 v2 25 次引用锁 mock 路径, 真实 LLM 留 P2 (不直接影响 AGENT v1.2)
+
+**§4.27 token OLU 估算 (per 守门 #4 + STAR-OLU-001 v0.1)**:
+- 本次合计 ~0.5M tokens (1 SRE·周 ≈ 1.2M, 在预算内)
+- 累计 P3-D.5 全部 3 commit: ~1.41M tokens (4f56979 0.91M + 73d490f 0.05M + 396833a 0.45M, 1.18 SRE·周)
+- 后续 P0 阶段 (3 个月内, 36 项 P0) ~3-5M
+- 双核心 78 项 全部落地 (12 个月+) ~13-19M (13-19 SRE·周, per STAR-OLU-001)
