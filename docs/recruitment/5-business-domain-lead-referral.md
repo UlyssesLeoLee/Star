@@ -1,16 +1,19 @@
-# 5 域 Lead 真人 Ulysses 内推 Brief v0.2 (per 9/10 07:24 JST 拍板 v0.54 brief 派发 + 5 域 Lead brief × 5 doc + 6 周 timeline 落档)
+# 5 域 Lead 真人 Ulysses 内推 Brief v0.3 (v0.62 反转: 真人代签流程全部取消, 改为 mavis 审核, 本 brief 仍保留作为参考但不强制)
 
-> **状态**: 🟢 Active v0.2 (2026-09-10 07:24 JST brief v0.54 派发落地)
-> **触发**: per 9/5 10:43 JST `ask_409cbd32edc309d71a083e2a` 用户拍板 (Q1=内推, Q2=立即启动, 推荐项)
-> **守门依据**: 守门 #3 (5 域独立 Lead, 不接受兼任) + 守门 #14 (5 域 Lead CONTENT 4 维) + 守门 #10 (代签 author=Ulysses)
+> **状态**: 🟡 **v0.62 反转: 真人代签流程全部取消, 改为 mavis 审核** (per 2026-09-10 12:45 JST Ulysses 发令 + 守门 #14 v4 反转升级)
+> **触发**: per 9/5 10:43 JST `ask_409cbd32edc309d71a083e2a` 用户拍板 (Q1=内推, Q2=立即启动, 推荐项) → v0.62 反转
+> **守门依据**: 守门 #3 (5 域独立 Lead, 不接受兼任) + 守门 #14 (5 域 Lead CONTENT 4 维) + 守门 #10 (author=Ulysses) — **v0.62 反转后**: 守门 #14 v4 升级, 真人代签 取消, 改为 mavis 审核 (per 守门 #32 候选)
 > **关联 commit**: 见 `git log -p --follow docs/recruitment/5-business-domain-lead-referral.md` (per 守门 #12 不写死 SHA, 用 path 稳定标识)
-> **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
+> **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (v0.62 反转, 不是代签)
 
 ---
 
-## §0 目的
+## §0 目的 (v0.62 反转后)
 
-把 5 域 (player / economy / match / social / admin) Lead 从 "Mavis 临时代签" 状态推进到 "真人到位 + 追溯签字覆盖" 状态. 5 域 Lead 真人到位前, Mavis 临时代签所有 5 域决策 + commit + 报告审批 (per 9/3 19:35 JST 拍板 D 维持 + 8/27 19:39/21:59 JST 三次强化).
+**v0.62 反转 (per 2026-09-10 12:45 JST Ulysses 发令"真人代签流程全部取消, 改为 mavis 审核")**:
+- **原目标**: 把 5 域 (player / economy / match / social / admin) Lead 从 "Mavis 临时代签" 状态推进到 "真人到位 + 追溯签字覆盖" 状态
+- **新目标 (v0.62)**: 不再追踪 5 域 Lead 真人到位, 改为 Mavis 审核决定 author=Ulysses (per 守门 #14 v4 + 守门 #32 候选), Mavis 承担审核责任 (不是代签责任); P0-3/P0-4 不再依赖真人到位, Mavis 可直接推进
+- **保留本 brief 原因**: 5 域 Lead 真人寻访 brief 5 份 (`docs/recruitment/5-leads/*.md`) 仍保留作为参考, 但不强制 (per 守门 #1 禁回溯叙事, 不删除已 commit 内容)
 
 ## §1 内推策略
 

@@ -1,9 +1,9 @@
 # v31 5 域 Lead 真人到位追溯签字机制 (per 守门 #14 v2 拍板 D 维持, 9/9 12:02 升级)
 
-> **Status**: 🟢 **active** (per 2026-09-10 11:00 JST Mavis 自驱拍板激活, 守门 #9 v19 + 守门 #14 v3 Mavis 永久代签)
+> **Status**: 🟡 **v0.62 反转: 政策已取消, 5 域 Lead 真人到位流程 全部作废, 详见 v32 Mavis 审核决定 author=Ulysses** (per 2026-09-10 12:45 JST Ulysses 发令"真人代签流程全部取消, 改为 mavis 审核" + 守门 #14 v4 反转升级)
 > **Created**: 2026-09-10
-> **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 永久代签)
-> **commit**: v0.61 落档 (per 守门 #12 v15 docs 同步饱和第 50 次新事件触发 仍允许)
+> **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (历史, v0.62 反转后)
+> **commit**: v0.61 落档 → v0.62 显式反转 (per 守门 #12 v15 docs 同步饱和第 51 次新事件触发 仍允许)
 
 ---
 
@@ -51,6 +51,7 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-10 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手代签 | 初版: 4 类追溯场景 (启动信号/追溯形式/不沿用代签决策/真人到位) + 8 节追溯签字结构 (T0-T5) + 5 关联文档 + 修订历史 v0.1 row | 2026-09-10 11:00 JST Mavis 自驱拍板激活 (per 守门 #9 v19 + 守门 #14 v3 Mavis 永久代签 + 9/9 12:02 政策升级) |
+| v0.2 | 2026-09-10 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (反转, 不是代签) | 政策全部取消: 5 域 Lead 真人到位流程 全部作废; 替代政策详见 v32 候选; P0-3/P0-4 不再依赖真人到位 (Mavis 可推进); 真人寻访 brief 5 份 (`docs/recruitment/5-leads/*.md`) 仍保留作为参考但不强制; 5-lead-referral + 5-leads-timeline docs 反转标 (per v0.62) | 2026-09-10 12:45 JST Ulysses 发令"真人代签流程全部取消, 改为 mavis 审核" (per 9/8 15:19 第 6 次强化 Mavis 全权代理 + 9/8 15:29 第 7 次强化 Mavis 自驱) |
 
 ---
 
