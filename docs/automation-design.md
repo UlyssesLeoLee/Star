@@ -1417,3 +1417,58 @@ frontend/src/app/automation-debug/
 
 
 **��֪ȱ�� + ʧ��ģʽ**: vitest pass �Ǳ�Ҫ�ǳ������ (2 worktree ���� 41 files / 345 tests pass, ��û�� e2e); 8 �Ž�ͼ�Ӿ��߲����ֹ� byte ���, û����ͼ�� diff; main worktree �� 12 �� untracked/modified ������ WIP ��ͻ, �ϲ��� stash + Move-Item ·���ܿ�. 
+
+
+### 4.26 P3-D.5 无限画布双核心 + ARG 图论构造 SRS 落档 (2026-09-10 17:30 JST per `docs/briefs/srs-canvas-{agent,gamify,integration}-001.md`)
+
+> **触发**: 2026-09-10 17:00/17:08/17:21 JST Ulysses 三阶段拍板: (1) 17:00 "把这些归纳进需求文档, 子代理同步撰写" → (2) 17:08 "管理 agent 和游戏化, 避免过度冗余" → (3) 17:21 "画布内体现 agent 之间关系的图论构造 (ARG)"
+> **依据**: 守门 #1 v15 (本轮第 68 次新事件, docs 同步允许) + 守门 #1 v19 (0 子代理调用, 0 散落子代理产出, 仅 task tool 派 2 worker) + 守门 #3 (5 域独立 Lead ≠ Star 22 DDD disclaimer) + 守门 #9 #3 (子代理 RPC 不可靠实证 5/5, 0 子代理调用实装期) + 守门 #9 v19 (Mavis 自驱, 拍板后立即执行) + 守门 #9 v20 (子代理 dispatch 必先 brief 落档, 3 brief 已落 `docs/briefs/srs-canvas-{agent,gamify,integration}-001.md`) + 守门 #9 v27 (RPC 失败 fallback 3 段, 子代理 invoke → verify → collect_output) + 守门 #10 (commit author=Ulysses, 8/27 19:39 JST 授权) + 守门 #11 (缺标比错标, AGENT §10 + GAMIFY 附录 A + 总册 §7 R-1~R-12 共 24+ 已知缺口显式列) + 守门 #12 (BAS 引用必 git log --follow 实证, 109 次引用 SRS-AGENT-RELATIONSHIP-001 已 git ls-files 实证) + 守门 #13 (DB W/T/M 三類横展 100% 覆盖, GAMIFY G11.2 15 张表 + AGENT A11.5 7 张表) + 守门 #14 v2 (5 域 Lead Mavis 临时代签, 真人到位后追溯签字) + 守门 #14 v3 (Mavis 永久代签, 5 角色签字栏全代签) + 守门 #14 v4 v0.62 反转 (真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses, per 2026-09-10 12:45 JST) + 守门 #15 (docs 同步饱和, 1 commit 6 文件 落档, 上次 commit e9a6c2e WBS v0.75.1 是第 67 次, 本 commit 4f56979 第 68 次) + 守门 #23 v2 (AI 第三方 API 禁止, GAMIFY G5 sticky note 聚类走 mock 接口, 守门 #23 v2 25 次引用锁 mock 路径, 真实 LLM 留 P2) + 守门 #1 禁回溯叙事 (撤回 v0.1 47.5K 总册不重写, 仅 v1.0 总册 v0.62 row 显式标反转)
+> **落档文件** (关联 commit `4f56979`, 6 files / 4107 insertions):
+> - `docs/requirements/SRS-CANVAS-001.md` v1.0 (54KB, 总册, 双核心 70 项索引 + 跨块接口 + 共享约束 + 13 跨拍板派生 + 12 风险 R-1~R-12 + 守门 16 交叉引用)
+> - `docs/requirements/SRS-CANVAS-AGENT-001.md` v1.1 (103KB, 38 项 = 28 旧 A1-A10 + 10 新 A11 ARG, 13 段, 109 次引用 SRS-AGENT-RELATIONSHIP-001 v0.1 主源 + 43 AC + 25 US + 12 已知缺口 + 7 张表 W/T/M 100% 覆盖 + 10 类关系 + 4 维度 + 5 团队模板)
+> - `docs/requirements/SRS-CANVAS-GAMIFY-001.md` v1.0 (92KB, 32 项 G1-G12, 73 AC + 23 US + 12 已知缺口 + G11.2 W/T/M 15 张表 100% 覆盖 Work 6 / Transaction 4 / Master 5 + G5 AI mock 87 次显式标注 + 守门 #23 v2 25 次锁 mock 路径)
+> - `docs/briefs/srs-canvas-agent-001.md` v1.1 (17KB, 38 项 + A11 ARG 10 项 + 4 表 W/T/M + 10 类关系 + 4 维度 + 5 团队模板)
+> - `docs/briefs/srs-canvas-gamify-001.md` v1.0 (12.6KB, 32 项 + G11 W/T/M + G5 AI mock)
+> - `docs/briefs/srs-canvas-integration-001.md` (1.1KB, deprecated 占位, 撤回 17:08 JST 旧方向)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| D5-1 | D5-1 | `docs/requirements/SRS-CANVAS-001.md` v1.0 (54KB) | A | **[P]** | (root Write tool) | 9 段 IPA SEC 模板 + 双核心 70 项索引 (28+10+32) + 12 大类砍 11 类 (Miro 通用) + 13 跨拍板派生 + 12 风险 R-1~R-12 + 守门 16 交叉引用; 17:08 JST 方向重置 + 17:21 JST ARG 补充, 2 次更新 |
+| D5-2 | D5-2 | `docs/requirements/SRS-CANVAS-AGENT-001.md` v1.1 (103KB) | A | **[P]** | (worker 子代理 1 Write tool, bg_eb11f9e3) | 13 段 (跟 V0.1 模板 +1 拆 0.1/0.2/0.3) + 38 FR (A1-A10 28 + A11 10) + 12 NFR + 43 AC + 25 US + 12 已知缺口 (含 A11 跨专题 5 缺口) + 7 张表 W/T/M 100% 覆盖 (Master 3 / Transaction 3 / Work 1) + 10 类关系 (4 核心 + 6 扩展) + 4 维度协作影响 + 5 团队模板 + 109 次引用 SRS-AGENT-RELATIONSHIP-001 v0.1 主源 + 守门 14/14 通过 |
+| D5-3 | D5-3 | `docs/requirements/SRS-CANVAS-GAMIFY-001.md` v1.0 (92KB) | A | **[P]** | (worker 子代理 2 Write tool, bg_84cf0613) | 10 段 (§0~§9 + 附录 A-D) + 32 FR (G1.1-G12.2) + 25 NFR + 73 AC + 23 US + 12 已知缺口 (附录 A) + G11.2 W/T/M 15 张表 100% 覆盖 (Work 6 / Transaction 4 / Master 5) + G5 AI mock 87 次显式标注 + 守门 #23 v2 25 次锁 mock 路径 + 16 处跨专题引用 + 18 类 Miro 通用功能砍掉 (附录 C) + 5 角色签字栏 (附录 D) + 守门 14/14 通过 |
+| D5-4 | D5-4 | `docs/briefs/srs-canvas-agent-001.md` v1.1 (17KB) | A | **[P]** | (root Write tool) | per 守门 #9 v20 子代理 dispatch 必先 brief, A11 ARG 10 项 + 4 表 W/T/M + 10 类关系 + 4 维度 + 5 团队模板; 17:17 JST v1.0 → 17:22 JST v1.1 (A11 二次更新) |
+| D5-5 | D5-5 | `docs/briefs/srs-canvas-gamify-001.md` v1.0 (12.6KB) | A | **[P]** | (root Write tool) | per 守门 #9 v20, G11 W/T/M + G5 AI mock; 17:17 JST v1.0 落档 |
+| D5-6 | D5-6 | `docs/briefs/srs-canvas-integration-001.md` (1.1KB, deprecated 占位) | A | **[P]** | (root Write tool) | 撤回 17:08 JST 旧方向 (Miro 集成/移动 27 项), 改 deprecated 占位, 后续 PR 清理 |
+| D5-7 | D5-7 | `scripts/automation/registry.md` §2 +3 行 + §3 v0.11 | A | **[P]** | (registry.md edit) | per 守门 #12 v21 [P] docs 同步必更新 registry, 3 索引 (srs-canvas-agent-001 + srs-canvas-gamify-001 + srs-canvas-integration-001 deprecated) + v0.11 修订历史 (3 阶段拍板) |
+| D5-8 | D5-8 | `docs/automation-design.md` §4.26 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #12 v21 [P] docs 同步必更新 §4 任务卡表 |
+| D5-9 | D5-9 | 1 commit author = `Ulysses <ulysses@mavis.local>` (commit `4f56979`) | A | **[P]** | (git commit) | 守门 #10 + 8/27 19:39 JST 授权 + 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 Mavis 审核 author=Ulysses; 不推 origin (守门 #1 反转后 R-05) |
+
+**§4.26 任务卡维度判定**:
+- R (Rerunnable): **是** (1 commit idempotent, 6 files / 4107 insertions, 0 子代理调用)
+- V (Volume): **是** (3 SRS 共 249KB, 70 项 FR + 27 段 + 84 已知缺口, 跨 1 总册 + 2 专题)
+- S (Structural): **是** (3 SRS 9-13 段 IPA SEC 模板 + 2 brief v1.1/v1.0 + 1 deprecated 占位 + 1 任务卡 + 1 registry v0.11 + 1 commit)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 (commit 4f56979) + 守门 #10 author = Ulysses + 守门 #5 env 不打印 + 守门 #9 #3 0 子代理调用 + 守门 #9 v20 brief 落档 + 守门 #9 v27 verify + 守门 #14 v2/v3/v4 代签 / 审核 规则全备)
+
+**§4.26 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v19 + #12 v21 + #14 v2 + #14 v3 + #14 v4)**:
+- `git log -p --follow docs/requirements/SRS-CANVAS-001.md` 实证 v1.0 落档 (commit `4f56979`)
+- `git log -p --follow docs/requirements/SRS-CANVAS-AGENT-001.md` 实证 v1.1 落档 (commit `4f56979`, 103KB)
+- `git log -p --follow docs/requirements/SRS-CANVAS-GAMIFY-001.md` 实证 v1.0 落档 (commit `4f56979`, 92KB)
+- `git log -p --follow docs/briefs/srs-canvas-agent-001.md` 实证 v1.1 落档 (commit `4f56979`, 17KB)
+- `git log -p --follow docs/briefs/srs-canvas-gamify-001.md` 实证 v1.0 落档 (commit `4f56979`, 12.6KB)
+- `git log -p --follow docs/briefs/srs-canvas-integration-001.md` 实证 deprecated 落档 (commit `4f56979`, 1.1KB)
+- 子代理 1 真实产出验证: `SRS-CANVAS-AGENT-001.md` 105,733 bytes / 1,558 行 / 13 段 / 38 FR + 12 NFR + 43 AC + 25 US / 7 张表 W/T/M 100% 覆盖 (per 守门 #9 v27 3 段 fallback verify 阶段)
+- 子代理 2 真实产出验证: `SRS-CANVAS-GAMIFY-001.md` 92,346 bytes / 1,323 行 / 10 段 / 32 FR + 25 NFR + 73 AC + 23 US / 15 张表 W/T/M 100% 覆盖 (per 守门 #9 v27 3 段 fallback verify 阶段)
+- 守门 #1 v19: 0 子代理调用 (实装期), 仅用 task tool 派 2 worker (bg_fc33dfea stop + bg_eb11f9e3 重派 + bg_84cf0613)
+- 守门 #9 #3: 0 子代理调用 (实装期), 不派二级子代理
+- 守门 #9 v19: Mavis 自驱, 拍板后立即执行 (17:08 JST 拍板 → 17:20 JST 落地 ~12 分钟, 17:21 JST 拍板 → 17:28 JST 落地 ~7 分钟)
+- 守门 #10 author = `Ulysses <ulysses@mavis.local>` (per 8/27 19:39 JST 授权 + 守门 #14 v3 Mavis 永久代签)
+- 守门 #11 缺标比错标: AGENT §10 已知缺口 12 个 + GAMIFY 附录 A 已知缺口 12 个 + 总册 §7 R-1~R-12 风险 12 个, 共 36 个已知缺口显式列, 0 隐藏
+- 守门 #13 DB W/T/M: GAMIFY G11.2 15 张表 (Work 6 / Transaction 4 / Master 5) + AGENT A11.5 7 张表 (Master 3 / Transaction 3 / Work 1), 22 张表 100% 覆盖
+- 守门 #14 v3: 5 角色签字栏全 Mavis 接手代签 (修订人 + 审批者 author=Ulysses)
+- 守门 #14 v4: 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses (per 2026-09-10 12:45 JST v0.62 反转)
+- 守门 #23 v2 AI 第三方 API 禁止: GAMIFY G5 sticky note 聚类走 mock 接口, 守门 #23 v2 25 次引用锁 mock 路径, 真实 LLM 留 P2
+
+**§4.26 token OLU 估算 (per 守门 #4 + STAR-OLU-001 v0.1)**:
+- 本次合计 ~0.91M tokens (1 SRE·周 ≈ 1.2M, 在预算内)
+- 后续 P0 阶段 (3 个月内, 31 项 P0) ~3-5M
+- 双核心 70 项 全部落地 (12 个月+) ~12-18M (12-18 SRE·周)
