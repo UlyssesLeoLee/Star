@@ -17,8 +17,9 @@ uuid = { workspace = true }
 star-context = { path = "../star-context" }
 
 [dev-dependencies]
-# v0.66 P0-4 InMemoryAdapterRegistry 测试用 (block_on 同步执行 async fn)
-tokio = { workspace = true, features = ["macros", "rt"] }
+# v0.66 P0-4 InMemoryAdapterRegistry 测试用 (#[tokio::test] async test runner)
+# v0.69 refactor: 加 rt-multi-thread 让 #[tokio::test] 跑 current_thread 默认 runtime (per Finding #3 follow-up)
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 
 [lints]
 workspace = true

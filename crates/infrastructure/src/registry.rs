@@ -189,86 +189,58 @@ mod tests {
         assert_eq!(reg.count(), 0);
     }
 
-    #[test]
-    fn register_postgres_adapter_adds_to_state() {
+    #[tokio::test]
+    async fn register_postgres_adapter_adds_to_state() {
         let reg = InMemoryAdapterRegistry::new();
         let actor = test_actor(Uuid::new_v4());
-        let result = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_postgres_adapter((), actor));
+        let result = reg.register_postgres_adapter((), actor).await;
         assert!(result.is_ok());
         assert_eq!(reg.count(), 1);
         assert_eq!(reg.list_by_kind(AdapterKind::Postgres).len(), 1);
     }
 
-    #[test]
-    fn register_all_5_kinds_works() {
+    #[tokio::test]
+    async fn register_all_5_kinds_works() {
         let reg = InMemoryAdapterRegistry::new();
         let actor = test_actor(Uuid::new_v4());
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_postgres_adapter((), actor.clone()));
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_nats_adapter((), actor.clone()));
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_object_storage_adapter((), actor.clone()));
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_scm_adapter((), actor.clone()));
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_agent_adapter((), actor));
+        let _ = reg.register_postgres_adapter((), actor.clone()).await;
+        let _ = reg.register_nats_adapter((), actor.clone()).await;
+        let _ = reg.register_object_storage_adapter((), actor.clone()).await;
+        let _ = reg.register_scm_adapter((), actor.clone()).await;
+        let _ = reg.register_agent_adapter((), actor).await;
         assert_eq!(reg.count(), 5);
     }
 
-    #[test]
-    fn register_multiple_per_kind_works() {
+    #[tokio::test]
+    async fn register_multiple_per_kind_works() {
         let reg = InMemoryAdapterRegistry::new();
         let actor1 = test_actor(Uuid::new_v4());
         let actor2 = test_actor(Uuid::new_v4());
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_postgres_adapter((), actor1));
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_postgres_adapter((), actor2));
+        let _ = reg.register_postgres_adapter((), actor1).await;
+        let _ = reg.register_postgres_adapter((), actor2).await;
         assert_eq!(reg.list_by_kind(AdapterKind::Postgres).len(), 2);
     }
 
-    #[test]
-    fn list_by_tenant_filters_correctly() {
+    #[tokio::test]
+    async fn list_by_tenant_filters_correctly() {
         let reg = InMemoryAdapterRegistry::new();
         let tenant_a = Uuid::new_v4();
         let tenant_b = Uuid::new_v4();
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_postgres_adapter((), test_actor(tenant_a)));
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_nats_adapter((), test_actor(tenant_a)));
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_postgres_adapter((), test_actor(tenant_b)));
+        let _ = reg.register_postgres_adapter((), test_actor(tenant_a)).await;
+        let _ = reg.register_nats_adapter((), test_actor(tenant_a)).await;
+        let _ = reg.register_postgres_adapter((), test_actor(tenant_b)).await;
         assert_eq!(reg.list_by_tenant(tenant_a).len(), 2);
         assert_eq!(reg.list_by_tenant(tenant_b).len(), 1);
     }
 
-    #[test]
-    fn list_registered_adapters_query_returns_all() {
+    #[tokio::test]
+    async fn list_registered_adapters_query_returns_all() {
         let reg = InMemoryAdapterRegistry::new();
         let actor = test_actor(Uuid::new_v4());
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_postgres_adapter((), actor.clone()));
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_nats_adapter((), actor));
+        let _ = reg.register_postgres_adapter((), actor.clone()).await;
+        let _ = reg.register_nats_adapter((), actor).await;
         let viewer = test_actor(Uuid::new_v4());
-        let result = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.list_registered_adapters((), viewer));
+        let result = reg.list_registered_adapters((), viewer).await;
         assert!(result.is_ok());
         let list = result.unwrap();
         assert_eq!(list.len(), 2);
@@ -283,16 +255,12 @@ mod tests {
         assert_eq!(AdapterKind::Agent.as_str(), "agent");
     }
 
-    #[test]
-    fn descriptor_has_distinct_uuid() {
+    #[tokio::test]
+    async fn descriptor_has_distinct_uuid() {
         let reg = InMemoryAdapterRegistry::new();
         let actor = test_actor(Uuid::new_v4());
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_postgres_adapter((), actor.clone()));
-        let _ = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(reg.register_postgres_adapter((), actor));
+        let _ = reg.register_postgres_adapter((), actor.clone()).await;
+        let _ = reg.register_postgres_adapter((), actor).await;
         let list = reg.list_by_kind(AdapterKind::Postgres);
         assert_ne!(
             list[0].id, list[1].id,
