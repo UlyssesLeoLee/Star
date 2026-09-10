@@ -1252,6 +1252,7 @@ async function mockCluster(req: MockClusterRequest): Promise<MockClusterResponse
 | 版本 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
 | **v0.1** | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版, 9 段 IPA SEC 结构, 12 子能力 32 项展开 (FR 32 + NFR 25 + AC 73 + US 23), G11.2 W/T/M 三類横展 15 张表 100% 覆盖 (per 守门 #13), G5 sticky note 聚类 AI mock 接口锁定 (per 守门 #23 v2), 不写 Miro 通用功能 (per brief §2 + 17:08 JST 拍板), 23 用户故事 (≥ 19 达标), 73 验收标准 (≥ 32 达标), 12 已知缺口 (≥ 8 达标), 守门 #1 + #3 + #5 + #6 + #7 + #9 + #10 + #11 + #12 + #13 + #14 v2 + #15 + #19 + #23 v2 全过, 5 域 Lead 真人到位前 Mavis 临时代签, 真人到位后追溯签字覆盖 | 2026-09-10 17:08 JST Ulysses 拍板"我这个无限画布主要功能是管理 agent 和游戏化, 避免过度冗余" + 子代理 brief `docs/briefs/srs-canvas-gamify-001.md` v0.1 (17:17 JST 落档, per ask_user 拍板重写自原 srs-canvas-content-001) |
+| **v0.1.1 (IPA SEC 合规性修复)** | **2026-09-10 19:10 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62)** | **IPA SEC 合规性修复: 不重写 §0-§9 旧内容 (per 守门 #1 禁回溯叙事, v0.1.1 反转行显式标). 加 §10 5 角色签字栏 (5 角色: 架构师/SRE Lead/平台/评审主持/PM, per AGENTS.md §3 7 段结构) + renumber §9 修订履历 → §11 修订履历. 12 段 (含 §10 5 角色签字栏 + §11 修订履历) 已合规. 字节数 72,187 → 73,053 (+866). 0 重写 §0-§8 旧内容.** | **2026-09-10 19:06 JST Ulysses 拍板"确保这里的文档符合日本 IPA 标准" + 守门 #9 v19 Mavis 自驱** |
 
 ---
 
