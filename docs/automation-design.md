@@ -81,15 +81,15 @@
 
 ### 1.4 守门编号累计表 (per AGENTS.md §4 + brief v0.46, 2026-09-09 21:18 JST Mavis 自驱盘点)
 
-> **盘点状态 (per brief v0.46)**: 现有 26 条 v1-v26 (line 127-154 of AGENTS.md), 编号累计到 v26; 现有 **v25 重号** (line 152 + 153, per守门 #11 缺标比错标) 待 v3x 激活时一并修; v17/v18/v19 文档排序错位 (line 143-145) 不影响验证; brief §2.2 示例候选 v26-v30 跟现有 v26 冲突, 重命名 v27-v31.
+> **盘点状态 (per brief v0.46 + v0.57 拍板)**: 现有 26 条 v1-v26 (line 127-154 of AGENTS.md), 编号累计到 v26; 现有 **v25 重号** (line 152 + 153, per守门 #11 缺标比错标) 待 v3x 激活时一并修; v17/v18/v19 文档排序错位 (line 143-145) 不影响验证; brief §2.2 示例候选 v26-v30 跟现有 v26 冲突, 重命名 v27-v31; **v28 + v29 已 🟢 active (per 9/10 09:30 JST Ulysses 拍板"v29 + v28 先激活 (推荐)")**, **v27 / v30 / v31 仍 🟡 待激活**.
 >
 > **v3x 候选 (5 条, status = 待 Ulysses 拍板激活)**: 跟 AGENTS.md §4.1.1 同源, 跨文档引用一致.
 
 | 编号 | 类别 | 触发事件 | 候选守门内容 (摘要) | 实证 / 触发 commit | 状态 |
 |---|---|---|---|---|---|
 | **v27** | 子代理 RPC 失败 fallback 必填 | 守门 #9 实证 P3-A.6/A.7 (10 background task `net::ERR_CONNECTION_CLOSED` 但 status 报 succeeded) + 守门 #9 v3 调试控制台走 subprocess 替代 RPC | `dispatcher.py invoke` 后 30s 内**必跑** `verify()` 二次验证, 连续 2 次 retry 失败 → 走 root session 直接实装; 适用所有 P3-B-F + H2 + ARG + P0-2/3/4 跨 session 续做项 | 跟守门 #9 #3 + 守门 #9 v20 + 守门 #9 v3 同源 | 🟡 待激活 |
-| **v28** | 拍板必带推荐项格式校验 | 9/8 16:08 JST Ulysses 第 8 次强化"拍板时必带推荐项 (推荐) 标" + 9/1 14:58 JST 守门 "拍板必 ask_user" | 任何 `ask_user` 必含 2-4 选项 + 至少 1 个 `(推荐)` 标, 推荐项放第 1 位; 不满足 = Mavis 终端自动 retry 1 次加推荐项; 落 `scripts/automation/ask_user_validator.py` | 跟 9/1 14:58 + 9/8 16:08 + 9/8 15:29 自驱强化 + 守门 #14 v3 同源 | 🟡 待激活 |
-| **v29** | docs 同步饱和 40+ 次主动告警 | 守门 #12 v15 死循环饱和边界 (per 2026-08-29 22:39 JST `5cfb7b3` 实证饱和点) + 9/9 21:18 JST 已达 docs 同步第 40 次新事件触发 | `automation/docs_sync_saturation.py` 自动计数, 累计 30/40/50 三档 warning + ask_user + error 阻断 commit; 仅记录 docs 同步 commit (per守门 #12 v21 [P] 子项) | 跟守门 #12 + 守门 #12 v15 + 守门 #1 v15 同源 | 🟡 待激活 |
+| **v28** | 拍板必带推荐项格式校验 | 9/8 16:08 JST Ulysses 第 8 次强化"拍板时必带推荐项 (推荐) 标" + 9/1 14:58 JST 守门 "拍板必 ask_user" | 任何 `ask_user` 必含 2-4 选项 + 至少 1 个 `(推荐)` 标, 推荐项放第 1 位; 不满足 = Mavis 终端自动 retry 1 次加推荐项; **🟢 active per v0.57 commit 落地 `scripts/automation/guardian/v28_recommendation.py`** | 跟 9/1 14:58 + 9/8 16:08 + 9/8 15:29 自驱强化 + 守门 #14 v3 同源 | 🟢 **active (per 9/10 09:30 JST 拍板)** |
+| **v29** | docs 同步饱和 40+ 次主动告警 | 守门 #12 v15 死循环饱和边界 (per 2026-08-29 22:39 JST `5cfb7b3` 实证饱和点) + 9/9 21:18 JST 已达 docs 同步第 40 次新事件触发 | `automation/docs_sync_saturation.py` 自动计数, 累计 30/40/50 三档 warning + ask_user + error 阻断 commit; 仅记录 docs 同步 commit (per守门 #12 v21 [P] 子项) | 跟守门 #12 + 守门 #12 v15 + 守门 #1 v15 同源 | 🟢 **active (per 9/10 09:30 JST 拍板)** |
 | **v30** | Mavis 永久代签适用边界 | 9/8 15:19 JST 第 6 次强化 + 9/8 15:29 JST 第 7 次强化 + 9/9 12:02 JST 守门 #14 v3 升级 (WBS v0.22 全部永久代签) | Mavis 永久代签**全部签字栏** (5 域 Lead / SRE Lead / 平台 / 评审主持 / PM + 真人到位相关 + 寻访流程 + DDD Review + 未来新增); 适用边界: 适用 = commit author + 修订人 + 审批 3 列; 不适用 = 方向大转弯 / Ulysses 已答选项 / 真人到位追溯 / host 状态永久改变 | 跟守门 #10 + 守门 #14 v2 + 守门 #14 v3 + 9/8 15:19/15:29/16:08 同源 | 🟡 待激活 |
 | **v31** | 5 域 Lead 真人到位追溯签字机制 | 9/9 12:02 JST 守门 #14 v3 升级 "真人到位流程暂时不追踪" + 9/3 19:35 JST 拍板 D "Mavis 长期代签, 真人到位后追溯签字" 维持 | 启动信号 = Ulysses 发令"5 域 Lead 真人到位流程激活"; 追溯签字形式 = 修订历史表 +1 行覆盖 5 域 Lead 决策行; 不沿用代签决策; 真人 Subagent dispatch brief 边界待 DDD Review 拍板; 落 `docs/recruitment/5-leads-traceback-mechanism.md` v0.1 placeholder | 跟守门 #3 + 守门 #14 v2 + 守门 #14 v3 + 9/9 12:02 JST 政策升级 同源 | 🟡 待激活 |
 
