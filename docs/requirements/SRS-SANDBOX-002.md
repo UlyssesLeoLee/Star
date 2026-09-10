@@ -1,8 +1,8 @@
 # SRS-SANDBOX-002
 
-> **Sandbox-as-a-Service (sandboxd) — 要件定義書 v0.1** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
+> **Sandbox-as-a-Service (sandboxd) — 要件定義書 v0.1.1** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
 >
-> - 状态: 🟡 Draft v0.1 (2026-09-10 JST 初版落档)
+> - 状态: 🟢 Draft v0.1.1 (2026-09-10 21:57 JST 决策点 D-1~D-6 全部已拍板 per Ulysses A 选项)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 上游: `docs/architecture/SANDBOX-001.md` v0.2 (子代理 subprocess 沙箱, 仅资源维隔离)
 > - 关联 commit: (留空, root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
@@ -26,7 +26,7 @@
 |---|---|
 | 文書 ID | SRS-SANDBOX-002 |
 | 文書名 | Sandbox-as-a-Service (sandboxd) — 要件定義書 |
-| バージョン | v0.1 (初版) |
+| バージョン | v0.1.1 (决策点 D-1~D-6 已拍板) |
 | 作成日 | 2026-09-10 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
@@ -36,7 +36,7 @@
 | 関連 commit | (root 统一 commit 时填, per 守门 #1 v15) |
 | 上位文書 | `docs/architecture/SANDBOX-001.md` v0.2 (派生) + `AGENTS.md` §4 守门硬约束 (守门 #1+#5+#9+#11+#13+#14 v3+#22+#28) |
 | 関連文書 | `docs/architecture/SANDBOX-001.md` v0.2 + `docs/basic-design/SANDBOX-BASIC-DESIGN-002.md` v0.1 (同期落档) + `docs/automation-design.md` v0.1 + `scripts/automation/guardian/sandbox.py` v0.2 (现役, 沙箱 v0.2 包装器) + `scripts/automation/dispatcher.py` v0.1 (现役, 子代理 invoke) + `crates/star-mcp/` (现役, MCP transport) |
-| 機能数 | 8 機能 (FR-1 ~ FR-8), 業務要件 5 (BR-1 ~ BR-5), 非機能要件 7 類 (NFR-P/A/S/M/T/O/C) 29 项, 受理条件 8 (AC-1 ~ AC-8) |
+| 機能数 | 8 機能 (FR-1 ~ FR-8), 業務要件 5 (BR-1 ~ BR-5), 非機能要件 7 類 (NFR-P/A/S/M/T/O/C) 29 项, 受理条件 8 (AC-1 ~ AC-8), 决策点 6 (D-1~D-6 全部已拍板 per Ulysses A 选项 2026-09-10 21:57 JST) |
 | データモデル | 4 表 W/T/M 横展 (Session / Policy / Audit / Capability, 100% 覆盖 per 守门 #13) |
 
 ### 0.2 修订履歴
@@ -560,14 +560,14 @@ sandboxd v0.1 在 Windows + Linux + macOS 三平台落地, 跟 SANDBOX-001 v0.2 
 
 | ID | 决策点 | 推荐项 (per 守门 v28) | 备选 1 | 备选 2 | 状态 |
 |---|---|---|---|---|---|
-| **D-1** | 形态 | **(推荐) 长期 daemon** | per-task ephemeral | library 嵌入 | 🟡 默认推荐, 待拍板 |
-| **D-2** | IPC 协议 | **(推荐) gRPC** | stdio JSON-RPC | named pipe / Unix socket | 🟡 默认推荐, 待拍板 |
-| **D-3** | 网络隔离深度 | **(推荐) allowlist** (子代理常要 git/cargo/crates.io) | 全阻断 (强隔离) | 透传 + 审计 (弱隔离) | 🟡 默认推荐, 待拍板 |
-| **D-4** | FS 隔离深度 | **(推荐) path allowlist** (子代理需要 read worktree + 写 cache) | AppContainer / mount ns 真正隔离 (强) | 只读 overlay (弱) | 🟡 默认推荐, 待拍板 |
-| **D-5** | 跟 mavis desktop 集成 | **(推荐) 独立 System Service** (跟 5 域 Lead 决策/代签解耦) | sandboxd 跑在 mavis 里 (耦合) | 双形态 (复杂) | 🟡 默认推荐, 待拍板 |
-| **D-6** | 观测性 | **(推荐) 两者都上** (Prometheus + PG audit log, 跟守门 v36 索引联动) | 仅 Prometheus | 仅 audit log | 🟡 默认推荐, 待拍板 |
+| **D-1** | 形态 | ✅ **(已拍板 2026-09-10 21:57 JST per Ulysses A 选项) 长期 daemon** | per-task ephemeral | library 嵌入 | 🟢 已拍板 |
+| **D-2** | IPC 协议 | ✅ **(已拍板 2026-09-10 21:57 JST per Ulysses A 选项) gRPC** | stdio JSON-RPC | named pipe / Unix socket | 🟢 已拍板 |
+| **D-3** | 网络隔离深度 | ✅ **(已拍板 2026-09-10 21:57 JST per Ulysses A 选项) allowlist** (子代理常要 git/cargo/crates.io) | 全阻断 (强隔离) | 透传 + 审计 (弱隔离) | 🟢 已拍板 |
+| **D-4** | FS 隔离深度 | ✅ **(已拍板 2026-09-10 21:57 JST per Ulysses A 选项) path allowlist** (子代理需要 read worktree + 写 cache) | AppContainer / mount ns 真正隔离 (强) | 只读 overlay (弱) | 🟢 已拍板 |
+| **D-5** | 跟 mavis desktop 集成 | ✅ **(已拍板 2026-09-10 21:57 JST per Ulysses A 选项) 独立 System Service** (跟 5 域 Lead 决策/代签解耦) | sandboxd 跑在 mavis 里 (耦合) | 双形态 (复杂) | 🟢 已拍板 |
+| **D-6** | 观测性 | ✅ **(已拍板 2026-09-10 21:57 JST per Ulysses A 选项) 两者都上** (Prometheus + PG audit log, 跟守门 v36 索引联动) | 仅 Prometheus | 仅 audit log | 🟢 已拍板 |
 
-**拍板格式** (per 守门 v28): 选 (1) (2) (3) 任何 + 标反转项即可, Mavis 立即更新文档 + 同步基本设计。
+**拍板格式** (per 守门 v28): 选 (1) (2) (3) 任何 + 标反转项即可, Mavis 立即更新文档 + 同步基本设计。**A 选项 = 全部用推荐, 已落档 v0.1.1 (per 2026-09-10 21:57 JST)**。
 
 ---
 
@@ -590,3 +590,4 @@ sandboxd v0.1 在 Windows + Linux + macOS 三平台落地, 跟 SANDBOX-001 v0.2 
 | バージョン | 日付 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | **v0.1** | 2026-09-10 21:49 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | 初版落档, 8 機能 (FR-1~FR-8, 24 项) + 5 業務要件 (BR-1~BR-5) + 7 非機能要件 (NFR-P/A/S/M/T/O/C 29 项) + 8 验收条件 (AC-1~AC-8) + 4 表 W/T/M 横展 (Session T + Policy M + Audit T + Capability M, 100% 覆盖 per 守门 #13) + 9 已知缺口 (含 1 P0 阻塞 sandboxd ↔ client 集成) + 6 决策点 (D-1 形态 / D-2 IPC / D-3 网络 / D-4 FS / D-5 集成 / D-6 观测), IPA 12 段结构 (目的 / 範囲 / 用語 / 業務 / 機能 / 非機能 / 制約 / 验收 / 数据 / 缺口 / 决策 / 签字 + 修订), 守门 10/10 通过 | 2026-09-10 21:48 JST Ulysses 拍板"agent 的沙盒设计到位了吗？没有的话，我希望沙盒组建是一个 app 形式的独立模块" + 21:49 JST "先把需求文档和基本设计改好" + SANDBOX-001 v0.2 派生 4 缺口 (#1 network / #2 fs / #5 observability / #6 elevated) 升级为独立 app 形态 |
+| **v0.1.1** | 2026-09-10 21:57 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 + 守门 v28 拍板必带推荐项 + 9/5 04:03 拍板后立即执行) | 6 决策点 D-1~D-6 全部用推荐项 (per Ulysses A 选项), status 字段 6/6 由 "🟡 默认推荐, 待拍板" → "🟢 已拍板", 推荐项加 "✅ (已拍板 2026-09-10 21:57 JST per Ulysses A 选项)" 前缀, 拍板格式说明追加 "A 选项 = 全部用推荐, 已落档 v0.1.1"; 守门 12/12 通过, 0 改任何业务 logic, 0 改任何功能/数据/缺口定义, 仅决策点状态 + 修订历史 v0.1.1 行; 触发: 2026-09-10 21:57 JST Ulysses reply "a" (= 选项 A 全部用推荐) |
