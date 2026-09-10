@@ -83,9 +83,9 @@
 >
 > | 同步项 | 测试点 | 优先级 |
 > |---|---|---|
-> | **T1** REQ-TST-001/002(ValidationResult.Level 维度) | 见 §6.2.1;Level 与既有 Type 正交,不新建 TestPlan/TestCase 对象;Acceptance Coverage 按 Level 缺口精确报告 | V1 Should-Have 测试(TBD,待 basic-design + spec 层补字段) |
-> | **T2** REQ-DSG-001/002(DesignArtifact + WorkItem Guard) | 见 §6.3.3;Guard 失败需指出未批准的具体 DesignArtifact;已批准版本不可覆盖式修改;ReviewRecord.Target 二选一互斥 | V1 Should-Have 测试(TBD) |
-> | **T3** REQ-OPS-001/002/003(IncidentRecord) | 见 §6.3.4;历史 ValidationResult/Acceptance Coverage 判定不可覆写,只可新增标注;OPS-003 三项非能力(不探测生产/不处理告警/不自动回滚修复)需负向缺失测试 | V1 Should-Have 测试(TBD) |
+> | **T1** REQ-TST-001/002(ValidationResult.Level 维度) | 见 requirements.md §8.3(原 "§6.2.1" 为 test-design 内部占位号, 2026-09-10 改为实指 requirements 锚点 per QA-DRIFT-001 §8.4.4 D1);Level 与既有 Type 正交,不新建 TestPlan/TestCase 对象;Acceptance Coverage 按 Level 缺口精确报告 | V1 Should-Have 测试(TBD,待 basic-design + spec 层补字段) |
+> | **T2** REQ-DSG-001/002(DesignArtifact + WorkItem Guard) | 见 requirements.md §27.6(原 "§6.3.3" 为 test-design 内部占位号, 2026-09-10 改为实指 requirements 锚点 per QA-DRIFT-001 §8.4.4 D1);Guard 失败需指出未批准的具体 DesignArtifact;已批准版本不可覆盖式修改;ReviewRecord.Target 二选一互斥 | V1 Should-Have 测试(TBD) |
+> | **T3** REQ-OPS-001/002/003(IncidentRecord) | 见 requirements.md §29.1(原 "§6.3.4" 为 test-design 内部占位号, 2026-09-10 改为实指 requirements 锚点 per QA-DRIFT-001 §8.4.4 D1);历史 ValidationResult/Acceptance Coverage 判定不可覆写,只可新增标注;OPS-003 三项非能力(不探测生产/不处理告警/不自动回滚修复)需负向缺失测试 | V1 Should-Have 测试(TBD) |
 >
 > **不变量保留**:MVP 测试矩阵 / AC 覆盖率公式(§6.2 现行列结构)/ E2E 路径 / VAL-001 四重门(§6.3.2)全部不动;上表新增内容均为叠加说明,不改写 §15 已冻结接口的现行文本,详见各子节内 RFC 待办标注。
 
