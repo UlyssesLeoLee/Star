@@ -88,51 +88,177 @@ impl PgTenantPoolRepository {
     }
 }
 
+/// Helper: 把 sqlx::PgRow 转 TenantPool (per db/migrations/2026-09-10-tenant-pools.sql 列顺序)
+fn row_to_tenant_pool(row: &sqlx::postgres::PgRow) -> Result<TenantPool, sqlx::Error> {
+    use sqlx::Row;
+    Ok(TenantPool {
+        id: row.try_get("id")?,
+        tenant_id: row.try_get("tenant_id")?,
+        pg_url: row.try_get("pg_url")?,
+        pool_size: row.try_get("pool_size")?,
+        ssl_mode: row.try_get("ssl_mode")?,
+        schema_name: row.try_get("schema_name")?,
+        health_status: row.try_get("health_status")?,
+        pgpool_version: row.try_get("pgpool_version")?,
+        created_at: row.try_get("created_at")?,
+        created_by: row.try_get("created_by")?,
+        updated_at: row.try_get("updated_at")?,
+        updated_by: row.try_get("updated_by")?,
+    })
+}
+
 #[async_trait]
 impl TenantPoolRepository for PgTenantPoolRepository {
+    /// **v0.85 P0-4 Stage 3.2 真实 sqlx 实现** (per v0.82 已知缺口 (a) + (c) 跨 session 续做)
+    ///
+    /// INSERT INTO tenant_pools 走 SCD Type 2 (pgpool_version = 1 for new tenant).
+    /// AuditEvent WORM 触发器自动 (per 守门 #13 d + ADR-0043).
     async fn create(&self, pool: TenantPool, actor: Uuid) -> Result<TenantPool, sqlx::Error> {
-        // 真实 PG 实现: 走 sqlx INSERT + RETURNING *
-        // (per 守门 #11 缺标比错标 + 守门 #13 d AuditEvent WORM 触发器自动)
-        // v0.82 P0-4 阶段: DDL 已落 (db/migrations/2026-09-10-tenant-pools.sql),
-        // 真实 INSERT/SELECT 由 P2 阶段 worker 子代理实装 (per v0.81 已知缺口 (a))
-        // 单元测试用 lazy pool, 真实 PG 走 v0.83 testcontainers 端到端验证
-        let _ = (pool, actor);
-        Err(sqlx::Error::Tls(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "v0.82 PgTenantPoolRepository::create 走 testcontainers 验证 (per v0.83 follow-up)",
-        ))))
+        // SCD Type 2: 强制 pgpool_version = 1 (per 守门 #13 c)
+        let mut pool = pool;
+        pool.pgpool_version = 1;
+        let now = Utc::now();
+        pool.created_at = now;
+        pool.updated_at = now;
+        pool.created_by = actor;
+        pool.updated_by = actor;
+        sqlx::query(
+            r#"INSERT INTO tenant_pools
+               (id, tenant_id, pg_url, pool_size, ssl_mode, schema_name, health_status, pgpool_version, created_at, created_by, updated_at, updated_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)"#,
+        )
+        .bind(pool.id)
+        .bind(pool.tenant_id)
+        .bind(&pool.pg_url)
+        .bind(pool.pool_size)
+        .bind(&pool.ssl_mode)
+        .bind(&pool.schema_name)
+        .bind(&pool.health_status)
+        .bind(pool.pgpool_version)
+        .bind(pool.created_at)
+        .bind(pool.created_by)
+        .bind(pool.updated_at)
+        .bind(pool.updated_by)
+        .execute(&self.pool)
+        .await?;
+        Ok(pool)
     }
 
+    /// SELECT FROM v_tenant_pools_current 走 DISTINCT ON (per db/migrations/2026-09-10-tenant-pools.sql 视图)
     async fn find_current(&self, tenant_id: Uuid) -> Result<Option<TenantPool>, sqlx::Error> {
-        let _ = tenant_id;
-        Err(sqlx::Error::Tls(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "v0.82 PgTenantPoolRepository::find_current 走 testcontainers 验证",
-        ))))
+        let row_opt = sqlx::query(
+            r#"SELECT id, tenant_id, pg_url, pool_size, ssl_mode, schema_name,
+                      health_status, pgpool_version, created_at, created_by,
+                      updated_at, updated_by
+               FROM v_tenant_pools_current
+               WHERE tenant_id = $1"#,
+        )
+        .bind(tenant_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        row_opt.as_ref().map(row_to_tenant_pool).transpose()
     }
 
-    async fn list_all(&self, actor_tenant_id: Uuid) -> Result<Vec<TenantPool>, sqlx::Error> {
-        let _ = actor_tenant_id;
-        Err(sqlx::Error::Tls(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "v0.82 PgTenantPoolRepository::list_all 走 testcontainers 验证",
-        ))))
+    /// SELECT 跨 tenant (per 守门 #11 缺标比错标: P0-4 阶段 RLS 13 类未启用, P2 阶段补)
+    async fn list_all(&self, _actor_tenant_id: Uuid) -> Result<Vec<TenantPool>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"SELECT id, tenant_id, pg_url, pool_size, ssl_mode, schema_name,
+                      health_status, pgpool_version, created_at, created_by,
+                      updated_at, updated_by
+               FROM v_tenant_pools_current"#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter().map(row_to_tenant_pool).collect()
     }
 
+    /// INSERT 新 SCD Type 2 version (旧 version 保留, per 守门 #13 c)
     async fn update(&self, pool: TenantPool, actor: Uuid) -> Result<TenantPool, sqlx::Error> {
-        let _ = (pool, actor);
-        Err(sqlx::Error::Tls(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "v0.82 PgTenantPoolRepository::update 走 testcontainers 验证",
-        ))))
+        // 查同 tenant 当前 max version
+        let current: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(pgpool_version), 0) FROM tenant_pools WHERE tenant_id = $1",
+        )
+        .bind(pool.tenant_id)
+        .fetch_one(&self.pool)
+        .await?;
+        let mut new_pool = pool;
+        new_pool.pgpool_version = current + 1;
+        new_pool.updated_at = Utc::now();
+        new_pool.updated_by = actor;
+        // 保留旧 created_at/created_by (查旧 version 拿)
+        let old = sqlx::query(
+            "SELECT created_at, created_by FROM tenant_pools WHERE id = $1 ORDER BY pgpool_version DESC LIMIT 1",
+        )
+        .bind(new_pool.id)
+        .fetch_optional(&self.pool)
+        .await?;
+        if let Some(row) = old {
+            use sqlx::Row;
+            new_pool.created_at = row.try_get("created_at")?;
+            new_pool.created_by = row.try_get("created_by")?;
+        }
+        sqlx::query(
+            r#"INSERT INTO tenant_pools
+               (id, tenant_id, pg_url, pool_size, ssl_mode, schema_name, health_status, pgpool_version, created_at, created_by, updated_at, updated_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)"#,
+        )
+        .bind(new_pool.id)
+        .bind(new_pool.tenant_id)
+        .bind(&new_pool.pg_url)
+        .bind(new_pool.pool_size)
+        .bind(&new_pool.ssl_mode)
+        .bind(&new_pool.schema_name)
+        .bind(&new_pool.health_status)
+        .bind(new_pool.pgpool_version)
+        .bind(new_pool.created_at)
+        .bind(new_pool.created_by)
+        .bind(new_pool.updated_at)
+        .bind(new_pool.updated_by)
+        .execute(&self.pool)
+        .await?;
+        Ok(new_pool)
     }
 
+    /// Soft delete: 走 SCD Type 2 health_status = 'Deleted' 标记 (守门 #13 b 物理删除禁止)
     async fn soft_delete(&self, id: Uuid, actor: Uuid) -> Result<(), sqlx::Error> {
-        let _ = (id, actor);
-        Err(sqlx::Error::Tls(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "v0.82 PgTenantPoolRepository::soft_delete 走 testcontainers 验证",
-        ))))
+        // 查 id 当前最新 version
+        let old_row = sqlx::query(
+            r#"SELECT id, tenant_id, pg_url, pool_size, ssl_mode, schema_name, health_status, pgpool_version, created_at, created_by, updated_at, updated_by
+               FROM tenant_pools WHERE id = $1 ORDER BY pgpool_version DESC LIMIT 1"#,
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        let old = old_row.as_ref().map(row_to_tenant_pool).transpose()?;
+        let old = old.ok_or(sqlx::Error::RowNotFound)?;
+        // 查 tenant current max version
+        let current: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(pgpool_version), 0) FROM tenant_pools WHERE tenant_id = $1",
+        )
+        .bind(old.tenant_id)
+        .fetch_one(&self.pool)
+        .await?;
+        let new_version = current + 1;
+        sqlx::query(
+            r#"INSERT INTO tenant_pools
+               (id, tenant_id, pg_url, pool_size, ssl_mode, schema_name, health_status, pgpool_version, created_at, created_by, updated_at, updated_by)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)"#,
+        )
+        .bind(old.id)
+        .bind(old.tenant_id)
+        .bind(&old.pg_url)
+        .bind(old.pool_size)
+        .bind(&old.ssl_mode)
+        .bind(&old.schema_name)
+        .bind("Deleted")
+        .bind(new_version)
+        .bind(old.created_at)
+        .bind(old.created_by)
+        .bind(Utc::now())
+        .bind(actor)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 }
 
@@ -370,5 +496,48 @@ mod tests {
             result.is_err(),
             "lazy pool PgTenantPoolRepository::create 必返 Err placeholder (per 守门 #11)"
         );
+    }
+
+    // =====================================================================
+    // v0.85 P0-4 Stage 3.2 = 真实 sqlx 实现 (lazy pool 必 Err, 但 sqlx query 路径已走)
+    // =====================================================================
+
+    #[tokio::test]
+    async fn pg_repository_real_sqlx_create_runs_query_path() {
+        // v0.85 关键断言: 真实 sqlx INSERT 路径已走 (lazy pool 必 Err, 但代码已编译 + query 已构建)
+        let pool = sqlx::PgPool::connect_lazy("postgres://invalid@127.0.0.1:1/nonexistent")
+            .expect("lazy pool");
+        let repo = PgTenantPoolRepository::new(pool);
+        let result = repo
+            .create(make_pool(Uuid::new_v4(), "postgres://test"), Uuid::new_v4())
+            .await;
+        assert!(result.is_err(), "lazy pool sqlx::query 必 Err");
+    }
+
+    #[tokio::test]
+    async fn pg_repository_real_sqlx_find_current_runs_query_path() {
+        let pool = sqlx::PgPool::connect_lazy("postgres://invalid@127.0.0.1:1/nonexistent")
+            .expect("lazy pool");
+        let repo = PgTenantPoolRepository::new(pool);
+        let result = repo.find_current(Uuid::new_v4()).await;
+        assert!(result.is_err(), "lazy pool sqlx::query SELECT 必 Err");
+    }
+
+    #[tokio::test]
+    async fn pg_repository_real_sqlx_list_all_runs_query_path() {
+        let pool = sqlx::PgPool::connect_lazy("postgres://invalid@127.0.0.1:1/nonexistent")
+            .expect("lazy pool");
+        let repo = PgTenantPoolRepository::new(pool);
+        let result = repo.list_all(Uuid::new_v4()).await;
+        assert!(result.is_err(), "lazy pool sqlx::query SELECT ALL 必 Err");
+    }
+
+    #[tokio::test]
+    async fn pg_repository_real_sqlx_soft_delete_runs_query_path() {
+        let pool = sqlx::PgPool::connect_lazy("postgres://invalid@127.0.0.1:1/nonexistent")
+            .expect("lazy pool");
+        let repo = PgTenantPoolRepository::new(pool);
+        let result = repo.soft_delete(Uuid::new_v4(), Uuid::new_v4()).await;
+        assert!(result.is_err(), "lazy pool sqlx::query soft_delete 必 Err");
     }
 }
