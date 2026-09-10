@@ -26,6 +26,19 @@ domain-worktree = { path = "../domain-worktree" }
 domain-search = { path = "../domain-search" }
 domain-scm = { path = "../domain-scm" }
 domain-validation = { path = "../domain-validation" }
+# v0.63 P0-3 Stage 1 (per WBS §14.15): 11 域 From<DomainError> for ApplicationError 映射
+# 跟 P0-2 star-api-rest (v0.58 + v0.59 + v0.60 17 域) 对称
+domain-feedback = { path = "../domain-feedback" }
+domain-integration = { path = "../domain-integration" }
+domain-comment = { path = "../domain-comment" }
+domain-batch = { path = "../domain-batch" }
+domain-theme = { path = "../domain-theme" }
+domain-agent = { path = "../domain-agent" }
+domain-cli = { path = "../domain-cli" }
+domain-tenant = { path = "../domain-tenant" }
+domain-identity = { path = "../domain-identity" }
+domain-permission = { path = "../domain-permission" }
+domain-project = { path = "../domain-project" }
 # P0-4: infrastructure adapter 错误映射 (per WBS §14.15 P0-4 收官, 跟 P0-2/3 同模式)
 infrastructure = { path = "../infrastructure" }
 [lints]
