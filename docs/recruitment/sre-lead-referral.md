@@ -1,6 +1,7 @@
 # SRE Lead 真人内推 Brief v0.1 (per 9/7 20:25 JST P0 依赖真人拍板 启动)
 
 > **状态**: 🟢 Active v0.1 (2026-09-07 20:25 JST 拍板落地)
+> **v0.63 反转 (per 2026-09-10 20:14 JST)**: 寻访流程全部 obsolete, Mavis 永久代签 5 域 Lead / SRE Lead / 平台 / 评审 / PM 决策, 真人到位追溯分支永久作废 (Ulysses 发令 真人寻访这个流程不要了, 跟 v0.62 反转方向一致更彻底, per 守门 #14 v3 + v0.63 升级)
 > **触发**: per 9/7 20:25 JST 用户拍板 (d) 3 群组全部并行启动 (推荐项, 5 域 + SRE + DDD Review Lead)
 > **守门依据**: 守门 #3 v2 (5 域 Lead 拒绝兼任 → 扩到 SRE Lead 独立) + 守门 #14 (CONTENT 4 维) + 守门 #10 (代签 author=Ulysses)
 > **关联 commit**: 见 `git log -p --follow docs/recruitment/sre-lead-referral.md` (per 守门 #12 不写死 SHA, 用 path 稳定标识)

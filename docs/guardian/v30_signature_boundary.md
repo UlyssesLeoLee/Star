@@ -1,8 +1,9 @@
 # v30 Mavis 永久代签适用边界 (per 守门 #14 v3 升级, 9/8 15:19 + 15:29 + 9/9 12:02)
 
 > **Status**: 🟡 **v0.62 反转: 政策已取消, 详见 v32 Mavis 审核决定 author=Ulysses** (per 2026-09-10 12:45 JST Ulysses 发令"真人代签流程全部取消, 改为 mavis 审核" + 守门 #14 v4 反转升级)
+> **v0.63 反转 (per 2026-09-10 20:14 JST)**: 真人寻访流程也全部取消 (Ulysses 发令"真人寻访这个流程不要了"), Mavis 永久代签 (无追溯分支, 5 域 Lead / SRE Lead / 平台 / 评审 / PM 全部), 详见 docs/recruitment 全部 obsolete 标
 > **Created**: 2026-09-10
-> **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (历史, v0.62 反转后)
+> **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (历史, v0.62 + v0.63 反转后)
 > **commit**: v0.61 落档 → v0.62 显式反转 (per 守门 #12 v15 docs 同步饱和第 51 次新事件触发 仍允许)
 
 ---

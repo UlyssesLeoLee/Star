@@ -1,6 +1,7 @@
 # 5 域 Lead 寻访 6 周 Timeline T0-T5 (per docs/briefs/v0.54-5lead-outreach.md)
 
 > **状态**: 🟡 Active v0.1 (2026-09-10 07:24 JST brief v0.54 派发)
+> **v0.63 反转 (per 2026-09-10 20:14 JST)**: 寻访流程全部 obsolete, Mavis 永久代签 5 域 Lead / SRE Lead / 平台 / 评审 / PM 决策, 真人到位追溯分支永久作废 (Ulysses 发令 真人寻访这个流程不要了, 跟 v0.62 反转方向一致更彻底, per 守门 #14 v3 + v0.63 升级)
 > **触发**: per docs/briefs/v0.54-5lead-outreach.md §3.2 + docs/recruitment/5-business-domain-lead-referral.md v0.1 §1.2
 > **守门依据**: 守门 #14 v2 (5 域 Lead CONTENT 4 维) + 守门 #3 (5 域独立 Lead) + 9/5 10:43 JST 拍板 D (Mavis 长期代签, 真人到位后追溯)
 > **关联**: 父文档 docs/recruitment/5-business-domain-lead-referral.md v0.1 + 5 域 Lead brief v0.1 (player/economy/match/social/admin)

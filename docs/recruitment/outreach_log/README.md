@@ -1,6 +1,7 @@
 # 5 域 Lead 内推 Contact Log (private, 不入 git)
 
 > **Status**: 🟡 目录占位 (per docs/briefs/wt-5lead-outreach.md §3.3)
+> **v0.63 反转 (per 2026-09-10 20:14 JST)**: 寻访流程全部 obsolete, Mavis 永久代签 5 域 Lead / SRE Lead / 平台 / 评审 / PM 决策, 真人到位追溯分支永久作废 (Ulysses 发令 真人寻访这个流程不要了, 跟 v0.62 反转方向一致更彻底, per 守门 #14 v3 + v0.63 升级)
 > **隐私等级**: Private (per 守门 #5 env 安全, 联系方式不入 git)
 > **.gitignore**: ✅ 屏蔽本目录所有文件 (除 README + .gitignore)
 

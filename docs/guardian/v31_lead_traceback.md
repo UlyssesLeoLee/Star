@@ -1,6 +1,7 @@
 # v31 5 域 Lead 真人到位追溯签字机制 (per 守门 #14 v2 拍板 D 维持, 9/9 12:02 升级)
 
 > **Status**: 🟡 **v0.62 反转: 政策已取消, 5 域 Lead 真人到位流程 全部作废, 详见 v32 Mavis 审核决定 author=Ulysses** (per 2026-09-10 12:45 JST Ulysses 发令"真人代签流程全部取消, 改为 mavis 审核" + 守门 #14 v4 反转升级)
+> **v0.63 反转 (per 2026-09-10 20:14 JST)**: 真人寻访流程也全部取消, 5 域 Lead 真人到位追溯分支永久 obsolete, 详见 docs/recruitment 全部 obsolete 标
 > **Created**: 2026-09-10
 > **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (历史, v0.62 反转后)
 > **commit**: v0.61 落档 → v0.62 显式反转 (per 守门 #12 v15 docs 同步饱和第 51 次新事件触发 仍允许)

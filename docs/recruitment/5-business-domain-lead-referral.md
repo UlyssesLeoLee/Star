@@ -1,6 +1,7 @@
 # 5 域 Lead 真人 Ulysses 内推 Brief v0.3 (v0.62 反转: 真人代签流程全部取消, 改为 mavis 审核, 本 brief 仍保留作为参考但不强制)
 
 > **状态**: 🟡 **v0.62 反转: 真人代签流程全部取消, 改为 mavis 审核** (per 2026-09-10 12:45 JST Ulysses 发令 + 守门 #14 v4 反转升级)
+> **v0.63 反转 (per 2026-09-10 20:14 JST)**: **寻访流程全部 obsolete, Mavis 永久代签, 5 域 Lead 决策无真人到位追溯分支** (Ulysses 发令"真人寻访这个流程不要了", 跟 v0.62 反转方向一致更彻底)
 > **触发**: per 9/5 10:43 JST `ask_409cbd32edc309d71a083e2a` 用户拍板 (Q1=内推, Q2=立即启动, 推荐项) → v0.62 反转
 > **守门依据**: 守门 #3 (5 域独立 Lead, 不接受兼任) + 守门 #14 (5 域 Lead CONTENT 4 维) + 守门 #10 (author=Ulysses) — **v0.62 反转后**: 守门 #14 v4 升级, 真人代签 取消, 改为 mavis 审核 (per 守门 #32 候选)
 > **关联 commit**: 见 `git log -p --follow docs/recruitment/5-business-domain-lead-referral.md` (per 守门 #12 不写死 SHA, 用 path 稳定标识)

@@ -1,6 +1,7 @@
 # 5 域 Lead 寻访状态: admin (管理域)
 
 > **域**: admin (管理域 5 域 RACI + 评审主持 Lead)
+> **v0.63 反转 (per 2026-09-10 20:14 JST)**: 寻访流程全部 obsolete, Mavis 永久代签 5 域 Lead / SRE Lead / 平台 / 评审 / PM 决策, 真人到位追溯分支永久作废 (Ulysses 发令 真人寻访这个流程不要了, 跟 v0.62 反转方向一致更彻底, per 守门 #14 v3 + v0.63 升级)
 > **关键职责**: 管理域 5 域 RACI + 评审主持 Lead
 > **token-OLU 估**: ~2 SRE·周 (~2.4M tokens)
 > **timeline**: T2-T4 (最后启动, 期望 3-4 周到位)
