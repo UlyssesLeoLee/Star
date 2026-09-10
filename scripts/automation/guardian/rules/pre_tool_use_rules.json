@@ -1,0 +1,125 @@
+{
+  "schema_version": "1.0",
+  "rules": [
+    {
+      "id": "R-BLOCK-001",
+      "name": "rm -rf 命中危险目录",
+      "level": "BLOCK",
+      "tool_class": "bash",
+      "pattern": "rm\\s+(-[a-z]*f[a-z]*\\s+)*(-[a-z]*r[a-z]*\\s+)*(/|~|\\$HOME|\\$\\{?HOME\\}?)",
+      "reason": "rm -rf 不可逆, 命中 / ~ $HOME 即阻断"
+    },
+    {
+      "id": "R-BLOCK-002",
+      "name": "dd if= 无 of= 限速",
+      "level": "BLOCK",
+      "tool_class": "bash",
+      "pattern": "dd\\s+.*of=/dev/(sd|nvme|hd)",
+      "reason": "dd 写入 /dev 设备, 不可逆"
+    },
+    {
+      "id": "R-BLOCK-003",
+      "name": "mkfs / fdisk",
+      "level": "BLOCK",
+      "tool_class": "bash",
+      "pattern": "(mkfs(\\.[a-z0-9]+)?\\s+|fdisk\\s+).*/dev/",
+      "reason": "mkfs / fdisk 格式化磁盘, 不可逆"
+    },
+    {
+      "id": "R-BLOCK-004",
+      "name": "chmod 777 根目录",
+      "level": "BLOCK",
+      "tool_class": "bash",
+      "pattern": "chmod\\s+[0-7]*7[0-7]+\\s+/",
+      "reason": "chmod 777 根目录, 严重安全风险"
+    },
+    {
+      "id": "R-BLOCK-005",
+      "name": "写 /etc /boot /sys /proc",
+      "level": "BLOCK",
+      "tool_class": "bash",
+      "pattern": ">\\s*/(etc|boot|sys|proc)/",
+      "reason": "重定向写入系统关键目录, 不可逆"
+    },
+    {
+      "id": "R-BLOCK-006",
+      "name": "打印 env 内容 (守门 #5)",
+      "level": "BLOCK",
+      "tool_class": "bash",
+      "pattern": "(Get-ChildItem\\s+env:|env(\\s|$)|printenv|set(\\s|$)).*\\|",
+      "reason": "env 内容可能含 secret, 禁止打印 (per 守门 #5)"
+    },
+    {
+      "id": "R-BLOCK-007",
+      "name": "GitHub PAT / OpenAI key 出现在参数",
+      "level": "BLOCK",
+      "tool_class": "bash",
+      "pattern": "(ghp_|gho_|ghs_|github_pat_|xox[abp]-|sk-[a-zA-Z0-9]{20,})",
+      "reason": "凭据出现在参数, 禁止 (per 守门 #5 扩展)"
+    },
+    {
+      "id": "R-BLOCK-008",
+      "name": "SSH 私钥读取",
+      "level": "BLOCK",
+      "tool_class": "bash",
+      "pattern": "cat\\s+.*(id_rsa|id_dsa|id_ed25519|id_ecdsa|.*_rsa|.*_ed25519|.*_dsa|.*_ecdsa|host_.*_key|backup_rsa)",
+      "reason": "SSH 私钥读取, 严重凭据泄露风险"
+    },
+    {
+      "id": "R-ASK-001",
+      "name": "curl | bash / wget | sh",
+      "level": "ASK",
+      "tool_class": "bash",
+      "pattern": "(curl|wget)\\s+.*(\\||&&)\\s*(bash|sh|zsh)\\b",
+      "reason": "远程脚本直接执行, 不可逆且供应链风险"
+    },
+    {
+      "id": "R-ASK-002",
+      "name": "sudo 任意调用",
+      "level": "ASK",
+      "tool_class": "bash",
+      "pattern": "^(sudo|sudoedit)\\s+",
+      "reason": "sudo 提权, 需要用户确认"
+    },
+    {
+      "id": "R-ASK-003",
+      "name": "git push --force",
+      "level": "ASK",
+      "tool_class": "bash",
+      "pattern": "git\\s+push\\s+.*(-f|--force)",
+      "reason": "force push 覆盖远程历史, 不可逆"
+    },
+    {
+      "id": "R-ASK-004",
+      "name": "写 ~/.ssh/ 下文件",
+      "level": "ASK",
+      "tool_class": "write",
+      "pattern": ".*\\.ssh/.*",
+      "reason": "写 SSH 目录, 需要用户确认"
+    },
+    {
+      "id": "R-ASK-005",
+      "name": "改 ~/.gitconfig 全局",
+      "level": "ASK",
+      "tool_class": "write",
+      "pattern": "gitconfig",
+      "reason": "改全局 git 配置, 影响所有仓库"
+    },
+    {
+      "id": "R-WARN-001",
+      "name": "cat | > /dev/null (静默丢弃)",
+      "level": "WARN",
+      "tool_class": "bash",
+      "pattern": "cat\\s+.*\\|\\s*.*>\\s*/dev/null",
+      "reason": "可能静默丢弃输出, 难以排查"
+    },
+    {
+      "id": "R-WARN-002",
+      "name": "全局 npm install / pip install",
+      "level": "WARN",
+      "tool_class": "bash",
+      "pattern": "(npm\\s+(install|i)\\s+-g|pip\\s+install\\s+)(?!.*--user)",
+      "reason": "全局安装, 可能污染系统 Python/Node"
+    }
+  ]
+}

@@ -38,6 +38,26 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Optional
 
+# PreToolUse guard (per WBS-002 T3.2 + SRS-PRE-TOOL-USE-GUARD-001.md FR-1.1)
+# 软依赖: guardian 不可用 → skip (per FR-6.1 fail-open)
+import os
+_PRE_TOOL_GUARD_ENABLED = os.environ.get("STAR_PRE_TOOL_USE_GUARD", "1") != "0"
+_PRE_TOOL_GUARD = None
+if _PRE_TOOL_GUARD_ENABLED:
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from guardian.pre_tool_use_guard import PreToolUseGuard, ToolCall, Decision as _PTGDecision
+        from guardian.rule_database import RuleDatabase
+        from guardian.audit_logger import AuditLogger
+        from guardian.paths import GUARDIAN_PATHS
+        _ptg_db = RuleDatabase(GUARDIAN_PATHS.rules, enable_watcher=False)
+        _ptg_audit = AuditLogger(GUARDIAN_PATHS.audit_log)
+        _PRE_TOOL_GUARD = PreToolUseGuard(_ptg_db, _ptg_audit)
+        _ptg_db.stop()  # 仅 startup 加载 1 次, 后续不再用 _ptg_db
+    except Exception as _e:  # noqa: BLE001
+        print(f"[WARN] PreToolUse guard unavailable, fail-open: {_e}", file=sys.stderr)
+        _PRE_TOOL_GUARD = None
+
 try:
     from fastapi import FastAPI, HTTPException
     from fastapi.middleware.cors import CORSMiddleware
@@ -239,6 +259,29 @@ def run_script(script_id: str):
     meta = SCRIPTS_META[script_id]
     if meta.status == "disabled":
         raise HTTPException(status_code=403, detail=f"script {script_id} is disabled (per §12.6 close-behavior=1)")
+
+    # === PreToolUse hook (per WBS-002 T3.2 + FR-1.1) ===
+    # 用 script_id + path 作 scan_target, 拦截危险脚本
+    if _PRE_TOOL_GUARD is not None:
+        try:
+            _ptg_decision = _PRE_TOOL_GUARD.evaluate(ToolCall(
+                tool_name="run_script",
+                tool_args={"script_id": script_id, "script_path": meta.path},
+                session_id=os.environ.get("Mavis_SESSION_ID", "console_server"),
+                agent_role="console_server",
+            ))
+            if _ptg_decision == _PTGDecision.BLOCK:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"PreToolUse guard BLOCK on script {script_id} (path: {meta.path})"
+                )
+            # ASK: 暂 log, 实际 ASK 应该走 ask_user (Mavis 集成层补)
+            # WARN: 继续执行
+        except HTTPException:
+            raise
+        except Exception as _e:  # noqa: BLE001
+            # fail-open: guard 自身错误不阻断
+            print(f"[WARN] PreToolUse guard skip (fail-open): {_e}", file=sys.stderr)
 
     script_path = ROOT_DEFAULT / meta.path
     if not script_path.exists():

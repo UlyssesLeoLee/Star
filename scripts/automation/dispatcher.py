@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -56,6 +57,16 @@ from typing import Optional
 ROOT_DEFAULT = Path(__file__).resolve().parent.parent.parent
 BRIEFS_DIR_DEFAULT = ROOT_DEFAULT / "docs" / "briefs"
 REPORTS_DIR_DEFAULT = ROOT_DEFAULT / "docs" / "reports"
+
+
+class DispatchBlockedError(Exception):
+    """PreToolUse guard 阻断子代理 dispatch 抛此异常 (per WBS-002 T3.2 + FR-1.2).
+
+    包含阻断原因 + rule_id (per DD §1.3 派生).
+    """
+    def __init__(self, message: str, rule_id: Optional[str] = None):
+        super().__init__(message)
+        self.rule_id = rule_id
 
 
 @dataclass
@@ -130,8 +141,51 @@ class SubagentDispatcher:
         TimeoutExpired → status="timeout" + exit_code=-1
         其他非零 exit → status="failed" + 实际 exit_code
         exit 0 → status="succeeded" + exit_code=0
+
+        PreToolUse hook (per WBS-002 T3.2 + SRS-PRE-TOOL-USE-GUARD-001.md FR-1.2):
+            在 invoke 实际执行前, 调 guardian.pre_tool_use_guard.PreToolUseGuard.evaluate_for_dispatch()
+            阻断危险操作 (rm -rf /, sudo, GitHub PAT leak, etc).
+            disable 方式: env var STAR_PRE_TOOL_USE_GUARD=0.
+            软依赖: guardian import 失败 → fail-open 跳过 (per FR-6.1).
         """
         task_id = brief_path.stem
+
+        # === PreToolUse hook (per FR-1.2 + NFR-S-4) ===
+        if os.environ.get("STAR_PRE_TOOL_USE_GUARD", "1") != "0":
+            try:
+                from guardian.pre_tool_use_guard import (
+                    PreToolUseGuard, ToolCall, Decision as PTGDecision,
+                )
+                from guardian.rule_database import RuleDatabase
+                from guardian.audit_logger import AuditLogger
+                from guardian.paths import GUARDIAN_PATHS
+                _ptg_db = RuleDatabase(GUARDIAN_PATHS.rules, enable_watcher=False)
+                _ptg_audit = AuditLogger(GUARDIAN_PATHS.audit_log)
+                _ptg_guard = PreToolUseGuard(_ptg_db, _ptg_audit)
+                # 用 brief 内容作 scan_target
+                brief_content = brief_path.read_text(encoding="utf-8", errors="replace") if brief_path.exists() else ""
+                _ptg_decision = _ptg_guard.evaluate(ToolCall(
+                    tool_name="mcp_dispatch",
+                    tool_args={"task_id": task_id, "brief_path": str(brief_path), "brief_content": brief_content[:500]},
+                    session_id=os.environ.get("Mavis_SESSION_ID", task_id),
+                    agent_role=agent or "subagent",
+                ))
+                if _ptg_decision == PTGDecision.BLOCK:
+                    # 阻断, 不 invoke
+                    _ptg_db.stop()
+                    raise DispatchBlockedError(
+                        f"PreToolUse guard BLOCK on dispatch {task_id} "
+                        f"(brief content: {brief_content[:100]!r})"
+                    )
+                # ASK / WARN: 当前仅 log, 实际 ASK 应该走 ask_user (Mavis runtime 集成层)
+                # 留 Mavis 集成时再加
+                _ptg_db.stop()
+            except DispatchBlockedError:
+                raise
+            except Exception as _e:  # noqa: BLE001
+                # fail-open: guardian 自身错误不阻断 dispatch
+                import sys as _sys
+                print(f"[WARN] PreToolUse guard skip (fail-open): {_e}", file=_sys.stderr)
         if agent is None:
             # fallback: 从 brief 文本解析
             content = brief_path.read_text(encoding="utf-8")
