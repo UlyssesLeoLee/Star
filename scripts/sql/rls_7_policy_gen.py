@@ -48,6 +48,31 @@ DEFAULT_TABLES = [
     "tenant_pools",
 ]
 
+# P3-D.6 15 张占位表名 (per CANVAS-IMPL-PLAN-001 §1.6 '14+15 张表 SQL DDL 落地', 实际 15 张 G 域)
+# v0.94 P0-4 Stage 4.0 跨 session 续做 v0.92 §3 已知缺口 (b) '11 Repository 表 跟 P3-D.6 14+15 张表有重叠':
+# P0-4 阶段占位表名 (P2 阶段 worker 子代理 + P3-D.6 阶段 2 任务 2.x 实跑时 fill 真实表名).
+# 走守门 #19 v19 复用 v0.92 rls_7_policy_gen.py 模式.
+P3D6_PLACEHOLDER_TABLES = [
+    # A11 域 (agent 域 5 表, per DD-CANVAS-AGENT-001 §3.1)
+    "agent_sessions",        # Agent 会话 (per DD-CANVAS-AGENT-001 §4.14.1)
+    "agent_policies",        # Agent policies (per DD §3.2)
+    "agent_actions",         # Agent actions audit (per DD §3.3)
+    "agent_relationships",   # Agent 关系 (per ARG.11 5 域 Lead)
+    "agent_trust_scores",    # Agent trust score (per ARG.G-4)
+    # A12 域 (canvas-collab 域 4 表, per DD §3.1, 协调性检查 v0.63 命名修正)
+    "canvas_elements",       # Canvas 元素 (per C-25 CanvasElementsBackend)
+    "canvas_multi_user_audit",  # Canvas 多用户 audit (per C-26, 守门 #13 d T 100% audit)
+    "canvas_reactions",      # Canvas reactions (per G7 reaction)
+    "canvas_comments",       # Canvas comments (per A12.4)
+    # G 域 (gamify 6 表, per SRS-CANVAS-GAMIFY-001)
+    "gamify_avatars",         # G1 avatar
+    "gamify_levels",          # G2 level
+    "gamify_sticky_notes",    # G3 sticky
+    "gamify_confetti",        # G4 confetti
+    "gamify_votes",           # G5 vote
+    "gamify_streaks",         # G6 streak
+]
+
 # 哪些表含 health_status 列 (走 7 类 policy #7 health_visibility)
 # 其他表跳过 #7 (避免 USING 引用不存在列)
 TABLES_WITH_HEALTH_STATUS = {"tenant_pools"}
@@ -192,12 +217,17 @@ BEGIN;
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="v0.92 7 类 RLS policy 模板生成器 (per v0.91 命名, 11 Repository 表默认)",
+        description="v0.92 7 类 RLS policy 模板生成器 (per v0.91 命名, 11 Repository 表 + 15 P3-D.6 占位表默认)",
     )
     parser.add_argument(
         "--tables",
         default=",".join(DEFAULT_TABLES),
-        help=f"逗号分隔表名 (默认全部 11 Repository 表: {','.join(DEFAULT_TABLES)})",
+        help=f"逗号分隔表名 (默认 11 Repository 表: {','.join(DEFAULT_TABLES)})",
+    )
+    parser.add_argument(
+        "--p3d6",
+        action="store_true",
+        help=f"扩展 P3-D.6 15 张占位表 (per v0.94 跨 session 续做 v0.92 §3 已知缺口 (b))",
     )
     parser.add_argument(
         "--output",
@@ -208,6 +238,12 @@ def main() -> int:
     args = parser.parse_args()
 
     tables = [t.strip() for t in args.tables.split(",") if t.strip()]
+    if args.p3d6:
+        tables = tables + P3D6_PLACEHOLDER_TABLES
+        print(
+            f"[v0.94] 扩展 P3-D.6 {len(P3D6_PLACEHOLDER_TABLES)} 张占位表, 总 {len(tables)} 张",
+            file=sys.stderr,
+        )
     ddl = gen_all(tables)
     args.output.write_text(ddl, encoding="utf-8")
     print(f"[ok] 生成 {len(tables)} 表 7 类 RLS policy DDL: {args.output} (+{len(ddl)} bytes)", file=sys.stderr)
