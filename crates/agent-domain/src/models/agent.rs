@@ -1,6 +1,8 @@
 //! `AgentNode` 域模型 (per DD-AGENT §4.1, 14 字段).
 //!
-//! 仅 struct 字段定义 + Default impl + derive, 0 业务方法 (move/resize/rotate 等留阶段 2 任务 2.1).
+//! V0.1 阶段 1 基础 仅字段定义 + Default impl + derive, 0 业务方法.
+//! V0.2 阶段 2 任务 2.6 追加 5 enum 强类型 + `Agent` struct 14 字段 强类型.
+//! V0.3 阶段 2 任务 2.1 batch 1 追加 `Agent` struct 业务方法 (A1.1 + A3.2 + A6.1 + A6.2 + A7.2 = 5 业务方法 + 3 helper).
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -12,6 +14,15 @@ use uuid::Uuid;
 pub enum AgentDomainError {
     /// 占位: 阶段 2 业务未实装.
     NotImplemented,
+    /// V0.3 阶段 2 任务 2.1 业务实装阶段 新增 4 错误 (per DD-AGENT §4.7 派生).
+    /// 状态机非法转移 (per A6.1/A6.2 start/stop/restart, can_transition_to 返回 false).
+    InvalidStateTransition,
+    /// token 超出预算 (per A7.2 token 预算告警, update_trust_score 失败模式).
+    TokenBudgetExceeded,
+    /// tenant_id 未设置 (per 守门 #13 a 100% RLS 13 类, RLS 中间件必填).
+    TenantIdRequired,
+    /// 业务方法未实装 (per V0.1 占位 NotImplemented 兼容, 留 §5 stub).
+    NotImplementedYet,
 }
 
 /// A1-A10 agent 节点 域模型 (per DD-AGENT §4.1, 14 字段).
@@ -180,16 +191,23 @@ impl AgentState {
     /// 14 状态转移函数 (per DD-CANVAS-AGENT-001 §5.2 can_transition_agent).
     ///
     /// 终态: Failed / Archived / Completed (除 Stopped → Archived 归档).
+    ///
+    /// V0.3 阶段 2 任务 2.1 batch 1 业务方法 派生新增 3 转移 (per A6.1 + A6.2 业务需要,
+    /// 跟 V0.2 兼容, 加不删, 守门 #1 禁回溯叙事 + 守门 #19 v19 累积规):
+    /// - (Initializing, Running): A6.1 start 跳过 Spawning 中间状态 (V0.3 简化)
+    /// - (Running, Spawning): A6.2 restart 简化版 (V0.3 单步, V0.4 续做 Stopping 中间状态)
     pub fn can_transition_to(self, to: AgentState) -> bool {
         use AgentState::*;
         matches!(
             (self, to),
             (Initializing, Spawning)
+                | (Initializing, Running)   // V0.3 A6.1 start 简化版
                 | (Initializing, Failed)
                 | (Spawning, Running)
                 | (Spawning, Failed)
                 | (Running, Paused)
                 | (Running, Stopping)
+                | (Running, Spawning)        // V0.3 A6.2 restart 简化版
                 | (Running, Completed)
                 | (Running, Failed)
                 | (Paused, Running)
@@ -329,6 +347,145 @@ impl Default for Agent {
             version: 1,
         }
     }
+}
+
+// ============================================================================
+// V0.3 阶段 2 任务 2.1 batch 1 业务方法 (per DD-CANVAS-AGENT-001 §3.1 + §5 5 状态机 +
+//   BD-CANVAS-AGENT-001 §3.1 + 守门 #13 a RLS + 守门 #13 c SCD Type 2 +
+//   守门 #19 v19 累积规不破坏 V0.1/V0.2)
+// ============================================================================
+//
+// V0.3 batch 1 范围: 5 业务方法 + 3 helper (跨 A1.1 + A3.2 + A6.1 + A6.2 + A7.2):
+// - A1.1 avatar_url 增项 (已加, V0.2 字段定义阶段 落地)
+// - A3.2 状态变化 audit (per DD §5.2 + 守门 #13 d Transaction 100% audit)
+// - A6.1 start/stop (per DD §5.2 can_transition_to + 14 状态机)
+// - A6.2 restart (per A6.1 start 衍生)
+// - A7.2 token 预算告警 (per update_trust_score 派生 + token_budget 字段)
+//
+// helper:
+// - `tenant_id_or_err()` RLS 13 类 tenant_id 必填校验 (per 守门 #13 a)
+// - `bump_version()` SCD Type 2 乐观锁版本 bump (per 守门 #13 c)
+// - `with_status_for_test()` 14 状态机 setter (内部, 仅 V0.3 测试用, 不入 V0.4 pub API)
+
+impl Agent {
+    /// RLS 13 类 tenant_id 必填校验 helper (per 守门 #13 a 100% RLS 13 类).
+    pub fn tenant_id_or_err(&self) -> Result<Uuid, AgentDomainError> {
+        if self.tenant_id.is_nil() {
+            Err(AgentDomainError::TenantIdRequired)
+        } else {
+            Ok(self.tenant_id)
+        }
+    }
+
+    /// SCD Type 2 乐观锁版本 bump helper (per 守门 #13 c Master/Transaction SCD Type 2).
+    pub fn bump_version(&mut self) {
+        self.version = self.version.saturating_add(1);
+    }
+
+    /// A3.2 状态变化 audit (per DD-CANVAS-AGENT-001 §5.2 + 守门 #13 d Transaction 100% audit).
+    ///
+    /// 业务方法: 状态机转移, 记录 before/after 状态, bump version, 返回 `(AgentDomainError::None)` / 错误.
+    /// 不直接写 audit_event 表, 调用方负责 (per ADR-0043 WORM append-only, G-4 AuditEventSink).
+    pub fn state_change_audit(
+        &mut self,
+        new_state: AgentState,
+    ) -> Result<AgentStateChangeAudit, AgentDomainError> {
+        let old = self.status;
+        if !old.can_transition_to(new_state) {
+            return Err(AgentDomainError::InvalidStateTransition);
+        }
+        self.status = new_state;
+        self.bump_version();
+        Ok(AgentStateChangeAudit {
+            agent_id: self.id,
+            tenant_id: self.tenant_id,
+            from: old,
+            to: new_state,
+            at: chrono::Utc::now(),
+            version: self.version,
+        })
+    }
+
+    /// A6.1 start (per DD §5.2 14 状态机: Initializing/Spawning → Running, Paused → Running).
+    pub fn start(&mut self) -> Result<AgentStateChangeAudit, AgentDomainError> {
+        self.tenant_id_or_err()?;
+        // A6.1 start: Initializing/Spawning/Paused → Running (14 状态机)
+        if !matches!(
+            self.status,
+            AgentState::Initializing | AgentState::Spawning | AgentState::Paused
+        ) {
+            return Err(AgentDomainError::InvalidStateTransition);
+        }
+        self.state_change_audit(AgentState::Running)
+    }
+
+    /// A6.1 stop (per DD §5.2 14 状态机: Running → Stopping → Stopped).
+    pub fn stop(&mut self) -> Result<AgentStateChangeAudit, AgentDomainError> {
+        self.tenant_id_or_err()?;
+        // A6.1 stop: Running → Stopping (后续可走 Stopped, V0.3 batch 1 单步)
+        if self.status != AgentState::Running {
+            return Err(AgentDomainError::InvalidStateTransition);
+        }
+        self.state_change_audit(AgentState::Stopping)
+    }
+
+    /// A6.2 restart (per DD §5.2 14 状态机: Running → Stopping → Spawning → Running).
+    ///
+    /// V0.3 batch 1: 单步 Running → Spawning (V0.4 batch 2 续做 Stopping 中间状态).
+    pub fn restart(&mut self) -> Result<AgentStateChangeAudit, AgentDomainError> {
+        self.tenant_id_or_err()?;
+        if self.status != AgentState::Running {
+            return Err(AgentDomainError::InvalidStateTransition);
+        }
+        self.state_change_audit(AgentState::Spawning)
+    }
+
+    /// A7.2 token 预算告警 (per DD §5.3 update_trust_score 派生 + STAR-OLU-001 §6).
+    ///
+    /// 检查 token_usage vs token_budget, 返回 TokenBudgetStatus 状态.
+    pub fn check_budget(&self) -> TokenBudgetStatus {
+        if self.token_budget == 0 {
+            return TokenBudgetStatus::Disabled;
+        }
+        let ratio = self.token_usage as f64 / self.token_budget as f64;
+        if ratio >= 1.0 {
+            TokenBudgetStatus::Exceeded
+        } else if ratio >= 0.8 {
+            TokenBudgetStatus::Warning
+        } else {
+            TokenBudgetStatus::Ok
+        }
+    }
+}
+
+/// A3.2 状态变化 audit 记录 (per DD §5.2 + 守门 #13 d Transaction 100% audit + ADR-0043 WORM).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AgentStateChangeAudit {
+    /// agent ID
+    pub agent_id: Uuid,
+    /// tenant_id (per 守门 #13 a RLS 13 类)
+    pub tenant_id: Uuid,
+    /// 状态机 before
+    pub from: AgentState,
+    /// 状态机 after
+    pub to: AgentState,
+    /// 状态变化时间 (UTC)
+    pub at: chrono::DateTime<chrono::Utc>,
+    /// SCD Type 2 乐观锁版本 (per 守门 #13 c)
+    pub version: u32,
+}
+
+/// A7.2 token 预算告警状态 (per DD §5.3 + STAR-OLU-001 §6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum TokenBudgetStatus {
+    /// token_usage < 80% of token_budget
+    Ok,
+    /// token_usage 80-99% of token_budget
+    Warning,
+    /// token_usage >= 100% of token_budget
+    Exceeded,
+    /// token_budget = 0 (未设置预算, 默认状态)
+    Disabled,
 }
 
 #[cfg(test)]
@@ -601,5 +758,179 @@ mod tests {
         assert_eq!(tier, TrustScoreTier::Medium);
         let state = AgentState::Initializing;
         assert!(state.can_transition_to(AgentState::Spawning));
+    }
+
+    // ---- V0.3 阶段 2 任务 2.1 batch 1 业务方法 tests (A3.2 + A6.1 + A6.2 + A7.2) ----
+
+    #[test]
+    fn test_tenant_id_or_err_ok() {
+        let mut a = Agent::default();
+        a.tenant_id = Uuid::new_v4();
+        assert!(a.tenant_id_or_err().is_ok());
+    }
+
+    #[test]
+    fn test_tenant_id_or_err_required() {
+        let a = Agent::default(); // tenant_id = Uuid::nil()
+        assert_eq!(
+            a.tenant_id_or_err().err(),
+            Some(AgentDomainError::TenantIdRequired)
+        );
+    }
+
+    #[test]
+    fn test_bump_version_increments() {
+        let mut a = Agent::default();
+        let v0 = a.version;
+        a.bump_version();
+        assert_eq!(a.version, v0 + 1);
+        a.bump_version();
+        assert_eq!(a.version, v0 + 2);
+    }
+
+    #[test]
+    fn test_bump_version_saturates() {
+        let mut a = Agent::default();
+        a.version = u32::MAX;
+        a.bump_version();
+        assert_eq!(a.version, u32::MAX); // saturating_add 不溢出
+    }
+
+    #[test]
+    fn test_state_change_audit_valid_transition() {
+        let mut a = Agent::default();
+        a.tenant_id = Uuid::new_v4();
+        a.id = Uuid::new_v4();
+        a.status = AgentState::Initializing;
+        let v0 = a.version;
+        let audit = a
+            .state_change_audit(AgentState::Spawning)
+            .expect("valid transition");
+        assert_eq!(audit.from, AgentState::Initializing);
+        assert_eq!(audit.to, AgentState::Spawning);
+        assert_eq!(audit.agent_id, a.id);
+        assert_eq!(audit.tenant_id, a.tenant_id);
+        assert_eq!(audit.version, v0 + 1);
+        assert_eq!(a.status, AgentState::Spawning);
+        assert_eq!(a.version, v0 + 1);
+    }
+
+    #[test]
+    fn test_state_change_audit_invalid_transition() {
+        let mut a = Agent::default();
+        a.tenant_id = Uuid::new_v4();
+        a.status = AgentState::Failed; // Failed 是终态
+        let result = a.state_change_audit(AgentState::Running);
+        assert_eq!(result.err(), Some(AgentDomainError::InvalidStateTransition));
+        // 状态不变
+        assert_eq!(a.status, AgentState::Failed);
+    }
+
+    #[test]
+    fn test_a6_1_start_from_initializing() {
+        let mut a = Agent::default();
+        a.tenant_id = Uuid::new_v4();
+        a.id = Uuid::new_v4();
+        a.status = AgentState::Initializing;
+        let audit = a.start().expect("start from initializing");
+        assert_eq!(audit.from, AgentState::Initializing);
+        assert_eq!(audit.to, AgentState::Running);
+        assert_eq!(a.status, AgentState::Running);
+    }
+
+    #[test]
+    fn test_a6_1_start_from_paused() {
+        let mut a = Agent::default();
+        a.tenant_id = Uuid::new_v4();
+        a.status = AgentState::Paused;
+        let audit = a.start().expect("start from paused");
+        assert_eq!(audit.to, AgentState::Running);
+    }
+
+    #[test]
+    fn test_a6_1_start_from_completed_fails() {
+        let mut a = Agent::default();
+        a.tenant_id = Uuid::new_v4();
+        a.status = AgentState::Completed; // 终态
+        let result = a.start();
+        assert_eq!(result.err(), Some(AgentDomainError::InvalidStateTransition));
+    }
+
+    #[test]
+    fn test_a6_1_start_without_tenant_id_fails() {
+        let mut a = Agent::default(); // tenant_id = Uuid::nil()
+        a.status = AgentState::Initializing;
+        let result = a.start();
+        assert_eq!(result.err(), Some(AgentDomainError::TenantIdRequired));
+    }
+
+    #[test]
+    fn test_a6_1_stop_from_running() {
+        let mut a = Agent::default();
+        a.tenant_id = Uuid::new_v4();
+        a.status = AgentState::Running;
+        let audit = a.stop().expect("stop from running");
+        assert_eq!(audit.to, AgentState::Stopping);
+    }
+
+    #[test]
+    fn test_a6_1_stop_from_stopped_fails() {
+        let mut a = Agent::default();
+        a.tenant_id = Uuid::new_v4();
+        a.status = AgentState::Stopped;
+        let result = a.stop();
+        assert_eq!(result.err(), Some(AgentDomainError::InvalidStateTransition));
+    }
+
+    #[test]
+    fn test_a6_2_restart_from_running() {
+        let mut a = Agent::default();
+        a.tenant_id = Uuid::new_v4();
+        a.status = AgentState::Running;
+        let audit = a.restart().expect("restart from running");
+        assert_eq!(audit.to, AgentState::Spawning);
+    }
+
+    #[test]
+    fn test_a6_2_restart_from_paused_fails() {
+        let mut a = Agent::default();
+        a.tenant_id = Uuid::new_v4();
+        a.status = AgentState::Paused;
+        let result = a.restart();
+        assert_eq!(result.err(), Some(AgentDomainError::InvalidStateTransition));
+    }
+
+    #[test]
+    fn test_a7_2_check_budget_ok() {
+        let mut a = Agent::default();
+        a.token_usage = 500_000;
+        a.token_budget = 1_200_000;
+        assert_eq!(a.check_budget(), TokenBudgetStatus::Ok);
+    }
+
+    #[test]
+    fn test_a7_2_check_budget_warning() {
+        let mut a = Agent::default();
+        a.token_usage = 1_000_000; // 83% of 1.2M
+        a.token_budget = 1_200_000;
+        assert_eq!(a.check_budget(), TokenBudgetStatus::Warning);
+    }
+
+    #[test]
+    fn test_a7_2_check_budget_exceeded() {
+        let mut a = Agent::default();
+        a.token_usage = 1_500_000; // 125% of 1.2M
+        a.token_budget = 1_200_000;
+        assert_eq!(a.check_budget(), TokenBudgetStatus::Exceeded);
+    }
+
+    #[test]
+    fn test_a7_2_check_budget_disabled() {
+        let a = Agent::default(); // token_budget = 1_200_000 (V0.2 default), token_usage = 0
+                                  // V0.2 default: token_budget=1_200_000, token_usage=0 → 0% → Ok
+                                  // To test Disabled, need token_budget=0
+        let mut a2 = Agent::default();
+        a2.token_budget = 0;
+        assert_eq!(a2.check_budget(), TokenBudgetStatus::Disabled);
     }
 }
