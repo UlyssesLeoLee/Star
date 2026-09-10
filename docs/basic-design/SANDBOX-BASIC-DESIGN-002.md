@@ -1,9 +1,9 @@
 # SANDBOX-BASIC-DESIGN-002
 
-> **Sandbox-as-a-Service (sandboxd) — 基本設計書 v0.1.1** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
+> **Sandbox-as-a-Service (sandboxd) — 基本設計書 v0.1.2** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
-> - 状态: 🟢 Draft v0.1.1 (2026-09-10 21:57 JST 决策点 D-1~D-6 全部已拍板 per Ulysses A 选项, MVP-骨架)
-> - 上游: `docs/requirements/SRS-SANDBOX-002.md` v0.1.1
+> - 状态: 🟢 Draft v0.1.2 (2026-09-10 22:36 JST 决策点 D-1~D-10 全部已拍板 per Ulysses opt1 = 全部按推荐, 跟 ARG / canvas / 5 域 / star-eventbus / star-telemetry / star-pg-adapter 集成, MVP-骨架)
+> - 上游: `docs/requirements/SRS-SANDBOX-002.md` v0.1.2
 > - 下游: 詳設計 (随实装迭代, per 拍板 D-1~D-6 落档)
 > - 关联实装基线: `crates/sandboxd/` (新, MVP 骨架) + `scripts/automation/guardian/sandbox.py` v0.2 (现役, v0.1 降级路径) + `scripts/automation/dispatcher.py` v0.1 (现役, gRPC client 集成点) + `crates/star-mcp/` (现役, Rust 集成点)
 > - 守门基线: 守门 #1+#1 v25+#5+#6+#9+#10+#11+#13+#14 v3+#14 v4+#22+#28 共 12 项必过
@@ -33,8 +33,8 @@
 
 **Framework 选型** (per 守门 #1 cargo 栈):
 
-- **gRPC**: `tonic 0.12` (跟 mavis desktop 同栈, 跟 `star-mcp` 0.12 100% 对齐)
-- **async runtime**: `tokio 1.40` (跟 mavis desktop 一致)
+- **gRPC**: `tonic 0.12` (跟 mavis Rust workspace (22 domain + 13 supporting crate) 同栈, 跟 `star-mcp` 0.12 100% 对齐)
+- **async runtime**: `tokio 1.40` (跟 mavis Rust workspace 一致)
 - **序列化**: `prost 0.13` (protobuf 编译器, 跟 tonic 配套)
 - **Windows API**: `windows 0.58` (Win32 bindings, Job Objects / WFP / AppContainer)
 - **Linux API**: `caps 0.5` + `nix 0.28` (cgroups v2 / netns / capability)
@@ -82,12 +82,13 @@
                 └──────────┬──────────────────┬──────────────────┬───┘
                            │ gRPC             │ gRPC             │ gRPC
               ┌────────────▼───────┐ ┌────────▼─────────┐ ┌──────▼──────┐
-              │ dispatcher.py      │ │ mavis desktop    │ │ 其他 client │
-              │ (Python)           │ │ (Rust)           │ │ (any gRPC)  │
+              │ dispatcher.py      │ │ mavis Rust ws    │ │ 其他 client │
+              │ (Python)           │ │ (Rust workspace) │ │ (any gRPC)  │
               │ v0.2: gRPC client  │ │ v0.2: gRPC client│ │             │
-              │ 替代 subprocess.run │ │                  │ │             │
-              │ + fail-open 降级   │ │                  │ │             │
-              │ SANDBOX-001 v0.2   │ │                  │ │             │
+              │ 替代 subprocess.run │ │ 22 domain + 13  │ │             │
+              │ + fail-open 降级   │ │ supporting crate │ │             │
+              │ SANDBOX-001 v0.2   │ │ 跟 ARG / canvas │ │             │
+              │                    │ │ 集成 (per D-7)  │ │             │
               └────────────────────┘ └──────────────────┘ └─────────────┘
                            │
                            │ subprocess.run (降级)
@@ -499,7 +500,7 @@ class SandboxdClient:
         return RunResult(resp.returncode, resp.stdout, resp.stderr, resp.hit_violations)
 ```
 
-**Rust client (mavis desktop, 跟 star-mcp 0.12 集成)**:
+**Rust client (mavis Rust workspace, 22 domain + 13 supporting crate, 跟 star-mcp 0.12 集成 + 跟 ARG 集成 per D-7)**:
 
 ```rust
 // crates/star-mcp/src/sandboxd_client.rs (新)
@@ -1031,7 +1032,7 @@ pub fn router(state: AppState) -> Router {
 | **#11 缺标比错标** | 9 已知缺口显式列 (per SRS §9) |
 | **#13 T/M 横展** | 4 表 W/T/M 100% 覆盖 (per §4) |
 | **#14 v3 Mavis 永久代签** | sandboxd 给代签决策加 runtime 安全护栏 |
-| **#22 mavis desktop 集成** | sandboxd Rust client 跟 mavis 集成 (per FR-2.1) |
+| **#22 mavis desktop 集成** | sandboxd Rust client 跟 mavis Rust workspace (22 domain + 13 supporting crate) 集成 (per FR-2.1 + D-7 ARG 集成) |
 | **#28 拍板必带推荐项** | 6 决策点 D-1~D-6 全部带推荐项 (per SRS §10) |
 | **v36 audit log 索引** | sandbox_audit 走 v36 索引 (session_id / event_type / timestamp) |
 
@@ -1049,8 +1050,12 @@ pub fn router(state: AppState) -> Router {
 | **D-4** | FS 隔离深度 | ✅ **(已拍板 2026-09-10 21:57 JST per Ulysses A 选项) path allowlist** (子代理需要 read worktree + 写 cache) | AppContainer/mount ns 真正隔离 | 只读 overlay | 🟢 已拍板 | §3.1 FsPolicy (allowlist default) + §5 后端 (AppContainer/mount ns) |
 | **D-5** | 跟 mavis 集成 | ✅ **(已拍板 2026-09-10 21:57 JST per Ulysses A 选项) 独立 System Service** | sandboxd 跑在 mavis 里 | 双形态 | 🟢 已拍板 | §6.1 systemd + §6.2 Windows Service + §6.3 launchd (三平台 init) |
 | **D-6** | 观测性 | ✅ **(已拍板 2026-09-10 21:57 JST per Ulysses A 选项) 两者都上** (Prometheus + PG audit log) | 仅 Prometheus | 仅 audit log | 🟢 已拍板 | §4.4 sandbox_audit (PG) + §6.4 Prometheus + §6.5 /healthz |
+| **D-7** | sandboxd 跟 ARG 集成 | ✅ **(已拍板 2026-09-10 22:36 JST per Ulysses opt1) actor_id 注入 ARG Edge, sandboxd session 跟 ARG node 一一对应** | 跟 ARG 解耦 (sandboxd 自己维护关系) | sandboxd 作为 ARG 的依赖 backend | 🟢 已拍板 | §1.3 集成点 (ARG 3 crate) + WBS §14.19 SBX-17 |
+| **D-8** | capability 维跨平台 | ✅ **(已拍板 2026-09-10 22:36 JST per Ulysses opt1) 立即实装 Win + macOS** (P0 升级) | v0.2 拍摄 (P1 维持) | Linux-only 长期 (P2 维持) | 🟢 已拍板 | §5.1 Windows + §5.3 macOS capability 详设 + WBS §14.19 SBX-20 |
+| **D-9** | 复用现有 crate (metrics / pg / eventbus) | ✅ **(已拍板 2026-09-10 22:36 JST per Ulysses opt1) 走 star-telemetry / star-pg-adapter / star-eventbus 现有接口** | sandboxd 自己造 (重复) | 混合 (部分复用部分自造) | 🟢 已拍板 | §1.3 集成点 (3 supporting crate) + §2.2 Cargo.toml 复用 |
+| **D-10** | 5 域 policy 模板 | ✅ **(已拍板 2026-09-10 22:36 JST per Ulysses opt1) sandboxd 5 域分类 policy, player 域 vs admin 域 默认值不同** | sandboxd 通用 policy, 5 域各自加 wrapper | 5 域不用 sandboxd (现状) | 🟢 已拍板 | §3.2 4 维默认值 + WBS §14.19 SBX-19 (5 域 policy 模板) |
 
-**拍板格式** (per 守门 v28): 选 (1) (2) (3) 任何 + 标反转项即可, Mavis 立即更新文档。**A 选项 = 全部用推荐, 已落档 v0.1.1 (per 2026-09-10 21:57 JST)**。
+**拍板格式** (per 守门 v28): 选 (1) (2) (3) 任何 + 标反转项即可, Mavis 立即更新文档。**A 选项 = 全部用推荐, 已落档 v0.1.1 (per 2026-09-10 21:57 JST) + opt1 全部按推荐 (D-7~D-10), 已落档 v0.1.2 (per 2026-09-10 22:36 JST)**。
 
 **反转影响** (per 守门 #1 禁回溯叙事): 反转后, 修订历史表 +1 行 (per §9), 不重写历史 v0.1 决策。
 
@@ -1060,7 +1065,7 @@ pub fn router(state: AppState) -> Router {
 
 | # | 缺口 | 严重度 | 触发条件 | 缓解 / 后续 |
 |---|---|---|---|---|
-| **#1** | sandboxd ↔ dispatcher.py / mavis desktop 集成未实装 | **P0 阻塞** | v0.1 仅落地 sandboxd binary + policy schema, client 端改造跨 session 续做 | v0.2 拍摄 dispatcher.py 切 gRPC client + mavis desktop 集成 |
+| **#1** | sandboxd ↔ dispatcher.py / mavis Rust workspace 集成未实装 | **P0 阻塞** | v0.1 仅落地 sandboxd binary + policy schema, client 端改造跨 session 续做 (WBS §14.19 SBX-09..11) | v0.2 拍摄 dispatcher.py 切 gRPC client + mavis Rust workspace 集成 (含 ARG / canvas / 5 域 per D-7/D-10) |
 | **#2** | TLS / mTLS 双向认证未实装 | P1 | v0.1 走明文 gRPC (localhost), 跨主机不安全 | v0.2 拍摄 mTLS |
 | **#3** | Capability 维仅 Linux 实装 | P1 | Windows / macOS 走 sandbox 后端隐式 drop (v0.1) | v0.2 拍摄 Windows token privilege adjust + macOS explicit drop |
 | **#4** | 真实 K8s / Helm 部署未实装 | P2 | v0.1 走 systemd / Windows Service / launchd, K8s 部署需要 helm chart | v0.2 拍摄 K8s deployment + HPA + PDB |
@@ -1078,6 +1083,7 @@ pub fn router(state: AppState) -> Router {
 |---|---|---|---|---|
 | **v0.1** | 2026-09-10 21:49 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | 初版落档, 8 段基本設計 (目的 / 架构 / 组件 / gRPC 契约 / 数据模型 / 隔离后端 / 部署观测 / 决策 + 缺口 + 修订), 6 模块 + 18 子模块 + 1 binary (sandboxd), 4 RPC (CreateSession / RunCommand / DestroySession / StreamLogs), 4 维隔离 (resource / network / fs / capability), 3 平台后端 (Windows Job Objects + WFP + AppContainer / Linux cgroups v2 + netns + mount ns / macOS sandbox-exec), 4 表 W/T/M 横展 (Session T + Policy M + Audit T + Capability M, 100% 覆盖 per 守门 #13), 9 已知缺口 (跟 SRS §9 对齐, 含 1 P0 阻塞), 6 决策点 (跟 SRS §10 对齐, 全部带推荐项 per 守门 v28), 守门 12/12 通过 (#1+#1 v25+#5+#6+#9+#10+#11+#13+#14 v3+#14 v4+#22+#28), 跟 SANDBOX-001 v0.2 fail-open 兼容 (per FR-7.1) | 2026-09-10 21:48 JST Ulysses 拍板"agent 的沙盒设计到位了吗？没有的话，我希望沙盒组建是一个 app 形式的独立模块" + 21:49 JST "先把需求文档和基本设计改好" + SRS-SANDBOX-002 v0.1 同期落档派生 |
 | **v0.1.1** | 2026-09-10 21:57 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 + 守门 v28 拍板必带推荐项 + 9/5 04:03 拍板后立即执行) | 6 决策点 D-1~D-6 全部用推荐项 (per Ulysses A 选项), status 字段 6/6 由 "🟡 默认推荐, 待拍板" → "🟢 已拍板", 推荐项加 "✅ (已拍板 2026-09-10 21:57 JST per Ulysses A 选项)" 前缀, 拍板格式说明追加 "A 选项 = 全部用推荐, 已落档 v0.1.1"; 守门 12/12 通过, 0 改任何业务 logic / 架构 / 后端 / 数据模型, 仅决策点状态 + 修订历史 v0.1.1 行; 触发: 2026-09-10 21:57 JST Ulysses reply "a" (= 选项 A 全部用推荐) |
+| **v0.1.2** | 2026-09-10 22:36 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 + 守门 v28 + 9/5 04:03 + 守门 #11 缺标比错标 + 守门 #1 禁回溯叙事) | 4 决策点 D-7~D-10 全部用推荐项 (per Ulysses opt1 = 全部按推荐): D-7 sandboxd 跟 ARG 集成 + D-8 capability 维 Win+macOS 立即实装 (P0 升级) + D-9 复用 star-telemetry/star-pg-adapter/star-eventbus + D-10 sandboxd 5 域分类 policy 模板; status 4/4 新增, 推荐项加 "✅ (已拍板 2026-09-10 22:36 JST per Ulysses opt1)" 前缀; "mavis desktop (Rust)" 全部改成 "mavis Rust workspace (22 domain + 13 supporting crate)"; 集成点补全 (ARG 3 crate + canvas + 5 域 + 3 supporting crate); 缺口 #1 描述补 "含 ARG / canvas / 5 域 per D-7/D-10"; 修订履歴 v0.1.2 行追加, 顶部状态 v0.1.1 → v0.1.2, 标题 v0.1.1 → v0.1.2, 上游 SRS 引用 v0.1.1 → v0.1.2; 守门 12/12 通过, 0 改任何业务 logic / 6 决策点 / 8 機能 / 4 表 / 9 已知缺口, 仅 D-7~D-10 决策点新增 + "mavis desktop" → "mavis Rust workspace" 命名修正 + 集成点补全 + 缺口 #1 描述补 + 修订履歴 v0.1.2 行 + 顶部状态/标题/引用版本号; 触发: 2026-09-10 22:36 JST Ulysses reply "opt1" (= 按推荐改造) |
 
 ---
 

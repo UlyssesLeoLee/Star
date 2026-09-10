@@ -1,9 +1,9 @@
 # DD-SANDBOX-002
 
-> **Sandbox-as-a-Service (sandboxd) — 詳細設計書 v0.1** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート + STAR 仓 OPS-DETAILED-DESIGN-001 模板)
+> **Sandbox-as-a-Service (sandboxd) — 詳細設計書 v0.1.1** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート + STAR 仓 OPS-DETAILED-DESIGN-001 模板)
 >
-> - 状态: 🟡 Draft v0.1 (2026-09-10 JST 初版落档)
-> - 上游: [`docs/requirements/SRS-SANDBOX-002.md`](../requirements/SRS-SANDBOX-002.md) v0.1.1 (37KB, 8 機能 / 5 業務 / 7 非機能 / 4 表 W/T/M / 9 缺口 / 6 决策点已拍板) + [`docs/basic-design/SANDBOX-BASIC-DESIGN-002.md`](../basic-design/SANDBOX-BASIC-DESIGN-002.md) v0.1.1 (46.6KB, 6 模块 / 18 子模块 / gRPC proto / 4 维后端)
+> - 状态: 🟢 Draft v0.1.1 (2026-09-10 22:36 JST 集成点补全 per Ulysses opt1, 跟 ARG / canvas / 5 域 / star-eventbus / star-telemetry / star-pg-adapter / mavis CLI / v37 守门 集成)
+> - 上游: [`docs/requirements/SRS-SANDBOX-002.md`](../requirements/SRS-SANDBOX-002.md) v0.1.2 (37KB, 8 機能 / 5 業務 / 7 非機能 / 4 表 W/T/M / 9 缺口 / 10 决策点全部已拍板) + [`docs/basic-design/SANDBOX-BASIC-DESIGN-002.md`](../basic-design/SANDBOX-BASIC-DESIGN-002.md) v0.1.2 (46.6KB, 6 模块 / 18 子模块 / gRPC proto / 4 维后端 / 10 决策点)
 > - 下游: 实装代码 (`crates/sandboxd/`) + 测试 + 报告 (`docs/reports/PHASE-SANDBOX-002-IMPL-REPORT.md`)
 > - 核心语言: Rust 1.80+ (跟 mavis desktop 同栈, per 守门 #1 cargo check)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #10 + 守门 #14 v3)
@@ -166,16 +166,25 @@ testcontainers = "0.20"  # PG 容器 (integration test)
 
 **運行時依賴 12 项 + 平台特定 3-5 项 + build/dev 5 项 = ~20 总依赖**, MVP 階段對齊 mavis workspace。
 
-### 1.3 既存 mavis 仓 集成点
+### 1.3 既存 mavis 仓 集成点 (per D-7/D-9/D-10 已拍板 22:36 JST)
 
 | 集成点 | 現有代碼 | 集成方式 |
 |---|---|---|
 | `dispatcher.py` v0.1 | `scripts/automation/dispatcher.py` `invoke()` | 創建 SandboxdClient, 替換 subprocess.run 為 gRPC CreateSession + RunCommand (per FR-7.1 fail-open 降級保留) |
 | `scripts/automation/guardian/sandbox.py` v0.2 | 资源維包裝器 | sandboxd 不可用時降級路徑 (per FR-7.1) |
+| **mavis CLI** (root/branch session 模型) | mavis 入口 → root session → branch session → tool call | sandboxd 在 mavis CLI 入口层接入, 跟 root/branch session 模型对齐 (WBS §14.19 SBX-09) |
 | `crates/star-mcp/` 0.12 | MCP transport | 創建 `crates/star-mcp/src/sandboxd_client.rs` (跟 Python client 對稱) |
+| **mavis Rust workspace (22 domain + 13 supporting crate)** | `crates/agent-domain/` (10 module) + `crates/arg/` + `arg-bridge/` + `arg-effect/` + `crates/canvas-collab/` 等 | 任意 gRPC client 通過 `crates/sandboxd-client/` (新建) 调用 (per WBS §14.19 SBX-10) |
+| **`crates/agent-domain/` (ARG 11 子项已收官, per D-7 拍板)** | ARG (Agent Relationship Graph) 10 类关系 + 5 团队模板 | sandboxd session actor_id 注入 ARG Edge, sandboxd session 跟 ARG node 一一对应 (per WBS §14.19 SBX-17) |
+| **`crates/arg-bridge/` + `arg-effect/`** | ARG 跟其他 crate 桥接 + 效果 | sandboxd session 走 arg-bridge 跟 ARG node 同步, arg-effect 跟踪 sandbox 状态变化 |
+| **`crates/canvas-collab/` (多人协作已收官, per WBS SBX-18)** | canvas 多人协作 | sandboxd per-user sandbox session 场景, canvas 多人同时编辑时各自独立 sandbox (per WBS §14.19 SBX-18) |
+| **5 域 Lead (player/economy/match/social/admin, per 守门 #3 8/21 JST, per D-10 拍板)** | 5 域独立 Lead, sandboxd 5 域分类 policy 模板 | sandbox_policy 5 域分类 (player 域 vs admin 域 默认值不同), 跟 WBS §14.19 SBX-19 联动 |
 | `crates/star-context/` | ActorContext (P0-1) | sandboxd 創建 session 時引用 ActorContext (tenant_id / workspace_id / actor_id), 跟守門 #13 RLS 13 類 對齊 |
+| **`crates/star-telemetry/` (per D-9 拍板)** | Prometheus 抓取 | sandboxd 9 指标可挂载到 star-telemetry, 避免重复 metrics 框架 (per D-9 推荐) |
+| **`crates/star-pg-adapter/` (per D-9 拍板)** | PG client | sandboxd 4 表 audit log 走 star-pg-adapter, 避免重复 sqlx (per D-9 推荐) |
+| **`crates/star-eventbus/` (Valkey stream, per D-9 拍板)** | 跨进程 via Valkey stream | sandboxd 内部跨 session 事件流走 star-eventbus, 避免重新发明 pubsub (per D-9 推荐) |
 | `db/migrations/` | PG schema | 追加 `db/migrations/2026-09-10-sandboxd-4-tables.sql` (per §4 4 表) |
-| `crates/star-telemetry/` (待) | Prometheus scrape | sandboxd 暴露 /metrics, 跟 mavis 主 metrics 抓取集成 |
+| **`docs/guardian/v37_sandbox_guard.md` (per 4acae3f 22:24 JST 落档)** | v37 sandbox_guard v0.1 软约束 | v37 是 sandboxd v0.1 软约束, sandboxd v0.1 hard 约束 (per SANDBOX-002), v0.2 升级; sandboxd 实装时 v37 → 守门 v37 active 状态切换 |
 
 ---
 
@@ -1121,3 +1130,4 @@ INSERT INTO sandbox_capability (capability_id, syscall_name, platform, risk_leve
 | バージョン | 日付 | 修订人 | 修订内容 | 觸發 |
 |---|---|---|---|---|
 | **v0.1** | 2026-09-10 22:11 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守門 #14 v3 + 守門 #14 v4 反轉 v0.62) | 初版落档, 5 維設計 (モジュール 24 文件 / クラス 5 struct 5 enum 5 trait / 時序 4 場景 / 状態遷移 2 圖 / 測試 8 類 56 UT + 17 IT + 11 E2E + 5 PT + 8 UAT), 4 表 W/T/M 100% 覆蓋 DDL (Session T + Policy M + Audit T + Capability M, 12/12 RLS 13 類必攜), 9 已知缺口 (跟 SRS-002 §9 對齊, 含 1 P0 阻塞), 跟 SRS-002 + BD-002 100% 對齊自審 (12 項), 跟現有守門 13 項聯動 (#1+#1 v15+#1 v19+#1 v25+#5+#6+#9+#9 v3+#11+#13+#14 v3+#22+#28), IPA 11 段結構 (目的 / 模組 / 類 / 時序 / 狀態 / 測試 / 數據 / 守門 / SRS-BD 對齊 / 缺口 / 簽字 + 修訂) | 2026-09-10 22:11 JST Ulysses 拍板"各級文檔完善好, 更新後續任務到 wbs" + SRS-SANDBOX-002 v0.1.1 + BD-SANDBOX-002 v0.1.1 派生 (6 決策點已拍板 per A 選項) |
+| **v0.1.1** | 2026-09-10 22:36 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守門 #14 v3 + 守門 #14 v4 + 守門 v28 + 9/5 04:03 + 守門 #11 缺標比錯標 + 守門 #1 禁回溯敘事) | 集成点 §1.3 補全 per Ulysses opt1 = 全部按推薦改造: +mavis CLI (root/branch session 模型) + crates/agent-domain/ (ARG 11 子項已收官, per D-7) + crates/arg-bridge/ + arg-effect/ + crates/canvas-collab/ (多人協作, per SBX-18) + 5 域 Lead (player/economy/match/social/admin, per 守門 #3 8/21 JST, per D-10) + crates/star-telemetry/ (per D-9) + crates/star-pg-adapter/ (per D-9) + crates/star-eventbus/ (per D-9) + docs/guardian/v37_sandbox_guard.md (per 4acae3f 22:24 JST 落檔, sandboxd v0.1 hard 約束跟 v37 v0.1 軟約束 串聯); 修訂履歴 v0.1.1 行追加, 顶部狀態 v0.1 → v0.1.1, 標題 v0.1 → v0.1.1, 上游 SRS 引用 v0.1.1 → v0.1.2, 上游 BD 引用 v0.1.1 → v0.1.2; 守門 12/12 通過, 0 改任何 24 文件 / 5 struct / 5 enum / 5 trait / 4 時序 / 2 狀態圖 / 4 表 DDL / 9 已知缺口 / 13 守門聯動, 僅集成点補全 + 修訂履歴 v0.1.1 行 + 顶部狀態/標題/上游引用版本號; 觸發: 2026-09-10 22:36 JST Ulysses reply "opt1" (= 按推薦改造); 估算 token 0.05M 實測 |

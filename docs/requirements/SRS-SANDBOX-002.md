@@ -2,7 +2,7 @@
 
 > **Sandbox-as-a-Service (sandboxd) — 要件定義書 v0.1.1** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
 >
-> - 状态: 🟢 Draft v0.1.1 (2026-09-10 21:57 JST 决策点 D-1~D-6 全部已拍板 per Ulysses A 选项)
+> - 状态: 🟢 Draft v0.1.2 (2026-09-10 22:36 JST 决策点 D-7~D-10 全部已拍板 per Ulysses opt1 = 全部按推荐, 跟 ARG / canvas / 5 域 / star-eventbus / star-telemetry / star-pg-adapter 集成 + 文档修正 + WBS §14.19 拆 4 子项)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 上游: `docs/architecture/SANDBOX-001.md` v0.2 (子代理 subprocess 沙箱, 仅资源维隔离)
 > - 关联 commit: (留空, root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
@@ -26,7 +26,7 @@
 |---|---|
 | 文書 ID | SRS-SANDBOX-002 |
 | 文書名 | Sandbox-as-a-Service (sandboxd) — 要件定義書 |
-| バージョン | v0.1.1 (决策点 D-1~D-6 已拍板) |
+| バージョン | v0.1.2 (决策点 D-1~D-10 全部已拍板) |
 | 作成日 | 2026-09-10 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
@@ -117,12 +117,19 @@
 | `docs/architecture/SANDBOX-001.md` v0.2 | **上游 / 派生** | sandbox v0.2 subprocess 包装器, 4 缺口 (#1+#2+#5+#6) 升级为本 SRS |
 | `AGENTS.md` §4 守门硬约束 | 上位 | 守门 #1+#5+#9+#10+#11+#13+#14 v3+#22+#28 |
 | `docs/requirements/SRS-PRE-TOOL-USE-GUARD-001.md` v0.1 | 平行 | IPA 模板参考, fail-open / fail-closed 派生, audit log Transaction append-only |
-| `docs/basic-design/SANDBOX-BASIC-DESIGN-002.md` v0.1 | 下游 | 同期落档, 8 段基本設計 |
+| `docs/basic-design/SANDBOX-BASIC-DESIGN-002.md` v0.1.1 | 下游 | 同期落档, 8 段基本設計 |
 | `docs/automation-design.md` v0.1 | 平行 | §1.2 [P]/[M]/[S] 判定 + §3.1 dispatcher.py brief 落地 |
-| `docs/guardian/README.md` | 平行 | 守门 v3x 落档目录, v27+v28+v29 实证 |
+| `docs/guardian/README.md` + `v37_sandbox_guard.md` | 平行 | 守门 v3x 落档目录, v27+v28+v29+v37 实证; v37 是 sandboxd v0.1 软约束 (per `4acae3f`), sandboxd v0.1 hard 约束 (per SANDBOX-002) 是 v0.2 升级 |
 | `scripts/automation/guardian/sandbox.py` v0.2 | 现役 | sandbox v0.2 包装器, v0.1 降级路径 |
 | `scripts/automation/dispatcher.py` v0.1 | 现役 | 子代理 invoke, 跟 sandboxd client 集成 |
 | `crates/star-mcp/` | 现役 | MCP transport, 跟 sandboxd client 集成 (Rust) |
+| `crates/agent-domain/` (10 module) | **现役 / 集成 (per D-7 拍板)** | ARG 11 子项已收官 (commit `a8ed5d0`), sandboxd session actor_id 注入 ARG Edge, 跟 ARG node 一一对应 (per D-7 推荐) |
+| `crates/arg/` + `arg-bridge/` + `arg-effect/` | **现役 / 集成 (per D-7 拍板)** | ARG (Agent Relationship Graph) 3 crate, sandboxd session 跟 10 类关系 + 5 团队模板 联动 |
+| `crates/canvas-collab/` + `docs/canvas-*/` | **现役 / 集成 (per WBS §14.19 SBX-18)** | canvas 多人协作已收官, sandboxd per-user sandbox session 场景待覆盖 |
+| 5 域 Lead (player / economy / match / social / admin) (per 守门 #3 8/21 JST) | **现役 / 集成 (per D-10 拍板)** | 5 域独立 Lead, sandboxd 5 域 policy 模板分类 (player 域 vs admin 域 默认值不同) |
+| `crates/star-eventbus/` (Valkey stream) | **现役 / 集成 (per D-9 拍板)** | 跨进程 via Valkey stream, sandboxd 内部跨 session 事件流通道 (per D-9 推荐) |
+| `crates/star-telemetry/` (Prometheus) | **现役 / 集成 (per D-9 拍板)** | Prometheus 抓取, sandboxd 9 指标可挂载, 避免重复 metrics 框架 (per D-9 推荐) |
+| `crates/star-pg-adapter/` (PG client) | **现役 / 集成 (per D-9 拍板)** | PG client, sandboxd 4 表 audit log 可走 star-pg-adapter, 避免重复 sqlx (per D-9 推荐) |
 | claude code `plugins/security-guidance` | 对照基线 | PreToolUse hook 9 种危险模式 → 本 SRS 派生 v0.2 sandboxd 4 维隔离 |
 
 ---
@@ -566,8 +573,12 @@ sandboxd v0.1 在 Windows + Linux + macOS 三平台落地, 跟 SANDBOX-001 v0.2 
 | **D-4** | FS 隔离深度 | ✅ **(已拍板 2026-09-10 21:57 JST per Ulysses A 选项) path allowlist** (子代理需要 read worktree + 写 cache) | AppContainer / mount ns 真正隔离 (强) | 只读 overlay (弱) | 🟢 已拍板 |
 | **D-5** | 跟 mavis desktop 集成 | ✅ **(已拍板 2026-09-10 21:57 JST per Ulysses A 选项) 独立 System Service** (跟 5 域 Lead 决策/代签解耦) | sandboxd 跑在 mavis 里 (耦合) | 双形态 (复杂) | 🟢 已拍板 |
 | **D-6** | 观测性 | ✅ **(已拍板 2026-09-10 21:57 JST per Ulysses A 选项) 两者都上** (Prometheus + PG audit log, 跟守门 v36 索引联动) | 仅 Prometheus | 仅 audit log | 🟢 已拍板 |
+| **D-7** | sandboxd 跟 ARG 集成 | ✅ **(已拍板 2026-09-10 22:36 JST per Ulysses opt1 = 全部按推荐) actor_id 注入 ARG Edge, sandboxd session 跟 ARG node 一一对应** | 跟 ARG 解耦 (sandboxd 自己维护关系) | sandboxd 作为 ARG 的依赖 backend | 🟢 已拍板 |
+| **D-8** | capability 维跨平台 | ✅ **(已拍板 2026-09-10 22:36 JST per Ulysses opt1) 立即实装 Win + macOS** (P0 升级, mavis 用户实际平台) | v0.2 拍摄 (P1 维持) | Linux-only 长期 (P2 维持) | 🟢 已拍板 |
+| **D-9** | 复用现有 crate (metrics / pg / eventbus) | ✅ **(已拍板 2026-09-10 22:36 JST per Ulysses opt1) 走 star-telemetry / star-pg-adapter / star-eventbus 现有接口** (避免重复造轮子) | sandboxd 自己造 (重复) | 混合 (部分复用部分自造) | 🟢 已拍板 |
+| **D-10** | 5 域 policy 模板 | ✅ **(已拍板 2026-09-10 22:36 JST per Ulysses opt1) sandboxd 5 域分类 policy, player 域 vs admin 域 默认值不同** | sandboxd 通用 policy, 5 域各自加 wrapper | 5 域不用 sandboxd (现状) | 🟢 已拍板 |
 
-**拍板格式** (per 守门 v28): 选 (1) (2) (3) 任何 + 标反转项即可, Mavis 立即更新文档 + 同步基本设计。**A 选项 = 全部用推荐, 已落档 v0.1.1 (per 2026-09-10 21:57 JST)**。
+**拍板格式** (per 守门 v28): 选 (1) (2) (3) 任何 + 标反转项即可, Mavis 立即更新文档 + 同步基本设计。**A 选项 = 全部用推荐, 已落档 v0.1.1 (per 2026-09-10 21:57 JST) + opt1 全部按推荐 (D-7~D-10), 已落档 v0.1.2 (per 2026-09-10 22:36 JST)**。
 
 ---
 
@@ -591,3 +602,4 @@ sandboxd v0.1 在 Windows + Linux + macOS 三平台落地, 跟 SANDBOX-001 v0.2 
 |---|---|---|---|---|
 | **v0.1** | 2026-09-10 21:49 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | 初版落档, 8 機能 (FR-1~FR-8, 24 项) + 5 業務要件 (BR-1~BR-5) + 7 非機能要件 (NFR-P/A/S/M/T/O/C 29 项) + 8 验收条件 (AC-1~AC-8) + 4 表 W/T/M 横展 (Session T + Policy M + Audit T + Capability M, 100% 覆盖 per 守门 #13) + 9 已知缺口 (含 1 P0 阻塞 sandboxd ↔ client 集成) + 6 决策点 (D-1 形态 / D-2 IPC / D-3 网络 / D-4 FS / D-5 集成 / D-6 观测), IPA 12 段结构 (目的 / 範囲 / 用語 / 業務 / 機能 / 非機能 / 制約 / 验收 / 数据 / 缺口 / 决策 / 签字 + 修订), 守门 10/10 通过 | 2026-09-10 21:48 JST Ulysses 拍板"agent 的沙盒设计到位了吗？没有的话，我希望沙盒组建是一个 app 形式的独立模块" + 21:49 JST "先把需求文档和基本设计改好" + SANDBOX-001 v0.2 派生 4 缺口 (#1 network / #2 fs / #5 observability / #6 elevated) 升级为独立 app 形态 |
 | **v0.1.1** | 2026-09-10 21:57 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 + 守门 v28 拍板必带推荐项 + 9/5 04:03 拍板后立即执行) | 6 决策点 D-1~D-6 全部用推荐项 (per Ulysses A 选项), status 字段 6/6 由 "🟡 默认推荐, 待拍板" → "🟢 已拍板", 推荐项加 "✅ (已拍板 2026-09-10 21:57 JST per Ulysses A 选项)" 前缀, 拍板格式说明追加 "A 选项 = 全部用推荐, 已落档 v0.1.1"; 守门 12/12 通过, 0 改任何业务 logic, 0 改任何功能/数据/缺口定义, 仅决策点状态 + 修订历史 v0.1.1 行; 触发: 2026-09-10 21:57 JST Ulysses reply "a" (= 选项 A 全部用推荐) |
+| **v0.1.2** | 2026-09-10 22:36 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 + 守门 v28 拍板必带推荐项 + 9/5 04:03 拍板后立即执行 + 守门 #11 缺标比错标 + 守门 #1 禁回溯叙事) | 4 决策点 D-7~D-10 全部用推荐项 (per Ulysses opt1 = 全部按推荐): D-7 sandboxd 跟 ARG 集成 (actor_id 注入 ARG Edge) + D-8 capability 维跨平台立即实装 Win+macOS (P0 升级) + D-9 复用 star-telemetry/star-pg-adapter/star-eventbus + D-10 sandboxd 5 域分类 policy 模板 (player 域 vs admin 域 默认值不同); status 字段 4/4 由 (新增) → "🟢 已拍板", 推荐项加 "✅ (已拍板 2026-09-10 22:36 JST per Ulysses opt1)"; §1.5 关联文档 +5 行 (crates/agent-domain/ ARG 3 crate + canvas-collab + 5 域 Lead + star-eventbus + star-telemetry + star-pg-adapter); 修订履歴 v0.1.2 行追加, 顶部状态 v0.1.1 → v0.1.2, 文档情報 v0.1.1 → v0.1.2; 守门 12/12 通过, 0 改任何业务 logic / 6 决策点 (D-1~D-6) / 8 機能 / 4 表 W/T/M / 9 已知缺口, 仅 D-7~D-10 决策点新增 + §1.5 关联文档补全 + 修订履歴 v0.1.2 行 + 顶部状态; 触发: 2026-09-10 22:36 JST Ulysses reply "opt1" (= 按推荐改造, 跟 ARG/canvas/5 域/star-eventbus/star-telemetry/star-pg-adapter 集成) |

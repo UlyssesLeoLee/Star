@@ -3,9 +3,10 @@
 > **Status**: 🟡 **Draft v0.1** (per 2026-09-10 22:24 JST Mavis 自驱, 待 Mavis 拍板激活)
 > **Created**: 2026-09-10
 > **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 Mavis 永久代签)
-> **关联 commit**: `4219c3d` (跨 session 协同 v37 sandbox 守门候选落档)
+> **关联 commit**: `4219c3d` (跨 session 协同 v37 sandbox 守门候选落档) + `bb30a9c` (SANDBOX-002 架构文档 v0.1) + `d01509b` (SANDBOX-002 6 文档 SRS+BD+DD+TDD+IMPL+WBS) + `941daea` (SANDBOX-002 v0.1.1 决策) + v0.1.2 4 决策点修订 (per 22:36 JST opt1)
 > **编号避让**: v32 / v33 / v34 / v35 / v36 已用, v37 落到下一个空号位
 > **守门基线**: 守门 #1+#1 v15+#1 v25+#5+#9+#11+#12 v21+#14 v3+#14 v4+#19 v19+#24 v2 12 项必过
+> **跟 SANDBOX-002 关系** (per 22:36 JST opt1 = 全部按推荐改造): v37 v0.1 是 sandboxd v0.1 **软约束** (5 维软约束: path allowlist + network allowlist + cpu/mem/wall-clock + capability stub + sandbox mode flag, 跟 `4219c3d` sandbox.py 集成 100% 对齐), **sandboxd v0.1 hard 约束** (4 维隔离 resource/network/fs/capability + 3 平台 + gRPC + session 池 + observability, per `docs/architecture/SANDBOX-002.md` v0.1.1 + 6 决策点 D-1~D-6 已拍板) 是 v0.2 升级; v37 → active 触发条件 = sandboxd v0.1 落地 (per WBS §14.19 SBX-01..SBX-08) + 实测 0 越权, v0.1 软约束 → v0.2 hard 约束切换
 
 ---
 
