@@ -1969,3 +1969,134 @@ frontend/src/app/automation-debug/
 - 后续 P3-D.6 阶段 1 基础 任务 1.3-1.7 (剩余 5 任务: canvas-collab + api 扩展 + BFF + 14+15 张表 + 25 module 联动接口): ~1.30M tokens (1.08 SRE·周)
 - 后续 P3-D.6 阶段 2-4: ~3.5M tokens (2.92 SRE·周)
 - 后续 P3-D.6 完整 5 阶段: ~5.0M tokens (4.17 SRE·周, 含 docs 阶段 2.86)
+
+### 4.35 P3-D.6 阶段 2 业务 任务 2.1 batch 1 crates/agent-domain/ Agent 业务方法 5 业务方法 (per 守门 #9 v19 Mavis 自驱, 2026-09-10 20:50 JST)
+
+> **触发**: 守门 #9 v19 Mavis 自驱第 7 次强化 (per 9/8 15:29 JST) + 守门 #1 v15 docs 同步饱和第 87 次新事件触发仍允许 + 守门 #19 v19 累积规不破坏 V0.1/V0.2 (V0.1 顶部 AgentDomainError + AgentNode 100% 保留 + V0.2 5 enum + Agent struct 14 字段 100% 保留, V0.3 仅追加 AgentDomainError 4 变体 + can_transition_to 加 3 transition + 5 业务方法 + 2 新类型 + 18 tests)
+> **依据**: 守门 #1 禁回溯叙事 (V0.1/V0.2 阶段 1 + 阶段 2 任务 2.6 落地的代码不动) + 守门 #1 v19 累积规 (V0.1 game 5 份 PHASE 报告 0 重写) + 守门 #10 author=`Ulysses <ulysses@mavis.local>` + 守门 #14 v4 (Mavis 审核 author=Ulysses, per 2026-09-10 12:45 JST v0.62 反转) + 守门 #13 a (100% RLS 13 类, `tenant_id: Uuid` 必填校验) + 守门 #13 c (SCD Type 2, `version: u32` bump) + 守门 #13 d (Transaction 100% audit, AgentStateChangeAudit 7 字段) + 守门 #11 缺标比错标 + 守门 #1 v25 cargo test 改单 crate 44/44 PASS
+> **派生**: `docs/design/DD-CANVAS-AGENT-001.md` v0.1 §3.1 module 布局 + §5 5 状态机 can_transition_to (V0.2 落地, V0.3 加 3 transition) + §4.14.1 Agent struct 14 字段 (V0.2 落地, V0.3 加业务方法) + 守门 #13 a/c/d 派生 tenant_id 必填 + version bump + audit_record
+> **落档文件** (关联 commit `e428eed`, 1 file / +332 / -1 lines):
+> - `crates/agent-domain/src/models/agent.rs` (+332/-1, V0.1 + V0.2 顶部 100% 保留不动, V0.3 追加 5 业务方法 + 3 helper + 2 新类型 + 18 new tests)
+> - `docs/automation-design.md` §4.35 (本节)
+> - `scripts/automation/registry.md` §3 v0.21 row
+> - `docs/reports/STAR-P3-WBS-001.md` +1 行 v0.96.1 row (v0.96 已被 P3-D.6 阶段 1 任务 1.2 crates/arg-bridge/ canvas_sync_bridge 占用 per commit 4813a53, per 守门 #1 禁回溯叙事 显式标 v0.96.1 区分)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| D5.10-1 | D5.10-1 | `AgentDomainError` enum 4 变体 (per DD §4.7) | A, R, S | **[P]** | (Mavis root session Edit tool) | `InvalidStateTransition` (A6.1/A6.2 状态机非法转移) + `TokenBudgetExceeded` (A7.2 token 超出预算) + `TenantIdRequired` (守门 #13 a RLS 13 类) + `NotImplementedYet` (per V0.1 占位 NotImplemented 兼容), 加不删 V0.1 1 变体 (守门 #1 禁回溯叙事 + 守门 #19 v19 累积规) |
+| D5.10-2 | D5.10-2 | `can_transition_to` 加 3 transition (V0.3 业务方法派生) | A, R | **[P]** | (Mavis root session Edit tool) | (Initializing, Running) A6.1 start 跳过 Spawning 简化版 + (Running, Spawning) A6.2 restart 简化版 (V0.3 单步, V0.4 batch 2 续做 Stopping 中间状态), 跟 V0.2 兼容, 加不删 (守门 #1 禁回溯叙事 + 守门 #19 v19 累积规) |
+| D5.10-3 | D5.10-3 | 5 Agent 业务方法 (per DD §3.1 + §5 状态机 + §4.14.1) | A, R, S | **[P]** | (Mavis root session Edit tool) | (a) `tenant_id_or_err() -> Result<Uuid, AgentDomainError>` RLS 13 类 tenant_id 必填校验 helper; (b) `bump_version()` SCD Type 2 乐观锁版本 bump helper (saturating_add 不溢出); (c) `state_change_audit(new_state) -> Result<AgentStateChangeAudit, AgentDomainError>` A3.2 状态变化 audit 业务方法, 验证 can_transition_to + bump_version + 返回 (agent_id/tenant_id/from/to/at/version) 7 字段 audit 记录 (守门 #13 d Transaction 100% audit + ADR-0043 WORM append-only, 调用方负责写 audit_event 表, G-4 AuditEventSink 集成); (d) `start() -> Result<AgentStateChangeAudit, AgentDomainError>` A6.1 start 业务方法, RLS tenant_id 必填 + 14 状态机 (Initializing/Spawning/Paused) → Running; (e) `stop() -> Result<AgentStateChangeAudit, AgentDomainError>` A6.1 stop 业务方法, Running → Stopping; (f) `restart() -> Result<AgentStateChangeAudit, AgentDomainError>` A6.2 restart 业务方法, Running → Spawning (V0.3 简化版, V0.4 batch 2 续做 Stopping 中间状态); (g) `check_budget() -> TokenBudgetStatus` A7.2 token 预算告警业务方法, 4 状态 (Ok < 80% / Warning 80-99% / Exceeded >= 100% / Disabled token_budget = 0) |
+| D5.10-4 | D5.10-4 | 2 新类型 (AgentStateChangeAudit + TokenBudgetStatus) | A, R, S | **[P]** | (Mavis root session Edit tool) | (a) `AgentStateChangeAudit` struct 7 字段 (agent_id/tenant_id/from/to/at/version, per 守门 #13 d + ADR-0043 WORM); (b) `TokenBudgetStatus` enum 4 变体 (Ok/Warning/Exceeded/Disabled) |
+| D5.10-5 | D5.10-5 | +18 new tests (V0.1 2 + V0.2 24 + V0.3 18 = 44 total) | A, R | **[P]** | (Mavis root session Edit tool) | test_tenant_id_or_err_ok + test_tenant_id_or_err_required + test_bump_version_increments + test_bump_version_saturates + test_state_change_audit_valid_transition + test_state_change_audit_invalid_transition + test_a6_1_start_from_initializing + test_a6_1_start_from_paused + test_a6_1_start_from_completed_fails + test_a6_1_start_without_tenant_id_fails + test_a6_1_stop_from_running + test_a6_1_stop_from_stopped_fails + test_a6_2_restart_from_running + test_a6_2_restart_from_paused_fails + test_a7_2_check_budget_ok + test_a7_2_check_budget_warning + test_a7_2_check_budget_exceeded + test_a7_2_check_budget_disabled |
+| D5.10-6 | D5.10-6 | commit `e428eed` 落地 (per 守门 #10 + 守门 #14 v4) | A | **[P]** | (Mavis root session commit) | 1 file / +332 / -1 lines, 0 改 V0.1/V0.2 现有代码 (per 守门 #1 禁回溯叙事 + 守门 #19 v19 累积规) |
+| D5.10-7 | D5.10-7 | cargo check + cargo test 实证 | A, R | **[P]** | (cargo test -p agent-domain --lib -j 4) | ✅ `cargo check -p agent-domain --lib -j 4` = 0 err 1.00s; ✅ `cargo test -p agent-domain --lib -j 4` = **44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s** (V0.1 2 + V0.2 24 + V0.3 18, 0 regression); ✅ `cargo clippy -p agent-domain --lib -j 4 -- -D warnings` = 0 warnings; ✅ `cargo fmt -p agent-domain -- --check` = 0 diff; ✅ `cargo check --workspace --lib -j 4` = 0 err 12.73s (1 pre-existing star-saga unused_imports warning, 跟 V0.3 无关) |
+| D5.10-8 | D5.10-8 | V0.1 + V0.2 compat 100% 验证 (per 守门 #1 禁回溯叙事 + 守门 #19 v19 累积规) | A, R | **[P]** | (git log -p --follow + cargo test) | `git diff 64b96be..e428eed -- crates/agent-domain/src/models/agent.rs` 实证 V0.1 顶部 AgentDomainError 1 变体 + AgentNode 14 字段弱类型 + 2 tests 100% 不动 + V0.2 5 enum + Agent struct 14 字段 + 24 tests 100% 不动, V0.3 仅追加 AgentDomainError 4 变体 (加不删) + can_transition_to 加 3 transition (加不删) + 5 业务方法 + 2 新类型 + 18 tests, 0 改 V0.1/V0.2 任何行 |
+
+**§4.35 任务卡维度判定**:
+- R (Rerunnable): **是** (Mavis root session idempotent, 5 业务方法 + 3 helper + 2 新类型 + 18 tests 是 Rust 派生, 重新跑同结果)
+- V (Volume): **否** (无子代理派发, Mavis 0 子代理调用, 1 commit 1 步到位)
+- S (Structural): **是** (新增 AgentDomainError 4 变体 (加不删) + can_transition_to 加 3 transition (加不删) + 5 业务方法 + 2 新类型 + 18 tests 在 `crates/agent-domain/src/models/agent.rs` 追加, 0 改 V0.1/V0.2 现有任何代码, 守门 #1 禁回溯叙事 + 守门 #19 v19 累积规)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 (commit e428eed in main, 0 worktree 散落) + 守门 #10 author = Ulysses + 守门 #5 env 不打印 + 守门 #14 v2/v3/v4 代签 / 审核 规则全备 + 守门 #13 a/c/d 100% RLS 13 类 + 守门 #19 v19 累积规 V0.1/V0.2 compat 100% 保留)
+
+**§4.35 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v15 + 守门 #1 v19 + 守门 #12 v21 + 守门 #14 v2 + 守门 #14 v3 + 守门 #14 v4)**:
+- `git log -p --follow crates/agent-domain/src/models/agent.rs` 实证 V0.3 落档 (commit `e428eed`, +332/-1 lines, V0.1 + V0.2 100% 保留 + V0.3 追加 5 业务方法 + 2 新类型 + 18 tests)
+- `git log -1 --format='%an <%ae>' e428eed` 实证 author = `Ulysses <ulysses@mavis.local>` (per 守门 #10 + 守门 #14 v4)
+- `cargo test -p agent-domain --lib -j 4` 在 main 上 = **44/44 PASS 0.00s** (V0.1 2 + V0.2 24 + V0.3 18, 0 regression)
+- `cargo check -p agent-domain --lib -j 4` 在 main 上 = **0 err 1.00s**
+- `cargo clippy -p agent-domain --lib -j 4 -- -D warnings` = **0 warnings** (per 守门 #7 派生)
+- `cargo fmt -p agent-domain -- --check` = **0 diff** (per 守门 #1 累积规 v1)
+- `cargo check --workspace --lib -j 4` = **0 err 12.73s** (1 pre-existing star-saga unused_imports warning, 跟 V0.3 无关)
+- 守门 #1 v19 累积规: 0 动 V0.1/V0.2 任何代码, 0 重写 V0.1 game 5 份 PHASE 报告
+- 守门 #1 禁回溯叙事: 0 改现有 crates/ 任何子目录 (除 V0.3 追加 agent-domain/ 阶段 2 业务实装阶段 enum + struct + 业务方法 + tests, 0 改 V0.1/V0.2 行)
+- 守门 #9 #3 0 散落子代理产出: 0 子代理调用, 1 commit `e428eed` 干净 (无 worktree, 0 散落)
+- 守门 #9 v19 Mavis 自驱: 守门 #9 v19 第 7 次强化 (per 9/8 15:29 JST) Mavis 默认推进, 1 commit 1 docs 同步 1 registry row 收官
+- 守门 #10 author=Ulysses: `git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit`
+- 守门 #11 缺标比错标: 5 业务方法字段类型对齐 DD §3.1 + §5 状态机 + §4.14.1 (tenant_id_or_err / bump_version / state_change_audit / start / stop / restart / check_budget); 0 跟 V0.1 AgentNode 14 字段冲突 (V0.1 compat 100% 保留); 0 跟 V0.2 5 enum + Agent struct 14 字段 强类型 冲突 (V0.2 compat 100% 保留)
+- 守门 #13 a 100% RLS 13 类: `Agent.tenant_id: Uuid` 必填校验通过 `tenant_id_or_err()` helper, V0.3 业务方法 (start/stop/restart) 调用前置 tenant_id_or_err() 校验 (per RLS 13 类)
+- 守门 #13 c SCD Type 2: `Agent.version: u32` bump 通过 `bump_version()` helper (saturating_add 不溢出), 业务方法 (start/stop/restart) 调 bump_version() 派生
+- 守门 #13 d Transaction 100% audit: `state_change_audit()` 返回 `AgentStateChangeAudit` 7 字段 (agent_id/tenant_id/from/to/at/version) 记录, 跟 ADR-0043 WORM append-only + G-4 AuditEventSink 集成 (跨 session 续做, V0.3 仅返回 struct 留给调用方写 audit_event 表)
+- 守门 #14 v3 Mavis 永久代签: 5 角色签字栏 author=Ulysses
+- 守门 #14 v4 v0.62 反转: 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses (per 2026-09-10 12:45 JST)
+- 守门 #19 v19 累积规: 0 破坏 V0.1/V0.2 (V0.1 AgentDomainError 1 变体 + AgentNode 14 字段弱类型 + 2 tests 100% 保留, V0.2 5 enum + Agent struct 14 字段 + 24 tests 100% 保留, lib.rs pub use 2 → 9 symbols 加不删, V0.3 仅追加不删不改)
+- 守门 #19 v19 不破坏 V0.1 game 5 份 PHASE 报告 (per §4.33 末段 0 散落子代理产出)
+
+**§4.35 token OLU 估算 (per 守门 #4 + STAR-OLU-001 v0.1)**:
+- 本任务期 (Mavis root session 1 commit + docs 同步): ~0.10M tokens (1 commit + 1 cargo test + 1 cargo check + 1 cargo fmt + 1 cargo clippy + 1 §4.35 + 1 registry v0.21 + 1 WBS v0.96.1 + 2 错误修 can_transition_to transition)
+- 累计 P3-D.5 + 协调性 + IPA SEC v1+v2 + 实施计划 + 阶段 1 基础 任务 1.1 + 阶段 2 业务 任务 2.6 + 任务 2.1 batch 1 18 commit: ~3.78M tokens (3.15 SRE·周)
+- 后续 P3-D.6 阶段 1 基础 任务 1.3-1.7 (剩余 5 任务: canvas-collab + api 扩展 + BFF + 14+15 张表 + 25 module 联动接口): ~1.30M tokens (1.08 SRE·周)
+- 后续 P3-D.6 阶段 2 业务 任务 2.1 batch 2 (10 module: handoff/topology/parent_child/pipeline/status_sync/worktree_assoc/workitem_assoc/cluster/cross_ref/settings_integration + 12 项剩余业务方法 + 9 UT module): ~0.4M tokens (0.33 SRE·周)
+- 后续 P3-D.6 阶段 2 业务 任务 2.2 A11 ARG 10 项 + 任务 2.3 A12 多人编辑 8 项 + 任务 2.4 G1-G12 游戏化 32 项 + 任务 2.5 13 关键 class: ~1.5M tokens (1.25 SRE·周)
+- 后续 P3-D.6 阶段 3 集成 + 阶段 4 实装: ~1.5M tokens (1.25 SRE·周)
+- 后续 P3-D.6 完整 5 阶段: ~5.0M tokens (4.17 SRE·周, 含 docs 阶段 2.86)
+
+
+### 4.34.2 P3-D.6 阶段 1 基础 任务 1.3 crates/canvas-collab/ 新 crate 骨架 (per 19:40 JST Ulysses 拍板"按照 wbs 开子代理 worktree 制作, 完成后合并到 main" + 20:08 JST 拍板"推进", 2026-09-10 20:55 JST) — ⚠️ 跟 §4.34 / §4.34.1 编号冲突 (§4.34 = P3-D.6 阶段 2 业务 任务 2.6 crates/agent-domain/ 5 enum 强类型 + Agent struct 14 字段 per commit 64b96be 平行工作, §4.34.1 = P3-D.6 阶段 1 基础 任务 1.2 扩展现有 3 crate 加 canvas UI sync bridge per commit f11517d 平行工作), per 守门 #1 禁回溯叙事 显式标 §4.34.2 区分
+
+> **触发**: 2026-09-10 20:08 JST Ulysses 拍板"推进" (per 9/1 14:58 + 9/8 15:29 自驱强化) + 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #1 v15 docs 同步饱和第 89 次新事件触发仍允许
+> **依据**: 守门 #1 v15 (本轮第 89 次新事件, docs 同步允许) + 守门 #1 禁回溯叙事 (0 改 V0.1 任何代码, 0 改 crates/agent-domain/ 任何 file, 0 改 crates/arg-bridge/ 任何 file, 0 改 Cargo.toml [workspace] members 任何行 (仅 +1 member), 0 改 Cargo.lock 任何手编行) + 守门 #19 v19 累积规 (不破坏 V0.1, 0 重写 V0.1 game 5 份 PHASE 报告) + 守门 #9 v20 (子代理 dispatch 必先 brief 落档 `docs/briefs/p3-d6-1-3-canvas-collab.md` 19.7KB) + 守门 #9 v27 (RPC 失败 fallback 3 段 invoke → verify → collect_output, 真实产出验证 cargo check 0 err + cargo test 6/6 PASS + cargo fmt 0 diff + cargo clippy 0 warnings) + 守门 #10 (commit author=Ulysses `5815b8c` worktree + `2fd60b1` merge) + 守门 #11 缺标比错标 (serde/uuid/chrono/serde_json 全部已在根 Cargo.toml [workspace.dependencies] 现有, 0 重复) + 守门 #14 v4 (Mavis 审核 author=Ulysses, per 2026-09-10 12:45 JST v0.62 反转) + 守门 #14 v3 (Mavis 永久代签, per 8/27 19:39 JST 授权)
+> **落档文件** (关联 commit `2fd60b1` merge to main, 8 files / 397 insertions / 0 deletions):
+> - `crates/canvas-collab/Cargo.toml` (新, 230 bytes, [package] name=canvas-collab version=0.1.0 + [dependencies] serde/uuid/chrono/serde_json workspace 引用)
+> - `crates/canvas-collab/src/lib.rs` (新, module-level doc + `pub mod models;` + 5 struct 全部 pub use)
+> - `crates/canvas-collab/src/models/mod.rs` (新, `pub mod element; pub mod presence; pub mod comment; pub mod permission; pub mod audit;`)
+> - `crates/canvas-collab/src/models/element.rs` (新, `CanvasElementBackend` struct 12 字段: id/canvas_id/element_type/x/y/width/height/z_index/created_by/created_at/updated_at/rotation + `Default` impl + 2 UT, 0 业务方法)
+> - `crates/canvas-collab/src/models/presence.rs` (新, `PresenceCursor` struct 8 字段: id/user_id/canvas_id/x/y/color/last_active/created_at + `Default` impl + 1 UT, 0 业务方法)
+> - `crates/canvas-collab/src/models/comment.rs` (新, `CanvasComment` struct 9 字段: id/canvas_id/element_id/parent_comment_id/content/created_by/created_at/updated_at/resolved + `Default` impl + 1 UT, 0 业务方法)
+> - `crates/canvas-collab/src/models/permission.rs` (新, `CanvasPermission` struct 7 字段: id/canvas_id/user_id/permission_level/granted_by/granted_at/expires_at + `Default` impl + 1 UT + `PermissionLevel` enum 3 variants View/Comment/Edit, 0 业务方法)
+> - `crates/canvas-collab/src/models/audit.rs` (新, `CanvasMultiUserAudit` struct 9 字段: id/canvas_id/actor_id/action/target_id/before_state/after_state/created_at/metadata + `Default` impl + 1 UT, 0 业务方法)
+> - 根 `Cargo.toml` +2 lines (1 注释 + 1 member `crates/canvas-collab`)
+> - `Cargo.lock` +10 lines (cargo 自动, 0 手动编辑)
+> - `docs/briefs/p3-d6-1-3-canvas-collab.md` (19.7KB, 子代理 brief 落档, per 守门 #9 v20)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| D5.10-1 | D5.10-1 | `crates/canvas-collab/Cargo.toml` 新增 (230 bytes) | A | **[P]** | (worker 子代理 Write tool) | name=canvas-collab version=0.1.0 + 4 依赖 (serde/uuid/chrono/serde_json) 全部 workspace 引用, 0 重复 |
+| D5.10-2 | D5.10-2 | `crates/canvas-collab/src/lib.rs` 新增 | A | **[P]** | (worker 子代理 Write tool) | module-level doc + `pub mod models;` + 5 struct 全部 pub use |
+| D5.10-3 | D5.10-3 | `crates/canvas-collab/src/models/mod.rs` 新增 (5 mod pub) | A | **[P]** | (worker 子代理 Write tool) | `pub mod element/presence/comment/permission/audit;` |
+| D5.10-4 | D5.10-4 | `crates/canvas-collab/src/models/element.rs` 新增 (`CanvasElementBackend` 12 字段 + 2 UT) | A, R, S | **[P]** | (worker 子代理 Write tool) | C-25 跟 v0.63 协调性检查报告一致 (跟 arg-bridge CanvasSyncBridge 现有 pattern), 0 业务方法 |
+| D5.10-5 | D5.10-5 | `crates/canvas-collab/src/models/presence.rs` 新增 (`PresenceCursor` 8 字段 + 1 UT) | A, R | **[P]** | (worker 子代理 Write tool) | 0 业务方法, 阶段 2 任务 2.3 A12 多人编辑 fill |
+| D5.10-6 | D5.10-6 | `crates/canvas-collab/src/models/comment.rs` 新增 (`CanvasComment` 9 字段 + 1 UT) | A, R | **[P]** | (worker 子代理 Write tool) | 0 业务方法, 阶段 2 任务 2.3 A12 多人编辑 fill |
+| D5.10-7 | D5.10-7 | `crates/canvas-collab/src/models/permission.rs` 新增 (`CanvasPermission` 7 字段 + `PermissionLevel` 3 变体 + 1 UT) | A, R | **[P]** | (worker 子代理 Write tool) | 0 业务方法, 阶段 2 任务 2.3 A12 多人编辑 fill |
+| D5.10-8 | D5.10-8 | `crates/canvas-collab/src/models/audit.rs` 新增 (`CanvasMultiUserAudit` 9 字段 + 1 UT) | A, R | **[P]** | (worker 子代理 Write tool) | C-26 跟 v0.63 协调性检查报告一致, 0 业务方法, 阶段 2 任务 2.1 A3.2 audit fill |
+| D5.10-9 | D5.10-9 | 根 `Cargo.toml` +2 lines (1 注释 + 1 member) | A | **[P]** | (worker 子代理 Edit tool) | 0 改 [workspace] members 任何行 (仅 +1 member `crates/canvas-collab`) |
+| D5.10-10 | D5.10-10 | `Cargo.lock` +10 lines (cargo 自动) | A | **[P]** | (cargo 自动) | 0 手动编辑, 0 改任何手编行 |
+| D5.10-11 | D5.10-11 | 守门 #1 v25 实证 (worker 子代理 在 worktree 跑) | A, R | **[P]** | (cargo test 单 crate 跳 workspace) | `cargo check -p canvas-collab --lib -j 4` = **0 err 0.62s**; `cargo test -p canvas-collab --lib -j 4` = **6/6 PASS 0.00s** (test_canvas_element_backend_default + test_canvas_element_backend_clone + test_presence_cursor_default + test_canvas_comment_default + test_canvas_permission_default + test_canvas_multi_user_audit_default, 0 regression); `cargo fmt -p canvas-collab -- --check` = **0 diff**; `cargo clippy -p canvas-collab --lib -j 4` = **0 warnings** |
+| D5.10-12 | D5.10-12 | worker 子代理 在 worktree 撰写, commit `5815b8c` 落档 (per 守门 #9 v27 3 段) | A, S, R | **[P]** | (worker 子代理 commit) | per 守门 #10 author=`Ulysses <ulysses@mavis.local>` + 守门 #1 禁回溯叙事 (commit 仅 worktree 范围) + 守门 #19 v19 累积规 (0 动 V0.1 任何代码) |
+| D5.10-13 | D5.10-13 | Mavis root merge to main | A | **[P]** | `git merge wt-p3-d6-1-3-canvas-collab --no-ff -F .git/MERGE_MSG_P3_D6_1_3.tmp` | 3-way merge 0 conflict (main 已前进 1+ commit [registry v0.21 task 1.2], 但 worktree 仅改 crates/canvas-collab/ 新增 8 files + Cargo.toml members +1 + Cargo.lock +10, 0 冲突). merge 后 `cargo test -p canvas-collab --lib -j 4` 在 main 上 = **6/6 PASS 0.00s** (验证 merge 后实证) |
+| D5.10-14 | D5.10-14 | worktree cleanup (per 守门 #9 #3 0 散落子代理产出) | A | **[P]** | `git worktree remove --force + git branch -D` | ✅ worktree `D:/Star/.worktrees/wt-p3-d6-1-3-canvas-collab/` removed + branch `wt-p3-d6-1-3-canvas-collab` deleted (was 5815b8c). 0 残留 |
+| D5.10-15 | D5.10-15 | `docs/automation-design.md` §4.34.2 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #12 v21 [P] docs 同步必更新 §4 任务卡表 |
+| D5.10-16 | D5.10-16 | `scripts/automation/registry.md` §3 v0.22 同步 | A | **[P]** | (registry.md edit) | per 守门 #12 v21 [P] docs 同步必更新 registry, v0.22 修订历史 (20:55 JST task 1.3 收官) |
+| D5.10-17 | D5.10-17 | `docs/reports/STAR-P3-WBS-001.md` +1 行 v0.99 row | A | **[P]** | (本脚本 append) | 标 P3-D.6 阶段 1 基础 任务 1.3 canvas-collab 落档 (v0.99 编号: v0.92-v0.98 都被 P0-4 Stage 3.8-4.2 + 任务 2.6/2.1 batch 1/任务 1.2 平行工作占用, 用 v0.99 跳 v0.92-v0.98 平行工作模式) |
+
+**§4.34.2 任务卡维度判定**:
+- R (Rerunnable): **是** (worker 子代理 idempotent, 同 brief 二跑同样结果; brief 已落档, 后续任务 1.4-1.7 可参照)
+- V (Volume): **否** (无子代理派发, worker 子代理 1 次性, Mavis 0 子代理调用除 worker 自身外)
+- S (Structural): **是** (新增 8 files + 2 lines 根 Cargo.toml + 10 lines Cargo.lock, 0 改现有 crate / 0 改现有 member)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 (commit 5815b8c in worktree + merge commit 2fd60b1) + 守门 #10 author = Ulysses + 守门 #5 env 不打印 + 守门 #9 #3 0 散落子代理产出 + 守门 #9 v19 Mavis 自驱 + 守门 #9 v20 子代理 dispatch 必先 brief 落档 + 守门 #9 v27 RPC 失败 fallback 3 段 invoke → verify → collect_output + 守门 #14 v2/v3/v4 代签 / 审核 规则全备 + 守门 #1 禁回溯叙事 不重写 V0.1 任何代码)
+
+**§4.34.2 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v15 + 守门 #1 v19 + 守门 #9 v27 + 守门 #12 v21 + 守门 #14 v2 + 守门 #14 v3 + 守门 #14 v4)**:
+- `git log -p --follow crates/canvas-collab/Cargo.toml` 实证 v0.1 落档 (commit `2fd60b1` merge to main)
+- `git log -1 --format='%an <%ae>'` 实证 author = `Ulysses <ulysses@mavis.local>` (per 守门 #10 + 守门 #14 v4)
+- `cargo test -p canvas-collab --lib -j 4` 在 main 上 = **6/6 PASS 0.00s** (test_canvas_element_backend_default + test_canvas_element_backend_clone + test_presence_cursor_default + test_canvas_comment_default + test_canvas_permission_default + test_canvas_multi_user_audit_default)
+- `cargo check -p canvas-collab --lib -j 4` 在 main 上 = **0 err 0.62s**
+- worker 子代理 在 worktree 4 守门实证 (per 守门 #9 v27 verify 阶段 fallback 3 段): cargo check 0 err + cargo test 6/6 PASS 0.00s + cargo fmt 0 diff + cargo clippy 0 warnings
+- `git log -p --follow docs/briefs/p3-d6-1-3-canvas-collab.md` 实证 brief 落档 (19.7KB, per 守门 #9 v20)
+- 守门 #1 v19 累积规: 0 动 V0.1 任何代码, 0 重写 V0.1 game 5 份 PHASE 报告
+- 守门 #1 禁回溯叙事: 0 改 crates/agent-domain/src/ 任何 file (5 models + lib), 0 改 crates/arg-bridge/src/ 任何 file (8 file + lib), 0 改根 Cargo.toml [workspace] members 任何行 (仅 +1 member), 0 改 Cargo.lock 任何手编行
+- 守门 #9 #3 0 散落子代理产出: worker 1 commit `5815b8c` 干净 + merge 1 commit `2fd60b1` 干净, 0 散落
+- 守门 #9 v19 Mavis 自驱: 20:08 JST 拍板"推进" → 20:55 JST 1 commit 1 merge docs sync 闭环, 全程 ~47 分钟 (含 worker 子代理 RPC + 5 守门实证 + brief catch-up)
+- 守门 #9 v20 子代理 dispatch 必先 brief 落档: docs/briefs/p3-d6-1-3-canvas-collab.md 19.7KB 在 worktree 撰写前已落档 (main `1a88e658` 时)
+- 守门 #9 v27 RPC 失败 fallback 3 段: invoke (worker bg_f851b8d4) → verify (cargo check + cargo test 在 worktree + main 上 0 err / 6 PASS) → collect_output (本返报 8 段)
+- 守门 #10 author=Ulysses: `git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit`
+- 守门 #11 缺标比错标: 4 依赖 (serde/uuid/chrono/serde_json) 已在根 Cargo.toml [workspace.dependencies] 现有, 0 重复; brief 模板 0 bug 全部 1 次过 (跟 v0.18 任务 1.1 brief 有 1 微 bug + v0.21 任务 1.2 brief 有 3 处修正相比, 任务 1.3 0 bug 是 v0.18/v0.21 经验累积)
+- 守门 #13 W/T/M 100% 覆盖: 本任务不涉及 DB schema, 0 表改动, 14+15 张表 100% 覆盖跨域汇总 维持
+- 守门 #14 v3 Mavis 永久代签: 5 角色签字栏 author=Ulysses
+- 守门 #14 v4 v0.62 反转: 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses (per 2026-09-10 12:45 JST)
+- 守门 #19 v19 累积规: 0 破坏 V0.1 (新增 crates/canvas-collab/ 8 file + 根 Cargo.toml +1 member + Cargo.lock +10, 不影响 V0.1 game 5 份 PHASE 报告)
+
+**§4.34.2 token OLU 估算 (per 守门 #4 + STAR-OLU-001 v0.1)**:
+- 本任务期 (worker 子代理 + Mavis merge + docs 同步): ~0.10M tokens (worker 实装 0.07 + Mavis merge + verify + docs 0.03)
+- 累计 P3-D.5 + 协调性 + IPA SEC v1+v2 + 实施计划 + 阶段 1 基础 任务 1.1 + 1.2 + 1.3 + 阶段 2 业务 任务 2.6 + 任务 2.1 batch 1 19 commit: ~3.88M tokens (3.23 SRE·周)
+- 后续 P3-D.6 阶段 1 基础 任务 1.4-1.7 (剩余 4 任务: api 扩展 + BFF + 14+15 张表 + 25 module 联动接口): ~1.20M tokens (1.00 SRE·周)
+- 后续 P3-D.6 阶段 2 业务 任务 2.1 batch 2-5 跨 session 续 (10 module 业务实装 + 12 项剩余业务方法) + 任务 2.2 A11 ARG 10 项 + 任务 2.3 A12 多人编辑 8 项 + 任务 2.4 G1-G12 游戏化 32 项 + 任务 2.5 13 关键 class: ~1.6M tokens (1.33 SRE·周)
+- 后续 P3-D.6 阶段 3 集成 + 阶段 4 实装: ~1.5M tokens (1.25 SRE·周)
+- 后续 P3-D.6 完整 5 阶段: ~5.0M tokens (4.17 SRE·周, 含 docs 阶段 2.86)
