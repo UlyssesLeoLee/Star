@@ -87,7 +87,17 @@ Phase G 至少落地 2 个 `CacheBackend` 实现：
 | 实现 | 后端 | 用途 | 性能 |
 |------|------|------|------|
 | `InMemoryBackend` | `dashmap` + `tokio::time::sleep` | 开发 / 测试 / 单 node 部署 | 纳秒级 |
-| `ValkeyBackend` | `redis-rs` 0.27+ / `valkey-rs` (协议 100% 兼容) | 生产 / 多 node 部署 | 毫秒级 |
+| `ValkeyBackend` | `redis-rs` 0.27+ (`tokio-comp` + `connection-manager` features) | 生产 / 多 node 部署 | 毫秒级 |
+
+**选型决定 (per 2026-09-10 23:41 JST 拍板)**:
+
+- 选 **`redis-rs` 0.27+** (commit pending Phase G+ 实装落地时)
+- 理由 1 (协议兼容): Redis RESP2/RESP3 协议 100% 兼容 Valkey,客户端无需 Valkey 专用 fork
+- 理由 2 (生态成熟): `redis-rs` 8 年+ 维护,周下载量 30M+,Tokio 异步 runtime 稳定支持
+- 理由 3 (Tokio 集成): workspace 已统一 tokio 异步 runtime,`redis-rs` 提供原生 `tokio-comp` feature,无 runtime 冲突
+- 理由 4 (演进路径): Valkey 8.0+ 引入新命令 (e.g. `ZMPOP` / `CLUSTER LINKS`),`redis-rs` upstream 跟踪 Redis 协议主线,新命令跟进速度 < Valkey 官方 1-2 周
+- 候选 `valkey-rs` 不选: 2024-12 LF 发布的社区 fork,目前 < 6 个月,生产验证少
+- 候选 `fred` (Redis-rs 竞品) 不选: 跟 tokio 集成 OK 但 API 风格非 idiomatic Rust,迁移成本高
 
 ## §3 Key 命名规范
 
