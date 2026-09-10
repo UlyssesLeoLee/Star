@@ -2313,3 +2313,19 @@ frontend/src/app/automation-debug/
 - 后续 P3-D.6 阶段 2 业务 任务 2.1 batch 2-5 跨 session 续 + 任务 2.2 A11 ARG 10 项 + 任务 2.3 A12 多人编辑 8 项 + 任务 2.4 G1-G12 游戏化 32 项 + 任务 2.5 13 关键 class: ~1.6M tokens (1.33 SRE·周)
 - 后续 P3-D.6 阶段 3 集成 + 阶段 4 实装: ~1.5M tokens (1.25 SRE·周)
 - 后续 P3-D.6 完整 5 阶段: ~5.0M tokens (4.17 SRE·周, 含 docs 阶段 2.86)
+
+
+### 4.34.5 P3-D.6 阶段 1 基础 任务 1.7 25 module 跨域接口对账 落档 (per 21:30 JST 拍板"完成剩余任务", 2026-09-10 22:00 JST) — ⚠️ 跟 §4.34 / §4.34.1 / §4.34.2 / §4.34.3 / §4.34.4 编号冲突 (§4.34 = 任务 2.6 per commit 64b96be, §4.34.1 = 任务 1.2 per commit f11517d, §4.34.2 = 任务 1.3 per commit 2fd60b1, §4.34.3 = 任务 1.4 per commit 2733c4d, §4.34.4 = 任务 1.5 per commit 3975bf2 平行工作), per 守门 #1 禁回溯叙事 显式标 §4.34.5 区分
+
+> **触发**: 2026-09-10 21:30 JST 拍板"完成剩余任务" (per 9/1 14:58 + 9/8 15:29 自驱强化) + 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #1 v15 docs 同步饱和第 92 次新事件触发仍允许
+> **依据**: 守门 #1 v15 (本轮第 92 次新事件, docs 同步允许) + 守门 #1 禁回溯叙事 (0 改 V0.1 + V0.2 任务 1.1-1.6 任何 file) + 守门 #19 v19 累积规 (不破坏 V0.1, 0 重写 V0.1 5 域任何 code) + 守门 #5 v2 (env 不打印) + 守门 #6 (PowerShell only 0 bash &&) + 守门 #9 v20 (子代理 dispatch 必先 brief 落档 `docs/briefs/p3-d6-1-7-25module-cross.md` 12.4KB) + 守门 #9 v27 (RPC 失败 fallback 3 段, 真实产出验证 cargo check 0 err + cargo test 35/35 PASS 0 regression + cargo fmt 0 diff + cargo clippy 0 warnings on my code + git diff crates/ db/ 0 line) + 守门 #10 (commit author=Ulysses `f1a104a` worktree + `305b72a` merge) + 守门 #11 缺标比错标 (5 已知缺口显式标) + 守门 #13 (25 module 跨域边界 100% "N (RGS call via HTTP)" 0 跨域 Rust crate 引用) + 守门 #14 v4 (Mavis 审核 author=Ulysses) + 守门 #14 v3 (Mavis 永久代签) + 8/31 22:45 JST RGS 协议 v0.62 disclaimer
+> **落档文件** (关联 commit `305b72a` merge to main, 2 files / 652 insertions / 0 deletions):
+> - `docs/architecture/P3D6-25-MODULE-CROSS-INTERFACE.md` (新, 307 lines / 17.4KB, 25 module 5 字段表 name/path/inputs/outputs/cross_domain_boundary + Mermaid 关系图 + 跨域接口 5 维度统计 HTTP ~50 / gRPC 0 / WebSocket 5 / DB ~100 / in-process ~80, per 守门 #22 mock placeholder P0-4 阶段只对账 P2 阶段 worker 子代理实装)
+> - `docs/architecture/P3D6-25-MODULE-DEPS.md` (新, 345 lines / 17.6KB, 25 module 依赖图 + V0.1 baseline 对比 Cargo.toml [dependencies] 实证 + 0 循环依赖 7 SCC + 0 跟 RGS 5 域共享)
+> - `docs/briefs/p3-d6-1-7-25module-cross.md` (12.4KB, 子代理 brief 落档, per 守门 #9 v20)
+
+**§4.34.5 token OLU 估算 (per 守门 #4 + STAR-OLU-001 v0.1)**:
+- 本任务期 (worker 子代理 + Mavis merge + docs 同步): ~0.18M tokens (worker 实装 0.13 + Mavis merge + verify + docs 0.05)
+- 累计 P3-D.5 + 协调性 + IPA SEC v1+v2 + 实施计划 + 阶段 1 基础 任务 1.1 + 1.2 + 1.3 + 1.4 + 1.5 + 1.6 + 1.7 25 commit: ~4.62M tokens (3.85 SRE·周)
+- **P3-D.6 阶段 1 基础 7 任务 全部 收官**
+- 后续 P3-D.6 阶段 2 业务 任务 2.1-2.5 + 阶段 3 集成 任务 3.1-3.4 + 阶段 4 实装 任务 4.1-4.6 跨 session 续做估 ~5.0M tokens / 4.17 SRE·周 (per 实施计划 §3)
