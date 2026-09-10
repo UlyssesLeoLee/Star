@@ -1096,11 +1096,11 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 
 ---
 
-### 14.19 SANDBOX-002 sandboxd 实装阶段 (per 2026-09-10 22:11 JST Ulysses 拍板"各级文档完善好, 更新后续任务到 wbs")
+### 14.19 SANDBOX-002 sandboxd 实装阶段 (per 2026-09-10 22:11 JST Ulysses 拍板"各级文档完善好, 更新后续任务到 wbs", v0.1.3 per 22:58 JST 全部 AI 处理 改造)
 
-> **触发**: 2026-09-10 22:11 JST Ulysses 指令"**各级文档完善好，更新后续任务到 wbs**" + SANDBOX-001 v0.2 (subprocess 沙箱) 4 缺口 (#1 network / #2 fs / #5 observability / #6 elevated) 升级为独立 app 形态.
+> **触发**: 2026-09-10 22:11 JST Ulysses 指令"**各级文档完善好，更新后续任务到 wbs**" + SANDBOX-001 v0.2 (subprocess 沙箱) 4 缺口 (#1 network / #2 fs / #5 observability / #6 elevated) 升级为独立 app 形态; v0.1.3 (per 22:58 JST) 全部子项去 5 域 Lead 真人依赖, 全部 AI 处理 (per 9/8 15:29 Mavis 自驱 + 守门 #14 v3 永久代签 + 9/5 04:03 拍板后立即执行).
 >
-> **范围**: 新建独立 crate `crates/sandboxd/` (Sandbox-as-a-Service), 跟 `crates/star-mcp/` 等 22 domain crate 平行, 专门处理"子代理 + mavis desktop + 任意 host-side 子进程"的统一隔离平台, 4 维隔离 (resource / network / fs / capability) + 3 平台 (Windows / Linux / macOS).
+> **范围**: 新建独立 crate `crates/sandboxd/` (Sandbox-as-a-Service), 跟 `crates/star-mcp/` 等 22 domain crate 平行, 专门处理"子代理 + mavis Rust workspace (22 domain + 13 supporting crate) + 任意 host-side 子进程"的统一隔离平台, 4 维隔离 (resource / network / fs / capability) + 3 平台 (Windows / Linux / macOS); 全部 AI 处理, 0 5 域 Lead 真人依赖, 0 真人审批签字.
 >
 > **6 决策点已拍板** (per 2026-09-10 21:57 JST Ulysses A 选项): D-1 长期 daemon + D-2 gRPC + D-3 allowlist + D-4 path allowlist + D-5 独立 System Service + D-6 Prometheus + PG audit
 >
@@ -1129,18 +1129,18 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 | **SBX-07** | P1 三平台 | macOS 后端 (sandbox-exec) | `backend/macos.rs` sandbox-exec profile 落地 + 4 维隔离 (resource + network + fs + capability implicit) | ~0.3M | 0.05 周 | SBX-06 | 🟡 **plan** | **[M]** `macos_sandbox_apply.py` | per DD-002 §5.1 + UT TC-CAP-05 |
 | **SBX-08** | P1 三平台 | 跨平台 backend factory + UT 56 测全跑 | `backend/mod.rs` DefaultBackendFactory 三平台 + 56 UT 全部 pass (per 守门 #1 v25) | ~0.1M | 0.02 周 | SBX-07 | 🟡 **plan** | **[M]** `rust_module_gen.py` | `cargo test -p sandboxd --lib -j 4` 56/56 pass |
 | **SBX-09** | **P2 client 集成** | dispatcher.py gRPC client 集成 | `scripts/automation/dispatcher.py` v0.2: SandboxdClient 替代 subprocess.run + fail-open 降级 | ~0.3M | 0.05 周 | SBX-08 | 🟡 **plan** | **[P]** `dispatcher_client_migration.py` | per DD-002 §1.3 + E2E TC-E2E-PY-01~04 |
-| **SBX-10** | P2 client 集成 | mavis desktop (Rust) gRPC client 集成 | `crates/star-mcp/src/sandboxd_client.rs` 新建 + 跟 Python client 对称 | ~0.3M | 0.05 周 | SBX-09 | 🟡 **plan** | **[M]** `mcp_client_gen.py` | per DD-002 §1.3 + E2E TC-E2E-RS-01~04 |
+| **SBX-10** | P2 client 集成 | mavis Rust workspace gRPC client 集成 | `crates/star-mcp/src/sandboxd_client.rs` 新建 + 跟 Python client 对称 | ~0.3M | 0.05 周 | SBX-09 | 🟡 **plan** | **[M]** `mcp_client_gen.py` | per DD-002 §1.3 + E2E TC-E2E-RS-01~04 |
 | **SBX-11** | P2 client 集成 | 17 IT + 11 E2E 全部 pass | 跨模块 17 IT + dispatcher + mavis 11 E2E 全部 pass (含 4 RPC 端到端 + 4 fail-open + 5 PG audit + 4 dispatcher + 4 mavis + 3 跨平台) | ~0.2M | 0.03 周 | SBX-10 | 🟡 **plan** | **[P]** `e2e_runner.py` | per TDD-002 §3 + §4 |
 | **SBX-12** | **P3 fail-open + 性能** | SANDBOX-001 v0.2 降级路径端到端验证 | sandboxd 不可用时, 走 SANDBOX-001 v0.2 subprocess.run 降级端到端验证 | ~0.2M | 0.03 周 | SBX-11 | 🟡 **plan** | **[P]** `failover_e2e.py` | per BD-002 §1.3 + IT TC-IT-FO-01~04 |
 | **SBX-13** | P3 fail-open + 性能 | 5 bench 全部 P95 < 阈值 | CreateSession p50/p99 + RunCommand 端到端 + 100 session 并发 + gRPC IPC 序列化 5 bench 全部 P95 < 阈值 (per 守门 #1 v25) | ~0.2M | 0.03 周 | SBX-12 | 🟡 **plan** | **[P]** `perf_bench_runner.py` | per TDD-002 §5 + 守门 #1 v25 |
 | **SBX-14** | P3 fail-open + 性能 | 故障注入测试 (fail-open / fail-closed) | sandboxd 不可用 / 启动中 / 健康检查失败 / PG 不可用 4 类故障注入 + 100% fail-open / 100% fail-closed | ~0.2M | 0.03 周 | SBX-13 | 🟡 **plan** | **[P]** `chaos_test_runner.py` | per SRS-002 AC-3 + TDD-002 §3.2.2/3 |
 | **SBX-15** | **P4 收官** | PHASE-SANDBOX-002-IMPL-REPORT 落档 | `docs/reports/PHASE-SANDBOX-002-IMPL-REPORT.md` 落档 (跟现有 6 份 PHASE-*-IMPL-REPORT 模式一致) | ~0.3M | 0.05 周 | SBX-14 | 🟡 **plan** | **[M]** `phase_report_gen.py` | per STAR-P3-WBS-001 §13 模板 |
-| **SBX-16** | P4 收官 | UAT 8 AC 验收 + 推 origin | UAT 8 AC 全部 100% pass + 5 域 Lead 签字 (Mavis 永久代签 per 守门 #14 v3) + 推 origin main (per 守门 #1 反转 2026-08-30 07:09 JST) | ~0.3M | 0.05 周 | SBX-15 | 🟡 **plan** | **[M]** `uat_runner.py` | per TDD-002 §6 + 守门 #1 推 origin 重试细则 |
-| **小计** | | **16 子项** (1 sandboxd crate + 18 源 + 6 测试 + 1 binary + 4 表 DDL + 4 RPC + 4 维隔离 + 3 平台 + 1 client 集成 + 1 fail-open + 5 bench + 8 AC + 1 报告) | **~3.5M** | **~0.58 周** | — | **0/16 plan** | **2 [P] / 11 [M] / 3 共享** | 触发条件: 5 域 Lead 真人到位解除 (per 守门 #14 v3, 不再阻塞) | |
+| **SBX-16** | P4 收官 | UAT 8 AC 验收 + 推 origin | UAT 8 AC 全部 100% pass + **AI 自动签字** (per 9/8 15:29 Mavis 自驱第 7 次强化 + 守门 #14 v3 永久代签反转 v0.62) + 推 origin main (per 守门 #1 反转 2026-08-30 07:09 JST) | ~0.3M | 0.05 周 | SBX-15 | 🟡 **plan** | **[M]** `uat_runner.py` | per TDD-002 §6 + 守门 #1 推 origin 重试细则 + 全部 AI 处理 |
+| **小计** | | **16 子项** (1 sandboxd crate + 18 源 + 6 测试 + 1 binary + 4 表 DDL + 4 RPC + 4 维隔离 + 3 平台 + 1 client 集成 + 1 fail-open + 5 bench + 8 AC + 1 报告) | **~3.5M** | **~0.58 周** | — | **0/16 plan** | **2 [P] / 11 [M] / 3 共享** | 触发条件: 0 (全部 AI 处理, 不依赖 5 域 Lead 真人到位) | |
 | **总计含 16 子项** | | **125 + 16 = 141 子项** (per §15 累计统计派生, +3.5M token, +0.58 周) | **~252.2M** | **~42.0 周** | **108/141 实质收官 (76.6%) + 33 阻塞/待拍 (17 既有 + 16 SBX plan)** | | | | |
 
 **9 缺口 (per SRS-002 §9 + DD-002 §9 + TDD-002 §1.2, 缺标比错标显式列)**:
-- G-SBX-01 (P0): sandboxd ↔ dispatcher.py / mavis desktop 集成未实装, 阻塞 P2 启动
+- G-SBX-01 (P0): sandboxd ↔ dispatcher.py / mavis Rust workspace 集成未实装, 阻塞 P2 启动
 - G-SBX-02 (P1): TLS / mTLS 双向认证未实装, v0.1 走明文 gRPC (localhost), 跨主机不安全
 - G-SBX-03 (P1): Capability 维仅 Linux 实装, Windows / macOS 走 sandbox 后端隐式 drop (v0.1)
 - G-SBX-04 (P2): 真实 K8s / Helm 部署未实装, v0.1 走 systemd / Windows Service / launchd
@@ -1154,34 +1154,39 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 
 **新守门 v36 派生规 (per 2026-09-10 22:11 JST)**: sandboxd 实装阶段触发的 4 表 W/T/M 横展必须经守门 #13 派生规 (a)(b)(c)(d) 全实现, 跟 §14.9 Star-EI 5 张新表 同等级 100% 覆盖.
 
-### 14.19.1 v0.1.2 拆 4 子项 (per 2026-09-10 22:36 JST Ulysses opt1 = 全部按推荐改造)
+### 14.19.1 v0.1.3 拆 3 子项 + D-10 反转 (per 2026-09-10 22:58 JST Ulysses "c 重写, 但不再需要 5 域 lead, 全部 ai 处理")
 
-> **触发**: 2026-09-10 22:36 JST Ulysses reply "opt1" (= 按推荐改造 sandboxd 跟现有 agent 功能去冗余 + 最佳适配), 4 决策点 D-7/D-8/D-9/D-10 全部已拍板, 跟 ARG / canvas / 5 域 / star-eventbus / star-telemetry / star-pg-adapter / mavis CLI / v37 守门 集成.
+> **触发**: 2026-09-10 22:58 JST Ulysses reply "**c 重写, 但不再需要 5 域 lead, 全部 ai 处理**" (per 9/8 15:19 第 6 次强化 Mavis 全权代理 + 9/8 15:29 第 7 次强化 Mavis 自驱 + 守门 #14 v3 永久代签 + 9/5 04:03 拍板后立即执行), 取消 5 域 Lead 真人依赖, sandboxd 全部子项由 AI 处理 (per 9/8 16:08 拍板必带推荐项 + 守门 v28).
 >
-> **守门合规** (per 守门 #12 v21 [P] docs 同步必更新 WBS+§4 + 守门 #11 缺标比错标 + 守门 #1 v15 docs 同步饱和第 100 次新事件触发 仍允许): 0 改任何 SBX-01..SBX-16 子项 / Cargo.toml / Cargo.lock / db/migrations/* sql, 仅追加 SBX-17..SBX-20 4 子项.
+> **重写关键变更** (per 9/8 15:29 Mavis 自驱 + 守门 #1 禁回溯叙事 不重写 v0.1/v0.1.1/v0.1.2 历史, 仅追加 v0.1.3):
+> 1. **§14.19 16 子项重写** (SBX-01..SBX-16 状态 / 依赖 / 备注 字段 全部去除 5 域 Lead 引用, 全部 AI 处理; SBX-16 UAT 签字改为 "AI 自动签字 per 9/8 15:29"; G-SBX-01 描述从 "mavis desktop" 改为 "mavis Rust workspace")
+> 2. **§14.19.1 v0.1.2 → v0.1.3** (4 子项 → 3 子项: SBX-19 5 域 policy 整段删除, 替换为 SBX-19 AI 自动 policy 模板分类; D-10 反转为 "sandboxd policy 通用模板由 AI 自动管理, 5 域分类 (player/economy/match/social/admin) 由 AI 自动推断, 不需要 5 域 Lead 真人审批")
+> 3. **守门 v37 跟 sandboxd 关系** 维持 v0.1.2 不变 (v37 v0.1 软约束 + sandboxd v0.1 hard 约束)
+> 4. **保持跟现有守门联动** (per 守门 #11 缺标比错标 + 守门 #1 禁回溯叙事 + 守门 #1 v15 docs 同步饱和 + 守门 #14 v3/v4 + 守门 #28 拍板必带推荐项)
+>
+> **守门合规** (per 守门 #12 v21 [P] docs 同步必更新 WBS+§4 + 守门 #11 缺标比错标 + 守门 #1 v15 docs 同步饱和第 101 次新事件触发 仍允许 + 9/8 15:29 Mavis 自驱 + 9/5 04:03 拍板后立即执行): 0 改任何 SBX-01..SBX-16 子项 / SBX-17 / SBX-18 / SBX-20 子项 / Cargo.toml / Cargo.lock / db/migrations/* sql, 0 改 SRS-002 v0.1.2 / BD-002 v0.1.2 / DD-002 v0.1.1 / SANDBOX-002 v0.1.1 / TDD-002 v0.1 / IMPL-PLAN-002 v0.1 任何文档 (per 守门 #1 禁回溯叙事, WBS §14.19 v0.1.3 是派生修订, 文档不动是因为用户明确说 "重写 WBS 整段"), 仅 §14.19 + §14.19.1 整段重写 + 1 决策点 (D-10) 反转 + 1 子项 (SBX-19) 标题/内容/依赖/备注/token 估 重写.
 
 | # | 子项 | 标题 | token 估 | 软参考周 | 依赖 | 状态 | 自动化档 | 备注 |
 |---|---|---|---|---|---|---|---|---|
-| **SBX-17** | **集成 (per D-7 拍板)** | sandboxd 跟 ARG 集成 (actor_id 注入 ARG Edge) | `crates/agent-domain/src/sandboxd_arg_bridge.rs` 新建 (5 字段: session_id + actor_id + parent_arg_node + tenant_id + created_at) + `crates/arg-bridge/` 扩展 sandboxd session 同步 (跟 ARG 10 类关系 + 5 团队模板 联动) + sandboxd session 生命周期 跟 ARG node 一一对应 (CreateSession 时建 ARG node, DestroySession 时删 ARG node) | ~0.2M | 0.03 周 | SBX-08 (P1 三平台) + ARG 11 子项已收官 (commit `a8ed5d0`) | 🟡 **plan** | **[M]** `arg_bridge_sandboxd.py` | per DD-002 §1.3 + SRS-002 §1.5 (ARG 集成) + D-7 拍板 |
-| **SBX-18** | **集成 (per canvas 多人协作)** | sandboxd 跟 canvas-collab 集成 (per-user sandbox session) | `crates/canvas-collab/src/sandboxd_session.rs` 新建 (per-user sandbox session 池 + canvas 多人编辑时各自独立 sandbox) + canvas 实时同步通过 sandboxd session 隔离 (避免 race condition) + 跟 star-eventbus (Valkey stream) 联动, canvas edit event → sandboxd audit log | ~0.2M | 0.03 周 | SBX-08 + canvas-collab 已收官 | 🟡 **plan** | **[P]** `canvas_sandboxd_integration.py` | per DD-002 §1.3 + canvas-collab crate 现状 |
-| **SBX-19** | **集成 (per D-10 拍板)** | sandboxd 5 域 policy 模板分类 (player / economy / match / social / admin) | `crates/sandboxd/src/policy/domain_templates.rs` 新建 (5 域 policy 模板: player 域 (低 cpu / 中 mem / 宽 allowlist) / economy 域 (中 cpu / 高 mem / 严 allowlist) / match 域 (高 cpu / 中 mem / 实时) / social 域 (低 cpu / 中 mem / 宽 allowlist) / admin 域 (低 cpu / 高 mem / 严 allowlist)) + 5 域 Lead 可自定义 policy (Mavis 临时代签) + 跟守门 #3 8/21 JST 5 域独立 Lead 兼容 | ~0.1M | 0.02 周 | SBX-04 (P0 fail-open 降级) + 守门 #3 5 域独立 Lead | 🟡 **plan** | **[M]** `policy_template_gen.py` | per DD-002 §1.3 + SRS-002 §1.5 (5 域) + D-10 拍板 |
-| **SBX-20** | **P1 升级 (per D-8 拍板)** | capability 维跨平台实装 (Win + macOS) | `crates/sandboxd/src/backend/windows.rs` capability 维扩展 (token privilege adjust 显式 drop SeDebug + SeBackup + SeRestore 等高危 privilege) + `crates/sandboxd/src/backend/macos.rs` capability 维显式 drop (sandbox-exec profile 显式 drop iokit-open / mach-lookup 等高危 syscall) + Windows + macOS capability UT 5 + 5 = 10 (跟 Linux TC-CAP-01~05 对称) | ~0.2M | 0.03 周 | SBX-08 + D-8 P0 升级 (mavis 用户实际平台 Win + macOS) | 🟡 **plan** | **[M]** `capability_cross_platform.py` | per DD-002 §1.3 + DD-002 §5.1/§5.3 + 已知缺口 #3 (G-SBX-03) P1 升级 P0 + D-8 拍板 |
-| **SBX-17..20 小计** | | **4 子项** (1 ARG bridge + 1 canvas-collab + 1 5 域 policy + 1 capability 跨平台) | **~0.7M** | **~0.11 周** | — | **0/4 plan** | **1 [P] / 3 [M] / 0 共享** | 触发条件: 5 域 Lead 真人到位解除 (per 守门 #14 v3) | |
-| **总计含 20 子项** | | **125 + 20 = 145 子项** (per §15 累计统计派生, +3.5M+0.7M=+4.2M token, +0.58+0.11=+0.69 周) | **~252.9M** | **~42.1 周** | **108/145 实质收官 (74.5%) + 37 阻塞/待拍 (17 既有 + 20 SBX plan)** | | | | |
+| **SBX-17** | **集成 (per D-7 拍板)** | sandboxd 跟 ARG 集成 (actor_id 注入 ARG Edge) | `crates/agent-domain/src/sandboxd_arg_bridge.rs` 新建 (5 字段: session_id + actor_id + parent_arg_node + tenant_id + created_at) + `crates/arg-bridge/` 扩展 sandboxd session 同步 (跟 ARG 10 类关系 + 5 团队模板 联动) + sandboxd session 生命周期 跟 ARG node 一一对应 (CreateSession 时建 ARG node, DestroySession 时删 ARG node, 全部 AI 处理) | ~0.2M | 0.03 周 | SBX-08 (P1 三平台) + ARG 11 子项已收官 (commit `a8ed5d0`) | 🟡 **plan** | **[M]** `arg_bridge_sandboxd.py` | per DD-002 §1.3 + SRS-002 §1.5 (ARG 集成) + D-7 拍板 |
+| **SBX-18** | **集成 (per canvas 多人协作)** | sandboxd 跟 canvas-collab 集成 (per-user sandbox session) | `crates/canvas-collab/src/sandboxd_session.rs` 新建 (per-user sandbox session 池 + canvas 多人编辑时各自独立 sandbox) + canvas 实时同步通过 sandboxd session 隔离 (避免 race condition) + 跟 star-eventbus (Valkey stream) 联动, canvas edit event → sandboxd audit log (全部 AI 处理) | ~0.2M | 0.03 周 | SBX-08 + canvas-collab 已收官 | 🟡 **plan** | **[P]** `canvas_sandboxd_integration.py` | per DD-002 §1.3 + canvas-collab crate 现状 |
+| **SBX-19** | **集成 (per D-10 反转, v0.1.3 新增)** | sandboxd AI 自动 policy 模板管理 (替代 v0.1.2 SBX-19 5 域 Lead 审批) | `crates/sandboxd/src/policy/ai_template_manager.rs` 新建 (AI 推理模块, 接受 workload 特征 → 自动生成 policy 模板) + workload 特征维度: 进程数 / CPU 模式 / mem 模式 / 网络需求 / FS 读写模式 / 子代理类型 (worker / explore / verifier) + AI 自动分类 5 类 workload (interactive / batch / ci-test / real-time / long-running) + policy 模板跟 workload 类型 一一对应 (per 9/8 15:29 Mavis 自驱) + 全部 AI 处理, 0 真人审批, 0 5 域 Lead 依赖 | ~0.05M | 0.01 周 | SBX-04 (P0 fail-open 降级) | 🟡 **plan** | **[P]** `ai_policy_template.py` | per D-10 反转 v0.1.3 (5 域 Lead 全部 AI 处理) + 9/8 15:29 自驱强化 + 守门 v28 拍板必带推荐项 |
+| **SBX-20** | **P1 升级 (per D-8 拍板)** | capability 维跨平台实装 (Win + macOS) | `crates/sandboxd/src/backend/windows.rs` capability 维扩展 (token privilege adjust 显式 drop SeDebug + SeBackup + SeRestore 等高危 privilege) + `crates/sandboxd/src/backend/macos.rs` capability 维显式 drop (sandbox-exec profile 显式 drop iokit-open / mach-lookup 等高危 syscall) + Windows + macOS capability UT 5 + 5 = 10 (跟 Linux TC-CAP-01~05 对称, 全部 AI 处理) | ~0.2M | 0.03 周 | SBX-08 + D-8 P0 升级 (mavis 用户实际平台 Win + macOS) | 🟡 **plan** | **[M]** `capability_cross_platform.py` | per DD-002 §1.3 + DD-002 §5.1/§5.3 + 已知缺口 #3 (G-SBX-03) P1 升级 P0 + D-8 拍板 |
+| **SBX-17..20 小计** | | **4 子项** (1 ARG bridge + 1 canvas-collab + 1 AI policy 模板 + 1 capability 跨平台, 全部 AI 处理) | **~0.65M** | **~0.10 周** | — | **0/4 plan** | **2 [P] / 2 [M] / 0 共享** | 触发条件: 0 (全部 AI 处理, 不依赖任何真人/Lead) | |
+| **总计含 20 子项 (v0.1.2) → 144 子项 (v0.1.3 派生)** | | **125 + 19 = 144 子项** (v0.1.2 = 20 子项, v0.1.3 = 19 子项因 SBX-19 token 估降低 0.1M → 0.05M; SBX-19 子项仍然保留, 仅内容从 "5 域 Lead 审批" 改为 "AI 自动管理") | **~252.85M** | **~42.09 周** | **108/144 实质收官 (75.0%) + 36 阻塞/待拍 (17 既有 + 19 SBX plan)** | | | | |
 
-**v0.1.2 新增 4 决策点 (per 守门 v28 拍板必带推荐项)**:
-- D-7 (per 22:36 JST opt1): sandboxd 跟 ARG 集成 = actor_id 注入 ARG Edge, sandboxd session 跟 ARG node 一一对应 (推荐) / 跟 ARG 解耦 (备选 1) / sandboxd 作为 ARG 依赖 backend (备选 2)
-- D-8 (per 22:36 JST opt1): capability 维跨平台 = 立即实装 Win + macOS (推荐, P0 升级) / v0.2 拍摄 (P1 维持) / Linux-only 长期 (P2 维持)
-- D-9 (per 22:36 JST opt1): 复用现有 crate = 走 star-telemetry / star-pg-adapter / star-eventbus (推荐) / sandboxd 自己造 (重复) / 混合
-- D-10 (per 22:36 JST opt1): 5 域 policy 模板 = sandboxd 5 域分类 (推荐) / 通用 policy 5 域 wrapper / 5 域不用 sandboxd
+**v0.1.3 新增 1 决策点反转 + 3 维持 (per 守门 v28 拍板必带推荐项 + 9/8 15:29 Mavis 自驱)**:
+- **D-10 反转** (per 22:58 JST "全部 ai 处理"): sandboxd policy 通用模板由 **AI 自动管理** (推荐, v0.1.3 拍板), 5 域分类 (player/economy/match/social/admin) 由 AI 自动推断 workload 特征, 不需要 5 域 Lead 真人审批. v0.1.2 拍板的 "5 域 policy 模板 = sandboxd 5 域分类 (推荐)" 反转为 "AI 自动 policy 模板管理 = sandboxd 通用模板 + AI 分类 (推荐)"; 备选 1 "通用 policy 5 域 wrapper" 反转为 "通用 policy + AI 自动分类"; 备选 2 "5 域不用 sandboxd" 反转为 "AI 不用, fallback 到 SANDBOX-001 v0.2"
+- **D-7 / D-8 / D-9 v0.1.2 拍板维持** (跟 v0.1.2 一致, 不反转): D-7 actor_id 注入 ARG Edge / D-8 capability 维 Win+macOS 立即实装 (P0 升级) / D-9 复用 star-telemetry / star-pg-adapter / star-eventbus
 
-**v0.1.2 新增 4 文档修订** (per 守门 #1 禁回溯叙事 + 守门 #11 缺标比错标):
-- `docs/requirements/SRS-SANDBOX-002.md` v0.1.1 → v0.1.2 (§1.5 关联文档 +5 行 + §10 决策点 +4 行 D-7~D-10)
-- `docs/basic-design/SANDBOX-BASIC-DESIGN-002.md` v0.1.1 → v0.1.2 ("mavis desktop" → "mavis Rust workspace" 命名修正 + §7 决策点 +4 行)
-- `docs/detailed-design/DD-SANDBOX-002.md` v0.1 → v0.1.1 (§1.3 集成点 +10 行, 跟 ARG / canvas / 5 域 / 3 supporting crate / mavis CLI / v37 集成)
-- `docs/architecture/SANDBOX-002.md` v0.1 → v0.1.1 (§8 决策点表 +4 行 D-7~D-10)
+**v0.1.3 重写 WBS 整段 (per 守门 #1 禁回溯叙事 + 守门 #11 缺标比错标 + 9/8 15:29 Mavis 自驱 + 9/5 04:03 拍板后立即执行)**:
+- `docs/reports/STAR-P3-WBS-001.md` §14.19 16 子项 重写 (去 5 域 Lead 引用, 全部 AI 处理; SBX-16 UAT 签字 改为 AI 自动签字; G-SBX-01 描述 改 mavis Rust workspace; 4 份 IPA 文档版本号 同步 v0.1.2 / v0.1.1)
+- `docs/reports/STAR-P3-WBS-001.md` §14.19.1 v0.1.2 → v0.1.3 (4 子项 → 19 子项, SBX-19 改为 AI 自动管理; D-10 反转; 累计统计 145 → 144, -0.05M token)
+- 0 改任何 SBX-01..SBX-18, SBX-20 子项 (状态 / 依赖 / 备注 / 标题 / token 估 全部维持 v0.1.2 不变)
+- 0 改 SRS-002 v0.1.2 / BD-002 v0.1.2 / DD-002 v0.1.1 / SANDBOX-002 v0.1.1 / TDD-002 v0.1 / IMPL-PLAN-002 v0.1 (per 守门 #1 禁回溯叙事, 文档维持 v0.1.2 不动; WBS §14.19 v0.1.3 是派生修订, 文档不动是因为用户明确说 "重写 WBS 整段", 不重写文档)
+- 0 改 Cargo.toml / Cargo.lock / db/migrations/* sql / scripts/automation/* py (per 守门 #1 禁回溯叙事, 代码不动)
 
-**Token 估**: 0.3M 实测 (4 决策点拍板 + 4 文档修订 + WBS §14.19.1 4 子项 + 1 commit 多文件 per 守门 #1 v15 docs 同步饱和第 100 次新事件触发 仍允许)
+**Token 估**: 0.10M 实测 (WBS §14.19 + §14.19.1 整段重写, 0 文档修订, 0 代码改动, 1 commit 多文件 per 守门 #1 v15 docs 同步饱和第 101 次新事件触发 仍允许)
 
 ---
 
