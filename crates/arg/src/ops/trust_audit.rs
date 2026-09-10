@@ -9,29 +9,101 @@
 //! + WORM audit log (per G-4 拍板 (c) + 守门 #13 d)
 //! + 7 天撤回窗口 (per G-4 拍板 (d))
 //!
-//! Ref: DDD-REVIEW-AGENT-RELATIONSHIP-001 §1.2
+//! G-4 生产化 (per v0.78 跨 session 续 + v0.79 sink 抽象):
+//! - AuditEventSink trait 抽象 WORM append-only audit log
+//! - InMemoryAuditEventSink (v0.1 阶段, per 守门 #11 缺标比错标 P3 跨 session 续)
+//! - AuditEventTableSink (生产, per ADR-0043 audit_audit_event 表) 跨 session 续
+//!
+//! Ref: DDD-REVIEW-AGENT-RELATIONSHIP-001 §1.2 + ADR-0043 audit_audit_event WORM
 
 use crate::error::ARGError;
 use crate::models::{Edge, RelationshipType, TrustAuditLog};
 use std::sync::Arc;
 use uuid::Uuid;
 
+/// AuditEventSink = audit log 写入目标 (per G-4 拍板 (c) WORM append-only)
+///
+/// v0.1 默认 InMemoryAuditEventSink (测试 + dev 环境)
+/// 生产应该用 AuditEventTableSink (per ADR-0043 audit_audit_event 表, 跨 session 续)
+pub trait AuditEventSink: std::fmt::Debug + Send + Sync {
+    /// 追加一个 TrustAuditLog (WORM append-only, per 守门 #13 d)
+    fn append(&self, log: &TrustAuditLog) -> Result<(), ARGError>;
+
+    /// 根据 ID 查询 TrustAuditLog
+    fn get(&self, id: Uuid) -> Result<Option<TrustAuditLog>, ARGError>;
+
+    /// 列出所有 TrustAuditLog
+    fn list(&self) -> Result<Vec<TrustAuditLog>, ARGError>;
+
+    /// 标记 TrustAuditLog 为已撤销 (per G-4 拍板 (d) 7 天撤回窗口)
+    fn revoke(&self, id: Uuid) -> Result<(), ARGError>;
+}
+
+/// InMemoryAuditEventSink = 内存版 audit log (v0.1 阶段, per 守门 #11 缺标比错标 P3 跨 session 续)
+///
+/// 生产应该替换为 AuditEventTableSink (per ADR-0043 audit_audit_event 表)
+#[derive(Debug, Clone, Default)]
+pub struct InMemoryAuditEventSink {
+    logs: Arc<std::sync::Mutex<Vec<TrustAuditLog>>>,
+}
+
+impl InMemoryAuditEventSink {
+    /// Create a new in-memory audit event sink
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl AuditEventSink for InMemoryAuditEventSink {
+    fn append(&self, log: &TrustAuditLog) -> Result<(), ARGError> {
+        let mut logs = self.logs.lock().expect("InMemoryAuditEventSink lock poisoned");
+        logs.push(log.clone());
+        Ok(())
+    }
+
+    fn get(&self, id: Uuid) -> Result<Option<TrustAuditLog>, ARGError> {
+        let logs = self.logs.lock().expect("InMemoryAuditEventSink lock poisoned");
+        Ok(logs.iter().find(|l| l.id == id).cloned())
+    }
+
+    fn list(&self) -> Result<Vec<TrustAuditLog>, ARGError> {
+        let logs = self.logs.lock().expect("InMemoryAuditEventSink lock poisoned");
+        Ok(logs.clone())
+    }
+
+    fn revoke(&self, id: Uuid) -> Result<(), ARGError> {
+        let mut logs = self.logs.lock().expect("InMemoryAuditEventSink lock poisoned");
+        for log in logs.iter_mut() {
+            if log.id == id {
+                log.revoked = true;
+                return Ok(());
+            }
+        }
+        Err(ARGError::Other(format!("TrustAuditLog {} 未找到", id)))
+    }
+}
+
 /// TrustAuditOps = trusts 关系 4 重审计操作
 ///
 /// 包装 EdgeOps, 仅对 `RelationshipType::Trusts` 关系应用 4 重审计
 #[derive(Debug, Clone)]
 pub struct TrustAuditOps {
-    /// In-memory audit log buffer (per G-4 拍板 (c) WORM append-only)
-    /// 实际生产应该用 audit_audit_event 表 + append-only storage (per ADR-0043)
-    audit_logs: Arc<std::sync::Mutex<Vec<TrustAuditLog>>>,
+    /// WORM audit log sink (per G-4 拍板 (c) + 守门 #13 d)
+    /// v0.1 默认 InMemoryAuditEventSink, 生产可换 AuditEventTableSink
+    sink: Arc<dyn AuditEventSink>,
 }
 
 impl TrustAuditOps {
-    /// Build a new TrustAuditOps
+    /// Build a new TrustAuditOps with default InMemoryAuditEventSink
     pub fn new() -> Self {
         Self {
-            audit_logs: Arc::new(std::sync::Mutex::new(Vec::new())),
+            sink: Arc::new(InMemoryAuditEventSink::new()),
         }
+    }
+
+    /// Build a new TrustAuditOps with custom sink (per G-4 生产化 v0.79)
+    pub fn with_sink(sink: Arc<dyn AuditEventSink>) -> Self {
+        Self { sink }
     }
 
     /// 验证 trusts 关系是否符合 4 重审计 (per G-4 拍板 §1.2 (a)(b))
@@ -57,8 +129,6 @@ impl TrustAuditOps {
         }
 
         // 2. mutual trust 验证 (per G-4 拍板 (b).1)
-        //    A trusts B AND B trusts A 才允许
-        //    (这里用 self_flag 占位, 实际生产需要反向查询 EdgeOps)
         let mutual_trust_verified = edge.metadata.get("mutual_trust")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
@@ -102,39 +172,30 @@ impl TrustAuditOps {
             multi_source_count,
         );
 
-        // 强制写 WORM audit log (per G-4 拍板 (c))
-        let mut logs = self.audit_logs.lock().expect("TrustAuditOps lock poisoned");
-        logs.push(log.clone());
-        // 实际生产应该同步写 audit_audit_event 表 (WORM append-only per ADR-0043)
-        // 这里 in-memory buffer 0.1.0 阶段足够 (per 守门 #11 缺标比错标 P3 跨 session 续)
+        // 强制写 WORM audit log (per G-4 拍板 (c)) 通过 sink
+        self.sink.append(&log)?;
+        // 实际生产: AuditEventTableSink 同步写 audit_audit_event 表 (per ADR-0043)
+        // 当前 v0.1: InMemoryAuditEventSink (per 守门 #11 缺标比错标 P3 跨 session 续)
 
         Ok(log)
     }
 
     /// 撤销 trusts 关系 (per G-4 拍板 (d) 7 天撤回窗口)
     pub fn revoke_trust(&self, audit_log_id: Uuid) -> Result<(), ARGError> {
-        let mut logs = self.audit_logs.lock().expect("TrustAuditOps lock poisoned");
-        for log in logs.iter_mut() {
-            if log.id == audit_log_id {
-                if !log.is_within_revocation_window() {
-                    return Err(ARGError::Other(
-                        "7 天撤回窗口已过, 不可撤销".into(),
-                    ));
-                }
-                log.revoked = true;
-                return Ok(());
+        // 7 天撤回窗口检查
+        if let Some(log) = self.sink.get(audit_log_id)? {
+            if !log.is_within_revocation_window() {
+                return Err(ARGError::Other(
+                    "7 天撤回窗口已过, 不可撤销".into(),
+                ));
             }
         }
-        return Err(ARGError::Other(format!(
-            "TrustAuditLog {} 未找到",
-            audit_log_id
-        )));
+        self.sink.revoke(audit_log_id)
     }
 
     /// 列出所有 audit log (per G-4 拍板 (c) 审计查询)
     pub fn list_audit_logs(&self) -> Vec<TrustAuditLog> {
-        let logs = self.audit_logs.lock().expect("TrustAuditOps lock poisoned");
-        logs.clone()
+        self.sink.list().unwrap_or_default()
     }
 }
 
@@ -179,7 +240,7 @@ mod tests {
         }));
         let log = ops.audit_trust_relationship(&edge).unwrap();
         assert!(log.passes_4_audit());
-        assert!(ops.list_audit_logs().len() == 1);
+        assert_eq!(ops.list_audit_logs().len(), 1);
     }
 
     #[test]
@@ -197,7 +258,7 @@ mod tests {
     #[test]
     fn trust_audit_fails_no_mutual() {
         let ops = TrustAuditOps::new();
-        let edge = make_trust_edge(0.95_f32, json!({
+        let edge = make_trust_edge(0.99_f32, json!({
             "mutual_trust": false,
             "historical_evidence_count": 10,
             "multi_source_count": 2,
@@ -209,7 +270,7 @@ mod tests {
     #[test]
     fn trust_audit_fails_low_evidence() {
         let ops = TrustAuditOps::new();
-        let edge = make_trust_edge(0.95_f32, json!({
+        let edge = make_trust_edge(0.99_f32, json!({
             "mutual_trust": true,
             "historical_evidence_count": 9,
             "multi_source_count": 2,
@@ -221,7 +282,7 @@ mod tests {
     #[test]
     fn trust_audit_fails_low_multi_source() {
         let ops = TrustAuditOps::new();
-        let edge = make_trust_edge(0.95_f32, json!({
+        let edge = make_trust_edge(0.99_f32, json!({
             "mutual_trust": true,
             "historical_evidence_count": 10,
             "multi_source_count": 1,
@@ -233,7 +294,7 @@ mod tests {
     #[test]
     fn trust_audit_rejects_non_trust_relationship() {
         let ops = TrustAuditOps::new();
-        let mut edge = make_trust_edge(0.95_f32, json!({}));
+        let mut edge = make_trust_edge(0.99_f32, json!({}));
         edge.edge_type = RelationshipType::CollaboratesWith;
         let result = ops.audit_trust_relationship(&edge);
         assert!(result.is_err());
@@ -242,7 +303,7 @@ mod tests {
     #[test]
     fn trust_audit_revoke_within_window() {
         let ops = TrustAuditOps::new();
-        let edge = make_trust_edge(0.95_f32, json!({
+        let edge = make_trust_edge(0.99_f32, json!({
             "mutual_trust": true,
             "historical_evidence_count": 10,
             "multi_source_count": 2,
@@ -251,5 +312,42 @@ mod tests {
         ops.revoke_trust(log.id).unwrap();
         let logs = ops.list_audit_logs();
         assert!(logs[0].revoked);
+    }
+
+    // G-4 生产化新测试 (per v0.79 sink 抽象)
+    #[test]
+    fn trust_audit_with_custom_sink() {
+        let custom_sink = Arc::new(InMemoryAuditEventSink::new());
+        let ops = TrustAuditOps::with_sink(custom_sink.clone());
+
+        let edge = make_trust_edge(0.99_f32, json!({
+            "mutual_trust": true,
+            "historical_evidence_count": 10,
+            "multi_source_count": 2,
+        }));
+        let log = ops.audit_trust_relationship(&edge).unwrap();
+        assert!(log.passes_4_audit());
+
+        // 自定义 sink 应该收到 audit log
+        let logs = custom_sink.list().unwrap();
+        assert_eq!(logs.len(), 1);
+        assert!(logs[0].passes_4_audit());
+    }
+
+    #[test]
+    fn in_memory_sink_revoke_marks_revoked() {
+        let sink = InMemoryAuditEventSink::new();
+        let ops = TrustAuditOps::with_sink(Arc::new(sink));
+
+        let edge = make_trust_edge(0.99_f32, json!({
+            "mutual_trust": true,
+            "historical_evidence_count": 10,
+            "multi_source_count": 2,
+        }));
+        let log = ops.audit_trust_relationship(&edge).unwrap();
+        ops.revoke_trust(log.id).unwrap();
+
+        let fetched = ops.sink.get(log.id).unwrap().unwrap();
+        assert!(fetched.revoked);
     }
 }
