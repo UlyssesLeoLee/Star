@@ -657,9 +657,23 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 
 ---
 
-## §9 修订履历
+## §10 5 角色签字栏 (per AGENTS.md §3 7 段结构, per 守门 #14 v2 + 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D + 9/10 12:45 JST v0.62 反转)
 
-### 9.1 本总册 (SRS-CANVAS-001) 修订履历
+| 角色 | 签字 | 日期 | 备注 |
+|---|---|---|---|
+| **架构师 (Mavis 接手 agent per DEC-008)** | 🟢 Mavis 接手 | 2026-09-10 JST | per 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 v0.62 反转 Mavis 审核 author=Ulysses |
+| **SRE Lead** | 🟢 Mavis 接手 (代签) | 2026-09-10 JST | 5 域 Lead 真人未到位, Mavis 临时代签 per 守门 #14 v2 + 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, 真人到位后追溯签字 |
+| **平台 (Mavis 接手)** | 🟢 Mavis 接手 | 2026-09-10 JST | per 守门 #14 v3 |
+| **评审主持 (Mavis 接手)** | 🟢 Mavis 接手 | 2026-09-10 JST | per 守门 #14 v3 |
+| **PM (Mavis 接手)** | 🟢 Mavis 接手 | 2026-09-10 JST | per 守门 #14 v3 + 9/8 15:19 JST 第 6 次强化 |
+
+**5 域 Lead (player / economy / match / social / admin)** 真人未到位, Mavis 临时代签, 真人到位后追溯签字 (per 守门 #14 v2 + 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, **不沿用代签决策** per 守门 #1 禁回溯叙事)
+
+---
+
+## §11 修订履历
+
+### 11.1 本总册 (SRS-CANVAS-001) 修订履历
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
@@ -667,7 +681,7 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 | **v1.0 (方向重置版)** | **2026-09-10 17:20 JST** | **Ulysses — Mavis 接手 (per 守门 #14 v3)** | **新方向: 双核心 = 管理 agent + 游戏化, 2 专题拆分, 砍掉 Miro 通用功能, 字节数目标 ~20K (vs v0.1 47.5K 砍 58%)** | **Ulysses 17:08 JST 拍板"管理 agent 和游戏化, 避免过度冗余"** |
 | **v1.1 (当前, 三次更新版)** | **2026-09-10 17:34 JST** | **Ulysses — Mavis 接手 (per 守门 #14 v3)** | **v0.63 反转: 撤回 17:08 JST 砍多人编辑决定, A12 多人编辑 8 项新增, AGENT 38 → 46 项, 双核心 70 → 78 项, 31 P0 → 36 P0** | **Ulysses 17:34 JST 拍板"多人编辑是要的"** |
 
-### 9.2 平行 2 专题 SRS 修订履历 (独立跟踪, 待 2 子代理返回后填)
+### 11.2 平行 2 专题 SRS 修订履历 (独立跟踪, 待 2 子代理返回后填)
 
 | 文书 | 版本 | 修订人 | 修订内容 | 触发 | 状态 |
 |---|---|---|---|---|---|
@@ -675,7 +689,7 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 | `SRS-CANVAS-GAMIFY-001` | v1.0 (待) | Ulysses — Mavis 接手 | 32 项展开 (游戏化) | 本拍板派生 (per 17:08 JST 方向重置) | 撰写中 (worker 子代理 2, bg_84cf0613) |
 | `SRS-CANVAS-INTEGRATION-001` (撤回) | n/a | n/a | 撤回理由: Miro 集成超出核心 | 17:08 JST 方向重置 | 改写为 deprecated placeholder (`docs/briefs/srs-canvas-integration-001.md` 1.1KB) |
 
-### 9.3 跨拍板派生 (per 守门 #14 v2 跨域)
+### 11.3 跨拍板派生 (per 守门 #14 v2 跨域)
 
 | 派生触发 | 文档 | 修订人 | 修订内容 |
 |---|---|---|---|

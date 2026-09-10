@@ -2344,6 +2344,29 @@ CREATE INDEX ON :Achievement(category);
 
 ---
 
+## §13 5 角色签字栏 (per AGENTS.md §3 7 段结构, per 守门 #14 v2 + 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D + 9/10 12:45 JST v0.62 反转)
+
+| 角色 | 签字 | 日期 | 备注 |
+|---|---|---|---|
+| **架构师 (Mavis 接手 agent per DEC-008)** | 🟢 Mavis 接手 | 2026-09-10 JST | per 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 v0.62 反转 Mavis 审核 author=Ulysses |
+| **SRE Lead** | 🟢 Mavis 接手 (代签) | 2026-09-10 JST | 5 域 Lead 真人未到位, Mavis 临时代签 per 守门 #14 v2 + 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, 真人到位后追溯签字 |
+| **平台 (Mavis 接手)** | 🟢 Mavis 接手 | 2026-09-10 JST | per 守门 #14 v3 |
+| **评审主持 (Mavis 接手)** | 🟢 Mavis 接手 | 2026-09-10 JST | per 守门 #14 v3 |
+| **PM (Mavis 接手)** | 🟢 Mavis 接手 | 2026-09-10 JST | per 守门 #14 v3 + 9/8 15:19 JST 第 6 次强化 |
+
+**5 域 Lead (player / economy / match / social / admin)** 真人未到位, Mavis 临时代签, 真人到位后追溯签字 (per 守门 #14 v2 + 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, **不沿用代签决策** per 守门 #1 禁回溯叙事)
+
+---
+
+## §14 修订历史 (per AGENTS.md §3 7 段结构, per 守门 #1 禁回溯叙事不重写 v0.1 + 修订历史表 1 行)
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|---|
+| **v0.1** | **2026-09-10 18:32 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3)** | **初版落档 — 子代理 1 bg_9ce1be6e 撰写, 13 段 (含 §11 NFR + §12 守门) + 5 附录, A1-A12 12 子能力 46 项 (A1-A10 28 + A11 10 + A12 8), 5 view 跨域, 5-tier 架构, 24 组件 + 6 crate + 1 BFF, 14 张表 W/T/M 100% 覆盖, 23 API + 5 WebSocket, 5 状态机 + 11 共享类型 + 13 关键 class (C-16=RelationshipEditor + C-21=ARGController 1:1 派生 ARG 源) + 6 时序图 (4 必含 + 2 补充 A12), NFR 6 类, 守门 19/19 + 26 派生规跨域全过, 19 已知缺口含 3 P0 阻塞 (#11 A12 WSS + #13 localStorage + #15 CRDT) + 1 跨 session 总结 (#17), 15 子代理失败接手; A11 1:1 派生自 `DD-AGENT-RELATIONSHIP-001.md` v0.1 模板; A12 1:1 派生自 `frontend-canvas-design.md` v0.1 §4.1+§4.6+§3.4** | **2026-09-10 18:25 JST Ulysses 拍板"完善详细设计文档"** |
+| **v0.1.1** | **2026-09-10 19:10 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3)** | **IPA SEC 合规性修复: 加 §13 5 角色签字栏 (per AGENTS.md §3 7 段结构) + §14 修订历史 (从原附录 E 抽出). 不重写 §0-§12 + 附录 A-D (per 守门 #1 禁回溯叙事, v0.1.1 反转行显式标).** | **2026-09-10 19:06 JST Ulysses 拍板"确保这里的文档符合日本 IPA 标准"** |
+
+---
+
 ## 附录 A: 跨专题引用清单 (per brief §6 返报 #7)
 
 ### A.1 SRS 引用
