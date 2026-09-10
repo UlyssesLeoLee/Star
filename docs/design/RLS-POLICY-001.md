@@ -1,7 +1,8 @@
-# RLS Policy 设计 (v0.87 P0-4 Stage 3.3)
+# RLS Policy 设计 (v0.87 P0-4 Stage 3.3 + v0.91 命名修正)
 
 > **Status**: 🟡 Active (P0-4 阶段声明落地, P2 阶段 worker 子代理实测 testcontainers)
 > **Created**: 2026-09-10
+> **Updated**: 2026-09-10 v0.91 命名修正 (7 类实际 policy → 13 类对象语义映射, per v0.87 §3 已知缺口 (b))
 > **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核**
 > **关联**: db/migrations/2026-09-10-rls-policies-tenant-pools.sql + db/migrations/2026-09-10-tenant-pools.sql
 > **For**: v0.82/v0.85 已知缺口 (b) 'RLS 13 类尚未启用' 跨 session 续做
@@ -146,3 +147,60 @@ N/A (本 commit 走 root session 直接实装, 纯 DDL 工作无子代理 dispat
 ## §7 修订历史
 
 详见 §7 表.
+
+---
+
+## §8 命名修正 (v0.91 P0-4 Stage 3.7 跨 session 续做)
+
+> **触发**: v0.87 §3 已知缺口 (b) '5 health_status 派生 visibility 合并成 1 policy, 总 7 类 policy 跟 "13 类" 命名不符, 文档命名修正在 v0.88+ 阶段'. v0.88/v0.89/v0.90 都在做别的缺口, v0.91 终于落地.
+> **原则**: per 守门 #1 禁回溯叙事, 不重写 §3 7 类实际 policy, 改在文末追加 §8 命名修正段 + 修订历史 v0.91 row.
+
+### §8.1 命名不一致问题
+
+- **文档标题**: §3 "13 类 RLS Policy 设计" (跟 v0.87 commit message 一致)
+- **§3.1-3.3 实际**: 4 类 CRUD + 1 类 schema isolation + 1 类 platform admin override = 6 类 policy (CRUD 类)
+- **§3.4 合并**: 5 类 health_status OR 合并成 1 类 visibility policy
+- **§3.5 audit trigger**: 1 类 (SECURITY DEFINER 跨 RLS, 不算 policy)
+- **总计**: 7 类实际 policy (per v0.87 §3 已知缺口 (b))
+
+### §8.2 跟 spec §6.1 "13 类对象" 关系
+
+per spec §6.1 "13 类对象必带 tenant_id", 13 类对象指 **业务对象** (User, Tenant, Project, Workspace, Role, Permission, Policy, Resource, Action, AuditEvent, Session, Token, ...), 不是 13 类 **policy**. RLS policy 简化版 4 类 CRUD + 1 schema + 1 admin + 1 health = 7 类, 覆盖 13 类业务对象的 SELECT/INSERT/UPDATE/DELETE/Schema/Admin/Health 维度.
+
+### §8.3 7 类 policy 覆盖 13 类对象语义映射
+
+| # | Policy 类别 | 覆盖 spec §6.1 13 类对象维度 | 业务对象示例 |
+|---|---|---|---|
+| 1 | tenant_pools_select | 13 类对象 SELECT 维度 | User/Tenant/Project/Workspace/... |
+| 2 | tenant_pools_insert | 13 类对象 INSERT 维度 | 同上 (创建) |
+| 3 | tenant_pools_update | 13 类对象 UPDATE 维度 | 同上 (修改) |
+| 4 | tenant_pools_delete | 13 类对象 DELETE 维度 (admin only) | 同上 (物理删, per 守门 #13 b 禁止) |
+| 5 | tenant_pools_schema_isolation | 13 类对象 schema_name 维度 | 跨 schema 隔离 (per §13.5) |
+| 6 | tenant_pools_platform_admin | 13 类对象 admin override 维度 | 紧急运维 (per §13.1) |
+| 7 | tenant_pools_health_visibility | 13 类对象 health_status 派生维度 (5 类 OR 合并) | 平台监控 |
+| **小计** | **7 类 policy** | **覆盖 13 类对象 7 维度** | **不重复 13 类业务对象** |
+
+### §8.4 跟未来扩展的关系
+
+- 未来表 (P3-D.6 14+15 张表 + star-pg-adapter 11 Repository) 都走同 7 类 policy pattern (per v0.88 ALTER DEFAULT PRIVILEGES 协同), 13 类业务对象各自有 7 类 policy
+- 真正的 "13 类" 命名源自 spec §6.1, 跟 RLS policy 数量解耦
+- P2 阶段 worker 子代理扩展时, **不要再喊 "13 类 policy"**, 改用 "tenant_pools 上 7 类 policy" + "13 类业务对象" 双轨命名
+
+### §8.5 文档命名修正 (本 §8 段)
+
+per 守门 #11 缺标比错标 + 守门 #1 禁回溯叙事, 本 commit:
+
+- **保留** §3 章节名 "13 类 RLS Policy 设计" (跟 v0.87 commit message 一致)
+- **保留** §3.1-3.5 内容 (7 类 policy 实际定义)
+- **新增** §8 命名修正段 (本段, 7 类 policy 实际数量 + 跟 13 类对象语义映射 + 未来扩展命名规则)
+- **修订** 文档 header 加 v0.91 update note
+
+### §8.6 关联
+
+- v0.87 RLS 13 类 policy 实装 (per DDL `db/migrations/2026-09-10-rls-policies-tenant-pools.sql`)
+- v0.88 PLATFORM_ADMIN role 实装 (per DDL `db/migrations/2026-09-10-platform-admin-role.sql`)
+- v0.89 PASSWORD 占位 k8s Secret 实装 (per `deploy/k3s-local/secrets/platform-admin-secret.yaml`)
+- v0.90 .gitignore 配 (per `.gitignore`)
+- v0.91 命名修正 (本 commit)
+- 累计 P0-4 完整度: 11 star-pg-adapter Repository + 5/5 register_*_adapter v2 spec + multi-tenant 路由 + DDL 持久化 + PgTenantPoolRepository 真实 sqlx + RLS 7 类 policy + PLATFORM_ADMIN role + PASSWORD 占位 k8s Secret + .gitignore 配 + **命名修正** 完备
+
