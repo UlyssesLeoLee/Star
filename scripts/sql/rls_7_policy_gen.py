@@ -94,8 +94,9 @@ ALTER TABLE {table} FORCE ROW LEVEL SECURITY; -- superuser 也走 RLS (per ADR-0
 
 
 def gen_4_crud_policies(table: str) -> str:
-    """生成 4 类 CRUD policy (跨 tenant_id 隔离 + admin bypass)"""
-    return f"""-- {table} 4 类 CRUD policy (per v0.91 §8.3 映射表 1-4)
+    """生成 4 类 CRUD policy (跨 tenant_id 隔离 + admin bypass, v0.97 加 DROP IF EXISTS idempotent)"""
+    return f"""-- {table} 4 类CRUD policy (per v0.91 §8.3 映射表 1-4, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS {table}_select ON {table};
 CREATE POLICY {table}_select ON {table}
     FOR SELECT
     USING (
@@ -103,6 +104,7 @@ CREATE POLICY {table}_select ON {table}
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS {table}_insert ON {table};
 CREATE POLICY {table}_insert ON {table}
     FOR INSERT
     WITH CHECK (
@@ -110,6 +112,7 @@ CREATE POLICY {table}_insert ON {table}
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS {table}_update ON {table};
 CREATE POLICY {table}_update ON {table}
     FOR UPDATE
     USING (
@@ -121,6 +124,7 @@ CREATE POLICY {table}_update ON {table}
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS {table}_delete ON {table};
 CREATE POLICY {table}_delete ON {table}
     FOR DELETE
     USING (
@@ -130,8 +134,9 @@ CREATE POLICY {table}_delete ON {table}
 
 
 def gen_schema_isolation_policy(table: str) -> str:
-    """生成 schema isolation policy (per §13.5 多 schema 隔离)"""
-    return f"""-- {table} schema isolation (per v0.91 §8.3 映射表 5)
+    """生成 schema isolation policy (per §13.5 多 schema 隔离, v0.97 加 DROP IF EXISTS idempotent)"""
+    return f"""-- {table} schema isolation (per v0.91 §8.3 映射表 5, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS {table}_schema_isolation ON {table};
 CREATE POLICY {table}_schema_isolation ON {table}
     FOR ALL
     USING (
@@ -142,8 +147,9 @@ CREATE POLICY {table}_schema_isolation ON {table}
 
 
 def gen_platform_admin_policy(table: str) -> str:
-    """生成 platform admin override policy (per v0.88 BYPASSRLS)"""
-    return f"""-- {table} platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
+    """生成 platform admin override policy (per v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS idempotent)"""
+    return f"""-- {table} platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS {table}_platform_admin ON {table};
 CREATE POLICY {table}_platform_admin ON {table}
     FOR ALL
     TO platform_admin
@@ -153,8 +159,9 @@ CREATE POLICY {table}_platform_admin ON {table}
 
 
 def gen_health_visibility_policy(table: str) -> str:
-    """生成 5 health_status OR 合并 visibility policy (per v0.91 §8.3 映射表 7)"""
-    return f"""-- {table} health_status 派生 visibility (per v0.91 §8.3 映射表 7, 5 status OR 合并)
+    """生成 5 health_status OR 合并 visibility policy (per v0.91 §8.3 映射表 7, v0.97 加 DROP IF EXISTS idempotent)"""
+    return f"""-- {table} health_status 派生 visibility (per v0.91 §8.3 映射表 7, 5 status OR 合并, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS {table}_health_visibility ON {table};
 CREATE POLICY {table}_health_visibility ON {table}
     FOR SELECT
     USING (
