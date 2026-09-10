@@ -161,6 +161,11 @@ hex = "0.4"
 # Regex (per OPT-NEXT-06-code-stub §3.4 domain-form + domain-search 实装)
 regex = "1"
 
+# Valkey / Redis client (per spec/cache/01 §2.3 + spec/cache/01 §2.3 选型决定 2026-09-10 23:41 JST)
+# redis-rs 0.27+ 协议 100% 兼容 Valkey, tokio-comp + connection-manager features
+# Phase G+ 启用于 crates/star-cache/src/valkey_backend.rs
+redis = { version = "0.27", default-features = false, features = ["tokio-comp", "connection-manager"] }
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
