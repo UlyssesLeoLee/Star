@@ -35,6 +35,16 @@ use uuid::Uuid;
 // 守门 #14 v2 (5 域 Lead Mavis 临时代签) + #12 v21 ([M] docs 同步)
 // =====================================================================
 pub mod arg;
+// =====================================================================
+// P3-D.6 阶段 1 基础 任务 1.4: crates/api/src/agent + canvas_collab
+// per docs/implementation-plans/CANVAS-IMPL-PLAN-001.md v0.1 §3 任务 1.4
+// + docs/briefs/p3-d6-1-4-api-extend.md (V0.2 brief 落档 0.20M tokens / 0.17 SRE·周)
+// 守门 #1 v25 cargo test 单 crate 实证 + 守门 #19 v19 累积规不破坏 V0.1
+// =====================================================================
+/// agent API module (per P3-D.6 任务 1.4)
+pub mod agent;
+/// canvas-collab API module (per P3-D.6 任务 1.4)
+pub mod canvas_collab;
 
 // =====================================================================
 // 实体(Entity / Aggregate Root)
