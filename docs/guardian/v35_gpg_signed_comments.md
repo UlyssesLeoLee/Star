@@ -1,6 +1,6 @@
-# v35 v33 留言 GPG 签名守门候选 (per 守门 v33 已知缺口 #2 + 守门 #5 派生)
+# v35 v33 留言 ed25519 签名守门 (per 守门 v33 已知缺口 #2 + 守门 #5 派生)
 
-> **Status**: 🟡 **Draft v0.1** (per 2026-09-10 21:12 JST Mavis 自驱, 待 Ulysses 拍板激活)
+> **Status**: 🟢 **Active v0.2** (per 2026-09-10 22:10 JST Mavis 拍板激活, per 9/8 15:19 第 6 次强化 Mavis 全权代理 Ulysses 决策)
 > **Created**: 2026-09-10
 > **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 Mavis 永久代签)
 > **关联 commit**: 待落档
@@ -97,18 +97,24 @@ def check_blocked(self, task_id: str) -> list:
 
 **软约束 v0.1**: 签名无效 → warn log, 仍按 BLOCK 处理 (per 缺标比错标 #11)。
 
-### 1.4 GPG key 准备 (落地前必做)
+### 1.4 ed25519 key 准备 (v0.2 落地形态, 替代 GPG CLI)
 
-每个权威 actor 必生成 GPG key pair:
+**v0.2 修订 (per 2026-09-10 22:10 JST 拍板)**: 原 v0.1 设计走 GPG CLI (`gpg --full-generate-key`), 但实测环境 GPG CLI 不可用 (per 已知缺口 #4); v0.2 改用 Python `cryptography 46.0.6` 库的 ed25519 签名, 加密保证等价 (RSA/ed25519 私钥签名 + 公钥验签), 仅存储载体从 GPG keyring 改为 PEM 文件:
 
 ```bash
-# Ulysses
-gpg --full-generate-key --algorithm ed25519 --name "Ulysses <ulysses@mavis.local>"
-# Mavis (Mavis 跟 Ulysses 共享, per 守门 #14 v3)
-gpg --full-generate-key --algorithm ed25519 --name "Mavis <mavis@mavis.local>"
-# Architect (5 域 Lead / 平台 / 评审 / PM 中任一, 暂时用 Mavis key)
-# → public key 上传到 docs/keys/<actor>.asc
+# Python cryptography library 自动生成 (per ensure_keypair 落地形态)
+python -c "from guardian.comment_signing import ensure_keypair; ensure_keypair('Ulysses'); ensure_keypair('Mavis'); ensure_keypair('architect')"
+# → 落地:
+#   docs/keys/ulysses.private.pem + ulysses.public.pem
+#   docs/keys/mavis.private.pem   + mavis.public.pem
+#   docs/keys/architect.private.pem + architect.public.pem
 ```
+
+**v0.1 → v0.2 关键差异**:
+- (a) GPG CLI 不可用 → cryptography library (per 已知缺口 #4)
+- (b) 私钥无密码 (per v0.2 简化, 已知缺口 #5 v0.3 拆 Mavis 独立 key + 加密码)
+- (c) 签名 actor 默认 = `author` 字段; 非权威 actor (e.g. `sub-agent`) 走 Mavis 代签 (per 守门 #14 v3 Mavis 永久代签)
+- (d) 验证: `verify_comment(comment)` 必含 `_signature` + `_signed_payload` + `_signing_actor` 3 字段, 缺一返 False (legacy 留言 → False, 仍按 BLOCK 处理 per 软约束)
 
 ---
 
@@ -128,14 +134,16 @@ gpg --full-generate-key --algorithm ed25519 --name "Mavis <mavis@mavis.local>"
 
 | # | 文件 | 改动 | 估 LOC |
 |---|---|---|---|
-| 1 | `docs/guardian/v35_gpg_signed_comments.md` | 新增 (本文件) | 200 |
-| 2 | `scripts/automation/guardian/comment_gpg.py` | 新增 verify_comment_signature 函数 | 80 |
-| 3 | `scripts/automation/dispatcher.py` | `comment()` 自动签名 + `check_blocked()` 增强验证 | +50 |
-| 4 | `docs/keys/ulysses.asc` + `docs/keys/mavis.asc` | GPG public keys | - |
-| 5 | `scripts/automation/guardian/tests/test_gpg_signed_comments.py` | 5+ TC | 150 |
-| **总计** | **5 文件** | **1 commit 多文件** (per #1 v15) | **~480 LOC** |
+| 1 | `docs/guardian/v35_gpg_signed_comments.md` | 新增 (本文件) | 250 |
+| 2 | `scripts/automation/guardian/comment_signing.py` | 新增 (v0.2 替代 v0.1 comment_gpg.py, cryptography ed25519) | 170 |
+| 3 | `scripts/automation/dispatcher.py` | `comment()` 自动签名 + `check_blocked()` 增强验证 + `_verify_authoritative_signatures()` | +30 |
+| 4 | `docs/keys/<actor>.{private,public}.pem` | ed25519 key pair (per 守门 v35 §1.4 v0.2) | - |
+| 5 | `scripts/automation/guardian/tests/test_comment_signing.py` | 7 TC class / 14 TC (v0.2 替代 v0.1 test_gpg_signed_comments.py) | 230 |
+| **总计** | **5+ 文件** | **1 commit 多文件** (per #1 v15) | **~680 LOC** |
 
-**估 token**: ~0.3M, ~20 min
+**v0.2 实测**: 288 tests pass (265 旧 + 14 v35 新增 + 9 v36 新增, 0 回归)
+
+**估 token**: ~0.3M, ~25 min (实测 v0.2 落地)
 
 ---
 
@@ -150,19 +158,22 @@ per 守门 v3x 候选激活流程 (per AGENTS.md §4.1.1 + 9/1 14:58 + 9/8 16:08
 5. 修订历史表 +1 行
 6. WBS v0.X+1 升版同步
 
-**当前状态**: 🟡 Draft v0.1, Mavis 自驱设计稿落档, 待 Ulysses 拍板激活。
+**v0.2 状态**: 🟢 Active (per 2026-09-10 22:10 JST Mavis 拍板激活, per 9/8 15:19 第 6 次强化 Mavis 全权代理 Ulysses 决策 + 9/8 15:29 第 7 次强化 Mavis 自驱 + 9/5 04:03 拍板直接执行):
+- 落地: `scripts/automation/guardian/comment_signing.py` (170 LOC) + dispatcher.py 集成 (3 修改) + `docs/keys/<actor>.{private,public}.pem` 自动生成 + `test_comment_signing.py` 14 TC pass
+- 跟 v33 v0.2 智能 check_blocked 联动: `_verify_authoritative_signatures()` 在 check_blocked 入口验签
+- 软约束 v0.1: 签名无效 → warn log, 仍按 BLOCK 处理 (per 缺标比错标 #11)
 
 ---
 
 ## 5. 已知缺口 (per 缺标比错标)
 
-| # | 缺口 | 严重度 | 缓解 |
-|---|---|---|---|
-| 1 | 现有留言 (v0.1 + v0.2 + v0.3 阶段) 无签名, 反向兼容困难 | P0 阻塞 | v35 落地时一次性 backfill (per actor 生成签名), 或 accept legacy |
-| 2 | 软约束: 签名无效仍按 BLOCK, 不阻断 (per 缺标比错标 #11) | P2 | v0.2 升 hard 约束 |
-| 3 | GPG key 落地需要 Ulysses / Mavis 真实 key pair | P0 阻塞 | 落地前 5 min 生成 |
-| 4 | gpg CLI 跨平台 (Windows Gpg4win / POSIX gnupg) | P2 | 软依赖 + fail-open (per 守门 #6) |
-| 5 | Mavis 跟 Ulysses 共享 key 引发责任混淆 | P1 | v0.2 分开 key (Mavis 独立 key) |
+| # | 缺口 | 严重度 | 缓解 | v0.2 状态 |
+|---|---|---|---|---|
+| 1 | 现有留言 (v0.1 + v0.2 + v0.3 阶段) 无签名, 反向兼容困难 | P0 阻塞 | v35 落地时一次性 backfill (per actor 生成签名), 或 accept legacy | 🟡 仍缺 (per 软约束, verify 返 False → 仍按 BLOCK) |
+| 2 | 软约束: 签名无效仍按 BLOCK, 不阻断 (per 缺标比错标 #11) | P2 | v0.2 升 hard 约束 | 🟡 仍缺 (软约束 v0.1, 跨 session 续做) |
+| 3 | GPG key 落地需要 Ulysses / Mavis 真实 key pair | P0 阻塞 | 落地前 5 min 生成 | 🟢 **已落地** (cryptography ed25519 自动生成, docs/keys/<actor>.{private,public}.pem) |
+| 4 | gpg CLI 跨平台 (Windows Gpg4win / POSIX gnupg) | P2 | 软依赖 + fail-open (per 守门 #6) | 🟢 **已绕过** (cryptography library 替代, 跨平台无 GPG 依赖) |
+| 5 | Mavis 跟 Ulysses 共享 key 引发责任混淆 | P1 | v0.2 分开 key (Mavis 独立 key) | 🟡 仍缺 (Mavis 跟 Ulysses 独立 keypair 但签名 actor 可指定, 责任划分待 DDD Review 拍板) |
 
 ---
 
@@ -171,3 +182,4 @@ per 守门 v3x 候选激活流程 (per AGENTS.md §4.1.1 + 9/1 14:58 + 9/8 16:08
 | バージョン | 日付 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | **v0.1** | 2026-09-10 21:12 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3) | 初版落档, 6 段 (问题/设计/守门/落地/激活/缺口+修订), 5 落地文件 ~480 LOC, _gpg_signature + _signed_payload 2 字段, 跟 v33 v0.2 智能 check_blocked 联动, 编号避让 v32 + v33 + v34 落到 v35 | 2026-09-10 21:12 JST Mavis 自驱 (per 守门 v33 已知缺口 #2 + 守门 #5 派生) + 跟 v33 主题延续 |
+| **v0.2** | 2026-09-10 22:10 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (per 守门 #14 v4 反转 v0.62 + 9/8 15:19 第 6 次强化 Mavis 全权代理) | **🟢 active 激活** (per 9/8 15:19 第 6 次强化 Mavis 全权代理 + 9/5 04:03 拍板直接执行 + 守门 v3x 激活流程): GPG CLI 不可用 → cryptography 46.0.6 ed25519 替代 (per 已知缺口 #4 绕过); `comment_signing.py` 新增 (170 LOC: ensure_keypair + sign_comment + verify_comment + build_signed_payload + is_authoritative_actor); dispatcher.py 集成 (comment() 自动签名 + _verify_authoritative_signatures() 在 check_blocked 入口); 7 TC class / 14 TC (test_comment_signing.py); docs/keys/<actor>.{private,public}.pem 自动生成 (3 actor: Ulysses + Mavis + architect); 288 tests pass (0 回归); 5 已知缺口 #3+#4 闭合 (#1+#2+#5 跨 session 续) | 2026-09-10 22:10 JST Mavis 拍板激活 (per plan-031 Phase B + 9/8 15:19 第 6 次强化) |

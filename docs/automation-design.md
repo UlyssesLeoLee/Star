@@ -81,9 +81,9 @@
 
 ### 1.4 守门编号累计表 (per AGENTS.md §4 + brief v0.46, 2026-09-09 21:18 JST Mavis 自驱盘点)
 
-> **盘点状态 (per brief v0.46 + v0.57 拍板)**: 现有 26 条 v1-v26 (line 127-154 of AGENTS.md), 编号累计到 v26; 现有 **v25 重号** (line 152 + 153, per守门 #11 缺标比错标) 已修 (per 2026-09-10 20:55 JST Mavis 自驱: line 153 改 v25b 守门 #1 v25 CI cargo test, line 152 维持 v25 守门 #14 v2 5 域 Lead 内推); v17/v18/v19 文档排序错位 (line 143-145) 不影响验证; brief §2.2 示例候选 v26-v30 跟现有 v26 冲突, 重命名 v27-v31; **v28 + v29 + v32 + v33 已 🟢 active (per 9/10 20:14 JST 拍板"v33 激活")**, **v27 已 🟢 active (per 9/10 11:00 JST)**, **v30 / v31 仍 🟡 (v0.62 反转 + v0.63 进一步反转 obsolete)**.
+> **盘点状态 (per brief v0.46 + v0.57 + v0.61 拍板)**: 现有 26 条 v1-v26 (line 127-154 of AGENTS.md), 编号累计到 v26; 现有 **v25 重号** (line 152 + 153, per守门 #11 缺标比错标) 已修 (per 2026-09-10 20:55 JST Mavis 自驱: line 153 改 v25b 守门 #1 v25 CI cargo test, line 152 维持 v25 守门 #14 v2 5 域 Lead 内推); v17/v18/v19 文档排序错位 (line 143-145) 不影响验证; brief §2.2 示例候选 v26-v30 跟现有 v26 冲突, 重命名 v27-v31; **v28 + v29 + v32 + v33 + v34 + v35 + v36 已 🟢 active** (per 9/10 20:14 JST 拍板"v33 激活" + 22:10 JST Mavis 自驱激活 v35+v36 per 9/8 15:19 第 6 次强化 Mavis 全权代理), **v27 已 🟢 active (per 9/10 11:00 JST)**, **v30 / v31 已 🟡 obsolete (v0.62 反转 + v0.63 进一步反转)**, **v37 仍 🟡 候选 (跟 v1.01 5 已知缺口联动)**.
 >
-> **v3x 候选 (5 条, status = 待 Ulysses 拍板激活)**: 跟 AGENTS.md §4.1.1 同源, 跨文档引用一致.
+> **v3x 候选 (1 条, status = 待 Mavis 拍板激活)**: 跟 AGENTS.md §4.1.1 同源, 跨文档引用一致.
 
 | 编号 | 类别 | 触发事件 | 候选守门内容 (摘要) | 实证 / 触发 commit | 状态 |
 |---|---|---|---|---|---|

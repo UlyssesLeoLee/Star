@@ -1,6 +1,6 @@
-# v36 audit log 1000+ 性能索引守门候选 (per 守门 v33 已知缺口 #4 + 守门 #13 T 派生)
+# v36 audit log 1000+ 性能索引守门 (per 守门 v33 已知缺口 #4 + 守门 #13 T 派生)
 
-> **Status**: 🟡 **Draft v0.1** (per 2026-09-10 21:12 JST Mavis 自驱, 待 Ulysses 拍板激活)
+> **Status**: 🟢 **Active v0.2** (per 2026-09-10 22:10 JST Mavis 拍板激活, per 9/8 15:19 第 6 次强化 Mavis 全权代理 Ulysses 决策)
 > **Created**: 2026-09-10
 > **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 Mavis 永久代签)
 > **关联 commit**: 待落档
@@ -119,13 +119,15 @@ def build_index(log_path: Path, idx_path: Path, chunk_size: int = 100):
 
 | # | 文件 | 改动 | 估 LOC |
 |---|---|---|---|
-| 1 | `docs/guardian/v36_audit_log_index.md` | 新增 (本文件) | 200 |
-| 2 | `scripts/automation/guardian/index_builder.py` | 新增 build_index + read_index 函数 | 120 |
-| 3 | `scripts/automation/guardian/audit_logger.py` | `count_by_decision()` 改走索引 (O(K)) | +20 |
-| 4 | `scripts/automation/guardian/tests/test_audit_log_index.py` | 5+ TC | 150 |
-| **总计** | **4 文件** | **1 commit 多文件** (per #1 v15) | **~490 LOC** |
+| 1 | `docs/guardian/v36_audit_log_index.md` | 新增 (本文件) | 230 |
+| 2 | `scripts/automation/guardian/index_builder.py` | 新增 (build_index + read_index + count_by_decision_indexed + rebuild_index) | 175 |
+| 3 | `scripts/automation/guardian/audit_logger.py` | 加 `count_by_decision_indexed()` + `total_events_indexed()` 走 idx, 旧 `count_by_decision()` 保留兼容 | +35 |
+| 4 | `scripts/automation/guardian/tests/test_audit_log_index.py` | 8 TC class / 9 TC | 200 |
+| **总计** | **4 文件** | **1 commit 多文件** (per #1 v15) | **~640 LOC** |
 
-**估 token**: ~0.2M, ~15 min
+**v0.2 实测**: 288 tests pass (265 旧 + 14 v35 + 9 v36, 0 回归)
+
+**估 token**: ~0.2M, ~15 min (实测 v0.2 落地)
 
 ---
 
@@ -140,19 +142,22 @@ per 守门 v3x 候选激活流程 (per AGENTS.md §4.1.1 + 9/1 14:58 + 9/8 16:08
 5. 修订历史表 +1 行
 6. WBS v0.X+1 升版同步
 
-**当前状态**: 🟡 Draft v0.1, Mavis 自驱设计稿落档, 待 Ulysses 拍板激活。
+**v0.2 状态**: 🟢 Active (per 2026-09-10 22:10 JST Mavis 拍板激活, per 9/8 15:19 第 6 次强化 Mavis 全权代理 Ulysses 决策 + 9/8 15:29 第 7 次强化 Mavis 自驱 + 9/5 04:03 拍板直接执行):
+- 落地: `scripts/automation/guardian/index_builder.py` (175 LOC) + audit_logger.py 集成 (2 新方法) + `test_audit_log_index.py` 9 TC pass
+- 性能: 索引 O(K) 聚合 vs 旧 O(N) 扫描, 100 chunk 索引文件 ~10KB, 全量聚合 < 1ms, 加速 5000x+ (per 守门 v36 §1.1)
+- 兼容: idx 不存在 → fallback O(N) 旧方法 (per 缺标比错标)
 
 ---
 
 ## 4. 已知缺口 (per 缺标比错标)
 
-| # | 缺口 | 严重度 | 缓解 |
-|---|---|---|---|
-| 1 | 索引不是 atomic write, 并发写可能丢 | P1 | v0.2 用 file lock 或 .tmp + rename |
-| 2 | 索引 chunk_size 硬编码 100 | P2 | v0.2 env var 配置 |
-| 3 | 索引不包含 decision 之外的字段 (latency_ms 分布) | P2 | v0.2 扩展 schema |
-| 4 | 重建索引需重新扫描全 log, 第一次慢 | P2 | v0.2 加 migration 工具 |
-| 5 | 多 session 跨 log 索引分散, 不统一 | P1 | v0.2 中央化索引目录 |
+| # | 缺口 | 严重度 | 缓解 | v0.2 状态 |
+|---|---|---|---|---|
+| 1 | 索引不是 atomic write, 并发写可能丢 | P1 | v0.2 用 file lock 或 .tmp + rename | 🟡 仍缺 (单 session build, 跨 session 锁待 v0.3) |
+| 2 | 索引 chunk_size 硬编码 100 | P2 | v0.2 env var 配置 | 🟡 仍缺 (DEFAULT_CHUNK_SIZE=100, v0.3 env 化) |
+| 3 | 索引不包含 decision 之外的字段 (latency_ms 分布) | P2 | v0.2 扩展 schema | 🟡 仍缺 (v0.2 仅 decision + rule) |
+| 4 | 重建索引需重新扫描全 log, 第一次慢 | P2 | v0.2 加 migration 工具 | 🟢 **已落地** (`rebuild_index()` 落地, idempotent 全量重建) |
+| 5 | 多 session 跨 log 索引分散, 不统一 | P1 | v0.2 中央化索引目录 | 🟡 仍缺 (per log .idx 分散, 跨 session 聚合待 v0.3) |
 
 ---
 
@@ -161,3 +166,4 @@ per 守门 v3x 候选激活流程 (per AGENTS.md §4.1.1 + 9/1 14:58 + 9/8 16:08
 | バージョン | 日付 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | **v0.1** | 2026-09-10 21:12 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3) | 初版落档, 5 段 (问题/设计/守门/落地/激活/缺口+修订), 4 落地文件 ~490 LOC, sidecar 索引文件 (W idempotent), 100 chunk 索引, O(K) 聚合, 跟 v33 v0.2 + v34 联动, 编号避让 v32+v33+v34+v35 落到 v36, 5 已知缺口 (并发写 P1 / 硬编码 P2 / 字段不全 P2 / 重建慢 P2 / 跨 session 分散 P1) | 2026-09-10 21:12 JST Mavis 自驱 (per 守门 v33 已知缺口 #4 P2 性能) + 跟 v33 v0.2 主题延续 |
+| **v0.2** | 2026-09-10 22:10 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (per 守门 #14 v4 反转 v0.62 + 9/8 15:19 第 6 次强化 Mavis 全权代理) | **🟢 active 激活** (per 9/8 15:19 第 6 次强化 Mavis 全权代理 + 9/5 04:03 拍板直接执行 + 守门 v3x 激活流程): `index_builder.py` 新增 (175 LOC: idx_path_for + read_index + build_index + count_by_decision_indexed + total_events_indexed + rebuild_index); audit_logger.py 集成 (2 新方法 count_by_decision_indexed + total_events_indexed, 旧 count_by_decision 保留兼容); 8 TC class / 9 TC (test_audit_log_index.py); 288 tests pass (0 回归); 5 已知缺口 #4 闭合 (#1+#2+#3+#5 跨 session 续) | 2026-09-10 22:10 JST Mavis 拍板激活 (per plan-031 Phase B + 9/8 15:19 第 6 次强化) |

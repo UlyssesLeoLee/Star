@@ -54,6 +54,15 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Optional
 
+try:
+    from guardian.comment_signing import is_authoritative_actor, sign_comment, verify_comment
+    _V35_SIGNING_AVAILABLE = True
+except ImportError:
+    _V35_SIGNING_AVAILABLE = False
+    sign_comment = None
+    verify_comment = None
+    is_authoritative_actor = None
+
 ROOT_DEFAULT = Path(__file__).resolve().parent.parent.parent
 BRIEFS_DIR_DEFAULT = ROOT_DEFAULT / "docs" / "briefs"
 REPORTS_DIR_DEFAULT = ROOT_DEFAULT / "docs" / "reports"
@@ -732,8 +741,17 @@ class SubagentDispatcher:
         )
         # append-only 写 (per 守门 #13 T)
         comments_path.parent.mkdir(parents=True, exist_ok=True)
+        # v35 ed25519 签名 (per 守门 v35 §1.1 + 守门 #5 派生)
+        # 权威 actor 必签 (Mavis 跟 Ulysses 共享 key per 守门 #14 v3)
+        # 软约束 v0.1: 签名失败 → warn log, 仍写原 dict (per 缺标比错标 #11)
+        payload = asdict(c)
+        if _V35_SIGNING_AVAILABLE:
+            try:
+                payload = sign_comment(payload, actor=author if is_authoritative_actor(author) else "Mavis")
+            except Exception as e:  # noqa: BLE001
+                print(f"[WARN] v35 sign failed for comment {comment_id}: {e}", file=sys.stderr)
         with comments_path.open("a", encoding="utf-8", errors="replace") as f:
-            f.write(json.dumps(asdict(c), ensure_ascii=False, separators=(",", ":")) + "\n")
+            f.write(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n")
         self._audit(
             action="comment",
             task_id=task_id,
@@ -773,17 +791,40 @@ class SubagentDispatcher:
             print(f"[WARN] read comments failed for {task_id}: {e}", file=sys.stderr)
         return out
 
+    def _verify_authoritative_signatures(self, task_id: str, comments: list) -> None:
+        """v35 GPG 验证 (per 守门 v35 §1.3): 权威 actor 留言必签名有效.
+
+        软约束 v0.1 (per 缺标比错标 #11 + v35 已知缺口 #2):
+            签名无效 → warn log, 不抛 (legacy 留言无签名也视为无效, 但不阻断)
+        """
+        if not _V35_SIGNING_AVAILABLE:
+            return
+        for c in comments:
+            actor = c.author or c.actor_role
+            if is_authoritative_actor(actor):
+                sig_ok = verify_comment(asdict(c))
+                if not sig_ok:
+                    print(
+                        f"[WARN] v35 权威留言签名无效 task_id={task_id} comment_id={c.id} author={c.author}",
+                        file=sys.stderr,
+                    )
+
     def check_blocked(self, task_id: str) -> list:
-        """返回未解除的 blocks=True 留言 (per 守门 v33 v0.2 §1.4 + 已知缺口 #3).
+        """返回未解除的 blocks=True 留言 (per 守门 v33 v0.2 §1.4 + 已知缺口 #3 + v35 GPG 联动).
 
         解除规则 (v0.2 智能):
             BLOCK 留言 c_blocks 有解除留言 c_resolve (c_resolve.parent_comment_id == c_blocks.id
             AND c_resolve.blocks is False AND c_resolve.actor_role in {"Ulysses", "architect", "Mavis"})
             → c_blocks 视为已解除, 不返
 
+        v35 GPG 联动 (v0.1 软约束):
+            权威 actor 留言 → 必验签, 签名无效 → warn log, 仍按 BLOCK 处理 (per v35 §1.3)
+
         其他未解除 BLOCK 留言 (actor_role = "sub-agent" 等非权威) → 仍返.
         """
         all_comments = self.list_comments(task_id)
+        # v35 GPG 验证 (per 守门 v35 §1.3 联动)
+        self._verify_authoritative_signatures(task_id, all_comments)
         blocking = [c for c in all_comments if c.blocks]
         if not blocking:
             return []

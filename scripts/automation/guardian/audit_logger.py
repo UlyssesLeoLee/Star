@@ -1,6 +1,11 @@
 """AuditLogger PM-4: JSON Lines 寫入, fail-closed.
 
 Per DD-PRE-TOOL-USE-GUARD-001.md §2.3 + SRS-PRE-TOOL-USE-GUARD-001.md §4.4 + 守门 #13 Transaction.
+
+v36 增强 (per docs/guardian/v36_audit_log_index.md §1.1):
+  - `count_by_decision_indexed()` 走 sidecar idx O(K) 聚合
+  - 主 log 仍 append-only (per 守门 #13 T), idx 是 W idempotent rebuild
+  - 旧 `count_by_decision()` 保持 O(N) 扫描兼容 (per 缺标比错标)
 """
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
@@ -11,6 +16,16 @@ import stat
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+try:
+    from guardian.index_builder import (
+        count_by_decision_indexed as _count_by_decision_indexed,
+        idx_path_for,
+        total_events_indexed as _total_events_indexed,
+    )
+    _V36_INDEX_AVAILABLE = True
+except ImportError:
+    _V36_INDEX_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -117,10 +132,37 @@ class AuditLogger:
         return results
 
     def count_by_decision(self) -> Dict[str, int]:
-        """統計 decision 計數, 供 session state 更新 (per NFR-O-1)."""
+        """統計 decision 計數, 供 session state 更新 (per NFR-O-1).
+
+        旧 O(N) 扫描版本 (保留兼容, per 缺标比错标); 新版 v36 走索引 O(K) 见 count_by_decision_indexed.
+        """
         counts = {"BLOCK": 0, "ASK": 0, "WARN": 0, "PASS": 0}
         for ev in self.query(limit=10_000_000):
             d = ev.decision
             if d in counts:
                 counts[d] += 1
         return counts
+
+    def count_by_decision_indexed(self) -> Dict[str, int]:
+        """v36: 走 sidecar idx O(K) 聚合 (per 守门 v36 §1.1 + 性能 5000x+).
+
+        idx 不存在 → 返旧 O(N) 扫描结果 (per 缺标比错标: 兼容未 build 状态).
+        """
+        if not _V36_INDEX_AVAILABLE:
+            return self.count_by_decision()
+        idx_p = idx_path_for(self._path)
+        if not idx_p.exists():
+            return self.count_by_decision()
+        return _count_by_decision_indexed(idx_p)
+
+    def total_events_indexed(self) -> int:
+        """v36: 走 idx 总 event 数 (O(K), per 守门 v36 §1.1).
+
+        idx 不存在 → fallback count_by_decision 总和.
+        """
+        if not _V36_INDEX_AVAILABLE:
+            return sum(self.count_by_decision().values())
+        idx_p = idx_path_for(self._path)
+        if not idx_p.exists():
+            return sum(self.count_by_decision().values())
+        return _total_events_indexed(idx_p)
