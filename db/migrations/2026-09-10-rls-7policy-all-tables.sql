@@ -53,13 +53,8 @@ CREATE POLICY ops_metrics_config_delete ON ops_metrics_config
         current_setting('app.is_admin', true) = 'true'
     );
 
--- ops_metrics_config schema isolation (per v0.91 §8.3 映射表 5)
-CREATE POLICY ops_metrics_config_schema_isolation ON ops_metrics_config
-    FOR ALL
-    USING (
-        schema_name = current_setting('app.current_schema_name', true)
-        OR current_setting('app.is_admin', true) = 'true'
-    );
+-- ops_metrics_config schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
+-- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
 -- ops_metrics_config platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
 CREATE POLICY ops_metrics_config_platform_admin ON ops_metrics_config
@@ -109,13 +104,8 @@ CREATE POLICY ops_cluster_action_log_delete ON ops_cluster_action_log
         current_setting('app.is_admin', true) = 'true'
     );
 
--- ops_cluster_action_log schema isolation (per v0.91 §8.3 映射表 5)
-CREATE POLICY ops_cluster_action_log_schema_isolation ON ops_cluster_action_log
-    FOR ALL
-    USING (
-        schema_name = current_setting('app.current_schema_name', true)
-        OR current_setting('app.is_admin', true) = 'true'
-    );
+-- ops_cluster_action_log schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
+-- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
 -- ops_cluster_action_log platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
 CREATE POLICY ops_cluster_action_log_platform_admin ON ops_cluster_action_log
@@ -165,13 +155,8 @@ CREATE POLICY ops_helm_release_state_delete ON ops_helm_release_state
         current_setting('app.is_admin', true) = 'true'
     );
 
--- ops_helm_release_state schema isolation (per v0.91 §8.3 映射表 5)
-CREATE POLICY ops_helm_release_state_schema_isolation ON ops_helm_release_state
-    FOR ALL
-    USING (
-        schema_name = current_setting('app.current_schema_name', true)
-        OR current_setting('app.is_admin', true) = 'true'
-    );
+-- ops_helm_release_state schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
+-- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
 -- ops_helm_release_state platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
 CREATE POLICY ops_helm_release_state_platform_admin ON ops_helm_release_state
@@ -221,13 +206,8 @@ CREATE POLICY ops_log_entry_delete ON ops_log_entry
         current_setting('app.is_admin', true) = 'true'
     );
 
--- ops_log_entry schema isolation (per v0.91 §8.3 映射表 5)
-CREATE POLICY ops_log_entry_schema_isolation ON ops_log_entry
-    FOR ALL
-    USING (
-        schema_name = current_setting('app.current_schema_name', true)
-        OR current_setting('app.is_admin', true) = 'true'
-    );
+-- ops_log_entry schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
+-- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
 -- ops_log_entry platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
 CREATE POLICY ops_log_entry_platform_admin ON ops_log_entry
@@ -277,13 +257,8 @@ CREATE POLICY ops_log_analysis_delete ON ops_log_analysis
         current_setting('app.is_admin', true) = 'true'
     );
 
--- ops_log_analysis schema isolation (per v0.91 §8.3 映射表 5)
-CREATE POLICY ops_log_analysis_schema_isolation ON ops_log_analysis
-    FOR ALL
-    USING (
-        schema_name = current_setting('app.current_schema_name', true)
-        OR current_setting('app.is_admin', true) = 'true'
-    );
+-- ops_log_analysis schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
+-- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
 -- ops_log_analysis platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
 CREATE POLICY ops_log_analysis_platform_admin ON ops_log_analysis
@@ -333,13 +308,8 @@ CREATE POLICY ops_log_query_log_delete ON ops_log_query_log
         current_setting('app.is_admin', true) = 'true'
     );
 
--- ops_log_query_log schema isolation (per v0.91 §8.3 映射表 5)
-CREATE POLICY ops_log_query_log_schema_isolation ON ops_log_query_log
-    FOR ALL
-    USING (
-        schema_name = current_setting('app.current_schema_name', true)
-        OR current_setting('app.is_admin', true) = 'true'
-    );
+-- ops_log_query_log schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
+-- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
 -- ops_log_query_log platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
 CREATE POLICY ops_log_query_log_platform_admin ON ops_log_query_log
@@ -389,13 +359,8 @@ CREATE POLICY oauth_clients_delete ON oauth_clients
         current_setting('app.is_admin', true) = 'true'
     );
 
--- oauth_clients schema isolation (per v0.91 §8.3 映射表 5)
-CREATE POLICY oauth_clients_schema_isolation ON oauth_clients
-    FOR ALL
-    USING (
-        schema_name = current_setting('app.current_schema_name', true)
-        OR current_setting('app.is_admin', true) = 'true'
-    );
+-- oauth_clients schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
+-- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
 -- oauth_clients platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
 CREATE POLICY oauth_clients_platform_admin ON oauth_clients
@@ -445,13 +410,8 @@ CREATE POLICY oauth_authorization_codes_delete ON oauth_authorization_codes
         current_setting('app.is_admin', true) = 'true'
     );
 
--- oauth_authorization_codes schema isolation (per v0.91 §8.3 映射表 5)
-CREATE POLICY oauth_authorization_codes_schema_isolation ON oauth_authorization_codes
-    FOR ALL
-    USING (
-        schema_name = current_setting('app.current_schema_name', true)
-        OR current_setting('app.is_admin', true) = 'true'
-    );
+-- oauth_authorization_codes schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
+-- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
 -- oauth_authorization_codes platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
 CREATE POLICY oauth_authorization_codes_platform_admin ON oauth_authorization_codes
@@ -501,13 +461,8 @@ CREATE POLICY oauth_access_tokens_delete ON oauth_access_tokens
         current_setting('app.is_admin', true) = 'true'
     );
 
--- oauth_access_tokens schema isolation (per v0.91 §8.3 映射表 5)
-CREATE POLICY oauth_access_tokens_schema_isolation ON oauth_access_tokens
-    FOR ALL
-    USING (
-        schema_name = current_setting('app.current_schema_name', true)
-        OR current_setting('app.is_admin', true) = 'true'
-    );
+-- oauth_access_tokens schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
+-- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
 -- oauth_access_tokens platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
 CREATE POLICY oauth_access_tokens_platform_admin ON oauth_access_tokens
@@ -557,13 +512,8 @@ CREATE POLICY oauth_refresh_tokens_delete ON oauth_refresh_tokens
         current_setting('app.is_admin', true) = 'true'
     );
 
--- oauth_refresh_tokens schema isolation (per v0.91 §8.3 映射表 5)
-CREATE POLICY oauth_refresh_tokens_schema_isolation ON oauth_refresh_tokens
-    FOR ALL
-    USING (
-        schema_name = current_setting('app.current_schema_name', true)
-        OR current_setting('app.is_admin', true) = 'true'
-    );
+-- oauth_refresh_tokens schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
+-- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
 -- oauth_refresh_tokens platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
 CREATE POLICY oauth_refresh_tokens_platform_admin ON oauth_refresh_tokens
