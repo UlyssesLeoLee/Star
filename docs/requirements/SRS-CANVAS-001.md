@@ -40,7 +40,8 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 (撤回) | 2026-09-10 17:10 JST | Ulysses — Mavis 接手 | 旧方向: Miro 全功能对标 12 大类 50 项, 3 专题拆分 (collab/content/integration) | Ulysses 17:00 JST 拍板 (后撤回) |
-| **v1.0 (当前)** | **2026-09-10 17:17 JST** | **Ulysses — Mavis 接手 (per 守门 #14 v3)** | **方向重置: 核心 = 管理 agent + 游戏化, 2 专题拆分 (agent/gamify), 砍掉 Miro 通用功能** | **Ulysses 17:08 JST 拍板"管理 agent 和游戏化, 避免过度冗余"** |
+| v1.0 (方向重置版) | 2026-09-10 17:20 JST | Ulysses — Mavis 接手 (per 守门 #14 v3) | 新方向: 双核心 = 管理 agent + 游戏化, 2 专题拆分, 砍掉 Miro 通用功能, 字节数目标 ~20K (vs v0.1 47.5K 砍 58%) | Ulysses 17:08 JST 拍板"管理 agent 和游戏化, 避免过度冗余" |
+| **v1.1 (当前, 三次更新版)** | **2026-09-10 17:34 JST** | **Ulysses — Mavis 接手 (per 守门 #14 v3)** | **v0.63 反转: 撤回 17:08 JST 砍多人编辑决定, A12 多人编辑 8 项新增, AGENT 38 → 46 项, 双核心 70 → 78 项, 31 P0 → 36 P0** | **Ulysses 17:34 JST 拍板"多人编辑是要的"** |
 
 ### 0.2 平行 2 专题 SRS 修订履历 (独立跟踪)
 
@@ -90,9 +91,9 @@ STAR 平台已在 2026-09-04 落地 V0.1 MVP 无限画布, 满足基础无限画
 | SRS | 域 | 子能力 | 项数 | 详细展开 |
 |---|---|---|---|---|
 | **SRS-CANVAS-001 (本总册)** | 跨域 / 索引 | 双核心 60 项 (索引级) | 60 项 (索引) | 双核心索引 + 优先级 + 跨块接口 + 共享约束 |
-| `SRS-CANVAS-AGENT-001` | 双核心 1: agent 管理 | A1-A11 (11 子能力, 含 ARG 图论构造) | **38 项** | 节点 / 拓扑 / 状态 / worktree / work-item / 操作 / 监控 / 聚类 / 跨域 / settings 集成 / **ARG (10 类关系 + 4 维度 + 5 模板 + 同步桥 + 成就)** (FR/NFR/AC/US 详细) |
+| `SRS-CANVAS-AGENT-001` | 双核心 1: agent 管理 | A1-A12 (12 子能力, 含 ARG 图论构造 + 多人编辑 per 17:34 JST v0.63 反转) | **46 项** | 节点 / 拓扑 / 状态 / worktree / work-item / 操作 / 监控 / 聚类 / 跨域 / settings 集成 / **ARG (10 类关系 + 4 维度 + 5 模板 + 同步桥 + 成就)** / **多人编辑 (8 项: 多人同时编辑 + 实时 cursor + 元素增删改 + Follow mode + 评论线程 + @ + 冲突解决 + audit)** (FR/NFR/AC/US 详细) |
 | `SRS-CANVAS-GAMIFY-001` | 双核心 2: 游戏化 | G1-G12 (12 子能力) | **32 项** | 节点 / 奖励 / 积分 / 升级 / AI 聚类 / 投票 / 反应 / confetti / 排行榜 / 任务 / 道具 / game 集成 (FR/NFR/AC/US 详细) |
-| **合计** | | | **70 项 (展开)** | |
+| **合计** | | | **78 项 (展开)** | |
 
 #### 1.3.2 V0.1 MVP 衔接 (per 守门 #11 缺标比错标)
 
@@ -264,9 +265,9 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 
 | 双核心 | 子能力 | 项数 | 优先级 P0 | P1 | P2 | P3 | 引用专题 SRS |
 |---|---|---|---|---|---|---|---|
-| **1. Agent 管理** | A1-A11 (11, 含 ARG 图论构造) | **38** | 19 | 11 | 8 | 0 | `SRS-CANVAS-AGENT-001` |
+| **1. Agent 管理** | A1-A12 (12, 含 ARG 图论构造 + 多人编辑 per 17:34 JST v0.63 反转) | **46** | 24 | 13 | 9 | 0 | `SRS-CANVAS-AGENT-001` |
 | **2. 游戏化** | G1-G12 (12) | **32** | 12 | 9 | 9 | 2 | `SRS-CANVAS-GAMIFY-001` |
-| **合计** | **23 子能力** | **70** | **31** | **20** | **17** | **2** | |
+| **合计** | **24 子能力** | **78** | **36** | **22** | **18** | **2** | |
 
 ### 4.2 Agent 管理 28 项 子能力索引 (per `SRS-CANVAS-AGENT-001`)
 
@@ -283,6 +284,7 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 | A9 agent session 跨域引用 | 2 | 跟 SRS-AGENT-VIEW-001 / SRS-AGENT-RELATIONSHIP-001 协同 | AGENT §4.9 |
 | A10 agent settings 集成 | 2 | 跟 V0.1 AgentSettingsTab 集成, 画布调用 settings | AGENT §4.10 |
 | **A11 ARG 图论构造 (per 17:21 JST 补充)** | **10** | **10 类关系边 + 4 维度协作影响 + 5 团队模板 + 同步桥 + 成就 + audit + 版本** (主源 `SRS-AGENT-RELATIONSHIP-001.md` v0.1) | **AGENT §4.11** |
+| **A12 多人编辑 (per 17:34 JST 拍板"多人编辑是要的", v0.63 反转)** | **8** | **多人同时编辑 + 实时 cursor + 元素增删改 + Follow mode + 评论线程 + @ + 冲突解决 (CRDT 选型) + view-comment-edit 3 级权限 + audit log** (撤回 17:08 JST 砍多人编辑决定) | **AGENT §4.12** |
 
 ### 4.3 游戏化 32 项 子能力索引 (per `SRS-CANVAS-GAMIFY-001`)
 
@@ -336,6 +338,12 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 | F-P0-A11.2 | 关系编辑 (UI 拖拽 + type 选择 + weight 滑块) | Agent | A11 | AGENT A11.2 |
 | F-P0-A11.3 | 4 维度协作影响 UI 指示器 (dispatch / context / trust / review) | Agent | A11 | AGENT A11.3 |
 | F-P0-A11.5 | 关系 audit log (per 守门 #13 W/T/M Transaction append-only + SCD Type 2) | Agent | A11 | AGENT A11.5 |
+| F-P0-A12.1 | 多人同时编辑同一 canvas (实时同步, max 200ms 延迟, max 10 并发) | Agent | A12 | AGENT A12.1 |
+| F-P0-A12.2 | 实时 cursor 同步 (其他用户光标 + 名字 + 当前 viewport) | Agent | A12 | AGENT A12.2 |
+| F-P0-A12.3 | 元素增删改实时同步 (Realtime WS 通道, 跟 V0.1 §4.1 模式 A 扩展) | Agent | A12 | AGENT A12.3 |
+| F-P0-A12.5 | 多人评论线程 + @ 提醒 (V0.1 comment_pin 已实装, 升级 thread + @ + notification 域对接) | Agent | A12 | AGENT A12.5 |
+| F-P0-A12.6 | 冲突解决 (CRDT 选型, Yjs vs Automerge vs LWW, 跟 A11 同步桥同源) | Agent | A12 | AGENT A12.6 |
+| F-P0-A12.8 | audit log 多人操作 (per 守门 #13 W/T/M Transaction append-only, 新增 `canvas_multi_user_audit` 表) | Agent | A12 | AGENT A12.8 |
 
 ### 4.5 跨块接口 (Cross-Block Interface)
 
@@ -356,6 +364,7 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 | **AGENT A11 5 团队模板** | Hub-and-Spoke / Mesh / Chain / Hierarchical / Review-Council, 1-click 部署 | **SRS-AGENT-RELATIONSHIP-001 §4.5** |
 | **AGENT A11 同步桥** | Memgraph ↔ LangGraph StateGraph 双向, UI sync status | **SRS-AGENT-RELATIONSHIP-001 §4.4** |
 | **AGENT A11 4 表 W/T/M** | agents = Master / agent_relationship_edges = Master / agent_relationship_edges_audit = Transaction / team_template_instances = Work, 100% 表覆盖 | **per 守门 #13** |
+| **AGENT A12 多人编辑** (per 17:34 JST v0.63 反转, 撤回 17:08 JST 砍多人编辑决定) | 多人同时编辑 + 实时 cursor + 元素增删改 + Follow mode + 评论线程 + @ + 冲突解决 + view-comment-edit 权限 + audit log (新增 `canvas_multi_user_audit` 表 100% RLS 13 类) | **per `frontend-canvas-design.md` §4.1 模式 A Realtime 通道** |
 
 #### 4.5.2 25 module 联动 (per frontend-canvas-design §4 联动矩阵 + 双核心扩展)
 
@@ -486,6 +495,11 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 | **ARG sync status** | WS | `wss://arg-sync/canvases/[id]` (per §4.4) | AGENT A11.9 |
 | **ARG audit log** | GET | `/v1/arg/edges/audit?edge_id=` (per 守门 #13 Transaction) | AGENT A11.5 |
 | **ARG relationship view (Agent View tab)** | GET | `/v1/arg/view?agent_session_id=` (per §1.3) | AGENT A11.10 |
+| **多人编辑 Realtime 通道 (per 17:34 JST v0.63 反转)** | WS | `wss://canvas-collab/canvases/[id]` (扩展 V0.1 §4.1 模式 A Realtime 通道) | AGENT A12.1 + A12.3 |
+| **多人编辑 presence (实时 cursor)** | WS | `wss://canvas-presence/canvases/[id]` (扩展 V0.1 §4.6 PresenceCursor 升级) | AGENT A12.2 |
+| **多人编辑 follow mode** | POST | `/v1/collaboration/canvases/[id]/follow?user_id=` (新) | AGENT A12.4 |
+| **多人编辑 comment thread + @ 提醒** | POST | `/v1/collaboration/canvases/[id]/comments/[cid]/thread` + `/v1/notifications/@` (扩展 V0.1) | AGENT A12.5 |
+| **多人编辑 audit log (新增表 `canvas_multi_user_audit`)** | GET | `/v1/collaboration/canvases/[id]/multi-user-audit` (新, per 守门 #13 Transaction append-only) | AGENT A12.8 |
 | Score points | GET/POST | `/v1/gamify/scores` | GAMIFY G3.1-3.2 |
 | Level up | WS | `wss://gamify-level/canvases/[id]` | GAMIFY G4.1-4.2 |
 | Sticky note 聚类 (AI, mock) | POST | `/v1/gamify/sticky-notes/cluster` | GAMIFY G5.1 |
@@ -621,9 +635,9 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 
 | 编号 | 验收项 | 当前状态 |
 |---|---|---|
-| AC-SRS-1 | `SRS-CANVAS-AGENT-001.md` 9 段齐全, **38 项**展开, 字节数 ≥ **30K**, **不写 Miro 通用功能 + A11 必含 4 表 W/T/M 三類横展** (per 守门 #13) | worker 子代理 1 撰写中 (**bg_fc33dfea 重派**, 17:22 JST stop + 重派) |
+| AC-SRS-1 | `SRS-CANVAS-AGENT-001.md` 9-13 段齐全, **46 项**展开 (A1-A12), 字节数 ≥ **40K**, **A11 必含 4 表 W/T/M 三類横展 + A12.8 多人 audit log W/T/M + 不写 Miro 通用功能** (per 守门 #13, 撤回 17:08 JST 砍多人编辑决定 per 17:34 JST v0.63 反转) | worker 子代理 1 v1.2 重写 (bg_eb11f9e3 重派, 17:34 JST) |
 | AC-SRS-2 | `SRS-CANVAS-GAMIFY-001.md` 9 段齐全, 32 项展开, 字节数 ≥ 30K, **G11 W/T/M 完整 + G5 AI mock 标注** + **不写 Miro 通用功能** | worker 子代理 2 撰写中 (bg_84cf0613, 17:20 JST 派, 不变) |
-| AC-SRS-3 | `SRS-CANVAS-001.md` (本总册 v1.0) 9 段齐全, 双核心 **70 项**索引 (28+10+32) + 跨块接口 + 共享约束, 字节数 ≥ 50K | root 撰写完成 (v1.0 + 17:22 JST A11 二次更新) |
+| AC-SRS-3 | `SRS-CANVAS-001.md` (本总册 v1.1) 9 段齐全, 双核心 **78 项**索引 (38+8+32) + 跨块接口 + 共享约束, 字节数 ≥ 50K | root 撰写完成 (v1.0 + 17:22 JST A11 二次更新 + 17:34 JST A12 三次更新 v0.63 反转) |
 
 ### 8.3 后续 P0 阶段验收 (3 个月内, 拍板后启动)
 
@@ -650,7 +664,8 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 (撤回) | 2026-09-10 17:10 JST | Ulysses — Mavis 接手 | 旧方向: Miro 全功能 12 大类 50 项, 3 专题拆分 (47.5KB) | Ulysses 17:00 JST 拍板 (后撤回) |
-| **v1.0 (当前, 方向重置版)** | **2026-09-10 17:20 JST** | **Ulysses — Mavis 接手 (per 守门 #14 v3)** | **新方向: 双核心 = 管理 agent + 游戏化, 2 专题拆分, 砍掉 Miro 通用功能, 字节数目标 ~20K (vs v0.1 47.5K 砍 58%)** | **Ulysses 17:08 JST 拍板"管理 agent 和游戏化, 避免过度冗余"** |
+| **v1.0 (方向重置版)** | **2026-09-10 17:20 JST** | **Ulysses — Mavis 接手 (per 守门 #14 v3)** | **新方向: 双核心 = 管理 agent + 游戏化, 2 专题拆分, 砍掉 Miro 通用功能, 字节数目标 ~20K (vs v0.1 47.5K 砍 58%)** | **Ulysses 17:08 JST 拍板"管理 agent 和游戏化, 避免过度冗余"** |
+| **v1.1 (当前, 三次更新版)** | **2026-09-10 17:34 JST** | **Ulysses — Mavis 接手 (per 守门 #14 v3)** | **v0.63 反转: 撤回 17:08 JST 砍多人编辑决定, A12 多人编辑 8 项新增, AGENT 38 → 46 项, 双核心 70 → 78 项, 31 P0 → 36 P0** | **Ulysses 17:34 JST 拍板"多人编辑是要的"** |
 
 ### 9.2 平行 2 专题 SRS 修订履历 (独立跟踪, 待 2 子代理返回后填)
 
@@ -666,6 +681,8 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 |---|---|---|---|
 | 2026-09-10 17:00 JST Ulysses 拍板"把这些归纳进需求文档, 子代理同步撰写" | 旧 v0.1 (撤回) | Mavis 接手 | 12 大类 50 项 Miro 差距归并 (撤回) |
 | **2026-09-10 17:08 JST Ulysses 拍板"管理 agent 和游戏化, 避免过度冗余"** | **本总册 v1.0** | **Mavis 接手** | **双核心重置, 2 专题拆分, 砍 11 大类 Miro 通用功能** |
+| **2026-09-10 17:21 JST Ulysses 拍板"画布内体现 agent 之间关系的图论构造"** | **本总册 v1.0 (二次更新) + AGENT brief v1.1** | **Mavis 接手** | **A11 ARG 子能力新增 (10 项), AGENT 28 → 38 项, 总 60 → 70 项; 引用 `SRS-AGENT-RELATIONSHIP-001.md` v0.1 (9/8 落档) 作为 A11 主源** |
+| **2026-09-10 17:34 JST Ulysses 拍板"多人编辑是要的" (v0.63 反转)** | **本总册 v1.0 → v1.1 (三次更新) + AGENT brief v1.1 → v1.2** | **Mavis 接手** | **A12 多人编辑子能力新增 (8 项), AGENT 38 → 46 项, 总 70 → 78 项; 撤回 17:08 JST 砍多人编辑决定 (per 守门 #1 禁回溯叙事, v0.63 反转行显式标); 引用 `frontend-canvas-design.md` §4.1 模式 A Realtime 通道 + §4.6 PresenceCursor 升级** |
 | 2026-08-27 19:39 JST 用户授权 (per 守门 #10 + #14 v3) | 本总册 v1.0 元数据 | Mavis 接手 | 修订人/审批者 代签规则 |
 | 2026-08-31 22:45 JST Q1-D 拍板 | 本总册 §1.4 + §7.1 | Mavis 接手 | 5 域 Lead ≠ Star 22 DDD disclaimer |
 | 2026-09-03 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D | 本总册 §7.1 | Mavis 接手 | Mavis 临时代签, 真人到位后追溯签字 |
@@ -705,8 +722,8 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 | 总册 SRS 撰写 (root) | ~0.05M | root (本 turn) |
 | 跨块校对 + 修订历史 + 1 commit | ~0.05M | root |
 | **本次撰写合计** | **~0.75M** (1 SRE·周 ≈ 1.2M, 在预算内) | per STAR-OLU-001 v0.1 |
-| 后续 P0 阶段 (3 个月内, 31 项 P0) | ~3-5M | per §4.4 P0 清单 |
-| 双核心 70 项 全部落地 (12 个月+) | ~12-18M (12-18 SRE·周, per STAR-OLU-001) | per §4.1 双核心 70 项 |
+| 后续 P0 阶段 (3 个月内, 36 项 P0) | ~3-5M | per §4.4 P0 清单 |
+| 双核心 78 项 全部落地 (12 个月+) | ~13-19M (13-19 SRE·周, per STAR-OLU-001) | per §4.1 双核心 78 项 |
 
 ### 9.6 撤回 → 重写 工作流 (per 守门 #1 v15 docs 同步饱和)
 

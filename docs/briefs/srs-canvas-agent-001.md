@@ -4,7 +4,8 @@
 **Phase**: P3-D.5 无限画布需求文档化 (Ulysses 17:08 JST 拍板: agent 管理 + 游戏化, 避免过度冗余; **17:21 JST 补充: 画布内体现 agent 之间关系的图论构造 (ARG)**)
 **Created**: 2026-09-10 17:17 JST (重写自原 srs-canvas-collab-001, 方向重置)
 **Updated**: 2026-09-10 17:22 JST (新增 A11 ARG 子能力 10 项, 28 项 → 38 项, 引用 `SRS-AGENT-RELATIONSHIP-001.md` v0.1)
-**Token 预算**: ~0.4M (守门 #4 / #19 估算, 1 SRE·周 = 1.2M 留 3x 缓冲)
+**Updated v1.2**: 2026-09-10 17:34 JST (Ulysses 拍板"多人编辑是要的", 撤回 17:08 JST 砍多人编辑决定, v0.63 反转, 新增 A12 多人编辑 8 项, 38 → 46 项)
+**Token 预算**: ~0.5M (守门 #4 / #19 估算, 1 SRE·周 = 1.2M 留 2.4x 缓冲, 含 A12 多人编辑 8 项新增)
 **Worktree**: 在 root 当前 main worktree 直实装 (per 守门 #9 #3 实证 5/5 RPC 不可靠, 不派二级子代理)
 
 ---
@@ -34,7 +35,8 @@
 | A9 agent session 跨域引用 | 跟 SRS-AGENT-VIEW-001 协同, 双向跳 | 2 项 |
 | A10 agent settings (V0.1 已实装) | agent-settings tab 集成, 引用 `PHASE-AGENT-SETTINGS-IMPL-REPORT.md` | 2 项 |
 | **A11 ARG 图论构造** (per 2026-09-10 17:21 JST Ulysses 补充) | **10 类关系边 + 4 维度协作影响 + 5 团队模板 + 同步桥 + 成就系统**, 引用 `SRS-AGENT-RELATIONSHIP-001.md` v0.1 (9/8 落档) | **10 项** |
-| **合计** | | **38 项** |
+| **A12 多人编辑** (per 2026-09-10 17:34 JST Ulysses 拍板 "多人编辑是要的", 撤回 17:08 JST 砍多人编辑决定, v0.63 反转) | **多人同时编辑 + 实时 cursor + 元素增删改同步 + Follow mode + 评论线程 + @ 提醒 + 冲突解决 + audit log** (8 项) | **8 项** |
+| **合计** | | **46 项** |
 
 子代理必须**逐项展开**为 SRS 需求条目, 不得合并 / 跳过 / 简写。每项含:
 - ID (e.g. `F-AGENT-A1.1` agent_node 完整卡)
@@ -135,16 +137,23 @@
 - **A11.10 跟 SRS-AGENT-RELATIONSHIP-001 协同** (Agent View "Relationship" tab 切换, per SRS-AGENT-RELATIONSHIP-001 §1.3) → §6 接口必含引用
 - **A11 cross-cutting 5 域 Lead 真人未到位** (关系定义 Mavis 临时代签, 真人到位后追溯签字 per 守门 #14 v2 + 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, **不沿用代签决策** per 守门 #1 禁回溯叙事) → §7 约束
 - **A11 cross-cutting Memgraph 部署** (Docker 启动, port 7687 Bolt + 7444 HTTP, 数据卷持久化, per SRS-AGENT-RELATIONSHIP-001 §3.2 PR-4) → §7 依赖
+- **A12.1 多人同时编辑 WebSocket 选型未拍板** (跟 A3 + A11 同步桥同源, P0 阻塞) → §7 风险
+- **A12.2 实时 cursor 跟 V0.1 PresenceCursor 集成** (V0.1 §4.6 已 design, 实装待 P3-C 拍板) → §3 业务背景
+- **A12.5 评论线程 + @ 提醒** 跟 V0.1 comment_pin (line 253) 集成, 跟 25 module notification 域对接 (per 总册 §6.3) → §6 接口必含
+- **A12.6 冲突解决 CRDT 选型** (Yjs vs Automerge vs LWW, 跟 A11 同步桥同源) → §7 风险
+- **A12.7 多人编辑权限** (view / comment / edit 3 级, 跟 5 域 Lead 责任边界 per 守门 #3, 真人到位后追溯签字) → §7 约束
+- **A12.8 audit log** (per 守门 #13 Transaction append-only, 多人操作必 audit) → §6 接口必含
 
 ## 4. 守门硬约束 (per 守门 #1 + 守门 #13 + 守门 #14 v2 + 守门 #15 docs 同步饱和)
 
 - 文档结构严格 9 段, 不增不减
-- **38 项每项全部展开** (FR/NFR/AC), 不合并, 不简写
-- 用户故事 ≥ 23 个 (38 项 × 60% 覆盖), US-x 格式
-- 验收标准 ≥ 38 个 (每项 1-2 个 AC)
-- 已知缺口 ≥ 8 个 (含 A11 跨专题 5 缺口)
+- **46 项每项全部展开** (FR/NFR/AC), 不合并, 不简写
+- 用户故事 ≥ 28 个 (46 项 × 60% 覆盖), US-x 格式
+- 验收标准 ≥ 46 个 (每项 1-2 个 AC)
+- 已知缺口 ≥ 8 个 (含 A11 跨专题 5 缺口 + A12 多人编辑 5 缺口)
 - **A11.5 关系 audit log 必含 W/T/M 三類横展** (per 守门 #13: agents = Master, audit = Transaction, template instances = Work, 100% 表覆盖)
-- **A11 cross-cutting 5 域 Lead 真人未到位前 Mavis 临时代签, 真人到位后追溯签字** (per 守门 #14 v2 + 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, **不沿用代签决策** per 守门 #1 禁回溯叙事)
+- **A12.8 多人编辑 audit log 必含 W/T/M Transaction append-only + SCD Type 2** (per 守门 #13, 100% 表覆盖)
+- **A11 + A12 cross-cutting 5 域 Lead 真人未到位前 Mavis 临时代签, 真人到位后追溯签字** (per 守门 #14 v2 + 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, **不沿用代签决策** per 守门 #1 禁回溯叙事)
 - **不写 Miro 通用功能** (本专题仅 agent 管理, 跟游戏化交叉部分在总册 §4.4 跨块接口)
 - commit author = `Ulysses <ulysses@mavis.local>` (per 守门 #10 + 8/27 19:39 JST 授权)
 - 修订人 / 审批者 = `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 守门 #14 v3 Mavis 永久代签 + 9/8 15:19 JST 第 6 次强化)
@@ -214,30 +223,42 @@
 - A11.9 **同步桥 UI 状态显示** (Memgraph ↔ LangGraph StateGraph, sync status indicator + last_sync_at + sync_error, per §4.4 + UC-01)
 - A11.10 **跟 SRS-AGENT-RELATIONSHIP-001 协同** (Agent View "Relationship" tab 切换, Agent Relationship Editor + Relationship View + Achievement Wall, per §1.3 + §6)
 
+### A12 多人编辑 (per 17:34 JST Ulysses 拍板"多人编辑是要的", 8 项, 撤回 17:08 JST 砍多人编辑决定, v0.63 反转)
+- A12.1 **多人同时编辑同一 canvas** (实时同步, WebSocket 选型未拍板, max 200ms 延迟, max 10 并发用户, per `frontend-canvas-design.md` §4.1 模式 A Realtime 通道)
+- A12.2 **实时 cursor 同步** (其他用户光标 + 名字 + 当前 viewport, V0.1 §4.6 PresenceCursor 升级, 复用 A11.9 同步桥 UI 状态显示模式)
+- A12.3 **元素增删改实时同步** (跟当前 localStorage + zustand persist 冲突, 需 backend 持久化, 跟 V0.1 §4.1 模式 A Realtime 通道扩展)
+- A12.4 **Follow mode** (A 用户跟随 B 用户视角, B 移动时 A 同步, 类似 GitHub Live Share)
+- A12.5 **多人评论线程 + @ 提醒** (V0.1 comment_pin line 253 已实装, 加 thread + @ + notification 域对接, per 总册 §6.3 25 module 联动)
+- A12.6 **冲突解决 (CRDT 选型)** (Yjs vs Automerge vs LWW, 跟 A11 同步桥同源, 拍板前 P0 阻塞, 选型后所有 element 自动 conflict-free)
+- A12.7 **协作权限 (view / comment / edit 3 级)** (BFF API 层强制, 5 域 Lead 真人到位后决策, 真人未到位 Mavis 临时代签 per 守门 #14 v2, 拍板前 25 module 联动走 view-only 兜底)
+- A12.8 **audit log 多人操作** (per 守门 #13 Transaction append-only + SCD Type 2, 多人增删改 / cursor 移动 / 评论 / @ 全部 audit, 表 `canvas_multi_user_audit` 100% RLS 13 类)
+
 ### 优先级建议
-- P0: A1.1-1.3, A2.1-2.2, A3.1, A4.1-4.2, A5.1-5.2, A6.1-6.2, **A11.1-11.3, A11.5** (核心管理 + ARG 基础)
-- P1: A2.3-2.4, A3.2-3.3, A6.3-6.4, A7.1-7.3, A8.1-8.3, **A11.4, A11.6, A11.9-11.10** (监控 + 操作 + ARG 高级)
+- P0: A1.1-1.3, A2.1-2.2, A3.1, A4.1-4.2, A5.1-5.2, A6.1-6.2, **A11.1-11.3, A11.5, A12.1-12.3, A12.5-12.6, A12.8** (核心管理 + ARG 基础 + **多人编辑基础** per 17:34 JST Ulysses 拍板)
+- P1: A2.3-2.4, A3.2-3.3, A6.3-6.4, A7.1-7.3, A8.1-8.3, **A11.4, A11.6, A11.9-11.10, A12.4, A12.7** (监控 + 操作 + ARG 高级 + **多人编辑辅助**)
 - P2: A9.1-9.2, A10.1-10.2, **A11.7-11.8** (跨域集成 + ARG 维护)
 
 ## 6. 落地清单
 
 | # | 文件 | 内容 | 行数预估 |
 |---|---|---|---|
-| 1 | `docs/requirements/SRS-CANVAS-AGENT-001.md` | 9 段 SRS, 38 项展开 (含 A11 ARG 10 项) | ~1100-1500 行 |
+| 1 | `docs/requirements/SRS-CANVAS-AGENT-001.md` | 13 段 SRS, 46 项展开 (含 A11 ARG 10 项 + A12 多人编辑 8 项) | ~1300-1700 行 |
 
-预估 0 commit (root 统一 commit), 1 文件, ~30-40K 字。
+预估 0 commit (root 统一 commit), 1 文件, ~35-50K 字。
 
 ## 7. 返报告知 (per 守门 #9 v27 collect_output)
 
 子代理返回时, 报告必须含:
 1. 实际写入文件路径 + 字节数
-2. 9 段是否齐全
-3. **38 项**展开计数: FR 数量 + NFR 数量 + AC 数量 + US 数量
-4. 已知缺口清单 (≥ 8 个, 含 A11 跨专题 5 缺口)
-5. 跨专题引用清单 (引用了 SRS-CANVAS-GAMIFY-001 / SRS-CANVAS-001 / 现有 SRS-AGENT-VIEW-001 / **SRS-AGENT-RELATIONSHIP-001 §1-§8** / BD + DD + DDD-REVIEW-AGENT-RELATIONSHIP-001 / SRS-STAR-AGENT-RUNTIME-001 的具体 §)
+2. 13 段是否齐全
+3. **46 项**展开计数: FR 数量 + NFR 数量 + AC 数量 + US 数量
+4. 已知缺口清单 (≥ 8 个, 含 A11 跨专题 5 缺口 + A12 多人编辑 5 缺口)
+5. 跨专题引用清单 (引用了 SRS-CANVAS-GAMIFY-001 / SRS-CANVAS-001 / 现有 SRS-AGENT-VIEW-001 / **SRS-AGENT-RELATIONSHIP-001 §1-§8** / BD + DD + DDD-REVIEW-AGENT-RELATIONSHIP-001 / SRS-STAR-AGENT-RUNTIME-001 / `frontend-canvas-design.md` §4.1 Realtime 通道 / V0.1 §4.6 PresenceCursor 的具体 §)
 6. **A11 必含 4 表 W/T/M 三類横展** (per 守门 #13: agents = Master / agent_relationship_edges = Master / agent_relationship_edges_audit = Transaction / team_template_instances = Work) — 列出每张表归到 W/T/M 哪類
 7. **A11 必含 10 类关系 + 4 维度 + 5 团队模板** 完整列表 (per `SRS-AGENT-RELATIONSHIP-001.md` §4.1.1+4.1.2+4.3+4.5)
-8. **不写 Miro 通用功能** 清单 (本专题明确砍掉的, 防止 scope creep)
-9. 任何意外 / 偏离 / 简化 / 跳过 项, 显式标注
+8. **A12 必含多人编辑** (8 项完整列表: 多人同时编辑 / 实时 cursor / 元素增删改 / Follow mode / 评论线程 + @ / 冲突解决 CRDT 选型 / view-comment-edit 3 级权限 / audit log)
+9. **A12.8 audit log 必含 W/T/M Transaction append-only + SCD Type 2** (per 守门 #13, 新增表 `canvas_multi_user_audit` 100% RLS 13 类)
+10. **不写 Miro 通用功能** 清单 (本专题明确砍掉的, 防止 scope creep, 撤回 17:08 JST 砍多人编辑决定 per 17:34 JST Ulysses 拍板)
+11. 任何意外 / 偏离 / 简化 / 跳过 项, 显式标注
 
 不要只回 "done" — 必须给可验证证据.
