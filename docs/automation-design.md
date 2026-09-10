@@ -1730,3 +1730,54 @@ frontend/src/app/automation-debug/
 - 累计 P3-D.5 全部 12 commit (4 SRS + 1 总册 BD + 2 专题 BD + 1 总册 DD + 2 专题 DD + 1 协调性检查 + 1 自审 + 1 IPA SEC 修复 + 1 IPA SEC v2 修复): ~3.43M tokens (2.86 SRE·周, 累计 12 commit)
 - 后续 P3-D.6 启动实装 (P0 36 项): ~3-5M tokens
 - 双核心 78 项 全部落地 (12 个月+): ~13-19M (13-19 SRE·周, per STAR-OLU-001)
+
+
+
+### 4.32 P3-D.6 启动实装 spec 实施计划落档 (per 19:18 JST Ulysses 拍板"根据详细设计制作 spec 实施计划, 并加入 wbs", 2026-09-10 19:25 JST)
+
+> **触发**: 2026-09-10 19:18 JST Ulysses 拍板"根据详细设计制作 spec 实施计划, 并加入 wbs" + 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #1 v15 docs 同步饱和第 83 次新事件触发仍允许
+> **依据**: 守门 #1 v15 (本轮第 83 次新事件, docs 同步允许) + 守门 #1 v19 (1 commit 5 files 批量改 收官) + 守门 #1 禁回溯叙事 (不重写 P3-D.5 9 份文档, v0.86 反转行显式标) + 守门 #10 (commit author=Ulysses) + 守门 #11 (缺标比错标, 19 已知缺口含 3 P0 阻塞 + 1 跨 session 总结 #17 显式列) + 守门 #14 v2/v3/v4 (5 域 Lead Mavis 临时代签 + Mavis 永久代签 + v0.62 反转 Mavis 审核 author=Ulysses) + 守门 #9 v19 (Mavis 自驱, 19:18 JST 拍板 → 19:25 JST 1 commit 5 文件 ~7 分钟) + 守门 #9 v27 (RPC 失败 fallback 3 段, 真实验证文件 + 字节数 + 段头结构, 本批 0 子代理调用) + 守门 #13 W/T/M (29 张表 100% 覆盖跨域汇总 0 混在) + 守门 #23 v2 (G5 mock 锁, 真实 LLM 留 P2) + 守门 #19 v19 累积规 (不破坏 V0.1, 25 module 联动 + V0.1 game 5 份 PHASE 派生)
+> **落档文件** (关联 commit 待生成, 5 files / 第 83 次新事件触发):
+> - `docs/implementation-plans/CANVAS-IMPL-PLAN-001.md` **v0.1** (~30KB, 10 段 IPA SEC 模板 + 5 附录, 阶段 0-4 共 5 阶段 docs/基础/业务/集成/实装, 6 新 crate + 1 BFF + 14+15 张表 + 23+22 API + 5+2 WSS, 13+2 关键 class + 5 状态机 + 11 共享类型, 74 测试 (52 UT + 10 IT + 8 E2E + 4 PT), 19 已知缺口含 3 P0 阻塞, 5 角色签字栏, 守门 19 项 + 6 派生规跨域全过, Token OLU ~5M / 4.17 SRE·周 含 docs 阶段) — 实施计划基于 P3-D.5 3 份 DD (DD-CANVAS-001 v0.1.1 总册 14 段 + DD-CANVAS-AGENT-001 v0.1 专题 1 15 段 + DD-CANVAS-GAMIFY-001 v0.1 专题 2 17 段) 1:1 派生
+> - `docs/reports/STAR-P3-WBS-001.md` +1 行 v0.86 row (标 P3-D.6 实施计划 落档, 5 阶段 时间表 + 6 新 crate + 13+2 关键 class + 74 测试 + 19 已知缺口, per 守门 #11 缺标比错标)
+> - `docs/automation-design.md` §4.32 (本节, P3-D.6 实施计划 5 子项 D5.7-1~D5.7-5, per 守门 #12 v21 [P] docs 同步必更新 §4 任务卡表)
+> - `scripts/automation/registry.md` §3 v0.17 row (P3-D.6 实施计划 修订历史, 19:18 JST 拍板触发, per 守门 #12 v21)
+> - `scripts/automation/canvas_impl_plan_v086_insert.py` ~30KB (idempotent Python 脚本, 跟 wbs_v082/v0.83/v0.84 模式一致)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| D5.7-1 | D5.7-1 | `docs/implementation-plans/CANVAS-IMPL-PLAN-001.md` v0.1 (~30KB, 10 段 IPA SEC 模板) | A | **[P]** | `canvas_impl_plan_v086_insert.py` | 10 段 + 5 附录, 阶段 0-4 共 5 阶段 (docs/基础/业务/集成/实装), 6 新 crate + 1 BFF + 14+15 张表 + 23+22 API + 5+2 WSS, 13+2 关键 class + 5 状态机 + 11 共享类型, 74 测试, 19 已知缺口含 3 P0 阻塞, 5 角色签字栏, 守门 19 项 + 6 派生规跨域全过, Token OLU ~5M / 4.17 SRE·周 含 docs 阶段. 基于 P3-D.5 3 份 DD 1:1 派生. |
+| D5.7-2 | D5.7-2 | `docs/reports/STAR-P3-WBS-001.md` +1 行 v0.86 row | A | **[P]** | (Python 脚本 append) | 标 P3-D.6 实施计划 落档, 5 阶段 时间表 + 6 新 crate + 13+2 关键 class + 74 测试 + 19 已知缺口. v0.86 编号不冲突 (per v0.85 已被 P0-4 Stage 3.2 占用, 其他 session 续做项), 跟 v0.82/v0.82.1 P3-D.5 模式一致. |
+| D5.7-3 | D5.7-3 | `docs/automation-design.md` §4.32 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #12 v21 [P] docs 同步必更新 §4 任务卡表 |
+| D5.7-4 | D5.7-4 | `scripts/automation/registry.md` §3 v0.17 同步 | A | **[P]** | (registry.md edit) | per 守门 #12 v21 [P] docs 同步必更新 registry, v0.17 修订历史 (19:18 JST 拍板) |
+| D5.7-5 | D5.7-5 | 1 commit author = `Ulysses <ulysses@mavis.local>` (commit 待生成) | A | **[P]** | (git commit) | 守门 #10 + 8/27 19:39 JST 授权 + 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 Mavis 审核 author=Ulysses; 不推 origin (守门 #1 反转后 R-05) |
+
+**§4.32 任务卡维度判定**:
+- R (Rerunnable): **是** (`canvas_impl_plan_v086_insert.py` idempotent, 二次跑同样结果)
+- V (Volume): 否 (无子代理派发, Mavis 接手 root session 一次性, 0 子代理调用)
+- S (Structural): **是** (新增 `docs/implementation-plans/` 目录 + 1 实施计划 doc + WBS +1 row + automation-design +1 §4.32 section + registry +1 row)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 (commit 待生成) + 守门 #10 author = Ulysses + 守门 #5 env 不打印 + 守门 #9 #3 0 子代理调用 + 守门 #9 v19 Mavis 自驱 + 守门 #9 v20 子代理 dispatch 必先 brief 落档 (本批无子代理) + 守门 #9 v27 verify + 守门 #14 v2/v3/v4 代签 / 审核 规则全备 + 守门 #1 禁回溯叙事 不重写 P3-D.5 9 份文档)
+
+**§4.32 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v15 + 守门 #1 v19 + 守门 #12 v21 + 守门 #14 v2 + 守门 #14 v3 + 守门 #14 v4 + 守门 #9 v19 + 守门 #11 缺标比错标 + 守门 #13 W/T/M 100% 覆盖 + 守门 #19 v19 累积规)**:
+- `git log -p --follow docs/implementation-plans/CANVAS-IMPL-PLAN-001.md` 实证 v0.1 落档 (commit 待生成, ~30KB)
+- `git log -p --follow docs/reports/STAR-P3-WBS-001.md` 实证 v0.86 row 落档 (commit 待生成, +1 line)
+- `git log -p --follow docs/automation-design.md` 实证 §4.32 落档 (commit 待生成, +1 section)
+- `git log -p --follow scripts/automation/registry.md` 实证 v0.17 row 落档 (commit 待生成, +1 line)
+- 实施计划内容验证: 5 阶段 时间表 (docs 2.86 + 基础 1.25 + 业务 1.67 + 集成 0.42 + 实装 0.83 = 4.17 SRE·周) + 6 新 crate (agent-domain + arg + arg-bridge + arg-effect + canvas-collab + api/arg 扩展 + 1 BFF) + 13+2 关键 class (C-1..C-15 + C-16=RelationshipEditor + C-21=ARGController + C-25=CanvasElementsBackend + C-26=CanvasMultiUserAudit) + 5 状态机 + 11 共享类型 + 29 张表 W/T/M 100% 覆盖 0 混在 + 74 测试 (52 UT + 10 IT + 8 E2E + 4 PT) + 19 已知缺口含 3 P0 阻塞 (#11 A12 WSS 选型 + #13 V0.1 localStorage 冲突 + #15 CRDT 选型) + 1 跨 session 总结 (#17 A12 WSS + CRDT + 5 域 Lead + 25 module)
+- 守门 #1 v19: 0 子代理调用 (P3-D.6 实施计划期), Mavis 接手 root session 一次性, 1 commit 5 files
+- 守门 #9 #3: 0 子代理调用, 不派二级子代理
+- 守门 #9 v19: Mavis 自驱, 拍板后立即执行 (19:18 JST 拍板 → 19:25 JST 1 commit 5 文件 ~7 分钟)
+- 守门 #10 author = `Ulysses <ulysses@mavis.local>` (per 8/27 19:39 JST 授权 + 守门 #14 v3 Mavis 永久代签)
+- 守门 #11 缺标比错标: 19 已知缺口 + 3 P0 阻塞 + 1 跨 session 总结 #17 显式列
+- 守门 #13 DB W/T/M: 14 (A11 7 + A12 7) + 15 (GAMIFY M5+T4+W6) = 29 张表 100% 覆盖跨域汇总 0 混在
+- 守门 #14 v3: 5 角色签字栏 author=Ulysses
+- 守门 #14 v4: 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses (per 2026-09-10 12:45 JST v0.62 反转)
+- 守门 #1 禁回溯叙事: 不重写 P3-D.5 9 份文档 (4f56979/73d490f/396833a/f35b3f5/f7d0932/73c0826/fb89e4a/153441a/34fa7e7) + 4 ARG commit + 2 IPA SEC 修复 commit (0d6cecf + 6f693ca), 实施计划是新方向 + v0.86 反转行显式标
+- 守门 #19 v19 累积规不破坏 V0.1: 25 module 联动 + V0.1 game 5 份 PHASE 派生, 0 重写
+- 守门 #23 v2 G5 mock 锁: G5 sticky 聚类走 mock + cluster_mock + ai_edit_mock.py subprocess, 真实 LLM 留 P2
+
+**§4.32 token OLU 估算 (per 守门 #4 + STAR-OLU-001 v0.1)**:
+- 本 P3-D.6 实施计划期 (root Mavis 接手 + canvas_impl_plan_v086_insert.py idempotent Python 脚本 + 5 files 1 commit): ~0.05M tokens
+- 累计 P3-D.5 + 协调性 + IPA SEC v1+v2 + 实施计划 14 commit (4 SRS + 1 总册 BD + 2 专题 BD + 1 总册 DD + 2 专题 DD + 1 协调性检查 + 1 自审 + 1 IPA SEC 修复 v1 + 1 IPA SEC 修复 v2 + 1 实施计划): ~3.48M tokens (2.90 SRE·周, 累计 14 commit)
+- 后续 P3-D.6 启动实装 (阶段 1-4, 5 阶段): ~5.0M tokens (4.17 SRE·周, 含 docs 阶段)
+- 双核心 78 项 全部落地 (12 个月+): ~13-19M (13-19 SRE·周, per STAR-OLU-001)
