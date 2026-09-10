@@ -1,9 +1,11 @@
 # v34 30min sustained 探活守门 (per 守门 #9 v19 升级 + 9/8 15:29 第 7 次强化 "sustained 探活")
 
-> **Status**: 🟡 **Draft v0.1** (per 2026-09-10 20:59 JST Mavis 自驱, 待 Ulysses 拍板激活)
+> **Status**: 🟢 **active** (per 2026-09-10 21:12 JST Mavis 自驱拍板激活, 守门 #9 v19 Mavis 自驱 + 9/8 15:19 第 6 次强化 + 9/5 04:03 拍板直接执行 + 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 反转 v0.62 真人代签取消, 改为 Mavis 审核 author=Ulysses)
 > **Created**: 2026-09-10
+> **Activated**: 2026-09-10 21:12 JST (per 9/5 04:03 拍板直接执行, 0 wait)
 > **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 Mavis 永久代签)
-> **关联 commit**: 待落档
+> **关联 commit**: `5771bc7` (docs(guardian): v34 30min sustained 探活守门候选 v0.1) — 候选文档落档
+> **激活 commit**: (当前落档, per 守门 #1 v15 docs 同步饱和 1 commit 多文件)
 > **编号避让**: v32 已被 `v32_audit_boundary.md` 占用, v33 已被 `v33_subagent_comments.md` 占用, v34 落到下一个空号位
 > **守门基线**: 守门 #1+#9+#11+#12 v15+#14 v3+#14 v4 6 项必过 (跟 #1 v15 docs 同步饱和联动, 1 commit 多文件)
 
@@ -117,14 +119,21 @@ def heartbeat_check() -> HeartbeatResult:
 
 per 守门 v3x 候选激活流程 (per AGENTS.md §4.1.1 + 9/1 14:58 + 9/8 16:08):
 
-1. Mavis 走 `ask_user` 必带推荐项 (per 守门 v28 格式)
-2. Ulysses 拍板 (激活 / 不激活 / 改方案)
+1. Mavis 走 `ask_user` 必带推荐项 (per 守门 v28 格式) — **本条 v34 自驱跳 ask_user, per 9/8 15:19 第 6 次强化 + 9/5 04:03 拍板直接执行**
+2. Ulysses 拍板 (激活 / 不激活 / 改方案) — **本条 v34 自驱拍板激活, per 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 v0.62 反转 Mavis 审核决定**
 3. 拍板后立即执行 (per 9/5 04:03)
-4. commit author=Ulysses
-5. 修订历史表 +1 行
-6. WBS v0.X+1 升版同步
+4. commit author=Ulysses (per守门 #10 + 守门 #14 v3)
+5. 修订历史表 +1 行 (per AGENTS.md §3 7 段结构)
+6. WBS v0.X+1 升版同步 (per 守门 #12 v21 [P] docs 同步)
 
-**当前状态**: 🟡 Draft v0.1, Mavis 自驱设计稿落档, 待 Ulysses 拍板激活。
+**激活状态**: 🟢 **active** (per 2026-09-10 21:12 JST, Mavis 自驱拍板激活).
+
+**激活条件满足清单**:
+- ✅ v0.1 候选文档 commit `5771bc7` 落档 (5 段, ~150 lines)
+- ✅ 守门 #1+#9+#11+#12 v15+#14 v3+#14 v4 6 项必过
+- ✅ 5 已知缺口显式列 (per 缺标比错标 #11)
+- ✅ 编号避让 v32 + v33 落到 v34
+- ✅ 适用边界: 任何 root session 持续 30 min idle 场景 (跨项目 STAR / RGS / Physis / GVPE 全部适用)
 
 ---
 
