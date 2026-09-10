@@ -1,0 +1,95 @@
+# k3s/cert-manager-issuer.yaml
+# v0.74 envoy TLS cert-manager 集成 (代替 v0.71 gen_tls_certs.sh 自签)
+# 用途: 自动签发 + 90 天自动续期 + SDS 集成, 替换手动 gen_tls_certs.sh
+# 前置: cert-manager v1.14+ 已部署在 cluster (per WBS §14.12 III 跨 session 续)
+---
+# Self-signed ClusterIssuer (用作根 CA, dev/test 友好, 不依赖外部 ACME)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: star-mock-selfsigned-issuer
+  labels:
+    app: star-mock
+    component: cert-manager
+    version: v0.74
+spec:
+  selfSigned: {}
+---
+# 基于 self-signed ClusterIssuer 的根 CA Certificate
+# (实际签发证书的下游 Certificate 会引用这个 CA)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: star-mock-root-ca
+  namespace: star-mock
+  labels:
+    app: star-mock
+    component: cert-manager
+    version: v0.74
+spec:
+  isCA: true
+  commonName: star-mock.local CA
+  secretName: star-mock-root-ca-secret
+  duration: 87600h  # 10 年 (根 CA 长效)
+  renewBefore: 720h  # 30 天前续期
+  issuerRef:
+    name: star-mock-selfsigned-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+  subject:
+    organizations:
+      - Star Project Mock
+---
+# CA ClusterIssuer (基于根 CA, 用于签发 leaf certificate)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: star-mock-ca-issuer
+  labels:
+    app: star-mock
+    component: cert-manager
+    version: v0.74
+spec:
+  ca:
+    secretName: star-mock-root-ca-secret
+---
+# Leaf Certificate (envoy TLS 终止用, 90 天自动续期)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: star-mock-tls-leaf
+  namespace: star-mock
+  labels:
+    app: star-mock
+    component: cert-manager
+    version: v0.74
+spec:
+  secretName: star-mock-tls  # envoy SDS 引用的 secret name (跟 v0.71 Secret 兼容)
+  duration: 2160h  # 90 天
+  renewBefore: 720h  # 30 天前续期 (per cert-manager 默认推荐)
+  commonName: star-mock.local
+  dnsNames:
+    - localhost
+    - star-mock
+    - star-mock-envoy
+    - star-mock-envoy.star-mock.svc.cluster.local
+    - star-mock-envoy.star-mock.svc
+  ipAddresses:
+    - 127.0.0.1
+  issuerRef:
+    name: star-mock-ca-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+  subject:
+    organizations:
+      - Star Project Mock
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+    - client auth
+  # 私钥配置 (per cert-manager v1.14+ 文档)
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
