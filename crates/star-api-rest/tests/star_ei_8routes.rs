@@ -52,10 +52,7 @@ async fn integration_ex_01_idempotency_keys_returns_501_not_implemented_after_v0
     // 验证 5 张新表 metadata 实证
     let tables = body["tables"].as_array().expect("tables must be array");
     assert_eq!(tables.len(), 5, "EX-01 should describe 5 new tables");
-    let table_names: Vec<&str> = tables
-        .iter()
-        .map(|t| t["name"].as_str().unwrap())
-        .collect();
+    let table_names: Vec<&str> = tables.iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert!(table_names.contains(&"idempotency_keys"));
     assert!(table_names.contains(&"lease_log"));
     assert!(table_names.contains(&"advisory_lock_audit"));
@@ -97,10 +94,7 @@ async fn integration_ex_02_mutex_returns_501_not_implemented_after_v0_53() {
     // 验证 7 module metadata 实证
     let modules = body["modules"].as_array().expect("modules must be array");
     assert_eq!(modules.len(), 7, "EX-02 should describe 7 modules");
-    let module_ids: Vec<&str> = modules
-        .iter()
-        .map(|m| m["id"].as_str().unwrap())
-        .collect();
+    let module_ids: Vec<&str> = modules.iter().map(|m| m["id"].as_str().unwrap()).collect();
     assert!(module_ids.contains(&"M-08"));
     assert!(module_ids.contains(&"M-14"));
 }
@@ -184,14 +178,13 @@ async fn integration_ex_04_subagent_locks_returns_501_not_implemented_after_v0_5
     let body: Value = serde_json::from_slice(&body_bytes).unwrap();
     assert_eq!(body["error"], "not_implemented");
     // 验证 10 SA 编号
-    let sa_ids = body["subagent_ids"].as_array().expect("subagent_ids must be array");
+    let sa_ids = body["subagent_ids"]
+        .as_array()
+        .expect("subagent_ids must be array");
     assert_eq!(sa_ids.len(), 9, "9 SA 编号 SA-01..SA-09 per §14.9 EX-04");
     // 验证 L0 协调 L1↔L1 (per 守门 #13 a)
     assert!(
-        body["l0_coordination"]
-            .as_str()
-            .unwrap()
-            .contains("L0"),
+        body["l0_coordination"].as_str().unwrap().contains("L0"),
         "l0_coordination 字段必须含 L0 (per 守门 #13 a)"
     );
 }
@@ -223,7 +216,9 @@ async fn integration_ex_05_ui_state_returns_501_not_implemented_after_v0_53() {
     // 验证 4 lib + 3 component metadata
     let libs = body["libs"].as_array().expect("libs must be array");
     assert_eq!(libs.len(), 4, "EX-05 should describe 4 ui libs");
-    let components = body["components"].as_array().expect("components must be array");
+    let components = body["components"]
+        .as_array()
+        .expect("components must be array");
     assert_eq!(components.len(), 3, "EX-05 should describe 3 components");
     // 验证 gm-console 集成目标
     assert_eq!(body["integration_target"], "gm-console AppShell");
@@ -315,7 +310,9 @@ async fn integration_ex_07_metrics_returns_501_not_implemented_after_v0_53() {
         .expect("prometheus_metrics must be array");
     assert_eq!(metrics.len(), 5, "5 Prometheus 指标 per EX-07 §3.7");
     // 验证 守门 #22 控制台不污染 main
-    let components = body["components"].as_array().expect("components must be array");
+    let components = body["components"]
+        .as_array()
+        .expect("components must be array");
     let console = components
         .iter()
         .find(|c| c["name"] == "console_server.py")
@@ -359,7 +356,9 @@ async fn integration_ex_08_test_runs_returns_501_not_implemented_after_v0_53() {
     let body: Value = serde_json::from_slice(&body_bytes).unwrap();
     assert_eq!(body["error"], "not_implemented");
     // 验证 8 想定シナリオ
-    let scenarios = body["scenarios"].as_array().expect("scenarios must be array");
+    let scenarios = body["scenarios"]
+        .as_array()
+        .expect("scenarios must be array");
     assert_eq!(scenarios.len(), 8, "8 想定シナリオ S-01..S-08");
     // 验证 38 测试矩阵 (18 UT + 8 IT + 12 E2E + 1 1000 并发压测)
     assert_eq!(body["test_matrix"]["ut"], 18);
@@ -368,10 +367,7 @@ async fn integration_ex_08_test_runs_returns_501_not_implemented_after_v0_53() {
     assert_eq!(body["test_matrix"]["pt_concurrency"], 1000);
     // 验证 守门 #1 v25 单 crate 模式
     assert!(
-        body["守门_#1_v25"]
-            .as_str()
-            .unwrap()
-            .contains("cargo test"),
+        body["守门_#1_v25"].as_str().unwrap().contains("cargo test"),
         "守门 #1 v25 must be present"
     );
 }

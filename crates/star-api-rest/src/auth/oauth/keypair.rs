@@ -385,8 +385,7 @@ mod tests {
 
         // 5) PEM → RsaPublicKey 走 SPKI parser, 验证 DER 编码合法
         use rsa::pkcs8::DecodePublicKey;
-        let pub_key = RsaPublicKey::from_public_key_pem(pub_pem)
-            .expect("SPKI PEM re-parse");
+        let pub_key = RsaPublicKey::from_public_key_pem(pub_pem).expect("SPKI PEM re-parse");
         assert_eq!(pub_key.size(), 256, "RSA 2048 public = 256 bytes");
 
         // 6) from_pem round-trip: 同一对 PEM 应该能 re-load 产生相同的 kid + jwk n/e

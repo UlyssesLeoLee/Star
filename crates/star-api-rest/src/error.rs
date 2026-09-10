@@ -240,15 +240,145 @@ impl From<domain_validation::ValidationError> for RestError {
     }
 }
 
+/// `domain_feedback::FeedbackError` → `RestError` (per v0.58 P0-2 Stage 1, WBS §14.15)
+impl From<domain_feedback::FeedbackError> for RestError {
+    fn from(e: domain_feedback::FeedbackError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_feedback::FeedbackError::NotFound(_) => ("FB_NOT_FOUND", "Validation", false),
+            domain_feedback::FeedbackError::InvalidState(_) => {
+                ("FB_INVALID_STATE_TRANSITION", "Validation", false)
+            }
+            domain_feedback::FeedbackError::TargetUnresolvable(_) => {
+                ("FB_TARGET_UNRESOLVABLE", "Validation", false)
+            }
+            domain_feedback::FeedbackError::ReadOnly => ("FB_READ_ONLY", "Validation", false),
+            domain_feedback::FeedbackError::NotDeletable => {
+                ("FB_NOT_DELETABLE", "Validation", false)
+            }
+            domain_feedback::FeedbackError::MissingSuccessor => {
+                ("FB_MISSING_SUCCESSOR", "Validation", false)
+            }
+            domain_feedback::FeedbackError::CrossWorktree => {
+                ("FB_CROSS_WORKTREE", "Validation", false)
+            }
+            domain_feedback::FeedbackError::PermissionDenied => {
+                ("FB_PERMISSION_DENIED", "Policy", false)
+            }
+            domain_feedback::FeedbackError::Conflict(_) => ("FB_CONFLICT", "External", false),
+            domain_feedback::FeedbackError::Internal(_) => ("INTERNAL", "Internal", true),
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("feedback: {e}"),
+            source_module: "domain-feedback".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the feedback id + tenant + role (developer/agent for AI feedback)"
+                .to_string(),
+        }
+    }
+}
+
+/// `domain_integration::IntegrationError` → `RestError` (per v0.58 P0-2 Stage 1, WBS §14.15)
+impl From<domain_integration::IntegrationError> for RestError {
+    fn from(e: domain_integration::IntegrationError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_integration::IntegrationError::NotFound(_) => {
+                ("RESOURCE_NOT_FOUND", "Validation", false)
+            }
+            domain_integration::IntegrationError::InvalidState(_) => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            domain_integration::IntegrationError::PermissionDenied => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_integration::IntegrationError::Conflict(_) => {
+                ("INTEGRATION_CONFLICT", "External", false)
+            }
+            domain_integration::IntegrationError::InvalidArgument(_) => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            domain_integration::IntegrationError::LoopGuardMissing(_) => {
+                ("I_LOOP_GUARD_MISSING", "Validation", false)
+            }
+            domain_integration::IntegrationError::CredentialMissing(_) => {
+                ("I_CREDENTIAL_MISSING", "Validation", false)
+            }
+            domain_integration::IntegrationError::Internal(_) => ("INTERNAL", "Internal", true),
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("integration: {e}"),
+            source_module: "domain-integration".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the integration id + provider + tenant + role (project_admin/developer)"
+                .to_string(),
+        }
+    }
+}
+
+/// `domain_comment::CommentError` → `RestError` (per v0.58 P0-2 Stage 1, WBS §14.15)
+impl From<domain_comment::CommentError> for RestError {
+    fn from(e: domain_comment::CommentError) -> Self {
+        let (code, source_kind, retriable) = match &e {
+            domain_comment::CommentError::NotFound(_) => ("COMMENT_NOT_FOUND", "Validation", false),
+            domain_comment::CommentError::InvalidState(_) => {
+                ("VALIDATION_FAILED", "Validation", false)
+            }
+            domain_comment::CommentError::PermissionDenied => ("POLICY_DENIED", "Policy", false),
+            domain_comment::CommentError::CrossTenantDenied(_, _) => {
+                ("POLICY_DENIED", "Policy", false)
+            }
+            domain_comment::CommentError::InvalidObjectKey => {
+                ("CMT_INVALID_OBJECT_KEY", "Validation", false)
+            }
+            domain_comment::CommentError::ReactionExists => {
+                ("CMT_REACTION_EXISTS", "External", false)
+            }
+            domain_comment::CommentError::EditDeleted => ("CMT_EDIT_DELETED", "Validation", false),
+            domain_comment::CommentError::Conflict(_) => ("COMMENT_CONFLICT", "External", false),
+            domain_comment::CommentError::Internal(_) => ("INTERNAL", "Internal", true),
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("comment: {e}"),
+            source_module: "domain-comment".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the comment id + thread id + tenant + role (developer/agent)".to_string(),
+        }
+    }
+}
+
 impl IntoResponse for RestError {
     fn into_response(self) -> axum::response::Response {
         // per spec §2.4: code → HTTP status 映射
         let status = match self.code.as_str() {
             "NOT_IMPLEMENTED" => StatusCode::NOT_IMPLEMENTED,
             "VALIDATION_FAILED" | "VALIDATION_RUN_FAILED" => StatusCode::BAD_REQUEST,
-            "RESOURCE_NOT_FOUND" | "WORKTREE_NOT_FOUND" => StatusCode::NOT_FOUND,
-            "POLICY_DENIED" => StatusCode::FORBIDDEN,
-            "WORKTREE_CONFLICT" => StatusCode::CONFLICT,
+            "RESOURCE_NOT_FOUND" | "WORKTREE_NOT_FOUND" | "FB_NOT_FOUND" | "COMMENT_NOT_FOUND" => {
+                StatusCode::NOT_FOUND
+            }
+            "POLICY_DENIED" | "FB_PERMISSION_DENIED" => StatusCode::FORBIDDEN,
+            "WORKTREE_CONFLICT"
+            | "INTEGRATION_CONFLICT"
+            | "COMMENT_CONFLICT"
+            | "VL_CONFLICT"
+            | "FB_CONFLICT"
+            | "SCM_CONFLICT" => StatusCode::CONFLICT,
+            "FB_INVALID_STATE_TRANSITION"
+            | "FB_TARGET_UNRESOLVABLE"
+            | "FB_READ_ONLY"
+            | "FB_NOT_DELETABLE"
+            | "FB_MISSING_SUCCESSOR"
+            | "FB_CROSS_WORKTREE"
+            | "I_LOOP_GUARD_MISSING"
+            | "I_CREDENTIAL_MISSING"
+            | "VL_INVARIANT_VIOLATED"
+            | "SCM_NOT_FOUND"
+            | "SCM_PROVIDER_ERROR" => StatusCode::UNPROCESSABLE_ENTITY,
+            "INTERNAL" => StatusCode::INTERNAL_SERVER_ERROR,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         (status, Json(serde_json::json!({ "error": self }))).into_response()

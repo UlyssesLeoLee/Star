@@ -60,10 +60,7 @@ impl OAuthClientRepository for MockOAuthClientRepository {
         Ok(map.get(client_id).cloned())
     }
 
-    async fn list_current(
-        &self,
-        _tenant_id: Uuid,
-    ) -> Result<Vec<OAuthClient>, PgAdapterError> {
+    async fn list_current(&self, _tenant_id: Uuid) -> Result<Vec<OAuthClient>, PgAdapterError> {
         let map = self.inner.lock().expect("poisoned");
         Ok(map.values().cloned().collect())
     }
@@ -309,7 +306,10 @@ impl MockOAuth2Bundles {
             client_type: "public".to_string(),
             redirect_uris: vec![redirect_uri.to_string()],
             allowed_scopes: vec!["read".to_string(), "write".to_string()],
-            allowed_grant_types: vec!["authorization_code".to_string(), "refresh_token".to_string()],
+            allowed_grant_types: vec![
+                "authorization_code".to_string(),
+                "refresh_token".to_string(),
+            ],
             require_pkce: true,
             require_authentication: false,
             owner_user_id: Uuid::nil(),

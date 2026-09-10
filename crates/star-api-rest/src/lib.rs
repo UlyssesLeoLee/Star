@@ -146,10 +146,7 @@ pub fn build_router() -> Router {
             post(routes::ex_06::check_tool_idempotency),
         )
         .route("/exclusion/metrics", get(routes::ex_07::get_metrics))
-        .route(
-            "/exclusion/test-runs",
-            post(routes::ex_08::start_test_run),
-        );
+        .route("/exclusion/test-runs", post(routes::ex_08::start_test_run));
 
     Router::new()
         .route("/api/v1/health", get(routes::health))
@@ -268,10 +265,7 @@ pub fn build_router_with_oauth(oauth_state: auth::oauth::OAuth2State) -> Router 
                     post(routes::ex_06::check_tool_idempotency),
                 )
                 .route("/exclusion/metrics", get(routes::ex_07::get_metrics))
-                .route(
-                    "/exclusion/test-runs",
-                    post(routes::ex_08::start_test_run),
-                ),
+                .route("/exclusion/test-runs", post(routes::ex_08::start_test_run)),
         )
         .merge(oauth_router.with_state(oauth_state))
         .layer(axum::middleware::from_fn(middleware::auth::auth_layer_stub))

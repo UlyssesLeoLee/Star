@@ -40,9 +40,7 @@ pub struct MutexAcquireRequest {
 /// - PG advisory lock (per D-01 拍板, 跟 ADR-0047 PG checkpointer Tier 3 共享)
 /// - Version CAS (per EX-02 M-13 module)
 /// - TraceId 透传 (per EX-02 M-12 module)
-pub async fn acquire_mutex(
-    Json(req): Json<MutexAcquireRequest>,
-) -> (StatusCode, Json<Value>) {
+pub async fn acquire_mutex(Json(req): Json<MutexAcquireRequest>) -> (StatusCode, Json<Value>) {
     let _ = req; // stub 阶段不实际使用
     (
         StatusCode::NOT_IMPLEMENTED,

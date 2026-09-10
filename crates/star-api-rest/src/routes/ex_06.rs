@@ -41,9 +41,7 @@ pub struct ToolIdemRequest {
 /// - 接入 `crates/star-mcp/src/middleware/idempotency.rs` (per 守门 #19 [M] `mcp_idem_wrapper.py`)
 /// - 16 tool RACI 5 域分摊 (per §14.9 EX-06 + 5 域 Lead 拍板, 临时代签 per 守门 #3 v2)
 /// - 写 idempotency_keys (T) + audit trigger (per 守门 #13 d Transaction 100% audit)
-pub async fn check_tool_idempotency(
-    Json(req): Json<ToolIdemRequest>,
-) -> (StatusCode, Json<Value>) {
+pub async fn check_tool_idempotency(Json(req): Json<ToolIdemRequest>) -> (StatusCode, Json<Value>) {
     let _ = req; // stub 阶段不实际使用
     (
         StatusCode::NOT_IMPLEMENTED,
