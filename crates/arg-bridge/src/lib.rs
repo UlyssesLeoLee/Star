@@ -37,6 +37,8 @@
 
 #![forbid(unsafe_code)]
 
+/// Canvas UI sync bridge (P3-D.6 阶段 1 基础 任务 1.2 新增, per DD-CANVAS-AGENT-001 v0.1 §3.1).
+pub mod canvas_sync_bridge;
 /// Error types used across the ARG Bridge Tier (per DD §9.1 — 6 variants).
 pub mod error;
 /// `LangGraphStateUpdater` — `ARGEvent` → 5 Reducer (per DD §4.11 + §5.3).
