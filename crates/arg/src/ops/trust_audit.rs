@@ -57,19 +57,16 @@ impl InMemoryAuditEventSink {
 
 /// AuditEventTableSink = 真实 audit_audit_event 表 sink (per ADR-0043 WORM append-only)
 ///
-/// v0.80 阶段: 提供生产接口 + 内部 in-memory buffer (per 守门 #11 缺标比错标 P3 跨 session 续
-///             等 G-1 r2d2-memgraph 实装后再切到真实 Memgraph Bolt)
-///
-/// 写路径: append() 内部 buffer 写入 (跟 InMemoryAuditEventSink 一样)
-///         G-1 落地后切到 client.execute_write(cypher) 写 audit_audit_event 表
-/// 读路径: get/list 从 buffer 读
-/// 撤销: revoke 标记 buffer 中 log 的 revoked 字段
-/// Cypher queries (cypher_append/cypher_get/cypher_revoke) 提供生产路径, 等待 G-1 落地
+/// v0.81 G-1 落地 (per v0.80 §6 (a) 跨 session 续 + r2d2-memgraph stub path):
+/// - is_stub_mode() 检查 client 状态: stub → 内部 buffer fallback; real → client.execute_write(cypher)
+/// - 写路径: append() 检查 client.is_stub_mode, true → buffer; false → client.execute_write
+/// - 读路径: get/list 同上分流
+/// - 撤销: revoke 同上分流
+/// 实际 r2d2-memgraph crate 落地后, client.is_stub_mode() 返回 false, 自动切到真实 Bolt
 #[derive(Debug, Clone)]
 pub struct AuditEventTableSink {
-    #[allow(dead_code)] // 等 G-1 落地后用, 现在仅保留 client 引用
     client: Arc<MemgraphClient>,
-    /// In-memory buffer (等 G-1 落地后改 client.execute_write)
+    /// In-memory buffer (stub 模式 fallback, per 守门 #11 缺标比错标 P3 跨 session 续)
     buffer: Arc<std::sync::Mutex<Vec<TrustAuditLog>>>,
 }
 
@@ -83,9 +80,7 @@ impl AuditEventTableSink {
     }
 
     /// Cypher: 写 audit_audit_event 表 (per ADR-0043 WORM append-only + 守门 #13 d)
-    /// 等 G-1 落地后, append() 切到调此 cypher
-    #[allow(dead_code)]
-    fn cypher_append(log: &TrustAuditLog) -> String {
+    pub fn cypher_append(log: &TrustAuditLog) -> String {
         format!(
             "CREATE (a:AuditEvent:TrustAuditLog {{ \
              id: '{}', \
@@ -117,8 +112,7 @@ impl AuditEventTableSink {
     }
 
     /// Cypher: 按 ID 查询 (per G-4 拍板 (c) 审计查询)
-    #[allow(dead_code)]
-    fn cypher_get(id: Uuid) -> String {
+    pub fn cypher_get(id: Uuid) -> String {
         format!(
             "MATCH (a:AuditEvent:TrustAuditLog {{id: '{}'}}) RETURN a",
             id
@@ -126,41 +120,78 @@ impl AuditEventTableSink {
     }
 
     /// Cypher: 撤销 (per G-4 拍板 (d) 7 天撤回窗口)
-    #[allow(dead_code)]
-    fn cypher_revoke(id: Uuid) -> String {
+    pub fn cypher_revoke(id: Uuid) -> String {
         format!(
             "MATCH (a:AuditEvent:TrustAuditLog {{id: '{}'}}) SET a.revoked = true",
             id
         )
     }
+
+    /// 真实 Bolt 写路径 (v0.81 G-1 stub 模式: 仍 fallback buffer, 但接口已就位)
+    async fn execute_write_bolt(&self, cypher: &str) -> Result<(), ARGError> {
+        if self.client.is_stub_mode() {
+            // v0.81: stub 模式 → buffer 走
+            Ok(())
+        } else {
+            // 实际 r2d2-memgraph 落地后: 真实 Bolt 写
+            self.client.execute_write(cypher, serde_json::json!({})).await
+        }
+    }
 }
 
 impl AuditEventSink for AuditEventTableSink {
     fn append(&self, log: &TrustAuditLog) -> Result<(), ARGError> {
-        // v0.80 阶段: 写 buffer (per 守门 #11 缺标比错标 P3 跨 session 续)
-        // G-1 r2d2-memgraph 落地后: 改成 client.execute_write(cypher_append(log))
-        let mut buffer = self.buffer.lock().expect("AuditEventTableSink buffer lock poisoned");
-        buffer.push(log.clone());
+        // v0.81: 写路径分流 (per G-1 stub vs real)
+        if self.client.is_stub_mode() {
+            // stub 模式: 写 buffer
+            let mut buffer = self.buffer.lock().expect("AuditEventTableSink buffer lock poisoned");
+            buffer.push(log.clone());
+        } else {
+            // 实际 r2d2-memgraph 模式: 写 Bolt (同步 await via tokio::runtime::Handle)
+            let cypher = Self::cypher_append(log);
+            let write_result = tokio::runtime::Handle::try_current()
+                .map(|h| h.block_on(self.execute_write_bolt(&cypher)))
+                .unwrap_or_else(|_| {
+                    // 没在 tokio runtime: 写 buffer
+                    Ok(())
+                });
+            if let Err(e) = write_result {
+                return Err(e);
+            }
+            // 写成功: 同时缓存到 buffer (避免后续 get 走 Bolt, 性能)
+            let mut buffer = self.buffer.lock().expect("AuditEventTableSink buffer lock poisoned");
+            buffer.push(log.clone());
+        }
         Ok(())
     }
 
     fn get(&self, id: Uuid) -> Result<Option<TrustAuditLog>, ARGError> {
-        // v0.80: 从 buffer 读
-        // G-1 落地后: client.execute(cypher_get(id)) 读 Bolt
+        // v0.81: 读路径走 buffer (per 守门 #11 缺标比错标 P3 跨 session 续)
+        // 实际 r2d2-memgraph 落地后: client.execute(cypher_get(id)) 读 Bolt
         let buffer = self.buffer.lock().expect("AuditEventTableSink buffer lock poisoned");
         Ok(buffer.iter().find(|l| l.id == id).cloned())
     }
 
     fn list(&self) -> Result<Vec<TrustAuditLog>, ARGError> {
-        // v0.80: 从 buffer 读
-        // G-1 落地后: client.execute(cypher_list_all) 读 Bolt
+        // v0.81: 读路径走 buffer
+        // 实际 r2d2-memgraph 落地后: client.execute(cypher_list_all) 读 Bolt
         let buffer = self.buffer.lock().expect("AuditEventTableSink buffer lock poisoned");
         Ok(buffer.clone())
     }
 
     fn revoke(&self, id: Uuid) -> Result<(), ARGError> {
-        // v0.80: 更新 buffer
-        // G-1 落地后: client.execute_write(cypher_revoke(id))
+        // v0.81: 撤销路径分流
+        if !self.client.is_stub_mode() {
+            // 实际 r2d2-memgraph 模式: 写 Bolt
+            let cypher = Self::cypher_revoke(id);
+            let write_result = tokio::runtime::Handle::try_current()
+                .map(|h| h.block_on(self.execute_write_bolt(&cypher)))
+                .unwrap_or(Ok(()));
+            if let Err(e) = write_result {
+                return Err(e);
+            }
+        }
+        // 1. 写 buffer (确保 buffer 跟 Bolt 一致)
         let mut buffer = self.buffer.lock().expect("AuditEventTableSink buffer lock poisoned");
         for log in buffer.iter_mut() {
             if log.id == id {

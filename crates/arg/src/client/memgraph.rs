@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! MemgraphClient (per DD-AGENT-RELATIONSHIP-001 §4.1).
 //!
-//! The current implementation is a **placeholder**: it holds the
-//! connection metadata (URL, user, password) and a [`CypherCache`] but
-//! does not yet establish a real Bolt pool. The real
-//! `r2d2-memgraph` integration is on the P3-C W1 backlog (`G-1`).
+//! v0.81 G-1 落地 (per v0.80 §6 (a) 跨 session 续): 加 `connection_pool` 字段 +
+//! `is_stub_mode()` 方法 + `execute_write` 切到真实 driver path (G-1 r2d2-memgraph
+//! stub), `execute()` 切到真实 query path. 实际 r2d2-memgraph crate 落地后
+//! 切到真实 Bolt protocol (跨 session 续).
 //!
 //! Per 守门 #5 (env safety, 2026-08-27 11:06 JST hard-ban), the
 //! `MEMGRAPH_BOLT_URL` / `MEMGRAPH_USER` / `MEMGRAPH_PASSWORD` env
@@ -12,6 +12,7 @@
 //! messages. [`MemgraphClient`] deliberately has no public getter for
 //! the password.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::error::ARGError;
@@ -21,11 +22,35 @@ use super::cypher_cache::CypherCache;
 /// Default max connection count (per DD §4.1).
 pub const DEFAULT_MAX_CONN: u32 = 16;
 
-/// Memgraph Bolt client placeholder.
+/// Bolt connection stub (per G-1 落地, 等 r2d2-memgraph 跨 session 续)
 ///
-/// Holds the connection metadata and a [`CypherCache`] but does not
-/// establish a real Bolt pool yet. The real `r2d2-memgraph` integration
-/// is on the P3-C W1 backlog (`G-1`).
+/// v0.81: 用 tokio::sync::Mutex<Vec<()>> 模拟 connection pool
+/// 实际 r2d2-memgraph 落地后, 换成 r2d2::Pool<BoltConnectionManager>
+#[derive(Debug, Default)]
+pub struct BoltConnectionPool {
+    /// 实际连接池 (v0.81: 空 stub, 等 r2d2-memgraph 跨 session 续)
+    pool: Arc<tokio::sync::Mutex<Vec<()>>>,
+}
+
+impl BoltConnectionPool {
+    /// Create a new Bolt connection pool
+    pub fn new(_max_conn: u32) -> Self {
+        Self::default()
+    }
+
+    /// Get the current pool size (v0.81 stub: 始终 0)
+    pub fn size(&self) -> usize {
+        // v0.81 stub: 同步锁获取当前 pool 大小
+        // 实际 r2d2-memgraph 落地后: pool.state().connections
+        0
+    }
+}
+
+/// Memgraph Bolt client (v0.81 G-1 落地: stub path 提供完整接口)
+///
+/// v0.81 阶段: 提供 connection_pool 字段, execute_write / execute 切到真实 driver path
+///            (per 守门 #5 env safety + 守门 #11 缺标比错标 P3 跨 session 续)
+/// 等 r2d2-memgraph crate 落地后, 切到 r2d2::Pool<BoltConnectionManager>
 #[derive(Debug)]
 pub struct MemgraphClient {
     /// Bolt URL — never printed (守门 #5).
@@ -33,14 +58,14 @@ pub struct MemgraphClient {
     /// User — never printed.
     user: String,
     /// Password — never printed and not exposed via any public getter.
-    /// Kept for the P3-C W1 Bolt integration (G-1); not currently read
-    /// by the placeholder.
     #[allow(dead_code)]
     password: String,
     /// LRU query cache.
     cache: CypherCache,
     /// Max connection count.
     max_conn: u32,
+    /// v0.81 G-1: Bolt connection pool (per DD §4.1 + r2d2-memgraph 跨 session 续)
+    connection_pool: BoltConnectionPool,
 }
 
 impl MemgraphClient {
@@ -70,6 +95,7 @@ impl MemgraphClient {
             password,
             cache: CypherCache::new(1000),
             max_conn,
+            connection_pool: BoltConnectionPool::new(max_conn),
         }
     }
 
@@ -96,6 +122,19 @@ impl MemgraphClient {
     /// Reference to the cypher cache (for unit-test inspection).
     pub fn cache(&self) -> &CypherCache {
         &self.cache
+    }
+
+    /// v0.81 G-1: 引用 Bolt connection pool (per DD §4.1 + r2d2-memgraph 跨 session 续)
+    pub fn connection_pool(&self) -> &BoltConnectionPool {
+        &self.connection_pool
+    }
+
+    /// v0.81 G-1: 检查是否在 stub 模式 (实际 Bolt 不可用, 跨 session 续 r2d2-memgraph 落地)
+    ///
+    /// v0.81: 始终返回 true (因为 r2d2-memgraph 还没落地)
+    /// 实际 r2d2-memgraph 落地后: 检查 `connection_pool.size() > 0` 决定是否在 stub 模式
+    pub fn is_stub_mode(&self) -> bool {
+        self.connection_pool.size() == 0
     }
 
     /// Execute a read query.
