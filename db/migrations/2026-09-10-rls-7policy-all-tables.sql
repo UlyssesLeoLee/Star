@@ -21,7 +21,8 @@ BEGIN;
 ALTER TABLE ops_metrics_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ops_metrics_config FORCE ROW LEVEL SECURITY; -- superuser 也走 RLS (per ADR-0043)
 
--- ops_metrics_config 4 类 CRUD policy (per v0.91 §8.3 映射表 1-4)
+-- ops_metrics_config 4 类CRUD policy (per v0.91 §8.3 映射表 1-4, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS ops_metrics_config_select ON ops_metrics_config;
 CREATE POLICY ops_metrics_config_select ON ops_metrics_config
     FOR SELECT
     USING (
@@ -29,6 +30,7 @@ CREATE POLICY ops_metrics_config_select ON ops_metrics_config
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_metrics_config_insert ON ops_metrics_config;
 CREATE POLICY ops_metrics_config_insert ON ops_metrics_config
     FOR INSERT
     WITH CHECK (
@@ -36,6 +38,7 @@ CREATE POLICY ops_metrics_config_insert ON ops_metrics_config
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_metrics_config_update ON ops_metrics_config;
 CREATE POLICY ops_metrics_config_update ON ops_metrics_config
     FOR UPDATE
     USING (
@@ -47,6 +50,7 @@ CREATE POLICY ops_metrics_config_update ON ops_metrics_config
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_metrics_config_delete ON ops_metrics_config;
 CREATE POLICY ops_metrics_config_delete ON ops_metrics_config
     FOR DELETE
     USING (
@@ -56,7 +60,8 @@ CREATE POLICY ops_metrics_config_delete ON ops_metrics_config
 -- ops_metrics_config schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
 -- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
--- ops_metrics_config platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
+-- ops_metrics_config platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS ops_metrics_config_platform_admin ON ops_metrics_config;
 CREATE POLICY ops_metrics_config_platform_admin ON ops_metrics_config
     FOR ALL
     TO platform_admin
@@ -72,7 +77,8 @@ CREATE POLICY ops_metrics_config_platform_admin ON ops_metrics_config
 ALTER TABLE ops_cluster_action_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ops_cluster_action_log FORCE ROW LEVEL SECURITY; -- superuser 也走 RLS (per ADR-0043)
 
--- ops_cluster_action_log 4 类 CRUD policy (per v0.91 §8.3 映射表 1-4)
+-- ops_cluster_action_log 4 类CRUD policy (per v0.91 §8.3 映射表 1-4, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS ops_cluster_action_log_select ON ops_cluster_action_log;
 CREATE POLICY ops_cluster_action_log_select ON ops_cluster_action_log
     FOR SELECT
     USING (
@@ -80,6 +86,7 @@ CREATE POLICY ops_cluster_action_log_select ON ops_cluster_action_log
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_cluster_action_log_insert ON ops_cluster_action_log;
 CREATE POLICY ops_cluster_action_log_insert ON ops_cluster_action_log
     FOR INSERT
     WITH CHECK (
@@ -87,6 +94,7 @@ CREATE POLICY ops_cluster_action_log_insert ON ops_cluster_action_log
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_cluster_action_log_update ON ops_cluster_action_log;
 CREATE POLICY ops_cluster_action_log_update ON ops_cluster_action_log
     FOR UPDATE
     USING (
@@ -98,6 +106,7 @@ CREATE POLICY ops_cluster_action_log_update ON ops_cluster_action_log
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_cluster_action_log_delete ON ops_cluster_action_log;
 CREATE POLICY ops_cluster_action_log_delete ON ops_cluster_action_log
     FOR DELETE
     USING (
@@ -107,7 +116,8 @@ CREATE POLICY ops_cluster_action_log_delete ON ops_cluster_action_log
 -- ops_cluster_action_log schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
 -- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
--- ops_cluster_action_log platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
+-- ops_cluster_action_log platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS ops_cluster_action_log_platform_admin ON ops_cluster_action_log;
 CREATE POLICY ops_cluster_action_log_platform_admin ON ops_cluster_action_log
     FOR ALL
     TO platform_admin
@@ -123,7 +133,8 @@ CREATE POLICY ops_cluster_action_log_platform_admin ON ops_cluster_action_log
 ALTER TABLE ops_helm_release_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ops_helm_release_state FORCE ROW LEVEL SECURITY; -- superuser 也走 RLS (per ADR-0043)
 
--- ops_helm_release_state 4 类 CRUD policy (per v0.91 §8.3 映射表 1-4)
+-- ops_helm_release_state 4 类CRUD policy (per v0.91 §8.3 映射表 1-4, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS ops_helm_release_state_select ON ops_helm_release_state;
 CREATE POLICY ops_helm_release_state_select ON ops_helm_release_state
     FOR SELECT
     USING (
@@ -131,6 +142,7 @@ CREATE POLICY ops_helm_release_state_select ON ops_helm_release_state
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_helm_release_state_insert ON ops_helm_release_state;
 CREATE POLICY ops_helm_release_state_insert ON ops_helm_release_state
     FOR INSERT
     WITH CHECK (
@@ -138,6 +150,7 @@ CREATE POLICY ops_helm_release_state_insert ON ops_helm_release_state
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_helm_release_state_update ON ops_helm_release_state;
 CREATE POLICY ops_helm_release_state_update ON ops_helm_release_state
     FOR UPDATE
     USING (
@@ -149,6 +162,7 @@ CREATE POLICY ops_helm_release_state_update ON ops_helm_release_state
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_helm_release_state_delete ON ops_helm_release_state;
 CREATE POLICY ops_helm_release_state_delete ON ops_helm_release_state
     FOR DELETE
     USING (
@@ -158,7 +172,8 @@ CREATE POLICY ops_helm_release_state_delete ON ops_helm_release_state
 -- ops_helm_release_state schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
 -- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
--- ops_helm_release_state platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
+-- ops_helm_release_state platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS ops_helm_release_state_platform_admin ON ops_helm_release_state;
 CREATE POLICY ops_helm_release_state_platform_admin ON ops_helm_release_state
     FOR ALL
     TO platform_admin
@@ -174,7 +189,8 @@ CREATE POLICY ops_helm_release_state_platform_admin ON ops_helm_release_state
 ALTER TABLE ops_log_entry ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ops_log_entry FORCE ROW LEVEL SECURITY; -- superuser 也走 RLS (per ADR-0043)
 
--- ops_log_entry 4 类 CRUD policy (per v0.91 §8.3 映射表 1-4)
+-- ops_log_entry 4 类CRUD policy (per v0.91 §8.3 映射表 1-4, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS ops_log_entry_select ON ops_log_entry;
 CREATE POLICY ops_log_entry_select ON ops_log_entry
     FOR SELECT
     USING (
@@ -182,6 +198,7 @@ CREATE POLICY ops_log_entry_select ON ops_log_entry
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_log_entry_insert ON ops_log_entry;
 CREATE POLICY ops_log_entry_insert ON ops_log_entry
     FOR INSERT
     WITH CHECK (
@@ -189,6 +206,7 @@ CREATE POLICY ops_log_entry_insert ON ops_log_entry
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_log_entry_update ON ops_log_entry;
 CREATE POLICY ops_log_entry_update ON ops_log_entry
     FOR UPDATE
     USING (
@@ -200,6 +218,7 @@ CREATE POLICY ops_log_entry_update ON ops_log_entry
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_log_entry_delete ON ops_log_entry;
 CREATE POLICY ops_log_entry_delete ON ops_log_entry
     FOR DELETE
     USING (
@@ -209,7 +228,8 @@ CREATE POLICY ops_log_entry_delete ON ops_log_entry
 -- ops_log_entry schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
 -- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
--- ops_log_entry platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
+-- ops_log_entry platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS ops_log_entry_platform_admin ON ops_log_entry;
 CREATE POLICY ops_log_entry_platform_admin ON ops_log_entry
     FOR ALL
     TO platform_admin
@@ -225,7 +245,8 @@ CREATE POLICY ops_log_entry_platform_admin ON ops_log_entry
 ALTER TABLE ops_log_analysis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ops_log_analysis FORCE ROW LEVEL SECURITY; -- superuser 也走 RLS (per ADR-0043)
 
--- ops_log_analysis 4 类 CRUD policy (per v0.91 §8.3 映射表 1-4)
+-- ops_log_analysis 4 类CRUD policy (per v0.91 §8.3 映射表 1-4, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS ops_log_analysis_select ON ops_log_analysis;
 CREATE POLICY ops_log_analysis_select ON ops_log_analysis
     FOR SELECT
     USING (
@@ -233,6 +254,7 @@ CREATE POLICY ops_log_analysis_select ON ops_log_analysis
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_log_analysis_insert ON ops_log_analysis;
 CREATE POLICY ops_log_analysis_insert ON ops_log_analysis
     FOR INSERT
     WITH CHECK (
@@ -240,6 +262,7 @@ CREATE POLICY ops_log_analysis_insert ON ops_log_analysis
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_log_analysis_update ON ops_log_analysis;
 CREATE POLICY ops_log_analysis_update ON ops_log_analysis
     FOR UPDATE
     USING (
@@ -251,6 +274,7 @@ CREATE POLICY ops_log_analysis_update ON ops_log_analysis
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_log_analysis_delete ON ops_log_analysis;
 CREATE POLICY ops_log_analysis_delete ON ops_log_analysis
     FOR DELETE
     USING (
@@ -260,7 +284,8 @@ CREATE POLICY ops_log_analysis_delete ON ops_log_analysis
 -- ops_log_analysis schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
 -- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
--- ops_log_analysis platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
+-- ops_log_analysis platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS ops_log_analysis_platform_admin ON ops_log_analysis;
 CREATE POLICY ops_log_analysis_platform_admin ON ops_log_analysis
     FOR ALL
     TO platform_admin
@@ -276,7 +301,8 @@ CREATE POLICY ops_log_analysis_platform_admin ON ops_log_analysis
 ALTER TABLE ops_log_query_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ops_log_query_log FORCE ROW LEVEL SECURITY; -- superuser 也走 RLS (per ADR-0043)
 
--- ops_log_query_log 4 类 CRUD policy (per v0.91 §8.3 映射表 1-4)
+-- ops_log_query_log 4 类CRUD policy (per v0.91 §8.3 映射表 1-4, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS ops_log_query_log_select ON ops_log_query_log;
 CREATE POLICY ops_log_query_log_select ON ops_log_query_log
     FOR SELECT
     USING (
@@ -284,6 +310,7 @@ CREATE POLICY ops_log_query_log_select ON ops_log_query_log
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_log_query_log_insert ON ops_log_query_log;
 CREATE POLICY ops_log_query_log_insert ON ops_log_query_log
     FOR INSERT
     WITH CHECK (
@@ -291,6 +318,7 @@ CREATE POLICY ops_log_query_log_insert ON ops_log_query_log
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_log_query_log_update ON ops_log_query_log;
 CREATE POLICY ops_log_query_log_update ON ops_log_query_log
     FOR UPDATE
     USING (
@@ -302,6 +330,7 @@ CREATE POLICY ops_log_query_log_update ON ops_log_query_log
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS ops_log_query_log_delete ON ops_log_query_log;
 CREATE POLICY ops_log_query_log_delete ON ops_log_query_log
     FOR DELETE
     USING (
@@ -311,7 +340,8 @@ CREATE POLICY ops_log_query_log_delete ON ops_log_query_log
 -- ops_log_query_log schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
 -- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
--- ops_log_query_log platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
+-- ops_log_query_log platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS ops_log_query_log_platform_admin ON ops_log_query_log;
 CREATE POLICY ops_log_query_log_platform_admin ON ops_log_query_log
     FOR ALL
     TO platform_admin
@@ -327,7 +357,8 @@ CREATE POLICY ops_log_query_log_platform_admin ON ops_log_query_log
 ALTER TABLE oauth_clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE oauth_clients FORCE ROW LEVEL SECURITY; -- superuser 也走 RLS (per ADR-0043)
 
--- oauth_clients 4 类 CRUD policy (per v0.91 §8.3 映射表 1-4)
+-- oauth_clients 4 类CRUD policy (per v0.91 §8.3 映射表 1-4, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS oauth_clients_select ON oauth_clients;
 CREATE POLICY oauth_clients_select ON oauth_clients
     FOR SELECT
     USING (
@@ -335,6 +366,7 @@ CREATE POLICY oauth_clients_select ON oauth_clients
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS oauth_clients_insert ON oauth_clients;
 CREATE POLICY oauth_clients_insert ON oauth_clients
     FOR INSERT
     WITH CHECK (
@@ -342,6 +374,7 @@ CREATE POLICY oauth_clients_insert ON oauth_clients
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS oauth_clients_update ON oauth_clients;
 CREATE POLICY oauth_clients_update ON oauth_clients
     FOR UPDATE
     USING (
@@ -353,6 +386,7 @@ CREATE POLICY oauth_clients_update ON oauth_clients
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS oauth_clients_delete ON oauth_clients;
 CREATE POLICY oauth_clients_delete ON oauth_clients
     FOR DELETE
     USING (
@@ -362,7 +396,8 @@ CREATE POLICY oauth_clients_delete ON oauth_clients
 -- oauth_clients schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
 -- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
--- oauth_clients platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
+-- oauth_clients platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS oauth_clients_platform_admin ON oauth_clients;
 CREATE POLICY oauth_clients_platform_admin ON oauth_clients
     FOR ALL
     TO platform_admin
@@ -378,7 +413,8 @@ CREATE POLICY oauth_clients_platform_admin ON oauth_clients
 ALTER TABLE oauth_authorization_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE oauth_authorization_codes FORCE ROW LEVEL SECURITY; -- superuser 也走 RLS (per ADR-0043)
 
--- oauth_authorization_codes 4 类 CRUD policy (per v0.91 §8.3 映射表 1-4)
+-- oauth_authorization_codes 4 类CRUD policy (per v0.91 §8.3 映射表 1-4, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS oauth_authorization_codes_select ON oauth_authorization_codes;
 CREATE POLICY oauth_authorization_codes_select ON oauth_authorization_codes
     FOR SELECT
     USING (
@@ -386,6 +422,7 @@ CREATE POLICY oauth_authorization_codes_select ON oauth_authorization_codes
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS oauth_authorization_codes_insert ON oauth_authorization_codes;
 CREATE POLICY oauth_authorization_codes_insert ON oauth_authorization_codes
     FOR INSERT
     WITH CHECK (
@@ -393,6 +430,7 @@ CREATE POLICY oauth_authorization_codes_insert ON oauth_authorization_codes
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS oauth_authorization_codes_update ON oauth_authorization_codes;
 CREATE POLICY oauth_authorization_codes_update ON oauth_authorization_codes
     FOR UPDATE
     USING (
@@ -404,6 +442,7 @@ CREATE POLICY oauth_authorization_codes_update ON oauth_authorization_codes
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS oauth_authorization_codes_delete ON oauth_authorization_codes;
 CREATE POLICY oauth_authorization_codes_delete ON oauth_authorization_codes
     FOR DELETE
     USING (
@@ -413,7 +452,8 @@ CREATE POLICY oauth_authorization_codes_delete ON oauth_authorization_codes
 -- oauth_authorization_codes schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
 -- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
--- oauth_authorization_codes platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
+-- oauth_authorization_codes platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS oauth_authorization_codes_platform_admin ON oauth_authorization_codes;
 CREATE POLICY oauth_authorization_codes_platform_admin ON oauth_authorization_codes
     FOR ALL
     TO platform_admin
@@ -429,7 +469,8 @@ CREATE POLICY oauth_authorization_codes_platform_admin ON oauth_authorization_co
 ALTER TABLE oauth_access_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE oauth_access_tokens FORCE ROW LEVEL SECURITY; -- superuser 也走 RLS (per ADR-0043)
 
--- oauth_access_tokens 4 类 CRUD policy (per v0.91 §8.3 映射表 1-4)
+-- oauth_access_tokens 4 类CRUD policy (per v0.91 §8.3 映射表 1-4, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS oauth_access_tokens_select ON oauth_access_tokens;
 CREATE POLICY oauth_access_tokens_select ON oauth_access_tokens
     FOR SELECT
     USING (
@@ -437,6 +478,7 @@ CREATE POLICY oauth_access_tokens_select ON oauth_access_tokens
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS oauth_access_tokens_insert ON oauth_access_tokens;
 CREATE POLICY oauth_access_tokens_insert ON oauth_access_tokens
     FOR INSERT
     WITH CHECK (
@@ -444,6 +486,7 @@ CREATE POLICY oauth_access_tokens_insert ON oauth_access_tokens
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS oauth_access_tokens_update ON oauth_access_tokens;
 CREATE POLICY oauth_access_tokens_update ON oauth_access_tokens
     FOR UPDATE
     USING (
@@ -455,6 +498,7 @@ CREATE POLICY oauth_access_tokens_update ON oauth_access_tokens
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS oauth_access_tokens_delete ON oauth_access_tokens;
 CREATE POLICY oauth_access_tokens_delete ON oauth_access_tokens
     FOR DELETE
     USING (
@@ -464,7 +508,8 @@ CREATE POLICY oauth_access_tokens_delete ON oauth_access_tokens
 -- oauth_access_tokens schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
 -- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
--- oauth_access_tokens platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
+-- oauth_access_tokens platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS oauth_access_tokens_platform_admin ON oauth_access_tokens;
 CREATE POLICY oauth_access_tokens_platform_admin ON oauth_access_tokens
     FOR ALL
     TO platform_admin
@@ -480,7 +525,8 @@ CREATE POLICY oauth_access_tokens_platform_admin ON oauth_access_tokens
 ALTER TABLE oauth_refresh_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE oauth_refresh_tokens FORCE ROW LEVEL SECURITY; -- superuser 也走 RLS (per ADR-0043)
 
--- oauth_refresh_tokens 4 类 CRUD policy (per v0.91 §8.3 映射表 1-4)
+-- oauth_refresh_tokens 4 类CRUD policy (per v0.91 §8.3 映射表 1-4, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS oauth_refresh_tokens_select ON oauth_refresh_tokens;
 CREATE POLICY oauth_refresh_tokens_select ON oauth_refresh_tokens
     FOR SELECT
     USING (
@@ -488,6 +534,7 @@ CREATE POLICY oauth_refresh_tokens_select ON oauth_refresh_tokens
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS oauth_refresh_tokens_insert ON oauth_refresh_tokens;
 CREATE POLICY oauth_refresh_tokens_insert ON oauth_refresh_tokens
     FOR INSERT
     WITH CHECK (
@@ -495,6 +542,7 @@ CREATE POLICY oauth_refresh_tokens_insert ON oauth_refresh_tokens
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS oauth_refresh_tokens_update ON oauth_refresh_tokens;
 CREATE POLICY oauth_refresh_tokens_update ON oauth_refresh_tokens
     FOR UPDATE
     USING (
@@ -506,6 +554,7 @@ CREATE POLICY oauth_refresh_tokens_update ON oauth_refresh_tokens
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS oauth_refresh_tokens_delete ON oauth_refresh_tokens;
 CREATE POLICY oauth_refresh_tokens_delete ON oauth_refresh_tokens
     FOR DELETE
     USING (
@@ -515,7 +564,8 @@ CREATE POLICY oauth_refresh_tokens_delete ON oauth_refresh_tokens
 -- oauth_refresh_tokens schema_isolation 跳过 (表无 schema_name 列, per v0.93 缺口 (d) 修)
 -- P2 阶段扩展多 schema (per §13.5) 时 ALTER TABLE ADD COLUMN schema_name + 加进 TABLES_WITH_SCHEMA_NAME 白名单
 
--- oauth_refresh_tokens platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
+-- oauth_refresh_tokens platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS oauth_refresh_tokens_platform_admin ON oauth_refresh_tokens;
 CREATE POLICY oauth_refresh_tokens_platform_admin ON oauth_refresh_tokens
     FOR ALL
     TO platform_admin
@@ -531,7 +581,8 @@ CREATE POLICY oauth_refresh_tokens_platform_admin ON oauth_refresh_tokens
 ALTER TABLE tenant_pools ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenant_pools FORCE ROW LEVEL SECURITY; -- superuser 也走 RLS (per ADR-0043)
 
--- tenant_pools 4 类 CRUD policy (per v0.91 §8.3 映射表 1-4)
+-- tenant_pools 4 类CRUD policy (per v0.91 §8.3 映射表 1-4, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS tenant_pools_select ON tenant_pools;
 CREATE POLICY tenant_pools_select ON tenant_pools
     FOR SELECT
     USING (
@@ -539,6 +590,7 @@ CREATE POLICY tenant_pools_select ON tenant_pools
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS tenant_pools_insert ON tenant_pools;
 CREATE POLICY tenant_pools_insert ON tenant_pools
     FOR INSERT
     WITH CHECK (
@@ -546,6 +598,7 @@ CREATE POLICY tenant_pools_insert ON tenant_pools
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS tenant_pools_update ON tenant_pools;
 CREATE POLICY tenant_pools_update ON tenant_pools
     FOR UPDATE
     USING (
@@ -557,13 +610,15 @@ CREATE POLICY tenant_pools_update ON tenant_pools
         OR current_setting('app.is_admin', true) = 'true'
     );
 
+DROP POLICY IF EXISTS tenant_pools_delete ON tenant_pools;
 CREATE POLICY tenant_pools_delete ON tenant_pools
     FOR DELETE
     USING (
         current_setting('app.is_admin', true) = 'true'
     );
 
--- tenant_pools schema isolation (per v0.91 §8.3 映射表 5)
+-- tenant_pools schema isolation (per v0.91 §8.3 映射表 5, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS tenant_pools_schema_isolation ON tenant_pools;
 CREATE POLICY tenant_pools_schema_isolation ON tenant_pools
     FOR ALL
     USING (
@@ -571,14 +626,16 @@ CREATE POLICY tenant_pools_schema_isolation ON tenant_pools
         OR current_setting('app.is_admin', true) = 'true'
     );
 
--- tenant_pools platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS)
+-- tenant_pools platform admin override (per v0.91 §8.3 映射表 6 + v0.88 BYPASSRLS, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS tenant_pools_platform_admin ON tenant_pools;
 CREATE POLICY tenant_pools_platform_admin ON tenant_pools
     FOR ALL
     TO platform_admin
     USING (true)
     WITH CHECK (true);
 
--- tenant_pools health_status 派生 visibility (per v0.91 §8.3 映射表 7, 5 status OR 合并)
+-- tenant_pools health_status 派生 visibility (per v0.91 §8.3 映射表 7, 5 status OR 合并, v0.97 加 DROP IF EXISTS 兼容 PG 9.5+)
+DROP POLICY IF EXISTS tenant_pools_health_visibility ON tenant_pools;
 CREATE POLICY tenant_pools_health_visibility ON tenant_pools
     FOR SELECT
     USING (
