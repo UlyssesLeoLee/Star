@@ -1,0 +1,64 @@
+[package]
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# `bff` — STAR BFF (Backend for Frontend) workspace (P3-D.6 阶段 1 基础 任务 1.5)
+#
+# 跟 `crates/api` 平级 (BFF vs API), 通过 `svc://` 引用业务 svc (per 9/1 13:05 JST
+# envoy 独立 deployment 偏好). 0 反向依赖 (BFF 调 API, API 不依赖 BFF).
+#
+# 守门合规 (per 守门 #1 v25 + 守门 #7 + 守门 #11 + 守门 #14 v2 + 守门 #19 v19):
+# - 0 改根 `Cargo.toml` [workspace] members 任何行 (bff 是新独立 workspace, 跟 tools/ / frontend/ 模式一致).
+# - 0 改 `crates/api/Cargo.toml` 任何行 (0 添加 bff 依赖, BFF 跟 API 平级 0 反向依赖).
+# - axum / tokio-tungstenite 用具体 version 0.8 / 0.21 (0 重复加到根 [workspace.dependencies], 守门 #1 禁回溯叙事).
+# - 5 域 Lead 真人到位前 Mavis 临时代签 (per 守门 #14 v2 拍板 D, 2026-09-05 10:43 JST).
+name = "bff"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "Apache-2.0"
+authors = ["Star Team"]
+repository = "https://github.com/UlyssesLeoLee/Star"
+description = "STAR BFF (Backend for Frontend) — envoy 独立 deployment, 5 REST + 4 WSS for A12 canvas collaboration"
+publish = false
+
+[workspace]
+# 新独立 workspace (per 守门 #1 禁回溯叙事 + brief §1.1 范围内 + §1.2 out-of-scope).
+# 0 业务方法实装 (留 P3-D.6 阶段 2 任务 2.3 A12 业务实装).
+# 0 真实 WSS 业务逻辑 (留 P3-D.6 阶段 3 集成 任务 3.2).
+
+[dependencies]
+# HTTP / WebSocket (per brief §2.1, axum 0.8 + features ws / macros, 跟 crates/api 一致)
+axum = { version = "0.8", features = ["ws", "macros"] }
+
+# 异步运行时 (per 根 [workspace.dependencies] 现有 tokio 1.40, 跟 crates/api 一致)
+tokio = { version = "1.40", features = ["full"] }
+
+# 序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# async-trait + thiserror (跟根 [workspace.dependencies] 一致)
+async-trait = "0.1"
+thiserror = "1"
+
+# ID / 时间 (跟根 [workspace.dependencies] 一致)
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
+
+# 跨 crate path 依赖 (per brief §1.1 范围内 + §2.1)
+# 守门 #1 禁回溯叙事: 0 改根 Cargo.toml [workspace] members 任何行 (bff 是新独立 workspace, 不需要注册)
+# 守门 #11 缺标比错标: star-context / canvas-collab / arg-bridge / api 4 path 依赖, 0 重复加
+# 注: crates/api package name = "api" (非 "star-api"), crates/arg-bridge package name = "star-arg-bridge" (per root Cargo.toml)
+star-context = { path = "../crates/star-context" }
+canvas-collab = { path = "../crates/canvas-collab" }
+star-arg-bridge = { path = "../crates/arg-bridge" }
+api = { path = "../crates/api" }
+
+[lints.rust]
+# 0 unsafe blocks (per 守门 #7 `unsafe_code = "forbid"`).
+unsafe_code = "forbid"
+# 阶段 1 基础 missing_docs = warn (0 deny, 跟 crates/api 一致, 阶段 2 业务实装阶段升 deny)
+missing_docs = "warn"
+# 跨 session 续的 idiom 严格
+rust_2018_idioms = { level = "deny", priority = -1 }
+# 阶段 1 基础 unreachable_pub = warn (0 deny, 跟 crates/api V0.1 一致, 阶段 2 业务实装阶段升 deny)
+unreachable_pub = "warn"

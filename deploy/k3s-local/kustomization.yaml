@@ -1,0 +1,31 @@
+# k3s-local 顶层 kustomize (per P3-D.6 阶段 1 基础 任务 1.5)
+# 集成 bff + star-api-rest + envoy 3 子资源
+# 守门 #1 禁回溯叙事: 0 改 deploy/k3s-local/install-sealed-secrets.sh 任何行
+# 守门 #1 禁回溯叙事: 0 改 deploy/k3s-local/star-api-rest-deploy.yaml 任何行
+# 守门 #1 禁回溯叙事: 0 改 deploy/k3s-local/envoy/* 任何行
+# 守门 #1 禁回溯叙事: 0 改 deploy/k3s-local/secrets/* 任何行
+# 5 域 Lead 真人到位前 Mavis 临时代签 (per 守门 #14 v2 拍板 D, 2026-09-05 10:43 JST)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 公共 namespace (per brief §2.9 + 守门 #11 缺标比错标, 跟 star-api-rest-deploy.yaml 一致)
+# star-api-rest-deploy.yaml 用 `star-system`, bff-deployment.yaml 用 `star` (BFF 是新独立 svc, per 9/1 13:05 JST 偏好)
+# 这里不设全局 namespace, 各自 yaml 自己定 (per 守门 #1 禁回溯叙事 0 改现有 yaml 任何行)
+
+# 公共 labels (per kubernetes 标签最佳实践 + 守门 #3 显式声明)
+# 用 labels: 替代 deprecated commonLabels: (per kustomize 5.x)
+labels:
+  - includeSelectors: false  # 跨 resource 不重复 selector labels (deployment selector 单独维护, 守门 #11 缺标比错标)
+    pairs:
+      app.kubernetes.io/part-of: star
+      app.kubernetes.io/managed-by: kustomize
+
+# 3 子资源 (per brief §2.9 + 守门 #1 禁回溯叙事 0 改现有)
+resources:
+  - bff-deployment.yaml
+  - star-api-rest-deploy.yaml
+  - envoy/
+
+# settings (kustomize build output)
+generatorOptions:
+  disableNameSuffixHash: true  # 显式关闭 hash suffix (ConfigMap / Service 不滚动更新)
