@@ -81,6 +81,7 @@
 
 - **Q5-I**: `_unused_user` 现象是 rust-analyzer IDE 过渡态症状, 非 cargo 行为, 随 H1 完成后自动消解, 不需要单独修复。
 - **Q7-T**: `domain-identity` 的 PermissionDenied 先于 CrossTenantDenied 是有意的最小信息暴露防御设计, 已核实代码行为符合预期, service 不改, IT 测试保留现状。
+- **H2 + H2-EXT + H5**（2026-09-10 核实闭环）: `git log --grep="ActorContext" -i` 显示 H2 原 3 domain 已分 3 commit 落地（`fcc6ff7` D.3 part 1/3 domain-feedback、`e0ceaf8` part 2/3 domain-validation、`630dd39` part 3/3 domain-integration+star-mcp，均 2026-09-07），另 `83b02ce` "Phase D.1 H2 强类型重构 + 5 domain 跨域字段扩展" 落地 H2-EXT 5 domain。**H5 重新实测**（2026-09-10）：`cargo check --workspace --all-targets` = **0 error**（从 968 baseline → 432 REMEASURE → 0，H2/H2-EXT/H3 全部收敛完成）。§1 H1-H5 全部闭环，无残留下游 AI 动作。
 
 ---
 
