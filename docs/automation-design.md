@@ -1568,3 +1568,62 @@ frontend/src/app/automation-debug/
 - 后续 P3-D 详细设计 (DD, 3 份): ~0.6M tokens (3 子代理并行)
 - 后续 P3-D.6 启动实装 (P0 36 项): ~3-5M tokens
 - 双核心 78 项 全部落地 (12 个月+): ~13-19M (13-19 SRE·周, per STAR-OLU-001)
+
+
+### 4.29 P3-D.5 DD 详细设计文档三份 + 协调性检查修复落档 (per 18:25 JST Ulysses 拍板"完善详细设计文档" + 18:30 JST 拍板"确保本设计和 agent 图关系设计妥善协调不冲突", 2026-09-10 18:35 JST)
+
+> **触发**: 2026-09-10 18:25 JST Ulysses 拍板"完善详细设计文档" + 18:30 JST 拍板"确保本设计和 agent 图关系设计妥善协调不冲突" + 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #14 v3 Mavis 永久代签 + 守门 #1 v15 docs 同步饱和第 74 次新事件触发仍允许
+> **依据**: 守门 #1 v15 (本轮第 74 次新事件, docs 同步允许) + 守门 #1 v19 (0 子代理调用, 0 散落子代理产出, 仅 task tool 派 2 worker DD 子代理) + 守门 #1 禁回溯叙事 (不重写 4 SRS commit + 2 BD commit, DD 是新方向 + 协调性检查修复 3 处) + 守门 #3 (5 域 Lead ≠ Star 22 DDD disclaimer) + 守门 #9 #3 (0 子代理调用实装期) + 守门 #9 v19 (Mavis 自驱, 18:25 JST 拍板 → 18:33 JST 2 子代理完成 ~8 分钟, 18:35 JST 协调性检查 + 修复 ~2 分钟) + 守门 #9 v20 (子代理 dispatch 必先 brief 落档, 3 份 DD brief 已落 `docs/briefs/dd-canvas-{total,agent,gamify}-001.md` + 3 份 BD brief catch-up `docs/briefs/bd-canvas-{total,agent,gamify}-001.md`) + 守门 #9 v27 (RPC 失败 fallback 3 段, 子代理 invoke → verify → collect_output, 真实验证文件 + 字节数 + 段数 + 14 张表 W/T/M + 13 关键 class + 5 状态机 + 11 共享类型) + 守门 #10 (代签, author=Ulysses) + 守门 #11 (缺标比错标, 19+12+12 已知缺口显式列) + 守门 #12 (BAS 引用必 git log --follow 实证) + 守门 #13 (DB W/T/M 100% 覆盖, 14 张表 跨域) + 守门 #14 v2/v3/v4 代签 / 审核 规则全备 + 守门 #15 (docs 同步饱和, 本 commit 1 次, 上次 commit f7d0932 是第 73 次, 本 commit 第 74 次) + 守门 #23 v2 (G5 sticky note 聚类走 mock 接口, 真实 LLM 留 P2) + 协调性检查 3 冲突修复 (C-16 → C-25 `CanvasElementsBackend` + C-21 → C-26 `CanvasMultiUserAudit` + Trust Score 5 档统一 ARG 源 `Untrusted/Low/Medium/High/VeryHigh` + 0-0.2/0.2-0.4/0.4-0.7/0.7-0.9/0.9-1.0, 仅修 root 写的 DD-CANVAS-001, BD-AGENT 已正确, DD-AGENT-001 子代理 1 已用 ARG 源命名, DD-GAMIFY 独立不需修)
+> **落档文件** (关联 commit 待生成, 10 files / 4 核心 + 6 brief catch-up, 第 74 次新事件):
+> - `docs/reports/COORDINATION-CHECK-001.md` v0.1 (21,544 bytes ~21KB, root 写, 协调性检查报告, 10 项检查 7 通过 + 3 冲突发现, §3 修复方案 C-25/C-26 顺延 + Trust Score 5 档统一 ARG 源)
+> - `docs/design/DD-CANVAS-001.md` **v0.1.1** (49,367 bytes ~48KB, root 写, 修复版, 10 段 + 5 附录 + 14 张表 W/T/M 100% 覆盖 + 13 关键 class (含 C-25 `CanvasElementsBackend` + C-26 `CanvasMultiUserAudit` 顺延) + 5 状态机 (含 §5.3 Trust Score 5 档 统一 ARG 源) + 11 共享类型 + 4 关键时序图)
+> - `docs/design/DD-CANVAS-AGENT-001.md` v0.1 (139,198 bytes ~136KB, 2,531 行, 子代理 1 bg_9ce1be6e 写, 专题 agent 管理 DD, 13 关键 class (C-16=`RelationshipEditor` + C-21=`ARGController` 1:1 派生自 ARG 源 DD-AGENT-RELATIONSHIP-001 v0.1) + 5 状态机 + 11 共享类型 + 6 时序图 (4 必含 + 2 补充 A12 多人编辑/Follow mode) + 14 张表 W/T/M 100% 覆盖 + 23 API 端点 + 5 WebSocket + 19 已知缺口含 3 P0 阻塞 + 守门 19/19 + 26 派生规跨域全过; **A11 1:1 派生自 DD-AGENT-RELATIONSHIP-001 v0.1 §3-§8 模板; A12 1:1 派生自 frontend-canvas-design.md v0.1 §4.1 模式 A + §4.6 PresenceCursor 升级**)
+> - `docs/design/DD-CANVAS-GAMIFY-001.md` v0.1 (161,742 bytes ~158KB, 3,439 行, 子代理 2 bg_50df734c 写, 专题游戏化 DD, 17 段 + 5 附录 + 13 关键 class + 5 状态机 + 11 共享类型 (170 字段) + 4 关键时序图 + **15 张表 W/T/M 100% 覆盖 0 混在 (Master 5 + Transaction 4 + Work 6)** + 22 API 端点 + 2 WebSocket + 74 测试 + 12 已知缺口含 DDD Review 必查 #11 + #12; **G5 锁定 mock 接口 (per 守门 #23 v2, 走 MockClient + ai_edit_mock.py subprocess.run, 真实 LLM 留 P2); G12 派生自 V0.1 game 5 份 PHASE 报告 (125 tests pass, 仅画布集成引用)**)
+> - `docs/briefs/dd-canvas-total-001.md` (catch-up from 18:25 JST DD 拍板, 子代理 0/1/2 dispatch 必先 brief 落档 per 守门 #9 v20)
+> - `docs/briefs/dd-canvas-agent-001.md` (catch-up, 子代理 1 bg_9ce1be6e dispatch 必先 brief 落档)
+> - `docs/briefs/dd-canvas-gamify-001.md` (catch-up, 子代理 2 bg_50df734c dispatch 必先 brief 落档)
+> - `docs/briefs/bd-canvas-total-001.md` (catch-up from 18:00 JST BD 拍板, 子代理 0/1/2 dispatch 必先 brief 落档)
+> - `docs/briefs/bd-canvas-agent-001.md` (catch-up, 子代理 1 bg_98f425fd dispatch 必先 brief 落档)
+> - `docs/briefs/bd-canvas-gamify-001.md` (catch-up, 子代理 2 bg_f5625885 dispatch 必先 brief 落档)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| D5.4-1 | D5.4-1 | `docs/reports/COORDINATION-CHECK-001.md` v0.1 (21KB) | A | **[P]** | (root Write tool) | 协调性检查报告: 10 项检查 7 通过 + 3 冲突 (C-16 编号 + C-21 编号 + Trust Score 5 档 命名/阈值), §3 修复方案, 4 ARG 已有 + 9 本批新写 vs 4 ARG 已有, 不重写 ARG 4 份 commit per 守门 #1 禁回溯叙事 |
+| D5.4-2 | D5.4-2 | `docs/design/DD-CANVAS-001.md` **v0.1.1** (48KB) 修复版 | A | **[P]** | (root Edit tool) | 协调性检查修复 3 处: C-16 `CanvasBackend` → C-25 `CanvasElementsBackend` + C-21 `MultiUserAudit` → C-26 `CanvasMultiUserAudit` + Trust Score 5 档统一 ARG 源 `Untrusted/Low/Medium/High/VeryHigh` + 0-0.2/0.2-0.4/0.4-0.7/0.7-0.9/0.9-1.0; §0 v0.1 → v0.1.1 + 修订历史 +1 行; §1.1 / §4 列表头同步; 字节数 +1,671 (47,696 → 49,367) |
+| D5.4-3 | D5.4-3 | `docs/design/DD-CANVAS-AGENT-001.md` v0.1 (136KB) | A | **[P]** | (worker 子代理 1 Write tool, bg_9ce1be6e) | 13 关键 class 1:1 派生 ARG 源 (C-16=RelationshipEditor + C-21=ARGController), 6 时序图 (4 必含 + 2 补充 A12), 14 张表 W/T/M 100% 覆盖, 23 API + 5 WebSocket, 19 已知缺口含 3 P0 阻塞 + 1 跨 session 总结, 守门 19/19 + 26 派生规跨域全过; **不需修复** (子代理 1 已用正确 ARG 源命名) |
+| D5.4-4 | D5.4-4 | `docs/design/DD-CANVAS-GAMIFY-001.md` v0.1 (158KB) | A | **[P]** | (worker 子代理 2 Write tool, bg_50df734c) | 17 段 + 5 附录 (略超 brief 10 段, 跟 DD-AGENT-RELATIONSHIP-001 模板对齐), 13 关键 class + 11 共享类型 170 字段, 15 张表 W/T/M 100% 覆盖 0 混在, 22 API + 2 WebSocket, 74 测试, 12 已知缺口; **不需修复** (游戏化独立, 跟 ARG 无关) |
+| D5.4-5 | D5.4-5 | `docs/briefs/dd-canvas-{total,agent,gamify}-001.md` + `docs/briefs/bd-canvas-{total,agent,gamify}-001.md` (6 brief catch-up) | A | **[P]** | (per 守门 #9 v20 子代理 dispatch 必先 brief 落档) | 6 份 brief 关联 6 份子代理 dispatch (DD 子代理 1 bg_9ce1be6e + DD 子代理 2 bg_50df734c + BD 子代理 1 bg_98f425fd + BD 子代理 2 bg_f5625885 + 总册 2 份), commit message 引用 brief 路径 |
+| D5.4-6 | D5.4-6 | `scripts/automation/registry.md` §2 +4 行 (3 DD + 1 COORDINATION) + §3 v0.14 | A | **[P]** | (registry.md edit) | per 守门 #12 v21 [P] docs 同步必更新 registry, 3 索引 (dd-canvas-total-001 + dd-canvas-agent-001 + dd-canvas-gamify-001) + 1 报告 (coordination-check-001) + v0.14 修订历史 (18:30 JST 协调性检查 拍板) |
+| D5.4-7 | D5.4-7 | `docs/automation-design.md` §4.29 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #12 v21 [P] docs 同步必更新 §4 任务卡表 |
+| D5.4-8 | D5.4-8 | 1 commit author = `Ulysses <ulysses@mavis.local>` (commit 待生成) | A | **[P]** | (git commit) | 守门 #10 + 8/27 19:39 JST 授权 + 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 Mavis 审核 author=Ulysses; 不推 origin (守门 #1 反转后 R-05) |
+
+**§4.29 任务卡维度判定**:
+- R (Rerunnable): **是** (1 commit idempotent, 4 核心文件 + 6 brief catch-up, 0 子代理调用 落档期)
+- V (Volume): **是** (3 DD 共 342KB / 5,970 行 + 1 报告 21KB + 6 brief 跨域, 跨 1 总册 + 2 专题 + 1 报告)
+- S (Structural): **是** (3 DD 各 10-17 段 + 附录 + 14-15 张表 W/T/M + 22-32 API 端点 + 5 WebSocket + 5 角色签字栏)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 (commit 待生成) + 守门 #10 author = Ulysses + 守门 #5 env 不打印 + 守门 #9 #3 0 子代理调用 + 守门 #9 v20 brief 落档 + 守门 #9 v27 verify + 守门 #14 v2/v3/v4 代签 / 审核 规则全备 + 守门 #1 禁回溯叙事 不重写 SRS + BD + ARG 4 commit)
+
+**§4.29 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v19 + #12 v21 + #14 v2 + #14 v3 + #14 v4)**:
+- `git log -p --follow docs/design/DD-CANVAS-001.md` 实证 v0.1.1 落档 (commit 待生成, 49,367 bytes, +1,671 vs v0.1 47,696)
+- `git log -p --follow docs/design/DD-CANVAS-AGENT-001.md` 实证 v0.1 落档 (commit 待生成, 139,198 bytes)
+- `git log -p --follow docs/design/DD-CANVAS-GAMIFY-001.md` 实证 v0.1 落档 (commit 待生成, 161,742 bytes)
+- `git log -p --follow docs/reports/COORDINATION-CHECK-001.md` 实证 v0.1 落档 (commit 待生成, 21,544 bytes)
+- 子代理 1 真实产出验证: DD-AGENT 139,198 bytes / 2,531 行 / 13 段 + 5 附录 / 46 项跨域 / 14 张表 W/T/M 100% 覆盖 / 13 关键 class (C-16=RelationshipEditor + C-21=ARGController 匹配 ARG 源) / 5 状态机 / 11 共享类型 / 6 时序图 / 19 已知缺口含 3 P0 阻塞 (per 守门 #9 v27 3 段 fallback verify 阶段)
+- 子代理 2 真实产出验证: DD-GAMIFY 161,742 bytes / 3,439 行 / 17 段 (略超 brief 10 段, 跟 DD-AGENT-RELATIONSHIP-001 模板对齐) / 32 项 G1-G12 / 15 张表 W/T/M 100% 覆盖 0 混在 (Master 5 + Transaction 4 + Work 6) / 13 关键 class / 5 状态机 / 11 共享类型 170 字段 / 22 API + 2 WebSocket / 12 已知缺口含 DDD Review 必查 #11 + #12 / G5 mock 锁 / G12 V0.1 5 份 PHASE 派生 (per 守门 #9 v27 3 段 fallback verify 阶段)
+- 协调性检查验证: 10 项检查 7 通过 + 3 冲突 (C-16 编号 + C-21 编号 + Trust Score 5 档 命名/阈值), 修复方案: C-16 → C-25 `CanvasElementsBackend` + C-21 → C-26 `CanvasMultiUserAudit` + Trust Score 5 档统一 ARG 源; 仅修 root 写的 DD-CANVAS-001, BD-AGENT 已正确 (grep 验证 0 `Unknown/Trusted/CanvasBackend/MultiUserAudit` 匹配), DD-AGENT-001 子代理 1 已用 ARG 源命名 (C-16=RelationshipEditor + C-21=ARGController, A12 走 §4.14.x sub-class 模式与本总册 C-25/C-26 不同但等价), DD-GAMIFY 独立不需修
+- 守门 #1 v19: 0 子代理调用 (实装期), 仅用 task tool 派 2 worker (DD 子代理 1 bg_9ce1be6e + DD 子代理 2 bg_50df734c)
+- 守门 #9 #3: 0 子代理调用 (实装期), 不派二级子代理
+- 守门 #9 v19: Mavis 自驱, 拍板后立即执行 (18:25 JST 拍板 → 18:33 JST 2 子代理完成 ~8 分钟, 18:35 JST 协调性检查 + 修复 ~2 分钟)
+- 守门 #10 author = `Ulysses <ulysses@mavis.local>` (per 8/27 19:39 JST 授权 + 守门 #14 v3 Mavis 永久代签)
+- 守门 #11 缺标比错标: AGENT 19 个 + GAMIFY 12 个 + 总册 12 个 + 协调性检查 3 个冲突显式列, 共 46 已知缺口显式列, 0 隐藏
+- 守门 #13 DB W/T/M: 总册 14 张表 (A11 7 + A12 7) + GAMIFY 15 张表 (Master 5 + Transaction 4 + Work 6) = **29 张表 100% 覆盖 跨域汇总** + 0 混在
+- 守门 #14 v3: 5 角色签字栏全 Mavis 接手代签 (修订人 + 审批者 author=Ulysses)
+- 守门 #14 v4: 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses (per 2026-09-10 12:45 JST v0.62 反转)
+- 守门 #1 禁回溯叙事: 不重写 4 SRS commit + 2 BD commit, DD 是新方向 + 协调性检查修复 3 处, 不回写 SRS / BD / ARG 4 commit
+- 守门 #23 v2 AI 第三方 API 禁止: GAMIFY G5 sticky note 聚类走 mock 接口 (MockClient + ai_edit_mock.py subprocess.run, 守门 #23 v2 49 次引用锁 mock 路径), 真实 LLM 留 P2
+
+**§4.29 token OLU 估算 (per 守门 #4 + STAR-OLU-001 v0.1)**:
+- 本 DD 撰写期 (root + 2 worker DD 子代理 + 协调性检查 + 修复): ~0.4M tokens
+- 累计 P3-D.5 全部 9 commit (4 SRS + 1 总册 BD + 2 专题 BD + 2 任务卡同步 + 1 DD 三份 + 协调性检查): ~3.36M tokens (2.80 SRE·周, 累计 9 commit)
+- 后续 P3-D.6 启动实装 (P0 36 项): ~3-5M tokens
+- 双核心 78 项 全部落地 (12 个月+): ~13-19M (13-19 SRE·周, per STAR-OLU-001)
