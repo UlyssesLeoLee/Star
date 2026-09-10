@@ -1096,6 +1096,66 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 
 ---
 
+### 14.19 SANDBOX-002 sandboxd 实装阶段 (per 2026-09-10 22:11 JST Ulysses 拍板"各级文档完善好, 更新后续任务到 wbs")
+
+> **触发**: 2026-09-10 22:11 JST Ulysses 指令"**各级文档完善好，更新后续任务到 wbs**" + SANDBOX-001 v0.2 (subprocess 沙箱) 4 缺口 (#1 network / #2 fs / #5 observability / #6 elevated) 升级为独立 app 形态.
+>
+> **范围**: 新建独立 crate `crates/sandboxd/` (Sandbox-as-a-Service), 跟 `crates/star-mcp/` 等 22 domain crate 平行, 专门处理"子代理 + mavis desktop + 任意 host-side 子进程"的统一隔离平台, 4 维隔离 (resource / network / fs / capability) + 3 平台 (Windows / Linux / macOS).
+>
+> **6 决策点已拍板** (per 2026-09-10 21:57 JST Ulysses A 选项): D-1 长期 daemon + D-2 gRPC + D-3 allowlist + D-4 path allowlist + D-5 独立 System Service + D-6 Prometheus + PG audit
+>
+> **4 份 IPA 标准文档落档** (per 2026-09-10 22:11 JST, 1 commit 多文件 per 守门 #1 v15):
+> - [`docs/requirements/SRS-SANDBOX-002.md`](../requirements/SRS-SANDBOX-002.md) v0.1.1 (37KB, 8 機能 / 5 業務 / 7 非機能 / 4 表 W/T/M / 9 缺口 / 6 决策点已拍板)
+> - [`docs/basic-design/SANDBOX-BASIC-DESIGN-002.md`](../basic-design/SANDBOX-BASIC-DESIGN-002.md) v0.1.1 (46.6KB, 6 模块 / 18 子模块 / gRPC proto / 4 维后端 / 三平台 init)
+> - [`docs/detailed-design/DD-SANDBOX-002.md`](../detailed-design/DD-SANDBOX-002.md) v0.1 (50.8KB, 5 维设计 + 4 表 DDL 100% 覆盖 + 9 缺口)
+> - [`docs/test-design/TEST-DESIGN-SANDBOX-002.md`](../test-design/TEST-DESIGN-SANDBOX-002.md) v0.1 (29.5KB, 5 级别测试 UT 56 + IT 17 + E2E 11 + PT 5 bench + UAT 8 AC = 97 测)
+> - [`docs/implementation-plans/SANDBOX-IMPL-PLAN-002.md`](../implementation-plans/SANDBOX-IMPL-PLAN-002.md) v0.1 (14.2KB, 5 阶段 × 16 子项 × ~3.5M token 总预算)
+>
+> **守门合规**:
+> - W/T/M 4 表 100% 覆盖 (Session T + Policy M + Audit T + Capability M, 0 W per session 用完即销毁派生, 12/12 RLS 13 類必携)
+> - 跟 SANDBOX-001 v0.2 fail-open 兼容 (per FR-7.1, 9 已知缺口显式标 #1 P0 阻塞 sandboxd↔client 集成)
+> - 12 项守门通过 (#1+#1 v15+#1 v19+#1 v25+#5+#6+#9+#9 v3+#11+#13+#14 v3+#14 v4+#22+#28)
+>
+> **5 阶段 × 16 子项** (per IMPL-PLAN §2-§6, 估 ~3.5M token / 3.5-4 周):
+
+| # | 阶段 | 子项 | 标题 | token 估 | 软参考周 | 依赖 | 状态 | 自动化档 | 备注 |
+|---|---|---|---|---|---|---|---|---|---|
+| **SBX-01** | **P0 骨架** | sandboxd crate 骨架 | `crates/sandboxd/` Cargo.toml + 6 模块占位 + lib.rs + 18 源 + 6 测试 + 1 binary | ~0.1M | 0.02 周 | 6 决策点已拍板 (per A 选项) | 🟡 **plan** | **[M]** `rust_crate_scaffold.py` | per DD-002 §1.1 文件结构 |
+| **SBX-02** | P0 骨架 | proto schema + 4 RPC stub | `proto/sandboxd.proto` 落地 + tonic-build 自动生成 + SandboxServiceImpl 4 RPC stub (CreateSession / RunCommand / DestroySession / StreamLogs) | ~0.1M | 0.02 周 | SBX-01 | 🟡 **plan** | **[M]** `proto_codegen.py` | per DD-002 §1.1 + §2.2 |
+| **SBX-03** | P0 骨架 | Linux Resource 维 (cgroups v2) | `backend/linux.rs` cgroups v2 落地 + SandboxLimits 应用 + 跟 SANDBOX-001 v0.2 100% 兼容 | ~0.2M | 0.03 周 | SBX-02 | 🟡 **plan** | **[M]** `linux_cgroup_apply.py` | per DD-002 §5.1 + UT TC-RES-01~08 |
+| **SBX-04** | P0 骨架 | fail-open 降级路径 | sandboxd 不可用时, dispatcher 走 SANDBOX-001 v0.2 subprocess.run 降级 | ~0.1M | 0.02 周 | SBX-03 | 🟡 **plan** | **[P]** `sandboxd_failover.py` | per FR-7.1 + IT TC-IT-FO-01~04 |
+| **SBX-05** | **P1 三平台** | Windows Resource + Network (Job Objects + WFP) | `backend/windows.rs` Job Objects + WFP 落地 + 跟 SANDBOX-001 v0.2 Resource 维 100% 复用 | ~0.3M | 0.05 周 | SBX-04 | 🟡 **plan** | **[M]** `windows_wfp_apply.py` | per DD-002 §5.1 + UT TC-RES-08 + TC-NET-08 |
+| **SBX-06** | P1 三平台 | Linux Network + FS + Capability (netns + mount ns + libcap) | `backend/linux.rs` 扩展: netns (iptables) + mount namespace + libcap | ~0.3M | 0.05 周 | SBX-05 | 🟡 **plan** | **[M]** `linux_ns_apply.py` | per DD-002 §5.1 + UT TC-NET-07 + TC-FS + TC-CAP-01~03 |
+| **SBX-07** | P1 三平台 | macOS 后端 (sandbox-exec) | `backend/macos.rs` sandbox-exec profile 落地 + 4 维隔离 (resource + network + fs + capability implicit) | ~0.3M | 0.05 周 | SBX-06 | 🟡 **plan** | **[M]** `macos_sandbox_apply.py` | per DD-002 §5.1 + UT TC-CAP-05 |
+| **SBX-08** | P1 三平台 | 跨平台 backend factory + UT 56 测全跑 | `backend/mod.rs` DefaultBackendFactory 三平台 + 56 UT 全部 pass (per 守门 #1 v25) | ~0.1M | 0.02 周 | SBX-07 | 🟡 **plan** | **[M]** `rust_module_gen.py` | `cargo test -p sandboxd --lib -j 4` 56/56 pass |
+| **SBX-09** | **P2 client 集成** | dispatcher.py gRPC client 集成 | `scripts/automation/dispatcher.py` v0.2: SandboxdClient 替代 subprocess.run + fail-open 降级 | ~0.3M | 0.05 周 | SBX-08 | 🟡 **plan** | **[P]** `dispatcher_client_migration.py` | per DD-002 §1.3 + E2E TC-E2E-PY-01~04 |
+| **SBX-10** | P2 client 集成 | mavis desktop (Rust) gRPC client 集成 | `crates/star-mcp/src/sandboxd_client.rs` 新建 + 跟 Python client 对称 | ~0.3M | 0.05 周 | SBX-09 | 🟡 **plan** | **[M]** `mcp_client_gen.py` | per DD-002 §1.3 + E2E TC-E2E-RS-01~04 |
+| **SBX-11** | P2 client 集成 | 17 IT + 11 E2E 全部 pass | 跨模块 17 IT + dispatcher + mavis 11 E2E 全部 pass (含 4 RPC 端到端 + 4 fail-open + 5 PG audit + 4 dispatcher + 4 mavis + 3 跨平台) | ~0.2M | 0.03 周 | SBX-10 | 🟡 **plan** | **[P]** `e2e_runner.py` | per TDD-002 §3 + §4 |
+| **SBX-12** | **P3 fail-open + 性能** | SANDBOX-001 v0.2 降级路径端到端验证 | sandboxd 不可用时, 走 SANDBOX-001 v0.2 subprocess.run 降级端到端验证 | ~0.2M | 0.03 周 | SBX-11 | 🟡 **plan** | **[P]** `failover_e2e.py` | per BD-002 §1.3 + IT TC-IT-FO-01~04 |
+| **SBX-13** | P3 fail-open + 性能 | 5 bench 全部 P95 < 阈值 | CreateSession p50/p99 + RunCommand 端到端 + 100 session 并发 + gRPC IPC 序列化 5 bench 全部 P95 < 阈值 (per 守门 #1 v25) | ~0.2M | 0.03 周 | SBX-12 | 🟡 **plan** | **[P]** `perf_bench_runner.py` | per TDD-002 §5 + 守门 #1 v25 |
+| **SBX-14** | P3 fail-open + 性能 | 故障注入测试 (fail-open / fail-closed) | sandboxd 不可用 / 启动中 / 健康检查失败 / PG 不可用 4 类故障注入 + 100% fail-open / 100% fail-closed | ~0.2M | 0.03 周 | SBX-13 | 🟡 **plan** | **[P]** `chaos_test_runner.py` | per SRS-002 AC-3 + TDD-002 §3.2.2/3 |
+| **SBX-15** | **P4 收官** | PHASE-SANDBOX-002-IMPL-REPORT 落档 | `docs/reports/PHASE-SANDBOX-002-IMPL-REPORT.md` 落档 (跟现有 6 份 PHASE-*-IMPL-REPORT 模式一致) | ~0.3M | 0.05 周 | SBX-14 | 🟡 **plan** | **[M]** `phase_report_gen.py` | per STAR-P3-WBS-001 §13 模板 |
+| **SBX-16** | P4 收官 | UAT 8 AC 验收 + 推 origin | UAT 8 AC 全部 100% pass + 5 域 Lead 签字 (Mavis 永久代签 per 守门 #14 v3) + 推 origin main (per 守门 #1 反转 2026-08-30 07:09 JST) | ~0.3M | 0.05 周 | SBX-15 | 🟡 **plan** | **[M]** `uat_runner.py` | per TDD-002 §6 + 守门 #1 推 origin 重试细则 |
+| **小计** | | **16 子项** (1 sandboxd crate + 18 源 + 6 测试 + 1 binary + 4 表 DDL + 4 RPC + 4 维隔离 + 3 平台 + 1 client 集成 + 1 fail-open + 5 bench + 8 AC + 1 报告) | **~3.5M** | **~0.58 周** | — | **0/16 plan** | **2 [P] / 11 [M] / 3 共享** | 触发条件: 5 域 Lead 真人到位解除 (per 守门 #14 v3, 不再阻塞) | |
+| **总计含 16 子项** | | **125 + 16 = 141 子项** (per §15 累计统计派生, +3.5M token, +0.58 周) | **~252.2M** | **~42.0 周** | **108/141 实质收官 (76.6%) + 33 阻塞/待拍 (17 既有 + 16 SBX plan)** | | | | |
+
+**9 缺口 (per SRS-002 §9 + DD-002 §9 + TDD-002 §1.2, 缺标比错标显式列)**:
+- G-SBX-01 (P0): sandboxd ↔ dispatcher.py / mavis desktop 集成未实装, 阻塞 P2 启动
+- G-SBX-02 (P1): TLS / mTLS 双向认证未实装, v0.1 走明文 gRPC (localhost), 跨主机不安全
+- G-SBX-03 (P1): Capability 维仅 Linux 实装, Windows / macOS 走 sandbox 后端隐式 drop (v0.1)
+- G-SBX-04 (P2): 真实 K8s / Helm 部署未实装, v0.1 走 systemd / Windows Service / launchd
+- G-SBX-05 (P2): 多租户隔离未实装, v0.1 走单租户
+- G-SBX-06 (P1): allowlist 绕过 (DNS rebinding / domain fronting), 攻击者用 IP 直连绕过域名 allowlist
+- G-SBX-07 (P2): sandboxd 自身被攻击 (host OS 漏洞 / 提权), sandboxd 是 host 进程, 自身被攻破则所有隔离失效
+- G-SBX-08 (P1): 子代理内部代码越权 (post-dispatch) 仍有窗口, 即便 sandboxd 隔离, 子代理在 session 内仍可任意调 subprocess
+- G-SBX-09 (P2): mavis runtime 升级不兼容 (gRPC schema breaking change), gRPC schema 走 buf 兼容
+
+**Token 估**: 0.15M 实测 (4 文档 + WBS §14.19 + 1 commit 多文件 per 守门 #1 v15 docs 同步饱和第 97 次新事件触发 仍允许)
+
+**新守门 v36 派生规 (per 2026-09-10 22:11 JST)**: sandboxd 实装阶段触发的 4 表 W/T/M 横展必须经守门 #13 派生规 (a)(b)(c)(d) 全实现, 跟 §14.9 Star-EI 5 张新表 同等级 100% 覆盖.
+
+---
+
 ## 15. 累计统计 (P3 全 5 阶段 + P3 之外 跨 Phase 0-9)
 
 | 阶段 | 子项 | token 预算 | 软参考周 | 实证状态 |
