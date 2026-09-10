@@ -63,6 +63,11 @@ domain-feedback = { path = "../domain-feedback" }
 # v0.58 P0-2 Stage 1 (per WBS §14.15): integration + comment 域 From<DomainError> for RestError 映射
 domain-integration = { path = "../domain-integration" }
 domain-comment = { path = "../domain-comment" }
+# v0.59 P0-2 Stage 2 (per WBS §14.15): batch + theme + cli(hermes) 域 From<DomainError> for RestError 映射
+# domain-agent 已在 Phase B.2.6 中定义 (line 61)
+domain-batch = { path = "../domain-batch" }
+domain-theme = { path = "../domain-theme" }
+domain-cli = { path = "../domain-cli" }
 # Phase I Batch 2 (per `STAR-API-REST-BACKEND-TAKEOVER-WBS-001.md` §1.1 表 #9-18)
 # 10 路由接线: code 4 + context 1 + merge_requests 1 + reviews 1 + validations 1 + submissions 1 + pipelines 1
 domain-search = { path = "../domain-search" }
