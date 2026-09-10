@@ -1,12 +1,15 @@
 //! v0.66 P0-4 Stage 1: InMemoryAdapterRegistry 实现
 //!
-//! per WBS §14.15 P0-4 (0.4M tokens), 守门 #1 v25 单 crate 模式 + 守门 #14 v4 永久代签.
+//! per WBS §14.15 P0-4 (0.4M tokens), 守门 #1 v25 单 crate 模式 + 守门 #14 v4 Mavis 审核 author=Ulysses.
 //!
 //! 提供 AdapterRegistry + AdapterQuery trait 的 in-memory 实现,
 //! 供 application crate 跨域编排 (per spec §2.4 / §14.1) 实证使用.
 //!
 //! 5 注册方法: postgres / nats / object_storage / scm / agent
 //! 1 查询方法: list_registered_adapters
+//!
+//! v0.72 P0-4 Stage 2 扩展: AdapterDescriptor 加 pg_url: Option<String> + registered_at: Option<DateTime<Utc>> 字段,
+//! InMemoryAdapterRegistry 设 None (per backward compat); RealPostgresAdapterRegistry 设 Some(pg_url).
 //!
 //! 守门 #1 v25 cargo test -p infrastructure -j 4 = 100% pass
 //! 守门 #14 v4 修订人: Ulysses(一人公司 12 角色 per DEC-008) - Mavis 接手**审核**
@@ -75,6 +78,10 @@ impl InMemoryAdapterRegistry {
         let desc = AdapterDescriptor {
             id: Uuid::new_v4(),
             tenant_id,
+            // v0.72 P0-4 Stage 2: 内存版 InMemoryAdapterRegistry 永远不连真实 PG
+            // (per AdapterDescriptor pg_url 字段扩展 backward compat)
+            pg_url: None,
+            registered_at: None,
         };
         let mut state = self.state.write().expect("lock");
         state
@@ -226,9 +233,13 @@ mod tests {
         let reg = InMemoryAdapterRegistry::new();
         let tenant_a = Uuid::new_v4();
         let tenant_b = Uuid::new_v4();
-        let _ = reg.register_postgres_adapter((), test_actor(tenant_a)).await;
+        let _ = reg
+            .register_postgres_adapter((), test_actor(tenant_a))
+            .await;
         let _ = reg.register_nats_adapter((), test_actor(tenant_a)).await;
-        let _ = reg.register_postgres_adapter((), test_actor(tenant_b)).await;
+        let _ = reg
+            .register_postgres_adapter((), test_actor(tenant_b))
+            .await;
         assert_eq!(reg.list_by_tenant(tenant_a).len(), 2);
         assert_eq!(reg.list_by_tenant(tenant_b).len(), 1);
     }
