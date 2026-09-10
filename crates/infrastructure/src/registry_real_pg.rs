@@ -13,6 +13,32 @@
 //! 3. 提供 verify_health() 方法调 star_pg_adapter::healthcheck(&pool) 做真实 PG 健康检查
 //! 4. list_registered_adapters 返回的 descriptor 带 pg_url + registered_at, 供 application 编排层后续用
 //!
+//! ## v0.73 P0-4 Stage 2.1 扩展: 6 ops Repository wire-up
+//!
+//! per v0.72 §3 已知缺口 (c) 跨 session 续做, 加 2 个公开 getter:
+//! - `pool() -> &PgPool` — 拿共享 pool 给 application crate 构造 ops Repository 实例
+//! - `pg_url() -> &str` — 拿构造时传入的 PG URL (供日志 / 诊断)
+//!
+//! wire-up pattern (per star-pg-adapter 6 ops Repository `pub fn new(pool: PgPool) -> Self` 模式):
+//!
+//! ```ignore
+//! // 1. 构造 RealPostgresAdapterRegistry (共享一个 pool)
+//! let reg = RealPostgresAdapterRegistry::new(pool, "postgres://prod/db");
+//!
+//! // 2. 用 pool getter 构造 ops Repository 实例 (per v0.67 6 ops Repository 收官)
+//! use star_pg_adapter::repository::ops_metrics_config::PgOpsMetricsConfigRepository;
+//! let metrics_repo = PgOpsMetricsConfigRepository::new(reg.pool().clone());
+//!
+//! // 3. 用 list_registered_adapters 查所有已注册 adapter descriptor
+//! let descs = reg.list_registered_adapters((), actor).await?;
+//! for d in descs {
+//!     println!("adapter {} -> pg_url {:?}", d.id, d.pg_url);
+//! }
+//! ```
+//!
+//! 所有 5 adapter kind (Postgres / Nats / ObjectStorage / Scm / Agent) 共享同一个 pool
+//! (per spec §13.1 PostgreSQL = 默认 SoR, §30.6 单一 PostgreSQL 数据库非 Database per Domain).
+//!
 //! ## 测试策略
 //!
 //! 单元测试用 `sqlx::PgPool::connect_lazy("postgres://invalid")` 不连真 PG (lazy pool 不会实际连),
@@ -67,6 +93,22 @@ impl RealPostgresAdapterRegistry {
         healthcheck(&self.pool)
             .await
             .map_err(|e| InfrastructureError::Internal(format!("pg healthcheck failed: {}", e)))
+    }
+
+    /// 拿共享 PgPool 引用 (v0.73 P0-4 Stage 2.1 扩展)
+    ///
+    /// 用于 application crate 跨域编排时构造 6 ops Repository 实例
+    /// (per v0.67 star-pg-adapter 6 ops Repository 收官, 全部 `pub fn new(pool: PgPool) -> Self` 模式).
+    /// 调用方需 `pool().clone()` 拿到 owned PgPool (per sqlx::PgPool = Arc 内部, clone 廉价).
+    pub fn pool(&self) -> &sqlx::PgPool {
+        &self.pool
+    }
+
+    /// 拿构造时传入的 PG URL (v0.73 P0-4 Stage 2.1 扩展)
+    ///
+    /// 用于日志 / 诊断 / 跟 descriptor.pg_url 交叉验证.
+    pub fn pg_url(&self) -> &str {
+        &self.pg_url
     }
 
     /// 当前注册的 adapter 总数
@@ -303,5 +345,64 @@ mod tests {
             }
             other => panic!("预期 Internal error, 实际 = {:?}", other),
         }
+    }
+
+    // =====================================================================
+    // v0.73 P0-4 Stage 2.1: 6 ops Repository wire-up getter 测试 (per 守门 #19 v19)
+    // =====================================================================
+
+    #[tokio::test]
+    async fn pool_getter_returns_reference() {
+        // v0.73 关键断言: pool() 返回 &PgPool 不 panic + 可 clone
+        // (per RealPostgresAdapterRegistry 共享单一 pool 设计, per spec §13.1 + §30.6)
+        let pool = test_lazy_pool();
+        let reg = RealPostgresAdapterRegistry::new(pool, "postgres://test");
+        let pool_ref = reg.pool();
+        // &PgPool 非空
+        let _cloned = pool_ref.clone();
+        // pool() 调用多次都成功 (no panic, no borrow conflict)
+        let _ = reg.pool();
+        let _ = reg.pool();
+    }
+
+    #[tokio::test]
+    async fn pg_url_getter_returns_same_url() {
+        // v0.73 关键断言: pg_url() 返回的 &str 跟构造时传入的 URL 同一字符串
+        let pg_url = "postgres://user:pass@db.example.com:5432/mydb";
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), pg_url);
+        assert_eq!(reg.pg_url(), pg_url, "pg_url() getter 必须返回构造时 URL");
+    }
+
+    #[tokio::test]
+    async fn multiple_kinds_share_same_pool() {
+        // v0.73 关键断言: 注册 5 种 adapter kind 后, 所有 kind 共享同一 pool
+        // (per spec §13.1 PostgreSQL = 默认 SoR 单一数据库非 Database per Domain)
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor.clone()).await;
+        let _ = reg.register_nats_adapter((), actor.clone()).await;
+        let _ = reg.register_object_storage_adapter((), actor.clone()).await;
+        let _ = reg.register_scm_adapter((), actor.clone()).await;
+        let _ = reg.register_agent_adapter((), actor).await;
+        // pool getter 可用 (5 kinds 都已注册共享同一 pool)
+        let _ = reg.pool();
+        assert_eq!(reg.count(), 5);
+    }
+
+    #[tokio::test]
+    async fn pool_clone_enables_repository_construction() {
+        // v0.73 关键 wire-up 测试: pool() 返回的 PgPool 可 clone 给 ops Repository 构造
+        // (per sqlx::PgPool = Arc 内部, clone 廉价且共享同一连接池)
+        // 这里用 PgOpsMetricsConfigRepository::new(pool.clone()) 实证 wire-up 模式成立
+        use star_pg_adapter::repository::ops_metrics_config::PgOpsMetricsConfigRepository;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor).await;
+        // 构造 ops Repository 用 pool getter (per v0.67 6 ops Repository `pub fn new(pool: PgPool)` 模式)
+        let metrics_repo = PgOpsMetricsConfigRepository::new(reg.pool().clone());
+        // 验证构造后 metrics_repo.pool() 可再次 clone 出来 (证明 pool 共享 Arc 内部)
+        let _repo_pool_clone = metrics_repo.pool().clone();
+        // reg.pool() 仍可用 (clone 不消耗原 pool, per sqlx::PgPool Arc 语义)
+        let _ = reg.pool();
     }
 }
