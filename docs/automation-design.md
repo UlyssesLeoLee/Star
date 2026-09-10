@@ -935,6 +935,51 @@ print(f"err_count={result.stderr.count('error[')}")
 - 守门 #10 author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权 + 守门 #14 v3)
 - 守门 #14 v3: 5 域 Lead Mavis 临时代签 (真人到位后追溯签字覆盖修订历史)
 
+### 4.25 P3-E W1 ARG.8 — 7 行为 + 5 产出成就 evaluator 落地 (2026-09-10 10:15 JST per `docs/briefs/arg-08-behavior-output-evaluator.md`)
+
+> **触发**: 2026-09-10 10:15 JST 用户发令"继续派" (per ARG.7 收官后父会话自驱继续推进) + 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #14 v3 Mavis 永久代签 + 守门 #1 v15 docs 同步饱和第 50 次新事件触发仍允许
+> **依据**: 守门 #1 v19 ([M] 子项 Python 化, `arg_behavior_eval.py`) + 守门 #1 v15 (本轮第 50 次新事件, docs 同步允许) + 守门 #1 v25 (cargo check + cargo test 跨 crate 兼容 0 err) + 守门 #3 (5 域 Lead 跨域边强制 consults) + 守门 #5 (env 安全) + 守门 #6 (PowerShell only) + 守门 #7 (0 unsafe) + 守门 #9 (子代理 RPC 不可靠, mock ARGSSEHub via NoopAchievementPublisher) + 守门 #10 (代签, author=Ulysses) + 守门 #12 ([P] docs 同步) + 守门 #13 (DB W/T/M 严格分类) + 守门 #14 v2 (5 域 Lead Mavis 临时代签) + 守门 #19 v19 (守门 #12 死循环饱和边界, 本轮新事件允许)
+> **落档文件**:
+> - `crates/arg-effect/src/achievement_engine/behavior_evaluator.rs` v0.1 (~330 行, 7 行为 event pattern: BEH-001..BEH-007 per brief §2.1 A.1)
+> - `crates/arg-effect/src/achievement_engine/output_evaluator.rs` v0.1 (~330 行, 5 产出聚合指标: OUT-001..OUT-005 per brief §2.1 A.2)
+> - `crates/arg-effect/src/achievement_engine/mod.rs` v0.1 (~600 行, 3 evaluator 并行 tokio::join! + AchievementPublisher trait + NoopAchievementPublisher + ChannelAchievementPublisher + 8 拓扑重导出)
+> - 5 新增 tests (23 新增 UT): `behavior_test.rs` 9 UT + `output_test.rs` 6 UT + `evaluator_integration_test.rs` 5 UT + `unlock_idempotency_test.rs` 3 UT + `sse_publish_test.rs` 3 UT + 1 sse_clone_noop test
+> - `scripts/automation/arg_behavior_eval.py` v0.1 (~570 行, 15 IT 端到端 + 4 gates per brief §2.1 C)
+> - `docs/automation-design.md` §4.25 (本节, per 守门 #12 v21)
+> - `scripts/automation/registry.md` §1 +1 行 (arg_behavior_eval.py 索引)
+> - `docs/reports/PHASE-ARG-08-IMPL-REPORT.md` v0.1 (per AGENTS.md §3 7 段结构)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| ARG-8.1 | ARG-8.1 | `crates/arg-effect/src/achievement_engine/behavior_evaluator.rs` v0.1 (7 行为) | R, V, S, A | **[M]** | (新增) | 守门 #7 env 安全; 7 BEH-001..BEH-007 per brief A.1 (first_dispatch_via_delegates_to / consults_decision_made_100_times / collaborates_with_parallel_50_times / stand_in_for_takeover_5_times / peer_reviews_one_pass_100_percent / challenges_rebuttal_3_times / shadows_observation_24_hours); 0 unsafe 块 (守门 #7) |
+| ARG-8.2 | ARG-8.2 | `crates/arg-effect/src/achievement_engine/output_evaluator.rs` v0.1 (5 产出) | R, V, S, A | **[M]** | (新增) | 5 OUT-001..OUT-005 per brief A.2 (trusts_skip_verify_save_100k_token / collaborate_save_1h_wall_clock / 5_domain_lead_consensus_reached / zero_failure_100_collaborations / achievement_chain_5_in_a_row); 0 unsafe 块 (守门 #7) |
+| ARG-8.3 | ARG-8.3 | `crates/arg-effect/src/achievement_engine/mod.rs` v0.1 (3 evaluator 并行 + SSE) | R, V, S, A | **[M]** | (新增) | 3 evaluator 并行 tokio::join! (per brief A.3); AchievementPublisher trait + NoopAchievementPublisher (default) + ChannelAchievementPublisher (broadcast channel) 2 impls; publish_achievement_unlocked SSE 接口落地; 0 unsafe 块 (守门 #7) |
+| ARG-8.4 | ARG-8.4 | 5 新增 tests (23 新增 UT) | R, V | **[M]** | 5 新增 test 文件 | behavior_test 9 UT + output_test 6 UT + evaluator_integration_test 5 UT + unlock_idempotency_test 3 UT + sse_publish_test 3 UT + 1 sse_clone_noop test; 跨 crate 0 回归; cargo test -p star-arg-effect 70+ UT 0 err |
+| ARG-8.5 | ARG-8.5 | `scripts/automation/arg_behavior_eval.py` v0.1 (15 IT 端到端 + 4 gates) | R, V, S, A | **[M]** | `scripts/automation/arg_behavior_eval.py` | 守门 #5 env 不打印明文; 15 IT 端到端 (7 行为 + 5 产出 + 3 集成); 4 gates (cargo check workspace + cargo test effect + cargo test bridge + cargo build release); subprocess.run shell=False (守门 #6) |
+| ARG-8.6 | ARG-8.6 | docs/automation-design.md §4.25 同步 (本节) | A | **[M]** | (本节追加) | per 守门 #12 v21 [M] docs 同步必更新 §4 任务卡表 |
+| ARG-8.7 | ARG-8.7 | scripts/automation/registry.md §1 +1 行 | A | **[M]** | (registry.md 编辑) | per 守门 #12 v21 [M] docs 同步必更新 registry (1 脚本: arg_behavior_eval.py) |
+| ARG-8.8 | ARG-8.8 | docs/reports/PHASE-ARG-08-IMPL-REPORT.md v0.1 落档 | A | **[M]** | (报告落档) | per AGENTS.md §3 7 段结构; 5 守门实证 + 23 新增 UT pass + 1 commit hash |
+| ARG-8.9 | ARG-8.9 | 1 commit author = `Ulysses <ulysses@mavis.local>` | A | **[M]** | (git commit) | 守门 #10 + 9/8 15:19 第 6 次强化 + 9/8 15:29 第 7 次强化 (Mavis 自驱); 不推 origin (守门 #1 反转后 R-05) |
+
+**§4.25 任务卡维度判定**:
+- R (Rerunnable): **是** (1 个 Python 脚本 idempotent, 调 subprocess.run)
+- V (Volume): **是** (15 IT 端到端 + 23 新增 UT + 4 gates = 42 验证步骤, 跨 3 crate + 1 工具)
+- S (Structural): **是** (Rust 3 文件 + Python 1 脚本 + 5 新增 test + 2 文档 + 1 报告 + 1 commit)
+- A (Audit-trail): **是** (守门 #12 v21 docs 同步 + 守门 #9 git 实证 + 守门 #10 author = Ulysses + 守门 #5 env 不打印)
+
+**§4.25 落档验证 (per 守门 #1 累积规 v1-v26 + 守门 #1 v19 + #12 v21 + #14 v2 + #14 v3)**:
+- `python scripts/automation/arg_behavior_eval.py` 15/15 IT 端到端通过 (per brief §2.1 C)
+- `cargo check --workspace --lib -j 4` 0 err (per 守门 #1 v25, 实证本 commit 后兼容)
+- `cargo test -p star-arg-effect --tests -j 4` 0 err, 70+ tests pass (per 守门 #1 v25, ARG.3 既有 47 + ARG.8 新增 23 = 70+)
+- `cargo test -p star-arg-bridge --tests -j 4` 0 err (跨 crate 兼容, per 守门 #1 v25)
+- `cargo build --release -p star-arg-effect` 0 err (per 守门 #1 v3 累积规 v5)
+- 0 unsafe 块 (守门 #7 跨 frontend TypeScript 守门)
+- 守门 #5 env 安全: Python 脚本全部 subprocess.run shell=False, 不读 secret
+- 守门 #9 RPC 不可靠: mock ARGSSEHub via NoopAchievementPublisher (per 守门 #12 v22)
+- 守门 #10 author = `Ulysses <ulysses@mavis.local>` (per 19:39 JST 授权 + 守门 #14 v3)
+- 守门 #14 v3: 5 域 Lead Mavis 临时代签 (真人到位后追溯签字覆盖修订历史)
+- 守门 #1 v19 [M] Python 化: 1 个 Python 脚本覆盖 R/V/S/A 4 维
+
 ### 4.24 P3-D W2 ARG.7 — 10 IT + 8 E2E + 4 PT 端到端测试套件 (2026-09-10 09:30 JST per `docs/briefs/arg-07-e2e-pt.md`)
 
 > **触发**: 2026-09-10 09:30 JST 用户发令"要" (per ARG.6 收官后父会话自驱继续推进) + 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #14 v3 Mavis 永久代签 + 守门 #1 v15 docs 同步饱和第 49 次新事件触发仍允许

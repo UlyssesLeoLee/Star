@@ -79,14 +79,19 @@ fn ut48b_topology_cypher_count_matches_8() {
 }
 
 #[tokio::test]
-async fn ut49_achievement_behavior_eval_placeholder() {
+async fn ut49_achievement_behavior_eval_first_edge() {
+    // ARG.8 (per brief `arg-08-behavior-output-evaluator.md` §2.1 A.1):
+    // BehaviorEvaluator now triggers BEH-001 on the first DELEGATES_TO
+    // edge (per pattern `first_dispatch_via_delegates_to`).
     let eval = BehaviorEvaluator::new();
     let triggered = eval
         .evaluate(&make_edge_event(Uuid::nil()), Uuid::nil())
         .await
         .expect("ok");
-    // Placeholder; real implementation lands in P3-E ARG.8.
-    assert!(triggered.is_empty());
+    assert!(
+        triggered.iter().any(|c| c == "BEH-001-FIRST-DELEGATES"),
+        "BEH-001 should trigger on first DELEGATES_TO edge, got: {triggered:?}"
+    );
     // The query-template layer is in `star_arg::query::behavior`:
     // 7 行为 patterns are already enumerated.
     let patterns = all_behavior_patterns();
@@ -94,13 +99,19 @@ async fn ut49_achievement_behavior_eval_placeholder() {
 }
 
 #[tokio::test]
-async fn ut50_achievement_output_eval_placeholder() {
+async fn ut50_achievement_output_eval_no_trigger_on_first_edge() {
+    // ARG.8 (per brief `arg-08-behavior-output-evaluator.md` §2.1 A.2):
+    // OutputEvaluator triggers on aggregate thresholds. A single
+    // DELEGATES_TO edge doesn't push any OUT metric over its threshold.
     let eval = OutputEvaluator::new();
     let triggered = eval
         .evaluate(&make_edge_event(Uuid::nil()), Uuid::nil())
         .await
         .expect("ok");
-    assert!(triggered.is_empty());
+    assert!(
+        triggered.is_empty(),
+        "OUT metrics should not trigger on first edge, got: {triggered:?}"
+    );
     let metrics = all_output_metrics();
     assert_eq!(metrics.len(), 5);
 }
@@ -116,12 +127,12 @@ async fn ut51_achievement_unlock_idempotent() {
     let user = Uuid::new_v4();
     let engine = ARGAchievementEngine::new(topology, behavior, output, ops, user);
 
-    // first call → 8 unlocks
+    // first call → 8 topology + 1 behavior (BEH-001) = 9 unlocks
     let first = engine
         .evaluate(make_edge_event(Uuid::nil()), Uuid::nil())
         .await
         .expect("ok");
-    assert_eq!(first.len(), 8);
+    assert_eq!(first.len(), 9);
 
     // second call → 0 unlocks (idempotent per (user, code))
     let second = engine
@@ -130,7 +141,7 @@ async fn ut51_achievement_unlock_idempotent() {
         .expect("ok");
     assert_eq!(second.len(), 0);
 
-    assert_eq!(engine.unique_unlocks(), 8);
+    assert_eq!(engine.unique_unlocks(), 9);
 }
 
 #[tokio::test]
