@@ -17,9 +17,9 @@ use tokio::process::Command;
 #[cfg(test)]
 use uuid::Uuid;
 
-use super::process::{OutputLine, OutputStream, ProcessHandle};
 #[cfg(test)]
-use super::process::{ProcessState};
+use super::process::ProcessState;
+use super::process::{OutputLine, OutputStream, ProcessHandle};
 
 // =====================================================================
 // 1. value_object

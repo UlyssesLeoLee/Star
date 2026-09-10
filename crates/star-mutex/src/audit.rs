@@ -76,7 +76,10 @@ impl LockAuditLogger {
     /// 记录锁释放事件.
     pub fn log_released(&self, lock_target: &str, hold_ms: i32) {
         let mut records = self.records.lock().unwrap();
-        if let Some(record) = records.iter_mut().find(|r| r.lock_target == lock_target && r.released_at.is_none()) {
+        if let Some(record) = records
+            .iter_mut()
+            .find(|r| r.lock_target == lock_target && r.released_at.is_none())
+        {
             record.released_at = Some(chrono::Utc::now());
             record.hold_ms = Some(hold_ms);
         }

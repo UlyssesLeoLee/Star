@@ -17,9 +17,7 @@ use domain_identity::{InMemoryIdentityService, UserId};
 use domain_permission::{
     InMemoryPermissionService, PermissionScheme, PermissionSchemeId, TenantId as PermTenantId,
 };
-use domain_workspace::{
-    InMemoryWorkspaceService, UserId as WsUserId, WorkspaceId,
-};
+use domain_workspace::{InMemoryWorkspaceService, UserId as WsUserId, WorkspaceId};
 use domain_worktree::InMemoryWorktreeService;
 use star_context::ActorContext as StarActorContext;
 use uuid::Uuid;

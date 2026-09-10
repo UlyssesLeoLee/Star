@@ -134,9 +134,15 @@ mod tests {
 
     #[test]
     fn test_lock_strategy_parse() {
-        assert_eq!(LockStrategy::parse("advisory").unwrap(), LockStrategy::Advisory);
+        assert_eq!(
+            LockStrategy::parse("advisory").unwrap(),
+            LockStrategy::Advisory
+        );
         assert_eq!(LockStrategy::parse("lease").unwrap(), LockStrategy::Lease);
-        assert_eq!(LockStrategy::parse("optimistic").unwrap(), LockStrategy::Optimistic);
+        assert_eq!(
+            LockStrategy::parse("optimistic").unwrap(),
+            LockStrategy::Optimistic
+        );
         assert!(LockStrategy::parse("unknown").is_err());
     }
 

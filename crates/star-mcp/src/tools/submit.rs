@@ -374,9 +374,8 @@ mod tests {
     use super::*;
     use domain_validation::ActorContext as VActorContext;
     use domain_validation::{
-        MarkValidationStatusCommand, SubmitValidationResultCommand,
-        TenantId as VTenantId, ValidationCommandPort, ValidationKind,
-        WorkItemId,
+        MarkValidationStatusCommand, SubmitValidationResultCommand, TenantId as VTenantId,
+        ValidationCommandPort, ValidationKind, WorkItemId,
     };
 
     #[tokio::test]

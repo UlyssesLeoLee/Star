@@ -19,10 +19,10 @@
 //!   5 域 (player/economy/match/social/admin) 业务子域映射待 DDD Review Lead 拍板
 
 use domain_permission::{
-    ActorContext, Action, CheckQuery, CreateSchemeCommand, Effect, GetSchemeQuery, GrantRoleCommand,
-    InMemoryPermissionService, ListRolesQuery, PermissionCommandPort, PermissionError,
-    PermissionQueryPort, PermissionRule, ProjectId, ResourceType, RevokeRoleCommand, Role,
-    RoleBinding, SubjectType, TenantId, UpsertRuleCommand, UserId,
+    Action, ActorContext, CheckQuery, CreateSchemeCommand, Effect, GetSchemeQuery,
+    GrantRoleCommand, InMemoryPermissionService, ListRolesQuery, PermissionCommandPort,
+    PermissionError, PermissionQueryPort, PermissionRule, ProjectId, ResourceType,
+    RevokeRoleCommand, Role, RoleBinding, SubjectType, TenantId, UpsertRuleCommand, UserId,
 };
 use uuid::Uuid;
 

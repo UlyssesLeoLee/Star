@@ -14,9 +14,9 @@ use chrono::Utc;
 use star_arg::models::edge::{Edge, EdgeDirection, RelationshipType};
 use star_arg::models::event::ARGEvent;
 use star_arg_effect::achievement_engine::behavior::{
-    BEH_001_FIRST_DELEGATES, BEH_002_CONSULTS_100, BEH_003_COLLAB_50, BEH_004_STAND_IN_5,
-    BEH_005_PEER_100PCT_10, BEH_006_CHALLENGE_3, BEH_007_SHADOWS_24H, BehaviorEvaluator,
-    BehaviorStats, BehaviorThresholds, ALL_BEH_CODES,
+    BehaviorEvaluator, BehaviorStats, BehaviorThresholds, ALL_BEH_CODES, BEH_001_FIRST_DELEGATES,
+    BEH_002_CONSULTS_100, BEH_003_COLLAB_50, BEH_004_STAND_IN_5, BEH_005_PEER_100PCT_10,
+    BEH_006_CHALLENGE_3, BEH_007_SHADOWS_24H,
 };
 use uuid::Uuid;
 

@@ -31,7 +31,10 @@ pub(crate) struct IdempotencyKey {
 
 impl IdempotencyKey {
     /// 从 header 解析 (简化版, 生产用 axum::http::HeaderMap 解析).
-    pub(crate) fn from_headers(idempotency_key_header: Option<&str>, body_fingerprint: &str) -> Result<Self, IdempotencyError> {
+    pub(crate) fn from_headers(
+        idempotency_key_header: Option<&str>,
+        body_fingerprint: &str,
+    ) -> Result<Self, IdempotencyError> {
         let client_key = idempotency_key_header
             .ok_or_else(|| IdempotencyError::Missing)?
             .to_string();
@@ -240,4 +243,3 @@ mod tests {
         assert_eq!(result.request_fingerprint, "fp-test");
     }
 }
-

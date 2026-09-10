@@ -100,9 +100,6 @@ mod tests {
         // 不同 namespace 同 resource ID 不同
         let lock1 = PgAdvisoryLock::new("work_item");
         let lock2 = PgAdvisoryLock::new("task");
-        assert_ne!(
-            lock1.lock_class_id("UUID-X"),
-            lock2.lock_class_id("UUID-X")
-        );
+        assert_ne!(lock1.lock_class_id("UUID-X"), lock2.lock_class_id("UUID-X"));
     }
 }

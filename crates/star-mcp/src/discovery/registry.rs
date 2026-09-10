@@ -178,4 +178,3 @@ mod tests {
         assert_eq!(reg.list().len(), 2);
     }
 }
-

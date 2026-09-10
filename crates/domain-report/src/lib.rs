@@ -640,8 +640,7 @@ impl ReportService {
             ReportType::RecentlyCreated => {
                 domain::c22_recently_created::generate(&*self.work_item_port, filter, report_id)
                     .await
-            }
-            // 暂未实装的子图走 stub (例如 P3 阶段的扩展图表) - all 22 variants covered, no _ needed
+            } // 暂未实装的子图走 stub (例如 P3 阶段的扩展图表) - all 22 variants covered, no _ needed
         }
     }
 

@@ -240,7 +240,9 @@ impl ChannelAchievementPublisher {
     }
 
     /// Build a default-capacity channel and return both halves.
-    pub fn with_capacity(cap: usize) -> (Self, tokio::sync::broadcast::Receiver<AchievementUnlock>) {
+    pub fn with_capacity(
+        cap: usize,
+    ) -> (Self, tokio::sync::broadcast::Receiver<AchievementUnlock>) {
         let (tx, rx) = tokio::sync::broadcast::channel(cap);
         (Self { tx }, rx)
     }
@@ -524,7 +526,9 @@ mod tests {
         // BehaviorEvaluator still triggers BEH-001 on the first delegates_to edge
         // even when topology backend is never_trigger.
         assert_eq!(unlocks.len(), 1);
-        assert!(unlocks.iter().any(|u| u.achievement_code == "BEH-001-FIRST-DELEGATES"));
+        assert!(unlocks
+            .iter()
+            .any(|u| u.achievement_code == "BEH-001-FIRST-DELEGATES"));
     }
 
     #[tokio::test]
@@ -601,7 +605,10 @@ mod tests {
             pub_.clone(),
         );
         let tenant = Uuid::nil();
-        engine.evaluate(make_edge_event(), tenant).await.expect("ok");
+        engine
+            .evaluate(make_edge_event(), tenant)
+            .await
+            .expect("ok");
         // 8 topology + 1 behavior (BEH-001) = 9 publishes
         assert_eq!(pub_.published_count(), 9);
     }

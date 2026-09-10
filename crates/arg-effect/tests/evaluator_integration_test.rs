@@ -18,7 +18,7 @@ use star_arg::models::event::ARGEvent;
 use star_arg::ops::event_writer::EventWriter;
 use star_arg::ops::AchievementOps;
 use star_arg_effect::achievement_engine::{
-    AchievementPublisher, ARGAchievementEngine, BehaviorEvaluator, BehaviorStats, OutputEvaluator,
+    ARGAchievementEngine, AchievementPublisher, BehaviorEvaluator, BehaviorStats, OutputEvaluator,
     OutputStats, StubTopologyBackend, TopologyBackend, TopologyEvaluator,
 };
 use star_arg_effect::error::EffectError;
@@ -53,14 +53,7 @@ fn make_engine(publisher: Arc<dyn AchievementPublisher>) -> ARGAchievementEngine
     let behavior = BehaviorEvaluator::new();
     let output = OutputEvaluator::new();
     let ops = AchievementOps::new(EventWriter::new());
-    ARGAchievementEngine::with_publisher(
-        topology,
-        behavior,
-        output,
-        ops,
-        Uuid::new_v4(),
-        publisher,
-    )
+    ARGAchievementEngine::with_publisher(topology, behavior, output, ops, Uuid::new_v4(), publisher)
 }
 
 /// Counting publisher — records every `publish_achievement_unlocked` call.
@@ -126,8 +119,10 @@ async fn int_ut_02_engine_combines_three_evaluator_results() {
     // 8 topology + 1 behavior (BEH-001 fires on any first edge event) = 9
     assert!(unlocks.len() >= 8);
     // Confirm the unlock set is the union of the 3 categories.
-    let codes: std::collections::HashSet<&str> =
-        unlocks.iter().map(|u| u.achievement_code.as_str()).collect();
+    let codes: std::collections::HashSet<&str> = unlocks
+        .iter()
+        .map(|u| u.achievement_code.as_str())
+        .collect();
     assert!(codes.contains("TOP-001-MESH-5DOMAIN"));
     // BEH-001 requires a DELEGATES_TO event (consults event won't
     // fire BEH-001; it increments consults_total not delegates_total).

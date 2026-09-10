@@ -75,7 +75,10 @@ mod tests {
         broker.inject(&mut cmd, &["STAR_TEST_API_KEY".to_string()]);
 
         assert_eq!(broker.len(), 1);
-        assert_eq!(broker.injected_keys(), vec!["STAR_TEST_API_KEY".to_string()]);
+        assert_eq!(
+            broker.injected_keys(),
+            vec!["STAR_TEST_API_KEY".to_string()]
+        );
 
         // 清理
         std::env::remove_var("STAR_TEST_API_KEY");
@@ -100,10 +103,7 @@ mod tests {
         let mut broker = AuthBroker::new();
         broker.inject(
             &mut cmd,
-            &[
-                "STAR_TEST_KEY_A".to_string(),
-                "STAR_TEST_KEY_B".to_string(),
-            ],
+            &["STAR_TEST_KEY_A".to_string(), "STAR_TEST_KEY_B".to_string()],
         );
 
         assert_eq!(broker.len(), 2);
@@ -112,4 +112,3 @@ mod tests {
         std::env::remove_var("STAR_TEST_KEY_B");
     }
 }
-

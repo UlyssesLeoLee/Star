@@ -30,7 +30,9 @@ async fn sse_ut_02_noop_publisher_records_each_publish() {
         uuid::Uuid::new_v4(),
     );
     for _ in 0..5 {
-        pub_.publish_achievement_unlocked(&unlock).await.expect("ok");
+        pub_.publish_achievement_unlocked(&unlock)
+            .await
+            .expect("ok");
     }
     assert_eq!(pub_.published_count(), 5);
 }
@@ -46,9 +48,15 @@ async fn sse_ut_03_channel_publisher_fans_out_to_subscriber() {
         serde_json::json!({}),
         uuid::Uuid::new_v4(),
     );
-    pub_.publish_achievement_unlocked(&unlock).await.expect("ok");
-    pub_.publish_achievement_unlocked(&unlock).await.expect("ok");
-    pub_.publish_achievement_unlocked(&unlock).await.expect("ok");
+    pub_.publish_achievement_unlocked(&unlock)
+        .await
+        .expect("ok");
+    pub_.publish_achievement_unlocked(&unlock)
+        .await
+        .expect("ok");
+    pub_.publish_achievement_unlocked(&unlock)
+        .await
+        .expect("ok");
     // Drain the channel — expect 3 unlocks.
     let mut count = 0;
     while let Ok(_u) = rx.try_recv() {
@@ -76,7 +84,10 @@ fn sse_clone_noop_resets_counter() {
         .unwrap();
     let pub_arc: Arc<dyn AchievementPublisher> = Arc::new(pub_);
     rt.block_on(async {
-        pub_arc.publish_achievement_unlocked(&unlock).await.expect("ok");
+        pub_arc
+            .publish_achievement_unlocked(&unlock)
+            .await
+            .expect("ok");
     });
     assert_eq!(pub_arc.published_count(), 1);
 }

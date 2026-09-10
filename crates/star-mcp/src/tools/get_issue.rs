@@ -14,9 +14,7 @@
 //! - 找不到 → McpError::validation("work item not found")
 //! - 跨 tenant 拒绝 (handler 简化设计: actor.tenant_id = nil) → 同上
 
-use domain_work_item::{
-    ActorContext, InMemoryWorkItemService, WorkItemId, WorkItemQueryPort,
-};
+use domain_work_item::{ActorContext, InMemoryWorkItemService, WorkItemId, WorkItemQueryPort};
 use serde_json::{json, Value};
 use std::sync::{Arc, OnceLock};
 

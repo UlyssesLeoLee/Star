@@ -134,7 +134,9 @@ impl AuditEventTableSink {
             Ok(())
         } else {
             // 实际 r2d2-memgraph 落地后: 真实 Bolt 写
-            self.client.execute_write(cypher, serde_json::json!({})).await
+            self.client
+                .execute_write(cypher, serde_json::json!({}))
+                .await
         }
     }
 }
@@ -144,7 +146,10 @@ impl AuditEventSink for AuditEventTableSink {
         // v0.81: 写路径分流 (per G-1 stub vs real)
         if self.client.is_stub_mode() {
             // stub 模式: 写 buffer
-            let mut buffer = self.buffer.lock().expect("AuditEventTableSink buffer lock poisoned");
+            let mut buffer = self
+                .buffer
+                .lock()
+                .expect("AuditEventTableSink buffer lock poisoned");
             buffer.push(log.clone());
         } else {
             // 实际 r2d2-memgraph 模式: 写 Bolt (同步 await via tokio::runtime::Handle)
@@ -159,7 +164,10 @@ impl AuditEventSink for AuditEventTableSink {
                 return Err(e);
             }
             // 写成功: 同时缓存到 buffer (避免后续 get 走 Bolt, 性能)
-            let mut buffer = self.buffer.lock().expect("AuditEventTableSink buffer lock poisoned");
+            let mut buffer = self
+                .buffer
+                .lock()
+                .expect("AuditEventTableSink buffer lock poisoned");
             buffer.push(log.clone());
         }
         Ok(())
@@ -168,14 +176,20 @@ impl AuditEventSink for AuditEventTableSink {
     fn get(&self, id: Uuid) -> Result<Option<TrustAuditLog>, ARGError> {
         // v0.81: 读路径走 buffer (per 守门 #11 缺标比错标 P3 跨 session 续)
         // 实际 r2d2-memgraph 落地后: client.execute(cypher_get(id)) 读 Bolt
-        let buffer = self.buffer.lock().expect("AuditEventTableSink buffer lock poisoned");
+        let buffer = self
+            .buffer
+            .lock()
+            .expect("AuditEventTableSink buffer lock poisoned");
         Ok(buffer.iter().find(|l| l.id == id).cloned())
     }
 
     fn list(&self) -> Result<Vec<TrustAuditLog>, ARGError> {
         // v0.81: 读路径走 buffer
         // 实际 r2d2-memgraph 落地后: client.execute(cypher_list_all) 读 Bolt
-        let buffer = self.buffer.lock().expect("AuditEventTableSink buffer lock poisoned");
+        let buffer = self
+            .buffer
+            .lock()
+            .expect("AuditEventTableSink buffer lock poisoned");
         Ok(buffer.clone())
     }
 
@@ -192,7 +206,10 @@ impl AuditEventSink for AuditEventTableSink {
             }
         }
         // 1. 写 buffer (确保 buffer 跟 Bolt 一致)
-        let mut buffer = self.buffer.lock().expect("AuditEventTableSink buffer lock poisoned");
+        let mut buffer = self
+            .buffer
+            .lock()
+            .expect("AuditEventTableSink buffer lock poisoned");
         for log in buffer.iter_mut() {
             if log.id == id {
                 log.revoked = true;
@@ -205,23 +222,35 @@ impl AuditEventSink for AuditEventTableSink {
 
 impl AuditEventSink for InMemoryAuditEventSink {
     fn append(&self, log: &TrustAuditLog) -> Result<(), ARGError> {
-        let mut logs = self.logs.lock().expect("InMemoryAuditEventSink lock poisoned");
+        let mut logs = self
+            .logs
+            .lock()
+            .expect("InMemoryAuditEventSink lock poisoned");
         logs.push(log.clone());
         Ok(())
     }
 
     fn get(&self, id: Uuid) -> Result<Option<TrustAuditLog>, ARGError> {
-        let logs = self.logs.lock().expect("InMemoryAuditEventSink lock poisoned");
+        let logs = self
+            .logs
+            .lock()
+            .expect("InMemoryAuditEventSink lock poisoned");
         Ok(logs.iter().find(|l| l.id == id).cloned())
     }
 
     fn list(&self) -> Result<Vec<TrustAuditLog>, ARGError> {
-        let logs = self.logs.lock().expect("InMemoryAuditEventSink lock poisoned");
+        let logs = self
+            .logs
+            .lock()
+            .expect("InMemoryAuditEventSink lock poisoned");
         Ok(logs.clone())
     }
 
     fn revoke(&self, id: Uuid) -> Result<(), ARGError> {
-        let mut logs = self.logs.lock().expect("InMemoryAuditEventSink lock poisoned");
+        let mut logs = self
+            .logs
+            .lock()
+            .expect("InMemoryAuditEventSink lock poisoned");
         for log in logs.iter_mut() {
             if log.id == id {
                 log.revoked = true;
@@ -258,10 +287,7 @@ impl TrustAuditOps {
     /// 验证 trusts 关系是否符合 4 重审计 (per G-4 拍板 §1.2 (a)(b))
     ///
     /// Returns Ok(TrustAuditLog) if all 4 audits pass, Err(ARGError) otherwise
-    pub fn audit_trust_relationship(
-        &self,
-        edge: &Edge,
-    ) -> Result<TrustAuditLog, ARGError> {
+    pub fn audit_trust_relationship(&self, edge: &Edge) -> Result<TrustAuditLog, ARGError> {
         // 仅对 Trusts 关系应用 4 重审计
         if edge.edge_type != RelationshipType::Trusts {
             return Err(ARGError::Other(
@@ -278,7 +304,9 @@ impl TrustAuditOps {
         }
 
         // 2. mutual trust 验证 (per G-4 拍板 (b).1)
-        let mutual_trust_verified = edge.metadata.get("mutual_trust")
+        let mutual_trust_verified = edge
+            .metadata
+            .get("mutual_trust")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
         if !mutual_trust_verified {
@@ -288,7 +316,9 @@ impl TrustAuditOps {
         }
 
         // 3. historical evidence 检查 (per G-4 拍板 (b).2 过去 30 天 ≥ 10 次)
-        let historical_evidence_count = edge.metadata.get("historical_evidence_count")
+        let historical_evidence_count = edge
+            .metadata
+            .get("historical_evidence_count")
             .and_then(|v| v.as_u64())
             .unwrap_or(0) as u32;
         if historical_evidence_count < 10 {
@@ -299,7 +329,9 @@ impl TrustAuditOps {
         }
 
         // 4. multi-source attestation 检查 (per G-4 拍板 (b).3 ≥ 2 个独立源头)
-        let multi_source_count = edge.metadata.get("multi_source_count")
+        let multi_source_count = edge
+            .metadata
+            .get("multi_source_count")
             .and_then(|v| v.as_u64())
             .unwrap_or(0) as u32;
         if multi_source_count < 2 {
@@ -334,9 +366,7 @@ impl TrustAuditOps {
         // 7 天撤回窗口检查
         if let Some(log) = self.sink.get(audit_log_id)? {
             if !log.is_within_revocation_window() {
-                return Err(ARGError::Other(
-                    "7 天撤回窗口已过, 不可撤销".into(),
-                ));
+                return Err(ARGError::Other("7 天撤回窗口已过, 不可撤销".into()));
             }
         }
         self.sink.revoke(audit_log_id)
@@ -382,11 +412,14 @@ mod tests {
     #[test]
     fn trust_audit_passes_all_4() {
         let ops = TrustAuditOps::new();
-        let edge = make_trust_edge(0.99_f32, json!({
-            "mutual_trust": true,
-            "historical_evidence_count": 10,
-            "multi_source_count": 2,
-        }));
+        let edge = make_trust_edge(
+            0.99_f32,
+            json!({
+                "mutual_trust": true,
+                "historical_evidence_count": 10,
+                "multi_source_count": 2,
+            }),
+        );
         let log = ops.audit_trust_relationship(&edge).unwrap();
         assert!(log.passes_4_audit());
         assert_eq!(ops.list_audit_logs().len(), 1);
@@ -395,11 +428,14 @@ mod tests {
     #[test]
     fn trust_audit_fails_low_trust_score() {
         let ops = TrustAuditOps::new();
-        let edge = make_trust_edge(0.94_f32, json!({
-            "mutual_trust": true,
-            "historical_evidence_count": 10,
-            "multi_source_count": 2,
-        }));
+        let edge = make_trust_edge(
+            0.94_f32,
+            json!({
+                "mutual_trust": true,
+                "historical_evidence_count": 10,
+                "multi_source_count": 2,
+            }),
+        );
         let result = ops.audit_trust_relationship(&edge);
         assert!(result.is_err());
     }
@@ -407,11 +443,14 @@ mod tests {
     #[test]
     fn trust_audit_fails_no_mutual() {
         let ops = TrustAuditOps::new();
-        let edge = make_trust_edge(0.99_f32, json!({
-            "mutual_trust": false,
-            "historical_evidence_count": 10,
-            "multi_source_count": 2,
-        }));
+        let edge = make_trust_edge(
+            0.99_f32,
+            json!({
+                "mutual_trust": false,
+                "historical_evidence_count": 10,
+                "multi_source_count": 2,
+            }),
+        );
         let result = ops.audit_trust_relationship(&edge);
         assert!(result.is_err());
     }
@@ -419,11 +458,14 @@ mod tests {
     #[test]
     fn trust_audit_fails_low_evidence() {
         let ops = TrustAuditOps::new();
-        let edge = make_trust_edge(0.99_f32, json!({
-            "mutual_trust": true,
-            "historical_evidence_count": 9,
-            "multi_source_count": 2,
-        }));
+        let edge = make_trust_edge(
+            0.99_f32,
+            json!({
+                "mutual_trust": true,
+                "historical_evidence_count": 9,
+                "multi_source_count": 2,
+            }),
+        );
         let result = ops.audit_trust_relationship(&edge);
         assert!(result.is_err());
     }
@@ -431,11 +473,14 @@ mod tests {
     #[test]
     fn trust_audit_fails_low_multi_source() {
         let ops = TrustAuditOps::new();
-        let edge = make_trust_edge(0.99_f32, json!({
-            "mutual_trust": true,
-            "historical_evidence_count": 10,
-            "multi_source_count": 1,
-        }));
+        let edge = make_trust_edge(
+            0.99_f32,
+            json!({
+                "mutual_trust": true,
+                "historical_evidence_count": 10,
+                "multi_source_count": 1,
+            }),
+        );
         let result = ops.audit_trust_relationship(&edge);
         assert!(result.is_err());
     }
@@ -452,11 +497,14 @@ mod tests {
     #[test]
     fn trust_audit_revoke_within_window() {
         let ops = TrustAuditOps::new();
-        let edge = make_trust_edge(0.99_f32, json!({
-            "mutual_trust": true,
-            "historical_evidence_count": 10,
-            "multi_source_count": 2,
-        }));
+        let edge = make_trust_edge(
+            0.99_f32,
+            json!({
+                "mutual_trust": true,
+                "historical_evidence_count": 10,
+                "multi_source_count": 2,
+            }),
+        );
         let log = ops.audit_trust_relationship(&edge).unwrap();
         ops.revoke_trust(log.id).unwrap();
         let logs = ops.list_audit_logs();
@@ -469,11 +517,14 @@ mod tests {
         let custom_sink = Arc::new(InMemoryAuditEventSink::new());
         let ops = TrustAuditOps::with_sink(custom_sink.clone());
 
-        let edge = make_trust_edge(0.99_f32, json!({
-            "mutual_trust": true,
-            "historical_evidence_count": 10,
-            "multi_source_count": 2,
-        }));
+        let edge = make_trust_edge(
+            0.99_f32,
+            json!({
+                "mutual_trust": true,
+                "historical_evidence_count": 10,
+                "multi_source_count": 2,
+            }),
+        );
         let log = ops.audit_trust_relationship(&edge).unwrap();
         assert!(log.passes_4_audit());
 
@@ -488,11 +539,14 @@ mod tests {
         let sink = InMemoryAuditEventSink::new();
         let ops = TrustAuditOps::with_sink(Arc::new(sink));
 
-        let edge = make_trust_edge(0.99_f32, json!({
-            "mutual_trust": true,
-            "historical_evidence_count": 10,
-            "multi_source_count": 2,
-        }));
+        let edge = make_trust_edge(
+            0.99_f32,
+            json!({
+                "mutual_trust": true,
+                "historical_evidence_count": 10,
+                "multi_source_count": 2,
+            }),
+        );
         let log = ops.audit_trust_relationship(&edge).unwrap();
         ops.revoke_trust(log.id).unwrap();
 
@@ -513,11 +567,14 @@ mod tests {
         let sink = Arc::new(AuditEventTableSink::new(client));
         let ops = TrustAuditOps::with_sink(sink.clone());
 
-        let edge = make_trust_edge(0.99_f32, json!({
-            "mutual_trust": true,
-            "historical_evidence_count": 10,
-            "multi_source_count": 2,
-        }));
+        let edge = make_trust_edge(
+            0.99_f32,
+            json!({
+                "mutual_trust": true,
+                "historical_evidence_count": 10,
+                "multi_source_count": 2,
+            }),
+        );
         let log = ops.audit_trust_relationship(&edge).unwrap();
         assert!(log.passes_4_audit());
 

@@ -156,9 +156,7 @@ impl BehaviorStats {
             }
             RelationshipType::Challenges => self.challenges_total += 1,
             RelationshipType::Shadows => self.shadows_total += 1,
-            RelationshipType::Mentors
-            | RelationshipType::ReportsTo
-            | RelationshipType::Trusts => {
+            RelationshipType::Mentors | RelationshipType::ReportsTo | RelationshipType::Trusts => {
                 // No-op for BEH patterns.
             }
         }
@@ -314,7 +312,12 @@ mod tests {
     fn beh_001_triggers_on_first_delegates_to_edge() {
         let eval = BehaviorEvaluator::new();
         let t = Uuid::new_v4();
-        let evt = ARGEvent::EdgeCreated(edge(Uuid::new_v4(), Uuid::new_v4(), RelationshipType::DelegatesTo, t));
+        let evt = ARGEvent::EdgeCreated(edge(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            RelationshipType::DelegatesTo,
+            t,
+        ));
         let code = block_on(eval.evaluate(&evt, t));
         let code = code.expect("ok");
         assert!(code.iter().any(|c| c == BEH_001_FIRST_DELEGATES));
@@ -329,7 +332,12 @@ mod tests {
         stats.consults_total = 99;
         eval.set_stats(stats);
         // 100th triggers BEH-002.
-        let evt = ARGEvent::EdgeCreated(edge(Uuid::new_v4(), Uuid::new_v4(), RelationshipType::Consults, t));
+        let evt = ARGEvent::EdgeCreated(edge(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            RelationshipType::Consults,
+            t,
+        ));
         let code = block_on(eval.evaluate(&evt, t)).expect("ok");
         assert!(code.iter().any(|c| c == BEH_002_CONSULTS_100));
     }

@@ -25,9 +25,7 @@ use domain_search::{
     ActorContext, InMemorySearchService, ResourceType, SearchQuery, SearchQueryDto,
     SearchQueryPort, TenantId,
 };
-use domain_work_item::{
-    InMemoryWorkItemService, TenantId as WorkItemTenantId, WorkItemFilter,
-};
+use domain_work_item::{InMemoryWorkItemService, TenantId as WorkItemTenantId, WorkItemFilter};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};

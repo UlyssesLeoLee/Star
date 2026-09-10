@@ -70,7 +70,8 @@ struct AppState {
     /// Session store (per server-push + reconnect, 持久化 in-memory + TTL GC)
     session_store: Arc<SessionStore>,
     /// Resources handler (per DELETE /resources/{id}, mock delete)
-    #[allow(dead_code)] // reserved for Phase D.8+ real persistence (per P1-5 cleanup, awaiting caller)
+    #[allow(dead_code)]
+    // reserved for Phase D.8+ real persistence (per P1-5 cleanup, awaiting caller)
     resources_handler: Arc<ResourcesHandler>,
 }
 

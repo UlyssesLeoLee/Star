@@ -47,7 +47,7 @@ pub mod prompts;
 pub mod trust_engine;
 
 pub use achievement_engine::{
-    AchievementPublisher, ARGAchievementEngine, BehaviorEvaluator, BehaviorStats,
+    ARGAchievementEngine, AchievementPublisher, BehaviorEvaluator, BehaviorStats,
     BehaviorThresholds, ChannelAchievementPublisher, NoopAchievementPublisher, OutputEvaluator,
     OutputStats, OutputThresholds, StubTopologyBackend, TopologyBackend, TopologyEvaluator,
 };

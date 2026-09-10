@@ -12,9 +12,9 @@ use chrono::Utc;
 use star_arg::models::edge::{Edge, EdgeDirection, RelationshipType};
 use star_arg::models::event::ARGEvent;
 use star_arg_effect::achievement_engine::output::{
-    ALL_OUT_CODES, OUT_001_TRUSTS_100K_TOKEN, OUT_002_COLLAB_1H, OUT_003_5_LEAD_CONSENSUS,
-    OUT_004_ZERO_FAIL_100, OUT_005_ACHIEVEMENT_CHAIN_5, OutputEvaluator, OutputStats,
-    OutputThresholds,
+    OutputEvaluator, OutputStats, OutputThresholds, ALL_OUT_CODES, OUT_001_TRUSTS_100K_TOKEN,
+    OUT_002_COLLAB_1H, OUT_003_5_LEAD_CONSENSUS, OUT_004_ZERO_FAIL_100,
+    OUT_005_ACHIEVEMENT_CHAIN_5,
 };
 use uuid::Uuid;
 
