@@ -2248,3 +2248,26 @@ frontend/src/app/automation-debug/
 **触发原因**: per Ulysses 2026-09-10 21:00 JST "补缺口"指令 + 守门 #9 v19 Mavis 自驱第 7 次强化 (per 9/8 15:29 JST) Mavis 默认推进 (per 守门 #11 缺标比错标 闭合已知缺口 #5)
 
 **commit author=Ulysses** (per 守门 #10 + 守门 #14 v4)
+
+
+### 4.34.4 P3-D.6 阶段 1 基础 任务 1.5 bff/ 新独立 workspace + bff/src/collaboration/ 5 REST + 4 WSS + envoy 独立 deployment (per 20:08 JST Ulysses 拍板"推进", 2026-09-10 21:30 JST) — ⚠️ 跟 §4.34 / §4.34.1 / §4.34.2 / §4.34.3 编号冲突 (§4.34 = P3-D.6 阶段 2 业务 任务 2.6 per commit 64b96be, §4.34.1 = 任务 1.2 per commit f11517d, §4.34.2 = 任务 1.3 per commit 2fd60b1, §4.34.3 = 任务 1.4 per commit 2733c4d 平行工作), per 守门 #1 禁回溯叙事 显式标 §4.34.4 区分
+
+> **触发**: 2026-09-10 20:08 JST Ulysses 拍板"推进" (per 9/1 14:58 + 9/8 15:29 自驱强化) + 守门 #9 v19 Mavis 自驱第 7 次强化 + 守门 #1 v15 docs 同步饱和第 91 次新事件触发仍允许
+> **依据**: 守门 #1 v15 (本轮第 91 次新事件, docs 同步允许) + 守门 #1 禁回溯叙事 (0 改 V0.1 任何代码, 0 改根 Cargo.toml [workspace] members 任何行 (bff 是新独立 workspace) + 0 改 crates/api/Cargo.toml 加 bff 依赖 + 0 改 crates/api/src/ 任何 file + 0 改 crates/canvas-collab/ 任何 file + 0 改 crates/agent-domain/ 任何 file + 0 改 crates/arg-bridge/ 任何 file + 0 改 deploy/k3s-local/ 现有 file) + 守门 #19 v19 累积规 (不破坏 V0.1, 0 重写 V0.1 任何代码) + 守门 #6 PowerShell only (0 bash &&) + 守门 #7 (unsafe_code="forbid") + 守门 #9 v20 (子代理 dispatch 必先 brief 落档 `docs/briefs/p3-d6-1-5-bff-skeleton.md` 31.3KB) + 守门 #9 v27 (RPC 失败 fallback 3 段 invoke → verify → collect_output, 真实产出验证 cargo check 0 err + cargo test 29/29 PASS + cargo fmt 0 diff + cargo clippy 0 warnings + kustomize 0 err) + 守门 #10 (commit author=Ulysses `4369650` worktree + `3975bf2` merge) + 守门 #11 缺标比错标 (4 已知缺口显式标: bff 新独立 workspace + BFF 跟 API 平级 0 反向依赖 + envoy 独立 deployment 0 istio sidecar + 0 真实 WSS 业务逻辑) + 守门 #14 v4 (Mavis 审核 author=Ulysses) + 守门 #14 v3 (Mavis 永久代签)
+> **落档文件** (关联 commit `3975bf2` merge to main, 12 files / 5310 insertions / 0 deletions):
+> - `bff/Cargo.toml` (新, 64 lines, [package] + [workspace] + 9 deps direct version + [lints.rust])
+> - `bff/Cargo.lock` (新, 2747 lines, cargo 自动)
+> - `bff/src/lib.rs` (新, 39 lines, module doc + pub mod collaboration + re-exports + 2 UT)
+> - `bff/src/collaboration/{mod,controller,wss_hub,permission,audit,dto}.rs` (6 新, 164+305+407+258+159+630 = 1923 lines, 27 UT)
+> - `deploy/k3s-local/bff-deployment.yaml` (新, 261 lines, envoy 独立 deployment 0 istio sidecar, bff-envoy Deployment + bff-envoy Service + bff Deployment + bff Service + bff-envoy-config ConfigMap)
+> - `deploy/k3s-local/kustomization.yaml` (新, 31 lines, 顶层 kustomize 集成)
+> - `docs/deployment/BFF-DEPLOYMENT-001.md` (新, 245 lines, 7 段结构 per AGENTS.md §3)
+> - `docs/briefs/p3-d6-1-5-bff-skeleton.md` (31.3KB, 子代理 brief 落档, per 守门 #9 v20)
+
+**§4.34.4 token OLU 估算 (per 守门 #4 + STAR-OLU-001 v0.1)**:
+- 本任务期 (worker 子代理 + Mavis merge + docs 同步): ~0.18M tokens (worker 实装 0.13 + Mavis merge + verify + docs 0.05)
+- 累计 P3-D.5 + 协调性 + IPA SEC v1+v2 + 实施计划 + 阶段 1 基础 任务 1.1 + 1.2 + 1.3 + 1.4 + 1.5 22 commit: ~4.24M tokens (3.53 SRE·周)
+- 后续 P3-D.6 阶段 1 基础 任务 1.6-1.7 (剩余 2 任务: 14+15 张表 + 25 module 联动接口): ~0.50M tokens (0.42 SRE·周)
+- 后续 P3-D.6 阶段 2 业务 任务 2.1 batch 2-5 跨 session 续 + 任务 2.2 A11 ARG 10 项 + 任务 2.3 A12 多人编辑 8 项 + 任务 2.4 G1-G12 游戏化 32 项 + 任务 2.5 13 关键 class: ~1.6M tokens (1.33 SRE·周)
+- 后续 P3-D.6 阶段 3 集成 + 阶段 4 实装: ~1.5M tokens (1.25 SRE·周)
+- 后续 P3-D.6 完整 5 阶段: ~5.0M tokens (4.17 SRE·周, 含 docs 阶段 2.86)
