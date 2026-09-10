@@ -182,3 +182,5 @@ mod tests {
         );
     }
 }
+
+pub mod registry;
