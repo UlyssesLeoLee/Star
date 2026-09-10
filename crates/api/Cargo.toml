@@ -35,5 +35,11 @@ axum = { version = "0.8", features = ["ws", "macros"] }
 # tokio-stream for broadcast::Receiver Stream impl (sse_hub)
 tokio-stream = "0.1"
 star-arg = { path = "../arg" }
+# P3-D.6 阶段 1 基础 任务 1.4: crates/api/src/agent + canvas_collab
+# per docs/briefs/p3-d6-1-4-api-extend.md §1.1 + §2.12
+# 守门 #11 缺标比错标: 0 重复加 axum/tokio/serde/uuid/chrono/async-trait/thiserror/star-context
+# 守门 #19 v19 累积规不破坏 V0.1 (arg/ 5 file 1863 lines 100% 保留)
+agent-domain = { path = "../agent-domain" }
+canvas-collab = { path = "../canvas-collab" }
 [lints]
 workspace = true
