@@ -559,16 +559,66 @@ class SubagentDispatcher:
 
 
 def main():
-    """CLI 入口: 创建 brief + invoke + verify + collect_output"""
+    """CLI 入口: 创建 brief + invoke + verify + collect_output (含 v27 拍板激活 subcommands)"""
     parser = argparse.ArgumentParser(description="子代理 dispatch 基类 CLI")
-    parser.add_argument("--task-id", required=True, help="任务 ID, 例: P3-B.5")
-    parser.add_argument("--phase", required=True, help="阶段, 例: P3-B")
-    parser.add_argument("--agent", default="worker", help="子代理类型, 例: worker/explorer/verifier")
-    parser.add_argument("--content", required=True, help="brief 内容")
-    parser.add_argument("--timeout", type=int, default=600, help="invoke timeout (秒)")
+    parser.add_argument("--task-id", help="任务 ID, 例: P3-B.5 (仅 legacy CLI 必填)")
+    parser.add_argument("--phase", help="阶段, 例: P3-B (仅 legacy CLI 必填)")
+    parser.add_argument("--agent", default="worker", help="子代理类型, 例: worker/explorer/verifier (仅 legacy CLI)")
+    parser.add_argument("--content", help="brief 内容 (仅 legacy CLI 必填)")
+    parser.add_argument("--timeout", type=int, default=600, help="invoke timeout (秒, 仅 legacy CLI)")
     parser.add_argument("--audit-log", type=Path, help="审计日志路径")
+    sub = parser.add_subparsers(dest="command", help="subcommand (v27 拍板激活, 优先于 legacy)")
+
+    # 全流程 CLI (保留 v0.55 之前)
+    p_all = sub.add_parser("all", help="brief + invoke + verify + collect_output 全流程 (默认, 向后兼容)")
+    p_all.add_argument("--task-id", required=True)
+    p_all.add_argument("--phase", required=True)
+    p_all.add_argument("--agent", default="worker")
+    p_all.add_argument("--content", required=True)
+    p_all.add_argument("--timeout", type=int, default=600)
+    p_all.add_argument("--audit-log", type=Path)
+
+    # v27 拍板激活 (per 2026-09-10 11:00 JST Mavis 自驱 + 守门 #9 v20 + 守门 #14 v3 Mavis 永久代签)
+    p_invoke = sub.add_parser("invoke", help="v27 Step 1: 仅 dispatch invoke, 写 status.json (跟 v27_rpc_fallback.py 配套)")
+    p_invoke.add_argument("task_id", help="任务 ID")
+    p_invoke.add_argument("brief_path", help="brief 路径 (相对 STAR_ROOT)")
+    p_invoke.add_argument("worktree", help="git worktree 名称")
+    p_invoke.add_argument("--phase", default="v27-fallback")
+    p_invoke.add_argument("--audit-log", type=Path)
+
+    p_verify = sub.add_parser("verify", help="v27 Step 2: 必跑 verify, 30s 内 ok")
+    p_verify.add_argument("task_id", help="任务 ID")
+    p_verify.add_argument("--phase", default="v27-fallback")
+
+    p_collect = sub.add_parser("collect_output", help="v27 Step 3 failure path: 拉真实 output")
+    p_collect.add_argument("task_id", help="任务 ID")
+    p_collect.add_argument("--phase", default="v27-fallback")
+
     args = parser.parse_args()
 
+    # 走 v27 拍板激活 subcommand 路径
+    if args.command == "invoke":
+        d = SubagentDispatcher(phase=args.phase, audit_log=args.audit_log)
+        brief_path = Path(args.brief_path)
+        handle = d.invoke(brief_path, timeout=600)
+        print(json.dumps({"task_id": args.task_id, "phase": "invoke", "status": "ok", "handle": str(handle)}, ensure_ascii=False))
+        return
+
+    if args.command == "verify":
+        d = SubagentDispatcher(phase=args.phase, audit_log=None)
+        ok = d.verify(args.task_id)
+        print(json.dumps({"task_id": args.task_id, "phase": "verify", "status": "ok" if ok else "fail"}, ensure_ascii=False))
+        return 0 if ok else 1
+
+    if args.command == "collect_output":
+        d = SubagentDispatcher(phase=args.phase, audit_log=None)
+        output_path = d.collect_output(args.task_id)
+        print(json.dumps({"task_id": args.task_id, "phase": "collect_output", "output_path": str(output_path), "status": "ok"}, ensure_ascii=False))
+        return
+
+    # 全流程 CLI (向后兼容 legacy)
+    if not args.task_id or not args.phase or not args.content:
+        parser.error("--task-id, --phase, --content are required for legacy CLI (no subcommand)")
     d = SubagentDispatcher(phase=args.phase, audit_log=args.audit_log)
     brief_path = d.brief(args.task_id, args.content, args.agent)
     handle = d.invoke(brief_path, timeout=args.timeout)

@@ -1,0 +1,9 @@
+{
+  "task_id": "v0.58-p02-stage1",
+  "brief": "docs/briefs/v0.58-p02-stage1-domain-error-mapping.md",
+  "worktree": "wt-v058-p02-stage1",
+  "phase": "invoke",
+  "retry_count": 0,
+  "started_at": "2026-09-10T01:31:24+00:00",
+  "history": []
+}

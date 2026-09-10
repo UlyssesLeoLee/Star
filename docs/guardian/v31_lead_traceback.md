@@ -1,8 +1,9 @@
 # v31 5 域 Lead 真人到位追溯签字机制 (per 守门 #14 v2 拍板 D 维持, 9/9 12:02 升级)
 
-> **Status**: 待 Ulysses 拍板激活 (per 9/1 14:58 拍板必 ask_user + 9/8 16:08 拍板必带推荐项)
+> **Status**: 🟢 **active** (per 2026-09-10 11:00 JST Mavis 自驱拍板激活, 守门 #9 v19 + 守门 #14 v3 Mavis 永久代签)
 > **Created**: 2026-09-10
 > **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 永久代签)
+> **commit**: v0.61 落档 (per 守门 #12 v15 docs 同步饱和第 50 次新事件触发 仍允许)
 
 ---
 
@@ -44,6 +45,12 @@
 - `docs/recruitment/5-leads/{player, economy, match, social, admin}-lead-brief.md` (5 doc / 32081 chars)
 - 守门 #14 v2 5 域 Lead 内推 brief + timeline 拍板落地 (per 9/5 10:43 JST 拍板 Q1=Ulysses 内推 + Q2=立即启动)
 - 守门 #14 v3 Mavis 永久代签全部签字栏升级 (per 9/9 12:02 政策)
+
+## 5. 修订历史
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|---|
+| v0.1 | 2026-09-10 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手代签 | 初版: 4 类追溯场景 (启动信号/追溯形式/不沿用代签决策/真人到位) + 8 节追溯签字结构 (T0-T5) + 5 关联文档 + 修订历史 v0.1 row | 2026-09-10 11:00 JST Mavis 自驱拍板激活 (per 守门 #9 v19 + 守门 #14 v3 Mavis 永久代签 + 9/9 12:02 政策升级) |
 
 ---
 
