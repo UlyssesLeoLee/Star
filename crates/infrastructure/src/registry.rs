@@ -15,8 +15,9 @@
 //! 守门 #14 v4 修订人: Ulysses(一人公司 12 角色 per DEC-008) - Mavis 接手**审核**
 
 use crate::{
-    AdapterDescriptor, AdapterQuery, AdapterRegistry, InfrastructureError,
-    RegisterPostgresAdapterCmd,
+    AdapterDescriptor, AdapterQuery, AdapterRegistry, InfrastructureError, RegisterAgentAdapterCmd,
+    RegisterNatsAdapterCmd, RegisterObjectStorageAdapterCmd, RegisterPostgresAdapterCmd,
+    RegisterScmAdapterCmd,
 };
 use async_trait::async_trait;
 use star_context::ActorContext;
@@ -178,6 +179,46 @@ impl AdapterRegistry for InMemoryAdapterRegistry {
         cmd.validate()?;
         // 内存版忽略 cmd.pg_url / pool_size / ssl_mode / schema_migrations_dir (per spec §13.1 内存版不连真 PG)
         self.register(AdapterKind::Postgres, actor.tenant_id)
+    }
+
+    /// **v0.80 P0-4 Stage 2.4 扩展: 4 register_*_adapter_v2 spec 重构**
+    ///
+    /// 4 cmd struct (Nats/ObjectStorage/Scm/Agent) 跟 v0.79 Postgres 同形:
+    /// 内存版不存 cmd 字段, 仅生成新 descriptor.
+    async fn register_nats_adapter_v2(
+        &self,
+        cmd: RegisterNatsAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError> {
+        cmd.validate()?;
+        self.register(AdapterKind::Nats, actor.tenant_id)
+    }
+
+    async fn register_object_storage_adapter_v2(
+        &self,
+        cmd: RegisterObjectStorageAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError> {
+        cmd.validate()?;
+        self.register(AdapterKind::ObjectStorage, actor.tenant_id)
+    }
+
+    async fn register_scm_adapter_v2(
+        &self,
+        cmd: RegisterScmAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError> {
+        cmd.validate()?;
+        self.register(AdapterKind::Scm, actor.tenant_id)
+    }
+
+    async fn register_agent_adapter_v2(
+        &self,
+        cmd: RegisterAgentAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError> {
+        cmd.validate()?;
+        self.register(AdapterKind::Agent, actor.tenant_id)
     }
 }
 

@@ -50,8 +50,9 @@
 
 use crate::registry::AdapterKind;
 use crate::{
-    AdapterDescriptor, AdapterQuery, AdapterRegistry, InfrastructureError,
-    RegisterPostgresAdapterCmd,
+    AdapterDescriptor, AdapterQuery, AdapterRegistry, InfrastructureError, RegisterAgentAdapterCmd,
+    RegisterNatsAdapterCmd, RegisterObjectStorageAdapterCmd, RegisterPostgresAdapterCmd,
+    RegisterScmAdapterCmd,
 };
 use async_trait::async_trait;
 use star_context::ActorContext;
@@ -239,6 +240,117 @@ impl AdapterRegistry for RealPostgresAdapterRegistry {
         let mut state = self.state.write().expect("lock");
         state
             .entry(AdapterKind::Postgres.as_str().to_string())
+            .or_insert_with(Vec::new)
+            .push(desc.clone());
+        Ok(desc)
+    }
+
+    /// **v0.80 P0-4 Stage 2.4 扩展: 4 register_*_adapter_v2 spec 重构**
+    ///
+    /// 4 cmd struct 跟 v0.79 Postgres 同形, RealPostgresAdapterRegistry 实现只 log 不实际连.
+    async fn register_nats_adapter_v2(
+        &self,
+        cmd: RegisterNatsAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError> {
+        cmd.validate()?;
+        tracing::debug!(
+            "register_nats_adapter_v2: tenant={} nats_url={} queue_group={:?} max_reconnects={:?}",
+            actor.tenant_id,
+            cmd.nats_url,
+            cmd.queue_group,
+            cmd.max_reconnects,
+        );
+        let desc = AdapterDescriptor {
+            id: Uuid::new_v4(),
+            tenant_id: actor.tenant_id,
+            pg_url: None,
+            registered_at: Some(chrono::Utc::now()),
+        };
+        let mut state = self.state.write().expect("lock");
+        state
+            .entry(AdapterKind::Nats.as_str().to_string())
+            .or_insert_with(Vec::new)
+            .push(desc.clone());
+        Ok(desc)
+    }
+
+    async fn register_object_storage_adapter_v2(
+        &self,
+        cmd: RegisterObjectStorageAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError> {
+        cmd.validate()?;
+        tracing::debug!(
+            "register_object_storage_adapter_v2: tenant={} bucket={} region={:?} endpoint={:?}",
+            actor.tenant_id,
+            cmd.bucket,
+            cmd.region,
+            cmd.endpoint,
+        );
+        let desc = AdapterDescriptor {
+            id: Uuid::new_v4(),
+            tenant_id: actor.tenant_id,
+            pg_url: None,
+            registered_at: Some(chrono::Utc::now()),
+        };
+        let mut state = self.state.write().expect("lock");
+        state
+            .entry(AdapterKind::ObjectStorage.as_str().to_string())
+            .or_insert_with(Vec::new)
+            .push(desc.clone());
+        Ok(desc)
+    }
+
+    async fn register_scm_adapter_v2(
+        &self,
+        cmd: RegisterScmAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError> {
+        cmd.validate()?;
+        // 守门 #5 v2 env 安全: token 不打印, 只 log provider + base_url 长度
+        tracing::debug!(
+            "register_scm_adapter_v2: tenant={} provider={} base_url={:?} token_len={}",
+            actor.tenant_id,
+            cmd.provider,
+            cmd.base_url,
+            cmd.token.len(),
+        );
+        let desc = AdapterDescriptor {
+            id: Uuid::new_v4(),
+            tenant_id: actor.tenant_id,
+            pg_url: None,
+            registered_at: Some(chrono::Utc::now()),
+        };
+        let mut state = self.state.write().expect("lock");
+        state
+            .entry(AdapterKind::Scm.as_str().to_string())
+            .or_insert_with(Vec::new)
+            .push(desc.clone());
+        Ok(desc)
+    }
+
+    async fn register_agent_adapter_v2(
+        &self,
+        cmd: RegisterAgentAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError> {
+        cmd.validate()?;
+        tracing::debug!(
+            "register_agent_adapter_v2: tenant={} runtime_mode={} model_id={:?}",
+            actor.tenant_id,
+            cmd.runtime_mode,
+            cmd.model_id,
+        );
+        let desc = AdapterDescriptor {
+            id: Uuid::new_v4(),
+            tenant_id: actor.tenant_id,
+            pg_url: None,
+            registered_at: Some(chrono::Utc::now()),
+        };
+        let mut state = self.state.write().expect("lock");
+        state
+            .entry(AdapterKind::Agent.as_str().to_string())
             .or_insert_with(Vec::new)
             .push(desc.clone());
         Ok(desc)
@@ -652,5 +764,165 @@ mod tests {
             result.is_err(),
             "RealPostgresAdapterRegistry v2 pg_url 空必返 Err"
         );
+    }
+
+    // =====================================================================
+    // v0.80 P0-4 Stage 2.4: 4 register_*_adapter_v2 spec 重构 (per 守门 #19 v19)
+    // =====================================================================
+
+    #[tokio::test]
+    async fn register_nats_adapter_v2_works() {
+        // v0.80 关键断言: InMemory + RealPostgres 都接受 RegisterNatsAdapterCmd
+        // (per v0.79 同形, 内存版 descriptor.pg_url = None 跟 v0.72 backward compat 一致)
+        use crate::registry::InMemoryAdapterRegistry;
+        use crate::RegisterNatsAdapterCmd;
+        let mem_reg = InMemoryAdapterRegistry::new();
+        let real_reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let cmd = RegisterNatsAdapterCmd {
+            nats_url: "nats://nats.star.svc.cluster.local:4222".to_string(),
+            queue_group: Some("star-queue".to_string()),
+            max_reconnects: Some(10),
+        };
+        let mem_result = mem_reg
+            .register_nats_adapter_v2(cmd.clone(), actor.clone())
+            .await;
+        let real_result = real_reg.register_nats_adapter_v2(cmd, actor).await;
+        assert!(mem_result.is_ok(), "InMemoryAdapterRegistry nats_v2 必成功");
+        assert!(
+            real_result.is_ok(),
+            "RealPostgresAdapterRegistry nats_v2 必成功"
+        );
+    }
+
+    #[tokio::test]
+    async fn register_nats_adapter_v2_validates_empty_nats_url() {
+        use crate::RegisterNatsAdapterCmd;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let cmd = RegisterNatsAdapterCmd {
+            nats_url: "".to_string(),
+            queue_group: None,
+            max_reconnects: None,
+        };
+        let result = reg.register_nats_adapter_v2(cmd, actor).await;
+        assert!(result.is_err(), "nats_url 空必返 Err");
+    }
+
+    #[tokio::test]
+    async fn register_object_storage_adapter_v2_works() {
+        use crate::registry::InMemoryAdapterRegistry;
+        use crate::RegisterObjectStorageAdapterCmd;
+        let mem_reg = InMemoryAdapterRegistry::new();
+        let real_reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let cmd = RegisterObjectStorageAdapterCmd {
+            bucket: "star-mvp-artifacts".to_string(),
+            region: Some("us-east-1".to_string()),
+            endpoint: Some("https://s3.amazonaws.com".to_string()),
+        };
+        let mem_result = mem_reg
+            .register_object_storage_adapter_v2(cmd.clone(), actor.clone())
+            .await;
+        let real_result = real_reg
+            .register_object_storage_adapter_v2(cmd, actor)
+            .await;
+        assert!(
+            mem_result.is_ok(),
+            "InMemoryAdapterRegistry object_storage_v2 必成功"
+        );
+        assert!(
+            real_result.is_ok(),
+            "RealPostgresAdapterRegistry object_storage_v2 必成功"
+        );
+    }
+
+    #[tokio::test]
+    async fn register_object_storage_adapter_v2_validates_empty_bucket() {
+        use crate::RegisterObjectStorageAdapterCmd;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let cmd = RegisterObjectStorageAdapterCmd {
+            bucket: "  ".to_string(),
+            region: None,
+            endpoint: None,
+        };
+        let result = reg.register_object_storage_adapter_v2(cmd, actor).await;
+        assert!(result.is_err(), "bucket 空必返 Err");
+    }
+
+    #[tokio::test]
+    async fn register_scm_adapter_v2_works() {
+        use crate::registry::InMemoryAdapterRegistry;
+        use crate::RegisterScmAdapterCmd;
+        let mem_reg = InMemoryAdapterRegistry::new();
+        let real_reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let cmd = RegisterScmAdapterCmd {
+            provider: "github".to_string(),
+            base_url: Some("https://api.github.com".to_string()),
+            token: "ghp_xxx_test_token".to_string(), // mock token, 不打印 (per 守门 #5 v2)
+        };
+        let mem_result = mem_reg
+            .register_scm_adapter_v2(cmd.clone(), actor.clone())
+            .await;
+        let real_result = real_reg.register_scm_adapter_v2(cmd, actor).await;
+        assert!(mem_result.is_ok(), "InMemoryAdapterRegistry scm_v2 必成功");
+        assert!(
+            real_result.is_ok(),
+            "RealPostgresAdapterRegistry scm_v2 必成功"
+        );
+    }
+
+    #[tokio::test]
+    async fn register_scm_adapter_v2_validates_empty_token() {
+        use crate::RegisterScmAdapterCmd;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let cmd = RegisterScmAdapterCmd {
+            provider: "github".to_string(),
+            base_url: None,
+            token: "".to_string(),
+        };
+        let result = reg.register_scm_adapter_v2(cmd, actor).await;
+        assert!(result.is_err(), "token 空必返 Err (per 守门 #5 v2)");
+    }
+
+    #[tokio::test]
+    async fn register_agent_adapter_v2_works() {
+        use crate::registry::InMemoryAdapterRegistry;
+        use crate::RegisterAgentAdapterCmd;
+        let mem_reg = InMemoryAdapterRegistry::new();
+        let real_reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let cmd = RegisterAgentAdapterCmd {
+            runtime_mode: "local".to_string(),
+            model_id: Some("gpt-4".to_string()),
+        };
+        let mem_result = mem_reg
+            .register_agent_adapter_v2(cmd.clone(), actor.clone())
+            .await;
+        let real_result = real_reg.register_agent_adapter_v2(cmd, actor).await;
+        assert!(
+            mem_result.is_ok(),
+            "InMemoryAdapterRegistry agent_v2 必成功"
+        );
+        assert!(
+            real_result.is_ok(),
+            "RealPostgresAdapterRegistry agent_v2 必成功"
+        );
+    }
+
+    #[tokio::test]
+    async fn register_agent_adapter_v2_validates_empty_runtime_mode() {
+        use crate::RegisterAgentAdapterCmd;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let cmd = RegisterAgentAdapterCmd {
+            runtime_mode: "".to_string(),
+            model_id: None,
+        };
+        let result = reg.register_agent_adapter_v2(cmd, actor).await;
+        assert!(result.is_err(), "runtime_mode 空必返 Err");
     }
 }
