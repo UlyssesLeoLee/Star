@@ -47,7 +47,7 @@ use uuid::Uuid;
 /// `crates/infrastructure/<adapter>.rs` 中提供 SQLx / NATS / SCM Adapter 实现。
 #[async_trait]
 pub trait AdapterRegistry: Send + Sync {
-    /// 注册 PostgreSQL adapter
+    /// 注册 PostgreSQL adapter (v1, 骨架阶段 cmd: () placeholder, per WBS v0.66 已知缺口 (a))
     async fn register_postgres_adapter(
         &self,
         cmd: (),
@@ -77,6 +77,55 @@ pub trait AdapterRegistry: Send + Sync {
         cmd: (),
         actor: ActorContext,
     ) -> Result<(), InfrastructureError>;
+
+    /// **注册 PostgreSQL adapter (v2, P0-4 Stage 2.3 spec 重构)**
+    ///
+    /// v0.79 P0-4 Stage 2.3 扩展: 真实 `RegisterPostgresAdapterCmd` 替代 v1 的 `cmd: ()` placeholder
+    /// (per WBS v0.66/v0.72/v0.73/v0.74/v0.75/v0.78 已知缺口 (b) 跨 session 续做, 闭合 v0.72 已知缺口 (a)).
+    ///
+    /// **v1 → v2 关系**: v1 保留 backward compat (P0-4 Stage 2.x 28+ 测试 callsite 不破坏);
+    /// v2 是 spec 重构方向, 后续 P2 阶段全部切到 v2 后 v1 删.
+    ///
+    /// **返回** `AdapterDescriptor` (per v0.72 字段扩展 pg_url + registered_at 填 Some)
+    /// 而非 `()`, 让 caller 拿到刚注册的 descriptor (per application crate 编排层后续用).
+    async fn register_postgres_adapter_v2(
+        &self,
+        cmd: RegisterPostgresAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError>;
+}
+
+/// **RegisterPostgresAdapterCmd** (v0.79 P0-4 Stage 2.3 spec 重构)
+///
+/// 真实注册 PostgreSQL adapter 的命令结构, 替代 v1 的 `cmd: ()` placeholder.
+///
+/// 字段 (per spec §13.1 PostgreSQL = 默认 SoR, §30.6 单一 PostgreSQL 数据库):
+/// - `pg_url`: PostgreSQL 连接 URL (必填, 不能为空, per 守门 #5 v2 env 安全: 不用 env var 偷)
+/// - `pool_size`: 连接池最大连接数 (可选, None = sqlx 默认 10)
+/// - `ssl_mode`: SSL/TLS 模式 (可选, None = prefer, per 守门 #13 a W/T/M + envoy 9/1 13:05 TLS 一致性)
+/// - `schema_migrations_dir`: SQL 迁移脚本目录 (可选, None = 用 star-pg-adapter 默认 `db/migrations/`)
+#[derive(Debug, Clone)]
+pub struct RegisterPostgresAdapterCmd {
+    /// PostgreSQL 连接 URL (必填)
+    pub pg_url: String,
+    /// 连接池最大连接数 (None = sqlx 默认)
+    pub pool_size: Option<u32>,
+    /// SSL/TLS 模式 (None = prefer)
+    pub ssl_mode: Option<String>,
+    /// 迁移脚本目录 (None = 默认 db/migrations/)
+    pub schema_migrations_dir: Option<String>,
+}
+
+impl RegisterPostgresAdapterCmd {
+    /// 必填校验: pg_url 非空 (per 守门 #11 缺标比错标)
+    pub fn validate(&self) -> Result<(), InfrastructureError> {
+        if self.pg_url.trim().is_empty() {
+            return Err(InfrastructureError::InvalidState(
+                "pg_url 必填非空 (per RegisterPostgresAdapterCmd spec)".to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// **AdapterQuery**(查询端口)

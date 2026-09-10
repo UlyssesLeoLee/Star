@@ -14,7 +14,10 @@
 //! 守门 #1 v25 cargo test -p infrastructure -j 4 = 100% pass
 //! 守门 #14 v4 修订人: Ulysses(一人公司 12 角色 per DEC-008) - Mavis 接手**审核**
 
-use crate::{AdapterDescriptor, AdapterQuery, AdapterRegistry, InfrastructureError};
+use crate::{
+    AdapterDescriptor, AdapterQuery, AdapterRegistry, InfrastructureError,
+    RegisterPostgresAdapterCmd,
+};
 use async_trait::async_trait;
 use star_context::ActorContext;
 use std::collections::HashMap;
@@ -160,6 +163,21 @@ impl AdapterRegistry for InMemoryAdapterRegistry {
     ) -> Result<(), InfrastructureError> {
         let _ = self.register(AdapterKind::Agent, actor.tenant_id)?;
         Ok(())
+    }
+
+    /// **v0.79 P0-4 Stage 2.3 扩展: register_postgres_adapter_v2 spec 重构**
+    ///
+    /// 接受真实 `RegisterPostgresAdapterCmd { pg_url, pool_size, ssl_mode, schema_migrations_dir }`,
+    /// 校验 pg_url 非空, 但内存版 InMemoryAdapterRegistry 不存真实 URL 字段 (per v0.72 backward compat:
+    /// descriptor.pg_url = None), 仅生成新 descriptor 含 tenant_id + UUID.
+    async fn register_postgres_adapter_v2(
+        &self,
+        cmd: RegisterPostgresAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError> {
+        cmd.validate()?;
+        // 内存版忽略 cmd.pg_url / pool_size / ssl_mode / schema_migrations_dir (per spec §13.1 内存版不连真 PG)
+        self.register(AdapterKind::Postgres, actor.tenant_id)
     }
 }
 

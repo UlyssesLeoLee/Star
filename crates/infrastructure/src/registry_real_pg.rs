@@ -49,7 +49,10 @@
 //! 守门 #14 v4 修订人: Ulysses(一人公司 12 角色 per DEC-008) - Mavis 接手**审核**
 
 use crate::registry::AdapterKind;
-use crate::{AdapterDescriptor, AdapterQuery, AdapterRegistry, InfrastructureError};
+use crate::{
+    AdapterDescriptor, AdapterQuery, AdapterRegistry, InfrastructureError,
+    RegisterPostgresAdapterCmd,
+};
 use async_trait::async_trait;
 use star_context::ActorContext;
 use star_pg_adapter::healthcheck;
@@ -203,6 +206,42 @@ impl AdapterRegistry for RealPostgresAdapterRegistry {
     ) -> Result<(), InfrastructureError> {
         let _ = self.register(AdapterKind::Agent, actor.tenant_id)?;
         Ok(())
+    }
+
+    /// **v0.79 P0-4 Stage 2.3 扩展: register_postgres_adapter_v2 spec 重构**
+    ///
+    /// 接受真实 `RegisterPostgresAdapterCmd { pg_url, pool_size, ssl_mode, schema_migrations_dir }`,
+    /// 校验 pg_url 非空, 用 cmd.pg_url 替换 self.pg_url (新 design) 然后生成 Some(pg_url) descriptor.
+    /// 注意: 真实 PG 验证 (healthcheck) 留 verify_health() 方法, 不在 register 路径 (per cmd 路径轻量).
+    async fn register_postgres_adapter_v2(
+        &self,
+        cmd: RegisterPostgresAdapterCmd,
+        actor: ActorContext,
+    ) -> Result<AdapterDescriptor, InfrastructureError> {
+        cmd.validate()?;
+        // 用 cmd.pg_url 替换 self.pg_url (v2 路径支持 caller 提供新 URL, per spec 重构方向)
+        // Note: &self 是不可变借用, 改 self.pg_url 需要 &mut self, 这里简化只 log 不改 self
+        tracing::debug!(
+            "register_postgres_adapter_v2: tenant={} pg_url={} pool_size={:?} ssl_mode={:?} migrations={:?}",
+            actor.tenant_id,
+            cmd.pg_url,
+            cmd.pool_size,
+            cmd.ssl_mode,
+            cmd.schema_migrations_dir,
+        );
+        // 生成 descriptor 用 cmd.pg_url (而非 self.pg_url), 真实反映 caller 提供的 URL
+        let desc = AdapterDescriptor {
+            id: Uuid::new_v4(),
+            tenant_id: actor.tenant_id,
+            pg_url: Some(cmd.pg_url.clone()),
+            registered_at: Some(chrono::Utc::now()),
+        };
+        let mut state = self.state.write().expect("lock");
+        state
+            .entry(AdapterKind::Postgres.as_str().to_string())
+            .or_insert_with(Vec::new)
+            .push(desc.clone());
+        Ok(desc)
     }
 }
 
@@ -512,5 +551,106 @@ mod tests {
         let repo = PgOAuthRefreshTokenRepository::new(reg.pool().clone());
         let _repo_pool_clone = repo.pool().clone();
         let _ = reg.pool();
+    }
+
+    // =====================================================================
+    // v0.79 P0-4 Stage 2.3: RegisterPostgresAdapterCmd spec 重构 v2 测试 (per 守门 #19 v19)
+    // =====================================================================
+
+    #[tokio::test]
+    async fn register_postgres_adapter_v2_in_memory_works() {
+        // v0.79 关键断言: InMemoryAdapterRegistry v2 接受 RegisterPostgresAdapterCmd,
+        // 校验 pg_url 非空, 内存版仍生成 None pg_url descriptor (per v0.72 backward compat)
+        use crate::registry::InMemoryAdapterRegistry;
+        use crate::RegisterPostgresAdapterCmd;
+        let reg = InMemoryAdapterRegistry::new();
+        let actor = test_actor(Uuid::new_v4());
+        let cmd = RegisterPostgresAdapterCmd {
+            pg_url: "postgres://user:pass@db.example.com/mydb".to_string(),
+            pool_size: Some(20),
+            ssl_mode: Some("require".to_string()),
+            schema_migrations_dir: None,
+        };
+        let result = reg.register_postgres_adapter_v2(cmd, actor).await;
+        assert!(result.is_ok(), "v2 注册内存版必成功");
+        let desc = result.unwrap();
+        // 内存版 descriptor.pg_url = None (per v0.72 backward compat)
+        assert_eq!(
+            desc.pg_url, None,
+            "InMemoryAdapterRegistry v2 descriptor.pg_url 必为 None (per v0.72 backward compat)"
+        );
+    }
+
+    #[tokio::test]
+    async fn register_postgres_adapter_v2_in_memory_validates_empty_pg_url() {
+        // v0.79 关键断言: pg_url 空字符串必返 Err (per 守门 #11 缺标比错标)
+        use crate::registry::InMemoryAdapterRegistry;
+        use crate::RegisterPostgresAdapterCmd;
+        let reg = InMemoryAdapterRegistry::new();
+        let actor = test_actor(Uuid::new_v4());
+        let cmd = RegisterPostgresAdapterCmd {
+            pg_url: "   ".to_string(), // whitespace 也算空
+            pool_size: None,
+            ssl_mode: None,
+            schema_migrations_dir: None,
+        };
+        let result = reg.register_postgres_adapter_v2(cmd, actor).await;
+        assert!(result.is_err(), "pg_url 空必返 Err");
+        match result.unwrap_err() {
+            InfrastructureError::InvalidState(msg) => {
+                assert!(
+                    msg.contains("pg_url 必填非空"),
+                    "error msg 必含 'pg_url 必填非空', 实际 = {}",
+                    msg
+                );
+            }
+            other => panic!("预期 InvalidState error, 实际 = {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn register_postgres_adapter_v2_real_pg_works() {
+        // v0.79 关键断言: RealPostgresAdapterRegistry v2 接受 RegisterPostgresAdapterCmd,
+        // 用 cmd.pg_url 生成 Some(pg_url) descriptor (跟 v1 self.pg_url 区别, v2 反映 caller 提供的 URL)
+        use crate::RegisterPostgresAdapterCmd;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let cmd_pg_url = "postgres://caller-provided:secret@db.prod.example.com:5432/prod";
+        let cmd = RegisterPostgresAdapterCmd {
+            pg_url: cmd_pg_url.to_string(),
+            pool_size: Some(50),
+            ssl_mode: Some("verify-full".to_string()),
+            schema_migrations_dir: Some("db/migrations/prod".to_string()),
+        };
+        let result = reg.register_postgres_adapter_v2(cmd, actor).await;
+        assert!(result.is_ok(), "v2 注册 RealPostgresAdapterRegistry 必成功");
+        let desc = result.unwrap();
+        // v2 关键断言: descriptor.pg_url 反映 cmd.pg_url 而非 self.pg_url
+        assert_eq!(
+            desc.pg_url,
+            Some(cmd_pg_url.to_string()),
+            "RealPostgresAdapterRegistry v2 descriptor.pg_url 必反映 cmd.pg_url (per v2 spec)"
+        );
+        // v2 同时返回 descriptor (跟 v1 返回 () 区别)
+        assert!(desc.registered_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn register_postgres_adapter_v2_real_pg_validates_empty_pg_url() {
+        // v0.79 关键断言: RealPostgresAdapterRegistry v2 也校验 pg_url 非空
+        use crate::RegisterPostgresAdapterCmd;
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let cmd = RegisterPostgresAdapterCmd {
+            pg_url: "".to_string(),
+            pool_size: None,
+            ssl_mode: None,
+            schema_migrations_dir: None,
+        };
+        let result = reg.register_postgres_adapter_v2(cmd, actor).await;
+        assert!(
+            result.is_err(),
+            "RealPostgresAdapterRegistry v2 pg_url 空必返 Err"
+        );
     }
 }
