@@ -89,7 +89,7 @@ spec:
 - **Secret** (凭据, per 8/27 11:06 JST secret 安全):
   - `GITHUB_TOKEN` / `GITLAB_TOKEN` / `BITBUCKET_APP_PASSWORD` / `GITEA_TOKEN` (per spec/vcs/05 §4)
   - `WEBHOOK_SECRET` (per spec/services/03 §2)
-  - `REDIS_URL` (per spec/cache/01 §5, Phase I+ 启用)
+  - `VALKEY_URL` (per spec/cache/01 §5, Phase I+ 启用; 选型 Valkey 替代 Redis, per docs/operation-design.md §4.4)
   - **所有凭据从 K8s Secret 注入，不进 ConfigMap，不进镜像层**
 
 ## §7 HPA + PDB

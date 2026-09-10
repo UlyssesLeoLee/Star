@@ -87,7 +87,7 @@ Phase G 至少落地 2 个 `CacheBackend` 实现：
 | 实现 | 后端 | 用途 | 性能 |
 |------|------|------|------|
 | `InMemoryBackend` | `dashmap` + `tokio::time::sleep` | 开发 / 测试 / 单 node 部署 | 纳秒级 |
-| `RedisBackend` | `redis-rs` 0.27+ | 生产 / 多 node 部署 | 毫秒级 |
+| `ValkeyBackend` | `redis-rs` 0.27+ / `valkey-rs` (协议 100% 兼容) | 生产 / 多 node 部署 | 毫秒级 |
 
 ## §3 Key 命名规范
 

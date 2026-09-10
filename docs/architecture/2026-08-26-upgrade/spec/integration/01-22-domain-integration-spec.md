@@ -291,10 +291,10 @@ per [ADR-0035 §8 不变量](../../adr/0035-phase-f-architecture.md) L304-306 + 
 
 ### §5.3 数据一致性
 
-- **规则**：用 [spec/cache/01 §2.3 InMemory backend](../cache/01-cache-contract-spec.md) 同步（`dashmap` + `tokio::time::sleep`），Redis Phase H+ 才上
+- **规则**：用 [spec/cache/01 §2.3 InMemory backend](../cache/01-cache-contract-spec.md) 同步（`dashmap` + `tokio::time::sleep`），Valkey Phase H+ 才上
 - **强制点**：
   - Phase H 单 node 部署用 `InMemoryBackend`（per [spec/cache/01 §2.3 L89](../cache/01-cache-contract-spec.md)）
-  - 多 node 部署 Phase H+ 才上 `RedisBackend`（per [ADR-0036 §7 #1 L268](../../adr/0036-phase-g-architecture.md) "Redis 后端仅 stub"）
+  - 多 node 部署 Phase H+ 才上 `ValkeyBackend`（per [ADR-0036 §7 #1 L268](../../adr/0036-phase-g-architecture.md) "Redis 后端仅 stub" — 2026-09 起架构选型切换 Valkey 替代 Redis, per docs/operation-design.md §4.4）
   - 22 domain cache key 命名严格按 [spec/cache/01 §3 命名规范](../cache/01-cache-contract-spec.md) `cache:v1:{crate}:{id}` 形式
 - **引用**：[spec/cache/01 §2.3 2 后端实现](../cache/01-cache-contract-spec.md) + [ADR-0036 §2 D11 L140-167](../../adr/0036-phase-g-architecture.md)
 
