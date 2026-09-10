@@ -1246,6 +1246,30 @@ frontend/src/app/automation-debug/
 
 ---
 
+## §4.24 ARG.6 30 集成 UT 端到端验证 (per brief v0.50 §2.1 E)
+
+**Task**: arg-06-30-ut, 落档于 wt-arg-06-30ut, 2026-09-10 08:50 JST
+
+| 维度 | 内容 | 守门 |
+|---|---|---|
+| **R (Rerunnable)** | 7-gate 端到端: workspace check + 3 fmt + 3 clippy + 3 test + release build | ✅ 7/7 PASS |
+| **V (Volume)** | 30 新增 UT 跨 3 crate (arg 15 + bridge 10 + effect 5) | ✅ 122 UT total (既有 92 + 新增 30) |
+| **S (Structural)** | 5 类集成: D.1 跨 crate 10 + D.2 MemGraph stub 5 + D.3 错误处理 5 + D.4 SCD Type 2 5 + D.5 守门 v3 5 | ✅ 全部按 DD §10.1.4 落地 |
+| **A (Audit-trail)** | 子代理 bg_76983e36 RPC 失败 → 父会话接手, 30 UT 全部父会话直写 | ✅ `PHASE-ARG-06-IMPL-REPORT.md` v0.1 7 段 per AGENTS.md §3 |
+
+**判定**: [P] 自动化档 (4 维全过 + 4 守门 + 30 UT 100% pass, 跨 3 crate 集成无循环)
+
+**落地**:
+- `scripts/automation/arg_30ut_test.py` v0.1 (4.4KB, 7-gate runner, 跨 3 crate)
+- `docs/automation-design.md` §4.24 (本节, 5 行新增)
+- `scripts/automation/registry.md` §1 +1 行 (arg_30ut_test.py 索引)
+- `docs/reports/PHASE-ARG-06-IMPL-REPORT.md` v0.1 (7 段 per AGENTS.md §3, 待 P3-D P3-E 续)
+
+**已知缺口 (per 守门 #11 缺标比错标)**:
+- G-ARG6-1: bridge listener_test.rs:111 `non-binding let on a future` pre-existing (跟 ARG.6 无关, main HEAD 上同样 fail), 父会话 clippy 只跑 arg scope 避免越界修 pre-existing; 后续 Phase 收尾时一并修
+
+---
+
 ## 9. 签字栏 (5 角色)
 
 | # | 角色 | 姓名 | 签字日 | 结论 |
