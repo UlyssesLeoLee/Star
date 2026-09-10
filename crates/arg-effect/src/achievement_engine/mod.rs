@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! `ARGAchievementEngine` (per DD-AGENT-RELATIONSHIP-001 §4.9 + §6 + §7).
 //!
-//! The engine wraps the 8 拓扑成就 Cypher queries, the 7 行为 event
-//! patterns and the 5 产出 aggregate-metric placeholders, and applies
-//! the `AchievementOps::unlock` (idempotent per `(user_id, code)`).
+//! The engine orchestrates 3 evaluators that together cover the **20
+//! canonical achievements** (per brief `arg-08-behavior-output-evaluator.md`):
 //!
-//! During ARG.3 the actual Cypher evaluation is stubbed (per ARG.1 G-1
-//! stub): the [`TopologyEvaluator`] returns `triggered = true` for the
-//! cypher codes that match a hard-coded tenant_id hash, so the full
-//! `evaluate → unlock` path is exercised end-to-end without a real
-//! Memgraph. The 8 cypher queries themselves are exposed verbatim
-//! through [`topology::all_topology_cyphers`] (already present in
-//! `star_arg::query::topology`).
+//! - **8 拓扑** — `TopologyEvaluator` (8 Cypher queries)
+//! - **7 行为** — `BehaviorEvaluator` (7 event patterns)
+//! - **5 产出** — `OutputEvaluator` (5 aggregate metrics)
+//!
+//! The engine runs all 3 evaluators in parallel via `tokio::join!` and
+//! persists the resulting unlocks through the shared
+//! [`AchievementOps`]. Unlock is idempotent per `(user_id, code)` (per
+//! ARG.1 §3.2.5).
 //!
 //! Cross-cutting safety nets (per `AGENTS.md` §4):
 //! - No `unsafe` is allowed (`unsafe_code = "forbid"` at workspace level, 守门 #7).
@@ -19,6 +19,7 @@
 
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use star_arg::models::achievement_unlock::AchievementUnlock;
 use star_arg::models::event::ARGEvent;
 use star_arg::ops::AchievementOps;
@@ -27,12 +28,17 @@ use uuid::Uuid;
 
 use crate::error::EffectError;
 
-/// 8 拓扑成就 Cypher 模板 (per DD §6 + brief §2.1 B).
-///
-/// The 8 codes mirror `star_arg::query::topology::all_topology_cyphers()`.
+#[path = "behavior_evaluator.rs"]
+pub mod behavior;
+#[path = "output_evaluator.rs"]
+pub mod output;
+
+pub use behavior::{BehaviorEvaluator, BehaviorStats, BehaviorThresholds};
+pub use output::{OutputEvaluator, OutputStats, OutputThresholds};
+
+/// 8 拓扑成就 Cypher 模板 (per DD §6 + brief §2.1 A).
 pub mod topology {
     use super::*;
-
     /// The 8 拓扑成就 codes (per DD §6). Stable order.
     pub const TOP_001: &str = "TOP-001-MESH-5DOMAIN";
     /// TOP-002: Hub-and-Spoke (1 Lead + 4 outgoing DELEGATES_TO).
@@ -63,13 +69,7 @@ pub mod topology {
     }
 }
 
-/// `TopologyEvaluator` — runs the 8 拓扑成就 Cypher queries against a
-/// pluggable backend.
-///
-/// The default backend ([`StubTopologyBackend`]) returns `triggered =
-/// true` when the tenant_id's first 8 bits match a configurable
-/// trigger mask. This exercises the full `evaluate → unlock` path
-/// without a live Memgraph (per ARG.1 G-1).
+/// `TopologyBackend` — runs a single Cypher query and returns whether it triggered.
 pub trait TopologyBackend: Send + Sync {
     /// Run a single Cypher query and return whether it triggered.
     fn evaluate(&self, cypher: &str, tenant_id: Uuid) -> Result<bool, EffectError>;
@@ -84,12 +84,8 @@ pub struct StubTopologyBackend {
 }
 
 impl StubTopologyBackend {
-    /// Build a backend that triggers for every Cypher (used by the
-    /// default achievement engine so the 8 unlocks are exercised in
-    /// the end-to-end tests).
+    /// Build a backend that triggers for the nil tenant.
     pub fn always_trigger() -> Self {
-        // We can't actually mark every tenant as triggering; we set
-        // a high mask and rely on the tenant-id check.
         Self {
             trigger_mask: Some(0x00),
         }
@@ -114,8 +110,6 @@ impl TopologyBackend for StubTopologyBackend {
         match self.trigger_mask {
             Some(_) => {
                 let bits = (tenant_id.as_u128() & 0xFF) as u8;
-                // Trigger when low 8 bits of tenant_id equal 0.
-                // This gives roughly 1/256 hit rate, deterministic.
                 Ok(bits == 0x00)
             }
             None => Ok(false),
@@ -168,69 +162,123 @@ impl TopologyEvaluator {
     }
 }
 
-/// `BehaviorEvaluator` — placeholder for the 7 行为 event pattern
-/// evaluator (per DD §3.1 + P3-E ARG.8 follow-up).
+/// `AchievementPublisher` — sink for SSE push of newly-unlocked achievements
+/// (per brief A.3 `ArgsSEHub.publish_achievement_unlocked`).
 ///
-/// During ARG.3 this always returns an empty list; the placeholder
-/// is exercised by the 5 achievement tests via the
-/// [`crate::achievement_engine::ARGAchievementEngine::evaluate`]
-/// orchestration.
-#[derive(Debug, Default, Clone)]
-pub struct BehaviorEvaluator;
-
-impl BehaviorEvaluator {
-    /// Build a new (empty) evaluator.
-    pub fn new() -> Self {
-        Self
-    }
-
-    /// Evaluate the 7 行为 event patterns. Returns `Vec::new()` —
-    /// the real implementation lands in P3-E ARG.8.
-    pub async fn evaluate(
+/// The trait is defined in `arg-effect` so the Effect Tier can stay
+/// decoupled from the API tier (which owns the concrete `ARGSSEHub`).
+/// The default no-op implementation records nothing; production wires
+/// this to the `ARGSSEHub` from `crates/api/src/arg/sse_hub.rs`.
+#[async_trait]
+pub trait AchievementPublisher: Send + Sync {
+    /// Publish a single unlock event. The implementation should be
+    /// non-blocking; failures must be reported via the returned `Result`
+    /// but should not stop the engine's evaluate loop.
+    async fn publish_achievement_unlocked(
         &self,
-        _event: &ARGEvent,
-        _tenant_id: Uuid,
-    ) -> Result<Vec<String>, EffectError> {
-        Ok(Vec::new())
+        unlock: &AchievementUnlock,
+    ) -> Result<(), EffectError>;
+
+    /// Number of events successfully published (for tests / metrics).
+    fn published_count(&self) -> usize;
+}
+
+/// `NoopAchievementPublisher` — default sink that records nothing
+/// (per brief §2.1 A.3 "mock ARGSSEHub" until ARG.4 wires the real one).
+#[derive(Debug, Default)]
+pub struct NoopAchievementPublisher {
+    /// Internal counter (only used by tests).
+    count: std::sync::atomic::AtomicUsize,
+}
+
+impl Clone for NoopAchievementPublisher {
+    fn clone(&self) -> Self {
+        // New instance with counter zeroed — counters are diagnostic
+        // only and tests are fine starting fresh.
+        Self::new()
     }
 }
 
-/// `OutputEvaluator` — placeholder for the 5 产出 aggregate-metric
-/// evaluator (per DD §3.1 + P3-E ARG.8 follow-up).
-#[derive(Debug, Default, Clone)]
-pub struct OutputEvaluator;
-
-impl OutputEvaluator {
-    /// Build a new (empty) evaluator.
+impl NoopAchievementPublisher {
+    /// Build a new noop publisher.
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+}
+
+#[async_trait]
+impl AchievementPublisher for NoopAchievementPublisher {
+    async fn publish_achievement_unlocked(
+        &self,
+        _unlock: &AchievementUnlock,
+    ) -> Result<(), EffectError> {
+        self.count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Ok(())
     }
 
-    /// Evaluate the 5 产出 aggregate metrics. Returns `Vec::new()`.
-    pub async fn evaluate(
+    fn published_count(&self) -> usize {
+        self.count.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+/// `ChannelAchievementPublisher` — broadcast-channel-backed publisher
+/// that hands every unlock event to one or more in-process subscribers
+/// (used by the WS / SSE handler in `crates/api/src/arg/sse_hub.rs`).
+///
+/// This is the bridge that lets the Effect Tier fan out unlock events
+/// without taking a hard dependency on the API tier.
+#[derive(Debug, Clone)]
+pub struct ChannelAchievementPublisher {
+    tx: tokio::sync::broadcast::Sender<AchievementUnlock>,
+}
+
+impl ChannelAchievementPublisher {
+    /// Build a new publisher wrapping the given broadcast channel.
+    pub fn new(tx: tokio::sync::broadcast::Sender<AchievementUnlock>) -> Self {
+        Self { tx }
+    }
+
+    /// Build a default-capacity channel and return both halves.
+    pub fn with_capacity(cap: usize) -> (Self, tokio::sync::broadcast::Receiver<AchievementUnlock>) {
+        let (tx, rx) = tokio::sync::broadcast::channel(cap);
+        (Self { tx }, rx)
+    }
+}
+
+#[async_trait]
+impl AchievementPublisher for ChannelAchievementPublisher {
+    async fn publish_achievement_unlocked(
         &self,
-        _event: &ARGEvent,
-        _tenant_id: Uuid,
-    ) -> Result<Vec<String>, EffectError> {
-        Ok(Vec::new())
+        unlock: &AchievementUnlock,
+    ) -> Result<(), EffectError> {
+        // `send` returns the number of active receivers; 0 is fine
+        // (no WS clients connected yet) and not an error.
+        let _ = self.tx.send(unlock.clone());
+        Ok(())
+    }
+
+    fn published_count(&self) -> usize {
+        self.tx.receiver_count()
     }
 }
 
 /// `ARGAchievementEngine` (per DD §4.9 + arch §3.1).
 ///
-/// Orchestrates the 3 evaluators and persists unlocks via the
-/// shared [`AchievementOps`]. Construction is infallible; the engine
-/// is `Clone` so it can be moved into `Arc` for shared use.
+/// Orchestrates the 3 evaluators in parallel via `tokio::join!` and
+/// persists unlocks via the shared [`AchievementOps`]. Construction
+/// is infallible; the engine is `Clone` so it can be moved into `Arc`
+/// for shared use.
 pub struct ARGAchievementEngine {
     topology: TopologyEvaluator,
     behavior: BehaviorEvaluator,
     output: OutputEvaluator,
     ops: Arc<AchievementOps>,
     /// Default user_id used when the engine is called without an
-    /// explicit user (per the brief's `evaluate(event, tenant_id)`
-    /// signature). Real callers should use the variant that takes a
-    /// user_id.
+    /// explicit user.
     default_user_id: Uuid,
+    /// SSE / WS sink (per brief A.3).
+    publisher: Arc<dyn AchievementPublisher>,
 }
 
 impl std::fmt::Debug for ARGAchievementEngine {
@@ -241,6 +289,7 @@ impl std::fmt::Debug for ARGAchievementEngine {
             .field("output", &self.output)
             .field("ops", &"<AchievementOps>")
             .field("default_user_id", &self.default_user_id)
+            .field("publisher", &"<dyn AchievementPublisher>")
             .finish()
     }
 }
@@ -253,13 +302,14 @@ impl Clone for ARGAchievementEngine {
             output: self.output.clone(),
             ops: self.ops.clone(),
             default_user_id: self.default_user_id,
+            publisher: self.publisher.clone(),
         }
     }
 }
 
 impl ARGAchievementEngine {
     /// Build a new engine wrapping the 3 evaluators + the
-    /// [`AchievementOps`].
+    /// [`AchievementOps`] + a noop publisher.
     pub fn new(
         topology: TopologyEvaluator,
         behavior: BehaviorEvaluator,
@@ -267,17 +317,38 @@ impl ARGAchievementEngine {
         ops: AchievementOps,
         default_user_id: Uuid,
     ) -> Self {
+        Self::with_publisher(
+            topology,
+            behavior,
+            output,
+            ops,
+            default_user_id,
+            Arc::new(NoopAchievementPublisher::new()),
+        )
+    }
+
+    /// Build a new engine wrapping the 3 evaluators + ops + a custom
+    /// publisher (per brief A.3 `ArgsSEHub.publish_achievement_unlocked`).
+    pub fn with_publisher(
+        topology: TopologyEvaluator,
+        behavior: BehaviorEvaluator,
+        output: OutputEvaluator,
+        ops: AchievementOps,
+        default_user_id: Uuid,
+        publisher: Arc<dyn AchievementPublisher>,
+    ) -> Self {
         Self {
             topology,
             behavior,
             output,
             ops: Arc::new(ops),
             default_user_id,
+            publisher,
         }
     }
 
-    /// Run the 3 evaluators in parallel-ish (sequential today) and
-    /// persist the resulting unlocks via [`AchievementOps::unlock`].
+    /// Run the 3 evaluators in parallel via `tokio::join!` and persist
+    /// the resulting unlocks via [`AchievementOps::unlock`].
     ///
     /// Returns the list of [`AchievementUnlock`] rows that were
     /// newly inserted (deduplicated per `(user_id, code)`).
@@ -297,10 +368,16 @@ impl ARGAchievementEngine {
         event: ARGEvent,
         tenant_id: Uuid,
     ) -> Result<Vec<AchievementUnlock>, EffectError> {
+        // 3 evaluators in parallel (per brief A.3 tokio::join!).
+        let (topo_res, beh_res, out_res) = tokio::join!(
+            self.topology.evaluate(&event, tenant_id),
+            self.behavior.evaluate(&event, tenant_id),
+            self.output.evaluate(&event, tenant_id),
+        );
         let mut codes: Vec<String> = Vec::new();
-        codes.extend(self.topology.evaluate(&event, tenant_id).await?);
-        codes.extend(self.behavior.evaluate(&event, tenant_id).await?);
-        codes.extend(self.output.evaluate(&event, tenant_id).await?);
+        codes.extend(topo_res?);
+        codes.extend(beh_res?);
+        codes.extend(out_res?);
 
         let mut unlocks: Vec<AchievementUnlock> = Vec::with_capacity(codes.len());
         for code in codes {
@@ -308,7 +385,7 @@ impl ARGAchievementEngine {
                 code.clone(),
                 user_id,
                 vec![],
-                serde_json::json!({"trigger": "evaluate_for_user"}),
+                serde_json::json!({"trigger": "evaluate_for_user", "event_kind": event.kind()}),
                 tenant_id,
             );
             let newly = self
@@ -317,6 +394,12 @@ impl ARGAchievementEngine {
                 .await
                 .map_err(|e| EffectError::InternalError(e.to_string()))?;
             if newly {
+                // Publish to SSE / WS via the configured publisher.
+                // Errors from publish are logged via tracing but do
+                // not block the unlock return value.
+                if let Err(e) = self.publisher.publish_achievement_unlocked(&row).await {
+                    tracing::warn!(target: "arg.achievement", "publish failed for {}: {}", code, e);
+                }
                 unlocks.push(row);
             }
         }
@@ -327,6 +410,21 @@ impl ARGAchievementEngine {
     /// the underlying [`AchievementOps`].
     pub fn unique_unlocks(&self) -> usize {
         self.ops.unique_unlocks()
+    }
+
+    /// Reference to the configured SSE / WS publisher.
+    pub fn publisher(&self) -> &Arc<dyn AchievementPublisher> {
+        &self.publisher
+    }
+
+    /// Reference to the behavior evaluator (used by tests).
+    pub fn behavior_evaluator(&self) -> &BehaviorEvaluator {
+        &self.behavior
+    }
+
+    /// Reference to the output evaluator (used by tests).
+    pub fn output_evaluator(&self) -> &OutputEvaluator {
+        &self.output
     }
 }
 
@@ -357,20 +455,6 @@ mod tests {
         }
     }
 
-    fn make_engine_with_tenant(_tenant: Uuid) -> (ARGAchievementEngine, Uuid) {
-        let backend: Arc<dyn TopologyBackend> = Arc::new(StubTopologyBackend::always_trigger());
-        let topology = TopologyEvaluator::new(backend);
-        let behavior = BehaviorEvaluator::new();
-        let output = OutputEvaluator::new();
-        let writer = EventWriter::new();
-        let ops = AchievementOps::new(writer);
-        let user = Uuid::new_v4();
-        (
-            ARGAchievementEngine::new(topology, behavior, output, ops, user),
-            user,
-        )
-    }
-
     fn make_edge_event() -> ARGEvent {
         let from = Uuid::new_v4();
         let to = Uuid::new_v4();
@@ -380,7 +464,6 @@ mod tests {
 
     #[tokio::test]
     async fn evaluate_runs_three_evaluators() {
-        // Always-trigger backend → 8 unlocks expected.
         let backend: Arc<dyn TopologyBackend> = Arc::new(StubTopologyBackend::always_trigger());
         let topology = TopologyEvaluator::new(backend);
         let behavior = BehaviorEvaluator::new();
@@ -389,14 +472,13 @@ mod tests {
         let ops = AchievementOps::new(writer);
         let user = Uuid::new_v4();
         let engine = ARGAchievementEngine::new(topology, behavior, output, ops, user);
-
-        // Use a tenant whose low 8 bits are 0 so the stub triggers.
         let tenant = Uuid::nil();
         let unlocks = engine
             .evaluate(make_edge_event(), tenant)
             .await
             .expect("ok");
-        assert_eq!(unlocks.len(), 8);
+        // 8 topology + 1 behavior (BEH-001 first_dispatch_via_delegates_to) = 9
+        assert_eq!(unlocks.len(), 9);
     }
 
     #[tokio::test]
@@ -419,9 +501,9 @@ mod tests {
             .evaluate(make_edge_event(), tenant)
             .await
             .expect("ok");
-        assert_eq!(first.len(), 8);
+        assert_eq!(first.len(), 9);
         assert_eq!(second.len(), 0, "second call is a no-op");
-        assert_eq!(engine.unique_unlocks(), 8);
+        assert_eq!(engine.unique_unlocks(), 9);
     }
 
     #[tokio::test]
@@ -439,7 +521,10 @@ mod tests {
             .evaluate(make_edge_event(), tenant)
             .await
             .expect("ok");
-        assert_eq!(unlocks.len(), 0);
+        // BehaviorEvaluator still triggers BEH-001 on the first delegates_to edge
+        // even when topology backend is never_trigger.
+        assert_eq!(unlocks.len(), 1);
+        assert!(unlocks.iter().any(|u| u.achievement_code == "BEH-001-FIRST-DELEGATES"));
     }
 
     #[tokio::test]
@@ -477,7 +562,6 @@ mod tests {
 
     #[test]
     fn all_8_cyphers_avoid_apoc() {
-        // per self-review F-11 fix.
         for pair in topology::all_cyphers() {
             assert!(
                 !pair.cypher.contains("apoc."),
@@ -490,22 +574,73 @@ mod tests {
 
     #[test]
     fn stub_topology_always_trigger_actually_triggers() {
-        // sanity: the always_trigger backend should trigger for the
-        // nil tenant (low 8 bits == 0).
         let b = StubTopologyBackend::always_trigger();
         let ok = b.evaluate("MATCH (n) RETURN n", Uuid::nil()).expect("ok");
         assert!(ok);
-        // and not trigger for a tenant whose low 8 bits are non-zero.
         let busy_tenant: Uuid = uuid::Uuid::from_u128(0x01);
         let ok2 = b.evaluate("MATCH (n) RETURN n", busy_tenant).expect("ok");
         assert!(!ok2);
     }
 
-    // ensure the make_engine_with_tenant helper is callable.
-    #[allow(dead_code)]
-    fn _make_engine_with_tenant_used() {
-        let (engine, _user) = make_engine_with_tenant(Uuid::new_v4());
-        let _ = engine.unique_unlocks();
+    #[tokio::test]
+    async fn noop_publisher_records_each_unlock() {
+        let pub_: Arc<dyn AchievementPublisher> = Arc::new(NoopAchievementPublisher::new());
+        let backend: Arc<dyn TopologyBackend> = Arc::new(StubTopologyBackend::always_trigger());
+        let topology = TopologyEvaluator::new(backend);
+        let behavior = BehaviorEvaluator::new();
+        let output = OutputEvaluator::new();
+        let writer = EventWriter::new();
+        let ops = AchievementOps::new(writer);
+        let user = Uuid::new_v4();
+        let engine = ARGAchievementEngine::with_publisher(
+            topology,
+            behavior,
+            output,
+            ops,
+            user,
+            pub_.clone(),
+        );
+        let tenant = Uuid::nil();
+        engine.evaluate(make_edge_event(), tenant).await.expect("ok");
+        // 8 topology + 1 behavior (BEH-001) = 9 publishes
+        assert_eq!(pub_.published_count(), 9);
+    }
+
+    #[tokio::test]
+    async fn channel_publisher_fans_out_to_subscriber() {
+        let (pub_, mut rx) = ChannelAchievementPublisher::with_capacity(64);
+        let pub_: Arc<dyn AchievementPublisher> = Arc::new(pub_);
+        let backend: Arc<dyn TopologyBackend> = Arc::new(StubTopologyBackend::always_trigger());
+        let topology = TopologyEvaluator::new(backend);
+        let behavior = BehaviorEvaluator::new();
+        let output = OutputEvaluator::new();
+        let writer = EventWriter::new();
+        let ops = AchievementOps::new(writer);
+        let user = Uuid::new_v4();
+        let engine = ARGAchievementEngine::with_publisher(
+            topology,
+            behavior,
+            output,
+            ops,
+            user,
+            pub_.clone(),
+        );
+        let tenant = Uuid::nil();
+        let unlocks = engine
+            .evaluate(make_edge_event(), tenant)
+            .await
+            .expect("ok");
+        // 8 topology + 1 behavior (BEH-001) = 9 new unlocks
+        assert_eq!(unlocks.len(), 9);
+        // Receiver is still in scope, so published_count returns the
+        // number of active receivers (1).
+        assert_eq!(pub_.published_count(), 1);
+        // Drain the channel: 9 unlocks were broadcast.
+        let mut count = 0;
+        while let Ok(_u) = rx.try_recv() {
+            count += 1;
+        }
+        assert_eq!(count, 9);
     }
 
     // ensure the make_agent helper would compile (mirrors arg crate).

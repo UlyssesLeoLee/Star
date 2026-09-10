@@ -47,8 +47,9 @@ pub mod prompts;
 pub mod trust_engine;
 
 pub use achievement_engine::{
-    ARGAchievementEngine, BehaviorEvaluator, OutputEvaluator, StubTopologyBackend, TopologyBackend,
-    TopologyEvaluator,
+    AchievementPublisher, ARGAchievementEngine, BehaviorEvaluator, BehaviorStats,
+    BehaviorThresholds, ChannelAchievementPublisher, NoopAchievementPublisher, OutputEvaluator,
+    OutputStats, OutputThresholds, StubTopologyBackend, TopologyBackend, TopologyEvaluator,
 };
 pub use context_injector::{
     ARGContextInjector, ContextProvider, DecisionRow, EventRow, InMemoryContextProvider,

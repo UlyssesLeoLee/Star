@@ -1,38 +1,44 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `output_test` — 3 UT (per DD §10.1.3 UT-45..UT-47).
+//! `output_test` — 5 UT (per brief §2.1 B + DD §10.1.3 OUT-UT-01..05).
 //!
-//! - UT-45 test_output_challenge_round — 双向论证 accept
-//! - UT-46 test_output_challenge_reject — reject 触发 escalate
-//! - UT-47 test_output_peer_review      — 双向 review ≥ 0.8
+//! 5 tests, one per OUT metric:
+//! - OUT-UT-01 trusts_skip_verify_save_100k_token
+//! - OUT-UT-02 collaborate_save_1h_wall_clock
+//! - OUT-UT-03 5_domain_lead_consensus_reached
+//! - OUT-UT-04 zero_failure_100_collaborations
+//! - OUT-UT-05 achievement_chain_5_in_a_row
 
-use std::sync::Arc;
-
-use async_trait::async_trait;
 use chrono::Utc;
-use serde_json::json;
-use star_arg::error::ARGError;
-use star_arg::llm::{LLMClient, LLMResponse, MockLLMClient};
-use star_arg::models::decision::{Decision, DecisionType, Output, Verdict};
 use star_arg::models::edge::{Edge, EdgeDirection, RelationshipType};
-use star_arg_effect::dispatch_router::InMemoryEdgeStore;
-use star_arg_effect::output_evaluator::ARGOutputEvaluator;
+use star_arg::models::event::ARGEvent;
+use star_arg_effect::achievement_engine::output::{
+    ALL_OUT_CODES, OUT_001_TRUSTS_100K_TOKEN, OUT_002_COLLAB_1H, OUT_003_5_LEAD_CONSENSUS,
+    OUT_004_ZERO_FAIL_100, OUT_005_ACHIEVEMENT_CHAIN_5, OutputEvaluator, OutputStats,
+    OutputThresholds,
+};
 use uuid::Uuid;
 
-fn edge(from: Uuid, to: Uuid, t: RelationshipType, weight: f32, tenant: Uuid) -> Edge {
+fn edge_with_meta(
+    from: Uuid,
+    to: Uuid,
+    t: RelationshipType,
+    meta: serde_json::Value,
+    tenant: Uuid,
+) -> Edge {
     let now = Utc::now();
     Edge {
         id: Uuid::new_v4(),
         from_agent: from,
         to_agent: to,
         edge_type: t,
-        weight,
+        weight: 0.7,
         direction: if t.is_directed() {
             EdgeDirection::Directed
         } else {
             EdgeDirection::Undirected
         },
         archived: false,
-        metadata: serde_json::Value::Null,
+        metadata: meta,
         tenant_id: tenant,
         created_at: now,
         updated_at: now,
@@ -41,106 +47,109 @@ fn edge(from: Uuid, to: Uuid, t: RelationshipType, weight: f32, tenant: Uuid) ->
     }
 }
 
-fn decision() -> Decision {
-    Decision {
-        decision_type: DecisionType::Architectural,
-        description: "use axum 0.8".into(),
-        context: json!({}),
-        tenant_id: Uuid::new_v4(),
-    }
+fn edge(from: Uuid, to: Uuid, t: RelationshipType, tenant: Uuid) -> Edge {
+    edge_with_meta(from, to, t, serde_json::Value::Null, tenant)
 }
 
-fn output() -> Output {
-    Output {
-        output_type: "code.review".into(),
-        content: json!({"pr": 1}),
+fn block_on<F: std::future::Future>(f: F) -> F::Output {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("build tokio runtime")
+        .block_on(f)
+}
+
+#[test]
+fn out_ut_01_trusts_skip_verify_save_100k_token() {
+    let eval = OutputEvaluator::new();
+    let t = Uuid::new_v4();
+    let mut stats = OutputStats::new();
+    stats.trusts_tokens_saved = 100_000.0;
+    eval.set_stats(stats);
+    let evt = ARGEvent::TrustScoreChanged {
         agent_id: Uuid::new_v4(),
-        tenant_id: Uuid::new_v4(),
-    }
+        before: 0.5,
+        after: 0.55,
+        delta: 0.05,
+    };
+    let code = block_on(eval.evaluate(&evt, t)).expect("ok");
+    // 100000 + 0.05 * 200 = 100010 >= 100000
+    assert!(code.iter().any(|c| c == OUT_001_TRUSTS_100K_TOKEN));
 }
 
-#[tokio::test]
-async fn ut45_output_challenge_round_accept() {
-    let tenant = Uuid::new_v4();
-    let from = Uuid::new_v4();
-    let to = Uuid::new_v4();
-    let mut store = InMemoryEdgeStore::default();
-    store.add(edge(from, to, RelationshipType::Challenges, 0.8, tenant));
-    let llm: Arc<dyn LLMClient> = Arc::new(MockLLMClient::new());
-    let eval = ARGOutputEvaluator::new(Arc::new(store), llm);
-    let v = eval
-        .challenge_round(from, to, decision(), tenant)
-        .await
-        .expect("ok");
-    // Mock returns verdict=None → we default to Accept (per ARG.3 守门 #23).
-    assert_eq!(v.verdict, Verdict::Accept);
-    assert!(v.is_accepted());
-    assert!(v.escalation.is_none());
+#[test]
+fn out_ut_02_collaborate_save_1h_wall_clock() {
+    let eval = OutputEvaluator::new();
+    let t = Uuid::new_v4();
+    let mut stats = OutputStats::new();
+    stats.collab_wall_clock_seconds = 3500.0;
+    eval.set_stats(stats);
+    let evt = ARGEvent::EdgeCreated(edge_with_meta(
+        Uuid::new_v4(),
+        Uuid::new_v4(),
+        RelationshipType::CollaboratesWith,
+        serde_json::json!({"wall_clock_saved_seconds": 200.0}),
+        t,
+    ));
+    let code = block_on(eval.evaluate(&evt, t)).expect("ok");
+    // 3500 + 200 = 3700 >= 3600
+    assert!(code.iter().any(|c| c == OUT_002_COLLAB_1H));
 }
 
-#[tokio::test]
-async fn ut46_output_challenge_reject_escalate() {
-    let tenant = Uuid::new_v4();
-    let from = Uuid::new_v4();
-    let to = Uuid::new_v4();
-    let mut store = InMemoryEdgeStore::default();
-    store.add(edge(from, to, RelationshipType::Challenges, 0.5, tenant));
-
-    // Custom mock that returns Verdict::Escalate on the second
-    // (evaluate) call so we exercise the escalation-metadata path.
-    struct EscalateMock;
-    #[async_trait]
-    impl LLMClient for EscalateMock {
-        async fn call(
-            &self,
-            _prompt: &str,
-            _input: &serde_json::Value,
-        ) -> Result<LLMResponse, ARGError> {
-            Ok(LLMResponse::new(
-                "needs review".into(),
-                Some(Verdict::Escalate),
-                Some(0.42),
-                0,
-            ))
-        }
-    }
-
-    let llm: Arc<dyn LLMClient> = Arc::new(EscalateMock);
-    let eval = ARGOutputEvaluator::new(Arc::new(store), llm);
-    let v = eval
-        .challenge_round(from, to, decision(), tenant)
-        .await
-        .expect("ok");
-    assert_eq!(v.verdict, Verdict::Escalate);
-    assert!(!v.is_accepted());
-    assert!(v.escalation.is_some());
-    assert_eq!(v.escalation.as_ref().unwrap().escalation_target, from);
+#[test]
+fn out_ut_03_5_domain_lead_consensus_reached() {
+    let eval = OutputEvaluator::new();
+    let t = Uuid::new_v4();
+    let mut stats = OutputStats::new();
+    stats.consensus_count = 1;
+    eval.set_stats(stats);
+    let evt = ARGEvent::EdgeCreated(edge(
+        Uuid::new_v4(),
+        Uuid::new_v4(),
+        RelationshipType::DelegatesTo,
+        t,
+    ));
+    let code = block_on(eval.evaluate(&evt, t)).expect("ok");
+    assert!(code.iter().any(|c| c == OUT_003_5_LEAD_CONSENSUS));
 }
 
-#[tokio::test]
-async fn ut47_output_peer_review_above_threshold() {
-    let tenant = Uuid::new_v4();
-    let a = Uuid::new_v4();
-    let b = Uuid::new_v4();
-    let mut store = InMemoryEdgeStore::default();
-    store.add(edge(a, b, RelationshipType::PeerReviews, 0.5, tenant));
+#[test]
+fn out_ut_04_zero_failure_100_collaborations() {
+    let mut stats = OutputStats::new();
+    stats.total_collaborations = 100;
+    stats.zero_failure_count = 100;
+    let codes = stats.triggered_codes(&OutputThresholds::default());
+    assert!(codes.iter().any(|c| c == OUT_004_ZERO_FAIL_100));
 
-    // Custom mock returning score=0.95 on both calls.
-    struct HighScoreMock;
-    #[async_trait]
-    impl LLMClient for HighScoreMock {
-        async fn call(
-            &self,
-            _prompt: &str,
-            _input: &serde_json::Value,
-        ) -> Result<LLMResponse, ARGError> {
-            Ok(LLMResponse::new("ok".into(), None, Some(0.95), 0))
-        }
+    // 100 collab but 99 zero-failure → not triggered.
+    let mut stats2 = OutputStats::new();
+    stats2.total_collaborations = 100;
+    stats2.zero_failure_count = 99;
+    let codes2 = stats2.triggered_codes(&OutputThresholds::default());
+    assert!(!codes2.iter().any(|c| c == OUT_004_ZERO_FAIL_100));
+}
+
+#[test]
+fn out_ut_05_achievement_chain_5_in_a_row() {
+    let mut stats = OutputStats::new();
+    stats.achievement_chain_length = 5;
+    let codes = stats.triggered_codes(&OutputThresholds::default());
+    assert!(codes.iter().any(|c| c == OUT_005_ACHIEVEMENT_CHAIN_5));
+
+    // Reset chain → not triggered.
+    let mut stats2 = OutputStats::new();
+    stats2.achievement_chain_length = 4;
+    let codes2 = stats2.triggered_codes(&OutputThresholds::default());
+    assert!(!codes2.iter().any(|c| c == OUT_005_ACHIEVEMENT_CHAIN_5));
+}
+
+#[test]
+fn all_5_out_codes_unique_and_canonical() {
+    assert_eq!(ALL_OUT_CODES.len(), 5);
+    let mut set: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    for c in ALL_OUT_CODES.iter() {
+        assert!(set.insert(*c), "duplicate code: {c}");
     }
-
-    let llm: Arc<dyn LLMClient> = Arc::new(HighScoreMock);
-    let eval = ARGOutputEvaluator::new(Arc::new(store), llm);
-    let v = eval.peer_review(a, b, output(), tenant).await.expect("ok");
-    assert!(v.accepted());
-    assert!((v.score() - 0.95).abs() < 1e-6);
+    assert_eq!(ALL_OUT_CODES[0], OUT_001_TRUSTS_100K_TOKEN);
+    assert_eq!(ALL_OUT_CODES[4], OUT_005_ACHIEVEMENT_CHAIN_5);
 }
