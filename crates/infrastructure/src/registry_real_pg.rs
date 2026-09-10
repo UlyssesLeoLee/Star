@@ -1,0 +1,307 @@
+//! v0.72 P0-4 Stage 2: RealPostgresAdapterRegistry 实现
+//!
+//! per WBS §14.15 P0-4 Stage 2 (0.5M tokens, 跨 session 续做), 守门 #1 v25 单 crate 模式 + 守门 #14 v4 Mavis 审核 author=Ulysses.
+//!
+//! 提供 AdapterRegistry + AdapterQuery trait 的 PostgreSQL 真实实现,
+//! 跟 InMemoryAdapterRegistry 平行共存 (in-memory 用于单元测试 / 集成测试 mock,
+//! real PG 用于 k3s-deployable P2 阶段 worker 子代理实装).
+//!
+//! ## 跟 InMemoryAdapterRegistry 区别
+//!
+//! 1. 持有 sqlx::PgPool 字段 (per v0.38 star-pg-adapter::connect_pool + PgConfig::from_url)
+//! 2. register_postgres_adapter 时填 pg_url: Some(self.pg_url.clone()) 到 descriptor
+//! 3. 提供 verify_health() 方法调 star_pg_adapter::healthcheck(&pool) 做真实 PG 健康检查
+//! 4. list_registered_adapters 返回的 descriptor 带 pg_url + registered_at, 供 application 编排层后续用
+//!
+//! ## 测试策略
+//!
+//! 单元测试用 `sqlx::PgPool::connect_lazy("postgres://invalid")` 不连真 PG (lazy pool 不会实际连),
+//! 仅验证 descriptor tracking + pg_url 填充正确. 真实 PG healthcheck 用 lazy pool 必然失败,
+//! 所以 verify_health 在单元测试里走 `is_err()` 断言 (per 守门 #11 缺标比错标).
+//!
+//! 守门 #1 v25 cargo test -p infrastructure -j 4 = 100% pass
+//! 守门 #14 v4 修订人: Ulysses(一人公司 12 角色 per DEC-008) - Mavis 接手**审核**
+
+use crate::registry::AdapterKind;
+use crate::{AdapterDescriptor, AdapterQuery, AdapterRegistry, InfrastructureError};
+use async_trait::async_trait;
+use star_context::ActorContext;
+use star_pg_adapter::healthcheck;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use uuid::Uuid;
+
+/// **RealPostgresAdapterRegistry** — PostgreSQL 真实版 AdapterRegistry 实现
+///
+/// 持有 sqlx::PgPool 字段, 描述符带 pg_url + registered_at.
+///
+/// 状态: registered adapters 索引 (kind → list of descriptors), 跟 InMemoryAdapterRegistry 平行
+#[derive(Debug, Clone)]
+pub struct RealPostgresAdapterRegistry {
+    /// PostgreSQL 连接池 (per v0.38 star-pg-adapter::connect_pool 构造)
+    pool: sqlx::PgPool,
+    /// PG 连接 URL (descriptor 填充用, per AdapterDescriptor.pg_url)
+    pg_url: String,
+    /// 状态: registered adapters 索引 (kind → list of descriptors)
+    state: Arc<RwLock<HashMap<String, Vec<AdapterDescriptor>>>>,
+}
+
+impl RealPostgresAdapterRegistry {
+    /// 新建 RealPostgresAdapterRegistry, 持有传入的 PgPool + pg_url
+    ///
+    /// 不验证 pool 实际连通性 (per PgPool::connect_lazy 兼容, 测试场景不需要真 PG).
+    /// 真实连通性验证用 `verify_health()` 方法.
+    pub fn new(pool: sqlx::PgPool, pg_url: impl Into<String>) -> Self {
+        Self {
+            pool,
+            pg_url: pg_url.into(),
+            state: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// 验证 PG 健康状态 (调 star_pg_adapter::healthcheck)
+    ///
+    /// 用于 P2 阶段 worker 子代理在调度前做 health gate, 跟 k3s readiness probe 协同.
+    /// 单元测试中 lazy pool 必然返回 Err (per 守门 #11 缺标比错标 + 守门 #5 v2 env 安全).
+    pub async fn verify_health(&self) -> Result<(), InfrastructureError> {
+        healthcheck(&self.pool)
+            .await
+            .map_err(|e| InfrastructureError::Internal(format!("pg healthcheck failed: {}", e)))
+    }
+
+    /// 当前注册的 adapter 总数
+    pub fn count(&self) -> usize {
+        let state = self.state.read().expect("lock");
+        state.values().map(|v| v.len()).sum()
+    }
+
+    /// 按 kind 列出 descriptors
+    pub fn list_by_kind(&self, kind: AdapterKind) -> Vec<AdapterDescriptor> {
+        let state = self.state.read().expect("lock");
+        state.get(kind.as_str()).cloned().unwrap_or_default()
+    }
+
+    /// 按 tenant_id 列出 descriptors (跨 kind)
+    pub fn list_by_tenant(&self, tenant_id: Uuid) -> Vec<AdapterDescriptor> {
+        let state = self.state.read().expect("lock");
+        state
+            .values()
+            .flat_map(|v| v.iter())
+            .filter(|d| d.tenant_id == tenant_id)
+            .cloned()
+            .collect()
+    }
+
+    /// 内部 helper: 注册一个 adapter descriptor, 5 register_*_adapter 方法共用
+    fn register(
+        &self,
+        kind: AdapterKind,
+        tenant_id: Uuid,
+    ) -> Result<AdapterDescriptor, InfrastructureError> {
+        let desc = AdapterDescriptor {
+            id: Uuid::new_v4(),
+            tenant_id,
+            // v0.72 P0-4 Stage 2: RealPostgresAdapterRegistry 跟 InMemoryAdapterRegistry 区别
+            // 1. pg_url: Some(self.pg_url.clone())  填入构造时传入的 PG URL
+            pg_url: Some(self.pg_url.clone()),
+            // 2. registered_at: Some(now)  填入当前 UTC 时间
+            registered_at: Some(chrono::Utc::now()),
+        };
+        let mut state = self.state.write().expect("lock");
+        state
+            .entry(kind.as_str().to_string())
+            .or_insert_with(Vec::new)
+            .push(desc.clone());
+        Ok(desc)
+    }
+}
+
+#[async_trait]
+impl AdapterRegistry for RealPostgresAdapterRegistry {
+    async fn register_postgres_adapter(
+        &self,
+        _cmd: (),
+        actor: ActorContext,
+    ) -> Result<(), InfrastructureError> {
+        let _ = self.register(AdapterKind::Postgres, actor.tenant_id)?;
+        Ok(())
+    }
+
+    async fn register_nats_adapter(
+        &self,
+        _cmd: (),
+        actor: ActorContext,
+    ) -> Result<(), InfrastructureError> {
+        let _ = self.register(AdapterKind::Nats, actor.tenant_id)?;
+        Ok(())
+    }
+
+    async fn register_object_storage_adapter(
+        &self,
+        _cmd: (),
+        actor: ActorContext,
+    ) -> Result<(), InfrastructureError> {
+        let _ = self.register(AdapterKind::ObjectStorage, actor.tenant_id)?;
+        Ok(())
+    }
+
+    async fn register_scm_adapter(
+        &self,
+        _cmd: (),
+        actor: ActorContext,
+    ) -> Result<(), InfrastructureError> {
+        let _ = self.register(AdapterKind::Scm, actor.tenant_id)?;
+        Ok(())
+    }
+
+    async fn register_agent_adapter(
+        &self,
+        _cmd: (),
+        actor: ActorContext,
+    ) -> Result<(), InfrastructureError> {
+        let _ = self.register(AdapterKind::Agent, actor.tenant_id)?;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl AdapterQuery for RealPostgresAdapterRegistry {
+    async fn list_registered_adapters(
+        &self,
+        _dummy: (),
+        _viewer: ActorContext,
+    ) -> Result<Vec<AdapterDescriptor>, InfrastructureError> {
+        let state = self.state.read().expect("lock");
+        let all: Vec<AdapterDescriptor> = state.values().flat_map(|v| v.iter()).cloned().collect();
+        Ok(all)
+    }
+}
+
+// =====================================================================
+// 单元测试 (per 守门 #1 v25 cargo test -p infrastructure --lib -j 4)
+// =====================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use star_context::ActorContext;
+    use uuid::Uuid;
+
+    /// 构造测试用 lazy pool (不连真 PG, 仅供单元测试)
+    /// per 守门 #5 v2 env 安全: 不从 env var 读 DATABASE_URL, hardcode 一个明显无效 URL
+    fn test_lazy_pool() -> sqlx::PgPool {
+        sqlx::PgPool::connect_lazy("postgres://test:test@127.0.0.1:1/nonexistent")
+            .expect("lazy pool construction should always succeed")
+    }
+
+    fn test_actor(tenant_id: Uuid) -> ActorContext {
+        ActorContext::new(Uuid::new_v4(), tenant_id)
+    }
+
+    #[tokio::test]
+    async fn new_registry_is_empty() {
+        // PgPool::connect_lazy 需要 tokio context (per sqlx 0.8.6 pool/inner.rs:529)
+        // 所以本测试必须用 #[tokio::test] 不能用裸 #[test]
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        assert_eq!(reg.count(), 0);
+    }
+
+    #[tokio::test]
+    async fn register_postgres_adapter_adds_descriptor_with_pg_url() {
+        let pg_url = "postgres://test:test@127.0.0.1:1/nonexistent";
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), pg_url);
+        let actor = test_actor(Uuid::new_v4());
+        let result = reg.register_postgres_adapter((), actor).await;
+        assert!(result.is_ok());
+        assert_eq!(reg.count(), 1);
+        let list = reg.list_by_kind(AdapterKind::Postgres);
+        assert_eq!(list.len(), 1);
+        // v0.72 Stage 2 关键断言: pg_url 必填 Some(pg_url), 跟 InMemoryAdapterRegistry 的 None 区别
+        assert_eq!(list[0].pg_url, Some(pg_url.to_string()));
+        // v0.72 Stage 2 关键断言: registered_at 必填 Some(now)
+        assert!(list[0].registered_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn register_all_5_kinds_works() {
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor.clone()).await;
+        let _ = reg.register_nats_adapter((), actor.clone()).await;
+        let _ = reg.register_object_storage_adapter((), actor.clone()).await;
+        let _ = reg.register_scm_adapter((), actor.clone()).await;
+        let _ = reg.register_agent_adapter((), actor).await;
+        assert_eq!(reg.count(), 5);
+    }
+
+    #[tokio::test]
+    async fn register_multiple_per_kind_works() {
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let actor1 = test_actor(Uuid::new_v4());
+        let actor2 = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor1).await;
+        let _ = reg.register_postgres_adapter((), actor2).await;
+        let list = reg.list_by_kind(AdapterKind::Postgres);
+        assert_eq!(list.len(), 2);
+        // 两个 descriptor 共享同一个 pg_url (per RealPostgresAdapterRegistry 共享 pool)
+        assert!(list.iter().all(|d| d.pg_url.is_some()));
+    }
+
+    #[tokio::test]
+    async fn list_by_tenant_filters_correctly() {
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let tenant_a = Uuid::new_v4();
+        let tenant_b = Uuid::new_v4();
+        let _ = reg
+            .register_postgres_adapter((), test_actor(tenant_a))
+            .await;
+        let _ = reg.register_nats_adapter((), test_actor(tenant_a)).await;
+        let _ = reg
+            .register_postgres_adapter((), test_actor(tenant_b))
+            .await;
+        assert_eq!(reg.list_by_tenant(tenant_a).len(), 2);
+        assert_eq!(reg.list_by_tenant(tenant_b).len(), 1);
+    }
+
+    #[tokio::test]
+    async fn list_registered_adapters_query_returns_all_with_pg_url() {
+        let pg_url = "postgres://prod@db.example.com:5432/mydb";
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), pg_url);
+        let actor = test_actor(Uuid::new_v4());
+        let _ = reg.register_postgres_adapter((), actor.clone()).await;
+        let _ = reg.register_nats_adapter((), actor).await;
+        let viewer = test_actor(Uuid::new_v4());
+        let result = reg.list_registered_adapters((), viewer).await;
+        assert!(result.is_ok());
+        let list = result.unwrap();
+        assert_eq!(list.len(), 2);
+        // pg_url 在 list_registered_adapters 路径下也保留
+        let pg_desc = list
+            .iter()
+            .find(|d| d.pg_url.is_some())
+            .expect("至少一个 postgres descriptor 必带 pg_url");
+        assert_eq!(pg_desc.pg_url, Some(pg_url.to_string()));
+    }
+
+    #[tokio::test]
+    async fn verify_health_returns_error_on_lazy_pool() {
+        // per 守门 #11 缺标比错标: lazy pool 实际不连, healthcheck 必返 Err
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://test");
+        let result = reg.verify_health().await;
+        assert!(
+            result.is_err(),
+            "lazy pool healthcheck 必失败 (per 守门 #11)"
+        );
+        // 错误类型是 InfrastructureError::Internal
+        match result.unwrap_err() {
+            InfrastructureError::Internal(msg) => {
+                assert!(
+                    msg.contains("pg healthcheck failed"),
+                    "error msg 必含 'pg healthcheck failed', 实际 = {}",
+                    msg
+                );
+            }
+            other => panic!("预期 Internal error, 实际 = {:?}", other),
+        }
+    }
+}

@@ -13,8 +13,15 @@ serde = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = "0.1"
 
+# v0.72 P0-4 Stage 2: RealPostgresAdapterRegistry 骨架
+# - star-pg-adapter 提供 healthcheck() 用于真实 PG 健康检查
+# - sqlx 提供 PgPool 类型 (connect_lazy 用于测试无需真 PG)
 star-context = { path = "../star-context" }
+star-pg-adapter = { path = "../star-pg-adapter" }
+sqlx = { workspace = true }
 
 [dev-dependencies]
 # v0.66 P0-4 InMemoryAdapterRegistry 测试用 (#[tokio::test] async test runner)

@@ -1893,10 +1893,14 @@ name = "infrastructure"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "serde",
+ "sqlx",
  "star-context",
+ "star-pg-adapter",
  "thiserror 1.0.69",
  "tokio",
+ "tracing",
  "uuid",
 ]
 

@@ -123,6 +123,14 @@ pub struct AdapterDescriptor {
     pub id: Uuid,
     /// 租户 ID(13 类对象必带,§6.1)
     pub tenant_id: Uuid,
+    /// PostgreSQL 连接 URL (only for Postgres adapter, None for others)
+    /// v0.72 P0-4 Stage 2 扩展: RealPostgresAdapterRegistry 会把构造时传入的 pg_url 填到这里
+    /// (per InMemoryAdapterRegistry backward compat, 内存版始终 None)
+    #[serde(default)]
+    pub pg_url: Option<String>,
+    /// 注册时间 (UTC) — v0.72 扩展 (per spec §13.1 默认 SoR 审计需求)
+    #[serde(default)]
+    pub registered_at: Option<chrono::DateTime<chrono::Utc>>,
     // 其它字段在 Phase 2 由具体 spec 补充
 }
 
@@ -184,3 +192,4 @@ mod tests {
 }
 
 pub mod registry;
+pub mod registry_real_pg;
