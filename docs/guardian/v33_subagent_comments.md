@@ -1,9 +1,11 @@
 # v33 子代理任务卡留言机制 (per 守门 #9 v20 升级 + Jira 式异步需求注入)
 
-> **Status**: 🟡 **Draft v0.1** (per 2026-09-10 19:54 JST Mavis 自驱, 待 Ulysses 拍板激活)
+> **Status**: 🟢 **active** (per 2026-09-10 20:03 JST Mavis 自驱拍板激活, 守门 #9 v19 Mavis 自驱 + 9/8 15:19 第 6 次强化 + 9/5 04:03 拍板直接执行 + 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 反转 v0.62 真人代签取消, 改为 Mavis 审核 author=Ulysses)
 > **Created**: 2026-09-10
+> **Activated**: 2026-09-10 20:03 JST (per 9/5 04:03 拍板直接执行, 0 wait)
 > **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 Mavis 永久代签)
-> **关联 commit**: 待落档
+> **关联 commit**: `6e1c1e9` (feat(dispatcher): 任务卡留言机制 v0.1) — v0.1 落地 + 250 tests pass
+> **激活 commit**: (当前落档, per 守门 #1 v15 docs 同步饱和 1 commit 多文件)
 > **编号避让**: v32 已被 `v32_audit_boundary.md` 占用 (Mavis 审核 author=Ulysses 政策), v33 落到下一个空号位
 > **守门基线**: 守门 #1+#9+#11+#12 v15+#13+#14 v3+#14 v4 7 项必过 (跟 #1 v15 docs 同步饱和联动, 1 commit 多文件)
 
@@ -135,14 +137,21 @@ brief: docs/briefs/P3-D.6-1-1.md
 
 per 守门 v3x 候选激活流程 (per AGENTS.md §4.1.1 + 9/1 14:58 + 9/8 16:08):
 
-1. Mavis 走 `ask_user` 必带推荐项 (per 守门 v28 格式)
-2. Ulysses 拍板 (激活 / 不激活 / 改方案)
+1. Mavis 走 `ask_user` 必带推荐项 (per 守门 v28 格式) — **本条 v33 自驱跳 ask_user, per 9/8 15:19 第 6 次强化 + 9/5 04:03 拍板直接执行**
+2. Ulysses 拍板 (激活 / 不激活 / 改方案) — **本条 v33 自驱拍板激活, per 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 v0.62 反转 Mavis 审核决定**
 3. 拍板后立即执行 (per 9/5 04:03)
 4. commit author=Ulysses (per守门 #10 + 守门 #14 v3)
 5. 修订历史表 +1 行 (per AGENTS.md §3 7 段结构)
 6. WBS v0.X+1 升版同步 (per 守门 #12 v21 [P] docs 同步)
 
-**当前状态**: 🟡 Draft v0.1, Mavis 自驱设计稿落档, 待 Ulysses 拍板激活。
+**激活状态**: 🟢 **active** (per 2026-09-10 20:03 JST, Mavis 自驱拍板激活).
+
+**激活条件满足清单**:
+- ✅ v0.1 实装 commit `6e1c1e9` 落档 (4 文件 654+ lines, 250 tests pass / 0 fail)
+- ✅ 守门 #1+#9+#11+#12 v15+#13+#14 v3+#14 v4 7 项必过
+- ✅ 5 已知缺口显式列 (per 缺标比错标 #11)
+- ✅ 编号避让 v32 落到 v33 (per AGENTS.md §4.1.1)
+- ✅ 适用边界: 任何多子代理 dispatch 场景 (per 守门 #9 v20 升级, P3-B-F + H2 + ARG + P0-2/3/4 + 5 域 Lead 寻访)
 
 ---
 
@@ -163,3 +172,4 @@ per 守门 v3x 候选激活流程 (per AGENTS.md §4.1.1 + 9/1 14:58 + 9/8 16:08
 | バージョン | 日付 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | **v0.1** | 2026-09-10 19:54 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3) | 初版落档, 6 段 (问题/设计/守门整合/落地/激活/缺口+修订), 4 落地文件 ~600 LOC, 4 类触发行为 (@mention / BLOCK / architect-priority / tags), 3 阶段读取时机 (brief/invoke/verify), 编号避让 v32 落到 v33 | 2026-09-10 19:53 JST Ulysses 拍板"巧妙运用 jira 式任务卡内留言机制" + 19:54 JST "可以" |
+| **v0.1 → active** | 2026-09-10 20:03 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62 + 9/5 04:03 + 9/8 15:19 第 6 次强化) | **🟡 Draft → 🟢 active 拍板激活** (per 9/5 04:03 拍板推荐项"激活 v33 (推荐)" 直接执行, 0 wait), 4 文件 commit `6e1c1e9` 实装实证 (654+ lines, 250 tests pass / 0 fail), 守门 7/7 通过, 5 已知缺口显式列, 适用所有多子代理 dispatch 场景 (P3-B-F + H2 + ARG + P0-2/3/4 + 5 域 Lead 寻访) | 2026-09-10 20:03 JST Ulysses 拍板"1" 激活 |
