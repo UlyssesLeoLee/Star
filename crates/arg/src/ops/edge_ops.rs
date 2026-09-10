@@ -20,6 +20,7 @@ use crate::models::edge::{Edge, RelationshipType};
 
 use super::event_writer::EventWriter;
 use super::trust_audit::TrustAuditOps;
+use super::v2_sink::V2EdgeSink;
 
 /// Filter used by [`EdgeOps::list`].
 #[derive(Debug, Clone, Default)]
@@ -49,6 +50,8 @@ pub struct EdgeOps {
     event_writer: Arc<EventWriter>,
     /// Optional TrustAuditOps for G-4 4 重审计 integration (per DDD-REVIEW §1.2)
     trust_audit: Option<Arc<TrustAuditOps>>,
+    /// Optional V2EdgeSink for G-10 阶段 1 双写 (per DDD-REVIEW §1.3)
+    v2_sink: Option<Arc<dyn V2EdgeSink>>,
 }
 
 impl EdgeOps {
@@ -58,6 +61,7 @@ impl EdgeOps {
             client,
             event_writer,
             trust_audit: None,
+            v2_sink: None,
         }
     }
 
@@ -67,11 +71,20 @@ impl EdgeOps {
         self
     }
 
+    /// Attach V2EdgeSink for G-10 阶段 1 双写 (per DDD-REVIEW §1.3)
+    pub fn with_v2_sink(mut self, v2_sink: Arc<dyn V2EdgeSink>) -> Self {
+        self.v2_sink = Some(v2_sink);
+        self
+    }
+
     /// Validate the edge, write it and append an `EdgeCreated` event.
     ///
     /// G-4 集成 (per DDD-REVIEW-AGENT-RELATIONSHIP-001 §1.2): 如果 trust_audit 已设置
     /// 且 edge.edge_type == Trusts, 自动调用 4 重审计 (阈值 0.95 + mutual + evidence + multi-source)
     /// + 写 WORM audit log. 如果 4 重审计失败, 返回 Err(ARGError) 不创建 edge.
+    ///
+    /// G-10 集成 (per DDD-REVIEW-AGENT-RELATIONSHIP-001 §1.3): 如果 v2_sink 已设置,
+    /// 自动双写 V2 schema (阶段 1 双写, 4 阶段渐进式迁移 跨 session 续).
     pub async fn create(&self, edge: Edge) -> Result<Edge, ARGError> {
         edge.validate()?;
 
@@ -84,6 +97,7 @@ impl EdgeOps {
             // trust_audit 未设置时, 跳过审计 (保持向后兼容, per 守门 #1 禁回溯叙事)
         }
 
+        // 1. 写 V1 (主路径, 旧 schema, per DD §3.3.1)
         let cypher = format!(
             "MATCH (a:Agent {{id: $from}}), (b:Agent {{id: $to}}) \
              CREATE (a)-[r:{} {{id: $id, weight: $weight, ...}}]->(b) \
@@ -96,6 +110,14 @@ impl EdgeOps {
         self.event_writer
             .append(crate::models::ARGEvent::EdgeCreated(edge.clone()))
             .await?;
+
+        // 2. G-10 集成: V1 写成功后, 同步双写 V2 (per DDD-REVIEW §1.3 阶段 1 双写 2 周)
+        if let Some(v2_sink) = &self.v2_sink {
+            v2_sink.append_v2(&edge)?;
+            // 实际 r2d2-memgraph G-1 落地后: v2_sink 是 MemgraphV2EdgeSink, 同步写 audit_audit_event 表
+            // 当前 v0.82 阶段: v2_sink 是 InMemoryV2EdgeSink (per 守门 #11 缺标比错标 P3 跨 session 续)
+        }
+
         Ok(edge)
     }
 

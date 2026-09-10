@@ -24,6 +24,8 @@ pub mod event_writer;
 pub mod template_ops;
 /// Trust 4 重审计操作 (per DDD-REVIEW-AGENT-RELATIONSHIP-001 §1.2 G-4 拍板).
 pub mod trust_audit;
+/// V2 edge sink 操作 (per DDD-REVIEW §1.3 G-10 拍板, 4 阶段渐进式迁移).
+pub mod v2_sink;
 
 pub use achievement_ops::AchievementOps;
 pub use agent_node::AgentNodeOps;
@@ -31,3 +33,4 @@ pub use edge_ops::EdgeOps;
 pub use event_writer::EventWriter;
 pub use template_ops::TemplateOps;
 pub use trust_audit::TrustAuditOps;
+pub use v2_sink::{InMemoryV2EdgeSink, V2EdgeSink};
