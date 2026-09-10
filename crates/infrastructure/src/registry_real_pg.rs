@@ -74,6 +74,9 @@ pub struct RealPostgresAdapterRegistry {
     pg_url: String,
     /// 状态: registered adapters 索引 (kind → list of descriptors)
     state: Arc<RwLock<HashMap<String, Vec<AdapterDescriptor>>>>,
+    /// **v0.81 P0-4 Stage 3.0 多租户路由**: per-tenant PgPool 索引
+    /// (per tenant_id → PgPool, 跨 session 续做 P0-4 累计 7 次仍未闭合的 v0.73/v0.74/v0.75/v0.78/v0.79/v0.80 已知缺口 (a))
+    tenant_pools: Arc<RwLock<HashMap<Uuid, sqlx::PgPool>>>,
 }
 
 impl RealPostgresAdapterRegistry {
@@ -86,6 +89,7 @@ impl RealPostgresAdapterRegistry {
             pool,
             pg_url: pg_url.into(),
             state: Arc::new(RwLock::new(HashMap::new())),
+            tenant_pools: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -113,6 +117,61 @@ impl RealPostgresAdapterRegistry {
     /// 用于日志 / 诊断 / 跟 descriptor.pg_url 交叉验证.
     pub fn pg_url(&self) -> &str {
         &self.pg_url
+    }
+
+    /// **v0.81 P0-4 Stage 3.0 多租户路由: register_pg_pool_for_tenant**
+    ///
+    /// 注册一个 tenant 专属的 PgPool (per spec §13.5 单一 PG + 多 schema / multi-tenant routing).
+    /// 跟 self.pool (构造时的默认 pool) 平行, 用于 P2 阶段 worker 子代理按 tenant_id 路由不同 schema.
+    ///
+    /// **校验**: pg_url 非空 (per 守门 #11 缺标比错标).
+    /// **不验证**: pool 实际连通性 (per PgPool::connect_lazy 兼容 + verify_health() 单独方法).
+    ///
+    /// **返回** AdapterDescriptor 含 tenant_id + pg_url + registered_at, 跟 v0.79/v0.80 v2 spec 一致.
+    pub async fn register_pg_pool_for_tenant(
+        &self,
+        tenant_id: Uuid,
+        pg_url: String,
+        pool: sqlx::PgPool,
+    ) -> Result<AdapterDescriptor, InfrastructureError> {
+        if pg_url.trim().is_empty() {
+            return Err(InfrastructureError::InvalidState(
+                "pg_url 必填非空 (per register_pg_pool_for_tenant spec, 守门 #11)".to_string(),
+            ));
+        }
+        // 1) 插入 per-tenant pool 索引
+        let mut tenant_pools = self.tenant_pools.write().expect("lock");
+        tenant_pools.insert(tenant_id, pool);
+        // 2) 同时加到 state descriptors (跟 v1/v2 spec 一致)
+        let desc = AdapterDescriptor {
+            id: Uuid::new_v4(),
+            tenant_id,
+            pg_url: Some(pg_url),
+            registered_at: Some(chrono::Utc::now()),
+        };
+        let mut state = self.state.write().expect("lock");
+        state
+            .entry(AdapterKind::Postgres.as_str().to_string())
+            .or_insert_with(Vec::new)
+            .push(desc.clone());
+        Ok(desc)
+    }
+
+    /// **v0.81 P0-4 Stage 3.0 多租户路由: get_pg_pool_for_tenant**
+    ///
+    /// 查询 tenant 专属 PgPool (return cloned Option<PgPool> 避免 lifetime issue).
+    /// 未注册的 tenant 返回 None (per 守门 #11 缺标比错标 + caller 自行 fallback).
+    pub fn get_pg_pool_for_tenant(&self, tenant_id: Uuid) -> Option<sqlx::PgPool> {
+        let tenant_pools = self.tenant_pools.read().expect("lock");
+        tenant_pools.get(&tenant_id).cloned()
+    }
+
+    /// **v0.81 P0-4 Stage 3.0 多租户路由: count_tenant_pools**
+    ///
+    /// 当前注册的 per-tenant pool 总数 (用于 application crate 跨域编排时的健康检查).
+    pub fn count_tenant_pools(&self) -> usize {
+        let tenant_pools = self.tenant_pools.read().expect("lock");
+        tenant_pools.len()
     }
 
     /// 当前注册的 adapter 总数
@@ -924,5 +983,95 @@ mod tests {
         };
         let result = reg.register_agent_adapter_v2(cmd, actor).await;
         assert!(result.is_err(), "runtime_mode 空必返 Err");
+    }
+
+    // =====================================================================
+    // v0.81 P0-4 Stage 3.0: 多租户 tenant_id 路由 (P0-4 累计 7 次仍未闭合缺口)
+    // =====================================================================
+
+    #[tokio::test]
+    async fn register_pg_pool_for_tenant_works() {
+        // v0.81 关键断言: 1 个 tenant 注册专属 pool 成功 + 计入 state descriptor
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://default");
+        let tenant_id = Uuid::new_v4();
+        let tenant_pg_url = "postgres://tenant_a@db.example.com/tenant_a_db";
+        let result = reg
+            .register_pg_pool_for_tenant(tenant_id, tenant_pg_url.to_string(), test_lazy_pool())
+            .await;
+        assert!(result.is_ok(), "register_pg_pool_for_tenant 必成功");
+        let desc = result.unwrap();
+        assert_eq!(desc.tenant_id, tenant_id, "descriptor.tenant_id 必匹配");
+        assert_eq!(
+            desc.pg_url,
+            Some(tenant_pg_url.to_string()),
+            "descriptor.pg_url 必填 Some(tenant_pg_url)"
+        );
+        assert!(desc.registered_at.is_some());
+        // state 也必加 1 个 descriptor
+        let pg_descs = reg.list_by_kind(AdapterKind::Postgres);
+        assert_eq!(pg_descs.len(), 1);
+        // tenant_pools 计数 = 1
+        assert_eq!(reg.count_tenant_pools(), 1);
+    }
+
+    #[tokio::test]
+    async fn get_pg_pool_for_tenant_returns_inserted_pool() {
+        // v0.81 关键断言: 多个 tenant 各自 register, get 各自返 unique pool
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://default");
+        let tenant_a = Uuid::new_v4();
+        let tenant_b = Uuid::new_v4();
+        // 2 tenant 各注册专属 pool
+        let _ = reg
+            .register_pg_pool_for_tenant(tenant_a, "postgres://a".to_string(), test_lazy_pool())
+            .await;
+        let _ = reg
+            .register_pg_pool_for_tenant(tenant_b, "postgres://b".to_string(), test_lazy_pool())
+            .await;
+        // get 各返独立 pool
+        let pool_a = reg.get_pg_pool_for_tenant(tenant_a);
+        let pool_b = reg.get_pg_pool_for_tenant(tenant_b);
+        assert!(
+            pool_a.is_some(),
+            "tenant_a pool 必存在 (per 守门 #11 缺标比错标)"
+        );
+        assert!(
+            pool_b.is_some(),
+            "tenant_b pool 必存在 (per 守门 #11 缺标比错标)"
+        );
+        // 不同 tenant 必返不同 pool (per sqlx::PgPool Arc 内部不同实例)
+        let ptr_a = pool_a.as_ref().unwrap() as *const _ as *const u8;
+        let ptr_b = pool_b.as_ref().unwrap() as *const _ as *const u8;
+        assert_ne!(
+            ptr_a, ptr_b,
+            "不同 tenant 必返不同 pool 实例 (per 路由隔离)"
+        );
+        // 总数 = 2
+        assert_eq!(reg.count_tenant_pools(), 2);
+    }
+
+    #[tokio::test]
+    async fn get_pg_pool_for_tenant_returns_none_for_unknown_tenant() {
+        // v0.81 关键断言: 未注册 tenant 返 None, caller 自行 fallback
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://default");
+        let unknown_tenant = Uuid::new_v4();
+        let result = reg.get_pg_pool_for_tenant(unknown_tenant);
+        assert!(
+            result.is_none(),
+            "未注册 tenant 必返 None (per 守门 #11 缺标比错标)"
+        );
+        assert_eq!(reg.count_tenant_pools(), 0);
+    }
+
+    #[tokio::test]
+    async fn register_pg_pool_for_tenant_validates_empty_pg_url() {
+        // v0.81 关键断言: pg_url 空字符串必返 Err
+        let reg = RealPostgresAdapterRegistry::new(test_lazy_pool(), "postgres://default");
+        let tenant_id = Uuid::new_v4();
+        let result = reg
+            .register_pg_pool_for_tenant(tenant_id, "  ".to_string(), test_lazy_pool())
+            .await;
+        assert!(result.is_err(), "pg_url 空必返 Err");
+        // 没插入
+        assert_eq!(reg.count_tenant_pools(), 0);
     }
 }
