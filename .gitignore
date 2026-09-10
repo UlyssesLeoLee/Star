@@ -105,3 +105,5 @@ __pycache__/
 
 # Transient v0.93 docs sync helper (per 守门 #5 v2 + 守门 #1 v19 batched approach)
 _v093_*.md
+# Transient v0.99.1 docs sync helper (per 守门 #5 v2 + 守门 #1 v19 batched approach)
+_v0991_*.md
