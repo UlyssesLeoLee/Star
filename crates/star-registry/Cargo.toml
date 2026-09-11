@@ -1,0 +1,21 @@
+[package]
+name = "star-registry"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Star Multica Runtime Registry (R3 阶段 1: 5 provider 探测 + MinVersion gate + StatusClassifier 4 档 + LoginShellResolver 30min TTL, per ADR-0027 R3 + plan-032 R3)"
+
+[dependencies]
+# workspace inheritance (per 守门 #1 + #19, 避免 version 重复)
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true
