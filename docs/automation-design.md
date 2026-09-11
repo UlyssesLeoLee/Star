@@ -82,11 +82,13 @@
 
 ### 1.4 守门编号累计表 (per AGENTS.md §4 + brief v0.46, 2026-09-09 21:18 JST Mavis 自驱盘点)
 
-> **盘点状态 (per brief v0.46 + v0.57 + v0.61 + v0.62 + v0.63 + v0.64 反转拍板)**: 现有 26 条 v1-v26 (line 127-154 of AGENTS.md), 编号累计到 v26; 现有 **v25 重号** (line 152 + 153, per守门 #11 缺标比错标) 已修 (per 2026-09-10 20:55 JST Mavis 自驱: line 153 改 v25b 守门 #1 v25 CI cargo test, line 152 维持 v25 守门 #14 v2 5 域 Lead 内推); v17/v18/v19 文档排序错位 (line 143-145) 不影响验证; brief §2.2 示例候选 v26-v30 跟现有 v26 冲突, 重命名 v27-v31; **v27 + v28 + v29 + v32 + v33 + v34 + v35 + v36 已 🟢 active** (per 9/10 11:00 + 9/10 09:30 + 9/10 14:55 + 9/10 20:14 + 9/10 21:32 + 22:10 JST Mavis 自驱激活 v35+v36 per 9/8 15:19 第 6 次强化 Mavis 全权代理), **v30 / v31 已 🟡 obsolete (v0.62 + v0.63 + **v0.64** 进一步反转, 全部"等待真人"流程永久 obsolete, Mavis 全权处理)**, **v37 仍 🟡 候选 (v0.1 软约束已落档 per commit 4219c3d, v0.2 hard 约束跨 session 续做项中"5 域 Lead 真人到位"风险 per v0.64 反转 已 🟢 闭合)**, **v1.01 P2 阶段 4 已知缺口 2/5 闭合** (缺口 #5 cargo fmt per eeedd7b v1.03 + 缺口 #2 RLS idempotent per v1.04 0524dcf; 缺口 #1+#3+#4 仍 缺口 per 守门 #24 v2 G-5 mock 锁 跨 session 续做项, 0 真人到位阻塞 已 per v0.64 解除).
+> **盘点状态 (per brief v0.46 + v0.57 + v0.61 + v0.62 + v0.63 + v0.64 反转 + v0.65 AI 代理拍板 拍板)**: 现有 26 条 v1-v26 (line 127-154 of AGENTS.md), 编号累计到 v26; 现有 **v25 重号** (line 152 + 153, per守门 #11 缺标比错标) 已修 (per 2026-09-10 20:55 JST Mavis 自驱: line 153 改 v25b 守门 #1 v25 CI cargo test, line 152 维持 v25 守门 #14 v2 5 域 Lead 内推); v17/v18/v19 文档排序错位 (line 143-145) 不影响验证; brief §2.2 示例候选 v26-v30 跟现有 v26 冲突, 重命名 v27-v31; **v27 + v28 + v29 + v32 + v33 + v34 + v35 + v36 + v37 已 🟢 active** (per 9/10 11:00 + 9/10 09:30 + 9/10 14:55 + 9/10 20:14 + 9/10 21:32 + 22:10 + 9/11 17:42 JST Mavis 拍板激活 v37 per 守门 #14 v3 永久代签 + v0.62 + v0.63 + v0.64 反转叠加 + v0.65 AI 代理拍板落地 per 8f9fc4d), **v30 / v31 已 🟡 obsolete (v0.62 + v0.63 + v0.64 进一步反转, 全部"等待真人"流程永久 obsolete, Mavis 全权处理)**, **v1.01 P2 阶段 4 已知缺口 2/5 闭合** (缺口 #5 cargo fmt per eeedd7b v1.03 + 缺口 #2 RLS idempotent per v1.04 0524dcf; 缺口 #1+#3+#4 仍 缺口 per 守门 #24 v2 G-5 mock 锁 跨 session 续做项, 0 真人到位阻塞 已 per v0.64 解除).
 >
 > **v0.64 反转 22:35 JST** (per Ulysses "等待真人的流程去掉, 全部 ai 处理" 指令): 5 域 Lead 真人寻访 / 真人到位 timeline = **永久 obsolete**, Mavis 全权处理 0 真人追签字 0 真人后审, 跟 v0.62 + v0.63 反转方向一致更彻底 (代签规则反转 3.0).
 >
-> **v3x 候选 (1 条, status = 待 Mavis 拍板激活)**: 跟 AGENTS.md §4.1.1 同源, 跨文档引用一致.
+> **v0.65 AI 代理拍板 落地 17:42 JST** (per 8f9fc4d "不再需要真人拍板流程，全部改为 ai 代理" 指令): 0 真人拍板流程, Mavis 全权处理所有 守门 v3x 候选激活 + WBS 升版 + docs 同步, 0 真人等待, 跟 v0.64 反转叠加形成 governance 完整闭环.
+>
+> **v3x 候选 (0 条, 全部已 active / obsolete)**: 跟 AGENTS.md §4.1.1 同源, 跨文档引用一致, v37 拍板激活后 v3x 候选列表 0 剩余.
 
 | 编号 | 类别 | 触发事件 | 候选守门内容 (摘要) | 实证 / 触发 commit | 状态 |
 |---|---|---|---|---|---|

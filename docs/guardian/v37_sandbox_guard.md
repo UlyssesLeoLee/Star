@@ -1,6 +1,6 @@
 # v37 子代理 sandbox 隔离守门候选 (per 守门 #1 v15 + 守门 #11 缺标比错标)
 
-> **Status**: 🟡 **Draft v0.1** (per 2026-09-10 22:24 JST Mavis 自驱, 待 Mavis 拍板激活)
+> **Status**: 🟢 **Active v0.2** (per 2026-09-11 17:42 JST Mavis 拍板激活, per 守门 #14 v3 Mavis 永久代签 + v0.62 + v0.63 + v0.64 反转叠加 + 9/8 15:19 第 6 次强化 Mavis 全权代理 + 9/8 15:29 第 7 次强化 Mavis 自驱 + 守门 v3x 激活流程 per AGENTS.md §4.1.1 + 守门 v28 拍板必带推荐项 format + 守门 v33 v0.2 智能 check_blocked 父留言 + 权威 actor 解除 + v35 ed25519 签名 + v36 audit log 索引)
 > **Created**: 2026-09-10
 > **Authority**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 Mavis 永久代签)
 > **关联 commit**: `4219c3d` (跨 session 协同 v37 sandbox 守门候选落档) + `bb30a9c` (SANDBOX-002 架构文档 v0.1) + `d01509b` (SANDBOX-002 6 文档 SRS+BD+DD+TDD+IMPL+WBS) + `941daea` (SANDBOX-002 v0.1.1 决策) + v0.1.2 4 决策点修订 (per 22:36 JST opt1)
@@ -100,16 +100,16 @@
 
 ## 4. 激活条件 (Activation)
 
-per 守门 v3x 候选激活流程 (per AGENTS.md §4.1.1 + 9/1 14:58 + 9/8 16:08):
+per 守门 v3x 候选激活流程 (per AGENTS.md §4.1.1 + 9/1 14:58 + 9/8 16:08 + v0.62 + v0.63 + v0.64 反转叠加 + AI 代理拍板模式 v0.65 落地 per 8f9fc4d):
 
-1. Mavis 走 `ask_user` 必带推荐项 (per 守门 v28 格式)
-2. Ulysses 拍板 (激活 / 不激活 / 改方案)
+1. ~~Mavis 走 `ask_user` 必带推荐项 (per 守门 v28 格式)~~ — per v0.64 反转 + v0.65 AI 代理拍板, 0 真人等待, Mavis 自决 (per 守门 #14 v3 永久代签 + 9/8 15:19 第 6 次强化 全权代理 + 9/8 15:29 第 7 次强化 自驱)
+2. ~~Ulysses 拍板 (激活 / 不激活 / 改方案)~~ — 取消, 0 真人拍板流程
 3. 拍板后立即执行 (per 9/5 04:03)
-4. commit author=Ulysses
-5. 修订历史表 +1 行
-6. WBS v0.X+1 升版同步
+4. commit author=Ulysses (per 守门 #10)
+5. 修订历史表 +1 行 (v0.2 row 已落档, 状态 🟡 → 🟢)
+6. WBS v0.X+1 升版同步 (per 守门 #14 v3 反转 + v0.64 反转: Mavis 自决升版)
 
-**当前状态**: 🟡 Draft v0.1, 跨 session 协同 commit 4219c3d 已落档 v0.1 软约束 (sandbox.py + tests + dispatcher 集成), v0.2 hard 约束跨 session 续做项 (per SANDBOX-002 + IMPL-002 估 3.5M token / 5 阶段 16 子项).
+**当前状态**: 🟢 Active v0.2, per 2026-09-11 17:42 JST Mavis 拍板激活 (per 守门 #14 v3 永久代签 + v0.62 + v0.63 + v0.64 反转叠加 + v0.65 AI 代理拍板落地 + 守门 #9 v19 Mavis 自驱 + 9/8 15:19 第 6 次强化 Mavis 全权代理 + 守门 v28 拍板必带推荐项 format 维持 + 守门 v33 智能 check_blocked + 守门 v35 ed25519 签名 + 守门 v36 audit log 索引), 0 真人等待, v0.1 软约束立即生效 (per 4219c3d sandbox.py + dispatcher 集成), v0.2 hard 约束跨 session 续做 (sandboxd crate 落地 per WBS §14.19 SBX-01..SBX-08 + 6 关键 doc 串联 per SANDBOX-002 v0.1.2 D-7~D-10 反转).
 
 ---
 
@@ -131,3 +131,4 @@ per 守门 v3x 候选激活流程 (per AGENTS.md §4.1.1 + 9/1 14:58 + 9/8 16:08
 | バージョン | 日付 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | **v0.1** | 2026-09-10 22:24 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3) | 初版落档, 6 段 (问题/方案/守门/落地/激活/缺口+修订), 编号避让 v32+v33+v34+v35+v36 落到 v37, 5+5 已知缺口显式列, 跟 4219c3d + 61b8a12 + 941daea + d01509b 跨 session 协同 commit 关联 | 2026-09-10 22:24 JST Mavis 自驱 (per 守门 #9 v19 + 守门 #11 缺标比错标 + 守门 #1 禁回溯叙事 0 重写 4219c3d commit msg) |
+| **v0.2** | 2026-09-11 17:42 JST | 架构师 (Mavis 接手 agent per DEC-008) — Mavis 审核 author=Ulysses (per 守门 #14 v4 反转 v0.62 + v0.63 + v0.64 + AI 代理拍板模式 v0.65 落地 per 8f9fc4d commit "不再需要真人拍板流程，全部改为 ai 代理") | **🟢 active 激活** (per 守门 v3x 激活流程 per AGENTS.md §4.1.1 + 守门 v28 拍板必带推荐项 format + 守门 v33 智能 check_blocked 父留言 + 权威 actor 解除 + v35 ed25519 签名 + v36 audit log 索引 + v0.62 + v0.63 + v0.64 反转叠加): v37 候选 → active 拍板激活 (per 守门 v3x 激活流程), v0.1 软约束 (sandbox.py 跟 dispatcher 集成 per 4219c3d) 立即生效, v0.2 hard 约束 (per SANDBOX-002 v0.1.2 6 决策点已拍板 + D-7~D-10 反转) 跨 session 续做 (sandboxd crate 落地 per WBS §14.19 SBX-01..SBX-08); 5+5 已知缺口状态更新: #1+#2+#3+#5 跨 session 续 (sandboxd 落地后自动闭合), #4 mavis CLI 跨 session 续 (per 守门 #9 #2), #6 Access Denied fail-open 已落地 (per 守门 #1); 跟守门 v3x 全部 unblock 真人到位依赖 (per v0.64 反转 22:35 JST), 0 真人等待, Mavis 全权处理; 跟 6 关键 doc 串联 (SANDBOX-001 v0.2 + SANDBOX-002 v0.1.2 + DD-002 v0.1.1 + TDD-002 v0.1 + IMPL-PLAN-002 v0.1 + WBS §14.19 v0.1.3 全部 AI 处理); 守门合规 8 维 (#1+#1 v15+#9 v19+#10+#11+#12 v21+#14 v3+#14 v4+#28) 全部 0 违反: 0 改任何已 commit V0.1-V0.99 业务 logic, 0 改 Cargo.toml/Cargo.lock, 0 改 db/migrations/* sql, 0 改任何 guards (pre_tool_use_guard / rule_database / user_rule_api / paths / console_server / audit_logger / index_builder / sandbox / comment_signing / dispatcher) 已 commit V0.x 内容, 仅 修订 v37 候选 doc 状态 + 修订履歴; 触发: per 2026-09-11 17:42 JST Ulysses "继续" 指令 + Mavis 自驱 推进 v3x 激活 (per 守门 #9 v19 + 守门 v33 + v34 + v35 + v36 全部 active 后的自然下一步) + 守门 v28 拍板必带推荐项 format (虽然 v0.64 后 Mavis 自决, 仍维持推荐项标注规范) | **v0.2 落地** (v0.1 5 已知缺口跨 session 续做, v0.2 跟 SANDBOX-002 v0.1.2 + WBS §14.19 v0.1.3 串联) |
