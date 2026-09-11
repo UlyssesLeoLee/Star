@@ -26,6 +26,7 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+use std::collections::VecDeque;
 use std::time::{Duration, Instant, SystemTime};
 
 use serde::{Deserialize, Serialize};
@@ -458,6 +459,9 @@ pub enum GameError {
         /// 当前 quest 状态 (e.g. 重复接任务)
         current: QuestStatus,
     },
+    /// backend 错误 (R5 阶段 2 新增, 透传 BackendError)
+    #[error("backend error: {0}")]
+    BackendError(#[from] BackendError),
 }
 
 /// GameLoop 1 闭环 (PoC 验证 5 件事)
@@ -472,14 +476,26 @@ pub struct GameLoop {
     pub agent: Agent,
     /// 当前 quest
     pub current_quest: Option<Quest>,
+    /// 游戏后端 (per ADR-0027 §2.2.3 Physis / GVPE 集成点, 默认 MockBackend)
+    pub backend: Box<dyn GameBackend>,
 }
 
 impl GameLoop {
-    /// 新建 gameloop
+    /// 新建 gameloop (默认 MockBackend, no-op, 阶段 1 行为)
     pub fn new(agent: Agent) -> Self {
         Self {
             agent,
             current_quest: None,
+            backend: Box::new(MockBackend),
+        }
+    }
+
+    /// 新建 gameloop with 自定义 backend (R5 阶段 2 新增, 阶段 2+ 用 PhysisMockBackend / 后续 PhysicsBackend)
+    pub fn new_with_backend(agent: Agent, backend: Box<dyn GameBackend>) -> Self {
+        Self {
+            agent,
+            current_quest: None,
+            backend,
         }
     }
 
@@ -535,6 +551,9 @@ impl GameLoop {
     }
 
     /// 失败 task (health 减少, cooldown, per ADR-0027 §2.2.1 4️⃣ + 6️⃣)
+    ///
+    /// R5 阶段 2: 失败时调 `backend.apply_physics(agent)` 让 backend 推 Collision event 触发额外 damage
+    /// (MockBackend no-op, PhysisMockBackend 推 queue 累加 damage)
     pub fn fail_quest(&mut self, damage: u32, cooldown: Duration) -> Result<bool, GameError> {
         let mut quest = self
             .current_quest
@@ -548,7 +567,9 @@ impl GameLoop {
             });
         }
         quest.status = QuestStatus::Failed;
-        // 受到伤害
+        // backend 先 apply (Collision event → 额外 damage), per R5 阶段 2 Physis 集成
+        self.backend.apply_physics(&mut self.agent)?;
+        // 受到显式伤害
         let died = self.agent.health.take_damage(damage);
         // 设置冷却
         self.agent.cooldown.apply(cooldown);
@@ -581,13 +602,20 @@ pub enum BackendError {
 /// GameBackend trait (per ADR-0027 §2.2.3 Physis / GVPE 集成点)
 ///
 /// 阶段 1: MockBackend (no-op, 验证 trait 抽象)
-/// 阶段 2: PhysicsBackend (Physis 0.1.x 实装)
+/// 阶段 2: PhysisMockBackend (模拟 Physis 0.1.x 接口形状, per plan-032 line 214)
 /// 阶段 3: GVPEBackend (GVPE 游戏运行时集成)
 pub trait GameBackend {
-    /// 应用物理 (移动 / 碰撞 / 受击)
+    /// 应用物理 (移动 / 碰撞 / 受击, backend 可直接修改 agent 属性 e.g. Collision → take_damage)
     fn apply_physics(&mut self, agent: &mut Agent) -> Result<(), BackendError>;
-    /// 查询碰撞
+    /// 查询碰撞 (返回当前 agent 周边碰撞 entity UUID 列表)
     fn query_collision(&self, agent: &Agent) -> Result<Vec<Uuid>, BackendError>;
+    /// 拉取 backend 推送给 GameLoop 的事件 (R5 阶段 2 新增, 默认 no-op)
+    ///
+    /// 用于: GameLoop 想 polling-style 处理事件流 (e.g. 移动轨迹, 累计伤害) 而不直接修改 agent.
+    /// `apply_physics` 跟 `poll_events` 是两种 integration 模式, 互不冲突.
+    fn poll_events(&mut self) -> Vec<BackendEvent> {
+        Vec::new()
+    }
 }
 
 /// MockBackend (no-op, 阶段 1 用)
@@ -599,6 +627,121 @@ impl GameBackend for MockBackend {
     }
     fn query_collision(&self, _agent: &Agent) -> Result<Vec<Uuid>, BackendError> {
         Ok(vec![])
+    }
+}
+
+// ============================================================================
+// §6.5 PhysicsEvent + PhysisMockBackend (R5 阶段 2, per plan-032 line 214)
+// ============================================================================
+
+/// Physis 物理事件 (R5 阶段 2 mock 模拟 Physis 0.1.x 接口形状)
+///
+/// 真实 Physis 0.1.x 接入后, 这 enum 会被 `physis::Event` 替代, 转换走 `From` impl.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PhysicsEvent {
+    /// 移动 (dx, dy 整数单位, 简单欧氏空间)
+    Move {
+        /// x 方向位移
+        dx: i32,
+        /// y 方向位移
+        dy: i32,
+    },
+    /// 碰撞 (with: Uuid, damage: u32)
+    Collision {
+        /// 碰撞对方 entity UUID
+        with: Uuid,
+        /// 碰撞伤害
+        damage: u32,
+    },
+}
+
+/// GameBackend 推送给 GameLoop 的事件 (R5 阶段 2 新增)
+///
+/// GameLoop 可通过 `backend.poll_events()` polling 消费, 不直接修改 agent 属性.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BackendEvent {
+    /// 移动 (跟 PhysicsEvent::Move 1:1 转发)
+    Move {
+        /// x 方向位移
+        dx: i32,
+        /// y 方向位移
+        dy: i32,
+    },
+    /// 受到伤害 (从 PhysicsEvent::Collision 派生)
+    Damage {
+        /// 伤害值
+        amount: u32,
+    },
+}
+
+/// PhysisMockBackend (R5 阶段 2 模拟 Physis 0.1.x, per plan-032 line 214)
+///
+/// 内部维护 `event_queue`, `apply_physics` 消费 queue 触发 Collision → agent.take_damage,
+/// `query_collision` 返回 queue 里的 collision UUIDs, `poll_events` 把 PhysicsEvent 转 BackendEvent.
+pub struct PhysisMockBackend {
+    event_queue: VecDeque<PhysicsEvent>,
+}
+
+impl Default for PhysisMockBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PhysisMockBackend {
+    /// 新建空 backend
+    pub fn new() -> Self {
+        Self {
+            event_queue: VecDeque::new(),
+        }
+    }
+    /// 推入物理事件 (测试 / 上游 source 用, e.g. Physis 主循环推送)
+    pub fn push_event(&mut self, event: PhysicsEvent) {
+        self.event_queue.push_back(event);
+    }
+    /// 队列大小 (测试用)
+    pub fn queue_len(&self) -> usize {
+        self.event_queue.len()
+    }
+}
+
+impl GameBackend for PhysisMockBackend {
+    fn apply_physics(&mut self, agent: &mut Agent) -> Result<(), BackendError> {
+        // 消费 queue, Collision → agent.take_damage; Move → 不直接改 6 维
+        while let Some(event) = self.event_queue.pop_front() {
+            match event {
+                PhysicsEvent::Move { .. } => {
+                    // 移动不直接改 6 维, GameLoop 走 poll_events 拉
+                }
+                PhysicsEvent::Collision { damage, .. } => {
+                    agent.health.take_damage(damage);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn query_collision(&self, _agent: &Agent) -> Result<Vec<Uuid>, BackendError> {
+        // 返回 queue 里未消费的 collision UUIDs
+        Ok(self
+            .event_queue
+            .iter()
+            .filter_map(|e| match e {
+                PhysicsEvent::Collision { with, .. } => Some(*with),
+                PhysicsEvent::Move { .. } => None,
+            })
+            .collect())
+    }
+
+    fn poll_events(&mut self) -> Vec<BackendEvent> {
+        // 把 queue 转 BackendEvent 返回 (drain 模式, 不直接改 agent)
+        self.event_queue
+            .drain(..)
+            .map(|e| match e {
+                PhysicsEvent::Move { dx, dy } => BackendEvent::Move { dx, dy },
+                PhysicsEvent::Collision { damage, .. } => BackendEvent::Damage { amount: damage },
+            })
+            .collect()
     }
 }
 
@@ -796,5 +939,135 @@ mod tests {
         assert!(backend.apply_physics(&mut agent).is_ok());
         assert!(backend.query_collision(&agent).is_ok());
         assert_eq!(backend.query_collision(&agent).unwrap().len(), 0);
+    }
+
+    // ========================================================================
+    // R5 阶段 2: PhysisMockBackend + GameLoop 集成 UT (per plan-032 R5 阶段 2)
+    // ========================================================================
+
+    #[test]
+    fn physis_mock_push_collision_event_apply_damage() {
+        let mut backend = PhysisMockBackend::new();
+        backend.push_event(PhysicsEvent::Collision {
+            with: Uuid::new_v4(),
+            damage: 30,
+        });
+        let mut agent = Agent::new("Mavis");
+        backend.apply_physics(&mut agent).unwrap();
+        assert_eq!(agent.health.value, 70); // 100 - 30
+        assert_eq!(backend.queue_len(), 0); // queue drained
+    }
+
+    #[test]
+    fn physis_mock_apply_physics_drains_queue() {
+        let mut backend = PhysisMockBackend::new();
+        backend.push_event(PhysicsEvent::Move { dx: 1, dy: 0 });
+        backend.push_event(PhysicsEvent::Move { dx: 0, dy: 1 });
+        backend.push_event(PhysicsEvent::Collision {
+            with: Uuid::new_v4(),
+            damage: 10,
+        });
+        assert_eq!(backend.queue_len(), 3);
+        let mut agent = Agent::new("Mavis");
+        backend.apply_physics(&mut agent).unwrap();
+        assert_eq!(backend.queue_len(), 0);
+        assert_eq!(agent.health.value, 90); // 100 - 10
+    }
+
+    #[test]
+    fn physis_mock_move_event_no_damage() {
+        let mut backend = PhysisMockBackend::new();
+        backend.push_event(PhysicsEvent::Move { dx: 5, dy: 5 });
+        let mut agent = Agent::new("Mavis");
+        backend.apply_physics(&mut agent).unwrap();
+        assert_eq!(agent.health.value, 100); // move 不掉血
+    }
+
+    #[test]
+    fn physis_mock_query_collision_returns_queued_uuids() {
+        let mut backend = PhysisMockBackend::new();
+        let npc1 = Uuid::new_v4();
+        let npc2 = Uuid::new_v4();
+        backend.push_event(PhysicsEvent::Collision {
+            with: npc1,
+            damage: 5,
+        });
+        backend.push_event(PhysicsEvent::Move { dx: 1, dy: 0 });
+        backend.push_event(PhysicsEvent::Collision {
+            with: npc2,
+            damage: 5,
+        });
+        let agent = Agent::new("Mavis");
+        let collisions = backend.query_collision(&agent).unwrap();
+        assert_eq!(collisions.len(), 2);
+        assert!(collisions.contains(&npc1));
+        assert!(collisions.contains(&npc2));
+    }
+
+    #[test]
+    fn physis_mock_poll_events_drains_and_translates() {
+        let mut backend = PhysisMockBackend::new();
+        backend.push_event(PhysicsEvent::Move { dx: 3, dy: 4 });
+        backend.push_event(PhysicsEvent::Collision {
+            with: Uuid::new_v4(),
+            damage: 15,
+        });
+        let events = backend.poll_events();
+        assert_eq!(events.len(), 2);
+        assert!(matches!(events[0], BackendEvent::Move { dx: 3, dy: 4 }));
+        assert!(matches!(events[1], BackendEvent::Damage { amount: 15 }));
+        assert_eq!(backend.queue_len(), 0); // drain 后 queue 空
+    }
+
+    #[test]
+    fn physis_mock_multiple_collision_accumulates_damage() {
+        let mut backend = PhysisMockBackend::new();
+        backend.push_event(PhysicsEvent::Collision {
+            with: Uuid::new_v4(),
+            damage: 20,
+        });
+        backend.push_event(PhysicsEvent::Collision {
+            with: Uuid::new_v4(),
+            damage: 30,
+        });
+        let mut agent = Agent::new("Mavis");
+        backend.apply_physics(&mut agent).unwrap();
+        assert_eq!(agent.health.value, 50); // 100 - 20 - 30
+    }
+
+    #[test]
+    fn game_loop_with_physis_backend_fail_quest_extra_damage() {
+        // GameLoop 用 PhysisMockBackend, 推 Collision event 触发额外 damage
+        let mut backend = PhysisMockBackend::new();
+        backend.push_event(PhysicsEvent::Collision {
+            with: Uuid::new_v4(),
+            damage: 25,
+        });
+        let mut game = GameLoop::new_with_backend(Agent::new("Mavis"), Box::new(backend));
+        let q = Quest::new("boss-fight", "hard", 0, 0);
+        game.assign_quest(q).unwrap();
+        let died = game.fail_quest(10, Duration::from_millis(0)).unwrap();
+        // backend apply 25 (Collision) + explicit 10 = 35 total damage
+        assert_eq!(game.agent.health.value, 65);
+        assert!(!died); // 65 > 0
+    }
+
+    #[test]
+    fn game_loop_with_mock_backend_fail_quest_no_extra_damage() {
+        // GameLoop 用 MockBackend (默认, no-op), fail_quest 只算显式 damage
+        let mut game = GameLoop::new(Agent::new("Mavis"));
+        let q = Quest::new("easy-fight", "no-op", 0, 0);
+        game.assign_quest(q).unwrap();
+        let died = game.fail_quest(10, Duration::from_millis(0)).unwrap();
+        assert_eq!(game.agent.health.value, 90); // 100 - 10
+        assert!(!died);
+    }
+
+    #[test]
+    fn game_loop_poll_events_empty_for_mock() {
+        // MockBackend 默认 poll_events 返空 (R5 阶段 2 trait default impl)
+        let mut backend = MockBackend;
+        let events = backend.poll_events();
+        assert!(events.is_empty());
     }
 }
