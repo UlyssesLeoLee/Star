@@ -31,6 +31,7 @@
 | `docs/frontend/design/mock-msw-handlers.md` | 兄弟 — 5 域 MSW handler (commit `3dde2b4` `b424611`) 是本设计文档 §3.3 数据量阈值实证 |
 | `STAR-P3-WBS-001.md` | 下游 — §1-§5 / §14 任务卡逐条 [P]/[S]/[M] 标 (本设计文档 §4 落表) |
 | `AGENTS.md` §4.1 守门派生 v19 | 下游 — 本设计文档定稿后追加守门派生规 |
+| [ADR-0026 Managed Agents Runtime 模式参考 — 借鉴 Multica](adr/0026-multica-patterns-borrow.md) v0.1 (2026-09-11) | 兄弟 — Multica 模式级参考 (状态机 / poisoned 语义 / 4 类触发 / autopilot) → v32 / v33 / v34 落地候选；本设计文档 §3 范式扩展跟 ADR-0026 §2.1 模式 1-3 对齐 |
 
 ### 0.3 适用读者
 
