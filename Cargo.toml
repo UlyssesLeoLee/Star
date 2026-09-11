@@ -126,7 +126,7 @@ async-trait = "0.1"
 r2d2 = "0.8"
 # r2d2-memgraph = "0.1"  # TODO: 等 r2d2-memgraph crate 落地后启用 (G-1 完整实装)
 # JWT 鉴权 (per §14.12 IV OAuth2 + JWT 拍板 2026-09-09 19:20 JST)
-jsonwebtoken = "9"
+jsonwebtoken = "11"
 
 # 序列化
 serde = { version = "1", features = ["derive"] }
@@ -138,7 +138,7 @@ bytes = "1"
 futures-util = "0.3"
 
 # 错误
-thiserror = "1"
+thiserror = "2"
 anyhow = "1"
 
 # ID / 时间
@@ -155,8 +155,8 @@ tracing = "0.1"
 sled = "0.34"
 
 # 加密(Phase F webhook 签名验证使用)
-sha2 = "0.10"
-hmac = "0.12"
+sha2 = "0.11"
+hmac = "0.13"
 hex = "0.4"
 
 # Regex (per OPT-NEXT-06-code-stub §3.4 domain-form + domain-search 实装)
@@ -165,7 +165,7 @@ regex = "1"
 # Valkey / Redis client (per spec/cache/01 §2.3 + spec/cache/01 §2.3 选型决定 2026-09-10 23:41 JST)
 # redis-rs 0.27+ 协议 100% 兼容 Valkey, tokio-comp + connection-manager features
 # Phase G+ 启用于 crates/star-cache/src/valkey_backend.rs
-redis = { version = "0.27", default-features = false, features = ["tokio-comp", "connection-manager"] }
+redis = { version = "1.7", default-features = false, features = ["tokio-comp", "connection-manager"] }
 
 [profile.release]
 lto = "thin"
