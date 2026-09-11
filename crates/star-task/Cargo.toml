@@ -1,0 +1,22 @@
+[package]
+name = "star-task"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Star Multica Task Lifecycle 抽象层 (R4 阶段 1: 7 态状态机 + session poison 5 reason + review gate + 4 类 404, per ADR-0027 R4 + plan-032 R4)"
+
+[dependencies]
+# workspace inheritance (per 守门 #1 + #19, 避免 version 重复)
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+star-registry = { path = "../star-registry" }
+
+[lints]
+workspace = true
