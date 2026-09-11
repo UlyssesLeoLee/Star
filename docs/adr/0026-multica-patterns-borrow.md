@@ -1,6 +1,6 @@
 # ADR-0026: Managed Agents Runtime 模式参考 — 借鉴 Multica
 
-> **状态**：🟢 Accepted v0.1（patterns only, no vendor-in）
+> **状态**：🟢 Accepted v0.2（patterns only, no vendor-in, 源码实证完成）
 > **日期**：2026-09-11
 > **修订人**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核**
 > **审批**：架构师 (Mavis 接手 agent per DEC-008) — per 守门 #14 v4 (2026-09-10 12:45 JST 反转) + 9/8 15:19 JST 第 6 次强化 Mavis 全权代理
@@ -18,27 +18,52 @@
 
 2026-09-11 16:33 JST 用户提问"是否可以进一步参考 multica"。Mavis 调研 Multica（开源 managed agents 平台，`github.com/multica-ai/multica`，~7.5k stars，Go + Next.js + PostgreSQL 17 + pgvector，本机 daemon + 自托管 server）后，给出 ADR 提案。
 
-### 1.1 Multica 的核心抽象
+### 1.3 源码验证摘要（per 2026-09-11 16:40 JST, depth-1 clone `D:\tmp\multica`）
 
-| 抽象 | 内容 |
-|---|---|
-| **Runtime = daemon × AI tool × workspace** | 三维正交 — 同台机器 + 同 CLI + 不同 workspace = 多个 runtime |
-| **Daemon PATH 扫描** | 启动时跑 13+ adapter 的 `command --version`，成功注册 runtime，失败 / 损坏标 `🔴 poisoned`（不删，标 unusable） |
-| **任务状态机** | `enqueue → claim → start → complete / fail`，`claim` 是单独一步（多 subagent 不竞争） |
-| **4 类触发** | assign（board 指派）/ @-mention（comment 里 @）/ chat（直接对话）/ autopilot（cron 自动建 issue 并指派） |
-| **Skill compounding** | 任务完成方案自动变 reusable skill，跨 subagent 复用 |
-| **Self-host + local-first** | daemon 在用户机器，server 只协调状态；代码 / 凭据 / 执行环境全在用户侧 |
+| 文件 | 行数 | 验证要点 | 关键发现 |
+|---|---|---|---|
+| `server/pkg/agent/version.go` | 178 | `MinVersions` map + `CheckMinVersion` 逻辑 | 8 个 provider 锁最低 semver；`BelowMinimumError` 类型化错误避免"读不出版本 → 当成旧版本误杀"的 corner case；dev-build git-describe 例外 |
+| `server/internal/daemon/agents_probe.go` | 330 | `probeAgentCLIs` 25 provider 探测逻辑 | 25 named provider + 1 `BuiltinRuntimes` 派生循环；**login shell 兜底**（macOS GUI daemon 不继承交互 shell PATH）；cachedShellResolvedAgents 30min TTL 避免每次 probe fork shell |
+| `server/internal/daemon/poisoned.go` | 217 | 4 类 poisoned 原因 + classify 函数 | **关键发现：poisoned 语义不是 "runtime 探测失败"，而是 "(agent, issue) session 不可恢复"**；用 `classifyPoisonedOutput`（输出包含 fallback marker）/ `classifyPoisonedError`（400 invalid_request_error）/ `classifyResumeUnsafeTimeout`（codex semantic inactivity）/ `classifyResumeUnsafeTransport`（codex resume oversized）4 层分类 |
+| `server/internal/handler/runtime_liveness_store.go` | 130 | `LivenessStore` interface + `RedisLivenessStore` 实现 | Redis TTL key 加速 hot path；`Available()` false 自动 fallback 到 DB；`Forget` best-effort（TTL 兜底） |
+| `server/internal/daemon/client.go` | 1287 | `ClaimTask` + `ClaimTasks` (batch) + `SendHeartbeat` + `Register` + `Deregister` | per-runtime claim 30s timeout + batch claim 5s timeout（避免 head-of-line coupling）；`isTaskNotFoundError` / `isRuntimeNotFoundError` / `isWorkspaceNotFoundError` 4 类 404 检测让 daemon 知道 server 端 task/runtime/workspace 已被删，本地 state 自清 |
+| `server/internal/service/autopilot.go` | 1933 | `DispatchAutopilot` + `DispatchAutopilotManual` + autopilot rule versioning | `create_issue` 模式（持久审计 trail，runtime offline 也创建 issue 等回来 claim）vs `run_only` 模式（runtime 离线就 `skipped` 不堆积任务）；`RecordAutopilotRuleVersion` 每次 publish +1 版本（MUL-4302 §3.4 accountability） |
+| `server/cmd/server/runtime_sweeper.go` | 765 | `sweepStaleRuntimes` + `sweepOfflineRuntimeTasks` + 4 个其他阶段 | **关键发现：liveness 实际是 2 档 + reconnect grace，不是博客说的 3 档 (30s/90s/5min)**；`staleThresholdSeconds = 150` (2.5min) + `defaultRuntimeReconnectGrace = 3h` |
+
+**修正 v0.1 的 4 处错误**：
+
+1. ~~"13+ adapter"~~ → **25 named provider + BuiltinRuntimes 派生**
+2. ~~"poisoned = 探测失败标 unusable"~~ → **"(agent, issue) session 不可恢复，4 类原因分类"**
+3. ~~"liveness 3 档 30s/90s/5min"~~ → **"2 档 150s 阈值 + 3h reconnect grace，Redis TTL 加速 hot path"**
+4. ~~"autopilot = cron 自动建 issue 并指派"~~ → **"create_issue vs run_only 双模式 + rule versioning accountability"**
+
+### 1.1 Multica 的核心抽象（**per 2026-09-11 16:40 JST 源码实证**）
+
+| 抽象 | 内容 | 源码实证 |
+|---|---|---|
+| **Runtime = daemon × AI tool × workspace** | 三维正交 — 同台机器 + 同 CLI + 不同 workspace = 多个 runtime | `server/cmd/server/runtime_sweeper.go:160-295` (`sweepStaleRuntimes`) |
+| **Daemon PATH 扫描** | 启动时跑 **25 个 named provider**（claude/codex/opencode/codearts/deveco/openclaw/hermes/pi/cursor/copilot/kimi/reasonix/dsh/kiro/codebuddy/antigravity/qoder/qoderclicn/traecli/grok/qwen/qwenpaw/dim/mcode/zeroclaw）+ 1 个 `agent.BuiltinRuntimes` 循环派生（如 omp 等），每个跑 `MULTICA_<NAME>_PATH` env → `exec.LookPath` → 失败再走 login shell 兜底（`agents_probe.go:155-306`） | `server/internal/daemon/agents_probe.go:155-306` (`probeAgentCLIs`) |
+| **最小版本门** | `MinVersions` map 锁 8 个 provider 的最低 semver（claude 2.0.0 / codex 0.100.0 / copilot 1.0.0 / grok 0.2.89 / qwen 0.20.0 / dim 0.3.10 / mcode 0.1.2 / zeroclaw 0.8.0），加上 `MinQuickCreateCLIVersion = "0.2.21"` 跟 dev-build git-describe 例外 | `server/pkg/agent/version.go:13-107` |
+| **Poisoned 语义** | **不是 runtime 探测失败**，而是"**(agent, issue) session 不可恢复**"——4 类原因：`FailureReasonIterationLimit` / `FailureReasonAgentFallbackMsg` / `FailureReasonAPIInvalidRequest`（400 invalid_request_error，含 image 超大）/ `FailureReasonCodexSemanticInactivity` / `FailureReasonCodexResumeOversized`；被 `GetLastTaskSession` 过滤，下次任务从 fresh session 起步 | `server/internal/daemon/poisoned.go:10-217` |
+| **任务状态机** | `enqueue → claim → start → complete / fail`，`claim` 是单独一步（多 daemon 不竞争）。Per-runtime `ClaimTask` + machine-level `ClaimTasks`（batch）+ `SendHeartbeat` + `Register` + `Deregister` | `server/internal/daemon/client.go:227-235` (`ClaimTask`) + `:642-651` (`SendHeartbeat`) + `:961` (`Register`) |
+| **Liveness 2-tier** | **不是博客说的 3 档 (30s/90s/5min)**，是 **2 档 + 任务终止 grace**：`DefaultHeartbeatInterval = 15s` (心跳) + `sweepInterval = 30s` (扫描) + `staleThresholdSeconds = 150` (2.5 分钟无心跳 → 标 offline) + `defaultRuntimeReconnectGrace = 3h` (offline 后 3h 才 terminate task)；`LivenessStore` interface 用 Redis TTL key 加速 hot path，failure 自动 fallback 到 DB | `server/internal/daemon/config.go:28` (`DefaultHeartbeatInterval`) + `server/internal/service/task.go:189` (`RuntimeClaimFreshnessSeconds = 150`) + `server/cmd/server/runtime_sweeper.go:24-50` |
+| **4 类触发** | assign（issue assignee）/ @-mention（comment 里 @）/ chat（直接对话）/ autopilot（cron / webhook / 手动） | `server/internal/handler/issue.go` (assign) + `server/internal/handler/comment.go` (@-mention) + `server/internal/handler/chat.go` (chat) + `server/internal/service/autopilot.go` (autopilot) |
+| **Autopilot 双模式** | `DispatchAutopilot` 入口 + `create_issue` 模式（持久审计 trail，即使 runtime offline 也创建 issue 等回来 claim）vs `run_only` 模式（runtime 离线就 `skipped` 不堆积任务） | `server/internal/service/autopilot.go:101-150` (`DispatchAutopilot`) |
+| **Skill compounding** | 任务完成方案自动变 reusable skill，跨 subagent 复用 | `server/internal/handler/skill_create.go` + `server/internal/handler/skill_refresh.go` |
+| **Self-host + local-first** | daemon 在用户机器，server 只协调状态；代码 / 凭据 / 执行环境全在用户侧 | `SELF_HOSTING.md` + `docker-compose.selfhost.yml` |
 
 ### 1.2 我们当前的痛点 ↔ Multica 解法
 
 | 痛点 | Multica 解法 | 我们当前状态 | 缺口 |
 |---|---|---|---|
-| Runtime 里有哪些 agent CLI | 13+ adapter + version probe | Mavis 知道自己跑哪个，其他一无所知 | 不可观测 |
-| 工具 auth / 版本失败 | poisoned 语义（标 unusable 不删） | 看 stderr 才知道，没标 | 不可恢复 |
-| Subagent 完成 ≠ 实际成功 | `complete / fail` 显式二态 | `status="succeeded"` 不可靠（守门 #9 实证 10/10 `net::ERR_CONNECTION_CLOSED`） | 不可信 |
-| 任务卡在哪个状态 | `enqueue / claim / start / complete/fail` 五态 | `pending / in_progress / completed / cancelled` 四态 | `claim` 缺失 |
+| Runtime 里有哪些 agent CLI | 25+ named provider probe + login shell 兜底（`agents_probe.go:115-152`） | Mavis 知道自己跑哪个，其他一无所知 | 不可观测 |
+| 工具最低版本 / 不兼容 | `MinVersions` map + semver gate（`version.go:13-22, 161-178`），低于最低 → `*BelowMinimumError` 类型化错误 | 看 stderr 才知道，没标 | 不可恢复 |
+| **(agent, issue) session 不可恢复** | **Poisoned 4 类原因 + `GetLastTaskSession` 过滤**（`poisoned.go:10-217`） | 无概念，subagent 反复 resume 同一烂 session | 不可信 |
+| Subagent 完成 ≠ 实际成功 | `complete / fail` 显式二态 + `classifyPoisonedOutput` 跟 `classifyPoisonedError` 两层分类 | `status="succeeded"` 不可靠（守门 #9 实证 10/10 `net::ERR_CONNECTION_CLOSED`） | 不可信 |
+| 任务卡在哪个状态 | `enqueue / claim / start / complete/fail` 五态，`ClaimTask` 跟 `ClaimTasks` 分层（`client.go:227-332`） | `pending / in_progress / completed / cancelled` 四态 | `claim` 缺失 |
 | 完成 → 入 main | review gate（人工 / 自动 review 完才进 done） | 直接进 done | 无 review |
-| 定期任务触发 | autopilot（cron 自动建 issue + 指派） | `cron_create` 跑完发结果 | 不入工作流 |
+| 定期任务触发 | autopilot（cron / webhook / 手动） + `create_issue` vs `run_only` 双模式（`autopilot.go:101-150`） | `cron_create` 跑完发结果 | 不入工作流 |
+| Runtime 离线判定 | 2 档 liveness + reconnect grace，Redis TTL 加速 hot path（`runtime_liveness_store.go` + `runtime_sweeper.go:215-295`） | 看 WS 断了才知道 | 不可观测 |
 
 ---
 
@@ -171,3 +196,4 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-11 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 初版（只搬模式 + 列出不搬部分 + v32-v34 落地候选 + 5 角色签字栏） | 2026-09-11 16:33 JST Ulysses 提问"是否可以进一步参考 multica" + ask_user 选项 path_opt1（只搬模式，自己实装）+ scope_opt4（只写设计文档 / ADR，不实装） |
+| v0.2 | 2026-09-11 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 源码实证 5 关键文件（depth-1 clone `D:\tmp\multica`）+ 修正 v0.1 4 处错误（25 provider 非 13+ / poisoned 实为 session 不可恢复非探测失败 / liveness 实为 2 档 + reconnect grace 非 3 档 / autopilot 实为 create_issue vs run_only 双模式）+ §1.3 源码验证摘要表 + §1.1 + §1.2 全量加 file:line 引用 | 2026-09-11 16:38 JST Ulysses 发 `https://github.com/multica-ai/multica` 链接 + ask_user 拍板 "Clone + 读 5 关键文件 + 更新 ADR"（depth_opt1）|
