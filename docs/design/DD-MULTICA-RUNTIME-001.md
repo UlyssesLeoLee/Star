@@ -453,7 +453,7 @@ class LoginShellResolver:
         try:
             shell = os.environ.get("SHELL", "/bin/sh")
             # macOS / Linux only (per FR-7 平台限制)
-            if "win" in os.sys.platform:
+            if "win" in sys.platform:
                 return None
             # 跑 which <cmds>
             result = subprocess.run(
@@ -510,7 +510,27 @@ class RuntimeStatusReporter:
                 f.write(f"- version: {e.version} (要求 ≥ {e.min_version})\n")
                 f.write(f"- path: {e.path}\n")
                 f.write(f"- 修复建议: 升级到 {e.min_version}+ 或重新登录\n\n")
+        # per 评审 v0.1 修正 O2: 回写 `runtime_weekly_poisoned_report.report_path` 字段
+        self._write_weekly_report_db_row(report_path, entries)
         return report_path
+    
+    def _write_weekly_report_db_row(self, report_path: Path, entries: List[RuntimeEntry]) -> None:
+        """回写 weekly report 到 `runtime_weekly_poisoned_report` 表 (per 评审 v0.1 修正 O2)"""
+        # per 守门 #5 env 安全: 不读 env, 走 conn 注入
+        from datetime import datetime
+        # TODO: 注入 conn (per守门 #19 v19 [P] 自动化档: 显式依赖注入, 不全局 import)
+        # 模板:
+        # for e in entries:
+        #     conn.execute("""
+        #         INSERT INTO runtime_weekly_poisoned_report
+        #             (report_date, provider, version, min_version, fix_suggestion, report_path, rls_tenant_id, rls_workspace_ids)
+        #         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        #     """, (
+        #         datetime.now().date(), e.provider, e.version, e.min_version,
+        #         f"升级到 {e.min_version}+ 或重新登录", str(report_path),
+        #         e.rls_tenant_id, e.rls_workspace_ids,
+        #     ))
+        ...
     
     def get_latest_status(self) -> List[dict]:
         """console API 用, 返最近一次 scan (per FR-26)"""
@@ -657,7 +677,7 @@ sequenceDiagram
 -- per 守门 #13 Master 100% RLS + 物理删除禁止 + SCD Type 2
 CREATE TABLE runtime_registry (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    provider VARCHAR(50) NOT NULL UNIQUE,        -- 'claude' / 'codex' / 'mcode' / ...
+    provider VARCHAR(50) NOT NULL,               -- 'claude' / 'codex' / 'mcode' / ... (per per 评审 v0.1 修正 M2: 移除 UNIQUE, 跟 SCD Type 2 历史行不冲突)
     display_name VARCHAR(100) NOT NULL,
     default_cmd VARCHAR(100) NOT NULL,
     env_path VARCHAR(100) NOT NULL,              -- 'MULTICA_CLAUDE_PATH'
@@ -677,6 +697,9 @@ CREATE TABLE runtime_registry (
     CHECK (scd_type_2_to IS NULL OR scd_type_2_to > scd_type_2_from)
 );
 CREATE INDEX idx_runtime_registry_provider ON runtime_registry(provider);
+-- per 评审 v0.1 修正 M2: partial UNIQUE index 仅约束 current=true 行, 历史行不阻断
+CREATE UNIQUE INDEX idx_runtime_registry_provider_current
+    ON runtime_registry(provider) WHERE scd_type_2_current = TRUE;
 CREATE INDEX idx_runtime_registry_scd ON runtime_registry(scd_type_2_current) WHERE scd_type_2_current = TRUE;
 ```
 

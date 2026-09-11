@@ -485,7 +485,16 @@ ALTER TABLE wbs_task
     ADD COLUMN runtime_not_found_at TIMESTAMPTZ,
     ADD COLUMN unauthorized_at TIMESTAMPTZ,
     ADD COLUMN review_gate_required BOOLEAN DEFAULT TRUE,
-    ADD COLUMN review_force_skip BOOLEAN DEFAULT FALSE;
+    ADD COLUMN review_force_skip BOOLEAN DEFAULT FALSE,
+    -- per 评审 v0.1 修正 M3: 6 态 status CHECK 约束
+    ADD CONSTRAINT chk_wbs_task_status_v33
+    CHECK (status IN ('pending','claimed','in_progress','pending_review','completed','failed','cancelled')),
+    -- per 评审 v0.1 修正 M5: 5 reason enum CHECK 约束 (跟 DD-POISON-001 配套)
+    ADD CONSTRAINT chk_wbs_task_session_poison_reason
+    CHECK (session_poison_reason IS NULL OR session_poison_reason IN (
+        'iteration_limit','agent_fallback_message',
+        'api_invalid_request','codex_semantic_inactivity','codex_resume_oversized'
+    ));
 ```
 
 ### 7.6 W-T-M 覆盖核对 (per 守门 #13)

@@ -82,13 +82,18 @@ class ClassifyPoisonedOutput:
     ]
     
     def classify(self, output: str) -> tuple[Optional[FailureReason], bool]:
-        """Classify output (per FR-6)"""
+        """Classify output (per FR-6)
+        
+        per 评审 v0.1 修正 O1: 跟 Multica `poisoned.go:67-72` `hasPrefixFold` 对齐,
+        改用 prefix 匹配 (case-insensitive) 而非 substring, 避免多命中误判.
+        """
         trimmed = (output or "").strip()
         if not trimmed or len(trimmed) > self.POISONED_OUTPUT_MAX_LEN:
             return None, False
         lowered = trimmed.lower()
         for marker, reason in self.POISONED_MARKERS:
-            if marker in lowered:
+            # per Multica poisoned.go:67 hasPrefixFold 1:1 派生
+            if lowered.startswith(marker):
                 return reason, True
         return None, False
 ```
@@ -101,21 +106,29 @@ class ClassifyPoisonedError:
     """Classify error 是否 poisoned (per FR-7)"""
     
     def classify(self, err_msg: str, provider: str = "") -> tuple[Optional[FailureReason], bool]:
-        """Classify error (per Multica poisoned.go:131-170)"""
+        """Classify error (per Multica poisoned.go:131-170)
+
+        per 评审 v0.1 修正 O1: 跟 Multica `poisoned.go:131-170, 193-217` `hasPrefixFold/hasSuffixFold` 对齐,
+        改用 prefix/suffix 匹配 (case-insensitive) 而非 substring.
+        """
         if not err_msg:
             return None, False
         lowered = err_msg.lower()
         # Image dimensions exceed max + image.source.base64.data (per Multica poisoned.go:146-148)
+        # 这两条需同时存在 (AND), 保持 substring 判定
         if "image dimensions exceed max allowed size" in lowered and "image.source.base64.data" in lowered:
             return FailureReason.API_INVALID_REQUEST, True
         # Anthropic shape: 400 + invalid_request_error (per Multica poisoned.go:155-157)
-        if "invalid_request_error" in lowered and "400" in lowered:
+        # per Multica `hasPrefixFold("400")` + `Contains("invalid_request_error")` 1:1
+        if lowered.startswith("400") and "invalid_request_error" in lowered:
             return FailureReason.API_INVALID_REQUEST, True
         # Codex-specific (per Multica poisoned.go:193-201 + 207-216)
         if provider.lower() == "codex":
-            if "codex_resume_oversized" in lowered:  # marker
+            # per Multica `hasSuffixFold(err, "codex_resume_oversized")` 1:1 派生
+            if lowered.endswith("codex_resume_oversized"):
                 return FailureReason.CODEX_RESUME_OVERSIZED, True
-            if "codex_semantic_inactivity" in lowered or "codex_first_turn_no_progress" in lowered:
+            # per Multica `hasPrefixFold("codex_first_turn_no_progress")` + similar
+            if lowered.startswith("codex_semantic_inactivity") or lowered.startswith("codex_first_turn_no_progress"):
                 return FailureReason.CODEX_SEMANTIC_INACTIVITY, True
         return None, False
 ```

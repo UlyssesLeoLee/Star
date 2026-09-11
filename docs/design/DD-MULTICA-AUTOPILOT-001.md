@@ -361,8 +361,14 @@ CREATE TABLE autopilot (
     rls_tenant_id UUID NOT NULL,
     rls_workspace_ids UUID[] NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- per 评审 v0.1 修正 M4: enum CHECK 约束
+    CONSTRAINT chk_autopilot_trigger_type CHECK (trigger_type IN ('cron','webhook','manual')),
+    CONSTRAINT chk_autopilot_execution_mode CHECK (execution_mode IN ('create_issue','run_only'))
 );
+-- per 评审 v0.1 修正 M2 (跟 DD-RUNTIME-001 §7.1 同): partial UNIQUE on (name, scd_type_2_current)
+CREATE UNIQUE INDEX idx_autopilot_name_current
+    ON autopilot(name) WHERE scd_type_2_current = TRUE;
 ```
 
 ### 7.2 `autopilot_run` (Transaction)
