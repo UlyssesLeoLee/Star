@@ -1,7 +1,10 @@
 """
 scan.py — RuntimeRegistry 主入口 (per DD-MULTICA-RUNTIME-001 §3.1)
 
-调用: python scripts/automation/registry/scan.py
+@deprecated v0.legacy — Replaced by Rust `star-registry::bin::scan` binary in R3 阶段
+                (per ADR-0027 R3). 阶段 1 实装: commit `fadff8f`.
+                Per 守门 #11 缺标比错标: 不删, 永久留档.
+                调用: python scripts/automation/registry/scan_v0_legacy.py
 """
 import argparse
 import json
@@ -19,10 +22,10 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
-from probe import RuntimeProbe
-from min_version import MinVersionGate
-from status import StatusClassifier
-from reporter import RuntimeStatusReporter
+from probe_v0_legacy import RuntimeProbe
+from min_version_v0_legacy import MinVersionGate
+from status_v0_legacy import StatusClassifier
+from reporter_v0_legacy import RuntimeStatusReporter
 
 
 def main():

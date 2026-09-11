@@ -1,6 +1,10 @@
 """
 min_version.py — MinVersionGate (per DD-MULTICA-RUNTIME-001 §3.3 + Multica version.go:13-178)
 
+@deprecated v0.legacy — Replaced by Rust `star-registry::min_version` module in R3 阶段
+                (per ADR-0027 R3). 阶段 1 实装: commit `fadff8f`.
+                Per 守门 #11 缺标比错标: 不删, 永久留档.
+
 8 provider 锁最低 semver, 区分 sentinel error (FR-8 ~ FR-11 per SRS).
 """
 import re

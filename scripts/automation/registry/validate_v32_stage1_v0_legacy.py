@@ -1,6 +1,10 @@
 """
 validate_v32_stage1.py — v32 阶段 1 验证脚本 (per SRS-MULTICA-RUNTIME-001 §7 AC + DD §11 UT/IT)
 
+@deprecated v0.legacy — Replaced by Rust integration tests in R3 阶段
+                (per ADR-0027 R3). 阶段 1 实装: commit `fadff8f`.
+                Per 守门 #11 缺标比错标: 不删, 永久留档.
+
 验证项 (per SRS §7 AC-1 ~ AC-8 + DD §11):
 - AC-1 scan 5 provider 全部探测, output 含全部 name
 - AC-2 MinVersion gate 8 provider 全部满足, 低于最低 → 标 poisoned
@@ -30,7 +34,7 @@ def main():
 
     # AC-1: 5 provider 全部探测
     print("[AC-1] 5 provider 全部探测")
-    from probe import RuntimeProbe
+    from probe_v0_legacy import RuntimeProbe
     probe = RuntimeProbe()
     entries = probe.probe_all()
     if len(entries) != 5:
@@ -44,7 +48,7 @@ def main():
 
     # AC-2: MinVersion gate
     print("[AC-2] MinVersion gate 8 provider 全部满足, 低于最低 → 标 poisoned")
-    from min_version import MinVersionGate
+    from min_version_v0_legacy import MinVersionGate
     gate = MinVersionGate()
     # 测试 ok case
     v_ok = gate.check("claude", "2.5.0")
@@ -79,7 +83,7 @@ def main():
 
     # AC-3: Login shell fallback (Windows 跳过)
     print("[AC-3] Login shell fallback (Windows 跳过)")
-    from shell_resolve import LoginShellResolver
+    from shell_resolve_v0_legacy import LoginShellResolver
     resolver = LoginShellResolver()
     if "win" in sys.platform:
         warnings.append("AC-3 SKIP: Windows 不实现 login shell fallback (per FR-7 平台限制)")
@@ -95,12 +99,12 @@ def main():
 
     # AC-4: 三档 status 全部覆盖
     print("[AC-4] 三档 status 全部覆盖")
-    from status import StatusClassifier, StatusVerdict
+    from status_v0_legacy import StatusClassifier, StatusVerdict
     classifier = StatusClassifier()
     # missing
-    from probe import RuntimeEntry
+    from probe_v0_legacy import RuntimeEntry
     e_missing = RuntimeEntry(provider="x", path=None, version=None, version_parsed=None, probe_method="missing")
-    from min_version import MinVersionVerdict
+    from min_version_v0_legacy import MinVersionVerdict
     v_miss_min = MinVersionVerdict("x", None, None, "no_minimum")
     s_missing = classifier.classify(e_missing, v_miss_min)
     if s_missing != StatusVerdict.MISSING:
@@ -131,7 +135,8 @@ def main():
 
     # AC-5: 不读 env 值
     print("[AC-5] 不读 env 值 (per 守门 #5)")
-    py_files = [f for f in Path(__file__).parent.glob("*.py") if f.name != "validate_v32_stage1.py"]
+    # self-skip: validator scans other py files (per 防 self-referential regex)
+    py_files = [f for f in Path(__file__).parent.glob("*.py") if f.name not in ("validate_v32_stage1.py", "validate_v32_stage1_v0_legacy.py")]
     for f in py_files:
         content = f.read_text(encoding="utf-8")
         # 检查 os.environ.get(...) print 模式
@@ -157,7 +162,7 @@ def main():
 
     # AC-7: 每次 scan 落 log
     print("[AC-7] 每次 scan 落 log (per 守门 #1 v15)")
-    from reporter import RuntimeStatusReporter
+    from reporter_v0_legacy import RuntimeStatusReporter
     from datetime import datetime, timezone
     import tempfile
     with tempfile.TemporaryDirectory() as tmpdir:

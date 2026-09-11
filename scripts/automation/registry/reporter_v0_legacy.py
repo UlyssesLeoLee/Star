@@ -1,6 +1,10 @@
 """
 reporter.py — RuntimeStatusReporter (per DD-MULTICA-RUNTIME-001 §3.6)
 
+@deprecated v0.legacy — Replaced by Rust `star-registry::reporter` module in R3 阶段
+                (per ADR-0027 R3). 阶段 1 实装: commit `fadff8f`.
+                Per 守门 #11 缺标比错标: 不删, 永久留档.
+
 audit log 持久化 + console API 暴露.
 Per 守门 #12 v21 [P] docs 同步: 每次 scan 落 log.
 """
@@ -10,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    from probe import RuntimeEntry
+    from probe_v0_legacy import RuntimeEntry
 
 
 class RuntimeStatusReporter:

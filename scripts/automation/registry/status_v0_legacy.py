@@ -1,6 +1,10 @@
 """
 status.py — StatusClassifier (per DD-MULTICA-RUNTIME-001 §3.4 + ADR-0026 v0.2 §1.1 抽象)
 
+@deprecated v0.legacy — Replaced by Rust `star-registry::status` module in R3 阶段
+                (per ADR-0027 R3). 阶段 1 实装: commit `fadff8f`.
+                Per 守门 #11 缺标比错标: 不删, 永久留档.
+
 3 档 status 分类 (active / stale / poisoned) + missing 4 档.
 Per 守门 #11 缺标比错标: poisoned 不删标.
 """
@@ -8,8 +12,8 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from probe import RuntimeEntry
-    from min_version import MinVersionVerdict
+    from probe_v0_legacy import RuntimeEntry
+    from min_version_v0_legacy import MinVersionVerdict
 
 
 class StatusVerdict(str, Enum):

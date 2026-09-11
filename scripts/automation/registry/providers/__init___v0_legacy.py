@@ -1,8 +1,12 @@
 """
 providers/ — 5 provider 适配器 (per DD-MULTICA-RUNTIME-001 §2.1 物理 layout)
 
+@deprecated v0.legacy — Replaced by Rust `star-registry::providers` module in R3 阶段
+                (per ADR-0027 R3). 阶段 1 实装: commit `fadff8f`.
+                Per 守门 #11 缺标比错标: 不删, 永久留档.
+
 阶段 1: 5 named provider 占位
-阶段 2: 扩到 25 named + BuiltinRuntimes 派生
+阶段 2: 扩到 25 named + BuiltinRuntimes 派生 (废弃, 跳过, 走 R3 Rust)
 
 每个 provider 是一个简单的 dataclass, 包含:
 - name: provider 标识

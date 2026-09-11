@@ -1,7 +1,14 @@
 """
 probe.py — RuntimeProbe (per DD-MULTICA-RUNTIME-001 §3.2 + Multica agents_probe.go:155-306)
 
-25 provider 探测, 3 层 fallback (PATH → shell → app bundle).
+@deprecated v0.legacy — Replaced by Rust `star-registry` crate in R3 阶段 (per ADR-0027 R3).
+                This file is kept for cross-platform fallback (per 守门 #6) and
+                does NOT delete (per 守门 #11 缺标比错标).
+                阶段 1 实装: commit `fadff8f`
+                阶段 2 重命名: commit (本 R2 阶段)
+                阶段 3 替换: per ADR-0027 R3 star-registry crate 实装后, 此文件
+                              走 legacy fallback, 不主动调用.
+
 Per 守门 #5 env 安全: env 只 invoke 不读.
 Per 守门 #6: subprocess.run(shell=False).
 """
@@ -13,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
-from shell_resolve import LoginShellResolver
+from shell_resolve_v0_legacy import LoginShellResolver
 
 
 @dataclass(frozen=True)

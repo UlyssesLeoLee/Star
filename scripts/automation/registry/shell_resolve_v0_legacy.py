@@ -1,6 +1,10 @@
 """
 shell_resolve.py — LoginShellResolver (per DD-MULTICA-RUNTIME-001 §3.5 + Multica agents_probe.go:30-50)
 
+@deprecated v0.legacy — Replaced by Rust `star-registry::shell_resolve` module in R3 阶段
+                (per ADR-0027 R3). 阶段 1 实装: commit `fadff8f`.
+                Per 守门 #11 缺标比错标: 不删, 永久留档.
+
 macOS GUI daemon 兜底 PATH 解析, 30min TTL 缓存.
 Per 守门 #6 PowerShell only: subprocess.run(shell=False).
 """
