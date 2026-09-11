@@ -3,8 +3,12 @@
 //!
 //! **目的**: in-process pub/sub + Mailbox 3 模式 (at-most-once / at-least-once / exactly-once)
 //!
-//! **架构 (per G.3 brief)**:
-//! - `EventBus`: topic-based pub/sub, 多个订阅者 / 主题
+//! **架构 (per G.3 brief + Phase G+ 落地)**:
+//! - `EventBus` trait + 2 实现:
+//!   - `InProcessEventBus` (G.3 骨架) — tokio mpsc 通道, 进程内 pub/sub
+//!   - `ValkeyEventBus` (Phase G+ 完整实装) — Valkey Streams 跨进程 pub/sub
+//!     选型 redis-rs 0.27+ (per docs/operation-design.md §4.4 + spec/cache/01 §2.3)
+//!     Stream key 命名 `valkey:eventbus:stream:{tenant_id}:{topic}` 租户隔离
 //! - `Mailbox`: 3 模式投递保证
 //!   - `AtMostOnce` (W 短 TTL 作业中, 完成即丢)
 //!   - `AtLeastOnce` (T append-only 审计, 重试至 ack)
@@ -31,6 +35,7 @@ use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
 
 mod mailbox;
+mod valkey_eventbus;
 
 /// 事件 (per G.3)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -163,6 +168,7 @@ impl EventBus for InProcessEventBus {
 pub use mailbox::{
     AtLeastOnceMailbox, AtMostOnceMailbox, ExactlyOnceMailbox, Mailbox, MailboxError, MailboxMode,
 };
+pub use valkey_eventbus::{ValkeyEventBus, ValkeyEventBusError};
 
 #[cfg(test)]
 mod tests {

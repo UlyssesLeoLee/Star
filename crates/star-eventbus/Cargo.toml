@@ -23,6 +23,10 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 async-trait = { workspace = true }
 futures-util = { workspace = true }
+# Valkey / Redis client (per spec/cache/01 §2.3 选型决定 redis-rs 0.27+
+# + Phase G+ 跨进程 EventBus 实装; 选型对齐 star-cache/valkey_backend.rs)
+# workspace dep 已 default-features = false, 这里 +streams 启用 XADD/XREAD
+redis = { workspace = true, features = ["streams"] }
 
 [lints]
 workspace = true
