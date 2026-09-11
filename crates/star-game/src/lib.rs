@@ -1,0 +1,800 @@
+//! star-game — Agent 小游戏核心理理念 (R5 阶段 1 PoC) 🟢
+//!
+//! Per ADR-0027 v0.1 §2.2 + plan-032 R5: **核心理念** = Mavis + 5 域 Lead + 子代理 = 游戏角色.
+//! 6 维属性 (Health / Mana / XP+Level / SkillTree / Inventory / Cooldown) + ECS-style
+//! 1 agent entity + 1 task (Quest) 闭环 + GameBackend trait (Physis 集成点).
+//!
+//! WBS 集成 (per ADR-0027 §2.2.2):
+//! - WBS row = Task Entity (关卡卡)
+//! - 任务依赖 = 关卡链
+//! - 关键路径 = 主线剧情 (per MS Project CPM, R8 实装)
+//! - 资源冲突 = 资源战 (多 subagent 抢同一 task)
+//! - 失败重试 = 死亡惩罚 (cooldown 机制, per 守门 #9 v27)
+//! - 升级解锁能力 = 天赋升级 (per v35+ skill compounding, R5 占位)
+//!
+//! Physis / GVPE 集成 (per user_profile 领域, 通过 GameBackend trait):
+//! - 阶段 1: MockBackend (no-op, 验证 trait 抽象)
+//! - 阶段 2: Physis 物理后端 (Physis 0.1.x 实装 + Collision 反馈)
+//! - 阶段 3: GVPE 游戏运行时 (ECS + 事件 + 调度)
+//!
+//! 跨域 (per 守门 #1 跨域 consults):
+//! - star-task: TaskId newtype 1:1 派生 (暂用本 crate local newtype, 后续 R9 整合)
+//! - star-registry: 5 域 Lead 真人内容由 Mavis 决定 (per 9/11 23:11 JST 强化)
+//!
+//! 守门合规 (per 守门 #1 v25 cargo test 单 crate 实证 + 守门 #7 0 unsafe)
+
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+
+use std::time::{Duration, Instant, SystemTime};
+
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use uuid::Uuid;
+
+// ============================================================================
+// §1 ID newtype
+// ============================================================================
+
+/// Agent ID (per Multica `AgentId` opaque)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AgentId(pub Uuid);
+
+impl From<Uuid> for AgentId {
+    fn from(id: Uuid) -> Self {
+        Self(id)
+    }
+}
+
+/// Task ID (per star-task 1:1 派生, 暂 local newtype, R9 整合时换 path 依赖)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct TaskId(pub Uuid);
+
+impl From<Uuid> for TaskId {
+    fn from(id: Uuid) -> Self {
+        Self(id)
+    }
+}
+
+/// Item ID
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ItemId(pub Uuid);
+
+// ============================================================================
+// §2 6 维属性 (per ADR-0027 §2.2.1)
+// ============================================================================
+
+/// 1️⃣ Health 生命值 (0-100), 掉到 0 = 需重启 session
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Health {
+    /// 当前生命值
+    pub value: u32,
+    /// 生命值上限
+    pub max: u32,
+}
+
+impl Health {
+    /// 默认 100 生命值
+    pub fn new() -> Self {
+        Self {
+            value: 100,
+            max: 100,
+        }
+    }
+    /// 受到伤害, 返是否死亡 (value 掉到 0)
+    pub fn take_damage(&mut self, amount: u32) -> bool {
+        self.value = self.value.saturating_sub(amount);
+        self.value == 0
+    }
+    /// 治疗恢复
+    pub fn heal(&mut self, amount: u32) {
+        self.value = (self.value + amount).min(self.max);
+    }
+}
+
+impl Default for Health {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// 2️⃣ Mana 法力值 (token 预算), 耗尽 = 强制续期
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Mana {
+    /// 当前 token 数
+    pub tokens: u32,
+    /// token 上限
+    pub max: u32,
+}
+
+impl Mana {
+    /// 默认 1000 token (per Multica context window 默认)
+    pub fn new() -> Self {
+        Self {
+            tokens: 1000,
+            max: 1000,
+        }
+    }
+    /// 消耗 token, 返是否够用
+    pub fn consume(&mut self, amount: u32) -> bool {
+        if self.tokens >= amount {
+            self.tokens -= amount;
+            true
+        } else {
+            false
+        }
+    }
+    /// 续期
+    pub fn replenish(&mut self, amount: u32) {
+        self.tokens = (self.tokens + amount).min(self.max);
+    }
+}
+
+impl Default for Mana {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// 3️⃣ XP / Level 经验/等级
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Xp {
+    /// 当前等级 (1-N)
+    pub level: u32,
+    /// 当前等级累计 XP
+    pub xp: u64,
+    /// 升级到下一级所需 XP (公式: level * 100)
+    pub xp_to_next_level: u64,
+}
+
+impl Xp {
+    /// 默认 level 1, 0 XP
+    pub fn new() -> Self {
+        Self {
+            level: 1,
+            xp: 0,
+            xp_to_next_level: 100,
+        }
+    }
+    /// 获得 XP, 自动检查升级 (per ADR-0027 §2.2.2 升级解锁能力)
+    /// 返是否升级 (可能一次跨多级)
+    pub fn gain(&mut self, amount: u64) -> bool {
+        self.xp += amount;
+        let mut leveled_up = false;
+        while self.xp >= self.xp_to_next_level {
+            self.xp -= self.xp_to_next_level;
+            self.level += 1;
+            self.xp_to_next_level = (self.level as u64) * 100;
+            leveled_up = true;
+        }
+        leveled_up
+    }
+}
+
+impl Default for Xp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// 4️⃣ SkillTree 天赋树 (per v35+ skill compounding, R5 占位)
+///
+/// 3 选 1 升级: 装备 / 法术 / 天赋 (per ADR-0027 §2.2.1)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SkillBranch {
+    /// 装备分支 (artifact 强化)
+    Equipment,
+    /// 法术分支 (LLM 调用优化)
+    Spell,
+    /// 天赋分支 (跨域协调能力)
+    Talent,
+}
+
+/// 4️⃣ SkillTree 天赋树 (per ADR-0027 §2.2.1)
+///
+/// 3 选 1 升级分支 (Equipment / Spell / Talent) + 多 tier (升级解锁能力)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillTree {
+    /// 当前分支 (3 选 1)
+    pub branch: SkillBranch,
+    /// 当前 tier (1-N, 升级解锁)
+    pub tier: u8,
+}
+
+impl SkillTree {
+    /// 默认 Talent 1 (跨域协调)
+    pub fn new() -> Self {
+        Self {
+            branch: SkillBranch::Talent,
+            tier: 1,
+        }
+    }
+    /// 切换分支 (per ADR-0027 §2.2.1 装备/法术/天赋 3 选 1 升级)
+    pub fn change_branch(&mut self, new_branch: SkillBranch) {
+        self.branch = new_branch;
+    }
+    /// 升级 tier (解锁能力)
+    pub fn upgrade_tier(&mut self) {
+        self.tier = self.tier.saturating_add(1);
+    }
+}
+
+impl Default for SkillTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Item 类型 (per ADR-0027 §2.2.1 Inventory 道具)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ItemKind {
+    /// commit 记录
+    Commit,
+    /// 输出文件
+    Output,
+    /// 报告
+    Report,
+    /// 工具/技能升级 token
+    Token,
+}
+
+/// Item 道具 (per ADR-0027 §2.2.1 Inventory 元素)
+///
+/// 4 类: Commit / Output / Report / Token, 携带 NFT-style metadata
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Item {
+    /// 道具 ID
+    pub id: ItemId,
+    /// 道具类型
+    pub kind: ItemKind,
+    /// 道具元数据 (per ADR-0027 §2.2.1 NFT-style metadata)
+    pub metadata: serde_json::Value,
+}
+
+/// 5️⃣ Inventory 背包 (artifacts / commits / reports = 道具)
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Inventory {
+    /// 道具列表
+    pub items: Vec<Item>,
+}
+
+impl Inventory {
+    /// 添加道具
+    pub fn add(&mut self, item: Item) {
+        self.items.push(item);
+    }
+    /// 移除道具 by id
+    pub fn remove(&mut self, id: ItemId) -> Option<Item> {
+        self.items
+            .iter()
+            .position(|i| i.id == id)
+            .map(|idx| self.items.remove(idx))
+    }
+    /// 道具数量
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+    /// 是否空
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+}
+
+/// 6️⃣ Cooldown 冷却 (per 守门 #9 v27 RPC fallback 防 retry storm)
+///
+/// 不 derive Serialize/Deserialize 因为 `Instant` 不实现 serde (PoC 仅内存, 持久化走 star-task)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Cooldown {
+    /// 冷却到什么时候 (None = 未冷却)
+    pub until: Option<Instant>,
+}
+
+impl Cooldown {
+    /// 无冷却
+    pub fn new() -> Self {
+        Self { until: None }
+    }
+    /// 设置冷却
+    pub fn apply(&mut self, duration: Duration) {
+        self.until = Some(Instant::now() + duration);
+    }
+    /// 是否在冷却中
+    pub fn is_active(&self) -> bool {
+        self.until.is_some_and(|t| Instant::now() < t)
+    }
+    /// 清除冷却
+    pub fn clear(&mut self) {
+        self.until = None;
+    }
+}
+
+impl Default for Cooldown {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ============================================================================
+// §3 Agent entity (per Multica ECS 风格)
+// ============================================================================
+
+/// Agent entity (per ADR-0027 §2.2.1 游戏角色 = Mavis / 5 域 Lead / 子代理)
+///
+/// 不 derive Serialize/Deserialize (SystemTime + Cooldown 不 impl serde, PoC 仅内存)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Agent {
+    /// Agent ID
+    pub id: AgentId,
+    /// Agent 名称 (e.g. "Mavis" / "5 域 Lead Player" / "subagent-1")
+    pub name: String,
+    /// 1️⃣ 生命值
+    pub health: Health,
+    /// 2️⃣ 法力值 (token 预算)
+    pub mana: Mana,
+    /// 3️⃣ 经验/等级
+    pub xp: Xp,
+    /// 4️⃣ 天赋树
+    pub skill_tree: SkillTree,
+    /// 5️⃣ 背包
+    pub inventory: Inventory,
+    /// 6️⃣ 冷却
+    pub cooldown: Cooldown,
+    /// 创建时间
+    pub created_at: SystemTime,
+}
+
+impl Agent {
+    /// 新建 agent (Mavis 初始化默认值, 5 域 Lead 真人内容由 Mavis 决定 per 9/11 23:11 JST 强化)
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            id: AgentId(Uuid::new_v4()),
+            name: name.into(),
+            health: Health::new(),
+            mana: Mana::new(),
+            xp: Xp::new(),
+            skill_tree: SkillTree::new(),
+            inventory: Inventory::default(),
+            cooldown: Cooldown::new(),
+            created_at: SystemTime::now(),
+        }
+    }
+
+    /// 是否死亡 (health = 0, 需重启 session)
+    pub fn is_dead(&self) -> bool {
+        self.health.value == 0
+    }
+
+    /// 是否在冷却中
+    pub fn in_cooldown(&self) -> bool {
+        self.cooldown.is_active()
+    }
+}
+
+// ============================================================================
+// §4 Quest (WBS row = 关卡卡, per ADR-0027 §2.2.2)
+// ============================================================================
+
+/// Quest 状态 (per WBS 5 态状态机简化, 跟 star-task 7 态映射)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum QuestStatus {
+    /// 可接 (WBS pending)
+    Available,
+    /// 进行中 (WBS in_progress)
+    InProgress,
+    /// 完成 (WBS completed)
+    Completed,
+    /// 失败 (WBS failed)
+    Failed,
+}
+
+/// Quest (WBS row = 关卡卡, per ADR-0027 §2.2.2)
+///
+/// 不 derive Serialize/Deserialize (SystemTime 不 impl serde, PoC 仅内存)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Quest {
+    /// Task ID (跟 star-task 1:1 派生)
+    pub id: TaskId,
+    /// 任务标题
+    pub title: String,
+    /// 任务描述
+    pub description: String,
+    /// 接任务消耗 mana (token 预算)
+    pub mana_cost: u32,
+    /// 完成获得 XP
+    pub xp_reward: u64,
+    /// 当前状态
+    pub status: QuestStatus,
+    /// 创建时间
+    pub created_at: SystemTime,
+}
+
+impl Quest {
+    /// 新建 quest
+    pub fn new(
+        title: impl Into<String>,
+        description: impl Into<String>,
+        mana_cost: u32,
+        xp_reward: u64,
+    ) -> Self {
+        Self {
+            id: TaskId(Uuid::new_v4()),
+            title: title.into(),
+            description: description.into(),
+            mana_cost,
+            xp_reward,
+            status: QuestStatus::Available,
+            created_at: SystemTime::now(),
+        }
+    }
+}
+
+// ============================================================================
+// §5 GameLoop 1 闭环 (per ADR-0027 §2.2.1 + 守门 v25 AC)
+// ============================================================================
+
+/// GameLoop 错误
+#[derive(Debug, Error)]
+pub enum GameError {
+    /// mana 不足
+    #[error("insufficient mana: required {required}, available {available}")]
+    InsufficientMana {
+        /// 接 quest 需要的 token 数
+        required: u32,
+        /// agent 当前剩余 token 数
+        available: u32,
+    },
+    /// agent 死亡
+    #[error("agent is dead, restart required")]
+    AgentDead,
+    /// agent 冷却中
+    #[error("agent in cooldown until {until:?}")]
+    InCooldown {
+        /// 冷却结束的瞬时时间
+        until: Instant,
+    },
+    /// quest 状态非法
+    #[error("invalid quest status: {current:?}")]
+    InvalidQuestStatus {
+        /// 当前 quest 状态 (e.g. 重复接任务)
+        current: QuestStatus,
+    },
+}
+
+/// GameLoop 1 闭环 (PoC 验证 5 件事)
+///
+/// 1. agent 接 task (mana 消耗)
+/// 2. agent 完成 task (xp 增加)
+/// 3. agent 升级 (skill tree 解锁)
+/// 4. agent 失败 (health 减少, cooldown)
+/// 5. agent 死亡 (mana 耗尽 / health=0, 需重启 session)
+pub struct GameLoop {
+    /// 当前 agent
+    pub agent: Agent,
+    /// 当前 quest
+    pub current_quest: Option<Quest>,
+}
+
+impl GameLoop {
+    /// 新建 gameloop
+    pub fn new(agent: Agent) -> Self {
+        Self {
+            agent,
+            current_quest: None,
+        }
+    }
+
+    /// 接 task (mana 消耗, per ADR-0027 §2.2.1 1️⃣)
+    pub fn assign_quest(&mut self, mut quest: Quest) -> Result<(), GameError> {
+        if self.agent.is_dead() {
+            return Err(GameError::AgentDead);
+        }
+        if self.agent.in_cooldown() {
+            return Err(GameError::InCooldown {
+                until: self.agent.cooldown.until.unwrap(),
+            });
+        }
+        if quest.status != QuestStatus::Available {
+            return Err(GameError::InvalidQuestStatus {
+                current: quest.status,
+            });
+        }
+        // 消耗 mana
+        if !self.agent.mana.consume(quest.mana_cost) {
+            return Err(GameError::InsufficientMana {
+                required: quest.mana_cost,
+                available: self.agent.mana.tokens,
+            });
+        }
+        quest.status = QuestStatus::InProgress;
+        self.current_quest = Some(quest);
+        Ok(())
+    }
+
+    /// 完成 task 成功 (xp 增加, per ADR-0027 §2.2.1 2️⃣ + 3️⃣)
+    pub fn complete_quest_success(&mut self) -> Result<Xp, GameError> {
+        let mut quest = self
+            .current_quest
+            .take()
+            .ok_or(GameError::InvalidQuestStatus {
+                current: QuestStatus::Available,
+            })?;
+        if quest.status != QuestStatus::InProgress {
+            return Err(GameError::InvalidQuestStatus {
+                current: quest.status,
+            });
+        }
+        quest.status = QuestStatus::Completed;
+        // 获得 XP, 自动升级
+        let leveled_up = self.agent.xp.gain(quest.xp_reward);
+        let xp_snapshot = self.agent.xp;
+        if leveled_up {
+            // 升级解锁 skill tree tier
+            self.agent.skill_tree.upgrade_tier();
+        }
+        Ok(xp_snapshot)
+    }
+
+    /// 失败 task (health 减少, cooldown, per ADR-0027 §2.2.1 4️⃣ + 6️⃣)
+    pub fn fail_quest(&mut self, damage: u32, cooldown: Duration) -> Result<bool, GameError> {
+        let mut quest = self
+            .current_quest
+            .take()
+            .ok_or(GameError::InvalidQuestStatus {
+                current: QuestStatus::Available,
+            })?;
+        if quest.status != QuestStatus::InProgress {
+            return Err(GameError::InvalidQuestStatus {
+                current: quest.status,
+            });
+        }
+        quest.status = QuestStatus::Failed;
+        // 受到伤害
+        let died = self.agent.health.take_damage(damage);
+        // 设置冷却
+        self.agent.cooldown.apply(cooldown);
+        Ok(died)
+    }
+
+    /// 重启 session (death 后)
+    pub fn restart(&mut self) {
+        self.agent.health = Health::new();
+        self.agent.cooldown.clear();
+        self.current_quest = None;
+    }
+}
+
+// ============================================================================
+// §6 GameBackend trait (Physis / GVPE 集成点, per ADR-0027 §2.2.3)
+// ============================================================================
+
+/// GameBackend 错误
+#[derive(Debug, Error)]
+pub enum BackendError {
+    /// 物理查询失败
+    #[error("physics query failed: {0}")]
+    PhysicsQuery(String),
+    /// 物理应用失败
+    #[error("physics apply failed: {0}")]
+    PhysicsApply(String),
+}
+
+/// GameBackend trait (per ADR-0027 §2.2.3 Physis / GVPE 集成点)
+///
+/// 阶段 1: MockBackend (no-op, 验证 trait 抽象)
+/// 阶段 2: PhysicsBackend (Physis 0.1.x 实装)
+/// 阶段 3: GVPEBackend (GVPE 游戏运行时集成)
+pub trait GameBackend {
+    /// 应用物理 (移动 / 碰撞 / 受击)
+    fn apply_physics(&mut self, agent: &mut Agent) -> Result<(), BackendError>;
+    /// 查询碰撞
+    fn query_collision(&self, agent: &Agent) -> Result<Vec<Uuid>, BackendError>;
+}
+
+/// MockBackend (no-op, 阶段 1 用)
+pub struct MockBackend;
+
+impl GameBackend for MockBackend {
+    fn apply_physics(&mut self, _agent: &mut Agent) -> Result<(), BackendError> {
+        Ok(())
+    }
+    fn query_collision(&self, _agent: &Agent) -> Result<Vec<Uuid>, BackendError> {
+        Ok(vec![])
+    }
+}
+
+// ============================================================================
+// §7 Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn health_damage_no_death() {
+        let mut h = Health::new();
+        assert!(!h.take_damage(30));
+        assert_eq!(h.value, 70);
+    }
+
+    #[test]
+    fn health_damage_to_zero_death() {
+        let mut h = Health::new();
+        assert!(h.take_damage(100));
+        assert_eq!(h.value, 0);
+    }
+
+    #[test]
+    fn health_heal() {
+        let mut h = Health::new();
+        h.take_damage(50);
+        h.heal(20);
+        assert_eq!(h.value, 70);
+    }
+
+    #[test]
+    fn mana_consume_and_replenish() {
+        let mut m = Mana::new();
+        assert!(m.consume(100));
+        assert_eq!(m.tokens, 900);
+        assert!(!m.consume(1000)); // 不足
+        m.replenish(200);
+        assert_eq!(m.tokens, 1000); // 满
+    }
+
+    #[test]
+    fn xp_gain_level_up() {
+        let mut xp = Xp::new();
+        assert!(!xp.gain(50)); // 50/100, 不升级
+        assert_eq!(xp.level, 1);
+        assert!(xp.gain(60)); // 110/100, 升级
+        assert_eq!(xp.level, 2);
+        assert_eq!(xp.xp, 10); // 110 - 100 = 10
+        assert_eq!(xp.xp_to_next_level, 200); // 2 * 100
+    }
+
+    #[test]
+    fn skill_tree_change_branch_and_upgrade() {
+        let mut st = SkillTree::new();
+        assert_eq!(st.branch, SkillBranch::Talent);
+        st.change_branch(SkillBranch::Spell);
+        assert_eq!(st.branch, SkillBranch::Spell);
+        st.upgrade_tier();
+        assert_eq!(st.tier, 2);
+    }
+
+    #[test]
+    fn inventory_add_remove_item() {
+        let mut inv = Inventory::default();
+        let item = Item {
+            id: ItemId(Uuid::new_v4()),
+            kind: ItemKind::Commit,
+            metadata: serde_json::json!({"hash": "abc1234"}),
+        };
+        inv.add(item.clone());
+        assert_eq!(inv.len(), 1);
+        let removed = inv.remove(item.id);
+        assert!(removed.is_some());
+        assert_eq!(inv.len(), 0);
+    }
+
+    #[test]
+    fn cooldown_apply_and_clear() {
+        let mut cd = Cooldown::new();
+        assert!(!cd.is_active());
+        cd.apply(Duration::from_millis(100));
+        assert!(cd.is_active());
+        cd.clear();
+        assert!(!cd.is_active());
+    }
+
+    #[test]
+    fn agent_new_6_attributes() {
+        let agent = Agent::new("Mavis");
+        assert_eq!(agent.name, "Mavis");
+        assert_eq!(agent.health.value, 100);
+        assert_eq!(agent.mana.tokens, 1000);
+        assert_eq!(agent.xp.level, 1);
+        assert_eq!(agent.skill_tree.branch, SkillBranch::Talent);
+        assert_eq!(agent.skill_tree.tier, 1);
+        assert!(agent.inventory.is_empty());
+        assert!(!agent.in_cooldown());
+    }
+
+    #[test]
+    fn quest_new_initial_state() {
+        let q = Quest::new("R5 PoC", "verify game loop", 50, 200);
+        assert_eq!(q.status, QuestStatus::Available);
+        assert_eq!(q.mana_cost, 50);
+        assert_eq!(q.xp_reward, 200);
+    }
+
+    #[test]
+    fn game_loop_assign_quest_consume_mana() {
+        let mut game = GameLoop::new(Agent::new("Mavis"));
+        let q = Quest::new("R5 PoC", "verify game loop", 50, 200);
+        let result = game.assign_quest(q);
+        assert!(result.is_ok());
+        assert_eq!(game.agent.mana.tokens, 950); // 1000 - 50
+        assert_eq!(
+            game.current_quest.as_ref().unwrap().status,
+            QuestStatus::InProgress
+        );
+    }
+
+    #[test]
+    fn game_loop_insufficient_mana() {
+        let mut agent = Agent::new("Mavis");
+        agent.mana.tokens = 30; // 不够
+        let mut game = GameLoop::new(agent);
+        let q = Quest::new("expensive", "too much", 50, 200);
+        let result = game.assign_quest(q);
+        assert!(matches!(result, Err(GameError::InsufficientMana { .. })));
+    }
+
+    #[test]
+    fn game_loop_complete_quest_gain_xp_and_level_up() {
+        let mut game = GameLoop::new(Agent::new("Mavis"));
+        let q = Quest::new("R5 PoC", "verify", 50, 200);
+        game.assign_quest(q).unwrap();
+        let xp = game.complete_quest_success().unwrap();
+        // 200 XP 触发 1 次升级 (level 1→2, xp 剩 100), 因公式 xp_to_next_level = level * 100
+        assert_eq!(xp.level, 2);
+        assert_eq!(xp.xp, 100); // 200 - 100 = 100 剩
+        assert_eq!(game.agent.skill_tree.tier, 2); // 升级解锁, tier 1→2
+    }
+
+    #[test]
+    fn game_loop_fail_quest_damage_and_cooldown() {
+        let mut game = GameLoop::new(Agent::new("Mavis"));
+        let q = Quest::new("fail-test", "test fail", 50, 200);
+        game.assign_quest(q).unwrap();
+        let died = game.fail_quest(30, Duration::from_millis(100)).unwrap();
+        assert!(!died);
+        assert_eq!(game.agent.health.value, 70);
+        assert!(game.agent.in_cooldown());
+    }
+
+    #[test]
+    fn game_loop_fail_to_death() {
+        let mut game = GameLoop::new(Agent::new("Mavis"));
+        let q = Quest::new("suicide", "die", 0, 0);
+        game.assign_quest(q).unwrap();
+        let died = game.fail_quest(100, Duration::from_millis(100)).unwrap();
+        assert!(died);
+        assert!(game.agent.is_dead());
+    }
+
+    #[test]
+    fn game_loop_restart_after_death() {
+        let mut game = GameLoop::new(Agent::new("Mavis"));
+        let q = Quest::new("die", "die", 0, 0);
+        game.assign_quest(q).unwrap();
+        game.fail_quest(100, Duration::from_millis(0)).unwrap();
+        assert!(game.agent.is_dead());
+        game.restart();
+        assert_eq!(game.agent.health.value, 100);
+        assert!(!game.agent.in_cooldown());
+    }
+
+    #[test]
+    fn game_loop_assign_after_cooldown() {
+        let mut game = GameLoop::new(Agent::new("Mavis"));
+        let q = Quest::new("first", "fail", 0, 0);
+        game.assign_quest(q).unwrap();
+        game.fail_quest(10, Duration::from_millis(100)).unwrap();
+        // 在 cooldown 中接新 quest → 失败
+        let q2 = Quest::new("second", "try", 0, 0);
+        let result = game.assign_quest(q2);
+        assert!(matches!(result, Err(GameError::InCooldown { .. })));
+    }
+
+    #[test]
+    fn mock_backend_no_op() {
+        let mut backend = MockBackend;
+        let mut agent = Agent::new("Mavis");
+        assert!(backend.apply_physics(&mut agent).is_ok());
+        assert!(backend.query_collision(&agent).is_ok());
+        assert_eq!(backend.query_collision(&agent).unwrap().len(), 0);
+    }
+}

@@ -3496,6 +3496,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "star-game"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
 name = "star-mcp"
 version = "0.1.0"
 dependencies = [
@@ -3607,6 +3617,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "star-registry"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "star-sa"
 version = "0.1.0"
 dependencies = [
@@ -3636,6 +3658,19 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
+]
+
+[[package]]
+name = "star-task"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "star-registry",
+ "thiserror 1.0.69",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

@@ -1,0 +1,19 @@
+[package]
+name = "star-game"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Star Agent 小游戏核心理念 (R5 阶段 1 PoC: 6 维属性 + 1 agent + 1 task 闭环 + GameBackend trait, per ADR-0027 R5 + plan-032 R5 🟢 MILESTONE)"
+
+[dependencies]
+# workspace inheritance (per 守门 #1 + #19, 避免 version 重复)
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true
