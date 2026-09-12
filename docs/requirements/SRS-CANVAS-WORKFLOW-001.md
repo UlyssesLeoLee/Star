@@ -714,11 +714,12 @@ STAR 平台已有 `automation` module (`frontend/src/app/automation/page.tsx`, p
 | ID | FR-WORKFLOW-W10.1 |
 | 描述 | 每个 `automation_flow` 有 `enabled: boolean` 字段 (复用既有 `AutomationRule.enabled` 语义), 仅 `enabled=true` 的 Flow 的触发节点会响应真实触发事件; `enabled=false` 时仍可手动运行调试 |
 | 数据 schema 增项 | `automation_flow.enabled` |
+| 业务规则 (v1.1 新增, per 守门 #1 禁回溯叙事 — 显式记录本条对 W10.1 原始范围的追加) | 若 Flow 中存在 `is_placeholder=true` 且未绑定真实 `agent_id` 的节点, 禁止将该 Flow 设为 `enabled=true`; 详见 §4.14.5 FR-W14.5 激活前置校验 |
 | 优先级 | P0 |
 
-**用户故事**: US-W21
+**用户故事**: US-W21, US-W32
 
-**验收标准**: AC-W10.1 — 停用后, schedule/webhook/canvas_event 触发不再生效; 手动触发仍可用于调试
+**验收标准**: AC-W10.1 — 停用后, schedule/webhook/canvas_event 触发不再生效; 手动触发仍可用于调试; 尝试激活含未绑定 `agent_id` 的占位节点的 Flow 时被拒绝并提示具体节点 (v1.1 新增, 对应 §4.14.5)
 
 **已知缺口**: 无
 
@@ -1060,7 +1061,7 @@ STAR 平台已有 `automation` module (`frontend/src/app/automation/page.tsx`, p
 
 ### 4.15 W15 LangGraph 智能控制 + 底部聊天栏 (5 项, **v1.1 新增**, per 追评 2 `01a09567-5720-7500-a870-9cff243e8102`)
 
-本子能力对接既有 `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` L0/L1 + TMO 架构, 不重新设计一套并行的智能控制系统; "L1↔L1 通信禁止" (守门 #13a) 约束同样适用于本 SRS 的动态路由 — 动态路由决策统一经 L0 做出, 不允许 Flow 内不同 Agent 占位节点互相直接通信决策。
+本子能力对接既有 `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` L0/L1 + TMO 架构, 不重新设计一套并行的智能控制系统; "L1↔L1 通信禁止" (守门 #13 a 派生, per `AGENTS.md` L0/TMO 架构记述, 非 §4 独立编号条款) 约束同样适用于本 SRS 的动态路由 — 动态路由决策统一经 L0 做出, 不允许 Flow 内不同 Agent 占位节点互相直接通信决策。
 
 #### 4.15.1 FR-W15.1 补齐画布底部聊天栏
 
@@ -1104,7 +1105,7 @@ STAR 平台已有 `automation` module (`frontend/src/app/automation/page.tsx`, p
 | 描述 | 条件节点新增 `routing_mode: "static_cel" \| "dynamic_agent"`; 选择 `dynamic_agent` 时, 分支走向由 L0 依据当前上下文 (`TopAgentState`) 在执行时动态决定, 而非预先写死的 CEL 表达式, 与 W4 静态分支并存, 用户按需选择 |
 | 数据 schema 增项 | `flow_node.routing_mode` (新增字段, 默认 `"static_cel"` 保持向后兼容) |
 | 接口依赖 | 复用 ADR-0046 `TopAgentState.active_tmo_operation` 语义, 不新增并行状态机 |
-| 业务规则 | 动态路由决策必须经 L0 做出, 禁止 Flow 内 Agent 占位节点间直接通信决策 (per 守门 #13a "L1↔L1 通信禁止" 同源约束) |
+| 业务规则 | 动态路由决策必须经 L0 做出, 禁止 Flow 内 Agent 占位节点间直接通信决策 (per 守门 #13 a 派生 "L1↔L1 通信禁止" 同源约束) |
 | 优先级 | P1 |
 
 **用户故事**: US-W34
@@ -1156,7 +1157,7 @@ STAR 平台已有 `automation` module (`frontend/src/app/automation/page.tsx`, p
 | 守门 #1 禁回溯叙事 | §0.3 显式记录本 SRS 对总册 §1.4 "Miro Flowchart / 通用集成" 砍掉决定的反转, 未静默重写 |
 | 守门 #11 缺标比错标 | §1.4 不包含范围 + 每项 FR "已知缺口" 字段 + §10 已知风险均显式列出, 不留隐性假设 |
 | 守门 #13 W/T/M 三类横展 | §7.2 逐表标注 Work/Transaction/Master 分类 |
-| 守门 #13a L1↔L1 通信禁止 (per ADR-0046) | W15.3 动态路由决策显式约束为经 L0 做出, 不允许 Agent 占位节点间直接通信决策 |
+| 守门 #13 a 派生 (L1↔L1 通信禁止, per `AGENTS.md` §6 ADR 索引 + ADR-0046, 非 §4 独立编号条款) | W15.3 动态路由决策显式约束为经 L0 做出, 不允许 Agent 占位节点间直接通信决策 |
 | 守门 #14 签字栏 | §11 沿用 5 角色签字结构 |
 | 守门 #23 v2 禁真实第三方 AI API 调用 (**v1.1 新增**) | W15.2 NL→Flow 解析、W15.3 动态路由决策底层 v1 均为 mock/规则化实现, 真实 LLM 接入留 P2, 详见 §1.4 / §10 |
 
@@ -1381,6 +1382,7 @@ Flow.tags 变更
 | 风险 #8 (**v1.1 新增**) | W15.2/W15.3 v1 均为 mock 规则化实现 (per 守门 #23 v2), 真实语义理解/智能判断能力有限, 可能与用户对"LangGraph 智能控制"的实际预期 (真正的 LLM 推理) 有落差 | 真实使用体验可能不及预期, 需在交付说明中明确 v1/P2 边界 | v1 先交付 mock 版本验证交互流程, 真实 LLM 接入时间点待 5 域 Lead / Ulysses 在 P2 阶段拍板 |
 | 风险 #9 (**v1.1 新增**) | LangGraph 动态路由 (`routing_mode="dynamic_agent"`) 的决策可复现性/确定性未澄清 — 同一输入两次执行是否应产生相同路由结果 | 影响 e2e 测试稳定性与执行历史的可审计性 | 待 Design Doc 阶段明确: 是否要求同输入同输出 (确定性 mock), 或允许非确定性但需记录决策依据 (per FR-W15.3 已知缺口) |
 | 风险 #10 (**v1.1 新增**) | AAA/spec/superpowers 3 套默认模板的具体节点清单 (per W14.2-W14.4) 由 agent 撰写本文档时基于 issue 描述与常见方法论合理推断, 尚未经真人 (issue 创建者 / 5 域 Lead) 逐节点确认 | 实际落地时节点清单可能需调整 | 已在 §11 签字栏标记 Draft 待拍板, 建议评审时逐节点过一遍 §4.14.2-§4.14.4 |
+| 风险 #11 (**v1.1 新增**) | FR-W14.3 编程 spec 式模板中"评审不通过"回指边形成的循环, 不做自动死循环检测 (与 BR-W-6 子流程环检测是不同层面 — 后者是子流程引用图, 前者是普通 Flow 边循环), 用户可能手动搭建出无法退出的循环 | 若用户反复"不通过"且无人工干预, Flow 可能无限重跑相同节点, 消耗执行资源 | v1 不做检测, 依赖 FR-W8.1 节点级重试策略上限与人工介入; 是否需要 Flow 级最大循环次数硬限制留 P2 评估 |
 
 ---
 
