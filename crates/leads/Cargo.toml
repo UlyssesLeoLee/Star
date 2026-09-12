@@ -1,0 +1,16 @@
+[package]
+name = "leads"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "5 角色 Rust 化 (per plan-032 R10 line 150-155 + DD-SHARED-TASK-001 §4.6 + §7 缺口 #8: enum Lead + trait DecisionAuthority + 5 Lead 真人内容由 Mavis 默认填 per 9/11 23:11 JST 强化 + 编译时保证 5 角色签字 = 5 域 Lead enum 必填)"
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true
