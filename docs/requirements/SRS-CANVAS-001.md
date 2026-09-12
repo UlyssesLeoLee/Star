@@ -10,9 +10,10 @@
 > - 关联 commit: (root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
 > - 关联 V0.1 实装: `docs/frontend-canvas-design.md` v0.1 + `frontend/src/components/CanvasView.tsx` + 6+3 e2e 守门
 > - 上位要件: `docs/requirements/SRS-STAR-OPS-001.md` v1.0 (STAR 平台运营 SRS)
-> - 平行专题 SRS (2 份并行撰写中, root 协调):
->   - `SRS-CANVAS-AGENT-001` (双核心 1: agent 管理域, 28 项)
->   - `SRS-CANVAS-GAMIFY-001` (双核心 2: 游戏化域, 32 项)
+> - 平行专题 SRS (2 份并行撰写中, root 协调; **+ 1 份 v1.2 新增, 三核心**):
+>   - `SRS-CANVAS-AGENT-001` (核心 1: agent 管理域, 28 项)
+>   - `SRS-CANVAS-GAMIFY-001` (核心 2: 游戏化域, 32 项)
+>   - **`SRS-CANVAS-WORKFLOW-001`** (核心 3: 自动化流程域, 42 项, **v1.2 新增, per ULYS-15 issue 委托**)
 > - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 2026-08-27 19:39 JST 用户授权 + 9/8 15:19 JST 第 6 次强化)
 > - 审批: 架构师 (Mavis 接手 agent per DEC-008) (per 守门 #14 v3 Mavis 永久代签)
 > - 日期: 2026-09-10 JST
@@ -41,14 +42,16 @@
 |---|---|---|---|---|
 | v0.1 (撤回) | 2026-09-10 17:10 JST | Ulysses — Mavis 接手 | 旧方向: Miro 全功能对标 12 大类 50 项, 3 专题拆分 (collab/content/integration) | Ulysses 17:00 JST 拍板 (后撤回) |
 | v1.0 (方向重置版) | 2026-09-10 17:20 JST | Ulysses — Mavis 接手 (per 守门 #14 v3) | 新方向: 双核心 = 管理 agent + 游戏化, 2 专题拆分, 砍掉 Miro 通用功能, 字节数目标 ~20K (vs v0.1 47.5K 砍 58%) | Ulysses 17:08 JST 拍板"管理 agent 和游戏化, 避免过度冗余" |
-| **v1.1 (当前, 三次更新版)** | **2026-09-10 17:34 JST** | **Ulysses — Mavis 接手 (per 守门 #14 v3)** | **v0.63 反转: 撤回 17:08 JST 砍多人编辑决定, A12 多人编辑 8 项新增, AGENT 38 → 46 项, 双核心 70 → 78 项, 31 P0 → 36 P0** | **Ulysses 17:34 JST 拍板"多人编辑是要的"** |
+| v1.1 (三次更新版) | 2026-09-10 17:34 JST | Ulysses — Mavis 接手 (per 守门 #14 v3) | v0.63 反转: 撤回 17:08 JST 砍多人编辑决定, A12 多人编辑 8 项新增, AGENT 38 → 46 项, 双核心 70 → 78 项, 31 P0 → 36 P0 | Ulysses 17:34 JST 拍板"多人编辑是要的" |
+| **v1.2 (当前, 双核心 → 三核心)** | **2026-09-12** | **Sonnet (agent, per Multica ULYS-15 委托)** | **新增第 3 核心"自动化流程" (`SRS-CANVAS-WORKFLOW-001`, 42 项), 双核心 78 → 三核心 120 项 (索引级同步, 详见 §1.3.1); 局部反转 §1.4 "Miro 12 种 diagram" 行中 Flowchart 子项与"Miro 通用集成"行, 见 §0.3 撤回记录; §4.1/§4.4 全量重排留 known gap (per 本 SRS §7.3 风险)** | **ULYS-15 issue 人类创建者委托"n8n 那种工作流的功能" — 尚待 Ulysses / 5 域 Lead 正式拍板, 状态 Draft** |
 
-### 0.2 平行 2 专题 SRS 修订履历 (独立跟踪)
+### 0.2 平行 3 专题 SRS 修订履历 (独立跟踪)
 
 | 文书 | 版本 | 状态 | 撰写方 | 触发 |
 |---|---|---|---|---|
 | `SRS-CANVAS-AGENT-001` | v1.0 (目标) | 撰写中 | worker 子代理 1 (bg_fc33dfea) | 本拍板派生 (per 17:08 JST 方向重置) |
 | `SRS-CANVAS-GAMIFY-001` | v1.0 (目标) | 撰写中 | worker 子代理 2 (bg_84cf0613) | 本拍板派生 (per 17:08 JST 方向重置) |
+| **`SRS-CANVAS-WORKFLOW-001`** | **v1.0 (Draft, 待拍板)** | **撰写完成, 待审** | **Sonnet (agent)** | **ULYS-15 issue 委托** |
 
 ### 0.3 撤回记录 (per 守门 #1 禁回溯叙事)
 
@@ -57,6 +60,7 @@
 | 2026-09-10 17:15 JST | 3 子代理 (bg_f85f553e / bg_0b4e50e6 / bg_85c3c459) | 旧方向: Miro 全功能 12 大类 50 项 | 2 子代理 (bg_fc33dfea / bg_84cf0613) 双核心 |
 | 2026-09-10 17:15 JST | 3 旧 brief (srs-canvas-collab/content/integration-001) | 旧方向 | 2 新 brief (srs-canvas-agent/gamify-001) + 1 deprecated placeholder |
 | 2026-09-10 17:17 JST | 总册 v0.1 (47.5KB) | 旧方向 | 总册 v1.0 (本文件, 聚焦双核心) |
+| **2026-09-12 (v1.2)** | **§1.4 不包含范围 "Miro 12 种 diagram" 行中的 Flowchart 子项 + "Miro 通用集成" 行 (仅限可执行编排一项, 局部反转)** | **ULYS-15 issue 人类创建者委托"n8n 那种工作流的功能" — 但不是恢复 Miro 被动绘图, 而是 `automation` module (Rule+Trigger+Condition+Action) 的图结构扩展** | **`SRS-CANVAS-WORKFLOW-001` v1.0 (核心 3: 自动化流程, 42 项), 详见该 SRS §0.3 完整反转声明** |
 
 ---
 
@@ -90,10 +94,11 @@ STAR 平台已在 2026-09-04 落地 V0.1 MVP 无限画布, 满足基础无限画
 
 | SRS | 域 | 子能力 | 项数 | 详细展开 |
 |---|---|---|---|---|
-| **SRS-CANVAS-001 (本总册)** | 跨域 / 索引 | 双核心 60 项 (索引级) | 60 项 (索引) | 双核心索引 + 优先级 + 跨块接口 + 共享约束 |
-| `SRS-CANVAS-AGENT-001` | 双核心 1: agent 管理 | A1-A12 (12 子能力, 含 ARG 图论构造 + 多人编辑 per 17:34 JST v0.63 反转) | **46 项** | 节点 / 拓扑 / 状态 / worktree / work-item / 操作 / 监控 / 聚类 / 跨域 / settings 集成 / **ARG (10 类关系 + 4 维度 + 5 模板 + 同步桥 + 成就)** / **多人编辑 (8 项: 多人同时编辑 + 实时 cursor + 元素增删改 + Follow mode + 评论线程 + @ + 冲突解决 + audit)** (FR/NFR/AC/US 详细) |
-| `SRS-CANVAS-GAMIFY-001` | 双核心 2: 游戏化 | G1-G12 (12 子能力) | **32 项** | 节点 / 奖励 / 积分 / 升级 / AI 聚类 / 投票 / 反应 / confetti / 排行榜 / 任务 / 道具 / game 集成 (FR/NFR/AC/US 详细) |
-| **合计** | | | **78 项 (展开)** | |
+| **SRS-CANVAS-001 (本总册)** | 跨域 / 索引 | 三核心 120 项 (索引级, per v1.2) | 120 项 (索引) | 三核心索引 + 优先级 + 跨块接口 + 共享约束 (§4.1/§4.4 全量重排为后续 known gap, 见 §7.3) |
+| `SRS-CANVAS-AGENT-001` | 核心 1: agent 管理 | A1-A12 (12 子能力, 含 ARG 图论构造 + 多人编辑 per 17:34 JST v0.63 反转) | **46 项** | 节点 / 拓扑 / 状态 / worktree / work-item / 操作 / 监控 / 聚类 / 跨域 / settings 集成 / **ARG (10 类关系 + 4 维度 + 5 模板 + 同步桥 + 成就)** / **多人编辑 (8 项: 多人同时编辑 + 实时 cursor + 元素增删改 + Follow mode + 评论线程 + @ + 冲突解决 + audit)** (FR/NFR/AC/US 详细) |
+| `SRS-CANVAS-GAMIFY-001` | 核心 2: 游戏化 | G1-G12 (12 子能力) | **32 项** | 节点 / 奖励 / 积分 / 升级 / AI 聚类 / 投票 / 反应 / confetti / 排行榜 / 任务 / 道具 / game 集成 (FR/NFR/AC/US 详细) |
+| **`SRS-CANVAS-WORKFLOW-001` (v1.2 新增)** | **核心 3: 自动化流程** | **W1-W13 (13 子能力)** | **42 项** | **n8n 式节点图 (触发/动作/条件/循环/子流程) + 标签绑定任务卡 + Backlog/Sprint 联动 (FR/NFR/AC/US 详细, per ULYS-15 issue 委托)** |
+| **合计** | | | **120 项 (展开)** | |
 
 #### 1.3.2 V0.1 MVP 衔接 (per 守门 #11 缺标比错标)
 
@@ -124,7 +129,7 @@ V0.1 MVP 已实装能力, 本总册**保留**为 V0.1 不重新设计:
 | **Miro 通用导出** | PDF / Word / Excel / CSV / SVG | PNG 已有 (V0.1), 文本导出超出核心 |
 | **Miro 通用互动** | Cursor chat / Async video / Timer workshop 用 | 互动用 Slack / 飞书 / 邮件 |
 | **Miro 通用版本** | Version history / Branching / Restore | 跟 Git worktree 重复, 用 Git 即可 |
-| **Miro 通用集成** | Slack / Jira / Asana / Figma / Notion / GitHub / Zoom | Star 25 module 已有, 集成超出画布核心 |
+| ~~**Miro 通用集成**~~ | ~~Slack / Jira / Asana / Figma / Notion / GitHub / Zoom~~ | **v1.2 局部反转 (per 2026-09-12, ULYS-15 issue 委托)**: 可执行 HTTP/webhook 编排能力已在 `SRS-CANVAS-WORKFLOW-001` W2.3/W3.2 落地 (`call_webhook` / `http_request` 通用动作); 但**具名第三方连接器** (Slack/Jira/Asana/Figma/Notion/GitHub/Zoom 专用 UI 封装) **仍砍掉**, 留 P2+ (per `SRS-CANVAS-WORKFLOW-001` §1.4) |
 | **Miro 通用移动** | iOS / Android native / Touch / Stylus / Offline | 客户端重投入, 短期 web 触控够用 |
 | **Miro 12 种 diagram** | Mind map / Flowchart / BPMN / ER / Wireframe / Kanban / Sequence / Smart drawing / Draw | 内容生产用专门工具 (Figma / Lucidchart) |
 | **Miro 模板库** | 2500+ 模板 | 评估做 5-10 个, 留 P3+ |
