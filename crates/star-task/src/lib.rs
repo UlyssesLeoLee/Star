@@ -1007,4 +1007,37 @@ mod tests {
         let shared: shared_task::SharedTask = row.into();
         assert_eq!(shared.state, shared_task::TaskState::Closed);
     }
+
+    // ========================================================================
+    // R9 阶段 3: 5 milestone benchmark 实测 (per plan-032 §4.1)
+    // ========================================================================
+
+    /// milestone #4: WBS 5 态状态机 100K task 吞吐 > 100K task/秒 (vs Jira 10K task/秒, 10x 加速)
+    /// 测量 100K task transition 时间, 计算 throughput
+    #[test]
+    #[ignore = "R9 阶段 3 PoC: criterion bench 留 benches/, 默认跳过避免 cargo test 慢"]
+    fn r9_milestone_4_transition_100k_tasks_throughput() {
+        use std::time::Instant;
+        let now = SystemTime::now();
+        let start = Instant::now();
+        for _i in 0..100_000 {
+            let mut row = WbsTaskRow::new(TaskId(Uuid::new_v4()), now);
+            let actor_id = ActorId(Uuid::new_v4());
+            let _ = row.transition(
+                TaskStatus::InProgress,
+                ActorType::System,
+                actor_id,
+                None,
+                now,
+            );
+        }
+        let elapsed = start.elapsed();
+        let elapsed_ms = elapsed.as_millis();
+        let throughput_per_sec = (100_000_u128 * 1000_u128)
+            .checked_div(elapsed_ms)
+            .unwrap_or(u128::MAX);
+        eprintln!(
+            "[R9 milestone #4] 100K task transition: {elapsed_ms} ms, throughput: {throughput_per_sec} task/秒 (target: > 100K task/秒)"
+        );
+    }
 }

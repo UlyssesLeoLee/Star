@@ -14,5 +14,12 @@ shared-task = { path = "../shared-task" }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "cpm_10k_tasks"
+harness = false
+
 [lints]
 workspace = true

@@ -14,5 +14,12 @@ shared-task = { path = "../shared-task" }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "concurrent_edit_100_nodes"
+harness = false
+
 [lints]
 workspace = true

@@ -3427,6 +3427,7 @@ dependencies = [
 name = "star-canvas"
 version = "0.1.0"
 dependencies = [
+ "criterion",
  "serde",
  "serde_json",
  "shared-task",
@@ -3527,6 +3528,7 @@ dependencies = [
 name = "star-game"
 version = "0.1.0"
 dependencies = [
+ "criterion",
  "serde",
  "serde_json",
  "shared-task",
@@ -3650,6 +3652,7 @@ name = "star-registry"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "criterion",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3683,6 +3686,7 @@ dependencies = [
 name = "star-scheduler"
 version = "0.1.0"
 dependencies = [
+ "criterion",
  "serde",
  "serde_json",
  "shared-task",
@@ -3705,6 +3709,7 @@ name = "star-task"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "criterion",
  "serde",
  "serde_json",
  "shared-task",

@@ -19,5 +19,12 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 star-registry = { path = "../star-registry" }
 
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "transition_batch_100k"
+harness = false
+
 [lints]
 workspace = true

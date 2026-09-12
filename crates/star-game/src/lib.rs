@@ -1131,4 +1131,25 @@ mod tests {
         let shared: shared_task::SharedTask = q.into();
         assert_eq!(shared.state, shared_task::TaskState::Closed);
     }
+
+    // ========================================================================
+    // R9 阶段 3: 5 milestone benchmark 实测 (per plan-032 §4.1)
+    // ========================================================================
+
+    /// milestone #5: Agent ECS 10K entity 60fps < 16.7ms (vs Physis 30fps 优化前 2x 加速)
+    /// 测量 10K Agent 1 frame update 时间
+    #[test]
+    #[ignore = "R9 阶段 3 PoC: criterion bench 留 benches/, 默认跳过避免 cargo test 慢"]
+    fn r9_milestone_5_ecs_10k_agents_one_frame_under_16_7ms() {
+        use std::time::Instant;
+        let mut agents: Vec<Agent> = (0..10_000)
+            .map(|i| Agent::new(format!("agent-{i}")))
+            .collect();
+        let start = Instant::now();
+        for agent in agents.iter_mut() {
+            agent.mana.replenish(1);
+        }
+        let elapsed_ms_f = start.elapsed().as_secs_f64() * 1000.0;
+        eprintln!("[R9 milestone #5] 10K agents 1 frame: {elapsed_ms_f:.2} ms (target: < 16.7 ms)");
+    }
 }

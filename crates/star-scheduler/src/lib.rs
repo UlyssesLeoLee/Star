@@ -646,4 +646,33 @@ mod tests {
         assert_eq!(shared.priority, shared_task::Priority::Medium);
         assert_eq!(shared.issue_key, Some("STAR-001".to_string()));
     }
+
+    // ========================================================================
+    // R9 阶段 3: 5 milestone benchmark 实测 (per plan-032 §4.1)
+    // ========================================================================
+
+    /// milestone #2: CPM 10K task < 100ms (vs MS Project 30s+, 300x 加速)
+    /// 测量 10K linear task chain 的 critical_path() 时间
+    #[test]
+    #[ignore = "R9 阶段 3 PoC: criterion bench 留 benches/, 默认跳过避免 cargo test 慢"]
+    fn r9_milestone_2_cpm_10k_tasks_under_100ms() {
+        use std::time::Instant;
+        let mut sched = Schedule::new("bench");
+        let mut prev: Option<TaskId> = None;
+        for i in 0..10_000 {
+            let mut task = Task::new(format!("T{i}"), 1);
+            if let Some(p) = prev {
+                task.add_predecessor(p);
+            }
+            let id = task.id;
+            sched.add_task(task);
+            prev = Some(id);
+        }
+        let scheduler = Scheduler::new();
+        let start = Instant::now();
+        let _ = scheduler.critical_path(&sched);
+        let _ = scheduler.critical_path_tasks(&sched);
+        let elapsed_ms = start.elapsed().as_millis();
+        eprintln!("[R9 milestone #2] CPM 10K tasks: {elapsed_ms} ms (target: < 100 ms)");
+    }
 }

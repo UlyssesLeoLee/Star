@@ -17,5 +17,12 @@ chrono = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "probe_1000_providers"
+harness = false
+
 [lints]
 workspace = true

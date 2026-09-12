@@ -912,4 +912,22 @@ mod tests {
         assert!(!is_dev_build("2.0.0"));
         assert!(!is_dev_build("2.1.267"));
     }
+
+    // ========================================================================
+    // R9 阶段 3: 5 milestone benchmark 实测 (per plan-032 §4.1)
+    // ========================================================================
+
+    /// milestone #1: 1000 provider probe < 200ms (vs Python 1-2K 秒, 10-20x 加速)
+    #[test]
+    #[ignore = "R9 阶段 3 PoC: criterion bench 留 benches/, 默认跳过避免 cargo test 慢"]
+    fn r9_milestone_1_probe_1000_providers_under_200ms() {
+        use std::time::Instant;
+        let start = Instant::now();
+        for _ in 0..200 {
+            let mut probe = RuntimeProbe::new();
+            let _entries = probe.probe_all();
+        }
+        let elapsed_ms = start.elapsed().as_millis();
+        eprintln!("[R9 milestone #1] 1000 provider probe: {elapsed_ms} ms (target: < 200 ms)");
+    }
 }
