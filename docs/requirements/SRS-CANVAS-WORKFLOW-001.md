@@ -16,7 +16,7 @@
 | 平行专题 | `SRS-CANVAS-AGENT-001` (专题 1: agent 管理) / `SRS-CANVAS-GAMIFY-001` (专题 2: 游戏化) |
 | 触发 issue | ULYS-15 "agent无限画布功能强化" |
 | 撰写者 | Sonnet (agent, per Multica ULYS-15 assignment) |
-| 版本 | v1.0 |
+| 版本 | v1.1 |
 | 状态 | Draft — 待 5 域 Lead / Ulysses 拍板 |
 
 ### 0.2 修订履历 (本 SRS)
@@ -24,6 +24,7 @@
 | 版本 | 日期 | 变更 | 触发 / 拍板依据 |
 |---|---|---|---|
 | v1.0 | 2026-09-12 | 初版: W1-W13 子能力 (42 项 FR), 覆盖 n8n 式节点图 + 标签绑定任务卡 + backlog/sprint 联动 | ULYS-15 issue 委托 (人类创建者需求文档委托, 非 Ulysses 直接拍板 — 待 §11 签字栏正式拍板) |
+| v1.1 | 2026-09-12 | 新增 W14 (默认工作流模板库: AAA 游戏资产管线 / spec 式 / superpowers 式) + W15 (LangGraph 智能控制 + 底部聊天栏), 共 +12 项 FR (42→54), +6 用户故事 (28→34); 同步更新 §1.3.2/§1.4/§1.5/§7/§8/§9/§10 | ULYS-15 issue 创建者 2 条追评委托: 评论 `01a09566-3f2d-7dc0-81c6-1ff46b89f056` (2026-09-12T11:35:01Z, 三套默认模板 + agent 占位预置) 与评论 `01a09567-5720-7500-a870-9cff243e8102` (2026-09-12T11:36:12Z, LangGraph 智能控制 + 补齐底部聊天栏, 创建者声明为"之前提过的需求") |
 
 ### 0.3 撤回记录 (per 守门 #1 禁回溯叙事)
 
@@ -63,6 +64,23 @@ ULYS-15 issue 原文 (issue 创建者, 人类成员, 2026-09-12):
 | `frontend/src/components/sprint/SprintBoardView.tsx` — Backlog = `workItems.filter(w => !w.sprint_id)`, 拖拽走 `@dnd-kit`, `addToSprint`/`removeFromSprint` 修改 `sprint_id` | 任务卡机制已成熟 (Jira 式 7 动作), 但**没有"由标签自动生成/回收任务卡"的机制** — 目前 WorkItem 都是人工创建 |
 | `WorkItem.labels: string[]` (`ids.ts` line 216) | 已有标签字段, 可直接复用, **无需新增 WorkItem 字段**做标签存储 |
 
+#### 1.2.1 追评委托 (v1.1 新增, per 守门 #1 禁回溯叙事 — 显式记录而非静默并入)
+
+issue 创建者在 v1.0 交付后追加 2 条评论, 均在原 issue 范围内, 本次 v1.1 显式吸收:
+
+> 追评 1 (`01a09566-3f2d-7dc0-81c6-1ff46b89f056`, 2026-09-12T11:35:01Z): "默认要一套图生高模到绑骨骼低模化加动作，各类贴图等的 AAA 工作流模板。再加一套编程的 spec 式的和一套 superpowers 式的工作流模板，用户选择后，可直接把 agent 占位和边以及数据流，其他类型的 node 都预设出来，供用户调整和自定义保存"
+
+> 追评 2 (`01a09567-5720-7500-a870-9cff243e8102`, 2026-09-12T11:36:12Z): "这些功能要支持 langgraph 的智能控制，允许通过最下方的聊天栏位创建，如果没有这个聊天栏位，要补上，我之前提过这个需求。"
+
+**已确认的现状差距 (针对追评, per 代码走查 2026-09-12)**:
+
+| 现状 | 差距 |
+|---|---|
+| `frontend/src/lib/store.ts` line 565 已有 `actor_session_id: undefined, // TODO: 接入 L0 chat bar session` (位于 `assignee_type: "agent"` 分支, per ADR-0046 §6.1) | 证实创建者"之前提过"的说法属实: 代码里已预留 L0 聊天栏会话接入点, 但**聊天栏 UI 本身尚未实现** |
+| `frontend/src/components/CommandBar.tsx` | 全仓库唯一含"底部/bottom/chat"相关字样的组件, 实为 ⌘K 式命令面板 (顶部/浮层触发), **不是**画布底部常驻聊天输入栏, 确认聊天栏缺口真实存在, 非误标 |
+| `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` (L0/L1 + TMO 7 StateGraph 节点 + `/api/tmo/*` 8 端点) | LangGraph 架构已在 ADR 层面拍板并部分落地 (`TopAgentState`/`SubAgentState`), 但**未接入画布/聊天栏交互层**, 也未覆盖"动态路由控制自动化 Flow 执行"这一新场景 |
+| `AutomationActionKind` 已含 `dispatch_agent` (`ids.ts` line 866), `SRS-CANVAS-WORKFLOW-001` v1.0 §4.7.2 FR-W7.2 已有"流程模板库"占位 (P2, 已知缺口"模板数量与清单待拍板") | 追评 1 正是对该已知缺口的具体拍板 (3 套模板 + 具体清单), 本次由 **W14 承接落地**, 不新增第二套模板机制 (详见 §4.7.2 已更新的已知缺口 + §4.14) |
+
 ### 1.3 包含范围 (In-Scope)
 
 #### 1.3.1 3 专题 SRS 职责划分 (更新, 双核心 → 三核心)
@@ -72,9 +90,9 @@ ULYS-15 issue 原文 (issue 创建者, 人类成员, 2026-09-12):
 | `SRS-CANVAS-001` (总册) | 跨域 / 索引 | 三核心索引 + 优先级 + 跨块接口 | 索引级, 待总册 v1.2 同步收录本专题 |
 | `SRS-CANVAS-AGENT-001` | 核心 1: agent 管理 | A1-A12 | 46 项 |
 | `SRS-CANVAS-GAMIFY-001` | 核心 2: 游戏化 | G1-G12 | 32 项 |
-| **`SRS-CANVAS-WORKFLOW-001` (本 SRS)** | **核心 3: 自动化流程** | **W1-W13 (13 子能力)** | **42 项** |
+| **`SRS-CANVAS-WORKFLOW-001` (本 SRS)** | **核心 3: 自动化流程** | **W1-W15 (15 子能力)** | **54 项** |
 
-#### 1.3.2 W1-W13 子能力总览
+#### 1.3.2 W1-W15 子能力总览
 
 | 子能力 | 名称 | 项数 | 概述 |
 |---|---|---|---|
@@ -91,8 +109,10 @@ ULYS-15 issue 原文 (issue 创建者, 人类成员, 2026-09-12):
 | W11 | 标签绑定任务卡 | 5 | 流程↔标签绑定 + 派生任务卡生成 + 持久化判定 + 标签变更传播 + 标签表达式 |
 | W12 | Backlog / Sprint 联动 | 5 | 默认落 Backlog + 拖拽进 Sprint + **在制 Sprint 标签变更规则** + 面板管理 UI + 手动覆盖 |
 | W13 | 数据一致性与状态映射 | 2 | 流程执行状态 ↔ WorkItem.status 解耦声明 + 1 task 1 sprint 维持 |
+| W14 (**v1.1 新增**) | 默认工作流模板库 | 7 | AAA 游戏资产管线 / spec 式 / superpowers 式 3 套内置模板 + 选中后自动预置 agent 占位节点/边/数据流 + 自定义另存 |
+| W15 (**v1.1 新增**) | LangGraph 智能控制 + 底部聊天栏 | 5 | 补齐底部聊天栏 (自然语言建/改 Flow) + LangGraph 式动态路由 + 与既有 L0/TMO 架构对接 |
 
-**合计: 42 项 FR** (P0 优先, 3 个月内目标)
+**合计: 54 项 FR** (P0 优先, 3 个月内目标; 其中 W1-W13 = 42 项为 v1.0 范围, W14-W15 = 12 项为 v1.1 新增)
 
 #### 1.3.3 n8n 概念 → 本 SRS 映射表 (per 缺标比错标, 逐项落地而非笼统"对标 n8n")
 
@@ -109,6 +129,9 @@ ULYS-15 issue 原文 (issue 创建者, 人类成员, 2026-09-12):
 | Sub-workflow | W7.1 | `workflow_subworkflow_node` (新增 kind, 引用另一 flow_id) | 新增 |
 | Execution history + re-run | W9.1-W9.2 | 独立面板 (非画布 element), 类比 `/automation` 页 | 新增 |
 | Active/inactive + versioning | W10.1-W10.3 | 工具栏开关 + 版本下拉 | 新增, W/T/M per 守门 #13 |
+| Agent 占位节点 (**v1.1 新增**, per 追评 1) | W14.5 | 复用 `workflow_action_node` (`action_kind = "dispatch_agent"`), 不新增 element kind | 复用 W3.1 既有 `dispatch_agent` 动作, 新增 `is_placeholder` / `placeholder_role_hint` 字段, 不扩展 W1 节点类别体系 |
+| LangGraph 式动态路由 (**v1.1 新增**, per 追评 2) | W15.3 | `workflow_condition_node.routing_mode = "static_cel" \| "dynamic_agent"` | 新增, 区别于 W4 静态 CEL 分支, 对接既有 L0/TopAgentState (ADR-0046) |
+| 底部聊天栏 / NL→Flow (**v1.1 新增**, per 追评 2) | W15.1-W15.2 | 独立于画布 element 的固定 UI 区域 (非画布 element), 类比 §4.9.1 执行历史面板"非画布 element"处理方式 | 新增 |
 
 ### 1.4 不包含范围 (Out-of-Scope, per 守门 #11 缺标比错标)
 
@@ -125,8 +148,11 @@ ULYS-15 issue 原文 (issue 创建者, 人类成员, 2026-09-12):
 | 游戏化 32 项 | reward / 积分 / 投票 / confetti | 属于 `SRS-CANVAS-GAMIFY-001`, 不重复 |
 | 后端持久化 API 具体实现 (数据库表 DDL / BFF route handler 代码) | REST/DB 层实现 | 本 SRS 只定义 §7/§8 数据与接口**需求** (schema 增项 + API 契约), 具体实现留 Design Doc (DD-CANVAS-WORKFLOW-001, 待创建) |
 | A12 多人协同编辑同一 Automation Flow 画布的 CRDT 冲突解决 | 多人同时拖节点 | 复用 `SRS-CANVAS-AGENT-001` A12 既有多人编辑基线, 本 SRS 不重新设计 CRDT, 只声明依赖 |
+| 真实第三方 LLM/NLU API 调用 (聊天栏自然语言解析 W15.2, 动态路由判断 W15.3) | 真实调用 OpenAI/Claude 等外部大模型做 NL→Flow 生成或路由决策 | per 守门 #23 v2 (禁真实第三方 AI API 调用), v1 一律 **mock 接口** (固定/规则化解析, 类比 `SRS-CANVAS-GAMIFY-001` G5 AI 聚类的同款处理), 真实 LLM 接入留 P2, 详见 §10 |
+| 真实 LangGraph Python 后端执行引擎接入 (真实 `console_server.py` `/api/tmo/*` 调用) | 聊天栏/动态路由与真实 L0/TMO 服务的网络对接 | 本 SRS 只定义前端契约 (画布 UI + 数据模型 + mock 桩), 复用 §3.2 "v1 前端 zustand mock" 既有约束边界, 真实对接属 Design Doc + Agent Runtime 范畴 |
+| superpowers 式模板中各阶段的真实技能自动触发 (如自动调用 brainstorming/TDD 技能执行) | Flow 节点自动驱动真实 agent 技能执行 | v1 该模板仅在画布上预置"阶段占位节点 + 顺序边", 代表方法论阶段划分, 不做真实技能调度对接, 真实调度属 Agent Runtime 范畴 |
 
-### 1.5 用户故事 (≥ 60% = 42 × 0.6 = 25.2 → 满足 ≥ 26, 本 SRS 提供 28 个)
+### 1.5 用户故事 (≥ 60% = 54 × 0.6 = 32.4 → 满足 ≥ 33, 本 SRS 提供 34 个)
 
 | 编号 | 角色 | 故事 | 子能力 | 优先级 |
 |---|---|---|---|---|
@@ -158,8 +184,14 @@ ULYS-15 issue 原文 (issue 创建者, 人类成员, 2026-09-12):
 | US-W26 | PM | 作为 PM, 我希望反过来给流程新加一个已绑定规则匹配的标签后, Backlog 里自动出现新任务卡, 不用手建 | W11.4 | P0 |
 | US-W27 | 5 域 Lead | 作为 Lead, 我希望在面板管理里看到"标签 → 流程 → 任务卡"的绑定关系一览表, 一眼看懂哪些自动化在跑 | W12.4 | P1 |
 | US-W28 | SRE | 作为 SRE, 我希望流程的运行状态 (跑成功/失败) 不会自动改动 task 卡的看板状态 (todo/done), 两者互不干扰, 除非我显式配置映射 | W13.1 | P1 |
+| US-W29 (**v1.1 新增**) | 美术/TA | 作为美术/TA, 我希望一键套用"AAA 游戏资产管线"模板, 画布自动搭好"图生高模→绑骨骼→低模化→加动作→出贴图"整条 agent 占位链路, 不用从零拖节点 | W14.1 + W14.2 | P1 |
+| US-W30 (**v1.1 新增**) | Dev | 作为 Dev, 我希望套用"spec 式"编程工作流模板, 自动搭好"需求 spec 撰写→评审→实现→测试→代码评审"的节点链路 | W14.1 + W14.3 | P1 |
+| US-W31 (**v1.1 新增**) | Dev | 作为 Dev, 我希望套用"superpowers 式"工作流模板, 自动搭好"brainstorming→写计划→执行计划→代码评审→收尾"的阶段占位节点链路 | W14.1 + W14.4 | P1 |
+| US-W32 (**v1.1 新增**) | PM | 作为 PM, 我希望套用任意默认模板后能直接调整节点参数/占位 agent, 并另存为我自己的自定义模板供团队复用 | W14.5 + W14.6 + W14.7 | P1 |
+| US-W33 (**v1.1 新增**, issue 创建者场景) | PM | 作为 PM, 我希望在画布底部的聊天栏里用自然语言描述"每天 9 点检查 P0 缺陷并通知我", 系统直接生成对应的 Flow 节点图, 不用手动拖节点 | W15.1 + W15.2 | P0 |
+| US-W34 (**v1.1 新增**) | 5 域 Lead | 作为 Lead, 我希望流程执行到条件节点时能由 LangGraph 式智能判断 (而非只有写死的 CEL 表达式) 决定下一步走哪个 agent, 并且这套判断跟现有 L0/TMO 架构是同一套, 不是另起炉灶 | W15.3 + W15.4 | P1 |
 
-**用户故事覆盖统计**: 28 个 (≥ 25.2 要求, 满足)
+**用户故事覆盖统计**: 34 个 (≥ 32.4 要求, 满足)
 
 ---
 
@@ -184,6 +216,10 @@ ULYS-15 issue 原文 (issue 创建者, 人类成员, 2026-09-12):
 | 标签绑定 (Tag Binding) | 1 个 Flow 在整体级别绑定 1 条**标签表达式** (tag AND/OR/NOT), 决定是否生成派生任务卡 |
 | 派生任务卡 (Derived Task Card) | 因 Tag Binding 命中而由系统自动创建/更新的 1 条 **真实 WorkItem 记录** (非虚拟投影, per §4.11.3 判定), `source_kind = "workflow_tag_binding"` |
 | 脱离状态 (Detached) | 派生任务卡所在 Sprint 已 **active** 且其标签绑定被移除时的过渡状态, 卡片保留但标红提示, 不立即删除 (per BR-W-3) |
+| 默认工作流模板 (Default Flow Template, **v1.1 新增**) | 内置只读的一套预配置节点图 (含节点/边/数据流/占位 agent), 选中后一键实例化为可编辑 `automation_flow`; v1.1 内置 3 套: AAA 游戏资产管线 / spec 式编程 / superpowers 式 |
+| Agent 占位节点 (Agent Placeholder Node, **v1.1 新增**) | `workflow_action_node` 的一种状态 (`action_kind = "dispatch_agent"` 且 `is_placeholder = true`), 表示"此处需要一个 agent 但尚未绑定具体 agent_id", 供用户后续指派, 不新增 element kind (per W14.5) |
+| 底部聊天栏 (Bottom Chat Bar, **v1.1 新增**) | 画布视图底部常驻的自然语言输入区域, 用于对话式创建/修改 Flow, 对接既有 L0 会话 (`actor_session_id`, per ADR-0046), 非画布 element |
+| LangGraph 式动态路由 (Dynamic Agent Routing, **v1.1 新增**) | 条件节点的一种路由模式 (`routing_mode = "dynamic_agent"`), 由 agent 在执行时依据上下文动态决定走哪条分支, 区别于 W4 的静态 CEL 表达式路由 (`routing_mode = "static_cel"`) |
 
 ### 2.3 跨域共享 (复用总册 §2.4, 不重复)
 
@@ -233,7 +269,7 @@ STAR 平台已有 `automation` module (`frontend/src/app/automation/page.tsx`, p
 
 ---
 
-## §4 业务需求 (42 项 FR)
+## §4 业务需求 (54 项 FR, 其中 W1-W13 = 42 项 v1.0 / W14-W15 = 12 项 v1.1 新增)
 
 ### 4.1 W1 流程节点类型体系 (4 项)
 
@@ -574,7 +610,7 @@ STAR 平台已有 `automation` module (`frontend/src/app/automation/page.tsx`, p
 
 **验收标准**: AC-W7.2 — 选择模板后生成预配置好的 Flow 图, 可直接改参数使用
 
-**已知缺口**: 模板数量与具体清单待 P2 阶段拍板
+**已知缺口**: ~~模板数量与具体清单待 P2 阶段拍板~~ **已由 v1.1 W14 具体拍板并落地** (per 追评 1, `01a09566-3f2d-7dc0-81c6-1ff46b89f056`): 3 套内置模板 (AAA / spec 式 / superpowers 式) + 具体节点清单见 §4.14; 本条目 (W7.2) 保留作为"模板库存在通用机制"的原始声明, 不重复定义, 优先级维持 P2 供本 SRS 版本演进溯源 (per 守门 #1 禁回溯叙事)
 
 ### 4.8 W8 错误处理与重试 (3 项)
 
@@ -905,6 +941,210 @@ STAR 平台已有 `automation` module (`frontend/src/app/automation/page.tsx`, p
 
 **已知缺口**: 无
 
+### 4.14 W14 默认工作流模板库 (7 项, **v1.1 新增**, per 追评 1 `01a09566-3f2d-7dc0-81c6-1ff46b89f056`)
+
+本子能力是 §4.7.2 FR-W7.2 (流程模板库通用机制) 的具体化落地, 不新增第二套模板机制; 关键设计决策: "agent 占位" 复用既有 W3.1 `dispatch_agent` 动作 (不新增 element kind), 仅新增 `is_placeholder` / `placeholder_role_hint` 两个字段, 因此本子能力不改动 W1 的 4 类节点体系。
+
+#### 4.14.1 FR-W14.1 默认模板选择器 (3 套内置模板)
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-WORKFLOW-W14.1 |
+| 描述 | "+ Flow" 入口的模板选择器 (per FR-W7.2 已有入口) 内置 3 套只读模板: (a) AAA 游戏资产管线, (b) 编程 spec 式, (c) superpowers 式; 每套模板附简介 + 缩略节点图预览 |
+| 数据 schema 增项 | 新增 `flow_template` 表 (Master, `is_builtin: boolean`) |
+| 业务规则 | — |
+| 优先级 | P1 |
+
+**用户故事**: US-W29 + US-W30 + US-W31
+
+**验收标准**: AC-W14.1 — 模板选择器展示 3 套内置模板, 每套可预览缩略节点图
+
+**已知缺口**: 无
+
+#### 4.14.2 FR-W14.2 AAA 游戏资产管线模板 (具体节点清单)
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-WORKFLOW-W14.2 |
+| 描述 | 套用后生成链路: `manual` 触发 → Agent 占位"图生高模" → Agent 占位"绑骨骼 (rigging)" → Agent 占位"高模转低模 (retopology)" → Agent 占位"绑定动作 (animation)" → 并行 N 条 Agent 占位"贴图生成" (diffuse/normal/roughness/AO 各 1 节点, per W3.3 并行编排) → Merge 汇合 (per W4.3) → 结束 |
+| 数据 schema 增项 | 复用 `flow_template.definition: { nodes: FlowNode[], edges: FlowEdge[] }` (JSON 快照) |
+| 业务规则 | 各 Agent 占位节点默认 `is_placeholder = true`, `placeholder_role_hint` 分别写入 "图生高模" / "绑骨骼" / "低模化" / "动作绑定" / "贴图生成" |
+| 优先级 | P1 |
+
+**用户故事**: US-W29
+
+**验收标准**: AC-W14.2 — 套用该模板后画布生成 5 个串联占位节点 + 1 组并行贴图占位节点 + 1 个 Merge 节点, 边与数据流预连好 (上游输出字段已映射到下游输入)
+
+**已知缺口**: "图生高模"/"绑骨骼"/"贴图生成"等具体 AI 生成能力的真实执行逻辑不在本 SRS 范围内 (v1 仅占位, 真实生成能力对接属 Agent Runtime / 具体 3D 生成服务范畴, 待专门 SRS)
+
+#### 4.14.3 FR-W14.3 编程 spec 式工作流模板
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-WORKFLOW-W14.3 |
+| 描述 | 套用后生成链路: `manual` 触发 → Agent 占位"需求 spec 撰写" → Condition (spec 评审是否通过, `routing_mode="static_cel"` 默认) → [通过] Agent 占位"实现开发" → Agent 占位"测试" → Agent 占位"代码评审" → 结束; [不通过] 边回指"需求 spec 撰写"节点形成修订循环 |
+| 数据 schema 增项 | 同 W14.2, 复用 `flow_template.definition` |
+| 业务规则 | 回指边形成的循环由用户在编辑态自行确认退出条件, 不做自动死循环检测 (与 BR-W-6 子流程环检测是两个不同层面, 此处是普通 Flow 边循环, 留 §10 已知风险) |
+| 优先级 | P1 |
+
+**用户故事**: US-W30
+
+**验收标准**: AC-W14.3 — 套用该模板后画布生成 5 个占位节点 (含 1 个条件节点) + 1 条评审不通过回指边
+
+**已知缺口**: 无
+
+#### 4.14.4 FR-W14.4 superpowers 式工作流模板
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-WORKFLOW-W14.4 |
+| 描述 | 套用后生成链路 (阶段划分参照 superpowers 方法论的头脑风暴→写计划→执行→评审→收尾节奏): `manual` 触发 → Agent 占位"brainstorming" → Agent 占位"writing-plans" → Agent 占位"executing-plans (含 TDD)" → Agent 占位"code-review" → Condition (评审是否通过) → [通过] Agent 占位"finishing-branch" → 结束; [不通过] 边回指"executing-plans"节点 |
+| 数据 schema 增项 | 同 W14.2 |
+| 业务规则 | 本模板仅代表**方法论阶段划分**的占位节点图, 不隐含对任何具体 agent 技能包的调用契约 (per §1.4 已声明的排除项) |
+| 优先级 | P1 |
+
+**用户故事**: US-W31
+
+**验收标准**: AC-W14.4 — 套用该模板后画布生成 5 个占位节点 (含 1 个条件节点) + 1 条评审不通过回指边
+
+**已知缺口**: 阶段命名与真实 agent 技能包 (如某具体 skill 命名规范) 的对应关系待 Design Doc 阶段与技能体系维护方对齐, v1 仅用阶段占位名称, 不做强绑定
+
+#### 4.14.5 FR-W14.5 模板套用自动预置节点/边/数据流 (核心诉求)
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-WORKFLOW-W14.5 |
+| 描述 | 用户选中任一模板 (内置或自定义) 后, 系统**一次性**在新建的 `automation_flow` 下实例化 `flow_template.definition` 中的全部节点 (含 Agent 占位) + 边 + `data_mapping` (per W6.1 数据流引用), 用户无需手动重建任一节点/连线 |
+| 数据 schema 增项 | `flow_node.is_placeholder: boolean` (新增字段) + `flow_node.placeholder_role_hint: string \| null` (新增字段) |
+| 接口依赖 | 复用 W1.1-W1.2 节点/边渲染 + W6.1 数据流映射机制, 批量实例化而非单节点创建 |
+| 业务规则 | 占位节点在未绑定具体 `agent_id` 前, 该节点可保存但**不可激活运行** (per W10.1 激活前置校验新增一条: 存在 `is_placeholder=true` 节点时禁止 active) |
+| 优先级 | P0 |
+
+**用户故事**: US-W32
+
+**验收标准**: AC-W14.5 — 套用模板后, 画布一次性出现模板定义的全部节点与边, 数据流字段已预映射; 尝试激活含未绑定占位节点的 Flow 时被拒绝并提示具体节点
+
+**已知缺口**: 无
+
+#### 4.14.6 FR-W14.6 用户调整后另存为自定义模板
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-WORKFLOW-W14.6 |
+| 描述 | 用户在套用内置模板并调整节点参数/占位 agent 后, 可"另存为自定义模板" (不覆盖内置模板, `is_builtin=false`), 供本人或团队后续复用 |
+| 数据 schema 增项 | `flow_template.created_by` / `flow_template.tenant_id` |
+| 业务规则 | 内置模板 (`is_builtin=true`) 只读, 不可编辑或删除, 仅可"另存为" |
+| 优先级 | P1 |
+
+**用户故事**: US-W32
+
+**验收标准**: AC-W14.6 — 调整后点击"另存为模板", 生成 1 条 `is_builtin=false` 的新模板记录, 内置模板本身不受影响
+
+**已知缺口**: 无
+
+#### 4.14.7 FR-W14.7 模板库管理 (内置只读 + 自定义 CRUD)
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-WORKFLOW-W14.7 |
+| 描述 | 模板库列表页支持: 查看全部模板 (内置 + 自定义) / 自定义模板改名/删除 / 按名称搜索; 内置模板不提供删除入口 |
+| 接口依赖 | per §8.2 新增 `flow_template` CRUD 端点 |
+| 业务规则 | — |
+| 优先级 | P2 |
+
+**用户故事**: US-W32
+
+**验收标准**: AC-W14.7 — 自定义模板可改名/删除, 内置模板无删除按钮
+
+**已知缺口**: 无
+
+### 4.15 W15 LangGraph 智能控制 + 底部聊天栏 (5 项, **v1.1 新增**, per 追评 2 `01a09567-5720-7500-a870-9cff243e8102`)
+
+本子能力对接既有 `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` L0/L1 + TMO 架构, 不重新设计一套并行的智能控制系统; "L1↔L1 通信禁止" (守门 #13a) 约束同样适用于本 SRS 的动态路由 — 动态路由决策统一经 L0 做出, 不允许 Flow 内不同 Agent 占位节点互相直接通信决策。
+
+#### 4.15.1 FR-W15.1 补齐画布底部聊天栏
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-WORKFLOW-W15.1 |
+| 描述 | 画布视图 (`/board` 或 Flow 编辑视图) 底部新增常驻聊天栏 UI (非画布 element, 类比 §4.9.1 执行历史面板的处理方式), 落地 `frontend/src/lib/store.ts` line 565 `// TODO: 接入 L0 chat bar session` 既有预留点; 聊天栏与既有 `CommandBar.tsx` (⌘K 命令面板) 是两个独立组件, 不合并 |
+| 数据 schema 增项 | 新增 `chat_session` 表 (Transaction, 对应 `actor_session_id`) |
+| 接口依赖 | 复用 ADR-0046 `actor_session_id` 字段与 L0 TopAgentState 会话机制 |
+| 业务规则 | — |
+| 优先级 | P0 |
+
+**用户故事**: US-W33
+
+**验收标准**: AC-W15.1 — 画布底部出现常驻输入栏; 发送消息后 `store.ts` 的 `actor_session_id` 不再为 `undefined`
+
+**已知缺口**: 聊天栏是否需要跨页面 (画布外) 持久悬浮, 待 Design Doc 决策
+
+#### 4.15.2 FR-W15.2 自然语言创建/编辑 Flow
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-WORKFLOW-W15.2 |
+| 描述 | 用户在聊天栏输入自然语言描述 (如"每天 9 点检查 P0 缺陷并通知我"), 系统解析后生成对应的 `flow_node` + `flow_edge` 图, 落入当前 Flow 编辑视图供用户确认/调整, 不直接静默保存 |
+| 数据 schema 增项 | `chat_session.parsed_flow_draft: Record<string, unknown> \| null` |
+| 接口依赖 | per §8.2 新增 NL→Flow 解析端点 |
+| 业务规则 | per 守门 #23 v2, v1 解析层为 **mock/规则化实现** (关键词 + 模板匹配, 非真实 LLM API 调用), 真实 LLM 语义解析留 P2 (类比 `SRS-CANVAS-GAMIFY-001` G5) |
+| 优先级 | P1 |
+
+**用户故事**: US-W33
+
+**验收标准**: AC-W15.2 — 输入符合 mock 规则的自然语言描述后, 编辑视图内出现对应草稿节点图, 用户确认后才正式保存
+
+**已知缺口**: mock 规则的覆盖范围 (能正确解析哪些句式) 待 Design Doc 列出具体规则表; 真实 NLU/LLM 接入时间点待 P2 阶段拍板
+
+#### 4.15.3 FR-W15.3 LangGraph 式动态路由
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-WORKFLOW-W15.3 |
+| 描述 | 条件节点新增 `routing_mode: "static_cel" \| "dynamic_agent"`; 选择 `dynamic_agent` 时, 分支走向由 L0 依据当前上下文 (`TopAgentState`) 在执行时动态决定, 而非预先写死的 CEL 表达式, 与 W4 静态分支并存, 用户按需选择 |
+| 数据 schema 增项 | `flow_node.routing_mode` (新增字段, 默认 `"static_cel"` 保持向后兼容) |
+| 接口依赖 | 复用 ADR-0046 `TopAgentState.active_tmo_operation` 语义, 不新增并行状态机 |
+| 业务规则 | 动态路由决策必须经 L0 做出, 禁止 Flow 内 Agent 占位节点间直接通信决策 (per 守门 #13a "L1↔L1 通信禁止" 同源约束) |
+| 优先级 | P1 |
+
+**用户故事**: US-W34
+
+**验收标准**: AC-W15.3 — `routing_mode="dynamic_agent"` 的条件节点在执行历史 (`execution_step`) 中记录 L0 给出的路由决策依据, 便于事后审计
+
+**已知缺口**: "动态路由决策依据"记录粒度 (是否需要记录完整 L0 推理过程还是仅记录最终分支选择) 待 Design Doc 拍板; v1 动态路由决策底层同样为 mock 规则化实现, 真实智能判断依赖 P2 真实 LLM 接入 (per §1.4 排除项)
+
+#### 4.15.4 FR-W15.4 聊天栏与 L0/TMO 会话集成
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-WORKFLOW-W15.4 |
+| 描述 | 聊天栏发送的每条消息绑定 1 个 `actor_session_id`, 与既有 L0 TopAgentState 会话生命周期一致 (开启/结束), 聊天栏创建的 Flow 的执行记录 (`execution_history`) 需可回链到发起该 Flow 的 `chat_session` |
+| 数据 schema 增项 | `execution_history.origin_chat_session_id: Uuid \| null` |
+| 接口依赖 | 复用 `/api/tmo/*` 既有 8 端点, 不新增并行的会话管理端点 |
+| 业务规则 | — |
+| 优先级 | P0 |
+
+**用户故事**: US-W34
+
+**验收标准**: AC-W15.4 — 由聊天栏创建的 Flow 执行后, 执行历史记录中可追溯到发起对话的 `chat_session_id`
+
+**已知缺口**: 无
+
+#### 4.15.5 FR-W15.5 聊天栏产物复用既有 Flow schema (不建平行系统)
+
+| 项 | 内容 |
+|---|---|
+| ID | FR-WORKFLOW-W15.5 |
+| 描述 | 聊天栏生成的 Flow 草稿必须是标准 `flow_node`/`flow_edge` 记录 (与 W1-W14 手动搭建/模板套用产出的 Flow 完全同构), 可在同一 Flow 编辑器中被手动继续编辑, 不引入专属"聊天栏 Flow"数据结构 |
+| 业务规则 | 与 W14.5 "模板批量实例化"复用同一批量写入接口, 语义上"聊天栏"是 Flow 的第 3 种创建入口 (手动拖拽 / 模板套用 / 自然语言), 而非第 3 套数据模型 |
+| 优先级 | P1 |
+
+**用户故事**: US-W33
+
+**验收标准**: AC-W15.5 — 聊天栏生成的 Flow 节点在编辑视图中与手动创建节点行为完全一致 (可拖动/改参数/删除)
+
+**已知缺口**: 无
+
 ---
 
 ## §5 约束条件 (Constraints)
@@ -916,7 +1156,9 @@ STAR 平台已有 `automation` module (`frontend/src/app/automation/page.tsx`, p
 | 守门 #1 禁回溯叙事 | §0.3 显式记录本 SRS 对总册 §1.4 "Miro Flowchart / 通用集成" 砍掉决定的反转, 未静默重写 |
 | 守门 #11 缺标比错标 | §1.4 不包含范围 + 每项 FR "已知缺口" 字段 + §10 已知风险均显式列出, 不留隐性假设 |
 | 守门 #13 W/T/M 三类横展 | §7.2 逐表标注 Work/Transaction/Master 分类 |
+| 守门 #13a L1↔L1 通信禁止 (per ADR-0046) | W15.3 动态路由决策显式约束为经 L0 做出, 不允许 Agent 占位节点间直接通信决策 |
 | 守门 #14 签字栏 | §11 沿用 5 角色签字结构 |
+| 守门 #23 v2 禁真实第三方 AI API 调用 (**v1.1 新增**) | W15.2 NL→Flow 解析、W15.3 动态路由决策底层 v1 均为 mock/规则化实现, 真实 LLM 接入留 P2, 详见 §1.4 / §10 |
 
 ### 5.2 技术约束 (per V0.1 既有栈)
 
@@ -956,6 +1198,22 @@ Webhook token (FR-W2.3) 与 HTTP 请求动作 (FR-W3.2) 涉及外部网络调用
 2. 展开该节点执行记录, 看到输入/输出 JSON, 定位到是超时 (FR-W9.3)
 3. SRE 直接点击"从失败节点重跑" (FR-W9.2), 前 2 个节点 (触发 + 数据转换) 复用历史输出, 只重跑第 3 个节点
 
+**场景 3 (v1.1 新增): 美术/TA 套用 AAA 模板并绑定占位 agent** (对应追评 1 诉求)
+
+1. 美术/TA 打开模板选择器, 选中"AAA 游戏资产管线"模板 (FR-W14.1)
+2. 系统一次性生成 5 个串联占位节点 + 1 组并行贴图占位节点 + 1 个 Merge 节点, 节点间数据流已预映射 (FR-W14.5)
+3. 美术/TA 尝试直接激活该 Flow, 系统检测到占位节点未绑定具体 `agent_id`, 拒绝激活并逐个提示 (FR-W14.5 业务规则)
+4. 美术/TA 为每个占位节点指派具体 agent, 再次激活成功
+5. 美术/TA 微调"贴图生成"节点的分辨率参数, 另存为自定义模板 "AAA-4K 贴图版" 供团队复用 (FR-W14.6)
+
+**场景 4 (v1.1 新增): PM 用聊天栏自然语言创建 Flow 并接受 LangGraph 动态路由** (对应追评 2 诉求)
+
+1. PM 在画布底部聊天栏输入"每天 9 点检查 P0 缺陷并通知我" (FR-W15.1)
+2. 系统 (v1 mock 规则化解析) 生成对应草稿: `schedule_cron` 触发 → 数据查询 → IF (是否存在 P0 缺陷) → `send_notification` (FR-W15.2)
+3. PM 确认草稿, Flow 正式保存, 与手动搭建的 Flow 完全同构, 可继续手动编辑 (FR-W15.5)
+4. PM 把 IF 节点的 `routing_mode` 改为 `dynamic_agent`, 交由 L0 依据当时上下文动态判断是否需要额外升级通知 (FR-W15.3)
+5. 该 Flow 每次执行的 `execution_history` 均可回链到发起对话的 `chat_session_id` (FR-W15.4)
+
 ### 6.2 异常场景
 
 | 场景 | 处理 |
@@ -987,6 +1245,12 @@ Webhook token (FR-W2.3) 与 HTTP 请求动作 (FR-W3.2) 涉及外部网络调用
 | `WorkItem.source_flow_id` | 字段新增 | 指回源 Flow |
 | `WorkItem.tag_binding_status` | 字段新增 | `bound`/`detached`/`null` |
 | `WorkItem.user_edited_fields` | 字段新增 | 系统字段/用户字段分区 |
+| `flow_template` (**v1.1 新增**) | 新增表 | 模板库主体, per W14.1 |
+| `flow_node.is_placeholder` / `flow_node.placeholder_role_hint` (**v1.1 新增**) | 字段新增 | Agent 占位标记, per W14.5 |
+| `flow_node.routing_mode` (**v1.1 新增**) | 字段新增 | `static_cel` / `dynamic_agent`, per W15.3 |
+| `chat_session` (**v1.1 新增**) | 新增表 | 底部聊天栏会话, per W15.1/W15.4 |
+| `chat_session.parsed_flow_draft` (**v1.1 新增**) | 字段新增 | NL→Flow 解析草稿, per W15.2 |
+| `execution_history.origin_chat_session_id` (**v1.1 新增**) | 字段新增 | 回链发起对话, per W15.4 |
 
 ### 7.2 W/T/M 三类横展 (per 守门 #13, 100% 表覆盖)
 
@@ -998,6 +1262,8 @@ Webhook token (FR-W2.3) 与 HTTP 请求动作 (FR-W3.2) 涉及外部网络调用
 | `execution_history` | **Transaction** | 每次运行 1 条, append-only, 不可改 |
 | `execution_step` | **Transaction** | 每节点每次运行 1 条, append-only |
 | `WorkItem` (含派生卡) | **Master** | 复用既有分类, 派生卡不例外 |
+| `flow_template` (**v1.1 新增**) | **Master** | 模板定义主档 (内置只读 + 自定义可写), 结构与 `automation_flow` 同源 |
+| `chat_session` (**v1.1 新增**) | **Transaction** | 每次聊天会话/消息 append-only 记录, 类比 `execution_history` |
 
 ### 7.3 数据完整性约束
 
@@ -1030,6 +1296,8 @@ Flow.tags 变更
 | `CanvasView.tsx` | 新增 4-6 个 element kind 渲染分支 (per W1.1, W4.3, W5.1) |
 | `/automation` 页 | 新增 "Flow" tab (列表 + 编辑入口) + "Flow Tags" tab (per W12.4) |
 | 新增 Flow 编辑器组件 (页面路径待定) | 节点拖拽画布, 复用 `CanvasView.tsx` viewport/pan/zoom 基座还是独立组件, 待 Design Doc 决策 (见 §10) |
+| 新增底部聊天栏组件 (**v1.1 新增**) | 独立于 `CommandBar.tsx`, 落地 `store.ts` line 565 TODO, per W15.1 |
+| 新增模板选择器组件 (**v1.1 新增**) | 挂载于 "+ Flow" 入口旁 (per 既有 FR-W7.2 入口), per W14.1 |
 
 ### 8.2 外部接口 (BFF Route, 新增)
 
@@ -1041,6 +1309,8 @@ Flow.tags 变更
 | Execution 重跑 | POST | `/v1/collaboration/flows/{id}/executions/{exec_id}/resume` | per FR-W9.2 |
 | Webhook 入口 | POST | `/v1/collaboration/flows/{id}/webhook/{token}` | per FR-W2.3 |
 | 标签绑定求值 (内部) | — | 复用 canvas_event 事件流, 非独立 REST 端点 | per FR-W2.4 + FR-W11.4 |
+| Flow Template CRUD (**v1.1 新增**) | GET/POST/PATCH/DELETE | `/v1/collaboration/flow-templates` | per FR-W14.1/W14.6/W14.7, 内置模板 (`is_builtin=true`) 只读, DELETE 仅对自定义模板开放 |
+| 聊天栏消息 + NL→Flow 解析 (**v1.1 新增**) | POST | `/v1/collaboration/chat-sessions/{id}/messages` | per FR-W15.1/W15.2, v1 后端为 mock 规则化解析 (per 守门 #23 v2), 复用/对接 `/api/tmo/*` (ADR-0046) 做 `actor_session_id` 会话管理, 不新增并行会话端点 |
 
 ### 8.3 Zustand Store 依赖
 
@@ -1050,6 +1320,8 @@ Flow.tags 变更
 | `flowNodes` / `flowEdges` | 新增 |
 | `executionHistory` | 新增 |
 | `workItems` | 扩展 (新增字段, per §7.1) |
+| `flowTemplates` (**v1.1 新增**) | 新增, per W14 |
+| `chatSessions` (**v1.1 新增**) | 新增, per W15.1/W15.4, 落地 `store.ts` line 565 `actor_session_id` TODO |
 
 ### 8.4 与既有 25 module 联动接口
 
@@ -1068,20 +1340,21 @@ Flow.tags 变更
 
 ## §9 验收标准 (Acceptance Criteria)
 
-### 9.1 功能验收 (42 个, 详见 §4 各项 "验收标准" 字段, 此处汇总统计)
+### 9.1 功能验收 (54 个, 详见 §4 各项 "验收标准" 字段, 此处汇总统计)
 
-| 优先级 | 项数 |
-|---|---|
-| P0 | 18 |
-| P1 | 17 |
-| P2 | 7 |
-| **合计** | **42** |
+| 优先级 | 项数 (v1.0 W1-W13) | 项数 (v1.1 W14-W15 新增) | 合计 |
+|---|---|---|---|
+| P0 | 18 | 3 | 21 |
+| P1 | 17 | 8 | 25 |
+| P2 | 7 | 1 | 8 |
+| **合计** | **42** | **12** | **54** |
 
 ### 9.2 质量验收
 
 | 项 | 标准 |
 |---|---|
 | e2e 覆盖 | 场景 1 (标签绑定→Backlog→拖入Sprint→active中解绑→Sprint结束回收) 与场景 2 (失败重跑) 各至少 1 条 e2e |
+| e2e 覆盖 (**v1.1 新增**) | 场景 3 (套用 AAA 模板→占位节点全部出现→绑定 agent 前禁止激活) 与场景 4 (聊天栏输入→草稿生成→确认保存) 各至少 1 条 e2e |
 | 单元测试 | BR-W-3 三分支 (Backlog/planned/active) 各 1 条单测 |
 | 类型检查 | 新增/扩展字段通过 TypeScript strict 编译, 0 error |
 
@@ -1105,6 +1378,9 @@ Flow.tags 变更
 | 风险 #5 | detached 状态 (FR-W12.3) 是否需要 Lead 人工确认交互 | 影响 5 域 Lead 的实际处理体验 | v1 先做只读角标提示, 待真人 Lead 反馈后细化 |
 | 风险 #6 | A12 多人协同编辑 CRDT 选型未拍板 (per `SRS-CANVAS-AGENT-001` A12.6) | 若 Flow 编辑器需要多人协同, 依赖此项 | 依赖外部 SRS, 本 SRS 不重复设计, 只声明依赖 |
 | 风险 #7 | 总册 `SRS-CANVAS-001` 尚未正式收录本专题为"三核心"第 3 核心 (仅本次配套修订 §1.3.1) | 总册 §4.1/§4.4 P0 清单等章节仍以"双核心"措辞为主, 需后续完整修订 | 已在总册做最小同步 (见配套 commit), 完整总册 v1.2 全量改写留后续 |
+| 风险 #8 (**v1.1 新增**) | W15.2/W15.3 v1 均为 mock 规则化实现 (per 守门 #23 v2), 真实语义理解/智能判断能力有限, 可能与用户对"LangGraph 智能控制"的实际预期 (真正的 LLM 推理) 有落差 | 真实使用体验可能不及预期, 需在交付说明中明确 v1/P2 边界 | v1 先交付 mock 版本验证交互流程, 真实 LLM 接入时间点待 5 域 Lead / Ulysses 在 P2 阶段拍板 |
+| 风险 #9 (**v1.1 新增**) | LangGraph 动态路由 (`routing_mode="dynamic_agent"`) 的决策可复现性/确定性未澄清 — 同一输入两次执行是否应产生相同路由结果 | 影响 e2e 测试稳定性与执行历史的可审计性 | 待 Design Doc 阶段明确: 是否要求同输入同输出 (确定性 mock), 或允许非确定性但需记录决策依据 (per FR-W15.3 已知缺口) |
+| 风险 #10 (**v1.1 新增**) | AAA/spec/superpowers 3 套默认模板的具体节点清单 (per W14.2-W14.4) 由 agent 撰写本文档时基于 issue 描述与常见方法论合理推断, 尚未经真人 (issue 创建者 / 5 域 Lead) 逐节点确认 | 实际落地时节点清单可能需调整 | 已在 §11 签字栏标记 Draft 待拍板, 建议评审时逐节点过一遍 §4.14.2-§4.14.4 |
 
 ---
 
@@ -1127,3 +1403,4 @@ Flow.tags 变更
 | 版本 | 日期 | 变更摘要 | 作者 |
 |---|---|---|---|
 | v1.0 | 2026-09-12 | 初版交付, 42 项 FR (W1-W13), 28 用户故事, 含 BR-W-3 核心裁决规则 | Sonnet (agent) |
+| v1.1 | 2026-09-12 | 追加 W14 (默认工作流模板库: AAA/spec/superpowers 3 套模板 + agent 占位自动预置 + 自定义另存) + W15 (LangGraph 智能控制 + 补齐底部聊天栏), 42→54 项 FR, 28→34 用户故事; 回应 issue 追评 1/2, 新增风险 #8-#10 | Sonnet (agent) |

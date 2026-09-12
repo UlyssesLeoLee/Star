@@ -13,7 +13,7 @@
 > - 平行专题 SRS (2 份并行撰写中, root 协调; **+ 1 份 v1.2 新增, 三核心**):
 >   - `SRS-CANVAS-AGENT-001` (核心 1: agent 管理域, 28 项)
 >   - `SRS-CANVAS-GAMIFY-001` (核心 2: 游戏化域, 32 项)
->   - **`SRS-CANVAS-WORKFLOW-001`** (核心 3: 自动化流程域, 42 项, **v1.2 新增, per ULYS-15 issue 委托**)
+>   - **`SRS-CANVAS-WORKFLOW-001`** (核心 3: 自动化流程域, 54 项, **v1.2 新增 / v1.1 子文档扩充至 54 项, per ULYS-15 issue 委托**)
 > - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 2026-08-27 19:39 JST 用户授权 + 9/8 15:19 JST 第 6 次强化)
 > - 审批: 架构师 (Mavis 接手 agent per DEC-008) (per 守门 #14 v3 Mavis 永久代签)
 > - 日期: 2026-09-10 JST
@@ -43,7 +43,8 @@
 | v0.1 (撤回) | 2026-09-10 17:10 JST | Ulysses — Mavis 接手 | 旧方向: Miro 全功能对标 12 大类 50 项, 3 专题拆分 (collab/content/integration) | Ulysses 17:00 JST 拍板 (后撤回) |
 | v1.0 (方向重置版) | 2026-09-10 17:20 JST | Ulysses — Mavis 接手 (per 守门 #14 v3) | 新方向: 双核心 = 管理 agent + 游戏化, 2 专题拆分, 砍掉 Miro 通用功能, 字节数目标 ~20K (vs v0.1 47.5K 砍 58%) | Ulysses 17:08 JST 拍板"管理 agent 和游戏化, 避免过度冗余" |
 | v1.1 (三次更新版) | 2026-09-10 17:34 JST | Ulysses — Mavis 接手 (per 守门 #14 v3) | v0.63 反转: 撤回 17:08 JST 砍多人编辑决定, A12 多人编辑 8 项新增, AGENT 38 → 46 项, 双核心 70 → 78 项, 31 P0 → 36 P0 | Ulysses 17:34 JST 拍板"多人编辑是要的" |
-| **v1.2 (当前, 双核心 → 三核心)** | **2026-09-12** | **Sonnet (agent, per Multica ULYS-15 委托)** | **新增第 3 核心"自动化流程" (`SRS-CANVAS-WORKFLOW-001`, 42 项), 双核心 78 → 三核心 120 项 (索引级同步, 详见 §1.3.1); 局部反转 §1.4 "Miro 12 种 diagram" 行中 Flowchart 子项与"Miro 通用集成"行, 见 §0.3 撤回记录; §4.1/§4.4 全量重排留 known gap (per 本 SRS §7.3 风险)** | **ULYS-15 issue 人类创建者委托"n8n 那种工作流的功能" — 尚待 Ulysses / 5 域 Lead 正式拍板, 状态 Draft** |
+| **v1.2 (双核心 → 三核心)** | **2026-09-12** | **Sonnet (agent, per Multica ULYS-15 委托)** | **新增第 3 核心"自动化流程" (`SRS-CANVAS-WORKFLOW-001`, 42 项), 双核心 78 → 三核心 120 项 (索引级同步, 详见 §1.3.1); 局部反转 §1.4 "Miro 12 种 diagram" 行中 Flowchart 子项与"Miro 通用集成"行, 见 §0.3 撤回记录; §4.1/§4.4 全量重排留 known gap (per 本 SRS §7.3 风险)** | **ULYS-15 issue 人类创建者委托"n8n 那种工作流的功能" — 尚待 Ulysses / 5 域 Lead 正式拍板, 状态 Draft** |
+| **v1.3 (当前, 最小索引同步)** | **2026-09-12** | **Sonnet (agent, per Multica ULYS-15 追评委托)** | **`SRS-CANVAS-WORKFLOW-001` 子文档 v1.0→v1.1, 新增 W14/W15 (+12 项), 42→54 项; 本总册 §1.3.1 索引数字同步更新: 三核心 120 → **132** 项 (仅计数同步, 不展开新内容, 详见子文档)** | **ULYS-15 issue 创建者 2 条追评 (评论 `01a09566…`/`01a09567…`): AAA/spec/superpowers 默认模板 + LangGraph 智能控制 + 补齐底部聊天栏** |
 
 ### 0.2 平行 3 专题 SRS 修订履历 (独立跟踪)
 
@@ -51,7 +52,7 @@
 |---|---|---|---|---|
 | `SRS-CANVAS-AGENT-001` | v1.0 (目标) | 撰写中 | worker 子代理 1 (bg_fc33dfea) | 本拍板派生 (per 17:08 JST 方向重置) |
 | `SRS-CANVAS-GAMIFY-001` | v1.0 (目标) | 撰写中 | worker 子代理 2 (bg_84cf0613) | 本拍板派生 (per 17:08 JST 方向重置) |
-| **`SRS-CANVAS-WORKFLOW-001`** | **v1.0 (Draft, 待拍板)** | **撰写完成, 待审** | **Sonnet (agent)** | **ULYS-15 issue 委托** |
+| **`SRS-CANVAS-WORKFLOW-001`** | **v1.1 (Draft, 待拍板)** | **撰写完成, 待审 (v1.1 新增 W14/W15)** | **Sonnet (agent)** | **ULYS-15 issue 委托 + 2 条追评** |
 
 ### 0.3 撤回记录 (per 守门 #1 禁回溯叙事)
 
@@ -94,11 +95,11 @@ STAR 平台已在 2026-09-04 落地 V0.1 MVP 无限画布, 满足基础无限画
 
 | SRS | 域 | 子能力 | 项数 | 详细展开 |
 |---|---|---|---|---|
-| **SRS-CANVAS-001 (本总册)** | 跨域 / 索引 | 三核心 120 项 (索引级, per v1.2) | 120 项 (索引) | 三核心索引 + 优先级 + 跨块接口 + 共享约束 (§4.1/§4.4 全量重排为后续 known gap, 见 §7.3) |
+| **SRS-CANVAS-001 (本总册)** | 跨域 / 索引 | 三核心 132 项 (索引级, per v1.3) | 132 项 (索引) | 三核心索引 + 优先级 + 跨块接口 + 共享约束 (§4.1/§4.4 全量重排为后续 known gap, 见 §7.3) |
 | `SRS-CANVAS-AGENT-001` | 核心 1: agent 管理 | A1-A12 (12 子能力, 含 ARG 图论构造 + 多人编辑 per 17:34 JST v0.63 反转) | **46 项** | 节点 / 拓扑 / 状态 / worktree / work-item / 操作 / 监控 / 聚类 / 跨域 / settings 集成 / **ARG (10 类关系 + 4 维度 + 5 模板 + 同步桥 + 成就)** / **多人编辑 (8 项: 多人同时编辑 + 实时 cursor + 元素增删改 + Follow mode + 评论线程 + @ + 冲突解决 + audit)** (FR/NFR/AC/US 详细) |
 | `SRS-CANVAS-GAMIFY-001` | 核心 2: 游戏化 | G1-G12 (12 子能力) | **32 项** | 节点 / 奖励 / 积分 / 升级 / AI 聚类 / 投票 / 反应 / confetti / 排行榜 / 任务 / 道具 / game 集成 (FR/NFR/AC/US 详细) |
-| **`SRS-CANVAS-WORKFLOW-001` (v1.2 新增)** | **核心 3: 自动化流程** | **W1-W13 (13 子能力)** | **42 项** | **n8n 式节点图 (触发/动作/条件/循环/子流程) + 标签绑定任务卡 + Backlog/Sprint 联动 (FR/NFR/AC/US 详细, per ULYS-15 issue 委托)** |
-| **合计** | | | **120 项 (展开)** | |
+| **`SRS-CANVAS-WORKFLOW-001` (v1.2 新增, v1.1 子文档已扩充)** | **核心 3: 自动化流程** | **W1-W15 (15 子能力)** | **54 项** | **n8n 式节点图 (触发/动作/条件/循环/子流程) + 标签绑定任务卡 + Backlog/Sprint 联动 + 默认工作流模板库 (W14) + LangGraph 智能控制/底部聊天栏 (W15) (FR/NFR/AC/US 详细, per ULYS-15 issue 委托 + 追评)** |
+| **合计** | | | **132 项 (展开)** | |
 
 #### 1.3.2 V0.1 MVP 衔接 (per 守门 #11 缺标比错标)
 
