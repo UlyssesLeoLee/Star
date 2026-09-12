@@ -430,6 +430,37 @@ impl Quest {
 }
 
 // ============================================================================
+// §4.5 Quest → SharedTask From impl (R9 阶段 2 整合, per DD-SHARED-TASK-001 §4.5)
+// ============================================================================
+
+/// Quest → SharedTask 转换 (per DD-SHARED-TASK-001 §4.5 字段映射表)
+///
+/// 注: Quest 缺 issue_key 跨域 (per DD §7 缺口 #7), 缺 assignee (走 GameLoop.agent.name),
+/// state 4 态 → 共享 5 态映射 (per DD §4.5)
+impl From<Quest> for shared_task::SharedTask {
+    fn from(quest: Quest) -> Self {
+        use shared_task::TaskState as STaskState;
+        let state = match quest.status {
+            QuestStatus::Available => STaskState::Open,
+            QuestStatus::InProgress => STaskState::InProgress,
+            QuestStatus::Completed => STaskState::Done,
+            QuestStatus::Failed => STaskState::Closed, // Failed → Closed (业务关闭)
+        };
+        Self {
+            // Quest 自己的 TaskId 是 local newtype (per R5 阶段 1 §1), 提取 Uuid 转 shared_task::TaskId
+            id: shared_task::TaskId(quest.id.0),
+            title: quest.title,
+            description: quest.description,
+            state,
+            assignee: None, // Quest 不存 assignee (走 GameLoop.agent.name)
+            priority: shared_task::Priority::default(),
+            issue_key: None, // Quest 缺 issue_key 跨域 (per DD §7 缺口 #7)
+            created_at: quest.created_at,
+        }
+    }
+}
+
+// ============================================================================
 // §5 GameLoop 1 闭环 (per ADR-0027 §2.2.1 + 守门 v25 AC)
 // ============================================================================
 
@@ -1069,5 +1100,35 @@ mod tests {
         let mut backend = MockBackend;
         let events = backend.poll_events();
         assert!(events.is_empty());
+    }
+
+    // ========================================================================
+    // R9 阶段 2: Quest → SharedTask 转换 UT (per DD-SHARED-TASK-001 §4.5)
+    // ========================================================================
+
+    #[test]
+    fn quest_to_shared_task_conversion_4_to_5_state_mapping() {
+        let q = Quest::new("R5 PoC", "verify game loop", 50, 200);
+        let original_id = q.id.0;
+        let shared: shared_task::SharedTask = q.into();
+        // id: Quest 自己的 TaskId (local newtype) → shared_task::TaskId
+        assert_eq!(shared.id.0, original_id);
+        assert_eq!(shared.title, "R5 PoC");
+        assert_eq!(shared.description, "verify game loop");
+        // Available → Open
+        assert_eq!(shared.state, shared_task::TaskState::Open);
+        // Quest 缺 assignee + issue_key
+        assert_eq!(shared.assignee, None);
+        assert_eq!(shared.issue_key, None);
+        assert_eq!(shared.priority, shared_task::Priority::Medium);
+    }
+
+    #[test]
+    fn quest_status_failed_maps_to_closed() {
+        // Failed → Closed (per DD §4.5 业务关闭)
+        let mut q = Quest::new("fail", "test", 0, 0);
+        q.status = QuestStatus::Failed;
+        let shared: shared_task::SharedTask = q.into();
+        assert_eq!(shared.state, shared_task::TaskState::Closed);
     }
 }

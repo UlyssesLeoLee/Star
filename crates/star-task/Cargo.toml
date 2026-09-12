@@ -12,6 +12,7 @@ description = "Star Multica Task Lifecycle 抽象层 (R4 阶段 1: 7 态状态�
 # workspace inheritance (per 守门 #1 + #19, 避免 version 重复)
 serde = { workspace = true }
 serde_json = { workspace = true }
+shared-task = { path = "../shared-task" }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }

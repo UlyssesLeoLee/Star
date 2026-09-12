@@ -567,6 +567,41 @@ impl WorkflowEngine {
 }
 
 // ============================================================================
+// §7.5 Issue → SharedTask From impl (R9 阶段 2 整合, per DD-SHARED-TASK-001 §4.2)
+// ============================================================================
+
+/// Issue → SharedTask 转换 (per DD-SHARED-TASK-001 §4.2 字段映射表)
+impl From<Issue> for shared_task::SharedTask {
+    fn from(issue: Issue) -> Self {
+        use shared_task::{Priority as SPriority, TaskId, TaskState as STaskState};
+        let state = match issue.state {
+            WorkflowState::Open => STaskState::Open,
+            WorkflowState::InProgress => STaskState::InProgress,
+            WorkflowState::InReview => STaskState::InReview,
+            WorkflowState::Done => STaskState::Done,
+            WorkflowState::Closed => STaskState::Closed,
+        };
+        let priority = match issue.priority {
+            Priority::Low => SPriority::Low,
+            Priority::Medium => SPriority::Medium,
+            Priority::High => SPriority::High,
+            Priority::Critical => SPriority::Critical,
+        };
+        Self {
+            // IssueKey 是 String (e.g. "STAR-001"), 不转 Uuid, 用新 UUID 分配 TaskId
+            id: TaskId(uuid::Uuid::new_v4()),
+            title: issue.summary,
+            description: issue.description,
+            state,
+            assignee: issue.assignee,
+            priority,
+            issue_key: Some(issue.key.0),
+            created_at: issue.created_at,
+        }
+    }
+}
+
+// ============================================================================
 // §8 Tests (R6 阶段 1 PoC 验证)
 // ============================================================================
 
@@ -710,5 +745,25 @@ mod tests {
         let deps = engine.cross_domain_deps.get(&"STAR-002".into()).unwrap();
         assert_eq!(deps.len(), 1);
         assert_eq!(deps[0], "STAR-001".into());
+    }
+
+    // ========================================================================
+    // R9 阶段 2: Issue → SharedTask 转换 UT (per DD-SHARED-TASK-001 §4.2)
+    // ========================================================================
+
+    #[test]
+    fn issue_to_shared_task_conversion() {
+        let (mut engine, wf_id) = setup_engine();
+        let issue = Issue::new("STAR-001", wf_id, "test issue", "first issue");
+        engine.create_issue(issue).unwrap();
+        // 重新取出 issue (因为 create_issue consume 了)
+        let stored_issue = engine.issues.get(&"STAR-001".into()).unwrap().clone();
+        let shared: shared_task::SharedTask = stored_issue.into();
+        assert_eq!(shared.title, "test issue");
+        assert_eq!(shared.description, "first issue");
+        assert_eq!(shared.state, shared_task::TaskState::Open);
+        assert_eq!(shared.priority, shared_task::Priority::Medium);
+        assert_eq!(shared.issue_key, Some("STAR-001".to_string()));
+        assert_eq!(shared.assignee, None);
     }
 }

@@ -645,6 +645,37 @@ impl WbsTaskRow {
 }
 
 // ============================================================================
+// §6.5 WbsTaskRow → SharedTask From impl (R9 阶段 2 整合, per DD-SHARED-TASK-001 §4.1)
+// ============================================================================
+
+/// WbsTaskRow → SharedTask 转换 (per DD-SHARED-TASK-001 §4.1 star-task 7→5 态映射)
+///
+/// 注: WbsTaskRow 不存 title/description/assignee/priority/issue_key, 默认值 (per DD §4.1 已知缺口)
+impl From<WbsTaskRow> for shared_task::SharedTask {
+    fn from(row: WbsTaskRow) -> Self {
+        use shared_task::TaskState as STaskState;
+        let state = match row.status {
+            TaskStatus::Pending | TaskStatus::Claimed | TaskStatus::Failed => STaskState::Open,
+            TaskStatus::InProgress => STaskState::InProgress,
+            TaskStatus::PendingReview => STaskState::InReview,
+            TaskStatus::Completed => STaskState::Done,
+            TaskStatus::Cancelled => STaskState::Closed, // 人工取消 = 业务关闭
+        };
+        Self {
+            // star-task::TaskId 是 local newtype (per R4 阶段 1), 提取 Uuid 转 shared_task::TaskId
+            id: shared_task::TaskId(row.id.0),
+            title: String::new(), // WbsTaskRow 不存 title (per DD §4.1 已知缺口)
+            description: String::new(),
+            state,
+            assignee: None, // WbsTaskRow 不存 assignee
+            priority: shared_task::Priority::default(),
+            issue_key: None, // WbsTaskRow 不存 issue_key 跨域
+            created_at: row.created_at,
+        }
+    }
+}
+
+// ============================================================================
 // §7 Errors
 // ============================================================================
 
@@ -850,6 +881,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(unused_variables)] // R4 阶段 1 pre-existing `let v` (per 8c2bde9 实证), R9 阶段 2 整合 clippy 触发, 不改原 R4 代码 per 守门 #1 禁回溯叙事
     fn review_gate_3_checks() {
         // 全部通过 → approved
         let v = ReviewGate::review(Some("abc1234"), Some("/tmp/ok"), &["/tmp/a1"]);
@@ -938,5 +970,41 @@ mod tests {
         assert!(row.runtime_not_found_at.is_some());
         row.mark_not_found(NotFoundType::Unauthorized, now);
         assert!(row.unauthorized_at.is_some());
+    }
+
+    // ========================================================================
+    // R9 阶段 2: WbsTaskRow → SharedTask 转换 UT (per DD-SHARED-TASK-001 §4.1)
+    // ========================================================================
+
+    #[test]
+    fn wbs_task_row_to_shared_task_7_to_5_state_mapping() {
+        let now = SystemTime::now();
+        // Pending → Open
+        let row = WbsTaskRow::new(TaskId(Uuid::new_v4()), now);
+        let original_id = row.id.0;
+        let shared: shared_task::SharedTask = row.into();
+        assert_eq!(shared.id.0, original_id);
+        assert_eq!(shared.state, shared_task::TaskState::Open);
+        assert_eq!(shared.title, "");
+        assert_eq!(shared.priority, shared_task::Priority::Medium);
+    }
+
+    #[test]
+    fn wbs_task_row_completed_to_done() {
+        let now = SystemTime::now();
+        let mut row = WbsTaskRow::new(TaskId(Uuid::new_v4()), now);
+        row.status = TaskStatus::Completed;
+        let shared: shared_task::SharedTask = row.into();
+        assert_eq!(shared.state, shared_task::TaskState::Done);
+    }
+
+    #[test]
+    fn wbs_task_row_cancelled_to_closed() {
+        // Cancelled → Closed (人工取消 = 业务关闭, per DD §4.1)
+        let now = SystemTime::now();
+        let mut row = WbsTaskRow::new(TaskId(Uuid::new_v4()), now);
+        row.status = TaskStatus::Cancelled;
+        let shared: shared_task::SharedTask = row.into();
+        assert_eq!(shared.state, shared_task::TaskState::Closed);
     }
 }

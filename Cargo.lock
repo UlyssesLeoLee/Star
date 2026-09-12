@@ -3000,6 +3000,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "shared-task"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
 name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3412,6 +3421,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "shared-task",
  "thiserror 1.0.69",
  "uuid",
 ]
@@ -3511,6 +3521,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "shared-task",
  "thiserror 1.0.69",
  "uuid",
 ]
@@ -3666,6 +3677,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "shared-task",
  "thiserror 1.0.69",
  "uuid",
 ]
@@ -3687,6 +3699,7 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
+ "shared-task",
  "star-registry",
  "thiserror 1.0.69",
  "tracing",
@@ -3776,6 +3789,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "shared-task",
  "thiserror 1.0.69",
  "uuid",
 ]

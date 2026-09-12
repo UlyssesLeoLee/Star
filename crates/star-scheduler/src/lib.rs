@@ -110,6 +110,30 @@ impl Task {
 }
 
 // ============================================================================
+// §3.5 Task → SharedTask From impl (R9 阶段 2 整合, per DD-SHARED-TASK-001 §4.4)
+// ============================================================================
+
+/// Task → SharedTask 转换 (per DD-SHARED-TASK-001 §4.4 字段映射表)
+///
+/// 注: MS Project Task 不存 description / created_at (走 Schedule.created 代理),
+/// state 通过 CpmNode 派生 (R9 阶段 1 默认 Open), assignee 走 TaskAssignment 派生
+impl From<Task> for shared_task::SharedTask {
+    fn from(task: Task) -> Self {
+        Self {
+            // star-scheduler::TaskId 是 local newtype (per R8 阶段 1), 提取 Uuid 转 shared_task::TaskId
+            id: shared_task::TaskId(task.id.0),
+            title: task.name,
+            description: String::new(), // Task 不存 description (per DD §4.4)
+            state: shared_task::TaskState::Open, // 通过 CpmNode 派生 (R9 阶段 2 临时, R9 阶段 3 修复 per DD §7 缺口 #6)
+            assignee: None,                      // 走 TaskAssignment 派生 (per DD §4.4)
+            priority: shared_task::Priority::default(),
+            issue_key: task.issue_key,
+            created_at: std::time::SystemTime::now(), // 走 Schedule.created 代理 (per DD §7 缺口 #6)
+        }
+    }
+}
+
+// ============================================================================
 // §4 Dependency (per MS Project predecessor link, 4 档 dependency type)
 // ============================================================================
 
@@ -600,5 +624,26 @@ mod tests {
         assert!(crit.contains(&c));
         assert!(crit.contains(&d));
         assert!(!crit.contains(&b));
+    }
+
+    // ========================================================================
+    // R9 阶段 2: Task → SharedTask 转换 UT (per DD-SHARED-TASK-001 §4.4)
+    // ========================================================================
+
+    #[test]
+    fn task_to_shared_task_conversion() {
+        let mut task = Task::new("MS Project task", 5);
+        task.issue_key = Some("STAR-001".to_string());
+        let original_id = task.id.0;
+        let shared: shared_task::SharedTask = task.into();
+        // id: star-scheduler::TaskId (local newtype) → shared_task::TaskId
+        assert_eq!(shared.id.0, original_id);
+        assert_eq!(shared.title, "MS Project task");
+        // description / created_at 走 Schedule 代理, 暂默认 (per DD §4.4 + §7 缺口 #6)
+        assert_eq!(shared.description, "");
+        assert_eq!(shared.state, shared_task::TaskState::Open);
+        assert_eq!(shared.assignee, None);
+        assert_eq!(shared.priority, shared_task::Priority::Medium);
+        assert_eq!(shared.issue_key, Some("STAR-001".to_string()));
     }
 }

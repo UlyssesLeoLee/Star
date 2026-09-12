@@ -297,6 +297,29 @@ impl Cursor {
 }
 
 // ============================================================================
+// §4.5 Node → SharedTask From impl (R9 阶段 2 整合, per DD-SHARED-TASK-001 §4.3)
+// ============================================================================
+
+/// Node → SharedTask 转换 (per DD-SHARED-TASK-001 §4.3 字段映射表)
+///
+/// 注: Node 不存 description (走 Node.content 复用), created_at 默认 now (R9 阶段 2 临时, R9 阶段 3 修复 per DD §7 缺口 #5)
+impl From<Node> for shared_task::SharedTask {
+    fn from(node: Node) -> Self {
+        Self {
+            // NodeId 是 Uuid, 直转 TaskId (newtype 提取 Uuid)
+            id: shared_task::TaskId(node.id.0),
+            title: node.content,
+            description: String::new(), // Node 不分离 description (per DD §4.3)
+            state: shared_task::TaskState::Open, // Node 无显式 state (per DD §4.3 默认 Open)
+            assignee: Some(node.created_by),
+            priority: shared_task::Priority::default(),
+            issue_key: node.issue_key,
+            created_at: std::time::SystemTime::now(), // Node 暂不存 created_at (per DD §7 缺口 #5)
+        }
+    }
+}
+
+// ============================================================================
 // §5 Canvas (核心, per plan-032 R7 自由画布)
 // ============================================================================
 
@@ -598,5 +621,31 @@ mod tests {
             result,
             Err(CanvasError::EdgeReferencesMissingNode(_))
         ));
+    }
+
+    // ========================================================================
+    // R9 阶段 2: Node → SharedTask 转换 UT (per DD-SHARED-TASK-001 §4.3)
+    // ========================================================================
+
+    #[test]
+    fn node_to_shared_task_conversion() {
+        let node = Node::new(
+            NodeKind::Sticky,
+            Position3D::new_2d(10.0, 20.0),
+            Size3D::new_2d(200.0, 100.0),
+            "TODO: R7 阶段 1",
+            Some("STAR-001".to_string()),
+            "Mavis",
+        );
+        let original_node_id = node.id.0;
+        let shared: shared_task::SharedTask = node.into();
+        // id: NodeId.0 (Uuid) → TaskId
+        assert_eq!(shared.id.0, original_node_id);
+        assert_eq!(shared.title, "TODO: R7 阶段 1");
+        assert_eq!(shared.description, "");
+        assert_eq!(shared.state, shared_task::TaskState::Open);
+        assert_eq!(shared.assignee, Some("Mavis".to_string()));
+        assert_eq!(shared.priority, shared_task::Priority::Medium);
+        assert_eq!(shared.issue_key, Some("STAR-001".to_string()));
     }
 }
