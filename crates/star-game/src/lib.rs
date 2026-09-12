@@ -1,4 +1,4 @@
-//! star-game — Agent 小游戏核心理理念 (R5 阶段 1 PoC) 🟢
+//! star-game — Agent 小游戏核心理理念 (R5 阶段 1 PoC + R5 阶段 3 ECS 整合) 🟢
 //!
 //! Per ADR-0027 v0.1 §2.2 + plan-032 R5: **核心理念** = Mavis + 5 域 Lead + 子代理 = 游戏角色.
 //! 6 维属性 (Health / Mana / XP+Level / SkillTree / Inventory / Cooldown) + ECS-style
@@ -32,6 +32,12 @@ use std::time::{Duration, Instant, SystemTime};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+
+// ============================================================================
+// R5 阶段 3: ECS 模块 (per plan-032 R5 阶段 3 ECS 实际 + task lifecycle 集成)
+// ============================================================================
+
+pub mod ecs;
 
 // ============================================================================
 // §1 ID newtype

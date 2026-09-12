@@ -10,6 +10,7 @@ description = "Star Agent 小游戏核心理念 (R5 阶段 1 PoC: 6 维属性 + 
 
 [dependencies]
 # workspace inheritance (per 守门 #1 + #19, 避免 version 重复)
+hecs = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shared-task = { path = "../shared-task" }

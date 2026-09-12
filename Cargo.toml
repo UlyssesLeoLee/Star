@@ -172,6 +172,10 @@ regex = "1"
 # Benchmark (per R9 阶段 3 5 milestone benchmark, per plan-032 §4.2)
 criterion = { version = "0.5", features = ["html_reports"] }
 
+# ECS (per R5 阶段 3 ECS 实际 + task lifecycle 集成, per plan-032 R5 阶段 3)
+# hecs 选型: per 守门 v28 推荐项 hecs 轻量 ~50KB vs bevy_ecs 完整 ~500KB, PoC 阶段选 hecs (Rust 优先 + 简单 API + 单线程)
+hecs = "0.10"
+
 # Valkey / Redis client (per spec/cache/01 §2.3 + spec/cache/01 §2.3 选型决定 2026-09-10 23:41 JST)
 # redis-rs 0.27+ 协议 100% 兼容 Valkey, tokio-comp + connection-manager features
 # Phase G+ 启用于 crates/star-cache/src/valkey_backend.rs
