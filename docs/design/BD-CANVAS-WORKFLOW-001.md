@@ -618,3 +618,79 @@ CREATE INDEX idx_chat_tenant ON chat_session(tenant_id);
 - `WorkItem.source_flow_id` 指向的 Flow 被删除时置空并保留卡片, 不级联删除 WorkItem
 - `automation_flow.tag_binding_expr` 保存前必须通过语法校验 (前端 + 后端双重, per §6.2 异常场景)
 - `flow_node.concurrency` CHECK (1-20), `flow_edge` CHECK 禁止自环 (from ≠ to)
+
+## §5 接口设计 (Interface Design)
+
+> per `ipa-interface-design` skill: 端点路径取自 SRS §8.2 已声明契约, 未声明的具体超时秒数/重试次数一律引用总册既有基线或标注【TBD】, 不自行编造数值。
+
+### 5.1 REST API (8 端点, BFF)
+
+| API ID | Method | Path | 说明 | Auth | RLS |
+|---|---|---|---|---|---|
+| API-WF-01 | `GET/POST/PATCH/DELETE` | `/v1/collaboration/flows` | Flow CRUD, 复用总册 §6.2 Canvas CRUD 模式 | Session token (既有) | ✓ tenant_id |
+| API-WF-02 | `GET/POST/PATCH/DELETE` | `/v1/collaboration/flows/{id}/nodes`, `/edges` | Node/Edge CRUD | 同上 | ✓ |
+| API-WF-03 | `POST/GET` | `/v1/collaboration/flows/{id}/executions` | 手动触发 Execution + 历史查询 | 同上 | ✓ |
+| API-WF-04 | `POST` | `/v1/collaboration/flows/{id}/executions/{exec_id}/resume` | 从失败节点重跑 (per FR-W9.2) | 同上, 需 Flow 写权限 | ✓ |
+| API-WF-05 | `POST` | `/v1/collaboration/flows/{id}/webhook/{token}` | Webhook 触发入口 (per FR-W2.3) | **token 校验** (非 session, 详见下) | ✓ |
+| API-WF-06 (**v1.1 新增**) | `GET/POST/PATCH/DELETE` | `/v1/collaboration/flow-templates` | 模板 CRUD, 内置模板 (`is_builtin=true`) 只读, DELETE 仅对自定义模板开放 | Session token | ✓ |
+| API-WF-07 (**v1.1 新增**) | `POST` | `/v1/collaboration/flow-templates/{id}/instantiate` | 套用模板一次性实例化节点/边/data_mapping (per FR-W14.5) | 同上 | ✓ |
+| API-WF-08 (**v1.1 新增**) | `POST` | `/v1/collaboration/chat-sessions/{id}/messages` | 聊天栏消息 + NL→Flow 解析 (per FR-W15.1/W15.2), v1 后端为 mock 规则化解析, 复用 `/api/tmo/*` 做会话管理 | Session token + `actor_session_id` | ✓ |
+
+### 5.2 API 详细契约 (示例: 核心端点, 详细设计阶段补齐余下端点的完整 schema)
+
+#### API-WF-03 `POST /v1/collaboration/flows/{id}/executions`
+
+| 项 | 内容 |
+|---|---|
+| Direction | UI → BFF |
+| Encoding | JSON, UTF-8 |
+| Request | `{ trigger_kind: "manual", input?: Record<string, unknown> }` |
+| Response 200 | `{ execution_id: UUID, status: "running" }` |
+| Response 4xx | `400` Flow 定义非法 (存在未绑定 `agent_id` 的 `is_placeholder` 节点且 Flow `enabled=true` 时同样拒绝, 见 §8) / `403` 无 Flow 执行权限 / `404` Flow 不存在 |
+| Timeout | 复用总册 §5.6 错误处理基线 (网络层), 具体秒数【TBD, 待总册 §5.6 数值统一确认后引用, 本 BD 不新定义独立于总册的超时数值】 |
+| Retry | 网络传输层最多 2 次 (per 总册 §5.6), 与 FR-W8.1 节点级业务重试 (`retry_policy`) 相互独立分层, 不叠加计数 |
+| Idempotency | 手动触发 v1 **不去重** (每次调用产生 1 条新 Execution), 与 Webhook/cron 触发行为一致, 由调用方自行避免重复点击造成的重复执行 |
+| Ordering | 单 Flow 允许并发多个 Execution 同时运行, 不做全局串行化 (per SRS 未声明串行约束) |
+
+#### API-WF-05 `POST /v1/collaboration/flows/{id}/webhook/{token}`
+
+| 项 | 内容 |
+|---|---|
+| Direction | 外部系统 → BFF (唯一对外无需登录会话的入口) |
+| Authentication | **path token 校验** (`flow_node.webhook_token`), 非 Session Cookie/Bearer — 因为调用方是外部系统而非登录用户 |
+| Authorization | token 与 `webhook_token` 精确匹配 + 所属 Flow `enabled=true` 方可触发 |
+| Request | 任意 JSON body (透传作为触发数据, 供下游节点 `input_bindings` 引用) |
+| Response 200 | `{ execution_id: UUID }` |
+| Response 4xx | `401` token 不匹配/已吊销 / `413` body 超出大小限制【TBD, 具体字节数待 Design Doc 结合总册请求体上限统一确认】 |
+| **签名/token 轮换策略** | **【TBD, 见 SRS §10 风险相关已知缺口】** — 当前设计仅有静态 `webhook_token` 字符串比对, 无 HMAC 签名校验、无 token 定期轮换机制。安全评审前不建议接入外部生产系统调用, 详见 §8 安全设计 |
+| Retry (调用方侧) | 由外部系统自行决定, BFF 不对 webhook 请求做特殊去重 (幂等性依赖外部系统请求体自带的业务幂等键, 本 BD 不假设外部系统行为) |
+
+#### API-WF-08 `POST /v1/collaboration/chat-sessions/{id}/messages`
+
+| 项 | 内容 |
+|---|---|
+| Direction | UI (底部聊天栏) → BFF → (mock 规则引擎, 非真实 LLM) |
+| Request | `{ message: string, actor_session_id: UUID }` |
+| Response 200 | `{ chat_session_id: UUID, parsed_flow_draft: FlowDraft \| null, matched: boolean }` |
+| Response 4xx | `401` `actor_session_id` 已过期/不存在 |
+| 业务规则 | v1 解析层为 mock/规则化实现 (关键词+模板匹配), 非真实 LLM API 调用 (per 守门 #23 v2); 解析失败返回 `matched: false`, 不视为错误 |
+| 已知缺口 | mock 规则覆盖范围 (能正确解析哪些句式) 待 Design Doc 列出具体规则表 (per SRS §10 已知缺口); 真实 NLU/LLM 接入时间点待 P2 阶段拍板, 本 BD 不预先设计真实集成方案 |
+
+### 5.3 实时更新: 复用既有 Canvas WebSocket 通道 (不新增独立 WS 端点)
+
+SRS §8 未声明本域专属 WebSocket 端点; Flow 节点/边本身是画布 element 的扩展 kind (per §2.1 6 个新 element kind), 节点位置/执行状态的实时同步**复用**总册既有 `wss://canvas-collab/canvases/[id]` 通道 (per `BD-CANVAS-AGENT-001` §5.2, `element.update` 事件), 不新增并行的 WebSocket 端点。Execution 运行中的节点级状态高频刷新需求 (如 SCR-WF-04 面板是否需要秒级刷新而非轮询) — **【TBD, Design Doc】**, 若确认需要, 届时在既有 `canvas-collab` 通道上扩展 `execution_step.status_changed` 事件类型, 而非另起新 WebSocket 端点。
+
+### 5.4 与既有 25 module 联动接口
+
+复用总册 §6.3 联动矩阵, 新增 1 行 (per SRS §8.4):
+
+| 25 module | 画布表现 | 本 BD 扩展 |
+|---|---|---|
+| automation | `automation_node` 单规则 | 升级为 Flow 图 (W1-W10), 既有 `AutomationRule` 视为 1 trigger + N action 的退化 2 层 Flow, 向后兼容 |
+| work-item | 拖 WorkItem → 画布 element | 标签绑定自动生成 WorkItem (W11-W12) |
+| notification | `send_notification` 动作 | Flow 失败通知复用 (FR-W8.3) |
+| L0/TMO (ADR-0046) | `/api/tmo/*` 8 端点 | 聊天栏会话 + 动态路由决策复用, 不新增并行会话端点 (v1.1 新增) |
+
+### 5.5 错误处理总则
+
+复用总册 §5.6 错误处理基线 (网络层重试), 节点级 `retry_policy` (FR-W8.1) 是业务层重试, 两层重试独立计数、互不干扰 (per SRS §8.5)。所有 REST 端点的 4xx 错误响应体统一沿用既有 BFF 错误结构 `{ error_code, message }` (per总册既有约定), 本 BD 不新定义独立的错误响应格式。
