@@ -1,4 +1,4 @@
-# Brief: OPT-A2 — WBS / Phase / 报告 [P][B] pending 全面扫描
+# Brief: OPT-A2 — WBS / Phase / 报告 \[P\]\[B\] pending 全面扫描
 
 **Agent**: explorer
 **Phase**: OPT-WBS

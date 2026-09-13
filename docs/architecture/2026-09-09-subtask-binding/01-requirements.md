@@ -392,7 +392,7 @@ CREATE TABLE task_quota_config (
 
 | # | 角色 | 姓名 | 签字日 | 结论 |
 |---|---|---|---|---|
-| 1 | 架构负责人 | Ulysses（一人公司 12 角色 per DEC-008）| 2026-09-09 | 🟡 Draft v0.1; 3 份 IPA 文档 (需求/基本/详细) 落档 + ADR-0052 决策记录 + LangGraph 02/03 升 v0.3 (TMO 7 → 8 节点); 跟 [01 §UC-14..UC-18 + F-26..F-32 + NFR-SB-01..05](#) + [02 §2.7 M-N8](./02-basic-design.md) + [03 §3.3 M-26..M-33](./03-detailed-design.md) 同步 |
+| 1 | 架构负责人 | Ulysses（一人公司 12 角色 per DEC-008）| 2026-09-09 | 🟡 Draft v0.1; 3 份 IPA 文档 (需求/基本/详细) 落档 + ADR-0052 决策记录 + LangGraph 02/03 升 v0.3 (TMO 7 → 8 节点); 跟 01 §UC-14..UC-18 + F-26..F-32 + NFR-SB-01..05 + [02 §2.7 M-N8](./02-basic-design.md) + [03 §3.3 M-26..M-33](./03-detailed-design.md) 同步 |
 | 1.1 | 架构师 / Mavis 接手审批 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-09 | 🟢 Mavis 接手终审通过 (per 2026-09-09 21:53 JST 用户发令"现在是否适合具有子代理功能, 通过在父任务卡交互下命令, 创建绑定子任务, 子任务有专属子代理" + ask_1df6987367ccc00928b65ee3 拍板 1 选项 "3 份新文档 + ADR-0052 升 v0.3 (推荐)"); 3 备选方案 (TMO M-N2 split 路径覆盖 / 仅 1 份 ADR / 直接进实装) 全部拒绝理由 + 5 风险 (3 实装 / 1 SDK alpha / 1 真人未到位) + 7 已知缺口 (G-SB-1..7) + 5 签字栏落档 |
 | 2 | SRE Lead | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-09 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份 (per 8/21 JST) 签字请 DDD Review 阶段补 |
 | 3 | 平台工程师 | 架构师 (Mavis 接手 agent per DEC-008) | 2026-09-09 | 🟢 Mavis 接手代签 (per 19:39 + 21:59 JST); 5 域独立真实身份签字请 DDD Review 阶段补 |
