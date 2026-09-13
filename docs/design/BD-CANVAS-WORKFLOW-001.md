@@ -694,3 +694,115 @@ SRS §8 未声明本域专属 WebSocket 端点; Flow 节点/边本身是画布 e
 ### 5.5 错误处理总则
 
 复用总册 §5.6 错误处理基线 (网络层重试), 节点级 `retry_policy` (FR-W8.1) 是业务层重试, 两层重试独立计数、互不干扰 (per SRS §8.5)。所有 REST 端点的 4xx 错误响应体统一沿用既有 BFF 错误结构 `{ error_code, message }` (per总册既有约定), 本 BD 不新定义独立的错误响应格式。
+
+## §6 5-View 详细设计 (機能・データ・動作・モジュール・ネットワーク)
+
+> 与 `BD-CANVAS-AGENT-001` §6 同一 5-View 体系, 逐 View 覆盖全部 54 项 FR (W1-W15)。
+
+### 6.1 機能 View (Functional)
+
+| 功能块 | 对应 FR 组 | 核心机能 |
+|---|---|---|
+| 节点体系与画布编排 | W1-W7 (FR-W1.1~W7.2, 20 项) | 节点类型/触发/动作/分支/循环/变量/子流程 — 图结构编辑与静态校验 |
+| 执行引擎 | W8-W9 (FR-W8.1~W9.3, 6 项) | 错误重试、执行历史、单步调试 |
+| 生命周期治理 | W10 (FR-W10.1~W10.3, 3 项) | 激活状态机、版本 SCD、Agent 占位符预检 |
+| 任务卡联动 (issue 核心诉求) | W11-W12 (FR-W11.1~W12.5, 10 项) | 标签绑定表达式 → 自动生成 WorkItem, Backlog/Sprint 三分支回收 |
+| 一致性 | W13 (FR-W13.1~W13.2, 2 项) | Flow 状态与 WorkItem 状态映射一致性校验 |
+| 模板库 (v1.1) | W14 (FR-W14.1~W14.7, 7 项) | 内置模板浏览/预览/一键实例化, Agent 占位符节点 |
+| 智能控制/聊天栏 (v1.1) | W15 (FR-W15.1~W15.5, 5 项) | 底部聊天栏、mock NL→Flow 解析、`routing_mode` 静态/动态双模式 |
+
+54 项 FR 的逐条 Actor/输入/输出/异常映射已在 §1.1.1-§1.1.15 给出, 本节不重复罗列, 仅做功能块级归类以支撑 §10 追溯矩阵按块索引。
+
+### 6.2 データ View (Data)
+
+复用 §4 全部内容 (8 张表, W/T/M = 5/3/0, 见 §4.1)。跨 View 补充: Flow 定义 (`automation_flow`+`flow_node`+`flow_edge`) 是**静态图数据**, Execution 相关表 (`execution_history`+`execution_step`) 是**运行时快照数据**, 两者生命周期独立 — 删除/停用 Flow 不级联删除历史 Execution 记录 (审计要求, per SRS §7 数据需求)。`chat_session` (v1.1) 是短生命周期会话数据, 与 Flow 数据无外键强耦合 (仅通过 `parsed_flow_draft` JSON 字段弱引用候选 Flow, 未落库前不产生实际 FK)。
+
+### 6.3 動作 View (Behavior / State Machine)
+
+#### 6.3.1 Flow 生命周期状态机 (FR-W10.1)
+
+```
+草稿(draft) --发布--> 已激活(enabled) --停用--> 已停用(disabled)
+                          |                          |
+                          +---------手动重新激活------+
+```
+
+激活前置校验 (per FR-W10.1 + FR-W14.5 v1.1 新增约束): 图中若存在 `is_placeholder=true` 且未绑定 `agent_id` 的节点, 禁止置为 `enabled`, API-WF-01 PATCH 返回 `400`（占位符未完成绑定）。
+
+#### 6.3.2 Execution 状态机 (FR-W9.1-W9.3)
+
+```
+running --成功--> succeeded
+running --节点失败且无重试余量--> failed --手动 resume (API-WF-04)--> running (从失败节点起)
+running --超时/取消--> cancelled
+```
+
+#### 6.3.3 WorkItem 联动三分支 (BR-W-3, W12)
+
+Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在容器三分支处理: Backlog 中 → 硬删除; 已排期 Sprint（未开始）→ 先移回 Backlog 再硬删除; 进行中 Sprint → 仅标记 "detached"（保留任务卡, 解除来源追溯), 不做删除 — 因为进行中 Sprint 的任务卡可能已产生下游工时/评论等业务数据, 删除会破坏审计链。
+
+### 6.4 モジュール View (Module)
+
+复用总册 §1.1.4 25-module 矩阵, 本 BD 新增/扩展的模块边界:
+
+| 模块 | 关系 |
+|---|---|
+| `workflow-engine` (新增) | 承载 W1-W10 图结构定义与执行引擎, 是本 BD 的核心新模块 |
+| `automation` (既有, 扩展) | 既有 `AutomationRule` 作为 Flow 的退化 2 层特例, 向后兼容, 不破坏既有数据 |
+| `work-item` (既有, 扩展) | 新增标签绑定生成/回收逻辑 (W11-W12), 复用既有 WorkItem CRUD, 仅扩展字段 (见 §4.3) |
+| `flow-template-library` (新增, v1.1) | W14 模板 CRUD + 实例化, 与 `workflow-engine` 强依赖（实例化产物是普通 Flow） |
+| `chat-bar` (新增, v1.1) | W15 聊天会话 + mock 解析, 依赖 `/api/tmo/*` (ADR-0046) 做会话管理, **不**直接调用 L1 Agent（per "L1↔L1 通信禁止" 派生约束, 聊天栏发起的动作经由既有 L0/TMO 编排层, 不新增旁路） |
+
+### 6.5 ネットワーク View (Network / Deployment)
+
+复用 `BD-CANVAS-AGENT-001` §2.1 既定 5-tier 部署拓扑（UI / BFF / Domain Service / DB / 既有 L0-TMO 服务), 本 BD 不引入新的网络拓扑层或新部署单元。Webhook 入口 (API-WF-05) 需要对外暴露, 部署侧是否需要独立的 API Gateway 限流/WAF 规则 — **【TBD, Design Doc, 见 §8 安全设计 §8.4】**。
+
+## §7 非功能要件 (NFR)
+
+> per `ipa-nonfunctional-requirements` skill: 以下数值为**基本设计提案值（待拍板）**, 非项目已批准基线; SRS 未量化处一律标【TBD】而非编造。验收方法逐条给出。
+
+| NFR ID | 类别 | 要求（提案值, 待拍板） | 验收方法 |
+|---|---|---|---|
+| NFR-WF-01 | 性能 | Flow 图 CRUD (API-WF-01/02) P95 响应 < 500ms（沿用总册既有 Canvas CRUD 基线, 非本 BD 新定标准） | 性能测试脚本 + APM 采样 |
+| NFR-WF-02 | 性能 | 单 Execution 节点间调度延迟 【TBD, SRS 未给出具体数值, 待与总册 §7 性能基线协调后拍板】 | — |
+| NFR-WF-03 | 容量 | 单 Flow 节点数上限 【TBD, SRS §7 未声明, 需产品侧确认避免超大图导致渲染/执行性能劣化】 | 边界测试 |
+| NFR-WF-04 | 容量 | `execution_history`/`execution_step` 保留周期 【TBD, 见 §4.5 审计策略同一缺口, 影响存储容量规划】 | — |
+| NFR-WF-05 | 可用性 | 沿用总册既有可用性基线, 本 BD 不新增独立于总册的 SLA 承诺 | 沿用总册监控 |
+| NFR-WF-06 | 可靠性 | 节点级重试 `retry_policy`（FR-W8.1）最大重试次数与退避策略 【TBD, SRS 未给出默认值, Design Doc 阶段需与产品确认默认 policy】 | 单元测试覆盖重试路径 |
+| NFR-WF-07 | 扩展性 | Flow 图新增节点 kind 需可插拔扩展（W1 节点类型体系设计目标）, 不要求本版本预留具体扩展点数量 | 代码评审 |
+| NFR-WF-08 | 安全性 | 见 §8, 本节不重复 | — |
+| NFR-WF-09 | 运维性/监控 | Execution 失败需可观测（沿用总册日志/监控管线), 是否需要专属告警规则 【TBD, Design Doc】 | — |
+| NFR-WF-10 | 兼容性 | 既有 `AutomationRule` 数据向后兼容, 迁移脚本需保证 0 数据丢失 | 迁移前后行数/字段比对测试 |
+| NFR-WF-11 | 灾备 | 沿用总册既有备份策略, 本 BD 不新增独立于总册的 RTO/RPO 数值 | 沿用总册灾备演练 |
+
+## §8 安全设计 (Security Design)
+
+> per `ipa-security-design` skill: 按实际攻击面逐项列出, 服务端权限校验与前端显示隐藏严格区分; 资料不足处标记【安全确认必要】而非假设已有防护。
+
+### 8.1 认证与授权
+
+- **认证 (Authentication)**: 所有 UI 发起的 API-WF-01~04/06~08 复用既有 Session Token 机制, 本 BD 不新增独立认证方式。
+- **授权 (Authorization)**: 复用既有 RBAC, Flow/Template 的读写权限与所属 Canvas/Workspace 权限一致 (per §4.2 RLS `tenant_id` 策略); 前端画面按钮的显示/隐藏（如 SCR-WF-01 编辑按钮）**仅为体验优化**, 真正的写权限校验必须在 BFF 层复核, 不得仅依赖前端隐藏。
+
+### 8.2 Webhook 入口 (API-WF-05) — 攻击面重点
+
+- 现设计仅有静态 `webhook_token` 字符串精确比对, **无 HMAC 签名校验、无 token 定期轮换机制、无请求体大小上限**（后者见 §5.2 已标 TBD）。
+- **【安全确认必要】** 该入口是系统对外暴露、无需登录会话即可触发执行的唯一端点, 建议安全评审给出: (a) 是否要求 HMAC-SHA256 签名头, (b) token 轮换周期, (c) 请求体大小上限, (d) 是否需要来源 IP allowlist。本 BD 不预先假设评审结论, 上述四项在评审前均按【TBD】处理, 不建议在评审完成前接入外部生产系统。
+
+### 8.3 Agent 占位符激活预检 (FR-W14.5/W10.1 派生)
+
+- 服务端强制校验: Flow 中存在 `is_placeholder=true` 且 `agent_id IS NULL` 的节点时, 禁止 `enabled=true`（见 §6.3.1）。此校验必须在 BFF/Domain Service 层强制执行, 不得仅由前端 UI 阻止提交, 防止绕过前端直接调用 API-WF-01 PATCH。
+
+### 8.4 输入校验与常见攻击面
+
+| 攻击面 | 现状 | 备注 |
+|---|---|---|
+| CEL 条件表达式 (`condition_expr`, W4) | 复用既有 `AutomationRule.condition_expr` 沙箱执行环境, 不新增独立 CEL 执行器 | 沙箱逃逸风险由既有 CEL 引擎既定边界承担, 本 BD 不重新评估既有引擎安全性 |
+| `{{node.<id>.output.<field>}}` 数据映射语法 (W6) | 需防止映射表达式被用于越权读取其他 Flow/其他租户的数据 | **【安全确认必要】**: 映射解析器是否严格限定在同一 Execution 上下文内取值, 需 Design Doc 明确并附单元测试证据 |
+| 聊天栏输入 (W15, mock 解析) | v1 为规则/关键词匹配, 非真实 LLM, 无 Prompt Injection 攻击面（因无真实模型推理） | 待未来接入真实 NLU/LLM 时需重新评估 Prompt Injection, 本版本不适用 |
+| Webhook 外部输入 body | 透传给下游节点 `input_bindings`, 需防止注入内容通过节点动作（如通知发送）产生二次注入 | **【安全确认必要】**, 具体转义/校验规则待 Design Doc 补齐 |
+
+### 8.5 审计与敏感数据
+
+- `execution_history`/`execution_step` 记录执行输入/输出, 若节点涉及敏感字段（如 WorkItem 中的隐私数据）, 是否需要脱敏存储 — **【TBD, Design Doc, 见 §4.5 同一缺口】**。
+- Secret/密钥管理（如未来 webhook HMAC 密钥的存储与轮换）复用总册既有密钥管理机制, 本 BD 不新建独立密钥库。
