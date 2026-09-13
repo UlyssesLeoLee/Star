@@ -846,6 +846,20 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 | T-19 | 本 BD §8.4 | Webhook 外部输入 body 透传下游节点的二次注入防护规则 | 若节点动作含通知发送等场景, 可能产生二次注入 | 【安全确认必要】, Design Doc |
 | T-20 | 本 BD §8.5 | Execution 记录中敏感字段是否需脱敏存储 | 影响审计数据的隐私合规性 | Design Doc |
 | T-21 | 本 BD §9.1 | `chat_session` 是否需要 TTL 自动清理, 影响 W/T/M 分类是否需从 Transaction 改判 Work | 影响 §4.1 分类结论的稳定性 | Design Doc 确认后可能需修订本 BD §4.1 |
+| T-22 | 本 BD §6.1(FR-W2.1) | 手动触发重复点击是否需要防抖(去重) | 影响并发点击时 Execution 是否重复生成 | Design Doc |
+| T-23 | 本 BD §6.1(FR-W2.4) | 画布事件触发风暴(高频操作)是否需要 debounce | 影响事件驱动 Execution 生成频率与系统负载 | SRS 已知缺口, Design Doc |
+| T-24 | 本 BD §6.3.1(FR-W4.3) | Merge 节点 join 模式下部分 inbound 分支永不到达时的超时策略未定 | 影响 join 型 Merge 节点是否会无限等待 | SRS 已知缺口, Design Doc |
+| T-25 | 本 BD §6.3.1(FR-W7.1) | 子流程引用环检测算法未定 (仅约束引用深度 ≤5) | 若循环检测算法缺失, 深度限制外仍可能构成执行期死循环 | SRS 已知缺口, Design Doc |
+| T-26 | 本 BD §6.3.2(FR-W9.1) | `execution_history`/`execution_step` 写入失败时的 at-least-once 重试机制未定 | 若不保证至少一次写入, 执行历史可能出现记录缺失 | Design Doc 落地细节 |
+| T-27 | 本 BD §3.2(SCR-WF-04)/§6.3.2(FR-W9.3) | `execution_step` 输入/输出 JSON 过大时是否分页/截断未定 | 影响侧栏详情面板渲染性能与可用性 | Design Doc |
+| T-28 | 本 BD §6.3.3(FR-W11.4) | 标签绑定事件处理中途失败的重试/补偿机制未定 | 影响派生任务卡与命中结果的最终一致性保证 | Design Doc |
+| T-29 | 本 BD §6.4(FR-W15.3) | L0 不可达/超时时的降级策略未定(回退 static_cel 默认分支, 或整体失败) | 影响 dynamic_agent 路由模式的可用性与容错行为 | Design Doc |
+| T-30 | 本 BD §3.2(SCR-WF-03) | 底部聊天栏是否需跨页面持久悬浮未定 | 影响聊天会话上下文在页面切换时是否保留 | Design Doc |
+| T-31 | 本 BD §3.2(SCR-WF-03) | 聊天栏自然语言输入长度上限未定 | 影响输入校验规则与超长文本处理方式 | Design Doc |
+| T-32 | 本 BD §4.2(`chat_session.routing_decision`) | L0 动态路由决策依据 JSON 字段粒度未定 | 影响决策可审计性与前端展示细节, 与 T-09 决策可复现性相关但非同一问题 | Design Doc |
+| T-33 | 本 BD §8.2 | Webhook 入口是否需要来源 IP allowlist 未定 | 影响 Webhook 攻击面缓解措施完整性 | 【安全确认必要】, 安全评审阶段 |
+| T-34 | 本 BD §6.5(网络视图)/§8.4 | Webhook 入口部署侧是否需要独立 API Gateway 限流/WAF 规则 | 影响 Webhook 攻击面在网络层的缓解措施完整性 | Design Doc, 见 §8 安全设计 |
+| T-35 | 本 BD §附录 D | 与本 BD 配套的测试设计文档尚未创建 | 影响 §10 追溯矩阵 Test Case 列能否回填 | Design Doc 后续阶段, 依据 `ipa-test-case` skill 产出 |
 
 ## §10 追溯矩阵 (Traceability Matrix)
 
@@ -880,13 +894,13 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 | SRE | — | 待拍板 | — |
 | Dev Lead | — | 待拍板 | — |
 
-**本文档为 ULYS-28 issue 委托的设计文档交付物, 由 agent Sonnet 撰写, 尚未经过上述 5 角色正式拍板, 状态为 Draft, 供审阅与后续拍板使用。§9.3 TBD 追踪矩阵中的全部 21 项在正式拍板前均视为未决。**
+**本文档为 ULYS-28 issue 委托的设计文档交付物, 由 agent Sonnet 撰写, 尚未经过上述 5 角色正式拍板, 状态为 Draft, 供审阅与后续拍板使用。§9.3 TBD 追踪矩阵中的全部 35 项在正式拍板前均视为未决。**
 
 ## §12 修订履历 (Revision History)
 
 | 版本 | 日期 | 变更摘要 | 作者 |
 |---|---|---|---|
-| v1.0 | 2026-09-13 | 初版交付, 覆盖 SRS-CANVAS-WORKFLOW-001 v1.1 全部 54 项 FR (W1-W15), §0-§12 + 附录完整章节结构, 8 张表 W/T/M=5/3/0, 8 个 REST API, 21 项 TBD 追踪矩阵 | Sonnet (agent) |
+| v1.0 | 2026-09-13 | 初版交付, 覆盖 SRS-CANVAS-WORKFLOW-001 v1.1 全部 54 项 FR (W1-W15), §0-§12 + 附录完整章节结构, 8 张表 W/T/M=5/3/0, 8 个 REST API, 35 项 TBD 追踪矩阵 | Sonnet (agent) |
 
 ## 附录
 
