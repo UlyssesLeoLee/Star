@@ -664,7 +664,7 @@ P3-B 5 域子项 (player / economy / match / social / admin) 落地时:
 
 #### 14.10.5 16 守门 (per PHASE-OPS-INTRY-REPORT v0.1 §2.4 + ADR-0048)
 
-#1 R-05 不 push (per 1a 推 origin 重试细则) + #1 v19 agent 交互 Python 化 (per `docs/automation-design.md` §4.16) + #1 v25 CI cargo test 单 crate + #3 5 域独立 Lead 临时代签 (per 9/3 11:35 反转) + #4 token-OLU + #5 环境变量安全 + #6 PowerShell only + #6 v2 frontend typecheck advisory + #7 0 unsafe + #7 v3 clippy advisory + #9 不 commit 散落子代理产出 + #10 代签规则应用 (author=Ulysses) + #11 缺标比错标安全 + #12 AI 协作文档治理 + #13 DB W/T/M 强制分类 (6 表 100% 覆盖) + #14 5 域 Lead CONTENT 4 维 + #19 v19 agent 交互走 scripts/automation + #21 v21 [P] docs 同步 + #23 AI mock 不开外部 API (per 9/2 09:01) + #24 v2 调试控制台走 subprocess + #25 v2 5 域 Lead 真人 Ulysses 内推 + #25 CI cargo test 单 crate (per 9/5 PR #12) + #26 CI 4 守门修订反转
+\#1 R-05 不 push (per 1a 推 origin 重试细则) + #1 v19 agent 交互 Python 化 (per `docs/automation-design.md` §4.16) + #1 v25 CI cargo test 单 crate + #3 5 域独立 Lead 临时代签 (per 9/3 11:35 反转) + #4 token-OLU + #5 环境变量安全 + #6 PowerShell only + #6 v2 frontend typecheck advisory + #7 0 unsafe + #7 v3 clippy advisory + #9 不 commit 散落子代理产出 + #10 代签规则应用 (author=Ulysses) + #11 缺标比错标安全 + #12 AI 协作文档治理 + #13 DB W/T/M 强制分类 (6 表 100% 覆盖) + #14 5 域 Lead CONTENT 4 维 + #19 v19 agent 交互走 scripts/automation + #21 v21 [P] docs 同步 + #23 AI mock 不开外部 API (per 9/2 09:01) + #24 v2 调试控制台走 subprocess + #25 v2 5 域 Lead 真人 Ulysses 内推 + #25 CI cargo test 单 crate (per 9/5 PR #12) + #26 CI 4 守门修订反转
 
 ---
 

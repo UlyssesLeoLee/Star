@@ -4,9 +4,9 @@
 > **WT**: `wt-arg-03-effect` (branch: `wt-arg-03-effect`, base: main @ 87e1618 含 ARG.1 + ARG.2 + ARG.4 merge)
 > **触发**: 2026-09-10 07:21 JST 用户发令"按顺序推进" + ARG.2 merge 走守门后父会话自驱
 > **依赖**: 
->   - ARG.1 (`crates/arg`) 已 merge @ `651117e`
->   - ARG.2 (`crates/arg-bridge`) 已 merge @ `87e1618` ← 刚 merge
->   - ARG.4 (`crates/api/src/arg`) 已 merge @ `1d894ab`
+> - ARG.1 (`crates/arg`) 已 merge @ `651117e`
+> - ARG.2 (`crates/arg-bridge`) 已 merge @ `87e1618` ← 刚 merge
+> - ARG.4 (`crates/api/src/arg`) 已 merge @ `1d894ab`
 > **拍板来源**: per WBS-001 v0.50 §14.11 ARG.3 (5M tokens / 0.8 周) + v0.50 跨 session 续做规划 (估 8M / 5-7 session)
 > **守门合规**: #1 v15 (第 45 次新事件) + #1 v19 ([P] 必先 `scripts/automation/arg_dispatch_test.py`) + #1 v25 (cargo test -p star-arg-effect --lib -j 4 100%) + #3 (跨域强制 consults) + #5 + #6 + #7 + #9 + #10 + #12 + #13 + #14 v3 (Mavis 永久代签) + #19 v19
 

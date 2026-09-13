@@ -150,7 +150,7 @@ git -c user.name='Ulysses' -c user.email='ulysses@mavis.local' commit -m "feat(a
 - [automation-design §4.17 ARG.1 6 子模块](../../docs/automation-design.md) — 前序基础
 - [automation-design §4.18 ARG.4 13 REST + 1 WS](../../docs/automation-design.md) — 本次任务
 - [brief arg-04-api-13rest-1ws.md 12.4KB 已落档](../../docs/briefs/arg-04-api-13rest-1ws.md) — 详细实施
-- [wt-arg-01-arg-crate worktree 已存在 `43c1f0c`](#) — 6 子模块基础
+- wt-arg-01-arg-crate worktree 已存在 `43c1f0c` — 6 子模块基础
 - [AGENTS.md §4 守门 #13 W/T/M 横展開 + RLS 13 類](../../AGENTS.md)
 - [PHASE-LANGGRAPH-TMO-IMPL-REPORT v0.3.2](../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md) — TMO 7 节点实装 phase 范式
 
