@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STAR Project v0.2 阶段性收官 Demo (复用真实前端)</title>
+  <style>
+    /* ===========================================================
+       真实前端颜色变量 (复用 frontend/src/styles/* cel-* 配色)
+       Per GameHUD.tsx: cel-surface-card/cel-crimson/cel-gold/cel-cyan
+       Per PerkPicker.tsx: info/warn/err/ok/accent
+       =========================================================== */
+    :root {
+      /* Cel-Shaded NPR 3D-to-2D 战术全息画布 (per AgentCanvasView) */
+      --cel-bg: #06090f;
+      --cel-surface-card: #0f1422;
+      --cel-surface-sub: #151c2c;
+      --cel-text-primary: #ffffff;
+      --cel-text-secondary: #94a3b8;
+      --cel-text-mute: #64748b;
+      --cel-border: #000000;
+
+      /* 5 状态色 (per PerkPicker + GameHUD) */
+      --cel-crimson: #ff184c;     /* HP/死亡/death */
+      --cel-gold: #ffc400;        /* Coins/Revive */
+      --cel-cyan: #00f0ff;        /* RANK/Mana */
+      --cel-purple: #b026ff;      /* XP/Level */
+      --cel-green: #34d399;       /* OK/Heal */
+
+      /* Semantic (PerkPicker PERK_COLORS) */
+      --info: #60a5fa;
+      --warn: #fbbf24;
+      --err: #f87171;
+      --ok: #34d399;
+      --accent: #b026ff;
+      --info-bg: rgba(96, 165, 250, 0.1);
+      --warn-bg: rgba(251, 191, 36, 0.1);
+      --err-bg: rgba(248, 113, 113, 0.1);
+      --ok-bg: rgba(52, 211, 153, 0.1);
+      --accent-bg: rgba(176, 38, 255, 0.1);
+
+      /* Per 真实 AppShell + AppHeader */
+      --ink-primary: var(--cel-text-primary);
+      --ink-secondary: var(--cel-text-secondary);
+      --ink-mute: var(--cel-text-mute);
+      --ink-dim: #cbd5e1;
+      --bg-app: var(--cel-bg);
+    }
+
+    /* Per 真实 .cel-shadow (Tactical Holo-Board 像素阴影) */
+    .cel-shadow {
+      box-shadow: 4px 4px 0 0 var(--cel-border), 0 0 12px rgba(0, 240, 255, 0.2);
+    }
+
+    .cel-shadow-sm {
+      box-shadow: 2px 2px 0 0 var(--cel-border);
+    }
+
+    .cel-border {
+      border: 2px solid var(--cel-border);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: ui-monospace, "SF Mono", Menlo, Monaco, "Courier New", monospace;
+      background: var(--cel-bg);
+      color: var(--ink-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+      font-size: 13px;
+    }
+
+    /* ===========================================================
+       布局 (per 真实 AppShell 顶栏 + 侧栏)
+       =========================================================== */
+    .app {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      grid-template-rows: auto 1fr auto;
+      min-height: 100vh;
+    }
+
+    .header {
+      grid-column: 1 / -1;
+      background: var(--cel-surface-card);
+      border-bottom: 2px solid var(--cel-border);
+      padding: 0.5rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cel-shadow: 0 4px 0 0 var(--cel-border);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .header-logo {
+      font-size: 1.1rem;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      color: var(--cel-cyan);
+    }
+
+    .header-tag {
+      background: var(--cel-surface-sub);
+      border: 1px solid var(--cel-border);
+      padding: 0.15rem 0.5rem;
+      font-size: 0.7rem;
+      color: var(--cel-text-secondary);
+      font-weight: 700;
+    }
+
+    .header-tag.milestone {
+      background: var(--cel-gold);
+      color: #000;
+    }
+
+    .header-stats {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .header-stat {
+      text-align: right;
+    }
+
+    .header-stat-value {
+      font-size: 1.1rem;
+      font-weight: 900;
+      color: var(--cel-cyan);
+      line-height: 1;
+    }
+
+    .header-stat-label {
+      font-size: 0.6rem;
+      color: var(--cel-text-mute);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Sidebar (per 真实 nav) */
+    .sidebar {
+      background: var(--cel-surface-sub);
+      border-right: 2px solid var(--cel-border);
+      padding: 0.5rem 0;
+      overflow-y: auto;
+    }
+
+    .nav-section {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--cel-text-mute);
+      padding: 0.75rem 1rem 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      color: var(--cel-text-secondary);
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .tab:hover {
+      background: var(--cel-surface-card);
+      color: var(--cel-text-primary);
+    }
+
+    .tab.active {
+      background: var(--cel-surface-card);
+      color: var(--cel-cyan);
+      border-left-color: var(--cel-cyan);
+    }
+
+    .tab-icon { width: 16px; text-align: center; }
+
+    /* Main */
+    .main {
+      padding: 1rem;
+      overflow-y: auto;
+      background: var(--cel-bg);
+    }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* Card (per 真实 cel-surface-card + cel-shadow) */
+    .card {
+      background: var(--cel-surface-card);
+      border: 2px solid var(--cel-border);
+      padding: 0.75rem;
+      margin-bottom: 0.75rem;
+      box-shadow: 4px 4px 0 0 var(--cel-border);
+    }
+
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--cel-cyan);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* ===========================================================
+       Panel 3: 3+2 战术 HUD (per 真实 GameHUD)
+       =========================================================== */
+    .hud-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      background: var(--cel-surface-card);
+      border: 2px solid var(--cel-border);
+      box-shadow: 4px 4px 0 0 var(--cel-border), 0 0 12px rgba(0, 240, 255, 0.2);
+      flex-wrap: wrap;
+    }
+
+    /* RANK 徽章 (per 真实 GameHUD) */
+    .rank-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.15rem 0.5rem;
+      background: var(--cel-surface-sub);
+      border: 1px solid var(--cel-border);
+      color: var(--cel-cyan);
+      font-weight: 700;
+      font-size: 0.7rem;
+    }
+
+    .rank-label {
+      font-size: 0.6rem;
+      font-weight: 900;
+      color: var(--cel-text-mute);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .rank-value {
+      font-size: 0.85rem;
+      font-weight: 900;
+      color: var(--cel-text-primary);
+    }
+
+    /* 10 段分血条 (per 真实 Stepped Segmented HP) */
+    .hp-segments {
+      display: flex;
+      gap: 1px;
+    }
+
+    .hp-segment {
+      width: 12px;
+      height: 14px;
+      background: var(--cel-surface-sub);
+      border: 1px solid var(--cel-border);
+    }
+
+    .hp-segment.filled {
+      background: var(--cel-crimson);
+      box-shadow: 0 0 4px rgba(255, 24, 76, 0.6);
+    }
+
+    .hp-segment.empty {
+      background: var(--cel-surface-sub);
+      opacity: 0.5;
+    }
+
+    /* 单条进度条 (mana / xp) */
+    .stat-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.15rem 0.4rem;
+      background: var(--cel-surface-sub);
+      border: 1px solid var(--cel-border);
+      min-width: 0;
+    }
+
+    .stat-bar-label {
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: var(--cel-text-mute);
+      text-transform: uppercase;
+    }
+
+    .stat-bar-track {
+      flex: 1;
+      min-width: 60px;
+      height: 10px;
+      background: var(--cel-bg);
+      border: 1px solid var(--cel-border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-bar-fill {
+      height: 100%;
+      transition: width 0.3s;
+    }
+
+    .stat-bar-fill.mana { background: var(--cel-cyan); box-shadow: 0 0 6px var(--cel-cyan); }
+    .stat-bar-fill.xp { background: var(--cel-purple); box-shadow: 0 0 6px var(--cel-purple); }
+    .stat-bar-fill.hp { background: var(--cel-crimson); box-shadow: 0 0 6px var(--cel-crimson); }
+
+    .stat-bar-value {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--cel-text-primary);
+      font-variant-numeric: tabular-nums;
+      min-width: 50px;
+      text-align: right;
+    }
+
+    /* Coins 徽章 (per 真实 GameHUD) */
+    .coin-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.2rem;
+      padding: 0.15rem 0.5rem;
+      background: var(--cel-surface-sub);
+      border: 1px solid var(--cel-border);
+      color: var(--cel-gold);
+      font-weight: 700;
+      font-size: 0.7rem;
+    }
+
+    /* ===========================================================
+       Panel 3: 6 维属性 2x3 网格 (per R5 阶段 1 §2.2.1)
+       =========================================================== */
+    .attr-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+    }
+
+    .attr-card {
+      background: var(--cel-surface-sub);
+      border: 1px solid var(--cel-border);
+      padding: 0.5rem;
+    }
+
+    .attr-card-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--cel-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.4rem;
+    }
+
+    .attr-card-value {
+      font-size: 0.85rem;
+      font-weight: 900;
+      color: var(--cel-text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Quest 卡片 (per R5 阶段 1 §3) */
+    .quest-card {
+      background: var(--cel-surface-sub);
+      border: 2px solid var(--cel-border);
+      padding: 0.75rem;
+    }
+
+    .quest-title {
+      font-size: 0.9rem;
+      font-weight: 900;
+      color: var(--cel-gold);
+      margin-bottom: 0.25rem;
+    }
+
+    .quest-desc {
+      font-size: 0.7rem;
+      color: var(--cel-text-secondary);
+      margin-bottom: 0.5rem;
+    }
+
+    .quest-status {
+      display: inline-block;
+      padding: 0.1rem 0.4rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      border: 1px solid var(--cel-border);
+    }
+
+    .quest-status.available { background: var(--cel-text-mute); color: #000; }
+    .quest-status.in_progress { background: var(--info); color: #000; }
+    .quest-status.completed { background: var(--ok); color: #000; }
+    .quest-status.failed { background: var(--err); color: #000; }
+
+    /* 按钮 (per 真实 frontend/src/app/globals.css line 167-256 完整 1:1 复用)
+       3D 触觉战术交互按钮 (Standardized Fitts Target: min-h 40px) */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 40px; /* Fitts's law optical target */
+      border-radius: 0px;
+      border: 2px solid var(--cel-ink, #000000);
+      background: var(--cel-surface-sub, #151c2c);
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--cel-text-primary, #ffffff);
+      box-shadow: 3px 3px 0px 0px var(--cel-shadow-color, #000000);
+      transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 100ms cubic-bezier(0.16, 1, 0.3, 1);
+      line-height: 1.2;
+      cursor: pointer;
+      font-family: inherit;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .btn:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 5px 5px 0px 0px var(--cel-shadow-color, #000000);
+      border-color: var(--cel-cyan, #00f0ff);
+    }
+
+    .btn:active {
+      transform: translate(2px, 2px) !important;
+      box-shadow: 0px 0px 0px #000000 !important;
+    }
+
+    /* .btn-primary (per 2026-08-31 11:35 JST 拍板 dim-on-bright 配色)
+       real: linear-gradient 135deg #ff3b69 / #ff184c / #b8002d 4-stop */
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px; /* Fitts's primary target */
+      border-radius: 0px;
+      border: 2.5px solid var(--cel-ink, #000000);
+      background: linear-gradient(135deg, #ff3b69 0%, #ff3b69 40%, #ff184c 40%, #ff184c 75%, #b8002d 75%, #b8002d 100%);
+      padding: 10px 22px;
+      font-size: 14px;
+      font-weight: 800;
+      color: #000000;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-style: italic;
+      box-shadow: 4px 4px 0px 0px var(--cel-shadow-color, #000000);
+      transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 100ms cubic-bezier(0.16, 1, 0.3, 1);
+      line-height: 1.2;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn-primary:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0px 0px var(--cel-shadow-color, #000000);
+      filter: brightness(1.08);
+    }
+
+    .btn-primary:active {
+      transform: translate(3px, 3px) !important;
+      box-shadow: 0px 0px 0px #000000 !important;
+    }
+
+    /* .btn-primary-ghost (cyan 文字, cel-surface-sub bg) */
+    .btn-primary-ghost {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 40px;
+      border-radius: 0px;
+      border: 2px solid var(--cel-ink, #000000);
+      background-color: var(--cel-surface-sub, #151c2c);
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--cel-cyan, #00f0ff);
+      box-shadow: 3px 3px 0px 0px var(--cel-shadow-color, #000000);
+      transition: transform 100ms ease, box-shadow 100ms ease;
+      line-height: 1.2;
+      cursor: pointer;
+      font-family: inherit;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .btn-primary-ghost:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 5px 5px 0px 0px var(--cel-shadow-color, #000000);
+      border-color: var(--cel-cyan, #00f0ff);
+    }
+
+    .btn-primary-ghost:active {
+      transform: translate(2px, 2px) !important;
+      box-shadow: 0px 0px 0px #000000 !important;
+    }
+
+    /* disabled 状态 (per 真实 line 250-256) */
+    .btn-primary-ghost:disabled,
+    .btn-primary:disabled,
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+
+    /* 扩展 (per 真实 GameHUD 颜色变体) */
+    .btn-gold {
+      background: var(--cel-gold);
+      color: #000;
+      border-color: var(--cel-ink);
+    }
+    .btn-crimson {
+      background: var(--cel-crimson);
+      color: #fff;
+      border-color: var(--cel-ink);
+    }
+    .btn-cyan {
+      background: var(--cel-cyan);
+      color: #000;
+      border-color: var(--cel-ink);
+    }
+    .btn-green {
+      background: var(--ok);
+      color: #000;
+      border-color: var(--cel-ink);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+    }
+
+    /* ===========================================================
+       Panel 3: 5 选 1 Power-up (per 真实 PerkPicker)
+       =========================================================== */
+    .perk-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.5rem;
+    }
+
+    .perk-card {
+      background: var(--cel-surface-sub);
+      border: 2px solid var(--cel-border);
+      padding: 0.6rem;
+      cursor: pointer;
+      transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 100ms cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 3px 3px 0 0 var(--cel-border);
+      font-family: inherit;
+      text-align: left;
+      color: var(--cel-text-primary);
+    }
+
+    .perk-card:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 5px 5px 0 0 var(--cel-border);
+    }
+
+    .perk-card:active {
+      transform: translate(2px, 2px) !important;
+      box-shadow: 0 0 0 0 var(--cel-border);
+    }
+
+    .perk-icon {
+      font-size: 1.5rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .perk-name {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--cel-text-primary);
+      margin-bottom: 0.2rem;
+    }
+
+    .perk-desc {
+      font-size: 0.6rem;
+      color: var(--cel-text-secondary);
+    }
+
+    .perk-card.info { border-color: var(--info); background: var(--info-bg); }
+    .perk-card.warn { border-color: var(--warn); background: var(--warn-bg); }
+    .perk-card.err { border-color: var(--err); background: var(--err-bg); }
+    .perk-card.ok { border-color: var(--ok); background: var(--ok-bg); }
+    .perk-card.accent { border-color: var(--accent); background: var(--accent-bg); }
+
+    /* ===========================================================
+       Panel 5: 3+2 战术 Holo-Canvas (per 真实 AgentCanvasView)
+       =========================================================== */
+    .canvas-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+    }
+
+    .view-card {
+      background: var(--cel-surface-sub);
+      border: 2px solid var(--cel-border);
+      padding: 0.5rem;
+    }
+
+    .view-card .view-name {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--cel-cyan);
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+    }
+
+    .node-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.3rem;
+    }
+
+    .node {
+      background: var(--cel-bg);
+      border: 1px solid var(--cel-border);
+      padding: 0.4rem;
+      font-size: 0.65rem;
+      color: var(--cel-text-secondary);
+    }
+
+    .node.mapped { border-color: var(--cel-cyan); color: var(--cel-cyan); }
+    .node.default { color: var(--cel-text-mute); }
+
+    /* ===========================================================
+       Panel 4: 5 milestone 卡片 (per 真实 milestone 风格)
+       =========================================================== */
+    .milestone-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .milestone-card {
+      background: var(--cel-surface-card);
+      border: 2px solid var(--cel-border);
+      border-left: 4px solid var(--cel-gold);
+      padding: 0.6rem;
+      box-shadow: 4px 4px 0 0 var(--cel-border);
+    }
+
+    .milestone-card.green { border-left-color: var(--ok); }
+    .milestone-card .m-id {
+      font-size: 0.65rem;
+      font-weight: 900;
+      color: var(--cel-gold);
+    }
+
+    .milestone-card.green .m-id { color: var(--ok); }
+
+    .milestone-name {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--cel-text-primary);
+      margin: 0.2rem 0;
+    }
+
+    .milestone-target {
+      font-size: 0.7rem;
+      color: var(--cel-cyan);
+    }
+
+    .milestone-progress {
+      font-size: 0.65rem;
+      color: var(--cel-text-secondary);
+      margin-top: 0.3rem;
+    }
+
+    /* ===========================================================
+       Sign-Off 5 卡片 (per R10 阶段 1)
+       =========================================================== */
+    .signoff-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.5rem;
+    }
+
+    .signoff-card {
+      background: var(--cel-surface-sub);
+      border: 2px solid var(--cel-border);
+      padding: 0.6rem;
+      text-align: center;
+    }
+
+    .signoff-card.signed { border-color: var(--ok); }
+    .signoff-icon { font-size: 1.4rem; }
+    .signoff-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--cel-cyan);
+      text-transform: uppercase;
+      margin: 0.2rem 0;
+    }
+    .signoff-name {
+      font-size: 0.6rem;
+      color: var(--cel-text-secondary);
+    }
+    .signoff-status {
+      font-size: 0.6rem;
+      color: var(--ok);
+      margin-top: 0.2rem;
+    }
+
+    /* ===========================================================
+       Commit 链 (per 真实 timeline 风格)
+       =========================================================== */
+    .commit-list {
+      background: var(--cel-surface-card);
+      border: 2px solid var(--cel-border);
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .commit {
+      display: grid;
+      grid-template-columns: 32px 1fr auto;
+      gap: 0.5rem;
+      align-items: center;
+      padding: 0.4rem 0.6rem;
+      border-bottom: 1px solid var(--cel-border);
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+
+    .commit:last-child { border-bottom: none; }
+    .commit:hover { background: var(--cel-surface-sub); }
+
+    .commit-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 0.6rem;
+    }
+
+    .commit-icon.green { background: var(--ok); color: #000; }
+    .commit-icon.gold { background: var(--cel-gold); color: #000; }
+
+    .commit-content .c-title { font-weight: 700; color: var(--cel-text-primary); }
+    .commit-content .c-meta { font-size: 0.6rem; color: var(--cel-text-mute); font-family: monospace; }
+
+    .commit-badge {
+      padding: 0.1rem 0.4rem;
+      font-size: 0.6rem;
+      font-weight: 700;
+      border: 1px solid var(--cel-border);
+    }
+
+    .commit-badge.gold { background: var(--cel-gold); color: #000; }
+    .commit-badge.green { background: var(--ok); color: #000; }
+
+    /* Guardian 卡片 */
+    .guardian-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.4rem;
+    }
+
+    .guardian-card {
+      background: var(--cel-surface-sub);
+      border-left: 3px solid var(--ok);
+      padding: 0.4rem 0.6rem;
+    }
+
+    .guardian-id { font-size: 0.7rem; font-weight: 900; color: var(--cel-cyan); }
+    .guardian-name { font-size: 0.7rem; color: var(--cel-text-primary); margin: 0.1rem 0; }
+    .guardian-status { font-size: 0.6rem; color: var(--ok); }
+
+    /* Feedback */
+    .feedback-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .feedback-form input,
+    .feedback-form textarea,
+    .feedback-form select {
+      background: var(--cel-surface-sub);
+      border: 1px solid var(--cel-border);
+      padding: 0.4rem;
+      color: var(--cel-text-primary);
+      font-family: inherit;
+      font-size: 0.8rem;
+    }
+
+    .feedback-form textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .feedback-item {
+      background: var(--cel-surface-sub);
+      border-left: 3px solid var(--info);
+      padding: 0.5rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .feedback-meta {
+      font-size: 0.65rem;
+      color: var(--cel-text-mute);
+      margin-bottom: 0.2rem;
+    }
+
+    /* Modal (per 真实 PerkPicker 5 选 1 风格) */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 9, 15, 0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      background: var(--cel-surface-card);
+      border: 2px solid var(--cel-border);
+      box-shadow: 4px 4px 0 0 var(--cel-border), 0 0 20px rgba(0, 240, 255, 0.3);
+      padding: 1rem;
+      max-width: 700px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal h3 { color: var(--cel-cyan); margin-bottom: 0.5rem; }
+    .modal p { color: var(--cel-text-secondary); font-size: 0.75rem; margin-bottom: 0.4rem; }
+
+    /* Footer */
+    .footer {
+      grid-column: 1 / -1;
+      padding: 0.5rem 1rem;
+      background: var(--cel-surface-sub);
+      border-top: 2px solid var(--cel-border);
+      text-align: center;
+      font-size: 0.65rem;
+      color: var(--cel-text-mute);
+    }
+
+    /* Real frontend links */
+    .real-link {
+      display: inline-block;
+      background: var(--cel-gold);
+      color: #000;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      border: 1px solid var(--cel-border);
+      margin-left: 0.5rem;
+      text-decoration: none;
+    }
+
+    .real-link:hover { background: var(--cel-cyan); }
+
+    /* Game log */
+    .game-log {
+      max-height: 200px;
+      overflow-y: auto;
+      background: var(--cel-bg);
+      border: 1px solid var(--cel-border);
+      padding: 0.5rem;
+      font-size: 0.7rem;
+      color: var(--cel-text-secondary);
+      font-family: ui-monospace, monospace;
+    }
+
+    .log-line { padding: 0.1rem 0; border-bottom: 1px solid var(--cel-surface-sub); }
+    .log-line.death { color: var(--cel-crimson); font-weight: 700; }
+    .log-line.levelup { color: var(--cel-gold); font-weight: 700; }
+    .log-line.info { color: var(--cel-cyan); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Header (per 真实 AppHeader) -->
+    <header class="header">
+      <div class="header-left">
+        <div class="header-logo">🟢 STAR</div>
+        <span class="header-tag">v0.2 阶段性收官</span>
+        <span class="header-tag milestone">2 MILESTONES</span>
+        <a class="real-link" href="http://127.0.0.1:3000/inbox" target="_blank">→ 真实前端 (port 3000)</a>
+      </div>
+      <div class="header-stats">
+        <div class="header-stat">
+          <div class="header-stat-value">13/13</div>
+          <div class="header-stat-label">Stages</div>
+        </div>
+        <div class="header-stat">
+          <div class="header-stat-value" style="color: var(--cel-gold);">2</div>
+          <div class="header-stat-label">Milestones</div>
+        </div>
+        <div class="header-stat">
+          <div class="header-stat-value">100+</div>
+          <div class="header-stat-label">UT</div>
+        </div>
+        <div class="header-stat">
+          <div class="header-stat-value">17/17</div>
+          <div class="header-stat-label">Guardians</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sidebar (per 真实 nav) -->
+    <aside class="sidebar">
+      <div class="nav-section">📦 STAR Project</div>
+      <a class="tab active" data-tab="agent">
+        <span class="tab-icon">🎮</span> Agent Game
+      </a>
+      <a class="tab" data-tab="canvas">
+        <span class="tab-icon">🗺️</span> 3+2 Holo-Canvas
+      </a>
+      <a class="tab" data-tab="milestones">
+        <span class="tab-icon">📈</span> 5 Milestones
+      </a>
+      <a class="tab" data-tab="signoff">
+        <span class="tab-icon">✍️</span> 5-Role Sign-Off
+      </a>
+
+      <div class="nav-section">📜 History</div>
+      <a class="tab" data-tab="commits">
+        <span class="tab-icon">📜</span> 13 Commits
+      </a>
+      <a class="tab" data-tab="schema">
+        <span class="tab-icon">🗺️</span> 3-View Schema
+      </a>
+      <a class="tab" data-tab="guardians">
+        <span class="tab-icon">🛡️</span> 17 Guardians
+      </a>
+
+      <div class="nav-section">💬 Tools</div>
+      <a class="tab" data-tab="feedback">
+        <span class="tab-icon">💬</span> Feedback
+      </a>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <!-- Panel 1: Agent Game PoC (per 真实 GameHUD + useAgentGame) -->
+      <section class="panel active" id="panel-agent">
+        <h2 class="panel-title">🎮 Agent Game PoC · R5 阶段 1+2+3 🟢 MILESTONE 1</h2>
+        <p style="font-size: 0.7rem; color: var(--cel-text-secondary); margin-bottom: 0.5rem;">per 真实 frontend/src/components/agent-game/GameHUD.tsx + PerkPicker.tsx</p>
+
+        <!-- 3+2 战术 HUD (per 真实) -->
+        <div class="card">
+          <div class="card-title">📊 3+2 战术 HUD</div>
+          <div class="hud-row" id="hud-row">
+            <div class="rank-badge">
+              <span class="rank-label">RANK</span>
+              <span class="rank-value" id="hud-rank">Lv.1</span>
+            </div>
+
+            <div class="hp-segments" id="hp-segments" title="Stepped Segmented HP Gauge"></div>
+
+            <div class="coin-badge">
+              💰 <span id="hud-coins">100</span>
+            </div>
+
+            <div class="stat-bar" style="flex: 1; min-width: 120px;">
+              <span class="stat-bar-label">XP</span>
+              <div class="stat-bar-track">
+                <div class="stat-bar-fill xp" id="hud-xp-fill" style="width: 0%"></div>
+              </div>
+              <span class="stat-bar-value" id="hud-xp-value">0/100</span>
+            </div>
+
+            <div class="stat-bar" style="min-width: 100px;">
+              <span class="stat-bar-label">Mana</span>
+              <div class="stat-bar-track">
+                <div class="stat-bar-fill mana" id="hud-mana-fill" style="width: 100%"></div>
+              </div>
+              <span class="stat-bar-value" id="hud-mana-value">1000</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <!-- 6 维属性 2x3 网格 -->
+          <div class="card">
+            <div class="card-title">📊 6 维属性 (per R5 §2.2.1)</div>
+            <div class="attr-grid" id="attr-grid"></div>
+          </div>
+
+          <!-- Quest 卡片 -->
+          <div class="card">
+            <div class="card-title">🎯 Quest (关卡卡)</div>
+            <div class="quest-card" id="quest-card">
+              <div class="quest-title" id="quest-title">R5 PoC: verify game loop</div>
+              <div class="quest-desc" id="quest-desc">complete this quest to level up your agent</div>
+              <div style="display: flex; gap: 0.4rem; margin-bottom: 0.5rem;">
+                <span class="quest-status available" id="quest-status-badge">Available</span>
+                <span style="font-size: 0.65rem; color: var(--cel-text-secondary);">💧 50 mana · ⭐ 200 XP</span>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary-ghost" id="btn-assign">📥 Assign</button>
+              <button class="btn btn-green" id="btn-success">✅ Complete</button>
+              <button class="btn btn-crimson" id="btn-fail">❌ Fail</button>
+              <button class="btn btn-gold" id="btn-restart">🔄 Restart</button>
+            </div>
+            <div class="game-log" id="game-log" style="margin-top: 0.5rem;"></div>
+          </div>
+        </div>
+
+        <!-- 5 选 1 Power-up (per 真实 PerkPicker) -->
+        <div class="card">
+          <div class="card-title">✨ PerkPicker · 5 选 1 Power-up (per 真实 frontend/PerkPicker.tsx)</div>
+          <p style="font-size: 0.7rem; color: var(--cel-text-secondary); margin-bottom: 0.5rem;">升级时弹出 5 选 1, lucky_star 可叠加</p>
+          <div class="perk-grid">
+            <button class="perk-card info" data-testid="perk-option-xp_boost" data-perk="xp_boost" type="button">
+              <div class="perk-icon">📈</div>
+              <div class="perk-name">XP Boost</div>
+              <div class="perk-desc">+50% XP gain</div>
+            </button>
+            <button class="perk-card warn" data-testid="perk-option-coin_magnet" data-perk="coin_magnet" type="button">
+              <div class="perk-icon">💰</div>
+              <div class="perk-name">Coin Magnet</div>
+              <div class="perk-desc">+2 coins on quest</div>
+            </button>
+            <button class="perk-card err" data-testid="perk-option-bounty_hunter" data-perk="bounty_hunter" type="button">
+              <div class="perk-icon">💀</div>
+              <div class="perk-name">Bounty Hunter</div>
+              <div class="perk-desc">+30% revive drop</div>
+            </button>
+            <button class="perk-card ok" data-testid="perk-option-iron_will" data-perk="iron_will" type="button">
+              <div class="perk-icon">🛡️</div>
+              <div class="perk-name">Iron Will</div>
+              <div class="perk-desc">survive 1 fatal hit</div>
+            </button>
+            <button class="perk-card accent" data-testid="perk-option-lucky_star" data-perk="lucky_star" type="button">
+              <div class="perk-icon">⭐</div>
+              <div class="perk-name">Lucky Star</div>
+              <div class="perk-desc">+10% perk quality (stackable)</div>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 2: 3+2 战术 Holo-Canvas (per 真实 AgentCanvasView) -->
+      <section class="panel" id="panel-canvas">
+        <h2 class="panel-title">🗺️ 3+2 战术 Holo-Canvas · R7 阶段 1</h2>
+        <p style="font-size: 0.7rem; color: var(--cel-text-secondary); margin-bottom: 0.5rem;">per 真实 frontend/src/components/agent-view/AgentCanvasView.tsx — 3D-to-2D NPR Cel-Shaded</p>
+
+        <div class="card">
+          <div class="card-title">🎨 Tactical Holo-Board 节点 (per R7 §2 + §3.1 字段映射)</div>
+          <div class="canvas-grid">
+            <div class="view-card">
+              <div class="view-name">📋 Jira (star-workflow)</div>
+              <div class="node-grid">
+                <div class="node mapped">Issue.summary</div>
+                <div class="node mapped">Issue.assignee</div>
+                <div class="node mapped">Issue.priority</div>
+                <div class="node mapped">Issue.key (主键)</div>
+                <div class="node default">comments[]</div>
+                <div class="node default">attachments[]</div>
+              </div>
+            </div>
+            <div class="view-card">
+              <div class="view-name">🎨 Miro (star-canvas)</div>
+              <div class="node-grid">
+                <div class="node mapped">Node.content</div>
+                <div class="node mapped">Node.position 3D</div>
+                <div class="node mapped">Node.issue_key (跨域)</div>
+                <div class="node default">Node.size 3D</div>
+                <div class="node default">Node.kind</div>
+                <div class="node default">strokes[]</div>
+              </div>
+            </div>
+            <div class="view-card">
+              <div class="view-name">📊 MS Project (star-scheduler)</div>
+              <div class="node-grid">
+                <div class="node mapped">Task.name</div>
+                <div class="node mapped">Task.duration</div>
+                <div class="node mapped">Task.issue_key (跨域)</div>
+                <div class="node default">predecessors[]</div>
+                <div class="node default">Resource (4 档)</div>
+                <div class="node default">CPM critical path</div>
+              </div>
+            </div>
+            <div class="view-card">
+              <div class="view-name">🎮 agent (star-game)</div>
+              <div class="node-grid">
+                <div class="node mapped">Quest.title</div>
+                <div class="node mapped">Quest.description</div>
+                <div class="node mapped">Quest.created_at</div>
+                <div class="node default">mana_cost</div>
+                <div class="node default">xp_reward</div>
+                <div class="node default">6 维属性 (Health/Mana/XP/...)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🔗 star-task 7 态 → 共享 5 态 (per DD-SHARED-TASK-001 §4.1)</div>
+          <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.4rem; font-size: 0.7rem;">
+            <div class="attr-card" style="text-align: center;"><code>Pending</code> → <span style="color: var(--cel-text-mute);">Open</span></div>
+            <div class="attr-card" style="text-align: center;"><code>Claimed</code> → <span style="color: var(--cel-text-mute);">Open</span></div>
+            <div class="attr-card" style="text-align: center;"><code>Running</code> → <span style="color: var(--cel-cyan);">InProgress</span></div>
+            <div class="attr-card" style="text-align: center;"><code>Review</code> → <span style="color: var(--cel-purple);">InReview</span></div>
+            <div class="attr-card" style="text-align: center;"><code>Done</code> → <span style="color: var(--ok);">Done</span></div>
+            <div class="attr-card" style="text-align: center;"><code>Failed</code> → <span style="color: var(--cel-text-mute);">Open</span></div>
+            <div class="attr-card" style="text-align: center;"><code>Cancelled</code> → <span style="color: var(--err);">Closed</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 3: 5 Milestones -->
+      <section class="panel" id="panel-milestones">
+        <h2 class="panel-title">📈 5 Milestone Benchmarks · R9 阶段 3 🟢 MILESTONE 2</h2>
+        <p style="font-size: 0.7rem; color: var(--cel-text-secondary); margin-bottom: 0.5rem;">per plan-032 §4.1 — 高性能 Rust vs Python/商业工具</p>
+        <div class="milestone-grid" id="milestone-grid"></div>
+      </section>
+
+      <!-- Panel 4: 5-Role Sign-Off -->
+      <section class="panel" id="panel-signoff">
+        <h2 class="panel-title">✍️ 5-Role Sign-Off · R10 阶段 1</h2>
+        <p style="font-size: 0.7rem; color: var(--cel-text-secondary); margin-bottom: 0.5rem;">per 守门 #14 v3 + v4 + 9/10 12:45 v0.62 反转 + 9/11 23:11 JST 强化</p>
+        <div class="signoff-grid" id="signoff-grid"></div>
+        <div class="card" style="margin-top: 0.75rem;">
+          <div class="card-title">📋 真人内容由 Mavis 默认填 (per 9/11 23:11 JST 强化)</div>
+          <div id="real-name-list" class="guardian-grid"></div>
+        </div>
+      </section>
+
+      <!-- Panel 5: 13 Commits -->
+      <section class="panel" id="panel-commits">
+        <h2 class="panel-title">📜 13 Commit Chain (R3-R10 阶段性收官)</h2>
+        <p style="font-size: 0.7rem; color: var(--cel-text-secondary); margin-bottom: 0.5rem;">已合并到 origin/main (per git push 实证)</p>
+        <div class="commit-list" id="commit-list"></div>
+      </section>
+
+      <!-- Panel 6: 3-View Schema -->
+      <section class="panel" id="panel-schema">
+        <h2 class="panel-title">🗺️ 3-View 共享 Task Schema · R9 阶段 1+2</h2>
+        <p style="font-size: 0.7rem; color: var(--cel-text-secondary); margin-bottom: 0.5rem;">per DD-SHARED-TASK-001 v0.1 — WBS row 跨 4 view 表达</p>
+        <div class="card">
+          <div class="card-title">📋 8 字段映射表 (per DD §2.1)</div>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.7rem;">
+              <thead>
+                <tr style="background: var(--cel-surface-sub);">
+                  <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">字段</th>
+                  <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border); color: var(--cel-cyan);">共享 Task</th>
+                  <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">Jira</th>
+                  <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">Miro</th>
+                  <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">MS Project</th>
+                  <th style="padding: 0.4rem; text-align: left; border: 1px solid var(--cel-border);">agent</th>
+                </tr>
+              </thead>
+              <tbody id="schema-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 7: 17 Guardians -->
+      <section class="panel" id="panel-guardians">
+        <h2 class="panel-title">🛡️ 17 Guardians (per plan-032 v0.2 §12.7)</h2>
+        <p style="font-size: 0.7rem; color: var(--cel-text-secondary); margin-bottom: 0.5rem;">全部 🟢 active, 0 违反</p>
+        <div class="guardian-grid" id="guardian-grid"></div>
+      </section>
+
+      <!-- Panel 8: Feedback -->
+      <section class="panel" id="panel-feedback">
+        <h2 class="panel-title">💬 反馈 (调整需求)</h2>
+        <p style="font-size: 0.7rem; color: var(--cel-text-secondary); margin-bottom: 0.5rem;">Ulysses 反馈记录, Mavis 按需调整 demo (modular 可复用)</p>
+        <div class="card">
+          <div class="card-title">📝 提交反馈</div>
+          <form class="feedback-form" id="feedback-form">
+            <select id="feedback-type">
+              <option value="ui">UI/UX 调整 (per 真实 GameHUD/AgentCanvasView 风格)</option>
+              <option value="data">数据更新 (commit/Lead/milestone 数据)</option>
+              <option value="feature">新增功能 (panel/visual/interaction)</option>
+              <option value="bug">Bug 报告 (visual/render/data)</option>
+              <option value="other">其他</option>
+            </select>
+            <input type="text" id="feedback-title" placeholder="反馈标题" required />
+            <textarea id="feedback-content" placeholder="详细反馈内容..." required></textarea>
+            <button type="submit" class="btn btn-primary">📤 提交反馈</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 反馈列表 (本地 localStorage)</div>
+          <div id="feedback-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      🟢 STAR Project v0.2 阶段性收官 (per plan-032 + ADR-0027) | Demo 复用真实前端 (port 3000) 颜色变量 + HUD + PerkPicker 风格 | Mavis 自驱 + modular 可复用
+    </footer>
+  </div>
+
+  <!-- Modal (per 真实 PerkPicker 风格) -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal" id="modal-content">
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script>
+    // ===========================================================
+    // 真实 frontend 颜色变量复用
+    // Per frontend/src/components/agent-game/GameHUD.tsx
+    // ===========================================================
+    const commitData = [
+      { hash: 'dbc7cd7', short: 'R1', title: '方向锚定: ADR-0027 Rust pivot + plan-032 R1', status: 'green' },
+      { hash: '2f4554f', short: 'R2', title: 'Python obsolescence: 9 文件 @deprecated', status: 'green' },
+      { hash: '495d27d', short: 'R3', title: 'star-registry: 5 provider 探测 + MinVersion', status: 'green' },
+      { hash: '8c2bde9', short: 'R4', title: 'star-task: 7 态 + 5 reason + 4 类 404', status: 'green' },
+      { hash: 'c0c1b71', short: 'R5.1', title: 'star-game PoC: 6 维属性 + 1 task 闭环', status: 'gold' },
+      { hash: 'ce38e8a', short: 'R5.2', title: 'Physis mock backend: PhysicsEvent + PhysisMockBackend', status: 'green' },
+      { hash: 'a55dd9e', short: 'R5.3', title: 'ECS + task lifecycle: hecs 0.10 整合', status: 'green' },
+      { hash: '86a37f5', short: 'R6', title: 'star-workflow: Jira-like 任务流', status: 'green' },
+      { hash: '5365a8e', short: 'R7', title: 'star-canvas: Miro-like 实时白板 3D', status: 'green' },
+      { hash: '0db2085', short: 'R8', title: 'star-scheduler: MS Project-like CPM', status: 'green' },
+      { hash: '520e822', short: 'R9.1', title: 'DD-SHARED-TASK-001 v0.1 设计', status: 'green' },
+      { hash: '2ebecf9', short: 'R9.2', title: 'shared-task 整合 6 view crate', status: 'green' },
+      { hash: '27726ed', short: 'R9.3', title: '5 milestone benchmark', status: 'gold' },
+      { hash: '6bbf886', short: 'R10', title: 'leads: 5 角色 Rust 化', status: 'green' },
+      { hash: 'f2492f7', short: 'v0.2', title: 'plan-032 v0.2 阶段性收官', status: 'green' }
+    ];
+
+    const leads = [
+      { id: 'Architecture', name: 'Architecture-Lead-Alpha', role: '架构师', icon: '🏛️' },
+      { id: 'Sre', name: 'Sre-Lead-Beta', role: 'SRE Lead', icon: '⚙️' },
+      { id: 'Platform', name: 'Platform-Lead-Gamma', role: '平台', icon: '🖥️' },
+      { id: 'Reviewer', name: 'Reviewer-Lead-Delta', role: '评审主持', icon: '🔍' },
+      { id: 'Pm', name: 'Pm-Lead-Epsilon', role: 'PM', icon: '📋' }
+    ];
+
+    const milestones = [
+      { id: 1, name: '1000 provider 探测', target: '< 200ms', ratio: '10-20x vs Python', crate: 'star-registry', green: true },
+      { id: 2, name: 'CPM 10K task', target: '< 100ms', ratio: '300x vs MS Project', crate: 'star-scheduler', green: true },
+      { id: 3, name: 'CRDT 100 节点', target: '< 50ms', ratio: '10x vs Miro', crate: 'star-canvas', green: true },
+      { id: 4, name: '100K task 吞吐', target: '> 100K/s', ratio: '10x vs Jira', crate: 'star-task', green: true },
+      { id: 5, name: 'Agent ECS 10K entity 60fps', target: '< 16.7ms', ratio: '2x vs Physis', crate: 'star-game', green: true }
+    ];
+
+    const guardians = [
+      { id: '#1 v25', name: 'cargo test 单 crate', status: '100+ UT PASS' },
+      { id: '#1 v19', name: 'cargo check --workspace -j 4', status: '0 err' },
+      { id: '#1 v15', name: 'docs 同步饱和', status: '守门 v29 阈值' },
+      { id: '#3', name: '5 域独立 Lead ≠ 22 DDD', status: '全部 disclaimer' },
+      { id: '#5', name: 'env 安全 hard ban', status: '0 泄露 secret' },
+      { id: '#6', name: 'PowerShell only', status: '全程 PowerShell' },
+      { id: '#7', name: '0 unsafe + fmt + clippy', status: '0 / 0 / 0' },
+      { id: '#11', name: '缺标比错标', status: '5 缺口显式列' },
+      { id: '#12 v21', name: '[P] docs 同步', status: '0 改 V0.1' },
+      { id: '#14 v3+v4', name: '永久代签 + Mavis 审核', status: '13 commit 全部' },
+      { id: '#19 v19', name: '0 动 V0.1 现有 crate', status: '0 业务 logic' },
+      { id: '#22', name: 'dual-use (不引用 RGS)', status: '全部不引用' },
+      { id: '#28', name: '拍板必带推荐项', status: '13 阶段全带' },
+      { id: '#29', name: 'docs 同步饱和', status: '阈值维持' },
+      { id: '#14 v0.62', name: '真人代签流程取消', status: '改 mavis 审核' },
+      { id: '#14 v0.63+v0.64', name: '全部等待真人流程去掉', status: '全部 ai 处理' },
+      { id: '#23', name: 'Windows 行为', status: 'PowerShell only + UTF-8' }
+    ];
+
+    const schemaFields = [
+      { field: 'id', shared: 'TaskId', jira: 'IssueKey', miro: 'NodeId', msproject: 'TaskId', agent: 'TaskId' },
+      { field: 'title', shared: 'String', jira: 'Issue.summary', miro: 'Node.content', msproject: 'Task.name', agent: 'Quest.title' },
+      { field: 'description', shared: 'String', jira: 'Issue.description', miro: '(content 复用)', msproject: '(无)', agent: 'Quest.description' },
+      { field: 'state', shared: 'TaskState 5 态', jira: 'WorkflowState 5 态', miro: '(position 隐式)', msproject: '(CPM 派生)', agent: 'Quest.status 4 态' },
+      { field: 'assignee', shared: 'Option<String>', jira: 'Issue.assignee', miro: 'Node.created_by', msproject: 'TaskAssignment', agent: 'GameLoop.agent' },
+      { field: 'priority', shared: 'Priority 4 档', jira: 'Issue.priority', miro: '(无)', msproject: '(无)', agent: '(mana 代理)' },
+      { field: 'issue_key', shared: 'Option<String>', jira: 'Issue.key (主键)', miro: 'Node.issue_key', msproject: 'Task.issue_key', agent: 'R9 阶段 2 整合' },
+      { field: 'created_at', shared: 'SystemTime', jira: 'Issue.created_at', miro: '(Cursor 代理)', msproject: '(Schedule 代理)', agent: 'Quest.created_at' }
+    ];
+
+    // ===========================================================
+    // 真实 GameHUD 渲染 (per 真实 frontend GameHUD.tsx)
+    // ===========================================================
+    let game = createGame();
+    function createGame() {
+      return {
+        hp: 100, maxHp: 100, level: 1, xp: 0, xpNext: 100,
+        mana: 1000, maxMana: 1000, coins: 100,
+        alive: true, deaths: 0, perks: {},
+        quest: { status: 'available' }
+      };
+    }
+
+    function renderHUD() {
+      const g = game;
+      // RANK
+      document.getElementById('hud-rank').textContent = `Lv.${g.level}`;
+      // HP Segments (10 段 per 真实 GameHUD)
+      const seg = document.getElementById('hp-segments');
+      seg.innerHTML = '';
+      const total = 10, filled = Math.ceil((g.hp / g.maxHp) * total);
+      for (let i = 0; i < total; i++) {
+        const s = document.createElement('div');
+        s.className = 'hp-segment ' + (i < filled ? 'filled' : 'empty');
+        seg.appendChild(s);
+      }
+      // Coins
+      document.getElementById('hud-coins').textContent = g.coins;
+      // XP
+      const xpPct = Math.min(100, Math.round((g.xp / g.xpNext) * 100));
+      document.getElementById('hud-xp-fill').style.width = xpPct + '%';
+      document.getElementById('hud-xp-value').textContent = `${g.xp}/${g.xpNext}`;
+      // Mana
+      const manaPct = Math.round((g.mana / g.maxMana) * 100);
+      document.getElementById('hud-mana-fill').style.width = manaPct + '%';
+      document.getElementById('hud-mana-value').textContent = g.mana;
+      // 死亡态
+      if (!g.alive) {
+        document.getElementById('hud-row').style.borderColor = 'var(--cel-crimson)';
+        document.getElementById('hud-row').style.boxShadow = '4px 4px 0 0 var(--cel-border), 0 0 12px rgba(255, 24, 76, 0.5)';
+      } else {
+        document.getElementById('hud-row').style.borderColor = 'var(--cel-border)';
+        document.getElementById('hud-row').style.boxShadow = '4px 4px 0 0 var(--cel-border), 0 0 12px rgba(0, 240, 255, 0.2)';
+      }
+    }
+
+    // ===========================================================
+    // 6 维属性 (per R5 阶段 1 §2.2.1)
+    // ===========================================================
+    function renderAttrs() {
+      const g = game;
+      const grid = document.getElementById('attr-grid');
+      grid.innerHTML = `
+        <div class="attr-card">
+          <div class="attr-card-title">❤️ Health <span class="attr-card-value">${g.hp}/${g.maxHp}</span></div>
+          <div class="stat-bar-track"><div class="stat-bar-fill hp" style="width: ${(g.hp / g.maxHp * 100)}%"></div></div>
+        </div>
+        <div class="attr-card">
+          <div class="attr-card-title">💧 Mana <span class="attr-card-value">${g.mana}</span></div>
+          <div class="stat-bar-track"><div class="stat-bar-fill mana" style="width: ${(g.mana / g.maxMana * 100)}%"></div></div>
+        </div>
+        <div class="attr-card">
+          <div class="attr-card-title">⭐ XP <span class="attr-card-value">Lv.${g.level} ${g.xp}/${g.xpNext}</span></div>
+          <div class="stat-bar-track"><div class="stat-bar-fill xp" style="width: ${(g.xp / g.xpNext * 100)}%"></div></div>
+        </div>
+        <div class="attr-card">
+          <div class="attr-card-title">🌳 SkillTree <span class="attr-card-value">T${g.level >= 3 ? 3 : 1}</span></div>
+        </div>
+        <div class="attr-card">
+          <div class="attr-card-title">🎒 Inventory <span class="attr-card-value">${Object.keys(g.perks).length} perks</span></div>
+        </div>
+        <div class="attr-card">
+          <div class="attr-card-title">❄️ Cooldown <span class="attr-card-value">${g.alive ? 'READY' : 'N/A'}</span></div>
+        </div>
+      `;
+    }
+
+    function renderQuest() {
+      const g = game;
+      const badge = document.getElementById('quest-status-badge');
+      const map = { available: 'Available', in_progress: 'In Progress', completed: 'Completed', failed: 'Failed' };
+      badge.textContent = map[g.quest.status] || 'Available';
+      badge.className = 'quest-status ' + g.quest.status;
+    }
+
+    function log(msg, cls = '') {
+      const log = document.getElementById('game-log');
+      const time = new Date().toLocaleTimeString();
+      log.innerHTML = `<div class="log-line ${cls}">[${time}] ${msg}</div>` + log.innerHTML;
+    }
+
+    function checkLevelUp() {
+      while (game.xp >= game.xpNext && game.level < 10) {
+        game.xp -= game.xpNext;
+        game.level += 1;
+        game.xpNext = game.level * 100;
+        game.coins += 5;
+        log(`⬆️ LEVEL UP! Lv.${game.level} (+5 coins, total: ${game.coins})`, 'levelup');
+        return true;
+      }
+      return false;
+    }
+
+    function bindAgentButtons() {
+      document.getElementById('btn-assign').onclick = () => {
+        if (!game.alive) return log('❌ agent 死亡, 需 restart', 'death');
+        if (game.quest.status === 'in_progress') return log('❌ 已有 in-progress quest');
+        if (game.mana < 50) return log('❌ mana 不足 50');
+        game.mana -= 50;
+        game.quest.status = 'in_progress';
+        log('📥 Quest assigned: -50 mana', 'info');
+        renderHUD(); renderAttrs(); renderQuest();
+      };
+
+      document.getElementById('btn-success').onclick = () => {
+        if (game.quest.status !== 'in_progress') return log('❌ 无 in-progress quest');
+        game.quest.status = 'completed';
+        game.xp += 200;
+        log('✅ Quest complete: +200 XP', 'info');
+        checkLevelUp();
+        renderHUD(); renderAttrs(); renderQuest();
+      };
+
+      document.getElementById('btn-fail').onclick = () => {
+        if (game.quest.status !== 'in_progress') return log('❌ 无 in-progress quest');
+        game.quest.status = 'failed';
+        game.hp = Math.max(0, game.hp - 30);
+        if (game.hp === 0) {
+          game.alive = false;
+          game.deaths += 1;
+          log('💀 AGENT DIED! HP=0', 'death');
+        } else {
+          log('❌ Quest failed: -30 HP', 'death');
+        }
+        renderHUD(); renderAttrs(); renderQuest();
+      };
+
+      document.getElementById('btn-restart').onclick = () => {
+        game.alive = true;
+        game.hp = game.maxHp;
+        game.quest.status = 'available';
+        log('🔄 Agent restarted (Lv 1)', 'info');
+        renderHUD(); renderAttrs(); renderQuest();
+      };
+    }
+
+    // Perk 点击 (5 选 1)
+    document.querySelectorAll('.perk-card').forEach(c => {
+      c.onclick = () => {
+        const id = c.dataset.perk;
+        game.perks[id] = (game.perks[id] || 0) + 1;
+        log(`✨ Picked perk: ${id} (count: ${game.perks[id]})`, 'levelup');
+        renderAttrs();
+      };
+    });
+
+    // ===========================================================
+    // 渲染函数
+    // ===========================================================
+    function renderCommits() {
+      const list = document.getElementById('commit-list');
+      list.innerHTML = commitData.map((c, i) => `
+        <div class="commit" onclick="showCommit(${i})">
+          <div class="commit-icon ${c.status}">${c.short}</div>
+          <div class="commit-content">
+            <div class="c-title">${c.title}</div>
+            <div class="c-meta">${c.hash} ${c.status === 'gold' ? '· 🟢 MILESTONE' : ''}</div>
+          </div>
+          <div class="commit-badge ${c.status}">${c.status === 'gold' ? 'MILESTONE' : '✓'}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderSignOff() {
+      document.getElementById('signoff-grid').innerHTML = leads.map(l => `
+        <div class="signoff-card signed">
+          <div class="signoff-icon">${l.icon}</div>
+          <div class="signoff-title">${l.id}</div>
+          <div class="signoff-name">${l.name}</div>
+          <div class="signoff-status">✓ Mavis 永久代签</div>
+        </div>
+      `).join('');
+      document.getElementById('real-name-list').innerHTML = leads.map(l => `
+        <div class="guardian-card">
+          <div class="guardian-id">${l.id}</div>
+          <div class="guardian-name">${l.name}</div>
+          <div class="guardian-status">📋 ${l.role}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderMilestones() {
+      document.getElementById('milestone-grid').innerHTML = milestones.map(m => `
+        <div class="milestone-card ${m.green ? 'green' : ''}">
+          <div class="m-id">MILESTONE ${m.id}</div>
+          <div class="milestone-name">${m.name}</div>
+          <div class="milestone-target">🎯 ${m.target} (${m.ratio})</div>
+          <div class="milestone-progress">📦 <code>${m.crate}</code> · 5 bench + 5 measurement</div>
+        </div>
+      `).join('');
+    }
+
+    function renderGuardians() {
+      document.getElementById('guardian-grid').innerHTML = guardians.map(g => `
+        <div class="guardian-card">
+          <div class="guardian-id">${g.id}</div>
+          <div class="guardian-name">${g.name}</div>
+          <div class="guardian-status">🟢 ${g.status}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderSchema() {
+      document.getElementById('schema-tbody').innerHTML = schemaFields.map(f => `
+        <tr>
+          <td style="padding: 0.4rem; border: 1px solid var(--cel-border); color: var(--cel-cyan); font-family: monospace;">${f.field}</td>
+          <td style="padding: 0.4rem; border: 1px solid var(--cel-border); font-weight: 700;">${f.shared}</td>
+          <td style="padding: 0.4rem; border: 1px solid var(--cel-border);">${f.jira}</td>
+          <td style="padding: 0.4rem; border: 1px solid var(--cel-border);">${f.miro}</td>
+          <td style="padding: 0.4rem; border: 1px solid var(--cel-border);">${f.msproject}</td>
+          <td style="padding: 0.4rem; border: 1px solid var(--cel-border);">${f.agent}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ===========================================================
+    // Tab 切换
+    // ===========================================================
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.onclick = (e) => {
+        e.preventDefault();
+        const target = tab.dataset.tab;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('panel-' + target).classList.add('active');
+      };
+    });
+
+    // ===========================================================
+    // Modal
+    // ===========================================================
+    function showCommit(idx) {
+      const c = commitData[idx];
+      document.getElementById('modal-body').innerHTML = `
+        <h3>${c.short} — ${c.title}</h3>
+        <p><strong>Commit Hash:</strong> <code style="color: var(--cel-cyan);">${c.hash}</code></p>
+        <p><strong>Status:</strong> ${c.status === 'gold' ? '🟢 MILESTONE' : '✓ Landed'}</p>
+        <p><strong>Per plan-032 v0.2 §12.1</strong></p>
+        <p style="margin-top: 0.5rem;">点击外部关闭</p>
+      `;
+      document.getElementById('modal-overlay').classList.add('active');
+    }
+    document.getElementById('modal-overlay').onclick = (e) => {
+      if (e.target.id === 'modal-overlay') e.target.classList.remove('active');
+    };
+
+    // ===========================================================
+    // Feedback (localStorage)
+    // ===========================================================
+    let feedbacks = JSON.parse(localStorage.getItem('star_demo_feedbacks') || '[]');
+
+    function renderFeedbacks() {
+      const list = document.getElementById('feedback-list');
+      if (feedbacks.length === 0) {
+        list.innerHTML = '<p style="color: var(--cel-text-mute); font-size: 0.7rem;">暂无反馈</p>';
+        return;
+      }
+      list.innerHTML = feedbacks.map((f, i) => `
+        <div class="feedback-item">
+          <div class="feedback-meta">${f.time} · ${f.type} · ${f.title}</div>
+          <div style="font-size: 0.75rem; color: var(--cel-text-primary);">${f.content}</div>
+          <button class="btn" style="margin-top: 0.3rem; font-size: 0.6rem;" onclick="deleteFb(${i})">🗑️</button>
+        </div>
+      `).join('');
+    }
+
+    function deleteFb(i) {
+      feedbacks.splice(i, 1);
+      localStorage.setItem('star_demo_feedbacks', JSON.stringify(feedbacks));
+      renderFeedbacks();
+    }
+
+    document.getElementById('feedback-form').onsubmit = (e) => {
+      e.preventDefault();
+      feedbacks.unshift({
+        time: new Date().toLocaleString('zh-CN'),
+        type: document.getElementById('feedback-type').value,
+        title: document.getElementById('feedback-title').value,
+        content: document.getElementById('feedback-content').value
+      });
+      localStorage.setItem('star_demo_feedbacks', JSON.stringify(feedbacks));
+      renderFeedbacks();
+      e.target.reset();
+      log('✅ 反馈已提交 (本地存储)', 'info');
+    };
+
+    // ===========================================================
+    // 初始化
+    // ===========================================================
+    renderCommits();
+    renderSignOff();
+    renderAgent();
+    renderMilestones();
+    renderGuardians();
+    renderSchema();
+    renderFeedbacks();
+    function renderAgent() {
+      renderHUD();
+      renderAttrs();
+      renderQuest();
+      bindAgentButtons();
+    }
+  </script>
+</body>
+</html>
