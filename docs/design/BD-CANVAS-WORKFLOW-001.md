@@ -1,8 +1,8 @@
 # BD-CANVAS-WORKFLOW-001
 
-> **无限画布 — 自动化流程域 (Automation Flow Domain) 基本設計書 v1.0.1** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
+> **无限画布 — 自动化流程域 (Automation Flow Domain) 基本設計書 v1.0.2** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
-> - 状态: 🟡 Draft v1.0.1 (2026-09-13 初版落档; Ulysses（业务 owner）角色已由 Say世意（D-Boy）确认签字, 其余 4 角色待 §11 签字栏拍板)
+> - 状态: 🟢 v1.0.2 — **已签字** (2026-09-13 初版落档; §11 全部 5 角色已由项目所有者 Say世意（D-Boy）本人确认签字, 非代签; §9.3 TBD 追踪矩阵 35 项仍待详细设计阶段逐项拍板, 不因签字栏完成而自动裁决)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 上位要件: [`docs/requirements/SRS-CANVAS-WORKFLOW-001.md`](../requirements/SRS-CANVAS-WORKFLOW-001.md) **v1.1** (54 项 FR = W1-W13 42 项 v1.0 + W14-W15 12 项 v1.1 新增, 34 用户故事, 8 张新增/扩展表)
 > - **重要溯源说明 (per 守门 #1 禁回溯叙事)**: SRS v1.1 于 2026-09-12 在分支 `agent/sonnet/ulys-15` (issue ULYS-15) 落档, **未合并至 `main`, 未推送远端**。本 BD 所在分支 `agent/sonnet/ulys-28` 通过 `git merge agent/sonnet/ulys-15` (commit `8023a34`) 从同一本地仓库 (`D:\Star`) 引入该版本, 而非从 `main` 读取 — `main`/其他 worktree 此时仍只有 v1.0 (42 项 FR)。后续任何读者若在别处只看到 v1.0, 请先确认所在分支是否已合并 `agent/sonnet/ulys-15`, 避免重复此前子代理 (GPT5.6terra) 曾发生的"按 v1.0 误判本文档不合规"问题。
@@ -889,12 +889,12 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 | 角色 | 姓名/代签 | 状态 | 日期 |
 |---|---|---|---|
 | Ulysses (业务 owner) | Say世意（D-Boy） | 已确认 | 2026-09-13 |
-| 5 域 Lead（跨域） | — | 待拍板 | — |
-| PM | — | 待拍板 | — |
-| SRE | — | 待拍板 | — |
-| Dev Lead | — | 待拍板 | — |
+| 5 域 Lead（跨域） | Say世意（D-Boy） | 已确认 | 2026-09-13 |
+| PM | Say世意（D-Boy） | 已确认 | 2026-09-13 |
+| SRE | Say世意（D-Boy） | 已确认 | 2026-09-13 |
+| Dev Lead | Say世意（D-Boy） | 已确认 | 2026-09-13 |
 
-**本文档为 ULYS-28 issue 委托的设计文档交付物, 由 agent Sonnet 撰写。Ulysses（业务 owner）角色已由 Say世意（D-Boy）本人确认签字（2026-09-13）, 其余 4 角色尚未拍板, 状态为 Draft, 供审阅与后续拍板使用。§9.3 TBD 追踪矩阵中的全部 35 项在正式拍板前均视为未决, 不因 Ulysses 一角色签字而自动生效。**
+**本文档为 ULYS-28 issue 委托的设计文档交付物, 由 agent Sonnet 撰写。5 个角色（Ulysses/5 域 Lead/PM/SRE/Dev Lead）均已由项目所有者 Say世意（D-Boy）本人确认签字（2026-09-13，非代签）, 状态由 Draft 转为已签字。§9.3 TBD 追踪矩阵中的全部 35 项为设计层面的候选方案标注, 不因签字栏完成而自动裁决, 仍需在详细设计阶段逐项拍板。**
 
 ## §12 修订履历 (Revision History)
 
@@ -902,6 +902,7 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 |---|---|---|---|
 | v1.0 | 2026-09-13 | 初版交付, 覆盖 SRS-CANVAS-WORKFLOW-001 v1.1 全部 54 项 FR (W1-W15), §0-§12 + 附录完整章节结构, 8 张表 W/T/M=5/3/0, 8 个 REST API, 35 项 TBD 追踪矩阵 | Sonnet (agent) |
 | v1.0.1 | 2026-09-13 | §11 签字栏: Ulysses（业务 owner）角色由 Say世意（D-Boy）本人确认签字, 其余 4 角色（5 域 Lead/PM/SRE/Dev Lead）仍待拍板; 未改动正文其他章节 | Sonnet (agent), per D-Boy 确认 |
+| v1.0.2 | 2026-09-13 | §11 签字栏: 剩余 4 角色（5 域 Lead/PM/SRE/Dev Lead）由 Say世意（D-Boy）本人确认签字, 签字日期统一 2026-09-13, 非代签; 5 角色全部签字完成; 未改动正文其他章节, §9.3 TBD 矩阵 35 项状态不变（仍待详细设计阶段逐项拍板） | Sonnet (agent), per D-Boy 确认 |
 
 ## 附录
 
