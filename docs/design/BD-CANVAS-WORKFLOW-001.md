@@ -806,3 +806,91 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 
 - `execution_history`/`execution_step` 记录执行输入/输出, 若节点涉及敏感字段（如 WorkItem 中的隐私数据）, 是否需要脱敏存储 — **【TBD, Design Doc, 见 §4.5 同一缺口】**。
 - Secret/密钥管理（如未来 webhook HMAC 密钥的存储与轮换）复用总册既有密钥管理机制, 本 BD 不新建独立密钥库。
+
+## §9 守门合规 (Guard Compliance) + TBD 追踪矩阵
+
+### 9.1 守门 #13 W/T/M 三分类声明
+
+已在 §4.1 声明: Master 5 张 / Transaction 3 张 / **Work 0 张**。
+
+**Work 类 0 张理由**: SRS 对本域 8 张表均未提出"临时性、会话级、需 TTL 自动清理"的业务需求 — Flow 定义类表（Master）需长期保留并支持版本回溯, Execution 类表（Transaction）需长期保留供审计, `chat_session`（v1.1 新增）虽是会话级数据但 SRS 未要求自动过期清理机制（仅要求关联 `actor_session_id`), 故暂归入 Transaction 而非 Work。若后续确认 `chat_session` 需要 TTL 自动清理策略, 则应重新分类为 Work — **本项分类前提标记【TBD, Design Doc 确认 `chat_session` 保留策略后可能改变本分类】**。
+
+### 9.2 守门 #13a L1↔L1 通信禁止派生约束
+
+`chat-bar` 模块 (W15) 不直接调用 L1 Agent, 经由既有 `/api/tmo/*` (ADR-0046) L0/TMO 编排层转发, 见 §6.4。
+
+### 9.3 TBD 追踪矩阵 (全量汇总, 按来源分类)
+
+> 本表汇总本 BD 全文出现的所有【TBD】/【安全确认必要】标记, 以及 SRS §10 已知风险 #1-#11 的继承状态。任何一项在本 BD 中均未被擅自假设或裁决。
+
+| # | 来源 | 内容 | 影响 | 归属阶段 |
+|---|---|---|---|---|
+| T-01 | SRS 风险#1 | Flow 编辑器复用主画布 viewport 还是独立子画布 (FR-W1.3) | 影响 W1-W10 全部 UI 实装路径, 本 BD §3 画面设计按"独立子画布"假设草拟, 待拍板后可能需重画 SCR-WF-01~06 | Design Doc 阶段拍板 |
+| T-02 | SRS 风险#2 | 后端真实持久化引擎缺失, v1 为前端 mock | Execution 无法跨会话可靠恢复, 真实生产使用前必须补齐; 本 BD §4 DDL 按"真实后端"设计, 但落地时序取决于此风险解决时间点 | P0 阻塞项, 需真实后端设计 |
+| T-03 | SRS 风险#3 | "从失败节点重跑"(API-WF-04) 对非幂等动作 (`create_worktree`) 的安全性未澄清 | 可能导致重复创建 worktree | Design Doc 评估幂等性标记机制 |
+| T-04 | SRS 风险#4 | 两个 Flow 标签表达式重叠命中同一标签组合 | 用户可能得到 2 张语义重复的任务卡 | v1 不做去重, P1 观察后决定 |
+| T-05 | SRS 风险#5 | detached 状态 (FR-W12.3) 是否需要 Lead 人工确认交互 | 影响 5 域 Lead 实际处理体验 | v1 只读角标提示, 待真人反馈细化 |
+| T-06 | SRS 风险#6 | A12 多人协同编辑 CRDT 选型未拍板 | 若 Flow 编辑器需多人协同则依赖此项 | 依赖外部 `SRS-CANVAS-AGENT-001`, 本 BD 不重复设计 |
+| T-07 | SRS 风险#7 | 总册 `SRS-CANVAS-001` 尚未正式收录本专题为"三核心" | 总册措辞仍以"双核心"为主 | 本次 wrap-up 仅做最小索引同步（见 §附录/wrap-up 说明), 完整总册改写留后续 |
+| T-08 | SRS 风险#8 (v1.1) | W15.2/15.3 v1 均为 mock 规则化实现, 与用户对"LangGraph 智能控制"预期可能有落差 | 真实使用体验可能不及预期 | v1 交付 mock 版本, 真实 LLM 接入时间点待 P2 拍板 |
+| T-09 | SRS 风险#9 (v1.1) | `routing_mode="dynamic_agent"` 决策可复现性/确定性未澄清 | 影响 e2e 测试稳定性与执行历史可审计性 | Design Doc 阶段明确是否要求确定性 mock |
+| T-10 | SRS 风险#10 (v1.1) | AAA/spec/superpowers 3 套默认模板节点清单为 agent 合理推断, 未经真人逐节点确认 | 实际落地节点清单可能需调整 | §11 签字栏标记 Draft, 评审时逐节点确认 |
+| T-11 | SRS 风险#11 (v1.1) | spec 模板"评审不通过"回指边循环不做自动死循环检测 | 用户可能手动搭建出无法退出的循环, 消耗执行资源 | v1 依赖节点级重试上限, Flow 级最大循环次数硬限制留 P2 评估 |
+| T-12 | 本 BD §4.5 | 是否需要独立于 `automation_flow_versions` 的专属审计表 | 影响审计数据模型是否需要扩展 | Design Doc |
+| T-13 | 本 BD §5.2 | API-WF-03 超时秒数无总册统一数值可引用 | 影响客户端超时/重试策略实装 | 待总册 §5.6 数值统一确认 |
+| T-14 | 本 BD §5.2 | Webhook 请求体大小上限未定义 | 影响 API-WF-05 输入校验实装 | Design Doc 结合总册请求体上限确认 |
+| T-15 | 本 BD §5.2/§8.2 | Webhook 签名/token 轮换策略缺失（仅静态 token 比对） | 安全评审前不建议接入外部生产系统 | 安全评审阶段, 见 §8.2 |
+| T-16 | 本 BD §5.3 | Execution 节点级状态是否需要秒级实时刷新（而非轮询） | 影响是否需要扩展既有 WebSocket 事件类型 | Design Doc |
+| T-17 | 本 BD §7 | NFR-WF-02/03/04/06/09 具体量化数值（调度延迟/节点数上限/保留周期/重试默认值/告警规则） | 影响容量规划与运维实装 | Design Doc, 需产品/SRE 协同拍板 |
+| T-18 | 本 BD §8.4 | `{{node.<id>.output.<field>}}` 映射解析器是否严格限定同 Execution 上下文取值 | 若无严格限定, 存在跨 Flow/跨租户越权读取风险 | 【安全确认必要】, Design Doc + 单元测试证据 |
+| T-19 | 本 BD §8.4 | Webhook 外部输入 body 透传下游节点的二次注入防护规则 | 若节点动作含通知发送等场景, 可能产生二次注入 | 【安全确认必要】, Design Doc |
+| T-20 | 本 BD §8.5 | Execution 记录中敏感字段是否需脱敏存储 | 影响审计数据的隐私合规性 | Design Doc |
+| T-21 | 本 BD §9.1 | `chat_session` 是否需要 TTL 自动清理, 影响 W/T/M 分类是否需从 Transaction 改判 Work | 影响 §4.1 分类结论的稳定性 | Design Doc 确认后可能需修订本 BD §4.1 |
+
+## §10 追溯矩阵 (Traceability Matrix)
+
+> 覆盖全部 54 项 FR (W1-W15), 而非仅 v1.1 新增 12 项。Design/Test 列为本 BD 交付时点的映射, Test Case ID 留待测试设计阶段（`ipa-test-case` skill）编写后回填。
+
+| FR 组 | FR 数 | 对应设计章节 | 对应表/API/画面 | Test Case (待补) |
+|---|---|---|---|---|
+| W1 节点类型体系 | 4 | §2.1, §3.2(SCR-WF-01), §4.2(`flow_node`) | `flow_node`, SCR-WF-01 | 【TBD, 测试设计阶段】 |
+| W2 触发节点 | 4 | §3.2(SCR-WF-02), §5.1(API-WF-05) | `flow_node`(kind=trigger), API-WF-05 webhook | 【TBD】 |
+| W3 动作节点 | 3 | §3.2, §5.4(module 联动) | `flow_node`(kind=action) | 【TBD】 |
+| W4 分支与条件 | 3 | §6.3.1, §8.4(CEL) | `flow_edge`(condition_expr) | 【TBD】 |
+| W5 循环与批处理 | 2 | §9.3(T-11 循环风险) | `flow_node`(kind=loop) | 【TBD】 |
+| W6 变量与表达式传递 | 3 | §8.4(数据映射语法) | `flow_edge`(data_mapping) | 【TBD】 |
+| W7 子流程与复用 | 2 | §4.2(`automation_flow`自引用) | `automation_flow` | 【TBD】 |
+| W8 错误处理与重试 | 3 | §6.3.2, §7(NFR-WF-06) | `execution_step`(retry_policy) | 【TBD】 |
+| W9 执行历史与调试 | 3 | §5.1(API-WF-03), §3.2(SCR-WF-04) | `execution_history`, SCR-WF-04 | 【TBD】 |
+| W10 激活状态与版本管理 | 3 | §6.3.1, §4.2(`automation_flow_versions` SCD2) | `automation_flow_versions` | 【TBD】 |
+| W11 标签绑定任务卡 | 5 | §6.3.3, §4.3(WorkItem 扩展) | `flow_node`(tag_binding_expr), WorkItem | 【TBD】 |
+| W12 Backlog/Sprint 联动 | 5 | §6.3.3(BR-W-3 三分支) | WorkItem 状态字段 | 【TBD】 |
+| W13 数据一致性 | 2 | §6.2 | 跨表一致性校验逻辑 | 【TBD】 |
+| W14 默认工作流模板库 (v1.1) | 7 | §3.2, §4.2(`flow_template`), §5.1(API-WF-06/07) | `flow_template`, SCR-WF-05 | 【TBD】 |
+| W15 智能控制+聊天栏 (v1.1) | 5 | §4.2(`chat_session`), §5.1(API-WF-08), §3.2(SCR-WF-06), §6.4 | `chat_session`, SCR-WF-06 | 【TBD】 |
+| **合计** | **54** | — | — | — |
+
+## §11 签字栏 (Signature Block)
+
+| 角色 | 姓名/代签 | 状态 | 日期 |
+|---|---|---|---|
+| Ulysses (业务 owner) | — | 待拍板 | — |
+| 5 域 Lead（跨域） | — | 待拍板 | — |
+| PM | — | 待拍板 | — |
+| SRE | — | 待拍板 | — |
+| Dev Lead | — | 待拍板 | — |
+
+**本文档为 ULYS-28 issue 委托的设计文档交付物, 由 agent Sonnet 撰写, 尚未经过上述 5 角色正式拍板, 状态为 Draft, 供审阅与后续拍板使用。§9.3 TBD 追踪矩阵中的全部 21 项在正式拍板前均视为未决。**
+
+## §12 修订履历 (Revision History)
+
+| 版本 | 日期 | 变更摘要 | 作者 |
+|---|---|---|---|
+| v1.0 | 2026-09-13 | 初版交付, 覆盖 SRS-CANVAS-WORKFLOW-001 v1.1 全部 54 项 FR (W1-W15), §0-§12 + 附录完整章节结构, 8 张表 W/T/M=5/3/0, 8 个 REST API, 21 项 TBD 追踪矩阵 | Sonnet (agent) |
+
+## 附录
+
+- 附录 A：本文档所引用的上位文档 —— `docs/requirements/SRS-CANVAS-WORKFLOW-001.md` (v1.1, 分支 `agent/sonnet/ulys-15` 合并入本分支, 详见交付说明)。
+- 附录 B：本文档所引用的同级文档 —— `docs/design/BD-CANVAS-AGENT-001.md`（5-tier 架构/5-View 体系/WebSocket 通道均直接复用其既定设计, 本 BD 不重复定义）、`docs/design/BD-CANVAS-GAMIFY-001.md`（章节结构参照）。
+- 附录 C：本文档所引用的总册文档 —— `docs/design/BD-CANVAS-001.md`（§1.1.4 模块 view 索引, 本次已同步新增交叉引用, 见交付说明）。
+- 附录 D：与本 BD 配套的测试设计文档 —— 【TBD, 尚未创建, 建议依据 §10 追溯矩阵与 `ipa-test-case` skill 后续产出】。
