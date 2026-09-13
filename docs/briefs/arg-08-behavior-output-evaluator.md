@@ -4,10 +4,10 @@
 > **WT**: `wt-arg-08-behavior-output-evaluator` (branch: `wt-arg-08-behavior-output-evaluator`, base: main @ 1596f97 含 ARG.1-7 merge)
 > **触发**: 2026-09-10 10:15 JST 用户发令"继续派" (per ARG.7 merge + 父会话自驱继续)
 > **依赖**: 
->   - ARG.1 (`crates/arg`) 已 merge @ `651117e`
->   - ARG.2 (`crates/arg-bridge`) 已 merge @ `87e1618`
->   - ARG.3 (`crates/arg-effect` 8 拓扑成就 Cypher 模板已落) 已 merge @ `f1207e2`
->   - ARG.7 (10 IT + 8 E2E + 4 PT 端到端测试套件) 已 merge @ `a8ed5d0`
+> - ARG.1 (`crates/arg`) 已 merge @ `651117e`
+> - ARG.2 (`crates/arg-bridge`) 已 merge @ `87e1618`
+> - ARG.3 (`crates/arg-effect` 8 拓扑成就 Cypher 模板已落) 已 merge @ `f1207e2`
+> - ARG.7 (10 IT + 8 E2E + 4 PT 端到端测试套件) 已 merge @ `a8ed5d0`
 > **拍板来源**: per WBS-001 v0.57 §14.11 ARG.8 (2M tokens / 0.3 周) + v0.50 跨 session 续做规划 (估 4-6M / 3-5 session)
 > **守门合规**: #1 v15 (第 50 次新事件) + #1 v19 ([M] 必先 `scripts/automation/arg_behavior_eval.py`) + #1 v25 + #3 + #5 + #6 + #7 + #9 + #10 + #12 + #13 + #14 v3 + #19 v19
 

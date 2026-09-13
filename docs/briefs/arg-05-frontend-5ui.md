@@ -4,10 +4,10 @@
 > **WT**: `wt-arg-05-frontend` (branch: `wt-arg-05-frontend`, base: main @ f1207e2 含 ARG.1+ARG.2+ARG.3+ARG.4 merge)
 > **触发**: 2026-09-10 07:46 JST 用户发令"按顺序推进" + ARG.3 merge 走守门后父会话自驱
 > **依赖**: 
->   - ARG.1 (`crates/arg`) 已 merge @ `651117e`
->   - ARG.2 (`crates/arg-bridge`) 已 merge @ `87e1618`
->   - ARG.3 (`crates/arg-effect`) 已 merge @ `f1207e2` ← 刚 merge
->   - ARG.4 (`crates/api/src/arg`) 已 merge @ `1d894ab` (提供 14 routes 13 REST + 1 WS API)
+> - ARG.1 (`crates/arg`) 已 merge @ `651117e`
+> - ARG.2 (`crates/arg-bridge`) 已 merge @ `87e1618`
+> - ARG.3 (`crates/arg-effect`) 已 merge @ `f1207e2` ← 刚 merge
+> - ARG.4 (`crates/api/src/arg`) 已 merge @ `1d894ab` (提供 14 routes 13 REST + 1 WS API)
 > **拍板来源**: per WBS-001 v0.50 §14.11 ARG.5 (3M tokens / 0.5 周) + v0.50 跨 session 续做规划 (估 4-6M / 3-5 session)
 > **守门合规**: #1 v15 (第 46 次新事件) + #1 v19 ([M] 必先 `scripts/automation/arg_ui_test.py`) + #1 v25 + #3 + #5 + #6 + #7 + #9 + #10 + #12 + #13 + #14 v3 + #19 v19
 
