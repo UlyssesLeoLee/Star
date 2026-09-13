@@ -9,7 +9,7 @@
 > - 状态: 🟡 Draft v0.1
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 关联需求: [`docs/requirements/SRS-CANVAS-001.md`](../requirements/SRS-CANVAS-001.md) v1.1 (58KB, 18:00 JST root 写, 双核心 78 项索引, 13 跨拍板派生, 13 风险, 守门 16 交叉引用)
-> - 关联专题 BD (派生): [`docs/design/BD-CANVAS-AGENT-001.md`](./BD-CANVAS-AGENT-001.md) v0.1 (A1-A12 46 项, 18:00 JST 子代理 1 写) + [`docs/design/BD-CANVAS-GAMIFY-001.md`](./BD-CANVAS-GAMIFY-001.md) v0.1 (G1-G12 32 项, 18:00 JST 子代理 2 写)
+> - 关联专题 BD (派生): [`docs/design/BD-CANVAS-AGENT-001.md`](./BD-CANVAS-AGENT-001.md) v0.1 (A1-A12 46 项, 18:00 JST 子代理 1 写) + [`docs/design/BD-CANVAS-GAMIFY-001.md`](./BD-CANVAS-GAMIFY-001.md) v0.1 (G1-G12 32 项, 18:00 JST 子代理 2 写) + [`docs/design/BD-CANVAS-WORKFLOW-001.md`](./BD-CANVAS-WORKFLOW-001.md) v1.0 (W1-W15 54 项 FR, 2026-09-13 ULYS-28 交付, 索引同步仅补此行 + 下方 §1.1.4 模块 view, 不改本文件 §1.1.2/§4 汇总计数与"双核心 78 项"表述, 详见该 BD §附录 C)
 > - 关联 V0.1: [`docs/frontend-canvas-design.md`](../frontend-canvas-design.md) v0.1 (14 element + 4 frame + 8 connector + 9 e2e 守门)
 > - 关联 V0.1 实装: [`frontend/src/components/CanvasView.tsx`](../frontend/src/components/CanvasView.tsx) (V0.1 11 处 element 渲染 + tool + minimap)
 > - 关联平行 view (派生自 SRS): [`docs/requirements/SRS-AGENT-RELATIONSHIP-001.md`](../requirements/SRS-AGENT-RELATIONSHIP-001.md) v0.1 (ARG, 37KB) + [`docs/design/BD-AGENT-RELATIONSHIP-001.md`](./BD-AGENT-RELATIONSHIP-001.md) v0.1 (55KB, A11 派生源) + [`docs/requirements/SRS-AGENT-VIEW-001.md`](../requirements/SRS-AGENT-VIEW-001.md) v1.0 (31KB) + [`docs/design/BD-AGENT-VIEW-001.md`](./BD-AGENT-VIEW-001.md) v0.1 (44KB)
@@ -119,6 +119,7 @@
 | `docs/design/BD-CANVAS-001.md` (本文件) | 总册 BD 跨域 | v0.1 (本批 root 写) |
 | `docs/design/BD-CANVAS-AGENT-001.md` | 专题 BD agent 管理 46 项 | v0.1 (本批 子代理 1 写) |
 | `docs/design/BD-CANVAS-GAMIFY-001.md` | 专题 BD 游戏化 32 项 | v0.1 (本批 子代理 2 写) |
+| `docs/design/BD-CANVAS-WORKFLOW-001.md` | 专题 BD 工作流编排 (W1-W15 54 项 FR) | v1.0 (2026-09-13 ULYS-28 交付) |
 | `docs/frontend-canvas-design.md` | V0.1 画布 design 基线 | v0.1 (V0.1 已落档) |
 | `crates/arg/` (A11 派生, 6 module) | ARG 数据 + 5-tier 架构 | v0.1 (9/8 已落档) |
 | `crates/arg-bridge/` (A11 派生) | Memgraph ↔ LangGraph 同步桥 | v0.1 (9/8 已落档) |
