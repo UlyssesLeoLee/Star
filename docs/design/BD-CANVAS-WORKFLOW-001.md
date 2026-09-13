@@ -854,8 +854,8 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 | FR 组 | FR 数 | 对应设计章节 | 对应表/API/画面 | Test Case (待补) |
 |---|---|---|---|---|
 | W1 节点类型体系 | 4 | §2.1, §3.2(SCR-WF-01), §4.2(`flow_node`) | `flow_node`, SCR-WF-01 | 【TBD, 测试设计阶段】 |
-| W2 触发节点 | 4 | §3.2(SCR-WF-02), §5.1(API-WF-05) | `flow_node`(kind=trigger), API-WF-05 webhook | 【TBD】 |
-| W3 动作节点 | 3 | §3.2, §5.4(module 联动) | `flow_node`(kind=action) | 【TBD】 |
+| W2 触发节点 | 4 | §3.2(SCR-WF-06 节点配置侧栏), §5.1(API-WF-05) | `flow_node`(kind=trigger), API-WF-05 webhook | 【TBD】 |
+| W3 动作节点 | 3 | §3.2(SCR-WF-06 节点配置侧栏), §5.4(module 联动) | `flow_node`(kind=action) | 【TBD】 |
 | W4 分支与条件 | 3 | §6.3.1, §8.4(CEL) | `flow_edge`(condition_expr) | 【TBD】 |
 | W5 循环与批处理 | 2 | §9.3(T-11 循环风险) | `flow_node`(kind=loop) | 【TBD】 |
 | W6 变量与表达式传递 | 3 | §8.4(数据映射语法) | `flow_edge`(data_mapping) | 【TBD】 |
@@ -863,11 +863,11 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 | W8 错误处理与重试 | 3 | §6.3.2, §7(NFR-WF-06) | `execution_step`(retry_policy) | 【TBD】 |
 | W9 执行历史与调试 | 3 | §5.1(API-WF-03), §3.2(SCR-WF-04) | `execution_history`, SCR-WF-04 | 【TBD】 |
 | W10 激活状态与版本管理 | 3 | §6.3.1, §4.2(`automation_flow_versions` SCD2) | `automation_flow_versions` | 【TBD】 |
-| W11 标签绑定任务卡 | 5 | §6.3.3, §4.3(WorkItem 扩展) | `flow_node`(tag_binding_expr), WorkItem | 【TBD】 |
-| W12 Backlog/Sprint 联动 | 5 | §6.3.3(BR-W-3 三分支) | WorkItem 状态字段 | 【TBD】 |
+| W11 标签绑定任务卡 | 5 | §6.3.3, §3.2(SCR-WF-05 Flow Tags 管理面板), §4.3(WorkItem 扩展) | `flow_node`(tag_binding_expr), WorkItem, SCR-WF-05 | 【TBD】 |
+| W12 Backlog/Sprint 联动 | 5 | §6.3.3(BR-W-3 三分支), §3.2(SCR-WF-05) | WorkItem 状态字段, SCR-WF-05 | 【TBD】 |
 | W13 数据一致性 | 2 | §6.2 | 跨表一致性校验逻辑 | 【TBD】 |
-| W14 默认工作流模板库 (v1.1) | 7 | §3.2, §4.2(`flow_template`), §5.1(API-WF-06/07) | `flow_template`, SCR-WF-05 | 【TBD】 |
-| W15 智能控制+聊天栏 (v1.1) | 5 | §4.2(`chat_session`), §5.1(API-WF-08), §3.2(SCR-WF-06), §6.4 | `chat_session`, SCR-WF-06 | 【TBD】 |
+| W14 默认工作流模板库 (v1.1) | 7 | §3.2(SCR-WF-02 模板选择器), §4.2(`flow_template`), §5.1(API-WF-06/07) | `flow_template`, SCR-WF-02 | 【TBD】 |
+| W15 智能控制+聊天栏 (v1.1) | 5 | §4.2(`chat_session`), §5.1(API-WF-08), §3.2(SCR-WF-03 底部聊天栏), §6.4 | `chat_session`, SCR-WF-03 | 【TBD】 |
 | **合计** | **54** | — | — | — |
 
 ## §11 签字栏 (Signature Block)
