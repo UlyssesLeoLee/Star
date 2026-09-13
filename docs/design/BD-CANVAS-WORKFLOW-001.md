@@ -1,8 +1,8 @@
 # BD-CANVAS-WORKFLOW-001
 
-> **无限画布 — 自动化流程域 (Automation Flow Domain) 基本設計書 v1.0.2** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
+> **无限画布 — 自动化流程域 (Automation Flow Domain) 基本設計書 v1.0.3** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
-> - 状态: 🟢 v1.0.2 — **已签字** (2026-09-13 初版落档; §11 全部 5 角色已由项目所有者 Say世意（D-Boy）本人确认签字, 非代签; §9.3 TBD 追踪矩阵 35 项仍待详细设计阶段逐项拍板, 不因签字栏完成而自动裁决)
+> - 状态: 🟢 v1.0.3 — **已签字** (2026-09-13 初版落档; §11 全部 5 角色已由项目所有者 Say世意（D-Boy）本人确认签字, 非代签; 头部"修订人/审批"字段已同步更新, 消除与 §11 的遗留矛盾; §9.3 TBD 追踪矩阵 35 项仍待详细设计阶段逐项拍板, 不因签字栏完成而自动裁决)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 上位要件: [`docs/requirements/SRS-CANVAS-WORKFLOW-001.md`](../requirements/SRS-CANVAS-WORKFLOW-001.md) **v1.1** (54 项 FR = W1-W13 42 项 v1.0 + W14-W15 12 项 v1.1 新增, 34 用户故事, 8 张新增/扩展表)
 > - **重要溯源说明 (per 守门 #1 禁回溯叙事)**: SRS v1.1 于 2026-09-12 在分支 `agent/sonnet/ulys-15` (issue ULYS-15) 落档, **未合并至 `main`, 未推送远端**。本 BD 所在分支 `agent/sonnet/ulys-28` 通过 `git merge agent/sonnet/ulys-15` (commit `8023a34`) 从同一本地仓库 (`D:\Star`) 引入该版本, 而非从 `main` 读取 — `main`/其他 worktree 此时仍只有 v1.0 (42 项 FR)。后续任何读者若在别处只看到 v1.0, 请先确认所在分支是否已合并 `agent/sonnet/ulys-15`, 避免重复此前子代理 (GPT5.6terra) 曾发生的"按 v1.0 误判本文档不合规"问题。
@@ -11,7 +11,7 @@
 > - 关联架构决策: [`docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md`](../architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) (L0/L1 + TMO 架构, `TopAgentState`/`SubAgentState`, `/api/tmo/*` 8 端点, W15 LangGraph 智能控制/聊天栏对接此架构而非另起一套)
 > - 关联 V0.1 实装: `frontend/src/components/CanvasView.tsx` (element 渲染基座) + `frontend/src/lib/store.ts` line 565 (`actor_session_id` L0 聊天栏会话预留点) + `frontend/src/components/CommandBar.tsx` (⌘K 命令面板, 与 W15 底部聊天栏是两个独立组件)
 > - 撰写者: Sonnet (agent, per Multica ULYS-28 assignment)
-> - 修订人/审批: 待 §11 签字栏拍板 (5 角色均 Draft/待拍板状态, 沿用 SRS v1.1 相同签字栏状态)
+> - 修订人/审批: §11 签字栏 5 角色（Ulysses/5 域 Lead/PM/SRE/Dev Lead）均已由项目所有者 Say世意（D-Boy）本人确认签字（2026-09-13，非代签）
 > - 日期: 2026-09-13
 > - 受众: 詳細設計エンジニア / 実装エンジニア / UI/UX 设计师 / アーキテクト / SRE / 5 域 Lead
 > - **dual-use 提醒**: 本 BD 不重复总册 BD (`BD-CANVAS-001.md`) 跨域共享部分, 聚焦 W1-W15 54 项详细设计; 本 BD 亦不裁决 SRS §10 已列的 11 项已知风险与各 FR "已知缺口" — 详见 §9 TBD 追踪矩阵, 一律标注待拍板, 不自行假设
@@ -903,6 +903,7 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 | v1.0 | 2026-09-13 | 初版交付, 覆盖 SRS-CANVAS-WORKFLOW-001 v1.1 全部 54 项 FR (W1-W15), §0-§12 + 附录完整章节结构, 8 张表 W/T/M=5/3/0, 8 个 REST API, 35 项 TBD 追踪矩阵 | Sonnet (agent) |
 | v1.0.1 | 2026-09-13 | §11 签字栏: Ulysses（业务 owner）角色由 Say世意（D-Boy）本人确认签字, 其余 4 角色（5 域 Lead/PM/SRE/Dev Lead）仍待拍板; 未改动正文其他章节 | Sonnet (agent), per D-Boy 确认 |
 | v1.0.2 | 2026-09-13 | §11 签字栏: 剩余 4 角色（5 域 Lead/PM/SRE/Dev Lead）由 Say世意（D-Boy）本人确认签字, 签字日期统一 2026-09-13, 非代签; 5 角色全部签字完成; 未改动正文其他章节, §9.3 TBD 矩阵 35 项状态不变（仍待详细设计阶段逐项拍板） | Sonnet (agent), per D-Boy 确认 |
+| v1.0.3 | 2026-09-13 | 修正头部"修订人/审批"字段遗留文案（原文仍写"5 角色均 Draft/待拍板", 与已完成的 §11 签字栏矛盾）, 更新为与 §11/§12 一致的"5 角色均已确认签字"; 未改动正文其他章节 | Sonnet (agent) |
 
 ## 附录
 
