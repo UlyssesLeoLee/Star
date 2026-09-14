@@ -1,0 +1,53 @@
+# cargo-deny 配置 (新增, 配合 .github/workflows/ci-gate.yml 的 security-audit job)
+#
+# 现状: 本仓库在此文件之前完全没有依赖安全审计 (无 deny.toml/audit.toml,
+# CI 没有 cargo-audit/cargo-deny 步骤, 5 条 dependabot 分支挂着未合并)。
+#
+# 落地策略: advisories (已知 CVE / 已撤回版本) 立即阻断合并;
+# licenses/bans/sources 先跑一轮观察结果, 现阶段为 advisory, 待补齐
+# allow-list 和真实的多版本依赖治理后再收紧为阻断项 (避免第一次跑就
+# 因为几十个 license 误报把 CI 焊死, 重蹈 clippy 从阻断改回 advisory 的覆辙)。
+#
+# 首轮本地实跑结果 (2026-09-12, cargo-deny 0.20.2), 详见 PR 描述:
+#   - advisories: 1 个真实漏洞 (RUSTSEC-2023-0071, rsa 0.9.10, star-api-rest 直接依赖)
+#                 + 2 个 unmaintained (fxhash / instant, 经 sled → star-arg-bridge)
+#   - licenses: agent-domain / canvas-collab 等内部 crate 缺 license 字段;
+#               webpki-roots 带的 CDLA-Permissive-2.0 不在允许清单
+
+[graph]
+targets = []
+all-features = false
+no-default-features = false
+
+[advisories]
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+ignore = []
+
+[licenses]
+version = 2
+confidence-threshold = 0.8
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "CC0-1.0",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Unicode-DFS-2016",
+  "OpenSSL",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "warn"
+deny = []
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

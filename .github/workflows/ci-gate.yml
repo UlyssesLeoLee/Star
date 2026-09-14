@@ -1,0 +1,98 @@
+name: CI Gate (blocking)
+
+# 新增门禁, 不改动 ci.yml (per 仓库 守门 #1 禁回溯叙事 / 0 改已 commit workflow)。
+# ci.yml 现有 job 保留为 informational; 本文件的 3 个 job 是新增的强制门禁,
+# 需在仓库 Settings → Branches → main → Require status checks 里勾选后才会真正阻断合并。
+#
+# 解决的 3 个具体问题 (per 2026-09-12 商品级验收 review):
+#   1) ci.yml 的 cargo test 只跑 `-p star-context --lib`(1/78 crate) → workspace-test 补全仓库覆盖
+#   2) ci.yml 的 cargo clippy 是 advisory (不阻断合并) → clippy-ratchet 阻断新增警告
+#   3) 完全没有依赖安全审计 → security-audit 阻断已知漏洞依赖
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  workspace-test:
+    name: cargo test --workspace (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo test --workspace
+        # 实测 (2026-09-12, 本地): 2338 passed / 0 failed, 217 test 二进制全绿。
+        # 未加 --all-features: 尚未验证全 feature 组合下是否同样通过, 留作后续独立
+        # (非阻断) job, 不在此处一次性引入未经验证的门禁。
+        # -j 4 沿用现有 job 的并行度设置, 仅为与既有配置保持一致 — 不是因为
+        # ubuntu-latest 需要它 (原 ci.yml 里的 "Windows 资源耗尽" 说明是本机
+        # Windows 开发环境的诊断, 与 runs-on: ubuntu-latest 无关, 不构成本 job
+        # 参数的依据)。
+        run: cargo test --workspace -j 4
+
+  clippy-ratchet:
+    name: clippy warning ratchet (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Count clippy warnings (JSON, includes per-target duplicates)
+        id: count
+        run: |
+          cargo clippy --workspace --all-targets -j 4 --message-format=json > clippy-output.json 2>clippy-stderr.log || true
+          CURRENT=$(jq -s '[.[] | select(.reason=="compiler-message" and .message.level=="warning")] | length' clippy-output.json)
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "当前 clippy warning 数 (JSON count, 含跨 target 重复): $CURRENT"
+
+      - name: Compare against baseline (fail if increased)
+        run: |
+          BASELINE=$(cat .github/quality-baseline/clippy-warning-count.txt)
+          CURRENT=${{ steps.count.outputs.current }}
+          echo "baseline=$BASELINE current=$CURRENT"
+          if [ "$CURRENT" -gt "$BASELINE" ]; then
+            echo "::error::clippy warning 数从 $BASELINE 增加到 $CURRENT — 本次改动引入了新警告, 禁止合并。"
+            echo "::error::如果本次改动包含修复既有警告导致数字下降, 请同步把 .github/quality-baseline/clippy-warning-count.txt 改成新的 $CURRENT (只能下调, 不能上调)。"
+            exit 1
+          fi
+          echo "通过: 未增加新警告 (baseline=$BASELINE, current=$CURRENT)。"
+
+      - name: Upload full clippy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clippy-report
+          path: clippy-output.json
+          retention-days: 14
+
+  security-audit:
+    name: cargo-deny advisories (blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cargo-deny check advisories (blocking — 已知漏洞/被撤回版本)
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories
+
+      - name: cargo-deny check bans/licenses/sources (advisory — 首轮跑, 未建立 baseline 前不阻断)
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check bans licenses sources
+        continue-on-error: true
