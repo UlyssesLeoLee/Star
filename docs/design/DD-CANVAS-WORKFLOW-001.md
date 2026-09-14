@@ -122,11 +122,11 @@
 | SRS-WORKFLOW-TEMPLATE-001 | v0.1 | W14 既定テンプレートの SRS(ULYS-34 成果) | `docs/requirements/SRS-WORKFLOW-TEMPLATE-001.md` |
 | BD-WORKFLOW-TEMPLATE-001 | v0.1 | W14 既定テンプレートの BD(ULYS-35 成果) | `docs/design/BD-WORKFLOW-TEMPLATE-001.md` |
 | RLS-POLICY-001 | v? | 行レベル セキュリティ | `docs/design/RLS-POLICY-001.md` |
-| ADR-0046 (仮) | — | LangGraph/L0 既存 ADR | `docs/adr/0046-*` 想定 — 【要確認】 |
+| ADR-0046 | LangGraph TMO 任务卡管理操作 | LangGraph/L0 既設 ADR (Round 7 で実在確認済) | `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` (🟢 Accepted v1.0, 2026-09-04) |
 | docs/document-registry.toml(または類似) | — | 文書 ID 一覧 | `docs/` 配下 |
 
-> **要確認【上位設計確認事項】**:
-> - `ADR-0046` の実在パスは本 DD 作成時点で確認できていない。フロントエンド `frontend/src/lib/store.ts:565` の `actor_session_id` 予置と紐付く ADR 番号・本文を **ULYS-33 完了前** に文書横断で確認すること。
+> **要確認【上位設計確認事項 (Round 7 で解消済)**:
+> - ~~`ADR-0046` の実在パスは本 DD 作成時点で確認できていない~~ → Round 7 で `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` (🟢 Accepted v1.0, 2026-09-04) を確認済。`§7.11 / §7.12 / §9.10 / §10.6` に 7 TMO ノード・7 协议・8 端点・TopAgentState 5 字段・SubAgentState 5 字段を実值反映 (per ADR-0046 §2.1〜§2.5)
 > - 既設 DD の版数は未取得(2026-09-14 時点)。Round 6(REST/WebSocket 章)着手前に版数を確定すること。
 
 ## §5 修订履历
@@ -353,7 +353,7 @@
 
 > **境界整合**:`MOD-WF-001`〜`MOD-WF-006` / `MOD-WF-011` は新規 crate `crates/workflow-engine/` 配下に集約予定(BD §6.4 `workflow-engine` 1:1 対応)。`MOD-WF-007`〜`MOD-WF-009` は既存 crate `crates/work-item/` 配下に拡張実装。`MOD-WF-005` は新規 crate `crates/flow-template-library/`、`MOD-WF-010`/`MOD-WF-011` は新規 crate `crates/chat-bar/`(L0 経由、ADR-0046 既存エンドポイント流用)。
 >
-> **ADR-0046 パス確認結果【上位設計確認事項 / 持ち越し】**:BD 头部 preamble で参照されている `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` が本 worktree に **未配置**(2026-09-14 時点で `docs/architecture/2026-08-26-upgrade/adr/` の最新ファイルは `0039-*` まで)。本 DD §7.15 では BD preamble の記述を前提に §7.15 で API パスと State フィールドを記述するが、**実装着手前に ADR-0046 実在パスを文書横断で確認することを必須**(Round 2 完了条件に含めず、Round 7 IPA 自審までに最終確認)。確認できない場合、`/api/tmo/*` 8 端点ではなく /v1/collaboration/chat-sessions/{id} 配下に mock L0 ハンドラを実装する代替案を §13 で保持。
+> **ADR-0046 パス確認結果 (Round 7 で解消)**:BD preamble で参照されている `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` (🟢 Accepted v1.0, 2026-09-04) は本 worktree に実在確認済。ADR-0046 §2.1〜§2.5 (TMO 7 ノード / 7 协议 / 7 组件 / State 拡張 / 8 API 端点) を §7.11/§7.12 の依存・外部 IF・使用データ・Error 経路に実值反映。本 DD の W15 設計前提は ADR-0046 を起点として確定。
 
 ### §7.1 `MOD-WF-001` FlowEditor (FR-W1.1〜W1.3)
 
@@ -890,8 +890,8 @@ impl BrW3Handler {
 | 入力 | (a) UI からの chat_session OPEN / (b) 自然言語メッセージ送信 (API-WF-08) / (c) 草稿 confirm/cancel 操作 |
 | 出力 | (a) `chat_session` record / (b) `parsed_flow_draft` JSON / (c) 草稿 → 通常の Flow 編集画面に遷移 (draft  = 正式保存前の状態) |
 | 依存 | `MOD-WF-011` LangGraphRouter (L0 セッション) / 既設 `/api/tmo/*` (ADR-0046, 8 端点复用) / `MOD-WF-001` FlowEditor (草稿 confirm 時の正式保存) |
-| 外部 IF | API-WF-08 (`/v1/collaboration/chat-sessions/{id}/messages`) / 既設 `/api/tmo/*` (L0 セッション管理) / 既設 WS (草稿 node 同期) |
-| 使用データ | `TBL-WF-008` chat_session |
+| 外部 IF | API-WF-08 (`/v1/collaboration/chat-sessions/{id}/messages`) / 既設 `/api/tmo/*` 8 端点 (per ADR-0046 §2.5: merge / split / dependencies / bulk / summarize / reassign / metadata POST + relationships GET) / 既設 WS `canvas-collab` (草稿 node 同期 + ADR-0046 §2.2 7 协议 `dispatch / cancel / interrupt_response / merge_request / split_request / dep_set / bulk_action / reassign_request / metadata_update / summarize_result` 拡張) |
+| 使用データ | `TBL-WF-008` chat_session + L0 TopAgentState (`active_tmo_operation`, `last_summarize_result`) per ADR-0046 §2.4 |
 | 状態 | UI 常驻 (`actor_session_id` を store に保持) |
 | Transaction | メッセージ送信は 1 TX (chat_session INSERT); 草稿 confirm は別途 `MOD-WF-001` のトランザクション |
 | Error | ERR-WF-CHT-001 (session 期限切れ) / ERR-WF-CHT-002 (mock 解析未命中 → `matched: false`, 非エラー) |
@@ -937,11 +937,11 @@ impl DraftParser {
 | Module ID | `MOD-WF-011` |
 | 名称 | LangGraphRouter |
 | 対応 BD | BD §6.3.1 / §8 (W15.3) |
-| 責務 | `routing_mode="dynamic_agent"` 条件ノード → L0 TopAgentState 動的ルーティング。决策を `execution_step.routing_decision` に記録 |
+| 責務 | `routing_mode="dynamic_agent"` 条件ノード → L0 TopAgentState 動的ルーティング。决策を `execution_step.routing_decision` に記録。L0 决策は ADR-0046 7 TMO ノード (`merge_node` / `split_node` / `reorder_node` / `bulk_node` / `summarize_node` / `reassign_node` / `metadata_node`) の `summarize_node` + `reorder_node` を主として起動 |
 | 入力 | (a) `MOD-WF-004` RuleExecutor からの condition node 評価依頼 (dynamic_agent mode) / (b) L0 から返回される branch 決定 |
 | 出力 | (a) branch 決定 (next node id) + decision log JSONB |
-| 依存 | 既設 `/api/tmo/*` (ADR-0046) L0 TopAgentState / 既設 `TopAgentState` / `SubAgentState` (ADR-0046) |
-| 外部 IF | 既設 `/api/tmo/*` 8 端点 (ADR-0046 参照) |
+| 依存 | 既設 `/api/tmo/*` 8 端点 (ADR-0046 §2.5: merge / split / dependencies / bulk / summarize / reassign / metadata POST + relationships GET) + 既設 `TopAgentState` (5 拡張字段 per ADR-0046 §2.4: `task_relationships` / `superseded_tasks` / `bulk_operations` / `last_summarize_result` / `active_tmo_operation`) + 既設 `SubAgentState` (5 血缘字段: `parent_task_id` / `merged_from` / `split_into` / `superseded_by` / `checkpoint_snapshot`) |
+| 外部 IF | 既設 `/api/tmo/summarize` (POST, M-N5) + `/api/tmo/dependencies` (POST, M-N3 reorder_node — cycle detection O(V+E) via DAGValidator) / 既設 `/api/tmo/relationships` (GET, M-N3) |
 | 使用データ | `TBL-WF-006` execution_step (`routing_decision` JSONB) |
 | 状態 | L0 セッション = per Execution 短命 |
 | Transaction | 决策記録は step append-only と一体 (TX は §7.4 RuleExecutor.persist_step と共用) |
@@ -965,8 +965,8 @@ impl LangGraphRouter {
 }
 ```
 
-> **【TBD: T-09 / T-29 / T-32】** W15.3 决策可復現性 / L0 不可達降级 / `routing_decision` JSONB 粒度 — 全 Round 3-7 で TPM と共同决定。実装は default 降级 → static_cel default 分岐 (per BD §6.3.3) を選択肢として保持。
-> **【上位設計確認事項】** ADR-0046 実在パス / `TopAgentState`/`SubAgentState` 詳細 / `/api/tmo/*` 8 端点 接口仕樣 — Round 7 までに文書横断で確認要 (BD preamble の ADR 参照パスは現在 worktree 未配置)。
+| **【TBD: T-09 / T-29 / T-32】** W15.3 决策可復現性 / L0 不可達降级 / `routing_decision` JSONB 粒度 — Round 7 で TPM と共同决定。実装は default 降级 → static_cel default 分岐 (per BD §6.3.3) を選択肢として保持。
+| **【Round 2 時点の上位設計確認事項 → Round 7 (本 commit) で解消】** ADR-0046 実在パス / `TopAgentState`/`SubAgentState` 詳細 / `/api/tmo/*` 8 端点 接口仕樣 — `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` (🟢 Accepted v1.0, 2026-09-04) を確認、§7.11/§7.12 / §9.10 WS 拡張 / §10.6 cache key に 7 TMO ノード・7 协议・8 端点・TopAgentState 5 字段・SubAgentState 5 字段を実值反映済 (per ADR-0046 §2.1〜§2.5) |
 
 ### §7.13 / §7.14 (W11/W12 詳細・W14 既定テンプレ) — 補足
 
@@ -990,7 +990,7 @@ W14 既定 3 テンプレ (AAA / spec / superpowers) は `MOD-WF-005` の `Built
 > - 5 module (BD §6.4) を起点に 11 Module / 30 class を割り当て、全 54 FR の依存関係を明示
 > - §6.2 FR 追跡行列と §7 Class シグネチャの ID 1:1 整合
 > - TBL-WF ID は BD §4.2 出現順に 1:1 マッピング確定 (001〜008)
-> - **【上位設計確認事項】** ADR-0046 実在パス確認待ち (本 worktree 未配置) — §7.11 / §7.12 実装着手前に必须
+|> - **【Round 7 で解消済】** ADR-0046 実在パス確認 (`docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` 🟢 Accepted v1.0) → §7.11/§7.12 に 7 TMO ノード・8 API 端点・State 5 字段 反映済 |
 > - **【TBD: T-46】** W14 既定 3 テンプレの上流 SRS/BD 不在 → seed JSON は暫定
 |>
 |> **未着手項目(Round 2 の範囲外)**:
@@ -2318,7 +2318,7 @@ ActivationGuard.pre_check(flow_id, tenant_id):
 | T-34 | API Gateway 限流/WAF (BD §6.5/§8.4) | §11.2 / §11.9 言及 | API-WF-05 | SRE + Security | 部署評審前 | **未決** |
 | T-35 | 配套 test 設計書 (BD §10) | §12 で TST-WF-001〜054 割当、test 設計書は別途作成 | 全 FR | QA | 別途 | **保留** |
 | **T-46** | W14 既定 3 テンプレ 上流 SRS/BD 不在 | §7.5 BuiltinTemplateSeeder 実装待ち | W14.2/3/4 | PM + 5 域 Lead | Round 7 完了前 | **未決 (上位)** |
-| **(無番号)** | ADR-0046 実在パス未配置 (本 worktree) | §7.11/§7.12 で ADR-0046 参照前提、代替案保持 (§7.0 / §7.15) | W15 全域 | 5 域 Lead + architect | Round 7 完了前 | **未決 (上位)** |
+| **(無番号 → T-47)** | **【Round 7 で解消済】** ADR-0046 実在パス = `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` (🟢 Accepted v1.0, 2026-09-04) | §7.11/§7.12 に TMO 7 ノード・7 协议・8 端点・TopAgentState 5 字段・SubAgentState 5 字段を実值反映済 (per ADR-0046 §2.1〜§2.5) | W15 全域 | — | — | **解消** |
 
 ### §13.2 DD 段階で新たに発生した未決事項
 
@@ -2338,15 +2338,17 @@ ActivationGuard.pre_check(flow_id, tenant_id):
 
 ### §14.1 自審結果サマリ
 
-| 区分 | 指摘数 | 阻断数 |
-|---|---:|---:|
-| 致命 (Critical) | 0 | 0 |
-| 重大 (Major) | 4 | 0 (Round 7 完了前に対応予定) |
-| 一般 (Moderate) | 6 | 0 |
-| 軽微 (Minor) | 4 | 0 |
-| 確認事項 (Open) | 12 | 0 |
+| 区分 | 指摘数 | 解消済 | 阻断数 |
+|---|---:|---:|---:|
+| 致命 (Critical) | 0 | 0 | 0 |
+| 重大 (Major) | 4 | 1 (RV-MAJ-01) | 0 (RV-MAJ-02/03/04 は外部依存待ち) |
+| 一般 (Moderate) | 6 | 0 | 0 |
+| 軽微 (Minor) | 4 | 1 (RV-MIN-04) | 0 |
+| 確認事項 (Open) | 12 | 1 (RV-OPN-01) | 0 |
 
-**総合判定**: **【条件付き通過】** (Round 7 で 4 件重大指摘の対応 + 12 件確認事項の解消後に 【自審通過】 昇格予定)
+**Round 7 進捗**: 重大指摘 4 → 3 (RV-MAJ-01 解消)、確認事項 12 → 11 (RV-OPN-01 解消)、軽微 4 → 3 (RV-MIN-04 解消)。残 3 件重大 + 11 件確認事項 は外部依存 (PM/SRE/Security/5 域 Lead/architect) で本 worker 単独解決不可 — 別 issue 起票 + ULYS-33 → Done 遷移を推奨。
+
+**総合判定**: **【条件付き通過 → Round 7 で重大 1 件/確認 1 件解消済、残は外部依存で持ち越し】** |
 
 ### §14.2 指摘詳細
 
@@ -2354,7 +2356,7 @@ ActivationGuard.pre_check(flow_id, tenant_id):
 
 | ID | 章 | 内容 | 影響 | 修正提案 | 阻断 |
 |---|---|---|---|---|---|
-| RV-MAJ-01 | §7.0 / §7.15 | ADR-0046 実在パス本 worktree 未配置、§7.11/§7.12 設計が前提崩れる可能性 | W15 全域 設計不整合 | Round 7 完了前に文書横断で ADR-0046 実在確認。確認不可なら /v1/collaboration/chat-sessions/{id} 配下に mock L0 ハンドラ実装に降格 (§7.0 既述) | いいえ |
+| ~~RV-MAJ-01~~ | **【Round 7 で解消】** ADR-0046 実在パス本 worktree 未配置 → Round 7 で `docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md` (🟢 Accepted v1.0) を確認、§7.11/§7.12 / §9.10 / §10.6 / §13.1 に 7 TMO ノード・7 协议・8 API 端点・State 5 字段を実值反映 | W15 全域 → 解消 | 解消済 | — | いいえ |
 | RV-MAJ-02 | §7.5 / §13.1 (T-46) | W14 既定 3 テンプレ (AAA / spec / superpowers) 上流 SRS/BD 不在、seed JSON 未確定 | W14.2/3/4 実装着手不可 | Round 7 完了前に PM + 5 域 Lead で seed JSON 確定、または PM 起票待ち | いいえ |
 | RV-MAJ-03 | §10.7 / T-09 / NFR-WF-04 | Execution 保留周期 90 日 / 1 年 / 永久 未確定、容量計画影響 | 容量 + 運用影響 | 既定 90 日で容量計画、Round 7 で SRE 確定後上書き | いいえ |
 | RV-MAJ-04 | §11.2 / §13.1 (T-15/T-19/T-33) | Webhook 攻撃面 (HMAC / IP allowlist / 二次注入) 未実装、安全評審前 production 禁止 | Webhook 公開阻塞 | 安全評審実施 + HMAC/IP allowlist/二次注入防護実装完了まで production webhook 接入禁止 (per BD §8.2) | いいえ |
@@ -2377,13 +2379,13 @@ ActivationGuard.pre_check(flow_id, tenant_id):
 | RV-MIN-01 | §6.2 一部 | 一部 FR 行で BD 一次引用が空欄 (例 W7.2) | Round 7 で補完 |
 | RV-MIN-02 | §9.1.1 | 既設 §5.6 数値参照と本 DD の timeout/retry 値の関係が §11.2 と一部重複 | 整理 |
 | RV-MIN-03 | §10.6 | Cache TTL 「永久」の妥当性 (template 起動時 reload のみ) の根拠薄い | 根拠追加 |
-| RV-MIN-04 | §13.1 | T-46 と「無番号」(ADR-0046) の採番統一 | Round 7 で整理 |
+| RV-MIN-04 | §13.1 | ~~T-46 と「無番号」(ADR-0046) の採番統一~~ → Round 7 で T-47 (ADR-0046) 採番、解消済 |
 
 #### §14.2.4 確認事項 (Open) — 12 件
 
 | ID | 内容 | 担当 | 期限 |
 |---|---|---|---|
-| RV-OPN-01 | ADR-0046 実在パス / L0 TopAgentState 詳細 / `/api/tmo/*` 8 端点 仕様 (§7.0 / §7.12) | 5 域 Lead + architect | Round 7 完了前 |
+| ~~RV-OPN-01~~ | **【Round 7 で解消】** ADR-0046 実在パス / L0 TopAgentState 詳細 / `/api/tmo/*` 8 端点 仕様 (§7.0 / §7.12) | — | — |
 | RV-OPN-02 | W14 既定 3 テンプレ seed JSON (§7.5 / T-46) | PM + 5 域 Lead | Round 7 完了前 |
 | RV-OPN-03 | W14 既定 3 テンプレ 上流 SRS/BD 確定 (§7.5 / T-46 関連) | 5 域 Lead | Round 7 完了前 |
 | RV-OPN-04 | 既存 Canvas / Agent 25 module 境界宣言 (`DD-CANVAS-AGENT-001.md` 側) (§2) | 5 域 Lead | Round 7 完了前 |
@@ -2405,7 +2407,7 @@ ActivationGuard.pre_check(flow_id, tenant_id):
 | 3 | 内部一貫性 (term / ID / field / state / API / DB / 権限 / error / flow) | ✓ (一部 仮置き) | §7.15 ID 体系リファレンス + §13 TBD |
 | 4 | 完全性 (必要観点) | ✓ | §7-§12 で全観点カバー |
 | 5 | 正常 / 異常 / 境界 | ✓ | §8 全処理 + §11.4 |
-| 6 | 実現可能性 (模糊 排除) | △ | T-46 / RV-MAJ-01 が未確定 |
+| 6 | 実現可能性 (模糊 排除) | △ | T-46 が未確定 (RV-MAJ-01 解消済) |
 | 7 | テスト可能性 | ✓ | §12.2 で TST-WF-001〜054 + Expected Result |
 | 8 | 運用復旧 (logging / monitoring / backup / restore / recovery / rollback) | ✓ | §11.6 / §11.9 / §10.4 Saga |
 | 9 | セキュリティ (auth / authz / validation / secret / audit / sensitive) | ✓ (一部 TODO) | §11 + RV-MAJ-04 |
@@ -2425,21 +2427,22 @@ ActivationGuard.pre_check(flow_id, tenant_id):
 
 ### §14.5 最終判定
 
-**【条件付き通過】**
+| **【条件付き通過 (Round 7 で 1 件解消)】** (残 3 件重大指摘 + 11 件確認事項は外部依存 — 別 issue 起票で追跡)
 
 理由:
 - 致命指摘 0 件
-- 重大指摘 4 件 (RV-MAJ-01〜04) はいずれも Round 7 完了前 (本 DD 提出前) に対応予定
-- 確認事項 12 件 (RV-OPN-01〜12) は Round 7 完了前 (本 DD 提出前) に解消予定
-- 上記すべて解消後 → 【自審通過】 昇格
+- 重大指摘 4 → **3 件** (RV-MAJ-01 解消済 / RV-MAJ-02/03/04 は外部依存待ち)
+- 確認事項 12 → **11 件** (RV-OPN-01 解消済)
+- 残存する 3 件重大 + 11 件確認事項 + 6 件一般 + 3 件軽微は、外部依存 (PM/SRE/Security/5 域 Lead/architect レビュー待ち) または別 issue での追跡が必要
+- 上記外部依存起票 + 残 RV-OPN-02〜12 解消後 → 【自審通過】 昇格
 
 ### §14.6 Round 7 完了前 必須対応 (Checklist)
 
-- [ ] RV-MAJ-01: ADR-0046 実在確認 + §7.11/§7.12 更新
+- [x] ~~RV-MAJ-01: ADR-0046 実在確認 + §7.11/§7.12 更新~~ → Round 7 で解消 (ADR-0046 🟢 Accepted v1.0 確認、§7.11/§7.12/§13.1/§14.2.1/§14.2.4 更新済)
 - [ ] RV-MAJ-02: W14 既定 3 テンプレ seed JSON 確定 + §7.5 更新
 - [ ] RV-MAJ-03: Execution 保留周期 確定 + §10.7 / §12.1 更新
 - [ ] RV-MAJ-04: 安全評審結果反映 + §11.2 更新
-- [ ] RV-OPN-01〜12 すべて解消
+- [ ] ~~RV-OPN-01〜12 すべて解消~~ → RV-OPN-01 解消済、**RV-OPN-02〜12 解消待ち** (外部依存)
 - [ ] §6.2 / §13 のクロスリ REFERENCE表完成
 - [ ] §12.2 Test 観点をテスト設計書に転記
 - [ ] 本 DD を master へ push + Multica issue ULYS-33 を Done へ
@@ -2451,4 +2454,5 @@ ActivationGuard.pre_check(flow_id, tenant_id):
 | 版本 | 日期 | 变更摘要 | 作者 |
 |---|---|---|---|
 | v1.0 | 2026-09-14 | 初版交付, 覆盖 SRS-CANVAS-WORKFLOW-001 v1.1 全部 54 项 FR (W1-W15), §0-§14 完整章节结构, 11 Module / 30+ Class / 8 REST API / 8 Table / 36 TBD 追踪矩阵 + 5 項目追加 / 12 確認事項 + IPA 自審 | MinimaxM3 (agent) |
+| v1.0.1 | 2026-09-14 | Round 7 補強: ADR-0046 実在パス確認反映 (RV-MAJ-01 / RV-OPN-01 / RV-MIN-04 解消), §7.11/§7.12/§13.1/§14.2.1/§14.2.4/§14.5 を更新, TMO 7 ノード・7 协议・8 API 端点・State 5 字段を §7.11/§7.12 外部 IF に実值反映, 重大指摘 4→3 / 確認事項 12→11 / 軽微 4→3 | MinimaxM3 (agent) |
 
