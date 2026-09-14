@@ -992,11 +992,1463 @@ W14 既定 3 テンプレ (AAA / spec / superpowers) は `MOD-WF-005` の `Built
 > - TBL-WF ID は BD §4.2 出現順に 1:1 マッピング確定 (001〜008)
 > - **【上位設計確認事項】** ADR-0046 実在パス確認待ち (本 worktree 未配置) — §7.11 / §7.12 実装着手前に必须
 > - **【TBD: T-46】** W14 既定 3 テンプレの上流 SRS/BD 不在 → seed JSON は暫定
->
-> **未着手項目(Round 2 の範囲外)**:
-> - §8 処理詳細・状態遷移(Round 3)
-> - §9 API 内部処理設計(Round 4)
-> - §10 データ/SQL/CRUD(Round 5)
-> - §11 セキュリティ/ログ/監査(Round 6)
-> - §12 NFR/テスト観点 + §13 TBD 追跡 + §14 IPA 自審(Round 7)
+|>
+|> **未着手項目(Round 2 の範囲外)**:
+|> - §8 処理詳細・状態遷移(Round 3)
+|> - §9 API 内部処理設計(Round 4)
+|> - §10 データ/SQL/CRUD(Round 5)
+|> - §11 セキュリティ/ログ/監査(Round 6)
+|> - §12 NFR/テスト観点 + §13 TBD 追跡 + §14 IPA 自審(Round 7)
+
+---
+
+## §8 处理詳細・状態遷移 (Round 3)
+
+> **本節の位置付け**: §7 で確定した Class シグネチャに対し、各処理 (P-NNN) を実装可能な粒度でブレークダウンする。`skill-multica-2` §10〜§12 (処理詳細 / 分岐条件 / Sequence) に従い、(a) 正常、(b) 検証失敗、(c) 権限失敗、(d) DB / ネットワーク失敗、(e) Timeout、(f) Retry、(g) Rollback / 補償、を全網羅する。状態機械は Mermaid `stateDiagram-v2` で図示する。
+
+### §8.1 ノードグラフ validation algorithm (W1.2 / W7.1 / BR-W-3)
+
+#### §8.1.1 処理 P-001: Flow 編集時の静的検証
+
+| 項目 | 内容 |
+|---|---|
+| Process ID | P-001 |
+| Purpose | Flow / Node / Edge の create / patch 時に静的検証を行い、不正な Flow 定義を永続化前に拒否する |
+| Caller | `MOD-WF-001` FlowEditor.create_flow / add_node / add_edge、`MOD-WF-005` TemplateInstantiator.instantiate |
+| Input | `CreateFlowInput` / `CreateNodeInput` / `CreateEdgeInput` |
+| Output | `Ok(entity)` または `Err(ERR-WF-VAL-*)` |
+
+| 順 | 処理 | 失敗時の Error |
+|---|---|---|
+| 1 | 必須フィールド存在検証 (kind, name, position_x/y) | ERR-WF-VAL-001 |
+| 2 | `kind` enum 値検証 (trigger / action / condition / merge / loop / subworkflow / agent_placeholder) | ERR-WF-VAL-001 |
+| 3 | `trigger_kind`/`action_kind`/`merge_mode` の kind 整合性検証 | ERR-WF-VAL-002 |
+| 4 | Edge: `from_node.flow_id == to_node.flow_id == flow_id` | ERR-WF-VAL-003 |
+| 5 | Edge: `from_node_id != to_node_id` (自環禁止、CHECK 制約と一致) | ERR-WF-VAL-004 |
+| 6 | 同 Flow 内 label 重複 edge (condition ノードで true/false ラベルが 2 件以上) | ERR-WF-VAL-005 |
+| 7 | Subflow node: `referenced_flow_id` 存在性 + 自参照禁止 + **循環検出** (DFS、深度 ≤5) | ERR-WF-VAL-006 (T-25 循環) |
+| 8 | CEL expression (`condition_expr`/`loop_source_expr`) 構文検証 (既存 CEL parser 呼び出し) | ERR-WF-VAL-007 |
+| 9 | data_mapping 構文 `{{node.<id>.output.<field>}}` パース (実行時評価 W6.1 / §8.4 で詳細) | ERR-WF-VAL-008 |
+| 10 | placeholder node の `agent_id` null 許容 (例 (W14.5 — 活性化時に再検証) | — |
+| 11 | `tag_binding_expr` (FR-W11.5) 構文検証 (BooleanExprParser) | ERR-WF-VAL-009 |
+| 12 | webhook_token 一意性 (`UNIQUE INDEX idx_node_webhook_token` 一致) | ERR-WF-VAL-010 |
+| 13 | `concurrency` 範囲 1〜20 (CHECK 制約) | ERR-WF-VAL-011 |
+
+> **【TBD: T-25】** 循環検出アルゴリズム詳細は §13 T-25 で持ち越し (深さ ≤5 は BD 既定)。DFS で `visited` + `rec_stack` セットを用いて実装、O(V+E)。
+
+#### §8.1.2 処理 P-002: webhook_token 衝突時の索引
+
+```text
+INSERT flow_node(webhook_token='abc')
+  → idx_node_webhook_token unique violation
+  → 409 Conflict → ERR-WF-VAL-010 (retry 可 / idempotent 再生成)
+```
+
+#### §8.1.3 状態遷移図: Flow ライフサイクル (W10.1 + W14.5 派生)
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft: create_flow
+    draft --> enabled: set_enabled(true) + ActivationGuard.OK
+    enabled --> disabled: set_enabled(false)
+    disabled --> enabled: set_enabled(true) + ActivationGuard.OK
+    enabled --> draft: rollback_to (新 version 作成 + enabled 状態は継承しない)
+    disabled --> draft: rollback_to
+    draft --> [*]: soft_delete (物理削除禁止、enabled_at=null)
+
+    note right of enabled
+        ActivationGuard: is_placeholder=true AND agent_id IS NULL
+        が 1 件でも存在 → ERR-WF-ACT-001 拒否
+        (per BD §6.3.1 + §8.3)
+    end note
+```
+
+#### §8.1.4 状態遷移図: BR-W-3 WorkItem 三分支 (W11.4 / W12.3)
+
+```mermaid
+stateDiagram-v2
+    [*] --> bound: derive (W11.2)
+    bound --> removed_tags: tag 解綁 / Flow 削除
+    removed_tags --> hard_deleted: 所在 Backlog
+    removed_tags --> moved_backlog_then_deleted: 未開始 Sprint → 先移 Backlog → 硬删
+    removed_tags --> detached: 进行中 Sprint → tag_binding_status='detached'
+    detached --> bound: 取消 (v1 不許可、T-05【人間確認要否】待ち)
+    detached --> hard_deleted: Sprint 完了 + Lead 確認 (P2 評価)
+
+    note right of detached
+        detached カード:
+        - source_flow_id NULL (参照断)
+        - tag_binding_status='detached'
+        - カード自体は存続 (审计链保持)
+    end note
+```
+
+### §8.2 Execution 起動 → ノード walk → 状態遷移 (W3-W9)
+
+#### §8.2.1 処理 P-010: Execution 起動 (TriggerService → RuleExecutor)
+
+| 順 | 処理 | 失敗時 |
+|---|---|---|
+| 1 | TriggerService.dispatch 入口 — trigger_kind 別 dispatcher 選択 | — |
+| 2 | pre_check: `automation_flow.enabled == true` | ERR-WF-TRG-001 |
+| 3 | pre_check: `ActivationGuard.pre_check` (placeholder 検証) | ERR-WF-ACT-001 |
+| 4 | `execution_history` INSERT (status='running', origin_chat_session_id 記録) | DB エラー → ERR-WF-DB-001 |
+| 5 | `automation_flow_versions` から current version の `definition` を読込 (キャッシュ 5 分 TTL) | DB エラー → ERR-WF-DB-001 |
+| 6 | RuleExecutor.start_execution(origin) 呼出 — execution_context 初期化 (Correlation ID 生成) | — |
+| 7 | walk_graph 入口 (topological order、入口ノード = trigger) | ERR-WF-VAL-001 (cycle 検出時) |
+| 8 | ExecutionRecorder.append_history (started_at 設定) | at-least-once retry、T-26 で詳細 |
+
+#### §8.2.2 処理 P-011: walk_graph 本体 (CLS-WF-013 ExecutionScheduler 連動)
+
+```text
+walk_graph(ctx):
+    let sorted = topological_sort(ctx.flow_nodes, ctx.flow_edges)
+    let queue = VecDeque::from([entry_node_id])
+    WHILE queue not empty:
+        let node_id = queue.pop_front()
+        IF node_id IN ctx.visited: CONTINUE
+        ctx.visited.insert(node_id)
+        let outcome = execute_node(node_id, ctx).await
+        match outcome:
+            NodeOutcome::Success(output) => recorder.append_step(succeeded, output); push next nodes
+            NodeOutcome::Branch(decision) => recorder.append_step(branch_evaluated, decision); push next per decision
+            NodeOutcome::Failed(err) => retry_policy.run_with_retry(node, ctx, err) or on_error.route(node, ctx)
+            NodeOutcome::Loop(items) => loop_node.iterate(items, body_node_ids, ctx)
+            NodeOutcome::Subflow(child_exec_id) => recorder.append_step(subflow_invoked, child_exec_id)
+        ctx.completed.add(node_id)
+        IF all terminal nodes reached: break
+    recorder.append_history(ended_at = now, status = succeeded)
+```
+
+#### §8.2.3 処理 P-012: execute_node (kind 別 dispatcher)
+
+| Node kind | Handler | 戻り値 |
+|---|---|---|
+| `trigger` | (処理なし、起点のみ。次の kind へ) | NodeOutcome::Success |
+| `action` | `ActionDispatcher.dispatch` (CLS-WF-010) | NodeOutcome::Success(output) / Failed |
+| `condition` (static_cel) | `CelConditionNode.evaluate` | NodeOutcome::Branch(decision) |
+| `condition` (dynamic_agent) | `LangGraphRouter.request_decision` | NodeOutcome::Branch(decision) |
+| `merge` (race) | 1 件目到着で即次へ | NodeOutcome::Success |
+| `merge` (join) | `MergeNode.await_arrivals` (T-24) | NodeOutcome::Success(aggregated) |
+| `loop` | `LoopNode.iterate` (T-25) | NodeOutcome::Loop(items) |
+| `subworkflow` | `SubflowNode.invoke` (T-26 循環検出) | NodeOutcome::Subflow |
+| `agent_placeholder` | placeholder → 活性化必須 (W14.5) | ERR-WF-ACT-001 (実行時) |
+
+### §8.3 BR-W-3 / W11/W12 状態機械 (Mermaid stateDiagram-v2)
+
+(§8.1.4 にて図示済 — Mermaid は §8.1.4 を参照。)
+
+### §8.4 Expression / CEL / データマッピング評価 (W6)
+
+#### §8.4.1 処理 P-020: ExpressionEvaluator.evaluate
+
+| 項目 | 内容 |
+|---|---|
+| Purpose | `{{node.<id>.output.<field>}}` / `{{flow.variables.<key>}}` / CEL 式を評価 |
+| Caller | RuleExecutor.execute_node (action / condition / loop の input 構築時) |
+| Input | expr: `&str`, ctx: `&ExecutionContext` |
+| Output | `Result<Value, WFError>` |
+
+| 順 | 処理 | 失敗時 |
+|---|---|---|
+| 1 | expr を字句解析 — `{{...}}` パターン検出 | — |
+| 2 | パターン (a) `node.<uuid>.output.<jsonpath>` → ctx.outputs[uuid] を JSONPath 評価 | ERR-WF-VAL-008 (uuid 不存在 / field 找不到) |
+| 3 | パターン (b) `flow.variables.<key>` → ctx.flow.variables[key] 参照 | ERR-WF-VAL-012 (key 不存在) |
+| 4 | パターン (c) CEL 式 → 既存 CEL parser 呼び出し | ERR-WF-VAL-013 (構文不正) |
+| 5 | パターン (d) 文字列リテラル / 数値リテラル → そのまま返却 | — |
+| 6 | **【TBD: T-18】 同一 Execution コンテキスト内に厳密に限定** (ctx.outputs に存在しない uuid は越権として拒否) | ERR-WF-AUTHZ-002 |
+
+> **【TBD: T-18】** 越権防止は実装段階で「ctx.outputs に存在しない uuid / 他 Execution / 他 Flow / 他 tenant の uuid を解決しようとした時点で拒」を徹底する。単体テスト evidence を §14 IPA 自審までに作成。
+
+#### §8.4.2 処理 P-021: CelConditionNode.evaluate (FR-W4.1 / W4.2)
+
+| 順 | 処理 | 失敗時 |
+|---|---|---|
+| 1 | mode 判定 (IF / Switch) | — |
+| 2 | IF: condition_expr を CEL 評価 (input = node.output までの累積 context) | ERR-WF-VAL-013 (構文) / ERR-WF-EXE-002 (eval error) |
+| 3 | Switch: 各 case を順次評価、最初に true となった case の edge_label を採用、else (default) 落ちは最下行 | — |
+| 4 | 両分岐とも活性 edge 不存在 / 全 case false → ERR-WF-EXE-FAILED | ERR-WF-EXE-003 |
+
+### §8.5 retry / on_error 分岐 (W8)
+
+#### §8.5.1 処理 P-030: RetryPolicyExecutor.run_with_retry
+
+| 項目 | 内容 |
+|---|---|
+| Purpose | ノード実行失敗時、`flow_node.retry_policy` (`{max_retries, backoff, delay_ms}`) に従い再実行 |
+| Caller | RuleExecutor.execute_node 内の ActionDispatcher 呼出時 |
+| Policy 既定 | 【TBD: T-06】 既定値 `max_retries=3, backoff='exponential', delay_ms=1000, max_delay_ms=30000` を Design Doc 提案値として保持 (BD §9.3 NFR-WF-06 で未確定) |
+
+| 順 | 処理 | 失敗時 |
+|---|---|---|
+| 1 | attempt = 0 から開始 | — |
+| 2 | op() 実行 | — |
+| 3 | Ok → 完了 | — |
+| 4 | Err(retryable) AND attempt < max_retries → attempt++ + delay(backoff(attempt)) → 2 へ戻る | — |
+| 5 | Err(retryable) AND attempt == max_retries → OnErrorRouter.route へ降格 | ERR-WF-EXE-RETRY-EXHAUSTED |
+| 6 | Err(non_retryable) → 即 OnErrorRouter.route | — |
+| 7 | retry 履歴を execution_step に append (`retry_count`, `retry_scheduled` event) | — |
+
+#### §8.5.2 処理 P-031: OnErrorRouter.route
+
+| 順 | 処理 | 失敗時 |
+|---|---|---|
+| 1 | failed_node からの `edge_kind='on_error'` edge を取得 | — |
+| 2 | 0 件 → Execution status='failed' → 既設 notification (W8.3) | ERR-WF-EXE-FAILED |
+| 3 | 1 件以上 → error_branch.activated event 発行 → 該当 next_node を walk_graph 継続 | — |
+| 4 | 多段 on_error (error → on_error → on_error) は node 単位で再帰評価 | — |
+
+#### §8.5.3 処理 P-032: 失敗通知 (W8.3)
+
+| 順 | 処理 | 失敗時 |
+|---|---|---|
+| 1 | execution_history.status='failed' + ended_at 設定後 30 秒以内に通知 | ERR-WF-NOTIFY-001 (notification module 失敗) |
+| 2 | 既設 notification module (BD §6.4) 経由で `send_notification` action を実行 | — |
+| 3 | 通知失敗時も execution の succeeded/failed 状態は変えない (audit 目的、notification は副作用) | — |
+
+### §8.6 Template instantiate トランザクション境界 (W14)
+
+#### §8.6.1 処理 P-040: TemplateInstantiator.instantiate
+
+| 項目 | 内容 |
+|---|---|
+| Purpose | テンプレート定義 (`{nodes, edges}`) を読み、新しい `automation_flow` を作成して 1 TX で全 node/edge を一括 INSERT |
+| Caller | `MOD-WF-005` FlowTemplateLibrary.instantiate |
+| Input | template_id, target_flow_id (新規), tenant_id, actor |
+| Output | `Result<Uuid /* new_flow_id */, WFError>` |
+
+| 順 | 処理 | 失敗時 |
+|---|---|---|
+| 1 | Flow 設定 (tenant_id, name) で `automation_flow` INSERT | DB エラー → 即 ROLLBACK |
+| 2 | template.definition.nodes を全件 `flow_node` へ INSERT (`is_placeholder=true` ノードはそのまま) | 1 件失敗 → 全件 ROLLBACK (partial 禁止) |
+| 3 | template.definition.edges を全件 `flow_edge` へ INSERT | 1 件失敗 → 全件 ROLLBACK |
+| 4 | template.definition.data_mapping を `flow_edge` の input_bindings として保存 | — |
+| 5 | `automation_flow_versions` に version_no=1, is_current=true で INSERT (per W10.2) | DB エラー → ROLLBACK |
+| 6 | COMMIT → `EVT-WF-033 flow.instantiated_from_template` 発行 | — |
+| 7 | 既設 canvas-collab WS 経由で element.update 発行 (placeholder node 表示) | notification 失敗は致命的ではない (WARN log) |
+
+> **【TBD: T-46】** seed JSON (AAA / spec / superpowers) は実装段階 PM 確定待ち。Round 7 IPA 自審までに確定。
+
+### §8.7 chat_session → L0 → execution chain (W15)
+
+#### §8.7.1 Sequence 図: 草稿生成 → 確認 → 実行
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as Bottom Chat Bar
+    participant CBS as ChatBarService
+    participant DP as DraftParser (mock)
+    participant FE as FlowEditor
+    participant L0 as /api/tmo/* (L0)
+    participant RE as RuleExecutor
+
+    User->>UI: 自然言語メッセージ送信
+    UI->>CBS: POST /v1/collaboration/chat-sessions/{id}/messages
+    CBS->>CBS: chat_session INSERT (chat_session_id, message)
+    CBS->>DP: parse(message)
+    alt 命中 (matched=true)
+        DP-->>CBS: ParsedFlowDraft { nodes, edges }
+        CBS->>CBS: chat_session.parsed_flow_draft 更新
+        CBS-->>UI: { chat_session_id, parsed_flow_draft, matched: true }
+        UI-->>User: 草稿プレビュー表示
+        User->>UI: "確定"
+        UI->>CBS: confirm_draft(chat_session_id, draft_id)
+        CBS->>FE: create_flow + bulk nodes/edges INSERT (TX)
+        FE-->>CBS: new_flow_id
+        CBS->>CBS: chat_session.applied = true
+        CBS-->>UI: { new_flow_id }
+        User->>UI: Flow "実行" ボタン
+        UI->>RE: POST /v1/collaboration/flows/{new_flow_id}/executions
+        RE->>RE: execution_history INSERT (origin_chat_session_id = chat_session_id, per W15.4)
+        RE-->>UI: { execution_id, status: running }
+    else 未命中 (matched=false)
+        DP-->>CBS: ParsedFlowDraft::None
+        CBS-->>UI: { matched: false } (非エラー)
+        UI-->>User: 「意図を読み取れませんでした」表示
+    end
+```
+
+#### §8.7.2 処理 P-050: L0 動的ルーティング (W15.3)
+
+| 順 | 処理 | 失敗時 |
+|---|---|---|
+| 1 | condition node の `routing_mode='dynamic_agent'` を検出 | — |
+| 2 | LangGraphRouter.request_decision(ctx, node_id) | — |
+| 3 | TmoClient (ADR-0046 `/api/tmo/*` 8 端点复用) 経由で L0 TopAgentState に decision 要求 | ERR-WF-LGR-001 (L0 不可達) |
+| 4 | 决策受信 → branch 決定 (next_node_id) | — |
+| 5 | execution_step に routing_decision JSONB 書込 | — |
+| 6 | 正常応答 | — |
+| 7 | **【TBD: T-29】** L0 不可達 / timeout / 5xx → `fallback_to_static_cel` (default 分岐へ降格)。 デフォルト = static_cel の default 分岐 (BD §6.3.3)。 | ERR-WF-LGR-002 (timeout) |
+
+> **【TBD: T-09】** decision 可復現性 (e2e test 安定性)。実装は「decision 応答に `decision_id` / `decision_seed` を含めて同一 seed 再現可」とし、記録フォーマットを §10 で確定。
+> **【TBD: T-32】** `routing_decision` JSONB 粒度 — `{ decision_id, l0_session_id, prompt_hash, response_raw, selected_branch, decided_at }` を Round 7 で最終確定。
+
+### §8.8 状態遷移図: Execution ライフサイクル (W9.1)
+
+```mermaid
+stateDiagram-v2
+    [*] --> running: insert execution_history (status=running)
+    running --> succeeded: 全 terminal node 完了
+    running --> failed: retry exhausted AND no on_error edge
+    running --> running: retry (attempt++) / on_error edge 経由継続
+    running --> cancelled: Timeout / 手動 cancel
+    failed --> running: resume_execution (API-WF-04, FR-W9.2, 失敗ノードから再実行)
+    succeeded --> [*]: append_history ended_at
+    failed --> [*]: append_history ended_at
+    cancelled --> [*]: append_history ended_at
+```
+
+---
+
+## §9 API 内部処理設計 (Round 4)
+
+> **本節の位置付け**: BD §5.1 で確定した 8 REST 端点 + 既設 WebSocket チャネル (canvas-collab) に対し、内部処理の `Request → Deserialize → Validation → Authentication → Authorization → Service → Domain → Repository → Transaction → Response Mapping → Response` 連鎖を全網羅する。`skill-multica-2` §16 (API 内部設計) に従う。
+
+### §9.1 共通 IF 仕様 (per API-WF-01〜08)
+
+#### §9.1.1 認証 / 認可 / Validation 順序
+
+| 順 | 処理 | 失敗時 Error |
+|---|---|---|
+| 1 | **Deserialize**: JSON body / path / query を型変換 (Rust `serde`) | 400 ERR-WF-VAL-001 |
+| 2 | **Validation**: 必須 / length / range / format / enum / referential | 400 ERR-WF-VAL-NNN |
+| 3 | **Authentication**: (a) UI 系 = 既設 Session Token middleware | 401 ERR-AUTH-001 (既存) |
+|   | (b) API-WF-05 webhook = path token 厳密一致 | 401 ERR-WF-TRG-003 |
+| 4 | **Authorization**: (a) 既設 RBAC `flow.read`/`flow.write`/`flow.execute`/`template.read`/`template.write`/`template.instantiate` の scope 検査 | 403 ERR-WF-AUTHZ-001 |
+|   | (b) tenant_id 取得 + RLS middleware 適用 | 403 ERR-AUTHZ-TENANT |
+| 5 | **Service 呼出**: 該当 Module の Service struct.method 呼出 | — |
+| 6 | **Domain Logic**: 業務ロジック (validation、状態遷移) | 4xx / 5xx 業務エラー |
+| 7 | **Repository**: SQL 実行 (Rust `sqlx`、tenant_id は parameterized) | DB エラー → 5xx ERR-WF-DB-001 |
+| 8 | **Transaction**: 1 業務処理 = 1 TX、複数 Table 操作は同一 TX 内 | ROLLBACK on error |
+| 9 | **Response Mapping**: entity → JSON DTO (DateTime ISO 8601, Uuid hyphenated, decimal string) | — |
+| 10 | **Response**: 200/201 + body / 4xx/5xx + 既設 BFF error 形式 `{ error_code, message }` | — |
+
+#### §9.1.2 共通 Header / Cookie / 観測フィールド
+
+| Header | 用途 |
+|---|---|
+| `Authorization: Bearer <session_token>` | Session Token (UI 系) |
+| `X-Tenant-ID` (request) | tenant_id (session と不一致なら 403) |
+| `X-Correlation-ID` (request/response) | Execution 起点の追跡 ID (per execution / per request) |
+| `X-Trace-Id` (response) | OpenTelemetry 互換 (既存) |
+| `Idempotency-Key` (request, optional) | POST / Webhook の冪等性 (W2.3) |
+
+#### §9.1.3 共通 Error 形式
+
+```json
+{
+  "error_code": "ERR-WF-XXX-NNN",
+  "message": "ユーザー向け日本語メッセージ",
+  "details": { /* 実装補助情報、内部専用、ログには記録 */ },
+  "correlation_id": "uuid"
+}
+```
+
+### §9.2 API-WF-01 `GET/POST/PATCH/DELETE /v1/collaboration/flows`
+
+| 項目 | 内容 |
+|---|---|
+| Direction | UI → BFF |
+| Method × Path | `GET /v1/collaboration/flows`, `POST /v1/collaboration/flows`, `PATCH /v1/collaboration/flows/{id}`, `DELETE /v1/collaboration/flows/{id}` |
+| Auth | Session Token + `flow.read` / `flow.write` |
+| RLS | ✓ tenant_id (RLS middleware) |
+| Idempotency | POST は `Idempotency-Key` 任意 (24h TTL、なければ v1 は作成ごとに 1 件生成 — T-22 で debounce 要否評価) |
+| Timeout | 既設 §5.6 数値参照 (T-13 待ち) |
+| Retry | ネットワーク層 最大 2 回 (per 既設 §5.6、§9.1.1 連鎖) |
+
+**POST Request**:
+```json
+{
+  "name": "string, 1〜255 文字",
+  "tags": ["string"],
+  "tag_binding_expr": "string (optional, AND/OR/NOT 構文)",
+  "variables": { /* JSON */ },
+  "status_mapping": { /* optional */ }
+}
+```
+
+**POST Response 201**:
+```json
+{ "id": "uuid", "name": "...", "enabled": false, "current_version_id": null, "created_at": "ISO 8601" }
+```
+
+**POST Response 4xx**: 400 (validation) / 401 (auth) / 403 (RBAC) / 409 (name conflict)
+
+**PATCH Request**:
+```json
+{
+  "name": "string?",
+  "tag_binding_expr": "string?",
+  "enabled": "bool?",
+  "variables": "object?",
+  "status_mapping": "object?",
+  "if_match_version": "int? (楽観ロック, T-27)"
+}
+```
+
+**PATCH 内部処理 (enabled=true 切替時)**:
+1. §9.1.1 順 1-5
+2. `ActivationGuard.pre_check(flow_id)` 呼出 — placeholder + agent_id null 検出
+3. placeholder 残存 → 400 ERR-WF-ACT-001 (per BD §6.3.1)
+4. 通過 → `automation_flow` UPDATE + `automation_flow_versions` に新 version append (definition 変化時のみ)
+5. 既設 canvas-collab WS へ `element.update` 通知
+6. 200 返却
+
+**DELETE Response**: 204 (soft_delete, 物理削除禁止 per BD §4.5)
+**DELETE 副作用**: Flow 削除時、`flow_node` / `flow_edge` は物理削除 (FK cascade)。`execution_history` / `execution_step` は残存。`WorkItem.source_flow_id` は NULL 化 (per BD §4.6)。
+
+### §9.3 API-WF-02 `GET/POST/PATCH/DELETE /v1/collaboration/flows/{id}/nodes, /edges`
+
+(Method × Path は §9.2 と類似、対象 entity が `flow_node` / `flow_edge`)
+
+**POST /nodes Request**:
+```json
+{
+  "kind": "trigger | action | condition | merge | loop | subworkflow | agent_placeholder",
+  "trigger_kind": "manual | schedule_cron | webhook | canvas_event?",
+  "action_kind": "http_request | transform_data | dispatch_agent | (既存 6 種)?",
+  "condition_expr": "string?",
+  "merge_mode": "race | join?",
+  "loop_source_expr": "string?",
+  "loop_body_node_ids": ["uuid"]?,
+  "concurrency": "u8 (1-20)?",
+  "input_bindings": { /* JSON, data_mapping 含む */ },
+  "retry_policy": { "max_retries": "u8", "backoff": "exponential|fixed", "delay_ms": "u32", "max_delay_ms": "u32" },
+  "referenced_flow_id": "uuid?",
+  "webhook_token": "string (1-64 字符, null 許容)?",
+  "routing_mode": "static_cel | dynamic_agent (default static_cel)",
+  "is_placeholder": "bool (default false)",
+  "placeholder_role_hint": "string?",
+  "position_x": "f32", "position_y": "f32"
+}
+```
+
+**POST /nodes 内部処理**: §9.1.1 + §8.1.1 P-001 (kind 整合 / CEL 構文 / webhook_token UNIQUE)
+
+**POST /edges Request**:
+```json
+{
+  "from_node_id": "uuid",
+  "to_node_id": "uuid",
+  "edge_label": "string? (true/false/case 値)",
+  "edge_kind": "normal | on_error (default normal)"
+}
+```
+
+**POST /edges 内部処理**: §8.1.1 順 4-6 (from_node / to_node flow_id 一致 + 自環禁止 + label 重複検出)
+
+### §9.4 API-WF-03 `POST/GET /v1/collaboration/flows/{id}/executions`
+
+| 項目 | 内容 |
+|---|---|
+| Method × Path | `POST /v1/collaboration/flows/{id}/executions`, `GET /v1/collaboration/flows/{id}/executions` |
+| Auth | Session Token + `flow.execute` (POST) / `flow.read` (GET) |
+
+**POST Request**:
+```json
+{ "trigger_kind": "manual", "input": { /* optional */ } }
+```
+
+**POST 内部処理 (per §8.2.1 P-010)**:
+1. §9.1.1 順 1-5
+2. `TriggerService.fire_manual(flow_id, input, actor)` 呼出
+3. pre_check: enabled + ActivationGuard
+4. `execution_history` INSERT (status='running', trigger_kind='manual')
+5. `RuleExecutor.start_execution(origin)` 呼出
+6. 200 返却 `{ execution_id, status: 'running' }`
+
+**POST 失敗**: 400 (Flow 定義非法 / placeholder 残存) / 403 / 404
+
+**GET Request**: `?status=running|succeeded|failed|cancelled&from=2026-01-01&to=2026-12-31&limit=50&cursor=<exec_id>`
+
+**GET Response**:
+```json
+{
+  "executions": [
+    {
+      "id": "uuid",
+      "flow_id": "uuid",
+      "flow_version_id": "uuid",
+      "status": "running|succeeded|failed|cancelled",
+      "trigger_kind": "manual|cron|webhook|canvas_event",
+      "started_at": "ISO 8601",
+      "ended_at": "ISO 8601?",
+      "origin_chat_session_id": "uuid?"
+    }
+  ],
+  "next_cursor": "uuid?"
+}
+```
+
+**GET 内部処理**: §10 SQL §10.2.5 参照 (cursor-based pagination, T-27)
+
+### §9.5 API-WF-04 `POST /v1/collaboration/flows/{id}/executions/{exec_id}/resume`
+
+| 項目 | 内容 |
+|---|---|
+| Auth | Session Token + `flow.write` (resume は書写扱い) |
+| Purpose | 失敗 Execution を失敗ノードから再実行 (FR-W9.2) |
+
+**Request**:
+```json
+{ "from_node_id": "uuid? (省略時 = 最初の failed node)" }
+```
+
+**内部処理**:
+1. §9.1.1 順 1-5
+2. `execution_history` を取得、`status='failed'` 確認、それ以外 → 400 ERR-WF-EXE-001
+3. 該当 failed node の `flow_node` を取得、`retry_policy` を読む
+4. `RuleExecutor.resume_execution(execution_id, from_node_id, actor)` 呼出
+5. 新 `execution_history` 行作成 (`resumed_from_execution_id = original_exec_id`)
+6. 200 返却 `{ new_execution_id, status: 'running' }`
+
+> **【TBD: T-03】** 非冪等 action (例 `create_worktree`) の再実行安全性。本 DD では「flow_node.action_kind が `dispatch_agent` 以外かつ非冪等疑いフラグが付与されている場合は `ERR-WF-CONFLICT-001` を返す」設計を Round 7 で最終決定 (BD §9.3 T-03)。
+
+### §9.6 API-WF-05 `POST /v1/collaboration/flows/{id}/webhook/{token}`
+
+| 項目 | 内容 |
+|---|---|
+| Direction | 外部システム → BFF (公開 endpoint) |
+| Auth | **path token 厳密一致** (Session 不要) |
+| RLS | ✓ tenant_id は token に紐付く flow から自動解決 |
+
+**Request**: 任意 JSON body (透伝、1MB 上限 既定 / T-14 / T-33)
+
+**Request Headers (optional, 推奨)**:
+- `Idempotency-Key`: 24h TTL、`(tenant_id, webhook_token, idempotency_key)` UNIQUE で重複検出
+
+**内部処理**:
+1. path token を webhook_index から flow_id 解決 (memory cache + DB fallback)
+2. token 不一致 / 該当 Flow `enabled=false` → 401 ERR-WF-TRG-003
+3. body 上限チェック (1MB 超過 → 413 ERR-WF-VAL-013) 【TBD: T-14】
+4. `Idempotency-Key` 同値検出 → 既存 `execution_id` を 200 で返却 (冪等性)
+5. `TriggerService.fire_webhook(flow_id, token, body, idempotency_key)` 呼出
+6. 内部は §9.4 POST /executions と同じ連鎖
+7. 200 返却 `{ execution_id }` (同期、即時 return、非同期実行)
+
+**Webhook 失敗 Error**: 401 / 413 / 500 (DB 失敗時)
+**Webhook 既設 WS 連動**: execution 起動後、既設 canvas-collab WS 経由で `element.update` を発行 (Execution 状態変化)
+
+> **【TBD: T-15 / T-33】** HMAC 署名 / IP allowlist は §11.1 で詳述。本 DD では未実装として文書化。
+
+### §9.7 API-WF-06 `GET/POST/PATCH/DELETE /v1/collaboration/flow-templates`
+
+| 項目 | 内容 |
+|---|---|
+| Method × Path | CRUD over `/v1/collaboration/flow-templates` |
+| Auth | Session Token + `template.read` (GET) / `template.write` (POST/PATCH/DELETE) |
+| RLS | tenant_id、ただし `is_builtin=true` は跨 tenant 可読 |
+
+**GET Response** (一覧):
+```json
+{
+  "templates": [
+    { "id": "uuid", "name": "string", "is_builtin": "bool", "created_by": "uuid", "created_at": "ISO 8601", "version": "int" }
+  ]
+}
+```
+
+**POST Request** (custom のみ):
+```json
+{
+  "name": "string",
+  "definition": { "nodes": [...], "edges": [...] }
+}
+```
+
+**DELETE 制約**: `is_builtin=true` → 403 ERR-WF-TPL-001 (per §7.5)
+
+### §9.8 API-WF-07 `POST /v1/collaboration/flow-templates/{id}/instantiate`
+
+| 項目 | 内容 |
+|---|---|
+| Purpose | テンプレートを既存 Flow にバルク INSERT で適用 (W14.5) |
+| Auth | Session Token + `template.instantiate` |
+
+**Request**:
+```json
+{
+  "target_flow_name": "string (省略時 = テン標名 + 現在日時)",
+  "variables": { /* optional */ }
+}
+```
+
+**内部処理**: §8.6.1 P-040 (1 TX で全 node/edge バルク INSERT)
+**Response 201**: `{ new_flow_id, name, node_count, edge_count }`
+
+### §9.9 API-WF-08 `POST /v1/collaboration/chat-sessions/{id}/messages`
+
+| 項目 | 内容 |
+|---|---|
+| Direction | UI (底部チャットバー) → BFF → (mock 規則エンジン) |
+| Auth | Session Token + `actor_session_id` (L0 セッション管理) |
+
+**Request**:
+```json
+{
+  "message": "string (1〜4096 字符, T-31)",
+  "actor_session_id": "uuid"
+}
+```
+
+**内部処理**:
+1. §9.1.1 順 1-5
+2. `ChatBarService.send_message(chat_session_id, message)` 呼出
+3. `chat_session` INSERT (message)
+4. `DraftParser.parse(message)` 呼出 (mock 規則 / T-14)
+5. 命中 → `parsed_flow_draft` 更新
+6. 未命中 → `matched=false` (非エラー)
+7. 既設 `/api/tmo/*` 経由で L0 セッション同期 (per ADR-0046、T-08)
+8. 200 返却 `{ chat_session_id, parsed_flow_draft, matched }`
+
+**草稿 confirm**: `POST /v1/collaboration/chat-sessions/{id}/drafts/{draft_id}/confirm` (実装は §7.11 ChatBarService.confirm_draft)
+
+### §9.10 既設 WebSocket チャネル (canvas-collab) — 拡張
+
+**BD §5.3** に従い、本 DD は新 WS 端点を追加せず、既設 `wss://canvas-collab/canvases/[id]` に event type を追加:
+
+| Event Type | Payload | 用途 |
+|---|---|---|
+| `flow_node.execution_status_changed` | `{ node_id, execution_id, status, started_at, ended_at? }` | SCR-WF-04 / SCR-WF-06 連動 |
+| `flow.execution_progress` | `{ flow_id, execution_id, completed, total }` | 進捗バー |
+| `flow.chat_draft_generated` | `{ chat_session_id, parsed_flow_draft, matched }` | チャットバー → キャンバス反映 |
+
+> **【TBD: T-16】** Execution ノード級 status が秒級リアルタイム刷新必要か否か。必要なら `flow_node.execution_status_changed` event type を採用 (上記設計済)、不要なら polling へ降格。
+
+---
+
+## §10 データ / SQL / CRUD 詳細設計 (Round 5)
+
+> **本節の位置付け**: BD §4 で確定した 8 表 + 既存 WorkItem 拡張 4 フィールドに対し、DD 段階での物理設計 (PK/FK/Unique/Check/Index/enum)、CRUD 対応、Transaction 境界、重要 SQL、楽観並列、保持/削除 規則を実装可能な粒度で記述する。`skill-multica-2` §17〜§22 に従う。
+
+### §10.1 8 表 + 既存 WorkItem 拡張 物理設計 (DD 段階)
+
+#### §10.1.1 `TBL-WF-001 automation_flow` (Master, 物理削除禁止)
+
+| Column | Type | Length | Null | Default | PK | FK | Unique | Check | Description |
+|---|---:|---|---|---|---|---|---|---|---|
+| `id` | UUID | — | NOT NULL | gen_random_uuid() | ✓ | — | — | — | Flow 識別子 |
+| `name` | VARCHAR(255) | 255 | NOT NULL | — | — | — | — | — | 表示名 (1〜255 文字) |
+| `tags` | TEXT[] | — | NOT NULL | '{}' | — | — | — | — | Flow タグ (FR-W11.1) |
+| `tag_binding_expr` | TEXT | — | NULL | — | — | — | — | — | AND/OR/NOT ブール式 (FR-W11.5) |
+| `enabled` | BOOLEAN | — | NOT NULL | false | — | — | — | — | 有効フラグ (FR-W10.1) |
+| `variables` | JSONB | — | NULL | — | — | — | — | — | Flow 級 全局変数 (FR-W6.2) |
+| `status_mapping` | JSONB | — | NULL | — | — | — | — | — | Execution 状態 → WorkItem status 映射 (FR-W13.1) |
+| `current_version_id` | UUID | — | NULL | — | — | `automation_flow_versions(id)` ON DELETE SET NULL | — | — | 現版本 指针 |
+| `tenant_id` | UUID | — | NOT NULL | — | — | — | — | — | RLS 用 |
+| `created_at` | TIMESTAMPTZ | — | NOT NULL | now() | — | — | — | — | UTC |
+| `updated_at` | TIMESTAMPTZ | — | NOT NULL | now() | — | — | — | — | UTC、UPDATE トリガで自動更新 |
+| `created_by` | UUID | — | NOT NULL | — | — | — | — | — | 作成者 |
+| `deleted_at` | TIMESTAMPTZ | — | NULL | NULL | — | — | — | — | soft_delete (DD 段階で追加、BD §4.5 物理削除禁止) |
+
+| Index | 種類 | 列 | 用途 |
+|---|---|---|---|
+| `idx_flow_tenant` | B-tree | `tenant_id` | RLS |
+| `idx_flow_enabled` | B-tree | `enabled` | 既設 scheduler 起動候補検索 |
+| `idx_flow_tags` | GIN | `tags` | W11 タグ命中検索 |
+| `idx_flow_deleted_at` | Partial B-tree | `(deleted_at) WHERE deleted_at IS NULL` | soft_delete 済除外 |
+
+| Constraint | 内容 |
+|---|---|
+| RLS policy | `flow_tenant_isolation USING (tenant_id = current_setting('app.tenant_id')::UUID)` |
+| Check | — (BD 既定) |
+
+| CRUD | 操作 | 対応 API | 備考 |
+|---|---|---|---|
+| C | INSERT | API-WF-01 POST | `enabled` default false |
+| R | SELECT | API-WF-01 GET | tenant_id filter 必須 |
+| U | UPDATE | API-WF-01 PATCH | enabled 切替時 ActivationGuard 必須 |
+| D | soft_delete | API-WF-01 DELETE | `deleted_at = now()` 設定、SELECT では除外 |
+
+#### §10.1.2 `TBL-WF-002 automation_flow_versions` (Master, SCD Type 2)
+
+| Column | Type | PK | FK | Unique | Description |
+|---|---:|---|---|---|---|
+| `id` | UUID | ✓ | — | — | 版本 ID |
+| `automation_flow_id` | UUID | — | ✓ → `automation_flow(id)` ON DELETE CASCADE | — | 親 Flow |
+| `version_no` | INTEGER | — | — | ✓ (UNIQUE(automation_flow_id, version_no)) | 連番 (1 から) |
+| `definition` | JSONB | — | — | — | nodes + edges 全体 snapshot |
+| `valid_from` | TIMESTAMPTZ | — | — | — | SCD2 有効開始 |
+| `valid_to` | TIMESTAMPTZ | — | — | — | SCD2 有効終了 (NULL = 現版本) |
+| `is_current` | BOOLEAN | — | — | — | 現版本 flag |
+| `rolled_back_from_version_no` | INTEGER | — | — | — | rollback 元 (NULL 可) |
+| `tenant_id` | UUID | — | — | — | RLS |
+| `created_at` | TIMESTAMPTZ | — | — | — | — |
+| `created_by` | UUID | — | — | — | — |
+
+| Index | 種類 | 列 | 用途 |
+|---|---|---|---|
+| `idx_flowver_flow` | B-tree | `automation_flow_id` | Flow 別 履歴 |
+| `idx_flowver_current` | Partial B-tree | `(automation_flow_id, is_current) WHERE is_current = true` | 現版本検索 |
+| `idx_flowver_tenant` | B-tree | `tenant_id` | RLS |
+
+#### §10.1.3 `TBL-WF-003 flow_node` (Master)
+
+(BD §4.2.3 通り、列構成は BD 参照。本 DD で追加する制約・既定値のみ補足:)
+
+| 追加項目 | 値 |
+|---|---|
+| Check | `concurrency BETWEEN 1 AND 20` |
+| Check | `(kind = 'loop' AND loop_source_expr IS NOT NULL) OR kind <> 'loop'` |
+| Check | `(kind = 'subworkflow' AND referenced_flow_id IS NOT NULL) OR kind <> 'subworkflow'` |
+| Check | `(kind = 'condition' AND condition_expr IS NOT NULL) OR kind <> 'condition'` |
+| Index | `idx_node_flow`, `idx_node_tenant`, `idx_node_placeholder` (partial), `idx_node_webhook_token` (UNIQUE partial) |
+
+#### §10.1.4 `TBL-WF-004 flow_edge` (Master)
+
+| Column 補足 | 値 |
+|---|---|
+| Check | `from_node_id <> to_node_id` (BD 既定) |
+| Check | `edge_kind IN ('normal', 'on_error')` |
+| Index | `idx_edge_flow`, `idx_edge_from`, `idx_edge_to` |
+
+#### §10.1.5 `TBL-WF-005 execution_history` (Transaction, append-only)
+
+(BD §4.2.5 通り。物理削除禁止。)
+
+| 追加項目 | 値 |
+|---|---|
+| Check | `status IN ('running', 'succeeded', 'failed', 'cancelled')` |
+| Check | `(status = 'running' AND ended_at IS NULL) OR (status <> 'running' AND ended_at IS NOT NULL)` |
+| Index | `idx_exec_flow`, `idx_exec_status`, `idx_exec_chat_session` (partial), `idx_exec_tenant` |
+
+#### §10.1.6 `TBL-WF-006 execution_step` (Transaction, append-only)
+
+| 追加項目 | 値 |
+|---|---|
+| Check | `status IN ('succeeded', 'failed', 'skipped', 'running')` |
+| Check | `retry_count >= 0` |
+| Index | `idx_step_exec`, `idx_step_node` |
+
+#### §10.1.7 `TBL-WF-007 flow_template` (Master, v1.1 新規)
+
+(BD §4.2.7 通り。RLS: `is_builtin=true` 跨 tenant 可読。)
+
+| 追加項目 | 値 |
+|---|---|
+| Check | `is_builtin = false OR created_by IS NOT NULL` (builtin も created_by は system UUID を設定) |
+| RLS | `template_tenant_isolation USING (is_builtin = true OR tenant_id = current_setting('app.tenant_id')::UUID)` |
+
+#### §10.1.8 `TBL-WF-008 chat_session` (Transaction, v1.1 新規, append-only)
+
+| 追加項目 | 値 |
+|---|---|
+| Check | `length(message) BETWEEN 1 AND 4096` (T-31 上限) |
+| Check | `actor_session_id IS NOT NULL` |
+| Index | `idx_chat_actor_session`, `idx_chat_tenant` |
+
+#### §10.1.9 既存 `WorkItem` 拡張 (BD §4.3)
+
+| Column 追加 | Type | Null | Default | Description |
+|---|---:|---|---|---|
+| `source_kind` | VARCHAR(30) | NULL | NULL | `'workflow_tag_binding'` (派生) or NULL (人工) |
+| `source_flow_id` | UUID | NULL | NULL | 派生元 Flow (FK なし、`ON DELETE SET NULL` を SQL 層で担保 — Flow 削除時 source_flow_id を NULL 化) |
+| `tag_binding_status` | VARCHAR(10) | NULL | NULL | `'bound'` / `'detached'` / NULL |
+| `user_edited_fields` | TEXT[] | NOT NULL | '{}' | system 同期が上書きしない field 名一覧 |
+
+| Index 追加 | 種類 | 列 | 用途 |
+|---|---|---|---|
+| `idx_workitem_source_flow` | B-tree | `source_flow_id` | 派生カード逆引き |
+| `idx_workitem_tag_binding` | Partial B-tree | `(source_flow_id, tag_binding_status) WHERE source_flow_id IS NOT NULL` | BR-W-3 検出 |
+
+### §10.2 重要 SQL (実装可能粒度)
+
+#### §10.2.1 SQL-WF-001: Flow 一覧 (cursor pagination)
+
+```sql
+-- SQL ID: SQL-WF-001
+-- Purpose: Flow 一覧 (cursor-based、tag filter 任意)
+-- Input: tenant_id, tag_filter?, cursor?, limit
+-- Table: automation_flow
+-- Join: なし
+-- Sort: created_at DESC, id DESC (安定 sort、cursor pagination 用)
+SELECT id, name, tags, tag_binding_expr, enabled, current_version_id, updated_at
+  FROM automation_flow
+ WHERE tenant_id = $1
+   AND deleted_at IS NULL
+   AND ($2::text[] IS NULL OR tags @> $2)
+   AND ($3::uuid IS NULL OR id < $3)
+ ORDER BY created_at DESC, id DESC
+ LIMIT $4 + 1;
+```
+
+| 項目 | 値 |
+|---|---|
+| Expected Rows | limit + 1 (次頁存在判定) |
+| Index | `idx_flow_tenant` (tenant_id filter)、`idx_flow_tags` (tag filter) |
+| 性能検証 | 【性能検証必要】: tag filter 大量時の GIN 索引効果 |
+
+#### §10.2.2 SQL-WF-002: Webhook token 解決 (hot path)
+
+```sql
+-- SQL ID: SQL-WF-002
+-- Purpose: webhook_token → flow_id 解決 (memory cache miss fallback)
+-- Input: webhook_token
+SELECT f.id AS flow_id, f.tenant_id, fn.id AS node_id
+  FROM flow_node fn
+  JOIN automation_flow f ON f.id = fn.automation_flow_id
+ WHERE fn.webhook_token = $1
+   AND fn.kind = 'trigger'
+   AND fn.trigger_kind = 'webhook'
+   AND f.enabled = true
+   AND f.deleted_at IS NULL
+ LIMIT 1;
+```
+
+| 項目 | 値 |
+|---|---|
+| Expected Rows | 0 or 1 |
+| Index | `idx_node_webhook_token` (UNIQUE partial) |
+| Cache | in-memory `RwLock<HashMap<String, (Uuid, Uuid)>>` (startup warm + DB fallback、5 分 TTL) |
+| 性能検証 | cache hit rate > 99% 想定 (webhook 高頻度時) |
+
+#### §10.2.3 SQL-WF-003: Execution 起動 (insert)
+
+```sql
+-- SQL ID: SQL-WF-003
+-- Purpose: 新 Execution 起動 (per §8.2.1 P-010 順 4)
+-- Input: flow_id, flow_version_id, trigger_kind, actor?, chat_session_id?, tenant_id
+INSERT INTO execution_history (
+  id, automation_flow_id, automation_flow_version_id, status, trigger_kind,
+  origin_chat_session_id, started_at, tenant_id
+) VALUES (
+  gen_random_uuid(), $1, $2, 'running', $3, $4, now(), $5
+)
+RETURNING id;
+```
+
+| 項目 | 値 |
+|---|---|
+| Transaction | 単独 INSERT、1 TX |
+| Lock | なし (Flow 行は参照のみ、Execution 行は新規) |
+| Index | `idx_exec_flow`, `idx_exec_chat_session` (read 経路) |
+
+#### §10.2.4 SQL-WF-004: Execution step 永続化 (at-least-once retry)
+
+```sql
+-- SQL ID: SQL-WF-004
+-- Purpose: 単 node 実行結果を append (per §8.2.2 walk_graph 順)
+-- Input: execution_id, node_id, status, input, output, retry_count, routing_decision?, tenant_id
+INSERT INTO execution_step (
+  id, execution_id, flow_node_id, status, input, output, retry_count,
+  routing_decision, started_at, ended_at, tenant_id
+) VALUES (
+  gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+);
+```
+
+| 項目 | 値 |
+|---|---|
+| Retry | 失敗時 in-process retry × 3 + dead letter queue (WARN log)【TBD: T-26】 |
+| Index | `idx_step_exec`, `idx_step_node` |
+| Lock | なし |
+
+#### §10.2.5 SQL-WF-005: Execution 履歴一覧 (cursor pagination, FR-W9.3)
+
+```sql
+-- SQL ID: SQL-WF-005
+-- Purpose: 実行履歴 + step 詳細 (side panel 用)
+-- Input: execution_id (1 実行分のみ取得)
+SELECT id, flow_node_id, status, input, output, retry_count, routing_decision,
+       started_at, ended_at
+  FROM execution_step
+ WHERE execution_id = $1
+ ORDER BY started_at ASC, id ASC;
+```
+
+| 項目 | 値 |
+|---|---|
+| 性能検証 | 【性能検証必要】: 大量 step (100+) 時の JSONB 入出力メモリ影響 (T-27) |
+
+#### §10.2.6 SQL-WF-006: Activation 検証 (FR-W10.1 / W14.5)
+
+```sql
+-- SQL ID: SQL-WF-006
+-- Purpose: placeholder + agent_id null 検出
+-- Input: flow_id
+SELECT COUNT(*) AS placeholder_unbound_count
+  FROM flow_node
+ WHERE automation_flow_id = $1
+   AND is_placeholder = true
+   AND (agent_id IS NULL);
+-- 0 なら enabled に切替可
+```
+
+| 項目 | 値 |
+|---|---|
+| Index | `idx_node_placeholder` (partial) |
+| 性能検証 | 100 nodes でも < 10ms 想定 |
+
+#### §10.2.7 SQL-WF-007: 派生 WorkItem 重複検出 (FR-W11.2 BR-W-1)
+
+```sql
+-- SQL ID: SQL-WF-007
+-- Purpose: source_flow_id + source_kind='workflow_tag_binding' で既存カード検索
+-- Input: flow_id
+SELECT id
+  FROM "WorkItem"
+ WHERE source_flow_id = $1
+   AND source_kind = 'workflow_tag_binding'
+   AND tag_binding_status = 'bound'
+ LIMIT 1;
+```
+
+| 項目 | 値 |
+|---|---|
+| 0 件 → 新規作成 | 1 件以上 → skip (BR-W-1) |
+| Index | `idx_workitem_source_flow` (DD 段階追加) |
+
+#### §10.2.8 SQL-WF-008: BR-W-3 三分支処理 (FR-W11.4 / W12.3)
+
+```sql
+-- SQL ID: SQL-WF-008
+-- Purpose: 派生カードに対し状態別に処理
+-- Input: flow_id, removed_tags
+-- (a) Backlog: sprint_id IS NULL → DELETE FROM "WorkItem" WHERE ...
+-- (b) 未開始 Sprint: sprint.status = 'planned' → UPDATE SET sprint_id = NULL; then DELETE
+-- (c) 进行中 Sprint: sprint.status = 'active' → UPDATE SET tag_binding_status = 'detached', source_flow_id = NULL
+-- ※ 1 TX で 3 分支一括実行 (Saga)
+```
+
+| 項目 | 値 |
+|---|---|
+| 性能検証 | 【性能検証必要】: 大量派生カード時の LOCK 範囲 |
+
+### §10.3 CRUD 対応マトリクス
+
+| Process | TBL-WF-001 | TBL-WF-002 | TBL-WF-003 | TBL-WF-004 | TBL-WF-005 | TBL-WF-006 | TBL-WF-007 | TBL-WF-008 | WorkItem(拡張) |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| API-WF-01 POST | C | C (v_no=1) | — | — | — | — | — | — | — |
+| API-WF-01 PATCH | U | C (definition 変化時) | — | — | — | — | — | — | — |
+| API-WF-01 DELETE | U(deleted_at) | — | D(cascade) | D(cascade) | — | — | — | — | U(source_flow_id=NULL) |
+| API-WF-02 POST nodes | — | — | C | — | — | — | — | — | — |
+| API-WF-02 POST edges | — | — | — | C | — | — | — | — | — |
+| API-WF-02 DELETE node | — | — | D | D(cascade) | — | — | — | — | — |
+| API-WF-03 POST exec | — | — | — | — | C | — | — | — | — |
+| API-WF-04 POST resume | — | — | — | — | C(new, resumed_from) | — | — | — | — |
+| API-WF-05 webhook | — | — | — | — | C | — | — | — | — |
+| API-WF-06 POST template | — | — | — | — | — | — | C | — | — |
+| API-WF-06 DELETE template | — | — | — | — | — | — | D(custom のみ) | — | — |
+| API-WF-07 instantiate | C | C | C(N) | C(M) | — | — | R | — | — |
+| API-WF-08 chat message | — | — | — | — | — | — | — | C | — |
+| 草稿 confirm (W15.2) | C | C | C(N) | C(M) | — | — | — | U(applied=true) | — |
+| Execution step persist | — | — | — | — | — | C | — | — | — |
+| BR-W-3 tag 解綁 | — | — | — | — | — | — | — | — | D/U/U |
+
+### §10.4 Transaction 境界
+
+| 処理 | TX 単位 | 備考 |
+|---|---|---|
+| API-WF-01 POST Flow | 1 | automation_flow + version v1 同時作成 |
+| API-WF-01 PATCH enabled=true | 1 | activation 検証 + flow UPDATE 同 TX、検証失敗時 ROLLBACK |
+| API-WF-01 PATCH definition | 1 | version append + flow.current_version_id 更新 同 TX |
+| API-WF-02 POST edge 1 件 | 1 | 1 edge 単位 |
+| API-WF-03 POST execution | 1 | execution_history 1 行 |
+| API-WF-04 POST resume | 1 | 新 execution + 旧 execution.resumed_from_execution_id 記録 |
+| API-WF-07 instantiate | 1 (TX 1 個) | Flow + N nodes + M edges + version バルク INSERT、部分失敗時全 ROLLBACK |
+| API-WF-08 chat message | 1 | chat_session 1 行 (草稿生成は副作用、別 TX) |
+| BR-W-3 tag 解綁 | 1 (Saga) | 3 分支一括実行、途中で失敗 → detached に退避 |
+| Execution step 永続化 | 1 (append) | 単 step 単位、retry 失敗 → DLQ (T-26) |
+
+> **Saga 採用箇所**: 全体 Execution は Saga パターン (1 TX で全 node 実行しない)。step 単位で永続化、step 間で Saga 補償可能 (per BD §6.4 + 本 DD §7.4)。
+> **外部 API**: DB transaction 期間中の長時間 HTTP 待ち禁止 (per skill-multica-2 §20)。step 実行 → HTTP call → step 永続化 は別 TX に分離。
+
+### §10.5 排他 / 並行制御
+
+| シナリオ | 制御方式 | 失敗時の振る舞い |
+|---|---|---|
+| Flow PATCH 時の version conflict | 楽観 lock (`flow.version` カラム追加 or `automation_flow_versions.version_no` で代用) | 409 ERR-WF-CONFLICT-001 → フロント再読込 |
+| Webhook 同時多発 (高頻度) | (a) `Idempotency-Key` UNIQUE で重複検出、(b) 各 Execution は独立、OK | 200 (idempotent) or 新 execution_id |
+| Execution step 永続化の並行 | UNIQUE constraint なし、append-only のため race なし | at-least-once retry (T-26) |
+| WorkItem 派生カード作成 (BR-W-1 重複) | `source_flow_id + tag_binding_status='bound'` で SELECT FOR UPDATE → 既存なら skip | — |
+| Tag 編集 + canvas_event 同時 | Flow 行の楽観 lock | 409 → reload |
+| BR-W-3 三分支同時実行 | `source_flow_id` で row lock、3 分支 1 TX | 競合時 409 ERR-WF-CONFLICT-001 |
+
+> **【TBD: T-27】** Flow 編集の CRDT vs 楽観 lock 選択 (per SRS リスク #6 派生、A12 CRDT 选型未拍板)。本 DD は楽観 lock 既定 (実装容易)、CRDT 採用時は `flow_node.version` を HLC (Hybrid Logical Clock) に変更。
+
+### §10.6 Cache 設計
+
+| Cache Key | Value | TTL | Invalidate | Fallback |
+|---|---|---|---|---|
+| `flow:{id}:version:{no}` | FlowDefinition | 5 分 | version append / rollback で invalidate | DB fetch |
+| `webhook_token:{token}` | (flow_id, tenant_id, node_id) | 5 分 | webhook_token UPDATE/DELETE で invalidate | DB fetch (SQL-WF-002) |
+| `template:builtin:*` | 内蔵テンプレート全体 | 起動時のみ reload (DB 変更不可のため runtime 永久) | 起動時のみ reload | DB fetch (rare) |
+| `tag_binding_expr:{flow_id}` | compiled AST | 1 時間 | Flow patch で invalidate | re-compile |
+
+> **Cache Failure**: cache 障害時 → DB 直接 fetch、業務影響なし (性能劣化のみ)。
+
+### §10.7 データ保持 / 削除規則
+
+| 表 | 保持期間 | 削除方式 |
+|---|---|---|
+| automation_flow | 無期限 | soft_delete (`deleted_at` 列追加, DD 段階で追加) |
+| automation_flow_versions | 無期限 | 物理削除禁止 |
+| flow_node | 無期限 | 親 Flow 削除時 cascade 物理削除 |
+| flow_edge | 無期限 | 親 Flow 削除時 cascade 物理削除 |
+| execution_history | 【TBD: T-09 / NFR-WF-04】 既定 90 日 (BD 既定案)、SLO 設定後に確定 | 物理削除可 (append-only 違反例外、運用ポリシー合意後) |
+| execution_step | 同上 | 同上 |
+| flow_template | 無期限 | custom のみ DELETE 可、builtin 不可 |
+| chat_session | 無期限 (append-only、監査用) | 物理削除禁止 |
+| WorkItem (拡張部) | 無期限 (派生カード audit 用) | 派生カードは BR-W-3 で物理削除、人工カードは手動 |
+
+> **【TBD: T-20】** execution_history/step 中の sensitive フィールド脱敏保存要否 (per BD §8.5)。実装は v1 は plaintext 保存 + audit 権限分離、Round 7 で SRE/Security と最終決定。
+
+---
+
+## §11 セキュリティ / ログ / 監査 / 設定 / 障害復旧 (Round 6)
+
+> **本節の位置付け**: BD §8 (Security Design) と TBD 追跡表 (§13) を実装可能な粒度的ブレークダウンする。`skill-multica-2` §29〜§32 に従う。
+
+### §11.1 認証 / 認可 (per §9.1.1)
+
+#### §11.1.1 認証方式
+
+| Endpoint 種別 | 認証方式 | 備考 |
+|---|---|---|
+| API-WF-01〜04 / 6〜8 | Session Token (既設 middleware) | Cookie / Bearer 既存パターン |
+| API-WF-05 webhook | path token 厳密一致 (`flow_node.webhook_token`) | HMAC / IP allowlist は未実装 |
+| 既設 WS canvas-collab | 既設認証 | — |
+
+#### §11.1.2 認可 (RBAC) — 必要スコープ
+
+| Scope | 許可操作 |
+|---|---|
+| `flow.read` | API-WF-01/02 GET, API-WF-03 GET, §9.3-9.5 読み取り |
+| `flow.write` | API-WF-01 PATCH/DELETE, API-WF-02 POST/PATCH/DELETE |
+| `flow.execute` | API-WF-03 POST, API-WF-04 POST |
+| `template.read` | API-WF-06 GET |
+| `template.write` | API-WF-06 POST/PATCH/DELETE (custom のみ) |
+| `template.instantiate` | API-WF-07 POST |
+| `chat.use` | API-WF-08 POST |
+
+| Scope チェック | 実装 |
+|---|---|
+| middleware で session_token → role → scope 解決 | 既設パターン |
+| 不足 → 403 ERR-WF-AUTHZ-001 | BFF layer |
+| フロント非表示は体験最適化のみ、サーバ側必須再検証 | per BD §8.1 |
+
+### §11.2 Webhook 攻撃面 (per BD §8.2 / T-15 / T-33)
+
+| 攻撃ベクトル | 現状 | Round 7 までの実装 |
+|---|---|---|
+| token 推測 | 64 字符 ランダム UUID | 実装 |
+| replay 攻撃 | `Idempotency-Key` 24h TTL | 実装 (Idempotency UNIQUE) |
+| body 過大 | 1MB 上限 (T-14 既定) | 実装 |
+| HMAC 偽造 | 未実装 | 【TBD: T-15】 安全審査前 TODO |
+| IP allowlist | 未実装 | 【TBD: T-33】 安全審査前 TODO |
+| 透射 body の二次注入 | 未実装 | 【TBD: T-19】 Design Doc + Unit test 必要 |
+
+> **Webhook 公開前**: 安全審査完了まで production 外部呼出接入禁止 (per BD §8.2 警告)。
+> **【重要】** HMAC / IP allowlist / 二次注入防護 3 件すべて未実装のため、**安全審査完了まで production webhook 公開禁止** (per BD §8.2 §11.2)。
+
+### §11.3 Agent 占位符活性化前検証 (per BD §8.3)
+
+```text
+ActivationGuard.pre_check(flow_id, tenant_id):
+    unbound_count = SQL-WF-006 (placeholder + agent_id null count)
+    IF unbound_count > 0:
+        return Err(ERR-WF-ACT-001 with details {
+            unbound_count,
+            placeholder_node_ids: SELECT id FROM flow_node WHERE is_placeholder=true AND agent_id IS NULL
+        })
+    ELSE:
+        return Ok(())
+```
+
+**検査位置**: BFF layer の `enabled=true` 切替時 (per BD §8.3 「サーバ側強制」)。フロント非表示は補助のみ。
+
+### §11.4 入力検証 (per §9.1.1 順 2)
+
+| 入力 | 検証 |
+|---|---|
+| Flow 名 | 1〜255 字符、UTF-8、`<script>` 等の HTML タグ不可 (XSS 防御) |
+| Tag | 英数 + `-_` のみ、1〜64 字符 |
+| kind / trigger_kind / action_kind / merge_mode / edge_kind / routing_mode | enum 厳密一致 |
+| condition_expr / loop_source_expr / tag_binding_expr | 構文検証 (§8.1 P-001 順 8, 11) |
+| webhook_token | UUID v4 形式、UNIQUE 制約 |
+| data_mapping | `{{node.<uuid>.output.<field>}}` パース (§8.4.1) |
+| concurrency | 1〜20 (CHECK 制約) |
+| チャット message | 1〜4096 字符、HTML エスケープ (T-31) |
+| Webhook body | 1MB 上限 (T-14) |
+
+### §11.5 機微データ マスキング
+
+| 項目 | ルール |
+|---|---|
+| password / secret / API key | 一切ログ・保存しない (per 既設) |
+| webhook_token | ログ出力時 hash 化 (SHA-256 prefix 8 字符) |
+| Execution 入力/出力 (JSONB) | plaintext 保存、audit 権限は `flow.read` 必要 (per 既設 RLS) |
+| sensitive フィールド (T-20) | 【TBD】 Design Doc 完了後 |
+
+### §11.6 Logging 設計
+
+| ログ種別 | 出力先 | 必須フィールド |
+|---|---|---|
+| Application Log | 既設 log pipeline | timestamp, trace_id, correlation_id, level, module, message |
+|  Access Log | 既設 | method, path, status, latency, tenant_id, actor_id |
+|  Error Log | 既設 + Sentry | error_code, stack_trace (dev のみ), correlation_id |
+|  Audit Log | append-only `automation_flow_versions` (definition 差分) | actor_id, action, before, after, timestamp |
+|  Security Log | 既設 security pipeline | auth_event, source_ip, user_agent, result |
+
+| 相関 ID | 用途 |
+|---|---|
+| `trace_id` | 1 HTTP request / WS event 単位、OpenTelemetry 互換 |
+| `correlation_id` | 1 Execution 単位、全 step / 全 API 呼出 / 全 DB 行に貫通 (`execution_history.id` と一致しても良い) |
+| `webhook_idempotency_key` | webhook 単位 (24h TTL) |
+
+> **禁止事項** (per skill-multica-2 §30): password、secret、private key、完全な access token、不要な個人機微情報を記録しない。
+
+### §11.7 Audit 設計
+
+| 対象 | 記録 | 保管 |
+|---|---|---|
+| Flow 定義変更 | `automation_flow_versions` append (definition snapshot) | 無期限 |
+| Flow enabled 切替 | `automation_flow_versions` + event log (actor, before, after) | 無期限 |
+| Execution 起動・完了 | `execution_history` (status, started_at, ended_at) + `execution_step` (全 node 入出力) | 【TBD: T-09 / NFR-WF-04】 |
+| Template CRUD | 既設 audit log | 既設保管 |
+| Chat 草稿生成・確定・取消 | `chat_session` (message, parsed_flow_draft, applied, actor, timestamp) | 無期限 |
+| RBAC 違反 | security log + WARN notification | 既設 |
+
+| Audit 粒度 | 実装 |
+|---|---|
+| version diff (definition) | 実装 (definition JSONB 比較) |
+| 細粒度監査 (誰が何時何フィールド変更) | 【TBD: T-12】 専用 audit table 要否 |
+
+### §11.8 設定管理
+
+| 区分 | 実装 |
+|---|---|
+| Code | git 管理 (rust ソース) |
+| Configuration | 環境変数 / 既設設定ファイル (dev / stg / prod 別) |
+| Secret | 既設シークレット管理 (Vault 等) |
+
+| 環境別設定 | DEV | STG | PROD |
+|---|---|---|---|
+| webhook body 上限 | 1MB | 1MB | 【TBD: T-14】 |
+| retry 既定 max_retries | 3 | 3 | 3 |
+| retry 既定 backoff | exp 1s→30s | exp 1s→30s | exp 1s→30s |
+| 派生 WorkItem 派生 rate limit | 100/min | 100/min | 1000/min |
+| webhook 公開 | no | no | 安全審査後 only |
+
+### §11.9 監視 / 障害復旧
+
+| 項目 | 実装 |
+|---|---|
+| Health Check | 既設 /healthz, /readyz に workflow-engine の DB 接続確認追加 |
+| Metrics | 既設 Prometheus exporter に追加: `wf_executions_total`, `wf_executions_failed_total`, `wf_execution_duration_seconds`, `wf_node_step_duration_seconds`, `wf_webhook_received_total` |
+| Alert | 【TBD: NFR-WF-09】 既設 alert pipeline に Execution 失敗率 > 10% / 5min を追加 (Round 7 で具体化) |
+| Trace | OpenTelemetry 既設 (`trace_id` 自動連動) |
+| Recovery | (a) Execution 失敗 → resume_execution (W9.2) (b) Step 永続化失敗 → DLQ + 手動介入 (c) Flow 定義不整合 → 既版本へ rollback (W10.3) (d) DB 障害 → 既設 retry + failover (e) cache 障害 → DB fallback (per §10.6) |
+| 人工介入境界 | (a) DLQ 手動再投入 (b) detached 取消 (T-05) (c) 安全審査前 webhook 公開 |
+
+### §11.10 構成 / Deploy
+
+| Tier | 構成 |
+|---|---|
+| UI | 既設 (frontend) |
+| BFF | workflow-engine BFF (新) / chat-bar BFF (新) |
+| Domain Service | workflow-engine (Rust) / flow-template-library (Rust) / chat-bar (Rust) |
+| DB | 既設 PostgreSQL + 8 新規 table + RLS policy |
+| External | 既設 L0/TMO (ADR-0046 `/api/tmo/*`) |
+
+---
+
+## §12 NFR + Test 観点 (Round 7 part 1)
+
+> **本節の位置付け**: BD §7 で提案された NFR 群を「採用 / 提案値維持 / TBD 持ち越し」の 3 区分に分類し、各 FR の Test 観点を §6.2 追跡表に一括付与する。`skill-multica-2` §46 (Testability) + §47 (Review 規則) に従う。
+
+### §12.1 NFR 採用状況 (per BD §7)
+
+| NFR ID | 採用状況 | DD 段階の値 / 動作 | テスト方法 |
+|---|---|---|---|
+| NFR-WF-01 性能 (Flow CRUD P95 < 500ms) | **採用** (BD 提案値維持) | 既設 Canvas CRUD 基線踏襲 | k6 負荷試験 + APM |
+| NFR-WF-02 性能 (node 間调度遅延) | **TBD** (BD §7 待ち) | 【TBD: T-17】 製品/SRE 協調後確定 | bench test |
+| NFR-WF-03 容量 (単 Flow node 数上限) | **TBD** | 既定 200 (実装容易な安全策)、製品確定後上書き | 境界テスト |
+| NFR-WF-04 容量 (Execution 保留周期) | **TBD** | 既定 90 日 (BD 既定案)、運用合意後確定 | 容量 + purge test |
+| NFR-WF-05 可用性 | **採用** (既設踏襲) | 既設 SLA | 等設監視 |
+| NFR-WF-06 信頼性 (retry 既定値) | **TBD** | 既定 `{max_retries: 3, backoff: exponential, delay_ms: 1000, max_delay_ms: 30000}` | unit test |
+| NFR-WF-07 拡張性 (新 node kind 可插拔) | **採用** | `NodeKind` enum 拡張で実装 | code review |
+| NFR-WF-08 セキュリティ | §11 参照 | — | — |
+| NFR-WF-09 運用/監視 | **TBD** | 既設 pipeline 統合 (alert 規則は §11.9) | alert test |
+| NFR-WF-10 互換性 (AutomationRule 後方互換) | **採用** | 既設 AutomationRule を Flow の退化 2 層特例として保持 | migration test |
+| NFR-WF-11 災備 | **採用** (既設踏襲) | 既設 backup 戦略 | 既設 disaster recovery drill |
+
+### §12.2 Test 観点 マトリクス (54 FR + 補助)
+
+#### §12.2.1 Test 観点 凡例
+
+| 区分 | 内容 |
+|---|---|
+| 正常 | 正常系 |
+| 境界 | 境界値 (0, 1, 最大, 空) |
+| 異常 | 異常系 (DB / network / timeout / parse error) |
+| 権限 | 認可 / RBAC |
+| 並行 | 並行 / race / 一部失敗 |
+| Timeout | Timeout |
+| Retry | Retry |
+| Rollback | Rollback / Saga 補償 |
+| 冪等 | 冪等性 |
+| データ不整合 | データ不整合 / 整合性検証 |
+| 外部失敗 | 外部システム / webhook / L0 失敗 |
+
+#### §12.2.2 W1-W4 Test 観点
+
+| FR ID | Test 観点 ID | 観点 | Expected Result |
+|---|---|---|---|
+| FR-W1.1 | TST-WF-001 | 正常 + kind 非法 + 権限 + 並行作成 | kind=trigger/action/condition/... 作成可、不正値は 400、権限無は 403 |
+| FR-W1.2 | TST-WF-002 | 正常 + 自環 + 種類不正 + 跨 Flow | edge 作成可、自環は 400、跨 Flow は 400 |
+| FR-W1.3 | TST-WF-003 | 正常 + 権限 + 並行 + 失敗 rollback | Flow 作成可、失敗時 ROLLBACK |
+| FR-W1.4 | TST-WF-004 | 正常 + データ読込失敗 + 編集中別 session 更新 | node 詳細表示可、JSON 過大時 truncate |
+| FR-W2.1 | TST-WF-005 | 正常 + 並行連打 + 権限 | execution 作成可、各 click で 1 実行 (T-22 debounce 待ち) |
+| FR-W2.2 | TST-WF-006 | 正常 + cron 非法 + TZ | scheduler 起動 OK、不正 cron は 400 |
+| FR-W2.3 | TST-WF-007 | 正常 + token 不一致 + body 過大 + 冪等キー重複 | webhook 起動可、不一致は 401、body 超過は 413、重複は同 execution_id |
+| FR-W2.4 | TST-WF-008 | 正常 + filter 不一致 + 高頻度 storm | 起動 OK、不一致は skip、storm は debounce (T-23) |
+| FR-W3.1 | TST-WF-009 | 正常 + 失敗→W8 + 副作用検証 + timeout | 6 種 action 動作 OK、timeout は retry |
+| FR-W3.2 | TST-WF-010 | 正常 + HTTP 5xx + JSONPath 非法 + timeout | HTTP action 動作、5xx は retry |
+| FR-W3.3 | TST-WF-011 | 正常 + 並列合流 + 順序違反 + 一部失敗 | 順序/並列 edge 解決 OK |
+| FR-W4.1 | TST-WF-012 | 正常 + 評価エラー + 両分岐非活性 | IF 評価 OK、エラーは ERR、両分岐無は ERR-EXE-003 |
+| FR-W4.2 | TST-WF-013 | 正常 + default 落ち + case 重複 | switch 評価 OK |
+| FR-W4.3 | TST-WF-014 | 正常 + 部分不到達 + 全不到達 | join mode は 全到着待ち (T-24) |
+| FR-W4.x timeout | TST-WF-014a | Timeout | 既設 scheduler timeout で ERR |
+
+#### §12.2.3 W5-W9 Test 観点
+
+| FR ID | Test ID | 観点 | Expected |
+|---|---|---|---|
+| FR-W5.1 | TST-WF-015 | 正常 + 配列非配列 + 0 要素 + 副作用反復 | loop 動作、0 要素は no-op |
+| FR-W5.2 | TST-WF-016 | 正常 + 並列度境界 + 範囲外 | concurrency 1-20 OK |
+| FR-W6.1 | TST-WF-017 | 正常 + node_id 不存在 + field 不存在 + 型不一致 | `{{node.<id>.output.<field>}}` 評価 OK |
+| FR-W6.2 | TST-WF-018 | 正常 + key 不存在 + 過去 Execution 不変 | `{{flow.variables.<key>}}` 評価 OK |
+| FR-W6.3 | TST-WF-019 | 正常 + 構文不正 + `/automation` 同一性 | CEL 評価 OK |
+| FR-W7.1 | TST-WF-020 | 正常 + 循環 + 深さ>5 + 孤立 | subflow 動作、循環は ERR-VAL-006 (T-25) |
+| FR-W7.2 | TST-WF-021 | 正常 + 0 件 + 失敗→手動作成経路確保 | template 選択 OK |
+| FR-W8.1 | TST-WF-022 | 正常 + 一時的失敗回復 + 永久失敗 + 並行 retry | retry OK、exhausted は ERR |
+| FR-W8.2 | TST-WF-023 | 正常 + on_error 不存在→failed + 多段 on_error | on_error ルート動作 |
+| FR-W8.3 | TST-WF-024 | 正常 + 通知失敗 + 30s 遅延検証 | notification 動作 |
+| FR-W9.1 | TST-WF-025 | 正常 + 書込失敗 retry + 容量超過 (T-09) | step append OK、DLQ 動作 |
+| FR-W9.2 | TST-WF-026 | 正常 + 非冪等 action 再実行 (T-03) + 孤立 replay | resume OK、非冪等は ERR-CONFLICT-001 |
+| FR-W9.3 | TST-WF-027 | 正常 + JSON 過大 (T-27) + 権限 | 詳細表示 OK、truncate 動作 |
+
+#### §12.2.4 W10-W15 Test 観点
+
+| FR ID | Test ID | 観点 | Expected |
+|---|---|---|---|
+| FR-W10.1 | TST-WF-028 | 正常 + 未束縛 placeholder 有→拒否 (W14.5) + 権限 | enabled 切替 OK、残存は 400 |
+| FR-W10.2 | TST-WF-029 | 正常 + 並行編集 conflict (T-27) + diff 取得 | version append OK、conflict は 409 |
+| FR-W10.3 | TST-WF-030 | 正常 + 不存在 version + rollback 連鎖 | rollback OK |
+| FR-W11.1 | TST-WF-031 | 正常 + 構文不正 + 監視 ON/OFF | 監視動作 |
+| FR-W11.2 | TST-WF-032 | 正常 + 並行重複 (BR-W-1) + 権限 | 派生 OK、重複は skip |
+| FR-W11.3 | TST-WF-033 | 正常 + 派生 カード 編集 + 集計 + 期限 | 同権動作 |
+| FR-W11.4 | TST-WF-034 | 正常 + 硬删 + 移回删 + detached + 中途失敗 (T-28) | 3 分岐動作 |
+| FR-W11.5 | TST-WF-035 | 正常 + 構文不正 + 括弧 + NOT 単独 | ブール式評価 OK |
+| FR-W12.1 | TST-WF-036 | 正常 + sprint_id 空 + 既存 kanban 連動 | Backlog 配置 OK |
+| FR-W12.2 | TST-WF-037 | 正常 + 拖拽先ロック + 派生 カード | Sprint 移動 OK |
+| FR-W12.3 | TST-WF-038 | 正常 + detached 中 Sprint 完了 + 取消 (T-05) | detached 状態保持 |
+| FR-W12.4 | TST-WF-039 | 正常 + 0 件 + 権限 | SCR-WF-05 表示 OK |
+| FR-W12.5 | TST-WF-040 | 正常 + system 字段 上書防止 + 解除 | user_edited_fields lock 動作 |
+| FR-W13.1 | TST-WF-041 | 正常 + 映射 未設定 + 映射 非法 | status 同期 OK |
+| FR-W13.2 | TST-WF-042 | 正常 + 派生 vs 人工 同値字段 | 1 task 1 sprint 制約動作 |
+| FR-W14.1 | TST-WF-043 | 正常 + 0 件 + 読込失敗 | 一覧取得 OK |
+| FR-W14.2 | TST-WF-044 | 正常 + 並行 + 適用後編集 | instantiate OK (T-46 待ち) |
+| FR-W14.3 | TST-WF-045 | 正常 + 循環構築 + 編集離脱 | spec テンプレ動作 |
+| FR-W14.4 | TST-WF-046 | 正常 + 循環 + 段階名 自由 | superpowers 動作 |
+| FR-W14.5 | TST-WF-047 | 正常 + placeholder + agent_id 空→拒否 + 拒否メッセージ具体性 | ActivationGuard 動作 |
+| FR-W14.6 | TST-WF-048 | 正常 + 同名重複 + 内蔵影響無 | 別保存 OK |
+| FR-W14.7 | TST-WF-049 | 正常 + 内蔵削除試行 403 + 検索 | CRUD OK |
+| FR-W15.1 | TST-WF-050 | 正常 + L0 不到達→离线表示 + 画布影響無 | チャットバー表示 OK |
+| FR-W15.2 | TST-WF-051 | 正常 + 未命中→提示 + 草稿取消 + 草稿→本保存 (T-14) | mock 解析動作 |
+| FR-W15.3 | TST-WF-052 | 正常 + L0 不到達 + 决策可再現性 (T-09) | dynamic_agent 動作、降格も動作 |
+| FR-W15.4 | TST-WF-053 | 正常 + session 期限切れ + 権限 | origin_chat_session_id 記録 OK |
+| FR-W15.5 | TST-WF-054 | 正常 + 草稿→編集中 + 草稿 取消 | 草稿と手動ノード同等動作 |
+
+### §12.3 Test 環境
+
+| 環境 | 用途 |
+|---|---|
+| Unit test | 各 Class の独立テスト (`cargo test`)、mock で外部依存を切る |
+| Integration test | dev DB + 8 新規 table migration + 全体処理テスト |
+| E2E test | stg 相当 + 実 UI からの flow (playwright 等) |
+| Load test | k6 で API-WF-01〜08 + webhook を P95 / P99 計測 (NFR-WF-01) |
+| 安全 test | webhook token 推測 / replay / body overflow / SQLi / XSS |
+
+---
+
+## §13 TBD 追跡 + 既知缺口 (Round 7 part 2)
+
+> **本節の位置付け**: BD §9.3 TBD 追跡表 35 項目を本 DD として分類しなおし、Round 7 IPA 自審までに未決の項目を継続追跡する。各項目に「影響範囲」「DD 段階での仮置き」「確認担当」「期限」を付与する。
+
+### §13.1 BD §9.3 35 項目 DD 段階処理
+
+| ID | 内容 (要約) | DD 段階の処理 | 影響範囲 | 確認担当 | 期限 | 状態 |
+|---|---|---|---|---|---|---|
+| T-01 | Flow editor viewport 复用 / 独立 (FR-W1.3) | API 境界を viewport 非依存に分離 (per §7.1) | W1-W10 UI 実装 | 5 域 Lead | Round 7 完了前 | **未決** |
+| T-02 | 後端実持久化 engine 欠如 (v1) | 8 表 DDL は「実後端」前提で作成 | Execution 跨 session 復旧 | SRE | P0 阻塞、並行設計 | **未決 (阻塞)** |
+| T-03 | Resume (FR-W9.2) 非冪等 action 安全性 | flow_node に `idempotency_required` フラグ追加検討 (Round 7 決定) | W9.2 + W3 action 一部 | Dev Lead | Round 7 完了前 | **未決** |
+| T-04 | Tag 重複命中 (FR-W11.x) | v1 は重複許可、P1 観察 | W11 | PM | P1 完了後 | **保留** |
+| T-05 | detached 取消 (FR-W12.3) 人間確認要否 | v1 = 只読角标、取消不可、PM feedback 待ち | W12.3 | PM + 5 域 Lead | Round 7 完了前 | **未決** |
+| T-06 | retry 既定値 (NFR-WF-06) | `{max_retries: 3, exp 1s→30s}` 仮置き | W8.1 | Dev Lead | Round 7 完了前 | **仮置き (要承認)** |
+| T-07 | 総冊 3 コア 收录 (FR-T-07) | 最小 index 同期のみ | 総冊 文書 | 5 域 Lead | 別途 | **保留** |
+| T-08 | mock 規則 / 真実 LLM (W15.2/W15.3) | v1 mock、Round 7 で規則 table 確定 | W15.2/W15.3 | PM | Round 7 完了前 | **未決 (mock)** |
+| T-09 | dynamic_agent 决策可復現性 (W15.3) | decision_id + decision_seed で再現可設計 (§10.2.4) | W15.3 e2e test | Dev Lead | Round 7 完了前 | **仮置き** |
+| T-10 | AAA/spec/superpowers 3 テンプレ節点 (W14.2-4) | seed JSON 暫定、PM 待ち | W14 | PM | Round 7 完了前 | **未決 (T-46)** |
+| T-11 | spec 循環 自動死循环 検出 (W14.3) | node 級 retry 上限で代替、Flow 級は P2 | W14.3 | Dev Lead | P2 評估 | **保留** |
+| T-12 | 独立 automation_flow_audit (BD §4.5) | version diff で代替、Security 評審待ち | W10 / audit | Security | 安全評審前 | **未決** |
+| T-13 | API-WF-03 超時秒数 (BD §5.2) | 既設 §5.6 数値待ち | 全 API | 既設 architect | 既設更新時 | **保留** |
+| T-14 | Webhook body 上限 (BD §5.2/§8.2) | 1MB 既定 (§9.6 / §11.2) | API-WF-05 | Dev Lead + Security | Round 7 完了前 | **仮置き** |
+| T-15 | Webhook 署名/token 輪換 (BD §5.2) | 静的比对 + HMAC TODO (§11.2) | API-WF-05 | Security | 安全評審前 | **未決** |
+| T-16 | Execution node 級 status 秒級刷新 (BD §5.3) | WS event type 拡張済 (§9.10) | SCR-WF-04/06 | PM | Round 7 完了前 | **仮放置** |
+| T-17 | NFR-WF-02/03/04/06/09 数値 | §12.1 採用/仮置き | NFR | 製品 + SRE | Round 7 完了前 | **仮置き (一部)** |
+| T-18 | 映射解析器 同一 Execution 限定 (§8.4.1) | 設計済、unit test 必要 (§8.4.1 順 6) | W6.1 | Dev Lead | Round 7 完了前 | **仮置き (要 test)** |
+| T-19 | Webhook 二次注入 防護 (BD §8.4) | Design Doc + Unit test (§11.2) | API-WF-05 | Security | 安全評審前 | **未決** |
+| T-20 | Execution sensitive 脱敏 (BD §8.5) | v1 plaintext、audit 権限分離、Round 7 決定 | 全 Execution | Security + SRE | Round 7 完了前 | **未決** |
+| T-21 | chat_session TTL 自動清理 (BD §9.1) | 無期限 append-only 維持、T-21 で再評価可能 | W15 | PM | Round 7 完了前 | **保留** |
+| T-22 | Manual debounce (FR-W2.1) | v1 debounce 無、毎回 1 実行 | W2.1 | Dev Lead | Round 7 完了前 | **仮置き** |
+| T-23 | canvas_event debounce (FR-W2.4) | 設計保留 (T-23) | W2.4 | Dev Lead | Round 7 完了前 | **未決** |
+| T-24 | join mode 部分不到達 timeout (FR-W4.3) | §7.4 で timeout 戦略保留 | W4.3 | Dev Lead | Round 7 完了前 | **未決** |
+| T-25 | subflow 循環検出 algorithm (FR-W7.1) | DFS O(V+E)、深さ ≤5 (§8.1.1 順 7) | W7.1 | Dev Lead | Round 7 完了前 | **仮置き (要 test)** |
+| T-26 | execution at-least-once (FR-W9.1) | SQL-WF-004 + DLQ 設計済 | W9.1 | Dev Lead | Round 7 完了前 | **仮置き** |
+| T-27 | JSON 分頁/截断 (FR-W9.3) | truncate_bytes(64KB) 既定 (§7.2) | W9.3 | Dev Lead | Round 7 完了前 | **仮置き** |
+| T-28 | 派生 WorkItem 重試/補償 (FR-W11.4) | Saga 1 TX (§10.4) | W11.4 | Dev Lead | Round 7 完了前 | **仮置き** |
+| T-29 | L0 不可達降級 (FR-W15.3) | static_cel default 分岐 fallback (§8.7.2) | W15.3 | Dev Lead | Round 7 完了前 | **仮置き** |
+| T-30 | チャットバー 跨ページ 持続浮游 (SCR-WF-03) | Round 2 仮設: 持続 | W15 UI | PM | Round 7 完了前 | **仮置き** |
+| T-31 | チャット message 上限 (SCR-WF-03) | 4096 字符 (§10.1.8 / §11.4) | W15 | PM | Round 7 完了前 | **仮置き** |
+| T-32 | routing_decision JSONB 粒度 (W15.3) | §8.7.2 仮設計、Round 7 最終確定 | W15.3 | Dev Lead | Round 7 完了前 | **仮置き** |
+| T-33 | Webhook IP allowlist (BD §8.2) | §11.2 TODO | API-WF-05 | Security | 安全評審前 | **未決** |
+| T-34 | API Gateway 限流/WAF (BD §6.5/§8.4) | §11.2 / §11.9 言及 | API-WF-05 | SRE + Security | 部署評審前 | **未決** |
+| T-35 | 配套 test 設計書 (BD §10) | §12 で TST-WF-001〜054 割当、test 設計書は別途作成 | 全 FR | QA | 別途 | **保留** |
+| **T-46** | W14 既定 3 テンプレ 上流 SRS/BD 不在 | §7.5 BuiltinTemplateSeeder 実装待ち | W14.2/3/4 | PM + 5 域 Lead | Round 7 完了前 | **未決 (上位)** |
+| **(無番号)** | ADR-0046 実在パス未配置 (本 worktree) | §7.11/§7.12 で ADR-0046 参照前提、代替案保持 (§7.0 / §7.15) | W15 全域 | 5 域 Lead + architect | Round 7 完了前 | **未決 (上位)** |
+
+### §13.2 DD 段階で新たに発生した未決事項
+
+| ID | 内容 | 影響 | 仮置き / 対応 |
+|---|---|---|---|
+| T-DD-01 | BR-W-3 三分支 + detached 取消の人間確認要否 (Lead 確認 workflow) | W12.3 / UX | §11.9 / §12.2.4 TST-WF-038 で「取消不可」既定 |
+| T-DD-02 | Flow 編集 CRDT vs 楽観 lock (A12 CRDT 选型未拍板派生) | W10.2 | §10.5 で楽観 lock 既定、CRDT 採用時は HLC |
+| T-DD-03 | 既存 AutomationRule → Flow 移行スクリプト | NFR-WF-10 | §12.1 migration test 必要 |
+| T-DD-04 | webhook HMAC/IP allowlist 安全評審前の production 外部呼出接入禁止 | §11.2 / API-WF-05 | 安全評審完了まで production 禁止 |
+| T-DD-05 | execution_history / execution_step 保留周期 90 日 vs 1 年 vs 永久 | §10.7 / NFR-WF-04 | 既定 90 日、運用合意待ち |
+
+---
+
+## §14 IPA 詳細設計 自審 (Round 7 part 3)
+
+> **本節の位置付け**: `ipa-document-self-review` skill の §2 (10 項目) と §47 (16 項目 Review 規則) に従い、本 DD を自己審査する。指摘は「致命 / 重大 / 一般 / 軽微 / 確認事項」の 5 区分で分類し、各項目に「根拠 / 影響 / 修正提案 / 阻断判定」を付与する。
+
+### §14.1 自審結果サマリ
+
+| 区分 | 指摘数 | 阻断数 |
+|---|---:|---:|
+| 致命 (Critical) | 0 | 0 |
+| 重大 (Major) | 4 | 0 (Round 7 完了前に対応予定) |
+| 一般 (Moderate) | 6 | 0 |
+| 軽微 (Minor) | 4 | 0 |
+| 確認事項 (Open) | 12 | 0 |
+
+**総合判定**: **【条件付き通過】** (Round 7 で 4 件重大指摘の対応 + 12 件確認事項の解消後に 【自審通過】 昇格予定)
+
+### §14.2 指摘詳細
+
+#### §14.2.1 重大 (Major) 指摘
+
+| ID | 章 | 内容 | 影響 | 修正提案 | 阻断 |
+|---|---|---|---|---|---|
+| RV-MAJ-01 | §7.0 / §7.15 | ADR-0046 実在パス本 worktree 未配置、§7.11/§7.12 設計が前提崩れる可能性 | W15 全域 設計不整合 | Round 7 完了前に文書横断で ADR-0046 実在確認。確認不可なら /v1/collaboration/chat-sessions/{id} 配下に mock L0 ハンドラ実装に降格 (§7.0 既述) | いいえ |
+| RV-MAJ-02 | §7.5 / §13.1 (T-46) | W14 既定 3 テンプレ (AAA / spec / superpowers) 上流 SRS/BD 不在、seed JSON 未確定 | W14.2/3/4 実装着手不可 | Round 7 完了前に PM + 5 域 Lead で seed JSON 確定、または PM 起票待ち | いいえ |
+| RV-MAJ-03 | §10.7 / T-09 / NFR-WF-04 | Execution 保留周期 90 日 / 1 年 / 永久 未確定、容量計画影響 | 容量 + 運用影響 | 既定 90 日で容量計画、Round 7 で SRE 確定後上書き | いいえ |
+| RV-MAJ-04 | §11.2 / §13.1 (T-15/T-19/T-33) | Webhook 攻撃面 (HMAC / IP allowlist / 二次注入) 未実装、安全評審前 production 禁止 | Webhook 公開阻塞 | 安全評審実施 + HMAC/IP allowlist/二次注入防護実装完了まで production webhook 接入禁止 (per BD §8.2) | いいえ |
+
+#### §14.2.2 一般 (Moderate) 指摘
+
+| ID | 章 | 内容 | 修正提案 |
+|---|---|---|---|
+| RV-MOD-01 | §6.2 全 FR | TBD 継承列が 17 項目で止まる可能性、Round 7 で全 FR の TBD 影響再評価必要 | §13 と §6.2 のクロスリ REFERENCE表追加 (Round 7 完了前) |
+| RV-MOD-02 | §7.4 / T-25 | Subflow 循環検出 DFS O(V+E) だが、深さ ≤5 と複合時のエッジケース未評価 | Round 7 で境界テスト (深さ = 5/6, 循環 vs 深さ) 追加 |
+| RV-MOD-03 | §8.5.1 / T-06 | retry 既定値 `{max_retries: 3, exp 1s→30s}` は仮置き、Dev Lead 承認待ち | Round 7 で Dev Lead レビュー + 承認 |
+| RV-MOD-04 | §8.7.2 / T-09/T-32 | routing_decision JSONB 粒度仮設計、再現性 unit test 必要 | Round 7 で unit test evidence 追加 |
+| RV-MOD-05 | §10.5 / T-27 | Flow 編集 楽観 lock vs CRDT 既定は楽観 lock、CRDT 採用時の HLC 切替未評価 | Round 7 で A12 CRDT 选型待ち、確定後 §10.5 を更新 |
+| RV-MOD-06 | §11.2 | Webhook HMAC / IP allowlist / 二次注入 / 透射 4 件すべて未実装、安全評審阻塞 | §11.2 に「安全評審前の production 外部呼出接入禁止」を強調表示 |
+
+#### §14.2.3 軽微 (Minor) 指摘
+
+| ID | 章 | 内容 |
+|---|---|---|
+| RV-MIN-01 | §6.2 一部 | 一部 FR 行で BD 一次引用が空欄 (例 W7.2) | Round 7 で補完 |
+| RV-MIN-02 | §9.1.1 | 既設 §5.6 数値参照と本 DD の timeout/retry 値の関係が §11.2 と一部重複 | 整理 |
+| RV-MIN-03 | §10.6 | Cache TTL 「永久」の妥当性 (template 起動時 reload のみ) の根拠薄い | 根拠追加 |
+| RV-MIN-04 | §13.1 | T-46 と「無番号」(ADR-0046) の採番統一 | Round 7 で整理 |
+
+#### §14.2.4 確認事項 (Open) — 12 件
+
+| ID | 内容 | 担当 | 期限 |
+|---|---|---|---|
+| RV-OPN-01 | ADR-0046 実在パス / L0 TopAgentState 詳細 / `/api/tmo/*` 8 端点 仕様 (§7.0 / §7.12) | 5 域 Lead + architect | Round 7 完了前 |
+| RV-OPN-02 | W14 既定 3 テンプレ seed JSON (§7.5 / T-46) | PM + 5 域 Lead | Round 7 完了前 |
+| RV-OPN-03 | W14 既定 3 テンプレ 上流 SRS/BD 確定 (§7.5 / T-46 関連) | 5 域 Lead | Round 7 完了前 |
+| RV-OPN-04 | 既存 Canvas / Agent 25 module 境界宣言 (`DD-CANVAS-AGENT-001.md` 側) (§2) | 5 域 Lead | Round 7 完了前 |
+| RV-OPN-05 | `chat_session` TTL 自動清理 (BD §9.1 / T-21) | PM | Round 7 完了前 |
+| RV-OPN-06 | BR-W-3 detached 取消 人間確認要否 (W12.3 / T-05) | PM + 5 域 Lead | Round 7 完了前 |
+| RV-OPN-07 | retry 既定値 (T-06 / NFR-WF-06) | Dev Lead | Round 7 完了前 |
+| RV-OPN-08 | dynamic_agent 决策可復現性 (W15.3 / T-09) | Dev Lead | Round 7 完了前 |
+| RV-OPN-09 | routing_decision JSONB 粒度 (W15.3 / T-32) | Dev Lead | Round 7 完了前 |
+| RV-OPN-10 | 安全評審 (HMAC / IP allowlist / 二次注入) (T-15/T-19/T-33) | Security + SRE | 安全評審前 |
+| RV-OPN-11 | Execution 保留周期 (NFR-WF-04 / T-09) | SRE | Round 7 完了前 |
+| RV-OPN-12 | Flow 編集 CRDT vs 楽観 lock (A12 CRDT 选型派生 / T-27) | architect | Round 7 完了前 |
+
+### §14.3 IPA 10 項目 Review 結果
+
+| # | 項目 | 結果 | 備考 |
+|---|---|---|---|
+| 1 | 目的 / 範囲 / 対象 / 前提 / In/Out Scope | ✓ | §0-§2 完整 |
+| 2 | 上位追跡 (主要対象 → Req/BD/DD) | ✓ | §6.2 54 FR 全項目 |
+| 3 | 内部一貫性 (term / ID / field / state / API / DB / 権限 / error / flow) | ✓ (一部 仮置き) | §7.15 ID 体系リファレンス + §13 TBD |
+| 4 | 完全性 (必要観点) | ✓ | §7-§12 で全観点カバー |
+| 5 | 正常 / 異常 / 境界 | ✓ | §8 全処理 + §11.4 |
+| 6 | 実現可能性 (模糊 排除) | △ | T-46 / RV-MAJ-01 が未確定 |
+| 7 | テスト可能性 | ✓ | §12.2 で TST-WF-001〜054 + Expected Result |
+| 8 | 運用復旧 (logging / monitoring / backup / restore / recovery / rollback) | ✓ | §11.6 / §11.9 / §10.4 Saga |
+| 9 | セキュリティ (auth / authz / validation / secret / audit / sensitive) | ✓ (一部 TODO) | §11 + RV-MAJ-04 |
+| 10 | TBD 明示 | ✓ | §13 で 36 + 5 項目追跡 |
+
+### §14.4 skill-multica-2 §50 最終品質門禁
+
+| 区分 | 項目 | 結果 |
+|---|---|---|
+| Traceability | DD → BD → Requirement / 主要設計 ID 一意 | ✓ (§6.2 + §7.15) |
+| Processing | 入力 / 出力 / 正常 / 分岐 / 異常 / 状態 | ✓ (§8) |
+| Data | DB アクセス / CRUD / Transaction / Rollback / 排他 / 一貫性 | ✓ (§10) |
+| Reliability | Timeout / Retry / Idempotency / 復旧 | ✓ (§8.5 / §10.4 / §11.9) |
+| Security | Auth / validation / secret / audit | ✓ (一部 TODO §11.2) |
+| Operations | Logging / Monitoring / Recovery / 設定 | ✓ (§11.6 / §11.9) |
+| Quality | 無断 変更 / 矛盾 / TBD / テスト / 実装 / Review | ✓ (Round 7 完了条件: RV-MAJ + RV-OPN 解消) |
+
+### §14.5 最終判定
+
+**【条件付き通過】**
+
+理由:
+- 致命指摘 0 件
+- 重大指摘 4 件 (RV-MAJ-01〜04) はいずれも Round 7 完了前 (本 DD 提出前) に対応予定
+- 確認事項 12 件 (RV-OPN-01〜12) は Round 7 完了前 (本 DD 提出前) に解消予定
+- 上記すべて解消後 → 【自審通過】 昇格
+
+### §14.6 Round 7 完了前 必須対応 (Checklist)
+
+- [ ] RV-MAJ-01: ADR-0046 実在確認 + §7.11/§7.12 更新
+- [ ] RV-MAJ-02: W14 既定 3 テンプレ seed JSON 確定 + §7.5 更新
+- [ ] RV-MAJ-03: Execution 保留周期 確定 + §10.7 / §12.1 更新
+- [ ] RV-MAJ-04: 安全評審結果反映 + §11.2 更新
+- [ ] RV-OPN-01〜12 すべて解消
+- [ ] §6.2 / §13 のクロスリ REFERENCE表完成
+- [ ] §12.2 Test 観点をテスト設計書に転記
+- [ ] 本 DD を master へ push + Multica issue ULYS-33 を Done へ
+
+---
+
+## §15 文档修订履历
+
+| 版本 | 日期 | 变更摘要 | 作者 |
+|---|---|---|---|
+| v1.0 | 2026-09-14 | 初版交付, 覆盖 SRS-CANVAS-WORKFLOW-001 v1.1 全部 54 项 FR (W1-W15), §0-§14 完整章节结构, 11 Module / 30+ Class / 8 REST API / 8 Table / 36 TBD 追踪矩阵 + 5 項目追加 / 12 確認事項 + IPA 自審 | MinimaxM3 (agent) |
 
