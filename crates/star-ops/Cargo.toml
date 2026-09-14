@@ -69,7 +69,7 @@ tower = { version = "0.5", features = ["util"] }
 # axum::body::Body 测试用
 # reqwest::Client IT 调 ops_api HTTP
 # criterion bench (per 守门 #7 v3 PT 雏形 P95 < 200ms)
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 
 # IT-5-GAPS 缺口 #1 + 缺口 #2: 真实 PG 连接 (per IT-5-GAPS-IMPL brief §2.1)
 # 复用 workspace 声明的 sqlx (database crate), 加 postgres 特性 (PG driver)
