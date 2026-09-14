@@ -967,9 +967,9 @@ STAR 平台已有 `automation` module (`frontend/src/app/automation/page.tsx`, p
 | 项 | 内容 |
 |---|---|
 | ID | FR-WORKFLOW-W14.2 |
-| 描述 | 套用后生成链路: `manual` 触发 → Agent 占位"图生高模" → Agent 占位"绑骨骼 (rigging)" → Agent 占位"高模转低模 (retopology)" → Agent 占位"绑定动作 (animation)" → 并行 N 条 Agent 占位"贴图生成" (diffuse/normal/roughness/AO 各 1 节点, per W3.3 并行编排) → Merge 汇合 (per W4.3) → 结束 |
+| 描述 | 套用后生成链路: `manual` 触发 → Agent 占位"图生高模" → Agent 占位"绑骨骼 (rigging)" → Agent 占位"低模化 (retopology)" → Agent 占位"绑定动作 (animation)" → 并行 N 条 Agent 占位"贴图生成" (diffuse/normal/roughness/AO 各 1 节点, per W3.3 并行编排) → Merge 汇合 (per W4.3) → 结束 |
 | 数据 schema 增项 | 复用 `flow_template.definition: { nodes: FlowNode[], edges: FlowEdge[] }` (JSON 快照) |
-| 业务规则 | 各 Agent 占位节点默认 `is_placeholder = true`, `placeholder_role_hint` 分别写入 "图生高模" / "绑骨骼" / "低模化" / "动作绑定" / "贴图生成" |
+| 业务规则 | 各 Agent 占位节点默认 `is_placeholder = true`, `placeholder_role_hint` 分别写入 "图生高模" / "绑骨骼" / "低模化" / "绑定动作" / "贴图生成" |
 | 优先级 | P1 |
 
 **用户故事**: US-W29
