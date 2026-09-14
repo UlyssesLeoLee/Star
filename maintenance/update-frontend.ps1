@@ -16,9 +16,69 @@
 # 设计原则:
 #   - git pull --ff-only: 本地有未推送 commit / 分支会失败, 不偷偷 merge
 #   - 失败立即退出 (ErrorActionPreference Stop), 留给调用方决定是否回滚
+#   - npm ci / npm install 进程跟踪 + 退出清理 (Ctrl+C / 异常 / 正常结束 三条路径都收)
+#     (避免 husky / postinstall / prepare 钩子残留孤儿进程)
 # =====================================================================
 
 $ErrorActionPreference = 'Stop'
+
+# ---- 子进程跟踪: 记录 npm + 它派生的整棵树 PID, 退出时收 ----
+$Script:TrackedPids = [System.Collections.Generic.List[int]]::new()
+$Script:CleanupDone = $false
+
+function Stop-TrackedTree {
+    # 幂等: 只跑一次, 避免 Ctrl+C 双触发
+    if ($Script:CleanupDone) { return }
+    $Script:CleanupDone = $true
+
+    if ($Script:TrackedPids.Count -eq 0) { return }
+
+    Write-Host ""
+    Write-Host "==== 清理子进程树 ====" -ForegroundColor Cyan
+    foreach ($procId in $Script:TrackedPids) {
+        try {
+            $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$procId" -EA SilentlyContinue
+            if ($proc -and $proc.Name -in @('node.exe','npm.cmd','cmd.exe')) {
+                Write-Host ("  -> taskkill /F /T /PID {0} ({1})" -f $procId, $proc.Name) -ForegroundColor DarkGray
+                # /F 不给机会, 但 Ctrl+C / 异常退出时必须强杀,
+                # 否则 husky / postinstall 钩子派生的 node 子进程会残留
+                Start-Process -FilePath 'taskkill.exe' -ArgumentList @('/F','/T','/PID',"$procId") -WindowStyle Hidden -Wait -EA SilentlyContinue | Out-Null
+            }
+        } catch { }
+    }
+    Write-Host "==== 清理完成 ====" -ForegroundColor Cyan
+}
+
+# Ctrl+C / 关闭窗口 -> 走 cleanup 再 exit
+# Windows PowerShell 5.1: TreatControlCAsInput 默认 false, 不需要显式设置
+try {
+    if ([Console]::TreatControlCAsInput -is [bool]) {
+        [Console]::TreatControlCAsInput = $false
+    }
+} catch { }
+
+$Handler = {
+    Write-Host ""
+    Write-Host "[Ctrl+C] 收到终止信号" -ForegroundColor Yellow
+    Stop-TrackedTree
+    [System.Environment]::Exit(130)
+}
+
+try {
+    if ($null -ne [Console]::CancelKeyPress) {
+        [Console]::CancelKeyPress.add($Handler)
+    }
+} catch {
+    Write-Host "  (CancelKeyPress handler 注册失败, 仅依赖 trap + finally 清理)" -ForegroundColor DarkGray
+}
+
+# 兜底: 任何未捕获异常都触发
+trap {
+    Write-Host ""
+    Write-Host "[trap] 异常: $_" -ForegroundColor Red
+    Stop-TrackedTree
+    break
+}
 
 # ---- 0. 切到仓库根 ----
 $RepoRoot = Split-Path -Parent $PSScriptRoot
@@ -120,27 +180,54 @@ Write-Host "[2/3] frontend/ npm ci (锁文件同步) ..." -ForegroundColor Cyan
 Push-Location $FrontendDir
 try {
     $CiOk = $false
-    npm ci 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) {
+    # 用 Start-Process 拿 npm PID, 便于退出时 taskkill /T 收整棵树
+    # (避免 husky / postinstall 钩子派生的 node 子进程残留孤儿)
+    $NpmProc = Start-Process -FilePath 'npm.cmd' `
+                              -ArgumentList 'ci' `
+                              -NoNewWindow `
+                              -PassThru `
+                              -Wait `
+                              -RedirectStandardOutput "$FrontendDir\ci.out.log" `
+                              -RedirectStandardError  "$FrontendDir\ci.err.log"
+    $Script:TrackedPids.Add($NpmProc.Id) | Out-Null
+    $NpmExit = $NpmProc.ExitCode
+    if ($NpmExit -eq 0) {
         $CiOk = $true
     } else {
         # Fallback: npm ci 失败 (典型: package.json 比 lock 新, lock 不同步)
         # 触发自动 npm install 修 lock, 再重试一次
-        Write-Host "  npm ci 失败 (exit $LASTEXITCODE), 触发 fallback: npm install 修 lock + retry" -ForegroundColor Yellow
+        Write-Host "  npm ci 失败 (exit $NpmExit), 触发 fallback: npm install 修 lock + retry" -ForegroundColor Yellow
         Write-Host "  (per 9/6 17:07 JST 实际验证: Sprint commit ef2bc80 加依赖没重生 lock)" -ForegroundColor Yellow
-        npm install --no-audit --no-fund
-        if ($LASTEXITCODE -ne 0) {
-            throw "npm install 失败, exit code: $LASTEXITCODE (修 lock 重试都失败, 需要手动介入)"
+        $InstallProc = Start-Process -FilePath 'npm.cmd' `
+                                     -ArgumentList 'install','--no-audit','--no-fund' `
+                                     -NoNewWindow `
+                                     -PassThru `
+                                     -Wait `
+                                     -RedirectStandardOutput "$FrontendDir\ci.out.log" `
+                                     -RedirectStandardError  "$FrontendDir\ci.err.log"
+        $Script:TrackedPids.Add($InstallProc.Id) | Out-Null
+        $InstallExit = $InstallProc.ExitCode
+        if ($InstallExit -ne 0) {
+            throw "npm install 失败, exit code: $InstallExit (修 lock 重试都失败, 需要手动介入)"
         }
         Write-Host "  npm install 完成, 锁已修复, 重试 npm ci ..." -ForegroundColor Cyan
-        npm ci
-        if ($LASTEXITCODE -ne 0) {
-            throw "npm ci 重试仍失败, exit code: $LASTEXITCODE"
+        $CiProc = Start-Process -FilePath 'npm.cmd' `
+                                -ArgumentList 'ci' `
+                                -NoNewWindow `
+                                -PassThru `
+                                -Wait `
+                                -RedirectStandardOutput "$FrontendDir\ci.out.log" `
+                                -RedirectStandardError  "$FrontendDir\ci.err.log"
+        $Script:TrackedPids.Add($CiProc.Id) | Out-Null
+        $CiRetryExit = $CiProc.ExitCode
+        if ($CiRetryExit -ne 0) {
+            throw "npm ci 重试仍失败, exit code: $CiRetryExit"
         }
         $CiOk = $true
     }
 } finally {
     Pop-Location
+    Stop-TrackedTree
 }
 if ($CiOk) {
     Write-Host "[2/3] npm ci 完成" -ForegroundColor Green
