@@ -26,13 +26,13 @@ import { resolveInitialTab } from "@/lib/cookies";
 // Next.js 14 强制 page-level dynamic 防止静态化时拿不到 cookie
 export const dynamic = "force-dynamic";
 
-export default function ProjectsPage({
+export default async function ProjectsPage({
   searchParams,
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  // 1) 读 cookie (server side, SSR 同步)
-  const cookieTab = readProjectsDefaultTabFromCookie();
+  // 1) 读 cookie (server side, SSR 同步) — Next 16 起 cookies() 异步, 必须 await.
+  const cookieTab = await readProjectsDefaultTabFromCookie();
   // 2) 合并 cookie + URL, 计算 initialTab
   const initialTab = resolveInitialTab(searchParams, cookieTab);
 

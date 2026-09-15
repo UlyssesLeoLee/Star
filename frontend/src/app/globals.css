@@ -1,11 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "../styles/theme.css";
+@import "@xterm/xterm/css/xterm.css";
+@import "tailwindcss";
 
 /* Star 日漫科技美学双主题 v2.0 (Shōnen Studio Light + Neo-Tokyo Dark) */
-@import "../styles/theme.css";
 /* xterm.js v6 终端样式 (per 2026-09-01 PHASE-MOBILE-PWA v0.2 远程终端) */
-@import "@xterm/xterm/css/xterm.css";
 
 /* ─────────────────────────────────────────────────────────────────────
  * 字体策略 (per 9/5 14:48 JST 实测修正, 原 q2-fonts_opt1 next/font 走不通)
@@ -503,92 +501,3 @@ html.light,
   0%, 100% { filter: contrast(1.05) saturate(1.1); }
   50% { filter: contrast(1.15) saturate(1.25) brightness(1.03); }
 }
-
-/* ── Light Mode Dynamic Overrides (100% Clean Separation) ── */
-html.light .bg-[#07090e],
-.theme-light .bg-[#07090e] {
-  background-color: var(--cel-bg) !important;
-}
-
-html.light .bg-[#0f1422],
-.theme-light .bg-[#0f1422] {
-  background-color: var(--cel-surface-card) !important;
-  border-color: var(--cel-ink) !important;
-}
-
-html.light .bg-[#0d121c]\/95,
-.theme-light .bg-[#0d121c]\/95 {
-  background-color: rgba(244, 239, 230, 0.95) !important;
-  border-color: var(--cel-ink) !important;
-}
-
-html.light .bg-[#151c2c],
-.theme-light .bg-[#151c2c] {
-  background-color: var(--cel-surface-sub) !important;
-  border-color: var(--cel-ink) !important;
-  color: var(--cel-text-primary) !important;
-}
-
-html.light .bg-[#090d16],
-.theme-light .bg-[#090d16] {
-  background-color: var(--cel-surface-stage) !important;
-  border-color: var(--cel-ink) !important;
-}
-
-html.light .text-white,
-.theme-light .text-white {
-  color: var(--cel-text-primary) !important;
-}
-
-html.light .text-slate-100,
-html.light .text-slate-200,
-html.light .text-slate-300,
-.theme-light .text-slate-100,
-.theme-light .text-slate-200,
-.theme-light .text-slate-300 {
-  color: var(--cel-text-primary) !important;
-}
-
-html.light .text-slate-400,
-html.light .text-slate-500,
-.theme-light .text-slate-400,
-.theme-light .text-slate-500 {
-  color: var(--cel-text-secondary) !important;
-}
-
-html.light .bg-screentone-dense,
-.theme-light .bg-screentone-dense {
-  background-image: radial-gradient(rgba(10, 13, 20, 0.15) 1px, transparent 1px) !important;
-}
-
-html.light .text-[#00f0ff],
-.theme-light .text-[#00f0ff] {
-  color: var(--cel-cyan) !important;
-}
-
-html.light .bg-[#00f0ff],
-.theme-light .bg-[#00f0ff] {
-  background-color: var(--cel-cyan) !important;
-}
-
-html.light .text-[#ff184c],
-.theme-light .text-[#ff184c] {
-  color: var(--cel-crimson) !important;
-}
-
-html.light .bg-[#ff184c],
-.theme-light .bg-[#ff184c] {
-  background-color: var(--cel-crimson) !important;
-}
-
-html.light .text-[#ffc400],
-.theme-light .text-[#ffc400] {
-  color: var(--cel-gold) !important;
-}
-
-html.light .bg-[#ffc400],
-.theme-light .bg-[#ffc400] {
-  background-color: var(--cel-gold) !important;
-}
-
-

@@ -2,7 +2,7 @@
 
 import { useStore } from "@/lib/store";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useRef, Suspense } from "react";
+import { useEffect, useRef, Suspense, use as ReactUse } from "react";
 import html2canvas from "html2canvas";
 import toast from "react-hot-toast";
 import { CanvasView } from "@/components/CanvasView";
@@ -12,7 +12,7 @@ import Link from "next/link";
 import { useTranslation } from "@/lib/i18n";
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 function CanvasPageInner({ canvasId }: { canvasId: string }) {
@@ -126,12 +126,12 @@ function CanvasPageInner({ canvasId }: { canvasId: string }) {
 
 export default function CanvasPage({ params }: PageProps) {
   const { t } = useTranslation();
-  // Next.js 14.2.5: params 是 plain object (不是 Promise)
-  // 原 use() unwrap 是 Next 15 API, Next 14 不支持
+  // Next 15+: params is a Promise; use() unwraps in client components.
   // (per 2026-09-04 canvas e2e 守门 prerequisite baseline fix)
+  const { id } = ReactUse(params);
   return (
     <Suspense fallback={<div className="card">Loading canvas...</div>}>
-      <CanvasPageInner canvasId={params.id} />
+      <CanvasPageInner canvasId={id} />
     </Suspense>
   );
 }
