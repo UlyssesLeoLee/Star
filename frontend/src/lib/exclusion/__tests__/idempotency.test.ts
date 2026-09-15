@@ -86,11 +86,15 @@ describe("IdempotencyManager", () => {
 
   it("localStorage expires after TTL", () => {
     const key = "test-key-5";
-    mgr.cacheKey(key, 1); // 1ms TTL
-    // 等过期
-    setTimeout(() => {
+    vi.useFakeTimers();
+    try {
+      mgr.cacheKey(key, 1); // 1ms TTL
+      // 推进时间超过 TTL
+      vi.advanceTimersByTime(10);
       const cached = mgr.getCachedKey(key);
       expect(cached).toBeNull();
-    }, 10);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

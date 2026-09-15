@@ -27,7 +27,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: { typedRoutes: false },
+  typedRoutes: false,
+  // Disable Next.js 16 auto-generated AGENTS.md / CLAUDE.md in app root.
+  agentRules: false,
   // W2 (Gantt) 临时跳过 TS 类型检查:
   // 已知 main HEAD 3e182d9 pre-existing 类型问题:
   //   - Sidebar.tsx NavItem.icon 类型 与 lucide-react icon 类型不匹配 (ForwardRefExoticComponent)

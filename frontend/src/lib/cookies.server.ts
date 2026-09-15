@@ -20,12 +20,12 @@ import { cookies } from "next/headers";
 import { PROJECTS_DEFAULT_TAB_COOKIE, isValidProjectsTab, type ProjectsTabId } from "./cookies";
 
 /**
- * server component 读 cookie (per Next.js 14 next/headers).
- * 在 server 渲染时同步可读, SSR HTML 已经包含正确的 default tab.
+ * server component 读 cookie (per Next.js 16 next/headers).
+ * Next 15+ 起 cookies() 变 async, 必须 await.
  */
-export function readProjectsDefaultTabFromCookie(): ProjectsTabId | null {
+export async function readProjectsDefaultTabFromCookie(): Promise<ProjectsTabId | null> {
   try {
-    const c = cookies().get(PROJECTS_DEFAULT_TAB_COOKIE)?.value;
+    const c = (await cookies()).get(PROJECTS_DEFAULT_TAB_COOKIE)?.value;
     return isValidProjectsTab(c) ? c : null;
   } catch {
     // 边界: middleware 上下文外调用 cookies() 会抛 — fallback null

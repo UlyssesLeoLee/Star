@@ -360,12 +360,16 @@ export function Tooltip({
     },
   } as const;
 
+  // React 19: cloneElement 不再接受 ref 作为 prop; 改用 ref 函数注入.
+  const setRefs = (node: HTMLElement | null) => {
+    mergeRefs<HTMLElement>(triggerRef, origRef as React.Ref<HTMLElement> | undefined)(node);
+  };
   const trigger = React.cloneElement(children, {
-    ref: mergeRefs<HTMLElement>(triggerRef, origRef as React.Ref<HTMLElement> | undefined),
     "aria-describedby": open ? tipIdRef.current : (childProps["aria-describedby"] as string | undefined),
     "data-tooltip-trigger": "",
     ...triggerHandlers,
-  });
+    ref: setRefs,
+  } as any);
 
   const tooltipNode =
     mounted && open ? (

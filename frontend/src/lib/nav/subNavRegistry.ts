@@ -27,7 +27,6 @@ import {
   ListTodo,
   Workflow,
   Calendar,
-  type LucideIcon,
 } from "lucide-react";
 import type { ModuleCategory } from "./registry";
 
@@ -39,7 +38,9 @@ export interface SubNavEntry {
   id: string;
   label: string;
   code: string;
-  icon: LucideIcon;
+  // React 19 兼容: LucideIcon 的 generic 在新 react types 下不再让 size/strokeWidth 自动 extend.
+  // 用一个具体的 component type 含 size/strokeWidth/className.
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
   category: ModuleCategory;
   /**
    * query 字符串片段 (e.g. "tab=kanban" / "view=list"), 拼到 pathname 后形成最终 href.

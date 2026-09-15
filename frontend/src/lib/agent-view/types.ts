@@ -57,8 +57,8 @@ export interface AgentCanvas {
   connectors: AgentCanvasConnector[];
   /** 初始 viewport (fit-to-content) */
   viewport: { x: number; y: number; zoom: number };
-  /** 派生时间戳 (用于 E2E / cache invalidation) */
-  derivedAt: string;
+  /** 派生时间戳 (用于 E2E / cache invalidation; SSR 阶段 null, client mount 后补) */
+  derivedAt: string | null;
 }
 
 /** "当前工作 agent" 标识 (per 拍板 #2: 自动选 + 手动覆盖 + URL 参数) */

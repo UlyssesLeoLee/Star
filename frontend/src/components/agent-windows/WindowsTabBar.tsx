@@ -27,13 +27,14 @@ interface WindowsTabBarProps {
   onNewTab: () => void;
 }
 
-const STATE_ICON: Record<TabState, React.ElementType> = {
-  created: Circle,
-  running: Loader2,
-  waiting_input: Circle,
-  completed: CheckCircle2,
-  failed: AlertCircle,
-  aborted: XCircle,
+// React 19 兼容: ElementType 默认变窄, 用一个明确的 component type 含 size/className.
+const STATE_ICON: Record<TabState, React.ComponentType<{ size?: number; className?: string }>> = {
+  created: Circle as React.ComponentType<{ size?: number; className?: string }>,
+  running: Loader2 as React.ComponentType<{ size?: number; className?: string }>,
+  waiting_input: Circle as React.ComponentType<{ size?: number; className?: string }>,
+  completed: CheckCircle2 as React.ComponentType<{ size?: number; className?: string }>,
+  failed: AlertCircle as React.ComponentType<{ size?: number; className?: string }>,
+  aborted: XCircle as React.ComponentType<{ size?: number; className?: string }>,
 };
 
 const STATE_COLOR: Record<TabState, string> = {
