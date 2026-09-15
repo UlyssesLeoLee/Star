@@ -50,7 +50,9 @@ export function Stat({
   hint?: string;
   tone?: "ok" | "warn" | "err" | "info" | "default";
   accent?: string;
-  icon?: React.ElementType;
+  // React 19 兼容: ElementType 默认变窄, 这里给 icon 一个 component type
+  // with size + className props.
+  icon?: React.ComponentType<{ size?: number; className?: string }>;
 }) {
   const { t } = useTranslation();
   const effectiveTone = tone ?? (accent === "primary" ? "info" : accent === "success" ? "ok" : "default");

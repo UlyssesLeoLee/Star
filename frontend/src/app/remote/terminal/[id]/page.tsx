@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import * as React from "react";
 import { ArrowLeft } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { XtermViewer } from "@/components/remote/XtermViewer";
@@ -10,10 +11,11 @@ import { useTranslation } from "@/lib/i18n";
 export default function RemoteTerminalPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const { t } = useTranslation();
-  const { id } = params;
+  // Next 15+: params is a Promise; use() unwraps in client components.
+  const { id } = React.use(params);
   const runtime = useStore((s) => s.localRuntimes.find((r) => r.id === id));
 
   if (!runtime) {

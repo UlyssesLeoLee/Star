@@ -557,9 +557,9 @@ const initialState = (set: any, get?: any): StoreState => ({
         priority: input.priority,
         sprint_id: input.sprint_id,
         project_id: input.project_id,
-        tenant_id: input.tenant_id,
-        workspace_ids: [input.tenant_id], // PoC: 1 workspace per tenant
-        assignee_id: assigneeId,
+        tenant_id: input.tenant_id ?? "",
+        workspace_ids: [input.tenant_id ?? ""], // PoC: 1 workspace per tenant
+        assignee_id: assigneeId ?? "",
         assignee_type: "agent",
         sa_type: pickSaTypeForKind(input.kind), // per ADR-0046 §6.1
         actor_session_id: undefined, // TODO: 接入 L0 chat bar session

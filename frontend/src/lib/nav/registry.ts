@@ -54,7 +54,8 @@ export interface ModuleDefinition {
   category: ModuleCategory;
   categoryLabel: string;
   description: string;
-  icon: React.ElementType;
+  // React 19 兼容: ElementType 默认变窄, 给 icon 一个明确的 component type.
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
   isCore?: boolean;
   count?: number;
 }
