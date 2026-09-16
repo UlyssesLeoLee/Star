@@ -1,0 +1,41 @@
+[package]
+name = "git-observer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — Git Observer: fsnotify + 100ms debounce + 15 GitEvent (ULYS-57.1 T2, per DD-WORKTREE-CANVAS-001 §11 + NFR-REL-001)"
+
+[lib]
+name = "git_observer"
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+futures-util = { workspace = true }
+
+# notify: cross-platform fs file watcher (per DD §11 Git Observer fsnotify)
+notify = { workspace = true }
+# tempfile: 测试用临时目录 (per 守门 #11 缺标比错标 — 阶段 1 测试用)
+tempfile = { workspace = true }
+
+# 跨 crate 引用: graph-core 提供 RepoId (per WORKTREE-CANVAS-IMPL-PLAN-001 §3 集成策略)
+# 单向依赖: git-observer → graph-core
+graph-core = { path = "../graph-core" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true
