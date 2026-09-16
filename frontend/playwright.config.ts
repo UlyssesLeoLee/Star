@@ -8,7 +8,7 @@ export default defineConfig({
   retries: 0,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: "http://localhost:3001",  // v5.1: 改 3001 (next start 生产模式, dev 模式 5-30s 编译期拿 error page)
     trace: "on-first-retry",
   },
   // §4.1 跨浏览器覆盖 (per TEST-DESIGN-OPS-001 v0.2 §4.1 + 5-LEVEL-FULL brief §2.1)
@@ -19,7 +19,7 @@ export default defineConfig({
     { name: "firefox", use: { ...devices["Desktop Firefox"] } },
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
   ],
-  webServer: {
+  webServer: process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1" ? undefined : {
     command: "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
