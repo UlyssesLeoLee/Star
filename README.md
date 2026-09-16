@@ -14,8 +14,8 @@ Star 是面向"AI 即工作流节点"时代重新设计的项目管理平台。
 | **工作空间** | 70 个 Rust crate + 1 个 npm frontend (327 个 .tsx/.ts) + 1308 篇设计文档 | `Cargo.toml` `members` + `find crates -name '*.rs'` + `find frontend/src` + `find docs -name '*.md'` |
 | **后端实现度** | 大头收官，边界收敛中 | 见 §1 "已实现"与 §2 "待收敛" |
 | **文档体系** | 16 SRS + 8 BD + 12 DD + 28 ADR | IPA 风格 (要件定義書 → 基本設計書 → 詳細設計書) |
-| **分支与 PR** | `main` 最新 `709a9e97`，最近 4 次 CI 全部 success | 见 §3 |
-| **本地 k3s 启动** | **未在本机验证可启动** | 见 §4 完整披露 |
+| **分支与 PR** | `main` 最新 `f3e10e47` (2026-09-16)，最近 4 次 CI 全部 success | 见 §3 |
+| **本地 k3s 启动** | **本机有活体 k3s cluster 在跑 (star-api-rest Running)，但完整 manifest server-side dry-run 暴露 2 个真实 bug** | 见 §4 完整披露 |
 | **诚实风险** | 1 个 helm chart YAML bug + 7 个未合入依赖 PR | 见 §5 |
 
 ---
@@ -32,7 +32,7 @@ Star 是面向"AI 即工作流节点"时代重新设计的项目管理平台。
 | 设计文档 (md) | 1308 | `find docs -name '*.md'` |
 | 架构决策记录 | 28 篇 ADR | `docs/architecture/**/adr/` + `docs/wiki/pgwiki/30-architecture/adr/` |
 | CI workflow | 4 job: rust-ci / e2e-integration / cross-platform / frontend-ci | `.github/workflows/ci.yml` |
-| 最近 4 次 main CI | 全部 success | `gh run list --branch main --limit 4` |
+| 最近 4 次 main CI | 全部 success (2026-09-14 ~ 2026-09-16) | `gh run list --branch main --limit 4` |
 
 ### 1.2 主要交付
 
@@ -46,7 +46,7 @@ Star 是面向"AI 即工作流节点"时代重新设计的项目管理平台。
 | `crates/infrastructure` + `crates/shared-task` | 2 | 基础设施 |
 | `crates/api` + `crates/application` | 2 | 接口层 |
 | `crates/arg*` + `crates/agent-domain` + `crates/canvas-collab` + `crates/leads` | 6 | 跨域工具 |
-| `deploy/k3s-local/` | kustomize (12 resource) + Dockerfile | kubectl kustomize 已在本机产出 12 resource, 见 §4 |
+| `deploy/k3s-local/` | kustomize (12 resource) + Dockerfile | 结构校验通过；本机活体 cluster 已跑通 `star-api-rest`，完整清单 dry-run 定位 2 个真实 bug (namespace 不一致 + cert-manager 缺失), 见 §4 |
 | `deploy/helm/star/` | Helm chart v0.1.0 | **Chart.yaml 有 YAML bug**, 见 §5 |
 | `maintenance/start-k3s-backend.ps1` 等 | 4 个 .ps1 / 4 个 .bat | Windows-WSL 启动脚本 (本任务未在 Windows 主机上跑通, 见 §4) |
 
@@ -82,7 +82,7 @@ Star 是面向"AI 即工作流节点"时代重新设计的项目管理平台。
 
 | 项 | 状态 |
 |---|---|
-| 本地 k3s / WSL Ubuntu 可启动后端 | **未在本机验证**, 见 §4 |
+| 本地 k3s / WSL Ubuntu 可启动后端 | **部分验证**: cluster 已跑通 6 天、`star-api-rest` Running；完整 kustomize 清单未跑通 (namespace 不一致 + cert-manager 缺失), 见 §4 |
 | 端到端 Playwright E2E | P3-A.5/WT-32 引用, 当前 CI run 中 skipped (per `gh pr checks 48` 输出) |
 | 投资人 demo 路径 | 走 文档 + 架构图 + 关键 PR 链接, 而不是本地 cluster 起 pod |
 
@@ -102,7 +102,7 @@ Star 是面向"AI 即工作流节点"时代重新设计的项目管理平台。
 | **#48** | docs(design): DD-CANVAS-WORKFLOW-001 v1.0 — ULYS-15/ULYS-33 stage 3 詳細設計 | `f9878671` | ULYS-47 甄别后合入, CI 全绿 |
 | **#4** | ci(deps): bump actions/setup-node from 4 to 7 | `709a9e97` | ULYS-47 甄别后合入 (dependabot 唯一 CI 全绿的 PR) |
 
-main HEAD: **`709a9e97`**
+main HEAD (2026-09-16): **`f3e10e47`** — `main` 之后又通过 PR #49 合入 17 条分支 (ops console / ARG canvas viewer / onboarding / TMO 节点等)，`dev` 已独立同步到等价状态 (树内容与 main 逐字节相同，见下)，但两分支的 commit 历史已分叉 (`f3e10e47` 不在 `dev` 的祖先链上)，**没有可 fast-forward 的路径**，合流需要一次显式 PR/merge 决策，不在本次收敛范围内。
 
 甄别原则 (per Opus1m 约束 + AGENTS.md 守门):
 
@@ -111,7 +111,7 @@ main HEAD: **`709a9e97`**
 3. **不合并 CI 红的依赖 bump** — dependabot PR #5/6/24/39/45 在最新 run 上有 FAIL 项
 4. **不批量合并** — 全部单 PR 单 commit, 任何冲突单 PR 处理
 
-`dev` 分支: 从最新 main 重建 (`origin/dev = origin/main = 709a9e97`), 上一份被 M2 plan residue 污染的 dev worktree 已删除。
+`dev` 分支 (2026-09-16 状态): HEAD `3308d99f` — 已吸收 PR #49 (17 分支合并) 的同等内容并修完其 CI 失败与 Codex review 意见，与 `main` 树内容一致 (`git diff origin/main origin/dev` 为空)，但提交历史与 main 独立分叉。上一份被 M2 plan residue 污染的 dev worktree 已删除；`AGENTS.md` 已确认无平台运行时块污染。
 
 ---
 
@@ -131,9 +131,29 @@ main HEAD: **`709a9e97`**
 | `kubectl kustomize deploy/k3s-local/` | **OK** | 产出 12 resource: 1 Namespace + 1 ServiceAccount + 2 ConfigMap + 4 Service + 4 Deployment |
 | `helm template deploy/helm/star/` | **FAIL** | Chart.yaml 第 3 行 YAML 解析错误 (见 §5) |
 
-### 4.2 结论
+### 4.1b 本机实测 (2026-09-16 补充验证, 不同 session)
 
-**当前 Windows 主机没有可启动的 k3s cluster, deploy/k3s-local/build-and-deploy.sh 与 maintenance/start-k3s-backend.ps1 的运行前提 (WSL Ubuntu + docker daemon + sudo 免密) 在本会话窗口不成立**。
+9/14 的结论 ("本机无 WSL/docker, 无法验证") 在本次复测中不成立 —— **本机 WSL2 里确实有一个长期运行的 k3s cluster**:
+
+| 探针 | 结果 | 命令 |
+|---|---|---|
+| `wsl -l -v` | `Ubuntu` Running | WSL2 Ubuntu 发行版在跑 |
+| `kubectl cluster-info` | **OK** | control plane at `https://127.0.0.1:52551` |
+| `kubectl get nodes` | **OK** | 1 node `ulyssespc`, `Ready`, `v1.36.4+k3s1`, containerd, Ubuntu 24.04 WSL2 内核, **AGE 6d5h** |
+| `kubectl get pods -n star-system` | **OK** | `star-api-rest` **1/1 Running**, AGE 35h (14 次重启, 当前健康) |
+| `kubectl apply --dry-run=server -k deploy/k3s-local/` | **部分通过, 2 类真实 bug** | 见下 |
+
+**server-side dry-run 结果** (对真实 API server 校验, 未落地):
+
+- ✅ 7 个资源校验通过: `namespace/star-system`、`serviceaccount/envoy`、`configmap/envoy-bootstrap`、`service/envoy`、`service/star-api-rest`、`deployment.apps/envoy`、`deployment.apps/star-api-rest`
+- ❌ **真 bug #1 — namespace 不一致**：`kubectl kustomize deploy/k3s-local/` 产出的 12 个资源里，`ConfigMap`/`Service`/`Deployment` 各有一份写的是 `namespace: star`，另一份写 `namespace: star-system`；manifest 集合里只声明了 `star-system` 这一个 `Namespace`，`star` 从未被创建。5 次 `Error from server (NotFound): namespaces "star" not found` 由此而来。
+- ❌ **真 bug #2 — cert-manager 未安装**：`Certificate`/`Issuer` (`cert-manager.io/v1`) 两个 CRD 在本 cluster 上不存在 (`no matches for kind "Certificate"/"Issuer"`)，kustomize 集合依赖 cert-manager 但部署清单/文档都没提这个前置条件。
+
+**结论**：k3s **确实可以在本机启动并跑通至少一个服务** (`star-api-rest` 已经跑了 6 天)，这比 9/14 "完全未验证" 的说法更进一步；但 `deploy/k3s-local/` 这套完整 kustomize 清单**没有被完整应用过**，dry-run 精确定位了两个此前没人发现的真实缺陷 (namespace 拼写不一致 + cert-manager 依赖未声明)，修完才谈得上"完整可启动"。
+
+### 4.2 结论 (2026-09-14 原始记录)
+
+**当前 Windows 主机没有可启动的 k3s cluster, deploy/k3s-local/build-and-deploy.sh 与 maintenance/start-k3s-backend.ps1 的运行前提 (WSL Ubuntu + docker daemon + sudo 免密) 在本会话窗口不成立**。（2026-09-16 更新：见 §4.1b，此结论已被推翻——cluster 是存在的，只是当时这个 session 里 Docker Desktop 的 npipe 没连上，探针选错了路径。）
 
 投资人 demo 路径上有三种选择,各自边界:
 
@@ -168,6 +188,9 @@ main HEAD: **`709a9e97`**
 | 5 | `DD-CANVAS-WORKFLOW-001.md` Round 3-7 待续作 (§8-§14) | 中 — 设计阶段未完结 | ULYS-33 续作 / ULYS-49 推荐 |
 | 6 | 总册 `SRS-CANVAS-001.md` v1.2 同步收录专题 3 (自动化流程域) | 中 — 三核心 vs 双核心不一致 | 5 域 Lead + Ulysses 拍板 |
 | 7 | 端到端 Playwright E2E (P3-A.5) | 中 — 当前 CI run 中 skipped | P3-A.5 后续 issue 跟进 |
+| 8 | `deploy/k3s-local/` kustomize 集合里 `ConfigMap`/`Service`/`Deployment` 各有一份误写 `namespace: star`（应为 `star-system`），server-side dry-run 实测 5 次 `NotFound` | **高** — 完整清单 `kubectl apply` 会失败一半资源 | 待新 issue：统一为 `star-system` |
+| 9 | `deploy/k3s-local/` 依赖 `cert-manager.io/v1` 的 `Certificate`/`Issuer`，但本机 cluster 未装 cert-manager 且文档未声明此前置条件 | 中 — 首次部署会在 TLS 证书这步卡住 | 待新 issue：文档补前置条件或清单去掉 cert-manager 依赖 |
+| 10 | `main` (`f3e10e47`) 与 `dev` (`3308d99f`) 树内容一致但提交历史已分叉，无法 fast-forward | 低 — 内容没有分歧，但两条历史线共存本身是治理债务 | 需要人工决定：dev→main 开一次 PR 收拢历史，还是保持现状 |
 
 ---
 
@@ -191,6 +214,7 @@ main HEAD: **`709a9e97`**
 - IPA 风格 V 模型 (要件 → 基本設計 → 詳細設計) 全程签字栏可追溯
 - 4 job CI (rust / frontend / cross-platform / e2e-integration) 全绿最近 4 次
 - 5 角色基本设计 (BD-CANVAS-WORKFLOW-001 v1.0.3) 已签字
+- 本机 k3s cluster 活体运行 6 天, `star-api-rest` 服务 Running
 
 **需要收敛验收** (不是失败, 是过程):
 
@@ -198,18 +222,19 @@ main HEAD: **`709a9e97`**
 - helm chart YAML 修一个引号就能修
 - dependabot PR rebase 后合并
 - 端到端 E2E 走完
-- k3s / Docker / WSL 三件套在 demo 环境的搭建
+- `deploy/k3s-local/` 完整清单跑通 (namespace 统一 + cert-manager 装上)
+- main/dev 两条已分叉但内容一致的历史线需要一次 PR 收拢
 
 **不在本任务窗口内** (诚实边界):
 
-- 本机可启动 cluster 实证 (Docker Desktop 没起, 没 WSL)
+- `deploy/k3s-local/` 完整 12-resource 清单端到端 apply 验证 (目前只做到 server-side dry-run 定位问题)
 - 总册 SRS 升 v1.2 (三核心同步)
 - 投资人 demo 演示脚本的最终版 (这是 Mavis/PM 的事, 不是仓库侧的事)
 
 ---
 
-**main HEAD: `709a9e97`** ·
-**dev HEAD: `709a9e97`** (= main, 本会话重建) ·
-**ULYS-47 session 收敛时间**: 2026-09-14 22:30 JST ·
-**诚实验证完成项**: kustomize 通过 (12 resource) · main CI 4/4 success · push access OK
-**诚实未验证项**: 本机 k3s 启动 · helm template · Dockerfile 构建 · 端到端 E2E · dependabot PR rebase
+**main HEAD: `f3e10e47`** (2026-09-16) ·
+**dev HEAD: `3308d99f`** (2026-09-16, 树内容与 main 一致, 历史已分叉) ·
+**最后更新**: 2026-09-16 (ULYS-47, 复核 9/14 记录并补测 k3s) ·
+**诚实验证完成项**: k3s cluster 活体运行 6 天 + `star-api-rest` Running · kustomize 结构通过 (12 resource) · server-side dry-run 定位 2 个真实清单 bug · main CI 4/4 success (跨 9/14~9/16) · push access OK
+**诚实未验证项**: `deploy/k3s-local/` 完整清单未跑通 (namespace 不一致 + cert-manager 缺失待修) · helm template · Dockerfile 构建 · 端到端 E2E · dependabot PR rebase · main/dev 历史分叉未收拢
