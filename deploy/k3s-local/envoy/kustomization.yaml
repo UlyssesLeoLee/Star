@@ -1,17 +1,19 @@
-# envoy kustomization (per v0.44 §14.12 III envoy 容器化实施, brief §3.1 kustomization.yaml)
-# 顶层 kustomize 整合 4 resource (deployment + service + configmap + serviceaccount)
+# envoy kustomization (per v0.44 §14.12 III envoy 容器化实施 + v0.71 §14.12 IV 业务路由 + TLS 自动签发)
+# 顶层 kustomize 整合 6 resource (deployment + service + configmap + serviceaccount + certificate + issuer)
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 # namespace: star-system (跟 star-api-rest-deploy.yaml 一致, 守门 #11 缺标比错标)
 namespace: star-system
 
-# 4 resource (per brief §3.1, 跨 session 续可加 HPA / NetworkPolicy)
+# 6 resource (per brief §3.1 + v0.71+ cert-manager Certificate/Issuer)
 resources:
   - serviceaccount.yaml
   - configmap.yaml
   - deployment.yaml
   - service.yaml
+  - certificate.yaml  # v0.71 TLS 自动签发 (cert-manager.io/v1)
+  # - issuer.yaml  # v0.71 包含在 certificate.yaml 同文件 (per v0.71 yaml 多文档)
 
 # 公共 labels (per kubernetes 标签最佳实践 + 守门 #3 显式声明)
 # 用 labels: 替代 deprecated commonLabels: (per kustomize 5.x)
