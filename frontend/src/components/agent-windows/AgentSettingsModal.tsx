@@ -37,7 +37,7 @@ import {
   AlertTriangle, Loader2, ShieldCheck, CheckCircle2, RefreshCw,
 } from "lucide-react";
 import type { CliTab } from "./WindowsTabBar";
-import type { ApiKey } from "@/mocks/schemas/cli";
+import type { ApiKey, ApiKeyCreateRequest } from "@/mocks/schemas/cli";
 
 // ---- types ----
 export interface AgentSettingsModalProps {
@@ -123,7 +123,7 @@ export function AgentSettingsModal({ open, onClose, tab, tenantId = "tenant-phys
 
   // ---- 2. 新增 key mutation ----
   const qc = useQueryClient();
-  const addMutation = useMutation<ApiKey, Error, ApiKey>({
+  const addMutation = useMutation<ApiKey, Error, ApiKeyCreateRequest>({
     mutationFn: async (key) => {
       const res = await fetch("/api/api-keys", {
         method: "POST",
@@ -196,7 +196,7 @@ export function AgentSettingsModal({ open, onClose, tab, tenantId = "tenant-phys
     const preview = form.mode === "encrypted_rust"
       ? `${form.secret.slice(0, 3)}-***${form.secret.slice(-3)}`
       : `env: ${form.envVarName}`;
-    const newKey: ApiKey = {
+    const newKey: ApiKeyCreateRequest = {
       id: `k_${Date.now()}`,
       provider: form.provider,
       label: form.label,
@@ -208,6 +208,9 @@ export function AgentSettingsModal({ open, onClose, tab, tenantId = "tenant-phys
       agent_id: tab.id,
       cli_profile_id: tab.profileName,
       agent_kind: inferAgentKindFromProfile(tab.profileName),
+      // encrypted_rust 模式下明文 secret (per 2026-09-16 review: 后端要靠这个生成密文,
+      // 之前只发 preview 会导致 real-mode 落库成功但没有可用凭证)
+      secret: form.mode === "encrypted_rust" ? form.secret : undefined,
     };
     try {
       await addMutation.mutateAsync(newKey);

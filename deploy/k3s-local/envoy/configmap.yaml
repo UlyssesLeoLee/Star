@@ -144,7 +144,9 @@ data:
                         typed_config:
                           "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
-      # sds_cluster (Secret Discovery Service, per cert-manager 自动签发 TLS cert, v0.71+)
+      # 1 SDS cluster (Secret Discovery Service, per cert-manager 自动签发 TLS cert, v0.71+)
+      # + v0.71 3 业务集群 — 必须同一个 clusters 列表 (YAML 同 key 重复第二份会覆盖第一份,
+      # 导致 star_https_listener TLS 引用的 sds_cluster 在生效配置里消失, per 2026-09-16 review)
       clusters:
         - name: sds_cluster
           connect_timeout: 5s
@@ -159,8 +161,6 @@ data:
                           address: secret-discovery-service
                           port_value: 8081
 
-      # v0.71 3 业务集群
-      clusters:
         - name: star_api_rest_cluster
           connect_timeout: 5s
           type: STRICT_DNS

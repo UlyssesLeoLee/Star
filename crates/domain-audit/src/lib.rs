@@ -857,7 +857,7 @@ impl RecordOnboardingFailedCommand {
         });
         RecordAuditCommand {
             tenant_id: self.tenant_id,
-            actor: Actor::System,  // per ADR-0043 §2.2: onboarding = system 行為
+            actor: Actor::System, // per ADR-0043 §2.2: onboarding = system 行為
             action: AuditAction::OnboardingTestKeyFailed,
             resource_type: "api_key".to_string(),
             resource_id: self.detected_key_id,
@@ -1308,8 +1308,8 @@ mod in_memory_stub {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::in_memory_stub::InMemoryAuditRecorder;
+    use super::*;
 
     fn make_admin_actor(tenant_id: TenantId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0)
@@ -1580,7 +1580,10 @@ mod tests {
             request_id: Some(Uuid::new_v4()),
         };
         let actor = ActorContext::new(Uuid::new_v4(), tenant_id.0);
-        let ev = recorder.record(cmd.into_record_command(), actor).await.unwrap();
+        let ev = recorder
+            .record(cmd.into_record_command(), actor)
+            .await
+            .unwrap();
         assert_eq!(ev.action, AuditAction::OnboardingTestKeyFailed);
         assert_eq!(ev.tenant_id, tenant_id);
         assert!(matches!(ev.actor, Actor::System));
@@ -1611,7 +1614,10 @@ mod tests {
             request_id: None,
         };
         let actor = ActorContext::new(Uuid::new_v4(), tenant_id.0);
-        let ev = recorder.record(cmd.into_record_command(), actor).await.unwrap();
+        let ev = recorder
+            .record(cmd.into_record_command(), actor)
+            .await
+            .unwrap();
         let after = ev.after_state.unwrap();
         assert_eq!(after["status_code"], 0);
         assert_eq!(after["provider"], "claude");
@@ -1634,7 +1640,10 @@ mod tests {
                 request_id: None,
             };
             let actor = ActorContext::new(Uuid::new_v4(), tenant_id.0);
-            let ev = recorder.record(cmd.into_record_command(), actor).await.unwrap();
+            let ev = recorder
+                .record(cmd.into_record_command(), actor)
+                .await
+                .unwrap();
             assert_eq!(ev.after_state.unwrap()["provider"], *provider);
         }
         assert_eq!(recorder.events.lock().unwrap().len(), 4);

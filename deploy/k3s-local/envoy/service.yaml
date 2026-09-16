@@ -1,6 +1,6 @@
 # envoy Service (per v0.44 §14.12 III envoy 容器化实施, brief §3.1 service.yaml)
-# ClusterIP service (per brief §3.1), port 15001 (admin) + 15090 (readiness)
-# future: business listener port 15000 / 8443 跨 session 续
+# ClusterIP service (per brief §3.1), port 15001 (admin) + 15090 (readiness) + 8443 (https, v0.71+)
+# future: business listener port 15000 跨 session 续 (http, envoy 目前只有 https listener)
 apiVersion: v1
 kind: Service
 metadata:
@@ -26,12 +26,16 @@ spec:
       port: 15090
       targetPort: readiness
       protocol: TCP
-    # future: business listener 跨 session 续 (per brief §6 已知缺口)
+    # https 业务入口 (per v0.71 §14.12 IV, deployment.yaml containerPort "https" = 8443;
+    # 之前这段一直被注释掉, 导致 /api/v1 /oauth /mcp /ws /actuator 5 条业务路由虽然在
+    # envoy 内部配了, 但 Service 不转发 8443, 集群内没有任何入口能打到它们, per 2026-09-16 review)
+    - name: https
+      port: 8443
+      targetPort: https
+      protocol: TCP
+    # future: business http listener 跨 session 续 (per brief §6 已知缺口, envoy 侧目前
+    # 只有 star_https_listener, 没有对应的 http listener, 所以这里先不开 http port)
     # - name: http
     #   port: 15000
     #   targetPort: http
-    #   protocol: TCP
-    # - name: https
-    #   port: 8443
-    #   targetPort: https
     #   protocol: TCP

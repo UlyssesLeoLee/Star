@@ -38,7 +38,7 @@ export interface OnboardingGuideProps {
   detectedKeys: DetectedKey[];
   testResults: Map<string, TestResult>;
   onSelectKey: (keyId: string, agentId: string) => void;
-  onAssociate: () => void;        // 用户点"确认关联" 触发父组件扫
+  onAssociate: (selections: Map<string, string>) => void;  // 用户点"确认关联" 触发父组件扫
   onSkip: () => void;             // "稍后" — 标记跳过
   onClose: () => void;            // 完成或跳过后关闭
   onRetryTest?: (keyId: string) => void;  // 失败重测
@@ -174,7 +174,7 @@ export function OnboardingGuide({
               <button
                 type="button"
                 data-testid="onboarding-associate"
-                onClick={onAssociate}
+                onClick={() => onAssociate(selections)}
                 disabled={selections.size === 0}
                 className="btn-primary text-[11px] px-3 py-1.5 flex items-center gap-1.5"
               >
