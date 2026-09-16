@@ -144,6 +144,8 @@ pub enum AuditAction {
     AiRetentionPurged,
     /// 导出请求(INV-AU-07 必审计)
     ExportRequested,
+    /// Onboarding 5 回 retry 失敗 (per ADR-0043 §2.2, actor_type=system)
+    OnboardingTestKeyFailed,
     /// 通用自定义动作
     Custom,
 }
@@ -168,6 +170,7 @@ impl std::fmt::Display for AuditAction {
             Self::FeedbackCreated => "FEEDBACK_CREATED",
             Self::AiRetentionPurged => "AI_RETENTION_PURGED",
             Self::ExportRequested => "EXPORT_REQUESTED",
+            Self::OnboardingTestKeyFailed => "ONBOARDING_TEST_KEY_FAILED",
             Self::Custom => "CUSTOM",
         };
         f.write_str(s)
@@ -789,9 +792,13 @@ pub struct ExportAuditCommand {
 }
 
 /// **AuditRecorder 端口**(3 个方法:普通 / AI / 跨租户尝试)
+///
+/// Onboarding 5 回 retry 失敗 (per ADR-0043 §2.2) は record() を再利用
+/// (action=OnboardingTestKeyFailed, actor=System, resource_type="api_key").
+/// 新メソッド追加は trait 拡張の硬制約を避けるため不可 (per Rust trait 衝突).
 #[async_trait]
 pub trait AuditRecorder: Send + Sync {
-    /// 记录普通 AuditEvent
+    /// 记录普通 AuditEvent (Onboarding 含 む, action 値域で区別)
     async fn record(
         &self,
         cmd: RecordAuditCommand,
@@ -809,6 +816,53 @@ pub trait AuditRecorder: Send + Sync {
         cmd: RecordAIAuditCommand,
         actor_ctx: ActorContext,
     ) -> Result<AIAuditMetadata, AuditError>;
+}
+
+/// **Onboarding 5 回 retry 失敗 コマンド** (per ADR-0043 §2.3)
+///
+/// record() に渡す helper 関数で変換される (new() 参照).
+/// action = "onboarding.test_key.failed", actor = System, after_state = JSONB.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordOnboardingFailedCommand {
+    pub tenant_id: TenantId,
+    /// frontend の DetectedKey.id (UUID 文字列を parse)
+    pub detected_key_id: Uuid,
+    pub provider: String,
+    pub label: String,
+    /// 固定 5
+    pub attempts: u8,
+    /// 0 = network error / 4xx / 5xx
+    pub status_code: u16,
+    pub error_message: String,
+    /// 任意, audit_audit_event.client_ip に転記
+    pub client_ip: Option<String>,
+    /// 任意, audit_audit_event.request_id に転記
+    pub request_id: Option<Uuid>,
+}
+
+impl RecordOnboardingFailedCommand {
+    /// RecordAuditCommand への変換 (record() メソッドに直接渡せる)
+    pub fn into_record_command(self) -> RecordAuditCommand {
+        let after = serde_json::json!({
+            "provider": self.provider,
+            "label": self.label,
+            "attempts": self.attempts,
+            "status_code": self.status_code,
+            "error_message": self.error_message,
+            "detected_key_id": self.detected_key_id.to_string(),
+        });
+        RecordAuditCommand {
+            tenant_id: self.tenant_id,
+            actor: Actor::System,  // per ADR-0043 §2.2: onboarding = system 行為
+            action: AuditAction::OnboardingTestKeyFailed,
+            resource_type: "api_key".to_string(),
+            resource_id: self.detected_key_id,
+            context_refs: vec![],
+            before_state: None,
+            after_state: Some(after),
+            immutable_hash: None,
+        }
+    }
 }
 
 /// **AuditQuery 端口**
@@ -1171,12 +1225,88 @@ impl AuditQueryPort for InMemoryAuditService {
 }
 
 // =====================================================================
+// InMemoryAuditRecorder stub (per ADR-0043 §2.2, commit 3 of 6)
+// Phase 2: SQLx Adapter (audit.audit_event INSERT) に置換
+// 公開 stub として mod tests の外で定義 (trait 全メソッド実装必須)
+// =====================================================================
+#[cfg(test)]
+mod in_memory_stub {
+    use super::*;
+    use std::collections::VecDeque;
+    use std::sync::Mutex;
+
+    /// **InMemoryAuditRecorder**: テスト用 + Phase 2 stub
+    #[derive(Default)]
+    pub struct InMemoryAuditRecorder {
+        pub events: Mutex<VecDeque<AuditEvent>>,
+    }
+
+    #[async_trait]
+    impl AuditRecorder for InMemoryAuditRecorder {
+        async fn record(
+            &self,
+            cmd: RecordAuditCommand,
+            _actor_ctx: ActorContext,
+        ) -> Result<AuditEvent, AuditError> {
+            let id = AuditEventId::new();
+            let ev = AuditEvent {
+                id,
+                tenant_id: cmd.tenant_id,
+                actor: cmd.actor,
+                action: cmd.action,
+                resource_type: cmd.resource_type,
+                resource_id: cmd.resource_id,
+                context_refs: cmd.context_refs,
+                before_state: cmd.before_state,
+                after_state: cmd.after_state,
+                cross_tenant: matches!(cmd.action, AuditAction::CrossTenantAttempt),
+                immutable_hash: cmd.immutable_hash.unwrap_or_else(|| "0".repeat(64)),
+                occurred_at: Utc::now(),
+            };
+            self.events.lock().unwrap().push_back(ev.clone());
+            Ok(ev)
+        }
+
+        async fn record_cross_tenant_attempt(
+            &self,
+            cmd: RecordCrossTenantAttemptCommand,
+            actor_ctx: ActorContext,
+        ) -> Result<AuditEvent, AuditError> {
+            let cmd2 = RecordAuditCommand {
+                tenant_id: TenantId(actor_ctx.tenant_id),
+                actor: Actor::System,
+                action: AuditAction::CrossTenantAttempt,
+                resource_type: cmd.attempted_resource_type,
+                resource_id: cmd.attempted_resource_id,
+                context_refs: vec![],
+                before_state: None,
+                after_state: None,
+                immutable_hash: None,
+            };
+            self.record(cmd2, actor_ctx).await
+        }
+
+        async fn record_ai(
+            &self,
+            _cmd: RecordAIAuditCommand,
+            _actor_ctx: ActorContext,
+        ) -> Result<AIAuditMetadata, AuditError> {
+            Err(AuditError::Internal(
+                "InMemoryAuditRecorder: record_ai not yet implemented (Phase 2+)".to_string(),
+            ))
+        }
+    }
+}
+
+// =====================================================================
 // 单元测试
 // =====================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::in_memory_stub::InMemoryAuditRecorder;
+
     fn make_admin_actor(tenant_id: TenantId) -> ActorContext {
         ActorContext::new(Uuid::new_v4(), tenant_id.0)
             .with_role(roles::TENANT_ADMIN)
@@ -1405,7 +1535,8 @@ mod tests {
 
     #[tokio::test]
     async fn cross_tenant_flag_consistency() {
-        let tenant_id = uuid::Uuid::new_v4();
+        let tenant_uuid = uuid::Uuid::new_v4();
+        let tenant_id = TenantId(tenant_uuid);
         let mut ev = AuditEvent {
             id: AuditEventId::new(),
             tenant_id: TenantId(tenant_id),
@@ -1416,15 +1547,92 @@ mod tests {
             context_refs: vec![],
             before_state: None,
             after_state: None,
-            cross_tenant: false, // 应是 true
+            cross_tenant: false,
             immutable_hash: "a".repeat(64),
             occurred_at: Utc::now(),
         };
         assert!(check_invariant_04_cross_tenant_flag(&ev).is_err());
         ev.cross_tenant = true;
         assert!(check_invariant_04_cross_tenant_flag(&ev).is_ok());
-        // 反向:cross_tenant=true 但 action 不是 CrossTenantAttempt
         ev.action = AuditAction::WorkItemOperation;
         assert!(check_invariant_04_cross_tenant_flag(&ev).is_err());
+    }
+
+    // -- Onboarding AuditRecorder tests (per ADR-0043 §2.2, commit 3 of 6) --
+
+    #[tokio::test]
+    async fn record_onboarding_failed_unauthorized() {
+        let tenant_id = TenantId::new();
+        let recorder = InMemoryAuditRecorder::default();
+        let cmd = RecordOnboardingFailedCommand {
+            tenant_id,
+            detected_key_id: Uuid::new_v4(),
+            provider: "openai".to_string(),
+            label: "OpenAI Primary".to_string(),
+            attempts: 5,
+            status_code: 401,
+            error_message: "401 Unauthorized: Invalid API key".to_string(),
+            client_ip: Some("127.0.0.1".to_string()),
+            request_id: Some(Uuid::new_v4()),
+        };
+        let actor = ActorContext::new(Uuid::new_v4(), tenant_id.0);
+        let ev = recorder.record(cmd.into_record_command(), actor).await.unwrap();
+        assert_eq!(ev.action, AuditAction::OnboardingTestKeyFailed);
+        assert_eq!(ev.tenant_id, tenant_id);
+        assert!(matches!(ev.actor, Actor::System));
+        assert_eq!(ev.resource_type, "api_key");
+        assert!(!ev.cross_tenant);
+        let after = ev.after_state.unwrap();
+        assert_eq!(after["provider"], "openai");
+        assert_eq!(after["label"], "OpenAI Primary");
+        assert_eq!(after["attempts"], 5);
+        assert_eq!(after["status_code"], 401);
+        assert_eq!(after["error_message"], "401 Unauthorized: Invalid API key");
+        assert_eq!(recorder.events.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn record_onboarding_failed_network_timeout() {
+        let tenant_id = TenantId::new();
+        let recorder = InMemoryAuditRecorder::default();
+        let cmd = RecordOnboardingFailedCommand {
+            tenant_id,
+            detected_key_id: Uuid::new_v4(),
+            provider: "claude".to_string(),
+            label: "Claude Backup".to_string(),
+            attempts: 5,
+            status_code: 0,
+            error_message: "network_timeout: TLS handshake failed".to_string(),
+            client_ip: None,
+            request_id: None,
+        };
+        let actor = ActorContext::new(Uuid::new_v4(), tenant_id.0);
+        let ev = recorder.record(cmd.into_record_command(), actor).await.unwrap();
+        let after = ev.after_state.unwrap();
+        assert_eq!(after["status_code"], 0);
+        assert_eq!(after["provider"], "claude");
+    }
+
+    #[tokio::test]
+    async fn record_onboarding_failed_4_required_providers() {
+        let tenant_id = TenantId::new();
+        let recorder = InMemoryAuditRecorder::default();
+        for provider in &["openai", "claude", "gemini", "minimax"] {
+            let cmd = RecordOnboardingFailedCommand {
+                tenant_id,
+                detected_key_id: Uuid::new_v4(),
+                provider: provider.to_string(),
+                label: format!("{} Test", provider),
+                attempts: 5,
+                status_code: 429,
+                error_message: "rate_limited".to_string(),
+                client_ip: None,
+                request_id: None,
+            };
+            let actor = ActorContext::new(Uuid::new_v4(), tenant_id.0);
+            let ev = recorder.record(cmd.into_record_command(), actor).await.unwrap();
+            assert_eq!(ev.after_state.unwrap()["provider"], *provider);
+        }
+        assert_eq!(recorder.events.lock().unwrap().len(), 4);
     }
 }
