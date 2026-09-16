@@ -262,10 +262,10 @@ function SoftKeyboard({
             onClick={() => onModeChange(m)}
             data-testid={`kb-mode-${m}`}
             className={
-              "flex-1 py-1.5 text-[10px] font-mono uppercase rounded-md " +
+              "flex-1 py-1.5 text-[10px] font-mono uppercase " +
               (mode === m
-                ? "bg-accent/20 text-accent border border-accent/40"
-                : "bg-bg text-ink-mute border border-line")
+                ? "bg-accent/20 text-accent border-2 border-[var(--cel-ink)] shadow-[1px_1px_0px_0px_var(--cel-ink)]"
+                : "bg-bg text-ink-mute border-2 border-[var(--cel-ink)]")
             }
           >
             {m}
@@ -282,7 +282,7 @@ function SoftKeyboard({
               type="button"
               onClick={() => onKey(k.data)}
               data-testid={`kb-ctrl-${k.label}`}
-              className="py-2.5 text-xs font-mono rounded-md border border-line bg-bg text-ink-dim active:bg-accent/20"
+              className="py-2.5 text-xs font-mono border-2 border-[var(--cel-ink)] bg-bg text-ink-dim active:bg-accent/20 shadow-[1px_1px_0px_0px_var(--cel-ink)]"
             >
               {k.label}
             </button>
@@ -298,7 +298,7 @@ function SoftKeyboard({
                   type="button"
                   onClick={() => onKey(k)}
                   data-testid={`kb-${k}`}
-                  className="flex-1 py-2 text-sm font-mono rounded-md border border-line bg-bg text-ink active:bg-accent/20"
+                  className="flex-1 py-2 text-sm font-mono border-2 border-[var(--cel-ink)] bg-bg text-ink active:bg-accent/20 shadow-[1px_1px_0px_0px_var(--cel-ink)]"
                 >
                   {k}
                 </button>
@@ -310,7 +310,7 @@ function SoftKeyboard({
               type="button"
               onClick={() => onKey(" ")}
               data-testid="kb-space"
-              className="flex-1 py-2 text-xs font-mono rounded-md border border-line bg-bg text-ink-dim"
+              className="flex-1 py-2 text-xs font-mono border-2 border-[var(--cel-ink)] bg-bg text-ink-dim shadow-[1px_1px_0px_0px_var(--cel-ink)]"
             >
               space
             </button>
@@ -318,7 +318,7 @@ function SoftKeyboard({
               type="button"
               onClick={() => onKey("\b")}
               data-testid="kb-backspace"
-              className="px-4 py-2 text-xs font-mono rounded-md border border-line bg-bg text-ink-dim"
+              className="px-4 py-2 text-xs font-mono border-2 border-[var(--cel-ink)] bg-bg text-ink-dim shadow-[1px_1px_0px_0px_var(--cel-ink)]"
             >
               ⌫
             </button>
@@ -326,7 +326,7 @@ function SoftKeyboard({
               type="button"
               onClick={() => onKey("\r")}
               data-testid="kb-enter"
-              className="px-4 py-2 text-xs font-mono rounded-md border border-accent/40 bg-accent/10 text-accent font-semibold"
+              className="px-4 py-2 text-xs font-mono border-2 border-[var(--cel-ink)] bg-accent/10 text-accent font-semibold shadow-[1px_1px_0px_0px_var(--cel-ink)]"
             >
               ↵ Enter
             </button>

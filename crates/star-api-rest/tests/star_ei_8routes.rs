@@ -181,7 +181,7 @@ async fn integration_ex_04_subagent_locks_returns_501_not_implemented_after_v0_5
     let sa_ids = body["subagent_ids"]
         .as_array()
         .expect("subagent_ids must be array");
-    assert_eq!(sa_ids.len(), 9, "9 SA 编号 SA-01..SA-09 per §14.9 EX-04");
+    assert_eq!(sa_ids.len(), 10, "10 SA 编号 SA-01..SA-10 per §14.9 EX-04");
     // 验证 L0 协调 L1↔L1 (per 守门 #13 a)
     assert!(
         body["l0_coordination"].as_str().unwrap().contains("L0"),

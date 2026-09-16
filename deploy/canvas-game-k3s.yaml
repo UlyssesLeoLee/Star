@@ -1,0 +1,612 @@
+# =====================================================================
+# canvas-game-k3s.yaml — 画布游戏 k3s 一键部署 (per 2026-09-07 07:06 JST 用户拍板)
+# =====================================================================
+# 4 crate 部署 (per SRS-STAR-CANVAS-GAME-001 v0.1 commit 4ed55ae + BD-GAME-001 64df37f):
+#   - canvas-engine  (跨域, 沿用 9/6)
+#   - domain-canvas  (业务域, 沿用 9/6)
+#   - canvas-realtime (Yjs CRDT 后端, 沿用 9/6)
+#   - canvas-game    (游戏引擎, 新, 第 4 crate, per 9/7 06:47 JST 拍板)
+#
+# 1 副本 (per 9/7 07:06 JST 拍板 dev 本地 + 1 副本)
+# 边缘 envoy 独立 deployment (per 9/1 13:05 JST 拍板, 不选 nginx / istio sidecar)
+#
+# 一键部署:
+#   pwsh -NoProfile -NonInteractive -File scripts/start-k3s-backend.ps1
+#   或 .\start-k3s-backend.bat
+#
+# 验证:
+#   kubectl get pods -n star-system -l app=canvas
+#   kubectl port-forward -n star-system svc/canvas-engine 8080:8080
+#   curl http://localhost:8080/healthz
+# =====================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: star-system
+  labels:
+    name: star-system
+    istio-injection: disabled  # 显式禁用 istio (per 9/1 13:05 JST 拍板不选 sidecar)
+---
+# =====================================================================
+# ServiceAccount + RBAC
+# =====================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: star-canvas
+  namespace: star-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: star-canvas-role
+  namespace: star-system
+rules:
+  - apiGroups: [""]
+    resources: [pods, services, configmaps, secrets, endpoints]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: star-canvas-rolebinding
+  namespace: star-system
+subjects:
+  - kind: ServiceAccount
+    name: star-canvas
+    namespace: star-system
+roleRef:
+  kind: Role
+  name: star-canvas-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# =====================================================================
+# ConfigMap — 共享配置 (env vars 4 个, 不放 secret 留 secrets)
+# =====================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: canvas-game-config
+  namespace: star-system
+data:
+  RUST_LOG: "info,canvas_engine=debug,canvas_game=debug"
+  RUST_BACKTRACE: "1"
+  CANVAS_WORLD_MIN: "-50000"
+  CANVAS_WORLD_MAX: "50000"
+  CANVAS_ZOOM_MIN: "0.1"
+  CANVAS_ZOOM_MAX: "4.0"
+  CANVAS_MAX_PLAYERS: "4"
+  CANVAS_MAX_BULLETS: "2000"
+  CANVAS_MAX_FLOORS: "12"
+  CANVAS_COLLISION_GRID_SIZE: "64"
+  CANVAS_SPRITE_ATLAS_SIZE: "2048"
+  CANVAS_SEED_MAX_LEN: "64"
+---
+# =====================================================================
+# Secret — 凭据 (per 守门 #5 env 安全, 部署前必须设置)
+# 一键部署前用:
+#   kubectl create secret generic canvas-game-secrets -n star-system \
+#     --from-literal=DATABASE_URL='postgres://...' \
+#     --from-literal=REDIS_URL='redis://...' \
+#     --from-literal=NATS_URL='nats://...' \
+#     --from-literal=S3_BUCKET='star-canvas-game' \
+#     --from-literal=GHCR_PAT='ghp_xxx'
+# =====================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: canvas-game-secrets
+  namespace: star-system
+type: Opaque
+stringData:
+  DATABASE_URL: "postgres://star:CHANGE_ME@postgres:5432/star_canvas_game"  # placeholder
+  REDIS_URL: "redis://redis:6379/0"
+  NATS_URL: "nats://nats:4222"
+  S3_BUCKET: "star-canvas-game"
+  S3_ENDPOINT: "http://minio:9000"
+  GHCR_PAT: "CHANGE_ME"  # ghcr.io 拉镜像
+---
+# =====================================================================
+# canvas-engine (跨域, 1 副本, 资源限制低)
+# =====================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canvas-engine
+  namespace: star-system
+  labels:
+    app: canvas-engine
+    tier: shared
+    version: v0.1
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: canvas-engine }
+  template:
+    metadata:
+      labels: { app: canvas-engine, tier: shared, version: v0.1 }
+    spec:
+      serviceAccountName: star-canvas
+      containers:
+      - name: canvas-engine
+        image: ghcr.io/ulysses-lee-lee/star-canvas-engine:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - { name: http, containerPort: 8080 }
+        envFrom:
+        - configMapRef: { name: canvas-game-config }
+        - secretRef: { name: canvas-game-secrets }
+        resources:
+          requests: { cpu: 100m, memory: 256Mi }
+          limits:   { cpu: 500m, memory: 512Mi }
+        livenessProbe:
+          httpGet: { path: /healthz, port: http }
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet: { path: /readyz, port: http }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canvas-engine
+  namespace: star-system
+  labels: { app: canvas-engine }
+spec:
+  selector: { app: canvas-engine }
+  ports:
+  - { name: http, port: 8080, targetPort: http }
+---
+# =====================================================================
+# domain-canvas (业务域, 1 副本, 资源限制中)
+# =====================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: domain-canvas
+  namespace: star-system
+  labels:
+    app: domain-canvas
+    tier: business
+    version: v0.1
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: domain-canvas }
+  template:
+    metadata:
+      labels: { app: domain-canvas, tier: business, version: v0.1 }
+    spec:
+      serviceAccountName: star-canvas
+      containers:
+      - name: domain-canvas
+        image: ghcr.io/ulysses-lee-lee/star-domain-canvas:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - { name: http, containerPort: 8081 }
+        envFrom:
+        - configMapRef: { name: canvas-game-config }
+        - secretRef: { name: canvas-game-secrets }
+        resources:
+          requests: { cpu: 200m, memory: 512Mi }
+          limits:   { cpu: 1000m, memory: 1Gi }
+        livenessProbe:
+          httpGet: { path: /healthz, port: http }
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet: { path: /readyz, port: http }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: domain-canvas
+  namespace: star-system
+  labels: { app: domain-canvas }
+spec:
+  selector: { app: domain-canvas }
+  ports:
+  - { name: http, port: 8081, targetPort: http }
+---
+# =====================================================================
+# canvas-realtime (Yjs CRDT 后端, 1 副本, headless service 走 sticky session)
+# =====================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canvas-realtime
+  namespace: star-system
+  labels:
+    app: canvas-realtime
+    tier: realtime
+    version: v0.1
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: canvas-realtime }
+  template:
+    metadata:
+      labels: { app: canvas-realtime, tier: realtime, version: v0.1 }
+    spec:
+      serviceAccountName: star-canvas
+      containers:
+      - name: canvas-realtime
+        image: ghcr.io/ulysses-lee-lee/star-canvas-realtime:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - { name: http, containerPort: 8082 }
+        - { name: ws, containerPort: 8083 }
+        envFrom:
+        - configMapRef: { name: canvas-game-config }
+        - secretRef: { name: canvas-game-secrets }
+        resources:
+          requests: { cpu: 200m, memory: 512Mi }
+          limits:   { cpu: 1000m, memory: 1Gi }
+        livenessProbe:
+          httpGet: { path: /healthz, port: http }
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet: { path: /readyz, port: http }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canvas-realtime
+  namespace: star-system
+  labels: { app: canvas-realtime }
+spec:
+  clusterIP: None  # Headless service, sticky session for Yjs (per SRS-001 §7.4)
+  selector: { app: canvas-realtime }
+  ports:
+  - { name: http, port: 8082, targetPort: http }
+  - { name: ws, port: 8083, targetPort: ws }
+---
+# =====================================================================
+# canvas-game (游戏引擎, 新, 第 4 crate, 1 副本, 资源限制高)
+# =====================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canvas-game
+  namespace: star-system
+  labels:
+    app: canvas-game
+    tier: game
+    version: v0.1
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: canvas-game }
+  template:
+    metadata:
+      labels: { app: canvas-game, tier: game, version: v0.1 }
+    spec:
+      serviceAccountName: star-canvas
+      containers:
+      - name: canvas-game
+        image: ghcr.io/ulysses-lee-lee/star-canvas-game:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - { name: http, containerPort: 8084 }
+        envFrom:
+        - configMapRef: { name: canvas-game-config }
+        - secretRef: { name: canvas-game-secrets }
+        resources:
+          requests: { cpu: 500m, memory: 1Gi }
+          limits:   { cpu: 2000m, memory: 4Gi }
+        livenessProbe:
+          httpGet: { path: /healthz, port: http }
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet: { path: /readyz, port: http }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canvas-game
+  namespace: star-system
+  labels: { app: canvas-game }
+spec:
+  selector: { app: canvas-game }
+  ports:
+  - { name: http, port: 8084, targetPort: http }
+---
+# =====================================================================
+# HPA — dev 1 副本但 HPA 配置好待 prod 5-20 副本直接复用
+# (per DD-GAME-001 v0.1 §12.2 K8s HPA 5-20 pod)
+# =====================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: canvas-game-hpa
+  namespace: star-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: canvas-game
+  minReplicas: 1
+  maxReplicas: 5  # dev 限制低, prod 可改 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: canvas-realtime-hpa
+  namespace: star-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: canvas-realtime
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+---
+# =====================================================================
+# NetworkPolicy — 默认拒绝, 只允许 envoy 入口 + 内部通信
+# (per 守门 #5 env 安全, dev 简化版)
+# =====================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: canvas-game-default-deny
+  namespace: star-system
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  egress:
+  # DNS
+  - to: [namespaceSelector: {}]
+    ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+  # PostgreSQL
+  - to: [podSelector: {}]
+    ports: [{ port: 5432, protocol: TCP }]
+  # Redis
+  - to: [podSelector: {}]
+    ports: [{ port: 6379, protocol: TCP }]
+  # NATS
+  - to: [podSelector: {}]
+    ports: [{ port: 4222, protocol: TCP }]
+  # S3 / MinIO
+  - to: [podSelector: {}]
+    ports: [{ port: 9000, protocol: TCP }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: canvas-game-allow-internal
+  namespace: star-system
+spec:
+  podSelector:
+    matchLabels:
+      tier: shared
+      tier: business
+      tier: realtime
+      tier: game
+  policyTypes: [Ingress]
+  ingress:
+  # 内部 pod 之间互访
+  - from:
+    - podSelector: {}
+    ports:
+    - { port: 8080, protocol: TCP }
+    - { port: 8081, protocol: TCP }
+    - { port: 8082, protocol: TCP }
+    - { port: 8083, protocol: TCP }
+    - { port: 8084, protocol: TCP }
+---
+# =====================================================================
+# envoy 边缘 — 独立 deployment (per 9/1 13:05 JST 拍板, 不选 nginx / istio sidecar)
+# ClusterIP service, 业务 svc 通过 svc:// 引用
+# dev 用 LoadBalancer 端口 10080 暴露本地
+# =====================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: envoy-edge
+  namespace: star-system
+  labels:
+    app: envoy-edge
+    tier: edge
+    version: v1.28-latest
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: envoy-edge }
+  template:
+    metadata:
+      labels: { app: envoy-edge, tier: edge, version: v1.28-latest }
+    spec:
+      serviceAccountName: star-canvas
+      containers:
+      - name: envoy
+        image: envoyproxy/envoy:v1.28-latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - { name: http, containerPort: 10000 }
+        - { name: admin, containerPort: 9901 }
+        volumeMounts:
+        - name: envoy-config
+          mountPath: /etc/envoy
+        resources:
+          requests: { cpu: 100m, memory: 128Mi }
+          limits:   { cpu: 500m, memory: 256Mi }
+        livenessProbe:
+          httpGet: { path: /ready, port: admin }
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: envoy-config
+        configMap:
+          name: envoy-edge-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: envoy-edge
+  namespace: star-system
+  labels: { app: envoy-edge }
+spec:
+  type: LoadBalancer
+  selector: { app: envoy-edge }
+  ports:
+  - { name: http, port: 10080, targetPort: http, nodePort: 30080 }  # dev 本地 30080
+  - { name: admin, port: 9901, targetPort: admin, nodePort: 30901 }
+---
+# =====================================================================
+# envoy 配置 ConfigMap — 把 4 后端 svc 通过 svc:// 引用
+# (per 9/1 13:05 JST 拍板: 业务 svc 通过 svc:// 引用, 不直连)
+# =====================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: envoy-edge-config
+  namespace: star-system
+data:
+  envoy.yaml: |
+    admin:
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 9901 }
+    static_resources:
+      listeners:
+      - name: canvas_listener
+        address:
+          socket_address: { address: 0.0.0.0, port_value: 10000 }
+        filter_chains:
+        - filters:
+          - name: envoy.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              stat_prefix: canvas_ingress
+              route_config:
+                virtual_hosts:
+                - name: canvas_backend
+                  domains: ["*"]
+                  routes:
+                  - match: { prefix: "/v1/canvases" }
+                    route: { cluster: canvas_engine, timeout: 30s }
+                  - match: { prefix: "/v1/games" }
+                    route: { cluster: domain_canvas, timeout: 30s }
+                  - match: { prefix: "/v1/mcp" }
+                    route: { cluster: domain_canvas, timeout: 60s }
+                  - match: { prefix: "/ws/canvas" }
+                    route: { cluster: canvas_realtime_ws, timeout: 0s }  # WS no timeout
+                  - match: { prefix: "/ws/game" }
+                    route: { cluster: canvas_realtime_ws, timeout: 0s }
+                  - match: { prefix: "/canvas-game" }
+                    route: { cluster: canvas_game, timeout: 30s }
+              http_filters:
+              - name: envoy.router
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      clusters:
+      - name: canvas_engine
+        type: STRICT_DNS
+        lb_policy: ROUND_ROBIN
+        load_assignment:
+          cluster_name: canvas_engine
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address: { address: canvas-engine.star-system.svc.cluster.local, port_value: 8080 }
+      - name: domain_canvas
+        type: STRICT_DNS
+        lb_policy: ROUND_ROBIN
+        load_assignment:
+          cluster_name: domain_canvas
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address: { address: domain-canvas.star-system.svc.cluster.local, port_value: 8081 }
+      - name: canvas_realtime_ws
+        type: STRICT_DNS
+        lb_policy: ROUND_ROBIN
+        load_assignment:
+          cluster_name: canvas_realtime_ws
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address: { address: canvas-realtime.star-system.svc.cluster.local, port_value: 8083 }
+      - name: canvas_game
+        type: STRICT_DNS
+        lb_policy: ROUND_ROBIN
+        load_assignment:
+          cluster_name: canvas_game
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address: { address: canvas-game.star-system.svc.cluster.local, port_value: 8084 }
+---
+# =====================================================================
+# ServiceMonitor (per NFR-OBS-2 Prometheus metrics 20+ 指标)
+# dev 阶段可选 (依赖 prometheus-operator)
+# =====================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: canvas-game-monitor
+  namespace: star-system
+  labels:
+    app: canvas-game
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: canvas-engine
+      app: domain-canvas
+      app: canvas-realtime
+      app: canvas-game
+  namespaceSelector:
+    matchNames: [star-system]
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+---
+# =====================================================================
+# PodDisruptionBudget — dev 1 副本, minAvailable 1 保 1 不被驱逐
+# (per DD-GAME-001 v0.1 §12.2 PDB)
+# =====================================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: canvas-game-pdb
+  namespace: star-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      tier: shared
+      tier: business
+      tier: realtime
+      tier: game

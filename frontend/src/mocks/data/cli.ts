@@ -11,8 +11,11 @@ export const MOCK_CLI_PROFILES: CliProfile[] = [
 ];
 
 export const MOCK_API_KEYS: ApiKey[] = [
-  { id: "k1", provider: "anthropic", label: "Primary", mode: "encrypted_rust", preview: "sk-***xyz1", createdAt: "2026-08-15" },
-  { id: "k2", provider: "openai", label: "Backup", mode: "environment_var", preview: "env: OPENAI_API_KEY", envVarName: "OPENAI_API_KEY", createdAt: "2026-08-20" },
+  { id: "k1", provider: "anthropic", label: "Primary", mode: "encrypted_rust", preview: "sk-***xyz1", createdAt: "2026-08-15", cli_profile_id: "claude" },
+  { id: "k2", provider: "openai", label: "Backup", mode: "environment_var", preview: "env: OPENAI_API_KEY", envVarName: "OPENAI_API_KEY", createdAt: "2026-08-20", cli_profile_id: "codex" },
+  // per 2026-09-02 02:49 JST Ulysses 拍板: openai/claude/gemini/minimax 4 必备
+  { id: "k3", provider: "minimax", label: "minimax Primary", mode: "encrypted_rust", preview: "mm-***xyz3", createdAt: "2026-09-01" },
+  { id: "k4", provider: "gemini", label: "Gemini Backup", mode: "environment_var", preview: "env: GOOGLE_API_KEY", envVarName: "GOOGLE_API_KEY", createdAt: "2026-09-01", cli_profile_id: "gemini" },
 ];
 
 export const MOCK_TASK_WINDOWS: TaskWindow[] = [

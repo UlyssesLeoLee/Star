@@ -72,6 +72,9 @@ export interface KanbanBoardProps {
   // 高亮"下一步状态列" (per 2026-09-05 拍板, 场景 2: 当前用户最近 transition 卡片的下一状态列)
   // 父组件计算后传入, 该列右上角飘气态粒子. undefined = 不高亮.
   nextStepStatus?: WorkItemStatus | null;
+  // 架构查看器 (per ADR-0041) → 父组件弹 ArchGraphModal
+  // 透传到 KanbanCard 的 🕸 Arch icon 按钮
+  onArchClick?: (workItem: WorkItem) => void;
 }
 
 const KANBAN_COLUMNS_LOCAL: ReadonlyArray<WorkItemStatus> = KANBAN_COLUMNS;
@@ -92,6 +95,7 @@ export function KanbanBoard({
   onRequestNewWorkItem,
   onWorkItemClick,
   nextStepStatus,
+  onArchClick,
 }: KanbanBoardProps) {
   const { t, tx } = useTranslation();
   const fallbackLabel = useStatusLabel("workItem", "todo");
@@ -421,6 +425,7 @@ export function KanbanBoard({
                     onDragStart={handleCardDragStart}
                     onDragEnd={handleCardDragEnd}
                     onClick={onWorkItemClick}
+                    onArchClick={onArchClick}
                   />
                 ))}
               </div>

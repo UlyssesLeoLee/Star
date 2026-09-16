@@ -15,13 +15,32 @@ export interface CliProfile {
 
 export interface ApiKey {
   id: string;
-  provider: "anthropic" | "openai" | "openclaw" | "hermes" | "google";
+  /** LLM 厂商 (per 2026-09-02 02:49 JST Ulysses 拍板: openai/claude/gemini/minimax 4 必备) */
+  provider: "anthropic" | "openai" | "openclaw" | "hermes" | "google" | "claude" | "gemini" | "minimax";
   label: string;
   mode: "encrypted_rust" | "environment_var";
   preview: string;
   envVarName?: string;
   createdAt: string;
   lastUsedAt?: string;
+  /** 关联 agent tab (per CliTab.id) — 各 agent 分别填不同 key */
+  agent_id?: string;
+  /** 关联 CLI profile (per CliProfile.id, e.g. "claude" / "codex" / "openclaw") */
+  cli_profile_id?: string;
+  /** 关联 agent_kind (per types/ids.ts AgentSession.agent_kind) */
+  agent_kind?: "claude-sonnet" | "gpt-4o" | "codex" | "internal-vibe-coder" | "gemini-2" | "minimax-v1";
+}
+
+/**
+ * POST /api/api-keys 请求体 (per 2026-09-16 review).
+ * `ApiKey` 本身是 list/read 也在用的摘要 DTO (只含 preview, 不含明文) —
+ * `encrypted_rust` 模式下 domain-cli 后端需要明文 secret 才能生成密文, 所以写请求在
+ * `ApiKey` 字段基础上多带 1 个 `secret`; 明文只在这次 POST 里过一次, 服务端返回 /
+ * 后续任何 list/read 响应(`ApiKey` 本身)都不应回带这个字段。
+ */
+export interface ApiKeyCreateRequest extends ApiKey {
+  /** 明文 secret (仅 mode="encrypted_rust" 时必填, environment_var 模式不需要) */
+  secret?: string;
 }
 
 export interface TaskWindow {
@@ -73,7 +92,10 @@ export function isApiKey(x: unknown): x is ApiKey {
     typeof o.label === "string" &&
     ["encrypted_rust", "environment_var"].includes(o.mode as string) &&
     typeof o.preview === "string" &&
-    typeof o.createdAt === "string"
+    typeof o.createdAt === "string" &&
+    (o.agent_id === undefined || typeof o.agent_id === "string") &&
+    (o.cli_profile_id === undefined || typeof o.cli_profile_id === "string") &&
+    (o.agent_kind === undefined || typeof o.agent_kind === "string")
   );
 }
 

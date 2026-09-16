@@ -87,7 +87,7 @@ export function CalendarHeader({
         <div
           role="tablist"
           aria-label="Calendar view"
-          className="inline-flex rounded-md border border-line bg-bg-soft overflow-hidden"
+          className="inline-flex border-2 border-[var(--cel-ink)] bg-bg-soft overflow-hidden cel-shadow"
         >
           <button
             type="button"

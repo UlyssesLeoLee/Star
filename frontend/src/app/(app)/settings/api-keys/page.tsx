@@ -26,11 +26,16 @@ const INITIAL: ApiKey[] = [
 ];
 
 const PROVIDER_HINT: Record<string, string> = {
-  anthropic: "Anthropic Claude",
-  openai: "OpenAI GPT",
-  openclaw: "OpenClaw API",
-  hermes: "Hermes AI",
-  google: "Google Gemini",
+  // per 2026-09-02 02:49 JST Ulysses 拍板: 4 必备 = openai / claude / gemini / minimax
+  openai:    "OpenAI (GPT-4o / o1) — 4 必备",
+  claude:    "Anthropic Claude (3.5 / 4 Sonnet) — 4 必备",
+  gemini:    "Google Gemini (2.0 Flash / Pro) — 4 必备",
+  minimax:   "minimax (m2.7 / m-large) — 4 必备",
+  // 兼容旧 provider
+  anthropic: "Anthropic (legacy alias)",
+  openclaw:  "OpenClaw API (CLI tool)",
+  hermes:    "Hermes AI (CLI tool)",
+  google:    "Google AI (legacy alias)",
 };
 
 export default function ApiKeysPage() {
@@ -86,7 +91,7 @@ export default function ApiKeysPage() {
 
       {/* 存储模式说明 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="p-3 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">
+        <div className="p-3 border-2 border-[var(--cel-ink)] bg-[color:var(--color-surface)] cel-shadow">
           <div className="flex items-center gap-2 mb-1.5">
             <Lock size={14} className="text-[color:var(--color-success)]" />
             <span className="text-sm font-medium">Encrypted (Rust backend)</span>
@@ -95,7 +100,7 @@ export default function ApiKeysPage() {
             AES-256-GCM 加密, 存于后端 <code className="px-1 rounded bg-[color:var(--color-surface-2)]">domain-cli</code> 内存, 跨设备同步。接口仅返回 key_id + label, 不返明文。
           </p>
         </div>
-        <div className="p-3 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">
+        <div className="p-3 border-2 border-[var(--cel-ink)] bg-[color:var(--color-surface)] cel-shadow">
           <div className="flex items-center gap-2 mb-1.5">
             <Globe size={14} className="text-[color:var(--color-info)]" />
             <span className="text-sm font-medium">Environment Variable</span>
@@ -108,7 +113,7 @@ export default function ApiKeysPage() {
 
       {/* Add Form */}
       {adding && (
-        <div className="p-4 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]">
+        <div className="p-4 border-2 border-[var(--cel-ink)] bg-[color:var(--color-surface-2)] cel-shadow">
           <div className="text-sm font-medium mb-3">添加 API Key</div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
@@ -201,7 +206,7 @@ export default function ApiKeysPage() {
             {keys.map((k) => (
               <div
                 key={k.id}
-                className="flex items-center gap-3 p-3 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)]"
+                className="flex items-center gap-3 p-3 border-2 border-[var(--cel-ink)] bg-[color:var(--color-surface)] cel-shadow"
               >
                 {k.mode === "encrypted_rust" ? (
                   <Lock size={14} className="text-[color:var(--color-success)]" />

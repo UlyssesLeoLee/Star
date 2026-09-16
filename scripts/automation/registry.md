@@ -91,6 +91,8 @@
 |---|---|---|---|---|
 | v0.1 | 2026-09-02 | 架构师 (Mavis 接手 agent per DEC-008) | 初版: 8 份脚本索引 (__init__.py × 2 + dispatcher + cli_helper/base + refactor_template + judge + smoke_test + registry_check), 任务卡调用方映射, 状态 🟢/🟡 分档 | 2026-09-02 00:39 JST 拍板 "新建 docs/automation-design.md + scripts/automation/ 落档" + 守门 #12 派生 v2 |
 | v0.2 | 2026-09-07 | 架构师 (Mavis 接手 agent per DEC-008) | +1 份脚本: `pgwiki_resolve_issues.py` (pgwiki 4 OPEN issue 一次性收掉: #18 补 work_item / #19 撤 kms / #20 5 个 ADR_PLANNED / #21 27 个 ARCH_PLANNED, counter 全 0 验证) | 2026-09-07 20:34 JST Ulysses 拍板 "能解决就尽量解决" |
+| v0.3 (K3S-v2 分支重号, 沿用原始报告编号) | 2026-09-08 | 架构师 (Mavis 接手 agent per DEC-008) | §1 索引无新行 (本批次 .ps1/.bat/.service 不属于 `scripts/automation/` 仓内 automation 体系, 落 `tools/star-flash-mock/scripts/` 平级目录); §4 引用文档 +2 份 (报告 + brief per K3S-6/K3S-7); 跨仓层变更配合 `docs/automation-design.md` §4.16 落档 | 2026-09-08 07:36 JST Ulysses 反馈 "启动 3000 端口后黑了" + ask_user `q1_a2aea15f` opt4 "合 1 commit" (07:51 JST 拍板) |
+| v0.4 (K3S-v2 分支重号, 沿用原始报告编号) | 2026-09-08 | 架构师 (Mavis 接手 agent per DEC-008) | §4 引用文档 (PHASE-K3S-STAR-MOCK-IMPL-REPORT.md) 升档 v0.1 → v0.2 (+ §8 续做记录: 镜像落 daocloud + k3s kubelet 半死 + port-forward disable + 3 条新守门派生规候选); 1 commit 落 envoy-deployment.yaml image path docker.io → docker.m.daocloud.io (永久) | 2026-09-08 08:04-08:08 JST 续做 (sudo 实为 sudoers 白名单非配额, k3s 内部状态破裂需 Ulysses 手动 restart k3s) |
 | v0.35 | 2026-09-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | §2 子代理任务索引 +1 行 (ulys-30-requirements-001 落地 SRS-WORKFLOW-TEMPLATE-001.md v0.1, per ULYS-34 子任务 retry: 前次 74dda328 commit 缺失, 本次重新撰写并落地) | 2026-09-14 JST ULYS-30 「全新模板模式」 stage 1 需求定义交付 + 守门 #12 v21 [P] docs 同步 |
 | v0.37 | 2026-09-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | §2 子代理任务索引 +1 行 (ulys-30-basic-design-001 落地 BD-WORKFLOW-TEMPLATE-001.md v0.1, per ULYS-35 子任务 retry: 原 dc14a111 因 2 次 session limit 失败, Mavis 接手 per 守门 #9 v19 + 守门 #14 v3) | 2026-09-14 JST ULYS-30 「全新模板模式」 stage 2 基本設計交付 + 守门 #12 v21 [P] docs 同步 |
 | v0.38 | 2026-09-14 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | §2 子代理任务索引 +1 行 (ulys-30-detailed-design-001 落地 DD-WORKFLOW-TEMPLATE-001.md v0.1, per ULYS-36 子任务 retry: 原 dc14a111 因 2 次 session limit 失败, Mavis 接手 per 守门 #9 v19 + 守门 #14 v3) | 2026-09-14 JST ULYS-30 「全新模板模式」 stage 3 詳細設計交付 + 守门 #12 v21 [P] docs 同步 |
@@ -103,6 +105,8 @@
 - `scripts/automation/smoke_test.py` (校验脚本, 跑通 4 case)
 - `scripts/automation/registry_check.py` (校验脚本, 索引一致性)
 - `AGENTS.md` §4.1 守门派生 v19/v20/v21 (待追加, per §5 守门基线)
+- `docs/reports/PHASE-K3S-STAR-MOCK-IMPL-REPORT.md` v0.1 (K3S-6: 7 段结构 per 守门 #3, 4 步根因 + 4 改动 + 8 缺口 + 5 角色签字)
+- `docs/briefs/k3s-star-mock-3000-restore-001.md` v0.1 (K3S-7 引用: per 守门 #9 v20 brief 落档, 4 改动 scope + 等 sudo 重置下 session 续项)
 
 | `scripts/automation/nav_completion_i18n.py` | i18n �ֵ� 21 �� categoryLabel �ֽڼ��滻 (per star-nav-completion-001 ������ A) | star-nav-completion-001 ������ A | `bd918e4` | [���] UTF-8 �ֽڼ�, 7 module �� 3 lang, GBK �����ѱ� |
 | `scripts/automation/post_merge_meta_update.py` | Ԫ commit ���� + �ű��������� (per ���� #21) | star-nav-completion-001 Ԫ commit | TBD | [���] GBK �ֽڼ� append |

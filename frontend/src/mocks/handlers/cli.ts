@@ -6,8 +6,8 @@
 //   POST   /api/cli-profiles         — 创建自定义
 //   PATCH  /api/cli-profiles/:id     — 启用/禁用 / 重命名
 //   DELETE /api/cli-profiles/:id     — 删除自定义
-//   GET    /api/api-keys             — 列出
-//   POST   /api/api-keys             — 添加 (encrypted / env_var)
+//   GET    /api/api-keys             — 列出 (per 2026-09-02 02:49 JST 4 必备: openai/claude/gemini/minimax + anthropic/hermes/openclaw)
+//   POST   /api/api-keys             — 添加 (encrypted / env_var, + agent_id/cli_profile_id/agent_kind 3 字段 per 02:49 JST 拍板)
 //   DELETE /api/api-keys/:id         — 删除
 //   GET    /api/task-windows         — 列出
 //   POST   /api/task-windows         — 创建
@@ -98,7 +98,10 @@ export const cliHandlers = [
     if (!isApiKey(body)) {
       return HttpResponse.json({ error: "Invalid API key" }, { status: 400 });
     }
-    return HttpResponse.json(body, { status: 201 });
+    // secret (明文, per ApiKeyCreateRequest) 仅这次写请求带, mock 收到后即弃 —
+    // 真后端场景下 domain-cli 会用它生成密文入库, 但响应体永远只回 ApiKey 摘要 (无明文)
+    const { secret: _secret, ...created } = body as typeof body & { secret?: string };
+    return HttpResponse.json(created, { status: 201 });
   }),
 
   del("/api/api-keys/:id", () => HttpResponse.json({ deleted: true })),

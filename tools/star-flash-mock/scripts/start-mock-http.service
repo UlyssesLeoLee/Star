@@ -1,0 +1,16 @@
+[Unit]
+Description=star-flash-mock python http.server (per 2026-09-08 15:48 JST Ulysses "3s 正常显示界面")
+# 跟 k3s-portforward.service 互斥 (3000 端口共享)
+After=k3s-portforward.service
+
+[Service]
+Type=simple
+# 不指定 User=leo19 (systemd user mode 跑 leo19 user service 时 cgroup 权限不够, status=216/GROUP)
+# 跑用户 systemd 默认 user
+WorkingDirectory=/home/leo19
+ExecStart=/usr/bin/python3 -m http.server 3000 --bind 0.0.0.0 --directory /mnt/d/Star/.worktrees/feat-auto-20260908-204a1a91/tools/star-flash-mock/dist
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
