@@ -824,15 +824,19 @@ pub trait AuditRecorder: Send + Sync {
 /// action = "onboarding.test_key.failed", actor = System, after_state = JSONB.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordOnboardingFailedCommand {
+    /// RLS 必填 (守門 #DB-13 CW-05)
     pub tenant_id: TenantId,
     /// frontend の DetectedKey.id (UUID 文字列を parse)
     pub detected_key_id: Uuid,
+    /// LLM provider 名 (e.g. "openai" / "anthropic")
     pub provider: String,
+    /// DetectedKey の表示ラベル
     pub label: String,
     /// 固定 5
     pub attempts: u8,
     /// 0 = network error / 4xx / 5xx
     pub status_code: u16,
+    /// 失敗理由の説明文
     pub error_message: String,
     /// 任意, audit_audit_event.client_ip に転記
     pub client_ip: Option<String>,
@@ -1237,8 +1241,8 @@ mod in_memory_stub {
 
     /// **InMemoryAuditRecorder**: テスト用 + Phase 2 stub
     #[derive(Default)]
-    pub struct InMemoryAuditRecorder {
-        pub events: Mutex<VecDeque<AuditEvent>>,
+    pub(crate) struct InMemoryAuditRecorder {
+        pub(crate) events: Mutex<VecDeque<AuditEvent>>,
     }
 
     #[async_trait]
@@ -1539,8 +1543,8 @@ mod tests {
         let tenant_id = TenantId(tenant_uuid);
         let mut ev = AuditEvent {
             id: AuditEventId::new(),
-            tenant_id: TenantId(tenant_id),
-            actor: make_actor_user(TenantId(tenant_id)),
+            tenant_id,
+            actor: make_actor_user(tenant_id),
             action: AuditAction::CrossTenantAttempt,
             resource_type: "work_item".to_string(),
             resource_id: Uuid::new_v4(),

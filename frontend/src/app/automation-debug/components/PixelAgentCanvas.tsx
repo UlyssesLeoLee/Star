@@ -489,7 +489,7 @@ export function PixelAgentCanvas({ autoDemo = true, className = "" }: PixelAgent
       led: resolveColor(ok, DEFAULT_PALETTE.led),
     };
 
-    function drawGround() {
+    const drawGround = () => {
       ctx.fillStyle = "rgba(255,255,255,0.04)";
       ctx.beginPath();
       ctx.ellipse(CANVAS / 2, CANVAS - 16, 88, 14, 0, 0, Math.PI * 2);
@@ -502,20 +502,20 @@ export function PixelAgentCanvas({ autoDemo = true, className = "" }: PixelAgent
           ctx.fillRect(x, y, 2, 2);
         }
       }
-    }
+    };
 
-    function drawGlow() {
+    const drawGlow = () => {
       const grad = ctx.createRadialGradient(CANVAS / 2, CANVAS / 2, 40, CANVAS / 2, CANVAS / 2, 120);
       grad.addColorStop(0, "rgba(116, 143, 252, 0.25)");
       grad.addColorStop(1, "rgba(116, 143, 252, 0)");
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, CANVAS, CANVAS);
-    }
+    };
 
     const startTime = performance.now();
     stateStartRef.current = startTime;
 
-    function loop() {
+    const loop = () => {
       const now = performance.now();
       const elapsed = now - startTime;
       const stateTime = now - stateStartRef.current;
@@ -586,7 +586,7 @@ export function PixelAgentCanvas({ autoDemo = true, className = "" }: PixelAgent
 
       frameIndexRef.current++;
       animRef.current = requestAnimationFrame(loop);
-    }
+    };
 
     animRef.current = requestAnimationFrame(loop);
 
