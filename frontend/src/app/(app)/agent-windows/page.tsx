@@ -86,7 +86,7 @@ export default function AgentWindowsPage() {
             <select
               value={selectedWorktree}
               onChange={(e) => setSelectedWorktree(e.target.value)}
-              className="text-xs px-2 py-1 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface)]"
+              className="text-xs px-2 py-1 border-2 border-[var(--cel-ink)] bg-[color:var(--color-surface)] cel-shadow"
               aria-label={t.ariaLabels.worktree}
             >
               <option value="wt-physis-gvpe">Physis / GVPE</option>

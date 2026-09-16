@@ -59,7 +59,7 @@ export default function CliProfilesPage() {
           {profiles.filter((p) => ["claude","codex","openclaw","hermes","gemini","aider"].includes(p.id)).map((p) => (
             <div
               key={p.id}
-              className={`p-3 rounded-md border ${p.enabled ? "border-[color:var(--color-border)]" : "border-[color:var(--color-border)] opacity-60"} bg-[color:var(--color-surface)]`}
+              className={`p-3 border-2 border-[var(--cel-ink)] ${p.enabled ? "" : "opacity-60"} bg-[color:var(--color-surface)] cel-shadow`}
             >
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">

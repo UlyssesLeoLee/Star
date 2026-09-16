@@ -16,7 +16,7 @@ export interface TabItem {
 
 const badgeToneClass: Record<BadgeTone, string> = {
   default: "bg-bg-card text-ink-mute border-line",
-  accent: "bg-accent/15 text-accent border-accent/30 shadow-[0_0_6px_rgba(0,240,255,0.2)]",
+  accent: "bg-accent/15 text-accent border-accent/30 shadow-[1.5px_1.5px_0px_0px_var(--cel-cyan)]",
   warn: "bg-warn/15 text-warn border-warn/30",
   err: "bg-err/15 text-err border-err/30",
   ok: "bg-ok/15 text-ok border-ok/30",
@@ -87,7 +87,7 @@ export function Tabs({
               variant === "pills" && [
                 "rounded-lg",
                 isActive
-                  ? "bg-bg-card text-accent shadow-[0_2px_8px_rgba(0,0,0,0.15)] border border-line font-bold"
+                  ? "bg-bg-card text-accent shadow-[3px_3px_0px_0px_var(--cel-ink)] border border-line font-bold"
                   : "text-ink-dim hover:text-ink hover:bg-bg-soft",
               ],
               variant !== "pills" && [
@@ -103,7 +103,7 @@ export function Tabs({
               </span>
             )}
             {isActive && variant !== "pills" && (
-              <span aria-hidden className="absolute left-0 right-0 -bottom-px h-0.5 bg-accent shadow-[0_0_10px_rgba(0,240,255,0.8)]" />
+              <span aria-hidden className="absolute left-0 right-0 -bottom-px h-[3px] bg-accent shadow-[2px_2px_0px_0px_var(--cel-ink)]" />
             )}
           </button>
         );

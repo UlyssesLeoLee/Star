@@ -292,7 +292,7 @@ export function Sidebar() {
                   type="button"
                   onClick={openMatrix}
                   data-testid="sidebar-add-custom"
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-line hover:border-accent/60 bg-bg-soft/40 hover:bg-accent/10 text-xs font-mono text-ink-mute hover:text-accent transition-all duration-200 group shadow-sm hover:shadow-[0_0_12px_rgba(0,240,255,0.15)]"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 border-2 border-dashed border-[var(--cel-ink)] hover:border-accent/60 bg-bg-soft/40 hover:bg-accent/10 text-xs font-mono text-ink-mute hover:text-accent transition-all duration-200 group hover:shadow-[2px_2px_0px_0px_var(--cel-ink),0_0_12px_rgba(0,240,255,0.15)]"
                 >
                   <Plus size={13} className="text-accent group-hover:rotate-90 transition-transform duration-300" />
                   <span className="font-semibold">{t.sidebar.customAdd}</span>
@@ -346,7 +346,7 @@ function ScopeToggle({ active, projectAvailable, onChange }: ScopeToggleProps) {
       aria-label={t.ariaLabels.sidebarScope}
       className="px-3 pt-3 pb-2 border-b border-line/60 shrink-0"
     >
-      <div className="flex items-center gap-1 p-0.5 rounded-lg bg-bg-soft/40 border border-line">
+      <div className="flex items-center gap-1 p-0.5 bg-bg-soft/40 border-2 border-[var(--cel-ink)] cel-shadow">
         {/* Main pill */}
         <button
           type="button"
@@ -356,9 +356,9 @@ function ScopeToggle({ active, projectAvailable, onChange }: ScopeToggleProps) {
           title={t.sidebar.scope.mainHint}
           onClick={() => onChange("main")}
           className={clsx(
-            "flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-wider transition-all duration-150",
+            "flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-mono uppercase tracking-wider transition-all duration-150",
             active === "main"
-              ? "bg-accent/15 text-accent border border-accent/40 shadow-[0_0_8px_rgba(0,240,255,0.25)]"
+              ? "bg-accent/15 text-accent border border-[var(--cel-ink)] shadow-[2px_2px_0px_0px_var(--cel-ink),0_0_8px_rgba(0,240,255,0.25)]"
               : "text-ink-mute hover:text-ink border border-transparent"
           )}
         >
@@ -376,9 +376,9 @@ function ScopeToggle({ active, projectAvailable, onChange }: ScopeToggleProps) {
           onClick={() => projectAvailable && onChange("project")}
           disabled={!projectAvailable}
           className={clsx(
-            "flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-wider transition-all duration-150",
+            "flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-mono uppercase tracking-wider transition-all duration-150",
             active === "project" && projectAvailable
-              ? "bg-accent/15 text-accent border border-accent/40 shadow-[0_0_8px_rgba(0,240,255,0.25)]"
+              ? "bg-accent/15 text-accent border border-[var(--cel-ink)] shadow-[2px_2px_0px_0px_var(--cel-ink),0_0_8px_rgba(0,240,255,0.25)]"
               : projectAvailable
                 ? "text-ink-mute hover:text-ink border border-transparent"
                 : "text-ink-mute/40 cursor-not-allowed border border-transparent"
