@@ -23,7 +23,7 @@ use crate::response::ResponseMeta;
 
 #[derive(Debug, Deserialize)]
 pub struct SubAgentLockRequest {
-    /// L1 SubAgent ID (per 9 SA 编号 SA-01..SA-09)
+    /// L1 SubAgent ID (per 9 SA 编号 SA-01..SA-10)
     pub subagent_id: String,
     /// 申请锁的业务键 (per L1 调度目标)
     pub lock_key: String,
@@ -56,8 +56,8 @@ pub async fn acquire_subagent_lock(
             ],
             "l0_coordination": "L0 协调 L1↔L1; L2 SubAgent 必须经 L1 TopAgent 派发 (per 守门 #13 a)",
             "domains": ["player", "economy", "match", "social", "admin"],
-            "subagent_ids": ["SA-01", "SA-02", "SA-03", "SA-04", "SA-05", "SA-06", "SA-07", "SA-08", "SA-09"],
-            "subagent_count": 9,
+            "subagent_ids": ["SA-01", "SA-02", "SA-03", "SA-04", "SA-05", "SA-06", "SA-07", "SA-08", "SA-09", "SA-10"],
+            "subagent_count": 10,
             "meta": ResponseMeta::stub(),
         })),
     )
