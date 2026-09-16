@@ -1027,6 +1027,86 @@ print(f"err_count={result.stderr.count('error[')}")
 - 守门 #14 v3: 5 域 Lead Mavis 临时代签 (真人到位后追溯签字覆盖修订历史)
 - 守门 #1 v19 [M] Python 化: 3 个 Python 脚本覆盖 R/V/S/A 4 维
 
+> **注: 以下 §4.16-4.17 沿用 K3S-v2 原始报告编号, 跟上文 §4.17 ARG.4 为不同主题重号 (per 守门 #1 禁回溯叙事, 不重新编号)**
+
+### 4.16 k3s star-mock 3000 端口恢复 (2026-09-08 07:36 JST per UAT 反馈 "启动 3000 端口后黑了")
+
+> **触发**: 2026-09-08 07:36 JST Ulysses 反馈 "用 playwright 操作进行 UAT 测试,现在启动 3000 端口后黑了,存在显示问题"
+> **落档文件**:
+> - `tools/star-flash-mock/k3s/envoy-deployment.yaml` (改, P0 热修复: 显式声明 `star-mock-mock-data` ConfigMap)
+> - `tools/star-flash-mock/scripts/start-k3s-backend.ps1` (新增, 158 行, 幂等启 k3s server, 从 Temp 落档)
+> - `tools/star-flash-mock/scripts/start-k3s-backend.bat` (新增, 47 行, pwsh 包装)
+> - `tools/star-flash-mock/scripts/k3s-portforward.service` (新增, 15 行, systemd user unit)
+> - `tools/star-flash-mock/scripts/README.md` (新增, 100 行, 启动顺序 + 速查命令 + 4 已知卡点 + 守门引用)
+> - `docs/reports/PHASE-K3S-STAR-MOCK-IMPL-REPORT.md` (新增, 7 段结构 per 守门 #3, ~ 250 行)
+> - `docs/briefs/k3s-star-mock-3000-restore-001.md` (新增, 86 行, per 守门 #9 v20)
+> **依据**: 守门 #1 派生 v19 (本次 4 改动维度全命中, 走 docs 同步) + 守门 #5 (env 安全, 全程无打印) + 守门 #9 v20 (brief 落档) + 守门 #10 (代签 Ulysses) + 守门 #12 v21 (docs 同步) + 守门 #15 饱和边界 (本 commit 触发 "新事件 = k3s UAT 恢复", 跨过 5cfb7b3 饱和点)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| K3S-1 | K3S-1 | WSL Ubuntu 启 k3s server (sudo nohup) | R, A | **[P]** | `tools/star-flash-mock/scripts/start-k3s-backend.ps1` | 幂等, 6443 LISTEN + node Ready 6d23h (k3s v1.36.3) |
+| K3S-2 | K3S-2 | apply envoy deployment + service + 2 CM | R, V, A | **[P]** | `tools/star-flash-mock/k3s/{envoy-deployment,star-mock-service}.yaml` | ns + deployment + service + CM 4 资源, 2/2 pod Pending (镜像未到, 阻塞 sudo) |
+| K3S-3 | K3S-3 | envoy-deployment.yaml P0 热修 (补 mock-data CM) | S, A | **[P]** | (yaml 编辑) | 原 deployment 引用 `configMap: star-mock-mock-data` 但缺 CM 定义, pod 卡 Pending 4m 因 FailedMount |
+| K3S-4 | K3S-4 | k3s-portforward systemd user service (3000 守护) | R, A | **[P]** | `tools/star-flash-mock/scripts/k3s-portforward.service` | 解决 "wsl 临时 VTL 销毁回收子进程" 根因, pod Running 后 auto-restart 切 active |
+| K3S-5 | K3S-5 | scripts/README.md 启动顺序 + 4 已知卡点 | A | **[P]** | (md 编辑) | per 守门 #12 实证 (Temp 路径 + 字节数 + mtime), 不回溯 |
+| K3S-6 | K3S-6 | PHASE-K3S-STAR-MOCK-IMPL-REPORT 7 段结构 | A | **[P]** | `docs/reports/PHASE-K3S-STAR-MOCK-IMPL-REPORT.md` | per 守门 #3 模板, §0 目的 + §1 改动 + §2 验证 + §3 缺口 + §4 子代理 + §5 守门 + §6 签字 + §7 修订 |
+| K3S-7 | K3S-7 | registry.md §1 索引 + 4 行 (3 脚本 + 1 报告) | A | **[P]** | (registry.md 编辑) | per 守门 #21 v21 [P] docs 同步必更新 registry |
+| K3S-8 | K3S-8 | automation-design.md §4.16 同步 (本节) | A | **[P]** | (本节追加) | per 守门 #21 v21 [P] docs 同步必更新 §4 任务卡表 |
+
+**§4.16 任务卡维度判定**:
+- R (Rerunnable): **是** (start-k3s-backend.ps1 幂等, port-forward service auto-restart)
+- V (Volume): **是** (本 commit 4 改动 + 4 新增, 跨 yaml / .ps1 / .bat / .service / .md 5 类型)
+- S (Structural): **是** (envoy-deployment.yaml 改 spec + 加 CM 段, 跟 §4.7-§4.15 平行)
+- A (Audit-trail): **是** (守门 #12 报告 7 段 + 守门 #21 任务卡表 + 守门 #9 git 实证 + 修订历史 v0.1)
+
+**§4.16 落档验证 (per 守门 #1 累积规 v15 饱和约束触发 "新事件" 跨过 5cfb7b3 饱和点)**:
+- 本 commit 1 个, author = `Ulysses <ulysses@mavis.local>` (per 守门 #10 + 8/27 19:39 JST 授权)
+- `git log -p --follow tools/star-flash-mock/k3s/envoy-deployment.yaml` 实证 CM 段追加 (commit 后)
+- `git log -p --follow tools/star-flash-mock/scripts/start-k3s-backend.ps1` 实证脚本落档 (commit 后)
+- `git log -p --follow docs/reports/PHASE-K3S-STAR-MOCK-IMPL-REPORT.md` 实证报告新增 (commit 后)
+- `git log -p --follow scripts/automation/registry.md` 实证 v0.x 追加 (commit 后)
+- `git log -p --follow docs/automation-design.md` 实证 §4.16 追加 (commit 后)
+- `git log -p --follow docs/briefs/k3s-star-mock-3000-restore-001.md` 实证 brief 落档 (commit 后)
+
+**§4.16 阻塞项 (等 sudo 重置, 5-15 min 自动恢复, 下 session 续)**:
+- K3S-2 续: `crictl pull docker.m.daocloud.io/envoyproxy/envoy:v1.32-latest` (需 sudo 配额)
+- K3S-4 续: `systemctl --user status k3s-portforward` 从 auto-restart loop 切 active (需 pod Running)
+- 验证: `curl -i localhost:3000` 200 + Playwright 截图 (守门 #22 + #23 路径)
+
+### 4.17 k3s star-mock 续做 v0.2 (2026-09-08 08:04-08:08 JST per sudo 实测 + k3s 内部状态破裂)
+
+> **触发**: 2026-09-08 08:04 JST Ulysses 拍板 "现在推完 UAT 闭环" (ask_user `q1_014274e2` opt1), 5min 后发现 (1) sudo 实为 sudoers 白名单非配额 (k3s crictl 免密, whoami 要密), (2) k3s kubelet 半死, container runtime 通信断
+> **落档文件**:
+> - `tools/star-flash-mock/k3s/envoy-deployment.yaml` (改, image 路径 docker.io → docker.m.daocloud.io, 永久避免 docker.io 拉超时)
+> - `docs/reports/PHASE-K3S-STAR-MOCK-IMPL-REPORT.md` v0.1 → v0.2 (+ §8 续做记录 5 步根因 + 3 已采取缓解 + 8 续做清单)
+> - `scripts/automation/registry.md` v0.3 → v0.4
+> **依据**: 守门 #1 派生 v19 (Python 化) + #9 v20 (brief 落档) + #10 (代签 Ulysses) + #12 v21 (docs 同步) + #15 饱和约束 (k3s 续做触发新事件, 跨过 5cfb7b3 饱和点)
+
+| # | 子项 | 标题 | 命中维度 | 初判 | 脚本路径 | 实证 / 备注 |
+|---|---|---|---|---|---|---|
+| K3S-v2-1 | K3S-v2-1 | 拉 envoy 镜像 (daocloud mirror, 免 docker.io 超时) | R, A | **[P]** | `sudo -n k3s crictl pull docker.m.daocloud.io/envoyproxy/envoy:v1.32-latest` | ✅ Image up to date sha256:49b0af0078643 (60MB, sudoers 白名单 k3s 免密) |
+| K3S-v2-2 | K3S-v2-2 | envoy-deployment.yaml image 永久改 daocloud 路径 | S, A | **[P]** | (yaml 编辑) | ✅ commit 落档, 下次 apply 自动用 daocloud, 跟 §4.16 K3S-3 (P0 热修 mock-data CM) 并列 |
+| K3S-v2-3 | K3S-v2-3 | port-forward service disable (避免 16 次 auto-restart 浪费 CPU) | R, A | **[P]** | `systemctl --user disable k3s-portforward.service` | ✅ 已 disable, 等 pod Ready 后手动 enable |
+| K3S-v2-4 | K3S-v2-4 | cleanup test pods (nop-test nop-default) | R | **[M]** | `kubectl delete pod --force` | ✅ 已删, 不留半死 pod |
+| K3S-v2-5 | K3S-v2-5 | nop-test pod 实证 root cause (k3s 全局问题) | R, A | **[P]** | (run + describe) | ✅ alpine 镜像 in default ns + star-mock ns 都卡 Pending, 跟 ns 无关, **是 k3s kubelet 半死** |
+| K3S-v2-6 | K3S-v2-6 | report v0.1 → v0.2 (+ §8 续做 5 步根因 + 8 续做清单) | A | **[P]** | (md 编辑) | per 守门 #12 v21 [P] docs 同步必更新 |
+| K3S-v2-7 | K3S-v2-7 | automation-design §4.17 同步 + registry.md v0.4 同步 | A | **[P]** | (md 编辑) | per 守门 #21 v21 [P] docs 同步必更新 §4 任务卡表 |
+
+**§4.17 任务卡维度判定**:
+- R (Rerunnable): **是** (crictl pull 幂等, system disable idempotent)
+- V (Volume): **是** (本批 2 改 + 1 commit, 跨 yaml / .md 2 类型)
+- S (Structural): **是** (image path 改, 跟 §4.16 K3S-3 P0 热修平行)
+- A (Audit-trail): **是** (PHASE-K3S-STAR-MOCK-IMPL-REPORT v0.2 §8 5 步根因 + 守门 #21 任务卡表)
+
+**§4.17 阻塞项 (等 Ulysses 手动操作, sudo systemctl restart k3s)**:
+- K3S-v2-5 续: journalctl -u k3s 应从 "Skipping pod sync" 切 "container runtime ok"
+- 验证 K3S-1 (deployment pod Ready) + K3S-4 (port-forward service active) + K3S-5 (curl 200) + K3S-6 (Playwright 截图)
+
+**§4.17 守门派生规候选 (per §8.6 教训, 待 Ulysses 拍板追加到 AGENTS.md §4.1)**:
+- 守门 #1 派生 v27: **拉镜像前必先看 `journalctl -u k3s | grep "Skipping pod sync"`, 若有则不要拉镜像, 先 systemctl restart k3s**
+- 守门 #1 派生 v28: **systemd 拉起 k3s 后必等待 60s 验证 container runtime 状态, 而非立即 apply yaml**
+- 守门 #1 派生 v29: **port-forward service 在 apply 之前必先 disable, 避免 "auto-restart 16 次 + 502 错误" CPU 浪费**
+
 ------
 
 ## 5. 守门基线 (per 守门 #1 派生 v19 + #9 派生 v2 + #12 派生 v2)

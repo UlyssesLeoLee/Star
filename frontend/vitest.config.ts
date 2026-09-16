@@ -28,6 +28,21 @@ export default defineConfig({
       "e2e/debug-mobile.spec.ts", // 临时调试 spec, 仅手动跑
       "e2e/canvas-view.spec.ts", // Playwright-only spec (per 2026-09-04 canvas e2e 守门补齐, uses @playwright/test)
       "e2e/canvas-share-export.spec.ts", // Playwright-only spec (per 2026-09-04 canvas Share/Export PNG, uses @playwright/test)
+      "e2e/arg-relationships.spec.ts", // Playwright-only spec (ARG.7 8 E2E, uses @playwright/test)
+      "e2e/collaboration-5d-lead-coordination.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/error-404-path-coverage.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/five-domain-feedback-loop.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/interaction-expectation-coverage.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/mcp-16-tool-coverage.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/ops-e2e-4-tab.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/ops-e2e-error-6field.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/ops-e2e-i18n.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/streamable-http-reconnect.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/tmo-merge-task-flow.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/uat-100pct-coverage-assertion.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/uat-3000-restore.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/uat-business-acceptance.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/worktree-creation-flow.spec.ts", // Playwright-only spec, uses @playwright/test
     ],
     setupFiles: ["./vitest.setup.ts"],
   },

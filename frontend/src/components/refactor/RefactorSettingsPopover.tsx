@@ -62,9 +62,9 @@ export function RefactorSettingsPopover({
         onClick={() => setOpen((o) => !o)}
         data-testid="refactor-settings-toggle"
         className={clsx(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
-          "border-line bg-bg-soft hover:border-accent/40 hover:text-accent",
-          open && "border-accent/60 text-accent bg-accent/10",
+          "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-2 transition-colors cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]",
+          "border-[var(--cel-ink)] bg-bg-soft hover:text-accent",
+          open && "text-accent bg-accent/10",
         )}
       >
         <Settings size={12} />
@@ -108,12 +108,12 @@ export function RefactorSettingsPopover({
                   }
                 }}
                 data-testid="refactor-batch-size-input"
-                className="flex-1 px-2 py-1.5 rounded border border-line bg-bg-card text-xs font-mono focus:outline-none focus:border-accent"
+                className="flex-1 px-2 py-1.5 border-2 border-[var(--cel-ink)] bg-bg-card text-xs font-mono focus:outline-none focus:border-accent"
               />
               <button
                 type="button"
                 onClick={commitSize}
-                className="px-2 py-1.5 rounded border border-accent/40 bg-accent/10 text-accent text-[10px] font-mono font-bold hover:bg-accent/20"
+                className="px-2 py-1.5 border-2 border-[var(--cel-ink)] bg-accent/10 text-accent text-[10px] font-mono font-bold hover:bg-accent/20 cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
               >
                 Apply
               </button>
@@ -129,7 +129,7 @@ export function RefactorSettingsPopover({
               type="button"
               onClick={handleReset}
               data-testid="refactor-reset-columns"
-              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded border border-err/40 bg-err/5 text-err text-[10px] font-mono font-bold hover:bg-err/15"
+              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 border-2 border-err bg-err/5 text-err text-[10px] font-mono font-bold hover:bg-err/15 cel-btn-3d shadow-[2px_2px_0px_0px_var(--err-DEFAULT)]"
               title={t.refactor.resetColumnsTitle}
             >
               <RotateCcw size={11} />

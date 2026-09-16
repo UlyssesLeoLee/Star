@@ -35,7 +35,7 @@ export function MobileHeader() {
   return (
     <header
       data-testid="mobile-header"
-      className="md:hidden sticky top-0 z-30 h-14 border-b border-line bg-bg/95 backdrop-blur-xl flex items-center px-3 gap-3"
+      className="md:hidden sticky top-0 z-30 h-14 border-b-2 border-[var(--cel-ink)] bg-bg/95 backdrop-blur-xl flex items-center px-3 gap-3 shadow-[0_3px_0px_0px_var(--cel-ink)]"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       <Link
@@ -76,7 +76,7 @@ export function MobileHeader() {
         >
           <Bell size={17} />
           {bellCount > 0 && (
-            <span className="absolute top-0.5 right-0.5 min-w-[14px] h-3.5 rounded-full bg-err text-white text-[8px] grid place-items-center px-1 font-mono font-bold">
+            <span className="absolute top-0.5 right-0.5 min-w-[14px] h-3.5 rounded-full bg-err text-white text-[8px] grid place-items-center px-1 font-mono font-bold border border-[var(--cel-ink)] shadow-[1px_1px_0px_0px_var(--cel-ink)]">
               {bellCount}
             </span>
           )}

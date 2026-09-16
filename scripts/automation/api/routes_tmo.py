@@ -169,17 +169,13 @@ async def tmo_operations() -> dict:
 # 注意: 用 scripts.automation 前缀, 跟 routes_tmo.py 其他 import 方式保持一致
 # (test_tmo_bulk_dag.py 用 PROJECT_ROOT 注入 sys.path, 'scripts.automation' 形式 import 才能 work)
 from scripts.automation.task_ops.nodes.split_node import (
+    DEFAULT_SPLIT_COUNT,
+    MAX_SPLIT_COUNT,
+    MIN_SPLIT_COUNT,
+    VALID_SPLIT_STRATEGIES,
     split_node,
 )
 
-# 局部常量 (per ADR-0049 P-AUTO-WT-01 修复: split_node 早版本未导出这 4 个常量,
-# routes_tmo.py 顶层 import 触发 ImportError → console_server mount_tmo_routes 走 except 分支,
-# 整个 /api/tmo/* 端点全部 404. 修补: 在路由层维护 split 范围常量, 跟 split_node 内部逻辑对齐
-# (split_node.py 默认 split_count=2, 范围 [2, 8], strategy ∈ {context, label, equal}).
-DEFAULT_SPLIT_COUNT = 2
-MIN_SPLIT_COUNT = 2
-MAX_SPLIT_COUNT = 8
-VALID_SPLIT_STRATEGIES = ("context", "label", "equal")
 
 
 # Module-level singleton manager (per 02 §2.6.5 调试控制台设计)

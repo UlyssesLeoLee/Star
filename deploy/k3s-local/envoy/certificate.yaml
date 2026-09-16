@@ -1,0 +1,59 @@
+# v0.71 §14.12 IV TLS 自动签发 (per cert-manager.io Certificate resource)
+#
+# 守门 #5 v2: bootstrap config 不含 secret, cert 通过 cert-manager SDS (Secret Discovery Service) 挂载
+# 选型: cert-manager.io/v1 + Issuer/ClusterIssuer (per cert-manager 官方 spec)
+#
+# 适用环境:
+# - staging/dev: self-signed Issuer (in-cluster CA)
+# - prod: Let's Encrypt ClusterIssuer (per cert-manager 官方 acme-shim)
+#
+# 自动签发 (v0.71 落地):
+# - 5 DNS names: star.local, api.star.local, mcp.star.local, ops.star.local, *.star.local
+# - 90 天自动续期 (cert-manager Certificate.spec.duration 默认 90d)
+# - 30 天前触发续期 (renewBefore 默认 duration/3 = 30d)
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: star-self-signed-issuer
+  namespace: star-system
+  labels:
+    app: envoy
+    app.kubernetes.io/component: tls
+spec:
+  # self-signed for dev/staging (per brief v0.71 §2.1 已知, 等 cert-manager 落地后)
+  selfSigned: {}
+---
+# v0.71 5 DNS names Certificate (per cert-manager.io/v1 spec, 守门 #1 禁回溯叙事不动已 commit issuer 资源)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: star-tls-cert
+  namespace: star-system
+  labels:
+    app: envoy
+    app.kubernetes.io/component: tls
+spec:
+  secretName: star-tls-cert-secret
+  # 引用上面定义的 self-signed Issuer (dev/staging)
+  # prod 切换: 改为引用 ClusterIssuer "letsencrypt-prod"
+  issuerRef:
+    name: star-self-signed-issuer
+    kind: Issuer
+    group: cert-manager.io
+  # 5 DNS names (per v0.71 业务路由)
+  dnsNames:
+    - star.local
+    - api.star.local
+    - mcp.star.local
+    - ops.star.local
+    - "*.star.local"
+  # 90 天有效 + 30 天前自动续期 (cert-manager 默认)
+  duration: 2160h # 90 days
+  renewBefore: 720h # 30 days
+  # secret 输出 (per v0.71 §2.2 SDS 挂载, envoy 通过 SDS cluster 读取)
+  # secretName: star-tls-cert-secret (above)
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+    - client auth

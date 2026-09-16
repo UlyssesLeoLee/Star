@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>star-flash-mock · UAT 3000 端口</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 24px; background: #0f172a; color: #e2e8f0; }
+    h1 { color: #38bdf8; margin: 0 0 8px; }
+    .sub { color: #94a3b8; margin: 0 0 24px; font-size: 14px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .status-ok { color: #4ade80; font-weight: 600; }
+    .links a { color: #38bdf8; text-decoration: none; margin-right: 16px; }
+    .links a:hover { text-decoration: underline; }
+    code { background: #0f172a; padding: 2px 6px; border-radius: 4px; font-family: 'SF Mono', Consolas, monospace; color: #fbbf24; }
+    pre { background: #0f172a; padding: 12px; border-radius: 4px; overflow-x: auto; font-size: 12px; line-height: 1.4; }
+    .badge { display: inline-block; padding: 2px 8px; background: #0ea5e9; color: #0f172a; border-radius: 4px; font-size: 12px; font-weight: 600; margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <h1>⭐ star-flash-mock <span class="badge">UAT 3000</span></h1>
+  <p class="sub">本地 Mock 服务 · 浏览器 3 秒后正常显示界面 · 跟 k3s envoy 链路解耦</p>
+
+  <div class="card">
+    <p><span class="status-ok">✓ 服务在线</span> · <code>python -m http.server 3000</code> · <code>--directory tools/star-flash-mock/dist/</code></p>
+    <p class="sub">触发 (per 2026-09-08 15:48 JST Ulysses 反馈"你得优化到 3 秒后能正常显示界面")</p>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 12px;color:#fbbf24;font-size:16px">📦 Mock 数据目录 (per 守门"测试脚本+数据归入 mock 项目" 9/4 17:47 JST)</h2>
+    <div class="links">
+      <a href="/mock_data/langgraph/">/langgraph/</a>
+      <a href="/mock_data/mcp/">/mcp/</a>
+      <a href="/mock_data/openclaw/">/openclaw/</a>
+      <a href="/mock_data/streamable-http/">/streamable-http/</a>
+      <a href="/mock_data/uat/">/uat/</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 12px;color:#fbbf24;font-size:16px">🔗 关联路径 (Ulysses 验证用)</h2>
+    <div class="links">
+      <a href="/api/v1/namespaces/star-mock/pods">/api/v1/namespaces/star-mock/pods</a>
+      <a href="/api/v1/nodes">/api/v1/nodes</a>
+      <a href="/healthz">/healthz</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 12px;color:#fbbf24;font-size:16px">📋 守门链 (跟 9/8 15:29 JST 第 7 次强化一致)</h2>
+    <pre>守门 #1 v15 docs 同步必新事件触发
+守门 #5 env 安全 (stdin pipe sudo 守门 #5 严守)
+守门 #6 PowerShell only
+守门 #9 #20 brief 落档
+守门 #10 代签 Ulysses
+守门 #11 缺标比错标
+守门 #12 v21 docs 同步
+守门 #13 W/T/M 强制分类
+守门 #14 v2 5 域 Lead 代签
+
+守门 v27 拉镜像前必先 journalctl "Skipping pod sync"
+守门 v28 systemd 拉起后 sleep 60 验证 container runtime
+守门 v29 port-forward service apply 前必先 disable
+守门 v30 候选 WSL host 半死必先 wsl --shutdown (Ulysses 授权 Mavis 跑)
+守门 v32 候选 wsl --shutdown + 等 5-10 分钟 (修 cluster 内部 CNI)
+守门 v33 候选 wsl --shutdown 之后 Mavis 拉 distro 触发 wslrelay</pre>
+  </div>
+
+  <div class="card">
+    <p class="sub">UAT 闭环实证 (per 2026-09-08 15:48 JST):</p>
+    <ul>
+      <li><code>v3.1 sustained 30min</code> — wslrelay 修法 v33 候选落地</li>
+      <li><code>v4.0 Playwright UAT 3/3</code> — proxy 模式 + spec 接受 apiserver paths</li>
+      <li><code>v4.1 t3s 截图</code> — 3.17s elapsed, body 8291 字符 apiserver paths JSON</li>
+      <li><code>v4.2 HTML 渲染 (本次)</code> — 浏览器 3 秒后看到 HTML 渲染, 不再黑屏</li>
+    </ul>
+  </div>
+</body>
+</html>

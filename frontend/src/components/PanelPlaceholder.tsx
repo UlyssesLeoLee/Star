@@ -57,7 +57,7 @@ export function PanelPlaceholder({
         <p className="text-sm text-ink-dim mt-2 leading-relaxed">{description}</p>
       </header>
 
-      <div className="rounded-md border border-line bg-bg-soft/40 p-5 mb-4">
+      <div className="border-2 border-line bg-bg-soft/40 p-5 mb-4 cel-shadow">
         <div className="text-xs uppercase tracking-wider text-ink-mute font-mono mb-3">
           {OWNER_NOTE[owner]}
         </div>
