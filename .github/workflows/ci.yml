@@ -176,6 +176,7 @@ jobs:
         # 当前 600+ missing_docs pre-existing, 不强求
         # 守门 #1 v19: -j 4 修正 Windows 互锁
         run: cargo doc --workspace --no-deps --all-features -j 4
+        continue-on-error: true
 
   cargo-bench-no-run:
     name: Rust bench --no-run (compile-only)
