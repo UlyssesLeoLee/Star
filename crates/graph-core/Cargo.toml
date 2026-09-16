@@ -1,0 +1,31 @@
+[package]
+name = "graph-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — Graph Core: GraphRepository Trait + Neo4j/Memory adapters + 11 Node + 13 Edge (ULYS-57.1 T1, per DD-WORKTREE-CANVAS-001 §7/§8/§10 + INV-WC-04/05)"
+
+[lib]
+name = "graph_core"
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有依赖全部来自 [workspace.dependencies] 现存 0 重复
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+# 测试 in-memory adapter + 11 Node + 13 Edge + n-hop 查询
+tokio = { workspace = true }
+
+[lints]
+workspace = true
