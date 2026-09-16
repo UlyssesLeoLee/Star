@@ -108,6 +108,12 @@ members = [
     # R9 (2026-09-12) 新增 crates/shared-task (3 view 共享 Task schema Rust 整合层, per DD-SHARED-TASK-001 v0.1 §2 §3 §4: TaskId newtype (per Multica opaque ID 1:1 派生) + SharedTask struct 8 字段 (id/title/description/state/assignee/priority/issue_key/created_at) + TaskState enum 5 态 (Open/InProgress/InReview/Done/Closed per Jira 默认 workflow) + Priority enum 4 档 (Low/Medium(default)/High/Critical per Jira priority) + From 转换 (5 view → 共享 Task) + Into 转换 (共享 Task → 5 view), 跟 6 view crate (star-task/star-workflow/star-canvas/star-scheduler/star-game/canvas-collab) path dep 整合, 守门 #1 v25 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 poisoned 不删标 + 守门 #14 v4 Mavis 审核, Mavis 临时代签 5 域 Lead 决策 per 9/3 11:35 JST 反转 + 守门 #19 v19 0 动 V0.1 现有 6 view crate 业务 logic 仅加 From/Into + 1-2 UT each)
     # R10 (2026-09-12) 新增 crates/leads (5 角色 Rust 化, per plan-032 R10 line 150-155 + DD-SHARED-TASK-001 §4.6 + §7 缺口 #8: enum Lead { Architecture/Sre/Platform/Reviewer/Pm } 5 域 Lead + trait DecisionAuthority 决策权威抽象 + struct LeadDecision 决策记录 + 5 个具体 Lead (ArchitectureLead/SreLead/PlatformLead/ReviewerLead/PmLead) 各自 impl DecisionAuthority + struct SignOffPanel 5 角色签字栏聚合 + 编译时保证 5 角色签字 = 5 域 Lead enum 必填 编译失败 = 漏签 + 5 域 Lead 真人内容由 Mavis 默认填 per 9/11 23:11 JST 强化 + 真人到位追溯 per 守门 #1 禁回溯叙事, 守门 #1 v25 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 + 守门 #14 v4 Mavis 审核, Mavis 临时代签 5 域 Lead 决策 per 9/3 11:35 JST 反转 + 守门 #19 v19 0 动 V0.1 任何业务 logic)
     "crates/canvas-collab", "crates/star-registry", "crates/star-task", "crates/star-game", "crates/star-workflow", "crates/star-canvas", "crates/star-scheduler", "crates/shared-task", "crates/leads", "crates/star-workflow", "crates/star-canvas", "crates/star-scheduler", "crates/shared-task", "crates/leads",
+    # Phase W20-AI-Worktree-Canvas (ULYS-57.1 T1, 2026-09-16): graph-core crate (per docs/implementation-plans/WORKTREE-CANVAS-IMPL-PLAN-001.md §4.1 + DD-WORKTREE-CANVAS-001.md §7/§8/§10)
+    "crates/graph-core",
+    # Phase W20-AI-Worktree-Canvas (ULYS-57.1 T2, 2026-09-16): git-adapter crate (libgit2 + CLI fallback, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.2 + DD-WORKTREE-CANVAS-001 §10)
+    "crates/git-adapter",
+    # Phase W20-AI-Worktree-Canvas (ULYS-57.1 T2, 2026-09-16): git-observer crate (fsnotify + 100ms debounce + 15 GitEvent, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.2 + DD-WORKTREE-CANVAS-001 §11)
+    "crates/git-observer",
 ]
 exclude = ["target"]
 
@@ -180,6 +186,16 @@ hecs = "0.10"
 # redis-rs 0.27+ 协议 100% 兼容 Valkey, tokio-comp + connection-manager features
 # Phase G+ 启用于 crates/star-cache/src/valkey_backend.rs
 redis = { version = "0.27", default-features = false, features = ["tokio-comp", "connection-manager"] }
+
+# === ULYS-57.1 T1-T2 (2026-09-16) 新增 4 dep ===
+# git2: libgit2 Rust binding (per DD-WORKTREE-CANVAS-001 §10 + D-GIT-001 + NFR-REL-001 Git 不可变)
+# notify: cross-platform fs file watcher (per DD §11 Git Observer fsnotify)
+git2 = "0.20"
+notify = "8"
+# tempfile: 测试用临时目录 (per 守门 #11 缺标比错标 — 阶段 1 测试用)
+tempfile = "3"
+# libgit2-sys 锁版本 (per issue 风险段: libgit2 跨平台差异 — 锁 libgit2-sys 0.18+)
+libgit2-sys = "0.18"
 
 [profile.release]
 lto = "thin"
