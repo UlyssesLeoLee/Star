@@ -1,0 +1,33 @@
+[package]
+name = "query-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — Query Engine: Search DSL Parser (6 关键字 show/agent/behind/ahead/health/modified) + NL Translator + Cypher generation + Cypher injection guard (ULYS-57.3 T11, per DD-WORKTREE-CANVAS-001 §17/§28 + D-SEARCH-001 + FR-SEARCH-001..006 + NFR-SEC-002)"
+
+[lib]
+name = "query_engine"
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+regex = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+
+# 跨 crate 引用: graph-core 提供 HumanState (per WORKTREE-CANVAS-IMPL-PLAN-001 §3 集成策略)
+# 单向依赖: query-engine → graph-core
+graph-core = { path = "../graph-core" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true

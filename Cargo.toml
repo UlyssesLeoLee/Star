@@ -114,6 +114,12 @@ members = [
     "crates/git-adapter",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.1 T2, 2026-09-16): git-observer crate (fsnotify + 100ms debounce + 15 GitEvent, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.2 + DD-WORKTREE-CANVAS-001 §11)
     "crates/git-observer",
+    # Phase W20-AI-Worktree-Canvas (ULYS-57.3 T8, 2026-09-17): action-engine crate (18 Action + 3 类别 + 二次确认 + Idempotency 24h + Audit SCD Type 2 + RBAC 5 角色 + Retry 3 档, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.8 + DD-WORKTREE-CANVAS-001 §18 + §42-§44)
+    "crates/action-engine",
+    # Phase W20-AI-Worktree-Canvas (ULYS-57.3 T9, 2026-09-17): event-bus crate (15 Event + 4 消费者 Graph/UI/Risk/Notification + 100ms 防抖 + Redis Streams abstraction, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.9 + DD-WORKTREE-CANVAS-001 §19/§20 + D-EVENT-001 + NFR-REL-002 throughput 10k eps)
+    "crates/event-bus",
+    # Phase W20-AI-Worktree-Canvas (ULYS-57.3 T10, 2026-09-17): layout-engine crate (3 Layout dagre/d3-force/ELK + 3 切换阈值 + visualDistance log(n+1)*30 + Incremental Layout, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.10 + DD-WORKTREE-CANVAS-001 §16/§31/§36 + D-LAYOUT-001 + NFR-PERF-002)
+    "crates/layout-engine",
 ]
 exclude = ["target"]
 

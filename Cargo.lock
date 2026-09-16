@@ -3,6 +3,21 @@
 version = 3
 
 [[package]]
+name = "action-engine"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "graph-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "aead"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1339,6 +1354,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "event-bus"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "futures-util",
+ "graph-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "event-listener"
 version = "5.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2183,6 +2214,20 @@ checksum = "07293a4e297ac234359b510362495713f75ea345d5307140414f20c69ffeb087"
 dependencies = [
  "bitflags 2.13.1",
  "libc",
+]
+
+[[package]]
+name = "layout-engine"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "graph-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

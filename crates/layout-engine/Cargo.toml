@@ -1,0 +1,32 @@
+[package]
+name = "layout-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — Layout Engine: dagre.js/d3-force/ELK.js 3 Layout + 3 切换阈值 + visualDistance log 公式 + Incremental Layout (ULYS-57.3 T10, per DD-WORKTREE-CANVAS-001 §16/§31/§36 + D-LAYOUT-001 + NFR-PERF-002 1000 WT 60fps)"
+
+[lib]
+name = "layout_engine"
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+
+# 跨 crate 引用: graph-core 提供 WorktreeId (per WORKTREE-CANVAS-IMPL-PLAN-001 §3 集成策略)
+# 单向依赖: layout-engine → graph-core
+graph-core = { path = "../graph-core" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true
