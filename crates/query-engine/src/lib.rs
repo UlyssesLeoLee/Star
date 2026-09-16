@@ -25,6 +25,9 @@
 
 #![forbid(unsafe_code)] // 守门 #7 0 unsafe
 #![deny(missing_docs)]
+// 守门 #6 v2: QueryError 6-field 设计 (code / message / source / location / context / trace_id)
+// 字段超过 100 字节是 intentional — TraceID + 完整 audit context
+#![allow(clippy::result_large_err)]
 
 pub mod cypher_guard;
 pub mod dsl_parser;

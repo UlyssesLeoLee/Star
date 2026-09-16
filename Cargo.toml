@@ -120,6 +120,10 @@ members = [
     "crates/event-bus",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.3 T10, 2026-09-17): layout-engine crate (3 Layout dagre/d3-force/ELK + 3 切换阈值 + visualDistance log(n+1)*30 + Incremental Layout, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.10 + DD-WORKTREE-CANVAS-001 §16/§31/§36 + D-LAYOUT-001 + NFR-PERF-002)
     "crates/layout-engine",
+    # Phase W20-AI-Worktree-Canvas (ULYS-57.3 T11, 2026-09-17): query-engine crate (DSL Parser 6 关键字 + NL Translator + Cypher generation + cypher guard, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.11 + DD-WORKTREE-CANVAS-001 §17/§28 + D-SEARCH-001 + FR-SEARCH-001..006 + NFR-SEC-002)
+    "crates/query-engine",
+    # Phase W20-AI-Worktree-Canvas (ULYS-57.3 T12, 2026-09-17): canvas-renderer crate (CanvasRenderer Trait + React-Flow 11.x adapter + LOD 3 级 + Viewport Virtualization + 5 View Mode + Focus N-hop, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.12 + DD-WORKTREE-CANVAS-001 §11/§29/§30/§37 + D-CANVAS-001 + INV-WC-05/06/07 + NFR-PERF-002)
+    "crates/canvas-renderer",
 ]
 exclude = ["target"]
 
