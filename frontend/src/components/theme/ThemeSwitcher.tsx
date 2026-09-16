@@ -41,7 +41,7 @@ export function ThemeSwitcher() {
     // Skeleton (per ui-3pane-arch.md §3.7)
     return (
       <div
-        className="px-3 py-1.5 text-body rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] animate-pulse"
+        className="px-3 py-1.5 text-body border-2 border-[var(--cel-ink)] bg-[color:var(--color-surface-2)] animate-pulse"
         aria-label="loading theme"
       >
         <span className="opacity-0">--</span>

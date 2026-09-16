@@ -285,7 +285,7 @@ export function WorkItemDetailDrawer({
       {/* 抽屉本体: 右侧滑入 */}
       <div
         data-testid="work-item-drawer-panel"
-        className="relative h-full bg-bg-card border-l border-line shadow-2xl flex flex-col animate-in slide-in-from-right duration-200"
+        className="relative h-full bg-bg-card border-l-2 border-[var(--cel-ink)] shadow-[-8px_0px_0px_0px_var(--cel-ink),0_25px_50px_-12px_rgba(0,0,0,0.4)] flex flex-col animate-in slide-in-from-right duration-200"
         style={{ width: DRAWER_W, maxWidth: "92vw" }}
         onClick={(e) => e.stopPropagation()}
       >

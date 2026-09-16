@@ -28,22 +28,22 @@ export function ChartFrame({
 }: ChartFrameProps) {
   return (
     <div
-      className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+      className="border-2 border-line bg-bg-card p-4 cel-shadow"
       role="img"
       aria-label={title}
       data-testid={`chart-frame-${chartId.toLowerCase()}`}
     >
       <div className="mb-3 flex items-start justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{title}</h3>
-          {description && <p className="text-sm text-zinc-500 dark:text-zinc-400">{description}</p>}
+          <h3 className="text-lg font-semibold text-ink">{title}</h3>
+          {description && <p className="text-sm text-ink-dim">{description}</p>}
         </div>
         <div className="flex gap-2">
           {filterSelector}
           {onSubscribe && (
             <button
               onClick={onSubscribe}
-              className="rounded border border-zinc-200 px-3 py-1 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="border-2 border-[var(--cel-ink)] bg-bg-soft px-3 py-1 text-sm font-semibold hover:bg-bg-card transition-colors cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
               aria-label={`Subscribe to ${title}`}
             >
               订阅
@@ -53,14 +53,14 @@ export function ChartFrame({
             <>
               <button
                 onClick={() => onExport('csv')}
-                className="rounded border border-zinc-200 px-3 py-1 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                className="border-2 border-[var(--cel-ink)] bg-bg-soft px-3 py-1 text-sm font-semibold hover:bg-bg-card transition-colors cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
                 aria-label="Export as CSV"
               >
                 CSV
               </button>
               <button
                 onClick={() => onExport('png')}
-                className="rounded border border-zinc-200 px-3 py-1 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                className="border-2 border-[var(--cel-ink)] bg-bg-soft px-3 py-1 text-sm font-semibold hover:bg-bg-card transition-colors cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
                 aria-label="Export as PNG"
               >
                 PNG
@@ -71,10 +71,10 @@ export function ChartFrame({
       </div>
 
       {isLoading && (
-        <div className="flex h-64 items-center justify-center text-zinc-500">Loading...</div>
+        <div className="flex h-64 items-center justify-center text-ink-mute">Loading...</div>
       )}
       {error && (
-        <div className="flex h-64 items-center justify-center text-red-500" role="alert">
+        <div className="flex h-64 items-center justify-center text-err" role="alert">
           ⚠ {error}
         </div>
       )}

@@ -102,7 +102,7 @@ export function PushSettings() {
               type="button"
               onClick={testPush}
               data-testid="push-test"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-line text-[11px] text-ink-dim hover:text-ink"
+              className="flex items-center gap-1 px-2.5 py-1.5 border-2 border-[var(--cel-ink)] text-[11px] text-ink-dim hover:text-ink cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]"
             >
               <Send size={11} />
               测试
@@ -112,7 +112,7 @@ export function PushSettings() {
               onClick={disable}
               disabled={busy}
               data-testid="push-disable"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-err/30 text-err text-[11px] hover:bg-err/10"
+              className="flex items-center gap-1 px-2.5 py-1.5 border-2 border-err text-err text-[11px] hover:bg-err/10 cel-btn-3d shadow-[2px_2px_0px_0px_var(--err-DEFAULT)]"
             >
               <BellOff size={11} />
               关闭
@@ -125,10 +125,10 @@ export function PushSettings() {
             disabled={busy || perm === "denied" || perm === "unsupported"}
             data-testid="push-enable"
             className={
-              "flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors " +
+              "flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold transition-colors border-2 border-[var(--cel-ink)] " +
               (perm === "denied" || perm === "unsupported"
-                ? "border border-line text-ink-mute cursor-not-allowed"
-                : "border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20")
+                ? "text-ink-mute cursor-not-allowed opacity-60"
+                : "bg-accent/10 text-accent hover:bg-accent/20 cel-btn-3d shadow-[2px_2px_0px_0px_var(--cel-ink)]")
             }
           >
             {perm === "granted" ? <Check size={11} /> : <Bell size={11} />}
