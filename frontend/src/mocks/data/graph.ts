@@ -22,6 +22,7 @@
 import type { GraphPayload, GraphNode, GraphEdge } from "@/types/graph";
 
 const WI_ID = "wi-arch-001";
+const WI_ID_NODE = `WI:${WI_ID}`;
 const TENANT_ID = "tenant-physis-corp";
 const PROJECT_ID = "proj-physis";
 const NOW = "2026-09-02T01:00:00Z";
@@ -251,3 +252,37 @@ export const MOCK_GRAPH_EMPTY: GraphPayload = {
   stats: { node_count: 0, edge_count: 0, kind_breakdown: {} },
   generated_at: NOW,
 };
+
+/**
+ * 为任意 work_item_id 生成图 (per 2026-09-16 review: Kanban 卡片真实 id
+ * 如 wi-001 跟本 fixture 固定的 wi-arch-001 错开, 导致点 Arch 按钮总 404)。
+ * 复用 PHYSIS-123 fixture 拓扑, 仅替换当前节点 id/label + 相关边的端点,
+ * 让任何真实 work_item 都能拿到一份可视化的图 (per ADR-0041 §2.3.5 mock 阶段)。
+ */
+export function buildMockGraphForWorkItem(
+  workItemId: string,
+  maxHop: 1 | 2 = 1,
+): GraphPayload {
+  const base = maxHop === 2 ? MOCK_GRAPH_PHYSIS_123_2HOP : MOCK_GRAPH_PHYSIS_123;
+  const currentNodeId = `WI:${workItemId}`;
+  return {
+    ...base,
+    work_item_id: workItemId,
+    fingerprint: `fp-${workItemId}-${base.fingerprint}`,
+    nodes: base.nodes.map((n) =>
+      n.id === WI_ID_NODE
+        ? {
+            ...n,
+            id: currentNodeId,
+            label: `${workItemId} (mock architecture graph)`,
+            properties: { ...n.properties, key: workItemId },
+          }
+        : n,
+    ),
+    edges: base.edges.map((e) => ({
+      ...e,
+      source: e.source === WI_ID_NODE ? currentNodeId : e.source,
+      target: e.target === WI_ID_NODE ? currentNodeId : e.target,
+    })),
+  };
+}

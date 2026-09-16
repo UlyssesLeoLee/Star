@@ -31,6 +31,18 @@ export interface ApiKey {
   agent_kind?: "claude-sonnet" | "gpt-4o" | "codex" | "internal-vibe-coder" | "gemini-2" | "minimax-v1";
 }
 
+/**
+ * POST /api/api-keys 请求体 (per 2026-09-16 review).
+ * `ApiKey` 本身是 list/read 也在用的摘要 DTO (只含 preview, 不含明文) —
+ * `encrypted_rust` 模式下 domain-cli 后端需要明文 secret 才能生成密文, 所以写请求在
+ * `ApiKey` 字段基础上多带 1 个 `secret`; 明文只在这次 POST 里过一次, 服务端返回 /
+ * 后续任何 list/read 响应(`ApiKey` 本身)都不应回带这个字段。
+ */
+export interface ApiKeyCreateRequest extends ApiKey {
+  /** 明文 secret (仅 mode="encrypted_rust" 时必填, environment_var 模式不需要) */
+  secret?: string;
+}
+
 export interface TaskWindow {
   id: string;
   name: string;

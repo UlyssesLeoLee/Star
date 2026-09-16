@@ -98,7 +98,10 @@ export const cliHandlers = [
     if (!isApiKey(body)) {
       return HttpResponse.json({ error: "Invalid API key" }, { status: 400 });
     }
-    return HttpResponse.json(body, { status: 201 });
+    // secret (明文, per ApiKeyCreateRequest) 仅这次写请求带, mock 收到后即弃 —
+    // 真后端场景下 domain-cli 会用它生成密文入库, 但响应体永远只回 ApiKey 摘要 (无明文)
+    const { secret: _secret, ...created } = body as typeof body & { secret?: string };
+    return HttpResponse.json(created, { status: 201 });
   }),
 
   del("/api/api-keys/:id", () => HttpResponse.json({ deleted: true })),

@@ -8,9 +8,11 @@
 //
 // 守门 (per AGENTS.md §0/§1.2 + handlers/cli.ts 模式):
 //   - maybeReal 头插入 real-mode bypass (P3-A.7 派生, per 8/27 commit 模式)
-//   - 404 / 400 / 202 / 200 全显式分支
+//   - 400 / 202 / 200 全显式分支
 //   - tenant_id 必带 (per REQ-SEC-001, 13 类)
-//   - work_item_id 不存在 → 404 (不返 mock 兜底, 避免污染前端逻辑)
+//   - work_item_id 任意非空字符串均生成图 (per mocks/data/graph.ts
+//     buildMockGraphForWorkItem, 2026-09-16 review: 真实 Kanban 卡片 id 如
+//     wi-001 需要能拿到图, 不再局限于原固定 fixture wi-arch-001)
 //
 // 已知缺口 (per 缺标比错标, 8/26 JST 守门 #1):
 //   1. ensure-fresh 不会真触发后端 agent, mock 直接返 fresh
@@ -19,18 +21,11 @@
 // =====================================================================
 
 import { http, HttpResponse } from "msw";
-import {
-  MOCK_GRAPH_PHYSIS_123,
-  MOCK_GRAPH_PHYSIS_123_2HOP,
-  MOCK_GRAPH_EMPTY,
-} from "@/mocks/data/graph";
+import { buildMockGraphForWorkItem } from "@/mocks/data/graph";
 import type {
   EnsureFreshRequest,
   GraphCypherRequest,
 } from "@/types/graph";
-
-/** 已知 work_item mock 集合 (per mocks/data/graph.ts 实证) */
-const MOCK_WI_IDS = new Set(["wi-arch-001"]);
 
 function isValidEnsureFresh(body: unknown): body is EnsureFreshRequest {
   if (typeof body !== "object" || body === null) return false;
@@ -64,12 +59,6 @@ export const graphHandlers = [
         { status: 400 },
       );
     }
-    if (!MOCK_WI_IDS.has(body.work_item_id)) {
-      return HttpResponse.json(
-        { error: "work_item_not_found", work_item_id: body.work_item_id },
-        { status: 404 },
-      );
-    }
     // mock 99% 返 fresh, 1% 模拟 202 (testing pending state)
     const isPending = Math.random() < 0.01;
     if (isPending) {
@@ -79,7 +68,7 @@ export const graphHandlers = [
       );
     }
     return HttpResponse.json(
-      { status: "fresh", graph: MOCK_GRAPH_PHYSIS_123 },
+      { status: "fresh", graph: buildMockGraphForWorkItem(body.work_item_id) },
       { status: 200 },
     );
   }),
@@ -93,15 +82,7 @@ export const graphHandlers = [
         { status: 400 },
       );
     }
-    if (!MOCK_WI_IDS.has(body.work_item_id)) {
-      return HttpResponse.json(
-        { error: "work_item_not_found", work_item_id: body.work_item_id },
-        { status: 404 },
-      );
-    }
-    const graph = body.max_hop === 2
-      ? MOCK_GRAPH_PHYSIS_123_2HOP
-      : MOCK_GRAPH_PHYSIS_123;
+    const graph = buildMockGraphForWorkItem(body.work_item_id, body.max_hop);
     return HttpResponse.json(graph, { status: 200 });
   }),
 
