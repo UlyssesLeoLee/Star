@@ -1,0 +1,40 @@
+[package]
+name = "git-adapter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — Git Provider: libgit2 + CLI fallback (ULYS-57.1 T2, per DD-WORKTREE-CANVAS-001 §10 + D-GIT-001 + NFR-REL-001 Git 不可变)"
+
+[lib]
+name = "git_adapter"
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+# libgit2 Rust binding — NFR-REL-001 Git Source of Truth 不可变
+# 锁版本: git2 0.20.x + libgit2-sys 0.18+ (per issue 风险段)
+git2 = { workspace = true }
+libgit2-sys = { workspace = true }
+
+# 跨 crate 引用: graph-core 提供 ID newtype / MergeStrategy 等跨域枚举
+# 单向依赖: git-adapter → graph-core (per WORKTREE-CANVAS-IMPL-PLAN-001 §3 集成策略)
+graph-core = { path = "../graph-core" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true
