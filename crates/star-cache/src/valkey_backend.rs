@@ -217,9 +217,8 @@ mod tests {
         let prev = std::env::var("VALKEY_URL").ok();
         std::env::remove_var("VALKEY_URL");
         let r = ValkeyBackend::from_env();
-        match prev {
-            Some(p) => std::env::set_var("VALKEY_URL", p),
-            None => {}
+        if let Some(p) = prev {
+            std::env::set_var("VALKEY_URL", p);
         }
         match r {
             Err(CacheError::Connection(msg)) => assert!(msg.contains("unset")),
