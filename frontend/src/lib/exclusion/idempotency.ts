@@ -22,6 +22,8 @@ export interface InflightRecord {
   controller: AbortController;
   startedAt: number;
   promise: Promise<unknown>;
+  /** abort 显式取消时 reject in-flight promise (per abort_test) */
+  reject: (reason: unknown) => void;
 }
 
 export class IdempotencyManager {
@@ -56,15 +58,24 @@ export class IdempotencyManager {
     const record = this.inflight.get(key);
 
     if (record && this.config.enableAbortController) {
-      record.controller.abort();
-    }
+          // 只发出 abort 信号, in-flight fn 自己负责监听并 abort 自己的逻辑
+          // (per dispatch_cancels_previous_test 模式: slowFn 自监听 controller.signal)
+          record.controller.abort();
+        }
 
     const controller = new AbortController();
     const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
+    // 同时维护一个 reject fn, 给 abort() 显式取消用 (per abort_test)
+    let rejectFn!: (reason: unknown) => void;
+    const abortPromise = new Promise<never>((_, reject) => {
+      rejectFn = reject;
+    });
+
     const promise = (async () => {
       try {
-        return await fn();
+        // race: fn() 完成 vs abortPromise (timeout / explicit abort)
+        return await Promise.race([fn(), abortPromise]);
       } finally {
         clearTimeout(timeoutHandle);
         this.inflight.delete(key);
@@ -77,6 +88,7 @@ export class IdempotencyManager {
       controller,
       startedAt: Date.now(),
       promise,
+      reject: rejectFn,
     });
 
     return promise;
@@ -87,6 +99,7 @@ export class IdempotencyManager {
     const record = this.inflight.get(key);
     if (record) {
       record.controller.abort();
+      record.reject(new Error(`IdempotencyManager: aborted in-flight dispatch for key "${key}"`));
       this.inflight.delete(key);
     }
   }
@@ -97,7 +110,7 @@ export class IdempotencyManager {
     const expiresAt = Date.now() + ttlMs;
     localStorage.setItem(
       `${this.config.storageKeyPrefix}${key}`,
-      JSON.stringify({ cachedAt: Date.now(), expiresAt }),
+      JSON.stringify({ key, cachedAt: Date.now(), expiresAt }),
     );
   }
 

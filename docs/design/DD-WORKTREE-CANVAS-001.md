@@ -4,8 +4,8 @@
 >
 > - 状态: 🟢 Draft v1.0 (2026-09-15, 上游 SRS/BD 已落档, 詳細設計派生可实装)
 > - 上游:
->   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (115 项需求: FR-WT 38 + FR-UI 14 + FR-GRAPH 12 + FR-RISK 11 + FR-AGENT 8 + FR-EXPLAIN 4 + FR-SEARCH 6 + FR-ACTION 10 + NFR 23)
->   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](BD-WORKTREE-CANVAS-001.md) v1.0 (14 模块 + 4 大 Trait + 15 决策点全部已拍板)
+>   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.1 (**126 唯一 ID**: 103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID; per self-review C-01 2026-09-17 JST)
+>   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](BD-WORKTREE-CANVAS-001.md) v1.1 (14 模块 + 4 大 Trait + 15 决策点全部已拍板, v1.1 修正 126 唯一 ID 对齐)
 > - 下游: 实装代码 (`crates/worktree-canvas/` + `frontend/src/app/(worktree-canvas)/`) + 测试 + 报告
 > - 核心语言: Rust 1.80+ (Core Services) + TypeScript 5.x (Frontend, Next.js 14.2.5)
 > - 守门基线: 守门 #1+#1 v25+#3+#5+#6+#9+#10+#11+#13+#14 v3+#14 v4+#22+#28+#29+#1 v15 共 15 项必过
@@ -3517,7 +3517,7 @@ pub async fn handle_graph_failure(services: &Services) -> Result<(), Error> {
 
 ## §50 Requirement Mapping
 
-(115 项完整映射见 `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0)
+(**126 唯一 ID** 完整映射见 `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.1, self-review C-01/C-04 v1.1)
 
 ---
 
@@ -3599,7 +3599,7 @@ pub async fn handle_graph_failure(services: &Services) -> Result<(), Error> {
 
 ### A.2 Consistency (一致性, 跟 SRS/BD 对齐)
 
-- ✅ 115 项需求 ID 与 SRS v1.0 完全一致
+- ✅ **126 唯一 ID** (103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID) 需求 ID 与 SRS v1.1 完全一致 (self-review C-01/C-04 v1.1)
 - ✅ 14 模块接口与 BD v1.0 完全一致
 - ✅ 11 Node + 13 Edge 字段与 SRS §七 §八 + BD §17-§18 完全一致
 - ✅ 7 Human State 状态机与 SRS §九 + BD §20 完全一致
@@ -3613,7 +3613,7 @@ pub async fn handle_graph_failure(services: &Services) -> Result<(), Error> {
 
 ### A.3 Traceability (可追踪性)
 
-- ✅ 115 项需求 → BD 章节 → DD 章节 完整闭环
+- ✅ **126 唯一 ID** 需求 → BD 章节 → DD 章节 完整闭环 (self-review C-04 v1.1)
 - ✅ 14 模块 → Trait Interface → 具体实现 (libgit2 / Neo4j / chevrotain / moka + Redis)
 - ✅ 18 Action → Trait + 18 实现文件 + Confirm Dialog
 - ✅ 15 Event → Enum + SSE 推送格式

@@ -40,6 +40,7 @@ export default defineConfig({
       "e2e/streamable-http-reconnect.spec.ts", // Playwright-only spec, uses @playwright/test
       "e2e/tmo-merge-task-flow.spec.ts", // Playwright-only spec, uses @playwright/test
       "e2e/uat-100pct-coverage-assertion.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/worktree-canvas.spec.ts", // Playwright-only spec (per ULYS-57 worktree canvas E2E, uses @playwright/test)
       "e2e/uat-3000-restore.spec.ts", // Playwright-only spec, uses @playwright/test
       "e2e/uat-business-acceptance.spec.ts", // Playwright-only spec, uses @playwright/test
       "e2e/worktree-creation-flow.spec.ts", // Playwright-only spec, uses @playwright/test

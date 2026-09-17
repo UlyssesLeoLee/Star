@@ -3,7 +3,7 @@
 > **AI Worktree Graph Canvas — 基本設計書 v1.0** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
 > - 状态: 🟢 Draft v1.0 (2026-09-15, 需求已落档, 基本設計派生)
-> - 上游: [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (115 项需求: FR-WT 38 + FR-UI 14 + FR-GRAPH 12 + FR-RISK 11 + FR-AGENT 8 + FR-EXPLAIN 4 + FR-SEARCH 6 + FR-ACTION 10 + NFR 23)
+> - 上游: [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.1 (**126 唯一 ID**: 103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID; per self-review C-01 2026-09-17 JST)
 > - 下游: 詳細設計 [`docs/design/DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.0 (本 commit 同期落档) + 实装代码
 > - 关联追踪矩阵: [`docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md`](TRACEABILITY-WORKTREE-CANVAS-001.md) v1.0 (本 commit 同期落档)
 > - 守门基线: 守门 #1+#3+#5+#6+#9+#10+#11+#13+#14 v3+#14 v4+#22+#28+#29 共 14 项必过
@@ -33,7 +33,7 @@
 (j) API 概览 + Event 定义 + 数据流 + 时序图 (per §27-§30)
 (k) 异常处理 + 并发控制 + 性能策略 (per §31-§33)
 (l) 安全设计 + 可观测性 + 测试策略 (per §34-§36)
-(m) Requirements Traceability 115 项 (per §37)
+(m) Requirements Traceability **126 唯一 ID** (per §37, v1.1 self-review C-04 修正)
 
 **MVP 范围** (per SRS §28 派生):
 - 5 Node (Repository / Mainline / Worktree / Task / AgentSession)
@@ -67,7 +67,7 @@
 
 ### 0.3 Requirements 继承清单 (per §三十一 Requirements Traceability)
 
-本 BD 继承 SRS v1.0 全部 115 项需求 ID, 详细追踪矩阵见 §37 + 独立 `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0。
+本 BD 继承 SRS v1.1 全部 **126 唯一 ID** 需求 ID (103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID), 详细追踪矩阵见 §37 + 独立 `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.1。
 
 继承大类:
 
@@ -82,7 +82,7 @@
 | FR-SEARCH (搜索 + 过滤) | 6 | §26 |
 | FR-ACTION (操作 + 权限) | 10 | §22 |
 | NFR (非功能需求) | 23 | §31-§36 |
-| **总计** | **126** | (per 自审校核, 含 11 NFR-NFR 边界) |
+| **总计** | **126 唯一 ID** | (per self-review C-01 v1.1 2026-09-17 JST: 103 FR + 23 NFR 子段 = 126 行; "含 11 NFR-NFR 边界" 措辞 v1.1 同步至 SRS 官方口径) |
 
 ---
 
@@ -887,37 +887,36 @@ RETURN main, w
 
 ### 12.1 18 Action + 3 分类 (D 决策)
 
-#### 12.1.1 Safe (5 项, 无副作用)
+#### 12.1.1 Safe (6 项, 无副作用只读)
 
 | Action | Description | Risk Class |
-|---|---|---|
-| `Open` | Open Worktree in file browser | Safe |
+|---|----|----|
+| `Create` | Create new Worktree | Safe |
+| `Open` | Open Worktree in shell | Safe |
 | `OpenInIDE` | Open in VSCode / Cursor | Safe |
 | `Compare` | Compare 2 Worktrees (read-only diff) | Safe |
 | `Focus` | Enter Focus Mode | Safe |
 | `ExplainRisk` | AI Explanation (read-only) | Safe |
 
-#### 12.1.2 Warning (8 项, 有副作用但可撤销)
+#### 12.1.2 Warning (6 项, 有副作用但可撤销)
 
 | Action | Description | Risk Class |
 |---|---|---|
 | `SyncMain` | git fetch + rebase onto main | Warning |
 | `Rebase` | git rebase onto target branch | Warning |
-| `Merge` | git merge Worktree to main | Warning |
 | `CreatePR` | Open PR via GitHub/GitLab API | Warning |
 | `Lock` / `Unlock` | Lock / Unlock Worktree | Warning |
 | `Archive` | Archive (not delete) | Warning |
-| `MarkSuperseded` | Mark Worktree as Superseded | Warning |
-| `SetDependency` / `RemoveDependency` | Manage DEPENDS_ON Edge | Warning |
 
-#### 12.1.3 Destructive (5 项, 高风险不可撤销)
+#### 12.1.3 Destructive (6 项, 高风险不可撤销)
 
 | Action | Description | Risk Class |
 |---|---|---|
+| `Merge` | git merge Worktree to main (影响 Main, 不可逆) | Destructive |
+| `MarkSuperseded` | Mark Worktree as Superseded (影响 Main 元信息) | Destructive |
+| `SetDependency` / `RemoveDependency` | Manage DEPENDS_ON Edge (影响 Graph Derived Data) | Destructive |
 | `Delete` | git worktree remove + branch delete | Destructive |
 | `Cleanup` | Batch delete STALE Worktrees | Destructive |
-| `ForceMerge` | Merge ignoring conflicts | Destructive |
-| `ForceRebase` | Rebase dropping commits | Destructive |
 | `ForceDelete` | Delete without confirmation | Destructive |
 
 ### 12.2 Action Engine Trait
@@ -1945,7 +1944,9 @@ Unit Test (Rust cargo + TS vitest)
 
 ---
 
-## §37 Requirements Traceability (115 项)
+## §37 Requirements Traceability (126 唯一 ID)
+
+> per self-review C-04 v1.1 2026-09-17 JST: 数字由 115 同步为 126 (103 FR + 23 NFR 子段)
 
 ### 37.1 FR-WT (38 项, BD 覆盖)
 
@@ -2016,7 +2017,7 @@ Unit Test (Rust cargo + TS vitest)
 | NFR-THEME-001 | §34 |
 | NFR-KEYB-001 | §34 |
 
-**完整追踪矩阵 (115 项)**: 见独立文件 `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0
+**完整追踪矩阵 (126 唯一 ID)**: 见独立文件 `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.1 (self-review C-04 修正)
 
 ---
 
@@ -2081,13 +2082,13 @@ Unit Test (Rust cargo + TS vitest)
 - ✅ §34 安全设计 (5 角色 + 8 机制 + A11Y + I18n + Theme)
 - ✅ §35 可观测性 (10 Metrics + OTel + Logs + Audit)
 - ✅ §36 测试策略 (金字塔 + 4 类型 + 性能 + 故障注入)
-- ✅ §37 Requirements Traceability (115 项 100%)
+- ✅ §37 Requirements Traceability (**126 唯一 ID 100%**, self-review C-04 v1.1)
 - ✅ §38 签字栏 (5 角色)
 - ✅ §39 修订历史 (1 行 v1.0)
 
 ### A.2 Consistency (一致性, 跟 SRS 对齐)
 
-- ✅ 115 项需求 ID 与 SRS v1.0 完全一致
+- ✅ **126 唯一 ID** (103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID) 需求 ID 与 SRS v1.1 完全一致 (self-review C-01/C-04 v1.1)
 - ✅ 14 模块与 SRS §二十四 完全一致
 - ✅ 11 Node + 13 Edge 与 SRS §七 §八 完全一致
 - ✅ 7 Human State 与 SRS §九 完全一致
@@ -2099,7 +2100,7 @@ Unit Test (Rust cargo + TS vitest)
 
 ### A.3 Traceability (可追踪性)
 
-- ✅ 115 项需求 → BD 章节 100% 映射 (§37)
+- ✅ **126 唯一 ID** 需求 → BD 章节 100% 映射 (§37, self-review C-04 v1.1)
 - ✅ 决策点 15 项 → 推荐方案 + 备选 完整 (§0.2)
 - ✅ 时序图 3 张 → Action / Explain 流程完整 (§30)
 - ✅ 性能 5 级 → 5 策略 完整 (§33)
