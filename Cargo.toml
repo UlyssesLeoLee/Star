@@ -114,6 +114,17 @@ members = [
     "crates/git-adapter",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.1 T2, 2026-09-16): git-observer crate (fsnotify + 100ms debounce + 15 GitEvent, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.2 + DD-WORKTREE-CANVAS-001 §11)
     "crates/git-observer",
+# Phase W20-AI-Worktree-Canvas (ULYS-57.2 T3-T7, 2026-09-16): business core 5 crates
+    # T3 worktree-service (per DD-WORKTREE-CANVAS-001 §12 + INV-WC-01/02/03/08/09)
+    "crates/worktree-service",
+    # T4 risk-engine (per DD-WORKTREE-CANVAS-001 §13 + INV-WC-03)
+    "crates/risk-engine",
+    # T5 health-engine (per DD-WORKTREE-CANVAS-001 §14 + INV-WC-02)
+    "crates/health-engine",
+    # T6 agent-bridge (per DD-WORKTREE-CANVAS-001 §15 + INV-WC-10)
+    "crates/agent-bridge",
+    # T7 relationship-engine (per DD-WORKTREE-CANVAS-001 §13 + INV-WC-04)
+    "crates/relationship-engine",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.3 T8, 2026-09-17): action-engine crate (18 Action + 3 类别 + 二次确认 + Idempotency 24h + Audit SCD Type 2 + RBAC 5 角色 + Retry 3 档, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.8 + DD-WORKTREE-CANVAS-001 §18 + §42-§44)
     "crates/action-engine",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.3 T9, 2026-09-17): event-bus crate (15 Event + 4 消费者 Graph/UI/Risk/Notification + 100ms 防抖 + Redis Streams abstraction, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.9 + DD-WORKTREE-CANVAS-001 §19/§20 + D-EVENT-001 + NFR-REL-002 throughput 10k eps)

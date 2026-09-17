@@ -1,0 +1,32 @@
+[package]
+name = "health-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — Health Engine: 13-factor weighted scoring + GREEN/YELLOW/RED thresholds + explainable deductions (ULYS-57.2 T5, per DD-WORKTREE-CANVAS-001 §14 + §34 + INV-WC-02 + D-HEALTH-001)"
+
+[lib]
+name = "health_engine"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+graph-core = { path = "../graph-core" }
+git-adapter = { path = "../git-adapter" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true
