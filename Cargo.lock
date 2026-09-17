@@ -3,6 +3,21 @@
 version = 3
 
 [[package]]
+name = "action-engine"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "graph-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "aead"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -391,6 +406,21 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "canvas-renderer"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "graph-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
  "uuid",
 ]
 
@@ -1339,6 +1369,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "event-bus"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "futures-util",
+ "graph-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "event-listener"
 version = "5.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2186,6 +2232,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "layout-engine"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "graph-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2697,6 +2757,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "query-engine"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "graph-core",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
