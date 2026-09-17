@@ -1,0 +1,34 @@
+[package]
+name = "agent-bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — Agent Bridge: AgentRuntime Trait + 8 methods + Multica adapter + AgentSession 14-state sync (ULYS-57.2 T6, per DD-WORKTREE-CANVAS-001 §15 + D-AGENT-001 + INV-WC-10)"
+
+[lib]
+name = "agent_bridge"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+futures-util = { workspace = true }
+
+graph-core = { path = "../graph-core" }
+git-adapter = { path = "../git-adapter" }
+git-observer = { path = "../git-observer" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true
