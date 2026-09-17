@@ -9,6 +9,7 @@ use std::fmt;
 
 /// 6-field `EventBusError`
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::result_large_err)] // 6-field 是守门 #6 强制 schema (per DD §38); boxing 会破坏公开 API (caller pattern-match on variant fields)
 pub struct EventBusError {
     /// 错误码
     pub code: String,

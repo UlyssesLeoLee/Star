@@ -11,19 +11,16 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use graph_core::types::{UserId, WorktreeId};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
+#[allow(unused_imports)] // ActionClass 仅在 tests mod `ActionType::X => ActionClass::Y` 路径使用; clippy lib profile 误报 (qualified path 不被识别为 import use)
 use crate::action::{
-    default_metadata, Action, ActionClass, ActionContext, ActionMetadata, ActionRequest,
-    ActionResult, ActionType,
+    default_metadata, Action, ActionClass, ActionMetadata, ActionRequest, ActionResult, ActionType,
 };
 use crate::audit_writer::AuditWriter;
 use crate::error::ActionError;
 use crate::idempotency::{IdempotencyRecord, IdempotencyStore};
 use crate::rbac::{require_confirm_or_die, require_permission, Role, User};
+#[allow(unused_imports)] // Uuid 在 `pub async fn dispatch(..., idempotency_key: Uuid, ...)` 签名中使用; clippy lib profile 误报
+use uuid::Uuid;
 
 /// Action Registry — 18 Action 注册表 (per INV-WC-09)
 ///

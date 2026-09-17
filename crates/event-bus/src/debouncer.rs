@@ -17,6 +17,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
+#[allow(unused_imports)] // 仅 dev-dependency (test mod uses Uuid::nil/new_v4)
 use uuid::Uuid;
 
 use crate::events::EventKind;

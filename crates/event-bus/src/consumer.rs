@@ -3,9 +3,9 @@
 //! 每 Consumer 关注一组事件类型:
 //! - `GraphConsumer`: 全部 15 个 (图投影)
 //! - `UiConsumer`: WorktreeCreated / WorktreeChanged / WorktreeDeleted / WorktreeMerged /
-//!                  BranchUpdated / MainUpdated / AgentStarted / AgentStopped /
-//!                  TaskChanged / RiskDetected / RiskResolved / HealthChanged /
-//!                  RelationCreated / RelationRemoved (UI 推送)
+//!   BranchUpdated / MainUpdated / AgentStarted / AgentStopped /
+//!   TaskChanged / RiskDetected / RiskResolved / HealthChanged /
+//!   RelationCreated / RelationRemoved (UI 推送)
 //! - `RiskConsumer`: WorktreeChanged / MainUpdated / TestCompleted (Risk 增量计算)
 //! - `NotificationConsumer`: RiskDetected / HealthChanged (通知)
 //!

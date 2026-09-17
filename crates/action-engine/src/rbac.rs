@@ -84,7 +84,7 @@ pub fn check_permission(user: &User, action: ActionType) -> PermissionDecision {
     use PermissionDecision::*;
     use Role::*;
 
-    let decision = match (user.role, action) {
+    match (user.role, action) {
         // Owner: 所有
         (Owner, _) => Allow,
         // SRE: Sync / Rebase / Merge / ForceMerge (per DD §44)
@@ -103,8 +103,7 @@ pub fn check_permission(user: &User, action: ActionType) -> PermissionDecision {
         (Lead, _) => Allow,
         // 其他组合拒绝
         (_, _) => Deny,
-    };
-    decision
+    }
 }
 
 /// 校验权限并返回 ActionError (失败)

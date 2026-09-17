@@ -83,6 +83,7 @@ impl AuditWriter {
     }
 
     /// Append 一条 audit record (不可修改 / 不可删除)
+    #[allow(clippy::too_many_arguments)] // 8 字段 (action/worktree/actor/actor_type/result/idempotency_key/payload/timestamp) 是 SCD Type 2 audit 强制 schema (per DD §43)
     pub fn append(
         &self,
         action_type: impl Into<String>,

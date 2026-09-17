@@ -5,6 +5,7 @@
 //! 守门 UT-3 (T10): `layout_incremental_update_60fps`
 
 use crate::bezier::bezier_path;
+#[allow(unused_imports)] // EdgePath 仅在 tests mod 使用 (lib incremental_update 流程不直接引用 EdgePath struct)
 use crate::engine::{EdgePath, LayoutOutput, NodePosition};
 
 /// 应用 changes 到 existing layout (per DD §31)

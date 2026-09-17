@@ -3,6 +3,9 @@
 //! 6 方法 (per DD §20 + T9.1):
 //! - `publish(event)` — 发布到 default stream
 //! - `publish_to(stream, event)` — 发布到指定 stream
+//!
+//! 全部函数返回 `Result<_, EventBusError>` — 守门 #6 v2 强制 6-field schema,
+//! boxing 会破坏公开 API (caller pattern-match on variant fields).
 //! - `subscribe(group, kinds)` — 订阅 (返回 receiver)
 //! - `consume(stream, group, max, block_ms)` — 拉取 batch
 //! - `ack(stream, group, event_id)` — ACK
@@ -10,6 +13,8 @@
 //!
 //! 阶段 1 用 InMemoryBus 实现 (本期 T9, 测试 / dev 用); Redis Streams backend
 //! 留 `BusBackend` trait, P2 落点。
+
+#![allow(clippy::result_large_err)] // 守门 #6 v2 强制 6-field EventBusError schema (per DD §38); boxing 会破坏公开 API
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
