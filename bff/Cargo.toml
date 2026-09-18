@@ -1,15 +1,26 @@
-[package]
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # `bff` — STAR BFF (Backend for Frontend) workspace (P3-D.6 阶段 1 基础 任务 1.5)
 #
 # 跟 `crates/api` 平级 (BFF vs API), 通过 `svc://` 引用业务 svc (per 9/1 13:05 JST
 # envoy 独立 deployment 偏好). 0 反向依赖 (BFF 调 API, API 不依赖 BFF).
 #
+# ULYS-57.4 (2026-09-17) 新增 `worktree_canvas` feature flag — T13 BFF module
+# (`bff/src/worktree_canvas/`) + 11 REST + 15 SSE + 1 WS endpoint + RBAC +
+# Idempotency + Audit 包装 (per DD-WORKTREE-CANVAS-001 §20-§21 +
+# WORKTREE-CANVAS-IMPL-PLAN-001 §4.13 + spec §4.4 §4.5).
+#
 # 守门合规 (per 守门 #1 v25 + 守门 #7 + 守门 #11 + 守门 #14 v2 + 守门 #19 v19):
-# - 0 改根 `Cargo.toml` [workspace] members 任何行 (bff 是新独立 workspace, 跟 tools/ / frontend/ 模式一致).
+# - 0 改根 `Cargo.toml` [workspace] members 任何行 (bff 是新独立 workspace).
 # - 0 改 `crates/api/Cargo.toml` 任何行 (0 添加 bff 依赖, BFF 跟 API 平级 0 反向依赖).
-# - axum / tokio-tungstenite 用具体 version 0.8 / 0.21 (0 重复加到根 [workspace.dependencies], 守门 #1 禁回溯叙事).
+# - axum / tokio-tungstenite 用具体 version 0.8 / 0.21 (0 重复加到根 [workspace.dependencies]).
+# - `worktree_canvas` feature 隔离新 BFF 模块; 0 feature = V0.1 collab only (守门 #19 v19).
+# - graph-core / git-adapter / git-observer 走 path 依赖, 0 重复加 [workspace.dependencies].
 # - 5 域 Lead 真人到位前 Mavis 临时代签 (per 守门 #14 v2 拍板 D, 2026-09-05 10:43 JST).
+# 空 [workspace] 标记 bff 跟根 workspace 0 关系 (独立 workspace, 0 改根 [workspace.members],
+# 跟 tools/ frontend/ 模式一致, per 守门 #1 禁回溯叙事 + 守门 #11 缺标比错标).
+[workspace]
+
+[package]
 name = "bff"
 version = "0.1.0"
 edition = "2021"
@@ -17,13 +28,26 @@ rust-version = "1.75"
 license = "Apache-2.0"
 authors = ["Star Team"]
 repository = "https://github.com/UlyssesLeoLee/Star"
-description = "STAR BFF (Backend for Frontend) — envoy 独立 deployment, 5 REST + 4 WSS for A12 canvas collaboration"
+description = "STAR BFF (Backend for Frontend) — envoy 独立 deployment, collab (V0.1) + worktree-canvas (V0.2, feature-gated)"
 publish = false
 
-[workspace]
-# 新独立 workspace (per 守门 #1 禁回溯叙事 + brief §1.1 范围内 + §1.2 out-of-scope).
-# 0 业务方法实装 (留 P3-D.6 阶段 2 任务 2.3 A12 业务实装).
-# 0 真实 WSS 业务逻辑 (留 P3-D.6 阶段 3 集成 任务 3.2).
+# NOTE: bff is single-crate, no [workspace] section needed. 跨 session 续:
+# 当 bff 子 crate (e.g. bff-worktree-canvas 独立 crate) 加入时, 加
+# [workspace] members = ["."] 即可, 当前阶段 0 子 crate.
+
+[features]
+# 守门 #19 v19: V0.1 collab 不动; `worktree_canvas` feature 默认开启 (per
+# brief §"完成标准 #1 BFF module 编译通过"), 0 feature 走 `--no-default-features`
+# 仅 V0.1 collab 用于回归。
+default = ["worktree_canvas"]
+worktree_canvas = [
+    "dep:graph-core",
+    "dep:git-adapter",
+    "dep:git-observer",
+    "dep:tokio-stream",
+    "dep:futures-util",
+    "dep:async-stream",
+]
 
 [dependencies]
 # HTTP / WebSocket (per brief §2.1, axum 0.8 + features ws / macros, 跟 crates/api 一致)
@@ -31,6 +55,10 @@ axum = { version = "0.8", features = ["ws", "macros"] }
 
 # 异步运行时 (per 根 [workspace.dependencies] 现有 tokio 1.40, 跟 crates/api 一致)
 tokio = { version = "1.40", features = ["full"] }
+# 可选 dep, 仅 `worktree_canvas` feature 用 (per ULYS-57.4 T13.3 15 SSE 端点)
+tokio-stream = { version = "0.1", optional = true }
+futures-util = { version = "0.3", optional = true }
+async-stream = { version = "0.3", optional = true }
 
 # 序列化
 serde = { version = "1", features = ["derive"] }
@@ -52,6 +80,12 @@ star-context = { path = "../crates/star-context" }
 canvas-collab = { path = "../crates/canvas-collab" }
 star-arg-bridge = { path = "../crates/arg-bridge" }
 api = { path = "../crates/api" }
+
+# ULYS-57.4 (2026-09-17) 3 新增 path 依赖 (仅 worktree_canvas feature 用)
+# 守门 #11: 0 重复加 [workspace.dependencies] (graph-core/git-adapter/git-observer 是新 crate, per 57.1 T1+T2)
+graph-core = { path = "../crates/graph-core", optional = true }
+git-adapter = { path = "../crates/git-adapter", optional = true }
+git-observer = { path = "../crates/git-observer", optional = true }
 
 [lints.rust]
 # 0 unsafe blocks (per 守门 #7 `unsafe_code = "forbid"`).

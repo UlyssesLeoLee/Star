@@ -1,0 +1,33 @@
+[package]
+name = "canvas-renderer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — Canvas Renderer: React-Flow 11.x adapter (MVP) + LOD 3 级 + Viewport Virtualization + 5 View Mode + Focus N-hop (ULYS-57.3 T12, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.12 + DD-WORKTREE-CANVAS-001 §11 + §29-§30 + §37 + D-CANVAS-001 + INV-WC-05/06/07 + NFR-PERF-002 1000 WT 60fps)"
+
+[lib]
+name = "canvas_renderer"
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+
+# 跨 crate 引用: graph-core 提供 WorktreeNode + NodeKind + NodePayload (per WORKTREE-CANVAS-IMPL-PLAN-001 §3 集成策略)
+# 单向依赖: canvas-renderer → graph-core
+graph-core = { path = "../graph-core" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,34 @@
+[package]
+name = "action-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — Action Engine: 18 Action + 3 分类 + 二次确认 + Idempotency 24h + Audit SCD Type 2 + RBAC 5 角色 + Retry 3 档 (ULYS-57.3 T8, per DD-WORKTREE-CANVAS-001 §18 + §42-§44 + INV-WC-09/11/12)"
+
+[lib]
+name = "action_engine"
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+# 跨 crate 引用: graph-core 提供 WorktreeId + MergeStrategy + UserId (per WORKTREE-CANVAS-IMPL-PLAN-001 §3 集成策略)
+# 单向依赖: action-engine → graph-core
+graph-core = { path = "../graph-core" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true

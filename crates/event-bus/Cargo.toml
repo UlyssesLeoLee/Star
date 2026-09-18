@@ -1,0 +1,39 @@
+[package]
+name = "event-bus"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — Event Bus: 15 Event + 4 消费者 (Graph/UI/Risk/Notification) + 100ms 防抖 + Redis Streams abstraction (ULYS-57.3 T9, per DD-WORKTREE-CANVAS-001 §19/§20 + D-EVENT-001 + NFR-REL-002 throughput 10k eps)"
+
+[lib]
+name = "event_bus"
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+futures-util = { workspace = true }
+
+# redis-rs 0.27 — Redis Streams 抽象 (per spec §4.5 + D-EVENT-001)
+# 本期 T9 实现 InMemoryBus (测试用), Redis Streams backend 留给 P2
+# redis = { workspace = true }  # 等 P2 启用
+
+# 跨 crate 引用: graph-core 提供 WorktreeId / BranchId / etc. (per WORKTREE-CANVAS-IMPL-PLAN-001 §3 集成策略)
+# 单向依赖: event-bus → graph-core
+graph-core = { path = "../graph-core" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true
