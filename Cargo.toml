@@ -110,6 +110,8 @@ members = [
     "crates/canvas-collab", "crates/star-registry", "crates/star-task", "crates/star-game", "crates/star-workflow", "crates/star-canvas", "crates/star-scheduler", "crates/shared-task", "crates/leads", "crates/star-workflow", "crates/star-canvas", "crates/star-scheduler", "crates/shared-task", "crates/leads",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.1 T1, 2026-09-16): graph-core crate (per docs/implementation-plans/WORKTREE-CANVAS-IMPL-PLAN-001.md §4.1 + DD-WORKTREE-CANVAS-001.md §7/§8/§10)
     "crates/graph-core",
+    # Phase W20-AI-Worktree-Canvas v1.2 (ULYS-57 self-review M-1, 2026-09-19 JST): worktree-canvas facade/aggregator crate re-exporting the 13 worktree-canvas sub-crates (per WORKTREE-CANVAS-IMPL-PLAN-001.md §0.1 + DD-WORKTREE-CANVAS-001.md §1.1)
+    "crates/worktree-canvas",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.1 T2, 2026-09-16): git-adapter crate (libgit2 + CLI fallback, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.2 + DD-WORKTREE-CANVAS-001 §10)
     "crates/git-adapter",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.1 T2, 2026-09-16): git-observer crate (fsnotify + 100ms debounce + 15 GitEvent, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.2 + DD-WORKTREE-CANVAS-001 §11)

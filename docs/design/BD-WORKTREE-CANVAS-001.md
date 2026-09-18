@@ -8,7 +8,7 @@
 > - 关联追踪矩阵: [`docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md`](TRACEABILITY-WORKTREE-CANVAS-001.md) v1.0 (本 commit 同期落档)
 > - 守门基线: 守门 #1+#3+#5+#6+#9+#10+#11+#13+#14 v3+#14 v4+#22+#28+#29 共 14 项必过
 > - 平行参考: `docs/requirements/SRS-CANVAS-001.md` v1.1 (无限画布总册) + `docs/frontend-canvas-design.md` v0.1 (V0.1 实装基线) + `SRS-AGENT-VIEW-001.md` v1.0 (个体视图) + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 (ARG)
-> - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 永久代签)
+> - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 接手代签, 5 域真人到位后切真人)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST)
 > - 日期: 2026-09-15 JST
 > - 受众: 詳細設計エンジニア / 実装エンジニア / SRE Lead / 5 域 Lead (未到位, Mavis 临时代签 per 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D)
@@ -2038,6 +2038,8 @@ Unit Test (Rust cargo + TS vitest)
 | 版本 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
 | v1.0 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版, 39 段 (目的/决策点/继承清单/架构/模块/组件/9 子模块/4 支撑层/数据模型/状态机/计算模型/Semantic Zoom/Focus/View/Inspector/API/Event/数据流/时序/异常/并发/性能/安全/可观测/测试/追踪/签字/修订), 14 模块, 4 大抽象 Trait, 15 决策点全部已拍板 (per §三十五 推荐方案明确), 11 Node + 13 Edge + 18 Action + 5 View + 6 Zoom + 7 State, 3 张时序图, 7 层性能策略 | 2026-09-15 Multica ULYS-57 issue 创建者发令 |
+| v1.1 | Ulysses — Mavis 接手 (per 守门 #14 v3, self-review C-04 修正) | 修正: §0.3 / §37 / §A.3 总数与 Trace §11 同步 126 唯一 ID (per self-review C-04) | 2026-09-17 ULYS-62 self-review 修正落地 |
+| v1.2 | Ulysses — Mavis 接手 (per 守门 #14 v3 + self-review 整体审查 m-7 派生) | 修正: "Mavis 永久代签" → "Mavis 接手代签 (5 域真人到位后切真人)" (修订人栏, per self-review m-7) | 2026-09-19 04:55 JST 自审整体审查 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位" |
 
 ---
 

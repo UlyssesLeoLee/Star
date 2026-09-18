@@ -4,8 +4,8 @@
 >
 > - 状态: 🟡 Draft v0.1
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
-> - 关联设计: [`docs/design/DD-WORKTREE-CANVAS-001.md`](../design/DD-WORKTREE-CANVAS-001.md) v1.0 (52 段 + 100+ 代码示例 + 14 crate + 30 TS 文件)
-> - 关联 spec: [`docs/specs/worktree-canvas-spec.md`](../specs/worktree-canvas-spec.md) v0.1 (本 commit 同期落档, 12 段 + 14 crate 接口签名 + 14 WBS 任务)
+> - 关联设计: [`docs/design/DD-WORKTREE-CANVAS-001.md`](../design/DD-WORKTREE-CANVAS-001.md) v1.0 (52 段 + 100+ 代码示例 + 14 crate + 30+ TS 文件)
+> - 关联 spec: [`docs/specs/worktree-canvas-spec.md`](../specs/worktree-canvas-spec.md) v0.1 (本 commit 同期落档, 12 段 + 14 crate 接口签名 + 32 WBS 任务)
 > - 关联需求: [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (126 唯一 ID: 103 FR + 21 NFR 子段, per self-review M-01 校核)
 > - 关联基本設計: [`docs/design/BD-WORKTREE-CANVAS-001.md`](../design/BD-WORKTREE-CANVAS-001.md) v1.0 (14 模块 + 15 决策点全部已拍板)
 > - 关联追踪矩阵: [`docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md`](../design/TRACEABILITY-WORKTREE-CANVAS-001.md) v1.0 (115/115 = 100% 闭环)
@@ -37,7 +37,7 @@
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
-| **v0.1** | **2026-09-15 21:21 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)** | **初版落档, 10 段 IPA SEC 模板 + 5 附录, 阶段 0-4 共 5 阶段 (docs / 基础 / 业务 / 集成 / 实装), 14 新 Rust crate + 1 BFF module + 30 TS 文件 + 5 张表 W/T/M 100% 覆盖 + 11 REST + 15 SSE + 1 WS + 18 Action + 15 Event, 74 测试 (52 UT + 10 IT + 8 E2E + 4 PT), 32 WBS 任务 (MVP 14 + P2 18), 13 已知缺口 (含 4 Critical 自审修正 + 9 自审 Minor), 5 角色签字栏, 守门 13 项必过, Token OLU ~5.45M / 4.5 SRE·周 (含 docs 阶段)** | **2026-09-15 21:21 JST 评论者发令 "制作 spec 和实施计划"** |
+| **v0.1** | **2026-09-15 21:21 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)** | **初版落档, 10 段 IPA SEC 模板 + 5 附录, 阶段 0-4 共 5 阶段 (docs / 基础 / 业务 / 集成 / 实装), 14 新 Rust crate + 1 BFF module + 30+ TS 文件 + 5 张表 W/T/M 100% 覆盖 + 11 REST + 15 SSE + 1 WS + 18 Action + 15 Event, 74 测试 (52 UT + 10 IT + 8 E2E + 4 PT), 32 WBS 任务 (MVP 14 + P2 18), 13 已知缺口 (含 4 Critical 自审修正 + 9 自审 Minor), 5 角色签字栏, 守门 13 项必过, Token OLU ~5.45M / 4.5 SRE·周 (含 docs 阶段)** | **2026-09-15 21:21 JST 评论者发令 "制作 spec 和实施计划"** |
 
 ### 0.3 撤回记录 (per 守门 #1 禁回溯叙事)
 
@@ -53,7 +53,7 @@
 
 - **5 阶段实施路径** (阶段 0 docs → 阶段 1 基础 → 阶段 2 业务 → 阶段 3 集成 → 阶段 4 实装)
 - **32 WBS 任务** (MVP 14 + P2 18, per `worktree-canvas-spec.md` §9)
-- **14 新 Rust crate + 1 BFF module + 30 TS 文件落地清单** (per DD §1.1)
+- **14 新 Rust crate + 1 BFF module + 30+ TS 文件落地清单** (per DD §1.1)
 - **5 张表 W/T/M 100% 覆盖** (per 守门 #13, 0 混在)
 - **11 REST + 15 SSE + 1 WS API 端点** (per DD §20-§21)
 - **18 Action + 15 Event 全覆盖** (per DD §18-§19)
@@ -67,7 +67,7 @@
 
 - **T1-T7 基础 7 crate** (graph-core / git-adapter / git-observer / worktree-service / risk-engine / health-engine / agent-bridge)
 - **T8 Action Engine + T9 Event Bus + T10 Layout Engine + T11 Query Engine + T12 Canvas Renderer**
-- **T13 1 BFF module + T14 30 前端 TS/TSX 文件**
+- **T13 1 BFF module + T14 30+ 前端 TS/TSX 文件**
 - **MVP 5 Node + 7 State + 13 Edge + 18 Action + 15 Event**
 - **5 View Mode + 6 Semantic Zoom + 11 Inspector Tab**
 - **5 张表 W/T/M 100% 覆盖** (per 守门 #13)
@@ -110,7 +110,7 @@
 | **action-engine** | 18 Action + 3 类别 + Idempotency + Audit | 2 表 (action_audit T + idempotency W) | dispatch / validate / check_permission | M-12 ActionEngine + 18 action impl | 11 REST |
 | **event-bus** | Redis Streams + 4 消费者 | 1 概念 (Redis Stream) | publish / subscribe / debounce | M-13 EventBus | 15 SSE |
 | **persistence** | PG Schema + Audit + Cache | 5 表 W/T/M 100% (per 守门 #13) | write_audit / read_graph / cache_get | M-14 PersistenceLayer | 0 (内部) |
-| **总计** | **103 FR (per self-review M-01)** | **5 张表 W/T/M** | **52 段 DD 行为** | **14 crate + 1 BFF module + 30 TS 文件** | **11 REST + 15 SSE + 1 WS** |
+| **总计** | **103 FR (per self-review M-01)** | **5 张表 W/T/M** | **52 段 DD 行为** | **14 crate + 1 BFF module + 30+ TS 文件** | **11 REST + 15 SSE + 1 WS** |
 
 ### 2.2 跨模块实施路径 (per 守门 #19 v19 docs 同步 + 守门 #1 禁回溯叙事)
 
@@ -179,8 +179,8 @@
 | 任务 | 依赖 | Token 估 | 守门 |
 |---|---|---|---|
 | **T13** `bff/src/worktree_canvas/` BFF module (per DD §20-§21) + 11 REST + 15 SSE + 1 WS 端点 + RBAC + Idempotency + Audit 包装 | T8 + T9 | ~250K | #1 v25 + #5 env + #6 PowerShell + OpenAPI 3.0 spec |
-| **T14** 30 前端 TS/TSX 文件 (`frontend/src/app/(worktree-canvas)/` + `frontend/src/components/worktree-canvas/`, per DD §22) + 5 View Mode + 6 Semantic Zoom + 11 Inspector Tab + Zustand Store + V0.1 复用 | T10 + T11 + T12 + T13 | ~400K | #1 v25 + #19 v19 (不破坏 V0.1) + 备 INV-WC-05..07 |
-| **T13-T14 累计**: 0.65M tokens / 0.54 SRE·周 / 1 BFF + 30 TS + 5 View + 6 Zoom + 11 Tab |||||
+| **T14** 30+ 前端 TS/TSX 文件 (`frontend/src/app/(worktree-canvas)/` + `frontend/src/components/worktree-canvas/`, per DD §22) + 5 View Mode + 6 Semantic Zoom + 11 Inspector Tab + Zustand Store + V0.1 复用 | T10 + T11 + T12 + T13 | ~400K | #1 v25 + #19 v19 (不破坏 V0.1) + 备 INV-WC-05..07 |
+| **T13-T14 累计**: 0.65M tokens / 0.54 SRE·周 / 1 BFF + 30+ TS + 5 View + 6 Zoom + 11 Tab |||||
 
 ### 阶段 4 实装 (P3-E.7.4, 0.5-1 周, 0.83 SRE·周)
 
@@ -336,7 +336,7 @@
 | 任务 | 关键 class / module | Token 估 | 守门 |
 |---|---|---|---|
 | T12.1 `CanvasRenderer` Trait + 8 方法 (per spec §4.1) | `crates/canvas-renderer/src/renderer.rs` | ~50K | D-CANVAS-001 + INV-WC-05/06/07 |
-| T12.2 React-Flow 11.x adapter (MVP, per BD D-CANVAS-001) | `crates/canvas-renderer/src/reactflow.rs` + 30 TS 文件 | ~150K | D-CANVAS-001 + React-Flow 11.x |
+| T12.2 React-Flow 11.x adapter (MVP, per BD D-CANVAS-001) | `crates/canvas-renderer/src/reactflow.rs` + 30+ TS 文件 | ~150K | D-CANVAS-001 + React-Flow 11.x |
 | T12.3 LOD (5 级缩放, per SRS §6) | `crates/canvas-renderer/src/lod.rs` | ~30K | INV-WC-06 + NFR-PERF-002 |
 | T12.4 Viewport Virtualization (per SRS §27) | `crates/canvas-renderer/src/virtualization.rs` | ~30K | NFR-PERF-002 (1000 WT 60fps) |
 | T12.5 5 View Mode 切换 (TREE/DEPENDENCY/RISK/AGENT/HISTORY) | `crates/canvas-renderer/src/view_mode.rs` | ~40K | FR-UI-007..011 |
@@ -355,7 +355,7 @@
 
 **T13 累计**: 250K tokens / 11 REST + 15 SSE + 1 WS + RBAC + Idempotency.
 
-### 4.14 T14 Frontend 30 TS/TSX 文件 (per DD §22)
+### 4.14 T14 Frontend 30+ TS/TSX 文件 (per DD §22)
 
 | 任务 | 关键 class / module | Token 估 | 守门 |
 |---|---|---|---|
@@ -370,7 +370,7 @@
 | T14.9 KeyboardShortcuts.tsx (V/H/+/-/1/2/3/F/S/Esc, per US-30) | 1 TSX | ~10K | US-30 + 可访问性 |
 | T14.10 ExplanationTooltip.tsx (AI Explanation, per FR-EXPLAIN-001..004) | 1 TSX | ~10K | FR-EXPLAIN |
 
-**T14 累计**: 400K tokens / 30 TS/TSX + Zustand + 5 View + 6 Zoom + 11 Inspector Tab.
+**T14 累计**: 400K tokens / 30+ TS/TSX + Zustand + 5 View + 6 Zoom + 11 Inspector Tab.
 
 ---
 
@@ -548,7 +548,7 @@ cargo test -p <crate> --lib -j 4     # 70/N PASS (单 crate 实证, per 守门 #
 
 | 角色 | 签字 | 日期 | 备注 |
 |---|---|---|---|
-| **架构师 (Mavis 接手 agent per DEC-008)** | 🟢 Mavis 接手审核 | 2026-09-15 JST | per 守门 #14 v3 Mavis 永久代签 + 守门 #14 v4 v0.62 反转 Mavis 审核 author=Ulysses |
+| **架构师 (Mavis 接手 agent per DEC-008)** | 🟢 Mavis 接手审核 | 2026-09-15 JST | per 守门 #14 v3 Mavis 接手代签 (5 域真人到位后切真人) + 守门 #14 v4 v0.62 反转 Mavis 审核 author=Ulysses |
 | **SRE Lead** | 🟢 Mavis 接手 (代签) | 2026-09-15 JST | 5 域 Lead 真人未到位, Mavis 临时代签 per 守门 #14 v2 + 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, 真人到位后追溯签字 |
 | **平台 (Mavis 接手)** | 🟢 Mavis 接手审核 | 2026-09-15 JST | per 守门 #14 v3 |
 | **评审主持 (Mavis 接手)** | 🟢 Mavis 接手审核 | 2026-09-15 JST | per 守门 #14 v3 |
@@ -562,7 +562,8 @@ cargo test -p <crate> --lib -j 4     # 70/N PASS (单 crate 实证, per 守门 #
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
-| **v0.1** | **2026-09-15 21:21 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)** | **初版落档, 10 段 IPA SEC 模板 + 5 附录, 阶段 0-4 共 5 阶段 (docs / 基础 / 业务 / 集成 / 实装) + 阶段 5 P2 续, 14 新 Rust crate + 1 BFF module + 30 TS 文件 + 5 张表 W/T/M 100% 覆盖 + 11 REST + 15 SSE + 1 WS + 18 Action + 15 Event, 70+ UT + 10 IT + 8 E2E + 4 PT (74 测试), 32 WBS 任务 (MVP 14 + P2 18), 4 Critical + 9 Major + 7 Minor 自审修正, 5 角色签字栏, 守门 13 项必过 + 4 守门 v3x active, Token OLU ~5.45M / 4.54 SRE·周 (含 docs)** | **2026-09-15 21:21 JST 评论者发令 "制作 spec 和实施计划"** |
+| **v0.1** | **2026-09-15 21:21 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)** | **初版落档, 10 段 IPA SEC 模板 + 5 附录, 阶段 0-4 共 5 阶段 (docs / 基础 / 业务 / 集成 / 实装) + 阶段 5 P2 续, 14 新 Rust crate + 1 BFF module + 30+ TS 文件 + 5 张表 W/T/M 100% 覆盖 + 11 REST + 15 SSE + 1 WS + 18 Action + 15 Event, 70+ UT + 10 IT + 8 E2E + 4 PT (74 测试), 32 WBS 任务 (MVP 14 + P2 18), 4 Critical + 9 Major + 7 Minor 自审修正, 5 角色签字栏, 守门 13 项必过 + 4 守门 v3x active, Token OLU ~5.45M / 4.54 SRE·周 (含 docs)** | **2026-09-15 21:21 JST 评论者发令 "制作 spec 和实施计划"** |
+| **v0.2** | **2026-09-19 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v3 + self-review 整体审查 m-1/m-2/m-3 派生)** | **修正: 14 WBS → 32 WBS (per §4.14 + 全文一致); SRS 版本 v1.0 → v1.1 + 126 唯一 ID 口径同步 (per §1.1); 前端 30 TS → 30+ TS 文件 (实际 45 = 5 pages + 40 components, per m-3) + Trace 版本 v1.0 → v1.1 (126 ID 追踪口径同步); "Mavis 永久代签" → "Mavis 接手代签 (5 域真人到位后切真人)" (per m-7)** | **2026-09-19 04:55 JST 自审整体审查 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位"** |
 
 ---
 
@@ -570,10 +571,10 @@ cargo test -p <crate> --lib -j 4     # 70/N PASS (单 crate 实证, per 守门 #
 
 详见本 doc §1.1 + §2.1 + §4 各表格, 派生自:
 
-- **SRS**: `docs/requirements/SRS-WORKTREE-CANVAS-001.md` v1.0 (115 项需求 per §0.1)
+- **SRS**: `docs/requirements/SRS-WORKTREE-CANVAS-001.md` v1.1 (126 唯一 ID per §0.1)
 - **BD**: `docs/design/BD-WORKTREE-CANVAS-001.md` v1.0 (14 模块 + 15 决策点)
 - **DD**: `docs/design/DD-WORKTREE-CANVAS-001.md` v1.0 (52 段 + 100+ 代码示例)
-- **Trace**: `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 (115 项追踪)
+- **Trace**: `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.1 (126 ID 追踪)
 - **Spec**: `docs/specs/worktree-canvas-spec.md` v0.1 (本 commit 同期落档)
 - **平行引用**: `docs/frontend-canvas-design.md` v0.1 (V0.1 实装基线) + `SRS-CANVAS-001.md` v1.1 (无限画布总册) + `SRS-AGENT-VIEW-001.md` v1.0 (个体视图) + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 (ARG) + `domain-worktree-spec.md` v0.1 (17 状态 + 9 项隔离)
 

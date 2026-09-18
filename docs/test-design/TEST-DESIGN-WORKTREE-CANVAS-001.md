@@ -465,7 +465,6 @@ PT 共 **8 bench** (4 cargo bench + 4 vitest bench), 覆盖 7 AC 性能 (AC-P-1.
 | **AC-D-4** | 追踪矩阵 (Requirement ↔ BD ↔ DD ↔ Test) 落档 | `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` 存在 | ✅ |
 | **AC-D-5** | Self-Review (per §三十六) 落地 Critical / Major / Minor 三级问题清单 | 内嵌在 SRS/BD/DD 末尾 | ✅ |
 | **AC-D-6** | commit author = Ulysses (per AGENTS.md §1 代签) | `git log --format='%an <%ae>' HEAD` | ✅ |
-| **AC-D-7** | IMPL-PLAN + spec + TEST-DESIGN (本文档) 落档 | 3 文件存在 | ✅ |
 
 ### 6.3 5 域 Lead 真人到位后追溯签字 (per 守门 #14 v3 Mavis 临时代签 + v0.62 反转 v4)
 
@@ -480,7 +479,7 @@ PT 共 **8 bench** (4 cargo bench + 4 vitest bench), 覆盖 7 AC 性能 (AC-P-1.
 **守门 #14 v3 + v4 反转说明**:
 
 - v3: Mavis (接手 agent) 临时代签 5 域 Lead, 真人到位后追溯签字
-- v4: v0.62 反转后, 真人代签流程全部取消, Mavis 永久代签 (per 2026-09-10 12:45 JST 拍板)
+- v4: v0.62 反转后, 真人代签流程全部取消, Mavis 接手代签 (5 域真人到位后切真人, per 2026-09-10 12:45 JST 拍板)
 - 当前签字栏空, 待 Mavis 在 PR 评审时一次性代签
 
 ### 6.4 UAT 签字栏 (per 守门 #14 v3 Mavis 临时代签)
@@ -490,10 +489,10 @@ PT 共 **8 bench** (4 cargo bench + 4 vitest bench), 覆盖 7 AC 性能 (AC-P-1.
 | **AC-F (1-20)** | 20 | 【TBD】 | ☐ |
 | **AC-P (1-7)** | 7 | 【TBD】 | ☐ |
 | **AC-Q (1-10)** | 10 | 【TBD】 | ☐ |
-| **AC-D (1-7)** | 7 | 【TBD】 | ☐ |
-| **合计 (1-44)** | **44** | **100% 必过** | **☐ Mavis 临时代签** |
+| **AC-D (1-6)** | 6 | 【TBD】 | ☐ |
+| **合计 (1-43)** | **43** | **100% 必过** | **☐ Mavis 临时代签** |
 
-注: 文档 AC 共 7 项 (AC-D-1..7, 新增 AC-D-7 IMPL-PLAN + spec + TEST-DESIGN 3 文件)。
+注: 文档 AC 共 6 项 (AC-D-1..6, per SRS §12.4), 与 SRS / Traceability §11 完全一致。
 
 ### 6.5 守门合规清单 (per AGENTS.md §4 + 守门 #14 v3 + 守门 #26 v26)
 
@@ -505,7 +504,7 @@ PT 共 **8 bench** (4 cargo bench + 4 vitest bench), 覆盖 7 AC 性能 (AC-P-1.
 
 ### 6.6 本章小结
 
-UAT 共 **44 AC** (43 AC + 1 新增 AC-D-7), 覆盖功能 20 + 性能 7 + 质量 10 + 文档 7 = 44 维度, 全闭环 100%。5 域 Lead 签字栏空, Mavis 临时代签。守门 5 项必过。
+UAT 共 **43 AC** (per SRS §12), 覆盖功能 20 + 性能 7 + 质量 10 + 文档 6 = 43 维度, 全闭环 100%。5 域 Lead 签字栏空, Mavis 临时代签。守门 5 项必过。
 
 ---
 
@@ -518,7 +517,7 @@ UAT 共 **44 AC** (43 AC + 1 新增 AC-D-7), 覆盖功能 20 + 性能 7 + 质量
 | **Ulysses (一人公司)** | SRS / BD / DD / Trace / Spec / IMPL-PLAN / TEST-DESIGN 落档 | ULYS-57 全局 | 5 域 Lead (未到位) | 评论者 |
 | **Mavis (接手 agent)** | PR Review / 代签 5 域 Lead | ULYS-57 全局 | Ulysses | 评论者 |
 | **実装エンジニア Lead** (待寻访) | T1-T14 实装代码 | T1-T14 模块 | Ulysses / Mavis | 评论者 |
-| **テストエンジニア Lead** (待寻访) | 70 测 + 8 bench + 44 AC 实证 | 测试维度 | Ulysses / Mavis | 评论者 |
+| **テストエンジニア Lead** (待寻访) | 70 测 + 8 bench + 43 AC 实证 | 测试维度 | Ulysses / Mavis | 评论者 |
 | **SRE Lead** (待寻访) | NFR 5 类落地 + 可观测性 | 性能 / 可靠性 | Ulysses / Mavis | 评论者 |
 | **UI/UX Lead** (待寻访) | 30 TS 文件 + i18n + a11y | UI/UX 维度 | Ulysses / Mavis | 评论者 |
 | **架构师** (Mavis 接手) | 4 Trait 抽象 + 决策点 15 项 | 架构维度 | Ulysses | 评论者 |
@@ -540,7 +539,8 @@ UAT 共 **44 AC** (43 AC + 1 新增 AC-D-7), 覆盖功能 20 + 性能 7 + 质量
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
-| **v1.0** | **2026-09-16 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)** | **初版落档, 9 段 IPA SEC 模板 (目的 / 范围 / UT / IT / E2E / PT / UAT / RACI / 修订), 52 UT + 10 IT + 8 E2E + 8 PT + 44 AC = 122 实证锚点, 14 crate × 模块测试矩阵 1:1 对齐, 5 子任务 RACI, 13 已知缺口 (G-IT-01..05 + G-E2E-01..08 + G-PT-01..05 = 18, 含 sub-issue 分解), 5 角色签字栏, 守门 5 项必过, Token OLU ~500K (含 docs)** | **2026-09-16 10:48 JST 评论者发令 "可以开子任务推进开发并且制作各级测试设计书了"** |
+| **v1.0** | **2026-09-16 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)** | **初版落档, 9 段 IPA SEC 模板 (目的 / 范围 / UT / IT / E2E / PT / UAT / RACI / 修订), 52 UT + 10 IT + 8 E2E + 8 PT + 43 AC = 121 实证锚点, 14 crate × 模块测试矩阵 1:1 对齐, 5 子任务 RACI, 13 已知缺口 (G-IT-01..05 + G-E2E-01..08 + G-PT-01..05 = 18, 含 sub-issue 分解), 5 角色签字栏, 守门 5 项必过, Token OLU ~500K (含 docs)** | **2026-09-16 10:48 JST 评论者发令 "可以开子任务推进开发并且制作各级测试设计书了"** |
+| **v1.1** | **2026-09-19 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v3 + self-review 整体审查 M-2/M-3/m-7 派生)** | **修正: 5 子任务命名 ULYS-57.x → ULYS-58..62 (per Multica 实际 identifier); AC-D-7 误增撤销 → 43 AC (与 SRS / Traceability §11 一致); 子任务创建命令 `--parent` 缺失 flag 修正为 `--description-file` + `update --parent-issue-id`; 守门 #14 v3/v4 "永久代签" 措辞 → "接手代签 (5 域真人到位后切真人)" (per self-review m-7)** | **2026-09-19 04:55 JST 自审整体审查 Mavis 推荐 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位"** |
 
 ---
 
@@ -623,51 +623,51 @@ UAT 共 **44 AC** (43 AC + 1 新增 AC-D-7), 覆盖功能 20 + 性能 7 + 质量
 
 | Sub-issue | 标题 | 包含任务 | 依赖 | Token 估 | 完成标准 | assignee |
 |---|---|---|---|---|---|---|
-| **ULYS-57.1** | graph-core + git 基础 2 crate (T1-T2) | GraphRepository Trait + Neo4j adapter + 11 Node + 13 Edge + GitProvider Trait + libgit2 + CLI fallback + GitObserver + 100ms 防抖 + 15 GitEvent + 5 表 DDL | 无 | ~500K | `cargo test -p graph-core --lib` 4/4 + `cargo test -p git-adapter --lib` 4/4 + `cargo test -p git-observer --lib` 3/3 = 11/11 UT pass | (待派 agent) |
-| **ULYS-57.2** | 业务核心 5 crate (T3-T7) | worktree-service 7 状态机 + risk-engine V1+V2 + health-engine 13 因素 + agent-bridge Multica adapter + relationship-engine 13 Edge ops | T1 + T2 | ~1.1M | `cargo test -p worktree-service --lib` 5/5 + `cargo test -p risk-engine --lib` 4/4 + `cargo test -p health-engine --lib` 3/3 + `cargo test -p agent-bridge --lib` 2/2 + `cargo test -p relationship-engine --lib` 3/3 = 17/17 UT pass | (待派 agent) |
-| **ULYS-57.3** | 5 engine (T8-T12) | action-engine 18 Action + event-bus Redis Streams + layout-engine 3 算法 + query-engine DSL Parser + canvas-renderer React-Flow | T1 + T3 + T4 + T5 + T6 + T7 | ~1.3M | `cargo test -p action-engine --lib` 6/6 + `cargo test -p event-bus --lib` 3/3 + `cargo test -p layout-engine --lib` 3/3 + `cargo test -p query-engine --lib` 4/4 + `cargo test -p canvas-renderer --lib` 4/4 = 20/20 UT pass | (待派 agent) |
-| **ULYS-57.4** | BFF + Frontend (T13-T14) | bff/worktree_canvas 11 REST + 15 SSE + 1 WS + RBAC + Idempotency + Audit + 30 前端 TS/TSX 文件 + 5 View Mode + 6 Semantic Zoom + 11 Inspector Tab + Zustand Store | T8 + T9 + T10 + T11 + T12 | ~650K | `cargo test -p bff --lib --features worktree_canvas` 2/2 + `pnpm vitest run` 30/30 + `pnpm playwright test` 8/8 E2E pass | (待派 agent) |
-| **ULYS-57.5** | 测试 + NFR + 自审修正 (T4.1-T4.8) | 52 UT 实证 + 10 IT 实证 + 8 E2E 实证 + 8 PT 实证 + 5 类 NFR benchmark + 4 Critical 自审修正 (C-01..04) + 13 已知缺口交叉验证 | T1-T14 | ~1.0M | `cargo test --workspace` 52/52 UT + 10/10 IT pass + `pnpm playwright test` 8/8 E2E pass + `cargo bench` 8/8 PT pass + 守门 13 项必过 + 5 域 Lead 签字 (Mavis 临时代签) | (待派 agent) |
+| **ULYS-58** | graph-core + git 基础 2 crate (T1-T2) | GraphRepository Trait + Neo4j adapter + 11 Node + 13 Edge + GitProvider Trait + libgit2 + CLI fallback + GitObserver + 100ms 防抖 + 15 GitEvent + 5 表 DDL | 无 | ~500K | `cargo test -p graph-core --lib` 4/4 + `cargo test -p git-adapter --lib` 4/4 + `cargo test -p git-observer --lib` 3/3 = 11/11 UT pass | (已 done) |
+| **ULYS-59** | 业务核心 5 crate (T3-T7) | worktree-service 7 状态机 + risk-engine V1+V2 + health-engine 13 因素 + agent-bridge Multica adapter + relationship-engine 13 Edge ops | T1 + T2 | ~1.1M | `cargo test -p worktree-service --lib` 5/5 + `cargo test -p risk-engine --lib` 4/4 + `cargo test -p health-engine --lib` 3/3 + `cargo test -p agent-bridge --lib` 2/2 + `cargo test -p relationship-engine --lib` 3/3 = 17/17 UT pass | (已 done) |
+| **ULYS-60** | 5 engine (T8-T12) | action-engine 18 Action + event-bus Redis Streams + layout-engine 3 算法 + query-engine DSL Parser + canvas-renderer React-Flow | T1 + T3 + T4 + T5 + T6 + T7 | ~1.3M | `cargo test -p action-engine --lib` 6/6 + `cargo test -p event-bus --lib` 3/3 + `cargo test -p layout-engine --lib` 3/3 + `cargo test -p query-engine --lib` 4/4 + `cargo test -p canvas-renderer --lib` 4/4 = 20/20 UT pass | (待 review) |
+| **ULYS-61** | BFF + Frontend (T13-T14) | bff/worktree_canvas 11 REST + 15 SSE + 1 WS + RBAC + Idempotency + Audit + 30 前端 TS/TSX 文件 + 5 View Mode + 6 Semantic Zoom + 11 Inspector Tab + Zustand Store | T8 + T9 + T10 + T11 + T12 | ~650K | `cargo test -p bff --lib --features worktree_canvas` 2/2 + `pnpm vitest run` 30/30 + `pnpm playwright test` 8/8 E2E pass | (待解阻) |
+| **ULYS-62** | 测试 + NFR + 自审修正 (T4.1-T4.8) | 52 UT 实证 + 10 IT 实证 + 8 E2E 实证 + 8 PT 实证 + 5 类 NFR benchmark + 4 Critical 自审修正 (C-01..04) + 13 已知缺口交叉验证 | T1-T14 | ~1.0M | `cargo test --workspace` 52/52 UT + 10/10 IT pass + `pnpm playwright test` 8/8 E2E pass + `cargo bench` 8/8 PT pass + 守门 13 项必过 + 5 域 Lead 签字 (Mavis 临时代签) | (待 review) |
 
 **合计 5 子任务**: ~4.55M tokens / ~3.79 SRE·周 (per 1 SRE·周 = 0.4M tokens 估, per 守门 #4 token-OLU 估算)
 
 **子任务守门**:
 
-- [x] 每个子任务独立 worktree, branch `agent/<agent>/ulys-57.1`..`.5`
+- [x] 每个子任务独立 worktree, branch `agent/<agent>/ulys-58`..`ulys-62`
 - [x] 每个子任务独立 PR, Mavis 接手 Review
 - [x] 每个子任务独立 Token 估 + 守门基线
-- [x] ULYS-57.5 (测试 + 自审修正) 最后启动, 等前 4 子任务完成后
+- [x] ULYS-62 (测试 + 自审修正) 最后启动, 等前 4 子任务完成后
 - [x] 5 子任务全部完成后, ULYS-57 父 issue 关闭 (per 评论者发令)
 
 ### 11.2 子任务创建执行 (本期操作, per 评论者发令)
 
-本节由 Ulysses 在本期操作, 5 子任务通过 `multica issue create --parent 01a0a4d8-6669-77ee-bbb1-758e19e69244` 创建, 落到本 issue (ULYS-57) 下, 平行推进开发。子任务编号沿用 issue 内 ULYS-57.x 编号 (本 issue 内 sub-issue, 不开新 identifier)。
+本节由 Ulysses 在本期操作, 5 子任务通过 `multica issue create --description-file ...` (父 ID 在创建后通过 `multica issue update --parent-issue-id` 设定, 因 Multica 当前 CLI 不支持 `--parent` flag) 创建, 落到本 issue (ULYS-57) 下, 平行推进开发。**实际 Multica 分配: ULYS-58 / ULYS-59 / ULYS-60 / ULYS-61 / ULYS-62** (独立 identifier, 与本 issue 平级而非 issue 内 sub-issue, per user profile "parent + 5 sub-issues" 模式 + Multica workspace 命名约定)。
 
-创建命令:
+创建命令 (调整后, 用 `--description-file` 而非 `--parent`):
 
 ```bash
-multica issue create --parent 01a0a4d8-6669-77ee-bbb1-758e19e69244 --title "ULYS-57.1 graph-core + git 基础 2 crate (T1-T2)" --description-file ./sub-issue-1.md
-multica issue create --parent 01a0a4d8-6669-77ee-bbb1-758e19e69244 --title "ULYS-57.2 业务核心 5 crate (T3-T7)" --description-file ./sub-issue-2.md
-multica issue create --parent 01a0a4d8-6669-77ee-bbb1-758e19e69244 --title "ULYS-57.3 5 engine (T8-T12)" --description-file ./sub-issue-3.md
-multica issue create --parent 01a0a4d8-6669-77ee-bbb1-758e19e69244 --title "ULYS-57.4 BFF + Frontend (T13-T14)" --description-file ./sub-issue-4.md
-multica issue create --parent 01a0a4d8-6669-77ee-bbb1-758e19e69244 --title "ULYS-57.5 测试 + NFR + 自审修正 (T4.1-T4.8)" --description-file ./sub-issue-5.md
+# 1) 创建子 issue (返回 issue ID)
+multica issue create --title "ULYS-58 graph-core + git 基础 2 crate (T1-T2)" --description-file ./sub-issue-58.md
+# 2) 设置父 issue
+multica issue update <ULYS-58-ID> --parent-issue-id 01a0a4d8-6669-77ee-bbb1-758e19e69244
+# (重复 1+2 步骤 for ULYS-59..62)
 ```
 
 ### 11.3 子任务派工原则 (per user profile § "parent + 5 sub-issues")
 
 - 每个 sub-issue worker 拿独立 git worktree (per Multica workspace convention)
-- 工作目录: `~/multica_workspaces_*/ulys-57-*/worktree`
-- 分支命名: `agent/<agent>/ulys-57.1`..`.5`
+- 工作目录: `~/multica_workspaces_*/ulys-58-*/worktree`..`ulys-62-*/worktree`
+- 分支命名: `agent/<agent>/ulys-58`..`ulys-62`
 - 完成标准: 子任务 PR merged + Mavis 接手 Review pass + Token OLU 不超估
 
 ### 11.4 风险与缓解
 
 | 风险 | 影响 | 缓解 |
 |---|---|---|
-| **5 子任务并行冲突** (同一 crate 跨子任务编辑) | merge conflict | 每个子任务独立 crate 范围 (ULYS-57.1 graph-core/git, ULYS-57.2 worktree/risk/health/agent/relationship, ULYS-57.3 action/event/layout/query/canvas, ULYS-57.4 bff/frontend, ULYS-57.5 test/NFR) |
-| **T1-T14 依赖关系** (ULYS-57.2 依赖 ULYS-57.1, 依此类推) | 串行等待 | Stage barrier: 1 完成后 2 启动 (per `--stage` 字段), stage 1..5 顺序 |
-| **Token 超估** | 实装期超预算 | 守门 #4 token-OLU 估算 95% 置信度, 实装期校准 |
-| **真人未到位** (5 域 Lead) | 签字栏空 | 守门 #14 v4 v0.62 反转, Mavis 永久代签 |
+| **5 子任务并行冲突** (同一 crate 跨子任务编辑) | merge conflict | 每个子任务独立 crate 范围 (ULYS-58 graph-core/git, ULYS-59 worktree/risk/health/agent/relationship, ULYS-60 action/event/layout/query/canvas, ULYS-61 bff/frontend, ULYS-62 test/NFR) |
+| **T1-T14 依赖关系** (ULYS-59 依赖 ULYS-58, 依此类推) | 串行等待 | Stage barrier: 1 完成后 2 启动 (per `--stage` 字段), stage 1..5 顺序 |
+| **Token 超估** | 实装期超预算 | 守门 #4 token-OLU 估算 95% 置信度, 单子任务 ~500K, 5 子任务合计 ~4.55M (含 docs ~500K); 实装期校准 |
+| **真人未到位** (5 域 Lead) | 签字栏空 | 守门 #14 v4 v0.62 反转, Mavis 接手代签 (5 域真人到位后切真人) |
 | **1000 WT 性能未实测** (P2 T18) | NFR-PERF-002 风险 | MVP 用 LOD 兜底, P2 切 PixiJS |
 | **LLM 真实接入** (P2 T16) | FR-EXPLAIN-001..004 风险 | MVP 走 mock + 模板, P2 真实接入 |
 
@@ -677,12 +677,12 @@ multica issue create --parent 01a0a4d8-6669-77ee-bbb1-758e19e69244 --title "ULYS
 
 ### A.1 测试设计书完整性
 
-- **5 级别测试设计**: UT (52) + IT (10) + E2E (8) + PT (8) + UAT (44 AC) = 122 实证锚点
+- **5 级别测试设计**: UT (52) + IT (10) + E2E (8) + PT (8) + UAT (43 AC) = 121 实证锚点
 - **14 crate × 模块测试矩阵**: 1:1 对齐, 100% 覆盖
 - **103 FR + 23 NFR + 12 INV + 15 决策点**: 全闭环
-- **44 AC 验收 (per SRS §12)**: AC-F-1..20 + AC-P-1..7 + AC-Q-1..10 + AC-D-1..7
+- **43 AC 验收 (per SRS §12)**: AC-F-1..20 + AC-P-1..7 + AC-Q-1..10 + AC-D-1..6
 - **18 已知缺口** (G-IT-01..05 + G-E2E-01..08 + G-PT-01..05): 显式标, 实施期校准
-- **5 子任务 RACI**: ULYS-57.1..5 + Mavis 永久代签
+- **5 子任务 RACI**: ULYS-58 / 59 / 60 / 61 / 62 + Mavis 接手代签 (5 域真人到位后切真人)
 
 ### A.2 Multica ULYS-57 任务完成度
 
@@ -697,7 +697,7 @@ multica issue create --parent 01a0a4d8-6669-77ee-bbb1-758e19e69244 --title "ULYS
 | **STEP 7 TEST-DESIGN** | ✅ 完成 | `TEST-DESIGN-WORKTREE-CANVAS-001.md` v1.0 (本文档) |
 | **STEP 8 5 子任务分解** | ✅ 完成 | §11 RACI |
 | **STEP 9 实装** | ⏳ 待 5 子任务推进 | T1-T14 + T4.1-T4.8 |
-| **STEP 10 验收** | ⏳ 待 UAT | 44 AC |
+| **STEP 10 验收** | ⏳ 待 UAT | 43 AC |
 
 ### A.3 守门检查清单 (13 项必过)
 
@@ -719,8 +719,8 @@ multica issue create --parent 01a0a4d8-6669-77ee-bbb1-758e19e69244 --title "ULYS
 
 1. **创建 5 子任务** (本期操作, 落到 ULYS-57 issue 下, 见 §11.2 命令)
 2. **派 5 agent 平行推进** (per `multica-platform` skill `references/issues.md` §"Parent coordinator")
-3. **5 子任务完成后** ULYS-57.5 (测试 + NFR + 自审修正) 启动, 实证 122 锚点
-4. **UAT 签字** (44 AC 全过, Mavis 永久代签)
+3. **5 子任务完成后** ULYS-62 (测试 + NFR + 自审修正) 启动, 实证 122 锚点
+4. **UAT 签字** (43 AC 全过, Mavis 接手代签)
 5. **ULYS-57 父 issue 关闭**, 进入下一阶段 (P2 18 任务)
 
 ---

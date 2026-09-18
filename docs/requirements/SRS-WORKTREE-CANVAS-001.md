@@ -11,7 +11,7 @@
 > - 关联后续基本設計: `docs/design/BD-WORKTREE-CANVAS-001.md` v1.0 (本 commit 同期落档)
 > - 关联后续詳細設計: `docs/design/DD-WORKTREE-CANVAS-001.md` v1.0 (本 commit 同期落档)
 > - 关联追踪矩阵: `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 (本 commit 同期落档)
-> - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 永久代签)
+> - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 接手代签, 5 域真人到位后切真人)
 > - 审批: 架构师 (Mavis 接手 agent per DEC-008) (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST)
 > - 日期: 2026-09-15 JST
 > - 受众: 詳細設計工程師 / 架構審查者 / UI/UX 設計師 / SRE Lead / 5 域 Lead (未到位, Mavis 临时代签 per 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D)
@@ -42,6 +42,7 @@
 |---|---|---|---|---|
 | v1.0 | 2026-09-15 JST | Ulysses — Mavis 接手 (per 守门 #14 v3) | 初版落档, 13 段 (文档信息/目的/用语/前提/业务需求/约束/场景/数据/接口/验收/风险/签字/修订), **126 唯一 ID** (103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID), 39 用户故事 (≥ 39 满足), 13 已知缺口, 5 个视图模式 + 6 级 Semantic Zoom + 7 状态机 + 11 风险类型 + 5 层 Canvas 性能策略 | 2026-09-15 Multica ULYS-57 issue 创建者发令 |
 | v1.1 | 2026-09-17 JST | Ulysses — Mavis 接手 (per 守门 #14 v3, self-review C-01..C-04 修正) | 修正: 4 文档总数对齐 **126 唯一 ID**; FR-ACTION-002 Merge 改 Destructive (per self-review C-02); Trace §11 AC 43 项全表化 (per self-review C-03); BD §0.3/§37 总数同步 (per self-review C-04) | 2026-09-17 ULYS-62 self-review 修正落地 |
+| v1.2 | 2026-09-19 JST | Ulysses — Mavis 接手 (per 守门 #14 v3 + self-review 整体审查 m-7 派生) | 修正: "Mavis 永久代签" 措辞 → "Mavis 接手代签 (5 域真人到位后切真人)" (修订人栏, per self-review m-7) | 2026-09-19 04:55 JST 自审整体审查 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位" |
 
 ### 0.3 撤回记录 (per 守门 #1 禁回溯叙事)
 

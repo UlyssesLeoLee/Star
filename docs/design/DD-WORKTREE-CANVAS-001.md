@@ -10,7 +10,7 @@
 > - 核心语言: Rust 1.80+ (Core Services) + TypeScript 5.x (Frontend, Next.js 14.2.5)
 > - 守门基线: 守门 #1+#1 v25+#3+#5+#6+#9+#10+#11+#13+#14 v3+#14 v4+#22+#28+#29+#1 v15 共 15 项必过
 > - 平行参考: `docs/frontend-canvas-design.md` v0.1 (V0.1 实装基线) + `SRS-AGENT-VIEW-001.md` v1.0 (个体视图) + `SRS-CANVAS-AGENT-001.md` v1.2 (A12 多人编辑)
-> - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 永久代签)
+> - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 接手代签, 5 域真人到位后切真人)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST)
 > - 日期: 2026-09-15 JST
 > - 受众: 実装エンジニア / SRE Lead / 5 域 Lead (未到位, Mavis 临时代签)
@@ -3538,6 +3538,8 @@ pub async fn handle_graph_failure(services: &Services) -> Result<(), Error> {
 | 版本 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
 | v1.0 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版, 52 段 (Purpose/Module/Domain/DTO/Entity/Value/Error/Node/Edge/Schema/Interfaces/State/Cache/Index/Query/DSL/Semantic Zoom/Canvas Virtualization/Incremental Layout/Delta Update/Conflict Detection/Health Score/Ahead-Behind/Focus N-hop/Error Code/Retry/Transaction/Concurrency/Idempotency/Audit Log/Permission/Unit Test/Integration Test/E2E Test/Performance Test/Failure Recovery/Requirement Mapping/Signature/Revision), 14 Rust crate + 30 TS 文件, 100+ 代码示例, 11 Node + 13 Edge + 18 Action + 15 Event + 7 State + 5 View + 6 Zoom 100% 覆盖, BD 15 决策点全部采纳, BD Minor #1/#2 全部已补 (Event 防抖详 / Saved Search 表) | 2026-09-15 Multica ULYS-57 issue 创建者发令 |
+| v1.1 | Ulysses — Mavis 接手 (per 守门 #14 v3, self-review C-01/C-04 修正) | 修正: §1.1 物理布局路径 14 crate + 30 TS 文件 + 100+ 代码示例口径同步; §50 需求映射 126 唯一 ID 全闭环 | 2026-09-17 ULYS-62 self-review 修正落地 |
+| v1.2 | Ulysses — Mavis 接手 (per 守门 #14 v3 + self-review 整体审查 m-7 派生) | 修正: "Mavis 永久代签" → "Mavis 接手代签 (5 域真人到位后切真人)" (修订人栏, per self-review m-7) | 2026-09-19 04:55 JST 自审整体审查 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位" |
 
 ---
 

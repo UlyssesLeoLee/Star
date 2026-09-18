@@ -1,0 +1,24 @@
+[package]
+name = "worktree-canvas"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — facade / aggregator crate re-exporting the 13 worktree-canvas sub-crates (graph-core / git-adapter / git-observer / worktree-service / risk-engine / health-engine / agent-bridge / relationship-engine / canvas-renderer / layout-engine / query-engine / action-engine / event-bus). Per DD-WORKTREE-CANVAS-001 §1.1 + IMPL-PLAN-001 §0.1 M-1 v1.2 修正 (per 2026-09-19 自审整体审查)."
+
+[dependencies]
+graph-core = { path = "../graph-core" }
+git-adapter = { path = "../git-adapter" }
+git-observer = { path = "../git-observer" }
+worktree-service = { path = "../worktree-service" }
+risk-engine = { path = "../risk-engine" }
+health-engine = { path = "../health-engine" }
+agent-bridge = { path = "../agent-bridge" }
+relationship-engine = { path = "../relationship-engine" }
+canvas-renderer = { path = "../canvas-renderer" }
+layout-engine = { path = "../layout-engine" }
+query-engine = { path = "../query-engine" }
+action-engine = { path = "../action-engine" }
+event-bus = { path = "../event-bus" }

@@ -8,15 +8,15 @@
 > - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)
 > - 审批: 架构师 (Mavis 接手 agent per DEC-008)
 > - 上游依赖:
->   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (115 项需求: FR-WT 38 + FR-UI 14 + FR-GRAPH 12 + FR-RISK 11 + FR-AGENT 8 + FR-EXPLAIN 4 + FR-SEARCH 6 + FR-ACTION 10 + NFR 23)
+>   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.1 (126 唯一 ID: FR-WT 38 + FR-UI 14 + FR-GRAPH 12 + FR-RISK 11 + FR-AGENT 8 + FR-EXPLAIN 4 + FR-SEARCH 6 + FR-ACTION 10 + NFR 21 子段去重 ID)
 >   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](../design/BD-WORKTREE-CANVAS-001.md) v1.0 (14 模块 + 4 大 Trait + 15 决策点全部已拍板)
->   - [`docs/design/DD-WORKTREE-CANVAS-001.md`](../design/DD-WORKTREE-CANVAS-001.md) v1.0 (52 段 + 100+ 代码示例 + 14 crate + 30 TS 文件)
+>   - [`docs/design/DD-WORKTREE-CANVAS-001.md`](../design/DD-WORKTREE-CANVAS-001.md) v1.0 (52 段 + 100+ 代码示例 + 14 crate + 30+ TS 文件)
 >   - [`docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md`](../design/TRACEABILITY-WORKTREE-CANVAS-001.md) v1.0 (103 FR + 23 NFR 子段 = 126 唯一 ID, 15 决策点, 43 AC)
 > - 下游交付:
 >   - 实施计划 [`docs/implementation-plans/WORKTREE-CANVAS-IMPL-PLAN-001.md`](../implementation-plans/WORKTREE-CANVAS-IMPL-PLAN-001.md) v0.1 (本 spec 同期落档, per 评论者发令)
 >   - 14 新 Rust crate 实装代码 (`crates/worktree-canvas/`, `crates/graph-core/`, `crates/git-observer/`, `crates/git-adapter/`, `crates/worktree-service/`, `crates/relationship-engine/`, `crates/risk-engine/`, `crates/health-engine/`, `crates/agent-bridge/`, `crates/canvas-renderer/`, `crates/layout-engine/`, `crates/query-engine/`, `crates/action-engine/`, `crates/event-bus/`)
 >   - 1 新 BFF module (`bff/src/worktree_canvas/`, 共 11 REST + 15 SSE + 1 WS)
->   - 30 新前端 TS/TSX 文件 (`frontend/src/app/(worktree-canvas)/` + `frontend/src/components/worktree-canvas/`)
+>   - 30+ 新前端 TS/TSX 文件 (`frontend/src/app/(worktree-canvas)/` + `frontend/src/components/worktree-canvas/`, 实际 45 文件 = 5 pages + 40 components, 超实 50%)
 > - 平行参考: [`docs/specs/domain-worktree-spec.md`](domain-worktree-spec.md) v0.1 (17 状态机 + 9 项隔离检查 + 7 状态投影) + `docs/frontend-canvas-design.md` v0.1 (V0.1 MVP 实装基线) + `SRS-AGENT-VIEW-001.md` v1.0 + `SRS-CANVAS-AGENT-001.md` v1.2 (A12 多人编辑消费源)
 
 ---
@@ -34,7 +34,7 @@
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 (per 守门 #14 v4 v0.62 反转) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
 | 关联 commit | 待生成 (root 统一 commit, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件) |
-| 关联文档 | SRS-WORKTREE-CANVAS-001.md v1.0 (115 项需求) + BD-WORKTREE-CANVAS-001.md v1.0 (14 模块 + 15 决策点) + DD-WORKTREE-CANVAS-001.md v1.0 (52 段) + TRACEABILITY-WORKTREE-CANVAS-001.md v1.0 (126 ID 追踪) + WORKTREE-CANVAS-IMPL-PLAN-001.md v0.1 (本 spec 同期落档) |
+| 关联文档 | SRS-WORKTREE-CANVAS-001.md v1.1 (126 唯一 ID) + BD-WORKTREE-CANVAS-001.md v1.1 (14 模块 + 15 决策点) + DD-WORKTREE-CANVAS-001.md v1.1 (52 段) + TRACEABILITY-WORKTREE-CANVAS-001.md v1.1 (126 ID 追踪) + WORKTREE-CANVAS-IMPL-PLAN-001.md v0.1 (本 spec 同期落档) |
 | 范围 | worktree-canvas 模块实装的所有接口签名 + 关键算法 + 不变量 + 错误码 + 测试入口; 不重写 SRS/BD/DD, 仅继承并落地为可实施 spec |
 | 守门基线 | 守门 #1+#1 v25+#3+#5+#6+#9+#10+#11+#13+#14 v3+#14 v4+#28+#29 共 13 项必过 |
 
@@ -42,7 +42,8 @@
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
-| **v0.1** | **2026-09-15 21:21 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)** | **初版落档, 12 段 IPA SEC spec 模板, 9 职责边界 + 11 实体 + 12 不变量 + 11 接口签名 (Rust) + 11 接口签名 (TS) + 18 Action 签名 + 15 Event 签名 + 8 错误码 + 8 算法入口 + 10 测试入口 + 14 crate 落地清单 + 30 TS 文件落地清单 + 13 已知缺口** | **2026-09-15 21:21 JST 评论者发令 "制作 spec 和实施计划" (per Multica ULYS-57 thread 01a0a504-3517-7299-b3bb-30c4209911e8)** |
+| **v0.1** | **2026-09-15 21:21 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v4 v0.62 反转)** | **初版落档, 12 段 IPA SEC spec 模板, 9 职责边界 + 11 实体 + 12 不变量 + 11 接口签名 (Rust) + 11 接口签名 (TS) + 18 Action 签名 + 15 Event 签名 + 8 错误码 + 8 算法入口 + 10 测试入口 + 14 crate 落地清单 + 30+ TS 文件落地清单 + 13 已知缺口** | **2026-09-15 21:21 JST 评论者发令 "制作 spec 和实施计划" (per Multica ULYS-57 thread 01a0a504-3517-7299-b3bb-30c4209911e8)** |
+| **v0.2** | **2026-09-19 JST** | **Ulysses — Mavis 接手审核 (per 守门 #14 v3 + self-review 整体审查 m-2 派生)** | **修正: SRS 版本 v1.0 → v1.1 + 126 唯一 ID 口径同步 (§0.1 §0.2 关联文档); BD/DD/Trace 版本 v1.0 → v1.1 (口径同步); 前端 30 TS → 30+ TS 文件 (实际 45 = 5 pages + 40 components, per m-3)** | **2026-09-19 04:55 JST 自审整体审查 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位"** |
 
 ### 0.3 撤回记录 (per 守门 #1 禁回溯叙事)
 
@@ -676,7 +677,7 @@ pub fn compute_layout(
 
 ## §9 实施任务分解 (WBS, per DD §1-§5 + SRS §28 MVP)
 
-引用 DD 物理文件清单 (14 Rust crate + 30 TS 文件)。本 spec 提炼 **MVP 14 任务** (per SRS §28 MVP 范围 + INV-WC-01..12) + **完整 32 任务** (含 P2 扩展)。
+引用 DD 物理文件清单 (14 Rust crate + 30+ TS 文件)。本 spec 提炼 **MVP 14 任务** (per SRS §28 MVP 范围 + INV-WC-01..12) + **完整 32 任务** (含 P2 扩展)。
 
 ### 9.1 MVP 14 任务 (SRS §28 MVP 必含)
 
@@ -695,7 +696,7 @@ pub fn compute_layout(
 | T11 | `query-engine` + DSL Parser (chevrotain) + NL Translator + Search DSL 6 项 | FR-SEARCH-001..006, BD D-SEARCH-001 | T1 | 200K | DD §17 + §28 |
 | T12 | `canvas-renderer` + React-Flow 11.x adapter + LOD + Viewport Virtualization | FR-UI-001..014, BD D-CANVAS-001, INV-WC-05..07 | T1 + T10 | 300K | DD §11 |
 | T13 | 1 BFF module (`bff/src/worktree_canvas/`) + 11 REST + 15 SSE + 1 WS | FR-ACTION-001..010, NFR-PERM-001 | T8 + T9 | 250K | DD §20-§21 |
-| T14 | 30 前端 TS/TSX 文件 + 5 View Mode + 6 Semantic Zoom + 7 状态 + 11 Inspector Tab | FR-UI-001..014, FR-WT-001..014, INV-WC-05..07 | T10 + T11 + T12 + T13 | 400K | DD §22 + §29-§30 |
+| T14 | 30+ 前端 TS/TSX 文件 + 5 View Mode + 6 Semantic Zoom + 7 状态 + 11 Inspector Tab | FR-UI-001..014, FR-WT-001..014, INV-WC-05..07 | T10 + T11 + T12 + T13 | 400K | DD §22 + §29-§30 |
 
 **MVP 14 任务合计**: ~3.3M tokens / 8 周 (1 SRE·周 = 0.4M tokens 估, per 守门 #4 token-OLU 估算)。
 
@@ -852,7 +853,7 @@ pub fn compute_layout(
 | #10 | commit author=Ulysses | ✅ 1 commit 多文件 |
 | #11 | 缺标比错标 | ✅ §11.3 13 类已知缺口显式列 |
 | #13 | W/T/M 三類横展 100% | ✅ §5.2 5 张表 W/T/M 严格分类 |
-| #14 v3 | Mavis 永久代签 | ✅ 5 角色签字栏 |
+| #14 v3 | Mavis 接手代签 (5 域真人到位后切真人) | ✅ 5 角色签字栏 |
 | #14 v4 | v0.62 反转 Mavis 审核 | ✅ author=Ulysses, Mavis 审核 |
 | #28 | 术语一致 | ✅ 跨 4 文档术语统一 |
 | #29 | docs 同步饱和 | ✅ 1 commit 多文件 |
