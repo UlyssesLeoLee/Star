@@ -22,6 +22,7 @@ desktop.ini
 
 # Rust (future)
 /target/
+**/target/
 **/*.rs.bk
 
 # Logs

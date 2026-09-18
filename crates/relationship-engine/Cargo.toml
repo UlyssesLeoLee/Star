@@ -1,0 +1,32 @@
+[package]
+name = "relationship-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — Relationship Engine: 13 Edge ops + 4 high-risk edge metadata + 1/2/3-hop queries (ULYS-57.2 T7, per DD-WORKTREE-CANVAS-001 §13 + §37 + INV-WC-04)"
+
+[lib]
+name = "relationship_engine"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+futures-util = { workspace = true }
+
+graph-core = { path = "../graph-core" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true

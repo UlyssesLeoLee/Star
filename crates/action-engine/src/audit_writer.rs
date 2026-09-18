@@ -31,7 +31,11 @@ pub struct AuditWriterError {
 
 impl std::fmt::Display for AuditWriterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}] {} (trace={})", self.code, self.message, self.trace_id)
+        write!(
+            f,
+            "[{}] {} (trace={})",
+            self.code, self.message, self.trace_id
+        )
     }
 }
 
@@ -94,14 +98,11 @@ impl AuditWriter {
         idempotency_key: Uuid,
         payload: serde_json::Value,
     ) -> Result<u64, AuditWriterError> {
-        let mut id_guard = self
-            .next_id
-            .write()
-            .map_err(|e| AuditWriterError {
-                code: "AUDIT.LOCK".to_string(),
-                message: format!("audit id lock poisoned: {e}"),
-                trace_id: Uuid::new_v4().to_string(),
-            })?;
+        let mut id_guard = self.next_id.write().map_err(|e| AuditWriterError {
+            code: "AUDIT.LOCK".to_string(),
+            message: format!("audit id lock poisoned: {e}"),
+            trace_id: Uuid::new_v4().to_string(),
+        })?;
         *id_guard += 1;
         let id = *id_guard;
         drop(id_guard);
@@ -253,7 +254,17 @@ mod tests {
 
         // 6. SCD Type 2: 同 actor + action_type 多次 append 视为新 record (valid_from 不同)
         //    本测试不模拟修正路径, 只验证 append-only
-        let _r1 = writer.append("Delete", wt, user, "user", "success", Uuid::new_v4(), serde_json::json!({})).unwrap();
+        let _r1 = writer
+            .append(
+                "Delete",
+                wt,
+                user,
+                "user",
+                "success",
+                Uuid::new_v4(),
+                serde_json::json!({}),
+            )
+            .unwrap();
         assert_eq!(writer.len(), 5);
     }
 }

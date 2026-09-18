@@ -21,8 +21,7 @@ pub fn sanitize_cypher_param(value: &str) -> Result<String, QueryError> {
     if value.is_empty() {
         return Err(QueryError::cypher_injection("empty cypher parameter"));
     }
-    if value.contains(';') || value.contains('$') || value.contains('{') || value.contains('}')
-    {
+    if value.contains(';') || value.contains('$') || value.contains('{') || value.contains('}') {
         return Err(QueryError::cypher_injection(format!(
             "parameter contains Cypher meta characters: '{value}'"
         )));

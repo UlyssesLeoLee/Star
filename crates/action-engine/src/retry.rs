@@ -99,11 +99,15 @@ impl RetryPolicy {
     /// 推进 attempt +1
     pub fn next(&self) -> Self {
         match *self {
-            RetryPolicy::Network { attempt } => RetryPolicy::Network { attempt: attempt + 1 },
-            RetryPolicy::GraphConnection { attempt } => {
-                RetryPolicy::GraphConnection { attempt: attempt + 1 }
-            }
-            RetryPolicy::LlmTimeout { attempt } => RetryPolicy::LlmTimeout { attempt: attempt + 1 },
+            RetryPolicy::Network { attempt } => RetryPolicy::Network {
+                attempt: attempt + 1,
+            },
+            RetryPolicy::GraphConnection { attempt } => RetryPolicy::GraphConnection {
+                attempt: attempt + 1,
+            },
+            RetryPolicy::LlmTimeout { attempt } => RetryPolicy::LlmTimeout {
+                attempt: attempt + 1,
+            },
         }
     }
 }
@@ -217,17 +221,15 @@ mod tests {
     #[test]
     fn retry_with_backoff_succeeds_after_failures() {
         let mut count = 0u32;
-        let result: Result<u32, String> = retry_with_backoff(
-            RetryPolicy::LlmTimeout { attempt: 0 },
-            || {
+        let result: Result<u32, String> =
+            retry_with_backoff(RetryPolicy::LlmTimeout { attempt: 0 }, || {
                 count += 1;
                 if count < 3 {
                     Err(RetryError::Retryable("transient".into()))
                 } else {
                     Ok(42)
                 }
-            },
-        );
+            });
         assert_eq!(result.unwrap(), 42);
         assert_eq!(count, 3);
     }
@@ -235,13 +237,11 @@ mod tests {
     #[test]
     fn retry_with_backoff_exhausts_after_max() {
         let mut count = 0u32;
-        let result: Result<u32, String> = retry_with_backoff(
-            RetryPolicy::Network { attempt: 0 },
-            || {
+        let result: Result<u32, String> =
+            retry_with_backoff(RetryPolicy::Network { attempt: 0 }, || {
                 count += 1;
                 Err(RetryError::Retryable("always fail".into()))
-            },
-        );
+            });
         assert!(result.is_err());
         assert_eq!(count, 4); // 1 initial + 3 retries
     }
@@ -249,13 +249,11 @@ mod tests {
     #[test]
     fn retry_with_backoff_does_not_retry_fatal() {
         let mut count = 0u32;
-        let result: Result<u32, String> = retry_with_backoff(
-            RetryPolicy::Network { attempt: 0 },
-            || {
+        let result: Result<u32, String> =
+            retry_with_backoff(RetryPolicy::Network { attempt: 0 }, || {
                 count += 1;
                 Err(RetryError::Fatal("git conflict".into()))
-            },
-        );
+            });
         assert!(result.is_err());
         assert_eq!(count, 1);
     }

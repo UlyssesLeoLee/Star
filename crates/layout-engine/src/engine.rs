@@ -236,15 +236,12 @@ impl LayoutEngine for LayoutEnginePure {
         options: LayoutOptions,
     ) -> Result<LayoutOutput, LayoutError> {
         if input.nodes.is_empty() {
-            return Err(LayoutError::new(
-                "LAYOUT.EMPTY_INPUT",
-                "no nodes to layout",
-            ));
+            return Err(LayoutError::new("LAYOUT.EMPTY_INPUT", "no nodes to layout"));
         }
 
-        let algorithm = options.algorithm.unwrap_or_else(|| {
-            pick_algorithm(input.view_mode, input.nodes.len())
-        });
+        let algorithm = options
+            .algorithm
+            .unwrap_or_else(|| pick_algorithm(input.view_mode, input.nodes.len()));
 
         // MVP grid layout: per algorithm 分配不同 grid (per node_count 分组)
         let cols = match algorithm {
@@ -346,14 +343,26 @@ mod tests {
 
         // DEPENDENCY / RISK / HISTORY → 任意 D3Force
         for n in [0, 50, 100, 500, 1000] {
-            assert_eq!(pick_algorithm(ViewMode::Dependency, n), LayoutAlgorithm::D3Force);
+            assert_eq!(
+                pick_algorithm(ViewMode::Dependency, n),
+                LayoutAlgorithm::D3Force
+            );
             assert_eq!(pick_algorithm(ViewMode::Risk, n), LayoutAlgorithm::D3Force);
-            assert_eq!(pick_algorithm(ViewMode::History, n), LayoutAlgorithm::D3Force);
+            assert_eq!(
+                pick_algorithm(ViewMode::History, n),
+                LayoutAlgorithm::D3Force
+            );
         }
 
         // AGENT: > 50 → Elk, <= 50 → D3Force
-        assert_eq!(pick_algorithm(ViewMode::Agent, 30), LayoutAlgorithm::D3Force);
-        assert_eq!(pick_algorithm(ViewMode::Agent, 50), LayoutAlgorithm::D3Force);
+        assert_eq!(
+            pick_algorithm(ViewMode::Agent, 30),
+            LayoutAlgorithm::D3Force
+        );
+        assert_eq!(
+            pick_algorithm(ViewMode::Agent, 50),
+            LayoutAlgorithm::D3Force
+        );
         assert_eq!(pick_algorithm(ViewMode::Agent, 51), LayoutAlgorithm::Elk);
     }
 
@@ -369,7 +378,10 @@ mod tests {
             view_mode: ViewMode::Tree,
             root_id: None,
         };
-        let out = engine.compute(input, LayoutOptions::default()).await.unwrap();
+        let out = engine
+            .compute(input, LayoutOptions::default())
+            .await
+            .unwrap();
         assert_eq!(out.nodes.len(), 3);
         assert_eq!(out.edges.len(), 2);
 

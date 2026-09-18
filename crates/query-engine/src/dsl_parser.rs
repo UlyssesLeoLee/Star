@@ -213,7 +213,10 @@ impl DslParser {
             out.push(parsed);
         }
         if out.is_empty() {
-            return Err(QueryError::dsl_parse(value, "show requires at least one value"));
+            return Err(QueryError::dsl_parse(
+                value,
+                "show requires at least one value",
+            ));
         }
         Ok(out)
     }
@@ -247,8 +250,9 @@ impl DslParser {
         } else {
             let head = value.chars().next().expect("guarded by is_empty");
             let op = match head {
-                '=' | '<' | '>' => Operator::parse(&head.to_string())
-                    .expect("guarded by head match"),
+                '=' | '<' | '>' => {
+                    Operator::parse(&head.to_string()).expect("guarded by head match")
+                }
                 _ => Operator::Eq, // default: no op = Eq
             };
             let rest = if matches!(head, '=' | '<' | '>') {
@@ -262,16 +266,19 @@ impl DslParser {
         if rest.is_empty() {
             return Err(QueryError::dsl_parse(value, "missing number after op"));
         }
-        let num: u32 = rest.parse().map_err(|_| {
-            QueryError::dsl_parse(value, format!("invalid number: '{rest}'"))
-        })?;
+        let num: u32 = rest
+            .parse()
+            .map_err(|_| QueryError::dsl_parse(value, format!("invalid number: '{rest}'")))?;
         Ok((op, num))
     }
 
     /// parse file path — allow alphanumeric + `._/-/` (守门 #10 注入防护)
     fn parse_file_path(&self, value: &str) -> Result<String, QueryError> {
         if value.is_empty() {
-            return Err(QueryError::dsl_parse(value, "modified value cannot be empty"));
+            return Err(QueryError::dsl_parse(
+                value,
+                "modified value cannot be empty",
+            ));
         }
         if !value
             .chars()

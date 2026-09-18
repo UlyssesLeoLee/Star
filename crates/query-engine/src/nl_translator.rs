@@ -54,7 +54,14 @@ pub fn nl_to_dsl(nl: &str) -> Result<String, QueryError> {
     }
 
     // agent 关键词
-    for agent in ["codex", "claude-code", "claude", "opencode", "gemini", "sonnet"] {
+    for agent in [
+        "codex",
+        "claude-code",
+        "claude",
+        "opencode",
+        "gemini",
+        "sonnet",
+    ] {
         if lower.contains(agent) {
             dsl_parts.push(format!("agent:{agent}"));
             break;
@@ -81,7 +88,8 @@ pub fn nl_to_dsl(nl: &str) -> Result<String, QueryError> {
     // health 关键词
     if lower.contains("health") || lower.contains("健康") {
         if let Some(n) = extract_number(&lower) {
-            let op = if lower.contains("below") || lower.contains("低于") || lower.contains("under") {
+            let op = if lower.contains("below") || lower.contains("低于") || lower.contains("under")
+            {
                 "<"
             } else {
                 ">"

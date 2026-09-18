@@ -124,6 +124,17 @@ members = [
     "crates/query-engine",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.3 T12, 2026-09-17): canvas-renderer crate (CanvasRenderer Trait + React-Flow 11.x adapter + LOD 3 级 + Viewport Virtualization + 5 View Mode + Focus N-hop, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.12 + DD-WORKTREE-CANVAS-001 §11/§29/§30/§37 + D-CANVAS-001 + INV-WC-05/06/07 + NFR-PERF-002)
     "crates/canvas-renderer",
+    # Phase W20-AI-Worktree-Canvas (ULYS-57.2 T3-T7, 2026-09-16): business core 5 crates
+    # T3 worktree-service (per DD-WORKTREE-CANVAS-001 §12 + INV-WC-01/02/03/08/09)
+    "crates/worktree-service",
+    # T4 risk-engine (per DD-WORKTREE-CANVAS-001 §13 + INV-WC-03)
+    "crates/risk-engine",
+    # T5 health-engine (per DD-WORKTREE-CANVAS-001 §14 + INV-WC-02)
+    "crates/health-engine",
+    # T6 agent-bridge (per DD-WORKTREE-CANVAS-001 §15 + INV-WC-10)
+    "crates/agent-bridge",
+    # T7 relationship-engine (per DD-WORKTREE-CANVAS-001 §13 + INV-WC-04)
+    "crates/relationship-engine",
 ]
 exclude = ["target"]
 

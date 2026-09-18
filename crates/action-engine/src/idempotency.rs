@@ -35,10 +35,7 @@ pub struct IdempotencyRecord {
 impl IdempotencyRecord {
     /// 检查记录是否已过期 (24h)
     pub fn is_expired(&self, now: SystemTime) -> bool {
-        let created_ts = self
-            .created_at
-            .timestamp()
-            .max(0) as u64;
+        let created_ts = self.created_at.timestamp().max(0) as u64;
         let record_epoch = SystemTime::UNIX_EPOCH + Duration::from_secs(created_ts);
         let live = now.duration_since(record_epoch).unwrap_or_default();
         live > IDEMPOTENCY_TTL

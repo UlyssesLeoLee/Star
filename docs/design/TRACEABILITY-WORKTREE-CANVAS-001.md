@@ -3,11 +3,11 @@
 > **AI Worktree Graph Canvas — 需求追踪矩阵 v1.0** (per 日本 IPA SEC 標準 / 追踪マトリックス + Multica ULYS-57 issue 要求)
 >
 > - 上游文档:
->   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.0 (115 项需求)
->   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](BD-WORKTREE-CANVAS-001.md) v1.0 (14 模块 + 15 决策点)
->   - [`docs/design/DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.0 (52 段 + 100+ 代码示例)
+>   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.1 (**126 唯一 ID**: 103 FR + 23 NFR 子段)
+>   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](BD-WORKTREE-CANVAS-001.md) v1.1 (14 模块 + 15 决策点)
+>   - [`docs/design/DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.1 (52 段 + 100+ 代码示例)
 > - 目的: 形成 Requirement ↔ BD ↔ DD ↔ Test 完整闭环, 验证需求无遗漏 / 设计无偏离 / 测试覆盖完整
-> - 状态: 🟢 Draft v1.0 (2026-09-15, 三阶段文档同期落档)
+> - 状态: 🟢 Draft v1.1 (2026-09-17, self-review C-01/C-03/C-04 修正)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v3)
 > - 日期: 2026-09-15 JST
@@ -16,13 +16,13 @@
 
 ## §0 文档目的
 
-本追踪矩阵按 Multica ULYS-57 issue 创建者发令 + §三十七 输出要求, 将 SRS-WORKTREE-CANVAS-001 v1.0 (115 项需求) 全部追踪到:
+本追踪矩阵按 Multica ULYS-57 issue 创建者发令 + §三十七 输出要求, 将 SRS-WORKTREE-CANVAS-001 v1.1 (**126 唯一 ID**: 103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID) 全部追踪到:
 
 1. **Basic Design (BD)** 章节 — 验证 SRS 需求被 BD 设计覆盖, 不存在 "孤儿需求"
 2. **Detailed Design (DD)** 章节 — 验证 BD 设计被 DD 实现覆盖, 不存在 "幽灵设计"
 3. **Test Target** — 验证每项需求都有可测试的验收目标, 不存在 "黑盒需求"
 
-**矩阵覆盖率目标**: 100% (115/115)
+**矩阵覆盖率目标**: 100% (**126/126 唯一 ID**, self-review C-01 v1.1)
 
 **测试类型分类**:
 - UT (Unit Test): Rust `cargo test` / TS `vitest`
@@ -289,11 +289,31 @@
 | AC-F-18 | Risk Resolved 跟踪 | UT | §13 | 设计 ✅ |
 | AC-F-19 | 5 角色 RBAC | UT | §44 | 设计 ✅ |
 | AC-F-20 | 多用户协同 | E2E | (引用 SRS-CANVAS-AGENT-001 A12) | 设计 ✅ |
-| AC-P-1..7 | 性能 7 项 | PT | §48 | 设计 ✅ |
-| AC-Q-1..10 | 质量 10 项 | UT + 评审 | §1.1 + §36 | 设计 ✅ |
-| AC-D-1..6 | 文档 6 项 | 落档检查 | (本追踪矩阵) | 设计 ✅ |
+| AC-P-1 | 100 Worktree 流畅 (FPS ≥ 30) | PT | §48 (vitest bench) | 设计 ✅ |
+| AC-P-2 | 1000 Worktree 可交互 (FPS ≥ 15) | PT | §48 + §30 (LOD) | 设计 ✅ |
+| AC-P-3 | Graph N-hop query P95 < 200ms | PT + k6 | §48 + §17 | 设计 ✅ |
+| AC-P-4 | Risk Engine delta update P95 < 500ms | PT | §48 | 设计 ✅ |
+| AC-P-5 | Explanation cache hit P95 < 50ms | PT | §15 (L2 Cache) | 设计 ✅ |
+| AC-P-6 | Event Bus throughput ≥ 10k eps | PT + criterion-rs | §48 | 设计 ✅ |
+| AC-P-7 | Health Compute P95 < 50ms / WT | PT + criterion-rs | §48 | 设计 ✅ |
+| AC-Q-1 | W/T/M 100% 覆盖 (5 表) | 落档检查 + 评审 | §1.1 + §36 | 设计 ✅ |
+| AC-Q-2 | 错误码 6-field | UT | §6 + §38 | 设计 ✅ |
+| AC-Q-3 | 守门 #14 v3 Mavis 永久代签 | 落档检查 | AGENTS.md | 设计 ✅ |
+| AC-Q-4 | 守门 #6 v2 6-field 错误码 | UT | §38 | 设计 ✅ |
+| AC-Q-5 | 守门 #11 缺标比错标 | 落档检查 | §36 | 设计 ✅ |
+| AC-Q-6 | 守门 #28 术语一致 | 落档检查 | §1 | 设计 ✅ |
+| AC-Q-7 | 守门 #DB-13 + I18N | 落档检查 | §44 | 设计 ✅ |
+| AC-Q-8 | 守门 #14 + A11Y + 键盘 | 评审 + axe-core | §34 + §30 | 设计 ✅ |
+| AC-Q-9 | 守门 #1 + OTel + Grafana | 实证 | §35 | 设计 ✅ |
+| AC-Q-10 | Audit WORM 物理删除禁止 | UT | §44 + §14 | 设计 ✅ |
+| AC-D-1 | SRS 落档 (15 段 + 2 附录) | 落档检查 | (本追踪矩阵 §1-§8) | 落档 ✅ |
+| AC-D-2 | BD 落档 (39 段 + 1 附录) | 落档检查 | (本追踪矩阵 §3) | 落档 ✅ |
+| AC-D-3 | DD 落档 (52 段 + 1 附录) | 落档检查 | (本追踪矩阵 §4) | 落档 ✅ |
+| AC-D-4 | Traceability 落档 (15 段 + 1 附录) | 落档检查 | (本追踪矩阵 §A) | 落档 ✅ |
+| AC-D-5 | Spec + IMPL-PLAN 落档 | 落档检查 | IMPL-PLAN §1-§6 | 落档 ✅ |
+| AC-D-6 | TEST-DESIGN 落档 (122 实证锚点) | 落档检查 | TEST-DESIGN §2-§6 | 落档 ✅ |
 
-**AC 覆盖率**: 43/43 = 100%
+**AC 覆盖率**: **43/43 = 100%** (AC-F 20 + AC-P 7 + AC-Q 10 + AC-D 6, per self-review C-03 v1.1 2026-09-17 JST 全表化展开)
 
 ---
 
@@ -315,7 +335,7 @@
 
 | 维度 | SRS | BD | DD | Test | 闭环状态 |
 |---|---|---|---|---|---|
-| 概念定义 | 115 项 | 14 模块 | 100+ 代码示例 | 43 AC | ✅ 闭环 |
+| 概念定义 | **126 唯一 ID** | 14 模块 | 100+ 代码示例 | 43 AC | ✅ 闭环 |
 | Node 11 类型 | §七 | §17 | §7 (11 struct) | UT | ✅ |
 | Edge 13 类型 | §八 | §18 | §8 (13 struct) | UT | ✅ |
 | Human State 7 | §九 | §20 | §23 (transition) | UT | ✅ |
@@ -364,7 +384,7 @@
 - ✅ 11 Node + 13 Edge + 18 Action + 15 Event + 7 State + 5 View + 6 Zoom + 11 Risk + 13 Health 因素 100% 设计
 - ✅ 14 模块 + 4 大 Trait + 15 决策点 100% 设计
 - ✅ 43 AC 100% 映射到 DD 测试目标
-- ✅ 完整需求追踪矩阵 115/115 = 100%
+- ✅ 完整需求追踪矩阵 **126/126 唯一 ID** = 100% (v1.1 self-review C-01 修正)
 
 ---
 
@@ -385,6 +405,7 @@
 | 版本 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
 | v1.0 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版, 15 段 (目的/FR-WT/FR-UI/FR-GRAPH/FR-RISK/FR-AGENT/FR-EXPLAIN/FR-SEARCH/FR-ACTION/NFR/决策点/AC/闭环/缺口/签字/修订), 追踪矩阵 115/115 = 100% 覆盖, 43 AC 映射到 DD 测试目标, 14 模块 + 15 决策点 + 7 闭环验证 | 2026-09-15 Multica ULYS-57 issue 创建者发令 |
+| v1.1 | Ulysses — Mavis 接手 (per 守门 #14 v3, self-review C-01/C-03 修正) | 修正: 总数 115 → 126 唯一 ID (103 FR + 23 NFR 子段); §11 AC 43 项全表化展开 (AC-F 20 + AC-P 7 + AC-Q 10 + AC-D 6); 覆盖率声明同步; 上游文档版本号 v1.0 → v1.1 | 2026-09-17 ULYS-62 self-review 修正落地 |
 
 ---
 
@@ -397,11 +418,11 @@
 | `SRS-WORKTREE-CANVAS-001.md` | v1.0 | ~105KB | 15 段 + 2 附录 | 🟢 Baseline |
 | `BD-WORKTREE-CANVAS-001.md` | v1.0 | ~83KB | 39 段 + 1 附录 | 🟢 Draft |
 | `DD-WORKTREE-CANVAS-001.md` | v1.0 | ~120KB | 52 段 + 1 附录 | 🟢 Draft |
-| `TRACEABILITY-WORKTREE-CANVAS-001.md` | v1.0 | ~28KB | 15 段 + 1 附录 | 🟢 Draft |
+| `TRACEABILITY-WORKTREE-CANVAS-001.md` | v1.1 | ~28KB | 15 段 + 1 附录 | 🟢 Draft |
 
 **总文档大小**: ~336KB
 **总章节数**: 121 段 + 5 附录
-**总追踪项**: 115 项需求 + 15 决策点 + 43 AC = 173 项追踪
+**总追踪项**: **126 唯一 ID** 需求 (103 FR + 23 NFR 子段) + 15 决策点 + 43 AC = **184 项追踪** (v1.1 self-review C-01 修正)
 
 ### A.2 Multica ULYS-57 任务完成度
 

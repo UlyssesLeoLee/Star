@@ -35,7 +35,8 @@ impl Role {
     pub const COUNT: usize = 5;
 
     /// 全部 5 个角色 (按 enum 顺序)
-    pub const ALL: [Role; Self::COUNT] = [Self::Owner, Self::SRE, Self::Lead, Self::PM, Self::Viewer];
+    pub const ALL: [Role; Self::COUNT] =
+        [Self::Owner, Self::SRE, Self::Lead, Self::PM, Self::Viewer];
 }
 
 /// 最小 User 表示 (完整 User 跨域定义在 domain-identity)
@@ -89,8 +90,10 @@ pub fn check_permission(user: &User, action: ActionType) -> PermissionDecision {
         (Owner, _) => Allow,
         // SRE: Sync / Rebase / Merge / ForceMerge (per DD §44)
         // 注: SRE 不在 §44 矩阵中, 仅 Owner 有全部; 但本期放权 SRE 给运维侧.
-        (SRE, SyncMain | Rebase | Merge | ForceMerge | ForceRebase | Focus | ExplainRisk
-        | Compare) => Allow,
+        (
+            SRE,
+            SyncMain | Rebase | Merge | ForceMerge | ForceRebase | Focus | ExplainRisk | Compare,
+        ) => Allow,
         // Lead: 同 §44 — Focus / ExplainRisk / Compare / Lock / Unlock / SyncMain / Archive / Cleanup
         // (Lock / Unlock 不在 18 Action 中 — 见 action.rs §0 注; Lead 域类操作本期 0 个 Action 对应,
         //  用 SRE 类代替; Lock/Unlock 实装时再加进 18 个)
@@ -132,10 +135,7 @@ pub fn require_confirmation(action: ActionType) -> Result<(), ActionError> {
 ///
 /// 返回 Err(confirm_required) 当:
 /// - Destructive 或 Warning 但 request.confirm == false
-pub fn require_confirm_or_die(
-    action: ActionType,
-    confirm: bool,
-) -> Result<(), ActionError> {
+pub fn require_confirm_or_die(action: ActionType, confirm: bool) -> Result<(), ActionError> {
     let m = crate::action::default_metadata(action);
     if m.requires_confirm && !confirm {
         Err(ActionError::confirm_required(&format!("{action:?}")))

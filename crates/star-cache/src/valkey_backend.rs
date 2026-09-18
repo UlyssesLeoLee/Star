@@ -188,19 +188,38 @@ impl CacheBackend for ValkeyBackend {
 mod tests {
     use super::*;
 
+    // 用 std::sync::Mutex 串行化 VALKEY_URL 的 set/remove 操作,
+    // 避免 cargo test --test-threads=N 并行运行时 from_env_ok / from_env_unset
+    // 互相 race 导致 from_env_ok 在 unset 后看到 None
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn from_env_ok() {
+        let _g = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let prev = std::env::var("VALKEY_URL").ok();
         std::env::set_var("VALKEY_URL", "valkey://x");
         let backend = ValkeyBackend::from_env();
-        assert!(backend.is_ok());
+        match prev {
+            Some(p) => std::env::set_var("VALKEY_URL", p),
+            None => std::env::remove_var("VALKEY_URL"),
+        }
+        assert!(
+            backend.is_ok(),
+            "from_env should succeed when VALKEY_URL is set"
+        );
         // url 字段保留 (但 # err 消息不打印)
         assert_eq!(backend.unwrap().url, "valkey://x");
     }
 
     #[test]
     fn from_env_unset() {
+        let _g = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let prev = std::env::var("VALKEY_URL").ok();
         std::env::remove_var("VALKEY_URL");
         let r = ValkeyBackend::from_env();
+        if let Some(p) = prev {
+            std::env::set_var("VALKEY_URL", p);
+        }
         match r {
             Err(CacheError::Connection(msg)) => assert!(msg.contains("unset")),
             Err(_) => panic!("expected Connection error"),

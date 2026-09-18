@@ -103,12 +103,8 @@ impl Consumer {
     pub const COUNT: usize = 4;
 
     /// 全部 4 个 Consumer
-    pub const ALL: [Consumer; Self::COUNT] = [
-        Self::Graph,
-        Self::Ui,
-        Self::Risk,
-        Self::Notification,
-    ];
+    pub const ALL: [Consumer; Self::COUNT] =
+        [Self::Graph, Self::Ui, Self::Risk, Self::Notification];
 }
 
 /// EventConsumer — 处理单条 event 的回调 (P2 落点实装)
@@ -153,7 +149,10 @@ mod tests {
 
         // 4 消费者 Group name 唯一
         let names: Vec<&str> = Consumer::ALL.iter().map(|c| c.group_name()).collect();
-        assert_eq!(names.iter().collect::<std::collections::HashSet<_>>().len(), 4);
+        assert_eq!(
+            names.iter().collect::<std::collections::HashSet<_>>().len(),
+            4
+        );
 
         // Graph 关注全部 15 个
         assert_eq!(Consumer::Graph.interested_kinds().len(), 15);

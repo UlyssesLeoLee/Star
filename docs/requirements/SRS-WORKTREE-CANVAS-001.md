@@ -40,7 +40,8 @@
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
-| v1.0 | 2026-09-15 JST | Ulysses — Mavis 接手 (per 守门 #14 v3) | 初版落档, 13 段 (文档信息/目的/用语/前提/业务需求/约束/场景/数据/接口/验收/风险/签字/修订), 96 项需求 (FR-WT-001..038 + FR-UI-001..014 + FR-GRAPH-001..012 + FR-RISK-001..011 + FR-AGENT-001..008 + FR-EXPLAIN-001..004 + FR-SEARCH-001..006 + FR-ACTION-001..010 + NFR 23 项), 39 用户故事 (≥ 39 满足), 13 已知缺口, 5 个视图模式 + 6 级 Semantic Zoom + 7 状态机 + 11 风险类型 + 5 层 Canvas 性能策略 | 2026-09-15 Multica ULYS-57 issue 创建者发令 |
+| v1.0 | 2026-09-15 JST | Ulysses — Mavis 接手 (per 守门 #14 v3) | 初版落档, 13 段 (文档信息/目的/用语/前提/业务需求/约束/场景/数据/接口/验收/风险/签字/修订), **126 唯一 ID** (103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID), 39 用户故事 (≥ 39 满足), 13 已知缺口, 5 个视图模式 + 6 级 Semantic Zoom + 7 状态机 + 11 风险类型 + 5 层 Canvas 性能策略 | 2026-09-15 Multica ULYS-57 issue 创建者发令 |
+| v1.1 | 2026-09-17 JST | Ulysses — Mavis 接手 (per 守门 #14 v3, self-review C-01..C-04 修正) | 修正: 4 文档总数对齐 **126 唯一 ID**; FR-ACTION-002 Merge 改 Destructive (per self-review C-02); Trace §11 AC 43 项全表化 (per self-review C-03); BD §0.3/§37 总数同步 (per self-review C-04) | 2026-09-17 ULYS-62 self-review 修正落地 |
 
 ### 0.3 撤回记录 (per 守门 #1 禁回溯叙事)
 
@@ -74,7 +75,7 @@
 14. **事件总线** — 15 个事件, 4 类消费者
 15. **MVP 范围** — 5 Node / 7 State / 4 Edge / 8 Action (per 28 节)
 
-**总需求数**: **96 项** (FR-WT 38 + FR-UI 14 + FR-GRAPH 12 + FR-RISK 11 + FR-AGENT 8 + FR-EXPLAIN 4 + FR-SEARCH 6 + FR-ACTION 10 = FR 103, **待 self-review 校核**; NFR 23 项)。
+**总需求数**: **126 唯一 ID** (FR 103 + NFR 23 子段, 去重后 21 唯一 NFR ID)。FR 详细: FR-WT 38 + FR-UI 14 + FR-GRAPH 12 + FR-RISK 11 + FR-AGENT 8 + FR-EXPLAIN 4 + FR-SEARCH 6 + FR-ACTION 10 = **103 FR ID**; NFR §4.9.x 子段 23 (去重后 21 唯一 ID)。
 
 本 SRS 是 P3-D 阶段 "Worktree 页面文档化" 的主册产物, 跟 `BD-WORKTREE-CANVAS-001.md` v1.0 + `DD-WORKTREE-CANVAS-001.md` v1.0 + `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 共同构成 ULYS-57 issue 4 份文档。
 
@@ -1342,7 +1343,7 @@
 | 项 | 内容 |
 |---|---|
 | ID | FR-ACTION-002 |
-| 描述 | 系统应把 18 Action 分类为 Safe (5 项: Open / Open in IDE / Compare / Focus / Explain Risk) / Warning (8 项: Sync Main / Rebase / Merge / Create PR / Lock / Unlock / Archive / Mark Superseded / Set Dependency / Remove Dependency) / Destructive (4 项: Delete / Cleanup / Force Merge / Force Rebase) |
+| 描述 | 系统应把 18 Action 分类为 Safe (6 项: Create / Open / Open in IDE / Compare / Focus / Explain Risk) / Warning (6 项: Sync Main / Rebase / Create PR / Lock / Unlock / Archive) / Destructive (6 项: **Merge** / Mark Superseded / Set Dependency / Remove Dependency / Delete / Cleanup) — per FR-WT-035 v1.1 Merge 改 Destructive (self-review C-02, 2026-09-17 JST); Force 修饰 (Force Merge / Force Rebase / Force Delete) 不计入 18 项 (作为 Force 修饰的子操作, 走 Destructive 流程) |
 | 输入 | Action |
 | 输出 | Classification |
 | 业务规则 | §二十二 + BR-13 |
@@ -2117,7 +2118,8 @@ Graph Delta + Git Diff + Risk Engine Output
 
 | 版本 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|
-| v1.0 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版, 15 段 (文档信息/目的/用语/前提/业务需求/约束/场景/数据/接口/状态/卡片/AI/验收/风险/签字), 96 项需求 (FR-WT 38 + FR-UI 14 + FR-GRAPH 12 + FR-RISK 11 + FR-AGENT 8 + FR-EXPLAIN 4 + FR-SEARCH 6 + FR-ACTION 10 + NFR 23), 39 用户故事 (≥ 39 满足), 13 已知缺口, 5 视图模式 + 6 级 Semantic Zoom + 7 状态机 + 11 风险类型 + 5 层性能策略 + 14 模块 + 18 Action | 2026-09-15 Multica ULYS-57 issue 创建者发令 |
+| v1.0 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版, 15 段 (文档信息/目的/用语/前提/业务需求/约束/场景/数据/接口/状态/卡片/AI/验收/风险/签字), **126 唯一 ID** (FR 103 + NFR 23 子段, 去重后 21 唯一 NFR ID), 39 用户故事 (≥ 39 满足), 13 已知缺口, 5 视图模式 + 6 级 Semantic Zoom + 7 状态机 + 11 风险类型 + 5 层性能策略 + 14 模块 + 18 Action | 2026-09-15 Multica ULYS-57 issue 创建者发令 |
+| v1.1 | Ulysses — Mavis 接手 (per 守门 #14 v3, self-review C-01..C-04 修正) | 修正: §0 总数对齐 126; §1.1 总数对齐 126; FR-ACTION-002 Merge 改 Destructive (per C-02); Trace §11 AC 43 项全表化 (per C-03); BD §0.3/§37 总数同步 (per C-04) | 2026-09-17 ULYS-62 self-review 修正落地 |
 
 ---
 
@@ -2244,7 +2246,7 @@ Graph Delta + Git Diff + Risk Engine Output
 | NFR-THEME-001 | 主题 | BD §34 / DD §29 | AC-Q-3 | P0 |
 | NFR-KEYB-001 | 键盘 | BD §34 / DD §30 | AC-Q-8 | P0 |
 
-(共 **115 项**, per §一 总需求数 96 + 23 NFR = 119, 此表覆盖 **100%**, 自审校核)
+(共 **126 唯一 ID** (103 FR + 23 NFR 子段 = 126 行计数), per §一 总需求数, 此表覆盖 **100%** (126/126 唯一 ID = 100%), 自审校核)
 
 ---
 
@@ -2268,7 +2270,7 @@ Graph Delta + Git Diff + Risk Engine Output
 - ✅ §13 已知风险 — 完整 (13 缺口 + DDD Review 必查 4 项)
 - ✅ §14 签字栏 — 完整 (5 角色)
 - ✅ §15 修订历史 — 完整 (1 行 v1.0)
-- ✅ 附录 A 需求追踪矩阵 — 完整 (115 项 100% 覆盖)
+- ✅ 附录 A 需求追踪矩阵 — 完整 (126 唯一 ID 100% 覆盖, v1.1 self-review C-01 修正)
 - ✅ 附录 B Self Review — 本段
 
 ### B.2 Consistency (一致性, 跨段术语)
@@ -2286,7 +2288,7 @@ Graph Delta + Git Diff + Risk Engine Output
 
 ### B.3 Traceability (可追踪性)
 
-- ✅ 115 项需求 → 附录 A 追踪矩阵 100% 覆盖
+- ✅ **126 唯一 ID** (103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID) → 附录 A 追踪矩阵 100% 覆盖 (v1.1 self-review C-01 修正)
 - ✅ 每项需求 → BD / DD 章节映射 → AC 验收 → 测试目标 完整闭环
 - ✅ 业务规则 20 项 (BR-1..20) 在 §3.3 集中定义, §4 / §7 / §9 引用
 

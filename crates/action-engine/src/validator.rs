@@ -10,7 +10,10 @@ use crate::error::ActionError;
 use crate::rbac::{require_confirm_or_die, require_permission, User};
 
 /// 校验入口 (RBAC + Confirm), 业务前置条件由具体 Action `validate` 做
-pub fn validate_request(user: &User, request: &crate::action::ActionRequest) -> Result<(), ActionError> {
+pub fn validate_request(
+    user: &User,
+    request: &crate::action::ActionRequest,
+) -> Result<(), ActionError> {
     require_permission(user, request.action_type)?;
     require_confirm_or_die(request.action_type, request.confirm)?;
     Ok(())
@@ -40,7 +43,9 @@ pub fn check_not_locked(worktree_id: uuid::Uuid, locked: bool) -> Result<(), Act
 }
 
 /// 校验 Worktree 未已合并 (per DD §18.2 — 重复 Merge 拒绝)
-pub fn check_not_merged(merged_at: Option<chrono::DateTime<chrono::Utc>>) -> Result<(), ActionError> {
+pub fn check_not_merged(
+    merged_at: Option<chrono::DateTime<chrono::Utc>>,
+) -> Result<(), ActionError> {
     if merged_at.is_some() {
         Err(ActionError::not_ready("worktree is already merged"))
     } else {

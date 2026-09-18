@@ -129,7 +129,10 @@ impl CanvasRenderer for StandardCanvasRenderer {
         if !LodSelector::is_node_kind_in_lod(kind, self.state.lod) {
             return Err(CanvasError::new(
                 "LOD_INVALID",
-                format!("node kind {:?} not visible at LOD {:?}", kind, self.state.lod),
+                format!(
+                    "node kind {:?} not visible at LOD {:?}",
+                    kind, self.state.lod
+                ),
             ));
         }
         // viewport virtualization
