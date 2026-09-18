@@ -183,7 +183,10 @@ mod tests {
         assert!(query.params.contains_key("behind_2"));
         assert!(query.params.contains_key("health_3"));
         assert!(query.params.contains_key("modified_4"));
-        assert_eq!(query.params.get("agent_1").unwrap(), &serde_json::json!("codex"));
+        assert_eq!(
+            query.params.get("agent_1").unwrap(),
+            &serde_json::json!("codex")
+        );
         assert_eq!(
             query.params.get("behind_2").unwrap(),
             &serde_json::json!(20)

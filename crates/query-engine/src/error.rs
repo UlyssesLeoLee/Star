@@ -82,11 +82,7 @@ impl QueryError {
 
     /// DSL parse 失败
     pub fn dsl_parse(input: &str, e: impl fmt::Display) -> Self {
-        Self::new(
-            "DSL_PARSE_ERROR",
-            format!("failed to parse DSL: {input}"),
-        )
-        .with_source(e)
+        Self::new("DSL_PARSE_ERROR", format!("failed to parse DSL: {input}")).with_source(e)
     }
 
     /// NL 翻译失败

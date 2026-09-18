@@ -140,9 +140,6 @@ mod tests {
             ShowValue::Conflict.to_human_state(),
             Some(HumanState::Conflict)
         );
-        assert_eq!(
-            ShowValue::Unmerged.to_human_state(),
-            None
-        );
+        assert_eq!(ShowValue::Unmerged.to_human_state(), None);
     }
 }

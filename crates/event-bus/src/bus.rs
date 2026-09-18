@@ -69,11 +69,8 @@ impl EventEnvelope {
 #[async_trait]
 pub trait BusBackend: Send + Sync {
     /// Publish
-    async fn publish(
-        &self,
-        stream: &str,
-        envelope: EventEnvelope,
-    ) -> Result<String, EventBusError>;
+    async fn publish(&self, stream: &str, envelope: EventEnvelope)
+        -> Result<String, EventBusError>;
 
     /// Consume (XREADGROUP equivalent)
     async fn consume(
@@ -147,7 +144,9 @@ impl InMemoryBus {
     /// Consumer group 注册 (初始化 offset = 0)
     pub fn register_group(&self, stream: &str, group: &str) {
         let mut g = self.inner.lock().expect("BusInner lock");
-        g.groups.entry((stream.to_string(), group.to_string())).or_insert(0);
+        g.groups
+            .entry((stream.to_string(), group.to_string()))
+            .or_insert(0);
     }
 }
 
@@ -163,7 +162,10 @@ impl BusBackend for InMemoryBus {
             .inner
             .lock()
             .map_err(|e| EventBusError::publish_failed(stream, e))?;
-        g.streams.entry(stream.to_string()).or_default().push(envelope);
+        g.streams
+            .entry(stream.to_string())
+            .or_default()
+            .push(envelope);
         Ok(event_id)
     }
 
@@ -187,8 +189,10 @@ impl BusBackend for InMemoryBus {
         // 取 [offset, offset + max)
         let batch: Vec<EventEnvelope> = events.iter().skip(offset).take(max).cloned().collect();
         // 推进 offset
-        g.groups
-            .insert((stream.to_string(), group.to_string()), offset + batch.len());
+        g.groups.insert(
+            (stream.to_string(), group.to_string()),
+            offset + batch.len(),
+        );
         Ok(batch)
     }
 
@@ -293,7 +297,12 @@ impl<B: BusBackend + 'static> EventBus<B> {
     }
 
     /// ACK
-    pub async fn ack(&self, stream: &str, group: &str, event_id: &str) -> Result<(), EventBusError> {
+    pub async fn ack(
+        &self,
+        stream: &str,
+        group: &str,
+        event_id: &str,
+    ) -> Result<(), EventBusError> {
         self.backend.ack(stream, group, event_id).await
     }
 
@@ -339,8 +348,8 @@ impl<B: BusBackend + 'static> Subscription<B> {
         let mut sent = 0;
         for e in envelopes {
             // 过滤 kinds
-            let kind_matches = self.kinds.is_empty()
-                || self.kinds.iter().any(|k| k.name() == e.kind);
+            let kind_matches =
+                self.kinds.is_empty() || self.kinds.iter().any(|k| k.name() == e.kind);
             if !kind_matches {
                 continue;
             }
@@ -391,9 +400,7 @@ mod tests {
         // 发布 5 个事件
         for _ in 0..5 {
             bus.publish(CanvasEvent::WorktreeDeleted {
-                payload: WorktreeDeletedPayload {
-                    id: Uuid::new_v4(),
-                },
+                payload: WorktreeDeletedPayload { id: Uuid::new_v4() },
             })
             .await
             .unwrap();
@@ -403,24 +410,15 @@ mod tests {
         backend.register_group(DEFAULT_STREAM_KEY, "ui");
 
         // 第一次 consume (max=3) — 应拿 3 个
-        let batch1 = bus
-            .consume(DEFAULT_STREAM_KEY, "ui", 3, 0)
-            .await
-            .unwrap();
+        let batch1 = bus.consume(DEFAULT_STREAM_KEY, "ui", 3, 0).await.unwrap();
         assert_eq!(batch1.len(), 3);
 
         // 第二次 consume — 拿剩余 2 个
-        let batch2 = bus
-            .consume(DEFAULT_STREAM_KEY, "ui", 10, 0)
-            .await
-            .unwrap();
+        let batch2 = bus.consume(DEFAULT_STREAM_KEY, "ui", 10, 0).await.unwrap();
         assert_eq!(batch2.len(), 2);
 
         // 第三次 — 0 个
-        let batch3 = bus
-            .consume(DEFAULT_STREAM_KEY, "ui", 10, 0)
-            .await
-            .unwrap();
+        let batch3 = bus.consume(DEFAULT_STREAM_KEY, "ui", 10, 0).await.unwrap();
         assert_eq!(batch3.len(), 0);
     }
 
@@ -432,16 +430,12 @@ mod tests {
 
         // 混合发布 3 个事件
         bus.publish(CanvasEvent::WorktreeCreated {
-            payload: WorktreeDeletedPayload {
-                id: Uuid::new_v4(),
-            },
+            payload: WorktreeDeletedPayload { id: Uuid::new_v4() },
         })
         .await
         .unwrap();
         bus.publish(CanvasEvent::WorktreeDeleted {
-            payload: WorktreeDeletedPayload {
-                id: Uuid::new_v4(),
-            },
+            payload: WorktreeDeletedPayload { id: Uuid::new_v4() },
         })
         .await
         .unwrap();
@@ -455,11 +449,8 @@ mod tests {
         .unwrap();
 
         // 订阅 Merged only
-        let (mut sub, _rx) = bus.subscribe(
-            DEFAULT_STREAM_KEY,
-            "ui",
-            vec![EventKind::WorktreeMerged],
-        );
+        let (mut sub, _rx) =
+            bus.subscribe(DEFAULT_STREAM_KEY, "ui", vec![EventKind::WorktreeMerged]);
         let sent = sub.poll_once().await.unwrap();
         assert_eq!(sent, 1); // 只有 WorktreeMerged 通过
     }

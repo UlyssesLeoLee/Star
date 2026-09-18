@@ -11,7 +11,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-#[allow(unused_imports)] // ActionClass 仅在 tests mod `ActionType::X => ActionClass::Y` 路径使用; clippy lib profile 误报 (qualified path 不被识别为 import use)
+#[allow(unused_imports)]
+// ActionClass 仅在 tests mod `ActionType::X => ActionClass::Y` 路径使用; clippy lib profile 误报 (qualified path 不被识别为 import use)
 use crate::action::{
     default_metadata, Action, ActionClass, ActionMetadata, ActionRequest, ActionResult, ActionType,
 };
@@ -19,7 +20,8 @@ use crate::audit_writer::AuditWriter;
 use crate::error::ActionError;
 use crate::idempotency::{IdempotencyRecord, IdempotencyStore};
 use crate::rbac::{require_confirm_or_die, require_permission, Role, User};
-#[allow(unused_imports)] // Uuid 在 `pub async fn dispatch(..., idempotency_key: Uuid, ...)` 签名中使用; clippy lib profile 误报
+#[allow(unused_imports)]
+// Uuid 在 `pub async fn dispatch(..., idempotency_key: Uuid, ...)` 签名中使用; clippy lib profile 误报
 use uuid::Uuid;
 
 /// Action Registry — 18 Action 注册表 (per INV-WC-09)
@@ -180,11 +182,9 @@ impl ActionEngine {
     ) -> Result<ActionResult, ActionError> {
         // 1. Idempotency check
         if let Some(replay) = self.idempotency.check(idempotency_key) {
-            let result: ActionResult =
-                serde_json::from_value(replay.result).map_err(|e| {
-                    ActionError::new("ACTION.IDEMPOTENCY_REPLAY", "replay deser failed")
-                        .with_source(e)
-                })?;
+            let result: ActionResult = serde_json::from_value(replay.result).map_err(|e| {
+                ActionError::new("ACTION.IDEMPOTENCY_REPLAY", "replay deser failed").with_source(e)
+            })?;
             return Ok(result);
         }
 
@@ -231,10 +231,7 @@ impl ActionEngine {
     ///
     /// 真实实现 (Merge / Delete / SyncMain 等) 在 P2 / ULYS-57.4 BFF 落点,
     /// 本期仅返回 success + 默认 new_state。
-    async fn execute_stub(
-        &self,
-        request: &ActionRequest,
-    ) -> Result<ActionResult, ActionError> {
+    async fn execute_stub(&self, request: &ActionRequest) -> Result<ActionResult, ActionError> {
         // ActionClass 取 metadata, 不强制要求 impl 存在 (P2)
         let _ = self
             .registry

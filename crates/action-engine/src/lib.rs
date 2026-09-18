@@ -35,8 +35,8 @@ pub mod danger;
 pub mod engine;
 pub mod error;
 pub mod idempotency;
-pub mod retry;
 pub mod rbac;
+pub mod retry;
 pub mod validator;
 
 pub use action::{

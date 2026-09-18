@@ -27,7 +27,12 @@ pub struct Viewport {
 impl Viewport {
     /// 构造新视口
     pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
-        Self { x, y, width, height }
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     /// 视口是否有效 (width/height > 0)
@@ -182,7 +187,11 @@ mod tests {
         assert_eq!(report.total, 1000);
         // 网格 6000×1600 (50*120 x 20*80), viewport 1920x1080 + margin
         // viewport + margin = 2320x1480 → cols ≈ 19, rows ≈ 18 ≈ 342 nodes
-        assert!(report.rendered < 600, "expected < 600, got {}", report.rendered);
+        assert!(
+            report.rendered < 600,
+            "expected < 600, got {}",
+            report.rendered
+        );
         assert!(
             report.ratio < 0.6,
             "expected < 60% ratio, got {:.2}",

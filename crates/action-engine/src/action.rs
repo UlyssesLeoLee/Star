@@ -230,14 +230,24 @@ pub fn default_metadata(action_type: ActionType) -> ActionMetadata {
         Archive => (Warning, "Archive (not delete)", true, true),
         MarkSuperseded => (Warning, "Mark Worktree as Superseded", true, true),
         // Destructive
-        Delete => (Destructive, "git worktree remove + branch delete", true, false),
+        Delete => (
+            Destructive,
+            "git worktree remove + branch delete",
+            true,
+            false,
+        ),
         Cleanup => (Destructive, "Batch delete STALE Worktrees", true, false),
         ForceMerge => (Destructive, "Merge ignoring conflicts", true, false),
         ForceRebase => (Destructive, "Rebase dropping commits", true, false),
         ForceDelete => (Destructive, "Delete without confirmation", true, false),
         // per spec §4.4 自审修正: Warning → Destructive
         Merge => (Destructive, "Merge Worktree into main", true, false),
-        RemoveDependency => (Destructive, "Remove DEPENDS_ON Edge (irreversible)", true, false),
+        RemoveDependency => (
+            Destructive,
+            "Remove DEPENDS_ON Edge (irreversible)",
+            true,
+            false,
+        ),
     };
     ActionMetadata {
         action_type,

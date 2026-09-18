@@ -12,7 +12,14 @@ pub fn bezier_path(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
     let dx = x2 - x1;
     format!(
         "M {} {} C {} {} {} {} {} {}",
-        x1, y1, x1 + dx * 0.25, y1, x2 - dx * 0.25, y2, x2, y2,
+        x1,
+        y1,
+        x1 + dx * 0.25,
+        y1,
+        x2 - dx * 0.25,
+        y2,
+        x2,
+        y2,
     )
 }
 

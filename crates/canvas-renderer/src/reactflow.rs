@@ -157,12 +157,7 @@ impl ReactFlowAdapter {
     }
 
     /// 构造 edge (source → target)
-    pub fn build_edge(
-        &self,
-        source: WorktreeId,
-        target: WorktreeId,
-        kind: &str,
-    ) -> ReactFlowEdge {
+    pub fn build_edge(&self, source: WorktreeId, target: WorktreeId, kind: &str) -> ReactFlowEdge {
         ReactFlowEdge {
             id: format!("{}->{}", source, target),
             source: source.to_string(),
@@ -179,11 +174,8 @@ impl ReactFlowAdapter {
     /// - `REACTFLOW_SERIALIZE` — serde_json error
     pub fn to_json(&self, spec: &ReactFlowSpec) -> Result<String, CanvasError> {
         serde_json::to_string(spec).map_err(|e| {
-            CanvasError::new(
-                "REACTFLOW_SERIALIZE",
-                "failed to serialize ReactFlowSpec",
-            )
-            .with_source(e)
+            CanvasError::new("REACTFLOW_SERIALIZE", "failed to serialize ReactFlowSpec")
+                .with_source(e)
         })
     }
 }

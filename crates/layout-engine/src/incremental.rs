@@ -5,7 +5,8 @@
 //! 守门 UT-3 (T10): `layout_incremental_update_60fps`
 
 use crate::bezier::bezier_path;
-#[allow(unused_imports)] // EdgePath 仅在 tests mod 使用 (lib incremental_update 流程不直接引用 EdgePath struct)
+#[allow(unused_imports)]
+// EdgePath 仅在 tests mod 使用 (lib incremental_update 流程不直接引用 EdgePath struct)
 use crate::engine::{EdgePath, LayoutOutput, NodePosition};
 
 /// 应用 changes 到 existing layout (per DD §31)
@@ -15,10 +16,7 @@ use crate::engine::{EdgePath, LayoutOutput, NodePosition};
 /// - Edge path 重新计算 (基于新位置)
 ///
 /// 时间复杂度 O(N + E), 全量 layout 是 O(N²).
-pub fn update_incremental(
-    mut existing: LayoutOutput,
-    changes: Vec<NodePosition>,
-) -> LayoutOutput {
+pub fn update_incremental(mut existing: LayoutOutput, changes: Vec<NodePosition>) -> LayoutOutput {
     for change in changes {
         if let Some(node) = existing.nodes.iter_mut().find(|n| n.id == change.id) {
             node.x = change.x;
@@ -114,8 +112,14 @@ mod tests {
         assert_eq!(n500.y, 444.0);
 
         // 受影响的 edge (n-499→n-500 和 n-500→n-501) path 重算
-        assert!(updated.edges.iter().any(|e| e.from == "n-499" && e.to == "n-500"));
-        assert!(updated.edges.iter().any(|e| e.from == "n-500" && e.to == "n-501"));
+        assert!(updated
+            .edges
+            .iter()
+            .any(|e| e.from == "n-499" && e.to == "n-500"));
+        assert!(updated
+            .edges
+            .iter()
+            .any(|e| e.from == "n-500" && e.to == "n-501"));
 
         // 性能粗略: 1 个 change + 1000 节点应在 < 100ms 完成 (60fps = 16ms, 但本 UT 不强求 16ms)
         assert!(elapsed_ms < 100, "incremental too slow: {elapsed_ms} ms");
