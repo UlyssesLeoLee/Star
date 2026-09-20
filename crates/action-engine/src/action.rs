@@ -235,6 +235,10 @@ pub fn default_metadata(action_type: ActionType) -> ActionMetadata {
         Focus => (Safe, "Enter Focus Mode", false, true),
         ExplainRisk => (Safe, "AI Explanation (read-only)", false, true),
         ListEvents => (Safe, "List events for Worktree", false, true),
+        // AI Actions (W4.2: Safe class, read-only by default)
+        AiChat => (Safe, "AI chat stream (per W3.2 SSE handler)", false, true),
+        AiCompletion => (Safe, "AI inline code completion (per W2.3)", false, true),
+        AiComposerEdit => (Safe, "AI composer edit (per W3.5)", false, true),
         // Warning
         SyncMain => (Warning, "git fetch + rebase onto main", true, true),
         Rebase => (Warning, "git rebase onto target branch", true, true),
@@ -277,8 +281,8 @@ mod tests {
     #[test]
     fn action_18_types_register_correctly() {
         // 守门 UT-1: 18 Action 全枚举可达
-        assert_eq!(ActionType::COUNT, 18);
-        assert_eq!(ActionType::ALL.len(), 18);
+        assert_eq!(ActionType::COUNT, 21);
+        assert_eq!(ActionType::ALL.len(), 21);
         // 每项 metadata 可取
         for at in ActionType::ALL.iter().copied() {
             let m = default_metadata(at);
@@ -299,7 +303,7 @@ mod tests {
                 );
             }
         }
-        // 计数 (per ULYS-57.3 issue description: Safe 6 + Warning 5 + Destructive 7 = 18)
+        // 计数 (per ULYS-57.3 + ULYS-98 v1.0.1 AI Actions: Safe 9 + Warning 5 + Destructive 7 = 21)
         let mut safe = 0;
         let mut warning = 0;
         let mut destructive = 0;
@@ -310,10 +314,10 @@ mod tests {
                 ActionClass::Destructive => destructive += 1,
             }
         }
-        assert_eq!(safe, 6);
+        assert_eq!(safe, 9);
         assert_eq!(warning, 5);
         assert_eq!(destructive, 7);
-        assert_eq!(safe + warning + destructive, 18);
+        assert_eq!(safe + warning + destructive, 21);
     }
 
     #[test]

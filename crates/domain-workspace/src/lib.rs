@@ -788,7 +788,7 @@ impl WorkspaceCommandPort for InMemoryWorkspaceService {
     ) -> Result<(), WorkspaceError> {
         Self::check_tenant(&actor, cmd.tenant_id)?;
         let removed_id = {
-            let mut store = self.members.write().await;
+            let store = self.members.write().await;
             store
                 .iter()
                 .find(|(_, m)| {
