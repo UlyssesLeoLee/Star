@@ -112,7 +112,27 @@ impl LocalRuntime for RealCliRuntime {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .kill_on_drop(true);
+            // FR-ORCA-001 AC-1 (docs/ecosystem-survey/orca-design-survey.md §2.4):
+            // agent CLI 进程不得因宿主进程重启/退出而被终止。kill_on_drop(true) 会在
+            // Child 句柄被 drop 时(含运行时正常关闭路径)对子进程发 SIGKILL,与该要求
+            // 直接冲突,因此关闭 —— 退出仍需由 `cancel()` 显式 kill。
+            .kill_on_drop(false);
+
+        #[cfg(unix)]
+        {
+            // 从父进程的 controlling terminal 信号组分离:父进程收到的 SIGINT/SIGHUP
+            // (终端 Ctrl-C、或父进程所在终端挂断)不会传播给子进程。
+            // pgid=0 等价 setpgid(0, 0)(以子进程自身 pid 作为新 pgid)。
+            cmd.process_group(0);
+        }
+        #[cfg(windows)]
+        {
+            // CREATE_NEW_PROCESS_GROUP (0x00000200,Win32 CreateProcess 标志):
+            // 子进程脱离父进程的 console 进程组,父进程收到的 Ctrl-C / Ctrl-Break
+            // 不会传播给子进程。
+            const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+            cmd.creation_flags(CREATE_NEW_PROCESS_GROUP);
+        }
 
         let mut child = match cmd.spawn() {
             Ok(c) => c,
