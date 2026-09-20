@@ -48,14 +48,22 @@ if [ "$total" -lt 50 ]; then
     echo "  [WARN] fixture count < 50, 缺标"
 fi
 
+# Use a writable temp dir; /tmp may not be mounted in MSYS shells under Multica Hermes
+TMPDIR_LOCAL="${TMPDIR:-${TMP:-${TEMP:-.}}}"
+TMPDIR_LOCAL="$(mkdir -p "$TMPDIR_LOCAL" 2>/dev/null && cd "$TMPDIR_LOCAL" && pwd || echo .)"
+SMOKE_SECRET_OUT="$TMPDIR_LOCAL/smoke_secret.out"
+SMOKE_SECRET_ERR="$TMPDIR_LOCAL/smoke_secret.err"
+SMOKE_JSON_OUT="$TMPDIR_LOCAL/smoke_json.out"
+SMOKE_JSON_ERR="$TMPDIR_LOCAL/smoke_json.err"
+
 # ===== 3. 守门 #5 无 secret 泄露 (Python batch — per ULYS-140 v1.1 加速) =====
 echo ""
 echo "--- 3. 守门 #5 无 secret 泄露 (Python batch) ---"
-if "$PYTHON_CMD" "$LIB_WIN" scan-secret "$MOCK_DATA_WIN" >/tmp/smoke_secret.out 2>/tmp/smoke_secret.err; then
-    grep -E "^TOTAL=|^LEAKS=" /tmp/smoke_secret.out
+if "$PYTHON_CMD" "$LIB_WIN" scan-secret "$MOCK_DATA_WIN" >"$SMOKE_SECRET_OUT" 2>"$SMOKE_SECRET_ERR"; then
+    grep -E "^TOTAL=|^LEAKS=" "$SMOKE_SECRET_OUT"
     echo "  [OK] no secret leak in fixtures"
 else
-    cat /tmp/smoke_secret.err
+    cat "$SMOKE_SECRET_ERR"
     echo "  [FAIL] secret leak detected"
     exit 1
 fi
@@ -63,11 +71,11 @@ fi
 # ===== 4. fixture JSON 格式校验 (Python batch — per ULYS-140 v1.1 加速) =====
 echo ""
 echo "--- 4. fixture JSON 格式校验 (Python batch) ---"
-if "$PYTHON_CMD" "$LIB_WIN" validate-json "$MOCK_DATA_WIN" >/tmp/smoke_json.out 2>/tmp/smoke_json.err; then
-    grep -E "^TOTAL=|^INVALID=" /tmp/smoke_json.out
+if "$PYTHON_CMD" "$LIB_WIN" validate-json "$MOCK_DATA_WIN" >"$SMOKE_JSON_OUT" 2>"$SMOKE_JSON_ERR"; then
+    grep -E "^TOTAL=|^INVALID=" "$SMOKE_JSON_OUT"
     echo "  [OK] all fixtures valid JSON"
 else
-    cat /tmp/smoke_json.err
+    cat "$SMOKE_JSON_ERR"
     echo "  [FAIL] invalid JSON detected"
     exit 1
 fi

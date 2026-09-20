@@ -12,6 +12,11 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 WTM_DIR="$REPO_ROOT/tools/star-flash-mock/mock_data/db-wtm"
 DOC="$REPO_ROOT/docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md"
+# Convert POSIX paths to Windows-style for native python3 (MSYS conversion off,
+# bare /c/Users/... paths not seen by python3.exe on Windows).
+LIB_WIN="$(cygpath -w "$REPO_ROOT/tools/star-flash-mock/scripts/_lib_validate.py" 2>/dev/null || echo "$REPO_ROOT/tools/star-flash-mock/scripts/_lib_validate.py")"
+WTM_DIR_WIN="$(cygpath -w "$WTM_DIR" 2>/dev/null || echo "$WTM_DIR")"
+PYTHON_CMD="${PYTHON:-python3}"
 
 echo "==== DB W/T/M 100% 表覆蓋回归测试 (per 守门 #13 + P5 推進) ===="
 echo "REPO_ROOT: $REPO_ROOT"
@@ -148,22 +153,19 @@ else
     exit 1
 fi
 
-# ===== 8. JSON 格式校验 =====
+# ===== 8. JSON 格式校验 (Python batch helper, 避免 for-loop + python3 -c 走 MSYS path 失败) =====
 echo ""
-echo "--- 8. fixture JSON 格式校验 ---"
-invalid_count=0
-for f in $(find "$WTM_DIR" -name "*.json" 2>/dev/null); do
-    if ! python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
-        echo "  [FAIL] invalid JSON: $f"
-        invalid_count=$((invalid_count + 1))
-    fi
-done
-if [ "$invalid_count" -eq 0 ]; then
-    echo "  [OK] $total 份 fixture 全部有效 JSON"
-else
-    echo "  [FAIL] $invalid_count invalid JSON"
+echo "--- 8. fixture JSON 格式校验 (Python batch helper) ---"
+JSON_OUT=$("$PYTHON_CMD" "$LIB_WIN" validate-json "$WTM_DIR_WIN" 2>&1)
+JSON_TOTAL=$(echo "$JSON_OUT" | grep "^TOTAL=" | cut -d= -f2)
+JSON_INVALID=$(echo "$JSON_OUT" | grep "^INVALID=" | cut -d= -f2)
+echo "  JSON validate: $JSON_TOTAL fixtures, $JSON_INVALID invalid"
+if [ "${JSON_INVALID:-0}" -ne 0 ]; then
+    echo "$JSON_OUT" | grep "^INVALID_FILE=" | head -5
+    echo "  [FAIL] $JSON_INVALID invalid JSON fixtures"
     exit 1
 fi
+echo "  [OK] $JSON_TOTAL 份 fixture 全部有效 JSON"
 
 # ===== 9. 守门 #5 无 secret 泄露 =====
 echo ""
