@@ -23,11 +23,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
-    response::{
-        sse::{Event, KeepAlive, Sse},
-        IntoResponse,
-    },
+    response::sse::{Event, KeepAlive, Sse},
     routing::{get, post},
     Json, Router,
 };
@@ -39,7 +35,7 @@ use thiserror::Error;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use domain_llm::chat::{ChatMessage, ChatRequest, ChatRole};
+use domain_llm::chat::{ChatMessage, ChatRequest};
 use domain_llm::{
     LlmProvider, LlmProviderRegistryError, MeteringStore, ProviderRegistry, TokenUsage,
 };
@@ -258,8 +254,8 @@ async fn chat_send(
         model.clone(),
         // v0.0.2 heuristic: rough char/4 estimate; W3 replaces with
         // provider-reported counts.
-        ((req.content.chars().count() as u32).div_ceil(4)),
-        ((resp.message.content.chars().count() as u32).div_ceil(4)),
+        (req.content.chars().count() as u32).div_ceil(4),
+        (resp.message.content.chars().count() as u32).div_ceil(4),
         Some(resp.id),
     );
     state.metering.record(usage.clone()).await;
@@ -309,6 +305,7 @@ async fn chat_messages(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use domain_llm::chat::ChatRole;
     use domain_llm::provider::mock::MockProvider;
     use domain_llm::MeteringStore;
 
@@ -611,7 +608,7 @@ async fn chat_stream(
     let model_for_record = model.clone();
 
     let sse_stream = async_stream::stream! {
-        let mut total_input: u32 = 0;
+        let total_input: u32 = 0;
         let mut total_output: u32 = 0;
         // v1.0.1 follow-up: ChatChunk 字段实际为 {id, model, role, delta, finish_reason},
         // 无 usage / done 字段 (W3.2 假设错, 修正).
