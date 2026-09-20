@@ -45,6 +45,18 @@ pub mod arg;
 pub mod agent;
 /// canvas-collab API module (per P3-D.6 任务 1.4)
 pub mod canvas_collab;
+// =====================================================================
+// ULYS-98-W1+W2 Star Cursor 极简版 — Chat + Completion + Metering RPC
+// per docs/briefs/ulys-98-star-cursor-min-v1.md §Sub-task 1.3 + 2.2 + 2.5
+// 守门 #1 v25 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 +
+// 守门 #19 v19 累积规不破坏 V0.1 (arg/ agent/ canvas_collab/ 100% 保留)
+// =====================================================================
+/// chat API module (W1 + W2 — Chat RPC stub + DispatchProvider wiring).
+pub mod chat;
+/// completion API module (W2 — inline code completion).
+pub mod completion;
+/// metering API module (W2 — token usage query).
+pub mod metering;
 
 // =====================================================================
 // 实体(Entity / Aggregate Root)
@@ -361,6 +373,31 @@ impl From<infrastructure::InfrastructureError> for ApiError {
             Conflict(msg) => ApiError::conflict(format!("infrastructure conflict: {msg}")),
             Internal(msg) => ApiError::internal(format!("infrastructure: {msg}")),
         }
+    }
+}
+
+// =====================================================================
+// ULYS-98-W2 (Star Cursor 极简版) — IntoResponse impl for top-level
+// `ApiError`. Each submodule (arg/agent/canvas_collab) had its own
+// 6-field `ApiError`; the top-level `ApiError` (lib.rs:159) is the one
+// that W2's chat / completion / metering handlers use. Without this
+// impl, axum's `Handler` bound on those handlers does not match.
+// =====================================================================
+impl axum::response::IntoResponse for ApiError {
+    fn into_response(self) -> axum::response::Response {
+        use axum::http::StatusCode;
+        use axum::Json;
+        let status = match self.code.as_str() {
+            "VALIDATION_FAILED" => StatusCode::BAD_REQUEST,
+            "POLICY_DENIED" => StatusCode::FORBIDDEN,
+            "UNAUTHORIZED" => StatusCode::UNAUTHORIZED,
+            "RESOURCE_NOT_FOUND" => StatusCode::NOT_FOUND,
+            "CONFLICT" => StatusCode::CONFLICT,
+            "LLM_PROVIDER_ERROR" => StatusCode::BAD_GATEWAY,
+            "INTERNAL" => StatusCode::INTERNAL_SERVER_ERROR,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        (status, Json(self)).into_response()
     }
 }
 
