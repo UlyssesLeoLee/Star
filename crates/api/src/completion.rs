@@ -355,3 +355,142 @@ impl From<CompletionInternalError> for ApiError {
         )
     }
 }
+// =====================================================================
+// Composer routes (ULYS-98-W3.4 backend)
+// =====================================================================
+// Per docs/briefs/ulys-98-star-cursor-min-v1.md §"Sub-task 3.4 Composer
+// 多文件 diff RPC" + §"Sub-task 4.2 action-engine 加 3 类 AI Action".
+//
+// v0.0.1 stub: returns 1 stub diff per file. W4.2 wires real LLM dispatch
+// via DispatchProvider + action-engine AiComposerEdit ActionType.
+
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ComposerEditApiRequest {
+    pub files: Vec<ComposerFileApi>,
+    pub instruction: String,
+    pub user_id: Uuid,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub session_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ComposerFileApi {
+    pub path: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FileEditOut {
+    pub path: String,
+    pub diff: String,
+    pub new_content: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ComposerEditApiResponse {
+    pub session_id: Uuid,
+    pub edits: Vec<FileEditOut>,
+    pub model: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ComposerApplyApiRequest {
+    pub session_id: Uuid,
+    pub paths: Vec<String>,
+    #[allow(dead_code)]
+    pub user_id: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ComposerApplyApiResponse {
+    pub applied_paths: Vec<String>,
+    pub skipped_paths: Vec<String>,
+}
+
+/// Append `/v1/composer/edit` + `/v1/composer/apply` routes to an existing
+/// Router (shares ChatState for metering + provider).
+pub fn extend_with_composer(router: Router, state: Arc<ChatState>) -> Router {
+    router
+        .route(
+            "/v1/composer/edit",
+            post(composer_edit_handler).with_state(state.clone()),
+        )
+        .route(
+            "/v1/composer/apply",
+            post(composer_apply_handler).with_state(state.clone()),
+        )
+}
+
+async fn composer_edit_handler(
+    State(state): State<Arc<ChatState>>,
+    Json(req): Json<ComposerEditApiRequest>,
+) -> Result<Json<ComposerEditApiResponse>, ApiError> {
+    if req.files.is_empty() {
+        return Err(ApiError::new(
+            "VALIDATION_FAILED",
+            "composer edit: files must be non-empty",
+            "api",
+            "validation",
+            false,
+            "Provide at least one file in the selection",
+        ));
+    }
+    if req.instruction.trim().is_empty() {
+        return Err(ApiError::new(
+            "VALIDATION_FAILED",
+            "composer edit: instruction must be non-empty",
+            "api",
+            "validation",
+            false,
+            "Provide a non-empty instruction",
+        ));
+    }
+    let session_id = req.session_id.unwrap_or_else(Uuid::new_v4);
+    let model = req
+        .model
+        .unwrap_or_else(|| "claude-3-5-sonnet-20241022".to_string());
+    let edits: Vec<FileEditOut> = req
+        .files
+        .into_iter()
+        .map(|f| FileEditOut {
+            path: f.path,
+            diff: format!("# composer stub (instruction: {})", req.instruction),
+            new_content: f.content,
+        })
+        .collect();
+    let _ = state; // v0.0.1 no-op; W4.2 wires provider + metering
+    Ok(Json(ComposerEditApiResponse {
+        session_id,
+        edits,
+        model,
+    }))
+}
+
+async fn composer_apply_handler(
+    State(state): State<Arc<ChatState>>,
+    Json(req): Json<ComposerApplyApiRequest>,
+) -> Result<Json<ComposerApplyApiResponse>, ApiError> {
+    let _ = state;
+    Ok(Json(ComposerApplyApiResponse {
+        applied_paths: req.paths,
+        skipped_paths: vec![],
+    }))
+}
+
+#[cfg(test)]
+mod composer_tests {
+    use super::*;
+
+    #[test]
+    fn composer_routes_helper_builds_router_without_error() {
+        let _ = extend_with_composer(Router::new(), crate::chat::ChatState::new(
+            Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(),
+            Uuid::parse_str("00000000-0000-0000-0000-000000000099").unwrap(),
+        ));
+    }
+}
