@@ -80,11 +80,19 @@ pub enum ActionType {
     Merge,
     /// Remove DEPENDS_ON Edge (irreversible)
     RemoveDependency,
+
+    // ==== AI (3) -- ULYS-98-W4.2 (per docs/briefs/ulys-98-star-cursor-min-v1.md §Sub-task 4.2) ====
+    /// AI chat completion (per W3.3 useChatStream hook).
+    AiChat,
+    /// AI inline code completion (per W2.3 inlineCompletion.ts).
+    AiCompletion,
+    /// AI multi-file composer diff (per W3.5 ComposerPanel.tsx).
+    AiComposerEdit,
 }
 
 impl ActionType {
     /// 18 Action 总数 (per INV-WC-09 守门)
-    pub const COUNT: usize = 18;
+    pub const COUNT: usize = 21;
 
     /// 全部 18 个 Action (按 enum 顺序)
     pub const ALL: [ActionType; Self::COUNT] = [
@@ -109,6 +117,10 @@ impl ActionType {
         Self::ForceDelete,
         Self::Merge,
         Self::RemoveDependency,
+        // AI (per W4.2)
+        Self::AiChat,
+        Self::AiCompletion,
+        Self::AiComposerEdit,
     ];
 }
 
