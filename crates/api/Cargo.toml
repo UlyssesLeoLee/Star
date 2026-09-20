@@ -48,5 +48,12 @@ domain-llm = { path = "../domain-llm" }
 # 守门 #11 缺标比错标: 0 重复加 axum/tokio/serde/uuid/chrono/async-trait/thiserror/star-context
 domain-agent = { path = "../domain-agent" }
 agent-bridge = { path = "../agent-bridge" }
+# v1.0.1 follow-up: W3.2 SSE handler 缺 futures-util + async-stream 依赖
+# (workspace 未声明, api crate 局部加; v1.0.2 workspace 加)
+futures-util = { version = "0.3", features = ["sink"] }
+async-stream = "0.3"
+[dev-dependencies]
+# v1.0.1 follow-up: SSE IT tests need tower::ServiceExt::oneshot
+tower = { version = "0.5", features = ["util"] }
 [lints]
 workspace = true

@@ -475,7 +475,7 @@ mod tests {
         let bytes = to_bytes(app.into_body(), 1024 * 64).await.unwrap();
         let body_str = String::from_utf8_lossy(&bytes);
         assert!(
-            body_str.contains("data:") && body_str.contains(""done""),
+            body_str.contains("data:") && body_str.contains("\"done\""),
             "expected SSE data frame with done field, got: {}",
             body_str.chars().take(400).collect::<String>(),
         );
@@ -537,17 +537,13 @@ impl From<ChatInternalError> for ApiError {
 /// forwards each [`ChatChunk`] as an `event: data` SSE frame.
 ///
 /// Wire format (per RFC 8895 text/event-stream):
-/// - `data: {"delta":"...","done":false}
-
-`  -- per token chunk
-/// - `data: {"delta":"","done":true,"usage":{...}}
-
-` -- terminal frame
+/// - `data: {\"delta\":\"...\",\"done\":false}\n\n`  -- per token chunk
+/// - `data: {\"delta\":\"\",\"done\":true,\"usage\":{...}}\n\n` -- terminal frame
 async fn chat_stream(
     State(state): State<Arc<ChatState>>,
     Query(q): Query<ChatStreamQuery>,
 ) -> Result<
-    Sse<std::pin::Pin<Box<dyn Stream<Item = Result<Event, Infallible>> + Send>>>,
+    Sse<axum::response::sse::KeepAliveStream<std::pin::Pin<Box<dyn Stream<Item = Result<Event, Infallible>> + Send>>>>,
     ApiError,
 > {
     use futures_util::StreamExt;
@@ -615,25 +611,30 @@ async fn chat_stream(
     let model_for_record = model.clone();
 
     let sse_stream = async_stream::stream! {
-        let mut total_input = 0u32;
-        let mut total_output = 0u32;
+        let mut total_input: u32 = 0;
+        let mut total_output: u32 = 0;
+        // v1.0.1 follow-up: ChatChunk 字段实际为 {id, model, role, delta, finish_reason},
+        // 无 usage / done 字段 (W3.2 假设错, 修正).
+        // done 由 finish_reason.is_some() 推断; usage 由 client 端估算 (per W3 注释).
         let mut provider_stream = provider_stream;
         while let Some(chunk_res) = provider_stream.next().await {
             match chunk_res {
                 Ok(chunk) => {
-                    if let Some(usage) = &chunk.usage {
-                        total_input = usage.input_tokens;
-                        total_output = usage.output_tokens;
+                    let is_terminal = chunk.finish_reason.is_some();
+                    if !chunk.delta.is_empty() {
+                        total_output = total_output.saturating_add(
+                            (chunk.delta.chars().count() as u32).div_ceil(4),
+                        );
                     }
                     let payload = serde_json::json!({
                         "delta": chunk.delta,
-                        "done": chunk.done,
-                        "usage": chunk.usage,
+                        "done": is_terminal,
+                        "finish_reason": chunk.finish_reason,
                     });
                     if let Ok(s) = serde_json::to_string(&payload) {
                         yield Ok(Event::default().data(s));
                     }
-                    if chunk.done {
+                    if is_terminal {
                         let usage = TokenUsage::new(
                             user_id,
                             tenant_id,
