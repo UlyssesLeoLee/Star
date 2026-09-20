@@ -1,5 +1,7 @@
 # STAR-P4-OPT-WBS-001 P4+ 阶段 优化专用 WBS (per 9/7 11:53 JST 用户发令"开子代理全面排查未实现的需求, 制定优化专用 wbs")
 
+> **⚠️ SUPERSEDED per ULYS-105.1 docs-fixup 2026-09-20 07:30 JST**: 本草案 v0.1 已被后续多阶段演进覆盖 (per v0.64 反转 5 域 Lead 真人到位流程永久 obsolete + §14.19 SANDBOX-002 v0.1.3 改造 + §14.20 P3-D.6 7 任务 + 守门 v3x 9 active)。本 banner 仅作历史追溯;新基线请参考 [`STAR-P3-WBS-001.md#15`](STAR-P3-WBS-001.md) 累计统计 v0.66 row + [`STAR-ULYS-105-AGGREGATE-001.md`](STAR-ULYS-105-AGGREGATE-001.md) v0.2 (per ULYS-105.1 docs-fixup 子任务 1.4)。原始 v0.1 内容 0 改动, 仅追加此 banner (per 守门 #1 禁回溯叙事)。
+>
 > **Status**: 🟡 Draft v0.1 (优化专用, 4 子代理 4 维度扫描结果汇总, 待 Ulysses 拍板顺序 / scope / token 分配)
 > **Created**: 2026-09-07 12:00 JST
 > **Authority**: Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手代签 (per 8/27 19:39 JST + 21:59 JST 三次强化 + 9/5 10:43 JST 5 域 Lead 反转)
