@@ -11,13 +11,15 @@ SCENARIOS_DIR="$REPO_ROOT/tools/star-flash-mock/mock_data/uat/scenarios"
 
 # Use py launcher (Windows-compatible, falls back to python3)
 PYTHON_CMD="${PYTHON:-python3}"
+# Convert POSIX path to Windows-style for native python3 (MSYS conversion off)
+SCRIPTS_WIN="$(cygpath -w "$SCRIPTS_DIR" 2>/dev/null || echo "$SCRIPTS_DIR")"
 
-echo "==== UAT 业务场景 26-35 (100% 覆盖 3 类失败/异常) regression test ===="
+echo "==== UAT 业务场景 26-35 (NotImplemented/MCP/TSC/5d-concurrent/Saga/Mavis/Coordination) regression test ===="
 
 # 1. 跑 S26-S35 fixture generator
 echo ""
 echo "--- 跑 S26-S35 _generate_uat_s26_s35.py ---"
-"$PYTHON_CMD" "$SCRIPTS_DIR/_generate_uat_s26_s35.py"
+"$PYTHON_CMD" "$SCRIPTS_WIN/_generate_uat_s26_s35.py"
 
 # 2. 验证 fixture 完整性
 echo ""

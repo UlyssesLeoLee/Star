@@ -63,7 +63,7 @@ else
     exit 1
 fi
 
-# ===== 4. 跨文档引用 + JSON 校验 =====
+# ===== 4. 跨文档引用 + JSON 校验 (Python batch helper, ULYS-140 v1.1 加速) =====
 echo ""
 echo "--- 4. 跨文档引用 + JSON 格式 ---"
 if [ -f "$REPORT" ]; then
@@ -72,18 +72,19 @@ else
     echo "  [WARN] 100% 覆盖率报告 缺失, 缺标"
 fi
 
-invalid_count=0
-for f in $(find "$MCP_DIR" -name "v1--mcp--*.json" 2>/dev/null); do
-    if ! python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
-        echo "  [FAIL] invalid JSON: $f"
-        invalid_count=$((invalid_count + 1))
-    fi
-done
-if [ "$invalid_count" -eq 0 ]; then
-    echo "  [OK] 16 fixture 全部有效 JSON"
-else
+# Convert POSIX paths to Windows-style for native python3
+MCP_DIR_WIN="$(cygpath -w "$MCP_DIR" 2>/dev/null || echo "$MCP_DIR")"
+LIB_WIN="$(cygpath -w "$REPO_ROOT/tools/star-flash-mock/scripts/_lib_validate.py" 2>/dev/null || echo "$REPO_ROOT/tools/star-flash-mock/scripts/_lib_validate.py")"
+JSON_OUT=$("${PYTHON:-python3}" "$LIB_WIN" validate-json "$MCP_DIR_WIN" 2>&1)
+JSON_TOTAL=$(echo "$JSON_OUT" | grep "^TOTAL=" | cut -d= -f2)
+JSON_INVALID=$(echo "$JSON_OUT" | grep "^INVALID=" | cut -d= -f2)
+echo "  JSON validate: $JSON_TOTAL fixtures, $JSON_INVALID invalid"
+if [ "${JSON_INVALID:-0}" -ne 0 ]; then
+    echo "$JSON_OUT" | grep "^INVALID_FILE=" | head -5
+    echo "  [FAIL] $JSON_INVALID invalid JSON fixtures"
     exit 1
 fi
+echo "  [OK] 16 fixture 全部有效 JSON"
 
 echo ""
 echo "==== MCP 16 tool 100% 覆蓋 regression test PASSED ===="
