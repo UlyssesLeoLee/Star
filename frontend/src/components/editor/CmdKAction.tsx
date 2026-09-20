@@ -403,3 +403,54 @@ export type CmdKChildProps = {
   /** Slot for the host editor to render alongside the overlay. */
   children?: ReactNode;
 };
+// =====================================================================
+// ULYS-98-W4.5: Cmd-K multi-iteration upgrade
+// =====================================================================
+// Per docs/briefs/ulys-98-star-cursor-min-v1.md Sub-task 4.5: refine loop.
+// First run produces diff; if user clicks "Refine", prompt re-runs against
+// the previous diff as additional context, producing a new diff. Repeat
+// until user Accepts or cancels.
+
+declare module "./CmdKAction" {
+  export interface CmdKRefineHook {
+    iterations: number;
+    refine: (extraInstruction: string) => Promise<void>;
+    canRefine: boolean;
+    busy: boolean;
+  }
+}
+
+export function makeRefineHook(
+  basePrompt: string,
+  previousDiff: string,
+  apply: (instruction: string) => Promise<void>,
+  busy: boolean,
+): {
+  iterations: number;
+  refine: (extraInstruction: string) => Promise<void>;
+  canRefine: boolean;
+  busy: boolean;
+} {
+  let iterations = 0;
+  return {
+    get iterations() {
+      return iterations;
+    },
+    get canRefine() {
+      return !busy && previousDiff.length > 0 && iterations < 5;
+    },
+    get busy() {
+      return busy;
+    },
+    async refine(extraInstruction: string) {
+      iterations += 1;
+      const composed = [
+        basePrompt,
+        "\n[Refinement iteration " + iterations + "]",
+        "Previous diff:\n" + previousDiff,
+        "\nAdditional instruction:\n" + extraInstruction,
+      ].join("\n");
+      await apply(composed);
+    },
+  };
+}

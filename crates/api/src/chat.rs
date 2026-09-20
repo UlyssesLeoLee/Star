@@ -24,12 +24,17 @@ use std::sync::Arc;
 use axum::{
     extract::{Query, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{
+        sse::{Event, KeepAlive, Sse},
+        IntoResponse,
+    },
     routing::{get, post},
     Json, Router,
 };
 use chrono::{DateTime, Utc};
+use futures_util::stream::Stream;
 use serde::{Deserialize, Serialize};
+use std::convert::Infallible;
 use thiserror::Error;
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -137,6 +142,15 @@ pub struct ChatMessagesQuery {
     pub session_id: Uuid,
 }
 
+/// GET `/v1/chat/stream?session_id=...&content=...` query (W3.2 SSE).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChatStreamQuery {
+    pub session_id: Uuid,
+    pub user_id: Uuid,
+    pub content: String,
+    pub model: Option<String>,
+}
+
 // =====================================================================
 // Response DTOs
 // =====================================================================
@@ -170,6 +184,7 @@ pub fn chat_routes(state: Arc<ChatState>) -> Router {
     Router::new()
         .route("/v1/chat/send", post(chat_send))
         .route("/v1/chat/messages", get(chat_messages))
+        .route("/v1/chat/stream", get(chat_stream))
         .with_state(state)
 }
 
@@ -409,6 +424,63 @@ mod tests {
         assert_eq!(err.code, "RESOURCE_NOT_FOUND");
     }
 
+    /// W3.2 IT: chat_stream rejects empty content with VALIDATION_FAILED.
+    #[tokio::test]
+    async fn chat_stream_handler_rejects_empty_content_with_400() {
+        let state = make_state();
+        let err = chat_stream(
+            State(state),
+            Query(ChatStreamQuery {
+                session_id: Uuid::new_v4(),
+                user_id: user(),
+                content: "   ".to_string(),
+                model: None,
+            }),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.code, "VALIDATION_FAILED");
+    }
+
+    /// W3.2 IT: chat_stream happy path -- mock provider yields 1 chunk + terminal done.
+    /// We assert the SSE stream emits at least one `event: data` payload containing
+    /// `delta` + `done` fields by polling the inner stream via `axum::body::Body`.
+    #[tokio::test]
+    async fn chat_stream_handler_emits_at_least_one_sse_data_frame() {
+        use axum::body::to_bytes;
+        use axum::http::{Request, StatusCode};
+
+        let state = make_state();
+        let router = chat_routes(state);
+        let app = tower::ServiceExt::oneshot(
+            router,
+            Request::builder()
+                .method("GET")
+                .uri("/v1/chat/stream?session_id=11111111-1111-1111-1111-111111111111&user_id=22222222-2222-2222-2222-222222222222&content=hello")
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(app.status(), StatusCode::OK);
+        let ct = app.headers().get("content-type").cloned();
+        assert!(
+            ct.as_ref().and_then(|v| v.to_str().ok()).map(|s| s.starts_with("text/event-stream")).unwrap_or(false),
+            "expected text/event-stream content-type, got {:?}",
+            ct,
+        );
+        // Body may be chunked; we don't require a specific number of bytes
+        // (mock provider emits done:true immediately), only that the body
+        // is non-empty and contains at least one `data:` SSE frame.
+        let bytes = to_bytes(app.into_body(), 1024 * 64).await.unwrap();
+        let body_str = String::from_utf8_lossy(&bytes);
+        assert!(
+            body_str.contains("data:") && body_str.contains(""done""),
+            "expected SSE data frame with done field, got: {}",
+            body_str.chars().take(400).collect::<String>(),
+        );
+    }
+
     #[test]
     fn chat_routes_builds_router_without_error() {
         let state = make_state();
@@ -456,11 +528,141 @@ impl From<ChatInternalError> for ApiError {
     }
 }
 
-/// Sentinel re-export so route handlers compile without unused warnings
-/// when [`axum::response::IntoResponse`] is referenced for future
-/// streaming replies (W3.2).
-#[allow(dead_code)]
-const _: fn() = || {
-    let _: Option<StatusCode> = None;
-    let _: Option<Box<dyn IntoResponse>> = None;
-};
+// =====================================================================
+// SSE handler (ULYS-98-W3 Sub-task 3.2 Chat stream RPC)
+// =====================================================================
+
+/// GET `/v1/chat/stream?session_id=...&content=...` -- Server-Sent Events
+/// streaming chat reply. Calls `LlmProvider::stream_completion` and
+/// forwards each [`ChatChunk`] as an `event: data` SSE frame.
+///
+/// Wire format (per RFC 8895 text/event-stream):
+/// - `data: {"delta":"...","done":false}
+
+`  -- per token chunk
+/// - `data: {"delta":"","done":true,"usage":{...}}
+
+` -- terminal frame
+async fn chat_stream(
+    State(state): State<Arc<ChatState>>,
+    Query(q): Query<ChatStreamQuery>,
+) -> Result<
+    Sse<std::pin::Pin<Box<dyn Stream<Item = Result<Event, Infallible>> + Send>>>,
+    ApiError,
+> {
+    use futures_util::StreamExt;
+
+    if q.content.trim().is_empty() {
+        return Err(ApiError::new(
+            "VALIDATION_FAILED",
+            "chat stream: content must be non-empty",
+            "api",
+            "validation",
+            false,
+            "Provide a non-empty content field",
+        ));
+    }
+
+    let mut sessions = state.sessions.lock().await;
+    let now = Utc::now();
+    let session = sessions.entry(q.session_id).or_insert_with(|| ChatSession {
+        id: q.session_id,
+        user_id: q.user_id,
+        messages: Vec::new(),
+        created_at: now,
+        updated_at: now,
+    });
+    session.messages.push(ChatMessage::user(q.content.clone()));
+    session.updated_at = now;
+    drop(sessions);
+
+    let model = q
+        .model
+        .clone()
+        .unwrap_or_else(|| "claude-3-5-sonnet-20241022".to_string());
+    let chat_req = ChatRequest {
+        model: model.clone(),
+        messages: state
+            .sessions
+            .lock()
+            .await
+            .get(&q.session_id)
+            .map(|s| s.messages.clone())
+            .unwrap_or_default(),
+        temperature: None,
+        max_tokens: Some(1024),
+        request_id: Some(Uuid::new_v4()),
+    };
+
+    let provider_stream = state
+        .provider
+        .stream_completion(chat_req)
+        .await
+        .map_err(|e| {
+            ApiError::new(
+                "LLM_PROVIDER_ERROR",
+                format!("chat stream: provider dispatch failed: {e}"),
+                "api",
+                "external",
+                true,
+                "Retry the request; check provider health if persistent",
+            )
+        })?;
+
+    let user_id = q.user_id;
+    let metering = state.metering.clone();
+    let tenant_id = state.tenant_id;
+    let model_for_record = model.clone();
+
+    let sse_stream = async_stream::stream! {
+        let mut total_input = 0u32;
+        let mut total_output = 0u32;
+        let mut provider_stream = provider_stream;
+        while let Some(chunk_res) = provider_stream.next().await {
+            match chunk_res {
+                Ok(chunk) => {
+                    if let Some(usage) = &chunk.usage {
+                        total_input = usage.input_tokens;
+                        total_output = usage.output_tokens;
+                    }
+                    let payload = serde_json::json!({
+                        "delta": chunk.delta,
+                        "done": chunk.done,
+                        "usage": chunk.usage,
+                    });
+                    if let Ok(s) = serde_json::to_string(&payload) {
+                        yield Ok(Event::default().data(s));
+                    }
+                    if chunk.done {
+                        let usage = TokenUsage::new(
+                            user_id,
+                            tenant_id,
+                            model_for_record.clone(),
+                            model_for_record.clone(),
+                            total_input,
+                            total_output,
+                            None,
+                        );
+                        metering.record(usage).await;
+                        break;
+                    }
+                }
+                Err(e) => {
+                    let payload = serde_json::json!({
+                        "delta": "",
+                        "done": true,
+                        "error": format!("{e}"),
+                    });
+                    if let Ok(s) = serde_json::to_string(&payload) {
+                        yield Ok(Event::default().data(s));
+                    }
+                    break;
+                }
+            }
+        }
+    };
+
+    let pinned: std::pin::Pin<Box<dyn Stream<Item = Result<Event, Infallible>> + Send>> =
+        Box::pin(sse_stream);
+    Ok(Sse::new(pinned).keep_alive(KeepAlive::new().interval(std::time::Duration::from_secs(15))))
+}
