@@ -29,9 +29,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use domain_llm::chat::{ChatMessage, ChatRequest, ChatRole};
-use domain_llm::{
-    LlmProvider, LlmProviderRegistryError, MeteringStore, TokenUsage,
-};
+use domain_llm::TokenUsage;
 
 use super::chat::ChatState;
 use crate::ApiError;
@@ -232,6 +230,7 @@ async fn completion_inline(
 mod tests {
     use super::*;
     use domain_llm::provider::mock::MockProvider;
+    use domain_llm::{LlmProvider, MeteringStore};
 
     fn tenant() -> Uuid {
         Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()
@@ -363,9 +362,6 @@ impl From<CompletionInternalError> for ApiError {
 //
 // v0.0.1 stub: returns 1 stub diff per file. W4.2 wires real LLM dispatch
 // via DispatchProvider + action-engine AiComposerEdit ActionType.
-
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ComposerEditApiRequest {

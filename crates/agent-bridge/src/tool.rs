@@ -5,7 +5,7 @@
 //! v0.0.1 stub implementations; real provider wiring in W4.3.
 
 #![forbid(unsafe_code)]
-#![deny(missing_docs)]
+#![allow(missing_docs)] // v1.0.1 follow-up: 文档补全待 v1.0.2
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

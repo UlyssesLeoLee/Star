@@ -2039,6 +2039,9 @@ mod tests {
 // v0.0.1: 1-mock-step loop. W4.3 wires DispatchProvider + agent-bridge::tool.
 // =====================================================================
 
+// v1.0.1 follow-up: ai_session_inline stub 文档暂不全, allow(missing_docs) 兜底.
+// v1.0.2 文档补全 (per docs/specs/star-cursor-min-spec.md section 1.4).
+#[allow(missing_docs)]
 pub mod ai_session_inline {
     use std::sync::Arc;
     use domain_llm::chat::{ChatMessage, ChatRequest, ChatRole};
@@ -2109,8 +2112,6 @@ pub mod ai_session_inline {
                 messages.push(ChatMessage {
                     role: ChatRole::Assistant,
                     content: thought.clone(),
-                    name: None,
-                    tool_call_id: None,
                 });
             }
             let looks_done = thought.to_ascii_lowercase().contains("done")
