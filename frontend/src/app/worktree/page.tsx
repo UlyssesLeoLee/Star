@@ -10,6 +10,20 @@ import { WORKTREE_SM, type WorktreeStatus } from "@/types/ids";
 import { GitBranch, GitMerge, Lock, Cpu, AlertCircle } from "lucide-react";
 import { clsx } from "clsx";
 import { useTranslation } from "@/lib/i18n";
+import dynamic from "next/dynamic";
+
+// ULYS-98-W1.1 — Monaco editor (loaded client-side only).
+const MonacoEditor = dynamic(
+  () => import("@/components/editor/MonacoEditor").then((m) => m.MonacoEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-32 items-center justify-center text-xs text-ink-mute">
+        Loading editor…
+      </div>
+    ),
+  },
+);
 
 export default function WorktreePage() {
   const { t } = useTranslation();
@@ -126,23 +140,45 @@ export default function WorktreePage() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-line text-[10px] text-ink-mute space-y-1">
-                <div className="flex items-center gap-1.5">
-                  <Lock size={10} /> Optimistic lock via lock_version
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Cpu size={10} /> 1 worktree ↔ 1 active agent session
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <AlertCircle size={10} /> 状态切换会触发 NATS event `star.events.{"{tenant_id}"}.worktree.worktree.*`
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+                              <div className="flex items-center gap-1.5">
+                                <Lock size={10} /> Optimistic lock via lock_version
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <Cpu size={10} /> 1 worktree ↔ 1 active agent session
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <AlertCircle size={10} /> 状态切换会触发 NATS event `star.events.{"{tenant_id}"}.worktree.worktree.*`
+                              </div>
+                            </div>
+
+                            {/* ULYS-98-W1.1 — Monaco editor preview. W1 stub: read-only,
+                                显示 src/lib/store.ts 的 placeholder 内容; W2 改成真实
+                                file-system + AI 补全. */}
+                            <div className="mt-4 pt-3 border-t border-line">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-[10px] uppercase tracking-wider text-ink-mute">
+                                  Code preview
+                                </div>
+                                <div className="text-[10px] font-mono text-ink-mute">
+                                  src/lib/store.ts
+                                </div>
+                              </div>
+                              <div className="h-48 rounded border border-line overflow-hidden">
+                                <MonacoEditor
+                                  path="src/lib/store.ts"
+                                  value={`// ULYS-98-W1 — Monaco editor stub preview\n// (per docs/briefs/ulys-98-star-cursor-min-v1.md §"Sub-task 1.1")\n//\n// W1: read-only preview only — no AI completion, no Cmd-K, no save.\n// W2: real file-system + Cmd-K inline edit + inline AI suggestion.\n\nexport interface Worktree {\n  id: string;\n  branch: string;\n  status: WorktreeStatus;\n}\n`}
+                                  readOnly
+                                  testId="monaco-preview"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
