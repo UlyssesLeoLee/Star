@@ -1,6 +1,6 @@
 # Star Mock Project UT + IT + ST 综合回归报告 (v1.1, per ULYS-140)
 
-> **生成时间**: 2026-09-20T14:08:06Z
+> **生成时间**: 2026-09-20T16:04:18Z
 > **范围**: tools/star-flash-mock/{scripts/,mock_data/,docs/,k3s/}
 > **触发**: ULYS-140 (回归测试) 2026-09-20 JST
 > **守门**: 守门 #1+#9+#11+#12+#13+#19+#24
@@ -48,7 +48,7 @@
 - `agent-runtime/l1-ecs/`: 23 份 fixture
 - `agent-runtime/l2-pools/`: 8 份 fixture
 - `mcp/`: 16 份 fixture
-- `streamable-http/`: 4 份 fixture
+- `streamable-http/`: 6 份 fixture
 - `db-wtm/work/`: 16 份 fixture
 - `db-wtm/transaction/`: 49 份 fixture
 - `db-wtm/master/`: 45 份 fixture

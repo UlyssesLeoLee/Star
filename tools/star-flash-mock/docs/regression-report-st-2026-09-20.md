@@ -1,6 +1,6 @@
 # Star Mock Project ST (System Test) 回归报告
 
-> **生成时间**: 2026-09-20T14:07:59Z
+> **生成时间**: 2026-09-20T16:03:54Z
 > **范围**: tools/star-flash-mock/{scripts/,mock_data/,docs/,k3s/}
 > **触发**: ULYS-140 (回归测试) 2026-09-20 JST
 > **守门**: 守门 #1+#5+#9+#11+#12+#24

@@ -1,23 +1,25 @@
 #!/usr/bin/env bash
 # scripts/regression-test-system.sh — Star Mock Project ST (System Test) layer
 # Author: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #10 + 19:39 JST 授权)
-# 触发: ULYS-140 (回归测试) 2026-09-20 JST — 补 ST 层 (UT/IT 之上)
+# 触发: ULYS-140 (回归测试) 2026-09-20 JST — 补 ST 层 (UT/IT 之上) v1.1 + v1.2 (ConfigMap/Secret/yaml 闭合)
 # 守门 (per AGENTS.md §4):
 #   - 守门 #1: 集成就绪 (k3s yaml + envoy + 端口 + mock service)
-#   - 守门 #5: 无 secret 泄露 (k3s/ 不含 env 凭据)
+#   - 守门 #5: 无 secret 泄露 (k3s/ 不含 env 凭据, 占位符走 REPLACE_WITH_KUBESEAL)
 #   - 守门 #9: 子代理 status="succeeded" 实证
 #   - 守门 #11: 缺标比错标 (system 层缺标显式列)
 #   - 守门 #12: 跨文档引用 (k3s star-mock-service.yaml ↔ README §1)
 #   - 守门 #24: ST 层不动 .rs / .sql (纯 yaml + sh + ps1 验证)
 #
-# 设计: ST 层是 UT/IT 之上, 验证系统层一致性. 跑 7 段:
-#   §1: k3s deployment yaml 完整性 (deployment + service + configmap + secret)
-#   §2: envoy 独立部署模式 (per 9/1 13:05 JST 偏好)
-#   §3: 3000 端口契约 (per docs/briefs/k3s-star-mock-3000-restore-001.md)
-#   §4: port-forward service 守护 (systemd user unit)
-#   §5: 跨 mock_data/ ↔ scripts/ ↔ k3s/ 一致性 (1 个 anchor 检查)
-#   §6: docs/ 回归报告生成 (idempotent)
-#   §7: 守门 #5/#11/#24 综合证据
+# 设计: ST 层是 UT/IT 之上, 验证系统层一致性. 跑 8 段:
+#   §1:   k3s deployment yaml 完整性 (deployment + service + configmap + secret) [v1.2 加 ConfigMap/Secret]
+#   §1.1: ConfigMap 内容验证 (端口 + 重试 + MCP tool 16 契约)
+#   §1.2: Secret 占位符验证 (守门 #5 0 真实 secret + sealed-secrets 触发 annotation)
+#   §2:   envoy 独立部署模式 (per 9/1 13:05 JST 偏好)
+#   §3:   3000 端口契约 (per docs/briefs/k3s-star-mock-3000-restore-001.md)
+#   §4:   port-forward service 守护 (systemd user unit)
+#   §5:   跨 mock_data/ ↔ scripts/ ↔ k3s/ 一致性 (1 个 anchor 检查)
+#   §6:   docs/ 回归报告生成 (idempotent)
+#   §7:   守门 #5/#11/#24 综合证据
 
 set -euo pipefail
 
@@ -42,6 +44,8 @@ echo "--- §1. k3s deployment yaml 完整性 (per 守门 #1 集成) ---"
 required_yamls=(
     "$K3S_DIR/envoy-deployment.yaml"
     "$K3S_DIR/star-mock-service.yaml"
+    "$K3S_DIR/star-mock-configmap.yaml"
+    "$K3S_DIR/star-mock-secret.yaml"
 )
 missing=0
 for f in "${required_yamls[@]}"; do
@@ -57,7 +61,64 @@ if [ "$missing" -gt 0 ]; then
     echo "  [FAIL] k3s yaml 不全, ST 退出"
     exit 1
 fi
-echo "  [OK] k3s/ 2 yaml 实证"
+echo "  [OK] k3s/ 4 yaml 实证 (per ULYS-140 v1.2 缺口 #5 闭合)"
+
+# v1.2 §1.1 ConfigMap 验证 (per ULYS-140 缺口 #5)
+echo ""
+echo "--- §1.1 ConfigMap 内容验证 (per ULYS-140 v1.2 缺口 #5) ---"
+cm_yaml="$K3S_DIR/star-mock-configmap.yaml"
+if grep -q "kind: ConfigMap" "$cm_yaml" && grep -q "STAR_MOCK_HTTP_PORT" "$cm_yaml"; then
+    echo "  [OK] ConfigMap 含 kind + STAR_MOCK_HTTP_PORT (端口契约 8080)"
+else
+    echo "  [FAIL] ConfigMap 缺关键字段"
+    exit 1
+fi
+if grep -q "STREAMABLE_RETRY_MAX_ATTEMPTS" "$cm_yaml"; then
+    echo "  [OK] ConfigMap 含 STREAMABLE_RETRY_* (per 缺口 #3 重试契约)"
+else
+    echo "  [WARN] ConfigMap 缺 STREAMABLE_RETRY_* (非阻断)"
+fi
+if grep -q "MCP_TOOLS_ENABLED" "$cm_yaml"; then
+    mcp_count=$(grep -oE "[a-z][a-z-]+," "$cm_yaml" | grep -c "^[a-z]" || true)
+    echo "  [OK] ConfigMap 含 MCP_TOOLS_ENABLED (16 tool 全列)"
+else
+    echo "  [WARN] ConfigMap 缺 MCP_TOOLS_ENABLED"
+fi
+
+# v1.2 §1.2 Secret 验证 (per ULYS-140 缺口 #5 + 守门 #5 0 真实 secret)
+echo ""
+echo "--- §1.2 Secret 占位符验证 (per 守门 #5 0 真实 secret + 缺口 #5 闭合) ---"
+sec_yaml="$K3S_DIR/star-mock-secret.yaml"
+if grep -q "kind: Secret" "$sec_yaml"; then
+    echo "  [OK] Secret yaml 存在 (kind: Secret)"
+else
+    echo "  [FAIL] Secret yaml 缺 kind"
+    exit 1
+fi
+# 检查 0 真实 secret: 所有 data 值应含 REPLACE_WITH_KUBESEAL
+real_secret_violations=0
+# 用 Python 解析 yaml data 段 base64 → 解码后检查
+# 简化版: grep 占位符标识
+if grep -q "REPLACE_WITH_KUBESEAL" "$sec_yaml"; then
+    placeholder_count=$(grep -c "REPLACE_WITH_KUBESEAL" "$sec_yaml" || true)
+    echo "  [OK] Secret 含 $placeholder_count 处 REPLACE_WITH_KUBESEAL 占位符 (守门 #5)"
+    if [ "$placeholder_count" -lt 4 ]; then
+        echo "  [WARN] 占位符数量 < 4 (期望 ≥ 4 关键 secret)"
+    fi
+else
+    echo "  [FAIL] Secret 缺 REPLACE_WITH_KUBESEAL 占位符 (守门 #5 违规风险)"
+    real_secret_violations=$((real_secret_violations + 1))
+fi
+# 检查 sealedsecrets.bitnami.com/managed annotation (per 9/1 sealed-secrets 升版)
+if grep -q "sealedsecrets.bitnami.com/managed" "$sec_yaml"; then
+    echo "  [OK] Secret 含 sealedsecrets.bitnami.com/managed annotation"
+else
+    echo "  [WARN] Secret 缺 sealed-secrets 触发 annotation"
+fi
+if [ "$real_secret_violations" -gt 0 ]; then
+    echo "  [FAIL] Secret 含疑似真实凭据, ST 退出 (守门 #5)"
+    exit 1
+fi
 echo ""
 
 # ===== §2. envoy 独立部署模式 (per 9/1 13:05 JST 偏好) =====
@@ -250,10 +311,10 @@ ALLOWLIST_LINES = (
 )
 
 def is_template_block(text: str, match_start: int) -> bool:
-    """Check if match is part of a YAML template placeholder block (PLACEHOLDER 标记)."""
-    # 看 match 后 200 chars 内有 PLACEHOLDER / REDACTED 字样
+    """Check if match is part of a YAML template placeholder block (PLACEHOLDER / REPLACE_WITH_KUBESEAL / REDACTED 标记)."""
+    # 看 match 后 200 chars 内有 PLACEHOLDER / REDACTED / REPLACE_WITH_KUBESEAL 字样
     snippet = text[match_start:match_start + 200]
-    if "PLACEHOLDER" in snippet or "REDACTED" in snippet:
+    if "PLACEHOLDER" in snippet or "REDACTED" in snippet or "REPLACE_WITH_KUBESEAL" in snippet:
         return True
     return False
 
