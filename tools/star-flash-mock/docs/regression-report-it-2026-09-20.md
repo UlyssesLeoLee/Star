@@ -1,6 +1,6 @@
 # Star Mock Project IT (Integration Test) 回归报告
 
-> **生成时间**: 2026-09-20T16:02:40Z
+> **生成时间**: 2026-09-20T21:37:35Z
 > **范围**: tools/star-flash-mock/mock_data/uat/{scenarios/,scripts/,regression/}
 > **触发**: ULYS-140 (回归测试) 2026-09-20 JST
 > **守门**: 守门 #1+#5+#9+#11+#12+#13+#19
