@@ -18,6 +18,8 @@
 
 pub mod error;
 pub mod runtime;
+pub mod sandbox;
+pub mod tool;
 
 pub use error::AgentError;
 pub use runtime::{

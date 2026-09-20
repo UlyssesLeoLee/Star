@@ -39,7 +39,7 @@ publish = false
 # 守门 #19 v19: V0.1 collab 不动; `worktree_canvas` feature 默认开启 (per
 # brief §"完成标准 #1 BFF module 编译通过"), 0 feature 走 `--no-default-features`
 # 仅 V0.1 collab 用于回归。
-default = ["worktree_canvas"]
+default = ["worktree_canvas", "cursor"]
 worktree_canvas = [
     "dep:graph-core",
     "dep:git-adapter",
@@ -49,7 +49,28 @@ worktree_canvas = [
     "dep:async-stream",
 ]
 
+# ULYS-98-W3 (2026-10-05) Star Cursor 极简版 — cursor 极简版模块 (per
+# docs/briefs/ulys-98-star-cursor-min-v1.md §"Sub-task 3.1/3.2/3.4/3.6"):
+# 4 REST + 2 SSE 端点 (POST /v1/chat/sessions + POST /v1/chat/send + GET /v1/chat/messages +
+# GET /v1/chat/stream + POST /v1/composer/edit + GET /v1/rag/search) + RAG 上下文检索 +
+# ChatSession in-memory repository (per 守门 #19 v19 阶段 1 占位模式). feature-gated 隔离:
+# 0 feature 走 V0.1 collab 仅 V0.1 回归守门, 加 feature 默认开启 (per W3 Gate "cargo
+# check --workspace --all-targets -j 4 0 错误").
+#
+# 守门合规 (per 守门 #1 v25 + 守门 #7 + 守门 #11 + 守门 #14 v2 + 守门 #19 v19):
+# - 0 改根 Cargo.toml [workspace] members 任何行 (bff 是新独立 workspace).
+# - domain-llm 是新 path 依赖 (per W3.6 RAG), 0 重复加 [workspace.dependencies].
+# - 0 改 crates/api/Cargo.toml 任何行 (0 添加 bff 依赖, BFF 跟 API 平级 0 反向依赖).
+# - cursor feature 隔离新 BFF 模块; 0 feature = V0.1 collab only (守门 #19 v19).
+cursor = [
+    "dep:domain-llm",
+    "dep:tokio-stream",
+    "dep:futures-util",
+    "dep:async-stream",
+]
+
 [dependencies]
+
 # HTTP / WebSocket (per brief §2.1, axum 0.8 + features ws / macros, 跟 crates/api 一致)
 axum = { version = "0.8", features = ["ws", "macros"] }
 
@@ -86,6 +107,15 @@ api = { path = "../crates/api" }
 graph-core = { path = "../crates/graph-core", optional = true }
 git-adapter = { path = "../crates/git-adapter", optional = true }
 git-observer = { path = "../crates/git-observer", optional = true }
+
+# ULYS-98-W3 (2026-10-05) 新增 path 依赖 (仅 cursor feature 用, per W3.6 RAG 调用
+# domain_llm::context::ContextBuilder + W3.1 chat session model DTOs re-export)
+# 守门 #11: domain-llm 是新 crate, 0 重复加 [workspace.dependencies].
+domain-llm = { path = "../crates/domain-llm", optional = true }
+
+[dev-dependencies]
+# ULYS-98-W1 chat routes use ServiceExt::oneshot for handler unit tests.
+tower = { version = "0.5", features = ["util"] }
 
 [lints.rust]
 # 0 unsafe blocks (per 守门 #7 `unsafe_code = "forbid"`).

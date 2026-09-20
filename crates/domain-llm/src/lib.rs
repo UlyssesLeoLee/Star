@@ -16,9 +16,33 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use futures_util::stream::BoxStream;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
+
+pub mod chat;
+pub mod composer;
+pub mod context;
+pub mod metering;
+pub mod provider;
+
+pub use chat::{ChatChunk, ChatMessage, ChatRequest, ChatResponse, ChatRole};
+pub use composer::{
+    ComposerEdit, ComposerEditRequest, ComposerEditResponse, ComposerFileContext, ComposerRole,
+    Selection,
+};
+pub use context::{
+    Chunk, ContextBuilder, ContextBuilderError, ContextHit, ContextQuery, Embedding,
+    HybridContextBuilder, InMemoryContextBuilder, InvertedIndexContextBuilder, MockEmbedder,
+    MOCK_EMBED_DIM,
+};
+pub use metering::{MeteringStore, TokenUsage, UsageAggregate};
+pub use provider::{
+    AnthropicProvider, MockProvider, OpenAiProvider, ProviderRegistry, ProviderRegistryError,
+    ProviderSelector, ANTHROPIC_DEFAULT_BASE_URL, OPENAI_DEFAULT_BASE_URL,
+};
+pub use provider::registry::DispatchProvider;
 
 // =====================================================================
 // LlmProvider trait
@@ -35,6 +59,48 @@ pub trait LlmProvider: Send + Sync {
 
     /// Health check (return current backend state)
     async fn health_check(&self) -> Result<LlmProviderRegistryHealth, LlmProviderRegistryError>;
+
+    /// **W1 (ULYS-98-W1) chat_completion stub** — non-streaming chat reply.
+    ///
+    /// v0.0.1 stub: returns `Err(LlmProviderRegistryError::Unimplemented(...))`
+    /// from the default trait impl. W2 (`AnthropicProvider` /
+    /// `OpenAIProvider`) will override with real API calls.
+    ///
+    /// See [`ChatRequest`] for input shape and [`ChatResponse`] for output.
+    async fn chat_completion(
+        &self,
+        _req: ChatRequest,
+    ) -> Result<ChatResponse, LlmProviderRegistryError> {
+        Err(LlmProviderRegistryError::Unimplemented(
+            "chat_completion not implemented (W1 stub — see ULYS-98-W2)".to_string(),
+        ))
+    }
+
+    /// **W1 (ULYS-98-W1) stream_completion stub** — streaming chat reply.
+    ///
+    /// v0.0.1 stub: returns `Err(LlmProviderRegistryError::Unimplemented(...))`
+    /// from the default trait impl. W2 will override with real `reqwest`
+    /// SSE streams.
+    ///
+    /// The stream item is a [`ChatChunk`]; the stream terminates after the
+    /// provider emits a chunk with `finish_reason = Some(...)`.
+    ///
+    /// W2 (ULYS-98-W2) widens the stream lifetime to `'static` so
+    /// dispatchers (`DispatchProvider`) can hold `Arc<dyn LlmProvider>`
+    /// and return a stream that does not borrow from `&self`. The W1
+    /// default impl still returns `Err(...)`, so the lifetime change
+    /// is invisible to stub callers.
+    async fn stream_completion(
+        &self,
+        _req: ChatRequest,
+    ) -> Result<
+        BoxStream<'static, Result<ChatChunk, LlmProviderRegistryError>>,
+        LlmProviderRegistryError,
+    > {
+        Err(LlmProviderRegistryError::Unimplemented(
+            "stream_completion not implemented (W1 stub — see ULYS-98-W2)".to_string(),
+        ))
+    }
 }
 
 // =====================================================================
@@ -63,6 +129,12 @@ pub enum LlmProviderRegistryError {
     /// Backend error
     #[error("backend error: {0}")]
     Backend(String),
+
+    /// W1 (ULYS-98-W1) stub placeholder — a feature is declared in the trait
+    /// surface but no real implementation backs it yet (e.g. `chat_completion`,
+    /// `stream_completion` in v0.0.1).
+    #[error("not implemented: {0}")]
+    Unimplemented(String),
 }
 
 // =====================================================================
@@ -208,5 +280,56 @@ mod tests {
     async fn llmproviderregistry_shutdown_no_error() {
         let backend = LlmProviderRegistry::new();
         backend.shutdown().await.unwrap();
+    }
+
+    /// **Test 5 (IT, W1 ULYS-98-W1.4)**: trait `chat_completion` stub returns
+    /// `Err(Unimplemented)` for v0.0.1 (per `docs/briefs/ulys-98-star-cursor-min-v1.md`
+    /// §"Sub-task 1.4"). W2 will override with Anthropic / OpenAI providers.
+    #[tokio::test]
+    async fn llmprovider_chat_completion_stub_returns_unimplemented() {
+        let mut backend = LlmProviderRegistry::new();
+        backend.mark_initialized();
+
+        let req = ChatRequest {
+            model: "stub-model".to_string(),
+            messages: vec![ChatMessage::user("hello")],
+            temperature: None,
+            max_tokens: None,
+            request_id: None,
+        };
+        let err = backend.chat_completion(req).await.unwrap_err();
+        match err {
+            LlmProviderRegistryError::Unimplemented(msg) => {
+                assert!(msg.contains("chat_completion"));
+            }
+            other => panic!("expected Unimplemented, got {other:?}"),
+        }
+    }
+
+    /// **Test 6 (IT, W1 ULYS-98-W1.4)**: trait `stream_completion` stub returns
+    /// `Err(Unimplemented)` for v0.0.1 (per brief §"Sub-task 1.4").
+    #[tokio::test]
+    async fn llmprovider_stream_completion_stub_returns_unimplemented() {
+        let mut backend = LlmProviderRegistry::new();
+        backend.mark_initialized();
+
+        let req = ChatRequest {
+            model: "stub-model".to_string(),
+            messages: vec![ChatMessage::user("hello")],
+            temperature: None,
+            max_tokens: None,
+            request_id: None,
+        };
+        let res = backend.stream_completion(req).await;
+        let err = match res {
+            Ok(_) => panic!("expected Unimplemented error, got Ok stream"),
+            Err(e) => e,
+        };
+        match err {
+            LlmProviderRegistryError::Unimplemented(msg) => {
+                assert!(msg.contains("stream_completion"));
+            }
+            other => panic!("expected Unimplemented, got {other:?}"),
+        }
     }
 }

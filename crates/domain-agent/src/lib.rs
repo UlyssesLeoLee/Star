@@ -2032,3 +2032,98 @@ mod tests {
         assert_eq!(s.tool_activity_summary.get("read_file"), Some(&3));
     }
 }
+
+// =====================================================================
+// AI Session loop (ULYS-98-W4.3 Agent mode)
+// Per docs/briefs/ulys-98-star-cursor-min-v1.md Sub-task 4.3
+// v0.0.1: 1-mock-step loop. W4.3 wires DispatchProvider + agent-bridge::tool.
+// =====================================================================
+
+pub mod ai_session_inline {
+    use std::sync::Arc;
+    use domain_llm::chat::{ChatMessage, ChatRequest, ChatRole};
+    use domain_llm::{LlmProvider, LlmProviderRegistryError};
+    use serde::{Deserialize, Serialize};
+    use thiserror::Error;
+    use uuid::Uuid;
+
+    #[derive(Debug, Error)]
+    pub enum AiSessionError {
+        #[error("provider error: {0}")]
+        Provider(#[from] LlmProviderRegistryError),
+        #[error("tool error: {0}")]
+        Tool(String),
+        #[error("max steps exceeded")]
+        MaxStepsExceeded,
+        #[error("invalid state: {0}")]
+        InvalidState(String),
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct AiStep {
+        pub step_id: Uuid,
+        pub thought: String,
+        pub tool_call: Option<serde_json::Value>,
+        pub observation: Option<String>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct AiSessionState {
+        pub session_id: Uuid,
+        pub steps: Vec<AiStep>,
+        pub final_answer: Option<String>,
+        pub max_steps: u32,
+    }
+
+    pub async fn run_agent_loop(
+        provider: Arc<dyn LlmProvider>,
+        user_prompt: String,
+        max_steps: u32,
+    ) -> Result<AiSessionState, AiSessionError> {
+        let mut state = AiSessionState {
+            session_id: Uuid::new_v4(),
+            steps: Vec::new(),
+            final_answer: None,
+            max_steps,
+        };
+
+        let mut messages = vec![ChatMessage::user(user_prompt.clone())];
+        for step_idx in 0..max_steps {
+            let req = ChatRequest {
+                model: "claude-3-5-sonnet-20241022".to_string(),
+                messages: messages.clone(),
+                temperature: None,
+                max_tokens: Some(512),
+                request_id: Some(Uuid::new_v4()),
+            };
+            let resp = provider.chat_completion(req).await?;
+            let thought = resp.message.content.clone();
+            let step = AiStep {
+                step_id: Uuid::new_v4(),
+                thought: thought.clone(),
+                tool_call: None,
+                observation: None,
+            };
+            state.steps.push(step);
+            if !thought.trim().is_empty() {
+                messages.push(ChatMessage {
+                    role: ChatRole::Assistant,
+                    content: thought.clone(),
+                    name: None,
+                    tool_call_id: None,
+                });
+            }
+            let looks_done = thought.to_ascii_lowercase().contains("done")
+                || thought.to_ascii_lowercase().contains("final answer");
+            if looks_done || step_idx + 1 >= max_steps {
+                state.final_answer = Some(thought);
+                break;
+            }
+        }
+
+        if state.final_answer.is_none() && state.steps.len() as u32 >= state.max_steps {
+            return Err(AiSessionError::MaxStepsExceeded);
+        }
+        Ok(state)
+    }
+}
