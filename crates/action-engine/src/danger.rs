@@ -36,9 +36,9 @@ mod tests {
                 Classification::Destructive => destructive += 1,
             }
         }
-        assert_eq!(safe, 6);
+        assert_eq!(safe, 9);
         assert_eq!(warning, 5);
         assert_eq!(destructive, 7);
-        assert_eq!(safe + warning + destructive, 18);
+        assert_eq!(safe + warning + destructive, 21);
     }
 }

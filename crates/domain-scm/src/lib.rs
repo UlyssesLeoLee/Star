@@ -1408,7 +1408,7 @@ impl ScmCommandPort for InMemoryScmService {
         // **INV-SCM-03** Idempotency: 重复 external_event_id 返回 IdempotencyConflict
         {
             let guard = self.idempotency.read().await;
-            if let Some(existing_id) = guard.get(&event.external_event_id) {
+            if guard.get(&event.external_event_id).is_some() {
                 return Err(ScmError::IdempotencyConflict);
             }
         }

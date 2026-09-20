@@ -282,8 +282,8 @@ mod tests {
         // 守门 UT-1 实证: 18 Action metadata 全部注册
         let mut reg = ActionRegistry::new();
         reg.register_all();
-        assert_eq!(reg.registered_count(), 18);
-        assert_eq!(reg.registered_types().len(), 18);
+        assert_eq!(reg.registered_count(), 21);
+        assert_eq!(reg.registered_types().len(), 21);
         for at in ActionType::ALL.iter().copied() {
             assert!(reg.metadata(at).is_some());
         }
@@ -302,7 +302,10 @@ mod tests {
                 | ActionType::Compare
                 | ActionType::Focus
                 | ActionType::ExplainRisk
-                | ActionType::ListEvents => ActionClass::Safe,
+                | ActionType::ListEvents
+                | ActionType::AiChat
+                | ActionType::AiCompletion
+                | ActionType::AiComposerEdit => ActionClass::Safe,
                 ActionType::SyncMain
                 | ActionType::Rebase
                 | ActionType::CreatePR
