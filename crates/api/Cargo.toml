@@ -41,5 +41,7 @@ star-arg = { path = "../arg" }
 # 守门 #19 v19 累积规不破坏 V0.1 (arg/ 5 file 1863 lines 100% 保留)
 agent-domain = { path = "../agent-domain" }
 canvas-collab = { path = "../canvas-collab" }
+# ULYS-98-W2: domain-llm provider + metering (per docs/briefs/ulys-98-star-cursor-min-v1.md §Sub-task 2.1 + 2.2 + 2.5)
+domain-llm = { path = "../domain-llm" }
 [lints]
 workspace = true

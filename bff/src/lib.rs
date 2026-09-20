@@ -29,6 +29,10 @@ pub mod collaboration;
 #[cfg(feature = "worktree_canvas")]
 pub mod worktree_canvas;
 
+// ULYS-98-W1 (per `docs/briefs/ulys-98-star-cursor-min-v1.md` §"Sub-task 1.3"):
+// 轻量级 RPC stub 集合, 当前包含 `chat` (POST /v1/chat/send + GET /v1/chat/messages).
+pub mod routes;
+
 // Re-exports for the convenience of the application layer.
 pub use collaboration::{build_router as build_collab_router, CollaborationState};
 
@@ -40,8 +44,8 @@ pub use worktree_canvas::{
 
 /// Top-level BFF router factory.
 ///
-/// 默认 (有 `worktree_canvas` feature): collab routes + worktree_canvas routes.
-/// `--no-default-features`: 仅 collab routes (V0.1 回归).
+/// 默认 (有 `worktree_canvas` feature): collab routes + worktree_canvas routes + chat routes.
+/// `--no-default-features`: 仅 collab routes + chat routes (V0.1 回归).
 pub fn build_router(state: build_collab_router_state::CollabRouterState) -> axum::Router {
     collab_only(state)
 }
@@ -49,9 +53,10 @@ pub fn build_router(state: build_collab_router_state::CollabRouterState) -> axum
 #[cfg(feature = "worktree_canvas")]
 pub use collab_only as build_full_router;
 
-/// V0.1 collab-only router (per 守门 #19 v19).
+/// V0.1 collab-only router (per 守门 #19 v19) — collab routes + chat routes.
 pub fn collab_only(state: build_collab_router_state::CollabRouterState) -> axum::Router {
     build_collab_router(state.into())
+        .merge(routes::chat::chat_routes())
 }
 
 /// Public state placeholder to allow V0.1 + worktree_canvas dual build.

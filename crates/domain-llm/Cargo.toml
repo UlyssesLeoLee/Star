@@ -16,6 +16,11 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 tokio = { workspace = true }
+# W1 (ULYS-98-W1) LlmProvider::stream_completion returns BoxStream<...>
+futures-util = { workspace = true }
+# W2 (ULYS-98-W2) anthropic + openai provider reqwest calls
+reqwest = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
