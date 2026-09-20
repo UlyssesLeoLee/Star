@@ -364,9 +364,6 @@ impl From<CompletionInternalError> for ApiError {
 // v0.0.1 stub: returns 1 stub diff per file. W4.2 wires real LLM dispatch
 // via DispatchProvider + action-engine AiComposerEdit ActionType.
 
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct ComposerEditApiRequest {
     pub files: Vec<ComposerFileApi>,

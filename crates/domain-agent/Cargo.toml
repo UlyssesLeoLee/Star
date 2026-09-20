@@ -17,6 +17,11 @@ chrono = { workspace = true }
 tokio = { workspace = true }
 
 star-context = { path = "../star-context" }
+# ULYS-98 v1.0.1 follow-up: ai_session_inline (W4.3) uses domain_llm + serde_json
+# per docs/specs/star-cursor-min-spec.md section 1.4 Agent API.
+# 守门 #11 缺标比错标: 0 重复加 serde/tokio/uuid/chrono/async-trait/thiserror/star-context.
+domain-llm = { path = "../domain-llm" }
+serde_json = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true }
 

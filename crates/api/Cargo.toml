@@ -43,5 +43,17 @@ agent-domain = { path = "../agent-domain" }
 canvas-collab = { path = "../canvas-collab" }
 # ULYS-98-W2: domain-llm provider + metering (per docs/briefs/ulys-98-star-cursor-min-v1.md §Sub-task 2.1 + 2.2 + 2.5)
 domain-llm = { path = "../domain-llm" }
+# ULYS-98-W4.3 + v1.0.1 follow-up: agent run loop (ai_session_inline) + tool dispatch (agent-bridge::tool)
+# per docs/specs/star-cursor-min-spec.md §1.4 Agent API
+# 守门 #11 缺标比错标: 0 重复加 axum/tokio/serde/uuid/chrono/async-trait/thiserror/star-context
+domain-agent = { path = "../domain-agent" }
+agent-bridge = { path = "../agent-bridge" }
+# v1.0.1 follow-up: W3.2 SSE handler 缺 futures-util + async-stream 依赖
+# (workspace 未声明, api crate 局部加; v1.0.2 workspace 加)
+futures-util = { version = "0.3", features = ["sink"] }
+async-stream = "0.3"
+[dev-dependencies]
+# v1.0.1 follow-up: SSE IT tests need tower::ServiceExt::oneshot
+tower = { version = "0.5", features = ["util"] }
 [lints]
 workspace = true
