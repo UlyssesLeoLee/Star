@@ -57,6 +57,9 @@ pub mod chat;
 pub mod completion;
 /// metering API module (W2 — token usage query).
 pub mod metering;
+/// agent run API module (v1.0.1 follow-up — /v1/agent/run backend).
+/// Per docs/specs/star-cursor-min-spec.md §1.4 Agent API.
+pub mod agent_run;
 
 // =====================================================================
 // 实体(Entity / Aggregate Root)
