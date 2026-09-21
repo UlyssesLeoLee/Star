@@ -29,6 +29,7 @@ pub const DEFAULT_MAX_CONN: u32 = 16;
 #[derive(Debug, Default)]
 pub struct BoltConnectionPool {
     /// 实际连接池 (v0.81: 空 stub, 等 r2d2-memgraph 跨 session 续)
+    #[allow(dead_code)] // v0.81 stub; r2d2-memgraph 落地后用 .lock().await.len()
     pool: Arc<tokio::sync::Mutex<Vec<()>>>,
 }
 

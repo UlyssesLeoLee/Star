@@ -15,7 +15,7 @@
 //! adapter 层不引入新表
 
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use sqlx::{ConnectOptions, PgPool};
+use sqlx::PgPool;
 use std::env;
 use std::str::FromStr;
 use std::time::Duration;

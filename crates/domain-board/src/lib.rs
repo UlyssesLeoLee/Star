@@ -793,7 +793,7 @@ impl BoardCommandPort for InMemoryBoardService {
         let new_col_id: BoardColumnId;
         let new_board: Board;
         {
-            let mut boards = self.boards.write().expect("lock");
+            let boards = self.boards.write().expect("lock");
             let board = require_board(&boards, cmd.board_id)?.clone();
             if board.tenant_id != cmd.tenant_id {
                 return Err(BoardError::CrossTenantDenied(
@@ -830,7 +830,7 @@ impl BoardCommandPort for InMemoryBoardService {
         check_tenant(actor, cmd.tenant_id)?;
         // 1) 在锁内完成全部状态计算,产出一个新 card + 新 board
         let (new_card, new_board, to_col_wip) = {
-            let mut boards = self.boards.write().expect("lock");
+            let boards = self.boards.write().expect("lock");
             let board = require_board(&boards, cmd.board_id)?.clone();
             if board.tenant_id != cmd.tenant_id {
                 return Err(BoardError::CrossTenantDenied(
@@ -948,7 +948,7 @@ impl BoardCommandPort for InMemoryBoardService {
     ) -> Result<Swimlane, BoardError> {
         check_tenant(actor, cmd.tenant_id)?;
         let (new_s, new_board) = {
-            let mut boards = self.boards.write().expect("lock");
+            let boards = self.boards.write().expect("lock");
             let board = require_board(&boards, cmd.board_id)?.clone();
             if board.tenant_id != cmd.tenant_id {
                 return Err(BoardError::CrossTenantDenied(
@@ -981,7 +981,7 @@ impl BoardCommandPort for InMemoryBoardService {
     ) -> Result<BoardColumn, BoardError> {
         check_tenant(actor, cmd.tenant_id)?;
         let (col, new_board) = {
-            let mut boards = self.boards.write().expect("lock");
+            let boards = self.boards.write().expect("lock");
             let board = require_board(&boards, cmd.board_id)?.clone();
             if board.tenant_id != cmd.tenant_id {
                 return Err(BoardError::CrossTenantDenied(
