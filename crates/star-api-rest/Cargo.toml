@@ -40,12 +40,12 @@ hex = { workspace = true }
 
 # v0.43 §14.12 IV OAuth2 server (per 2026-09-09 20:20 JST 用户拍板 both flows)
 ring = "0.17"
-base64 = "0.22"
+base64 = "0.23"
 async-trait = "0.1"
 # v0.47 §14.12 IV OAuth2 真实 RSA 2048 keygen (per brief v0.47 §3.1)
 rsa = { version = "0.9", features = ["pem"] }
-rand = "0.8"
-pkcs8 = { version = "0.10", features = ["pem"] }
+rand = "0.10"
+pkcs8 = { version = "0.11", features = ["pem"] }
 star-pg-adapter = { path = "../star-pg-adapter" }
 
 # Phase B.2 (Tier 1 真实数据源: tenant / identity / permission) — per star-mcp 同源
