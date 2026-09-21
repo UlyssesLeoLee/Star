@@ -28,6 +28,7 @@ import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { Tabs, type TabItem } from "@/components/Tabs";
 import { Settings, User, Users, CreditCard, Key } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
+import { CelCard3D } from "@/components/effects/CelCard3D";
 
 type SettingsTab = "profile" | "account" | "team" | "billing" | "apikeys";
 
@@ -140,60 +141,62 @@ function SettingsPageInner() {
 
       <Tabs items={TABS as TabItem[]} active={tab} onChange={(id) => setTab(id as SettingsTab)} />
 
-      <div className="card" data-testid={`settings-panel-${tab}`}>
-        <SectionTitle>
-          {TABS.find((t) => t.id === tab)?.label}
-        </SectionTitle>
-        {tab === "profile" && (
-          <SimpleForm
-            onSave={handleSave}
-            fields={[
-              { key: "name",     label: "Display Name", value: "Ulysses",           placeholder: "Your name"       },
-              { key: "email",    label: "Email",        value: "ulysses@mavis.local", placeholder: "you@org.com",   type: "email" },
-              { key: "timezone", label: "Timezone",     value: "Asia/Tokyo (JST)",  placeholder: "TZ identifier"   },
-            ]}
-          />
-        )}
-        {tab === "account" && (
-          <SimpleForm
-            onSave={handleSave}
-            fields={[
-              { key: "username",  label: "Username",  value: "ulysses",        placeholder: "login handle" },
-              { key: "current",   label: "Current Password", value: "",       placeholder: "********", type: "password" },
-              { key: "newpass",   label: "New Password",      value: "",       placeholder: "********", type: "password" },
-            ]}
-          />
-        )}
-        {tab === "team" && (
-          <SimpleForm
-            onSave={handleSave}
-            fields={[
-              { key: "team",   label: "Team Name",  value: "Star Core",   placeholder: "team display name" },
-              { key: "domain", label: "Domain",     value: "mavis.local", placeholder: "team slug" },
-            ]}
-          />
-        )}
-        {tab === "billing" && (
-          <SimpleForm
-            onSave={handleSave}
-            fields={[
-              { key: "plan",   label: "Plan",        value: "Pro (mock)",       placeholder: "Pro / Team / Ent" },
-              { key: "card",   label: "Card Number", value: "**** **** **** 4242", placeholder: "16 digits" },
-              { key: "exp",    label: "Expiry",      value: "12/29",            placeholder: "MM/YY" },
-            ]}
-          />
-        )}
-        {tab === "apikeys" && (
-          <SimpleForm
-            onSave={handleSave}
-            fields={[
-              { key: "label", label: "Key Label", value: "ci-bot", placeholder: "human-readable name" },
-              { key: "scope", label: "Scope",     value: "read:issues, write:comments", placeholder: "comma-separated scopes" },
-              { key: "token", label: "Token (P3: not actually encrypted)", value: "", placeholder: "paste or generate", type: "password" },
-            ]}
-          />
-        )}
-      </div>
+      <CelCard3D>
+        <div className="card" data-testid={`settings-panel-${tab}`}>
+          <SectionTitle>
+            {TABS.find((t) => t.id === tab)?.label}
+          </SectionTitle>
+          {tab === "profile" && (
+            <SimpleForm
+              onSave={handleSave}
+              fields={[
+                { key: "name",     label: "Display Name", value: "Ulysses",           placeholder: "Your name"       },
+                { key: "email",    label: "Email",        value: "ulysses@mavis.local", placeholder: "you@org.com",   type: "email" },
+                { key: "timezone", label: "Timezone",     value: "Asia/Tokyo (JST)",  placeholder: "TZ identifier"   },
+              ]}
+            />
+          )}
+          {tab === "account" && (
+            <SimpleForm
+              onSave={handleSave}
+              fields={[
+                { key: "username",  label: "Username",  value: "ulysses",        placeholder: "login handle" },
+                { key: "current",   label: "Current Password", value: "",       placeholder: "********", type: "password" },
+                { key: "newpass",   label: "New Password",      value: "",       placeholder: "********", type: "password" },
+              ]}
+            />
+          )}
+          {tab === "team" && (
+            <SimpleForm
+              onSave={handleSave}
+              fields={[
+                { key: "team",   label: "Team Name",  value: "Star Core",   placeholder: "team display name" },
+                { key: "domain", label: "Domain",     value: "mavis.local", placeholder: "team slug" },
+              ]}
+            />
+          )}
+          {tab === "billing" && (
+            <SimpleForm
+              onSave={handleSave}
+              fields={[
+                { key: "plan",   label: "Plan",        value: "Pro (mock)",       placeholder: "Pro / Team / Ent" },
+                { key: "card",   label: "Card Number", value: "**** **** **** 4242", placeholder: "16 digits" },
+                { key: "exp",    label: "Expiry",      value: "12/29",            placeholder: "MM/YY" },
+              ]}
+            />
+          )}
+          {tab === "apikeys" && (
+            <SimpleForm
+              onSave={handleSave}
+              fields={[
+                { key: "label", label: "Key Label", value: "ci-bot", placeholder: "human-readable name" },
+                { key: "scope", label: "Scope",     value: "read:issues, write:comments", placeholder: "comma-separated scopes" },
+                { key: "token", label: "Token (P3: not actually encrypted)", value: "", placeholder: "paste or generate", type: "password" },
+              ]}
+            />
+          )}
+        </div>
+      </CelCard3D>
 
       <div className="card mt-3 text-xs text-ink-dim">
         <SectionTitle>Submit Endpoint — P3 缺口</SectionTitle>

@@ -264,7 +264,11 @@ export function CelButton3D({
       style={{ width: "160px", height: "54px" }}
     >
       <div className="absolute inset-0 pointer-events-none">
-        <Canvas camera={{ position: [0, 0, 3.2], fov: 45 }} gl={{ alpha: true }}>
+        <Canvas
+          camera={{ position: [0, 0, 3.2], fov: 45 }}
+          gl={{ alpha: true, antialias: false, powerPreference: "low-power" }}
+          frameloop={pressed || hovered || focused ? "always" : "demand"}
+        >
           <CelButtonMesh
             variant={variant}
             pressed={pressed}
@@ -421,7 +425,15 @@ export function CelToggle3D({
 }: CelToggle3DProps) {
   const [focused, setFocused] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [animating, setAnimating] = useState(false);
+
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    setAnimating(true);
+    const timer = setTimeout(() => setAnimating(false), 450);
+    return () => clearTimeout(timer);
+  }, [checked]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -444,7 +456,11 @@ export function CelToggle3D({
     >
       <div style={{ width: "84px", height: "38px" }} className="relative">
         {mounted && (
-          <Canvas camera={{ position: [0, 0, 2.8], fov: 45 }} gl={{ alpha: true }}>
+          <Canvas
+            camera={{ position: [0, 0, 2.8], fov: 45 }}
+            gl={{ alpha: true, antialias: false, powerPreference: "low-power" }}
+            frameloop={animating || focused ? "always" : "demand"}
+          >
             <CelToggleMesh checked={checked} focused={focused} />
           </Canvas>
         )}
@@ -603,7 +619,16 @@ export function CelBeacon3D({
   title,
 }: CelBeacon3DProps) {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    setMounted(true);
+    const handleVis = () => {
+      setVisible(document.visibilityState !== "hidden");
+    };
+    document.addEventListener("visibilitychange", handleVis);
+    return () => document.removeEventListener("visibilitychange", handleVis);
+  }, []);
 
   if (!mounted) {
     return <div style={{ width: size, height: size }} className="bg-black/50" />;
@@ -615,7 +640,11 @@ export function CelBeacon3D({
       style={{ width: size, height: size }}
       className={`relative pointer-events-none ${className}`}
     >
-      <Canvas camera={{ position: [0, 0, 3.2], fov: 45 }} gl={{ alpha: true }}>
+      <Canvas
+        camera={{ position: [0, 0, 3.2], fov: 45 }}
+        gl={{ alpha: true, antialias: false, powerPreference: "low-power" }}
+        frameloop={visible ? "always" : "never"}
+      >
         <CelBeaconMesh status={status} />
       </Canvas>
     </div>
@@ -721,7 +750,15 @@ function CelDialMesh({ value }: { value: number }) {
 
 export function CelDial3D({ value, onChange, options, className = "" }: CelDial3DProps) {
   const [mounted, setMounted] = useState(false);
+  const [animating, setAnimating] = useState(false);
+
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    setAnimating(true);
+    const timer = setTimeout(() => setAnimating(false), 450);
+    return () => clearTimeout(timer);
+  }, [value]);
 
   const handleClick = () => {
     const next = (value + 1) % options.length;
@@ -741,7 +778,11 @@ export function CelDial3D({ value, onChange, options, className = "" }: CelDial3
     >
       <div style={{ width: "64px", height: "54px" }} className="relative">
         {mounted && (
-          <Canvas camera={{ position: [0, 0, 2.6], fov: 45 }} gl={{ alpha: true }}>
+          <Canvas
+            camera={{ position: [0, 0, 2.6], fov: 45 }}
+            gl={{ alpha: true, antialias: false, powerPreference: "low-power" }}
+            frameloop={animating ? "always" : "demand"}
+          >
             <CelDialMesh value={value} />
           </Canvas>
         )}

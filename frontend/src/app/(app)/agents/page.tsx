@@ -23,6 +23,7 @@ import {
   CelBeacon3D,
   CelDial3D,
 } from "@/components/effects/Cel3DUI";
+import { CelCard3D } from "@/components/effects/CelCard3D";
 
 export default function AgentsPage() {
   const { t } = useTranslation();
@@ -53,12 +54,20 @@ export default function AgentsPage() {
         count={`${active} active`}
       />
 
-      {/* KPI Stats Deck */}
+      {/* KPI Stats Deck (3渲2 触觉物理卡片) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Stat label="Total Agents" value={agents.length} hint="全域代理人注册" tone="info" />
-        <Stat label="Active Nodes" value={active} hint="并发执行中" tone="ok" />
-        <Stat label="Standby / Paused" value={agents.filter((a) => a.status === "paused").length} tone="warn" />
-        <Stat label="Failed / Blocked" value={agents.filter((a) => a.status === "failed").length} tone="err" />
+        <CelCard3D className="h-full">
+          <Stat label="Total Agents" value={agents.length} hint="全域代理人注册" tone="info" />
+        </CelCard3D>
+        <CelCard3D className="h-full">
+          <Stat label="Active Nodes" value={active} hint="并发执行中" tone="ok" />
+        </CelCard3D>
+        <CelCard3D className="h-full">
+          <Stat label="Standby / Paused" value={agents.filter((a) => a.status === "paused").length} tone="warn" />
+        </CelCard3D>
+        <CelCard3D className="h-full">
+          <Stat label="Failed / Blocked" value={agents.filter((a) => a.status === "failed").length} tone="err" />
+        </CelCard3D>
       </div>
 
       {/* Main Grid: Left Operational Table & Comms, Right Real 3D Cel Shader Terminal */}

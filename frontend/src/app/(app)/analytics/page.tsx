@@ -26,6 +26,7 @@ import { MOCK_KPI_FALLBACK, COST_SERIES_FALLBACK } from "@/mocks/data";
 import type { KpiCard, CostPoint } from "@/mocks/schemas/analytics";
 import { useTranslation } from "@/lib/i18n";
 import { CelButton3D } from "@/components/effects/Cel3DUI";
+import { CelCard3D } from "@/components/effects/CelCard3D";
 
 function MiniLineChart({ data }: { data: ReadonlyArray<CostPoint> }) {
   const { t } = useTranslation();
@@ -164,7 +165,9 @@ export default function AnalyticsPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {kpi.map((k) => (
-          <Stat key={k.label} label={k.label} value={k.value} hint={k.hint} tone={k.tone} />
+          <CelCard3D key={k.label} className="h-full">
+            <Stat label={k.label} value={k.value} hint={k.hint} tone={k.tone} />
+          </CelCard3D>
         ))}
       </div>
 
@@ -181,47 +184,49 @@ export default function AnalyticsPage() {
       />
 
       {activeTab === "burndown" && (
-        <div data-testid="tab-burndown" className="card relative overflow-hidden">
-          <div className="flex items-center justify-between mb-2">
-            <SectionTitle><TrendingDown size={11} className="inline mr-1 text-accent" /> Sprint Burndown Chart (14 days)</SectionTitle>
-            <span className="text-xs text-ink-dim font-mono flex items-center gap-1.5">
-              <Cpu size={11} className="text-accent" />
-              <span>MAX: <strong className="text-accent font-semibold">{maxRemaining} SP</strong></span>
-            </span>
+        <CelCard3D>
+          <div data-testid="tab-burndown" className="card relative overflow-hidden">
+            <div className="flex items-center justify-between mb-2">
+              <SectionTitle><TrendingDown size={11} className="inline mr-1 text-accent" /> Sprint Burndown Chart (14 days)</SectionTitle>
+              <span className="text-xs text-ink-dim font-mono flex items-center gap-1.5">
+                <Cpu size={11} className="text-accent" />
+                <span>MAX: <strong className="text-accent font-semibold">{maxRemaining} SP</strong></span>
+              </span>
+            </div>
+            <svg viewBox="0 0 500 200" className="w-full h-64">
+              <defs>
+                <linearGradient id="burn-fill-analytics" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.35" />
+                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <line x1="30" y1="170" x2="490" y2="170" stroke="var(--color-border)" />
+              <line x1="30" y1="20" x2="30"  y2="170" stroke="var(--color-border)" />
+              <line x1="30" y1="30" x2="490" y2="155" stroke="#6e7681" strokeDasharray="4,4" />
+              <path
+                d={`M 30 ${170 - (burndown[0]?.remaining_points || 0) / maxRemaining * 140} ` +
+                   burndown.map((b, i) => `L ${30 + (i * 460 / (Math.max(burndown.length - 1, 1)))} ${170 - (b.remaining_points / maxRemaining) * 140}`).join(" ") +
+                   ` L 490 170 L 30 170 Z`}
+                fill="url(#burn-fill-analytics)"
+              />
+              <path
+                d={`M 30 ${170 - (burndown[0]?.remaining_points || 0) / maxRemaining * 140} ` +
+                   burndown.map((b, i) => `L ${30 + (i * 460 / (Math.max(burndown.length - 1, 1)))} ${170 - (b.remaining_points / maxRemaining) * 140}`).join(" ")}
+                fill="none"
+                stroke="#00f0ff"
+                strokeWidth="2.5"
+                className="drop-shadow-[0_0_8px_rgba(0,240,255,0.6)]"
+              />
+              <text x="5" y="30" fontSize="11" fill="var(--color-text-dim)" fontFamily="monospace" fontWeight="bold">{maxRemaining}</text>
+              <text x="5" y="170" fontSize="11" fill="var(--color-text-dim)" fontFamily="monospace" fontWeight="bold">0</text>
+              <text x="240" y="190" fontSize="11" fill="var(--color-text-dim)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">// SPRINT TIMELINE (14 DAYS) //</text>
+            </svg>
+            <div className="flex items-center gap-4 text-sm text-ink-dim mt-2 pt-2 border-t border-line">
+              <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-info shadow-[0_0_6px_rgba(0,240,255,0.8)]" /> 实际剩余点数 (Actual Remaining)</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 border-t border-dashed border-ink-mute" /> 理想燃尽斜率 (Ideal Guideline)</span>
+            </div>
           </div>
-          <svg viewBox="0 0 500 200" className="w-full h-64">
-            <defs>
-              <linearGradient id="burn-fill-analytics" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <line x1="30" y1="170" x2="490" y2="170" stroke="var(--color-border)" />
-            <line x1="30" y1="20" x2="30"  y2="170" stroke="var(--color-border)" />
-            <line x1="30" y1="30" x2="490" y2="155" stroke="#6e7681" strokeDasharray="4,4" />
-            <path
-              d={`M 30 ${170 - (burndown[0]?.remaining_points || 0) / maxRemaining * 140} ` +
-                 burndown.map((b, i) => `L ${30 + (i * 460 / (Math.max(burndown.length - 1, 1)))} ${170 - (b.remaining_points / maxRemaining) * 140}`).join(" ") +
-                 ` L 490 170 L 30 170 Z`}
-              fill="url(#burn-fill-analytics)"
-            />
-            <path
-              d={`M 30 ${170 - (burndown[0]?.remaining_points || 0) / maxRemaining * 140} ` +
-                 burndown.map((b, i) => `L ${30 + (i * 460 / (Math.max(burndown.length - 1, 1)))} ${170 - (b.remaining_points / maxRemaining) * 140}`).join(" ")}
-              fill="none"
-              stroke="#00f0ff"
-              strokeWidth="2.5"
-              className="drop-shadow-[0_0_8px_rgba(0,240,255,0.6)]"
-            />
-            <text x="5" y="30" fontSize="11" fill="var(--color-text-dim)" fontFamily="monospace" fontWeight="bold">{maxRemaining}</text>
-            <text x="5" y="170" fontSize="11" fill="var(--color-text-dim)" fontFamily="monospace" fontWeight="bold">0</text>
-            <text x="240" y="190" fontSize="11" fill="var(--color-text-dim)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">// SPRINT TIMELINE (14 DAYS) //</text>
-          </svg>
-          <div className="flex items-center gap-4 text-sm text-ink-dim mt-2 pt-2 border-t border-line">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-info shadow-[0_0_6px_rgba(0,240,255,0.8)]" /> 实际剩余点数 (Actual Remaining)</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-0.5 border-t border-dashed border-ink-mute" /> 理想燃尽斜率 (Ideal Guideline)</span>
-          </div>
-        </div>
+        </CelCard3D>
       )}
 
       {activeTab === "gantt" && (
@@ -239,18 +244,20 @@ export default function AnalyticsPage() {
       )}
 
       {activeTab === "cost" && (
-        <div className="card mb-3" data-testid="cost-trend-card">
-          <div className="flex items-center justify-between mb-2">
-            <SectionTitle>Daily Cost Trend (7-day API & Model Spend)</SectionTitle>
-            <TrendingUp size={14} className="text-ok drop-shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
+        <CelCard3D className="mb-3">
+          <div className="card" data-testid="cost-trend-card">
+            <div className="flex items-center justify-between mb-2">
+              <SectionTitle>Daily Cost Trend (7-day API & Model Spend)</SectionTitle>
+              <TrendingUp size={14} className="text-ok drop-shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
+            </div>
+            <MiniLineChart data={costSeries} />
+            <div className="flex justify-between mt-2 font-mono text-xs text-ink-dim">
+              {costSeries.map((d) => (
+                <span key={d.day}>{d.day} (${d.usd})</span>
+              ))}
+            </div>
           </div>
-          <MiniLineChart data={costSeries} />
-          <div className="flex justify-between mt-2 font-mono text-xs text-ink-dim">
-            {costSeries.map((d) => (
-              <span key={d.day}>{d.day} (${d.usd})</span>
-            ))}
-          </div>
-        </div>
+        </CelCard3D>
       )}
 
       {activeTab === "velocity" && (

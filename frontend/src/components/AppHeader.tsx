@@ -21,6 +21,7 @@ import { useNavStore } from "@/lib/nav/navStore";
 import { MODULE_MAP, getCategoryStyles, type ModuleDefinition } from "@/lib/nav/registry";
 import { AppMatrixDrawer } from "@/components/nav/AppMatrixDrawer";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
+import { TacticalCore3D } from "@/components/effects/TacticalCore3D";
 
 export function AppHeader() {
   const pathname = usePathname() ?? "/";
@@ -100,8 +101,11 @@ export function AppHeader() {
 
           {/* === Right: Tactical HUD, App Matrix, Theme Toggle, ⌘K, bell, status, avatar === */}
           <div className="ml-auto flex items-center gap-3">
-            {/* Tactical HUD Telemetry (from chrono-vibe) */}
+            {/* Tactical HUD Telemetry with micro 3D Cel Gyroscope Core */}
             <div className="hidden xl:flex items-center gap-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black px-3.5 h-9 cel-shadow">
+              <div className="flex items-center justify-center shrink-0" data-testid="tactical-core-slot" title="Tactical Neural Gyroscope">
+                <TacticalCore3D size={26} status="nominal" />
+              </div>
               <div className="flex flex-col justify-center">
                 <div className="flex justify-between items-center text-[10px] font-mono font-bold tracking-wider text-[var(--cel-text-secondary,#94a3b8)]">
                   <span>NEURAL SYNC 〔神経同調〕</span>
