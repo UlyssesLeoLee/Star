@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
 
-use crate::{ParseResult, Symbol, SymbolKind};
+use crate::{ParseResult, Symbol};
 
 /// Symbol Resolver 错误
 #[derive(Debug, Error)]

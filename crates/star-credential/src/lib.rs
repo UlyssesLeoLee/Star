@@ -21,7 +21,7 @@ use thiserror::Error;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use domain_kms::{EncryptedBlob, KeyId, KmsClient, LocalMockKms};
+use domain_kms::{EncryptedBlob, KmsClient, LocalMockKms};
 
 /// 凭证 Provider (5 类 + F-02 2 类 LLM provider)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]

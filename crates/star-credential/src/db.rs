@@ -8,17 +8,14 @@
 //!
 //! 不在本 PoC: 真实 PostgreSQL + RLS 13 類 (V2-3 完整版)
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Mutex;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{
-    CredentialError, CredentialMetadata, CredentialPlaintext, CredentialRecord, CredentialStatus,
-    Provider,
-};
+use crate::{CredentialMetadata, CredentialRecord, CredentialStatus, Provider};
 use domain_kms::EncryptedBlob;
 
 /// 持久化层错误

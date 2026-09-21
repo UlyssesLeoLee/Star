@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 use crate::entity::{
     ConsumedByKind, Feedback, FeedbackConsumedEvent, FeedbackInboxItem, FeedbackResolution,
-    ResolutionEvidence, ResolutionEvidenceRef,
+    ResolutionEvidence,
 };
 use crate::error::FeedbackError;
 use crate::event::{

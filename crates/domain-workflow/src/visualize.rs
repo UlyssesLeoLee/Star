@@ -3,7 +3,6 @@
 //! 把工作流状态机导出为 SVG / DOT / Mermaid 格式, 给前端 w4 编辑器对接.
 
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 // =====================================================================
 // SVG 导出

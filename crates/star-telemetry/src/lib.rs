@@ -14,13 +14,8 @@
 
 #![allow(missing_docs)] // G.9 PoC 启动, Phase 2 spec 完成后补 doc
 
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::sync::RwLock;
 use uuid::Uuid;
 
 mod exporter;

@@ -16,7 +16,6 @@
 //!   - 不接 KMS, fallback 链明文配置
 
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use thiserror::Error;
 
 /// Fallback 触发原因 (简化版: untagged enum, 序列化所有字段为 JSON value, 不强加 tag 结构, 避免 newtype 限制)
