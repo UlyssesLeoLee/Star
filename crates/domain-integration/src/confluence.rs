@@ -177,6 +177,7 @@ impl ConfluenceLink {
 
 /// **Confluence Adapter 内部状态**
 #[derive(Debug)]
+#[allow(dead_code)] // W4.1 follow-up 接入 Confluence API 时会用
 struct ConfluenceAdapterInner {
     /// Confluence 站点 URL(例如 "https://acme.atlassian.net")
     site_url: String,

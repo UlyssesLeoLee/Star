@@ -595,6 +595,7 @@ impl Default for InMemoryNotificationService {
     }
 }
 
+#[allow(dead_code)] // config const, 后续 worker 会引用
 const MAX_RETRY: u32 = 5;
 
 #[async_trait]

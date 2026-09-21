@@ -332,7 +332,7 @@ impl HermesClient {
     }
 
     /// Mock cancel response
-    fn mock_cancel(id: Uuid) -> CancelResponse {
+    fn mock_cancel(_id: Uuid) -> CancelResponse {
         use chrono::Utc;
         CancelResponse {
             cancelled: true,

@@ -379,7 +379,7 @@ impl WindowService {
         if window.upload_trigger != trigger {
             return Err(WindowError::TriggerMismatch(window.upload_trigger, trigger));
         }
-        let tab = window
+        let _tab = window
             .tabs
             .iter()
             .find(|t| t.id == tab_id)

@@ -390,6 +390,8 @@ html.dark,
   /* 内嵌斜切高光/暗面 — 硬边斜角 (Hard Bevel, Zero Blur) 增强物理厚度感 */
   --cel-bevel-hi: rgba(255, 255, 255, 0.14);
   --cel-bevel-lo: rgba(0, 0, 0, 0.35);
+  --cel-glint-color: rgba(255, 255, 255, 0.28);
+  --cel-glint-rim: rgba(0, 240, 255, 0.16);
 }
 
 /* ── 2. LIGHT MODE SYSTEM (.theme-light / html.light) ── */
@@ -410,6 +412,8 @@ html.light,
   --cel-shadow-color: #0a0d14;
   --cel-bevel-hi: rgba(255, 255, 255, 0.65);
   --cel-bevel-lo: rgba(10, 13, 20, 0.18);
+  --cel-glint-color: rgba(255, 255, 255, 0.70);
+  --cel-glint-rim: rgba(0, 85, 255, 0.15);
 }
 
 /* 1. Comic Halftone & Screentone Patterns */
@@ -507,4 +511,65 @@ html.light,
 @keyframes burstPulse {
   0%, 100% { filter: contrast(1.05) saturate(1.1); }
   50% { filter: contrast(1.15) saturate(1.25) brightness(1.03); }
+}
+
+/* 7. Hardware-Accelerated 3D Space & Tactile Depth Utilities */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.perspective-1200 {
+  perspective: 1200px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.translate-z-sm {
+  transform: translateZ(6px);
+}
+
+.translate-z-md {
+  transform: translateZ(14px);
+}
+
+.translate-z-lg {
+  transform: translateZ(24px);
+}
+
+/* Stepped Anime Specular Glint (Zero Diffuse Blur) */
+.cel-specular-glint {
+  position: relative;
+  overflow: hidden;
+}
+
+.cel-specular-glint::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    transparent 42%,
+    rgba(255, 255, 255, 0.28) 42%,
+    rgba(255, 255, 255, 0.45) 45%,
+    rgba(0, 240, 255, 0.35) 47%,
+    transparent 47%,
+    transparent 100%
+  );
+  opacity: 0;
+  transition: opacity 120ms ease, transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateX(-40%) translateY(-40%);
+  z-index: 5;
+}
+
+.cel-specular-glint:hover::before {
+  opacity: 1;
+  transform: translateX(40%) translateY(40%);
 }
