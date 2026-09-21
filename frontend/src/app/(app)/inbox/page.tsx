@@ -17,6 +17,7 @@ import { MOCK_NOTIFS_FALLBACK } from "@/mocks/data";
 import type { MockNotif } from "@/mocks/schemas/inbox";
 import { useTranslation } from "@/lib/i18n";
 import { CelBeacon3D } from "@/components/effects/Cel3DUI";
+import { CelCard3D } from "@/components/effects/CelCard3D";
 
 export default function InboxPage() {
   const { t } = useTranslation();
@@ -63,33 +64,35 @@ export default function InboxPage() {
         count={`${unread} unread`}
       />
 
-      {/* Tactical Speech Bubble Briefing Card (from chrono-vibe) */}
-      <div className="card relative overflow-hidden clip-hud-corner">
-        <div className="flex items-center justify-between border-b-2 border-black pb-2.5 mb-3.5">
-          <h3 className="text-sm font-black uppercase tracking-wider text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
-            <Radio size={15} className="text-[var(--cel-crimson,#ff184c)] animate-pulse" />
-            <span>TACTICAL TRANSMISSION // CHANNEL 01</span>
-          </h3>
-          <span className="text-xs font-mono font-bold bg-black text-[var(--cel-gold,#ffc400)] px-2.5 py-0.5 border border-black">
-            HIGH PRIORITY
-          </span>
-        </div>
+      {/* Tactical Speech Bubble Briefing Card (from chrono-vibe with 3渲2 触觉物理卡片) */}
+      <CelCard3D>
+        <div className="card relative overflow-hidden clip-hud-corner">
+          <div className="flex items-center justify-between border-b-2 border-black pb-2.5 mb-3.5">
+            <h3 className="text-sm font-black uppercase tracking-wider text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
+              <Radio size={15} className="text-[var(--cel-crimson,#ff184c)] animate-pulse" />
+              <span>TACTICAL TRANSMISSION // CHANNEL 01</span>
+            </h3>
+            <span className="text-xs font-mono font-bold bg-black text-[var(--cel-gold,#ffc400)] px-2.5 py-0.5 border border-black">
+              HIGH PRIORITY
+            </span>
+          </div>
 
-        <div className="border-2 border-black p-4 bg-[var(--cel-surface-stage,#090d16)] cel-shadow relative">
-          <p className="text-sm font-medium leading-relaxed text-[var(--cel-text-primary,#ffffff)]">
-            <strong className="text-[var(--cel-crimson,#ff184c)] font-black mr-2">[MAVIS // 統制官]:</strong>
-            「全站 3渲2 视觉构架已接入中央通信信道。所有领域状态流转均以高对比度墨线阶梯卡片呈现，零脏状态逃逸，随时执行战术派发！」
-          </p>
-        </div>
+          <div className="border-2 border-black p-4 bg-[var(--cel-surface-stage,#090d16)] cel-shadow relative">
+            <p className="text-sm font-medium leading-relaxed text-[var(--cel-text-primary,#ffffff)]">
+              <strong className="text-[var(--cel-crimson,#ff184c)] font-black mr-2">[MAVIS // 統制官]:</strong>
+              「全站 3渲2 视觉构架已接入中央通信信道。所有领域状态流转均以高对比度墨线阶梯卡片呈现，零脏状态逃逸，随时执行战术派发！」
+            </p>
+          </div>
 
-        <div className="flex items-center justify-between text-xs font-mono text-[var(--cel-text-secondary,#94a3b8)] pt-3">
-          <span className="flex items-center gap-1.5">
-            <span className="size-2 bg-emerald-400 border border-black rotate-45" />
-            COGNITIVE LOAD: 0.12 (OPTIMAL)
-          </span>
-          <span className="text-[var(--cel-cyan,#00f0ff)] font-bold">CHARISMA: MAXIMAL</span>
+          <div className="flex items-center justify-between text-xs font-mono text-[var(--cel-text-secondary,#94a3b8)] pt-3">
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 bg-emerald-400 border border-black rotate-45" />
+              COGNITIVE LOAD: 0.12 (OPTIMAL)
+            </span>
+            <span className="text-[var(--cel-cyan,#00f0ff)] font-bold">CHARISMA: MAXIMAL</span>
+          </div>
         </div>
-      </div>
+      </CelCard3D>
 
       {/* Notifications Inked Feed */}
       <div className="card">

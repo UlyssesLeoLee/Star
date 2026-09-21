@@ -80,6 +80,7 @@ import type {
   Board, Project, WorkItem, WorkItemStatus, Identity, Workspace, Sprint, Milestone, Iso8601,
 } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
+import { CelCard3D } from "@/components/effects/CelCard3D";
 
 // 5 tab 类型已迁出到 @/lib/cookies (per 2026-09-01 16:41 JST cookie-default 拍板, server 需要共享)
 const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode }> = [
@@ -450,6 +451,22 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
         selectedId={selectedProjectId}
         onSelect={setSelectedProjectId}
       />
+
+      {/* ---- Project Telemetry Deck (3渲2 触觉物理卡片) ---- */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <CelCard3D className="h-full">
+          <Stat label="Open Tasks" value={kpis.open} hint="待处理 / 进行中" tone="info" />
+        </CelCard3D>
+        <CelCard3D className="h-full">
+          <Stat label="Completed" value={kpis.closed} hint="已闭环事项" tone="ok" />
+        </CelCard3D>
+        <CelCard3D className="h-full">
+          <Stat label="Active Agents" value={kpis.activeAgents} hint="自律代理人" tone="warn" />
+        </CelCard3D>
+        <CelCard3D className="h-full">
+          <Stat label="Worktrees" value={kpis.worktrees} hint="隔离工作区分支" tone="default" />
+        </CelCard3D>
+      </div>
 
       {/* ---- Tabs ---- */}
       <Tabs
@@ -929,8 +946,9 @@ function ProjectMembers({
   return (
     <div data-testid="projects-members-tab" className="space-y-3">
       <DomainMarker domain="player" label="player 域 (用户/identity/workspace)" />
-      <div className="card">
-        <div className="flex items-center justify-between mb-2">
+      <CelCard3D>
+        <div className="card">
+          <div className="flex items-center justify-between mb-2">
           <div>
             <div className="text-sm font-semibold">{project.name} — Members</div>
             <div className="text-[10px] text-ink-mute font-mono">
@@ -1000,7 +1018,8 @@ function ProjectMembers({
             </tbody>
           </table>
         )}
-      </div>
+        </div>
+      </CelCard3D>
       {/* 已知缺口 #4 详细说明 */}
       <div className="text-[10px] text-ink-mute font-mono">
         ⚠ 角色 (project_admin / developer / viewer) 用 mock 推导: owner → admin, 跨多 workspace → developer, 单一 → viewer

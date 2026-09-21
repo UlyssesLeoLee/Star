@@ -1,0 +1,80 @@
+{
+  "_meta": {
+    "version": "v1",
+    "module": "streamable-http",
+    "scenario": "retry-with-backoff-after-5xx",
+    "purpose": "per ULYS-140 缺口 #3 — Streamable HTTP retry case (per docs/test-design/TEST-DESIGN-STREAMABLE-HTTP-001.md §3.5 重试契约)",
+    "method": "POST",
+    "endpoint": "/v1/streamable/sessions/{id}/events/retry",
+    "added_in": "v1.2 (commit ULYS-140 v1.2)"
+  },
+  "request_sequence": [
+    {
+      "step": 1,
+      "method": "POST",
+      "url": "/v1/streamable/sessions/sess_retry_test/events",
+      "headers": {
+        "Content-Type": "text/event-stream",
+        "Last-Event-Id": "evt_retry_001"
+      },
+      "body": { "event_type": "agent.thought.delta", "delta": "..." },
+      "response": {
+        "status": 503,
+        "headers": { "Retry-After": "2" },
+        "body": { "error": "upstream_unavailable", "error_code": "STREAMABLE_UPSTREAM_503" }
+      },
+      "client_action": "wait Retry-After (2s) + apply backoff"
+    },
+    {
+      "step": 2,
+      "method": "POST",
+      "url": "/v1/streamable/sessions/sess_retry_test/events",
+      "headers": {
+        "Content-Type": "text/event-stream",
+        "Last-Event-Id": "evt_retry_001",
+        "X-Retry-Attempt": "1",
+        "X-Retry-Backoff-Ms": "2000"
+      },
+      "response": {
+        "status": 503,
+        "headers": { "Retry-After": "4" },
+        "body": { "error": "upstream_unavailable", "error_code": "STREAMABLE_UPSTREAM_503" }
+      },
+      "client_action": "double backoff (2000ms → 4000ms)"
+    },
+    {
+      "step": 3,
+      "method": "POST",
+      "url": "/v1/streamable/sessions/sess_retry_test/events",
+      "headers": {
+        "Content-Type": "text/event-stream",
+        "Last-Event-Id": "evt_retry_001",
+        "X-Retry-Attempt": "2",
+        "X-Retry-Backoff-Ms": "4000"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream",
+          "Last-Event-Id": "evt_retry_002"
+        },
+        "body_sse": [
+          "id: evt_retry_002",
+          "event: agent.thought.delta",
+          "data: {\"delta\":\"recovered after 2 retries\"}",
+          "",
+          "id: evt_retry_003",
+          "event: agent.done",
+          "data: {\"status\":\"ok\"}",
+          ""
+        ]
+      },
+      "client_action": "resume stream from evt_retry_002 onward"
+    }
+  ],
+  "expected_behavior": {
+    "total_attempts": 3,
+    "total_backoff_ms": 6000,
+    "idempotency": "Last-Event-Id preserved across retries — server must dedupe by event id, NOT replay"
+  }
+}

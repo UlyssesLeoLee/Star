@@ -53,6 +53,7 @@ const CEL_FRAGMENT_SHADER = /* glsl */ `
   uniform vec3 uShadowColor;
   uniform vec3 uHighlightColor;
   uniform vec3 uRimColor;
+  uniform vec3 uCounterRimColor;
   uniform vec3 uLightPos;
   uniform float uBands;
   uniform float uHalftoneScale;
@@ -103,16 +104,18 @@ const CEL_FRAGMENT_SHADER = /* glsl */ `
       color = mix(color, uShadowColor * 0.5, (1.0 - dotMask) * shadowMask * uHalftoneIntensity);
     }
 
-    // 5. Hard-Edged Anime Specular Highlight
+    // 5. Hard-Edged Anime Stepped Specular Glint
     float NdotH = max(0.0, dot(N, H));
-    float spec = smoothstep(0.92, 0.95, pow(NdotH, 32.0));
-    color += spec * uHighlightColor * 0.85;
+    float spec = step(0.93, pow(NdotH, 36.0));
+    color += spec * uHighlightColor * 0.95;
 
-    // 6. Anime Fresnel Rim Light (Edge Sheen)
+    // 6. Anime Dual-Rim Lighting (Key Rim + Counter Rim Chroma Shift)
     if (uEnableRim > 0.5) {
       float fresnel = 1.0 - max(0.0, dot(N, V));
-      float rim = smoothstep(0.68, 0.74, fresnel) * smoothstep(0.05, 0.3, halfLambert);
-      color += rim * uRimColor * 1.2;
+      float keyRim = smoothstep(0.68, 0.74, fresnel) * smoothstep(0.05, 0.3, halfLambert);
+      float counterRim = smoothstep(0.76, 0.82, fresnel) * (1.0 - smoothstep(0.05, 0.3, halfLambert));
+      color += keyRim * uRimColor * 1.3;
+      color += counterRim * uCounterRimColor * 1.05;
     }
 
     gl_FragColor = vec4(color, 1.0);
@@ -150,6 +153,7 @@ const PALETTE_CONFIGS: Record<
     shadow: string;
     highlight: string;
     rim: string;
+    counterRim: string;
     outline: string;
   }
 > = {
@@ -159,6 +163,7 @@ const PALETTE_CONFIGS: Record<
     shadow: "#3d0513",
     highlight: "#ffffff",
     rim: "#00f0ff",
+    counterRim: "#ffc400",
     outline: "#000000",
   },
   cyan: {
@@ -166,6 +171,7 @@ const PALETTE_CONFIGS: Record<
     shadow: "#032838",
     highlight: "#ffffff",
     rim: "#ff184c",
+    counterRim: "#ffc400",
     outline: "#000000",
   },
   gold: {
@@ -173,6 +179,7 @@ const PALETTE_CONFIGS: Record<
     shadow: "#382902",
     highlight: "#ffffff",
     rim: "#00f0ff",
+    counterRim: "#ff184c",
     outline: "#000000",
   },
   stealth: {
@@ -180,6 +187,7 @@ const PALETTE_CONFIGS: Record<
     shadow: "#090d16",
     highlight: "#8ca8db",
     rim: "#00f0ff",
+    counterRim: "#ff184c",
     outline: "#000000",
   },
 
@@ -189,6 +197,7 @@ const PALETTE_CONFIGS: Record<
     shadow: "#2a040b",
     highlight: "#ffffff",
     rim: "#0055ff",
+    counterRim: "#d48800",
     outline: "#0a0d14",
   },
   "manga-cobalt": {
@@ -196,6 +205,7 @@ const PALETTE_CONFIGS: Record<
     shadow: "#05102e",
     highlight: "#ffffff",
     rim: "#e60033",
+    counterRim: "#0055ff",
     outline: "#0a0d14",
   },
   "manga-gold": {
@@ -203,6 +213,7 @@ const PALETTE_CONFIGS: Record<
     shadow: "#2b1b00",
     highlight: "#ffffff",
     rim: "#0055ff",
+    counterRim: "#e60033",
     outline: "#0a0d14",
   },
   "manga-sumi": {
@@ -210,6 +221,7 @@ const PALETTE_CONFIGS: Record<
     shadow: "#06080d",
     highlight: "#ffffff",
     rim: "#e60033",
+    counterRim: "#0055ff",
     outline: "#0a0d14",
   },
 };
@@ -245,6 +257,7 @@ function CelShadedMesh({
       uShadowColor: { value: new THREE.Color(p.shadow) },
       uHighlightColor: { value: new THREE.Color(p.highlight) },
       uRimColor: { value: new THREE.Color(p.rim) },
+      uCounterRimColor: { value: new THREE.Color(p.counterRim) },
       uLightPos: { value: lightPos },
       uBands: { value: bands },
       uHalftoneScale: { value: 0.15 },
@@ -422,7 +435,7 @@ function ChronoScene({
 }
 
 // ============================================================================
-// 5. EXPORTABLE CONTROLLER CANVAS
+// 5. EXPORTABLE CONTROLLER CANVAS (DUAL-THEME ADAPTIVE & VIEWPORT GUARDED)
 // ============================================================================
 export function AnimeCelShaderCanvas({
   palette = "crimson",
@@ -433,16 +446,75 @@ export function AnimeCelShaderCanvas({
   speed = 1.0,
   className = "",
 }: AnimeCelShaderProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isClient, setIsClient] = useState(false);
+  const [inView, setInView] = useState(true);
+  const [tabVisible, setTabVisible] = useState(true);
+  const [isLight, setIsLight] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
+
+    const checkTheme = () => {
+      setIsLight(document.documentElement.classList.contains("light"));
+    };
+    checkTheme();
+
+    let themeObserver: MutationObserver | null = null;
+    if (typeof MutationObserver !== "undefined") {
+      themeObserver = new MutationObserver(checkTheme);
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+    }
+
+    const handleVisibilityChange = () => {
+      setTabVisible(!document.hidden);
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    let observer: IntersectionObserver | null = null;
+    if (containerRef.current && typeof IntersectionObserver !== "undefined") {
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          setInView(entry.isIntersecting);
+        },
+        { threshold: 0.05 }
+      );
+      observer.observe(containerRef.current);
+    }
+
+    return () => {
+      themeObserver?.disconnect();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      observer?.disconnect();
+    };
   }, []);
+
+  // ── Automatic Dual-Theme Masterpiece Palette Mapping ──
+  const activePalette = useMemo<CelPalette>(() => {
+    if (!isLight) return palette;
+    switch (palette) {
+      case "crimson":
+        return "manga-vermilion";
+      case "cyan":
+        return "manga-cobalt";
+      case "gold":
+        return "manga-gold";
+      case "stealth":
+        return "manga-sumi";
+      default:
+        return palette;
+    }
+  }, [palette, isLight]);
+
+  const shouldRender = isClient && inView && tabVisible;
 
   if (!isClient) {
     return (
-      <div className={`w-full h-full bg-[#080c14] flex items-center justify-center ${className}`}>
-        <span className="text-xs font-mono font-bold text-[#00f0ff] animate-pulse">
+      <div className={`w-full h-full bg-[var(--cel-surface-stage,#090d16)] flex items-center justify-center ${className}`}>
+        <span className="text-xs font-mono font-bold text-[var(--cel-cyan,#00f0ff)] animate-pulse">
           INITIALIZING_3D_CEL_PIPELINE...
         </span>
       </div>
@@ -450,14 +522,15 @@ export function AnimeCelShaderCanvas({
   }
 
   return (
-    <div className={`relative w-full h-full overflow-hidden ${className}`}>
+    <div ref={containerRef} className={`relative w-full h-full overflow-hidden ${className}`}>
       <Canvas
         camera={{ position: [0, 0, 6.2], fov: 45 }}
-        gl={{ antialias: true, alpha: true }}
+        gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
+        frameloop={shouldRender ? "always" : "demand"}
         className="w-full h-full"
       >
         <ChronoScene
-          palette={palette}
+          palette={activePalette}
           outlineThickness={outlineThickness}
           bands={bands}
           enableHalftone={enableHalftone}
