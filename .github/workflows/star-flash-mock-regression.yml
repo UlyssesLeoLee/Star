@@ -1,0 +1,49 @@
+name: star-flash-mock regression (UT+IT+ST)
+
+# 触发: PR 或 push 影响 tools/star-flash-mock/**, .github/workflows/star-flash-mock-regression.yml
+# 目的: per ULYS-140 缺口 #7 — docs/ 回归报告 接入 CI, 失败即停
+# 守门: #1+#11+#12+#24 (per AGENTS.md §4)
+# 实证: tools/star-flash-mock/scripts/run-all.sh v1.1 — 13/13 PASS
+
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "tools/star-flash-mock/**"
+      - ".github/workflows/star-flash-mock-regression.yml"
+  push:
+    branches: [main, dev]
+    paths:
+      - "tools/star-flash-mock/**"
+      - ".github/workflows/star-flash-mock-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: run-all.sh UT+IT+ST
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run star-flash-mock regression (run-all.sh v1.1)
+        # 守门 #1+#24: 失败即停 (set -e + exit 1 from run-all.sh on FAIL)
+        # Ubuntu bash 兼容 run-all.sh (无需 cygpath, 路径原生 posix)
+        run: |
+          set -euo pipefail
+          bash tools/star-flash-mock/scripts/run-all.sh
+
+      - name: Upload regression report artifact
+        # 守门 #12: commit-time docs 同步 — 把本日综合报告 upload, 方便 PR review 对比
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: star-flash-mock-regression-report
+          path: |
+            tools/star-flash-mock/docs/regression-report-*.md
+          if-no-files-found: warn
+          retention-days: 30

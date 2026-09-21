@@ -9,6 +9,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 FIVE_DIR="$REPO_ROOT/tools/star-flash-mock/mock_data/five-domain"
 AUDIT_DOC="$REPO_ROOT/docs/qa/STAR-FIVE-DOMAIN-LEAD-AUDIT-001.md"
+# Convert POSIX paths to Windows-style for native python3 (MSYS conversion off)
+LIB_WIN="$(cygpath -w "$REPO_ROOT/tools/star-flash-mock/scripts/_lib_validate.py" 2>/dev/null || echo "$REPO_ROOT/tools/star-flash-mock/scripts/_lib_validate.py")"
+FIVE_DIR_WIN="$(cygpath -w "$FIVE_DIR" 2>/dev/null || echo "$FIVE_DIR")"
+PYTHON_CMD="${PYTHON:-python3}"
 
 echo "==== 5 域 Lead 30 fixture 走查 (per 守门 #3 + #14) ===="
 
@@ -100,21 +104,19 @@ else
     echo "  [WARN] audit doc 缺失, 缺标"
 fi
 
-# ===== 6. JSON 格式校验 =====
+# ===== 6. JSON 格式校验 (Python batch helper, 避免 for-loop + python3 -c 走 MSYS path 失败) =====
 echo ""
-echo "--- 6. fixture JSON 格式校验 ---"
-invalid_count=0
-for f in $(find "$FIVE_DIR" -name "*.json" 2>/dev/null); do
-    if ! python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
-        echo "  [FAIL] invalid JSON: $f"
-        invalid_count=$((invalid_count + 1))
-    fi
-done
-if [ "$invalid_count" -eq 0 ]; then
-    echo "  [OK] 30 份 fixture 全部有效 JSON"
-else
+echo "--- 6. fixture JSON 格式校验 (Python batch helper) ---"
+JSON_OUT=$("$PYTHON_CMD" "$LIB_WIN" validate-json "$FIVE_DIR_WIN" 2>&1)
+JSON_TOTAL=$(echo "$JSON_OUT" | grep "^TOTAL=" | cut -d= -f2)
+JSON_INVALID=$(echo "$JSON_OUT" | grep "^INVALID=" | cut -d= -f2)
+echo "  JSON validate: $JSON_TOTAL fixtures, $JSON_INVALID invalid"
+if [ "${JSON_INVALID:-0}" -ne 0 ]; then
+    echo "$JSON_OUT" | grep "^INVALID_FILE=" | head -5
+    echo "  [FAIL] $JSON_INVALID invalid JSON fixtures"
     exit 1
 fi
+echo "  [OK] $JSON_TOTAL 份 fixture 全部有效 JSON"
 
 # ===== 7. 守门 #5 无 secret 泄露 =====
 echo ""
