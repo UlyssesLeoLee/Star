@@ -5,6 +5,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use super::{AgentTask, TaskState, TaskStateTransition};
 
 /// WAL checkpoint 间隔 (ms) — per 守门 #13 a 派生 (W 短 TTL)
+#[allow(dead_code)] // config const, 后续 P3 阶段 taskqueue worker 会引用
 pub(crate) const WAL_CHECKPOINT_INTERVAL_MS: u64 = 60_000;
 
 /// 初始化 schema (idempotent)
