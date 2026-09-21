@@ -13,10 +13,8 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Mutex;
 use thiserror::Error;
-use uuid::Uuid;
 
 use crate::{CredentialMetadata, CredentialRecord, CredentialStatus, Provider};
-use domain_kms::EncryptedBlob;
 
 /// 持久化层错误
 #[derive(Debug, Error)]
@@ -332,6 +330,8 @@ fn parse_event_type(s: &str) -> Result<AuditEventType, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
+    use domain_kms::EncryptedBlob;
 
     fn make_record(provider: Provider, status: CredentialStatus) -> CredentialRecord {
         CredentialRecord {

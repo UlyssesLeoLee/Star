@@ -17,7 +17,7 @@ use crate::entity::{Integration, SyncState};
 use crate::error::IntegrationError;
 use crate::value_object::{
     ConflictStrategy, ExternalEntityId, ExternalSystemName, IntegrationId, IntegrationRelationType,
-    IntegrationSource, IntegrationState, ProjectId, TenantId, UserId,
+    IntegrationSource, IntegrationState, ProjectId, TenantId,
 };
 use crate::ActorContext;
 
