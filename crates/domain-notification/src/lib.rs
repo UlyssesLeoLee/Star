@@ -25,7 +25,7 @@
 //!
 //! Lead 责任: notification Lead
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
