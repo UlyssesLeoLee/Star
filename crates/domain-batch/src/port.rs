@@ -12,11 +12,11 @@ use serde::{Deserialize, Serialize};
 use star_context::ActorContext;
 
 use crate::domain::{
-    AlertRule, BatchDomain, Dag, Event, Log, LogChunk, LogOffset, Node, NodeExecutionResult,
-    NodeStatus, NodeType, Run, RunStatus, Sla, Task,
+    AlertRule, BatchDomain, Dag, Event, LogChunk, LogOffset, Node, NodeExecutionResult, NodeType,
+    Run, RunStatus, Sla, Task,
 };
 use crate::error::BatchError;
-use crate::{AlertRuleId, NodeId, NodeTypeId, RunId, SlaId, TaskId, TenantId, UserId, WorkerId};
+use crate::{AlertRuleId, NodeId, NodeTypeId, RunId, SlaId, TaskId, TenantId, UserId};
 
 // =====================================================================
 // Command 端口

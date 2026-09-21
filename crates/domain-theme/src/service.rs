@@ -1,8 +1,6 @@
 //! 主题系统应用服务
 
-use async_trait::async_trait;
 use std::sync::Arc;
-use uuid::Uuid;
 
 use super::context::ThemeContext;
 use super::entity::{ScopeOwner, Theme};
@@ -122,7 +120,7 @@ impl ThemeService {
             .find_by_scope(theme_id, scope, ctx.actor_id, ctx.tenant_id)
             .await?;
 
-        let mut theme = if let Some(mut t) = existing {
+        let theme = if let Some(mut t) = existing {
             // INV-THEME-04
             if !inv_04_version_monotonic(t.version, t.version + 1) {
                 return Err(ThemeError::Storage("version monotonicity".into()));

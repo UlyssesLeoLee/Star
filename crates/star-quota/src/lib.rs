@@ -154,6 +154,7 @@ impl QuotaStore for InMemoryQuotaStore {
 
     async fn insert_new_revision(&self, q: Quota) -> Result<Quota, QuotaError> {
         let mut by_id = self.by_id.write().await;
+        #[allow(unused_mut)] // Rust 1.84 false-positive on RwLockWriteGuard write().await
         let mut current = self.current.write().await;
         // 旧版本 (如有) 设 valid_to_ms
         if let Some(old_id) = current.get(&(q.tenant_id, q.resource)).copied() {
@@ -172,6 +173,7 @@ impl QuotaStore for InMemoryQuotaStore {
         resource: ResourceKind,
         delta: u64,
     ) -> Result<Quota, QuotaError> {
+        #[allow(unused_mut)] // Rust 1.84 false-positive on RwLockWriteGuard write().await
         let mut current = self.current.write().await;
         let id = current
             .get(&(tenant_id, resource))

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use star_treesitter::{Language, Symbol, SymbolKind};
+use star_treesitter::Symbol;
 
 /// TaskGraph 领域错误
 #[derive(Debug, Error)]
