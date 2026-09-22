@@ -141,10 +141,7 @@ impl ChatRequest {
             msg.validate().map_err(|_| -> &'static str {
                 // Re-borrow as a static string by leaking — only on error path,
                 // and only the first violation.
-                Box::leak(
-                    format!("chat message at index {idx} failed validation")
-                        .into_boxed_str(),
-                )
+                Box::leak(format!("chat message at index {idx} failed validation").into_boxed_str())
             })?;
         }
         Ok(())
