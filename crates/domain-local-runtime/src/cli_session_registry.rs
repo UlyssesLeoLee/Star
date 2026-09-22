@@ -115,7 +115,10 @@ impl CliSessionRegistry {
     }
 
     fn init_schema(&self) -> Result<(), CliSessionRegistryError> {
-        let conn = self.conn.lock().expect("cli_session registry mutex poisoned");
+        let conn = self
+            .conn
+            .lock()
+            .expect("cli_session registry mutex poisoned");
         conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS cli_session (
@@ -142,7 +145,10 @@ impl CliSessionRegistry {
 
     /// 插入新 session(`state` 必须是 `Created`; 调用方负责构造 `CliSession`)
     pub fn insert(&self, session: &CliSession) -> Result<(), CliSessionRegistryError> {
-        let conn = self.conn.lock().expect("cli_session registry mutex poisoned");
+        let conn = self
+            .conn
+            .lock()
+            .expect("cli_session registry mutex poisoned");
         let args_json = serde_json::to_string(&session.args)?;
         let history_json = serde_json::to_string(&session.state_history)?;
         let metadata_json = serde_json::to_string(&session.metadata)?;
@@ -171,7 +177,10 @@ impl CliSessionRegistry {
 
     /// 按 ID 查
     pub fn get(&self, id: CliSessionId) -> Result<CliSession, CliSessionRegistryError> {
-        let conn = self.conn.lock().expect("cli_session registry mutex poisoned");
+        let conn = self
+            .conn
+            .lock()
+            .expect("cli_session registry mutex poisoned");
         let row = conn
             .query_row(
                 "SELECT id, tenant_id, worktree_id, state, command, args_json,
@@ -194,7 +203,10 @@ impl CliSessionRegistry {
         tenant_id: TenantId,
         state: Option<CliSessionState>,
     ) -> Result<Vec<CliSession>, CliSessionRegistryError> {
-        let conn = self.conn.lock().expect("cli_session registry mutex poisoned");
+        let conn = self
+            .conn
+            .lock()
+            .expect("cli_session registry mutex poisoned");
         let (sql, state_str): (&str, Option<String>) = if let Some(s) = state {
             (
                 "SELECT id, tenant_id, worktree_id, state, command, args_json,
@@ -218,11 +230,8 @@ impl CliSessionRegistry {
         };
         let mut stmt = conn.prepare(sql)?;
         let rows = if let Some(s) = state_str {
-            stmt.query_map(
-                params![tenant_id.to_string(), s],
-                cli_session_row_mapper,
-            )?
-            .collect::<Result<Vec<_>, _>>()?
+            stmt.query_map(params![tenant_id.to_string(), s], cli_session_row_mapper)?
+                .collect::<Result<Vec<_>, _>>()?
         } else {
             stmt.query_map(params![tenant_id.to_string()], cli_session_row_mapper)?
                 .collect::<Result<Vec<_>, _>>()?
@@ -239,7 +248,10 @@ impl CliSessionRegistry {
     /// 是因为 CliSessionTransition 列表 size 小(单 session 寿命内 < 100),
     /// 整体写简化逻辑 + 保证一致性。
     pub fn update(&self, session: &CliSession) -> Result<(), CliSessionRegistryError> {
-        let conn = self.conn.lock().expect("cli_session registry mutex poisoned");
+        let conn = self
+            .conn
+            .lock()
+            .expect("cli_session registry mutex poisoned");
         if session.state.is_terminal() {
             // Archived 是单调终态, 不允许 update 把它迁出 Archived 之外
             // 但 update 本身仍允许(写相同状态归档时间等); 这里只挡 Archived → Other
@@ -326,9 +338,7 @@ impl CliSessionRow {
     }
 }
 
-fn cli_session_row_mapper(
-    row: &rusqlite::Row<'_>,
-) -> rusqlite::Result<CliSessionRow> {
+fn cli_session_row_mapper(row: &rusqlite::Row<'_>) -> rusqlite::Result<CliSessionRow> {
     Ok(CliSessionRow {
         id: row.get(0)?,
         tenant_id: row.get(1)?,
@@ -389,7 +399,8 @@ mod tests {
             "codex".to_string(),
             vec!["--model".to_string(), "gpt-5".to_string()],
         );
-        s.metadata.insert("host".to_string(), "test-host".to_string());
+        s.metadata
+            .insert("host".to_string(), "test-host".to_string());
         s.try_transition(CliSessionState::Running, "spawn")
             .expect("created -> running");
         s
@@ -421,8 +432,7 @@ mod tests {
 
         s.try_transition(CliSessionState::Orphaned, "parent gone")
             .unwrap();
-        s.try_transition(CliSessionState::Running, "adopt")
-            .unwrap();
+        s.try_transition(CliSessionState::Running, "adopt").unwrap();
         s.scrollback_bytes = 4096;
         r.update(&s).unwrap();
 
@@ -431,10 +441,7 @@ mod tests {
         assert_eq!(loaded.scrollback_bytes, 4096);
         // history: created + running + orphaned + running = 4
         assert_eq!(loaded.state_history.len(), 4);
-        assert_eq!(
-            loaded.state_history.last().unwrap().reason,
-            "adopt"
-        );
+        assert_eq!(loaded.state_history.last().unwrap().reason, "adopt");
     }
 
     #[test]
@@ -487,10 +494,8 @@ mod tests {
 
     #[test]
     fn file_mode_persists_across_reopen() {
-        let tmp = std::env::temp_dir().join(format!(
-            "ulys156-cli-session-{}.sqlite3",
-            Uuid::new_v4()
-        ));
+        let tmp =
+            std::env::temp_dir().join(format!("ulys156-cli-session-{}.sqlite3", Uuid::new_v4()));
         let tenant: TenantId = Uuid::new_v4().into();
         let wt: WorktreeId = Uuid::new_v4().into();
         let s_id = {

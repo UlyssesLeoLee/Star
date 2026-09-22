@@ -43,11 +43,17 @@ pub struct SandboxConfig {
     pub env: Vec<(String, String)>,
 }
 
-fn default_timeout() -> Duration { Duration::from_secs(60) }
+fn default_timeout() -> Duration {
+    Duration::from_secs(60)
+}
 
 impl Default for SandboxConfig {
     fn default() -> Self {
-        Self { timeout: default_timeout(), workdir: None, env: vec![] }
+        Self {
+            timeout: default_timeout(),
+            workdir: None,
+            env: vec![],
+        }
     }
 }
 
@@ -77,7 +83,9 @@ pub fn deny_list() -> Vec<String> {
 
 pub fn is_denied(cmd: &str) -> bool {
     let lower = cmd.to_ascii_lowercase();
-    deny_list().iter().any(|needle| lower.contains(&needle.to_ascii_lowercase()))
+    deny_list()
+        .iter()
+        .any(|needle| lower.contains(&needle.to_ascii_lowercase()))
 }
 
 pub async fn run(cmd: &str, cfg: &SandboxConfig) -> Result<SandboxResult, SandboxError> {
@@ -102,27 +110,37 @@ pub async fn run(cmd: &str, cfg: &SandboxConfig) -> Result<SandboxResult, Sandbo
     for (k, v) in &cfg.env {
         command.env(k, v);
     }
-    command.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::null());
+    command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdin(Stdio::null());
 
-    let mut child = command.spawn().map_err(|e| SandboxError::Io(format!("spawn failed: {e}")))?;
+    let mut child = command
+        .spawn()
+        .map_err(|e| SandboxError::Io(format!("spawn failed: {e}")))?;
     let stdout_pipe = child.stdout.take();
     let stderr_pipe = child.stderr.take();
 
     let read_stdout = async move {
         let mut s = String::new();
-        if let Some(mut pipe) = stdout_pipe { let _ = pipe.read_to_string(&mut s).await; }
+        if let Some(mut pipe) = stdout_pipe {
+            let _ = pipe.read_to_string(&mut s).await;
+        }
         s
     };
     let read_stderr = async move {
         let mut s = String::new();
-        if let Some(mut pipe) = stderr_pipe { let _ = pipe.read_to_string(&mut s).await; }
+        if let Some(mut pipe) = stderr_pipe {
+            let _ = pipe.read_to_string(&mut s).await;
+        }
         s
     };
 
     let outcome = timeout(cfg.timeout, async {
         let (s, e, status) = tokio::join!(read_stdout, read_stderr, child.wait());
         (s, e, status)
-    }).await;
+    })
+    .await;
 
     let (stdout, stderr, status) = match outcome {
         Ok(v) => v,
@@ -134,9 +152,17 @@ pub async fn run(cmd: &str, cfg: &SandboxConfig) -> Result<SandboxResult, Sandbo
     let duration_ms = started.elapsed().as_millis() as u64;
 
     if !status.success() {
-        return Err(SandboxError::NonZeroExit { code: exit_code, stderr: stderr.clone() });
+        return Err(SandboxError::NonZeroExit {
+            code: exit_code,
+            stderr: stderr.clone(),
+        });
     }
-    Ok(SandboxResult { stdout, stderr, exit_code, duration_ms })
+    Ok(SandboxResult {
+        stdout,
+        stderr,
+        exit_code,
+        duration_ms,
+    })
 }
 
 #[cfg(test)]
@@ -158,7 +184,10 @@ mod tests {
     async fn run_blocks_denied_command() {
         let cfg = SandboxConfig::default();
         let err = run("sudo rm -rf /etc", &cfg).await.unwrap_err();
-        match err { SandboxError::Denied(_) => {}, other => panic!("expected Denied, got {other:?}") }
+        match err {
+            SandboxError::Denied(_) => {}
+            other => panic!("expected Denied, got {other:?}"),
+        }
     }
 
     #[tokio::test]
@@ -178,7 +207,10 @@ mod tests {
 
     #[tokio::test]
     async fn run_nonexistent_workdir_errors() {
-        let cfg = SandboxConfig { workdir: Some(PathBuf::from("/this/path/does/not/exist/anywhere")), ..SandboxConfig::default() };
+        let cfg = SandboxConfig {
+            workdir: Some(PathBuf::from("/this/path/does/not/exist/anywhere")),
+            ..SandboxConfig::default()
+        };
         let err = run("ls", &cfg).await.unwrap_err();
         assert!(matches!(err, SandboxError::WorkdirNotFound(_)));
     }

@@ -68,8 +68,7 @@ impl ChatState {
     /// Construct a state with the standard provider registry.
     pub fn new(tenant_id: Uuid, actor_id: Uuid) -> Arc<Self> {
         let registry = Arc::new(ProviderRegistry::with_defaults());
-        let provider: Arc<dyn LlmProvider> =
-            Arc::new(domain_llm::DispatchProvider::new(registry));
+        let provider: Arc<dyn LlmProvider> = Arc::new(domain_llm::DispatchProvider::new(registry));
         Arc::new(Self {
             provider,
             sessions: Arc::new(Mutex::new(HashMap::new())),
@@ -208,16 +207,20 @@ async fn chat_send(
     let now = Utc::now();
 
     // Create session if missing.
-    let session = sessions.entry(req.session_id).or_insert_with(|| ChatSession {
-        id: req.session_id,
-        user_id: req.user_id,
-        messages: Vec::new(),
-        created_at: now,
-        updated_at: now,
-    });
+    let session = sessions
+        .entry(req.session_id)
+        .or_insert_with(|| ChatSession {
+            id: req.session_id,
+            user_id: req.user_id,
+            messages: Vec::new(),
+            created_at: now,
+            updated_at: now,
+        });
 
     // Append user message.
-    session.messages.push(ChatMessage::user(req.content.clone()));
+    session
+        .messages
+        .push(ChatMessage::user(req.content.clone()));
     session.updated_at = now;
 
     // Build ChatRequest for the provider.
@@ -235,16 +238,20 @@ async fn chat_send(
 
     // Dispatch to the provider (real LLM when key present + no_network_mode=false;
     // stub otherwise — see brief §Risk #1).
-    let resp = state.provider.chat_completion(chat_req).await.map_err(|e| {
-        ApiError::new(
-            "LLM_PROVIDER_ERROR",
-            format!("chat send: provider dispatch failed: {e}"),
-            "api",
-            "external",
-            true,
-            "Retry the request; check provider health if persistent",
-        )
-    })?;
+    let resp = state
+        .provider
+        .chat_completion(chat_req)
+        .await
+        .map_err(|e| {
+            ApiError::new(
+                "LLM_PROVIDER_ERROR",
+                format!("chat send: provider dispatch failed: {e}"),
+                "api",
+                "external",
+                true,
+                "Retry the request; check provider health if persistent",
+            )
+        })?;
 
     // Record token usage (W2.5 metering).
     let usage = TokenUsage::new(
@@ -394,13 +401,10 @@ mod tests {
         .await
         .unwrap();
 
-        let resp = chat_messages(
-            State(state),
-            Query(ChatMessagesQuery { session_id: sid }),
-        )
-        .await
-        .unwrap()
-        .0;
+        let resp = chat_messages(State(state), Query(ChatMessagesQuery { session_id: sid }))
+            .await
+            .unwrap()
+            .0;
         assert_eq!(resp.session_id, sid);
         assert_eq!(resp.count, 2);
         assert_eq!(resp.messages[0].role, ChatRole::User);
@@ -462,7 +466,10 @@ mod tests {
         assert_eq!(app.status(), StatusCode::OK);
         let ct = app.headers().get("content-type").cloned();
         assert!(
-            ct.as_ref().and_then(|v| v.to_str().ok()).map(|s| s.starts_with("text/event-stream")).unwrap_or(false),
+            ct.as_ref()
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.starts_with("text/event-stream"))
+                .unwrap_or(false),
             "expected text/event-stream content-type, got {:?}",
             ct,
         );
@@ -540,7 +547,11 @@ async fn chat_stream(
     State(state): State<Arc<ChatState>>,
     Query(q): Query<ChatStreamQuery>,
 ) -> Result<
-    Sse<axum::response::sse::KeepAliveStream<std::pin::Pin<Box<dyn Stream<Item = Result<Event, Infallible>> + Send>>>>,
+    Sse<
+        axum::response::sse::KeepAliveStream<
+            std::pin::Pin<Box<dyn Stream<Item = Result<Event, Infallible>> + Send>>,
+        >,
+    >,
     ApiError,
 > {
     use futures_util::StreamExt;

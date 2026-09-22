@@ -330,8 +330,8 @@ fn parse_event_type(s: &str) -> Result<AuditEventType, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
     use domain_kms::EncryptedBlob;
+    use uuid::Uuid;
 
     fn make_record(provider: Provider, status: CredentialStatus) -> CredentialRecord {
         CredentialRecord {

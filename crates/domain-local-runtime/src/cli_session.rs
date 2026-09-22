@@ -173,30 +173,30 @@ impl CliSession {
     ///
     /// 返回 Err 时不修改 self —— 既保证原子, 也方便调用方决定是否需要回滚。
     pub fn try_transition(
-            &mut self,
-            to: CliSessionState,
-            reason: impl Into<String>,
-        ) -> Result<(), CliSessionTransitionError> {
-            let from = self.state;
-            // no-op 必须先判: 否则 is_valid_transition(from, from) 永远是 false
-            // → 返回 IllegalTransition, 跟 NoOpTransition 在调用方语义不一致
-            if from == to {
-                return Err(CliSessionTransitionError::NoOpTransition { state: from });
-            }
-            if !is_valid_transition(from, to) {
-                return Err(CliSessionTransitionError::IllegalTransition { from, to });
-            }
-            let now = Utc::now();
-            self.state = to;
-            self.updated_at = now;
-            self.state_history.push(CliSessionTransition {
-                from: Some(from),
-                to,
-                reason: reason.into(),
-                at: now,
-            });
-            Ok(())
+        &mut self,
+        to: CliSessionState,
+        reason: impl Into<String>,
+    ) -> Result<(), CliSessionTransitionError> {
+        let from = self.state;
+        // no-op 必须先判: 否则 is_valid_transition(from, from) 永远是 false
+        // → 返回 IllegalTransition, 跟 NoOpTransition 在调用方语义不一致
+        if from == to {
+            return Err(CliSessionTransitionError::NoOpTransition { state: from });
         }
+        if !is_valid_transition(from, to) {
+            return Err(CliSessionTransitionError::IllegalTransition { from, to });
+        }
+        let now = Utc::now();
+        self.state = to;
+        self.updated_at = now;
+        self.state_history.push(CliSessionTransition {
+            from: Some(from),
+            to,
+            reason: reason.into(),
+            at: now,
+        });
+        Ok(())
+    }
 }
 
 /// **状态机迁移表** —— 单一事实源; 与 `CliSessionState` 文档迁移图对应
@@ -303,8 +303,7 @@ mod tests {
     #[test]
     fn happy_path_created_running_terminated_archived() {
         let mut s = make_session();
-        s.try_transition(CliSessionState::Running, "spawn")
-            .unwrap();
+        s.try_transition(CliSessionState::Running, "spawn").unwrap();
         s.try_transition(CliSessionState::Terminated, "user cancel")
             .unwrap();
         s.try_transition(CliSessionState::Archived, "audit archive")
