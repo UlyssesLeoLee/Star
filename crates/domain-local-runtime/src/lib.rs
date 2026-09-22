@@ -48,6 +48,8 @@ define_uuid_id!(DeviceId);
 define_uuid_id!(WorktreeId);
 define_uuid_id!(AgentSessionId);
 define_uuid_id!(ProjectId);
+// ULYS-156 单进程持久化层适配 (§A 锁定, 9/22 JST 决策会)
+define_uuid_id!(CliSessionId);
 
 // =====================================================================
 // UUID 强类型 ID 宏(参考 domain-worktree / domain-tenant 模式)
@@ -1621,3 +1623,11 @@ pub mod subscribe_real;
 pub mod e2e_integration;
 pub mod spawn_upload_hub;
 pub mod spawn_upload_integration;
+
+// ULYS-156 单进程持久化层适配 (§A 锁定路径; per D-Boy 9/22 JST 决策):
+// cli_session = 7 态状态机 + 实体; cli_session_registry = SQLite WAL 持久化
+// 注: process_supervisor / graceful_shutdown / health_self_test 留 P1 followup,
+// 因为上游 `docs/ecosystem-survey/orca-design-survey.md` 在本 worktree 不可达,
+// D-Boy §A 锁定本路线但具体 AC 切片后续轮次补。
+pub mod cli_session;
+pub mod cli_session_registry;

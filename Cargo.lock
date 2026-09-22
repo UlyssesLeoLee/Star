@@ -1124,6 +1124,7 @@ dependencies = [
  "chrono",
  "futures-util",
  "reqwest",
+ "rusqlite",
  "serde",
  "serde_json",
  "star-context",
