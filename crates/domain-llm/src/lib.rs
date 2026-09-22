@@ -24,6 +24,7 @@ use uuid::Uuid;
 pub mod chat;
 pub mod composer;
 pub mod context;
+pub mod events;
 pub mod metering;
 pub mod provider;
 
@@ -37,6 +38,7 @@ pub use context::{
     HybridContextBuilder, InMemoryContextBuilder, InvertedIndexContextBuilder, MockEmbedder,
     MOCK_EMBED_DIM,
 };
+pub use events::{AgentStreamEvent, StopReason, StreamError, ThinkingLevel, Usage};
 pub use metering::{MeteringStore, TokenUsage, UsageAggregate};
 pub use provider::registry::DispatchProvider;
 pub use provider::{
@@ -100,6 +102,80 @@ pub trait LlmProvider: Send + Sync {
         Err(LlmProviderRegistryError::Unimplemented(
             "stream_completion not implemented (W1 stub — see ULYS-98-W2)".to_string(),
         ))
+    }
+
+    /// **PI-1 / FR-1, FR-2 (per SRS-PI-BORROW-001) v2 stream** —
+    /// streaming chat reply using the 12-variant [`AgentStreamEvent`]
+    /// protocol.
+    ///
+    /// **No-throw contract (PI-3 / FR-16)**: the returned stream MUST NOT
+    /// yield `Result::Err`. Provider SDK exceptions, HTTP 4xx-5xx, and
+    /// timeouts MUST be encoded into
+    /// [`AgentStreamEvent::Error`] (with `recoverable: bool`) and the
+    /// stream continues until [`AgentStreamEvent::Done`] or
+    /// [`AgentStreamEvent::Aborted`] is emitted.
+    ///
+    /// Default impl falls back to `stream_completion` (when implemented)
+    /// and translates each `ChatChunk` into an `AgentStreamEvent`. W2
+    /// `AnthropicProvider` / `OpenAiProvider` will override with native
+    /// SSE → `AgentStreamEvent` adapters.
+    async fn stream_completion_v2(
+        &self,
+        req: ChatRequest,
+    ) -> Result<
+        BoxStream<'static, AgentStreamEvent>,
+        LlmProviderRegistryError,
+    > {
+        use futures_util::stream::StreamExt;
+
+        // Translate v1 chunks → v2 events. If v1 also returns Unimplemented,
+        // emit a single Error{ recoverable: false } event and Done so the
+        // no-throw contract (PI-3 / FR-16) still terminates the stream.
+        let v1 = match self.stream_completion(req).await {
+            Ok(s) => s,
+            Err(e) => {
+                let msg = e.to_string();
+                return Ok(futures_util::stream::iter(vec![
+                    AgentStreamEvent::Error {
+                        error: StreamError::new("v1_unimplemented", msg, false),
+                        recoverable: false,
+                    },
+                    AgentStreamEvent::done_default(),
+                ])
+                .boxed());
+            }
+        };
+
+        // Each Ok(ChatChunk) → one AgentStreamEvent. The terminal chunk
+        // (finish_reason = Some) becomes AgentStreamEvent::Done; the v1
+        // contract already only fires that variant at the end, so we don't
+        // need to synthesize one. The Err path becomes Error{ recoverable: false }
+        // per no-throw.
+        Ok(v1
+            .map(|chunk_result| match chunk_result {
+                Ok(chunk) => {
+                    if let Some(fr) = chunk.finish_reason.as_deref() {
+                        AgentStreamEvent::Done {
+                            stop_reason: StopReason::parse_loose(fr),
+                            usage: Usage::default(),
+                        }
+                    } else if chunk.delta.is_empty() {
+                        AgentStreamEvent::StreamStart {
+                            id: chunk.id,
+                            model: chunk.model,
+                        }
+                    } else {
+                        AgentStreamEvent::TextDelta {
+                            delta: chunk.delta,
+                        }
+                    }
+                }
+                Err(e) => AgentStreamEvent::Error {
+                    error: StreamError::new("provider_error", e.to_string(), false),
+                    recoverable: false,
+                },
+            })
+            .boxed())
     }
 }
 
@@ -296,6 +372,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
+            ..Default::default()
         };
         let err = backend.chat_completion(req).await.unwrap_err();
         match err {
@@ -319,6 +396,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
+            ..Default::default()
         };
         let res = backend.stream_completion(req).await;
         let err = match res {
