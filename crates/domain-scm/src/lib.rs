@@ -355,6 +355,26 @@ pub mod roles {
 }
 
 // =====================================================================
+// Multi-Provider Identity Validation(ULYS-172 / FR-ORCA-043)
+// =====================================================================
+//
+// 2026-09-22 D-Boy 决策 B — 仅 GitHub 实装;Linear / Jira / GitLab
+// 留作 future-extension 占位。详见 `multi_provider_identity` 模块文档。
+
+pub mod multi_provider_identity;
+
+// Re-export 常用类型到 crate 根,方便 integration test 和 application 层 import
+pub use multi_provider_identity::{
+    IdentityLink, IdentityLinkId, IdentityPropagation, IdentityPropagationId,
+    IdentityProvider, IdentityValidation, IdentityValidationId, InMemoryMultiProviderIdentityService,
+    LinkIdentitiesCommand, MultiProviderIdentityCommandPort, MultiProviderIdentityError,
+    MultiProviderIdentityPort, MultiProviderIdentityQueryPort, PropagationStatus, PropagatedField,
+    PropagateIdentityChangeCommand, ProviderIdentity, ProviderIdentityId,
+    RegisterProviderIdentityCommand, RevokeIdentityCommand, ValidateIdentityCommand,
+    ValidationStatus,
+};
+
+// =====================================================================
 // 错误(§8.3 SC-001~006)
 // =====================================================================
 
