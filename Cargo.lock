@@ -1371,6 +1371,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "serde",
+ "serde_json",
  "star-context",
  "thiserror 1.0.69",
  "tokio",
