@@ -25,18 +25,12 @@ pub mod lifecycle;
 pub mod projection;
 pub mod service;
 pub mod service_impl;
-pub mod shared_dir_sources;
 
 pub use error::ServiceError;
 pub use lifecycle::{transition, TransitionError};
 pub use projection::{StatusObservedPoint, WorktreeStatusObserved};
 pub use service::{SyncResult, WorktreeFilter, WorktreeService, WorktreeUpdate};
 pub use service_impl::InMemoryWorktreeService;
-// Re-export path C (per-workspace multica CLI config) shared-dir reader so the
-// eventual ULYS-158 `shared_dir_resolver` orchestrator (per ULYS-158 §3.3) can
-// call it from a sibling crate without depending on this crate's private layout.
-pub use shared_dir_sources::{
-    collect_cli_config_shared_dirs, collect_cli_config_shared_dirs_strict,
-    resolve_cli_config_path, CliConfigError, CLI_CONFIG_DIR_NAME, CLI_CONFIG_FIELD,
-    CLI_CONFIG_FILE_NAME, SOURCE_CLI_CONFIG,
-};
+// 注: per-workspace multica-config/config.json 的 shared-dir reader 已在
+// crates/worktree-shared-dir/ (FileBackedConfigSource) 实装, 不在本 crate.
+// ULYS-177 历史 commit ef025c8d 的 `shared_dir_sources.rs` 模块已被替代.

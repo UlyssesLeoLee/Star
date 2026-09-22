@@ -1,24 +1,19 @@
--- 2026-09-22-worktree-shared-dir.sql (ULYS-177, per ULYS-158 §3.3 "新表 worktree_shared_dir")
+-- 2026-09-22-worktree-shared-dir.sql (ULYS-104.3 + ULYS-158 + ULYS-177 合并, 2026-09-22 JST)
 --
--- v1.00 worktree_shared_dir 表 (per ULYS-158 §3.3 + FR-ORCA-007 三路并存)
+-- v1.0 worktree_shared_dir 表 (per docs/ecosystem-survey/orca-design-survey.md v1.0 §3 FR-ORCA-007
+-- + 9/22 D-Boy 拍板 TBD-0044-01 C 选项 + 11:36 路径 C 自决:
+--   第 3 机制不依赖 Multica CLI 升版, 直读 `<workspace>/multica-config/config.json`).
 --
--- 作用: 持久化 worktree 共享目录 (per FR-ORCA-007 + FR-ORCA-006 并行隔离保证).
---       1 row = 1 个共享目录 entry + 它的 source (per-user / workspace-level / cli_config)
---       + 它绑定到哪个 repo。
--- 设计: source 决定这条 entry 的来源 (per 9/22 D-Boy 路径 C 拍板), 用于 audit + 重启后 reconcile。
---       path 存的是归一化后的字符串 (per shared_dir_sources.rs normalize_path)。
--- 守门 #13 a 100% RLS + #13 b 物理删除禁止 + #13 c SCD Type 2 + #13 d T 100% audit
+-- 作用: Worktree 共享目录配置 (M = Metadata); 3 机制之一 (workspace-level, per v1.0 §3 FR-ORCA-007 #2)
+-- 设计: 1 row = 1 shared directory entry; mount_strategy 5 档 + priority 1-3
+--       + source 标注 (per_user / workspace_level / cli_config, per FR-ORCA-007 三路并存)
+-- 守门 #13 a 100% RLS + #13 b 物理删除禁止 (软删 enabled=false) + #13 d T 100% audit
 --
--- ULYS-177 范围 (本次实装切片):
---   ULYS-177 = ULYS-158.1 = path C 子任务 (per-workspace multica CLI config 适配).
---   本迁移只定义 **schema + RLS + audit trigger**, 不灌数据;
---   数据由 ULYS-158 §3.3 shared_dir_resolver orchestrator 在后续 sprint
---   把三路合并结果写入 (per ULYS-158 §5 实装收尾验证).
---
--- 关联:
---   - 父 issue: ULYS-158 (Worktree 共享目录 3 机制, FR-ORCA-005..011)
---   - 子 issue: ULYS-177 (= ULYS-158.1, 本 issue)
---   - FR-ORCA-007: 三路并存 (per-user + workspace-level + cli_config)
+-- 合并说明:
+--   ULYS-158 v1.0 MVP (commit b90df528) 提供 mount_strategy + label + priority (P1/P2/P3) + RLS + audit.
+--   ULYS-177 v1.0 (commit ef025c8d) 提供 source 字段 (per_user / workspace_level / cli_config).
+--   本次合并 (ULYS-158.1 + ULYS-177 path C) 合并两者字段, source 跟 mount_strategy 各自独立,
+--   让 3 路来源可被 audit + 在 worktree_create_async 时 reconcile.
 
 BEGIN;
 
@@ -27,48 +22,56 @@ DROP TABLE IF EXISTS worktree_shared_dir CASCADE;
 CREATE TABLE IF NOT EXISTS worktree_shared_dir (
     -- Primary key
     id UUID NOT NULL DEFAULT gen_random_uuid(),
-    -- FK: 关联 worktree_canvas_worktree.repo_id (per ULYS-57.1 T1)
-    -- ON DELETE CASCADE: worktree 删了 → 共享目录绑定也清掉 (避免悬挂引用)
+    -- M row 主键
     repo_id UUID NOT NULL,
-    -- 共享目录的来源 (per FR-ORCA-007 三路优先级)
-    -- 'per_user'        : ~/.star/worktree_shared_dirs.txt (P1, 由 ULYS-158 实装)
-    -- 'workspace_level' : <workspace>/.star/worktree_shared_dirs.txt (P1, 由 ULYS-158 实装)
-    -- 'cli_config'      : <workspace>/multica-config/config.json.worktree_shared_directories (路径 C, 由 ULYS-177 实装)
-    source VARCHAR(32) NOT NULL,
-    -- 归一化后的绝对路径 (per shared_dir_sources.rs::normalize_path)
-    -- 存为 text 而非 path: 跨平台路径表达不统一 (Windows \ vs POSIX /); 比较时
-    -- 由应用层做 case-insensitive (Windows) / case-sensitive (POSIX) 判定。
+    -- M Repo 引用 (FK worktree_canvas_graph_node.id where node_kind='Repository')
     path TEXT NOT NULL,
-    -- 是否启用 (软删除标记; 物理删除被 RLS 禁用 per 守门 #13 b)
+    -- M 共享目录绝对路径 (per FR-ORCA-007 AC-1/AC-2/AC-3 跨 worktree 共享)
+    -- source 字段: 3 路来源 (per FR-ORCA-007 三路并存, per 9/22 D-Boy 路径 C 拍板):
+    --   'per_user'        : ~/.star/worktree_shared_dirs.txt (P1, 由后续 P1 实装)
+    --   'workspace_level' : <workspace>/.star/worktree_shared_dirs.txt (P1, 由后续 P1 实装, PG 表即本表)
+    --   'cli_config'      : <workspace>/multica-config/config.json.worktree_shared_directories
+    --                       (路径 C, FileBackedConfigSource 直读, 已实装 per ULYS-177)
+    source VARCHAR(32) NOT NULL DEFAULT 'cli_config',
+    -- M 5 档 mount (per FR-ORCA-007 + 9/22 D-Boy 决策 TBD-0044-02):
+    --   worktree_add / symlink / hardlink / bind_mount / copy
+    mount_strategy VARCHAR(16) NOT NULL DEFAULT 'worktree_add',
+    -- M 显示名 (e.g. "node_modules", ".env", ".vscode/settings.json")
+    label VARCHAR(64) NOT NULL DEFAULT '',
+    -- M 1-3 档 (P1 = 最高 = workspace-level 主共享; P3 = 最低 = per-user 兜底)
+    priority SMALLINT NOT NULL DEFAULT 3,
+    -- M 软删标志; 物理删除 = FALSE
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    -- 排序优先级 (per FR-ORCA-007 高 → 低: per_user=10, workspace_level=20, cli_config=30)
-    -- 同 source 内多 entries: 按 path 字典序排序
-    priority SMALLINT NOT NULL DEFAULT 30,
-    -- 审计 + 时间戳 (per 守门 #13 d T 100% audit + ADR-0043 WORM)
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_by UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::UUID,
+    created_by UUID,
+    -- M 创建人 (FK star-identity.user.id)
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_by UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::UUID,
-    -- M SCD Type 2 (per 守门 #13 c)
+    updated_by UUID,
+    -- M 最后修改人
+    retention_period INT,
+    -- M 保留天数 (NULL = 永久; 用于 audit GC)
+    -- M SCD Type 2 字段 (per 守门 #13 c)
     valid_from TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     valid_to TIMESTAMPTZ,
     pgpool_version INT NOT NULL DEFAULT 1,
     tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::UUID,
     workspace_id UUID NOT NULL,
-    -- 显式主键
     CONSTRAINT worktree_shared_dir_pk PRIMARY KEY (id),
-    -- UNIQUE: 同一 repo 内 (source, path) 唯一 (SCD Type 2 version 维度外)
-    CONSTRAINT worktree_shared_dir_repo_source_path_unique
-        UNIQUE (repo_id, source, path, pgpool_version),
-    -- CHECK: source 必须是 3 路之一 (per FR-ORCA-007 三路并存)
+    -- UNIQUE: 同一 repo 内 (source, path, mount_strategy) 不重复 (SCD Type 2 version 维度外)
+    CONSTRAINT worktree_shared_dir_repo_source_path_strategy_unique
+        UNIQUE (repo_id, source, path, mount_strategy, pgpool_version),
+    -- CHECK: source 必须在 3 路之一
     CONSTRAINT worktree_shared_dir_source_check
         CHECK (source IN ('per_user', 'workspace_level', 'cli_config')),
-    -- CHECK: priority 范围 (10/20/30, 跟 source 强对应)
+    -- CHECK: mount_strategy 必须在 5 档内
+    CONSTRAINT worktree_shared_dir_mount_strategy_check
+        CHECK (mount_strategy IN ('worktree_add', 'symlink', 'hardlink', 'bind_mount', 'copy')),
+    -- CHECK: priority 必须在 1-3 内 (P1/P2/P3)
     CONSTRAINT worktree_shared_dir_priority_check
-        CHECK (priority IN (10, 20, 30))
+        CHECK (priority BETWEEN 1 AND 3)
 );
 
--- 7 类 RLS policy (per 守门 #13 a 100% RLS, FORCE 跨 superuser)
+-- 7 类 RLS policy (per 守门 #13 a)
 ALTER TABLE worktree_shared_dir ENABLE ROW LEVEL SECURITY;
 ALTER TABLE worktree_shared_dir FORCE ROW LEVEL SECURITY;
 
@@ -100,23 +103,28 @@ DROP POLICY IF EXISTS wsd_superuser_bypass ON worktree_shared_dir;
 CREATE POLICY wsd_superuser_bypass ON worktree_shared_dir
     USING (current_setting('app.role', true) = 'superuser');
 
--- audit trigger (per 守门 #13 d T 100% audit, 跨 RLS)
+-- audit trigger (per 守门 #13 d)
 DROP TRIGGER IF EXISTS wsd_audit ON worktree_shared_dir;
 CREATE TRIGGER wsd_audit
     AFTER INSERT OR UPDATE OR DELETE ON worktree_shared_dir
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
 
--- Index: 按 repo + source 查所有共享目录 (per FR-ORCA-007 三路收集)
-CREATE INDEX IF NOT EXISTS worktree_shared_dir_repo_source_idx
-    ON worktree_shared_dir (repo_id, source);
-
--- Index: 按 tenant + enabled 查活跃 entry (per shared_dir_resolver reconcile)
-CREATE INDEX IF NOT EXISTS worktree_shared_dir_tenant_enabled_idx
-    ON worktree_shared_dir (tenant_id, enabled)
-    WHERE enabled = TRUE;
-
--- Index: 按 source 优先级排序 (per FR-ORCA-007 高 → 低)
+-- Indexes (4 个核心索引 + 2 partial)
+CREATE INDEX IF NOT EXISTS worktree_shared_dir_repo_idx
+    ON worktree_shared_dir (repo_id);
+CREATE INDEX IF NOT EXISTS worktree_shared_dir_workspace_idx
+    ON worktree_shared_dir (workspace_id);
+-- Partial index: 仅对 enabled=TRUE 的行建 priority 索引 (生产环境 90% 行 enabled)
 CREATE INDEX IF NOT EXISTS worktree_shared_dir_priority_idx
-    ON worktree_shared_dir (repo_id, priority ASC, path ASC);
+    ON worktree_shared_dir (repo_id, priority)
+    WHERE enabled = TRUE;
+-- Partial index: 按 source 过滤 (cli_config 路径 C, per ULYS-177)
+CREATE INDEX IF NOT EXISTS worktree_shared_dir_source_idx
+    ON worktree_shared_dir (repo_id, source)
+    WHERE enabled = TRUE;
+-- Partial index: 仅对 retention_period 已设置的行建索引 (audit GC 用)
+CREATE INDEX IF NOT EXISTS worktree_shared_dir_retention_idx
+    ON worktree_shared_dir (retention_period, created_at)
+    WHERE retention_period IS NOT NULL;
 
 COMMIT;
