@@ -28,7 +28,18 @@ use thiserror::Error;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+mod compaction;
 mod sqlite_backend;
+
+// 公开 PI-7 compaction API (per SRS-PI-BORROW-001 §1.3 + §4 FR-28)
+// 注意: `sqlite_backend::now_ms` 是 pub(crate), 仅本 crate 内可见;
+//       compaction 模块通过 `super::now_ms` 引用.
+pub use compaction::{
+    estimate_tokens, extract_file_ops, extract_file_ops_from_message, find_cut_point,
+    summarize_messages, CompactionDecision, CompactionDetails, CompactionEntry, CompactionError,
+    CompactionKind, CompactionMessage, CompactionStore, CompactionUsage, Compactor, CutPoint,
+    FileOps, MessageRole, SqliteCompactionStore, ToolCall, DEFAULT_SUMMARY_MAX_CHARS,
+};
 
 /// 6 状态机 (per INV-DISP-01)
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
