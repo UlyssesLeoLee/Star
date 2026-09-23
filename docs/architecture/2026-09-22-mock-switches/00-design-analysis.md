@@ -1,8 +1,8 @@
 # Mock 開關 (Mock Switches) × 全項目 Mock — 設計分析 (Design Analysis)
 
-> **狀態**: 🟡 Draft v0.1 (待拍板)
-> **日期**: 2026-09-23 (v0.1 落檔)
-> **制定者**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手代審
+> **狀態**: 🟢 Approved v0.2 (reply `01a0d073` 2026-09-23 22:46 JST 「a」 = 接受 (a) 選項 = 6 決策全部走推薦 A+A+B+A+B+A)
+> **日期**: 2026-09-23 (v0.1 落檔 → v0.2 修訂)
+> **修訂人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**審核** (per 守門 #14 v4)
 > **觸發 issue**: ULYS-190 "Mock开关" — `01a0cb7c-8022-715b-9a4d-4bbc58e7461e`
 > **適用項目**: **跨項目範圍** — Star / IDE1.0 / RGS / CATs / IM1.0 / GitGit / Ada 共 7 個項目 (跟 ULYS-191 v0.2 approved 範圍一致, 排除 Xiaoshuo)
 > **關聯文檔**:
@@ -318,16 +318,16 @@ LLM 讀到 `plugin.kms.enabled=false, module.unlock.enabled=true`, 一眼看出:
 
 ---
 
-## 5. 6 落地前必拍決策 (per ULYS-191 v0.1 §5 對齊, 待 Ulysses 拍板)
+## 5. 6 落地前必拍決策 (per ULYS-191 v0.1 §5 對齊, 全部 ✅ 鎖版)
 
-| # | 決策 | 候選 | 推薦 | 備註 |
+| # | 決策 | 候選 | 推薦 | v0.2 鎖版狀態 |
 |---|---|---|---|---|
-| #1 | **三層 schema 範圍** | **A**: 1 個 cluster_switch + N 個 plugin_switch + M 個 module_switch (本 v0.1) <br> B: 只 cluster + plugin, 跳 module <br> C: 只 cluster, plugin/module 走 CLI flag | **A** | 三層完整落地, 跟 ULYS-191 ACI scope 對齊; B/C 是過渡方案, 後續必擴 L3 |
-| #2 | **落地優先級** | **A**: 先 Star + IM1.0 (per ULYS-191 v0.3 G-ACI-01 結論同源) <br> B: 先 IM1.0 1 個, 驗證 schema 可行再擴 <br> C: 7 項目並行 | **A** | IM1.0 阻力最小 (已有 Cargo features 雛形), 跟 ULYS-191 §4.1 順序對齊 |
-| #3 | **版本策略** | A: v0.1-draft → 1 sprint 後 v0.2 鎖版 <br> **B**: v0.1-draft → v0.2 加字段 (rolling) <br> C: v0.1 一次性鎖版 | **B** | 跟 ULYS-191 v0.1 → v0.2 (rolling) 同模式, schema 字段演進更順 |
-| #4 | **跟既有 mock 配置兼容性** | **A**: 並存擴展 (Cargo features / MSW / fixture_assertion 全保留) <br> B: 強制遷移 <br> C: 雙寫雙讀 (shadow mode) | **A** | 並存擴展對齊 ULYS-191 v0.1 §3.4; B/C 高風險, 1 sprint 後再評估 |
-| #5 | **跨項目 monorepo vs 拷貝** | A: monorepo (新建 `tools/mock-switch-spec` crate / package) <br> **B**: 各自拷貝 (跟 ULYS-191 v0.2 決策 #5 一致) <br> C: 拷貝 + monorepo 驗證腳本 | **B** | 各自拷貝, schema 統一即可; monorepo 後續評估 (跟 ULYS-191 決策 #5 同源) |
-| #6 | **mock_switch_trace 寫入策略** | A: 每次 emit 都帶 (每次 assertion 都加 trace) <br> **B**: 只在開關「動態切換」時帶 (節省字段) <br> C: 開關變更時另寫審計日誌 (audit log) | **A** | 每次帶最直觀, LLM 不用推導; B 節省但 LLM 推導成本高; C audit log 跟 mock_switch_trace 是兩條路, 易混淆 |
+| #1 | **三層 schema 範圍** | **A**: 1 個 cluster_switch + N 個 plugin_switch + M 個 module_switch (本 v0.1) <br> B: 只 cluster + plugin, 跳 module <br> C: 只 cluster, plugin/module 走 CLI flag | **A** | ✅ **A** (per reply `01a0d073`「a」) |
+| #2 | **落地優先級** | **A**: 先 Star + IM1.0 (per ULYS-191 v0.3 G-ACI-01 結論同源) <br> B: 先 IM1.0 1 個, 驗證 schema 可行再擴 <br> C: 7 項目並行 | **A** | ✅ **A** (per reply `01a0d073`「a」) |
+| #3 | **版本策略** | A: v0.1-draft → 1 sprint 後 v0.2 鎖版 <br> **B**: v0.1-draft → v0.2 加字段 (rolling) <br> C: v0.1 一次性鎖版 | **B** | ✅ **B** (per reply `01a0d073`「a」) |
+| #4 | **跟既有 mock 配置兼容性** | **A**: 並存擴展 (Cargo features / MSW / fixture_assertion 全保留) <br> B: 強制遷移 <br> C: 雙寫雙讀 (shadow mode) | **A** | ✅ **A** (per reply `01a0d073`「a」) |
+| #5 | **跨項目 monorepo vs 拷貝** | A: monorepo (新建 `tools/mock-switch-spec` crate / package) <br> **B**: 各自拷貝 (跟 ULYS-191 v0.2 決策 #5 一致) <br> C: 拷貝 + monorepo 驗證腳本 | **B** | ✅ **B** (per reply `01a0d073`「a」) |
+| #6 | **mock_switch_trace 寫入策略** | A: 每次 emit 都帶 (每次 assertion 都加 trace) <br> **B**: 只在開關「動態切換」時帶 (節省字段) <br> C: 開關變更時另寫審計日誌 (audit log) | **A** | ✅ **A** (per reply `01a0d073`「a」) |
 
 ---
 
@@ -376,21 +376,25 @@ LLM 讀到 `plugin.kms.enabled=false, module.unlock.enabled=true`, 一眼看出:
 
 ## 8. 下一步 (per 守門 #15 不主動 scope creep)
 
-🟡 **本 v0.1 拍板前需 Ulysses 拍板 6 決策** (per §5)
-🟡 **G-MS-01 Ada mock 項目盤點確認** (per §6 + §4.6)
-🟡 **Ulysses 拍板啟動 §4.1 第 1 笔 brief** (Star mock cluster_switch 雛形, ~0.3-0.5M tokens, per 守門 #20 + #15 + 1 sub-agent 1 切點)
+🟡 **本 v0.2 鎖版後狀態**: 6 決策全部 ✅ 鎖版 (A+A+B+A+B+A, per reply `01a0d073`「a」); 派工授權已收到, **未實際派 sub-agent** (per 守門 #3 + #14 v3 + ULYS-191 reply `01a0cdc1`「a」拍板範式)
+
+🟡 **G-MS-01 Ada mock 項目盤點確認** (per §6 + §4.6, 仍 缺口, 跨 session 續)
+🟡 **§4.1 Star mock cluster_switch 雛形 brief** 落档 (`docs/briefs/ulys-190-star-mock-cluster-switch-stage1.md` v0.1, 待派工)
 
 **跨 session 續做入口**:
 
-1. 🟡 v0.2 修訂 (per 6 決策拍板 + G-MS-01 解決 + §4.1 第 1 笔 brief 反饋)
-2. 🟡 §4.1 第 1 笔 brief 啟動派工 (Star mock cluster_switch, commit 落 `tools/star-flash-mock/.mock-cluster.json`)
-3. 🟡 §4.2 IM1.0 plugin_switch 雛形 brief 啟動派工 (跟 §4.1 並行, 阻力最小)
-4. 🟡 §4.3 4 項目 (RGS / CATs / IDE1.0 / GitGit) plugin_switch brief 啟動派工 (順序: IM1.0 → CATs+IDE1.0 共享 Rust helper → RGS → GitGit)
-5. 🟡 §4.4 7 項目 module_switch 擴展 (最大塊, 跨 session 續)
-6. 🟡 §4.5 跨項目 CI 加 `mock-switch-validate` (收官, 1 commit)
-7. 🟡 G-MS-02/03/04/05 缺口跨 session 解決
+1. ✅ v0.1 起草 (commit `c3d7d171`, 9/23 22:11 JST)
+2. ✅ v0.2 鎖版 (per reply `01a0d073`「a」, 6 決策全部走推薦 A+A+B+A+B+A)
+3. ✅ §4.1 Star mock cluster_switch brief v0.1 落档 (`docs/briefs/ulys-190-star-mock-cluster-switch-stage1.md`)
+4. 🟡 等候派工觸發 (T1 D-Boy 明示「派吧」/ T2 5 域 Lead 真人到位 / T3 D-Boy 修 brief 範圍, 任一即派, per ULYS-191 §4.1.2 brief §6 觸發條件)
+5. 🟡 sub-agent 落地實裝 (per brief v0.1 §1.1 In-Scope, ~0.3-0.5M tokens, 1 commit 收官)
+6. 🟡 §4.2 IM1.0 plugin_switch brief 啟動派工 (跟 §4.1 並行, 阻力最小)
+7. 🟡 §4.3 4 項目 (RGS / CATs / IDE1.0 / GitGit) plugin_switch brief 啟動派工 (順序: IM1.0 → CATs+IDE1.0 共享 Rust helper → RGS → GitGit)
+8. 🟡 §4.4 7 項目 module_switch 擴展 (最大塊, 跨 session 續)
+9. 🟡 §4.5 跨項目 CI 加 `mock-switch-validate` (收官, 1 commit)
+10. 🟡 G-MS-01/02/03/04/05 缺口跨 session 解決
 
-**token 累計**: ~0.04M (v0.1 起草, 對齊 ULYS-191 v0.1 ~0.05M)
+**token 累計**: ~0.04M (v0.1 起草) + ~0.03M (v0.2 修訂 + brief v0.1 起草) = ~0.07M
 
 ---
 
@@ -399,6 +403,7 @@ LLM 讀到 `plugin.kms.enabled=false, module.unlock.enabled=true`, 一眼看出:
 | 版本 | 日期 | 修訂人 | 內容 |
 |---|---|---|---|
 | **v0.1** | 2026-09-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手代審 | **初稿 (Draft)** — 觸發 ULYS-190 (2026-09-22 23:38 JST); 9 節結構 (目的 / 概念映射 / Mock 項目盤點 / Schema 鎖版 / 5 階段路徑 / 6 決策 / 已知缺口 / 守門自檢 / 下一步); ~16 KB / 270 行 (per `wc -l` 估算); 預估 ~0.04M token; 跨項目範圍 7 (跟 ULYS-191 v0.2 approved 一致, 排除 Xiaoshuo); 跟 ULYS-191 銜接點在 §1.2 mock_switch_trace 字段 |
+| **v0.2** | 2026-09-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**審核** | **Approved** (reply `01a0d073` 2026-09-23 22:46 JST 「a」) — 6 決策全部 ✅ 鎖版 (A+A+B+A+B+A, 全部走推薦); banner 從 🟡 Draft → 🟢 Approved; §5 6 決策行加 ✅ 鎖版狀態列; §8 下一步更新派工等待狀態; §9 加 v0.2 row; 預估 ~0.03M token (本 v0.2 修訂) |
 
 ---
 
