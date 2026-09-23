@@ -24,6 +24,9 @@ tracing = { workspace = true }
 
 # 跨 crate 引用: worktree-shared-dir 复用 graph-core 的 RepoId
 graph-core = { path = "../graph-core" }
+# 跨 crate 引用: StartFromPicker (FR-ORCA-009) 用 git-adapter 的 GitProvider
+# 列 branches / 取 head / 取 commit SHA / merge_base.
+git-adapter = { path = "../git-adapter" }
 
 [dev-dependencies]
 # UT 用 tokio test runtime
