@@ -23,6 +23,19 @@ import { AppMatrixDrawer } from "@/components/nav/AppMatrixDrawer";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
 import { TacticalCore3D } from "@/components/effects/TacticalCore3D";
 
+// GitHub Worktree 标识符 (per ULYS-176 §3 用户反馈: 左上角 icon 下方显示当前启动的 worktree 编号)
+// 数据源优先级: process.env.NEXT_PUBLIC_WORKTREE_ID (Multica spawn dev server 时注入)
+//             → process.env.NEXT_PUBLIC_MULTICA_ISSUE_ID (备选)
+//             → '' (用户多 worktree 并开时仍可读)
+const WORKTREE_ID =
+  process.env.NEXT_PUBLIC_WORKTREE_ID ||
+  process.env.NEXT_PUBLIC_MULTICA_ISSUE_ID ||
+  "";
+const WORKTREE_BRANCH =
+  process.env.NEXT_PUBLIC_WORKTREE_BRANCH ||
+  process.env.NEXT_PUBLIC_GIT_BRANCH ||
+  "";
+
 export function AppHeader() {
   const pathname = usePathname() ?? "/";
   const openCommandBar = useCommandBarStore((s) => s.open);
@@ -42,11 +55,16 @@ export function AppHeader() {
     <>
       <header
         data-testid="app-header"
-        className="h-16 sticky top-0 z-30 border-b-2 border-black bg-[var(--cel-surface-card,#0f1422)]/95 backdrop-blur-xl cel-shadow transition-all select-none text-[var(--cel-text-primary,#ffffff)]"
+        className="h-[76px] sticky top-0 z-30 border-b-2 border-black bg-[var(--cel-surface-card,#0f1422)]/95 backdrop-blur-xl cel-shadow transition-all select-none text-[var(--cel-text-primary,#ffffff)]"
       >
         <div className="h-full px-6 flex items-center gap-4">
-          {/* === Left: Workspace Switcher === */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* === Left: Workspace Switcher + Worktree ID sub-label ===
+              per ULYS-176 §3: 在 ACME Studio CORE 按钮下方添加一行 monospace badge,
+              显示当前启动的 GitHub worktree 编号 (Multica issue identifier), 方便一眼识别
+              是哪个分支的 dev server (避免多 worktree 并开时混淆)。
+              数据源: process.env.NEXT_PUBLIC_WORKTREE_ID / NEXT_PUBLIC_WORKTREE_BRANCH
+              (Multica 平台在 spawn dev server 时注入; 缺省时该 sub-label 整行 hidden, 不破坏原布局) */}
+          <div className="flex flex-col items-start gap-1 shrink-0">
             <button
               type="button"
               data-testid="workspace-switcher"
@@ -58,6 +76,23 @@ export function AppHeader() {
               <span className="text-[10px] text-black font-mono font-black px-1.5 py-0.5 bg-[var(--cel-gold,#ffc400)] border border-black">CORE</span>
               <ChevronDown size={12} className="text-[var(--cel-text-secondary)] ml-0.5" />
             </button>
+            {WORKTREE_ID && (
+              <div
+                data-testid="worktree-id-badge"
+                className="flex items-center gap-1.5 pl-1 pr-2 h-5 text-[10px] font-mono font-bold border border-black bg-[var(--cel-surface-stage,#090d16)] text-[var(--cel-cyan,#00f0ff)] whitespace-nowrap"
+                title={`GitHub worktree: ${WORKTREE_ID}${WORKTREE_BRANCH ? ` @ ${WORKTREE_BRANCH}` : ""}`}
+              >
+                <span className="size-1.5 bg-[var(--cel-cyan,#00f0ff)] animate-pulse" aria-hidden="true" />
+                <span className="text-[var(--cel-text-secondary,#94a3b8)] font-black tracking-wider">WT</span>
+                <span className="text-[var(--cel-text-primary,#ffffff)] font-black">{WORKTREE_ID}</span>
+                {WORKTREE_BRANCH && (
+                  <>
+                    <span className="text-[var(--cel-text-secondary,#94a3b8)]">·</span>
+                    <span className="text-[var(--cel-gold,#ffc400)] font-black tracking-tight">{WORKTREE_BRANCH}</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* === Middle: Primary Navigation Tabs (用户自由增删) === */}
