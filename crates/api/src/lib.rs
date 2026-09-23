@@ -51,15 +51,15 @@ pub mod canvas_collab;
 // 守门 #1 v25 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 +
 // 守门 #19 v19 累积规不破坏 V0.1 (arg/ agent/ canvas_collab/ 100% 保留)
 // =====================================================================
+/// agent run API module (v1.0.1 follow-up — /v1/agent/run backend).
+/// Per docs/specs/star-cursor-min-spec.md §1.4 Agent API.
+pub mod agent_run;
 /// chat API module (W1 + W2 — Chat RPC stub + DispatchProvider wiring).
 pub mod chat;
 /// completion API module (W2 — inline code completion).
 pub mod completion;
 /// metering API module (W2 — token usage query).
 pub mod metering;
-/// agent run API module (v1.0.1 follow-up — /v1/agent/run backend).
-/// Per docs/specs/star-cursor-min-spec.md §1.4 Agent API.
-pub mod agent_run;
 
 // =====================================================================
 // 实体(Entity / Aggregate Root)

@@ -14,11 +14,7 @@
 
 use std::sync::Arc;
 
-use axum::{
-    extract::State,
-    routing::post,
-    Json, Router,
-};
+use axum::{extract::State, routing::post, Json, Router};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -27,8 +23,8 @@ use agent_bridge::tool::ToolCall;
 use domain_agent::ai_session_inline::{run_agent_loop, AiSessionError};
 use domain_llm::LlmProvider;
 
-use crate::ApiError;
 use crate::chat::ChatState;
+use crate::ApiError;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AgentRunApiRequest {
@@ -110,7 +106,10 @@ async fn agent_run(
     if req.max_steps == 0 || req.max_steps > 50 {
         return Err(ApiError::new(
             "VALIDATION_FAILED",
-            format!("agent run: max_steps must be in 1..=50, got {}", req.max_steps),
+            format!(
+                "agent run: max_steps must be in 1..=50, got {}",
+                req.max_steps
+            ),
             "api",
             "validation",
             false,
@@ -248,11 +247,20 @@ mod tests {
     fn tool_name_str_maps_all_4_tools() {
         let r = ToolCall::ReadFile { path: "/x".into() };
         assert_eq!(tool_name_str(&r), "read_file");
-        let e = ToolCall::EditFile { path: "/x".into(), new_content: "y".into() };
+        let e = ToolCall::EditFile {
+            path: "/x".into(),
+            new_content: "y".into(),
+        };
         assert_eq!(tool_name_str(&e), "edit_file");
-        let c = ToolCall::RunCmd { cmd: "ls".into(), timeout_secs: Some(5) };
+        let c = ToolCall::RunCmd {
+            cmd: "ls".into(),
+            timeout_secs: Some(5),
+        };
         assert_eq!(tool_name_str(&c), "run_cmd");
-        let w = ToolCall::WebSearch { query: "x".into(), max_results: Some(3) };
+        let w = ToolCall::WebSearch {
+            query: "x".into(),
+            max_results: Some(3),
+        };
         assert_eq!(tool_name_str(&w), "web_search");
     }
 }

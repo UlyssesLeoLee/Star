@@ -16,11 +16,13 @@
 #![allow(clippy::result_large_err)]
 #![allow(clippy::too_many_arguments)]
 
+pub mod annotate;
 pub mod error;
 pub mod runtime;
 pub mod sandbox;
 pub mod tool;
 
+pub use annotate::{AnnotationAuthor, AnnotationRegistry, AnnotationRegistryError, DiffAnnotation};
 pub use error::AgentError;
 pub use runtime::{
     AgentEvent, AgentFilter, AgentMetrics, AgentRuntime, AgentSession, InMemoryAgentRuntime,

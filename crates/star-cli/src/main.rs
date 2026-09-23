@@ -1,18 +1,22 @@
-//! `star` CLI (Phase D.2 MVP 17 核心命令)
+//! `star` CLI (Phase D.2 MVP 17 核心命令 + ULYS-196 Skill Registry 4 命令)
 //!
 //! per `docs/architecture/2026-08-26-upgrade/spec/cli/01-cli-spec.md` §2
+//!
+//! ULYS-196 加 `star skill add/list/show/remove` 4 子命令 (per FR-ORCA-034 §10.2)
 
 use clap::{Parser, Subcommand};
 
 mod commands;
 mod error;
 mod output;
+mod skill_registry;
 
 pub(crate) use error::StarError;
 
 use commands::{
     agent, code, context, issue, mr, pipeline, project, submit, task, test, workspace, worktree,
 };
+use skill_registry::SkillRegistry;
 
 #[derive(Debug, Parser)]
 #[command(name = "star", version, about, long_about = None)]
@@ -54,11 +58,14 @@ enum TopCommand {
     Test(test::TestCommand),
     #[command(subcommand)]
     Pipeline(pipeline::PipelineCommand),
+    /// ULYS-196: Skill Registry 子命令 (per FR-ORCA-034 §10.2)
+    Skill(skill_registry::SkillCommandArgs),
 }
 
 fn main() -> std::process::ExitCode {
     let cli = Cli::parse();
-    match run(cli) {
+    let mut skill_registry = SkillRegistry::new();
+    match run(cli, &mut skill_registry) {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("error: {e}");
@@ -67,7 +74,7 @@ fn main() -> std::process::ExitCode {
     }
 }
 
-fn run(cli: Cli) -> Result<(), StarError> {
+fn run(cli: Cli, skill_registry: &mut SkillRegistry) -> Result<(), StarError> {
     match cli.command {
         TopCommand::Agent(c) => c.run(),
         TopCommand::Task(c) => c.run(),
@@ -81,5 +88,6 @@ fn run(cli: Cli) -> Result<(), StarError> {
         TopCommand::Mr(c) => c.run(),
         TopCommand::Test(c) => c.run(),
         TopCommand::Pipeline(c) => c.run(),
+        TopCommand::Skill(c) => skill_registry::run(c, skill_registry),
     }
 }

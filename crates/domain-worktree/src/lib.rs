@@ -23,6 +23,13 @@
 //!
 //! Lead 责任: worktree Lead
 
+pub mod edit;
+pub use edit::{
+    ApplyContextEditCommand, ContextEdit, ContextEditApplied, ContextEditApplyResult,
+    ContextEditBatch, ContextEditId, EditError, ForkCommand, ForkResult, ForkSpec,
+    InMemoryWorktreeEditor, WorktreeEditPort, WorktreeEditQueryPort,
+};
+
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 

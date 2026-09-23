@@ -23,9 +23,7 @@ use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::chat::{ChatChunk, ChatMessage, ChatRequest, ChatResponse, ChatRole};
-use crate::{
-    LlmProvider, LlmProviderRegistryError, LlmProviderRegistryHealth,
-};
+use crate::{LlmProvider, LlmProviderRegistryError, LlmProviderRegistryHealth};
 
 /// Default Anthropic Messages API base URL.
 pub const ANTHROPIC_DEFAULT_BASE_URL: &str = "https://api.anthropic.com";
@@ -169,26 +167,20 @@ impl AnthropicProvider {
             "messages": messages,
         });
         if !system_buf.is_empty() {
-            body.as_object_mut().unwrap().insert(
-                "system".to_string(),
-                serde_json::Value::String(system_buf),
-            );
+            body.as_object_mut()
+                .unwrap()
+                .insert("system".to_string(), serde_json::Value::String(system_buf));
         }
         if let Some(t) = req.temperature {
-            body.as_object_mut().unwrap().insert(
-                "temperature".to_string(),
-                serde_json::json!(t),
-            );
+            body.as_object_mut()
+                .unwrap()
+                .insert("temperature".to_string(), serde_json::json!(t));
         }
         body
     }
 
     /// Parse an Anthropic Messages response into a [`ChatResponse`].
-    fn parse_response(
-        model: &str,
-        request_id: Uuid,
-        parsed: &AnthropicResponse,
-    ) -> ChatResponse {
+    fn parse_response(model: &str, request_id: Uuid, parsed: &AnthropicResponse) -> ChatResponse {
         let text = parsed
             .content
             .iter()
@@ -202,7 +194,10 @@ impl AnthropicProvider {
             id: request_id,
             model: model.to_string(),
             message: ChatMessage::assistant(text),
-            finish_reason: parsed.stop_reason.clone().unwrap_or_else(|| "stop".to_string()),
+            finish_reason: parsed
+                .stop_reason
+                .clone()
+                .unwrap_or_else(|| "stop".to_string()),
             created_at: Utc::now(),
         }
     }
@@ -235,7 +230,9 @@ struct AnthropicResponse {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum AnthropicContentBlock {
-    Text { text: String },
+    Text {
+        text: String,
+    },
     #[serde(other)]
     Unknown,
 }
@@ -269,10 +266,7 @@ impl LlmProvider for AnthropicProvider {
         }
 
         let body = self.build_request_body(&req);
-        let url = format!(
-            "{}/v1/messages",
-            self.base_url.trim_end_matches('/')
-        );
+        let url = format!("{}/v1/messages", self.base_url.trim_end_matches('/'));
 
         if self.no_network_mode {
             debug!(
@@ -331,9 +325,7 @@ impl LlmProvider for AnthropicProvider {
             .send()
             .await
             .map_err(|e| {
-                LlmProviderRegistryError::Backend(format!(
-                    "anthropic: HTTP send failed: {e}"
-                ))
+                LlmProviderRegistryError::Backend(format!("anthropic: HTTP send failed: {e}"))
             })?;
 
         let status = response.status();
@@ -353,9 +345,7 @@ impl LlmProvider for AnthropicProvider {
         }
 
         let parsed: AnthropicResponse = response.json().await.map_err(|e| {
-            LlmProviderRegistryError::Backend(format!(
-                "anthropic: response parse failed: {e}"
-            ))
+            LlmProviderRegistryError::Backend(format!("anthropic: response parse failed: {e}"))
         })?;
         let request_id = req.request_id.unwrap_or_else(Uuid::new_v4);
         Ok(Self::parse_response(&model, request_id, &parsed))
@@ -389,10 +379,7 @@ impl LlmProvider for AnthropicProvider {
                     id,
                     model,
                     role: ChatRole::Assistant,
-                    delta: format!(
-                        "[anthropic stub: stream] {} messages",
-                        req.messages.len()
-                    ),
+                    delta: format!("[anthropic stub: stream] {} messages", req.messages.len()),
                     finish_reason: Some("stop".to_string()),
                 })
             });
@@ -440,10 +427,7 @@ mod tests {
     fn sample_request() -> ChatRequest {
         ChatRequest {
             model: ANTHROPIC_DEFAULT_MODEL.to_string(),
-            messages: vec![
-                ChatMessage::system("be terse"),
-                ChatMessage::user("hi"),
-            ],
+            messages: vec![ChatMessage::system("be terse"), ChatMessage::user("hi")],
             temperature: Some(0.5),
             max_tokens: Some(256),
             request_id: Some(Uuid::new_v4()),
@@ -534,10 +518,7 @@ mod tests {
             request_id: None,
         };
         let err = p.chat_completion(req).await.unwrap_err();
-        assert!(matches!(
-            err,
-            LlmProviderRegistryError::InvalidOperation(_)
-        ));
+        assert!(matches!(err, LlmProviderRegistryError::InvalidOperation(_)));
     }
 
     #[tokio::test]
