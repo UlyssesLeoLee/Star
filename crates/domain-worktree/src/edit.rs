@@ -49,9 +49,7 @@ use crate::{
 // =====================================================================
 
 /// ContextEdit 单次操作的 ID(用于审计 / 持久化层追踪)
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 /// 单次 ContextEdit 的 UUID(per INV-ED-08:edits 不可共享 ID)
 pub struct ContextEditId(pub Uuid);
@@ -301,11 +299,7 @@ pub trait WorktreeEditPort: Send + Sync {
     /// - INV-ED-02:parent_at 不大于当前时间
     /// - INV-ED-03:子 Worktree 必带 parent_worktree_id + parent_at
     /// - INV-ED-05:父 Worktree 状态不变
-    async fn fork(
-        &self,
-        cmd: ForkCommand,
-        actor: &ActorContext,
-    ) -> Result<ForkResult, EditError>;
+    async fn fork(&self, cmd: ForkCommand, actor: &ActorContext) -> Result<ForkResult, EditError>;
 }
 
 /// **WorktreeEditQueryPort** — 读端口(查询历史 edits / fork chain)
@@ -536,11 +530,7 @@ impl WorktreeEditPort for InMemoryWorktreeEditor {
         })
     }
 
-    async fn fork(
-        &self,
-        cmd: ForkCommand,
-        actor: &ActorContext,
-    ) -> Result<ForkResult, EditError> {
+    async fn fork(&self, cmd: ForkCommand, actor: &ActorContext) -> Result<ForkResult, EditError> {
         // INV-ED-02:parent_at 不晚于当前时间
         let now = Utc::now();
         cmd.spec.validate(now)?;
@@ -655,7 +645,7 @@ impl WorktreeEditQueryPort for InMemoryWorktreeEditor {
 mod tests {
     use super::*;
     use crate::{
-        HealthState, ConflictState, ProjectId, RepositoryId, RuntimeId, TenantId, UserId,
+        ConflictState, HealthState, ProjectId, RepositoryId, RuntimeId, TenantId, UserId,
         WorkItemId, WorktreeStatus,
     };
 
@@ -807,7 +797,11 @@ mod tests {
             WorktreeStatus::Fixing,
         ] {
             let wt = make_wt(TenantId::new(), s);
-            assert!(InMemoryWorktreeEditor::ensure_editable(&wt).is_ok(), "{:?}", s);
+            assert!(
+                InMemoryWorktreeEditor::ensure_editable(&wt).is_ok(),
+                "{:?}",
+                s
+            );
         }
     }
 
