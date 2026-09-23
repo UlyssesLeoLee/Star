@@ -31,3 +31,6 @@ pub use lifecycle::{transition, TransitionError};
 pub use projection::{StatusObservedPoint, WorktreeStatusObserved};
 pub use service::{SyncResult, WorktreeFilter, WorktreeService, WorktreeUpdate};
 pub use service_impl::InMemoryWorktreeService;
+// 注: per-workspace multica-config/config.json 的 shared-dir reader 已在
+// crates/worktree-shared-dir/ (FileBackedConfigSource) 实装, 不在本 crate.
+// ULYS-177 历史 commit ef025c8d 的 `shared_dir_sources.rs` 模块已被替代.

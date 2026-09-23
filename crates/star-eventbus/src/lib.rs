@@ -35,6 +35,7 @@ use tokio::sync::{mpsc, RwLock};
 use uuid::Uuid;
 
 mod mailbox;
+mod unified_projection;
 mod valkey_eventbus;
 
 /// 事件 (per G.3)
@@ -167,6 +168,10 @@ impl EventBus for InProcessEventBus {
 
 pub use mailbox::{
     AtLeastOnceMailbox, AtMostOnceMailbox, ExactlyOnceMailbox, Mailbox, MailboxError, MailboxMode,
+};
+pub use unified_projection::{
+    AgentId, HydrationState, Provenance, SubjectId, SubjectKind, UnifiedProjectionError,
+    UnifiedStatusEntry, UnifiedStatusProjection, WorktreeId,
 };
 pub use valkey_eventbus::{ValkeyEventBus, ValkeyEventBusError};
 

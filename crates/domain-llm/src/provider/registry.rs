@@ -18,9 +18,7 @@ use async_trait::async_trait;
 use futures_util::StreamExt;
 
 use crate::chat::ChatRequest;
-use crate::{
-    LlmProvider, LlmProviderRegistryError,
-};
+use crate::{LlmProvider, LlmProviderRegistryError};
 
 use super::anthropic::AnthropicProvider;
 use super::mock::MockProvider;
@@ -101,11 +99,7 @@ impl ProviderRegistry {
 
     /// Register a `model_prefix → provider` binding. Existing bindings
     /// for the same prefix are replaced.
-    pub fn register(
-        &mut self,
-        model_prefix: impl Into<String>,
-        provider: Arc<dyn LlmProvider>,
-    ) {
+    pub fn register(&mut self, model_prefix: impl Into<String>, provider: Arc<dyn LlmProvider>) {
         self.routes.insert(model_prefix.into(), provider);
     }
 

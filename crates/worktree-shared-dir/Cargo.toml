@@ -1,0 +1,33 @@
+[package]
+name = "worktree-shared-dir"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Worktree Graph Canvas — Worktree Shared Directory resolver: 3-mechanism FR-ORCA-007 (per-user + workspace-level + per-workspace multica-config/config.json file-backed ConfigSource). Per docs/ecosystem-survey/orca-design-survey.md v1.0 §3 FR-ORCA-005..011 + 9/22 D-Boy 拍板 TBD-0044-01 C 选项 (file-backed ConfigSource in this repo, 不依赖 Multica CLI v1.0 schema). ULYS-104.3 (ULYS-158 + ULYS-177) P0-D v1.0 实装."
+
+[lib]
+name = "worktree_shared_dir"
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+
+# 跨 crate 引用: worktree-shared-dir 复用 graph-core 的 RepoId
+graph-core = { path = "../graph-core" }
+
+[dev-dependencies]
+# UT 用 tokio test runtime
+tokio = { workspace = true }
+
+[lints]
+workspace = true
