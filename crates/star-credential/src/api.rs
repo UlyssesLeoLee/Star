@@ -12,14 +12,14 @@
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::{IntoResponse, Json},
+    response::Json,
     routing::{get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::db::{AuditEventType, CredentialAuditEvent, CredentialDb};
+use crate::db::CredentialDb;
 use crate::{
     CredentialError, CredentialManager, CredentialMetadata, CredentialPlaintext, CredentialRecord,
     Provider,
@@ -437,6 +437,7 @@ async fn export_credentials(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::{AuditEventType, CredentialAuditEvent};
 
     fn make_state() -> AppState {
         AppState::new(

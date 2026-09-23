@@ -1,0 +1,59 @@
+{
+  "_meta": {
+    "version": "v1",
+    "module": "streamable-http",
+    "scenario": "internal-error-500",
+    "purpose": "per ULYS-140 缺口 #3 — Streamable HTTP 5xx 错误 case (per docs/test-design/TEST-DESIGN-STREAMABLE-HTTP-001.md §3.4 错误路径)",
+    "method": "POST",
+    "endpoint": "/v1/streamable/sessions/{id}/events",
+    "added_in": "v1.2 (commit ULYS-140 v1.2)"
+  },
+  "request": {
+    "method": "POST",
+    "url": "/v1/streamable/sessions/sess_5xx_test/events",
+    "headers": {
+      "Content-Type": "text/event-stream",
+      "Accept": "text/event-stream",
+      "Last-Event-Id": "evt_500_001"
+    },
+    "body": {
+      "event_type": "agent.thought.delta",
+      "session_id": "sess_5xx_test",
+      "payload": { "delta": "truncated..." }
+    }
+  },
+  "response": {
+    "status": 500,
+    "status_text": "Internal Server Error",
+    "headers": {
+      "Content-Type": "application/json",
+      "Retry-After": "1"
+    },
+    "body": {
+      "error": "internal_error",
+      "error_code": "STREAMABLE_INTERNAL_500",
+      "message": "Upstream LLM provider returned transient error",
+      "request_id": "req_500_test_001",
+      "retryable": true,
+      "retry_strategy": {
+        "max_attempts": 3,
+        "initial_backoff_ms": 100,
+        "backoff_multiplier": 2.0,
+        "max_backoff_ms": 2000
+      }
+    }
+  },
+  "expected_behavior": {
+    "client_should": [
+      "honor Retry-After header (1 second)",
+      "apply exponential backoff (100ms → 200ms → 400ms)",
+      "preserve Last-Event-Id for resume on retry",
+      "give up after max_attempts (3) and surface error to caller"
+    ],
+    "server_should": [
+      "log request_id with error_code STREAMABLE_INTERNAL_500",
+      "include trace_id in logs (守门 #1)",
+      "NOT include any upstream API key in error body (守门 #5)"
+    ]
+  }
+}

@@ -19,5 +19,32 @@
   "fixture_assertion": {
     "guard_check_pass": true,
     "elapsed_under_10ms": true
+  },
+  "aci_assertion": {
+    "assertion_id": "star-flash-mock:guards:g-1",
+    "aci_version": "0.1.0-draft",
+    "layer": "ut",
+    "scope": {
+      "project": "star-flash-mock",
+      "module": "guards",
+      "domain": "admin",
+      "operation": "task_queue_check",
+      "http_method": "GET"
+    },
+    "expect": {
+      "type": "response_within_ms",
+      "value": 10,
+      "description": "task_queue_no_persistence_gap 检查应在 10ms 内返回 (per G-1 L0 性能预算)"
+    },
+    "actual": {
+      "type": "response_within_ms",
+      "value": 5,
+      "description": "实测 5ms 完成, 快于预期 1 倍"
+    },
+    "status": "PASS",
+    "severity": "info",
+    "reasoning": "actual 5ms 远低于 expect 10ms 阈值 (50% 余量), guard G-1 (task_queue_no_persistence_gap) 检查通过, 任务队列无持久化空窗符合 L0 调度器连续性要求",
+    "tags": ["perf", "l0", "scheduler", "smoke"],
+    "captured_at": "2026-09-23T10:00:00Z"
   }
 }

@@ -9,6 +9,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 AR_DIR="$REPO_ROOT/tools/star-flash-mock/mock_data/agent-runtime"
 REPORT="$REPO_ROOT/docs/reports/AGENT-RUNTIME-G-1-18-COVERAGE-REPORT.md"
+# Convert POSIX paths to Windows-style for native python3 (MSYS conversion off)
+LIB_WIN="$(cygpath -w "$REPO_ROOT/tools/star-flash-mock/scripts/_lib_validate.py" 2>/dev/null || echo "$REPO_ROOT/tools/star-flash-mock/scripts/_lib_validate.py")"
+AR_DIR_WIN="$(cygpath -w "$AR_DIR" 2>/dev/null || echo "$AR_DIR")"
+PYTHON_CMD="${PYTHON:-python3}"
 
 echo "==== Agent Runtime G-1~G-18 落地回归 ===="
 
@@ -64,31 +68,27 @@ else
     exit 1
 fi
 
-# ===== 7. JSON 格式校验 + 守门 #5 无 secret 泄露 =====
+# ===== 7. JSON 格式校验 + 守门 #5 无 secret 泄露 (Python batch helper, 避免 MSYS path 失败) =====
 echo ""
-echo "--- 7. JSON 格式 + 守门 #5 ---"
-invalid=0
-for f in $(find "$AR_DIR" -name "*.json" 2>/dev/null); do
-    if ! python3 -c "import json; json.load(open('$f'))" 2>/dev/null; then
-        echo "  [FAIL] invalid JSON: $f"
-        invalid=$((invalid + 1))
+echo "--- 7. JSON 格式 + 守门 #5 (Python batch helper) ---"
+JSON_OUT=$("$PYTHON_CMD" "$LIB_WIN" validate-json "$AR_DIR_WIN" 2>&1)
+JSON_TOTAL=$(echo "$JSON_OUT" | grep "^TOTAL=" | cut -d= -f2)
+JSON_INVALID=$(echo "$JSON_OUT" | grep "^INVALID=" | cut -d= -f2)
+SECRET_OUT=$("$PYTHON_CMD" "$LIB_WIN" scan-secret "$AR_DIR_WIN" 2>&1)
+SECRET_LEAKS=$(echo "$SECRET_OUT" | grep "^LEAKS=" | cut -d= -f2)
+echo "  JSON validate: $JSON_TOTAL fixtures, $JSON_INVALID invalid"
+echo "  secret scan: $JSON_TOTAL fixtures, $SECRET_LEAKS leaks"
+if [ "${JSON_INVALID:-0}" -ne 0 ] || [ "${SECRET_LEAKS:-0}" -ne 0 ]; then
+    if [ "${JSON_INVALID:-0}" -ne 0 ]; then
+        echo "$JSON_OUT" | grep "^INVALID_FILE=" | head -5
     fi
-done
-if [ "$invalid" -eq 0 ]; then
-    echo "  [OK] 全部 fixture 有效 JSON"
-fi
-
-forbidden_patterns=("password=" "api_key=" "secret=" "BEGIN PRIVATE KEY" "GHCR_PAT")
-leak_count=0
-for pattern in "${forbidden_patterns[@]}"; do
-    matches=$(grep -r -l -i --include="*.json" "$pattern" "$AR_DIR" 2>/dev/null || true)
-    if [ -n "$matches" ]; then
-        leak_count=$((leak_count + 1))
+    if [ "${SECRET_LEAKS:-0}" -ne 0 ]; then
+        echo "$SECRET_OUT" | grep "^LEAK=" | head -5
     fi
-done
-if [ "$leak_count" -eq 0 ]; then
-    echo "  [OK] no secret leak"
+    echo "  [FAIL] 守门 #5 or JSON validate 失败"
+    exit 1
 fi
+echo "  [OK] 全部 fixture 有效 JSON + 0 secret leak"
 
 # ===== 8. 跨文档引用 =====
 echo ""

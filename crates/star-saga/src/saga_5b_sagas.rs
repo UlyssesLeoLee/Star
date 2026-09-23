@@ -24,7 +24,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::saga_step::{CallId, CrossDomainCall};
+use crate::saga_step::CrossDomainCall;
 
 /// 5 域 Saga 类型 (per 守门 #14 + Q-003 拍板)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -191,6 +191,7 @@ impl SagaDefinition {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::saga_step::CallId;
 
     #[test]
     fn five_saga_types_have_unique_strs() {

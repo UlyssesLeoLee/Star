@@ -8,18 +8,13 @@
 //!
 //! 不在本 PoC: 真实 PostgreSQL + RLS 13 類 (V2-3 完整版)
 
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Mutex;
 use thiserror::Error;
-use uuid::Uuid;
 
-use crate::{
-    CredentialError, CredentialMetadata, CredentialPlaintext, CredentialRecord, CredentialStatus,
-    Provider,
-};
-use domain_kms::EncryptedBlob;
+use crate::{CredentialMetadata, CredentialRecord, CredentialStatus, Provider};
 
 /// 持久化层错误
 #[derive(Debug, Error)]
@@ -335,6 +330,8 @@ fn parse_event_type(s: &str) -> Result<AuditEventType, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use domain_kms::EncryptedBlob;
+    use uuid::Uuid;
 
     fn make_record(provider: Provider, status: CredentialStatus) -> CredentialRecord {
         CredentialRecord {

@@ -9,14 +9,17 @@ REPO_ROOT="$(cd "$(dirname "$0")/../../../../.." && pwd)"
 SCRIPTS_DIR="$REPO_ROOT/tools/star-flash-mock/mock_data/uat/scripts"
 SCENARIOS_DIR="$REPO_ROOT/tools/star-flash-mock/mock_data/uat/scenarios"
 
+# Use py launcher (Windows-compatible, falls back to python3)
 PYTHON_CMD="${PYTHON:-python3}"
+# Convert POSIX path to Windows-style for native python3 (MSYS conversion off)
+SCRIPTS_WIN="$(cygpath -w "$SCRIPTS_DIR" 2>/dev/null || echo "$SCRIPTS_DIR")"
 
-echo "==== UAT 业务场景 11-15 (TMO M-N2..M-N6) regression test ===="
+echo "==== UAT 业务场景 11-15 (S11-S15) regression test ===="
 
 # 1. 跑 S11-S15 fixture generator
 echo ""
 echo "--- 跑 S11-S15 _generate_uat_s11_s15.py ---"
-"$PYTHON_CMD" "$SCRIPTS_DIR/_generate_uat_s11_s15.py"
+"$PYTHON_CMD" "$SCRIPTS_WIN/_generate_uat_s11_s15.py"
 
 # 2. 验证 fixture 完整性
 echo ""

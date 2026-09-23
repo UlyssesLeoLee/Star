@@ -1062,7 +1062,7 @@ impl ContextStore {
     /// 列出 task 全部 Context
     pub async fn list_by_task(&self, task_id: Uuid) -> Vec<ContextEntry> {
         let by_task = self.by_task.read().await;
-        let keys = by_task.get(&task_id).cloned().unwrap_or_default();
+        let _keys = by_task.get(&task_id).cloned().unwrap_or_default();
         drop(by_task);
         let entries = self.entries.read().await;
         let mut result = vec![];

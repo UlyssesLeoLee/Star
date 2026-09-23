@@ -67,7 +67,7 @@ impl GitProvider for Libgit2Provider {
             .map(|o| o.id())
             .or_else(|| git2_repo.head().ok().and_then(|h| h.target()));
 
-        for worktree_name in worktrees.iter().flatten() {
+        for worktree_name in worktrees.iter().flatten().flatten() {
             let wt = match git2_repo.find_worktree(worktree_name) {
                 Ok(w) => w,
                 Err(_) => continue,
@@ -290,8 +290,8 @@ impl GitProvider for Libgit2Provider {
         let mut out = Vec::new();
         for entry in statuses.iter() {
             let path = match entry.path() {
-                Some(p) => std::path::PathBuf::from(p),
-                None => continue,
+                Ok(p) => std::path::PathBuf::from(p),
+                Err(_) => continue,
             };
             let s = entry.status();
             let kind = if s.is_conflicted() {

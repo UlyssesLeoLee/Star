@@ -38,11 +38,11 @@ pub use context::{
     MOCK_EMBED_DIM,
 };
 pub use metering::{MeteringStore, TokenUsage, UsageAggregate};
+pub use provider::registry::DispatchProvider;
 pub use provider::{
     AnthropicProvider, MockProvider, OpenAiProvider, ProviderRegistry, ProviderRegistryError,
     ProviderSelector, ANTHROPIC_DEFAULT_BASE_URL, OPENAI_DEFAULT_BASE_URL,
 };
-pub use provider::registry::DispatchProvider;
 
 // =====================================================================
 // LlmProvider trait

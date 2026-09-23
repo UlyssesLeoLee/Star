@@ -1213,6 +1213,7 @@ impl RelationQueryPort for InMemoryRelationService {
 // 辅助:端点比较
 // =====================================================================
 
+#[allow(dead_code)] // tests mod 引用 (T561 helper)
 #[inline]
 fn endpoint_eq(a: (ResourceType, Uuid), b: (ResourceType, Uuid)) -> bool {
     a.0 == b.0 && a.1 == b.1

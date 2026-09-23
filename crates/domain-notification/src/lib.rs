@@ -25,7 +25,7 @@
 //!
 //! Lead 责任: notification Lead
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
@@ -68,6 +68,11 @@ pub enum NotificationEventType {
     AgentSessionTimeout,
     /// Protected Action 被拒绝(越权),必须通知
     ProtectedActionDenied,
+    // --- FR-ORCA-040:Agent Finish / Needs-You 通知(per docs/ecosystem-survey/orca-design-survey.md §13.2,529)---
+    /// Agent 完成(working -> done),必须通知用户(突破 INV-N-07)
+    AgentFinished,
+    /// Agent 需要用户介入(working -> needs you),必须通知用户(突破 INV-N-07)
+    NeedsYou,
     // 抑制 - 默认不发
     /// Agent 执行步骤开始,默认抑制
     AgentStepStarted,
@@ -101,6 +106,8 @@ impl NotificationEventType {
             Self::AgentSessionCrashed => "agent_session.crashed",
             Self::AgentSessionTimeout => "agent_session.timeout",
             Self::ProtectedActionDenied => "protected_action.denied",
+            Self::AgentFinished => "agent.finished",
+            Self::NeedsYou => "agent.needs_you",
             Self::AgentStepStarted => "agent.step.started",
             Self::AgentStepCompleted => "agent.step.completed",
             Self::ToolInvoked => "tool.invoked",
@@ -124,6 +131,8 @@ impl NotificationEventType {
                 | Self::AgentSessionCrashed
                 | Self::AgentSessionTimeout
                 | Self::ProtectedActionDenied
+                | Self::AgentFinished
+                | Self::NeedsYou
         )
     }
 
@@ -313,6 +322,28 @@ impl NotificationStatus {
     /// 是否为终态(不再重试或变更)
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Delivered | Self::Read | Self::DeadLettered)
+    }
+}
+
+impl Notification {
+    /// FR-ORCA-041 Unread Bolded (per docs/ecosystem-survey/orca-design-survey.md §13.2,533)
+    /// 当前通知是否处于"未读"视觉强调态(sidebar bolded 而非 badged)。
+    ///
+    /// **判据**:`read_at == None` 且状态未到终态。
+    /// 注:`Pending`/`Sent`/`Failed` 都是 unread(用户尚未确认);`Read` 与 `DeadLettered` 不是。
+    pub fn is_unread(&self) -> bool {
+        self.read_at.is_none()
+            && !matches!(
+                self.status,
+                NotificationStatus::Read | NotificationStatus::DeadLettered
+            )
+    }
+
+    /// FR-ORCA-041:sidebar 是否应"加粗"(bolded)而非显示数字 badge。
+    /// 当前实现:仅当至少有一条针对该 resource 的 unread 通知时才返回 true。
+    /// `resource_type` + `resource_id` 用于 sidebar 路由;`unread_count` 为聚合查询结果。
+    pub fn should_bold_for_sidebar(resource_unread_count: u32) -> bool {
+        resource_unread_count > 0
     }
 }
 
@@ -595,6 +626,7 @@ impl Default for InMemoryNotificationService {
     }
 }
 
+#[allow(dead_code)] // config const, 后续 worker 会引用
 const MAX_RETRY: u32 = 5;
 
 #[async_trait]
@@ -1029,6 +1061,8 @@ mod tests {
         assert!(NotificationEventType::FeedbackRequired.is_breakthrough());
         assert!(NotificationEventType::AgentSessionFailed.is_breakthrough());
         assert!(NotificationEventType::AgentSessionCrashed.is_breakthrough());
+        assert!(NotificationEventType::AgentFinished.is_breakthrough());
+        assert!(NotificationEventType::NeedsYou.is_breakthrough());
         assert!(NotificationEventType::AgentSessionTimeout.is_breakthrough());
         assert!(NotificationEventType::ProtectedActionDenied.is_breakthrough());
     }
@@ -1065,6 +1099,74 @@ mod tests {
         assert!(!NotificationStatus::Pending.is_terminal());
         assert!(!NotificationStatus::Sent.is_terminal());
         assert!(!NotificationStatus::Failed.is_terminal());
+    }
+
+    #[test]
+    fn notification_is_unread_after_dispatch() {
+        // FR-ORCA-041:刚 dispatch 的通知 read_at == None -> is_unread == true
+        let n = Notification {
+            id: NotificationId::new(),
+            tenant_id: TenantId::new(),
+            user_id: UserId::new(),
+            event_type: NotificationEventType::AgentFinished,
+            resource_type: "worktree".to_string(),
+            resource_id: uuid::Uuid::new_v4(),
+            channel_id: NotificationChannelId::new(),
+            subject: "Agent finished".to_string(),
+            body: "Your agent has completed the task".to_string(),
+            status: NotificationStatus::Sent,
+            created_at: chrono::Utc::now(),
+            sent_at: Some(chrono::Utc::now()),
+            read_at: None,
+            retry_count: 0,
+        };
+        assert!(
+            n.is_unread(),
+            "FR-ORCA-041:刚 dispatch 的通知应判为 unread (sidebar 加粗)"
+        );
+    }
+
+    #[test]
+    fn notification_is_unread_after_mark_read_returns_false() {
+        // FR-ORCA-041:用户点开后 read_at 被 set,is_unread == false (sidebar 取消加粗)
+        let n = Notification {
+            id: NotificationId::new(),
+            tenant_id: TenantId::new(),
+            user_id: UserId::new(),
+            event_type: NotificationEventType::NeedsYou,
+            resource_type: "worktree".to_string(),
+            resource_id: uuid::Uuid::new_v4(),
+            channel_id: NotificationChannelId::new(),
+            subject: "Needs you".to_string(),
+            body: "Please review the diff".to_string(),
+            status: NotificationStatus::Read,
+            created_at: chrono::Utc::now(),
+            sent_at: Some(chrono::Utc::now()),
+            read_at: Some(chrono::Utc::now()),
+            retry_count: 0,
+        };
+        assert!(
+            !n.is_unread(),
+            "FR-ORCA-041:已读后 is_unread == false (sidebar 取消加粗)"
+        );
+    }
+
+    #[test]
+    fn sidebar_should_bold_when_unread_count_gt_zero() {
+        // FR-ORCA-041:sidebar 加粗判据:未读计数 > 0
+        assert!(!Notification::should_bold_for_sidebar(0));
+        assert!(Notification::should_bold_for_sidebar(1));
+        assert!(Notification::should_bold_for_sidebar(7));
+    }
+
+    #[test]
+    fn event_as_str_new_variants() {
+        // FR-ORCA-040:AgentFinish / NeedsYou as_str 映射
+        assert_eq!(
+            NotificationEventType::AgentFinished.as_str(),
+            "agent.finished"
+        );
+        assert_eq!(NotificationEventType::NeedsYou.as_str(), "agent.needs_you");
     }
 
     #[tokio::test]

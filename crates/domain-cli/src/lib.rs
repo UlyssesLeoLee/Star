@@ -646,11 +646,11 @@ use base64::Engine;
 
 /// 使用 AES-256-GCM 加密明文, 返回 base64(nonce || ciphertext)
 pub fn encrypt(plaintext: &str, master_key: &[u8; 32]) -> Result<String, CliError> {
-    use rand::RngCore;
+    use rand::Rng;
     let key = Key::<Aes256Gcm>::from_slice(master_key);
     let cipher = Aes256Gcm::new(key);
     let mut nonce_bytes = [0u8; 12];
-    rand::thread_rng().fill_bytes(&mut nonce_bytes);
+    rand::rng().fill_bytes(&mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
     let ciphertext = cipher
         .encrypt(nonce, plaintext.as_bytes())

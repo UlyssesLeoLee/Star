@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use thiserror::Error;
 use tokio::process::Command;
-use uuid::Uuid;
 
 use crate::{TriggerMode, UploadStatus, UploadTask};
 
@@ -252,6 +251,7 @@ pub fn inv_03_completed_at_set(task: &UploadTask) -> bool {
 mod tests {
     use super::*;
     use chrono::Utc;
+    use uuid::Uuid;
 
     fn sample_task() -> UploadTask {
         UploadTask {

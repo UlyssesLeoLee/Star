@@ -18,11 +18,7 @@
 
 use std::sync::Arc;
 
-use axum::{
-    extract::State,
-    routing::post,
-    Json, Router,
-};
+use axum::{extract::State, routing::post, Json, Router};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -185,21 +181,24 @@ async fn completion_inline(
         request_id: Some(Uuid::new_v4()),
     };
 
-    let resp = state.provider.chat_completion(chat_req).await.map_err(|e| {
-        ApiError::new(
-            "LLM_PROVIDER_ERROR",
-            format!("completion: provider dispatch failed: {e}"),
-            "api",
-            "external",
-            true,
-            "Retry the request; check provider health if persistent",
-        )
-    })?;
+    let resp = state
+        .provider
+        .chat_completion(chat_req)
+        .await
+        .map_err(|e| {
+            ApiError::new(
+                "LLM_PROVIDER_ERROR",
+                format!("completion: provider dispatch failed: {e}"),
+                "api",
+                "external",
+                true,
+                "Retry the request; check provider health if persistent",
+            )
+        })?;
 
     let input_tokens = ((req.prefix.chars().count()
         + req.suffix.chars().count()
-        + COMPLETION_SYSTEM_PROMPT.chars().count())
-        as u32)
+        + COMPLETION_SYSTEM_PROMPT.chars().count()) as u32)
         .div_ceil(4);
     let output_tokens = (resp.message.content.chars().count() as u32).div_ceil(4);
 
@@ -244,12 +243,7 @@ mod tests {
 
     fn make_state() -> Arc<ChatState> {
         let mock: Arc<dyn LlmProvider> = Arc::new(MockProvider::new());
-        ChatState::with_provider(
-            mock,
-            Arc::new(MeteringStore::new()),
-            tenant(),
-            actor(),
-        )
+        ChatState::with_provider(mock, Arc::new(MeteringStore::new()), tenant(), actor())
     }
 
     fn sample_request() -> CompletionInlineRequest {
@@ -310,9 +304,7 @@ mod tests {
         let state = make_state();
         let mut r = sample_request();
         r.file_path = "".into();
-        let err = completion_inline(State(state), Json(r))
-            .await
-            .unwrap_err();
+        let err = completion_inline(State(state), Json(r)).await.unwrap_err();
         assert_eq!(err.code, "VALIDATION_FAILED");
     }
 
@@ -484,9 +476,12 @@ mod composer_tests {
 
     #[test]
     fn composer_routes_helper_builds_router_without_error() {
-        let _ = extend_with_composer(Router::new(), crate::chat::ChatState::new(
-            Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(),
-            Uuid::parse_str("00000000-0000-0000-0000-000000000099").unwrap(),
-        ));
+        let _ = extend_with_composer(
+            Router::new(),
+            crate::chat::ChatState::new(
+                Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(),
+                Uuid::parse_str("00000000-0000-0000-0000-000000000099").unwrap(),
+            ),
+        );
     }
 }
