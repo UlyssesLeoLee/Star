@@ -19,5 +19,32 @@
   "fixture_assertion": {
     "guard_check_pass": true,
     "elapsed_under_10ms": true
+  },
+  "aci_assertion": {
+    "assertion_id": "star-flash-mock:guards:g-7",
+    "aci_version": "0.1.0-draft",
+    "layer": "ut",
+    "scope": {
+      "project": "star-flash-mock",
+      "module": "guards",
+      "domain": "admin",
+      "operation": "backpressure_throttle_check",
+      "http_method": "GET"
+    },
+    "expect": {
+      "type": "response_within_ms",
+      "value": 10,
+      "description": "backpressure throttle 应在 10ms 内返回 (per G-7 L0 性能预算)"
+    },
+    "actual": {
+      "type": "response_within_ms",
+      "value": 5,
+      "description": "实测 5ms 完成, 限流状态稳定"
+    },
+    "status": "PASS",
+    "severity": "info",
+    "reasoning": "actual 5ms ≤ expect 10ms, backpressure throttle guard 通过, 限流器在阈值内未触发降级",
+    "tags": ["perf", "l0", "backpressure", "throttle"],
+    "captured_at": "2026-09-23T10:00:00Z"
   }
 }
