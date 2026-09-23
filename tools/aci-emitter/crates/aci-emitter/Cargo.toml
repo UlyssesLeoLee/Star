@@ -1,0 +1,26 @@
+[package]
+name = "aci-emitter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+# CLI 仅 bin 使用 (per brief §1.1.5 clap derive);
+# 加在 [dependencies] 是 bin 派生宏所必需 (编译期).
+# 库使用者不强制用 clap (此 dep 只是 pub 在 bin target 编译时可见).
+clap = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tempfile = "3.10"

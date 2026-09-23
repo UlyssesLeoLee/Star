@@ -1,0 +1,19 @@
+# Rust build artifacts
+/target/
+**/target/
+
+# Lockfile backups
+/Cargo.lock.bak
+**/Cargo.lock.bak
+
+# Editor / OS cruft
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local test scratch
+/tmp/
+/scratch/
