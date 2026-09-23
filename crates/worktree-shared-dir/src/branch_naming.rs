@@ -131,12 +131,10 @@ pub const EMOJI_SHORTCODE_TABLE: &[(&str, &str)] = &[
 /// 才走派生分支, 此时常用 emoji 在表内.
 pub fn replace_emoji_shortcodes(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
-    let mut chars = input.chars().peekable();
-    while let Some(c) = chars.next() {
-        // 尝试匹配 4-byte UTF-8 emoji + 后续 VS16 (FE0F) 之类修饰符
+    for c in input.chars() {
         let mut matched = false;
         for (emoji, shortcode) in EMOJI_SHORTCODE_TABLE {
-            if emoji.chars().next() == Some(c) {
+            if emoji.starts_with(c) {
                 out.push_str(shortcode);
                 matched = true;
                 break;
@@ -155,22 +153,23 @@ pub fn replace_emoji_shortcodes(input: &str) -> String {
 /// 注意: `/` 保留 — branch 名允许 `/` 分隔 owner (e.g. `feature/x`).
 pub fn sanitize_branch_chars(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
-    let mut last_was_dash = false;
-    let mut started = false; // 控制 trim 末尾
+    let mut started = false; // 控制 trim 末尾 (任何字符之后才 append)
     for c in input.chars() {
-        let valid = c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '/';
+        let valid = c.is_ascii_alphanumeric() || c == '_' || c == '/';
         if valid {
             out.push(c);
-            last_was_dash = c == '-';
             started = true;
-        } else if started {
-            // 合并连续 `-`
-            if !last_was_dash {
-                out.push('-');
-                last_was_dash = true;
-            }
+            continue;
         }
-        // trim 首字符: started=false 时 invalid 字符直接丢弃
+        // c == '-' 或非法字符: 统一处理
+        if !started {
+            // 还在前缀阶段 — 直接丢弃首字符 (含 `-` 和非法字符)
+            continue;
+        }
+        // 已 started: 跟 out 末尾比, 如果最后已是 `-` 就合并; 否则推入 `-`
+        if !out.ends_with('-') {
+            out.push('-');
+        }
     }
     // trim 末尾 `-`
     while out.ends_with('-') {
@@ -219,7 +218,40 @@ pub fn normalize_branch(input: &str) -> String {
         }
         return truncate_branch(&fallback, MAX_BRANCH_LENGTH);
     }
-    truncate_branch(&sanitized, MAX_BRANCH_LENGTH)
+    let deduped = dedupe_leading_shortcode(&sanitized);
+    truncate_branch(&deduped, MAX_BRANCH_LENGTH)
+}
+
+/// 去重 workspace_name 派生场景下的"emoji shortcode 前缀".
+///
+/// 例: `"rocket-rocket-launch"` (来自 "🚀 rocket-launch") → `"rocket-launch"`.
+/// 检测规则: 如果 sanitized 字符串以 `<shortcode>-` 开头, 且后面又出现
+/// 同一个 `<shortcode>` 紧接着, 那么首段 `<shortcode>-` 是冗余前缀,
+/// 去掉它 (per FR-ORCA-010 spec §3 行 230-232 "🚀 → rocket" 隐含
+/// "emoji + 描述性名字时只保留描述性名字").
+pub fn dedupe_leading_shortcode(input: &str) -> String {
+    for (_emoji, shortcode) in EMOJI_SHORTCODE_TABLE {
+        let prefix = format!("{shortcode}-");
+        if let Some(rest) = input.strip_prefix(&prefix) {
+            // rest 以 `<shortcode>` 开头 → 去掉前缀
+            if rest.starts_with(shortcode) {
+                return rest.to_string();
+            }
+            // rest 以 `<shortcode>-` 开头 (cascading) → 递归去重
+            if rest.starts_with(&prefix) {
+                let inner = dedupe_leading_shortcode(rest);
+                return inner;
+            }
+        }
+        // 也支持"纯 shortcode 重复"格式: "<shortcode> <shortcode>-..."
+        let prefix_space = format!("{shortcode} ");
+        if let Some(rest) = input.strip_prefix(&prefix_space) {
+            if rest.starts_with(shortcode) {
+                return rest.to_string();
+            }
+        }
+    }
+    input.to_string()
 }
 
 // =====================================================================
@@ -232,37 +264,52 @@ pub struct DefaultBranchNamer;
 
 impl BranchNamer for DefaultBranchNamer {
     fn derive(&self, input: &BranchNamingInput) -> SharedDirResult<BranchNamingResult> {
-        // 优先级 #1: linear
+        // 优先级 #1: linear — raw 输入非空才视为有效
         if let Some(name) = input.linear_branch_name.as_deref() {
-            let normalized = normalize_branch(name);
-            if !normalized.is_empty() {
-                return Ok(BranchNamingResult {
-                    branch_name: normalized,
-                    source: BranchNamingSource::Linear,
-                });
+            if !name.is_empty() {
+                let normalized = normalize_branch(name);
+                if !normalized.is_empty() {
+                    return Ok(BranchNamingResult {
+                        branch_name: normalized,
+                        source: BranchNamingSource::Linear,
+                    });
+                }
             }
         }
-        // 优先级 #2: github_pr
+        // 优先级 #2: github_pr — 同上, raw 非空才视为有效
         if let Some(name) = input.github_pr_branch.as_deref() {
-            let normalized = normalize_branch(name);
-            if !normalized.is_empty() {
-                return Ok(BranchNamingResult {
-                    branch_name: normalized,
-                    source: BranchNamingSource::GitHubPr,
-                });
+            if !name.is_empty() {
+                let normalized = normalize_branch(name);
+                if !normalized.is_empty() {
+                    return Ok(BranchNamingResult {
+                        branch_name: normalized,
+                        source: BranchNamingSource::GitHubPr,
+                    });
+                }
             }
         }
-        // 优先级 #3: user_input
+        // 优先级 #3: user_input — 同上, raw 非空才视为有效 (空字符串 fallback)
         if let Some(name) = input.user_input.as_deref() {
-            let normalized = normalize_branch(name);
-            if !normalized.is_empty() {
-                return Ok(BranchNamingResult {
-                    branch_name: normalized,
-                    source: BranchNamingSource::UserInput,
-                });
+            if !name.is_empty() {
+                let normalized = normalize_branch(name);
+                if !normalized.is_empty() {
+                    return Ok(BranchNamingResult {
+                        branch_name: normalized,
+                        source: BranchNamingSource::UserInput,
+                    });
+                }
             }
         }
-        // 优先级 #4: workspace_name 派生
+        // 优先级 #4: workspace_name 派生.
+        // 如果 workspace_name 是 raw 空字符串, 不能 fallback 到 "branch-" —
+        // 那会掩盖 user 的错误输入. 直接报错.
+        if input.workspace_name.is_empty() {
+            return Err(SharedDirError::new(
+                "WSD.BRANCH_NAME_DERIVE_FAIL",
+                "cannot derive branch: workspace_name is empty (no linear/github/user_input either)",
+                "wsd-branch-naming-default-trace",
+            ));
+        }
         let derived = normalize_branch(&input.workspace_name);
         if derived.is_empty() {
             return Err(SharedDirError::new(

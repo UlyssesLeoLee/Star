@@ -284,7 +284,8 @@ impl StartFromPickerError {
 
     /// 转 `SharedDirError`.
     pub fn into_shared_dir_error(self, trace_id: impl Into<String>) -> SharedDirError {
-        SharedDirError::new(self.code, self.message, trace_id).with_source(
+        // SharedDirError::new 第一个参数是 &str, self.code 是 String — 借用.
+        SharedDirError::new(&self.code, self.message, trace_id).with_source(
             self.source
                 .as_deref()
                 .unwrap_or("StartFromPicker"),
@@ -482,7 +483,12 @@ impl RealStartFromPicker {
         let path = self
             .registry
             .lookup(repo_id)
-            .map_err(StartFromPickerError::into_shared_dir_error)?;
+            // into_shared_dir_error 需要 self + trace_id 两个参数, map_err 的闭包
+            // 只接 E (thiserror 派生的 RegistryError). 用 trace_id 字面量包装.
+            .map_err(|e| {
+                let trace = format!("wsd-picker-open-repo-{repo_id}");
+                e.into_shared_dir_error(trace)
+            })?;
         let handle = self.git.open_repo(&path).await.map_err(|e| {
             SharedDirError::new(
                 "WSD.PICKER_GIT_OPEN_FAIL",

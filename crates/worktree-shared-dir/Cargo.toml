@@ -21,6 +21,9 @@ async-trait = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 tracing = { workspace = true }
+# tokio: FR-ORCA-009 RealStartFromPicker::fetch 用 `tokio::task::spawn_blocking`
+# 跑 `git fetch` 避免阻塞 async runtime. lib code 用, 不能仅 dev-dep.
+tokio = { workspace = true }
 
 # 跨 crate 引用: worktree-shared-dir 复用 graph-core 的 RepoId
 graph-core = { path = "../graph-core" }
