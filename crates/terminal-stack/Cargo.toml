@@ -1,0 +1,43 @@
+[package]
+name = "terminal-stack"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Star Terminal Stack — scrollback ring buffer + split-pane tree + SQLite WAL persistence + WebSocket protocol layer (per ULYS-200 + ULYS-220 P1-A + ULYS-222 P1-C + FR-ORCA-036/039 §12 v1.0 + 终端栈选型 = 候选 B per 2026-09-22 JST 决策)"
+
+[lib]
+name = "terminal_stack"
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies] 或 per-crate (per rusqlite 同款)
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+# ULYS-220 P1-A Persistence: rusqlite bundled SQLite WAL (per cli_session_registry / star-taskqueue 同款)
+rusqlite = { version = "0.32", default-features = false, features = ["bundled"] }
+# ULYS-222 P1-C WebSocket Protocol Layer (per crates/api 守门 #48 axum 0.8 锁定)
+# 选 axum 而非 actix-web: workspace 实际锁定 axum 0.8 (per crates/api, 守门 #48 2026-09-08)
+# 不重写 workspace 已选 HTTP 栈 (per D-Boy 守门 #13 "不重写 Rust 生态已有组件" 派生)
+axum = { version = "0.8", features = ["ws", "macros"] }
+# tokio 在 [workspace.dependencies] 已带 full features
+tokio-stream = "0.1"
+# async-trait 已在 [workspace.dependencies] (per crates/api 同款模式, 守门 #11 0 重复加 version)
+async-trait = { workspace = true }
+# tokio 在 [workspace.dependencies] 已带 full features (per crates/api 守门 #48);
+# terminal-stack 此前用 tokio 只有 persistence 层 (互斥用 sqlite Mutex), WebSocket 层引入
+# tokio runtime primitives (broadcast / mpsc / select), 故加 tokio workspace dep.
+tokio = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true
