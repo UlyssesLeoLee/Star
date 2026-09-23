@@ -17,9 +17,7 @@ use futures_util::stream::{self, StreamExt};
 use uuid::Uuid;
 
 use crate::chat::{ChatChunk, ChatMessage, ChatRequest, ChatResponse, ChatRole};
-use crate::{
-    LlmProvider, LlmProviderRegistryError, LlmProviderRegistryHealth,
-};
+use crate::{LlmProvider, LlmProviderRegistryError, LlmProviderRegistryHealth};
 
 /// Default model name reported by [`MockProvider`] responses.
 pub const MOCK_DEFAULT_MODEL: &str = "mock-llm";
@@ -222,10 +220,7 @@ mod tests {
             request_id: None,
         };
         let err = p.chat_completion(req).await.unwrap_err();
-        assert!(matches!(
-            err,
-            LlmProviderRegistryError::InvalidOperation(_)
-        ));
+        assert!(matches!(err, LlmProviderRegistryError::InvalidOperation(_)));
     }
 
     #[tokio::test]

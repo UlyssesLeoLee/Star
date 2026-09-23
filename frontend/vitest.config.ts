@@ -44,6 +44,7 @@ export default defineConfig({
       "e2e/uat-3000-restore.spec.ts", // Playwright-only spec, uses @playwright/test
       "e2e/uat-business-acceptance.spec.ts", // Playwright-only spec, uses @playwright/test
       "e2e/worktree-creation-flow.spec.ts", // Playwright-only spec, uses @playwright/test
+      "e2e/diff-annotation.spec.ts", // Playwright-only spec (per ULYS-211 FR-ORCA-035 diff 标注 E2E, uses @playwright/test)
     ],
     setupFiles: ["./vitest.setup.ts"],
   },

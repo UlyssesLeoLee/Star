@@ -23,7 +23,7 @@ export function PageHeader({
       <div>
         <div className="flex items-center gap-2.5 mb-1.5">
           {icon}
-          <h1 className="text-2xl font-black text-ink tracking-tight" style={{textShadow: '3px 3px 0 var(--cel-shadow-color, #000)'}}>{title}</h1>
+          <h1 className="text-2xl font-black text-ink tracking-tight">{title}</h1>
           {track && (
             <span className="pill border-line text-ink-dim font-mono text-xs font-semibold">
               {interpolate(t.pageHeader.trackPill, { track })}
