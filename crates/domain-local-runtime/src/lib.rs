@@ -50,6 +50,12 @@ define_uuid_id!(AgentSessionId);
 define_uuid_id!(ProjectId);
 // ULYS-156 单进程持久化层适配 (§A 锁定, 9/22 JST 决策会)
 define_uuid_id!(CliSessionId);
+// ULYS-156 P0-A 续 (9/23 JST 拍板 B 推进到完成, FR-ORCA-001 AC-4 / FR-ORCA-003 /
+// FR-ORCA-004 / NFR-ORCA-001 / NFR-ORCA-002): PID lock + supervisor + graceful +
+// health_self_test 用 ID
+define_uuid_id!(SessionLockId);
+define_uuid_id!(SupervisorId);
+define_uuid_id!(ShutdownId);
 
 // =====================================================================
 // UUID 强类型 ID 宏(参考 domain-worktree / domain-tenant 模式)
@@ -1626,8 +1632,14 @@ pub mod spawn_upload_integration;
 
 // ULYS-156 单进程持久化层适配 (§A 锁定路径; per D-Boy 9/22 JST 决策):
 // cli_session = 7 态状态机 + 实体; cli_session_registry = SQLite WAL 持久化
-// 注: process_supervisor / graceful_shutdown / health_self_test 留 P1 followup,
-// 因为上游 `docs/ecosystem-survey/orca-design-survey.md` 在本 worktree 不可达,
-// D-Boy §A 锁定本路线但具体 AC 切片后续轮次补。
+// 9/23 JST D-Boy 「推进到完成」翻 PR (P0-A 续):
+// - cli_session_lock: PID + 启动时间 lock 记录, 防 PID 回收骗锁 (FR-ORCA-001 AC-4 / FR-ORCA-004)
+// - process_supervisor: 跨 session 监督 + 5 launches/60s crash-loop containment (NFR-ORCA-002)
+// - graceful_shutdown: 注册 graceful handler, 串行 cancel 活跃 session
+// - health_self_test: 跨进程 (本仓库单进程模型下=跨 4 模块) 自检 (FR-ORCA-003)
 pub mod cli_session;
+pub mod cli_session_lock;
 pub mod cli_session_registry;
+pub mod graceful_shutdown;
+pub mod health_self_test;
+pub mod process_supervisor;
