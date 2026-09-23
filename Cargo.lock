@@ -5472,6 +5472,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "git-adapter",
  "graph-core",
  "serde",
  "serde_json",
