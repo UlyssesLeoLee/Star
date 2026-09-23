@@ -219,4 +219,18 @@ pub trait WorktreeService: Send + Sync {
 
     /// Archive 单个 (per INV-WC-08 保留 Provenance)
     async fn archive(&self, id: WorktreeId) -> Result<(), ServiceError>;
+
+    /// 扫描 + 导入 external git worktrees (per ULYS-195 / FR-ORCA-011).
+    ///
+    /// `repo_path` = 仓库 git 根目录; `force=true` 时同 branch 冲突会覆盖更新
+    /// 内部 Worktree.branch/path 指向新 worktree_path.
+    ///
+    /// 返回 `ImportOutcome { imported, skipped, updated }`, caller 可决定
+    /// 是否发 SSE `WorktreeEventEnvelope::Created` 给订阅者.
+    async fn import_external_worktrees(
+        &self,
+        repo_id: RepoId,
+        repo_path: &std::path::Path,
+        force: bool,
+    ) -> Result<crate::external_worktree_import::ImportOutcome, ServiceError>;
 }

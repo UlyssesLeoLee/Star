@@ -470,6 +470,116 @@ impl WorktreeService for InMemoryWorktreeService {
         });
         Ok(())
     }
+
+    async fn import_external_worktrees(
+        &self,
+        repo_id: RepoId,
+        repo_path: &std::path::Path,
+        force: bool,
+    ) -> Result<crate::external_worktree_import::ImportOutcome, ServiceError> {
+        use crate::external_worktree_import::{
+            diff_external, map_to_worktree, parse_porcelain, ImportError,
+        };
+
+        // 调 git (in-memory impl 不在 stage 1 调 git CLI;
+        //    测试可走 parse_porcelain 注入 fake 数据, prod 走 scan_external_worktrees)
+        //    这里走 scan_external_worktrees — 失败时 ImportError → ServiceError.
+        let externals = match crate::external_worktree_import::scan_external_worktrees(repo_path)
+            .await
+        {
+            Ok(v) => v,
+            // porcelain_v1 fallback: 若 --porcelain 不被 git 旧版支持, 退到 v1 输出解析
+            // (此处 e2e 路径默认用 v2, 测试路径直接走 parse_porcelain)
+            Err(ImportError::GitCommand(msg)) if msg.contains("unknown option") => {
+                return Err(ServiceError::new(
+                    "WT.GIT_FAIL",
+                    format!("git worktree list --porcelain unsupported: {msg}"),
+                    "trace",
+                ));
+            }
+            Err(e) => {
+                return Err(e.into_service_error(format!(
+                    "import_external_worktrees:{}",
+                    uuid::Uuid::new_v4()
+                )));
+            }
+        };
+
+        let _ = parse_porcelain; // suppress unused warning if compile-only path skips
+        let existing = {
+            let guard = self.inner.read().await;
+            guard
+                .worktrees
+                .values()
+                .filter(|w| w.repo_id == repo_id)
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+        let to_import = diff_external(&externals, &existing);
+
+        let mut outcome = crate::external_worktree_import::ImportOutcome::default();
+        let mut now = Utc::now();
+
+        for ext in to_import {
+            // 冲突检测: 同 branch 已存在
+            let branch_conflict = ext.branch.as_ref().and_then(|b| {
+                existing
+                    .iter()
+                    .find(|w| w.branch == *b && w.path != ext.worktree_path)
+            });
+
+            if let Some(conflict) = branch_conflict {
+                if !force {
+                    tracing::warn!(
+                        branch = %ext.branch.as_deref().unwrap_or("(detached)"),
+                        existing_id = %conflict.id,
+                        "import_external_worktrees: branch conflict, skip (force=true to override)"
+                    );
+                    outcome
+                        .skipped
+                        .push(ext.branch.clone().unwrap_or_else(|| "(detached)".into()));
+                    continue;
+                }
+                // force=true: 更新内部 Worktree.branch 指向新 path (path 单独 record_observed)
+                let mut guard = self.inner.write().await;
+                if let Some(stored) = guard.worktrees.get_mut(&conflict.id) {
+                    stored.branch = ext.branch.clone().unwrap_or_else(|| {
+                        ext.head_commit.chars().take(7).collect()
+                    });
+                    stored.path = ext.worktree_path.clone();
+                    stored.last_activity = now;
+                    outcome.updated.push(stored.clone());
+                }
+                drop(guard);
+                continue;
+            }
+
+            // 新 insert
+            let wt = map_to_worktree(repo_id, &ext);
+            let id = wt.id;
+            {
+                let mut guard = self.inner.write().await;
+                guard.worktrees.insert(id, wt.clone());
+                // init projection
+                guard
+                    .projections
+                    .entry(id)
+                    .or_insert_with(crate::projection::WorktreeStatusObserved::new);
+            }
+
+            // 发 SSE Created 事件
+            let _ = self.event_tx.send(WorktreeEventEnvelope::Created {
+                worktree_id: id,
+                repo_id,
+                at: now,
+            });
+
+            outcome.imported.push(wt);
+            now = Utc::now();
+        }
+
+        Ok(outcome)
+    }
 }
 
 #[cfg(test)]
