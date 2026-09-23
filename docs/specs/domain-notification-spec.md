@@ -316,3 +316,80 @@ per [basic-design v0.16 §3.2.9 22 domain contact face 表](../../basic-design.m
 **接触面统计**: 6 条 (v0.16 新增,本 spec 由 `scripts/inter_collab_refine.py` 批量生成)
 
 **dual-use 警告** (per AGENTS.md §5 v0.6 + Q1-D 拍板): 5 域 (player/economy/match/social/admin) 是 RGS 仓历史治理命名,Star 仓不建立业务子域↔DDD 映射。本 spec 协作基于 22 domain crate,不通过 5 域绑定推导。
+
+
+---
+
+## 6. Orca 借鉴点 12 落地（FR-ORCA-040 / FR-ORCA-041，per `docs/ecosystem-survey/orca-design-survey.md` v1.0 §13）
+
+> 上游：ULYS-104 (parent `01a0b920-28d5-7dc8-93c2-9cbc73ba9c4d`)，子条目 ULYS-163。
+> spec 锚点：§13.2 行 527-533 + 附录 B 行 711-712（blob `0bd0e9b6`）。
+
+### 6.1 FR-ORCA-040 Agent Finish / Needs-You 通知
+
+**需求**：agent 状态从 working → done / needs you → 通过 native notification 通知用户
+（macOS Notification Center / Windows toast / Linux libnotify）。
+
+**MVP 实装**（本次 ULYS-163 范围，backend-only）：
+
+| 落点 | 状态 |
+|---|---|
+| `NotificationEventType` 新增 `AgentFinished` + `NeedsYou` 两个突破抑制变体 | ✅ 已 ship（lib.rs:73-77 + as_str 映射 + is_breakthrough） |
+| `as_str()` 映射 `"agent.finished"` / `"agent.needs_you"` | ✅ 已 ship（lib.rs:108-109） |
+| 突破 INV-N-07 默认抑制，dispatch 必成 | ✅ 已 ship（lib.rs:127-128 is_breakthrough match arms） |
+| Native notification 适配层（macOS / Windows / Linux 三个 OS Provider） | ⏳ P1 followup（本期 backend only，MVP 仅暴露突破抑制语义） |
+
+**AC（验收条件）**：
+
+- AC-1：dispatch `AgentFinished` / `NeedsYou` 必须返回 `Ok(Notification)`，不被 `EventSuppressed` 拒绝（已覆盖 `it_v5_fr_orca_040_agent_finished_needs_you_breakthrough`）。
+- AC-2：`as_str()` 返回 `"agent.finished"` / `"agent.needs_you"`，可被 audit/event-bus 消费（已覆盖 `event_as_str_new_variants` lib test）。
+- AC-3：调用方调用语义必须显式区分 working → done 与 working → needs you，不允许以单一 `AgentStepCompleted` 替代。
+
+### 6.2 FR-ORCA-041 Unread Worktree Bolded（不 badge）
+
+**需求**：未读 worktree 在 sidebar **加粗**（不显示数字 badge）；用户 click 后清除 unread。
+
+**MVP 实装**（本期 backend-only）：
+
+| 落点 | 状态 |
+|---|---|
+| `Notification::is_unread()` 方法（判据：`read_at == None` 且 status 非终态） | ✅ 已 ship（lib.rs:333-339） |
+| `Notification::should_bold_for_sidebar(unread_count)` 静态方法（判据：unread_count > 0） | ✅ 已 ship（lib.rs:344-346） |
+| `list_by_user(unread_only=true)` 查询已可用（前置已 ship） | ✅ 已 ship（lib.rs:489-493） |
+| Sidebar UI 渲染层加粗（font-weight bold） | ⏳ P1 followup（本期无 frontend，apps/cats-client 仍为 M0 placeholder） |
+| Sidebar 不渲染数字 badge（取消 badge count） | ⏳ P1 followup（与上一项同包） |
+| 点开 sidebar 项后调 `mark_read` 清 unread | ✅ Backend ready；前端绑定 = P1 |
+
+**AC（验收条件）**：
+
+- AC-1：刚 dispatch 的通知 `is_unread() == true`（已覆盖 `notification_is_unread_after_dispatch` lib test + `it_v5_fr_orca_041_unread_bolded_flow` 步骤 1）。
+- AC-2：调用 `mark_read` 后 `is_unread() == false`（已覆盖 `notification_is_unread_after_mark_read_returns_false` lib test + `it_v5_fr_orca_041_unread_bolded_flow` 步骤 3）。
+- AC-3：`should_bold_for_sidebar(0) == false`、`should_bold_for_sidebar(>0) == true`（已覆盖 `sidebar_should_bold_when_unread_count_gt_zero` lib test）。
+- AC-4：sidebar 不显示数字 badge（仅加粗）—— 此 AC 须 frontend（apps/cats-client M0 → M2 时落地）；本期 backend 文档层面已强制判据 `unread_count > 0` 仅控制 bolded，不暴露 badge 计数 API。
+
+### 6.3 不在 MVP 范围（明确边界）
+
+| 项 | 不做理由 |
+|---|---|
+| Native notification Provider 适配（macOS NSUserNotification / Windows toast / Linux libnotify） | 跨 OS 适配复杂，本期 backend only；用户当前通过 `list_by_user` 拉取通知后由前端触发系统通知 |
+| Sidebar UI 加粗渲染 | apps/cats-client 仍为 M0 placeholder（per ULIS-45 task-service SSE README）；前端 M2 升级时一并落地 |
+| "Mark unread" 按钮（让用户手动把已读标回 unread） | spec §13.1 提及但 §13.2 未列入 FR-ORCA-040/041；保留为未来扩展 |
+| 跨 device 同步 unread 状态（设备 A 读了，设备 B 仍显示未读） | spec 未要求；INV-AGT-09 提示 100% 写入 Transcript 但未要求实时同步 |
+| Notification 聚合（digest / quiet hours） | spec §30.3 列入 V1；本期 P2 scope 不含 |
+
+### 6.4 测试矩阵
+
+| 测试 | 位置 | 覆盖 |
+|---|---|---|
+| `event_breakthrough_invn07`（含 AgentFinished + NeedsYou） | lib.rs `tests` 模块 | FR-ORCA-040 突破抑制 |
+| `event_suppressed_invn07` | lib.rs `tests` 模块 | INV-N-07 默认抑制仍生效（AgentFinished / NeedsYou 不被错归入抑制） |
+| `event_as_str_new_variants` | lib.rs `tests` 模块 | FR-ORCA-040 as_str 映射 |
+| `notification_is_unread_after_dispatch` | lib.rs `tests` 模块 | FR-ORCA-041 AC-1 |
+| `notification_is_unread_after_mark_read_returns_false` | lib.rs `tests` 模块 | FR-ORCA-041 AC-2 |
+| `sidebar_should_bold_when_unread_count_gt_zero` | lib.rs `tests` 模块 | FR-ORCA-041 AC-3 |
+| `it_v5_fr_orca_040_agent_finished_needs_you_breakthrough` | tests/integration_test.rs | FR-ORCA-040 端到端 dispatch |
+| `it_v5_fr_orca_041_unread_bolded_flow` | tests/integration_test.rs | FR-ORCA-041 端到端 dispatch → mark_read → is_unread 翻转 |
+
+---
+
+> 本 §6 由 ULYS-163 worker 于 2026-09-22 JST 添加，对应 v1.0 spec 的 §13 落地。Stage 2 done → ULYS-163 进入 Stage 3 时由父 issue worker 审稿。
