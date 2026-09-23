@@ -1,10 +1,10 @@
 # ACI (Assertion-Capability Interface) × 全项目 Mock — 設計分析 (Design Analysis)
 
-> **狀態**: 🟡 Draft v0.1 (ULYS-191 觸發, 待 Ulysses 拍板 6 落地前決策)
-> **日期**: 2026-09-22
+> **狀態**: 🟢 Approved v0.2 (reply `01a0cbf3` 2026-09-23 10:48 JST 「xiaoshuo不需要考虑。可以启动」 = 排除 Xiaoshuo + 啟動落地)
+> **日期**: 2026-09-22 (v0.1 落檔) → 2026-09-23 (v0.2 修訂)
 > **制定者**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手代審
 > **觸發 issue**: ULYS-191 "ACI接口" — 所有项目的 Mock 项目要具备 ACI 接口，有效输出提示词型断言，方便大模型判断问题
-> **適用項目**: **跨項目範圍** (per description 字面 "所有项目" — Star / RGS / CATs / IDE1.0 / IM1.0 / GitGit / Xiaoshuo / Ada 共 8 個項目), 設計稿落地第一階段以 Star `tools/star-flash-mock/` 為參考實裝, 跨項目介面契約由本檔統一
+> **適用項目**: **跨項目範圍** — Star / IDE1.0 / RGS / CATs / IM1.0 / GitGit / Ada 共 **7 個項目** (v0.2 排除 Xiaoshuo, per reply `01a0cbf3`「xiaoshuo不需要考虑」), 設計稿落地第一階段以 Star `tools/star-flash-mock/` 為參考實裝, 跨項目介面契約由本檔統一
 > **關聯文檔**:
 > - [`docs/architecture/2026-09-22-jev-integration/00-design-analysis.md`](../2026-09-22-jev-integration/00-design-analysis.md) (姊妹文檔, ULYS-189, 小腦判斷層)
 > - ULYS-190 "Mock开关" (sibling issue, 同期觸發, 觸發測試目標功能開關)
@@ -128,15 +128,16 @@ ULYS-191 description 字面 "所有项目" = ULYS 一人公司 8 個項目。盤
 | 2 | **IDE1.0** (`E:/IDE1.0`) | 8 個 `crates/*/tests/integration.rs` + `tests/st/cli_smoke.sh` (per ULYS-139) | `assert!()` / `assert_eq!()` (Rust 原生), stdout `PASS/FAIL` | ❌ 不可 (純 boolean + panic msg) | 🟡 中 (Rust 寫 ACI emitter helper crate) |
 | 3 | **RGS** (`D:/RustGameServer`) | 待盤點 (per ULYS-136) | 待盤點 | ❓ 未知 | 🔴 待盤點 |
 | 4 | **CATs** (`D:/CATs`) | 待盤點 (per ULYS-135) | 待盤點 | ❓ 未知 | 🔴 待盤點 |
-| 5 | **IM1.0** (`待 git clone`) | 待盤點 (per ULYS-138) | 待盤點 | ❓ 未知 | 🔴 待盤點 |
+| 5 | **IM1.0** (`D:/IM1.0`) (v0.2 確認位置非 `/e/IM1.0`, 修正 G-ACI-02) | 待盤點 (per ULYS-138) | 待盤點 | ❓ 未知 | 🔴 待盤點 |
 | 6 | **GitGit** (`D:/GitGit`) | 待盤點 (per ULYS-137) | 待盤點 | ❓ 未知 | 🔴 待盤點 |
-| 7 | **Xiaoshuo** (`D:/Xiaoshuo`) | 待盤點 (per ULYS-141) | 待盤點 | ❓ 未知 | 🔴 待盤點 |
-| 8 | **Ada** (`D:/Ada`) | 不確定是否有 mock 项目 (per ULYS-137 同類) | 待盤點 | ❓ 未知 | 🟢 0 (可能無 mock) |
+| 7 | **Ada** (`D:/Ada`) | 不確定是否有 mock 项目 (per ULYS-137 同類) | 待盤點 | ❓ 未知 | 🟢 0 (可能無 mock) |
+| ~~8~~ | ~~**Xiaoshuo** (`D:/Xiaoshuo`)~~ | ~~待盤點 (per ULYS-141)~~ | — | — | **🟢 排除 (per reply `01a0cbf3`「xiaoshuo不需要考虑」)** |
 
 **已知缺口 (per 守門 #11 缺標比錯標)**:
-- **G-ACI-01**: 項目 #3-#7 5 個項目**未盤點**, v0.1 落地前需每個項目一個 worker 子代理跑 `find . -name '*mock*' -type d | xargs ls` 盤點 (per 守門 #20)
-- **G-ACI-02**: IM1.0 (`E:/IM1.0` per memory) 是否存在需確認, 否則 8 個項目中 1 個可能不存在
+- **G-ACI-01**: 項目 #3-#6 4 個項目**未盤點**, v0.2 落地前需每個項目一個 worker 子代理跑 `find . -name '*mock*' -type d | xargs ls` 盤點 (per 守門 #20)
+- ~~**G-ACI-02**: IM1.0 (`E:/IM1.0` per memory) 是否存在需確認~~ → ✅ **已解決 (v0.2 確認: `D:/IM1.0` 存在, ls 驗證 OK)**
 - **G-ACI-03**: 跨項目 mock 工具語言不一致 (Star = sh+python / IDE1.0 = Rust / 其他未知), ACI emitter 需支援多語言 (≥3: sh + python + rust), 否則逐個寫
+- **G-ACI-07**: 7 個項目中部分项目可能沒有 mock 工具 (Ada 等), 落地時確認
 
 ---
 
@@ -309,16 +310,16 @@ $ aci-summary tools/star-flash-mock/assertions/2026-09-23T09-53-40Z/
 
 ## 5. 落地前必拍 6 個決策 (per ULYS-189 v0.1 經驗)
 
-不決不寫代碼。建議 Ulysses 拍板方向, v0.2 鎖版:
+**v0.2 拍板狀態** (per reply `01a0cbf3` 2026-09-23 10:48 JST 「可以启动」= 全部隱含 ✅ 推薦選項, 走 v0.2 鎖版):
 
-| # | 決策 | 推薦選項 | 理由 |
-|---|---|---|---|
-| **#1** | **ACI schema 範圍** | **A**: 8 個字段 (`assertion_id / scope / expect / actual / status / severity / reasoning / captured_at` 必填, 其餘可選) | 必填 8 個是 LLM 推理最小集, 可選 5 個按需豐富; 避免 v0.1 過度設計 |
-| **#2** | **落地優先級** | **B**: 先 Star `tools/star-flash-mock/` 第 1 階段 (per §4.1), 再 IDE1.0, 再其餘 6 個项目 | Star mock 已結構化 + ULYS-140 已 ship, 阻力最小; IDE1.0 第二; 其餘需先盤點 (G-ACI-01) |
-| **#3** | **ACI 版本策略** | **A**: v0.1-draft 起步, 1 個 sprint 後拍 v0.2 (鎖版), 之後 v0.3+ 才允許加字段 | 跟 ULIS-189 Jev schema 同型, 避免 v0.x 字段漂移 |
-| **#4** | **跟現有 fixture_assertion 兼容性** | **A**: 並存擴展 (§3.4), 2 版本同時寫, 1 sprint 後觀察再決定刪舊 | 不破既有 `validate.py`, 降低落地風險 |
-| **#5** | **跨項目 monorepo 還是各自拷貝** | **B**: 各自拷貝 `_lib_aci_emit.sh/.py/.rs` (每項目獨立版本) | 8 個项目語言 + 版本不一致, monorepo 維護成本高; 拷貝 + 同源 schema 即可 (per 守門 #19 v19 Python 化) |
-| **#6** | **LLM agent 讀取入口** | **A**: 每項目獨立 `.aci.json` + `aci-summary` CLI (per §4.4); LLM 通過 CLI 讀 | LLM 直接讀分散的 `.aci.json` 太碎, 給 CLI 聚合; 不引入外部 vendor (per 守門 #24) |
+| # | 決策 | 推薦選項 | v0.2 拍板 | 理由 |
+|---|---|---|---|---|
+| **#1** | **ACI schema 範圍** | A: 8 個字段必填 + 5 可選 | ✅ **A** | 必填 8 個是 LLM 推理最小集, 可選 5 個按需豐富; 避免 v0.x 過度設計 |
+| **#2** | **落地優先級** | B: 先 Star → IDE1.0 → 其餘 4 個項目 (排除 Xiaoshuo) | ✅ **B** | Star mock 已結構化 + ULYS-140 已 ship, 阻力最小; IDE1.0 第二; 其餘 4 (RGS/CATs/IM1.0/GitGit) 需先盤點 (G-ACI-01) |
+| **#3** | **ACI 版本策略** | A: v0.1-draft → 1 sprint 後 v0.2 鎖版 | ✅ **A** (v0.2 = 本檔鎖版) | 跟 ULYS-189 Jev schema 同型, 避免 v0.x 字段漂移 |
+| **#4** | **跟現有 fixture_assertion 兼容性** | A: 並存擴展 (§3.4) | ✅ **A** | 不破既有 `validate.py`, 降低落地風險 |
+| **#5** | **跨項目 monorepo vs 拷貝** | B: 各自拷貝 `_lib_aci_emit.sh/.py/.rs` | ✅ **B** | 7 個项目語言 + 版本不一致, monorepo 維護成本高; 拷貝 + 同源 schema 即可 (per 守門 #19 v19 Python 化) |
+| **#6** | **LLM agent 讀取入口** | A: 每項目獨立 `.aci.json` + `aci-summary` CLI | ✅ **A** | LLM 直接讀分散的 `.aci.json` 太碎, 給 CLI 聚合; 不引入外部 vendor (per 守門 #24) |
 
 ---
 
@@ -326,13 +327,13 @@ $ aci-summary tools/star-flash-mock/assertions/2026-09-23T09-53-40Z/
 
 | # | 缺口 | 風險 | 對齊方式 |
 |---|---|---|---|
-| **G-ACI-01** | 項目 #3-#7 (RGS / CATs / IM1.0 / GitGit / Xiaoshuo) mock 項目未盤點 | 改造工作量預估不準 | v0.2 後, 每項目 1 個 worker brief 跑 `find . -name '*mock*'` |
-| **G-ACI-02** | IM1.0 倉庫位置未確認 (`E:/IM1.0` per memory vs 8 個項目清單) | 可能 8 → 7 個項目 | v0.2 前先 `ls /e/IM1.0 2>/dev/null` 確認 |
+| **G-ACI-01** | 項目 #3-#6 4 個項目 (RGS / CATs / IM1.0 / GitGit) mock 項目未盤點 | 改造工作量預估不準 | v0.2 後, 每項目 1 個 worker brief 跑 `find . -name '*mock*'` |
+| ~~**G-ACI-02**~~ | ~~IM1.0 倉庫位置未確認~~ | — | ✅ **已解決 (v0.2): `D:/IM1.0` 存在, ls 驗證 OK** |
 | **G-ACI-03** | 跨語言 emitter 需 sh + python + rust ≥ 3 種 | 落地時每種語言各寫 1 個 helper, 工時 ~3x | v0.2 拍板決策 #5 (拷貝 vs monorepo) 後明確 |
 | **G-ACI-04** | LLM prompt template hint 寫成字段 (`prompt_template_hint` per §3.1), 但實際 LLM 提示工程需實驗 (prompt 寫法影響判斷準確率) | v0.1 hint 可能是「猜」, 真實 LLM 讀可能漏抓字段 | 第 1 階段 (Star mock) 落地後跑 10 條真實 LLM agent dry-run 驗證 |
-| **G-ACI-05** | 並存擴展期間 (`fixture_assertion` + `aci_assertion` 兩份), 文件體積 2x | 8 個项目 fixture 全量 × 2 = 翻倍, CI 跑分變慢 | 1 sprint 後觀察, 驗證 ACI 落後刪舊 (`fixture_assertion`) |
+| **G-ACI-05** | 並存擴展期間 (`fixture_assertion` + `aci_assertion` 兩份), 文件體積 2x | 7 個项目 fixture 全量 × 2 = 翻倍, CI 跑分變慢 | 1 sprint 後觀察, 驗證 ACI 落後刪舊 (`fixture_assertion`) |
 | **G-ACI-06** | Star mock 已有 `mock_data/agent-runtime/guards/v1--guard--g-*.json` 175 份 fixture, 全量加 ACI 字段後, diff 大 | 單 commit 文件巨多, 難 review | v0.2 拆 brief: (a) schema + emitter, (b) sample 5 份 fixture, (c) 全量 fixture 批量加 |
-| **G-ACI-07** | 8 個項目中部分项目可能沒有 mock 工具 (Ada 等), 「所有项目」字面理解可能過寬 | 落地時找不到東西改造 | v0.2 前先全域 `find . -name '*mock*' -type d` 確認有 mock 的項目清單 |
+| **G-ACI-07** | 7 個項目中部分项目可能沒有 mock 工具 (Ada 等), 「所有项目」字面理解可能過寬 | 落地時找不到東西改造 | v0.2 前先全域 `find . -name '*mock*' -type d` 確認有 mock 的項目清單 |
 
 ---
 
@@ -357,25 +358,30 @@ $ aci-summary tools/star-flash-mock/assertions/2026-09-23T09-53-40Z/
 | #24 vendor 中立 | ✅ | 0 外部 vendor, 只用 stdlib JSON + serde |
 
 **v0.1 拍板狀態**: 🟡 6 決策待拍板, 7 缺口顯式列。
+**v0.2 拍板狀態**: 🟢 6 決策 ✅ 全部鎖版 (per §5), 1 缺口 ✅ 解決 (G-ACI-02), 6 缺口跨 session 續做 (per §6), 守門 #3 進入 per-項目 brief 拆解狀態 (per §4.1.2 brief doc)。
 
 ---
 
 ## 8. 下一步 (Next Steps)
 
-本 v0.1 落地後, 等待 Ulysses 拍板 6 決策 + 是否啟動 §4.1.2 第 1 筆 brief (Star mock 第 1 階段)。
+**v0.2 拍板狀態**: 🟢 6 決策 ✅ 全部鎖版 (per §5), 1 缺口 ✅ 解決 (G-ACI-02), reply `01a0cbf3` 2026-09-23 10:48 JST 「可以启动」= **明確綠燈, 啟動落地**。
 
-**等待中 (per 守門 #15, 不主動 scope creep)**:
+**第 1 筆 brief 落檔** (per 守門 #20 + #15, 對齊 ULYS-189 §6.1 經驗):
+- 落地位置: `docs/briefs/ulys-191-star-mock-aci-stage1.md`
+- 內容: Star `tools/star-flash-mock/` 第 1 階段實裝 brief
+  - (a) `.aci.json` schema 配置文件
+  - (b) `_lib_aci_emit.sh` + `_lib_aci_emit.py` emitter helper (per 決策 #5)
+  - (c) sample 5 份 fixture 全量加 `aci_assertion` 字段 (per G-ACI-06 三段拆解 a)
+  - (d) `aci-summary` CLI 雛形 (per §4.4 + 決策 #6)
+- 工時估: ~0.3-0.5M tokens
+- commit 目標: `agent/minimaxm3/ulys-191` branch (Star 主倉)
+- author: `Ulysses <ulysses@mavis.local>` (per 守門 #10)
 
-1. 🟡 **6 決策拍板** (per §5) → v0.2 鎖版, 修訂本檔
-2. 🟡 **G-ACI-01/02/07 盤點確認** (per §6) → v0.2 前先跑全域 mock 项目盤點
-3. 🟡 **Ulysses 拍板啟動第 1 筆 brief** (per §4.1.2) → Star `tools/star-flash-mock/` 第 1 階段落地
-
-**v0.2 預期內容** (decision 鎖版後):
-- §5 6 決策 ✅
-- §6 缺口 G-ACI-01/02/07 狀態更新
-- §4 落地路徑微調 (per 決策)
-- 新增 §X Cerebellum Credential 同型 §6.1 (per ULYS-189 §6.1 經驗): ACI Schema 詳細設計 (字段 final 名 + LLM prompt template 樣本)
-- §10 修訂歷史加 v0.2 row
+**v0.2 後續 (跨 session 續做, 不在本 brief 範圍)**:
+1. Star 全量 175 fixture 加 `aci_assertion` (per G-ACI-06 三段拆解 b/c)
+2. IDE1.0 8 個 integration test + cli_smoke.sh (per §4.2)
+3. 4 個項目盤點 + 排程 (per §4.3 + G-ACI-01)
+4. 跨項目統一驗證 (per §4.5)
 
 ---
 
@@ -383,7 +389,8 @@ $ aci-summary tools/star-flash-mock/assertions/2026-09-23T09-53-40Z/
 
 | 版本 | 日期 | 修訂人 | 內容 |
 |---|---|---|---|
-| **v0.1** | 2026-09-23 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手代審 | **初稿 (Draft)** — 觸發 ULYS-191 (2026-09-22 23:39 JST) + reply `01a0cbc1` (2026-09-23 09:53 JST)「我的目的是改造我所有的 mock 项目」; 9 節結構 (目的 / 概念映射 / 跨項目盤點 / Schema 鎖版 / 5 階段路徑 / 6 決策 / 7 缺口 / 守門自檢 / 下一步); ~10 KB, 預估 ~0.05M token |
+| **v0.1** | 2026-09-23 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手代審 | **初稿 (Draft)** — 觸發 ULYS-191 (2026-09-22 23:39 JST) + reply `01a0cbc1` (2026-09-23 09:53 JST)「我的目的是改造我所有的 mock 项目」; 9 節結構 (目的 / 概念映射 / 跨項目盤點 / Schema 鎖版 / 5 階段路徑 / 6 決策 / 7 缺口 / 守門自檢 / 下一步); ~22 KB / 398 行, 預估 ~0.05M token |
+| **v0.2** | 2026-09-23 | Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手代審 | **Approved** (reply `01a0cbf3` 2026-09-23 10:48 JST 「xiaoshuo不需要考虑。可以启动」) — 6 決策全部 ✅ 隱含接受 (全部走推薦選項, A+A+A+A+B+A); 排除 Xiaoshuo (8 → 7 項目); G-ACI-02 ✅ 解決 (IM1.0 = `D:/IM1.0`); 啟動 §4.1.2 第 1 筆 brief (Star mock 第 1 階段); 守門 #3 進入 per-項目 brief 拆解狀態; ~22.8 KB / 412 行; 預估 ~0.03M token (本 v0.2 修訂) |
 
 ---
 
