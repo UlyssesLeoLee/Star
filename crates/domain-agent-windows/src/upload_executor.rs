@@ -253,7 +253,6 @@ mod tests {
     use chrono::Utc;
     use uuid::Uuid;
 
-
     fn sample_task() -> UploadTask {
         UploadTask {
             id: Uuid::new_v4(),

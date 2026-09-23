@@ -114,8 +114,7 @@ docker.io/library/star-api-rest                  ulys99              856d70212ac
 | Pod IP | `10.42.0.32` | `10.42.0.169` | 新分配 |
 | 镜像 SHA (k3s containerd) | `a2f877a1291c5 32.4MB` | `856d70212acb1 32.8MB` | 新构建, +0.4MB |
 
-**关键发现**: dev branch 已从 22 路由 stub 部分走到真实业务实现 (work-items / context), 不再需要 "等 P2 阶段 worker 实装" 占位.
----
+### 关键发现: dev branch 已从 22 路由 stub 部分走到真实业务实现 (work-items / context), 不再需要 "等 P2 阶段 worker 实装" 占位.
 
 ## 3. 已知缺口 (per 守门 #11 缺标比错标)
 
