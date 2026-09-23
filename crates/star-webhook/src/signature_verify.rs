@@ -10,7 +10,7 @@
 //! 仅返回"invalid"/"missing"/"decode"分类,避免日志泄露。
 
 use super::WebhookEvent;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 use thiserror::Error;
 
@@ -106,7 +106,7 @@ impl SignatureVerifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hmac::{Hmac, Mac};
+    use hmac::{Hmac, KeyInit, Mac};
     use sha2::Sha256;
 
     fn hmac_sha256_hex(secret: &[u8], body: &[u8]) -> String {
