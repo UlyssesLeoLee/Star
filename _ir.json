@@ -1,0 +1,140 @@
+{
+  "has_more": false,
+  "issues": [
+    {
+      "id": "01a0cd6c-9df6-7742-b0fe-df67f7015438",
+      "identifier": "ULYS-214",
+      "number": 214,
+      "title": "A4 完善：Agent Session v2 前端 Restart chip UI + use-restart hook"
+    },
+    {
+      "id": "01a0cd6c-9808-75db-9d31-ba34b45b54c8",
+      "identifier": "ULYS-213",
+      "number": 213,
+      "title": "B4 完善：Jev 真 API key 接入 + 中文 100 条 dry-run + 1k traffic threshold 校准"
+    },
+    {
+      "id": "01a0ccd0-19f0-784e-9fee-a5ab4c1d70c4",
+      "identifier": "ULYS-208",
+      "number": 208,
+      "title": "gm-backend 8081 health probe server 静默死亡 (tokio::spawn + bind 失败日志误报) — 修复 e2e-smoke 12/12 剩余项"
+    },
+    {
+      "id": "01a0b7b2-fd50-7037-b43a-8f648bb0e2d6",
+      "identifier": "ULYS-94",
+      "number": 94,
+      "title": "ULYS-91: 恢复 WSL Postgres + k3s + 跑 12 DB fixture 集成测试 + e2e-smoke 12 探针"
+    },
+    {
+      "id": "01a0bd93-c2a9-7838-a2b8-82a2369073e2",
+      "identifier": "ULYS-123",
+      "number": 123,
+      "title": "GitGit MinioVault::get_at_version 真接 minIO server-side versioning (升 rust-s3 支持 versionId + sidecar 加 version_id 字段 + e2e 测试)"
+    },
+    {
+      "id": "01a0bf6e-fca2-790a-a795-2e5296d1ae80",
+      "identifier": "ULYS-157",
+      "number": 157,
+      "title": "ULYS-104.2 [P0-C] AI Vault 对话历史搜索 (FR-ORCA-019..024)"
+    },
+    {
+      "id": "01a0be71-6c35-75b0-8684-fd71870ca757",
+      "identifier": "ULYS-154",
+      "number": 154,
+      "title": "[CATs/M2] 客户端 UI 深度功能(切片 D)"
+    },
+    {
+      "id": "01a0be71-8bc2-7e11-845c-ab11cf096d99",
+      "identifier": "ULYS-155",
+      "number": 155,
+      "title": "[CATs/M2] 多媒体 6 服务(切片 E)"
+    },
+    {
+      "id": "01a0be1b-9e48-7b7a-be34-60db495569f5",
+      "identifier": "ULYS-125",
+      "number": 125,
+      "title": "功能点罗列"
+    },
+    {
+      "id": "01a0be4d-4eb4-7220-a153-bc2ac625bff2",
+      "identifier": "ULYS-149",
+      "number": 149,
+      "title": "[CATs] 实现 cats-bff 业务 8 endpoint"
+    },
+    {
+      "id": "01a0bd24-394a-7af5-bd0d-37e6f8496dc3",
+      "identifier": "ULYS-113",
+      "number": 113,
+      "title": "分支合并"
+    },
+    {
+      "id": "01a0be6e-ee5b-7bfa-a1d6-6804fa421ea0",
+      "identifier": "ULYS-151",
+      "number": 151,
+      "title": "[CATs] 实现 task-service 业务 + SSE 进度推送"
+    },
+    {
+      "id": "01a0be2c-f32e-7738-8c68-191a0a616608",
+      "identifier": "ULYS-141",
+      "number": 141,
+      "title": "回归测试"
+    },
+    {
+      "id": "01a0be6f-3d76-7792-b8e2-89869adf4eea",
+      "identifier": "ULYS-153",
+      "number": 153,
+      "title": "[CATs] 实现 report-service 聚合查询 + audit-service 真实 Kafka consumer"
+    },
+    {
+      "id": "01a0be2b-d70d-71e6-bdef-559661462cf3",
+      "identifier": "ULYS-137",
+      "number": 137,
+      "title": "回归测试"
+    },
+    {
+      "id": "01a0be6f-1877-77c2-b3d2-2a44d9ac1f30",
+      "identifier": "ULYS-152",
+      "number": 152,
+      "title": "[CATs] 实现 file-service + notification-service (4+3 endpoints)"
+    },
+    {
+      "id": "01a0bf6f-6288-7801-a629-afc8669836f1",
+      "identifier": "ULYS-159",
+      "number": 159,
+      "title": "ULYS-104.4 [P0-B 评估期] ProcessSupervisor 子 crate 评估 (ADR-0046 候选草案)"
+    },
+    {
+      "id": "01a0be2b-83bf-7868-97cc-b6bd981ebf5e",
+      "identifier": "ULYS-136",
+      "number": 136,
+      "title": "回归测试"
+    },
+    {
+      "id": "01a0be6d-ba06-78fd-b2a3-e92aaadbd700",
+      "identifier": "ULYS-150",
+      "number": 150,
+      "title": "[CATs] 实现 project-service 业务 5 endpoint (CRUD)"
+    },
+    {
+      "id": "01a0bdf5-ee17-7df4-a82b-accb518a05f3",
+      "identifier": "ULYS-124",
+      "number": 124,
+      "title": "CLI"
+    },
+    {
+      "id": "01a0be2c-2f17-78f1-b01e-956ea699666c",
+      "identifier": "ULYS-138",
+      "number": 138,
+      "title": "回归测试"
+    },
+    {
+      "id": "01a0be1c-de2e-7bf6-90cf-5dce1b5730cd",
+      "identifier": "ULYS-129",
+      "number": 129,
+      "title": "GitGit Desktop"
+    }
+  ],
+  "limit": 50,
+  "offset": 0,
+  "total": 22
+}
