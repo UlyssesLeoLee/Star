@@ -21,15 +21,20 @@
 #![allow(clippy::too_many_arguments)]
 
 pub mod error;
+pub mod external_worktree_import;
 pub mod lifecycle;
 pub mod projection;
 pub mod service;
 pub mod service_impl;
 
 pub use error::ServiceError;
+pub use external_worktree_import::{
+    diff_external, map_to_worktree, parse_porcelain, scan_external_worktrees, ExternalWorktree,
+    ImportError, ImportOutcome,
+};
 pub use lifecycle::{transition, TransitionError};
 pub use projection::{StatusObservedPoint, WorktreeStatusObserved};
-pub use service::{SyncResult, WorktreeFilter, WorktreeService, WorktreeUpdate};
+pub use service::{SyncResult, Worktree, WorktreeFilter, WorktreeService, WorktreeUpdate};
 pub use service_impl::InMemoryWorktreeService;
 // 注: per-workspace multica-config/config.json 的 shared-dir reader 已在
 // crates/worktree-shared-dir/ (FileBackedConfigSource) 实装, 不在本 crate.
