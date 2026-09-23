@@ -1,0 +1,29 @@
+[package]
+name = "terminal-stack"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Star Terminal Stack — scrollback ring buffer + split-pane tree + SQLite WAL persistence (per ULYS-200 + ULYS-220 P1-A + FR-ORCA-036/039 §12 v1.0 + 终端栈选型 = 候选 B per 2026-09-22 JST 决策)"
+
+[lib]
+name = "terminal_stack"
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies] 或 per-crate (per rusqlite 同款)
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+# ULYS-220 P1-A Persistence: rusqlite bundled SQLite WAL (per cli_session_registry / star-taskqueue 同款)
+rusqlite = { version = "0.32", default-features = false, features = ["bundled"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true
