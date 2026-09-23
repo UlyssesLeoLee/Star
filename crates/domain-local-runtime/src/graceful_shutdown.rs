@@ -94,13 +94,14 @@ pub enum ShutdownStep {
         /// 释放时间
         at: DateTime<Utc>,
     },
-    /// 子进程 kill 已发(本期 stub;真实 SIGTERM/SIGKILL 留 P1)
+    /// 子进程 kill 已发(Unix 走 nix::sys::signal::killpg;Windows 仍 stub 留 ULYS-211)
     KillProcess {
         /// 关联 CliSession
         cli_session_id: CliSessionId,
         /// 进程 PID
         pid: u32,
-        /// 模拟信号名(如 "SIGTERM (grace=5s, stub)")
+        /// 信号描述(Unix: `"SIGTERM→SIGKILL (grace=Ns, real)"` 或 `"kill failed: ..."`;
+        /// Windows: `"Windows stub (ULYS-211 will replace) (grace=Ns)"`)
         signal: String,
         /// 触发时间
         at: DateTime<Utc>,
@@ -313,12 +314,40 @@ impl GracefulShutdown {
             }
         }
 
-        // Step 3: 模拟子进程 kill(stub,真实 SIGTERM 留 P1)
+        // Step 3: 真实子进程 kill (Unix: SIGTERM 整组 → grace → SIGKILL 整组)
+        // 同步版本(per shutdown_all 是 sync fn;grace 用 std::thread::sleep)
+        #[cfg(unix)]
+        for (sid, pid) in locks.iter() {
+            use crate::unix_session::kill_tree_sync;
+            let grace = self.config.sigterm_grace_secs;
+            // kill_tree_sync 返回 Err 表示进程已不存在或无权限(per unix_session 文档),
+            // graceful_shutdown 的 KillProcess step 不计失败 — 仍记一条 step 用于审计
+            match kill_tree_sync(*pid, grace) {
+                Ok(()) => steps.push(ShutdownStep::KillProcess {
+                    cli_session_id: *sid,
+                    pid: *pid,
+                    signal: format!("SIGTERM→SIGKILL (grace={}s, real)", grace),
+                    at: Utc::now(),
+                }),
+                Err(e) => steps.push(ShutdownStep::KillProcess {
+                    cli_session_id: *sid,
+                    pid: *pid,
+                    signal: format!("kill failed: {} (grace={}s)", e, grace),
+                    at: Utc::now(),
+                }),
+            }
+        }
+
+        // Step 3 (Windows): stub, 留 ULYS-211 Job Object 升级
+        #[cfg(not(unix))]
         for (sid, pid) in locks.iter() {
             steps.push(ShutdownStep::KillProcess {
                 cli_session_id: *sid,
                 pid: *pid,
-                signal: format!("SIGTERM (grace={}s, stub)", self.config.sigterm_grace_secs),
+                signal: format!(
+                    "Windows stub (ULYS-211 will replace) (grace={}s)",
+                    self.config.sigterm_grace_secs
+                ),
                 at: Utc::now(),
             });
         }
