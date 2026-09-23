@@ -2043,10 +2043,10 @@ mod tests {
 // v1.0.2 文档补全 (per docs/specs/star-cursor-min-spec.md section 1.4).
 #[allow(missing_docs)]
 pub mod ai_session_inline {
-    use std::sync::Arc;
     use domain_llm::chat::{ChatMessage, ChatRequest, ChatRole};
     use domain_llm::{LlmProvider, LlmProviderRegistryError};
     use serde::{Deserialize, Serialize};
+    use std::sync::Arc;
     use thiserror::Error;
     use uuid::Uuid;
 

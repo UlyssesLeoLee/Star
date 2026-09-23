@@ -15,6 +15,10 @@ pub(crate) enum StarError {
     /// IO 错误(当前未使用,留作未来 stub 扩展)
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+
+    /// Skill Registry 错误 (per FR-ORCA-034, ULYS-196)
+    #[error("skill registry: {0}")]
+    Skill(String),
 }
 
 impl StarError {
@@ -22,6 +26,9 @@ impl StarError {
     pub(crate) const fn exit_code(&self) -> u8 {
         match self {
             Self::Json(_) | Self::Io(_) => 2,
+            // Skill 错误分类: 既有用户错(AlreadyExists / NotFound / InvalidSource)
+            // 也有内部错(mvp 当前归 2)
+            Self::Skill(_) => 1,
         }
     }
 }

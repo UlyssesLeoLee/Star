@@ -107,12 +107,7 @@ mod tests {
 
     fn make_state() -> Arc<ChatState> {
         let mock: Arc<dyn LlmProvider> = Arc::new(MockProvider::new());
-        ChatState::with_provider(
-            mock,
-            Arc::new(MeteringStore::new()),
-            tenant(),
-            actor(),
-        )
+        ChatState::with_provider(mock, Arc::new(MeteringStore::new()), tenant(), actor())
     }
 
     #[tokio::test]
@@ -191,7 +186,10 @@ mod tests {
         .await
         .unwrap()
         .0;
-        assert_eq!(resp.aggregate.call_count, 2, "aggregate includes both tenants");
+        assert_eq!(
+            resp.aggregate.call_count, 2,
+            "aggregate includes both tenants"
+        );
         assert_eq!(resp.events.len(), 1, "events list filters to tenant");
         assert_eq!(resp.events[0].tenant_id, tenant());
     }

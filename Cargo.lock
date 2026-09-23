@@ -1124,6 +1124,7 @@ dependencies = [
  "chrono",
  "futures-util",
  "reqwest",
+ "rusqlite",
  "serde",
  "serde_json",
  "star-context",
@@ -3912,6 +3913,7 @@ name = "star-eventbus"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "futures-util",
  "redis",
  "serde",
@@ -5298,6 +5300,7 @@ dependencies = [
  "relationship-engine",
  "risk-engine",
  "worktree-service",
+ "worktree-shared-dir",
 ]
 
 [[package]]
@@ -5309,6 +5312,21 @@ dependencies = [
  "futures-util",
  "git-adapter",
  "git-observer",
+ "graph-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "worktree-shared-dir"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
  "graph-core",
  "serde",
  "serde_json",

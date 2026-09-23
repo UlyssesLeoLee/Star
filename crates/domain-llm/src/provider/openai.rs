@@ -22,9 +22,7 @@ use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::chat::{ChatChunk, ChatMessage, ChatRequest, ChatResponse, ChatRole};
-use crate::{
-    LlmProvider, LlmProviderRegistryError, LlmProviderRegistryHealth,
-};
+use crate::{LlmProvider, LlmProviderRegistryError, LlmProviderRegistryHealth};
 
 /// Default OpenAI Chat Completions base URL.
 pub const OPENAI_DEFAULT_BASE_URL: &str = "https://api.openai.com";
@@ -112,9 +110,7 @@ impl OpenAiProvider {
         match std::env::var("OPENAI_API_KEY") {
             Ok(v) if !v.trim().is_empty() => Ok(v),
             _ => self.api_key.clone().ok_or_else(|| {
-                LlmProviderRegistryError::Backend(
-                    "openai: OPENAI_API_KEY not set".to_string(),
-                )
+                LlmProviderRegistryError::Backend("openai: OPENAI_API_KEY not set".to_string())
             }),
         }
     }
@@ -156,11 +152,7 @@ impl OpenAiProvider {
     }
 
     /// Parse an OpenAI Chat Completions response into a [`ChatResponse`].
-    fn parse_response(
-        model: &str,
-        request_id: Uuid,
-        parsed: &OpenAiResponse,
-    ) -> ChatResponse {
+    fn parse_response(model: &str, request_id: Uuid, parsed: &OpenAiResponse) -> ChatResponse {
         let text = parsed
             .choices
             .first()
@@ -300,9 +292,7 @@ impl LlmProvider for OpenAiProvider {
             .send()
             .await
             .map_err(|e| {
-                LlmProviderRegistryError::Backend(format!(
-                    "openai: HTTP send failed: {e}"
-                ))
+                LlmProviderRegistryError::Backend(format!("openai: HTTP send failed: {e}"))
             })?;
 
         let status = response.status();
@@ -321,9 +311,7 @@ impl LlmProvider for OpenAiProvider {
         }
 
         let parsed: OpenAiResponse = response.json().await.map_err(|e| {
-            LlmProviderRegistryError::Backend(format!(
-                "openai: response parse failed: {e}"
-            ))
+            LlmProviderRegistryError::Backend(format!("openai: response parse failed: {e}"))
         })?;
         let request_id = req.request_id.unwrap_or_else(Uuid::new_v4);
         Ok(Self::parse_response(&model, request_id, &parsed))
@@ -352,10 +340,7 @@ impl LlmProvider for OpenAiProvider {
                     id,
                     model,
                     role: ChatRole::Assistant,
-                    delta: format!(
-                        "[openai stub: stream] {} messages",
-                        req.messages.len()
-                    ),
+                    delta: format!("[openai stub: stream] {} messages", req.messages.len()),
                     finish_reason: Some("stop".to_string()),
                 })
             });
@@ -400,10 +385,7 @@ mod tests {
     fn sample_request() -> ChatRequest {
         ChatRequest {
             model: OPENAI_DEFAULT_MODEL.to_string(),
-            messages: vec![
-                ChatMessage::system("be terse"),
-                ChatMessage::user("hi"),
-            ],
+            messages: vec![ChatMessage::system("be terse"), ChatMessage::user("hi")],
             temperature: Some(0.7),
             max_tokens: Some(128),
             request_id: Some(Uuid::new_v4()),
@@ -430,12 +412,8 @@ mod tests {
 
     #[test]
     fn openai_provider_with_base_url_overrides() {
-        let p = OpenAiProvider::new()
-            .with_base_url("https://openai-compatible-proxy.example.com");
-        assert_eq!(
-            p.base_url,
-            "https://openai-compatible-proxy.example.com"
-        );
+        let p = OpenAiProvider::new().with_base_url("https://openai-compatible-proxy.example.com");
+        assert_eq!(p.base_url, "https://openai-compatible-proxy.example.com");
     }
 
     #[tokio::test]
@@ -487,10 +465,7 @@ mod tests {
             request_id: None,
         };
         let err = p.chat_completion(req).await.unwrap_err();
-        assert!(matches!(
-            err,
-            LlmProviderRegistryError::InvalidOperation(_)
-        ));
+        assert!(matches!(err, LlmProviderRegistryError::InvalidOperation(_)));
     }
 
     #[tokio::test]
