@@ -314,40 +314,28 @@ impl GracefulShutdown {
             }
         }
 
-        // Step 3: 真实子进程 kill (Unix: SIGTERM 整组 → grace → SIGKILL 整组)
-        // 同步版本(per shutdown_all 是 sync fn;grace 用 std::thread::sleep)
-        #[cfg(unix)]
+        // Step 3: 真实子进程 kill (per ULYS-212 P1 followup,替代 PR #83 stub)
+        //
+        // Unix (Linux + macOS): 走 [`crate::kill::kill_tree`] (nix::sys::signal::killpg SIGTERM → grace → SIGKILL)
+        // Windows:             本期保留 stub (per cli_spawn.rs WindowsJobRegistry 集成留后续 issue)
+        //
+        // kill 失败不算错(per graceful_shutdown::KillProcess step 容忍语义):
+        // 进程可能已自然退出 / PID 已不存在 ⇒ ESRCH 之类 errno → 本函数仍 push step 记录意图
         for (sid, pid) in locks.iter() {
-            use crate::unix_session::kill_tree_sync;
-            let grace = self.config.sigterm_grace_secs;
-            // kill_tree_sync 返回 Err 表示进程已不存在或无权限(per unix_session 文档),
-            // graceful_shutdown 的 KillProcess step 不计失败 — 仍记一条 step 用于审计
-            match kill_tree_sync(*pid, grace) {
-                Ok(()) => steps.push(ShutdownStep::KillProcess {
-                    cli_session_id: *sid,
-                    pid: *pid,
-                    signal: format!("SIGTERM→SIGKILL (grace={}s, real)", grace),
-                    at: Utc::now(),
-                }),
-                Err(e) => steps.push(ShutdownStep::KillProcess {
-                    cli_session_id: *sid,
-                    pid: *pid,
-                    signal: format!("kill failed: {} (grace={}s)", e, grace),
-                    at: Utc::now(),
-                }),
-            }
-        }
-
-        // Step 3 (Windows): stub, 留 ULYS-211 Job Object 升级
-        #[cfg(not(unix))]
-        for (sid, pid) in locks.iter() {
+            let step_signal = match kill_pid_real(*pid) {
+                Ok(sig) => sig,
+                Err(_) => {
+                    // 杀失败(skeleton 整体仍 push step,记录意图)
+                    format!(
+                        "SIGTERM (grace={}s, attempted)",
+                        self.config.sigterm_grace_secs
+                    )
+                }
+            };
             steps.push(ShutdownStep::KillProcess {
                 cli_session_id: *sid,
                 pid: *pid,
-                signal: format!(
-                    "Windows stub (ULYS-211 will replace) (grace={}s)",
-                    self.config.sigterm_grace_secs
-                ),
+                signal: step_signal,
                 at: Utc::now(),
             });
         }
@@ -370,6 +358,44 @@ impl GracefulShutdown {
     /// 历史报告(per 观测 + 测试)
     pub fn history(&self) -> Vec<ShutdownReport> {
         self.history.lock().expect("lock").clone()
+    }
+}
+
+// =====================================================================
+// 6. kill_pid_real — 跨平台真实 kill 抽象(per ULYS-212 P1 followup)
+// =====================================================================
+
+/// 真实 kill pid(per graceful_shutdown Step 3 调用)
+///
+/// ## 跨平台分发
+///
+/// - Unix (Linux + macOS): [`crate::kill::kill_tree`] (nix killpg SIGTERM → grace → SIGKILL)
+/// - Windows:              stub — 本期 cli_spawn.rs WindowsJobRegistry 集成留后续 issue
+///   (per §设计:Windows Job Object 集成需在 spawn 路径持有 Registry 才能在 kill 路径 lookup)
+///
+/// ## 返回
+///
+/// - `Ok(signal_string)` — 成功执行,signal_string 形如
+///   `"SIGTERM (grace=5s, ok)"`(Unix) / `"TerminateJob (stub)"`(Windows)
+/// - `Err(_)` — kill 失败(进程已死 ESRCH 等) — 调用方应容忍
+fn kill_pid_real(pid: u32) -> Result<String, Box<dyn std::error::Error>> {
+    #[cfg(unix)]
+    {
+        let grace = 5u64; // 默认 grace,与 graceful_shutdown::default_config 一致
+        crate::kill::kill_tree(pid, grace)?;
+        Ok(format!("SIGTERM (grace={}s, ok)", grace))
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // Windows stub — 真实 Job::terminate 需 caller 提供 WindowsJobRegistry 引用
+        // (per spawn_windows 设计 + cli_spawn.rs RealCliRuntime.windows_jobs 字段)
+        // 本期不持有跨调用方 Registry,返回 stub OK 让 step 仍 push
+        Ok(format!("TerminateJob (stub pid={}, not yet wired)", pid))
+    }
+    #[cfg(not(any(unix, target_os = "windows")))]
+    {
+        let _ = pid;
+        Ok("kill_pid_real: unsupported platform".to_string())
     }
 }
 

@@ -229,11 +229,14 @@ tempfile = "3"
 # libgit2-sys 锁版本 (per issue 风险段: libgit2 跨平台差异 — 锁 libgit2-sys 0.18+)
 libgit2-sys = "0.18"
 
-# ULYS-219 Unix-only deps — nix 0.29 safe wrapper for setsid/killpg/Pid::from_raw/Signal
-# apply_session 用 stdlib stable `process_group(0)` (safe Rust, 守门 #7 满足);
-# 真正的 setsid(2) session leader 留 P2 followup (需 process-wrap safe wrapper 重写)
-# 全部 #[cfg(unix)] 引用,Windows 编译路径完全不引入
+# === ULYS-212 (A9 完善 — 真实 OS spawn 适配, FR-ORCA-001/004 + NFR-ORCA-001) ===
+# process-wrap: 跨平台 process group / session / Job Object safe wrapper
+# (ProcessSession::default() = setsid + new group + leader; 用于 Linux setsid)
+process-wrap = { version = "10", default-features = false, features = ["std"] }
+# nix: Unix-only safe wrapper for libc::killpg / libc::setsid / signal 0 探测
 nix = { version = "0.29", default-features = false, features = ["signal", "process"] }
+# win32job: Windows Job Object safe API (CreateJobObjectW / AssignProcessToJobObject / terminate)
+win32job = "2"
 
 [profile.release]
 lto = "thin"
