@@ -130,12 +130,8 @@ pub async fn scan_external_worktrees(repo_path: &Path) -> Result<Vec<ExternalWor
 ///
 /// 每条 entry 由 `\n\n` 分隔; 每个 entry 的首行必为 `worktree <path>`.
 pub fn parse_porcelain(stdout: &str) -> Result<Vec<ExternalWorktree>, ImportError> {
-    // 平台兼容: Windows 上 git CLI 可能输出 `\r\n` 行尾 (尤其 `core.autocrlf=true` 配置下),
-    // `\n\n` split 会把 CRLF 边界粘合为单一 block, 丢失中间的 worktree.
-    // 归一化 `\r\n` → `\n` 后再 split (per ULYS-195 stage 2 review finding #1).
-    let normalized = stdout.replace("\r\n", "\n");
     let mut out = Vec::new();
-    for block in normalized.split("\n\n") {
+    for block in stdout.split("\n\n") {
         let block = block.trim();
         if block.is_empty() {
             continue;
@@ -268,128 +264,12 @@ impl ImportOutcome {
 }
 
 // =====================================================================
-// 阶段 2: 触发场景 helper + post-import hook (per ULYS-195 §3.3 + §6)
-// =====================================================================
-//
-// `WorktreeService::import_external_worktrees` 已是单次 trait 方法; 阶段 2
-// 抽出三件辅助:
-//   1. `scan_for_repo` / `scan_all_repos` — 给 4 触发场景 (app_startup /
-//      CLI `multica worktree list` / UI `/api/v1/worktree-import/scan?repo_id=X` /
-//      cron 每 5 分钟) 的统一 entry point
-//   2. `PostImportHook` trait — 让 `InMemoryWorktreeService` 在 import 成功后
-//      回调 (e.g. SharedDirResolver 重算共享目录 symlinks)
-//   3. `NoopPostImportHook` — 默认空 hook, 保持 stage 1 行为不破坏测试
-//
-// 故意**不**实装:
-//   - PG-backed persistence: 走 stage 2 PR 拆分, 不在本 PR 范围 (per D-Boy 9/24 拍板)
-//   - cron infra: 仓库暂无 scheduler, 留 P1 followup
-//   - CLI/UI/REST 接线: 跨 crate, 走 stage 2 PR 拆分
-
-/// 单 repo 导入入口 (per ULYS-195 §6 trigger scenario helper).
-///
-/// 给 CLI / UI / cron / app_startup 4 类 caller 的统一入口 — 内部直接转
-/// `WorktreeService::import_external_worktrees` trait 方法, 强制走 service
-/// 抽象层 (不绕过 trait 直接 scan + diff).
-///
-/// `repo_path` 是 git 仓库根目录 (即 `git rev-parse --show-toplevel` 的输出).
-pub async fn scan_for_repo<S: crate::service::WorktreeService + ?Sized>(
-    service: &S,
-    repo_id: RepoId,
-    repo_path: &Path,
-    force: bool,
-) -> Result<ImportOutcome, ServiceError> {
-    service
-        .import_external_worktrees(repo_id, repo_path, force)
-        .await
-}
-
-/// `RepoDescriptor` — `scan_all_repos` 接受的输入 (per ULYS-195 §3.3 cron
-/// 定时扫所有 repo 防漏检).
-///
-/// 仓库路径就是 git 根; 不引入额外 metadata (per FR-ORCA-011 AC-3 "批量
-/// 扫描 + 导入" 简化为 (repo_id, repo_path) 二元组).
-#[derive(Debug, Clone)]
-pub struct RepoDescriptor {
-    /// Repo UUID (per graph-core `RepoId`)
-    pub repo_id: RepoId,
-    /// git 仓库根路径 (per `git rev-parse --show-toplevel`)
-    pub repo_path: PathBuf,
-}
-
-/// 批量扫描入口 (per ULYS-195 §3.3 + AC-3).
-///
-/// 对每个 repo 调 `scan_for_repo`, 错误不阻断后续 repo — 汇总到
-/// `Vec<(RepoId, ServiceError)>`. 任一 repo 成功 = 全部 `ImportOutcome` 拼成
-/// 一个 vector 返回.
-///
-/// caller (e.g. cron / app_startup) 可逐 repo 看 errors, 不需要整个批次
-/// 失败即重试全部.
-pub async fn scan_all_repos<S: crate::service::WorktreeService + ?Sized>(
-    service: &S,
-    repos: &[RepoDescriptor],
-    force: bool,
-) -> (Vec<(RepoId, ImportOutcome)>, Vec<(RepoId, ServiceError)>) {
-    let mut outcomes = Vec::with_capacity(repos.len());
-    let mut errors = Vec::new();
-    for repo in repos {
-        match scan_for_repo(service, repo.repo_id, &repo.repo_path, force).await {
-            Ok(o) => outcomes.push((repo.repo_id, o)),
-            Err(e) => errors.push((repo.repo_id, e)),
-        }
-    }
-    (outcomes, errors)
-}
-
-/// `PostImportHook` — import 成功后的回调 (per ULYS-195 §3 软依赖).
-///
-/// 默认 impl (`NoopPostImportHook`) 是空 hook; 实装 crate 可注入更复杂
-/// 逻辑. 例如 `SharedDirResolverHook` 在 import 成功后调
-/// `shared_dir_resolver.resolve(repo_id)` 重算共享目录 symlinks.
-///
-/// 故意**异步**: 避免阻塞 import 主路径, hook 失败不阻断 import 结果
-/// (只 warn log). 这是 stage 2 解耦的关键.
-#[async_trait::async_trait]
-pub trait PostImportHook: Send + Sync {
-    /// Import 完成后回调 (per outcome 全部 imported+updated 之后).
-    ///
-    /// `repo_id` — 触发 import 的 repo
-    /// `imported` — 本轮新 insert 的 Worktree (可能空)
-    /// `updated` — force=true 时被更新的 Worktree (可能空)
-    /// `skipped` — branch 冲突被 skip 的 branch 名 (可能空)
-    async fn on_import_complete(
-        &self,
-        repo_id: RepoId,
-        imported: &[Worktree],
-        updated: &[Worktree],
-        skipped: &[String],
-    );
-}
-
-/// 默认空 hook — `InMemoryWorktreeService::new()` 用这个, 不破坏 stage 1 测试。
-#[derive(Debug, Default, Clone, Copy)]
-pub struct NoopPostImportHook;
-
-#[async_trait::async_trait]
-impl PostImportHook for NoopPostImportHook {
-    async fn on_import_complete(
-        &self,
-        _repo_id: RepoId,
-        _imported: &[Worktree],
-        _updated: &[Worktree],
-        _skipped: &[String],
-    ) {
-        // noop — 不发事件, 不写 DB, 不调 resolver
-    }
-}
-
-// =====================================================================
 // 测试 (per ULYS-195 §3 #5 实装收尾验证)
 // =====================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::InMemoryWorktreeService;
 
     #[test]
     fn parse_porcelain_single_with_lock() {
@@ -568,82 +448,5 @@ mod tests {
             updated: vec![wt],
         };
         assert_eq!(outcome.total_changed(), 2);
-    }
-
-    // --- 阶段 2 stage 2 review finding #1: CRLF 平台兼容 (Windows git 输出 `\r\n`) ---
-
-    #[test]
-    fn parse_porcelain_crlf_line_endings_windows_git() {
-        // 模拟 Windows 上 `git worktree list --porcelain` 用 CRLF 行尾的输出.
-        // 2 个 worktree + CRLF: 必须解析出 2 条, 而不是 1 条 (粘合 bug).
-        let input = "worktree /tmp/wt1\r\nHEAD abc123\r\nbranch refs/heads/feat-x\r\n\r\nworktree /tmp/wt2\r\nHEAD def456\r\nbranch refs/heads/main\r\n\r\n";
-        let out = parse_porcelain(input).unwrap();
-        assert_eq!(out.len(), 2, "CRLF 不能粘合 2 个 worktree");
-        assert_eq!(out[0].branch.as_deref(), Some("feat-x"));
-        assert_eq!(out[1].branch.as_deref(), Some("main"));
-    }
-
-    #[test]
-    fn parse_porcelain_mixed_crlf_and_lf() {
-        // 混合行尾: 头 1 个 worktree 用 LF, 第 2 个用 CRLF.
-        let input = "worktree /tmp/wt1\nHEAD abc123\nbranch refs/heads/feat-x\n\nworktree /tmp/wt2\r\nHEAD def456\r\nbranch refs/heads/main\r\n\r\n";
-        let out = parse_porcelain(input).unwrap();
-        assert_eq!(out.len(), 2);
-        assert_eq!(out[0].branch.as_deref(), Some("feat-x"));
-        assert_eq!(out[1].branch.as_deref(), Some("main"));
-    }
-
-    // --- 阶段 2 stage 2: scan_for_repo / scan_all_repos trigger helpers ---
-
-    #[tokio::test]
-    async fn scan_for_repo_calls_import_external_worktrees() {
-        // 不需要真 git: 直接用 service trait + 调 scan_for_repo
-        // 验证它就是 import_external_worktrees 的 thin wrapper.
-        // 这里 mock 通过 InMemoryWorktreeService + 走空 path (会失败,
-        // 但我们要确认 scan_for_repo 真的把参数透传过去).
-        let svc = InMemoryWorktreeService::new();
-        let repo_id = RepoId::new_v4();
-        let err = scan_for_repo(&svc, repo_id, Path::new("/nonexistent/repo"), false)
-            .await
-            .expect_err("nonexistent repo should error");
-        // 错误来自 git CLI spawn fail (Windows 上 /nonexistent 不存在
-        // 导致 spawn 失败或 git 命令非零退出).
-        assert!(
-            err.code == "WT.GIT_FAIL" || err.code == "WT.IO_FAIL",
-            "expected WT.GIT_FAIL or WT.IO_FAIL, got {}",
-            err.code
-        );
-    }
-
-    #[tokio::test]
-    async fn scan_all_repos_continues_on_error() {
-        // scan_all_repos 必须不阻断: 一个 repo 错误不影响后续 repo.
-        let svc = InMemoryWorktreeService::new();
-        let repos = vec![
-            RepoDescriptor {
-                repo_id: RepoId::new_v4(),
-                repo_path: PathBuf::from("/nonexistent/repo-1"),
-            },
-            RepoDescriptor {
-                repo_id: RepoId::new_v4(),
-                repo_path: PathBuf::from("/nonexistent/repo-2"),
-            },
-        ];
-        let (outcomes, errors) = scan_all_repos(&svc, &repos, false).await;
-        assert!(outcomes.is_empty(), "no successes for nonexistent paths");
-        assert_eq!(errors.len(), 2, "both repos should error independently");
-    }
-
-    #[tokio::test]
-    async fn noop_post_import_hook_runs_without_panic() {
-        // Noop hook 调一次不应 panic (给 stage 1 InMemoryWorktreeService 用)
-        let hook = NoopPostImportHook;
-        let repo_id = RepoId::new_v4();
-        let imported: Vec<Worktree> = vec![];
-        let updated: Vec<Worktree> = vec![];
-        let skipped: Vec<String> = vec![];
-        hook.on_import_complete(repo_id, &imported, &updated, &skipped)
-            .await;
-        // 没 panic = pass
     }
 }

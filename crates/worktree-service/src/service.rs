@@ -234,13 +234,4 @@ pub trait WorktreeService: Send + Sync {
         repo_path: &std::path::Path,
         force: bool,
     ) -> Result<crate::external_worktree_import::ImportOutcome, ServiceError>;
-
-    /// 列出 Start-from Picker 4 选 1 候选 (per ULYS-194 §3.1 + FR-ORCA-009).
-    ///
-    /// 默认实现调 `pick_start_from_candidates` + `InMemoryWorktreeService` 内部 state
-    /// 作为 `existing` 数组. 阶段 2 接 PG 后实现可换 PG-backed.
-    async fn pick_start_from_candidates(
-        &self,
-        repo_id: RepoId,
-    ) -> Result<PickerCandidates, ServiceError>;
 }
