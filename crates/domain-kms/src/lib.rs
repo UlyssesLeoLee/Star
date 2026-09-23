@@ -197,9 +197,9 @@ pub struct LocalMockKms {
 impl LocalMockKms {
     /// 构造新 mock KMS(随机生成主密钥, 不持久化)
     pub fn new() -> Self {
-        use rand::RngCore;
+        use rand::Rng;
         let mut key = [0u8; 32];
-        rand::thread_rng().fill_bytes(&mut key);
+        rand::rng().fill_bytes(&mut key);
         let master_key_id = KeyId::new(format!("mock-master-{}", Utc::now().timestamp_millis()));
         info!(master_key_id = %master_key_id.as_str(), "LocalMockKms initialized");
         Self {
@@ -227,9 +227,9 @@ impl Default for LocalMockKms {
 #[async_trait]
 impl KmsClient for LocalMockKms {
     async fn generate_dek(&self, tenant_id: &TenantId) -> Result<(KeyId, EncryptedBlob), KmsError> {
-        use rand::RngCore;
+        use rand::Rng;
         let mut dek = [0u8; 32];
-        rand::thread_rng().fill_bytes(&mut dek);
+        rand::rng().fill_bytes(&mut dek);
         let dek_id = KeyId::new(format!(
             "dek-{}-{}",
             tenant_id,
@@ -242,7 +242,7 @@ impl KmsClient for LocalMockKms {
         let cipher = Aes256Gcm::new_from_slice(&self.master_key)
             .map_err(|e| KmsError::Internal(e.to_string()))?;
         let mut nonce_bytes = [0u8; 12];
-        rand::thread_rng().fill_bytes(&mut nonce_bytes);
+        rand::rng().fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from_slice(&nonce_bytes);
         let encrypted_dek = cipher
             .encrypt(nonce, dek.as_ref())
@@ -278,7 +278,7 @@ impl KmsClient for LocalMockKms {
     ) -> Result<EncryptedBlob, KmsError> {
         use aes_gcm::aead::Aead;
         use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
-        use rand::RngCore;
+        use rand::Rng;
 
         let deks = self.deks.read().await;
         let dek_bytes = deks
@@ -287,7 +287,7 @@ impl KmsClient for LocalMockKms {
         let cipher =
             Aes256Gcm::new_from_slice(dek_bytes).map_err(|e| KmsError::Internal(e.to_string()))?;
         let mut nonce_bytes = [0u8; 12];
-        rand::thread_rng().fill_bytes(&mut nonce_bytes);
+        rand::rng().fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from_slice(&nonce_bytes);
         let ciphertext = cipher
             .encrypt(nonce, plaintext)
