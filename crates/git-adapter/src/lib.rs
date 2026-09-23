@@ -27,6 +27,6 @@ pub use cli_provider::CliGitProvider;
 pub use error::GitError;
 pub use libgit2_provider::Libgit2Provider;
 pub use provider::{
-    ConflictInfo, Diff, DiffFile, DiffHunk, GitProvider, MergeResult, RepoHandle, StatusEntry,
-    StatusKind, SyncResult, WorktreeInfo,
+    BranchInfo, ConflictInfo, Diff, DiffFile, DiffHunk, GitProvider, MergeResult, MergeStrategy,
+    RepoHandle, StatusEntry, StatusKind, SyncResult, WorktreeInfo,
 };
