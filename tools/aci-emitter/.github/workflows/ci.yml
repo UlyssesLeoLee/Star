@@ -1,0 +1,142 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Per 守门 #14v4 + 跨平台 CI 7/7 绿
+jobs:
+  # 1. Rust 标准套: fmt + check + clippy + test
+  rust:
+    name: Rust (check / test / clippy / fmt)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable, MSRV 1.77)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: super-cache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            super-cache-${{ runner.os }}-
+            super-cache-
+
+      - name: rustfmt
+        working-directory: .
+        run: cargo fmt --all -- --check
+
+      - name: cargo check
+        run: cargo check --all-targets
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets --no-deps
+
+      - name: cargo test
+        run: cargo test --workspace --all-features
+
+  # 2. Cross-platform smoke: ubuntu
+  smoke-ubuntu:
+    name: Cross-platform smoke (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: cargo build (release)
+        run: cargo build --workspace --release
+      - name: cargo test (release)
+        run: cargo test --workspace --release
+
+  # 3. Cross-platform smoke: macos
+  smoke-macos:
+    name: Cross-platform smoke (macos)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: cargo build (release)
+        run: cargo build --workspace --release
+      - name: cargo test (release)
+        run: cargo test --workspace --release
+
+  # 4. Cross-platform smoke: windows
+  smoke-windows:
+    name: Cross-platform smoke (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: cargo build (release)
+        run: cargo build --workspace --release
+      - name: cargo test (release)
+        run: cargo test --workspace --release
+
+  # 5. Markdown lint (跟 Star 仓 markdownlint-cli2 配置一致)
+  markdown-lint:
+    name: Markdown lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install markdownlint-cli2
+        run: npm install -g markdownlint-cli2
+      - name: Lint
+        run: markdownlint-cli2 "**/*.md"
+
+  # 6. Rust doc (rustdoc build)
+  rust-doc:
+    name: Rust doc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustdoc
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: doc-cache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: cargo doc (no warnings, treat as error)
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --workspace --no-deps
+
+  # 7. Rust bench (compile-only; per brief §1.1.7)
+  rust-bench:
+    name: Rust bench (compile-only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+          key: bench-cache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: cargo bench (compile-only)
+        run: cargo bench --workspace --no-run || cargo build --workspace --benches
