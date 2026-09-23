@@ -93,15 +93,151 @@ per 守门 #11 缺标比错标:
 - **缺口 #7**: docs/ 2 份回归报告 (P5 升版: +1 W-T-M-100-COVERAGE-REPORT), 缺每次跑出的 commit-time 报告
 - **缺口 #8** (P5 升版新增): frontend TS Schema 同步 (Zustand store / MSW mock 状态分类), 等 P3-B 拍板
 - **缺口 #9** (P5 升版新增): V2 候補フィールド 暫定 T (symbol_index_snapshot / forgejo provider / Squad V2), V2 化时降格 W
-- **缺口 #10** (P5 升版新增): 19 Module 混在 W/T/M 運用設計での TTL 差異明示 (各 fixture retention_period 已显式, 监控 + 削除ジョブ落地待 v0.3)
+| **缺口 #10** (P5 升版新增): 19 Module 混在 W/T/M 運用設計での TTL 差異明示 (各 fixture retention_period 已显式, 监控 + 削除ジョブ落地待 v0.3)
 
-## 5. 跨项目引用 (per 守门 #12 + AGENTS.md §5 仓库拓扑)
+## 5. ACI 接口 (LLM-可读断言契约, per ULYS-191 §4.1.2 brief v0.1)
+
+### 5.1 目的
+
+让 mock 项目的所有 fixture 输出**提示词型断言** (per ULYS-191 §1), 方便 LLM agent
+(Claude Code / Codex / 后续 agent) 一行指令读懂 mock 结果 (PASS/FAIL + 为什么 + 怎么修)。
+
+对比传统 boolean assertion vs ACI assertion:
+
+| 维度 | 传统 (`fixture_assertion`) | ACI (`aci_assertion`) |
+|---|---|---|
+| 结构 | `{guard_check_pass: true, elapsed_under_10ms: true}` | 10-13 字段 dict (assertion_id / expect / actual / reasoning / suggested_fix / ...) |
+| 严重程度 | 0 (无) | 5 档 (`critical/high/medium/low/info`) |
+| 修复建议 | 0 | `suggested_fix` 字段 (自然语言, LLM 可直接采纳) |
+| 时间维度 | 0 | `captured_at` RFC3339 (LLM 判读趋势) |
+| tags | 0 | 可选 (perf/kms/concurrency/...) 帮 LLM 分类 |
+
+### 5.2 顶层配置 `.aci.json`
+
+`.aci.json` 是 mock 项目根的 schema 契约声明文件 (per ACI schema v0.1 §3.1):
+- `aci_version`: schema 版本 (LLM 看到 v0.2 知道字段含义可能已扩展)
+- `supported_layers`: `["ut", "it", "st", "e2e"]`
+- `severity_levels`: `["critical", "high", "medium", "low", "info"]`
+- `assertion_statuses`: `["PASS", "FAIL", "WARN", "SKIP"]`
+- `expect_value_types`: 17 种 (response_within_ms / field_equals / workflow_completes / ...)
+- `schema_required_fields`: 10 个必填字段
+
+### 5.3 Fixture 字段 `aci_assertion` (并存扩展, 不删 fixture_assertion)
+
+每个 fixture 文件加一个 `aci_assertion` dict, 字段示例 (per `.aci.json` schema):
+
+```json
+{
+  "aci_assertion": {
+    "assertion_id": "star-flash-mock:guards:g-1",
+    "aci_version": "0.1.0-draft",
+    "layer": "ut",
+    "scope": {
+      "project": "star-flash-mock",
+      "module": "guards",
+      "domain": "admin",
+      "operation": "task_queue_check",
+      "http_method": "GET"
+    },
+    "expect": {
+      "type": "response_within_ms",
+      "value": 10,
+      "description": "task_queue_no_persistence_gap 检查应在 10ms 内返回"
+    },
+    "actual": {
+      "type": "response_within_ms",
+      "value": 5,
+      "description": "实测 5ms 完成, 快于预期 1 倍"
+    },
+    "status": "PASS",
+    "severity": "info",
+    "reasoning": "actual 5ms 远低于 expect 10ms 阈值 (50% 余量), guard G-1 通过",
+    "tags": ["perf", "l0", "scheduler", "smoke"],
+    "captured_at": "2026-09-23T10:00:00Z"
+  }
+}
+```
+
+**字段语义**:
+- `expect`/`actual`: 人类可读 (`{type, value, description}`), LLM 必读
+- `status`: PASS/FAIL/WARN/SKIP
+- `severity`: critical/high/medium/low/info (LLM 优先处理 critical)
+- `reasoning`: FAIL 时必填, 「为什么 fail」自然语言
+- `suggested_fix`: FAIL 时建议填, 「怎么修」自然语言
+- `captured_at`: RFC3339 时间戳
+
+### 5.4 emitter helper (`scripts/_lib_aci_emit.py`)
+
+Python emitter (`AciEmitter` class) + bash wrapper (`_lib_aci_emit.sh`)。
+
+**Python 用法**:
+
+```python
+from pathlib import Path
+from _lib_aci_emit import AciEmitter
+
+em = AciEmitter(layer="it")
+a = em.build(
+    assertion_id="star-flash-mock:guards:g-1",
+    scope={"project": "star-flash-mock", "module": "guards", "domain": "admin"},
+    expect={"type": "response_within_ms", "value": 2000,
+            "description": "API should respond within 2s"},
+    actual={"type": "response_within_ms", "value": 5,
+            "description": "Measured 5ms response"},
+    status="PASS",
+    severity="info",
+    reasoning="actual 5ms << expect 2000ms threshold, by 400x margin",
+    tags=["perf", "smoke"],
+)
+em.write(a, Path("/tmp/out.aci.json"))
+```
+
+**CLI 用法**:
+
+```bash
+python3 scripts/_lib_aci_emit.py emit \
+  --layer it \
+  --assertion-id "star-flash-mock:guards:g-1" \
+  --scope project=star-flash-mock module=guards domain=admin \
+  --expect-type response_within_ms --expect-value 2000 --expect-description "..." \
+  --actual-type response_within_ms --actual-value 5 --actual-description "..." \
+  --status PASS --severity info --reasoning "..." \
+  --tags smoke,perf \
+  --output /tmp/out.aci.json
+```
+
+### 5.5 聚合 CLI (`tools/aci-summary/aci_summary.py`)
+
+对目录递归收集 `aci_assertion`, 聚合 critical/high/medium 统计 + Top N issues:
+
+```bash
+python3 tools/aci-summary/aci_summary.py tools/star-flash-mock/mock_data/agent-runtime/guards/ --top 5
+# 输出 critical/high/medium 统计 + Top 5 issues (severity-sorted)
+```
+
+LLM agent 主用例: 一行指令获取 mock 结果概览, 不必逐个 fixture 解析。
+
+### 5.6 Stage 1 落地状态 (per brief v0.1)
+
+- ✅ `.aci.json` (本项目根)
+- ✅ `_lib_aci_emit.py` (Python emitter, AciEmitter class)
+- ✅ `_lib_aci_emit.sh` (bash wrapper)
+- ✅ 5 sample fixture 加 `aci_assertion` 字段 (G-1/3/5/7/9, 都 PASS)
+- ✅ `aci_summary.py` (CLI 雏形, MVP 阶段)
+- ⏳ Stage 2: 全量 175 fixture 加 `aci_assertion` (per G-ACI-06 b/c, 第 2 笔 brief)
+- ⏳ Stage 3: IDE1.0 / RustGameServer / 4 个项目适配 (per §4.2 + §4.3)
+- ⏳ Stage 4: 跨项目统一验证 (per §4.5)
+
+**完整设计稿**: `docs/architecture/2026-09-22-aci-mock-interface/00-design-analysis.md` v0.2
+**Brief v0.1**: `docs/briefs/ulys-191-star-mock-aci-stage1.md`
+
+## 6. 跨项目引用 (per 守门 #12 + AGENTS.md §5 仓库拓扑)
 
 - **不**引用 RGS 仓 (`D:\RustGameServer\tools\rgs-flash-mock`): 仅治理结构镜像, fixture 不双向同步
 - **不**引用 RGS 5 域 Lead 真人: Star 仓 5 域 Lead 临时代签 per AGENTS.md §4 #3 反转
 - **不**建立业务子域↔DDD bounded context 映射: fixture 用 module 维度 (per 守门 #3)
 
-## 6. 修订历史 (per 守门 #12)
+## 7. 修订历史 (per 守门 #12)
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
