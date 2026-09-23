@@ -30,6 +30,7 @@
 pub mod error;
 pub mod shared_dir_resolver;
 pub mod shared_dir_types;
+pub mod worktree_create_async;
 
 pub use error::{SharedDirError, SharedDirResult};
 pub use shared_dir_resolver::{
@@ -42,4 +43,8 @@ pub use shared_dir_resolver::{
 pub use shared_dir_types::{
     PickerCandidate, PickerCandidateKind, SharedDirConfig, SharedDirPriority, SharedDirSource,
     SharedDirectory, SharedMountStrategy,
+};
+pub use worktree_create_async::{
+    InMemoryWorktreeCreateAsync, RealWorktreeCreateAsync, WorktreeCreateAsync,
+    WorktreeCreateHandle, WorktreeCreateRequest, WorktreeEvent,
 };

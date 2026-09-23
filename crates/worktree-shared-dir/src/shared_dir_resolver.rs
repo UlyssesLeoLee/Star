@@ -27,6 +27,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use tracing::warn;
 
 use crate::error::{SharedDirError, SharedDirResult};
@@ -73,7 +74,7 @@ pub fn resolve_cli_config_path(workspace_root: &Path) -> PathBuf {
 }
 
 /// Resolver 解析结果 (按 priority 升序排列, P1 在前)
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResolvedSharedDirs {
     /// 已合并去重的 SharedDirectory 列表 (按 priority 升序)
     pub entries: Vec<SharedDirectory>,
