@@ -347,7 +347,6 @@ impl Notification {
     }
 }
 
-
 // =====================================================================
 // 错误
 // =====================================================================
@@ -1121,7 +1120,10 @@ mod tests {
             read_at: None,
             retry_count: 0,
         };
-        assert!(n.is_unread(), "FR-ORCA-041:刚 dispatch 的通知应判为 unread (sidebar 加粗)");
+        assert!(
+            n.is_unread(),
+            "FR-ORCA-041:刚 dispatch 的通知应判为 unread (sidebar 加粗)"
+        );
     }
 
     #[test]
@@ -1143,7 +1145,10 @@ mod tests {
             read_at: Some(chrono::Utc::now()),
             retry_count: 0,
         };
-        assert!(!n.is_unread(), "FR-ORCA-041:已读后 is_unread == false (sidebar 取消加粗)");
+        assert!(
+            !n.is_unread(),
+            "FR-ORCA-041:已读后 is_unread == false (sidebar 取消加粗)"
+        );
     }
 
     #[test]

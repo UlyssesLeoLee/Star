@@ -296,7 +296,6 @@ async fn it_v1_invn07_breakthrough_dispatched() {
     }
 }
 
-
 /// **IT-V5-1 (FR-ORCA-040)**: AgentFinished / NeedsYou 突破 INV-N-07 默认抑制,dispatch 必须成功
 #[tokio::test]
 async fn it_v5_fr_orca_040_agent_finished_needs_you_breakthrough() {
@@ -314,11 +313,14 @@ async fn it_v5_fr_orca_040_agent_finished_needs_you_breakthrough() {
             .await
             .expect("FR-ORCA-040:AgentFinished/NeedsYou 应突破 INV-N-07");
         assert_eq!(n.event_type, evt);
-        assert_eq!(n.event_type.as_str(), match evt {
-            NotificationEventType::AgentFinished => "agent.finished",
-            NotificationEventType::NeedsYou => "agent.needs_you",
-            _ => unreachable!(),
-        });
+        assert_eq!(
+            n.event_type.as_str(),
+            match evt {
+                NotificationEventType::AgentFinished => "agent.finished",
+                NotificationEventType::NeedsYou => "agent.needs_you",
+                _ => unreachable!(),
+            }
+        );
     }
 }
 
@@ -342,7 +344,10 @@ async fn it_v5_fr_orca_041_unread_bolded_flow() {
         )
         .await
         .unwrap();
-    assert!(dispatched.is_unread(), "FR-ORCA-041:dispatch 后 is_unread == true (sidebar 加粗)");
+    assert!(
+        dispatched.is_unread(),
+        "FR-ORCA-041:dispatch 后 is_unread == true (sidebar 加粗)"
+    );
     assert!(
         domain_notification::Notification::should_bold_for_sidebar(1),
         "FR-ORCA-041:unread_count=1 → sidebar 加粗"
@@ -374,7 +379,10 @@ async fn it_v5_fr_orca_041_unread_bolded_flow() {
         )
         .await
         .unwrap();
-    assert!(!read.is_unread(), "FR-ORCA-041:已读后 is_unread == false (sidebar 取消加粗)");
+    assert!(
+        !read.is_unread(),
+        "FR-ORCA-041:已读后 is_unread == false (sidebar 取消加粗)"
+    );
     assert!(
         !domain_notification::Notification::should_bold_for_sidebar(0),
         "FR-ORCA-041:unread_count=0 → sidebar 不加粗(不显示 badge)"
