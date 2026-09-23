@@ -136,6 +136,19 @@ pub struct ChatRequest {
     pub thinking_level: Option<crate::events::ThinkingLevel>,
 }
 
+impl Default for ChatRequest {
+    fn default() -> Self {
+        Self {
+            model: String::new(),
+            messages: Vec::new(),
+            temperature: None,
+            max_tokens: None,
+            request_id: None,
+            thinking_level: None,
+        }
+    }
+}
+
 impl ChatRequest {
     /// Cheap structural validation: model + non-empty messages.
     pub fn validate(&self) -> Result<(), &'static str> {
@@ -177,11 +190,6 @@ impl Default for ChatRequest {
 // =====================================================================
 
 /// **ChatResponse** -- non-streaming chat completion result.
-///
-/// `finish_reason` follows the OpenAI convention ("stop" / "length" /
-/// "content_filter" / "tool_calls" — last deferred to W2). `created_at` is
-/// stamped by the provider when the model finalizes the reply (for v0.0.1
-/// stub: stamped by the test harness since no provider runs yet).
 ///
 /// **v0.0.2 (PI-2 / FR-9)**: `finish_reason: String` is **deprecated**;
 /// use `stop_reason: StopReason` instead. The string field is retained for
@@ -313,10 +321,6 @@ mod tests {
     fn chat_request_validate_rejects_empty_model_and_messages() {
         let r = ChatRequest {
             model: "".to_string(),
-            messages: vec![ChatMessage::user("hi")],
-            temperature: None,
-            max_tokens: None,
-            request_id: None,
             ..Default::default()
         };
         assert!(r.validate().is_err());
@@ -324,9 +328,6 @@ mod tests {
         let r = ChatRequest {
             model: "gpt-test".to_string(),
             messages: vec![],
-            temperature: None,
-            max_tokens: None,
-            request_id: None,
             ..Default::default()
         };
         assert!(r.validate().is_err());
@@ -350,6 +351,10 @@ mod tests {
         assert_eq!(r.model, "gpt-test");
         assert_eq!(r.message.role, ChatRole::Assistant);
         assert_eq!(r.message.content, "hello back");
+        #[allow(deprecated)]
+        {
+            assert_eq!(r.finish_reason, "stop");
+        }
         assert_eq!(r.stop_reason, crate::events::StopReason::Stop);
         // id must be a non-nil UUID
         assert_ne!(r.id, Uuid::nil());

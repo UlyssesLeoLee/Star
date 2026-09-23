@@ -944,7 +944,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "domain-llm",
- "domain-tool",
  "futures-util",
  "serde",
  "serde_json",

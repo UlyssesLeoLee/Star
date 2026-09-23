@@ -158,7 +158,8 @@ impl OpenAiProvider {
             .first()
             .map(|c| c.message.content.clone())
             .unwrap_or_default();
-        let finish_reason_str = parsed
+        #[allow(deprecated)] // legacy wire compat (PI-2 / FR-9)
+        let finish_reason = parsed
             .choices
             .first()
             .and_then(|c| c.finish_reason.clone())
@@ -168,8 +169,8 @@ impl OpenAiProvider {
             model: model.to_string(),
             message: ChatMessage::assistant(text),
             #[allow(deprecated)]
-            finish_reason: finish_reason_str.clone(),
-            stop_reason: crate::events::StopReason::parse_loose(&finish_reason_str),
+            finish_reason: finish_reason.clone(),
+            stop_reason: crate::events::StopReason::parse_loose(&finish_reason),
             usage: crate::events::Usage::default(),
             created_at: Utc::now(),
         }
@@ -390,17 +391,13 @@ mod tests {
     use crate::chat::ChatMessage;
 
     fn sample_request() -> ChatRequest {
-            ChatRequest {
-                model: OPENAI_DEFAULT_MODEL.to_string(),
-                messages: vec![
-                    ChatMessage::system("be terse"),
-                    ChatMessage::user("hi"),
-                ],
-                temperature: Some(0.7),
-                max_tokens: Some(128),
-                request_id: Some(Uuid::new_v4()),
-                ..Default::default()
-            }
+        ChatRequest {
+            model: OPENAI_DEFAULT_MODEL.to_string(),
+            messages: vec![ChatMessage::system("be terse"), ChatMessage::user("hi")],
+            temperature: Some(0.7),
+            max_tokens: Some(128),
+            request_id: Some(Uuid::new_v4()),
+            thinking_level: None,
         }
 
     #[test]
@@ -474,7 +471,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
-            ..Default::default()
+            thinking_level: None,
         };
         let err = p.chat_completion(req).await.unwrap_err();
         assert!(matches!(err, LlmProviderRegistryError::InvalidOperation(_)));
