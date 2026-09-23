@@ -27,6 +27,13 @@ tracing = { workspace = true }
 rusqlite = { version = "0.32", default-features = false, features = ["bundled"] }
 
 star-context = { path = "../star-context" }
+
+# ULYS-219 P1 followup — 真实 setsid session leader + 跨进程 kill (Unix 部分)
+# nix 0.29 仅 signal/process feature (killpg / Pid::from_raw / Signal / setsid safe wrapper)
+# 全部 #[cfg(unix)] 引用,Windows 编译路径不引入 nix crate
+[target.'cfg(unix)'.dependencies]
+nix = { workspace = true }
+
 [dev-dependencies]
 tokio = { workspace = true }
 # ULYS-156 P0-A 续 cli_session_lock file mode 测试需要 tempfile

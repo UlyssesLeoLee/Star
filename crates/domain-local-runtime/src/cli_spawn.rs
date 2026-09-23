@@ -120,16 +120,38 @@ impl LocalRuntime for RealCliRuntime {
 
         #[cfg(unix)]
         {
-            // 从父进程的 controlling terminal 信号组分离:父进程收到的 SIGINT/SIGHUP
-            // (终端 Ctrl-C、或父进程所在终端挂断)不会传播给子进程。
-            // pgid=0 等价 setpgid(0, 0)(以子进程自身 pid 作为新 pgid)。
-            cmd.process_group(0);
+            // ULYS-219 P1 followup: 真实 `setsid(2)` 创建新 session leader
+            // (per unix_session::apply_session)。
+            //
+            // 对比 v0.1 的 `cmd.process_group(0)`(等价 `setpgid(0, 0)`):
+            //
+            // | API            | pgid 分离 | session leader | tty 分离 | 父进程 signal 屏蔽 |
+            // |----------------|:---------:|:--------------:|:--------:|:------------------:|
+            // | setpgid(0, 0)  |     ✅    |       ❌       |    ❌    |         ❌         |
+            // | setsid(2)      |     ✅    |       ✅       |    ✅    |         ✅         |
+            //
+            // setsid 是 POSIX "完全 daemon-like" 行为,是 Orca FR-ORCA-001 AC-1
+            // 真正要的"脱离父进程任何控制信号"。
+            //
+            // Windows 编译路径不走此分支(留 ULYS-211 Job Object)。
+            // Fallback:`UnixSessionOptions::default().new_session = false` 时
+            // apply_session 是 no-op,等同旧 process_group(0) 行为(向后兼容)。
+            use crate::unix_session::{apply_session, UnixSessionOptions};
+            let opts = UnixSessionOptions::default(); // grace=5, new_session=true
+            if let Err(e) = apply_session(&mut cmd, &opts) {
+                tracing::warn!(
+                    "cli_spawn: apply_session failed ({}); fallback to process_group(0)",
+                    e
+                );
+                // setsid 失败(如 EPERM)时退化到 setpgid,保证 spawn 不被阻断
+                cmd.process_group(0);
+            }
         }
         #[cfg(windows)]
         {
             // CREATE_NEW_PROCESS_GROUP (0x00000200,Win32 CreateProcess 标志):
             // 子进程脱离父进程的 console 进程组,父进程收到的 Ctrl-C / Ctrl-Break
-            // 不会传播给子进程。
+            // 不会传播给子进程。ULYS-211 P1 followup 将升级到 Job Object。
             const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
             cmd.creation_flags(CREATE_NEW_PROCESS_GROUP);
         }
