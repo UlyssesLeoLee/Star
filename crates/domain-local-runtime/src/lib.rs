@@ -1643,3 +1643,6 @@ pub mod cli_session_registry;
 pub mod graceful_shutdown;
 pub mod health_self_test;
 pub mod process_supervisor;
+// ULYS-219 P1 followup — Unix 真实 setsid session leader + killpg 跨进程 kill
+// Windows 部分仍 stub (留 ULYS-211),本模块 #[cfg(unix)] only
+pub mod unix_session;
