@@ -19,5 +19,32 @@
   "fixture_assertion": {
     "guard_check_pass": true,
     "elapsed_under_10ms": true
+  },
+  "aci_assertion": {
+    "assertion_id": "star-flash-mock:guards:g-3",
+    "aci_version": "0.1.0-draft",
+    "layer": "ut",
+    "scope": {
+      "project": "star-flash-mock",
+      "module": "guards",
+      "domain": "admin",
+      "operation": "l1_l2_hysteresis_check",
+      "http_method": "GET"
+    },
+    "expect": {
+      "type": "response_within_ms",
+      "value": 10,
+      "description": "lightweight↔ECS 切换迟滞检查应在 10ms 内返回 (per G-3 L0 性能预算)"
+    },
+    "actual": {
+      "type": "response_within_ms",
+      "value": 5,
+      "description": "实测 5ms 完成, 切换迟滞窗口稳定"
+    },
+    "status": "PASS",
+    "severity": "info",
+    "reasoning": "actual 5ms ≤ expect 10ms, L1/L2 lightweight→ECS 切换迟滞 guard 通过, 调度器降级路径无抖动",
+    "tags": ["perf", "l0", "scheduler", "hysteresis"],
+    "captured_at": "2026-09-23T10:00:00Z"
   }
 }
