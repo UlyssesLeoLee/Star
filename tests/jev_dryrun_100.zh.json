@@ -1,0 +1,602 @@
+[
+  {
+    "id": 1,
+    "input": "你好，请问今天的天气如何？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 2,
+    "input": "请解释一下什么是机器学习",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 3,
+    "input": "如何用Python编写一个简单的Web应用？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 4,
+    "input": "请列举五个中国古代的著名诗人",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 5,
+    "input": "什么是区块链技术？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 6,
+    "input": "如何学习英文单词更高效？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 7,
+    "input": "请介绍一下人工智能在医疗中的应用",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 8,
+    "input": "怎样才能写出好的代码？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 9,
+    "input": "云计算的优势和劣势分别是什么？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 10,
+    "input": "请解释量子计算的基本原理",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 11,
+    "input": "如何制定有效的学习计划？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 12,
+    "input": "什么是大数据？它有哪些应用场景？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 13,
+    "input": "请介绍互联网发展的历史",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 14,
+    "input": "如何有效地管理时间？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 15,
+    "input": "请解释什么是虚拟现实技术",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 16,
+    "input": "如何建立良好的沟通技巧？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 17,
+    "input": "什么是5G技术？它将带来什么变化？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 18,
+    "input": "请讲述一个著名的科学发现的故事",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 19,
+    "input": "如何培养创意思维？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 20,
+    "input": "什么是物联网？请举一些例子",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 21,
+    "input": "请解释深度学习的工作原理",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 22,
+    "input": "如何提高工作效率？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 23,
+    "input": "什么是自然语言处理？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 24,
+    "input": "请介绍一下可再生能源的种类",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 25,
+    "input": "如何写出有说服力的论文？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 26,
+    "input": "什么是生物技术？它的前景如何？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 27,
+    "input": "请解释什么是网络安全",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 28,
+    "input": "如何建立个人品牌？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 29,
+    "input": "什么是数据挖掘？它有哪些应用？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 30,
+    "input": "请讲述一个企业成功的案例",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 31,
+    "input": "如何养成阅读的习惯？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 32,
+    "input": "什么是知识图谱技术？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 33,
+    "input": "请介绍气候变化及其影响",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 34,
+    "input": "如何进行有效的项目管理？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 35,
+    "input": "什么是边缘计算？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 36,
+    "input": "请解释人工智能伦理的重要性",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 37,
+    "input": "如何成为一个优秀的领导者？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 38,
+    "input": "什么是容器化技术？请举例说明",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 39,
+    "input": "请介绍一下世界上的主要货币体系",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 40,
+    "input": "如何保持身心健康？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 41,
+    "input": "什么是微服务架构？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 42,
+    "input": "请讲述一个历史事件的转折点",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 43,
+    "input": "如何有效学习新技能？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 44,
+    "input": "什么是API？它在软件开发中的作用是什么？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 45,
+    "input": "请介绍一下可持续发展的概念",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 46,
+    "input": "如何进行有效的市场调研？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 47,
+    "input": "什么是强化学习？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 48,
+    "input": "请解释什么是图神经网络",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 49,
+    "input": "如何建立有效的团队合作？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 50,
+    "input": "什么是DevOps？它的优势是什么？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 51,
+    "input": "请讲述一个科技创新改变世界的故事",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 52,
+    "input": "如何写好一份商业企划书？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 53,
+    "input": "什么是零信任安全模型？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 54,
+    "input": "请介绍神经网络的基本结构",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 55,
+    "input": "如何提高创新能力？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 56,
+    "input": "什么是持续集成和持续交付？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 57,
+    "input": "请讲述一个社会变革的案例",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 58,
+    "input": "如何进行有效的演讲和演示？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 59,
+    "input": "什么是推荐系统？它在哪些领域应用？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 60,
+    "input": "请解释什么是分布式系统",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 61,
+    "input": "如何建立个人学习系统？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 62,
+    "input": "什么是无服务器架构？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 63,
+    "input": "请介绍一下网络编程的基础知识",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 64,
+    "input": "如何制定个人的职业发展计划？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 65,
+    "input": "什么是树莓派？它可以用来做什么？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 66,
+    "input": "请讲述一个医学突破的故事",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 67,
+    "input": "如何选择合适的编程语言？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 68,
+    "input": "什么是异常检测？它有哪些应用？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 69,
+    "input": "请介绍一下数据库的基本概念",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 70,
+    "input": "如何维持工作和生活的平衡？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 71,
+    "input": "什么是元学习？它的意义是什么？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 72,
+    "input": "请解释什么是云原生应用",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 73,
+    "input": "如何进行有效的需求分析？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 74,
+    "input": "什么是知识蒸馏？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 75,
+    "input": "请讲述一个环保创新的案例",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 76,
+    "input": "如何成为一个全栈工程师？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 77,
+    "input": "什么是图像识别？它的应用有哪些？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 78,
+    "input": "请介绍一下操作系统的核心功能",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 79,
+    "input": "如何有效地进行代码审查？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 80,
+    "input": "什么是对抗训练？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 81,
+    "input": "请讲述一个教育改革的故事",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 82,
+    "input": "如何设计一个可用性强的用户界面？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 83,
+    "input": "什么是自适应学习？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 84,
+    "input": "请解释什么是模型压缩",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 85,
+    "input": "如何建立一个学习型组织？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 86,
+    "input": "什么是迁移学习？它为什么重要？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 87,
+    "input": "请介绍一下文本挖掘的技术",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 88,
+    "input": "如何进行有效的客户管理？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 89,
+    "input": "什么是集成学习？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 90,
+    "input": "请讲述一个科技公司成功的故事",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 91,
+    "input": "如何打造高效的开发流程？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 92,
+    "input": "什么是因果推断？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 93,
+    "input": "请介绍一下机器学习的评估指标",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 94,
+    "input": "如何有效地进行知识管理？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 95,
+    "input": "什么是说明性人工智能？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 96,
+    "input": "请讲述一个环境保护的成功故事",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 97,
+    "input": "如何进行有效的供应链管理？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 98,
+    "input": "什么是联邦学习？它的应用前景如何？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 99,
+    "input": "请介绍一下区块链在金融中的应用",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  },
+  {
+    "id": 100,
+    "input": "如何建立一个高效的反馈系统？",
+    "expected_role": "assistant",
+    "expected_contains": ""
+  }
+]

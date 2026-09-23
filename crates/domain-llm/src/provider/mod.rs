@@ -16,11 +16,13 @@
 //! - 5 域 Lead 真人到位前 Mavis 临时代签.
 
 pub mod anthropic;
+pub mod jev;
 pub mod mock;
 pub mod openai;
 pub mod registry;
 
 pub use anthropic::{AnthropicProvider, ANTHROPIC_DEFAULT_BASE_URL};
+pub use jev::{JevCerebellumProvider, JevError, ResolvedKey, parse_key_input, JEV_DEFAULT_BASE_URL};
 pub use mock::MockProvider;
 pub use openai::{OpenAiProvider, OPENAI_DEFAULT_BASE_URL};
 pub use registry::{DispatchProvider, ProviderRegistry, ProviderRegistryError, ProviderSelector};
