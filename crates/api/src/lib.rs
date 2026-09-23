@@ -58,6 +58,8 @@ pub mod agent_run;
 pub mod chat;
 /// completion API module (W2 — inline code completion).
 pub mod completion;
+/// diff annotation API module (ULYS-165 FR-ORCA-035 — Diff annotation REST API)
+pub mod diff_annotation;
 /// metering API module (W2 — token usage query).
 pub mod metering;
 
