@@ -23,10 +23,14 @@ futures-util = { workspace = true }
 serde_json = { workspace = true }
 # w22-w31 通用 tracing
 tracing = { workspace = true }
+# ULYS-156 cli_session_registry: rusqlite bundled SQLite WAL (per star-taskqueue 同款)
+rusqlite = { version = "0.32", default-features = false, features = ["bundled"] }
 
 star-context = { path = "../star-context" }
 [dev-dependencies]
 tokio = { workspace = true }
+# ULYS-156 P0-A 续 cli_session_lock file mode 测试需要 tempfile
+tempfile = "3"
 
 [lints]
 workspace = true

@@ -156,12 +156,8 @@ impl MeteringStore {
         };
         for ev in inner.events.values() {
             if ev.user_id == user_id {
-                agg.total_input_tokens = agg
-                    .total_input_tokens
-                    .saturating_add(ev.input_tokens);
-                agg.total_output_tokens = agg
-                    .total_output_tokens
-                    .saturating_add(ev.output_tokens);
+                agg.total_input_tokens = agg.total_input_tokens.saturating_add(ev.input_tokens);
+                agg.total_output_tokens = agg.total_output_tokens.saturating_add(ev.output_tokens);
                 agg.total_tokens = agg.total_tokens.saturating_add(ev.total_tokens);
                 agg.call_count = agg.call_count.saturating_add(1);
             }
@@ -259,7 +255,7 @@ mod tests {
     #[test]
     fn estimate_chat_tokens_sums_inputs_and_estimates_output() {
         let msgs = vec![
-            ("user".to_string(), "hello".to_string()),  // 2 tokens
+            ("user".to_string(), "hello".to_string()),      // 2 tokens
             ("assistant".to_string(), "world".to_string()), // 2 tokens
         ];
         let (inp, out) = estimate_chat_tokens(&msgs, "hi");
@@ -271,16 +267,19 @@ mod tests {
     async fn metering_store_record_appends_event() {
         let s = MeteringStore::new();
         assert_eq!(s.len().await, 0);
-        s.record_call(user(), tenant(), "mock", "mock-llm", 10, 5, None).await;
+        s.record_call(user(), tenant(), "mock", "mock-llm", 10, 5, None)
+            .await;
         assert_eq!(s.len().await, 1);
     }
 
     #[tokio::test]
     async fn metering_store_aggregate_for_user_sums_only_target() {
         let s = MeteringStore::new();
-        s.record_call(user(), tenant(), "mock", "mock-llm", 10, 5, None).await;
+        s.record_call(user(), tenant(), "mock", "mock-llm", 10, 5, None)
+            .await;
         let other = Uuid::parse_str("00000000-0000-0000-0000-0000000000ff").unwrap();
-        s.record_call(other, tenant(), "mock", "mock-llm", 20, 10, None).await;
+        s.record_call(other, tenant(), "mock", "mock-llm", 20, 10, None)
+            .await;
 
         let agg = s.aggregate_for_user(user()).await;
         assert_eq!(agg.total_input_tokens, 10);
@@ -292,8 +291,10 @@ mod tests {
     #[tokio::test]
     async fn metering_store_snapshot_returns_all_events() {
         let s = MeteringStore::new();
-        s.record_call(user(), tenant(), "anthropic", "claude-test", 1, 1, None).await;
-        s.record_call(user(), tenant(), "openai", "gpt-test", 2, 2, None).await;
+        s.record_call(user(), tenant(), "anthropic", "claude-test", 1, 1, None)
+            .await;
+        s.record_call(user(), tenant(), "openai", "gpt-test", 2, 2, None)
+            .await;
         let snap = s.snapshot().await;
         assert_eq!(snap.len(), 2);
     }
@@ -301,7 +302,8 @@ mod tests {
     #[tokio::test]
     async fn metering_store_reset_for_tests_clears_state() {
         let s = MeteringStore::new();
-        s.record_call(user(), tenant(), "mock", "mock-llm", 1, 1, None).await;
+        s.record_call(user(), tenant(), "mock", "mock-llm", 1, 1, None)
+            .await;
         assert_eq!(s.len().await, 1);
         s.reset_for_tests().await;
         assert_eq!(s.len().await, 0);
@@ -315,7 +317,8 @@ mod tests {
         for _ in 0..10 {
             let s2 = s.clone();
             handles.push(tokio::spawn(async move {
-                s2.record_call(user(), tenant(), "mock", "mock-llm", 1, 1, None).await;
+                s2.record_call(user(), tenant(), "mock", "mock-llm", 1, 1, None)
+                    .await;
             }));
         }
         for h in handles {

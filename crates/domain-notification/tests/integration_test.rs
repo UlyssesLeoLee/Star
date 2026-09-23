@@ -296,6 +296,99 @@ async fn it_v1_invn07_breakthrough_dispatched() {
     }
 }
 
+/// **IT-V5-1 (FR-ORCA-040)**: AgentFinished / NeedsYou 突破 INV-N-07 默认抑制,dispatch 必须成功
+#[tokio::test]
+async fn it_v5_fr_orca_040_agent_finished_needs_you_breakthrough() {
+    let svc = InMemoryNotificationService::new();
+    let tenant_id = Uuid::new_v4();
+    let user = Uuid::new_v4();
+    let actor = make_user_actor(tenant_id, user);
+
+    for evt in [
+        NotificationEventType::AgentFinished,
+        NotificationEventType::NeedsYou,
+    ] {
+        let n = svc
+            .dispatch(basic_dispatch_cmd(tenant_id, user, evt), &actor)
+            .await
+            .expect("FR-ORCA-040:AgentFinished/NeedsYou 应突破 INV-N-07");
+        assert_eq!(n.event_type, evt);
+        assert_eq!(
+            n.event_type.as_str(),
+            match evt {
+                NotificationEventType::AgentFinished => "agent.finished",
+                NotificationEventType::NeedsYou => "agent.needs_you",
+                _ => unreachable!(),
+            }
+        );
+    }
+}
+
+/// **IT-V5-2 (FR-ORCA-041)**: dispatch 后 is_unread=true;mark_read 后 is_unread=false
+#[tokio::test]
+async fn it_v5_fr_orca_041_unread_bolded_flow() {
+    let svc = InMemoryNotificationService::new();
+    let tenant_id = Uuid::new_v4();
+    let user = Uuid::new_v4();
+    let actor = make_user_actor(tenant_id, user);
+
+    svc.register_channel(basic_channel_cmd(tenant_id, user), &actor)
+        .await
+        .unwrap();
+
+    // 1) dispatch AgentFinished → 通知 is_unread=true (sidebar 加粗)
+    let dispatched = svc
+        .dispatch(
+            basic_dispatch_cmd(tenant_id, user, NotificationEventType::AgentFinished),
+            &actor,
+        )
+        .await
+        .unwrap();
+    assert!(
+        dispatched.is_unread(),
+        "FR-ORCA-041:dispatch 后 is_unread == true (sidebar 加粗)"
+    );
+    assert!(
+        domain_notification::Notification::should_bold_for_sidebar(1),
+        "FR-ORCA-041:unread_count=1 → sidebar 加粗"
+    );
+
+    // 2) list_by_user unread_only=true 能看到
+    let unread = svc
+        .list_by_user(
+            ListByUserQuery {
+                tenant_id: TenantId(tenant_id),
+                user_id: UserId::from(user),
+                unread_only: true,
+            },
+            &actor,
+        )
+        .await
+        .unwrap();
+    assert_eq!(unread.len(), 1);
+
+    // 3) 用户点开(模拟 click) → mark_read → is_unread=false (sidebar 取消加粗)
+    let read = svc
+        .mark_read(
+            MarkReadCommand {
+                tenant_id: TenantId(tenant_id),
+                notification_id: dispatched.id,
+                actor_user_id: UserId::from(user),
+            },
+            &actor,
+        )
+        .await
+        .unwrap();
+    assert!(
+        !read.is_unread(),
+        "FR-ORCA-041:已读后 is_unread == false (sidebar 取消加粗)"
+    );
+    assert!(
+        !domain_notification::Notification::should_bold_for_sidebar(0),
+        "FR-ORCA-041:unread_count=0 → sidebar 不加粗(不显示 badge)"
+    );
+}
+
 /// **IT-V1-4**: upsert_template 需 admin role (INV-N-04)
 #[tokio::test]
 async fn it_v1_template_requires_admin() {

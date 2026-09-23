@@ -46,19 +46,39 @@ impl ToolName {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "tool", rename_all = "snake_case")]
 pub enum ToolCall {
-    ReadFile { path: String },
-    EditFile { path: String, new_content: String },
-    RunCmd { cmd: String, timeout_secs: Option<u64> },
-    WebSearch { query: String, max_results: Option<u32> },
+    ReadFile {
+        path: String,
+    },
+    EditFile {
+        path: String,
+        new_content: String,
+    },
+    RunCmd {
+        cmd: String,
+        timeout_secs: Option<u64>,
+    },
+    WebSearch {
+        query: String,
+        max_results: Option<u32>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "tool", rename_all = "snake_case")]
 pub enum ToolOutput {
-    ReadFile { path: String, content: String },
-    EditFile { path: String, applied: bool },
+    ReadFile {
+        path: String,
+        content: String,
+    },
+    EditFile {
+        path: String,
+        applied: bool,
+    },
     RunCmd(SandboxResult),
-    WebSearch { query: String, results: Vec<SearchHit> },
+    WebSearch {
+        query: String,
+        results: Vec<SearchHit>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,7 +100,10 @@ pub async fn dispatch(call: ToolCall) -> Result<ToolOutput, ToolError> {
             tokio::fs::write(&path, new_content)
                 .await
                 .map_err(|e| ToolError::Io(format!("write({path}): {e}")))?;
-            Ok(ToolOutput::EditFile { path, applied: true })
+            Ok(ToolOutput::EditFile {
+                path,
+                applied: true,
+            })
         }
         ToolCall::RunCmd { cmd, timeout_secs } => {
             let cfg = SandboxConfig {
@@ -92,7 +115,9 @@ pub async fn dispatch(call: ToolCall) -> Result<ToolOutput, ToolError> {
         }
         ToolCall::WebSearch { query, max_results } => {
             let _ = (query, max_results);
-            Err(ToolError::NotImplemented("web_search: wire external search API in W4.3".into()))
+            Err(ToolError::NotImplemented(
+                "web_search: wire external search API in W4.3".into(),
+            ))
         }
     }
 }
@@ -106,18 +131,29 @@ mod tests {
         let dir = tempdir();
         let p = dir.join("hi.txt");
         tokio::fs::write(&p, "hi").await.unwrap();
-        let out = dispatch(ToolCall::ReadFile { path: p.to_string_lossy().into_owned() })
-            .await
-            .unwrap();
-        match out { ToolOutput::ReadFile { content, .. } => assert_eq!(content, "hi"), _ => panic!() }
+        let out = dispatch(ToolCall::ReadFile {
+            path: p.to_string_lossy().into_owned(),
+        })
+        .await
+        .unwrap();
+        match out {
+            ToolOutput::ReadFile { content, .. } => assert_eq!(content, "hi"),
+            _ => panic!(),
+        }
     }
 
     #[tokio::test]
     async fn run_cmd_dispatch_echo() {
-        let out = dispatch(ToolCall::RunCmd { cmd: "echo hello".into(), timeout_secs: Some(5) })
-            .await
-            .unwrap();
-        match out { ToolOutput::RunCmd(r) => assert_eq!(r.stdout.trim(), "hello"), _ => panic!() }
+        let out = dispatch(ToolCall::RunCmd {
+            cmd: "echo hello".into(),
+            timeout_secs: Some(5),
+        })
+        .await
+        .unwrap();
+        match out {
+            ToolOutput::RunCmd(r) => assert_eq!(r.stdout.trim(), "hello"),
+            _ => panic!(),
+        }
     }
 
     fn tempdir() -> std::path::PathBuf {
