@@ -27,6 +27,7 @@ export { auditHandlers } from "./audit";
 export { providersLlmHandlers } from "./providers-llm";
 export { kmsHandlers } from "./kms";
 export { worktreeCanvasHandlers } from "./worktree-canvas";
+export { worktreeSharedHandlers } from "./worktree-shared";
 
 import { agentsHandlers } from "./agents";
 import { analyticsHandlers } from "./analytics";
@@ -45,6 +46,7 @@ import { auditHandlers } from "./audit";
 import { providersLlmHandlers } from "./providers-llm";
 import { kmsHandlers } from "./kms";
 import { worktreeCanvasHandlers } from "./worktree-canvas";
+import { worktreeSharedHandlers } from "./worktree-shared";
 
 export const handlers = [
   ...agentsHandlers,
@@ -64,4 +66,5 @@ export const handlers = [
   ...providersLlmHandlers,
   ...kmsHandlers,
   ...worktreeCanvasHandlers,
+  ...worktreeSharedHandlers,
 ];
