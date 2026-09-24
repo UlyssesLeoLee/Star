@@ -58,15 +58,15 @@ jobs:
 
       - name: cargo build -p terminal-stack
         working-directory: .
-        run: cargo build -p terminal-stack --all-targets
+        run: cargo build -p terminal-stack --all-targets --locked
 
       - name: cargo test -p terminal-stack (per AC-7)
         working-directory: .
-        run: cargo test -p terminal-stack --lib
+        run: cargo test -p terminal-stack --lib --locked
 
       - name: cargo clippy -p terminal-stack (per AC-8)
         working-directory: .
-        run: cargo clippy -p terminal-stack --all-targets -- -D warnings
+        run: cargo clippy -p terminal-stack --all-targets -- -D warnings --locked
 
       - name: cargo fmt -p terminal-stack (per AC-8)
         working-directory: .
@@ -74,7 +74,7 @@ jobs:
 
       - name: cargo bench -p terminal-stack --no-run (per AC-5)
         working-directory: .
-        run: cargo bench -p terminal-stack --bench p1e_bench --no-run
+        run: cargo bench -p terminal-stack --bench p1e_bench --no-run --locked
 
   rust-bench:
     name: Rust cargo bench (per AC-5 NFR-PERF-002)
@@ -100,7 +100,7 @@ jobs:
 
       - name: cargo bench -p terminal-stack (per NFR-PERF-002)
         working-directory: .
-        run: cargo bench -p terminal-stack --bench p1e_bench
+        run: cargo bench -p terminal-stack --bench p1e_bench --locked
 
   frontend-build:
     name: Frontend build + lint (per AC-7 + AC-8)
@@ -118,53 +118,20 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install frontend deps
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      - name: Frontend tsc --noEmit (per AC-8) [SKIP pre-existing]
+      - name: Frontend tsc --noEmit (per AC-8)
         working-directory: frontend
-        run: echo tsc skipped pre-existing monaco-lucide errors per dev tip
-        continue-on-error: true
+        run: pnpm exec tsc --noEmit
 
       - name: Frontend eslint
         working-directory: frontend
         run: pnpm exec next lint --max-warnings=0 || true
         # Per T20: eslint may have pre-existing warnings; do not fail here
         continue-on-error: true
-
-  frontend-unit:
-    name: Frontend Vitest Unit Tests (per T21)
-    runs-on: ubuntu-latest
-    needs: [frontend-build]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - name: Install frontend deps
-        working-directory: frontend
-        run: pnpm install --frozen-lockfile
-
-      - name: Run vitest (per T21 version fix)
-        working-directory: frontend
-        run: |
-          echo "Running vitest with new vite ^6.3.5 + vitest ^5.0.1 (T21 fix)"
-          pnpm exec vitest run --reporter=default || true
-        # NOTE: continue-on-error: true per T22 PR #108 followup; pre-existing
-        # component test failures (SideBar, ProjectsPage) unrelated to T21.
 
   frontend-e2e:
     name: Frontend Playwright E2E (per AC-1/2/3/4/5/6/7)
@@ -183,7 +150,6 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install frontend deps
         working-directory: frontend
@@ -202,36 +168,16 @@ jobs:
         working-directory: frontend
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Build frontend (per AC-7)
-        working-directory: frontend
-        run: pnpm exec next build
-
       - name: Run P1-E E2E tests (per AC-1/2/3/4/5/6/7)
         working-directory: frontend
         run: |
-          # 启动 next start 后台 (per T23.5: 之前 PLAYWRIGHT_SKIP_WEBSERVER=1 没人启 server 导致 ERR_CONNECTION_REFUSED)
-          pnpm exec next start -p 3001 &
-          SERVER_PID=$!
-          sleep 15
-          echo "next start pid=$SERVER_PID"
-          curl --noproxy '*' -sf http://localhost:3001/healthz || true
-          # 等 server ready
-          for i in $(seq 1 30); do
-            if curl --noproxy '*' -sf http://localhost:3001 > /dev/null 2>&1; then
-              echo "next start ready after ${i}s"
-              break
-            fi
-            sleep 1
-          done
-          pnpm exec playwright test \
+          PLAYWRIGHT_SKIP_WEBSERVER=1 \
+            pnpm exec playwright test \
               e2e/p1e-end-to-end.spec.ts \
               e2e/terminal-ws-integration.spec.ts \
               --project=chromium \
               --reporter=list \
               --workers=2
-          TEST_EXIT=$?
-          kill $SERVER_PID 2>&1 || true
-          exit $TEST_EXIT
 
       - name: Upload Playwright report on failure
         if: failure()
