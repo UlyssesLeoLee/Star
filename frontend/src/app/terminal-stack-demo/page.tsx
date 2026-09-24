@@ -23,20 +23,12 @@
 //   ❌ 真实 PTY subprocess (per ULYS-200 §5 — P2 followup)
 // =====================================================================
 
-import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { TerminalStackContainer } from "@/components/terminal/TerminalStackContainer";
+import { TerminalSplitToolbar } from "@/components/terminal/TerminalSplitToolbar";
 import { useTerminalStackStore } from "@/components/terminal/terminalStackStore";
 
 export default function TerminalStackDemoPage() {
-  return (
-    <Suspense fallback={<div className="p-4" data-testid="terminal-stack-demo-loading">Loading...</div>}>
-      <TerminalStackDemoContent />
-    </Suspense>
-  );
-}
-
-function TerminalStackDemoContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams?.get("sessionId") ?? null;
   const tree = useTerminalStackStore((s) => s.tree);
@@ -64,6 +56,7 @@ function TerminalStackDemoContent() {
           </span>
         )}
       </h1>
+      <TerminalSplitToolbar />
       <TerminalStackContainer sessionId={sessionId} />
       <p
         className="mt-3 text-xs text-ink-dim"
