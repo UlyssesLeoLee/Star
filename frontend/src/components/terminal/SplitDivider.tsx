@@ -37,8 +37,8 @@ export function SplitDivider({
       e.preventDefault();
       setDragging(true);
       onDragStart?.(dividerId);
-      const startX = e.clientX;
-      const startY = e.clientY;
+      let startX = e.clientX;
+      let startY = e.clientY;
       let accumulated = 0;
 
       const handleMove = (ev: MouseEvent) => {
