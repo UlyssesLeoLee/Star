@@ -1,44 +1,47 @@
 "use client";
 
 // =====================================================================
-// TerminalStackContainer.tsx — 主入口 (per ULYS-223 P1-D 验收)
+// TerminalStackContainer.tsx — 主入口 (per ULYS-223 P1-D + ULYS-222 P1-C 集成)
 // =====================================================================
 // 集成:
 //   - TerminalSplitToolbar (操作 UI)
 //   - TerminalSplitPane (SplitTree 渲染)
+//   - useTerminalStackWs hook (PR #98.5: 真实 WS 接入 PR #106 协议)
 //   - 简化版 xterm container (per pane, MVP 占位)
 // =====================================================================
-// P1-C 后端 WS push SplitUpdate 时, 接 server 替换 mock pane 渲染即可
+// P1-C 后端 WS push SplitUpdate 时, wsClient dispatch → setTree 自动重渲
 // =====================================================================
 
 import { TerminalSplitToolbar } from "./TerminalSplitToolbar";
 import { TerminalSplitPane } from "./TerminalSplitPane";
 import { useTerminalStackStore } from "./terminalStackStore";
+import { useTerminalStackWs } from "@/hooks/useTerminalStackWs";
 import { type ReactNode, useEffect } from "react";
 
 export interface TerminalStackContainerProps {
   /** Optional pane renderer (default: 占位 div + pane id) */
   renderPane?: (paneId: string, isActive: boolean) => ReactNode;
-  /** WebSocket URL (per P1-C, MVP v0: unused, mock mode) */
-  wsUrl?: string;
+  /**
+   * WebSocket session id (per PR #106 server pane id).
+   * - null / undefined → mock mode (per TerminalStackContainer.tsx PR #98 默认行为)
+   * - string → 真实 WS 接入 (per PR #98.5 wsClient)
+   */
+  sessionId?: string | null;
 }
 
 export function TerminalStackContainer({
   renderPane,
-  wsUrl,
+  sessionId,
 }: TerminalStackContainerProps) {
   const tree = useTerminalStackStore((s) => s.tree);
   const setWsConnected = useTerminalStackStore((s) => s.setWsConnected);
 
-  // MVP v0: 模拟 WS 状态 (P1-C 接入后真实连接)
+  // PR #98.5: 真实 WS 接入 (per PR #106 协议 + wsClient.ts)
+  const ws = useTerminalStackWs({ sessionId: sessionId ?? null });
+  // mock mode 行为 (per PR #98): 无 sessionId → setWsConnected(true)
   useEffect(() => {
-    if (wsUrl) {
-      // 真实模式: 占位 (P1-C 实现)
-      setWsConnected(false);
-    } else {
-      setWsConnected(true); // mock mode
-    }
-  }, [wsUrl, setWsConnected]);
+    if (!sessionId) setWsConnected(true);
+  }, [sessionId, setWsConnected]);
 
   const defaultRenderPane = (paneId: string, _isActive: boolean): ReactNode => (
     <div
@@ -56,6 +59,11 @@ export function TerminalStackContainer({
     <div className="terminal-stack-container" data-testid="terminal-stack-container">
       <TerminalSplitToolbar />
       <TerminalSplitPane tree={tree} renderPane={renderPane ?? defaultRenderPane} />
+      {/* PR #98.5: ws sendStdin / ws sendResize 暴露给 caller via ws return */}
+      {/* MVP v0: 由 caller 在 P1-C 接通后通过 ws.sendStdin / ws.sendResize 接入 */}
+      <div data-testid="ws-debug" hidden>
+        connected={String(ws.isConnected())}
+      </div>
     </div>
   );
 }
