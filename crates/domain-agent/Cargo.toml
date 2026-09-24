@@ -22,6 +22,10 @@ star-context = { path = "../star-context" }
 # 守门 #11 缺标比错标: 0 重复加 serde/tokio/uuid/chrono/async-trait/thiserror/star-context.
 domain-llm = { path = "../domain-llm" }
 serde_json = { workspace = true }
+# ULYS-204 PI-3 (per SRS-PI-BORROW-001 §4 FR-16): loop_boundary::default_stream_fn
+# returns Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>> -- needs futures-util
+# for `stream::once` + `stream::iter` + `StreamExt::flat_map` adapters.
+futures-util = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true }
 
