@@ -202,16 +202,36 @@ jobs:
         working-directory: frontend
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Build frontend (per AC-7)
+        working-directory: frontend
+        run: pnpm exec next build
+
       - name: Run P1-E E2E tests (per AC-1/2/3/4/5/6/7)
         working-directory: frontend
         run: |
-          PLAYWRIGHT_SKIP_WEBSERVER=1 \
-            pnpm exec playwright test \
+          # 启动 next start 后台 (per T23.5: 之前 PLAYWRIGHT_SKIP_WEBSERVER=1 没人启 server 导致 ERR_CONNECTION_REFUSED)
+          pnpm exec next start -p 3001 &
+          SERVER_PID=$!
+          sleep 15
+          echo "next start pid=$SERVER_PID"
+          curl --noproxy '*' -sf http://localhost:3001/healthz || true
+          # 等 server ready
+          for i in $(seq 1 30); do
+            if curl --noproxy '*' -sf http://localhost:3001 > /dev/null 2>&1; then
+              echo "next start ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          pnpm exec playwright test \
               e2e/p1e-end-to-end.spec.ts \
               e2e/terminal-ws-integration.spec.ts \
               --project=chromium \
               --reporter=list \
               --workers=2
+          TEST_EXIT=$?
+          kill $SERVER_PID 2>&1 || true
+          exit $TEST_EXIT
 
       - name: Upload Playwright report on failure
         if: failure()
