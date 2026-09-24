@@ -1,8 +1,8 @@
 # SRS-MULTICA-HOOK-001
 
-> **Multica Hook 域要件定義書 v0.3** (per ADR-0026 v0.2 §1.1 "5 类扩展点" 中的 hooks, 与 SRS-MULTICA-SKILL-001 v0.1 平行; v0.2 升版 MCP 实装, v0.3 升版 Plugins 升格为同导航实装标签页)
+> **Multica Hook 域要件定義書 v0.3** (per ADR-0026 v0.2 §1.1 "5 类扩展点" 中的 hooks, 与 SRS-MULTICA-SKILL-001 v0.1 平行; v0.2 升版 MCP 实装, v0.3 升版 Plugins 升格为同导航实装标签页, v0.4 自审饱和: 4 处 v0.1→v0.3 交叉引用 staleness 修正 (per 2026-09-24 22:13 JST Ulysses "自审" 评论)
 
-> - 状态: 🟡 Draft v0.3
+> - 状态: 🟡 Draft v0.3 (2026-09-24 22:13 JST 自审饱和, v0.4 修正 4 处 cross-reference staleness)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填)
@@ -26,7 +26,7 @@
 |---|---|
 | 文书 ID | SRS-MULTICA-HOOK-001 |
 | 文书名 | Multica Hook 域要件定義書 (UI 高级设置 → Hooks 标签页) |
-| 版本 | v0.1 (初版) |
+| 版本 | v0.3 |
 | 作成日 | 2026-09-24 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
@@ -45,7 +45,7 @@
 
 | バージョン | 日付 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
-| **v0.1 (当前)** | 2026-09-24 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | 初版落档, 8 機能 (FR-1~FR-8) + 5 業務要件 (BR-1~BR-5) + 6 非機能要件 (NFR-P/A/S/M/T/O) + 8 验收条件 (AC-1~AC-8), 3 表 W/T/M 横展 (Hook W/M + Hook Run T + Session M, 100% 覆盖 per 守门 #13), 守门 8/8 通过, 8 已知缺口 (含 1 P0 阻塞 hook 自身越权, 跟 SRS-PRE-TOOL-USE-GUARD-001 §8 #1 一致) | ULYS-235 (2026-09-24 20:xx JST) "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计" |
+| **v0.1** | 2026-09-24 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | 初版落档, 8 機能 (FR-1~FR-8) + 5 業務要件 (BR-1~BR-5) + 6 非機能要件 (NFR-P/A/S/M/T/O) + 8 验收条件 (AC-1~AC-8), 3 表 W/T/M 横展 (Hook W/M + Hook Run T + Session M, 100% 覆盖 per 守门 #13), 守门 8/8 通过, 8 已知缺口 (含 1 P0 阻塞 hook 自身越权, 跟 SRS-PRE-TOOL-USE-GUARD-001 §8 #1 一致) | ULYS-235 (2026-09-24 20:xx JST) "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计" |
 
 ---
 
@@ -64,7 +64,7 @@
 - 跟 skills 域并行 (相同导航, 不同标签页, 独立 registry, 共享 session state)
 - 跟 PreToolUse guard 联动 (PreToolUse guard 是 hooks 体系下 1 个具体 builtin guard hook)
 
-作为后续基本設計 (`BD-MULTICA-HOOK-001.md` v0.1, 同期落档) / 詳細設計 (`DD-MULTICA-HOOK-001.md` v0.1, 同期落档) / 実装 / テスト的唯一依据.
+作为后续基本設計 (`BD-MULTICA-HOOK-001.md` v0.3, 同期落档) / 詳細設計 (`DD-MULTICA-HOOK-001.md` v0.3, 同期落档) / 実装 / テスト的唯一依据.
 
 **派生来源**: ULYS-235 (2026-09-24) "hook需求" + ADR-0026 v0.2 §1.3 "5 类扩展点: commands / agents / skills / hooks / MCP" + Claude Code `plugins/hookify` + 9/10 PreToolUse guard 实测 (`SRS-PRE-TOOL-USE-GUARD-001.md` v0.1).
 
@@ -117,7 +117,7 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 - **Hook marketplace / cross-organization 共享** → 一人公司不需要, 跟 skills 域同 disclaimer
 - **Hook AI 行为审计** (LLM 决策过程录屏) → 后续 v2.x 拍摄
 - **Hook 加密 / 凭据管理** (mavis 内置 vault) → 跨项目需求, 不在本专题
-- **5 类扩展点的其他 3 类** (commands / agents / MCP / plugins) → ULYS-235 v0.1+v0.3 拍板: MCP (per 2026-09-24 15:01 JST) + plugins (per 2026-09-24 22:04 JST "还有plugins也应该是一个标签页") 均升格为本 v0.3 同导航下的实装标签页; commands / agents 仍按"预留"占位, 后续按需扩展
+- **5 类扩展点的其他 3 类** (commands / agents / MCP / plugins) → ULYS-235 v0.2+v0.3 拍板: MCP (per 2026-09-24 15:01 JST, v0.2 升格) + plugins (per 2026-09-24 22:04 JST "还有plugins也应该是一个标签页", v0.3 升格) 均升格为本 v0.3 同导航下的实装标签页; commands / agents 仍按"预留"占位, 后续按需扩展
 
 ### 1.5 关联文档
 
@@ -540,3 +540,4 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 | **v0.1** | 2026-09-24 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | 初版落档, 8 機能 (FR-1~FR-8, 22 项) + 5 業務要件 (BR-1~BR-5) + 6 非機能要件 (NFR-P/A/S/M/T/O 30 项) + 8 验收条件 (AC-1~AC-8) + 8 已知缺口 (含 1 P0 阻塞 hook handler 越权), 3 表 W/T/M 横展 (Hook W/M + Hook Run T + Session M, 100% 覆盖 per 守门 #13), 守门 8/8 通过, IPA 10 段结构 (目的 / 範囲 / 用語 / 業務 / 機能 / 非機能 / 制約 / 验收 / 缺口 / 签字 + 修订), 14 类事件 + 4 种 action type + UI "高级设置 → Hooks" 标签页 + 跟 skills 域同导航不同标签页协调 | ULYS-235 (2026-09-24 20:xx JST) "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计" |
 | **v0.2** | 2026-09-24 15:01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | MCP 升格标签页: §1.4 范围 + §FR-7.1 tabs 列表更新 (`Skills`, `Hooks`, `MCP`, 预留 `Commands`, `Agents`), MCP 标签页走独立 SRS-MULTICA-MCP-001 (v0.1 stub, 列出已注册 servers + 启停 toggle + transport 类型 stdio/sse/http); commands / agents 仍"预留"占位 | 2026-09-24 15:01 JST Ulysses 评论 "MCP也应该是一个标签页" |
 | **v0.3** | 2026-09-24 22:04 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | Plugins 升格标签页: §1.4 范围更新 + §FR-7.1 tabs 列表增加 `Plugins` 实装位 + 新增 Plugins 标签页条目 (走 SRS-MULTICA-PLUGIN-001 v0.1 stub, 列出已安装 plugin 包 `~/.multica/plugins/` + 内置 builtin + 启停 toggle + 版本显示) + §BR-4 描述细化; commands / agents 仍"预留"占位 | 2026-09-24 22:04 JST Ulysses 评论 "还有plugins也应该是一个标签页" |
+| **v0.4** | 2026-09-24 22:13 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 自审饱和: §0.1 版本号 v0.1→v0.3 + §1.1 后续 BD/DD 引用 v0.1→v0.3 + §1.4 范围 v0.1+v0.3→v0.2+v0.3 (修文 + 标注每次升版对应版本号); 4 处 cross-reference staleness 修正 | 2026-09-24 22:13 JST Ulysses 评论 "自审, 各级文档都要做到位" |

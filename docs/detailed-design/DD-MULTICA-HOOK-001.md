@@ -1,8 +1,8 @@
 # DD-MULTICA-HOOK-001
 
-> **Multica Hook 域詳細設計書 v0.3** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート + STAR 仓 OPS-DETAILED-DESIGN-001 模板; v0.2 MCP 实装, v0.3 Plugins 升格为同导航实装标签页)
+> **Multica Hook 域詳細設計書 v0.3** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート + STAR 仓 OPS-DETAILED-DESIGN-001 模板; v0.2 MCP 实装, v0.3 Plugins 升格为同导航实装标签页, v0.4 自审饱和: 修正 4 处 v0.1→v0.3 交叉引用 staleness + DD §6 TBD-5 mojibake 修正 (per 2026-09-24 22:13 JST Ulysses "自审" 评论)
 
-> - 状态: 🟡 Draft v0.3 (2026-09-24 22:04 JST 升版, Plugins 升格为同导航实装标签页)
+> - 状态: 🟡 Draft v0.3 (2026-09-24 22:04 JST 升版, Plugins 升格为同导航实装标签页; 22:13 JST 自审饱和, v0.4 修正 4 处 cross-reference staleness + §6 TBD-5 mojibake)
 > - 上游: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.3 (升版含 MCP + Plugins tab) + [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) v0.3 (升版含 MCP + Plugins tab, 6 module / 3 表 / 14 事件 / 4 action type / 5 集成点 / 8 API 端点)
 > - 下游: 实装代码 + 测试 + 报告
 > - 核心语言: Python 3.10+ (后端) + TypeScript + Next.js 14+ (前端)
@@ -15,7 +15,7 @@
 
 ## §0 目的 (Purpose)
 
-本詳細設計書は `BD-MULTICA-HOOK-001.md` v0.1 で定めた基本設計を実装可能なレベルまで展開する。MVP-骨架段階の Python ファイル + JSON 設定 + Next.js コンポーネント + pytest テストの物理形状と 100% 一致させ、実装者が追加設計判断をせずに済む粒度で仕様を提供する。
+本詳細設計書は `BD-MULTICA-HOOK-001.md` v0.3 で定めた基本設計を実装可能なレベルまで展開する。MVP-骨架段階の Python ファイル + JSON 設定 + Next.js コンポーネント + pytest テストの物理形状と 100% 一致させ、実装者が追加設計判断をせずに済む粒度で仕様を提供する。
 
 **核心スコープ**:
 
@@ -32,7 +32,7 @@
 - 网络层拦截 (egress filtering) → v2.x, 本 v0.1 仅 NetworkEgress 事件 stub
 - Hook marketplace / cross-organization 共享 → 一人公司不需要
 - Hook AI 行为审计 (LLM 决策录屏) → v2.x
-- 5 类扩展点的其他 3 类 (commands / agents / MCP / plugins) → ULYS-235 v0.1+v0.3 拍板: MCP (per 2026-09-24 15:01 JST) + plugins (per 2026-09-24 22:04 JST "还有plugins也应该是一个标签页") 均升格为本 v0.3 同导航下的实装标签页; commands / agents 仍按"预留"占位, 后续按需扩展
+- 5 类扩展点的其他 3 类 (commands / agents / MCP / plugins) → ULYS-235 v0.2+v0.3 拍板: MCP (per 2026-09-24 15:01 JST, v0.2 升格) + plugins (per 2026-09-24 22:04 JST "还有plugins也应该是一个标签页", v0.3 升格) 均升格为本 v0.3 同导航下的实装标签页; commands / agents 仍按"预留"占位, 后续按需扩展
 
 ---
 
@@ -1396,7 +1396,7 @@ stateDiagram-v2
 | TBD-2 | UI 國際化 (i18n) 中英文標籤 | frontend | 実装者 | 2026-10-01 | 待實裝 |
 | TBD-3 | audit log rotation 實裝 (90 天保留 + 壓縮) | scripts/automation/hooks/audit_logger.py | 実装者 | 2026-10-01 | 待實裝 |
 | TBD-4 | NetworkEgress 事件 stub 實裝 (v0.1 不實際攔截) | scripts/automation/hooks/event_emitter.py | 実装者 | 2026-10-01 | 待實裝 |
-| TBD-5 | 跟 skills 域 session state 共享實裝 (跨標�頁) | scripts/automation/hooks/state/ + skills 域 | 実装者 | 2026-10-01 | 待實裝 |
+| TBD-5 | 跟 skills 域 session state 共享實裝 (跨標籤頁) | scripts/automation/hooks/state/ + skills 域 | 実装者 | 2026-10-01 | 待實裝 |
 | TBD-6 | watch 監聽的 events (created, modified, deleted) | registry.json + watchdog | 実装者 | 2026-10-01 | 待實裝 |
 | TBD-7 | 並行 hook 資源競爭 (lock 機制) | fanout_scheduler.py | 実装者 | 2026-10-01 | 已知缺口 #4, 待 v0.2 |
 
@@ -1408,8 +1408,8 @@ stateDiagram-v2
 
 | 對象 | ID | 是否影響 | 修改内容 |
 |---|---|---|---|
-| 上位 SRS | SRS-MULTICA-HOOK-001 v0.1 | ✓ | 引用 |
-| 上位 BD | BD-MULTICA-HOOK-001 v0.1 | ✓ | 引用 |
+| 上位 SRS | SRS-MULTICA-HOOK-001 v0.3 | ✓ | 引用 |
+| 上位 BD | BD-MULTICA-HOOK-001 v0.3 | ✓ | 引用 |
 | 平行 SRS | SRS-MULTICA-SKILL-001 v0.1 | ✗ | 不影響 (獨立 registry) |
 | 下位 SRS | SRS-PRE-TOOL-USE-GUARD-001 v0.1 | ✗ | 不影響 (PreToolUse guard 是 hooks 下 1 個 builtin, 已實裝) |
 | 下位 DD | DD-PRE-TOOL-USE-GUARD-001 v0.1 | ✗ | 不影響 |
@@ -1444,3 +1444,4 @@ stateDiagram-v2
 | **v0.1** | 2026-09-24 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | 初版落档, 6 module (EM-1 + HR-2 + FS-3 + HR-4 + AL-5 + BL-6) + 3 表 W/T/M (Hook W/M + Hook Run T + Session M, 100% 覆盖 per 守门 #13) + 14 事件 + 4 action type + 6 Class (CLS-EM-1 + CLS-HR-2 + CLS-FS-3 + CLS-HR-4 + CLS-AL-5 + CLS-BL-6) + 5 frontend component (CMP-HOOK-LIST + CMP-HOOK-DETAIL + CMP-HOOK-RUN-LOG + NewHookDialog + page.tsx) + 21 文件 (~3.2K 行) + 16 method + 4 状態 + 17 unit test + 9 integration test + 7 TBD + 12 影響範圍 + IPA 9 段结构 (目的 / モジュール / クラス / メソッド / 状態遷移 / テスト / TBD / 影響範囲 / 签字 + 修订) | ULYS-235 (2026-09-24 20:xx JST) "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计" |
 | **v0.2** | 2026-09-24 15:01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | MCP 升格标签页: §1 不做什么 + §3 影響範圍 (MCP 标签页不影响本 DD 模块) + 标题版本 + 上游引用 v0.2; 跨标签页共享 session_id 假设在 MCP 标签页仍然成立; commands / agents 仍"预留"占位 | 2026-09-24 15:01 JST Ulysses 评论 "MCP也应该是一个标签页" |
 | **v0.3** | 2026-09-24 22:04 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | Plugins 升格标签页: §1 不做什么 (Plugins 不影响本 DD 模块) + §3 影響範圍 + 标题版本 + 上游引用 v0.3; 跨标签页共享 session_id 假设在 Plugins 标签页仍然成立; commands / agents 仍"预留"占位 | 2026-09-24 22:04 JST Ulysses 评论 "还有plugins也应该是一个标签页" |
+| **v0.4** | 2026-09-24 22:13 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 自审饱和: §0 上游 BD 引用 v0.1→v0.3 + §1 不做什么 v0.1+v0.3→v0.2+v0.3 + §6 TBD-5 mojibake `跨標�頁` → `跨標籤頁` + §7 影響範圍 SRS/BD 行 v0.1→v0.3; 4 处 cross-reference staleness + 1 处 mojibake 修正 | 2026-09-24 22:13 JST Ulysses 评论 "自审, 各级文档都要做到位" |

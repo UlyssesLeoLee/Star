@@ -1,8 +1,8 @@
 # BD-MULTICA-HOOK-001
 
-> **Multica Hook 域基本設計書 v0.3** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート; v0.2 升版 MCP 实装, v0.3 升版 Plugins 升格为同导航实装标签页)
+> **Multica Hook 域基本設計書 v0.3** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート; v0.2 升版 MCP 实装, v0.3 Plugins 升格为同导航实装标签页, v0.4 自审饱和: 修正 4 处 v0.1→v0.3 交叉引用 staleness (per 2026-09-24 22:13 JST Ulysses "自审" 评论)
 
-> - 状态: 🟡 Draft v0.3 (2026-09-24 22:04 JST 升版, Plugins 升格为同导航实装标签页)
+> - 状态: 🟡 Draft v0.3 (2026-09-24 22:04 JST 升版, Plugins 升格为同导航实装标签页; 22:13 JST 自审饱和, v0.4 修正 4 处 cross-reference staleness)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
@@ -20,7 +20,7 @@
 
 ## §0 目的 (Purpose)
 
-本文档基于 [`SRS-MULTICA-HOOK-001`](../requirements/SRS-MULTICA-HOOK-001.md) v0.1 的需求, 定义 **STAR 平台 "高级设置 → Hooks" 域** 的基本設計:
+本文档基于 [`SRS-MULTICA-HOOK-001`](../requirements/SRS-MULTICA-HOOK-001.md) v0.3 的需求, 定义 **STAR 平台 "高级设置 → Hooks" 域** 的基本設計:
 
 - **システムアーキテクチャ** (mavis runtime hook 事件流 + UI 高级设置导航 + 标签页架构)
 - **機能分割 / モジュール設計** (6 module: Event Emitter + Hook Registry + Fan-out Scheduler + Hook Runner + Audit Logger + Builtin Hook Loader)
@@ -33,7 +33,7 @@
 - **用語集** (跟 SRS 共享 + BD 新增 8 条)
 - **签字栏 + 修订履歴**
 
-**派生来源**: ULYS-235 (2026-09-24) + ADR-0026 v0.2 §1.3 "5 类扩展点" + SRS-MULTICA-HOOK-001 v0.1 全部 FR-1~FR-8 / BR-1~BR-5 / NFR-P/A/S/M/T/O + Claude Code `plugins/hookify` 14 类事件基线 + `SRS-PRE-TOOL-USE-GUARD-001.md` v0.1 (PreToolUse guard 是 hooks 下 1 个 builtin guard).
+**派生来源**: ULYS-235 (2026-09-24) + ADR-0026 v0.2 §1.3 "5 类扩展点" + SRS-MULTICA-HOOK-001 v0.3 全部 FR-1~FR-8 / BR-1~BR-5 / NFR-P/A/S/M/T/O + Claude Code `plugins/hookify` 14 类事件基线 + `SRS-PRE-TOOL-USE-GUARD-001.md` v0.1 (PreToolUse guard 是 hooks 下 1 个 builtin guard).
 
 ---
 
@@ -59,13 +59,13 @@
 - Hook marketplace / cross-organization 共享 → 一人公司不需要
 - Hook AI 行为审计 (LLM 决策录屏) → v2.x
 - Hook 加密 / 凭据管理 (mavis 内置 vault) → 跨项目需求
-- 5 类扩展点的其他 3 类 (commands / agents / MCP / plugins) → ULYS-235 v0.1+v0.3 拍板: MCP (per 2026-09-24 15:01 JST) + plugins (per 2026-09-24 22:04 JST "还有plugins也应该是一个标签页") 均升格为本 v0.3 同导航下的实装标签页; commands / agents 仍按"预留"占位, 后续按需扩展
+- 5 类扩展点的其他 3 类 (commands / agents / MCP / plugins) → ULYS-235 v0.2+v0.3 拍板: MCP (per 2026-09-24 15:01 JST, v0.2 升格) + plugins (per 2026-09-24 22:04 JST "还有plugins也应该是一个标签页", v0.3 升格) 均升格为本 v0.3 同导航下的实装标签页; commands / agents 仍按"预留"占位, 后续按需扩展
 
 ### 1.3 关联文档
 
 | 文档 | 关系 | 关键引用 |
 |---|---|---|
-| `SRS-MULTICA-HOOK-001.md` v0.1 | 上位 | FR-1~FR-8 / BR-1~BR-5 / NFR-P/A/S/M/T/O |
+| `SRS-MULTICA-HOOK-001.md` v0.3 | 上位 | FR-1~FR-8 / BR-1~BR-5 / NFR-P/A/S/M/T/O |
 | `AGENTS.md` §4 守门硬约束 | 上位 | 守门 #1+#5+#6+#9+#10+#13+#14 v3+#14 v4 |
 | `ADR-0026` v0.2 §1.3 | 上位 | 5 类扩展点 (commands / agents / skills / hooks / MCP) |
 | `SRS-MULTICA-SKILL-001.md` v0.1 | 平行 | skills 域 SRS (共享"高级设置"导航) |
@@ -901,3 +901,4 @@ session_state_manager.save_shared_state(session_id, shared_state)
 | **v0.1** | 2026-09-24 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | 初版落档, 6 module (EM-1 + HR-2 + FS-3 + HR-4 + AL-5 + BL-6) + 3 表 W/T/M (Hook W/M + Hook Run T + Session M, 100% 覆盖 per 守门 #13) + 14 事件 + 4 action type + 5 集成点 + 8 API 端点 + 12 文件 + 30 项 NFR + UI "高级设置 → Hooks" 标签页 (3 区域布局 + Next.js 14+ 路由), 守门 8/8 通过, IPA 13 段结构 (目的 / 範囲 / アーキテクチャ / モジュール / データ / IF / UI / セキュリティ / 非機能 / 障害 / 用語 / 签字 + 修订) | ULYS-235 (2026-09-24 20:xx JST) "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计" |
 | **v0.2** | 2026-09-24 15:01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | MCP 升格标签页: §1.2 范围 + §7.1 导航 ASCII 图 + §7.3 路由 Next.js 14+ (`/settings/advanced/mcp` 加入实装) + §3 架构 ASCII 图更新 (Skills / Hooks / MCP 三标签页); commands / agents 仍"预留"占位 | 2026-09-24 15:01 JST Ulysses 评论 "MCP也应该是一个标签页" |
 | **v0.3** | 2026-09-24 22:04 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | Plugins 升格标签页: §1.2 范围更新 + §7.1 导航 ASCII 图增加 `[Plugins]` + §7.3 路由增加 `/settings/advanced/plugins` + §3 架构 ASCII 图更新为四标签页 (Skills / Hooks / MCP / Plugins); commands / agents 仍"预留"占位 | 2026-09-24 22:04 JST Ulysses 评论 "还有plugins也应该是一个标签页" |
+| **v0.4** | 2026-09-24 22:13 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 自审饱和: §0 上位 SRS 引用 v0.1→v0.3 + §0 派生来源 SRS 引用 v0.1→v0.3 + §1.2 范围 v0.1+v0.3→v0.2+v0.3 + §1.3 关联文档 SRS 行 v0.1→v0.3; 4 处 cross-reference staleness 修正 | 2026-09-24 22:13 JST Ulysses 评论 "自审, 各级文档都要做到位" |
