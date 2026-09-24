@@ -32,7 +32,10 @@ test.describe("Terminal Stack WS Integration (PR #98.5)", () => {
 
   test("2. mock mode (no sessionId) shows connected=true", async ({ page }) => {
     await page.goto("/terminal-stack-demo");
-    await page.waitForSelector('[data-testid="ws-debug"]');
+    // ws-debug is in a <div hidden> — use state: 'attached' to skip visibility check
+    await page.waitForSelector('[data-testid="ws-debug"]', { state: "attached" });
+    // Give time for TerminalStackContainer's useEffect to fire setWsConnected(true)
+    await page.waitForTimeout(300);
     const content = await page.locator('[data-testid="ws-debug"]').textContent();
     expect(content).toContain("connected=true");
   });
@@ -40,20 +43,26 @@ test.describe("Terminal Stack WS Integration (PR #98.5)", () => {
   test("3. real WS sessionId triggers WebSocket connect attempt", async ({
     page,
   }) => {
-    let wsConnected = false;
+    // Reset state on window for browser-side capture
     await page.addInitScript(() => {
       // @ts-expect-error - test-only injection
+      (window as unknown as { __mockWsCalled: boolean }).__mockWsCalled = false;
+      // @ts-expect-error
       window.__mockWsCtor = function (url: string) {
         // @ts-expect-error
         const ws = new (window as unknown as { WebSocket: typeof WebSocket }).WebSocket(url);
-        wsConnected = true;
+        // @ts-expect-error
+        (window as unknown as { __mockWsCalled: boolean }).__mockWsCalled = true;
         return ws as unknown as WebSocket;
       } as unknown as typeof WebSocket;
     });
 
     await page.goto("/terminal-stack-demo?sessionId=real-session");
     await page.waitForTimeout(500);
-    expect(wsConnected).toBe(true);
+    const called = await page.evaluate(
+      () => (window as unknown as { __mockWsCalled: boolean }).__mockWsCalled,
+    );
+    expect(called).toBe(true);
   });
 
   test("4. tree state updates on SplitUpdate message (mock via __mockWsCtor)", async ({

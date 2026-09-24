@@ -103,12 +103,13 @@ test.describe("P1-E End-to-end Integration (per ULYS-232)", () => {
   }) => {
     await installMockWsServer(page, SESSION, PANE);
     await page.goto("/terminal-stack-demo?sessionId=" + SESSION);
-    // Wait for ws client to receive HELLO (per useTerminalStackWs hook)
-    await page.waitForTimeout(500);
-    // ws-debug element shows connection state
-    await expect(page.locator('[data-testid="ws-debug"]')).toContainText(
-      "connected=true",
-      { timeout: 3000 },
+    // Wait for ws client to receive HELLO → onHello handler → setWsConnected(true)
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('[data-testid="ws-debug"]');
+        return el && el.textContent?.includes("connected=true");
+      },
+      { timeout: 5000 },
     );
   });
 
