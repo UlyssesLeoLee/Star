@@ -1,12 +1,12 @@
 # BD-MULTICA-HOOK-001
 
-> **Multica Hook 域基本設計書 v0.2** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
+> **Multica Hook 域基本設計書 v0.3** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート; v0.2 升版 MCP 实装, v0.3 升版 Plugins 升格为同导航实装标签页)
 
-> - 状态: 🟡 Draft v0.2 (2026-09-24 15:01 JST 升版, MCP 升格为同导航实装标签页)
+> - 状态: 🟡 Draft v0.3 (2026-09-24 22:04 JST 升版, Plugins 升格为同导航实装标签页)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
-> - 上位要件: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.2 (升版含 MCP tab, 8 機能 / 5 業務 / 6 非機能 / 8 验收 / 8 已知缺口, 守门 8/8 通过)
+> - 上位要件: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.3 (升版含 MCP + Plugins tab, 8 機能 / 5 業務 / 6 非機能 / 8 验收 / 8 已知缺口, 守门 8/8 通过)
 > - 关联実装基线: `scripts/automation/hooks/` (v0.0 未创建, 待 v0.1 落档) + `scripts/automation/console_server.py` v0.1 (hook 事件流入口, 现役) + `scripts/automation/dispatcher.py` v0.1 (子代理 invoke 前置, 现役) + `scripts/automation/guardian/pre_tool_use_guard.py` (PreToolUse builtin guard hook)
 > - 平行参考: `docs/automation-design.md` v0.1 (Python 化基线) + `SRS-MULTICA-SKILL-001.md` v0.1 (skills 域, 共享"高级设置"导航) + `SRS-PRE-TOOL-USE-GUARD-001.md` v0.1 (PreToolUse guard 是 hooks 下 1 个 builtin guard)
 > - 守门基线: 守门 #1+#5+#6+#9+#10+#13+#14 v3+#14 v4 8 项必过 (守门 #1 v25 cargo test 不需要跑, 文档工作)
@@ -59,7 +59,7 @@
 - Hook marketplace / cross-organization 共享 → 一人公司不需要
 - Hook AI 行为审计 (LLM 决策录屏) → v2.x
 - Hook 加密 / 凭据管理 (mavis 内置 vault) → 跨项目需求
-- 5 类扩展点的其他 3 类 (commands / agents / MCP) → ULYS-235 v0.1 拍板: MCP 升格为本 v0.1 同导航下的实装标签页 (per 2026-09-24 15:01 JST 用户拍板 "MCP也应该是一个标签页"); commands / agents 仍按"预留"占位, 后续按需扩展
+- 5 类扩展点的其他 3 类 (commands / agents / MCP / plugins) → ULYS-235 v0.1+v0.3 拍板: MCP (per 2026-09-24 15:01 JST) + plugins (per 2026-09-24 22:04 JST "还有plugins也应该是一个标签页") 均升格为本 v0.3 同导航下的实装标签页; commands / agents 仍按"预留"占位, 后续按需扩展
 
 ### 1.3 关联文档
 
@@ -94,10 +94,10 @@
 │  │           Frontend (Next.js 14+, /settings/advanced/...)       │  │
 │  │  ┌──────────────────┐ ┌──────────────────┐ ┌───────────────┐    │  │
 │  │  │ 高级设置 导航     │ │ 高级设置 导航     │ │ 高级设置 导航   │    │  │
-│  │  │ └ Skills 标签页   │ │ └ Hooks 标签页    │ │ └ MCP 标签页     │    │  │
-│  │  │   (per skill SRS)│ │   (本 BD §3)     │ │ (per MCP SRS    │    │  │
-│  │  │                  │ │                  │ │  v0.1 stub)     │    │  │
-│  │  └──────────────────┘ └──────────────────┘ └───────────────┘    │  │
+│  │  │ └ Skills 标签页   │ │ └ Hooks 标签页    │ │ └ MCP 标签页     │ │ └ Plugins 标签页 │    │  │
+│  │  │   (per skill SRS)│ │   (本 BD §3)     │ │ (per MCP SRS    │ │ (per Plugin SRS │    │  │
+│  │  │                  │ │                  │ │  v0.1 stub)     │ │  v0.1 stub)     │    │  │
+│  │  └──────────────────┘ └──────────────────┘ └───────────────┘ └───────────────┘    │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │                                  ▲                                   │
 │                                  │ HTTP API (FastAPI 8080)           │
@@ -709,6 +709,7 @@ session_state_manager.save_shared_state(session_id, shared_state)
 │     ├─ [Skills]  ← SRS-MULTICA-SKILL-001 v0.1           │
 │     ├─ [Hooks]   ← 本 BD (per ULYS-235)                │
 │     ├─ [MCP]     ← SRS-MULTICA-MCP-001 v0.1 stub (per 2026-09-24 15:01 JST 用户拍板 "MCP也应该是一个标签页")
+│     ├─ [Plugins] ← SRS-MULTICA-PLUGIN-001 v0.1 stub (per 2026-09-24 22:04 JST 用户拍板 "还有plugins也应该是一个标签页")
 │     ├─ [Commands]  ← (预留, 未来扩展)                   │
 │     └─ [Agents]    ← (预留, 未来扩展)                   │
 └─────────────────────────────────────────────────────────┘
@@ -743,6 +744,7 @@ session_state_manager.save_shared_state(session_id, shared_state)
 /settings/advanced/hooks        # Hooks 标签页 (本 BD)
 /settings/advanced/skills       # Skills 标签页 (per skill SRS)
 /settings/advanced/mcp          # MCP 标签页 (per MCP SRS v0.1 stub, 2026-09-24 15:01 JST 用户拍板 "MCP也应该是一个标签页")
+/settings/advanced/plugins      # Plugins 标签页 (per Plugin SRS v0.1 stub, 2026-09-24 22:04 JST 用户拍板 "还有plugins也应该是一个标签页")
 /settings/advanced/commands    # (预留)
 /settings/advanced/agents      # (预留)
 ```
@@ -898,3 +900,4 @@ session_state_manager.save_shared_state(session_id, shared_state)
 |---|---|---|---|---|
 | **v0.1** | 2026-09-24 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | 初版落档, 6 module (EM-1 + HR-2 + FS-3 + HR-4 + AL-5 + BL-6) + 3 表 W/T/M (Hook W/M + Hook Run T + Session M, 100% 覆盖 per 守门 #13) + 14 事件 + 4 action type + 5 集成点 + 8 API 端点 + 12 文件 + 30 项 NFR + UI "高级设置 → Hooks" 标签页 (3 区域布局 + Next.js 14+ 路由), 守门 8/8 通过, IPA 13 段结构 (目的 / 範囲 / アーキテクチャ / モジュール / データ / IF / UI / セキュリティ / 非機能 / 障害 / 用語 / 签字 + 修订) | ULYS-235 (2026-09-24 20:xx JST) "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计" |
 | **v0.2** | 2026-09-24 15:01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | MCP 升格标签页: §1.2 范围 + §7.1 导航 ASCII 图 + §7.3 路由 Next.js 14+ (`/settings/advanced/mcp` 加入实装) + §3 架构 ASCII 图更新 (Skills / Hooks / MCP 三标签页); commands / agents 仍"预留"占位 | 2026-09-24 15:01 JST Ulysses 评论 "MCP也应该是一个标签页" |
+| **v0.3** | 2026-09-24 22:04 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | Plugins 升格标签页: §1.2 范围更新 + §7.1 导航 ASCII 图增加 `[Plugins]` + §7.3 路由增加 `/settings/advanced/plugins` + §3 架构 ASCII 图更新为四标签页 (Skills / Hooks / MCP / Plugins); commands / agents 仍"预留"占位 | 2026-09-24 22:04 JST Ulysses 评论 "还有plugins也应该是一个标签页" |
