@@ -1,7 +1,7 @@
 # Mock 開關 (Mock Switches) × 全項目 Mock — 設計分析 (Design Analysis)
 
-> **狀態**: 🟢 Approved v0.2 (reply `01a0d073` 2026-09-23 22:46 JST 「a」 = 接受 (a) 選項 = 6 決策全部走推薦 A+A+B+A+B+A)
-> **日期**: 2026-09-23 (v0.1 落檔 → v0.2 修訂)
+> **狀態**: 🟢 Approved v0.3 (reply `01a0d0e1` 2026-09-23 23:02 JST 「完成所有后续工作」 T1 派工 + G-MS-01 ✅ 解決)
+> **日期**: 2026-09-23 (v0.1 落档 → v0.2 修訂 → v0.3 G-MS-01 解決)
 > **修訂人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**審核** (per 守門 #14 v4)
 > **觸發 issue**: ULYS-190 "Mock开关" — `01a0cb7c-8022-715b-9a4d-4bbc58e7461e`
 > **適用項目**: **跨項目範圍** — Star / IDE1.0 / RGS / CATs / IM1.0 / GitGit / Ada 共 7 個項目 (跟 ULYS-191 v0.2 approved 範圍一致, 排除 Xiaoshuo)
@@ -101,7 +101,7 @@ ULYS-190 description 字面: **「Mock项目要可以触发测试目标的功能
 | 4 | **CATs** | `D:/CATs/crates/cats-mock/` | 🟢 有 (Cargo features, `cargo test --features mock-runtime`) | 🔴 無 (plugin 解耦但無 plugin_switch 抽象) | 🔴 無 | 🟡 中 |
 | 5 | **IM1.0** | `D:/IM1.0/crates/im-testkit/` | 🟢 有 (`crates/im-testkit/src/lib.rs` 模組開關) | 🟡 部分 (`feature = "mock_kms"` / `feature = "mock_audit"` 等 3 個 Cargo features, 算 plugin switch 雛形) | 🔴 無 (sub-module level 仍 hardcode) | 🟢 小 (擴 L3 module_switch 即可) |
 | 6 | **GitGit** | `D:/GitGit/apps/gm-console/src/mocks/` | 🟢 有 (MSW frontend dev-only, `if (process.env.NODE_ENV === 'development')`) | 🔴 無 (frontend MSW handlers 寫死, 沒 plugin 概念) | 🔴 無 | 🟡 中 |
-| 7 | **Ada** | (待 G-MS-02 確認) | ❓ 待盤點 (per ULYS-191 G-ACI-07 Ada 可能無 mock) | ❓ 待盤點 | ❓ 待盤點 | ❓ 待盤點 |
+| 7 | **Ada** ✅ G-MS-01 解決 | 🟢 **有 Rust mock** (`D:/Ada/crates/ada-mock`, **屬性 = testkit scaffold**, 非 backend mock) | 🟡 中 (新增 `.mock-cluster.json` CI 配置) | 🔴 無 (testkit 模式, 落地違反守門 #15 scope creep) | 🔴 無 (同上) | 🟢 小 (降級模式 L1 only) |
 
 ### 2.2 7 項目細節 (每項目現狀摘要)
 
@@ -141,9 +141,16 @@ ULYS-190 description 字面: **「Mock项目要可以触发测试目标的功能
 - **L2 plugin**: frontend MSW handlers 寫死, 沒 plugin 概念; TypeScript MSW handler dispatch 不分業務域
 - **L3 module**: 同 L2
 
-#### 項目 7 — Ada (per G-MS-02 待盤點)
+#### 項目 7 — Ada ✅ G-MS-01 解決 (per `docs/briefs/ulys-190-g-ms-01-ada-inventory.md` v0.1)
 
-- 待 G-MS-02 盤點確認 (per ULYS-191 G-ACI-07 經驗, 可能無 mock 工具, 「7 項目」字面可能過寬)
+- **路徑**: `D:/Ada/crates/ada-mock` (跟 ULYS-191 v0.3 G-ACI-01 推薦派工順序隱含一致)
+- **類型**: Rust testkit scaffold crate (`ada_mock` lib, 1 feature `server = ["dep:time"]`, 預設關, 純 in-memory mocks + fixtures + builders, **不對外 emit ACI assertion**)
+- **L1 cluster_switch**: 🟢 落地 (新增 `D:/Ada/crates/ada-mock/.mock-cluster.json`, `enabled=false` 預設因 testkit 不對外)
+- **L2 plugin_switch**: 🔴 降級 — testkit 模式, plugin 概念不適用, 強行落地違反守門 #15 scope creep
+- **L3 module_switch**: 🔴 降級 (同上)
+- **跟 ULYS-191 ACI 銜接**: 🔴 無 (testkit 不 emit assertion 到外部, `mock_switch_trace` 無意義)
+- **改造工作量**: 🟢 小 (L1 only, 跨 session brief 啟動派工)
+- **推薦派工順序調整** (per §1.3 brief): Star → IM1.0 → RGS → CATs → IDE1.0 → GitGit → **Ada (降級 L1 only, 預估 token 從 0.3-0.5M 降到 0.1-0.2M)**
 
 ### 2.3 共通缺口 (per 7 項目 G-MS-00)
 
@@ -310,10 +317,11 @@ LLM 讀到 `plugin.kms.enabled=false, module.unlock.enabled=true`, 一眼看出:
 - **估時**: ~0.2-0.3M tokens
 - **依賴**: §4.4 module_switch 7 項目落地
 
-### §4.6 (隱含) — G-MS-02 Ada mock 項目盤點確認
+### §4.6 — G-MS-01 Ada mock 項目盤點確認 ✅ 已解決
 
-- **範圍**: 確認 Ada 是否有 mock 工具; 無 mock 則「7 項目」改 6 項目
-- **產出**: G-MS-02 ✅ 解決 或 Ada 改 Out-of-Scope
+- **範圍**: 確認 Ada 是否有 mock 工具; 有 mock 則降級模式 (L1 only)
+- **產出**: `docs/briefs/ulys-190-g-ms-01-ada-inventory.md` v0.1 落档 ✅ (per commit 後續 v0.3 落地)
+- **結論**: Ada **有** Rust mock (`D:/Ada/crates/ada-mock`), 屬性 testkit scaffold (非 backend mock), 降級模式 L1 only
 - **估時**: ~0.02M tokens (純 ls + 讀源碼)
 
 ---
@@ -337,7 +345,7 @@ LLM 讀到 `plugin.kms.enabled=false, module.unlock.enabled=true`, 一眼看出:
 
 | ID | 缺口 | 影響 | 解決方案 |
 |---|---|---|---|
-| **G-MS-01** | 7 項目中 Ada 是否真有 mock 工具未確認 | 落地清單不準 (「7 項目」可能過寬) | §4.6 落地前先盤點; 跟 ULYS-191 G-ACI-07 同源 |
+| **G-MS-01** | ✅ 已解決 (per `docs/briefs/ulys-190-g-ms-01-ada-inventory.md` v0.1) | Ada 有 Rust mock (`D:/Ada/crates/ada-mock`, 屬性 testkit scaffold), 降級模式 L1 only | 跨 session brief 啟動派工時顯式標 L1 only |
 | **G-MS-02** | IM1.0 倉庫位置: 已確認 `D:/IM1.0` (per ULYS-191 v0.2 實證) | ✅ 已解決 (per ULYS-191 v0.2 §「G-ACI-02 ✅ 解決」) | — |
 | **G-MS-03** | CATs + IDE1.0 共享 Rust emitter helper 範圍未定 | 落地時要不要共用 code? | ULYS-191 v0.3 G-ACI-01 §2 推薦: 共用 (per「CATs + IDE1.0 共享 Rust emitter helper」); ULYS-190 沿用 |
 | **G-MS-04** | 「plugin」 跟「module」命名跨項目是否一致 | 落地時字段對不上 | schema 鎖死 plugin_id / module_id 命名, per 項目可別名 (alias) 但 schema 必填 |
@@ -378,7 +386,7 @@ LLM 讀到 `plugin.kms.enabled=false, module.unlock.enabled=true`, 一眼看出:
 
 🟡 **本 v0.2 鎖版後狀態**: 6 決策全部 ✅ 鎖版 (A+A+B+A+B+A, per reply `01a0d073`「a」); 派工授權已收到, **未實際派 sub-agent** (per 守門 #3 + #14 v3 + ULYS-191 reply `01a0cdc1`「a」拍板範式)
 
-🟡 **G-MS-01 Ada mock 項目盤點確認** (per §6 + §4.6, 仍 缺口, 跨 session 續)
+🟡 **G-MS-01 Ada mock 項目盤點確認** ✅ 已解決 (per `docs/briefs/ulys-190-g-ms-01-ada-inventory.md` v0.1, Ada 降級模式 L1 only)
 🟡 **§4.1 Star mock cluster_switch 雛形 brief** 落档 (`docs/briefs/ulys-190-star-mock-cluster-switch-stage1.md` v0.1, 待派工)
 
 **跨 session 續做入口**:
@@ -404,6 +412,7 @@ LLM 讀到 `plugin.kms.enabled=false, module.unlock.enabled=true`, 一眼看出:
 |---|---|---|---|
 | **v0.1** | 2026-09-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手代審 | **初稿 (Draft)** — 觸發 ULYS-190 (2026-09-22 23:38 JST); 9 節結構 (目的 / 概念映射 / Mock 項目盤點 / Schema 鎖版 / 5 階段路徑 / 6 決策 / 已知缺口 / 守門自檢 / 下一步); ~16 KB / 270 行 (per `wc -l` 估算); 預估 ~0.04M token; 跨項目範圍 7 (跟 ULYS-191 v0.2 approved 一致, 排除 Xiaoshuo); 跟 ULYS-191 銜接點在 §1.2 mock_switch_trace 字段 |
 | **v0.2** | 2026-09-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**審核** | **Approved** (reply `01a0d073` 2026-09-23 22:46 JST 「a」) — 6 決策全部 ✅ 鎖版 (A+A+B+A+B+A, 全部走推薦); banner 從 🟡 Draft → 🟢 Approved; §5 6 決策行加 ✅ 鎖版狀態列; §8 下一步更新派工等待狀態; §9 加 v0.2 row; 預估 ~0.03M token (本 v0.2 修訂) |
+| **v0.3** | 2026-09-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**審核** | **G-MS-01 ✅ 解決** (reply `01a0d0e1` 2026-09-23 23:02 JST 「完成所有后续工作」 T1 派工 + brief `docs/briefs/ulys-190-g-ms-01-ada-inventory.md` v0.1 落档); §2.1 主表 Ada row 從「❓ 待盤點」→「✅ G-MS-01 解決 (testkit scaffold 降級模式 L1 only)」; §2.2 項目 7 詳述擴展; §4.6 從「G-MS-02」改名「G-MS-01 ✅ 已解決」; §6 G-MS-01 row 從「待盤點」→「✅ 已解決 + 引用 brief」; §8 下一步 G-MS-01 ✅ 解決標; §9 加 v0.3 row; 預估 ~0.02M token (本 v0.3 修訂) |
 
 ---
 
