@@ -63,7 +63,7 @@ export function TerminalStackContainer({
       {/* PR #98.5: ws sendStdin / ws sendResize 暴露给 caller via ws return */}
       {/* MVP v0: 由 caller 在 P1-C 接通后通过 ws.sendStdin / ws.sendResize 接入 */}
       <div data-testid="ws-debug" hidden>
-        connected={String(wsConnected)}
+        connected={String(ws.isConnected())}
       </div>
     </div>
   );
