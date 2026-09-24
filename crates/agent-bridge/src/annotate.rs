@@ -273,6 +273,17 @@ impl AnnotationRegistry {
         let fragments: Vec<String> = annotations.iter().map(|a| a.to_prompt_fragment()).collect();
         Some(fragments.join("\n---\n\n"))
     }
+
+    /// 遍历全部 annotations (per ULYS-165 list_annotations 兜底 filter)
+    ///
+    /// MVP v0: 仅 list_for_agent_run / list_for_file, 兜底无 filter 用此 API
+    /// (per description §3.3 "agent_run_id 字段反映 InMemoryAnnotationStore::open_for_agent_run 排序语义")
+    pub fn iter_all(&self) -> Vec<&DiffAnnotation> {
+        let mut all: Vec<&DiffAnnotation> = self.annotations.values().collect();
+        // 按 created_at ASC 稳定排序 (per add 顺序)
+        all.sort_by_key(|a| a.created_at);
+        all
+    }
 }
 
 impl Default for AnnotationRegistry {

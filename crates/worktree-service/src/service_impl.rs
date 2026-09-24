@@ -20,6 +20,9 @@ use crate::projection::{StatusObservedPoint, WorktreeStatusObserved};
 use crate::service::{
     SyncResult, Worktree, WorktreeEventEnvelope, WorktreeFilter, WorktreeService, WorktreeUpdate,
 };
+use crate::start_from_picker::{
+    pick_start_from_candidates, PickerCandidates, StartFromPickerSource,
+};
 
 /// In-memory Worktree service 实装
 ///
@@ -38,6 +41,45 @@ struct Inner {
     health_provider: Option<Arc<dyn HealthProvider>>,
     /// 风险评估 provider (per INV-WC-03, 阶段 2 接 risk-engine crate)
     risk_provider: Option<Arc<dyn RiskProvider>>,
+    /// Start-from Picker 4 选 1 候选 source (per ULYS-194 / FR-ORCA-009)
+    /// 默认 None → NoopPickerSource (永远只返回 empty)
+    picker_source: Option<Arc<dyn StartFromPickerSource>>,
+}
+
+/// Noop picker source — 永远只返回 empty 候选 (kind 4 sentinel).
+/// 用于 InMemoryWorktreeService::new() 的 default, 不依赖 git-adapter.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoopPickerSource;
+
+#[async_trait]
+impl StartFromPickerSource for NoopPickerSource {
+    async fn list_github_branches(
+        &self,
+        _repo_id: RepoId,
+    ) -> Result<Vec<crate::start_from_picker::PickerCandidate>, ServiceError> {
+        Ok(Vec::new())
+    }
+    async fn list_existing_worktrees(
+        &self,
+        _repo_id: RepoId,
+    ) -> Result<Vec<crate::start_from_picker::PickerCandidate>, ServiceError> {
+        Ok(Vec::new())
+    }
+    async fn list_local_paths(
+        &self,
+        _repo_id: RepoId,
+    ) -> Result<Vec<crate::start_from_picker::PickerCandidate>, ServiceError> {
+        Ok(Vec::new())
+    }
+    fn empty_candidate(&self, repo_id: RepoId) -> crate::start_from_picker::PickerCandidate {
+        use worktree_shared_dir::{PickerCandidate, PickerCandidateKind};
+        PickerCandidate {
+            id: format!("empty:{repo_id}"),
+            label: "Empty / Start from scratch".to_string(),
+            description: "No base ref — only branch name + repo metadata".to_string(),
+            kind: PickerCandidateKind::CommitSha,
+        }
+    }
 }
 
 /// Health provider 抽象 (避免 health-engine 与 worktree-service 循环依赖)
@@ -103,9 +145,29 @@ impl InMemoryWorktreeService {
                 projections: HashMap::new(),
                 health_provider: Some(health),
                 risk_provider: Some(risk),
+                picker_source: None,
             })),
             event_tx,
         }
+    }
+
+    /// 设置 Start-from Picker 4 选 1 候选 source (per ULYS-194 / FR-ORCA-009).
+    /// 不传 source → 用 NoopPickerSource (永远只返回 empty).
+    ///
+    /// ## 调用约束
+    ///
+    /// 必须在 `InMemoryWorktreeService::new()` 之后立即使用, 不与其它 task 共享同一 service.
+    /// 用 `try_write` 写内部 state, 若 lock 已被持有则放弃 (no-op).
+    /// 生产路径应改用 `with_providers_and_picker` 构造法 (本类型用 try_write 是为
+    /// 避免破坏现有 `new()` 签名 + 14+ 个调用方 tests, per 守门 #19).
+    pub fn with_picker_source(self, source: Arc<dyn StartFromPickerSource>) -> Self {
+        if let Ok(mut guard) = self.inner.try_write() {
+            guard.picker_source = Some(source);
+        }
+        // else: lock 已被持有 (例如并发 task 持有 inner.write().await),
+        // 这是 caller 误用, 我们 ignore 不 panic. 这种情况下 picker_source
+        // 保持 None, 运行时走 NoopPickerSource fallback.
+        self
     }
 
     /// 内部: 记录 status observed (per DD §12.5)
@@ -469,6 +531,145 @@ impl WorktreeService for InMemoryWorktreeService {
             at: Utc::now(),
         });
         Ok(())
+    }
+
+    async fn import_external_worktrees(
+        &self,
+        repo_id: RepoId,
+        repo_path: &std::path::Path,
+        force: bool,
+    ) -> Result<crate::external_worktree_import::ImportOutcome, ServiceError> {
+        use crate::external_worktree_import::{
+            diff_external, map_to_worktree, parse_porcelain, ImportError,
+        };
+
+        // 调 git (in-memory impl 不在 stage 1 调 git CLI;
+        //    测试可走 parse_porcelain 注入 fake 数据, prod 走 scan_external_worktrees)
+        //    这里走 scan_external_worktrees — 失败时 ImportError → ServiceError.
+        let externals = match crate::external_worktree_import::scan_external_worktrees(repo_path)
+            .await
+        {
+            Ok(v) => v,
+            // porcelain_v1 fallback: 若 --porcelain 不被 git 旧版支持, 退到 v1 输出解析
+            // (此处 e2e 路径默认用 v2, 测试路径直接走 parse_porcelain)
+            Err(ImportError::GitCommand(msg)) if msg.contains("unknown option") => {
+                return Err(ServiceError::new(
+                    "WT.GIT_FAIL",
+                    format!("git worktree list --porcelain unsupported: {msg}"),
+                    "trace",
+                ));
+            }
+            Err(e) => {
+                return Err(e.into_service_error(format!(
+                    "import_external_worktrees:{}",
+                    uuid::Uuid::new_v4()
+                )));
+            }
+        };
+
+        let _ = parse_porcelain; // suppress unused warning if compile-only path skips
+        let existing = {
+            let guard = self.inner.read().await;
+            guard
+                .worktrees
+                .values()
+                .filter(|w| w.repo_id == repo_id)
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+        let to_import = diff_external(&externals, &existing);
+
+        let mut outcome = crate::external_worktree_import::ImportOutcome::default();
+        let mut now = Utc::now();
+
+        for ext in to_import {
+            // 冲突检测: 同 branch 已存在
+            let branch_conflict = ext.branch.as_ref().and_then(|b| {
+                existing
+                    .iter()
+                    .find(|w| w.branch == *b && w.path != ext.worktree_path)
+            });
+
+            if let Some(conflict) = branch_conflict {
+                if !force {
+                    tracing::warn!(
+                        branch = %ext.branch.as_deref().unwrap_or("(detached)"),
+                        existing_id = %conflict.id,
+                        "import_external_worktrees: branch conflict, skip (force=true to override)"
+                    );
+                    outcome
+                        .skipped
+                        .push(ext.branch.clone().unwrap_or_else(|| "(detached)".into()));
+                    continue;
+                }
+                // force=true: 更新内部 Worktree.branch 指向新 path (path 单独 record_observed)
+                let mut guard = self.inner.write().await;
+                if let Some(stored) = guard.worktrees.get_mut(&conflict.id) {
+                    stored.branch = ext.branch.clone().unwrap_or_else(|| {
+                        ext.head_commit.chars().take(7).collect()
+                    });
+                    stored.path = ext.worktree_path.clone();
+                    stored.last_activity = now;
+                    outcome.updated.push(stored.clone());
+                }
+                drop(guard);
+                continue;
+            }
+
+            // 新 insert
+            let wt = map_to_worktree(repo_id, &ext);
+            let id = wt.id;
+            {
+                let mut guard = self.inner.write().await;
+                guard.worktrees.insert(id, wt.clone());
+                // init projection
+                guard
+                    .projections
+                    .entry(id)
+                    .or_insert_with(crate::projection::WorktreeStatusObserved::new);
+            }
+
+            // 发 SSE Created 事件
+            let _ = self.event_tx.send(WorktreeEventEnvelope::Created {
+                worktree_id: id,
+                repo_id,
+                at: now,
+            });
+
+            outcome.imported.push(wt);
+            now = Utc::now();
+        }
+
+        Ok(outcome)
+    }
+
+    async fn pick_start_from_candidates(
+        &self,
+        repo_id: RepoId,
+    ) -> Result<PickerCandidates, ServiceError> {
+        // 1. 取 snapshot of existing (避免 lock 与 picker 异步操作死锁)
+        let existing: Vec<Worktree> = {
+            let guard = self.inner.read().await;
+            guard
+                .worktrees
+                .values()
+                .filter(|w| w.repo_id == repo_id)
+                .cloned()
+                .collect()
+        };
+        // guard 在表达式结束已 drop (NLL), 无需再 drop.
+
+        // 2. 取 source (default = NoopPickerSource)
+        let source: Arc<dyn StartFromPickerSource> = {
+            let guard = self.inner.read().await;
+            guard
+                .picker_source
+                .clone()
+                .unwrap_or_else(|| Arc::new(NoopPickerSource))
+        };
+
+        // 3. 调 helper (per start_from_picker::pick_start_from_candidates)
+        pick_start_from_candidates(repo_id, &existing, source.as_ref()).await
     }
 }
 

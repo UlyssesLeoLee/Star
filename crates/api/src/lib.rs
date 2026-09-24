@@ -58,8 +58,19 @@ pub mod agent_run;
 pub mod chat;
 /// completion API module (W2 — inline code completion).
 pub mod completion;
+/// diff annotation API module (ULYS-165 FR-ORCA-035 — Diff annotation REST API)
+pub mod diff_annotation;
 /// metering API module (W2 — token usage query).
 pub mod metering;
+
+// =====================================================================
+// ULYS-194 Start-from Picker BFF 路由 (FR-ORCA-009)
+// per docs/spec/FR-ORCA-009 §3.3 + ULYS-158 §3
+// 守门 #1 v25 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 +
+// 守门 #19 v19 累积规不破坏 V0.1 (现有 7 mod 100% 保留)
+// =====================================================================
+/// Start-from Picker BFF 路由 (per ULYS-194 §3.3)
+pub mod worktree_picker;
 
 // =====================================================================
 // 实体(Entity / Aggregate Root)

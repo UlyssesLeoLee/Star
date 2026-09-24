@@ -2098,6 +2098,7 @@ pub mod ai_session_inline {
                 temperature: None,
                 max_tokens: Some(512),
                 request_id: Some(Uuid::new_v4()),
+                ..Default::default()
             };
             let resp = provider.chat_completion(req).await?;
             let thought = resp.message.content.clone();

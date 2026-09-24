@@ -140,7 +140,7 @@ impl GameWorld {
 
 /// update_mana_system: 每秒恢复 1 token (PoC, 简化)
 fn update_mana_system(world: &mut World) {
-    for (_, mana) in world.query_mut::<&mut Mana>() {
+    for mana in world.query_mut::<&mut Mana>() {
         // 简化: PoC 阶段每秒恢复 1 token (R5 阶段 3 占位, 真实恢复逻辑留 R10 整合)
         mana.replenish(0); // 0 = 占位, 不实际恢复
     }
@@ -149,7 +149,7 @@ fn update_mana_system(world: &mut World) {
 /// update_cooldown_system: Cooldown 倒计时, until < now → clear
 fn update_cooldown_system(world: &mut World) {
     let now = Instant::now();
-    for (_, cd) in world.query_mut::<&mut Cooldown>() {
+    for cd in world.query_mut::<&mut Cooldown>() {
         if let Some(until) = cd.until {
             if now >= until {
                 cd.until = None;

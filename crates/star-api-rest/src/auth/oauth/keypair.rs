@@ -8,7 +8,7 @@
 //! - 守门 #14 v3: Mavis 永久代签
 
 use base64::Engine;
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use rsa::{
     pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey, LineEnding},
     traits::PublicKeyParts,

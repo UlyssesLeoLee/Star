@@ -78,6 +78,10 @@ members = [
     "crates/domain-tool",
     # Phase G.1 (L0 SQLite 任务队列) 启动: 2026-09-07 注册 crates/star-taskqueue (SQLite WAL TaskQueue, per SRS-STAR-AGENT-RUNTIME-001 §G-1, 守门 #13 a W 派生, Mavis 临时代签 5 域 Lead 决策 per 9/3 11:35 JST 反转)
     "crates/star-taskqueue",
+    # Phase W20-TS-AI-Terminal-Stack (ULYS-200, 2026-09-23 JST): terminal-stack crate (ScrollbackBuffer ring + SplitTree 数据层, per FR-ORCA-036 + §12 split pane 附加需求, MVP v0 = 内存 + JSON 序列化, 持久化与前端 UI 留 P1 followup)
+    "crates/terminal-stack",
+    # Phase W20-AV-AI-Vault-Domain (ULYS-157, 2026-09-23 JST): ai-vault crate (SearchPolicy + clear_search_index, per FR-ORCA-023/024 桌面索引控制 + Clear Index, spec v1.0 line 347-353, MVP v0 = local-only settings + idempotent clear)
+    "crates/ai-vault",
     # Phase G.3 (EventBus + Mailbox) 启动: 2026-09-07 注册 crates/star-eventbus (in-process pub/sub + Mailbox 3 模式, 守门 #13 a L0 协调 派生)
     "crates/star-eventbus",
     # Phase G.5 (Tenant Quota) 启动: 2026-09-07 注册 crates/star-quota (compute / storage / LLM token 配额, 守门 #13 d M 派生 SCD Type 2 + 13 類 RLS)
@@ -164,7 +168,7 @@ async-trait = "0.1"
 r2d2 = "0.8"
 # r2d2-memgraph = "0.1"  # TODO: 等 r2d2-memgraph crate 落地后启用 (G-1 完整实装)
 # JWT 鉴权 (per §14.12 IV OAuth2 + JWT 拍板 2026-09-09 19:20 JST)
-jsonwebtoken = "9"
+jsonwebtoken = "11"
 
 # 序列化
 serde = { version = "1", features = ["derive"] }
@@ -176,7 +180,7 @@ bytes = "1"
 futures-util = "0.3"
 
 # 错误
-thiserror = "1"
+thiserror = "2"
 anyhow = "1"
 
 # ID / 时间
@@ -193,29 +197,32 @@ tracing = "0.1"
 sled = "0.34"
 
 # 加密(Phase F webhook 签名验证使用)
-sha2 = "0.10"
-hmac = "0.12"
+sha2 = "0.11"
+hmac = "0.13"
 hex = "0.4"
 
 # Regex (per OPT-NEXT-06-code-stub §3.4 domain-form + domain-search 实装)
 regex = "1"
 
+# Serial test execution (per ULYS-194 9/24 rebase fix — env-var mutating tests 跨 #[tokio::test] 串行化)
+serial_test = "3"
+
 # Benchmark (per R9 阶段 3 5 milestone benchmark, per plan-032 §4.2)
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 
 # ECS (per R5 阶段 3 ECS 实际 + task lifecycle 集成, per plan-032 R5 阶段 3)
 # hecs 选型: per 守门 v28 推荐项 hecs 轻量 ~50KB vs bevy_ecs 完整 ~500KB, PoC 阶段选 hecs (Rust 优先 + 简单 API + 单线程)
-hecs = "0.10"
+hecs = "0.11"
 
 # Valkey / Redis client (per spec/cache/01 §2.3 + spec/cache/01 §2.3 选型决定 2026-09-10 23:41 JST)
 # redis-rs 0.27+ 协议 100% 兼容 Valkey, tokio-comp + connection-manager features
 # Phase G+ 启用于 crates/star-cache/src/valkey_backend.rs
-redis = { version = "0.27", default-features = false, features = ["tokio-comp", "connection-manager"] }
+redis = { version = "1.7", default-features = false, features = ["tokio-comp", "connection-manager"] }
 
 # === ULYS-57.1 T1-T2 (2026-09-16) 新增 4 dep ===
 # git2: libgit2 Rust binding (per DD-WORKTREE-CANVAS-001 §10 + D-GIT-001 + NFR-REL-001 Git 不可变)
 # notify: cross-platform fs file watcher (per DD §11 Git Observer fsnotify)
-git2 = "0.20"
+git2 = "0.21"
 notify = "8"
 # tempfile: 测试用临时目录 (per 守门 #11 缺标比错标 — 阶段 1 测试用)
 tempfile = "3"

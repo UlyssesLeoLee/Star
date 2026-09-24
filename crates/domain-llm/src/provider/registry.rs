@@ -273,6 +273,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: Some(Uuid::new_v4()),
+            ..Default::default()
         }
     }
 

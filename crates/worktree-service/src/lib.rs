@@ -21,16 +21,28 @@
 #![allow(clippy::too_many_arguments)]
 
 pub mod error;
+pub mod external_worktree_import;
 pub mod lifecycle;
 pub mod projection;
 pub mod service;
 pub mod service_impl;
+pub mod start_from_picker;
 
 pub use error::ServiceError;
+pub use external_worktree_import::{
+    diff_external, map_to_worktree, parse_porcelain, scan_external_worktrees, ExternalWorktree,
+    ImportError, ImportOutcome,
+};
 pub use lifecycle::{transition, TransitionError};
 pub use projection::{StatusObservedPoint, WorktreeStatusObserved};
-pub use service::{SyncResult, WorktreeFilter, WorktreeService, WorktreeUpdate};
-pub use service_impl::InMemoryWorktreeService;
+pub use service::{SyncResult, Worktree, WorktreeEventEnvelope, WorktreeFilter, WorktreeService, WorktreeUpdate};
+pub use service_impl::{InMemoryWorktreeService, NoopPickerSource};
+pub use start_from_picker::{
+    branch_to_remote_candidate, collect_by_kind, contains_id, filter_and_dedupe,
+    local_path_to_candidate, pick_start_from_candidates, select_by_id,
+    worktree_to_existing_candidate, DefaultStartFromPickerSource, PickerCandidate,
+    PickerCandidateKind, PickerCandidates, StartFromPickerSource,
+};
 // 注: per-workspace multica-config/config.json 的 shared-dir reader 已在
 // crates/worktree-shared-dir/ (FileBackedConfigSource) 实装, 不在本 crate.
 // ULYS-177 历史 commit ef025c8d 的 `shared_dir_sources.rs` 模块已被替代.

@@ -234,6 +234,7 @@ async fn chat_send(
         temperature: None,
         max_tokens: Some(1024),
         request_id: Some(Uuid::new_v4()),
+        ..Default::default()
     };
 
     // Dispatch to the provider (real LLM when key present + no_network_mode=false;
@@ -596,6 +597,7 @@ async fn chat_stream(
         temperature: None,
         max_tokens: Some(1024),
         request_id: Some(Uuid::new_v4()),
+        ..Default::default()
     };
 
     let provider_stream = state

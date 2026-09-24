@@ -155,6 +155,7 @@ fn map_err(e: CredentialError) -> (StatusCode, String) {
         CredentialError::NotFound(_) => StatusCode::NOT_FOUND,
         CredentialError::Revoked(_) | CredentialError::Deprecated(_) => StatusCode::GONE,
         CredentialError::InvalidPlaintext(_) => StatusCode::BAD_REQUEST,
+        CredentialError::DbSyncFailed(_) => StatusCode::ACCEPTED, // in-memory 生效, DB 同步降级
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     };
     // 守门 #5: 错误消息不打印凭证内容
@@ -166,6 +167,7 @@ fn map_err(e: CredentialError) -> (StatusCode, String) {
         CredentialError::KmsEncrypt(m) => format!("kms encrypt: {}", m),
         CredentialError::KmsDecrypt(m) => format!("kms decrypt: {}", m),
         CredentialError::Internal(m) => format!("internal: {}", m),
+        CredentialError::DbSyncFailed(m) => format!("db sync failed: {}", m),
     };
     (status, msg)
 }
