@@ -1,4 +1,3 @@
-bash.exe: warning: could not find /tmp, please create!
 "use client";
 
 // =====================================================================
