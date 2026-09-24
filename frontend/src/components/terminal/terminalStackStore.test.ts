@@ -41,14 +41,14 @@ describe("terminalStackStore (ULYS-223 P1-D)", () => {
     }
   });
 
-  it("D. split 3 times yields 4 leaves (depth 2)", () => {
+  it("D. split 3 times yields 4 leaves (depth 3 — re-splitting pane-root nest deeper)", () => {
     const s = useTerminalStackStore.getState();
-    s.splitCurrentPane("vertical"); // 1 → 2
-    s.splitCurrentPane("horizontal"); // activePaneId still pane-root → split again
-    s.splitCurrentPane("horizontal"); // 2 → 4
+    s.splitCurrentPane("vertical"); // 1 → 2 (depth 0 → 1)
+    s.splitCurrentPane("horizontal"); // 2 → 3 (depth 1 → 2)
+    s.splitCurrentPane("horizontal"); // 3 → 4 (depth 2 → 3, pane-root keeps getting re-wrapped)
     const { tree, depth } = useTerminalStackStore.getState();
     expect(countLeaves(tree)).toBe(4);
-    expect(depth).toBe(2);
+    expect(depth).toBe(3);
   });
 
   it("E. setActivePane changes active pane id", () => {
