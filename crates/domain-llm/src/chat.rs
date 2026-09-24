@@ -113,6 +113,10 @@ impl ChatMessage {
 /// Model name is required (no implicit default). Sampling knobs are minimal
 /// for v0.0.1; richer controls (top_p, stop sequences, response_format) are
 /// deferred to W2.
+///
+/// **v0.0.2 (PI-2 / FR-11)**: `thinking_level` selects per-model reasoning
+/// depth (per Pi's `ThinkingLevel`). Providers that don't support
+/// extended thinking treat any non-`Off` value as `Off`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatRequest {
     /// Model identifier (e.g. "claude-3-5-sonnet", "gpt-4o-mini").
@@ -126,6 +130,10 @@ pub struct ChatRequest {
     pub max_tokens: Option<u32>,
     /// Optional caller-supplied request id for idempotency / tracing.
     pub request_id: Option<Uuid>,
+    /// **v0.0.2 (PI-2 / FR-11)**: reasoning depth hint. `None` = provider
+    /// default (usually `Off` for non-thinking models, `Medium` for
+    /// thinking models).
+    pub thinking_level: Option<crate::events::ThinkingLevel>,
 }
 
 impl ChatRequest {
@@ -148,6 +156,19 @@ impl ChatRequest {
     }
 }
 
+impl Default for ChatRequest {
+    fn default() -> Self {
+        Self {
+            model: String::new(),
+            messages: Vec::new(),
+            temperature: None,
+            max_tokens: None,
+            request_id: None,
+            thinking_level: None,
+        }
+    }
+}
+
 // =====================================================================
 // ChatResponse (output of LlmProvider::chat_completion)
 // =====================================================================
@@ -158,7 +179,13 @@ impl ChatRequest {
 /// "content_filter" / "tool_calls" — last deferred to W2). `created_at` is
 /// stamped by the provider when the model finalizes the reply (for v0.0.1
 /// stub: stamped by the test harness since no provider runs yet).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// **v0.0.2 (PI-2 / FR-9)**: `finish_reason: String` is **deprecated**;
+/// use `stop_reason: StopReason` instead. The string field is retained for
+/// 1 version for backwards compatibility (per SRS-PI-BORROW-001 NFR-4).
+/// `usage: Usage` carries the full 5-tuple token + cost accounting
+/// (per FR-8).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatResponse {
     /// Provider-issued response id (echo of `ChatRequest::request_id` if the
     /// provider does not assign its own; for v0.0.1 stub: same UUID).
@@ -167,8 +194,19 @@ pub struct ChatResponse {
     pub model: String,
     /// Single assistant message (non-streaming replies are atomic).
     pub message: ChatMessage,
-    /// Stop reason (OpenAI convention).
+    /// **Deprecated v0.0.2 (PI-2 / FR-9)**: use `stop_reason` instead.
+    /// Kept for 1 version for downstream compile-compatibility (per
+    /// SRS-PI-BORROW-001 NFR-4). When present it is the string form of
+    /// `stop_reason`.
+    #[deprecated(note = "use `stop_reason: StopReason` instead (per PI-2 / FR-9)")]
     pub finish_reason: String,
+    /// **v0.0.2 (PI-2 / FR-7)**: 7-value enum replacing the legacy
+    /// `finish_reason: String` field.
+    pub stop_reason: crate::events::StopReason,
+    /// **v0.0.2 (PI-2 / FR-8)**: 5-tuple token + cost accounting. Always
+    /// present for non-streaming replies; `Usage::default()` for the stub
+    /// path.
+    pub usage: crate::events::Usage,
     /// Server-side timestamp at reply finalization.
     pub created_at: DateTime<Utc>,
 }
@@ -178,6 +216,7 @@ impl ChatResponse {
     ///
     /// Used by W1 trait stub implementations to fabricate a deterministic
     /// reply without invoking an actual LLM.
+    #[allow(deprecated)] // stub path keeps the legacy string for compat
     pub fn stub_assistant(model: impl Into<String>, content: impl Into<String>) -> Self {
         let id = Uuid::new_v4();
         Self {
@@ -185,6 +224,8 @@ impl ChatResponse {
             model: model.into(),
             message: ChatMessage::assistant(content),
             finish_reason: "stop".to_string(),
+            stop_reason: crate::events::StopReason::Stop,
+            usage: crate::events::Usage::default(),
             created_at: Utc::now(),
         }
     }
@@ -273,6 +314,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
+            ..Default::default()
         };
         assert!(r.validate().is_err());
 
@@ -282,6 +324,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
+            ..Default::default()
         };
         assert!(r.validate().is_err());
     }
@@ -294,6 +337,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: Some(Uuid::new_v4()),
+            ..Default::default()
         };
         assert!(r.validate().is_ok());
     }
@@ -304,7 +348,7 @@ mod tests {
         assert_eq!(r.model, "gpt-test");
         assert_eq!(r.message.role, ChatRole::Assistant);
         assert_eq!(r.message.content, "hello back");
-        assert_eq!(r.finish_reason, "stop");
+        assert_eq!(r.stop_reason, crate::events::StopReason::Stop);
         // id must be a non-nil UUID
         assert_ne!(r.id, Uuid::nil());
     }

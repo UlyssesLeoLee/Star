@@ -158,15 +158,19 @@ impl OpenAiProvider {
             .first()
             .map(|c| c.message.content.clone())
             .unwrap_or_default();
+        let finish_reason_str = parsed
+            .choices
+            .first()
+            .and_then(|c| c.finish_reason.clone())
+            .unwrap_or_else(|| "stop".to_string());
         ChatResponse {
             id: request_id,
             model: model.to_string(),
             message: ChatMessage::assistant(text),
-            finish_reason: parsed
-                .choices
-                .first()
-                .and_then(|c| c.finish_reason.clone())
-                .unwrap_or_else(|| "stop".to_string()),
+            #[allow(deprecated)]
+            finish_reason: finish_reason_str.clone(),
+            stop_reason: crate::events::StopReason::parse_loose(&finish_reason_str),
+            usage: crate::events::Usage::default(),
             created_at: Utc::now(),
         }
     }
@@ -265,7 +269,10 @@ impl LlmProvider for OpenAiProvider {
                     "[openai stub] received {} messages",
                     req.messages.len()
                 )),
+                #[allow(deprecated)]
                 finish_reason: "stop".to_string(),
+                stop_reason: crate::events::StopReason::Stop,
+                usage: crate::events::Usage::default(),
                 created_at: Utc::now(),
             });
         }
@@ -385,10 +392,14 @@ mod tests {
     fn sample_request() -> ChatRequest {
         ChatRequest {
             model: OPENAI_DEFAULT_MODEL.to_string(),
-            messages: vec![ChatMessage::system("be terse"), ChatMessage::user("hi")],
+            messages: vec![
+                ChatMessage::system("be terse"),
+                ChatMessage::user("hi"),
+            ],
             temperature: Some(0.7),
             max_tokens: Some(128),
             request_id: Some(Uuid::new_v4()),
+            ..Default::default()
         }
     }
 
@@ -450,7 +461,7 @@ mod tests {
         let p = OpenAiProvider::new();
         let resp = p.chat_completion(sample_request()).await.unwrap();
         assert!(resp.message.content.contains("[openai stub]"));
-        assert_eq!(resp.finish_reason, "stop");
+        assert_eq!(resp.stop_reason, crate::events::StopReason::Stop);
         assert_ne!(resp.id, Uuid::nil());
     }
 
@@ -463,6 +474,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
+            ..Default::default()
         };
         let err = p.chat_completion(req).await.unwrap_err();
         assert!(matches!(err, LlmProviderRegistryError::InvalidOperation(_)));
