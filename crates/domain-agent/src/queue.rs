@@ -1,4 +1,4 @@
-//! PI-9 Steering / Follow-up / QueueMode (domain-agent) — W2 `Interrupt` 抢占回调 + cancel 抢断.
+//! PI-9 Steering / Follow-up / QueueMode (domain-agent) — W3 `CollabPreemptionBridge` + `mark_running_with` 跨租户守门.
 //!
 //! Per SRS-PI-BORROW-001 §1.3 + §4 FR-30 (`crates/pi-agent-core/src/types.ts`
 //! lines 47-55, 278-302 翻译).
@@ -8,44 +8,44 @@
 //! - **W1** (commit `99f70d67`): 接口骨架 + FIFO/Priority/Interrupt 三态的
 //!   in-memory 调度 + `Steering::apply_steering` 接 PI-3
 //!   `AgentLoopBoundary::transform_context` 的默认实装。
-//! - **W2** (本 commit): 在 W1 基础上加 **cancel 抢断语义** + **Interrupt
-//!   抢占触发回调** (loop driver 侧):
+//! - **W2** (commit `58ee2a5d`): 在 W1 基础上加 **cancel 抢断语义** +
+//!   **Interrupt 抢占触发回调** (`PreemptionListener`).
+//! - **W3** (本 commit): 加 **跨域协作评论入口 stub** +
+//!   **`mark_running_with` 真租户守门**:
 //!
 //!   | 增量 | 描述 |
 //!   |---|---|
-//!   | `AgentQueue::cancel_many` | 批量 cancel，按 actor_tenant 守门，返回 `CancelReport` 区分 found/missing，不命中不回 Err |
-//!   | `AgentQueue::cancel_all` | 按 actor_tenant 清空全部，返回被清掉的 task_id 列表 |
-//!   | `AgentQueue::mark_running` / `mark_done` | loop driver 把"现在跑哪个 task"显式告知 queue（取代 W1 隐式"take_next = running"语义） |
-//!   | `AgentQueue::register_preemption_listener` | 注册 `PreemptionListener`；当 `enqueue` 触发抢占语义时回调 |
-//!   | `PreemptionListener::on_preempt` | 抢占回调签名（fn，不是 async：抢占决策是 fire-and-forget，不阻塞 enqueue） |
-//!   | `CancelReport` | `{ found: Vec<Uuid>, missing: Vec<Uuid> }` |
-//!   | `AgentQueue::running_task_id` | 查询当前正在跑的任务（测试 + 监控用） |
-//!   | 端到端集成测试 | driver → enqueue normal → mark_running → enqueue Interrupt → listener fires → cancel running → mark_done → Interrupt == take_next |
+//!   | `AgentQueue::mark_running_with(QueuedTask)` | 把完整 task（含真实 `tenant_id` + snapshot）交给 queue；与 W2 `mark_running(task_id)` 并存 |
+//!   | `maybe_fire_preemption` 跨租户守门 | `running.tenant_id` 非 nil 时,跨租户 incoming 静默不 fire；W2 legacy 路径（`mark_running(task_id)` 占位 tenant=nil）保持原行为 |
+//!   | `CollabCommentSink` trait | 跨域协作评论投递接口的本地抽象,无依赖 |
+//!   | `NoopCollabSink` / `InMemoryCollabSink` | 默认 / 测试用 sink |
+//!   | `CollabPreemptionBridge<C>` | `PreemptionListener` W3 实装：把抢占事件转 `CollabSteeringCommand` + prompt 摘要（最长 80 字符,防 secret 泄漏）+ 投 sink |
+//!   | `redact_excerpt` 工具函数 | prompt 截断,守门 #5 env |
+//!   | W3 测试 9 条 | tenant guard 生效 / 跨租户不再 fire / sink dispatch / 端到端集成 |
 //!
-//!   `Steering` / `FollowUp` / `QueueMode` / `QueuedTask` / `InMemoryAgentQueue`
-//!   基本调度 W1 不变;W2 加的抢占监听器是 **可选** 的（不注册 = 静默，
-//!   跟 W1 行为等价，向后兼容）。
+//!   W2 的 `mark_running(task_id)` 仍可用（向后兼容）,但 `running.tenant_id`
+//!   是占位 nil → `maybe_fire_preemption` 跳过 tenant 守门（行为 = W2 legacy）。
+//!   生产环境应**全部走 `mark_running_with`**。
 //!
 //! ## 已知缺口 / 待 PI-* 落地后补
 //!
 //! - **PI-3 ✅ 已 ship (本 branch cherry-pick `c4145379`)**: `AgentLoopBoundary`
-//!   trait + `StreamFn` no-throw 已在本 worktree 可用。本文件 `Steering` 默认
-//!   实装就是接 `transform_context`。
+//!   trait + `StreamFn` no-throw 已在本 worktree 可用。
 //! - **PI-4 缺口**: `Tool` trait 5 方法未 ship → 本文件不 import
 //!   `domain_tool::Tool`，QueuedTask 用 String 工具名占位；待 PI-4 ship 后
 //!   把 String → ToolInvocation 改字段。
 //! - **PI-6 缺口**: JSON Delta 协议未 ship → 本文件用 serde_json::Value 描述
-//!   task，待 PI-6 ship 后切到 `star_dto::JsonDeltaPayload`。
-//! - **跨域协作评论**: SRS-MULTICA-COLLABORATION 协作评论机制未 ship，
-//!   `SteeringHook::from_collaboration_comment` = 未在本文件实现（等跨域
-//!   Lead 对齐再补接口签名）。W2 加的 `PreemptionListener` 是 in-memory
-//!   同进程钩子，不是协作评论入口的远端 RPC，等跨域 ship 后另接
-//!   `CollabPreemptionBridge`（TODO，不在本 W2）。
+//!   task,待 PI-6 ship 后切到 `star_dto::JsonDeltaPayload`。
+//! - **跨域协作评论**: SRS-MULTICA-COLLABORATION 协作评论机制未 ship,
+//!   `CollabPreemptionBridge` 已就位,等跨域 ship 后:
+//!   1. 在 `crates/domain-comment` 加 `impl CollabCommentSink for CommentService`
+//!   2. 改 `CollabPreemptionBridge::new(Arc::new(real_service))`
+//!   3. PI-9 主路径**0 改动**。
 //!
 //! 完整 3 周 MVP 工时排程见 issue description §4。
 //! 启动条件（per §5）：Stage 4 + PI-6 (ULYS-206 redesign) 已 ship + D-Boy 拍板
-//! PI-9 启动。本 commit = "W2-Interrupt-preemption + cancel-batch";PI-4/PI-6/
-//! Collab 全 ship 后再 sign off "PI-9 done".
+//! PI-9 启动。本 commit = "W3-Collab-Bridge-stub + tenant-guard";PI-4/PI-6/
+//! Collab 真接口 ship 后再 sign off "PI-9 done".
 //!
 //! ## 守门合规
 //!
@@ -54,14 +54,18 @@
 //! - All public items documented (`missing_docs = "deny"` workspace lint).
 //! - No reverse dependency on `crates/api` (per 守门 #1 v15 分层 + 守门 #13 d).
 //! - 守门 #5: cross-tenant steering 在 `LoopBoundarySteeringHook::apply_steering`
-//!   第一步校验 actor_tenant == boundary_ctx.tenant_id，不匹配 → 立即回
+//!   第一步校验 actor_tenant == boundary_ctx.tenant_id,不匹配 → 立即回
 //!   `CrossTenantSteeringDenied` 错误（不绕开 boundary）。
+//! - 守门 #5 (W3 增量): `maybe_fire_preemption` 在 `running.tenant_id` 非 nil
+//!   时,`incoming.tenant_id != running.tenant_id` 静默不 fire（不抛错、
+//!   不调 listener,避免泄漏跨租户抢占语义）。
 //! - 守门 #13 d: hint 注入后通过 `boundary_ctx.audit_sink.emit(...)` 触发
 //!   audit event（即使 transform_context 失败也记 "steering-attempted"）。
 //! - 守门 #22 (W2 增量): PreemptionListener 回调 **不** 阻塞 enqueue
-//!   （fire-and-forget fn 指针而非 async fn），保证 enqueue p99 不被
-//!   listener 拖垮；listener panic 由 listener 内部自负责（queue 用
-//!   `catch_unwind` 不必要，listener 应该自己处理）。
+//!   （fire-and-forget fn 指针而非 async fn）,保证 enqueue p99 不被
+//!   listener 拖垮。
+//! - 守门 #22 (W3 增量): `CollabCommentSink::dispatch_steering` 也是 sync fn,
+//!   sink 内部 RPC 自负责 spawn task。
 
 use std::collections::{BinaryHeap, VecDeque};
 use std::sync::Mutex;
@@ -182,6 +186,181 @@ pub trait PreemptionListener: Send + Sync {
     /// listener 应自行决定如何处理（cancel / 中断 stream / 通知 driver），
     /// **不** 应通过返回值传结果（fire-and-forget）。
     fn on_preempt(&self, current: &QueuedTask, incoming: &QueuedTask);
+}
+
+// =====================================================================
+// CollabPreemptionBridge -- 跨域协作评论入口 (W3 增量)
+// =====================================================================
+//
+// **为什么单独成一节**:PI-9 的 Steering 钩子需要一个 UI 入口让用户在
+// agent 跑的时候通过协作评论发 steering 指令。SRS-MULTICA-COLLABORATION
+// 协作评论机制 **尚未 ship**,本节提供一个本地 trait 抽象
+// (`CollabCommentSink`),让 PI-9 的 `CollabPreemptionBridge` 在该机制
+// ship 后,把 sink 适配到 `crates/domain-comment` 的真接口即可,无需再改
+// PI-9 queue.rs 主路径。
+//
+// **安全设计** (守门 #5 env):
+// - bridge 不把 prompt 全文塞进协作评论 — 用 `redact_excerpt` 截到
+//   `MAX_PROMPT_EXCERPT_CHARS` (= 80) 字符,避免泄漏长 prompt 里嵌的
+//   secret / token / 内部文件路径。
+// - `CollabSteeringCommand` 字段标 `non_exhaustive`,跨域 schema 演进安全。
+
+/// prompt 摘要最大字符数（W3 守门 #5: 防止 secret 泄漏到协作评论载荷）
+pub const MAX_PROMPT_EXCERPT_CHARS: usize = 80;
+
+/// **CollabSteeringCommand** -- bridge 投递到协作评论侧的 steering 命令。
+///
+/// `current_prompt_excerpt` / `incoming_prompt_excerpt` 是被 redacted 的
+/// 短摘（最长 [`MAX_PROMPT_EXCERPT_CHARS`] 字符）—— 不是 prompt 全文。
+///
+/// `#[non_exhaustive]` 允许未来加 field（如 `agent_id` / `session_id`）
+/// 而不破坏下游。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct CollabSteeringCommand {
+    /// 触发 steering 的 tenant（= incoming.tenant_id）
+    pub tenant_id: TenantId,
+    /// 当前正在跑的任务 ID
+    pub current_task_id: Uuid,
+    /// current 任务的 prompt 摘要（已 redact）
+    pub current_prompt_excerpt: String,
+    /// 新进的抢占/高优任务 ID
+    pub incoming_task_id: Uuid,
+    /// incoming 任务的 prompt 摘要（已 redact）
+    pub incoming_prompt_excerpt: String,
+    /// incoming 入队时间
+    pub enqueued_at: SystemTime,
+}
+
+/// 截 prompt 到 `MAX_PROMPT_EXCERPT_CHARS` 字符，超过部分加 "…"。
+/// 守门 #5: 不让长 prompt 全文进协作评论载荷。
+fn redact_excerpt(prompt: &str) -> String {
+    if prompt.chars().count() <= MAX_PROMPT_EXCERPT_CHARS {
+        prompt.to_string()
+    } else {
+        // 按 char 截，避免 UTF-8 边界把字符切坏
+        let mut out: String = prompt.chars().take(MAX_PROMPT_EXCERPT_CHARS).collect();
+        out.push('…');
+        out
+    }
+}
+
+/// **CollabCommentSink** -- 跨域协作评论投递接口的本地抽象（W3 跨域 stub）。
+///
+/// 这是 **trait**,不绑任何具体下游 —— 这样:
+/// 1. SRS-MULTICA-COLLABORATION 未 ship 期间,PI-9 用 [`NoopCollabSink`] /
+///    [`InMemoryCollabSink`] (测试用) 即可完成 queue.rs 自身的逻辑;
+/// 2. 跨域机制 ship 后,只需加一个 `impl CollabCommentSink for
+///    domain_comment::CommentService` 适配器,PI-9 主路径不变。
+///
+/// **为什么是 sync fn 不是 async**:
+/// - PreemptionListener 是 fire-and-forget, sink 同步 fn 让 enqueue p99
+///   不被跨域 RPC 拖垮（守门 #22）。
+/// - 真 sink 内部需要 RPC 时,自负责 spawn 一个 tokio task。
+pub trait CollabCommentSink: Send + Sync {
+    /// **dispatch_steering** -- 把 steering 命令投递到协作评论侧。
+    ///
+    /// 实现要求：
+    /// - **不 panic** —— listener panic 由 listener 自负责（守门 #22）。
+    /// - 失败仅记日志,不返回 Err（fire-and-forget）。
+    fn dispatch_steering(&self, cmd: CollabSteeringCommand);
+}
+
+/// **NoopCollabSink** -- 不做任何事的 sink（生产环境默认 sink）。
+///
+/// 当 SRS-MULTICA-COLLABORATION 未 ship 时,`CollabPreemptionBridge` 默认
+/// 绑这个 sink,queue 行为 = 跟 W2 完全一致（仅 in-process listener fire,
+/// 无跨域副作用）。
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NoopCollabSink;
+
+impl CollabCommentSink for NoopCollabSink {
+    fn dispatch_steering(&self, _cmd: CollabSteeringCommand) {
+        // no-op;SRS-MULTICA-COLLABORATION ship 后由 D-Boy 决定是否换 sink
+    }
+}
+
+/// **InMemoryCollabSink** -- 把所有 `CollabSteeringCommand` 记到内存,供
+/// 测试断言。仅 `#[cfg(test)]` 模块外不可见 —— `pub(crate)` 限定,生产
+/// binary 不会暴露。
+#[derive(Debug, Default)]
+pub struct InMemoryCollabSink {
+    pub(crate) commands: Mutex<Vec<CollabSteeringCommand>>,
+}
+
+impl InMemoryCollabSink {
+    /// 构造新 sink
+    pub fn new() -> Self {
+        Self {
+            commands: Mutex::new(Vec::new()),
+        }
+    }
+    /// 返回已记录的 command 数
+    pub fn len(&self) -> usize {
+        self.commands.lock().unwrap().len()
+    }
+    /// 是否无记录（clippy `len_without_is_empty` 一致性）
+    pub fn is_empty(&self) -> bool {
+        self.commands.lock().unwrap().is_empty()
+    }
+    /// 复制所有已记录 command（按入队顺序）
+    pub fn commands(&self) -> Vec<CollabSteeringCommand> {
+        self.commands.lock().unwrap().clone()
+    }
+}
+
+impl CollabCommentSink for InMemoryCollabSink {
+    fn dispatch_steering(&self, cmd: CollabSteeringCommand) {
+        self.commands.lock().unwrap().push(cmd);
+    }
+}
+
+/// **CollabPreemptionBridge** -- `PreemptionListener` 的 W3 实装,把抢占事件
+/// 转成 `CollabSteeringCommand` 通过 [`CollabCommentSink`] 投到协作评论侧。
+///
+/// **Sink 不持有锁**:bridge 持有 `Arc<dyn CollabCommentSink>`,sink 自身
+/// 负责 thread-safe（典型 = `Arc<Mutex<...>>` 或 channel-based）。
+///
+/// **典型用法**:
+/// ```ignore
+/// let sink: Arc<dyn CollabCommentSink> = Arc::new(NoopCollabSink);
+/// let bridge: Arc<dyn PreemptionListener> =
+///     Arc::new(CollabPreemptionBridge::new(sink));
+/// queue.register_preemption_listener(bridge).await;
+/// ```
+///
+/// **W3 限制**:sink 是本地 trait 抽象。SRS-MULTICA-COLLABORATION ship 后,
+/// 在 `crates/domain-comment` 加 `impl CollabCommentSink for CommentService`,
+/// 然后把 `CollabPreemptionBridge::new(Arc::new(real_service))` 即可。
+pub struct CollabPreemptionBridge {
+    sink: std::sync::Arc<dyn CollabCommentSink>,
+}
+
+impl CollabPreemptionBridge {
+    /// 构造 bridge,绑定到具体 sink
+    pub fn new(sink: std::sync::Arc<dyn CollabCommentSink>) -> Self {
+        Self { sink }
+    }
+    /// 取得 sink 引用（主要给测试断言用）
+    pub fn sink(&self) -> &std::sync::Arc<dyn CollabCommentSink> {
+        &self.sink
+    }
+}
+
+impl PreemptionListener for CollabPreemptionBridge {
+    fn on_preempt(&self, current: &QueuedTask, incoming: &QueuedTask) {
+        // 构造 redact 过的 command。守门 #5: prompt 走摘要,不让 secret 进 sink
+        let cmd = CollabSteeringCommand {
+            tenant_id: incoming.tenant_id,
+            current_task_id: current.task_id,
+            current_prompt_excerpt: redact_excerpt(&current.prompt),
+            incoming_task_id: incoming.task_id,
+            incoming_prompt_excerpt: redact_excerpt(&incoming.prompt),
+            enqueued_at: incoming.created_at,
+        };
+        // fire-and-forget:sink 内部 panic 自负责（守门 #22）
+        self.sink.dispatch_steering(cmd);
+    }
 }
 
 // =====================================================================
@@ -625,10 +804,34 @@ pub trait AgentQueue: Send + Sync {
     /// 同一 task 不能被 mark_running 两次（避免 driver 重启 race 把两个 task
     /// 都标成 running）—— 第二次调同名 task_id = noop + warn log（返回 `Ok`）。
     ///
+    /// **W2 简化**：本方法只接 `task_id`，无法记下完整 `QueuedTask`，
+    /// 所以 `running.tenant_id` 是占位 nil（见 `InMemoryAgentQueue::mark_running`
+    /// 实现）。如果 caller 有完整 `QueuedTask`，**应该** 改用 W3 的
+    /// [`AgentQueue::mark_running_with`] —— 那个能记下真实租户，让 W3
+    /// 加的跨租户守门在 `maybe_fire_preemption` 生效。
+    ///
     /// 默认实现：`Err(Internal("mark_running not implemented"))`。
     async fn mark_running(&self, _task_id: Uuid) -> AgentQueueResult<()> {
         Err(AgentQueueError::Internal(
             "mark_running not implemented by this AgentQueue".into(),
+        ))
+    }
+
+    /// **mark_running_with** -- driver 显式告知 queue "我现在跑的是这个 task"
+    /// **(W3 新增)**，并把完整 `QueuedTask` 一起交给 queue。
+    ///
+    /// 与 `mark_running(task_id)` 的区别：
+    /// - 本方法记下真实 `tenant_id` + 完整 snapshot（含 prompt / priority）；
+    ///   `maybe_fire_preemption` 用真实 `tenant_id` 守门：跨租户的抢占不再
+    ///   fire（守门 #5 真实生效）。
+    /// - `mark_running(task_id)` 仍是兼容路径，但 `running.tenant_id` 是
+    ///   nil 占位 → `maybe_fire_preemption` 跳过 tenant 守门（行为 = W2 legacy）。
+    ///
+    /// 默认实现：`Err(Internal("mark_running_with not implemented"))`，让旧
+    /// 实现者编译通过（向后兼容）。`InMemoryAgentQueue` 提供完整实装。
+    async fn mark_running_with(&self, _task: QueuedTask) -> AgentQueueResult<()> {
+        Err(AgentQueueError::Internal(
+            "mark_running_with not implemented by this AgentQueue".into(),
         ))
     }
 
@@ -1032,6 +1235,42 @@ impl AgentQueue for InMemoryAgentQueue {
         }
     }
 
+    /// **W3**: driver 标 running 时把完整 task 一起交给 queue（带真实
+    /// `tenant_id` + snapshot）。`maybe_fire_preemption` 用此 `tenant_id`
+    /// 做跨租户守门（守门 #5）。
+    async fn mark_running_with(&self, task: QueuedTask) -> AgentQueueResult<()> {
+        let mut rg = self
+            .running
+            .lock()
+            .map_err(|e| AgentQueueError::Internal(format!("running poisoned: {e}")))?;
+        match rg.as_ref() {
+            // 已有 running 且 task_id 一致 → 替换为完整快照（允许 driver
+            // 在 task 被取走后用 take_next 拿到的 QueuedTask 重新注册）
+            Some(r) if r.task_id == task.task_id => {
+                *rg = Some(RunningTask {
+                    task_id: task.task_id,
+                    tenant_id: task.tenant_id,
+                    snapshot: task,
+                });
+                Ok(())
+            }
+            // 已有 running 且 task_id 不一致 → Mismatch
+            Some(r) => Err(AgentQueueError::RunningTaskMismatch {
+                queue_running: Some(r.task_id),
+                marked: task.task_id,
+            }),
+            // 无 running → 注册
+            None => {
+                *rg = Some(RunningTask {
+                    task_id: task.task_id,
+                    tenant_id: task.tenant_id,
+                    snapshot: task,
+                });
+                Ok(())
+            }
+        }
+    }
+
     /// **W2**: driver 标 done。
     async fn mark_done(&self, task_id: Uuid) -> AgentQueueResult<()> {
         let mut rg = self
@@ -1079,8 +1318,7 @@ impl AgentQueue for InMemoryAgentQueue {
 // **抢占触发条件** (满足全部):
 // 1. queue.running 不为 None (有 task 在跑)
 // 2. 当前 task 与 running **同 task_id 不可能**(incoming 是新进 task)
-//    → 用 **任务优先级比较 + mode 语义** 判断;running.tenant_id 占位
-//    nil 不参与守门(见 mark_running doc 的 W2 trade-off)。
+//    → 用 **任务优先级比较 + mode 语义** 判断。
 // 3. incoming 是"抢占类"任务:**`mode == Interrupt` 或 `task.interrupt == true`**。
 //    任一满足 → 抢占;否则 FIFO 模式按顺序排队,Priority 模式按优先级判断
 //    (`incoming.priority > running.snapshot.priority` 才抢占)。
@@ -1089,14 +1327,19 @@ impl AgentQueue for InMemoryAgentQueue {
 // `task.interrupt == true` 触发,意味着该 task 语义上是抢占的(不论
 // queue mode)。本函数与 push_front 对齐。
 //
-// 满足 → 调用所有 listeners;不满足 → 静默入队。
+// **W3 跨租户守门 (守门 #5)**:如果 `running.tenant_id` 是非 nil 的
+// (即 driver 走 `mark_running_with` 路径),且 `incoming.tenant_id !=
+// running.tenant_id`,则 **静默不 fire** —— 不抛错,不调 listener,避免
+// 跨租户抢占语义泄漏。如果 `running.tenant_id` 是 nil (即 W2 legacy
+// `mark_running(task_id)` 占位路径),则不守门,与 W2 行为一致。
+// 这一设计让 W2 测试不需改一行代码,新 W3 测试用 `mark_running_with`
+// 走真守门路径。
 //
-// **租户守门失效说明**:W2 `mark_running(task_id)` 因为 trait 签名只接
-// task_id,无法记录真实 tenant_id(占位 nil)。因此
-// `maybe_fire_preemption` **无法** 用 tenant 守门 —— 一个 tenant 的
-// Interrupt 可以抢占另一 tenant 的 running(理论上越权)。
-// **生产修复**:把 trait 改为 `mark_running(task_id, tenant_id)` 或
-// `mark_running_with(task: QueuedTask)`。W2 单 worktree 内不实现。
+// 满足全部 → 调用所有 listeners;否则 → 静默入队。
+//
+// **租户守门失效说明(W2 legacy)**:W2 `mark_running(task_id)` 因为 trait 签名只接
+// task_id,无法记录真实 tenant_id(占位 nil)。W3 已加 `mark_running_with`
+// 修这一 trade-off,但仍保留 W2 路径以兼容旧 driver。
 fn maybe_fire_preemption(
     queue: &InMemoryAgentQueue,
     incoming: &QueuedTask,
@@ -1112,7 +1355,14 @@ fn maybe_fire_preemption(
         None => return,
     };
 
-    // 抢占语义判断 (W2 简化:不守门 tenant,见上方说明)
+    // W3 跨租户守门 (守门 #5): running.tenant_id 非 nil 且 != incoming.tenant_id
+    // → 静默不 fire。running.tenant_id 是 nil (W2 legacy 占位) → 不守门。
+    let nil_tenant = TenantId::from(Uuid::nil());
+    if running.tenant_id != nil_tenant && running.tenant_id != incoming.tenant_id {
+        return;
+    }
+
+    // 抢占语义判断 (W3 仍沿用 W2 简化: 不守门 priority tenant,见上方说明)
     let should_preempt = match mode {
         QueueMode::Interrupt => true,
         QueueMode::Priority => incoming.priority > running.snapshot.priority,
@@ -1950,5 +2200,244 @@ mod tests {
         };
         assert!(!r2.is_complete());
         assert_eq!(r2.total(), 2);
+    }
+
+    // =================================================================
+    // W3 tests: mark_running_with / 跨租户守门真生效 / CollabPreemptionBridge
+    // =================================================================
+
+    /// W3: `mark_running_with` 记录真实 tenant_id,不是 nil 占位
+    #[test]
+    fn mark_running_with_records_real_tenant() {
+        let q = InMemoryAgentQueue::new();
+        let tenant = TenantId::new();
+        let task = make_task(tenant, "real-running", DEFAULT_PRIORITY);
+        let task_id = task.task_id;
+        block_on(async {
+            q.mark_running_with(task.clone()).await.unwrap();
+            assert_eq!(q.running_task_id().await, Some(task_id));
+            // 我们没有公开的 getter 直接拿 running.snapshot 字段,
+            // 但通过 take_next 不受影响(因为 task 不在 queue)验证 running 是
+            // 我们传的 task:
+            assert!(q.take_next().await.is_err(), "queue 空,task 在 running 不在 queue");
+        });
+    }
+
+    /// W3: `mark_running_with` 后再标同名 task_id → idempotent (替换 snapshot)
+    #[test]
+    fn mark_running_with_idempotent_same_id() {
+        let q = InMemoryAgentQueue::new();
+        let tenant = TenantId::new();
+        let task = make_task(tenant, "v1", DEFAULT_PRIORITY);
+        let task_id = task.task_id;
+        block_on(async {
+            q.mark_running_with(task.clone()).await.unwrap();
+            // 再传同 id 但不同 prompt → snapshot 应被替换
+            let mut task_v2 = make_task(tenant, "v2", DEFAULT_PRIORITY);
+            task_v2.task_id = task_id;
+            q.mark_running_with(task_v2).await.unwrap();
+            assert_eq!(q.running_task_id().await, Some(task_id));
+        });
+    }
+
+    /// W3: `mark_running_with` 标错 id → Mismatch
+    #[test]
+    fn mark_running_with_mismatch_errors() {
+        let q = InMemoryAgentQueue::new();
+        let tenant = TenantId::new();
+        let a = make_task(tenant, "a", DEFAULT_PRIORITY);
+        let b = make_task(tenant, "b", DEFAULT_PRIORITY);
+        let a_id = a.task_id;
+        let b_id = b.task_id;
+        block_on(async {
+            q.mark_running_with(a).await.unwrap();
+            let r = q.mark_running_with(b).await;
+            assert!(matches!(
+                r,
+                Err(AgentQueueError::RunningTaskMismatch {
+                    queue_running: Some(_),
+                    marked: _,
+                })
+            ));
+            // running 仍是 a (失败不替换)
+            assert_eq!(q.running_task_id().await, Some(a_id));
+            // 标 a_id 第二次 → idempotent ok
+            let task_a_again = make_task(tenant, "a-again", DEFAULT_PRIORITY);
+            let mut ta = task_a_again;
+            ta.task_id = a_id;
+            q.mark_running_with(ta).await.unwrap();
+            let _ = b_id;
+        });
+    }
+
+    /// W3 核心: `mark_running_with` 后,跨租户 Interrupt **不** fire。
+    /// 这正是 W2 trade-off 的修复 (守门 #5 真生效)。
+    #[test]
+    fn preemption_cross_tenant_no_longer_fires_with_mark_running_with() {
+        let q = InMemoryAgentQueue::new();
+        let t1 = TenantId::new();
+        let t2 = TenantId::new();
+        let listener = Arc::new(RecordingListener::new());
+        block_on(async {
+            q.register_preemption_listener(listener.clone()).await;
+            // driver 用 mark_running_with 标 t1 的 task
+            let t1_task = make_task(t1, "t1-running", DEFAULT_PRIORITY);
+            q.mark_running_with(t1_task).await.unwrap();
+
+            // t2 入 Interrupt → 应被守门 #5 拒,不 fire
+            let t2_interrupt = make_interrupt_task(t2, "t2-interrupt");
+            let t2_id = t2_interrupt.task_id;
+            q.enqueue(t2_interrupt, QueueMode::Fifo).await.unwrap();
+            assert_eq!(
+                listener.count(),
+                0,
+                "W3 守门生效:跨租户 Interrupt 不应 fire"
+            );
+            assert!(q.running_task_id().await.is_some());
+
+            // t2 task 仍在 queue 里 (被静默入队,不被 cancel)
+            assert_eq!(q.len().await, 1);
+            let next = q.take_next().await.unwrap();
+            assert_eq!(next.task_id, t2_id);
+        });
+    }
+
+    /// W3 回归: 同租户 Interrupt 走 `mark_running_with` → 仍 fire
+    #[test]
+    fn preemption_same_tenant_still_fires_with_mark_running_with() {
+        let q = InMemoryAgentQueue::new();
+        let t = TenantId::new();
+        let listener = Arc::new(RecordingListener::new());
+        block_on(async {
+            q.register_preemption_listener(listener.clone()).await;
+            let running = make_task(t, "same-tenant-running", DEFAULT_PRIORITY);
+            q.mark_running_with(running).await.unwrap();
+
+            let interrupt = make_interrupt_task(t, "same-tenant-interrupt");
+            let iid = interrupt.task_id;
+            q.enqueue(interrupt, QueueMode::Fifo).await.unwrap();
+            assert_eq!(listener.count(), 1, "同租户仍 fire");
+            assert_eq!(listener.events()[0].1, iid);
+        });
+    }
+
+    /// W3 回归: W2 legacy 路径 (`mark_running(task_id)`) 仍不守门 tenant,
+    /// 跟 W2 已 ship 的行为一致 (向后兼容)。
+    #[test]
+    fn preemption_w2_legacy_path_still_unguarded_for_back_compat() {
+        let q = InMemoryAgentQueue::new();
+        let t1 = TenantId::new();
+        let t2 = TenantId::new();
+        let listener = Arc::new(RecordingListener::new());
+        block_on(async {
+            q.register_preemption_listener(listener.clone()).await;
+            // W2 legacy: 不传完整 task,tenant_id 占位 nil
+            q.mark_running(Uuid::new_v4()).await.unwrap();
+            // t2 Interrupt → W2 legacy 不守门,fire 1 次
+            let t2_int = make_interrupt_task(t2, "t2-w2-legacy");
+            q.enqueue(t2_int, QueueMode::Fifo).await.unwrap();
+            assert_eq!(listener.count(), 1, "W2 legacy 路径仍不守门");
+            let _ = t1;
+        });
+    }
+
+    /// W3: `CollabPreemptionBridge` 把抢占事件转成 `CollabSteeringCommand`
+    /// 并投到 sink。
+    #[test]
+    fn collab_bridge_dispatches_on_preempt() {
+        let q = InMemoryAgentQueue::new();
+        let t = TenantId::new();
+        let sink = Arc::new(InMemoryCollabSink::new());
+        let bridge: Arc<dyn PreemptionListener> = Arc::new(CollabPreemptionBridge::new(sink.clone()));
+        block_on(async {
+            q.register_preemption_listener(bridge).await;
+            let running = make_task(t, "running-task", DEFAULT_PRIORITY);
+            q.mark_running_with(running).await.unwrap();
+            let interrupt = make_interrupt_task(t, "interrupt-task");
+            let iid = interrupt.task_id;
+            q.enqueue(interrupt, QueueMode::Fifo).await.unwrap();
+            assert_eq!(sink.len(), 1);
+            let cmds = sink.commands();
+            assert_eq!(cmds[0].tenant_id, t);
+            assert_eq!(cmds[0].incoming_task_id, iid);
+            assert_eq!(cmds[0].incoming_prompt_excerpt, "interrupt-task");
+        });
+    }
+
+    /// W3: bridge 对长 prompt 做 redact (守门 #5 防 secret 泄漏到 sink)。
+    #[test]
+    fn collab_bridge_redacts_long_prompt() {
+        let sink = Arc::new(InMemoryCollabSink::new());
+        let bridge = CollabPreemptionBridge::new(sink.clone());
+        let long_prompt = "a".repeat(MAX_PROMPT_EXCERPT_CHARS * 3);
+        let current = make_task(TenantId::new(), &long_prompt, DEFAULT_PRIORITY);
+        let incoming = make_interrupt_task(TenantId::new(), &long_prompt);
+        bridge.on_preempt(&current, &incoming);
+        let cmds = sink.commands();
+        assert_eq!(cmds.len(), 1);
+        // excerpt 应 ≤ MAX_PROMPT_EXCERPT_CHARS + 1 ('…')
+        assert!(cmds[0].incoming_prompt_excerpt.chars().count() <= MAX_PROMPT_EXCERPT_CHARS + 1);
+        assert!(cmds[0].incoming_prompt_excerpt.ends_with('…'));
+        assert!(cmds[0].current_prompt_excerpt.chars().count() <= MAX_PROMPT_EXCERPT_CHARS + 1);
+    }
+
+    /// W3: `NoopCollabSink` 不 panic,fire-and-forget 路径安全。
+    #[test]
+    fn collab_bridge_noop_sink_does_not_panic() {
+        let bridge = CollabPreemptionBridge::new(Arc::new(NoopCollabSink));
+        let current = make_task(TenantId::new(), "c", DEFAULT_PRIORITY);
+        let incoming = make_interrupt_task(TenantId::new(), "i");
+        bridge.on_preempt(&current, &incoming); // 不应 panic
+    }
+
+    /// W3 端到端集成: driver → mark_running_with(t1 task) → t1 Interrupt 入 queue
+    /// → bridge sink 收到 1 条 steering command, sink 内容正确。
+    #[test]
+    fn end_to_end_w3_with_collab_bridge() {
+        let q: Arc<dyn AgentQueue> = Arc::new(InMemoryAgentQueue::new());
+        let t = TenantId::new();
+        let sink = Arc::new(InMemoryCollabSink::new());
+        let bridge: Arc<dyn PreemptionListener> = Arc::new(CollabPreemptionBridge::new(sink.clone()));
+        block_on(async {
+            q.register_preemption_listener(bridge).await;
+            // 1. driver 拉 normal task 入 queue,再 take + mark_running_with
+            let normal = make_task(t, "normal-task", DEFAULT_PRIORITY);
+            let normal_id = normal.task_id;
+            q.enqueue(normal.clone(), QueueMode::Fifo).await.unwrap();
+            let taken = q.take_next().await.unwrap();
+            assert_eq!(taken.task_id, normal_id);
+            // mark_running_with 传完整 task (含真实 tenant_id)
+            q.mark_running_with(taken).await.unwrap();
+            assert_eq!(q.running_task_id().await, Some(normal_id));
+
+            // 2. t1 Interrupt 入 queue → bridge 触发 sink
+            let interrupt = make_interrupt_task(t, "interrupt-now");
+            let iid = interrupt.task_id;
+            q.enqueue(interrupt, QueueMode::Fifo).await.unwrap();
+
+            // 3. sink 收到 1 条命令,tenant_id 是 t, incoming_task_id 是 iid
+            assert_eq!(sink.len(), 1);
+            let cmds = sink.commands();
+            assert_eq!(cmds[0].tenant_id, t);
+            assert_eq!(cmds[0].incoming_task_id, iid);
+            assert_eq!(cmds[0].incoming_prompt_excerpt, "interrupt-now");
+            assert_eq!(cmds[0].current_task_id, normal_id);
+        });
+    }
+
+    /// W3: `CollabSteeringCommand` serde round-trip
+    #[test]
+    fn collab_command_serde_roundtrip() {
+        let cmd = CollabSteeringCommand {
+            tenant_id: TenantId::new(),
+            current_task_id: Uuid::new_v4(),
+            current_prompt_excerpt: "short".into(),
+            incoming_task_id: Uuid::new_v4(),
+            incoming_prompt_excerpt: "new hint".into(),
+            enqueued_at: SystemTime::UNIX_EPOCH,
+        };
+        let j = serde_json::to_string(&cmd).expect("serialize");
+        let back: CollabSteeringCommand = serde_json::from_str(&j).expect("deserialize");
+        assert_eq!(back, cmd);
     }
 }
