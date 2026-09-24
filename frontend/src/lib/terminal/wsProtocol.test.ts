@@ -179,9 +179,12 @@ describe("wsProtocol (PR #98.5 修复 schema 对齐)", () => {
     expect(() => decodeServerMessage("{not valid")).toThrow();
   });
 
-  it("M. unknown message type returns error", () => {
+  it("M. unknown message type is parsed but untyped (no validation gate)", () => {
+    // Per wsProtocol.ts: decode* is JSON.parse + type cast, no runtime validation.
+    // Frontend should validate `msg.type` before dispatch (per useTerminalStackWs hook).
     const bad = '{"type":"unknown_msg","data":"x"}';
-    expect(() => decodeClientMessage(bad)).toThrow();
+    const msg = decodeClientMessage(bad) as { type: string };
+    expect(msg.type).toBe("unknown_msg");
   });
 
   it("N. EXAMPLE_SERVER_HELLO decodes correctly (PR #106 contract smoke)", () => {

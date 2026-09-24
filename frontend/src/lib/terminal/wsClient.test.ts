@@ -5,7 +5,12 @@
 // =====================================================================
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+
+// (placeholder pattern removed - use direct globalThis assignment in class block below)
+
 import { TerminalWsClient } from "./wsClient";
+
 
 // Mock WebSocket class
 class MockWebSocket {
@@ -51,15 +56,62 @@ class MockWebSocket {
 let mockWs: MockWebSocket | null = null;
 let mockWsUrl = "";
 
-// @ts-expect-error mock global
-globalThis.WebSocket = vi.fn().mockImplementation((url: string) => {
-  mockWs = new MockWebSocket(url);
-  mockWsUrl = url;
-  return mockWs;
-});
+// Simple proxy class that delegates everything to the inner MockWebSocket
+// This is needed because wsClient.ts uses `new WebSocket(url)` which must return a proper instance
+class MockWebSocketCtor implements MockWebSocket {
+  // WebSocket standard constants (per real WebSocket spec)
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+  readyState = MockWebSocketCtor.CONNECTING;
+  onopen: ((e: unknown) => void) | null = null;
+  onclose: ((e: unknown) => void) | null = null;
+  onerror: ((e: unknown) => void) | null = null;
+  onmessage: ((e: unknown) => void) | null = null;
+  binaryType = "";
+  sent: string[] = [];
+  url = "";
+
+  constructor(url: string) {
+    this.url = url;
+    this.sent = [];
+    mockWsUrl = url;
+    // Set outer mockWs so test code can access via `mockWs!.sent`
+    mockWs = this as unknown as MockWebSocket;
+  }
+  send(data: string) {
+    this.sent.push(data);
+  }
+  close() {
+    this.readyState = 3;
+    if (this.onclose) this.onclose({});
+  }
+  triggerOpen() {
+    this.readyState = 1;
+    if (this.onopen) this.onopen({});
+  }
+  triggerMessage(data: string) {
+    if (this.onmessage) this.onmessage({ data });
+  }
+  triggerError() {
+    if (this.onerror) this.onerror({});
+  }
+  triggerClose() {
+    this.readyState = 3;
+    if (this.onclose) this.onclose({});
+  }
+}
+vi.stubGlobal("WebSocket", MockWebSocketCtor);
 
 describe("TerminalWsClient (PR #98.5)", () => {
+  beforeAll(() => {
+    // Use vi.stubGlobal to override jsdom's read-only WebSocket
+    vi.stubGlobal("WebSocket", MockWebSocketCtor);
+  });
   beforeEach(() => {
+    // Re-stub before each test to ensure MSW didn't reset
+    vi.stubGlobal("WebSocket", MockWebSocketCtor);
     mockWs = null;
     mockWsUrl = "";
   });
