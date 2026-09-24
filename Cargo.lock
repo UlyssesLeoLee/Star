@@ -1093,6 +1093,7 @@ dependencies = [
  "star-context",
  "thiserror",
  "tokio",
+ "tracing",
  "uuid",
 ]
 

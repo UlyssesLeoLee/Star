@@ -232,6 +232,33 @@ pub struct CollabSteeringCommand {
     pub enqueued_at: SystemTime,
 }
 
+impl CollabSteeringCommand {
+    /// **new** -- 构造 CollabSteeringCommand(cross-crate caller 用,
+    /// 因为 struct 是 `#[non_exhaustive]`,同 crate 内可用 struct literal,
+    /// 跨 crate 必须用 constructor)。
+    ///
+    /// **ULYS-207 PI-9 W4 P-B**:application crate 胶水 `SteeringSinkBridge`
+    /// 调此方法构造 CollabSteeringCommand 转 `domain_comment::SteeringCommand`。
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        tenant_id: TenantId,
+        current_task_id: Uuid,
+        current_prompt_excerpt: String,
+        incoming_task_id: Uuid,
+        incoming_prompt_excerpt: String,
+        enqueued_at: SystemTime,
+    ) -> Self {
+        Self {
+            tenant_id,
+            current_task_id,
+            current_prompt_excerpt,
+            incoming_task_id,
+            incoming_prompt_excerpt,
+            enqueued_at,
+        }
+    }
+}
+
 /// 截 prompt 到 `MAX_PROMPT_EXCERPT_CHARS` 字符，超过部分加 "…"。
 /// 守门 #5: 不让长 prompt 全文进协作评论载荷。
 fn redact_excerpt(prompt: &str) -> String {
