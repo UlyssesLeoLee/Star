@@ -31,6 +31,7 @@
       "operation": "task_queue_check",
       "http_method": "GET"
     },
+    "mock_switch_trace": "cluster.enabled=true, cluster.mode=offline, cluster.aci_compat_version=0.1.0-draft, [TBD plugins section 落地後擴充]",
     "expect": {
       "type": "response_within_ms",
       "value": 10,

@@ -231,15 +231,114 @@ LLM agent 主用例: 一行指令获取 mock 结果概览, 不必逐个 fixture 
 **完整设计稿**: `docs/architecture/2026-09-22-aci-mock-interface/00-design-analysis.md` v0.2
 **Brief v0.1**: `docs/briefs/ulys-191-star-mock-aci-stage1.md`
 
-## 6. 跨项目引用 (per 守门 #12 + AGENTS.md §5 仓库拓扑)
+## 6. Mock Cluster Switch (per ULYS-190 §4.1 brief v0.1)
+
+### 6.1 目的
+
+ULYS-190 落地阶段 1: 给 Star mock 加 **L1 cluster_switch** 雛形, 控制整個 cluster 啟用 / 關閉 / 模式 (offline / passthrough / proxy)。
+配合 ULYS-191 ACI emit 帶 `mock_switch_trace` 字段 (per §5.3 + design-analysis §3.4), LLM 一眼看出「是 mock 模擬的 X 功能 vs 真實的 Y 服務」失敗。
+
+### 6.2 顶层配置 `.mock-cluster.json`
+
+```json
+{
+  "$schema": "https://ulysses-star.local/schemas/mock-cluster/v0.1.0-draft.json",
+  "cluster_version": "0.1.0-draft",
+  "project": "star-flash-mock",
+  "cluster_id": "star-flash-mock--dev-cluster",
+  "enabled": true,
+  "mode": "offline",
+  "fallback_to_real": false,
+  "aci_compat_version": "0.1.0-draft",
+  "supported_layers": ["ut", "it", "st", "e2e"],
+  "tags_taxonomy": ["perf", "kms", "rbac", "auth", "concurrency", "regression"]
+}
+```
+
+**字段說明**:
+
+| 字段 | 必填 | 含義 |
+|---|---|---|
+| `cluster_version` | ✅ | schema 版本 (semver, 跟 `.aci.json` `aci_version` 對齊) |
+| `project` | ✅ | mock 項目名 (跟 `.aci.json` `project` 字段一致) |
+| `cluster_id` | ✅ | cluster 全局唯一 ID (e.g. `<project>--<env>`) |
+| `enabled` | ✅ | bool, 整個 cluster 啟用 / 關閉; false = 全部 fixture 不 dispatch |
+| `mode` | ✅ | `offline` / `passthrough` / `proxy` (per §6.3 模式說明) |
+| `fallback_to_real` | 🟡 | bool, mock 失敗時是否 fallback 真實服務 (預設 false, mock 失敗暴露給測試) |
+| `aci_compat_version` | ✅ | 對齊 `.aci.json` `aci_version` (e.g. `"0.1.0-draft"`); 不一致則 dispatcher 報錯 |
+
+### 6.3 三種 mode 說明
+
+| mode | 含義 | LLM 看到的 mock_switch_trace |
+|---|---|---|
+| `offline` | mock 完全本地模擬, 不連真實服務 | `cluster.mode=offline` |
+| `passthrough` | mock 轉發到真實服務, 只 mock 部分欄位 | `cluster.mode=passthrough` |
+| `proxy` | mock 作為 reverse proxy, mock 記錄所有進 / 出 (trace 用) | `cluster.mode=proxy` |
+
+### 6.4 reader helper (`scripts/_lib_mock_switch.py`)
+
+```bash
+# 1. is-enabled: exit 0=enabled, 1=disabled
+python3 scripts/_lib_mock_switch.py is-enabled --cluster-config .mock-cluster.json
+# 期望: CLUSTER_ENABLED=true (exit 0)
+
+# 2. get-mode: print cluster mode
+python3 scripts/_lib_mock_switch.py get-mode --cluster-config .mock-cluster.json
+# 期望: CLUSTER_MODE=offline (exit 0)
+
+# 3. trace: print mock_switch_trace 字符串 (per §5.3 ACI emit 用)
+python3 scripts/_lib_mock_switch.py trace --cluster-config .mock-cluster.json
+# 期望: cluster.enabled=true, cluster.mode=offline, cluster.aci_compat_version=0.1.0-draft, [TBD plugins section 落地後擴充]
+
+# 4. validate-compat: 校验 .aci.json aci_version 跟 .mock-cluster.json aci_compat_version 一致
+python3 scripts/_lib_mock_switch.py validate-compat \
+    --cluster-config .mock-cluster.json --aci-config .aci.json
+# 期望: ACI_COMPAT=OK (cluster=0.1.0-draft) (exit 0); 不一致 exit 3
+```
+
+### 6.5 跟 ACI emit 拼接 (per §5.4 `_lib_aci_emit.py`)
+
+`_lib_aci_emit.py` 加 `mock_switch_trace` 字段 (per ULYS-190 §3.4 + brief v0.1 §1.1 item 5):
+
+```bash
+# 推荐: 从 _lib_mock_switch.py 拼接 trace, 再传入 emit
+TRACE=$(python3 scripts/_lib_mock_switch.py trace --cluster-config .mock-cluster.json)
+python3 scripts/_lib_aci_emit.py emit \
+    --assertion-id "star-flash-mock:test:g-99" \
+    --layer it \
+    --scope project=star-flash-mock,module=guards,domain=admin \
+    --expect-type response_within_ms --expect-value 2000 --expect-description "expect 2s" \
+    --actual-type response_within_ms --actual-value 5 --actual-description "actual 5ms" \
+    --status PASS --severity info \
+    --reasoning "test emit with mock_switch_trace" \
+    --mock-switch-trace "$TRACE" \
+    --output /tmp/test.aci.json
+```
+
+### 6.6 Stage 1 落地状态 (per brief v0.1)
+
+- ✅ `.mock-cluster.json` (本项目根, L1 cluster_switch 契约)
+- ✅ `_lib_mock_switch.py` (Python reader, MockSwitchReader class + 4 CLI 子命令)
+- ✅ `.aci.json` 加 `aci_compat_version` 字段 (per brief §1.1 item 3)
+- ✅ G-1 sample fixture 加 `mock_switch_trace` 字段 (per brief §1.1 item 4)
+- ✅ `_lib_aci_emit.py` 加 `mock_switch_trace` 参数 + `--mock-switch-trace` CLI flag (per brief §1.1 item 5)
+- ⏳ Stage 2: 全量 5 sample fixture 加 `mock_switch_trace` (per §4.4 + G-MS-04 跨項目 plugin_id 命名, 第 2 笔 brief)
+- ⏳ Stage 3: L2 plugin_switch + L3 module_switch (per design-analysis §4.2-§4.4, 6 项目 brief)
+- ⏳ Stage 4: 跨项目 CI 加 `mock-switch-validate` (per design-analysis §4.5)
+
+**完整设计稿**: `docs/architecture/2026-09-22-mock-switches/00-design-analysis.md` v0.2
+**Brief v0.1**: `docs/briefs/ulys-190-star-mock-cluster-switch-stage1.md`
+
+## 7. 跨项目引用 (per 守门 #12 + AGENTS.md §5 仓库拓扑)
 
 - **不**引用 RGS 仓 (`D:\RustGameServer\tools\rgs-flash-mock`): 仅治理结构镜像, fixture 不双向同步
 - **不**引用 RGS 5 域 Lead 真人: Star 仓 5 域 Lead 临时代签 per AGENTS.md §4 #3 反转
 - **不**建立业务子域↔DDD bounded context 映射: fixture 用 module 维度 (per 守门 #3)
 
-## 7. 修订历史 (per 守门 #12)
+## 8. 修订历史 (per 守门 #12)
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版: 脚手架 (scripts/ + mock_data/ + docs/ + k3s/) + 165 份 fixture 估算 + 9 份回归脚本 + 7 份守门落档; 迁移 docs/reports/wiremock-openclaw 20 份 → mock_data/openclaw/ | 2026-09-05 06:50 JST user 拍板 (单文件 v0.6 → v0.7 + 新建 tools/star-flash-mock/ + 全栈覆盖) |
 | v0.2 | 2026-09-05 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | P5 升版: 110 fixture 落地 (45 M + 49 T + 16 W) 100% 覆蓋 100 表; +98 fixture 透过 _generate_100_fixtures.py 可再生; +regression-test-db-wtm-100.sh 9 段走查 PASS; +W-T-M-100-COVERAGE-REPORT.md v0.1; 派生守門 10 条 CW-01~CW-10 全部 PASS; 守门 #5/#11/#12/#13 a/b/c/d 0 违反 | 2026-09-05 06:50 JST user 拍板 "推进" + P5 DB W/T/M 100% 表覆蓋 (推荐) |
+| v0.3 | 2026-09-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | ULYS-190 §4.1 brief Stage 1: +`.mock-cluster.json` (L1 cluster_switch 契约) +`_lib_mock_switch.py` (MockSwitchReader class + 4 CLI 子命令: is-enabled/get-mode/trace/validate-compat) +`.aci.json` 加 `aci_compat_version` 字段 +`mock_data/agent-runtime/guards/v1--guard--g-1.json` 加 `mock_switch_trace` 字段 +`_lib_aci_emit.py` 加 `mock_switch_trace` 参数 + `--mock-switch-trace` CLI flag + README §6 Mock Cluster Switch (6.1 目的 / 6.2 .mock-cluster.json / 6.3 mode / 6.4 reader helper / 6.5 ACI emit 拼接 / 6.6 Stage 1 状态); regression-test-system.sh 13/13 PASS + regression-test-agent-runtime.sh PASS + validate-compat OK; 守门 #1+#5+#7+#10+#11+#13+#14v4+#15+#19v19+#20+#24 0 违反 | 2026-09-23 23:02 JST user 拍板「推进」(per reply `01a0d081`) T1 派工触發 + brief v0.1 (per commit `0f199757` ULYS-190 v0.2 approved) |
