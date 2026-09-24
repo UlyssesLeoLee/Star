@@ -1018,18 +1018,21 @@ impl SteeringSinkBridge {
 impl domain_agent::queue::CollabCommentSink for SteeringSinkBridge {
     fn dispatch_steering(&self, cmd: domain_agent::queue::CollabSteeringCommand) {
         // 把 domain-agent 的 CollabSteeringCommand 转 domain-comment 的 SteeringCommand
-        // 注:CollabSteeringCommand 不带 agent_id / agent_session_id (per W3 简化设计);
-        //     bridge 用 tenant + task_id 占位 — 由后续 PI-9 W5 (per D-Boy 决策) 加 QueuedTask
-        //     完整字段透传。本 W4 走 P-B 路径:agent_id = 占位 nil,agent_session_id = incoming_task_id。
+        // **ULYS-207 PI-9 W5**:CollabSteeringCommand 现带 4 个真实
+        // agent/session 字段(current_agent_id / current_session_id /
+        // incoming_agent_id / incoming_session_id)。Bridge 透传真实值,
+        // **不再**用 `incoming_task_id` 占位(per W4 已知 trade-off fix path)。
+        // SteeringCommand.agent_id 用 incoming_agent_id (steering 触发来自
+        // incoming);SteeringCommand.agent_session_id 用 incoming_session_id
+        // (作 ParentType::AgentSession 的 parent_id)。
         let steering_cmd = domain_comment::SteeringCommand::new(
             domain_comment::TenantId::from(cmd.tenant_id.as_uuid()),
             cmd.current_task_id,
             cmd.current_prompt_excerpt,
             cmd.incoming_task_id,
             cmd.incoming_prompt_excerpt,
-            // agent_id 占位 = incoming_task_id (不能 nil,ActorContext::new INV-ACT-01 守门)
-            domain_comment::AgentId::from(cmd.incoming_task_id),
-            cmd.incoming_task_id, // agent_session_id 占位 = incoming_task_id
+            domain_comment::AgentId::from(cmd.incoming_agent_id.as_uuid()),
+            cmd.incoming_session_id.as_uuid(),
         );
         self.inner.dispatch_steering(steering_cmd);
     }
@@ -1204,12 +1207,22 @@ use domain_agent::TenantId;
         let bridge = SteeringSinkBridge::new(recorder.clone());
 
         let tenant = TenantId::from(uuid::Uuid::new_v4());
+        // **ULYS-207 PI-9 W5**:agent_id / session_id 用真实 UUID 占位(不再
+        // 用 task_id 占位)。后续 CollabPreemptionBridge 透传 QueuedTask 真值。
+        let current_agent = domain_agent::AgentId::from(uuid::Uuid::new_v4());
+        let current_session = domain_agent::AgentSessionId::from(uuid::Uuid::new_v4());
+        let incoming_agent = domain_agent::AgentId::from(uuid::Uuid::new_v4());
+        let incoming_session = domain_agent::AgentSessionId::from(uuid::Uuid::new_v4());
         let cmd = CollabSteeringCommand::new(
             tenant,
             uuid::Uuid::new_v4(),
             "current task prompt excerpt".to_string(),
+            current_agent,
+            current_session,
             uuid::Uuid::new_v4(),
             "incoming task prompt excerpt".to_string(),
+            incoming_agent,
+            incoming_session,
             std::time::SystemTime::now(),
         );
 
@@ -1224,8 +1237,27 @@ use domain_agent::TenantId;
         assert_eq!(got.incoming_task_id, cmd.incoming_task_id);
         assert_eq!(got.current_prompt_excerpt, cmd.current_prompt_excerpt);
         assert_eq!(got.incoming_prompt_excerpt, cmd.incoming_prompt_excerpt);
-        // agent_session_id 占位 = incoming_task_id (per W4 P-B 设计)
-        assert_eq!(got.agent_session_id, cmd.incoming_task_id);
+        // **ULYS-207 PI-9 W5**:agent_id / agent_session_id 透传真实值
+        // (不再用 incoming_task_id 占位 — per W4 已知 trade-off fix path)。
+        assert_eq!(
+            got.agent_id.as_uuid(),
+            cmd.incoming_agent_id.as_uuid(),
+            "agent_id must come from incoming_agent_id (W5)"
+        );
+        assert_eq!(
+            got.agent_session_id, cmd.incoming_session_id.as_uuid(),
+            "agent_session_id must come from incoming_session_id (W5)"
+        );
+        // 守门:透传真实值 ≠ 任何 task_id 占位
+        assert_ne!(
+            got.agent_id.as_uuid(),
+            cmd.incoming_task_id,
+            "W5 forbids W4 placeholder = incoming_task_id"
+        );
+        assert_ne!(
+            got.agent_session_id, cmd.incoming_task_id,
+            "W5 forbids W4 placeholder = incoming_task_id"
+        );
     }
 
     #[tokio::test]
@@ -1236,16 +1268,28 @@ use domain_agent::TenantId;
         let bridge = SteeringSinkBridge::new(Arc::new(adapter));
 
         let tenant = TenantId::from(uuid::Uuid::new_v4());
+        // **ULYS-207 PI-9 W5**:agent_id / session_id 真实值
+        let current_agent = domain_agent::AgentId::from(uuid::Uuid::new_v4());
+        let current_session = domain_agent::AgentSessionId::from(uuid::Uuid::new_v4());
+        let incoming_agent = domain_agent::AgentId::from(uuid::Uuid::new_v4());
+        let incoming_session = domain_agent::AgentSessionId::from(uuid::Uuid::new_v4());
         let cmd = CollabSteeringCommand::new(
             tenant,
             uuid::Uuid::new_v4(),
             "old".to_string(),
+            current_agent,
+            current_session,
             uuid::Uuid::new_v4(),
             "new".to_string(),
+            incoming_agent,
+            incoming_session,
             std::time::SystemTime::now(),
         );
 
-        let parent_id_for_query = cmd.incoming_task_id;
+        // **ULYS-207 PI-9 W5**:parent_id_for_query 现在是真实
+        // incoming_session_id(不再是 incoming_task_id 占位)
+        let parent_id_for_query = cmd.incoming_session_id.as_uuid();
+        let expected_agent_id = cmd.incoming_agent_id.as_uuid();
         bridge.dispatch_steering(cmd);
 
         // 给 sink 时间 block_on 创建 comment
@@ -1267,6 +1311,12 @@ use domain_agent::TenantId;
         assert_eq!(c.parent_type, domain_comment::ParentType::AgentSession);
         assert!(c.author_agent_id.is_some(), "INV-C-05: agent author required");
         assert!(c.author_user_id.is_none());
+        // **ULYS-207 PI-9 W5**:author_agent_id 用真实 incoming_agent_id
+        assert_eq!(
+            c.author_agent_id.unwrap().as_uuid(),
+            expected_agent_id,
+            "W5: author_agent_id must come from real incoming_agent_id, not task_id placeholder"
+        );
         assert!(c.body.contains("old"));
         assert!(c.body.contains("new"));
     }

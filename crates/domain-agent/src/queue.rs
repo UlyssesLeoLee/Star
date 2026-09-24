@@ -213,8 +213,14 @@ pub const MAX_PROMPT_EXCERPT_CHARS: usize = 80;
 /// `current_prompt_excerpt` / `incoming_prompt_excerpt` 是被 redacted 的
 /// 短摘（最长 [`MAX_PROMPT_EXCERPT_CHARS`] 字符）—— 不是 prompt 全文。
 ///
-/// `#[non_exhaustive]` 允许未来加 field（如 `agent_id` / `session_id`）
-/// 而不破坏下游。
+/// **ULYS-207 PI-9 W5**:`current_agent_id` / `current_session_id` /
+/// `incoming_agent_id` / `incoming_session_id` 在 W5 落地,**透传自
+/// `QueuedTask`**,不再用 `task_id` 占位（per W4 已知 trade-off fix path）。
+/// Bridge 取真实 `AgentId` / `AgentSessionId`,application 层
+/// `SteeringSinkBridge` 透传到 `domain_comment::SteeringCommand` 用作
+/// `comment.author_agent_id` 与 `parent_id = ParentType::AgentSession`。
+///
+/// `#[non_exhaustive]` 允许未来加 field 而不破坏下游。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct CollabSteeringCommand {
@@ -224,10 +230,18 @@ pub struct CollabSteeringCommand {
     pub current_task_id: Uuid,
     /// current 任务的 prompt 摘要（已 redact）
     pub current_prompt_excerpt: String,
+    /// **W5** 当前任务的 agent（透传自 `QueuedTask.agent_id`）
+    pub current_agent_id: AgentId,
+    /// **W5** 当前任务的 session（透传自 `QueuedTask.session_id`）
+    pub current_session_id: AgentSessionId,
     /// 新进的抢占/高优任务 ID
     pub incoming_task_id: Uuid,
     /// incoming 任务的 prompt 摘要（已 redact）
     pub incoming_prompt_excerpt: String,
+    /// **W5** incoming 任务的 agent（透传自 `QueuedTask.agent_id`）
+    pub incoming_agent_id: AgentId,
+    /// **W5** incoming 任务的 session（透传自 `QueuedTask.session_id`）
+    pub incoming_session_id: AgentSessionId,
     /// incoming 入队时间
     pub enqueued_at: SystemTime,
 }
@@ -237,23 +251,34 @@ impl CollabSteeringCommand {
     /// 因为 struct 是 `#[non_exhaustive]`,同 crate 内可用 struct literal,
     /// 跨 crate 必须用 constructor)。
     ///
-    /// **ULYS-207 PI-9 W4 P-B**:application crate 胶水 `SteeringSinkBridge`
-    /// 调此方法构造 CollabSteeringCommand 转 `domain_comment::SteeringCommand`。
+    /// **ULYS-207 PI-9 W4 P-B / W5**:application crate 胶水
+    /// `SteeringSinkBridge` 调此方法构造 CollabSteeringCommand 转
+    /// `domain_comment::SteeringCommand`。W5 加 `current_agent_id` /
+    /// `current_session_id` / `incoming_agent_id` / `incoming_session_id`
+    /// 4 个真实字段,W4 的 `incoming_task_id` 占位已废止。
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         tenant_id: TenantId,
         current_task_id: Uuid,
         current_prompt_excerpt: String,
+        current_agent_id: AgentId,
+        current_session_id: AgentSessionId,
         incoming_task_id: Uuid,
         incoming_prompt_excerpt: String,
+        incoming_agent_id: AgentId,
+        incoming_session_id: AgentSessionId,
         enqueued_at: SystemTime,
     ) -> Self {
         Self {
             tenant_id,
             current_task_id,
             current_prompt_excerpt,
+            current_agent_id,
+            current_session_id,
             incoming_task_id,
             incoming_prompt_excerpt,
+            incoming_agent_id,
+            incoming_session_id,
             enqueued_at,
         }
     }
@@ -377,12 +402,18 @@ impl CollabPreemptionBridge {
 impl PreemptionListener for CollabPreemptionBridge {
     fn on_preempt(&self, current: &QueuedTask, incoming: &QueuedTask) {
         // 构造 redact 过的 command。守门 #5: prompt 走摘要,不让 secret 进 sink
+        // **ULYS-207 PI-9 W5**:agent_id / session_id 透传自 QueuedTask,
+        // 不再用 incoming_task_id 占位(per W4 已知 trade-off fix path)。
         let cmd = CollabSteeringCommand {
             tenant_id: incoming.tenant_id,
             current_task_id: current.task_id,
             current_prompt_excerpt: redact_excerpt(&current.prompt),
+            current_agent_id: current.agent_id,
+            current_session_id: current.session_id,
             incoming_task_id: incoming.task_id,
             incoming_prompt_excerpt: redact_excerpt(&incoming.prompt),
+            incoming_agent_id: incoming.agent_id,
+            incoming_session_id: incoming.session_id,
             enqueued_at: incoming.created_at,
         };
         // fire-and-forget:sink 内部 panic 自负责（守门 #22）
@@ -2453,18 +2484,111 @@ mod tests {
     }
 
     /// W3: `CollabSteeringCommand` serde round-trip
+    /// W5: 扩 4 个新 agent/session 字段,验证 round-trip 仍一致
     #[test]
     fn collab_command_serde_roundtrip() {
         let cmd = CollabSteeringCommand {
             tenant_id: TenantId::new(),
             current_task_id: Uuid::new_v4(),
             current_prompt_excerpt: "short".into(),
+            current_agent_id: AgentId::new(),
+            current_session_id: AgentSessionId::new(),
             incoming_task_id: Uuid::new_v4(),
             incoming_prompt_excerpt: "new hint".into(),
+            incoming_agent_id: AgentId::new(),
+            incoming_session_id: AgentSessionId::new(),
             enqueued_at: SystemTime::UNIX_EPOCH,
         };
         let j = serde_json::to_string(&cmd).expect("serialize");
         let back: CollabSteeringCommand = serde_json::from_str(&j).expect("deserialize");
         assert_eq!(back, cmd);
+    }
+
+    /// **ULYS-207 PI-9 W5**:`CollabPreemptionBridge::on_preempt` 把
+    /// `QueuedTask.agent_id` / `session_id` 透传到 `CollabSteeringCommand` 的
+    /// 4 个新字段(current_agent_id / current_session_id /
+    /// incoming_agent_id / incoming_session_id),**不再用 `task_id` 占位**
+    /// (per W4 已知 trade-off fix path)。
+    #[test]
+    fn collab_bridge_w5_passes_real_agent_and_session_ids() {
+        let sink = Arc::new(InMemoryCollabSink::new());
+        let bridge = CollabPreemptionBridge::new(sink.clone());
+        let t = TenantId::new();
+        // current 和 incoming 用**不同**的 agent_id / session_id,确保
+        // W5 bridge 透传精确值,不丢字段或互相串。
+        let current = make_task(t, "current-prompt", DEFAULT_PRIORITY);
+        let incoming = make_interrupt_task(t, "incoming-prompt");
+        let current_agent = current.agent_id;
+        let current_session = current.session_id;
+        let incoming_agent = incoming.agent_id;
+        let incoming_session = incoming.session_id;
+
+        bridge.on_preempt(&current, &incoming);
+
+        let cmds = sink.commands();
+        assert_eq!(cmds.len(), 1, "bridge must dispatch exactly once");
+        let cmd = &cmds[0];
+        assert_eq!(cmd.current_agent_id, current_agent, "W5: current_agent_id from QueuedTask");
+        assert_eq!(cmd.current_session_id, current_session, "W5: current_session_id from QueuedTask");
+        assert_eq!(cmd.incoming_agent_id, incoming_agent, "W5: incoming_agent_id from QueuedTask");
+        assert_eq!(cmd.incoming_session_id, incoming_session, "W5: incoming_session_id from QueuedTask");
+        // 守门:4 个新字段 ≠ 任何 task_id(W4 占位 = incoming_task_id 已废止)
+        assert_ne!(cmd.current_agent_id.as_uuid(), current.task_id);
+        assert_ne!(cmd.current_session_id.as_uuid(), current.task_id);
+        assert_ne!(cmd.incoming_agent_id.as_uuid(), incoming.task_id);
+        assert_ne!(cmd.incoming_session_id.as_uuid(), incoming.task_id);
+    }
+
+    /// **ULYS-207 PI-9 W5**:W4 已知 `agent_id` / `agent_session_id` 占位 =
+    /// `incoming_task_id`。W5 修复:4 个新字段是真实 `AgentId` /
+    /// `AgentSessionId`,可以跟 `task_id` 完全独立。
+    #[test]
+    fn collab_command_w5_new_fields_independent_from_task_ids() {
+        let sink = Arc::new(InMemoryCollabSink::new());
+        let bridge = CollabPreemptionBridge::new(sink.clone());
+        let t = TenantId::new();
+        let current = make_task(t, "c", DEFAULT_PRIORITY);
+        let incoming = make_interrupt_task(t, "i");
+        bridge.on_preempt(&current, &incoming);
+        let cmd = &sink.commands()[0];
+        // 4 个新字段应都是非空 UUID(因为 `QueuedTask::new` 默认
+        // `AgentId::new() = Uuid::new_v4()`,不会撞 task_id)
+        assert!(!cmd.current_agent_id.as_uuid().is_nil());
+        assert!(!cmd.current_session_id.as_uuid().is_nil());
+        assert!(!cmd.incoming_agent_id.as_uuid().is_nil());
+        assert!(!cmd.incoming_session_id.as_uuid().is_nil());
+        // 跨字段独立性:任一字段都不应等于另一字段(W4 占位串同 UUID 的风险被消)
+        assert_ne!(cmd.current_agent_id.as_uuid(), cmd.current_session_id.as_uuid());
+        assert_ne!(cmd.incoming_agent_id.as_uuid(), cmd.incoming_session_id.as_uuid());
+        assert_ne!(cmd.current_agent_id.as_uuid(), cmd.incoming_agent_id.as_uuid());
+        assert_ne!(cmd.current_session_id.as_uuid(), cmd.incoming_session_id.as_uuid());
+    }
+
+    /// **ULYS-207 PI-9 W5**:`CollabSteeringCommand::new` 构造函数签名扩到
+    /// 10 个参数(2 tenant_id-related + 2 + 4 W5 agent/session + 2 task +
+    /// 2 prompt + 1 timestamp),确保 caller 用真值不会混淆参数顺序。
+    #[test]
+    fn collab_command_w5_new_constructor_signature() {
+        let t = TenantId::new();
+        let ct = Uuid::new_v4();
+        let ce = "ce".to_string();
+        let ca = AgentId::new();
+        let cs = AgentSessionId::new();
+        let it = Uuid::new_v4();
+        let ie = "ie".to_string();
+        let ia = AgentId::new();
+        let is_ = AgentSessionId::new();
+        let ts = SystemTime::now();
+        let cmd = CollabSteeringCommand::new(t, ct, ce.clone(), ca, cs, it, ie.clone(), ia, is_, ts);
+        assert_eq!(cmd.tenant_id, t);
+        assert_eq!(cmd.current_task_id, ct);
+        assert_eq!(cmd.current_prompt_excerpt, ce);
+        assert_eq!(cmd.current_agent_id, ca);
+        assert_eq!(cmd.current_session_id, cs);
+        assert_eq!(cmd.incoming_task_id, it);
+        assert_eq!(cmd.incoming_prompt_excerpt, ie);
+        assert_eq!(cmd.incoming_agent_id, ia);
+        assert_eq!(cmd.incoming_session_id, is_);
+        assert_eq!(cmd.enqueued_at, ts);
     }
 }
