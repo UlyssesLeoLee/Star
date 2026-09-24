@@ -3,6 +3,13 @@
 //! per `docs/architecture/2026-08-26-upgrade/spec/cli/01-cli-spec.md` §2
 //!
 //! ULYS-196 加 `star skill add/list/show/remove` 4 子命令 (per FR-ORCA-034 §10.2)
+//!
+//! ULYS-218.2 加 `star worktree start-from-picker <repo>` 子命令 (per FR-ORCA-009 CLI 列表).
+//! 该子命令调 backend `worktree-shared-dir::RealStartFromPicker::list_candidates` /
+//! `resolve`, 需要 tokio runtime. 主入口用 `#[tokio::main(flavor = "current_thread")]`
+//! (轻量、CLI 一次性进程没必要上 multi-thread), 其它 17 个 MVP + Skill 子命令全是 sync,
+//! 在 tokio runtime 上下文里 sync 调用无副作用 (per tokio 官方文档 "calling sync code from
+//! a tokio runtime is allowed and incurs no overhead").
 
 use clap::{Parser, Subcommand};
 
@@ -62,10 +69,11 @@ enum TopCommand {
     Skill(skill_registry::SkillCommandArgs),
 }
 
-fn main() -> std::process::ExitCode {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> std::process::ExitCode {
     let cli = Cli::parse();
     let mut skill_registry = SkillRegistry::new();
-    match run(cli, &mut skill_registry) {
+    match run(cli, &mut skill_registry).await {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("error: {e}");
@@ -74,7 +82,7 @@ fn main() -> std::process::ExitCode {
     }
 }
 
-fn run(cli: Cli, skill_registry: &mut SkillRegistry) -> Result<(), StarError> {
+async fn run(cli: Cli, skill_registry: &mut SkillRegistry) -> Result<(), StarError> {
     match cli.command {
         TopCommand::Agent(c) => c.run(),
         TopCommand::Task(c) => c.run(),
@@ -84,7 +92,7 @@ fn run(cli: Cli, skill_registry: &mut SkillRegistry) -> Result<(), StarError> {
         TopCommand::Context(c) => c.run(),
         TopCommand::Code(c) => c.run(),
         TopCommand::Workspace(c) => c.run(),
-        TopCommand::Worktree(c) => c.run(),
+        TopCommand::Worktree(c) => c.run().await,
         TopCommand::Mr(c) => c.run(),
         TopCommand::Test(c) => c.run(),
         TopCommand::Pipeline(c) => c.run(),
