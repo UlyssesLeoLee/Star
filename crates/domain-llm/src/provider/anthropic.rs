@@ -190,14 +190,19 @@ impl AnthropicProvider {
             })
             .collect::<Vec<_>>()
             .join("");
+        #[allow(deprecated)] // legacy wire compat (PI-2 / FR-9)
+        let finish_reason = parsed
+            .stop_reason
+            .clone()
+            .unwrap_or_else(|| "stop".to_string());
         ChatResponse {
             id: request_id,
             model: model.to_string(),
             message: ChatMessage::assistant(text),
-            finish_reason: parsed
-                .stop_reason
-                .clone()
-                .unwrap_or_else(|| "stop".to_string()),
+            #[allow(deprecated)]
+            finish_reason: finish_reason.clone(),
+            stop_reason: crate::events::StopReason::parse_loose(&finish_reason),
+            usage: crate::events::Usage::default(),
             created_at: Utc::now(),
         }
     }
@@ -288,7 +293,10 @@ impl LlmProvider for AnthropicProvider {
                     "[anthropic stub] received {} messages",
                     req.messages.len()
                 )),
+                #[allow(deprecated)]
                 finish_reason: "stop".to_string(),
+                stop_reason: crate::events::StopReason::Stop,
+                usage: crate::events::Usage::default(),
                 created_at: Utc::now(),
             });
         }
@@ -431,6 +439,7 @@ mod tests {
             temperature: Some(0.5),
             max_tokens: Some(256),
             request_id: Some(Uuid::new_v4()),
+            thinking_level: None,
         }
     }
 
@@ -516,6 +525,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
+            thinking_level: None,
         };
         let err = p.chat_completion(req).await.unwrap_err();
         assert!(matches!(err, LlmProviderRegistryError::InvalidOperation(_)));

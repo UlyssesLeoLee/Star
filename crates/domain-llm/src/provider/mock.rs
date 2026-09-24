@@ -103,7 +103,10 @@ impl LlmProvider for MockProvider {
                 req.model.clone()
             },
             message: ChatMessage::assistant(content),
+            #[allow(deprecated)]
             finish_reason: "stop".to_string(),
+            stop_reason: crate::events::StopReason::Stop,
+            usage: crate::events::Usage::default(),
             created_at: Utc::now(),
         })
     }
@@ -153,6 +156,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: Some(Uuid::new_v4()),
+            thinking_level: None,
         }
     }
 
@@ -204,6 +208,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
+            thinking_level: None,
         };
         let resp = p.chat_completion(req).await.unwrap();
         assert_eq!(resp.message.content, MOCK_FALLBACK_CONTENT);
@@ -218,6 +223,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
+            thinking_level: None,
         };
         let err = p.chat_completion(req).await.unwrap_err();
         assert!(matches!(err, LlmProviderRegistryError::InvalidOperation(_)));
