@@ -134,10 +134,57 @@ impl Comment {
         }
         Ok(())
     }
+
+    /// **INV-C-05 强化(parent_type 感知)**:针对每个 ParentType 验证 author 类型
+    ///
+    /// - `WorkItem` / `PullRequest` / `Discussion`:作者必须是 user(`author_user_id` 非空,`author_agent_id` 空)
+    /// - `AgentSession`:作者必须是 agent(`author_agent_id` 非空,`author_user_id` 空)
+    ///
+    /// **ULYS-207 PI-9 W4 P-B**:跟新增 `ParentType::AgentSession` variant 配套,
+    /// 把 spec §3 INV-C-05 "AI 提的 Comment (AgentSession 触发)" 在代码层落地
+    ///
+    /// 调用点:`InMemoryCommentService::create_comment` 在 `validate_author()` 通过后再调一次
+    pub fn validate_author_for_parent_type(&self) -> Result<(), CommentError> {
+        match self.parent_type {
+            ParentType::WorkItem | ParentType::PullRequest | ParentType::Discussion => {
+                if self.author_agent_id.is_some() {
+                    return Err(CommentError::InvalidState(format!(
+                        "INV-C-05: parent_type={} comment must have user author, not agent",
+                        self.parent_type.as_str()
+                    )));
+                }
+            }
+            ParentType::AgentSession => {
+                if self.author_user_id.is_some() {
+                    return Err(CommentError::InvalidState(
+                        "INV-C-05: parent_type=agent_session comment must have agent author, not user"
+                            .to_string(),
+                    ));
+                }
+                if self.author_agent_id.is_none() {
+                    return Err(CommentError::InvalidState(
+                        "INV-C-05: parent_type=agent_session comment must have author_agent_id"
+                            .to_string(),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 /// 评论的父对象类型
+///
+/// ## 变更历史
+/// - v1: WorkItem / PullRequest / Discussion(初版)
+/// - v2: 新增 `AgentSession` variant(ULYS-207 PI-9 W4 P-B 路径,per D-Boy 2026-09-24 批准)
+///   - spec `domain-comment-spec.md §3 INV-C-05` 早就提到 "AgentSession 触发",
+///     但 ParentType enum 没有对应 variant — 此 PR 把 spec 与实现拉齐
+///   - **守门**: AgentSession parent 的 Comment 必须 `author_agent_id` 非空且 `author_user_id` 为空
+///     (INV-C-05 强化;实装在 `Comment::validate_author_for_parent_type`)
+///   - **跨租户**: `list_by_parent` 已用通用 `parent_type == q.parent_type` 过滤,
+///     不需要 query 端改动
 pub enum ParentType {
     /// 挂在 WorkItem 上
     WorkItem,
@@ -145,6 +192,8 @@ pub enum ParentType {
     PullRequest,
     /// 挂在 Discussion 上
     Discussion,
+    /// 挂在 AgentSession 上(ULYS-207 PI-9 新增;agent session steering comment 的挂载点)
+    AgentSession,
 }
 
 impl ParentType {
@@ -154,6 +203,7 @@ impl ParentType {
             Self::WorkItem => "work_item",
             Self::PullRequest => "pull_request",
             Self::Discussion => "discussion",
+            Self::AgentSession => "agent_session",
         }
     }
 }
@@ -538,6 +588,7 @@ impl CommentCommandPort for InMemoryCommentService {
             deleted_at: None,
         };
         c.validate_author()?;
+        c.validate_author_for_parent_type()?;
         self.repo.insert_comment(c.clone()).await?;
         self.comments.write().unwrap().insert(c.id, c.clone());
         Ok(c)
@@ -735,6 +786,274 @@ impl CommentQueryPort for InMemoryCommentService {
 }
 
 // =====================================================================
+// ULYS-207 PI-9 W4 P-B: CommentServiceAdapter + SteeringCommentSink
+// =====================================================================
+//
+// ## 背景
+//
+// `domain-agent::queue::CollabCommentSink` 在 W3 (commit 97641799) 已 ship,是
+// `PreemptionListener` 把抢占事件投递到协作评论侧的本地抽象。
+//
+// W3 留了 TODO:"SRS-MULTICA-COLLABORATION ship 后,在 `crates/domain-comment`
+// 加 `impl CollabCommentSink for CommentService`"。
+//
+// 本节把 TODO 落地,关键设计:
+//
+// 1. **trait 镜像**:定义本 crate 的 `SteeringCommentSink` trait(同步同形于
+//    `domain_agent::queue::CollabCommentSink`)。**不**直接跨 crate 实现
+//    `CollabCommentSink`,避免循环依赖。胶水 adapter 由 `crates/application`
+//    提供(见 §"application crate 胶水" P-B 范围扩展说明)。
+//
+// 2. **Adapter 责任**:`CommentServiceAdapter<CS>` 把 `SteeringCommand` 转成
+//    `CreateCommentCommand` 走 `CommentCommandPort::create_comment`,
+//    强制 `ParentType::AgentSession`(INV-C-05 强化)。
+//
+// 3. **守门**:
+//    - **跨租户**:把 cmd.tenant_id 作为 query tenant,actor.tenant_id = cmd.tenant_id,
+//      service 内部 CrossTenantDenied 守门即生效。
+//    - **agent author**:adapter 设 `author_agent_id = cmd.agent_id`(来自
+//      SteeringCommand),`author_user_id = None`,守门 #5 + INV-C-05 双校验。
+//    - **prompt 防泄漏**:`body = format!("...{}...", cmd.prompt_excerpt)`,
+//      excerpt 已由 caller redacted(bridge 层守门 #5 守了 80 字符上限)。
+//
+// 4. **fire-and-forget**:`dispatch_steering` 是同步 fn 返回 (),
+//    失败仅记日志(由 caller 通过 `tracing`)。CommentService 自身是 async,
+//    adapter 内部 `block_on` 不优雅 — adapter 接受 sync caller,把 RPC
+//    内部 tokio::spawn。**实际实现见 `application` crate 的 bridge adapter**。
+
+/// **SteeringCommand** -- 来自 `domain-agent::queue::CollabSteeringCommand`
+/// 的本 crate 内镜像(简化版,只保留投递到 comment service 需要的字段)。
+///
+/// `#[non_exhaustive]` 允许未来加字段(per task protocol 演进)。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SteeringCommand {
+    /// 触发 steering 的 tenant
+    pub tenant_id: TenantId,
+    /// 当前正在跑的任务 ID
+    pub current_task_id: Uuid,
+    /// current 任务的 prompt 摘要(已 redact,来自 caller)
+    pub current_prompt_excerpt: String,
+    /// 触发 steering 的 incoming 任务 ID
+    pub incoming_task_id: Uuid,
+    /// incoming 任务的 prompt 摘要(已 redact,来自 caller)
+    pub incoming_prompt_excerpt: String,
+    /// 触发 steering 的 agent ID(用于 adapter 把它设为 comment author)
+    pub agent_id: AgentId,
+    /// agent session ID(用作 ParentType::AgentSession 的 parent_id)
+    pub agent_session_id: Uuid,
+}
+
+impl SteeringCommand {
+    /// 构造新 steering 命令 — `#[non_exhaustive]` 友好(caller 不需要写 ..Default::default())
+    pub fn new(
+        tenant_id: TenantId,
+        current_task_id: Uuid,
+        current_prompt_excerpt: String,
+        incoming_task_id: Uuid,
+        incoming_prompt_excerpt: String,
+        agent_id: AgentId,
+        agent_session_id: Uuid,
+    ) -> Self {
+        Self {
+            tenant_id,
+            current_task_id,
+            current_prompt_excerpt,
+            incoming_task_id,
+            incoming_prompt_excerpt,
+            agent_id,
+            agent_session_id,
+        }
+    }
+}
+
+/// **SteeringCommentSink** -- 本 crate 的 steering 评论投递抽象 trait。
+///
+/// **同形于** `domain_agent::queue::CollabCommentSink`,但**留在本 crate**
+/// 以避免 `domain-agent` 依赖 `domain-comment` 的反向耦合。
+///
+/// **fire-and-forget**:sync fn,不返回 Err(失败仅记日志)。
+///
+/// **安全设计**(守门 #5 env):
+/// - prompt 字段由 caller(bridge 层)redact,不在 trait 边界做二次脱敏
+/// - tenant_id 由 caller 传入,服务内部 CrossTenantDenied 守门生效
+pub trait SteeringCommentSink: Send + Sync {
+    /// **dispatch_steering** -- 把 steering 命令投递到本 comment service。
+    ///
+    /// **实现要求**:
+    /// - **不 panic** —— listener panic 由 listener 自负责(守门 #22)
+    /// - 失败仅记日志,不返回 Err(fire-and-forget)
+    fn dispatch_steering(&self, cmd: SteeringCommand);
+}
+
+/// **NoopSteeringSink** -- 不做任何事的 sink(默认 sink,适配器未注入时使用)。
+///
+/// 当 SRS-MULTICA-COLLABORATION 跨域未 ship、或 caller 不想把 steering
+/// 事件投递到评论侧时,绑这个 sink — 投递事件仅在 domain-agent in-process
+/// 内部流转,无跨域副作用。
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NoopSteeringSink;
+
+impl SteeringCommentSink for NoopSteeringSink {
+    fn dispatch_steering(&self, _cmd: SteeringCommand) {
+        // no-op
+    }
+}
+
+/// **CommentServiceAdapter** -- 把 `SteeringCommand` 转为
+/// `CreateCommentCommand` 投递到 `CommentCommandPort` 的薄壳适配器。
+///
+/// **设计要点**:
+///
+/// - **不耦合 domain-agent**:依赖本 crate 自己的 `CommentCommandPort`,
+///   由 application crate 提供桥接 `impl domain_agent::queue::CollabCommentSink for BridgeAdapter`
+///   把 `domain_agent::queue::CollabSteeringCommand` 转 `domain_comment::SteeringCommand`。
+/// - **守门 #5 / INV-C-05**:adapter 强制 `ParentType::AgentSession` +
+///   `author_agent_id = cmd.agent_id` + `author_user_id = None`。
+/// - **异步约束**:`dispatch_steering` 是同步 fn(Sink trait 要求),
+///   内部调 `tokio::runtime::Handle::current().block_on(...)` 跑 async service。
+///   这要求 caller 在 tokio runtime 内执行(典型 = spawn 一个 worker thread
+///   把 `Arc<Self>` 交给它)。PI-9 单元测试用 `tokio::runtime::Builder::new_current_thread()`。
+///
+/// **典型用法**(application crate 胶水层):
+/// ```ignore
+/// let svc: Arc<dyn CommentCommandPort> = Arc::new(InMemoryCommentService::new());
+/// let adapter = CommentServiceAdapter::new(svc);
+/// let sink: Arc<dyn SteeringCommentSink> = Arc::new(adapter);
+/// sink.dispatch_steering(cmd);
+/// ```
+pub struct CommentServiceAdapter {
+    /// Comment 命令端口(异步)
+    svc: Arc<dyn CommentCommandPort>,
+    /// 用于在 sync sink 内 block_on 异步 service 的 tokio handle
+    rt: tokio::runtime::Handle,
+}
+
+impl std::fmt::Debug for CommentServiceAdapter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CommentServiceAdapter")
+            .field("svc_id", &std::any::type_name::<dyn CommentCommandPort>())
+            .finish()
+    }
+}
+
+impl CommentServiceAdapter {
+    /// 构造 adapter。**caller 必须已在 tokio runtime 内**(典型 = 当前线程)。
+    ///
+    /// # Panics
+    /// 当 caller 不在 tokio runtime 内时 panic
+    /// (因为 `tokio::runtime::Handle::current()` 返回 Err)。
+    /// 这守住"fire-and-forget sink 在 sync 上下文被错调"的开发者错误。
+    pub fn new(svc: Arc<dyn CommentCommandPort>) -> Self {
+        let rt = tokio::runtime::Handle::current();
+        Self { svc, rt }
+    }
+
+    /// 构造 adapter,使用指定的 runtime handle(用于测试 / 多 runtime 场景)
+    pub fn with_handle(
+        svc: Arc<dyn CommentCommandPort>,
+        rt: tokio::runtime::Handle,
+    ) -> Self {
+        Self { svc, rt }
+    }
+
+    /// 取得底层 service 的引用(主要给测试断言用)
+    pub fn service(&self) -> &Arc<dyn CommentCommandPort> {
+        &self.svc
+    }
+}
+
+impl SteeringCommentSink for CommentServiceAdapter {
+    fn dispatch_steering(&self, cmd: SteeringCommand) {
+        // 守门:不 panic,失败仅记日志(守门 #22)
+        // 同步 sink 调异步 service:用 captured runtime handle block_on
+        let svc = self.svc.clone();
+        let rt = self.rt.clone();
+        let actor = ActorContext::new(cmd.agent_id.as_uuid(), cmd.tenant_id.0)
+            .with_agent_session(true);
+        let body = format!(
+            "[steering] task {} preempted by task {}\ncurrent: {}\nincoming: {}",
+            cmd.current_task_id,
+            cmd.incoming_task_id,
+            cmd.current_prompt_excerpt,
+            cmd.incoming_prompt_excerpt,
+        );
+        let create = CreateCommentCommand {
+            tenant_id: cmd.tenant_id,
+            project_id: ProjectId::new(),
+            parent_type: ParentType::AgentSession,
+            parent_id: cmd.agent_session_id,
+            body,
+            author_user_id: None,
+            author_agent_id: Some(cmd.agent_id),
+            mentions: vec![],
+            attachment_ids: vec![],
+            // actor_user_id 不能是 nil (ActorContext::new 的 INV-ACT-01 守门)
+            // 这里用 incoming_task_id 作占位(system actor 代表)
+            actor_user_id: UserId::from(Uuid::new_v4()),
+        };
+        // fire-and-forget: spawn async task on captured runtime
+        // 不 block_on 因为 caller 通常在 runtime 上下文内 (block_on 会 panic:
+        // "Cannot start a runtime from within a runtime")
+        // 失败由 spawned future 内部 tracing::warn (caller 通过 tracing 订阅)
+        rt.spawn(async move {
+            if let Err(e) = svc.create_comment(create, &actor).await {
+                tracing::warn!(
+                    tenant_id = %cmd.tenant_id,
+                    incoming_task_id = %cmd.incoming_task_id,
+                    current_task_id = %cmd.current_task_id,
+                    error = %e,
+                    "CommentServiceAdapter::dispatch_steering spawn failed"
+                );
+            }
+        });
+    }
+}
+
+impl CommentServiceAdapter {
+    /// `dispatch_steering` 的内部 async 实装,失败返回 `CommentError`。
+    /// 公开给单元测试调,生产 sink trait caller 不直接调。
+    pub async fn dispatch_steering_inner(
+        &self,
+        cmd: &SteeringCommand,
+    ) -> Result<Comment, CommentError> {
+        // 构造 CreateCommentCommand,守门 INV-C-05(AgentSession parent)
+        let body = format!(
+            "[steering] task {} preempted by task {}\ncurrent: {}\nincoming: {}",
+            cmd.current_task_id,
+            cmd.incoming_task_id,
+            cmd.current_prompt_excerpt,
+            cmd.incoming_prompt_excerpt,
+        );
+        let create = CreateCommentCommand {
+            tenant_id: cmd.tenant_id,
+            project_id: ProjectId::new(),
+            parent_type: ParentType::AgentSession,
+            parent_id: cmd.agent_session_id,
+            body,
+            author_user_id: None,
+            author_agent_id: Some(cmd.agent_id),
+            mentions: vec![],
+            attachment_ids: vec![],
+            actor_user_id: UserId::from(Uuid::nil()), // system actor 占位(INV-C-01 跨租户守门依赖 actor.tenant_id)
+        };
+        // 同步 sink → 异步 service:用 captured runtime handle block_on
+        let svc = self.svc.clone();
+        let actor = ActorContext::new(cmd.agent_id.as_uuid(), cmd.tenant_id.0)
+            .with_agent_session(true);
+        let create_clone = create.clone();
+        self.rt
+            .spawn(async move {
+                svc.create_comment(create_clone, &actor).await
+            })
+            .await
+            .map_err(|join_err| {
+                CommentError::Internal(format!("tokio join failed: {join_err}"))
+            })?
+    }
+}
+
+// =====================================================================
 // InMemoryCommentRepository
 // =====================================================================
 
@@ -851,6 +1170,9 @@ mod tests {
     fn parent_type_as_str() {
         assert_eq!(ParentType::WorkItem.as_str(), "work_item");
         assert_eq!(ParentType::PullRequest.as_str(), "pull_request");
+        assert_eq!(ParentType::Discussion.as_str(), "discussion");
+        // ULYS-207 PI-9 W4 P-B 新增 variant
+        assert_eq!(ParentType::AgentSession.as_str(), "agent_session");
     }
 
     #[test]
@@ -907,10 +1229,93 @@ mod tests {
             ActorContext::new(AgentId::new().as_uuid(), tid).with_agent_session(true);
         agent_actor.tenant_id = tid;
         let mut cmd = make_cmd(tid);
+        // ULYS-207 PI-9 W4 P-B:Agent author 必须配 `ParentType::AgentSession` (INV-C-05 强化)
+        cmd.parent_type = ParentType::AgentSession;
         cmd.author_agent_id = Some(AgentId::new());
         cmd.author_user_id = None;
         let c = svc.create_comment(cmd, &agent_actor).await.unwrap();
         assert!(c.author_agent_id.is_some());
+    }
+
+    #[tokio::test]
+    async fn create_comment_agent_session_requires_agent_author() {
+        // INV-C-05 强化:ParentType::AgentSession 必须有 author_agent_id
+        let svc = InMemoryCommentService::new();
+        let tid = uuid::Uuid::new_v4();
+        let actor = dev(tid);
+        let mut cmd = make_cmd(tid);
+        cmd.parent_type = ParentType::AgentSession;
+        // author_agent_id 留 None,author_user_id 设非空 — 应被拒
+        cmd.author_user_id = Some(UserId::from(uuid::Uuid::new_v4()));
+        cmd.author_agent_id = None;
+        let res = svc.create_comment(cmd, &actor).await;
+        assert!(matches!(res, Err(CommentError::InvalidState(msg)) if msg.contains("INV-C-05")));
+    }
+
+    #[tokio::test]
+    async fn create_comment_agent_session_rejects_user_author() {
+        // INV-C-05 强化:ParentType::AgentSession 拒 user author
+        let svc = InMemoryCommentService::new();
+        let tid = uuid::Uuid::new_v4();
+        let actor = dev(tid);
+        let mut cmd = make_cmd(tid);
+        cmd.parent_type = ParentType::AgentSession;
+        cmd.author_user_id = Some(UserId::from(uuid::Uuid::new_v4()));
+        cmd.author_agent_id = Some(AgentId::new()); // 同时有 user + agent 也会被 validate_author 拒
+        let res = svc.create_comment(cmd, &actor).await;
+        // 既被 validate_author("both") 拒 也被 validate_author_for_parent_type 拒 — 哪个先看实现顺序
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn create_comment_workitem_rejects_agent_author() {
+        // INV-C-05 强化:ParentType::WorkItem 拒 agent author (prev: 测试用 WorkItem+agent 是 bug)
+        let svc = InMemoryCommentService::new();
+        let tid = uuid::Uuid::new_v4();
+        let mut agent_actor =
+            ActorContext::new(AgentId::new().as_uuid(), tid).with_agent_session(true);
+        agent_actor.tenant_id = tid;
+        let mut cmd = make_cmd(tid);
+        cmd.parent_type = ParentType::WorkItem;
+        cmd.author_agent_id = Some(AgentId::new());
+        cmd.author_user_id = None;
+        let res = svc.create_comment(cmd, &agent_actor).await;
+        assert!(matches!(res, Err(CommentError::InvalidState(msg)) if msg.contains("INV-C-05")));
+    }
+
+    #[tokio::test]
+    async fn list_by_parent_agent_session_filters() {
+        // list_by_parent 对 ParentType::AgentSession 同样按 parent_type+parent_id 过滤(0 query 端改动)
+        let svc = InMemoryCommentService::new();
+        let tid = uuid::Uuid::new_v4();
+        let mut agent_actor =
+            ActorContext::new(AgentId::new().as_uuid(), tid).with_agent_session(true);
+        agent_actor.tenant_id = tid;
+        let session_id = Uuid::new_v4();
+        let mut cmd = make_cmd(tid);
+        cmd.parent_type = ParentType::AgentSession;
+        cmd.parent_id = session_id;
+        cmd.author_agent_id = Some(AgentId::new());
+        cmd.author_user_id = None;
+        svc.create_comment(cmd, &agent_actor).await.unwrap();
+        // 再 create 一个不同 session 的 AgentSession comment
+        let mut cmd2 = make_cmd(tid);
+        cmd2.parent_type = ParentType::AgentSession;
+        cmd2.parent_id = Uuid::new_v4();
+        cmd2.author_agent_id = Some(AgentId::new());
+        cmd2.author_user_id = None;
+        svc.create_comment(cmd2, &agent_actor).await.unwrap();
+
+        // 查 session_id,应只回 1 条
+        let q = ListByParentQuery {
+            tenant_id: TenantId(tid),
+            parent_type: ParentType::AgentSession,
+            parent_id: session_id,
+            include_deleted: false,
+        };
+        let list = svc.list_by_parent(q, &agent_actor).await.unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].parent_id, session_id);
     }
 
     #[tokio::test]

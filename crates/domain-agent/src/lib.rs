@@ -49,7 +49,38 @@ use uuid::Uuid;
 define_uuid_id!(AgentId);
 define_uuid_id!(AgentSessionId);
 define_uuid_id!(AgentPolicyTemplateId);
-define_uuid_id!(TenantId);
+// ULYS-207 PI-9 W4 P-B: TenantId 跨 crate 公开 (SteeringSinkBridge 测试需要从
+// domain_comment 构造 TenantId). 手写 pub struct 而非 macro,因为 `pub define_uuid_id!`
+// 在 macro_rules 1.x 不允许。生成的 struct 字段保持与 macro 一致。
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
+#[serde(transparent)]
+/// 领域强类型租户 ID(ULYS-207 PI-9 W4 P-B 公开)
+pub struct TenantId(pub Uuid);
+
+impl TenantId {
+    /// 生成一个新的随机 ID
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+    /// 返回内部原始的 `Uuid` 值
+    pub fn as_uuid(&self) -> Uuid {
+        self.0
+    }
+}
+
+impl From<Uuid> for TenantId {
+    fn from(u: Uuid) -> Self {
+        Self(u)
+    }
+}
+
+impl std::fmt::Display for TenantId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 define_uuid_id!(ProjectId);
 define_uuid_id!(UserId);
 define_uuid_id!(WorktreeId);
