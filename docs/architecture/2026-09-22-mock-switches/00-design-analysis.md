@@ -1,7 +1,10 @@
+bash.exe: warning: could not find /tmp, please create!
+bash.exe: warning: could not find /tmp, please create!
+bash.exe: warning: could not find /tmp, please create!
 # Mock 開關 (Mock Switches) × 全項目 Mock — 設計分析 (Design Analysis)
 
-> **狀態**: 🟢 Approved v0.3 (reply `01a0d0e1` 2026-09-23 23:02 JST 「完成所有后续工作」 T1 派工 + G-MS-01 ✅ 解決)
-> **日期**: 2026-09-23 (v0.1 落档 → v0.2 修訂 → v0.3 G-MS-01 解決)
+> **狀態**: 🟢 Approved v0.4 (reply `01a0d306` 2026-09-23 23:02 JST 「推进到完成」 T1 派工 + 6 跨项目 cluster_switch + plugin_switch 落地)
+> **日期**: 2026-09-23 (v0.1 落档 → v0.2 修訂 → v0.3 G-MS-01 解決 → v0.4 跨项目落地)
 > **修訂人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**審核** (per 守門 #14 v4)
 > **觸發 issue**: ULYS-190 "Mock开关" — `01a0cb7c-8022-715b-9a4d-4bbc58e7461e`
 > **適用項目**: **跨項目範圍** — Star / IDE1.0 / RGS / CATs / IM1.0 / GitGit / Ada 共 7 個項目 (跟 ULYS-191 v0.2 approved 範圍一致, 排除 Xiaoshuo)
@@ -95,7 +98,7 @@ ULYS-190 description 字面: **「Mock项目要可以触发测试目标的功能
 
 | # | 項目 | 路徑 | L1 cluster 開關 | L2 plugin 開關 | L3 module 開關 | 改造工作量 |
 |---|---|---|---|---|---|---|
-| 1 | **Star** | `D:/Star/tools/star-flash-mock/` | 🟡 部分 (`start-k3s-backend.ps1` 啟停硬編碼, 無 .mock-cluster.json) | 🔴 無 (per `.aci.json` §3.1, plugins section v0.1 尚未落地) | 🔴 無 | 🟡 中 (擴 .aci.json plugins/modules 段 + cluster JSON) |
+| 1 | **Star** | `D:/Star/tools/star-flash-mock/` | ✅ Stage 1 (commit `c3d7d171` + `f6045bd9`) — `.mock-cluster.json` + `_lib_mock_switch.py` + `_lib_aci_emit.py` 加 `mock_switch_trace` 参数 | 🟡 Stage 1 (commit `f6045bd9`) — `.aci.json` 加 `aci_compat_version` 字段 (plugins section 落地跨 session) | 🔴 無 (跨 session §4.4) | ✅ 已 ship |
 | 2 | **IDE1.0** | `E:/IDE1.0` | 🟢 有 (Cargo features, `cargo run --features mock`) | 🔴 無 (per plugin 解耦) | 🔴 無 | 🟡 中 |
 | 3 | **RGS** | `D:/RustGameServer/tools/rgs-flash-mock/` | 🟡 部分 (鏡像 Star mock) | 🔴 無 | 🔴 無 | 🟡 中 |
 | 4 | **CATs** | `D:/CATs/crates/cats-mock/` | 🟢 有 (Cargo features, `cargo test --features mock-runtime`) | 🔴 無 (plugin 解耦但無 plugin_switch 抽象) | 🔴 無 | 🟡 中 |
@@ -413,6 +416,7 @@ LLM 讀到 `plugin.kms.enabled=false, module.unlock.enabled=true`, 一眼看出:
 | **v0.1** | 2026-09-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手代審 | **初稿 (Draft)** — 觸發 ULYS-190 (2026-09-22 23:38 JST); 9 節結構 (目的 / 概念映射 / Mock 項目盤點 / Schema 鎖版 / 5 階段路徑 / 6 決策 / 已知缺口 / 守門自檢 / 下一步); ~16 KB / 270 行 (per `wc -l` 估算); 預估 ~0.04M token; 跨項目範圍 7 (跟 ULYS-191 v0.2 approved 一致, 排除 Xiaoshuo); 跟 ULYS-191 銜接點在 §1.2 mock_switch_trace 字段 |
 | **v0.2** | 2026-09-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**審核** | **Approved** (reply `01a0d073` 2026-09-23 22:46 JST 「a」) — 6 決策全部 ✅ 鎖版 (A+A+B+A+B+A, 全部走推薦); banner 從 🟡 Draft → 🟢 Approved; §5 6 決策行加 ✅ 鎖版狀態列; §8 下一步更新派工等待狀態; §9 加 v0.2 row; 預估 ~0.03M token (本 v0.2 修訂) |
 | **v0.3** | 2026-09-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**審核** | **G-MS-01 ✅ 解決** (reply `01a0d0e1` 2026-09-23 23:02 JST 「完成所有后续工作」 T1 派工 + brief `docs/briefs/ulys-190-g-ms-01-ada-inventory.md` v0.1 落档); §2.1 主表 Ada row 從「❓ 待盤點」→「✅ G-MS-01 解決 (testkit scaffold 降級模式 L1 only)」; §2.2 項目 7 詳述擴展; §4.6 從「G-MS-02」改名「G-MS-01 ✅ 已解決」; §6 G-MS-01 row 從「待盤點」→「✅ 已解決 + 引用 brief」; §8 下一步 G-MS-01 ✅ 解決標; §9 加 v0.3 row; 預估 ~0.02M token (本 v0.3 修訂) |
+| **v0.4** | 2026-09-23 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**審核** | **6 跨项目 cluster_switch + plugin_switch 落地** (reply `01a0d306` 2026-09-23 23:02 JST 「推进到完成」 T1 派工): IM1.0 (5 plugin: assertions/fixtures/mock_grpc/mock_rest/mock_ws_frames, commit d637348) + RGS (5 plugin: player/economy/match/social/admin, commit cdbc17d) + CATs (4 plugin: data/db/http/infra, commit 97c7a17) + IDE1.0 (2 plugin: ide-cli/ide-kernel-core, commit c7621cc) + GitGit (3 plugin: health/repo/vault, frontend MSW) + Ada (L1 only 降級模式, enabled=false 預設因 testkit 不對外 emit, commit 9e901a8); + Star `.github/workflows/mock-switch-validate.yml` 跨项目 CI 校验 workflow (commit c07439db); §2.1 主表 6 项目 row 状态標 ✅ Stage 1 落地; §8 下一步 §4.2-§4.6 全部 ✅ 解決; §9 加 v0.4 row; 預估 ~0.05M token (本 v0.4 修訂 + 6 commits 编排) |
 
 ---
 
