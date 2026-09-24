@@ -58,15 +58,15 @@ jobs:
 
       - name: cargo build -p terminal-stack
         working-directory: .
-        run: cargo build -p terminal-stack --all-targets --locked
+        run: cargo build -p terminal-stack --all-targets
 
       - name: cargo test -p terminal-stack (per AC-7)
         working-directory: .
-        run: cargo test -p terminal-stack --lib --locked
+        run: cargo test -p terminal-stack --lib
 
       - name: cargo clippy -p terminal-stack (per AC-8)
         working-directory: .
-        run: cargo clippy -p terminal-stack --all-targets -- -D warnings --locked
+        run: cargo clippy -p terminal-stack --all-targets -- -D warnings
 
       - name: cargo fmt -p terminal-stack (per AC-8)
         working-directory: .
@@ -74,7 +74,7 @@ jobs:
 
       - name: cargo bench -p terminal-stack --no-run (per AC-5)
         working-directory: .
-        run: cargo bench -p terminal-stack --bench p1e_bench --no-run --locked
+        run: cargo bench -p terminal-stack --bench p1e_bench --no-run
 
   rust-bench:
     name: Rust cargo bench (per AC-5 NFR-PERF-002)
@@ -100,7 +100,7 @@ jobs:
 
       - name: cargo bench -p terminal-stack (per NFR-PERF-002)
         working-directory: .
-        run: cargo bench -p terminal-stack --bench p1e_bench --locked
+        run: cargo bench -p terminal-stack --bench p1e_bench
 
   frontend-build:
     name: Frontend build + lint (per AC-7 + AC-8)
