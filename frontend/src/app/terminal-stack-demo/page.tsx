@@ -26,7 +26,6 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { TerminalStackContainer } from "@/components/terminal/TerminalStackContainer";
-import { TerminalSplitToolbar } from "@/components/terminal/TerminalSplitToolbar";
 import { useTerminalStackStore } from "@/components/terminal/terminalStackStore";
 
 export default function TerminalStackDemoPage() {
@@ -65,7 +64,6 @@ function TerminalStackDemoContent() {
           </span>
         )}
       </h1>
-      <TerminalSplitToolbar />
       <TerminalStackContainer sessionId={sessionId} />
       <p
         className="mt-3 text-xs text-ink-dim"
