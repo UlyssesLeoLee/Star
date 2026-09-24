@@ -1,8 +1,8 @@
 # SRS-MULTICA-HOOK-001
 
-> **Multica Hook 域要件定義書 v0.1** (per ADR-0026 v0.2 §1.1 "5 类扩展点" 中的 hooks, 与 SRS-MULTICA-SKILL-001 v0.1 平行)
+> **Multica Hook 域要件定義書 v0.2** (per ADR-0026 v0.2 §1.1 "5 类扩展点" 中的 hooks, 与 SRS-MULTICA-SKILL-001 v0.1 平行; v0.2 升版: MCP 升格为同导航实装标签页)
 
-> - 状态: 🟡 Draft v0.1
+> - 状态: 🟡 Draft v0.2
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填)
@@ -117,7 +117,7 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 - **Hook marketplace / cross-organization 共享** → 一人公司不需要, 跟 skills 域同 disclaimer
 - **Hook AI 行为审计** (LLM 决策过程录屏) → 后续 v2.x 拍摄
 - **Hook 加密 / 凭据管理** (mavis 内置 vault) → 跨项目需求, 不在本专题
-- **5 类扩展点的其他 3 类** (commands / agents / MCP) → ULYS-235 只要求 hooks, 后续按需扩展; 但导航 "高级设置" 预留扩展位
+- **5 类扩展点的其他 3 类** (commands / agents / MCP) → ULYS-235 v0.1 拍板: MCP 升格为本 v0.1 同导航下的实装标签页 (per 2026-09-24 15:01 JST 用户拍板 "MCP也应该是一个标签页"); commands / agents 仍按"预留"占位, 后续按需扩展
 
 ### 1.5 关联文档
 
@@ -183,7 +183,7 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 
 ### BR-4 高级设置导航统一容器 (per ULYS-235 拍板)
 
-"高级设置" 顶层导航下, skills / hooks 共享同一容器, 不同能力走不同标签页 (e.g. "Skills" 标签页 + "Hooks" 标签页), 独立 registry, 共享 session state. **预留扩展位**: 后续 commands / agents / MCP 等扩展点按需加新标签页, 走同一导航.
+"高级设置" 顶层导航下, skills / hooks 共享同一容器, 不同能力走不同标签页 (e.g. "Skills" 标签页 + "Hooks" 标签页), 独立 registry, 共享 session state. **预留扩展位**: 后续 commands / agents 等扩展点按需加新标签页, 走同一导航 (MCP 已在 v0.2 升格为实装标签页, per 2026-09-24 15:01 JST 用户拍板 "MCP也应该是一个标签页").
 
 ### BR-5 规则可观测 (跟 BR-4 PreToolUse guard 一致)
 
@@ -366,10 +366,11 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 
 **FR-7.1** 同导航不同标签页
 
-- "高级设置" 顶层导航: tabs = [`Skills`, `Hooks`, (预留: `Commands`, `Agents`, `MCP`)]
+- "高级设置" 顶层导航: tabs = [`Skills`, `Hooks`, `MCP`, (预留: `Commands`, `Agents`)]
 - Skills 标签页: 走 SRS-MULTICA-SKILL-001 v0.1 的 skill CRUD
 - Hooks 标签页: 走本 SRS §FR-6 的 hook CRUD
-- 两个标签页独立 registry, 共享 session_id (跨标签页 state 可传递)
+- MCP 标签页: 走 SRS-MULTICA-MCP-001 (v0.1 占位 stub, per 2026-09-24 15:01 JST 用户拍板 "MCP也应该是一个标签页") — 列出本机已注册 MCP servers, 启停 toggle, transport 类型 (stdio / sse / http), 详见 MCP 域独立 SRS
+- 三个实装标签页独立 registry, 共享 session_id (跨标签页 state 可传递)
 
 **FR-7.2** 独立 registry + 共享 session state
 
@@ -536,3 +537,4 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 | バージョン | 日付 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | **v0.1** | 2026-09-24 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3 + 守门 #14 v4 反转 v0.62) | 初版落档, 8 機能 (FR-1~FR-8, 22 项) + 5 業務要件 (BR-1~BR-5) + 6 非機能要件 (NFR-P/A/S/M/T/O 30 项) + 8 验收条件 (AC-1~AC-8) + 8 已知缺口 (含 1 P0 阻塞 hook handler 越权), 3 表 W/T/M 横展 (Hook W/M + Hook Run T + Session M, 100% 覆盖 per 守门 #13), 守门 8/8 通过, IPA 10 段结构 (目的 / 範囲 / 用語 / 業務 / 機能 / 非機能 / 制約 / 验收 / 缺口 / 签字 + 修订), 14 类事件 + 4 种 action type + UI "高级设置 → Hooks" 标签页 + 跟 skills 域同导航不同标签页协调 | ULYS-235 (2026-09-24 20:xx JST) "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计" |
+| **v0.2** | 2026-09-24 15:01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | MCP 升格标签页: §1.4 范围 + §FR-7.1 tabs 列表更新 (`Skills`, `Hooks`, `MCP`, 预留 `Commands`, `Agents`), MCP 标签页走独立 SRS-MULTICA-MCP-001 (v0.1 stub, 列出已注册 servers + 启停 toggle + transport 类型 stdio/sse/http); commands / agents 仍"预留"占位 | 2026-09-24 15:01 JST Ulysses 评论 "MCP也应该是一个标签页" |
