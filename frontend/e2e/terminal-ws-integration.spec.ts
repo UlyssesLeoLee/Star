@@ -85,12 +85,12 @@ test.describe("Terminal Stack WS Integration (PR #98.5)", () => {
   test("1. wsClient URL contains session_id", async ({ page }) => {
     // Install MockWsClass (per terminal-ws-integration spec — same pattern as p1e)
     await installTestMockWs(page);
+    await page.goto("/terminal-stack-demo?sessionId=test-session-123");
+    await page.waitForTimeout(500);
     const constructedUrls: string[] = await page.evaluate(() => {
       // @ts-expect-error
-      return (window.__mockWsInstances ?? []).map((w: unknown) => w.url);
+      return (window.__mockWsInstances ?? []).map((w: unknown) => (w as { url: string }).url);
     });
-    await page.goto("/terminal-stack-demo?sessionId=test-session-123");
-    await page.waitForTimeout(300);
     expect(constructedUrls.some((u) => u.includes("/v1/terminal/test-session-123/connect"))).toBe(true);
     await expect(page.locator('[data-testid="terminal-stack-container"]')).toBeVisible();
   });
