@@ -30,49 +30,64 @@ async function installMockWsServer(
   sessionId: string,
   paneId: string,
 ): Promise<void> {
+  // T23.6 fix: 使用 window.__mockWsCtor (per useTerminalStackWs hook)
+  // 而不是 window.WebSocket = X (Chromium 不允许覆盖内置 WebSocket).
+  // MockCtor 模拟服务端, 在 'open' 后 100ms 推 hello + snapshot message.
   await page.addInitScript(
     ({ sessionId, paneId }) => {
-      // @ts-expect-error - test-only injection
-      window.__wsMockEvents = [];
       const OrigWS = window.WebSocket;
-      // @ts-expect-error
-      window.WebSocket = function (url: string) {
+      // @ts-expect-error - test-only injection
+      window.__mockWsCtor = function (url: string) {
         // @ts-expect-error
-        const ws = new OrigWS(url);
-        ws.addEventListener("open", () => {
-          setTimeout(() => {
+        const ws = new OrigWS(url) as WebSocket & {
+          __testInstances?: unknown[];
+          readyState: number;
+        };
+        // Force open immediately (Chromium WS would normally do this async)
+        setTimeout(() => {
+          try {
+            // Set readyState = OPEN (1) so sendStdin works
+            Object.defineProperty(ws, "readyState", {
+              value: 1,
+              configurable: true,
+            });
+            ws.dispatchEvent(new Event("open"));
             // AC-1: HELLO
-            ws.dispatchEvent(
-              new MessageEvent("message", {
-                data: JSON.stringify({
-                  type: "hello",
-                  session_id: sessionId,
-                  panes: [paneId],
-                  total_bytes: 1024,
-                  server_time: "2026-09-24T00:00:00Z",
+            setTimeout(() => {
+              ws.dispatchEvent(
+                new MessageEvent("message", {
+                  data: JSON.stringify({
+                    type: "hello",
+                    session_id: sessionId,
+                    panes: [paneId],
+                    total_bytes: 1024,
+                    server_time: "2026-09-24T00:00:00Z",
+                  }),
                 }),
-              }),
-            );
-            // AC-2: Snapshot (5 seed lines)
-            ws.dispatchEvent(
-              new MessageEvent("message", {
-                data: JSON.stringify({
-                  type: "snapshot",
-                  pane_id: paneId,
-                  from_seq: null,
-                  lines: Array.from({ length: 5 }).map((_, i) => ({
-                    id: `p1e-line-${i}`,
-                    timestamp: "2026-09-24T00:00:00Z",
-                    text: `[P1-E seed line ${i}]`,
-                    source: "stdout",
-                    byte_len: 32,
-                  })),
+              );
+              // AC-2: Snapshot (5 seed lines)
+              ws.dispatchEvent(
+                new MessageEvent("message", {
+                  data: JSON.stringify({
+                    type: "snapshot",
+                    pane_id: paneId,
+                    from_seq: null,
+                    lines: Array.from({ length: 5 }).map((_, i) => ({
+                      id: `p1e-line-${i}`,
+                      timestamp: "2026-09-24T00:00:00Z",
+                      text: `[P1-E seed line ${i}]`,
+                      source: "stdout",
+                      byte_len: 32,
+                    })),
+                  }),
                 }),
-              }),
-            );
-          }, 100);
-        });
-        return ws;
+              );
+            }, 50);
+          } catch {
+            // ignore — if Chromium blocks event dispatch
+          }
+        }, 100);
+        return ws as unknown as WebSocket;
       } as unknown as typeof WebSocket;
     },
     { sessionId, paneId },

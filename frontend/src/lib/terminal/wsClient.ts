@@ -48,6 +48,12 @@ export interface TerminalWsClientOptions {
   handlers: TerminalWsHandlers;
   /** Reconnect after disconnect (per NFR-AC keepalive) */
   autoReconnect?: boolean;
+  /**
+   * Inject a custom WebSocket constructor (for testing).
+   * Defaults to global `WebSocket`.
+   * Production code should leave this undefined.
+   */
+  WebSocketCtor?: typeof WebSocket;
   /** Initial reconnect delay in ms */
   reconnectDelayMs?: number;
 }
@@ -74,7 +80,8 @@ export class TerminalWsClient {
     if (this.ws && this.ws.readyState <= WebSocket.OPEN) return;
 
     const url = buildTerminalWsUrl(this.opts.sessionId);
-    const ws = new WebSocket(url);
+    const Ctor = this.opts.WebSocketCtor ?? WebSocket;
+    const ws = new Ctor(url);
     ws.binaryType = "arraybuffer";
     this.ws = ws;
 
