@@ -30,49 +30,77 @@ async function installMockWsServer(
   sessionId: string,
   paneId: string,
 ): Promise<void> {
-  // T23.6 fix: 使用 window.__mockWsCtor (per useTerminalStackWs hook)
-  // 而不是 window.WebSocket = X (Chromium 不允许覆盖内置 WebSocket).
-  // MockCtor 模拟服务端, 在 'open' 后 100ms 推 hello + snapshot message.
+  // T23.6 round 4 fix: MockWsCtor extends EventTarget — not real Chromium WebSocket
+  // (real WS tries network connect which fails because no server).
+  // MockCtor: full EventTarget + WebSocket-like API surface for wsClient.
   await page.addInitScript(
     ({ sessionId, paneId }) => {
-      const OrigWS = window.WebSocket;
-      // @ts-expect-error - test-only injection
+      // @ts-expect-error
+      window.__mockWsInstances = [];
+      // @ts-expect-error
       window.__mockWsCtor = function (url: string) {
         // @ts-expect-error
-        const ws = new OrigWS(url) as WebSocket & {
-          __testInstances?: unknown[];
-          readyState: number;
-        };
-        // Force open immediately (Chromium WS would normally do this async)
-        setTimeout(() => {
-          try {
-            // Set readyState = OPEN (1) so sendStdin works
-            Object.defineProperty(ws, "readyState", {
-              value: 1,
-              configurable: true,
-            });
-            ws.dispatchEvent(new Event("open"));
-            // AC-1: HELLO
-            setTimeout(() => {
-              ws.dispatchEvent(
-                new MessageEvent("message", {
+        const ws = new (window as unknown as { __MockWsClass: new (url: string, sessionId: string, paneId: string) => WebSocket }).__MockWsClass(url, sessionId, paneId);
+        return ws as unknown as WebSocket;
+      };
+      // Define MockWsClass inline in init script (can't use class syntax in addInitScript cleanly)
+      // @ts-expect-error
+      window.__MockWsClass = (function () {
+        const states = ["CONNECTING", "OPEN", "CLOSING", "CLOSED"];
+        const codes = { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 };
+        function MockWs(this: unknown, url: string, sid: string, pid: string) {
+          // @ts-expect-error
+          this.url = url;
+          // @ts-expect-error
+          this.sessionId = sid;
+          // @ts-expect-error
+          this.paneId = pid;
+          // @ts-expect-error
+          this.binaryType = "arraybuffer";
+          // @ts-expect-error
+          this.readyState = codes.CONNECTING;
+          // @ts-expect-error
+          this.onopen = null;
+          // @ts-expect-error
+          this.onmessage = null;
+          // @ts-expect-error
+          this.onerror = null;
+          // @ts-expect-error
+          this.onclose = null;
+          // @ts-expect-error
+          this.sent = [];
+          // @ts-expect-error
+          (window as unknown as { __mockWsInstances: unknown[] }).__mockWsInstances.push(this);
+          // After 50ms, fire open + hello + snapshot (per server protocol)
+          setTimeout(() => {
+            try {
+              // @ts-expect-error
+              this.readyState = codes.OPEN;
+              // Fire onopen (per WebSocket spec, Event dispatched)
+              const openEvent = new Event("open");
+              // @ts-expect-error
+              this.dispatchEvent(openEvent);
+              if (typeof this.onopen === "function") this.onopen(openEvent);
+              // 30ms after open: dispatch hello + snapshot
+              setTimeout(() => {
+                const hello = new MessageEvent("message", {
                   data: JSON.stringify({
                     type: "hello",
-                    session_id: sessionId,
-                    panes: [paneId],
+                    session_id: sid,
+                    panes: [pid],
                     total_bytes: 1024,
                     server_time: "2026-09-24T00:00:00Z",
                   }),
-                }),
-              );
-              // AC-2: Snapshot (5 seed lines)
-              ws.dispatchEvent(
-                new MessageEvent("message", {
+                });
+                // @ts-expect-error
+                this.dispatchEvent(hello);
+                if (typeof this.onmessage === "function") this.onmessage(hello);
+                const snap = new MessageEvent("message", {
                   data: JSON.stringify({
                     type: "snapshot",
-                    pane_id: paneId,
+                    pane_id: pid,
                     from_seq: null,
-                    lines: Array.from({ length: 5 }).map((_, i) => ({
+                    lines: Array.from({ length: 5 }).map((_: unknown, i: number) => ({
                       id: `p1e-line-${i}`,
                       timestamp: "2026-09-24T00:00:00Z",
                       text: `[P1-E seed line ${i}]`,
@@ -80,15 +108,33 @@ async function installMockWsServer(
                       byte_len: 32,
                     })),
                   }),
-                }),
-              );
-            }, 50);
-          } catch {
-            // ignore — if Chromium blocks event dispatch
-          }
-        }, 100);
-        return ws as unknown as WebSocket;
-      } as unknown as typeof WebSocket;
+                });
+                // @ts-expect-error
+                this.dispatchEvent(snap);
+                if (typeof this.onmessage === "function") this.onmessage(snap);
+              }, 30);
+            } catch (e) {
+              // ignore
+            }
+          }, 50);
+        }
+        MockWs.prototype.send = function (data: string) {
+          // @ts-expect-error
+          this.sent.push(data);
+        };
+        MockWs.prototype.close = function () {
+          // @ts-expect-error
+          this.readyState = codes.CLOSED;
+          const closeEvent = new Event("close");
+          // @ts-expect-error
+          this.dispatchEvent(closeEvent);
+          if (typeof this.onclose === "function") this.onclose(closeEvent);
+        };
+        MockWs.prototype.dispatchEvent = EventTarget.prototype.dispatchEvent;
+        MockWs.prototype.addEventListener = EventTarget.prototype.addEventListener;
+        MockWs.prototype.removeEventListener = EventTarget.prototype.removeEventListener;
+        return MockWs;
+      })();
     },
     { sessionId, paneId },
   );

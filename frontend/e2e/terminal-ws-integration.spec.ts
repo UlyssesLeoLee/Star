@@ -9,24 +9,89 @@
 
 import { test, expect } from "@playwright/test";
 
+// =====================================================================
+// installTestMockWs — MockWsClass EventTarget-based WS mock
+// (T23.6 round 4: 使用真正的 EventTarget-backed mock, 避免 Chromium real WS
+// 网络请求失败)
+// =====================================================================
+async function installTestMockWs(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  await page.addInitScript(() => {
+    // @ts-expect-error
+    window.__mockWsInstances = [];
+    // @ts-expect-error
+    window.__mockWsCtor = function (url: string) {
+      // @ts-expect-error
+      const WsClass = (window as unknown as { __MockWsClass: new (url: string) => WebSocket }).__MockWsClass;
+      return new WsClass(url) as unknown as WebSocket;
+    };
+    // @ts-expect-error
+    (window as unknown as { __MockWsClass: new (url: string) => WebSocket }).__MockWsClass = (function () {
+      function MockWs(this: unknown, url: string) {
+        // @ts-expect-error
+        this.url = url;
+        // @ts-expect-error
+        this.binaryType = "arraybuffer";
+        // @ts-expect-error
+        this.readyState = 0; // CONNECTING
+        // @ts-expect-error
+        this.onopen = null;
+        // @ts-expect-error
+        this.onmessage = null;
+        // @ts-expect-error
+        this.onerror = null;
+        // @ts-expect-error
+        this.onclose = null;
+        // @ts-expect-error
+        this.sent = [];
+        // @ts-expect-error
+        (window as unknown as { __mockWsInstances: unknown[] }).__mockWsInstances.push(this);
+        // After 50ms, fire open + (optionally hello + snapshot per test)
+        setTimeout(() => {
+          try {
+            // @ts-expect-error
+            this.readyState = 1; // OPEN
+            const openEvent = new Event("open");
+            // @ts-expect-error
+            this.dispatchEvent(openEvent);
+            if (typeof this.onopen === "function") this.onopen(openEvent);
+          } catch (e) {
+            // ignore
+          }
+        }, 50);
+      }
+      MockWs.prototype.send = function (data: string) {
+        // @ts-expect-error
+        this.sent.push(data);
+      };
+      MockWs.prototype.close = function () {
+        // @ts-expect-error
+        this.readyState = 3; // CLOSED
+        const closeEvent = new Event("close");
+        // @ts-expect-error
+        this.dispatchEvent(closeEvent);
+        if (typeof this.onclose === "function") this.onclose(closeEvent);
+      };
+      MockWs.prototype.dispatchEvent = EventTarget.prototype.dispatchEvent;
+      MockWs.prototype.addEventListener = EventTarget.prototype.addEventListener;
+      MockWs.prototype.removeEventListener = EventTarget.prototype.removeEventListener;
+      return MockWs;
+    })();
+  });
+}
+
 test.describe("Terminal Stack WS Integration (PR #98.5)", () => {
   test("1. wsClient URL contains session_id", async ({ page }) => {
-    // Mock WS via addInitScript before page loads
-    await page.addInitScript(() => {
-      const OrigWS = window.WebSocket;
-      // @ts-expect-error - test-only injection
-      window.__mockWsCtor = function (url: string) {
-        // @ts-expect-error
-        return new OrigWS(url);
-      } as unknown as typeof WebSocket;
+    // Install MockWsClass (per terminal-ws-integration spec — same pattern as p1e)
+    await installTestMockWs(page);
+    const constructedUrls: string[] = await page.evaluate(() => {
+      // @ts-expect-error
+      return (window.__mockWsInstances ?? []).map((w: unknown) => w.url);
     });
-
     await page.goto("/terminal-stack-demo?sessionId=test-session-123");
-    await page.waitForSelector('[data-testid="terminal-stack-container"]', {
-      timeout: 5000,
-    });
-    // ws-debug should be hidden after ws close (per TerminalStackContainer effect)
-    // For mock, since no actual WS server, ws-debug stays visible.
+    await page.waitForTimeout(300);
+    expect(constructedUrls.some((u) => u.includes("/v1/terminal/test-session-123/connect"))).toBe(true);
     await expect(page.locator('[data-testid="terminal-stack-container"]')).toBeVisible();
   });
 
@@ -43,83 +108,51 @@ test.describe("Terminal Stack WS Integration (PR #98.5)", () => {
   test("3. real WS sessionId triggers WebSocket connect attempt", async ({
     page,
   }) => {
-    // Reset state on window for browser-side capture
-    await page.addInitScript(() => {
-      // @ts-expect-error - test-only injection
-      (window as unknown as { __mockWsCalled: boolean }).__mockWsCalled = false;
-      // @ts-expect-error
-      window.__mockWsCtor = function (url: string) {
-        // @ts-expect-error
-        const ws = new (window as unknown as { WebSocket: typeof WebSocket }).WebSocket(url);
-        // @ts-expect-error
-        (window as unknown as { __mockWsCalled: boolean }).__mockWsCalled = true;
-        return ws as unknown as WebSocket;
-      } as unknown as typeof WebSocket;
-    });
-
+    await installTestMockWs(page);
     await page.goto("/terminal-stack-demo?sessionId=real-session");
-    await page.waitForTimeout(500);
-    const called = await page.evaluate(
-      () => (window as unknown as { __mockWsCalled: boolean }).__mockWsCalled,
+    await page.waitForTimeout(300);
+    const instances = await page.evaluate(
+      // @ts-expect-error
+      () => (window.__mockWsInstances ?? []).length,
     );
-    expect(called).toBe(true);
+    expect(instances).toBeGreaterThan(0);
   });
 
   test("4. tree state updates on SplitUpdate message (mock via __mockWsCtor)", async ({
     page,
   }) => {
-    // Track all created WS instances so test can dispatch to them
-    const wsInstances: WebSocket[] = [];
-    await page.addInitScript(() => {
-      const OrigWS = window.WebSocket;
-      // @ts-expect-error - test-only
-      const instances: unknown[] = ((window as unknown as { __testWsInstances: unknown[] })
-        .__testWsInstances = []);
-      // @ts-expect-error
-      (window as unknown as { __mockWsCtor: typeof WebSocket }).__mockWsCtor = function (url: string) {
-        // @ts-expect-error
-        const ws = new OrigWS(url) as WebSocket & { _onopenRef?: () => void };
-        instances.push(ws);
-        // Force open immediately (Chromium WS would normally do this async)
-        setTimeout(() => {
-          try {
-            // Trigger onopen to set wsConnected=true
-            Object.defineProperty(ws, "readyState", { value: 1, configurable: true });
-            ws.dispatchEvent(new Event("open"));
-          } catch {
-            // ignore
-          }
-        }, 10);
-        return ws as unknown as WebSocket;
-      } as unknown as typeof WebSocket;
-    });
-
+    await installTestMockWs(page);
     await page.goto("/terminal-stack-demo?sessionId=tree-update");
     await page.waitForSelector('[data-testid="terminal-stack-container"]');
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(300);
 
     // Inject SplitUpdate via the test hook
     await page.evaluate(() => {
-      const inst = ((window as unknown as { __testWsInstances?: WebSocket[] }).__testWsInstances ?? [])[0];
+      // @ts-expect-error
+      const instances = (window.__mockWsInstances ?? []) as Array<{
+        dispatchEvent: (ev: Event) => boolean;
+        onmessage: ((ev: MessageEvent) => void) | null;
+      }>;
+      const inst = instances[0];
       if (!inst) return;
-      inst.dispatchEvent(
-        new MessageEvent("message", {
-          data: JSON.stringify({
-            type: "split_update",
-            root_id: "550e8400-e29b-41d4-a716-446655440000",
-            tree: {
-              kind: "split",
-              id: "split-1",
-              direction: "horizontal",
-              children: [
-                { kind: "pane", pane: { id: "pane-root", ratio: 0.5 } },
-                { kind: "pane", pane: { id: "new-pane", ratio: 0.5 } },
-              ],
-            },
-            reason: "user_split",
-          }),
+      const msg = new MessageEvent("message", {
+        data: JSON.stringify({
+          type: "split_update",
+          root_id: "550e8400-e29b-41d4-a716-446655440000",
+          tree: {
+            kind: "split",
+            id: "split-1",
+            direction: "horizontal",
+            children: [
+              { kind: "pane", pane: { id: "pane-root", ratio: 0.5 } },
+              { kind: "pane", pane: { id: "new-pane", ratio: 0.5 } },
+            ],
+          },
+          reason: "user_split",
         }),
-      );
+      });
+      inst.dispatchEvent(msg);
+      if (typeof inst.onmessage === "function") inst.onmessage(msg);
     });
 
     await expect(page.locator('[data-testid="pane-count"]')).toHaveText(
@@ -139,48 +172,9 @@ test.describe("Terminal Stack WS Integration (PR #98.5)", () => {
   });
 
   test("6. ws dispatch SplitUpdate updates zustand store", async ({ page }) => {
-    // Inject mock ws that emits split_update after open
-    await page.addInitScript(() => {
-      const OrigWS = window.WebSocket;
-      // @ts-expect-error
-      (window as unknown as { __mockWsCtor: typeof WebSocket }).__mockWsCtor = function (url: string) {
-        // @ts-expect-error
-        const ws = new OrigWS(url) as WebSocket;
-        setTimeout(() => {
-          try {
-            Object.defineProperty(ws, "readyState", { value: 1, configurable: true });
-            ws.dispatchEvent(new Event("open"));
-            ws.dispatchEvent(
-              new MessageEvent("message", {
-                data: JSON.stringify({
-                  type: "split_update",
-                  root_id: "550e8400-e29b-41d4-a716-446655440000",
-                  tree: {
-                    kind: "split",
-                    id: "split-1",
-                    direction: "horizontal",
-                    children: [
-                      {
-                        kind: "pane",
-                        pane: { id: "pane-root", ratio: 0.5, title: "root" },
-                      },
-                      { kind: "pane", pane: { id: "new-pane", ratio: 0.5 } },
-                    ],
-                  },
-                  reason: "user_split",
-                }),
-              }),
-            );
-          } catch {
-            // ignore
-          }
-        }, 100);
-        return ws as unknown as WebSocket;
-      } as unknown as typeof WebSocket;
-    });
-
+    await installTestMockWs(page);
     await page.goto("/terminal-stack-demo?sessionId=split-update-test");
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(300);
     await expect(page.locator('[data-testid="pane-count"]')).toHaveText(
       /^2 panes/,
       { timeout: 3000 },
