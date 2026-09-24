@@ -33,6 +33,7 @@ worktree-shared-dir = { path = "../worktree-shared-dir" }
 
 [dev-dependencies]
 tokio = { workspace = true }
+serial_test = { workspace = true }
 
 [lints]
 workspace = true

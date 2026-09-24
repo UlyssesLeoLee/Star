@@ -419,6 +419,7 @@ mod tests {
     use git_adapter::{GitError, WorktreeInfo};
     use graph_core::state::{HumanState, TestState};
     use graph_core::types::WorktreeId;
+    use serial_test::serial;
     use uuid::Uuid;
 
     // --- mock GitProvider (per 守门 #11 缺标比错标, 仅 test scope) ---
@@ -705,6 +706,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial(env_var)]
     async fn source_3_local_paths_from_env_or_empty() {
         let git = mock_git_with(vec![]);
         let src = DefaultStartFromPickerSource::new(git);
@@ -892,6 +894,7 @@ mod tests {
     // ---------- 集成 + edge cases (per spec §6 ≥ 2 integration) ----------
 
     #[tokio::test]
+    #[serial(env_var)]
     async fn pick_start_from_candidates_full_pipeline() {
         // 4 来源全部命中, 验证总条数
         let git = mock_git_with(vec![
@@ -917,6 +920,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial(env_var)]
     async fn pick_start_from_candidates_empty_repo_returns_only_empty() {
         // 仓库啥都没 → 只有 empty 候选 (FR-ORCA-009 §2 启动条件 "无前置依赖")
         let git = mock_git_with(vec![]);

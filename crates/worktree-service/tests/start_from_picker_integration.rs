@@ -17,6 +17,7 @@ use git_adapter::{
 };
 use graph_core::state::{HumanState, TestState};
 use graph_core::types::{RepoId, WorktreeId};
+use serial_test::serial;
 use uuid::Uuid;
 
 use worktree_service::{
@@ -178,7 +179,8 @@ impl StartFromPickerSource for StubPicker {
 // =====================================================================
 
 #[tokio::test]
-async fn integration_default_source_via_real_git_provider_shape() {
+    #[serial(env_var)]
+    async fn integration_default_source_via_real_git_provider_shape() {
     // 集成: DefaultStartFromPickerSource + StubGit 满足 GitProvider 接口,
     // 调 pick_start_from_candidates, 验证 4 分类全走通.
     let git: Arc<dyn GitProvider> = Arc::new(StubGit {
@@ -270,7 +272,8 @@ async fn integration_worktree_service_with_custom_picker_source() {
 }
 
 #[tokio::test]
-async fn integration_git_provider_failure_returns_empty_for_kind_1_only() {
+    #[serial(env_var)]
+    async fn integration_git_provider_failure_returns_empty_for_kind_1_only() {
     // 集成: git provider 失败 → 只 kind 1 空, kind 2/3/4 不受影响 (per FR-ORCA-009).
     let git: Arc<dyn GitProvider> = Arc::new(StubGit {
         branches: vec![],
@@ -291,7 +294,8 @@ async fn integration_git_provider_failure_returns_empty_for_kind_1_only() {
 }
 
 #[tokio::test]
-async fn integration_picker_candidate_kind_mapping_correct() {
+    #[serial(env_var)]
+    async fn integration_picker_candidate_kind_mapping_correct() {
     // 集成: 验证 PickerCandidateKind 复用 worktree-shared-dir enum, 不重复定义.
     // 4 来源 → 4 enum variants.
     let git: Arc<dyn GitProvider> = Arc::new(StubGit {
@@ -319,7 +323,8 @@ async fn integration_picker_candidate_kind_mapping_correct() {
 }
 
 #[tokio::test]
-async fn integration_select_by_id_round_trips_through_all_categories() {
+    #[serial(env_var)]
+    async fn integration_select_by_id_round_trips_through_all_categories() {
     // 集成: select_by_id 全分类命中 (UI 端 confirm callback 路径).
     let git: Arc<dyn GitProvider> = Arc::new(StubGit {
         branches: vec![branch("main", "aaa1111", true)],
