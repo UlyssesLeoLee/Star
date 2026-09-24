@@ -2041,6 +2041,42 @@ mod tests {
 
 // v1.0.1 follow-up: ai_session_inline stub 文档暂不全, allow(missing_docs) 兜底.
 // v1.0.2 文档补全 (per docs/specs/star-cursor-min-spec.md section 1.4).
+//
+// v1.0.3 (ULYS-204 PI-3) follow-up: registered `pub mod loop_boundary;`
+// below with full docs (per SRS-PI-BORROW-001 §4 FR-13~18 + §7 AC-4).
+// 守门 #11 缺标比错标: 0 重复加 serde/tokio/uuid/chrono/async-trait/thiserror/star-context.
+//
+// ULYS-204 (PI-3): `AgentLoopBoundary` trait + StreamFn no-throw contract
+// (per SRS-PI-BORROW-001 §4 FR-13~18 + §7 AC-4). 100% 文档化 -- 守门
+// `missing_docs = "deny"` 已 verify (per ULYS-181 PI-5 policy_hooks.rs 同款).
+pub mod loop_boundary;
+
+// ULYS-207 (PI-9 redesign): Steering / Follow-up / QueueMode 三 trait + 内存
+// queue stub + Steering::apply_steering 接 PI-3 AgentLoopBoundary::transform_context
+// 的默认实装 (`LoopBoundarySteeringHook`) + 退化路径 (`NoopSteering`).
+// Per SRS-PI-BORROW-001 §1.3 + §4 FR-30. PI-3 已 ship (cherry-pick c4145379)
+// → W1 "Steering loop wiring" 选项兑现。
+// PI-4/PI-6/SRS-MULTICA-COLLABORATION 仍是 W2/W3 接缝。
+pub mod queue;
+
+// ULYS-181 (PI-5): `PolicyHook` trait + `PolicyHooks` container + audit hooks
+// (per SRS-PI-BORROW-001 §4 FR-24~26 + §7 AC-6). PI-3 (`loop_boundary.rs`)
+// 直接 use 这套抽象; 守门 `unreachable_pub = "deny"` 通过 re-export 暴露
+// 给 Application 层 (`crates/api`).
+pub mod policy_hooks;
+
+// PI-3 公共符号 re-export (避免 Application 层 `crate::loop_boundary::policy_hooks` 双段路径).
+pub use loop_boundary::{
+    AgentLoopBoundary, BoundaryError, ConvertOutcome, DefaultLoopBoundary, FailureMode,
+    InternalContext, InternalMessage, InternalRole, LoopBoundaryContext, NoThrowProbe,
+    StreamFn, ToolCallRequest, TransformOutcome, default_stream_fn, simulated_failure_stream,
+};
+pub use policy_hooks::{
+    AuditEventSpec, AuditSink, NoopAuditSink, PolicyDecision, PolicyHook, PolicyHooks,
+    ToolCallHookContext, ToolCallOutcome, apply_after_tool_call_hooks,
+    apply_before_tool_call_hooks,
+};
+
 #[allow(missing_docs)]
 pub mod ai_session_inline {
     use domain_llm::chat::{ChatMessage, ChatRequest, ChatRole};
@@ -2098,7 +2134,7 @@ pub mod ai_session_inline {
                 temperature: None,
                 max_tokens: Some(512),
                 request_id: Some(Uuid::new_v4()),
-                ..Default::default()
+                thinking_level: None,
             };
             let resp = provider.chat_completion(req).await?;
             let thought = resp.message.content.clone();
