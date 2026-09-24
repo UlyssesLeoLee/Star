@@ -19,7 +19,7 @@
 // =====================================================================
 
 import {
-  Trello,
+  SquareKanban,
   SquareChartGantt,
   LayoutDashboard,
   Users,
@@ -81,7 +81,7 @@ export const SUBNAV_REGISTRY: SubNavGroup[] = [
         id: "kanban",
         label: "Kanban",
         code: "KB",
-        icon: Trello,
+        icon: SquareKanban,
         category: "work",
         query: "tab=kanban",
       },

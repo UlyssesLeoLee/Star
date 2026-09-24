@@ -27,6 +27,10 @@ export interface TerminalStackState {
   wsConnected: boolean;
   /** 是否正在 drag-resize divider */
   draggingDividerId: string | null;
+  /** Number of leaves in `tree` (computed: mirrors tree.paneCount for direct store access) */
+  paneCount: number;
+  /** Tree depth (computed: mirrors tree.depth for direct store access) */
+  depth: number;
 }
 
 export interface TerminalStackActions {
@@ -47,25 +51,27 @@ const INITIAL_STATE: TerminalStackState = {
   activePaneId: INITIAL_ROOT_ID,
   wsConnected: false,
   draggingDividerId: null,
+  paneCount: 1,
+  depth: 0,
 };
 
 export const useTerminalStackStore = create<TerminalStackState & TerminalStackActions>(
   (set, get) => ({
     ...INITIAL_STATE,
 
-    setTree: (tree) => set({ tree }),
+    setTree: (tree) => set({ tree, paneCount: tree.paneCount, depth: tree.depth }),
 
     splitCurrentPane: (direction) => {
       const { activePaneId, tree } = get();
       if (!activePaneId) return;
       const next = splitPane(tree, activePaneId, direction);
-      set({ tree: next });
+      set({ tree: next, paneCount: next.paneCount, depth: next.depth });
     },
 
     splitPaneById: (paneId, direction) => {
       const { tree } = get();
       const next = splitPane(tree, paneId, direction);
-      set({ tree: next });
+      set({ tree: next, paneCount: next.paneCount, depth: next.depth });
     },
 
     closePaneById: (paneId) => {
@@ -73,7 +79,7 @@ export const useTerminalStackStore = create<TerminalStackState & TerminalStackAc
       const { tree } = get();
       if (tree.paneCount <= 1) return;
       const next = closeLeafPane(tree, paneId);
-      if (next) set({ tree: next });
+      if (next) set({ tree: next, paneCount: next.paneCount, depth: next.depth });
     },
 
     setActivePane: (paneId) => set({ activePaneId: paneId }),

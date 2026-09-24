@@ -66,7 +66,7 @@ import { buildEvents } from "@/components/calendar/events";
 import {
   FolderTree,
   LayoutDashboard,
-  Trello,
+  SquareKanban,
   SquareChartGantt,
   CalendarRange,
   Users,
@@ -84,7 +84,7 @@ import { CelCard3D } from "@/components/effects/CelCard3D";
 
 // 5 tab 类型已迁出到 @/lib/cookies (per 2026-09-01 16:41 JST cookie-default 拍板, server 需要共享)
 const TAB_ITEMS: Array<{ id: ProjectsTabId; label: string; icon: React.ReactNode }> = [
-  { id: "kanban",    label: "Kanban",    icon: <Trello size={12} /> },
+  { id: "kanban",    label: "Kanban",    icon: <SquareKanban size={12} /> },
   { id: "timeline",  label: "Timeline",  icon: <SquareChartGantt size={12} /> },
   { id: "backlog",   label: "Backlog",   icon: <LayoutDashboard size={12} /> },
   { id: "agents",    label: "Agents",    icon: <Users size={12} /> },

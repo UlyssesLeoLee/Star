@@ -56,10 +56,12 @@ export function splitPane(
     // 未找到, 抛错或返回原 tree
     throw new Error(`pane not found: ${paneId}`);
   }
+  // Recompute depth by walking the new tree (depth may increase by 0..N depending on where split happened)
+  const newDepth = treeDepth({ root: splitRoot, paneCount: tree.paneCount + 1, depth: 0, kind: "split" });
   return {
     root: splitRoot,
     paneCount: tree.paneCount + 1,
-    depth: tree.depth + 1,
+    depth: newDepth,
     kind: "split",
   };
 }
