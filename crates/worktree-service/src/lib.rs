@@ -37,6 +37,16 @@ pub use lifecycle::{transition, TransitionError};
 pub use projection::{StatusObservedPoint, WorktreeStatusObserved};
 pub use service::{SyncResult, Worktree, WorktreeEventEnvelope, WorktreeFilter, WorktreeService, WorktreeUpdate};
 pub use service_impl::{InMemoryWorktreeService, NoopPickerSource};
+
+// ULYS-195 stage 2 PR #4 — PG-backed 实装 (FR-ORCA-011)
+#[cfg(feature = "pg")]
+pub mod pg_worktree_repository;
+#[cfg(feature = "pg")]
+pub mod pg_worktree_service;
+#[cfg(feature = "pg")]
+pub use pg_worktree_repository::{PgWorktreeRepository, WorktreeRow};
+#[cfg(feature = "pg")]
+pub use pg_worktree_service::PgWorktreeService;
 pub use start_from_picker::{
     branch_to_remote_candidate, collect_by_kind, contains_id, filter_and_dedupe,
     local_path_to_candidate, pick_start_from_candidates, select_by_id,
