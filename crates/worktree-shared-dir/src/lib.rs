@@ -41,8 +41,9 @@ pub use branch_naming::{
 };
 pub use error::{SharedDirError, SharedDirResult};
 pub use external_worktree_import::{
-    ExternalWorktree, ExternalWorktreeImport, ExternalWorktreeImportError,
-    ExternalWorktreeImportResult, InMemoryExternalWorktreeImport,
+    DynExternalWorktreeImport, ExternalWorktree, ExternalWorktreeImport,
+    ExternalWorktreeImportError, ExternalWorktreeImportRegistry,
+    ExternalWorktreeImportResult, InMemoryExternalWorktreeImport, RealExternalWorktreeImport,
 };
 pub use shared_dir_resolver::{
     ConfigSource, FileBackedConfigSource, InMemorySharedDirConfigSource,

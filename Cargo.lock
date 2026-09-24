@@ -5506,6 +5506,8 @@ dependencies = [
  "graph-core",
  "serde",
  "serde_json",
+ "serial_test",
+ "tempfile",
  "thiserror",
  "tokio",
  "tracing",
