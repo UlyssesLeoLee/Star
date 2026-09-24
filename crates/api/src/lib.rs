@@ -64,6 +64,15 @@ pub mod diff_annotation;
 pub mod metering;
 
 // =====================================================================
+// ULYS-194 Start-from Picker BFF 路由 (FR-ORCA-009)
+// per docs/spec/FR-ORCA-009 §3.3 + ULYS-158 §3
+// 守门 #1 v25 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 +
+// 守门 #19 v19 累积规不破坏 V0.1 (现有 7 mod 100% 保留)
+// =====================================================================
+/// Start-from Picker BFF 路由 (per ULYS-194 §3.3)
+pub mod worktree_picker;
+
+// =====================================================================
 // 实体(Entity / Aggregate Root)
 // =====================================================================
 // (本 crate 为 supporting 层,无业务实体 — 实体由 domain-* crate 拥有)

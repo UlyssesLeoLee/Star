@@ -204,6 +204,9 @@ hex = "0.4"
 # Regex (per OPT-NEXT-06-code-stub §3.4 domain-form + domain-search 实装)
 regex = "1"
 
+# Serial test execution (per ULYS-194 9/24 rebase fix — env-var mutating tests 跨 #[tokio::test] 串行化)
+serial_test = "3"
+
 # Benchmark (per R9 阶段 3 5 milestone benchmark, per plan-032 §4.2)
 criterion = { version = "0.8", features = ["html_reports"] }
 

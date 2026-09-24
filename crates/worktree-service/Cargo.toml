@@ -25,13 +25,15 @@ tracing = { workspace = true }
 futures-util = { workspace = true }
 
 # 跨 crate 引用 (per WORKTREE-CANVAS-IMPL-PLAN-001 §3 集成策略)
-# 单向依赖: worktree-service → graph-core + git-adapter + git-observer
+# 单向依赖: worktree-service → graph-core + git-adapter + git-observer + worktree-shared-dir
 graph-core = { path = "../graph-core" }
 git-adapter = { path = "../git-adapter" }
 git-observer = { path = "../git-observer" }
+worktree-shared-dir = { path = "../worktree-shared-dir" }
 
 [dev-dependencies]
 tokio = { workspace = true }
+serial_test = { workspace = true }
 
 [lints]
 workspace = true
