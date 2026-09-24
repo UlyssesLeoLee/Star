@@ -3945,6 +3945,8 @@ dependencies = [
  "domain-work-item",
  "domain-workspace",
  "domain-worktree",
+ "git-adapter",
+ "graph-core",
  "hex",
  "hmac 0.13.0",
  "jsonwebtoken",
@@ -3964,6 +3966,7 @@ dependencies = [
  "tower",
  "tracing",
  "uuid",
+ "worktree-shared-dir",
 ]
 
 [[package]]

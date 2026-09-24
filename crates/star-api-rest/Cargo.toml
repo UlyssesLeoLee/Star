@@ -85,6 +85,15 @@ star-context = { path = "../star-context" }
 # 注意: star-mcp 只有 [[bin]] 无 [lib], 不可作 path dep;
 #       共享鉴权逻辑放 star-context (per P0-1 联动审计, AGENTS.md §4.1 v16)
 
+# ULYS-218.3 [P1-F] REST endpoint `/v1/worktrees/start-from-picker` + `/external-worktrees`
+# per issue ULYS-230 description §2 (4 endpoints wiring `worktree-shared-dir` traits).
+# Backend trait scope from PR #107 (commit 8900fd30 on origin/dev):
+# `StartFromPicker` + `ExternalWorktreeImport` + `PickerCandidate` + `StartFrom`.
+# 守门 #11 缺标比错标: 3 个 path dep 都是 workspace 成员, 0 重复加 axum/tokio/serde/uuid/chrono/async-trait/thiserror.
+worktree-shared-dir = { path = "../worktree-shared-dir" }
+git-adapter = { path = "../git-adapter" }
+graph-core = { path = "../graph-core" }
+
 [dev-dependencies]
 # axum::Router::oneshot 测试 helper (per star-mcp 模式)
 tower = { version = "0.5", features = ["util"] }

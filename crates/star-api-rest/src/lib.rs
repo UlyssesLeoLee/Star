@@ -78,6 +78,28 @@ pub fn build_router() -> Router {
         .route("/workspaces/{id}", get(routes::workspaces::get_by_id))
         .route("/worktrees", post(routes::worktrees::create))
         .route("/worktrees/{id}", get(routes::worktrees::get_by_id))
+        // ── ULYS-218.3 [P1-F] worktree picker + external import 路由 (per FR-ORCA-009/011 REST) ──
+        // 4 个 endpoint wiring `worktree-shared-dir` backend traits (PR #107).
+        .route(
+            "/worktrees/start-from-candidates",
+            get(routes::worktree_picker::list_candidates)
+                .with_state(routes::worktree_picker::state_arc()),
+        )
+        .route(
+            "/worktrees/start-from-picker/resolve",
+            post(routes::worktree_picker::resolve)
+                .with_state(routes::worktree_picker::state_arc()),
+        )
+        .route(
+            "/worktrees/external-worktrees",
+            get(routes::worktree_external::list_external)
+                .with_state(routes::worktree_external::state_arc()),
+        )
+        .route(
+            "/worktrees/external-worktrees/import",
+            post(routes::worktree_external::import_external)
+                .with_state(routes::worktree_external::state_arc()),
+        )
         .route("/code/search", get(routes::code::search))
         .route("/code/symbols/{id}", get(routes::code::get_symbol))
         .route(
@@ -199,6 +221,27 @@ pub fn build_router_with_oauth(oauth_state: auth::oauth::OAuth2State) -> Router 
                 .route("/workspaces/{id}", get(routes::workspaces::get_by_id))
                 .route("/worktrees", post(routes::worktrees::create))
                 .route("/worktrees/{id}", get(routes::worktrees::get_by_id))
+                // ── ULYS-218.3 [P1-F] worktree picker + external import 路由 (per FR-ORCA-009/011 REST) ──
+                .route(
+                    "/worktrees/start-from-candidates",
+                    get(routes::worktree_picker::list_candidates)
+                        .with_state(routes::worktree_picker::state_arc()),
+                )
+                .route(
+                    "/worktrees/start-from-picker/resolve",
+                    post(routes::worktree_picker::resolve)
+                        .with_state(routes::worktree_picker::state_arc()),
+                )
+                .route(
+                    "/worktrees/external-worktrees",
+                    get(routes::worktree_external::list_external)
+                        .with_state(routes::worktree_external::state_arc()),
+                )
+                .route(
+                    "/worktrees/external-worktrees/import",
+                    post(routes::worktree_external::import_external)
+                        .with_state(routes::worktree_external::state_arc()),
+                )
                 .route("/code/search", get(routes::code::search))
                 .route("/code/symbols/{id}", get(routes::code::get_symbol))
                 .route(
@@ -280,6 +323,51 @@ pub fn build_router_with_oauth(oauth_state: auth::oauth::OAuth2State) -> Router 
 /// 库版本
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+// =====================================================================
+// ULYS-218.3 [P1-F] 测试 helper: 用 caller-supplied state 构建 4 个新路由的 router
+//
+// 默认 `build_router()` 用 OnceLock 共享 state; 测试间隔离需要 caller 注入
+// 自己的 state (避免共享可变状态污染). 跟 `routes::worktrees::service()` 测试模式
+// 一致 (per `lib.rs::tests::reset_all_state`).
+// =====================================================================
+
+/// 构造一个带 caller-supplied state 的 Router, 包含 4 个新路由 + health endpoint.
+/// 跨测试隔离: 不走 OnceLock 默认 state, caller 注入 PickerBffState + ExternalBffState.
+/// 中间件 (auth/rate_limit/audit stub) 跟生产 build_router 一致.
+#[cfg(test)]
+pub fn build_router_for_test(
+    picker_state: std::sync::Arc<routes::worktree_picker::PickerBffState>,
+    external_state: std::sync::Arc<routes::worktree_external::ExternalBffState>,
+) -> axum::Router {
+    let picker_state_2 = picker_state.clone();
+    let external_state_2 = external_state.clone();
+    axum::Router::new()
+        .route("/api/v1/health", get(routes::health))
+        .route(
+            "/api/v1/worktrees/start-from-candidates",
+            get(routes::worktree_picker::list_candidates).with_state(picker_state),
+        )
+        .route(
+            "/api/v1/worktrees/start-from-picker/resolve",
+            post(routes::worktree_picker::resolve).with_state(picker_state_2),
+        )
+        .route(
+            "/api/v1/worktrees/external-worktrees",
+            get(routes::worktree_external::list_external).with_state(external_state),
+        )
+        .route(
+            "/api/v1/worktrees/external-worktrees/import",
+            post(routes::worktree_external::import_external).with_state(external_state_2),
+        )
+        .layer(axum::middleware::from_fn(middleware::auth::auth_layer_stub))
+        .layer(axum::middleware::from_fn(
+            middleware::rate_limit::rate_limit_layer_stub,
+        ))
+        .layer(axum::middleware::from_fn(
+            middleware::audit::audit_layer_stub,
+        ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293,6 +381,8 @@ mod tests {
     /// - std::sync::RwLock (sync reset): work_items / worktrees / code / context / validations / submissions / webhooks::endpoints
     /// - tokio::sync::RwLock (async reset): workspaces / merge_requests / reviews / pipelines
     /// - 不含: webhooks::deliveries (复用 `star_webhook::DeliveryStore`, 缺 reset, 留 P1)
+    /// - 不含: worktree_picker / worktree_external (OnceLock state, 测试用 `build_router_for_test` 隔离,
+    ///   per ULYS-218.3 [P1-F] FR-ORCA-009/011 REST).
     async fn reset_all_state() {
         // sync reset (std::sync::RwLock)
         routes::work_items::service().reset();
