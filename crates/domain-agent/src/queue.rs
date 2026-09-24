@@ -1,4 +1,4 @@
-//! PI-9 Steering / Follow-up / QueueMode (domain-agent) — W3 `CollabPreemptionBridge` + `mark_running_with` 跨租户守门.
+//! PI-9 Steering / Follow-up / QueueMode (domain-agent) — W6 「PI-4/PI-6 ship 收紧」.
 //!
 //! Per SRS-PI-BORROW-001 §1.3 + §4 FR-30 (`crates/pi-agent-core/src/types.ts`
 //! lines 47-55, 278-302 翻译).
@@ -10,7 +10,7 @@
 //!   `AgentLoopBoundary::transform_context` 的默认实装。
 //! - **W2** (commit `58ee2a5d`): 在 W1 基础上加 **cancel 抢断语义** +
 //!   **Interrupt 抢占触发回调** (`PreemptionListener`).
-//! - **W3** (本 commit): 加 **跨域协作评论入口 stub** +
+//! - **W3** (commit `97641799`): 加 **跨域协作评论入口 stub** +
 //!   **`mark_running_with` 真租户守门**:
 //!
 //!   | 增量 | 描述 |
@@ -27,15 +27,41 @@
 //!   是占位 nil → `maybe_fire_preemption` 跳过 tenant 守门（行为 = W2 legacy）。
 //!   生产环境应**全部走 `mark_running_with`**。
 //!
-//! ## 已知缺口 / 待 PI-* 落地后补
+//! - **W4** (commit `dcc31890`, P-B 路径): `ParentType::AgentSession` variant
+//!   + INV-C-05 守门同步 + application `SteeringSinkBridge` 把
+//!     `CollabSteeringCommand` 转 `SteeringCommand` 走 `InMemoryCommentService`,
+//!     PI-9 主路径 0 改动。
+//!
+//! - **W5** (commit `4ea76dfa`): `CollabSteeringCommand` 加 4 字段
+//!   (`current_agent_id` / `current_session_id` / `incoming_agent_id` /
+//!   `incoming_session_id`),bridge 透传 `QueuedTask.agent_id` / `session_id` 真实值
+//!   (消除 W4 占位 `= incoming_task_id` trade-off)。
+//!
+//! - **W6** (本 commit): **PI-4 + PI-6 已 ship 后收紧 `QueuedTask` 占位字段**:
+//!
+//!   | 字段 | W5 形态 | W6 形态 | 依据 |
+//!   |---|---|---|---|
+//!   | `tool_hint` | `String` | `Option<domain_tool::ToolExecutionMode>` | PI-4 (ULYS-205, commit `0b00ecec`) ship `ToolExecutionMode` 4 变体 (Sync/Async/Stream/Background) 作为调度提示 |
+//!   | `payload_op` (新) | (无) | `Option<star_dto::delta::Op>` | PI-6 (ULYS-206, commit `2a0ca91a`) ship 7 ops (r/s/d/a/t/p/m) 作为结构化载荷 |
+//!   | `payload` (保留) | `serde_json::Value` | `serde_json::Value` | 向后兼容 PI-6 之前的 caller;`payload_op` 与 `payload` 同时存在,默认 `payload_op = None`,显式设置时二选一 |
+//!
+//!   W6 测试新增 4 条：tool_hint 默认 None / `payload_op` 序列化 / `Op::Set` 透传 /
+//!   `Op::Apply` reducer 端到端 (调 `star_dto::delta::apply`)。
+//!
+//!   W1-W5 任何 caller 测试**0 改动**——`QueuedTask::new()` 默认 `tool_hint = None` /
+//!   `payload_op = None`,既有测试通过 `make_task` helper 走 `new()`,自动兼容。
+//!
+//! ## 已知缺口 / 待 SRS-MULTICA-COLLABORATION 落地后补
 //!
 //! - **PI-3 ✅ 已 ship (本 branch cherry-pick `c4145379`)**: `AgentLoopBoundary`
 //!   trait + `StreamFn` no-throw 已在本 worktree 可用。
-//! - **PI-4 缺口**: `Tool` trait 5 方法未 ship → 本文件不 import
-//!   `domain_tool::Tool`，QueuedTask 用 String 工具名占位；待 PI-4 ship 后
-//!   把 String → ToolInvocation 改字段。
-//! - **PI-6 缺口**: JSON Delta 协议未 ship → 本文件用 serde_json::Value 描述
-//!   task,待 PI-6 ship 后切到 `star_dto::JsonDeltaPayload`。
+//! - **PI-4 ✅ 已 ship (origin/main commit `0b00ecec`)**: `Tool` trait 5 方法
+//!   + `ToolExecutionMode` 4 变体。本 commit 把 `tool_hint` 收紧为
+//!     `Option<domain_tool::ToolExecutionMode>`,Sprint 3 接 `Tool::execute`
+//!     dispatcher 后可进一步收紧为完整 `ToolInvocation`。
+//! - **PI-6 ✅ 已 ship (origin/main commit `2a0ca91a`)**: `star_dto::delta::Op`
+//!   7 ops + `apply` reducer。本 commit 加 `payload_op: Option<Op>` 字段,
+//!   序列化路径已验证 (Set/Set round-trip)。
 //! - **跨域协作评论**: SRS-MULTICA-COLLABORATION 协作评论机制未 ship,
 //!   `CollabPreemptionBridge` 已就位,等跨域 ship 后:
 //!   1. 在 `crates/domain-comment` 加 `impl CollabCommentSink for CommentService`
@@ -44,8 +70,8 @@
 //!
 //! 完整 3 周 MVP 工时排程见 issue description §4。
 //! 启动条件（per §5）：Stage 4 + PI-6 (ULYS-206 redesign) 已 ship + D-Boy 拍板
-//! PI-9 启动。本 commit = "W3-Collab-Bridge-stub + tenant-guard";PI-4/PI-6/
-//! Collab 真接口 ship 后再 sign off "PI-9 done".
+//! PI-9 启动。W6 兑现 D-Boy 2026-09-24 「完成所有后续工作，全选，推进到完成」:
+//! PI-4 + PI-6 已 ship + SRS-MULTICA-COLLABORATION 真接口仍待 ship (跨域协调)。
 //!
 //! ## 守门合规
 //!
@@ -457,10 +483,13 @@ impl Default for QueueMode {
 
 /// **QueuedTask** -- 队列里的单个待派发任务 (per pi-agent-core/src/types.ts:278-302).
 ///
-/// 不耦合 PI-4 `Tool` trait / PI-6 JSON Delta 协议（占位字段）：
-/// - `tool_hint`: `String` 占位，待 PI-4 ship 后收紧为 `ToolInvocation`；
-/// - `payload`: `serde_json::Value` 占位，待 PI-6 ship 后收紧为
-///   `star_dto::JsonDeltaPayload`。
+/// 字段（per ULYS-207 PI-9 W6）：
+/// - `tool_hint`: PI-4 ship 后收紧为 `Option<domain_tool::ToolExecutionMode>` —
+///   调度提示,默认 `None`（纯 prompt 任务不需要工具）。
+/// - `payload`: 保留 `serde_json::Value` 以向后兼容 W5 之前 caller。
+/// - `payload_op`: PI-6 ship 后新增 `Option<star_dto::delta::Op>` — 结构化
+///   载荷,7 ops (r/s/d/a/t/p/m)。与 `payload` 同时存在,默认 `None`。
+///   agent loop 优先用 `payload_op`（若 Some）,降级走 `payload`（保持向后兼容）。
 ///
 /// `#[non_exhaustive]` 允许 PI-4 / PI-6 ship 后加新字段而不破坏 NFR-4。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -476,10 +505,25 @@ pub struct QueuedTask {
     pub session_id: AgentSessionId,
     /// 用户提示原文
     pub prompt: String,
-    /// 工具调用 hint（PI-4 ship 后收紧）
-    pub tool_hint: String,
-    /// 任务载荷（PI-6 ship 后收紧）
+    /// 工具调用 hint（PI-4 ship 后收紧为 `Option<ToolExecutionMode>`）。
+    ///
+    /// `None` = 纯 prompt 任务,不调任何工具。
+    /// `Some(Synchronous)` / `Some(Async)` / `Some(Stream)` / `Some(Background)`
+    /// = 调度提示,agent loop 据此选 dispatcher 路径 (per FR-22)。
+    pub tool_hint: Option<domain_tool::ToolExecutionMode>,
+    /// 任务载荷（向后兼容 W5 之前 caller）。
+    ///
+    /// 与 `payload_op` 二选一：默认 `Null`,PI-6 后可改设结构化 `Op` 的 JSON
+    /// 表示；显式设 `payload_op = Some(op)` 时本字段保留作 fallback。
     pub payload: serde_json::Value,
+    /// 任务载荷（PI-6 ship 后新增）— 7 ops (r/s/d/a/t/p/m) 的结构化增量。
+    ///
+    /// `None` = 不携带结构化变更（默认,纯 prompt / 任意 Value）。
+    /// `Some(Op::Set(path, value))` = 设置路径上的值。
+    /// `Some(Op::Replace(value))` = 替换整个根值。
+    /// agent loop 优先用此字段做 apply（Sprint 3 接 star-taskgraph 增量同步）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payload_op: Option<star_dto::delta::Op>,
     /// 优先级（`MIN_PRIORITY`..=`MAX_PRIORITY`）
     pub priority: i32,
     /// 队首插队标记（`Interrupt` 模式专用）
@@ -502,12 +546,31 @@ impl QueuedTask {
             agent_id,
             session_id,
             prompt: prompt.into(),
-            tool_hint: String::new(),
+            tool_hint: None,
             payload: serde_json::Value::Null,
+            payload_op: None,
             priority: DEFAULT_PRIORITY,
             interrupt: false,
             created_at: SystemTime::now(),
         }
+    }
+
+    /// Builder: 设置 tool_hint (PI-4 `ToolExecutionMode`)
+    pub fn with_tool_hint(mut self, mode: domain_tool::ToolExecutionMode) -> Self {
+        self.tool_hint = Some(mode);
+        self
+    }
+
+    /// Builder: 设置 payload_op (PI-6 `star_dto::delta::Op`)
+    pub fn with_payload_op(mut self, op: star_dto::delta::Op) -> Self {
+        self.payload_op = Some(op);
+        self
+    }
+
+    /// Builder: 设置 payload (保留向后兼容)
+    pub fn with_payload(mut self, payload: serde_json::Value) -> Self {
+        self.payload = payload;
+        self
     }
 
     /// 构造为 Interrupt（抢占）任务
@@ -2590,5 +2653,87 @@ mod tests {
         assert_eq!(cmd.incoming_agent_id, ia);
         assert_eq!(cmd.incoming_session_id, is_);
         assert_eq!(cmd.enqueued_at, ts);
+    }
+
+    // =====================================================================
+    // ULYS-207 PI-9 W6 测试 (PI-4 ToolExecutionMode + PI-6 star_dto::delta::Op 收紧)
+    // =====================================================================
+
+    /// **ULYS-207 PI-9 W6**:`QueuedTask::new()` 默认 `tool_hint = None` (纯 prompt 任务)
+    #[test]
+    fn queued_task_new_tool_hint_defaults_to_none_w6() {
+        let tenant = TenantId::from(Uuid::new_v4());
+        let task = make_task(tenant, "纯 prompt 任务", DEFAULT_PRIORITY);
+        assert!(task.tool_hint.is_none(), "默认 tool_hint 应为 None");
+        assert!(task.payload_op.is_none(), "默认 payload_op 应为 None");
+        assert_eq!(task.payload, serde_json::Value::Null);
+    }
+
+    /// **ULYS-207 PI-9 W6**:`with_tool_hint` builder 设 4 变体 (PI-4 ToolExecutionMode)
+    #[test]
+    fn queued_task_with_tool_hint_supports_all_four_modes_w6() {
+        let tenant = TenantId::from(Uuid::new_v4());
+        for mode in [
+            domain_tool::ToolExecutionMode::Synchronous,
+            domain_tool::ToolExecutionMode::Async,
+            domain_tool::ToolExecutionMode::Stream,
+            domain_tool::ToolExecutionMode::Background,
+        ] {
+            let task = make_task(tenant, "with mode", DEFAULT_PRIORITY).with_tool_hint(mode);
+            assert_eq!(task.tool_hint, Some(mode), "{:?} 未透传", mode);
+        }
+    }
+
+    /// **ULYS-207 PI-9 W6**:`payload_op` 用 `Op::Set` 路径,serde round-trip 一致
+    #[test]
+    fn queued_task_payload_op_set_serde_roundtrip_w6() {
+        use star_dto::delta::Op;
+        let tenant = TenantId::from(Uuid::new_v4());
+        let op = Op::Set(
+            vec!["items".to_string(), "0".to_string(), "name".to_string()],
+            serde_json::json!("alpha"),
+        );
+        let task = make_task(tenant, "task with op", DEFAULT_PRIORITY).with_payload_op(op.clone());
+        assert_eq!(task.payload_op, Some(op.clone()));
+        let j = serde_json::to_string(&task).expect("serialize");
+        let back: QueuedTask = serde_json::from_str(&j).expect("deserialize");
+        assert_eq!(back.payload_op, Some(op));
+    }
+
+    /// **ULYS-207 PI-9 W6**:payload_op 端到端 `Op::Set` 走 star_dto::delta::apply 正确改值
+    #[test]
+    fn queued_task_payload_op_apply_reducer_end_to_end_w6() {
+        use star_dto::delta::{apply, Op};
+        let tenant = TenantId::from(Uuid::new_v4());
+        let op = Op::Set(
+            vec!["greeting".to_string()],
+            serde_json::json!("hello"),
+        );
+        let task = make_task(tenant, "apply me", DEFAULT_PRIORITY).with_payload_op(op.clone());
+
+        // 模拟 agent loop 优先用 payload_op 调 apply
+        let base = serde_json::json!({ "greeting": "world", "n": 1 });
+        let applied = if let Some(op) = task.payload_op.as_ref() {
+            apply(Some(base.clone()), std::slice::from_ref(op)).expect("apply Ok")
+        } else {
+            base.clone()
+        };
+        assert_eq!(applied, serde_json::json!({ "greeting": "hello", "n": 1 }));
+    }
+
+    /// **ULYS-207 PI-9 W6**:`payload` (向后兼容 Value) + `payload_op` (新) 同时存在不互斥
+    #[test]
+    fn queued_task_payload_and_payload_op_coexist_w6() {
+        use star_dto::delta::Op;
+        let tenant = TenantId::from(Uuid::new_v4());
+        let task = make_task(tenant, "both", DEFAULT_PRIORITY)
+            .with_payload(serde_json::json!({ "legacy": true }))
+            .with_payload_op(Op::Replace(serde_json::json!({ "new": 1 })));
+        // payload 与 payload_op 同时存在,各自独立
+        assert_eq!(task.payload, serde_json::json!({ "legacy": true }));
+        match task.payload_op.as_ref() {
+            Some(Op::Replace(v)) => assert_eq!(*v, serde_json::json!({ "new": 1 })),
+            other => panic!("expected Op::Replace, got {:?}", other),
+        }
     }
 }
