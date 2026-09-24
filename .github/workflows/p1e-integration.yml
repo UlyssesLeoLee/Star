@@ -126,7 +126,7 @@ jobs:
 
       - name: Frontend tsc --noEmit (per AC-8) [SKIP pre-existing]
         working-directory: frontend
-        run: echo "tsc skipped: pre-existing monaco/lucide/PaneNodeView errors per dev tip"
+        run: echo tsc skipped pre-existing monaco-lucide errors per dev tip
         continue-on-error: true
 
       - name: Frontend eslint
