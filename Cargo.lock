@@ -4458,6 +4458,7 @@ dependencies = [
  "async-trait",
  "axum",
  "chrono",
+ "criterion",
  "rusqlite",
  "serde",
  "serde_json",
@@ -4465,6 +4466,8 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "tracing",
+ "tracing-subscriber",
  "uuid",
 ]
 

@@ -119,3 +119,4 @@ _v0997_*.md
 _v063_*.py
 # Pytest status.json artifacts (per 2026-09-10 A.5 housekeeping, test_*.status.json from dispatcher hook tests, status="deferred")
 docs/briefs/test_*.status.json
+target-232/
