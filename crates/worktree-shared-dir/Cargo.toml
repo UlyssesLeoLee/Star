@@ -35,7 +35,9 @@ git-adapter = { path = "../git-adapter" }
 # UT 用 tokio test runtime (already declared above as dep, dev re-export is fine)
 # tempfile: integration test 用 temp repo + temp dir (per ULYS-217 §5 cargo test --test create_async_integration)
 tempfile = { workspace = true }
-# serial_test: integration test 跨 env-var 互斥 (per ULYS-194 rebase fix)
+# serial_test 让 real git 测试串行 (per worktree-service 集成测试同模式, per ULYS-231
+# §6). 曾在 a21c3494 (ULYS-217) 整段替换 [dev-dependencies] 时被误删, 导致
+# real_external_worktree_integration.rs 编译失败 (unresolved import serial_test).
 serial_test = { workspace = true }
 
 [lints]
