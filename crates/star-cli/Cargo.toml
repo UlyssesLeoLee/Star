@@ -18,8 +18,16 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
+uuid = { workspace = true }
 # 0 新依赖:clap 是 Rust 生态默认 CLI 解析器,接受 4.5 稳定版
 clap = { version = "4.5", features = ["derive"] }
+# ULYS-218.2 / FR-ORCA-009 CLI: 调 backend StartFromPicker + GitProvider
+tokio = { workspace = true }
+async-trait = { workspace = true }
+# 跨 crate: FR-ORCA-009 CLI 调 backend StartFromPicker (per ULYS-218 PR #107 ship)
+worktree-shared-dir = { path = "../worktree-shared-dir" }
+# 跨 crate: RealStartFromPicker 通过 GitProvider 列 branches / 取 HEAD
+git-adapter = { path = "../git-adapter" }
 
 [lints]
 workspace = true
