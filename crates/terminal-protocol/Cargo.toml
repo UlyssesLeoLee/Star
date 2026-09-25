@@ -1,0 +1,25 @@
+[package]
+name = "terminal-protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Terminal escape-sequence protocol layer: OSC 52 clipboard + Kitty Keyboard Protocol (ULYS-104.11 / ULYS-166, per FR-ORCA-037/038, decoupled from concrete terminal stack so ULYS-164 stack pick can plug in later)"
+
+[lib]
+name = "terminal_protocol"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

@@ -116,6 +116,9 @@ members = [
     "crates/worktree-canvas",
     # Phase W20-AI-Worktree-Canvas (ULYS-158 + ULYS-177, 2026-09-22 JST): worktree-shared-dir crate (SharedDirResolver + 3 Source 聚合 + FileBackedConfigSource 直读 multica-config/config.json, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.13 + DD-WORKTREE-CANVAS-001 §12/§24 + FR-ORCA-005..011)
     "crates/worktree-shared-dir",
+    # ULYS-166 (ULYS-104.11, 2026-09-23): terminal-protocol — OSC 52 + Kitty Keyboard Protocol
+    # 协议层 (FR-ORCA-037/038), 与终端栈选型 (ULYS-164) 解耦, OSC 解析复用 ULYS-161.
+    "crates/terminal-protocol",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.1 T2, 2026-09-16): git-adapter crate (libgit2 + CLI fallback, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.2 + DD-WORKTREE-CANVAS-001 §10)
     "crates/git-adapter",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.1 T2, 2026-09-16): git-observer crate (fsnotify + 100ms debounce + 15 GitEvent, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.2 + DD-WORKTREE-CANVAS-001 §11)
