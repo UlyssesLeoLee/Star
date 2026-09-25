@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "hooks": [
+    {
+      "name": "user_defined_post_tool_audit",
+      "event_type": "PostToolUse",
+      "action_type": "post",
+      "handler": "scripts.automation.hooks.user.user_post_audit:handler",
+      "enabled": true,
+      "archived": false,
+      "priority": 100,
+      "parallel": false,
+      "timeout_ms": 1000,
+      "retry": 0,
+      "description": "Sample user-defined PostToolUse hook — writes latency_ms to audit log for any tool that took > 5s (transform 注入 slow_tool 标志). 演示 hook 体系如何让用户添加工具, 不依赖 builtin 5 件套.",
+      "created_at": "2026-09-25T00:00:00+00:00",
+      "updated_at": "2026-09-25T00:00:00+00:00"
+    },
+    {
+      "name": "user_defined_session_echo",
+      "event_type": "SessionEnd",
+      "action_type": "post",
+      "handler": "scripts.automation.hooks.user.user_session_echo:handler",
+      "enabled": true,
+      "archived": false,
+      "priority": 200,
+      "parallel": false,
+      "timeout_ms": 500,
+      "retry": 0,
+      "description": "Sample SessionEnd hook — writes session_id + duration to ~/.multica/session-history.log (append-only). 用于让用户演示如何用 hook 拓展 session lifecycle.",
+      "created_at": "2026-09-25T00:00:00+00:00",
+      "updated_at": "2026-09-25T00:00:00+00:00"
+    },
+    {
+      "name": "user_defined_cron_heartbeat",
+      "event_type": "CronTick",
+      "action_type": "post",
+      "handler": "scripts.automation.hooks.user.user_cron_heartbeat:handler",
+      "enabled": true,
+      "archived": false,
+      "priority": 100,
+      "parallel": false,
+      "timeout_ms": 100,
+      "retry": 0,
+      "description": "Sample CronTick hook — writes heartbeat timestamp to audit log every tick. 演示 cron 事件接入, 用于 ULYS-236 (定时任务) 调试.",
+      "created_at": "2026-09-25T00:00:00+00:00",
+      "updated_at": "2026-09-25T00:00:00+00:00"
+    }
+  ]
+}
