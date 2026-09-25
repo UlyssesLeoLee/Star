@@ -252,6 +252,19 @@ impl LlmProvider for DispatchProvider {
         // `map` then `boxed()` to coerce the lifetime.
         Ok(s.boxed())
     }
+
+    async fn stream_completion_v2(
+        &self,
+        req: crate::chat::ChatRequest,
+    ) -> Result<
+        futures_util::stream::BoxStream<'static, crate::events::AgentStreamEvent>,
+        LlmProviderRegistryError,
+    > {
+        // Delegate so native provider v2 streams are not bypassed by the
+        // trait's v1-translating default impl.
+        let provider = self.registry.select(&req);
+        provider.stream_completion_v2(req).await
+    }
 }
 
 // =====================================================================
