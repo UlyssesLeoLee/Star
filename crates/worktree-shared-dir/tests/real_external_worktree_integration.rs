@@ -191,7 +191,15 @@ async fn real_cleanup_stale_removes_removed_worktree() {
         "scan 应包含 wt-removed: {before_paths:?}"
     );
 
-    // git worktree remove --force (强删, 避免 dirty block)
+    // import 它 (per AC-2 进 managed 集合) — cleanup_stale 只 diff managed,
+    // 不 import 的话它根本不会被当成 "曾经 managed 现在消失" 的候选.
+    real.import(repo_id, wt_path.clone())
+        .await
+        .expect("import failed");
+    assert_eq!(real.managed_paths(repo_id), vec![wt_path.clone()]);
+
+    // git worktree remove --force (强删, 避免 dirty block) — 模拟用户在
+    // Orca 外部直接删掉这个已 import 的 worktree.
     assert!(
         git_worktree_remove(&repo, &wt_path),
         "git worktree remove failed"
@@ -205,10 +213,15 @@ async fn real_cleanup_stale_removes_removed_worktree() {
         "scan 不应再含已 remove 的 wt-removed: {after_paths:?}"
     );
 
-    // cleanup_stale: registry 主仓 path 不在 scan 里 (因为主仓没作为 worktree add)
-    // → 应返回主仓 path 作为 stale (per Real impl §2.2 cleanup_stale 逻辑)
-    let _stale = real.cleanup_stale(repo_id).await.unwrap();
-    // 至少调用不 panic, 不强求精确 stale 内容 (per stub 测试同模式)
+    // cleanup_stale: managed 里的 wt-removed 已经不在 porcelain 里了
+    // → 应精确返回 [wt_path] (per Real impl §2.2 cleanup_stale 逻辑, 只 diff
+    // managed, 不碰主仓 registry path).
+    let stale = real.cleanup_stale(repo_id).await.unwrap();
+    assert_eq!(stale, vec![wt_path.clone()], "应精确返回被外部删除的 wt-removed");
+    assert!(
+        real.managed_paths(repo_id).is_empty(),
+        "cleanup_stale 后 wt-removed 应从 managed 里摘掉"
+    );
     let _ = registry;
 }
 
