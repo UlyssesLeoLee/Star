@@ -150,14 +150,13 @@ mod tests {
     use super::*;
 
     fn sample_request(content: &str) -> ChatRequest {
-            ChatRequest {
-                model: MOCK_DEFAULT_MODEL.to_string(),
-                messages: vec![ChatMessage::user(content)],
-                temperature: None,
-                max_tokens: None,
-                request_id: Some(Uuid::new_v4()),
-                ..Default::default()
-            }
+        ChatRequest {
+            model: MOCK_DEFAULT_MODEL.to_string(),
+            messages: vec![ChatMessage::user(content)],
+            temperature: None,
+            max_tokens: None,
+            request_id: Some(Uuid::new_v4()),
+            thinking_level: None,
         }
 
     #[test]
@@ -208,7 +207,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
-            ..Default::default()
+            thinking_level: None,
         };
         let resp = p.chat_completion(req).await.unwrap();
         assert_eq!(resp.message.content, MOCK_FALLBACK_CONTENT);
@@ -223,7 +222,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
-            ..Default::default()
+            thinking_level: None,
         };
         let err = p.chat_completion(req).await.unwrap_err();
         assert!(matches!(err, LlmProviderRegistryError::InvalidOperation(_)));

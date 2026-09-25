@@ -129,18 +129,6 @@ impl SplitTree {
         }
     }
 
-    /// 从持久化层恢复 (per ULYS-220 P1-A persistence::load_pane)
-    ///
-    /// **MVP v0**: caller 提供 root + pane_count + depth, 不重新遍历.
-    /// 与 persistence::count_recursive 配合使用.
-    pub fn from_parts(root: PaneNode, pane_count: usize, depth: usize) -> Self {
-        Self {
-            root,
-            pane_count,
-            depth,
-        }
-    }
-
     /// 创建 split tree (root = split node with 2 children)
     pub fn new_split(
         root_id: uuid::Uuid,

@@ -50,19 +50,9 @@ export function useTerminalStackWs(opts: UseTerminalStackWsOptions) {
       return;
     }
 
-    // T23.6: 测试 can inject a custom WebSocket constructor via window.__mockWsCtor
-    // (per Playwright addInitScript before page.goto). This avoids needing to
-    // override window.WebSocket which Chromium does not allow.
-    const WebSocketCtor =
-      typeof window !== "undefined"
-        ? ((window as unknown as { __mockWsCtor?: typeof WebSocket })
-            .__mockWsCtor as typeof WebSocket | undefined)
-        : undefined;
-
     const client = new TerminalWsClient({
       sessionId: opts.sessionId,
       autoReconnect: opts.autoReconnect ?? true,
-      WebSocketCtor,
       handlers: {
         onHello: () => {
           setWsConnected(true);
@@ -77,13 +67,14 @@ export function useTerminalStackWs(opts: UseTerminalStackWsOptions) {
           // T23 followup will hook this up to a per-pane scrollback store
         },
         onSplitUpdate: (msg) => {
-          // msg.tree is PaneNodeView (1:1 mirror of SplitTree)
-          // We need to wrap in a SplitTreeView
+          // msg.tree is PaneNodeView (1:1 mirror of SplitTree).
+          // Per wsProtocol.ts: split_update has `tree:` (not `root:`) field.
+          const treeNode = msg.tree;
           const wrapped: SplitTreeView = {
-            root: msg.root.kind === "split" ? msg.root : msg.root,
-            paneCount: countPanes(msg.root),
-            depth: computeDepth(msg.root),
-            kind: msg.root.kind === "split" ? "split" : "single",
+            root: treeNode,
+            paneCount: countPanes(treeNode),
+            depth: computeDepth(treeNode),
+            kind: treeNode.kind === "split" ? "split" : "single",
           };
           setTree(wrapped);
         },

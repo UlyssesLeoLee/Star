@@ -190,7 +190,8 @@ impl AnthropicProvider {
             })
             .collect::<Vec<_>>()
             .join("");
-        let finish_reason_str = parsed
+        #[allow(deprecated)] // legacy wire compat (PI-2 / FR-9)
+        let finish_reason = parsed
             .stop_reason
             .clone()
             .unwrap_or_else(|| "stop".to_string());
@@ -199,8 +200,8 @@ impl AnthropicProvider {
             model: model.to_string(),
             message: ChatMessage::assistant(text),
             #[allow(deprecated)]
-            finish_reason: finish_reason_str.clone(),
-            stop_reason: crate::events::StopReason::parse_loose(&finish_reason_str),
+            finish_reason: finish_reason.clone(),
+            stop_reason: crate::events::StopReason::parse_loose(&finish_reason),
             usage: crate::events::Usage::default(),
             created_at: Utc::now(),
         }
@@ -432,17 +433,13 @@ mod tests {
     use crate::chat::ChatMessage;
 
     fn sample_request() -> ChatRequest {
-            ChatRequest {
-                model: ANTHROPIC_DEFAULT_MODEL.to_string(),
-                messages: vec![
-                    ChatMessage::system("be terse"),
-                    ChatMessage::user("hi"),
-                ],
-                temperature: Some(0.5),
-                max_tokens: Some(256),
-                request_id: Some(Uuid::new_v4()),
-                ..Default::default()
-            }
+        ChatRequest {
+            model: ANTHROPIC_DEFAULT_MODEL.to_string(),
+            messages: vec![ChatMessage::system("be terse"), ChatMessage::user("hi")],
+            temperature: Some(0.5),
+            max_tokens: Some(256),
+            request_id: Some(Uuid::new_v4()),
+            thinking_level: None,
         }
 
     #[test]
@@ -527,7 +524,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
-            ..Default::default()
+            thinking_level: None,
         };
         let err = p.chat_completion(req).await.unwrap_err();
         assert!(matches!(err, LlmProviderRegistryError::InvalidOperation(_)));

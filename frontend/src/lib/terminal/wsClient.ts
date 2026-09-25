@@ -48,12 +48,6 @@ export interface TerminalWsClientOptions {
   handlers: TerminalWsHandlers;
   /** Reconnect after disconnect (per NFR-AC keepalive) */
   autoReconnect?: boolean;
-  /**
-   * Inject a custom WebSocket constructor (for testing).
-   * Defaults to global `WebSocket`.
-   * Production code should leave this undefined.
-   */
-  WebSocketCtor?: typeof WebSocket;
   /** Initial reconnect delay in ms */
   reconnectDelayMs?: number;
 }
@@ -80,66 +74,40 @@ export class TerminalWsClient {
     if (this.ws && this.ws.readyState <= WebSocket.OPEN) return;
 
     const url = buildTerminalWsUrl(this.opts.sessionId);
-    const Ctor = this.opts.WebSocketCtor ?? WebSocket;
-    const ws = new Ctor(url);
+    const ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
     this.ws = ws;
 
-    // Cross-env compat: use addEventListener if available (real WS has it),
-    // fallback to onopen/onmessage/onerror/onclose property assignment (mock WS).
-    if (typeof ws.addEventListener === "function") {
-      ws.addEventListener("open", () => {
-        this.opts.handlers.onConnectionChange?.(true);
-      });
-      ws.addEventListener("message", (e: MessageEvent) => {
-        const text = typeof e.data === "string" ? e.data : "";
-        if (!text) return;
-        try {
-          const msg = decodeServerMessage(text);
-          this.dispatch(msg);
-        } catch {
-          this.opts.handlers.onError?.({
-            type: "error",
-            code: "invalid_message",
-            message: `failed to parse server message`,
-          });
-        }
-      });
-      ws.addEventListener("error", () => {
-        // Browsers fire error + close together; defer state-change to onclose
-      });
-      ws.addEventListener("close", () => {
-        this.opts.handlers.onConnectionChange?.(false);
-        if (!this.closed && this.opts.autoReconnect) {
-          this.scheduleReconnect();
-        }
-      });
-    } else {
-      // Fallback: direct property assignment (used by vitest MockWebSocketCtor)
-      (ws as unknown as { onopen: (() => void) | null }).onopen = () => {
-        this.opts.handlers.onConnectionChange?.(true);
-      };
-      (ws as unknown as { onmessage: ((e: MessageEvent) => void) | null }).onmessage = (e: MessageEvent) => {
-        const text = typeof e.data === "string" ? e.data : "";
-        if (!text) return;
-        try {
-          const msg = decodeServerMessage(text);
-          this.dispatch(msg);
-        } catch {
-          this.opts.handlers.onError?.({
-            type: "error",
-            code: "invalid_message",
-            message: `failed to parse server message`,
-          });
-        }
-      };
-      (ws as unknown as { onclose: (() => void) | null }).onclose = () => {
-        this.opts.handlers.onConnectionChange?.(false);
-        if (!this.closed && this.opts.autoReconnect) {
-          this.scheduleReconnect();
-        }
-      };
-    }
+    ws.onopen = () => {
+      this.opts.handlers.onConnectionChange?.(true);
+    };
+
+    ws.onmessage = (e) => {
+      const text = typeof e.data === "string" ? e.data : "";
+      if (!text) return;
+      try {
+        const msg = decodeServerMessage(text);
+        this.dispatch(msg);
+      } catch {
+        // per protocol: malformed JSON → onError (with custom code)
+        this.opts.handlers.onError?.({
+          type: "error",
+          code: "invalid_message",
+          message: `failed to parse server message`,
+        });
+      }
+    };
+
+    ws.onerror = () => {
+      // Browsers fire error + close together; defer state-change to onclose
+    };
+
+    ws.onclose = () => {
+      this.opts.handlers.onConnectionChange?.(false);
+      if (!this.closed && this.opts.autoReconnect) {
+        this.scheduleReconnect();
+      }
+    };
   }
 
   private scheduleReconnect(): void {
