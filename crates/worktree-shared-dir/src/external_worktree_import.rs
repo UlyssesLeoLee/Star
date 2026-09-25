@@ -41,10 +41,12 @@
 //! - scan: registry.lookup(repo_id) → GitProvider::open_repo → list_worktrees → 转 DTO
 //! - import: 同 path 必须先 scan 出来; 标记 is_managed=true, 返回
 //!   派生的 WorktreeId (本 crate WorktreeId = RepoId 占位, per PR #107
-//!   InMemory 同样的 placeholder 策略, 等 ULYS-217 WorktreeStateMachine
-//!   实装后再调 RealWorktreeCreateAsync::start 真正进 Provisioning)
-//! - cleanup_stale: 调 GitProvider::remove_worktree (本期最小实装: 对
-//!   stale path 做 git-level remove; 状态机侧等 ULYS-217 跨 session 续).
+//!   InMemory 同样的 placeholder 策略; `RealWorktreeCreateAsync::start`
+//!   ULYS-217 已 ship, 但它是"新建 worktree"语义, 接不了"接管已存在
+//!   path"的 import, 仍是占位, 见 struct doc)
+//! - cleanup_stale: diff `managed` (import 过的 path) 与当前 porcelain,
+//!   已消失的从 `managed` 摘掉并上报; 不调 `GitProvider::remove_worktree`
+//!   (那些 path 在 git 自己眼里已经不存在了, 调了也没意义).
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -602,13 +604,21 @@ impl ExternalWorktreeImportRegistry {
 /// - **`import` 占位**: 标 `is_managed = true` 进入本 impl 内部
 ///   "managed list" (per AC-2 隐含 — caller 后续要 manage). 返回
 ///   派生的 WorktreeId (新 UUID v4 placeholder), 让 caller 可 await
-///   该 ID 追踪. 等 ULYS-217 `WorktreeStateMachine` +
-///   `RealWorktreeCreateAsync::start` 实装后, 替换为真实 Provisioning.
+///   该 ID 追踪. `ULYS-217 RealWorktreeCreateAsync::start` 现已 ship,
+///   但它的入参是 `WorktreeCreateRequest { repo_url, base_ref, branch,
+///   worktree_path, .. }` — 语义是"新建一个 worktree", 不是"接管一个
+///   已经存在于磁盘上的外部 worktree". 两者不匹配, 所以这里仍是占位,
+///   不是被 ULYS-217 阻塞; 真要替换需要 `WorktreeCreateAsync` 侧先加一个
+///   "adopt existing path" 的入口 (跨 issue followup).
 ///
-/// - **`cleanup_stale` 边界**: AC-3 要求 "`git worktree remove` 后
-///   下次 scan 清理 stale". 本期最小实装: 把 registry 里所有 path
-///   走 `GitProvider::remove_worktree(force=false)`; 状态机侧等
-///   ULYS-217 跨 session 续 (RealWorktreeCreateAsync 接管).
+/// - **`cleanup_stale` 语义**: AC-3 要求 "`git worktree remove` 后
+///   下次 cleanup_stale 发现差异并清理". 比对对象是 `managed`
+///   (import 过的 path 集合), 不是 `registry` (repo_id → 主仓 path,
+///   只给 `open_repo` 用) — 已消失于 porcelain 的 managed path 视为
+///   stale, 从 `managed` 里摘掉即可; 不再对 stale path 调
+///   `GitProvider::remove_worktree` (git 那边已经不认识这个 path 了,
+///   再调一次没有意义, 也没有 `WorktreeStateMachine` 可接 per
+///   ULYS-217 备注).
 ///
 /// - **trait object DI**: 提供 `DynExternalWorktreeImport` 类型别名
 ///   (per 守门 #12), DI 容器 (api / cli main.rs) 持 `Arc<dyn ...>`.
@@ -617,8 +627,9 @@ pub struct RealExternalWorktreeImport {
     pub git: Arc<dyn GitProvider>,
     /// repo_id → 本地 path 注册表.
     pub registry: Arc<ExternalWorktreeImportRegistry>,
-    /// 本 impl 跟踪的 "已 managed" path 集合 (import 写入, cleanup_stale 清空).
-    /// 跨 call 共享 (Arc); 不依赖 WorktreeStateMachine (ULYS-217 pending).
+    /// 本 impl 跟踪的 "已 managed" path 集合 (import 写入, cleanup_stale 读取 +
+    /// 清空 — 是 cleanup_stale diff porcelain 的比对对象, 见上面设计要点).
+    /// 跨 call 共享 (Arc); 不依赖 WorktreeStateMachine (无对应真实实装, 见上).
     managed: Arc<RwLock<std::collections::HashMap<RepoId, HashSet<PathBuf>>>>,
 }
 
@@ -738,7 +749,9 @@ impl ExternalWorktreeImport for RealExternalWorktreeImport {
             let mut m = self.managed.write().unwrap();
             m.entry(repo_id).or_default().insert(path.clone());
         }
-        // 3. 返回派生的 WorktreeId (新 UUID v4 placeholder, 等 ULYS-217 接状态机后换)
+        // 3. 返回派生的 WorktreeId (新 UUID v4 placeholder — `WorktreeCreateAsync::start`
+        // 的入参是 "新建 worktree" 语义, 接不了 "接管已存在 path" 的 import, 见上面
+        // struct doc; 真要换掉这个占位需要跨 issue 给 create-async 侧先加个入口)
         // 注: 本 trait 方法签名声明返回 RepoId (per PR #107 `WorktreeId = RepoId`
         // type alias in graph_core::types); caller 把它当 WorktreeId 用.
         // v4 占位够用 (caller 不依赖确定性 — InMemory impl 同样返回 repo_id
@@ -763,40 +776,29 @@ impl ExternalWorktreeImport for RealExternalWorktreeImport {
         let porcelain_paths: HashSet<PathBuf> =
             infos.into_iter().map(|i| i.path).collect();
 
-        // 2. 收集 registry 里所有 path 中, 已经不在 porcelain 里的 (stale)
-        let registry_paths: Vec<(RepoId, PathBuf)> = self.registry.list_paths();
-        let mut stale: Vec<PathBuf> = Vec::new();
-        for (rid, p) in registry_paths {
-            if rid == repo_id && !porcelain_paths.contains(&p) {
-                stale.push(p);
-            }
-        }
+        // 2. 收集本 impl 跟踪的 "已 managed" (即 import 过) path 中, 已经不在
+        //    porcelain 里的 (stale) — 即用户在 Orca 外直接 `git worktree
+        //    remove` 掉了一个之前 import 过的 worktree.
+        //    注: 不用 `registry` (repo_id → 主仓 path 的 1:1 映射, 只给
+        //    `open_repo` lookup 用) 做比对 — 主仓 path 和 porcelain 里的
+        //    worktree path 是两个不同集合, 拿主仓 path 去比 porcelain 只会
+        //    把主仓自己误判成 stale (且完全测不到真正被 remove 的外部
+        //    worktree). `managed` 才是 AC-3 要 diff 的对象.
+        let mut m = self.managed.write().unwrap();
+        let managed_paths = m.entry(repo_id).or_default();
+        let stale: Vec<PathBuf> = managed_paths
+            .iter()
+            .filter(|p| !porcelain_paths.contains(*p))
+            .cloned()
+            .collect();
 
-        // 3. 调 GitProvider::remove_worktree (本期最小实装: 对 stale path 做
-        //    git-level remove; 失败不阻断 — caller 拿 log 即可)
+        // 3. 清掉 managed 跟踪 (跟 stale path 一致的). 不再调
+        //    `GitProvider::remove_worktree` — stale path 已经不在 git 的
+        //    worktree 列表里了 (那正是它被判定为 stale 的原因), 对它再调
+        //    一次 `worktree remove` 要么必然失败 (git 不认识这个 path),
+        //    要么误伤传进来的 `handle` 对应的主仓. 这里只需要同步内部状态.
         for p in &stale {
-            let _ = self
-                .git
-                .remove_worktree(&handle, p, /* force = */ false)
-                .await
-                .map_err(|e| {
-                    tracing::warn!(
-                        path = %p.display(),
-                        error = %e,
-                        "remove_worktree failed during cleanup_stale (continuing)"
-                    );
-                    e
-                });
-        }
-
-        // 4. 清掉 managed 跟踪 (跟 stale path 一致的)
-        {
-            let mut m = self.managed.write().unwrap();
-            if let Some(set) = m.get_mut(&repo_id) {
-                for p in &stale {
-                    set.remove(p);
-                }
-            }
+            managed_paths.remove(p);
         }
 
         Ok(stale)
@@ -822,7 +824,6 @@ mod real_tests {
         worktrees: Vec<WorktreeInfo>,
         open_should_fail: bool,
         list_should_fail: bool,
-        remove_should_fail: bool,
     }
 
     #[async_trait]
@@ -854,17 +855,14 @@ mod real_tests {
         async fn remove_worktree(
             &self,
             _: &RepoHandle,
-            path: &Path,
+            _path: &Path,
             _force: bool,
         ) -> Result<(), GitError> {
-            if self.remove_should_fail {
-                return Err(GitError::new("GIT.TEST_FAIL", "remove_worktree failed"));
-            }
-            // 模拟 remove: 在 stub 列表里把对应 path 移除, 真实场景下
-            // 下次 list_worktrees 就拿不到. 这里不动 list (cleanup_stale
-            // 测试需要稳定 porcelain 集合, 借助 stub 显式构造).
-            let _ = path;
-            Ok(())
+            // cleanup_stale 不再调这个方法 (stale path 已经不在 git 自己的
+            // worktree 列表里了, 见 external_worktree_import.rs cleanup_stale
+            // 实装注释) — 跟其它这个 stub 里没被本 crate 用到的方法一样,
+            // unimplemented!() 就够了.
+            unimplemented!()
         }
         async fn diff(
             &self,
@@ -952,7 +950,6 @@ mod real_tests {
             worktrees: vec![],
             open_should_fail: false,
             list_should_fail: false,
-            remove_should_fail: false,
         });
         let registry = Arc::new(ExternalWorktreeImportRegistry::new());
         let repo_id = RepoId::new_v4();
@@ -986,7 +983,6 @@ mod real_tests {
             ],
             open_should_fail: false,
             list_should_fail: false,
-            remove_should_fail: false,
         });
         let registry = Arc::new(ExternalWorktreeImportRegistry::new());
         let repo_id = RepoId::new_v4();
@@ -1010,7 +1006,6 @@ mod real_tests {
             worktrees: vec![],
             open_should_fail: true,
             list_should_fail: false,
-            remove_should_fail: false,
         });
         let registry = Arc::new(ExternalWorktreeImportRegistry::new());
         let repo_id = RepoId::new_v4();
@@ -1027,7 +1022,6 @@ mod real_tests {
             worktrees: vec![],
             open_should_fail: false,
             list_should_fail: true,
-            remove_should_fail: false,
         });
         let registry = Arc::new(ExternalWorktreeImportRegistry::new());
         let repo_id = RepoId::new_v4();
@@ -1044,7 +1038,6 @@ mod real_tests {
             worktrees: vec![wt_info("/tmp/repo/wt1", "feat-a", "aaaa")],
             open_should_fail: false,
             list_should_fail: false,
-            remove_should_fail: false,
         });
         let registry = Arc::new(ExternalWorktreeImportRegistry::new());
         let repo_id = RepoId::new_v4();
@@ -1071,7 +1064,6 @@ mod real_tests {
             worktrees: vec![wt_info("/tmp/repo/wt1", "feat-a", "aaaa")],
             open_should_fail: false,
             list_should_fail: false,
-            remove_should_fail: false,
         });
         let registry = Arc::new(ExternalWorktreeImportRegistry::new());
         let repo_id = RepoId::new_v4();
@@ -1101,45 +1093,55 @@ mod real_tests {
 
     #[tokio::test]
     async fn real_cleanup_stale_returns_paths_not_in_porcelain() {
-        // registry 有 2 个 path; porcelain 只有 1 个 (wt2 已被 git worktree remove)
+        // managed 有 2 个 import 过的 path; porcelain 只返回 1 个
+        // (wt2 已经在 Orca 外被 `git worktree remove` 掉了).
         let git: Arc<dyn GitProvider> = Arc::new(StubGit {
             worktrees: vec![wt_info("/tmp/repo/wt1", "feat-a", "aaaa")],
             open_should_fail: false,
             list_should_fail: false,
-            remove_should_fail: false,
         });
         let registry = Arc::new(ExternalWorktreeImportRegistry::new());
         let repo_id = RepoId::new_v4();
         registry.register(repo_id, PathBuf::from("/tmp/repo"));
-        // 模拟已被 git worktree remove 的 path: 走 register 但 porcelain 不返回
         let real = RealExternalWorktreeImport::new(git, registry.clone());
-        // 先 import 一下, 让 wt1 标 is_managed=true (cleanup 内部清 managed set)
+
+        // import wt1 + wt2 (wt2 是 stub porcelain 之外硬塞进 managed 的一个 path,
+        // 模拟 "曾经 import 过, 后来被 Orca 外部直接 git worktree remove 掉"):
         real.import(repo_id, PathBuf::from("/tmp/repo/wt1"))
             .await
             .unwrap();
+        {
+            let mut m = real.managed.write().unwrap();
+            m.entry(repo_id)
+                .or_default()
+                .insert(PathBuf::from("/tmp/repo/wt2"));
+        }
 
         let stale = real.cleanup_stale(repo_id).await.unwrap();
-        // stub list_worktrees 始终返回 [wt1]; registry.list_paths() 只列
-        // 我们刚 register 的 repo path (/tmp/repo 主仓), 不含 wt1.
-        // 因此 stale = [] (主仓 path 仍在 porcelain — 假设主仓 = /tmp/repo, stub
-        // list_worktrees 没返回它, 算 stale).
-        // 注: 本测试重点是 "cleanup_stale 不 panic + 返回 Vec"; 实际 stale
-        // 内容取决于 stub 列表.
-        let _ = stale;
-        // 二次调用不应死锁 (锁顺序正确)
+        assert_eq!(
+            stale,
+            vec![PathBuf::from("/tmp/repo/wt2")],
+            "只有 wt2 从 porcelain 消失, wt1 仍在, 主仓 path 从不参与比对"
+        );
+        // wt1 仍留在 managed 里 (仍在 porcelain), wt2 被摘掉了.
+        let remaining = real.managed_paths(repo_id);
+        assert_eq!(remaining, vec![PathBuf::from("/tmp/repo/wt1")]);
+
+        // 再调一次: 已经没有 stale 了 (wt2 已被摘掉), 不应重复上报.
         let stale2 = real.cleanup_stale(repo_id).await.unwrap();
-        assert!(stale2.is_empty() || !stale2.is_empty());
+        assert!(stale2.is_empty());
     }
 
     #[tokio::test]
-    async fn real_cleanup_stale_remove_failure_does_not_propagate() {
-        // remove_worktree 失败时, cleanup_stale 仍应返回 stale list (本期约定
-        // 失败不阻断 — caller 拿 log 即可, per cleanup_stale doc).
+    async fn real_cleanup_stale_ignores_unmanaged_registry_path() {
+        // 回归测试: registry 里的主仓 path (/tmp/repo) 从未被 import 过,
+        // 也不在 porcelain 里 — 早前的 bug 会把它错判成 stale 并尝试
+        // git-level remove 主仓自己. 修复后 cleanup_stale 只 diff `managed`,
+        // 主仓 path 根本不参与比较, 所以 stale 必须是空的.
         let git: Arc<dyn GitProvider> = Arc::new(StubGit {
             worktrees: vec![],
             open_should_fail: false,
             list_should_fail: false,
-            remove_should_fail: true,
         });
         let registry = Arc::new(ExternalWorktreeImportRegistry::new());
         let repo_id = RepoId::new_v4();
@@ -1147,8 +1149,10 @@ mod real_tests {
         let real = RealExternalWorktreeImport::new(git, registry);
 
         let stale = real.cleanup_stale(repo_id).await.unwrap();
-        // 主仓 /tmp/repo 不在 porcelain → stale. remove 失败但不 panic.
-        assert_eq!(stale, vec![PathBuf::from("/tmp/repo")]);
+        assert!(
+            stale.is_empty(),
+            "未 import 过的主仓 path 不应被当成 stale: {stale:?}"
+        );
     }
 
     #[tokio::test]
@@ -1184,7 +1188,6 @@ mod real_tests {
             worktrees: vec![wt_info("/tmp/repo/wt1", "feat-a", "aaaa")],
             open_should_fail: false,
             list_should_fail: false,
-            remove_should_fail: false,
         });
         let registry = Arc::new(ExternalWorktreeImportRegistry::new());
         let repo_id = RepoId::new_v4();
