@@ -6,6 +6,7 @@
 //! - `openai.rs`    — OpenAI Compatible provider (POST https://api.openai.com/v1/chat/completions)
 //! - `mock.rs`      — CI / no-key stub (deterministic reply, no network)
 //! - `registry.rs`  — provider selection by model name
+//! - `sse.rs`       — SSE → `AgentStreamEvent` translation for `stream_completion_v2` (ULYS-178)
 //!
 //! **v0.0.2 (W2)**: real reqwest wiring + `no_network_mode` (守门 #25 v25 模式, CI 默认不联网).
 //!
@@ -19,6 +20,7 @@ pub mod anthropic;
 pub mod mock;
 pub mod openai;
 pub mod registry;
+mod sse;
 
 pub use anthropic::{AnthropicProvider, ANTHROPIC_DEFAULT_BASE_URL};
 pub use mock::MockProvider;
