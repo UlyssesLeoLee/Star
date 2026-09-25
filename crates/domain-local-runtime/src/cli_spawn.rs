@@ -50,6 +50,15 @@ pub struct RealCliRuntime {
     pub mock_fallback: bool,
     /// 活跃 child 句柄 (用于取消)
     active: Arc<Mutex<HashMap<Uuid, Child>>>,
+    /// Windows Job Object 注册表(pid → Job),per ULYS-212 P1 followup
+    ///
+    /// **跨平台字段**(非 Windows 上是 `()` 不占空间);
+    /// 通过 `Arc<Mutex<...>>` 在 Linux/macOS 上零成本
+    /// (`Mutex<()>::new(())` 不分配 hash map)。
+    #[cfg(target_os = "windows")]
+    windows_jobs: Arc<Mutex<HashMap<u32, Arc<crate::spawn_windows::WindowsJob>>>>,
+    #[cfg(not(target_os = "windows"))]
+    _windows_jobs_unused: (),
 }
 
 impl RealCliRuntime {
@@ -58,6 +67,10 @@ impl RealCliRuntime {
         Self {
             mock_fallback: false,
             active: Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(target_os = "windows")]
+            windows_jobs: Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(not(target_os = "windows"))]
+            _windows_jobs_unused: (),
         }
     }
 
@@ -66,6 +79,10 @@ impl RealCliRuntime {
         Self {
             mock_fallback: true,
             active: Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(target_os = "windows")]
+            windows_jobs: Arc::new(Mutex::new(HashMap::new())),
+            #[cfg(not(target_os = "windows"))]
+            _windows_jobs_unused: (),
         }
     }
 }
@@ -120,30 +137,33 @@ impl LocalRuntime for RealCliRuntime {
 
         #[cfg(unix)]
         {
-            // ULYS-219 P1 followup: 真实 `setsid(2)` 创建新 session leader
-            // (per unix_session::apply_session)。
+            // 从父进程的 controlling terminal 信号组分离:父进程收到的 SIGINT/SIGHUP
+            // (终端 Ctrl-C、或父进程所在终端挂断)不会传播给子进程。
+            // pgid=0 等价 setpgid(0, 0)(以子进程自身 pid 作为新 pgid)。
             //
-            // 对比 v0.1 的 `cmd.process_group(0)`(等价 `setpgid(0, 0)`):
-            //
-            // | API            | pgid 分离 | session leader | tty 分离 | 父进程 signal 屏蔽 |
-            // |----------------|:---------:|:--------------:|:--------:|:------------------:|
-            // | setpgid(0, 0)  |     ✅    |       ❌       |    ❌    |         ❌         |
-            // | setsid(2)      |     ✅    |       ✅       |    ✅    |         ✅         |
-            //
-            // setsid 是 POSIX "完全 daemon-like" 行为,是 Orca FR-ORCA-001 AC-1
-            // 真正要的"脱离父进程任何控制信号"。
-            //
-            // Windows 编译路径不走此分支(留 ULYS-211 Job Object)。
-            // Fallback:`UnixSessionOptions::default().new_session = false` 时
-            // apply_session 是 no-op,等同旧 process_group(0) 行为(向后兼容)。
-            use crate::unix_session::{apply_session, UnixSessionOptions};
-            let opts = UnixSessionOptions::default(); // grace=5, new_session=true
-            if let Err(e) = apply_session(&mut cmd, &opts) {
-                tracing::warn!(
-                    "cli_spawn: apply_session failed ({}); fallback to process_group(0)",
-                    e
-                );
-                // setsid 失败(如 EPERM)时退化到 setpgid,保证 spawn 不被阻断
+            // ULYS-212 P1 followup:此处改为走 [`crate::spawn_linux::wrap_linux_session`]
+            // (Linux 真 setsid,经 process_wrap safe wrapper) — 替代原 stub `process_group(0)`
+            // macOS 仍走 [`crate::spawn_macos::wrap_macos_setpgid`] (setpgid 语义)
+            // Unix 公用分支同时保留 `process_group(0)` fallback(若 new_session=false 显式禁)
+            #[cfg(target_os = "linux")]
+            {
+                use crate::spawn_linux::{wrap_linux_session, LinuxSpawnOptions};
+                let opts = LinuxSpawnOptions {
+                    new_session: true,
+                    cgroup: crate::spawn_linux::CgroupMode::Auto,
+                    scope_name: None,
+                };
+                wrap_linux_session(&mut cmd, &opts);
+            }
+            #[cfg(target_os = "macos")]
+            {
+                use crate::spawn_macos::{wrap_macos_setpgid, MacosSpawnOptions};
+                let opts = MacosSpawnOptions { new_pg: true };
+                wrap_macos_setpgid(&mut cmd, &opts);
+            }
+            // 非 Linux/macOS Unix(如 BSD)fallback — 保留原 `process_group(0)` 路径
+            #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+            {
                 cmd.process_group(0);
             }
         }
@@ -151,9 +171,13 @@ impl LocalRuntime for RealCliRuntime {
         {
             // CREATE_NEW_PROCESS_GROUP (0x00000200,Win32 CreateProcess 标志):
             // 子进程脱离父进程的 console 进程组,父进程收到的 Ctrl-C / Ctrl-Break
-            // 不会传播给子进程。ULYS-211 P1 followup 将升级到 Job Object。
-            const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-            cmd.creation_flags(CREATE_NEW_PROCESS_GROUP);
+            // 不会传播给子进程。
+            //
+            // ULYS-212 P1 followup:同时注入 Windows Job Object(经 win32job safe wrapper)
+            // — Job 设 JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE ⇒ handle close 时 OS 杀整 Job 进程组
+            use crate::spawn_windows::{apply_windows_creation_flags, WindowsSpawnOptions};
+            let opts = WindowsSpawnOptions::default();
+            apply_windows_creation_flags(&mut cmd, &opts);
         }
 
         let mut child = match cmd.spawn() {
@@ -175,6 +199,42 @@ impl LocalRuntime for RealCliRuntime {
         };
 
         let pid = child.id();
+
+        // ULYS-212: Windows Job Object 注册
+        // — spawn 后立刻把 child 加入 Job(KILL_ON_JOB_CLOSE ⇒ handle close 时 OS 杀整 Job 进程组)
+        #[cfg(target_os = "windows")]
+        {
+            use crate::spawn_windows::{WindowsJobRegistry, WindowsSpawnOptions};
+            // 1) 创建 Job Object(KILL_ON_JOB_CLOSE 由 WindowsSpawnOptions::default() 启用)
+            let opts = WindowsSpawnOptions::default();
+            match WindowsJobRegistry::create_job(&opts) {
+                Ok(job) => {
+                    // 2) spawn 后 child.raw_handle() 拿进程句柄,加入 Job
+                    //    RawHandle = *mut c_void → 直接 cast usize → 再 cast isize 给 win32job
+                    let raw_addr: isize = match child.raw_handle() {
+                        Some(h) => h as usize as isize,
+                        None => 0,
+                    };
+                    let pid_num = pid.unwrap_or(0);
+                    let mut jobs = self.windows_jobs.lock().await;
+                    // 真实 assign_process(child_handle) — 把 child 加入 Job
+                    // (per win32job::Job::assign_process(isize) safe API)
+                    let _ = job.assign_process(raw_addr);
+                    jobs.insert(pid_num, job);
+                    tracing::debug!(
+                        "ULYS-212: Windows Job Object created for pid={} (raw_handle=0x{:x})",
+                        pid_num,
+                        raw_addr as usize
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "ULYS-212: WindowsJobRegistry::create_job failed: {:?} (falling back to no-job)",
+                        e
+                    );
+                }
+            }
+        }
 
         // 推 stdout/stderr 流
         let stdout = child

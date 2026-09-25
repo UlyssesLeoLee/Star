@@ -1,0 +1,6 @@
+[toolchain]
+# ACI emitter 是独立 crate (per 决策 #5), 不绑 Star 仓的 1.98.1
+# 锁 stable (CI 用 stable), 与 process-wrap 0.8 MSRV 1.77 对齐
+channel = "stable"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

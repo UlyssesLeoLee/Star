@@ -172,6 +172,19 @@ impl ChatRequest {
     }
 }
 
+impl Default for ChatRequest {
+    fn default() -> Self {
+        Self {
+            model: String::new(),
+            messages: Vec::new(),
+            temperature: None,
+            max_tokens: None,
+            request_id: None,
+            thinking_level: None,
+        }
+    }
+}
+
 // =====================================================================
 // ChatResponse (output of LlmProvider::chat_completion)
 // =====================================================================

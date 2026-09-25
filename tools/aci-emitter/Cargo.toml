@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = ["crates/aci-emitter"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"  # per process-wrap 0.8 MSRV (brief §1.1.2)
+license = "MIT OR Apache-2.0"
+authors = ["Ulysses <ulysses@mavis.local>"]
+description = "跨项目 ACI (Assertion Contract Interface) emitter helper crate, per ULYS-191 §4.2.1"
+repository = "https://github.com/UlyssesLeoLee/aci-emitter"
+readme = "crates/aci-emitter/README.md"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+thiserror = "1.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+clap = { version = "4.5", features = ["derive"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

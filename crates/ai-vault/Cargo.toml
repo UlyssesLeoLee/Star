@@ -1,0 +1,25 @@
+[package]
+name = "ai-vault"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "AI Vault domain — local-only search policy + clear index (per ULYS-157 P0-C MVP v0 + FR-ORCA-023 桌面索引控制 + FR-ORCA-024 Clear Search Index, spec v1.0 line 347-353)"
+
+[lib]
+name = "ai_vault"
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

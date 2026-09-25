@@ -1,0 +1,141 @@
+{
+  "_doc": "test_hooks.json — fixture for tests/automation/hooks/test_*.py, per DD §5.1 fixtures/test_hooks.json. 包含 10 正常 + 5 故意错误用例.",
+  "_schema_version": "1.0",
+  "valid_hooks": [
+    {
+      "name": "test_pre_tool_block",
+      "event_type": "PreToolUse",
+      "action_type": "pre",
+      "handler": "scripts.automation.hooks.builtin.pre_tool_use_guard:handler",
+      "enabled": true,
+      "priority": 10,
+      "timeout_ms": 1000,
+      "description": "fixture: PreToolUse BLOCK 命中 (per DD §5.1 T-EM-1)"
+    },
+    {
+      "name": "test_post_tool_pass",
+      "event_type": "PostToolUse",
+      "action_type": "post",
+      "handler": "scripts.automation.hooks.user.user_post_audit:handler",
+      "enabled": true,
+      "priority": 100,
+      "timeout_ms": 1000,
+      "description": "fixture: PostToolUse PASS (per DD §5.1 T-EM-2)"
+    },
+    {
+      "name": "test_session_start_cleanup",
+      "event_type": "SessionStart",
+      "action_type": "post",
+      "handler": "builtin:session_start_cleanup",
+      "enabled": true,
+      "priority": 50,
+      "timeout_ms": 5000,
+      "description": "fixture: SessionStart cleanup (per DD §5.1 T-BL-1)"
+    },
+    {
+      "name": "test_subagent_dispatch_audit",
+      "event_type": "SubagentDispatch",
+      "action_type": "pre",
+      "handler": "builtin:subagent_dispatch_audit",
+      "enabled": true,
+      "priority": 10,
+      "timeout_ms": 500,
+      "description": "fixture: SubagentDispatch audit (per DD §5.1 T-FS-1)"
+    },
+    {
+      "name": "test_tool_error_fallback_transient",
+      "event_type": "ToolError",
+      "action_type": "post",
+      "handler": "builtin:tool_error_fallback",
+      "enabled": true,
+      "priority": 100,
+      "timeout_ms": 200,
+      "description": "fixture: ToolError transient retry (per DD §5.1 T-RUN-1)"
+    },
+    {
+      "name": "test_tool_error_fallback_fatal",
+      "event_type": "ToolError",
+      "action_type": "post",
+      "handler": "builtin:tool_error_fallback",
+      "enabled": true,
+      "priority": 100,
+      "timeout_ms": 200,
+      "description": "fixture: ToolError fatal (per DD §5.1 T-RUN-2)"
+    },
+    {
+      "name": "test_cron_tick",
+      "event_type": "CronTick",
+      "action_type": "post",
+      "handler": "scripts.automation.hooks.user.user_cron_heartbeat:handler",
+      "enabled": true,
+      "priority": 100,
+      "timeout_ms": 100,
+      "description": "fixture: CronTick (per DD §5.1 T-EM-2)"
+    },
+    {
+      "name": "test_file_watch_pass",
+      "event_type": "FileWatch",
+      "action_type": "post",
+      "handler": "scripts.automation.hooks.user.user_post_audit:handler",
+      "enabled": true,
+      "priority": 100,
+      "timeout_ms": 500,
+      "description": "fixture: FileWatch PASS"
+    },
+    {
+      "name": "test_runtime_scan",
+      "event_type": "RuntimeScan",
+      "action_type": "post",
+      "handler": "scripts.automation.hooks.user.user_post_audit:handler",
+      "enabled": true,
+      "priority": 100,
+      "timeout_ms": 500,
+      "description": "fixture: RuntimeScan"
+    },
+    {
+      "name": "test_workspace_switch",
+      "event_type": "WorkspaceSwitch",
+      "action_type": "post",
+      "handler": "scripts.automation.hooks.user.user_post_audit:handler",
+      "enabled": true,
+      "priority": 100,
+      "timeout_ms": 500,
+      "description": "fixture: WorkspaceSwitch"
+    }
+  ],
+  "invalid_hooks": [
+    {
+      "_comment": "missing 'name' field — schema 校验失败 (per DD §5.1 T-HR-3)",
+      "event_type": "PreToolUse",
+      "action_type": "pre",
+      "handler": "scripts.automation.hooks.builtin.pre_tool_use_guard:handler"
+    },
+    {
+      "_comment": "invalid event_type — 不在 14 类枚举 (per DD §5.1 T-HR-3)",
+      "name": "test_invalid_event",
+      "event_type": "NotARealEvent",
+      "action_type": "pre",
+      "handler": "scripts.automation.hooks.builtin.pre_tool_use_guard:handler"
+    },
+    {
+      "_comment": "invalid action_type — 不在 4 种枚举 (per DD §5.1 T-HR-3)",
+      "name": "test_invalid_action",
+      "event_type": "PreToolUse",
+      "action_type": "super_block",
+      "handler": "scripts.automation.hooks.builtin.pre_tool_use_guard:handler"
+    },
+    {
+      "_comment": "missing 'handler' field — schema 校验失败 (per DD §5.1 T-HR-3)",
+      "name": "test_no_handler",
+      "event_type": "PreToolUse",
+      "action_type": "pre"
+    },
+    {
+      "_comment": "name 含非法字符 (uppercase + space) — schema 校验失败 per pattern ^[a-z0-9_-]+$",
+      "name": "Test Invalid Name",
+      "event_type": "PreToolUse",
+      "action_type": "pre",
+      "handler": "scripts.automation.hooks.builtin.pre_tool_use_guard:handler"
+    }
+  ]
+}

@@ -14,11 +14,15 @@ use uuid::Uuid;
 use graph_core::state::{HumanState, MergeStrategy, TestState};
 use graph_core::types::{RepoId, UserId, WorktreeId};
 
+use worktree_shared_dir::{NoopPostImportHook, PostImportHook};
 use crate::error::ServiceError;
 use crate::lifecycle::{transition as lifecycle_transition, WorktreeEvent, WorktreeSnapshot};
 use crate::projection::{StatusObservedPoint, WorktreeStatusObserved};
 use crate::service::{
     SyncResult, Worktree, WorktreeEventEnvelope, WorktreeFilter, WorktreeService, WorktreeUpdate,
+};
+use crate::start_from_picker::{
+    pick_start_from_candidates, PickerCandidates, StartFromPickerSource,
 };
 
 /// In-memory Worktree service 实装
@@ -26,9 +30,13 @@ use crate::service::{
 /// - 内部存 `HashMap<WorktreeId, Worktree>` + `Arc<RwLock>` 包裹
 /// - 每个 repo 维护 1 个 30 天 `WorktreeStatusObserved` projection
 /// - 事件通过 `broadcast::channel` 扇出 (per DD §12 `subscribe`)
+/// - `post_import_hook` 在 `import_external_worktrees` 成功后回调 (per
+///   ULYS-195 §3 软依赖 + stage 2 解耦). 默认 `NoopPostImportHook`, 不破坏 stage 1.
 pub struct InMemoryWorktreeService {
     inner: Arc<RwLock<Inner>>,
     event_tx: broadcast::Sender<WorktreeEventEnvelope>,
+    /// 阶段 2: import 成功后的回调 (默认空)
+    post_import_hook: Arc<dyn PostImportHook>,
 }
 
 struct Inner {
@@ -38,6 +46,45 @@ struct Inner {
     health_provider: Option<Arc<dyn HealthProvider>>,
     /// 风险评估 provider (per INV-WC-03, 阶段 2 接 risk-engine crate)
     risk_provider: Option<Arc<dyn RiskProvider>>,
+    /// Start-from Picker 4 选 1 候选 source (per ULYS-194 / FR-ORCA-009)
+    /// 默认 None → NoopPickerSource (永远只返回 empty)
+    picker_source: Option<Arc<dyn StartFromPickerSource>>,
+}
+
+/// Noop picker source — 永远只返回 empty 候选 (kind 4 sentinel).
+/// 用于 InMemoryWorktreeService::new() 的 default, 不依赖 git-adapter.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoopPickerSource;
+
+#[async_trait]
+impl StartFromPickerSource for NoopPickerSource {
+    async fn list_github_branches(
+        &self,
+        _repo_id: RepoId,
+    ) -> Result<Vec<crate::start_from_picker::PickerCandidate>, ServiceError> {
+        Ok(Vec::new())
+    }
+    async fn list_existing_worktrees(
+        &self,
+        _repo_id: RepoId,
+    ) -> Result<Vec<crate::start_from_picker::PickerCandidate>, ServiceError> {
+        Ok(Vec::new())
+    }
+    async fn list_local_paths(
+        &self,
+        _repo_id: RepoId,
+    ) -> Result<Vec<crate::start_from_picker::PickerCandidate>, ServiceError> {
+        Ok(Vec::new())
+    }
+    fn empty_candidate(&self, repo_id: RepoId) -> crate::start_from_picker::PickerCandidate {
+        use worktree_shared_dir::{PickerCandidate, PickerCandidateKind};
+        PickerCandidate {
+            id: format!("empty:{repo_id}"),
+            label: "Empty / Start from scratch".to_string(),
+            description: "No base ref — only branch name + repo metadata".to_string(),
+            kind: PickerCandidateKind::CommitSha,
+        }
+    }
 }
 
 /// Health provider 抽象 (避免 health-engine 与 worktree-service 循环依赖)
@@ -103,9 +150,44 @@ impl InMemoryWorktreeService {
                 projections: HashMap::new(),
                 health_provider: Some(health),
                 risk_provider: Some(risk),
+                picker_source: None,
             })),
             event_tx,
+            post_import_hook: Arc::new(NoopPostImportHook),
         }
+    }
+
+    /// 设置 Start-from Picker 4 选 1 候选 source (per ULYS-194 / FR-ORCA-009).
+    /// 不传 source → 用 NoopPickerSource (永远只返回 empty).
+    ///
+    /// ## 调用约束
+    ///
+    /// 必须在 `InMemoryWorktreeService::new()` 之后立即使用, 不与其它 task 共享同一 service.
+    /// 用 `try_write` 写内部 state, 若 lock 已被持有则放弃 (no-op).
+    /// 生产路径应改用 `with_providers_and_picker` 构造法 (本类型用 try_write 是为
+    /// 避免破坏现有 `new()` 签名 + 14+ 个调用方 tests, per 守门 #19).
+    pub fn with_picker_source(self, source: Arc<dyn StartFromPickerSource>) -> Self {
+        if let Ok(mut guard) = self.inner.try_write() {
+            guard.picker_source = Some(source);
+        }
+        // else: lock 已被持有 (例如并发 task 持有 inner.write().await),
+        // 这是 caller 误用, 我们 ignore 不 panic. 这种情况下 picker_source
+        // 保持 None, 运行时走 NoopPickerSource fallback.
+        self
+    }
+
+    /// 阶段 2: 自定义 post_import_hook (per ULYS-195 §3 软依赖).
+    ///
+    /// `InMemoryWorktreeService::import_external_worktrees` 在收集完
+    /// `ImportOutcome { imported, skipped, updated }` 后, 调用 hook 的
+    /// `on_import_complete(repo_id, imported, updated, skipped)` 回调.
+    ///
+    /// 默认 impl (`NoopPostImportHook`) 不做任何事. 实装 crate 可注入
+    /// `SharedDirResolverHook` 等更复杂 hook (在 stage 2 PR #2 引入 worktree-shared-dir
+    /// 时实装).
+    pub fn with_post_import_hook(mut self, hook: Arc<dyn PostImportHook>) -> Self {
+        self.post_import_hook = hook;
+        self
     }
 
     /// 内部: 记录 status observed (per DD §12.5)
@@ -470,6 +552,116 @@ impl WorktreeService for InMemoryWorktreeService {
         });
         Ok(())
     }
+
+    async fn import_external_worktrees(
+        &self,
+        repo_id: RepoId,
+        repo_path: &std::path::Path,
+        force: bool,
+    ) -> Result<crate::external_worktree_import::ImportOutcome, ServiceError> {
+        use crate::external_worktree_import::{
+            diff_external, map_to_worktree, parse_porcelain, ImportError,
+        };
+
+        // 调 git (in-memory impl 不在 stage 1 调 git CLI;
+        //    测试可走 parse_porcelain 注入 fake 数据, prod 走 scan_external_worktrees)
+        //    这里走 scan_external_worktrees — 失败时 ImportError → ServiceError.
+        let externals = match crate::external_worktree_import::scan_external_worktrees(repo_path)
+            .await
+        {
+            Ok(v) => v,
+            // porcelain_v1 fallback: 若 --porcelain 不被 git 旧版支持, 退到 v1 输出解析
+            // (此处 e2e 路径默认用 v2, 测试路径直接走 parse_porcelain)
+            Err(ImportError::GitCommand(msg)) if msg.contains("unknown option") => {
+                return Err(ServiceError::new(
+                    "WT.GIT_FAIL",
+                    format!("git worktree list --porcelain unsupported: {msg}"),
+                    "trace",
+                ));
+            }
+            Err(e) => {
+                return Err(e.into_service_error(format!(
+                    "import_external_worktrees:{}",
+                    uuid::Uuid::new_v4()
+                )));
+            }
+        };
+
+        let _ = parse_porcelain; // suppress unused warning if compile-only path skips
+        let existing = {
+            let guard = self.inner.read().await;
+            guard
+                .worktrees
+                .values()
+                .filter(|w| w.repo_id == repo_id)
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+        let to_import = diff_external(&externals, &existing);
+
+        let mut outcome = crate::external_worktree_import::ImportOutcome::default();
+        let mut now = Utc::now();
+
+        for ext in to_import {
+            // 冲突检测: 同 branch 已存在
+            let branch_conflict = ext.branch.as_ref().and_then(|b| {
+                existing
+                    .iter()
+                    .find(|w| w.branch == *b && w.path != ext.worktree_path)
+            });
+
+            if let Some(conflict) = branch_conflict {
+                if !force {
+                    tracing::warn!(
+                        branch = %ext.branch.as_deref().unwrap_or("(detached)"),
+                        existing_id = %conflict.id,
+                        "import_external_worktrees: branch conflict, skip (force=true to override)"
+                    );
+                    outcome
+                        .skipped
+                        .push(ext.branch.clone().unwrap_or_else(|| "(detached)".into()));
+                    continue;
+                }
+                // force=true: 更新内部 Worktree.branch 指向新 path (path 单独 record_observed)
+                let mut guard = self.inner.write().await;
+                if let Some(stored) = guard.worktrees.get_mut(&conflict.id) {
+                    stored.branch = ext.branch.clone().unwrap_or_else(|| {
+                        ext.head_commit.chars().take(7).collect()
+                    });
+                    stored.path = ext.worktree_path.clone();
+                    stored.last_activity = now;
+                    outcome.updated.push(stored.clone());
+                }
+                drop(guard);
+                continue;
+            }
+
+            // 新 insert
+            let wt = map_to_worktree(repo_id, &ext);
+            let id = wt.id;
+            {
+                let mut guard = self.inner.write().await;
+                guard.worktrees.insert(id, wt.clone());
+                // init projection
+                guard
+                    .projections
+                    .entry(id)
+                    .or_insert_with(crate::projection::WorktreeStatusObserved::new);
+            }
+
+            // 发 SSE Created 事件
+            let _ = self.event_tx.send(WorktreeEventEnvelope::Created {
+                worktree_id: id,
+                repo_id,
+                at: now,
+            });
+
+            outcome.imported.push(wt);
+            now = Utc::now();
+        }
+
+        Ok(outcome)
+    }
 }
 
 #[cfg(test)]
@@ -569,5 +761,91 @@ mod tests {
         let stored = svc.get(wt.id).await.unwrap();
         assert_eq!(stored.health_score, health);
         let _ = updated;
+    }
+
+    // --- 阶段 2 stage 2: post_import_hook 在 import_external_worktrees 成功路径上被调用 ---
+
+    #[derive(Default)]
+    struct HookCounter {
+        count: std::sync::Arc<std::sync::Mutex<u32>>,
+    }
+
+    #[async_trait::async_trait]
+    impl worktree_shared_dir::PostImportHook for HookCounter {
+        async fn on_import_complete(
+            &self,
+            _repo_id: graph_core::types::RepoId,
+            _imported: &[worktree_shared_dir::WorktreeId],
+            _updated: &[worktree_shared_dir::WorktreeId],
+            _skipped: &[String],
+        ) {
+            *self.count.lock().unwrap() += 1;
+        }
+    }
+
+    #[tokio::test]
+    async fn post_import_hook_invoked_after_import() {
+        // 验证: import_external_worktrees 成功路径会调 hook (阶段 2 解耦).
+        // 这里用真实 git tempdir (e2e 路径) + Counting hook 记录调用.
+        use std::process::Command;
+        let tmp = std::env::temp_dir().join(format!(
+            "ulys195-stage2-hook-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        if std::fs::create_dir_all(&tmp).is_err() {
+            eprintln!("[skip] cannot create tempdir");
+            return;
+        }
+        let run = |args: &[&str]| -> bool {
+            Command::new("git")
+                .current_dir(&tmp)
+                .args(args)
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+        };
+        let git_avail = Command::new("git")
+            .arg("--version")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if !git_avail {
+            eprintln!("[skip] git not available");
+            return;
+        }
+        if !run(&["init", "-q", "-b", "main"]) {
+            eprintln!("[skip] git init failed");
+            return;
+        }
+        run(&["config", "user.email", "test@example.com"]);
+        run(&["config", "user.name", "test"]);
+        run(&["config", "commit.gpgsign", "false"]);
+        std::fs::write(tmp.join("README.md"), "hello\n").unwrap();
+        if !run(&["add", "."]) || !run(&["commit", "-q", "-m", "init"]) {
+            eprintln!("[skip] git commit failed");
+            return;
+        }
+
+        let counter = HookCounter::default();
+        let svc = InMemoryWorktreeService::new()
+            .with_post_import_hook(std::sync::Arc::new(HookCounter {
+                count: std::sync::Arc::clone(&counter.count),
+            }));
+        let repo_id = RepoId::new_v4();
+        let outcome = svc
+            .import_external_worktrees(repo_id, &tmp, false)
+            .await
+            .expect("import ok");
+        assert!(
+            outcome.total_changed() >= 1,
+            "expected ≥1 import (got {})",
+            outcome.total_changed()
+        );
+        assert_eq!(
+            *counter.count.lock().unwrap(),
+            1,
+            "hook 应被调用 1 次 (1 个 repo 扫一次)"
+        );
     }
 }

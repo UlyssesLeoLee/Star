@@ -158,7 +158,6 @@ mod tests {
             request_id: Some(Uuid::new_v4()),
             thinking_level: None,
         }
-    }
 
     #[test]
     fn mock_provider_default_name_is_mock() {
@@ -195,7 +194,7 @@ mod tests {
         assert_eq!(resp.model, MOCK_DEFAULT_MODEL);
         assert_eq!(resp.message.role, ChatRole::Assistant);
         assert_eq!(resp.message.content, "[mock] hello world");
-        assert_eq!(resp.finish_reason, "stop");
+        assert_eq!(resp.stop_reason, crate::events::StopReason::Stop);
         assert_ne!(resp.id, Uuid::nil());
     }
 

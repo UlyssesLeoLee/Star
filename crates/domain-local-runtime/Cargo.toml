@@ -28,13 +28,16 @@ rusqlite = { version = "0.32", default-features = false, features = ["bundled"] 
 
 star-context = { path = "../star-context" }
 
-# ULYS-219 P1 followup — 真实 setsid session leader + 跨进程 kill (Unix 部分)
-# apply_session: stdlib stable `process_group(0)` (100% safe Rust, 守门 #7 满足)
-#   真正的 setsid(2) session leader 留 P2 followup (需 process-wrap safe wrapper 重写)
-# kill_tree: nix::sys::signal::killpg (pure safe wrapper, 守门 #7 满足)
-# 全部 #[cfg(unix)] 引用,Windows 编译路径不引入 nix crate
+# ULYS-212 (A9 完善 — 真实 OS spawn 适配)
+# process-wrap: 跨平台 safe wrapper for setsid (Linux) / Job Object (Windows)
+# 仅 std feature: std::process::Command 集成点;在 cli_spawn 中经 as_std_mut() 桥接
+process-wrap = { workspace = true }
+# nix: Unix-only killpg / signal 0 探测 (per ULYS-219 已选定 0.29)
 [target.'cfg(unix)'.dependencies]
 nix = { workspace = true }
+# win32job: Windows-only Job Object safe API
+[target.'cfg(windows)'.dependencies]
+win32job = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

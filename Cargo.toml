@@ -78,6 +78,8 @@ members = [
     "crates/domain-tool",
     # Phase G.1 (L0 SQLite 任务队列) 启动: 2026-09-07 注册 crates/star-taskqueue (SQLite WAL TaskQueue, per SRS-STAR-AGENT-RUNTIME-001 §G-1, 守门 #13 a W 派生, Mavis 临时代签 5 域 Lead 决策 per 9/3 11:35 JST 反转)
     "crates/star-taskqueue",
+    # Phase W20-TS-AI-Terminal-Stack (ULYS-200, 2026-09-23 JST): terminal-stack crate (ScrollbackBuffer ring + SplitTree 数据层, per FR-ORCA-036 + §12 split pane 附加需求, MVP v0 = 内存 + JSON 序列化, 持久化与前端 UI 留 P1 followup)
+    "crates/terminal-stack",
     # Phase G.3 (EventBus + Mailbox) 启动: 2026-09-07 注册 crates/star-eventbus (in-process pub/sub + Mailbox 3 模式, 守门 #13 a L0 协调 派生)
     "crates/star-eventbus",
     # Phase G.5 (Tenant Quota) 启动: 2026-09-07 注册 crates/star-quota (compute / storage / LLM token 配额, 守门 #13 d M 派生 SCD Type 2 + 13 類 RLS)
@@ -114,6 +116,9 @@ members = [
     "crates/worktree-canvas",
     # Phase W20-AI-Worktree-Canvas (ULYS-158 + ULYS-177, 2026-09-22 JST): worktree-shared-dir crate (SharedDirResolver + 3 Source 聚合 + FileBackedConfigSource 直读 multica-config/config.json, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.13 + DD-WORKTREE-CANVAS-001 §12/§24 + FR-ORCA-005..011)
     "crates/worktree-shared-dir",
+    # ULYS-166 (ULYS-104.11, 2026-09-23): terminal-protocol — OSC 52 + Kitty Keyboard Protocol
+    # 协议层 (FR-ORCA-037/038), 与终端栈选型 (ULYS-164) 解耦, OSC 解析复用 ULYS-161.
+    "crates/terminal-protocol",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.1 T2, 2026-09-16): git-adapter crate (libgit2 + CLI fallback, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.2 + DD-WORKTREE-CANVAS-001 §10)
     "crates/git-adapter",
     # Phase W20-AI-Worktree-Canvas (ULYS-57.1 T2, 2026-09-16): git-observer crate (fsnotify + 100ms debounce + 15 GitEvent, per WORKTREE-CANVAS-IMPL-PLAN-001 §4.2 + DD-WORKTREE-CANVAS-001 §11)
@@ -200,6 +205,9 @@ hex = "0.4"
 # Regex (per OPT-NEXT-06-code-stub §3.4 domain-form + domain-search 实装)
 regex = "1"
 
+# Serial test execution (per ULYS-194 9/24 rebase fix — env-var mutating tests 跨 #[tokio::test] 串行化)
+serial_test = "3"
+
 # Benchmark (per R9 阶段 3 5 milestone benchmark, per plan-032 §4.2)
 criterion = { version = "0.8", features = ["html_reports"] }
 
@@ -222,11 +230,14 @@ tempfile = "3"
 # libgit2-sys 锁版本 (per issue 风险段: libgit2 跨平台差异 — 锁 libgit2-sys 0.18+)
 libgit2-sys = "0.18"
 
-# ULYS-219 Unix-only deps — nix 0.29 safe wrapper for setsid/killpg/Pid::from_raw/Signal
-# apply_session 用 stdlib stable `process_group(0)` (safe Rust, 守门 #7 满足);
-# 真正的 setsid(2) session leader 留 P2 followup (需 process-wrap safe wrapper 重写)
-# 全部 #[cfg(unix)] 引用,Windows 编译路径完全不引入
+# === ULYS-212 (A9 完善 — 真实 OS spawn 适配, FR-ORCA-001/004 + NFR-ORCA-001) ===
+# process-wrap: 跨平台 process group / session / Job Object safe wrapper
+# (ProcessSession::default() = setsid + new group + leader; 用于 Linux setsid)
+process-wrap = { version = "10", default-features = false, features = ["std"] }
+# nix: Unix-only safe wrapper for libc::killpg / libc::setsid / signal 0 探测
 nix = { version = "0.29", default-features = false, features = ["signal", "process"] }
+# win32job: Windows Job Object safe API (CreateJobObjectW / AssignProcessToJobObject / terminate)
+win32job = "2"
 
 [profile.release]
 lto = "thin"

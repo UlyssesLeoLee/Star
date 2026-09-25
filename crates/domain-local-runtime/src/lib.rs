@@ -1643,6 +1643,18 @@ pub mod cli_session_registry;
 pub mod graceful_shutdown;
 pub mod health_self_test;
 pub mod process_supervisor;
-// ULYS-219 P1 followup — Unix 真实 setsid session leader + killpg 跨进程 kill
-// Windows 部分仍 stub (留 ULYS-211),本模块 #[cfg(unix)] only
-pub mod unix_session;
+
+// ULYS-212 (A9 完善 — 真实 OS spawn 适配):
+// 落地 PR #83 §8 P1 followup 三项:
+// 1. Linux 真 OS spawn: setsid + systemd cgroup (NFR-ORCA-001)
+// 2. macOS 真 OS spawn: setpgid
+// 3. Windows 真 OS spawn: Job Object + Win32 CreateProcess
+// + 跨平台 kill 抽象
+// - spawn_linux:   #[cfg(target_os = "linux")]   setsid + cgroup (process_wrap + systemd-run)
+// - spawn_macos:   #[cfg(target_os = "macos")]   setpgid (tokio process_group)
+// - spawn_windows: #[cfg(target_os = "windows")] Job Object + CREATE_NEW_PROCESS_GROUP (win32job)
+// - kill:          跨平台 kill_tree (Unix nix killpg, Windows Job::terminate)
+pub mod kill;
+pub mod spawn_linux;
+pub mod spawn_macos;
+pub mod spawn_windows;

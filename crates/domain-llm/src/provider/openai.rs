@@ -399,7 +399,6 @@ mod tests {
             request_id: Some(Uuid::new_v4()),
             thinking_level: None,
         }
-    }
 
     #[test]
     fn openai_provider_default_is_no_network() {
@@ -459,7 +458,7 @@ mod tests {
         let p = OpenAiProvider::new();
         let resp = p.chat_completion(sample_request()).await.unwrap();
         assert!(resp.message.content.contains("[openai stub]"));
-        assert_eq!(resp.finish_reason, "stop");
+        assert_eq!(resp.stop_reason, crate::events::StopReason::Stop);
         assert_ne!(resp.id, Uuid::nil());
     }
 

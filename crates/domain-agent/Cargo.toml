@@ -26,12 +26,6 @@ serde_json = { workspace = true }
 # returns Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>> -- needs futures-util
 # for `stream::once` + `stream::iter` + `StreamExt::flat_map` adapters.
 futures-util = { workspace = true }
-# ULYS-207 PI-9 W6 (per D-Boy 2026-09-24 "完成所有后续工作，全选，推进到完成"):
-# PI-4 (ULYS-205, commit 0b00ecec) ship 后,QueuedTask::tool_hint: String -> Option<domain_tool::ToolExecutionMode>.
-# PI-6 (ULYS-206, commit 2a0ca91a) ship 后,新增 QueuedTask::payload_op: Option<star_dto::delta::Op>
-# (serde_json::Value payload 保留向后兼容 PI-6 之前的 caller).
-domain-tool = { path = "../domain-tool" }
-star-dto = { path = "../star-dto" }
 [dev-dependencies]
 tokio = { workspace = true }
 

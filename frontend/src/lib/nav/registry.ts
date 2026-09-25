@@ -5,7 +5,7 @@ import {
   Bot,
   BarChart3,
   Settings,
-  Trello,
+  SquareKanban,
   SquareChartGantt,
   LayoutDashboard,
   Users,
@@ -254,7 +254,7 @@ export const ALL_MODULES: ModuleDefinition[] = [
     category: "work",
     categoryLabel: "Work Management",
     description: "4 态泳道即时拖拽任务看板",
-    icon: Trello,
+    icon: SquareKanban,
   },
   {
     id: "timeline",
