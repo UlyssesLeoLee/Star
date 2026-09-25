@@ -651,6 +651,89 @@ impl From<domain_project::ProjectError> for RestError {
     }
 }
 
+// =====================================================================
+// ULYS-218.3 [P1-F] worktree-shared-dir errors → RestError
+// `SharedDirError` (6-field, per worktree-shared-dir/src/error.rs) covers
+// Picker / ExternalWorktreeImport / BranchNaming / SharedDirResolver 4 域错误.
+// 守门 #11 缺标比错标: worktree-shared-dir 0 复制 axum/serde/uuid/chrono 等基础 dep.
+// =====================================================================
+
+/// `worktree_shared_dir::SharedDirError` → `RestError` (6-field 映射)
+impl From<worktree_shared_dir::SharedDirError> for RestError {
+    fn from(e: worktree_shared_dir::SharedDirError) -> Self {
+        let code = match e.code.as_str() {
+            // picker 域 (FR-ORCA-009)
+            "WSD.PICKER_REPO_NOT_REGISTERED" => "WORKTREE_REPO_NOT_REGISTERED",
+            "WSD.PICKER_ID_INVALID" => "VALIDATION_FAILED",
+            "WSD.PICKER_FETCH_FAIL" => "INTERNAL",
+            "WSD.PICKER_GIT_OPEN_FAIL" => "INTERNAL",
+            "WSD.PICKER_GIT_LIST_BRANCHES_FAIL" => "INTERNAL",
+            "WSD.PICKER_GIT_HEAD_FAIL" => "INTERNAL",
+            // external import 域 (FR-ORCA-011)
+            "WSD.EXT_REPO_NOT_FOUND" => "WORKTREE_REPO_NOT_REGISTERED",
+            "WSD.EXT_PATH_NOT_IN_SCAN" => "VALIDATION_FAILED",
+            "WSD.EXT_GIT_CMD_FAIL" => "INTERNAL",
+            "WSD.EXT_PARSE_FAIL" => "VALIDATION_FAILED",
+            // branch naming 域 (FR-ORCA-010)
+            "WSD.BRANCH_NAMING_INVALID" => "VALIDATION_FAILED",
+            // default (per shared_dir_resolver / shared_dir_types 兜底)
+            _ => "INTERNAL",
+        };
+        let source_kind = match code {
+            "WORKTREE_REPO_NOT_REGISTERED" => "Validation",
+            "VALIDATION_FAILED" => "Validation",
+            _ => "Internal",
+        };
+        let retriable = code == "INTERNAL";
+        let hint = match code {
+            "WORKTREE_REPO_NOT_REGISTERED" => {
+                "Register the repo_id via worktree-shared-dir registry first (see \
+                 `StartFromPickerRegistry::register` / `InMemoryExternalWorktreeImport::register_repo`)"
+            }
+            "VALIDATION_FAILED" => {
+                "Check the candidate id format (`<kind>:<value>`) and the path existence"
+            }
+            _ => "Retry with backoff; check git binary on PATH and network for downstream calls",
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("worktree-shared-dir: {e}"),
+            source_module: "worktree-shared-dir".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: hint.to_string(),
+        }
+    }
+}
+
+/// `worktree_shared_dir::ExternalWorktreeImportError` → `RestError`
+/// 4 变体映射 (per worktree-shared-dir/src/external_worktree_import.rs):
+///   - `RepoNotFound`  → WORKTREE_REPO_NOT_REGISTERED 404 (caller forgot to register_repo)
+///   - `PathNotInScan` → VALIDATION_FAILED 400 (path not in git worktree list output)
+///   - `GitCommand`    → INTERNAL 500 retriable (git binary / IO failure)
+///   - `Parse`         → VALIDATION_FAILED 400 (porcelain v2 format broken)
+impl From<worktree_shared_dir::ExternalWorktreeImportError> for RestError {
+    fn from(e: worktree_shared_dir::ExternalWorktreeImportError) -> Self {
+        use worktree_shared_dir::ExternalWorktreeImportError::*;
+        let (code, source_kind, retriable) = match &e {
+            GitCommand(_) => ("INTERNAL", "Internal", true),
+            Parse(_) => ("VALIDATION_FAILED", "Validation", false),
+            RepoNotFound { .. } => ("WORKTREE_REPO_NOT_REGISTERED", "Validation", false),
+            PathNotInScan { .. } => ("VALIDATION_FAILED", "Validation", false),
+        };
+        Self {
+            code: code.to_string(),
+            message: format!("external-worktree-import: {e}"),
+            source_module: "worktree-shared-dir".to_string(),
+            source_kind: source_kind.to_string(),
+            retriable,
+            hint: "Check the repo_id (registered via register_repo?) + path (must appear in \
+                   `git worktree list --porcelain` output for scan to know it exists)"
+                .to_string(),
+        }
+    }
+}
+
 impl IntoResponse for RestError {
     fn into_response(self) -> axum::response::Response {
         // per spec §2.4: code → HTTP status 映射
@@ -659,6 +742,7 @@ impl IntoResponse for RestError {
             "VALIDATION_FAILED" | "VALIDATION_RUN_FAILED" => StatusCode::BAD_REQUEST,
             "RESOURCE_NOT_FOUND"
             | "WORKTREE_NOT_FOUND"
+            | "WORKTREE_REPO_NOT_REGISTERED"
             | "FB_NOT_FOUND"
             | "COMMENT_NOT_FOUND"
             | "AGENT_NOT_FOUND"

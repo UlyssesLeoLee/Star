@@ -32,6 +32,8 @@ pub mod validations;
 pub mod webhooks;
 pub mod work_items;
 pub mod workspaces;
+pub mod worktree_external;
+pub mod worktree_picker;
 pub mod worktrees;
 
 use axum::Json;

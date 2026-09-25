@@ -36,7 +36,7 @@ pub mod error;
 pub mod external_worktree_import;
 pub mod shared_dir_resolver;
 pub mod shared_dir_types;
-pub mod start_from_picker;
+pub mod worktree_create_async;
 
 pub use branch_naming::{
     BranchNamer, BranchNamingInput, BranchNamingResult, BranchNamingSource, DefaultBranchNamer,
@@ -61,7 +61,7 @@ pub use shared_dir_types::{
     PickerCandidate, PickerCandidateKind, SharedDirConfig, SharedDirPriority, SharedDirSource,
     SharedDirectory, SharedMountStrategy,
 };
-pub use start_from_picker::{
-    InMemoryStartFromPicker, RealStartFromPicker, RemoteFetch, StartFrom,
-    StartFromPickerError, StartFromPickerRegistry, describe_start_from, parse_candidate_id,
+pub use worktree_create_async::{
+    InMemoryWorktreeCreateAsync, RealWorktreeCreateAsync, WorktreeCreateAsync,
+    WorktreeCreateHandle, WorktreeCreateRequest, WorktreeEvent,
 };

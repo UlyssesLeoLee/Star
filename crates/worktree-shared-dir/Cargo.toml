@@ -27,17 +27,16 @@ tokio = { workspace = true }
 
 # 跨 crate 引用: worktree-shared-dir 复用 graph-core 的 RepoId
 graph-core = { path = "../graph-core" }
-# 跨 crate 引用: StartFromPicker (FR-ORCA-009) 用 git-adapter 的 GitProvider
-# 列 branches / 取 head / 取 commit SHA / merge_base.
+# ULYS-158.4: RealWorktreeCreateAsync 复用 git-adapter 的 GitProvider trait (per FR-ORCA-008 AC-1 git fetch + worktree add)
 git-adapter = { path = "../git-adapter" }
+# ULYS-158.4: orchestrator 用 tokio mpsc + spawn (per FR-ORCA-008 AC-1 异步 / AC-2 进度 channel / AC-3 cancel)
+tokio = { workspace = true }
+# ULYS-158.4: 5 mount_strategy 跨平台 (per FR-ORCA-007 AC-1) — 用 std lib, 0 新依赖
 
 [dev-dependencies]
-# UT 用 tokio test runtime
-tokio = { workspace = true }
-# Real git repo integration test (per ULYS-231 §6)
+# UT 用 tokio test runtime (already declared above as dep, dev re-export is fine)
+# tempfile: integration test 用 temp repo + temp dir (per ULYS-217 §5 cargo test --test create_async_integration)
 tempfile = { workspace = true }
-# serial_test 让 real git 测试串行 (per worktree-service 集成测试同模式)
-serial_test = { workspace = true }
 
 [lints]
 workspace = true
