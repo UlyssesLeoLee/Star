@@ -59,7 +59,7 @@
 - Hook marketplace / cross-organization 共享 → 一人公司不需要
 - Hook AI 行为审计 (LLM 决策录屏) → v2.x
 - Hook 加密 / 凭据管理 (mavis 内置 vault) → 跨项目需求
-- 5 类扩展点的其他 3 类 (commands / agents / MCP / plugins) → ULYS-235 v0.2+v0.3 拍板: MCP (per 2026-09-24 15:01 JST, v0.2 升格) + plugins (per 2026-09-24 22:04 JST "还有plugins也应该是一个标签页", v0.3 升格) 均升格为本 v0.3 同导航下的实装标签页; commands / agents 仍按"预留"占位, 后续按需扩展
+- **5 类扩展点的其他 2 类** (commands / agents) → 仍按"预留"占位, 后续按需扩展; **MCP (per 2026-09-24 15:01 JST, v0.2 升格) + Plugins (per 2026-09-24 22:04 JST "还有plugins也应该是一个标签页", v0.3 升格) 均升格为本 v0.3 同导航下的实装标签页**, 不再属于本专题排除范围
 
 ### 1.3 关联文档
 
