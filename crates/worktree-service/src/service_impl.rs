@@ -14,7 +14,7 @@ use uuid::Uuid;
 use graph_core::state::{HumanState, MergeStrategy, TestState};
 use graph_core::types::{RepoId, UserId, WorktreeId};
 
-use crate::external_worktree_import::{NoopPostImportHook, PostImportHook};
+use worktree_shared_dir::{NoopPostImportHook, PostImportHook};
 use crate::error::ServiceError;
 use crate::lifecycle::{transition as lifecycle_transition, WorktreeEvent, WorktreeSnapshot};
 use crate::projection::{StatusObservedPoint, WorktreeStatusObserved};
@@ -771,12 +771,12 @@ mod tests {
     }
 
     #[async_trait::async_trait]
-    impl crate::external_worktree_import::PostImportHook for HookCounter {
+    impl worktree_shared_dir::PostImportHook for HookCounter {
         async fn on_import_complete(
             &self,
             _repo_id: graph_core::types::RepoId,
-            _imported: &[crate::service::Worktree],
-            _updated: &[crate::service::Worktree],
+            _imported: &[worktree_shared_dir::WorktreeId],
+            _updated: &[worktree_shared_dir::WorktreeId],
             _skipped: &[String],
         ) {
             *self.count.lock().unwrap() += 1;

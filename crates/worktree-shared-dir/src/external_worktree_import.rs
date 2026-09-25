@@ -105,6 +105,59 @@ impl From<ExternalWorktreeImportError> for SharedDirError {
 pub type ExternalWorktreeImportResult<T> = Result<T, ExternalWorktreeImportError>;
 
 // =====================================================================
+// PostImportHook (per ULYS-195 §3 软依赖) — stage 2 stub
+// =====================================================================
+
+/// Worktree UUID placeholder. worktree-shared-dir crate 不依赖
+/// worktree-service 内部 type; 这里用 `uuid::Uuid` 直接 alias, hook
+/// 实装方通过 `repo_id` 二次查询完整 Worktree 信息即可 (per ULYS-195 stage 2 P1 followup).
+pub type WorktreeId = uuid::Uuid;
+
+/// Import 完成后回调 (per ULYS-195 §3 软依赖).
+///
+/// 默认 impl (`NoopPostImportHook`) 是空 hook; 实装 crate 可注入更复杂
+/// 逻辑. 例如 `SharedDirResolverHook` 在 import 成功后调
+/// `shared_dir_resolver.resolve(repo_id)` 重算共享目录 symlinks.
+///
+/// ## 注意
+///
+/// 当前 stage 2 stub 仅传递 `repo_id` + imported/updated/skipped 的
+/// `WorktreeId` 列表 (不传递完整 `Worktree` struct). 完整 Worktree
+/// 信息应在 hook 实装方通过 `repo_id` 二次查询 (per ULYS-195 stage 2 P1 followup).
+#[async_trait::async_trait]
+pub trait PostImportHook: Send + Sync {
+    /// Import 完成后回调 (per outcome 全部 imported+updated 之后).
+    ///
+    /// `repo_id` — 触发 import 的 repo
+    /// `imported` — 这次新 import 的 worktree id 列表
+    /// `updated` — 这次 force-updated 的 worktree id 列表
+    /// `skipped` — 这次跳过 (无变化) 的 path 列表 (per ExternalWorktreeImportError::ConflictSkipped)
+    async fn on_import_complete(
+        &self,
+        repo_id: RepoId,
+        imported: &[WorktreeId],
+        updated: &[WorktreeId],
+        skipped: &[String],
+    );
+}
+
+/// 默认空 impl (per ULYS-195 §3 默认 stage 1 行为不破坏).
+pub struct NoopPostImportHook;
+
+#[async_trait::async_trait]
+impl PostImportHook for NoopPostImportHook {
+    async fn on_import_complete(
+        &self,
+        _repo_id: RepoId,
+        _imported: &[WorktreeId],
+        _updated: &[WorktreeId],
+        _skipped: &[String],
+    ) {
+        // no-op
+    }
+}
+
+// =====================================================================
 // DTO (per brief §2.3)
 // =====================================================================
 
