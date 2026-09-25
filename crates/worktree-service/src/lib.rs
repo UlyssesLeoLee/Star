@@ -31,7 +31,8 @@ pub mod start_from_picker;
 pub use error::ServiceError;
 pub use external_worktree_import::{
     diff_external, map_to_worktree, parse_porcelain, scan_external_worktrees, ExternalWorktree,
-    ImportError, ImportOutcome,
+    ImportError, ImportOutcome, NoopPostImportHook, PostImportHook, RepoDescriptor, scan_all_repos,
+    scan_for_repo,
 };
 pub use lifecycle::{transition, TransitionError};
 pub use projection::{StatusObservedPoint, WorktreeStatusObserved};

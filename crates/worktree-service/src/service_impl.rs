@@ -14,6 +14,7 @@ use uuid::Uuid;
 use graph_core::state::{HumanState, MergeStrategy, TestState};
 use graph_core::types::{RepoId, UserId, WorktreeId};
 
+use crate::external_worktree_import::{NoopPostImportHook, PostImportHook};
 use crate::error::ServiceError;
 use crate::lifecycle::{transition as lifecycle_transition, WorktreeEvent, WorktreeSnapshot};
 use crate::projection::{StatusObservedPoint, WorktreeStatusObserved};
@@ -29,9 +30,13 @@ use crate::start_from_picker::{
 /// - 内部存 `HashMap<WorktreeId, Worktree>` + `Arc<RwLock>` 包裹
 /// - 每个 repo 维护 1 个 30 天 `WorktreeStatusObserved` projection
 /// - 事件通过 `broadcast::channel` 扇出 (per DD §12 `subscribe`)
+/// - `post_import_hook` 在 `import_external_worktrees` 成功后回调 (per
+///   ULYS-195 §3 软依赖 + stage 2 解耦). 默认 `NoopPostImportHook`, 不破坏 stage 1.
 pub struct InMemoryWorktreeService {
     inner: Arc<RwLock<Inner>>,
     event_tx: broadcast::Sender<WorktreeEventEnvelope>,
+    /// 阶段 2: import 成功后的回调 (默认空)
+    post_import_hook: Arc<dyn PostImportHook>,
 }
 
 struct Inner {
@@ -148,6 +153,7 @@ impl InMemoryWorktreeService {
                 picker_source: None,
             })),
             event_tx,
+            post_import_hook: Arc::new(NoopPostImportHook),
         }
     }
 
@@ -167,6 +173,20 @@ impl InMemoryWorktreeService {
         // else: lock 已被持有 (例如并发 task 持有 inner.write().await),
         // 这是 caller 误用, 我们 ignore 不 panic. 这种情况下 picker_source
         // 保持 None, 运行时走 NoopPickerSource fallback.
+        self
+    }
+
+    /// 阶段 2: 自定义 post_import_hook (per ULYS-195 §3 软依赖).
+    ///
+    /// `InMemoryWorktreeService::import_external_worktrees` 在收集完
+    /// `ImportOutcome { imported, skipped, updated }` 后, 调用 hook 的
+    /// `on_import_complete(repo_id, imported, updated, skipped)` 回调.
+    ///
+    /// 默认 impl (`NoopPostImportHook`) 不做任何事. 实装 crate 可注入
+    /// `SharedDirResolverHook` 等更复杂 hook (在 stage 2 PR #2 引入 worktree-shared-dir
+    /// 时实装).
+    pub fn with_post_import_hook(mut self, hook: Arc<dyn PostImportHook>) -> Self {
+        self.post_import_hook = hook;
         self
     }
 
@@ -640,6 +660,22 @@ impl WorktreeService for InMemoryWorktreeService {
             now = Utc::now();
         }
 
+        // 阶段 2: post_import_hook 回调 (per ULYS-195 §3 软依赖).
+        //
+        // 故意 await 在 import 主路径之后, hook 失败**不**阻断 import 结果
+        // (吞掉 + warn log). 调用方拿到的 `ImportOutcome` 已 commit 进
+        // service 内部 state; hook 只做副作用 (symlinks / DB write / SSE).
+        //
+        // NoopPostImportHook 默认实现 = 不做任何事, 保留 stage 1 行为.
+        self.post_import_hook
+            .on_import_complete(
+                repo_id,
+                &outcome.imported,
+                &outcome.updated,
+                &outcome.skipped,
+            )
+            .await;
+
         Ok(outcome)
     }
 
@@ -770,5 +806,91 @@ mod tests {
         let stored = svc.get(wt.id).await.unwrap();
         assert_eq!(stored.health_score, health);
         let _ = updated;
+    }
+
+    // --- 阶段 2 stage 2: post_import_hook 在 import_external_worktrees 成功路径上被调用 ---
+
+    #[derive(Default)]
+    struct HookCounter {
+        count: std::sync::Arc<std::sync::Mutex<u32>>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::external_worktree_import::PostImportHook for HookCounter {
+        async fn on_import_complete(
+            &self,
+            _repo_id: graph_core::types::RepoId,
+            _imported: &[crate::service::Worktree],
+            _updated: &[crate::service::Worktree],
+            _skipped: &[String],
+        ) {
+            *self.count.lock().unwrap() += 1;
+        }
+    }
+
+    #[tokio::test]
+    async fn post_import_hook_invoked_after_import() {
+        // 验证: import_external_worktrees 成功路径会调 hook (阶段 2 解耦).
+        // 这里用真实 git tempdir (e2e 路径) + Counting hook 记录调用.
+        use std::process::Command;
+        let tmp = std::env::temp_dir().join(format!(
+            "ulys195-stage2-hook-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        if std::fs::create_dir_all(&tmp).is_err() {
+            eprintln!("[skip] cannot create tempdir");
+            return;
+        }
+        let run = |args: &[&str]| -> bool {
+            Command::new("git")
+                .current_dir(&tmp)
+                .args(args)
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+        };
+        let git_avail = Command::new("git")
+            .arg("--version")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if !git_avail {
+            eprintln!("[skip] git not available");
+            return;
+        }
+        if !run(&["init", "-q", "-b", "main"]) {
+            eprintln!("[skip] git init failed");
+            return;
+        }
+        run(&["config", "user.email", "test@example.com"]);
+        run(&["config", "user.name", "test"]);
+        run(&["config", "commit.gpgsign", "false"]);
+        std::fs::write(tmp.join("README.md"), "hello\n").unwrap();
+        if !run(&["add", "."]) || !run(&["commit", "-q", "-m", "init"]) {
+            eprintln!("[skip] git commit failed");
+            return;
+        }
+
+        let counter = HookCounter::default();
+        let svc = InMemoryWorktreeService::new()
+            .with_post_import_hook(std::sync::Arc::new(HookCounter {
+                count: std::sync::Arc::clone(&counter.count),
+            }));
+        let repo_id = RepoId::new_v4();
+        let outcome = svc
+            .import_external_worktrees(repo_id, &tmp, false)
+            .await
+            .expect("import ok");
+        assert!(
+            outcome.total_changed() >= 1,
+            "expected ≥1 import (got {})",
+            outcome.total_changed()
+        );
+        assert_eq!(
+            *counter.count.lock().unwrap(),
+            1,
+            "hook 应被调用 1 次 (1 个 repo 扫一次)"
+        );
     }
 }
