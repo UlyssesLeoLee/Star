@@ -4088,6 +4088,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "star-quota",
  "thiserror 2.0.20",
  "tokio",
  "uuid",

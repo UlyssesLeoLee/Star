@@ -146,6 +146,10 @@ fn parse_provider(s: &str) -> Result<Provider, String> {
         "kms_vault" => Ok(Provider::KmsVault),
         "kms_aws" => Ok(Provider::KmsAws),
         "kms_local_mock" => Ok(Provider::KmsLocalMock),
+        "llm_openai" => Ok(Provider::LlmOpenAi),
+        "llm_anthropic" => Ok(Provider::LlmAnthropic),
+        "llm_github_copilot" => Ok(Provider::LlmGitHubCopilot),
+        "llm_google" => Ok(Provider::LlmGoogle),
         other => Err(format!("unknown provider: {}", other)),
     }
 }
