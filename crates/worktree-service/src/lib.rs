@@ -37,6 +37,15 @@ pub use lifecycle::{transition, TransitionError};
 pub use projection::{StatusObservedPoint, WorktreeStatusObserved};
 pub use service::{SyncResult, Worktree, WorktreeFilter, WorktreeService, WorktreeUpdate};
 pub use service_impl::InMemoryWorktreeService;
+// ULYS-194 Start-from Picker (FR-ORCA-009): re-export start_from_picker 模块符号
+// 让 integration test (`start_from_picker_integration.rs`) + 外部 caller 直接 use.
+// 注: NoopPickerSource 在 service_impl.rs (per ULYS-194 跟 PickerSource trait impl 一起).
+pub use service_impl::NoopPickerSource;
+pub use start_from_picker::{
+    pick_start_from_candidates, select_by_id, worktree_to_existing_candidate,
+    DefaultStartFromPickerSource, PickerCandidate, PickerCandidateKind, PickerCandidates,
+    StartFromPickerSource,
+};
 // 注: per-workspace multica-config/config.json 的 shared-dir reader 已在
 // crates/worktree-shared-dir/ (FileBackedConfigSource) 实装, 不在本 crate.
 // ULYS-177 历史 commit ef025c8d 的 `shared_dir_sources.rs` 模块已被替代.
