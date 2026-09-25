@@ -25,7 +25,7 @@ use domain_kms::{EncryptedBlob, KmsClient, LocalMockKms};
 
 use crate::db::CredentialDb;
 
-/// 凭证 Provider (5 类 + F-02 2 类 LLM provider)
+/// 凭证 Provider (5 类 + F-02 4 类 LLM provider, per FR-ORCA-042 ULYS-203)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Provider {
     /// OpenClaw (LLM agent 编排, B.5)
@@ -42,6 +42,10 @@ pub enum Provider {
     LlmOpenAi,
     /// LLM: Anthropic (F-02 Anthropic 通道, 2026-09-08 拍板扩展)
     LlmAnthropic,
+    /// LLM: GitHub Copilot (FR-ORCA-042 §14 ULYS-203 2026-09-23 拍板扩展)
+    LlmGitHubCopilot,
+    /// LLM: Google (Gemini / PaLM, FR-ORCA-042 §14 ULYS-203 2026-09-23 拍板扩展)
+    LlmGoogle,
 }
 
 impl Provider {
@@ -55,7 +59,23 @@ impl Provider {
             Self::KmsLocalMock => "kms_local_mock",
             Self::LlmOpenAi => "llm_openai",
             Self::LlmAnthropic => "llm_anthropic",
+            Self::LlmGitHubCopilot => "llm_github_copilot",
+            Self::LlmGoogle => "llm_google",
         }
+    }
+
+    /// 是否是 4 类 LLM provider 之一 (per FR-ORCA-042)
+    pub fn is_llm(&self) -> bool {
+        matches!(
+            self,
+            Self::LlmOpenAi | Self::LlmAnthropic | Self::LlmGitHubCopilot | Self::LlmGoogle
+        )
+    }
+}
+
+impl std::fmt::Display for Provider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -379,7 +399,9 @@ impl CredentialManager {
                 deprecated_at_ms,
                 revoked_at_ms,
             )
-            .map_err(|e| CredentialError::DbSyncFailed(format!("credential_id={}: {}", credential_id, e)))?;
+            .map_err(|e| {
+                CredentialError::DbSyncFailed(format!("credential_id={}: {}", credential_id, e))
+            })?;
 
         Ok(())
     }
@@ -406,5 +428,6 @@ fn now_ms() -> u64 {
 #[cfg(test)]
 mod tests;
 
+pub mod account_switcher;
 pub mod api;
 pub mod db;

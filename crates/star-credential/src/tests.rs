@@ -205,10 +205,7 @@ async fn build_manager_with_db_inserted() -> (CredentialManager, Arc<CredentialD
     use domain_kms::LocalMockKms;
 
     let db = Arc::new(CredentialDb::in_memory().expect("in-memory DB"));
-    let manager = CredentialManager::new(
-        Arc::new(LocalMockKms::new()),
-        db.clone(),
-    );
+    let manager = CredentialManager::new(Arc::new(LocalMockKms::new()), db.clone());
 
     let id = manager
         .store(
@@ -225,7 +222,9 @@ async fn build_manager_with_db_inserted() -> (CredentialManager, Arc<CredentialD
         .unwrap();
 
     // 把 in-memory 记录预插入 DB (模拟后续 sprint 中 store() 写 DB 的场景)
-    let record = manager.list("tenant-1", Some(Provider::OpenClaw)).await
+    let record = manager
+        .list("tenant-1", Some(Provider::OpenClaw))
+        .await
         .into_iter()
         .find(|r| r.id == id)
         .expect("just-stored record");
@@ -254,9 +253,15 @@ async fn v2_ulys234_revoke_syncs_db_status_and_timestamp() {
     manager.revoke(&id).await.expect("revoke must succeed");
 
     // AC-1: DB 行 status = Revoked
-    let db_rows = db.list_credentials("tenant-1", Some(Provider::OpenClaw)).unwrap();
+    let db_rows = db
+        .list_credentials("tenant-1", Some(Provider::OpenClaw))
+        .unwrap();
     assert_eq!(db_rows.len(), 1, "exactly one row in DB");
-    assert_eq!(db_rows[0].status, CredentialStatus::Revoked, "AC-1: DB status = Revoked");
+    assert_eq!(
+        db_rows[0].status,
+        CredentialStatus::Revoked,
+        "AC-1: DB status = Revoked"
+    );
 
     // AC-2: DB 行 revoked_at_ms = in-memory record.revoked_at_ms
     let after = manager
@@ -310,7 +315,9 @@ async fn v2_ulys234_revoke_persists_across_db_reload() {
 
     // 用一个新的 CredentialDb 实例模拟"重启"(in-memory DB 之间隔离, 所以这里只验证
     // DB 行确实已写入 — list_credentials 读的是同一个 conn)
-    let reloaded = db.list_credentials("tenant-1", Some(Provider::OpenClaw)).unwrap();
+    let reloaded = db
+        .list_credentials("tenant-1", Some(Provider::OpenClaw))
+        .unwrap();
     assert_eq!(reloaded.len(), 1, "DB row exists after revoke");
     assert_eq!(
         reloaded[0].status,
@@ -324,7 +331,9 @@ async fn v2_ulys234_revoke_persists_across_db_reload() {
     use domain_kms::LocalMockKms;
     let _manager2 = CredentialManager::new(Arc::new(LocalMockKms::new()), db.clone());
     // 即使 manager2 内存空, DB 已有 Revoked 行, 后续 load_from_db() / active() 校验会看到此状态
-    let final_check = db.list_credentials("tenant-1", Some(Provider::OpenClaw)).unwrap();
+    let final_check = db
+        .list_credentials("tenant-1", Some(Provider::OpenClaw))
+        .unwrap();
     assert_eq!(final_check[0].status, CredentialStatus::Revoked);
 }
 
