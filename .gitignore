@@ -1,5 +1,6 @@
 # Agent / IDE runtime
 /.claude/
+/.multica/
 *.swp
 *.swo
 *~
@@ -24,6 +25,10 @@ desktop.ini
 /target/
 /target-*/
 **/target/
+**/target-*/
+# ULYS-212 worktree 期间(mmap bug workaround)使用 CARGO_TARGET_DIR=target-ulys-212,
+# 避免 cargo 跨 worktree 互锁(per 守门 #1 v19)+ Windows mmap bug(per cargo 1.98.1 mmap)
+# 跨 worker 各自的 scope 命名(target-ulys-{issue_id})
 **/*.rs.bk
 
 # Logs

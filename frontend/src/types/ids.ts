@@ -420,6 +420,25 @@ export interface AgentSession {
   cost_summary: { usd: number; budget_usd: number };
   started_at: Iso8601;
   ended_at?: Iso8601;
+  /**
+   * Agent 退出(clean or crash)后置 true, UI 据此渲染 Restart chip (per FR-ORCA-014,
+   * ULYS-197 v1 → v2 字段增量)。
+   *
+   * 渲染开关: 本字段为 true 或后端推 `AgentEvent::RestartAvailable` 时,
+   * `RestartChip` 才显示; 点 Restart 后由调用方重置回 false 并 emit
+   * `AgentEvent::RestartConsumed`。
+   */
+  restart_available?: boolean;
+  /**
+   * 关联 terminal pane UUID (per FR-ORCA-012 Agent Session 单一概念模型,
+   * 三元组 = CLI agent × terminal × worktree)。ULYS-197 v1 → v2 新增, UI
+   * 用此 ID 决策在重启时回到哪个 terminal pane / 跳终端详情。Optional —
+   * terminal pane 创建后才由后端 set_terminal_id 写入, 默认 None。
+   *
+   * 类型仅为字段镜像: 本期(`ULYS-214`)前端 REST 路径尚不读取,
+   * 仅对齐 `crates/agent-bridge::AgentSession.terminal_id`。
+   */
+  terminal_id?: Uuid;
 }
 
 // =====================================================================

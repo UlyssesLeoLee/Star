@@ -1,0 +1,108 @@
+name: spawn-e2e (ULYS-212)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# ULYS-212 (A9 完善 — 真实 OS spawn 适配):
+# CI 矩阵验证 spawn_linux / spawn_macos / spawn_windows / kill 跨平台
+# (Linux setsid+cgroup / macOS setpgid / Windows Job Object)
+# + systemd-run 真实压测(per 第 8 节 P1 followup systemd-run CI 压测)
+
+jobs:
+  spawn-cross-platform:
+    name: spawn-e2e (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo check domain-local-runtime
+        run: cargo check -p domain-local-runtime --lib -j 4
+
+      - name: cargo test spawn_linux/macos/windows/kill
+        run: >-
+          cargo test -p domain-local-runtime --lib -j 4 --
+          "spawn_linux::" "spawn_macos::" "spawn_windows::" "kill::"
+
+      - name: cargo test graceful_shutdown (kill pid step)
+        run: >-
+          cargo test -p domain-local-runtime --lib -j 4 --
+          "graceful_shutdown::tests::"
+
+      - name: cargo test cli_spawn (Windows Job Object 集成)
+        run: >-
+          cargo test -p domain-local-runtime --lib -j 4 --
+          "cli_spawn::"
+
+  systemd-run-e2e:
+    name: systemd-run e2e (Linux only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check systemd-run availability
+        id: check_systemd
+        shell: bash
+        run: |
+          if command -v systemd-run >/dev/null 2>&1; then
+            echo "systemd-run found at $(command -v systemd-run)"
+            echo "systemd-run-version=$(systemd-run --version | head -n1)"
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::systemd-run not found; skipping systemd-run e2e"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: systemd-run transient scope smoke
+        if: steps.check_systemd.outputs.ok == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          SCOPE_NAME="ulys-cli-ci-$$"
+          systemd-run --scope --unit="$SCOPE_NAME" sleep 600 &
+          SCOPE_PID=$!
+          sleep 1
+          PROCESS_COUNT=$(systemd-cgls --no-pager 2>/dev/null | grep -c "$SCOPE_NAME" || true)
+          if [ "$PROCESS_COUNT" -lt 1 ]; then
+            echo "::error::systemd-cgls found no processes for scope $SCOPE_NAME"
+            exit 1
+          fi
+          echo "OK: scope $SCOPE_NAME holds $PROCESS_COUNT process(es)"
+          kill -TERM $SCOPE_PID 2>/dev/null || true
+          wait $SCOPE_PID 2>/dev/null || true
+          echo "OK: scope terminated"
+
+      - name: cargo test spawn_linux::pick_cgroup_backend (Auto 探测)
+        if: steps.check_systemd.outputs.ok == 'true'
+        run: >-
+          cargo test -p domain-local-runtime --lib -j 4 --
+          "spawn_linux::tests::pick_cgroup_backend_auto_resolves_via_detect"
+
+      - name: cargo test spawn_linux::pick_cgroup_backend (Enabled / Disabled)
+        run: >-
+          cargo test -p domain-local-runtime --lib -j 4 --
+          "spawn_linux::tests::pick_cgroup_backend_enabled_is_systemd_run"
+          "spawn_linux::tests::pick_cgroup_backend_disabled_is_noop"
