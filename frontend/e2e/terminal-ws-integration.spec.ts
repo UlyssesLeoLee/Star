@@ -7,6 +7,70 @@
 
 import { test, expect } from "@playwright/test";
 
+// =====================================================================
+// installTestMockWs — MockWsClass EventTarget-based WS mock
+// (T23.6 round 4: 使用真正的 EventTarget-backed mock, 避免 Chromium real WS
+// 网络请求失败)
+// =====================================================================
+async function installTestMockWs(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  await page.addInitScript(() => {
+    // @ts-expect-error
+    window.__mockWsInstances = [];
+    // @ts-expect-error
+    window.__mockWsCtor = function (url: string) {
+      // @ts-expect-error
+      const WsClass = (window as unknown as { __MockWsClass: new (url: string) => WebSocket }).__MockWsClass;
+      // @ts-expect-error
+      const inst = new WsClass(url);
+      // @ts-expect-error
+      window.__mockWsInstances.push(inst);
+      return inst as unknown as WebSocket;
+    };
+    // @ts-expect-error
+    (window as unknown as { __MockWsClass: new (url: string) => WebSocket }).__MockWsClass = (function () {
+      class MockWs extends EventTarget {
+        url: string;
+        binaryType = "arraybuffer";
+        readyState: number = 0; // CONNECTING
+        onopen: ((ev: Event) => void) | null = null;
+        onmessage: ((ev: MessageEvent) => void) | null = null;
+        onerror: ((ev: Event) => void) | null = null;
+        onclose: ((ev: Event) => void) | null = null;
+        sent: string[] = [];
+        constructor(url: string) {
+          super();
+          this.url = url;
+          // @ts-expect-error
+          (window as unknown as { __mockWsInstances: unknown[] }).__mockWsInstances.push(this);
+          // After 50ms, fire open + (optionally hello + snapshot per test)
+          setTimeout(() => {
+            try {
+              this.readyState = 1; // OPEN
+              const openEvent = new Event("open");
+              this.dispatchEvent(openEvent);
+              if (typeof this.onopen === "function") this.onopen(openEvent);
+            } catch (e) {
+              // ignore
+            }
+          }, 50);
+        }
+        send(data: string): void {
+          this.sent.push(data);
+        }
+        close(): void {
+          this.readyState = 3; // CLOSED
+          const closeEvent = new Event("close");
+          this.dispatchEvent(closeEvent);
+          if (typeof this.onclose === "function") this.onclose(closeEvent);
+        }
+      }
+      return MockWs;
+    })();
+  });
+}
+
 test.describe("Terminal Stack WS Integration (PR #98.5)", () => {
   test("1. wsClient URL contains session_id", async ({ page }) => {
     // Mock WebSocket server
