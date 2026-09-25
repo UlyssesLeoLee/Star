@@ -67,13 +67,14 @@ export function useTerminalStackWs(opts: UseTerminalStackWsOptions) {
           // T23 followup will hook this up to a per-pane scrollback store
         },
         onSplitUpdate: (msg) => {
-          // msg.tree is PaneNodeView (1:1 mirror of SplitTree)
-          // We need to wrap in a SplitTreeView
+          // msg.tree is PaneNodeView (1:1 mirror of SplitTree).
+          // Per wsProtocol.ts: split_update has `tree:` (not `root:`) field.
+          const treeNode = msg.tree;
           const wrapped: SplitTreeView = {
-            root: msg.root.kind === "split" ? msg.root : msg.root,
-            paneCount: countPanes(msg.root),
-            depth: computeDepth(msg.root),
-            kind: msg.root.kind === "split" ? "split" : "single",
+            root: treeNode,
+            paneCount: countPanes(treeNode),
+            depth: computeDepth(treeNode),
+            kind: treeNode.kind === "split" ? "split" : "single",
           };
           setTree(wrapped);
         },
