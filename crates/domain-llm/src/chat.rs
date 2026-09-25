@@ -149,7 +149,10 @@ impl ChatRequest {
             msg.validate().map_err(|_| -> &'static str {
                 // Re-borrow as a static string by leaking — only on error path,
                 // and only the first violation.
-                Box::leak(format!("chat message at index {idx} failed validation").into_boxed_str())
+                Box::leak(
+                    format!("chat message at index {idx} failed validation")
+                        .into_boxed_str(),
+                )
             })?;
         }
         Ok(())
@@ -334,8 +337,6 @@ mod tests {
         let r = ChatRequest {
             model: "gpt-test".to_string(),
             messages: vec![ChatMessage::user("hi")],
-            temperature: None,
-            max_tokens: None,
             request_id: Some(Uuid::new_v4()),
             ..Default::default()
         };
@@ -344,6 +345,7 @@ mod tests {
 
     #[test]
     fn chat_response_stub_assistant_sets_finish_reason_stop() {
+        #[allow(deprecated)]
         let r = ChatResponse::stub_assistant("gpt-test", "hello back");
         assert_eq!(r.model, "gpt-test");
         assert_eq!(r.message.role, ChatRole::Assistant);
