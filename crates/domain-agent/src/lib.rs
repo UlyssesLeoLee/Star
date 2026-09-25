@@ -87,6 +87,15 @@ define_uuid_id!(WorktreeId);
 define_uuid_id!(WorkItemId);
 
 // =====================================================================
+// PolicyHooks (PI-5: SRS-PI-BORROW-001 §4 FR-24~26 + ULYS-181)
+// =====================================================================
+
+/// `PolicyHook` trait + `PolicyDecision` + `PolicyHooks` 容器 (per ULYS-181 PI-5).
+///
+/// 完整定义 + 集成契约见 [`policy_hooks`].
+pub mod policy_hooks;
+
+// =====================================================================
 // 14 状态机(§7.4,F-08 修正后)
 // =====================================================================
 
@@ -372,7 +381,7 @@ pub struct AgentSession {
     pub lock_version: u32,
 }
 
-/// AgentPolicy(§4.2.5,§24.3,12 强制点)
+/// AgentPolicy(§4.2.5,§24.3,12 强制点 + SRS-PI-BORROW-001 §4 FR-25 + ULYS-181 PI-5)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentPolicy {
     /// 允许访问的仓库列表
@@ -405,6 +414,13 @@ pub struct AgentPolicy {
     pub require_test: bool,
     /// 是否强制要求人工审批
     pub require_approval: bool,
+    /// `PolicyHooks` 注入 (per SRS-PI-BORROW-001 §4 FR-25 + ULYS-181 PI-5).
+    ///
+    /// 运行时由 application 层注册, 序列化时**跳过**(hooks 不能从 JSON 反序列化,
+    /// 必须运行时注入, per 守门 #11 缺标比错标). 老数据反序列化 = 空 hooks, 等价于
+    /// FR-26 默认 conservative 行为.
+    #[serde(skip, default)]
+    pub policy_hooks: crate::policy_hooks::PolicyHooks,
 }
 
 impl AgentPolicy {
@@ -426,6 +442,9 @@ impl AgentPolicy {
             require_review: true,
             require_test: true,
             require_approval: true,
+            // PI-5: 默认保守策略 = 0 hooks (per SRS-PI-BORROW-001 §4 FR-26).
+            // 12 强制点由 application 层按需注入 (per ULYS-175 §"关键发现").
+            policy_hooks: crate::policy_hooks::PolicyHooks::new(),
         }
     }
 
@@ -1523,6 +1542,59 @@ mod tests {
         assert_eq!(p.network_access, NetworkAccess::Deny);
         assert_eq!(p.secret_access, SecretAccess::None);
         assert!(p.require_approval);
+    }
+
+    #[test]
+    fn policy_conservative_has_empty_hooks_by_default() {
+        // PI-5: 默认保守策略 = 0 hooks (per SRS-PI-BORROW-001 §4 FR-26).
+        let p = AgentPolicy::conservative();
+        assert!(p.policy_hooks.is_empty());
+        assert_eq!(p.policy_hooks.before_len(), 0);
+        assert_eq!(p.policy_hooks.after_len(), 0);
+    }
+
+    #[test]
+    fn policy_hooks_field_deserializes_as_empty_from_legacy_json() {
+        // PI-5: 老数据反序列化 = 空 hooks, 等价于 FR-26 默认 conservative 行为.
+        // 模拟一个不含 policy_hooks 字段的老 JSON (per AGENTS.md 守门 #11 缺标比错标).
+        let legacy_json = r#"{
+            "allowed_repositories": [],
+            "allowed_worktrees": [],
+            "allowed_paths": [],
+            "forbidden_paths": ["**/.env"],
+            "allowed_tools": ["read_file"],
+            "allowed_command_categories": ["query"],
+            "network_access": "Deny",
+            "secret_access": "None",
+            "max_runtime_seconds": 300,
+            "max_context_tokens": 32000,
+            "max_change_files": 10,
+            "max_change_lines": 500,
+            "require_review": true,
+            "require_test": true,
+            "require_approval": true
+        }"#;
+        let p: AgentPolicy = serde_json::from_str(legacy_json).unwrap();
+        assert!(p.policy_hooks.is_empty(), "legacy JSON must deserialize with empty hooks");
+    }
+
+    #[test]
+    fn policy_hooks_field_serializes_as_skip() {
+        // PI-5: hooks 不能从 JSON 反序列化, 必须运行时注入 (per ULYS-181 issue description).
+        // 序列化时整体 skip, 即使有 hook 注入也不进 JSON.
+        struct CountHook;
+        impl crate::policy_hooks::PolicyHook for CountHook {
+            fn name(&self) -> &str {
+                "count"
+            }
+        }
+        let p = AgentPolicy {
+            policy_hooks: crate::policy_hooks::PolicyHooks::new().with_before(CountHook),
+            ..AgentPolicy::conservative()
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        assert!(!json.contains("policy_hooks"));
+        assert!(!json.contains("count"), "hook name must not leak to JSON");
     }
 
     #[test]

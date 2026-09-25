@@ -105,20 +105,18 @@ export function DiffAnnotator({
     [anchor, head],
   );
 
-  /**
-   * 该行落在哪些 annotation 里 (gutter 角标用)。
-   * 按**渲染出来的行**去问每条 annotation, 而不是展开 line_range —— agent
-   * 侧写入的区间可能远大于当前 hunk, 展开会白跑几万次循环。
-   */
+  /** 该行落在哪些 annotation 里 (gutter 角标用) */
   const annotationsByLine = useMemo(() => {
     const map = new Map<number, DiffAnnotation[]>();
-    for (const line of lines) {
-      if (line.newLine === null) continue;
-      const hits = annotations.filter((a) => rangeCoversLine(a.line_range, line.newLine as number));
-      if (hits.length > 0) map.set(line.newLine, hits);
+    for (const a of annotations) {
+      for (let line = a.line_range.start; line < a.line_range.end; line += 1) {
+        const bucket = map.get(line);
+        if (bucket) bucket.push(a);
+        else map.set(line, [a]);
+      }
     }
     return map;
-  }, [annotations, lines]);
+  }, [annotations]);
 
   const onGutterClick = useCallback(
     (line: number, shiftKey: boolean) => {
