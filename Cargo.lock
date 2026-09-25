@@ -944,10 +944,14 @@ dependencies = [
  "async-trait",
  "chrono",
  "domain-llm",
+ "domain-tool",
+ "futures-util",
  "serde",
  "serde_json",
  "star-context",
+"star-dto",
  "thiserror",
+ "thiserror 1.0.69",
  "tokio",
  "uuid",
 ]
@@ -1082,6 +1086,7 @@ dependencies = [
  "star-context",
  "thiserror",
  "tokio",
+ "tracing",
  "uuid",
 ]
 

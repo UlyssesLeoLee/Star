@@ -44,6 +44,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 pub use star_context::ActorContext;
 use uuid::Uuid;
+use std::sync::Arc;
 
 // =====================================================================
 // 实体(Entity / Aggregate Root)
@@ -965,6 +966,78 @@ impl From<domain_project::ProjectError> for ApplicationError {
     }
 }
 
+// =====================================================================
+// ULYS-207 PI-9 W4 P-B: SteeringSinkBridge -- domain-agent 与 domain-comment 间的胶水
+// =====================================================================
+//
+// ## 职责
+//
+// `domain-agent::queue::CollabCommentSink` 是 PreemptionListener 把抢占事件
+// 投递到协作评论侧的本地 trait;`domain-comment::SteeringCommentSink` 是本 crate
+// 落地的 sink 抽象。两者同形但**留在各自 crate 内**(避免 domain-agent ↔ domain-comment
+// 循环依赖)。本模块提供 `SteeringSinkBridge`:
+//
+// - 实现 `domain_agent::queue::CollabCommentSink` (由 bridge 在 application 层 cross-crate 实现)
+// - 内部包 `domain_comment::CommentServiceAdapter` (domain-comment 提供的 sink)
+// - 把 `CollabSteeringCommand` (domain-agent) 转 `SteeringCommand` (domain-comment) 后投递
+//
+// ## 守门
+//
+// - **跨租户守门**:bridge 把 agent_session_id + agent_id 从 QueuedTask 透传到 SteeringCommand;
+//   CommentService 内部 CrossTenantDenied + INV-C-05 守门即生效。
+// - **prompt 防泄漏**:`CollabSteeringCommand` 的 prompt_excerpt 已在
+//   `domain-agent::queue::CollabPreemptionBridge` 层 redact (W3 守门 #5 80 字符上限);
+//   bridge 仅透传,不二次处理。
+// - **不调 close / push / 任何 side-effect**:本模块仅提供 trait impl,生命周期由 caller 管理。
+
+/// **SteeringSinkBridge** -- `CollabCommentSink` 的 application 层实装,
+/// 把抢占事件投递到 `CommentServiceAdapter`。
+///
+/// **设计**:
+/// - 持有 `Arc<dyn SteeringCommentSink>` (实际是 `CommentServiceAdapter`)
+/// - 实现 `domain_agent::queue::CollabCommentSink`
+/// - 同步 fn dispatch → 透传到下游 sink(下游自己负责 block_on 异步 service)
+pub struct SteeringSinkBridge {
+    /// 下游 sink(实际 = CommentServiceAdapter)
+    inner: Arc<dyn domain_comment::SteeringCommentSink>,
+}
+
+impl std::fmt::Debug for SteeringSinkBridge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SteeringSinkBridge").finish()
+    }
+}
+
+impl SteeringSinkBridge {
+    /// 构造 bridge,绑定到下游 sink
+    pub fn new(inner: Arc<dyn domain_comment::SteeringCommentSink>) -> Self {
+        Self { inner }
+    }
+}
+
+impl domain_agent::queue::CollabCommentSink for SteeringSinkBridge {
+    fn dispatch_steering(&self, cmd: domain_agent::queue::CollabSteeringCommand) {
+        // 把 domain-agent 的 CollabSteeringCommand 转 domain-comment 的 SteeringCommand
+        // **ULYS-207 PI-9 W5**:CollabSteeringCommand 现带 4 个真实
+        // agent/session 字段(current_agent_id / current_session_id /
+        // incoming_agent_id / incoming_session_id)。Bridge 透传真实值,
+        // **不再**用 `incoming_task_id` 占位(per W4 已知 trade-off fix path)。
+        // SteeringCommand.agent_id 用 incoming_agent_id (steering 触发来自
+        // incoming);SteeringCommand.agent_session_id 用 incoming_session_id
+        // (作 ParentType::AgentSession 的 parent_id)。
+        let steering_cmd = domain_comment::SteeringCommand::new(
+            domain_comment::TenantId::from(cmd.tenant_id.as_uuid()),
+            cmd.current_task_id,
+            cmd.current_prompt_excerpt,
+            cmd.incoming_task_id,
+            cmd.incoming_prompt_excerpt,
+            domain_comment::AgentId::from(cmd.incoming_agent_id.as_uuid()),
+            cmd.incoming_session_id.as_uuid(),
+        );
+        self.inner.dispatch_steering(steering_cmd);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1107,3 +1180,145 @@ mod tests {
         assert!(app_err.retriable, "internal errors should be retriable");
     }
 }
+#[cfg(test)]
+mod steering_bridge_tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    use domain_agent::queue::{CollabCommentSink, CollabSteeringCommand};
+use domain_agent::TenantId;
+    use domain_comment::{
+    CommentQueryPort, CommentServiceAdapter, InMemoryCommentService, SteeringCommand,
+                          SteeringCommentSink};
+
+    /// 记录 sink -- 测试用,记录所有接收到的 `SteeringCommand`
+    #[derive(Default)]
+    struct RecordingSink {
+        captured: Mutex<Vec<SteeringCommand>>,
+    }
+    impl SteeringCommentSink for RecordingSink {
+        fn dispatch_steering(&self, cmd: SteeringCommand) {
+            self.captured.lock().unwrap().push(cmd);
+        }
+    }
+
+    #[test]
+    fn bridge_dispatches_to_inner_sink() {
+        let recorder: Arc<RecordingSink> = Arc::new(RecordingSink::default());
+        let bridge = SteeringSinkBridge::new(recorder.clone());
+
+        let tenant = TenantId::from(uuid::Uuid::new_v4());
+        // **ULYS-207 PI-9 W5**:agent_id / session_id 用真实 UUID 占位(不再
+        // 用 task_id 占位)。后续 CollabPreemptionBridge 透传 QueuedTask 真值。
+        let current_agent = domain_agent::AgentId::from(uuid::Uuid::new_v4());
+        let current_session = domain_agent::AgentSessionId::from(uuid::Uuid::new_v4());
+        let incoming_agent = domain_agent::AgentId::from(uuid::Uuid::new_v4());
+        let incoming_session = domain_agent::AgentSessionId::from(uuid::Uuid::new_v4());
+        let cmd = CollabSteeringCommand::new(
+            tenant,
+            uuid::Uuid::new_v4(),
+            "current task prompt excerpt".to_string(),
+            current_agent,
+            current_session,
+            uuid::Uuid::new_v4(),
+            "incoming task prompt excerpt".to_string(),
+            incoming_agent,
+            incoming_session,
+            std::time::SystemTime::now(),
+        );
+
+        bridge.dispatch_steering(cmd.clone());
+
+        let captured = recorder.captured.lock().unwrap();
+        assert_eq!(captured.len(), 1, "bridge should dispatch exactly once");
+        let got = &captured[0];
+        // tenant_id round-trip via Uuid (两个 crate 的 TenantId newtype 不同)
+        assert_eq!(got.tenant_id.as_uuid(), cmd.tenant_id.as_uuid());
+        assert_eq!(got.current_task_id, cmd.current_task_id);
+        assert_eq!(got.incoming_task_id, cmd.incoming_task_id);
+        assert_eq!(got.current_prompt_excerpt, cmd.current_prompt_excerpt);
+        assert_eq!(got.incoming_prompt_excerpt, cmd.incoming_prompt_excerpt);
+        // **ULYS-207 PI-9 W5**:agent_id / agent_session_id 透传真实值
+        // (不再用 incoming_task_id 占位 — per W4 已知 trade-off fix path)。
+        assert_eq!(
+            got.agent_id.as_uuid(),
+            cmd.incoming_agent_id.as_uuid(),
+            "agent_id must come from incoming_agent_id (W5)"
+        );
+        assert_eq!(
+            got.agent_session_id, cmd.incoming_session_id.as_uuid(),
+            "agent_session_id must come from incoming_session_id (W5)"
+        );
+        // 守门:透传真实值 ≠ 任何 task_id 占位
+        assert_ne!(
+            got.agent_id.as_uuid(),
+            cmd.incoming_task_id,
+            "W5 forbids W4 placeholder = incoming_task_id"
+        );
+        assert_ne!(
+            got.agent_session_id, cmd.incoming_task_id,
+            "W5 forbids W4 placeholder = incoming_task_id"
+        );
+    }
+
+    #[tokio::test]
+    async fn end_to_end_bridge_to_comment_service() {
+        // 真实端到端:CommentServiceAdapter(impl SteeringCommentSink) → InMemoryCommentService
+        let svc = Arc::new(InMemoryCommentService::new());
+        let adapter = CommentServiceAdapter::new(svc.clone());
+        let bridge = SteeringSinkBridge::new(Arc::new(adapter));
+
+        let tenant = TenantId::from(uuid::Uuid::new_v4());
+        // **ULYS-207 PI-9 W5**:agent_id / session_id 真实值
+        let current_agent = domain_agent::AgentId::from(uuid::Uuid::new_v4());
+        let current_session = domain_agent::AgentSessionId::from(uuid::Uuid::new_v4());
+        let incoming_agent = domain_agent::AgentId::from(uuid::Uuid::new_v4());
+        let incoming_session = domain_agent::AgentSessionId::from(uuid::Uuid::new_v4());
+        let cmd = CollabSteeringCommand::new(
+            tenant,
+            uuid::Uuid::new_v4(),
+            "old".to_string(),
+            current_agent,
+            current_session,
+            uuid::Uuid::new_v4(),
+            "new".to_string(),
+            incoming_agent,
+            incoming_session,
+            std::time::SystemTime::now(),
+        );
+
+        // **ULYS-207 PI-9 W5**:parent_id_for_query 现在是真实
+        // incoming_session_id(不再是 incoming_task_id 占位)
+        let parent_id_for_query = cmd.incoming_session_id.as_uuid();
+        let expected_agent_id = cmd.incoming_agent_id.as_uuid();
+        bridge.dispatch_steering(cmd);
+
+        // 给 sink 时间 block_on 创建 comment
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        // list_by_parent(AgentSession) 应能查到 1 条
+        let q = domain_comment::ListByParentQuery {
+            tenant_id: domain_comment::TenantId::from(tenant.as_uuid()),
+            parent_type: domain_comment::ParentType::AgentSession,
+            parent_id: parent_id_for_query,
+            include_deleted: false,
+        };
+        // 使用真实 user_id (INV-ACT-01 不允许 nil)
+        let actor = ActorContext::new(uuid::Uuid::new_v4(), tenant.as_uuid())
+            .with_agent_session(true);
+        let list = svc.list_by_parent(q, &actor).await.unwrap();
+        assert_eq!(list.len(), 1, "comment should be persisted via sink chain");
+        let c = &list[0];
+        assert_eq!(c.parent_type, domain_comment::ParentType::AgentSession);
+        assert!(c.author_agent_id.is_some(), "INV-C-05: agent author required");
+        assert!(c.author_user_id.is_none());
+        // **ULYS-207 PI-9 W5**:author_agent_id 用真实 incoming_agent_id
+        assert_eq!(
+            c.author_agent_id.unwrap().as_uuid(),
+            expected_agent_id,
+            "W5: author_agent_id must come from real incoming_agent_id, not task_id placeholder"
+        );
+        assert!(c.body.contains("old"));
+        assert!(c.body.contains("new"));
+    }
+}
+

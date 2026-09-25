@@ -6,11 +6,12 @@
 //! **演进 (per 守门 #1 + 守门 #12)**:
 //! - v0.0.1 (2026-09-04 `5357c0a`): 4 强类型 ID + `ActorContext` alias + `ListByTenantDto` stub
 //! - v0.1.0 (2026-09-07, 本 commit): 公共 DTO 类型 (Identifier/Timestamp/TenantContext/AuditTrail) + 5 domain 接入 + unit test
+//! - v0.2.0 (2026-09-23, ULYS-206 PI-6): JSON Delta 协议 (`delta` mod) — 7 ops (r/s/d/a/t/p/m) for star-taskgraph react-flow 增量同步
 //!
 //! **W/T/M 分类 (per 守门 #13 + 9/1 18:30 JST 拍板)**:
 //! - **M (Master, SCD Type 2)**: `Identifier<T>` — phantom type 防 ID 混用 + 标识版本
 //! - **T (Transaction, append-only)**: `AuditTrail` — 跨域事件流水, 物理删除禁止 + 审计必填
-//! - **W (Work, 短 TTL)**: 无 (DTO 本身是数据载体, 不存数据; 分类归属其映射的 DB 表)
+//! - **W (Work, 短 TTL)**: `delta::Op` 批次 — 短 TTL 效果载体 (per ULYS-206 §W/T/M); 不持久化为独立 DB 表, 消费者 (star-taskgraph 前端 / star-taskqueue 压缩 / domain-worktree 上下文编辑) 可选审计日志 event_type=`'json_delta_op'`
 //!
 //! **守门 (per HANDOFF v0.8 §10 + ubiquitous-language.md v1.1)**:
 //! - 字段命名跟 [`docs/ubiquitous-language.md`](../../../docs/ubiquitous-language.md) v1.0 §1 保持一致
@@ -38,6 +39,19 @@ use uuid::Uuid;
 pub use star_context::ActorContext as DtoActorContext;
 // 跨域共享强类型 ID 暂不引入依赖, 跨 sub-session 续时从 star-context 重新导出
 // (per T3.1 启动原则: stub only, 不引入 cycle 依赖)
+
+// =====================================================================
+// §0.b JSON Delta 协议 (per ULYS-206 PI-6, v0.2.0, 2026-09-23)
+// =====================================================================
+
+/// **PI-6 JSON Delta 协议** — 7 ops (r/s/d/a/t/p/m) for star-taskgraph react-flow 增量同步.
+///
+/// 模块文档见 [`delta`]. 入口类型:
+/// - [`delta::Op`] — 7 变体 enum (Replace/Set/Delete/Append/Truncate/Splice/Move)
+/// - [`delta::apply`] / [`delta::apply_immutable`] — reducer, 原子批量 apply
+/// - [`delta::PathError`] / [`delta::UnsafePathError`] / [`delta::DeltaError`] — 错误类型
+/// - [`delta::RESERVED_SEGMENTS`] / [`delta::is_reserved_segment`] / [`delta::assert_safe_path`] — 原型链污染防御
+pub mod delta;
 
 // =====================================================================
 // §1 M 类 (Master, SCD Type 2) — Identifier<T>
