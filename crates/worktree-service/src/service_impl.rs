@@ -21,9 +21,7 @@ use crate::projection::{StatusObservedPoint, WorktreeStatusObserved};
 use crate::service::{
     SyncResult, Worktree, WorktreeEventEnvelope, WorktreeFilter, WorktreeService, WorktreeUpdate,
 };
-use crate::start_from_picker::{
-    pick_start_from_candidates, PickerCandidates, StartFromPickerSource,
-};
+use crate::start_from_picker::{pick_start_from_candidates, PickerCandidates, StartFromPickerSource};
 
 /// In-memory Worktree service 实装
 ///
@@ -661,6 +659,35 @@ impl WorktreeService for InMemoryWorktreeService {
         }
 
         Ok(outcome)
+    }
+
+    async fn pick_start_from_candidates(
+        &self,
+        repo_id: RepoId,
+    ) -> Result<PickerCandidates, ServiceError> {
+        // 1. 取 snapshot of existing (避免 lock 与 picker 异步操作死锁)
+        let existing: Vec<Worktree> = {
+            let guard = self.inner.read().await;
+            guard
+                .worktrees
+                .values()
+                .filter(|w| w.repo_id == repo_id)
+                .cloned()
+                .collect()
+        };
+        // guard 在表达式结束已 drop (NLL), 无需再 drop.
+
+        // 2. 取 source (default = NoopPickerSource)
+        let source: Arc<dyn StartFromPickerSource> = {
+            let guard = self.inner.read().await;
+            guard
+                .picker_source
+                .clone()
+                .unwrap_or_else(|| Arc::new(NoopPickerSource))
+        };
+
+        // 3. 调 helper (per start_from_picker::pick_start_from_candidates)
+        pick_start_from_candidates(repo_id, &existing, source.as_ref()).await
     }
 }
 

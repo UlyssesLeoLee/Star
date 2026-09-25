@@ -2252,3 +2252,8 @@ pub mod ai_session_inline {
         Ok(state)
     }
 }
+
+// PI-9 W5/W6 (per ULYS-207 PI-9): CollabPreemptionBridge + CollabSteeringCommand
+// (per SRS-PI-BORROW-001 §4 FR-30). 跟 application crate 的 SteeringSinkBridge
+// 集成.
+pub mod queue;

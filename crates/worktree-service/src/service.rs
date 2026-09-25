@@ -18,9 +18,10 @@ use uuid::Uuid;
 use graph_core::state::{HumanState, MergeStrategy, TestState};
 use graph_core::types::{RepoId, UserId, WorktreeId};
 
+use crate::start_from_picker::PickerCandidates;
+
 use crate::error::ServiceError;
 use crate::lifecycle::WorktreeEvent;
-use crate::start_from_picker::PickerCandidates;
 
 /// Worktree 过滤 (per DD §12)
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -234,4 +235,13 @@ pub trait WorktreeService: Send + Sync {
         repo_path: &std::path::Path,
         force: bool,
     ) -> Result<crate::external_worktree_import::ImportOutcome, ServiceError>;
+
+    /// 选 Start-from Picker candidates (per ULYS-194 FR-ORCA-009)
+    ///
+    /// 默认实现走 `InMemoryWorktreeService` + 注入的 `StartFromPickerSource`.
+    /// 默认 source = `NoopPickerSource` (永远只返 empty).
+    async fn pick_start_from_candidates(
+        &self,
+        repo_id: RepoId,
+    ) -> Result<PickerCandidates, ServiceError>;
 }

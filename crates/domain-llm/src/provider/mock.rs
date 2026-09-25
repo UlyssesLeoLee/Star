@@ -158,6 +158,7 @@ mod tests {
             request_id: Some(Uuid::new_v4()),
             thinking_level: None,
         }
+    }
 
     #[test]
     fn mock_provider_default_name_is_mock() {

@@ -165,6 +165,11 @@ repository = "https://github.com/UlyssesLeoLee/Star"
 # 异步运行时与异步 trait
 tokio = { version = "1.40", features = ["full"] }
 async-trait = "0.1"
+# WebSocket HTTP server (per ULYS-222 P1-C — terminal-stack WebSocket protocol layer 依赖)
+# 0.8 选型跟 crates/api 守门 #48 一致
+axum = { version = "0.8", features = ["ws", "macros"] }
+# tokio-stream for broadcast::Receiver Stream impl (per crates/api/arg/sse_hub 模式)
+tokio-stream = "0.1"
 # G-1 r2d2-memgraph (per WBS §14.15 跨 session 续, v0.81 落地 stub path)
 r2d2 = "0.8"
 # r2d2-memgraph = "0.1"  # TODO: 等 r2d2-memgraph crate 落地后启用 (G-1 完整实装)

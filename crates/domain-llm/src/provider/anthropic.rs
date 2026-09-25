@@ -441,6 +441,7 @@ mod tests {
             request_id: Some(Uuid::new_v4()),
             thinking_level: None,
         }
+    }
 
     #[test]
     fn anthropic_provider_default_is_no_network() {

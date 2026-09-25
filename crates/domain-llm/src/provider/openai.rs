@@ -399,6 +399,7 @@ mod tests {
             request_id: Some(Uuid::new_v4()),
             thinking_level: None,
         }
+    }
 
     #[test]
     fn openai_provider_default_is_no_network() {

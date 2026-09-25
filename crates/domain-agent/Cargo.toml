@@ -26,6 +26,11 @@ serde_json = { workspace = true }
 # returns Pin<Box<dyn Stream<Item = AgentStreamEvent> + Send>> -- needs futures-util
 # for `stream::once` + `stream::iter` + `StreamExt::flat_map` adapters.
 futures-util = { workspace = true }
+# ULYS-207 PI-9 W5 (commit `536a830a`): CollabSteeringCommand 真实字段
+# tool_hint: domain_tool::ToolExecutionMode (PI-4 ship, ULYS-205 0b00ecec)
+# payload_op: star_dto::delta::Op (PI-6 ship, ULYS-206 2a0ca91a)
+domain-tool = { path = "../domain-tool" }
+star-dto = { path = "../star-dto" }
 [dev-dependencies]
 tokio = { workspace = true }
 

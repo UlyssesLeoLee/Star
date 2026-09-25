@@ -24,8 +24,11 @@
 #![deny(missing_docs)]
 #![allow(clippy::result_large_err)]
 
+pub mod persistence;
+pub mod recovery;
 pub mod scrollback_buffer;
 pub mod split_pane;
+pub mod ws;
 
 pub use scrollback_buffer::{
     ScrollbackBuffer, ScrollbackError as BufferError, ScrollbackLine, ScrollbackSource,

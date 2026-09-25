@@ -35,6 +35,8 @@ git-adapter = { path = "../git-adapter" }
 # UT 用 tokio test runtime (already declared above as dep, dev re-export is fine)
 # tempfile: integration test 用 temp repo + temp dir (per ULYS-217 §5 cargo test --test create_async_integration)
 tempfile = { workspace = true }
+# serial_test: integration test 跨 env-var 互斥 (per ULYS-194 rebase fix)
+serial_test = { workspace = true }
 
 [lints]
 workspace = true
