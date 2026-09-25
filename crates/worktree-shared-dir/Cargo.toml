@@ -30,8 +30,6 @@ graph-core = { path = "../graph-core" }
 # ULYS-158.4: RealWorktreeCreateAsync 复用 git-adapter 的 GitProvider trait (per FR-ORCA-008 AC-1 git fetch + worktree add)
 git-adapter = { path = "../git-adapter" }
 # ULYS-158.4: orchestrator 用 tokio mpsc + spawn (per FR-ORCA-008 AC-1 异步 / AC-2 进度 channel / AC-3 cancel)
-tokio = { workspace = true }
-# ULYS-158.4: 5 mount_strategy 跨平台 (per FR-ORCA-007 AC-1) — 用 std lib, 0 新依赖
 
 [dev-dependencies]
 # UT 用 tokio test runtime (already declared above as dep, dev re-export is fine)
