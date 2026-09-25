@@ -24,58 +24,50 @@ async function installTestMockWs(
     window.__mockWsCtor = function (url: string) {
       // @ts-expect-error
       const WsClass = (window as unknown as { __MockWsClass: new (url: string) => WebSocket }).__MockWsClass;
-      return new WsClass(url) as unknown as WebSocket;
+      // @ts-expect-error
+      const inst = new WsClass(url);
+      // @ts-expect-error
+      window.__mockWsInstances.push(inst);
+      return inst as unknown as WebSocket;
     };
     // @ts-expect-error
     (window as unknown as { __MockWsClass: new (url: string) => WebSocket }).__MockWsClass = (function () {
-      function MockWs(this: unknown, url: string) {
-        // @ts-expect-error
-        this.url = url;
-        // @ts-expect-error
-        this.binaryType = "arraybuffer";
-        // @ts-expect-error
-        this.readyState = 0; // CONNECTING
-        // @ts-expect-error
-        this.onopen = null;
-        // @ts-expect-error
-        this.onmessage = null;
-        // @ts-expect-error
-        this.onerror = null;
-        // @ts-expect-error
-        this.onclose = null;
-        // @ts-expect-error
-        this.sent = [];
-        // @ts-expect-error
-        (window as unknown as { __mockWsInstances: unknown[] }).__mockWsInstances.push(this);
-        // After 50ms, fire open + (optionally hello + snapshot per test)
-        setTimeout(() => {
-          try {
-            // @ts-expect-error
-            this.readyState = 1; // OPEN
-            const openEvent = new Event("open");
-            // @ts-expect-error
-            this.dispatchEvent(openEvent);
-            if (typeof this.onopen === "function") this.onopen(openEvent);
-          } catch (e) {
-            // ignore
-          }
-        }, 50);
+      class MockWs extends EventTarget {
+        url: string;
+        binaryType = "arraybuffer";
+        readyState: number = 0; // CONNECTING
+        onopen: ((ev: Event) => void) | null = null;
+        onmessage: ((ev: MessageEvent) => void) | null = null;
+        onerror: ((ev: Event) => void) | null = null;
+        onclose: ((ev: Event) => void) | null = null;
+        sent: string[] = [];
+        constructor(url: string) {
+          super();
+          this.url = url;
+          // @ts-expect-error
+          (window as unknown as { __mockWsInstances: unknown[] }).__mockWsInstances.push(this);
+          // After 50ms, fire open + (optionally hello + snapshot per test)
+          setTimeout(() => {
+            try {
+              this.readyState = 1; // OPEN
+              const openEvent = new Event("open");
+              this.dispatchEvent(openEvent);
+              if (typeof this.onopen === "function") this.onopen(openEvent);
+            } catch (e) {
+              // ignore
+            }
+          }, 50);
+        }
+        send(data: string): void {
+          this.sent.push(data);
+        }
+        close(): void {
+          this.readyState = 3; // CLOSED
+          const closeEvent = new Event("close");
+          this.dispatchEvent(closeEvent);
+          if (typeof this.onclose === "function") this.onclose(closeEvent);
+        }
       }
-      MockWs.prototype.send = function (data: string) {
-        // @ts-expect-error
-        this.sent.push(data);
-      };
-      MockWs.prototype.close = function () {
-        // @ts-expect-error
-        this.readyState = 3; // CLOSED
-        const closeEvent = new Event("close");
-        // @ts-expect-error
-        this.dispatchEvent(closeEvent);
-        if (typeof this.onclose === "function") this.onclose(closeEvent);
-      };
-      MockWs.prototype.dispatchEvent = EventTarget.prototype.dispatchEvent;
-      MockWs.prototype.addEventListener = EventTarget.prototype.addEventListener;
-      MockWs.prototype.removeEventListener = EventTarget.prototype.removeEventListener;
       return MockWs;
     })();
   });

@@ -30,111 +30,94 @@ async function installMockWsServer(
   sessionId: string,
   paneId: string,
 ): Promise<void> {
-  // T23.6 round 4 fix: MockWsCtor extends EventTarget — not real Chromium WebSocket
-  // (real WS tries network connect which fails because no server).
-  // MockCtor: full EventTarget + WebSocket-like API surface for wsClient.
+  // T23.6 round 7 fix: MockWs extends EventTarget (proper subclass so internal
+  // event listener storage works correctly — borrowing EventTarget.prototype
+  // doesn't init the private listener slot, so addEventListener was a no-op).
   await page.addInitScript(
     ({ sessionId, paneId }) => {
       // @ts-expect-error
       window.__mockWsInstances = [];
       // @ts-expect-error
-      window.__mockWsCtor = function (url: string) {
-        // @ts-expect-error
-        const ws = new (window as unknown as { __MockWsClass: new (url: string, sessionId: string, paneId: string) => WebSocket }).__MockWsClass(url, sessionId, paneId);
-        return ws as unknown as WebSocket;
-      };
-      // Define MockWsClass inline in init script (can't use class syntax in addInitScript cleanly)
-      // @ts-expect-error
       window.__MockWsClass = (function () {
-        const states = ["CONNECTING", "OPEN", "CLOSING", "CLOSED"];
-        const codes = { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 };
-        function MockWs(this: unknown, url: string, sid: string, pid: string) {
-          // @ts-expect-error
-          this.url = url;
-          // @ts-expect-error
-          this.sessionId = sid;
-          // @ts-expect-error
-          this.paneId = pid;
-          // @ts-expect-error
-          this.binaryType = "arraybuffer";
-          // @ts-expect-error
-          this.readyState = codes.CONNECTING;
-          // @ts-expect-error
-          this.onopen = null;
-          // @ts-expect-error
-          this.onmessage = null;
-          // @ts-expect-error
-          this.onerror = null;
-          // @ts-expect-error
-          this.onclose = null;
-          // @ts-expect-error
-          this.sent = [];
-          // @ts-expect-error
-          (window as unknown as { __mockWsInstances: unknown[] }).__mockWsInstances.push(this);
-          // After 50ms, fire open + hello + snapshot (per server protocol)
-          setTimeout(() => {
-            try {
-              // @ts-expect-error
-              this.readyState = codes.OPEN;
-              // Fire onopen (per WebSocket spec, Event dispatched)
-              const openEvent = new Event("open");
-              // @ts-expect-error
-              this.dispatchEvent(openEvent);
-              if (typeof this.onopen === "function") this.onopen(openEvent);
-              // 30ms after open: dispatch hello + snapshot
-              setTimeout(() => {
-                const hello = new MessageEvent("message", {
-                  data: JSON.stringify({
-                    type: "hello",
-                    session_id: sid,
-                    panes: [pid],
-                    total_bytes: 1024,
-                    server_time: "2026-09-24T00:00:00Z",
-                  }),
-                });
-                // @ts-expect-error
-                this.dispatchEvent(hello);
-                if (typeof this.onmessage === "function") this.onmessage(hello);
-                const snap = new MessageEvent("message", {
-                  data: JSON.stringify({
-                    type: "snapshot",
-                    pane_id: pid,
-                    from_seq: null,
-                    lines: Array.from({ length: 5 }).map((_: unknown, i: number) => ({
-                      id: `p1e-line-${i}`,
-                      timestamp: "2026-09-24T00:00:00Z",
-                      text: `[P1-E seed line ${i}]`,
-                      source: "stdout",
-                      byte_len: 32,
-                    })),
-                  }),
-                });
-                // @ts-expect-error
-                this.dispatchEvent(snap);
-                if (typeof this.onmessage === "function") this.onmessage(snap);
-              }, 30);
-            } catch (e) {
-              // ignore
-            }
-          }, 50);
+        class MockWs extends EventTarget {
+          url: string;
+          sessionId: string;
+          paneId: string;
+          binaryType = "arraybuffer";
+          readyState: number = 0; // CONNECTING
+          onopen: ((ev: Event) => void) | null = null;
+          onmessage: ((ev: MessageEvent) => void) | null = null;
+          onerror: ((ev: Event) => void) | null = null;
+          onclose: ((ev: Event) => void) | null = null;
+          sent: string[] = [];
+          constructor(url: string, sid: string, pid: string) {
+            super();
+            this.url = url;
+            this.sessionId = sid;
+            this.paneId = pid;
+            // After 50ms, fire open + (30ms later) hello + snapshot
+            setTimeout(() => {
+              try {
+                this.readyState = 1; // OPEN
+                const openEvent = new Event("open");
+                this.dispatchEvent(openEvent);
+                if (typeof this.onopen === "function") this.onopen(openEvent);
+                setTimeout(() => {
+                  const hello = new MessageEvent("message", {
+                    data: JSON.stringify({
+                      type: "hello",
+                      session_id: sid,
+                      panes: [pid],
+                      total_bytes: 1024,
+                      server_time: "2026-09-24T00:00:00Z",
+                    }),
+                  });
+                  this.dispatchEvent(hello);
+                  if (typeof this.onmessage === "function") this.onmessage(hello);
+                  const snap = new MessageEvent("message", {
+                    data: JSON.stringify({
+                      type: "snapshot",
+                      pane_id: pid,
+                      from_seq: null,
+                      lines: Array.from({ length: 5 }).map((_: unknown, i: number) => ({
+                        id: `p1e-line-${i}`,
+                        timestamp: "2026-09-24T00:00:00Z",
+                        text: `[P1-E seed line ${i}]`,
+                        source: "stdout",
+                        byte_len: 32,
+                      })),
+                    }),
+                  });
+                  this.dispatchEvent(snap);
+                  if (typeof this.onmessage === "function") this.onmessage(snap);
+                }, 30);
+              } catch (e) {
+                // ignore
+              }
+            }, 50);
+          }
+          send(data: string): void {
+            this.sent.push(data);
+          }
+          close(): void {
+            this.readyState = 3; // CLOSED
+            const closeEvent = new Event("close");
+            this.dispatchEvent(closeEvent);
+            if (typeof this.onclose === "function") this.onclose(closeEvent);
+          }
         }
-        MockWs.prototype.send = function (data: string) {
-          // @ts-expect-error
-          this.sent.push(data);
-        };
-        MockWs.prototype.close = function () {
-          // @ts-expect-error
-          this.readyState = codes.CLOSED;
-          const closeEvent = new Event("close");
-          // @ts-expect-error
-          this.dispatchEvent(closeEvent);
-          if (typeof this.onclose === "function") this.onclose(closeEvent);
-        };
-        MockWs.prototype.dispatchEvent = EventTarget.prototype.dispatchEvent;
-        MockWs.prototype.addEventListener = EventTarget.prototype.addEventListener;
-        MockWs.prototype.removeEventListener = EventTarget.prototype.removeEventListener;
         return MockWs;
       })();
+      // @ts-expect-error
+      window.__mockWsCtor = function (url: string) {
+        // @ts-expect-error
+        const WsClass = (window as unknown as { __MockWsClass: new (url: string, sid: string, pid: string) => WebSocket }).__MockWsClass;
+        // @ts-expect-error
+        const inst = new WsClass(url, sessionId, paneId);
+        // @ts-expect-error
+        (window as unknown as { __mockWsInstances: unknown[] }).__mockWsInstances.push(inst);
+        return inst as unknown as WebSocket;
+      };
     },
     { sessionId, paneId },
   );
