@@ -23,15 +23,28 @@ uuid = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 futures-util = { workspace = true }
+# ULYS-195 stage 2 PR #4 — PG-backed `PgWorktreeService` (FR-ORCA-011).
+# 用 `pg` feature 隔开, 避免强制每个 consumer 编译 sqlx (per 守门 #11 + #13 a/d 双 backend)
+sqlx = { workspace = true, optional = true }
 
 # 跨 crate 引用 (per WORKTREE-CANVAS-IMPL-PLAN-001 §3 集成策略)
-# 单向依赖: worktree-service → graph-core + git-adapter + git-observer
+# 单向依赖: worktree-service → graph-core + git-adapter + git-observer + worktree-shared-dir
 graph-core = { path = "../graph-core" }
 git-adapter = { path = "../git-adapter" }
 git-observer = { path = "../git-observer" }
+worktree-shared-dir = { path = "../worktree-shared-dir" }
+
+[features]
+# Per 守门 #11 + #13 a/d: 默认 off; 用 `cargo build -p worktree-service --features pg` 启用
+default = []
+pg = ["dep:sqlx"]
 
 [dev-dependencies]
 tokio = { workspace = true }
+serial_test = { workspace = true }
+# PG 集成测试依赖 (dev-dep, 不用 feature gating — `#![cfg(feature = "pg")]`
+# 在测试文件顶部隔离了实际使用点, 让 sqlx 不进 default test 编译).
+sqlx = { workspace = true }
 
 [lints]
 workspace = true

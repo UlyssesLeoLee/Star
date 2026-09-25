@@ -179,7 +179,7 @@ async fn completion_inline(
         temperature: Some(0.2),
         max_tokens: Some(256),
         request_id: Some(Uuid::new_v4()),
-        thinking_level: None,
+        ..Default::default()
     };
 
     let resp = state

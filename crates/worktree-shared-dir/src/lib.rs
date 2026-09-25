@@ -27,11 +27,24 @@
 #![allow(clippy::result_large_err)]
 #![allow(clippy::too_many_arguments)]
 
+pub mod branch_naming;
 pub mod error;
+pub mod external_worktree_import;
 pub mod shared_dir_resolver;
 pub mod shared_dir_types;
+pub mod start_from_picker;
 
+pub use branch_naming::{
+    BranchNamer, BranchNamingInput, BranchNamingResult, BranchNamingSource, DefaultBranchNamer,
+    EMOJI_SHORTCODE_TABLE, MAX_BRANCH_LENGTH, normalize_branch, replace_emoji_shortcodes,
+    sanitize_branch_chars, truncate_branch,
+};
 pub use error::{SharedDirError, SharedDirResult};
+pub use external_worktree_import::{
+    DynExternalWorktreeImport, ExternalWorktree, ExternalWorktreeImport,
+    ExternalWorktreeImportError, ExternalWorktreeImportRegistry,
+    ExternalWorktreeImportResult, InMemoryExternalWorktreeImport, RealExternalWorktreeImport,
+};
 pub use shared_dir_resolver::{
     ConfigSource, FileBackedConfigSource, InMemorySharedDirConfigSource,
     InMemorySharedDirPerUserSource, InMemorySharedDirResolver, InMemorySharedDirWorkspaceSource,
@@ -42,4 +55,8 @@ pub use shared_dir_resolver::{
 pub use shared_dir_types::{
     PickerCandidate, PickerCandidateKind, SharedDirConfig, SharedDirPriority, SharedDirSource,
     SharedDirectory, SharedMountStrategy,
+};
+pub use start_from_picker::{
+    InMemoryStartFromPicker, RealStartFromPicker, RemoteFetch, StartFrom,
+    StartFromPickerError, StartFromPickerRegistry, describe_start_from, parse_candidate_id,
 };

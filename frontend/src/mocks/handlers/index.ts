@@ -28,6 +28,10 @@ export { providersLlmHandlers } from "./providers-llm";
 export { kmsHandlers } from "./kms";
 export { worktreeCanvasHandlers } from "./worktree-canvas";
 
+export { worktreeSharedHandlers } from "./worktree-shared";
+export { annotationsHandlers } from "./annotations";
+
+
 import { agentsHandlers } from "./agents";
 import { analyticsHandlers } from "./analytics";
 import { inboxHandlers } from "./inbox";
@@ -45,6 +49,10 @@ import { auditHandlers } from "./audit";
 import { providersLlmHandlers } from "./providers-llm";
 import { kmsHandlers } from "./kms";
 import { worktreeCanvasHandlers } from "./worktree-canvas";
+
+import { worktreeSharedHandlers } from "./worktree-shared";
+import { annotationsHandlers } from "./annotations";
+
 
 export const handlers = [
   ...agentsHandlers,
@@ -64,4 +72,8 @@ export const handlers = [
   ...providersLlmHandlers,
   ...kmsHandlers,
   ...worktreeCanvasHandlers,
+
+...worktreeSharedHandlers,
+...annotationsHandlers,
+
 ];

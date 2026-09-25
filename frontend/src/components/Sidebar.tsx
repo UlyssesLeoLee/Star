@@ -22,6 +22,7 @@ import {
   type SubNavEntry,
 } from "@/lib/nav/subNavRegistry";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
+import { SidebarWorktreesCard } from "@/components/worktree-shared/SidebarWorktreesCard";
 
 // =====================================================================
 // Sidebar — 折叠 + scope toggle 双模态侧栏
@@ -302,6 +303,15 @@ export function Sidebar() {
           </>
         )}
       </nav>
+
+      {/* === Hidden Worktrees Card (ULYS-228 FR-ORCA-011 AC-2) ===
+          折叠态隐藏, 展开态显示在底部 footer 之前. 当前用 placeholder repo_id,
+          生产环境从 /projects/[id] 路由参数注入. */}
+      {!isCollapsed && sidebarScope === "project" && isProjectScopeAvailable && (
+        <div className="shrink-0 px-3 py-3">
+          <SidebarWorktreesCard repoId="00000000-0000-0000-0000-000000000001" />
+        </div>
+      )}
 
       {/* === Bottom Tactical HUD Footer (仅展开态可见) === */}
       {!isCollapsed && (

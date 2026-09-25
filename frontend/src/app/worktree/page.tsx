@@ -11,6 +11,7 @@ import { GitBranch, GitMerge, Lock, Cpu, AlertCircle } from "lucide-react";
 import { clsx } from "clsx";
 import { useTranslation } from "@/lib/i18n";
 import dynamic from "next/dynamic";
+import { StartWorktreeButton } from "@/components/worktree-shared/StartWorktreeButton";
 
 // ULYS-98-W1.1 — Monaco editor (loaded client-side only).
 const MonacoEditor = dynamic(
@@ -46,6 +47,11 @@ export default function WorktreePage() {
         track="B"
         count={worktrees.length}
       />
+
+      {/* ULYS-228 FR-ORCA-009 entry point — New worktree button → StartFromPicker modal */}
+      <div className="mb-4">
+        <StartWorktreeButton repoId="00000000-0000-0000-0000-000000000001" />
+      </div>
 
       <SectionTitle>状态机可视化</SectionTitle>
       <div className="mb-5">

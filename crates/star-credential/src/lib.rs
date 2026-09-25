@@ -23,6 +23,8 @@ use uuid::Uuid;
 
 use domain_kms::{EncryptedBlob, KmsClient, LocalMockKms};
 
+use crate::db::CredentialDb;
+
 /// 凭证 Provider (5 类 + F-02 2 类 LLM provider)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Provider {
@@ -139,6 +141,9 @@ pub enum CredentialError {
     /// 内部错误
     #[error("internal: {0}")]
     Internal(String),
+    /// DB 同步失败 (per ULYS-234 §2.3: in-memory 已生效, DB 同步降级不阻断 revoke)
+    #[error("db sync failed: {0}")]
+    DbSyncFailed(String),
 }
 
 /// 凭证管理器 (用户 UI 填 → 加密存储 → 运行时解密)
@@ -148,21 +153,28 @@ pub struct CredentialManager {
     records: Arc<RwLock<HashMap<String, CredentialRecord>>>,
     /// 索引: (tenant_id, provider) -> `Vec<id>` (一个 tenant 可有多个 OpenClaw 凭证)
     by_tenant_provider: Arc<RwLock<HashMap<(String, Provider), Vec<String>>>>,
+    /// DB 持久化句柄 (per ULYS-234: revoke() 同步 DB credential.status)
+    db: Arc<CredentialDb>,
 }
 
 impl CredentialManager {
-    /// 新建凭证管理器 (KMS client 由调用方注入, 默认 LocalMockKms)
-    pub fn new(kms: Arc<dyn KmsClient>) -> Self {
+    /// 新建凭证管理器 (KMS client + DB 由调用方注入)
+    pub fn new(kms: Arc<dyn KmsClient>, db: Arc<CredentialDb>) -> Self {
         Self {
             kms,
             records: Arc::new(RwLock::new(HashMap::new())),
             by_tenant_provider: Arc::new(RwLock::new(HashMap::new())),
+            db,
         }
     }
 
-    /// 默认 + LocalMockKms (per 守门 #19 \[M\] 拍板 F.3 mock maturity)
+    /// 默认 + LocalMockKms + in_memory DB (per 守门 #19 [M] 拍板 F.3 mock maturity)
+    /// 既有调用方 (api.rs / lib.rs 自测) 零修改编译通过
     pub fn with_local_mock_kms() -> Self {
-        Self::new(Arc::new(LocalMockKms::new()))
+        Self::new(
+            Arc::new(LocalMockKms::new()),
+            Arc::new(CredentialDb::in_memory().expect("in-memory CredentialDb init")),
+        )
     }
 
     /// 用户在 UI 填入凭证 → 加密 → 入库
@@ -331,13 +343,44 @@ impl CredentialManager {
     }
 
     /// 凭证撤销: 标 revoked, 不删 (per INV-CR-06)
+    ///
+    /// per ULYS-234: revoke() 同时同步 DB `credential.status = 'Revoked'`。
+    /// 失败语义 (per §2.3):
+    /// - in-memory 已生效 → **不回滚**
+    /// - DB 同步失败 → 返 `CredentialError::DbSyncFailed(String)`,调用方可观测
+    /// - 不抛 panic
     pub async fn revoke(&self, credential_id: &str) -> Result<(), CredentialError> {
-        let mut records = self.records.write().await;
-        let record = records
-            .get_mut(credential_id)
-            .ok_or_else(|| CredentialError::NotFound(credential_id.to_string()))?;
-        record.status = CredentialStatus::Revoked;
-        record.revoked_at_ms = Some(now_ms());
+        // 1. 更新 in-memory (per INV-CR-06: 标 revoked, 不物理删)
+        let revoked_at = now_ms();
+        {
+            let mut records = self.records.write().await;
+            let record = records
+                .get_mut(credential_id)
+                .ok_or_else(|| CredentialError::NotFound(credential_id.to_string()))?;
+            record.status = CredentialStatus::Revoked;
+            record.revoked_at_ms = Some(revoked_at);
+        }
+
+        // 2. 同步 DB (per ULYS-234 §2.3: 失败时 in-memory 不回滚, 仅返 DbSyncFailed)
+        // 读 in-memory 当前状态作为 DB 更新来源 (含 deprecated_at_ms 既有值)
+        let (status, deprecated_at_ms, revoked_at_ms) = {
+            let records = self.records.read().await;
+            match records.get(credential_id) {
+                Some(r) => (r.status, r.deprecated_at_ms, r.revoked_at_ms),
+                // 理论上不会发生 (我们刚写完), 防御性 fallback
+                None => return Err(CredentialError::NotFound(credential_id.to_string())),
+            }
+        };
+        self.db
+            .update_credential_status(
+                credential_id,
+                status,
+                revoked_at,
+                deprecated_at_ms,
+                revoked_at_ms,
+            )
+            .map_err(|e| CredentialError::DbSyncFailed(format!("credential_id={}: {}", credential_id, e)))?;
+
         Ok(())
     }
 

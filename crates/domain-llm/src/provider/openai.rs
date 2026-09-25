@@ -158,8 +158,7 @@ impl OpenAiProvider {
             .first()
             .map(|c| c.message.content.clone())
             .unwrap_or_default();
-        #[allow(deprecated)] // legacy wire compat (PI-2 / FR-9)
-        let finish_reason = parsed
+        let finish_reason_str = parsed
             .choices
             .first()
             .and_then(|c| c.finish_reason.clone())
@@ -169,8 +168,8 @@ impl OpenAiProvider {
             model: model.to_string(),
             message: ChatMessage::assistant(text),
             #[allow(deprecated)]
-            finish_reason: finish_reason.clone(),
-            stop_reason: crate::events::StopReason::parse_loose(&finish_reason),
+            finish_reason: finish_reason_str.clone(),
+            stop_reason: crate::events::StopReason::parse_loose(&finish_reason_str),
             usage: crate::events::Usage::default(),
             created_at: Utc::now(),
         }
@@ -393,11 +392,14 @@ mod tests {
     fn sample_request() -> ChatRequest {
         ChatRequest {
             model: OPENAI_DEFAULT_MODEL.to_string(),
-            messages: vec![ChatMessage::system("be terse"), ChatMessage::user("hi")],
+            messages: vec![
+                ChatMessage::system("be terse"),
+                ChatMessage::user("hi"),
+            ],
             temperature: Some(0.7),
             max_tokens: Some(128),
             request_id: Some(Uuid::new_v4()),
-            thinking_level: None,
+            ..Default::default()
         }
     }
 
@@ -459,7 +461,7 @@ mod tests {
         let p = OpenAiProvider::new();
         let resp = p.chat_completion(sample_request()).await.unwrap();
         assert!(resp.message.content.contains("[openai stub]"));
-        assert_eq!(resp.finish_reason, "stop");
+        assert_eq!(resp.stop_reason, crate::events::StopReason::Stop);
         assert_ne!(resp.id, Uuid::nil());
     }
 
@@ -472,7 +474,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
-            thinking_level: None,
+            ..Default::default()
         };
         let err = p.chat_completion(req).await.unwrap_err();
         assert!(matches!(err, LlmProviderRegistryError::InvalidOperation(_)));

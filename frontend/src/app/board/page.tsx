@@ -29,7 +29,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { KanbanBoard, KANBAN_COLUMNS } from "@/components/board/KanbanBoard";
 import { KanbanFilters, type KanbanFiltersValue } from "@/components/board/KanbanFilters";
 import { useBoardSync, type BoardSyncChange } from "@/hooks/useBoardSync";
-import { Trello, RefreshCw, X } from "lucide-react";
+import { SquareKanban as Trello, RefreshCw, X } from "lucide-react";
 import type { WorkItem, WorkItemStatus } from "@/types/ids";
 import { useTranslation } from "@/lib/i18n";
 

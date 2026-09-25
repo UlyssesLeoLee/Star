@@ -234,14 +234,11 @@ impl Tool for ToolRegistry {
     /// **FR-21 stub**: validate the `name` field is a string. Real JSON Schema
     /// validation lands in Sprint 3 (per BD §2.1, schemars + jsonschema deps).
     fn prepare_arguments(&self, args: &Value) -> Result<ToolArgs, ToolRegistryError> {
-        let name = args
-            .get("name")
-            .and_then(Value::as_str)
-            .ok_or_else(|| {
-                ToolRegistryError::InvalidOperation(
-                    "missing or non-string 'name' field in arguments".to_string(),
-                )
-            })?;
+        let name = args.get("name").and_then(Value::as_str).ok_or_else(|| {
+            ToolRegistryError::InvalidOperation(
+                "missing or non-string 'name' field in arguments".to_string(),
+            )
+        })?;
         if name.is_empty() {
             return Err(ToolRegistryError::InvalidOperation(
                 "'name' field must be non-empty".to_string(),
@@ -428,7 +425,9 @@ mod tests {
     async fn tool_execute_stub_returns_backend_error() {
         let backend = ToolRegistry::new();
         let args = ToolArgs::new(Uuid::new_v4(), json!({ "name": "bash" }));
-        let err = <ToolRegistry as Tool>::execute(&backend, args).await.unwrap_err();
+        let err = <ToolRegistry as Tool>::execute(&backend, args)
+            .await
+            .unwrap_err();
         assert!(
             matches!(err, ToolRegistryError::Backend(ref s) if s.contains("cannot execute")),
             "expected Backend error mentioning 'cannot execute', got {err:?}"
@@ -451,8 +450,7 @@ mod tests {
     #[test]
     fn tool_replay_stub_returns_none() {
         let backend = ToolRegistry::new();
-        let result =
-            <ToolRegistry as Tool>::replay(&backend, Uuid::new_v4()).unwrap();
+        let result = <ToolRegistry as Tool>::replay(&backend, Uuid::new_v4()).unwrap();
         assert!(result.is_none());
     }
 

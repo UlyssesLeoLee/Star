@@ -150,15 +150,15 @@ mod tests {
     use super::*;
 
     fn sample_request(content: &str) -> ChatRequest {
-        ChatRequest {
-            model: MOCK_DEFAULT_MODEL.to_string(),
-            messages: vec![ChatMessage::user(content)],
-            temperature: None,
-            max_tokens: None,
-            request_id: Some(Uuid::new_v4()),
-            thinking_level: None,
+            ChatRequest {
+                model: MOCK_DEFAULT_MODEL.to_string(),
+                messages: vec![ChatMessage::user(content)],
+                temperature: None,
+                max_tokens: None,
+                request_id: Some(Uuid::new_v4()),
+                ..Default::default()
+            }
         }
-    }
 
     #[test]
     fn mock_provider_default_name_is_mock() {
@@ -195,7 +195,7 @@ mod tests {
         assert_eq!(resp.model, MOCK_DEFAULT_MODEL);
         assert_eq!(resp.message.role, ChatRole::Assistant);
         assert_eq!(resp.message.content, "[mock] hello world");
-        assert_eq!(resp.finish_reason, "stop");
+        assert_eq!(resp.stop_reason, crate::events::StopReason::Stop);
         assert_ne!(resp.id, Uuid::nil());
     }
 
@@ -208,7 +208,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
-            thinking_level: None,
+            ..Default::default()
         };
         let resp = p.chat_completion(req).await.unwrap();
         assert_eq!(resp.message.content, MOCK_FALLBACK_CONTENT);
@@ -223,7 +223,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
-            thinking_level: None,
+            ..Default::default()
         };
         let err = p.chat_completion(req).await.unwrap_err();
         assert!(matches!(err, LlmProviderRegistryError::InvalidOperation(_)));

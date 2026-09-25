@@ -372,7 +372,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
-            thinking_level: None,
+            ..Default::default()
         };
         let err = backend.chat_completion(req).await.unwrap_err();
         match err {
@@ -396,7 +396,7 @@ mod tests {
             temperature: None,
             max_tokens: None,
             request_id: None,
-            thinking_level: None,
+            ..Default::default()
         };
         let res = backend.stream_completion(req).await;
         let err = match res {
