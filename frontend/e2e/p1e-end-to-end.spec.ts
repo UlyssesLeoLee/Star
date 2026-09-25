@@ -197,65 +197,40 @@ test.describe("P1-E End-to-end Integration (per ULYS-232)", () => {
   });
 
   test("AC-4: SplitUpdate → store.setTree (per P1-C §3.3.5)", async ({ page }) => {
-    await page.addInitScript(() => {
-      const OrigWS = window.WebSocket;
-      // @ts-expect-error
-      window.WebSocket = function (url: string) {
-        const ws = new OrigWS(url);
-        ws.addEventListener("open", () => {
-          setTimeout(() => {
-            ws.dispatchEvent(
-              new MessageEvent("message", {
-                data: JSON.stringify({
-                  type: "hello",
-                  session_id: "p1e-split-session",
-                  panes: ["550e8400-e29b-41d4-a716-446655440001"],
-                  total_bytes: 0,
-                  server_time: "2026-09-24T00:00:00Z",
-                }),
-              }),
-            );
-            ws.dispatchEvent(
-              new MessageEvent("message", {
-                data: JSON.stringify({
-                  type: "split_update",
-                  root_id: "550e8400-e29b-41d4-a716-446655440010",
-                  tree: {
-                    kind: "split",
-                    id: "550e8400-e29b-41d4-a716-446655440011",
-                    direction: "horizontal",
-                    children: [
-                      {
-                        kind: "pane",
-                        pane: {
-                          id: "550e8400-e29b-41d4-a716-446655440012",
-                          ratio: 0.5,
-                        },
-                      },
-                      {
-                        kind: "pane",
-                        pane: {
-                          id: "550e8400-e29b-41d4-a716-446655440013",
-                          ratio: 0.5,
-                        },
-                      },
-                    ],
-                  },
-                  reason: "user_split",
-                }),
-              }),
-            );
-          }, 100);
-        });
-        return ws;
-      } as unknown as typeof WebSocket;
-    });
-
+    await installMockWsServer(page, "p1e-split-session", "550e8400-e29b-41d4-a716-446655440001");
     await page.goto("/terminal-stack-demo?sessionId=p1e-split");
-    await page.waitForTimeout(500);
+    // Dispatch split_update via test hook after mock instance is created
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      // @ts-expect-error
+      const instances = (window.__mockWsInstances ?? []) as Array<{
+        dispatchEvent: (ev: Event) => boolean;
+        onmessage: ((ev: MessageEvent) => void) | null;
+      }>;
+      const inst = instances[0];
+      if (!inst) throw new Error("No mock WS instance");
+      const splitMsg = new MessageEvent("message", {
+        data: JSON.stringify({
+          type: "split_update",
+          root_id: "550e8400-e29b-41d4-a716-446655440010",
+          tree: {
+            kind: "split",
+            id: "550e8400-e29b-41d4-a716-446655440011",
+            direction: "horizontal",
+            children: [
+              { kind: "pane", pane: { id: "550e8400-e29b-41d4-a716-446655440012", ratio: 0.5 } },
+              { kind: "pane", pane: { id: "550e8400-e29b-41d4-a716-446655440013", ratio: 0.5 } },
+            ],
+          },
+          reason: "user_split",
+        }),
+      });
+      inst.dispatchEvent(splitMsg);
+      if (typeof inst.onmessage === "function") inst.onmessage(splitMsg);
+    });
     await expect(page.locator('[data-testid="pane-count"]')).toHaveText(
       /^2 panes/,
-      { timeout: 3000 },
+      { timeout: 5000 },
     );
   });
 

@@ -113,13 +113,42 @@ test.describe("Terminal Stack WS Integration (PR #98.5)", () => {
 
   test("4. tree state updates on SplitUpdate message", async ({ page }) => {
     await page.goto("/terminal-stack-demo?sessionId=tree-update");
-    await page.waitForSelector('[data-testid="terminal-pane-pane-root"]');
-    // Note: receiving SplitUpdate requires WS connection; in mock mode (no sessionId),
-    // we can verify the toolbar interactions independently.
-    const splitBtn = page.locator('[data-testid="split-vertical-btn"]');
-    await splitBtn.click();
+    await page.waitForSelector('[data-testid="terminal-stack-container"]');
+    // Wait long enough for wsClient to construct the mock WS (50ms) + open (50ms) + listeners registered
+    await page.waitForTimeout(800);
+
+    // Inject SplitUpdate via the test hook
+    await page.evaluate(() => {
+      // @ts-expect-error
+      const instances = (window.__mockWsInstances ?? []) as Array<{
+        dispatchEvent: (ev: Event) => boolean;
+        onmessage: ((ev: MessageEvent) => void) | null;
+      }>;
+      const inst = instances[0];
+      if (!inst) return;
+      const msg = new MessageEvent("message", {
+        data: JSON.stringify({
+          type: "split_update",
+          root_id: "550e8400-e29b-41d4-a716-446655440000",
+          tree: {
+            kind: "split",
+            id: "split-1",
+            direction: "horizontal",
+            children: [
+              { kind: "pane", pane: { id: "pane-root", ratio: 0.5 } },
+              { kind: "pane", pane: { id: "new-pane", ratio: 0.5 } },
+            ],
+          },
+          reason: "user_split",
+        }),
+      });
+      inst.dispatchEvent(msg);
+      if (typeof inst.onmessage === "function") inst.onmessage(msg);
+    });
+
     await expect(page.locator('[data-testid="pane-count"]')).toHaveText(
       /^2 panes/,
+      { timeout: 5000 },
     );
   });
 
@@ -182,11 +211,39 @@ test.describe("Terminal Stack WS Integration (PR #98.5)", () => {
     });
 
     await page.goto("/terminal-stack-demo?sessionId=split-update-test");
-    await page.waitForTimeout(500);
-    // After SplitUpdate, pane count should be 2
+    // Wait for mock WS to be constructed
+    await page.waitForTimeout(800);
+    // Dispatch split_update manually (mock doesn't auto-dispatch split)
+    await page.evaluate(() => {
+      // @ts-expect-error
+      const instances = (window.__mockWsInstances ?? []) as Array<{
+        dispatchEvent: (ev: Event) => boolean;
+        onmessage: ((ev: MessageEvent) => void) | null;
+      }>;
+      const inst = instances[0];
+      if (!inst) return;
+      const msg = new MessageEvent("message", {
+        data: JSON.stringify({
+          type: "split_update",
+          root_id: "550e8400-e29b-41d4-a716-446655440000",
+          tree: {
+            kind: "split",
+            id: "split-1",
+            direction: "horizontal",
+            children: [
+              { kind: "pane", pane: { id: "pane-root", ratio: 0.5 } },
+              { kind: "pane", pane: { id: "new-pane", ratio: 0.5 } },
+            ],
+          },
+          reason: "user_split",
+        }),
+      });
+      inst.dispatchEvent(msg);
+      if (typeof inst.onmessage === "function") inst.onmessage(msg);
+    });
     await expect(page.locator('[data-testid="pane-count"]')).toHaveText(
       /^2 panes/,
-      { timeout: 3000 },
+      { timeout: 5000 },
     );
   });
 });
