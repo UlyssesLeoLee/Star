@@ -30,94 +30,50 @@ async function installMockWsServer(
   sessionId: string,
   paneId: string,
 ): Promise<void> {
-  // T23.6 round 7 fix: MockWs extends EventTarget (proper subclass so internal
-  // event listener storage works correctly — borrowing EventTarget.prototype
-  // doesn't init the private listener slot, so addEventListener was a no-op).
   await page.addInitScript(
     ({ sessionId, paneId }) => {
+      // @ts-expect-error - test-only injection
+      window.__wsMockEvents = [];
+      const OrigWS = window.WebSocket;
       // @ts-expect-error
-      window.__mockWsInstances = [];
-      // @ts-expect-error
-      window.__MockWsClass = (function () {
-        class MockWs extends EventTarget {
-          url: string;
-          sessionId: string;
-          paneId: string;
-          binaryType = "arraybuffer";
-          readyState: number = 0; // CONNECTING
-          onopen: ((ev: Event) => void) | null = null;
-          onmessage: ((ev: MessageEvent) => void) | null = null;
-          onerror: ((ev: Event) => void) | null = null;
-          onclose: ((ev: Event) => void) | null = null;
-          sent: string[] = [];
-          constructor(url: string, sid: string, pid: string) {
-            super();
-            this.url = url;
-            this.sessionId = sid;
-            this.paneId = pid;
-            // After 50ms, fire open + (30ms later) hello + snapshot
-            setTimeout(() => {
-              try {
-                this.readyState = 1; // OPEN
-                const openEvent = new Event("open");
-                this.dispatchEvent(openEvent);
-                if (typeof this.onopen === "function") this.onopen(openEvent);
-                setTimeout(() => {
-                  const hello = new MessageEvent("message", {
-                    data: JSON.stringify({
-                      type: "hello",
-                      session_id: sid,
-                      panes: [pid],
-                      total_bytes: 1024,
-                      server_time: "2026-09-24T00:00:00Z",
-                    }),
-                  });
-                  this.dispatchEvent(hello);
-                  if (typeof this.onmessage === "function") this.onmessage(hello);
-                  const snap = new MessageEvent("message", {
-                    data: JSON.stringify({
-                      type: "snapshot",
-                      pane_id: pid,
-                      from_seq: null,
-                      lines: Array.from({ length: 5 }).map((_: unknown, i: number) => ({
-                        id: `p1e-line-${i}`,
-                        timestamp: "2026-09-24T00:00:00Z",
-                        text: `[P1-E seed line ${i}]`,
-                        source: "stdout",
-                        byte_len: 32,
-                      })),
-                    }),
-                  });
-                  this.dispatchEvent(snap);
-                  if (typeof this.onmessage === "function") this.onmessage(snap);
-                }, 30);
-              } catch (e) {
-                // ignore
-              }
-            }, 50);
-          }
-          send(data: string): void {
-            this.sent.push(data);
-          }
-          close(): void {
-            this.readyState = 3; // CLOSED
-            const closeEvent = new Event("close");
-            this.dispatchEvent(closeEvent);
-            if (typeof this.onclose === "function") this.onclose(closeEvent);
-          }
-        }
-        return MockWs;
-      })();
-      // @ts-expect-error
-      window.__mockWsCtor = function (url: string) {
+      window.WebSocket = function (url: string) {
         // @ts-expect-error
-        const WsClass = (window as unknown as { __MockWsClass: new (url: string, sid: string, pid: string) => WebSocket }).__MockWsClass;
-        // @ts-expect-error
-        const inst = new WsClass(url, sessionId, paneId);
-        // @ts-expect-error
-        (window as unknown as { __mockWsInstances: unknown[] }).__mockWsInstances.push(inst);
-        return inst as unknown as WebSocket;
-      };
+        const ws = new OrigWS(url);
+        ws.addEventListener("open", () => {
+          setTimeout(() => {
+            // AC-1: HELLO
+            ws.dispatchEvent(
+              new MessageEvent("message", {
+                data: JSON.stringify({
+                  type: "hello",
+                  session_id: sessionId,
+                  panes: [paneId],
+                  total_bytes: 1024,
+                  server_time: "2026-09-24T00:00:00Z",
+                }),
+              }),
+            );
+            // AC-2: Snapshot (5 seed lines)
+            ws.dispatchEvent(
+              new MessageEvent("message", {
+                data: JSON.stringify({
+                  type: "snapshot",
+                  pane_id: paneId,
+                  from_seq: null,
+                  lines: Array.from({ length: 5 }).map((_, i) => ({
+                    id: `p1e-line-${i}`,
+                    timestamp: "2026-09-24T00:00:00Z",
+                    text: `[P1-E seed line ${i}]`,
+                    source: "stdout",
+                    byte_len: 32,
+                  })),
+                }),
+              }),
+            );
+          }, 100);
+        });
+        return ws;
+      } as unknown as typeof WebSocket;
     },
     { sessionId, paneId },
   );
@@ -132,13 +88,12 @@ test.describe("P1-E End-to-end Integration (per ULYS-232)", () => {
   }) => {
     await installMockWsServer(page, SESSION, PANE);
     await page.goto("/terminal-stack-demo?sessionId=" + SESSION);
-    // Wait up to 8 seconds — MockWsClass has 50ms open + 30ms hello delay (real 80ms total)
-    await page.waitForFunction(
-      () => {
-        const el = document.querySelector('[data-testid="ws-debug"]');
-        return el && el.textContent?.includes("connected=true");
-      },
-      { timeout: 8000 },
+    // Wait for ws client to receive HELLO (per useTerminalStackWs hook)
+    await page.waitForTimeout(500);
+    // ws-debug element shows connection state
+    await expect(page.locator('[data-testid="ws-debug"]')).toContainText(
+      "connected=true",
+      { timeout: 3000 },
     );
   });
 
@@ -197,40 +152,65 @@ test.describe("P1-E End-to-end Integration (per ULYS-232)", () => {
   });
 
   test("AC-4: SplitUpdate → store.setTree (per P1-C §3.3.5)", async ({ page }) => {
-    await installMockWsServer(page, "p1e-split-session", "550e8400-e29b-41d4-a716-446655440001");
-    await page.goto("/terminal-stack-demo?sessionId=p1e-split");
-    // Dispatch split_update via test hook after mock instance is created
-    await page.waitForTimeout(300);
-    await page.evaluate(() => {
+    await page.addInitScript(() => {
+      const OrigWS = window.WebSocket;
       // @ts-expect-error
-      const instances = (window.__mockWsInstances ?? []) as Array<{
-        dispatchEvent: (ev: Event) => boolean;
-        onmessage: ((ev: MessageEvent) => void) | null;
-      }>;
-      const inst = instances[0];
-      if (!inst) throw new Error("No mock WS instance");
-      const splitMsg = new MessageEvent("message", {
-        data: JSON.stringify({
-          type: "split_update",
-          root_id: "550e8400-e29b-41d4-a716-446655440010",
-          tree: {
-            kind: "split",
-            id: "550e8400-e29b-41d4-a716-446655440011",
-            direction: "horizontal",
-            children: [
-              { kind: "pane", pane: { id: "550e8400-e29b-41d4-a716-446655440012", ratio: 0.5 } },
-              { kind: "pane", pane: { id: "550e8400-e29b-41d4-a716-446655440013", ratio: 0.5 } },
-            ],
-          },
-          reason: "user_split",
-        }),
-      });
-      inst.dispatchEvent(splitMsg);
-      if (typeof inst.onmessage === "function") inst.onmessage(splitMsg);
+      window.WebSocket = function (url: string) {
+        const ws = new OrigWS(url);
+        ws.addEventListener("open", () => {
+          setTimeout(() => {
+            ws.dispatchEvent(
+              new MessageEvent("message", {
+                data: JSON.stringify({
+                  type: "hello",
+                  session_id: "p1e-split-session",
+                  panes: ["550e8400-e29b-41d4-a716-446655440001"],
+                  total_bytes: 0,
+                  server_time: "2026-09-24T00:00:00Z",
+                }),
+              }),
+            );
+            ws.dispatchEvent(
+              new MessageEvent("message", {
+                data: JSON.stringify({
+                  type: "split_update",
+                  root_id: "550e8400-e29b-41d4-a716-446655440010",
+                  tree: {
+                    kind: "split",
+                    id: "550e8400-e29b-41d4-a716-446655440011",
+                    direction: "horizontal",
+                    children: [
+                      {
+                        kind: "pane",
+                        pane: {
+                          id: "550e8400-e29b-41d4-a716-446655440012",
+                          ratio: 0.5,
+                        },
+                      },
+                      {
+                        kind: "pane",
+                        pane: {
+                          id: "550e8400-e29b-41d4-a716-446655440013",
+                          ratio: 0.5,
+                        },
+                      },
+                    ],
+                  },
+                  reason: "user_split",
+                }),
+              }),
+            );
+          }, 100);
+        });
+        return ws;
+      } as unknown as typeof WebSocket;
     });
+
+    await page.goto("/terminal-stack-demo?sessionId=p1e-split");
+    await page.waitForTimeout(500);
     await expect(page.locator('[data-testid="pane-count"]')).toHaveText(
       /^2 panes/,
-      { timeout: 5000 },
+      { timeout: 3000 },
     );
   });
 

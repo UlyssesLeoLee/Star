@@ -1,0 +1,67 @@
+name: mock-switch-validate (跨项目 L1/L2/L3 cluster_switch + ACI compat 校验)
+
+# 触发: PR 或 push 影响 tools/mock-switch-validate.py 或 mock 项目 .mock-cluster.json/.aci.json
+# 目的: per ULYS-190 §4.5 — 跨项目 CI 跑 mock_switch + ACI 校验, 失败即停
+# 守门: #1+#11+#12+#24 (per AGENTS.md §4)
+# 实证: tools/mock-switch-validate.py v0.1 — validate-all 跨 7 项目
+
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "tools/mock-switch-validate.py"
+      - "tools/star-flash-mock/.mock-cluster.json"
+      - "tools/star-flash-mock/.aci.json"
+      - ".github/workflows/mock-switch-validate.yml"
+  push:
+    branches: [main, dev]
+    paths:
+      - "tools/mock-switch-validate.py"
+      - "tools/star-flash-mock/.mock-cluster.json"
+      - "tools/star-flash-mock/.aci.json"
+      - ".github/workflows/mock-switch-validate.yml"
+  workflow_dispatch:
+
+jobs:
+  mock-switch-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate Star mock (per ULYS-190 §4.1 + §4.5 brief)
+        working-directory: tools/star-flash-mock
+        run: |
+          python3 ../mock-switch-validate.py validate-one \
+            --cluster-config .mock-cluster.json \
+            --aci-config .aci.json
+          echo "EXIT_CODE=$?"
+
+      - name: Validate cross-project (per ULYS-190 §4.5 brief, 预期 FAIL=6 跨项目待落地)
+        run: |
+          python3 tools/mock-switch-validate.py validate-all | tee mock-switch-status.txt
+          echo "EXIT_CODE=$?"
+          # NOTE: 当前 FAIL=6 是预期 (6 跨项目待 §4.2-§4.6 brief 落地), 不 fail CI
+          # 只有当 Star mock 自身 FAIL 才 fail CI
+          grep "PROJECT=star-flash-mock cluster_ok=False" mock-switch-status.txt && \
+            (echo "ERROR: Star mock cluster_switch 校验 fail" && exit 1) || \
+            echo "OK: Star mock cluster_switch 校验通过"
+
+      - name: Generate cross-project status report
+        run: |
+          python3 tools/mock-switch-validate.py report \
+            --output docs/mock-switch-status.md
+          cat docs/mock-switch-status.md
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mock-switch-status
+          path: docs/mock-switch-status.md
+          retention-days: 30

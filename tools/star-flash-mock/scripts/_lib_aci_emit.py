@@ -138,8 +138,14 @@ class AciEmitter:
         suggested_fix: Optional[str] = None,
         tags: Optional[list[str]] = None,
         captured_at: Optional[str] = None,
+        mock_switch_trace: Optional[str] = None,
     ) -> dict[str, Any]:
-        """构造一条 ACI assertion dict (符合 .aci.json 必填字段)."""
+        """构造一条 ACI assertion dict (符合 .aci.json 必填字段).
+
+        mock_switch_trace (per ULYS-190 §3.4 + §4.1 brief v0.1): 可选字段,
+        推荐调用方从 _lib_mock_switch.py MockSwitchReader.build_trace() 获取,
+        实现层不强制 import (per 守門 #15 + brief §5 G-MS-BRIEF-02 並存擴展).
+        """
         _validate_assertion_id(assertion_id)
         _validate_scope(scope)
         _validate_expect_or_actual("expect", expect)
@@ -172,6 +178,8 @@ class AciEmitter:
             assertion["suggested_fix"] = suggested_fix
         if tags:
             assertion["tags"] = list(tags)
+        if mock_switch_trace is not None:
+            assertion["mock_switch_trace"] = mock_switch_trace
         return assertion
 
     def with_tags(self, assertion: dict[str, Any], tags: list[str]) -> dict[str, Any]:
@@ -327,6 +335,8 @@ def _build_argparser() -> argparse.ArgumentParser:
                     help="逗号分隔 tags (例: perf,kms,timeout)")
     e.add_argument("--captured-at", default=None,
                     help="RFC3339 时间戳 (缺省: now UTC)")
+    e.add_argument("--mock-switch-trace", default=None,
+                    help="mock_switch_trace 字段 (per ULYS-190 §3.4, 推荐从 _lib_mock_switch.py MockSwitchReader.build_trace() 拼接)")
     e.add_argument("--output", required=True, type=Path,
                     help="输出文件路径 (JSON)")
 
@@ -377,6 +387,7 @@ def cmd_emit(args: argparse.Namespace) -> int:
             suggested_fix=args.suggested_fix,
             tags=tags,
             captured_at=args.captured_at,
+            mock_switch_trace=args.mock_switch_trace,
         )
         em.write(assertion, args.output)
     except (AciEmitError, AciValidationError) as exc:
