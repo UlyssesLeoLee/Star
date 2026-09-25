@@ -8,9 +8,11 @@ license.workspace = true
 description = "Star 跨域共享 DTO 类型 (T3.1, per HANDOFF-ST-001.md v0.8 §10)"
 # v0.0.1 (T3.1 跨 sub-session 续): stub only, 4 强类型 ID 重导出 + ActorContext alias
 # v0.1.0 (T3.1 收官): 22 domain-* DTO 全量 re-export + Saga 跨域事件 DTO
+# v0.2.0 (ULYS-206 PI-6, 2026-09-23): JSON Delta 协议 (`delta` mod) — 7 ops (r/s/d/a/t/p/m) for star-taskgraph react-flow 增量同步
 
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true }  # v0.2.0 (ULYS-206 PI-6): JsonValue type alias for delta::Op
 uuid = { workspace = true }
 chrono = { workspace = true }
 star-context = { path = "../star-context" }

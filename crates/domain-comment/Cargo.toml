@@ -14,6 +14,8 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 tokio = { workspace = true }
+# ULYS-207 PI-9 W4 P-B: CommentServiceAdapter::dispatch_steering 用 tracing::warn! 记失败
+tracing = { workspace = true }
 
 star-context = { path = "../star-context" }
 [dev-dependencies]
