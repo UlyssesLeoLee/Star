@@ -86,6 +86,13 @@ pub struct ResolvedSharedDirs {
 pub trait PerUserSource: Send + Sync {
     /// 列出 per-user 配置的所有 SharedDirectory
     async fn list(&self) -> SharedDirResult<Vec<SharedDirectory>>;
+
+    /// 列出 per-user 文件路径源 (用于 audit / dry-run).
+    ///
+    /// Per ULYS-158.2 §2.3: 新增方法暴露给 audit / 故障排查场景.
+    /// - `FileBackedPerUserSource` 返回其 `~/.star/worktree_shared_dirs.txt` 路径.
+    /// - `NoopPerUserSource` / `InMemorySharedDirPerUserSource` 返回 `<empty>` (无外部源).
+    async fn source_path(&self) -> std::path::PathBuf;
 }
 
 /// Workspace-level Source (机制 2, FR-ORCA-007 #2) — MVP 阶段 Noop 占位, PG impl 留 P1 followup
@@ -121,6 +128,10 @@ pub struct NoopPerUserSource;
 impl PerUserSource for NoopPerUserSource {
     async fn list(&self) -> SharedDirResult<Vec<SharedDirectory>> {
         Ok(Vec::new())
+    }
+
+    async fn source_path(&self) -> std::path::PathBuf {
+        std::path::PathBuf::from("<noop>")
     }
 }
 
@@ -298,6 +309,181 @@ impl ConfigSource for FileBackedConfigSource {
 }
 
 // =====================================================================
+// FileBackedPerUserSource (本仓库实装, ULYS-158.2 P0)
+// =====================================================================
+
+/// 默认 per-user 配置文件名 (per ULYS-158.2 §2.1, 路径 C 派生自
+/// `docs/ecosystem-survey/orca-design-survey.md` v1.0 §3 FR-ORCA-007).
+///
+/// 完整路径默认是 `<home>/.star/worktree_shared_dirs.txt`, 通过
+/// [`default_per_user_config_path`] 拼装. 测试时可注入临时目录.
+pub const PERUSER_CONFIG_FILE_NAME: &str = "worktree_shared_dirs.txt";
+
+/// 默认 per-user 配置所在目录名 (`~/.star`).
+pub const PERUSER_CONFIG_DIR_NAME: &str = ".star";
+
+/// 拼装默认 per-user 配置文件路径 (`<home>/.star/worktree_shared_dirs.txt`).
+///
+/// - POSIX: `$HOME/.star/worktree_shared_dirs.txt`
+/// - Windows: `%USERPROFILE%\.star\worktree_shared_dirs.txt`
+///
+/// 返回的路径即使 `<home>` 不存在或 `.star/` 目录不存在也合法 (per FR-ORCA-007
+/// fallback: 文件缺失 = `Ok(Vec::new())`).
+pub fn default_per_user_config_path() -> std::path::PathBuf {
+    let home = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    home.join(PERUSER_CONFIG_DIR_NAME)
+        .join(PERUSER_CONFIG_FILE_NAME)
+}
+
+/// 真实文件读 per-user Source — 直读 `<config_path>` (默认 `~/.star/worktree_shared_dirs.txt`).
+///
+/// Per ULYS-158.2 §2 (FR-ORCA-007 机制 1):
+/// - **格式**: 一行一个绝对路径; 空行 / `#` 开头行 = 注释; 空格 trim.
+/// - **缺失文件 / 字段缺失** → `Ok(Vec::new())` (lenient, per FR-ORCA-007 fallback).
+/// - **解析失败** (非注释行空 / `..` 后路径无法解析 / 权限拒绝) →
+///   `Err(WSD.PERUSER_IO_FAIL | WSD.PERUSER_PARSE_FAIL)`. `list()` lenient 入口
+///   把错误降级为 `Ok(Vec::new())`, 仅 `warn!` 日志.
+///
+/// ## 为什么不是 JSON?
+///
+/// Orca AC-1 用 `git config --file-list` 风格的纯路径文件 (`worktree.sharedDirectories`
+/// 已在机制 2 占位). 本仓库派生 spec 走纯文本, 避免和机制 3 (`config.json`)
+/// 重复, 也方便运维 `cat >> ~/.star/worktree_shared_dirs.txt` 追加.
+///
+/// ## 严格模式
+///
+/// `load_strict()` 把任何错误向上抛, 适合 audit / dry-run 场景.
+/// `list()` 默认走 lenient (per FR-ORCA-007 fallback).
+#[derive(Debug, Clone)]
+pub struct FileBackedPerUserSource {
+    config_path: std::path::PathBuf,
+}
+
+impl FileBackedPerUserSource {
+    /// 默认构造: 配置文件路径为 `~/.star/worktree_shared_dirs.txt`.
+    pub fn new() -> Self {
+        Self::with_path(default_per_user_config_path())
+    }
+
+    /// 给定配置文件路径 (测试 / 注入用).
+    pub fn with_path(config_path: impl Into<std::path::PathBuf>) -> Self {
+        Self {
+            config_path: config_path.into(),
+        }
+    }
+
+    /// 配置文件路径引用.
+    pub fn config_path(&self) -> &std::path::Path {
+        &self.config_path
+    }
+
+    /// 严格读: 任何 IO/parse 错误都向上抛 `SharedDirError`.
+    pub async fn load_strict(&self) -> SharedDirResult<Vec<SharedDirectory>> {
+        Self::load_strict_sync(&self.config_path)
+    }
+
+    /// 同步严格读 (内部使用 + 测试).
+    fn load_strict_sync(config_path: &Path) -> SharedDirResult<Vec<SharedDirectory>> {
+        // 缺失文件 → 空 (per FR-ORCA-007 fallback, 不是错误)
+        let raw = match std::fs::read_to_string(config_path) {
+            Ok(s) => s,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(Vec::new());
+            }
+            Err(e) => {
+                return Err(SharedDirError::new(
+                    "WSD.PERUSER_IO_FAIL",
+                    format!("failed to read {}: {}", config_path.display(), e),
+                    DEFAULT_TRACE_ID,
+                )
+                .with_source(format!("io: {e}")));
+            }
+        };
+
+        // 行解析: skip 注释 / 空行, 每行 trim, 相对路径拒
+        let mut entries: Vec<SharedDirectory> = Vec::new();
+        for (idx, raw_line) in raw.lines().enumerate() {
+            let line = raw_line.trim();
+            // 空行 / `#` 注释 / `//` 注释 → skip
+            if line.is_empty() || line.starts_with('#') || line.starts_with("//") {
+                continue;
+            }
+            // 路径归一化 (复用 crate-internal normalize_path, 拒绝相对路径)
+            let normalized = match normalize_path(line) {
+                Ok(p) => p,
+                Err(e) => {
+                    return Err(SharedDirError::new(
+                        "WSD.PERUSER_PARSE_FAIL",
+                        format!(
+                            "line {} of {}: invalid path {:?}: {}",
+                            idx + 1,
+                            config_path.display(),
+                            line,
+                            e
+                        ),
+                        DEFAULT_TRACE_ID,
+                    )
+                    .with_source(format!("parse: {e}")));
+                }
+            };
+            entries.push(SharedDirectory {
+                source: SharedDirSource::PerUser,
+                path: normalized,
+                mount_strategy: SharedMountStrategy::WorktreeAdd,
+                label: derive_label(line),
+                priority: SharedDirPriority::P3,
+                enabled: true,
+            });
+        }
+
+        // 去重保序 (first occurrence wins)
+        let mut seen: Vec<std::path::PathBuf> = Vec::new();
+        entries.retain(|sd| {
+            if seen.iter().any(|q| q == &sd.path) {
+                false
+            } else {
+                seen.push(sd.path.clone());
+                true
+            }
+        });
+
+        Ok(entries)
+    }
+}
+
+impl Default for FileBackedPerUserSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl PerUserSource for FileBackedPerUserSource {
+    async fn list(&self) -> SharedDirResult<Vec<SharedDirectory>> {
+        // lenient 模式: 任何错误降级为 Ok(empty), 仅 warn 日志
+        match self.load_strict().await {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                warn!(
+                    target: "worktree_shared_dir::FileBackedPerUserSource",
+                    config_path = %self.config_path.display(),
+                    error = %e,
+                    "FileBackedPerUserSource read failed; falling back to empty (per FR-ORCA-007 fallback semantics)"
+                );
+                Ok(Vec::new())
+            }
+        }
+    }
+
+    async fn source_path(&self) -> std::path::PathBuf {
+        self.config_path.clone()
+    }
+}
+
+// =====================================================================
 // InMemory impls (测试 / 本地开发用)
 // =====================================================================
 
@@ -318,6 +504,10 @@ impl InMemorySharedDirPerUserSource {
 impl PerUserSource for InMemorySharedDirPerUserSource {
     async fn list(&self) -> SharedDirResult<Vec<SharedDirectory>> {
         Ok(self.entries.clone())
+    }
+
+    async fn source_path(&self) -> std::path::PathBuf {
+        std::path::PathBuf::from("<in-memory>")
     }
 }
 
@@ -830,6 +1020,230 @@ mod tests {
         });
         let actual = std::path::PathBuf::from(&cfg.shared_directories[0]);
         assert_eq!(actual, expected);
+    }
+
+    // ---- FileBackedPerUserSource ----
+
+    fn write_per_user(dir: &Path, body: &str) -> PathBuf {
+        // 写到 `dir/.star/worktree_shared_dirs.txt`, 跟生产路径布局一致
+        let cfg_dir = dir.join(PERUSER_CONFIG_DIR_NAME);
+        fs::create_dir_all(&cfg_dir).expect("mkdir .star");
+        let p = cfg_dir.join(PERUSER_CONFIG_FILE_NAME);
+        fs::write(&p, body).expect("write worktree_shared_dirs.txt");
+        p
+    }
+
+    #[tokio::test]
+    async fn per_user_backed_missing_file_returns_empty_lenient() {
+        let tmp = TempDir::new("peruser-missing");
+        let src = FileBackedPerUserSource::with_path(
+            tmp.path().join(PERUSER_CONFIG_DIR_NAME).join(PERUSER_CONFIG_FILE_NAME),
+        );
+        let entries = src.list().await.unwrap();
+        assert!(entries.is_empty());
+        // source_path 暴露给 audit
+        assert_eq!(
+            src.source_path().await,
+            tmp.path()
+                .join(PERUSER_CONFIG_DIR_NAME)
+                .join(PERUSER_CONFIG_FILE_NAME)
+        );
+    }
+
+    #[tokio::test]
+    async fn per_user_backed_missing_file_strict_returns_empty() {
+        let tmp = TempDir::new("peruser-missing-strict");
+        let cfg = tmp
+            .path()
+            .join(PERUSER_CONFIG_DIR_NAME)
+            .join(PERUSER_CONFIG_FILE_NAME);
+        let entries = FileBackedPerUserSource::load_strict_sync(&cfg).unwrap();
+        assert!(entries.is_empty());
+    }
+
+    #[tokio::test]
+    async fn per_user_backed_parses_absolute_paths_with_p3() {
+        let tmp = TempDir::new("peruser-abs");
+        write_per_user(
+            tmp.path(),
+            "# Per-user worktree shared dirs\n\
+             /opt/team/shared-cache\n\
+             /var/cache/build-output\n\n\
+             # trailing comment\n",
+        );
+        let cfg = tmp
+            .path()
+            .join(PERUSER_CONFIG_DIR_NAME)
+            .join(PERUSER_CONFIG_FILE_NAME);
+        let entries = FileBackedPerUserSource::load_strict_sync(&cfg).unwrap();
+        assert_eq!(entries.len(), 2);
+        // 跨平台: `/opt/team/shared-cache` 在 Windows 上变 `\opt\team\shared-cache`
+        let expected_a = std::path::PathBuf::from(if cfg!(windows) {
+            r"\opt\team\shared-cache"
+        } else {
+            "/opt/team/shared-cache"
+        });
+        let expected_b = std::path::PathBuf::from(if cfg!(windows) {
+            r"\var\cache\build-output"
+        } else {
+            "/var/cache/build-output"
+        });
+        let paths: Vec<std::path::PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
+        assert!(paths.contains(&expected_a), "missing {expected_a:?} in {paths:?}");
+        assert!(paths.contains(&expected_b), "missing {expected_b:?} in {paths:?}");
+        // 每条都标 P3 / PerUser / enabled / WorktreeAdd
+        for e in &entries {
+            assert_eq!(e.source, SharedDirSource::PerUser);
+            assert_eq!(e.priority, SharedDirPriority::P3);
+            assert!(e.enabled);
+            assert_eq!(e.mount_strategy, SharedMountStrategy::WorktreeAdd);
+        }
+    }
+
+    #[tokio::test]
+    async fn per_user_backed_empty_file_returns_empty() {
+        let tmp = TempDir::new("peruser-empty");
+        write_per_user(tmp.path(), "");
+        let cfg = tmp
+            .path()
+            .join(PERUSER_CONFIG_DIR_NAME)
+            .join(PERUSER_CONFIG_FILE_NAME);
+        let entries = FileBackedPerUserSource::load_strict_sync(&cfg).unwrap();
+        assert!(entries.is_empty());
+    }
+
+    #[tokio::test]
+    async fn per_user_backed_comments_and_blanks_skipped() {
+        let tmp = TempDir::new("peruser-comments");
+        write_per_user(
+            tmp.path(),
+            "# header comment\n\
+             \n\
+             // C-style comment also skipped\n\
+                \n\
+             /opt/team/shared\n\
+             # inline comment\n\
+             /opt/team/other\n",
+        );
+        let cfg = tmp
+            .path()
+            .join(PERUSER_CONFIG_DIR_NAME)
+            .join(PERUSER_CONFIG_FILE_NAME);
+        let entries = FileBackedPerUserSource::load_strict_sync(&cfg).unwrap();
+        assert_eq!(entries.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn per_user_backed_duplicate_paths_deduplicated() {
+        let tmp = TempDir::new("peruser-dedup");
+        write_per_user(
+            tmp.path(),
+            "/opt/shared\n  /opt/shared  \n/opt/shared\n/opt/other\n",
+        );
+        let cfg = tmp
+            .path()
+            .join(PERUSER_CONFIG_DIR_NAME)
+            .join(PERUSER_CONFIG_FILE_NAME);
+        let entries = FileBackedPerUserSource::load_strict_sync(&cfg).unwrap();
+        assert_eq!(entries.len(), 2);
+        // 跨平台: `/opt/shared` 在 Windows 上变 `\opt\shared`
+        let expected = std::path::PathBuf::from(if cfg!(windows) {
+            r"\opt\shared"
+        } else {
+            "/opt/shared"
+        });
+        let expected_other = std::path::PathBuf::from(if cfg!(windows) {
+            r"\opt\other"
+        } else {
+            "/opt/other"
+        });
+        let paths: Vec<std::path::PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
+        assert!(paths.contains(&expected));
+        assert!(paths.contains(&expected_other));
+    }
+
+    #[tokio::test]
+    async fn per_user_backed_relative_path_rejected_strict() {
+        let tmp = TempDir::new("peruser-rel");
+        write_per_user(tmp.path(), "/opt/abs\nrelative/path\n");
+        let cfg = tmp
+            .path()
+            .join(PERUSER_CONFIG_DIR_NAME)
+            .join(PERUSER_CONFIG_FILE_NAME);
+        let strict = FileBackedPerUserSource::load_strict_sync(&cfg);
+        assert!(
+            matches!(strict, Err(ref e) if e.code == "WSD.PERUSER_PARSE_FAIL"),
+            "expected WSD.PERUSER_PARSE_FAIL, got {strict:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn per_user_backed_relative_path_lenient_falls_back_to_empty() {
+        let tmp = TempDir::new("peruser-rel-lenient");
+        write_per_user(tmp.path(), "relative/path\n");
+        let cfg = tmp
+            .path()
+            .join(PERUSER_CONFIG_DIR_NAME)
+            .join(PERUSER_CONFIG_FILE_NAME);
+        let src = FileBackedPerUserSource::with_path(cfg);
+        let entries = src.list().await.unwrap();
+        // lenient: 解析失败 → 降级为空 (per FR-ORCA-007 fallback)
+        assert!(entries.is_empty());
+    }
+
+    #[tokio::test]
+    async fn per_user_backed_default_path_uses_home_star() {
+        // 不依赖环境变量; 验证常量 + 拼装函数形态稳定.
+        assert_eq!(PERUSER_CONFIG_FILE_NAME, "worktree_shared_dirs.txt");
+        assert_eq!(PERUSER_CONFIG_DIR_NAME, ".star");
+        let p = default_per_user_config_path();
+        // 末位 component 必须是文件名
+        assert_eq!(
+            p.file_name().and_then(|s| s.to_str()),
+            Some(PERUSER_CONFIG_FILE_NAME)
+        );
+        // 倒数第二 component 必须是 `.star`
+        let parent = p.parent().expect("path has parent");
+        assert_eq!(
+            parent.file_name().and_then(|s| s.to_str()),
+            Some(PERUSER_CONFIG_DIR_NAME)
+        );
+    }
+
+    #[tokio::test]
+    async fn per_user_backed_integration_with_resolver_three_sources() {
+        // 端到端: FileBackedPerUserSource + FileBackedConfigSource + workspace 三路并存.
+        let tmp = TempDir::new("peruser-three");
+        write_per_user(tmp.path(), "/opt/peruser/a\n/opt/peruser/b\n");
+        write_config(
+            tmp.path(),
+            r#"{"worktree_shared_directories": ["/opt/cli/x"]}"#,
+        );
+        let per_user_src =
+            FileBackedPerUserSource::with_path(tmp.path().join(PERUSER_CONFIG_DIR_NAME).join(PERUSER_CONFIG_FILE_NAME));
+        let resolver = InMemorySharedDirResolver::new(
+            Arc::new(per_user_src),
+            Arc::new(InMemorySharedDirWorkspaceSource::new(vec![ws(
+                "/opt/ws/y",
+                SharedDirPriority::P1,
+            )])),
+            Arc::new(FileBackedConfigSource::new(tmp.path())),
+        );
+        let r = resolver.resolve(uuid::Uuid::nil()).await.unwrap();
+        // 3 source 命中: ws/y (P1) + cli/x (P3 multica) + peruser/a,b (P3)
+        assert_eq!(r.entries.len(), 4);
+        assert_eq!(r.entries[0].priority, SharedDirPriority::P1);
+        assert_eq!(r.entries[0].source, SharedDirSource::Workspace);
+        // per-user 的两条按 P3 排在最后, source 标 PerUser
+        let per_user_entries: Vec<&SharedDirectory> = r
+            .entries
+            .iter()
+            .filter(|e| e.source == SharedDirSource::PerUser)
+            .collect();
+        assert_eq!(per_user_entries.len(), 2);
+        assert!(r.sources_hit.contains(&SharedDirSource::PerUser));
+        assert!(r.sources_hit.contains(&SharedDirSource::MulticaConfig));
+        assert!(r.sources_hit.contains(&SharedDirSource::Workspace));
     }
 
     // ---- InMemorySharedDirResolver 集成 ----

@@ -318,65 +318,6 @@ impl TerminalStackPersistence {
         )?;
         Ok(max)
     }
-
-    /// 加载 pane 从 `since_seq` 之后的 scrollback 行 (per seq_no > since_seq, ASC 排序)
-    ///
-    /// **目的 (per ULYS-221 P1-B Restart Recovery)**: 增量 replay — caller 已知自己拉到 `last_seq`,
-    /// 本方法只返回 `seq_no > last_seq` 的行, 跳过重复历史.
-    ///
-    /// **语义**:
-    /// - `since_seq == 0` 或 `None` caller 语义 = 拉全量 (行为等同于 `load_scrollback(pane_id, capacity)`)
-    /// - `since_seq >= max_seq` = 返空 `ScrollbackBuffer`
-    /// - 容量满仍按 `ScrollbackBuffer` 内部 drop-oldest 处理 (caller 应传 `usize::MAX` 保全)
-    ///
-    /// 守门:
-    /// - #11 缺标比错标: 与 `load_scrollback` 同等查询路径
-    /// - #DB-13 W/T/M 派生: `Mutex<Connection>` 串行化
-    pub fn load_scrollback_since_seq(
-        &self,
-        pane_id: Uuid,
-        since_seq: i64,
-        capacity_lines: usize,
-    ) -> Result<ScrollbackBuffer, TerminalStackPersistenceError> {
-        let conn = self
-            .conn
-            .lock()
-            .expect("terminal-stack persistence mutex poisoned");
-        let mut stmt = conn.prepare(
-            "SELECT id, timestamp_ms, text, source, byte_len
-             FROM terminal_stack_scrollback_line
-             WHERE pane_id = ?1 AND seq_no > ?2
-             ORDER BY seq_no ASC",
-        )?;
-        let rows = stmt.query_map(params![pane_id.to_string(), since_seq], |row| {
-            let id_str: String = row.get(0)?;
-            let ts_ms: i64 = row.get(1)?;
-            let text: String = row.get(2)?;
-            let source_str: String = row.get(3)?;
-            let byte_len: i64 = row.get(4)?;
-            Ok((id_str, ts_ms, text, source_str, byte_len))
-        })?;
-
-        let mut buf = ScrollbackBuffer::new(capacity_lines);
-        for row in rows {
-            let (id_str, ts_ms, text, source_str, byte_len) = row?;
-            let id = Uuid::parse_str(&id_str).map_err(|e| {
-                TerminalStackPersistenceError::InvalidUuid {
-                    field: "id",
-                    msg: e.to_string(),
-                }
-            })?;
-            let source = parse_source(&source_str)?;
-            let timestamp = DateTime::<Utc>::from_timestamp_millis(ts_ms).ok_or_else(|| {
-                TerminalStackPersistenceError::InvalidSource(format!("bad ts {ts_ms}"))
-            })?;
-            // ignore EmptyText error since persisted lines are guaranteed non-empty
-            let _ = buf.append_with_timestamp(text, source, timestamp);
-            let _ = byte_len; // MVP trade-off: ScrollbackBuffer append 不消费 byte_len, 接受此限制
-            let _ = id; // 同上: ScrollbackLine::id 由 append_with_timestamp 内部 Uuid::new_v4() 生成
-        }
-        Ok(buf)
-    }
 }
 
 // =====================================================================

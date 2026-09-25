@@ -390,18 +390,18 @@ mod tests {
     use crate::chat::ChatMessage;
 
     fn sample_request() -> ChatRequest {
-        ChatRequest {
-            model: OPENAI_DEFAULT_MODEL.to_string(),
-            messages: vec![
-                ChatMessage::system("be terse"),
-                ChatMessage::user("hi"),
-            ],
-            temperature: Some(0.7),
-            max_tokens: Some(128),
-            request_id: Some(Uuid::new_v4()),
-            ..Default::default()
+            ChatRequest {
+                model: OPENAI_DEFAULT_MODEL.to_string(),
+                messages: vec![
+                    ChatMessage::system("be terse"),
+                    ChatMessage::user("hi"),
+                ],
+                temperature: Some(0.7),
+                max_tokens: Some(128),
+                request_id: Some(Uuid::new_v4()),
+                ..Default::default()
+            }
         }
-    }
 
     #[test]
     fn openai_provider_default_is_no_network() {

@@ -660,52 +660,7 @@ impl WorktreeService for InMemoryWorktreeService {
             now = Utc::now();
         }
 
-        // 阶段 2: post_import_hook 回调 (per ULYS-195 §3 软依赖).
-        //
-        // 故意 await 在 import 主路径之后, hook 失败**不**阻断 import 结果
-        // (吞掉 + warn log). 调用方拿到的 `ImportOutcome` 已 commit 进
-        // service 内部 state; hook 只做副作用 (symlinks / DB write / SSE).
-        //
-        // NoopPostImportHook 默认实现 = 不做任何事, 保留 stage 1 行为.
-        self.post_import_hook
-            .on_import_complete(
-                repo_id,
-                &outcome.imported,
-                &outcome.updated,
-                &outcome.skipped,
-            )
-            .await;
-
         Ok(outcome)
-    }
-
-    async fn pick_start_from_candidates(
-        &self,
-        repo_id: RepoId,
-    ) -> Result<PickerCandidates, ServiceError> {
-        // 1. 取 snapshot of existing (避免 lock 与 picker 异步操作死锁)
-        let existing: Vec<Worktree> = {
-            let guard = self.inner.read().await;
-            guard
-                .worktrees
-                .values()
-                .filter(|w| w.repo_id == repo_id)
-                .cloned()
-                .collect()
-        };
-        // guard 在表达式结束已 drop (NLL), 无需再 drop.
-
-        // 2. 取 source (default = NoopPickerSource)
-        let source: Arc<dyn StartFromPickerSource> = {
-            let guard = self.inner.read().await;
-            guard
-                .picker_source
-                .clone()
-                .unwrap_or_else(|| Arc::new(NoopPickerSource))
-        };
-
-        // 3. 调 helper (per start_from_picker::pick_start_from_candidates)
-        pick_start_from_candidates(repo_id, &existing, source.as_ref()).await
     }
 }
 

@@ -80,8 +80,6 @@ members = [
     "crates/star-taskqueue",
     # Phase W20-TS-AI-Terminal-Stack (ULYS-200, 2026-09-23 JST): terminal-stack crate (ScrollbackBuffer ring + SplitTree 数据层, per FR-ORCA-036 + §12 split pane 附加需求, MVP v0 = 内存 + JSON 序列化, 持久化与前端 UI 留 P1 followup)
     "crates/terminal-stack",
-    # Phase W20-AV-AI-Vault-Domain (ULYS-157, 2026-09-23 JST): ai-vault crate (SearchPolicy + clear_search_index, per FR-ORCA-023/024 桌面索引控制 + Clear Index, spec v1.0 line 347-353, MVP v0 = local-only settings + idempotent clear)
-    "crates/ai-vault",
     # Phase G.3 (EventBus + Mailbox) 启动: 2026-09-07 注册 crates/star-eventbus (in-process pub/sub + Mailbox 3 模式, 守门 #13 a L0 协调 派生)
     "crates/star-eventbus",
     # Phase G.5 (Tenant Quota) 启动: 2026-09-07 注册 crates/star-quota (compute / storage / LLM token 配额, 守门 #13 d M 派生 SCD Type 2 + 13 類 RLS)

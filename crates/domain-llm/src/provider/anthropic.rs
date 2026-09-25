@@ -432,18 +432,18 @@ mod tests {
     use crate::chat::ChatMessage;
 
     fn sample_request() -> ChatRequest {
-        ChatRequest {
-            model: ANTHROPIC_DEFAULT_MODEL.to_string(),
-            messages: vec![
-                ChatMessage::system("be terse"),
-                ChatMessage::user("hi"),
-            ],
-            temperature: Some(0.5),
-            max_tokens: Some(256),
-            request_id: Some(Uuid::new_v4()),
-            ..Default::default()
+            ChatRequest {
+                model: ANTHROPIC_DEFAULT_MODEL.to_string(),
+                messages: vec![
+                    ChatMessage::system("be terse"),
+                    ChatMessage::user("hi"),
+                ],
+                temperature: Some(0.5),
+                max_tokens: Some(256),
+                request_id: Some(Uuid::new_v4()),
+                ..Default::default()
+            }
         }
-    }
 
     #[test]
     fn anthropic_provider_default_is_no_network() {

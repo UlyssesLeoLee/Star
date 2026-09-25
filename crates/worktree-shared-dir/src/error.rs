@@ -14,6 +14,8 @@
 //! - WSD.CONFIG_IO_FAIL     : ConfigSource FS 读失败 (file not found 不算, 其它 IO 算)
 //! - WSD.CONFIG_TYPE_FAIL   : ConfigSource 字段类型错 (期望 array, 实际其它)
 //! - WSD.PG_FAIL            : WorkspaceSource 读 PG 表失败 (待 PG impl 实装)
+//! - WSD.PERUSER_IO_FAIL    : PerUserSource FS 读失败 (file not found 不算, 其它 IO 算)
+//! - WSD.PERUSER_PARSE_FAIL : PerUserSource 解析失败 (空行外的格式错 / 空 path 等)
 
 use serde::{Deserialize, Serialize};
 use std::error::Error as StdError;
