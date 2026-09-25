@@ -949,9 +949,8 @@ dependencies = [
  "serde",
  "serde_json",
  "star-context",
-"star-dto",
+ "star-dto",
  "thiserror",
- "thiserror 1.0.69",
  "tokio",
  "uuid",
 ]
