@@ -1,4 +1,4 @@
-//! PI-9 Steering / Follow-up / QueueMode (domain-agent) — W6 「PI-4/PI-6 ship 收紧」.
+//! PI-9 Steering / Follow-up / QueueMode (domain-agent) — W3 `CollabPreemptionBridge` + `mark_running_with` 跨租户守门.
 //!
 //! Per SRS-PI-BORROW-001 §1.3 + §4 FR-30 (`crates/pi-agent-core/src/types.ts`
 //! lines 47-55, 278-302 翻译).
@@ -10,7 +10,7 @@
 //!   `AgentLoopBoundary::transform_context` 的默认实装。
 //! - **W2** (commit `58ee2a5d`): 在 W1 基础上加 **cancel 抢断语义** +
 //!   **Interrupt 抢占触发回调** (`PreemptionListener`).
-//! - **W3** (commit `97641799`): 加 **跨域协作评论入口 stub** +
+//! - **W3** (本 commit): 加 **跨域协作评论入口 stub** +
 //!   **`mark_running_with` 真租户守门**:
 //!
 //!   | 增量 | 描述 |
@@ -27,41 +27,15 @@
 //!   是占位 nil → `maybe_fire_preemption` 跳过 tenant 守门（行为 = W2 legacy）。
 //!   生产环境应**全部走 `mark_running_with`**。
 //!
-//! - **W4** (commit `dcc31890`, P-B 路径): `ParentType::AgentSession` variant
-//!   + INV-C-05 守门同步 + application `SteeringSinkBridge` 把
-//!     `CollabSteeringCommand` 转 `SteeringCommand` 走 `InMemoryCommentService`,
-//!     PI-9 主路径 0 改动。
-//!
-//! - **W5** (commit `4ea76dfa`): `CollabSteeringCommand` 加 4 字段
-//!   (`current_agent_id` / `current_session_id` / `incoming_agent_id` /
-//!   `incoming_session_id`),bridge 透传 `QueuedTask.agent_id` / `session_id` 真实值
-//!   (消除 W4 占位 `= incoming_task_id` trade-off)。
-//!
-//! - **W6** (本 commit): **PI-4 + PI-6 已 ship 后收紧 `QueuedTask` 占位字段**:
-//!
-//!   | 字段 | W5 形态 | W6 形态 | 依据 |
-//!   |---|---|---|---|
-//!   | `tool_hint` | `String` | `Option<domain_tool::ToolExecutionMode>` | PI-4 (ULYS-205, commit `0b00ecec`) ship `ToolExecutionMode` 4 变体 (Sync/Async/Stream/Background) 作为调度提示 |
-//!   | `payload_op` (新) | (无) | `Option<star_dto::delta::Op>` | PI-6 (ULYS-206, commit `2a0ca91a`) ship 7 ops (r/s/d/a/t/p/m) 作为结构化载荷 |
-//!   | `payload` (保留) | `serde_json::Value` | `serde_json::Value` | 向后兼容 PI-6 之前的 caller;`payload_op` 与 `payload` 同时存在,默认 `payload_op = None`,显式设置时二选一 |
-//!
-//!   W6 测试新增 4 条：tool_hint 默认 None / `payload_op` 序列化 / `Op::Set` 透传 /
-//!   `Op::Apply` reducer 端到端 (调 `star_dto::delta::apply`)。
-//!
-//!   W1-W5 任何 caller 测试**0 改动**——`QueuedTask::new()` 默认 `tool_hint = None` /
-//!   `payload_op = None`,既有测试通过 `make_task` helper 走 `new()`,自动兼容。
-//!
-//! ## 已知缺口 / 待 SRS-MULTICA-COLLABORATION 落地后补
+//! ## 已知缺口 / 待 PI-* 落地后补
 //!
 //! - **PI-3 ✅ 已 ship (本 branch cherry-pick `c4145379`)**: `AgentLoopBoundary`
 //!   trait + `StreamFn` no-throw 已在本 worktree 可用。
-//! - **PI-4 ✅ 已 ship (origin/main commit `0b00ecec`)**: `Tool` trait 5 方法
-//!   + `ToolExecutionMode` 4 变体。本 commit 把 `tool_hint` 收紧为
-//!     `Option<domain_tool::ToolExecutionMode>`,Sprint 3 接 `Tool::execute`
-//!     dispatcher 后可进一步收紧为完整 `ToolInvocation`。
-//! - **PI-6 ✅ 已 ship (origin/main commit `2a0ca91a`)**: `star_dto::delta::Op`
-//!   7 ops + `apply` reducer。本 commit 加 `payload_op: Option<Op>` 字段,
-//!   序列化路径已验证 (Set/Set round-trip)。
+//! - **PI-4 缺口**: `Tool` trait 5 方法未 ship → 本文件不 import
+//!   `domain_tool::Tool`，QueuedTask 用 String 工具名占位；待 PI-4 ship 后
+//!   把 String → ToolInvocation 改字段。
+//! - **PI-6 缺口**: JSON Delta 协议未 ship → 本文件用 serde_json::Value 描述
+//!   task,待 PI-6 ship 后切到 `star_dto::JsonDeltaPayload`。
 //! - **跨域协作评论**: SRS-MULTICA-COLLABORATION 协作评论机制未 ship,
 //!   `CollabPreemptionBridge` 已就位,等跨域 ship 后:
 //!   1. 在 `crates/domain-comment` 加 `impl CollabCommentSink for CommentService`
@@ -70,8 +44,8 @@
 //!
 //! 完整 3 周 MVP 工时排程见 issue description §4。
 //! 启动条件（per §5）：Stage 4 + PI-6 (ULYS-206 redesign) 已 ship + D-Boy 拍板
-//! PI-9 启动。W6 兑现 D-Boy 2026-09-24 「完成所有后续工作，全选，推进到完成」:
-//! PI-4 + PI-6 已 ship + SRS-MULTICA-COLLABORATION 真接口仍待 ship (跨域协调)。
+//! PI-9 启动。本 commit = "W3-Collab-Bridge-stub + tenant-guard";PI-4/PI-6/
+//! Collab 真接口 ship 后再 sign off "PI-9 done".
 //!
 //! ## 守门合规
 //!
@@ -239,14 +213,8 @@ pub const MAX_PROMPT_EXCERPT_CHARS: usize = 80;
 /// `current_prompt_excerpt` / `incoming_prompt_excerpt` 是被 redacted 的
 /// 短摘（最长 [`MAX_PROMPT_EXCERPT_CHARS`] 字符）—— 不是 prompt 全文。
 ///
-/// **ULYS-207 PI-9 W5**:`current_agent_id` / `current_session_id` /
-/// `incoming_agent_id` / `incoming_session_id` 在 W5 落地,**透传自
-/// `QueuedTask`**,不再用 `task_id` 占位（per W4 已知 trade-off fix path）。
-/// Bridge 取真实 `AgentId` / `AgentSessionId`,application 层
-/// `SteeringSinkBridge` 透传到 `domain_comment::SteeringCommand` 用作
-/// `comment.author_agent_id` 与 `parent_id = ParentType::AgentSession`。
-///
-/// `#[non_exhaustive]` 允许未来加 field 而不破坏下游。
+/// `#[non_exhaustive]` 允许未来加 field（如 `agent_id` / `session_id`）
+/// 而不破坏下游。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct CollabSteeringCommand {
@@ -256,58 +224,12 @@ pub struct CollabSteeringCommand {
     pub current_task_id: Uuid,
     /// current 任务的 prompt 摘要（已 redact）
     pub current_prompt_excerpt: String,
-    /// **W5** 当前任务的 agent（透传自 `QueuedTask.agent_id`）
-    pub current_agent_id: AgentId,
-    /// **W5** 当前任务的 session（透传自 `QueuedTask.session_id`）
-    pub current_session_id: AgentSessionId,
     /// 新进的抢占/高优任务 ID
     pub incoming_task_id: Uuid,
     /// incoming 任务的 prompt 摘要（已 redact）
     pub incoming_prompt_excerpt: String,
-    /// **W5** incoming 任务的 agent（透传自 `QueuedTask.agent_id`）
-    pub incoming_agent_id: AgentId,
-    /// **W5** incoming 任务的 session（透传自 `QueuedTask.session_id`）
-    pub incoming_session_id: AgentSessionId,
     /// incoming 入队时间
     pub enqueued_at: SystemTime,
-}
-
-impl CollabSteeringCommand {
-    /// **new** -- 构造 CollabSteeringCommand(cross-crate caller 用,
-    /// 因为 struct 是 `#[non_exhaustive]`,同 crate 内可用 struct literal,
-    /// 跨 crate 必须用 constructor)。
-    ///
-    /// **ULYS-207 PI-9 W4 P-B / W5**:application crate 胶水
-    /// `SteeringSinkBridge` 调此方法构造 CollabSteeringCommand 转
-    /// `domain_comment::SteeringCommand`。W5 加 `current_agent_id` /
-    /// `current_session_id` / `incoming_agent_id` / `incoming_session_id`
-    /// 4 个真实字段,W4 的 `incoming_task_id` 占位已废止。
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        tenant_id: TenantId,
-        current_task_id: Uuid,
-        current_prompt_excerpt: String,
-        current_agent_id: AgentId,
-        current_session_id: AgentSessionId,
-        incoming_task_id: Uuid,
-        incoming_prompt_excerpt: String,
-        incoming_agent_id: AgentId,
-        incoming_session_id: AgentSessionId,
-        enqueued_at: SystemTime,
-    ) -> Self {
-        Self {
-            tenant_id,
-            current_task_id,
-            current_prompt_excerpt,
-            current_agent_id,
-            current_session_id,
-            incoming_task_id,
-            incoming_prompt_excerpt,
-            incoming_agent_id,
-            incoming_session_id,
-            enqueued_at,
-        }
-    }
 }
 
 /// 截 prompt 到 `MAX_PROMPT_EXCERPT_CHARS` 字符，超过部分加 "…"。
@@ -428,18 +350,12 @@ impl CollabPreemptionBridge {
 impl PreemptionListener for CollabPreemptionBridge {
     fn on_preempt(&self, current: &QueuedTask, incoming: &QueuedTask) {
         // 构造 redact 过的 command。守门 #5: prompt 走摘要,不让 secret 进 sink
-        // **ULYS-207 PI-9 W5**:agent_id / session_id 透传自 QueuedTask,
-        // 不再用 incoming_task_id 占位(per W4 已知 trade-off fix path)。
         let cmd = CollabSteeringCommand {
             tenant_id: incoming.tenant_id,
             current_task_id: current.task_id,
             current_prompt_excerpt: redact_excerpt(&current.prompt),
-            current_agent_id: current.agent_id,
-            current_session_id: current.session_id,
             incoming_task_id: incoming.task_id,
             incoming_prompt_excerpt: redact_excerpt(&incoming.prompt),
-            incoming_agent_id: incoming.agent_id,
-            incoming_session_id: incoming.session_id,
             enqueued_at: incoming.created_at,
         };
         // fire-and-forget:sink 内部 panic 自负责（守门 #22）
@@ -483,13 +399,10 @@ impl Default for QueueMode {
 
 /// **QueuedTask** -- 队列里的单个待派发任务 (per pi-agent-core/src/types.ts:278-302).
 ///
-/// 字段（per ULYS-207 PI-9 W6）：
-/// - `tool_hint`: PI-4 ship 后收紧为 `Option<domain_tool::ToolExecutionMode>` —
-///   调度提示,默认 `None`（纯 prompt 任务不需要工具）。
-/// - `payload`: 保留 `serde_json::Value` 以向后兼容 W5 之前 caller。
-/// - `payload_op`: PI-6 ship 后新增 `Option<star_dto::delta::Op>` — 结构化
-///   载荷,7 ops (r/s/d/a/t/p/m)。与 `payload` 同时存在,默认 `None`。
-///   agent loop 优先用 `payload_op`（若 Some）,降级走 `payload`（保持向后兼容）。
+/// 不耦合 PI-4 `Tool` trait / PI-6 JSON Delta 协议（占位字段）：
+/// - `tool_hint`: `String` 占位，待 PI-4 ship 后收紧为 `ToolInvocation`；
+/// - `payload`: `serde_json::Value` 占位，待 PI-6 ship 后收紧为
+///   `star_dto::JsonDeltaPayload`。
 ///
 /// `#[non_exhaustive]` 允许 PI-4 / PI-6 ship 后加新字段而不破坏 NFR-4。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -505,25 +418,10 @@ pub struct QueuedTask {
     pub session_id: AgentSessionId,
     /// 用户提示原文
     pub prompt: String,
-    /// 工具调用 hint（PI-4 ship 后收紧为 `Option<ToolExecutionMode>`）。
-    ///
-    /// `None` = 纯 prompt 任务,不调任何工具。
-    /// `Some(Synchronous)` / `Some(Async)` / `Some(Stream)` / `Some(Background)`
-    /// = 调度提示,agent loop 据此选 dispatcher 路径 (per FR-22)。
-    pub tool_hint: Option<domain_tool::ToolExecutionMode>,
-    /// 任务载荷（向后兼容 W5 之前 caller）。
-    ///
-    /// 与 `payload_op` 二选一：默认 `Null`,PI-6 后可改设结构化 `Op` 的 JSON
-    /// 表示；显式设 `payload_op = Some(op)` 时本字段保留作 fallback。
+    /// 工具调用 hint（PI-4 ship 后收紧）
+    pub tool_hint: String,
+    /// 任务载荷（PI-6 ship 后收紧）
     pub payload: serde_json::Value,
-    /// 任务载荷（PI-6 ship 后新增）— 7 ops (r/s/d/a/t/p/m) 的结构化增量。
-    ///
-    /// `None` = 不携带结构化变更（默认,纯 prompt / 任意 Value）。
-    /// `Some(Op::Set(path, value))` = 设置路径上的值。
-    /// `Some(Op::Replace(value))` = 替换整个根值。
-    /// agent loop 优先用此字段做 apply（Sprint 3 接 star-taskgraph 增量同步）。
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub payload_op: Option<star_dto::delta::Op>,
     /// 优先级（`MIN_PRIORITY`..=`MAX_PRIORITY`）
     pub priority: i32,
     /// 队首插队标记（`Interrupt` 模式专用）
@@ -546,31 +444,12 @@ impl QueuedTask {
             agent_id,
             session_id,
             prompt: prompt.into(),
-            tool_hint: None,
+            tool_hint: String::new(),
             payload: serde_json::Value::Null,
-            payload_op: None,
             priority: DEFAULT_PRIORITY,
             interrupt: false,
             created_at: SystemTime::now(),
         }
-    }
-
-    /// Builder: 设置 tool_hint (PI-4 `ToolExecutionMode`)
-    pub fn with_tool_hint(mut self, mode: domain_tool::ToolExecutionMode) -> Self {
-        self.tool_hint = Some(mode);
-        self
-    }
-
-    /// Builder: 设置 payload_op (PI-6 `star_dto::delta::Op`)
-    pub fn with_payload_op(mut self, op: star_dto::delta::Op) -> Self {
-        self.payload_op = Some(op);
-        self
-    }
-
-    /// Builder: 设置 payload (保留向后兼容)
-    pub fn with_payload(mut self, payload: serde_json::Value) -> Self {
-        self.payload = payload;
-        self
     }
 
     /// 构造为 Interrupt（抢占）任务
@@ -2547,193 +2426,18 @@ mod tests {
     }
 
     /// W3: `CollabSteeringCommand` serde round-trip
-    /// W5: 扩 4 个新 agent/session 字段,验证 round-trip 仍一致
     #[test]
     fn collab_command_serde_roundtrip() {
         let cmd = CollabSteeringCommand {
             tenant_id: TenantId::new(),
             current_task_id: Uuid::new_v4(),
             current_prompt_excerpt: "short".into(),
-            current_agent_id: AgentId::new(),
-            current_session_id: AgentSessionId::new(),
             incoming_task_id: Uuid::new_v4(),
             incoming_prompt_excerpt: "new hint".into(),
-            incoming_agent_id: AgentId::new(),
-            incoming_session_id: AgentSessionId::new(),
             enqueued_at: SystemTime::UNIX_EPOCH,
         };
         let j = serde_json::to_string(&cmd).expect("serialize");
         let back: CollabSteeringCommand = serde_json::from_str(&j).expect("deserialize");
         assert_eq!(back, cmd);
-    }
-
-    /// **ULYS-207 PI-9 W5**:`CollabPreemptionBridge::on_preempt` 把
-    /// `QueuedTask.agent_id` / `session_id` 透传到 `CollabSteeringCommand` 的
-    /// 4 个新字段(current_agent_id / current_session_id /
-    /// incoming_agent_id / incoming_session_id),**不再用 `task_id` 占位**
-    /// (per W4 已知 trade-off fix path)。
-    #[test]
-    fn collab_bridge_w5_passes_real_agent_and_session_ids() {
-        let sink = Arc::new(InMemoryCollabSink::new());
-        let bridge = CollabPreemptionBridge::new(sink.clone());
-        let t = TenantId::new();
-        // current 和 incoming 用**不同**的 agent_id / session_id,确保
-        // W5 bridge 透传精确值,不丢字段或互相串。
-        let current = make_task(t, "current-prompt", DEFAULT_PRIORITY);
-        let incoming = make_interrupt_task(t, "incoming-prompt");
-        let current_agent = current.agent_id;
-        let current_session = current.session_id;
-        let incoming_agent = incoming.agent_id;
-        let incoming_session = incoming.session_id;
-
-        bridge.on_preempt(&current, &incoming);
-
-        let cmds = sink.commands();
-        assert_eq!(cmds.len(), 1, "bridge must dispatch exactly once");
-        let cmd = &cmds[0];
-        assert_eq!(cmd.current_agent_id, current_agent, "W5: current_agent_id from QueuedTask");
-        assert_eq!(cmd.current_session_id, current_session, "W5: current_session_id from QueuedTask");
-        assert_eq!(cmd.incoming_agent_id, incoming_agent, "W5: incoming_agent_id from QueuedTask");
-        assert_eq!(cmd.incoming_session_id, incoming_session, "W5: incoming_session_id from QueuedTask");
-        // 守门:4 个新字段 ≠ 任何 task_id(W4 占位 = incoming_task_id 已废止)
-        assert_ne!(cmd.current_agent_id.as_uuid(), current.task_id);
-        assert_ne!(cmd.current_session_id.as_uuid(), current.task_id);
-        assert_ne!(cmd.incoming_agent_id.as_uuid(), incoming.task_id);
-        assert_ne!(cmd.incoming_session_id.as_uuid(), incoming.task_id);
-    }
-
-    /// **ULYS-207 PI-9 W5**:W4 已知 `agent_id` / `agent_session_id` 占位 =
-    /// `incoming_task_id`。W5 修复:4 个新字段是真实 `AgentId` /
-    /// `AgentSessionId`,可以跟 `task_id` 完全独立。
-    #[test]
-    fn collab_command_w5_new_fields_independent_from_task_ids() {
-        let sink = Arc::new(InMemoryCollabSink::new());
-        let bridge = CollabPreemptionBridge::new(sink.clone());
-        let t = TenantId::new();
-        let current = make_task(t, "c", DEFAULT_PRIORITY);
-        let incoming = make_interrupt_task(t, "i");
-        bridge.on_preempt(&current, &incoming);
-        let cmd = &sink.commands()[0];
-        // 4 个新字段应都是非空 UUID(因为 `QueuedTask::new` 默认
-        // `AgentId::new() = Uuid::new_v4()`,不会撞 task_id)
-        assert!(!cmd.current_agent_id.as_uuid().is_nil());
-        assert!(!cmd.current_session_id.as_uuid().is_nil());
-        assert!(!cmd.incoming_agent_id.as_uuid().is_nil());
-        assert!(!cmd.incoming_session_id.as_uuid().is_nil());
-        // 跨字段独立性:任一字段都不应等于另一字段(W4 占位串同 UUID 的风险被消)
-        assert_ne!(cmd.current_agent_id.as_uuid(), cmd.current_session_id.as_uuid());
-        assert_ne!(cmd.incoming_agent_id.as_uuid(), cmd.incoming_session_id.as_uuid());
-        assert_ne!(cmd.current_agent_id.as_uuid(), cmd.incoming_agent_id.as_uuid());
-        assert_ne!(cmd.current_session_id.as_uuid(), cmd.incoming_session_id.as_uuid());
-    }
-
-    /// **ULYS-207 PI-9 W5**:`CollabSteeringCommand::new` 构造函数签名扩到
-    /// 10 个参数(2 tenant_id-related + 2 + 4 W5 agent/session + 2 task +
-    /// 2 prompt + 1 timestamp),确保 caller 用真值不会混淆参数顺序。
-    #[test]
-    fn collab_command_w5_new_constructor_signature() {
-        let t = TenantId::new();
-        let ct = Uuid::new_v4();
-        let ce = "ce".to_string();
-        let ca = AgentId::new();
-        let cs = AgentSessionId::new();
-        let it = Uuid::new_v4();
-        let ie = "ie".to_string();
-        let ia = AgentId::new();
-        let is_ = AgentSessionId::new();
-        let ts = SystemTime::now();
-        let cmd = CollabSteeringCommand::new(t, ct, ce.clone(), ca, cs, it, ie.clone(), ia, is_, ts);
-        assert_eq!(cmd.tenant_id, t);
-        assert_eq!(cmd.current_task_id, ct);
-        assert_eq!(cmd.current_prompt_excerpt, ce);
-        assert_eq!(cmd.current_agent_id, ca);
-        assert_eq!(cmd.current_session_id, cs);
-        assert_eq!(cmd.incoming_task_id, it);
-        assert_eq!(cmd.incoming_prompt_excerpt, ie);
-        assert_eq!(cmd.incoming_agent_id, ia);
-        assert_eq!(cmd.incoming_session_id, is_);
-        assert_eq!(cmd.enqueued_at, ts);
-    }
-
-    // =====================================================================
-    // ULYS-207 PI-9 W6 测试 (PI-4 ToolExecutionMode + PI-6 star_dto::delta::Op 收紧)
-    // =====================================================================
-
-    /// **ULYS-207 PI-9 W6**:`QueuedTask::new()` 默认 `tool_hint = None` (纯 prompt 任务)
-    #[test]
-    fn queued_task_new_tool_hint_defaults_to_none_w6() {
-        let tenant = TenantId::from(Uuid::new_v4());
-        let task = make_task(tenant, "纯 prompt 任务", DEFAULT_PRIORITY);
-        assert!(task.tool_hint.is_none(), "默认 tool_hint 应为 None");
-        assert!(task.payload_op.is_none(), "默认 payload_op 应为 None");
-        assert_eq!(task.payload, serde_json::Value::Null);
-    }
-
-    /// **ULYS-207 PI-9 W6**:`with_tool_hint` builder 设 4 变体 (PI-4 ToolExecutionMode)
-    #[test]
-    fn queued_task_with_tool_hint_supports_all_four_modes_w6() {
-        let tenant = TenantId::from(Uuid::new_v4());
-        for mode in [
-            domain_tool::ToolExecutionMode::Synchronous,
-            domain_tool::ToolExecutionMode::Async,
-            domain_tool::ToolExecutionMode::Stream,
-            domain_tool::ToolExecutionMode::Background,
-        ] {
-            let task = make_task(tenant, "with mode", DEFAULT_PRIORITY).with_tool_hint(mode);
-            assert_eq!(task.tool_hint, Some(mode), "{:?} 未透传", mode);
-        }
-    }
-
-    /// **ULYS-207 PI-9 W6**:`payload_op` 用 `Op::Set` 路径,serde round-trip 一致
-    #[test]
-    fn queued_task_payload_op_set_serde_roundtrip_w6() {
-        use star_dto::delta::Op;
-        let tenant = TenantId::from(Uuid::new_v4());
-        let op = Op::Set(
-            vec!["items".to_string(), "0".to_string(), "name".to_string()],
-            serde_json::json!("alpha"),
-        );
-        let task = make_task(tenant, "task with op", DEFAULT_PRIORITY).with_payload_op(op.clone());
-        assert_eq!(task.payload_op, Some(op.clone()));
-        let j = serde_json::to_string(&task).expect("serialize");
-        let back: QueuedTask = serde_json::from_str(&j).expect("deserialize");
-        assert_eq!(back.payload_op, Some(op));
-    }
-
-    /// **ULYS-207 PI-9 W6**:payload_op 端到端 `Op::Set` 走 star_dto::delta::apply 正确改值
-    #[test]
-    fn queued_task_payload_op_apply_reducer_end_to_end_w6() {
-        use star_dto::delta::{apply, Op};
-        let tenant = TenantId::from(Uuid::new_v4());
-        let op = Op::Set(
-            vec!["greeting".to_string()],
-            serde_json::json!("hello"),
-        );
-        let task = make_task(tenant, "apply me", DEFAULT_PRIORITY).with_payload_op(op.clone());
-
-        // 模拟 agent loop 优先用 payload_op 调 apply
-        let base = serde_json::json!({ "greeting": "world", "n": 1 });
-        let applied = if let Some(op) = task.payload_op.as_ref() {
-            apply(Some(base.clone()), std::slice::from_ref(op)).expect("apply Ok")
-        } else {
-            base.clone()
-        };
-        assert_eq!(applied, serde_json::json!({ "greeting": "hello", "n": 1 }));
-    }
-
-    /// **ULYS-207 PI-9 W6**:`payload` (向后兼容 Value) + `payload_op` (新) 同时存在不互斥
-    #[test]
-    fn queued_task_payload_and_payload_op_coexist_w6() {
-        use star_dto::delta::Op;
-        let tenant = TenantId::from(Uuid::new_v4());
-        let task = make_task(tenant, "both", DEFAULT_PRIORITY)
-            .with_payload(serde_json::json!({ "legacy": true }))
-            .with_payload_op(Op::Replace(serde_json::json!({ "new": 1 })));
-        // payload 与 payload_op 同时存在,各自独立
-        assert_eq!(task.payload, serde_json::json!({ "legacy": true }));
-        match task.payload_op.as_ref() {
-            Some(Op::Replace(v)) => assert_eq!(*v, serde_json::json!({ "new": 1 })),
-            other => panic!("expected Op::Replace, got {:?}", other),
-        }
     }
 }
