@@ -1,0 +1,36 @@
+[package]
+name = "canvas-realtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "canvas-realtime: Yjs CRDT 后端 (per ULYS-160 §3 阶段 1 骨架, per SRS-STAR-CANVAS-GAME-001 v0.1 §4.3 + BD-STAR-CANVAS-GAME-001 v0.1 §6 + deploy/canvas-game-k3s.yaml containerPort 8082 HTTP + 8083 WebSocket) — 阶段 1 axum + axum::extract::ws 双端口 server healthz + /ready + /version + WSS echo endpoint (no Yjs 协议), 阶段 2 落地 Yjs/yrs CRDT 集成"
+
+[[bin]]
+name = "canvas-realtime"
+path = "src/main.rs"
+
+[lib]
+name = "canvas_realtime"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = "0.24"
+axum = { workspace = true }
+tower = "0.5"
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+futures-util = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[lints]
+workspace = true
