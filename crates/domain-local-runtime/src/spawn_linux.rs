@@ -176,38 +176,30 @@ pub fn pick_cgroup_backend(opts: &LinuxSpawnOptions) -> CgroupBackend {
 /// 真正的 setsid 在 `spawn()` 时执行,失败通过 `nix::Error` 冒泡到 spawn 调用方
 /// (典型:`EPERM` 当进程已是 session leader 且无 `CAP_SETGID`)。
 #[cfg(target_os = "linux")]
-pub fn wrap_linux_session(cmd: &mut tokio::process::Command, opts: &LinuxSpawnOptions) {
+pub fn wrap_linux_session(cmd: tokio::process::Command, opts: &LinuxSpawnOptions) -> tokio::process::Command {
     if !opts.new_session {
-        return;
+        return cmd;
     }
-    // v10 process-wrap API migration (fixes dev baseline red:
-    //  error: `process_wrap::std::Wrap` is not in this scope)
+    // v10 process-wrap API migration (fixes dev baseline red).
     //
-    // v0.x API (used in dev until 2bf9f431 cherry-pick):
-    //   use process_wrap::std::Wrap;
-    //   cmd.as_std_mut().wrap_with(ProcessSession::default());
+    // v10 wraps `CommandWrap<Command>` 是唯一能装 wrapper 的容器;
+    // `CommandWrap::into_command()` consume 时会 **drop wrappers**, 所以 caller
+    // 不能拿回原始 cmd. 因此本函数 consume cmd 但不返回 wrapped — 让 caller
+    // 用 `tokio::process::Command::process_group(0)` fallback 维持 pgid 部分
+    // (cli_spawn.rs:147 已保留此 fallback)。
     //
-    // v10 API: `Wrap` trait renamed to `CommandWrapper`,
-    // `wrap_with` removed in favor of `CommandWrap` wrapper container with `.wrap(W)`.
-    // The wrapper is LAZY — only takes effect on `.spawn()` — so we cannot apply
-    // it to `&mut tokio::process::Command` and have caller spawn it (caller would
-    // need to switch to `CommandWrap<tokio::process::Command>` and spawn via that).
+    // ⚠️ Functional no-op: ProcessSession 在此被注册到临时 wrapped 后随 owned
+    // value drop 丢失, **setsid 永不生效**。降级到 pgid-only 语义。
     //
-    // To preserve the existing `&mut tokio::process::Command` API surface for
-    // callers (cli_spawn.rs:156, kill.rs:332, spawn_linux.rs tests), we temporarily
-    // construct a CommandWrap, register ProcessSession, then drop it. **This is a
-    // functional no-op** at runtime (setsid NOT applied) — caller retains its
-    // existing `tokio::process::Command::process_group(0)` fallback (cli_spawn.rs:147)
-    // which keeps the process-group part of setsid semantics, losing only the
-    // session-leader / controlling-terminal detach.
-    //
-    // TODO (ULYS-212 followup P2): migrate caller to `CommandWrap<tokio::process::Command>`
-    // and restore full setsid semantics via process-wrap v10. Tracked separately.
+    // TODO (ULYS-212 P2): 重构 caller 为 `CommandWrap<tokio::process::Command>` 类型,
+    // 通过 wrapped.spawn() 调用恢复完整 setsid。单独 PR, scope 跨 caller, 不在本 PR 内。
     use process_wrap::tokio::{CommandWrap, CommandWrapper, ProcessSession};
     let mut wrapped = CommandWrap::from(cmd);
     wrapped.wrap(ProcessSession);
-    // wrapped dropped here; setsid hook never fires. Caller's `cmd` unchanged.
-    let _ = wrapped;
+    // wrapped 立刻 drop, ProcessSession 失效。返回原始 cmd (也丢失 wrapper 状态)。
+    // 因 caller 接下来调 `cmd.spawn()`, wrapper 不会被触发。
+    drop(wrapped);
+    cmd
 }
 
 // =====================================================================
@@ -431,21 +423,21 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn wrap_linux_session_new_session_false_is_noop() {
-        let mut cmd = tokio::process::Command::new("echo");
+        let cmd = tokio::process::Command::new("echo");
         let opts = LinuxSpawnOptions {
             new_session: false,
             ..Default::default()
         };
         // 仅验证不 panic,不验证 cmd 内部状态(unsafe 块未被触发,Type system 保证不污染)
-        wrap_linux_session(&mut cmd, &opts);
+        let _ = wrap_linux_session(cmd, &opts);
     }
 
     #[cfg(target_os = "linux")]
     #[test]
     fn wrap_linux_session_new_session_true_does_not_panic() {
-        let mut cmd = tokio::process::Command::new("echo");
+        let cmd = tokio::process::Command::new("echo");
         let opts = LinuxSpawnOptions::default();
         // pre_exec 仅在 spawn 时执行,这里 closure 未触发;验证 safe wrapper 注入编译通过
-        wrap_linux_session(&mut cmd, &opts);
+        let _ = wrap_linux_session(cmd, &opts);
     }
 }
