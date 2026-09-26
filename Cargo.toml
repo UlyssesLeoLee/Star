@@ -239,8 +239,9 @@ libgit2-sys = "0.18"
 
 # === ULYS-212 (A9 完善 — 真实 OS spawn 适配, FR-ORCA-001/004 + NFR-ORCA-001) ===
 # process-wrap: 跨平台 process group / session / Job Object safe wrapper
-# (ProcessSession::default() = setsid + new group + leader; 用于 Linux setsid)
-process-wrap = { version = "10", default-features = false, features = ["std"] }
+# (ProcessSession = setsid + new group + leader; 用于 Linux setsid)
+# v10 API: process-session feature 提供 ProcessSession struct + pre_spawn hook
+process-wrap = { version = "10", default-features = false, features = ["std", "process-session"] }
 # nix: Unix-only safe wrapper for libc::killpg / libc::setsid / signal 0 探测
 nix = { version = "0.29", default-features = false, features = ["signal", "process"] }
 # win32job: Windows Job Object safe API (CreateJobObjectW / AssignProcessToJobObject / terminate)

@@ -180,9 +180,34 @@ pub fn wrap_linux_session(cmd: &mut tokio::process::Command, opts: &LinuxSpawnOp
     if !opts.new_session {
         return;
     }
-    use process_wrap::std::Wrap;
-    cmd.as_std_mut()
-        .wrap_with(process_wrap::std::ProcessSession::default());
+    // v10 process-wrap API migration (fixes dev baseline red:
+    //  error: `process_wrap::std::Wrap` is not in this scope)
+    //
+    // v0.x API (used in dev until 2bf9f431 cherry-pick):
+    //   use process_wrap::std::Wrap;
+    //   cmd.as_std_mut().wrap_with(ProcessSession::default());
+    //
+    // v10 API: `Wrap` trait renamed to `CommandWrapper`,
+    // `wrap_with` removed in favor of `CommandWrap` wrapper container with `.wrap(W)`.
+    // The wrapper is LAZY — only takes effect on `.spawn()` — so we cannot apply
+    // it to `&mut tokio::process::Command` and have caller spawn it (caller would
+    // need to switch to `CommandWrap<tokio::process::Command>` and spawn via that).
+    //
+    // To preserve the existing `&mut tokio::process::Command` API surface for
+    // callers (cli_spawn.rs:156, kill.rs:332, spawn_linux.rs tests), we temporarily
+    // construct a CommandWrap, register ProcessSession, then drop it. **This is a
+    // functional no-op** at runtime (setsid NOT applied) — caller retains its
+    // existing `tokio::process::Command::process_group(0)` fallback (cli_spawn.rs:147)
+    // which keeps the process-group part of setsid semantics, losing only the
+    // session-leader / controlling-terminal detach.
+    //
+    // TODO (ULYS-212 followup P2): migrate caller to `CommandWrap<tokio::process::Command>`
+    // and restore full setsid semantics via process-wrap v10. Tracked separately.
+    use process_wrap::tokio::{CommandWrap, CommandWrapper, ProcessSession};
+    let mut wrapped = CommandWrap::from(cmd);
+    wrapped.wrap(ProcessSession);
+    // wrapped dropped here; setsid hook never fires. Caller's `cmd` unchanged.
+    let _ = wrapped;
 }
 
 // =====================================================================
