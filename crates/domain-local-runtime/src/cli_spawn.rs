@@ -153,7 +153,7 @@ impl LocalRuntime for RealCliRuntime {
                     cgroup: crate::spawn_linux::CgroupMode::Auto,
                     scope_name: None,
                 };
-                wrap_linux_session(&mut cmd, &opts);
+                cmd = wrap_linux_session(cmd, &opts);
             }
             #[cfg(target_os = "macos")]
             {
