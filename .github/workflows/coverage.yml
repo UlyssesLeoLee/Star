@@ -29,6 +29,9 @@ on:
 
 permissions:
   contents: read
+  # ULYS-154 PR-1: pull-requests: write 让 "Comment PR with baseline delta" step 能写评论
+  # (CI 实证: GITHUB_TOKEN 默认 read-only, 写 PR 评论报 HttpError: Resource not accessible by integration)
+  pull-requests: write
 
 concurrency:
   # 同一 PR 同一次 push 只跑一个 coverage job (避免 tarpaulin 跑 30 分钟浪费 CI 配额)
