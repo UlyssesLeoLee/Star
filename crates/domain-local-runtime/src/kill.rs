@@ -322,13 +322,15 @@ mod tests {
     async fn test_spawn_sleep_then_killpg() {
         use std::time::Duration;
         // 1) spawn sleep 30(走 setsid wrapper)
-        let cmd = tokio::process::Command::new("sleep");
+        let mut cmd = tokio::process::Command::new("sleep");
         cmd.arg("30")
             // setpgid(0, 0) → 子进程 pgid == pid (等价 setsid 的 pgid 部分)
             // 注:此测试不验 setsid 完整语义(那是 wrap_linux_session 自己的范围),
             // 仅验 killpg(SIGTERM) 能打到该 group
             .process_group(0)
             .kill_on_drop(false);
+        // wrap_linux_session 现在是 no-op (per PR #157/#159/#163 chain — setsid 永不生效).
+        // 保留调用 (维持 API 契约 + pgid fallback 路径), cmd 走 mut borrow.
         let mut cmd = crate::spawn_linux::wrap_linux_session(
             cmd,
             &crate::spawn_linux::LinuxSpawnOptions {
