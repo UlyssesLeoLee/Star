@@ -32,6 +32,10 @@ on:
         description: "手动指定 tag (默认: latest)"
         required: false
         default: "latest"
+      ghcr_pat:
+        description: "GHCR Personal Access Token (secrets.GHCR_TOKEN 不存在时的 fallback, required: false)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -82,7 +86,8 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.IMAGE_OWNER }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          # secrets.GHCR_TOKEN 优先 (CI 设置后), inputs.ghcr_pat fallback (手动 dispatch)
+          password: ${{ secrets.GHCR_TOKEN || inputs.ghcr_pat }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

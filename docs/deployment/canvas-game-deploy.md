@@ -83,8 +83,12 @@
 # 1. 同步代码到 WSL Ubuntu
 wsl -d Ubuntu -- bash -c 'cd ~/Star && git pull origin dev'
 
-# 2. 触发 GHCR publish workflow (push dev 时自动触发, 或手动 dispatch)
+# 2a. 触发 GHCR publish workflow (push dev 时自动触发, 或手动 dispatch)
+gh workflow run publish-canvas-game.yml -f ghcr_pat="$GHCR_PAT_CLASSIC"
+# 注: workflow 加了 `inputs.ghcr_pat` fallback (per ULYS-160 PR #166 followup),
+# 因为 secrets.GHCR_TOKEN 在 repo settings 不存在. 设了 secret 后用:
 gh workflow run publish-canvas-game.yml
+# 也可直接 push dev 让 workflow 自动跑 (默认 trigger)
 
 # 3. 等镜像推到 GHCR 后, 部署到 k3s
 cd ~/Star
