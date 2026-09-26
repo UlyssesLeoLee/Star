@@ -658,6 +658,25 @@ impl WorktreeService for InMemoryWorktreeService {
             now = Utc::now();
         }
 
+        // 阶段 2 (per ULYS-195 §3): import 完成后回调 post_import_hook
+        // (PR #155 cargo-tarpaulin workspace run fail 暴露这个 import flow 没调 hook 的
+        // bug — issue #174, ULYS-154 dev baseline red 3/3).
+        //
+        // 无条件调 hook (NoopPostImportHook 默认 noop, dispatch 开销可忽略,
+        // 统一行为比 conditional dispatch 更可测).
+        let imported_ids: Vec<worktree_shared_dir::WorktreeId> =
+            outcome.imported.iter().map(|w| w.id).collect();
+        let updated_ids: Vec<worktree_shared_dir::WorktreeId> =
+            outcome.updated.iter().map(|w| w.id).collect();
+        self.post_import_hook
+            .on_import_complete(
+                repo_id,
+                &imported_ids,
+                &updated_ids,
+                &outcome.skipped,
+            )
+            .await;
+
         Ok(outcome)
     }
 
