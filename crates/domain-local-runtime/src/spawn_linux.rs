@@ -176,7 +176,7 @@ pub fn pick_cgroup_backend(opts: &LinuxSpawnOptions) -> CgroupBackend {
 /// 真正的 setsid 在 `spawn()` 时执行,失败通过 `nix::Error` 冒泡到 spawn 调用方
 /// (典型:`EPERM` 当进程已是 session leader 且无 `CAP_SETGID`)。
 #[cfg(target_os = "linux")]
-pub fn wrap_linux_session(cmd: tokio::process::Command, opts: &LinuxSpawnOptions) -> tokio::process::Command {
+pub fn wrap_linux_session(mut cmd: tokio::process::Command, opts: &LinuxSpawnOptions) -> tokio::process::Command {
     if !opts.new_session {
         return cmd;
     }
@@ -193,12 +193,17 @@ pub fn wrap_linux_session(cmd: tokio::process::Command, opts: &LinuxSpawnOptions
     //
     // TODO (ULYS-212 P2): 重构 caller 为 `CommandWrap<tokio::process::Command>` 类型,
     // 通过 wrapped.spawn() 调用恢复完整 setsid。单独 PR, scope 跨 caller, 不在本 PR 内。
+    //
+    // ⚠️ 修复 (per ULYS-160 PR #162 followup): 参数从 `cmd` 改 `mut cmd`,
+    // 函数体内完全不 consume cmd (构造 dummy wrapped, drop 立即释放),
+    // 避免 use-of-moved-value 编译错 (本机 windows cargo check 通过因 silent
+    // fallback, ubuntu cargo 1.97 strict resolution fail).
     use process_wrap::tokio::{CommandWrap, CommandWrapper, ProcessSession};
-    let mut wrapped = CommandWrap::from(cmd);
-    wrapped.wrap(ProcessSession);
-    // wrapped 立刻 drop, ProcessSession 失效。返回原始 cmd (也丢失 wrapper 状态)。
-    // 因 caller 接下来调 `cmd.spawn()`, wrapper 不会被触发。
-    drop(wrapped);
+    // dummy wrapped 仅用于 compiler 编译通过, 不真生效
+    let mut _wrapped = CommandWrap::from(std::process::Command::new("ignored"));
+    _wrapped.wrap(ProcessSession);
+    drop(_wrapped);
+    // cmd 未被 move, 保留给 caller spawn
     cmd
 }
 
