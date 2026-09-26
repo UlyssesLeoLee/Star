@@ -1,0 +1,34 @@
+[package]
+name = "canvas-game"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "canvas-game: 画布游戏 引擎 (per ULYS-160 §4 阶段 1 骨架, per SRS-STAR-CANVAS-GAME-001 v0.1 §4.4 + BD-STAR-CANVAS-GAME-001 v0.1 §6 + deploy/canvas-game-k3s.yaml containerPort 8084) — 阶段 1 axum HTTP server healthz + /ready + /version + 占位 gameplay endpoint, 阶段 2 落地 角色 / 弹幕 / 战斗 / 3D sprite 游戏逻辑"
+
+[[bin]]
+name = "canvas-game"
+path = "src/main.rs"
+
+[lib]
+name = "canvas_game"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = "0.5"
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[lints]
+workspace = true

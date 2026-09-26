@@ -1,0 +1,32 @@
+//! canvas-game main: axum HTTP server 监听 :8084.
+
+use canvas_game::router;
+use tracing::{info, warn};
+use tracing_subscriber::EnvFilter;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .init();
+
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(canvas_game::ServiceMetadata::CANVAS_GAME.http_port);
+
+    let app = router();
+    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
+    info!(
+        service = canvas_game::ServiceMetadata::CANVAS_GAME.name,
+        version = canvas_game::ServiceMetadata::CANVAS_GAME.version,
+        %addr,
+        "canvas-game starting (阶段 1 skeleton)"
+    );
+
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
+
+    warn!("canvas-game exited");
+    Ok(())
+}

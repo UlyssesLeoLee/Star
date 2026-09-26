@@ -1,0 +1,37 @@
+[package]
+name = "canvas-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "canvas-engine: 跨 5 domain 共享 平台能力 (per ULYS-160 §1 阶段 1 骨架, per SRS-STAR-CANVAS-GAME-001 v0.1 §4.1 + BD-STAR-CANVAS-GAME-001 v0.1 §6 + deploy/canvas-game-k3s.yaml containerPort 8080) — 阶段 1 axum HTTP server healthz + /ready + /version + 服务名版本元信息 endpoint, 阶段 2 落地 平台能力 + 5 domain 共享 API"
+
+[[bin]]
+name = "canvas-engine"
+path = "src/main.rs"
+
+[lib]
+name = "canvas_engine"
+path = "src/lib.rs"
+
+[dependencies]
+# workspace 基础 (per canvas-collab 同款骨架)
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+# axum HTTP server (per star-api-rest 同款)
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = "0.5"
+# tracing (per workspace lints + 守门 #14 + 守门 #13 a L0 协调)
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[lints]
+workspace = true

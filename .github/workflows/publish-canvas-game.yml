@@ -1,0 +1,119 @@
+# ULYS-160 publish-canvas-game.yml — 4 canvas-game crate 镜像构建 + 推 GHCR
+#
+# 触发:
+#   - push main / dev: 推 :latest + 短 SHA tag
+#   - push tag v*: 推版本号 tag (e.g. v0.1)
+#   - workflow_dispatch: 手动跑
+#
+# 凭据: GHCR_TOKEN (classic PAT with packages:write scope, per star-release-workflow 守门 #5 env 安全)
+#       跟现有 Coverage workflow 同样用 secrets.GHCR_TOKEN
+#
+# 镜像目标:
+#   ghcr.io/ulysses-lee-lee/star-canvas-engine
+#   ghcr.io/ulysses-lee-lee/star-domain-canvas
+#   ghcr.io/ulysses-lee-lee/star-canvas-realtime
+#   ghcr.io/ulysses-lee-lee/star-canvas-game
+#
+# 守门:
+#   - #1 cargo check --workspace --all-targets + cargo test 单 crate
+#   - #5 GHCR_TOKEN 仅写 packages, 不打印 env value
+#   - #13 a/b/c/d 跨域协调 (本 PR scope: 4 镜像, 不动业务)
+#   - #14 5 域 Lead Mavis 临时代签 (per ULYS-160 issue 160)
+
+name: Publish canvas-game (4 crates → GHCR)
+
+on:
+  push:
+    branches: [main, dev]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "手动指定 tag (默认: latest)"
+        required: false
+        default: "latest"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: ulysses-lee-lee
+  # 4 crate 镜像名 (per deploy/canvas-game-k3s.yaml image: 字段)
+  IMAGES: >-
+    canvas-engine
+    domain-canvas
+    canvas-realtime
+    canvas-game
+
+jobs:
+  test:
+    name: cargo test (4 crates)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+      - name: cargo check --workspace --all-targets
+        # 守门 #1 v25: 0 err 才推 GHCR
+        run: cargo check --workspace --all-targets -j 4
+      - name: cargo test (4 canvas-game crates)
+        # 守门 #1 v25 cargo test 单 crate 实证
+        run: cargo test -p canvas-engine -p domain-canvas -p canvas-realtime -p canvas-game -j 4
+
+  build-and-push:
+    name: build + push (${{ matrix.image }})
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON('["canvas-engine","domain-canvas","canvas-realtime","canvas-game"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.IMAGE_OWNER }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/star-${{ matrix.image }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+            type=raw,value=${{ inputs.tag || 'latest' }},enable={{is_default_branch}}
+          flavor: |
+            latest=auto
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: crates/${{ matrix.image }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image digest
+        id: digest
+        run: |
+          echo "digest=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/star-${{ matrix.image }}:${{ inputs.tag || 'latest' }})" >> $GITHUB_OUTPUT

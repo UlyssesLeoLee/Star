@@ -1,0 +1,34 @@
+[package]
+name = "domain-canvas"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "domain-canvas: 业务域 画布 (per ULYS-160 §2 阶段 1 骨架, per SRS-STAR-CANVAS-GAME-001 v0.1 §4.2 + BD-STAR-CANVAS-GAME-001 v0.1 §6 + deploy/canvas-game-k3s.yaml containerPort 8081) — 阶段 1 axum HTTP server healthz + /ready + /version + 占位 endpoint, 阶段 2 落地 26 表 W/T/M + 5 角色 业务 logic"
+
+[[bin]]
+name = "domain-canvas"
+path = "src/main.rs"
+
+[lib]
+name = "domain_canvas"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = "0.5"
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[lints]
+workspace = true
