@@ -528,10 +528,14 @@ async fn it_v3_agent_author_comment() {
     let mut agent_actor = ActorContext::new(agent.as_uuid(), tenant_id).with_agent_session(true);
     agent_actor.tenant_id = tenant_id;
 
+    // INV-C-05 (per spec §3): AgentSession 触发的 comment 必须 agent author (user author 空).
+    // 此前 IT-V3-5 用 parent_type=PullRequest 跟 INV-C-05 强化 (lib.rs:147) 冲突,
+    // 单测 fail: "INV-C-05: parent_type=pull_request comment must have user author, not agent".
+    // 改用 ParentType::AgentSession (per ULYS-207 PI-9 W4 P-B INV-C-05 强化).
     let cmd = CreateCommentCommand {
         tenant_id: TenantId(tenant_id),
         project_id: ProjectId::new(),
-        parent_type: ParentType::PullRequest,
+        parent_type: ParentType::AgentSession,
         parent_id: Uuid::new_v4(),
         body: "[bot] reviewed, looks good".to_string(),
         author_user_id: None,
@@ -543,7 +547,7 @@ async fn it_v3_agent_author_comment() {
     let c = svc.create_comment(cmd, &agent_actor).await.unwrap();
     assert_eq!(c.author_agent_id, Some(agent));
     assert!(c.author_user_id.is_none());
-    assert!(matches!(c.parent_type, ParentType::PullRequest));
+    assert!(matches!(c.parent_type, ParentType::AgentSession));
 }
 
 // =====================================================================
