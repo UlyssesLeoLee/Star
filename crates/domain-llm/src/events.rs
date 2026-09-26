@@ -543,4 +543,358 @@ mod tests {
             assert_eq!(ev, back);
         }
     }
+
+    // =====================================================================
+    // PI-1 / FR-6 -- 12-variant direct coverage (per AC-1)
+    //
+    // Each of the 12 AgentStreamEvent variants must have >= 1 dedicated
+    // test. The earlier round-trip + helper tests cover TextDelta,
+    // ToolCall{Start,Delta,End}, Done, Aborted (6 of 12). The tests
+    // below cover the remaining 6: StreamStart, ThinkingDelta, Error,
+    // AnnotationDelta, PathUpdate, MetaUpdate.
+    // =====================================================================
+
+    /// FR-6 variant coverage: `StreamStart` -- the first event of a stream,
+    /// carries the provider-issued response id + model name.
+    #[test]
+    fn agent_stream_event_stream_start_carries_id_and_model() {
+        let id = uuid::Uuid::new_v4();
+        let e = AgentStreamEvent::StreamStart {
+            id,
+            model: "claude-sonnet-4-5".to_string(),
+        };
+        // Inspect fields by reference (no partial move).
+        match &e {
+            AgentStreamEvent::StreamStart {
+                id: got_id,
+                model,
+            } => {
+                assert_eq!(*got_id, id);
+                assert_eq!(model, "claude-sonnet-4-5");
+            }
+            _ => panic!("expected StreamStart"),
+        }
+        // Round-trip preserves both fields exactly.
+        let json = serde_json::to_string(&e).unwrap();
+        let back: AgentStreamEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(e, back);
+    }
+
+    /// FR-6 variant coverage: `ThinkingDelta` -- split-stream reasoning
+    /// text; must coexist with TextDelta and survive round-trip.
+    #[test]
+    fn agent_stream_event_thinking_delta_round_trips() {
+        let e = AgentStreamEvent::ThinkingDelta {
+            delta: "Let me consider the user's request...".to_string(),
+        };
+        assert!(!e.is_terminal());
+        let json = serde_json::to_string(&e).unwrap();
+        // Distinguishability from TextDelta at the wire level (different
+        // variant name) -- this is what lets the UI split reasoning from
+        // final text per FR-4.
+        assert!(json.contains("ThinkingDelta"));
+        assert!(!json.contains("TextDelta"));
+        let back: AgentStreamEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(e, back);
+    }
+
+    /// FR-6 variant coverage: `Error` -- payload + recoverable flag.
+    /// Per PI-3 / FR-16 no-throw contract, this is what replaces
+    /// `Result::Err` mid-stream.
+    #[test]
+    fn agent_stream_event_error_carries_recoverable_flag() {
+        let recoverable = AgentStreamEvent::Error {
+            error: StreamError::new("http_429", "rate limited", true).with_status(429),
+            recoverable: true,
+        };
+        let terminal = AgentStreamEvent::Error {
+            error: StreamError::new("sdk_panic", "model crashed", false),
+            recoverable: false,
+        };
+        // The agent loop's retry decision is keyed off `recoverable`.
+        // Inspect fields by reference to avoid partial move.
+        match &recoverable {
+            AgentStreamEvent::Error { recoverable, error } => {
+                assert!(*recoverable);
+                assert_eq!(error.kind, "http_429");
+                assert_eq!(error.http_status, Some(429));
+            }
+            _ => panic!("expected Error(recoverable=true)"),
+        }
+        match &terminal {
+            AgentStreamEvent::Error { recoverable, .. } => assert!(!(*recoverable)),
+            _ => panic!("expected Error(recoverable=false)"),
+        }
+        // Both round-trip.
+        for ev in [&recoverable, &terminal] {
+            let json = serde_json::to_string(ev).unwrap();
+            let back: AgentStreamEvent = serde_json::from_str(&json).unwrap();
+            assert_eq!(*ev, back);
+        }
+    }
+
+    /// FR-6 variant coverage: `AnnotationDelta` -- UI-only annotation
+    /// hint (code block, citation, language id, ...). The variant
+    /// carries a stable `kind` and a free-form JSON payload.
+    #[test]
+    fn agent_stream_event_annotation_delta_carries_kind_and_payload() {
+        let payload = serde_json::json!({
+            "language": "rust",
+            "line_start": 12,
+            "line_end": 18,
+        });
+        let e = AgentStreamEvent::AnnotationDelta {
+            kind: "code_block".to_string(),
+            payload: payload.clone(),
+        };
+        // Inspect fields by reference (no partial move).
+        match &e {
+            AgentStreamEvent::AnnotationDelta { kind, payload: p } => {
+                assert_eq!(kind, "code_block");
+                assert_eq!(p, &payload);
+            }
+            _ => panic!("expected AnnotationDelta"),
+        }
+        let json = serde_json::to_string(&e).unwrap();
+        let back: AgentStreamEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(e, back);
+    }
+
+    /// FR-6 variant coverage: `PathUpdate` -- worktree / file-path hint
+    /// (`read` / `write` / `edit` / `delete`). UI-only.
+    #[test]
+    fn agent_stream_event_path_update_round_trips() {
+        let e = AgentStreamEvent::PathUpdate {
+            path: "/tmp/foo.rs".to_string(),
+            action: "edit".to_string(),
+        };
+        // Inspect fields by reference (no partial move).
+        match &e {
+            AgentStreamEvent::PathUpdate { path, action } => {
+                assert_eq!(path, "/tmp/foo.rs");
+                assert_eq!(action, "edit");
+            }
+            _ => panic!("expected PathUpdate"),
+        }
+        let json = serde_json::to_string(&e).unwrap();
+        let back: AgentStreamEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(e, back);
+    }
+
+    /// FR-6 variant coverage: `MetaUpdate` -- free-form metadata
+    /// (provider name, finish-reason raw string, rate-limit hints).
+    /// `payload` is optional.
+    #[test]
+    fn agent_stream_event_meta_update_with_and_without_payload() {
+        let bare = AgentStreamEvent::MetaUpdate {
+            key: "provider_request_id".to_string(),
+            value: "req_abc123".to_string(),
+            payload: None,
+        };
+        let rich = AgentStreamEvent::MetaUpdate {
+            key: "x_ratelimit_remaining".to_string(),
+            value: "42".to_string(),
+            payload: Some(serde_json::json!({"window": "60s", "remaining": 42})),
+        };
+        for ev in [bare, rich] {
+            let json = serde_json::to_string(&ev).unwrap();
+            let back: AgentStreamEvent = serde_json::from_str(&json).unwrap();
+            assert_eq!(ev, back);
+        }
+    }
+
+    // =====================================================================
+    // PI-1 / FR-6 -- cross-chunk UTF-8 boundary coverage (>= 3 cases)
+    //
+    // AgentStreamEvent does not concatenate fragments itself -- the
+    // consumer (agent loop / UI) is responsible for buffering until a
+    // valid UTF-8 codepoint boundary. Each TextDelta chunk itself must
+    // be valid UTF-8 (per FR-3 "UTF-8 校验"); the consumer-side merge
+    // then concatenates chunks char-by-char. These tests exercise the
+    // contract by splitting a multi-byte-char string into N valid-UTF-8
+    // chunks that together carry every byte of the original, then
+    // asserting the consumer-side concatenation reconstructs the
+    // original string losslessly.
+    // =====================================================================
+
+    /// FR-6 cross-chunk case 1: 2-byte UTF-8 char "é" (U+00E9, 0xC3 0xA9)
+    /// emitted across two chunks -- the producer must land the split
+    /// on a char boundary; the consumer concatenates to recover the
+    /// original byte sequence.
+    #[test]
+    fn text_delta_concat_two_byte_codepoint_across_chunks() {
+        let s = "caf\u{00e9}"; // "café" -- 5 bytes: 0x63 0x61 0x66 0xC3 0xA9
+        let (a, b) = s.split_at(3); // "caf" (3 ASCII bytes) + "\u{00e9}" (2 bytes)
+        assert!(a.is_char_boundary(3));
+        assert!(b.is_char_boundary(0));
+        let stream = [
+            AgentStreamEvent::text_delta(a),
+            AgentStreamEvent::text_delta(b),
+        ];
+        let reassembled: String = stream
+            .iter()
+            .map(|e| match e {
+                AgentStreamEvent::TextDelta { delta } => delta.as_str(),
+                _ => panic!("expected TextDelta only"),
+            })
+            .collect();
+        assert_eq!(reassembled, "caf\u{00e9}");
+        assert_eq!(reassembled.as_bytes(), s.as_bytes());
+        assert!(std::str::from_utf8(reassembled.as_bytes()).is_ok());
+    }
+
+    /// FR-6 cross-chunk case 2: 3-byte UTF-8 CJK char "中" (U+4E2D,
+    /// 0xE4 0xB8 0xAD) emitted in its own chunk alongside surrounding
+    /// ASCII text -- verifies the producer preserves a complete
+    /// codepoint per chunk even when the source string mixes scripts.
+    #[test]
+    fn text_delta_concat_three_byte_codepoint_in_own_chunk() {
+        let s = "hi\u{4e2d}ok"; // 7 bytes: 2 ASCII + 3 CJK + 2 ASCII
+        let (a, b) = s.split_at(2); // "hi" + "\u{4e2d}ok"
+        let (b1, b2) = b.split_at(3); // "\u{4e2d}" + "ok"
+        let stream = vec![
+            AgentStreamEvent::text_delta(a),
+            AgentStreamEvent::text_delta(b1),
+            AgentStreamEvent::text_delta(b2),
+        ];
+        let reassembled: String = stream
+            .iter()
+            .map(|e| match e {
+                AgentStreamEvent::TextDelta { delta } => delta.as_str(),
+                _ => panic!("expected TextDelta only"),
+            })
+            .collect();
+        assert_eq!(reassembled, "hi\u{4e2d}ok");
+        assert_eq!(reassembled.as_bytes(), s.as_bytes());
+        assert!(std::str::from_utf8(reassembled.as_bytes()).is_ok());
+        // Every individual chunk must be valid UTF-8 (FR-3 invariant).
+        for e in &stream {
+            if let AgentStreamEvent::TextDelta { delta } = e {
+                assert!(std::str::from_utf8(delta.as_bytes()).is_ok());
+            }
+        }
+    }
+
+    /// FR-6 cross-chunk case 3: 4-byte UTF-8 emoji "😀" (U+1F600,
+    /// 0xF0 0x9F 0x98 0x80) emitted as one of several chunks, with
+    /// empty interleaved deltas (a common provider behavior between
+    /// bursts of text). Verifies empty deltas are no-ops and the
+    /// consumer-side concat still recovers the original.
+    #[test]
+    fn text_delta_concat_four_byte_emoji_with_empty_interleavings() {
+        let s = "go\u{1F600}!"; // "go😀!" -- 7 bytes: 2 ASCII + 4 emoji + 1 ASCII
+        // Split char-by-char: "g" / "o" / "\u{1F600}" / "!"
+        let chars: Vec<String> = s.chars().map(|c| c.to_string()).collect();
+        assert_eq!(chars.len(), 4);
+        let stream = [
+            AgentStreamEvent::text_delta(""), // leading empty (common heartbeat)
+            AgentStreamEvent::text_delta(&chars[0]),
+            AgentStreamEvent::text_delta(""), // mid empty
+            AgentStreamEvent::text_delta(&chars[1]),
+            AgentStreamEvent::text_delta(&chars[2]),
+            AgentStreamEvent::text_delta(""), // trailing empty
+            AgentStreamEvent::text_delta(&chars[3]),
+        ];
+        let reassembled: String = stream
+            .iter()
+            .map(|e| match e {
+                AgentStreamEvent::TextDelta { delta } => delta.as_str(),
+                _ => panic!("expected TextDelta only"),
+            })
+            .collect();
+        assert_eq!(reassembled, "go\u{1F600}!");
+        assert_eq!(reassembled.as_bytes(), s.as_bytes());
+        assert!(std::str::from_utf8(reassembled.as_bytes()).is_ok());
+    }
+
+    // =====================================================================
+    // PI-1 / FR-6 -- error recovery coverage (>= 2 cases)
+    //
+    // Per PI-3 / FR-16 no-throw contract, every provider failure mode
+    // must be expressible as `AgentStreamEvent::Error` with an
+    // appropriate `recoverable` flag and a meaningful `StreamError`.
+    // These tests pin down the 5-category failure model called out by
+    // FR-18 (HTTP 4xx / HTTP 5xx / timeout / SDK panic / protocol err)
+    // in the AgentStreamEvent layer (FR-18 ITs live in domain-agent).
+    // =====================================================================
+
+    /// FR-6 error recovery case 1: HTTP 429 (rate limit) is recoverable
+    /// -- the agent loop should retry with backoff.
+    #[test]
+    fn agent_stream_event_error_http_429_is_recoverable() {
+        let e = AgentStreamEvent::Error {
+            error: StreamError::new("http_429", "rate limited", true).with_status(429),
+            recoverable: true,
+        };
+        match e {
+            AgentStreamEvent::Error {
+                error,
+                recoverable,
+            } => {
+                assert!(recoverable);
+                assert_eq!(error.kind, "http_429");
+                assert_eq!(error.http_status, Some(429));
+            }
+            _ => panic!("expected Error"),
+        }
+    }
+
+    /// FR-6 error recovery case 2: SDK panic / protocol err is NOT
+    /// recoverable -- retrying will hit the same failure mode.
+    #[test]
+    fn agent_stream_event_error_sdk_panic_is_not_recoverable() {
+        let e = AgentStreamEvent::Error {
+            error: StreamError::new(
+                "sdk_panic",
+                "provider returned malformed SSE frame",
+                false,
+            ),
+            recoverable: false,
+        };
+        match e {
+            AgentStreamEvent::Error {
+                error,
+                recoverable,
+            } => {
+                assert!(!recoverable);
+                assert_eq!(error.kind, "sdk_panic");
+                assert!(error.message.contains("malformed SSE"));
+            }
+            _ => panic!("expected Error"),
+        }
+    }
+
+    /// FR-6 error recovery case 3 (bonus): HTTP 5xx upstream timeout is
+    /// recoverable once; the no-throw contract (FR-16) is preserved --
+    /// the stream terminates with `Done` after `Error`, never with
+    /// `Result::Err`.
+    #[test]
+    fn agent_stream_event_error_5xx_stream_terminates_with_done() {
+        let stream: Vec<AgentStreamEvent> = vec![
+            AgentStreamEvent::StreamStart {
+                id: uuid::Uuid::new_v4(),
+                model: "gpt-4o".to_string(),
+            },
+            AgentStreamEvent::text_delta("partial answer: "),
+            AgentStreamEvent::Error {
+                error: StreamError::new("http_5xx", "upstream timeout", true).with_status(504),
+                recoverable: true,
+            },
+            AgentStreamEvent::Done {
+                stop_reason: StopReason::Error,
+                usage: Usage::default(),
+            },
+        ];
+        // Per FR-16, the stream ends with Done after Error; never with
+        // an unhandled Result::Err.
+        assert!(stream.last().unwrap().is_terminal());
+        let mut saw_error = false;
+        for e in &stream {
+            if let AgentStreamEvent::Error { recoverable, .. } = e {
+                saw_error = true;
+                assert!(*recoverable);
+            }
+        }
+        assert!(saw_error, "stream should contain an Error event");
+    }
 }

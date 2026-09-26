@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use futures_util::stream::{self, StreamExt};
+use futures_util::stream::{self, BoxStream, StreamExt};
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -23,7 +23,10 @@ use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::chat::{ChatChunk, ChatMessage, ChatRequest, ChatResponse, ChatRole};
+use crate::events::{AgentStreamEvent, StreamError};
 use crate::{LlmProvider, LlmProviderRegistryError, LlmProviderRegistryHealth};
+
+use super::sse;
 
 /// Default Anthropic Messages API base URL.
 pub const ANTHROPIC_DEFAULT_BASE_URL: &str = "https://api.anthropic.com";
@@ -50,6 +53,9 @@ pub struct AnthropicProvider {
     client: Option<Client>,
     /// When `true`, build the request but never send (CI default).
     no_network_mode: bool,
+    /// HTTP timeout: whole-request for `chat_completion`, per-read for
+    /// `stream_completion_v2` (a long stream must not hit a total cap).
+    timeout: Duration,
 }
 
 /// Custom `Debug` impl that **redacts the API key** (守门 #5 v2).
@@ -60,6 +66,7 @@ impl std::fmt::Debug for AnthropicProvider {
             .field("base_url", &self.base_url)
             .field("client", &self.client.as_ref().map(|_| "<reqwest::Client>"))
             .field("no_network_mode", &self.no_network_mode)
+            .field("timeout", &self.timeout)
             .finish()
     }
 }
@@ -78,6 +85,7 @@ impl AnthropicProvider {
             base_url: ANTHROPIC_DEFAULT_BASE_URL.to_string(),
             client: None,
             no_network_mode: true,
+            timeout: REQUEST_TIMEOUT,
         }
     }
 
@@ -91,6 +99,7 @@ impl AnthropicProvider {
             base_url: ANTHROPIC_DEFAULT_BASE_URL.to_string(),
             client: None,
             no_network_mode: true,
+            timeout: REQUEST_TIMEOUT,
         }
     }
 
@@ -104,6 +113,12 @@ impl AnthropicProvider {
     /// `true` to avoid network access (守门 #25 v25).
     pub fn with_network(mut self, enabled: bool) -> Self {
         self.no_network_mode = !enabled;
+        self
+    }
+
+    /// Override the HTTP timeout (default 30s).
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
         self
     }
 
@@ -125,7 +140,7 @@ impl AnthropicProvider {
             return Ok(c.clone());
         }
         Client::builder()
-            .timeout(REQUEST_TIMEOUT)
+            .timeout(self.timeout)
             .build()
             .map_err(|e| {
                 LlmProviderRegistryError::Backend(format!(
@@ -205,6 +220,78 @@ impl AnthropicProvider {
             usage: crate::events::Usage::default(),
             created_at: Utc::now(),
         }
+    }
+    /// Streaming client: connect + per-read timeout, no whole-request cap.
+    fn stream_http(&self) -> Result<Client, reqwest::Error> {
+        Client::builder()
+            .connect_timeout(self.timeout)
+            .read_timeout(self.timeout)
+            .build()
+    }
+
+    /// Body of [`LlmProvider::stream_completion_v2`]; runs inside the
+    /// [`sse::no_throw`] guard, so every failure is an event, never `Err`.
+    async fn open_stream_v2(self, req: ChatRequest) -> BoxStream<'static, AgentStreamEvent> {
+        if let Err(e) = req.validate() {
+            return sse::failed_stream(StreamError::new("invalid_request", e, false));
+        }
+        let id = req.request_id.unwrap_or_else(Uuid::new_v4);
+        let model = if req.model.is_empty() {
+            ANTHROPIC_DEFAULT_MODEL.to_string()
+        } else {
+            req.model.clone()
+        };
+
+        if self.no_network_mode {
+            // Deterministic stub (守门 #25 v25): same shape as a real stream.
+            return stream::iter(vec![
+                AgentStreamEvent::StreamStart {
+                    id,
+                    model,
+                },
+                AgentStreamEvent::text_delta(format!(
+                    "[anthropic stub: stream] {} messages",
+                    req.messages.len()
+                )),
+                AgentStreamEvent::done_default(),
+            ])
+            .boxed();
+        }
+
+        let api_key = match self.api_key_from_env() {
+            Ok(k) => k,
+            Err(e) => return sse::failed_stream(StreamError::new("config", e.to_string(), false)),
+        };
+        let client = match self.stream_http() {
+            Ok(c) => c,
+            Err(e) => {
+                return sse::failed_stream(StreamError::new(
+                    "config",
+                    format!("anthropic: reqwest client build failed: {e}"),
+                    false,
+                ))
+            }
+        };
+        let mut body = self.build_request_body(&req);
+        let Some(obj) = body.as_object_mut() else {
+            return sse::failed_stream(StreamError::new(
+                "invalid_request",
+                "anthropic: request body is not a JSON object",
+                false,
+            ));
+        };
+        obj.insert("stream".to_string(), Value::Bool(true));
+        let url = format!("{}/v1/messages", self.base_url.trim_end_matches('/'));
+
+        // **守门 #5 v2**: key 只进请求头, 不进 event / log.
+        let request = client
+            .post(&url)
+            .header("x-api-key", &api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .header("accept", "text/event-stream")
+            .json(&body);
+        sse::open(request, sse::AnthropicTranslator::new(id, model)).await
     }
 }
 
@@ -420,6 +507,15 @@ impl LlmProvider for AnthropicProvider {
             })
         });
         Ok(s.boxed())
+    }
+    /// **W2 (ULYS-178)** native SSE → [`AgentStreamEvent`] stream
+    /// (PI-1 FR-1 ~ FR-6, PI-3 FR-16 ~ FR-18). Never returns `Err`.
+    async fn stream_completion_v2(
+        &self,
+        req: ChatRequest,
+    ) -> Result<BoxStream<'static, AgentStreamEvent>, LlmProviderRegistryError> {
+        let inner = stream::once(self.clone().open_stream_v2(req)).flatten().boxed();
+        Ok(sse::no_throw("anthropic", inner))
     }
 }
 

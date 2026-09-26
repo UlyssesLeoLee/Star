@@ -141,6 +141,36 @@ impl CredentialDb {
             "CREATE INDEX IF NOT EXISTS idx_audit_credential ON credential_audit_event(credential_id)",
             [],
         )?;
+        // ULYS-203 FR-ORCA-042: account_selection 表 — per (tenant, provider) 唯一
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS account_selection (
+                tenant_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                active_credential_id TEXT NOT NULL,
+                switched_at_ms INTEGER NOT NULL,
+                PRIMARY KEY (tenant_id, provider)
+            )",
+            [],
+        )?;
+        // ULYS-203 FR-ORCA-042: account_usage 表 — 按天 bucket 聚合
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS account_usage (
+                tenant_id TEXT NOT NULL,
+                credential_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                day_bucket TEXT NOT NULL,
+                tokens_in INTEGER NOT NULL DEFAULT 0,
+                tokens_out INTEGER NOT NULL DEFAULT 0,
+                call_count INTEGER NOT NULL DEFAULT 0,
+                last_used_at_ms INTEGER NOT NULL,
+                PRIMARY KEY (tenant_id, credential_id, day_bucket)
+            )",
+            [],
+        )?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_usage_tenant_day ON account_usage(tenant_id, day_bucket)",
+            [],
+        )?;
         Ok(())
     }
 
@@ -313,6 +343,8 @@ fn parse_provider(s: &str) -> Result<Provider, String> {
         "kms_local_mock" => Ok(Provider::KmsLocalMock),
         "llm_openai" => Ok(Provider::LlmOpenAi),
         "llm_anthropic" => Ok(Provider::LlmAnthropic),
+        "llm_github_copilot" => Ok(Provider::LlmGitHubCopilot),
+        "llm_google" => Ok(Provider::LlmGoogle),
         other => Err(format!("unknown provider: {}", other)),
     }
 }
@@ -324,6 +356,188 @@ fn parse_event_type(s: &str) -> Result<AuditEventType, String> {
         "revoke" => Ok(AuditEventType::Revoke),
         "retrieve" => Ok(AuditEventType::Retrieve),
         other => Err(format!("unknown event type: {}", other)),
+    }
+}
+
+// === ULYS-203 FR-ORCA-042: Account Switcher + Usage Tracking ===
+
+/// Account Selection 记录 (per (tenant, LLM provider) → active credential_id)
+///
+/// FR-ORCA-042 §14: 多账号热切换 — UI 可热切换账号, 不重登录 (保留 tokens)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountSelection {
+    /// tenant_id
+    pub tenant_id: String,
+    /// LLM provider (仅 4 类 LLM)
+    pub provider: Provider,
+    /// 当前 active credential_id
+    pub active_credential_id: String,
+    /// 切换时间(毫秒)
+    pub switched_at_ms: u64,
+}
+
+/// Usage Record 记录 (按天 bucket 聚合 per (tenant, credential_id))
+///
+/// FR-ORCA-042 §14.2: 每 account token 用量 / 调用次数 / 配额跟踪
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UsageRecord {
+    /// tenant_id
+    pub tenant_id: String,
+    /// credential_id
+    pub credential_id: String,
+    /// LLM provider
+    pub provider: Provider,
+    /// 日期 bucket (YYYY-MM-DD 格式便于查询)
+    pub day_bucket: String,
+    /// 输入 token 累计
+    pub tokens_in: u64,
+    /// 输出 token 累计
+    pub tokens_out: u64,
+    /// 调用次数
+    pub call_count: u64,
+    /// 最后一次使用时间(毫秒)
+    pub last_used_at_ms: u64,
+}
+
+// === ULYS-203 FR-ORCA-042: account_selection CRUD ===
+
+impl CredentialDb {
+    /// Upsert 当前 active selection (per tenant, provider)
+    pub fn upsert_selection(&self, sel: &AccountSelection) -> Result<(), DbError> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO account_selection (tenant_id, provider, active_credential_id, switched_at_ms)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(tenant_id, provider) DO UPDATE SET
+                active_credential_id = excluded.active_credential_id,
+                switched_at_ms = excluded.switched_at_ms",
+            params![
+                sel.tenant_id,
+                sel.provider.as_str(),
+                sel.active_credential_id,
+                sel.switched_at_ms as i64,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// 查 (tenant, provider) 当前 active selection
+    pub fn get_selection(
+        &self,
+        tenant_id: &str,
+        provider: Provider,
+    ) -> Result<Option<AccountSelection>, DbError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT tenant_id, provider, active_credential_id, switched_at_ms
+             FROM account_selection WHERE tenant_id = ?1 AND provider = ?2",
+        )?;
+        let mut rows = stmt.query(params![tenant_id, provider.as_str()])?;
+        if let Some(row) = rows.next()? {
+            let provider_str: String = row.get(1)?;
+            let provider =
+                parse_provider(&provider_str).map_err(|_| rusqlite::Error::InvalidQuery)?;
+            Ok(Some(AccountSelection {
+                tenant_id: row.get(0)?,
+                provider,
+                active_credential_id: row.get(2)?,
+                switched_at_ms: row.get::<_, i64>(3)? as u64,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// 列出 tenant 所有 active selections
+    pub fn list_selections(&self, tenant_id: &str) -> Result<Vec<AccountSelection>, DbError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT tenant_id, provider, active_credential_id, switched_at_ms
+             FROM account_selection WHERE tenant_id = ?1 ORDER BY provider",
+        )?;
+        let rows = stmt
+            .query_map(params![tenant_id], |row| {
+                let provider_str: String = row.get(1)?;
+                let provider =
+                    parse_provider(&provider_str).map_err(|_| rusqlite::Error::InvalidQuery)?;
+                Ok(AccountSelection {
+                    tenant_id: row.get(0)?,
+                    provider,
+                    active_credential_id: row.get(2)?,
+                    switched_at_ms: row.get::<_, i64>(3)? as u64,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+}
+
+// === ULYS-203 FR-ORCA-042: account_usage CRUD ===
+
+impl CredentialDb {
+    /// 累加 token / 调用次数 (per (tenant, credential_id, day_bucket))
+    pub fn add_usage(
+        &self,
+        tenant_id: &str,
+        credential_id: &str,
+        provider: Provider,
+        day_bucket: &str,
+        tokens_in: u64,
+        tokens_out: u64,
+        last_used_at_ms: u64,
+    ) -> Result<(), DbError> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO account_usage
+                (tenant_id, credential_id, provider, day_bucket, tokens_in, tokens_out, call_count, last_used_at_ms)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7)
+             ON CONFLICT(tenant_id, credential_id, day_bucket) DO UPDATE SET
+                tokens_in = tokens_in + excluded.tokens_in,
+                tokens_out = tokens_out + excluded.tokens_out,
+                call_count = call_count + 1,
+                last_used_at_ms = excluded.last_used_at_ms",
+            params![
+                tenant_id,
+                credential_id,
+                provider.as_str(),
+                day_bucket,
+                tokens_in as i64,
+                tokens_out as i64,
+                last_used_at_ms as i64,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// 列出 credential 的 usage (按 day_bucket ASC)
+    pub fn list_usage(
+        &self,
+        tenant_id: &str,
+        credential_id: &str,
+    ) -> Result<Vec<UsageRecord>, DbError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT tenant_id, credential_id, provider, day_bucket, tokens_in, tokens_out, call_count, last_used_at_ms
+             FROM account_usage WHERE tenant_id = ?1 AND credential_id = ?2 ORDER BY day_bucket ASC",
+        )?;
+        let rows = stmt
+            .query_map(params![tenant_id, credential_id], |row| {
+                let provider_str: String = row.get(2)?;
+                let provider =
+                    parse_provider(&provider_str).map_err(|_| rusqlite::Error::InvalidQuery)?;
+                Ok(UsageRecord {
+                    tenant_id: row.get(0)?,
+                    credential_id: row.get(1)?,
+                    provider,
+                    day_bucket: row.get(3)?,
+                    tokens_in: row.get::<_, i64>(4)? as u64,
+                    tokens_out: row.get::<_, i64>(5)? as u64,
+                    call_count: row.get::<_, i64>(6)? as u64,
+                    last_used_at_ms: row.get::<_, i64>(7)? as u64,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 }
 
