@@ -1,0 +1,136 @@
+# ULYS-154 PR-1: cargo-tarpaulin 回归测试覆盖率基线
+# ─────────────────────────────────────────────────────────────
+# 设计原则 (per AGENTS.md §6 守门 + PR-1 scope = "只加 CI + 工具, 不动业务"):
+#   1. 不挡 merge (advisory): tarpaulin 出错只在日志, fail 不影响 PR 合入
+#   2. 不替代 cargo test: 与 ci.yml 的 cargo test 并存, 仅做覆盖率度量
+#   3. 不污染 release artifact: coverage/ 全在 .gitignore, 只作 workflow artifact
+#   4. 单平台跑 (ubuntu-latest): Windows tarpaulin 对 tokio async 统计偏差大,
+#      macOS GH runner 慢 3x; 与 cargo test 的 cross-platform smoke (ci.yml) 职责分开
+#
+# 触发:
+#   - push main: 跑覆盖率, 累计基线 (无 PR 比较)
+#   - PR 任何分支合 dev/main: 跑覆盖率, 与 base 比较 delta (advisory)
+#   - workflow_dispatch: 手动跑, 可选只跑指定 crate
+# ─────────────────────────────────────────────────────────────
+
+name: Coverage (cargo-tarpaulin, advisory)
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
+    inputs:
+      crate:
+        description: "可选: 只跑指定 crate (per AGENTS.md 守门 #1 单 crate 模式)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  # 同一 PR 同一次 push 只跑一个 coverage job (避免 tarpaulin 跑 30 分钟浪费 CI 配额)
+  group: coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tarpaulin-workspace:
+    name: cargo-tarpaulin (workspace, advisory)
+    runs-on: ubuntu-latest
+    # ULYS-154 scope: advisory — 不挡 PR 合入, 但跑出真实数据
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-tarpaulin (pinned)
+        # ULYS-154 PR-1: 锁版本 0.31.x, 避免 tarpaulin 升级导致覆盖率算法变化、baseline 不可比
+        # tarpaulin 不在 rust-toolchain 组件里, 必须显式装
+        run: |
+          cargo install --locked cargo-tarpaulin --version "^0.31"
+
+      - name: cargo tarpaulin (lib only, ${{ inputs.crate || '--workspace' }})
+        env:
+          # tarpaulin 在 GitHub Actions 容器内需要这些, 否则 ptrace attach 失败
+          CARGO_TARPAULIN_ARGS: "--locked --workspace --lib --timeout 120 --skip-clean --output-dir coverage"
+        run: |
+          mkdir -p coverage
+          if [ -n "${{ inputs.crate }}" ]; then
+            echo "Single-crate mode: ${{ inputs.crate }}"
+            cargo tarpaulin -p "${{ inputs.crate }}" --lib --timeout 120 \
+              --skip-clean --output-dir coverage
+          else
+            # workspace 全跑; tarpaulin 内部会逐 crate 统计
+            # 注: AGENTS.md §4.1 v19 守门 — 不用 -j, tarpaulin 自己调度
+            cargo tarpaulin --workspace --lib --timeout 120 \
+              --skip-clean --output-dir coverage
+          fi
+
+      - name: Generate per-crate baseline summary
+        # ULYS-154 PR-1 验收: 生成 baseline.txt (每 crate 一行覆盖率)
+        # tarpaulin 没有原生 per-crate summary, 自己用 cargo-tarpaulin report 解析
+        if: success() || failure()
+        run: |
+          if [ -f coverage/cobertura.xml ]; then
+            # cobertura.xml 是标准格式, 用 Python 解析每个 package (= crate) 的 line-rate
+            python3 scripts/coverage_summary.py coverage/cobertura.xml \
+              > coverage/baseline.txt 2> coverage/parse_warnings.txt || true
+            echo "── per-crate baseline ──"
+            head -100 coverage/baseline.txt
+            echo "── workspace total ──"
+            tail -5 coverage/baseline.txt
+          else
+            echo "::warning::coverage/cobertura.xml not generated (tarpaulin failed or no tests)"
+            echo "tarpaulin 失败不影响 PR, 见 job 日志定位根因" > coverage/baseline.txt
+          fi
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.event.pull_request.number || github.ref_name }}-${{ github.sha }}
+          path: |
+            coverage/
+            !coverage/parse_warnings.txt
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Comment PR with baseline delta
+        # PR 触发时, 把 baseline 数字写到 PR 评论 (advisory)
+        if: github.event_name == 'pull_request' && (success() || failure())
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'coverage/baseline.txt';
+            if (!fs.existsSync(path)) {
+              console.log('baseline.txt 不存在, 跳过评论');
+              return;
+            }
+            const summary = fs.readFileSync(path, 'utf8').slice(0, 6000);
+            const body = [
+              '## 📊 ULYS-154 PR-1 覆盖率基线 (cargo-tarpaulin, advisory)',
+              '',
+              '```',
+              summary,
+              '```',
+              '',
+              '> **本评论为 advisory**, 覆盖率数字本身不挡 PR 合入。',
+              '> 完整 artifact: 见本 job 上传的 `coverage-*` artifact (保留 14 天)。',
+              '> 路线图: ULYS-154 (PR-1 = 基线, PR-2~4 = 按价值密度分阶段补到 90%)。'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
