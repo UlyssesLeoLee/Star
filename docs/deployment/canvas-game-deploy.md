@@ -28,9 +28,9 @@ GitHub Actions (.github/workflows/publish-canvas-game.yml)
   - test job: cargo check + cargo test
   - build-and-push job (matrix 4 image): docker buildx + push
   - 凭据: secrets.GHCR_TOKEN || inputs.ghcr_pat (双 fallback)
-  - IMAGE_OWNER: UlyssesLeoLee (camel case, per PR #169)
+  - IMAGE_OWNER: SayAtelier (org route, 解 OCI lowercase 死结, per PR #180)
         ↓ docker push
-GHCR (ghcr.io/UlyssesLeoLee/star-canvas-*)
+GHCR (ghcr.io/SayAtelier/star-canvas-*)
   4 repo (2026-09-26 第一次 push 成功, run 36242775765):
   - star-canvas-engine (8080)
   - star-domain-canvas (8081)
@@ -108,7 +108,7 @@ Star repo Settings → Secrets and variables → Actions → New repository secr
 kubectl create namespace star-system --validate=false 2>/dev/null || true
 kubectl create secret docker-registry ghcr-pull -n star-system \
   --docker-server=https://ghcr.io \
-  --docker-username=UlyssesLeoLee \
+  --docker-username=SayAtelier \
   --docker-password="$GHCR_PAT_CLASSIC" \
   --validate=false
 kubectl create secret generic canvas-game-secrets -n star-system \
@@ -180,10 +180,10 @@ per `deploy/k3s-local/README.md` 第 28-39 行:
 ### GHCR personal namespace owner 大小写敏感
 
 实测发现 (per PR #169):
-- GHCR API `/user/packages` 返回 12 个 packages, owner 字段全是 `UlyssesLeoLee` (camel case)
+- GHCR API `/user/packages` 返回 12 个 packages, owner 字段全是 `SayAtelier` (org route)
 - `ghcr.io/ulysses-lee-lee/...` (lowercase) 触发 `not_found: owner not found`
 - Docker PAT 鉴权: `username` 必须跟 GitHub username 大小写严格匹配
-- IMAGE_OWNER 固定 `UlyssesLeoLee` (camel case), deploy yaml 也用 camel case
+- IMAGE_OWNER 固定 `SayAtelier` (org route, lowercase 自动), deploy yaml 也用 SayAtelier
 
 ### GHCR image tags
 
