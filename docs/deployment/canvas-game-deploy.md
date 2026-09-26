@@ -84,8 +84,10 @@
 wsl -d Ubuntu -- bash -c 'cd ~/Star && git pull origin dev'
 
 # 2. 触发 GHCR publish workflow (push dev 时自动触发, 或手动 dispatch)
-# 注: workflow 改用 GITHUB_TOKEN 自动登录 GHCR (per ULYS-160 PR #167 followup),
-# 不需要额外 secret / PAT. GitHub Actions 自动 token 带 packages:write scope.
+# 必设: Star repo Settings -> Secrets and variables -> Actions -> New repository secret
+#   Name: GHCR_TOKEN
+#   Value: ghcr.io classic PAT with write:packages scope
+# (per PR #168: GITHUB_TOKEN 在 personal namespace 不可用, 改回用 classic PAT)
 gh workflow run publish-canvas-game.yml
 # 也可直接 push dev 让 workflow 自动跑 (默认 trigger)
 
