@@ -107,14 +107,82 @@ class MockSwitchReader:
 
         v0.1 简化版: 只含 cluster.enabled + cluster.mode + cluster.aci_compat_version.
         plugins / modules 部分留 placeholder, 待 §4.4 module_switch 扩展补完整.
+
+        v0.2 (per ULYS-190 §4.4 stage3 Star): plugins.<id>.modules.<id> 真拼接,
+        跨项目範式对齐 IM1.0 (PR #24) + CATs (PR #18).
         """
-        parts = [
-            f"cluster.enabled={str(self.is_cluster_enabled()).lower()}",
-            f"cluster.mode={self.get_mode()}",
-            f"cluster.aci_compat_version={self.get_aci_compat_version()}",
-            "[TBD plugins section 落地後擴充]",
-        ]
-        return ", ".join(parts)
+        # Read template from .mock-cluster.json mock_switch_trace_format field,
+        # substitute {cluster.enabled} + {cluster.mode}, append plugins=[...]=
+        # 7/7 modules summary (if .aci.json has plugins section).
+        template = self._config.get(
+            "mock_switch_trace_format",
+            "cluster.enabled={cluster.enabled}, cluster.mode={cluster.mode}, [TBD plugins section 落地後擴充]",
+        )
+        # Substitute cluster placeholders
+        result = template.replace("{cluster.enabled}", str(self.is_cluster_enabled()).lower())
+        result = result.replace("{cluster.mode}", self.get_mode())
+        return result
+
+    # ----- plugin / module reading (per ULYS-190 §4.4 stage3) -------------
+
+    def read_plugins(self, aci_config_path: Path) -> dict[str, Any]:
+        """读 .aci.json 的 plugins.<id>.modules.<id> section.
+
+        Returns dict with:
+          - plugins_total: int
+          - plugins_enabled: int
+          - modules_total: int
+          - modules_enabled: int
+          - plugins: dict[plugin_id, dict[module_id, module_state]]
+        """
+        try:
+            aci = json.loads(aci_config_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            raise ClusterConfigError(
+                f"读取 .aci.json 失败: {e} (path={aci_config_path})"
+            ) from e
+
+        plugins_total = 0
+        plugins_enabled = 0
+        modules_total = 0
+        modules_enabled = 0
+        plugins: dict[str, Any] = {}
+
+        for plugin_id, plugin_data in aci.get("plugins", {}).items():
+            plugins_total += 1
+            plugin_enabled = bool(plugin_data.get("enabled", False))
+            if plugin_enabled:
+                plugins_enabled += 1
+
+            plugin_entry = {
+                "plugin_id": plugin_id,
+                "enabled": plugin_enabled,
+                "default_mode": plugin_data.get("default_mode", "offline"),
+                "modules_total": 0,
+                "modules_enabled": 0,
+                "modules": {},
+            }
+            for module_id, module_data in plugin_data.get("modules", {}).items():
+                modules_total += 1
+                plugin_entry["modules_total"] += 1
+                module_enabled = bool(module_data.get("enabled", False))
+                if module_enabled:
+                    modules_enabled += 1
+                    plugin_entry["modules_enabled"] += 1
+                plugin_entry["modules"][module_id] = {
+                    "module_id": module_id,
+                    "enabled": module_enabled,
+                    "mode": module_data.get("mode", "offline"),
+                }
+            plugins[plugin_id] = plugin_entry
+
+        return {
+            "plugins_total": plugins_total,
+            "plugins_enabled": plugins_enabled,
+            "modules_total": modules_total,
+            "modules_enabled": modules_enabled,
+            "plugins": plugins,
+        }
 
     # ----- ACI compat validation -------------------------------------------
 
@@ -212,10 +280,26 @@ def cmd_validate_compat(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_read_plugins(args: argparse.Namespace) -> int:
+    """读 .aci.json plugins.<id>.modules.<id> section (per ULYS-190 §4.4 stage3).
+
+    输出 JSON 到 stdout, exit 0=OK, 1+exit=ERROR.
+    """
+    r = MockSwitchReader(Path(args.cluster_config))
+    try:
+        plugins = r.read_plugins(Path(args.aci_config))
+    except MockSwitchError as e:
+        print(f"ERROR={type(e).__name__}: {e}", file=sys.stderr)
+        return 2
+    import json as _json
+    print(_json.dumps(plugins, ensure_ascii=False, indent=2))
+    return 0
+
+
 def _build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="_lib_mock_switch.py",
-        description="Star Mock L1 cluster_switch reader (per ULYS-190 §4.1)",
+        description="Star Mock L1 cluster_switch + L2 plugin + L3 module reader (per ULYS-190 §4.1 + §4.4 stage3)",
     )
     sub = p.add_subparsers(dest="subcommand", required=True)
 
@@ -246,6 +330,18 @@ def _build_argparser() -> argparse.ArgumentParser:
         help="path to .aci.json (e.g. tools/star-flash-mock/.aci.json)",
     )
     sp.set_defaults(func=cmd_validate_compat)
+
+    sp = sub.add_parser(
+        "read-plugins",
+        parents=[common],
+        help="read .aci.json plugins.<id>.modules.<id> section (per ULYS-190 §4.4 stage3)",
+    )
+    sp.add_argument(
+        "--aci-config",
+        required=True,
+        help="path to .aci.json (e.g. tools/star-flash-mock/.aci.json)",
+    )
+    sp.set_defaults(func=cmd_read_plugins)
 
     return p
 

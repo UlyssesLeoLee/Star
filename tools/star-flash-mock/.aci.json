@@ -5,9 +5,25 @@
   "project": "star-flash-mock",
   "description": "Star Flash Mock ACI 契约 v0.1 — 提示词型断言 (LLM-可读)",
   "homepage": "https://github.com/UlyssesLeoLee/Star/tree/main/tools/star-flash-mock",
-  "supported_layers": ["ut", "it", "st", "e2e"],
-  "severity_levels": ["critical", "high", "medium", "low", "info"],
-  "assertion_statuses": ["PASS", "FAIL", "WARN", "SKIP"],
+  "supported_layers": [
+    "ut",
+    "it",
+    "st",
+    "e2e"
+  ],
+  "severity_levels": [
+    "critical",
+    "high",
+    "medium",
+    "low",
+    "info"
+  ],
+  "assertion_statuses": [
+    "PASS",
+    "FAIL",
+    "WARN",
+    "SKIP"
+  ],
   "expect_value_types": [
     "response_within_ms",
     "response_status_2xx",
@@ -123,6 +139,127 @@
     "v0.4": "4 个项目盘点 (per §4.3 + G-ACI-01)",
     "v0.5": "跨项目统一验证 (per §4.5)",
     "v1.0": "aci-summary CLI 完整版 + LLM Consumer"
+  },
+  "plugins": {
+    "five_domain": {
+      "plugin_id": "five_domain",
+      "enabled": true,
+      "default_mode": "offline",
+      "description": "5-domain SRS fixture suite (admin/economy/match/social/player × 6 fixture each = 30 fixture files)",
+      "modules": {
+        "fixtures": {
+          "module_id": "fixtures",
+          "enabled": true,
+          "mode": "offline",
+          "description": "30 fixture files across 5 domains (admin:6 + economy:6 + match:6 + player:6 + social:6), per _generate_30_five_domain_fixtures.py",
+          "fixture_count": 30,
+          "generator": "_generate_30_five_domain_fixtures.py",
+          "fixture_dir": "tools/star-flash-mock/mock_data/five-domain/"
+        }
+      }
+    },
+    "agent_runtime": {
+      "plugin_id": "agent_runtime",
+      "enabled": true,
+      "default_mode": "offline",
+      "description": "Agent runtime fixture suite (guards/l0-dispatcher/l1-ecs/l2-pools, 45 fixtures total)",
+      "modules": {
+        "fixtures": {
+          "module_id": "fixtures",
+          "enabled": true,
+          "mode": "offline",
+          "description": "45 fixture files (guards/l0-dispatcher/l1-ecs/l2-pools), per _generate_45_agent_runtime_fixtures.py + build_archetype/build_system/build_pool/build_guard",
+          "fixture_count": 45,
+          "generator": "_generate_45_agent_runtime_fixtures.py",
+          "fixture_dir": "tools/star-flash-mock/mock_data/agent-runtime/"
+        }
+      }
+    },
+    "mcp": {
+      "plugin_id": "mcp",
+      "enabled": true,
+      "default_mode": "offline",
+      "description": "MCP (Model Context Protocol) fixture suite (10 fixtures)",
+      "modules": {
+        "fixtures": {
+          "module_id": "fixtures",
+          "enabled": true,
+          "mode": "offline",
+          "description": "10 fixture files, per _generate_10_mcp_fixtures.py + build_fixture",
+          "fixture_count": 10,
+          "generator": "_generate_10_mcp_fixtures.py",
+          "fixture_dir": "tools/star-flash-mock/mock_data/mcp/"
+        }
+      }
+    },
+    "db_wtm": {
+      "plugin_id": "db_wtm",
+      "enabled": true,
+      "default_mode": "offline",
+      "description": "DB W/T/M (Master/Transaction/Work) fixture suite (100 fixtures per per-aggregate, 3 categories: master/transaction/work)",
+      "modules": {
+        "fixtures": {
+          "module_id": "fixtures",
+          "enabled": true,
+          "mode": "offline",
+          "description": "100 fixture files (per _generate_100_fixtures.py + build_fixture), 3 sub-categories: master / transaction / work",
+          "fixture_count": 100,
+          "generator": "_generate_100_fixtures.py",
+          "fixture_dir": "tools/star-flash-mock/mock_data/db-wtm/"
+        }
+      }
+    },
+    "langgraph": {
+      "plugin_id": "langgraph",
+      "enabled": true,
+      "default_mode": "offline",
+      "description": "LangGraph fixture suite (sa-01..09 / sa-10 / tmo sub-categories)",
+      "modules": {
+        "fixtures": {
+          "module_id": "fixtures",
+          "enabled": true,
+          "mode": "offline",
+          "description": "LangGraph fixture files, sub-categories: sa-01..09 / sa-10 / tmo",
+          "fixture_count": 0,
+          "generator": "(no Python generator script — fixtures directly committed)",
+          "fixture_dir": "tools/star-flash-mock/mock_data/langgraph/"
+        }
+      }
+    },
+    "uat": {
+      "plugin_id": "uat",
+      "enabled": true,
+      "default_mode": "offline",
+      "description": "UAT (User Acceptance Testing) fixture + scripts (35 UAT scripts × 1 regression suite)",
+      "modules": {
+        "regression": {
+          "module_id": "regression",
+          "enabled": true,
+          "mode": "offline",
+          "description": "35 UAT scripts (uat-s01-s05 / uat-s06-s10 / uat-s11-s15 / uat-s16-s20 / uat-s21-s25 / uat-s26-s35) + 6 generator scripts + regression-test-system.sh / smoke-test.sh",
+          "fixture_count": 35,
+          "generator": "_generate_uat_s*.py (6 scripts)",
+          "fixture_dir": "tools/star-flash-mock/mock_data/uat/"
+        }
+      }
+    },
+    "core": {
+      "plugin_id": "core",
+      "enabled": true,
+      "default_mode": "offline",
+      "description": "Core dispatch helpers (mock_switch reader + ACI emit + validate)",
+      "modules": {
+        "dispatch": {
+          "module_id": "dispatch",
+          "enabled": true,
+          "mode": "offline",
+          "description": "_lib_mock_switch.py (L1+L2+L3 reader) + _lib_aci_emit.py (ACI emitter) + _lib_validate.py (JSON schema validator)",
+          "fixture_count": 0,
+          "generator": "(N/A — Python helpers)",
+          "fixture_dir": "tools/star-flash-mock/scripts/_lib_*.py"
+        }
+      }
+    }
   },
   "reference_docs": [
     "docs/architecture/2026-09-22-aci-mock-interface/00-design-analysis.md v0.2",
