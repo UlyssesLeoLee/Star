@@ -10,6 +10,18 @@
 # 1 副本 (per 9/7 07:06 JST 拍板 dev 本地 + 1 副本)
 # 边缘 envoy 独立 deployment (per 9/1 13:05 JST 拍板, 不选 nginx / istio sidecar)
 #
+# 镜像来源 (per ULYS-160 issue #160):
+#   GHCR owner: UlyssesLeoLee (camel case, 必须跟 GitHub username 严格匹配,
+#            workflow 写 lowercase 会触发 GHCR API 'not_found: owner not found',
+#            per PR #169 followup)
+#   Image tag: :dev (per publish-canvas-game.yml `tags: type=ref,event=branch`,
+#            push dev → 自动推 :dev tag; 没有 :latest tag)
+#   4 image repo:
+#     - ghcr.io/UlyssesLeoLee/star-canvas-engine:dev    (port 8080)
+#     - ghcr.io/UlyssesLeoLee/star-domain-canvas:dev    (port 8081)
+#     - ghcr.io/UlyssesLeoLee/star-canvas-realtime:dev  (port 8082 + 8083 WSS)
+#     - ghcr.io/UlyssesLeoLee/star-canvas-game:dev      (port 8084)
+#
 # 一键部署:
 #   pwsh -NoProfile -NonInteractive -File scripts/start-k3s-backend.ps1
 #   或 .\start-k3s-backend.bat
@@ -132,7 +144,7 @@ spec:
       serviceAccountName: star-canvas
       containers:
       - name: canvas-engine
-        image: ghcr.io/ulysses-lee-lee/star-canvas-engine:latest
+        image: ghcr.io/UlyssesLeoLee/star-canvas-engine:dev
         imagePullPolicy: IfNotPresent
         ports:
         - { name: http, containerPort: 8080 }
@@ -185,7 +197,7 @@ spec:
       serviceAccountName: star-canvas
       containers:
       - name: domain-canvas
-        image: ghcr.io/ulysses-lee-lee/star-domain-canvas:latest
+        image: ghcr.io/UlyssesLeoLee/star-domain-canvas:dev
         imagePullPolicy: IfNotPresent
         ports:
         - { name: http, containerPort: 8081 }
@@ -238,7 +250,7 @@ spec:
       serviceAccountName: star-canvas
       containers:
       - name: canvas-realtime
-        image: ghcr.io/ulysses-lee-lee/star-canvas-realtime:latest
+        image: ghcr.io/UlyssesLeoLee/star-canvas-realtime:dev
         imagePullPolicy: IfNotPresent
         ports:
         - { name: http, containerPort: 8082 }
@@ -294,7 +306,7 @@ spec:
       serviceAccountName: star-canvas
       containers:
       - name: canvas-game
-        image: ghcr.io/ulysses-lee-lee/star-canvas-game:latest
+        image: ghcr.io/UlyssesLeoLee/star-canvas-game:dev
         imagePullPolicy: IfNotPresent
         ports:
         - { name: http, containerPort: 8084 }
