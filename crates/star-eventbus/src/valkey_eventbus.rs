@@ -345,11 +345,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn connect_rejects_valkey_scheme() {
-        // 跟 star-cache 行为对齐: redis-rs 0.27 默认不认 valkey:// scheme
-        // 生产部署用 redis:// (Valkey 协议 100% 兼容)
+    async fn connect_attempts_valkey_scheme() {
+        // valkey:// 现在被 redis-rs 1.7+ 接受 (1.7 跟 valkey client 合并, 默认 first-class),
+        // 跟 star-cache/src/valkey_backend.rs 行为对齐 (line 200-211 测 valkey://x 通过 env)。
+        // connect() 在 Client::open 阶段不 reject, 而是 ConnectionManager::new 阶段连接失败
+        // (example:6379 不存在), 所以返 Err(ConnectFailed) 而不是 InvalidUrl。
+        // 旧名 connect_rejects_valkey_scheme 已不准确 (不再 reject scheme).
         let r = ValkeyEventBus::connect("valkey://example:6379", Uuid::new_v4()).await;
-        assert!(matches!(r, Err(ValkeyEventBusError::InvalidUrl)));
+        assert!(
+            matches!(r, Err(ValkeyEventBusError::ConnectFailed)),
+            "expected ConnectFailed for unconnectable valkey://, got a different error",
+        );
     }
 
     #[tokio::test]
