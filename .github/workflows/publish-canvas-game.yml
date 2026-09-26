@@ -9,10 +9,10 @@
 #       跟现有 Coverage workflow 同样用 secrets.GHCR_TOKEN
 #
 # 镜像目标:
-#   ghcr.io/ulysses-lee-lee/star-canvas-engine
-#   ghcr.io/ulysses-lee-lee/star-domain-canvas
-#   ghcr.io/ulysses-lee-lee/star-canvas-realtime
-#   ghcr.io/ulysses-lee-lee/star-canvas-game
+#   ghcr.io/starghorg/star-canvas-engine
+#   ghcr.io/starghorg/star-domain-canvas
+#   ghcr.io/starghorg/star-canvas-realtime
+#   ghcr.io/starghorg/star-canvas-game
 #
 # 守门:
 #   - #1 cargo check --workspace --all-targets + cargo test 单 crate
@@ -40,8 +40,8 @@ permissions:
 env:
   REGISTRY: ghcr.io
   # IMAGE_OWNER 必须是 GitHub username camel case (per PR #168 followup fix: GHCR namespace
-  # 必须跟 GitHub username 完全匹配, lowercase 'ulysses-lee-lee' 会触发 not_found)
-  IMAGE_OWNER: UlyssesLeoLee
+  # 必须跟 GitHub username 完全匹配, lowercase 'starghorg' 会触发 not_found)
+  IMAGE_OWNER: StarGHorg
   # 4 crate 镜像名 (per deploy/canvas-game-k3s.yaml image: 字段)
   IMAGES: >-
     canvas-engine
