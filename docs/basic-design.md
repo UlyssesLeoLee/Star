@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v0.1 (2026-08-25)
-> **上游要件定义书**: `D:\Star\docs\requirements.md` v2.0(下文以 §N 引用)
+> **文档版本**: v0.2 (2026-09-27)
+> **上游要件定义书**: `D:\Star\docs\requirements.md` v2.1(下文以 §N 引用)
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -10,7 +10,7 @@
 
 ### 0.1 文档目的与定位
 
-本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本设计書》阶段的产出。其上游是《要件定義書 v2.0》(§0-§47),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
+本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本设计書》阶段的产出。其上游是《要件定義書 v2.1》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
 
 **本文档不输出生产代码**(重申 §47):
 
@@ -47,6 +47,7 @@
 | Security Boundary(§16, §23.2, §34) | §6 安全边界、§4.6 Local Runtime |
 | Domain Boundary(§6) | §2 Domain 划分、§3 Context Map |
 | Worktree Lifecycle(§22.2) | §4.1、§7、附录 A |
+| 渡口 Worktree 群组体验(§50) | §16 Worktree Index、Group Shell、同级 App、CLI、范围化 Chat、插件与 LangGraph |
 | Agent Policy(§24.3) | §4.2、§6.4 |
 | Feedback Model(§25) | §4.3 |
 | Context Model(§26) | §4.4 |
@@ -67,6 +68,8 @@
 - **SoR**: System of Record,本设计中默认为 PostgreSQL
 - **ACL**: Anti-Corruption Layer
 - **P0/P1/P2**: 优先级(继承 §41.2)
+- **Worktree Group**: 以既有 `worktree_id` 标识的 Project 内应用上下文；它提供导航、授权范围与跨 App 协作，不复制 Worktree 业务事实。
+- **Group Context**: `tenant_id / workspace_id / project_id / repository_id / worktree_id / actor_id` 的已授权请求上下文。
 
 ### 0.4 受众
 
@@ -4151,3 +4154,280 @@ frontend/src/
 ---
 
 *本节 §12 は onboarding 機能追加 (2026-09-02 08:01 JST Ulysses 4 拍板) による。*
+
+---
+
+## 16. 渡口 Worktree 群组基本设计（requirements §50）
+
+### 16.1 设计目标与边界
+
+本节把 `Worktree` 组织成 Project 内的顶层工作入口。用户从 Worktree Index 选择一个 Worktree 后进入对应的 `WorktreeGroupShell`；Multica、Jira 类工作管理、Task Card 索引、Infinite Canvas 和可插拔应用作为同级入口。CLI 与 Agent Session 从任务卡内打开。固定底栏 Chat Bar 始终可用，并在发送前选择 `WORKTREE` 或 `GLOBAL` 范围。
+
+群组树的直接子项包括 Multica 生命周期入口、Jira 类工作管理入口、Task Card 索引、Infinite Canvas 与已启用插件。**Task Cards 与 Infinite Canvas 是直接挂在 Worktree 下的平级入口**；Task Card 可由 Multica 或 Jira 类视图打开，但不隶属于其中某个 App。CLI 与 Agent Session 是任务卡内的操作面板，不是 Worktree 下的独立同级入口。
+
+```text
+Tenant → Workspace → Project
+                          └─ Worktree Index
+                             └─ Worktree Group(worktree_id)
+                                ├─ Multica Task Lifecycle
+                                ├─ Jira-class Work Management（Board / Backlog / Sprint）
+                                ├─ Task Card Index（直接挂在 Worktree 下；卡内可打开 CLI / Agent Session）
+                                ├─ Infinite Canvas App（Miro 类，直接挂在 Worktree 下）
+                                └─ Plugin Apps（同级扩展槽）
+
+App Shell 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
+```
+
+`WorktreeGroupShell` 是 UI 组合与授权上下文，不是新的业务聚合根。其唯一身份是既有 `worktree_id`，不复制 Worktree、WorkItem、AgentSession 或 Canvas 事实。Tenant → Workspace → Project 仍是归属与权限层级；`1 WorkItem → 0/1/N Worktrees` 和 Worktree / WorkItem 状态独立性继续成立。项目可能尚无 Worktree 时，Project 范围的 Board/Backlog 仍可使用；创建并选择 Worktree 后再进入 Worktree Group。
+
+当前 `/worktree-canvas` 是 Project 范围的 **Worktree Overview Graph**，用于跨 Worktree 冲突、依赖和热区总览。它不替代 Worktree Group 中面向当前工作区的 **Infinite Canvas**。两个页面应有不同导航标签、路由和查询范围；Overview Graph 可以链接进入具体 Group，Group Canvas 也可以链接到 Overview Graph。
+
+### 16.2 Worktree Index 与同级 App Shell
+
+| 组件 | 职责 | 关键输入 | 约束 |
+|---|---|---|---|
+| `WorktreeIndex` | 展示当前 Project 可访问的 Worktree、状态摘要、告警和最近活动；选择后打开 Group | `project_id`, actor permissions, Worktree projections | 不把 Task 状态折叠成 Worktree 状态；遵循 RLS |
+| `WorktreeGroupShell` | 组合 Group Header、同级 App 导航、主内容区、固定底栏 Chat Bar | 已授权 `GroupContext` | 切换 Worktree 时重新解析上下文和订阅 |
+| `GroupAppRegistry` | 根据平台注册表及 Group App Binding 生成同级 App 入口 | app manifest, enablement, permissions | 插件路由与原生 App 使用相同授权接口 |
+| `MulticaLifecycleApp` | 展示 claim、execution、review gate、failed 等任务执行生命周期 | WorkItem、Workflow、AgentSession 投影 | 与 Jira 类视图共用 WorkItem 事实 |
+| `JiraWorkManagementApp` | 提供 Board/Backlog/Sprint/Relation 管理视图 | WorkItem、Workflow、Planning、Relation 投影 | 不建立第二套任务事实源 |
+| `TaskCardIndex` | 在 Worktree Group 下直接列出并打开 Task Cards；可由 Multica 或 Jira 视图深链进入 | WorkItem、AgentSession、TaskCard projection | Task Card 是统一任务工作入口，不是某个 App 的私有子对象 |
+| `InfiniteCanvasApp` | 编辑当前 Worktree 的空间画布，并引用任务、Agent、CLI、Flow 和关系 | Canvas Document、EntityRef、Realtime projection | Canvas Element 不复制被引用实体状态 |
+| `AgentCliPanel` | 嵌入 Task Card 详情，展示 AgentSession 与受控 CLI Session，附着/分离终端输出 | Runtime / Worktree / WorkItem / Policy | 只能执行批准的启动配置和命令类别 |
+| `PluginAppSlot` | 在同级导航和内容区挂载经授权的插件 App | Plugin Manifest、Group Plugin Binding | 不允许插件直接访问其它 App 状态或数据库 |
+| `BottomChatBar` | 持久输入、范围选择、实体引用和 LangGraph 流式交互 | Scope + EntityRefs + Checkpoint | 全系统只保留一套底栏 Chat Bar |
+
+Task Card 是 WorkItem、Multica lifecycle 与 LangGraph Agent 状态的统一展示卡，并通过 `TaskCardIndex` 直接出现在 Worktree Group 导航中。Board、Backlog、Sprint、Task Card、Canvas 和 Agent 面板传递同一组 typed EntityRef；页面组件不得各自创建独立 task store。Multica 与 Jira 是并列的能力入口，Task Card 索引和 Infinite Canvas 也与二者并列。
+
+### 16.3 组件与 Domain / Adapter 映射
+
+| 能力 | 主要组件 / Domain | 事实或职责 |
+|---|---|---|
+| Worktree 导航与群组上下文 | `WorktreeIndex`, `WorktreeGroupShell`, Application `GroupContextResolver` | 从既有 Worktree 生成授权 UI 上下文；不新增 WorktreeGroup 聚合 |
+| 任务管理 | `domain-work-item`, `domain-workflow`, `domain-board`, `domain-planning`, `domain-relation` | WorkItem、流程状态、Board、Backlog、Sprint、任务关系 |
+| Multica 生命周期 | Task Lifecycle service + `TaskCardManager` + `domain-agent` | claim / start / review / fail / session health 状态投影；版本冲突待 §16.13 收敛 |
+| Infinite Canvas | Canvas Application Module + Canvas Repository / Realtime Adapter | Canvas Document、Element、Layout、typed EntityRef、presence |
+| Worktree overview | `domain-worktree` + Project-scoped Graph Projection | 跨 Worktree 风险、依赖与状态总览 |
+| 任务卡 CLI | `TaskCliSessionController` + `domain-local-runtime` + Local Daemon | 基于 Task Card、Worktree 和 approved launch profile 创建受限会话 |
+| 聊天与多 Agent | `ScopedChatRouter` + LangGraph TopAgent / Task SubAgent + TMO | L0 统筹范围内动作，L1 任务卡隔离执行 |
+| 插件 | `PluginAppRegistry` + `PluginCapabilityGateway` + ACL | Manifest、兼容性、权限、事件订阅、生命周期与审计 |
+| 跨 App 同步 | Application Command Bus + Transactional Outbox + NATS JetStream + Projection | 跨 App 写入统一事务和事件路径；实时通道只推送投影 |
+
+以上是逻辑组件映射，第一阶段继续部署在现有 `work-core`、`worker --role all`、Web 前端与 Local Runtime 边界内。新增 UI App 和 Plugin Registry 不自动形成独立微服务或 K8s Deployment，遵循 §1.5 K8s Tax 纪律。
+
+### 16.4 Group Context 与 EntityRef 契约
+
+Group Context 在 Application / Authorization 层从登录身份、Project 授权和所选 Worktree 解析，前端只能传递目标引用，不能自行声明已授权范围。
+
+| Context 字段 | 来源 | 用途 |
+|---|---|---|
+| `tenant_id` | Identity / Tenant authorization | RLS 与租户隔离 |
+| `workspace_id` / `project_id` | Project membership | Project 内数据和能力范围 |
+| `repository_id` | Worktree registration | SCM / 文件操作边界 |
+| `worktree_id` | 当前已选 Worktree | Group scope、CLI、Agent 和 Canvas |
+| `actor_id` / `actor_kind` | 已认证用户、Agent 或 system | 权限决策和 Audit |
+| `scope_kind` | Chat / App 请求显式选择 | `GLOBAL` 或 `WORKTREE` 行为路由 |
+| `entity_refs[]` | 用户选中的任务卡、画布元素或实体 | 业务目标定位，逐个重新校验 |
+| `correlation_id` / `idempotency_key` | Application boundary | 请求去重与全链追踪 |
+
+Global scope 的可见 Worktree 集合由 actor permissions 计算；Global 不代表全租户通行。每个跨 Worktree 写命令必须显式提供 target Worktree IDs，并按目标分别进行 Tenant、Project、Repository、Worktree、Path、Tool、Secret 和状态 Guard 校验。
+
+`EntityRef` 是跨 App 的稳定 typed reference，至少包含 `entity_type / entity_id / tenant_id / project_id / worktree_id? / version?`。引用只负责寻址，不授予读取或写入权限；被引用对象每次打开和变更时仍需校验权限与版本。
+
+### 16.5 App 命令、Outbox 事件与投影
+
+跨 App 修改走已存在的事务边界：
+
+```text
+Task / Canvas / Chat / Plugin UI
+  → GroupContextResolver
+  → Authorization + AgentPolicy + Workflow Guard
+  → Application Command（typed refs + idempotency key）
+  → Domain Transaction + Transactional Outbox
+  → NATS JetStream（版本化业务事件）
+  → Task / Canvas / Agent / Plugin / Search / Audit projections
+  → star-sse（当前已授权 Group 的实时更新）
+```
+
+领域事件沿用 CloudEvents 1.0 与 §4.12 契约，新增或补足字段：`schema_version`、`tenant_id`、`project_id`、适用时的 `repository_id` / `worktree_id`、`actor_id`、`event_id`、`causation_id`、`correlation_id`、`idempotency_key`、`occurred_at` 和 typed payload。NATS JetStream 是领域事件权威；Canvas WS/SSE、浏览器状态和插件订阅是可重建投影，不能产生第二份业务真相。
+
+首批事件扩展：
+
+| 事件 | 源 | 消费者 | 用途 |
+|---|---|---|---|
+| `WorktreeGroupOpened` | Application / Audit | Audit, collaboration | 记录 Group 访问与实时订阅，不作为业务聚合事实 |
+| `WorkItemLinkedToCanvas` | work-item / canvas application | Task, Canvas, Audit | 双向跳转并保持实体引用 |
+| `WorkItemStateChanged` | work-item | Board, Canvas, Chat, Plugin projections | 更新所有同级 App 中的任务状态 |
+| `TaskCliSessionStarted` / `TaskCliSessionEnded` | local-runtime / agent | Task Card, Canvas, Audit | 展示 CLI 状态并关联运行记录 |
+| `PluginBindingChanged` | Plugin Registry | GroupAppRegistry, Audit | 更新当前 Group App 入口与能力 |
+| `PluginCapabilityRevoked` | Plugin Registry / Permission | Plugin Gateway, Agent Runtime, Audit | 禁用插件能力并中止或排空运行中调用 |
+| `ScopedChatCommandSubmitted` | Chat Application | LangGraph L0, Audit | 根据范围启动全局或 Worktree 级流程 |
+
+每个命令通过 Application API 执行，成功后才由 Outbox 发布事件。事件消费者需幂等；失败时按 Outbox/NATS retry/DLQ 恢复。高频 presence、光标和 CLI token stream 属 Realtime Observed State，不进入业务事务事件流。
+
+### 16.6 Task Card CLI Session
+
+CLI 是卡片关联的 Local Runtime 会话面板，不能通过 SaaS Gateway 提供任意远程 Shell。`TaskCliSessionController` 调用现有 Runtime 白名单能力 `StartAuthorizedAgentSession` 或经详细设计批准的 profile-based interactive variant；会话启动配置来自平台注册的 Agent/CLI Profile，参数与工作目录由平台构造并锁定在授权 Worktree 范围内。
+
+基本调用契约（语义级）：
+
+```text
+OpenTaskCardCliSession(
+  task_card_ref,
+  work_item_id,
+  worktree_id,
+  runtime_id,
+  approved_launch_profile_id,
+  requested_tool_capabilities,
+  idempotency_key
+) -> TaskCliSessionRef
+```
+
+启动前必须验证：Task Card 指向的 WorkItem 可访问；显式选择的 Worktree 与 Project / Repository 对应且属于用户授权集合；Runtime 在线并已绑定设备；启动 Profile 可用；AgentPolicy 允许请求的工具、命令类别、文件路径、Secret Scope 与网络访问。Local Runtime 在本机强制 Path Jail 和子进程监督；SaaS 不可提交自由命令字符串作为启动配置。
+
+CLI Session 状态：
+
+```text
+REQUESTED → AUTHORIZED → STARTING → ATTACHED → RUNNING
+                              ├→ WAITING_APPROVAL → RUNNING
+                              ├→ COMPLETED
+                              ├→ FAILED / TIMEOUT / CANCELLED
+                              └→ DISCONNECTED → RECONNECTING / LOST
+```
+
+切换 Worktree 仅解除当前 UI attachment，不会把运行会话改绑到另一 Worktree。用户需显式结束会话或打开其原 Group；Scope 切换后，旧 Session 的流不得被转送到新 Worktree 面板。命令摘要、策略拒绝、退出状态与验证结果投影回 Task Card 和关联 Canvas Element；敏感输出进入 Context 前应用 Secret Redaction，并按 Untrusted Content 处理。
+
+### 16.7 底栏 Chat Scope 与 LangGraph 路由
+
+`BottomChatBar` 在所有 Worktree Group App 中固定显示，提供 `WORKTREE` 和 `GLOBAL` 两个显式 Scope。`ScopedChatRouter` 将 scope 与目标实体写入 L0 State，并在执行前再次调用 `GroupContextResolver`；UI 当前选中 App 或 EntityRef 不能隐式扩大权限。
+
+| Scope | L0 加载的上下文 | 可用协调能力 | L1 归属 |
+|---|---|---|---|
+| `WORKTREE` | 当前 Worktree、关联 WorkItem/Agent/Canvas、当前 Runtime 和授权项目策略 | 当前 Group 内任务规划、启动/暂停、Canvas 操作和汇总 | 新建或恢复的 TaskCard 均绑定当前 `worktree_id` |
+| `GLOBAL` | 当前 actor 可访问的 Worktree 索引与跨 Worktree 摘要 | TMO 合并/拆分/依赖/批量/分配/汇总；可跨显式授权的 Worktree | 每张 L1 卡持有一个明确 Worktree ID；TMO 操作留在 L0 |
+
+LangGraph `TopAgentState` 增加或映射 `scope_kind / target_worktree_ids / entity_refs / group_context_ref / correlation_id`。这些字段进入 checkpoint key 和 Audit metadata。Task SubAgent State 必须有 `work_item_id / worktree_id / task_card_id / parent_thread_id`，工具调用只从当前授权范围内的 Tool Registry 解析。L1 之间不直接通信；Canvas 或插件触发跨任务动作时仍交给 L0/TMO。Human-in-the-loop interrupt、resume、Guard 和已有 checkpoint tiering 继续沿用 LangGraph 专题设计。
+
+底栏发送后，Global 与 Worktree 对话可以保留各自的 session/checkpoint；切换 scope 不修改既有 checkpoint，也不自动将一段对话升级为另一 scope。显式升级 scope 时创建新请求并重新解析目标和授权。
+
+### 16.8 Plugin App Registry 与热插拔
+
+Plugin Manifest 语义字段：`plugin_id / version / compatibility_range / publisher / signature_ref / ui_surfaces / routes / capabilities[] / commands[] / event_subscriptions[] / entity_ref_types[] / permission_scopes[] / data_schema_versions[] / resource_limits / lifecycle_policy`。Manifest 注册不等于能力授权；Tenant/Project Admin 的 Permission Scheme 与 Group Plugin Binding 分别决定安装许可和当前 Worktree Group 是否启用。
+
+```text
+REGISTERED → VALIDATING → CONFIGURING → ACTIVE ↔ DEGRADED
+                                         ↓
+                                      DRAINING → DISABLED
+```
+
+启用顺序：验证来源/签名和兼容范围 → 校验权限和依赖 → 执行兼容的数据迁移 → 启动隔离 Adapter → 建立事件订阅 → 向指定 Group App Registry 公布入口。禁用顺序：立即拒绝新命令并撤销 Tool/Secret capability → 标记 `DRAINING` → 对已有调用按策略限时完成或取消 → 删除实时订阅和 UI 入口 → 写 append-only Audit。权限撤销即时生效；`draining` 只用于安全关闭已开始的调用，不保留新调用资格。
+
+运行时隔离原则：插件经稳定 Application API / ACL 访问 Domain；默认不与 `work-core` 共享任意代码执行上下文，不可直接访问数据库、Environment Secret、Local filesystem、其它插件状态或浏览器内其它 App 状态。未签名、版本不兼容或缺少授权的插件不可启用。插件崩溃进入 `DEGRADED`，其它同级 App 与 Worktree Group 继续可用。具体签名算法、进程沙箱或 Wasm/外部进程承载方式留 ADR/详细设计决定，不在本章假定已经选定。
+
+### 16.9 数据所有权与 W/T/M 分类
+
+| 对象 | 分类 | SoR / 存储 | 生命周期与规则 |
+|---|---|---|---|
+| Group Context 当前选择 / 活跃 App | Work (W) | 前端状态 / Valkey projection | 显式 `retention_period` 与过期清理，不作为业务事实 |
+| Group chat presence / canvas cursor / terminal attachment lease | Work (W) | Realtime projection / Valkey | 短 TTL + heartbeat，超时自动释放 |
+| LangGraph 执行中状态、可恢复 checkpoint 和工作队列指针 | Work (W) | 已选 CheckpointStore / Local Runtime | 通过 Agent Policy 定义保留期、加密、清除与恢复边界 |
+| Canvas Document 当前结构、元素布局、跨域 EntityRef | Master (M) | PostgreSQL SoR + Canvas Projection | tenant/project/worktree RLS；版本化/SCD Type 2；删除关系需审计 |
+| Group App 排序、固定 App、插件绑定与启用设置 | Master (M) | PostgreSQL SoR | RLS；配置版本历史/SCD Type 2 |
+| Plugin Manifest、兼容性、Capability Schema、批准 Launch Profile | Master (M) | Registry SoR | RLS；版本不可变，升级产生新版本 |
+| Plugin 权限授予、Scope 与 Group 绑定 | Master (M) | PostgreSQL SoR / Permission | RLS + SCD Type 2；撤权事件即时传播 |
+| Canvas Element 与 WorkItem / TaskCard 的当前绑定 | Master (M) | PostgreSQL SoR | RLS；typed ref；绑定历史 SCD Type 2 |
+| CLI Session 生命周期和 TaskCard 命令记录 | Transaction (T) | PostgreSQL SoR + Audit | Append-only 审计；终端输出全文依 retention policy 单独保存/脱敏 |
+| Plugin 注册/启停/撤权/迁移记录 | Transaction (T) | PostgreSQL Audit / Event | Append-only；包含 actor、reason、plugin/version 和 correlation_id |
+| 跨 App 命令、LangGraph interrupt 与操作结果 | Transaction (T) | Audit + domain transaction | Append-only 关键决策和操作结果；不把敏感 Prompt/Code 默认放普通日志 |
+| Outbox / Domain Event | Transaction (T) | PostgreSQL Outbox → NATS JetStream | Event 不变；Schema versioned；消费幂等；DLQ 可审计 |
+
+所有 Master 对象 100% Tenant/Project RLS 并按更新策略保留 Type 2 历史；所有 Transaction 审计 append-only；所有 Work 数据声明 retention period 并实施 TTL/过期删除。`WorktreeGroup` 本身不建表为第二份 Worktree；实时状态与业务事实分离，遵守 §5.2 与 AGENTS.md 守门 #13。
+
+### 16.10 安全与信任边界
+
+| 边界 | 校验点 | 必须记录 |
+|---|---|---|
+| Group Navigation | 每次打开、切换 Worktree 时重新解析 actor 对 Project/Repository/Worktree 的权限 | actor、project/worktree、结果、correlation_id |
+| Canvas EntityRef | 按实体类型和目标范围二次授权；对不存在或越界实体使用不可区分的错误响应 | 请求类型、目标 ID 摘要、拒绝原因代码 |
+| Task CLI | Device mTLS、Runtime/Project/Repo/Worktree/Path/Tool/Command Category/Secret 检查 | Profile、策略版本、Session、Exit/Reject 摘要 |
+| Chat/LangGraph | Scope 是路由上下文，不是授权；每次 Tool 调用重新校验 Group Context 与目标 | scope、目标 refs、Tool、checkpoint、interrupt、审批人 |
+| Plugin | Publisher / 签名 / 版本 / 依赖 / 权限 / 资源配额 / Capability Gate | manifest version、binding、启停、能力调用与撤权 |
+| Context ingestion | Canvas 文本、插件结果、CLI 输出均标 Untrusted Content，走 Injection 检查与 Secret Redaction | 来源类型、内容引用和策略结果，不默认记全文 |
+
+切换到新 Worktree 时，前端清除上一个 Group 的 entity selection、订阅和未发送上下文；建立新的授权凭据/Realtime subscription。任何被撤销的权限对已有 WebSocket、Plugin capability 和 CLI command token 都须传播撤销，不能只隐藏导航入口。
+
+### 16.11 关键交互流程
+
+#### A. 从 Worktree Index 打开任务卡 CLI
+
+```text
+Developer → WorktreeIndex → WorktreeGroupShell
+  → TaskCardIndex（或从 Multica / Jira 视图打开 TaskCard）选择 TaskCard / WorkItem
+  → 选择执行 Worktree（卡片关联多 WT 时必须显式选择）
+  → TaskCliSessionController
+  → Authorization + AgentPolicy + approved launch profile
+  → Local Runtime 白名单命令 / StartAuthorizedAgentSession
+  → Local Daemon 在目标 Worktree 附着 CLI
+  → TaskCard + Canvas projection + Audit 更新
+```
+
+任一权限或 Runtime 校验失败时，不建立 Session，不改变 WorkItem 状态；错误以可定位原因返回任务卡。成功建立 Session 后，结束与验证结果仍分别写入 AgentSession、CLI Session、ValidationResult，并由既有 Worktree/WorkItem 状态 Guard 决定是否流转。
+
+#### B. Canvas 操作任务卡
+
+```text
+Canvas element(EntityRef: WorkItem)
+  → command: TransitionWorkItem / SetRelation / CreateWorkItem
+  → GroupContextResolver + authorization + workflow guard
+  → domain-work-item / domain-relation transaction + Outbox
+  → NATS event
+  ├→ Board / Backlog / Sprint projection
+  ├→ Canvas node refresh
+  ├→ Chat / Plugin subscribers
+  └→ Audit trace (same correlation_id)
+```
+
+Canvas Element 删除只删表现层或关系绑定；删除 WorkItem 必须通过 WorkItem 删除/归档政策和授权命令。Canvas Flow 由 automation domain 管理，WorkItem Workflow 由 workflow domain 管理；L0 在二者之间发起编排，不互换状态机。
+
+#### C. 底栏 Chat 按范围编排
+
+```text
+Chat Bar(scope, text, entity_refs)
+  → ScopedChatRouter + GroupContextResolver
+  → LangGraph TopAgent(L0) parse / guard / plan
+  ├─ WORKTREE: 当前 Group 的 Task SubAgent(L1) 或当前 Group Tool
+  └─ GLOBAL: TMO(L0) 选择明确目标 Worktrees，再分别 dispatch L1
+  → checkpoints + domain commands + events + Audit
+```
+
+确认/拒绝/审批采用 LangGraph interrupt 与既有权限流程；在 scope 更改、checkpoint 恢复或重试时重新做授权校验，不能仅复用历史授权结果。
+
+### 16.12 Requirement / Acceptance 追踪
+
+| Requirement | 本设计落点 | 验收 |
+|---|---|---|
+| WTG-001/002 | §16.1-16.4 | AC-WTG-001 |
+| TCI-001 | §16.2-16.3 | AC-WTG-001 |
+| TCI-002/003/004 | §16.6, §16.10, §16.11 A | AC-TCI-001 |
+| CAN-001/002/003/004/005 | §16.2, §16.5, §16.11 B | AC-CAN-001 |
+| CHAT-001/002 | §16.4, §16.7, §16.11 C | AC-CHAT-001 |
+| PLG-001/002/003 | §16.3, §16.8, §16.10 | AC-PLG-001 |
+| LGS-001/002 | §16.7, §16.11 C | AC-CHAT-002 |
+| ARCH-OBL-GRP-001 | §16.4-16.10 | AC-TRACE-001 |
+
+### 16.13 Open Issues 与详细设计输入
+
+| # | 未决项 | 处理阶段 |
+|---|---|---|
+| 1 | Multica Task Lifecycle 文档中“五态”标题、状态集合与 review gate 文字存在潜在版本差异；需定唯一生命周期事实源及 WorkItem/TaskCard/AgentSession 的状态映射 | Phase 3 专题要件一致性同步 |
+| 2 | Worktree Overview Graph 与 Group Infinite Canvas 的 URL、持久化对象命名和 Project/Worktree 查询范围 | 外部设计 / Canvas 专题同步 |
+| 3 | 交互式 TTY 的协议、可附着方式、命令白名单和批准 Launch Profile Schema | Runtime / Security 详细设计与 PoC |
+| 4 | Plugin Publisher 签名信任根、沙箱承载方式、插件升级/回滚/数据迁移补偿策略 | Plugin ADR / Integration 详细设计 |
+| 5 | Global L0 可访问 Worktree 数量、汇总 Context Budget 与跨 Group 实时流节流策略 | LangGraph / Performance PoC |
+| 6 | Canvas Document 元素数量、冲突解决以及版本历史的具体存储布局 | Canvas Data Design / PoC |
+
+基本设计对上述领域已确立产品树、所有权、命令事件路径、权限边界和验收方向；协议格式、DDL、API handler、TTY 机制、签名算法和沙箱实现留给相应详细设计，不以本节文字声称已实现。
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|---|
+| v0.2 | 2026-09-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 继承 requirements v2.1 §50，新增 Worktree Index/Group Shell、同级 App、Group Context、受控任务卡 CLI、范围化 LangGraph Chat、Plugin 热插拔、W/T/M 分类、跨 App 事件与追踪验收 | 用户要求 Worktree 作为顶层索引及群组应用体系 |
