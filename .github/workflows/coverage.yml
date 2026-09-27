@@ -64,17 +64,17 @@ jobs:
       - name: cargo tarpaulin (lib only, ${{ inputs.crate || '--workspace' }})
         env:
           # tarpaulin 在 GitHub Actions 容器内需要这些, 否则 ptrace attach 失败
-          CARGO_TARPAULIN_ARGS: "--locked --workspace --lib --timeout 120 --skip-clean --output-dir coverage --out Xml"
+          CARGO_TARPAULIN_ARGS: "--locked --workspace --lib --bins --timeout 120 --skip-clean --output-dir coverage --out Xml"
         run: |
           mkdir -p coverage
           if [ -n "${{ inputs.crate }}" ]; then
             echo "Single-crate mode: ${{ inputs.crate }}"
-            cargo tarpaulin -p "${{ inputs.crate }}" --lib --timeout 120 \
+            cargo tarpaulin -p "${{ inputs.crate }}" --lib --bins --timeout 120 \
               --skip-clean --output-dir coverage --out Xml
           else
             # workspace 全跑; tarpaulin 内部会逐 crate 统计
             # 注: AGENTS.md §4.1 v19 守门 — 不用 -j, tarpaulin 自己调度
-            cargo tarpaulin --workspace --lib --timeout 120 \
+            cargo tarpaulin --workspace --lib --bins --timeout 120 \
               --skip-clean --output-dir coverage --out Xml
           fi
 
