@@ -552,23 +552,27 @@ data:
       - name: canvas_engine
         type: STRICT_DNS
         lb_policy: ROUND_ROBIN
+        dns_lookup_family: V4_ONLY
         load_assignment:
+        connect_timeout_ms: 5000
           cluster_name: canvas_engine
           endpoints:
           - lb_endpoints:
             - endpoint:
                 address:
-                  socket_address: { address: canvas-engine.star-system.svc.cluster.local, port_value: 8080 }
+                  socket_address: { address: 10.43.76.231, port_value: 8080 }
       - name: domain_canvas
         type: STRICT_DNS
         lb_policy: ROUND_ROBIN
+        dns_lookup_family: V4_ONLY
         load_assignment:
+        connect_timeout_ms: 5000
           cluster_name: domain_canvas
           endpoints:
           - lb_endpoints:
             - endpoint:
                 address:
-                  socket_address: { address: domain-canvas.star-system.svc.cluster.local, port_value: 8081 }
+                  socket_address: { address: 10.43.28.84, port_value: 8081 }
       - name: canvas_realtime_ws
         type: STRICT_DNS
         lb_policy: ROUND_ROBIN
@@ -583,12 +587,14 @@ data:
         type: STRICT_DNS
         lb_policy: ROUND_ROBIN
         load_assignment:
+        dns_lookup_family: V4_ONLY
+        connect_timeout_ms: 5000
           cluster_name: canvas_game
           endpoints:
           - lb_endpoints:
             - endpoint:
                 address:
-                  socket_address: { address: canvas-game.star-system.svc.cluster.local, port_value: 8084 }
+                  socket_address: { address: 10.43.76.79, port_value: 8084 }
 ---
 # =====================================================================
 # ServiceMonitor (per NFR-OBS-2 Prometheus metrics 20+ 指标)
