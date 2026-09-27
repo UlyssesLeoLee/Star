@@ -17,10 +17,10 @@
 #   Image tag: :dev (per publish-canvas-game.yml `tags: type=ref,event=branch`,
 #            push dev → 自动推 :dev tag; 没有 :latest tag)
 #   4 image repo:
-#     - ghcr.io/SayAtelier/star-canvas-engine:dev    (port 8080)
-#     - ghcr.io/SayAtelier/star-domain-canvas:dev    (port 8081)
-#     - ghcr.io/SayAtelier/star-canvas-realtime:dev  (port 8082 + 8083 WSS)
-#     - ghcr.io/SayAtelier/star-canvas-game:dev      (port 8084)
+#     - ghcr.io/sayatelier/star-canvas-engine:dev    (port 8080)
+#     - ghcr.io/sayatelier/star-domain-canvas:dev    (port 8081)
+#     - ghcr.io/sayatelier/star-canvas-realtime:dev  (port 8082 + 8083 WSS)
+#     - ghcr.io/sayatelier/star-canvas-game:dev      (port 8084)
 #
 # 一键部署:
 #   pwsh -NoProfile -NonInteractive -File scripts/start-k3s-backend.ps1
@@ -144,7 +144,9 @@ spec:
       serviceAccountName: star-canvas
       containers:
       - name: canvas-engine
-        image: ghcr.io/SayAtelier/star-canvas-engine:dev
+        image: ghcr.io/sayatelier/star-canvas-engine:dev
+        imagePullSecrets:
+        - name: ghcr-pull-secret
         imagePullPolicy: IfNotPresent
         ports:
         - { name: http, containerPort: 8080 }
@@ -197,7 +199,9 @@ spec:
       serviceAccountName: star-canvas
       containers:
       - name: domain-canvas
-        image: ghcr.io/SayAtelier/star-domain-canvas:dev
+        image: ghcr.io/sayatelier/star-domain-canvas:dev
+        imagePullSecrets:
+        - name: ghcr-pull-secret
         imagePullPolicy: IfNotPresent
         ports:
         - { name: http, containerPort: 8081 }
@@ -250,7 +254,9 @@ spec:
       serviceAccountName: star-canvas
       containers:
       - name: canvas-realtime
-        image: ghcr.io/SayAtelier/star-canvas-realtime:dev
+        image: ghcr.io/sayatelier/star-canvas-realtime:dev
+        imagePullSecrets:
+        - name: ghcr-pull-secret
         imagePullPolicy: IfNotPresent
         ports:
         - { name: http, containerPort: 8082 }
@@ -306,7 +312,9 @@ spec:
       serviceAccountName: star-canvas
       containers:
       - name: canvas-game
-        image: ghcr.io/SayAtelier/star-canvas-game:dev
+        image: ghcr.io/sayatelier/star-canvas-game:dev
+        imagePullSecrets:
+        - name: ghcr-pull-secret
         imagePullPolicy: IfNotPresent
         ports:
         - { name: http, containerPort: 8084 }
