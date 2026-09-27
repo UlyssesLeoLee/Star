@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定義書（統合拡張版 v2.0）
+# Vibe Coding Work Management SaaS 要件定義書（統合拡張版 v2.1）
 
 ## 0. 文档说明与前提
 
@@ -34,6 +34,8 @@ Vibe Coding Work Management SaaS 要件定义书（本文档）
 
 本文档的下游产出为《基本设计书》，因此本文档只定义 **要件（Requirement）与架构义务（Architecture Obligation）**，不输出数据库 DDL、API 具体实现或生产代码（§105）。
 
+> **v2.1 补充（2026-09-27）**：产品主导航采用“渡口 Worktree 群组”模型。每个已注册 Worktree 是顶层工作上下文；其下 Multica 生命周期、Jira 类工作管理、Task Card 索引、Infinite Canvas 与已启用插件是平级入口。Task Card 索引和 Infinite Canvas 均直接挂在 Worktree 下，CLI / Agent Session 从卡片内打开。完整要件见第 50 章。
+
 ---
 
 ## 2. 产品重新定位
@@ -44,6 +46,7 @@ Vibe Coding Work Management SaaS 要件定义书（本文档）
 1. Jira-class Work Management
 2. GitHub / GitLab Development Integration
 3. AI Coding Worktree Control Plane
+4. Worktree-first Group Experience（以 Worktree 为顶层索引，承载任务、画布、CLI、聊天与可插拔应用）
 ```
 
 AI-native 的含义边界（§0）：
@@ -1284,6 +1287,9 @@ ARCH-OBL-DEV-006  Observed State
 
 ARCH-OBL-DEV-007  Review Segregation of Duties（无对应原提示词章节编号 — per §27.4-27.5 新增）
   → Cross-Review 的 Reviewer 不得等于 Author；Agent-Assisted Review 不得因"审核"身份获得超出既有 Feedback/ValidationResult（Auto 层级）以外的额外权限，Reject 决策不得绕过 Human/Policy Gate 自动阻断 Worktree 生命周期。
+
+ARCH-OBL-GRP-001  Worktree Group Coherence（第 50 章新增）
+  → 任务、Canvas、CLI、聊天、LangGraph 与插件必须在明确的 Worktree Group Context 中协作；任何跨 Worktree 操作必须显式列出目标 Worktree 并分别经过授权、审计与状态校验。
 ```
 
 ---
@@ -1405,6 +1411,12 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | `DSG-xxx` | Design Artifact Requirement（设计书生命周期与批准 Guard，第 8.3 章，per brainstorming 线程 C） |
 | `TST-xxx` | Test Level Requirement（単体/結合/総合/受入 Level 维度，第 27.6 章，per brainstorming 线程 C） |
 | `OPS-xxx` | Incident Record Requirement（生产事件追溯，第 29.1 章，per brainstorming 线程 C） |
+| `WTG-xxx` | 渡口 Worktree 群组 Requirement（Worktree 顶层索引、同级应用与群组上下文，第 50 章） |
+| `TCI-xxx` | Task Card / CLI Requirement（任务卡、受控 CLI 会话与运行时绑定，第 50 章） |
+| `CAN-xxx` | Worktree 群组 Canvas Requirement（Canvas 与任务、Agent、Jira 类对象互操作，第 50 章） |
+| `CHAT-xxx` | 范围化底栏聊天 Requirement（`GLOBAL` / `WORKTREE` 选择与审计，第 50 章） |
+| `PLG-xxx` | Group App Plugin Requirement（插件声明、群组启用与热插拔，第 50 章） |
+| `LGS-xxx` | LangGraph Scope Requirement（L0/L1 在群组范围内的编排边界，第 50 章） |
 
 ### 41.2 关键 P0 Requirement 登记表（§63）
 
@@ -1431,6 +1443,18 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | DSG-002 | 系统必须支持将"关联 DesignArtifact 全部 APPROVED"设为既有 WorkItem 状态转换 Guard 的前置条件 | 第 8.2、8.3 章 | ARCH-OBL-DEV-001 |
 | TST-001 | 系统必须支持 ValidationResult 携带 Level 字段（単体/結合/総合/受入），并按 Level 聚合测试覆盖 | 第 27.6 章 | ARCH-OBL-DEV-005 |
 | OPS-001 | 系统必须支持登记 IncidentRecord 并关联到修复 WorkItem，追溯"生产问题 → 根因 ChangeSet → 修复 → 验证证据" | 第 29.1 章 | ARCH-OBL-DEV-002/005 |
+| WTG-001 | Project 内必须以已注册 Worktree 作为工作界面的顶层索引；进入任一 Worktree 后展示其 Worktree Group | 第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
+| WTG-002 | Worktree Group 下的 Task Management、Task Card 及其 Agent/CLI 会话、Infinite Canvas 与已启用插件必须共享不可伪造的 Tenant、Project、Repository、Worktree 上下文 | 第 50.2-50.3 章 | ARCH-OBL-GRP-001/ARCH-OBL-DEV-001 |
+| TCI-001 | Multica 生命周期、Jira 类 Board/Backlog/Sprint 与 Worktree 下直接访问的 Task Card 索引必须共用同一 WorkItem 事实源 | 第 50.3 章 | ARCH-OBL-GRP-001 |
+| TCI-002 | 任务卡必须能够在已授权的关联 Worktree 中打开受控 CLI 会话，并将会话、命令结果与审计关联回任务卡 | 第 50.4 章 | ARCH-OBL-DEV-004/ARCH-OBL-GRP-001 |
+| CAN-001 | Canvas 必须作为 Worktree Group 内与 Task Management 同级的应用，并以实体链接关联 WorkItem、TaskCard、AgentSession 与 Worktree | 第 50.5 章 | ARCH-OBL-GRP-001/ARCH-OBL-DEV-002 |
+| CAN-002 | Canvas 对任务状态、关系和自动化的写操作必须走领域命令及既有 Guard；Canvas 仅消费已提交结果 | 第 50.5 章 | ARCH-OBL-GRP-001 |
+| CHAT-001 | 固定底栏聊天必须支持 `GLOBAL` 与单一 `WORKTREE` 两种范围，并将范围、目标、会话和命令写入审计与 checkpoint | 第 50.6 章 | ARCH-OBL-GRP-001 |
+| CHAT-002 | `WORKTREE` 范围只能装载该群组上下文和授权工具；`GLOBAL` 写操作必须显式列出目标 Worktree | 第 50.6 章 | ARCH-OBL-GRP-001/ARCH-OBL-DEV-001 |
+| PLG-001 | 插件必须声明 UI surface、能力、事件订阅、权限、版本兼容性与支持范围，且只能通过稳定应用接口接入 | 第 50.7 章 | ARCH-OBL-GRP-001/ARCH-OBL-DEV-004 |
+| PLG-002 | 插件必须支持可审计的注册、配置、启用、降级、排空和禁用生命周期；禁用后立即撤销能力而不删除既有业务事实 | 第 50.7 章 | ARCH-OBL-GRP-001 |
+| LGS-001 | LangGraph L0 必须接收 `GLOBAL` / `WORKTREE` 范围；L1 TaskCard 的 checkpoint、工具调用与 Canvas/插件动作必须带 Worktree ID | 第 50.6、50.8 章 | ARCH-OBL-GRP-001 |
+| LGS-002 | 跨任务、Canvas 或插件发起的编排必须经 L0、领域命令与事件执行；L1 之间不得直接通信 | 第 50.8 章 | ARCH-OBL-GRP-001 |
 
 本文档第 1-17 章新增的基础 Requirement（`REQ-TWP-xxx / REQ-WF-xxx / REQ-PLAN-xxx / REQ-COLLAB-xxx / REQ-PERM-xxx / REQ-AUTO-xxx / REQ-NOTIF-xxx / REQ-SEARCH-xxx / REQ-DATA-xxx / REQ-RT-xxx / REQ-SEC-xxx / REQ-AUDIT-xxx / REQ-WI-xxx`）与 Vibe Coding 扩展 P0 Requirement 共同构成完整 ID 登记表，下游《基本设计书》须逐项继承。
 
@@ -2137,3 +2161,143 @@ Star 倉 22 `domain-*` crate (per ADR-0040) + 25 MRU (per api-design.md §2.1) �
 ---
 
 *本节 §49 は onboarding 機能追加 (2026-09-02 08:01 JST Ulysses 4 拍板) による。*
+
+---
+
+## 50. 渡口 Worktree 群组体验要求（v2.1 新增）
+
+### 50.1 目的与产品树
+
+本节把 Star 的独特工作方式定义为 **Worktree-first Group Experience**：用户进入一个 Project 后，先从 Worktree Index 选择正在处理的 Worktree；随后在该 Worktree 的群组内使用任务管理、Task Cards、Infinite Canvas 与已启用应用，CLI 和 Agent Session 从任务卡内打开。
+
+Tenant / Workspace / Project 继续承担归属、权限和安全边界。Worktree-first 只定义 Project 内的导航与执行工作面，不改变既有领域层级，也不改变 `1 WorkItem → 0/1/N Worktrees`、`1 Worktree → N AgentSessions` 和 Worktree Status 独立于 WorkItem Status 的约束。
+
+```text
+Tenant → Workspace → Project
+                      └─ Worktree Index（顶层索引）
+                         └─ Worktree Group（由 worktree_id 标识）
+                            ├─ Multica Task Lifecycle（执行生命周期 / claim / review / Agent）
+                            ├─ Jira-class Work Management（Board / Backlog / Sprint / Relation）
+                            ├─ Task Cards（直接挂在 Worktree 下；卡内可打开 CLI / Agent Session）
+                            ├─ Infinite Canvas（Miro 类无限画布）
+                            └─ 已启用的 Group App Plugins
+
+固定底栏 Chat Bar：GLOBAL 范围 ｜ 当前 WORKTREE 范围
+```
+
+`Worktree Group` 是围绕既有 `Worktree` 的应用上下文和导航投影，以 `worktree_id` 为身份；它不复制 Git Worktree、WorkItem 或 AgentSession 的业务事实。Project 范围的 Worktree Graph Overview 继续用于跨 Worktree 冲突、依赖与全景查看；群组内的 Infinite Canvas 用于当前 Worktree 的协作与编排，两者须在名称、路由和数据范围上明确区分。
+
+### 50.2 术语与共同上下文
+
+| 术语 | 定义 | 事实来源 |
+|---|---|---|
+| Worktree Group | 当前 Worktree 的应用容器，提供导航、授权上下文、跨 App 跳转和实时订阅 | 既有 `Worktree` + Group Context Projection |
+| WorkItem | Jira 类业务任务，承载状态、负责人、Backlog、Sprint、关系和 Guard | `domain-work-item` |
+| Task Card | 直接挂在 Worktree 下的任务入口；由 Task Management 视图访问，并在卡内呈现 CLI 与 LangGraph L1 状态 | WorkItem / AgentSession / TaskCardManager 投影 |
+| Canvas Element | Canvas 中的节点、连线、Frame 或绑定；可引用任务卡，但不成为第二套任务事实 | Canvas 聚合与实体链接 |
+| Task CLI Session | 从任务卡发起、绑定具体 Worktree 的受控本地命令会话 | Local Runtime / Agent Policy / Audit |
+| Group Context | `tenant_id / workspace_id / project_id / repository_id / worktree_id / actor_id` 的不可伪造上下文 | Application Authorization Layer |
+
+每个群组内的 App 必须先取得 Group Context，再查询、展示或执行命令。任一实体链接使用带类型的 `EntityRef`，至少支持 `work_item`、`task_card`、`agent_session`、`worktree`、`canvas_element`、`automation_flow`、`comment`、`relation` 和 `plugin_resource`。
+
+### 50.3 同级应用、任务卡与单一任务事实源
+
+每张 Task Card 均可打开关联的受控 CLI / Agent Session 面板；会话归属该 Task Card 和明确选定的 Worktree，不作为 Worktree 导航树中的独立同级入口。
+
+Multica Task Lifecycle、Jira-class Work Management、Task Cards、Infinite Canvas 和 Group Plugin Apps 都是 Worktree Group 的同级能力入口。**Task Cards 与 Infinite Canvas 必须直接挂在 Worktree 下并列显示**；Task Card 可从 Multica 生命周期或 Jira 类 Board / Backlog / Sprint 打开，但不是其中任何 App 的私有子对象。Multica 提供 claim / execution / review gate / failed / poisoned-session 等执行生命周期能力；Jira 类提供 Board / Backlog / Sprint / Relation 管理能力；二者共用 WorkItem、Workflow、Planning、Relation 和 Audit 的事实来源。
+
+Canvas 可以创建任务链接、定位任务、展示状态、发起受权的任务命令和展示 Agent/CLI 进度。Canvas 不持久化 WorkItem 状态副本，也不直接修改其他 App 的前端状态。状态与关系变更必须经过 Application Command、既有 Workflow Guard、领域事务与 Outbox 事件，再投影回 Task Management、Canvas、Chat 和插件。
+
+| ID | 要件 | 优先级 |
+|---|---|---|
+| WTG-001 | Project 内以 Worktree Index 作为工作界面根节点；每一个已注册 Worktree 均可进入唯一的 Worktree Group 工作面 | P0 |
+| WTG-002 | 群组内的 Task Management、Task Card 及其 Agent/CLI 会话、Infinite Canvas 与已启用插件必须共享 Group Context | P0 |
+| WTG-003 | Worktree 归档、删除观察或失联后，群组资源必须保留可追溯关系并按 Project Policy 转为只读、恢复或归档状态 | P1 |
+| TCI-001 | Multica 生命周期和 Jira 类计划视图必须投影同一 WorkItem；Task Card 索引作为 Worktree 下的平级入口访问该任务；不得产生并行任务状态机或第二个任务事实源 | P0 |
+| CAN-001 | Canvas 必须作为群组内同级 App，并能绑定、创建、定位和查看 WorkItem、Task Card、AgentSession、Relation 与自动化流程 | P0 |
+| CAN-002 | Canvas 发起的任务写操作必须经过 Task Domain Command 与 Guard；结果由事件回写所有订阅 App | P0 |
+
+### 50.4 任务卡内 CLI
+
+任务卡允许打开 CLI，以便人或 Agent 在卡内完成实际工作。CLI 会话必须绑定 `work_item_id`、`worktree_id`、Runtime、Agent Policy 和已批准的启动配置；界面在任务卡中展示会话状态、输出流、取消入口与返回的验证结果。
+
+CLI 由 Local Runtime 在目标 Worktree 中启动，并持续校验 Repository、Worktree、允许路径、工具类别、命令类别、Secret Scope 与运行时间限制。每次启动、输入、输出摘要、拒绝、取消和结果均关联 `task_card_id`、`work_item_id`、`worktree_id`、`agent_session_id`（如有）和 `correlation_id` 写入审计。卡片在多个 Worktree 中出现时，用户必须选择当前执行 Worktree，系统不得隐式跨 Worktree 启动会话。
+
+| ID | 要件 | 优先级 |
+|---|---|---|
+| TCI-002 | 任务卡可在经授权的关联 Worktree 中打开受控 CLI Session，并将上下文、命令结果和审计关联回任务卡 | P0 |
+| TCI-003 | CLI Session 被拒绝、断开、超时或 Runtime 失联时，任务卡必须显示可定位状态，且不得误写 WorkItem 完成状态 | P0 |
+| TCI-004 | CLI 输出进入 Agent Context 前必须按 Untrusted Content 处理，并沿用 Prompt Injection、Secret Redaction 与 Content Retention 规则 | P0 |
+
+### 50.5 Canvas 与任务、Jira 类能力的互动
+
+Canvas 为当前 Worktree 的任务编排和协作表面。任务卡可拖入 Canvas、从 Canvas 跳回 Board/Backlog/Sprint、在元素上显示任务状态和 Agent/CLI 摘要；Canvas 也可通过实体链接显示 Blocked、Dependency、Feedback、Review、Validation 与自动化 Flow。
+
+在 Canvas 内创建任务时，系统先创建或关联真正的 WorkItem，再建立 Canvas Element Link。删除 Canvas Element 只删除或归档画布表现，不会删除 WorkItem。Canvas Workflow 与 WorkItem Workflow 是不同概念：前者是自动化流程 / Flow，后者是任务状态流转；两者通过受控命令和事件连接。
+
+| ID | 要件 | 优先级 |
+|---|---|---|
+| CAN-003 | 从 Canvas 创建或关联任务时，必须保留 `worktree_id`、`work_item_id`、`canvas_element_id` 与 `correlation_id` 的可追溯链接 | P0 |
+| CAN-004 | Task Management 状态、Agent 进度、CLI 结果与 Validation 变化必须以实时投影更新 Canvas；Canvas 订阅失败后必须可重放 | P1 |
+| CAN-005 | Canvas、Board、Backlog 和 Sprint 对同一 WorkItem 的跳转必须保持同一实体引用与同一权限判定 | P0 |
+
+### 50.6 固定底栏聊天与 LangGraph 范围
+
+App Shell 只提供一个固定底栏 Chat Bar。用户在发送前选择 `WORKTREE` 或 `GLOBAL` 范围，并可附加当前任务卡、Canvas Element 或其他 EntityRef。选择器必须始终可见，消息历史、checkpoint、工具调用和审计均记录范围。
+
+- `WORKTREE`：L0 只加载当前 Group Context、当前 Worktree 的任务/画布/运行时摘要和该范围内已授权工具；由此创建的 L1 Task Card 必须带相同 `worktree_id`。
+- `GLOBAL`：L0 用于跨 Worktree 统筹、规划、合并、拆分、依赖、批量操作和汇总。任何会写入数据或启动执行的指令必须显式列出目标 Worktree，系统对每个目标独立执行授权、状态和审计校验。
+- L1 Task Card Agent 保持任务卡级隔离。跨卡操作、Canvas 发起的编排和插件发起的任务操作由 L0 的 Task Operations Manager 协调，L1 之间不得直接通信。
+
+| ID | 要件 | 优先级 |
+|---|---|---|
+| CHAT-001 | 固定底栏提供 `GLOBAL` / `WORKTREE` 范围选择，并将范围和实体引用写入聊天、checkpoint、工具调用与 Audit | P0 |
+| CHAT-002 | `WORKTREE` 范围只能读取并执行该群组已授权的上下文和工具；`GLOBAL` 写操作必须提供明确目标 Worktree | P0 |
+| LGS-001 | L0 与所有 L1 的状态、checkpoint、工具调用和流式事件必须携带适用的 Worktree Scope | P0 |
+| LGS-002 | 所有跨任务、Canvas 或插件编排必须由 L0、领域命令和事件实现，保持 Task Card 的隔离边界 | P0 |
+
+### 50.7 Group App Plugin 热插拔
+
+插件作为 Worktree Group 内的可选 App 或能力提供者接入。插件 Manifest 必须声明标识与版本、兼容范围、UI surface、路由、命令与工具能力、事件订阅、EntityRef 类型、所需权限、数据模式版本、迁移策略和资源限制。插件通过稳定 Application API / ACL 调用领域能力；不得直接连接数据库、读取其他 App 的前端状态或绕过 Group Context。
+
+插件生命周期为：`registered → configuring → active → degraded → draining → disabled`。启用前校验来源、签名或可信发布策略、版本兼容性、权限授予和数据迁移；禁用时先停止新调用并排空活动会话，再撤销 UI 入口、命令和工具能力。业务事实、Canvas 链接、CLI 审计与历史事件在禁用后保持可读可追溯。
+
+| ID | 要件 | 优先级 |
+|---|---|---|
+| PLG-001 | Plugin Registry 必须声明 UI、能力、订阅、权限、版本兼容性与支持范围，并以群组级别启用 | P0 |
+| PLG-002 | 插件必须支持注册、配置、启用、降级、排空和禁用的可审计热插拔生命周期 | P0 |
+| PLG-003 | 插件产生的命令、事件和资源引用必须携带 Group Context、`correlation_id` 与 `schema_version` | P0 |
+
+### 50.8 跨 App 事件、审计与验收
+
+跨 App 写操作统一遵循下列路径：
+
+```text
+Task Management / Canvas / Chat / Plugin
+  → Group Context Resolver
+  → Authorization + Policy Guard
+  → Application Command
+  → Domain Transaction + Transactional Outbox
+  → Versioned Domain Event
+  → Task / Canvas / Chat / Plugin / Search / Audit Projections
+```
+
+事件至少携带 `schema_version`、`tenant_id`、`project_id`、`worktree_id`（适用时）、`actor_id`、`event_id`、`causation_id`、`correlation_id` 和 `idempotency_key`。NATS JetStream 是领域事件权威；Canvas 或 App 的实时流只负责投影与分发，不建立第二份业务事件事实源。
+
+| 验收 ID | 受入基准 |
+|---|---|
+| AC-WTG-001 | 选择一个 Worktree 后，界面直接展示同级的 Multica、Jira 类工作管理、Task Card 索引、Infinite Canvas 和已启用插件；Task Card 索引与 Canvas 不嵌套在 Task Management 下，CLI / Agent Session 从任务卡内打开；切换 Worktree 时各 App 同步切换上下文和数据范围 |
+| AC-TCI-001 | 从任务卡打开 CLI 后，工作目录、Runtime、允许路径和命令策略都与所选 Worktree 一致；越界请求被拒绝并审计 |
+| AC-CAN-001 | Canvas 中选中任务卡或 WorkItem 节点可打开其详情；任务状态变更实时反映到节点；从 Canvas 变更状态仍经过既有 Guard |
+| AC-CHAT-001 | 底栏切换 `WORKTREE` / `GLOBAL` 后，消息、checkpoint、工具调用与 Audit 均记录范围；`WORKTREE` 范围不可读取其他 Worktree 上下文 |
+| AC-CHAT-002 | `GLOBAL` 发起跨 Worktree 编排时，L0 为每个目标创建明确归属的 L1 卡片，且不存在 L1 到 L1 的直接通信 |
+| AC-PLG-001 | 启用兼容插件后，它作为同级 Group App 出现；禁用后入口和能力撤销，既有 Task、Canvas、CLI 审计和引用仍可读取 |
+| AC-TRACE-001 | 一次从 Canvas 或底栏聊天发起的任务操作，可由同一 `correlation_id` 串起 Worktree、WorkItem、TaskCard、CLI Session、Canvas Element、Plugin 调用与 Audit |
+
+### 50.9 追溯与后续专题同步
+
+本节为总要件基线。`SRS-MULTICA-TASK-001` 负责任务生命周期与 review gate，`SRS-CANVAS-001` / `SRS-CANVAS-WORKFLOW-001` 负责画布与 Flow，`SRS-WORKTREE-CANVAS-001` 负责跨 Worktree 图谱，`architecture/2026-09-03-langgraph/01-requirements.md` 负责 L0/L1 编排。后续专题文档必须继承本节的 Group Context、单一任务事实源、范围化聊天、CLI、插件和跨 App 事件约束。
+
+| 版本 | 日期 | 修订人 | 修订内容 | 触发 |
+|---|---|---|---|---|
+| v2.1 | 2026-09-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增渡口 Worktree 群组产品树、任务卡 CLI、范围化聊天、Canvas 互操作、插件热插拔和 LangGraph 约束 | 用户提出 Worktree 顶层索引与群组 App 体系 |
