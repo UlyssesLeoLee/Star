@@ -39,7 +39,7 @@ fn bridge_error_display_offline_persist_failed() {
 
 #[test]
 fn bridge_error_display_memgraph_down() {
-    let e = BridgeError::MemgraphDown;
+    let e = BridgeError::MemgraphDown("connection lost".to_string());
     let msg = format!("{e}");
     assert!(!msg.is_empty(), "msg should not be empty");
     assert!(msg.to_lowercase().contains("memgraph") || msg.to_lowercase().contains("down"),
@@ -55,7 +55,7 @@ fn bridge_error_display_internal_error() {
 
 #[test]
 fn bridge_error_debug_format() {
-    let e = BridgeError::MemgraphDown;
+    let e = BridgeError::MemgraphDown("connection lost".to_string());
     let dbg = format!("{:?}", e);
     assert!(dbg.contains("MemgraphDown"), "debug: {dbg}");
 }
