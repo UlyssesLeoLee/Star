@@ -512,6 +512,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "http-body-util",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -527,6 +528,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "http-body-util",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -543,6 +545,7 @@ dependencies = [
  "anyhow",
  "axum",
  "futures-util",
+ "http-body-util",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -1104,6 +1107,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "http-body-util",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
