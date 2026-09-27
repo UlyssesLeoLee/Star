@@ -32,6 +32,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+axum = { workspace = true }
+tower = { version = "0.5", features = ["util"] }
+serde_json = { workspace = true }
+http-body-util = "0.1"
+
 
 [lints]
 workspace = true
