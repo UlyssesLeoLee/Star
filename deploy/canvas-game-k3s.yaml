@@ -541,6 +541,9 @@ data:
                     route: { cluster: canvas_realtime_ws, timeout: 0s }
                   - match: { prefix: "/canvas-game" }
                     route: { cluster: canvas_game, timeout: 30s }
+                  # catch-all (per ULYS-160 #160 phase-1 skeleton: only health/version routes exist)
+                  - match: { prefix: "/" }
+                    route: { cluster: canvas_game, timeout: 30s }
               http_filters:
               - name: envoy.router
                 typed_config:
