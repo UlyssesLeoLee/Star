@@ -3,7 +3,7 @@
 //! arg-bridge 已有 inline test (flush_test.rs, integration.rs, langgraph_test.rs).
 //! 这里加独立 integration test 覆盖 error module 各 variant.
 
-use arg_bridge::error::BridgeError;
+use star_arg_bridge::error::BridgeError;
 use std::time::Duration;
 
 #[test]
