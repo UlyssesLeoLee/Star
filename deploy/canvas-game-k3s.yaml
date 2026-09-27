@@ -552,9 +552,7 @@ data:
       - name: canvas_engine
         type: STRICT_DNS
         lb_policy: ROUND_ROBIN
-        dns_lookup_family: V4_ONLY
         load_assignment:
-        connect_timeout_ms: 5000
           cluster_name: canvas_engine
           endpoints:
           - lb_endpoints:
@@ -564,9 +562,7 @@ data:
       - name: domain_canvas
         type: STRICT_DNS
         lb_policy: ROUND_ROBIN
-        dns_lookup_family: V4_ONLY
         load_assignment:
-        connect_timeout_ms: 5000
           cluster_name: domain_canvas
           endpoints:
           - lb_endpoints:
@@ -587,8 +583,6 @@ data:
         type: STRICT_DNS
         lb_policy: ROUND_ROBIN
         load_assignment:
-        dns_lookup_family: V4_ONLY
-        connect_timeout_ms: 5000
           cluster_name: canvas_game
           endpoints:
           - lb_endpoints:
