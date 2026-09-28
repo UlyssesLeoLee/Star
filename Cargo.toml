@@ -213,7 +213,7 @@ hex = "0.4"
 regex = "1"
 
 # Serial test execution (per ULYS-194 9/24 rebase fix — env-var mutating tests 跨 #[tokio::test] 串行化)
-serial_test = "3"
+serial_test = "4"
 
 # Benchmark (per R9 阶段 3 5 milestone benchmark, per plan-032 §4.2)
 criterion = { version = "0.8", features = ["html_reports"] }
@@ -242,7 +242,7 @@ libgit2-sys = "0.18"
 # (ProcessSession::default() = setsid + new group + leader; 用于 Linux setsid)
 process-wrap = { version = "10", default-features = false, features = ["std"] }
 # nix: Unix-only safe wrapper for libc::killpg / libc::setsid / signal 0 探测
-nix = { version = "0.29", default-features = false, features = ["signal", "process"] }
+nix = { version = "0.31", default-features = false, features = ["signal", "process"] }
 # win32job: Windows Job Object safe API (CreateJobObjectW / AssignProcessToJobObject / terminate)
 win32job = "2"
 
