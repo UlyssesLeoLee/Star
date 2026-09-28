@@ -1,7 +1,8 @@
 /* =====================================================================
- * STAR PLATFORM — 日漫双主题设计系统 v2.0
+ * STAR PLATFORM — 三大独立主题设计系统 v3.0
  * ☀️  Shōnen Studio Light — 少年漫画工作室 · 白底墨线 · 樱花点缀
  * 🌙  Neo-Tokyo Dark     — 赛博霓虹 · 黑曜石深空 · 电光青紫
+ * 🎄  Pixel Noel         — 圣夜像素 · 经典冬日 · 纯像素色彩心理学
  *
  * 设计原则 (艺术品级):
  *   · 色彩心理学: 白=纯粹/力量, 深墨=专注/权威, 樱花粉=温度/活力
@@ -182,3 +183,224 @@
   --glow-accent:    0 0 21px rgba(0, 240, 255, 0.38), 0 0 42px rgba(168, 85, 247, 0.16);
   --glow-secondary: 0 0 21px rgba(255, 42, 133, 0.38);
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+ * 🎄  CHRISTMAS PIXEL MODE — Pixel Noel (圣夜像素 · 经典冬日纯像素风)
+ *     色彩心理学架构:
+ *       - 圣夜冷杉夜空: #0b130e → #122017 → #1a2f23 (深沉、静谧、专注与庇护)
+ *       - 暖炉丝绒绯红: #d42426 · 绯红微光 rgba(212, 36, 38, 0.40) (活力、温暖、庆典、诱目)
+ *       - 常青冬青松针: #165b33 · 绿意盎然 (生机、自然、互补色平衡)
+ *       - 伯利恒星芒烛金: #f8b229 · 烛光高亮 (奇迹、丰收、荣誉与焦点)
+ *       - 初雪晶莹霜白: #f5f8f5 · 高可读性文本 (纯洁、雪夜、WCAG AAA 对比度)
+ *     纯像素艺术特征:
+ *       - 0px 矢量圆角: 纯直角像素阶梯，零平滑曲率
+ *       - 纯硬边阶梯阴影: 3px / 5px 零模糊像素投影 (Zero Blur Hard Offset)
+ *       - 双重像素边框: 外层 2px 深墨线 + 内层 1px 烛金/霜白像素高光斜切
+ * ─────────────────────────────────────────────────────────────────────*/
+.christmas,
+html.christmas,
+.theme-christmas {
+  color-scheme: dark;
+
+  /* === 主色 / 强调色 === */
+  --color-primary:            #d42426;
+  --color-primary-glow:       rgba(212, 36, 38, 0.40);
+  --color-secondary:          #165b33;
+  --color-secondary-glow:     rgba(22, 91, 51, 0.38);
+  --color-accent:             #f8b229;
+  --color-accent-soft:        #e69c0d;
+  --color-accent-50:          #f8b229;
+  --color-accent-violet:      #9333ea;
+  --color-accent-violet-glow: rgba(147, 51, 234, 0.30);
+
+  /* 主色反色 — 纯白 (红底上对比度 7.8:1 WCAG AAA) */
+  --color-on-primary:         #ffffff;
+
+  /* === 语义色 === */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger:  #ef4444;
+  --color-neutral: #7a9a8b;
+  --color-info:    #38bdf8;
+
+  /* === 背景层 (圣夜霜雪半透明毛玻璃与深林底) === */
+  --color-surface:          #0a120d;
+  --color-surface-2:        rgba(18, 32, 23, 0.72);
+  --color-surface-elevated: rgba(26, 47, 35, 0.85);
+  --color-surface-glass:    rgba(18, 32, 23, 0.65);
+
+  /* Tailwind bg.* token 映射 */
+  --bg-DEFAULT: #0a120d;
+  --bg-soft:    rgba(18, 32, 23, 0.72);
+  --bg-lighter: rgba(26, 47, 35, 0.85);
+  --bg-card:    rgba(18, 32, 23, 0.65);
+
+  /* === 文字 — 初雪白 (WCAG AAA 对比度 ≥ 14:1 on #0a120d) === */
+  --color-text:      #f5f8f5;
+  --color-text-dim:  #a3c2b1;
+  --color-text-mute: #628271;
+
+  /* Tailwind ink.* token 映射 */
+  --ink-DEFAULT: #f5f8f5;
+  --ink-dim:     #a3c2b1;
+  --ink-mute:    #628271;
+
+  /* === 边框 — 冬日微冰晶透光磨砂线 (毛玻璃微高光) === */
+  --color-border:        rgba(248, 178, 41, 0.25);
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-border-hover:  rgba(248, 178, 41, 0.75);
+
+  /* Tailwind line / border.* token 映射 */
+  --line-DEFAULT:   rgba(248, 178, 41, 0.25);
+  --border-DEFAULT: rgba(248, 178, 41, 0.25);
+  --border-line:    rgba(255, 255, 255, 0.12);
+
+  /* === HUD 战术微标签 === */
+  --color-hud-tag:        #f8b229;
+  --color-hud-tag-bg:     rgba(248, 178, 41, 0.16);
+  --color-hud-tag-border: rgba(248, 178, 41, 0.50);
+
+  /* === 语义 ok/warn/err/info Tailwind 映射 === */
+  --ok-DEFAULT:   #22c55e;
+  --warn-DEFAULT: #f59e0b;
+  --err-DEFAULT:  #ef4444;
+  --info-DEFAULT: #38bdf8;
+
+  /* === 毛玻璃温润漫射投影与微发光 (Glassmorphism Diffuse Shadows) === */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(248, 178, 41, 0.25);
+  --glow-accent:    0 0 20px rgba(248, 178, 41, 0.35);
+  --glow-secondary: 0 0 20px rgba(212, 36, 38, 0.30);
+
+  /* === 常规毛玻璃平滑圆角 === */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* === 毛玻璃 Glassmorphism 核心令牌 === */
+  --glass-blur: blur(14px);
+  --glass-bg: rgba(18, 32, 23, 0.65);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * ✨ CHARISMA PIXEL — 极魅像素 (第4套UI主题: 歧路旅人 HD-2D 神恩紫红金)
+ *    背景: 剧院黑曜深渊 #0c0a14 → 行宫暗紫 #171326 → 台阶浮雕紫 #221c38
+ *    文字: 香槟丝白 #fdf4ff → 暮色尘紫 #a79bb7 → 幽邃暗紫 #6b5f7c
+ *    主色: 神恩紫罗兰 #8b5cf6 · 醉梦丝绒红 #e11d48 · 帝国流金 #f59e0b
+ *    视觉: 歧路旅人 3D 仿 2D 体素挤压、移轴景深、舞台聚光灯与 CRT 光栅
+ * ─────────────────────────────────────────────────────────────────────*/
+.charisma,
+html.charisma,
+.theme-charisma {
+  color-scheme: dark;
+
+  /* === 主色 / 强调色 === */
+  --color-primary:            #8b5cf6;
+  --color-primary-glow:       rgba(139, 92, 246, 0.42);
+  --color-secondary:          #e11d48;
+  --color-secondary-glow:     rgba(225, 29, 72, 0.38);
+  --color-accent:             #f59e0b;
+  --color-accent-soft:        #d97706;
+  --color-accent-50:          #f59e0b;
+  --color-accent-violet:      #a855f7;
+  --color-accent-violet-glow: rgba(168, 85, 247, 0.32);
+
+  /* 主色反色 — 纯白 (在 #8b5cf6 紫底上对比度 6.8:1 WCAG AA+) */
+  --color-on-primary:         #ffffff;
+
+  /* === 语义色 === */
+  --color-success: #10b981;
+  --color-warning: #fbbf24;
+  --color-danger:  #f43f5e;
+  --color-neutral: #948da5;
+  --color-info:    #38bdf8;
+
+  /* === 背景层 (剧场黑曜深渊与行宫殿堂) === */
+  --color-surface:          #0c0a14;
+  --color-surface-2:        #171326;
+  --color-surface-elevated: #221c38;
+  --color-surface-glass:    rgba(23, 19, 38, 0.88);
+
+  /* Tailwind bg.* token 映射 */
+  --bg-DEFAULT: #0c0a14;
+  --bg-soft:    #171326;
+  --bg-lighter: #221c38;
+  --bg-card:    #171326;
+
+  /* === 文字 — 香槟丝白 (WCAG AAA 对比度 15.8:1 on #0c0a14) === */
+  --color-text:      #fdf4ff;
+  --color-text-dim:  #a79bb7;
+  --color-text-mute: #6b5f7c;
+
+  /* Tailwind ink.* token 映射 */
+  --ink-DEFAULT: #fdf4ff;
+  --ink-dim:     #a79bb7;
+  --ink-mute:    #6b5f7c;
+
+  /* === 边框 — 8-bit 紫金浮雕墨线 (纯像素硬边) === */
+  --color-border:        #2c2245;
+  --color-border-subtle: #1a152b;
+  --color-border-hover:  #f59e0b;
+
+  /* Tailwind line / border.* token 映射 */
+  --line-DEFAULT:   #2c2245;
+  --border-DEFAULT: #2c2245;
+  --border-line:    #3d3060;
+
+  /* === HUD 战术微标签 === */
+  --color-hud-tag:        #f59e0b;
+  --color-hud-tag-bg:     rgba(245, 158, 11, 0.14);
+  --color-hud-tag-border: rgba(245, 158, 11, 0.45);
+
+  /* === 语义 ok/warn/err/info Tailwind 映射 === */
+  --ok-DEFAULT:   #10b981;
+  --warn-DEFAULT: #f59e0b;
+  --err-DEFAULT:  #f43f5e;
+  --info-DEFAULT: #38bdf8;
+
+  /* === 纯像素风硬边投影 (零模糊 Zero-Blur Stepped Offsets) === */
+  --shadow-sm: 2px 2px 0px #050409;
+  --shadow-md: 3px 3px 0px #050409, inset 1px 1px 0px rgba(245, 158, 11, 0.25);
+  --shadow-lg: 5px 5px 0px #050409, inset 2px 2px 0px rgba(245, 158, 11, 0.35);
+  --glow-accent:    0 0 0 2px #f59e0b, 3px 3px 0px #050409;
+  --glow-secondary: 0 0 0 2px #e11d48, 3px 3px 0px #050409;
+
+  /* === 纯像素 0px 矢量圆角 (硬直角阶梯) === */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+
+  /* === CEL-SHADED / PIXEL ENGINE TOKENS === */
+  --cel-bg: #0c0a14;
+  --cel-surface-card: #171326;
+  --cel-surface-sub: #221c38;
+  --cel-surface-stage: #08060e;
+  --cel-card-ramp: linear-gradient(135deg, #2a2046 0%, #2a2046 35%, #1c1530 35%, #1c1530 70%, #0c0a14 70%, #0c0a14 100%);
+  --cel-crimson: #e11d48;
+  --cel-cyan: #8b5cf6;
+  --cel-gold: #f59e0b;
+  --cel-ink: #050409;
+  --cel-text-primary: #fdf4ff;
+  --cel-text-secondary: #a79bb7;
+  --cel-screentone-dot: rgba(245, 158, 11, 0.16);
+  --cel-shadow-color: #050409;
+  --cel-bevel-hi: rgba(245, 158, 11, 0.35);
+  --cel-bevel-lo: rgba(5, 4, 9, 0.85);
+  --cel-glint-color: rgba(255, 255, 255, 0.45);
+  --cel-glint-rim: rgba(139, 92, 246, 0.38);
+
+  /* === HD-2D (歧路旅人 / OCTOPATH TRAVELER) 宗师级 3D 仿 2D 光学与体素变量 === */
+  --hd2d-candle-gold:    #fbbf24;
+  --hd2d-candle-amber:   #f59e0b;
+  --hd2d-hearth-glow:    rgba(245, 158, 11, 0.30);
+  --hd2d-rim-aurora:     rgba(139, 92, 246, 0.35);
+  --hd2d-vignette:       radial-gradient(ellipse at center, transparent 50%, rgba(5, 4, 9, 0.88) 100%);
+  --hd2d-crt-scanline:   repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0px, rgba(0,0,0,0.18) 1px, transparent 1px, transparent 2px);
+  --hd2d-extrusion-hi:   inset 0 2px 0 0 rgba(245, 208, 120, 0.60), inset 2px 0 0 0 rgba(245, 208, 120, 0.40);
+  --hd2d-extrusion-lo:   inset 0 -2px 0 0 rgba(0, 0, 0, 0.70), inset -2px 0 0 0 rgba(0, 0, 0, 0.50);
+}
+

@@ -13,14 +13,14 @@ type NextThemesProps = ComponentProps<typeof NextThemesProvider>;
 export interface StarThemeProviderProps {
   children: ReactNode;
   /** 强制 defaultTheme (默认 "light") */
-  defaultTheme?: "light" | "dark";
+  defaultTheme?: "light" | "dark" | "christmas" | "charisma";
   /** 扩展 ThemeId 列表 (供 next-themes 已知列表) */
   themes?: string[];
 }
 
 /**
  * Star 主题 Provider — 包装 next-themes.
- * - attribute="class" → 在 html 标签加 .dark / .light
+ * - attribute="class" → 在 html 标签加 .dark / .light / .christmas / .charisma
  * - enableSystem={false} → 不跟随系统, 用户显式选
  * - storageKey="star-theme" → 与其他站点隔离
  * - 三层解析 (Personal / Tenant / Global) 由调用方 (api/theme.ts hook) 走, 此处只负责 next-themes 状态.
@@ -28,7 +28,7 @@ export interface StarThemeProviderProps {
 export function ThemeProvider({
   children,
   defaultTheme = "light",
-  themes = ["light", "dark"],
+  themes = ["light", "dark", "christmas", "charisma"],
 }: StarThemeProviderProps) {
   const props: Omit<NextThemesProps, "children"> = {
     attribute: "class",

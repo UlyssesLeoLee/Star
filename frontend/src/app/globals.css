@@ -11,6 +11,17 @@
  *   改: 纯 system 字体栈, 0 网络外联, 守门 #1 v1 + #5 一并满足
  *   后续: v0.2 PR 单独处理 woff2 自托管, 不混本次提交
  * ─────────────────────────────────────────────────────────────────────*/
+/* ─────────────────────────────────────────────────────────────────────
+ * 免费可商用纯像素游戏字体声明 (KenPixel CC0 自托管 + 像素字体系)
+ * ─────────────────────────────────────────────────────────────────────*/
+@font-face {
+  font-family: "KenPixel";
+  src: url("/fonts/kenpixel.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* 日漫圆体 — 跨平台 system 字体栈 */
   --font-anime: "PingFang SC", "Microsoft YaHei", "Hiragino Sans", "Yu Gothic UI", "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif;
@@ -18,6 +29,12 @@
   --font-mono:  ui-monospace, "SFMono-Regular", "Cascadia Code", "JetBrains Mono", "Consolas", "Menlo", monospace;
   /* 日文明朝体 — AI Tab 限定 */
   --font-serif-jp: "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", serif;
+  /* 免费商用纯像素游戏字体栈:
+     Latin: 'KenPixel' (CC0, 18KB 本地自托管), 'Press Start 2P', 'Silkscreen' (OFL)
+     CJK 中文像素: 'Ark Pixel 12px' (方舟像素体 OFL), 'Fusion Pixel' (缝合像素字 MIT), 'Zpix' (最像素), 'DotGothic16' (OFL)
+     Native Bitmap: 'SimSun', 'NSimSun' (Windows 原生 12px 点阵汉字), 'MingLiU'
+     Fallback: ui-monospace, monospace */
+  --font-pixel: "KenPixel", "Press Start 2P", "Silkscreen", "Ark Pixel 12px", "Ark Pixel 10px", "Fusion Pixel", "Zpix", "DotGothic16", "SimSun", "NSimSun", "MingLiU", ui-monospace, monospace;
 }
 
 /* 全局 body 走 anime 字体栈, 走 <html className="font-sans-jp"> 触发 */
@@ -41,9 +58,26 @@ html, body {
 }
 
 /* Light mode: 宣纸底纹 — 极细点网纹增加纸质感 (仅亮色模式) */
-:root:not(.dark) body {
+:root:not(.dark):not(.christmas) body {
   background-image: radial-gradient(circle, rgba(13,17,23,0.035) 1px, transparent 1px);
   background-size: 24px 24px;
+}
+
+/* Christmas Pixel mode: 纯像素字体 + 1-bit 点阵清晰渲染 + 雪花棋盘点阵 (圣夜纯像素主题) */
+html.christmas,
+html.christmas body,
+.christmas body,
+body.christmas {
+  font-family: var(--font-pixel) !important;
+  -webkit-font-smoothing: none !important;
+  -moz-osx-font-smoothing: unset !important;
+  text-rendering: geometricPrecision !important;
+  background-image:
+    radial-gradient(rgba(245, 248, 245, 0.08) 1.5px, transparent 1.5px),
+    radial-gradient(rgba(248, 178, 41, 0.06) 1px, transparent 1px);
+  background-size: 16px 16px, 32px 32px;
+  background-position: 0 0, 8px 8px;
+  image-rendering: pixelated;
 }
 
 /* 艺术级战术微型滚动条 — 主题自适应 */
@@ -488,6 +522,27 @@ html.light,
   background: var(--cel-card-ramp);
 }
 
+.cel-ramp-christmas {
+  background: linear-gradient(135deg, 
+    #eb3b3d 0%, #eb3b3d 35%, 
+    #d42426 35%, #d42426 70%, 
+    #9e1428 70%, #9e1428 100%);
+}
+
+.cel-ramp-pine {
+  background: linear-gradient(135deg, 
+    #228b4e 0%, #228b4e 35%, 
+    #165b33 35%, #165b33 70%, 
+    #0d381f 70%, #0d381f 100%);
+}
+
+.cel-ramp-gold {
+  background: linear-gradient(135deg, 
+    #fcd34d 0%, #fcd34d 35%, 
+    #f8b229 35%, #f8b229 70%, 
+    #b45309 70%, #b45309 100%);
+}
+
 /* 5. 3D Cel Button & Interactive Kinetics */
 .cel-btn-3d {
   position: relative;
@@ -573,3 +628,537 @@ html.light,
   opacity: 1;
   transform: translateX(40%) translateY(40%);
 }
+
+/* ============================================================================
+   ★ CHRISTMAS PURE PIXEL-ART (纯像素风) UI ENGINE
+   Zero vector radius, stepped integer pixel bevels, 8-bit kinetic spring,
+   and authentic winter festive pixel-art components.
+   ============================================================================ */
+
+/* 0. 纯像素字体规范 (免费商用像素游戏字体 + 1-Bit 点阵抗锯齿消除 — 仅 Charisma Pixel 主题独占) */
+html.charisma,
+html.charisma body,
+.charisma body,
+.font-pixel,
+.pixel-card,
+.pixel-btn,
+.pixel-btn-primary,
+.pixel-badge,
+.pixel-badge-ribbon,
+.pixel-badge-star,
+.pixel-badge-pine,
+.pixel-badge-charisma,
+.pixel-badge-velvet {
+  font-family: var(--font-pixel) !important;
+  -webkit-font-smoothing: none !important;
+  -moz-osx-font-smoothing: unset !important;
+  text-rendering: geometricPrecision !important;
+}
+
+/* 1. Christmas Pixel Card (纯像素双层卡片) */
+.pixel-card {
+  border-radius: 0px !important;
+  border: 2px solid var(--cel-ink, #060b08);
+  background: var(--cel-surface-card, #122017);
+  padding: 1.25rem 1.5rem;
+  box-shadow:
+    inset 1px 1px 0 0 var(--cel-bevel-hi, rgba(248, 178, 41, 0.35)),
+    inset -1px -1px 0 0 var(--cel-bevel-lo, rgba(6, 11, 8, 0.85)),
+    3px 3px 0px 0px var(--cel-shadow-color, #060b08);
+  position: relative;
+  image-rendering: pixelated;
+  transition: transform 60ms steps(2), box-shadow 60ms steps(2);
+}
+.pixel-card:hover {
+  transform: translate(-1px, -1px);
+  box-shadow:
+    inset 1px 1px 0 0 var(--cel-bevel-hi, rgba(248, 178, 41, 0.35)),
+    inset -1px -1px 0 0 var(--cel-bevel-lo, rgba(6, 11, 8, 0.85)),
+    5px 5px 0px 0px var(--cel-shadow-color, #060b08);
+  border-color: var(--cel-gold, #f8b229);
+}
+
+/* 2. Christmas Pixel Button (8-bit 街机触感像素按键) */
+.pixel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  border-radius: 0px !important;
+  border: 2px solid var(--cel-ink, #060b08);
+  background: var(--cel-surface-sub, #1a2f23);
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  color: var(--cel-text-primary, #f5f8f5);
+  box-shadow:
+    inset 1px 1px 0 0 var(--cel-bevel-hi, rgba(248, 178, 41, 0.35)),
+    inset -1px -1px 0 0 var(--cel-bevel-lo, rgba(6, 11, 8, 0.85)),
+    3px 3px 0px 0px var(--cel-shadow-color, #060b08);
+  transition: transform 60ms steps(2), box-shadow 60ms steps(2);
+  image-rendering: pixelated;
+  line-height: 1.2;
+}
+.pixel-btn:hover {
+  transform: translate(-1px, -1px);
+  border-color: var(--cel-gold, #f8b229);
+  box-shadow:
+    inset 1px 1px 0 0 var(--cel-bevel-hi, rgba(248, 178, 41, 0.35)),
+    inset -1px -1px 0 0 var(--cel-bevel-lo, rgba(6, 11, 8, 0.85)),
+    4px 4px 0px 0px var(--cel-shadow-color, #060b08);
+}
+.pixel-btn:active {
+  transform: translate(2px, 2px) !important;
+  box-shadow:
+    inset -1px -1px 0 0 var(--cel-bevel-lo, rgba(6, 11, 8, 0.85)),
+    1px 1px 0px 0px var(--cel-shadow-color, #060b08) !important;
+}
+
+/* 3. Christmas Pixel Primary Button (节日丝绒红像素按键) */
+.pixel-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border-radius: 0px !important;
+  border: 2px solid var(--cel-ink, #060b08);
+  background: linear-gradient(135deg, #eb3b3d 0%, #eb3b3d 40%, #d42426 40%, #d42426 75%, #9e1428 75%, #9e1428 100%);
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  color: #ffffff;
+  text-shadow: 1px 1px 0px #060b08;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow:
+    inset 1px 1px 0 0 rgba(255, 255, 255, 0.45),
+    inset -1px -1px 0 0 rgba(6, 11, 8, 0.75),
+    3px 3px 0px 0px var(--cel-shadow-color, #060b08);
+  transition: transform 60ms steps(2), box-shadow 60ms steps(2);
+  image-rendering: pixelated;
+  line-height: 1.2;
+}
+.pixel-btn-primary:hover {
+  transform: translate(-1px, -1px);
+  filter: brightness(1.08);
+  border-color: var(--cel-gold, #f8b229);
+  box-shadow:
+    inset 1px 1px 0 0 rgba(255, 255, 255, 0.45),
+    inset -1px -1px 0 0 rgba(6, 11, 8, 0.75),
+    5px 5px 0px 0px var(--cel-shadow-color, #060b08);
+}
+.pixel-btn-primary:active {
+  transform: translate(2px, 2px) !important;
+  box-shadow:
+    inset -1px -1px 0 0 rgba(6, 11, 8, 0.75),
+    1px 1px 0px 0px var(--cel-shadow-color, #060b08) !important;
+}
+
+/* 4. Christmas Pixel Badges (缎带红与伯利恒星金徽章) */
+.pixel-badge-ribbon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 0px !important;
+  border: 1.5px solid var(--cel-ink, #060b08);
+  background-color: var(--cel-crimson, #d42426);
+  color: #ffffff;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  line-height: 1;
+  box-shadow:
+    inset 1px 1px 0 0 rgba(255, 255, 255, 0.45),
+    inset -1px -1px 0 0 rgba(0, 0, 0, 0.45),
+    2px 2px 0px 0px var(--cel-shadow-color, #060b08);
+}
+
+.pixel-badge-star {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 0px !important;
+  border: 1.5px solid var(--cel-ink, #060b08);
+  background-color: var(--cel-gold, #f8b229);
+  color: #0b130e;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  line-height: 1;
+  box-shadow:
+    inset 1px 1px 0 0 rgba(255, 255, 255, 0.65),
+    inset -1px -1px 0 0 rgba(0, 0, 0, 0.35),
+    2px 2px 0px 0px var(--cel-shadow-color, #060b08);
+}
+
+.pixel-badge-pine {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 0px !important;
+  border: 1.5px solid var(--cel-ink, #060b08);
+  background-color: var(--cel-cyan, #165b33);
+  color: #f5f8f5;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  line-height: 1;
+  box-shadow:
+    inset 1px 1px 0 0 rgba(255, 255, 255, 0.35),
+    inset -1px -1px 0 0 rgba(0, 0, 0, 0.45),
+    2px 2px 0px 0px var(--cel-shadow-color, #060b08);
+}
+
+/* 5. Frosted Glassmorphism for html.christmas (常规毛玻璃风格) */
+html.christmas .card,
+.christmas .card {
+  border-radius: var(--radius-md, 10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(18, 32, 23, 0.65) !important;
+  backdrop-filter: blur(14px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(150%) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+html.christmas .card:hover,
+.christmas .card:hover {
+  transform: translateY(-2px) !important;
+  border-color: rgba(248, 178, 41, 0.55) !important;
+  box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(248, 178, 41, 0.25), 0 0 16px rgba(248, 178, 41, 0.15) !important;
+}
+
+html.christmas .btn,
+.christmas .btn {
+  border-radius: var(--radius-sm, 6px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(26, 47, 35, 0.8) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+  transition: transform 0.15s ease, background-color 0.15s ease !important;
+}
+
+html.christmas .btn:hover,
+.christmas .btn:hover {
+  transform: translateY(-1px) !important;
+  background: rgba(35, 65, 48, 0.9) !important;
+  border-color: rgba(248, 178, 41, 0.45) !important;
+}
+
+html.christmas .btn-primary,
+.christmas .btn-primary {
+  border-radius: var(--radius-sm, 6px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  background: linear-gradient(135deg, rgba(235, 59, 61, 0.9) 0%, rgba(212, 36, 38, 0.95) 100%) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  box-shadow: 0 4px 16px rgba(212, 36, 38, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+}
+
+html.christmas .btn-primary:hover,
+.christmas .btn-primary:hover {
+  filter: brightness(1.08) !important;
+  box-shadow: 0 6px 20px rgba(212, 36, 38, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+}
+
+/* 6. Override default .card and .btn when in html.charisma (极魅像素: 神恩紫红金) */
+html.charisma .card,
+.charisma .card {
+  border-radius: 0px !important;
+  border-color: var(--cel-ink, #050409);
+  background-image: radial-gradient(var(--cel-screentone-dot) 1px, transparent 1px), var(--cel-card-ramp);
+  box-shadow:
+    inset 1px 1px 0 0 var(--cel-bevel-hi),
+    inset -1px -1px 0 0 var(--cel-bevel-lo),
+    3px 3px 0px 0px var(--cel-shadow-color, #050409);
+}
+
+html.charisma .btn-primary,
+.charisma .btn-primary {
+  border-radius: 0px !important;
+  border-color: var(--cel-ink, #050409);
+  background: linear-gradient(135deg, #a78bfa 0%, #a78bfa 25%, #8b5cf6 25%, #8b5cf6 65%, #6d28d9 65%, #6d28d9 100%);
+  color: #ffffff;
+  box-shadow:
+    inset 1px 1px 0 0 rgba(255, 255, 255, 0.45),
+    inset -1px -1px 0 0 rgba(5, 4, 9, 0.75),
+    3px 3px 0px 0px var(--cel-shadow-color, #050409);
+}
+
+/* 7. Charisma Pixel Badges (神恩紫罗兰与醉梦丝绒红徽章) */
+.pixel-badge-charisma {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 0px !important;
+  border: 1.5px solid var(--cel-ink, #050409);
+  background-color: var(--color-primary, #8b5cf6);
+  color: #ffffff;
+  font-family: var(--font-pixel) !important;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  line-height: 1;
+  box-shadow:
+    inset 1px 1px 0 0 rgba(255, 255, 255, 0.45),
+    inset -1px -1px 0 0 rgba(0, 0, 0, 0.45),
+    2px 2px 0px 0px var(--cel-shadow-color, #050409);
+}
+
+.pixel-badge-velvet {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 0px !important;
+  border: 1.5px solid var(--cel-ink, #050409);
+  background-color: var(--color-secondary, #e11d48);
+  color: #ffffff;
+  font-family: var(--font-pixel) !important;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  line-height: 1;
+  box-shadow:
+    inset 1px 1px 0 0 rgba(255, 255, 255, 0.45),
+    inset -1px -1px 0 0 rgba(0, 0, 0, 0.45),
+    2px 2px 0px 0px var(--cel-shadow-color, #050409);
+}
+
+/* ============================================================================
+   ★ OCTOPATH TRAVELER (HD-2D / 歧路旅人) GRANDMASTER 3D-TO-2D PIXEL ENGINE
+   Tilt-shift depth of field, orthographic diorama extrusion, candle warm bounce,
+   and authentic retro JRPG tactile feedback.
+   ============================================================================ */
+
+/* 1. HD-2D 箱庭微缩视差景深舞台 (Tilt-Shift Diorama Container) */
+.hd2d-stage {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.hd2d-tilt {
+  transform: rotateX(8deg) rotateY(-4deg);
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 300ms ease;
+  transform-style: preserve-3d;
+}
+.hd2d-tilt:hover {
+  transform: rotateX(2deg) rotateY(0deg) translateZ(8px);
+}
+
+/* 2. HD-2D 体素双层面板 (Voxel Extruded Panel with Warm Hearth Light) */
+.hd2d-panel {
+  border-radius: 0px !important;
+  border: 2px solid var(--cel-ink, #060b08);
+  background: 
+    radial-gradient(ellipse at 50% 0%, rgba(248, 190, 34, 0.12) 0%, transparent 70%),
+    linear-gradient(145deg, #1b3526 0%, #13241a 45%, #0b1510 100%);
+  box-shadow:
+    inset 0 2px 0 0 rgba(248, 190, 34, 0.45),
+    inset 2px 0 0 0 rgba(248, 190, 34, 0.25),
+    inset 0 -2px 0 0 rgba(0, 0, 0, 0.75),
+    inset -2px 0 0 0 rgba(0, 0, 0, 0.65),
+    0 1px 0 1px #060b08,
+    4px 4px 0px 0px #060b08,
+    0 8px 24px rgba(6, 11, 8, 0.65);
+  position: relative;
+  image-rendering: pixelated;
+}
+
+/* 3. HD-2D 触觉体素按键 (Arcade Microswitch Tactile Button) */
+.hd2d-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  border-radius: 0px !important;
+  border: 2px solid var(--cel-ink, #060b08);
+  background: linear-gradient(180deg, #1f3d2c 0%, #15291e 100%);
+  padding: 8px 18px;
+  font-family: var(--font-pixel) !important;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cel-text-primary, #f5f8f5);
+  box-shadow:
+    inset 0 2px 0 0 rgba(248, 190, 34, 0.55),
+    inset 2px 0 0 0 rgba(248, 190, 34, 0.35),
+    inset 0 -2px 0 0 rgba(0, 0, 0, 0.7),
+    3px 4px 0px 0px #060b08;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 60ms steps(2), box-shadow 60ms steps(2);
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none !important;
+}
+.hd2d-btn:hover {
+  transform: translate(-1px, -2px);
+  filter: brightness(1.1);
+  box-shadow:
+    inset 0 2px 0 0 rgba(248, 190, 34, 0.75),
+    inset 2px 0 0 0 rgba(248, 190, 34, 0.45),
+    inset 0 -2px 0 0 rgba(0, 0, 0, 0.7),
+    4px 6px 0px 0px #060b08;
+}
+.hd2d-btn:active {
+  transform: translate(2px, 3px) !important;
+  box-shadow:
+    inset 0 1px 0 0 rgba(0, 0, 0, 0.8),
+    1px 1px 0px 0px #060b08 !important;
+}
+
+/* 4. HD-2D 皇家红丝绒主按键 (Royal Crimson Ribbon Primary) */
+.hd2d-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border-radius: 0px !important;
+  border: 2px solid var(--cel-ink, #060b08);
+  background: linear-gradient(180deg, #e62e45 0%, #c81e3a 50%, #9e1428 100%);
+  padding: 10px 22px;
+  font-family: var(--font-pixel) !important;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+  text-shadow: 1px 1px 0px #060b08;
+  box-shadow:
+    inset 0 2px 0 0 rgba(255, 230, 160, 0.65),
+    inset 2px 0 0 0 rgba(255, 230, 160, 0.4),
+    inset 0 -3px 0 0 rgba(60, 5, 12, 0.8),
+    3px 5px 0px 0px #060b08;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 60ms steps(2), box-shadow 60ms steps(2);
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none !important;
+}
+.hd2d-btn-primary:hover {
+  transform: translate(-1px, -2px);
+  filter: brightness(1.08);
+  box-shadow:
+    inset 0 2px 0 0 rgba(255, 230, 160, 0.8),
+    inset 2px 0 0 0 rgba(255, 230, 160, 0.5),
+    inset 0 -3px 0 0 rgba(60, 5, 12, 0.8),
+    4px 7px 0px 0px #060b08;
+}
+.hd2d-btn-primary:active {
+  transform: translate(2px, 4px) !important;
+  box-shadow:
+    inset 0 2px 0 0 rgba(60, 5, 12, 0.9),
+    1px 1px 0px 0px #060b08 !important;
+}
+
+/* 5. HD-2D 复古 CRT 显像管微光栅 (Trinitron Phosphor Scanlines) */
+.hd2d-scanlines {
+  position: relative;
+}
+.hd2d-scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.16) 0px,
+    rgba(0, 0, 0, 0.16) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  z-index: 10;
+  opacity: 0.8;
+}
+
+/* 6. 动态温暖烛光与壁炉光晕微呼吸 */
+.hd2d-candle-flicker {
+  animation: hd2dCandleGlow 2.8s ease-in-out infinite;
+}
+
+@keyframes hd2dCandleGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px rgba(248, 190, 34, 0.28));
+  }
+  30% {
+    filter: drop-shadow(0 0 16px rgba(255, 138, 34, 0.38));
+  }
+  60% {
+    filter: drop-shadow(0 0 8px rgba(248, 190, 34, 0.22));
+  }
+  80% {
+    filter: drop-shadow(0 0 14px rgba(248, 190, 34, 0.34));
+  }
+}
+
+/* 7. Charisma HD-2D 专属体素面板与按键 (极魅紫金舞台) */
+.charisma .hd2d-panel,
+html.charisma .hd2d-panel {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(245, 158, 11, 0.16) 0%, transparent 70%),
+    linear-gradient(145deg, #271e3d 0%, #171326 45%, #0c0a14 100%);
+  border-color: var(--cel-ink, #050409);
+  box-shadow:
+    inset 0 2px 0 0 rgba(245, 158, 11, 0.45),
+    inset 2px 0 0 0 rgba(245, 158, 11, 0.25),
+    inset 0 -2px 0 0 rgba(0, 0, 0, 0.8),
+    inset -2px 0 0 0 rgba(0, 0, 0, 0.7),
+    0 1px 0 1px #050409,
+    4px 4px 0px 0px #050409,
+    0 8px 24px rgba(5, 4, 9, 0.75);
+}
+
+.charisma .hd2d-btn,
+html.charisma .hd2d-btn {
+  background: linear-gradient(180deg, #2f2549 0%, #1b152d 100%);
+  border-color: var(--cel-ink, #050409);
+  box-shadow:
+    inset 0 2px 0 0 rgba(245, 158, 11, 0.55),
+    inset 2px 0 0 0 rgba(245, 158, 11, 0.35),
+    inset 0 -2px 0 0 rgba(0, 0, 0, 0.7),
+    3px 4px 0px 0px #050409;
+}
+
+.charisma .hd2d-btn-primary,
+html.charisma .hd2d-btn-primary {
+  background: linear-gradient(180deg, #9f75ff 0%, #8b5cf6 45%, #6d28d9 100%);
+  border-color: var(--cel-ink, #050409);
+  box-shadow:
+    inset 0 2px 0 0 rgba(255, 235, 175, 0.7),
+    inset 2px 0 0 0 rgba(255, 235, 175, 0.45),
+    inset 0 -3px 0 0 rgba(40, 10, 80, 0.8),
+    3px 5px 0px 0px #050409;
+}
+
+.charisma .hd2d-candle-flicker {
+  animation: hd2dCharismaGlow 2.8s ease-in-out infinite;
+}
+
+@keyframes hd2dCharismaGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 12px rgba(139, 92, 246, 0.35)) drop-shadow(0 0 4px rgba(245, 158, 11, 0.4));
+  }
+  35% {
+    filter: drop-shadow(0 0 18px rgba(225, 29, 72, 0.45)) drop-shadow(0 0 8px rgba(245, 158, 11, 0.55));
+  }
+  70% {
+    filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.28)) drop-shadow(0 0 3px rgba(245, 158, 11, 0.3));
+  }
+}
+
+
+

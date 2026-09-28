@@ -1,11 +1,11 @@
 # 03. Star LangGraph 統合アーキテクチャ - 詳細設計書 (Detailed Design)
 
-> **状態**：🟢 Draft v0.2
-> **日期**：2026-09-04 (升版自 v0.1)
+> **状態**：🟡 Draft v0.3 (Worktree 群组集成详细设计补充待评审)
+> **日期**：2026-09-28
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
-> **签批**：🟢 Mavis 接手终审（per 2026-08-27 19:39 + 21:59 JST 用户授权）
-> **依赖**：[01-requirements.md](01-requirements.md)（要件定義書 v0.2）· [02-basic-design.md](02-basic-design.md)（基本設計書 v0.2）· [ADR-0030](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0030-agent-lease-heartbeat-resume.md) · [ADR-0032](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0032-mcp-transport-stdio.md) · [ADR-0046 LangGraph TMO 任务卡管理操作](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) · [AGENTS.md](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md)
-> **关联文档**：[01-requirements.md](01-requirements.md)（要件定義書 v0.2）· [02-basic-design.md](02-basic-design.md)（基本設計書 v0.2）· [PHASE-LANGGRAPH-TMO-IMPL-REPORT.md](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md)（7 子项实装计划）
+> **审核**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核；v0.3 补充待评审
+> **依赖**：[01-requirements.md](01-requirements.md)（要件定義書 v0.3）· [02-basic-design.md](02-basic-design.md)（基本設計書 v0.3）· [ADR-0030](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0030-agent-lease-heartbeat-resume.md) · [ADR-0032](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0032-mcp-transport-stdio.md) · [ADR-0046 LangGraph TMO 任务卡管理操作](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) · [AGENTS.md](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md)
+> **关联文档**：[01-requirements.md](01-requirements.md)（要件定義書 v0.3）· [02-basic-design.md](02-basic-design.md)（基本設計書 v0.3）· [PHASE-LANGGRAPH-TMO-IMPL-REPORT.md](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md)（7 子项实装计划）
 
 > **本 view 范围** (per [01 §1.0](01-requirements.md)): 本詳細設計書涵盖的是 **任务卡子代理 (Sub-Agent)** 系统的 LangGraph 状態機 / 节点 / 边 / reducer / シーケンス図 / 状態遷移 / 永続化 / テスト設計。**不涵盖** 现有 Mavis worker subagent (worker/explorer/verifier, `dispatcher.py` + brief 派发) 系统 — 那是另一套独立 sub-agent 系统, per [01 §1.0](01-requirements.md) 区别表。
 
@@ -1985,6 +1985,7 @@ per 01 §7 + 02 §10 + 追加:
 |---|---|---|---|---|
 | v0.1 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：18 模块 + 4 主要 class + 7 top node + 5 sub node + 4 edge + 9 subgraph (SA-01..SA-09) + 4 シーケンス図 (mermaid) + 3 状態遷移図 + 19 UT / 9 IT / 8 E2E / 8 PT テスト設計 + エラー処理 4 レベル + 永続化 3-tier + 12 既知課題 | 2026-09-03 17:51 JST 用户发令"另起一套架构view,专门设计langgraph相关的功能" (随 01-requirements.md + 02-basic-design.md 同步落档) |
 | v0.2 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **TMO 升版**: §1.1 模块构成加 task_ops/ (7 节点 + 7 协议) + SA-10 task-orchestrator; §1.2 模块责任加 M-19..M-25 (7 新 module); §3.2.1.1 TMO 7 节点 Python 実装 (merge/split/reorder/bulk/summarize/reassign/metadata) 全代码; §5.1 状态机加 superseded 终态 (per 守门 #13 d Transaction append-only); §8.1 UT 加 UT-20..UT-26 (7 新单测); §8.2 IT 加 IT-10..IT-12 (merge/split/bulk+DAG 3 新集成); §8.3 E2E 加 E2E-09..E2E-13 (5 新 UC 测试); §9 加 2 新已知缺口 (TMO 实装 P0 / 守门 #13 a 实证); 5 签字栏 v0.2 升版; 守门 #1+#5+#6+#7+#9+#10+#12+#13+#19+#20+#22 跨 stage 全过 (文档工作无 .rs 改动, cargo check 不需要跑) | 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡, 做整体统筹规划, 发号施令的入口是底端聊天窗口, 例如合并任务a和任务b" (per ask_d076c26d3fbf599eec1c32fd 拍板 (1) 范围=完整 7 节点全覆盖 (2) 文档策略=原地升版 v0.1 → v0.2 (3) 实装阶段=文档+commit 一并落), ~0.06M token 估 |
+| v0.3 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 GroupContext/RunContext、WORKTREE/GLOBAL 目标授权、Task Card 与 CLI 绑定、独立 Group App Registry capability bridge，以及 Work checkpoint 与 Transaction 审计边界；本版待评审 | 用户要求先将需求与基本设计合并到 dev，再据基本设计更新详细设计 |
 
 ---
 
@@ -2002,3 +2003,95 @@ per 01 §7 + 02 §10 + 追加:
 - [LangGraph Documentation](https://langchain-ai.github.io/langgraph/) — StateGraph / Checkpoint / Subgraph / Interrupt / Command
 - [LangGraph Streaming](https://langchain-ai.github.io/langgraph/how-tos/streaming/) — astream modes (values/updates/events)
 - [LangGraph Checkpoint](https://langchain-ai.github.io/langgraph/concepts/persistence/) — BaseCheckpointSaver
+
+**版本兼容缺口**：历史基本设计记载 LangGraph SDK 0.2.x 锁版。本节采用官方当前 Python API 的 `context_schema` / `Runtime.context` 术语描述运行时上下文；实施前必须在依赖升级评审中确认与仓库锁定版本兼容，或提供同等的版本适配层，不据此默认为依赖已升级。
+
+## 13. Worktree 群组集成详细设计 (v0.3)
+
+本节把 v0.3 群组设计补充为本 DD 的规范实现契约。Worktree 是渡口的产品导航根；LangGraph L0/L1 是 Worktree 群组内的编排与执行角色，不构成另一套应用树。下列契约优先于本文件旧代码样例中未携带 GroupContext 的部分；旧样例只说明节点算法，不代表授权或持久化边界。
+
+### 13.1 不可变运行上下文与可变图状态
+
+每次 L0/L1 调用先由服务端 `GroupContextResolver` 根据已认证主体、当前 Worktree、请求 scope 和目标引用解析上下文。客户端不能提交可信的 `actor_id`、permission snapshot 或 tenant 身份；这些值由认证与授权层产生。GLOBAL 写操作必须携带显式目标 Worktree 集合，并逐个预授权。L1 每次执行严格绑定一个 Worktree；L0 可以跨多个已授权目标编排，但不能把多个 Worktree 合并成一个 L1 执行目录。
+
+```python
+from dataclasses import dataclass
+from typing import Literal, TypedDict
+
+@dataclass(frozen=True)
+class AgentRunContext:
+    actor_id: str
+    tenant_id: str
+    scope_kind: Literal["WORKTREE", "GLOBAL"]
+    worktree_id: str | None
+    authorized_target_worktree_ids: tuple[str, ...]
+    permission_snapshot_ref: str
+    correlation_id: str
+
+class ScopedAgentState(TypedDict, total=False):
+    user_input: str
+    scope_kind: Literal["WORKTREE", "GLOBAL"]  # server-written audit/display snapshot
+    worktree_id: str | None
+    work_item_id: str | None
+    task_card_id: str | None
+    target_worktree_ids: list[str]  # server-resolved allowlist, never LLM-selected
+    entity_refs: list[dict]
+    correlation_id: str
+    active_subagents: list[dict]
+    final_result: str | None
+
+builder = StateGraph(ScopedAgentState, context_schema=AgentRunContext)
+compiled = builder.compile(checkpointer=checkpointer)
+config = {"configurable": {"thread_id": opaque_thread_id}}
+await compiled.ainvoke(input_state, config=config, context=verified_context)
+```
+
+`AgentRunContext` 是每次调用的运行时上下文，权限检查以它为准；state 中的 scope/id 字段只是受服务端控制的可见快照，不允许模型节点改写授权范围。恢复时由 `thread_id` 查回 Run Record，并重新验证 actor、tenant、Worktree、目标 ACL 和插件 capability；不得把 checkpoint 中存储的旧权限当作当前授权。
+
+Human-in-the-loop 节点用 LangGraph interrupt 保存等待点；Group Shell 提交批准/拒绝后，服务端先重新解析并校验 GroupContext，再用同一不透明 `thread_id` 配置以 `Command(resume=decision)` 恢复。resume payload 只能表达用户决策，不能携带或覆盖 actor、scope、permission 或 authorized targets。
+
+### 13.2 Task Card、WorkItem 与执行身份
+
+每个 L1 Run 的 `worktree_id`、`work_item_id` 和 `task_card_id` 必填并保持一致。Task Card 是同级应用共享的执行工作面；CLI/Agent Session 由 Runtime / AgentPolicy 在卡片内启动，启动目录必须从已校验的 Worktree binding 取得，不得由浏览器当前 URL 或用户输入路径推断。一个 Task Card 可关联多次有独立 `thread_id` 的执行尝试；WorkItem 生命周期仍由 Multica Lifecycle Service 唯一写入。
+
+```text
+TaskExecutionContext = {
+  worktree_id, work_item_id, task_card_id,
+  actor_id, tenant_id, scope_kind,
+  authorized_capabilities, permission_snapshot_ref,
+  runtime_profile, correlation_id
+}
+```
+
+Canvas、Multica、Jira 等价视图和 Task Card 索引只传递经 resolver 验证的 `EntityRef(type, id, worktree_id)`；它们不自行创建 LangGraph thread，不直接读写 checkpoint 表，也不复制任务状态。群组插件由 Group App Registry 提供入口和 capability，LangGraph `SubAgentRegistry` 仍只负责 Agent Graph 类型。每次插件工具调用都重新检查插件启用状态、scope 与授权；被卸载或撤权的 capability 不得继续用于新的写调用。
+
+### 13.3 Checkpoint、审计与隔离
+
+| 数据 | 分类 | 详细设计规则 |
+|---|---|---|
+| LangGraph state/checkpoint、可恢复执行上下文 | Work | 有明确 `retention_period` / `expires_at`；thread ID 不复用；按 tenant + thread 隔离。它们用于恢复，不是审计事实 |
+| Run 当前态投影、活跃执行引用 | Work | 可按保留期清理或由事件重建；不得作为唯一操作历史 |
+| Dispatch、tool 调用、scope/目标授权结果、用户确认、interrupt/resume、插件 capability 使用 | Transaction | append-only，记录 actor/tenant/worktree/work_item/task_card/correlation 和每目标结果；禁止物理删除 |
+| 任务标题、计划元数据、用户维护配置 | Master | SCD Type 2；按 Master RLS 规则隔离 |
+
+`thread_id` 使用不透明的唯一 ID；Run Record 建立它与 `tenant_id`、`actor_id`、`worktree_id`、`work_item_id`、`task_card_id` 的服务端映射。SQLite 文件仅可用于单机开发或测试。多副本/生产运行必须选用所有执行实例可访问且支持隔离的 checkpointer；checkpointer backend 的最终选型仍是部署决策项。state/checkpoint 中禁止保存 API key、cookie、token、原始 credential 和未经脱敏的敏感 tool output。
+
+### 13.4 Group Shell 请求与流式响应
+
+Group Shell 每次提交都发送 `scope_kind`、用户当前的 `worktree_id`（若适用）、`work_item_id` / `task_card_id` / 类型化 EntityRef、`target_worktree_ids`（仅 GLOBAL 写操作）和 `idempotency_key`。服务端返回规范化的 `run_id`、不透明 `thread_id` 和已验证 scope。未提供 GLOBAL 写目标返回 `422 target_required`；目标未授权返回逐目标 `403 target_forbidden`，这些目标不会执行；重复命令由 idempotency key 去重。
+
+图流向 Group Shell 的是经筛选的 UI DTO，不直接透传完整 checkpoint。实现采用 LangGraph 支持的 `updates`、`messages`、`custom` 等 stream mode，再映射为前端事件 `run.started`、`task.updated`、`message.delta`、`approval.required`、`target.result` 和 `run.completed`。Checkpoint/内部 state 调试流仅供受限诊断，不暴露给普通群组成员。
+
+### 13.5 关键验收与已知缺口
+
+| 检查点 | 详细验收 |
+|---|---|
+| Scope 保存 | WORKTREE/GLOBAL scope 与 Worktree/WorkItem/Task Card ID 在 L0、L1、Run Record 和审计事件中一致 |
+| 授权隔离 | GLOBAL 每个写目标独立校验；一个 L1 Run 不能跨 Worktree；未授权目标没有副作用 |
+| Resume | 恢复前重新授权；过期或被撤销的权限/插件 capability 阻断继续写入 |
+| App 交互 | Task Card/Canvas/Multica 通过 canonical ID 与领域 API 交互，不直接操作图状态或 checkpoint |
+| 状态与审计 | 可恢复 checkpoint 按 Work retention 清理；操作历史从 Transaction 事件审计，不依赖 checkpoint 永久留存 |
+
+**已知缺口**：生产 checkpointer 后端及 failover/加密配置待 Runtime/SRE 设计裁定；GLOBAL 多目标部分成功的 UI 呈现沿用基本设计逐目标结果，具体补偿和重试策略由 TMO 详细设计补齐。
+
+---

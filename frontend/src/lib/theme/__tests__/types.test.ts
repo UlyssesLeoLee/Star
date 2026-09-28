@@ -12,11 +12,13 @@ import {
 } from "../types";
 
 describe("THEMES", () => {
-  it("至少 2 个内置主题 (Light + Dark)", () => {
-    expect(THEMES.length).toBeGreaterThanOrEqual(2);
+  it("至少 4 个内置主题 (Light + Dark + Christmas + Charisma)", () => {
+    expect(THEMES.length).toBeGreaterThanOrEqual(4);
     const ids = THEMES.map((t) => t.id);
     expect(ids).toContain("light");
     expect(ids).toContain("dark");
+    expect(ids).toContain("christmas");
+    expect(ids).toContain("charisma");
   });
 
   it("每个主题都有完整 color / spacing / radius token", () => {
@@ -31,7 +33,33 @@ describe("THEMES", () => {
     for (const t of THEMES) {
       if (t.id === "light") expect(t.isDark).toBe(false);
       if (t.id === "dark") expect(t.isDark).toBe(true);
+      if (t.id === "christmas") expect(t.isDark).toBe(true);
+      if (t.id === "charisma") expect(t.isDark).toBe(true);
     }
+  });
+
+  it("圣诞主题符合常规毛玻璃风格特征 (标准圆角 > 0px)", () => {
+    const xmas = THEMES.find((t) => t.id === "christmas");
+    expect(xmas).toBeDefined();
+    expect(xmas!.displayName).toBe("圣夜霜雪");
+    for (const r of xmas!.radii) {
+      expect(r.px).toBeGreaterThan(0);
+    }
+  });
+
+  it("极魅主题为唯一专属 16 位与 HD-2D 纯像素风 (0px 矢量圆角 + 神恩紫罗兰与丝绒红)", () => {
+    const charisma = THEMES.find((t) => t.id === "charisma");
+    expect(charisma).toBeDefined();
+    expect(charisma!.displayName).toBe("极魅像素");
+    for (const r of charisma!.radii) {
+      expect(r.px).toBe(0);
+    }
+    const primary = charisma!.colors.find((c) => c.name === "--color-primary");
+    expect(primary?.hex).toBe("#8B5CF6");
+    const secondary = charisma!.colors.find((c) => c.name === "--color-secondary");
+    expect(secondary?.hex).toBe("#E11D48");
+    const surface = charisma!.colors.find((c) => c.name === "--color-surface");
+    expect(surface?.hex).toBe("#0C0A14");
   });
 });
 

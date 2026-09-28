@@ -32,7 +32,8 @@ import { StatusPill } from "@/components/StatusPill";
 import { Tooltip } from "@/components/ui/tooltip";
 import { GasParticlesHint } from "@/components/effects/GasParticlesHint";
 import { AlertTriangle, Plus, SlidersHorizontal } from "lucide-react";
-import type { Board, WorkItem, WorkItemStatus, Identity } from "@/types/ids";
+import type { Board, WorkItem, WorkItemStatus, Identity, WtmCategory } from "@/types/ids";
+import { WT_M_FROM_KIND, WT_M_LABELS } from "@/types/ids";
 import { KANBAN_COLUMNS } from "@/mocks/data";
 import { isFallbackStatus } from "./constants";
 import { useTranslation, interpolate, useStatusLabel } from "@/lib/i18n";
@@ -411,23 +412,88 @@ export function KanbanBoard({
                 </div>
               )}
               <div className="space-y-2">
-                {cards.length === 0 && (
-                  <div className="text-[10px] text-ink-mute italic text-center py-4">
-                    {t.board.dragCardsHere}
-                  </div>
-                )}
-                {cards.map((w) => (
-                  <KanbanCard
-                    key={w.id}
-                    workItem={w}
-                    assignee={w.assignee_id ? identityMap[w.assignee_id] : undefined}
-                    isDragging={effectiveDraggingId === w.id}
-                    onDragStart={handleCardDragStart}
-                    onDragEnd={handleCardDragEnd}
-                    onClick={onWorkItemClick}
-                    onArchClick={onArchClick}
-                  />
-                ))}
+              {cards.length === 0 && (
+                <div className="text-[10px] text-ink-mute italic text-center py-4">
+                  {t.board.dragCardsHere}
+                </div>
+              )}
+              {/* === W/T/M 三類横展開 swimlane (per AGENTS.md §4 #13 + docs/kanban-vmodel-jp/W-T-M-VERIFICATION-REPORT.md) ===
+                  - 把 cards 按 w_t_m 分 3 个 swimlane (W = 业务 / T = 执行 / M = 主数据)
+                  - 每个 swimlane 头部小 label (W / T / M + count), 卡片按 swimlane 分组渲染
+                  - 0 卡片的 swimlane 自动隐藏 (避免视觉噪声)
+                  - 兜底 (uncategorized) 合并到 M swimlane 底部, 标"未分類"
+                  - 拖动/drop 行为不变 (per测试 ✓): 卡片仍在 col.work_item_ids 数组里, drop 到 col 仍触发 onTransition
+              */}
+              {(() => {
+                const wtm = (w: WorkItem): WtmCategory => w.w_t_m ?? WT_M_FROM_KIND[w.kind] ?? "uncategorized";
+                // 顺序: W → T → M, uncategorized 合并到 M 末尾
+                const order: WtmCategory[] = ["W", "T", "M"];
+                const groups = order.map((cat) => ({
+                  cat,
+                  items: cards.filter((w) => wtm(w) === cat),
+                }));
+                const uncat = cards.filter((w) => wtm(w) === "uncategorized");
+                return (
+                  <>
+                    {groups.map((g) => (
+                      <div key={g.cat} data-testid={`kanban-swimlane-${g.cat}-${col.status}`}>
+                        {g.items.length > 0 && (
+                          <div className="flex items-center gap-1.5 mb-1 px-0.5 select-none">
+                            <span className={clsx(
+                              "text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border",
+                              g.cat === "W" && "border-accent/40 bg-accent/10 text-accent",
+                              g.cat === "T" && "border-warn/40 bg-warn/10 text-warn",
+                              g.cat === "M" && "border-ok/40 bg-ok/10 text-ok",
+                            )}>
+                              {g.cat} · {WT_M_LABELS[g.cat].zh}
+                            </span>
+                            <span className="text-[9px] text-ink-mute font-mono">{g.items.length}</span>
+                            <span className="flex-1 border-t border-line/40" />
+                          </div>
+                        )}
+                        <div className="space-y-2">
+                          {g.items.map((w) => (
+                            <KanbanCard
+                              key={w.id}
+                              workItem={w}
+                              assignee={w.assignee_id ? identityMap[w.assignee_id] : undefined}
+                              isDragging={effectiveDraggingId === w.id}
+                              onDragStart={handleCardDragStart}
+                              onDragEnd={handleCardDragEnd}
+                              onClick={onWorkItemClick}
+                              onArchClick={onArchClick}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {uncat.length > 0 && (
+                      <div data-testid={`kanban-swimlane-uncategorized-${col.status}`}>
+                        <div className="flex items-center gap-1.5 mb-1 px-0.5 select-none">
+                          <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-ink-mute/30 bg-bg-soft text-ink-mute">
+                            未分類 · {uncat.length}
+                          </span>
+                          <span className="flex-1 border-t border-line/40" />
+                        </div>
+                        <div className="space-y-2">
+                          {uncat.map((w) => (
+                            <KanbanCard
+                              key={w.id}
+                              workItem={w}
+                              assignee={w.assignee_id ? identityMap[w.assignee_id] : undefined}
+                              isDragging={effectiveDraggingId === w.id}
+                              onDragStart={handleCardDragStart}
+                              onDragEnd={handleCardDragEnd}
+                              onClick={onWorkItemClick}
+                              onArchClick={onArchClick}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               </div>
               {/* + Add task (per 2026-08-31 12:07 JST 二拍, Drawer 替代 inline 编辑)
                   - 点击 → 父组件 onRequestNewWorkItem(status) 推 WorkItemDetailDrawer

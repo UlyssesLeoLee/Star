@@ -200,6 +200,35 @@ export type WorkItemStatus =
 export type WorkItemKind = "story" | "task" | "bug" | "spike" | "epic";
 export type WorkItemPriority = "p0" | "p1" | "p2" | "p3";
 
+// =====================================================================
+// §W-T-M 三類横展開 (per docs/kanban-vmodel-jp/W-T-M-VERIFICATION-REPORT.md
+//   + docs/data-design/ipa-detail/00-CLASSIFICATION-W-T-M.md v0.1
+//   + AGENTS.md §4 #13 DB 三類横展開守门)
+// W = Work (work_items 主表 / workflow_definition 状态机)
+// T = Transaction (workflow_transition / workflow_state / automation_rule / comment)
+// M = Master (workflow_definition_template / identity / tenant)
+// Kind → W/T/M 映射 (per docs/kanban-vmodel-jp/SPRINT-VIEW-P1-REPORT.md):
+//   - story / epic → W (大粒度 业务功能, 通常跨多次 sprint)
+//   - task / bug   → T (具体执行/缺陷修复, 一次性 Transaction)
+//   - spike        → M (探索/调研, Master data 后沉淀为知识库)
+// "未分类" (uncategorized) 兜底 — kanban 渲染时合并到 M swimlane 底部
+// =====================================================================
+export type WtmCategory = "W" | "T" | "M" | "uncategorized";
+export const WT_M_FROM_KIND: Record<WorkItemKind, WtmCategory> = {
+  story: "W",
+  epic: "W",
+  task: "T",
+  bug: "T",
+  spike: "M",
+};
+export const WT_M_ORDER: ReadonlyArray<WtmCategory> = ["W", "T", "M"];
+export const WT_M_LABELS: Record<WtmCategory, { ja: string; en: string; zh: string; desc: string }> = {
+  W: { ja: "W (Work)", en: "W (Work)", zh: "W (业务)", desc: "work_items 主表 / workflow_definition 状态机" },
+  T: { ja: "T (Transaction)", en: "T (Transaction)", zh: "T (执行)", desc: "workflow_transition / automation_rule / comment" },
+  M: { ja: "M (Master)", en: "M (Master)", zh: "M (主数据)", desc: "workflow_definition_template / identity / tenant" },
+  uncategorized: { ja: "未分類", en: "uncategorized", zh: "未分类", desc: "kind 不明, 兜底 swimlane" },
+};
+
 export interface WorkItem {
   id: Uuid;
   tenant_id: Uuid;
@@ -224,9 +253,12 @@ export interface WorkItem {
   //   Worktree → AgentSession (1:1) → WorkItem (N:1) 三层关联
   //   关联 wt 后可在 Drawer 展示 17 状态机 + 跳 wt 详情 (Phase 2+)
   worktree_id?: Uuid;
+  // W/T/M 横展開分類 (per AGENTS.md §4 #13 + docs/kanban-vmodel-jp/W-T-M-VERIFICATION-REPORT.md)
+  // 缺省: kind → WT_M_FROM_KIND 派生. 但允许 WorkItem 显式 override (例如 promotion: spike → M 后被改派为 task → T)
+  w_t_m?: WtmCategory;
   created_at: Iso8601;
   updated_at: Iso8601;
-}
+  }
 
 // =====================================================================
 // 5b. design-artifact (per test-design.md §6.3.3 V1 Should-Have Test)
