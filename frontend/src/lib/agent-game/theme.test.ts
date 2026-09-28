@@ -20,10 +20,14 @@ describe("COLORS", () => {
 });
 
 describe("FONTS", () => {
-  it("3 字体: primary / mono / stamp", () => {
+  it("基础字体: primary / mono / stamp", () => {
     expect(FONTS.primary).toContain("Hiragino");
     expect(FONTS.mono).toContain("SF Mono");
     expect(FONTS.stamp).toContain("Mincho");
+  });
+
+  it("纯像素游戏字体: pixel 存在并包含 KenPixel", () => {
+    expect(FONTS.pixel).toContain("KenPixel");
   });
 });
 

@@ -7,7 +7,7 @@
  * - 预留扩展: HighContrast / Solarized 等
  * - 第三方 / 租户自定义主题可追加 variant
  */
-export type ThemeId = "light" | "dark" | "high-contrast" | "solarized";
+export type ThemeId = "light" | "dark" | "christmas" | "charisma" | "high-contrast" | "solarized";
 
 /**
  * 主题作用域 (三层解析: Personal > Tenant > Global)
@@ -74,6 +74,54 @@ const STAR_DARK_PALETTE: ColorToken[] = [
   { name: "--color-border", hex: "#1E293B" },
 ];
 
+/**
+ * Star 调色板 — Pixel Noel / 圣夜像素 (第3套UI主题: 圣诞纯像素风)
+ * 运用色彩心理学:
+ * - 圣夜绯红 (#D42426): 象征壁炉暖意、礼物缎带与节日喜悦，激发核心 CTA 的活力
+ * - 常青松针 (#165B33): 象征常青生命与森林避风港，古典互补色消除视觉疲劳
+ * - 星芒烛金 (#F8B229): 伯利恒星芒与暖烛光，带来成就感、荣誉与焦点高光
+ * - 圣夜密林黑 (#0B130E): 冬夜冷杉阴影基底，提供深沉静谧的阅读专注感
+ * - 初雪霜白 (#F5F8F5): 纯净晶莹的高对比雪地文本，保证 WCAG AAA 可读性
+ */
+const STAR_CHRISTMAS_PALETTE: ColorToken[] = [
+  { name: "--color-primary", hex: "#D42426" },
+  { name: "--color-secondary", hex: "#165B33" },
+  { name: "--color-accent", hex: "#F8B229" },
+  { name: "--color-success", hex: "#22C55E" },
+  { name: "--color-warning", hex: "#F59E0B" },
+  { name: "--color-danger", hex: "#EF4444" },
+  { name: "--color-neutral", hex: "#7A9A8B" },
+  { name: "--color-surface", hex: "#0B130E" },
+  { name: "--color-surface-2", hex: "#122017" },
+  { name: "--color-text", hex: "#F5F8F5" },
+  { name: "--color-text-dim", hex: "#9EBCAB" },
+  { name: "--color-border", hex: "#234330" },
+];
+
+/**
+ * Star 调色板 — Charisma Pixel / 极魅像素 (第4套UI主题: 歧路旅人 HD-2D 神恩紫红金复古纯像素)
+ * 运用色彩心理学与游戏美术设计:
+ * - 神恩紫罗兰 (#8B5CF6): 象征神秘、高贵神圣与极魅引力 (Charisma/Grace)，带来深邃神往感
+ * - 醉梦丝绒红 (#E11D48): 剧场帷幕与舞娘红丝绒，高多巴胺舞台聚焦与行动力
+ * - 帝国流金 (#F59E0B): 水晶吊灯与古典浮雕鎏金，提供成就感与荣誉高光
+ * - 剧院黑曜深渊 (#0C0A14): 沉静极暗紫黑底，营造 HD-2D 剧场聚光灯明暗戏剧张力
+ * - 香槟丝白 (#FDF4FF): 带有微暖紫金调的高光文本，WCAG AAA 15.8:1 极致可读性
+ */
+const STAR_CHARISMA_PALETTE: ColorToken[] = [
+  { name: "--color-primary", hex: "#8B5CF6" },
+  { name: "--color-secondary", hex: "#E11D48" },
+  { name: "--color-accent", hex: "#F59E0B" },
+  { name: "--color-success", hex: "#10B981" },
+  { name: "--color-warning", hex: "#FBBF24" },
+  { name: "--color-danger", hex: "#F43F5E" },
+  { name: "--color-neutral", hex: "#948DA5" },
+  { name: "--color-surface", hex: "#0C0A14" },
+  { name: "--color-surface-2", hex: "#171326" },
+  { name: "--color-text", hex: "#FDF4FF" },
+  { name: "--color-text-dim", hex: "#A79BB7" },
+  { name: "--color-border", hex: "#2C2245" },
+];
+
 /** 间距 token (4px 基础栅格) */
 const STAR_SPACING: SpacingToken[] = [
   { name: "--space-1", px: 4 },
@@ -93,7 +141,14 @@ const STAR_RADII: RadiusToken[] = [
   { name: "--radius-lg", px: 10 },
 ];
 
-/** 内置主题 (亮 + 暗) — 接口预留扩展 */
+/** 纯像素圆角 token (8-bit 纯直角阶梯, 0px 矢量圆角) */
+const PIXEL_RADII: RadiusToken[] = [
+  { name: "--radius-sm", px: 0 },
+  { name: "--radius-md", px: 0 },
+  { name: "--radius-lg", px: 0 },
+];
+
+/** 内置主题 (暗夜神格 + 少年原画 + 圣夜像素 + 极魅像素) */
 export const THEMES: ThemeDefinition[] = [
   {
     id: "dark",
@@ -113,14 +168,24 @@ export const THEMES: ThemeDefinition[] = [
     radii: STAR_RADII,
     version: 2,
   },
-  // 扩展占位 (per 2026-08-29 04:09 JST 用户拍板 "支持后续增加"):
-  // {
-  //   id: "high-contrast",
-  //   displayName: "High Contrast",
-  //   isDark: true,
-  //   colors: [...],
-  //   ...
-  // },
+  {
+    id: "christmas",
+    displayName: "圣夜像素",
+    isDark: true,
+    colors: STAR_CHRISTMAS_PALETTE,
+    spacings: STAR_SPACING,
+    radii: PIXEL_RADII,
+    version: 1,
+  },
+  {
+    id: "charisma",
+    displayName: "极魅像素",
+    isDark: true,
+    colors: STAR_CHARISMA_PALETTE,
+    spacings: STAR_SPACING,
+    radii: PIXEL_RADII,
+    version: 1,
+  },
 ];
 
 /** 按 id 查找主题 */
