@@ -34,12 +34,8 @@ export const ja: Dictionary = {
   },
   appHeader: {
     workspaceSwitcher: "ワークスペース切替",
-    allApps: "ALL APPS",
-    appsCount: "25+",
-    tacticalJump: "タクティカルジャンプ...",
     notifications: "通知 ({count} 件未読)",
     realtimeOnline: "リアルタイム状態: オンライン",
-    synced: "同期中",
     addMoreTabs: "ヘッダーにタブを追加",
     removeFromHeader: "{label} をヘッダーから削除",
   },
