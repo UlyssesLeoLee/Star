@@ -1518,3 +1518,27 @@ frontend/src/
 > **文档结束**
 >
 > **commit 落地**: 本 BD-STAR-CANVAS-GAME-001 v0.1 落档跟 SRS-STAR-CANVAS-GAME-001 v0.1 (commit `4ed55ae`) + DD-STAR-CANVAS-GAME-001 v0.1 同期 commit, 修订人 = Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 (per 8/27 19:39 JST 授权).
+>
+> ---
+>
+> ## 阶段 1 实现状态 (per ULYS-160, 2026-09-26)
+>
+> 4 crate 已落地为**阶段 1 骨架** (per issue #160, deploy/canvas-game-k3s.yaml 引用从此可解析).
+>
+> BD-STAR-CANVAS-GAME-001 §6 列出的 4 crate (canvas-engine / domain-canvas / canvas-realtime / canvas-game) 已全部进 Star 仓库, 阶段 2 业务逻辑待后续 PR 渐进落地。
+>
+> **关键文件** (per ULYS-160 PR):
+> - `crates/{crate}/Cargo.toml` (lib + bin, axum + tokio + tracing 依赖)
+> - `crates/{crate}/src/lib.rs` (ServiceMetadata + Phase enum + router())
+> - `crates/{crate}/src/main.rs` (axum server 启动)
+> - `crates/{crate}/tests/smoke.rs` (5 tests per crate, 20/20 pass)
+> - `crates/{crate}/Dockerfile` (multi-stage rust → debian-slim)
+> - `.github/workflows/publish-canvas-game.yml` (4-image matrix GHCR publish)
+> - `docs/deployment/canvas-game-deploy.md` (部署手册)
+>
+> **守门**:
+> - #1 v25 cargo check --workspace --all-targets 0 err + cargo test 4 crate 20/20 pass
+> - #5 GHCR_TOKEN 仅写 packages, 不打印 env value
+> - #7 unsafe_code = "forbid" (workspace lint, 4 crate 全 0 unsafe)
+> - #11 缺标比错标 (Phase::Skeleton + NotImplemented 占位)
+> - #14 v4 Mavis 临时代签 5 域 Lead (per 9/3 11:35 JST 反转)

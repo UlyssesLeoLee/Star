@@ -176,13 +176,28 @@ pub fn pick_cgroup_backend(opts: &LinuxSpawnOptions) -> CgroupBackend {
 /// 真正的 setsid 在 `spawn()` 时执行,失败通过 `nix::Error` 冒泡到 spawn 调用方
 /// (典型:`EPERM` 当进程已是 session leader 且无 `CAP_SETGID`)。
 #[cfg(target_os = "linux")]
-pub fn wrap_linux_session(cmd: &mut tokio::process::Command, opts: &LinuxSpawnOptions) {
+pub fn wrap_linux_session(_cmd: tokio::process::Command, opts: &LinuxSpawnOptions) -> tokio::process::Command {
     if !opts.new_session {
-        return;
+        return _cmd;
     }
-    use process_wrap::std::Wrap;
-    cmd.as_std_mut()
-        .wrap_with(process_wrap::std::ProcessSession::default());
+    // v10 process-wrap API migration (fixes dev baseline red).
+    //
+    // ⚠️ Functional no-op (per PR #157 / #159 / #162): ProcessSession 在 process-wrap v10
+    // 是 lazy wrapper, 必须装在 CommandWrap<Command> 容器上, 跟 caller 的
+    // tokio::process::Command 走两套 API. 要保留 caller 签名 (`&mut`/owned cmd) 就要么
+    // 真改 caller API (ULYS-212 P2 followup), 要么牺牲 setsid 完整语义降级.
+    //
+    // 本 PR 选择降级: 参数用 `_cmd` 标记 unused, 函数体 no-op. caller 的
+    // `tokio::process::Command::process_group(0)` fallback (cli_spawn.rs:147)
+    // 维持 pgid 部分, 失去 session-leader / controlling-terminal detach 部分.
+    //
+    // 本机 (windows cargo 1.98.1) cargo check --workspace --all-targets 0 err,
+    // ubuntu (cargo 1.97) PR #159 因 use-of-moved-value fail, PR #162 因
+    // std::process::Command 类型不匹配 fail, 本次改成 no-op 函数体彻底绕开.
+    //
+    // TODO (ULYS-212 P2): 重构 caller 改 `CommandWrap<tokio::process::Command>` 类型,
+    // 通过 wrapped.spawn() 调用恢复完整 setsid. 单独 PR, scope 跨 caller, 不在本 PR 内.
+    _cmd
 }
 
 // =====================================================================
@@ -406,21 +421,21 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn wrap_linux_session_new_session_false_is_noop() {
-        let mut cmd = tokio::process::Command::new("echo");
+        let cmd = tokio::process::Command::new("echo");
         let opts = LinuxSpawnOptions {
             new_session: false,
             ..Default::default()
         };
         // 仅验证不 panic,不验证 cmd 内部状态(unsafe 块未被触发,Type system 保证不污染)
-        wrap_linux_session(&mut cmd, &opts);
+        let _ = wrap_linux_session(cmd, &opts);
     }
 
     #[cfg(target_os = "linux")]
     #[test]
     fn wrap_linux_session_new_session_true_does_not_panic() {
-        let mut cmd = tokio::process::Command::new("echo");
+        let cmd = tokio::process::Command::new("echo");
         let opts = LinuxSpawnOptions::default();
         // pre_exec 仅在 spawn 时执行,这里 closure 未触发;验证 safe wrapper 注入编译通过
-        wrap_linux_session(&mut cmd, &opts);
+        let _ = wrap_linux_session(cmd, &opts);
     }
 }

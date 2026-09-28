@@ -58,7 +58,7 @@ use graph_core::state::HumanState;
 use graph_core::types::{RepoId, WorktreeId};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Mutex};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use git_adapter::GitProvider;

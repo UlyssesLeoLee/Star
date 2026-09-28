@@ -1,16 +1,16 @@
 # SRS-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域要件定義書 v0.1** (per ADR-0026 v0.2 §2.1 模式 2, 跟 v33 候选对齐)
+> **Multica Task Lifecycle 域要件定義書 v0.2** (6 状态 + 独立 Review Gate, per ADR-0026 v0.2 §2.1 模式 2; 渡口 Worktree 群组集成补充)
 >
-> - 状态: 🟡 Draft v0.1
+> - 状态: 🟡 Draft v0.2
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联基本設計書: [`docs/design/BD-MULTICA-TASK-001.md`](../design/BD-MULTICA-TASK-001.md) (下个 turn 落档)
+> - 关联基本設計書: [`docs/design/BD-MULTICA-TASK-001.md`](../design/BD-MULTICA-TASK-001.md) v0.1
 > - 关联 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2
 > - 关联 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 (v33 候选)
 > - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3)
 > - 审批: 架构师 (Mavis 接手 agent per DEC-008) — per 守门 #14 v4
-> - 日期: 2026-09-11 JST
+> - 日期: 2026-09-28 JST
 > - 受众: 詳細設計エンジニア / アーキテクト / SRE / 5 域 Lead 真人
 
 ---
@@ -21,7 +21,7 @@
 |---|---|
 | 文书 ID | SRS-MULTICA-TASK-001 |
 | 文书名 | Multica Task Lifecycle 域要件定義書 (v33 候选对齐) |
-| 版本 | v0.1 |
+| 版本 | v0.2 |
 | 作成日 | 2026-09-11 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
@@ -38,9 +38,9 @@
 
 ### 1.1 文档目的
 
-本文档基于 ADR-0026 v0.2 §1.2 痛点 + §2.1 模式 2 (WBS 5 态状态机 + review gate), 定义 STAR 平台 **Multica Task Lifecycle 域** 的需求规格说明书。
+本文档基于 ADR-0026 v0.2 §1.2 痛点 + §2.1 模式 2, 定义 STAR 平台 **Multica Task Lifecycle 域** 的需求规格说明书。
 
-**核心方向锚点 (per ADR-0026 v0.2 + 2026-09-11 20:10 JST Ulysses 拍板)**: WBS 现有 4 态 → 5 态扩展 (加 `claimed` + `failed`), subagent complete → Mavis review → 才进 done。**配套** (跟 SRS-MULTICA-POISON-001 强绑定) session poisoning 标记。
+**核心方向锚点 (per ADR-0026 v0.2 + 2026-09-11 20:10 JST Ulysses 拍板)**: WBS 现有 4 态 → 6 态 (加 `claimed` + `failed`)，review 状态独立于生命周期状态；subagent complete 先进入 review gate，通过后才进 `completed`。**配套** (跟 SRS-MULTICA-POISON-001 强绑定) session poisoning 标记。
 
 ### 1.2 背景 (用户痛点)
 
@@ -57,11 +57,11 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 
 | 子能力 | Multica 源 | 关键 file:line |
 |---|---|---|
-| TK-1 5 态状态机扩展 | client.go:227-235 (ClaimTask) + task state machine | enqueued → claimed → started → completed / failed |
+| TK-1 6 态状态机扩展 | client.go:227-235 (ClaimTask) + task state machine | pending → claimed → in_progress → completed / failed / cancelled |
 | TK-2 4 类 404 区分 | client.go:35-91 (isWorkspaceNotFoundError / isTaskNotFoundError / isRuntimeNotFoundError / isUnauthorizedError) | daemon 知道 server 端删除事件 |
 | TK-3 Session poison 标记 (跟 SRS-MULTICA-POISON-001 配套) | poisoned.go:10-217 (FailureReason × 5) | 4 类原因 + GetLastTaskSession 过滤 |
 | TK-4 Review gate | Multica 默认 subagent complete → 人工 review → done | subagent_review.py |
-| TK-5 WBS row schema 升级 | WBS current 4 态 → 5 态 + 字段 | `STAR-P3-WBS-001.md` 状态定义 |
+| TK-5 WBS row schema 升级 | WBS current 4 态 → 6 态 + 字段 | `STAR-P3-WBS-001.md` 状态定义 |
 
 ### 1.4 不含范围 (Out-of-Scope, per ADR-0026 v0.2 §2.2)
 
@@ -74,6 +74,18 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 
 - 本 SRS 跟 WBS 状态定义一对一映射, 跟 `SRS-STAR-AGENT-RUNTIME-001.md` 平行
 - WBS row schema 升级由本 SRS 拍板, 实装由 `scripts/automation/wbs_migrate_v33.py` 落地
+
+### 1.6 渡口 Worktree 群组集成边界 (v0.2 补充)
+
+本节定义 Multica Task Lifecycle 如何进入渡口的 Worktree 群组, 不改变 §1.3-§1.4 的 Multica 状态机范围。
+
+- **Worktree 是产品导航根**。每个 Worktree 下, Multica、Jira 等价任务管理、Task Card 索引、Infinite Canvas 与已启用插件是同级入口；Multica 不是 Task Card 索引的父级容器。
+- **同一 WorkItem 是任务事实源**。Multica、Jira 等价视图、Task Card 与 Canvas 可呈现或操作同一 WorkItem；入口切换不得复制出另一份状态机或产生平行任务 ID。所有修改经对应领域命令和授权规则提交。
+- **Task Card 是执行工作面**。从 Multica 或其他同级应用打开任务卡后，任务身份仍绑定同一个 `work_item_id` 与 `worktree_id`。CLI/Agent Session 在卡内打开，并以该任务卡作为执行上下文；CLI 生命周期由 Runtime/AgentPolicy 管理，不扩展 Multica 的五态状态机。
+- **Canvas 使用类型化引用**。Canvas 可链接或触发受授权的 WorkItem 命令；画布元素只保存 `EntityRef`/关系和布局数据，不成为 WorkItem 状态事实源。
+- **插件入口由群组注册表管理**。热插拔插件可按 manifest 声明 Worktree/Global 范围、能力与权限，并注册群组内同级入口；插件不拥有 Multica 状态机，也不能绕过领域授权。
+
+验收时以 root 需求 [`docs/requirements.md`](../requirements.md) §50 和基本设计 [`docs/basic-design.md`](../basic-design.md) §16 为跨应用一致性基线。
 
 ---
 
@@ -124,7 +136,7 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 
 ## §4 功能需求 (FR, 22 项)
 
-### TK-1 5 态状态机扩展 (FR-1 ~ FR-6)
+### TK-1 6 态状态机扩展 (FR-1 ~ FR-6)
 
 | FR | 描述 | 优先级 |
 |---|---|---|
@@ -158,7 +170,7 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 
 | FR | 描述 | 优先级 |
 |---|---|---|
-| FR-16 | subagent 报 complete → 不直接进 done, 进 `pending_review` 中间态 (或 `in_progress` 带 `awaiting_review: bool`) | P0 |
+| FR-16 | subagent 报 complete → 不直接进 done, 设置 `review_state=pending_review` (或 `in_progress` 带 `awaiting_review: bool`) | P0 |
 | FR-17 | Mavis review 3 件事: (a) commit hash 存在 / (b) output 落档 / (c) artifact 落档 | P0 |
 | FR-18 | Mavis review 通过 → 进 `completed`; review 失败 → 进 `failed` + 标 review_failed_reason | P0 |
 | FR-19 | Review gate 可配置 skip (per 守门 #9 v27 fallback) | P0 |
@@ -167,8 +179,8 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 
 | FR | 描述 | 优先级 |
 |---|---|---|
-| FR-20 | WBS row schema 升级, 5 态 status + session_poisoned + stale_dispatch + 4 类 404 timestamp + review gate 字段 | P0 |
-| FR-21 | 守门 #13 W-T-M 100% 覆盖: pending/claimed = Work (短 TTL), in_progress/completed/failed = Transaction (append-only), cancelled = Work (短 TTL) | P0 |
+| FR-20 | WBS row schema 升级, 6 态 lifecycle status + 独立 review_state + session_poisoned + stale_dispatch + 4 类 404 timestamp | P0 |
+| FR-21 | 守门 #13 W-T-M 100% 覆盖: 当前态与 claim/session lease 为 Work projection (短 TTL); 状态转换、完成/失败结果、review 决定为 Transaction append-only; task metadata 为 Master SCD Type 2 | P0 |
 | FR-22 | WBS row 加 `task_lifecycle_audit: jsonb` 字段, 每次状态变更 +1 审计 entry | P0 |
 
 ---
@@ -191,7 +203,7 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 |---|---|
 | 守门 #9 v27 RPC fallback | stale_dispatch=true 跟 review gate 配套 |
 | 守门 #11 缺标比错标 | session_poisoned 不删标 |
-| 守门 #13 W-T-M | 5 态 status 严格分类 |
+| 守门 #13 W-T-M | 6 态 lifecycle status + 独立 review_state 严格分类 |
 | 守门 #14 v4 Mavis 审核 | author=Ulysses |
 
 | 风险 | 概率 | 影响 | 缓解 |
@@ -208,13 +220,17 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 | AC | 描述 |
 |---|---|
 | AC-1 | 41 子项 status 字段全部迁移, 无 pending 漏改 (registry_check 验证) |
-| AC-2 | subagent complete → 必进 pending_review, 不直接进 done |
+| AC-2 | subagent complete → 必进 `review_state=pending_review`, 不直接进 completed |
 | AC-3 | session_poisoned 5 类原因枚举全 |
 | AC-4 | stale_dispatch=true 时, console 红 banner 显示 |
 | AC-5 | 守门 #13 W-T-M 100% 覆盖 (Work / Transaction / Master) |
 | AC-6 | automation console 状态机 transition 图可视化 |
 | AC-7 | 4 类 404 timestamp 字段全部落档 |
 | AC-8 | audit log 每次状态变更 +1 entry |
+| AC-9 | 同一 `work_item_id` 从 Multica、Jira 等价视图、Task Card 与 Canvas 进入时保持身份和状态一致, 不生成并行任务状态机 |
+| AC-10 | 任务卡 CLI/Agent Session 同时绑定 `worktree_id` 与 `work_item_id`; CLI 不改变 Multica 任务状态定义 |
+| AC-11 | Task Card 索引与 Infinite Canvas 在 Worktree 群组中是同级入口; Canvas 写入通过领域命令和权限校验 |
+| AC-12 | 插件可声明范围及 capability 并热插拔注册群组入口; 卸载后其持有的任务事实仍由 Multica/WorkItem 域负责 |
 
 ---
 
@@ -222,7 +238,7 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 
 | 缺口 | 优先级 | 阻塞 | 缓解 |
 |---|---|---|---|
-| #1 5 态 state machine 跟现有 WBS row 字段冲突 (e.g. `status` 当前是 enum 4 态) | P0 | 阻塞 AC-1 | `wbs_migrate_v33.py` 兼容迁移 |
+| #1 6 态 state machine 跟现有 WBS row 字段冲突 (e.g. `status` 当前是 enum 4 态) | P0 | 阻塞 AC-1 | `wbs_migrate_v33.py` 兼容迁移 |
 | #2 Session poison 5 类原因 跟现有 session 概念区分 (Mavis 当前 session = Mavis root session, 不等于 `(agent, issue) session`) | P0 | 阻塞 AC-3 | 文档加 disclaimer, 实施时统一命名 |
 | #3 Review gate 跟守门 #9 v27 fallback 协调 (v27 已是 fallback 路径) | P0 | 阻塞 AC-2 | force_skip 配置 |
 | #4 stale_dispatch=true 时, subagent output 怎么保留? (per 守门 #9 v27) | P1 | 不阻塞 | 暂存 `<task_id>.stale.json` 24h |
@@ -239,7 +255,7 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 | Inventory | [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 v33 候选 |
 | 配套 SRS | [`docs/requirements/SRS-MULTICA-POISON-001.md`](../requirements/SRS-MULTICA-POISON-001.md) (Session Poison 配套) |
 | 配套 SRS | [`docs/requirements/SRS-MULTICA-RUNTIME-001.md`](../requirements/SRS-MULTICA-RUNTIME-001.md) (Runtime Registry 前置) |
-| BD | [`docs/design/BD-MULTICA-TASK-001.md`](../design/BD-MULTICA-TASK-001.md) (下个 turn 落档) |
+| BD | [`docs/design/BD-MULTICA-TASK-001.md`](../design/BD-MULTICA-TASK-001.md) v0.1 |
 | WBS | [`STAR-P3-WBS-001.md`](../../STAR-P3-WBS-001.md) 状态定义 |
 | 守门 | AGENTS.md §4.1 守门 #1 v15 / #9 v27 / #11 / #13 |
 
@@ -262,3 +278,4 @@ STAR / Mavis 当前 root session 模型下, 3 类具体痛点 (per ADR-0026 §1.
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-11 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 初版（22 FR / 5 NFR / 6 已知缺口 + 5 角色签字栏） | 2026-09-11 20:43 JST ask_user 选项 form_opt2 |
+| v0.2 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 增加渡口 Worktree 群组集成边界与 AC-9..AC-12; 明确 Multica、Jira 等价视图、Task Card、Canvas 共用 WorkItem 身份、卡内 CLI 与插件注册边界；统一 6 态生命周期、独立 review_state 及 W/T/M 当前态投影/审计分类 | 用户要求按 Worktree 为顶层索引推进渡口需求与基本设计 |

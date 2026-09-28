@@ -1671,3 +1671,26 @@ STAR 画布游戏 (Canvas Game) 是一套**画布里的弹幕 Roguelike 游戏**
 > 7. `docs/briefs/canvas-game-{p0,p1,p2}.md` 新增 3 份子 brief (P0 启动后 5 域 Lead 拍板)
 > 8. `automation-design.md` §4 任务卡表 + `registry.md` 索引追加 (per 守门 #21)
 > 9. 旧 9/6 立 2 份 brief (canvas-e2e-guard-001 + canvas-share-export-001) 标 superseded (per G-GAME-11)
+
+---
+
+## 阶段 1 实现状态 (per ULYS-160, 2026-09-26)
+
+4 crate 已落地为**阶段 1 骨架** (per issue #160, deploy/canvas-game-k3s.yaml 引用从此可解析):
+
+| Crate | 路径 | 端口 | 阶段 1 落地点 | 阶段 2 待落地 |
+| --- | --- | --- | --- | --- |
+| `canvas-engine` | `crates/canvas-engine/` | 8080 | axum HTTP `/healthz` `/ready` `/version` + Dockerfile + tests/smoke.rs (5/5 pass) | 跨 5 domain 共享 API + 平台能力 (per SRS §4.1) |
+| `domain-canvas` | `crates/domain-canvas/` | 8081 | axum HTTP + 占位 `/api/v1/canvas` + Dockerfile + tests/smoke.rs (5/5 pass) | 26 表 W/T/M + 5 角色 CRUD (per SRS §4.2) |
+| `canvas-realtime` | `crates/canvas-realtime/` | 8082 + 8083 WSS | axum HTTP + tokio-tungstenite WSS echo + Dockerfile + tests/smoke.rs (5/5 pass) | Yjs/yrs CRDT 集成 (per SRS §4.3) |
+| `canvas-game` | `crates/canvas-game/` | 8084 | axum HTTP + 占位 `/api/v1/gameplay` + Dockerfile + tests/smoke.rs (5/5 pass) | 角色/弹幕/战斗/3D sprite (per SRS §4.4) |
+
+**GHCR publish workflow**: `.github/workflows/publish-canvas-game.yml` (4-image matrix, push GHCR on push dev/main/tag)
+
+**部署手册**: `docs/deployment/canvas-game-deploy.md`
+
+**守门**:
+- #1 v25 cargo check --workspace --all-targets 0 err + cargo test 4 crate 20/20 pass
+- #7 unsafe_code = "forbid" (workspace lint, 4 crate 全 0 unsafe)
+- #11 缺标比错标 (Phase::Skeleton + NotImplemented 占位)
+- #14 v4 Mavis 临时代签 5 域 Lead (per 9/3 11:35 JST 反转)

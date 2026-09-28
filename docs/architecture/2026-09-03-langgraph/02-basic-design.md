@@ -1,11 +1,11 @@
 # 02. Star LangGraph 統合アーキテクチャ - 基本設計書 (Basic Design)
 
-> **状態**：🟢 Draft v0.2
-> **日期**：2026-09-04 (升版自 v0.1)
+> **状態**：🟢 Draft v0.3 (Worktree 群组集成补充)
+> **日期**：2026-09-28
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
-> **签批**：🟢 Mavis 接手终审（per 2026-08-27 19:39 + 21:59 JST 用户授权）
-> **依赖**：[01-requirements.md](01-requirements.md)（要件定義書 v0.2）· [ADR-0032 MCP Transport stdio](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0032-mcp-transport-stdio.md) · [ADR-0030 Agent Lease/Heartbeat/Resume](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0030-agent-lease-heartbeat-resume.md) · [ADR-0046 LangGraph TMO 任务卡管理操作](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) · [AGENTS.md §4 守门](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md)
-> **关联文档**：[01-requirements.md](01-requirements.md)（要件定義書 v0.2）· [03-detailed-design.md](03-detailed-design.md)（詳細設計書 v0.2）· [PHASE-LANGGRAPH-TMO-IMPL-REPORT.md](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md)（7 子项实装计划）
+> **审核**：Mavis 接手审核；v0.3 为 Draft，群组集成补充待后续评审
+> **依赖**：[01-requirements.md](01-requirements.md)（要件定義書 v0.3）· [ADR-0032 MCP Transport stdio](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0032-mcp-transport-stdio.md) · [ADR-0030 Agent Lease/Heartbeat/Resume](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0030-agent-lease-heartbeat-resume.md) · [ADR-0046 LangGraph TMO 任务卡管理操作](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) · [AGENTS.md §4 守门](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md)
+> **关联文档**：[01-requirements.md](01-requirements.md)（要件定義書 v0.3）· [03-detailed-design.md](03-detailed-design.md)（詳細設計書 v0.2, 后续同步本阶段接口）· [PHASE-LANGGRAPH-TMO-IMPL-REPORT.md](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md)（7 子项实装计划）
 
 ---
 
@@ -30,30 +30,30 @@
 ┌────────────────────────────────────────────────────────────────────────────┐
 │                       UI Tier (gm-console frontend)                         │
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │  AppShell (per AGENTS.md §7 #15 v0.15 5-tab: Kanban/Timeline/Backlog) │  │
+│  │  Worktree Group Shell (Worktree index → peer applications)            │  │
 │  │  ┌────────────────────────────────────────────────────────────────┐  │  │
-│  │  │  AppHeader (Top bar: Star logo + Tab nav + Theme + User)        │  │  │
+│  │  │  AppHeader (Worktree selector + group nav + theme + user)      │  │  │
 │  │  ├────────────────────────────────────────────────────────────────┤  │  │
-│  │  │  Sidebar (w-56, 224px: 5-tab nav + Pinned Board)                │  │  │
+│  │  │  Sidebar (Worktree index + group app entries)                  │  │  │
 │  │  ├────────────────────────────────────────────────────────────────┤  │  │
-│  │  │  Main Content (Tab content area)                                │  │  │
-│  │  │    •  Tab 1 Kanban: Board 列 + 卡片 (跨 sub-agent 状态 mirror)  │  │  │
-│  │  │    •  Tab 2 Timeline: GanttChart (sub-agent timeline)           │  │  │
-│  │  │    •  Tab 3 Backlog: workItems 列表                             │  │  │
-│  │  │    •  Tab 4 Agents: ★ NEW ★ 所有 sub-agent 状态一览              │  │  │
-│  │  │    •  Tab 5 Worktrees: worktrees 列表                           │  │  │
+│  │  │  Main Content (selected Worktree peer app)                      │  │  │
+│  │  │    • Multica + Jira-equivalent views → shared WorkItem           │  │  │
+│  │  │    • Task Card Index → shared task execution cards                │  │  │
+│  │  │    • Group Infinite Canvas → typed EntityRef links                │  │  │
+│  │  │    • Enabled plugin apps → GroupAppRegistry (hot-plug)            │  │  │
 │  │  ├────────────────────────────────────────────────────────────────┤  │  │
-│  │  │  ★ NEW ★ Chat Bar (固定底行, 全幅)                              │  │  │
+│  │  │  ★ Chat Bar (固定底行, 全幅, scope: WORKTREE / GLOBAL)          │  │  │
 │  │  │    ┌──────────────────────────────────────────────────────┐    │  │  │
-│  │  │    │  [input: "H2 8 domain 改造並列で"  ]  [Send  ↑]      │    │  │  │
+│  │  │    │  [WORKTREE ▾] [input: "合并任务 a 和 b" ] [Send ↑]   │    │  │  │
 │  │  │    └──────────────────────────────────────────────────────┘    │  │  │
 │  │  └────────────────────────────────────────────────────────────────┘  │  │
-│  │  ★ NEW ★ Task Card Modal (点击 task card 详情)                        │  │
-│  │    •  Sub-agent 名称 + 类型 + status                                  │  │
+│  │  Task Card Detail (from any peer app; CLI panel stays inside card)   │  │
+│  │    •  Worktree / WorkItem / task_card identity + agent status        │  │
 │  │    •  Latest streaming output                                         │  │
 │  │    •  Controls: Pause / Resume / Cancel                               │  │
-│  │    •  History tab: 节点执行履歴 + checkpoint info                      │  │
-│  │    •  Decision tab: human-in-the-loop prompts                          │  │
+│  │    •  History: node execution + checkpoint info                       │  │
+│  │    •  CLI pane: bound to the card's authorized Worktree               │  │
+│  │    •  Decisions: human-in-the-loop prompts                            │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 │   │ WebSocket (SSE-fallback)         │ HTTP REST (control)                  │
 └───┼──────────────────────────────────┼──────────────────────────────────────┘
@@ -119,6 +119,19 @@
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### 1.1.1 渡口产品树与 LangGraph 执行树
+
+产品导航层级和 LangGraph 的 L0/L1/L2 执行拓扑是两个正交结构：Worktree 是渡口产品根，L0/L1 是该产品内的编排/执行角色。
+
+| 产品位置 | 组件 | 关系与职责 |
+|---|---|---|
+| 顶层 | Worktree | 选择仓库工作上下文与权限边界 |
+| Worktree 群组同级 | Multica、Jira 等价任务视图、Task Card 索引、Group Infinite Canvas、启用的插件应用 | 多种入口引用同一 WorkItem/实体，不互相嵌套为产品根 |
+| Task Card 内 | CLI/Agent Session、输出、checkpoint、决策与审计 | 执行会话绑定 `worktree_id` + `work_item_id` + `task_card_id` |
+| 固定底栏 | Group Shell Chat Bar | 显式选择 `WORKTREE` / `GLOBAL`，跨同级应用保持范围和会话 |
+
+Group Infinite Canvas 与 Project/Repository 级 Worktree Overview Graph 是不同对象；以类型化 Worktree/EntityRef 深链连接。插件应用入口由 Group App Registry 热插拔，`SubAgentRegistry` 只管理 LangGraph 执行类型。
+
 ### 1.2 階層構造 (Hierarchy)
 
 | 階層 | 名称 | 数量 | 生命周期 | 永続化 |
@@ -145,13 +158,13 @@
 | **C-04** | CheckpointStore | 3-tier 永続化 (Memory / SQLite / PostgreSQL) | Cross | P0 |
 | **C-05** | McpClient | star-mcp 16 tools proxy | L2 | P0 |
 | **C-06** | UIStreamer | WebSocket / SSE / REST 3 通道推送 | Cross | P0 |
-| **C-07** | TaskCardManager | UI 状态 ↔ Sub-agent state mirror | L0/L1 | P0 |
+| **C-07** | TaskCardManager | WorkItem-backed Task Card projection ↔ L1 execution state | L0/L1 | P0 |
 | **C-08** | AuditLogger | 全 tool call / dispatch / interrupt 記録 | Cross | P0 |
 | **C-09** | TokenTelemetry | token 計量 + OLU 集計 (per 守门 #4) | Cross | P1 |
 | **C-10** | GuardEnforcer | AGENTS.md §4 守门 13 main + 24 派生规 = 37 项 自动检查 | Cross | P1 |
 | **C-11** | StateSchemaRegistry | LangGraph state schema 中央管理 | Cross | P1 |
 | **C-12** | InterruptManager | human-in-the-loop interrupt / resume | L0/L1 | P0 |
-| **C-13** | SubAgentRegistry | sub-agent 类型注册表 (SA-01..SA-09 + new) | L0 | P1 |
+| **C-13** | SubAgentRegistry | LangGraph sub-agent 执行图类型注册表 (SA-01..SA-09 + new; 不注册 Group App) | L0 | P1 |
 | **C-14** | CrossDomainDispatcher | 跨 domain crate 调用协调 (per 守门 #3) | L2 | P2 |
 | **C-15** | HealthCheck | /api/health endpoint, 状態監視 | Cross | P1 |
 | **C-16** | TaskOperationsManager | TMO 集中管理: 7 节点 (M-N1..M-N7) + 7 协议 + DAG 校验; 唯一 cross-task actor | L0 | P0 (v0.2) |
@@ -161,6 +174,8 @@
 | **C-20** | DAGValidator | cycle detection O(V+E) 校验, 检测到环 → reject + interrupt | L0 | P0 (v0.2) |
 | **C-21** | ReassignManager | SA-XX 类型切换, checkpoint preserved (per §2.6 M-N6) | L0 | P1 (v0.2) |
 | **C-22** | SummarizeCollector | 跨 N SubAgentState 状态聚合, LLM 表格化 | L0 | P1 (v0.2) |
+| **C-23** | GroupContextResolver | 将 `scope_kind`、Worktree、WorkItem、Task Card 和 actor 权限解析成执行上下文 | Cross | P0 (v0.3) |
+| **C-24** | PluginCapabilityBridge | 将 Group App Registry 已授权 capability 暴露给 L0/L1；不管理插件入口生命周期 | L0/L1 | P1 (v0.3) |
 
 ## 2. 機能設計 (Function Design)
 
@@ -174,6 +189,11 @@ class TopAgentState(TypedDict, total=False):
     # user input
     user_input: str                                # 用户输入 (chat bar)
     intent: Optional[str]                          # LLM 解析后的意图 (tool_call | dispatch | clarify)
+    scope_kind: Literal["WORKTREE", "GLOBAL"]     # 显式范围，不得由 node 推断或丢失
+    group_context_ref: Optional[GroupContextRef]   # actor/tenant/worktree/permissions 引用
+    target_worktree_ids: list[str]                 # GLOBAL 操作的显式授权目标集合
+    entity_refs: list[EntityRef]                   # Task/Canvas/Flow 类型化对象引用
+    correlation_id: str                            # 跨 app / L0 / L1 / tool 的追踪 ID
     
     # active / completed sub-agents (reducer add)
     active_subagents: Annotated[list[SubAgentRef], operator.add]
@@ -243,6 +263,10 @@ class SubAgentState(TypedDict, total=False):
     """子代理 state schema (LangGraph TypedDict)"""
     task_id: str                                    # 唯一 ID (UUID v7)
     task_type: str                                  # SA-01..SA-09
+    worktree_id: str                                # 必填: 该会话唯一执行 Worktree
+    work_item_id: Optional[str]                    # 关联的 canonical WorkItem
+    task_card_id: str                               # Task Card 执行面 ID
+    parent_thread_id: str                           # L0 发起 thread
     context: dict                                   # task 別 context (input, params)
     intermediate_steps: Annotated[list[Step], operator.add]
     final_result: Optional[Any]
@@ -327,7 +351,7 @@ def make_subagent_graph(task_type: str) -> StateGraph:
 | **L1 → L0** | error | 失败 | task_id, status=failed, error_msg, stack_trace |
 | **L1 ↔ L1** | (N/A) | 禁止 | — |
 | **L0/L1 → UI** | stream | SSE 推送 | type (token/state/event), payload |
-| **UI → L0** | user_input | chat bar | text, attachments |
+| **UI → L0** | user_input | Group Shell chat bar | text, attachments, scope_kind, GroupContext, target_worktree_ids, EntityRefs |
 | **UI → L0** | card_action | task card 操作 | task_id, action (pause/resume/cancel) |
 | **UI → L0** | tmo_action | TMO 入口 (chat bar / 卡片菜单 / 多选工具栏) | operation (merge/split/reorder/bulk/summarize/reassign/metadata), target_task_ids, payload |
 | **UI → L1** | (proxy 経由) | task card 详情操作 | task_id, action |
@@ -521,7 +545,7 @@ class AuditedMcpToolNode(ToolNode):
 
 | 方向 | 类型 | 説明 | 触发节点 | 字段 |
 |---|---|---|---|---|
-| **L0 → L1** | `merge_request` | 通知 a/b 进入 stash_state (Transaction append-only) | M-N1 | target_task_ids, merge_strategy |
+| **L0 → L1** | `merge_request` | 将 a/b 可恢复 checkpoint 暂存为 Work (按 retention_period); merge 决策和 supersede lineage 单独写 Transaction audit | M-N1 | target_task_ids, merge_strategy |
 | **L0 → L1** | `split_request` | snapshot a 当前 checkpoint | M-N2 | target_task_id, split_strategy |
 | **L0 → L1** | `dep_set` | DAG 边更新, C-20 校验 | M-N3 | dep_set (DAG 边集合) |
 | **L0 → L1** | `bulk_action` | N 张卡并行 action | M-N4 | target_task_ids, action |
@@ -582,7 +606,7 @@ class SubAgentState(TypedDict, total=False):
 |---|---|---|
 | **#13 a (L1↔L1 禁止)** | 7 节点全部 L0 协调, 跨任务操作只经 L0 (TaskOperationsManager C-16) | §2.6.1 节点设计 |
 | **#13 c (Master RLS)** | task_metadata 表 100% RLS 必携 (per 守门 d) | §2.6.4 M-N7 + 03 §7 schema |
-| **#13 d (Master 100% RLS / Transaction 100% audit / Work 100% retention)** | task card 状态 = Work (短 TTL, supersede 后 retention), checkpoint history = Transaction (append-only, audit 必携), metadata = Master (SCD Type 2) | §2.6.4 SubAgentState.blood 字段全部 append-only |
+| **#13 d (Master 100% RLS / Transaction 100% audit / Work 100% retention)** | Task Card 活动态与可恢复 checkpoint = Work (按 retention_period 过期/清理); 决策、审批、CLI 命令审计和不可变操作记录 = Transaction (append-only + audit); metadata = Master (SCD Type 2) | 本节 + §2.6.4 血缘/审计字段 |
 | **#4 (token-OLU)** | TMO 是 L0 决策, 不重 L1 token; TokenTelemetry (C-09) 计量每个 TMO 操作 token | §2.6.6 telemetry |
 | **#19 (Python 化)** | TMO 实装走 `scripts/automation/task_ops.py` (per 守门 #19 派生, 后续 phase 起), 不写 .rs | [PHASE-LANGGRAPH-TMO-IMPL-REPORT](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md) |
 | **#9 v3 (subprocess 走 console_server)** | TMO UI 操作走 Next.js API route → FastAPI 8080 console_server.py → subprocess 调 task_ops.py | [PHASE-LANGGRAPH-TMO-IMPL-REPORT](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md) §5 守门 |
@@ -649,6 +673,11 @@ Task Card 状态机扩展:
 // top_agent/state.ts
 export interface TopAgentState {
   user_input: string;
+  scope_kind: 'WORKTREE' | 'GLOBAL';
+  group_context_ref?: GroupContextRef;
+  target_worktree_ids: string[];
+  entity_refs: EntityRef[];
+  correlation_id: string;
   intent?: 'tool_call' | 'dispatch' | 'clarify'
         | 'task_merge' | 'task_split' | 'set_dependencies'  // v0.2 TMO
         | 'bulk_action' | 'summarize' | 'reassign' | 'metadata';
@@ -673,6 +702,10 @@ export interface TopAgentState {
 export interface SubAgentState {
   task_id: string;
   task_type: SA_01 | SA_02 | ... | SA_09;
+  worktree_id: string;
+  work_item_id?: string;
+  task_card_id: string;
+  parent_thread_id: string;
   context: Record<string, any>;
   intermediate_steps: Step[];              // reducer add
   final_result?: any;
@@ -693,7 +726,7 @@ export interface SubAgentState {
   merged_from: string[];                   // reducer add (append)
   split_into: string[];                    // reducer add (append)
   superseded_by?: string;                  // 被取代的目标 task_id
-  checkpoint_snapshot?: string;            // 拆分/重分配前的快照 ID (per 守门 #13 d Transaction append-only)
+  checkpoint_snapshot?: string;            // 可恢复快照 ID (Work, 按 retention_period 保留)
 }
 
 export interface SubAgentRef {
@@ -805,15 +838,15 @@ CREATE POLICY task_metadata_isolation ON task_metadata
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  AppHeader (h-12, 48px)                                            │
-│  [Star logo] [5 tab nav]                [Theme] [User Avatar]      │
+│  [Worktree selector] [Multica/Jira/Tasks/Canvas/Plugins] [User]    │
 ├──────┬───────────────────────────────────────────────────────────┤
 │      │                                                            │
 │      │                                                            │
 │  S   │                                                            │
-│  i   │           Main Content Area (Tab content)                   │
+│  i   │           Selected Worktree peer app                        │
 │  d   │                                                            │
 │  e   │  ┌─────────────────────────────────────────────┐         │
-│  b   │  │  Tab 4 Agents (★ NEW, 主要 tab)              │         │
+│  b   │  │  Task Card Index / Agent execution cards     │         │
 │  a   │  │  ┌─────────┐ ┌─────────┐ ┌─────────┐       │         │
 │  r   │  │  │ Card 1  │ │ Card 2  │ │ Card 3  │       │         │
 │      │  │  │ SA-01   │ │ SA-03   │ │ SA-04   │       │         │
@@ -827,9 +860,9 @@ CREATE POLICY task_metadata_isolation ON task_metadata
 │      │                                                            │
 │      │                                                            │
 ├──────┴───────────────────────────────────────────────────────────┤
-│  ★ NEW ★ Chat Bar (固定底行, h-14, 56px)                          │
+│  Group Shell Chat Bar (固定底行, h-14, 56px)                      │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │  [📎] [input: "H2 8 domain 改造並列で"        ]  [Send↑]│    │
+│  │  [WORKTREE ▾] [📎] [input: "合并任务 a 和 b"] [Send↑]│    │
 │  └─────────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -843,7 +876,7 @@ CREATE POLICY task_metadata_isolation ON task_metadata
     │ (on Enter or Send click)
     ▼
 [UI: POST /api/top-agent/dispatch]
-    │ { user_input: "H2 8 domain 改造並列で" }
+    │ { user_input, scope_kind, worktree_id, target_worktree_ids, entity_refs }
     ▼
 [Backend: Top Agent parse_intent_node]
     │ intent = "dispatch"
@@ -855,7 +888,7 @@ CREATE POLICY task_metadata_isolation ON task_metadata
     ▼
 [Frontend: WebSocket receive]
     │ for each TaskCardCreate:
-    │   append card to Agents tab grid
+    │   append card to selected Worktree's Task Card Index
     │   card.animated_fade_in
     ▼
 [Backend: sub-agents run]
@@ -923,8 +956,8 @@ CREATE POLICY task_metadata_isolation ON task_metadata
 | **Header** | agent type (SA-01..SA-09) + task_id (短码) + status badge |
 | **Body** | latest streaming output (markdown render, syntax highlight) |
 | **Footer** | started_at + duration + token_usage + controls (Pause/Resume/Cancel) |
-| **Click → Modal** | 全 state dump, history, checkpoint info, decision log |
-| **Drag** | 5 tab 间 drag (e.g., 从 Agents → Kanban) |
+| **Open → Card Detail** | 全 state 摘要、history、checkpoint、decision log；从任一群组同级应用打开都解析相同 canonical WorkItem |
+| **CLI Pane** | 卡内终端/Agent Session；启动前验证本卡 `worktree_id` + `work_item_id` + permission，不按当前浏览器路由猜路径 |
 
 ## 5. インターフェース設計 (Interface Design)
 
@@ -1135,10 +1168,10 @@ per 要件 §3.1 NFR-P-01..06 目標 + 実装戦略：
 
 ### 9.2 既存 gm-console frontend 拡張
 
-- 既存 5 tab 维持 (per AGENTS.md §7 #15 v0.15 拍板)
-- Tab 4 "Agents" → 加入 sub-agent 状态 (per §4.1)
-- Chat Bar 底行 追加 (per §4.1)
-- 既存 Kanban / Timeline 等 tab, task card 状态 mirror (sub-agent ↔ card 連動)
+- Worktree selector 是产品导航根；Multica、Jira 等价视图、Task Card Index、Group Infinite Canvas 与启用插件作为该 Worktree 下同级应用
+- 原 Kanban / Timeline / Backlog / Agents 属于群组应用内工作视图，不再作为 Worktree 根导航结构；Task Card 在这些视图中保持相同 `work_item_id`
+- Group Shell 固定底栏跨同级应用复用，并始终携带 `WORKTREE` 或 `GLOBAL` scope 与对应授权上下文
+- 插件应用由 Group App Registry 热插拔；`SubAgentRegistry` (C-13) 只增删 LangGraph 执行图类型，两套注册表不可互换
 
 ### 9.3 既存 star-mcp 統合
 
@@ -1155,8 +1188,8 @@ per 要件 §7 + 追加:
 - 並行 sub-agent 数上限 50 (NFR-P-03, リソース制約)
 - 5 域 Lead 决策追跡 UI 未完成 (F-15 标 P2)
 - token OLU telemetry 接入待 SRE Lead 真人
-- Chat Bar 既存フロントエンド統合 UI 検証未実施 (デザイン段階, v0.1 は MVP 機能)
-- Task Card Modal 詳細 view 未実装 (F-10 部分, v0.1 は一覧のみ)
+- Group Shell 聊天栏 scope selector / WorktreeContext 真实前端接入尚待实现与验证 (设计约束已在 v0.3 定义)
+- Task Card 卡内 CLI pane 的产品交互与 Runtime/AgentPolicy 实装尚待后续实施 (本版定义身份绑定与授权边界)
 - 既存 dispatcher.py / console_server.py との共存 過渡期 (per §9.1)
 - LangGraph SDK バージョン固定 (lock to 0.2.x, 2026-09-03 時点)
 - **TMO 7 节点 (M-N1..M-N7) 实装 P0**: v0.2 文档完成, 组件 C-16..C-22 schema 落档, 实装待 P0-1/H2 阻塞解除 (per [PHASE-LANGGRAPH-TMO-IMPL-REPORT](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md) 7 子项 phase 计划, 走守门 #19 Python 化 + 守门 #9 v3 subprocess 路径)
@@ -1184,6 +1217,10 @@ per 要件 §7 + 追加:
 |---|---|---|---|---|
 | v0.1 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：15 component + 9 sub-agent 类型 + 3-tier checkpoint + 12 API endpoint + 守门 統合 + 性能/运用/移行設計 | 2026-09-03 17:51 JST 用户发令"另起一套架构view,专门设计langgraph相关的功能" (随 01-requirements.md 同步落档) |
 | v0.2 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **TMO 升版**: 新增 §2.6 Task Management Operations 全节 (7 节点 M-N1..M-N7 + 7 协议 + 7 组件 C-16..C-22 + State Schema 扩展 + Reducer 5 新 channel + 5 route_after_parse_intent_tmo + 守门合规表 7 项 + Telemetry/Metrics 7 项 + 状态机扩展 superseded 终态); §1.3 组件表加 C-16..C-22; §2.3.1 通信协议加 7 类 (merge_request / split_request / dep_set / bulk_action / reassign_request / metadata_update / summarize_result) + tmo_action; §2.4.2 Reducer 加 5 新 channel (task_relationships / superseded_tasks / bulk_operations / last_summarize_result / active_tmo_operation); §3.2 State Schema (TS) 加 TopAgentState 5 新字段 + SubAgentState 5 血缘字段; §5.2 外部 API 加 8 端点 (/api/tmo/merge|split|dependencies|bulk|summarize|reassign|metadata|relationships); §10 加 2 新已知缺口 (TMO 实装 P0 / 守门 #13 a 实证); 5 签字栏 v0.2 升版; 守门 #1+#5+#6+#7+#9+#10+#12+#13+#19+#20+#22 跨 stage 全过 (文档工作无 .rs 改动, cargo check 不需要跑) | 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡, 做整体统筹规划, 发号施令的入口是底端聊天窗口, 例如合并任务a和任务b" (per ask_d076c26d3fbf599eec1c32fd 拍板 (1) 范围=完整 7 节点全覆盖 (2) 文档策略=原地升版 v0.1 → v0.2 (3) 实装阶段=文档+commit 一并落), ~0.06M token 估 |
+
+| v0.3 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Worktree Group Shell 纳入 UI 根上下文，明确 WORKTREE/GLOBAL 范围、跨应用共享 WorkItem、卡内 CLI、插件应用注册与 SubAgentRegistry 的边界；扩展 L0/L1 state、组件和验收/授权路径 | 用户要求按 Worktree 为顶层索引同步 LangGraph、插件与任务卡设计 |
+
+---
 
 ---
 

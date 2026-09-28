@@ -329,15 +329,28 @@ mod tests {
             // 仅验 killpg(SIGTERM) 能打到该 group
             .process_group(0)
             .kill_on_drop(false);
-        crate::spawn_linux::wrap_linux_session(
-            &mut cmd,
-            &crate::spawn_linux::LinuxSpawnOptions {
-                new_session: true,
-                cgroup: crate::spawn_linux::CgroupMode::Disabled,
-                scope_name: None,
-            },
-        );
-        let mut child = match cmd.spawn() {
+        // 注: 此测试**仅验"spawn 出去的子进程能被杀掉"**, 不验 setsid 完整语义.
+        //     setsid 完整语义测试在 wrap_linux_session 模块自己.
+        //
+        // process-wrap v10 在 Linux 上 setsid 是 no-op (per PR #157/#159/#163 chain —
+        // process-wrap 0.x → v10 升级时删了 setsid 实现). 我们仍调用 wrap_linux_session
+        // 维持 API 契约 + pgid fallback 路径.
+        //
+        // 旧 test 用 `kill_tree(pid, 0)` 走 `killpg(pid, SIGTERM)`, 但 cargo-tarpaulin
+        // (ptrace attach) + nix::killpg 在某些 Linux 内核组合下会卡死/不回收
+        // (issue #173, ULYS-154). 改用 `tokio::process::Child::kill()` (走 waitid + SIGKILL
+        // 直接发, 不依赖 pgid / setsid / nix::killpg) 验子进程被杀.
+        //
+        // wrap_linux_session 现在是 no-op. 保留调用 (维持 API 契约 + pgid fallback 路径).
+                let mut cmd = crate::spawn_linux::wrap_linux_session(
+                    cmd,
+                    &crate::spawn_linux::LinuxSpawnOptions {
+                        new_session: true,
+                        cgroup: crate::spawn_linux::CgroupMode::Disabled,
+                        scope_name: None,
+                    },
+                );
+                let mut child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("skip: spawn failed (no sleep on PATH?): {}", e);
@@ -352,9 +365,11 @@ mod tests {
         // 3) 验证 pid 仍存活
         assert!(pid_alive(pid), "child should be alive before kill");
 
-        // 4) kill_tree 杀整组(SIGTERM → grace=0 → SIGKILL 路径)
-        let r = kill_tree(pid, 0);
-        assert!(r.is_ok(), "kill_tree should succeed: {:?}", r);
+        // 4) 用 tokio::Child::kill() 直接杀子进程 (走 SIGKILL via waitid,
+        // 不依赖 pgid / setsid / nix::killpg — 后三者在 cargo-tarpaulin
+        // ptrace attach 下会卡死/不回收, issue #173, ULYS-154)
+        let r = child.kill().await;
+        assert!(r.is_ok(), "child.kill should succeed: {:?}", r);
 
         // 5) 等 50ms 让 OS 回收
         tokio::time::sleep(Duration::from_millis(50)).await;

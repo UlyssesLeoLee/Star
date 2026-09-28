@@ -2087,3 +2087,31 @@ pub async fn migrate_canvas_to_game(
 > **文档结束**
 >
 > **commit 落地**: 本 DD-STAR-CANVAS-GAME-001 v0.1 跟 SRS-STAR-CANVAS-GAME-001 v0.1 (commit `4ed55ae`) + BD-STAR-CANVAS-GAME-001 v0.1 (commit `64df37f`) 同期落档, 修订人 = Ulysses (一人公司 12 角色 per DEC-008) — Mavis 接手 (per 8/27 19:39 JST 授权).
+>
+> ---
+>
+> ## 阶段 1 实现状态 (per ULYS-160, 2026-09-26)
+>
+> 4 crate 已落地为**阶段 1 骨架** (per issue #160).
+>
+> DD-STAR-CANVAS-GAME-001 §6 列出的 4 crate 模块树 (canvas-engine / domain-canvas / canvas-realtime / canvas-game) 已全部进 Star 仓库, 阶段 2 详细业务模块 (§6.1-§6.4 的 element 模型 / CRDT sync / 游戏引擎各子系统) 待后续 PR 渐进落地。
+>
+> **当前 crate 结构**:
+>
+> ```text
+> crates/canvas-engine/
+>   Cargo.toml      (axum + tokio + tracing + tracing-subscriber[env-filter] + tower[dev])
+>   Dockerfile      (multi-stage rust:slim-bookworm → debian:bookworm-slim)
+>   src/lib.rs      (~95 行: ServiceMetadata + Phase enum + router() + 3 endpoint)
+>   src/main.rs     (~30 行: axum serve)
+>   tests/smoke.rs  (5 tests: 3 unit + 2 axum integration)
+> crates/domain-canvas/    (同结构, port 8081, 占位 /api/v1/canvas)
+> crates/canvas-realtime/  (同结构, port 8082 HTTP + 8083 WSS echo)
+> crates/canvas-game/      (同结构, port 8084, 占位 /api/v1/gameplay)
+> ```
+>
+> **守门**:
+> - #1 v25 cargo check --workspace --all-targets 0 err + cargo test 4 crate 20/20 pass
+> - #7 unsafe_code = "forbid" (workspace lint, 4 crate 全 0 unsafe, 即使 process-wrap v10 之前 trace 也是 safe wrapper)
+> - #11 缺标比错标 (Phase::Skeleton + NotImplemented 占位)
+> - #14 v4 Mavis 临时代签 5 域 Lead (per 9/3 11:35 JST 反转)

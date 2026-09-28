@@ -267,6 +267,8 @@ impl From<win32job::JobError> for WindowsSpawnError {
 
 // 跨平台 stub(用于非 Windows 编译期调用方可达,运行期永远不命中)
 #[cfg(not(target_os = "windows"))]
+/// 跨平台 stub (per ULYS-160 PR-163 followup: missing_docs deny 强制要求 pub struct 文档化)
+/// 非 Windows 上调用即返回 unsupported 错误, 守门 #7 防御性编程避免 caller 误用.
 #[derive(Debug)]
 pub struct WindowsJobRegistry {
     _private: (),

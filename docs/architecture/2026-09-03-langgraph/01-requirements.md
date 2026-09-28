@@ -1,9 +1,9 @@
 # 01. Star LangGraph 統合アーキテクチャ - 要件定義書 (Requirements Definition)
 
-> **状態**：🟢 Draft v0.2
-> **日期**：2026-09-04 (升版自 v0.1)
+> **状態**：🟢 Draft v0.3 (Worktree 群组集成补充)
+> **日期**：2026-09-28
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
-> **签批**：🟢 Mavis 接手终审（per 2026-08-27 19:39 JST 用户授权"允许你代签" + 21:59 JST 第三次强化"继续, 你可以代签"）
+> **审核**：Mavis 接手审核；v0.3 为 Draft，群组集成补充待后续评审
 > **依赖**：[ADR-0033 代签规则反转](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0033-agent-co-signing-policy.md) · [ADR-0046 LangGraph TMO 任务卡管理操作](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) · [AGENTS.md §4 守门硬约束](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) · [STAR-OLU-001.md token 基线](https://github.com/UlyssesLeoLee/Star/blob/main/docs/ol/STAR-OLU-001.md) · [STAR-P3-WBS-001.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/reports/STAR-P3-WBS-001.md)
 > **关联文档**：[02-basic-design.md](02-basic-design.md)（基本設計書 v0.2）· [03-detailed-design.md](03-detailed-design.md)（詳細設計書 v0.2）· [PHASE-LANGGRAPH-TMO-IMPL-REPORT.md](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md)（7 子项实装计划）
 > **適用範囲**：STAR 主仓 (`D:\Star`) 全体，gm-console frontend / star-mcp / 22 domain-* crates / scripts/automation/ 全栈
@@ -14,11 +14,11 @@
 
 本文档定义 Star 项目的 **LangGraph 統合アーキテクチャ** (Star-LG) — 一个 2-level hierarchical multi-agent 系统：
 
-- **L0 全体代理 (Top-Level Agent / Total Agent)**：放置在 UI 最下行聊天栏背后，**整体控制 Star 全局各个细节**（per 2026-09-03 17:51 JST 用户决策原文）
-- **L1 任务卡子代理 (Sub-Agent / Task Card Agent)**：每张任务卡 = 1 个 sub-agent 窗口概念，**各自有独特一套作为代理的 LangGraph 设计**
+- **L0 全体代理 (Top-Level Agent / Total Agent)**：由 Group Shell 固定底部聊天栏进入，明确选择 `WORKTREE` 或 `GLOBAL` 范围；按选定范围统筹任务与群组应用
+- **L1 任务卡子代理 (Sub-Agent / Task Card Agent)**：在 Worktree 群组的 Task Card 内运行，每个执行会话绑定 Worktree/WorkItem/Task Card 身份，**各自有独特一套作为代理的 LangGraph 设计**
 
 通过该架构实现：
-1. **统一入口**：单聊天栏 → 全局控制（UI 简素化）
+1. **统一入口**：共享底栏显式选择 `WORKTREE`/`GLOBAL`，L0 在已授权范围内统筹（UI 简素化）
 2. **任务可视化**：每 sub-agent = 1 张任务卡（透明度提升）
 3. **跨 session 持续**：checkpointing + resume
 4. **5 域 Lead 协同**：守门 violation 实时检测 + 决策追踪
@@ -71,7 +71,7 @@ Star 项目现状（per 2026-09-03 main HEAD `e5f0503`）：
 
 | # | 効果 | 計測指標 |
 |---|---|---|
-| **E-01** | 单一聊天栏 → 全局控制 (UI 简素化) | 跨域操作平均点击数 ≤ 3 |
+| **E-01** | 单一共享聊天栏 + WORKTREE/GLOBAL 显式范围 → 授权范围内统筹 (UI 简素化) | 跨域操作平均点击数 ≤ 3; 未授权目标写入拦截率 100% |
 | **E-02** | 任务卡可视化 → sub-agent 透明性 | 100% sub-agent 状态 UI 可见 |
 | **E-03** | checkpointing 跨 session 持续 | 跨 session resume 成功率 ≥ 95% |
 | **E-04** | 5 域 Lead 决策 / token 消耗 / 守门 violation 实时可观测 | 决策 latency ≤ 1s，可观测延迟 ≤ 500ms |
@@ -83,7 +83,7 @@ Star 项目现状（per 2026-09-03 main HEAD `e5f0503`）：
 #### 1.4.1 主シナリオ: 全体代理 → 子代理 dispatch
 
 ```
-[User] ──input──> [Chat Bar] ──> [Top Agent: parse_intent]
+[User] ──input + scope──> [Group Shell Chat Bar] ──> [Top Agent: resolve_context → parse_intent]
                                        │
                                        ├── (simple query) ──> [Tool Node: 直接调用 MCP tool]
                                        │                              │
@@ -274,12 +274,12 @@ Star 项目现状（per 2026-09-03 main HEAD `e5f0503`）：
 - **Trigger**: chat bar 输入 "合并任务 a 和任务 b" (或 UI 卡片多选 → 合并按钮)
 - **Flow**:
   1. Top: parse_intent_node 解析 → intent = "task_merge", target_task_ids = [a, b]
-  2. Top: merge_node (per 02 §2.6) 协调: 通知 a/b 进入 stash_state (保存 checkpoint 到 Transaction 表)
+  2. Top: merge_node (per 02 §2.6) 协调: 通知 a/b 进入 stash_state (保存可恢复 checkpoint 到 Work, retention_period 到期清理; 审计/血缘事实单独写 Transaction)
   3. Top: dispatch merged_task (SA-10 task-orchestrator, type = "merge", context = {merged_from: [a, b], merged_state: snapshots})
   4. Top: 标记 a/b 状态 = "superseded", pointer → merged_task
   5. UI: a/b 卡片灰显 (badge: "已合并"), merged_task 新卡出现 (label: "a + b")
   6. SubAgent (SA-10): 用 a + b 的 stash_state 作为初始 context, 继续 plan/execute
-- **Postcondition**: a + b checkpoint 完整保留 (Transaction append-only), merged_task 启动, 血缘可追溯
+- **Postcondition**: a + b checkpoint 按 Work retention 完整保留, merged_task 启动; 合并决定与 supersede 血缘写入 Transaction append-only
 - **约束 (per 守门 #13)**: L1 ↔ L1 禁止通信, 全部走 L0 协调
 
 #### UC-10: 任务卡拆分 (Task Split, TMO M-N2)
@@ -336,7 +336,7 @@ Star 项目现状（per 2026-09-03 main HEAD `e5f0503`）：
 
 | # | 機能 | 説明 | 優先度 |
 |---|---|---|---|
-| **F-01** | 全体代理 chat 入口 | UI 最下行 chat bar ↔ Top Agent WebSocket/SSE | P0 |
+| **F-01** | 全体代理 chat 入口 | Group Shell 固定底栏 ↔ Top Agent WebSocket/SSE，显式携带 WORKTREE/GLOBAL 范围 | P0 |
 | **F-02** | 子代理 dispatch | Top → SubAgentPool.spawn(type, context) | P0 |
 | **F-03** | 任务卡 UI | per sub-agent = 1 card, 状态/历史/操作 UI | P0 |
 | **F-04** | LangGraph state 管理 | Top + Sub 独立 state schema + reducer | P0 |
@@ -361,6 +361,25 @@ Star 项目现状（per 2026-09-03 main HEAD `e5f0503`）：
 | **F-23** | 跨任务汇总 (TMO M-N5) | L0 summarize_node, 跨 N SubAgentState 聚合, LLM 表格化 | P1 (v0.2) |
 | **F-24** | 子代理重新分配 (TMO M-N6) | L0 reassign_node, 类型 SA-XX 切换, checkpoint preserved | P1 (v0.2) |
 | **F-25** | 元数据编辑 (TMO M-N7) | L0 metadata_node, task_metadata 表更新 (Master RLS 必携) | P1 (v0.2) |
+| **F-26** | Worktree GroupContext 传播 | L0 会话、L1 Task Card、工具调用和 checkpoint 绑定 `worktree_id`；Task Card 再绑定 `work_item_id` / `task_card_id` | P0 (v0.3) |
+| **F-27** | WORKTREE/GLOBAL scope 控制 | 聊天入口显式选择范围；GLOBAL 写入前须给出 target Worktree 并逐目标授权，审计范围与目标 | P0 (v0.3) |
+| **F-28** | Task Card 内 CLI/Agent Session | CLI 在卡内打开，继承并校验卡片关联的 Worktree 与 WorkItem 上下文；会话归 Runtime/AgentPolicy 管理 | P0 (v0.3) |
+| **F-29** | 群组插件应用交互 | 通过 Group App Registry 获取已启用插件及其 capability；sub-agent type registry 只注册 LangGraph 执行类型，不代替群组应用导航 | P1 (v0.3) |
+
+### 2.5 渡口 Worktree 群组集成要求 (v0.3)
+
+Worktree 是产品导航根。Multica、Jira 等价任务视图、Task Card 索引、Infinite Canvas 与已启用插件是其群组内同级应用；LangGraph 是跨应用编排和执行能力，不另造一个平行产品树。
+
+| 规则 | 要求 |
+|---|---|
+| 单一上下文 | 每条聊天消息、L0 run、L1 run、tool call、checkpoint 和审计事件记录 `scope_kind`、`worktree_id`、`work_item_id`、`task_card_id` 中适用字段以及 `correlation_id` |
+| WORKTREE | 只允许操作当前 Worktree 群组内的对象；切换同级应用时保留范围，不得因 UI 路由切换扩大访问 |
+| GLOBAL | 可读取/统筹用户获权的多个 Worktree；每个写操作必须解析出明确目标集合，逐目标校验 permission/tenant/worktree，失败目标不执行并返回结果 |
+| 任务卡与 CLI | Task Card 是执行工作面，CLI 在卡内嵌入或打开；Runtime 启动命令前验证卡片绑定的 `worktree_id` 与 `work_item_id`，禁止仅凭浏览器当前路径推断执行目录 |
+| 插件 | Group App Registry 管理插件 manifest、启停、群组入口和应用 capability；`F-16` Sub-Agent Registry 管理 Agent 执行图类型。两者可通过受控 capability bridge 交互，不得混用注册记录或权限 |
+| 画布 | Group Infinite Canvas 与 Task Card/Jira 类功能以共享 WorkItem ID 和类型化 EntityRef 互联；Worktree Overview Graph 是 Project 级独立画布，LangGraph 仅接收其授权引用，不复制图实体事实 |
+
+**验收条件**: `AC-GROUP-LG-1` 同一任务从群组应用打开后 L1、CLI 与 checkpoint 的 Worktree/WorkItem/Task Card ID 一致；`AC-GROUP-LG-2` WORKTREE/GLOBAL 范围均显式进入 state 并可审计；`AC-GROUP-LG-3` GLOBAL 未指定/未获授权的目标写操作被拒绝；`AC-GROUP-LG-4` 禁用群组插件后 Agent type registry 和业务事实保持完整。
 
 ## 3. 非機能要件 (Non-Functional Requirements)
 
@@ -449,9 +468,9 @@ per AGENTS.md §4 守门硬约束 (13 main + 24 派生规 = 37 项) 全部继承
 
 | 用語 | 説明 |
 |---|---|
-| **全体代理 (Top-Level Agent / Total Agent)** | UI 最下行聊天栏背后 LangGraph instance，整体控制 Star 全局各个细节 |
+| **全体代理 (Top-Level Agent / Total Agent)** | Group Shell 共享底栏后的 LangGraph instance；每次运行显式绑定 `WORKTREE` 或 `GLOBAL` scope，只能在已授权 Worktree 范围内统筹 |
 | **子代理 (Sub-Agent)** | 任务卡単位 LangGraph subgraph, 特定 task 状態機 |
-| **任务卡 (Task Card)** | UI 上 sub-agent 可视化窗，状态/履歴/操作 UI |
+| **任务卡 (Task Card)** | Worktree 群组内的执行工作面，绑定 canonical WorkItem 与 LangGraph L1 状态；CLI/Agent Session 在卡内打开 |
 | **Dispatch** | 全体代理 → 子代理 task 割当 |
 | **Checkpoint** | LangGraph state 永続化点，跨 session 恢复用 |
 | **Reducer** | LangGraph state channel 更新関数 |
@@ -538,8 +557,8 @@ Top: parse_intent → intent="task_merge", target_task_ids=[a, b]
 Top: merge_node (per 02 §2.6 M-N1)
      │
      ├── sub_step 1: 通知 a / b 进入 stash_state
-     │     a.checkpoint_id → a_stash (Transaction append-only)
-     │     b.checkpoint_id → b_stash (Transaction append-only)
+ │     a.checkpoint_id → a_stash (Work checkpoint, retention_period)
+ │     b.checkpoint_id → b_stash (Work checkpoint, retention_period)
      │
      ├── sub_step 2: dispatch merged_task (SA-10 task-orchestrator, type="merge")
      │     merged_task.context = {
@@ -602,6 +621,7 @@ Top: collect → respond → user "已合并 a + b, merged_task 启动"
 |---|---|---|---|---|
 | v0.1 | 2026-09-03 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版：2-level hierarchical LangGraph 架构 (全体代理 L0 + 任务卡子代理 L1) 落档；18 機能 / 4 NFR 類 / 14 制約 / 20 用語 / 5 想定シナリオ / 18 UC | 2026-09-03 17:51 JST 用户发令"另起一套架构view,专门设计langgraph相关的功能,需求文档、基本设计、详细设计按照日本IPA规则设计" |
 | v0.2 | 2026-09-04 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | **TMO (Task Management Operations) 升版**: 加 5 UC (UC-09..UC-13: 合并 / 拆分 / 依赖编排 / 批量 / 跨任务汇总+元数据) + 7 機能 (F-19..F-25) + 5 NFR (NFR-TMO-01..05: 合并原子性 / 拆分可逆 / 批量一致性 / 血缘可追溯 / DAG 校验) + 1 想定シナリオ (S-06 合并任务 a 和 b) + 4 用語 (TMO / TaskOperationsManager / Task Relationship Graph / Supersede) + 1 制約派生 (L1↔L1 禁止 → TMO 全部 L0 协调) + 2 已知缺口 (TMO 实装 P0 / 守门 #13 a 实证待补) + 5 签字栏 v0.2 升版行 + ADR-0046 索引 + 引用 PHASE-LANGGRAPH-TMO-IMPL-REPORT 实装 phase 计划; 随 02-basic-design.md + 03-detailed-design.md 同步升档 v0.2; 守门 #1+#5+#6+#7+#9+#10+#12+#19+#20+#22+#13 跨 stage 全过 (文档工作无 .rs 改动, cargo check 不需要跑) | 2026-09-04 19:15 JST 用户发令"langgraph功能需要可以操控任务卡, 做整体统筹规划, 发号施令的入口是底端聊天窗口, 例如合并任务a和任务b这种全局管理的ai功能是要能实现的" (per ask_d076c26d3fbf599eec1c32fd 拍板 (1) 范围=完整 7 节点全覆盖 (2) 文档策略=原地升版 v0.1 → v0.2 (3) 实装阶段=文档+commit 一并落), ~0.06M token 估 |
+| v0.3 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 Worktree GroupContext、WORKTREE/GLOBAL scope、逐目标授权、卡内 CLI 会话绑定、Group App Registry 与 Sub-Agent Registry 边界；新增 F-26..F-29 与 AC-GROUP-LG-1..4 | 用户要求按 Worktree 为顶层索引同步 LangGraph、插件与任务卡设计 |
 
 ---
 

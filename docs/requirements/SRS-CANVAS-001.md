@@ -1,11 +1,11 @@
 # SRS-CANVAS-001
 
-> **无限画布 (Infinite Canvas) 总册 SRS v1.0** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート)
+> **无限画布 (Infinite Canvas) 总册 SRS v1.4** (per 日本 IPA SEC 標準 / 要件定義書 テンプレート; Worktree 群组集成补充)
 >
 > **⚠️ 方向重置 (per 2026-09-10 17:08 JST Ulysses 拍板)**
 > 核心功能 = **管理 agent + 游戏化**, 避免过度冗余
 >
-> - 状态: Requirements Baseline
+> - 状态: Requirements Baseline (v1.4 群组集成补充)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 commit: (root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
 > - 关联 V0.1 实装: `docs/frontend-canvas-design.md` v0.1 + `frontend/src/components/CanvasView.tsx` + 6+3 e2e 守门
@@ -14,9 +14,9 @@
 >   - `SRS-CANVAS-AGENT-001` (核心 1: agent 管理域, 28 项)
 >   - `SRS-CANVAS-GAMIFY-001` (核心 2: 游戏化域, 32 项)
 >   - **`SRS-CANVAS-WORKFLOW-001`** (核心 3: 自动化流程域, 54 项, **v1.2 新增 / v1.1 子文档扩充至 54 项, per ULYS-15 issue 委托**)
-> - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 2026-08-27 19:39 JST 用户授权 + 9/8 15:19 JST 第 6 次强化)
-> - 审批: 架构师 (Mavis 接手 agent per DEC-008) (per 守门 #14 v3 Mavis 永久代签)
-> - 日期: 2026-09-10 JST
+> - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
+> - 审批: 架构师 (Mavis 接手 agent per DEC-008) (per 守门 #14 v4)
+> - 日期: 2026-09-28 JST (v1.4 补充)
 > - 受众: 詳細設計工程師 / 架構審查者 / UI/UX 設計師 / SRE Lead / 5 域 Lead (未到位, Mavis 临时代签 per 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D)
 
 ---
@@ -27,7 +27,7 @@
 |---|---|
 | 文书 ID | SRS-CANVAS-001 |
 | 文书名 | 无限画布 总册 SRS (Infinite Canvas Master SRS) |
-| 版本 | v1.0 (方向重置版) |
+| 版本 | v1.4 (Worktree 群组集成补充) |
 | 作成日 | 2026-09-10 |
 | 作成者 | Ulysses — Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手) (per 守门 #14 v3) |
@@ -44,7 +44,9 @@
 | v1.0 (方向重置版) | 2026-09-10 17:20 JST | Ulysses — Mavis 接手 (per 守门 #14 v3) | 新方向: 双核心 = 管理 agent + 游戏化, 2 专题拆分, 砍掉 Miro 通用功能, 字节数目标 ~20K (vs v0.1 47.5K 砍 58%) | Ulysses 17:08 JST 拍板"管理 agent 和游戏化, 避免过度冗余" |
 | v1.1 (三次更新版) | 2026-09-10 17:34 JST | Ulysses — Mavis 接手 (per 守门 #14 v3) | v0.63 反转: 撤回 17:08 JST 砍多人编辑决定, A12 多人编辑 8 项新增, AGENT 38 → 46 项, 双核心 70 → 78 项, 31 P0 → 36 P0 | Ulysses 17:34 JST 拍板"多人编辑是要的" |
 | **v1.2 (双核心 → 三核心)** | **2026-09-12** | **Sonnet (agent, per Multica ULYS-15 委托)** | **新增第 3 核心"自动化流程" (`SRS-CANVAS-WORKFLOW-001`, 42 项), 双核心 78 → 三核心 120 项 (索引级同步, 详见 §1.3.1); 局部反转 §1.4 "Miro 12 种 diagram" 行中 Flowchart 子项与"Miro 通用集成"行, 见 §0.3 撤回记录; §4.1/§4.4 全量重排留 known gap (per 本 SRS §7.3 风险)** | **ULYS-15 issue 人类创建者委托"n8n 那种工作流的功能" — 尚待 Ulysses / 5 域 Lead 正式拍板, 状态 Draft** |
-| **v1.3 (当前, 最小索引同步)** | **2026-09-12** | **Sonnet (agent, per Multica ULYS-15 追评委托)** | **`SRS-CANVAS-WORKFLOW-001` 子文档 v1.0→v1.1, 新增 W14/W15 (+12 项), 42→54 项; 本总册 §1.3.1 索引数字同步更新: 三核心 120 → **132** 项 (仅计数同步, 不展开新内容, 详见子文档)** | **ULYS-15 issue 创建者 2 条追评 (评论 `01a09566…`/`01a09567…`): AAA/spec/superpowers 默认模板 + LangGraph 智能控制 + 补齐底部聊天栏** |
+| **v1.3 (最小索引同步)** | **2026-09-12** | **Sonnet (agent, per Multica ULYS-15 追评委托)** | **`SRS-CANVAS-WORKFLOW-001` 子文档 v1.0→v1.1, 新增 W14/W15 (+12 项), 42→54 项; 本总册 §1.3.1 索引数字同步更新: 三核心 120 → **132** 项 (仅计数同步, 不展开新内容, 详见子文档)** | **ULYS-15 issue 创建者 2 条追评 (评论 `01a09566…`/`01a09567…`): AAA/spec/superpowers 默认模板 + LangGraph 智能控制 + 补齐底部聊天栏** |
+
+| **v1.4 (渡口群组集成补充)** | **2026-09-28 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **增加 Worktree 为导航根、Multica/Jira 等价能力/Task Card/Canvas/插件为群组同级入口、固定双范围聊天栏、卡内 CLI、类型化跨域引用及两种 Canvas 边界；新增 AC-GROUP-1..7** | **用户要求按 Worktree 顶层索引完善需求与基本设计，并确保应用群组交互、插件热插拔和 LangGraph 融入体系** |
 
 ### 0.2 平行 3 专题 SRS 修订履历 (独立跟踪)
 
@@ -52,7 +54,7 @@
 |---|---|---|---|---|
 | `SRS-CANVAS-AGENT-001` | v1.0 (目标) | 撰写中 | worker 子代理 1 (bg_fc33dfea) | 本拍板派生 (per 17:08 JST 方向重置) |
 | `SRS-CANVAS-GAMIFY-001` | v1.0 (目标) | 撰写中 | worker 子代理 2 (bg_84cf0613) | 本拍板派生 (per 17:08 JST 方向重置) |
-| **`SRS-CANVAS-WORKFLOW-001`** | **v1.1 (Draft, 待拍板)** | **撰写完成, 待审 (v1.1 新增 W14/W15)** | **Sonnet (agent)** | **ULYS-15 issue 委托 + 2 条追评** |
+| **`SRS-CANVAS-WORKFLOW-001`** | **v1.2 (Draft)** | **撰写完成; W14/W15 + Worktree 群组范围补充** | **Sonnet (原稿) / Mavis 接手审核** | **ULYS-15 issue 委托 + 渡口 Worktree 群组集成同步** |
 
 ### 0.3 撤回记录 (per 守门 #1 禁回溯叙事)
 
@@ -98,7 +100,7 @@ STAR 平台已在 2026-09-04 落地 V0.1 MVP 无限画布, 满足基础无限画
 | **SRS-CANVAS-001 (本总册)** | 跨域 / 索引 | 三核心 132 项 (索引级, per v1.3) | 132 项 (索引) | 三核心索引 + 优先级 + 跨块接口 + 共享约束 (§4.1/§4.4 全量重排为后续 known gap, 见 §7.3) |
 | `SRS-CANVAS-AGENT-001` | 核心 1: agent 管理 | A1-A12 (12 子能力, 含 ARG 图论构造 + 多人编辑 per 17:34 JST v0.63 反转) | **46 项** | 节点 / 拓扑 / 状态 / worktree / work-item / 操作 / 监控 / 聚类 / 跨域 / settings 集成 / **ARG (10 类关系 + 4 维度 + 5 模板 + 同步桥 + 成就)** / **多人编辑 (8 项: 多人同时编辑 + 实时 cursor + 元素增删改 + Follow mode + 评论线程 + @ + 冲突解决 + audit)** (FR/NFR/AC/US 详细) |
 | `SRS-CANVAS-GAMIFY-001` | 核心 2: 游戏化 | G1-G12 (12 子能力) | **32 项** | 节点 / 奖励 / 积分 / 升级 / AI 聚类 / 投票 / 反应 / confetti / 排行榜 / 任务 / 道具 / game 集成 (FR/NFR/AC/US 详细) |
-| **`SRS-CANVAS-WORKFLOW-001` (v1.2 新增, v1.1 子文档已扩充)** | **核心 3: 自动化流程** | **W1-W15 (15 子能力)** | **54 项** | **n8n 式节点图 (触发/动作/条件/循环/子流程) + 标签绑定任务卡 + Backlog/Sprint 联动 + 默认工作流模板库 (W14) + LangGraph 智能控制/底部聊天栏 (W15) (FR/NFR/AC/US 详细, per ULYS-15 issue 委托 + 追评)** |
+| **`SRS-CANVAS-WORKFLOW-001` (v1.2 群组集成补充，v1.1 含 W14/W15)** | **核心 3: 自动化流程** | **W1-W15 (15 子能力)** | **54 项** | **n8n 式节点图 (触发/动作/条件/循环/子流程) + 标签绑定任务卡 + Backlog/Sprint 联动 + 默认工作流模板库 (W14) + 消费 Group Shell 共享聊天上下文的 LangGraph 智能控制 (W15) (FR/NFR/AC/US 详细) |
 | **合计** | | | **132 项 (展开)** | |
 
 #### 1.3.2 V0.1 MVP 衔接 (per 守门 #11 缺标比错标)
@@ -141,6 +143,8 @@ V0.1 MVP 已实装能力, 本总册**保留**为 V0.1 不重新设计:
 | **5 域独立 Lead ≠ Star 22 DDD bounded context** | 业务子域↔DDD 映射 | per 2026-08-31 22:45 JST Q1-D 拍板 disclaimer |
 | **Star 25 module DDD bounded context 业务子域映射** | 业务子域↔DDD 映射 | per 2026-08-31 22:45 JST Q1-D 拍板 disclaimer, 不建立 |
 
+**范围消歧 (v1.4)**: §1.4 排除的 “Jira 集成”仅指对接外部 Jira SaaS 的专用 OAuth/连接器 UI；它不排除渡口内部的 Jira 等价任务管理应用。Group Infinite Canvas 必须能用 Worktree-scoped `EntityRef` 引用同一 WorkItem/Task Card，并通过领域命令与授权策略创建关联、跳转和发起支持的任务操作。Canvas 不拥有另一份 WorkItem 状态。
+
 ### 1.5 用户故事 (总册级, 跨 2 专题)
 
 | 编号 | 角色 | 故事 | 优先级 | 引用专题 |
@@ -155,6 +159,16 @@ V0.1 MVP 已实装能力, 本总册**保留**为 V0.1 不重新设计:
 | US-T-8 | Dev (RPG 玩家) | 作为 RPG 玩家, 我希望有 power-up 道具 (双倍积分 / 自动聚类 / 隐身), inventory 物品栏管理 | P3 | GAMIFY G11 |
 | US-T-9 | 团队成员 | 作为成员, 我希望画布上跟 Roguelike / Manga 主题游戏节点集成, 一边画架构一边玩 | P2 | GAMIFY G12 (V0.1 集成) |
 | US-T-10 | 5 域 Lead | 作为 Lead, 我希望 agent 聚类 / 排序 / 过滤, 按 role / kind / status 分组 | P1 | AGENT A8 |
+
+### 1.6 渡口 Worktree 群组集成边界 (v1.4 补充)
+
+- **产品树**：Worktree 是导航根。每个 Worktree 群组下，Multica、Jira 等价任务管理、Task Card 索引、Group Infinite Canvas 和已启用插件入口是同级能力。
+- **Canvas 角色**：本 SRS 的 Infinite Canvas 提供可视化协作表面，支持把 WorkItem、Task Card、关系、Agent/Flow 等以类型化元素引用加入画布，并从画布跳转或发起经授权的领域命令。“Miro-like”描述画布交互，不扩大为全部 Miro 通用功能。
+- **任务事实**：Canvas 元素引用统一使用 `EntityRef(type, id, worktree_id)`；布局和画布元数据属于 Canvas，任务状态归 WorkItem/Multica/Jira 等价域。Canvas 不维护第二份任务状态机。
+- **聊天栏**：固定底部聊天栏属于 Group Shell，在各群组应用间保持同一会话入口；明确选择 `WORKTREE` 或 `GLOBAL`。Canvas 只传递当前 Worktree/元素作为上下文，不创建专属聊天栏。
+- **执行卡与 CLI**：打开任务引用进入同一 Task Card；CLI/Agent Session 在卡内呈现，并绑定 Worktree 与 WorkItem。它不是 Worktree 下的独立同级应用。
+- **插件热插拔**：插件 manifest 声明 scope、capability、权限和群组入口；启用/停用会动态更新同级应用导航。插件通过域 API/事件交互，不能绕过 Worktree ACL 或直接改写其他域的事实数据。
+- **另一种 Canvas**：[`SRS-WORKTREE-CANVAS-001.md`](SRS-WORKTREE-CANVAS-001.md) 定义 Project/Repository 级 Worktree Overview Graph，与本 Group Infinite Canvas 是不同对象；二者只通过显式 Worktree/实体引用深链。
 
 ---
 
@@ -637,6 +651,18 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 | AC-V0.1-4 | 5 联动 (WorkItem/Worktree/Relation/Comment/Search URL) | V0.1 落档 | per `frontend-canvas-design.md` §4 |
 | AC-V0.1-5 | StatusPill 60+ 色码同步 | V0.1 落档 | per design §3.4 + ADR-FE-013 |
 
+### 8.1.1 渡口 Worktree 群组集成验收 (v1.4)
+
+| 编号 | 验收项 | 目标 |
+|---|---|---|
+| AC-GROUP-1 | Worktree 群组导航 | Multica、Jira 等价任务视图、Task Card 索引、Group Infinite Canvas 与插件入口位于选中 Worktree 下的同级导航层 |
+| AC-GROUP-2 | 任务跨应用引用 | 从 Canvas、Multica 或 Jira 等价视图打开同一任务，解析到相同 `work_item_id` / Task Card；任务状态更新通过领域事件同步 |
+| AC-GROUP-3 | Canvas 写入边界 | 元素用带 `worktree_id` 的类型化引用；任何任务变更经领域命令、ACL 与审计路径，不在 Canvas 建立平行事实 |
+| AC-GROUP-4 | 全局聊天范围 | Group Shell 底栏显式显示 `WORKTREE`/`GLOBAL`；工作区范围绑定当前 Worktree，全局写操作要求明确目标 Worktree 并逐目标授权 |
+| AC-GROUP-5 | 卡内 CLI | Task Card 内可打开 CLI/Agent Session，且会话与 `worktree_id`、`work_item_id`、`task_card_id` 绑定 |
+| AC-GROUP-6 | 插件热插拔 | 经授权的插件启用/卸载动态增删同级入口；卸载不得删除其引用的 WorkItem 或审计事实 |
+| AC-GROUP-7 | 两种 Canvas 消歧 | Group Infinite Canvas 与 Project Worktree Overview Graph 使用不同对象/上下文，可通过 Worktree 引用互链 |
+
 ### 8.2 3 份 SRS 撰写验收 (per 守门 #9 v27)
 
 | 编号 | 验收项 | 当前状态 |
@@ -685,14 +711,18 @@ STAR 平台是 5 域 (player/economy/match/social/admin per 8/21 JST RGS 治理�
 |---|---|---|---|---|
 | v0.1 (撤回) | 2026-09-10 17:10 JST | Ulysses — Mavis 接手 | 旧方向: Miro 全功能 12 大类 50 项, 3 专题拆分 (47.5KB) | Ulysses 17:00 JST 拍板 (后撤回) |
 | **v1.0 (方向重置版)** | **2026-09-10 17:20 JST** | **Ulysses — Mavis 接手 (per 守门 #14 v3)** | **新方向: 双核心 = 管理 agent + 游戏化, 2 专题拆分, 砍掉 Miro 通用功能, 字节数目标 ~20K (vs v0.1 47.5K 砍 58%)** | **Ulysses 17:08 JST 拍板"管理 agent 和游戏化, 避免过度冗余"** |
-| **v1.1 (当前, 三次更新版)** | **2026-09-10 17:34 JST** | **Ulysses — Mavis 接手 (per 守门 #14 v3)** | **v0.63 反转: 撤回 17:08 JST 砍多人编辑决定, A12 多人编辑 8 项新增, AGENT 38 → 46 项, 双核心 70 → 78 项, 31 P0 → 36 P0** | **Ulysses 17:34 JST 拍板"多人编辑是要的"** |
+| **v1.1 (三次更新版)** | **2026-09-10 17:34 JST** | **Ulysses — Mavis 接手 (per 守门 #14 v3)** | **v0.63 反转: 撤回 17:08 JST 砍多人编辑决定, A12 多人编辑 8 项新增, AGENT 38 → 46 项, 双核心 70 → 78 项, 31 P0 → 36 P0** | **Ulysses 17:34 JST 拍板"多人编辑是要的"** |
+| **v1.2 (三核心)** | **2026-09-12** | **Sonnet (agent, per Multica ULYS-15 委托)** | 新增自动化流程核心并更新为三核心索引 120 项 | ULYS-15 issue 委托 |
+| **v1.3 (流程索引同步)** | **2026-09-12** | **Sonnet (agent, per Multica ULYS-15 追评委托)** | 工作流扩为 54 项，总索引更新为 132 项 | ULYS-15 创建者追评 |
+| **v1.4 (当前)** | **2026-09-28 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **渡口 Worktree 群组集成补充，AC-GROUP-1..7** | **用户提出 Worktree 顶层导航与同级群组应用要求** |
 
-### 11.2 平行 2 专题 SRS 修订履历 (独立跟踪, 待 2 子代理返回后填)
+### 11.2 平行 3 专题 SRS 修订履历 (独立跟踪)
 
 | 文书 | 版本 | 修订人 | 修订内容 | 触发 | 状态 |
 |---|---|---|---|---|---|
 | `SRS-CANVAS-AGENT-001` | v1.0 (待) | Ulysses — Mavis 接手 | 28 项展开 (agent 管理) | 本拍板派生 (per 17:08 JST 方向重置) | 撰写中 (worker 子代理 1, bg_fc33dfea) |
 | `SRS-CANVAS-GAMIFY-001` | v1.0 (待) | Ulysses — Mavis 接手 | 32 项展开 (游戏化) | 本拍板派生 (per 17:08 JST 方向重置) | 撰写中 (worker 子代理 2, bg_84cf0613) |
+| `SRS-CANVAS-WORKFLOW-001` | v1.2 | Sonnet (原稿) / Mavis 接手审核 | W1-W15 共 54 FR；Group Shell 聊天范围和 Worktree 归属同步 | ULYS-15 委托 + 2026-09-28 渡口群组集成 | Draft |
 | `SRS-CANVAS-INTEGRATION-001` (撤回) | n/a | n/a | 撤回理由: Miro 集成超出核心 | 17:08 JST 方向重置 | 改写为 deprecated placeholder (`docs/briefs/srs-canvas-integration-001.md` 1.1KB) |
 
 ### 11.3 跨拍板派生 (per 守门 #14 v2 跨域)

@@ -1,5 +1,10 @@
 # ADR-0027: Rust Pivot + Agent 小游戏核心理念 + Jira/Miro/MS Project 整合
 
+> **⚠️ SUPERSEDED 2026-09-07** (per `BD-STAR-CANVAS-GAME-001.md` v0.1, commit `64df37f`, ULYS-160 stage 1+2 拍板).
+> 本文档是 9/6 立 Miro 风协作画布 (SUPERSEDED 9/7) 阶段设计, **改方向为**: **弹幕 Roguelike + 3渲2 像素风机器人**.
+> 保留 3 crate 架构骨架 (canvas-engine / domain-canvas / canvas-realtime) + 5 装饰 element 渲染接口, 推翻其他部分.
+> 后续 stage-2 工作见 [`docs/design/BD-STAR-CANVAS-GAME-001.md`](../design/BD-STAR-CANVAS-GAME-001.md) v0.1.
+
 > **状态**: 🟢 Accepted v0.1 (2026-09-11)
 > **日期**: 2026-09-11
 > **修订人**: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核**

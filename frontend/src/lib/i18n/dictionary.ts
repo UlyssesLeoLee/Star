@@ -64,12 +64,8 @@ export interface Dictionary {
   };
   appHeader: {
     workspaceSwitcher: string;
-    allApps: string;
-    appsCount: string;
-    tacticalJump: string;
     notifications: string;
     realtimeOnline: string;
-    synced: string;
     addMoreTabs: string;
     removeFromHeader: string;
   };
