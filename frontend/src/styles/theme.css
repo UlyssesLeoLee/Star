@@ -528,3 +528,122 @@ html.shanghai,
   --shanghai-border-pattern: repeating-linear-gradient(45deg, #c89228, #c89228 3px, #b8282b 3px, #b8282b 6px);
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+ * 🎞️  JAPANESE CEL (日式经典赛璐璐动画)
+ *     艺术与平面设计特征:
+ *       - 80-90s 经典日漫手绘赛璐璐胶片画（セル画 / Cel Animation）
+ *       - 0.8px~1.2px 均匀清晰机械转印碳粉黑线（Trace Line / トレス線）
+ *       - 严格分块平涂双阶阴影（Flat Color + Hard Step Shadow 1号影），零漫反射过度
+ *       - 标志性高光白斑（Anime Highlights）与赛璐璐胶片透光暖白基底
+ *       - EVA 战术天青蓝 (#2563EB) · 赛璐璐活力朱红 (#EA580C) · 柠檬明黄 (#F59E0B)
+ * ─────────────────────────────────────────────────────────────────────*/
+.cel,
+html.cel,
+.theme-cel {
+  color-scheme: light;
+
+  /* === 主色 / 强调色 === */
+  --color-primary:            #2563eb;
+  --color-primary-glow:       rgba(37, 99, 235, 0.35);
+  --color-secondary:          #ea580c;
+  --color-secondary-glow:     rgba(234, 88, 12, 0.30);
+  --color-accent:             #f59e0b;
+  --color-accent-soft:        #d97706;
+  --color-accent-50:          #f59e0b;
+  --color-accent-violet:      #4f46e5;
+  --color-accent-violet-glow: rgba(79, 70, 229, 0.25);
+
+  /* 主色反色 — 纯白 (在天青蓝底上对比度 ≥ 4.5:1 WCAG AA) */
+  --color-on-primary:         #ffffff;
+
+  /* === 语义色 === */
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-danger:  #dc2626;
+  --color-neutral: #334155;
+  --color-info:    #2563eb;
+
+  /* === 背景层 (赛璐璐透光胶片三级阶梯) === */
+  --color-surface:          #f8fafc;
+  --color-surface-2:        #ffffff;
+  --color-surface-elevated: #eef2f6;
+  --color-surface-glass:    rgba(255, 255, 255, 0.94);
+
+  /* Tailwind bg.* token 映射 */
+  --bg-DEFAULT: #f8fafc;
+  --bg-soft:    #ffffff;
+  --bg-lighter: #eef2f6;
+  --bg-card:    #ffffff;
+
+  /* === 文字 — 赛璐璐手描漆黑墨线 === */
+  --color-text:      #111827;
+  --color-text-dim:  #4b5563;
+  --color-text-mute: #64748b;
+
+  /* Tailwind ink.* token 映射 */
+  --ink-DEFAULT: #111827;
+  --ink-dim:     #4b5563;
+  --ink-mute:    #64748b;
+
+  /* === 边框 — 动画墨线 (1.5px 纯实心黑线) === */
+  --color-border:        #1e293b;
+  --color-border-subtle: #cbd5e1;
+  --color-border-hover:  #2563eb;
+
+  /* Tailwind line / border.* token 映射 */
+  --line-DEFAULT:   #1e293b;
+  --border-DEFAULT: #1e293b;
+  --border-line:    #111827;
+
+  /* === HUD 战术微标签 === */
+  --color-hud-tag:        #2563eb;
+  --color-hud-tag-bg:     rgba(37, 99, 235, 0.12);
+  --color-hud-tag-border: #1e293b;
+
+  /* === 语义 ok/warn/err/info Tailwind 映射 === */
+  --ok-DEFAULT:   #16a34a;
+  --warn-DEFAULT: #f59e0b;
+  --err-DEFAULT:  #dc2626;
+  --info-DEFAULT: #2563eb;
+
+  /* === 赛璐璐胶片分层硬投影 (模拟压画胶片 0 模糊阴影) === */
+  --shadow-sm: 2px 2px 0px #1e293b;
+  --shadow-md: 3px 3px 0px #1e293b;
+  --shadow-lg: 5px 5px 0px #1e293b;
+  --glow-accent:    0 0 0 2px #2563eb;
+  --glow-secondary: 0 0 0 2px #ea580c;
+
+  /* === 赛璐璐胶片微倒角 === */
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 6px;
+  --radius-xl: 10px;
+
+  /* === CEL-SHADED TOKENS === */
+  --cel-bg: #f8fafc;
+  --cel-surface-card: #ffffff;
+  --cel-surface-sub: #eef2f6;
+  --cel-surface-stage: #e2e8f0;
+  --cel-card-ramp: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  --cel-crimson: #dc2626;
+  --cel-cyan: #2563eb;
+  --cel-gold: #f59e0b;
+  --cel-ink: #111827;
+  --cel-text-primary: #111827;
+  --cel-text-secondary: #4b5563;
+  --cel-screentone-dot: rgba(37, 99, 235, 0.08);
+  --cel-shadow-color: rgba(17, 24, 39, 0.85);
+  --cel-bevel-hi: rgba(255, 255, 255, 0.95);
+  --cel-bevel-lo: rgba(17, 24, 39, 0.35);
+  --cel-glint-color: #ffffff;
+  --cel-glint-rim: rgba(37, 99, 235, 0.45);
+
+  /* === 日式赛璐璐专属变量 === */
+  --anime-cel-blue:       #2563eb;
+  --anime-cel-vermilion:  #ea580c;
+  --anime-cel-yellow:     #f59e0b;
+  --anime-cel-ink:        #111827;
+  --anime-cel-film:       #f8fafc;
+  --anime-cel-border:     2px solid #1e293b;
+}
+

@@ -1312,5 +1312,122 @@ html.shanghai .btn-primary:hover,
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 1px 2px 4px rgba(34, 28, 22, 0.15);
 }
 
+/* =====================================================================
+   🎞️ JAPANESE CEL ANIMATION (日式经典手绘赛璐璐) COMPONENT OVERRIDES
+   ===================================================================== */
+
+/* 1. Japanese Cel Card (赛璐璐胶片分层与手绘墨线) */
+html.cel .card,
+.cel .card {
+  border-radius: 3px !important;
+  border: 1.5px solid #1e293b !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  box-shadow: 3px 3px 0 #1e293b !important;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+html.cel .card:hover,
+.cel .card:hover {
+  border-color: #2563eb !important;
+  box-shadow: 4px 4px 0 #1e293b !important;
+  transform: translate(-1px, -1px);
+}
+
+/* 2. Japanese Cel Buttons (赛璐璐硬切色阶平涂按键) */
+html.cel .btn,
+.cel .btn {
+  border-radius: 2px !important;
+  border: 1.5px solid #1e293b !important;
+  background: #f8fafc !important;
+  color: #111827 !important;
+  font-weight: 700;
+  box-shadow: 2px 2px 0 #1e293b !important;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+html.cel .btn:hover,
+.cel .btn:hover {
+  background: #ffffff !important;
+  border-color: #2563eb !important;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 #1e293b !important;
+}
+
+html.cel .btn:active,
+.cel .btn:active {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 0 0 0 #1e293b !important;
+}
+
+html.cel .btn-primary,
+.cel .btn-primary {
+  border-radius: 2px !important;
+  border: 1.5px solid #111827 !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 800;
+  box-shadow: 2px 2px 0 #111827 !important;
+}
+
+html.cel .btn-primary:hover,
+.cel .btn-primary:hover {
+  background: #1d4ed8 !important;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 #111827 !important;
+}
+
+html.cel .btn-primary:active,
+.cel .btn-primary:active {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 0 0 0 #111827 !important;
+}
+
+/* 3. Japanese Cel Badges (经典动画色块印章) */
+.cel-badge-azure {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 2px;
+  border: 1.5px solid #1e293b;
+  background-color: #2563eb;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 7px;
+  line-height: 1;
+  box-shadow: 1.5px 1.5px 0 #1e293b;
+}
+
+.cel-badge-vermilion {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 2px;
+  border: 1.5px solid #1e293b;
+  background-color: #ea580c;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 7px;
+  line-height: 1;
+  box-shadow: 1.5px 1.5px 0 #1e293b;
+}
+
+.cel-badge-yellow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 2px;
+  border: 1.5px solid #1e293b;
+  background-color: #f59e0b;
+  color: #111827;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 7px;
+  line-height: 1;
+  box-shadow: 1.5px 1.5px 0 #1e293b;
+}
+
 
 

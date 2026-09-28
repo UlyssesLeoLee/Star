@@ -80,7 +80,7 @@ const OUTLINE_FRAGMENT = /* glsl */ `
 // ============================================================================
 // 2. PROCEDURAL 3D MESH RIG (~180 POLYGONS)
 // ============================================================================
-export type TacticalCoreTheme = "light" | "dark" | "christmas" | "charisma" | "shanghai";
+export type TacticalCoreTheme = "light" | "dark" | "christmas" | "charisma" | "shanghai" | "cel";
 
 function CoreMesh({
   status,
@@ -101,6 +101,37 @@ function CoreMesh({
   const effectiveTheme = isLight ? "light" : theme;
 
   const colors = useMemo(() => {
+    // ── 0. 日式赛璐璐 (80-90s 经典日漫手绘平涂色与机械墨线) ──
+    if (effectiveTheme === "cel") {
+      switch (status) {
+        case "warning":
+          return {
+            base: new THREE.Color("#f59e0b"),
+            shadow: new THREE.Color("#291500"),
+            keyRim: new THREE.Color("#ea580c"),
+            counterRim: new THREE.Color("#2563eb"),
+            outline: new THREE.Color("#111827"),
+          };
+        case "overdrive":
+          return {
+            base: new THREE.Color("#ea580c"),
+            shadow: new THREE.Color("#270802"),
+            keyRim: new THREE.Color("#f59e0b"),
+            counterRim: new THREE.Color("#2563eb"),
+            outline: new THREE.Color("#111827"),
+          };
+        case "nominal":
+        default:
+          return {
+            base: new THREE.Color("#2563eb"),
+            shadow: new THREE.Color("#0f172a"),
+            keyRim: new THREE.Color("#ea580c"),
+            counterRim: new THREE.Color("#f59e0b"),
+            outline: new THREE.Color("#111827"),
+          };
+      }
+    }
+
     // ── 1. 老上海月份牌 (民国海派擦笔水彩与留声机鎏金) ──
     if (effectiveTheme === "shanghai") {
       switch (status) {
@@ -365,7 +396,8 @@ export function TacticalCore3D({
         return;
       }
       const cl = document.documentElement.classList;
-      if (cl.contains("shanghai")) setActiveTheme("shanghai");
+      if (cl.contains("cel")) setActiveTheme("cel");
+      else if (cl.contains("shanghai")) setActiveTheme("shanghai");
       else if (cl.contains("charisma")) setActiveTheme("charisma");
       else if (cl.contains("christmas")) setActiveTheme("christmas");
       else if (cl.contains("light")) setActiveTheme("light");
