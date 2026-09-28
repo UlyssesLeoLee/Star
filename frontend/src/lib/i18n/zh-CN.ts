@@ -44,12 +44,8 @@ export const zhCN: Dictionary = {
   },
   appHeader: {
     workspaceSwitcher: "切换工作区",
-    allApps: "ALL APPS",
-    appsCount: "25+",
-    tacticalJump: "战术跳转...",
     notifications: "通知 ({count} 未读)",
     realtimeOnline: "实时同步: 在线",
-    synced: "SYNCED",
     addMoreTabs: "添加更多标签到顶栏",
     removeFromHeader: "从顶栏移除 {label}",
   },

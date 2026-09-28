@@ -34,12 +34,8 @@ export const en: Dictionary = {
   },
   appHeader: {
     workspaceSwitcher: "Switch workspace",
-    allApps: "ALL APPS",
-    appsCount: "25+",
-    tacticalJump: "Tactical Jump...",
     notifications: "Notifications ({count} unread)",
     realtimeOnline: "Realtime status: online",
-    synced: "SYNCED",
     addMoreTabs: "Add more tabs to header",
     removeFromHeader: "Remove {label} from header",
   },

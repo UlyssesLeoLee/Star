@@ -21,7 +21,6 @@ import { useNavStore } from "@/lib/nav/navStore";
 import { MODULE_MAP, getCategoryStyles, type ModuleDefinition } from "@/lib/nav/registry";
 import { AppMatrixDrawer } from "@/components/nav/AppMatrixDrawer";
 import { useTranslation, useModuleTranslation } from "@/lib/i18n";
-import { TacticalCore3D } from "@/components/effects/TacticalCore3D";
 
 // GitHub Worktree 标识符 (per ULYS-176 §3 用户反馈: 左上角 icon 下方显示当前启动的 worktree 编号)
 // 数据源优先级: process.env.NEXT_PUBLIC_WORKTREE_ID (Multica spawn dev server 时注入)
@@ -134,92 +133,63 @@ export function AppHeader() {
             </Link>
           </nav>
 
-          {/* === Right: Tactical HUD, App Matrix, Theme Toggle, ⌘K, bell, status, avatar ===
-              per ULYS-176 §2 用户反馈: 顶栏按钮过挤 → telemetry HUD 收到 2xl (≥1536px),
-              xl/1440 viewport 不渲染这块(keeps 1280-1535px 顶栏呼吸感), 屏幕够宽再放出来。
-              同时给 label 加 whitespace-nowrap 防字字换行, gap 降到 2/2.5, 内 padding 降 0.5。 */}
-          <div className="ml-auto flex items-center gap-2">
-            {/* Tactical HUD Telemetry with micro 3D Cel Gyroscope Core */}
-            <div className="hidden 2xl:flex items-center gap-2.5 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black px-3 h-9 cel-shadow shrink-0">
-              <div className="flex items-center justify-center shrink-0" data-testid="tactical-core-slot" title="Tactical Neural Gyroscope">
-                <TacticalCore3D size={24} status="nominal" />
-              </div>
-              <div className="flex flex-col justify-center min-w-0">
-                <div className="flex items-center gap-2 text-[10px] font-mono font-bold tracking-wider text-[var(--cel-text-secondary,#94a3b8)] whitespace-nowrap">
-                  <span>NEURAL SYNC</span>
-                  <span className="text-[var(--cel-cyan,#00f0ff)] font-mono font-black">99.8%</span>
-                </div>
-                <div className="w-24 h-1.5 bg-[#090d14] border border-black mt-0.5 relative overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-[var(--cel-cyan,#00f0ff)] via-[var(--cel-gold,#ffc400)] to-[var(--cel-crimson,#ff184c)]"
-                    style={{ width: "99.8%" }}
-                  />
-                </div>
-              </div>
-              <div className="h-5 w-px bg-black shrink-0" />
-              <div className="text-right shrink-0">
-                <div className="text-[10px] font-mono font-bold text-[var(--cel-text-secondary,#94a3b8)] whitespace-nowrap">STATUS</div>
-                <div className="text-xs font-mono font-black text-[var(--cel-gold,#ffc400)] whitespace-nowrap">INV:PASS</div>
-              </div>
-            </div>
+          {/* === Right: App Matrix, Theme Toggle, ⌘K, bell, dot, avatar ===
+                        per 2026-09-27 用户反馈: 顶栏按钮过挤, 删 TacticalCore3D HUD + 文字说明,
+                        只保留图标/dot/borderless 状态指示. 5 个核心控件, 1520px 顶栏不再 overflow. */}
+                    <div className="ml-auto flex items-center gap-2">
+                      {/* === 右上角应用菜单 / App Matrix 抽屉按钮 (icon-only) === */}
+                      <button
+                        type="button"
+                        onClick={openMatrix}
+                        data-testid="app-matrix-trigger"
+                        aria-label={t.ariaLabels.openAppMatrix}
+                        className="size-9 grid place-items-center border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-cyan,#00f0ff)] hover:bg-[var(--cel-surface-card,#0f1422)] transition-all cel-shadow shrink-0 group"
+                      >
+                        <LayoutGrid size={14} className="group-hover:scale-110 transition-transform duration-200" />
+                      </button>
 
-            {/* === 右上角应用菜单 / App Matrix 抽屉按钮 === */}
-            <button
-              type="button"
-              onClick={openMatrix}
-              data-testid="app-matrix-trigger"
-              aria-label={t.ariaLabels.openAppMatrix}
-              className="flex items-center gap-1.5 px-2.5 h-9 border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-primary,#ffffff)] hover:text-[var(--cel-cyan,#00f0ff)] transition-all text-xs font-mono group cel-shadow shrink-0 whitespace-nowrap"
-            >
-              <LayoutGrid size={13} className="text-[var(--cel-cyan,#00f0ff)] group-hover:scale-110 transition-transform duration-200 shrink-0" />
-              <span className="hidden lg:inline font-bold">{t.appHeader.allApps}</span>
-              <span className="text-[10px] px-1.5 py-0.5 bg-black text-[var(--cel-cyan,#00f0ff)] font-bold border border-black">{t.appHeader.appsCount}</span>
-            </button>
+                      <ThemeSwitcher />
 
-            <ThemeSwitcher />
+                      <button
+                        type="button"
+                        onClick={openCommandBar}
+                        data-testid="command-bar-trigger"
+                        aria-label={t.ariaLabels.openCommandBar}
+                        className="flex items-center gap-1.5 h-9 px-2 border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-primary,#ffffff)] hover:bg-[var(--cel-surface-card,#0f1422)] transition-all text-xs cel-shadow shrink-0 whitespace-nowrap"
+                      >
+                        <Search size={13} className="text-[var(--cel-cyan,#00f0ff)] shrink-0" />
+                        <kbd className="inline-flex items-center justify-center text-[10px] font-mono px-1.5 border border-black bg-[var(--cel-surface-stage,#090d16)] text-[var(--cel-gold,#ffc400)] font-black">⌘K</kbd>
+                      </button>
 
-            <button
-              type="button"
-              onClick={openCommandBar}
-              data-testid="command-bar-trigger"
-              aria-label={t.ariaLabels.openCommandBar}
-              className="flex items-center gap-1.5 px-2.5 h-9 border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-primary,#ffffff)] hover:text-white transition-all text-xs cel-shadow shrink-0 whitespace-nowrap"
-            >
-              <Search size={14} className="text-[var(--cel-cyan,#00f0ff)] shrink-0" />
-              <span className="hidden 2xl:inline font-medium">{t.appHeader.tacticalJump}</span>
-              <kbd className="inline-flex items-center justify-center min-w-[2.5rem] text-[11px] font-mono px-2 py-0.5 border border-black bg-[var(--cel-surface-stage,#090d16)] text-[var(--cel-gold,#ffc400)] font-black whitespace-nowrap tracking-wide">
-                              ⌘K
-                            </kbd>
-            </button>
+                      <button
+                        type="button"
+                        data-testid="notifications-bell"
+                        aria-label={tx(t.appHeader.notifications, { count: notifCount })}
+                        className="relative size-9 grid place-items-center text-[var(--cel-text-primary,#ffffff)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-colors shrink-0"
+                      >
+                        <Bell size={15} />
+                        {notifCount > 0 && (
+                          <span
+                            data-testid="notifications-badge"
+                            className="absolute -top-1.5 -right-1.5 min-w-[18px] h-4.5 border border-black bg-[var(--cel-crimson,#ff184c)] text-black text-[10px] grid place-items-center px-1 font-mono font-black"
+                          >
+                            {notifCount}
+                          </span>
+                        )}
+                      </button>
 
-            <button
-              type="button"
-              data-testid="notifications-bell"
-              aria-label={tx(t.appHeader.notifications, { count: notifCount })}
-              className="relative h-9 w-9 grid place-items-center text-[var(--cel-text-primary,#ffffff)] hover:text-white border-2 border-black bg-[var(--cel-surface-sub,#151c2c)] cel-shadow transition-colors shrink-0"
-            >
-              <Bell size={15} />
-              {notifCount > 0 && (
-                <span
-                  data-testid="notifications-badge"
-                  className="absolute -top-1.5 -right-1.5 min-w-[18px] h-4.5 border border-black bg-[var(--cel-crimson,#ff184c)] text-black text-[10px] grid place-items-center px-1 font-mono font-black"
-                >
-                  {notifCount}
-                </span>
-              )}
-            </button>
+                      {/* Realtime status — dot only, no text label */}
+                      <div
+                        data-testid="realtime-status"
+                        className="size-9 grid place-items-center border-2 border-black bg-[var(--cel-surface-stage,#090d16)] cel-shadow shrink-0"
+                        aria-label={t.appHeader.realtimeOnline}
+                        title={t.appHeader.realtimeOnline}
+                      >
+                        <span className="size-2.5 bg-ok rounded-full border border-black" aria-hidden="true" />
+                      </div>
 
-            <div
-              data-testid="realtime-status"
-              className="hidden md:flex items-center gap-1.5 px-2.5 h-9 border-2 border-black bg-[var(--cel-surface-stage,#090d16)] cel-shadow shrink-0 whitespace-nowrap"
-              aria-label={t.appHeader.realtimeOnline}
-            >
-              <span className="size-2 bg-ok border border-black shrink-0" aria-hidden="true" />
-              <span className="text-xs text-[var(--cel-text-secondary,#94a3b8)] font-mono tracking-wider font-bold">{t.appHeader.synced}</span>
-            </div>
-
-            <UserMenu />
-          </div>
+                      <UserMenu />
+                    </div>
         </div>
       </header>
 

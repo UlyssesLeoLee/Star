@@ -23,7 +23,7 @@ function Display() {
     <div>
       <span data-testid="current-lang">{language}</span>
       <span data-testid="signout">{t.userMenu.signOut}</span>
-      <span data-testid="tactical">{t.appHeader.tacticalJump}</span>
+            <span data-testid="tactical">{t.appHeader.workspaceSwitcher}</span>
       <span data-testid="html-lang-attr">{document.documentElement.lang}</span>
       <button data-testid="set-en" onClick={() => setLanguage("en")}>
         EN
