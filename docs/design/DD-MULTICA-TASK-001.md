@@ -1,8 +1,8 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v0.2** (per 日本 IPA SEC 標準, Worktree 群组集成补充)
+> **Multica Task Lifecycle 域 詳細設計書 v0.3** (per 日本 IPA SEC 標準, Worktree 群组执行策略收口)
 >
-> - 状态: 🟡 Draft v0.2 (群组集成与 canonical WorkItem 契约补充待评审)
+> - 状态: 🟡 Draft v0.3 (执行身份、GLOBAL 部分失败策略与兼容门补充待评审)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
 > - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
@@ -11,7 +11,7 @@
 > - 上位 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 v33 候选
 > - 配套 SRS: [`docs/requirements/SRS-MULTICA-POISON-001.md`](../requirements/SRS-MULTICA-POISON-001.md) (Session Poison 强绑定)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核**`
-> - 审核: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核；v0.2 补充待评审
+> - 审核: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核；v0.3 补充待评审
 > - 日期: 2026-09-28 JST
 > - 受众: 詳細設計エンジニア / 実装エンジニア / アーキテクト / SRE / 5 域 Lead 真人
 > - dual-use 提醒: 本 DD 不引用 RGS 仓 + 不建立业务子域↔DDD 映射
@@ -25,10 +25,10 @@
 |---|---|
 | 文书 ID | DD-MULTICA-TASK-001 |
 | 文书名 | Multica Task Lifecycle 域 詳細設計書 (Worktree Group 集成) |
-| 版本 | v0.2 |
+| 版本 | v0.3 |
 | 作成日 | 2026-09-28 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (per DEC-008) |
-| 承認者 | Draft；v0.2 群组集成补充待评审 |
+| 承認者 | Draft；v0.3 群组执行策略补充待评审 |
 | 关联 commit | (待生成) |
 | 关联文档 | `SRS-MULTICA-TASK-001.md` v0.2 + `BD-MULTICA-TASK-001.md` v0.1 + ADR-0026 v0.2 + `DD-SHARED-TASK-001.md` v0.2 |
 | 范围 | TK-1 ~ TK-5 子能力 × 22 FR = 5 关键 class + 1 状态机 + 11 共享类型 + 3 时序图 + 5 张表 (W-T-M 100%) + 6 API + 30+ 测试 |
@@ -479,11 +479,12 @@ CREATE TABLE task_not_found_log (
 CREATE INDEX idx_task_not_found_log_task_id ON task_not_found_log(task_id);
 ```
 
-### 7.5 `wbs_task_v33` (legacy WBS compatibility projection; not a canonical W/T/M fact table)
+### 7.5 Legacy `wbs_task` migration source (not a v0.3 target schema)
 
 ```sql
--- 升级现有 wbs_task 表, 加 6 态 status + session_poisoned + stale_dispatch + 4 类 404 timestamp + review gate 字段
--- (现有 wbs_task schema 待 wbs_migrate_v33.py 落地时详, per FR-20)
+-- 历史迁移样例：现有 wbs_task 曾混存 Master、Work 与 Transaction 字段。
+-- 本 ALTER 仅供识别迁移来源，不可作为 v0.3 的新表结构执行。
+-- 上线前必须拆分到 §14.2 的 canonical 表；legacy source 后续只读/归档策略由 migration rehearsal 定稿。
 ALTER TABLE wbs_task
     ADD COLUMN session_poisoned BOOLEAN DEFAULT FALSE,
     ADD COLUMN session_poison_reason VARCHAR(50),
@@ -512,7 +513,7 @@ ALTER TABLE wbs_task
 
 | 表 | W/T/M | 检查 |
 |---|---|---|
-| `wbs_task_v33` | Compatibility projection | ⚠️ 混合字段，按 §14.2 拆出 canonical Work / Transaction / Master 来源 |
+| `wbs_task_v33` | Master（主分类） | ⚠️ 迁移期已知混合字段：`status` → Work；poison/review/404 事实 → Transaction；上线前必须拆分，见 §14.2 |
 | `task_lifecycle_audit` | Transaction | ✅ RLS 13 类 + 物理删除禁止 (TRIGGER) + 审计 |
 | `task_review` | Work | ✅ retention 7 天；审查结论必须另写 audit event |
 | `task_stale_dispatch` | Work | ✅ retention 7 天 |
@@ -691,17 +692,17 @@ ALTER TABLE wbs_task
 
 跟 SRS-MULTICA-TASK-001 §9 同 + DD-MULTICA-POISON-001 强绑定。
 
-## §14 渡口 Worktree 群组集成契约 (v0.2)
+## §14 渡口 Worktree 群组集成契约 (v0.3)
 
-本节是 v0.2 的规范性补充，与 [`BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1 和 [`SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2 对齐。旧样例中的 `task_id` 表示兼容别名；新接口的 canonical key 是 `work_item_id`。旧 §7 中把整个 `wbs_task_v33` 视为 Master、或把 `pending_review` 放入 status enum 的内容不再作为 v0.2 的物理设计依据。
+本节是 v0.3 的规范性补充，与 [`BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1 和 [`SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2 对齐。旧样例中的 `task_id` 表示兼容别名；新接口的 canonical key 是 `work_item_id`。旧 §7 中把整个 `wbs_task_v33` 视为 Master、或把 `pending_review` 放入 status enum 的内容不再作为 v0.3 的物理设计依据。
 
 ### 14.1 领域事实源与身份
 
 | 身份/事实 | 唯一所有者 | 详细规则 |
 |---|---|---|
-| `worktree_id` | Worktree Domain | 每个任务只能归属一个 Worktree；所有读取、命令、执行与事件都携带此 ID |
+| `worktree_id` | Worktree Domain / GroupContext | 同一 WorkItem 可关联 0..N 个 Worktree（沿用 `docs/basic-design.md` §16.1）；每次 Task Card 命令/CLI/Agent Run 必须选择一个明确且已授权的 Worktree。执行中的唯一绑定放在 `active_worktree_id`，不是 WorkItem 的全局归属 |
 | `work_item_id` | WorkItem Domain | 跨 Multica、Jira 等价视图、Task Card 和 Canvas 引用的 canonical ID；源系统 ID 通过 alias 映射，不做字符串强转 |
-| `task_card_id` | Task Card Manager | 执行工作面的稳定 ID；`work_item_id` 唯一关联当前 Task Card，执行重试另建 Run/Session ID |
+| `task_card_id` | Task Card projection | v1 等于 canonical `work_item_id`，不建立第二个任务身份；执行重试另建 Run/Session ID |
 | lifecycle `status` | Multica Lifecycle Service | 唯一允许改变六态状态的命令入口 |
 | `review_state` | Review Gate | `none/pending_review/accepted/rejected` 与主状态分列；提交 review 不产生第七种任务状态 |
 | Canvas 元素与位置 | Canvas Domain | 保存布局、元素和类型化 EntityRef；任务状态只能经 Multica 命令更新 |
@@ -713,22 +714,22 @@ Multica、Jira 等价视图、Task Card Index、Group Infinite Canvas 和已启�
 
 | 物理表/数据集 | 分类 | 关键约束 | 保留规则 |
 |---|---|---|---|
-| `task_lifecycle_current` | Work | PK `work_item_id`; `worktree_id`, `task_card_id`, `tenant_id`, 六态 `status`, 独立 `review_state`, claim lease, Runtime session ref, `version` | 必含 `retention_period` 与 `expires_at`; 到期清理或由 Transaction 事件重建 |
+| `task_lifecycle_current` | Work | PK `work_item_id`; 可空 `active_worktree_id`, `task_card_id`, `tenant_id`, 六态 `status`, 独立 `review_state`, claim lease, Runtime session ref, `version` | 必含 `retention_period` 与 `expires_at`; 到期清理或由 Transaction 事件重建 |
 | `task_review` | Work | 保存待审 artifact/output refs 与审查工作载荷；通过 `work_item_id` + `task_card_id` 关联 | 必含 `retention_period`; 决策结果不靠此表留存 |
 | `task_stale_dispatch` | Work | 最近一次 dispatch verify 状态及临时输出引用 | 必含 `retention_period`; 原始诊断内容脱敏后到期清理 |
-| `task_metadata` | Master | WorkItem 标题、描述、标签、优先级、执行策略引用；SCD Type 2 | 物理删除禁止；RLS 13 类必携 |
+| `task_metadata` | Master | WorkItem 标题、描述、标签、优先级、执行策略引用；以 `project_id` 归属，不复制单个 `worktree_id`；SCD Type 2 | 物理删除禁止；RLS 13 类必携 |
 | `task_lifecycle_audit` | Transaction | 状态/Review/TMO/ACL/dispatch 事件，带 `worktree_id`, `work_item_id`, `task_card_id`, `actor_id`, `correlation_id`, `event_id` | append-only，物理删除禁止；RLS 13 类和 audit 必携 |
 | `task_session_health` | Transaction | poison/404/fresh-session 决策及 session ref，不能覆写历史事件 | append-only，物理删除禁止；RLS 13 类和 audit 必携 |
-| `wbs_task_v33` | Compatibility projection | 旧 WBS row 的导入/查询兼容层；通过 alias 映射到 canonical `work_item_id` | 不得成为第二个生命周期事实源；迁移期写入只经 Lifecycle Service |
+| `wbs_task_v33` | Master（主分类） | 迁移期 legacy source；标题/描述/优先级/alias 属 Master，SCD Type 2 + RLS；已知混合列见本节 gap，拆分完成后不得继续写 lifecycle 或事件字段 |
 
-**v0.2 canonical W/T/M 覆盖**：Work 3/3 (`task_lifecycle_current`, `task_review`, `task_stale_dispatch`)；Transaction 2/2 (`task_lifecycle_audit`, `task_session_health`)；Master 1/1 (`task_metadata`)。`wbs_task_v33` 是迁移兼容投影，不作为混合分类主表计入，W/T/M owner 仍由上述 6 个规范数据集承担。
+**v0.3 W/T/M 覆盖**：canonical Work 3/3 (`task_lifecycle_current`, `task_review`, `task_stale_dispatch`)；Transaction 2/2 (`task_lifecycle_audit`, `task_session_health`)；Master 1/1 (`task_metadata`)；另有 legacy source `wbs_task_v33` 主分类 Master 1/1。共 7 个数据集/迁移源均已分配主分类；legacy source 仍含已列明的 Work/Transaction 混合列，是 release blocker，必须拆分并 rehearsal 验证。拆分后 Master 静态字段写入 `task_metadata`，状态写 `task_lifecycle_current`，不可变决定/诊断写 append-only Transaction。
 
 所有 Work 数据都有 `retention_period`；Master 全表使用 SCD Type 2 + RLS；Transaction 全表 append-only + audit + RLS。v0.1 §7 的旧 DDL 供迁移字段参考；实施时按本节分类拆分动态当前态、Master metadata 与不可变审计事件，不允许把混合 WBS 行整表归入一个分类。
 
 ```sql
 CREATE TABLE task_lifecycle_current (
   work_item_id UUID PRIMARY KEY,
-  worktree_id UUID NOT NULL,
+  active_worktree_id UUID,
   task_card_id UUID NOT NULL UNIQUE,
   tenant_id UUID NOT NULL,
   status VARCHAR(20) NOT NULL CHECK (status IN
@@ -742,16 +743,21 @@ CREATE TABLE task_lifecycle_current (
   version BIGINT NOT NULL DEFAULT 1,
   retention_period INTERVAL NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (task_card_id = work_item_id),
+  CHECK (
+    (status IN ('claimed','in_progress') AND active_worktree_id IS NOT NULL) OR
+    (status NOT IN ('claimed','in_progress') AND active_worktree_id IS NULL)
+  )
 );
 CREATE INDEX idx_task_lifecycle_worktree_status
-  ON task_lifecycle_current (tenant_id, worktree_id, status);
+  ON task_lifecycle_current (tenant_id, active_worktree_id, status);
 
 CREATE TABLE task_metadata (
   work_item_id UUID NOT NULL,
   version BIGINT NOT NULL,
   tenant_id UUID NOT NULL,
-  worktree_id UUID NOT NULL,
+  project_id UUID NOT NULL,
   title TEXT NOT NULL,
   description TEXT,
   priority VARCHAR(16) NOT NULL,
@@ -820,11 +826,18 @@ Group App Registry 与 LangGraph `SubAgentRegistry` 是两个分离注册表：�
 | DD-MG-04 | `review_state=pending_review` 时主 status 保持 `in_progress`；未接受 review 不可进入 `completed` |
 | DD-MG-05 | 插件 disable 后新调用失败，但核心任务、Transaction audit 和 Canvas EntityRef 保持可读 |
 
-### 14.6 尚待详细裁定
+### 14.6 待迁移 / 实现验证
 
-- 旧 `wbs_task` 与 canonical `work_item_id` 的 alias 回填冲突/重复处理，按 migration rehearsal 确认；不得以猜测自动合并。
-- `task_card_id` 是 1:1 当前卡投影；历史执行尝试存储在独立 Runtime session 表，确切归属表由 Runtime DD 定稿。
-- GLOBAL 批量操作已定义逐目标授权与结果；跨目标补偿是否自动执行由 LangGraph/TMO review 决定。
+- 旧 `wbs_task` 与 canonical `work_item_id` 的重复/冲突 alias 在 migration rehearsal 中隔离到 reconciliation 清单；禁止按标题、Jira key 或相似字段自动合并。唯一来源确认后才写 alias 映射。
+- `task_card_id` 在 v1 与 `work_item_id` 相同；历史执行尝试使用不同的 Run/Runtime Session ID。Runtime 表归属由 Runtime DD 落定，不得由 UI 临时生成执行凭据。
+- GLOBAL 操作按目标独立授权与执行；v1 不做自动跨目标补偿。响应每个目标的部分结果，任何重试用原 idempotency key；需要补偿时必须发起新的、显式授权的 Lifecycle Command。
+
+### 14.7 SDK 与恢复兼容门
+
+- 本 DD 定义 LangGraph 需要的上下文语义，不把特定 SDK 的 `context_schema`、Runtime 或 checkpointer 方法名视为已部署 API。LangGraph 实装前，必须以仓库锁定的 Python SDK 版本跑 compile/import 与最小 resume compatibility check，并把实际版本记入实现报告。
+- LangGraph thread、Chat Session、WorkItem、Task Card、Run ID 各自独立；checkpoint 仅保存计算状态与权限 snapshot reference。每次 start/resume 都通过 GroupContextResolver 重新授权，旧 snapshot 不可恢复已撤销的 scope 或 plugin capability。
+- PostgreSQL checkpointer Tier 3 是否可启动须按 ADR-0047 与当前 AGENTS 治理门复核；未满足前置条件时不得把 PostgreSQL 列为已启用后端，较低 Tier 的选择也必须遵守当前批准的部署策略。
+- 每个 GLOBAL target 先完成 ACL preflight 再产生副作用；authorized targets 允许部分成功，denied targets 不调用插件、不启动 Run、不写 WorkItem 状态。
 
 ---
 
@@ -839,3 +852,4 @@ Group App Registry 与 LangGraph `SubAgentRegistry` 是两个分离注册表：�
 修订履历:
 | v0.1 | 2026-09-11 | Ulysses — Mavis 接手**审核** | 初版（5 关键 class + 1 状态机 + 11 共享类型 + 3 时序图 + 5 张表 W-T-M 100% + 6 API + 30+ 测试）| 2026-09-11 20:50 JST Ulysses 拍板 |
 | v0.2 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Worktree/WorkItem/Task Card 设为统一身份契约；把 review_state 与六态 lifecycle 分离；补充 scope 授权、卡内 CLI、插件 capability、Outbox 及 W/T/M 物理数据边界。旧版签字记录只适用于 v0.1 | 用户要求基本设计合入 dev 后继续完成详细设计 |
+| v0.3 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 收口 Task Card ID 与 WorkItem ID 一致策略、WorkItem 0..N Worktree 关联和 active execution binding、WBS alias 冲突隔离、GLOBAL 部分成功且不自动补偿、LangGraph SDK/checkpointer 兼容门；显式列出 legacy WBS mixed-field migration gap | Worktree Group 实施计划审查发现身份/失败语义/SDK 版本门未闭合 |

@@ -37,7 +37,6 @@ const LEGACY_REDIRECTS = [
   // ── /sprint sink (per 2026-09-05 19:13 JST 拍板: /issues 重命名 /sprint) ──
   { source: "/issues", destination: "/sprint?view=sprint", permanent: false },
   { source: "/work-item", destination: "/sprint?view=list", permanent: false },
-  { source: "/worktree", destination: "/sprint?view=tree", permanent: false },
 
   // ── /agent-view sink (per 2026-09-05 19:45 JST 拍板: /agents -> /agent-view 307 redirect) ──
   { source: "/agent", destination: "/agent-view", permanent: false },
