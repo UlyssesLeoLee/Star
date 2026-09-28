@@ -138,6 +138,16 @@ def get_changed_files(base: str = "origin/dev") -> list[str]:
         return []
 
 
+# 激活文件 allowlist — Group 激活 PR 可跨 Group 范围 (per docs/worktree-group-guard.md §3.4.5)
+ACTIVATION_FILES = {
+    "docs/worktree-group-guard.md",
+    "docs/automation-design.md",
+    "scripts/automation/group_guard.py",
+    "scripts/automation/__tests__/test_group_guard.py",
+    "scripts/automation/registry.md",
+}
+
+
 def check_group_boundary(group: str, files: list[str]) -> tuple[bool, list[str]]:
     """守门 #32 — Group 边界检查.
 
@@ -152,6 +162,9 @@ def check_group_boundary(group: str, files: list[str]) -> tuple[bool, list[str]]
     for f in files:
         # Strip leading ./ prefix if any
         clean = f.lstrip("./")
+        # Allow activation files (per §3.4.5)
+        if clean in ACTIVATION_FILES:
+            continue
         if not any(clean.startswith(prefix) or clean == prefix.rstrip("/")
                    for prefix in allowed):
             violations.append(f"  - {f}  (not in {group} range)")
@@ -216,14 +229,20 @@ def cmd_check(args) -> int:
 
     group_id = os.environ.get("NEXT_PUBLIC_GROUP_ID", "")
     wt_id = os.environ.get("NEXT_PUBLIC_WORKTREE_ID", "")
-    if group_id == group and wt_id:
+    if group_id == "":
+        # Not set — just warn (per §3.4.3 fallback core)
+        print(f"# 守门 #34 (Group 二维 ID): ⚠️  WARN (NEXT_PUBLIC_GROUP_ID not set; fallback core)")
+        print(f"#  Hint: run 'python3 scripts/automation/group_guard.py env' for setup")
+    elif group_id != group:
+        print(f"# 守门 #34 (Group 二维 ID): ❌ FAIL (env NEXT_PUBLIC_GROUP_ID={group_id}, expected {group})")
+    else:
+        # group_id matches expected; check worktree_id (optional, warn only)
         print(f"# 守门 #34 (Group 二维 ID): ✅ PASS")
         print(f"  NEXT_PUBLIC_GROUP_ID={group_id}")
-        print(f"  NEXT_PUBLIC_WORKTREE_ID={wt_id}")
-    elif group_id == "":
-        print(f"# 守门 #34 (Group 二维 ID): ⚠️  WARN (NEXT_PUBLIC_GROUP_ID not set; fallback core)")
-    else:
-        print(f"# 守门 #34 (Group 二维 ID): ❌ FAIL (env NEXT_PUBLIC_GROUP_ID={group_id}, expected {group})")
+        if wt_id:
+            print(f"  NEXT_PUBLIC_WORKTREE_ID={wt_id}")
+        else:
+            print(f"  NEXT_PUBLIC_WORKTREE_ID (unset, fallback to branch-name hash)")
 
     print()
     return 0 if (passed_32 and passed_33) else 1
