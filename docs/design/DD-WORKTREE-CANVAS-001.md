@@ -1,25 +1,24 @@
 # DD-WORKTREE-CANVAS-001
 
-> **AI Worktree Graph Canvas — 詳細設計書 v1.0** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート + STAR 仓 BD/DD 派生模板)
+> **AI Worktree Graph Canvas — 詳細設計書 v1.3** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート + STAR 仓 BD/DD 派生模板)
 >
-> - 状态: 🟢 Draft v1.0 (2026-09-15, 上游 SRS/BD 已落档, 詳細設計派生可实装)
+> - 状态: 🟡 Draft v1.3 (2026-09-28 Worktree 群组边界补充待评审；旧 v1.0-v1.2 审核记录保留为历史)
 > - 上游:
->   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.1 (**126 唯一 ID**: 103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID; per self-review C-01 2026-09-17 JST)
->   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](BD-WORKTREE-CANVAS-001.md) v1.1 (14 模块 + 4 大 Trait + 15 决策点全部已拍板, v1.1 修正 126 唯一 ID 对齐)
+>   - [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.3 (**126 唯一 ID**；补充 Project Graph 与 Group Infinite Canvas 的对象边界)
+>   - [`docs/design/BD-WORKTREE-CANVAS-001.md`](BD-WORKTREE-CANVAS-001.md) v1.3 (Worktree 群组边界补充)
 > - 下游: 实装代码 (`crates/worktree-canvas/` + `frontend/src/app/(worktree-canvas)/`) + 测试 + 报告
 > - 核心语言: Rust 1.80+ (Core Services) + TypeScript 5.x (Frontend, Next.js 14.2.5)
 > - 守门基线: 守门 #1+#1 v25+#3+#5+#6+#9+#10+#11+#13+#14 v3+#14 v4+#22+#28+#29+#1 v15 共 15 项必过
 > - 平行参考: `docs/frontend-canvas-design.md` v0.1 (V0.1 实装基线) + `SRS-AGENT-VIEW-001.md` v1.0 (个体视图) + `SRS-CANVAS-AGENT-001.md` v1.2 (A12 多人编辑)
-> - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 接手代签, 5 域真人到位后切真人)
-> - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST)
-> - 日期: 2026-09-15 JST
+> - 修订人/审核: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核`; v1.3 补充待评审
+> - 日期: 2026-09-28 JST
 > - 受众: 実装エンジニア / SRE Lead / 5 域 Lead (未到位, Mavis 临时代签)
 
 ---
 
 ## §0 目的 (Purpose)
 
-本詳細設計書は `BD-WORKTREE-CANVAS-001.md` v1.0 で定めた基本設計を実装可能なレベルまで展開する。実装者は追加設計判断をせずに済む粒度で仕様を提供する。
+本詳細設計書は `BD-WORKTREE-CANVAS-001.md` v1.3 で定めた Project/Repository Worktree Overview Graph 基本設計を実装可能なレベルまで展開する。Worktree Group Infinite Canvas は別アプリであり、本 DD は明示的な深リンク境界のみ定める。
 
 **核心スコープ** (per SRS §三十二 50 项要求):
 
@@ -3519,6 +3518,31 @@ pub async fn handle_graph_failure(services: &Services) -> Result<(), Error> {
 
 (**126 唯一 ID** 完整映射见 `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.1, self-review C-01/C-04 v1.1)
 
+### §50.1 Project Worktree Graph 与 Group Infinite Canvas 边界 (v1.3)
+
+本 DD 定义的是 Project/Repository 范围的 Worktree Overview Graph：展示 Worktree 节点、Git 状态、依赖、风险和仓库关系。渡口 Group Infinite Canvas 是单个 Worktree 群组内的协作应用，由 Canvas Domain 定义；两者不共享持久化图实体或布局状态。
+
+| 项 | Project Worktree Overview Graph (本 DD) | Group Infinite Canvas (Canvas DD) |
+|---|---|---|
+| 根对象 | `project_id` / `repository_id` | `canvas_id` + 单一 `worktree_id` |
+| 核心节点 | Worktree/Git/Agent/风险等项目图实体 | 画布元素、便签、关系及 typed EntityRef |
+| 事实源 | Git / Worktree Domain / Worktree Graph | Canvas Domain；任务身份由 WorkItem Domain 提供 |
+| 入口 | Project/Repository 的 Worktree Overview Graph | Worktree 群组同级应用入口 |
+| 写权限 | 每项 Worktree Action 再校验该 Worktree 权限 | GroupContext 的 Worktree scope；GLOBAL 写另做逐目标授权 |
+
+- Project Graph 可以展示指向 Group Canvas 的 `GroupAppDeepLink(canvas_id, worktree_id)`，但不得将 Canvas Element 复制成 Graph Node/Edge，也不得从图投影写入 WorkItem 状态。
+- `GroupAppDeepLink` 是导航引用，不是授权 token；打开时由 Group Shell/Canvas API 重新验证 actor、tenant 和 Worktree ACL。项目图中的 Worktree 可见性不自动授予 Canvas、任务卡或 CLI 权限。
+- Worktree Overview Graph 不持有 Group Shell 底栏聊天会话，也不把 `WORKTREE/GLOBAL` 选择映射成 Project Graph 的权限范围。需要 L0 统筹时，只向共享底栏提交选中的 `EntityRef`，由 Group Shell Resolver 建立新 scope。
+- Project Graph 的 Action Engine 只负责 Worktree/Git actions。创建/关联 WorkItem、更新任务 lifecycle、编辑 Group Canvas 或运行 Task Card CLI 必须分别调用所属 Domain API。
+- `worktree.group_app.opened` 导航事件可供项目图计量，不作为 WorkItem/Canvas 的事务事实；所有跨域变更继续由来源 Domain Outbox 发布。
+
+| 验收 ID | 通过条件 |
+|---|---|
+| WT-GROUP-01 | Project Graph 节点类型中无 Canvas Element/Task Card 的影子副本 |
+| WT-GROUP-02 | Group Canvas 深链包含 `worktree_id`，目标 API 在打开/写入时独立授权 |
+| WT-GROUP-03 | 任务或 Canvas 变更不会通过 Project Graph Action Engine 直接写入外域表 |
+| WT-GROUP-04 | 从 Project Graph 打开的 Group Shell 聊天范围显式显示为 WORKTREE 或 GLOBAL |
+
 ---
 
 ## §51 签字栏 (5 角色)
@@ -3540,6 +3564,7 @@ pub async fn handle_graph_failure(services: &Services) -> Result<(), Error> {
 | v1.0 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 初版, 52 段 (Purpose/Module/Domain/DTO/Entity/Value/Error/Node/Edge/Schema/Interfaces/State/Cache/Index/Query/DSL/Semantic Zoom/Canvas Virtualization/Incremental Layout/Delta Update/Conflict Detection/Health Score/Ahead-Behind/Focus N-hop/Error Code/Retry/Transaction/Concurrency/Idempotency/Audit Log/Permission/Unit Test/Integration Test/E2E Test/Performance Test/Failure Recovery/Requirement Mapping/Signature/Revision), 14 Rust crate + 30 TS 文件, 100+ 代码示例, 11 Node + 13 Edge + 18 Action + 15 Event + 7 State + 5 View + 6 Zoom 100% 覆盖, BD 15 决策点全部采纳, BD Minor #1/#2 全部已补 (Event 防抖详 / Saved Search 表) | 2026-09-15 Multica ULYS-57 issue 创建者发令 |
 | v1.1 | Ulysses — Mavis 接手 (per 守门 #14 v3, self-review C-01/C-04 修正) | 修正: §1.1 物理布局路径 14 crate + 30 TS 文件 + 100+ 代码示例口径同步; §50 需求映射 126 唯一 ID 全闭环 | 2026-09-17 ULYS-62 self-review 修正落地 |
 | v1.2 | Ulysses — Mavis 接手 (per 守门 #14 v3 + self-review 整体审查 m-7 派生) | 修正: "Mavis 永久代签" → "Mavis 接手代签 (5 域真人到位后切真人)" (修订人栏, per self-review m-7) | 2026-09-19 04:55 JST 自审整体审查 + 9/18 23:14 JST 评论者发令 "没动的也都处理到位" |
+| v1.3 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确本 DD 只描述 Project/Repository Worktree Overview Graph，新增其与 Worktree 下 Group Infinite Canvas 的对象、权限、深链和写入边界 | 用户要求 Worktree 为渡口顶层、Canvas 为其下一级同级应用 |
 
 ---
 

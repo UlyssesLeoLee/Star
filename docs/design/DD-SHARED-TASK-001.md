@@ -1,16 +1,17 @@
 # DD-SHARED-TASK-001
 
-> **3 view 共享 Task Schema 设计 (Rust pivot 整合层) v0.1**
+> **Worktree Group canonical WorkItem / shared Task projection 设计 (Rust pivot 整合层) v0.2**
 >
-> 跨 3 view (Jira + Miro + MS Project) 共享 Task entity 表达, 准备 R9 阶段 2 整合 (7 crate 类型映射)
+> 保留跨 Jira + Canvas + Scheduler 等 view 的轻量 Task 投影，并增加 Worktree 群组共享的 canonical WorkItem 身份契约。
 >
-> - **状态**: 🟢 Draft v0.1 (2026-09-12, R9 阶段 1 设计阶段, 不动现有 7 crate)
+> - **状态**: 🟡 Draft v0.2 (Worktree 群组 identity/lifecycle 契约补充待评审)
 > - **目标阶段**: R9 阶段 2 整合 (per plan-032 R9 line 138-144) + R9 阶段 3 benchmark (5 milestone)
-> - **关联 ADR**: [ADR-0027 v0.1 §2.3.2 共享 Task schema 跨 3 view](../adr/0027-rust-pivot-agent-game.md)
+> - **关联 ADR**: [ADR-0027 v0.1 §2.3.2 共享 Task schema 跨 3 view](../adr/0027-rust-pivot-agent-game.md)（v0.2 将该 schema 定位为 view projection）
+> - **关联群组基线**: [`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) §14; [`BD-WORKTREE-CANVAS-001.md`](BD-WORKTREE-CANVAS-001.md) §1.5
 > - **关联 plan**: [plan-032 R9 整合 + 性能 benchmark](../plans/plan-032-rust-pivot-agent-game.md) line 134-144
 > - **关联 7 crate**: star-task / star-workflow / star-canvas / star-scheduler / star-game / star-registry
 > - **修订人**: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核**`
-> - **审批**: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4)
+> - **审批**: Draft；v0.2 群组集成补充待评审
 > - **作者**: 2026-09-12 JST, Mavis 起草
 > - **dual-use 提醒**: 本 DD 跨 Star 仓 7 crate, 不引用 RGS 仓 + 不建立业务子域↔DDD 映射 (per 守门 #3 disclaimer)
 
@@ -21,11 +22,11 @@
 | 项目 | 内容 |
 |---|---|
 | 文档 ID | DD-SHARED-TASK-001 |
-| 文档名 | 3 view 共享 Task Schema 设计 (Rust pivot 整合层) |
-| 版本 | v0.1 |
-| 创建日 | 2026-09-12 |
+| 文档名 | Worktree Group canonical WorkItem / shared Task projection 设计 (Rust pivot 整合层) |
+| 版本 | v0.2 |
+| 创建日 | 2026-09-28 (v0.2; v0.1 初版 2026-09-12) |
 | 修订人 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (per DEC-008) |
-| 审批 | 架构师 (Mavis 接手 agent per DEC-008) — per 守门 #14 v4 |
+| 审批 | Draft；v0.2 群组集成补充待评审 |
 | dual-use | 跨 Star 仓 7 crate, 不引用 RGS 仓 + 不建立业务子域↔DDD 映射 (per 守门 #3 disclaimer) |
 | 跟 5 域 disclaimer 关系 | 5 域独立 Lead ≠ Star 22 DDD bounded context (per 守门 #3 拍板, 文档加 disclaimer) |
 | 跟守门 #3 关系 | "5 域独立 Lead" 是 RGS 仓历史治理命名, 不等于 Star 仓 22 DDD bounded context; 不建立业务子域↔DDD 映射 |
@@ -35,6 +36,7 @@
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-12 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** | 初版 (R9 阶段 1 共享 Task schema 设计: 8 字段 + 3 view 映射表 + 7 crate 集成表 + 5 milestone 验证计划) | 2026-09-12 09:20 JST Ulysses 拍板 R9 阶段 1 + per plan-032 R9 line 138-144 |
+| v0.2 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Worktree/tenant/canonical WorkItem identity、task-card 关联、Multica lifecycle 事实源、EntityRef 及只读 view projection 边界；v0.1 签字/阶段记录保持为历史 | 用户要求先合入 Worktree 群组基本设计，再推进详细设计 |
 
 ---
 
@@ -515,3 +517,69 @@ R9 阶段 1 = 1 docs commit (本 DD), 累计 docs sync 计数 = 53 (R1 拍板后
 - [star-game crate (R5 阶段 1+2 commit c0c1b71 + ce38e8a)](../../crates/star-game/src/lib.rs)
 - [star-registry crate (R3 阶段 1 commit 495d27d)](../../crates/star-registry/src/lib.rs)
 - [AGENTS.md §3 7 段结构 + §4 守门硬约束](../../AGENTS.md)
+
+## §11 Worktree 群组 canonical WorkItem 契约 (v0.2)
+
+### 11.1 身份 envelope 与投影边界
+
+本节规定 Worktree 群组内同一项工作如何被 Multica、Jira 等价视图、Task Card 与 Infinite Canvas 共同引用。§2 的 8 字段 `SharedTask` 保留为 view-level read projection，不能再兼作跨应用主键或任务 lifecycle 事实源。
+
+```rust
+pub struct WorkItemIdentity {
+    pub work_item_id: WorkItemId, // canonical, 不随 view/provider 改变
+    pub worktree_id: WorktreeId,  // 单一归属 Worktree
+    pub tenant_id: TenantId,
+}
+
+pub struct WorkItemReadModel {
+    pub identity: WorkItemIdentity,
+    pub task_card_id: TaskCardId,
+    pub title: String,
+    pub description: Option<String>,
+    pub lifecycle_status: MulticaTaskStatus,
+    pub review_state: ReviewState, // 独立于六态 lifecycle
+    pub priority: Priority,
+    pub display_state: HashMap<ViewKind, String>, // 每种 view 的只读呈现映射
+    pub version: u64,
+}
+
+pub struct WorkItemExternalRef {
+    pub work_item_id: WorkItemId,
+    pub provider: String,
+    pub source_type: String,
+    pub source_object_id: String,
+}
+```
+
+`work_item_id` 是系统内稳定主键，外部 Jira issue key、Canvas element ID、Scheduler task ID 都通过 `(provider, source_type, source_object_id)` 唯一映射到它；禁止用 `IssueKey`、`NodeId` 或路径字符串直接 cast 成 WorkItemId。WorkItem 属于一个且仅一个 `worktree_id`。一个 WorkItem 关联一个当前 `task_card_id`；重试/恢复生成独立 Runtime session，不另造任务卡或 WorkItem。
+
+### 11.2 状态事实源与 view 映射
+
+- canonical lifecycle 由 Multica 管理：`pending / claimed / in_progress / completed / failed / cancelled`；Review Gate 使用单独的 `review_state=none/pending_review/accepted/rejected`。
+- Jira、Kanban、Canvas 等 view 可以把 `review_state=pending_review` 显示为本 view 的 “In Review”，但这只是 projection；view 保存的 display label 不能反向写成 canonical lifecycle status。
+- 所有任务状态写操作必须走 Multica Lifecycle Command，并携带 `worktree_id + work_item_id + task_card_id + idempotency_key + correlation_id`；失败/取消状态不能被旧 5 态 enum 折叠丢失。
+- Canvas element 默认不是任务；仅在用户显式创建/关联 WorkItem 后，元素才含 `EntityRef("work_item", work_item_id, worktree_id)`。布局仍由 Canvas Domain 所有。
+
+### 11.3 群组关系、权限与数据分类
+
+| 对象 | 所有者 | W/T/M 分类 | 规则 |
+|---|---|---|---|
+| WorkItem identity/metadata 与 external ref | WorkItem Domain | Master | 稳定 ID；SCD Type 2；RLS 13 类必携；物理删除禁止 |
+| lifecycle current status 与 Task Card 当前投影 | Multica/Task Card Manager | Work | 明确 `retention_period`；到期可清理或由 Transaction 重建 |
+| lifecycle/review/permission/dispatch 事件 | Lifecycle Audit | Transaction | append-only + audit + RLS 13 类；不可用 Canvas 元数据替代 |
+| Canvas node、edge、position 与 view preference | Canvas Domain | 按各表 Work/T/M 单独分类 | 只存布局和 EntityRef，不复制 WorkItem lifecycle |
+| 插件 manifest/enabled/capability grants | Group App Registry | Master 或 Transaction 按稳定配置/操作事实拆表 | 插件开关不删除 WorkItem、Task Card、审计和 EntityRef |
+| LangGraph checkpoint/session | Runtime | Work | 仅恢复用途，有 `retention_period`；永久执行审计另存 Transaction |
+
+WORKTREE scope 只能查询当前 `worktree_id`。GLOBAL 读可以覆盖 actor 已授权的多 Worktree；每次 GLOBAL 写必须带明确 `target_worktree_ids` 并逐目标执行服务端授权，不能由 display projection 或插件 manifest 扩权。
+
+### 11.4 兼容迁移与验收
+
+旧 `SharedTask.id` 与各 crate 私有 ID 进入 `work_item_external_ref` alias mapping；导入发现一对多/多对一冲突时进入人工 reconciliation 队列，不自动合并或覆盖。迁移先以只读 dual-read 校验 view projection，再将写入口逐一切到 Lifecycle Command；canonical ID 一经分配不可因重命名或插件卸载而改变。
+
+| 验收 ID | 通过条件 |
+|---|---|
+| SHARED-WI-01 | Multica、Jira 等价视图、Task Card、Canvas 深链最终落到相同 `work_item_id` 与 `worktree_id` |
+| SHARED-WI-02 | view display state 与六态 lifecycle/review_state 映射可逆性明确；状态写入统一经 Multica |
+| SHARED-WI-03 | 未授权 Worktree 下 WorkItem/EntityRef 不可读取；GLOBAL 写逐目标授权并审计 |
+| SHARED-WI-04 | provider alias 冲突被隔离报告，不发生自动合并或任务丢失 |

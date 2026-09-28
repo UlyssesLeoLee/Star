@@ -9,7 +9,7 @@
 > - 上位要件: 无独立上位 SRS (本 SRS 为新领域主册; 平行引用 `SRS-CANVAS-001.md` v1.4 无限画布总册 + `SRS-AGENT-VIEW-001.md` v1.0 个体视图 + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 ARG)
 > - 平行专题 SRS: 0 (本 SRS 为独立专题主册, 不下挂子专题)
 > - 关联后续基本設計: `docs/design/BD-WORKTREE-CANVAS-001.md` v1.3
-> - 关联后续詳細設計: `docs/design/DD-WORKTREE-CANVAS-001.md` v1.0 (本 commit 同期落档)
+> - 关联后续詳細設計: `docs/design/DD-WORKTREE-CANVAS-001.md` v1.3 (Worktree Group 边界补充)
 > - 关联追踪矩阵: `docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 (本 commit 同期落档)
 > - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 2026-08-27 19:39 JST 用户授权 + 守门 #14 v3 Mavis 接手代签, 5 域真人到位后切真人)
 > - 审批: 架构师 (Mavis 接手 agent per DEC-008) (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST)
@@ -31,7 +31,7 @@
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
 | 关联 commit | (root 统一 commit 时填, per 守门 #1 v15) |
-| 关联文档 | `BD-WORKTREE-CANVAS-001.md` v1.3 + `DD-WORKTREE-CANVAS-001.md` v1.0 + `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 |
+| 关联文档 | `BD-WORKTREE-CANVAS-001.md` v1.3 + `DD-WORKTREE-CANVAS-001.md` v1.3 + `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 |
 | 上位文档 | 无 (新领域主册) |
 | 平行文档 | `SRS-CANVAS-001.md` v1.4 (无限画布总册) + `SRS-AGENT-VIEW-001.md` v1.0 (个体视图) + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 (ARG) |
 | 拍板来源 | 2026-09-15 Multica ULYS-57 issue 创建者发令 "你是一名资深软件架构师...针对一个面向 AI 并行开发场景的 Worktree 无限画布管理模块, 依次生成需求文档 / 基本设计 / 详细设计" |
@@ -80,7 +80,7 @@
 
 **总需求数**: **126 唯一 ID** (FR 103 + NFR 23 子段, 去重后 21 唯一 NFR ID)。FR 详细: FR-WT 38 + FR-UI 14 + FR-GRAPH 12 + FR-RISK 11 + FR-AGENT 8 + FR-EXPLAIN 4 + FR-SEARCH 6 + FR-ACTION 10 = **103 FR ID**; NFR §4.9.x 子段 23 (去重后 21 唯一 ID)。
 
-本 SRS 是 P3-D 阶段 "Worktree 页面文档化" 的主册产物, 跟 `BD-WORKTREE-CANVAS-001.md` v1.3 + `DD-WORKTREE-CANVAS-001.md` v1.0 + `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 共同构成 ULYS-57 issue 4 份文档。
+本 SRS 是 P3-D 阶段 "Worktree 页面文档化" 的主册产物, 跟 `BD-WORKTREE-CANVAS-001.md` v1.3 + `DD-WORKTREE-CANVAS-001.md` v1.3 + `TRACEABILITY-WORKTREE-CANVAS-001.md` v1.0 共同构成 ULYS-57 issue 4 份文档。
 
 作为后续实装 / 测试 / 验收的唯一依据 (per 守门 #1 禁回溯叙事约束, 后阶段不允许重新定义核心概念)。
 
