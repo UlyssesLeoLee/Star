@@ -4,7 +4,7 @@
 >
 > - 状态: 🟢 Draft v1.3 (Worktree 群组边界补充)
 > - 上游: [`docs/requirements/SRS-WORKTREE-CANVAS-001.md`](../requirements/SRS-WORKTREE-CANVAS-001.md) v1.3 (**126 唯一 ID**: 103 FR + 23 NFR 子段, 去重后 21 唯一 NFR ID)
-> - 下游: 詳細設計 [`docs/design/DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.0 (本 commit 同期落档) + 实装代码
+> - 下游: 詳細設計 [`docs/design/DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.3 (Worktree Group 边界补充) + 实装代码
 > - 关联追踪矩阵: [`docs/design/TRACEABILITY-WORKTREE-CANVAS-001.md`](TRACEABILITY-WORKTREE-CANVAS-001.md) v1.0 (本 commit 同期落档)
 > - 守门基线: 守门 #1+#3+#5+#6+#9+#10+#11+#13+#14 v3+#14 v4+#22+#28+#29 共 14 项必过
 > - 平行参考: `docs/requirements/SRS-CANVAS-001.md` v1.4 (无限画布总册) + `docs/frontend-canvas-design.md` v0.1 (V0.1 实装基线) + `SRS-AGENT-VIEW-001.md` v1.0 (个体视图) + `SRS-AGENT-RELATIONSHIP-001.md` v0.1 (ARG)

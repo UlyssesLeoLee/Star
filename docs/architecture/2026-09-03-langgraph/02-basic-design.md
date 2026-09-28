@@ -5,7 +5,7 @@
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **审核**：Mavis 接手审核；v0.3 为 Draft，群组集成补充待后续评审
 > **依赖**：[01-requirements.md](01-requirements.md)（要件定義書 v0.3）· [ADR-0032 MCP Transport stdio](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0032-mcp-transport-stdio.md) · [ADR-0030 Agent Lease/Heartbeat/Resume](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0030-agent-lease-heartbeat-resume.md) · [ADR-0046 LangGraph TMO 任务卡管理操作](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) · [AGENTS.md §4 守门](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md)
-> **关联文档**：[01-requirements.md](01-requirements.md)（要件定義書 v0.3）· [03-detailed-design.md](03-detailed-design.md)（詳細設計書 v0.2, 后续同步本阶段接口）· [PHASE-LANGGRAPH-TMO-IMPL-REPORT.md](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md)（7 子项实装计划）
+> **关联文档**：[01-requirements.md](01-requirements.md)（要件定義書 v0.3）· [03-detailed-design.md](03-detailed-design.md)（詳細設計書 v0.3, 同步本阶段接口与授权契约）· [PHASE-LANGGRAPH-TMO-IMPL-REPORT.md](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md)（7 子项实装计划）
 
 ---
 

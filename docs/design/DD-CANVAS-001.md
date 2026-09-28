@@ -1,21 +1,20 @@
 # DD-CANVAS-001
 
-> **无限画布 (Infinite Canvas) — 总册詳細設計書 v0.1** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート)
+> **无限画布 (Infinite Canvas) — 总册詳細設計書 v0.2** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート)
 >
 > **⚠️ 双核心定位 (per 2026-09-10 17:08 + 17:21 + 17:34 + 18:00 + 18:25 JST Ulysses 拍板)**
 > 核心功能 = **管理 agent + 游戏化**, 避免过度冗余
 > 6 阶段拍板: 17:00 旧 12 大类 50 项 Miro 全面对标 (撤回) → 17:08 双核心 → 17:21 ARG 图论构造 (A11) → 17:34 多人编辑 (A12, v0.63 反转) → 18:00 基于需求文档制作基本设计文档 (BD) → 18:25 完善详细设计文档 (本 DD)
 >
-> - 状态: 🟡 Draft **v0.1.1** (v0.1.1 协调性检查修复落档)
+> - 状态: 🟡 Draft **v0.2** (Worktree 群组集成补充待评审；既有 v0.1.x 审核记录只适用于原基线)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
-> - 关联需求: [`docs/requirements/SRS-CANVAS-001.md`](../requirements/SRS-CANVAS-001.md) v1.1 (58KB, 18:00 JST root 写, 双核心 78 项索引)
-> - 关联基本設計: [`docs/design/BD-CANVAS-001.md`](../design/BD-CANVAS-001.md) v0.1 (50KB, 18:00 JST root 写, 5 view 跨域 + 14 张表 W/T/M 100% 覆盖)
+> - 关联需求: [`docs/requirements/SRS-CANVAS-001.md`](../requirements/SRS-CANVAS-001.md) v1.4 (Worktree 群组集成边界)
+> - 关联基本設計: [`docs/design/BD-CANVAS-001.md`](../design/BD-CANVAS-001.md) v0.2 (Worktree 群组集成)
 > - 关联专题 DD (派生): [`docs/design/DD-CANVAS-AGENT-001.md`](./DD-CANVAS-AGENT-001.md) v0.1 (18:25 JST 子代理 1 写) + [`docs/design/DD-CANVAS-GAMIFY-001.md`](./DD-CANVAS-GAMIFY-001.md) v0.1 (18:25 JST 子代理 2 写)
 > - 关联平行 DD: [`docs/design/DD-AGENT-RELATIONSHIP-001.md`](./DD-AGENT-RELATIONSHIP-001.md) v0.1 (94KB, 9/9 落档, 13 关键 class + 4 effect + 5 状态机 + 11 共享类型 + 4 时序图 模板)
 > - 关联 V0.1: [`docs/frontend-canvas-design.md`](../frontend-canvas-design.md) v0.1 + [`frontend/src/components/CanvasView.tsx`](../frontend/src/components/CanvasView.tsx)
-> - 修订人: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 2026-08-27 19:39 JST 用户授权 + 9/8 15:19 JST 第 6 次强化)
-> - 审批: 架构师 (Mavis 接手 agent per DEC-008) (5 角色签字栏 per AGENTS.md §3)
-> - 日期: 2026-09-10 JST (18:25 JST 拍板"完善详细设计文档")
+> - 修订人/审核: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核；v0.2 补充待评审
+> - 日期: 2026-09-28 JST
 > - 受众: 実装エンジニア / テストエンジニア / アーキテクト / SRE / 5 域 Lead (未到位, Mavis 临时代签 per 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D)
 
 ---
@@ -28,12 +27,12 @@
 |---|---|
 | 文书 ID | DD-CANVAS-001 |
 | 文书名 | 无限画布 (Infinite Canvas) 総冊詳細設計書 |
-| 版本 | **v0.1.1** (per 2026-09-10 18:35 JST 协调性检查修复) |
-| 作成日 | 2026-09-10 |
+| 版本 | **v0.2** (Worktree 群组集成补充; v0.1.x 记录只适用于原基线) |
+| 作成日 | 2026-09-28 (v0.2; v0.1 初版 2026-09-10) |
 | 作成者 | Ulysses — Mavis 接手 (per DEC-008) |
-| 承認者 | 架构师 (Mavis 接手) |
+| 承認者 | Draft；v0.2 群组集成补充待评审 |
 | 关联 commit | `fb89e4a` (10 files / 8,160 insertions, 第 74 次新事件, 含 v0.1.1 修复版) + `153441a` (§4.29 + registry v0.14, 第 75 次新事件) |
-| 关联文档 | `SRS-CANVAS-001.md` v1.1 + `BD-CANVAS-001.md` v0.1 (本批派生) + `DD-CANVAS-{AGENT,GAMIFY}-001.md` v0.1 (本批派生) + `DD-AGENT-RELATIONSHIP-001.md` v0.1 (94KB 模板) |
+| 关联文档 | `SRS-CANVAS-001.md` v1.4 + `BD-CANVAS-001.md` v0.2 + `DD-CANVAS-WORKFLOW-001.md` v1.0.2 + `DD-MULTICA-TASK-001.md` v0.2 |
 | 平行 DD | `DD-AGENT-VIEW-001.md` (待补, 9/5 落档) |
 
 ### 0.2 修订履历
@@ -42,6 +41,7 @@
 |---|---|---|---|---|
 | **v0.1** | **2026-09-10 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3)** | **初始版本: 双核心 (管理 agent + 游戏化) + 多人编辑 (per 17:34 JST v0.63 反转) + ARG (per 17:21 JST) 总册 DD 跨域汇总, 10 段 + 5 附录, 15 章节 IPA SEC 模板, 5 view 跨域 + 14 张表 SQL DDL W/T/M 100% 覆盖 + 32 API 端点 OpenAPI spec + 5 WebSocket 协议 + 13 关键 class + 5 状态机 + 11 共享类型 + 4 关键时序图 + 6 类 NFR + 19 守门 + 12 已知缺口 + 5 角色签字栏** | **2026-09-10 18:25 JST Ulysses 拍板"完善详细设计文档" + 18:00 JST BD 拍板 + 17:34 JST v0.63 反转多人编辑 + 17:21 JST ARG 图论构造 + 17:08 JST 双核心 + 17:00 JST 旧方向撤回 (per 守门 #1 禁回溯叙事)** |
 | **v0.1.1** | **2026-09-10 18:35 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3)** | **协调性检查修复: 3 处 — (1) §4 C-16 `CanvasBackend` → C-25 `CanvasElementsBackend` (本批新增 A12.3 顺延, 跟表名 `canvas_elements_backend` 一致) + §4 C-21 `MultiUserAudit` → C-26 `CanvasMultiUserAudit` (本批新增 A12.8 顺延, 跟表名 `canvas_multi_user_audit` 一致); (2) §5.3 Trust Score 5 档 命名/阈值统一为 ARG 源 `Untrusted (0-0.2) / Low (0.2-0.4) / Medium (0.4-0.7) / High (0.7-0.9) / VeryHigh (0.9-1.0)`; (3) §1.1 / §4 列表头同步更新 (C-21/C-16 → C-25/C-26). 不重写 ARG 4 份 commit (per 守门 #1 禁回溯叙事). BD-CANVAS-AGENT-001 v0.1 无需修复 (5.4.4 已用 ARG 源命名/阈值). DD-CANVAS-AGENT-001 v0.1 子代理 1 已用 C-16=RelationshipEditor / C-21=ARGController (匹配 ARG 源), A12 走 §4.14.x sub-class 模式 (与本总册 C-25/C-26 不同但等价, 跨 DD 一致性在 附录 A 派生源说明).** | **2026-09-10 18:30 JST Ulysses 拍板"确保本设计和 agent 图关系设计妥善协调不冲突" + 协调性检查报告 `COORDINATION-CHECK-001.md` v0.1 §3 修复方案** |
+| **v0.2** | **2026-09-28 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **新增 Worktree 群组 Canvas 详细契约；明确 Group Shell 聊天栏、WorkItem EntityRef、Task Card/CLI 深链、插件 capability 与 W/T/M 数据边界；旧 v0.1.x 签核记录仅保留为历史** | **用户要求 Worktree 为顶层、Canvas 与任务应用同级并继续详细设计** |
 
 ---
 
@@ -52,7 +52,7 @@
 本文档基于 [`BD-CANVAS-001.md` §0-§10](../design/BD-CANVAS-001.md) v0.1 (50KB, 18:00 JST root 写) 的基本設計, 定义 **无限画布 (Infinite Canvas)** 总冊詳細設計 (DD):
 
 - 5 view 跨域詳細实现 (機能/データ/動作/モジュール/ネットワーク, 跨 3 SRS + 3 BD)
-- 14 张表 SQL DDL W/T/M 100% 覆盖 (A11 7 张 + A12 7 张, 跨域汇总)
+- 16 张表 W/T/M 覆盖 (Canvas 原有 A11/A12 14 张 + Worktree 群组扩展 2 张)
 - 32 API 端点 OpenAPI spec + 5 WebSocket protocol 完整
 - 6 类 NFR benchmark (性能/可靠性/安全/易用/可观测/ARG)
 - 13 关键 class (C-1/C-2/C-3/C-4/C-7/C-8/C-11/C-12/C-13/C-14/C-15 + **C-25 + C-26** [v0.1.1 修复: 原 C-16/C-21 顺延]) 跨域 + 5 状态机 + 11 共享类型
@@ -78,7 +78,7 @@
 | §6 共享类型 | 11 共享类型完整定义 | 跨域 |
 | §7 接口协议 | 5 WebSocket + 内部 5 协议 + 32 API OpenAPI spec | 跨域 |
 | §8 时序图 | 4 关键时序图 | 跨域 |
-| §9 数据持久化 | 14 张表 SQL DDL + Memgraph Cypher + zustand | 跨域 |
+| §9 数据持久化 | 原有 14 张表 + Worktree 群组扩展 2 张；另含 Memgraph Cypher + zustand | 跨域 |
 | §10 测试用例 | UT + IT + E2E + PT 4 类, 跨域 ≥ 30 | 跨域 |
 | 附录 A | 跨专题引用清单 | 跨域 |
 | 附录 B | 跨域组件映射 (4 文件 DD + 6 crate + 5 V0.1 复用 + 25 module 联动) | 跨域 |
@@ -108,7 +108,7 @@
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │ 5 view 跨域 UI:                                                │  │
 │  │ 1. 機能 view: 78 FR (46 + 32) + 10 关键 class (跨域)         │  │
-│  │ 2. データ view: 14 张表 (W/T/M) + 5 状态机 + 11 共享类型      │  │
+│  │ 2. データ view: 16 张表 (W/T/M) + 5 状态机 + 11 共享类型      │  │
 │  │ 3. 動作 view: 5 域 + 多人 + ARG 4 维 + 4 关键时序图         │  │
 │  │ 4. モジュール view: 18 Rust module + 1 Python + V0.1 复用     │  │
 │  │ 5. ネットワーク view: 5 WebSocket + 32 API + 74+ 测试          │  │
@@ -130,7 +130,7 @@
 │  └─────────────┘  └─────────────┘  └─────────────┘  └───────────┘  │
 │  ┌─────────────────────────────────────────────────────────────┐  │
 │  │ Memgraph (Docker, port 7687 Bolt + 7444 HTTP, 数据卷持久化) │  │
-│  │ 14 张表 W/T/M 100% 覆盖 (per 守门 #13)                       │  │
+│  │ 16 张表 W/T/M 100% 覆盖 (per 守门 #13)                       │  │
 │  └─────────────────────────────────────────────────────────────┘  │
 │  ┌─────────────────────────────────────────────────────────────┐  │
 │  │ 25 module 联动接口 (work-item / worktree / agent / relation / │  │
@@ -146,7 +146,7 @@
 | Tier 1: gm-console frontend | Next.js 14 + React 18 + zustand 5 view 跨域 UI | 跨域 |
 | Tier 2: BFF | FastAPI + Next.js API routes, 32 REST + 5 WebSocket | 跨域 |
 | Tier 3: Domain Crates | 6 Rust crate (arg + arg-bridge + arg-effect + api/arg + 新增 2) | 跨域 |
-| Tier 4: Memgraph | 图数据库, 14 张表 W/T/M 100% 覆盖 (per 守门 #13) | 跨域 |
+| Tier 4: Memgraph | 图数据库，Canvas 16 张表 W/T/M 100% 覆盖 (per 守门 #13) | 跨域 |
 | Tier 5: LangGraph | 25 module 联动接口 + TMO 9 节点 (per `SRS-STAR-AGENT-RUNTIME-001.md` §4) | 跨域 |
 
 ### 2.3 4 关键时序图 (跨域, per DD-AGENT-RELATIONSHIP-001 v0.1 §8)
@@ -203,7 +203,7 @@ Memgraph write fails → in-process 缓存继续工作 (LWW 缓存)
 
 | 组件 | 路径 | 派生 | 类型 |
 |---|---|---|---|
-| 1. CanvasView 增强 | `frontend/src/components/CanvasView.tsx` | A1-A12 全部 14 张表 + 46 项 | V0.1 + 扩展 |
+| 1. CanvasView 增强 | `frontend/src/components/CanvasView.tsx` | A1-A12 原有 14 张表 + 群组扩展 2 张 + 46 项 | V0.1 + 扩展 |
 | 2. CanvasToolbar 扩展 | `frontend/src/components/CanvasToolbar.tsx` (V0.1 line 376) | A11.2 + A12.5 + 跨域 5 view | 新增 |
 | 3. CanvasSidebar 扩展 | `frontend/src/components/CanvasSidebar.tsx` (V0.1) | A2.2 + A12.7 + V0.1 game | 新增 |
 | 4. CanvasMinimap 增强 | `frontend/src/components/CanvasMinimap.tsx` (V0.1 line 365) | A11.9 + A12.1 | V0.1 + 扩展 |
@@ -375,9 +375,9 @@ Memgraph write fails → in-process 缓存继续工作 (LWW 缓存)
 
 ---
 
-## §9 数据持久化 (Data Persistence, 14 张表 SQL DDL + Memgraph Cypher + zustand)
+## §9 数据持久化 (Data Persistence, 原有 14 张表 + 群组扩展 2 张 + Memgraph Cypher + zustand)
 
-### 9.1 14 张表 W/T/M 跨域汇总 (per 守门 #13 100% 覆盖)
+### 9.1 Canvas 持久化表 W/T/M 跨域汇总 (原有 14 张 + 群组扩展 2 张)
 
 **A11 7 张表** (派生自 `DD-AGENT-RELATIONSHIP-001.md` v0.1 §9.1, 完整 SQL DDL 详见专题 DD):
 
@@ -560,11 +560,56 @@ CREATE TABLE canvas_presence_cursors (
 - **Master 6/14 (42.9%)**: agents / agent_relationship_edges / achievements / canvas_comments / canvas_permissions / canvas_elements_backend
 - **Transaction 5/14 (35.7%)**: agent_relationship_edges_audit / achievement_unlocks / relationship_events / canvas_multi_user_audit / canvas_comment_mentions
 - **Work 3/14 (21.4%)**: team_template_instances (TTL 30d) / canvas_followers (session-bound) / canvas_presence_cursors (heartbeat 30s)
-- **总计 14/14 = 100%** ✓ (per 守门 #13 W/T/M 三類横展 强制分类, 禁止混在)
+- 原有表合计 **14/14 = 100%**；本版新增的 `group_canvas_registry`、`canvas_entity_ref` 均为 Master，完整 W/T/M 清单见 §14.3。
 
-### 9.2 29 张表跨域汇总 (per 守门 #13)
+**v0.2 Worktree 群组扩展 DDL** (历史版本不得把下列表计入旧 14 张基线):
 
-总册 14 张表 (A11 7 + A12 7) + GAMIFY 15 张表 (per BD-CANVAS-GAMIFY-001 v0.1 §4.1 G11 15 张表 Work 6 + Transaction 4 + Master 5) = **29 张表 100% W/T/M 覆盖跨域汇总**
+```sql
+CREATE TABLE group_canvas_registry (
+  registry_row_id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  worktree_id UUID NOT NULL,
+  canvas_id UUID NOT NULL,
+  version BIGINT NOT NULL,
+  title TEXT NOT NULL,
+  valid_from TIMESTAMPTZ NOT NULL,
+  valid_to TIMESTAMPTZ,
+  is_current BOOLEAN NOT NULL,
+  CHECK (valid_to IS NULL OR valid_to > valid_from),
+  CHECK ((is_current AND valid_to IS NULL) OR (NOT is_current AND valid_to IS NOT NULL)),
+  UNIQUE (tenant_id, worktree_id, canvas_id, version)
+);
+CREATE UNIQUE INDEX uq_group_canvas_current
+  ON group_canvas_registry (tenant_id, worktree_id, canvas_id)
+  WHERE is_current;
+
+CREATE TABLE canvas_entity_ref (
+  ref_row_id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  worktree_id UUID NOT NULL,
+  canvas_id UUID NOT NULL,
+  element_id UUID NOT NULL,
+  ref_type TEXT NOT NULL,
+  ref_id UUID NOT NULL,
+  version BIGINT NOT NULL,
+  valid_from TIMESTAMPTZ NOT NULL,
+  valid_to TIMESTAMPTZ,
+  is_current BOOLEAN NOT NULL,
+  CHECK (valid_to IS NULL OR valid_to > valid_from),
+  CHECK ((is_current AND valid_to IS NULL) OR (NOT is_current AND valid_to IS NOT NULL)),
+  UNIQUE (tenant_id, worktree_id, canvas_id, element_id, ref_type, ref_id, version)
+);
+CREATE UNIQUE INDEX uq_canvas_entity_ref_current
+  ON canvas_entity_ref
+    (tenant_id, worktree_id, canvas_id, element_id, ref_type, ref_id)
+  WHERE is_current;
+```
+
+两表均启用 tenant + worktree RLS；Worktree 物理外键名称跟随 Worktree Domain migration。`canvas_entity_ref` 的 canvas/element 同群组一致性由 Domain transaction 校验；不能以 polymorphic `ref_id` 外键取代 Task/WorkItem Domain 授权检查。Master 更新采用 SCD Type 2：同一事务关闭旧版本并插入新版本；禁止原位改写历史版本或物理删除。
+
+### 9.2 31 张表跨域汇总 (per 守门 #13)
+
+Canvas 原有 14 张表 (A11 7 + A12 7) + Worktree 群组扩展 2 张 + GAMIFY 15 张表 (per BD-CANVAS-GAMIFY-001 v0.1 §4.1 G11 15 张表 Work 6 + Transaction 4 + Master 5) = **31 张表 100% W/T/M 覆盖跨域汇总**
 
 ### 9.3 Memgraph Cypher schema (A11 派生, per `DD-AGENT-RELATIONSHIP-001.md` v0.1 §9.2)
 
@@ -756,6 +801,7 @@ interface GamifyStore extends A12Store {
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | **v0.1** | **2026-09-10 18:25 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3)** | **初始版本: 双核心 (管理 agent + 游戏化) + 多人编辑 (per 17:34 JST v0.63 反转) + ARG (per 17:21 JST) 总册 DD 跨域汇总, 11 段 + 5 附录, 15 章节 IPA SEC 模板, 5 view 跨域 + 14 张表 SQL DDL W/T/M 100% 覆盖 + 32 API 端点 OpenAPI spec + 5 WebSocket 协议 + 13 关键 class + 5 状态机 + 11 共享类型 + 4 关键时序图 + 6 类 NFR + 19 守门 + 12 已知缺口 + 5 角色签字栏** | **2026-09-10 18:25 JST Ulysses 拍板"完善详细设计文档" + 18:00 JST BD 拍板 + 17:34 JST v0.63 反转多人编辑 + 17:21 JST ARG 图论构造 + 17:08 JST 双核心 + 17:00 JST 旧方向撤回 (per 守门 #1 禁回溯叙事)** |
+| **v0.2** | **2026-09-28 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核** | **新增 Worktree 群组 Canvas 详细契约：GroupContext、canonical WorkItem EntityRef、同级 Task Card/Multica/Jira 等价能力交互、Group Shell 聊天栏归属、插件 capability 边界及 W/T/M 数据映射；v0.1.x 历史记录保留** | **用户要求 Worktree 为产品树顶层、Canvas 与任务应用同级，并基于新基本设计推进详细设计** |
 | **v0.1.1** | **2026-09-10 18:35 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3)** | **协调性检查修复: 3 处 — (1) §4 C-16 `CanvasBackend` → C-25 `CanvasElementsBackend` (本批新增 A12.3 顺延, 跟表名 `canvas_elements_backend` 一致) + §4 C-21 `MultiUserAudit` → C-26 `CanvasMultiUserAudit` (本批新增 A12.8 顺延, 跟表名 `canvas_multi_user_audit` 一致); (2) §5.3 Trust Score 5 档 命名/阈值统一为 ARG 源 `Untrusted (0-0.2) / Low (0.2-0.4) / Medium (0.4-0.7) / High (0.7-0.9) / VeryHigh (0.9-1.0)`; (3) §1.1 / §4 列表头同步更新 (C-21/C-16 → C-25/C-26). 不重写 ARG 4 份 commit (per 守门 #1 禁回溯叙事). BD-CANVAS-AGENT-001 v0.1 无需修复 (5.4.4 已用 ARG 源命名/阈值). DD-CANVAS-AGENT-001 v0.1 子代理 1 已用 C-16=RelationshipEditor / C-21=ARGController (匹配 ARG 源), A12 走 §4.14.x sub-class 模式 (与本总册 C-25/C-26 不同但等价, 跨 DD 一致性在 附录 A 派生源说明).** | **2026-09-10 18:30 JST Ulysses 拍板"确保本设计和 agent 图关系设计妥善协调不冲突" + 协调性检查报告 `COORDINATION-CHECK-001.md` v0.1 §3 修复方案** |
 | **v0.1.2** | **2026-09-10 19:10 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3)** | **IPA SEC 合规性修复: 加 §11 NFR 详细 (6 类, 29 项, 跨域) + §12 5 角色签字栏 (per AGENTS.md §3 7 段结构, per 守门 #14 v2/v3/v4) + §13 修订历史 (从原 §0 修订履历 + 附录 E.1 跨拍板派生 抽出). 不重写 §0-§10 + 附录 A-E (per 守门 #1 禁回溯叙事, v0.1.2 反转行显式标).** | **2026-09-10 19:06 JST Ulysses 拍板"确保这里的文档符合日本 IPA 标准" + 守门 #9 v19 Mavis 自驱 + 守门 #1 v19 批量改 1 commit 收官** |
 
@@ -855,7 +901,7 @@ interface GamifyStore extends A12Store {
 | 守门 #11 缺标比错标 | 已知缺口 12 个 ≥ 8 满足, 显式列附录 C | per AGENTS.md §4 #11 |
 | 守门 #12 AI 文档治理 | BAS 引用必 git log --follow 实证, 禁回溯叙事 | per AGENTS.md §4 #12 |
 | 守门 #12 v21 docs 同步必更新 §4 + registry | 1 任务卡 + 1 索引追加 (后续) | per AGENTS.md §4 #12 v21 |
-| 守门 #13 DB W/T/M 三類横展 100% 覆盖 | 14 张表 (A11 7 + A12 7) + 29 张表跨域汇总 | per AGENTS.md §4 #13 |
+| 守门 #13 DB W/T/M 三類横展 100% 覆盖 | 原有 14 张表 (A11 7 + A12 7) + 群组扩展 2 张 = 16 张 Canvas 表；跨域合计 31 张 | per AGENTS.md §4 #13 |
 | 守门 #14 v2 5 域 Lead Mavis 临时代签 | 真人到位后追溯签字 (per 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D) | per AGENTS.md §4 #14 v2 |
 | 守门 #14 v3 Mavis 永久代签 | 5 角色签字栏 author=Ulysses | per AGENTS.md §4 #14 v3 |
 | 守门 #14 v4 v0.62 反转 | 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses (per 2026-09-10 12:45 JST) | per AGENTS.md §4 #14 v4 |
@@ -867,3 +913,97 @@ interface GamifyStore extends A12Store {
 > **撰写完成**: 2026-09-10 18:30 JST, root session mvs_942987595a124037901d37205a548e6f
 > **2 专题 DD 状态**: 撰写中 (bg_9ce1be6e DD-AGENT + bg_50df734c DD-GAMIFY), 等待 worker 子代理返回后 root 校对 + 1 commit 3 文件落档 (per 守门 #1 v15 docs 同步饱和)
 > **下次拍板触发**: 2 专题 DD 返回后, root 自动 commit 3 文件落档 (本总册 DD + 2 专题 DD), 后续 P3-D.6 启动实装 (P0 36 项 per 总册 §4.4). per 守门 #12 v21 后续需更新 automation-design.md §4.29 + registry.md v0.14.
+
+## §14 Worktree 群组 Canvas 详细契约 (v0.2)
+
+本节将 Infinite Canvas 接入 Worktree 群组树；它规定群组画布如何连接任务应用，并保留现有 agent graph、gamification、collaboration 等专题能力。旧版的功能模块和关系图仍是 Canvas Domain 内部视图，不会成为渡口新的产品导航根。
+
+### 14.1 对象和上下文
+
+| 对象 | 身份与事实源 | 边界 |
+|---|---|---|
+| Worktree Group Canvas | Canvas Domain 的 `canvas_id`，必有一个 `worktree_id` 所属 | 从 Worktree 群组同级入口打开；权限不得高于当前 GroupContext |
+| Canvas Element | `canvas_id + element_id` | 持有内容、位置、尺寸、显示状态；默认不是 WorkItem |
+| WorkItem 引用 | `EntityRef(type, id, worktree_id)` | 引用 canonical `work_item_id`；Canvas 不拥有 lifecycle/status |
+| Task Card | `task_card_id + work_item_id` | Canvas 只提供深链/预览；执行会话由 Task Card Runtime 管理 |
+| Project Worktree Overview Graph | Project/Repository Graph 的 `project_id` 和 Worktree 节点 | 属于 `DD-WORKTREE-CANVAS-001`; 不等同于本 Group Canvas |
+
+每次 API/WebSocket 操作带服务端生成的 `GroupContext(tenant_id, actor_id, worktree_id, permissions, correlation_id)`。WORKTREE scope 限于一个群组；GLOBAL scope 仅允许读取明确获权的群组集合，写入必须附显式 `target_worktree_ids` 并逐项授权。浏览器路由、Canvas 节点类型或插件声明均不是权限凭据。
+
+### 14.2 跨应用交互协议
+
+```mermaid
+sequenceDiagram
+    participant UI as Worktree Group Shell
+    participant CV as Infinite Canvas
+    participant ACL as GroupContext/ACL Resolver
+    participant WD as WorkItem/Multica Domain API
+    participant EB as Event Outbox
+    participant TC as Task Card Projection
+    UI->>CV: open(canvas_id, worktree_id, GroupContextRef)
+    CV->>ACL: authorize(canvas read, worktree_id)
+    ACL-->>CV: verified GroupContext
+    UI->>CV: create/link WorkItem (EntityRef)
+    CV->>ACL: authorize(command, target worktree)
+    ACL->>WD: create/link/status command(work_item_id, idempotency_key)
+    WD->>EB: append WorkItemChanged
+    EB-->>TC: update projection
+    EB-->>CV: update linked entity preview
+    CV-->>UI: refresh typed reference; Task Card opens by canonical ID
+```
+
+- “创建任务”由 WorkItem Domain 分配 `work_item_id`，Canvas 随后保存 `EntityRef("work_item", work_item_id, worktree_id)`。
+- “关联已有任务”、状态变化、claim、review、完成等都通过 WorkItem/Multica 命令；Canvas 本地事件只能变更布局和展示属性。
+- 打开 Task Card 时只传 `work_item_id` 与 `worktree_id`，由 Task Card Manager 解析唯一 `task_card_id`。CLI/Agent Session 在卡片内部启动，Canvas 不直接创建 CLI、checkpoint 或 agent graph。
+- Group Shell 底部聊天栏跨 Canvas 与所有同级应用共用。Canvas 可传当前 `EntityRef` 作消息上下文，但不创建独立 `ChatBarService` 或第二个 chat session。
+- 已启用插件入口来自 Group App Registry；Canvas 只呈现有权访问的 capability。插件写操作仍经同一 ACL + Domain API，不允许插件替代 Multica 状态机。
+
+### 14.3 存储和 W/T/M 规则
+
+本版 Canvas 表数为 16：原有 A11/A12 共 14 张（§9.1）加本节群组扩展 2 张。下表逐表给出 W/T/M 归属；扩展表的 DDL 在 §9.1。
+
+| 表/记录 | 分类 | 字段/约束补充 | 删除/保留 |
+|---|---|---|---|
+| `agents` | Master | tenant owner；跨 Worktree 可见性由 RLS 限制 | SCD Type 2，RLS 13 类，物理删除禁止 |
+| `agent_relationship_edges` | Master | 边两端 actor/tenant 校验 | SCD Type 2，RLS 13 类，物理删除禁止 |
+| `achievements` | Master | 成就定义/版本 | SCD Type 2，RLS 13 类，物理删除禁止 |
+| `canvas_comments` | Master | 所属 `canvas_id` 与 tenant/worktree 一致 | SCD Type 2，RLS 13 类，物理删除禁止 |
+| `canvas_permissions` | Master | 权限配置不是授权凭证；请求时重新校验 ACL | SCD Type 2，RLS 13 类，物理删除禁止 |
+| `canvas_elements_backend` | Master | 每行必带 `worktree_id`; 所属 `canvas_id` 必须同 Worktree | SCD Type 2，RLS 13 类，物理删除禁止 |
+| `group_canvas_registry` | Master | §9.1 DDL；`tenant_id + worktree_id + canvas_id` 是业务键，`version` 是聚合版本；当前版本唯一 | SCD Type 2，RLS 13 类，物理删除禁止 |
+| `canvas_entity_ref` | Master | §9.1 DDL；只存 typed ref，不缓存任务状态；元素与引用必须属于相同 tenant/worktree/canvas | SCD Type 2，RLS 13 类，物理删除禁止 |
+| `agent_relationship_edges_audit` | Transaction | 每条边变更记录 actor、tenant、correlation | append-only + audit + RLS 13 类，物理删除禁止 |
+| `achievement_unlocks` | Transaction | 解锁事实与来源事件 | append-only + audit + RLS 13 类，物理删除禁止 |
+| `relationship_events` | Transaction | 关系状态/分值变化事实 | append-only + audit + RLS 13 类，物理删除禁止 |
+| `canvas_multi_user_audit` | Transaction | 增加 `worktree_id`, `canvas_id`, `element_id`, `entity_ref`, `actor_id`, `correlation_id` | append-only + audit + RLS 13 类，物理删除禁止 |
+| `canvas_comment_mentions` | Transaction | comment 与 mentioned actor 的关联事实 | append-only + audit + RLS 13 类，物理删除禁止 |
+| `team_template_instances` | Work | 必带 `worktree_id` 与 `retention_period`; 默认 TTL 30 天 | 到期物理清理；不进入审计事实 |
+| `canvas_followers` | Work | 必带 `worktree_id` 与 `retention_period`; session-bound | session/TTL 到期物理清理；不进入审计事实 |
+| `canvas_presence_cursors` | Work | 必带 `worktree_id` 与 `retention_period`; heartbeat 默认 30 秒 | TTL 到期物理清理；不进入审计事实 |
+
+合计：Master 8 张、Transaction 5 张、Work 3 张，**16/16 分类完成**。两张新增 Master 均启用 SCD Type 2 和 13 类 RLS。WorkItem/lifecycle/checkpoint 由所属 Domain 管理，Canvas 只保存 typed reference，不复制 lifecycle 或 checkpoint；删除 WorkItem 不级联删除 Canvas Element。
+
+任何群组 Canvas 的数据库行必须校验 `tenant_id + worktree_id` 一致。引用失效时保留 disabled/broken reference 并显示原因；删除 WorkItem 不能 cascade 删除 Canvas Element。事件和布局变更分别提交：Domain 事件经 Outbox 驱动投影，Canvas 自身布局交易不修改 WorkItem lifecycle。
+
+### 14.4 接口与失败处理
+
+| 操作 | API 契约 | 主要失败 |
+|---|---|---|
+| 列表/读取 | `GET group canvases`，服务端按授权 `worktree_id` 过滤 | `403` 无权、`404` 不存在或不可见 |
+| 创建/关联 WorkItem | Canvas Command → Domain API；必须提供 `worktree_id`、actor session、`idempotency_key`、`correlation_id` | `409` 重复/版本冲突、`422` 引用格式错误 |
+| 更新任务状态 | Task Lifecycle Command，不提供 Canvas 直写接口 | `403` 无权、`409` 状态/version 冲突 |
+| 插件 capability | registry grant + 每次请求重新授权 | disabled/revoked 返回 `403 capability_unavailable` |
+
+网络断开或 Outbox 延迟时 Canvas 显示“同步中/过期”并按 event version 合并；不得把本地 optimistic state 当作已完成任务事实。跨 Worktree 的 GLOBAL 写入按目标回传结果；拒绝目标不得产生副作用。
+
+### 14.5 详细设计验收
+
+| ID | 通过条件 |
+|---|---|
+| DD-CANVAS-GROUP-01 | Canvas、Multica、Jira 等价视图与 Task Card 打开同一个 canonical WorkItem |
+| DD-CANVAS-GROUP-02 | Worktree Group Canvas 与 Project Worktree Overview Graph 使用不同对象、路由、存储事实和权限上下文 |
+| DD-CANVAS-GROUP-03 | 未授权 Worktree 的 EntityRef 不可读写；GLOBAL 写操作逐目标校验并审计 |
+| DD-CANVAS-GROUP-04 | Canvas 只持有 typed ref/layout；任务 lifecycle 更新由 Multica/WorkItem Domain 唯一处理 |
+| DD-CANVAS-GROUP-05 | 插件 disable 不删除 Canvas/WorkItem/audit；撤权后 capability 新调用立即失败 |
+
+**待实施确认**：现存 PostgreSQL Canvas 表与 Graph/Memgraph read model 的同步方式、具体唯一索引和迁移顺序，需在 schema migration review 中对照真实 DDL 定稿；本节规定的 owner、scope 和 W/T/M 分类不可在迁移中放宽。

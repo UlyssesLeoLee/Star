@@ -5,7 +5,7 @@
 > **制定者**：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手
 > **审核**：Mavis 接手审核；v0.3 为 Draft，群组集成补充待后续评审
 > **依赖**：[ADR-0033 代签规则反转](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0033-agent-co-signing-policy.md) · [ADR-0046 LangGraph TMO 任务卡管理操作](https://github.com/UlyssesLeoLee/Star/blob/main/docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) · [AGENTS.md §4 守门硬约束](https://github.com/UlyssesLeoLee/Star/blob/main/AGENTS.md) · [STAR-OLU-001.md token 基线](https://github.com/UlyssesLeoLee/Star/blob/main/docs/ol/STAR-OLU-001.md) · [STAR-P3-WBS-001.md](https://github.com/UlyssesLeoLee/Star/blob/main/docs/reports/STAR-P3-WBS-001.md)
-> **关联文档**：[02-basic-design.md](02-basic-design.md)（基本設計書 v0.2）· [03-detailed-design.md](03-detailed-design.md)（詳細設計書 v0.2）· [PHASE-LANGGRAPH-TMO-IMPL-REPORT.md](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md)（7 子项实装计划）
+> **关联文档**：[02-basic-design.md](02-basic-design.md)（基本設計書 v0.3）· [03-detailed-design.md](03-detailed-design.md)（詳細設計書 v0.3）· [PHASE-LANGGRAPH-TMO-IMPL-REPORT.md](../../reports/PHASE-LANGGRAPH-TMO-IMPL-REPORT.md)（7 子项实装计划）
 > **適用範囲**：STAR 主仓 (`D:\Star`) 全体，gm-console frontend / star-mcp / 22 domain-* crates / scripts/automation/ 全栈
 
 ---

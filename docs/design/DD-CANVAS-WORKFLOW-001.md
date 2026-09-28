@@ -1,9 +1,10 @@
 # DD-CANVAS-WORKFLOW-001
 
-> **无限画布 — 自动化流程域 (Automation Flow Domain) 詳細設計書 v1.0 (Draft)**
+> **无限画布 — 自动化流程域 (Automation Flow Domain) 詳細設計書 v1.0.2 (Draft)**
 >
-| 状態 | 🟡 v1.0 (Draft — Round 2 / 7;§0-5 + §6 + §7 落档;§8-§14 待 Round 3-7) |
-> - 上位: `docs/design/BD-CANVAS-WORKFLOW-001.md` v1.0.3(已签字) / `docs/requirements/SRS-CANVAS-WORKFLOW-001.md` v1.1
+| 状態 | 🟡 v1.0.2 (Worktree 群组集成详细契约补充待评审；原 Round 7 状态保留为历史记录) |
+> - 上位: `docs/design/BD-CANVAS-WORKFLOW-001.md` v1.0.4 / `docs/requirements/SRS-CANVAS-WORKFLOW-001.md` v1.2
+> - 群组总册: `docs/design/BD-CANVAS-001.md` v0.2 / `docs/requirements/SRS-CANVAS-001.md` v1.4
 > - 下游: 開発実装 / テスト設計 / Review
 > - 整合参考: `docs/design/DD-CANVAS-001.md` v? / `docs/design/DD-CANVAS-AGENT-001.md` v?
 > - 作成日: 2026-09-14
@@ -18,19 +19,19 @@
 |---|---|
 | 文書 ID | DD-CANVAS-WORKFLOW-001 |
 | 文書名 | 无限画布 — 自动化流程域 詳細設計書 |
-| 上位要件定義 | SRS-CANVAS-WORKFLOW-001 v1.1 |
-| 上位基本設計 | BD-CANVAS-WORKFLOW-001 v1.0.3(全 5 角色签字済) |
-| 版数 | v1.0 (Draft,Round 1) |
-| ステータス | 🟡 Draft — IPA 自審待ち |
-| 対象モジュール | Flow Editor / Template Selector / Bottom Chat Bar / Execution History / Flow Tags Manager / Node Config Sidebar / RuleExecutor / LangGraph/L0 Router(本 DD の主担当スコープ) |
+| 上位要件定義 | SRS-CANVAS-WORKFLOW-001 v1.2 |
+| 上位基本設計 | BD-CANVAS-WORKFLOW-001 v1.0.4 (群组集成补充待评审) |
+| 版数 | v1.0.2 (Draft) |
+| ステータス | 🟡 Draft — Group Shell integration supplement pending review |
+| 対象モジュール | Flow Editor / Template Selector / Group Shell Chat Adapter / Execution History / Flow Tags Manager / Node Config Sidebar / RuleExecutor / LangGraph/L0 Router(本 DD の主担当スコープ) |
 | 非対象 | 既存 Canvas コア・Agent 詳細(参照のみ)/ 25 module コア(参照のみ)。これらは DD-CANVAS-001 / DD-CANVAS-AGENT-001 が担当。 |
-| 作成日 | 2026-09-14 |
+| 作成日 | 2026-09-28 (v1.0.2; initial v1.0 2026-09-14) |
 | 作成者 | ULYS-33 担当エージェント |
-| Review 状態 | 未開始(IPA 詳細設計 自審は Round 7 で実施) |
+| Review 状態 | v1.0.2 integration review 待ち；旧 Round 7 结果仅适用于 v1.0.1 基线 |
 
 ## §1 文档目的
 
-本書は `BD-CANVAS-WORKFLOW-001` v1.0.3 で確定した 54 FR(W1〜W15、うち W14 に 3 セットの既定ワークフローテンプレート + Agent プレースホルダノード/エッジ/データフロー、W15 に LangGraph 知的制御 + キャンバス底部チャットバー)を **実装可能な粒度** にブレークダウンする。
+本書は `BD-CANVAS-WORKFLOW-001` v1.0.4 で確定した 54 FR(W1〜W15、うち W14 に 3 セットの既定ワークフローテンプレート + Agent プレースホルダノード/エッジ/データフロー、W15 に LangGraph 知的制御 + Group Shell 共有底栏との接続)を **実装可能な粒度** にブレークダウンする。W15 はチャット入力アダプターを担当し、底栏 UI と session scope の所有者は Group Shell とする。
 
 具体的には:
 
@@ -2455,4 +2456,125 @@ ActivationGuard.pre_check(flow_id, tenant_id):
 |---|---|---|---|
 | v1.0 | 2026-09-14 | 初版交付, 覆盖 SRS-CANVAS-WORKFLOW-001 v1.1 全部 54 项 FR (W1-W15), §0-§14 完整章节结构, 11 Module / 30+ Class / 8 REST API / 8 Table / 36 TBD 追踪矩阵 + 5 項目追加 / 12 確認事項 + IPA 自審 | MinimaxM3 (agent) |
 | v1.0.1 | 2026-09-14 | Round 7 補強: ADR-0046 実在パス確認反映 (RV-MAJ-01 / RV-OPN-01 / RV-MIN-04 解消), §7.11/§7.12/§13.1/§14.2.1/§14.2.4/§14.5 を更新, TMO 7 ノード・7 协议・8 API 端点・State 5 字段を §7.11/§7.12 外部 IF に実值反映, 重大指摘 4→3 / 確認事項 12→11 / 軽微 4→3 | MinimaxM3 (agent) |
+| v1.0.2 | 2026-09-28 | 增补 Worktree 群组 / Group Shell 接入、Flow Worktree ownership、scope-aware chat/run schema、canonical WorkItem 深链、GLOBAL 逐目标授权和 Transaction/Work 分层；不覆盖旧版评审记录 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 |
 
+---
+
+## §16 Worktree Group / Group Shell 详细设计补充 (v1.0.2)
+
+本节落实 SRS v1.2、BD v1.0.4 的群组集成。Canvas Workflow 是 Worktree 群组内 Infinite Canvas 的自动化能力；它不拥有 Worktree 导航、共享底栏、WorkItem lifecycle 或插件入口。
+
+### 16.1 Ownership 与数据契约
+
+| 对象 | 归属 | Workflow 的职责 |
+|---|---|---|
+| Worktree 导航、群组应用同级入口 | Group Shell | 通过 `GroupContextRef` 接入，不生成局部应用树 |
+| 底部聊天栏与 scope selector | Group Shell | `ChatBarService` 收敛为 `GroupShellChatAdapter`；适配 Group Shell session 和 L0，不绘制/持有独立聊天栏 |
+| `work_item_id` 与 lifecycle | WorkItem / Multica Domain | Workflow 仅将触发/自动化来源作为 `EntityRef`；不得直接更改任务状态 |
+| Flow 定义/版本 | Canvas Workflow Domain | 创建和实例化时固定一个 `worktree_id` |
+| execution/checkpoint | Workflow Runtime / LangGraph | 每个执行带 `scope_kind`、来源 chat、Flow/Worktree 和 correlation；checkpoint 是可清理 Work |
+| plugin entry/capability | Group App Registry | Workflow 通过 capability bridge 使用获准服务；不使用 SubAgentRegistry 注册插件入口 |
+
+规范 `FlowRunContext`：
+
+```text
+FlowRunContext = {
+  tenant_id, actor_id, scope_kind,
+  worktree_id, target_worktree_ids,
+  automation_flow_id, automation_flow_version_id,
+  origin_chat_session_id?, work_item_id?, task_card_id?, entity_refs[],
+  permission_snapshot_ref, correlation_id, idempotency_key
+}
+```
+
+服务端由已认证 principal 生成 `tenant_id/actor_id/permissions`；不采信客户端 permission 字段。`automation_flow.worktree_id` 是唯一 owner；实例化模板时复制到新 Flow，不能从无权群组创建 Flow。Flow trigger 如需跨群组，只能转成 L0 GLOBAL 请求，由 L0 对每个 target Worktree 预授权并逐项派发。
+
+### 16.2 Schema 变更与 W/T/M
+
+```sql
+ALTER TABLE automation_flow
+  ADD COLUMN worktree_id UUID;
+-- Backfill only from an authoritative stored owner; quarantine ambiguous rows.
+-- After reconciliation, enforce NOT NULL and the canonical Worktree FK.
+CREATE INDEX idx_automation_flow_worktree
+  ON automation_flow (tenant_id, worktree_id, enabled);
+
+ALTER TABLE chat_session
+  ADD COLUMN scope_kind VARCHAR(16) NOT NULL DEFAULT 'WORKTREE'
+    CHECK (scope_kind IN ('WORKTREE','GLOBAL')),
+  ADD COLUMN worktree_id UUID,
+  ADD COLUMN target_worktree_ids JSONB NOT NULL DEFAULT '[]'::jsonb
+    CHECK (jsonb_typeof(target_worktree_ids) = 'array'),
+  ADD COLUMN correlation_id UUID;
+ALTER TABLE execution_history
+  ADD COLUMN origin_chat_session_id UUID REFERENCES chat_session(id),
+  ADD COLUMN scope_kind VARCHAR(16) NOT NULL DEFAULT 'WORKTREE'
+    CHECK (scope_kind IN ('WORKTREE','GLOBAL')),
+  ADD COLUMN worktree_id UUID,
+  ADD COLUMN target_worktree_ids JSONB NOT NULL DEFAULT '[]'::jsonb
+    CHECK (jsonb_typeof(target_worktree_ids) = 'array'),
+  ADD COLUMN work_item_id UUID,
+  ADD COLUMN task_card_id UUID,
+  ADD COLUMN correlation_id UUID;
+```
+
+For new rows, `automation_flow.worktree_id` is required and immutable after creation; `chat_session.worktree_id` is the Worktree where the Group Shell session was opened, including GLOBAL sessions. Legacy rows remain nullable until authoritative backfill is available. The logical foreign key targets the Worktree Domain's canonical ID; physical FK/table names are resolved with its migration.
+
+| 表/数据 | 分类 | 保留及写入规则 |
+|---|---|---|
+| `automation_flow`, `automation_flow_versions` | Master | 每条 Flow 有 `worktree_id`; RLS 13 类 + SCD Type 2; 外部插件不能越过所属群组 |
+| `chat_session`、逐条消息/scope snapshot | Transaction | 每个 session 固定 scope；用户切换 WORKTREE/GLOBAL 或 GLOBAL target set 时开启新的 scoped session；message/授权决策 append-only，保存 actor、scope、Worktree 与 correlation |
+| `execution_history`, `execution_step` | Transaction | 每个 completed/failed run 形成不可变记录；字段包括 origin chat、scope、worktree、targets 和 WorkItem/Task Card refs；敏感输入/输出先脱敏 |
+| 活跃 run/checkpoint/current status | Work | Runtime Work projection/checkpointer，必须有 `retention_period`/`expires_at`; 到期清理不删 Transaction history |
+| Flow draft/临时编辑状态 | Work | 带 retention；确认后才在 Flow Domain 创建 Master Flow |
+
+**规范性覆盖（Worktree 群组模式）**：本节取代前文任何把 `chat_session.parsed_flow_draft`、`chat_session.applied` 或 `execution_history.status='running'` 当作可变事实源的旧说明。`chat_session` 只追加用户/系统消息、scope snapshot、draft 引用及确认/取消事件；Flow 草稿正文和未完成编辑态放在有 `retention_period`/`expires_at` 的 Runtime Work checkpoint。旧列若因兼容暂时保留，只能作为只读投影并停止写入；确认后创建 Flow Master 并 append 确认事件，取消/过期后清理 Work 草稿并 append 对应事件。活跃 execution 状态写 `execution_run_current`，最终结果 append 到 `execution_history`/`execution_step`。
+
+前文 §8.7、§10.7、§11 中把 `parsed_flow_draft` / `applied` 写入 `chat_session` 的描述视为旧版持久化方式，统一按本条执行；API/WebSocket 可继续返回 `parsed_flow_draft` 作为短期 DTO，但 payload 只保存在 Runtime Work checkpoint，不写进 Transaction 行。
+
+`execution_history` 作为 Transaction 不允许原位覆盖历史步骤或授权目标。需要更新的活跃 `status` 写在 Runtime 管理的 Work projection `execution_run_current`（可复用既有 Runtime run registry/checkpoint store，不额外创建 Workflow 业务表）；结束时 append 最终 execution record 和 event。`target_worktree_ids` 保存已授权的目标 snapshot 与逐目标结果；请求原文/未授权目标另记拒绝事件，不得将其当成执行授权。
+
+新迁移要求：所有既有 automation_flow 在 `worktree_id` backfill 前保持只读；若 owner 无法从持久来源唯一确定则放入 reconciliation 清单，不按浏览器当前路径猜测。RLS policy 必须同时检查 tenant 与 Worktree。GLOBAL 写操作 target list 必须非空，逐项 ACL preflight 完成后才进入 side effect 阶段。
+
+### 16.3 请求、消息与确认序列
+
+```json
+{
+  "message": "创建一个检查 CI 并更新任务卡的流程",
+  "scope_kind": "WORKTREE",
+  "worktree_id": "<current-worktree>",
+  "target_worktree_ids": [],
+  "entity_refs": [{"type":"work_item","id":"<work-item-id>","worktree_id":"<current-worktree>"}],
+  "idempotency_key": "<per-user-turn>",
+  "correlation_id": "<trace-id>"
+}
+```
+
+- Group Shell Chat Adapter 校验 scope 格式，再由 API middleware 按登录主体解析 GroupContext 与实体 ACL。
+- L0 可以提议 Flow draft；draft 正文写入有 TTL 的 Runtime Work checkpoint，`chat_session` 只追加消息与 draft reference；draft 尚未成为 Flow Master，也未触发 external side effect。
+- 用户确认后 `FlowDraftService` 再验证 Flow owner、Worktree、引用和插件 capability，并在单个事务创建 Flow/version。
+- 生成、确认、取消 draft 均向 `chat_session` 追加事件；draft 更新不原位改写 Transaction 行，确认成功后再清理 Work draft。
+- 手动或事件触发 execution 都生成新的 Run ID；LangGraph thread ID 不等同于 chat session、WorkItem 或 Task Card ID。
+- 中断/恢复时重新加载并重新校验权限、插件状态和 GroupContext；历史 checkpoint 只恢复计算状态，不恢复已撤销授权。
+- 只有经筛选的 `updates/messages/custom` UI DTO 发给 Group Shell；不向群组普通成员流出完整 checkpoint 或敏感 step payload。
+
+### 16.4 失败语义与验收
+
+| 条件 | 结果 |
+|---|---|
+| WORKTREE 缺少 `worktree_id` 或 Flow 与上下文不一致 | `422 group_context_invalid`，不建 session/run |
+| GLOBAL 写缺目标集合 | `422 target_required`，不创建 execution |
+| 一个目标无权 | 该目标记录 `target_forbidden` 且无 side effect；其他已授权目标返回独立结果 |
+| 插件已禁用/撤权 | 新 capability call 返回 `403 capability_unavailable`；Flow/WorkItem 和审计保留 |
+| L0/checkpointer 暂时不可用 | 当前 run 标记暂停/失败并保留可见状态；重试前重新授权，不假报成功 |
+| 用户取消 draft | 只记取消事件并清理过期 Work draft；不创建 Flow 或 WorkItem |
+
+| 验收 ID | 通过条件 |
+|---|---|
+| WF-GROUP-01 | 从 Multica/Jira/Canvas 打开的 WorkItem 引用在 Flow、Run、Task Card 中 ID 一致 |
+| WF-GROUP-02 | 共享底栏在切换同级应用时保持；W15 只适配，不新增第二个聊天栏 |
+| WF-GROUP-03 | 每个 Flow 绑定 Worktree；Workflow API、模板 instantiate、trigger 均强制 owner 校验 |
+| WF-GROUP-04 | GLOBAL target 授权与结果逐项持久化；未授权目标无副作用 |
+| WF-GROUP-05 | checkpoint expiration 不删除 execution/chat/audit Transaction 事实 |
+
+**版本缺口**：LangGraph Python context/checkpointer 的精确 API 需与仓库实际锁定版本进行 compatibility review；Workflow 设计只依赖“每次 run 的不可变验证上下文”和重新授权语义，不把特定 SDK 版本当作已升级事实。
