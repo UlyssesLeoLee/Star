@@ -60,7 +60,7 @@ jobs:
           cat docs/mock-switch-status.md
 
       - name: Upload report artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mock-switch-status
           path: docs/mock-switch-status.md

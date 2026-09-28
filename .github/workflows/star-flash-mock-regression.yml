@@ -40,7 +40,7 @@ jobs:
       - name: Upload regression report artifact
         # 守门 #12: commit-time docs 同步 — 把本日综合报告 upload, 方便 PR review 对比
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: star-flash-mock-regression-report
           path: |
