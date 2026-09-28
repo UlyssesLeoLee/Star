@@ -81,6 +81,24 @@ def test_detect_group_core():
     assert group_guard.detect_group_from_branch(branch) == "core"
 
 
+
+def test_check_group_boundary_activation_allowed():
+    """Activation files (docs/scripts/automation) allowed in any group."""
+    files = [
+        "docs/worktree-group-guard.md",
+        "scripts/automation/group_guard.py",
+    ]
+    passed, violations = group_guard.check_group_boundary("canvas", files)
+    assert passed, f"Activation files should be allowed in canvas: {violations}"
+
+
+def test_check_group_boundary_frontend_with_canvas_violation():
+    """frontend-group PR 改 canvas-engine still fails (no cross-group)."""
+    files = ["frontend/src/App.tsx", "crates/canvas-engine/src/lib.rs"]
+    passed, violations = group_guard.check_group_boundary("frontend", files)
+    assert not passed
+    assert any("canvas-engine" in v for v in violations)
+
 if __name__ == "__main__":
     test_check_group_boundary_canvas()
     test_check_group_boundary_canvas_violation()
@@ -91,4 +109,6 @@ if __name__ == "__main__":
     test_detect_group_domain()
     test_detect_group_frontend()
     test_detect_group_core()
-    print("✅ All 9 group_guard tests PASS")
+    test_check_group_boundary_activation_allowed()
+    test_check_group_boundary_frontend_with_canvas_violation()
+    print("✅ All 11 group_guard tests PASS")
