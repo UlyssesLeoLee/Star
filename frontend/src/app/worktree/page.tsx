@@ -10,10 +10,16 @@ CREATE
   (agentSessions:Variable {name:"agentSessions", type:"variable", language:"typescript"}),
   (localRuntimes:Variable {name:"localRuntimes", type:"variable", language:"typescript"}),
   (project:Variable {name:"selectedProject", type:"variable", language:"typescript"}),
+  (requestedProjectId:Variable {name:"requestedProjectId", type:"variable", language:"typescript"}),
+  (persistedProject:Variable {name:"persistedProject", type:"variable", language:"typescript"}),
+  (router:Variable {name:"router", type:"variable", language:"typescript"}),
+  (searchParams:Variable {name:"searchParams", type:"variable", language:"typescript"}),
   (worktrees:Variable {name:"projectWorktrees", type:"variable", language:"typescript"}),
   (worktree:Variable {name:"wt", type:"variable", language:"typescript"}),
+  (projectSelectionGate:Logic {name:"projectSelectionGate", type:"logic", language:"tsx", complexity:"simple"}),
   (nextStates:Variable {name:"allowedNext", type:"variable", language:"typescript"}),
   (selectProject:Function {name:"selectProject", type:"function", signature:"onChange(event): void", visibility:"private", complexity:"simple"}),
+  (syncProjectSelection:Function {name:"syncProjectSelection", type:"function", signature:"useEffect callback(): void", visibility:"private", complexity:"moderate"}),
   (projectMap:Function {name:"projectMap", type:"function", signature:"projects.map(project => JSX.Element)", visibility:"private", complexity:"simple"}),
   (worktreeMap:Function {name:"worktreeMap", type:"function", signature:"projectWorktrees.map(worktree => JSX.Element)", visibility:"private", complexity:"moderate"}),
   (transitionMap:Function {name:"transitionMap", type:"function", signature:"allowedNext.map(status => JSX.Element)", visibility:"private", complexity:"simple"}),
@@ -27,11 +33,17 @@ CREATE
   (file)-[:CONTAINS]->(row),
   (file)-[:CONTAINS]->(apps),
   (file)-[:CONTAINS]->(editor),
+  (file)-[:CONTAINS]->(projectSelectionGate),
   (page)-[:USES]->(projects),
   (page)-[:USES]->(agentSessions),
   (page)-[:USES]->(localRuntimes),
   (page)-[:USES]->(project),
+  (page)-[:USES]->(requestedProjectId),
+  (page)-[:USES]->(persistedProject),
+  (page)-[:USES]->(router),
+  (page)-[:USES]->(searchParams),
   (page)-[:USES]->(worktrees),
+  (page)-[:USES]->(projectSelectionGate),
   (page)-[:USES]->(wt),
   (page)-[:USES]->(nextStates),
   (page)-[:CALLS]->(filterProject),
@@ -44,6 +56,13 @@ CREATE
   (page)-[:CALLS]->(transitionMap),
   (page)-[:CALLS]->(appMap),
   (page)-[:CALLS]->(selectProject),
+  (page)-[:CALLS]->(syncProjectSelection),
+  (selectProject)-[:USES]->(router),
+  (selectProject)-[:USES]->(searchParams),
+  (syncProjectSelection)-[:USES]->(router),
+  (syncProjectSelection)-[:USES]->(searchParams),
+  (syncProjectSelection)-[:USES]->(persistedProject),
+  (syncProjectSelection)-[:USES]->(project),
   (page)-[:CALLS]->(row),
   (page)-[:USES]->(apps),
   (page)-[:USES]->(editor);
@@ -52,6 +71,7 @@ CREATE
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useNavStore } from "@/lib/nav/navStore";
@@ -95,21 +115,35 @@ const MonacoEditor = dynamic(
 
 export default function WorktreePage() {
   const { t } = useTranslation();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { projects, worktrees, agentSessions, localRuntimes, transitionWorktree } = useStore();
   const selectedProjectId = useNavStore((state) => state.selectedProjectId);
   const setSelectedProjectId = useNavStore((state) => state.setSelectedProjectId);
   const [hasMounted, setHasMounted] = useState(false);
-  const selectedProject = projects.find((project) => project.id === (hasMounted ? selectedProjectId : null)) ?? projects[0] ?? null;
+  const requestedProjectId = searchParams.get("project_id");
+  const persistedProject = projects.find((project) => project.id === (hasMounted ? selectedProjectId : null)) ?? null;
+  const selectedProject = requestedProjectId
+    ? projects.find((project) => project.id === requestedProjectId) ?? null
+    : persistedProject;
   const projectWorktrees = worktrees.filter((worktree) => worktree.project_id === selectedProject?.id);
   const [selected, setSelected] = useState<string>("");
 
   useEffect(() => setHasMounted(true), []);
 
   useEffect(() => {
-    if (hasMounted && selectedProject && selectedProjectId !== selectedProject.id) {
+    if (!hasMounted || !selectedProject) return;
+
+    if (selectedProjectId !== selectedProject.id) {
       setSelectedProjectId(selectedProject.id);
     }
-  }, [hasMounted, selectedProject, selectedProjectId, setSelectedProjectId]);
+
+    if (requestedProjectId !== selectedProject.id) {
+      const query = new URLSearchParams(searchParams.toString());
+      query.set("project_id", selectedProject.id);
+      router.replace(`/worktree?${query.toString()}`, { scroll: false });
+    }
+  }, [hasMounted, requestedProjectId, router, searchParams, selectedProject, selectedProjectId, setSelectedProjectId]);
 
   useEffect(() => {
     if (!projectWorktrees.some((worktree) => worktree.id === selected)) {
@@ -146,30 +180,43 @@ export default function WorktreePage() {
           id="worktree-project"
           value={selectedProject?.id ?? ""}
           onChange={(event) => {
-            setSelectedProjectId(event.target.value);
+            const projectId = event.target.value;
+            setSelectedProjectId(projectId);
             setSelected("");
+            const query = new URLSearchParams(searchParams.toString());
+            query.set("project_id", projectId);
+            router.replace(`/worktree?${query.toString()}`, { scroll: false });
           }}
           className="rounded-md border border-line bg-bg-soft px-3 py-2 text-sm"
           data-testid="worktree-project-selector"
         >
+          {!selectedProject && <option value="" disabled>选择 Project</option>}
           {projects.map((project) => (
             <option key={project.id} value={project.id}>{project.key} · {project.name}</option>
           ))}
         </select>
-        <span className="text-xs text-ink-mute">原型按所选 Project 过滤本地数据；服务端授权尚未接入。</span>
+        <span className="text-xs text-ink-mute">原型按路由中的 Project 过滤本地数据；服务端授权尚未接入。</span>
       </section>
 
-      <div className="card mb-4 flex flex-wrap items-center gap-3 text-xs">
-        <span className="font-semibold text-ink-dim">Worktree 创建 / 导入</span>
-        <span className="text-ink-mute">等待 Project→Repository 绑定和服务端受权 API；当前页面不发起创建或清理操作。</span>
-      </div>
+      {requestedProjectId && !selectedProject && (
+        <div role="status" className="card mb-4 text-sm text-warning" data-testid="worktree-project-unavailable">
+          当前链接中的 Project 无法在本地原型数据中解析；请选择一个可用 Project。
+        </div>
+      )}
 
-      {selectedProject && <SectionTitle>{selectedProject.key} · {selectedProject.name} 的 Worktree</SectionTitle>}
-      <div className="mb-5">
-        <StateMachineDiagram sm={WORKTREE_SM} highlightState={wt?.status} />
-      </div>
+      {selectedProject ? (
+        <>
+          <div className="card mb-4 flex flex-wrap items-center gap-3 text-xs">
+            <span className="font-semibold text-ink-dim">Worktree 创建 / 导入</span>
+            <span className="text-ink-mute">等待 Project→Repository 绑定和服务端受权 API；当前页面不发起创建或清理操作。</span>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <SectionTitle>{selectedProject.key} · {selectedProject.name} 的 Worktree</SectionTitle>
+          <div className="mb-5">
+            <StateMachineDiagram sm={WORKTREE_SM} highlightState={wt?.status} />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* 列表 */}
         <div className="lg:col-span-2">
           <div className="card">
@@ -327,7 +374,14 @@ export default function WorktreePage() {
                         )}
                       </div>
                     </div>
-                  </div>
+                </>
+              ) : (
+                <section className="card space-y-2" data-testid="worktree-project-selection-prompt">
+                  <h2 className="text-sm font-semibold">先选择 Project</h2>
+                  <p className="text-xs text-ink-mute">选择 Project 后，这里才显示该项目的 Worktree 清单和管理信息。</p>
+                </section>
+              )}
+            </div>
                 );
               }
 

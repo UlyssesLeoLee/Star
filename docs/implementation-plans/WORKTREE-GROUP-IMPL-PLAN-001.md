@@ -1,13 +1,13 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project Worktree 群组实施计划 v0.4**
+> **渡口 Project Worktree 群组实施计划 v0.5**
 >
-> - 状态：🟡 执行中（Phase 0 已按 Project → Worktree → Group Apps 收口；Phase 1 canonical route、项目入口和本地 Group Shell 预览已在浏览器验证；Phase 2 等待安全 API / 持久化门槛）
+> - 状态：🟡 执行中（Phase 0/1 已完成设计与预览；Phase 2A GroupContext / 跨 App 契约详细设计完成；下一步 Phase 2B 实装认证 Actor、Project/Worktree ACL 与 GroupContextResolver）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - 日期：2026-09-29
-> - 关联需求：`docs/requirements.md` v2.3 §50
-> - 关联基本设计：`docs/basic-design.md` v0.4 §16
-> - 关联详细设计：`docs/design/DD-MULTICA-TASK-001.md` v0.3、`docs/design/DD-CANVAS-001.md` v0.2、`docs/design/DD-CANVAS-WORKFLOW-001.md` v1.0.2
+> - 关联需求：`docs/requirements.md` v2.4 §50
+> - 关联基本设计：`docs/basic-design.md` v0.5 §16
+> - 关联详细设计：`docs/design/DD-WORKTREE-GROUP-001.md` v0.1、`docs/design/DD-MULTICA-TASK-001.md` v0.3、`docs/design/DD-WORKTREE-CANVAS-001.md` v1.3
 
 ---
 
@@ -27,7 +27,7 @@ Project（先选择，限定可见工作范围）
         └── Plugin Apps（可启停的同级应用入口）
 ```
 
-`/worktree` 是项目 Worktree 管理入口，Project 页的 Worktrees 视图可进入该 Index；`/worktree/{worktree_id}/group` 展开指定 Worktree 的同级应用。所有生产入口均消费同一个服务端解析、授权后的 `GroupContext(worktree_id, tenant_id, actor_id, permission_snapshot_ref, correlation_id)`。应用导航由 Group Shell 持有；应用只负责自己的领域视图，不得创建第二棵 Worktree 树或自己的底部聊天栏。
+`/worktree?project_id={project_id}` 是项目 Worktree 管理入口，Project 页的 Worktrees 视图传递当前 Project ID 进入 Index；`/worktree/{worktree_id}/group` 展开指定 Worktree 的同级应用。所有生产入口均消费同一个服务端解析、授权后的 `GroupContext(worktree_id, tenant_id, actor_id, permission_snapshot_ref, correlation_id)`。应用导航由 Group Shell 持有；应用只负责自己的领域视图，不得创建第二棵 Worktree 树或自己的底部聊天栏。
 
 “完成”分两级报告：
 
@@ -66,16 +66,16 @@ Project（先选择，限定可见工作范围）
 
 | Phase | 交付范围 | 依赖 | 完成门 |
 |---|---|---|---|
-| **0 设计基线** | 需求/基本/详细设计统一 Project 选择 → Worktree 管理 → 展开后同级 App、canonical ID、ownership、W/T/M 和权限规则 | `requirements.md` v2.3 §50、`basic-design.md` v0.4 §16、详细设计 v0.3 | ✅ 已收口；未知 SDK 版本仍作为兼容门 |
-| **1 Group Shell 原型** | 项目选择、项目 Worktree 清单与状态管理面板；展开 Worktree 后显示 Multica/Jira/Task Card/Canvas/Workflow/Plugins 同级导航；Canvas ↔ Task Card 深链；底部 scope selector | 现有 project nav store / frontend store / CanvasView | 🟡 预览交付：Project 页 Worktrees 视图进入 canonical `/worktree` Index；浏览器可见按 Project 过滤的 Worktree 管理信号和同级 App 树；Task Card / CLI preview / WORKTREE-GLOBAL 选择可见，未连接的发送和命令保持禁用；owner 数据与服务端操作仍待接入 |
-| **2 canonical 任务闭环** | WorkItem 与 Worktree 归属 API、Multica/Jira adapter、Task Card 的读取/写命令和 version/idempotency | 已授权 GroupContextResolver、PostgreSQL repository、alias reconciliation | ⏸️ 准备门未通过：当前 `star-api-rest` WorkItem handler 使用 `InMemoryWorkItemService` / stub auth / 默认 nil-tenant ActorContext；禁止接到 Group Shell。需先完成认证 Actor 注入、Project/Worktree ACL 与持久化 adapter，再验同 ID/version、越界零副作用和幂等 |
-| **3 Canvas 双向联动** | `EntityRef`、Worktree-scoped Canvas 查询、Canvas 创建任务/关联任务/打开任务、跨域 outbox | Phase 2 + Canvas persistence/API | Canvas 和所有任务视图读到同一 canonical ID；Canvas 不能绕过 Lifecycle Service；项目级旧 Canvas migration 冲突隔离 |
+| **0 设计基线** | 需求/基本/详细设计统一 Project 选择 → Worktree 管理 → 展开后同级 App、canonical ID、ownership、W/T/M 和权限规则 | `requirements.md` v2.4 §50、`basic-design.md` v0.5 §16、`DD-WORKTREE-GROUP-001.md` v0.1 | ✅ 已收口；SDK、Plugin sandbox 与在途撤权仍作为兼容门 |
+| **1 Group Shell 原型** | 项目选择、项目 Worktree 清单与状态管理面板；展开 Worktree 后显示 Multica/Jira/Task Card/Canvas/Workflow/Plugins 同级导航；Canvas ↔ Task Card 深链；底部 scope selector | 现有 project nav store / frontend store / CanvasView | 🟡 预览交付：Project Worktrees 入口携带 `project_id` 进入 Index；浏览器可见按 Project 过滤的 Worktree 管理信号和同级 App 树；Task Card / CLI preview / WORKTREE-GLOBAL 选择可见，未连接的发送和命令保持禁用；owner 数据与服务端操作仍待接入 |
+| **2 安全上下文与 canonical 任务闭环** | 2A GroupContext / 跨 App 详细契约；2B 认证 Actor、Project/Worktree ACL、GroupContextResolver；2C PostgreSQL 持久化与 WorkItem / Worktree 归属 API、Multica/Jira adapter、Task Card 读写及 version/idempotency；2D Index 投影与受权管理操作 | 2A 设计基线；认证与 ACL；DB migration、alias reconciliation、Worktree owner / Agent / Runtime / Git 状态事实源 | 🟡 2A 设计完成（`DD-WORKTREE-GROUP-001.md` v0.1）；⏸️ 2B 尚未实装：当前 `star-api-rest` WorkItem handler 使用 `InMemoryWorkItemService` / stub auth / 默认 nil-tenant ActorContext，不能接到 Group Shell。依次通过认证 Actor + ACL 负向验收、持久化同 ID/version 与幂等验收、Index 数据源和管理动作验收 |
+| **3 Canvas 双向联动** | `EntityRef`、Worktree-scoped Canvas 查询、Canvas 创建任务/关联任务/打开任务、跨域 outbox | Phase 2B ACL + Phase 2C persistence / WorkItem API + Canvas persistence/API | Canvas 和所有任务视图读到同一 canonical ID；Canvas 不能绕过 Lifecycle Service；项目级旧 Canvas migration 冲突隔离 |
 | **4 Task Card CLI** | `TaskExecutionContext`、本地 Runtime session 绑定、卡内 CLI、运行/取消/断线恢复 | Local Runtime 身份、Worktree checkout、工具与 secret capability ACL | CLI cwd 必须解析为授权 checkout；缺失/过期 scope 拒绝执行；执行记录可追溯，退出后清理 Work 状态 |
-| **5 Group Chat + LangGraph** | Chat scope/targets DTO、服务端 GroupContext middleware、L0 router、Flow draft、LangGraph run/checkpoint、resume 再授权 | Phase 2 ACL、Phase 4 TaskExecutionContext、锁定的 LangGraph SDK compatibility review | WORKTREE 只读写本 Worktree；GLOBAL 写需显式授权目标；未授权目标零副作用；checkpoint 恢复不复活撤销授权；chat session、WorkItem、Task Card、LangGraph thread ID 分离 |
-| **6 Plugin 热插拔** | manifest/version/capability、Group App Registry 动态发现、enable/disable/uninstall、热撤权和 UI 更新 | Phase 2 ACL + Phase 5 L0 capability bridge | disable/uninstall 后新调用即时失败；在途操作有确定取消/排空语义；业务 Transaction 与 Canvas ref 保留；agent registry 不冒充 app registry |
+| **5 Group Chat + LangGraph** | Chat scope/targets DTO、服务端 GroupContext middleware、L0 router、Flow draft、LangGraph run/checkpoint、resume 再授权 | Phase 2B ACL、Phase 4 TaskExecutionContext、锁定的 LangGraph SDK compatibility review | WORKTREE 只读写本 Worktree；GLOBAL 写需显式授权目标；未授权目标零副作用；checkpoint 恢复不复活撤销授权；chat session、WorkItem、Task Card、LangGraph thread ID 分离 |
+| **6 Plugin 热插拔** | manifest/version/capability、Group App Registry 动态发现、enable/disable/uninstall、热撤权和 UI 更新 | Phase 2B ACL + Phase 5 L0 capability bridge | disable/uninstall 后新调用即时失败；在途操作有确定取消/排空语义；业务 Transaction 与 Canvas ref 保留；agent registry 不冒充 app registry |
 | **7 跨应用验收与发布** | Worktree → 每个 app 的端到端路径、权限矩阵、审计、故障注入、性能和迁移演练 | Phase 1-6 | §4 验收全过；已知缺口逐项关闭或保留为有 owner 的 release blocker；发布说明不把 preview 标为生产能力 |
 
-Phase 2、3 可在接口契约稳定后并行开发；Phase 4、5 共享授权与执行身份，未完成对应 API 前不能用 UI stub 替代。Phase 6 必须复用 Phase 5 的 L0 capability bridge。
+Phase 2B 是安全基础门；2C 与 Canvas 数据层可在命令契约稳定后并行开发，2D 依赖 owner / Session / Runtime / Git 状态的权威数据源。Phase 4、5 共享授权与执行身份，未完成对应 API 前不能用 UI stub 替代。Phase 6 必须复用 Phase 5 的 L0 capability bridge。
 
 ## §4 跨应用验收矩阵
 
@@ -115,12 +115,15 @@ Phase 2、3 可在接口契约稳定后并行开发；Phase 4、5 共享授权�
 
 | Phase | 结果 | 证据/限制 |
 |---|---|---|
-| 0 设计基线 | 🟢 完成 | 需求 v2.3 §50、基本设计 v0.4 §16、Multica 详细设计 v0.3 对齐 Project → Worktree → Group Apps；跨 Worktree 归属、GLOBAL 部分成功、W/T/M legacy gap 与 LangGraph 兼容门已明确 |
-| 1 Group Shell | 🟡 预览完成 | Project 页 Worktrees 视图 → canonical `/worktree` Project Index → Worktree Group 路由已在浏览器渲染；Index 显示 Agent/Runtime、branch、status、PR、lock 和最近活动；Group Shell 显示 Task Card、卡内 CLI 预览和 WORKTREE/GLOBAL 选择。数据仍为 seed/local；Worktree owner 字段、服务端 GroupContext、Chat API、真实 terminal session、创建/归档与 plugin runtime 尚未接通 |
-| 2 canonical 任务闭环 | ⏸️ 前置门阻塞 | 现有 REST WorkItem 路由使用内存服务和透传认证 stub；不能安全连 UI。下一实现必须先提供服务端认证 actor、Project/Worktree ACL 和持久化 repository |
+| 0 设计基线 | 🟢 完成 | 需求 v2.4 §50、基本设计 v0.5 §16、Group 详细设计 v0.1 与 Multica 详细设计 v0.3 对齐 Project → Worktree → Group Apps；实体授权、生命周期、事件、W/T/M 与兼容门已明确 |
+| 1 Group Shell | 🟡 预览完成 | Project 页 Worktrees 视图 → `/worktree?project_id=...` → Worktree Group 路由已在浏览器渲染；Index 显示 Agent/Runtime、branch、status、PR、lock 和最近活动；Group Shell 显示 Task Card、卡内 CLI 预览和 WORKTREE/GLOBAL 选择。数据仍为 seed/local；Worktree owner 字段、服务端 GroupContext、Chat API、真实 terminal session、创建/归档与 plugin runtime 尚未接通 |
+| 2A GroupContext / 跨 App 契约 | 🟢 详细设计完成 | `DD-WORKTREE-GROUP-001.md` v0.1 定义认证 actor、Project/Worktree ACL、Worktree 管理 plan/confirm、TaskExecutionContext、EntityRef、Outbox、Chat/LangGraph 与 Plugin 撤权契约；这不代表后端已实现 |
+| 2B 认证 Actor / ACL / GroupContextResolver | ⚪ 下一阶段 | 当前 REST `auth_layer_stub` 不注入认证身份，默认 Actor 不能承载生产请求；先接入验证后的 Actor 与 Project/Worktree ACL，并实现跨租户、跨项目负向拒绝 |
+| 2C canonical 任务闭环 / 持久化 | ⏸️ 等待 2B | WorkItem REST 路由仍使用内存服务；2B 安全上下文完成后，落 PostgreSQL repository、统一 ID/version、幂等命令和生命周期映射 |
+| 2D Worktree Index 投影 / 管理 API | ⚪ 未开始 | 需要 owner、Session、Runtime、PR、Git lock/conflict 等权威投影来源；管理动作须 plan/confirm、乐观锁与 Audit |
 | 3-7 | ⚪ 未开始 | 按 §3 依赖顺序推进；不得把 Phase 1 展示当作生产验收 |
 
-本次验证记录：`/worktree` 返回 HTTP 200；调用 Next `redirects()` 配置确认共有 27 条重定向且不含 `/worktree`。浏览器能渲染 Project Worktree Index 与 `/worktree/wt-003/group?app=task-card&work_item_id=wi-001&cli=1`，AX 树可见同级 App、任务详情、卡内 CLI 预览和禁用的 Chat 发送。`pnpm typecheck` 未通过，仍有 Monaco 子组件、terminal store、push client 和 MSW 重复导出等仓库诊断；定向 Vitest 在收集用例前被 `src/mocks/handlers/index.ts` 中重复导出的 `annotationsHandlers` 阻断。没有把 preview/seed 行为标成生产能力。
+本次 HTTP 验证：`/worktree?project_id=prj-mobile` 与 `/worktree/wt-003/group?app=task-card&work_item_id=wi-001&cli=1` 均返回 200，Index 响应保留 `project_id`，Group 响应保留 `wt-003`，没有 redirect。Phase 1 的浏览器预览记录：页面可见同级 App、任务详情、卡内 CLI 预览和禁用的 Chat 发送。`pnpm typecheck` 未通过，仍有 Monaco 子组件、terminal store、push client 和 MSW 重复导出等仓库诊断；定向 Vitest 在收集用例前被 `src/mocks/handlers/index.ts` 中重复导出的 `annotationsHandlers` 阻断。没有把 preview/seed 行为标成生产能力。
 
 ---
 
@@ -132,3 +135,4 @@ Phase 2、3 可在接口契约稳定后并行开发；Phase 4、5 共享授权�
 | v0.2 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Phase 0 设计收口与 Phase 1 预览原型交付；补充阶段结果、typecheck 基线缺口和生产验收边界 | 用户要求继续推进到完成 |
 | v0.3 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将导航改为 Project selector → Project Worktree Index → Worktree → 同级 Group Apps；确认多 Agent 可见性与服务端安全门槛 | 用户澄清核心痛点为多 Agent Worktree 混乱与内部管理不可控 |
 | v0.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 `/worktree` 为 Index canonical route，从 Project Worktrees 视图建立入口；移除其指向 Sprint 树视图的 redirect；补充 Worktree owner projection 缺口 | 本地 HTTP 检查显示 `/worktree` 返回 307 至 Sprint |
+| v0.5 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 GroupContext 与跨 App 详细设计；将 Phase 2 拆成 2A 设计、2B 认证/ACL、2C 持久化任务闭环、2D Worktree Index 投影；Project Index 路由保留 `project_id` | REST WorkItem 路由复核确认默认 Actor、no-op auth 与 in-memory blocker |

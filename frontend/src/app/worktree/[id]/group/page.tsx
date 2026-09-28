@@ -256,7 +256,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
           </div>
           <div className="flex items-center gap-2">
             <span className="rounded border border-warning/40 bg-warning/10 px-2 py-1 text-[10px] text-warning">前端原型 · mock store</span>
-            <Link href="/worktree" className="btn text-xs">Project Worktree Index</Link>
+            <Link href={`/worktree?project_id=${encodeURIComponent(worktree.project_id)}`} className="btn text-xs">Project Worktree Index</Link>
           </div>
         </div>
       </header>

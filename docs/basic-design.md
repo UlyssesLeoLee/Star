@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v0.4 (2026-09-29)
-> **上游要件定义书**: `D:\Star\docs\requirements.md` v2.3(下文以 §N 引用)
+> **文档版本**: v0.5 (2026-09-29)
+> **上游要件定义书**: `D:\Star\docs\requirements.md` v2.4(下文以 §N 引用)
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -4163,7 +4163,7 @@ frontend/src/
 
 本节把项目内的多 Agent Worktree 管理设为主工作流程。用户先选择 Project，随后只看到该 Project 可访问的 Worktree 清单及其运行状态；展开一个 Worktree 后，在它下面显示当前的 Group App 导航和内容区。CLI 与 Agent Session 从 Task Card 内打开。固定底栏 Chat Bar 只在进入某个 Worktree Group 后显示，并在发送前选择 `WORKTREE` 或 `GLOBAL` 范围。
 
-Project 的 Worktrees 视图提供进入 Project Worktree Index 的链接；`/worktree` 是该 Index 的 canonical route，`/worktree/{worktree_id}/group` 是对应群组入口。两者不得重定向到 Sprint / 通用任务列表；直接访问、刷新和从项目入口跳转都必须保留当前 Project 或 `worktree_id`。
+Project 的 Worktrees 视图提供进入 Project Worktree Index 的链接，并传递 `project_id`；`/worktree?project_id={project_id}` 是该 Index 的 canonical deep link，`/worktree` 无项目参数时先显示 Project Selector（可恢复经用户选定的最近项目，但须规范化为带参数 URL）。`/worktree/{worktree_id}/group` 是对应群组入口，其 Project 归属由服务端按 Worktree 解析。所有路由不得重定向到 Sprint / 通用任务列表；直接访问、刷新和从项目入口跳转都必须保留当前 Project 或 `worktree_id`。缺少或无效的 `project_id` 不得静默回退到任意项目。
 
 导航树分两步展开：Project → Project-scoped Worktree Index → Worktree → Group Apps。Worktree Index 的行或卡片须可比较分支、Worktree 状态、Owner/Agent、Runtime、PR、冲突/锁和最近活动，并提供受权管理入口。展开的 Worktree 下，Multica 生命周期、Jira 类工作管理、Task Card 索引、Infinite Canvas、Workflow/LangGraph 与已启用插件是同级应用。**Task Cards 与 Infinite Canvas 是直接挂在 Worktree 下的平级入口**；Task Card 可由 Multica 或 Jira 类视图打开，但不隶属于其中某个 App。CLI 与 Agent Session 是任务卡内的操作面板，不是导航树节点。
 
@@ -4192,7 +4192,7 @@ Worktree Group 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 |---|---|---|---|
 | `ProjectSelector` | 选择当前项目范围并同步导航状态 | actor 可访问的 Project projections | 未授权 Project 不可出现在 selector；切换后清除上个项目的 Worktree selection |
 | `ProjectWorktreeIndex` / `WorktreeIndex` | 只展示当前 Project 可访问的 Worktree，并比较 branch、status、owner/Agent、Runtime、PR、风险/锁和最近活动 | `project_id`, actor permissions, Worktree projections | 不把 Task 状态折叠成 Worktree 状态；遵循 RLS；不混列其他 Project |
-| `ProjectWorktreesEntry` | 从 Project 的 Worktrees 视图打开 canonical Project Worktree Index | selected `project_id` | 保留 Project 选择；入口不得落入通用任务树路由 |
+| `ProjectWorktreesEntry` | 从 Project 的 Worktrees 视图打开 `/worktree?project_id={project_id}` | selected `project_id` | 深链保留 Project 选择；入口不得落入通用任务树路由 |
 | `WorktreeTreeNode` | 展开/收起 Worktree；展开后挂出同级 App 导航，显示管理状态与可用动作 | `worktree_id`, lifecycle/status projection, permissions | 未展开时不渲染 App 子树；危险动作须按现有 Worktree Action Guard 确认、幂等和审计 |
 | `WorktreeGroupShell` | 组合当前 Worktree Header、同级 App 导航、主内容区、固定底栏 Chat Bar | 已授权 `GroupContext` | 切换 Worktree 时重新解析上下文和订阅；当前 WT 与 App 树选择一致 |
 | `GroupAppRegistry` | 根据平台注册表及 Group App Binding 生成同级 App 入口 | app manifest, enablement, permissions | 插件路由与原生 App 使用相同授权接口 |
@@ -4442,3 +4442,4 @@ Chat Bar(scope, text, entity_refs)
 | v0.2 | 2026-09-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 继承 requirements v2.1 §50，新增 Worktree Index/Group Shell、同级 App、Group Context、受控任务卡 CLI、范围化 LangGraph Chat、Plugin 热插拔、W/T/M 分类、跨 App 事件与追踪验收 | 用户要求 Worktree 作为顶层索引及群组应用体系 |
 | v0.3 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 导航明确为 Project 选择 → Project Worktree Index → 展开 Worktree → 同级 Group Apps；将多 Agent Worktree owner/Runtime/PR/冲突/锁可视与受控管理纳入核心职责 | 用户澄清产品要解决多 Agent Worktree 混乱及内部管理不可控 |
 | v0.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Project Worktree Index 与 Worktree Group 的 canonical route；Project Worktrees 视图提供管理入口，Worktree 路由不再落入 Sprint 树视图 | 浏览器验收发现 `/worktree` 曾被重定向到 Sprint |
+| v0.5 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Index 的 Project 选择编码进 `project_id` deep link；缺少/无效项目时禁止静默回退；Project 页入口与 Group 返回 Index 均保留项目范围 | Project Worktree Index 与 Group 路由详细设计收口 |
