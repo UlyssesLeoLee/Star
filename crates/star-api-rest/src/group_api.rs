@@ -3,11 +3,11 @@
 //!   (f:File {name:"group_api.rs",type:"file",language:"rust"}),(m:Module {name:"group_api",type:"module",language:"rust"}),
 //!   (s:Class {name:"GroupApiState",type:"class"}),(r:Class {name:"GroupContextResolver",type:"class"}),(e:Class {name:"GroupApiError",type:"class"}),
 //!   (b:Class {name:"ProjectBinding",type:"class"}),(w:Class {name:"WorktreeIndexRow",type:"class"}),
-//!   (mi:Module {name:"work_items",type:"module",language:"rust"}),(mt:Module {name:"worktrees",type:"module",language:"rust"}),
+//!   (mi:Module {name:"work_items",type:"module",language:"rust"}),(mt:Module {name:"worktrees",type:"module",language:"rust"}),(ca:Module {name:"canvas",type:"module",language:"rust"}),
 //!   (sn:Function {name:"GroupApiState::new",type:"function"}),(sf:Function {name:"GroupApiState::from_ref",type:"function"}),(rn:Function {name:"GroupContextResolver::new",type:"function"}),(rc:Function {name:"GroupContextResolver::resolve_worktree_context",type:"function"}),(fr:Function {name:"FromRef::from_ref",type:"function"}),
 //!   (eb:Function {name:"GroupApiError::bad_request",type:"function"}),(eu:Function {name:"GroupApiError::unauthorized",type:"function"}),(ef:Function {name:"GroupApiError::forbidden",type:"function"}),(en:Function {name:"GroupApiError::not_found",type:"function"}),(ei:Function {name:"GroupApiError::internal",type:"function"}),(ec:Function {name:"GroupApiError::conflict",type:"function"}),(iv:Function {name:"GroupApiError::invalid_request",type:"function"}),(er:Function {name:"GroupApiError::into_response",type:"function"}),
 //!   (st:Function {name:"set_tenant",type:"function"}),(ab:Function {name:"active_binding",type:"function"}),(va:Function {name:"validate_actor",type:"function"}),(rs:Function {name:"require_scope",type:"function"}),(re:Function {name:"resolve_worktree_context",type:"function"}),(bu:Function {name:"build_group_router",type:"function"}),(wp:Function {name:"worktree_projection",type:"function"}),
-//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(s),(m)-[:CONTAINS]->(r),(m)-[:CONTAINS]->(e),(m)-[:CONTAINS]->(b),(m)-[:CONTAINS]->(w),(m)-[:CONTAINS]->(mi),(m)-[:CONTAINS]->(mt),
+//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(s),(m)-[:CONTAINS]->(r),(m)-[:CONTAINS]->(e),(m)-[:CONTAINS]->(b),(m)-[:CONTAINS]->(w),(m)-[:CONTAINS]->(mi),(m)-[:CONTAINS]->(mt),(m)-[:CONTAINS]->(ca),
 //!   (s)-[:HAS_METHOD]->(sn),(s)-[:HAS_METHOD]->(sf),(r)-[:HAS_METHOD]->(rn),(r)-[:HAS_METHOD]->(rc),(e)-[:HAS_METHOD]->(eb),(e)-[:HAS_METHOD]->(eu),(e)-[:HAS_METHOD]->(ef),(e)-[:HAS_METHOD]->(en),(e)-[:HAS_METHOD]->(ei),(e)-[:HAS_METHOD]->(ec),(e)-[:HAS_METHOD]->(iv),(e)-[:HAS_METHOD]->(er),(m)-[:CONTAINS]->(fr),
 //!   (m)-[:CONTAINS]->(st),(m)-[:CONTAINS]->(ab),(m)-[:CONTAINS]->(va),(m)-[:CONTAINS]->(rs),(m)-[:CONTAINS]->(re),(m)-[:CONTAINS]->(bu),(m)-[:CONTAINS]->(wp),
 //!   (st)-[:CALLS]->(ei),(ab)-[:CALLS]->(ei),(ab)-[:CALLS]->(en),(va)-[:CALLS]->(eu),(rs)-[:CALLS]->(ef),(rc)-[:CALLS]->(st),(rc)-[:CALLS]->(ab),(rc)-[:CALLS]->(ei),(rc)-[:CALLS]->(en),(re)-[:CALLS]->(va),(re)-[:CALLS]->(rs),(re)-[:CALLS]->(eb),(re)-[:CALLS]->(rc),(rc)-[:CALLS]->(wp),(sn)-[:CALLS]->(rn),(bu)-[:CALLS]->(re);
@@ -27,6 +27,7 @@ use uuid::Uuid;
 
 use crate::auth::{oauth::AuthenticatedUser, AuthUser, JwtConfig};
 
+mod canvas;
 mod work_items;
 mod worktrees;
 
@@ -333,5 +334,6 @@ pub fn build_group_router(state: GroupApiState) -> Router {
         )
         .merge(worktrees::router())
         .merge(work_items::router())
+        .merge(canvas::router())
         .with_state(state)
 }

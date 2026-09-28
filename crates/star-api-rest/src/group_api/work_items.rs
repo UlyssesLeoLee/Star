@@ -58,10 +58,10 @@ struct WorkItemListQuery {
 }
 
 #[derive(Debug, FromRow)]
-struct WorktreeScope {
-    workspace_id: Uuid,
-    project_id: Uuid,
-    repo_id: Uuid,
+pub(super) struct WorktreeScope {
+    pub(super) workspace_id: Uuid,
+    pub(super) project_id: Uuid,
+    pub(super) repo_id: Uuid,
 }
 
 #[derive(Debug, FromRow)]
@@ -446,7 +446,7 @@ async fn transition_work_item(
     Ok(Json(response))
 }
 
-async fn authorize_worktree(
+pub(super) async fn authorize_worktree(
     tx: &mut Transaction<'_, sqlx::Postgres>,
     actor: &super::AuthUser,
     worktree_id: Uuid,
@@ -504,7 +504,7 @@ async fn load_work_item(
     Ok(project_work_item(row))
 }
 
-async fn lookup_idempotency(
+pub(super) async fn lookup_idempotency(
     tx: &mut Transaction<'_, sqlx::Postgres>,
     actor: &super::AuthUser,
     key: &str,
@@ -532,7 +532,7 @@ async fn lookup_idempotency(
     }
 }
 
-async fn save_idempotency(
+pub(super) async fn save_idempotency(
     tx: &mut Transaction<'_, sqlx::Postgres>,
     actor: &super::AuthUser,
     key: &str,
@@ -569,7 +569,7 @@ async fn save_idempotency(
     Ok(())
 }
 
-fn idempotency_key(headers: &HeaderMap) -> Result<String, GroupApiError> {
+pub(super) fn idempotency_key(headers: &HeaderMap) -> Result<String, GroupApiError> {
     let key = headers
         .get("Idempotency-Key")
         .and_then(|value| value.to_str().ok())
@@ -578,12 +578,15 @@ fn idempotency_key(headers: &HeaderMap) -> Result<String, GroupApiError> {
     Ok(key.to_owned())
 }
 
-fn request_hash<T: Serialize>(operation: &str, body: &T) -> Result<Vec<u8>, GroupApiError> {
+pub(super) fn request_hash<T: Serialize>(
+    operation: &str,
+    body: &T,
+) -> Result<Vec<u8>, GroupApiError> {
     let bytes = serde_json::to_vec(&(operation, body)).map_err(|_| GroupApiError::internal())?;
     Ok(Sha256::digest(bytes).to_vec())
 }
 
-fn parse_id(value: &str) -> Result<Uuid, GroupApiError> {
+pub(super) fn parse_id(value: &str) -> Result<Uuid, GroupApiError> {
     Uuid::parse_str(value).map_err(|_| GroupApiError::bad_request())
 }
 
@@ -685,7 +688,7 @@ fn default_priority() -> String {
     "medium".to_owned()
 }
 
-fn require_task_writer(role: &str) -> Result<(), GroupApiError> {
+pub(super) fn require_task_writer(role: &str) -> Result<(), GroupApiError> {
     match role {
         "tenant_admin" | "project_admin" | "developer" | "agent" => Ok(()),
         _ => Err(GroupApiError::forbidden()),
