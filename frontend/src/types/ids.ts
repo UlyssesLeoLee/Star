@@ -714,6 +714,13 @@ export type CanvasElementKind =
   | "automation_node"
   | "comment_pin";
 
+/** Worktree Group Canvas reference to an entity owned by another domain. */
+export interface CanvasEntityRef {
+  ref_type: "work_item" | "worktree" | "agent_session" | "automation" | "pull_request" | "comment";
+  ref_id: Uuid;
+  worktree_id: Uuid;
+}
+
 /** Canvas 元素 */
 export interface CanvasElement {
   id: Uuid;
@@ -725,6 +732,8 @@ export interface CanvasElement {
   height: number;
   rotation: number;
   z_index: number;
+  /** Typed Group reference; legacy project canvases may still use content IDs below. */
+  entity_ref?: CanvasEntityRef;
   content: {
     text?: string;
     color?: string;

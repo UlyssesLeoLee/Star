@@ -10,6 +10,9 @@ CREATE
   (scopeType:Variable {name:"ChatScope", type:"variable", language:"typescript"}),
   (isAppId:Function {name:"isAppId", type:"function", signature:"isAppId(value: string | null): value is AppId", visibility:"private", complexity:"simple"}),
   (enabledPlugins:Variable {name:"enabledPlugins", type:"variable", language:"typescript"}),
+  (groupCanvas:Variable {name:"groupCanvas", type:"variable", language:"typescript"}),
+  (canvasLinkError:Variable {name:"canvasLinkError", type:"variable", language:"typescript"}),
+  (setCanvasLinkError:Variable {name:"setCanvasLinkError", type:"variable", language:"typescript"}),
   (projects:Variable {name:"projects", type:"variable", language:"typescript"}),
   (worktrees:Variable {name:"worktrees", type:"variable", language:"typescript"}),
   (worktree:Variable {name:"worktree", type:"variable", language:"typescript"}),
@@ -20,7 +23,7 @@ CREATE
   (taskHref:Function {name:"taskHref", type:"function", signature:"taskHref(workItemId: string, cli?: boolean): string", visibility:"private", complexity:"simple"}),
   (appHref:Function {name:"appHref", type:"function", signature:"appHref(appId: AppId, params?: Record<string, string>): string", visibility:"private", complexity:"simple"}),
   (changeScope:Function {name:"changeScope", type:"function", signature:"changeScope(nextScope: ChatScope): void", visibility:"private", complexity:"simple"}),
-  (openCanvasTask:Function {name:"openCanvasTask", type:"function", signature:"openCanvasTask(workItemId: string): void", visibility:"private", complexity:"simple"}),
+  (openCanvasTask:Function {name:"openCanvasTask", type:"function", signature:"openCanvasTask(workItemId: string, refWorktreeId?: string): void", visibility:"private", complexity:"moderate"}),
   (taskMap:Function {name:"taskMap", type:"function", signature:"projectWorkItems.map(workItem => JSX.Element)", visibility:"private", complexity:"moderate"}),
   (appMap:Function {name:"appMap", type:"function", signature:"GROUP_APPS.map(app => JSX.Element)", visibility:"private", complexity:"moderate"}),
   (jiraColumnMap:Function {name:"jiraColumnMap", type:"function", signature:"STATUS_OPTIONS.map(status => JSX.Element)", visibility:"private", complexity:"moderate"}),
@@ -42,6 +45,9 @@ CREATE
   (page)-[:USES]->(statusOptions),
   (page)-[:USES]->(scope),
   (page)-[:USES]->(enabledPlugins),
+  (page)-[:USES]->(groupCanvas),
+  (page)-[:USES]->(canvasLinkError),
+  (page)-[:USES]->(setCanvasLinkError),
   (page)-[:USES]->(projectWorkItems),
   (page)-[:USES]->(currentApp),
   (page)-[:USES]->(projects),
@@ -66,6 +72,7 @@ CREATE
   (page)-[:CALLS]->(appHref),
   (page)-[:CALLS]->(changeScope),
   (page)-[:CALLS]->(openCanvasTask),
+  (openCanvasTask)-[:CALLS]->(setCanvasLinkError),
   (page)-[:CALLS]->(taskMap),
   (page)-[:CALLS]->(appMap),
   (page)-[:CALLS]->(jiraColumnMap),
@@ -147,6 +154,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const scope: ChatScope = searchParams.get("scope") === "GLOBAL" ? "GLOBAL" : "WORKTREE";
+  const [canvasLinkError, setCanvasLinkError] = useState<string | null>(null);
   const [enabledPlugins, setEnabledPlugins] = useState<Record<string, boolean>>({
     "canvas-insights": true,
     "release-helper": true,
@@ -173,16 +181,23 @@ export default function GroupWorkspacePage({ params }: PageProps) {
   const currentApp = isAppId(requestedApp) ? requestedApp : "multica";
   const currentWorkItemId = searchParams.get("work_item_id");
   const selectedTask = projectWorkItems.find((item) => item.id === currentWorkItemId);
-  const cliPreviewOpen = searchParams.get("cli") === "1";
-  const projectCanvas = worktree
-    ? canvases.find((canvas) => canvas.ref_kind === "project" && canvas.ref_id === worktree.project_id)
+  const cliPreviewOpen = searchParams.get("cli") === "1" && selectedTask?.worktree_id === worktreeId;
+  const groupCanvas = worktree
+    ? canvases.find((canvas) => canvas.ref_kind === "worktree" && canvas.ref_id === worktree.id)
     : undefined;
-  const elements = projectCanvas
-    ? canvasElements.filter((element) => element.canvas_id === projectCanvas.id)
+  const elements = groupCanvas
+    ? canvasElements.filter((element) => element.canvas_id === groupCanvas.id)
     : [];
-  const connectors = projectCanvas
-    ? canvasConnectors.filter((connector) => connector.canvas_id === projectCanvas.id)
+  const connectors = groupCanvas
+    ? canvasConnectors.filter((connector) => connector.canvas_id === groupCanvas.id)
     : [];
+  const selectedTaskCanvasElement = selectedTask
+    ? elements.find((element) =>
+        element.entity_ref?.ref_type === "work_item" &&
+        element.entity_ref.ref_id === selectedTask.id &&
+        element.entity_ref.worktree_id === worktreeId,
+      )
+    : undefined;
   const basePath = `/worktree/${encodeURIComponent(worktreeId)}/group`;
   function taskHref(workItemId: string, cli = false) {
     const query = new URLSearchParams({ app: "task-card", work_item_id: workItemId, scope });
@@ -201,7 +216,15 @@ export default function GroupWorkspacePage({ params }: PageProps) {
     router.replace(`${basePath}?${query.toString()}`, { scroll: false });
   }
 
-  function openCanvasTask(workItemId: string) {
+  function openCanvasTask(workItemId: string, refWorktreeId?: string) {
+    const taskIsBoundHere = projectWorkItems.some(
+      (item) => item.id === workItemId && item.worktree_id === worktreeId,
+    );
+    if (refWorktreeId !== worktreeId || !taskIsBoundHere) {
+      setCanvasLinkError("此 Canvas 引用没有当前 Worktree 的显式授权关联，已阻止跳转。请先在当前 Worktree 中建立 canonical 任务关联。");
+      return;
+    }
+    setCanvasLinkError(null);
     router.push(taskHref(workItemId));
   }
 
@@ -362,8 +385,10 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 border-t border-line pt-3">
-                      <Link href={taskHref(selectedTask.id, true)} className="btn-primary text-xs"><CheckSquare size={13} /> 卡内 CLI 预览</Link>
-                      {projectCanvas && <Link href={appHref("canvas", { highlight: elements.find((element) => element.content.work_item_id === selectedTask.id)?.id ?? "" })} className="btn text-xs"><LayoutGrid size={13} /> 在 Canvas 中定位</Link>}
+                      {selectedTask.worktree_id === worktreeId
+                        ? <Link href={taskHref(selectedTask.id, true)} className="btn-primary text-xs"><CheckSquare size={13} /> 卡内 CLI 预览</Link>
+                        : <span className="rounded border border-line px-2 py-1 text-[10px] text-ink-mute">先绑定当前 Worktree 才能打开 CLI</span>}
+                      {selectedTaskCanvasElement && <Link href={appHref("canvas", { highlight: selectedTaskCanvasElement.id })} className="btn text-xs"><LayoutGrid size={13} /> 在 Canvas 中定位</Link>}
                       <Link href={appHref("jira")} className="btn text-xs"><ArrowUpRight size={13} /> 打开 Jira 视图</Link>
                     </div>
                   </article>
@@ -403,14 +428,15 @@ export default function GroupWorkspacePage({ params }: PageProps) {
           {currentApp === "canvas" && (
             <div className="space-y-3">
               <div className="flex flex-wrap items-end justify-between gap-3">
-                <div><h2 className="text-lg font-semibold">Infinite Canvas · Miro 等价入口</h2><p className="text-xs text-ink-mute">Canvas 与 Task Card 同级；画布元素可打开 canonical WorkItem。</p></div>
-                <span className="rounded border border-warning/40 bg-warning/10 px-2 py-1 text-[10px] text-warning">项目共享 seed · Group ACL 未接</span>
+                <div><h2 className="text-lg font-semibold">Infinite Canvas · Miro 等价入口</h2><p className="text-xs text-ink-mute">Canvas 与 Task Card 同级；typed EntityRef 指向当前 Worktree 内的 canonical WorkItem。</p></div>
+                <span className="rounded border border-warning/40 bg-warning/10 px-2 py-1 text-[10px] text-warning">Worktree scope · 持久化 API 未接</span>
               </div>
-              {projectCanvas ? (
+              {canvasLinkError && <p role="alert" className="rounded border border-warning/30 bg-warning/5 p-3 text-xs text-warning">{canvasLinkError}</p>}
+              {groupCanvas ? (
                 <div className="h-[min(68vh,760px)] overflow-hidden rounded-lg border border-line bg-bg-card" data-testid="group-canvas-preview">
-                  <div className="border-b border-line px-3 py-2 text-xs font-medium">{projectCanvas.title}</div>
+                  <div className="border-b border-line px-3 py-2 text-xs font-medium">{groupCanvas.title}</div>
                   <CanvasView
-                    canvas={projectCanvas}
+                    canvas={groupCanvas}
                     elements={elements}
                     connectors={connectors}
                     highlightElementId={searchParams.get("highlight") ?? undefined}
@@ -418,7 +444,10 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                   />
                 </div>
               ) : (
-                <div className="card flex min-h-56 items-center justify-center text-sm text-ink-mute">此项目暂时没有 Canvas seed。</div>
+                <div className="card flex min-h-56 flex-col items-center justify-center gap-2 px-6 text-center">
+                  <p className="text-sm text-ink-dim">当前 Worktree 没有显式绑定的 Group Canvas。</p>
+                  <p className="max-w-xl text-xs leading-relaxed text-ink-mute">旧 Project / Free Canvas 不会自动继承到这里；绑定创建、元素保存和 EntityRef API 尚未接通，因此不会用全局 seed 冒充当前 Worktree 画布。</p>
+                </div>
               )}
             </div>
           )}
