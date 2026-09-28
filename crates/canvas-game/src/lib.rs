@@ -93,7 +93,7 @@ async fn index_html() -> impl IntoResponse {
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>canvas-game · k3s skeleton</title>
+  <title>canvas-game · 像素风 Roguelike 弹幕</title>
   <style>
     body { font-family: -apple-system, system-ui, sans-serif; background: #0a0e14; color: #e6edf3; margin: 0; padding: 24px; }
     h1 { color: #58a6ff; margin: 0 0 8px 0; }
@@ -114,19 +114,21 @@ async fn index_html() -> impl IntoResponse {
   </style>
 </head>
 <body>
-  <h1>🎮 canvas-game</h1>
+  <h1>🎮 canvas-game <span class="pill" style="background:#ff184c">PIXEL ROGUELIKE</span></h1>
   <div class="meta">
-    phase: <span class="pill">Skeleton</span>
-    version: <span id="ver">0.1.0</span>
-    HTTP: <code>:8084</code>
-    branch: <code>dev</code>
+    <span>phase: <span class="pill">Skeleton</span></span>
+    <span>version: <span id="ver">0.1.0</span></span>
+    <span>HTTP: <code>:8084</code></span>
+    <span>branch: <code>dev</code></span>
+    <span>theme: <span class="pill" style="background:#00f0ff;color:#000">3渲2 PIXEL ART</span></span>
   </div>
 
   <h2>📡 4 Canvas 服务 (k3s cluster)</h2>
 
   <div class="card">
     <div class="name">canvas-game <span class="pill">本服务</span></div>
-    <div class="desc">游戏引擎主服务 — 阶段 1 骨架,占位 endpoint /api/v1/gameplay</div>
+    <div class="desc">弹幕 Roguelike + 3渲2 像素风机器人 — 阶段 1 骨架, 占位 <code>/api/v1/gameplay</code></div>
+    <div class="desc" style="margin-top:8px;font-size:12px;color:#8b949e">per <code>BD-STAR-CANVAS-GAME-001.md</code> v0.1: 4 大游戏域 (角色/弹幕/战斗/关卡) + Three.js 0.169+ + WebGL 2.0 sprite atlas + 像素化后处理</div>
     <div class="links">
       <a href="/healthz">/healthz</a>
       <a href="/version">/version</a>
@@ -136,8 +138,9 @@ async fn index_html() -> impl IntoResponse {
   </div>
 
   <div class="card">
-    <div class="name">canvas-engine</div>
-    <div class="desc">画布渲染引擎 — HTML5 Canvas / WebGL / 2D drawing primitives</div>
+    <div class="name">canvas-engine <span class="pill" style="background:#ffc400;color:#000">渲染</span></div>
+    <div class="desc">像素风 3渲2 渲染 (Three.js + WebGL sprite atlas + 像素化 shader) — 机器人 / 子弹 / 关卡 tile</div>
+    <div class="desc" style="margin-top:8px;font-size:12px;color:#8b949e">per BD-STAR-CANVAS-GAME-001 v0.1 §6 <code>canvas-engine</code>: 跨 5 domain 共享 平台能力</div>
     <div class="links">
       <a href="http://localhost:13080/healthz" target="_blank">:13080/healthz</a>
       <a href="http://localhost:13080/version" target="_blank">:13080/version</a>
@@ -145,8 +148,9 @@ async fn index_html() -> impl IntoResponse {
   </div>
 
   <div class="card">
-    <div class="name">canvas-realtime</div>
-    <div class="desc">实时协作 / WebSocket gateway — 多人同步光标 / 共享画布</div>
+    <div class="name">canvas-realtime <span class="pill" style="background:#3fb950">CRDT</span></div>
+    <div class="desc">像素风多人合作 (Yjs CRDT) — 共享生命池 + 子弹同步 + Hades 死亡保留</div>
+    <div class="desc" style="margin-top:8px;font-size:12px;color:#8b949e">1-4 玩家同步 (per BD §8 协作机制); Yjs 重连自动 merge 关卡进度</div>
     <div class="links">
       <a href="http://localhost:15080/healthz" target="_blank">:15080/healthz</a>
       <a href="http://localhost:15080/version" target="_blank">:15080/version</a>
@@ -154,8 +158,9 @@ async fn index_html() -> impl IntoResponse {
   </div>
 
   <div class="card">
-    <div class="name">domain-canvas</div>
-    <div class="desc">领域画布 — 项目 / 业务 / 状态聚合</div>
+    <div class="name">domain-canvas <span class="pill" style="background:#8957e5">域</span></div>
+    <div class="desc">Roguelike 关卡数据 + 角色成长 + 道具池 — 26 表 W/T/M (16+6+6 含 1 二象)</div>
+    <div class="desc" style="margin-top:8px;font-size:12px;color:#8b949e">per BD §2.1.4 跨切 supporting crate 9 + BD §2.1.5 infrastructure 10 (per 2026-09-03 拍 1 落档补)</div>
     <div class="links">
       <a href="http://localhost:14080/healthz" target="_blank">:14080/healthz</a>
       <a href="http://localhost:14080/version" target="_blank">:14080/version</a>
@@ -170,6 +175,34 @@ async fn index_html() -> impl IntoResponse {
   <button onclick="testAll()">🔁 测试全部 4 服务</button>
 
   <div id="console">[ 点击按钮测试 API ]</div>
+
+  <h2>🎨 像素风 Roguelike 设计 (per BD-STAR-CANVAS-GAME-001 v0.1)</h2>
+
+  <div class="card" style="background:linear-gradient(135deg,#0f1422 0%,#1a0e2c 100%);border-color:#ff184c">
+    <div class="name">🎮 画布游戏 — 弹幕 Roguelike + 3渲2 像素风</div>
+    <div class="desc" style="font-size:14px;line-height:1.6">
+      <strong>4 大游戏域</strong>: 角色 (AvatarClass: warrior/mage/rogue/healer/tinkerer/default) · 弹幕 (5 模式 + 1000+ 子弹/60fps) · 战斗 (5 维伤害公式 + 5 状态效果 + 100+ 技能) · 关卡 (procedural generation + seed 可复现 + 6 biome + 6 BOSS)
+    </div>
+    <div class="desc" style="margin-top:8px;font-size:14px;line-height:1.6">
+      <strong>3渲2 渲染</strong>: Three.js 0.169+ + WebGL 2.0 + sprite atlas + <strong style="color:#00f0ff">像素化后处理</strong> (per BD §6 canvas-engine pixelation-shader.ts)
+    </div>
+    <div class="desc" style="margin-top:8px;font-size:14px;line-height:1.6">
+      <strong>多人合作</strong>: 1-4 玩家 + Yjs CRDT + 共享生命池 + <strong style="color:#ffc400">Hades 死亡保留机制</strong> (per BD §8 协作)
+    </div>
+    <div class="desc" style="margin-top:8px;font-size:13px;color:#8b949e">
+      5 装饰 element 沿用 + 7 改写游戏 element (per BD §1.1 + §1.2 推翻 Miro 风 SUPERSEDED 9/7 拍板)
+    </div>
+    <!-- Pixel art preview canvas (per roguelike + 3渲2) -->
+    <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <canvas id="pixel-preview" width="120" height="120" style="image-rendering:pixelated;border:2px solid #00f0ff;background:#0d1117"></canvas>
+      <div style="font-size:12px;color:#8b949e;font-family:ui-monospace,monospace">
+        <div>🎯 16×16 tile sprite</div>
+        <div>🌟 3渲2 pixel art</div>
+        <div>🎮 4 大游戏域</div>
+        <div>👥 1-4 玩家合作</div>
+      </div>
+    </div>
+  </div>
 
   <h2>📋 Star 项目主页链接</h2>
   <div class="card">
@@ -225,6 +258,86 @@ fetch('/version').then(r => r.json()).then(j => {
   document.getElementById('ver').textContent = j.version;
   document.getElementById('ver').style.color = '#3fb950';
 }).catch(() => {});
+
+// Pixel-art canvas preview (per BD-STAR-CANVAS-GAME-001 v0.1 §6 3渲2 像素化后处理)
+// Renders 16×16 tile sprite: 像素风机器人 + 弹幕 + 关卡 tile
+(function renderPixelArt() {
+  const c = document.getElementById('pixel-preview');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  const S = 8;       // 每个 pixel = 8×8 屏幕 px
+  const W = 15;      // 15 tiles wide = 120/8
+  const H = 15;      // 15 tiles tall
+
+  // Pixel art palette (per BD 像素化 shader)
+  const palette = {
+    bg: '#0d1117',
+    grid: '#161b22',
+    robot: '#00f0ff',
+    robotShadow: '#0080a0',
+    bullet: '#ffc400',
+    bulletCore: '#ffffff',
+    tile: '#2a1a3a',
+    tileAccent: '#8957e5',
+    boss: '#ff184c',
+    spark: '#3fb950'
+  };
+
+  // Background grid (per BD §3.2 procedural level)
+  ctx.fillStyle = palette.bg;
+  ctx.fillRect(0, 0, 120, 120);
+  for (let y = 0; y < 15; y++) {
+    for (let x = 0; x < 15; x++) {
+      ctx.fillStyle = palette.grid;
+      ctx.fillRect(x * S, y * S, S, S);
+    }
+  }
+
+  // Tile accent (procedural gen seed indicator)
+  ctx.fillStyle = palette.tile;
+  ctx.fillRect(2 * S, 2 * S, 3 * S, 3 * S);
+  ctx.fillStyle = palette.tileAccent;
+  ctx.fillRect(3 * S, 3 * S, S, S);
+
+  // Boss enemy (per BD §6 6 BOSS — 红色十字)
+  ctx.fillStyle = palette.boss;
+  for (let i = 0; i < 3; i++) {
+    ctx.fillRect((9 + i) * S, 4 * S, S, S);
+    ctx.fillRect(10 * S, (3 + i) * S, S, S);
+  }
+
+  // Pixel robot (per BD §1.1 角色 sprite 3渲2)
+  ctx.fillStyle = palette.robotShadow;
+  ctx.fillRect(5 * S, 7 * S, 4 * S, 6 * S);
+  ctx.fillStyle = palette.robot;
+  ctx.fillRect(6 * S, 6 * S, 3 * S, 5 * S);
+  // 眼睛
+  ctx.fillStyle = palette.bulletCore;
+  ctx.fillRect(6 * S, 7 * S, S / 2, S / 2);
+  ctx.fillRect(8 * S, 7 * S, S / 2, S / 2);
+
+  // Bullet pattern (per BD §6 弹幕池 + 5 模式)
+  ctx.fillStyle = palette.bullet;
+  for (let i = 0; i < 5; i++) {
+    const bx = (5 + i * 1) * S;
+    const by = 11 * S;
+    ctx.fillRect(bx, by, S / 2, S / 2);
+  }
+  ctx.fillStyle = palette.bulletCore;
+  ctx.fillRect(6 * S, 11 * S, S / 4, S / 4);
+  ctx.fillRect(8 * S, 11 * S, S / 4, S / 4);
+
+  // Spark (level up indicator)
+  ctx.fillStyle = palette.spark;
+  ctx.fillRect(11 * S, 12 * S, S / 2, S / 2);
+
+  // Title overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, 120, 12);
+  ctx.fillStyle = '#00f0ff';
+  ctx.font = 'bold 8px ui-monospace, monospace';
+  ctx.fillText('🎮 ROGUELIKE', 4, 9);
+})();
 </script>
 </body>
 </html>"#;
