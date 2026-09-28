@@ -112,6 +112,24 @@ impl JwtConfig {
     }
 }
 
+impl JwtConfig {
+    /// 从服务端 verifier 环境变量构造，不要求 REST API 持有 JWT 私钥。
+    pub fn verifier_from_env() -> Result<Self, JwtError> {
+        let public_key_pem = std::env::var("JWT_PUBLIC_KEY_PEM")
+            .map_err(|_| JwtError::Config("JWT_PUBLIC_KEY_PEM env var not set".to_string()))?;
+        let issuer =
+            std::env::var("JWT_ISSUER").unwrap_or_else(|_| "https://api.star.local".to_string());
+        let audience =
+            std::env::var("JWT_AUDIENCE").unwrap_or_else(|_| "star-api-rest".to_string());
+        Ok(Self {
+            private_key_pem: String::new(),
+            public_key_pem,
+            issuer,
+            audience,
+            ttl_seconds: 3600,
+        })
+    }
+}
 /// 颁发 JWT (用私钥签)
 pub fn issue_token(
     config: &JwtConfig,

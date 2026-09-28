@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `star-api-rest` binary — STAR Developer REST API server
+//! Cypher structural manifest.
+//! CREATE
+//!   (f:File {name:"main.rs",type:"file",language:"rust"}),(m:Module {name:"main",type:"module",language:"rust"}),
+//!   (mn:Function {name:"main",type:"function"}),(jv:Function {name:"JwtConfig::verifier_from_env",type:"function"}),(pg:Function {name:"PgConfig::from_env",type:"function"}),(cp:Function {name:"connect_pool",type:"function"}),(sn:Function {name:"GroupApiState::new",type:"function"}),(br:Function {name:"build_group_router",type:"function"}),(lb:Function {name:"TcpListener::bind",type:"function"}),(sv:Function {name:"axum::serve",type:"function"}),
+//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(mn),(mn)-[:CALLS]->(jv),(mn)-[:CALLS]->(pg),(mn)-[:CALLS]->(cp),(mn)-[:CALLS]->(sn),(mn)-[:CALLS]->(br),(mn)-[:CALLS]->(lb),(mn)-[:CALLS]->(sv);
+//! Production Worktree Group REST API server.
 //!
-//! CLI:
-//! ```text
-//! star-api-rest [--bind-addr <ADDR>]
-//!   --bind-addr ADDR     # 监听地址 (默认 127.0.0.1:8081)
-//!                        # 可通过 STAR_API_REST_BIND_ADDR 环境变量覆盖
-//! ```
-//!
-//! 22 路由 stub 当前返 501 Not Implemented,
-//! P2 阶段 (Phase M+) worker 子代理实装业务逻辑 (派前必先 `automation/dispatcher.py brief(...)`).
+//! The legacy build_router remains available to existing tests and local route
+//! previews. The production binary exposes only authenticated Group API routes.
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
-use star_api_rest::build_router;
+use star_api_rest::{
+    auth::JwtConfig,
+    group_api::{build_group_router, GroupApiState},
+};
+use star_pg_adapter::{connect_pool, PgConfig};
 use tracing::info;
 
 #[tokio::main]
@@ -23,9 +25,17 @@ async fn main() -> anyhow::Result<()> {
         .parse()
         .expect("invalid bind addr");
 
-    let app = build_router();
+    let jwt = Arc::new(JwtConfig::verifier_from_env().map_err(|error| {
+        anyhow::anyhow!("JWT verifier configuration invalid ({})", error.code())
+    })?);
+    let pg_config = PgConfig::from_env()
+        .map_err(|error| anyhow::anyhow!("PostgreSQL configuration invalid ({})", error.code()))?;
+    let pool = connect_pool(&pg_config)
+        .await
+        .map_err(|error| anyhow::anyhow!("PostgreSQL connection failed ({})", error.code()))?;
 
-    info!(%bind_addr, "star-api-rest starting (skeleton v0.1, 22 routes stub)");
+    let app = build_group_router(GroupApiState::new(jwt, pool));
+    info!(%bind_addr, "star-api-rest Worktree Group API starting");
 
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
     axum::serve(listener, app).await?;

@@ -157,6 +157,12 @@ where
             Err(e) => return Err(BearerError::InvalidToken(format!("{:?}", e.code()))),
         };
 
+        if claims.sub != claims.user_id || claims.sub.is_nil() || claims.tenant_id.is_nil() {
+            return Err(BearerError::InvalidToken(
+                "subject claims mismatch".to_string(),
+            ));
+        }
+
         Ok(AuthenticatedUser(claims.to_auth_user()))
     }
 }
