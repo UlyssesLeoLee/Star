@@ -12,7 +12,19 @@ export type CelPalette =
   | "manga-vermilion"
   | "manga-cobalt"
   | "manga-gold"
-  | "manga-sumi";
+  | "manga-sumi"
+  // ── 极魅像素 Charisma HD-2D Palettes ──
+  | "charisma-violet"
+  | "charisma-crimson"
+  | "charisma-gold"
+  // ── 圣夜霜雪 Christmas Glassmorphism Palettes ──
+  | "christmas-noel"
+  | "christmas-pine"
+  // ── 老上海月份牌 Shanghai Yuefenpai Palettes ──
+  | "shanghai-gilt"
+  | "shanghai-jade";
+
+export type ActiveTheme = "dark" | "light" | "charisma" | "christmas" | "shanghai";
 
 export interface AnimeCelShaderProps {
   palette?: CelPalette;
@@ -223,6 +235,68 @@ const PALETTE_CONFIGS: Record<
     rim: "#e60033",
     counterRim: "#0055ff",
     outline: "#0a0d14",
+  },
+
+  // ── 极魅像素 Charisma HD-2D (歧路旅人 体素斜面挤压) ──
+  "charisma-violet": {
+    base: "#8b5cf6",
+    shadow: "#140d24",
+    highlight: "#f5f3ff",
+    rim: "#e11d48",
+    counterRim: "#f59e0b",
+    outline: "#050409",
+  },
+  "charisma-crimson": {
+    base: "#e11d48",
+    shadow: "#28040b",
+    highlight: "#fff1f2",
+    rim: "#8b5cf6",
+    counterRim: "#f59e0b",
+    outline: "#050409",
+  },
+  "charisma-gold": {
+    base: "#f59e0b",
+    shadow: "#241602",
+    highlight: "#fffbeb",
+    rim: "#8b5cf6",
+    counterRim: "#e11d48",
+    outline: "#050409",
+  },
+
+  // ── 圣夜霜雪 Christmas Glassmorphism (伯利恒烛金 + 常青松针) ──
+  "christmas-noel": {
+    base: "#d42426",
+    shadow: "#140405",
+    highlight: "#fff5f5",
+    rim: "#f8b229",
+    counterRim: "#165b33",
+    outline: "#060b08",
+  },
+  "christmas-pine": {
+    base: "#165b33",
+    shadow: "#05170b",
+    highlight: "#f0fdf4",
+    rim: "#f8b229",
+    counterRim: "#d42426",
+    outline: "#060b08",
+  },
+
+  // ── 老上海月份牌 Shanghai Yuefenpai (擦笔水彩鎏金 + Art Deco) ──
+  "shanghai-gilt": {
+    base: "#d49e35",
+    shadow: "#2b170c",
+    highlight: "#fffbf0",
+    rim: "#b8282b",
+    counterRim: "#1b5e48",
+    outline: "#221c16",
+  },
+  "shanghai-jade": {
+    base: "#1b5e48",
+    shadow: "#05150f",
+    highlight: "#f0fff9",
+    rim: "#d49e35",
+    counterRim: "#b8282b",
+    outline: "#221c16",
   },
 };
 
@@ -450,13 +524,18 @@ export function AnimeCelShaderCanvas({
   const [isClient, setIsClient] = useState(false);
   const [inView, setInView] = useState(true);
   const [tabVisible, setTabVisible] = useState(true);
-  const [isLight, setIsLight] = useState(false);
+  const [activeTheme, setActiveTheme] = useState<ActiveTheme>("dark");
 
   useEffect(() => {
     setIsClient(true);
 
     const checkTheme = () => {
-      setIsLight(document.documentElement.classList.contains("light"));
+      const cl = document.documentElement.classList;
+      if (cl.contains("shanghai")) setActiveTheme("shanghai");
+      else if (cl.contains("charisma")) setActiveTheme("charisma");
+      else if (cl.contains("christmas")) setActiveTheme("christmas");
+      else if (cl.contains("light")) setActiveTheme("light");
+      else setActiveTheme("dark");
     };
     checkTheme();
 
@@ -492,22 +571,45 @@ export function AnimeCelShaderCanvas({
     };
   }, []);
 
-  // ── Automatic Dual-Theme Masterpiece Palette Mapping ──
+  // ── Automatic 5-Theme Masterpiece Palette Mapping ──
   const activePalette = useMemo<CelPalette>(() => {
-    if (!isLight) return palette;
-    switch (palette) {
-      case "crimson":
-        return "manga-vermilion";
-      case "cyan":
-        return "manga-cobalt";
-      case "gold":
-        return "manga-gold";
-      case "stealth":
-        return "manga-sumi";
+    switch (activeTheme) {
+      case "light":
+        // Shōnen 少年原画: 宣纸白线条美学 (manga-* series)
+        switch (palette) {
+          case "crimson": return "manga-vermilion";
+          case "cyan":    return "manga-cobalt";
+          case "gold":    return "manga-gold";
+          case "stealth": return "manga-sumi";
+          default:        return palette;
+        }
+      case "charisma":
+        // 极魅像素 HD-2D: 神恩紫罗兰 × 醉梦丝绒红 × 帝国流金
+        switch (palette) {
+          case "crimson": return "charisma-crimson";
+          case "gold":    return "charisma-gold";
+          default:        return "charisma-violet";
+        }
+      case "christmas":
+        // 圣夜霜雪 Glassmorphism: 圣夜绯红 × 常青松针
+        switch (palette) {
+          case "stealth":
+          case "gold":    return "christmas-pine";
+          default:        return "christmas-noel";
+        }
+      case "shanghai":
+        // 老上海月份牌: 留声机鎏金 × 翡翠碧玉墨绿
+        switch (palette) {
+          case "stealth":
+          case "cyan":    return "shanghai-jade";
+          default:        return "shanghai-gilt";
+        }
+      case "dark":
       default:
+        // 暗夜神格 Neo-Tokyo Cyber Manga: 原始赛博 palette
         return palette;
     }
-  }, [palette, isLight]);
+  }, [palette, activeTheme]);
 
   const shouldRender = isClient && inView && tabVisible;
 
