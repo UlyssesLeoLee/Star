@@ -1,15 +1,15 @@
 # BD-CANVAS-001
 
-> **无限画布 (Infinite Canvas) — 总册基本設計書 v0.1** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
+> **无限画布 (Infinite Canvas) — 总册基本設計書 v0.2** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
 > **⚠️ 双核心定位 (per 2026-09-10 17:08 + 17:21 + 17:34 JST Ulysses 拍板)**
 > 核心功能 = **管理 agent + 游戏化**, 避免过度冗余
 > 方向重置: 17:00 JST 旧 12 大类 50 项 Miro 全面对标 (撤回, 3 子代理 stop) → 17:08 JST 双核心 (砍 11 大类 Miro 通用) → 17:21 JST ARG 图论构造 (A11 10 项) → 17:34 JST 多人编辑 (A12 8 项, v0.63 反转)
 >
-> - 状态: 🟡 Draft v0.1
+> - 状态: 🟡 Draft v0.2 (Worktree 群组集成补充)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
-> - 关联需求: [`docs/requirements/SRS-CANVAS-001.md`](../requirements/SRS-CANVAS-001.md) v1.1 (58KB, 18:00 JST root 写, 双核心 78 项索引, 13 跨拍板派生, 13 风险, 守门 16 交叉引用)
-> - 关联专题 BD (派生): [`docs/design/BD-CANVAS-AGENT-001.md`](./BD-CANVAS-AGENT-001.md) v0.1 (A1-A12 46 项, 18:00 JST 子代理 1 写) + [`docs/design/BD-CANVAS-GAMIFY-001.md`](./BD-CANVAS-GAMIFY-001.md) v0.1 (G1-G12 32 项, 18:00 JST 子代理 2 写) + [`docs/design/BD-CANVAS-WORKFLOW-001.md`](./BD-CANVAS-WORKFLOW-001.md) v1.0 (W1-W15 54 项 FR, 2026-09-13 ULYS-28 交付, 索引同步仅补此行 + 下方 §1.1.4 模块 view, 不改本文件 §1.1.2/§4 汇总计数与"双核心 78 项"表述, 详见该 BD §附录 C)
+> - 关联需求: [`docs/requirements/SRS-CANVAS-001.md`](../requirements/SRS-CANVAS-001.md) v1.4 (三核心 132 项索引 + Worktree 群组集成边界)
+> - 关联专题 BD (派生): [`docs/design/BD-CANVAS-AGENT-001.md`](./BD-CANVAS-AGENT-001.md) v0.1 (A1-A12 46 项) + [`docs/design/BD-CANVAS-GAMIFY-001.md`](./BD-CANVAS-GAMIFY-001.md) v0.1 (G1-G12 32 项) + [`docs/design/BD-CANVAS-WORKFLOW-001.md`](./BD-CANVAS-WORKFLOW-001.md) v1.0.4 (W1-W15 自动化流程 + Worktree 群组集成)
 > - 关联 V0.1: [`docs/frontend-canvas-design.md`](../frontend-canvas-design.md) v0.1 (14 element + 4 frame + 8 connector + 9 e2e 守门)
 > - 关联 V0.1 实装: [`frontend/src/components/CanvasView.tsx`](../frontend/src/components/CanvasView.tsx) (V0.1 11 处 element 渲染 + tool + minimap)
 > - 关联平行 view (派生自 SRS): [`docs/requirements/SRS-AGENT-RELATIONSHIP-001.md`](../requirements/SRS-AGENT-RELATIONSHIP-001.md) v0.1 (ARG, 37KB) + [`docs/design/BD-AGENT-RELATIONSHIP-001.md`](./BD-AGENT-RELATIONSHIP-001.md) v0.1 (55KB, A11 派生源) + [`docs/requirements/SRS-AGENT-VIEW-001.md`](../requirements/SRS-AGENT-VIEW-001.md) v1.0 (31KB) + [`docs/design/BD-AGENT-VIEW-001.md`](./BD-AGENT-VIEW-001.md) v0.1 (44KB)
@@ -22,7 +22,7 @@
 
 ## §0 目的 (Purpose)
 
-本文档基于 [`SRS-CANVAS-001.md`](../requirements/SRS-CANVAS-001.md) v1.1 (58KB, 18:00 JST root 写, 双核心 78 项索引) 的需求, 定义 **无限画布 (Infinite Canvas)** 总册基本設計 (BD), 涵盖:
+本文档基于 [`SRS-CANVAS-001.md`](../requirements/SRS-CANVAS-001.md) v1.4 (三核心 132 项索引 + Worktree 群组集成边界) 的需求, 定义 **无限画布 (Infinite Canvas)** 总册基本設計 (BD), 涵盖:
 
 1. **5 view 跨域架构** (機能/データ/動作/モジュール/ネットワーク) 覆盖双核心 (管理 agent + 游戏化) + 多人编辑 (v0.63 反转) + ARG (10 类关系)
 2. **14 张表 W/T/M 100% 覆盖** (A11 7 张 + A12 7 张) 跨域汇总
@@ -116,7 +116,7 @@
 
 | 路径 | 用途 | 状态 |
 |---|---|---|
-| `docs/design/BD-CANVAS-001.md` (本文件) | 总册 BD 跨域 | v0.1 (本批 root 写) |
+| `docs/design/BD-CANVAS-001.md` (本文件) | 总册 BD 跨域 | v0.2 (Worktree 群组集成补充) |
 | `docs/design/BD-CANVAS-AGENT-001.md` | 专题 BD agent 管理 46 项 | v0.1 (本批 子代理 1 写) |
 | `docs/design/BD-CANVAS-GAMIFY-001.md` | 专题 BD 游戏化 32 项 | v0.1 (本批 子代理 2 写) |
 | `docs/design/BD-CANVAS-WORKFLOW-001.md` | 专题 BD 工作流编排 (W1-W15 54 项 FR) | v1.0 (2026-09-13 ULYS-28 交付) |
@@ -171,6 +171,19 @@
 | 实现 (PHASE-* 报告) | 后续 P3-D.6 阶段 | 待 DD 落档后启动 |
 
 ---
+
+### 1.3 渡口 Worktree 群组集成 (v0.2 补充)
+
+本 BD 将 Infinite Canvas 定义为 Worktree 群组内的同级应用，和 Multica、Jira 等价任务管理能力、Task Card 索引、插件入口并列。这里的“Miro-like”指无限画布交互面及其与任务工作的联动，不恢复已排除的通用 Miro 产品范围。§1.2 排除的 Jira/Asana 等集成仅指外部 SaaS 连接器；渡口内部 Jira 等价任务能力及其与 Canvas/Task Card 的交互明确在范围内。
+
+- **上下文**：Canvas 路由继承 `GroupContext(worktree_id, tenant_id, actor_id, permissions)`；所有读写以当前 Worktree 做授权边界。
+- **任务交互**：画布节点保存 `EntityRef(type, id, worktree_id)`；创建、关联、状态变更调用 WorkItem/Task Management 域命令，经 ACL 与 Outbox 发布事件。Canvas 布局和元素状态不复制 WorkItem 生命周期。
+- **同级入口**：从 Worktree 群组导航进入 Infinite Canvas 或 Task Card Index；从 Multica/Jira/Canvas 任一应用打开同一 Task Card 时解析为相同 `work_item_id`。
+- **卡内执行**：CLI/Agent Session 由 Task Card Detail 承载，并绑定 `worktree_id`、`work_item_id`、`task_card_id`；它不是 Worktree 下的独立导航应用。
+- **聊天栏**：底部聊天栏归 Group Shell 所有并跨群组应用固定显示，显式切换 `WORKTREE` 或 `GLOBAL`。Canvas 将当前对象作为上下文传递，不再创建局部聊天栏。
+- **热插拔扩展**：`GroupAppRegistry` 解析已启用插件 manifest，按权限动态增加/撤销群组同级入口；插件写操作仍经过领域命令和授权层。插件注册表与 Agent/Canvas 节点注册表分开管理。
+
+流程、持久化事件与权限约束以 [`docs/basic-design.md`](../basic-design.md) §16 为共享架构基线；Project 级 Worktree Overview Graph 的边界见 [`BD-WORKTREE-CANVAS-001.md`](BD-WORKTREE-CANVAS-001.md) §1.5。
 
 ## §2 系统架构 (System Architecture)
 
@@ -596,11 +609,12 @@ v1-v14 基础守门 (cargo + 守门实证) + v15 docs 同步饱和 + v16 P0-1 �
 
 ---
 
-## §10 修订履历 (v0.1 + 修订人 + 触发)
+## §10 修订履历 (v0.2 + 修订人 + 触发)
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | **v0.1** | **2026-09-10 JST** | **Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3)** | **初始版本: 双核心 (管理 agent + 游戏化) + 多人编辑 (per 17:34 JST v0.63 反转) + ARG (per 17:21 JST) 总册 BD 跨域汇总, 5 view 跨域 + 14 张表 W/T/M 100% 覆盖 + 32 API 端点 + 5 WebSocket + 6 类 NFR + 19 守门 + 12 已知缺口 + 5 角色签字栏** | **2026-09-10 18:00 JST Ulysses 拍板"基于需求文档制作基本设计文档" + 17:34 JST v0.63 反转多人编辑 + 17:21 JST ARG 图论构造 + 17:08 JST 双核心 + 17:00 JST 旧方向撤回 (per 守门 #1 禁回溯叙事)** |
+| v0.2 | 2026-09-28 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 Worktree 群组上下文、Canvas 与 Task Card/Jira 等价能力的领域命令交互、卡内 CLI、Shell 聊天栏及热插拔插件注册边界 | 用户要求以 Worktree 为渡口顶层索引并将 Canvas 作为同级群组应用 |
 
 ### 10.1 跨拍板派生 (4 阶段 + 5 守门拍板, per 守门 #14 v2 跨域)
 

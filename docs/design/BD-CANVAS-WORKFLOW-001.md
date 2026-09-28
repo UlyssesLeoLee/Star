@@ -1,29 +1,29 @@
 # BD-CANVAS-WORKFLOW-001
 
-> **无限画布 — 自动化流程域 (Automation Flow Domain) 基本設計書 v1.0.3** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
+> **无限画布 — 自动化流程域 (Automation Flow Domain) 基本設計書 v1.0.4** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート)
 >
-> - 状态: 🟢 v1.0.3 — **已签字** (2026-09-13 初版落档; §11 全部 5 角色已由项目所有者 Say世意（D-Boy）本人确认签字, 非代签; 头部"修订人/审批"字段已同步更新, 消除与 §11 的遗留矛盾; §9.3 TBD 追踪矩阵 35 项仍待详细设计阶段逐项拍板, 不因签字栏完成而自动裁决)
+> - 状态: 🟡 v1.0.4 — **群组集成补充待评审** (原 v1.0.3 基线及 2026-09-13 的 5 角色签字记录保留；本次补充未签字/未审批；原有业务 TBD 仍按 §9.3 追踪)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
-> - 上位要件: [`docs/requirements/SRS-CANVAS-WORKFLOW-001.md`](../requirements/SRS-CANVAS-WORKFLOW-001.md) **v1.1** (54 项 FR = W1-W13 42 项 v1.0 + W14-W15 12 项 v1.1 新增, 34 用户故事, 8 张新增/扩展表)
-> - **重要溯源说明 (per 守门 #1 禁回溯叙事)**: SRS v1.1 于 2026-09-12 在分支 `agent/sonnet/ulys-15` (issue ULYS-15) 落档, **未合并至 `main`, 未推送远端**。本 BD 所在分支 `agent/sonnet/ulys-28` 通过 `git merge agent/sonnet/ulys-15` (commit `8023a34`) 从同一本地仓库 (`D:\Star`) 引入该版本, 而非从 `main` 读取 — `main`/其他 worktree 此时仍只有 v1.0 (42 项 FR)。后续任何读者若在别处只看到 v1.0, 请先确认所在分支是否已合并 `agent/sonnet/ulys-15`, 避免重复此前子代理 (GPT5.6terra) 曾发生的"按 v1.0 误判本文档不合规"问题。
-> - 上位总册: [`docs/requirements/SRS-CANVAS-001.md`](../requirements/SRS-CANVAS-001.md) (总册, 索引级, 待总册后续版本正式收录本专题为"三核心"第 3 核心) + [`docs/design/BD-CANVAS-001.md`](./BD-CANVAS-001.md) (root 写总册 BD, 本 BD 专题聚焦 W1-W15 详细设计)
-> - 平行专题 BD: [`docs/design/BD-CANVAS-AGENT-001.md`](./BD-CANVAS-AGENT-001.md) (专题 1: agent 管理 46 项) + [`docs/design/BD-CANVAS-GAMIFY-001.md`](./BD-CANVAS-GAMIFY-001.md) (专题 2: 游戏化 32 项) — 本 BD 为**专题 3: 自动化流程**, 与前两者并列, **不属于**总册 `SRS-CANVAS-001` 现行"双核心"功能分类, 仅做索引级交叉引用 (per 本 issue 明确指示, 不强行归类)
-> - 关联架构决策: [`docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md`](../architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) (L0/L1 + TMO 架构, `TopAgentState`/`SubAgentState`, `/api/tmo/*` 8 端点, W15 LangGraph 智能控制/聊天栏对接此架构而非另起一套)
-> - 关联 V0.1 实装: `frontend/src/components/CanvasView.tsx` (element 渲染基座) + `frontend/src/lib/store.ts` line 565 (`actor_session_id` L0 聊天栏会话预留点) + `frontend/src/components/CommandBar.tsx` (⌘K 命令面板, 与 W15 底部聊天栏是两个独立组件)
+> - 上位要件: [`docs/requirements/SRS-CANVAS-WORKFLOW-001.md`](../requirements/SRS-CANVAS-WORKFLOW-001.md) **v1.2** (54 项 FR；v1.2 将 W15 聊天栏对齐 Group Shell 共享底栏、范围和目标 Worktree 授权)
+> - **历史溯源说明 (per 守门 #1 禁回溯叙事)**: 原 v1.1 基线于 2026-09-12 在 `agent/sonnet/ulys-15` 落档，并由本 BD 原分支 `agent/sonnet/ulys-28` 通过 commit `8023a34` 引入。该说明仅记录原基线来源；本次 v1.2 需求及 v1.0.4 设计补充按当前工作树文档同步，不推断其他分支或远端状态。
+> - 上位总册: [`docs/requirements/SRS-CANVAS-001.md`](../requirements/SRS-CANVAS-001.md) **v1.4** (已将自动化流程列为第 3 核心) + [`docs/design/BD-CANVAS-001.md`](./BD-CANVAS-001.md) **v0.2** (Group Shell、Worktree 同级应用与共享上下文边界)
+> - 平行专题 BD: [`docs/design/BD-CANVAS-AGENT-001.md`](./BD-CANVAS-AGENT-001.md) (专题 1: agent 管理 46 项) + [`docs/design/BD-CANVAS-GAMIFY-001.md`](./BD-CANVAS-GAMIFY-001.md) (专题 2: 游戏化 32 项) — 本 BD 为**专题 3: 自动化流程**, 与前两者并列并纳入总册三核心索引
+> - 关联架构决策: [`docs/architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md`](../architecture/2026-08-26-upgrade/adr/0046-langgraph-task-management-operations.md) (L0/L1 + TMO 架构, `TopAgentState`/`SubAgentState`, `/api/tmo/*` 8 端点；Flow 以 GroupContext 请求 L0，不另建会话或编排体系)
+> - 关联界面职责: `CanvasView.tsx` 是画布内容渲染基座；Group Shell 拥有共享底栏和 `actor_session_id` 会话入口；`CommandBar.tsx` 是独立的 ⌘K 命令面板
 > - 撰写者: Sonnet (agent, per Multica ULYS-28 assignment)
-> - 修订人/审批: §11 签字栏 5 角色（Ulysses/5 域 Lead/PM/SRE/Dev Lead）均已由项目所有者 Say世意（D-Boy）本人确认签字（2026-09-13，非代签）
-> - 日期: 2026-09-13
+> - 修订人/审批: v1.0.4 群组集成补充由 Mavis 接手审核；待评审。§11 的签字仅适用于 v1.0.3 及此前基线，不延伸到本补充
+> - 日期: 2026-09-28
 > - 受众: 詳細設計エンジニア / 実装エンジニア / UI/UX 设计师 / アーキテクト / SRE / 5 域 Lead
-> - **dual-use 提醒**: 本 BD 不重复总册 BD (`BD-CANVAS-001.md`) 跨域共享部分, 聚焦 W1-W15 54 项详细设计; 本 BD 亦不裁决 SRS §10 已列的 11 项已知风险与各 FR "已知缺口" — 详见 §9 TBD 追踪矩阵, 一律标注待拍板, 不自行假设
+> - **dual-use 提醒**: 本 BD 聚焦 W1-W15 自动化流程设计；Worktree 群组树、共享 Group Shell、统一 WorkItem/Task Card 与插件注册由上位总册定义，本 BD 通过 GroupContext 与引用接口接入，不复制其主数据或 UI；SRS §10 风险与各 FR 已知缺口继续在 §9 追踪
 
 ---
 
 ## §0 目的 (Purpose)
 
-本文档基于 [`SRS-CANVAS-WORKFLOW-001.md`](../requirements/SRS-CANVAS-WORKFLOW-001.md) v1.1 的需求, 定义 **无限画布 — 自动化流程域 (Automation Flow Domain)** 的基本設計:
+本文档基于 [`SRS-CANVAS-WORKFLOW-001.md`](../requirements/SRS-CANVAS-WORKFLOW-001.md) v1.2 的需求, 定义 **无限画布 — 自动化流程域 (Automation Flow Domain)** 的基本設計。自动化流程仍是 Worktree 下 Canvas 应用中的能力；本专题不把聊天栏、WorkItem 或插件权限另建成自己的副本:
 
 - 系统架构 (UI / API / 数据流 / LangGraph 路由层) 覆盖 W1-W15 54 项
-- 组件一览 + 画面设计 (Flow 编辑器 / 模板选择器 / 底部聊天栏 / 执行历史面板 / 标签绑定管理面板)
+- 组件一览 + 画面设计 (Flow 编辑器 / 模板选择器 / 执行历史面板 / 标签绑定管理面板；共享聊天栏由 Group Shell 提供)
 - 数据设计 (8 张新增/扩展表定义, W/T/M 分类, SCD/RLS/审计策略)
 - 接口设计 (REST + WebSocket 端点, 认证/超时/重试策略)
 - 5 View 详细 (机能/データ/動作/モジュール/ネットワーク) 覆盖 54 项 FR
@@ -160,15 +160,15 @@
 | FR-WORKFLOW-W14.6 | Dev/PM/美术TA | 已套用并调整内置模板 | "另存为自定义模板"操作 | 新增 1 条 `is_builtin=false` 的 `flow_template` 记录 | 无 | 内置模板本身不受影响 | P1 |
 | FR-WORKFLOW-W14.7 | Dev/PM/美术TA | 存在自定义模板 | 改名/删除/搜索操作 | 自定义模板 CRUD 生效, 内置模板无删除入口 | 尝试删除内置模板 → 前端不提供入口, 后端 403 兜底 | 模板库列表反映最新状态 | P2 |
 
-#### 1.1.15 W15 LangGraph 智能控制 + 底部聊天栏 (5 项, v1.1 新增)
+#### 1.1.15 W15 LangGraph 智能控制 + Group Shell 共享聊天栏 (5 项；W15 能力 v1.1 新增，群组集成 v1.2)
 
 | FR ID | Actor | 前置条件 | 输入 | 输出 | 异常处理 | 后置条件 | 优先级 |
 |---|---|---|---|---|---|---|---|
-| FR-WORKFLOW-W15.1 | Dev/PM/美术TA | 已进入画布/Flow 编辑视图 | 无 (UI 常驻) | 底部常驻聊天栏渲染, `actor_session_id` 从 `undefined` 变为有效会话 | L0 会话建立失败 → 聊天栏显示离线态, 不阻塞画布其他操作 | 用户可开始对话 | P0 |
-| FR-WORKFLOW-W15.2 | Dev/PM/美术TA | 聊天栏会话已建立 | 自然语言描述文本 | `chat_session.parsed_flow_draft` 生成草稿节点图, 落入编辑视图供确认 | mock 规则未命中任何句式 → 提示"未能解析", 不生成草稿 (**mock 规则覆盖范围【TBD】, 见 SRS 已知缺口**) | 草稿需用户显式确认才正式保存 (不静默落库) | P1 |
-| FR-WORKFLOW-W15.3 | 系统 (L0) | 条件节点 `routing_mode="dynamic_agent"` | 当前 `TopAgentState` 上下文 | L0 动态决定分支走向, 决策依据记录到 `execution_step` | L0 不可达/超时 → **【TBD, Design Doc】降级策略未定** (回退 static_cel 默认分支? 整体失败?) | 分支决策可事后审计 (**决策可复现性 【TBD】, 见 SRS 风险 #9**) | P1 |
-| FR-WORKFLOW-W15.4 | 系统 | 聊天栏消息已发送 | 消息内容 + `actor_session_id` | `execution_history.origin_chat_session_id` 回链 | 会话已过期 → 复用既有 TopAgentState 会话生命周期规则拒绝 | 由聊天栏发起的 Execution 可溯源至对话 | P0 |
-| FR-WORKFLOW-W15.5 | Dev/PM/美术TA | 聊天栏已生成草稿 | 用户在编辑视图中的后续操作 | 草稿节点与手动创建节点行为完全一致 (可拖动/改参数/删除) | 无 | 不引入专属"聊天栏 Flow"数据结构, 复用 `flow_node`/`flow_edge` | P1 |
+| FR-WORKFLOW-W15.1 | Dev/PM/美术TA | 已进入 Worktree 群组内任一同级应用 | Group Shell 共享栏中的 `scope_kind` (`WORKTREE`/`GLOBAL`)、当前 `worktree_id` 与 GroupContext | Group Shell 保持同一个 `actor_session_id` 并提供固定底栏；Canvas 仅注册当前 Flow/EntityRef 上下文 | L0 会话建立失败 → Group Shell 显示离线态；缺少 Worktree 或目标授权 → 禁止对应写操作 | 跨应用切换保留会话范围，不创建 Canvas 专属底栏/会话 | P0 |
+| FR-WORKFLOW-W15.2 | Dev/PM/美术TA | Group Shell 会话已建立 | 自然语言描述 + 当前 Flow/EntityRef + scope/目标 Worktree | `chat_session.parsed_flow_draft` 生成标准节点图草稿；WORKTREE 绑定当前 Worktree，GLOBAL 必须先选目标 | mock 规则未命中 → 提示"未能解析"；未指定或未获授权目标 → 不生成可写草稿 | 用户显式确认后才保存；草稿保留所选 scope/target | P1 |
+| FR-WORKFLOW-W15.3 | 系统 (L0) | 条件节点 `routing_mode="dynamic_agent"` | 带 scope、目标和 ACL 的 GroupContext/`TopAgentState` | L0 动态决定分支；插件调用前校验 manifest capability、scope、用户授权及目标 Worktree | 越权目标或 capability 不匹配 → 拒绝动作；L0 超时降级策略仍为 TBD | 决策和授权目标记录到 `execution_step`，可事后审计 | P1 |
+| FR-WORKFLOW-W15.4 | 系统 | Group Shell 消息已发送 | 消息、`actor_session_id`、`scope_kind`、当前及显式目标 Worktree | `execution_history` 回链原聊天会话并记录范围和目标集合 | 会话过期、scope 缺失或目标权限失效 → 拒绝执行 | Flow Execution 可溯源到会话、范围和实际授权目标 | P0 |
+| FR-WORKFLOW-W15.5 | Dev/PM/美术TA | Group Shell 已生成 Flow 草稿 | 用户在对应 Worktree 的 Flow 编辑视图中确认/修改 | 标准 `flow_node`/`flow_edge` 记录归属目标 Worktree；Canvas 与其他应用引用同一 Flow/WorkItem ID | GLOBAL 草稿未选择且授权目标 Worktree → 阻止保存 | 手动、模板、聊天生成共用同一 Flow schema，不产生平行任务/卡片状态 | P1 |
 
 **In-Scope 合计**: 54 项 FR (P0=21 / P1=25 / P2=8), 34 用户故事 (US-W1 ~ US-W34, 覆盖率 34/54=63.0% ≥ 60% 门槛)。
 
@@ -177,22 +177,30 @@
 | 排除项 | 说明 | 边界依据 |
 |---|---|---|
 | 真实第三方 LLM/NLU API 调用 (W15.2 NL→Flow 解析, W15.3 动态路由决策) | v1 一律 mock/规则化实现 | 守门 #23 v2 (禁真实第三方 AI API 调用), 真实接入时间点待 P2 阶段拍板 — **本 BD 不预先设计真实 LLM 集成方案** |
-| 真实 LangGraph Python 后端 (`/api/tmo/*`) 网络对接 | 本 BD 只定义前端契约 + mock 桩 | 真实对接属 Agent Runtime 范畴, 待专门设计 |
-| 真实第三方连接器市场 / 可视化表达式构建器 / 节点级混合标签 | 均为 P2+ 观察项 | per SRS §1.4, 留 P2+ |
+| 真实 LangGraph Python 后端 (`/api/tmo/*`) 网络实现 | 本 BD 定义 GroupContext、scope/target、授权和插件 capability 的接口契约；运行时网络接入仍属 Agent Runtime 范畴 | 真实对接实现留专门设计；契约依赖本 BD §2/§5/§8 |
+| 真实第三方连接器市场 / 可视化表达式构建器 / 节点级混合标签 | 均为 P2+ 观察项；Worktree 内插件热插拔通过 Group App Registry 接入，不属于第三方市场 | per SRS §1.4, 留 P2+；Registry 契约见总册 BD |
 | 后端持久化 API 具体实现 (DDL / route handler 代码) | 本 BD §4/§5 定义数据/接口**契约**, 不含可运行代码 | 详细设计 (DD-CANVAS-WORKFLOW-001, 待创建) 阶段落地 |
 | A12 多人协同编辑 CRDT 冲突解决 | 依赖 `SRS-CANVAS-AGENT-001` A12 既有基线 | 本 BD 不重新设计, 只声明依赖 (SRS 风险 #6) |
 | superpowers 模板各阶段真实技能自动触发 | v1 仅占位节点图, 无真实调度契约 | 属 Agent Runtime 范畴 |
 | "图生高模"/"绑骨骼"等具体 AI 生成能力的真实执行逻辑 | v1 仅占位 | 待专门 SRS |
 
+### 1.2.1 Worktree 群组集成边界
+
+- 顶层导航是 Worktree；Canvas、Multica、Jira 等价任务管理、Task Card 索引和已启用插件是在 Worktree 下同级的应用入口。Flow 是 Canvas 应用内的自动化能力，不是额外的顶层应用或任务体系。
+- Group Shell 在这些同级应用间提供同一固定底部聊天栏。`WORKTREE`/`GLOBAL` 是请求范围；切换 Canvas、任务视图或 Task Card 不改变会话范围。
+- `work_item_id` 是任务唯一身份。Flow 标签绑定、Canvas 无限画布和 Task Card 都引用同一 WorkItem；Flow 不复制任务状态。Task Card 内 CLI/Agent Session 的启动由 Runtime/AgentPolicy 承接，Flow 仅通过授权动作引用，不在此定义第二套 CLI 生命周期。
+- Group App Registry 管理插件安装、启用、停用与 manifest capability；LangGraph `SubAgentRegistry` 管理执行期 Agent/子图注册。Flow 只能通过受授权的插件桥接调用能力，不能把聊天范围当成额外权限。
+- Group Infinite Canvas 是 Worktree 下的协作应用；Repository/Project Worktree Overview Graph 是独立的 Worktree 图视图。二者以 `EntityRef` 链接，不共用画布文档或路由身份。
+
 ### 1.3 文档结构 (per issue 章节指示 + `BD-CANVAS-AGENT-001.md` 10 段模板折中)
 
-本 BD 共 12 段 + 1 附录, 在 `BD-CANVAS-AGENT-001.md`/`BD-CANVAS-GAMIFY-001.md` 既有 10 段模板基础上, 按本 issue 的明确指示新增 2 个独立顶层段落 (§8 安全设计单列成段, 而非像姊妹 BD 那样折入 NFR 小节; §10 追溯矩阵单列成段), 以匹配 `ipa-security-design` / 追溯矩阵的 issue 要求; §3 沿用姊妹 BD"组件一览"命名并入画面设计内容 (而非拆出独立"画面设计"顶层段), 因为本域新增画面(聊天栏/模板选择器)与新增组件是 1:1 对应关系, 拆分会造成重复表述:
+本 BD 共 12 段 + 1 附录, 在 `BD-CANVAS-AGENT-001.md`/`BD-CANVAS-GAMIFY-001.md` 既有 10 段模板基础上, 按既有结构保留 §8 安全设计与 §10 追溯矩阵; §3 聚焦 Flow 编辑器、模板选择器、执行历史与标签绑定面板。共享聊天栏属于 Group Shell，本专题只描述其 Flow 上下文与接口，不把它列为 Canvas 自有组件:
 
 §0 目的 / §1 适用范围 / §2 系统架构 / §3 组件一览与画面设计 / §4 数据设计 / §5 接口设计 / §6 5 View 详细 / §7 NFR / §8 安全设计 / §9 守门合规 + TBD 追踪矩阵 / §10 追溯矩阵 / §11 签字栏 / §12 修订履历 / 附录 A 跨专题引用清单
 
 ### 1.4 派生映射
 
-本 BD 100% 派生自 `SRS-CANVAS-WORKFLOW-001` v1.1 §4 (W1-W15, 54 项), 不新增 SRS 未提及的功能范围; W14/W15 (v1.1 新增 12 项) 是本次 issue 的重点验收对象, 在 §3/§4/§5/§8/§10 均标注 **(v1.1 新增)** 以便追溯。
+本 BD 派生自 `SRS-CANVAS-WORKFLOW-001` v1.2 §4 (W1-W15, 54 项)。W14/W15 最初于 v1.1 纳入；本 v1.2 补充将 W15 接入 Group Shell 共享聊天、`WORKTREE/GLOBAL` scope、GroupContext 与逐目标授权，不扩展为 Canvas 自有会话或插件注册体系。
 
 ---
 
@@ -202,19 +210,25 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ UI Tier (前端, frontend/src/)                                    │
+│ Group Shell (跨应用外壳)                                        │
+│  - Worktree 为顶层索引；同级入口为 Multica/Jira 等价任务/Canvas/插件│
+│  - 共享固定底部聊天栏；scope = WORKTREE 或 GLOBAL                │
+├─────────────────────────────────────────────────────────────────┤
+│ UI Tier (Worktree 同级应用, frontend/src/)                       │
 │  - CanvasView.tsx: 新增 6 个 flow element kind 渲染分支            │
 │  - Flow 编辑器组件 (页面路径待定,【TBD】复用主画布 viewport 或独立子画布) │
 │  - 模板选择器组件 (W14.1, 挂载于 "+ Flow" 入口旁)                    │
-│  - 底部聊天栏组件 (W15.1, 独立于 CommandBar.tsx)                    │
+│  - Canvas 向 Group Shell 注册 Flow/EntityRef 上下文，不拥有聊天栏   │
+│  - CommandBar.tsx (⌘K) 与 Group Shell 聊天栏职责分离               │
 │  - 执行历史面板 / 标签绑定管理面板 ("/automation" 页扩展 tab)         │
 ├─────────────────────────────────────────────────────────────────┤
 │ API Tier (BFF REST + WebSocket, per §5)                          │
 │  - Flow/Node/Edge CRUD, Execution 触发/查询/重跑, Webhook 入口     │
-│  - Flow Template CRUD (v1.1), Chat Session 消息 (v1.1)            │
+│  - Flow Template CRUD, 接收 GroupContext + scope/target 授权上下文 │
 ├─────────────────────────────────────────────────────────────────┤
 │ LangGraph 路由层 (v1.1 新增, 对接既有 ADR-0046, 不新起并行架构)      │
-│  - L0 TopAgentState: 接收 chat_session 消息 + dynamic_agent 路由请求│
+│  - L0 TopAgentState: 接收共享会话消息 + Flow/EntityRef/GroupContext│
+│  - 插件 capability 经授权桥接；SubAgentRegistry 不替代 Group App Registry│
 │  - "L1↔L1 通信禁止": Flow 内 Agent 占位节点间不允许直接通信决策,     │
 │    动态路由决策统一经 L0 做出 (per 守门 #13a 派生)                   │
 │  - /api/tmo/* 既有 8 端点复用, 不新增并行会话管理端点                │
@@ -226,14 +240,14 @@
 │ Data Tier (per §4)                                                │
 │  - automation_flow(_versions) / flow_node / flow_edge (Master)    │
 │  - execution_history / execution_step / chat_session (Transaction)│
-│  - flow_template (Master, v1.1) / WorkItem (Master, 扩展字段)     │
+│  - flow_template (Master) / WorkItem (Master, 引用统一 work_item_id)│
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### 2.2 UI/API/数据流概述
 
-- **UI → API**: Flow 编辑器/聊天栏/模板选择器均通过 §5.2 REST 端点持久化, 无本地专属存储 (per §5.3 Zustand slice 仅做前端缓存, 非唯一真源)。
-- **API → LangGraph 路由层**: 仅 W15.3 (`routing_mode="dynamic_agent"`) 与 W15.1/W15.2/W15.4 (聊天栏) 场景调用 L0; 其余 52 项 FR 的执行路径不经过 LangGraph 路由层, 走既有 `RuleExecutor` 同步/异步调度。
+- **UI → API**: Group Shell 持有共享聊天会话；Canvas 仅提供当前 Flow/EntityRef 上下文。Flow API 持久化 `scope_kind`、Worktree 与授权目标，无 Canvas 专属聊天状态或任务副本。
+- **API → LangGraph 路由层**: W15 场景传递 `GroupContext`、`actor_session_id`、scope、Flow/EntityRef 和目标 Worktree；L0 按当前授权决定执行。其余 52 项 FR 走既有 `RuleExecutor`。
 - **数据流**: 详见 §6.2 データ view 对 §7.4 (SRS) 标签绑定数据流的复用与扩展。
 
 ### 2.3 数据流场景 (Flow 执行 + 标签绑定, 两条主链路)
@@ -251,7 +265,8 @@
 Flow.tags 变更 (含 W15 聊天栏/模板套用间接触发)
   → canvas_event 触发 (FR-W2.4)
   → 标签绑定重新求值 (FR-W11.1/W11.4)
-  → 命中变化判定 → 创建/detach/硬删 WorkItem (BR-W-3 三分支)
+  → 命中变化判定 → 创建/detach/删除规范 WorkItem (BR-W-3 三分支)
+  → 返回 canonical `work_item_id`；Task Card 与同级应用读取同一任务事实
   → user_edited_fields 保护检查, 系统字段同步跳过已接管字段
 ```
 
@@ -267,7 +282,7 @@ Flow.tags 变更 (含 W15 聊天栏/模板套用间接触发)
 |---|---|---|
 | Flow 编辑器 (新组件, 页面路径待定) | 节点拖拽画布, 复用或独立于 `CanvasView.tsx` viewport 【TBD, 见 SRS 风险 #1】 | W1-W10 |
 | 模板选择器 (新组件) | "+ Flow" 入口旁弹出, 展示 3 套内置模板 + 自定义模板 | W14 |
-| 底部聊天栏 (新组件) | 画布/Flow 编辑视图底部常驻, 落地 `store.ts:565` `actor_session_id` 预留点 | W15.1/W15.4 |
+| Group Shell 共享聊天栏 (外壳组件, 本 BD 不实现) | 各 Worktree 同级应用间固定共享；Canvas 注册 Flow/EntityRef 上下文与 scope 所需目标 | W15.1/W15.4 |
 | 执行历史面板 (新组件) | 独立面板 (非画布 element), 类比 `/automation` 页 | W9 |
 | Flow Tags 管理面板 (新 tab, 扩展 `/automation` 页) | 标签表达式→Flow→派生任务卡 三级绑定关系表 | W12.4 |
 | 节点配置侧栏 (扩展既有侧栏模式) | 双击节点后展开, 复用 V0.1 联动 2 模式 | W1.4, W9.3 |
@@ -278,7 +293,7 @@ Flow.tags 变更 (含 W15 聊天栏/模板套用间接触发)
 |---|---|---|---|
 | SCR-WF-01 | Flow 编辑器主画面 | 拖拽搭建/编辑节点图 | Dev/PM/美术TA |
 | SCR-WF-02 | 模板选择器 (弹层/侧栏) | 选择内置/自定义模板一键套用 | Dev/PM/美术TA |
-| SCR-WF-03 | 底部聊天栏 | 自然语言创建/编辑 Flow, L0 会话入口 | Dev/PM/美术TA |
+| SCR-WF-03 | Flow 共享聊天上下文 | Group Shell 会话在 Flow 上下文中创建/编辑草稿；不代表 Canvas 自有聊天栏 | Dev/PM/美术TA |
 | SCR-WF-04 | 执行历史面板 | 查看/重跑/调试 Execution | Dev/PM/SRE |
 | SCR-WF-05 | Flow Tags 管理面板 | 管理标签绑定关系, 增删 Flow tags | PM/5域Lead |
 | SCR-WF-06 | 节点配置侧栏 | 编辑单节点参数 (trigger/action/condition/retry 等) | Dev/PM/美术TA |
@@ -288,7 +303,7 @@ Flow.tags 变更 (含 W15 聊天栏/模板套用间接触发)
 | 项目 | 内容 |
 |---|---|
 | 显示条件 | 用户点击工具栏 "+ Flow" (FR-W1.3) 或从 Flow 列表进入已有 Flow |
-| 画面构成 | 顶部工具栏 (Active/Inactive 开关 FR-W10.1, 版本下拉 FR-W10.2, "+ Flow" 入口) + 中央节点画布 (复用或独立于 `CanvasView.tsx` viewport, 【TBD】见 SRS 风险 #1) + 右侧节点配置侧栏 (双击呼出, SCR-WF-06) + 底部聊天栏 (SCR-WF-03) |
+| 画面构成 | Group Shell 外壳 (含共享底部聊天栏和 `WORKTREE`/`GLOBAL` 选择器) + 顶部 Flow 工具栏 (Active/Inactive 开关 FR-W10.1, 版本下拉 FR-W10.2, "+ Flow" 入口) + 中央节点画布 + 右侧节点配置侧栏 (双击呼出, SCR-WF-06)；画布 viewport 复用方式仍按 SRS 风险 #1 追踪 |
 | 输入项目 | 节点拖拽位置 / connector 连线 / 双击节点触发详情 |
 | 权限控制 (前端显示 vs 后端) | 前端: 无 Flow 编辑权限时隐藏"+ Flow"/编辑操作按钮; 后端: RBAC 校验写操作 (per §8.2), 前端隐藏不能替代后端校验 |
 | 画面迁移 | 工具栏 "+ Flow" → 新建空 Flow (本画面); 模板选择器确认套用 (SCR-WF-02) → 返回本画面 (已预置节点); 执行历史 tab → SCR-WF-04 |
@@ -308,18 +323,18 @@ Flow.tags 变更 (含 W15 聊天栏/模板套用间接触发)
 | 关联 API | `/v1/collaboration/flow-templates` (GET 列表, POST 套用后新建 Flow) |
 | 异常表现 | 模板列表加载失败 → 空态 + 重试, 不阻塞"空白创建"路径 |
 
-#### SCR-WF-03 底部聊天栏
+#### SCR-WF-03 Flow 上下文中的 Group Shell 共享聊天栏
 
 | 项目 | 内容 |
 |---|---|
-| 显示条件 | 画布/Flow 编辑视图始终可见 (常驻), 【TBD】是否需跨页面持久悬浮 (per SRS 已知缺口) |
-| 画面构成 | 输入框 + 发送按钮 + 消息历史区 (per `chat_session`) + 草稿预览态 (解析出 `parsed_flow_draft` 后展示"确认应用"/"取消"按钮) |
-| 输入项目 | 自然语言文本 (无长度上限【TBD】) |
-| Validation | mock 规则匹配失败 → 提示"未能解析"消息, 不生成草稿, 不报错崩溃 |
-| 按钮行为 | "发送" → 调用 §5.2 聊天消息端点; "确认应用"草稿 → 正式写入 `flow_node`/`flow_edge` (非静默保存); "取消" → 丢弃草稿 |
-| 权限控制 | 需登录会话 (`actor_session_id`), 与既有 L0 TopAgentState 会话生命周期一致 |
-| 关联 API | `POST /v1/collaboration/chat-sessions/{id}/messages` |
-| 异常表现 | L0 会话不可达 → 聊天栏显示"离线"提示, 不阻塞画布其他操作 (per FR-W15.1 异常处理) |
+| 显示条件 | Group Shell 在 Worktree 下各同级应用固定显示；Canvas 进入时向 Shell 注册 Flow/EntityRef 上下文，不单独渲染此栏 |
+| 画面构成 | 共享输入框、会话消息历史、范围选择器 (`WORKTREE`/`GLOBAL`)；Flow 草稿预览附着于共享会话消息，展示"确认应用"/"取消" |
+| 输入项目 | 自然语言文本 + 当前上下文；GLOBAL 写操作要求显式选择目标 Worktree 并通过逐目标授权 |
+| Validation | mock 规则未命中 → 提示"未能解析"；scope/目标缺失、授权失效或插件 capability 不满足 → 拒绝写入 |
+| 按钮行为 | Group Shell 发送消息；Flow 草稿确认时通过 Flow API 写入目标 Worktree 下的 `flow_node`/`flow_edge`；取消仅丢弃草稿 |
+| 权限控制 | 复用 `actor_session_id` 与 L0 TopAgentState 生命周期；服务端校验 scope、`GroupContext`、用户 ACL、目标 Worktree 和插件 manifest capability |
+| 关联 API | `POST /v1/collaboration/chat-sessions/{id}/messages`，请求携带 scope/context；详见 §5.2 |
+| 异常表现 | L0 不可达 → Group Shell 显示离线提示；Flow 页面和其他群组应用继续可用 |
 
 #### SCR-WF-04 执行历史面板
 
@@ -368,7 +383,7 @@ Flow.tags 变更 (含 W15 聊天栏/模板套用间接触发)
                           ▼                                   ▼
                     (保存/取消回 SCR-WF-01)          (重跑生成新 Execution)
 
-SCR-WF-03 底部聊天栏 (画布内常驻, 独立生命周期) ──(确认应用草稿)──→ SCR-WF-01 (草稿节点落入编辑视图)
+Group Shell 共享聊天栏 (跨同级应用常驻, 会话范围不随页面切换) ──(Flow 上下文 + 确认草稿)──→ SCR-WF-01 (写入目标 Worktree 的标准 Flow)
 ```
 
 ---
@@ -388,13 +403,13 @@ SCR-WF-03 底部聊天栏 (画布内常驻, 独立生命周期) ──(确认应
 | `execution_history` | Transaction | 单次执行记录, append-only |
 | `execution_step` | Transaction | 单节点执行记录, append-only |
 | `flow_template` (**v1.1 新增**) | Master | 模板库主体 (内置只读 + 自定义可写) |
-| `chat_session` (**v1.1 新增**) | Transaction | 底部聊天栏会话/消息, append-only |
+| `chat_session` (**v1.1 新增 / v1.2 扩展**) | Transaction | Group Shell 共享会话消息、scope 和目标快照, append-only |
 
 **W/T/M 三类横展 (per 守门 #13, 100% 表覆盖声明)**:
 
 - Master 5/8 (62.5%): `automation_flow` / `automation_flow_versions` / `flow_node` / `flow_edge` / `flow_template`
 - Transaction 3/8 (37.5%): `execution_history` / `execution_step` / `chat_session`
-- **Work 0/8 (0%)** — 显式声明而非遗漏 (per 守门 #11 缺标比错标): 本域没有 session-bound/TTL 临时数据表。聊天栏会话看似像"session"概念, 但 SRS FR-W15.4 明确要求其执行记录需可回链审计 (`execution_history.origin_chat_session_id`), 故归类 **Transaction (append-only 永久保留)** 而非 Work (TTL 过期清理); 若详细设计阶段引入短期编辑锁/在线协作状态等临时数据, 届时可能新增 Work 类表, 本 BD 不预先假设该需求存在。
+- **Work 0/8 (0%)** — 显式声明而非遗漏 (per 守门 #11 缺标比错标): 本域没有 session-bound/TTL 临时表。Group Shell 的聊天消息与 Flow 执行均是可审计 Transaction；短期 UI 恢复、编辑锁或在线协作投影若需要 TTL，应作为独立 Work 状态建模，不得对 Transaction 审计事实做物理清理。Group App Registry 的安装/启用主档不在本 BD 的 8 张表内。
 - **总计 8/8 = 100% ✓**
 
 ### 4.2 表定义 (DDL 建议, 详细设计阶段可调整)
@@ -404,6 +419,7 @@ SCR-WF-03 底部聊天栏 (画布内常驻, 独立生命周期) ──(确认应
 ```sql
 CREATE TABLE automation_flow (
   id UUID PRIMARY KEY,
+  worktree_id UUID NOT NULL,  -- Flow 主档归属唯一 Worktree；GLOBAL 请求创建时仍须选定此归属
   name VARCHAR(255) NOT NULL,
   tags TEXT[] NOT NULL DEFAULT '{}',
   tag_binding_expr TEXT,  -- AND/OR/NOT 布尔表达式, per FR-W11.5
@@ -418,6 +434,7 @@ CREATE TABLE automation_flow (
 );
 
 CREATE INDEX idx_flow_tenant ON automation_flow(tenant_id);
+CREATE INDEX idx_flow_worktree ON automation_flow(worktree_id);
 CREATE INDEX idx_flow_enabled ON automation_flow(enabled);
 CREATE INDEX idx_flow_tags ON automation_flow USING GIN(tags);
 
@@ -510,6 +527,8 @@ CREATE TABLE execution_history (
   id UUID PRIMARY KEY,
   automation_flow_id UUID NOT NULL,  -- 有意不加 REFERENCES ... ON DELETE CASCADE, per §7.3 数据完整性约束
   automation_flow_version_id UUID,
+  scope_kind VARCHAR(10) NOT NULL CHECK (scope_kind IN ('WORKTREE', 'GLOBAL')),
+  target_worktree_ids UUID[] NOT NULL DEFAULT '{}',  -- 实际授权并执行的目标集合，审计快照
   status VARCHAR(20) NOT NULL,  -- running/succeeded/failed
   trigger_kind VARCHAR(30) NOT NULL,
   resumed_from_execution_id UUID,  -- per FR-W9.2
@@ -520,6 +539,7 @@ CREATE TABLE execution_history (
 );
 
 CREATE INDEX idx_exec_flow ON execution_history(automation_flow_id);
+CREATE INDEX idx_exec_scope ON execution_history(scope_kind);
 CREATE INDEX idx_exec_status ON execution_history(status);
 CREATE INDEX idx_exec_chat_session ON execution_history(origin_chat_session_id) WHERE origin_chat_session_id IS NOT NULL;
 CREATE INDEX idx_exec_tenant ON execution_history(tenant_id);
@@ -570,12 +590,15 @@ CREATE POLICY template_tenant_isolation ON flow_template
 -- 内置模板 (is_builtin=true) 跨租户可读, 自定义模板受租户隔离; 写操作另受 §8 RBAC 校验 (内置只读)
 ```
 
-#### 4.2.8 `chat_session` (Transaction, **v1.1 新增**, per W15, append-only)
+#### 4.2.8 `chat_session` (Transaction, **v1.1 新增 / v1.2 扩展**, Group Shell 会话审计, append-only)
 
 ```sql
 CREATE TABLE chat_session (
   id UUID PRIMARY KEY,
-  actor_session_id UUID NOT NULL,  -- 对应 store.ts:565 TODO, 与 L0 TopAgentState 会话对齐
+  actor_session_id UUID NOT NULL,  -- 复用 Group Shell/L0 TopAgentState 会话，不由 Canvas 创建
+  scope_kind VARCHAR(10) NOT NULL CHECK (scope_kind IN ('WORKTREE', 'GLOBAL')),
+  worktree_id UUID,  -- WORKTREE 当前上下文；GLOBAL 可为空但写入时必须提供目标
+  target_worktree_ids UUID[] NOT NULL DEFAULT '{}',  -- 用户显式选择并授权的目标集合
   message TEXT NOT NULL,
   parsed_flow_draft JSONB,  -- mock 解析出的草稿节点图, per FR-W15.2
   applied BOOLEAN NOT NULL DEFAULT false,  -- 草稿是否已被用户确认应用
@@ -586,12 +609,14 @@ CREATE TABLE chat_session (
 
 CREATE INDEX idx_chat_actor_session ON chat_session(actor_session_id);
 CREATE INDEX idx_chat_tenant ON chat_session(tenant_id);
+CREATE INDEX idx_chat_worktree ON chat_session(worktree_id) WHERE worktree_id IS NOT NULL;
 ```
 
 ### 4.3 既有表字段扩展
 
 | 表 | 新增字段 | 说明 |
 |---|---|---|
+| `automation_flow` | `worktree_id UUID NOT NULL` | Flow 主档唯一归属；跨 Worktree GLOBAL 请求仍须明确选择创建目标 |
 | `WorkItem` | `source_kind VARCHAR(30)` | 标记派生来源 (`workflow_tag_binding`), per FR-W11.2 |
 | `WorkItem` | `source_flow_id UUID` (nullable, **不**级联删除, per §7.3) | 指回源 Flow, Flow 删除时置空保留卡片 |
 | `WorkItem` | `tag_binding_status VARCHAR(10)` | `bound`/`detached`/`null`, per FR-W12.3 |
@@ -627,16 +652,24 @@ CREATE INDEX idx_chat_tenant ON chat_session(tenant_id);
 
 | API ID | Method | Path | 说明 | Auth | RLS |
 |---|---|---|---|---|---|
-| API-WF-01 | `GET/POST/PATCH/DELETE` | `/v1/collaboration/flows` | Flow CRUD, 复用总册 §6.2 Canvas CRUD 模式 | Session token (既有) | ✓ tenant_id |
+| API-WF-01 | `GET/POST/PATCH/DELETE` | `/v1/collaboration/flows` | Flow CRUD；创建时必须指定唯一 `worktree_id`，由服务端校验 Worktree 写权限 | Session token (既有) | ✓ tenant_id + Worktree ACL |
 | API-WF-02 | `GET/POST/PATCH/DELETE` | `/v1/collaboration/flows/{id}/nodes`, `/edges` | Node/Edge CRUD | 同上 | ✓ |
-| API-WF-03 | `POST/GET` | `/v1/collaboration/flows/{id}/executions` | 手动触发 Execution + 历史查询 | 同上 | ✓ |
+| API-WF-03 | `POST/GET` | `/v1/collaboration/flows/{id}/executions` | 手动触发 Execution + 历史查询；请求带 scope 和显式目标 | 同上 | ✓ scope/target ACL |
 | API-WF-04 | `POST` | `/v1/collaboration/flows/{id}/executions/{exec_id}/resume` | 从失败节点重跑 (per FR-W9.2) | 同上, 需 Flow 写权限 | ✓ |
 | API-WF-05 | `POST` | `/v1/collaboration/flows/{id}/webhook/{token}` | Webhook 触发入口 (per FR-W2.3) | **token 校验** (非 session, 详见下) | ✓ |
 | API-WF-06 (**v1.1 新增**) | `GET/POST/PATCH/DELETE` | `/v1/collaboration/flow-templates` | 模板 CRUD, 内置模板 (`is_builtin=true`) 只读, DELETE 仅对自定义模板开放 | Session token | ✓ |
-| API-WF-07 (**v1.1 新增**) | `POST` | `/v1/collaboration/flow-templates/{id}/instantiate` | 套用模板一次性实例化节点/边/data_mapping (per FR-W14.5) | 同上 | ✓ |
-| API-WF-08 (**v1.1 新增**) | `POST` | `/v1/collaboration/chat-sessions/{id}/messages` | 聊天栏消息 + NL→Flow 解析 (per FR-W15.1/W15.2), v1 后端为 mock 规则化解析, 复用 `/api/tmo/*` 做会话管理 | Session token + `actor_session_id` | ✓ |
+| API-WF-07 (**v1.1 新增**) | `POST` | `/v1/collaboration/flow-templates/{id}/instantiate` | 套用模板为目标 Worktree 创建 Flow，再一次性实例化节点/边/data_mapping (per FR-W14.5) | 同上 | ✓ scope/target ACL |
+| API-WF-08 (**v1.1 新增 / v1.2 扩展**) | `POST` | `/v1/collaboration/chat-sessions/{id}/messages` | Group Shell 共享聊天消息 + NL→Flow 草稿；Canvas 提供 Flow/EntityRef 上下文 | Session token + `actor_session_id` + scope/target ACL | ✓ |
 
 ### 5.2 API 详细契约 (示例: 核心端点, 详细设计阶段补齐余下端点的完整 schema)
+
+#### API-WF-01 `POST /v1/collaboration/flows` (创建 Flow)
+
+| 项 | 内容 |
+|---|---|
+| Request | `{ worktree_id: UUID, name: string, ... }` |
+| 归属规则 | `automation_flow.worktree_id` 在创建时必填且固定单一归属；GLOBAL 请求创建时仍必须选定一个 Flow 所属 Worktree。普通 PATCH 不隐式迁移 Flow |
+| 授权 | 服务端校验操作者对目标 Worktree 与 Flow 的创建权限；不能仅凭客户端传入的 `worktree_id` 建立授权 |
 
 #### API-WF-03 `POST /v1/collaboration/flows/{id}/executions`
 
@@ -644,13 +677,21 @@ CREATE INDEX idx_chat_tenant ON chat_session(tenant_id);
 |---|---|
 | Direction | UI → BFF |
 | Encoding | JSON, UTF-8 |
-| Request | `{ trigger_kind: "manual", input?: Record<string, unknown> }` |
-| Response 200 | `{ execution_id: UUID, status: "running" }` |
-| Response 4xx | `400` Flow 定义非法 (存在未绑定 `agent_id` 的 `is_placeholder` 节点且 Flow `enabled=true` 时同样拒绝, 见 §8) / `403` 无 Flow 执行权限 / `404` Flow 不存在 |
+| Request | `{ trigger_kind: "manual", scope_kind: "WORKTREE" \| "GLOBAL", target_worktree_ids: UUID[], input?: Record<string, unknown> }` |
+| 目标规则 | WORKTREE 范围只包含 Flow 所属 Worktree；GLOBAL 必须显式列出目标并逐一校验。定时、事件和绑定到 Flow 的 Webhook 触发默认按所属 Worktree 执行；跨 Worktree 执行必须另有显式目标与运行时服务策略授权 |
+| Response 200 | `{ execution_id: UUID, status: "running", scope_kind, target_worktree_ids: UUID[] }` |
+| Response 4xx | `400` Flow 定义非法或 GLOBAL 缺少显式目标 / `403` scope、Flow 或任一目标无权限 / `404` Flow 不存在 |
 | Timeout | 复用总册 §5.6 错误处理基线 (网络层), 具体秒数【TBD, 待总册 §5.6 数值统一确认后引用, 本 BD 不新定义独立于总册的超时数值】 |
 | Retry | 网络传输层最多 2 次 (per 总册 §5.6), 与 FR-W8.1 节点级业务重试 (`retry_policy`) 相互独立分层, 不叠加计数 |
 | Idempotency | 手动触发 v1 **不去重** (每次调用产生 1 条新 Execution), 与 Webhook/cron 触发行为一致, 由调用方自行避免重复点击造成的重复执行 |
 | Ordering | 单 Flow 允许并发多个 Execution 同时运行, 不做全局串行化 (per SRS 未声明串行约束) |
+
+#### API-WF-07 `POST /v1/collaboration/flow-templates/{id}/instantiate`
+
+| 项 | 内容 |
+|---|---|
+| Request | `{ worktree_id: UUID, ... }` |
+| 规则 | 套用模板创建的 Flow 必须落到一个明确 Worktree；服务端校验模板可读、目标可写，并将 `worktree_id` 固化在 Flow 主档 |
 
 #### API-WF-05 `POST /v1/collaboration/flows/{id}/webhook/{token}`
 
@@ -658,7 +699,7 @@ CREATE INDEX idx_chat_tenant ON chat_session(tenant_id);
 |---|---|
 | Direction | 外部系统 → BFF (唯一对外无需登录会话的入口) |
 | Authentication | **path token 校验** (`flow_node.webhook_token`), 非 Session Cookie/Bearer — 因为调用方是外部系统而非登录用户 |
-| Authorization | token 与 `webhook_token` 精确匹配 + 所属 Flow `enabled=true` 方可触发 |
+| Authorization | token 与 `webhook_token` 精确匹配 + 所属 Flow `enabled=true` 方可触发；执行范围固定为该 Flow 所属 Worktree，调用方 token 不赋予 GLOBAL 权限 |
 | Request | 任意 JSON body (透传作为触发数据, 供下游节点 `input_bindings` 引用) |
 | Response 200 | `{ execution_id: UUID }` |
 | Response 4xx | `401` token 不匹配/已吊销 / `413` body 超出大小限制【TBD, 具体字节数待 Design Doc 结合总册请求体上限统一确认】 |
@@ -667,18 +708,20 @@ CREATE INDEX idx_chat_tenant ON chat_session(tenant_id);
 
 #### API-WF-08 `POST /v1/collaboration/chat-sessions/{id}/messages`
 
+**GroupContext contract**: 请求携带 `scope_kind`、当前 `worktree_id`、显式 `target_worktree_ids` 和可选 Flow/`EntityRef` 上下文。BFF/L0 用 `actor_session_id` 解析用户与群组授权；权限事实由服务端派生，不接受客户端传入的角色或授权结论。GLOBAL 读操作可不带写目标；任何写操作都必须先解析出完整目标集合并逐一授权。
+
 | 项 | 内容 |
 |---|---|
-| Direction | UI (底部聊天栏) → BFF → (mock 规则引擎, 非真实 LLM) |
-| Request | `{ message: string, actor_session_id: UUID }` |
-| Response 200 | `{ chat_session_id: UUID, parsed_flow_draft: FlowDraft \| null, matched: boolean }` |
-| Response 4xx | `401` `actor_session_id` 已过期/不存在 |
-| 业务规则 | v1 解析层为 mock/规则化实现 (关键词+模板匹配), 非真实 LLM API 调用 (per 守门 #23 v2); 解析失败返回 `matched: false`, 不视为错误 |
+| Direction | Group Shell 共享底栏 → BFF → (mock 规则引擎, 非真实 LLM) |
+| Request | `{ message: string, actor_session_id: UUID, scope_kind: "WORKTREE" \| "GLOBAL", worktree_id: UUID \| null, target_worktree_ids: UUID[], context: { flow_id?: UUID, entity_refs?: EntityRef[] } }` |
+| Response 200 | `{ chat_session_id: UUID, scope_kind, target_worktree_ids: UUID[], parsed_flow_draft: FlowDraft \| null, matched: boolean }` |
+| Response 4xx | `401` 会话失效 / `403` scope 或任一目标无授权 / `400` GLOBAL 写操作没有显式目标 / `404` Flow 或实体引用不存在 |
+| 业务规则 | `actor_session_id` 由 L0 会话机制校验；服务端从登录主体构造 GroupContext，不能信任客户端自报权限。WORKTREE 只作用于当前 Worktree；GLOBAL 写操作逐目标授权。调用插件前核对 Group App Registry manifest capability、scope、用户授权和目标。v1 解析仍为 mock/规则化实现，非真实 LLM API 调用；解析失败返回 `matched: false` |
 | 已知缺口 | mock 规则覆盖范围 (能正确解析哪些句式) 待 Design Doc 列出具体规则表 (per SRS §10 已知缺口); 真实 NLU/LLM 接入时间点待 P2 阶段拍板, 本 BD 不预先设计真实集成方案 |
 
 ### 5.3 实时更新: 复用既有 Canvas WebSocket 通道 (不新增独立 WS 端点)
 
-SRS §8 未声明本域专属 WebSocket 端点; Flow 节点/边本身是画布 element 的扩展 kind (per §2.1 6 个新 element kind), 节点位置/执行状态的实时同步**复用**总册既有 `wss://canvas-collab/canvases/[id]` 通道 (per `BD-CANVAS-AGENT-001` §5.2, `element.update` 事件), 不新增并行的 WebSocket 端点。Execution 运行中的节点级状态高频刷新需求 (如 SCR-WF-04 面板是否需要秒级刷新而非轮询) — **【TBD, Design Doc】**, 若确认需要, 届时在既有 `canvas-collab` 通道上扩展 `execution_step.status_changed` 事件类型, 而非另起新 WebSocket 端点。
+SRS §8 未声明本域专属 WebSocket 端点; Flow 节点/边本身是画布 element 的扩展 kind (per §2.1 6 个新 element kind), 节点位置/执行状态的实时同步**复用**总册既有 `wss://canvas-collab/canvases/[id]` 通道 (per `BD-CANVAS-AGENT-001` §5.2, `element.update` 事件), 不新增并行的 WebSocket 端点。Group Shell 聊天消息走共享会话接口，不复用 Canvas 文档协同 socket，避免把跨应用会话绑定到某张画布。Execution 运行中的节点级状态高频刷新需求 (如 SCR-WF-04 面板是否需要秒级刷新而非轮询) — **【TBD, Design Doc】**, 若确认需要, 届时在既有 `canvas-collab` 通道上扩展 `execution_step.status_changed` 事件类型, 而非另起新 WebSocket 端点。
 
 ### 5.4 与既有 25 module 联动接口
 
@@ -687,9 +730,11 @@ SRS §8 未声明本域专属 WebSocket 端点; Flow 节点/边本身是画布 e
 | 25 module | 画布表现 | 本 BD 扩展 |
 |---|---|---|
 | automation | `automation_node` 单规则 | 升级为 Flow 图 (W1-W10), 既有 `AutomationRule` 视为 1 trigger + N action 的退化 2 层 Flow, 向后兼容 |
-| work-item | 拖 WorkItem → 画布 element | 标签绑定自动生成 WorkItem (W11-W12) |
+| work-item | 拖 WorkItem → 画布 element | 标签绑定创建/更新既有规范 WorkItem；Canvas、任务视图与 Task Card 通过同一 `work_item_id` 交互，不复制状态 (W11-W12) |
 | notification | `send_notification` 动作 | Flow 失败通知复用 (FR-W8.3) |
-| L0/TMO (ADR-0046) | `/api/tmo/*` 8 端点 | 聊天栏会话 + 动态路由决策复用, 不新增并行会话端点 (v1.1 新增) |
+| Group Shell | 共享固定底栏 + `WORKTREE`/`GLOBAL` scope | 共享会话复用 `actor_session_id`；Canvas 注册 Flow/EntityRef 上下文，不渲染第二个聊天栏 (W15, v1.2) |
+| Group App Registry | Worktree 群组应用与插件 manifest | 热插拔状态由 Registry 管理；本域校验 capability/scope/目标后才请求执行，不管理安装状态 |
+| L0/TMO (ADR-0046) | `/api/tmo/*` 8 端点 | 接收 GroupContext 并做动态路由；`SubAgentRegistry` 是执行期 Agent/子图注册，不替代 Group App Registry |
 
 ### 5.5 错误处理总则
 
@@ -709,13 +754,13 @@ SRS §8 未声明本域专属 WebSocket 端点; Flow 节点/边本身是画布 e
 | 任务卡联动 (issue 核心诉求) | W11-W12 (FR-W11.1~W12.5, 10 项) | 标签绑定表达式 → 自动生成 WorkItem, Backlog/Sprint 三分支回收 |
 | 一致性 | W13 (FR-W13.1~W13.2, 2 项) | Flow 状态与 WorkItem 状态映射一致性校验 |
 | 模板库 (v1.1) | W14 (FR-W14.1~W14.7, 7 项) | 内置模板浏览/预览/一键实例化, Agent 占位符节点 |
-| 智能控制/聊天栏 (v1.1) | W15 (FR-W15.1~W15.5, 5 项) | 底部聊天栏、mock NL→Flow 解析、`routing_mode` 静态/动态双模式 |
+| 智能控制/共享聊天上下文 (v1.2) | W15 (FR-W15.1~W15.5, 5 项) | 消费 Group Shell 会话及 scope/GroupContext、mock NL→Flow 草稿、`routing_mode` 静态/动态双模式 |
 
 54 项 FR 的逐条 Actor/输入/输出/异常映射已在 §1.1.1-§1.1.15 给出, 本节不重复罗列, 仅做功能块级归类以支撑 §10 追溯矩阵按块索引。
 
 ### 6.2 データ View (Data)
 
-复用 §4 全部内容 (8 张表, W/T/M = 5/3/0, 见 §4.1)。跨 View 补充: Flow 定义 (`automation_flow`+`flow_node`+`flow_edge`) 是**静态图数据**, Execution 相关表 (`execution_history`+`execution_step`) 是**运行时快照数据**, 两者生命周期独立 — 删除/停用 Flow 不级联删除历史 Execution 记录 (审计要求, per SRS §7 数据需求)。`chat_session` (v1.1) 是短生命周期会话数据, 与 Flow 数据无外键强耦合 (仅通过 `parsed_flow_draft` JSON 字段弱引用候选 Flow, 未落库前不产生实际 FK)。
+复用 §4 全部内容 (8 张表, W/T/M = 5/3/0, 见 §4.1)。跨 View 补充: `automation_flow.worktree_id` 固定 Flow 的唯一归属；Flow 定义是静态 Master，Execution 表保存每次执行时的 scope/授权目标 Transaction 快照；删除/停用 Flow 不级联删除历史 Execution。`chat_session` (Transaction) 记录 Group Shell 的消息、范围和目标；活跃 UI 恢复及 LangGraph 可恢复 checkpoint 属短期 Work 状态，应采用独立 TTL/保留策略，不改变聊天/执行审计事实分类。
 
 ### 6.3 動作 View (Behavior / State Machine)
 
@@ -751,7 +796,7 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 | `automation` (既有, 扩展) | 既有 `AutomationRule` 作为 Flow 的退化 2 层特例, 向后兼容, 不破坏既有数据 |
 | `work-item` (既有, 扩展) | 新增标签绑定生成/回收逻辑 (W11-W12), 复用既有 WorkItem CRUD, 仅扩展字段 (见 §4.3) |
 | `flow-template-library` (新增, v1.1) | W14 模板 CRUD + 实例化, 与 `workflow-engine` 强依赖（实例化产物是普通 Flow） |
-| `chat-bar` (新增, v1.1) | W15 聊天会话 + mock 解析, 依赖 `/api/tmo/*` (ADR-0046) 做会话管理, **不**直接调用 L1 Agent（per "L1↔L1 通信禁止" 派生约束, 聊天栏发起的动作经由既有 L0/TMO 编排层, 不新增旁路） |
+| Group Shell shared chat | W15 共享会话 + mock 解析, 请求经 `/api/tmo/*` (ADR-0046) 进入 L0 并携带 GroupContext；**不**直接调用 L1 Agent，也不为 Canvas 新开聊天旁路 |
 
 ### 6.5 ネットワーク View (Network / Deployment)
 
@@ -781,8 +826,9 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 
 ### 8.1 认证与授权
 
-- **认证 (Authentication)**: 所有 UI 发起的 API-WF-01~04/06~08 复用既有 Session Token 机制, 本 BD 不新增独立认证方式。
-- **授权 (Authorization)**: 复用既有 RBAC, Flow/Template 的读写权限与所属 Canvas/Workspace 权限一致 (per §4.2 RLS `tenant_id` 策略); 前端画面按钮的显示/隐藏（如 SCR-WF-01 编辑按钮）**仅为体验优化**, 真正的写权限校验必须在 BFF 层复核, 不得仅依赖前端隐藏。
+- **认证 (Authentication)**: 所有 UI 发起的 API-WF-01~04/06~08 复用既有 Session Token 与 `actor_session_id`，不新增独立认证方式。
+- **授权 (Authorization)**: 服务端从认证主体构造 GroupContext，并逐请求校验 scope、Worktree membership/ACL、Flow 归属及目标集。`WORKTREE` 只操作当前 Worktree；`GLOBAL` 的每项写操作必须显式列出并逐目标授权，任何失败目标都不得执行。前端按钮显隐仅是体验优化，BFF/Domain Service 必须复核授权。
+- **插件能力**: 通过 Group App Registry 读取已启用插件 manifest，并在执行前验证 capability、scope、用户授权和目标 Worktree。LangGraph `SubAgentRegistry` 仅解析执行期 Agent/子图，不授予插件安装权限；聊天栏选 `GLOBAL` 不扩大 manifest 或用户 ACL。
 
 ### 8.2 Webhook 入口 (API-WF-05) — 攻击面重点
 
@@ -799,7 +845,8 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 |---|---|---|
 | CEL 条件表达式 (`condition_expr`, W4) | 复用既有 `AutomationRule.condition_expr` 沙箱执行环境, 不新增独立 CEL 执行器 | 沙箱逃逸风险由既有 CEL 引擎既定边界承担, 本 BD 不重新评估既有引擎安全性 |
 | `{{node.<id>.output.<field>}}` 数据映射语法 (W6) | 需防止映射表达式被用于越权读取其他 Flow/其他租户的数据 | **【安全确认必要】**: 映射解析器是否严格限定在同一 Execution 上下文内取值, 需 Design Doc 明确并附单元测试证据 |
-| 聊天栏输入 (W15, mock 解析) | v1 为规则/关键词匹配, 非真实 LLM, 无 Prompt Injection 攻击面（因无真实模型推理） | 待未来接入真实 NLU/LLM 时需重新评估 Prompt Injection, 本版本不适用 |
+| Group Shell 消息与 scope (W15) | 服务端校验 `actor_session_id`、GroupContext、scope、目标 ACL；客户端不得自报授权结果 | GLOBAL 未指定或任一目标未授权时拒绝整项写操作；未来接入真实 LLM/NLU 时重新评估 Prompt Injection |
+| 插件动作 (W15/LangGraph) | 对照 Group App Registry manifest 验证 capability、启用状态、scope 和目标；同一请求按用户 ACL 再校验 | 插件 capability 不由 LangGraph `SubAgentRegistry` 推导；拒绝未声明或超范围动作 |
 | Webhook 外部输入 body | 透传给下游节点 `input_bindings`, 需防止注入内容通过节点动作（如通知发送）产生二次注入 | **【安全确认必要】**, 具体转义/校验规则待 Design Doc 补齐 |
 
 ### 8.5 审计与敏感数据
@@ -813,11 +860,11 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 
 已在 §4.1 声明: Master 5 张 / Transaction 3 张 / **Work 0 张**。
 
-**Work 类 0 张理由**: SRS 对本域 8 张表均未提出"临时性、会话级、需 TTL 自动清理"的业务需求 — Flow 定义类表（Master）需长期保留并支持版本回溯, Execution 类表（Transaction）需长期保留供审计, `chat_session`（v1.1 新增）虽是会话级数据但 SRS 未要求自动过期清理机制（仅要求关联 `actor_session_id`), 故暂归入 Transaction 而非 Work。若后续确认 `chat_session` 需要 TTL 自动清理策略, 则应重新分类为 Work — **本项分类前提标记【TBD, Design Doc 确认 `chat_session` 保留策略后可能改变本分类】**。
+**Work 类 0 张理由**: Flow 定义与模板为 Master；聊天消息、scope/目标快照和执行结果为 Transaction，均需保留审计链。短期 UI 会话恢复、编辑锁等 TTL 数据若未来需要，必须作为独立 Work 投影设计，不能重分类或清理 `chat_session`/`execution_history`。本域当前 8 张表按 SRS 分类覆盖率 100%。
 
 ### 9.2 守门 #13a L1↔L1 通信禁止派生约束
 
-`chat-bar` 模块 (W15) 不直接调用 L1 Agent, 经由既有 `/api/tmo/*` (ADR-0046) L0/TMO 编排层转发, 见 §6.4。
+W15 的 Group Shell 共享栏不直接调用 L1 Agent；消息与执行请求经既有 `/api/tmo/*` (ADR-0046) L0/TMO 编排层转发，并携带 scope、GroupContext 和目标 Worktree。Group App Registry 与 `SubAgentRegistry` 职责分离，见 §5.4/§8.1。
 
 ### 9.3 TBD 追踪矩阵 (全量汇总, 按来源分类)
 
@@ -831,10 +878,10 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 | T-04 | SRS 风险#4 | 两个 Flow 标签表达式重叠命中同一标签组合 | 用户可能得到 2 张语义重复的任务卡 | v1 不做去重, P1 观察后决定 |
 | T-05 | SRS 风险#5 | detached 状态 (FR-W12.3) 是否需要 Lead 人工确认交互 | 影响 5 域 Lead 实际处理体验 | v1 只读角标提示, 待真人反馈细化 |
 | T-06 | SRS 风险#6 | A12 多人协同编辑 CRDT 选型未拍板 | 若 Flow 编辑器需多人协同则依赖此项 | 依赖外部 `SRS-CANVAS-AGENT-001`, 本 BD 不重复设计 |
-| T-07 | SRS 风险#7 | 总册 `SRS-CANVAS-001` 尚未正式收录本专题为"三核心" | 总册措辞仍以"双核心"为主 | 本次 wrap-up 仅做最小索引同步（见 §附录/wrap-up 说明), 完整总册改写留后续 |
+| T-07 | SRS 风险#7 (已解决) | 总册是否正式收录本专题为"三核心"第 3 核心 | 总册 SRS v1.3/v1.4 已索引 W1-W15 与三核心结构 | 已关闭；后续沿用总册现行索引，不再作为待办 |
 | T-08 | SRS 风险#8 (v1.1) | W15.2/15.3 v1 均为 mock 规则化实现, 与用户对"LangGraph 智能控制"预期可能有落差 | 真实使用体验可能不及预期 | v1 交付 mock 版本, 真实 LLM 接入时间点待 P2 拍板 |
 | T-09 | SRS 风险#9 (v1.1) | `routing_mode="dynamic_agent"` 决策可复现性/确定性未澄清 | 影响 e2e 测试稳定性与执行历史可审计性 | Design Doc 阶段明确是否要求确定性 mock |
-| T-10 | SRS 风险#10 (v1.1) | AAA/spec/superpowers 3 套默认模板节点清单为 agent 合理推断, 未经真人逐节点确认 | 实际落地节点清单可能需调整 | §11 签字栏标记 Draft, 评审时逐节点确认 |
+| T-10 | SRS 风险#10 (v1.1) | AAA/spec/superpowers 3 套默认模板节点清单为 agent 合理推断, 尚未逐节点确认 | 实际落地节点清单可能需调整 | 评审时逐节点确认；历史 §11 签字不自动代表本补充对每个模板节点的确认 |
 | T-11 | SRS 风险#11 (v1.1) | spec 模板"评审不通过"回指边循环不做自动死循环检测 | 用户可能手动搭建出无法退出的循环, 消耗执行资源 | v1 依赖节点级重试上限, Flow 级最大循环次数硬限制留 P2 评估 |
 | T-12 | 本 BD §4.5 | 是否需要独立于 `automation_flow_versions` 的专属审计表 | 影响审计数据模型是否需要扩展 | Design Doc |
 | T-13 | 本 BD §5.2 | API-WF-03 超时秒数无总册统一数值可引用 | 影响客户端超时/重试策略实装 | 待总册 §5.6 数值统一确认 |
@@ -845,7 +892,7 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 | T-18 | 本 BD §8.4 | `{{node.<id>.output.<field>}}` 映射解析器是否严格限定同 Execution 上下文取值 | 若无严格限定, 存在跨 Flow/跨租户越权读取风险 | 【安全确认必要】, Design Doc + 单元测试证据 |
 | T-19 | 本 BD §8.4 | Webhook 外部输入 body 透传下游节点的二次注入防护规则 | 若节点动作含通知发送等场景, 可能产生二次注入 | 【安全确认必要】, Design Doc |
 | T-20 | 本 BD §8.5 | Execution 记录中敏感字段是否需脱敏存储 | 影响审计数据的隐私合规性 | Design Doc |
-| T-21 | 本 BD §9.1 | `chat_session` 是否需要 TTL 自动清理, 影响 W/T/M 分类是否需从 Transaction 改判 Work | 影响 §4.1 分类结论的稳定性 | Design Doc 确认后可能需修订本 BD §4.1 |
+| T-21 | 本 BD §4.1/§9.1 | Transaction 审计记录的保留/归档期限与短期 UI 恢复投影的边界尚未量化 | 影响容量、归档和恢复实现；不改变聊天/执行事实的 Transaction 分类 | Design Doc / 数据治理确认；TTL 状态必须独立建模为 Work |
 | T-22 | 本 BD §6.1(FR-W2.1) | 手动触发重复点击是否需要防抖(去重) | 影响并发点击时 Execution 是否重复生成 | Design Doc |
 | T-23 | 本 BD §6.1(FR-W2.4) | 画布事件触发风暴(高频操作)是否需要 debounce | 影响事件驱动 Execution 生成频率与系统负载 | SRS 已知缺口, Design Doc |
 | T-24 | 本 BD §6.3.1(FR-W4.3) | Merge 节点 join 模式下部分 inbound 分支永不到达时的超时策略未定 | 影响 join 型 Merge 节点是否会无限等待 | SRS 已知缺口, Design Doc |
@@ -854,7 +901,7 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 | T-27 | 本 BD §3.2(SCR-WF-04)/§6.3.2(FR-W9.3) | `execution_step` 输入/输出 JSON 过大时是否分页/截断未定 | 影响侧栏详情面板渲染性能与可用性 | Design Doc |
 | T-28 | 本 BD §6.3.3(FR-W11.4) | 标签绑定事件处理中途失败的重试/补偿机制未定 | 影响派生任务卡与命中结果的最终一致性保证 | Design Doc |
 | T-29 | 本 BD §6.4(FR-W15.3) | L0 不可达/超时时的降级策略未定(回退 static_cel 默认分支, 或整体失败) | 影响 dynamic_agent 路由模式的可用性与容错行为 | Design Doc |
-| T-30 | 本 BD §3.2(SCR-WF-03) | 底部聊天栏是否需跨页面持久悬浮未定 | 影响聊天会话上下文在页面切换时是否保留 | Design Doc |
+| T-30 | 本 BD §3.2(SCR-WF-03) | Group Shell 底栏在窄屏、缩放及安全区中的折叠/停靠尺寸未定 | 影响 Canvas 与同级应用的可用 viewport 和遮挡处理 | 基本设计视觉规格确认；共享会话持久范围已由 Group Shell 统一定义 |
 | T-31 | 本 BD §3.2(SCR-WF-03) | 聊天栏自然语言输入长度上限未定 | 影响输入校验规则与超长文本处理方式 | Design Doc |
 | T-32 | 本 BD §4.2(`chat_session.routing_decision`) | L0 动态路由决策依据 JSON 字段粒度未定 | 影响决策可审计性与前端展示细节, 与 T-09 决策可复现性相关但非同一问题 | Design Doc |
 | T-33 | 本 BD §8.2 | Webhook 入口是否需要来源 IP allowlist 未定 | 影响 Webhook 攻击面缓解措施完整性 | 【安全确认必要】, 安全评审阶段 |
@@ -881,7 +928,7 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 | W12 Backlog/Sprint 联动 | 5 | §6.3.3(BR-W-3 三分支), §3.2(SCR-WF-05) | WorkItem 状态字段, SCR-WF-05 | 【TBD】 |
 | W13 数据一致性 | 2 | §6.2 | 跨表一致性校验逻辑 | 【TBD】 |
 | W14 默认工作流模板库 (v1.1) | 7 | §3.2(SCR-WF-02 模板选择器), §4.2(`flow_template`), §5.1(API-WF-06/07) | `flow_template`, SCR-WF-02 | 【TBD】 |
-| W15 智能控制+聊天栏 (v1.1) | 5 | §4.2(`chat_session`), §5.1(API-WF-08), §3.2(SCR-WF-03 底部聊天栏), §6.4 | `chat_session`, SCR-WF-03 | 【TBD】 |
+| W15 智能控制+Group Shell 共享聊天上下文 (v1.2) | 5 | §4.2(`chat_session`/scope), §5.1(API-WF-08), §3.2(SCR-WF-03 上下文行为), §6.4/§8.1 | `chat_session`, Group Shell, Flow | 【TBD】 |
 | **合计** | **54** | — | — | — |
 
 ## §11 签字栏 (Signature Block)
@@ -896,6 +943,8 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 
 **本文档为 ULYS-28 issue 委托的设计文档交付物, 由 agent Sonnet 撰写。5 个角色（Ulysses/5 域 Lead/PM/SRE/Dev Lead）均已由项目所有者 Say世意（D-Boy）本人确认签字（2026-09-13，非代签）, 状态由 Draft 转为已签字。§9.3 TBD 追踪矩阵中的全部 35 项为设计层面的候选方案标注, 不因签字栏完成而自动裁决, 仍需在详细设计阶段逐项拍板。**
 
+**签字范围说明**: 上述签字记录只对应 v1.0.3 及之前的设计基线。v1.0.4 群组集成补充尚未评审或签字；历史签字不代表对本次新增的 GroupContext、scope/target、插件 capability 边界或新增接口细节的批准。
+
 ## §12 修订履历 (Revision History)
 
 | 版本 | 日期 | 变更摘要 | 作者 |
@@ -904,10 +953,11 @@ Flow 标签解绑或 Flow 删除时, 对应自动生成的 WorkItem 按其所在
 | v1.0.1 | 2026-09-13 | §11 签字栏: Ulysses（业务 owner）角色由 Say世意（D-Boy）本人确认签字, 其余 4 角色（5 域 Lead/PM/SRE/Dev Lead）仍待拍板; 未改动正文其他章节 | Sonnet (agent), per D-Boy 确认 |
 | v1.0.2 | 2026-09-13 | §11 签字栏: 剩余 4 角色（5 域 Lead/PM/SRE/Dev Lead）由 Say世意（D-Boy）本人确认签字, 签字日期统一 2026-09-13, 非代签; 5 角色全部签字完成; 未改动正文其他章节, §9.3 TBD 矩阵 35 项状态不变（仍待详细设计阶段逐项拍板） | Sonnet (agent), per D-Boy 确认 |
 | v1.0.3 | 2026-09-13 | 修正头部"修订人/审批"字段遗留文案（原文仍写"5 角色均 Draft/待拍板", 与已完成的 §11 签字栏矛盾）, 更新为与 §11/§12 一致的"5 角色均已确认签字"; 未改动正文其他章节 | Sonnet (agent) |
+| v1.0.4 | 2026-09-28 | 群组集成补充：Worktree 下同级应用定位；Canvas 使用 Group Shell 共享聊天栏；补充 WORKTREE/GLOBAL、Flow Worktree 归属、GroupContext、GLOBAL 逐目标授权、插件 manifest capability 校验及与 SubAgentRegistry 的边界；修正 Transaction 审计分类和已解决风险引用。原 v1.0.3 签字仅适用于此前基线，本补充待评审 | Mavis 接手审核 |
 
 ## 附录
 
-- 附录 A：本文档所引用的上位文档 —— `docs/requirements/SRS-CANVAS-WORKFLOW-001.md` (v1.1, 分支 `agent/sonnet/ulys-15` 合并入本分支, 详见交付说明)。
+- 附录 A：本文档所引用的上位文档 —— `docs/requirements/SRS-CANVAS-WORKFLOW-001.md` (v1.2；原 v1.1 基线来源记录见头部历史溯源说明)。
 - 附录 B：本文档所引用的同级文档 —— `docs/design/BD-CANVAS-AGENT-001.md`（5-tier 架构/5-View 体系/WebSocket 通道均直接复用其既定设计, 本 BD 不重复定义）、`docs/design/BD-CANVAS-GAMIFY-001.md`（章节结构参照）。
-- 附录 C：本文档所引用的总册文档 —— `docs/design/BD-CANVAS-001.md`（§1.1.4 模块 view 索引, 本次已同步新增交叉引用, 见交付说明）。
+- 附录 C：本文档所引用的总册文档 —— `docs/design/BD-CANVAS-001.md` v0.2（Group Shell 与 Worktree 同级应用边界）。
 - 附录 D：与本 BD 配套的测试设计文档 —— 【TBD, 尚未创建, 建议依据 §10 追溯矩阵与 `ipa-test-case` skill 后续产出】。
