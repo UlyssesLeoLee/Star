@@ -1,5 +1,10 @@
 # Brief: bd-canvas-gamify-001
 
+> **⚠️ SUPERSEDED 2026-09-07** (per `BD-STAR-CANVAS-GAME-001.md` v0.1, commit `64df37f`, ULYS-160 stage 1+2 拍板).
+> 本文档是 9/6 立 Miro 风协作画布 (SUPERSEDED 9/7) 阶段设计, **改方向为**: **弹幕 Roguelike + 3渲2 像素风机器人**.
+> 保留 3 crate 架构骨架 (canvas-engine / domain-canvas / canvas-realtime) + 5 装饰 element 渲染接口, 推翻其他部分.
+> 后续 stage-2 工作见 [`docs/design/BD-STAR-CANVAS-GAME-001.md`](../design/BD-STAR-CANVAS-GAME-001.md) v0.1.
+
 **Agent**: worker (root 派发, 2 子代理并行之 2/2 per 守门 #9 v20 + v27 3 段 fallback)
 **Phase**: P3-D.5 BD 基本设计 (18:00 JST Ulysses 拍板"基于需求文档制作基本设计文档")
 **Created**: 2026-09-10 18:02 JST
