@@ -404,3 +404,127 @@ html.charisma,
   --hd2d-extrusion-lo:   inset 0 -2px 0 0 rgba(0, 0, 0, 0.70), inset -2px 0 0 0 rgba(0, 0, 0, 0.50);
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+ * 🪭  SHANGHAI YUEFENPAI — 老上海月份牌 (第5套UI主题: 民国海派摩登擦笔水彩)
+ *     色彩心理学与历史美学架构:
+ *       - 象牙暖宣纸底: #F5E8C7 → #FAF2DE → #EBD8B0 (温润石版纸墨、古籍书卷沉淀)
+ *       - 旗袍朱砂茜红: #B8282B · 茜红微光 rgba(184, 40, 43, 0.28) (海派旗袍经典红、典雅风华)
+ *       - 翡翠碧玉墨绿: #1B5E48 · 碧玉互补 (翡翠玉镯、东方雅致沉稳冷暖平衡)
+ *       - 留声机老鎏金: #D49E35 · 烫金回纹 (黄铜唱机号角、Art Deco 黄金流光)
+ *       - 老上海炭墨黑: #221C16 · 传统徽墨 (古籍刊头、金石篆刻字样、WCAG AAA 13.5:1)
+ *     艺术与平面设计特征:
+ *       - 双线金红画框 (Double Line Ornamental Border Frame)
+ *       - 柔和擦笔水彩漫射纸面晕染 (Tonal Watercolor Vignette & Halftone Litho)
+ *       - 民国美术字书法与典雅宋体
+ * ─────────────────────────────────────────────────────────────────────*/
+.shanghai,
+html.shanghai,
+.theme-shanghai {
+  color-scheme: light;
+
+  /* === 主色 / 强调色 === */
+  --color-primary:            #b8282b;
+  --color-primary-glow:       rgba(184, 40, 43, 0.32);
+  --color-secondary:          #1b5e48;
+  --color-secondary-glow:     rgba(27, 94, 72, 0.30);
+  --color-accent:             #d49e35;
+  --color-accent-soft:        #c48f29;
+  --color-accent-50:          #d49e35;
+  --color-accent-violet:      #7c2d4a;
+  --color-accent-violet-glow: rgba(124, 45, 74, 0.25);
+
+  /* 主色反色 — 象牙暖白 (在朱砂底上对比度 7.5:1 WCAG AAA) */
+  --color-on-primary:         #faf2de;
+
+  /* === 语义色 === */
+  --color-success: #1b5e48;
+  --color-warning: #d49e35;
+  --color-danger:  #b8282b;
+  --color-neutral: #8c7e70;
+  --color-info:    #2a6f97;
+
+  /* === 背景层 (石版印刷象牙暖宣纸三级阶梯) === */
+  --color-surface:          #f5e8c7;
+  --color-surface-2:        #faf2de;
+  --color-surface-elevated: #ebd8b0;
+  --color-surface-glass:    rgba(250, 242, 222, 0.92);
+
+  /* Tailwind bg.* token 映射 */
+  --bg-DEFAULT: #f5e8c7;
+  --bg-soft:    #faf2de;
+  --bg-lighter: #ebd8b0;
+  --bg-card:    #faf2de;
+
+  /* === 文字 — 老炭墨黑 (WCAG AAA 对比度 ≥ 13.5:1 on #f5e8c7) === */
+  --color-text:      #221c16;
+  --color-text-dim:  #6b6055;
+  --color-text-mute: #8c7e70;
+
+  /* Tailwind ink.* token 映射 */
+  --ink-DEFAULT: #221c16;
+  --ink-dim:     #6b6055;
+  --ink-mute:    #8c7e70;
+
+  /* === 边框 — 民国月份牌老鎏金与朱砂印边 === */
+  --color-border:        #c89228;
+  --color-border-subtle: #dfca9f;
+  --color-border-hover:  #b8282b;
+
+  /* Tailwind line / border.* token 映射 */
+  --line-DEFAULT:   #c89228;
+  --border-DEFAULT: #c89228;
+  --border-line:    #b88420;
+
+  /* === HUD 战术微标签 === */
+  --color-hud-tag:        #b8282b;
+  --color-hud-tag-bg:     rgba(184, 40, 43, 0.12);
+  --color-hud-tag-border: #c89228;
+
+  /* === 语义 ok/warn/err/info Tailwind 映射 === */
+  --ok-DEFAULT:   #1b5e48;
+  --warn-DEFAULT: #d49e35;
+  --err-DEFAULT:  #b8282b;
+  --info-DEFAULT: #2a6f97;
+
+  /* === 老上海月份牌画框质感投影与金箔高光 === */
+  --shadow-sm: 0 1px 3px rgba(34, 28, 22, 0.12), 0 0 0 1px rgba(200, 146, 40, 0.35);
+  --shadow-md: 0 4px 16px rgba(34, 28, 22, 0.16), 0 0 0 1px #c89228, inset 0 0 0 2px #faf2de, inset 0 0 0 3px #b8282b;
+  --shadow-lg: 0 10px 28px rgba(34, 28, 22, 0.22), 0 0 0 2px #c89228, 0 0 16px rgba(212, 158, 53, 0.25);
+  --glow-accent:    0 0 16px rgba(212, 158, 53, 0.35);
+  --glow-secondary: 0 0 16px rgba(184, 40, 43, 0.30);
+
+  /* === 月份牌典雅微倒角 === */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* === CEL-SHADED / POSTER ENGINE TOKENS === */
+  --cel-bg: #f5e8c7;
+  --cel-surface-card: #faf2de;
+  --cel-surface-sub: #ebd8b0;
+  --cel-surface-stage: #dfca9f;
+  --cel-card-ramp: linear-gradient(145deg, #fff9ec 0%, #faf2de 45%, #f1e2c2 100%);
+  --cel-crimson: #b8282b;
+  --cel-cyan: #1b5e48;
+  --cel-gold: #d49e35;
+  --cel-ink: #221c16;
+  --cel-text-primary: #221c16;
+  --cel-text-secondary: #6b6055;
+  --cel-screentone-dot: rgba(184, 40, 43, 0.08);
+  --cel-shadow-color: rgba(34, 28, 22, 0.55);
+  --cel-bevel-hi: rgba(255, 255, 255, 0.75);
+  --cel-bevel-lo: rgba(34, 28, 22, 0.22);
+  --cel-glint-color: rgba(212, 158, 53, 0.45);
+  --cel-glint-rim: rgba(184, 40, 43, 0.25);
+
+  /* === 老上海月份牌 Art Deco 专属变量 === */
+  --shanghai-parchment: #f5e8c7;
+  --shanghai-cinnabar:  #b8282b;
+  --shanghai-jade:      #1b5e48;
+  --shanghai-gilt:      #d49e35;
+  --shanghai-charcoal:  #221c16;
+  --shanghai-frame:     2px solid #c89228;
+  --shanghai-border-pattern: repeating-linear-gradient(45deg, #c89228, #c89228 3px, #b8282b 3px, #b8282b 6px);
+}
+

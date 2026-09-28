@@ -12,13 +12,14 @@ import {
 } from "../types";
 
 describe("THEMES", () => {
-  it("至少 4 个内置主题 (Light + Dark + Christmas + Charisma)", () => {
-    expect(THEMES.length).toBeGreaterThanOrEqual(4);
+  it("至少 5 个内置主题 (Light + Dark + Christmas + Charisma + Shanghai)", () => {
+    expect(THEMES.length).toBeGreaterThanOrEqual(5);
     const ids = THEMES.map((t) => t.id);
     expect(ids).toContain("light");
     expect(ids).toContain("dark");
     expect(ids).toContain("christmas");
     expect(ids).toContain("charisma");
+    expect(ids).toContain("shanghai");
   });
 
   it("每个主题都有完整 color / spacing / radius token", () => {
@@ -35,6 +36,7 @@ describe("THEMES", () => {
       if (t.id === "dark") expect(t.isDark).toBe(true);
       if (t.id === "christmas") expect(t.isDark).toBe(true);
       if (t.id === "charisma") expect(t.isDark).toBe(true);
+      if (t.id === "shanghai") expect(t.isDark).toBe(false);
     }
   });
 
@@ -60,6 +62,21 @@ describe("THEMES", () => {
     expect(secondary?.hex).toBe("#E11D48");
     const surface = charisma!.colors.find((c) => c.name === "--color-surface");
     expect(surface?.hex).toBe("#0C0A14");
+  });
+
+  it("老上海月份牌主题符合民国海派摩登风格特征 (暖象牙宣纸 + 旗袍朱砂茜红 + 翡翠碧玉墨绿)", () => {
+    const shanghai = THEMES.find((t) => t.id === "shanghai");
+    expect(shanghai).toBeDefined();
+    expect(shanghai!.displayName).toBe("老上海月份牌");
+    expect(shanghai!.isDark).toBe(false);
+    const primary = shanghai!.colors.find((c) => c.name === "--color-primary");
+    expect(primary?.hex).toBe("#B8282B");
+    const secondary = shanghai!.colors.find((c) => c.name === "--color-secondary");
+    expect(secondary?.hex).toBe("#1B5E48");
+    const surface = shanghai!.colors.find((c) => c.name === "--color-surface");
+    expect(surface?.hex).toBe("#F5E8C7");
+    const border = shanghai!.colors.find((c) => c.name === "--color-border");
+    expect(border?.hex).toBe("#C89228");
   });
 });
 
