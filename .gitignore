@@ -129,3 +129,25 @@ target-232/
 # ULYS-154 PR-1 (cargo-tarpaulin 覆盖率输出, 仅作 workflow artifact, 不入库)
 coverage/
 coverage-*/
+
+# Session 内 worktree artifacts (per 2026-09-27 + 2026-09-28 session 实装):
+# - cargo-tarpaulin workflow output (0_cargo-tarpaulin (workspace, advisory).txt)
+# - run<id>.zip + run<id>/ : workflow run artifacts
+# - ghcr-secret.yaml : k3s rollout GHCR pull secret
+# - k3s-rollout.sh / patch_probe.sh / rollout_canvas.sh : k3s deploy scripts (per PR #161-#169 deploy/canvas-game-k3s.yaml rollout)
+# - setup-k3s-registries.sh / wait_k3s.sh : k3s cluster setup helpers
+# - start-canvas-game.bat / 启动 canvas-game.bat : Windows entry scripts (per session 内 + Desktop 复制)
+/0_cargo-tarpaulin*.txt
+/cargo-tarpaulin*.txt
+/cargo-tarpaulin*/
+/run*.zip
+/run[0-9]*/
+/ghcr-secret.yaml
+/k3s-rollout.sh
+/patch_probe.sh
+/rollout_canvas.sh
+/setup-k3s-registries.sh
+/wait_k3s.sh
+/start-canvas-game.bat
+/启动*.bat
+/deploy/_local_*
