@@ -17,6 +17,7 @@ import { MOCK_AGENTS_FALLBACK } from "@/mocks/data";
 import type { AgentRow } from "@/mocks/schemas/agent";
 import { useTranslation } from "@/lib/i18n";
 import { AnimeCelShaderCanvas, CelPalette } from "@/components/effects/AnimeCelShaderCanvas";
+import { TacticalCore3D } from "@/components/effects/TacticalCore3D";
 import {
   CelButton3D,
   CelToggle3D,
@@ -184,16 +185,19 @@ export default function AgentsPage() {
           <div className="card relative overflow-hidden">
             {/* Top Badge */}
             <div className="flex items-center justify-between border-b-2 border-black pb-3 mb-4">
-              <div>
-                <div className="text-[11px] font-black text-[var(--cel-gold,#ffc400)] uppercase tracking-widest font-mono">
-                  AVATAR SPEC // S-CLASS
+              <div className="flex items-center gap-3">
+                <TacticalCore3D size={42} status="nominal" className="shrink-0" />
+                <div>
+                  <div className="text-[11px] font-black text-[var(--cel-gold,#ffc400)] uppercase tracking-widest font-mono">
+                    AVATAR SPEC // S-CLASS
+                  </div>
+                  <h3 className="text-base font-black uppercase italic tracking-wider text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
+                    AGENT CORE 3D
+                    <span className="text-xs font-black not-italic px-2 py-0.5 bg-[var(--cel-crimson,#ff184c)] text-black border border-black">
+                      神格
+                    </span>
+                  </h3>
                 </div>
-                <h3 className="text-base font-black uppercase italic tracking-wider text-[var(--cel-text-primary,#ffffff)] flex items-center gap-2">
-                  AGENT CORE 3D
-                  <span className="text-xs font-black not-italic px-2 py-0.5 bg-[var(--cel-crimson,#ff184c)] text-black border border-black">
-                    神格
-                  </span>
-                </h3>
               </div>
               <span className="text-xs font-mono font-bold text-[var(--cel-text-secondary,#94a3b8)]">
                 〔戦術司令機〕
@@ -245,24 +249,42 @@ export default function AgentsPage() {
               </div>
             </div>
 
-            {/* Live Palette Selector Tuning Bar */}
+            {/* Live Palette Selector Tuning Bar — 5 Themes Complete Coverage */}
             <div className="mt-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black p-3 space-y-2.5 text-xs">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-[var(--cel-text-secondary,#94a3b8)] uppercase font-mono">
-                  CEL PALETTE:
-                </span>
-                <div className="flex gap-1.5">
-                  {(["crimson", "cyan", "gold", "stealth"] as CelPalette[]).map((p) => (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[var(--cel-text-secondary,#94a3b8)] uppercase font-mono">
+                    CEL PALETTE (5大主题流派):
+                  </span>
+                  <span className="text-[10px] font-mono text-[var(--cel-gold,#ffc400)] uppercase font-bold">
+                    {celPalette}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      { id: "crimson", label: "🌙 茜红 (Dark)" },
+                      { id: "cyan", label: "🌙 电光青" },
+                      { id: "gold", label: "🌙 黄金" },
+                      { id: "charisma-violet", label: "✨ 极魅紫 (HD-2D)" },
+                      { id: "charisma-crimson", label: "✨ 醉梦红" },
+                      { id: "shanghai-gilt", label: "🪭 留声金 (月份牌)" },
+                      { id: "shanghai-jade", label: "🪭 翡翠绿" },
+                      { id: "christmas-noel", label: "🎄 圣夜红 (毛玻璃)" },
+                      { id: "christmas-pine", label: "🎄 松针绿" },
+                      { id: "manga-vermilion", label: "☀️ 宣纸红 (Light)" },
+                    ] as const
+                  ).map((item) => (
                     <button
-                      key={p}
-                      onClick={() => setCelPalette(p)}
-                      className={`px-2.5 py-1 text-[11px] font-mono font-bold uppercase border border-black transition-all ${
-                        celPalette === p
-                          ? "bg-[var(--cel-crimson,#ff184c)] text-black border-white shadow-sm"
+                      key={item.id}
+                      onClick={() => setCelPalette(item.id as CelPalette)}
+                      className={`px-2 py-1 text-[10px] font-mono font-bold uppercase border border-black transition-all ${
+                        celPalette === item.id
+                          ? "bg-[var(--cel-primary,#8b5cf6)] text-white border-white shadow-sm"
                           : "bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-secondary,#94a3b8)] hover:text-white"
                       }`}
                     >
-                      {p}
+                      {item.label}
                     </button>
                   ))}
                 </div>
