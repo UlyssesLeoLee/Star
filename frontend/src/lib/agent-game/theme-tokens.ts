@@ -46,13 +46,70 @@ export const LIGHT_COLORS = {
 /** 暗色调色板 (现状) */
 export const DARK_COLORS = DARK;
 
-/** 主题 mode (dark | light) */
-export type ThemeMode = "dark" | "light";
+/** 圣诞像素调色板 (圣夜像素风格, 冬日经典红绿金纯像素调) */
+export const CHRISTMAS_COLORS = {
+  // 圣夜密林深黑底
+  inkBlack: "#0b130e",
+  inkDark: "#122017",
+  inkMid: "#1a2f23",
+  inkLight: "#234330",
+  // 圣夜绯红 (温暖壁炉 / 缎带)
+  vermilion: "#d42426",
+  vermilionGlow: "#ff4d6d",
+  // 常青冬青松绿 (替换 neonCyan)
+  neonCyan: "#165b33",
+  neonCyanGlow: "#22c55e",
+  // 伯利恒星芒烛金
+  gold: "#f8b229",
+  goldGlow: "#fcd34d",
+  // 圣诞夜空紫
+  cyberPurple: "#9333ea",
+  cyberPurpleGlow: "#c084fc",
+  // 雾杉灰
+  ash: "#7a9a8b",
+  ashLight: "#9ebcab",
+  // 初雪霜白 (高对比文字)
+  paper: "#f5f8f5",
+} as const;
+
+/** 极魅像素调色板 (歧路旅人 HD-2D 神恩紫红金复古纯像素调) */
+export const CHARISMA_COLORS = {
+  // 剧院黑曜深渊底
+  inkBlack: "#0c0a14",
+  inkDark: "#171326",
+  inkMid: "#221c38",
+  inkLight: "#2c2245",
+  // 醉梦丝绒红 (舞娘丝绒帷幕)
+  vermilion: "#e11d48",
+  vermilionGlow: "#fb7185",
+  // 神恩紫罗兰 (歧路旅人神恩法术与引力光球)
+  neonCyan: "#8b5cf6",
+  neonCyanGlow: "#a78bfa",
+  // 帝国流金 (烛光与古典浮雕)
+  gold: "#f59e0b",
+  goldGlow: "#fbbf24",
+  // 圣殿极光紫
+  cyberPurple: "#a855f7",
+  cyberPurpleGlow: "#c084fc",
+  // 暮霭紫灰
+  ash: "#948da5",
+  ashLight: "#a79bb7",
+  // 香槟丝白 (高对比文本)
+  paper: "#fdf4ff",
+} as const;
+
+/** 主题 mode (dark | light | christmas | charisma) */
+export type ThemeMode = "dark" | "light" | "christmas" | "charisma";
+
+/** Agent Game 调色板结构类型 */
+export type AgentGamePalette = Record<keyof typeof DARK_COLORS, string>;
 
 /**
  * useAgentGameTheme — 客户端 hook, 跟随 next-themes 切换 palette
  *   - dark 模式: DARK (墨黑底 + 高饱和霓虹)
  *   - light 模式: LIGHT (宣纸底 + 高饱和印刷)
+ *   - christmas 模式: CHRISTMAS (圣夜密林黑 + 绯红 + 松绿 + 烛金)
+ *   - charisma 模式: CHARISMA (剧院黑曜深渊 + 神恩紫 + 丝绒红 + 帝国金)
  *   - 默认值: dark (per 守门 #13, dark 优先)
  *   - mount 前返回 dark (避免 hydration 闪烁)
  */
@@ -60,10 +117,27 @@ export function useAgentGameTheme() {
   const { theme, resolvedTheme } = useTheme();
   return useMemo(() => {
     // 用 resolvedTheme (per next-themes, 处理 system 默认)
-    const mode: ThemeMode = resolvedTheme === "light" || theme === "light" ? "light" : "dark";
+    let mode: ThemeMode = "dark";
+    if (resolvedTheme === "light" || theme === "light") {
+      mode = "light";
+    } else if (resolvedTheme === "christmas" || theme === "christmas") {
+      mode = "christmas";
+    } else if (resolvedTheme === "charisma" || theme === "charisma") {
+      mode = "charisma";
+    }
+
+    let colors: AgentGamePalette = DARK_COLORS;
+    if (mode === "light") {
+      colors = LIGHT_COLORS;
+    } else if (mode === "christmas") {
+      colors = CHRISTMAS_COLORS;
+    } else if (mode === "charisma") {
+      colors = CHARISMA_COLORS;
+    }
+
     return {
       mode,
-      colors: mode === "light" ? LIGHT_COLORS : DARK_COLORS,
+      colors,
     };
   }, [theme, resolvedTheme]);
 }

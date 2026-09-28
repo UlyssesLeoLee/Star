@@ -1,17 +1,18 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v0.1** (per 日本 IPA SEC 標準, 跟 v33 候选对齐)
+> **Multica Task Lifecycle 域 詳細設計書 v0.2** (per 日本 IPA SEC 標準, Worktree 群组集成补充)
 >
-> - 状态: 🟡 Draft v0.1 (2026-09-11 JST 初版落档, per 20:50 JST Ulysses 拍板)
+> - 状态: 🟡 Draft v0.2 (群组集成与 canonical WorkItem 契约补充待评审)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.1 (22 FR / 5 NFR / 6 已知缺口)
+> - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
+> - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
 > - 上位 inventory: [`docs/inventory/multica-gap.md`](../inventory/multica-gap.md) v0.1 §2.2 v33 候选
 > - 配套 SRS: [`docs/requirements/SRS-MULTICA-POISON-001.md`](../requirements/SRS-MULTICA-POISON-001.md) (Session Poison 强绑定)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核**`
-> - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4)
-> - 日期: 2026-09-11 JST
+> - 审核: Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核；v0.2 补充待评审
+> - 日期: 2026-09-28 JST
 > - 受众: 詳細設計エンジニア / 実装エンジニア / アーキテクト / SRE / 5 域 Lead 真人
 > - dual-use 提醒: 本 DD 不引用 RGS 仓 + 不建立业务子域↔DDD 映射
 > - **本 DD 模板 1:1 派生自 `DD-AGENT-RELATIONSHIP-001.md` v0.1**
@@ -23,13 +24,13 @@
 | 项目 | 内容 |
 |---|---|
 | 文书 ID | DD-MULTICA-TASK-001 |
-| 文书名 | Multica Task Lifecycle 域 詳細設計書 (v33 候选对齐) |
-| 版本 | v0.1 |
-| 作成日 | 2026-09-11 |
+| 文书名 | Multica Task Lifecycle 域 詳細設計書 (Worktree Group 集成) |
+| 版本 | v0.2 |
+| 作成日 | 2026-09-28 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (per DEC-008) |
-| 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
+| 承認者 | Draft；v0.2 群组集成补充待评审 |
 | 关联 commit | (待生成) |
-| 关联文档 | `SRS-MULTICA-TASK-001.md` v0.1 + ADR-0026 v0.2 + inventory v0.1 + 4 平行 DD |
+| 关联文档 | `SRS-MULTICA-TASK-001.md` v0.2 + `BD-MULTICA-TASK-001.md` v0.1 + ADR-0026 v0.2 + `DD-SHARED-TASK-001.md` v0.2 |
 | 范围 | TK-1 ~ TK-5 子能力 × 22 FR = 5 关键 class + 1 状态机 + 11 共享类型 + 3 时序图 + 5 张表 (W-T-M 100%) + 6 API + 30+ 测试 |
 | 守门 | 19 项 + 26 派生规 跨域覆盖 |
 
@@ -272,8 +273,9 @@ stateDiagram-v2
     CLAIMED --> PENDING : reaper 30s 超时回 PENDING (per FR-6)
     CLAIMED --> CANCELLED : 人工取消
     IN_PROGRESS --> PENDING_REVIEW : subagent complete (per FR-16)
-    PENDING_REVIEW --> COMPLETED : Mavis review 通过 (per FR-18)
-    PENDING_REVIEW --> FAILED : Mavis review 失败 (per FR-18)
+    IN_PROGRESS --> IN_PROGRESS : completion submitted / review_state=pending_review
+    IN_PROGRESS --> COMPLETED : review accepted (per FR-18)
+    IN_PROGRESS --> FAILED : execution or review rejected (per FR-18)
     IN_PROGRESS --> FAILED : subagent fail
     FAILED --> PENDING : 重试
     COMPLETED --> [*]
@@ -287,9 +289,9 @@ stateDiagram-v2
 |---|---|---|---|
 | PENDING | CLAIMED | subagent claim | 唯一 claim (per FR-2) |
 | CLAIMED | IN_PROGRESS | subagent start | 30s 内必 start (per FR-6) |
-| IN_PROGRESS | PENDING_REVIEW | subagent complete | 必进 review (per FR-16) |
-| PENDING_REVIEW | COMPLETED | Mavis review 通过 | review 3 件事通过 (per FR-17) |
-| PENDING_REVIEW | FAILED | Mavis review 失败 | review_failed_reason 必填 |
+| IN_PROGRESS | IN_PROGRESS | completion submitted | 主状态不变；独立设 `review_state=pending_review` (per FR-16) |
+| IN_PROGRESS | COMPLETED | review accept | review 3 件事通过 (per FR-17) |
+| IN_PROGRESS | FAILED | execution failure / review reject | `failure_reason` / `review_failed_reason` 必填 |
 
 ---
 
@@ -392,25 +394,32 @@ sequenceDiagram
 
 ---
 
-## §7 SQL DDL (5 张表, W-T-M 100% 覆盖 per 守门 #13)
+## §7 SQL DDL (v0.1 baseline; v0.2 canonical data model in §14.2)
 
 ### 7.1 `task_lifecycle_audit` (Transaction, append-only)
 
 ```sql
 -- per 守门 #13 Transaction 100% audit + 物理删除禁止
 CREATE TABLE task_lifecycle_audit (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    task_id UUID NOT NULL,
+    event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL,
+    worktree_id UUID NOT NULL,
+    work_item_id UUID NOT NULL,
+    task_card_id UUID NOT NULL,
+    event_type VARCHAR(48) NOT NULL,
     from_status VARCHAR(20),
-    to_status VARCHAR(20) NOT NULL,
-    actor VARCHAR(50) NOT NULL,  -- 'subagent' / 'mavis' / 'human' / 'system'
-    reason TEXT,
-    rls_tenant_id UUID NOT NULL,
-    rls_workspace_ids UUID[] NOT NULL DEFAULT '{}',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    to_status VARCHAR(20),
+    review_state VARCHAR(20),
+    actor_id UUID NOT NULL,
+    correlation_id UUID NOT NULL,
+    idempotency_key TEXT,
+    target_worktree_id UUID,
+    target_result VARCHAR(24),
+    payload_redacted JSONB NOT NULL DEFAULT '{}'::jsonb,
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX idx_task_lifecycle_audit_task_id ON task_lifecycle_audit(task_id);
-CREATE INDEX idx_task_lifecycle_audit_created_at ON task_lifecycle_audit(created_at DESC);
+CREATE INDEX idx_task_lifecycle_audit_item_time
+  ON task_lifecycle_audit(tenant_id, worktree_id, work_item_id, occurred_at DESC);
 -- 物理删除禁止 TRIGGER (per 守门 #13)
 ```
 
@@ -455,7 +464,7 @@ CREATE TABLE task_stale_dispatch (
 );
 ```
 
-### 7.4 `task_not_found_log` (Transaction)
+### 7.4 `task_not_found_log` (Transaction, v0.1; consolidated into `task_session_health` in v0.2)
 
 ```sql
 -- 4 类 404 落档 (per FR-7 ~ FR-10)
@@ -470,7 +479,7 @@ CREATE TABLE task_not_found_log (
 CREATE INDEX idx_task_not_found_log_task_id ON task_not_found_log(task_id);
 ```
 
-### 7.5 `wbs_task_v33` (Master, 升级现有 wbs_task)
+### 7.5 `wbs_task_v33` (legacy WBS compatibility projection; not a canonical W/T/M fact table)
 
 ```sql
 -- 升级现有 wbs_task 表, 加 6 态 status + session_poisoned + stale_dispatch + 4 类 404 timestamp + review gate 字段
@@ -485,10 +494,12 @@ ALTER TABLE wbs_task
     ADD COLUMN runtime_not_found_at TIMESTAMPTZ,
     ADD COLUMN unauthorized_at TIMESTAMPTZ,
     ADD COLUMN review_gate_required BOOLEAN DEFAULT TRUE,
+    ADD COLUMN review_state VARCHAR(20) NOT NULL DEFAULT 'none'
+        CHECK (review_state IN ('none','pending_review','accepted','rejected')),
     ADD COLUMN review_force_skip BOOLEAN DEFAULT FALSE,
     -- per 评审 v0.1 修正 M3: 6 态 status CHECK 约束
     ADD CONSTRAINT chk_wbs_task_status_v33
-    CHECK (status IN ('pending','claimed','in_progress','pending_review','completed','failed','cancelled')),
+    CHECK (status IN ('pending','claimed','in_progress','completed','failed','cancelled')),
     -- per 评审 v0.1 修正 M5: 5 reason enum CHECK 约束 (跟 DD-POISON-001 配套)
     ADD CONSTRAINT chk_wbs_task_session_poison_reason
     CHECK (session_poison_reason IS NULL OR session_poison_reason IN (
@@ -497,15 +508,15 @@ ALTER TABLE wbs_task
     ));
 ```
 
-### 7.6 W-T-M 覆盖核对 (per 守门 #13)
+### 7.6 v0.1 W-T-M 盘点 (v0.2 canonical coverage is §14.2)
 
 | 表 | W/T/M | 检查 |
 |---|---|---|
-| `wbs_task_v33` | Master | ✅ RLS 13 类 + SCD Type 2 + 物理删除禁止 |
+| `wbs_task_v33` | Compatibility projection | ⚠️ 混合字段，按 §14.2 拆出 canonical Work / Transaction / Master 来源 |
 | `task_lifecycle_audit` | Transaction | ✅ RLS 13 类 + 物理删除禁止 (TRIGGER) + 审计 |
-| `task_review` | Work | ✅ retention 7 天 |
+| `task_review` | Work | ✅ retention 7 天；审查结论必须另写 audit event |
 | `task_stale_dispatch` | Work | ✅ retention 7 天 |
-| `task_not_found_log` | Transaction | ✅ RLS 13 类 + 物理删除禁止 (TRIGGER) + 审计 |
+| `task_not_found_log` | Transaction (v0.1) | v0.2 合并至 `task_session_health`，保留历史事件 |
 
 ---
 
@@ -680,6 +691,141 @@ ALTER TABLE wbs_task
 
 跟 SRS-MULTICA-TASK-001 §9 同 + DD-MULTICA-POISON-001 强绑定。
 
+## §14 渡口 Worktree 群组集成契约 (v0.2)
+
+本节是 v0.2 的规范性补充，与 [`BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1 和 [`SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2 对齐。旧样例中的 `task_id` 表示兼容别名；新接口的 canonical key 是 `work_item_id`。旧 §7 中把整个 `wbs_task_v33` 视为 Master、或把 `pending_review` 放入 status enum 的内容不再作为 v0.2 的物理设计依据。
+
+### 14.1 领域事实源与身份
+
+| 身份/事实 | 唯一所有者 | 详细规则 |
+|---|---|---|
+| `worktree_id` | Worktree Domain | 每个任务只能归属一个 Worktree；所有读取、命令、执行与事件都携带此 ID |
+| `work_item_id` | WorkItem Domain | 跨 Multica、Jira 等价视图、Task Card 和 Canvas 引用的 canonical ID；源系统 ID 通过 alias 映射，不做字符串强转 |
+| `task_card_id` | Task Card Manager | 执行工作面的稳定 ID；`work_item_id` 唯一关联当前 Task Card，执行重试另建 Run/Session ID |
+| lifecycle `status` | Multica Lifecycle Service | 唯一允许改变六态状态的命令入口 |
+| `review_state` | Review Gate | `none/pending_review/accepted/rejected` 与主状态分列；提交 review 不产生第七种任务状态 |
+| Canvas 元素与位置 | Canvas Domain | 保存布局、元素和类型化 EntityRef；任务状态只能经 Multica 命令更新 |
+| 插件入口/capability | Group App Registry | 管理启用及 capability 暴露，不拥有任务状态与 Task Card |
+
+Multica、Jira 等价视图、Task Card Index、Group Infinite Canvas 和已启用插件是 Worktree 群组的同级入口。Canvas 对 WorkItem 只存 `EntityRef(type, id, worktree_id)`；空白便签必须经过显式“创建任务”命令才会生成 WorkItem。Project/Repository 的 Worktree Overview Graph 由 `DD-WORKTREE-CANVAS-001` 管理，不能映射成群组 Infinite Canvas 对象。
+
+### 14.2 生命周期与持久化表 (W/T/M)
+
+| 物理表/数据集 | 分类 | 关键约束 | 保留规则 |
+|---|---|---|---|
+| `task_lifecycle_current` | Work | PK `work_item_id`; `worktree_id`, `task_card_id`, `tenant_id`, 六态 `status`, 独立 `review_state`, claim lease, Runtime session ref, `version` | 必含 `retention_period` 与 `expires_at`; 到期清理或由 Transaction 事件重建 |
+| `task_review` | Work | 保存待审 artifact/output refs 与审查工作载荷；通过 `work_item_id` + `task_card_id` 关联 | 必含 `retention_period`; 决策结果不靠此表留存 |
+| `task_stale_dispatch` | Work | 最近一次 dispatch verify 状态及临时输出引用 | 必含 `retention_period`; 原始诊断内容脱敏后到期清理 |
+| `task_metadata` | Master | WorkItem 标题、描述、标签、优先级、执行策略引用；SCD Type 2 | 物理删除禁止；RLS 13 类必携 |
+| `task_lifecycle_audit` | Transaction | 状态/Review/TMO/ACL/dispatch 事件，带 `worktree_id`, `work_item_id`, `task_card_id`, `actor_id`, `correlation_id`, `event_id` | append-only，物理删除禁止；RLS 13 类和 audit 必携 |
+| `task_session_health` | Transaction | poison/404/fresh-session 决策及 session ref，不能覆写历史事件 | append-only，物理删除禁止；RLS 13 类和 audit 必携 |
+| `wbs_task_v33` | Compatibility projection | 旧 WBS row 的导入/查询兼容层；通过 alias 映射到 canonical `work_item_id` | 不得成为第二个生命周期事实源；迁移期写入只经 Lifecycle Service |
+
+**v0.2 canonical W/T/M 覆盖**：Work 3/3 (`task_lifecycle_current`, `task_review`, `task_stale_dispatch`)；Transaction 2/2 (`task_lifecycle_audit`, `task_session_health`)；Master 1/1 (`task_metadata`)。`wbs_task_v33` 是迁移兼容投影，不作为混合分类主表计入，W/T/M owner 仍由上述 6 个规范数据集承担。
+
+所有 Work 数据都有 `retention_period`；Master 全表使用 SCD Type 2 + RLS；Transaction 全表 append-only + audit + RLS。v0.1 §7 的旧 DDL 供迁移字段参考；实施时按本节分类拆分动态当前态、Master metadata 与不可变审计事件，不允许把混合 WBS 行整表归入一个分类。
+
+```sql
+CREATE TABLE task_lifecycle_current (
+  work_item_id UUID PRIMARY KEY,
+  worktree_id UUID NOT NULL,
+  task_card_id UUID NOT NULL UNIQUE,
+  tenant_id UUID NOT NULL,
+  status VARCHAR(20) NOT NULL CHECK (status IN
+    ('pending','claimed','in_progress','completed','failed','cancelled')),
+  review_state VARCHAR(20) NOT NULL DEFAULT 'none' CHECK (review_state IN
+    ('none','pending_review','accepted','rejected')),
+  claim_actor_id UUID,
+  claim_expires_at TIMESTAMPTZ,
+  runtime_session_id UUID,
+  stale_dispatch BOOLEAN NOT NULL DEFAULT FALSE,
+  version BIGINT NOT NULL DEFAULT 1,
+  retention_period INTERVAL NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_task_lifecycle_worktree_status
+  ON task_lifecycle_current (tenant_id, worktree_id, status);
+
+CREATE TABLE task_metadata (
+  work_item_id UUID NOT NULL,
+  version BIGINT NOT NULL,
+  tenant_id UUID NOT NULL,
+  worktree_id UUID NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  priority VARCHAR(16) NOT NULL,
+  labels JSONB NOT NULL DEFAULT '[]'::jsonb,
+  execution_policy_ref UUID,
+  valid_from TIMESTAMPTZ NOT NULL,
+  valid_to TIMESTAMPTZ,
+  is_current BOOLEAN NOT NULL DEFAULT TRUE,
+  PRIMARY KEY (work_item_id, version)
+);
+CREATE UNIQUE INDEX uq_task_metadata_current
+  ON task_metadata (tenant_id, work_item_id) WHERE is_current;
+
+-- `task_lifecycle_audit` uses the append-only DDL from §7.1 (canonical columns shown there).
+
+CREATE TABLE task_session_health (
+  event_id UUID PRIMARY KEY,
+  tenant_id UUID NOT NULL,
+  worktree_id UUID NOT NULL,
+  work_item_id UUID NOT NULL,
+  task_card_id UUID NOT NULL,
+  runtime_session_id UUID NOT NULL,
+  health_event VARCHAR(32) NOT NULL,
+  reason_code VARCHAR(64),
+  actor_id UUID NOT NULL,
+  correlation_id UUID NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_task_session_health_item_time
+  ON task_session_health (tenant_id, worktree_id, work_item_id, occurred_at DESC);
+```
+
+`task_review` retains the v0.1 review artifact fields but must add `worktree_id`, `work_item_id`, `task_card_id`, `retention_period`, and `expires_at`. `task_stale_dispatch` uses the same identity envelope and Work retention. The v0.1 `task_not_found_log` is migrated into `task_session_health` event rows without losing event IDs/timestamps. `task_lifecycle_audit`, `task_session_health`, and `task_metadata` must carry the repository's applicable RLS policies; event tables forbid UPDATE/DELETE and Master rows use SCD Type 2. The DDL is logical target schema; exact production SQL policy names and FK table names are finalized against the owning WorkItem/Worktree migrations.
+
+### 14.3 命令 envelope 与授权
+
+```json
+{
+  "scope_kind": "WORKTREE | GLOBAL",
+  "worktree_id": "required for WORKTREE",
+  "target_worktree_ids": ["required explicitly for GLOBAL writes"],
+  "work_item_id": "canonical WorkItem ID",
+  "task_card_id": "Task Card ID",
+  "idempotency_key": "per command",
+  "correlation_id": "end-to-end trace"
+}
+```
+
+`actor_id`、tenant、permission snapshot 只能从认证 principal 和服务端授权结果取得，拒收客户端声明的权限。WORKTREE 命令只能操作 `worktree_id` 下对象；GLOBAL 写操作先逐目标授权，再执行允许的目标并为每个目标回传 allowed/denied/succeeded/failed 结果。空目标返回 `422 target_required`；单目标无权返回 `403 target_forbidden` 且无副作用。`task_id` 仅作为过渡兼容字段，服务端先查 alias，响应总是带 canonical ID。
+
+所有 `claim/start/submit_completion/review_accept/review_reject/cancel/TMO` 命令都带相同 envelope 并由 Lifecycle Service 在事务内校验 `worktree_id + work_item_id + task_card_id` 对应关系、当前 status、权限、version 和 idempotency key。状态转换及每个 GLOBAL 目标的授权结论写入 Transaction audit/outbox；Canvas 与插件不能直写上述表。
+
+### 14.4 卡内 CLI、LangGraph 与插件交互
+
+Task Card Detail 从 Multica/Jira/Canvas 任一同级入口打开时，先用 canonical `work_item_id` 获取同一卡片。卡内 CLI/Agent Session 启动前创建 `TaskExecutionContext(worktree_id, work_item_id, task_card_id, actor_id, tenant_id, scope_kind, runtime_profile, permission_snapshot_ref, correlation_id)`；Runtime/AgentPolicy 再验证工作目录、可执行工具、secret capability 与目标授权。浏览器 URL、Canvas 节点 ID 和外部 Jira key 均不得直接成为执行目录或授权凭据。
+
+Group App Registry 与 LangGraph `SubAgentRegistry` 是两个分离注册表：前者决定群组入口及插件 capability，后者决定 agent graph type。插件通过 capability bridge 请求 Lifecycle Command 或只读 API；每次调用均复验 enabled/scope/ACL。卸载插件即时阻止新 capability 调用，并保留已有 WorkItem、审计和 disabled EntityRef。
+
+### 14.5 一致性验收补充
+
+| ID | 验收 |
+|---|---|
+| DD-MG-01 | Multica、Jira 等价任务视图、Task Card 与 Canvas 对同一 canonical `work_item_id` 显示同一 lifecycle version |
+| DD-MG-02 | 任一写入来源都经过 Lifecycle Service；并发/重放由 version + idempotency key 收敛 |
+| DD-MG-03 | Task Card CLI 只能在绑定 Worktree 内运行；跨 Worktree GLOBAL 操作按目标逐项授权并审计 |
+| DD-MG-04 | `review_state=pending_review` 时主 status 保持 `in_progress`；未接受 review 不可进入 `completed` |
+| DD-MG-05 | 插件 disable 后新调用失败，但核心任务、Transaction audit 和 Canvas EntityRef 保持可读 |
+
+### 14.6 尚待详细裁定
+
+- 旧 `wbs_task` 与 canonical `work_item_id` 的 alias 回填冲突/重复处理，按 migration rehearsal 确认；不得以猜测自动合并。
+- `task_card_id` 是 1:1 当前卡投影；历史执行尝试存储在独立 Runtime session 表，确切归属表由 Runtime DD 定稿。
+- GLOBAL 批量操作已定义逐目标授权与结果；跨目标补偿是否自动执行由 LangGraph/TMO review 决定。
+
 ---
 
 ## 附录 A-E
@@ -692,3 +838,4 @@ ALTER TABLE wbs_task
 
 修订履历:
 | v0.1 | 2026-09-11 | Ulysses — Mavis 接手**审核** | 初版（5 关键 class + 1 状态机 + 11 共享类型 + 3 时序图 + 5 张表 W-T-M 100% + 6 API + 30+ 测试）| 2026-09-11 20:50 JST Ulysses 拍板 |
+| v0.2 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Worktree/WorkItem/Task Card 设为统一身份契约；把 review_state 与六态 lifecycle 分离；补充 scope 授权、卡内 CLI、插件 capability、Outbox 及 W/T/M 物理数据边界。旧版签字记录只适用于 v0.1 | 用户要求基本设计合入 dev 后继续完成详细设计 |

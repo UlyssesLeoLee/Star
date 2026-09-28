@@ -199,7 +199,7 @@ mod integration_tests {
             .unwrap();
 
         // resolve 全链路
-        let mut full_ctx = ThemeContext::new(Some(actor), tenant);
+        let full_ctx = ThemeContext::new(Some(actor), tenant);
         // mock repo 的 find_by_scope 占位用了 ThemeId::Light, 这里手动验证: 在 list_by_scope 找到 Dark
         let personal = svc.list_available(&full_ctx).await.unwrap();
         assert_eq!(personal.len(), 1);

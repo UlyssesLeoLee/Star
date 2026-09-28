@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { LIGHT_COLORS, DARK_COLORS, useAgentGameTheme } from "./theme-tokens";
+import { LIGHT_COLORS, DARK_COLORS, CHRISTMAS_COLORS, CHARISMA_COLORS, useAgentGameTheme } from "./theme-tokens";
 
 // mock next-themes
 const mockUseTheme = vi.fn();
@@ -42,6 +42,56 @@ describe("DARK_COLORS", () => {
   });
 });
 
+describe("CHRISTMAS_COLORS", () => {
+  it("圣夜黑底 inkBlack", () => {
+    expect(CHRISTMAS_COLORS.inkBlack).toBe("#0b130e");
+  });
+  it("圣夜绯红 vermilion", () => {
+    expect(CHRISTMAS_COLORS.vermilion).toBe("#d42426");
+  });
+  it("常青松绿 neonCyan (替代青色)", () => {
+    expect(CHRISTMAS_COLORS.neonCyan).toBe("#165b33");
+  });
+  it("伯利恒星金 gold", () => {
+    expect(CHRISTMAS_COLORS.gold).toBe("#f8b229");
+  });
+  it("初雪霜白 paper", () => {
+    expect(CHRISTMAS_COLORS.paper).toBe("#f5f8f5");
+  });
+  it("15 色类齐全", () => {
+    const keys = Object.keys(CHRISTMAS_COLORS);
+    expect(keys.length).toBe(15);
+    expect(keys).toContain("vermilion");
+    expect(keys).toContain("neonCyan");
+    expect(keys).toContain("gold");
+  });
+});
+
+describe("CHARISMA_COLORS", () => {
+  it("剧院黑曜深渊底 inkBlack", () => {
+    expect(CHARISMA_COLORS.inkBlack).toBe("#0c0a14");
+  });
+  it("醉梦丝绒红 vermilion", () => {
+    expect(CHARISMA_COLORS.vermilion).toBe("#e11d48");
+  });
+  it("神恩紫罗兰 neonCyan (替换青色)", () => {
+    expect(CHARISMA_COLORS.neonCyan).toBe("#8b5cf6");
+  });
+  it("帝国流金 gold", () => {
+    expect(CHARISMA_COLORS.gold).toBe("#f59e0b");
+  });
+  it("香槟丝白 paper", () => {
+    expect(CHARISMA_COLORS.paper).toBe("#fdf4ff");
+  });
+  it("15 色类齐全", () => {
+    const keys = Object.keys(CHARISMA_COLORS);
+    expect(keys.length).toBe(15);
+    expect(keys).toContain("vermilion");
+    expect(keys).toContain("neonCyan");
+    expect(keys).toContain("gold");
+  });
+});
+
 describe("useAgentGameTheme", () => {
   beforeEach(() => {
     mockUseTheme.mockReset();
@@ -59,6 +109,20 @@ describe("useAgentGameTheme", () => {
     const { result } = renderHook(() => useAgentGameTheme());
     expect(result.current.mode).toBe("dark");
     expect(result.current.colors).toBe(DARK_COLORS);
+  });
+
+  it("theme=christmas → mode=christmas, colors=CHRISTMAS", () => {
+    mockUseTheme.mockReturnValue({ theme: "christmas", resolvedTheme: "christmas" });
+    const { result } = renderHook(() => useAgentGameTheme());
+    expect(result.current.mode).toBe("christmas");
+    expect(result.current.colors).toBe(CHRISTMAS_COLORS);
+  });
+
+  it("theme=charisma → mode=charisma, colors=CHARISMA", () => {
+    mockUseTheme.mockReturnValue({ theme: "charisma", resolvedTheme: "charisma" });
+    const { result } = renderHook(() => useAgentGameTheme());
+    expect(result.current.mode).toBe("charisma");
+    expect(result.current.colors).toBe(CHARISMA_COLORS);
   });
 
   it("theme=system + resolvedTheme=light → mode=light (per resolvedTheme 优先)", () => {

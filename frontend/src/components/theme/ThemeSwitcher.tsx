@@ -48,6 +48,13 @@ export function ThemeSwitcher() {
     );
   }
 
+  const getThemeIcon = (t?: (typeof THEMES)[number]) => {
+    if (!t) return "🌙";
+    if (t.id === "charisma") return "✨";
+    if (t.id === "christmas") return "🎄";
+    return t.isDark ? "🌙" : "☀️";
+  };
+
   const current = THEMES.find((t) => t.id === theme) ?? THEMES[0];
 
   return (
@@ -58,15 +65,15 @@ export function ThemeSwitcher() {
         className="size-9 grid place-items-center text-base border-2 border-black bg-[var(--cel-surface-card,#0f1422)] hover:bg-[var(--cel-surface-sub,#151c2c)] text-[var(--cel-text-primary,#ffffff)] transition-all cel-shadow shrink-0"
         aria-label="theme switcher"
         aria-expanded={open}
-        title={current.isDark ? "dark" : "light"}
+        title={`${current.displayName} (${current.id})`}
       >
-        {current.isDark ? "🌙" : "☀️"}
+        {getThemeIcon(current)}
       </button>
 
       {open && (
         <div
           role="listbox"
-          className="absolute right-0 mt-2 w-44 border-2 border-black bg-[var(--cel-surface-card,#0f1422)] text-[var(--cel-text-primary,#ffffff)] cel-shadow-lg z-50 overflow-hidden"
+          className="absolute right-0 mt-2 w-48 border-2 border-black bg-[var(--cel-surface-card,#0f1422)] text-[var(--cel-text-primary,#ffffff)] cel-shadow-lg z-50 overflow-hidden"
         >
           {THEMES.map((t) => (
             <button
@@ -82,8 +89,9 @@ export function ThemeSwitcher() {
               }`}
             >
               <span className="flex items-center gap-2">
-                <span className="text-base">{t.isDark ? "🌙" : "☀️"}</span>
+                <span className="text-base">{getThemeIcon(t)}</span>
                 <span className="font-mono text-xs uppercase">{t.id}</span>
+                <span className="text-[11px] text-[var(--cel-text-secondary,#94a3b8)]">({t.displayName})</span>
               </span>
               {t.id === theme && <span aria-hidden className="text-[var(--cel-cyan,#00f0ff)] font-black">✓</span>}
             </button>

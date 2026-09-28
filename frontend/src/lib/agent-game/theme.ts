@@ -40,7 +40,7 @@ export const COLORS = {
   paper: "#f8f5f0",            // 日式宣纸白
 } as const;
 
-/** 字体 (per 拍板, 日式风格) */
+/** 字体 (per 拍板, 日式风格 + 免费商用纯像素游戏字体) */
 export const FONTS = {
   /** 主字体: UI / 标题 (sans-serif, 加粗) */
   primary: '"Hiragino Sans", "Yu Gothic", "Meiryo", system-ui, sans-serif',
@@ -48,6 +48,8 @@ export const FONTS = {
   mono: '"SF Mono", "Cascadia Code", "Consolas", "Menlo", monospace',
   /** 印章字体: agent name (decorative) */
   stamp: '"Hiragino Mincho ProN", "Yu Mincho", "MS Mincho", serif',
+  /** 纯像素游戏字体: 经典免费商用像素风格 (KenPixel CC0 / 方舟像素 / 点阵回退) */
+  pixel: '"KenPixel", "Press Start 2P", "Silkscreen", "Ark Pixel 12px", "Fusion Pixel", "Zpix", "SimSun", monospace',
 } as const;
 
 /** 装饰元素尺寸 (per 拍板 #3, 全装饰) */
