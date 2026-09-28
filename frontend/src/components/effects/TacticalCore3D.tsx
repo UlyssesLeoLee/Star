@@ -80,23 +80,122 @@ const OUTLINE_FRAGMENT = /* glsl */ `
 // ============================================================================
 // 2. PROCEDURAL 3D MESH RIG (~180 POLYGONS)
 // ============================================================================
+export type TacticalCoreTheme = "light" | "dark" | "christmas" | "charisma" | "shanghai";
+
 function CoreMesh({
   status,
   isHovered,
   burstTime,
+  theme = "dark",
   isLight = false,
 }: {
   status: "nominal" | "warning" | "overdrive";
   isHovered: boolean;
   burstTime: number;
+  theme?: TacticalCoreTheme;
   isLight?: boolean;
 }) {
   const coreRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Group>(null);
 
+  const effectiveTheme = isLight ? "light" : theme;
+
   const colors = useMemo(() => {
-    if (isLight) {
-      // ── Shōnen Studio Archival Paper Palette (Light Mode) ──
+    // ── 1. 老上海月份牌 (民国海派擦笔水彩与留声机鎏金) ──
+    if (effectiveTheme === "shanghai") {
+      switch (status) {
+        case "warning":
+          return {
+            base: new THREE.Color("#c89228"),
+            shadow: new THREE.Color("#201208"),
+            keyRim: new THREE.Color("#b8282b"),
+            counterRim: new THREE.Color("#1b5e48"),
+            outline: new THREE.Color("#7a1518"),
+          };
+        case "overdrive":
+          return {
+            base: new THREE.Color("#b8282b"),
+            shadow: new THREE.Color("#330408"),
+            keyRim: new THREE.Color("#d49e35"),
+            counterRim: new THREE.Color("#1b5e48"),
+            outline: new THREE.Color("#221c16"),
+          };
+        case "nominal":
+        default:
+          return {
+            base: new THREE.Color("#d49e35"),
+            shadow: new THREE.Color("#2b170c"),
+            keyRim: new THREE.Color("#b8282b"),
+            counterRim: new THREE.Color("#1b5e48"),
+            outline: new THREE.Color("#c89228"),
+          };
+      }
+    }
+
+    // ── 2. 极魅像素 (歧路旅人 HD-2D 神恩紫罗兰与醉梦丝绒红) ──
+    if (effectiveTheme === "charisma") {
+      switch (status) {
+        case "warning":
+          return {
+            base: new THREE.Color("#f59e0b"),
+            shadow: new THREE.Color("#241602"),
+            keyRim: new THREE.Color("#8b5cf6"),
+            counterRim: new THREE.Color("#e11d48"),
+            outline: new THREE.Color("#050409"),
+          };
+        case "overdrive":
+          return {
+            base: new THREE.Color("#e11d48"),
+            shadow: new THREE.Color("#28040b"),
+            keyRim: new THREE.Color("#8b5cf6"),
+            counterRim: new THREE.Color("#f59e0b"),
+            outline: new THREE.Color("#050409"),
+          };
+        case "nominal":
+        default:
+          return {
+            base: new THREE.Color("#8b5cf6"),
+            shadow: new THREE.Color("#140d24"),
+            keyRim: new THREE.Color("#e11d48"),
+            counterRim: new THREE.Color("#f59e0b"),
+            outline: new THREE.Color("#050409"),
+          };
+      }
+    }
+
+    // ── 3. 圣夜霜雪 (常规毛玻璃冬日绯红与常青松绿) ──
+    if (effectiveTheme === "christmas") {
+      switch (status) {
+        case "warning":
+          return {
+            base: new THREE.Color("#f8b229"),
+            shadow: new THREE.Color("#241803"),
+            keyRim: new THREE.Color("#d42426"),
+            counterRim: new THREE.Color("#22c55e"),
+            outline: new THREE.Color("#060b08"),
+          };
+        case "overdrive":
+          return {
+            base: new THREE.Color("#165b33"),
+            shadow: new THREE.Color("#05170b"),
+            keyRim: new THREE.Color("#f8b229"),
+            counterRim: new THREE.Color("#d42426"),
+            outline: new THREE.Color("#060b08"),
+          };
+        case "nominal":
+        default:
+          return {
+            base: new THREE.Color("#d42426"),
+            shadow: new THREE.Color("#140405"),
+            keyRim: new THREE.Color("#f8b229"),
+            counterRim: new THREE.Color("#165b33"),
+            outline: new THREE.Color("#060b08"),
+          };
+      }
+    }
+
+    // ── 4. 少年原画 (Shōnen Studio Archival Paper Palette) ──
+    if (effectiveTheme === "light") {
       switch (status) {
         case "warning":
           return {
@@ -126,7 +225,7 @@ function CoreMesh({
       }
     }
 
-    // ── Neo-Tokyo Cyber Manga Void Palette (Dark Mode) ──
+    // ── 5. 暗夜神格 (Neo-Tokyo Cyber Manga Void Palette - 默认) ──
     switch (status) {
       case "warning":
         return {
@@ -154,7 +253,7 @@ function CoreMesh({
           outline: new THREE.Color("#000000"),
         };
     }
-  }, [status, isLight]);
+  }, [status, effectiveTheme]);
 
   const coreGeom = useMemo(() => new THREE.IcosahedronGeometry(0.85, 0), []);
   const ringGeom = useMemo(() => new THREE.TorusGeometry(1.25, 0.05, 8, 24), []);
@@ -240,12 +339,14 @@ function CoreMesh({
 // ============================================================================
 export interface TacticalCore3DProps {
   status?: "nominal" | "warning" | "overdrive";
+  theme?: TacticalCoreTheme;
   size?: number;
   className?: string;
 }
 
 export function TacticalCore3D({
   status = "nominal",
+  theme,
   size = 40,
   className = "",
 }: TacticalCore3DProps) {
@@ -253,13 +354,22 @@ export function TacticalCore3D({
   const [isHovered, setIsHovered] = useState(false);
   const [burstTime, setBurstTime] = useState(0);
   const [isPageVisible, setIsPageVisible] = useState(true);
-  const [isLight, setIsLight] = useState(false);
+  const [activeTheme, setActiveTheme] = useState<TacticalCoreTheme>(theme ?? "dark");
 
   useEffect(() => {
     setMounted(true);
 
     const checkTheme = () => {
-      setIsLight(document.documentElement.classList.contains("light"));
+      if (theme) {
+        setActiveTheme(theme);
+        return;
+      }
+      const cl = document.documentElement.classList;
+      if (cl.contains("shanghai")) setActiveTheme("shanghai");
+      else if (cl.contains("charisma")) setActiveTheme("charisma");
+      else if (cl.contains("christmas")) setActiveTheme("christmas");
+      else if (cl.contains("light")) setActiveTheme("light");
+      else setActiveTheme("dark");
     };
     checkTheme();
 
@@ -281,7 +391,7 @@ export function TacticalCore3D({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       observer?.disconnect();
     };
-  }, []);
+  }, [theme]);
 
   const handleClick = useCallback(() => {
     setBurstTime(Date.now());
@@ -330,7 +440,7 @@ export function TacticalCore3D({
             status={status}
             isHovered={isHovered}
             burstTime={burstTime}
-            isLight={isLight}
+            theme={activeTheme}
           />
         </Canvas>
       )}
