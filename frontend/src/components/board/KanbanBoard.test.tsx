@@ -16,7 +16,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"; // eslint-disable
 import { render, screen, fireEvent, cleanup } from "@testing-library/react"; // eslint-disable-line @typescript-eslint/no-unused-vars
 import type { ReactNode } from "react";
 import { KanbanBoard } from "./KanbanBoard";
-import type { Board, WorkItem, Identity } from "@/types/ids";
+import type { Board, WorkItem, Identity, WtmCategory } from "@/types/ids";
+import { WT_M_FROM_KIND, WT_M_ORDER } from "@/types/ids";
 import { I18nProvider } from "@/lib/i18n";
 
 // per 2026-08-31 i18n 补缺口 v2: KanbanBoard 内 useTranslation() 必须包 I18nProvider
@@ -38,19 +39,21 @@ const mockIdentities: Identity[] = [
   { id: "usr-002", tenant_id: "t-1", email: "h@x", display_name: "Hera",    provider: "google", status: "active", mfa_enabled: false },
 ];
 
-const mkWorkItem = (id: string, status: WorkItem["status"]): WorkItem => ({
+// 默认 kind=story (派生 W); 测试需要时显式 override
+const mkWorkItem = (id: string, status: WorkItem["status"], kind: WorkItem["kind"] = "story", w_t_m?: WtmCategory): WorkItem => ({
   id,
   tenant_id: "t-1",
   project_id: "p-1",
   key: `PHYSIS-${id.replace("wi-", "")}`,
   title: `Test ${id}`,
   description: "",
-  kind: "story",
+  kind,
   status,
   priority: "p1",
   reporter_id: "usr-001",
   story_points: 3,
   labels: [],
+  w_t_m,  // 显式 override (per WT_M_FROM_KIND 派生)
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 });
@@ -182,5 +185,143 @@ describe("KanbanBoard", () => {
     // 注意: drop 路径不应触发 click (drag → drop 是另一通道)
     // 验证 onTransition 没被 click 误触发
     expect(onTransition).not.toHaveBeenCalled();
+  });
+
+  // =====================================================================
+  // W/T/M 三類横展開 swimlane 测试 (per docs/kanban-vmodel-jp/W-T-M-VERIFICATION-REPORT.md
+  //   + AGENTS.md §4 #13 DB 三類横展開守门 + frontend/src/types/ids.ts WtmCategory)
+  //
+  // 设计:
+  //   - WT_M_FROM_KIND 默认派生: story/epic→W, task/bug→T, spike→M
+  //   - WorkItem.w_t_m 可显式 override (派生失败/特殊分类)
+  //   - KanbanBoard 渲染 3 swimlane (W/T/M) per column, 0 卡片 swimlane 自动隐藏
+  // =====================================================================
+
+  // ---- Test 5: W/T/M — 默认 kind→wtm 派生正确 ----
+  it("WT_M_FROM_KIND 派生: story/epic→W, task/bug→T, spike→M", () => {
+    // 派生表 (per frontend/src/types/ids.ts)
+    expect(WT_M_FROM_KIND.story).toBe("W");
+    expect(WT_M_FROM_KIND.epic).toBe("W");
+    expect(WT_M_FROM_KIND.task).toBe("T");
+    expect(WT_M_FROM_KIND.bug).toBe("T");
+    expect(WT_M_FROM_KIND.spike).toBe("M");
+    // 顺序: W → T → M (UI 渲染顺序, 跟 WT_M_LABELS 一致)
+    expect(WT_M_ORDER).toEqual(["W", "T", "M"]);
+  });
+
+  // ---- Test 6: W/T/M swimlane — 看板按 kind 自动分 swimlane ----
+  it("看板按 kind 派生 swimlane: todo 列 1W+1T+1M + 1 uncategorized", () => {
+    const mixedBoard: Board = {
+      ...mockBoard,
+      columns: [
+        { status: "todo", work_item_ids: ["wi-W1", "wi-T1", "wi-M1", "wi-U1"], wip_limit: 8 },
+        { status: "in_progress", work_item_ids: [], wip_limit: 5 },
+        { status: "review", work_item_ids: [], wip_limit: 3 },
+        { status: "done", work_item_ids: [], wip_limit: 99 },
+      ],
+    };
+    const mixedItems: WorkItem[] = [
+      // wi-W1: story → 派生 W (default)
+      mkWorkItem("wi-W1", "todo", "story"),
+      // wi-T1: task → 派生 T
+      mkWorkItem("wi-T1", "todo", "task"),
+      // wi-M1: spike → 派生 M
+      mkWorkItem("wi-M1", "todo", "spike"),
+      // wi-U1: story + 显式 w_t_m override → uncategorized 兜底 (合并到 M 末尾)
+      mkWorkItem("wi-U1", "todo", "story", "uncategorized"),
+    ];
+    renderWithI18n(
+      <KanbanBoard
+        board={mixedBoard}
+        workItems={mixedItems}
+        identities={mockIdentities}
+        onTransition={vi.fn()}
+      />,
+    );
+
+    // 4 个 swimlane testid 应渲染 (W/T/M/uncategorized, 都只在 todo 列有卡片)
+    expect(screen.getByTestId("kanban-swimlane-W-todo")).toBeTruthy();
+    expect(screen.getByTestId("kanban-swimlane-T-todo")).toBeTruthy();
+    expect(screen.getByTestId("kanban-swimlane-M-todo")).toBeTruthy();
+    expect(screen.getByTestId("kanban-swimlane-uncategorized-todo")).toBeTruthy();
+
+    // 4 个卡片全部渲染
+    expect(screen.getByTestId("kanban-card-wi-W1")).toBeTruthy();
+    expect(screen.getByTestId("kanban-card-wi-T1")).toBeTruthy();
+    expect(screen.getByTestId("kanban-card-wi-M1")).toBeTruthy();
+    expect(screen.getByTestId("kanban-card-wi-U1")).toBeTruthy();
+
+    // 其他 3 列 swimlane 不渲染 (0 卡片)
+    expect(screen.queryByTestId("kanban-swimlane-W-in_progress")).toBeNull();
+    expect(screen.queryByTestId("kanban-swimlane-T-in_progress")).toBeNull();
+    expect(screen.queryByTestId("kanban-swimlane-M-in_progress")).toBeNull();
+  });
+
+  // ---- Test 7: W/T/M — w_t_m 显式 override 优先于 kind 派生 ----
+  it("WorkItem.w_t_m 显式 override 优先于 kind 派生", () => {
+    // story + 显式 w_t_m="M" → 强制归 M (覆盖默认派生 W)
+    const overrideBoard: Board = {
+      ...mockBoard,
+      columns: [
+        { status: "todo", work_item_ids: ["wi-OV"], wip_limit: 8 },
+        { status: "in_progress", work_item_ids: [], wip_limit: 5 },
+        { status: "review", work_item_ids: [], wip_limit: 3 },
+        { status: "done", work_item_ids: [], wip_limit: 99 },
+      ],
+    };
+    const overrideItems: WorkItem[] = [
+      mkWorkItem("wi-OV", "todo", "story", "M"),
+    ];
+    renderWithI18n(
+      <KanbanBoard
+        board={overrideBoard}
+        workItems={overrideItems}
+        identities={mockIdentities}
+        onTransition={vi.fn()}
+      />,
+    );
+
+    // 应该只渲染 M swimlane (W swimlane 即使 kind=story 也因 override 不渲染)
+    expect(screen.getByTestId("kanban-swimlane-M-todo")).toBeTruthy();
+    expect(screen.queryByTestId("kanban-swimlane-W-todo")).toBeNull();
+    expect(screen.queryByTestId("kanban-swimlane-T-todo")).toBeNull();
+    expect(screen.getByTestId("kanban-card-wi-OV")).toBeTruthy();
+  });
+
+  // ---- Test 8: W/T/M — 拖动行为不变 (测试 ✓: drop 仍按 status 列) ----
+  it("W/T/M swimlane 不破坏现有 drop 行为: drop 到 swimlane 仍触发 status 列 onTransition", () => {
+    // W swimlane 内的卡片拖到 review 列仍触发 onTransition(id, review)
+    const swimlaneBoard: Board = {
+      ...mockBoard,
+      columns: [
+        { status: "todo", work_item_ids: ["wi-W1"], wip_limit: 8 },
+        { status: "in_progress", work_item_ids: [], wip_limit: 5 },
+        { status: "review", work_item_ids: [], wip_limit: 3 },
+        { status: "done", work_item_ids: [], wip_limit: 99 },
+      ],
+    };
+    const swimlaneItems: WorkItem[] = [
+      mkWorkItem("wi-W1", "todo", "story"),  // 默认派生 W
+    ];
+    const onTransition = vi.fn();
+    renderWithI18n(
+      <KanbanBoard
+        board={swimlaneBoard}
+        workItems={swimlaneItems}
+        identities={mockIdentities}
+        onTransition={onTransition}
+      />,
+    );
+
+    // drop wi-W1 到 review 列 (W swimlane 内的卡片)
+    const reviewCol = screen.getByTestId("kanban-column-review");
+    const dt = {
+      getData: (type: string) => (type === "text/issue-id" ? "wi-W1" : ""),
+    };
+    fireEvent.drop(reviewCol, { dataTransfer: dt });
+
+    // 仍按 status 列路由, 不受 W/T/M 分组影响
+    expect(onTransition).toHaveBeenCalledTimes(1);
+    expect(onTransition).toHaveBeenCalledWith("wi-W1", "review");
   });
 });

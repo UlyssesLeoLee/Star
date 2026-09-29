@@ -1,0 +1,35 @@
+[package]
+name = "layout-engine-wasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Layout Engine WASM wrapper — 浏览器端 layout 算法 + visualDistance 计算 (per docs/architecture/2026-09-28-upgrade/rust-to-wasm-frontend-memory-research.md §3.1 P0 PoC)"
+
+[lib]
+name = "layout_engine_wasm"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
+wasm-bindgen = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+thiserror = { workspace = true }
+
+# 复用现有 layout-engine crate (per WORKTREE-CANVAS-IMPL-PLAN-001 §3 集成策略)
+layout-engine = { path = "../layout-engine" }
+
+[dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[lints]
+workspace = true
+
+# 守门 #7: workspace 全局 forbid unsafe_code
+# 守门 #11: 缺标比错标
+# 守门 #13: W/T/M (本期仅实现 layout 算法, 不涉及 DB 表, 无 W/T/M 分类)
