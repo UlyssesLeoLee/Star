@@ -7,6 +7,11 @@ CREATE
   (event:Class {name:"CanvasOutboxEventMetadata",type:"class",visibility:"public"}),
   (eventPage:Class {name:"CanvasOutboxEventPage",type:"class",visibility:"public"}),
   (indexQuery:Class {name:"WorktreeIndexQuery",type:"class",visibility:"public"}),
+  (projectsQuery:Class {name:"AuthorizedProjectsQuery",type:"interface",visibility:"public"}),
+  (authorizedProject:Class {name:"AuthorizedProjectAccess",type:"interface",visibility:"public"}),
+  (repository:Class {name:"ProjectWorktreeRepository",type:"interface",visibility:"public"}),
+  (candidate:Class {name:"WorktreeImportCandidate",type:"interface",visibility:"public"}),
+  (lifecycleReceipt:Class {name:"ProjectWorktreeLifecycleReceipt",type:"interface",visibility:"public"}),
   (error:Class {name:"GroupApiError",type:"class",visibility:"public"}),
   (errorCtor:Function {name:"GroupApiError.constructor",type:"function",signature:"constructor(status: number, code: string, message: string)",visibility:"public",complexity:"simple"}),
   (client:Class {name:"WorktreeGroupApiClient",type:"class",visibility:"public"}),
@@ -14,6 +19,11 @@ CREATE
   (request:Function {name:"WorktreeGroupApiClient.request",type:"function",signature:"request<T>(path: string, init?: RequestInit): Promise<T>",visibility:"private",complexity:"moderate"}),
   (groupContext:Function {name:"WorktreeGroupApiClient.getGroupContext",type:"function",signature:"getGroupContext<T>(worktreeId: string): Promise<T>",visibility:"public",complexity:"simple"}),
   (index:Function {name:"WorktreeGroupApiClient.listProjectWorktrees",type:"function",signature:"listProjectWorktrees<T>(projectId: string, query?: WorktreeIndexQuery): Promise<T>",visibility:"public",complexity:"moderate"}),
+  (listAuthorizedProjects:Function {name:"WorktreeGroupApiClient.listAuthorizedProjects",type:"function",signature:"listAuthorizedProjects<T>(query?: AuthorizedProjectsQuery): Promise<T>",visibility:"public",complexity:"moderate"}),
+  (projectRepositories:Function {name:"WorktreeGroupApiClient.listProjectWorktreeRepositories",type:"function",signature:"listProjectWorktreeRepositories<T>(projectId: string): Promise<T>",visibility:"public",complexity:"simple"}),
+  (importCandidates:Function {name:"WorktreeGroupApiClient.listWorktreeImportCandidates",type:"function",signature:"listWorktreeImportCandidates<T>(projectId: string, repositoryId: string, limit?: number): Promise<T>",visibility:"public",complexity:"simple"}),
+  (createWorktree:Function {name:"WorktreeGroupApiClient.createProjectWorktree",type:"function",signature:"createProjectWorktree<T>(projectId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T>",visibility:"public",complexity:"simple"}),
+  (importWorktree:Function {name:"WorktreeGroupApiClient.importProjectWorktree",type:"function",signature:"importProjectWorktree<T>(projectId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T>",visibility:"public",complexity:"simple"}),
   (projectMembers:Function {name:"WorktreeGroupApiClient.listProjectMembers",type:"function",signature:"listProjectMembers<T>(projectId: string): Promise<T>",visibility:"public",complexity:"simple"}),
   (managementPlan:Function {name:"WorktreeGroupApiClient.createManagementPlan",type:"function",signature:"createManagementPlan<T>(worktreeId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T>",visibility:"public",complexity:"simple"}),
   (managementConfirm:Function {name:"WorktreeGroupApiClient.confirmManagementPlan",type:"function",signature:"confirmManagementPlan<T>(worktreeId: string, planId: string): Promise<T>",visibility:"public",complexity:"simple"}),
@@ -35,11 +45,11 @@ CREATE
   (readError:Function {name:"readApiError",type:"function",signature:"readApiError(response: Response): Promise<GroupApiError>",visibility:"private",complexity:"simple"}),
   (normalizeBaseUrl:Function {name:"normalizeBaseUrl",type:"function",signature:"normalizeBaseUrl(baseUrl: string): string",visibility:"private",complexity:"moderate"}),
   (waitPoll:Function {name:"waitForPoll",type:"function",signature:"waitForPoll(ms: number, signal: AbortSignal): Promise<void>",visibility:"private",complexity:"simple"}),
-  (file)-[:CONTAINS]->(token),(file)-[:CONTAINS]->(cursor),(file)-[:CONTAINS]->(event),(file)-[:CONTAINS]->(eventPage),(file)-[:CONTAINS]->(indexQuery),(file)-[:CONTAINS]->(error),(file)-[:CONTAINS]->(client),(file)-[:CONTAINS]->(projectMembers),(file)-[:CONTAINS]->(poller),(file)-[:CONTAINS]->(readError),(file)-[:CONTAINS]->(waitPoll),
+  (file)-[:CONTAINS]->(token),(file)-[:CONTAINS]->(cursor),(file)-[:CONTAINS]->(event),(file)-[:CONTAINS]->(eventPage),(file)-[:CONTAINS]->(indexQuery),(file)-[:CONTAINS]->(projectsQuery),(file)-[:CONTAINS]->(authorizedProject),(file)-[:CONTAINS]->(repository),(file)-[:CONTAINS]->(candidate),(file)-[:CONTAINS]->(lifecycleReceipt),(file)-[:CONTAINS]->(error),(file)-[:CONTAINS]->(client),(file)-[:CONTAINS]->(projectMembers),(file)-[:CONTAINS]->(poller),(file)-[:CONTAINS]->(readError),(file)-[:CONTAINS]->(waitPoll),
   (error)-[:HAS_METHOD]->(errorCtor),
-  (client)-[:HAS_METHOD]->(ctor),(client)-[:HAS_METHOD]->(request),(client)-[:HAS_METHOD]->(groupContext),(client)-[:HAS_METHOD]->(index),(client)-[:HAS_METHOD]->(projectMembers),(client)-[:HAS_METHOD]->(managementPlan),(client)-[:HAS_METHOD]->(managementConfirm),(client)-[:HAS_METHOD]->(workItems),(client)-[:HAS_METHOD]->(transitionWorkItem),(client)-[:HAS_METHOD]->(canvases),(client)-[:HAS_METHOD]->(createCanvas),(client)-[:HAS_METHOD]->(createCanvasElement),(client)-[:HAS_METHOD]->(updateCanvasElement),(client)-[:HAS_METHOD]->(deleteCanvasElement),(client)-[:HAS_METHOD]->(updateCanvasDocument),(client)-[:HAS_METHOD]->(elements),(client)-[:HAS_METHOD]->(events),(client)-[:HAS_METHOD]->(createItem),
+  (client)-[:HAS_METHOD]->(ctor),(client)-[:HAS_METHOD]->(request),(client)-[:HAS_METHOD]->(groupContext),(client)-[:HAS_METHOD]->(index),(client)-[:HAS_METHOD]->(listAuthorizedProjects),(client)-[:HAS_METHOD]->(projectRepositories),(client)-[:HAS_METHOD]->(importCandidates),(client)-[:HAS_METHOD]->(createWorktree),(client)-[:HAS_METHOD]->(importWorktree),(client)-[:HAS_METHOD]->(projectMembers),(client)-[:HAS_METHOD]->(managementPlan),(client)-[:HAS_METHOD]->(managementConfirm),(client)-[:HAS_METHOD]->(workItems),(client)-[:HAS_METHOD]->(transitionWorkItem),(client)-[:HAS_METHOD]->(canvases),(client)-[:HAS_METHOD]->(createCanvas),(client)-[:HAS_METHOD]->(createCanvasElement),(client)-[:HAS_METHOD]->(updateCanvasElement),(client)-[:HAS_METHOD]->(deleteCanvasElement),(client)-[:HAS_METHOD]->(updateCanvasDocument),(client)-[:HAS_METHOD]->(elements),(client)-[:HAS_METHOD]->(events),(client)-[:HAS_METHOD]->(createItem),
   (poller)-[:HAS_METHOD]->(pollerCtor),(poller)-[:HAS_METHOD]->(pollOnce),(poller)-[:HAS_METHOD]->(runPoller),
-  (ctor)-[:CALLS]->(normalizeBaseUrl),(request)-[:CALLS]->(readError),(groupContext)-[:CALLS]->(request),(index)-[:CALLS]->(request),(index)-[:USES]->(indexQuery),(projectMembers)-[:CALLS]->(request),(managementPlan)-[:CALLS]->(request),(managementConfirm)-[:CALLS]->(request),(workItems)-[:CALLS]->(request),(transitionWorkItem)-[:CALLS]->(request),(canvases)-[:CALLS]->(request),(createCanvas)-[:CALLS]->(request),(createCanvasElement)-[:CALLS]->(request),(updateCanvasElement)-[:CALLS]->(request),(updateCanvasDocument)-[:CALLS]->(request),(elements)-[:CALLS]->(request),(events)-[:CALLS]->(request),(createItem)-[:CALLS]->(request),(pollerCtor)-[:USES]->(event),(pollerCtor)-[:USES]->(eventPage),(pollOnce)-[:CALLS]->(events),(runPoller)-[:CALLS]->(pollOnce),(runPoller)-[:CALLS]->(waitPoll);
+  (ctor)-[:CALLS]->(normalizeBaseUrl),(request)-[:CALLS]->(readError),(groupContext)-[:CALLS]->(request),(index)-[:CALLS]->(request),(index)-[:USES]->(indexQuery),(listAuthorizedProjects)-[:CALLS]->(request),(listAuthorizedProjects)-[:USES]->(projectsQuery),(projectRepositories)-[:CALLS]->(request),(importCandidates)-[:CALLS]->(request),(createWorktree)-[:CALLS]->(request),(importWorktree)-[:CALLS]->(request),(projectMembers)-[:CALLS]->(request),(managementPlan)-[:CALLS]->(request),(managementConfirm)-[:CALLS]->(request),(workItems)-[:CALLS]->(request),(transitionWorkItem)-[:CALLS]->(request),(canvases)-[:CALLS]->(request),(createCanvas)-[:CALLS]->(request),(createCanvasElement)-[:CALLS]->(request),(updateCanvasElement)-[:CALLS]->(request),(updateCanvasDocument)-[:CALLS]->(request),(elements)-[:CALLS]->(request),(events)-[:CALLS]->(request),(createItem)-[:CALLS]->(request),(pollerCtor)-[:USES]->(event),(pollerCtor)-[:USES]->(eventPage),(pollOnce)-[:CALLS]->(events),(runPoller)-[:CALLS]->(pollOnce),(runPoller)-[:CALLS]->(waitPoll);
 */
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
@@ -246,6 +256,43 @@ export interface WorktreeIndexQuery {
   include_archived?: boolean;
 }
 
+export interface AuthorizedProjectsQuery {
+  limit?: number;
+  cursor?: string;
+}
+
+export interface AuthorizedProjectAccess {
+  project_id: string;
+  role: string;
+}
+
+export interface ProjectWorktreeRepository {
+  repository_id: string;
+  name: string;
+  default_branch: string;
+}
+
+export interface WorktreeImportCandidate {
+  candidate_id: string;
+  repository_id: string;
+  name: string;
+  branch: string;
+  head_commit: string;
+  dirty: boolean;
+  observed_at: string;
+}
+
+export interface ProjectWorktreeLifecycleReceipt {
+  operation_id: string;
+  worktree_id: string;
+  project_id: string;
+  repository_id: string;
+  branch: string;
+  state: "provisioning" | "ready";
+  accepted_at: string;
+  correlation_id: string;
+}
+
 export interface TaskCliSessionReceipt {
   session_id: string;
   worktree_id: string;
@@ -351,6 +398,40 @@ export class WorktreeGroupApiClient {
     const serialized = query.toString();
     const suffix = serialized ? `?${serialized}` : "";
     return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/worktrees${suffix}`);
+  }
+
+  listAuthorizedProjects<T>(query: AuthorizedProjectsQuery = {}): Promise<T> {
+    const params = new URLSearchParams();
+    if (query.limit !== undefined) params.set("limit", String(query.limit));
+    if (query.cursor) params.set("cursor", query.cursor);
+    const serialized = params.toString();
+    const suffix = serialized ? `?${serialized}` : "";
+    return this.request(`/api/v1/projects${suffix}`);
+  }
+
+  listProjectWorktreeRepositories<T>(projectId: string): Promise<T> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/worktree-repositories`);
+  }
+
+  listWorktreeImportCandidates<T>(projectId: string, repositoryId: string, limit = 25): Promise<T> {
+    const query = new URLSearchParams({ repository_id: repositoryId, limit: String(limit) });
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/worktree-import-candidates?${query.toString()}`);
+  }
+
+  createProjectWorktree<T>(projectId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/worktrees`, {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(body),
+    });
+  }
+
+  importProjectWorktree<T>(projectId: string, body: Record<string, unknown>, idempotencyKey: string): Promise<T> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/worktrees/import`, {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(body),
+    });
   }
 
   listProjectMembers<T>(projectId: string): Promise<T> {
