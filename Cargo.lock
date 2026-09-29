@@ -3173,6 +3173,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "query-engine-wasm"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "query-engine",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "thiserror 2.0.20",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "quinn"
 version = "0.11.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3459,6 +3473,22 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "relationship-engine-wasm"
+version = "0.1.0"
+dependencies = [
+ "graph-core",
+ "js-sys",
+ "relationship-engine",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "thiserror 2.0.20",
+ "uuid",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
