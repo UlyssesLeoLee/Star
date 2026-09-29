@@ -1,0 +1,29 @@
+[package]
+name = "star-desktop"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Star Desktop — Tauri 2.0 + 1 page board (PoC P0, per docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2)"
+
+# Tauri binary requires a binary target
+[[bin]]
+name = "star-desktop"
+path = "src-tauri/src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri 2.0 runtime
+tauri = { version = "2", features = [] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# 复用现有 crates (守门 #19: 0 动业务 logic)
+domain-board = { path = "../../crates/domain-board" }
+relationship-engine-wasm = { path = "../../crates/relationship-engine-wasm" }
+
+[lints]
+workspace = true
