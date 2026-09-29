@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v4.7 (2026-09-30)
-> **上游要件定义书**: `D:\Star\docs\requirements.md` v5.14(下文以 §N 引用)
+> **文档版本**: v5.0 (2026-09-30)
+> **上游要件定义书**: docs/requirements.md v5.17(下文以 §N 引用)
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -10,7 +10,7 @@
 
 ### 0.1 文档目的与定位
 
-本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.13》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
+本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.16》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
 
 **本文档不输出生产代码**(重申 §47):
 
@@ -4182,7 +4182,7 @@ Tenant → Workspace → Project（先选定）
 Worktree Group 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 ```
 
-`ProjectWorktreeIndex` 和 `WorktreeGroupShell` 是两层 UI 组合，不是新的业务聚合根。前者只负责按已授权 Project 展示和管理 Worktree；后者唯一身份是已展开的 `worktree_id`，负责同级 App 导航、GroupContext 和统一底栏，不复制 Worktree、WorkItem、AgentSession 或 Canvas 事实。Tenant → Workspace → Project 仍是归属与权限层级；`1 WorkItem → 0/1/N Worktrees` 和 Worktree / WorkItem 状态独立性继续成立。项目可能尚无 Worktree 时，可从 Project Worktree Index 发起受权创建或导入，再展开进入 Worktree Group。
+`ProjectWorktreeIndex` 和 `WorktreeGroupShell` 是两层 UI 组合，不是新的业务聚合根。前者只负责按已授权 Project 展示和管理 Worktree；后者唯一身份是已展开的 `worktree_id`，负责同级 App 导航、GroupContext 和统一底栏，不复制 Worktree、WorkItem、AgentSession 或 Canvas 事实。Tenant → Workspace → Project 仍是归属与权限层级；`1 WorkItem → 0/1/N Worktrees` 和 Worktree / WorkItem 状态独立性继续成立。项目可能尚无 Worktree 时，可从 Project Worktree Index 发起受权创建或导入，再展开进入 Worktree Group；缺少可信 lifecycle provider 或 Repository binding 时 API 返回非成功结果，不能生成预览之外的虚假 Worktree。
 
 当前 `/worktree-canvas` 是 Project 范围的 **Worktree Overview Graph**，用于跨 Worktree 冲突、依赖和热区总览。它不替代 Worktree Group 中面向当前工作区的 **Infinite Canvas**。两个页面应有不同导航标签、路由和查询范围；Overview Graph 可以链接进入具体 Group，Group Canvas 也可以链接到 Overview Graph。
 
@@ -4190,9 +4190,10 @@ Worktree Group 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 
 | 组件 | 职责 | 关键输入 | 约束 |
 |---|---|---|---|
-| `ProjectSelector` | 选择当前项目范围并同步导航状态 | actor 可访问的 Project projections | 未授权 Project 不可出现在 selector；切换后清除上个项目的 Worktree selection |
+| `ProjectSelector` | 选择当前项目范围并同步导航状态 | `GET /api/v1/projects` 的 actor 授权目录；无 API 时只在明确标注的本地预览模式使用 seed | 服务端列表按当前 tenant/user 的有效 membership 返回 `project_id`/role，UUID 游标分页，每页 ≤200、no-store；拒绝未知字段/重复 ID/无效 role；完整加载前不对未加载深链宣告无权；生产 API 错误不回退 seed；API session 切换时同步清除 Project、Index 和成员角色投影；当前无 Project 名称 SoR，使用 `Project {UUID}` 标签 |
 | `ProjectWorktreeIndex` / `WorktreeIndex` | 只展示当前 Project 可访问的 Worktree，并比较 branch、status、owner/Agent、Runtime、PR、风险/锁和最近活动 | `project_id`, actor permissions, Worktree projections | 不把 Task 状态折叠成 Worktree 状态；遵循 RLS；不混列其他 Project |
 | `ProjectMemberDirectory` | 给有权管理员提供当前 Project 的有效成员及角色，供负责人筛选和分配 | authenticated `project_id`, current membership | 仅显示当前 Project 的成员 ID / role；不使用 seed 或跨 Project 搜索，服务端确认时再次验证成员有效性 |
+| `ProjectWorktreeLifecycleControls` | 在 Index 内按服务端 Repository 清单创建 Worktree，或发现并导入当前 Repository 的 Host Runtime 候选 | authenticated Project、Repository projection、Project role | Repository 来自 `GET /api/v1/projects/{project_id}/worktree-repositories`；候选、创建和导入走对应 Project API；校验 Project/Repository/candidate/receipt 关联，受理后刷新 Index；错误时关闭写操作且不回退 seed |
 | `ProjectWorktreesEntry` | 从 Project 的 Worktrees 视图打开 `/worktree?project_id={project_id}` | selected `project_id` | 深链保留 Project 选择；入口不得落入通用任务树路由 |
 | `WorktreeTreeNode` | 展开/收起 Worktree；展开后挂出同级 App 导航，显示管理状态与可用动作 | `worktree_id`, lifecycle/status projection, permissions | 未展开时不渲染 App 子树；危险动作须按现有 Worktree Action Guard 确认、幂等和审计 |
 | `WorktreeGroupShell` | 组合当前 Worktree Header、同级 App 导航、主内容区、固定底栏 Chat Bar | 已授权 `GroupContext` | 切换 Worktree 时重新解析上下文和订阅；当前 WT 与 App 树选择一致 |
@@ -4205,7 +4206,9 @@ Worktree Group 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 | `PluginAppSlot` | 在同级导航和内容区挂载经授权的插件 App | Plugin Manifest、Group Plugin Binding | 不允许插件直接访问其它 App 状态或数据库 |
 | `BottomChatBar` | 持久输入、范围选择、实体引用和 LangGraph 流式交互 | Scope + EntityRefs + Checkpoint | 全系统只保留一套底栏 Chat Bar |
 
-当宿主认证 provider 已安装时，`ProjectWorktreeIndex` 使用 `GET /api/v1/projects/{project_id}/worktrees` 的服务端授权 projection，展示 owner、Agent Session、Runtime、Worktree 状态、PR、dirty/ahead/behind、health/risk 与锁版本，并支持 owner/state/archive 筛选和 `next_cursor` 续页。401/403 或网络错误进入错误态，不能混合或回退到 Zustand seed；provider 尚未装配时才显示明确标记的本地预览。`ProjectMemberDirectory` 通过 `GET /api/v1/projects/{project_id}/members` 读取当前有效成员及 Project role；仅当当前 role 是 `tenant_admin` / `project_admin` 时展示转派入口。负责人转派先选择目录成员，再向 `POST /management-plans` 提交 `assign_owner`、当前 `expected_version`、correlation 与幂等键，展示短时 plan 并等待二次确认。成员目录失败时关闭转派；确认成功后重读授权 Index，失败或过期不乐观更新。服务端仍会在 plan 与 confirm 时复核 manager role 和目标成员有效性。归档/恢复同样走短时 plan-confirm；API 当前保守拒绝仍有 Agent Session / Runtime 引用的归档。此操作不删除 Git checkout；创建/导入、停止执行和物理清理仍需独立的受权 lifecycle/API。
+生产 `ProjectSelector` 先经 `GET /api/v1/projects` 读取当前用户在当前 tenant 下的有效 membership；目录只暴露 Project UUID 与角色，以稳定 UUID cursor 分页，每页最多 200 条并禁用缓存。选择器严格校验投影字段、role、重复 ID 与 cursor，支持续页；深链 Project 未出现在当前页时保持“继续加载以验证”状态，只有目录读完仍未命中才显示无权或不存在。生产 provider 已挂载但读取失败时显示错误与重试，不显示 seed Project。API session generation 切换时，selector、Worktree Index 与 member role projection 立即隐藏旧 session 数据，并在新 session 的授权请求返回后恢复。仓库当前没有 Project 名称 SoR，因此生产标签是 `Project {UUID}`；Project 名称需要后续权威主数据接入。没有 provider 的原型仍可显示明确标识的本地预览。
+
+当宿主认证 provider 已安装时，`ProjectWorktreeIndex` 使用 `GET /api/v1/projects/{project_id}/worktrees` 的服务端授权 projection，展示 owner、Agent Session、Runtime、Worktree 状态、PR、dirty/ahead/behind、health/risk 与锁版本，并支持 owner/state/archive 筛选和 `next_cursor` 续页。401/403 或网络错误进入错误态，不能混合或回退到 Zustand seed；provider 尚未装配时才显示明确标记的本地预览。`ProjectMemberDirectory` 通过 `GET /api/v1/projects/{project_id}/members` 读取当前有效成员及 Project role；仅当当前 role 是 `tenant_admin` / `project_admin` 时展示转派入口。负责人转派先选择目录成员，再向 `POST /management-plans` 提交 `assign_owner`、当前 `expected_version`、correlation 与幂等键，展示短时 plan 并等待二次确认。成员目录失败时关闭转派；确认成功后重读授权 Index，失败或过期不乐观更新。服务端仍会在 plan 与 confirm 时复核 manager role 和目标成员有效性。归档/恢复同样走短时 plan-confirm；API 当前保守拒绝仍有 Agent Session / Runtime 引用的归档。此操作不删除 Git checkout。`ProjectWorktreeLifecycleControls` 已挂到 Project Index：先经 `GET /api/v1/projects/{project_id}/worktree-repositories` 获取 `project:read` 授权的脱敏仓库清单，再经受保护的候选发现接口列出候选，创建/导入请求携带幂等键和 correlation ID；客户端复核返回 receipt 的 Project、Repository、分支和 correlation 后才提示受理并刷新 Index。角色不具写权限、接口错误、响应校验失败或宿主认证未连接时均关闭写操作，不读本地 seed。当前生产 main 未安装 lifecycle provider，Repository binding 的权威数据源也未接通，因此仓库清单接口返回 503，生产创建/导入仍不可用；操作停止和物理清理继续要求独立 lifecycle/API。
 
 Index 同时显示两种不同事实：数据库中的持久化 `locked` 标记，以及 `git_lock { state, source, observed_at }` 当前 Git Worktree retention lock 观测。该 Git 锁保护 Git 管理记录免遭 prune，并影响 Worktree 的移动/删除；它不是 Agent 活跃状态、文件编辑互斥锁或独占租约，unlocked 不表示 Worktree 空闲。只有可信 Host Runtime 在最近 30 秒内返回且时间戳不晚于当前时刻的 `locked` / `unlocked` 才是确定 Git 锁状态；没有 Runtime/provider、provider 失败、时间戳缺失或过期时必须显示 `unknown`。观测每页最多并发 8 项、单项 provider 最长等待 2 秒、整页最多等待 3 秒，超时项保持 unknown。unknown/unlocked 都不能证明 Agent 已停止；清理必须先检查独立 Agent/Session/Runtime 活跃状态并完成 drain，再对同一 Repository/Worktree 重新观测并经授权执行器确认。
 
@@ -4497,6 +4500,8 @@ Chat Bar(scope, text, entity_refs)
 | WTG-004/005 | §16.2、§16.10-16.11 | AC-WTG-002/003 |
 | WTG-006 | §16.1-16.2 | AC-WTG-004 |
 | WTG-007/008/009 | §16.2、§16.10-16.11 | AC-WTG-005/006/007 |
+| WTG-011 | §16.2、§16.10-16.11 | AC-WTG-008 |
+| WTG-012 | §16.2、§16.10-16.11 | AC-WTG-009 |
 | TCI-001 | §16.2-16.3 | AC-WTG-001 |
 | TCI-002/003/004 | §16.6, §16.10, §16.11 A | AC-TCI-001 |
 | CAN-001/002/003/004/005 | §16.2, §16.5, §16.9, §16.11 B | AC-CAN-001/002 |
@@ -4532,6 +4537,8 @@ Chat Bar(scope, text, entity_refs)
 | 4 | Plugin Publisher 签名信任根、沙箱承载方式、插件升级/回滚/数据迁移补偿策略 | Plugin ADR / Integration 详细设计 |
 | 5 | Global L0 可访问 Worktree 数量、汇总 Context Budget 与跨 Group 实时流节流策略 | LangGraph / Performance PoC |
 | 6 | Canvas Document element/connector 数量上限已有 API 校验，viewport / frames / connectors 采用 Canvas registry SCD2；多人同时编辑的合并体验、事件消费延迟和大文档性能阈值仍需验证 | Canvas Data Design / Integration PoC |
+| 7 | Project Worktree create/import 控件已接入条件式 API，但 Host Runtime provider、受信任 Project-Repository binding 和 durable writer 未装配 | API seam 返回 503；不能创建 checkout 或授予生产能力 | 实现服务端 repository registry、可信路径解析、Git 创建/导入执行、operation/Audit/Outbox 持久化与取消/恢复；验证越权、冲突和幂等重放 |
+| 8 | 仓库尚无持久 Project 名称 SoR；授权目录目前只返回 Project ID/role | 生产 Index 能按授权 ID 定位范围，但不能提供权威名称 | 接入 Project Domain 的持久 repository/master，并定义与现有 membership/Project-Repository binding 的主键和生命周期；完成名称与访问目录一致性验证 |
 
 基本设计对上述领域已确立产品树、所有权、命令事件路径、权限边界和验收方向；协议格式、DDL、API handler、TTY 机制、签名算法和沙箱实现留给相应详细设计，不以本节文字声称已实现。
 
@@ -4581,3 +4588,6 @@ Chat Bar(scope, text, entity_refs)
 | v4.5 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.12 / Group detailed design v4.10；把 Plugin Registry UI consumer 的输入校验、稳定排序、provider/session generation 清理和错误 fail closed 约束细化；新增投影契约测试 evidence，明确仍无插件执行权限 | 继续 Phase 6，收紧 Group App navigation projection 的边界验证 |
 | v4.6 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.13；区分 PostgreSQL RLS policy 与 runtime SQL grants，要求 migration owner/service role 分离、逐表最小授权和以实际非特权角色验收；记载 Phase 5/6 隔离库验证与生产 grants 未配置 | Phase 5/6 PostgreSQL 验证发现 FORCE RLS 不授予 schema/table SQL 权限 |
 | v4.7 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.14；为 Project Worktree Index 定义 Git Worktree retention-lock observation、30 秒 freshness、unknown 与持久化 `locked` 分离，并要求 cleanup 在 agent/session drain 后重新观测；宿主 Runtime observer 尚未装配 | Phase 2D 增加 Git 锁观测切片并冻结安全清理前置条件 |
+| v4.8 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.15 / Group detailed design v4.14；定义 Project-scoped Worktree create/import API、opaque candidate、无客户端路径/URL、授权复核、幂等 receipt 与 provider 缺失 503；明确 Host Runtime provider、Index 控件和生产创建/导入尚未接通 | Phase 2D 推进 Worktree Index create/import API contract |
+| v4.9 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.16 / Group detailed design v4.15；新增脱敏 Project Repository 查询与 Worktree Index 创建/导入控件契约，验证 Project/Repository/candidate/receipt 并在受理后刷新；宿主认证、Project-Repository SoR、production lifecycle provider 与数据库写入仍未接通 | Phase 2D 从 create/import API seam 推进到 Index UI 消费切片 |
+| v5.0 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.17 / Group detailed design v4.16；Project Selector 改为消费当前 actor 的服务端 membership 目录，支持校验、分页、深链未决状态和 session 更换时清除旧目录/Index/member role；生产不回退 seed，名称 SoR 和宿主认证/数据库仍待接入 | 继续 Phase 2D，消除生产 Project 选择对本地 seed 的依赖并关闭跨 session 旧投影窗口 |

@@ -149,6 +149,49 @@ describe("WorktreeGroupApiClient", () => {
     });
   });
 
+  it("lists only server-authorized Projects with a bounded cursor query", async () => {
+    const { api, fetcher } = makeClient("user-jwt");
+
+    await api.listAuthorizedProjects({ limit: 80, cursor: "22222222-2222-4222-8222-222222222222" });
+
+    const [input, init] = fetcher.mock.calls[0];
+    const url = new URL(String(input), "http://localhost");
+    expect(url.pathname).toBe("/api/v1/projects");
+    expect(Object.fromEntries(url.searchParams.entries())).toEqual({
+      limit: "80",
+      cursor: "22222222-2222-4222-8222-222222222222",
+    });
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer user-jwt");
+    expect(init?.cache).toBe("no-store");
+  });
+
+  it("uses Project-scoped routes for repository discovery, candidate listing, create, and import", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () =>
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    const api = new WorktreeGroupApiClient(async () => "user-jwt", fetcher);
+    const createBody = { repository_id: "repo-1", branch: "feature/one", base_ref: "main", correlation_id: "corr-1" };
+    const importBody = { repository_id: "repo-1", candidate_id: "candidate-1", correlation_id: "corr-2" };
+
+    await api.listProjectWorktreeRepositories("project one");
+    await api.listWorktreeImportCandidates("project one", "repo one", 12);
+    await api.createProjectWorktree("project one", createBody, "idem-create");
+    await api.importProjectWorktree("project one", importBody, "idem-import");
+
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(fetcher.mock.calls.map(([input, init]) => [String(input), init?.method ?? "GET"])).toEqual([
+      ["/api/v1/projects/project%20one/worktree-repositories", "GET"],
+      ["/api/v1/projects/project%20one/worktree-import-candidates?repository_id=repo+one&limit=12", "GET"],
+      ["/api/v1/projects/project%20one/worktrees", "POST"],
+      ["/api/v1/projects/project%20one/worktrees/import", "POST"],
+    ]);
+    expect(new Headers(fetcher.mock.calls[2][1]?.headers).get("Idempotency-Key")).toBe("idem-create");
+    expect(new Headers(fetcher.mock.calls[3][1]?.headers).get("Idempotency-Key")).toBe("idem-import");
+    expect(JSON.parse(String(fetcher.mock.calls[2][1]?.body))).toEqual(createBody);
+    expect(JSON.parse(String(fetcher.mock.calls[3][1]?.body))).toEqual(importBody);
+    expect(fetcher.mock.calls.every(([, init]) => init?.credentials === "omit" && init?.cache === "no-store")).toBe(true);
+  });
+
   it("sends an idempotent Worktree management plan", async () => {
     const { api, fetcher } = makeClient("user-jwt");
 
@@ -364,3 +407,11 @@ describe("WorktreeGroupApiClient", () => {
       .not.toThrow();
   });
 });
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (suite:Function {name:"worktreeGroupApi tests"}),
+      (api:Class {name:"WorktreeGroupApiClient"});
+CREATE (lifecycleRoutes:Function {name:"Project Worktree lifecycle route case",type:"function",visibility:"private",complexity:"moderate"});
+CREATE (suite)-[:CONTAINS]->(lifecycleRoutes),
+       (lifecycleRoutes)-[:CALLS]->(api);
+*/

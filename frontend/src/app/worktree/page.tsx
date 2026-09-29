@@ -3,6 +3,8 @@ CYPHER STRUCTURE MANIFEST
 CREATE
   (file:File {name:"frontend/src/app/worktree/page.tsx", type:"file", language:"tsx"}),
   (page:Function {name:"WorktreePage", type:"function", signature:"WorktreePage(): JSX.Element", visibility:"public", complexity:"complex"}),
+  (lifecycleControls:Function {name:"ProjectWorktreeLifecycleControls",type:"function",language:"tsx",visibility:"public",complexity:"complex"}),
+  (authorizedSelector:Function {name:"AuthorizedProjectSelector",type:"function",language:"tsx",visibility:"public",complexity:"complex"}),
   (row:Function {name:"Row", type:"function", signature:"Row(props: { label: string; value: React.ReactNode }): JSX.Element", visibility:"private", complexity:"simple"}),
   (apps:Variable {name:"WORKTREE_GROUP_APPS", type:"variable", language:"typescript"}),
   (editor:Variable {name:"MonacoEditor", type:"variable", language:"typescript"}),
@@ -30,6 +32,10 @@ CREATE
   (formatTimestamp:Function {name:"formatTimestamp", type:"function", signature:"formatTimestamp(value: string): string", visibility:"private", complexity:"simple"}),
   (deriveTransitions:Function {name:"deriveTransitions", type:"function", signature:"WORKTREE_SM.transitions.filter(...).map(...)", visibility:"private", complexity:"simple"}),
   (file)-[:CONTAINS]->(page),
+  (file)-[:CONTAINS]->(lifecycleControls),
+  (file)-[:CONTAINS]->(authorizedSelector),
+  (page)-[:CALLS]->(lifecycleControls),
+  (page)-[:CALLS]->(authorizedSelector),
   (file)-[:CONTAINS]->(row),
   (file)-[:CONTAINS]->(apps),
   (file)-[:CONTAINS]->(editor),
@@ -85,12 +91,16 @@ import { GitBranch, GitMerge, Lock, Cpu, AlertCircle } from "lucide-react";
 import { clsx } from "clsx";
 import { useTranslation } from "@/lib/i18n";
 import dynamic from "next/dynamic";
+import { ProjectWorktreeLifecycleControls } from "./ProjectWorktreeLifecycleControls";
+import { AuthorizedProjectSelector, type AuthorizedProjectDirectoryState } from "./AuthorizedProjectSelector";
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 CREATE
   (indexApi:Variable {name:"worktreeGroupApi",type:"variable",language:"typescript"}),
   (indexState:Variable {name:"projectIndexState",type:"variable",language:"typescript"}),
   (memberState:Variable {name:"memberDirectoryState",type:"variable",language:"typescript"}),
+  (indexStateApi:Variable {name:"projectIndexStateApi",type:"variable",language:"typescript"}),
+  (memberStateApi:Variable {name:"memberDirectoryStateApi",type:"variable",language:"typescript"}),
   (memberSequence:Variable {name:"memberRequestSequence",type:"variable",language:"typescript"}),
   (ownerTarget:Variable {name:"ownerTarget",type:"variable",language:"typescript"}),
   (canManageOwners:Variable {name:"canManageOwners",type:"variable",language:"typescript"}),
@@ -107,6 +117,13 @@ CREATE
   (managementConfirm:Function {name:"confirmArchivePlan",type:"function",visibility:"private",complexity:"moderate"}),
   (ownerPlan:Function {name:"createOwnerPlan",type:"function",visibility:"private",complexity:"moderate"}),
   (ownerConfirm:Function {name:"confirmOwnerPlan",type:"function",visibility:"private",complexity:"moderate"}),
+  (authorizedProjectDirectory:Variable {name:"authorizedProjectDirectory",type:"variable",language:"typescript"}),
+  (authorizedProjects:Variable {name:"authorizedProjects",type:"variable",language:"typescript"}),
+  (authorizedProject:Variable {name:"authorizedProject",type:"variable",language:"typescript"}),
+  (authorizedSelectionId:Variable {name:"authorizedSelectionId",type:"variable",language:"typescript"}),
+  (authorizedProjectDirectoryApi:Variable {name:"authorizedProjectDirectoryApi",type:"variable",language:"typescript"}),
+  (authorizedDirectoryMatchesApi:Variable {name:"authorizedDirectoryMatchesApi",type:"variable",language:"typescript"}),
+  (receiveAuthorizedProjectDirectory:Function {name:"receiveAuthorizedProjectDirectory",type:"function",visibility:"private",complexity:"simple"}),
   (memberApi:Function {name:"WorktreeGroupApiClient.listProjectMembers",type:"function",visibility:"public",complexity:"simple"});
 MATCH (page:Function {name:"WorktreePage"}), (api:Variable {name:"worktreeGroupApi"}),
       (state:Variable {name:"projectIndexState"}),
@@ -120,9 +137,14 @@ MATCH (page:Function {name:"WorktreePage"}), (api:Variable {name:"worktreeGroupA
       (memberMethod:Function {name:"WorktreeGroupApiClient.listProjectMembers"}),
       (ownerPlan:Function {name:"createOwnerPlan"}),
       (ownerConfirm:Function {name:"confirmOwnerPlan"}),
+      (authorizedSelector:Function {name:"AuthorizedProjectSelector"}),
       (normalizeGitLock:Function {name:"normalizeWorktreeGitLock"});
 CREATE (page)-[:USES]->(api), (page)-[:USES]->(state), (page)-[:USES]->(members),
        (page)-[:CALLS]->(refresh), (page)-[:CALLS]->(directoryEffect),
+       (page)-[:USES]->(authorizedProjectDirectory),(page)-[:USES]->(authorizedProjects),(page)-[:USES]->(authorizedProject),(page)-[:USES]->(authorizedSelectionId),
+       (page)-[:USES]->(authorizedProjectDirectoryApi),(page)-[:USES]->(authorizedDirectoryMatchesApi),(page)-[:CALLS]->(receiveAuthorizedProjectDirectory),
+       (page)-[:USES]->(indexStateApi),(page)-[:USES]->(memberStateApi),
+       (page)-[:CALLS]->(authorizedSelector),
        (directoryEffect)-[:CALLS]->(memberMethod),
        (refresh)-[:CALLS]->(mapper), (details)-[:CALLS]->(plan),
        (details)-[:CALLS]->(confirm), (details)-[:CALLS]->(ownerPlan),
@@ -318,9 +340,25 @@ export default function WorktreePage() {
   const [hasMounted, setHasMounted] = useState(false);
   const requestedProjectId = searchParams.get("project_id");
   const persistedProject = projects.find((project) => project.id === (hasMounted ? selectedProjectId : null)) ?? null;
-  const selectedProject = requestedProjectId
-    ? projects.find((project) => project.id === requestedProjectId) ?? null
-    : persistedProject;
+  const [authorizedProjectDirectory, setAuthorizedProjectDirectory] = useState<AuthorizedProjectDirectoryState>({
+    mode: "loading", projects: [], next_cursor: null, loading_more: false,
+  });
+  const authorizedProjectDirectoryApi = useRef(worktreeGroupApi);
+  const authorizedDirectoryMatchesApi = authorizedProjectDirectoryApi.current === worktreeGroupApi;
+  const receiveAuthorizedProjectDirectory = useCallback((state: AuthorizedProjectDirectoryState) => {
+    authorizedProjectDirectoryApi.current = worktreeGroupApi;
+    setAuthorizedProjectDirectory(state);
+  }, [worktreeGroupApi]);
+  const authorizedProjects = authorizedProjectDirectory.projects;
+  const authorizedSelectionId = requestedProjectId ?? (hasMounted ? selectedProjectId : null);
+  const authorizedProject = worktreeGroupApi && authorizedDirectoryMatchesApi
+    ? authorizedProjects.find((project) => project.project_id === authorizedSelectionId)
+    : undefined;
+  const selectedProject = worktreeGroupApi
+    ? authorizedProject ? { id: authorizedProject.project_id, key: "Project", name: authorizedProject.project_id } : null
+    : requestedProjectId
+      ? projects.find((project) => project.id === requestedProjectId) ?? null
+      : persistedProject;
   const projectWorktrees = worktrees.filter((worktree) => worktree.project_id === selectedProject?.id);
   const [selected, setSelected] = useState<string>("");
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -328,11 +366,14 @@ export default function WorktreePage() {
   const [indexFilters, setIndexFilters] = useState({ owner_user_id: "", human_state: "" });
   const [indexState, setIndexState] = useState<ProjectWorktreeIndexState | null>(null);
   const [memberDirectoryState, setMemberDirectoryState] = useState<ProjectMemberDirectoryState | null>(null);
+  const indexStateApi = useRef(worktreeGroupApi);
+  const memberDirectoryStateApi = useRef(worktreeGroupApi);
   const indexRequestSequence = useRef(0);
   const memberRequestSequence = useRef(0);
 
   const refreshProjectWorktreeIndex = useCallback(async (projectId: string, cursor?: string) => {
     if (!worktreeGroupApi) return;
+    indexStateApi.current = worktreeGroupApi;
     const requestSequence = ++indexRequestSequence.current;
     setIndexState((current) => {
       if (cursor && current?.project_id === projectId) {
@@ -393,6 +434,7 @@ export default function WorktreePage() {
     }
     const requestSequence = ++memberRequestSequence.current;
     const projectId = selectedProject.id;
+    memberDirectoryStateApi.current = worktreeGroupApi;
     setMemberDirectoryState({ project_id: projectId, mode: "loading", members: [] });
     void worktreeGroupApi.listProjectMembers<ProjectMemberDirectoryEnvelope>(projectId)
       .then((response) => {
@@ -431,7 +473,12 @@ export default function WorktreePage() {
     }
   }, [hasMounted, requestedProjectId, router, searchParams, selectedProject, selectedProjectId, setSelectedProjectId]);
 
-  const currentProjectIndex = selectedProject && indexState?.project_id === selectedProject.id ? indexState : null;
+  const currentProjectIndex = selectedProject && indexStateApi.current === worktreeGroupApi && indexState?.project_id === selectedProject.id
+    ? indexState
+    : null;
+  const currentMemberDirectory = worktreeGroupApi && memberDirectoryStateApi.current === worktreeGroupApi
+    ? memberDirectoryState
+    : null;
   const liveIndexRows = currentProjectIndex?.rows ?? [];
   useEffect(() => {
     if (worktreeGroupApi) {
@@ -473,27 +520,42 @@ export default function WorktreePage() {
 
       <section className="card mb-4 flex flex-wrap items-center gap-3" aria-label="项目 Worktree 范围">
         <label htmlFor="worktree-project" className="text-xs font-semibold text-ink-dim">Project</label>
-        <select
-          id="worktree-project"
-          value={selectedProject?.id ?? ""}
-          onChange={(event) => {
-            const projectId = event.target.value;
-            setSelectedProjectId(projectId);
-            setSelected("");
-            const query = new URLSearchParams(searchParams.toString());
-            query.set("project_id", projectId);
-            router.replace(`/worktree?${query.toString()}`, { scroll: false });
-          }}
-          className="rounded-md border border-line bg-bg-soft px-3 py-2 text-sm"
-          data-testid="worktree-project-selector"
-        >
-          {!selectedProject && <option value="" disabled>选择 Project</option>}
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>{project.key} · {project.name}</option>
-          ))}
-        </select>
+        {worktreeGroupApi ? (
+          <AuthorizedProjectSelector
+            api={worktreeGroupApi}
+            selectedProjectId={selectedProject?.id ?? ""}
+            onSelect={(projectId) => {
+              setSelectedProjectId(projectId);
+              setSelected("");
+              const query = new URLSearchParams(searchParams.toString());
+              query.set("project_id", projectId);
+              router.replace(`/worktree?${query.toString()}`, { scroll: false });
+            }}
+            onStateChange={receiveAuthorizedProjectDirectory}
+          />
+        ) : (
+          <select
+            id="worktree-project"
+            value={selectedProject?.id ?? ""}
+            onChange={(event) => {
+              const projectId = event.target.value;
+              setSelectedProjectId(projectId);
+              setSelected("");
+              const query = new URLSearchParams(searchParams.toString());
+              query.set("project_id", projectId);
+              router.replace(`/worktree?${query.toString()}`, { scroll: false });
+            }}
+            className="rounded-md border border-line bg-bg-soft px-3 py-2 text-sm"
+            data-testid="worktree-project-selector"
+          >
+            {!selectedProject && <option value="" disabled>选择 Project</option>}
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>{project.key} · {project.name}</option>
+            ))}
+          </select>
+        )}
         <span className="text-xs text-ink-mute">
-          {worktreeGroupApi ? "数据来自当前用户授权的 Worktree Index API。" : "本地预览数据；宿主登录与授权 provider 尚未装配。"}
+          {worktreeGroupApi ? "Project 与 Worktree 均来自当前用户授权的服务端目录。" : "本地预览数据；宿主登录与授权 provider 尚未装配。"}
         </span>
         {worktreeGroupApi && (
           <label className="flex items-center gap-2 text-xs text-ink-dim">
@@ -503,7 +565,17 @@ export default function WorktreePage() {
         )}
       </section>
 
-      {requestedProjectId && !selectedProject && (
+      {authorizedSelectionId && !selectedProject && worktreeGroupApi && authorizedDirectoryMatchesApi && authorizedProjectDirectory.mode === "ready" && authorizedProjectDirectory.next_cursor && (
+        <div role="status" className="card mb-4 text-sm text-warning" data-testid="worktree-project-pending-page">
+          当前选择的 Project 尚未出现在已加载页面中；请继续加载 Project 目录以验证访问权限。
+        </div>
+      )}
+      {authorizedSelectionId && !selectedProject && worktreeGroupApi && authorizedDirectoryMatchesApi && authorizedProjectDirectory.mode === "ready" && !authorizedProjectDirectory.next_cursor && (
+        <div role="status" className="card mb-4 text-sm text-warning" data-testid="worktree-project-unavailable">
+          当前用户无权访问所选 Project，或该 Project 不存在。
+        </div>
+      )}
+      {requestedProjectId && !selectedProject && !worktreeGroupApi && (
         <div role="status" className="card mb-4 text-sm text-warning" data-testid="worktree-project-unavailable">
           当前链接中的 Project 无法在本地原型数据中解析；请选择一个可用 Project。
         </div>
@@ -511,10 +583,14 @@ export default function WorktreePage() {
 
       {selectedProject ? (
         <>
-          <div className="card mb-4 flex flex-wrap items-center gap-3 text-xs">
-            <span className="font-semibold text-ink-dim">Worktree 创建 / 导入</span>
-            <span className="text-ink-mute">创建 / 导入与 Git checkout 清理仍需 Repository/Runtime 协调器；列表中的归档只管理平台记录，不删除目录。</span>
-          </div>
+          <ProjectWorktreeLifecycleControls
+            api={worktreeGroupApi}
+            projectId={selectedProject.id}
+            role={currentMemberDirectory?.project_id === selectedProject.id && currentMemberDirectory.mode === "ready"
+              ? currentMemberDirectory.role
+              : undefined}
+            onAccepted={() => refreshProjectWorktreeIndex(selectedProject.id)}
+          />
 
           <SectionTitle>{selectedProject.key} · {selectedProject.name} 的 Worktree</SectionTitle>
           <div className="mb-5">
@@ -665,10 +741,10 @@ export default function WorktreePage() {
               key={liveWorktree.id}
               row={liveWorktree}
               api={worktreeGroupApi}
-              members={memberDirectoryState?.project_id === selectedProject.id && memberDirectoryState.mode === "ready" ? memberDirectoryState.members : []}
-              membersLoading={memberDirectoryState?.project_id !== selectedProject.id || memberDirectoryState?.mode === "loading"}
-              membersError={memberDirectoryState?.project_id === selectedProject.id && memberDirectoryState.mode === "error" ? memberDirectoryState.error : undefined}
-              canManageOwners={memberDirectoryState?.project_id === selectedProject.id && memberDirectoryState.mode === "ready" && (memberDirectoryState.role === "tenant_admin" || memberDirectoryState.role === "project_admin")}
+              members={currentMemberDirectory?.project_id === selectedProject.id && currentMemberDirectory.mode === "ready" ? currentMemberDirectory.members : []}
+              membersLoading={currentMemberDirectory?.project_id !== selectedProject.id || currentMemberDirectory?.mode === "loading"}
+              membersError={currentMemberDirectory?.project_id === selectedProject.id && currentMemberDirectory.mode === "error" ? currentMemberDirectory.error : undefined}
+              canManageOwners={currentMemberDirectory?.project_id === selectedProject.id && currentMemberDirectory.mode === "ready" && (currentMemberDirectory.role === "tenant_admin" || currentMemberDirectory.role === "project_admin")}
               onRefresh={() => refreshProjectWorktreeIndex(selectedProject.id)}
             />
           )}

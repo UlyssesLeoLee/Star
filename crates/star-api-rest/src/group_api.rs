@@ -43,7 +43,17 @@
 //! CREATE (gls:Enum {name:"WorktreeGitLockState",type:"enum",language:"rust"}),(glo:Class {name:"WorktreeGitLockObservation",type:"class",language:"rust"}),(glq:Class {name:"WorktreeGitLockQuery",type:"class",language:"rust"}),(gle:Enum {name:"WorktreeGitLockObserverError",type:"enum",language:"rust"}),(gloi:Interface {name:"WorktreeGitLockObserver",type:"interface",language:"rust"}),(glb:Function {name:"GroupApiState::with_worktree_git_lock_observer",type:"function",language:"rust"}),(glunknown:Function {name:"WorktreeGitLockObservation::unknown",type:"function",language:"rust"}),(glnorm:Function {name:"WorktreeGitLockObservation::normalize",type:"function",language:"rust"}),(globserve:Function {name:"WorktreeGitLockObserver::observe",type:"function",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(gls),(m)-[:CONTAINS]->(glo),(m)-[:CONTAINS]->(glq),(m)-[:CONTAINS]->(gle),(m)-[:CONTAINS]->(gloi),(s)-[:HAS_METHOD]->(glb),(glo)-[:HAS_METHOD]->(glunknown),(glo)-[:HAS_METHOD]->(glnorm),(gloi)-[:HAS_METHOD]->(globserve),(glb)-[:USES]->(gloi),(glnorm)-[:USES]->(gls);
 
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(s:Class {name:"GroupApiState",type:"class"}),(b:Function {name:"build_group_router",type:"function"});
+//! CREATE (wl:Module {name:"worktree_lifecycle",type:"module",language:"rust"}),(wp:Interface {name:"ProjectWorktreeLifecycleProvider",type:"interface",language:"rust"}),(install:Function {name:"GroupApiState::with_worktree_lifecycle_provider",type:"function",language:"rust"}),(wlRouter:Function {name:"worktree_lifecycle::router",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(wl),(wl)-[:CONTAINS]->(wp),(s)-[:USES]->(wp),(s)-[:HAS_METHOD]->(install),(install)-[:USES]->(wp),(b)-[:CALLS]->(wlRouter);
 use std::sync::Arc;
+pub use worktree_lifecycle::{
+    ProjectWorktreeCreateCommand, ProjectWorktreeImportCommand, ProjectWorktreeLifecycleProvider,
+    ProjectWorktreeRepository, ProjectWorktreeRepositoryQuery, WorktreeImportCandidate,
+    WorktreeImportCandidatesQuery, WorktreeLifecycleProviderError, WorktreeLifecycleReceipt,
+    WorktreeLifecycleState,
+};
 
 use async_trait::async_trait;
 use axum::{
@@ -67,6 +77,7 @@ mod group_apps;
 mod scoped_chat;
 mod scoped_chat_store;
 mod work_items;
+mod worktree_lifecycle;
 mod worktrees;
 
 pub use cli_sessions::{
@@ -158,6 +169,7 @@ pub struct GroupApiState {
     scoped_chat_workflow: Option<Arc<dyn ScopedChatWorkflow>>,
     group_app_registry: Option<Arc<dyn GroupAppRegistryProvider>>,
     worktree_git_lock_observer: Option<Arc<dyn WorktreeGitLockObserver>>,
+    worktree_lifecycle_provider: Option<Arc<dyn ProjectWorktreeLifecycleProvider>>,
 }
 
 impl GroupApiState {
@@ -169,6 +181,7 @@ impl GroupApiState {
             scoped_chat_workflow: None,
             group_app_registry: None,
             worktree_git_lock_observer: None,
+            worktree_lifecycle_provider: None,
         }
     }
 
@@ -199,6 +212,15 @@ impl GroupApiState {
         observer: Arc<dyn WorktreeGitLockObserver>,
     ) -> Self {
         self.worktree_git_lock_observer = Some(observer);
+        self
+    }
+
+    /// Install a trusted Project-scoped Git Worktree lifecycle adapter.
+    pub fn with_worktree_lifecycle_provider(
+        mut self,
+        provider: Arc<dyn ProjectWorktreeLifecycleProvider>,
+    ) -> Self {
+        self.worktree_lifecycle_provider = Some(provider);
         self
     }
 }
@@ -509,6 +531,7 @@ pub fn build_group_router(state: GroupApiState) -> Router {
             get(resolve_worktree_context),
         )
         .merge(worktrees::router())
+        .merge(worktree_lifecycle::router())
         .merge(work_items::router())
         .merge(cli_sessions::router())
         .merge(scoped_chat::router())

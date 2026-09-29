@@ -8,15 +8,26 @@
 //! MATCH (lm:Function {name:"list_project_members"})
 //! CREATE (va:Function {name:"validate_actor",type:"function"}),(rs:Function {name:"require_scope",type:"function"}),(st:Function {name:"set_tenant",type:"function"}),(ab:Function {name:"active_binding",type:"function"}),
 //!        (lm)-[:CALLS]->(va),(lm)-[:CALLS]->(rs),(lm)-[:CALLS]->(st),(lm)-[:CALLS]->(ab);
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"worktrees",type:"module"}),(rt:Function {name:"router",type:"function"});
+//! CREATE (projects:Function {name:"list_authorized_projects",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(projectsQuery:Class {name:"AuthorizedProjectsQuery",type:"class",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(projects),(m)-[:CONTAINS]->(projectsQuery),(rt)-[:CALLS]->(projects),(projects)-[:CALLS]->(validate_actor),(projects)-[:CALLS]->(require_scope),(projects)-[:CALLS]->(set_tenant);
 //! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! MATCH (m:Module {name:"worktrees",type:"module"}),(li:Function {name:"list_project_worktrees",type:"function"}),(wp:Function {name:"worktree_projection",type:"function"}),(observerTrait:Interface {name:"WorktreeGitLockObserver",type:"interface"});
 //! CREATE (observations:Function {name:"observe_git_locks",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(observe:Function {name:"observe_git_lock",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(bounded:Function {name:"observe_git_lock_with_timeout",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(testModule:Module {name:"git_lock_observation_tests",type:"module",language:"rust"}),(test:Class {name:"TestGitLockObserver",type:"class",language:"rust"}),(testObserve:Function {name:"TestGitLockObserver::observe",type:"function",language:"rust"}),(query:Function {name:"query",type:"function",language:"rust",visibility:"private"}),(missing:Function {name:"missing_provider_or_runtime_returns_unknown",type:"function",language:"rust",visibility:"private"}),(unavailable:Function {name:"unavailable_provider_returns_unknown",type:"function",language:"rust",visibility:"private"}),(stale:Function {name:"stale_or_unstamped_provider_result_is_unknown",type:"function",language:"rust",visibility:"private"}),(fresh:Function {name:"fresh_provider_result_preserves_git_lock_state",type:"function",language:"rust",visibility:"private"}),(timeoutTest:Function {name:"slow_provider_times_out_to_unknown",type:"function",language:"rust",visibility:"private"}),(batchTest:Function {name:"batch_observations_preserve_order_and_unknown_missing_runtime",type:"function",language:"rust",visibility:"private"});
 //! CREATE (m)-[:CONTAINS]->(observations),(m)-[:CONTAINS]->(observe),(m)-[:CONTAINS]->(bounded),(m)-[:CONTAINS]->(testModule),(testModule)-[:CONTAINS]->(test),(testModule)-[:CONTAINS]->(query),(testModule)-[:CONTAINS]->(missing),(testModule)-[:CONTAINS]->(unavailable),(testModule)-[:CONTAINS]->(stale),(testModule)-[:CONTAINS]->(fresh),(testModule)-[:CONTAINS]->(timeoutTest),(testModule)-[:CONTAINS]->(batchTest),(test)-[:HAS_METHOD]->(testObserve),(test)-[:IMPLEMENTS]->(observerTrait),(li)-[:CALLS]->(observations),(observations)-[:CALLS]->(observe),(observe)-[:CALLS]->(bounded),(bounded)-[:CALLS]->(observerTrait),(observations)-[:CALLS]->(wp),(missing)-[:CALLS]->(observe),(missing)-[:CALLS]->(observations),(unavailable)-[:CALLS]->(observe),(stale)-[:CALLS]->(observe),(fresh)-[:CALLS]->(observe),(timeoutTest)-[:CALLS]->(bounded),(batchTest)-[:CALLS]->(observations);
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"worktrees",type:"module"});
+//! CREATE (projectQueryTests:Module {name:"authorized_projects_query_tests",type:"module",language:"rust"}),(rejectsUnknown:Function {name:"rejects_unknown_project_query_fields",type:"function",language:"rust",visibility:"private",complexity:"simple"});
+//! CREATE (m)-[:CONTAINS]->(projectQueryTests),(projectQueryTests)-[:CONTAINS]->(rejectsUnknown);
 
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
-    http::HeaderMap,
+    http::{
+        HeaderMap,
+        header::{CACHE_CONTROL, VARY},
+    },
     routing::{get, post},
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -30,9 +41,8 @@ use uuid::Uuid;
 
 use super::{
     AuthenticatedUser, GroupApiError, GroupApiState, WorktreeGitLockObservation,
-    WorktreeGitLockObserver, WorktreeGitLockObserverError, WorktreeGitLockQuery,
-    WorktreeGitLockState, WorktreeIndexRow, active_binding, require_scope, set_tenant,
-    validate_actor, worktree_projection,
+    WorktreeGitLockObserver, WorktreeGitLockObserverError, WorktreeGitLockQuery, WorktreeIndexRow,
+    active_binding, require_scope, set_tenant, validate_actor, worktree_projection,
 };
 
 #[derive(Debug, Deserialize)]
@@ -42,6 +52,13 @@ struct IndexQuery {
     owner_user_id: Option<String>,
     human_state: Option<String>,
     include_archived: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AuthorizedProjectsQuery {
+    limit: Option<i64>,
+    cursor: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,6 +98,7 @@ struct PlanIdempotency {
 
 pub(super) fn router() -> Router<GroupApiState> {
     Router::new()
+        .route("/api/v1/projects", get(list_authorized_projects))
         .route(
             "/api/v1/projects/{project_id}/worktrees",
             get(list_project_worktrees),
@@ -97,6 +115,69 @@ pub(super) fn router() -> Router<GroupApiState> {
             "/api/v1/worktrees/{worktree_id}/management-plans/{plan_id}/confirm",
             post(confirm_management_plan),
         )
+}
+
+async fn list_authorized_projects(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Query(query): Query<AuthorizedProjectsQuery>,
+) -> Result<impl axum::response::IntoResponse, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "project:read")?;
+    let limit = query.limit.unwrap_or(100).clamp(1, 200);
+    let cursor = query
+        .cursor
+        .as_deref()
+        .map(Uuid::parse_str)
+        .transpose()
+        .map_err(|_| GroupApiError::invalid_request("invalid_project_cursor"))?;
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    set_tenant(&mut tx, actor.tenant_id).await?;
+    let mut projects = sqlx::query_as::<_, (Uuid, String)>(
+        r#"
+        SELECT project_id, role
+        FROM permission.project_role_binding
+        WHERE tenant_id = $1 AND user_id = $2 AND valid_from <= now() AND valid_to IS NULL
+          AND ($3::UUID IS NULL OR project_id > $3)
+        ORDER BY project_id
+        LIMIT $4
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(actor.user_id)
+    .bind(cursor)
+    .bind(limit + 1)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    let has_more = projects.len() > limit as usize;
+    if has_more {
+        projects.pop();
+    }
+    let next_cursor = if has_more {
+        projects
+            .last()
+            .map(|(project_id, _)| project_id.to_string())
+    } else {
+        None
+    };
+    Ok((
+        [(CACHE_CONTROL, "no-store"), (VARY, "Authorization")],
+        Json(json!({
+            "projects": projects.into_iter().map(|(project_id, role)| json!({
+                "project_id": project_id,
+                "role": role,
+            })).collect::<Vec<_>>(),
+            "limit": limit,
+            "next_cursor": next_cursor,
+        })),
+    ))
 }
 
 async fn list_project_worktrees(
@@ -767,6 +848,7 @@ async fn observe_git_locks(
 
 #[cfg(test)]
 mod git_lock_observation_tests {
+    use super::super::WorktreeGitLockState;
     use super::*;
 
     struct TestGitLockObserver {
@@ -891,5 +973,24 @@ mod git_lock_observation_tests {
         assert_eq!(results[0].state, WorktreeGitLockState::Unlocked);
         assert_eq!(results[1].state, WorktreeGitLockState::Unknown);
         assert_eq!(results[2].state, WorktreeGitLockState::Unlocked);
+    }
+}
+
+#[cfg(test)]
+mod authorized_projects_query_tests {
+    use super::*;
+
+    #[test]
+    fn rejects_unknown_project_query_fields() {
+        let valid: AuthorizedProjectsQuery =
+            serde_json::from_value(json!({ "limit": 50, "cursor": Uuid::new_v4() })).unwrap();
+        assert_eq!(valid.limit, Some(50));
+        assert!(valid.cursor.is_some());
+
+        let invalid = serde_json::from_value::<AuthorizedProjectsQuery>(json!({
+            "limit": 50,
+            "local_seed": true
+        }));
+        assert!(invalid.is_err());
     }
 }

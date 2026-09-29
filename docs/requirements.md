@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.14）
+# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.17）
 
 ## 0. 文档说明与前提
 
@@ -1482,6 +1482,7 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | WTG-002 | Worktree Group 下的 Task Management、Task Card 及其 Agent/CLI 会话、Infinite Canvas 与已启用插件必须共享不可伪造的 Tenant、Project、Repository、Worktree 上下文 | 第 50.2-50.3 章 | ARCH-OBL-GRP-001/ARCH-OBL-DEV-001 |
 | WTG-006 | Project Worktree Index 与 Worktree Group 必须可分别访问；Index 深链以 `project_id` 保留所选 Project，Group 深链以 `worktree_id` 保留所选 Worktree；Project Worktrees 视图须能进入 Index，Index 路由不得被通用任务列表路由替代 | 第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
 | WTG-010 | Worktree Index 分开呈现当前 Git lock observation 与持久化 lock 标记；unknown 不得通过 cleanup guard | 第 50.1、50.3、50.8 章 | ARCH-OBL-GRP-001 |
+| WTG-011 | Project Worktree Index 必须以 `project:read` + 当前 membership 查询脱敏的已绑定 Repository 清单（仅 ID/name/default branch，不含 URL/路径），并提供授权候选发现、创建与导入；仅接受 Project 已绑定 repository_id、经过 Git ref 校验的 branch/base_ref 或可信 Host Runtime opaque candidate_id；拒绝客户端路径、仓库 URL 和 Git 命令；副作用前重验 membership 与 Project-Repository binding，以 Idempotency-Key/correlation_id 幂等持久化 operation、Worktree projection、Audit/Outbox 后返回 202；缺少 provider 返回 503；Index UI 不得回退本地 seed，须验证 Project/Repository/candidate/receipt 关联并在受理后刷新 Index | 第 50.3.1 章 | ARCH-OBL-GRP-001 |
 | TCI-001 | Multica 生命周期、Jira 类 Board/Backlog/Sprint 与 Worktree 下直接访问的 Task Card 索引必须共用同一 WorkItem 事实源 | 第 50.3 章 | ARCH-OBL-GRP-001 |
 | TCI-002 | 任务卡必须能够在已授权的关联 Worktree 中打开受控交互式 PTY CLI 会话，并将会话、命令结果与审计关联回任务卡 | 第 50.4 章 | ARCH-OBL-DEV-004/ARCH-OBL-GRP-001 |
 | TCI-006 | Task Card review gate 必须使用版本化、幂等且可审计的请求/通过/驳回命令，只有非提交者评审通过后才可完成 | 第 50.3 章 | ARCH-OBL-GRP-001 |
@@ -2277,11 +2278,17 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 | WTG-008 | Index 的归档/恢复操作必须使用当前 Worktree version 创建短时 plan 并二次确认；执行绑定未解除时归档必须失败；归档只改变平台可见状态，不删除 Git checkout | P0 |
 | WTG-009 | Worktree owner 必须可由有权管理员转派给当前 Project 的有效成员；候选人只能来自当前认证成员目录，转派使用 Worktree version、短时 plan、二次确认、幂等与审计；成员目录不可用时不得开放自由文本或 seed 转派 | P0 |
 | WTG-010 | Project Worktree Index 必须分开呈现持久化 `locked` 标记与 Host Runtime 实时 Git Worktree retention lock observation；该 Git 锁只保护 Git 管理记录，不能表示 Agent 活跃或文件编辑互斥；缺少 provider/runtime、失败、超时、无效或超过 30 秒的观测为 `unknown`；unknown/unlocked 均不能证明 Agent 已停止，物理清理须检查独立活跃状态并在 drain 后重新观测 | P0 |
+| WTG-011 | Project Worktree Index 必须以 `project:read` + 当前 membership 查询脱敏的已绑定 Repository 清单（仅 ID/name/default branch，不含 URL/路径），并提供授权候选发现、创建与导入；仅接受 Project 已绑定 repository_id、经过 Git ref 校验的 branch/base_ref 或可信 Host Runtime opaque candidate_id；拒绝客户端路径、仓库 URL 和 Git 命令；副作用前重验 membership 与 Project-Repository binding，以 Idempotency-Key/correlation_id 幂等持久化 operation、Worktree projection、Audit/Outbox 后返回 202；缺少 provider 返回 503；Index UI 不得回退本地 seed，须验证 Project/Repository/candidate/receipt 关联并在受理后刷新 Index | P0 |
+| WTG-012 | 生产 Project Selector 必须从当前 Bearer actor 在当前 tenant 下的有效 Project membership 目录加载 Project；返回最小 `project_id`/role 投影并稳定分页，禁止用本地 seed 冒充授权范围；当 Project 主数据源未接入时，标签仅能显示 ID，不得从非权威本地数据补名 | P0 |
 | TCI-001 | Multica 生命周期和 Jira 类计划视图必须投影同一 WorkItem；Task Card 索引作为 Worktree 下的平级入口访问该任务；不得产生并行任务状态机或第二个任务事实源 | P0 |
 | TCI-005 | Multica、Jira 与 Task Card 的生命周期动作必须调用同一个 WorkItem lifecycle command，并遵循合法状态迁移、review gate、writer ACL、版本冲突、幂等、correlation 与审计规则 | P0 |
 | TCI-006 | `in_progress` claimant 可提交当前 WorkItem 进入 `pending_review`；仅当前 Worktree 的非 claimant `tenant_admin` / `project_admin` / `developer` 可通过或驳回；驳回必须有理由；三类命令均校验 `expected_version`、幂等键、scope 与审计；通过转为 `completed`，驳回转为 `failed` | P0 |
 | CAN-001 | Canvas 必须作为群组内同级 App，并能绑定、创建、定位和查看 WorkItem、Task Card、AgentSession、Relation 与自动化流程 | P0 |
 | CAN-002 | Canvas 发起的任务写操作必须经过 Task Domain Command 与 Guard；结果由事件回写所有订阅 App | P0 |
+
+### 50.3.1 Project scoped Worktree 创建与导入
+
+创建/导入是 Worktree Index 的受授权生命周期命令。浏览器仅选择当前 Project 已绑定的 repository，并在导入时引用 Host Runtime 返回的不透明候选 ID；路径和远端 URL 由服务端配置解析，不能由客户端指定。Host Runtime provider 必须在 Git 副作用前重新验证当前 actor membership、Project-Repository binding 与 Worktree 冲突，并幂等持久化 operation、归属投影、Audit 和 Outbox。provider 或受信任 repository binding 未配置时，请求失败关闭且不得生成“成功”Worktree。
 
 ### 50.4 任务卡内 CLI
 
@@ -2389,6 +2396,8 @@ Group UI 的 API 认证必须由宿主登录会话注入异步 access-token prov
 | AC-WTG-005 | live Index 从授权 Project Worktree API 投影读取 owner/执行绑定/健康信号，按 owner/state/archive 筛选并按 cursor 续页；API 失败时显示错误且不显示本地 seed 结果；没有宿主 provider 时界面必须明确标为本地预览 |
 | AC-WTG-006 | 归档/恢复必须先以当前 version 生成有期限 plan，再经用户二次确认；活动 Agent/Runtime 绑定阻止归档；确认后刷新授权 Index；此动作不得运行 `git worktree remove` 或删除 checkout |
 | AC-WTG-007 | owner 候选只来自当前 Project 的认证成员目录；仅 `tenant_admin` / `project_admin` 可发起转派；用户选择候选后，系统以当前 Worktree version 创建 `assign_owner` plan，校验返回 Worktree / 操作 / 到期时间，并经二次确认；服务端在 plan / confirm 重验角色与候选成员状态；确认成功后重载授权 Index，失败、过期或成员目录读取异常时不乐观更新 owner |
+| AC-WTG-008 | `GET /api/v1/projects/{project_id}/worktree-repositories` 必须使用当前 Bearer actor、`project:read` 与有效 Project membership，且只返回已绑定 Repository 的 ID/name/default branch；name 不得是 URL、主机路径或含控制字符。候选发现与 create/import 使用 `worktree:create`，仅 tenant_admin/project_admin/developer 可写。Index UI 只消费当前 Project 的服务端 Repository/候选投影，严格校验字段 allowlist、ID、分支、候选唯一性与回执的 Project/Repository/correlation 关联，不回退 seed；候选 ID 必须来自 Host Runtime。请求拒绝 path、repo_url 和命令；provider 在 Git 副作用前重验 membership/binding，并在返回 202 前幂等写入 operation、Worktree 归属、Audit/Outbox；缺少 provider 或 durable writer 时必须返回非成功响应且不产生成功投影；成功受理后刷新 Index。 |
+| AC-WTG-009 | 生产 Project Selector 必须通过 `GET /api/v1/projects` 读取当前 Bearer actor 在当前 tenant 下的有效 Project membership；接口只返回 `project_id` 与允许的 role，使用稳定 UUID keyset cursor，单页不超过 200，并设置 `no-store`。客户端拒绝额外字段、无效/重复 ID、未知角色和不匹配游标；分页未完成时不得把未加载的深链判作无权，完整加载后未命中才显示不可访问；provider/请求失败时不得回退到本地 Project seed。API session/actor 切换时，Project directory、Worktree Index 与成员角色投影必须立即清除旧 session 数据，在当前 session 的授权数据重新返回前隐藏旧 Project 和管理入口。当前仓库没有持久 Project 名称 SoR，生产 selector 用明确的 `Project {UUID}` 标签，不借本地名称补齐。 |
 | AC-TCI-001 | 从任务卡打开 CLI 后，工作目录、Runtime、允许路径和命令策略都与所选 Worktree 一致；越界请求被拒绝并审计 |
 | AC-WTI-001 | Project Worktree Index 将 Git Worktree retention lock observation 与持久化 `locked` 字段分开；该 Git 锁只说明 Git 是否保护管理记录免遭 prune/移动/删除，不表示 Agent 活跃、编辑互斥或任务空闲；仅带可信来源且年龄不超过 30 秒的 `locked` / `unlocked` observation 可显示为确定状态；缺少 Runtime/provider、读取失败、缺少或过期时间戳、未来时间戳一律显示 `unknown`；unknown/unlocked 都不得视为 Agent 已停止，物理清理须检查独立活跃状态、完成 session/agent drain、重新观测并经受权 Repository/Runtime 执行 |
 | AC-TCI-002 | 在线 Multica、Jira 与 Task Card 对同一任务显示相同 lifecycle version；只显示服务端允许的状态操作；领取/开始/完成/失败/取消/重试使用当前版本和幂等键；pending review 阻止完成；成功与冲突后刷新同一授权投影 |
@@ -2472,3 +2481,6 @@ Group UI 的 API 认证必须由宿主登录会话注入异步 access-token prov
 | v5.12 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Group App 授权导航响应校验细化为 UUID correlation、非负安全整数 Registry version、最多 100 条、唯一 plugin ID、受限字段长度/控制字符与 int32 sort order；要求按 sort order 与 plugin ID 稳定排序；补充实现与聚焦测试证据 | 继续 Phase 6，验证服务端投影的客户端消费边界并扩充 WG-ACC-19 |
 | v5.13 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 Group PostgreSQL runtime SQL grants 与 RLS 分离验收；记录 Phase 5/6 迁移在隔离库幂等重放、12 表 FORCE RLS、租户/actor 策略和 append-only trigger 实测；目标 DB、实际应用角色与正式 grants 尚未确定 | Phase 5/6 隔离数据库验证发现 SQL role privilege 未由 RLS policy 或迁移自动提供 |
 | v5.14 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 Project Worktree Index 的实时 Git Worktree retention lock observation 契约；明确该信号不是 Agent 活跃或编辑互斥状态，与持久化 `locked` 字段分离；缺少/失败/过期显示 unknown，unknown/unlocked 均不能通过清理前置检查，且清理前须检查独立活跃状态并在 drain 后复验；仅记录当前 observer 接口/UI 切片，宿主 Runtime observer 未装配 | 继续推进 Phase 2D，补齐 Worktree 管理面的锁可见性并明确安全清理前置条件 |
+| v5.15 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 Worktree create/import 生命周期 API 要件：Project Repository binding、服务端路径解析、不透明候选 ID、严格拒绝客户端路径/URL、授权复核、幂等 operation 与 Audit/Outbox；缺少 Host Runtime provider 时 fail closed；明确本轮只增加条件式 API contract，不代表 production provider 或 UI 已接通 | 继续 Phase 2D，推进 Worktree Index 的安全创建与导入闭环 |
+| v5.16 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Project Repository 脱敏发现 API 与 Index create/import UI 契约；要求服务端当前 Project projection、路径/URL 安全名称、客户端严格字段 allowlist/关联/回执复核、写后刷新和 provider 缺失 fail closed；实现仅为条件式 UI/API seam，生产 provider、binding 数据源和宿主认证仍未接通 | Phase 2D 将 Worktree 生命周期接口推进到 Project Index 可交互入口 |
+| v5.17 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增基于当前租户有效 membership 的 `GET /api/v1/projects` 与生产 Project Selector；限定 ID/role 投影、稳定 UUID cursor/200 条上限/no-store，前端拒绝未识别字段并支持分页/重试；API session 更换时清除旧 Project/Index/member-role projection；生产 Project 名称 SoR、宿主 provider、目标 DB/ACL/RLS 部署仍未接通，selector 不使用本地 seed 冒充 | 继续 Phase 2D，将 Project 选择源接到当前用户授权目录并关闭跨 session 旧投影窗口 |

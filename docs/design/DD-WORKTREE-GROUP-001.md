@@ -1,13 +1,13 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project Worktree 管理与 Group Apps 详细设计 v4.13**
+> **渡口 Project Worktree 管理与 Group Apps 详细设计 v4.16**
 >
 > - 状态：🟡 Draft（Phase 2B/2C/2D 与 Phase 3B-3F 已有多项条件式 API/UI 切片；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 卡内 xterm ticket-first UI、status/cancel/reattach、bounded Session listing/recovery API seam 与手动 UI 已实现；Phase 5 有 scope-aware Chat 授权提交、GLOBAL 目标目录、多选 UI、加密 Transcript/Run/outbox persistence adapter，但 production main 未装 protector/L0；Phase 6 有五表 Registry migration、生产 main 装配的 PostgreSQL 只读 projection provider/API 与 Group UI live consumer；Phase 5/6 migrations 已在隔离库重复执行并验证 12 张 FORCE RLS、策略及 trigger（事务内临时授权已回滚），目标 DB/runtime role grants 未配置；manifest trust root/ingest、lifecycle writer、capability runtime/revocation、真实 PostgreSQL RLS 验收未完成。仍缺宿主认证 provider、目标 DB migration 部署与 ACL/RLS 运行验收、真实 CLI provisioner/OS sandbox/terminal sink/audit、LangGraph 部署版本/服务身份/权限 broker；Canvas 仍缺服务端 durable event offset/realtime；历史归属 reconciliation 与跨 App 生产验收未完成）
 > - 日期：2026-09-30
 > - Phase 2D 状态：Git Worktree retention-lock observer contract 与 Index UI 已有条件式切片；生产 main 未配置 Host Runtime observer，因此运行态仍显示 unknown。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.14 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v4.7 §16
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.17 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v5.0 §16
 > - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v0.3、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.3、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
 > - 文档边界：本 DD 定义 Project → Worktree → Group Apps 的应用契约，不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
@@ -57,7 +57,7 @@ Task Card 与 Canvas 是 Group Apps 的直接同级入口。CLI 是 Task Card �
 | `/worktree/{worktree_id}/group?app={app_id}` | 指定 Worktree 的 Group Shell 与某一同级 App | Project、Repository、Workspace、Tenant 均从已登记 Worktree 服务端解析；URL 中的 `app_id` 不授予能力 |
 | `/worktree/{worktree_id}/group?app=task-card&work_item_id={id}&cli=1` | 打开 Task Card，可选打开 CLI 面板 | 任务与 Worktree 关联、权限和 CLI policy 必须由服务端检查；没有关联时只允许查看或发起受权关联流程，不启动 CLI |
 
-Project 页的 Worktrees 入口必须带上 `project_id`。Index 和 Group 的深链刷新后仍须恢复同一范围；`/worktree` 不得重定向至 Sprint 或通用任务树。前端导航状态可缓存，但不作为授权依据。
+生产 `ProjectSelector` 通过 `GET /api/v1/projects` 读取当前 actor 的有效 Project membership；目录只返回 Project UUID/role，以 UUID keyset cursor 分页并设 no-store。当前仓库未找到持久 Project 名称 SoR，因此生产标签用 `Project {UUID}`。宿主 API 错误时不得回退到本地 seed；仅在没有 provider 且显式标记为本地原型时可以展示 seed。Project 页的 Worktrees 入口必须带上 `project_id`。Index 和 Group 的深链刷新后仍须恢复同一范围；`/worktree` 不得重定向至 Sprint 或通用任务树。前端导航状态可缓存，但不作为授权依据。
 
 ### 1.4 Group UI JWT Provider 与 API Adapter
 
@@ -71,7 +71,7 @@ Group route 已提供 `WorktreeGroupApiProvider` 注入点和条件式 projectio
 
 | 区域 | 预览实现 | 生产目标 |
 |---|---|---|
-| Project Index | Zustand seed 过滤 | 授权 Project 的分页 API + Worktree 投影 |
+| Project Index | 显式标记的本地原型预览 | `GET /api/v1/projects` membership 目录 + 授权 Worktree 投影；API session generation 更换时清除旧目录、Index 与成员角色 |
 | Worktree 归属 | 当前 AgentSession / Runtime 引用 | 独立 `owner_user_id`、AgentSession 当前绑定及历史会话 |
 | Worktree 操作 | 不提供创建或清理按钮 | 按 §6 的授权动作、状态守卫和 Audit |
 | Group Apps | 原生 App 本地路由；有 API provider 时读取服务端授权 projection 并清空 stale/error 导航；无 provider 时仅显示标记的本地预览 | 服务端 App Registry + 当前 GroupContext + 共享实体引用；Plugin Gateway/runtime 与热撤权仍需部署 |
@@ -81,7 +81,7 @@ Group route 已提供 `WorktreeGroupApiProvider` 注入点和条件式 projectio
 
 | 模块 | 输入 | 责任 | 不负责 |
 |---|---|---|---|
-| `ProjectSelector` | 已认证 actor 的 Project 列表 | 选择 Project、清除旧 Worktree selection、写入可分享路由 | 自行判断 membership |
+| `ProjectSelector` | `GET /api/v1/projects` 返回的 actor membership directory | 仅呈现服务端当前 tenant/user 授权的 Project ID/role；选择、清除旧 Worktree selection、写入可分享路由 | 自行判断 membership；用本地 seed 补生产名称 |
 | `ProjectWorktreeIndex` | `project_id` + 服务端投影 | 比较 Worktree 运行信号、显示风险并提供允许的管理动作 | 创建第二份 Worktree 状态事实 |
 | `WorktreeGroupShell` | `worktree_id` + `GroupContext` | 解析同级 App、当前 Worktree Header、唯一 Chat 底栏与路由状态 | 充当新的领域聚合根 |
 | `GroupAppRegistry` | 原生 App registry、Plugin manifest、actor grants | 生成同级 App 节点及 capability 集合 | 以 UI 隐藏代替服务端授权 |
@@ -139,6 +139,9 @@ GroupContext 是服务端解析结果，只能在一次已授权请求中使用�
 |---|---|---|---|
 | `GET /api/v1/projects/{project_id}/worktrees` | Index 游标分页与 owner/state/archive 筛选 | `project:read` + Project membership | Worktree 投影、`next_cursor` |
 | `GET /api/v1/projects/{project_id}/members` | 读取负责人可选成员 | `project:read` + 当前 Project membership | 仅当前有效成员的 `user_id` / role；不用于跨 Project 搜索，写入时再次校验 membership |
+| GET /api/v1/projects/{project_id}/worktree-import-candidates | 发现可导入 checkout；limit 默认 25、范围 1–50 | worktree:create + 当前 Project membership 与 writer role | 仅读可信 provider 的不透明 candidate_id、repository_id、branch、commit 与 dirty 状态；no-store，不返回路径/URL；provider 缺失返回 503 |
+| POST /api/v1/projects/{project_id}/worktrees | 在 Project 已绑定 Repository 中创建 Worktree | worktree:create + tenant_admin / project_admin / developer | body 仅含 repository_id、branch、base_ref、可选 correlation_id；Idempotency-Key；provider 复核 membership/binding 并幂等持久化 operation、Worktree projection、Audit/Outbox 后返回 202 receipt |
+| POST /api/v1/projects/{project_id}/worktrees/import | 导入已发现的 Host Runtime checkout | worktree:create + tenant_admin / project_admin / developer | body 仅含 repository_id、不透明 candidate_id、可选 correlation_id；Idempotency-Key；不接受路径、URL 或命令；返回 202 receipt |
 | `GET /api/v1/worktrees/{worktree_id}/group-context` | 打开 Worktree Group 前解析当前上下文 | `worktree:read` + Project membership | `group_context` 与 Worktree 投影；尚无 `apps[]` / `allowed_actions[]` |
 | `POST /api/v1/worktrees/{worktree_id}/work-items` | 创建 Task Card / canonical WorkItem | `work-item:write` + Project writer role | 任务、Task Card 同 ID，初始 `pending`, version 1 |
 | `GET /api/v1/worktrees/{worktree_id}/work-items` | Task Card / Multica 当前 Worktree 任务列表 | `work-item:read` + Project membership | 有界列表、canonical `work_item_id` 与 lifecycle version |
@@ -183,8 +186,13 @@ GroupContext 是服务端解析结果，只能在一次已授权请求中使用�
 
 | Method / path | 验证 | 实际行为与边界 |
 |---|---|---|
+| GET /api/v1/projects?limit=&cursor= | RS256 Bearer；project:read | 按当前 actor tenant/user 查询有效 Project Role Binding；仅返回 `project_id` 与 role，UUID keyset cursor，limit 默认 100、范围 1–200，no-store；不返回 Project 名称/仓库 URL，生产名称等待 Project SoR |
 | GET /api/v1/projects/{project_id}/worktrees | RS256 Bearer；project:read；active Project Role Binding | 服务端 tenant + project 过滤；owner/state/archive 筛选；按 `(updated_at,id)` 倒序 cursor 分页，cursor 绑定当前查询参数 |
 | GET /api/v1/projects/{project_id}/members | RS256 Bearer；project:read；active Project Role Binding | 仅投影该 Project 当前有效成员 ID 与 role；`assign_owner` plan / confirm 再次验证目标 membership |
+| GET /api/v1/projects/{project_id}/worktree-repositories | RS256 Bearer；project:read；active Project Role Binding | 调用受信任 lifecycle provider 查询当前 Project 已绑定仓库；仅返回 repository_id/name/default_branch，不返回 URL 或 checkout path；最多 100 项并校验重复 ID、路径/URL 型名称和 ref；provider 未安装返回 503 |
+| GET /api/v1/projects/{project_id}/worktree-import-candidates?repository_id=&limit= | RS256 Bearer；worktree:create；active Project Role Binding + writer role | provider 返回当前 Project/Repository 的 opaque candidate_id、branch、commit、dirty 和 observed_at；limit 默认 25、范围 1–50；不返回 path/URL，provider 未安装返回 503 |
+| POST /api/v1/projects/{project_id}/worktrees | RS256 Bearer；worktree:create；tenant_admin / project_admin / developer | 严格请求 DTO；仅接受已绑定 repository_id、合法 branch/base_ref 与可选 correlation_id；Idempotency-Key；provider 在 side effect 前重验 membership/binding，并在返回 202 前持久化 operation、Worktree projection、Audit/Outbox |
+| POST /api/v1/projects/{project_id}/worktrees/import | RS256 Bearer；worktree:create；tenant_admin / project_admin / developer | 严格请求 DTO；仅接受 repository_id、可信 opaque candidate_id 与可选 correlation_id；Idempotency-Key；不接受路径、URL、命令；返回关联 Project/Repository/correlation 的 202 receipt |
 | GET /api/v1/worktrees/{worktree_id}/group-context | RS256 Bearer；worktree:read；当前 Project membership | tenant-scoped Worktree 投影、Actor、成员角色、granted scopes、membership version 和 permission snapshot ref；当前不返回 App Registry / allowed actions |
 | POST /api/v1/worktrees/{worktree_id}/work-items | RS256 Bearer；work-item:write；developer / project_admin / tenant_admin / agent membership role | 同一事务创建 canonical WorkItem metadata、pending lifecycle、Worktree association、created audit 和幂等结果；`task_card_id = work_item_id` |
 | GET /api/v1/worktrees/{worktree_id}/work-items[/{work_item_id}] | RS256 Bearer；work-item:read；当前 Project membership | 当前 Worktree association 限定 Task Card 读列表或详情；列表最多 100 条 |
@@ -231,11 +239,13 @@ GroupContext 当前尚未返回 `allowed_actions[]`。Phase 2D 已实现的 plan
 
 | 动作 | 预检 | 写入规则 |
 |---|---|---|
-| 创建 / 导入 | Project 与 Repository 可访问；路径 / 分支不冲突；Runtime 可达 | 当前未实现；待 Worktree lifecycle / Runtime provisioning API |
+| 创建 / 导入 | Project Repository binding 可见；branch/base_ref 符合 Git ref 约束；导入使用可信候选 ID | 三条 fail-closed API contract 已实现；Host Runtime provider、可信 binding/路径解析、operation + Worktree + Audit/Outbox writer 与 Index UI 未接通，故生产 create/import 仍不可用 |
 | 转派 owner | `tenant_admin` / `project_admin`；目标用户仍是该 Project member | 已实现 5 分钟 plan/confirm、expected version、SCD2 owner assignment 与 before/after Audit |
 | 归档 / 恢复 | `tenant_admin` / `project_admin`；已有 AgentSession / Runtime 关联时拒绝归档 | 已实现 plan/confirm、expected version、保留截止时间与 Audit；检查当前只按关联 ID 非空保守拒绝，未接 Runtime 活跃状态查询 |
 | 清理 | 先跑 plan：Agent / CLI inactive、Runtime detached、Git lock absent、保留策略满足 | 仅使用未过期 plan；二次确认、幂等执行、审计实际 Git 操作 |
 | 取消 / 恢复 | operation 与当前 lifecycle 匹配 | 版本条件更新，记录恢复来源和失败原因 |
+
+Project lifecycle provider contract 要求：请求只携带 Project 内 repository_id 与 branch/base_ref，导入只携带 Host Runtime candidate_id；所有 checkout 路径和远端 URL 从服务端受信任 Repository registry/config 解析。API 在数据库事务中校验当前 Project membership 与 worktree:create scope，provider 在任何 Git 副作用前再次检查 membership、Project-Repository binding 和当前 Worktree 冲突。provider 必须以稳定 Idempotency-Key/fingerprint 去重，并在返回 202 前持久化 operation、Worktree/Project 归属、Audit 与 Outbox；receipt 只包含 operation/worktree/project/repository/branch/state/correlation，不暴露主机路径。未装配 provider 时一律返回 503。当前 API DTO 对未知字段拒绝，阻止 path/repo_url 注入；该接口尚无 Host Runtime 实现或 Index 控件。
 
 归档与 Git Worktree 物理清理是不同操作。Phase 2D 只做数据库归档标志，不运行 `git worktree remove`，也不探测 Git lock；在 Agent / CLI / Runtime 状态数据源和 cleanup plan 接通前，清理动作不可用。已绑定 Session / Runtime 的 Worktree 目前一律不允许归档，避免把未知状态误认为空闲。
 
@@ -416,6 +426,8 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | WTG-001 / AC-WTG-001 | §1-§5 | Project membership 限定 Index；同级 App 树与唯一 GroupContext |
 | WTG-004 / AC-WTG-003 | §3、§6 | owner、Agent、Runtime、PR、冲突/锁和最近活动来自有版本的服务端投影；操作有授权与 Audit |
 | WTG-010 / AC-WTI-001 | §3.1、§4、§5、§12 | Git retention lock 与持久化 `locked` 分离，且不代表 Agent 活跃/互斥；unknown/unlocked 不表示空闲；cleanup 需独立活跃状态、drain 和最终重观测 |
+| WTG-011 / AC-WTG-008 | §4、§6.1、§10、§11 A | Project Repository discovery + Index create/import UI；严格字段 allowlist、当前授权与 binding 复核，拒绝客户端路径/URL，持久化 operation/Audit/Outbox，provider 缺失返回 503 |
+| WTG-012 / AC-WTG-009 | §1.2、§2、§4.2、§11 | Project selector 来自当前用户 membership 目录；ID/role 最小投影、cursor/缓存边界、seed 不回退和无名称 SoR 时使用 UUID 标签 |
 | WTG-009 / AC-WTG-007 | §4.2、§6.1.1 | 当前 Project 成员目录、候选人验证、版本化 plan-confirm 和成功后刷新 |
 | WTG-005 / AC-WTG-002 | §1-§5、§9 | Project/Worktree 切换清空旧订阅；跨项目实体引用拒绝 |
 | WTG-006 / AC-WTG-004 | §1.2 | Index 与 Group 深链独立、刷新稳定，不落入通用任务列表 |
@@ -465,6 +477,8 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | 7 | LangGraph 官方 Python checkpoint/resume/replay API 语义已核对；生产包版本、服务部署/身份、独立 Postgres checkpointer schema/retention 与 Plugin sandbox/revocation ADR 尚未冻结 | 无法完成生产恢复、租户隔离和插件热撤权；checkpoint replay 可能重复执行节点副作用 | 固定并审核 runtime/checkpointer 版本与数据库权限/retention；完成 checkpoint restore、interrupt replay、side-effect 幂等、逐次 reauthorization 与 Plugin revoke 演练 |
 | 8 | 2B/2C/2D migrations 未应用；Project SoR / Role Binding provisioning API 尚不存在，Worktree 历史 scope/owner/work-item association 未回填 | 代码可编译，但无可用 membership 和可信历史映射；数据库 RLS / FK 未真实验证 | 在目标数据库评审并应用 migrations；通过受控 provisioning 建立 M bindings，审计 reconciliation，并完成跨 tenant/project/RLS 负向集成 |
 | 9 | Worktree/Task-scoped Session listing route 与刷新后发现/恢复 UI 已有 fail-closed 切片，但仓内没有真实 `TaskCliSessionProvisioner` 实现 | 当前应用无宿主 provider，listing 在生产中不可用并返回 503；页面不得通过持久化 ticket 绕过授权 | 接入生产 provisioner；按当前 tenant/actor/project/repository/worktree/task/runtime/session binding 查询最近记录，完成 no-store、授权拒绝、恢复新票据与刷新页面的运行验收 |
+| 10 | Project Worktree create/import 已有认证 API contract 和 Index 控件，但没有生产 Host Runtime provider、Project-Repository SoR binding writer 或 durable writer | API 返回 503；无法从 Project 安全解析 Repository checkout，也无法将 Git operation 原子投影至 Worktree/Audit/Outbox | 实现受信 Repository registry/provisioning、Git lifecycle adapter 与持久化 operation writer；验收 race-safe membership/binding 复核、幂等重放、失败恢复和审计 |
+| 11 | Project 授权目录可列 ID/role，但没有持久 Project 主数据/name SoR | 生产 Index 可按授权 ID 定位；显示名缺失，且不能用本地 seed 冒充权威 | 接入持久 `ProjectRepository`/Project master 与 membership projection，并用同一 actor/tenant 边界验证目录 ID、名称和 binding |
 
 ## §14 审阅栏与修订履历
 
@@ -529,3 +543,6 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v1.2 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 盘点 terminal-stack 现状，定义 Phase 4B grant→PTY session→首帧单次 WebSocket attachment 流程；明确 Noop sink / lazy pane / pipe stdio 不满足受控 Task CLI，列出 Group UI Token Provider 与 Runtime PTY 的依赖 | 继续推进所有 Phase，基于现有 terminal-stack 推进 Task Card CLI Session |
 | v1.3 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Local Runtime 单次 attachment ticket ledger 与 binding/TTL/清理契约；新增 protected WebSocket 首帧授权和真实 sink 注入 seam，并明确实际 ACL authorizer、Task Session API、Group router、PTY/sandbox 与 Bearer UI wiring 仍未接通；上游同步 basic design v1.0 | 继续推进所有 Phase，开始落地 Task Card CLI attachment 的可实现安全边界 |
 | v4.13 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.14 / basic design v4.7；定义 Project Index 的 Host Runtime Git Worktree retention lock observation DTO、授权后查询、30 秒 freshness、单项/整页 timeout 与 unknown fallback；明确该信号不表示 Agent 活跃或文件互斥，区分历史持久 `locked` 标记，cleanup 需独立活跃状态、drain 与最终重观测；observer 未装配，生产验收仍缺 | Phase 2D 增加 Worktree lock 可见性切片并固定 cleanup 安全门 |
+| v4.14 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.15 / basic design v4.8；新增 Project-scoped create/import candidate API contract、scope/role/membership checks、严格拒绝路径和仓库 URL、幂等 receipt 与 provider 503 边界；明确 Host Runtime adapter、归属/operation/audit/outbox writer 和 Index UI 尚未实现 | Phase 2D 补齐 Worktree 生命周期写接口边界 |
+| v4.15 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.16 / basic design v4.9；新增脱敏 Project Repository discovery route 与 Index create/import UI 的校验、角色门、候选查询和受理后刷新契约；reject path/URL 型 Repository/candidate name 与响应多余字段；记录 Repository SoR、Host Runtime provider、durable writer、认证装配和生产验收仍未完成 | Phase 2D 把 Worktree 生命周期 seam 接到 Project Index 可交互入口 |
+| v4.16 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.17 / basic design v5.0；新增 `/api/v1/projects` 有效 membership 目录与 UUID cursor、role/field allowlist、200 条上限及 no-store 契约；API session generation 更换时清除旧 Project/Index/member-role 投影；生产 Project 名称 SoR 与宿主认证/目标数据库验收仍未完成 | Project Selector 必须以当前用户授权目录为生产数据源，并清除跨 session 旧授权投影 |
