@@ -25,6 +25,7 @@ thiserror = { workspace = true }
 # 复用现有 relationship-engine crate + graph-core EdgeKind
 relationship-engine = { path = "../relationship-engine" }
 graph-core = { path = "../graph-core" }
+uuid = { workspace = true }
 
 [dev-dependencies]
 wasm-bindgen-test = { workspace = true }

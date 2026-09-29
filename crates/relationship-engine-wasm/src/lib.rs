@@ -38,6 +38,10 @@
 
 use graph_core::edge::EdgeKind;
 use relationship_engine::edge_ops::validate_kind;
+use relationship_engine::n_hop::NHopQuery;
+use graph_core::edge::EdgePayload;
+use graph_core::node::NodePayload;
+use graph_core::types::WorktreeId; // type alias for Uuid (transparent)
 use wasm_bindgen::prelude::*;
 
 // =====================================================================
@@ -161,6 +165,66 @@ pub fn version() -> String {
     )
 }
 
+/// `bfs_n_hop_json(input_json: &str, start_id_str: &str, hop: u8) -> Result<String, JsError>`
+///
+/// Stage 2 PR-237 (per docs §3.2 P2): 完整 BFS 集成 via JSON I/O.
+/// input_json: JSON `{ "nodes": [...], "edges": [...] }` (per graph-core NodePayload/EdgePayload shape)
+/// start_id_str: UUID 字符串 (例如 "550e8400-e29b-41d4-a716-446655440000")
+/// 返回: JSON 序列化的 NHopResult ({start_id, hop, nodes_count, edges_count, visited_count, duration_ms})
+#[wasm_bindgen]
+pub fn bfs_n_hop_json(
+    input_json: &str,
+    start_id_str: &str,
+    hop: u8,
+) -> Result<String, JsError> {
+    // Parse input JSON
+    #[derive(serde::Deserialize)]
+    struct Input {
+        nodes: Vec<NodePayload>,
+        edges: Vec<EdgePayload>,
+    }
+    let input: Input = serde_json::from_str(input_json)
+        .map_err(|e| JsError::new(&format!("input JSON parse error: {e}")))?;
+
+    // Parse start_id
+    // WorktreeId is type alias for Uuid (per crates/graph-core/src/types.rs:pub type WorktreeId = Uuid)
+    // Uuid parses directly to WorktreeId (transparent type alias)
+    let start_id: WorktreeId = uuid::Uuid::parse_str(start_id_str)
+        .map_err(|e| JsError::new(&format!("start_id parse error: {e}")))?;
+
+    // BFS
+    let result = NHopQuery::bfs_local(start_id, hop, &input.nodes, &input.edges);
+
+    // Serialize result (summary)
+    #[derive(serde::Serialize)]
+    struct ResultSummary {
+        start_id: String,
+        hop: u8,
+        nodes_count: usize,
+        edges_count: usize,
+        visited_count: usize,
+        duration_ms: u64,
+    }
+    let summary = ResultSummary {
+        start_id: result.start_id.to_string(),
+        hop: result.hop,
+        nodes_count: result.nodes.len(),
+        edges_count: result.edges.len(),
+        visited_count: result.visited_count,
+        duration_ms: result.duration_ms,
+    };
+    serde_json::to_string(&summary)
+        .map_err(|e| JsError::new(&format!("result serialize error: {e}")))
+}
+
+/// `max_hop() -> u8`
+///
+/// 守门: 3-hop 上限 (per DD-WORKTREE-CANVAS-001 §37 + INV-WC-04).
+#[wasm_bindgen]
+pub fn max_hop() -> u8 {
+    3
+}
+
 // =====================================================================
 // Unit tests (Rust side, 不依赖 wasm-bindgen-test runtime)
 // =====================================================================
@@ -251,6 +315,14 @@ mod tests {
         assert!(v.contains("relationship-engine-wasm"));
         assert!(v.contains("rust-to-wasm"));
     }
+
+    // ===== Stage 2 PR-237 tests: max_hop (BFS 完整集成) =====
+
+    #[test]
+    fn max_hop_is_three() {
+        // 守门 #11: 3-hop 上限 per DD-WORKTREE-CANVAS-001 §37 + INV-WC-04
+        assert_eq!(max_hop(), 3);
+    }
 }
 
 // =====================================================================
@@ -275,5 +347,26 @@ mod wasm_tests {
     #[wasm_bindgen_test]
     fn edge_kind_at_wasm() {
         assert_eq!(edge_kind_at(0), "based_on");
+    }
+
+    // Stage 2 PR-237: bfs_n_hop_json (BFS 完整集成)
+    #[wasm_bindgen_test]
+    fn bfs_n_hop_json_empty_graph() {
+        let input = r#"{"nodes": [], "edges": []}"#;
+        let result = bfs_n_hop_json(input, "00000000-0000-0000-0000-000000000000", 3);
+        assert!(result.is_ok());
+    }
+
+    #[wasm_bindgen_test]
+    fn bfs_n_hop_json_invalid_start_id() {
+        let input = r#"{"nodes": [], "edges": []}"#;
+        let result = bfs_n_hop_json(input, "not-a-uuid", 3);
+        assert!(result.is_err());
+    }
+
+    #[wasm_bindgen_test]
+    fn bfs_n_hop_json_invalid_json() {
+        let result = bfs_n_hop_json("not json", "00000000-0000-0000-0000-000000000000", 3);
+        assert!(result.is_err());
     }
 }
