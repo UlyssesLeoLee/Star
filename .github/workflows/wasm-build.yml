@@ -1,0 +1,104 @@
+# .github/workflows/wasm-build.yml
+# =====================================================================
+# Auto-build Rust→WASM crates on PR push + commit binaries to frontend/public/wasm/
+# Per docs/architecture/2026-09-28-upgrade/rust-to-wasm-frontend-memory-research.md §3.1 P0/P1
+# + docs/architecture/2026-09-30-upgrade/rust-wasm-build-integration-guide.md
+# =====================================================================
+name: WASM Build
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'crates/*-wasm/**'
+      - 'scripts/build-wasm.sh'
+      - '.github/workflows/wasm-build.yml'
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'crates/*-wasm/**'
+
+jobs:
+  build:
+    name: Build WASM + Verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+
+      - name: Install wasm-pack
+        run: |
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Verify Rust crates compile to wasm32
+        run: |
+          for crate in crates/*-wasm; do
+            echo "🔍 Checking $crate..."
+            cargo check --manifest-path "$crate/Cargo.toml" --target wasm32-unknown-unknown
+          done
+
+      - name: Build WASM crates (release)
+        run: bash scripts/build-wasm.sh
+
+      - name: Verify WASM binaries
+        run: |
+          echo "📁 Built WASM files:"
+          ls -la frontend/public/wasm/
+          echo ""
+          echo "🔍 Verify .wasm magic bytes:"
+          for f in frontend/public/wasm/*.wasm; do
+            if [ -f "$f" ]; then
+              magic=$(head -c 4 "$f" | xxd -p)
+              if [ "$magic" = "0061736d" ]; then
+                echo "  ✅ $f (size: $(stat -c %s "$f") bytes)"
+              else
+                echo "  ❌ $f (invalid magic: $magic)"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Run Rust unit tests
+        run: |
+          for crate in crates/*-wasm; do
+            echo "🧪 Testing $crate..."
+            cargo test --manifest-path "$crate/Cargo.toml" --lib
+          done
+
+      - name: Commit binaries to PR branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository_full_name
+        run: |
+          git config user.email "wasm-bot@star.local"
+          git config user.name "WASM Build Bot"
+          git add frontend/public/wasm/
+          if git diff --cached --quiet; then
+            echo "no WASM changes"
+          else
+            git commit -m "ci(wasm): auto-build WASM binaries from PR-${{ github.event.pull_request.number }}"
+            git push
+          fi
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-binaries
+          path: frontend/public/wasm/
+          retention-days: 7
