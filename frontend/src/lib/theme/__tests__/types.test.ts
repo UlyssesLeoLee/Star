@@ -38,15 +38,16 @@ describe("THEMES", () => {
     }
   });
 
-  it("圣诞主题符合纯像素风特征 (0px 矢量圆角)", () => {
+  it("圣诞主题符合常规毛玻璃风格特征 (标准圆角 > 0px)", () => {
     const xmas = THEMES.find((t) => t.id === "christmas");
     expect(xmas).toBeDefined();
+    expect(xmas!.displayName).toBe("圣夜霜雪");
     for (const r of xmas!.radii) {
-      expect(r.px).toBe(0);
+      expect(r.px).toBeGreaterThan(0);
     }
   });
 
-  it("极魅主题符合歧路旅人 HD-2D 纯像素风特征 (0px 矢量圆角 + 神恩紫罗兰与丝绒红)", () => {
+  it("极魅主题为唯一专属 16 位与 HD-2D 纯像素风 (0px 矢量圆角 + 神恩紫罗兰与丝绒红)", () => {
     const charisma = THEMES.find((t) => t.id === "charisma");
     expect(charisma).toBeDefined();
     expect(charisma!.displayName).toBe("极魅像素");
