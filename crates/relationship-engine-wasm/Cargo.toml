@@ -1,0 +1,37 @@
+[package]
+name = "relationship-engine-wasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Relationship Engine WASM wrapper — 浏览器端 n-hop BFS + EdgeKind 校验 (per docs/architecture/2026-09-28-upgrade/rust-to-wasm-frontend-memory-research.md §3.2 P3)"
+
+[lib]
+name = "relationship_engine_wasm"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+# 守门 #11 缺标比错标: 所有 dep 来自 [workspace.dependencies]
+wasm-bindgen = { workspace = true }
+js-sys = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde-wasm-bindgen = { workspace = true }
+thiserror = { workspace = true }
+
+# 复用现有 relationship-engine crate + graph-core EdgeKind
+relationship-engine = { path = "../relationship-engine" }
+graph-core = { path = "../graph-core" }
+
+[dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[lints]
+workspace = true
+
+# 守门 #7: workspace 全局 forbid unsafe_code
+# 守门 #11: 缺标比错标
+# 守门 #13: W/T/M (本期仅算法, 不涉及 DB 表, 无 W/T/M 分类)
