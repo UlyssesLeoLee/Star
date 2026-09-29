@@ -29,6 +29,7 @@
 
 pub mod auth;
 pub mod error;
+pub mod group_api;
 pub mod middleware;
 pub mod rbac;
 pub mod response;
@@ -87,8 +88,7 @@ pub fn build_router() -> Router {
         )
         .route(
             "/worktrees/start-from-picker/resolve",
-            post(routes::worktree_picker::resolve)
-                .with_state(routes::worktree_picker::state_arc()),
+            post(routes::worktree_picker::resolve).with_state(routes::worktree_picker::state_arc()),
         )
         .route(
             "/worktrees/external-worktrees",
