@@ -1,9 +1,10 @@
 # `crates/star-desktop/` — Tauri 2.0 PoC P0
 
-> **status**: PoC P0 (per [docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2](../../../docs/architecture/2026-09-29-upgrade/rust-app-end-research.md))
+> **status**: PoC P1 (per [docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2](../../../docs/architecture/2026-09-29-upgrade/rust-app-end-research.md))
 > **date**: 2026-09-30 JST
 > **author**: Ulysses (一人公司 12 角色 per DEC-008) — minimax-agent
-> **trigger**: user 2026-09-30 "B: 跳过 PR-239, 直接开始 Tauri PoC"
+> **trigger**: user 2026-09-30 "A: 继续 P1 准备" (PR-240 follow-up of PR-239)
+> **PR history**: P0 skeleton (PR-239) → P1 icons + IPC (PR-240, 本 PR) → P2 实战 (留 PR-241+)
 
 ## 目标
 
@@ -33,11 +34,15 @@ crates/star-desktop/
         └── main.ts             # IPC call → render 6 列 × mock data
 ```
 
-## IPC commands (本期实现)
+## IPC commands (本期 P1 实现)
 
 | Command | 入参 | 出参 | 来源 |
 |---|---|---|---|
-| `list_work_items` | 无 | `Vec<WorkItem>` (mock 4 items) | `crates/star-desktop/src-tauri/src/lib.rs` |
+| `list_work_items` | 无 | `Vec<WorkItem>` (mock 4 items) | P0 (PR-239) |
+| `list_worktree_groups` | 无 | `Vec<WorktreeGroup>` (mock 3 groups) | P1 新增 |
+| `list_canvas_entities` | 无 | `Vec<CanvasEntity>` (mock 4 entities) | P1 新增 |
+| `get_app_version` | 无 | `String` (semver from `CARGO_PKG_VERSION`) | P1 新增 |
+| `get_keyboard_layout` | 无 | `KeyboardLayout` (W/T/M swimlane + 6 statuses) | P1 新增 |
 
 ## 复用 crates (守门 #19: 0 改)
 
@@ -55,21 +60,22 @@ Cargo.toml `[lints] workspace = true` 继承 workspace lint (`unsafe_code = "for
 - ❌ 真实 IPC commands (除 `list_work_items` mock 外)
 - ❌ 集成现有前端 `frontend/` (Next.js 14 — 留 P2 渐进迁移)
 
-## 下一步 (P1)
+## 下一步 (PR-241+)
 
 | Task | 内容 | 估 |
 |---|---|---|
-| **T-001** | 添加 icons (32x32.png / 128x128.png / icon.icns / icon.ico) | 1 天 |
-| **T-002** | `npm install` 在 `frontend/` + `cargo build -p star-desktop` | 1 天 |
-| **T-003** | `cargo tauri dev` 实际跑起来 (验证 WebView 启动 < 200ms) | 1 天 |
-| **T-004** | 真实 IPC: list_worktree_groups + list_work_items_from_db (接 crates/domain-board) | 1 周 |
-| **T-005** | 真实前端: 复用 `frontend/src/components/board/KanbanBoard.tsx` (W/T/M swimlane) | 1 周 |
+| ✅ **T-001** | ~~添加 icons (32x32.png / 128x128.png / icon.icns / icon.ico)~~ | 1 天 DONE |
+| ⏳ **T-002** | `npm install` 在 `frontend/` + `cargo build -p star-desktop` (Linux build host 或更大内存 Windows) | 1 天 |
+| ⏳ **T-003** | `cargo tauri dev` 实际跑起来 (验证 WebView 启动 < 200ms) | 1 天 |
+| ✅ **T-004** | ~~真实 IPC: list_worktree_groups + list_canvas_entities + get_app_version + get_keyboard_layout (mock 完成, P2 接 crates/domain-board + crates/canvas-engine)~~ | 1 周 DONE |
+| ⏳ **T-005** | 真实前端: 复用 `frontend/src/components/board/KanbanBoard.tsx` (W/T/M swimlane) | 1 周 |
 
 ## 验证 (本 PR)
 
-- ✅ `crates/star-desktop/` 完整骨架 (Cargo.toml + src-tauri/ + frontend/)
-- ✅ Tauri 2.0 配置 + capabilities 完整 (`tauri.conf.json` + `capabilities/default.json`)
-- ✅ Frontend TS strict + Vite config + index.html 1 page
+- ✅ **5 icons** 创建: `32x32.png` (2679B) + `128x128.png` (45448B) + `128x128@2x.png` (181435B) + `icon.icns` (45448B) + `icon.ico` (2679B)
+- ✅ **5 IPC commands** 完整: list_work_items + list_worktree_groups + list_canvas_entities + get_app_version + get_keyboard_layout
+- ✅ **5 unit tests** 添加 (IPC mock data assertions)
+- ✅ `cargo metadata --format-version 1` 验证 workspace manifest 有效 (per `cargo metadata` — lightweight check, 不触发 `cargo check` 全 build)
 - ⚠ **`cargo check -p star-desktop` 当前 Windows machine build 失败** (Tauri 2.0 引入 100+ Windows crates, 触发 `STATUS_STACK_BUFFER_OVERRUN` / Windows resource exhaustion). 验证需要 Linux build host 或更大内存 Windows machine.
 
 ## Refs
