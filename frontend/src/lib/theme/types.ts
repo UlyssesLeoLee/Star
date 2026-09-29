@@ -75,13 +75,13 @@ const STAR_DARK_PALETTE: ColorToken[] = [
 ];
 
 /**
- * Star 调色板 — Frost Noel / 圣夜霜雪 (第3套UI主题: 冬日温暖毛玻璃风格)
- * 运用毛玻璃 (Glassmorphism) 与冬日色彩心理学:
- * - 圣夜绯红 (#D42426): 礼物缎带与节日暖意
- * - 常青松针 (#165B33): 冬青与冷杉避风港
- * - 星芒烛金 (#F8B229): 伯利恒暖光与流光倒影
- * - 圣夜霜林 (#0B130E): 半透明毛玻璃微暗底
- * - 初雪霜白 (#F5F8F5): 晶莹高对比文本
+ * Star 调色板 — Pixel Noel / 圣夜像素 (第3套UI主题: 圣诞纯像素风)
+ * 运用色彩心理学:
+ * - 圣夜绯红 (#D42426): 象征壁炉暖意、礼物缎带与节日喜悦，激发核心 CTA 的活力
+ * - 常青松针 (#165B33): 象征常青生命与森林避风港，古典互补色消除视觉疲劳
+ * - 星芒烛金 (#F8B229): 伯利恒星芒与暖烛光，带来成就感、荣誉与焦点高光
+ * - 圣夜密林黑 (#0B130E): 冬夜冷杉阴影基底，提供深沉静谧的阅读专注感
+ * - 初雪霜白 (#F5F8F5): 纯净晶莹的高对比雪地文本，保证 WCAG AAA 可读性
  */
 const STAR_CHRISTMAS_PALETTE: ColorToken[] = [
   { name: "--color-primary", hex: "#D42426" },
@@ -100,7 +100,7 @@ const STAR_CHRISTMAS_PALETTE: ColorToken[] = [
 
 /**
  * Star 调色板 — Charisma Pixel / 极魅像素 (第4套UI主题: 歧路旅人 HD-2D 神恩紫红金复古纯像素)
- * 运用色彩心理学与 16 位游戏机 / HD-2D 美术设计:
+ * 运用色彩心理学与游戏美术设计:
  * - 神恩紫罗兰 (#8B5CF6): 象征神秘、高贵神圣与极魅引力 (Charisma/Grace)，带来深邃神往感
  * - 醉梦丝绒红 (#E11D48): 剧场帷幕与舞娘红丝绒，高多巴胺舞台聚焦与行动力
  * - 帝国流金 (#F59E0B): 水晶吊灯与古典浮雕鎏金，提供成就感与荣誉高光
@@ -141,14 +141,14 @@ const STAR_RADII: RadiusToken[] = [
   { name: "--radius-lg", px: 10 },
 ];
 
-/** 纯像素圆角 token (8-bit 纯直角阶梯, 0px 矢量圆角 — 仅 Charisma Pixel 独占) */
+/** 纯像素圆角 token (8-bit 纯直角阶梯, 0px 矢量圆角) */
 const PIXEL_RADII: RadiusToken[] = [
   { name: "--radius-sm", px: 0 },
   { name: "--radius-md", px: 0 },
   { name: "--radius-lg", px: 0 },
 ];
 
-/** 内置主题 (暗夜神格 + 少年原画 + 圣夜霜雪 + 极魅像素) */
+/** 内置主题 (暗夜神格 + 少年原画 + 圣夜像素 + 极魅像素) */
 export const THEMES: ThemeDefinition[] = [
   {
     id: "dark",
@@ -170,12 +170,12 @@ export const THEMES: ThemeDefinition[] = [
   },
   {
     id: "christmas",
-    displayName: "圣夜霜雪",
+    displayName: "圣夜像素",
     isDark: true,
     colors: STAR_CHRISTMAS_PALETTE,
     spacings: STAR_SPACING,
-    radii: STAR_RADII,
-    version: 2,
+    radii: PIXEL_RADII,
+    version: 1,
   },
   {
     id: "charisma",

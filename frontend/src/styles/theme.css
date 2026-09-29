@@ -223,42 +223,42 @@ html.christmas,
   --color-neutral: #7a9a8b;
   --color-info:    #38bdf8;
 
-  /* === 背景层 (圣夜霜雪半透明毛玻璃与深林底) === */
-  --color-surface:          #0a120d;
-  --color-surface-2:        rgba(18, 32, 23, 0.72);
-  --color-surface-elevated: rgba(26, 47, 35, 0.85);
-  --color-surface-glass:    rgba(18, 32, 23, 0.65);
+  /* === 背景层 (圣夜密林与壁炉木屋沉夜) === */
+  --color-surface:          #0b130e;
+  --color-surface-2:        #122017;
+  --color-surface-elevated: #1a2f23;
+  --color-surface-glass:    rgba(18, 32, 23, 0.88);
 
   /* Tailwind bg.* token 映射 */
-  --bg-DEFAULT: #0a120d;
-  --bg-soft:    rgba(18, 32, 23, 0.72);
-  --bg-lighter: rgba(26, 47, 35, 0.85);
-  --bg-card:    rgba(18, 32, 23, 0.65);
+  --bg-DEFAULT: #0b130e;
+  --bg-soft:    #122017;
+  --bg-lighter: #1a2f23;
+  --bg-card:    #122017;
 
-  /* === 文字 — 初雪白 (WCAG AAA 对比度 ≥ 14:1 on #0a120d) === */
+  /* === 文字 — 初雪白 (WCAG AAA 对比度 ≥ 14:1 on #0b130e) === */
   --color-text:      #f5f8f5;
-  --color-text-dim:  #a3c2b1;
-  --color-text-mute: #628271;
+  --color-text-dim:  #9ebcab;
+  --color-text-mute: #5c7a6b;
 
   /* Tailwind ink.* token 映射 */
   --ink-DEFAULT: #f5f8f5;
-  --ink-dim:     #a3c2b1;
-  --ink-mute:    #628271;
+  --ink-dim:     #9ebcab;
+  --ink-mute:    #5c7a6b;
 
-  /* === 边框 — 冬日微冰晶透光磨砂线 (毛玻璃微高光) === */
-  --color-border:        rgba(248, 178, 41, 0.25);
-  --color-border-subtle: rgba(255, 255, 255, 0.08);
-  --color-border-hover:  rgba(248, 178, 41, 0.75);
+  /* === 边框 — 8-bit 松针深墨线 (纯像素硬边) === */
+  --color-border:        #234330;
+  --color-border-subtle: #16281e;
+  --color-border-hover:  #f8b229;
 
   /* Tailwind line / border.* token 映射 */
-  --line-DEFAULT:   rgba(248, 178, 41, 0.25);
-  --border-DEFAULT: rgba(248, 178, 41, 0.25);
-  --border-line:    rgba(255, 255, 255, 0.12);
+  --line-DEFAULT:   #234330;
+  --border-DEFAULT: #234330;
+  --border-line:    #2d573f;
 
   /* === HUD 战术微标签 === */
   --color-hud-tag:        #f8b229;
-  --color-hud-tag-bg:     rgba(248, 178, 41, 0.16);
-  --color-hud-tag-border: rgba(248, 178, 41, 0.50);
+  --color-hud-tag-bg:     rgba(248, 178, 41, 0.14);
+  --color-hud-tag-border: rgba(248, 178, 41, 0.45);
 
   /* === 语义 ok/warn/err/info Tailwind 映射 === */
   --ok-DEFAULT:   #22c55e;
@@ -266,23 +266,47 @@ html.christmas,
   --err-DEFAULT:  #ef4444;
   --info-DEFAULT: #38bdf8;
 
-  /* === 毛玻璃温润漫射投影与微发光 (Glassmorphism Diffuse Shadows) === */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(255, 255, 255, 0.12);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(248, 178, 41, 0.25);
-  --glow-accent:    0 0 20px rgba(248, 178, 41, 0.35);
-  --glow-secondary: 0 0 20px rgba(212, 36, 38, 0.30);
+  /* === 纯像素风硬边投影 (零模糊 Zero-Blur Stepped Offsets) === */
+  --shadow-sm: 2px 2px 0px #060b08;
+  --shadow-md: 3px 3px 0px #060b08, inset 1px 1px 0px rgba(248, 178, 41, 0.25);
+  --shadow-lg: 5px 5px 0px #060b08, inset 2px 2px 0px rgba(248, 178, 41, 0.35);
+  --glow-accent:    0 0 0 2px #f8b229, 3px 3px 0px #060b08;
+  --glow-secondary: 0 0 0 2px #d42426, 3px 3px 0px #060b08;
 
-  /* === 常规毛玻璃平滑圆角 === */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  /* === 纯像素 0px 矢量圆角 (硬直角阶梯) === */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
 
-  /* === 毛玻璃 Glassmorphism 核心令牌 === */
-  --glass-blur: blur(14px);
-  --glass-bg: rgba(18, 32, 23, 0.65);
-  --glass-border: 1px solid rgba(255, 255, 255, 0.12);
+  /* === CEL-SHADED / PIXEL ENGINE TOKENS === */
+  --cel-bg: #0b130e;
+  --cel-surface-card: #122017;
+  --cel-surface-sub: #1a2f23;
+  --cel-surface-stage: #070d09;
+  --cel-card-ramp: linear-gradient(135deg, #1d3627 0%, #1d3627 35%, #14241b 35%, #14241b 70%, #0b130e 70%, #0b130e 100%);
+  --cel-crimson: #d42426;
+  --cel-cyan: #22c55e;
+  --cel-gold: #f8b229;
+  --cel-ink: #060b08;
+  --cel-text-primary: #f5f8f5;
+  --cel-text-secondary: #9ebcab;
+  --cel-screentone-dot: rgba(248, 178, 41, 0.16);
+  --cel-shadow-color: #060b08;
+  --cel-bevel-hi: rgba(248, 178, 41, 0.35);
+  --cel-bevel-lo: rgba(6, 11, 8, 0.85);
+  --cel-glint-color: rgba(255, 255, 255, 0.40);
+  --cel-glint-rim: rgba(212, 36, 38, 0.35);
+
+  /* === HD-2D (歧路旅人 / OCTOPATH TRAVELER) 宗师级 3D 仿 2D 光学与体素变量 === */
+  --hd2d-candle-gold:    #f8be22;
+  --hd2d-candle-amber:   #ff8a22;
+  --hd2d-hearth-glow:    rgba(255, 138, 34, 0.28);
+  --hd2d-rim-aurora:     rgba(125, 232, 208, 0.25);
+  --hd2d-vignette:       radial-gradient(ellipse at center, transparent 55%, rgba(6, 11, 8, 0.82) 100%);
+  --hd2d-crt-scanline:   repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0px, rgba(0,0,0,0.16) 1px, transparent 1px, transparent 2px);
+  --hd2d-extrusion-hi:   inset 0 2px 0 0 rgba(255, 220, 130, 0.55), inset 2px 0 0 0 rgba(255, 220, 130, 0.35);
+  --hd2d-extrusion-lo:   inset 0 -2px 0 0 rgba(0, 0, 0, 0.65), inset -2px 0 0 0 rgba(0, 0, 0, 0.45);
 }
 
 /* ─────────────────────────────────────────────────────────────────────
