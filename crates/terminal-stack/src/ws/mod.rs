@@ -7,6 +7,7 @@
 //! - [`protocol`]: JSON 消息 schema (ClientMessage / ServerMessage) + 错误类型
 //! - [`hub`]: in-process pub/sub hub per pane (per 守门 #13 L0 协调派生 — Mailbox 模式)
 //! - [`handler`]: axum WS endpoint (`WebSocketUpgrade` extractor) + 事件循环
+//! - [`authorized`]: Task Card 受保护路由；首帧单次 ticket 校验成功后才注册 pane 并回放 scrollback
 //! - [`integration`]: 持久化层 (P1-A) 适配 + P1-B recovery seam (trait abstraction)
 //!
 //! **协议契约** (per `frontend/src/components/remote/XtermViewer.tsx` line 134/149/150):
@@ -26,6 +27,13 @@
 //! - #11 缺标比错标: 所有 dep 来自 [workspace.dependencies] 或 per-crate (axum 0.8 已 per-crate 在 `crates/api` 守门 #48 锁定)
 //! - #13 L0 协调派生 (in-process pub/sub + Mailbox)
 
+//! CYPHER STRUCTURE MANIFEST.
+//! CREATE
+//!   (f:File {name:"ws/mod.rs",type:"file",language:"rust"}),(m:Module {name:"ws",type:"module",language:"rust"}),
+//!   (au:Module {name:"authorized",type:"module",language:"rust"}),(ha:Module {name:"handler",type:"module",language:"rust"}),(hu:Module {name:"hub",type:"module",language:"rust"}),(in:Module {name:"integration",type:"module",language:"rust"}),(pr:Module {name:"protocol",type:"module",language:"rust"}),
+//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(au),(m)-[:CONTAINS]->(ha),(m)-[:CONTAINS]->(hu),(m)-[:CONTAINS]->(in),(m)-[:CONTAINS]->(pr);
+
+pub mod authorized;
 pub mod handler;
 pub mod hub;
 pub mod integration;

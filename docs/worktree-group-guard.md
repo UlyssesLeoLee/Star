@@ -50,14 +50,15 @@ git diff --stat $(git merge-base HEAD origin/dev)..HEAD   -- crates/ bff/ fronte
 
 ### 3.2 守门 #33 v0 — Group cross-ref 守门
 
-- canvas-group 0 依赖 domain-group src，反之亦然 (Cargo path dep 双向 0)
-- frontend-group 0 改 `crates/` 任何源文件
-- **检查**: `cargo metadata --format-version 1 --no-deps | jq '.packages[] | select(.name | startswith("crates-") | not)'` 验证
+- Canvas source ownership = `crates/canvas-*` + `crates/domain-canvas`；Domain source ownership = `crates/domain-*`（排除 `domain-canvas`）+ `crates/star-*`。两组 workspace package 间 Cargo path dependency 必须双向为 0。
+- 此检查只覆盖上面的 Canvas/Domain 源 crate ownership；`crates/api`、`crates/application`、`crates/infrastructure`、Worktree adapters 与共享基础 crate 不通过名称推断为任一方，跨组共享依赖需由对应 API/接口契约管理。
+- frontend-group 0 改 `crates/` 任何源文件，由守门 #32 的文件边界检查执行。
+- **检查**: `python scripts/automation/group_guard.py check --group canvas` 或 `--group domain`。脚本读取完整 `cargo metadata --format-version 1` 的已解析 workspace 图，逐条检查两组 package 的直接依赖；metadata 缺失、执行失败或解析错误时 fail closed。`frontend` 与 `core` 显示 N/A。
 
 ### 3.3 守门 #34 v0 — Group 二维 ID 注入
 
 - Group worktree spawn 时必设 `NEXT_PUBLIC_GROUP_ID` env
-- 缺省 fallback `core`
+- 缺省时按现有开发约定提示 WARN 并 fallback `core`；显式值与当前 Group 不匹配时守门命令 exit 1
 - AppHeader 必显示 `group:wt-id` 二维 badge (per §2.2)
 
 ## 4. 启动 Group worktree (per basic-design.md v0.2 §13.2)
@@ -110,7 +111,7 @@ export NEXT_PUBLIC_WORKTREE_ID=wt-domain-worktree
 
 ## 6. 已知缺口 + 后续 PR
 
-- (a) Group 守门 #32/#33/#34 仅文档定义, 0 工具脚本 (per 守门 #9 Python 化, 后续 PR 加 `scripts/automation/group_guard.py`)
+- (a) Group 守门 #32/#33/#34 已有 `scripts/automation/group_guard.py`；#33 实现 Cargo resolved graph 双向 cross-ref 检查，#34 的显式错配会以非零退出，未设置变量仍是开发 fallback 警告。它们不实现产品 GroupContext 授权
 - (b) Multica 二维 ID 注入位未实装 (per ULYS-158.4 后续 PR — 改 frontend Multica spawn script)
 - (c) Group-level Cargo workspace 拆分 (frontend / bff 已独立 + 新增 crates-canvas / crates-domain) 未实装 (估 ~30 min)
 - (d) AppHeader wt-id-badge 改二维 `group:wt-id·branch` UI (估 ~20 min, frontend-group 任务)

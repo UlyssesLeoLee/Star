@@ -1,3 +1,14 @@
+/*
+CYPHER STRUCTURE MANIFEST
+CREATE
+  (file:File {name:"frontend/src/lib/terminal/wsClient.test.ts",type:"file",language:"typescript"}),
+  (socket:Class {name:"MockWebSocket",type:"class",language:"typescript"}),
+  (connectTest:Function {name:"authorized connection tests",type:"function",language:"typescript"}),
+  (setup:Function {name:"beforeEach WebSocket stub",type:"function",language:"typescript"}),
+  (teardown:Function {name:"afterEach cleanup",type:"function",language:"typescript"}),
+  (file)-[:CONTAINS]->(socket),(file)-[:CONTAINS]->(connectTest),(file)-[:CONTAINS]->(setup),(file)-[:CONTAINS]->(teardown);
+*/
+
 // =====================================================================
 // wsClient.test.ts — WebSocket Client integration test (per PR #98.5)
 // =====================================================================
@@ -51,20 +62,30 @@ class MockWebSocket {
 let mockWs: MockWebSocket | null = null;
 let mockWsUrl = "";
 
-// @ts-expect-error mock global
-globalThis.WebSocket = vi.fn().mockImplementation((url: string) => {
-  mockWs = new MockWebSocket(url);
-  mockWsUrl = url;
-  return mockWs;
-});
+class MockWebSocketConstructor extends MockWebSocket {
+  static readonly OPEN = 1;
+  static readonly CONNECTING = 0;
+  static readonly CLOSED = 3;
+
+  constructor(url: string) {
+    super(url);
+    mockWs = this;
+    mockWsUrl = url;
+  }
+}
 
 describe("TerminalWsClient (PR #98.5)", () => {
   beforeEach(() => {
     mockWs = null;
     mockWsUrl = "";
+    // MSW patches the global WebSocket in its beforeAll hook. Install this
+    // test's fake afterward so the terminal client sees a browser-like socket.
+    vi.stubGlobal("WebSocket", MockWebSocketConstructor);
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -269,5 +290,81 @@ describe("TerminalWsClient (PR #98.5)", () => {
     // Don't triggerOpen → readyState is 0 (CONNECTING)
     client.sendStdin("test");
     expect(mockWs!.sent).toHaveLength(0);
+  });
+
+  it("M. ticket connection sends authorization first and waits for Hello before enabling input", async () => {
+    const client = new TerminalWsClient({
+      sessionId: "test-session",
+      getAttachmentTicket: vi.fn().mockResolvedValue("one-use-ticket"),
+      handlers: {},
+    });
+
+    client.connect();
+    await Promise.resolve();
+    expect(mockWs).not.toBeNull();
+    expect(client.isConnected()).toBe(false);
+
+    mockWs!.triggerOpen();
+    expect(mockWs!.sent).toEqual([
+      JSON.stringify({ type: "authorize", ticket: "one-use-ticket" }),
+    ]);
+    client.sendStdin("must-not-send-before-hello");
+    expect(mockWs!.sent).toHaveLength(1);
+    expect(client.isConnected()).toBe(false);
+
+    mockWs!.triggerMessage(
+      JSON.stringify({
+        type: "hello",
+        session_id: "550e8400-e29b-41d4-a716-446655440000",
+        panes: [],
+        total_bytes: 0,
+        server_time: "2026-09-24T00:00:00Z",
+      }),
+    );
+    expect(client.isConnected()).toBe(true);
+    client.sendStdin("allowed-after-hello");
+    expect(JSON.parse(mockWs!.sent[1])).toEqual({
+      type: "stdin",
+      data: "allowed-after-hello",
+    });
+  });
+
+  it("N. reconnect obtains and sends a fresh one-use ticket", async () => {
+    vi.useFakeTimers();
+    const getAttachmentTicket = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce("first-ticket")
+      .mockResolvedValueOnce("second-ticket");
+    const client = new TerminalWsClient({
+      sessionId: "test-session",
+      getAttachmentTicket,
+      autoReconnect: true,
+      reconnectDelayMs: 25,
+      handlers: {},
+    });
+
+    client.connect();
+    await Promise.resolve();
+    const firstSocket = mockWs;
+    firstSocket!.triggerOpen();
+    expect(JSON.parse(firstSocket!.sent[0])).toEqual({
+      type: "authorize",
+      ticket: "first-ticket",
+    });
+
+    firstSocket!.triggerClose();
+    await vi.advanceTimersByTimeAsync(25);
+    await Promise.resolve();
+
+    expect(getAttachmentTicket).toHaveBeenCalledTimes(2);
+    expect(mockWs).not.toBe(firstSocket);
+    mockWs!.triggerOpen();
+    expect(JSON.parse(mockWs!.sent[0])).toEqual({
+      type: "authorize",
+      ticket: "second-ticket",
+    });
+
+    client.close();
+    vi.useRealTimers();
   });
 });

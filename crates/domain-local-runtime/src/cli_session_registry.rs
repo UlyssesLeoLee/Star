@@ -1,9 +1,14 @@
 //! Star Local Runtime — CLI Session 持久化层 (ULYS-156)
 //!
+//! CYPHER STRUCTURAL MANIFEST
+//! CREATE (f:File {name:"cli_session_registry.rs",type:"file",language:"rust"}),(m:Module {name:"cli_session_registry",type:"module",language:"rust"}),(nonce_ledger:Class {name:"task_cli_grant_nonce_ledger",type:"class",classification:"work"}),(ticket_ledger:Class {name:"task_cli_attachment_ticket",type:"class",classification:"work"}),(binding:Class {name:"TaskCliAttachmentTicketBinding",type:"class",language:"rust"}),(consume_nonce:Function {name:"consume_task_grant_nonce",type:"function"}),(issue_ticket:Function {name:"issue_task_cli_attachment_ticket",type:"function"}),(consume_ticket:Function {name:"consume_task_cli_attachment_ticket",type:"function"}),(hash_ticket:Function {name:"hash_attachment_ticket",type:"function"}),(valid_binding:Function {name:"validate_attachment_binding",type:"function"}),(ttl:Variable {name:"ATTACHMENT_TICKET_MAX_TTL_SECONDS",type:"variable"}),(single_use_test:Function {name:"attachment_ticket_is_single_use_and_scope_bound",type:"function"}),(expiry_test:Function {name:"expired_attachment_ticket_is_rejected",type:"function"});
+//! CREATE (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(nonce_ledger),(m)-[:CONTAINS]->(ticket_ledger),(m)-[:CONTAINS]->(binding),(m)-[:CONTAINS]->(consume_nonce),(m)-[:CONTAINS]->(issue_ticket),(m)-[:CONTAINS]->(consume_ticket),(m)-[:CONTAINS]->(hash_ticket),(m)-[:CONTAINS]->(valid_binding),(m)-[:CONTAINS]->(ttl),(m)-[:CONTAINS]->(single_use_test),(m)-[:CONTAINS]->(expiry_test),(consume_nonce)-[:WRITES]->(nonce_ledger),(issue_ticket)-[:WRITES]->(ticket_ledger),(issue_ticket)-[:CALLS]->(hash_ticket),(issue_ticket)-[:CALLS]->(valid_binding),(issue_ticket)-[:USES]->(ttl),(consume_ticket)-[:WRITES]->(ticket_ledger),(consume_ticket)-[:CALLS]->(hash_ticket),(consume_ticket)-[:CALLS]->(valid_binding),(single_use_test)-[:CALLS]->(issue_ticket),(single_use_test)-[:CALLS]->(consume_ticket),(expiry_test)-[:CALLS]->(issue_ticket),(expiry_test)-[:CALLS]->(consume_ticket);
+//!
 //! 实现 [ULYS-156](https://app.multica.ai/issue/01a0bf6b-486c-71b8-9bf4-92bde909c7f8)
 //! §A 单进程持久化层适配 路线下的 "cli_session_registry" 模块:
 //!
 //! - 单进程 SQLite WAL 持久化(`Mutex<Connection>` per 守门 #DB-13 W/T/M 派生)
+//! - Task CLI grant nonce uses a dedicated FULL-synchronous WAL connection for fail-closed consumption
 //! - 内存模式 (`in_memory`) + 文件模式 (`open`)
 //! - DDL inline `init_schema`, 复用 `star-taskqueue` / `star-credential` 同款
 //!   `init_schema` 风格(避免引入 sqlx-macros / refinery 等重型迁移框架)
@@ -42,8 +47,11 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use chrono::{DateTime, TimeZone, Utc};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
+use uuid::Uuid;
 
 use super::cli_session::{CliSession, CliSessionState, CliSessionTransition};
 use super::{CliSessionId, TenantId, WorktreeId};
@@ -76,7 +84,44 @@ pub enum CliSessionRegistryError {
     /// 这里只是落库前的最后一道防线 —— 理论上 ORM 不应让非法 in-flight)
     #[error("illegal terminal state: cannot modify archived session {0}")]
     IllegalArchived(String),
+    /// 授权 nonce 已在此 Runtime 消费
+    #[error("task execution grant nonce was already consumed")]
+    GrantNonceReplay,
+    /// 授权 nonce 为空、租户为空或 grant 已过期/超出允许窗口
+    #[error("task execution grant nonce or expiry is invalid")]
+    InvalidGrantNonce,
+    /// Attachment ticket was already consumed for this exact bound session.
+    #[error("task CLI attachment ticket was already consumed")]
+    AttachmentTicketReplay,
+    /// Attachment ticket, expiry, or bound context is invalid.
+    #[error("task CLI attachment ticket is invalid")]
+    InvalidAttachmentTicket,
 }
+
+/// Group and Task Card facts bound to a short-lived browser attachment ticket.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct TaskCliAttachmentTicketBinding {
+    /// Tenant authorized to attach to the session.
+    pub tenant_id: Uuid,
+    /// Project containing the selected Worktree.
+    pub project_id: Uuid,
+    /// Repository mounted by the selected Worktree.
+    pub repository_id: Uuid,
+    /// Worktree whose Task Card owns the CLI session.
+    pub worktree_id: Uuid,
+    /// Canonical Task Card / WorkItem identity.
+    pub work_item_id: Uuid,
+    /// Authenticated user or agent actor.
+    pub actor_id: Uuid,
+    /// Local Runtime hosting the session.
+    pub runtime_id: Uuid,
+    /// Existing Local Runtime CLI session.
+    pub session_id: Uuid,
+    /// Current policy revision; ACL is rechecked before ticket consumption.
+    pub policy_version: i64,
+}
+
+const ATTACHMENT_TICKET_MAX_TTL_SECONDS: i64 = 60;
 
 // =====================================================================
 // 2. registry
@@ -85,6 +130,8 @@ pub enum CliSessionRegistryError {
 /// **CLI Session 持久化层**(SQLite, 单进程)
 pub struct CliSessionRegistry {
     conn: Mutex<Connection>,
+    /// Separate SQLite connection with FULL synchronous commits for grant nonce consumption.
+    grant_nonce_conn: Mutex<Connection>,
 }
 
 impl CliSessionRegistry {
@@ -94,8 +141,10 @@ impl CliSessionRegistry {
         // 测试场景也跑默认 journal_mode; 真生产 = WAL
         let r = Self {
             conn: Mutex::new(conn),
+            grant_nonce_conn: Mutex::new(Connection::open_in_memory()?),
         };
         r.init_schema()?;
+        r.init_grant_nonce_schema()?;
         Ok(r)
     }
 
@@ -104,13 +153,19 @@ impl CliSessionRegistry {
     /// 内部启用 WAL(读并发 + 写不阻塞读者)与 `synchronous=NORMAL`(ACID 折中),
     /// 与 `star-taskqueue` 同款配置。
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, CliSessionRegistryError> {
+        let path = path.as_ref();
         let conn = Connection::open(path)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
+        let grant_nonce_conn = Connection::open(path)?;
+        grant_nonce_conn.pragma_update(None, "journal_mode", "WAL")?;
+        grant_nonce_conn.pragma_update(None, "synchronous", "FULL")?;
         let r = Self {
             conn: Mutex::new(conn),
+            grant_nonce_conn: Mutex::new(grant_nonce_conn),
         };
         r.init_schema()?;
+        r.init_grant_nonce_schema()?;
         Ok(r)
     }
 
@@ -141,6 +196,220 @@ impl CliSessionRegistry {
             "#,
         )?;
         Ok(())
+    }
+
+    fn init_grant_nonce_schema(&self) -> Result<(), CliSessionRegistryError> {
+        let conn = self
+            .grant_nonce_conn
+            .lock()
+            .expect("task grant nonce connection mutex poisoned");
+        conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS task_cli_grant_nonce_ledger (
+                nonce            TEXT PRIMARY KEY NOT NULL,
+                tenant_id        TEXT NOT NULL,
+                expires_at_ms    INTEGER NOT NULL,
+                consumed_at_ms   INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_task_cli_grant_nonce_tenant_expiry
+                ON task_cli_grant_nonce_ledger(tenant_id, expires_at_ms);
+            CREATE TABLE IF NOT EXISTS task_cli_attachment_ticket (
+                ticket_hash    TEXT PRIMARY KEY NOT NULL,
+                tenant_id      TEXT NOT NULL,
+                project_id     TEXT NOT NULL,
+                repository_id  TEXT NOT NULL,
+                worktree_id    TEXT NOT NULL,
+                work_item_id   TEXT NOT NULL,
+                actor_id       TEXT NOT NULL,
+                runtime_id     TEXT NOT NULL,
+                session_id     TEXT NOT NULL,
+                policy_version INTEGER NOT NULL,
+                expires_at_ms  INTEGER NOT NULL,
+                created_at_ms  INTEGER NOT NULL,
+                consumed_at_ms INTEGER
+            );
+            CREATE INDEX IF NOT EXISTS idx_task_cli_attachment_ticket_expiry
+                ON task_cli_attachment_ticket(expires_at_ms);
+            "#,
+        )?;
+        Ok(())
+    }
+
+    /// 原子且持久地消费一个 Task Card CLI grant nonce。
+    ///
+    /// Nonce 记录属于 Work 状态：grant 到期并经过 5 分钟时钟偏差窗口后，在后续消费时清理。
+    /// 调用方须先验证签发者/签名与当前 ACL；expiry 是签名保护的原始过期时间。
+    pub fn consume_task_grant_nonce(
+        &self,
+        tenant_id: Uuid,
+        nonce: Uuid,
+        expires_at: DateTime<Utc>,
+        now: DateTime<Utc>,
+    ) -> Result<(), CliSessionRegistryError> {
+        if tenant_id.is_nil()
+            || nonce.is_nil()
+            || expires_at <= now
+            || expires_at > now + chrono::Duration::minutes(5)
+        {
+            return Err(CliSessionRegistryError::InvalidGrantNonce);
+        }
+        let mut conn = self
+            .grant_nonce_conn
+            .lock()
+            .expect("task grant nonce connection mutex poisoned");
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        tx.execute(
+            "DELETE FROM task_cli_grant_nonce_ledger WHERE expires_at_ms <= ?1",
+            params![
+                now.timestamp_millis()
+                    .saturating_sub(chrono::Duration::minutes(5).num_milliseconds())
+            ],
+        )?;
+        let inserted = tx.execute(
+            r#"INSERT OR IGNORE INTO task_cli_grant_nonce_ledger
+               (nonce,tenant_id,expires_at_ms,consumed_at_ms) VALUES (?1,?2,?3,?4)"#,
+            params![
+                nonce.to_string(),
+                tenant_id.to_string(),
+                expires_at.timestamp_millis(),
+                now.timestamp_millis()
+            ],
+        )?;
+        if inserted != 1 {
+            return Err(CliSessionRegistryError::GrantNonceReplay);
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Issue an opaque single-use ticket for an already-started Task Card CLI session.
+    ///
+    /// Only the SHA-256 digest is persisted. The caller must authenticate the actor, verify the
+    /// current ACL, ensure the session is live, and send the plaintext ticket only to that actor.
+    pub fn issue_task_cli_attachment_ticket(
+        &self,
+        binding: &TaskCliAttachmentTicketBinding,
+        ttl: chrono::Duration,
+        now: DateTime<Utc>,
+    ) -> Result<String, CliSessionRegistryError> {
+        validate_attachment_binding(binding)?;
+        if ttl <= chrono::Duration::zero()
+            || ttl > chrono::Duration::seconds(ATTACHMENT_TICKET_MAX_TTL_SECONDS)
+        {
+            return Err(CliSessionRegistryError::InvalidAttachmentTicket);
+        }
+        let expires_at = now
+            .checked_add_signed(ttl)
+            .ok_or(CliSessionRegistryError::InvalidAttachmentTicket)?;
+        let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
+        let ticket_hash = hash_attachment_ticket(&token);
+        let mut conn = self
+            .grant_nonce_conn
+            .lock()
+            .expect("task CLI attachment ticket connection mutex poisoned");
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        tx.execute(
+            "DELETE FROM task_cli_attachment_ticket WHERE expires_at_ms <= ?1",
+            params![now.timestamp_millis().saturating_sub(300_000)],
+        )?;
+        tx.execute(
+            r#"INSERT INTO task_cli_attachment_ticket
+               (ticket_hash,tenant_id,project_id,repository_id,worktree_id,work_item_id,
+                actor_id,runtime_id,session_id,policy_version,expires_at_ms,created_at_ms)
+               VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)"#,
+            params![
+                ticket_hash,
+                binding.tenant_id.to_string(),
+                binding.project_id.to_string(),
+                binding.repository_id.to_string(),
+                binding.worktree_id.to_string(),
+                binding.work_item_id.to_string(),
+                binding.actor_id.to_string(),
+                binding.runtime_id.to_string(),
+                binding.session_id.to_string(),
+                binding.policy_version,
+                expires_at.timestamp_millis(),
+                now.timestamp_millis(),
+            ],
+        )?;
+        tx.commit()?;
+        Ok(token)
+    }
+
+    /// Atomically consume an attachment ticket after current ACL and session checks succeed.
+    ///
+    /// A replay is distinguished only for the same binding. A mismatched binding and an expired
+    /// or unknown token all return the same invalid-ticket error to avoid disclosing session state.
+    pub fn consume_task_cli_attachment_ticket(
+        &self,
+        ticket: &str,
+        binding: &TaskCliAttachmentTicketBinding,
+        now: DateTime<Utc>,
+    ) -> Result<(), CliSessionRegistryError> {
+        validate_attachment_binding(binding)?;
+        if ticket.len() != 64 || !ticket.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(CliSessionRegistryError::InvalidAttachmentTicket);
+        }
+        let ticket_hash = hash_attachment_ticket(ticket);
+        let mut conn = self
+            .grant_nonce_conn
+            .lock()
+            .expect("task CLI attachment ticket connection mutex poisoned");
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let changed = tx.execute(
+            r#"UPDATE task_cli_attachment_ticket SET consumed_at_ms=?1
+               WHERE ticket_hash=?2 AND tenant_id=?3 AND project_id=?4 AND repository_id=?5
+                 AND worktree_id=?6 AND work_item_id=?7 AND actor_id=?8 AND runtime_id=?9
+                 AND session_id=?10 AND policy_version=?11 AND expires_at_ms>?1
+                 AND consumed_at_ms IS NULL"#,
+            params![
+                now.timestamp_millis(),
+                ticket_hash,
+                binding.tenant_id.to_string(),
+                binding.project_id.to_string(),
+                binding.repository_id.to_string(),
+                binding.worktree_id.to_string(),
+                binding.work_item_id.to_string(),
+                binding.actor_id.to_string(),
+                binding.runtime_id.to_string(),
+                binding.session_id.to_string(),
+                binding.policy_version,
+            ],
+        )?;
+        if changed == 1 {
+            tx.commit()?;
+            return Ok(());
+        }
+
+        let consumed = tx
+            .query_row(
+                r#"SELECT consumed_at_ms FROM task_cli_attachment_ticket
+                   WHERE ticket_hash=?1 AND tenant_id=?2 AND project_id=?3 AND repository_id=?4
+                     AND worktree_id=?5 AND work_item_id=?6 AND actor_id=?7 AND runtime_id=?8
+                     AND session_id=?9 AND policy_version=?10"#,
+                params![
+                    ticket_hash,
+                    binding.tenant_id.to_string(),
+                    binding.project_id.to_string(),
+                    binding.repository_id.to_string(),
+                    binding.worktree_id.to_string(),
+                    binding.work_item_id.to_string(),
+                    binding.actor_id.to_string(),
+                    binding.runtime_id.to_string(),
+                    binding.session_id.to_string(),
+                    binding.policy_version,
+                ],
+                |row| row.get::<_, Option<i64>>(0),
+            )
+            .optional()?
+            .flatten()
+            .is_some();
+        tx.commit()?;
+        if consumed {
+            Err(CliSessionRegistryError::AttachmentTicketReplay)
+        } else {
+            Err(CliSessionRegistryError::InvalidAttachmentTicket)
+        }
     }
 
     /// 插入新 session(`state` 必须是 `Created`; 调用方负责构造 `CliSession`)
@@ -354,6 +623,32 @@ fn cli_session_row_mapper(row: &rusqlite::Row<'_>) -> rusqlite::Result<CliSessio
     })
 }
 
+fn validate_attachment_binding(
+    binding: &TaskCliAttachmentTicketBinding,
+) -> Result<(), CliSessionRegistryError> {
+    let ids = [
+        binding.tenant_id,
+        binding.project_id,
+        binding.repository_id,
+        binding.worktree_id,
+        binding.work_item_id,
+        binding.actor_id,
+        binding.runtime_id,
+        binding.session_id,
+    ];
+    if ids.contains(&Uuid::nil()) || binding.policy_version <= 0 {
+        return Err(CliSessionRegistryError::InvalidAttachmentTicket);
+    }
+    Ok(())
+}
+
+fn hash_attachment_ticket(ticket: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"star.task-cli-attachment.v1:");
+    hasher.update(ticket.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
 /// 把 UUID 解析失败映射到独立 variant —— 保留字段名 + 原始 error 消息。
 fn parse_uuid(s: &str, field: &'static str) -> Result<uuid::Uuid, CliSessionRegistryError> {
     uuid::Uuid::parse_str(s).map_err(|e| CliSessionRegistryError::InvalidUuid {
@@ -404,6 +699,64 @@ mod tests {
         s.try_transition(CliSessionState::Running, "spawn")
             .expect("created -> running");
         s
+    }
+
+    fn attachment_binding() -> TaskCliAttachmentTicketBinding {
+        TaskCliAttachmentTicketBinding {
+            tenant_id: Uuid::new_v4(),
+            project_id: Uuid::new_v4(),
+            repository_id: Uuid::new_v4(),
+            worktree_id: Uuid::new_v4(),
+            work_item_id: Uuid::new_v4(),
+            actor_id: Uuid::new_v4(),
+            runtime_id: Uuid::new_v4(),
+            session_id: Uuid::new_v4(),
+            policy_version: 1,
+        }
+    }
+
+    #[test]
+    fn attachment_ticket_is_single_use_and_scope_bound() {
+        let registry = reg();
+        let now = Utc.timestamp_opt(1_700_000_000, 0).single().unwrap();
+        let binding = attachment_binding();
+        let ticket = registry
+            .issue_task_cli_attachment_ticket(&binding, chrono::Duration::seconds(30), now)
+            .unwrap();
+        assert_eq!(ticket.len(), 64);
+
+        let mut wrong_actor = binding.clone();
+        wrong_actor.actor_id = Uuid::new_v4();
+        assert!(matches!(
+            registry.consume_task_cli_attachment_ticket(&ticket, &wrong_actor, now),
+            Err(CliSessionRegistryError::InvalidAttachmentTicket)
+        ));
+
+        registry
+            .consume_task_cli_attachment_ticket(&ticket, &binding, now)
+            .unwrap();
+        assert!(matches!(
+            registry.consume_task_cli_attachment_ticket(&ticket, &binding, now),
+            Err(CliSessionRegistryError::AttachmentTicketReplay)
+        ));
+    }
+
+    #[test]
+    fn expired_attachment_ticket_is_rejected() {
+        let registry = reg();
+        let now = Utc.timestamp_opt(1_700_000_000, 0).single().unwrap();
+        let binding = attachment_binding();
+        let ticket = registry
+            .issue_task_cli_attachment_ticket(&binding, chrono::Duration::seconds(1), now)
+            .unwrap();
+        assert!(matches!(
+            registry.consume_task_cli_attachment_ticket(
+                &ticket,
+                &binding,
+                now + chrono::Duration::seconds(2)
+            ),
+            Err(CliSessionRegistryError::InvalidAttachmentTicket)
+        ));
     }
 
     #[test]

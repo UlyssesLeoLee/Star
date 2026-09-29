@@ -1,3 +1,14 @@
+/*
+CYPHER STRUCTURE MANIFEST
+CREATE
+  (file:File {name:"frontend/src/lib/pushClient.ts",type:"file",language:"typescript"}),
+  (subscribe:Function {name:"requestPushSubscription",type:"function"}),
+  (unsubscribe:Function {name:"unsubscribePush",type:"function"}),
+  (simulate:Function {name:"simulateLocalPush",type:"function"}),
+  (decode:Function {name:"urlBase64ToUint8Array",type:"function"}),
+  (file)-[:CONTAINS]->(subscribe),(file)-[:CONTAINS]->(unsubscribe),(file)-[:CONTAINS]->(simulate),(file)-[:CONTAINS]->(decode);
+*/
+
 // Star Web Push 客户端 (per 2026-09-01 PHASE-MOBILE-PWA v0.4)
 //
 // 真实推送: 后端 VAPID + push 端点 + pushManager.subscribe, server 端存 subscription
@@ -110,7 +121,7 @@ export async function simulateLocalPush(payload: {
 }
 
 // VAPID 公钥转 Uint8Array (Push API 需求)
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = atob(base64);

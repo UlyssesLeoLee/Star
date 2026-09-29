@@ -1,3 +1,15 @@
+/*
+CYPHER STRUCTURE MANIFEST
+CREATE
+  (file:File {name:"frontend/src/components/editor/inlineCompletion.ts",type:"file",language:"typescript"}),
+  (request:Class {name:"CompletionInlineRequest",type:"interface"}),
+  (response:Class {name:"CompletionInlineResponse",type:"interface"}),
+  (register:Function {name:"registerInlineCompletion",type:"function"}),
+  (fetch:Function {name:"defaultCompletionFetcher",type:"function"}),
+  (stub:Function {name:"stubCompletionFetcher",type:"function"}),
+  (file)-[:CONTAINS]->(request),(file)-[:CONTAINS]->(response),(file)-[:CONTAINS]->(register),(file)-[:CONTAINS]->(fetch),(file)-[:CONTAINS]->(stub);
+*/
+
 // =====================================================================
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // frontend/src/components/editor/inlineCompletion.ts — ULYS-98-W2.3
@@ -213,7 +225,7 @@ export function registerInlineCompletion(
     "html",
   ];
 
-  const disposers: monaco.IDisposable[] = [];
+  const disposers: monacoNs.IDisposable[] = [];
 
   for (const lang of languages) {
     const provider: monacoNs.languages.CompletionItemProvider = {
