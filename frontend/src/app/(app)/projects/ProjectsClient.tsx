@@ -659,7 +659,12 @@ export default function ProjectsClient({ initialTab }: { initialTab: ProjectsTab
       {tab === "worktrees" && (
         <div data-testid="projects-worktrees-tab" className="space-y-2">
           <DomainMarker domain="admin" label="admin 域 (RBAC/permission/tenant)" />
-          <div className="text-xs font-mono text-ink-mute">Worktrees — per project_id 过滤 ({projectWorktrees.length} 总数)</div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-mono text-ink-mute">Worktrees — per project_id 过滤 ({projectWorktrees.length} 总数)</div>
+            <Link href="/worktree" className="btn-primary text-xs" data-testid="open-project-worktree-index">
+              打开项目 Worktree 管理
+            </Link>
+          </div>
           {projectCanvases.length > 0 && (
             <div
               data-testid="project-canvas-links"

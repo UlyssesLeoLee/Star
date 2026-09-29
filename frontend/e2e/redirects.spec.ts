@@ -1,7 +1,7 @@
 // =====================================================================
 // frontend/e2e/redirects.spec.ts — U5 (multica-style route consolidation)
 //
-// Unit-level tests for the 26-entry legacy-route → 6-panel redirect map.
+// Unit-level tests for the legacy-route redirect map and retained first-class routes.
 //
 // These are NOT a Playwright/browser e2e suite. We don't have @playwright
 // installed in this worktree. Instead we validate the redirect config at
@@ -50,14 +50,10 @@ const findRedirect = (source: string) => {
 };
 
 describe("redirects: legacy 22 routes → 6 panels", () => {
-  it("contains 28 entries (9 projects-sink + 1 /workspace/:id param + 3 issues/sprint-sink + 6 agent-view-sink + 6 inbox-sink + 3 settings-sink)", () => {
-    // per 2026-09-04 canvas e2e 守门 prerequisite: /canvas/:id 移出 legacy redirect 列表
-    //   (app/canvas/[id]/page.tsx 才是设计文档意图的 CanvasView Miro 详情页主入口).
-    //   从 27 entries 减到 26 entries; per 2026-09-05 19:13 JST 拍板: /issues → /sprint 重命名,
-    //   27 entries 加 1 条 /issues → /sprint 兜底 = 27 entries.
-    //   per 2026-09-05 19:45 JST 拍板: /agents → /agent-view 307 redirect + /agent 也重定向到 /agent-view,
-    //   28 entries 加 1 条 /agents → /agent-view 兜底 = 28 entries.
-    expect(LEGACY_REDIRECTS.length).toBe(28);
+  it("contains 27 entries (9 projects-sink + 2 issues/sprint-sink + 6 agent-view-sink + 6 inbox-sink + 4 settings-sink)", () => {
+    // /worktree is not redirected because it is the Project Worktree Index route.
+    // Total: 9 project routes + 2 sprint routes + 6 agent routes + 6 inbox routes + 4 settings routes.
+    expect(LEGACY_REDIRECTS.length).toBe(27);
   });
 
   it("/workspace → /projects (case 1)", () => {
@@ -69,6 +65,10 @@ describe("redirects: legacy 22 routes → 6 panels", () => {
   it("/work-item → /sprint?view=list (case 2, per 2026-09-05 19:13 JST: /issues 重命名 /sprint + Kanban 已删)", () => {
     const r = findRedirect("/work-item");
     expect(r?.destination).toBe("/sprint?view=list");
+  });
+
+  it("/worktree remains the Project Worktree Index route", () => {
+    expect(findRedirect("/worktree")).toBeUndefined();
   });
 
   it("/board → /projects?tab=kanban (case 3, per 2026-08-31 12:42 JST DRIFT-α-003 修复)", () => {

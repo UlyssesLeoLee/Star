@@ -27,12 +27,12 @@ interface CanvasViewProps {
   connectors: CanvasConnector[];
   highlightElementId?: string;
   readOnly?: boolean;
-  onOpenWorkItem?: (workItemId: string, worktreeId?: string) => void;
+  onOpenWorkItem?: (workItemId: string) => void;
 }
 
 const STICKY_PALETTE = ["#f9d77e", "#ffb3c1", "#a3d9ff", "#b8f0c4", "#d4b3ff"];
 
-export function CanvasView({ canvas, elements, connectors, highlightElementId, readOnly = false }: CanvasViewProps) {
+export function CanvasView({ canvas, elements, connectors, highlightElementId, readOnly = false, onOpenWorkItem }: CanvasViewProps) {
   const { t } = useTranslation();
   // viewport: 世界坐标
   const [viewport, setViewport] = useState(canvas.viewport);
@@ -131,24 +131,14 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   };
 
   const onElementDoubleClick = (el: CanvasElement) => {
-    const workItemId = el.entity_ref
-      ? el.entity_ref.ref_type === "work_item" ? el.entity_ref.ref_id : undefined
-      : el.content.work_item_id;
-    if (workItemId && onOpenWorkItem) {
-      onOpenWorkItem(workItemId, el.entity_ref?.worktree_id);
+    if (el.content.work_item_id && onOpenWorkItem) {
+      onOpenWorkItem(el.content.work_item_id);
       return;
     }
 
     // 联动 2:work_item_card / worktree_node / agent_cursor / automation_node → 跳详情
-    const ref = el.entity_ref
-      ? el.entity_ref.ref_id
-      : el.content.work_item_id || el.content.worktree_id || el.content.agent_session_id || el.content.automation_id;
-    const kind = el.entity_ref?.ref_type === "work_item" ? "work-item"
-      : el.entity_ref?.ref_type === "worktree" ? "worktree"
-      : el.entity_ref?.ref_type === "agent_session" ? "agent"
-      : el.entity_ref?.ref_type === "automation" ? "automation"
-      : el.entity_ref ? null
-      : el.content.work_item_id ? "work-item"
+    const ref = el.content.work_item_id || el.content.worktree_id || el.content.agent_session_id || el.content.automation_id;
+    const kind = el.content.work_item_id ? "work-item"
       : el.content.worktree_id ? "worktree"
       : el.content.agent_session_id ? "agent"
       : el.content.automation_id ? "automation"
@@ -194,10 +184,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         );
       }
       case "work_item_card": {
-        const workItemId = el.entity_ref
-          ? el.entity_ref.ref_type === "work_item" ? el.entity_ref.ref_id : undefined
-          : el.content.work_item_id;
-        const wi = useStore.getState().workItems.find((w) => w.id === workItemId);
+        const wi = useStore.getState().workItems.find((w) => w.id === el.content.work_item_id);
         if (!wi) return null;
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
@@ -217,10 +204,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         );
       }
       case "worktree_node": {
-        const worktreeId = el.entity_ref
-          ? el.entity_ref.ref_type === "worktree" ? el.entity_ref.ref_id : undefined
-          : el.content.worktree_id;
-        const wt = worktrees.find((w) => w.id === worktreeId);
+        const wt = worktrees.find((w) => w.id === el.content.worktree_id);
         if (!wt) return null;
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>

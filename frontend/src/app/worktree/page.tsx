@@ -1,21 +1,88 @@
+/*
+CYPHER STRUCTURE MANIFEST
+CREATE
+  (file:File {name:"frontend/src/app/worktree/page.tsx", type:"file", language:"tsx"}),
+  (page:Function {name:"WorktreePage", type:"function", signature:"WorktreePage(): JSX.Element", visibility:"public", complexity:"complex"}),
+  (row:Function {name:"Row", type:"function", signature:"Row(props: { label: string; value: React.ReactNode }): JSX.Element", visibility:"private", complexity:"simple"}),
+  (apps:Variable {name:"WORKTREE_GROUP_APPS", type:"variable", language:"typescript"}),
+  (editor:Variable {name:"MonacoEditor", type:"variable", language:"typescript"}),
+  (projects:Variable {name:"projects", type:"variable", language:"typescript"}),
+  (agentSessions:Variable {name:"agentSessions", type:"variable", language:"typescript"}),
+  (localRuntimes:Variable {name:"localRuntimes", type:"variable", language:"typescript"}),
+  (project:Variable {name:"selectedProject", type:"variable", language:"typescript"}),
+  (worktrees:Variable {name:"projectWorktrees", type:"variable", language:"typescript"}),
+  (worktree:Variable {name:"wt", type:"variable", language:"typescript"}),
+  (nextStates:Variable {name:"allowedNext", type:"variable", language:"typescript"}),
+  (selectProject:Function {name:"selectProject", type:"function", signature:"onChange(event): void", visibility:"private", complexity:"simple"}),
+  (projectMap:Function {name:"projectMap", type:"function", signature:"projects.map(project => JSX.Element)", visibility:"private", complexity:"simple"}),
+  (worktreeMap:Function {name:"worktreeMap", type:"function", signature:"projectWorktrees.map(worktree => JSX.Element)", visibility:"private", complexity:"moderate"}),
+  (transitionMap:Function {name:"transitionMap", type:"function", signature:"allowedNext.map(status => JSX.Element)", visibility:"private", complexity:"simple"}),
+  (appMap:Function {name:"appMap", type:"function", signature:"WORKTREE_GROUP_APPS.map(app => JSX.Element)", visibility:"private", complexity:"simple"}),
+  (filterProject:Function {name:"filterProject", type:"function", signature:"worktrees.filter(worktree => project_id matches)", visibility:"private", complexity:"simple"}),
+  (agentForWorktree:Function {name:"agentForWorktree", type:"function", signature:"agentSessions.find(session => session.worktree_id === worktree.id)", visibility:"private", complexity:"simple"}),
+  (runtimeForWorktree:Function {name:"runtimeForWorktree", type:"function", signature:"localRuntimes.find(runtime => runtime.id === worktree.local_runtime_id)", visibility:"private", complexity:"simple"}),
+  (formatTimestamp:Function {name:"formatTimestamp", type:"function", signature:"formatTimestamp(value: string): string", visibility:"private", complexity:"simple"}),
+  (deriveTransitions:Function {name:"deriveTransitions", type:"function", signature:"WORKTREE_SM.transitions.filter(...).map(...)", visibility:"private", complexity:"simple"}),
+  (file)-[:CONTAINS]->(page),
+  (file)-[:CONTAINS]->(row),
+  (file)-[:CONTAINS]->(apps),
+  (file)-[:CONTAINS]->(editor),
+  (page)-[:USES]->(projects),
+  (page)-[:USES]->(agentSessions),
+  (page)-[:USES]->(localRuntimes),
+  (page)-[:USES]->(project),
+  (page)-[:USES]->(worktrees),
+  (page)-[:USES]->(wt),
+  (page)-[:USES]->(nextStates),
+  (page)-[:CALLS]->(filterProject),
+  (page)-[:CALLS]->(agentForWorktree),
+  (page)-[:CALLS]->(runtimeForWorktree),
+  (page)-[:CALLS]->(formatTimestamp),
+  (page)-[:CALLS]->(deriveTransitions),
+  (page)-[:CALLS]->(projectMap),
+  (page)-[:CALLS]->(worktreeMap),
+  (page)-[:CALLS]->(transitionMap),
+  (page)-[:CALLS]->(appMap),
+  (page)-[:CALLS]->(selectProject),
+  (page)-[:CALLS]->(row),
+  (page)-[:USES]->(apps),
+  (page)-[:USES]->(editor);
+*/
+
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
+import { useNavStore } from "@/lib/nav/navStore";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { StateMachineDiagram } from "@/components/StateMachineDiagram";
-import { WORKTREE_SM, type WorktreeStatus } from "@/types/ids";
+import { WORKTREE_SM, type Worktree, type WorktreeStatus } from "@/types/ids";
 import { GitBranch, GitMerge, Lock, Cpu, AlertCircle } from "lucide-react";
 import { clsx } from "clsx";
 import { useTranslation } from "@/lib/i18n";
 import dynamic from "next/dynamic";
-import { StartWorktreeButton } from "@/components/worktree-shared/StartWorktreeButton";
+
+function formatTimestamp(value: string): string {
+  const timestamp = new Date(value);
+  return Number.isNaN(timestamp.getTime())
+    ? "—"
+    : `${timestamp.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
+const WORKTREE_GROUP_APPS = [
+  { id: "multica", label: "Multica" },
+  { id: "jira", label: "Jira 视图" },
+  { id: "task-card", label: "Task Cards" },
+  { id: "canvas", label: "Infinite Canvas" },
+  { id: "workflow", label: "Workflow / LangGraph" },
+  { id: "plugins", label: "Plugins" },
+] as const;
 
 // ULYS-98-W1.1 — Monaco editor (loaded client-side only).
 const MonacoEditor = dynamic(
-  () => import("@/components/editor/MonacoEditor").then((m) => m.MonacoEditor),
+  () => import("@/components/editor/MonacoEditor"),
   {
     ssr: false,
     loading: () => (
@@ -28,10 +95,35 @@ const MonacoEditor = dynamic(
 
 export default function WorktreePage() {
   const { t } = useTranslation();
-  const { worktrees, transitionWorktree } = useStore();
-  const [selected, setSelected] = useState<string>("wt-003");
+  const { projects, worktrees, agentSessions, localRuntimes, transitionWorktree } = useStore();
+  const selectedProjectId = useNavStore((state) => state.selectedProjectId);
+  const setSelectedProjectId = useNavStore((state) => state.setSelectedProjectId);
+  const [hasMounted, setHasMounted] = useState(false);
+  const selectedProject = projects.find((project) => project.id === (hasMounted ? selectedProjectId : null)) ?? projects[0] ?? null;
+  const projectWorktrees = worktrees.filter((worktree) => worktree.project_id === selectedProject?.id);
+  const [selected, setSelected] = useState<string>("");
 
-  const wt = worktrees.find((w) => w.id === selected);
+  useEffect(() => setHasMounted(true), []);
+
+  useEffect(() => {
+    if (hasMounted && selectedProject && selectedProjectId !== selectedProject.id) {
+      setSelectedProjectId(selectedProject.id);
+    }
+  }, [hasMounted, selectedProject, selectedProjectId, setSelectedProjectId]);
+
+  useEffect(() => {
+    if (!projectWorktrees.some((worktree) => worktree.id === selected)) {
+      setSelected(projectWorktrees[0]?.id ?? "");
+    }
+  }, [projectWorktrees, selected]);
+
+  const wt = projectWorktrees.find((worktree) => worktree.id === selected);
+  const agentForWorktree = (worktree: Worktree) =>
+    agentSessions.find((session) => session.id === worktree.agent_session_id && session.worktree_id === worktree.id);
+  const runtimeForWorktree = (worktree: Worktree) =>
+    localRuntimes.find((runtime) => runtime.id === worktree.local_runtime_id && runtime.tenant_id === worktree.tenant_id);
+  const selectedAgent = wt ? agentForWorktree(wt) : undefined;
+  const selectedRuntime = wt ? runtimeForWorktree(wt) : undefined;
   const allowedNext = wt
     ? Array.from(new Set(
         WORKTREE_SM.transitions.filter((t) => t.from === wt.status).map((t) => t.to),
@@ -42,18 +134,37 @@ export default function WorktreePage() {
     <div className="max-w-7xl">
       <PageHeader
         title={t.pageTitles['/worktree'].title}
-        subtitle="17 状态机 (§7.1) — INV-WT-01~04。每个 worktree 是 git checkout 的隔离副本,绑定 local-runtime + agent-session + PR。"
+        subtitle="项目级 Worktree 管理 — 先选择 Project，再比较 Agent、Runtime、PR、冲突与锁信号；当前展示本地原型数据。"
         icon={<GitBranch className="text-accent" size={20} />}
         track="B"
-        count={worktrees.length}
+        count={projectWorktrees.length}
       />
 
-      {/* ULYS-228 FR-ORCA-009 entry point — New worktree button → StartFromPicker modal */}
-      <div className="mb-4">
-        <StartWorktreeButton repoId="00000000-0000-0000-0000-000000000001" />
+      <section className="card mb-4 flex flex-wrap items-center gap-3" aria-label="项目 Worktree 范围">
+        <label htmlFor="worktree-project" className="text-xs font-semibold text-ink-dim">Project</label>
+        <select
+          id="worktree-project"
+          value={selectedProject?.id ?? ""}
+          onChange={(event) => {
+            setSelectedProjectId(event.target.value);
+            setSelected("");
+          }}
+          className="rounded-md border border-line bg-bg-soft px-3 py-2 text-sm"
+          data-testid="worktree-project-selector"
+        >
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>{project.key} · {project.name}</option>
+          ))}
+        </select>
+        <span className="text-xs text-ink-mute">原型按所选 Project 过滤本地数据；服务端授权尚未接入。</span>
+      </section>
+
+      <div className="card mb-4 flex flex-wrap items-center gap-3 text-xs">
+        <span className="font-semibold text-ink-dim">Worktree 创建 / 导入</span>
+        <span className="text-ink-mute">等待 Project→Repository 绑定和服务端受权 API；当前页面不发起创建或清理操作。</span>
       </div>
 
-      <SectionTitle>状态机可视化</SectionTitle>
+      {selectedProject && <SectionTitle>{selectedProject.key} · {selectedProject.name} 的 Worktree</SectionTitle>}
       <div className="mb-5">
         <StateMachineDiagram sm={WORKTREE_SM} highlightState={wt?.status} />
       </div>
@@ -62,31 +173,40 @@ export default function WorktreePage() {
         {/* 列表 */}
         <div className="lg:col-span-2">
           <div className="card">
-            <SectionTitle>Worktrees ({worktrees.length})</SectionTitle>
+            <SectionTitle>Project Worktree Index ({projectWorktrees.length})</SectionTitle>
             <table className="table">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Name</th>
+                  <th>Worktree</th>
                   <th>Branch</th>
                   <th>Status</th>
+                  <th>Agent / Runtime</th>
                   <th>PR</th>
+                  <th>Lock</th>
                   <th>Last event</th>
                 </tr>
               </thead>
               <tbody>
-                {worktrees.map((w) => (
+                {projectWorktrees.map((w) => (
                   <tr
                     key={w.id}
                     onClick={() => setSelected(w.id)}
+                    aria-expanded={selected === w.id}
                     className={clsx("cursor-pointer", selected === w.id && "bg-accent/5")}
                   >
-                    <td className="font-mono text-xs">{w.id}</td>
-                    <td className="font-medium">{w.name}</td>
+                    <td>
+                      <div className="font-mono text-[10px] text-ink-mute">{w.id}</div>
+                      <div className="font-medium">{w.name}</div>
+                    </td>
                     <td className="font-mono text-xs text-info">{w.branch}</td>
                     <td><StatusPill value={w.status} /></td>
+                    <td className="text-[10px]">
+                      <div>{agentForWorktree(w)?.name ?? "未绑定 Agent"}</div>
+                      <div className="text-ink-mute">{runtimeForWorktree(w)?.hostname ?? "未绑定 Runtime"}</div>
+                    </td>
                     <td className="font-mono text-xs">{w.pr_id ?? "—"}</td>
-                    <td className="text-ink-dim text-xs">{new Date(w.last_event_at).toLocaleTimeString()}</td>
+                    <td className="font-mono text-xs">v{w.lock_version}</td>
+                    <td className="text-ink-dim text-xs">{formatTimestamp(w.last_event_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -109,11 +229,11 @@ export default function WorktreePage() {
               <dl className="text-xs space-y-1.5 mb-4">
                 <Row label="Branch" value={<span className="font-mono text-info">{wt.branch}</span>} />
                 <Row label="Base" value={<span className="font-mono">{wt.base_branch}</span>} />
-                <Row label="Local Runtime" value={wt.local_runtime_id ?? "—"} />
-                <Row label="Agent Session" value={wt.agent_session_id ?? "—"} />
+                <Row label="Local Runtime" value={selectedRuntime ? `${selectedRuntime.hostname} · ${selectedRuntime.status}` : wt.local_runtime_id ?? "未绑定"} />
+                <Row label="Agent Session" value={selectedAgent ? `${selectedAgent.name} · ${selectedAgent.status}` : wt.agent_session_id ?? "未绑定"} />
                 <Row label="PR" value={wt.pr_id ?? "—"} />
                 <Row label="Lock version" value={<span className="font-mono">v{wt.lock_version}</span>} />
-                <Row label="Created" value={new Date(wt.created_at).toLocaleString()} />
+                <Row label="Created" value={formatTimestamp(wt.created_at)} />
               </dl>
 
               <div className="text-[10px] uppercase tracking-wider text-ink-mute mb-1.5 flex items-center gap-1.5">
@@ -143,6 +263,31 @@ export default function WorktreePage() {
                 >
                   <span className="font-mono">⊞</span> 打开在 Canvas
                 </Link>
+                <Link
+                  href={`/worktree/${encodeURIComponent(wt.id)}/group`}
+                  className="btn-primary ml-2 text-[10px]"
+                  data-testid="open-worktree-group"
+                >
+                  展开 Worktree 群组
+                </Link>
+              </div>
+
+              <div className="mt-4 border-t border-line pt-3" data-testid="expanded-worktree-apps">
+                <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-ink-mute">
+                  {wt.name} · 展开应用
+                </div>
+                <nav aria-label={`${wt.name} 的 Worktree 群组应用`} className="grid grid-cols-2 gap-1">
+                  {WORKTREE_GROUP_APPS.map((app) => (
+                    <Link
+                      key={app.id}
+                      href={`/worktree/${encodeURIComponent(wt.id)}/group?app=${app.id}`}
+                      className="rounded border border-line px-2 py-2 text-xs text-ink-dim transition hover:border-accent/50 hover:text-accent"
+                      data-testid={`expanded-worktree-app-${app.id}`}
+                    >
+                      {app.label}
+                    </Link>
+                  ))}
+                </nav>
               </div>
 
               <div className="mt-4 pt-3 border-t border-line text-[10px] text-ink-mute space-y-1">
@@ -150,7 +295,7 @@ export default function WorktreePage() {
                                 <Lock size={10} /> Optimistic lock via lock_version
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <Cpu size={10} /> 1 worktree ↔ 1 active agent session
+                                <Cpu size={10} /> 当前执行绑定；历史 Agent Sessions 待接入
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <AlertCircle size={10} /> 状态切换会触发 NATS event `star.events.{"{tenant_id}"}.worktree.worktree.*`

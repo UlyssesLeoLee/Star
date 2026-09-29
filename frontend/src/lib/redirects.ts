@@ -1,14 +1,14 @@
 // =====================================================================
 // frontend/src/lib/redirects.ts — U5 (multica-style route consolidation)
 //
-// Single source of truth for the 26 legacy-route → 6-panel redirect map
-// per docs/frontend/design/ui-redesign-multica-style.md §2.
+// Single source of truth for legacy routes redirected to consolidated app
+// routes. /worktree is an active Project Worktree Index route, not a redirect.
 //
 // 22 domain routes are absorbed into 6 new panel routes (27 total
 // entries because /workspace has both an exact-match and a /:id
 // path-param variant for deep links):
 //   /inbox      ← notification / comment / audit / feedback / search / context
-//   /issues     ← work-item / worktree
+//   /issues     ← work-item
 //   /projects   ← project / workspace / board / planning / scm / collaboration
 //                 / workflow / canvas (with id) / relation
 //   /agents     ← agent / validation / automation / development / local-runtime
@@ -87,7 +87,6 @@ export const LEGACY_REDIRECTS: ReadonlyArray<NextRedirect> = [
     destination: "/sprint?view=list",
     permanent: false,
   },
-  { source: "/worktree", destination: "/sprint?view=tree", permanent: false },
 
   // ── /agent-view sink (per 2026-09-05 19:45 JST 拍板: /agents -> /agent-view 307 redirect) ──
   { source: "/agent", destination: "/agent-view", permanent: false },
