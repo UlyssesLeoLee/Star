@@ -98,8 +98,34 @@ export const CHARISMA_COLORS = {
   paper: "#fdf4ff",
 } as const;
 
-/** 主题 mode (dark | light | christmas | charisma) */
-export type ThemeMode = "dark" | "light" | "christmas" | "charisma";
+/** 老上海月份牌调色板 (民国海派摩登擦笔水彩与 Art Deco 暖象牙宣纸调) */
+export const SHANGHAI_COLORS = {
+  // 暖象牙宣纸底
+  inkBlack: "#f5e8c7",
+  inkDark: "#ebd8b0",
+  inkMid: "#faf2de",
+  inkLight: "#dfca9f",
+  // 旗袍朱砂茜红
+  vermilion: "#b8282b",
+  vermilionGlow: "#d43f42",
+  // 翡翠碧玉墨绿 (替换青色)
+  neonCyan: "#1b5e48",
+  neonCyanGlow: "#298265",
+  // 留声机老鎏金
+  gold: "#d49e35",
+  goldGlow: "#e5b452",
+  // 胭脂紫红
+  cyberPurple: "#7c2d4a",
+  cyberPurpleGlow: "#9e3f63",
+  // 老上海黛灰
+  ash: "#8c7e70",
+  ashLight: "#a39587",
+  // 老炭墨黑 (高对比文本)
+  paper: "#221c16",
+} as const;
+
+/** 主题 mode (dark | light | christmas | charisma | shanghai) */
+export type ThemeMode = "dark" | "light" | "christmas" | "charisma" | "shanghai";
 
 /** Agent Game 调色板结构类型 */
 export type AgentGamePalette = Record<keyof typeof DARK_COLORS, string>;
@@ -110,6 +136,7 @@ export type AgentGamePalette = Record<keyof typeof DARK_COLORS, string>;
  *   - light 模式: LIGHT (宣纸底 + 高饱和印刷)
  *   - christmas 模式: CHRISTMAS (圣夜密林黑 + 绯红 + 松绿 + 烛金)
  *   - charisma 模式: CHARISMA (剧院黑曜深渊 + 神恩紫 + 丝绒红 + 帝国金)
+ *   - shanghai 模式: SHANGHAI (象牙暖宣纸 + 旗袍朱砂红 + 翡翠墨绿 + 留声机金)
  *   - 默认值: dark (per 守门 #13, dark 优先)
  *   - mount 前返回 dark (避免 hydration 闪烁)
  */
@@ -124,6 +151,8 @@ export function useAgentGameTheme() {
       mode = "christmas";
     } else if (resolvedTheme === "charisma" || theme === "charisma") {
       mode = "charisma";
+    } else if (resolvedTheme === "shanghai" || theme === "shanghai") {
+      mode = "shanghai";
     }
 
     let colors: AgentGamePalette = DARK_COLORS;
@@ -133,6 +162,8 @@ export function useAgentGameTheme() {
       colors = CHRISTMAS_COLORS;
     } else if (mode === "charisma") {
       colors = CHARISMA_COLORS;
+    } else if (mode === "shanghai") {
+      colors = SHANGHAI_COLORS;
     }
 
     return {

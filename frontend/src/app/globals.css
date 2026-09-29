@@ -29,6 +29,8 @@
   --font-mono:  ui-monospace, "SFMono-Regular", "Cascadia Code", "JetBrains Mono", "Consolas", "Menlo", monospace;
   /* 日文明朝体 — AI Tab 限定 */
   --font-serif-jp: "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", serif;
+  /* 老上海月份牌字体栈: 民国美术字 / 经典宋体 / 仿宋 / 康熙字典体 / 典雅衬线 */
+  --font-shanghai: "Songti SC", "Source Han Serif SC", "Noto Serif CJK SC", "STSong", "SimSun", "FZShuTi", "FZXingKai-S04S", "Yu Mincho", "Hiragino Mincho ProN", serif;
   /* 免费商用纯像素游戏字体栈:
      Latin: 'KenPixel' (CC0, 18KB 本地自托管), 'Press Start 2P', 'Silkscreen' (OFL)
      CJK 中文像素: 'Ark Pixel 12px' (方舟像素体 OFL), 'Fusion Pixel' (缝合像素字 MIT), 'Zpix' (最像素), 'DotGothic16' (OFL)
@@ -58,9 +60,24 @@ html, body {
 }
 
 /* Light mode: 宣纸底纹 — 极细点网纹增加纸质感 (仅亮色模式) */
-:root:not(.dark):not(.christmas) body {
+:root:not(.dark):not(.christmas):not(.shanghai) body {
   background-image: radial-gradient(circle, rgba(13,17,23,0.035) 1px, transparent 1px);
   background-size: 24px 24px;
+}
+
+/* Shanghai Yuefenpai mode: 民国典雅宋体 + 暖象牙宣纸微石版颗粒 (老上海月份牌风格) */
+html.shanghai,
+html.shanghai body,
+.shanghai body,
+body.shanghai {
+  font-family: var(--font-shanghai) !important;
+  background-color: var(--color-surface, #f5e8c7);
+  color: var(--color-text, #221c16);
+  background-image:
+    radial-gradient(circle, rgba(184, 40, 43, 0.04) 1px, transparent 1px),
+    radial-gradient(circle, rgba(200, 146, 40, 0.05) 1.5px, transparent 1.5px);
+  background-size: 20px 20px, 40px 40px;
+  background-position: 0 0, 10px 10px;
 }
 
 /* Christmas Pixel mode: 纯像素字体 + 1-bit 点阵清晰渲染 + 雪花棋盘点阵 (圣夜纯像素主题) */
@@ -1158,6 +1175,141 @@ html.charisma .hd2d-btn-primary {
   70% {
     filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.28)) drop-shadow(0 0 3px rgba(245, 158, 11, 0.3));
   }
+}
+
+/* ============================================================================
+   ★ SHANGHAI YUEFENPAI (老上海月份牌) GRANDMASTER LITHOGRAPH ENGINE
+   Republic of China (1920s-1930s) Haipai Modernism, double-line gilded ornamental
+   frames, traditional ink & wash watercolor, and vintage enameled badges.
+   ============================================================================ */
+
+/* 1. Shanghai Yuefenpai Card (老上海月份牌双线金边画框卡片) */
+html.shanghai .card,
+.shanghai .card {
+  border-radius: 4px !important;
+  border: 1.5px solid var(--color-border, #c89228) !important;
+  background-color: var(--color-surface-2, #faf2de) !important;
+  background-image:
+    radial-gradient(rgba(184, 40, 43, 0.05) 1px, transparent 1px),
+    linear-gradient(145deg, #fffaf0 0%, #faf2de 50%, #f3e6c6 100%) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.8),
+    inset 0 0 0 3px #faf2de,
+    inset 0 0 0 4.5px rgba(184, 40, 43, 0.45),
+    3px 4px 12px rgba(34, 28, 22, 0.12),
+    0 1px 3px rgba(34, 28, 22, 0.08) !important;
+  color: var(--color-text, #221c16) !important;
+  font-family: var(--font-shanghai) !important;
+}
+
+html.shanghai .card:hover,
+.shanghai .card:hover {
+  border-color: var(--color-primary, #b8282b) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.9),
+    inset 0 0 0 3px #faf2de,
+    inset 0 0 0 4.5px #b8282b,
+    4px 6px 16px rgba(34, 28, 22, 0.18),
+    0 0 10px rgba(212, 158, 53, 0.25) !important;
+}
+
+/* 2. Shanghai Yuefenpai Buttons (民国搪瓷珐琅与鎏金按键) */
+html.shanghai .btn,
+.shanghai .btn {
+  border-radius: 3px !important;
+  border: 1.5px solid #c89228 !important;
+  background: linear-gradient(180deg, #fffbf2 0%, #faecd0 100%) !important;
+  color: #221c16 !important;
+  font-family: var(--font-shanghai) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(34, 28, 22, 0.15),
+    1px 2px 4px rgba(34, 28, 22, 0.12) !important;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease !important;
+}
+
+html.shanghai .btn:hover,
+.shanghai .btn:hover {
+  transform: translateY(-1px) !important;
+  border-color: #b8282b !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f6e4bf 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    2px 3px 8px rgba(34, 28, 22, 0.18) !important;
+}
+
+html.shanghai .btn-primary,
+.shanghai .btn-primary {
+  border-radius: 3px !important;
+  border: 1.5px solid #7a1518 !important;
+  background: linear-gradient(180deg, #cf3a3e 0%, #b8282b 50%, #941e21 100%) !important;
+  color: #faf2de !important;
+  font-family: var(--font-shanghai) !important;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 160, 0.6),
+    inset 0 0 0 1px rgba(212, 158, 53, 0.4),
+    2px 3px 8px rgba(184, 40, 43, 0.35) !important;
+}
+
+html.shanghai .btn-primary:hover,
+.shanghai .btn-primary:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(180deg, #db4448 0%, #c42f32 50%, #9e2326 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 230, 180, 0.8),
+    inset 0 0 0 1px rgba(212, 158, 53, 0.6),
+    2px 4px 12px rgba(184, 40, 43, 0.45) !important;
+}
+
+/* 3. Shanghai Yuefenpai Badges (民国印章与留声机鎏金徽章) */
+.shanghai-badge-cinnabar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 2px;
+  border: 1px solid #7a1518;
+  background-color: #b8282b;
+  color: #faf2de;
+  font-family: var(--font-shanghai) !important;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 1px 2px 4px rgba(34, 28, 22, 0.15);
+}
+
+.shanghai-badge-jade {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 2px;
+  border: 1px solid #114232;
+  background-color: #1b5e48;
+  color: #faf2de;
+  font-family: var(--font-shanghai) !important;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 1px 2px 4px rgba(34, 28, 22, 0.15);
+}
+
+.shanghai-badge-gilt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 2px;
+  border: 1px solid #a3751e;
+  background-color: #d49e35;
+  color: #221c16;
+  font-family: var(--font-shanghai) !important;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 1px 2px 4px rgba(34, 28, 22, 0.15);
 }
 
 

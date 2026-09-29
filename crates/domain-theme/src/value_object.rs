@@ -21,6 +21,8 @@ pub enum ThemeId {
     Christmas,
     /// 极魅纯像素主题 (第四套内置主题: 歧路旅人 HD-2D 风格)
     Charisma,
+    /// 老上海月份牌主题 (第五套内置主题: 民国海派擦笔水彩与 Art Deco 暖象牙宣纸风格)
+    Shanghai,
     /// 扩展位 1: 高对比度 (无障碍)
     #[serde(skip)]
     HighContrast,
@@ -37,6 +39,7 @@ impl ThemeId {
             ThemeId::Dark => "dark",
             ThemeId::Christmas => "christmas",
             ThemeId::Charisma => "charisma",
+            ThemeId::Shanghai => "shanghai",
             ThemeId::HighContrast => "high-contrast",
             ThemeId::Solarized => "solarized",
         }
@@ -52,7 +55,7 @@ impl ThemeId {
 
     /// 内置(非扩展位)主题列表
     pub fn all_builtin() -> &'static [ThemeId] {
-        &[ThemeId::Light, ThemeId::Dark, ThemeId::Christmas, ThemeId::Charisma]
+        &[ThemeId::Light, ThemeId::Dark, ThemeId::Christmas, ThemeId::Charisma, ThemeId::Shanghai]
     }
 }
 
@@ -198,11 +201,13 @@ mod tests {
         assert_eq!(ThemeId::Dark.as_str(), "dark");
         assert_eq!(ThemeId::Christmas.as_str(), "christmas");
         assert_eq!(ThemeId::Charisma.as_str(), "charisma");
+        assert_eq!(ThemeId::Shanghai.as_str(), "shanghai");
     }
 
     #[test]
     fn test_theme_id_is_dark() {
         assert!(!ThemeId::Light.is_dark());
+        assert!(!ThemeId::Shanghai.is_dark());
         assert!(ThemeId::Dark.is_dark());
         assert!(ThemeId::Christmas.is_dark());
         assert!(ThemeId::Charisma.is_dark());
@@ -216,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_builtin_count() {
-        assert_eq!(ThemeId::all_builtin().len(), 4);
+        assert_eq!(ThemeId::all_builtin().len(), 5);
     }
 
     #[test]
