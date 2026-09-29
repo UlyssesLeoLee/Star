@@ -1,8 +1,8 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project Worktree 管理与 Group Apps 详细设计 v0.6**
+> **渡口 Project Worktree 管理与 Group Apps 详细设计 v0.5**
 >
-> - 状态：🟡 Draft（Phase 2B/2C/2D 与 Phase 3B Canvas migration/API 代码切片已实现并编译；Phase 3 前端 API 接线、Canvas Outbox consumer、Canvas 创建 WorkItem 命令、数据库部署、ACL/RLS 负向验收与历史归属回填待完成）
+> - 状态：🟡 Draft（Phase 2B/2C/2D API 与增量 migration 已实现并编译；Phase 3 前端已收紧 Worktree Canvas scope；Canvas 持久化/API、Outbox、数据库部署、ACL 负向验收与历史归属回填待完成）
 > - 日期：2026-09-29
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - 上位需求：[`docs/requirements.md`](../requirements.md) v2.4 §50
@@ -235,11 +235,7 @@ Index 同时呈现一个 Worktree 的 owner、当前 Agent、活跃 Runtime、PR
 
 Group Canvas 与 Task Card、Multica、Jira 同级；Canvas Element 仅持有带类型 `EntityRef { ref_type, ref_id, worktree_id }`，不持有 WorkItem 状态副本。Canvas registry 以当前 Worktree 为唯一查询边界；`project` / `free` Canvas 和旧元素中的裸 `work_item_id` 不构成 Worktree 绑定证据。双击任务 Element 导航到保留当前 Worktree 的 `app=task-card&work_item_id={id}`；后端须同时验证 EntityRef 的 `worktree_id`、当前 Worktree 的 canonical WorkItem association 与 Project ACL。“创建任务”“关联任务”“变更状态”“建立关系”须走对应事实 owner 的 Application Command，再由 Outbox 更新 Canvas 与其它投影。Project 级 Worktree Overview Graph 与 Worktree Group Infinite Canvas 分路由、分查询范围、分用户目的。
 
-Phase 3B migration 将 `canvas.group_canvas_registry`、`canvas.canvas_elements_backend`、`canvas.canvas_entity_ref` 定义为 Master/SCD2；`canvas.canvas_group_audit` 与 `canvas.canvas_group_outbox` 是 Transaction/append-only。新 Group API 支持 Worktree Canvas 查询/创建、元素查询/创建/版本更新/逻辑移除、EntityRef 设置/替换/解除。读写均先验证 JWT actor、Worktree 所属 Project 与当前 membership，再设置事务级 `app.tenant_id` / `app.worktree_id` 供 RLS 使用；写命令还需 `canvas:write` 和 Project writer role。Phase 3B 当前只接受 canonical `work_item` 与当前 `worktree` 两类 EntityRef；Jira issue 引用要等 Jira alias/SoR contract 落定后扩展。任务 EntityRef 只解析到同 tenant/project、当前 Worktree association 下同时存在 canonical metadata 与 Multica lifecycle 的 WorkItem；写入或读取 WorkItem 引用还需 `work-item:read`，否则元素响应隐藏此类引用。Canvas `content` 不得另存身份 ID；任务卡元素和 Worktree 节点必须分别绑定同类 typed EntityRef。
-
-元素与 EntityRef 的 SCD2 变更、append-only Audit、Outbox 和幂等响应在同一 PostgreSQL transaction 提交。事件携带 actor、correlation ID、Worktree / Project scope 与 aggregate version；元素与其 EntityRef 共用单调递增的 Element version，EntityRef 自身版本另放入事件 payload，Canvas registry 事件使用 Canvas version。Canvas API 不更新 Multica lifecycle；任务状态仍走 WorkItem Lifecycle Command。当前仍未实现 Canvas Outbox consumer/realtime 投影、从 Canvas 发起 WorkItem Command、Canvas/Jira relation command 或 Canvas 前端 API 接线；迁移尚未在数据库应用，因此这些 API 是未部署代码切片。
-
-Phase 3A 前端切片只加载 `Canvas.ref_kind=worktree && Canvas.ref_id=current_worktree_id`，任务深链要求显式 typed EntityRef 与当前 Worktree task association；旧 Project / Free seed 不自动迁移。Canvas UI 仍读 mock store，未绑定当前 Worktree 的任务不显示 CLI 入口。当前空状态继续提示尚未连接生产 API，不能据此验收 Phase 3。
+当前前端切片只加载 `Canvas.ref_kind=worktree && Canvas.ref_id=current_worktree_id`，任务深链还要求显式 typed EntityRef 与当前 Worktree task association；旧 Project / Free seed 不自动迁移。未绑定当前 Worktree 的任务不显示 CLI 入口。Canvas 数据仍来自 mock store，Group Canvas 创建、元素持久化、EntityRef resolver/API、Outbox consumer 和服务端 ACL 尚未落地，因此空状态如实提示未接 API，不能据此验收 Phase 3。
 
 ### 8.2 Group Chat 与 LangGraph
 
@@ -337,7 +333,7 @@ Phase 2 migrations 已逐表加入 tenant RLS；Master 表无 DELETE policy，Tr
 | 3 | 旧 Worktree projection 保留 `project_id` / `owner_user_id` denormalized columns；权威 Project / Owner SCD2 表已创建 | 历史投影与 Master binding 需保持一致；旧 owner/Project 行未回填 | provisioning/reconciliation 同事务维护 Master 与投影；历史映射有审计证据 |
 | 4 | GroupContext 只返回 context 与 Worktree，没有 App Registry / `allowed_actions[]`；Canvas、Chat、LangGraph、Plugin API 仍未落地 | Worktree group shell 仍无法真实完成跨应用交互 | 接入 Registry / EntityRef resolver 与各 App API，权限测试覆盖每个入口 |
 | 5 | 当前 archive guard 仅根据 AgentSession/Runtime reference 是否为空；没有 Git lock、活跃会话、Runtime drain 状态源 | 对有过绑定但已结束的 Runtime 也会保守拒绝；不能安全执行物理清理 | 接 Agent/Runtime/Git 权威状态、cleanup plan/confirm、恢复策略与故障演练 |
-| 6 | Phase 3B Canvas migration/API 代码已实现，但 migration 未部署；UI 仍用 mock store，Outbox consumer、Canvas 发起 WorkItem Command、Jira relation command 尚未实现 | Canvas 仍不能在已部署系统中创建/协同 Task Card、Multica 或 Jira | 评审并应用 migration；接线前端 API 与 Outbox consumer；Canvas 创建/关联任务只走事实 owner Command；对旧 Project Canvas 做审计分类，歧义项隔离，不自动迁移；完成跨 Worktree/Project ACL 与 RLS 负向验收 |
+| 6 | Group UI 已过滤为显式 Worktree Canvas 并隔离 Project/Free seed；Canvas registry、元素持久化、EntityRef API / Outbox 尚未实现 | 当前只关闭了前端误读范围，Canvas 仍无法从服务端创建、关联或同步任务 | 完成 Worktree-scoped Canvas Domain migration/API 与 Outbox；EntityRef resolver 按当前 GroupContext 授权；对旧 Project Canvas 做审计分类，歧义项隔离，不自动迁移 |
 | 7 | LangGraph SDK/checkpointer 和 Plugin sandbox/revocation ADR 未冻结 | 无法安全恢复流程或热拔除插件 | SDK/API compatibility review 与运行时撤权演练通过 |
 | 8 | 2B/2C/2D migrations 未应用；Project SoR / Role Binding provisioning API 尚不存在，Worktree 历史 scope/owner/work-item association 未回填 | 代码可编译，但无可用 membership 和可信历史映射；数据库 RLS / FK 未真实验证 | 在目标数据库评审并应用 migrations；通过受控 provisioning 建立 M bindings，审计 reconciliation，并完成跨 tenant/project/RLS 负向集成 |
 
@@ -358,4 +354,3 @@ Phase 2 migrations 已逐表加入 tenant RLS；Master 表无 DELETE policy，Tr
 | v0.3 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 canonical WorkItem / Multica 六态持久化、幂等与追加审计，稳定 cursor Index，Worktree owner SCD2 与 archive plan/confirm；逐项标出未部署数据库、旧投影 reconciliation、Jira/Review/Runtime/Canvas/Chat/Plugin 等生产缺口 | 用户要求继续完成 Phase 2B/2C/2D，并重申 Project Worktree Index 是管理多 Agent Worktree 的主入口 |
 | v0.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 收紧 Task 关系、metadata 与授权 Project 一致性查询；GroupContext/WorkItem 请求锁定 Worktree Project 绑定；claim lease 与管理确认期限改由 DB 时钟判断；为 failed 终态补齐 Work 保留期限与重试清除语义 | 自审发现 tenant 内异常 WorkItem-Project 关系可能越过当前 Project 查询边界，并统一短期 lease / confirm deadline 时钟来源 |
 | v0.5 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义带 `worktree_id` 的 Canvas EntityRef 以及旧 Project/Free Canvas 隔离规则；前端 Group Canvas 仅接受显式 Worktree 绑定，并阻止未绑定任务的 Canvas 深链和 CLI 入口；记录 Canvas persistence/API/Outbox 尚未实现 | Phase 3 源码核对发现 Group 页面复用全局 Project Canvas seed，可能把跨 Worktree 任务当成当前上下文 |
-| v0.6 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 落地 Canvas Worktree scope migration/API 代码契约：Canvas/Element/EntityRef SCD2、Audit/Outbox append-only、幂等与版本更新、当前 WorkItem 关联解析；明确未部署数据库、未接前端 API / Outbox consumer / Canvas WorkItem Command | 用户要求继续推进 Phase 3，补齐 Canvas 与 Worktree 内 Task Card 的服务端持久化边界 |

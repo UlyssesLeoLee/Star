@@ -27,11 +27,12 @@ interface CanvasViewProps {
   connectors: CanvasConnector[];
   highlightElementId?: string;
   readOnly?: boolean;
+  onOpenWorkItem?: (workItemId: string) => void;
 }
 
 const STICKY_PALETTE = ["#f9d77e", "#ffb3c1", "#a3d9ff", "#b8f0c4", "#d4b3ff"];
 
-export function CanvasView({ canvas, elements, connectors, highlightElementId, readOnly = false }: CanvasViewProps) {
+export function CanvasView({ canvas, elements, connectors, highlightElementId, readOnly = false, onOpenWorkItem }: CanvasViewProps) {
   const { t } = useTranslation();
   // viewport: 世界坐标
   const [viewport, setViewport] = useState(canvas.viewport);
@@ -130,6 +131,11 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   };
 
   const onElementDoubleClick = (el: CanvasElement) => {
+    if (el.content.work_item_id && onOpenWorkItem) {
+      onOpenWorkItem(el.content.work_item_id);
+      return;
+    }
+
     // 联动 2:work_item_card / worktree_node / agent_cursor / automation_node → 跳详情
     const ref = el.content.work_item_id || el.content.worktree_id || el.content.agent_session_id || el.content.automation_id;
     const kind = el.content.work_item_id ? "work-item"
