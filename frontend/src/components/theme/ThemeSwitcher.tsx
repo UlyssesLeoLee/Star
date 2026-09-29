@@ -50,6 +50,8 @@ export function ThemeSwitcher() {
 
   const getThemeIcon = (t?: (typeof THEMES)[number]) => {
     if (!t) return "🌙";
+    if (t.id === "cel") return "🎞️";
+    if (t.id === "shanghai") return "🪭";
     if (t.id === "charisma") return "✨";
     if (t.id === "christmas") return "🎄";
     return t.isDark ? "🌙" : "☀️";

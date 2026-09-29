@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { LIGHT_COLORS, DARK_COLORS, CHRISTMAS_COLORS, CHARISMA_COLORS, useAgentGameTheme } from "./theme-tokens";
+import { LIGHT_COLORS, DARK_COLORS, CHRISTMAS_COLORS, CHARISMA_COLORS, SHANGHAI_COLORS, useAgentGameTheme } from "./theme-tokens";
 
 // mock next-themes
 const mockUseTheme = vi.fn();
@@ -92,6 +92,31 @@ describe("CHARISMA_COLORS", () => {
   });
 });
 
+describe("SHANGHAI_COLORS", () => {
+  it("暖象牙宣纸底 inkBlack", () => {
+    expect(SHANGHAI_COLORS.inkBlack).toBe("#f5e8c7");
+  });
+  it("旗袍朱砂茜红 vermilion", () => {
+    expect(SHANGHAI_COLORS.vermilion).toBe("#b8282b");
+  });
+  it("翡翠墨绿 neonCyan (替代青色)", () => {
+    expect(SHANGHAI_COLORS.neonCyan).toBe("#1b5e48");
+  });
+  it("留声机老鎏金 gold", () => {
+    expect(SHANGHAI_COLORS.gold).toBe("#d49e35");
+  });
+  it("老炭墨黑 paper", () => {
+    expect(SHANGHAI_COLORS.paper).toBe("#221c16");
+  });
+  it("15 色类齐全", () => {
+    const keys = Object.keys(SHANGHAI_COLORS);
+    expect(keys.length).toBe(15);
+    expect(keys).toContain("vermilion");
+    expect(keys).toContain("neonCyan");
+    expect(keys).toContain("gold");
+  });
+});
+
 describe("useAgentGameTheme", () => {
   beforeEach(() => {
     mockUseTheme.mockReset();
@@ -123,6 +148,13 @@ describe("useAgentGameTheme", () => {
     const { result } = renderHook(() => useAgentGameTheme());
     expect(result.current.mode).toBe("charisma");
     expect(result.current.colors).toBe(CHARISMA_COLORS);
+  });
+
+  it("theme=shanghai → mode=shanghai, colors=SHANGHAI", () => {
+    mockUseTheme.mockReturnValue({ theme: "shanghai", resolvedTheme: "shanghai" });
+    const { result } = renderHook(() => useAgentGameTheme());
+    expect(result.current.mode).toBe("shanghai");
+    expect(result.current.colors).toBe(SHANGHAI_COLORS);
   });
 
   it("theme=system + resolvedTheme=light → mode=light (per resolvedTheme 优先)", () => {

@@ -7,7 +7,7 @@
  * - 预留扩展: HighContrast / Solarized 等
  * - 第三方 / 租户自定义主题可追加 variant
  */
-export type ThemeId = "light" | "dark" | "christmas" | "charisma" | "high-contrast" | "solarized";
+export type ThemeId = "light" | "dark" | "christmas" | "charisma" | "shanghai" | "cel" | "high-contrast" | "solarized";
 
 /**
  * 主题作用域 (三层解析: Personal > Tenant > Global)
@@ -122,6 +122,56 @@ const STAR_CHARISMA_PALETTE: ColorToken[] = [
   { name: "--color-border", hex: "#2C2245" },
 ];
 
+/**
+ * Star 调色板 — Shanghai Yuefenpai / 老上海月份牌 (第5套UI主题: 民国海派摩登擦笔水彩与 Art Deco 暖象牙宣纸)
+ * 融合 1920-1930s 民国海派经典月份牌、双线金纹画框与擦笔水彩画法:
+ * - 旗袍朱砂茜红 (#B8282B): 典雅海派旗袍经典朱砂红，兼具历史厚度与摩登风韵
+ * - 翡翠碧玉墨绿 (#1B5E48): 翡翠耳坠与墨玉手镯，冷暖互补的中式典雅视觉平衡
+ * - 留声机老鎏金 (#D49E35): 黄铜号角与古典烫金花边，展现黄金时代的流光溢彩
+ * - 象牙暖宣纸底 (#F5E8C7): 经时光沉淀的暖调石版印刷月份牌老宣纸，温润不刺眼
+ * - 老上海炭墨黑 (#221C16): 传统徽墨书卷炭黑，字字清晰，温润雅致，WCAG AAA 13.5:1
+ */
+const STAR_SHANGHAI_PALETTE: ColorToken[] = [
+  { name: "--color-primary", hex: "#B8282B" },
+  { name: "--color-secondary", hex: "#1B5E48" },
+  { name: "--color-accent", hex: "#D49E35" },
+  { name: "--color-success", hex: "#1B5E48" },
+  { name: "--color-warning", hex: "#D49E35" },
+  { name: "--color-danger", hex: "#B8282B" },
+  { name: "--color-neutral", hex: "#8C7E70" },
+  { name: "--color-surface", hex: "#F5E8C7" },
+  { name: "--color-surface-2", hex: "#EBD8B0" },
+  { name: "--color-text", hex: "#221C16" },
+  { name: "--color-text-dim", hex: "#6B6055" },
+  { name: "--color-border", hex: "#C89228" },
+];
+
+/**
+ * Star 调色板 — Classic Japanese Anime Cel (日式赛璐璐经典手绘动画美学)
+ *
+ * 核心审美定义:
+ * - 纯正动画赛璐璐平涂（Flat Paint Fill / ベタ塗り）：严格的双阶色块阴影（固有色与1号影），没有漫反射模糊
+ * - 赛璐璐天青蓝 (#2563EB): 黄金年代经典日漫天空与主角战服天青蓝
+ * - 赛璐璐活力朱红 (#EA580C): 赛璐璐手绘明亮纯朱红
+ * - 赛璐璐向日葵黄 (#F59E0B): 柠檬高光明黄
+ * - 胶片透光暖白 (#F8FAFC): 赛璐璐透明胶片基底底色
+ * - 机械转印漆黑线 (#111827): 0.8px~1.2px 均匀清晰的手描墨线，抗锯齿锐利无羽化
+ */
+const STAR_CEL_PALETTE: ColorToken[] = [
+  { name: "--color-primary", hex: "#2563EB" },
+  { name: "--color-secondary", hex: "#EA580C" },
+  { name: "--color-accent", hex: "#F59E0B" },
+  { name: "--color-success", hex: "#16A34A" },
+  { name: "--color-warning", hex: "#F59E0B" },
+  { name: "--color-danger", hex: "#DC2626" },
+  { name: "--color-neutral", hex: "#334155" },
+  { name: "--color-surface", hex: "#F8FAFC" },
+  { name: "--color-surface-2", hex: "#FFFFFF" },
+  { name: "--color-text", hex: "#111827" },
+  { name: "--color-text-dim", hex: "#4B5563" },
+  { name: "--color-border", hex: "#1E293B" },
+];
+
 /** 间距 token (4px 基础栅格) */
 const STAR_SPACING: SpacingToken[] = [
   { name: "--space-1", px: 4 },
@@ -148,7 +198,21 @@ const PIXEL_RADII: RadiusToken[] = [
   { name: "--radius-lg", px: 0 },
 ];
 
-/** 内置主题 (暗夜神格 + 少年原画 + 圣夜霜雪 + 极魅像素) */
+/** 老上海月份牌画框圆角 token (细腻微内圆角 / 民国画框边线) */
+const SHANGHAI_RADII: RadiusToken[] = [
+  { name: "--radius-sm", px: 2 },
+  { name: "--radius-md", px: 4 },
+  { name: "--radius-lg", px: 8 },
+];
+
+/** 赛璐璐胶片切角 token (2px/3px 动画打孔赛璐璐胶片 Sheet 边角) */
+const CEL_RADII: RadiusToken[] = [
+  { name: "--radius-sm", px: 2 },
+  { name: "--radius-md", px: 3 },
+  { name: "--radius-lg", px: 6 },
+];
+
+/** 内置主题 (暗夜神格 + 少年原画 + 圣夜霜雪 + 极魅像素 + 老上海月份牌 + 日式赛璐璐) */
 export const THEMES: ThemeDefinition[] = [
   {
     id: "dark",
@@ -184,6 +248,24 @@ export const THEMES: ThemeDefinition[] = [
     colors: STAR_CHARISMA_PALETTE,
     spacings: STAR_SPACING,
     radii: PIXEL_RADII,
+    version: 1,
+  },
+  {
+    id: "shanghai",
+    displayName: "老上海月份牌",
+    isDark: false,
+    colors: STAR_SHANGHAI_PALETTE,
+    spacings: STAR_SPACING,
+    radii: SHANGHAI_RADII,
+    version: 1,
+  },
+  {
+    id: "cel",
+    displayName: "日式赛璐璐",
+    isDark: false,
+    colors: STAR_CEL_PALETTE,
+    spacings: STAR_SPACING,
+    radii: CEL_RADII,
     version: 1,
   },
 ];

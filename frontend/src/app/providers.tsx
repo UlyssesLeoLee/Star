@@ -29,7 +29,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <ThemeProvider defaultTheme="light" themes={["light", "dark", "christmas", "charisma"]}>
+    <ThemeProvider defaultTheme="light" themes={["light", "dark", "christmas", "charisma", "shanghai", "cel"]}>
       <QueryClientProvider client={client}>
         {children}
         <Toaster
