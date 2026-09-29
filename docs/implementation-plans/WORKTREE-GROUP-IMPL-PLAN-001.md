@@ -1,13 +1,13 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project Worktree 群组实施计划 v1.0**
+> **渡口 Project Worktree 群组实施计划 v0.9**
 >
-> - 状态：🟡 执行中（Phase 0/1、2A 完成；2B/2C/2D API 与 additive migrations 已实现并编译；Phase 3A scope guard 与 3B Canvas persistence/API 代码切片已落地；Phase 3 UI API 接线、Outbox consumer、Canvas WorkItem Command、数据库部署、成员 provisioning 与 ACL/RLS 负向验收待完成）
+> - 状态：🟡 执行中（Phase 0/1、2A 完成；2B/2C/2D API 与 additive migrations 已实现并编译；Phase 3 Canvas scope guard 已落地；Canvas persistence/API、Outbox、数据库部署、成员 provisioning 与 ACL/RLS 负向验收待完成）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - 日期：2026-09-29
 > - 关联需求：`docs/requirements.md` v2.4 §50
 > - 关联基本设计：`docs/basic-design.md` v0.5 §16
-> - 关联详细设计：`docs/design/DD-WORKTREE-GROUP-001.md` v0.6、`docs/design/DD-MULTICA-TASK-001.md` v0.3、`docs/design/DD-WORKTREE-CANVAS-001.md` v1.3
+> - 关联详细设计：`docs/design/DD-WORKTREE-GROUP-001.md` v0.5、`docs/design/DD-MULTICA-TASK-001.md` v0.3、`docs/design/DD-WORKTREE-CANVAS-001.md` v1.3
 
 ---
 
@@ -69,7 +69,7 @@ Project（先选择，限定可见工作范围）
 | **0 设计基线** | 需求/基本/详细设计统一 Project 选择 → Worktree 管理 → 展开后同级 App、canonical ID、ownership、W/T/M 和权限规则 | `requirements.md` v2.4 §50、`basic-design.md` v0.5 §16、`DD-WORKTREE-GROUP-001.md` v0.5 | ✅ 已收口；SDK、Plugin sandbox 与在途撤权仍作为兼容门 |
 | **1 Group Shell 原型** | 项目选择、项目 Worktree 清单与状态管理面板；展开 Worktree 后显示 Multica/Jira/Task Card/Canvas/Workflow/Plugins 同级导航；Canvas ↔ Task Card 深链；底部 scope selector | 现有 project nav store / frontend store / CanvasView | 🟡 预览交付：Project Worktrees 入口携带 `project_id` 进入 Index；浏览器可见按 Project 过滤的 Worktree 管理信号和同级 App 树；Task Card / CLI preview / WORKTREE-GLOBAL 选择可见，未连接的发送和命令保持禁用；owner 数据与服务端操作仍待接入 |
 | **2 安全上下文与 canonical 任务闭环** | 2A GroupContext / 跨 App 契约；2B 认证 Actor、Project/Worktree ACL、GroupContextResolver；2C Postgres canonical WorkItem + Multica 生命周期、版本/幂等/审计；2D Cursor Index、owner/archive plan-confirm | 2A 设计基线；2B-2D migrations、membership provisioning、历史 reconciliation、ACL/RLS 与并发验收 | 🟡 2B/2C/2D API 与迁移代码已完成切片；DB 迁移和集成验收未完成，不能启用生产写路径；Jira sync、Domain adapter、Runtime/Git 状态接入仍是 blocker |
-| **3 Canvas 双向联动** | 3A UI Worktree scope guard / 旧 seed 隔离；3B Worktree Canvas/Element/EntityRef persistence、版本化 API、Audit/Outbox 原子写；3C UI 接真实 API、Outbox consumer 与 Canvas→WorkItem Command | Phase 2B ACL + Phase 2C persistence / WorkItem API + Canvas migration/API + GroupContext | 3A/3B 代码切片完成但未部署；Canvas 不得直接写 Multica lifecycle；前端、Outbox consumer、Canvas 创建/关联任务 Command、旧 Canvas 冲突分类和 ACL/RLS 运行验收通过后才关闭 Phase 3 |
+| **3 Canvas 双向联动** | `EntityRef`、Worktree-scoped Canvas 查询、Canvas 创建任务/关联任务/打开任务、跨域 outbox；当前先完成 UI Worktree scope guard 与旧 seed 隔离 | Phase 2B ACL + Phase 2C persistence / WorkItem API + Canvas persistence/API | Canvas 和所有任务视图读到同一 canonical ID；Canvas 不能绕过 Lifecycle Service；项目级旧 Canvas migration 冲突隔离；目前只完成前端 scope guard，后端/API/Outbox 未完成 |
 | **4 Task Card CLI** | `TaskExecutionContext`、本地 Runtime session 绑定、卡内 CLI、运行/取消/断线恢复 | Local Runtime 身份、Worktree checkout、工具与 secret capability ACL | CLI cwd 必须解析为授权 checkout；缺失/过期 scope 拒绝执行；执行记录可追溯，退出后清理 Work 状态 |
 | **5 Group Chat + LangGraph** | Chat scope/targets DTO、服务端 GroupContext middleware、L0 router、Flow draft、LangGraph run/checkpoint、resume 再授权 | Phase 2B ACL、Phase 4 TaskExecutionContext、锁定的 LangGraph SDK compatibility review | WORKTREE 只读写本 Worktree；GLOBAL 写需显式授权目标；未授权目标零副作用；checkpoint 恢复不复活撤销授权；chat session、WorkItem、Task Card、LangGraph thread ID 分离 |
 | **6 Plugin 热插拔** | manifest/version/capability、Group App Registry 动态发现、enable/disable/uninstall、热撤权和 UI 更新 | Phase 2B ACL + Phase 5 L0 capability bridge | disable/uninstall 后新调用即时失败；在途操作有确定取消/排空语义；业务 Transaction 与 Canvas ref 保留；agent registry 不冒充 app registry |
@@ -126,14 +126,12 @@ Project 选择 → Project Worktree Index → 展开 Worktree → 同级 Apps �
 | 2B 认证 Actor / ACL / GroupContextResolver | 🟡 代码与 additive migration 完成，部署/ACL 验收待做 | production-only Group API；JWT sub/user_id 一致性；Project active membership；独立 Project Worktree Master binding；owner/task/link projection 不猜历史值。migration 未部署、membership 未 provisioning、跨 tenant/project/RLS 负向用例未跑 |
 | 2C canonical 任务闭环 / 持久化 | 🟡 API 与 additive migration 完成切片，Domain adapter/数据库验收待做 | 新 Group API 写 canonical WorkItem Master、Multica 六态 Work current、Worktree SCD2 link、version、Idempotency-Key 和 append-only audit；`cargo check -p star-api-rest --all-targets -j 4` 通过。未应用 migration；REST crate 仍持有 SQL coordinator，旧 Domain service 保持 3 态 in-memory；Review/Jira alias/UI 没接通 |
 | 2D Worktree Index 投影 / 管理 API | 🟡 Cursor Index 与 plan/confirm API 完成切片，数据库/运行状态验收待做 | stable keyset cursor + owner/state/archive filters；owner SCD2；归档/恢复 plan-confirm + expected version + audit；有 session/runtime ref 时保守拒绝 archive。没有 Git lock/Runtime active state source、create/import/physical cleanup；migration 未部署，UI 仍 seed |
-| 3A Canvas scope guard | 🟢 前端边界代码切片完成 | Group 页面只查显式 Worktree Canvas；Canvas task link 要求 EntityRef 和任务关联都指向当前 Worktree；未绑定任务无 CLI 入口；UI 数据仍为 mock |
-| 3B Canvas persistence/API | 🟡 后端代码切片完成，DB 未部署 | 新增 Worktree-scoped migration 与 Group API：Canvas list/create，Element list/create/versioned update/soft delete，typed EntityRef set/replace/clear；Project membership + scope/role、RLS GUC、当前 WorkItem association resolver、transactional Audit/Outbox 与幂等；EntityRef 变更同步推进 Element version，Outbox aggregate version 单调；`cargo check -p star-api-rest --all-targets -j 4` 通过；未应用 migration，未做 SQL runtime / ACL/RLS 负向验收 |
-| 3C Canvas 跨 App UI 与事件消费 | ⚪ 待开始 | 前端尚未切到新 API；Outbox 无 consumer/realtime projection；Canvas 创建任务、Jira relation 尚未调用事实 owner Command |
+| 3 Canvas scope guard | 🟡 前端边界切片完成 | Group 页面只查显式 Worktree Canvas；Canvas task link 要求 EntityRef 和任务关联都指向当前 Worktree；未绑定任务无 CLI 入口；持久化/API/Outbox 尚未接通 |
 | 4-7 | ⚪ 未开始 | 按 §3 依赖顺序推进；不得把 Phase 1 展示当作生产验收 |
 
 本次 HTTP 验证：`/worktree?project_id=prj-mobile` 与 `/worktree/wt-003/group?app=task-card&work_item_id=wi-001&cli=1` 均返回 200，Index 响应保留 `project_id`，Group 响应保留 `wt-003`，没有 redirect。Phase 1 的浏览器预览记录：页面可见同级 App、任务详情、卡内 CLI 预览和禁用的 Chat 发送。`pnpm typecheck` 未通过，仍有 Monaco 子组件、terminal store、push client 和 MSW 重复导出等仓库诊断；定向 Vitest 在收集用例前被 `src/mocks/handlers/index.ts` 中重复导出的 `annotationsHandlers` 阻断。没有把 preview/seed 行为标成生产能力。
 
-Phase 3A 已完成前端 Worktree scope guard；Phase 3B 已增加服务端 migration/API 的代码切片，涵盖 Canvas registry、元素、typed EntityRef、版本条件写入、幂等、Audit 与 append-only Outbox。前端 Group Canvas 仍来自 mock store，Outbox consumer / Canvas→WorkItem Command 未接入。本轮未运行浏览器或测试，未应用数据库 migration；`cargo check -p star-api-rest --all-targets -j 4`、改动文件 `rustfmt --check` 与 `git diff --check` 用于本轮静态验证，数据库 DDL / RLS / ACL 运行行为仍未验证。
+Phase 3 当前仅完成代码层面的 Canvas scope guard；本轮未运行浏览器、测试或 DB migration。前端 Group Canvas 数据仍来自 mock store，空状态明确说明旧 Project/Free Canvas 不会被继承；真实 Group Canvas 需等 Canvas Domain persistence/API 与 Outbox 接通。
 
 ---
 
@@ -152,4 +150,3 @@ Phase 2B-2D 本地验证：`cargo check -p star-api-rest --all-targets -j 4` 通
 | v0.7 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 完成 Phase 2B/2C/2D 的 Group API 与 additive migration 代码切片：Project/Owner SCD2、canonical WorkItem/Multica 六态、version/idempotency/audit、stable cursor Index 与 owner/archive plan-confirm；明确数据库未部署、membership/reconciliation、Domain adapter、Jira sync、真实 Session/Runtime/Git 检查与 UI 接线仍未完成 | 用户要求连续推进 2B/2C/2D，并重申 Project Worktree Index 是解决多 Agent Worktree 混乱的主入口 |
 | v0.8 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确进入 Phase 3 生产联动前的数据库迁移、Project SoR/membership、历史归属、RLS/ACL/幂等/TTL 验收门；记录 Task Project 关联校验与 failed 终态保留修正，避免把代码切片误报为生产完成 | Phase 2B/2C/2D 自审补强跨 Project 隔离和生产启用条件 |
 | v0.9 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 加入 Phase 3 Canvas scope guard 结果：只接受 Worktree 显式绑定和 typed EntityRef，Project/Free seed 隔离，未绑定任务关闭 CLI 入口；将 Canvas persistence/API/Outbox 列为当前未完成工作 | Canvas 页面复用全局 Project seed 且跨 Worktree 任务深链未校验当前 scope |
-| v1.0 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 分拆 Phase 3A/3B/3C；记录 3B migration/API 代码切片、实体引用/版本/幂等/审计/Outbox 边界和验证状态；明确 UI 接线、Outbox consumer、Canvas WorkItem Command 与 DB 部署仍是未关闭门 | 用户要求继续推进到完成，进入 Phase 3B Canvas 服务端联动 |
