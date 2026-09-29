@@ -1,0 +1,51 @@
+# .github/workflows/star-desktop-build.yml (PR-242 NEW)
+# =====================================================================
+# Star Desktop Linux Build CI (per docs §3.2 P3)
+# Linux build host 验证 star-desktop (Tauri 2.0 二进制 build)
+# 触发: PR base=dev 或 push main (per workspace lints dev-only release flow)
+# =====================================================================
+name: star-desktop-build
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - "crates/star-desktop/**"
+      - ".github/workflows/star-desktop-build.yml"
+  push:
+    branches: [dev, main]
+    paths:
+      - "crates/star-desktop/**"
+      - ".github/workflows/star-desktop-build.yml"
+
+jobs:
+  linux-build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+      RUSTFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates/star-desktop"
+
+      - name: Install Linux build deps (webkit2gtk, librsvg)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev                                  libgtk-3-dev                                  libayatana-appindicator3-dev                                  librsvg2-dev                                  patchelf                                  build-essential
+
+      - name: cargo check -p star-desktop
+        run: |
+          cargo check -p star-desktop --message-format=short
+
+      - name: cargo test -p star-desktop --lib
+        run: |
+          cargo test -p star-desktop --lib --message-format=short
+        # 预期: 5 (P0) + 5 (P1 IPC) + 16 (P2 adapter + IPC) = 26 tests pass
