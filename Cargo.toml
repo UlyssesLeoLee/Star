@@ -154,6 +154,8 @@ members = [
     "crates/agent-bridge",
     # T7 relationship-engine (per DD-WORKTREE-CANVAS-001 §13 + INV-WC-04)
     "crates/relationship-engine",
+    # ULYS-229 (ULYS-104.19, 2026-09-29): query-engine-wasm crate (阶段 1 PoC, wasm-pack cdylib + rlib 双输出, per docs/architecture/2026-09-28-upgrade/rust-to-wasm-frontend-memory-research.md §3.1 P1: parse_dsl + validate_dsl + 6 keyword utility 暴露给浏览器, 复用 crates/query-engine 纯函数, 守门 #1 v25 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 + 守门 #19 v19 0 动 V0.1 任何业务 logic)
+    "crates/query-engine-wasm",
     # ULYS-228 (ULYS-104.18, 2026-09-29): layout-engine-wasm crate (阶段 1 PoC, wasm-pack cdylib + rlib 双输出, per docs/architecture/2026-09-28-upgrade/rust-to-wasm-frontend-memory-research.md §3.1 P0: pick_algorithm + visual_distance 暴露给浏览器, 复用 crates/layout-engine 纯函数, 守门 #1 v25 cargo test 单 crate 实证 + 守门 #7 0 unsafe + 守门 #11 缺标比错标 + 守门 #19 v19 0 动 V0.1 任何业务 logic)
     "crates/layout-engine-wasm",
 ]
@@ -263,6 +265,8 @@ win32job = "2"
 wasm-bindgen = "0.2"
 # wasm-bindgen-test: 浏览器/wasm runtime 测试 (跑 `wasm-pack test --node`)
 wasm-bindgen-test = "0.2"
+# js-sys: Rust ↔ JS 互操作 (Array + Promise + etc., per wasm-bindgen convention)
+js-sys = "0.3"
 # serde-wasm-bindgen: 类型安全 JS↔Rust 传值 (本期未用, 但留作 layout-engine 二进制接口)
 serde-wasm-bindgen = "0.6"
 
