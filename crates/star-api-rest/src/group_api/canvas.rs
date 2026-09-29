@@ -1,36 +1,175 @@
 //! Cypher structural manifest.
 //! CREATE
 //!   (f:File {name:"canvas.rs",type:"file",language:"rust"}),(m:Module {name:"canvas",type:"module",language:"rust"}),
-//!   (cb:Class {name:"CreateCanvasBody",type:"class"}),(eb:Class {name:"CreateElementBody",type:"class"}),(ub:Class {name:"UpdateElementBody",type:"class"}),(er:Class {name:"EntityRefBody",type:"class"}),(sb:Class {name:"SetEntityRefBody",type:"class"}),(xb:Class {name:"ClearEntityRefBody",type:"class"}),(db:Class {name:"DeleteElementBody",type:"class"}),(lr:Class {name:"CanvasListRow",type:"class"}),(cv:Class {name:"CurrentCanvasVersion",type:"class"}),(cew:Class {name:"CurrentElement",type:"class"}),(cer:Class {name:"CurrentEntityRef",type:"class"}),(row:Class {name:"CanvasElementRow",type:"class"}),
-//!   (rt:Function {name:"router",type:"function"}),(lc:Function {name:"list_canvases",type:"function"}),(cc:Function {name:"create_canvas",type:"function"}),(le:Function {name:"list_elements",type:"function"}),(ce:Function {name:"create_element",type:"function"}),(ue:Function {name:"update_element",type:"function"}),(de:Function {name:"delete_element",type:"function"}),(sr:Function {name:"set_entity_ref",type:"function"}),(cr:Function {name:"clear_entity_ref",type:"function"}),(authz:Function {name:"authorize_group_scope",type:"function"}),(rw:Function {name:"request_worktree",type:"function"}),(rc:Function {name:"require_canvas",type:"function"}),(ve:Function {name:"validate_entity_ref",type:"function"}),(ir:Function {name:"insert_entity_ref",type:"function"}),(ae:Function {name:"append_event",type:"function"}),(lock:Function {name:"lock_element",type:"function"}),(close:Function {name:"close_element_version",type:"function"}),(bump:Function {name:"bump_element_version",type:"function"}),(ld:Function {name:"load_element",type:"function"}),(qe:Function {name:"query_elements",type:"function"}),(ep:Function {name:"element_projection",type:"function"}),(hs:Function {name:"has_scope",type:"function"}),(veb:Function {name:"validate_element_body",type:"function"}),(vr:Function {name:"validate_required_ref",type:"function"}),(ii:Function {name:"identity_key_present",type:"function"}),(eo:Function {name:"empty_object",type:"function"}),
-//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(cb),(m)-[:CONTAINS]->(eb),(m)-[:CONTAINS]->(ub),(m)-[:CONTAINS]->(er),(m)-[:CONTAINS]->(sb),(m)-[:CONTAINS]->(xb),(m)-[:CONTAINS]->(db),(m)-[:CONTAINS]->(lr),(m)-[:CONTAINS]->(cv),(m)-[:CONTAINS]->(cew),(m)-[:CONTAINS]->(cer),(m)-[:CONTAINS]->(row),
-//!   (m)-[:CONTAINS]->(rt),(m)-[:CONTAINS]->(lc),(m)-[:CONTAINS]->(cc),(m)-[:CONTAINS]->(le),(m)-[:CONTAINS]->(ce),(m)-[:CONTAINS]->(ue),(m)-[:CONTAINS]->(de),(m)-[:CONTAINS]->(sr),(m)-[:CONTAINS]->(cr),(m)-[:CONTAINS]->(authz),(m)-[:CONTAINS]->(rw),(m)-[:CONTAINS]->(rc),(m)-[:CONTAINS]->(ve),(m)-[:CONTAINS]->(ir),(m)-[:CONTAINS]->(ae),(m)-[:CONTAINS]->(lock),(m)-[:CONTAINS]->(close),(m)-[:CONTAINS]->(bump),(m)-[:CONTAINS]->(ld),(m)-[:CONTAINS]->(qe),(m)-[:CONTAINS]->(ep),(m)-[:CONTAINS]->(hs),(m)-[:CONTAINS]->(veb),(m)-[:CONTAINS]->(vr),(m)-[:CONTAINS]->(ii),(m)-[:CONTAINS]->(eo),
-//!   (rt)-[:CALLS]->(lc),(rt)-[:CALLS]->(cc),(rt)-[:CALLS]->(le),(rt)-[:CALLS]->(ce),(rt)-[:CALLS]->(ue),(rt)-[:CALLS]->(de),(rt)-[:CALLS]->(sr),(rt)-[:CALLS]->(cr),(lc)-[:CALLS]->(rw),(lc)-[:CALLS]->(authz),(lc)-[:CALLS]->(rc),(cc)-[:CALLS]->(rw),(cc)-[:CALLS]->(authz),(cc)-[:CALLS]->(ae),(ce)-[:CALLS]->(authz),(ce)-[:CALLS]->(rc),(ce)-[:CALLS]->(veb),(ce)-[:CALLS]->(ve),(ce)-[:CALLS]->(ir),(ce)-[:CALLS]->(ae),(ue)-[:CALLS]->(authz),(ue)-[:CALLS]->(rc),(ue)-[:CALLS]->(lock),(ue)-[:CALLS]->(close),(ue)-[:CALLS]->(ae),(de)-[:CALLS]->(authz),(de)-[:CALLS]->(lock),(de)-[:CALLS]->(close),(de)-[:CALLS]->(ae),(sr)-[:CALLS]->(authz),(sr)-[:CALLS]->(lock),(sr)-[:CALLS]->(ve),(sr)-[:CALLS]->(ir),(sr)-[:CALLS]->(bump),(sr)-[:CALLS]->(ae),(cr)-[:CALLS]->(authz),(cr)-[:CALLS]->(lock),(cr)-[:CALLS]->(vr),(cr)-[:CALLS]->(bump),(cr)-[:CALLS]->(ae),(le)-[:CALLS]->(authz),(le)-[:CALLS]->(rc),(le)-[:CALLS]->(qe),(qe)-[:CALLS]->(hs),(ld)-[:CALLS]->(qe),(bump)-[:CALLS]->(close),(authz)-[:CALLS]->(ve);
+//!   (cb:Class {name:"CreateCanvasBody",type:"class"}),(eb:Class {name:"CreateElementBody",type:"class"}),(ub:Class {name:"UpdateElementBody",type:"class"}),(er:Class {name:"EntityRefBody",type:"class"}),(sb:Class {name:"SetEntityRefBody",type:"class"}),(xb:Class {name:"ClearEntityRefBody",type:"class"}),(db:Class {name:"DeleteElementBody",type:"class"}),(lr:Class {name:"CanvasListRow",type:"class"}),(cv:Class {name:"CurrentCanvasVersion",type:"class"}),(cew:Class {name:"CurrentElement",type:"class"}),(cer:Class {name:"CurrentEntityRef",type:"class"}),(row:Class {name:"CanvasElementRow",type:"class"}),(cdoc:Class {name:"CanvasDocumentBody",type:"class"}),(vp:Class {name:"CanvasViewport",type:"class"}),(fr:Class {name:"CanvasFrameBody",type:"class"}),(con:Class {name:"CanvasConnectorBody",type:"class"}),(docrow:Class {name:"CurrentCanvasDocument",type:"class"}),(eq:Class {name:"CanvasEventsQuery",type:"class"}),(eout:Class {name:"CanvasOutboxEvent",type:"class"}),
+//!   (rt:Function {name:"router",type:"function"}),(lc:Function {name:"list_canvases",type:"function"}),(cc:Function {name:"create_canvas",type:"function"}),(le:Function {name:"list_elements",type:"function"}),(ce:Function {name:"create_element",type:"function"}),(ue:Function {name:"update_element",type:"function"}),(de:Function {name:"delete_element",type:"function"}),(sr:Function {name:"set_entity_ref",type:"function"}),(cr:Function {name:"clear_entity_ref",type:"function"}),(ud:Function {name:"update_document",type:"function"}),(events:Function {name:"list_canvas_events",type:"function"}),(validate_events:Function {name:"validated_cursor_and_limit",type:"function"}),(vd:Function {name:"validate_document",type:"function"}),(vdr:Function {name:"validate_document_refs",type:"function"}),(authz:Function {name:"authorize_group_scope",type:"function"}),(rw:Function {name:"request_worktree",type:"function"}),(rc:Function {name:"require_canvas",type:"function"}),(ve:Function {name:"validate_entity_ref",type:"function"}),(ir:Function {name:"insert_entity_ref",type:"function"}),(ae:Function {name:"append_event",type:"function"}),(lock:Function {name:"lock_element",type:"function"}),(close:Function {name:"close_element_version",type:"function"}),(bump:Function {name:"bump_element_version",type:"function"}),(ld:Function {name:"load_element",type:"function"}),(qe:Function {name:"query_elements",type:"function"}),(ep:Function {name:"element_projection",type:"function"}),(hs:Function {name:"has_scope",type:"function"}),(veb:Function {name:"validate_element_body",type:"function"}),(vr:Function {name:"validate_required_ref",type:"function"}),(ii:Function {name:"identity_key_present",type:"function"}),(eo:Function {name:"empty_object",type:"function"}),
+//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(cb),(m)-[:CONTAINS]->(eb),(m)-[:CONTAINS]->(ub),(m)-[:CONTAINS]->(er),(m)-[:CONTAINS]->(sb),(m)-[:CONTAINS]->(xb),(m)-[:CONTAINS]->(db),(m)-[:CONTAINS]->(lr),(m)-[:CONTAINS]->(cv),(m)-[:CONTAINS]->(cew),(m)-[:CONTAINS]->(cer),(m)-[:CONTAINS]->(row),(m)-[:CONTAINS]->(cdoc),(m)-[:CONTAINS]->(vp),(m)-[:CONTAINS]->(fr),(m)-[:CONTAINS]->(con),(m)-[:CONTAINS]->(docrow),(m)-[:CONTAINS]->(eq),(m)-[:CONTAINS]->(eout),
+//!   (m)-[:CONTAINS]->(rt),(m)-[:CONTAINS]->(lc),(m)-[:CONTAINS]->(cc),(m)-[:CONTAINS]->(le),(m)-[:CONTAINS]->(ce),(m)-[:CONTAINS]->(ue),(m)-[:CONTAINS]->(de),(m)-[:CONTAINS]->(sr),(m)-[:CONTAINS]->(cr),(m)-[:CONTAINS]->(ud),(m)-[:CONTAINS]->(events),(m)-[:CONTAINS]->(validate_events),(m)-[:CONTAINS]->(vd),(m)-[:CONTAINS]->(vdr),(m)-[:CONTAINS]->(authz),(m)-[:CONTAINS]->(rw),(m)-[:CONTAINS]->(rc),(m)-[:CONTAINS]->(ve),(m)-[:CONTAINS]->(ir),(m)-[:CONTAINS]->(ae),(m)-[:CONTAINS]->(lock),(m)-[:CONTAINS]->(close),(m)-[:CONTAINS]->(bump),(m)-[:CONTAINS]->(ld),(m)-[:CONTAINS]->(qe),(m)-[:CONTAINS]->(ep),(m)-[:CONTAINS]->(hs),(m)-[:CONTAINS]->(veb),(m)-[:CONTAINS]->(vr),(m)-[:CONTAINS]->(ii),(m)-[:CONTAINS]->(eo),
+//!   (rt)-[:CALLS]->(lc),(rt)-[:CALLS]->(cc),(rt)-[:CALLS]->(le),(rt)-[:CALLS]->(ce),(rt)-[:CALLS]->(ue),(rt)-[:CALLS]->(de),(rt)-[:CALLS]->(sr),(rt)-[:CALLS]->(cr),(rt)-[:CALLS]->(ud),(rt)-[:CALLS]->(events),(events)-[:CALLS]->(validate_events),(events)-[:CALLS]->(authz),(events)-[:CALLS]->(rc),(lc)-[:CALLS]->(rw),(lc)-[:CALLS]->(authz),(lc)-[:CALLS]->(rc),(cc)-[:CALLS]->(rw),(cc)-[:CALLS]->(authz),(cc)-[:CALLS]->(ae),(ce)-[:CALLS]->(authz),(ce)-[:CALLS]->(rc),(ce)-[:CALLS]->(veb),(ce)-[:CALLS]->(ve),(ce)-[:CALLS]->(ir),(ce)-[:CALLS]->(ae),(ue)-[:CALLS]->(authz),(ue)-[:CALLS]->(rc),(ue)-[:CALLS]->(lock),(ue)-[:CALLS]->(close),(ue)-[:CALLS]->(ae),(de)-[:CALLS]->(authz),(de)-[:CALLS]->(lock),(de)-[:CALLS]->(close),(de)-[:CALLS]->(ae),(sr)-[:CALLS]->(authz),(sr)-[:CALLS]->(lock),(sr)-[:CALLS]->(ve),(sr)-[:CALLS]->(ir),(sr)-[:CALLS]->(bump),(sr)-[:CALLS]->(ae),(cr)-[:CALLS]->(authz),(cr)-[:CALLS]->(lock),(cr)-[:CALLS]->(vr),(cr)-[:CALLS]->(bump),(cr)-[:CALLS]->(ae),(ud)-[:CALLS]->(rw),(ud)-[:CALLS]->(pi),(ud)-[:CALLS]->(vd),(ud)-[:CALLS]->(rh),(ud)-[:CALLS]->(authz),(ud)-[:CALLS]->(rc),(ud)-[:CALLS]->(lk),(ud)-[:CALLS]->(vdr),(ud)-[:CALLS]->(ae),(ud)-[:CALLS]->(sv),(vdr)-[:CALLS]->(hs),(le)-[:CALLS]->(authz),(le)-[:CALLS]->(rc),(le)-[:CALLS]->(qe),(qe)-[:CALLS]->(hs),(ld)-[:CALLS]->(qe),(bump)-[:CALLS]->(close),(authz)-[:CALLS]->(ve);
+
+//! Additional Canvas -> WorkItem atomic command structure.
+//! CREATE (cwc:Class {name:"CreateWorkItemOnCanvasBody",type:"class"}),
+//!        (cwoc:Function {name:"create_work_item_on_canvas",type:"function"});
+//! MATCH (m:Module {name:"canvas",type:"module"}),
+//!       (cwc:Class {name:"CreateWorkItemOnCanvasBody",type:"class"}),
+//!       (cwoc:Function {name:"create_work_item_on_canvas",type:"function"});
+//! CREATE (m)-[:CONTAINS]->(cwc),(m)-[:CONTAINS]->(cwoc);
+//! MATCH (r:Function {name:"router",type:"function"}),
+//!       (cwoc:Function {name:"create_work_item_on_canvas",type:"function"}),
+//!       (authz:Function {name:"authorize_group_scope",type:"function"}),
+//!       (rc:Function {name:"require_canvas",type:"function"}),
+//!       (ir:Function {name:"insert_entity_ref",type:"function"}),
+//!       (ae:Function {name:"append_event",type:"function"});
+//! CREATE (r)-[:CALLS]->(cwoc),(cwoc)-[:CALLS]->(authz),
+//!        (cwoc)-[:CALLS]->(rc),(cwoc)-[:CALLS]->(ir),(cwoc)-[:CALLS]->(ae);
+//! Atomic element deletion also versions the Canvas document and removes all dangling layout references.
+//! MATCH (de:Function {name:"delete_element"}), (doc:Class {name:"CurrentCanvasDocument"}),
+//!       (fr:Class {name:"CanvasFrameBody"}), (con:Class {name:"CanvasConnectorBody"});
+//! CREATE (de)-[:USES]->(doc),(de)-[:USES]->(fr),(de)-[:USES]->(con);
+//! Element updates are field-scoped commands; unselected fields are merged from the locked row.
+//! CREATE (mode:Enum {name:"CanvasElementUpdateMode",type:"enum"});
+//! MATCH (m:Module {name:"canvas"}),(body:Class {name:"UpdateElementBody"}),
+//!       (update:Function {name:"update_element"}),(lock:Function {name:"lock_element"}),
+//!       (validate:Function {name:"validate_element_body"});
+//! CREATE (m)-[:CONTAINS]->(mode),(body)-[:USES]->(mode),(update)-[:CALLS]->(lock),
+//!        (update)-[:CALLS]->(validate),(update)-[:VALIDATES_MODE]->(mode);
+
+use std::collections::HashSet;
 
 use axum::{
-    extract::{Path, State},
-    http::HeaderMap,
-    routing::{get, put},
     Json, Router,
+    extract::{Path, Query, State},
+    http::HeaderMap,
+    routing::{get, post, put},
 };
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::work_items::{
-    authorize_worktree, idempotency_key, lookup_idempotency, parse_id, request_hash,
-    require_task_writer, save_idempotency, WorktreeScope,
+    AiTaskData, CreateWorkItemBody, WorktreeScope, authorize_worktree, idempotency_key,
+    load_work_item, lookup_idempotency, parse_id, request_hash, require_task_writer,
+    save_idempotency, validate_ai_task_scope, validate_create_body,
 };
 use super::{
-    active_binding, require_scope, validate_actor, AuthUser, AuthenticatedUser, GroupApiError,
-    GroupApiState,
+    AuthUser, AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope,
+    validate_actor,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
 struct CreateCanvasBody {
     title: String,
     correlation_id: Option<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CanvasViewport {
+    x: f64,
+    y: f64,
+    zoom: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CanvasFrameBody {
+    id: Uuid,
+    canvas_id: Uuid,
+    title: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    element_ids: Vec<Uuid>,
+    is_slide: bool,
+    order: i32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CanvasConnectorBody {
+    id: Uuid,
+    canvas_id: Uuid,
+    kind: String,
+    from_element_id: Uuid,
+    to_element_id: Uuid,
+    routing: String,
+    arrow_start: bool,
+    arrow_end: bool,
+    color: String,
+    width: f64,
+    label: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CanvasDocumentBody {
+    expected_version: i64,
+    viewport: CanvasViewport,
+    frames: Vec<CanvasFrameBody>,
+    connectors: Vec<CanvasConnectorBody>,
+    correlation_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CreateWorkItemOnCanvasBody {
+    item_type: String,
+    title: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default = "default_priority")]
+    priority: String,
+    #[serde(default)]
+    labels: Vec<String>,
+    ai_task_data: Option<AiTaskData>,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    #[serde(default)]
+    rotation: f64,
+    #[serde(default)]
+    z_index: i32,
+    correlation_id: Option<Uuid>,
+}
+
+fn default_priority() -> String {
+    "medium".to_owned()
+}
+
+#[derive(Debug, FromRow)]
+struct CurrentCanvasDocument {
+    version: i64,
+    title: String,
+    created_by: Uuid,
+    created_at: chrono::DateTime<chrono::Utc>,
+    viewport: Value,
+    frames: Value,
+    connectors: Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct CanvasEventsQuery {
+    cursor_at: Option<DateTime<Utc>>,
+    cursor_event_id: Option<Uuid>,
+    limit: Option<i64>,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+struct CanvasOutboxEvent {
+    event_id: Uuid,
+    worktree_id: Uuid,
+    canvas_id: Uuid,
+    element_id: Option<Uuid>,
+    event_type: String,
+    schema_version: i32,
+    aggregate_version: i64,
+    actor_id: Uuid,
+    correlation_id: Uuid,
+    occurred_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -62,18 +201,25 @@ struct CreateElementBody {
     correlation_id: Option<Uuid>,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum CanvasElementUpdateMode {
+    Position,
+    Geometry,
+    Content,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct UpdateElementBody {
     expected_version: i64,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-    rotation: f64,
-    z_index: i32,
-    content: Value,
-    locked: bool,
-    hidden: bool,
+    update_mode: CanvasElementUpdateMode,
+    x: Option<f64>,
+    y: Option<f64>,
+    width: Option<f64>,
+    height: Option<f64>,
+    rotation: Option<f64>,
+    content: Option<Value>,
     correlation_id: Option<Uuid>,
 }
 
@@ -106,6 +252,7 @@ struct CanvasListRow {
     created_by: Uuid,
     created_at: chrono::DateTime<chrono::Utc>,
     element_count: i64,
+    document: Value,
 }
 
 #[derive(Debug, FromRow)]
@@ -173,6 +320,246 @@ pub(super) fn router() -> Router<GroupApiState> {
             "/api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/elements/{element_id}/entity-ref",
             put(set_entity_ref).delete(clear_entity_ref),
         )
+        .route(
+            "/api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/document",
+            put(update_document),
+        )
+        .route(
+            "/api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/events",
+            get(list_canvas_events),
+        )
+        .route(
+            "/api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/work-items",
+            post(create_work_item_on_canvas),
+        )
+}
+
+async fn list_canvas_events(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path((worktree_id, canvas_id)): Path<(String, String)>,
+    Query(query): Query<CanvasEventsQuery>,
+) -> Result<Json<Value>, GroupApiError> {
+    let worktree_id = request_worktree(&actor, &worktree_id, "canvas:read")?;
+    let canvas_id = parse_id(&canvas_id)?;
+    let (cursor_at, cursor_event_id, limit) = validated_cursor_and_limit(query)?;
+    let (mut tx, _) =
+        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, false).await?;
+    require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
+
+    let events = sqlx::query_as::<_, CanvasOutboxEvent>(
+        r#"SELECT event_id,worktree_id,canvas_id,element_id,event_type,schema_version,
+                  aggregate_version,actor_id,correlation_id,occurred_at
+           FROM canvas.canvas_group_outbox
+           WHERE tenant_id=$1 AND worktree_id=$2 AND canvas_id=$3
+             AND ($4::timestamptz IS NULL OR (occurred_at,event_id) > ($4::timestamptz,$5::uuid))
+           ORDER BY occurred_at,event_id
+           LIMIT $6"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree_id)
+    .bind(canvas_id)
+    .bind(cursor_at)
+    .bind(cursor_event_id)
+    .bind(limit)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+
+    let next_cursor = events
+        .last()
+        .map(|event| json!({"cursor_at": event.occurred_at, "cursor_event_id": event.event_id}));
+    Ok(Json(json!({"events": events, "next_cursor": next_cursor})))
+}
+
+fn validated_cursor_and_limit(
+    query: CanvasEventsQuery,
+) -> Result<(Option<DateTime<Utc>>, Option<Uuid>, i64), GroupApiError> {
+    let cursor_is_complete = query.cursor_at.is_some() == query.cursor_event_id.is_some();
+    let limit = query.limit.unwrap_or(100);
+    if !cursor_is_complete {
+        return Err(GroupApiError::invalid_request("incomplete_event_cursor"));
+    }
+    if !(1..=200).contains(&limit) {
+        return Err(GroupApiError::invalid_request("invalid_event_limit"));
+    }
+    Ok((query.cursor_at, query.cursor_event_id, limit))
+}
+
+async fn create_work_item_on_canvas(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path((worktree_id, canvas_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    Json(body): Json<CreateWorkItemOnCanvasBody>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "work-item:write")?;
+    let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
+    let canvas_id = parse_id(&canvas_id)?;
+    let item_for_validation = CreateWorkItemBody {
+        item_type: body.item_type.clone(),
+        title: body.title.clone(),
+        description: body.description.clone(),
+        priority: body.priority.clone(),
+        labels: body.labels.clone(),
+        ai_task_data: body.ai_task_data.clone(),
+        correlation_id: body.correlation_id,
+    };
+    validate_create_body(&item_for_validation)?;
+    validate_element_body(
+        "work_item_card",
+        body.x,
+        body.y,
+        body.width,
+        body.height,
+        body.rotation,
+        &json!({}),
+    )?;
+    let key = idempotency_key(&headers)?;
+    let hash = request_hash(
+        &format!("canvas:work-item:create:{worktree_id}:{canvas_id}"),
+        &body,
+    )?;
+
+    let (mut tx, scope) =
+        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
+    validate_ai_task_scope(&item_for_validation, scope.repo_id)?;
+    require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
+    if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
+        tx.commit().await.map_err(|_| GroupApiError::internal())?;
+        return Ok(Json(response));
+    }
+
+    let work_item_id = Uuid::new_v4();
+    let element_id = Uuid::new_v4();
+    let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
+    sqlx::query(
+        r#"INSERT INTO multica.task_metadata
+           (work_item_id,tenant_id,workspace_id,project_id,item_type,title,description,priority,labels,ai_task_data,reporter_user_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)"#,
+    )
+    .bind(work_item_id)
+    .bind(actor.tenant_id)
+    .bind(scope.workspace_id)
+    .bind(scope.project_id)
+    .bind(&body.item_type)
+    .bind(body.title.trim())
+    .bind(&body.description)
+    .bind(&body.priority)
+    .bind(&body.labels)
+    .bind(body.ai_task_data.as_ref().map(|data| json!(data)))
+    .bind(actor.user_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    sqlx::query(
+        "INSERT INTO multica.task_lifecycle_current (work_item_id,tenant_id,status,version) VALUES ($1,$2,'pending',1)",
+    )
+    .bind(work_item_id)
+    .bind(actor.tenant_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    sqlx::query(
+        "INSERT INTO multica.work_item_worktree (tenant_id,project_id,work_item_id,worktree_id) VALUES ($1,$2,$3,$4)",
+    )
+    .bind(actor.tenant_id)
+    .bind(scope.project_id)
+    .bind(work_item_id)
+    .bind(worktree_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    sqlx::query(
+        r#"INSERT INTO multica.task_lifecycle_audit
+           (tenant_id,project_id,worktree_id,work_item_id,task_card_id,to_status,event_type,actor_id,idempotency_key,correlation_id,details)
+           VALUES ($1,$2,$3,$4,$4,'pending','created',$5,$6,$7,$8)"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(scope.project_id)
+    .bind(worktree_id)
+    .bind(work_item_id)
+    .bind(actor.user_id)
+    .bind(&key)
+    .bind(correlation_id)
+    .bind(json!({"source":"canvas","canvas_id":canvas_id,"element_id":element_id}))
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+
+    sqlx::query(
+        r#"INSERT INTO canvas.canvas_elements_backend
+           (tenant_id,worktree_id,canvas_id,element_id,kind,x,y,width,height,rotation,z_index,content,version,created_by)
+           VALUES ($1,$2,$3,$4,'work_item_card',$5,$6,$7,$8,$9,$10,$11,1,$12)"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree_id)
+    .bind(canvas_id)
+    .bind(element_id)
+    .bind(body.x)
+    .bind(body.y)
+    .bind(body.width)
+    .bind(body.height)
+    .bind(body.rotation)
+    .bind(body.z_index)
+    .bind(json!({"title":body.title.trim(),"item_type":body.item_type,"status":"pending"}))
+    .bind(actor.user_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    insert_entity_ref(
+        &mut tx,
+        actor.tenant_id,
+        worktree_id,
+        canvas_id,
+        element_id,
+        &EntityRefBody {
+            ref_type: "work_item".to_owned(),
+            ref_id: work_item_id,
+            worktree_id,
+        },
+        1,
+        actor.user_id,
+    )
+    .await?;
+    append_event(
+        &mut tx,
+        &actor,
+        &scope,
+        worktree_id,
+        canvas_id,
+        Some(element_id),
+        "canvas.work_item_card.created",
+        correlation_id,
+        1,
+        json!({"work_item_id":work_item_id,"element_id":element_id}),
+    )
+    .await?;
+
+    let task = load_work_item(
+        &mut tx,
+        actor.tenant_id,
+        scope.project_id,
+        worktree_id,
+        work_item_id,
+    )
+    .await?;
+    let element = load_element(
+        &mut tx,
+        actor.tenant_id,
+        &scope,
+        worktree_id,
+        canvas_id,
+        element_id,
+        has_scope(&actor, "work-item:read"),
+    )
+    .await?;
+    let response = json!({"work_item":task,"element":element,"correlation_id":correlation_id});
+    save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    Ok(Json(response))
 }
 
 async fn list_canvases(
@@ -186,6 +573,8 @@ async fn list_canvases(
     let rows = sqlx::query_as::<_, CanvasListRow>(
         r#"
         SELECT c.canvas_id, c.title, c.version, c.created_by, c.created_at,
+               jsonb_build_object('version', c.version, 'viewport', c.viewport,
+                                  'frames', c.frames, 'connectors', c.connectors) AS document,
                (SELECT count(*) FROM canvas.canvas_elements_backend e
                 WHERE e.tenant_id = c.tenant_id AND e.worktree_id = c.worktree_id
                   AND e.canvas_id = c.canvas_id AND e.is_current) AS element_count
@@ -230,8 +619,8 @@ async fn create_canvas(
     sqlx::query(
         r#"
         INSERT INTO canvas.group_canvas_registry
-            (tenant_id, worktree_id, canvas_id, version, title, created_by)
-        VALUES ($1, $2, $3, 1, $4, $5)
+            (tenant_id, worktree_id, canvas_id, version, title, created_by, viewport, frames, connectors)
+        VALUES ($1, $2, $3, 1, $4, $5, $6, '[]'::jsonb, '[]'::jsonb)
         "#,
     )
     .bind(actor.tenant_id)
@@ -239,6 +628,7 @@ async fn create_canvas(
     .bind(canvas_id)
     .bind(body.title.trim())
     .bind(actor.user_id)
+    .bind(json!({"x":0,"y":0,"zoom":1}))
     .execute(&mut *tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
@@ -262,6 +652,220 @@ async fn create_canvas(
     save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
     Ok(Json(response))
+}
+
+async fn update_document(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path((worktree_id, canvas_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    Json(body): Json<CanvasDocumentBody>,
+) -> Result<Json<Value>, GroupApiError> {
+    let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
+    let canvas_id = parse_id(&canvas_id)?;
+    validate_document(&body)?;
+    if body.frames.iter().any(|frame| frame.canvas_id != canvas_id)
+        || body
+            .connectors
+            .iter()
+            .any(|connector| connector.canvas_id != canvas_id)
+    {
+        return Err(GroupApiError::invalid_request(
+            "canvas_document_scope_mismatch",
+        ));
+    }
+    let key = idempotency_key(&headers)?;
+    let hash = request_hash(
+        &format!("canvas:document:update:{worktree_id}:{canvas_id}"),
+        &body,
+    )?;
+    let (mut tx, scope) =
+        authorize_group_scope(&state.resolver.pool, &actor, worktree_id, true).await?;
+    require_canvas(&mut tx, actor.tenant_id, worktree_id, canvas_id).await?;
+    if let Some(response) = lookup_idempotency(&mut tx, &actor, &key, &hash).await? {
+        tx.commit().await.map_err(|_| GroupApiError::internal())?;
+        return Ok(Json(response));
+    }
+    let current = sqlx::query_as::<_, CurrentCanvasDocument>(
+        r#"SELECT version,title,created_by,created_at,viewport,frames,connectors
+           FROM canvas.group_canvas_registry
+           WHERE tenant_id=$1 AND worktree_id=$2 AND canvas_id=$3
+             AND is_current AND valid_to IS NULL FOR UPDATE"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree_id)
+    .bind(canvas_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::not_found)?;
+    if current.version != body.expected_version {
+        return Err(GroupApiError::conflict("canvas_document_version_conflict"));
+    }
+    validate_document_refs(&mut tx, actor.tenant_id, worktree_id, canvas_id, &body).await?;
+    let next_version = current
+        .version
+        .checked_add(1)
+        .ok_or_else(|| GroupApiError::conflict("version_exhausted"))?;
+    let closed = sqlx::query(
+        r#"UPDATE canvas.group_canvas_registry
+           SET valid_to=clock_timestamp(),is_current=FALSE
+           WHERE tenant_id=$1 AND worktree_id=$2 AND canvas_id=$3
+             AND version=$4 AND is_current AND valid_to IS NULL"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree_id)
+    .bind(canvas_id)
+    .bind(current.version)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    if closed.rows_affected() != 1 {
+        return Err(GroupApiError::conflict("canvas_document_version_conflict"));
+    }
+    sqlx::query(
+        r#"INSERT INTO canvas.group_canvas_registry
+           (tenant_id,worktree_id,canvas_id,version,title,created_by,created_at,viewport,frames,connectors)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree_id)
+    .bind(canvas_id)
+    .bind(next_version)
+    .bind(&current.title)
+    .bind(current.created_by)
+    .bind(current.created_at)
+    .bind(json!(body.viewport))
+    .bind(json!(body.frames))
+    .bind(json!(body.connectors))
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    let correlation_id = body.correlation_id.unwrap_or_else(Uuid::new_v4);
+    let document = json!({
+        "version": next_version,
+        "viewport": &body.viewport,
+        "frames": &body.frames,
+        "connectors": &body.connectors
+    });
+    let response = json!({"canvas_id":canvas_id,"worktree_id":worktree_id,"document":document});
+    append_event(
+        &mut tx,
+        &actor,
+        &scope,
+        worktree_id,
+        canvas_id,
+        None,
+        "canvas.document.updated",
+        correlation_id,
+        next_version,
+        json!({"expected_version": body.expected_version}),
+    )
+    .await?;
+    save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    Ok(Json(response))
+}
+
+fn validate_document(body: &CanvasDocumentBody) -> Result<(), GroupApiError> {
+    let viewport = &body.viewport;
+    if body.expected_version <= 0
+        || !viewport.x.is_finite()
+        || !viewport.y.is_finite()
+        || !viewport.zoom.is_finite()
+        || viewport.x.abs() > 1_000_000.0
+        || viewport.y.abs() > 1_000_000.0
+        || !(0.1..=4.0).contains(&viewport.zoom)
+        || body.frames.len() > 1_000
+        || body.connectors.len() > 5_000
+    {
+        return Err(GroupApiError::invalid_request("invalid_canvas_document"));
+    }
+    let mut frame_ids = HashSet::new();
+    for frame in &body.frames {
+        if !frame_ids.insert(frame.id)
+            || frame.title.trim().is_empty()
+            || frame.title.len() > 200
+            || !frame.x.is_finite()
+            || !frame.y.is_finite()
+            || !frame.width.is_finite()
+            || !frame.height.is_finite()
+            || frame.width <= 0.0
+            || frame.width > 100_000.0
+            || frame.height <= 0.0
+            || frame.height > 100_000.0
+            || frame.element_ids.len() > 1_000
+        {
+            return Err(GroupApiError::invalid_request("invalid_canvas_frame"));
+        }
+    }
+    let mut connector_ids = HashSet::new();
+    for connector in &body.connectors {
+        if !connector_ids.insert(connector.id)
+            || connector.from_element_id == connector.to_element_id
+            || !matches!(
+                connector.kind.as_str(),
+                "work_item_relation" | "agent_handoff" | "free" | "dependency"
+            )
+            || !matches!(
+                connector.routing.as_str(),
+                "straight" | "curved" | "orthogonal"
+            )
+            || !connector.width.is_finite()
+            || connector.width <= 0.0
+            || connector.width > 32.0
+            || connector.color.len() > 32
+            || connector
+                .label
+                .as_ref()
+                .is_some_and(|label| label.len() > 500)
+        {
+            return Err(GroupApiError::invalid_request("invalid_canvas_connector"));
+        }
+    }
+    Ok(())
+}
+
+async fn validate_document_refs(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    worktree_id: Uuid,
+    canvas_id: Uuid,
+    body: &CanvasDocumentBody,
+) -> Result<(), GroupApiError> {
+    let referenced_ids = body
+        .frames
+        .iter()
+        .flat_map(|frame| frame.element_ids.iter().copied())
+        .chain(
+            body.connectors
+                .iter()
+                .flat_map(|connector| [connector.from_element_id, connector.to_element_id]),
+        )
+        .collect::<HashSet<_>>();
+    if referenced_ids.is_empty() {
+        return Ok(());
+    }
+    let current_ids = sqlx::query_scalar::<_, Uuid>(
+        r#"SELECT element_id FROM canvas.canvas_elements_backend
+           WHERE tenant_id=$1 AND worktree_id=$2 AND canvas_id=$3
+             AND is_current AND valid_to IS NULL AND element_id = ANY($4)"#,
+    )
+    .bind(tenant_id)
+    .bind(worktree_id)
+    .bind(canvas_id)
+    .bind(referenced_ids.iter().copied().collect::<Vec<_>>())
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .into_iter()
+    .collect::<HashSet<_>>();
+    if current_ids.len() != referenced_ids.len() {
+        return Err(GroupApiError::invalid_request(
+            "canvas_document_element_not_found",
+        ));
+    }
+    Ok(())
 }
 
 async fn list_elements(
@@ -407,15 +1011,6 @@ async fn update_element(
     let worktree_id = request_worktree(&actor, &worktree_id, "canvas:write")?;
     let canvas_id = parse_id(&canvas_id)?;
     let element_id = parse_id(&element_id)?;
-    validate_element_body(
-        "shape",
-        body.x,
-        body.y,
-        body.width,
-        body.height,
-        body.rotation,
-        &body.content,
-    )?;
     if body.expected_version < 1 {
         return Err(GroupApiError::invalid_request("invalid_expected_version"));
     }
@@ -436,6 +1031,75 @@ async fn update_element(
     if current.version != body.expected_version {
         return Err(GroupApiError::conflict("version_conflict"));
     }
+    let (x, y, width, height, rotation, content) = match body.update_mode {
+        CanvasElementUpdateMode::Position => match (
+            body.x,
+            body.y,
+            body.width,
+            body.height,
+            body.rotation,
+            body.content,
+        ) {
+            (Some(x), Some(y), None, None, None, None) => (
+                x,
+                y,
+                current.width,
+                current.height,
+                current.rotation,
+                current.content.clone(),
+            ),
+            _ => {
+                return Err(GroupApiError::invalid_request(
+                    "invalid_canvas_element_update",
+                ));
+            }
+        },
+        CanvasElementUpdateMode::Geometry => match (
+            body.x,
+            body.y,
+            body.width,
+            body.height,
+            body.rotation,
+            body.content,
+        ) {
+            (None, None, Some(width), Some(height), Some(rotation), None) => (
+                current.x,
+                current.y,
+                width,
+                height,
+                rotation,
+                current.content.clone(),
+            ),
+            _ => {
+                return Err(GroupApiError::invalid_request(
+                    "invalid_canvas_element_update",
+                ));
+            }
+        },
+        CanvasElementUpdateMode::Content => match (
+            body.x,
+            body.y,
+            body.width,
+            body.height,
+            body.rotation,
+            body.content,
+        ) {
+            (None, None, None, None, None, Some(content)) => (
+                current.x,
+                current.y,
+                current.width,
+                current.height,
+                current.rotation,
+                content,
+            ),
+            _ => {
+                return Err(GroupApiError::invalid_request(
+                    "invalid_canvas_element_update",
+                ));
+            }
+        },
+    };
+    validate_element_body(&current.kind, x, y, width, height, rotation, &content)?;
     close_element_version(
         &mut tx,
         actor.tenant_id,
@@ -459,15 +1123,15 @@ async fn update_element(
     .bind(canvas_id)
     .bind(element_id)
     .bind(&current.kind)
-    .bind(body.x)
-    .bind(body.y)
-    .bind(body.width)
-    .bind(body.height)
-    .bind(body.rotation)
-    .bind(body.z_index)
-    .bind(&body.content)
-    .bind(body.locked)
-    .bind(body.hidden)
+    .bind(x)
+    .bind(y)
+    .bind(width)
+    .bind(height)
+    .bind(rotation)
+    .bind(current.z_index)
+    .bind(&content)
+    .bind(current.locked)
+    .bind(current.hidden)
     .bind(next_version)
     .bind(actor.user_id)
     .execute(&mut *tx)
@@ -484,7 +1148,7 @@ async fn update_element(
         "canvas.element.updated",
         correlation_id,
         next_version,
-        json!({"version": next_version}),
+        json!({"version": next_version, "update_mode": body.update_mode}),
     )
     .await?;
     let response = json!({"element": load_element(&mut tx, actor.tenant_id, &scope, worktree_id, canvas_id, element_id, has_scope(&actor, "work-item:read")).await?});
@@ -733,11 +1397,76 @@ async fn delete_element(
         tx.commit().await.map_err(|_| GroupApiError::internal())?;
         return Ok(Json(response));
     }
+    let current_document = sqlx::query_as::<_, CurrentCanvasDocument>(
+        r#"SELECT version,title,created_by,created_at,viewport,frames,connectors
+           FROM canvas.group_canvas_registry
+           WHERE tenant_id=$1 AND worktree_id=$2 AND canvas_id=$3
+             AND is_current AND valid_to IS NULL FOR UPDATE"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree_id)
+    .bind(canvas_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::not_found)?;
     let current =
         lock_element(&mut tx, actor.tenant_id, worktree_id, canvas_id, element_id).await?;
     if current.version != body.expected_version {
         return Err(GroupApiError::conflict("version_conflict"));
     }
+    let mut frames =
+        serde_json::from_value::<Vec<CanvasFrameBody>>(current_document.frames.clone())
+            .map_err(|_| GroupApiError::internal())?;
+    let mut connectors =
+        serde_json::from_value::<Vec<CanvasConnectorBody>>(current_document.connectors.clone())
+            .map_err(|_| GroupApiError::internal())?;
+    for frame in &mut frames {
+        frame.element_ids.retain(|id| *id != element_id);
+    }
+    let connector_count_before = connectors.len();
+    connectors.retain(|connector| {
+        connector.from_element_id != element_id && connector.to_element_id != element_id
+    });
+    let removed_connector_count = connector_count_before - connectors.len();
+    let next_document_version = current_document
+        .version
+        .checked_add(1)
+        .ok_or_else(|| GroupApiError::conflict("version_exhausted"))?;
+    let closed_document = sqlx::query(
+        r#"UPDATE canvas.group_canvas_registry
+           SET valid_to=clock_timestamp(),is_current=FALSE
+           WHERE tenant_id=$1 AND worktree_id=$2 AND canvas_id=$3
+             AND version=$4 AND is_current AND valid_to IS NULL"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree_id)
+    .bind(canvas_id)
+    .bind(current_document.version)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    if closed_document.rows_affected() != 1 {
+        return Err(GroupApiError::conflict("canvas_document_version_conflict"));
+    }
+    sqlx::query(
+        r#"INSERT INTO canvas.group_canvas_registry
+           (tenant_id,worktree_id,canvas_id,version,title,created_by,created_at,viewport,frames,connectors)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree_id)
+    .bind(canvas_id)
+    .bind(next_document_version)
+    .bind(&current_document.title)
+    .bind(current_document.created_by)
+    .bind(current_document.created_at)
+    .bind(&current_document.viewport)
+    .bind(json!(frames))
+    .bind(json!(connectors))
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
     sqlx::query(
         r#"UPDATE canvas.canvas_entity_ref SET valid_to=clock_timestamp(), is_current=FALSE
            WHERE tenant_id=$1 AND worktree_id=$2 AND canvas_id=$3 AND element_id=$4 AND is_current"#,
@@ -760,6 +1489,19 @@ async fn delete_element(
         &scope,
         worktree_id,
         canvas_id,
+        None,
+        "canvas.document.updated",
+        correlation_id,
+        next_document_version,
+        json!({"removed_element_id": element_id, "removed_connector_count": removed_connector_count}),
+    )
+    .await?;
+    append_event(
+        &mut tx,
+        &actor,
+        &scope,
+        worktree_id,
+        canvas_id,
         Some(element_id),
         "canvas.element.removed",
         correlation_id,
@@ -767,8 +1509,13 @@ async fn delete_element(
         json!({"previous_version": current.version}),
     )
     .await?;
-    let response =
-        json!({"element_id": element_id, "deleted": true, "version": current.version + 1});
+    let response = json!({
+        "element_id": element_id,
+        "deleted": true,
+        "version": current.version + 1,
+        "document_version": next_document_version,
+        "removed_connector_count": removed_connector_count
+    });
     save_idempotency(&mut tx, &actor, &key, &hash, &response).await?;
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
     Ok(Json(response))
@@ -930,8 +1677,8 @@ async fn lock_element(
     canvas_id: Uuid,
     element_id: Uuid,
 ) -> Result<CurrentElement, GroupApiError> {
-    sqlx::query_as::<_, CurrentElement>(
-        r#"SELECT kind,version
+    let current = sqlx::query_as::<_, CurrentElement>(
+        r#"SELECT kind,x,y,width,height,rotation,z_index,content,locked,hidden,version
            FROM canvas.canvas_elements_backend
            WHERE tenant_id=$1 AND worktree_id=$2 AND canvas_id=$3 AND element_id=$4
              AND is_current AND valid_to IS NULL FOR UPDATE"#,
@@ -943,7 +1690,11 @@ async fn lock_element(
     .fetch_optional(&mut **tx)
     .await
     .map_err(|_| GroupApiError::internal())?
-    .ok_or_else(GroupApiError::not_found)
+    .ok_or_else(GroupApiError::not_found)?;
+    if current.locked {
+        return Err(GroupApiError::conflict("canvas_element_locked"));
+    }
+    Ok(current)
 }
 
 async fn close_element_version(
@@ -1200,4 +1951,73 @@ fn identity_key_present(value: &Value) -> bool {
 
 fn empty_object() -> Value {
     json!({})
+}
+
+#[cfg(test)]
+mod canvas_events_tests {
+    use super::{CanvasEventsQuery, validated_cursor_and_limit};
+    use chrono::{DateTime, Utc};
+    use uuid::Uuid;
+
+    #[test]
+    fn canvas_event_query_accepts_first_page_and_enforces_bounds() {
+        let (cursor_at, cursor_id, limit) = validated_cursor_and_limit(CanvasEventsQuery {
+            cursor_at: None,
+            cursor_event_id: None,
+            limit: None,
+        })
+        .expect("first page should be valid");
+        assert_eq!(cursor_at, None);
+        assert_eq!(cursor_id, None);
+        assert_eq!(limit, 100);
+
+        let (_, _, max_limit) = validated_cursor_and_limit(CanvasEventsQuery {
+            cursor_at: None,
+            cursor_event_id: None,
+            limit: Some(200),
+        })
+        .expect("maximum page size should be valid");
+        assert_eq!(max_limit, 200);
+
+        for invalid_limit in [0, 201] {
+            assert!(
+                validated_cursor_and_limit(CanvasEventsQuery {
+                    cursor_at: None,
+                    cursor_event_id: None,
+                    limit: Some(invalid_limit),
+                })
+                .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn canvas_event_cursor_requires_timestamp_and_event_id_together() {
+        let cursor_at: DateTime<Utc> = "2026-09-29T00:00:00Z".parse().unwrap();
+        assert!(
+            validated_cursor_and_limit(CanvasEventsQuery {
+                cursor_at: Some(cursor_at),
+                cursor_event_id: None,
+                limit: None,
+            })
+            .is_err()
+        );
+        assert!(
+            validated_cursor_and_limit(CanvasEventsQuery {
+                cursor_at: None,
+                cursor_event_id: Some(Uuid::new_v4()),
+                limit: None,
+            })
+            .is_err()
+        );
+
+        assert!(
+            validated_cursor_and_limit(CanvasEventsQuery {
+                cursor_at: Some(cursor_at),
+                cursor_event_id: Some(Uuid::new_v4()),
+                limit: Some(1),
+            })
+            .is_ok()
+        );
+    }
 }

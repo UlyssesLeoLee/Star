@@ -14,6 +14,10 @@ async-trait = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+ring = "0.17"
+portable-pty = "0.9"
 tokio = { workspace = true }
 # w21 http_client 真实 HTTP (reqwest + SSE stream)
 reqwest = { workspace = true, features = ["stream"] }

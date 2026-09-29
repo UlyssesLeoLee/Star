@@ -1,3 +1,13 @@
+/*
+CYPHER STRUCTURE MANIFEST
+CREATE
+  (file:File {name:"frontend/src/components/editor/MonacoEditor.tsx",type:"file",language:"typescript"}),
+  (props:Class {name:"MonacoEditorProps",type:"interface"}),
+  (component:Function {name:"MonacoEditor",type:"function"}),
+  (language:Function {name:"inferLanguageFromPath",type:"function"}),
+  (file)-[:CONTAINS]->(props),(file)-[:CONTAINS]->(component),(file)-[:CONTAINS]->(language);
+*/
+
 // =====================================================================
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // frontend/src/components/editor/MonacoEditor.tsx — ULYS-98-W1.1
@@ -13,6 +23,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
+import type * as Monaco from "monaco-editor";
 
 // Lazy-load the official @monaco-editor/react wrapper — Monaco ships Web Workers
 // that must NOT execute on the Next.js server side.
@@ -180,7 +191,7 @@ export default function MonacoEditor({
           inlineSuggest: { enabled: false },
           quickSuggestions: false,
         }}
-        onMount={(_editor, monaco) => {
+        onMount={(_editor: Monaco.editor.IStandaloneCodeEditor, monaco: typeof Monaco) => {
           // Force plaintext model → language, 避免语言未注册时 Monaco 抛错.
           monaco.editor.getModels().forEach((model) => {
             if (model.getLanguageId() !== resolvedLanguage) {

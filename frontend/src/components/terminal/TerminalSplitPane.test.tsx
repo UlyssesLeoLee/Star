@@ -1,10 +1,19 @@
+/*
+CYPHER STRUCTURE MANIFEST
+CREATE
+  (file:File {name:"frontend/src/components/terminal/TerminalSplitPane.test.tsx",type:"file",language:"typescript"}),
+  (suite:Function {name:"TerminalStackContainer tests",type:"function"}),
+  (no_session:Function {name:"preview remains disconnected",type:"function"}),
+  (file)-[:CONTAINS]->(suite),(file)-[:CONTAINS]->(no_session);
+*/
+
 // =====================================================================
 // TerminalSplitPane.test.tsx — Component integration test (per ULYS-223 P1-D §6.8)
 // =====================================================================
 // 守门: Vitest + @testing-library/react + jsdom (per vitest.config.ts)
 // =====================================================================
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 import { TerminalStackContainer } from "./TerminalStackContainer";
@@ -16,6 +25,11 @@ afterEach(() => {
 });
 
 describe("TerminalStackContainer (ULYS-223 P1-D)", () => {
+  it("keeps the preview terminal disconnected when there is no session", () => {
+    render(<TerminalStackContainer />);
+    expect(useTerminalStackStore.getState().wsConnected).toBe(false);
+  });
+
   it("K. renders toolbar + single root pane initially", () => {
     render(<TerminalStackContainer />);
     expect(screen.getByTestId("terminal-stack-container")).toBeTruthy();

@@ -1,3 +1,28 @@
+/*
+CYPHER STRUCTURE MANIFEST
+CREATE
+  (file:File {name:"frontend/src/lib/terminal/wsClient.ts",type:"file",language:"typescript"}),
+  (client:Class {name:"TerminalWsClient",type:"class",language:"typescript"}),
+  (handlers:Class {name:"TerminalWsHandlers",type:"class",language:"typescript"}),
+  (options:Class {name:"TerminalWsClientOptions",type:"class",language:"typescript"}),
+  (ctor:Function {name:"constructor",type:"function",language:"typescript"}),
+  (connect:Function {name:"connect",type:"function",language:"typescript"}),
+  (fetchTicket:Function {name:"connectWithAttachmentTicket",type:"function",language:"typescript"}),
+  (open:Function {name:"openSocket",type:"function",language:"typescript"}),
+  (retry:Function {name:"scheduleReconnect",type:"function",language:"typescript"}),
+  (dispatch:Function {name:"dispatch",type:"function",language:"typescript"}),
+  (stdin:Function {name:"sendStdin",type:"function",language:"typescript"}),
+  (resize:Function {name:"sendResize",type:"function",language:"typescript"}),
+  (ping:Function {name:"sendPing",type:"function",language:"typescript"}),
+  (send:Function {name:"send",type:"function",language:"typescript"}),
+  (close:Function {name:"close",type:"function",language:"typescript"}),
+  (connected:Function {name:"isConnected",type:"function",language:"typescript"}),
+  (browser:Function {name:"isBrowser",type:"function",language:"typescript"}),
+  (file)-[:CONTAINS]->(client),(file)-[:CONTAINS]->(handlers),(file)-[:CONTAINS]->(options),(file)-[:CONTAINS]->(browser),
+  (client)-[:HAS_METHOD]->(ctor),(client)-[:HAS_METHOD]->(connect),(client)-[:HAS_METHOD]->(fetchTicket),(client)-[:HAS_METHOD]->(open),(client)-[:HAS_METHOD]->(retry),(client)-[:HAS_METHOD]->(dispatch),(client)-[:HAS_METHOD]->(stdin),(client)-[:HAS_METHOD]->(resize),(client)-[:HAS_METHOD]->(ping),(client)-[:HAS_METHOD]->(send),(client)-[:HAS_METHOD]->(close),(client)-[:HAS_METHOD]->(connected),
+  (connect)-[:CALLS]->(fetchTicket),(connect)-[:CALLS]->(open),(fetchTicket)-[:CALLS]->(open),(open)-[:CALLS]->(dispatch),(stdin)-[:CALLS]->(send),(resize)-[:CALLS]->(send),(ping)-[:CALLS]->(send);
+*/
+
 "use client";
 
 // =====================================================================
@@ -46,6 +71,8 @@ export type TerminalWsHandlers = {
 export interface TerminalWsClientOptions {
   sessionId: string;
   handlers: TerminalWsHandlers;
+  /** Fetches a fresh, one-use ticket for each socket connection and reconnect. */
+  getAttachmentTicket?: () => Promise<string>;
   /** Reconnect after disconnect (per NFR-AC keepalive) */
   autoReconnect?: boolean;
   /** Initial reconnect delay in ms */
@@ -60,6 +87,8 @@ export interface TerminalWsClientOptions {
 export class TerminalWsClient {
   private ws: WebSocket | null = null;
   private closed = false;
+  private connecting = false;
+  private authorized = false;
   private reconnectDelayMs: number;
   private readonly opts: TerminalWsClientOptions;
 
@@ -71,14 +100,52 @@ export class TerminalWsClient {
   /** Open WebSocket connection. Idempotent: closes existing then reopens. */
   connect(): void {
     if (this.closed) return;
+    if (this.connecting) return;
     if (this.ws && this.ws.readyState <= WebSocket.OPEN) return;
 
+    if (this.opts.getAttachmentTicket) {
+      void this.connectWithAttachmentTicket();
+      return;
+    }
+
+    this.openSocket();
+  }
+
+  private async connectWithAttachmentTicket(): Promise<void> {
+    this.connecting = true;
+    try {
+      const ticket = await this.opts.getAttachmentTicket?.();
+      if (this.closed) return;
+      if (!ticket || ticket.length > 1024) {
+        throw new Error("attachment ticket unavailable");
+      }
+      this.openSocket(ticket);
+    } catch {
+      this.opts.handlers.onConnectionChange?.(false);
+      this.opts.handlers.onError?.({
+        type: "error",
+        code: "internal",
+        message: "Unable to authorize terminal attachment",
+      });
+      if (!this.closed && this.opts.autoReconnect) this.scheduleReconnect();
+    } finally {
+      this.connecting = false;
+    }
+  }
+
+  private openSocket(ticket?: string): void {
     const url = buildTerminalWsUrl(this.opts.sessionId);
     const ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
     this.ws = ws;
+    this.authorized = false;
 
     ws.onopen = () => {
+      if (ticket !== undefined) {
+        ws.send(JSON.stringify({ type: "authorize", ticket }));
+        return;
+      }
+      this.authorized = true;
       this.opts.handlers.onConnectionChange?.(true);
     };
 
@@ -87,6 +154,10 @@ export class TerminalWsClient {
       if (!text) return;
       try {
         const msg = decodeServerMessage(text);
+        if (msg.type === "hello" && this.opts.getAttachmentTicket) {
+          this.authorized = true;
+          this.opts.handlers.onConnectionChange?.(true);
+        }
         this.dispatch(msg);
       } catch {
         // per protocol: malformed JSON → onError (with custom code)
@@ -103,6 +174,7 @@ export class TerminalWsClient {
     };
 
     ws.onclose = () => {
+      this.authorized = false;
       this.opts.handlers.onConnectionChange?.(false);
       if (!this.closed && this.opts.autoReconnect) {
         this.scheduleReconnect();
@@ -164,7 +236,7 @@ export class TerminalWsClient {
   }
 
   private send(msg: ClientMessage): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.authorized) {
       // MVP v0: silently drop if not connected
       return;
     }
@@ -187,7 +259,7 @@ export class TerminalWsClient {
 
   /** Whether currently connected (per WebSocket readyState). */
   isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
+    return this.ws?.readyState === WebSocket.OPEN && this.authorized;
   }
 }
 

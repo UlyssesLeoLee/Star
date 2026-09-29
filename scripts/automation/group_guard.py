@@ -16,10 +16,13 @@ Usage:
 Refs: docs/worktree-group-guard.md
 """
 import argparse
+import json
 import os
 import subprocess
 import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 GROUP_RANGES = {
     "canvas": [
@@ -172,13 +175,120 @@ def check_group_boundary(group: str, files: list[str]) -> tuple[bool, list[str]]
     return len(violations) == 0, violations
 
 
-def check_cross_ref(group: str) -> tuple[bool, str]:
-    """守门 #33 — Group cross-ref 守门 (Cargo path deps 双向 0).
+def _cargo_source_group(manifest_path: str, repo_root: Path) -> str | None:
+    """Map source crates to the two ownership groups covered by guard #33."""
+    manifest_dir = Path(manifest_path).resolve().parent
+    try:
+        relative = manifest_dir.relative_to(repo_root.resolve()).as_posix().casefold()
+    except ValueError:
+        return None
 
-    Simplified check: warn if canvas-group PR touches domain-* src
-    """
-    # This is a stub; full implementation needs cargo metadata analysis
-    return True, "OK (placeholder; full cargo metadata check pending)"
+    if relative.startswith("crates/canvas-") or relative == "crates/domain-canvas":
+        return "canvas"
+    if (relative.startswith("crates/domain-") and relative != "crates/domain-canvas") or relative.startswith("crates/star-"):
+        return "domain"
+    return None
+
+
+def _cross_group_cargo_edges(metadata: dict, repo_root: Path) -> list[str]:
+    """Return direct workspace Cargo dependency edges crossing Canvas/Domain."""
+    packages = metadata.get("packages")
+    workspace_members = metadata.get("workspace_members")
+    resolve = metadata.get("resolve")
+    if not isinstance(packages, list) or not isinstance(workspace_members, list):
+        raise ValueError("cargo metadata is missing packages or workspace_members")
+    if not isinstance(resolve, dict) or not isinstance(resolve.get("nodes"), list):
+        raise ValueError("cargo metadata is missing the resolved dependency graph")
+
+    member_ids = set(workspace_members)
+    package_by_id = {
+        package.get("id"): package
+        for package in packages
+        if isinstance(package, dict) and package.get("id") in member_ids
+    }
+    if package_by_id.keys() != member_ids:
+        raise ValueError("cargo metadata is missing a workspace member package")
+    resolved_nodes = resolve["nodes"]
+    if any(
+        not isinstance(node, dict)
+        or not isinstance(node.get("id"), str)
+        or not isinstance(node.get("deps"), list)
+        for node in resolved_nodes
+    ):
+        raise ValueError("cargo metadata contains a malformed resolved node")
+    nodes_by_id = {node["id"]: node for node in resolved_nodes}
+    if not member_ids.issubset(nodes_by_id):
+        raise ValueError("resolved dependency graph is missing a workspace member node")
+
+    groups = {
+        package_id: _cargo_source_group(package.get("manifest_path", ""), repo_root)
+        for package_id, package in package_by_id.items()
+    }
+
+    edges = []
+    for node in resolved_nodes:
+        source_id = node.get("id")
+        source_group = groups.get(source_id)
+        if source_group is None:
+            continue
+        source_package = package_by_id[source_id]
+        for dependency in node["deps"]:
+            if not isinstance(dependency, dict) or not isinstance(dependency.get("pkg"), str):
+                raise ValueError("cargo metadata contains a malformed dependency edge")
+            target_id = dependency["pkg"]
+            target_group = groups.get(target_id)
+            if target_group is None or target_group == source_group:
+                continue
+            target_package = package_by_id[target_id]
+            edges.append(
+                f"{source_group}:{source_package['name']} -> "
+                f"{target_group}:{target_package['name']}"
+            )
+    return sorted(set(edges))
+
+
+def check_cross_ref(
+    group: str,
+    *,
+    metadata: dict | None = None,
+    repo_root: Path = REPO_ROOT,
+) -> tuple[bool, str]:
+    """守门 #33 — Canvas/Domain source crates may not depend on each other."""
+    if group in {"frontend", "core"}:
+        return True, "N/A (守门 #33 applies to Canvas/Domain Cargo source groups)"
+
+    if metadata is None:
+        try:
+            result = subprocess.run(
+                ["cargo", "metadata", "--format-version", "1"],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=120,
+                check=False,
+            )
+        except (OSError, UnicodeError, subprocess.TimeoutExpired) as exc:
+            return False, f"cargo metadata unavailable: {exc}"
+        if result.returncode != 0:
+            detail = result.stderr.strip().splitlines()
+            return False, "cargo metadata failed: " + (detail[-1] if detail else f"exit {result.returncode}")
+        try:
+            metadata = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            return False, f"cargo metadata returned invalid JSON: {exc}"
+
+    try:
+        edges = _cross_group_cargo_edges(metadata, repo_root)
+    except (KeyError, TypeError, ValueError) as exc:
+        return False, f"invalid cargo metadata graph: {exc}"
+    if edges:
+        shown = "; ".join(edges[:10])
+        remaining = len(edges) - min(len(edges), 10)
+        if remaining:
+            shown += f"; ... and {remaining} more"
+        return False, f"{len(edges)} cross-group Cargo path dependency edge(s): {shown}"
+    return True, "0 cross-group Cargo path dependencies (Canvas <-> Domain)"
 
 
 def print_env(group: str) -> None:
@@ -229,11 +339,13 @@ def cmd_check(args) -> int:
 
     group_id = os.environ.get("NEXT_PUBLIC_GROUP_ID", "")
     wt_id = os.environ.get("NEXT_PUBLIC_WORKTREE_ID", "")
+    passed_34 = True
     if group_id == "":
         # Not set — just warn (per §3.4.3 fallback core)
         print(f"# 守门 #34 (Group 二维 ID): ⚠️  WARN (NEXT_PUBLIC_GROUP_ID not set; fallback core)")
         print(f"#  Hint: run 'python3 scripts/automation/group_guard.py env' for setup")
     elif group_id != group:
+        passed_34 = False
         print(f"# 守门 #34 (Group 二维 ID): ❌ FAIL (env NEXT_PUBLIC_GROUP_ID={group_id}, expected {group})")
     else:
         # group_id matches expected; check worktree_id (optional, warn only)
@@ -245,7 +357,7 @@ def cmd_check(args) -> int:
             print(f"  NEXT_PUBLIC_WORKTREE_ID (unset, fallback to branch-name hash)")
 
     print()
-    return 0 if (passed_32 and passed_33) else 1
+    return 0 if (passed_32 and passed_33 and passed_34) else 1
 
 
 def cmd_env(args) -> int:

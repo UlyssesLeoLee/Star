@@ -1,3 +1,25 @@
+/*
+CYPHER STRUCTURE MANIFEST
+CREATE
+  (file:File {name:"frontend/src/components/CanvasView.tsx",type:"file",language:"tsx"}),
+  (props:Class {name:"CanvasViewProps",type:"class",visibility:"private"}),
+  (view:Function {name:"CanvasView",type:"function",signature:"CanvasView(props: CanvasViewProps): JSX.Element",visibility:"public",complexity:"complex"}),
+  (updateViewport:Function {name:"updateViewport",type:"function",signature:"updateViewport(nextViewport: CanvasViewport): void",visibility:"private",complexity:"simple"}),
+  (onMouseMove:Function {name:"onMouseMove",type:"function",signature:"onMouseMove(event: React.MouseEvent): void",visibility:"private",complexity:"moderate"}),
+  (onMouseUp:Function {name:"onMouseUp",type:"function",signature:"onMouseUp(): void",visibility:"private",complexity:"moderate"}),
+  (displayElements:Variable {name:"displayElements",type:"variable",language:"typescript"}),
+  (dragPreview:Variable {name:"dragPreview",type:"variable",language:"typescript"}),
+  (dragPreviewRef:Variable {name:"dragPreviewRef",type:"variable",language:"typescript"}),
+  (positionChange:Variable {name:"onElementPositionChange",type:"variable",language:"typescript"}),
+  (selectionChange:Variable {name:"onSelectionChange",type:"variable",language:"typescript"}),
+  (deleteElements:Variable {name:"onDeleteElements",type:"variable",language:"typescript"}),
+  (deleteSelection:Function {name:"deleteSelection",type:"function",signature:"deleteSelection(): Promise<void>",visibility:"private",complexity:"moderate"}),
+  (viewport:Variable {name:"viewport",type:"variable",language:"typescript"}),
+  (onViewportChange:Variable {name:"onViewportChange",type:"variable",language:"typescript"}),
+  (file)-[:CONTAINS]->(props),(file)-[:CONTAINS]->(view),(view)-[:CONTAINS]->(updateViewport),(view)-[:CONTAINS]->(onMouseMove),(view)-[:CONTAINS]->(onMouseUp),(view)-[:CONTAINS]->(displayElements),
+  (view)-[:CONTAINS]->(deleteSelection),(view)-[:USES]->(viewport),(view)-[:USES]->(onViewportChange),(view)-[:USES]->(positionChange),(view)-[:USES]->(selectionChange),(view)-[:USES]->(deleteElements),(view)-[:USES]->(dragPreview),(view)-[:USES]->(dragPreviewRef),(view)-[:CALLS]->(updateViewport),(view)-[:CALLS]->(onMouseMove),(view)-[:CALLS]->(onMouseUp),(view)-[:CALLS]->(displayElements),(view)-[:CALLS]->(deleteSelection),(onMouseMove)-[:USES]->(positionChange),(onMouseMove)-[:USES]->(dragPreviewRef),(onMouseUp)-[:USES]->(dragPreviewRef),(onMouseUp)-[:CALLS]->(positionChange),(displayElements)-[:USES]->(dragPreview),(updateViewport)-[:USES]->(viewport),(updateViewport)-[:USES]->(onViewportChange),(deleteSelection)-[:USES]->(deleteElements);
+*/
+
 "use client";
 
 /**
@@ -13,7 +35,7 @@
  */
 
 import type {
-  Canvas, CanvasElement, CanvasConnector, Worktree, AgentSession, AutomationRule, Feedback,
+  Canvas, CanvasElement, CanvasConnector, CanvasViewport, Worktree, WorkItem, AgentSession, AutomationRule, Feedback,
 } from "@/types/ids";
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useStore } from "@/lib/store";
@@ -22,25 +44,40 @@ import { MousePointer2, Hand, Plus, Trash2, ZoomIn, ZoomOut, Maximize2 } from "l
 import { useTranslation } from "@/lib/i18n";
 
 interface CanvasViewProps {
-  canvas: Canvas;
-  elements: CanvasElement[];
-  connectors: CanvasConnector[];
+  canvas: Pick<Canvas, "id" | "viewport" | "frames">;
+  elements: CanvasElementView[];
+  connectors: CanvasConnectorView[];
   highlightElementId?: string;
   readOnly?: boolean;
+  groupWorkItems?: Array<Pick<WorkItem, "id" | "key" | "title" | "status">>;
+  groupWorktrees?: Array<Pick<Worktree, "id" | "branch" | "status">>;
   onOpenWorkItem?: (workItemId: string, worktreeId?: string) => void;
+  onViewportChange?: (viewport: CanvasViewport) => void;
+  onElementPositionChange?: (position: { elementId: string; x: number; y: number; expectedVersion: number }) => Promise<void>;
+  onSelectionChange?: (elementIds: string[]) => void;
+  onDeleteElements?: (elementIds: string[]) => Promise<void>;
 }
+
+type CanvasElementView = Pick<CanvasElement,
+  "id" | "canvas_id" | "kind" | "x" | "y" | "width" | "height" | "rotation" | "z_index" | "entity_ref" | "content" | "locked" | "hidden"
+> & { version?: number };
+type CanvasConnectorView = Pick<CanvasConnector,
+  "id" | "canvas_id" | "kind" | "from_element_id" | "to_element_id" | "routing" | "arrow_start" | "arrow_end" | "color" | "width" | "label"
+>;
 
 const STICKY_PALETTE = ["#f9d77e", "#ffb3c1", "#a3d9ff", "#b8f0c4", "#d4b3ff"];
 
-export function CanvasView({ canvas, elements, connectors, highlightElementId, readOnly = false, onOpenWorkItem }: CanvasViewProps) {
+export function CanvasView({ canvas, elements, connectors, highlightElementId, readOnly = false, groupWorkItems, groupWorktrees, onOpenWorkItem, onViewportChange, onElementPositionChange, onSelectionChange, onDeleteElements }: CanvasViewProps) {
   const { t } = useTranslation();
   // viewport: 世界坐标
   const [viewport, setViewport] = useState(canvas.viewport);
   const [selected, setSelected] = useState<string[]>([]);
   const [tool, setTool] = useState<"select" | "pan">("select");
   const svgRef = useRef<SVGSVGElement>(null);
-  const dragState = useRef<{ type: "pan" | "element" | null; startX: number; startY: number; elX: number; elY: number; elId: string | null }>({
-    type: null, startX: 0, startY: 0, elX: 0, elY: 0, elId: null,
+  const [dragPreview, setDragPreview] = useState<{ elementId: string; x: number; y: number } | null>(null);
+  const dragPreviewRef = useRef<{ elementId: string; x: number; y: number } | null>(null);
+  const dragState = useRef<{ type: "pan" | "element" | null; startX: number; startY: number; elX: number; elY: number; elId: string | null; expectedVersion: number }>({
+    type: null, startX: 0, startY: 0, elX: 0, elY: 0, elId: null, expectedVersion: 0,
   });
 
   const worktrees = useStore((s) => s.worktrees);
@@ -49,6 +86,12 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   const feedbacks = useStore((s) => s.feedbacks);
   const moveCanvasElement = useStore((s) => s.moveCanvasElement);
   const deleteCanvasElement = useStore((s) => s.deleteCanvasElement);
+  const availableWorkItems = groupWorkItems ?? useStore.getState().workItems;
+  const availableWorktrees = groupWorktrees ?? worktrees;
+
+  useEffect(() => {
+    onSelectionChange?.(selected);
+  }, [onSelectionChange, selected]);
 
   // 屏幕坐标 → 世界坐标
   const screenToWorld = useCallback((sx: number, sy: number) => ({
@@ -61,6 +104,11 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     x: (wx - viewport.x) * viewport.zoom,
     y: (wy - viewport.y) * viewport.zoom,
   }), [viewport]);
+
+  const updateViewport = useCallback((nextViewport: CanvasViewport) => {
+    setViewport(nextViewport);
+    onViewportChange?.(nextViewport);
+  }, [onViewportChange]);
 
   // 自动滚动到高亮 element
   useEffect(() => {
@@ -77,7 +125,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   const onMouseDown = (e: React.MouseEvent) => {
     if (e.button === 1 || (e.button === 0 && tool === "pan") || e.shiftKey) {
       // 中键 / pan 工具 / shift = pan viewport
-      dragState.current = { type: "pan", startX: e.clientX, startY: e.clientY, elX: viewport.x, elY: viewport.y, elId: null };
+      dragState.current = { type: "pan", startX: e.clientX, startY: e.clientY, elX: viewport.x, elY: viewport.y, elId: null, expectedVersion: 0 };
     }
   };
 
@@ -86,16 +134,34 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     if (ds.type === "pan") {
       const dx = (e.clientX - ds.startX) / viewport.zoom;
       const dy = (e.clientY - ds.startY) / viewport.zoom;
-      setViewport({ ...viewport, x: ds.elX - dx, y: ds.elY - dy });
-    } else if (ds.type === "element" && ds.elId && !readOnly) {
+      updateViewport({ ...viewport, x: ds.elX - dx, y: ds.elY - dy });
+    } else if (ds.type === "element" && ds.elId && (!readOnly || onElementPositionChange)) {
       const dx = (e.clientX - ds.startX) / viewport.zoom;
       const dy = (e.clientY - ds.startY) / viewport.zoom;
-      moveCanvasElement(ds.elId, ds.elX + dx, ds.elY + dy);
+      const nextX = ds.elX + dx;
+      const nextY = ds.elY + dy;
+      if (onElementPositionChange) {
+        const preview = { elementId: ds.elId, x: nextX, y: nextY };
+        dragPreviewRef.current = preview;
+        setDragPreview(preview);
+      }
+      else moveCanvasElement(ds.elId, nextX, nextY);
     }
   };
 
   const onMouseUp = () => {
-    dragState.current = { type: null, startX: 0, startY: 0, elX: 0, elY: 0, elId: null };
+    const ds = dragState.current;
+    dragState.current = { type: null, startX: 0, startY: 0, elX: 0, elY: 0, elId: null, expectedVersion: 0 };
+    const preview = dragPreviewRef.current;
+    dragPreviewRef.current = null;
+    if (ds.type === "element" && ds.elId && ds.expectedVersion > 0 && onElementPositionChange && preview?.elementId === ds.elId) {
+      const position = { elementId: ds.elId, x: preview.x, y: preview.y, expectedVersion: ds.expectedVersion };
+      if (position.x !== ds.elX || position.y !== ds.elY) {
+        void onElementPositionChange(position).catch(() => undefined).finally(() => setDragPreview(null));
+        return;
+      }
+    }
+    setDragPreview(null);
   };
 
   // 滚轮 zoom
@@ -110,15 +176,23 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
       const sy = e.clientY - rect.top;
       const wx = sx / viewport.zoom + viewport.x;
       const wy = sy / viewport.zoom + viewport.y;
-      setViewport({ x: wx - sx / newZoom, y: wy - sy / newZoom, zoom: newZoom });
+      updateViewport({ x: wx - sx / newZoom, y: wy - sy / newZoom, zoom: newZoom });
     }
   };
 
-  const onElementMouseDown = (e: React.MouseEvent, el: CanvasElement) => {
+  const onElementMouseDown = (e: React.MouseEvent, el: CanvasElementView) => {
     e.stopPropagation();
     if (tool === "pan") return;
+    if (e.shiftKey) {
+      setSelected((current) => current.includes(el.id)
+        ? current.filter((selectedId) => selectedId !== el.id)
+        : [...current, el.id]);
+      return;
+    }
     setSelected([el.id]);
-    if (!readOnly) {
+    dragPreviewRef.current = null;
+    setDragPreview(null);
+    if (!el.locked && (!readOnly || onElementPositionChange)) {
       dragState.current = {
         type: "element",
         startX: e.clientX,
@@ -126,11 +200,23 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         elX: el.x,
         elY: el.y,
         elId: el.id,
+        expectedVersion: el.version ?? 0,
       };
     }
   };
 
-  const onElementDoubleClick = (el: CanvasElement) => {
+  const deleteSelection = async () => {
+    if (selected.length === 0) return;
+    try {
+      if (onDeleteElements) await onDeleteElements(selected);
+      else selected.forEach((id) => deleteCanvasElement(id));
+      setSelected([]);
+    } catch {
+      // The owning Group page reports the API failure and keeps this selection available for retry.
+    }
+  };
+
+  const onElementDoubleClick = (el: CanvasElementView) => {
     const workItemId = el.entity_ref
       ? el.entity_ref.ref_type === "work_item" ? el.entity_ref.ref_id : undefined
       : el.content.work_item_id;
@@ -158,8 +244,12 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
     }
   };
 
+  const displayElements = dragPreview
+    ? elements.map((element) => element.id === dragPreview.elementId ? { ...element, x: dragPreview.x, y: dragPreview.y } : element)
+    : elements;
+
   // render element
-  const renderElement = (el: CanvasElement) => {
+  const renderElement = (el: CanvasElementView) => {
     const isHighlighted = el.id === highlightElementId;
     const isSelected = selected.includes(el.id);
     const stroke = isHighlighted ? "#2f81f7" : isSelected ? "#79c0ff" : "#30363d";
@@ -197,7 +287,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         const workItemId = el.entity_ref
           ? el.entity_ref.ref_type === "work_item" ? el.entity_ref.ref_id : undefined
           : el.content.work_item_id;
-        const wi = useStore.getState().workItems.find((w) => w.id === workItemId);
+        const wi = availableWorkItems.find((w) => w.id === workItemId);
         if (!wi) return null;
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
@@ -220,7 +310,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         const worktreeId = el.entity_ref
           ? el.entity_ref.ref_type === "worktree" ? el.entity_ref.ref_id : undefined
           : el.content.worktree_id;
-        const wt = worktrees.find((w) => w.id === worktreeId);
+        const wt = availableWorktrees.find((w) => w.id === worktreeId);
         if (!wt) return null;
         return (
           <g key={el.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: "pointer" }} onMouseDown={(e) => onElementMouseDown(e, el)} onDoubleClick={() => onElementDoubleClick(el)}>
@@ -315,9 +405,9 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   };
 
   // render connector(bezier 复用 SmView 算法)
-  const renderConnector = (c: CanvasConnector) => {
-    const from = elements.find((e) => e.id === c.from_element_id);
-    const to = elements.find((e) => e.id === c.to_element_id);
+  const renderConnector = (c: CanvasConnectorView) => {
+    const from = displayElements.find((e) => e.id === c.from_element_id);
+    const to = displayElements.find((e) => e.id === c.to_element_id);
     if (!from || !to) return null;
     const fx = from.x + from.width / 2;
     const fy = from.y + from.height / 2;
@@ -385,12 +475,12 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
   };
 
   // minimap(右下角,显示 viewport 范围)
-  const allX = elements.map((e) => e.x);
-  const allY = elements.map((e) => e.y);
+  const allX = displayElements.map((e) => e.x);
+  const allY = displayElements.map((e) => e.y);
   const minX = allX.length > 0 ? Math.min(...allX) - 100 : 0;
   const minY = allY.length > 0 ? Math.min(...allY) - 100 : 0;
-  const maxX = allX.length > 0 ? Math.max(...allX.map((x, i) => x + elements[i].width)) + 100 : 1200;
-  const maxY = allY.length > 0 ? Math.max(...allY.map((y, i) => y + elements[i].height)) + 100 : 800;
+  const maxX = allX.length > 0 ? Math.max(...allX.map((x, i) => x + displayElements[i].width)) + 100 : 1200;
+  const maxY = allY.length > 0 ? Math.max(...allY.map((y, i) => y + displayElements[i].height)) + 100 : 800;
 
   return (
     <div data-testid="canvas-container" className="relative w-full h-full bg-bg overflow-hidden">
@@ -403,22 +493,22 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
           <Hand size={14} />
         </button>
         <div className="w-px h-5 bg-line" />
-        <button onClick={() => setViewport({ ...viewport, zoom: Math.min(4, viewport.zoom * 1.2) })} className="btn p-1.5" title={t.ariaLabels.canvasZoomIn}>
+        <button onClick={() => updateViewport({ ...viewport, zoom: Math.min(4, viewport.zoom * 1.2) })} className="btn p-1.5" title={t.ariaLabels.canvasZoomIn}>
           <ZoomIn size={14} />
         </button>
-        <button onClick={() => setViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })} className="btn p-1.5" title={t.ariaLabels.canvasZoomOut}>
+        <button onClick={() => updateViewport({ ...viewport, zoom: Math.max(0.1, viewport.zoom / 1.2) })} className="btn p-1.5" title={t.ariaLabels.canvasZoomOut}>
           <ZoomOut size={14} />
         </button>
         <button onClick={() => {
           // fit to content
-          setViewport({ x: minX, y: minY, zoom: Math.min(1200 / (maxX - minX), 800 / (maxY - minY), 1) });
+          updateViewport({ x: minX, y: minY, zoom: Math.min(1200 / (maxX - minX), 800 / (maxY - minY), 1) });
         }} className="btn p-1.5" title={t.ariaLabels.canvasFit}>
           <Maximize2 size={14} />
         </button>
         <span className="text-[10px] text-ink-dim font-mono px-2">{Math.round(viewport.zoom * 100)}%</span>
         <div className="w-px h-5 bg-line" />
-        {selected.length > 0 && !readOnly && (
-          <button onClick={() => { selected.forEach((id) => deleteCanvasElement(id)); setSelected([]); }} className="btn p-1.5 text-err" title={t.ariaLabels.canvasDelete}>
+        {selected.length > 0 && (!readOnly || onDeleteElements) && (
+          <button onClick={() => void deleteSelection()} disabled={selected.some((id) => elements.some((element) => element.id === id && element.locked))} className="btn p-1.5 text-err disabled:opacity-40" title={t.ariaLabels.canvasDelete}>
             <Trash2 size={14} />
           </button>
         )}
@@ -457,7 +547,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
         {connectors.map(renderConnector)}
 
         {/* Element */}
-        {elements.map((el) => (
+        {displayElements.map((el) => (
           <g key={`wrapper-${el.id}`} data-testid={`canvas-element-${el.id}`}>
             {renderElement(el)}
           </g>
@@ -478,7 +568,7 @@ export function CanvasView({ canvas, elements, connectors, highlightElementId, r
             strokeWidth={2}
           />
           {/* elements dots */}
-          {elements.map((e) => (
+          {displayElements.map((e) => (
             <rect key={e.id} x={e.x} y={e.y} width={e.width} height={e.height} fill="#3fb950" opacity={0.6} />
           ))}
         </svg>

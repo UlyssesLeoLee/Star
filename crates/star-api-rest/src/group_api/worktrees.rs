@@ -2,27 +2,30 @@
 //! CREATE
 //!   (f:File {name:"worktrees.rs",type:"file",language:"rust"}),(m:Module {name:"worktrees",type:"module",language:"rust"}),
 //!   (q:Class {name:"IndexQuery",type:"class"}),(c:Class {name:"IndexCursor",type:"class"}),(p:Class {name:"ManagementPlanBody",type:"class"}),(w:Class {name:"ManageWorktreeRow",type:"class"}),(i:Class {name:"PlanIdempotency",type:"class"}),(mp:Class {name:"ManagementPlanRow",type:"class"}),
-//!   (rt:Function {name:"router",type:"function"}),(li:Function {name:"list_project_worktrees",type:"function"}),(pl:Function {name:"create_management_plan",type:"function"}),(co:Function {name:"confirm_management_plan",type:"function"}),(au:Function {name:"authorize_worktree",type:"function"}),(cu:Function {name:"decode_cursor",type:"function"}),(ec:Function {name:"encode_cursor",type:"function"}),(rh:Function {name:"request_hash",type:"function"}),(val:Function {name:"validate_plan",type:"function"}),(rm:Function {name:"require_manager_role",type:"function"}),
-//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(q),(m)-[:CONTAINS]->(c),(m)-[:CONTAINS]->(p),(m)-[:CONTAINS]->(w),(m)-[:CONTAINS]->(i),(m)-[:CONTAINS]->(mp),(m)-[:CONTAINS]->(rt),(m)-[:CONTAINS]->(li),(m)-[:CONTAINS]->(pl),(m)-[:CONTAINS]->(co),(m)-[:CONTAINS]->(au),(m)-[:CONTAINS]->(cu),(m)-[:CONTAINS]->(ec),(m)-[:CONTAINS]->(rh),(m)-[:CONTAINS]->(val),(m)-[:CONTAINS]->(rm),
-//!   (rt)-[:CALLS]->(li),(rt)-[:CALLS]->(pl),(rt)-[:CALLS]->(co),(li)-[:CALLS]->(au),(li)-[:CALLS]->(cu),(li)-[:CALLS]->(ec),(pl)-[:CALLS]->(au),(pl)-[:CALLS]->(val),(pl)-[:CALLS]->(rh),(pl)-[:CALLS]->(rm),(co)-[:CALLS]->(au),(co)-[:CALLS]->(rm);
+//!   (rt:Function {name:"router",type:"function"}),(li:Function {name:"list_project_worktrees",type:"function"}),(lm:Function {name:"list_project_members",type:"function"}),(pl:Function {name:"create_management_plan",type:"function"}),(co:Function {name:"confirm_management_plan",type:"function"}),(au:Function {name:"authorize_worktree",type:"function"}),(cu:Function {name:"decode_cursor",type:"function"}),(ec:Function {name:"encode_cursor",type:"function"}),(rh:Function {name:"request_hash",type:"function"}),(val:Function {name:"validate_plan",type:"function"}),(rm:Function {name:"require_manager_role",type:"function"}),
+//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(q),(m)-[:CONTAINS]->(c),(m)-[:CONTAINS]->(p),(m)-[:CONTAINS]->(w),(m)-[:CONTAINS]->(i),(m)-[:CONTAINS]->(mp),(m)-[:CONTAINS]->(rt),(m)-[:CONTAINS]->(li),(m)-[:CONTAINS]->(lm),(m)-[:CONTAINS]->(pl),(m)-[:CONTAINS]->(co),(m)-[:CONTAINS]->(au),(m)-[:CONTAINS]->(cu),(m)-[:CONTAINS]->(ec),(m)-[:CONTAINS]->(rh),(m)-[:CONTAINS]->(val),(m)-[:CONTAINS]->(rm),
+//!   (rt)-[:CALLS]->(li),(rt)-[:CALLS]->(lm),(rt)-[:CALLS]->(pl),(rt)-[:CALLS]->(co),(li)-[:CALLS]->(au),(li)-[:CALLS]->(cu),(li)-[:CALLS]->(ec),(lm)-[:CALLS]->(au),(pl)-[:CALLS]->(au),(pl)-[:CALLS]->(val),(pl)-[:CALLS]->(rh),(pl)-[:CALLS]->(rm),(co)-[:CALLS]->(au),(co)-[:CALLS]->(rm);
+//! MATCH (lm:Function {name:"list_project_members"})
+//! CREATE (va:Function {name:"validate_actor",type:"function"}),(rs:Function {name:"require_scope",type:"function"}),(st:Function {name:"set_tenant",type:"function"}),(ab:Function {name:"active_binding",type:"function"}),
+//!        (lm)-[:CALLS]->(va),(lm)-[:CALLS]->(rs),(lm)-[:CALLS]->(st),(lm)-[:CALLS]->(ab);
 
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::HeaderMap,
     routing::{get, post},
-    Json, Router,
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, Transaction};
 use uuid::Uuid;
 
 use super::{
-    active_binding, require_scope, set_tenant, validate_actor, worktree_projection,
-    AuthenticatedUser, GroupApiError, GroupApiState, WorktreeIndexRow,
+    AuthenticatedUser, GroupApiError, GroupApiState, WorktreeIndexRow, active_binding,
+    require_scope, set_tenant, validate_actor, worktree_projection,
 };
 
 #[derive(Debug, Deserialize)]
@@ -74,6 +77,10 @@ pub(super) fn router() -> Router<GroupApiState> {
         .route(
             "/api/v1/projects/{project_id}/worktrees",
             get(list_project_worktrees),
+        )
+        .route(
+            "/api/v1/projects/{project_id}/members",
+            get(list_project_members),
         )
         .route(
             "/api/v1/worktrees/{worktree_id}/management-plans",
@@ -179,6 +186,48 @@ async fn list_project_worktrees(
         "limit": limit,
         "next_cursor": next_cursor,
         "worktrees": worktrees,
+    })))
+}
+
+async fn list_project_members(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path(project_id): Path<String>,
+) -> Result<Json<Value>, GroupApiError> {
+    validate_actor(&actor)?;
+    require_scope(&actor, "project:read")?;
+    let project_id = Uuid::parse_str(&project_id).map_err(|_| GroupApiError::bad_request())?;
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    set_tenant(&mut tx, actor.tenant_id).await?;
+    let binding = active_binding(&mut tx, &actor, project_id).await?;
+    let members = sqlx::query_as::<_, (Uuid, String)>(
+        r#"
+        SELECT user_id, role
+        FROM permission.project_role_binding
+        WHERE tenant_id = $1 AND project_id = $2 AND valid_to IS NULL
+        ORDER BY user_id
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+
+    Ok(Json(json!({
+        "project_id": project_id,
+        "role": binding.role,
+        "permission_snapshot_ref": format!("{}:v{}", binding.id, binding.version),
+        "members": members.into_iter().map(|(user_id, role)| json!({
+            "user_id": user_id,
+            "role": role,
+        })).collect::<Vec<_>>(),
     })))
 }
 

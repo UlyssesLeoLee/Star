@@ -1,40 +1,92 @@
 //! Cypher structural manifest.
 //! CREATE
 //!   (f:File {name:"group_api.rs",type:"file",language:"rust"}),(m:Module {name:"group_api",type:"module",language:"rust"}),
-//!   (s:Class {name:"GroupApiState",type:"class"}),(r:Class {name:"GroupContextResolver",type:"class"}),(e:Class {name:"GroupApiError",type:"class"}),
+//!   (ga:Module {name:"group_apps",type:"module",language:"rust"}),(gp:Interface {name:"GroupAppRegistryProvider",type:"interface",language:"rust"}),
+//!   (s:Class {name:"GroupApiState",type:"class"}),(r:Class {name:"GroupContextResolver",type:"class"}),(e:Class {name:"GroupApiError",type:"class"}),(cp:Module {name:"cli_sessions",type:"module",language:"rust"}),(tp:Interface {name:"TaskCliSessionProvisioner",type:"interface"}),(pe:Enum {name:"TaskCliSessionProvisionError",type:"enum"}),(cm:Class {name:"TaskCliSessionStartCommand",type:"class"}),(receipt:Class {name:"TaskCliSessionReceipt",type:"class"}),
 //!   (b:Class {name:"ProjectBinding",type:"class"}),(w:Class {name:"WorktreeIndexRow",type:"class"}),
 //!   (mi:Module {name:"work_items",type:"module",language:"rust"}),(mt:Module {name:"worktrees",type:"module",language:"rust"}),(ca:Module {name:"canvas",type:"module",language:"rust"}),
-//!   (sn:Function {name:"GroupApiState::new",type:"function"}),(sf:Function {name:"GroupApiState::from_ref",type:"function"}),(rn:Function {name:"GroupContextResolver::new",type:"function"}),(rc:Function {name:"GroupContextResolver::resolve_worktree_context",type:"function"}),(fr:Function {name:"FromRef::from_ref",type:"function"}),
-//!   (eb:Function {name:"GroupApiError::bad_request",type:"function"}),(eu:Function {name:"GroupApiError::unauthorized",type:"function"}),(ef:Function {name:"GroupApiError::forbidden",type:"function"}),(en:Function {name:"GroupApiError::not_found",type:"function"}),(ei:Function {name:"GroupApiError::internal",type:"function"}),(ec:Function {name:"GroupApiError::conflict",type:"function"}),(iv:Function {name:"GroupApiError::invalid_request",type:"function"}),(er:Function {name:"GroupApiError::into_response",type:"function"}),
+//!   (sn:Function {name:"GroupApiState::new",type:"function"}),(sp:Function {name:"GroupApiState::with_task_cli_session_provisioner",type:"function"}),(sf:Function {name:"GroupApiState::from_ref",type:"function"}),(rn:Function {name:"GroupContextResolver::new",type:"function"}),(rc:Function {name:"GroupContextResolver::resolve_worktree_context",type:"function"}),(fr:Function {name:"FromRef::from_ref",type:"function"}),(csr:Function {name:"cli_sessions::router",type:"function"}),
+//!   (eb:Function {name:"GroupApiError::bad_request",type:"function"}),(eu:Function {name:"GroupApiError::unauthorized",type:"function"}),(ef:Function {name:"GroupApiError::forbidden",type:"function"}),(en:Function {name:"GroupApiError::not_found",type:"function"}),(ei:Function {name:"GroupApiError::internal",type:"function"}),(ec:Function {name:"GroupApiError::conflict",type:"function"}),(iv:Function {name:"GroupApiError::invalid_request",type:"function"}),(us:Function {name:"GroupApiError::service_unavailable",type:"function"}),(er:Function {name:"GroupApiError::into_response",type:"function"}),
 //!   (st:Function {name:"set_tenant",type:"function"}),(ab:Function {name:"active_binding",type:"function"}),(va:Function {name:"validate_actor",type:"function"}),(rs:Function {name:"require_scope",type:"function"}),(re:Function {name:"resolve_worktree_context",type:"function"}),(bu:Function {name:"build_group_router",type:"function"}),(wp:Function {name:"worktree_projection",type:"function"}),
-//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(s),(m)-[:CONTAINS]->(r),(m)-[:CONTAINS]->(e),(m)-[:CONTAINS]->(b),(m)-[:CONTAINS]->(w),(m)-[:CONTAINS]->(mi),(m)-[:CONTAINS]->(mt),(m)-[:CONTAINS]->(ca),
-//!   (s)-[:HAS_METHOD]->(sn),(s)-[:HAS_METHOD]->(sf),(r)-[:HAS_METHOD]->(rn),(r)-[:HAS_METHOD]->(rc),(e)-[:HAS_METHOD]->(eb),(e)-[:HAS_METHOD]->(eu),(e)-[:HAS_METHOD]->(ef),(e)-[:HAS_METHOD]->(en),(e)-[:HAS_METHOD]->(ei),(e)-[:HAS_METHOD]->(ec),(e)-[:HAS_METHOD]->(iv),(e)-[:HAS_METHOD]->(er),(m)-[:CONTAINS]->(fr),
+//!   (f)-[:CONTAINS]->(m),(m)-[:CONTAINS]->(s),(m)-[:CONTAINS]->(r),(m)-[:CONTAINS]->(e),(m)-[:CONTAINS]->(b),(m)-[:CONTAINS]->(w),(m)-[:CONTAINS]->(mi),(m)-[:CONTAINS]->(mt),(m)-[:CONTAINS]->(ca),(m)-[:CONTAINS]->(cp),(cp)-[:CONTAINS]->(tp),(cp)-[:CONTAINS]->(pe),(cp)-[:CONTAINS]->(cm),(cp)-[:CONTAINS]->(receipt),(cp)-[:CONTAINS]->(csr),
+//!   (s)-[:HAS_METHOD]->(sn),(s)-[:HAS_METHOD]->(sp),(s)-[:HAS_METHOD]->(sf),(r)-[:HAS_METHOD]->(rn),(r)-[:HAS_METHOD]->(rc),(e)-[:HAS_METHOD]->(eb),(e)-[:HAS_METHOD]->(eu),(e)-[:HAS_METHOD]->(ef),(e)-[:HAS_METHOD]->(en),(e)-[:HAS_METHOD]->(ei),(e)-[:HAS_METHOD]->(ec),(e)-[:HAS_METHOD]->(iv),(e)-[:HAS_METHOD]->(us),(e)-[:HAS_METHOD]->(er),(m)-[:CONTAINS]->(fr),
 //!   (m)-[:CONTAINS]->(st),(m)-[:CONTAINS]->(ab),(m)-[:CONTAINS]->(va),(m)-[:CONTAINS]->(rs),(m)-[:CONTAINS]->(re),(m)-[:CONTAINS]->(bu),(m)-[:CONTAINS]->(wp),
-//!   (st)-[:CALLS]->(ei),(ab)-[:CALLS]->(ei),(ab)-[:CALLS]->(en),(va)-[:CALLS]->(eu),(rs)-[:CALLS]->(ef),(rc)-[:CALLS]->(st),(rc)-[:CALLS]->(ab),(rc)-[:CALLS]->(ei),(rc)-[:CALLS]->(en),(re)-[:CALLS]->(va),(re)-[:CALLS]->(rs),(re)-[:CALLS]->(eb),(re)-[:CALLS]->(rc),(rc)-[:CALLS]->(wp),(sn)-[:CALLS]->(rn),(bu)-[:CALLS]->(re);
+//!   (st)-[:CALLS]->(ei),(ab)-[:CALLS]->(ei),(ab)-[:CALLS]->(en),(va)-[:CALLS]->(eu),(rs)-[:CALLS]->(ef),(rc)-[:CALLS]->(st),(rc)-[:CALLS]->(ab),(rc)-[:CALLS]->(ei),(rc)-[:CALLS]->(en),(re)-[:CALLS]->(va),(re)-[:CALLS]->(rs),(re)-[:CALLS]->(eb),(re)-[:CALLS]->(rc),(rc)-[:CALLS]->(wp),(sn)-[:CALLS]->(rn),(bu)-[:CALLS]->(re),(bu)-[:CALLS]->(csr);
+
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(s:Class {name:"GroupApiState",type:"class"}),(e:Class {name:"GroupApiError",type:"class"}),(b:Function {name:"build_group_router",type:"function"}),(su:Function {name:"GroupApiError::service_unavailable",type:"function"});
+//! CREATE (sc:Module {name:"scoped_chat",type:"module",language:"rust"}),(wf:Interface {name:"ScopedChatWorkflow",type:"interface",language:"rust"}),(sw:Function {name:"GroupApiState::with_scoped_chat_workflow",type:"function",language:"rust"}),(fu:Function {name:"GroupApiError::feature_unavailable",type:"function",language:"rust"}),(sr:Function {name:"scoped_chat::router",type:"function",language:"rust"});
+//! MATCH (b:Function {name:"build_group_router",type:"function"}),(sw:Function {name:"GroupApiState::with_scoped_chat_workflow",type:"function"}),(s:Class {name:"GroupApiState",type:"class"}),(e:Class {name:"GroupApiError",type:"class"}),(fu:Function {name:"GroupApiError::feature_unavailable",type:"function"}),(sr:Function {name:"scoped_chat::router",type:"function"}),(sc:Module {name:"scoped_chat",type:"module"}),(wf:Interface {name:"ScopedChatWorkflow",type:"interface"});
+//! CREATE (m)-[:CONTAINS]->(sc),(s)-[:USES]->(wf),(sw)-[:USES]->(wf),(e)-[:HAS_METHOD]->(fu),(b)-[:CALLS]->(sr),(sc)-[:CONTAINS]->(wf),(sr)-[:CALLS]->(sw),(fu)-[:CALLS]->(su);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(s:Class {name:"GroupApiState",type:"class"}),(w:Interface {name:"ScopedChatWorkflow",type:"interface"});
+//! CREATE (ss:Module {name:"scoped_chat_store",type:"module",language:"rust"}),(pg:Class {name:"PgScopedChatWorkflow",type:"class",language:"rust"}),(pgnew:Function {name:"PgScopedChatWorkflow::new",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(ss),(s)-[:USES]->(pg),(ss)-[:CONTAINS]->(pg),(pg)-[:USES]->(w),(pg)-[:HAS_METHOD]->(pgnew);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"cli_sessions",type:"module"}),(s:Class {name:"GroupApiState",type:"class"});
+//! CREATE (access:Class {name:"TaskCliSessionAccessCommand",type:"class",language:"rust"}),(status:Class {name:"TaskCliSessionStatus",type:"class",language:"rust"}),(state:Enum {name:"TaskCliSessionState",type:"enum",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(access),(m)-[:CONTAINS]->(status),(m)-[:CONTAINS]->(state),(s)-[:USES]->(access);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"cli_sessions",type:"module"});
+//! CREATE (list:Class {name:"TaskCliSessionListCommand",type:"class",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(list);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (ss:Module {name:"scoped_chat_store",type:"module"});
+//! CREATE (protector:Interface {name:"TranscriptBodyProtector",type:"interface",language:"rust"}),(context:Class {name:"TranscriptProtectionContext",type:"class",language:"rust"}),(body:Class {name:"ProtectedTranscriptBody",type:"class",language:"rust"});
+//! CREATE (ss)-[:CONTAINS]->(protector),(ss)-[:CONTAINS]->(context),(ss)-[:CONTAINS]->(body);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(ga:Module {name:"group_apps",type:"module"}),(s:Class {name:"GroupApiState",type:"class"}),(gp:Interface {name:"GroupAppRegistryProvider",type:"interface"});
+//! CREATE (install:Function {name:"GroupApiState::with_group_app_registry",type:"function",language:"rust"}),(registryRouter:Function {name:"group_apps::router",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(ga),(ga)-[:CONTAINS]->(gp),(s)-[:HAS_METHOD]->(install),(install)-[:USES]->(gp),(registryRouter)-[:CALLS]->(ga);
 
 use std::sync::Arc;
 
 use axum::{
+    Json, Router,
     extract::{FromRef, Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::get,
-    Json, Router,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::auth::{oauth::AuthenticatedUser, AuthUser, JwtConfig};
+use crate::auth::{AuthUser, JwtConfig, oauth::AuthenticatedUser};
 
 mod canvas;
+mod cli_sessions;
+mod group_apps;
+mod scoped_chat;
+mod scoped_chat_store;
 mod work_items;
 mod worktrees;
+
+pub use cli_sessions::{
+    TaskCliSessionAccessCommand, TaskCliSessionListCommand, TaskCliSessionProvisionError,
+    TaskCliSessionProvisioner, TaskCliSessionReceipt, TaskCliSessionStartCommand,
+    TaskCliSessionState, TaskCliSessionStatus,
+};
+pub use group_apps::{
+    GroupAppNavigationEntry, GroupAppRegistryError, GroupAppRegistryProvider,
+    GroupAppRegistryQuery, GroupAppRegistrySnapshot, PgGroupAppRegistryProvider,
+};
+pub use scoped_chat::{
+    AuthorizedChatTarget, ScopedChatCommand, ScopedChatEntityRef, ScopedChatReceipt,
+    ScopedChatScope, ScopedChatWorkflow, ScopedChatWorkflowError,
+};
+pub use scoped_chat_store::{
+    PgScopedChatWorkflow, ProtectedTranscriptBody, TranscriptBodyProtector,
+    TranscriptProtectionContext,
+};
 
 #[derive(Clone)]
 pub struct GroupApiState {
     jwt: Arc<JwtConfig>,
     resolver: GroupContextResolver,
+    task_cli_session_provisioner: Option<Arc<dyn TaskCliSessionProvisioner>>,
+    scoped_chat_workflow: Option<Arc<dyn ScopedChatWorkflow>>,
+    group_app_registry: Option<Arc<dyn GroupAppRegistryProvider>>,
 }
 
 impl GroupApiState {
@@ -42,7 +94,31 @@ impl GroupApiState {
         Self {
             jwt,
             resolver: GroupContextResolver::new(pool),
+            task_cli_session_provisioner: None,
+            scoped_chat_workflow: None,
+            group_app_registry: None,
         }
+    }
+
+    /// Install the trusted Local Runtime session provisioner for Task Card CLI routes.
+    pub fn with_task_cli_session_provisioner(
+        mut self,
+        provisioner: Arc<dyn TaskCliSessionProvisioner>,
+    ) -> Self {
+        self.task_cli_session_provisioner = Some(provisioner);
+        self
+    }
+
+    /// Install the trusted scope-aware chat/L0 workflow adapter.
+    pub fn with_scoped_chat_workflow(mut self, workflow: Arc<dyn ScopedChatWorkflow>) -> Self {
+        self.scoped_chat_workflow = Some(workflow);
+        self
+    }
+
+    /// Install a trusted provider for the current, authorized Group App navigation projection.
+    pub fn with_group_app_registry(mut self, registry: Arc<dyn GroupAppRegistryProvider>) -> Self {
+        self.group_app_registry = Some(registry);
+        self
     }
 }
 
@@ -159,6 +235,20 @@ impl GroupApiError {
         Self {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             code: "internal_error",
+        }
+    }
+
+    fn service_unavailable() -> Self {
+        Self {
+            status: StatusCode::SERVICE_UNAVAILABLE,
+            code: "task_cli_runtime_unavailable",
+        }
+    }
+
+    fn feature_unavailable(code: &'static str) -> Self {
+        Self {
+            status: StatusCode::SERVICE_UNAVAILABLE,
+            code,
         }
     }
 
@@ -334,6 +424,9 @@ pub fn build_group_router(state: GroupApiState) -> Router {
         )
         .merge(worktrees::router())
         .merge(work_items::router())
+        .merge(cli_sessions::router())
+        .merge(scoped_chat::router())
         .merge(canvas::router())
+        .merge(group_apps::router())
         .with_state(state)
 }

@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v0.5 (2026-09-29)
-> **上游要件定义书**: `D:\Star\docs\requirements.md` v2.4(下文以 §N 引用)
+> **文档版本**: v4.6 (2026-09-29)
+> **上游要件定义书**: `D:\Star\docs\requirements.md` v5.13(下文以 §N 引用)
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -10,7 +10,7 @@
 
 ### 0.1 文档目的与定位
 
-本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v2.3》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
+本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.13》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
 
 **本文档不输出生产代码**(重申 §47):
 
@@ -4192,6 +4192,7 @@ Worktree Group 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 |---|---|---|---|
 | `ProjectSelector` | 选择当前项目范围并同步导航状态 | actor 可访问的 Project projections | 未授权 Project 不可出现在 selector；切换后清除上个项目的 Worktree selection |
 | `ProjectWorktreeIndex` / `WorktreeIndex` | 只展示当前 Project 可访问的 Worktree，并比较 branch、status、owner/Agent、Runtime、PR、风险/锁和最近活动 | `project_id`, actor permissions, Worktree projections | 不把 Task 状态折叠成 Worktree 状态；遵循 RLS；不混列其他 Project |
+| `ProjectMemberDirectory` | 给有权管理员提供当前 Project 的有效成员及角色，供负责人筛选和分配 | authenticated `project_id`, current membership | 仅显示当前 Project 的成员 ID / role；不使用 seed 或跨 Project 搜索，服务端确认时再次验证成员有效性 |
 | `ProjectWorktreesEntry` | 从 Project 的 Worktrees 视图打开 `/worktree?project_id={project_id}` | selected `project_id` | 深链保留 Project 选择；入口不得落入通用任务树路由 |
 | `WorktreeTreeNode` | 展开/收起 Worktree；展开后挂出同级 App 导航，显示管理状态与可用动作 | `worktree_id`, lifecycle/status projection, permissions | 未展开时不渲染 App 子树；危险动作须按现有 Worktree Action Guard 确认、幂等和审计 |
 | `WorktreeGroupShell` | 组合当前 Worktree Header、同级 App 导航、主内容区、固定底栏 Chat Bar | 已授权 `GroupContext` | 切换 Worktree 时重新解析上下文和订阅；当前 WT 与 App 树选择一致 |
@@ -4204,7 +4205,13 @@ Worktree Group 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 | `PluginAppSlot` | 在同级导航和内容区挂载经授权的插件 App | Plugin Manifest、Group Plugin Binding | 不允许插件直接访问其它 App 状态或数据库 |
 | `BottomChatBar` | 持久输入、范围选择、实体引用和 LangGraph 流式交互 | Scope + EntityRefs + Checkpoint | 全系统只保留一套底栏 Chat Bar |
 
+当宿主认证 provider 已安装时，`ProjectWorktreeIndex` 使用 `GET /api/v1/projects/{project_id}/worktrees` 的服务端授权 projection，展示 owner、Agent Session、Runtime、Worktree 状态、PR、dirty/ahead/behind、health/risk 与锁版本，并支持 owner/state/archive 筛选和 `next_cursor` 续页。401/403 或网络错误进入错误态，不能混合或回退到 Zustand seed；provider 尚未装配时才显示明确标记的本地预览。`ProjectMemberDirectory` 通过 `GET /api/v1/projects/{project_id}/members` 读取当前有效成员及 Project role；仅当当前 role 是 `tenant_admin` / `project_admin` 时展示转派入口。负责人转派先选择目录成员，再向 `POST /management-plans` 提交 `assign_owner`、当前 `expected_version`、correlation 与幂等键，展示短时 plan 并等待二次确认。成员目录失败时关闭转派；确认成功后重读授权 Index，失败或过期不乐观更新。服务端仍会在 plan 与 confirm 时复核 manager role 和目标成员有效性。归档/恢复同样走短时 plan-confirm；API 当前保守拒绝仍有 Agent Session / Runtime 引用的归档。此操作不删除 Git checkout；创建/导入、停止执行和物理清理仍需独立的受权 lifecycle/API。
+
 Task Card 是 WorkItem、Multica lifecycle 与 LangGraph Agent 状态的统一展示卡，并通过 `TaskCardIndex` 直接出现在 Worktree Group 导航中。Board、Backlog、Sprint、Task Card、Canvas 和 Agent 面板传递同一组 typed EntityRef；页面组件不得各自创建独立 task store。Multica 与 Jira 是并列的能力入口，Task Card 索引和 Infinite Canvas 也与二者并列。
+
+一个 Worktree 可以包含多个 Canvas。Group Canvas projection 返回当前 Worktree 全部可见 Canvas 和所选 Canvas 内容；路由 `canvas_id` 保存可分享的选择状态，缺省时选择列表首项，非法值回退到有效授权项。创建 Canvas 使用认证幂等命令，响应得到新 ID 后切换选择并刷新投影；切换 Worktree 或登录主体时不得复用旧 Canvas 内容或待提交命令。将已有 Task Card 放到 Canvas 时，前端从当前 Worktree 未关联列表中选择；单个认证幂等的 Element 创建命令同时携带元素布局和 typed `EntityRef`，后端原子复验 Worktree association 并创建二者。
+
+live Canvas 中，未锁定的 Element 可拖动并单独编辑宽度、高度与旋转角度；Element PUT 使用 `update_mode=position`、`geometry` 或 `content`，每种模式只接受对应字段，其它字段由服务端从当前行锁定投影带回。位置命令只改 x/y，几何命令只改 width/height/rotation；请求均携带当前 Element `expected_version`、幂等键与 `correlation_id`，成功后重读授权投影，版本冲突显示错误并刷新，不覆盖新版本。尺寸范围为 (0, 10,000]，旋转范围为 [-36,000, 36,000] 度。Frame/connector Document、便笺内容与 Element 删除仍使用独立 API，不通过全局 seed 更新 live Group。
 
 ### 16.3 组件与 Domain / Adapter 映射
 
@@ -4258,12 +4265,22 @@ Task / Canvas / Chat / Plugin UI
 
 领域事件沿用 CloudEvents 1.0 与 §4.12 契约，新增或补足字段：`schema_version`、`tenant_id`、`project_id`、适用时的 `repository_id` / `worktree_id`、`actor_id`、`event_id`、`causation_id`、`correlation_id`、`idempotency_key`、`occurred_at` 和 typed payload。NATS JetStream 是领域事件权威；Canvas WS/SSE、浏览器状态和插件订阅是可重建投影，不能产生第二份业务真相。
 
+Canvas viewport、frames 和 visual connectors 与 Canvas registry 共用 PostgreSQL Master/SCD2 版本。保存操作以 Canvas `expected_version` 做并发控制，按 `Idempotency-Key` 重放，并将版本变更、Audit 与 Outbox 放入同一事务；Frame / connector 的 element IDs 必须属于同一 Canvas。Live Group 可编辑 Frame 标题/几何/演示标记及 connector 颜色、线宽、路由、箭头和标签；这些都是完整 Document draft 的 CAS 修改。Connector 仅表达画布布局，不等价于 WorkItem / Jira relation；业务关系必须通过 WorkItem Relation Command。
+
+从 Canvas 新建 Task Card 使用 WorkItem owner 的原子 Application Command：在同一个数据库事务中创建 canonical WorkItem metadata、Multica 初始 lifecycle、Worktree association、Canvas `work_item_card` Element 与 typed EntityRef，并写 Task Audit、Canvas Audit、Transactional Outbox 和幂等响应。Command 同时要求 `work-item:write` 与 `canvas:write` 及当前 Project writer role；一个 `correlation_id` 贯穿任务与画布记录。任一步失败时整体回滚，不留下孤儿任务或无效画布卡。Canvas 只负责展示和布局，不复制任务生命周期。
+
+在线 Multica / Jira / Task Card 的生命周期操作调用 `POST /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/lifecycle`。API adapter 发送当前 `expected_version`、`Idempotency-Key` 与 `correlation_id`；Group UI 从六态 lifecycle、`review_state` 与 `active_worktree_id` 生成允许动作。服务端仍是合法转移、writer ACL、claim lease 和 review gate 的最终裁决者。成功及冲突后页面重新读取当前 Worktree 授权投影；Canvas、Board 与 Task Card 不各自保存状态副本。
+
+Task Card review gate 走独立的 `POST /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/review` 命令。当前 `in_progress` claimant 可提交 `action=submit`，仅将 review state 置为 `pending_review`；不同的当前 Project `tenant_admin` / `project_admin` / `developer` 可 `accept` 或 `reject`，驳回必须带理由。所有动作使用当前 lifecycle `expected_version`、幂等键与 correlation ID，服务端逐请求验证 Worktree association 和角色并写 append-only lifecycle audit；通过将状态转为 `completed`，驳回转为 `failed`，成功或冲突后重载授权投影。该 Group API 切片复用现有 lifecycle 表与审计表，不代表 Review Domain adapter、Outbox event projection 或宿主登录 provider 已部署。
+
 首批事件扩展：
 
 | 事件 | 源 | 消费者 | 用途 |
 |---|---|---|---|
 | `WorktreeGroupOpened` | Application / Audit | Audit, collaboration | 记录 Group 访问与实时订阅，不作为业务聚合事实 |
 | `WorkItemLinkedToCanvas` | work-item / canvas application | Task, Canvas, Audit | 双向跳转并保持实体引用 |
+| `CanvasDocumentUpdated` | Canvas Application | Canvas projection, authorized Group subscribers, Audit | 广播新的 Canvas Document version；Frame 与 visual connector 只作布局投影 |
+| `canvas.work_item_card.created` | WorkItem / Canvas Application Command | Task Card, Canvas projection, Audit | 原子创建 canonical WorkItem 与画布卡，并通过 typed EntityRef 关联 |
 | `WorkItemStateChanged` | work-item | Board, Canvas, Chat, Plugin projections | 更新所有同级 App 中的任务状态 |
 | `TaskCliSessionStarted` / `TaskCliSessionEnded` | local-runtime / agent | Task Card, Canvas, Audit | 展示 CLI 状态并关联运行记录 |
 | `PluginBindingChanged` | Plugin Registry | GroupAppRegistry, Audit | 更新当前 Group App 入口与能力 |
@@ -4272,9 +4289,33 @@ Task / Canvas / Chat / Plugin UI
 
 每个命令通过 Application API 执行，成功后才由 Outbox 发布事件。事件消费者需幂等；失败时按 Outbox/NATS retry/DLQ 恢复。高频 presence、光标和 CLI token stream 属 Realtime Observed State，不进入业务事务事件流。
 
+Phase 3E 的 Canvas 事件读取先提供受保护的有界轮询契约：`GET /api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/events` 每次请求重新解析 actor、当前 Project membership、Worktree 和 Canvas 授权，按 `(occurred_at,event_id)` 复合游标读取最多 200 条（默认 100）。响应只含刷新 projection 所需的事件元数据，不返回 payload 或 EntityRef 目标；客户端收到后再调用当前已授权的 Canvas / Element API 取投影。该读取端点是 Outbox 到实时消费路径接通前的查询接口，不替代 NATS JetStream consumer、consumer offset、SSE/WebSocket 推送或跨 App 实时验收。
+
+浏览器 `CanvasOutboxPoller` 使用按 Worktree/Canvas scope 隔离的本地复合游标作为可丢弃恢复提示；页面重载后先恢复并校验游标，每个事件页仍通过 Bearer API 重新授权，且仅在当前授权 projection 刷新成功后写入下一游标。存储不可用或内容损坏时从头 at-least-once 重放；本地游标不包含身份凭据，不授予访问权，不是服务端 durable consumer offset，也不代表 NATS / SSE / WebSocket 实时链路完成。
+
+浏览器 Group API adapter (`frontend/src/lib/group/worktreeGroupApi.ts`) 接受宿主注入的 `GroupAccessTokenProvider`，每次请求动态取得当前用户 access JWT，再添加 `Authorization: Bearer`；宿主同时提供非敏感 `sessionKey`，并在 principal 或登录会话切换时更新它，使 Group 页面立即卸载旧 API client、清空旧身份 projection 并重新加载。该 key 不作授权凭据、不持久化、不发送给 API。adapter 封装 Project Worktree Index/filter、owner/archive plan-confirm、GroupContext、WorkItem 查询与 lifecycle transition、Canvas/Element/Outbox、Canvas 初始化、Canvas Document CAS 和 Canvas→WorkItem API。adapter 不读写 token 存储、不持有 refresh token、不使用 `NEXT_PUBLIC_API_KEY`、不把 token 暴露在 URL/终端 WebSocket，并设置 `credentials: omit` 与 `cache: no-store`；远程 API origin 必须使用 HTTPS，仅 loopback 开发地址允许 HTTP；缺 token 在发网络请求前失败，401/403 向宿主会话层传播。
+
+Group 页面在宿主 provider 下可加载授权 API projection；若 Worktree 尚无 Canvas，页面提供经认证、幂等的初始化命令，成功后刷新授权投影；Canvas 出现后再提供 Canvas→Task Card 创建入口，成功后重载授权投影并链接到 canonical Task Card。在线 Multica/Jira/Task Card 调用同一 lifecycle API，带当前 version、幂等键和 correlation ID；成功或冲突后重载授权投影。实时 Canvas 的 viewport、Frame 属性/成员、纯视觉连线创建/删除和 connector 样式都进入完整 Document draft，再以 draft 固定的 `expected_version` 和幂等键显式 CAS 保存；版本冲突不自动重基，用户可放弃草稿并刷新。未锁定且无实体引用的 Text/Sticky Note 内容使用 Element 版本 CAS 更新；Element 删除在同一事务清理 Frame membership 与引用该元素的连线；locked Element 删除返回冲突且不删除 WorkItem。视觉连线始终是布局数据，不创建 WorkItem/Jira relation。任一命令失败都不得回退 seed 伪造成功。当前应用根布局尚未装配实际 provider，默认仍显示 mock/preview；不得因此以共享 API key 或本地 seed 模拟服务端授权。
+
 ### 16.6 Task Card CLI Session
 
 CLI 是卡片关联的 Local Runtime 会话面板，不能通过 SaaS Gateway 提供任意远程 Shell。`TaskCliSessionController` 调用现有 Runtime 白名单能力 `StartAuthorizedAgentSession` 或经详细设计批准的 profile-based interactive variant；会话启动配置来自平台注册的 Agent/CLI Profile，参数与工作目录由平台构造并锁定在授权 Worktree 范围内。
+
+浏览器终端复用 `terminal-stack` WebSocket 协议与 snapshot/scrollback 能力；这些协议组件只负责传输与恢复，不负责创建或授权进程。Task Card REST API 必须先验证 actor、当前 Project membership、Task/Worktree 关联、Runtime 与 Approved Profile，再由 Local Runtime 创建 CLI Session。REST 返回的短时、单次 attachment ticket 绑定 actor、GroupContext、Task、已启动 session 和 policy version；ticket TTL 不超过 60 秒，只保存 SHA-256 摘要，并在到期加 5 分钟重放识别窗口后清理。浏览器在 WebSocket 第一帧提交 ticket；授权器必须重验当前 membership、session 状态与 policy version，并原子消费 ticket。授权成功前不得注册 pane、返回 snapshot 或接收 stdin/resize。Bearer JWT 不放入 WebSocket URL 或协议帧。
+
+生命周期控制 API 使用 `GET /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/cli-sessions/{session_id}`、`DELETE` 同路径以及 `POST .../{session_id}/attachment-tickets`。status、cancel、attach 分别要求 `agent_session:read`、`agent_session:cancel`、`agent_session:attach` scope、非空 `X-Correlation-ID`，并逐请求验证当前 Project writer membership 与 canonical Task/Worktree link；Runtime provisioner 必须再核验完整 session binding、当前 ACL 与 Runtime health，并以 correlation ID 记录 TaskRun Audit。status 只返回受限状态、exit code 与更新时间，不返回 PTY 字节或 ticket；cancel 幂等；reattach 只为仍运行且未归档的 session 签发全新 ≤60 秒单次 ticket，并设置 `Cache-Control: no-store`。session 不存在或绑定不匹配统一隐藏为 404；缺失 provisioner 返回 503。当前 Task Card 已接入认证 API client：用户可刷新状态、显式取消；连接失败/断开后需先查询 status，仅 `running` / `disconnected` 才请求新的 attachment ticket。旧 ticket 不复用，自动重连关闭。Session 关联不持久化 ticket；Worktree/Task-scoped Session listing API 与刷新后发现 UI 已建立条件式切片，列表仅返回脱敏状态且不超过 20 条。恢复仍先查询当前状态并请求服务端新签 ticket；真实 provisioner 未装配时 listing 返回 503，故不能视为生产 Session 恢复已接通。
+
+页面刷新后的 Session 发现使用 `GET /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/cli-sessions?limit=N`；请求要求 `agent_session:read`、当前 Project writer membership、canonical Task/Worktree link、Runtime binding 与 `X-Correlation-ID`。默认读取最近 20 条，服务端 limit 为 1–50；列表只返回 session ID、有限状态、exit code 与更新时间，设 `Cache-Control: no-store`，不得包含 ticket 或终端输出。客户端在 Task Card 中提供显式刷新、状态查询、取消与恢复操作；恢复仍须先重查状态并调用 reattach 获取新 ticket。Session ID 可经 API 列表重新发现，但 ticket 从不持久化；真实 provisioner 未装配时返回 503。
+
+Phase 4B1 的 Group API 接口为 `POST /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/cli-sessions`。Bearer actor 必须具备 `agent_session:start` scope 和当前 Project writer membership；服务端锁定并检查 canonical WorkItem-Worktree association、`in_progress` claimant、`expected_lifecycle_version`、未进入 pending review 及 Worktree Runtime binding。请求只提交 lifecycle version、server-approved profile ID 与 `correlation_id`，不接受命令文本、argv 或环境变量；`Idempotency-Key` 与请求 fingerprint 交由 provisioner 去重。fingerprint 覆盖 tenant、actor、project、repository、worktree、task、runtime、profile 与 lifecycle version，不能只对浏览器 body 做哈希。GroupApiState 仅在显式注入 `TaskCliSessionProvisioner` 后开放该能力，默认无 provisioner 时返回 HTTP 503。注入实现必须在 grant 签发和 spawn 前再次读取当前 ACL、任务版本、Runtime health、Approved Profile 与 sandbox 状态，解决 REST 校验与实际启动之间的授权竞态；不得依赖 REST 事务提交时的快照。
+
+只有 Local Runtime 已实际创建受隔离的 session 并签发新鲜单次 ticket 后，API 才返回 `running`、session ID 和 attachment ticket；响应设置 `Cache-Control: no-store`，ticket expiry 不超过 60 秒。Runtime 未分配、任务状态/claimant/version 不匹配返回明确冲突；provisioner 缺失或 Runtime 不可用不得伪造 session。当前代码只包含认证路由、DB 前置校验、未接线的底层 PTY adapter 和可注入 provisioner 契约；尚无生产 provisioner、真实签名调用、受 sandbox 管控的 spawn、TaskRun Audit 或 PTY sink，因此仍不代表 CLI 可运行。
+
+执行 grant 使用 Ed25519 issuer 私钥签名；grant 包含 `key_id` 与完整不可变 `TaskExecutionContext`，签名域固定为 `star.task-cli.execution-grant.v1`。私钥只配置在受信任 API signer，Local Runtime 只配置按 key id 轮换的 32-byte 公钥；轮换时保留旧公钥至在途 grant 过期（最长五分钟）。Runtime 必须先验签，随后校验 tenant/project/repository/worktree/runtime/profile/时效与 canonical checkout，再原子消费单次 nonce；当前 ACL 与 Runtime health 仍须在 spawn 前重新检查。`prepare_and_consume_verified_task_cli_execution` 提供该顺序的 fail-closed helper；现有低层 context helper 只可用于已认证的内部调用。签名 helper 尚未接入 Task Session API、ACL/health 重验或 process spawn，不代表 CLI 可以执行。
+
+已实现的 Phase 4B 代码切片包括 Local Runtime SQLite ticket hash ledger、首帧 authorization frame 解析、授权成功后才注册 pane 的受保护路由 seam、必传 `TerminalEventSink` 注入，以及前端 ticket-first transport。Phase 4B1 新增的 Task Session start REST route 已挂入 Group router，并提供 `TaskCliSessionProvisioner` 注入点；当前 main 未配置该 provisioner，真实 Group ACL/session authorizer 与签名 grant 调用未接通，故 route 默认返回 503 而不伪造成功。Phase 4B2 新增 crate-internal `TaskPtyManager` adapter，使用 `portable-pty` 承载交互输入、resize、带序号输出字节与退出状态；输出先进入容量为 256 个 chunk 的单消费者 FIFO 队列，sink 变慢时 reader 以背压暂停 PTY drain；PTY manager 关闭时终止其拥有的子进程。子进程环境从空环境起步，只注入 prepared execution 的获批静态变量。Phase 4B3 Group UI 代码切片提供卡内 Session start、status、cancel 与手动 reattach：start 命令携带 lifecycle version / correlation / Idempotency-Key，不从浏览器接收 argv、命令或 cwd；仅在真实 start receipt 返回后挂载 xterm，ticket 留在页面内存并单次提交到 WebSocket 首帧，Hello 授权前禁用 stdin，pane output 按 session 隔离。重连先读取状态，仅 running/disconnected 可申请服务端新签 ticket；自动重连关闭。Session 关联不跨页面持久化 ticket；Phase 4B4 已增加 Worktree/Task-scoped bounded listing route 与刷新后手动发现 UI，但真实 provisioner 未装配时仍返回 503。PTY adapter 尚未与 Session provisioner、ticket ledger、`terminal-stack` sink / durable scrollback 或 TaskRun Audit 接线，也没有 OS-enforced sandbox/path jail，故不能启用真实 CLI。首帧限制为 2 KiB，终端消息限制为 1 MiB，部署配置可收紧但不得超过接入端能力。
+
+Local Runtime 负责 PTY 生命周期、Worktree checkout 绑定和 stdin/stdout/resize；真实进程只能在已配置的 OS-enforced sandbox / path jail 中启动，缺少隔离能力时必须 fail closed。PTY 只提供交互终端能力，不是进程隔离机制。`terminal-stack` 的协议 handler / hub 只有在接入受授权的 Task Session adapter 后才能用于 Group。当前 `terminal-stack` 的默认 sink 是 Noop，且没有 Task Card session provisioning，不能视为可执行 CLI。
 
 基本调用契约（语义级）：
 
@@ -4315,7 +4356,31 @@ REQUESTED → AUTHORIZED → STARTING → ATTACHED → RUNNING
 
 LangGraph `TopAgentState` 增加或映射 `scope_kind / target_worktree_ids / entity_refs / group_context_ref / correlation_id`。这些字段进入 checkpoint key 和 Audit metadata。Task SubAgent State 必须有 `work_item_id / worktree_id / task_card_id / parent_thread_id`，工具调用只从当前授权范围内的 Tool Registry 解析。L1 之间不直接通信；Canvas 或插件触发跨任务动作时仍交给 L0/TMO。Human-in-the-loop interrupt、resume、Guard 和已有 checkpoint tiering 继续沿用 LangGraph 专题设计。
 
+LangGraph thread ID 必须由服务端生成并映射到 Chat Session，不得接受客户端提供的 graph thread ID，也不得与 WorkItem、Task Card 或 Agent Session ID 共用。checkpointer 只保存非敏感 workflow state 与 thread/run 关联，不保存 JWT、permission snapshot、GroupContext grant 或 Plugin capability；每次 resume、interrupt approval、checkpoint replay 和工具调用都重新解析当前 scope 与授权。官方 Python LangGraph 使用 checkpointer 的 `thread_id` 作为 checkpoint 主键，并以 `Command(resume=...)` 恢复 interrupt；从 checkpoint 恢复/重放会重新执行边界之后的节点，因此可能有副作用的节点必须通过版本化、幂等、可审计的 Domain Command/outbox 执行。PostgresSaver 的建表初始化属于受控 migration/setup 作业，不得让 API 请求启动时以应用权限自动创建 checkpoint schema。当前这些约束是 Phase 5 runtime 的实现门，不代表 LangGraph 已部署。
+
 底栏发送后，Global 与 Worktree 对话可以保留各自的 session/checkpoint；切换 scope 不修改既有 checkpoint，也不自动将一段对话升级为另一 scope。显式升级 scope 时创建新请求并重新解析目标和授权。
+
+Phase 5 的 Group API submission seam 为 `POST /api/v1/worktrees/{worktree_id}/chat/messages`。请求携带 `chat:submit` 权限、显式 scope、消息、可选 session / typed EntityRef、correlation 与 UUID `Idempotency-Key`；不接受客户端 actor、tenant 或 role。`WORKTREE` 目标固定为路径 Worktree；`GLOBAL` 必须明确列出 1–20 个目标。API 在派发前逐个重新解析 GroupContext 并验证 EntityRef 的 Worktree 归属，任一失败则整批不派发。`PgScopedChatWorkflow` 实现了 PostgreSQL 原子 persistence adapter：写入 Transcript/Run intent、actor-scoped 幂等 fingerprint/receipt、dispatch outbox 与 Audit；相同 key/fingerprint 返回原 receipt，不同 fingerprint 返回冲突。`main.rs` 尚未安装该 adapter，缺省仍 fail-closed 503；即使受控注入后返回 queued 202，也仍需 outbox consumer/L0 dispatch、LangGraph runtime/checkpoint/resume、目标级流式 UI 与生产身份授权才能执行和完成对话。
+
+Phase 5 Chat 持久化数据按 W/T/M 横展如下；本批无 Master 表：
+
+| 表 | W/T/M | 生命周期与治理 |
+|---|---|---|
+| `multica.group_chat_session` | T | Chat Session 创建事实与 server-generated `langgraph_thread_id`；不可 UPDATE/DELETE；tenant + actor RLS |
+| `multica.group_chat_message` | T | Transcript 元数据事实（不含正文）；append-only；tenant + actor RLS |
+| `multica.group_chat_message_payload` | W | AEAD ciphertext + wrapped data key；默认最多 90 天并遵循 Project Policy；`expires_at`、tenant + actor RLS；清理/密钥销毁 worker 未实现 |
+| `multica.group_chat_dispatch_event` | T | 同事务 outbox dispatch intent；append-only、只携带 run 引用；tenant RLS |
+| `multica.group_chat_audit_event` | T | Session/message/run 审计事实；append-only、不复制正文或 Secret；tenant + actor RLS |
+| `multica.group_chat_run` | W | queued/execution 工作投影；`retention_period=30 days`、`expires_at`、tenant + actor RLS；清理与消费者续期作业未实现 |
+| `multica.group_chat_idempotency` | W | 30 天 replay receipt；同 actor/key 锁定后校验 SHA-256 request fingerprint；tenant + actor RLS；过期清理作业未实现 |
+
+Transcript 正文属于敏感 AI Prompt/Response，沿用 Agent Policy 的加密与保留要求：默认最多保留 90 天，Project Policy 可缩短或调整；到期必须物理删除密文或销毁专属数据密钥，并保留不含正文的审计元数据。T 类 append-only 约束只适用于消息/审计元数据，不等于正文永久留存。当前 migration 已拆分 T 元数据与 W ciphertext/wrapped-key payload；`PgScopedChatWorkflow` 必须显式注入 `TranscriptBodyProtector`，其真实 KMS/envelope implementation 尚不存在。密钥轮换/销毁、期限清理 worker、授权导出/删除、日志脱敏和实际 RLS 验收均未完成，故生产 Chat persistence 仍保持关闭。
+
+七张表均启用并强制 RLS；Session、Transcript metadata、dispatch 和 Audit 事实以触发器禁止更新/物理删除。单一事务包含 idempotency receipt、必要的 Session、受保护的 user message payload、queued Run、outbox 与 Audit；只有事务提交成功才返回 `queued` receipt。出站事件不携带 JWT、permission snapshot、Plugin grant 或消息正文。当前 repository adapter 尚未安装在生产 API state，也没有真实 protector / payload cleanup 或消费 outbox 的 worker，因此 UI composer 继续禁用、目标 DB migration/RLS 仍须部署验收。
+
+省略 `correlation_id` 时由服务端将本次 `Idempotency-Key` 作为稳定 correlation，确保客户端以同一幂等键重试时 fingerprint 不因服务端随机 UUID 改变；显式 correlation 则包含在请求指纹中。
+
+GLOBAL 目标选择通过 `GET /api/v1/worktrees/{worktree_id}/chat/targets` 提供。目录请求要求当前用户 Bearer 与 `chat:submit`，在同一 tenant-scoped transaction 中锁定并授权路径 Worktree 和当前 Project membership，再读取候选目标；结果仅包含该 Tenant 中 actor 当前仍有效 Project membership 下的非归档 Worktree `worktree_id / project_id / name`，按 Worktree ID 稳定排序，游标分页 `limit=1..100`。不返回 checkout 路径或 owner/runtime 等管理数据。底栏在 Global scope 展示多选，最多 20 个；目录只帮助用户选目标，提交请求仍实时重验每个 GroupContext。Group 页面没有宿主 token/provider 或 workflow 时不能回退到 seed 目标或发送。
 
 ### 16.8 Plugin App Registry 与热插拔
 
@@ -4331,6 +4396,12 @@ REGISTERED → VALIDATING → CONFIGURING → ACTIVE ↔ DEGRADED
 
 运行时隔离原则：插件经稳定 Application API / ACL 访问 Domain；默认不与 `work-core` 共享任意代码执行上下文，不可直接访问数据库、Environment Secret、Local filesystem、其它插件状态或浏览器内其它 App 状态。未签名、版本不兼容或缺少授权的插件不可启用。插件崩溃进入 `DEGRADED`，其它同级 App 与 Worktree Group 继续可用。具体签名算法、进程沙箱或 Wasm/外部进程承载方式留 ADR/详细设计决定，不在本章假定已经选定。
 
+生产时，同级插件导航由当前 Worktree 的 Group App Registry 授权投影驱动；客户端只渲染服务端确认 active 且授权有效的插件。当前 Group 页面已消费 `GET /group-apps`：校验 Worktree ID、UUID correlation ID、非负安全整数 Registry version、最多 100 条、受限且唯一 plugin ID、无控制字符且限长的 manifest version/label、int32 sort order，并按 sort order 与 plugin ID 排列；页面可手动刷新、每 30 秒刷新且在 tab 恢复可见时刷新。加载、请求错误、Worktree 切换或 provider/session generation 变化时立即清除旧插件导航，错误状态提供显式重试，不回退本地预览。没有 API provider 的演示环境才展示明确标记的内存预览开关；它不安装插件、不写 Registry、不发放 capability，也不执行插件代码。当前 live 页面只显示服务端授权导航 projection，不代表插件 execution surface、capability gateway 或热撤权已完成。
+
+Group Shell 通过 `GET /api/v1/worktrees/{worktree_id}/group-apps` 获取生产导航 projection。API 要求当前 Bearer 与 `worktree:read`，先解析路径 Worktree 的有效 Project membership，再调用生产 main 已装配的 `PgGroupAppRegistryProvider`。provider 在单一 tenant/actor scoped transaction 中锁定并复验当前 membership version、非归档 Worktree 与 Project binding，再读取 Registry revision、current binding、当前 verified manifest、Host API compatibility 与 actor 的 `group_app:open` grant；只返回 `plugin_id / manifest_version / label / sort_order`。响应限制最多 100 条、ID 唯一并稳定排序，设置 `Cache-Control: no-store`，不包括任意外链、capability 列表/Secret、授权快照或原始 manifest。数据库缺 migration、查询失败或 provider 未配置均 fail closed；Group UI 尚未消费该 endpoint，预览仍与生产投影分离。当前 host API version 为 1。
+
+Phase 6 migration 建立五张表：manifest、Worktree Registry revision、Worktree binding、actor grant 和 append-only Audit。四张 Master 都使用 SCD2 有效区间、current-row 唯一约束、FORCE RLS 和“只可关闭当前行、不可物理删除/改写历史字段”的 trigger；Audit 为 Transaction，拒绝 UPDATE/DELETE。migration 不提供应用写 policy，也不实现签名信任根、manifest ingest、enable/disable、grant lifecycle 或 capability gateway。`verification_status='verified'` 是可信 ingest 的结果标记，不能由其自身证明签名可信。
+
 ### 16.9 数据所有权与 W/T/M 分类
 
 | 对象 | 分类 | SoR / 存储 | 生命周期与规则 |
@@ -4338,17 +4409,23 @@ REGISTERED → VALIDATING → CONFIGURING → ACTIVE ↔ DEGRADED
 | Group Context 当前选择 / 活跃 App | Work (W) | 前端状态 / Valkey projection | 显式 `retention_period` 与过期清理，不作为业务事实 |
 | Group chat presence / canvas cursor / terminal attachment lease | Work (W) | Realtime projection / Valkey | 短 TTL + heartbeat，超时自动释放 |
 | LangGraph 执行中状态、可恢复 checkpoint 和工作队列指针 | Work (W) | 已选 CheckpointStore / Local Runtime | 通过 Agent Policy 定义保留期、加密、清除与恢复边界 |
-| Canvas Document 当前结构、元素布局、跨域 EntityRef | Master (M) | PostgreSQL SoR + Canvas Projection | tenant/project/worktree RLS；版本化/SCD Type 2；删除关系需审计 |
-| Group App 排序、固定 App、插件绑定与启用设置 | Master (M) | PostgreSQL SoR | RLS；配置版本历史/SCD Type 2 |
-| Plugin Manifest、兼容性、Capability Schema、批准 Launch Profile | Master (M) | Registry SoR | RLS；版本不可变，升级产生新版本 |
-| Plugin 权限授予、Scope 与 Group 绑定 | Master (M) | PostgreSQL SoR / Permission | RLS + SCD Type 2；撤权事件即时传播 |
+| Canvas Document viewport / frames / visual connectors、元素布局、跨域 EntityRef | Master (M) | PostgreSQL SoR + Canvas Projection | tenant/project/worktree RLS；与 Canvas registry 同步版本化/SCD Type 2；同 Canvas 引用校验；connector 不作为 WorkItem relation |
+| `plugin.group_app_manifest` | Master (M) | PostgreSQL Registry SoR | SCD2；manifest version/revision 保留，verified 只由可信 ingest 写入；RLS、无物理删除 |
+| `plugin.group_app_registry_state` | Master (M) | PostgreSQL Registry SoR | Worktree revision SCD2；current registry version 单行；RLS、无物理删除 |
+| `plugin.group_app_binding` | Master (M) | PostgreSQL Registry SoR | Worktree install/lifecycle SCD2；当前 plugin binding 唯一；RLS、无物理删除 |
+| `plugin.group_app_access_grant` | Master (M) | PostgreSQL Permission SoR | actor `group_app:open` grant SCD2、可过期；RLS、无物理删除；Tool/Data capability 另行校验 |
+| `plugin.group_app_audit_event` | Transaction (T) | PostgreSQL Audit | append-only；记录注册、验证、binding、grant 与 runtime 状态变更；不存 Secret |
 | Canvas Element 与 WorkItem / TaskCard 的当前绑定 | Master (M) | PostgreSQL SoR | RLS；typed ref；绑定历史 SCD Type 2 |
+| Task CLI grant nonce 消费记录 | Work (W) | Local Runtime SQLite WAL，nonce 专用 `synchronous=FULL` connection | 单次消费；grant expires 后保留 5 分钟时钟偏差窗口，再于后续请求懒清理；只存 tenant/nonce/expiry/timestamp，不存 token 或 secret |
+| Task CLI WebSocket attachment ticket | Work (W) | Local Runtime SQLite WAL，grant/ticket ledger 专用 `synchronous=FULL` connection | 仅保存 SHA-256 摘要；绑定 tenant/project/repository/worktree/work_item/actor/runtime/session/policy_version；TTL ≤ 60 秒、单次原子消费；expiry + 5 分钟后懒清理；不保存 Bearer JWT |
 | CLI Session 生命周期和 TaskCard 命令记录 | Transaction (T) | PostgreSQL SoR + Audit | Append-only 审计；终端输出全文依 retention policy 单独保存/脱敏 |
 | Plugin 注册/启停/撤权/迁移记录 | Transaction (T) | PostgreSQL Audit / Event | Append-only；包含 actor、reason、plugin/version 和 correlation_id |
 | 跨 App 命令、LangGraph interrupt 与操作结果 | Transaction (T) | Audit + domain transaction | Append-only 关键决策和操作结果；不把敏感 Prompt/Code 默认放普通日志 |
 | Outbox / Domain Event | Transaction (T) | PostgreSQL Outbox → NATS JetStream | Event 不变；Schema versioned；消费幂等；DLQ 可审计 |
 
 所有 Master 对象 100% Tenant/Project RLS 并按更新策略保留 Type 2 历史；所有 Transaction 审计 append-only；所有 Work 数据声明 retention period 并实施 TTL/过期删除。`WorktreeGroup` 本身不建表为第二份 Worktree；实时状态与业务事实分离，遵守 §5.2 与 AGENTS.md 守门 #13。
+
+PostgreSQL 的 RLS policy 与 SQL schema/table privilege 是两层独立控制。部署须分离 migration owner 和运行时 service role，并根据每个 adapter 的读写动作授予 `USAGE` 及逐表最小权限；不得用 superuser、`BYPASSRLS` 或表 owner 身份运行 Group API。当前 Phase 5/6 migrations 已在隔离库验证 FORCE RLS、策略和不可变 trigger，但迁移未向某个推定角色自动授权，目标环境的实际 service role/bootstrap grants 仍须由部署清单显式定义并用该角色验证。
 
 ### 16.10 安全与信任边界
 
@@ -4414,14 +4491,33 @@ Chat Bar(scope, text, entity_refs)
 | Requirement | 本设计落点 | 验收 |
 |---|---|---|
 | WTG-001/002 | §16.1-16.4 | AC-WTG-001 |
+| TCI-001/005 | §16.5、§16.9 | AC-TCI-002 |
 | WTG-004/005 | §16.2、§16.10-16.11 | AC-WTG-002/003 |
 | WTG-006 | §16.1-16.2 | AC-WTG-004 |
+| WTG-007/008/009 | §16.2、§16.10-16.11 | AC-WTG-005/006/007 |
 | TCI-001 | §16.2-16.3 | AC-WTG-001 |
 | TCI-002/003/004 | §16.6, §16.10, §16.11 A | AC-TCI-001 |
-| CAN-001/002/003/004/005 | §16.2, §16.5, §16.11 B | AC-CAN-001 |
+| CAN-001/002/003/004/005 | §16.2, §16.5, §16.9, §16.11 B | AC-CAN-001/002 |
+| CAN-006 | §16.5, §16.9, §16.11 B | AC-CAN-002/006 |
+| CAN-007/008/009 | §16.2, §16.5, §16.9, §16.11 B | AC-CAN-003/004/005 |
+| CAN-010 | §16.5, §16.9, §16.11 B | AC-CAN-007 |
+| CAN-011 | §16.5, §16.9, §16.11 B | AC-CAN-008 |
+| CAN-012 | §16.5, §16.9, §16.11 B | AC-CAN-009 |
+| TCI-006 | §16.3, §16.9, §16.11 A | AC-TCI-003 |
+| TCI-007 | §16.6, §16.10, §16.11 A | AC-TCI-004 |
+| TCI-008 | §16.6, §16.10, §16.11 A | AC-TCI-005 |
+| TCI-011/012 | §16.6, §16.10, §16.11 A | AC-TCI-008/009 |
+| GRP-AUTH-001 | §16.5, §16.10 | AC-GRP-AUTH-001 |
 | CHAT-001/002 | §16.4, §16.7, §16.11 C | AC-CHAT-001 |
+| CHAT-003 | §16.7, §16.10, §16.11 C | AC-CHAT-003 |
+| CHAT-004 | §16.7, §16.10, §16.11 C | AC-CHAT-004 |
+| CHAT-005 | §16.7, §16.10, §16.11 C | AC-CHAT-005 |
+| CHAT-006 | §16.7, §16.9, §16.10 | AC-CHAT-006 |
 | PLG-001/002/003 | §16.3, §16.8, §16.10 | AC-PLG-001 |
-| LGS-001/002 | §16.7, §16.11 C | AC-CHAT-002 |
+| PLG-004 | §16.8, §16.10 | AC-PLG-002 |
+| PLG-005 | §16.8-16.10 | AC-PLG-003 |
+| GRP-DB-001 | §16.9-16.10 | AC-GRP-DB-001 |
+| LGS-001/002/003 | §16.7, §16.10, §16.11 C | AC-CHAT-002/003 |
 | ARCH-OBL-GRP-001 | §16.4-16.10 | AC-TRACE-001 |
 
 ### 16.13 Open Issues 与详细设计输入
@@ -4433,7 +4529,7 @@ Chat Bar(scope, text, entity_refs)
 | 3 | 交互式 TTY 的协议、可附着方式、命令白名单和批准 Launch Profile Schema | Runtime / Security 详细设计与 PoC |
 | 4 | Plugin Publisher 签名信任根、沙箱承载方式、插件升级/回滚/数据迁移补偿策略 | Plugin ADR / Integration 详细设计 |
 | 5 | Global L0 可访问 Worktree 数量、汇总 Context Budget 与跨 Group 实时流节流策略 | LangGraph / Performance PoC |
-| 6 | Canvas Document 元素数量、冲突解决以及版本历史的具体存储布局 | Canvas Data Design / PoC |
+| 6 | Canvas Document element/connector 数量上限已有 API 校验，viewport / frames / connectors 采用 Canvas registry SCD2；多人同时编辑的合并体验、事件消费延迟和大文档性能阈值仍需验证 | Canvas Data Design / Integration PoC |
 
 基本设计对上述领域已确立产品树、所有权、命令事件路径、权限边界和验收方向；协议格式、DDL、API handler、TTY 机制、签名算法和沙箱实现留给相应详细设计，不以本节文字声称已实现。
 
@@ -4443,3 +4539,42 @@ Chat Bar(scope, text, entity_refs)
 | v0.3 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 导航明确为 Project 选择 → Project Worktree Index → 展开 Worktree → 同级 Group Apps；将多 Agent Worktree owner/Runtime/PR/冲突/锁可视与受控管理纳入核心职责 | 用户澄清产品要解决多 Agent Worktree 混乱及内部管理不可控 |
 | v0.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Project Worktree Index 与 Worktree Group 的 canonical route；Project Worktrees 视图提供管理入口，Worktree 路由不再落入 Sprint 树视图 | 浏览器验收发现 `/worktree` 曾被重定向到 Sprint |
 | v0.5 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Index 的 Project 选择编码进 `project_id` deep link；缺少/无效项目时禁止静默回退；Project 页入口与 Group 返回 Index 均保留项目范围 | Project Worktree Index 与 Group 路由详细设计收口 |
+| v0.6 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v2.5 的 Canvas Document 版本化要求；确定 Canvas registry SCD2 保存 viewport / frames / connectors，加入同 Canvas 元素引用校验、CAS 幂等更新与 Audit/Outbox 原子边界 | Phase 3 Canvas Document persistence API 切片实现 |
+| v0.7 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v2.6；规定 Canvas 新建 Task Card 使用单事务 WorkItem / Multica / Worktree / Element / EntityRef / Audit / Outbox Application Command，并共享 correlation ID | Phase 3D Canvas→WorkItem 原子创建命令实现后同步基本设计 |
+| v0.8 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Task CLI grant nonce 消费记录的 W 分类、SQLite WAL 存储、单次消费与 expires + 5 分钟时钟偏差保留窗；明确 nonce ledger 不替代签名和 ACL 验证 | Phase 4A 新增 durable nonce consumption helper 后同步数据分类 |
+| v0.9 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 Task Card CLI 与 terminal-stack 的边界；规定浏览器使用首帧提交、单次短时 attachment ticket，REST Bearer JWT 不进入 WebSocket；PTY 与 checkout 仍由 Local Runtime 负责 | Phase 4B 盘点发现 terminal-stack 仅提供 Noop sink / 协议层，需先冻结安全 attachment 契约 |
+| v1.0 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Phase 4B ticket 契约细化为完整 Group/Task/Runtime/Session/policy 绑定、≤60 秒 TTL、SHA-256 摘要、原子单次消费与 expiry+5 分钟懒清理；同步受保护首帧路由和 sink 注入代码切片状态，明确 Group router、真实 ACL authorizer、Session API 与 PTY 仍未接通 | Phase 4B 实现 Local Runtime ticket ledger 与 terminal-stack protected route seam 后同步设计 |
+| v1.1 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v2.7 / Group detailed design v1.4；新增 Canvas Outbox 受保护复合游标轮询读取的基本设计契约，限制返回事件元数据并注明 consumer、offset、NATS 与实时推送仍未完成 | Phase 3E 新增 Canvas Outbox 读取端点后同步基本设计 |
+| v1.2 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v2.8 / Group detailed design v1.5；定义浏览器 Group API 的宿主 JWT provider、逐请求 Bearer、缺 token fail-closed、远程 origin 强制 HTTPS 和 no-store/no-cookie 约束，明确 Group 页面仍未安装实际登录 provider | 新增 Group REST API 客户端 adapter 后冻结其登录会话接入边界 |
+| v1.3 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v2.9 / Group detailed design v1.8；增加非敏感 session generation key，规定身份或会话切换时销毁旧 API client 与 Group projection；记录 Group 页面条件式只读 API projection 与当前未装配宿主 provider 的状态 | 防止认证 callback 引用稳定时跨账号复用旧页面投影 |
+| v1.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v3.0 / Group detailed design v1.9；记录 provider-backed Canvas 页面已调用原子 Canvas→WorkItem API 创建入口、刷新授权投影并提供 Task Card 深链；布局编辑仍为只读，宿主 provider 缺失时仍为 preview | Phase 3E Canvas→Task Card 创建入口接入后同步基本设计状态 |
+| v1.5 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v3.1 / Group detailed design v2.0；增加 Worktree 无 Canvas 时认证幂等初始化命令及成功后重载投影的顺序约束，初始化失败不回退 seed | Phase 3E 补齐首次进入空 Worktree 的 Canvas 初始化路径 |
+| v1.6 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v3.2 / Group detailed design v2.1；接入 Group Canvas viewport 暂存和显式 Document CAS 保存，冲突需重载处理；Frame/connector/Element 编辑仍未接线 | Phase 3E 使用现有 CAS API 持久化 Group Canvas 视口 |
+| v1.7 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v3.3 / Group detailed design v2.2；补充 Worktree 内多 Canvas 列表、URL 选择、新建后切换与授权投影刷新规则 | Phase 3E 实现多 Canvas 投影选择与认证创建入口 |
+| v1.8 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v3.4 / Group detailed design v2.3；增加将已有 Worktree Task Card 通过原子 Element + EntityRef 命令加入 Canvas 的职责与约束 | Phase 3E 接通既有任务卡与 Canvas 的 UI 关联 |
+| v1.9 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v3.5 / Group detailed design v2.4；定义 live Canvas Element 位置的 expected-version CAS 保存与冲突刷新，明确只修改坐标且其它 Element 写操作仍独立验收 | Phase 3E 接通受限 Canvas Element 移动入口 |
+| v2.0 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v3.6 / Group detailed design v2.5；定义 Multica/Jira/Task Card 共用版本化 lifecycle command、review gate、幂等写入与冲突刷新规则 | Phase 3F 将现有 WorkItem lifecycle API 接入 Group UI |
+| v2.1 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v3.7 / Group detailed design v2.6；明确 Group App Registry 授权投影是生产插件同级导航的唯一来源，并限定客户端插件开关为不授予能力、不执行代码的本地预览 | Phase 6 将启用的预览插件显示为 Worktree 下同级导航入口 |
+| v2.2 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v3.8 / Group detailed design v2.7；将 Frame 创建/删除、元素归入 Frame、纯视觉连线创建/删除纳入 live Canvas Document draft + 固定版本 CAS；保留视觉连接与业务关系的边界 | Phase 3E 复用 Canvas Document endpoint 接通画布结构编辑 |
+| v2.3 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v3.9 / Group detailed design v2.8；补充 Frame 几何/演示与连线样式编辑、便笺 Element CAS、以及删除 Element 时同事务清理 Frame/connector 引用的边界 | Phase 3E 接通完整画布展示属性编辑和一致性删除 |
+| v2.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v4.0 / Group detailed design v2.9；将未锁定 Element 的宽高/旋转独立接入 Element version CAS，保留其余字段并明确数值范围 | Phase 3E 补齐 Canvas Element 的几何属性编辑 |
+| v2.5 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v4.1 / Group detailed design v3.0；定义 Worktree Index 的条件式服务端投影、游标续页、fail-closed 预览边界和归档/恢复 plan-confirm UI；明确宿主 provider 未安装、owner 转派及 checkout 创建/清理仍待后续接线 | Phase 2D 将 Index 与安全管理计划接入 UI，并保留服务端未装配状态 |
+| v2.6 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v4.2 / Group detailed design v3.1；新增 Project ACL 保护的成员目录及负责人转派交互，固定候选来源、短时 plan-confirm、版本冲突和失败关闭行为；保留宿主 provider / 数据库部署门 | Phase 2D 将已有 assign_owner 管理计划 API 补齐到 Worktree Index UI |
+| v2.7 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v4.3 / Group detailed design v3.2；定义 Canvas Outbox 浏览器 projection consumer 的本地复合游标恢复与先刷新后持久化顺序，明确浏览器游标不替代 NATS consumer offset / realtime | Phase 3E 增加浏览器可恢复游标，减少页面重载后的重复投影刷新 |
+| v2.8 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v4.4 / Group detailed design v3.3；定义 claimant 提交评审、非 claimant reviewer 通过/驳回、拒绝理由、版本化幂等审计及通过/驳回后的状态迁移；明确宿主认证、Review Domain adapter 与 Outbox 仍未接入 | Phase 2C / 3F 增加 canonical WorkItem review command API 与 Group UI |
+| v2.9 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v4.5 / Group detailed design v3.4；定义 Task CLI Ed25519 grant 的 key id、issuer 私钥与 Runtime 公钥分离、签名域和验签→scope/checkout 校验→nonce 消费顺序；明确 grant helper 尚未接入 API、ACL/health recheck 或进程启动 | Phase 4A 增加受签名保护的 TaskExecutionContext 验证入口 |
+| v3.0 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v4.6 / Group detailed design v3.5；定义 authenticated Task CLI Session start REST 契约、GroupApiState provisioner 注入、Project/WorkItem/Worktree/claimant/version 校验、request fingerprint/idempotency、实时 ACL/Runtime/sandbox 复验和 no-store 单次 ticket 响应；明确当前只有 fail-closed route seam，未有真实 provisioner/spawn | Phase 4B1 增加 Group REST Task Session API 接入边界 |
+| v3.1 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v4.7 / Group detailed design v3.6；定义 Local Runtime `TaskPtyManager` 的交互 PTY、清空进程环境、受限输入/resize、序号化字节输出和退出状态契约；明确该 adapter 未接 Session provisioner / terminal-stack / TaskRun Audit 且没有 OS sandbox | Phase 4B2 增加底层 PTY adapter，冻结与授权执行器的隔离边界 |
+| v3.2 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v4.8 / Group detailed design v3.7；补充 PTY 输出有界 FIFO 背压、attachment 前输出保留和 manager 退出时终止 PTY 子进程的生命周期契约；明确 adapter 仍未接 provisioner、terminal-stack、审计或 OS sandbox | Phase 4B2 自审修正输出订阅竞态并补齐 Runtime 进程回收契约 |
+| v3.3 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.0 / Group detailed design v3.8；定义卡内 CLI Session start 与 ticket-first xterm 门槛；新增 Group Chat scope/targets 授权入口及 `ScopedChatWorkflow` fail-closed seam，并明确 Transcript、LangGraph runtime/checkpoint、resume 与流式 UI 尚未完成 | 继续推进所有 Phase，完成卡内 CLI UI 安全边界并开始 Phase 5 Group Chat API |
+| v3.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.1 / Group detailed design v3.9；定义 `GET /chat/targets` 的成员过滤、非归档条件、最小字段、稳定游标分页与底栏 Global 多选；明确目录不是 grant，消息提交仍逐目标实时授权且未配置 workflow 时禁发 | 继续推进所有 Phase，补齐 Global Chat 目标发现与选择入口 |
+| v3.5 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.2 / Group detailed design v4.0；补充 Task CLI Session status/cancel/reattach route 契约、专用 scope、逐请求 Group 授权、Runtime 完整 session-binding 复验、脱敏状态、幂等取消及重新签发 ticket；明确当前无生产 provisioner 且 UI 未接入重连 | 继续推进 Phase 4B 生命周期控制面，避免旧 ticket 重用或伪报生产终端已完成 |
+| v3.6 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.3 / Group detailed design v4.1；定义 Task Card 的状态刷新、幂等取消、断线后先查状态再手动申请新 ticket；限制可重新连接状态并明确页面刷新后缺少 Session listing/recovery API；真实 provisioner、PTY sink、sandbox、Audit 与宿主 provider 仍未装配 | Phase 4B3 接通 Session 生命周期 REST client 与 Task Card 控制 UI |
+| v3.7 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.4 / Group detailed design v4.2；定义 Task Card 页面重载后的 Worktree/Task-scoped Session 列表与手动发现/恢复流程：默认 20 条、上限 50、no-store 脱敏字段、不含 ticket/output；恢复仍逐次复验状态并由服务端签发新 ticket；真实 provisioner/provider 缺失时返回 503 | Phase 4B4 增加受授权 Session listing REST seam 与刷新恢复 UI |
+| v3.8 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.5 / Group detailed design v4.3；冻结 LangGraph thread ID 服务端生成、checkpointer 无授权快照、resume/interrupt/replay/tool-call 实时授权与副作用 Domain Command/outbox 幂等要求；PostgresSaver 初始化走受控 setup，不由 API runtime 建表；LangGraph runtime / Transcript / stream UI 仍未接通 | Phase 5 LangGraph 官方 API 核对确认 checkpoint replay 会重新执行节点，补齐可恢复流程的副作用安全边界 |
+| v4.1 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.8 / Group detailed design v4.6；将 Transcript 分为不含正文的 T 元数据和有期限 W 加密 payload，强制 `TranscriptBodyProtector` seam；记录密钥服务、清理、轮换/销毁、导出/删除与运行验收仍缺 | 按 CHAT-006 将 persistence schema/code 收紧为仅存密文 |
+| v4.2 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.9 / Group detailed design v4.7；增加 `/group-apps` authorized projection API、provider 实时 membership/grant 复验、最小输出/条目限制与未注入 503 边界；插件运行时、enable/disable command 与撤权仍未接通 | Phase 6 建立 Worktree 下同级 Plugin 导航的服务端授权读取 seam |
+| v4.3 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.10 / Group detailed design v4.8；生产 main 装配 PostgreSQL Registry 只读 provider，增加 manifest/state/binding/grant 四类 Master SCD2 与 append-only Audit schema；明确 migration 尚未部署，签名 trust root/ingest、lifecycle writer、capability gateway、UI live consumer 和真实 RLS 验收仍缺 | 继续 Phase 6，从 fail-closed 导航 seam 推进到 PostgreSQL 授权投影实现 |
+| v4.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.11 / Group detailed design v4.9；实现 Group App Registry live UI consumer 的 provider/session generation 隔离、Worktree/version/entry 验证、稳定排序、显式/定时/可见性刷新和错误 fail closed；明确此导航不代表插件 runtime 已接入 | 继续 Phase 6，将授权导航投影接入 Worktree Group 同级 App 树 |
+| v4.5 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.12 / Group detailed design v4.10；把 Plugin Registry UI consumer 的输入校验、稳定排序、provider/session generation 清理和错误 fail closed 约束细化；新增投影契约测试 evidence，明确仍无插件执行权限 | 继续 Phase 6，收紧 Group App navigation projection 的边界验证 |
+| v4.6 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.13；区分 PostgreSQL RLS policy 与 runtime SQL grants，要求 migration owner/service role 分离、逐表最小授权和以实际非特权角色验收；记载 Phase 5/6 隔离库验证与生产 grants 未配置 | Phase 5/6 PostgreSQL 验证发现 FORCE RLS 不授予 schema/table SQL 权限 |

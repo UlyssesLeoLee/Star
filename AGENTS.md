@@ -15,7 +15,7 @@
 >
 > —— per 2026-08-27 19:39 JST 用户明确发令"允许你代签" + 07:16 JST 代签规则反转 + 2026-08-26 AI 协作文档治理规则保留
 
-**产品导航与 Worktree 管理硬约束**：选定 Project 后以该项目的 Worktree Index 为主导航；展开 Worktree 后展示同级应用，Canvas 与 Task Card 同级，CLI 从任务卡内打开，底栏聊天可选当前 Worktree 或 Global scope。Multica/Jira 类任务、Canvas、Agent/LangGraph 与插件通过同一 GroupContext 协同；Worktree 的归属、Agent/Runtime 绑定及生命周期状态必须可管理、可审计。
+**产品导航与 Worktree 管理硬约束**：Worktree Index 是多 Agent 开发的核心管理面，必须直接解决归属、Agent/Runtime 绑定、生命周期、锁与冲突信号分散且内部变更不可控的问题；选定 Project 后以该项目的 Worktree Index 为主导航，并在其中呈现可审计的 Worktree 状态与经授权的管理流程，不得用通用任务列表或本地 seed 状态冒充生产管理。展开 Worktree 后展示同级应用，Canvas 与 Task Card 同级，CLI 从任务卡内打开，底栏聊天可选当前 Worktree 或 Global scope。Multica/Jira 类任务、Canvas、Agent/LangGraph 与插件通过同一 GroupContext 协同。
 
 ---
 

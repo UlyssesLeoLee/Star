@@ -11,6 +11,7 @@
 //! - `LocalRuntime` 聚合根(运行时注册 / 心跳 / 状态)
 //! - `WorktreeMount` 实体(运行时挂载 Worktree 关系)
 //! - `AgentExecutionContext` 实体(Agent 在 Local Runtime 上的执行上下文)
+//! - `task_execution::TaskExecutionContext` (Task Card CLI 的授权边界与 canonical checkout 校验)
 //! - `RuntimeHeartbeat` 事件(Append-only 心跳流)
 //!
 //! ## 关键不变量 (INV-RT-01~05)
@@ -1658,3 +1659,4 @@ pub mod kill;
 pub mod spawn_linux;
 pub mod spawn_macos;
 pub mod spawn_windows;
+pub mod task_execution;
