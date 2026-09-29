@@ -28,6 +28,7 @@
 
 use query_engine::dsl_parser::DslParser;
 use query_engine::keywords::{Keyword, KEYWORD_COUNT};
+use query_engine::QueryEnginePure;
 use wasm_bindgen::prelude::*;
 
 // =====================================================================
@@ -147,6 +148,50 @@ pub fn operator_at(idx: u32) -> String {
     }
 }
 
+/// `dsl_to_cypher_json(dsl: &str) -> Result<String, JsError>`
+///
+/// Stage 2 PR-238 (per docs §3.2 P2): DSL → Cypher 生成 (per crates/query-engine/src/engine.rs::dsl_to_cypher).
+/// 返回 JSON 序列化的 CypherQuery ({cypher: String, params: Object}).
+/// 守门 #10: Cypher injection guard (per NFR-SEC-002, $param binding 而非字符串拼接).
+#[wasm_bindgen]
+pub fn dsl_to_cypher_json(dsl: &str) -> Result<String, JsError> {
+    let engine = QueryEnginePure;
+    let result = engine
+        .dsl_to_cypher_sync(dsl)
+        .map_err(|e| JsError::new(&format!("dsl_to_cypher error: {e:?}")))?;
+    serde_json::to_string(&result)
+        .map_err(|e| JsError::new(&format!("serialize error: {e}")))
+}
+
+/// `cypher_param_count(cypher_json: &str) -> u32`
+///
+/// 守门 #11: Cypher params 不应为空 (有 filter 时必含 param).
+#[wasm_bindgen]
+pub fn cypher_param_count(cypher_json: &str) -> u32 {
+    #[derive(serde::Deserialize)]
+    struct CypherQueryView {
+        #[serde(default)]
+        params: serde_json::Map<String, serde_json::Value>,
+    }
+    serde_json::from_str::<CypherQueryView>(cypher_json)
+        .map(|q| q.params.len() as u32)
+        .unwrap_or(0)
+}
+
+/// `keyword_from_filter(filter_json: &str) -> String`
+///
+/// 守门: 给一个 filter JSON, 返回 keyword 字符串 (e.g. "show" / "agent" / "behind").
+#[wasm_bindgen]
+pub fn keyword_from_filter(filter_json: &str) -> String {
+    #[derive(serde::Deserialize)]
+    struct FilterView {
+        keyword: String,
+    }
+    serde_json::from_str::<FilterView>(filter_json)
+        .map(|f| f.keyword)
+        .unwrap_or_default()
+}
+
 // =====================================================================
 // Unit tests (Rust side, 不依赖 wasm-bindgen-test runtime)
 // =====================================================================
@@ -235,6 +280,39 @@ mod tests {
         assert_eq!(operator_at(100), "");
         assert_eq!(operator_at(u32::MAX), "");
     }
+
+    // ===== Stage 2 PR-238 tests: Cypher + JSON helpers (wasm-bindgen fn on native OK) =====
+
+    #[test]
+    fn cypher_param_count_zero_on_invalid_json() {
+        assert_eq!(cypher_param_count("not json"), 0);
+        assert_eq!(cypher_param_count("{}"), 0);
+        assert_eq!(cypher_param_count(r#"{"cypher": "MATCH (n)"}"#), 0);
+    }
+
+    #[test]
+    fn cypher_param_count_with_params() {
+        let json = r#"{"cypher": "MATCH (w:Worktree)", "params": {"show_0": ["Unmerged"], "behind_1": 5}}"#;
+        assert_eq!(cypher_param_count(json), 2);
+    }
+
+    #[test]
+    fn keyword_from_filter_show() {
+        let json = r#"{"keyword": "show", "value": ["Unmerged"]}"#;
+        assert_eq!(keyword_from_filter(json), "show");
+    }
+
+    #[test]
+    fn keyword_from_filter_agent() {
+        let json = r#"{"keyword": "agent", "value": ["codex"]}"#;
+        assert_eq!(keyword_from_filter(json), "agent");
+    }
+
+    #[test]
+    fn keyword_from_filter_invalid_json() {
+        assert_eq!(keyword_from_filter("not json"), "");
+        assert_eq!(keyword_from_filter("{}"), "");
+    }
 }
 
 // =====================================================================
@@ -280,5 +358,34 @@ mod wasm_tests {
         let json = parse_full_dsl("").unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.as_array().unwrap().len(), 0);
+    }
+
+    // Stage 2 PR-238: dsl_to_cypher_json (Cypher 生成)
+    #[wasm_bindgen_test]
+    fn dsl_to_cypher_json_show_ready_wasm() {
+        let json = dsl_to_cypher_json("show ready").unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let cypher = parsed.get("cypher").unwrap().as_str().unwrap();
+        assert!(cypher.starts_with("MATCH (w:Worktree)"));
+        // should have at least 1 param for show filter
+        let params = parsed.get("params").unwrap().as_object().unwrap();
+        assert!(!params.is_empty(), "params should not be empty for show filter");
+    }
+
+    #[wasm_bindgen_test]
+    fn dsl_to_cypher_json_behind_wasm() {
+        let json = dsl_to_cypher_json("behind >5").unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let cypher = parsed.get("cypher").unwrap().as_str().unwrap();
+        assert!(cypher.contains("behind") || cypher.contains("Behind"));
+    }
+
+    #[wasm_bindgen_test]
+    fn dsl_to_cypher_json_invalid_dsl_wasm() {
+        // Empty DSL might or might not error — just verify it doesn't panic
+        let result = dsl_to_cypher_json("");
+        // Empty DSL: 0 filters → Cypher is just MATCH (w:Worktree) without WHERE
+        // So this should be Ok with empty params
+        assert!(result.is_ok(), "empty DSL should not error");
     }
 }
