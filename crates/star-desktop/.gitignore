@@ -1,0 +1,16 @@
+# Tauri 2.0 build artifacts
+target/
+**/*.rs.bk
+Cargo.lock
+
+# Vite build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Tauri bundle output
+src-tauri/target/
+
+# OS files
+.DS_Store
+Thumbs.db
