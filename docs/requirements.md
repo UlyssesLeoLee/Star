@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定義書（統合拡張版 v2.1）
+# Vibe Coding Work Management SaaS 要件定義書（統合拡張版 v2.4）
 
 ## 0. 文档说明与前提
 
@@ -34,7 +34,11 @@ Vibe Coding Work Management SaaS 要件定义书（本文档）
 
 本文档的下游产出为《基本设计书》，因此本文档只定义 **要件（Requirement）与架构义务（Architecture Obligation）**，不输出数据库 DDL、API 具体实现或生产代码（§105）。
 
-> **v2.1 补充（2026-09-27）**：产品主导航采用“渡口 Worktree 群组”模型。每个已注册 Worktree 是顶层工作上下文；其下 Multica 生命周期、Jira 类工作管理、Task Card 索引、Infinite Canvas 与已启用插件是平级入口。Task Card 索引和 Infinite Canvas 均直接挂在 Worktree 下，CLI / Agent Session 从卡片内打开。完整要件见第 50 章。
+> **v2.2 补充（2026-09-28）**：导航明确采用“先选 Project → 查看/管理该项目 Worktree → 展开 Worktree → 进入同级 Group Apps”。Worktree 管理是项目开发的核心工作面；展开的 Worktree 下包含 Multica、Jira 类工作管理、Task Card、Infinite Canvas、Workflow/LangGraph 和插件入口。完整要件见第 50 章。
+>
+> **v2.3 补充（2026-09-29）**：Project Worktree Index 是可直接访问的产品入口；Project 页的 Worktrees 视图须能进入该管理面，Worktree 导航不能被通用任务列表路由替代。展开后的 Worktree Group 路由须保留 `worktree_id` 上下文。完整要件见第 50 章。
+>
+> **v2.4 补充（2026-09-29）**：Index 深链以 `/worktree?project_id={project_id}` 保留所选项目；项目 Worktrees 入口必须传递 `project_id`，无项目参数时要求先选 Project。Group 深链继续以 `worktree_id` 解析并校验 Project 归属。完整要件见第 50 章。
 
 ---
 
@@ -1443,8 +1447,9 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | DSG-002 | 系统必须支持将"关联 DesignArtifact 全部 APPROVED"设为既有 WorkItem 状态转换 Guard 的前置条件 | 第 8.2、8.3 章 | ARCH-OBL-DEV-001 |
 | TST-001 | 系统必须支持 ValidationResult 携带 Level 字段（単体/結合/総合/受入），并按 Level 聚合测试覆盖 | 第 27.6 章 | ARCH-OBL-DEV-005 |
 | OPS-001 | 系统必须支持登记 IncidentRecord 并关联到修复 WorkItem，追溯"生产问题 → 根因 ChangeSet → 修复 → 验证证据" | 第 29.1 章 | ARCH-OBL-DEV-002/005 |
-| WTG-001 | Project 内必须以已注册 Worktree 作为工作界面的顶层索引；进入任一 Worktree 后展示其 Worktree Group | 第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
+| WTG-001 | 用户选择 Project 后，系统只展示当前 actor 可访问的 Worktree；展开任一 Worktree 后展示其 Worktree Group | 第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
 | WTG-002 | Worktree Group 下的 Task Management、Task Card 及其 Agent/CLI 会话、Infinite Canvas 与已启用插件必须共享不可伪造的 Tenant、Project、Repository、Worktree 上下文 | 第 50.2-50.3 章 | ARCH-OBL-GRP-001/ARCH-OBL-DEV-001 |
+| WTG-006 | Project Worktree Index 与 Worktree Group 必须可分别访问；Index 深链以 `project_id` 保留所选 Project，Group 深链以 `worktree_id` 保留所选 Worktree；Project Worktrees 视图须能进入 Index，Index 路由不得被通用任务列表路由替代 | 第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
 | TCI-001 | Multica 生命周期、Jira 类 Board/Backlog/Sprint 与 Worktree 下直接访问的 Task Card 索引必须共用同一 WorkItem 事实源 | 第 50.3 章 | ARCH-OBL-GRP-001 |
 | TCI-002 | 任务卡必须能够在已授权的关联 Worktree 中打开受控 CLI 会话，并将会话、命令结果与审计关联回任务卡 | 第 50.4 章 | ARCH-OBL-DEV-004/ARCH-OBL-GRP-001 |
 | CAN-001 | Canvas 必须作为 Worktree Group 内与 Task Management 同级的应用，并以实体链接关联 WorkItem、TaskCard、AgentSession 与 Worktree | 第 50.5 章 | ARCH-OBL-GRP-001/ARCH-OBL-DEV-002 |
@@ -2164,28 +2169,30 @@ Star 倉 22 `domain-*` crate (per ADR-0040) + 25 MRU (per api-design.md §2.1) �
 
 ---
 
-## 50. 渡口 Worktree 群组体验要求（v2.1 新增）
+## 50. 渡口 Project Worktree 管理与群组体验要求（v2.4）
 
 ### 50.1 目的与产品树
 
-本节把 Star 的独特工作方式定义为 **Worktree-first Group Experience**：用户进入一个 Project 后，先从 Worktree Index 选择正在处理的 Worktree；随后在该 Worktree 的群组内使用任务管理、Task Cards、Infinite Canvas 与已启用应用，CLI 和 Agent Session 从任务卡内打开。
+本节把 Star 的独特工作方式定义为 **Project → Worktree → Group Apps**：用户先选择 Project，再看到该 Project 的 Worktree 清单和管理状态；展开一个 Worktree 后，进入该 Worktree 的群组应用导航。它要解决多 Agent 并行开发时 Worktree 分散、归属不清、状态不可见、冲突和清理不可控的问题。CLI 和 Agent Session 从任务卡内打开。
 
-Tenant / Workspace / Project 继续承担归属、权限和安全边界。Worktree-first 只定义 Project 内的导航与执行工作面，不改变既有领域层级，也不改变 `1 WorkItem → 0/1/N Worktrees`、`1 Worktree → N AgentSessions` 和 Worktree Status 独立于 WorkItem Status 的约束。
+Tenant / Workspace / Project 继续承担归属、权限和安全边界。导航层级是 Project 选择器 → Project-scoped Worktree Index → 展开的 Worktree → 同级 Group Apps。Project 选择器负责限定列表范围，展开的 Worktree 是当前执行上下文；这不新增 ProjectGroup 或 WorktreeGroup 业务聚合，也不改变 `1 WorkItem → 0/1/N Worktrees`、`1 Worktree → N AgentSessions` 和 Worktree Status 独立于 WorkItem Status 的约束。
 
 ```text
-Tenant → Workspace → Project
-                      └─ Worktree Index（顶层索引）
-                         └─ Worktree Group（由 worktree_id 标识）
-                            ├─ Multica Task Lifecycle（执行生命周期 / claim / review / Agent）
-                            ├─ Jira-class Work Management（Board / Backlog / Sprint / Relation）
-                            ├─ Task Cards（直接挂在 Worktree 下；卡内可打开 CLI / Agent Session）
-                            ├─ Infinite Canvas（Miro 类无限画布）
-                            └─ 已启用的 Group App Plugins
+Tenant → Workspace → Project（用户先选择）
+                                  └─ Project Worktree Index（只列当前 Project 的 Worktree）
+                                     └─ Worktree（展开；显示分支 / 状态 / Agent / Runtime / PR / 风险 / 锁）
+                                        └─ Worktree Group Apps（由 worktree_id 标识）
+                                           ├─ Multica Task Lifecycle（执行生命周期 / claim / review / Agent）
+                                           ├─ Jira-class Work Management（Board / Backlog / Sprint / Relation）
+                                           ├─ Task Cards（同级；卡内可打开 CLI / Agent Session）
+                                           ├─ Infinite Canvas（同级；Miro 类无限画布）
+                                           ├─ Workflow / LangGraph（同级流程编排入口）
+                                           └─ 已启用的 Group App Plugins（同级扩展入口）
 
-固定底栏 Chat Bar：GLOBAL 范围 ｜ 当前 WORKTREE 范围
+展开 Worktree 后固定底栏 Chat Bar：GLOBAL 范围 ｜ 当前 WORKTREE 范围
 ```
 
-`Worktree Group` 是围绕既有 `Worktree` 的应用上下文和导航投影，以 `worktree_id` 为身份；它不复制 Git Worktree、WorkItem 或 AgentSession 的业务事实。Project 范围的 Worktree Graph Overview 继续用于跨 Worktree 冲突、依赖与全景查看；群组内的 Infinite Canvas 用于当前 Worktree 的协作与编排，两者须在名称、路由和数据范围上明确区分。
+`Project Worktree Index` 是项目选择后的管理入口，聚合展示该项目已授权的 Worktree 事实和运行信号；它不是跨项目的平铺列表。Worktree 展开后显示该 Worktree 的同级 App 导航。`Worktree Group` 是围绕既有 `Worktree` 的应用上下文和导航投影，以 `worktree_id` 为身份；它不复制 Git Worktree、WorkItem 或 AgentSession 的业务事实。Project 范围的 Worktree Graph Overview 继续用于跨 Worktree 冲突、依赖与全景查看；群组内的 Infinite Canvas 用于当前 Worktree 的协作与编排，两者须在名称、路由和数据范围上明确区分。
 
 ### 50.2 术语与共同上下文
 
@@ -2210,9 +2217,12 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 
 | ID | 要件 | 优先级 |
 |---|---|---|
-| WTG-001 | Project 内以 Worktree Index 作为工作界面根节点；每一个已注册 Worktree 均可进入唯一的 Worktree Group 工作面 | P0 |
-| WTG-002 | 群组内的 Task Management、Task Card 及其 Agent/CLI 会话、Infinite Canvas 与已启用插件必须共享 Group Context | P0 |
+| WTG-001 | 用户选择 Project 后，系统只展示该 Project 中当前 actor 可访问的 Worktree；展开任一 Worktree 后显示其唯一 Group App 导航 | P0 |
+| WTG-002 | 展开的 Worktree 下，Multica、Jira 类管理、Task Card、Infinite Canvas、Workflow/LangGraph 与插件为同级入口，并共享 Group Context | P0 |
 | WTG-003 | Worktree 归档、删除观察或失联后，群组资源必须保留可追溯关系并按 Project Policy 转为只读、恢复或归档状态 | P1 |
+| WTG-004 | Project Worktree Index 必须可比较各 Worktree 的 owner/Agent、branch、status、Runtime、PR、冲突/锁和最近活动，并从同一处进入受权管理动作 | P0 |
+| WTG-005 | Worktree 切换或展开时，应用、实体查询、底栏范围和订阅必须同步到该 Worktree；切换 Project 时不得泄漏上一 Project 的 Worktree 或任务 | P0 |
+| WTG-006 | Project Worktree Index 与 Worktree Group 必须可分别访问；Index 深链 `/worktree?project_id=...` 保留所选 Project，Group 深链以 `worktree_id` 保留所选 Worktree；缺少 Project 时先显示选择器，Project Worktrees 视图须传递 `project_id`，Index 不得被通用任务列表路由替代 | P0 |
 | TCI-001 | Multica 生命周期和 Jira 类计划视图必须投影同一 WorkItem；Task Card 索引作为 Worktree 下的平级入口访问该任务；不得产生并行任务状态机或第二个任务事实源 | P0 |
 | CAN-001 | Canvas 必须作为群组内同级 App，并能绑定、创建、定位和查看 WorkItem、Task Card、AgentSession、Relation 与自动化流程 | P0 |
 | CAN-002 | Canvas 发起的任务写操作必须经过 Task Domain Command 与 Guard；结果由事件回写所有订阅 App | P0 |
@@ -2286,7 +2296,10 @@ Task Management / Canvas / Chat / Plugin
 
 | 验收 ID | 受入基准 |
 |---|---|
-| AC-WTG-001 | 选择一个 Worktree 后，界面直接展示同级的 Multica、Jira 类工作管理、Task Card 索引、Infinite Canvas 和已启用插件；Task Card 索引与 Canvas 不嵌套在 Task Management 下，CLI / Agent Session 从任务卡内打开；切换 Worktree 时各 App 同步切换上下文和数据范围 |
+| AC-WTG-001 | 选择 Project 后只显示其获准 Worktree；展开 Worktree 后，Multica、Jira 类工作管理、Task Card、Infinite Canvas、Workflow/LangGraph 和已启用插件以同级节点出现；Task Card 与 Canvas 不嵌套在任务管理 App 下，CLI / Agent Session 从卡内打开 |
+| AC-WTG-002 | 展开另一 Worktree 后，各 App、实体查询、底栏 Scope 和实时订阅同步切换；Project 切换后旧项目的 Worktree 不出现在列表和 Group Context 中 |
+| AC-WTG-003 | Worktree 清单能显示 owner/Agent、branch、status、Runtime、PR、冲突/锁与最近活动；管理动作经权限、确认和幂等校验并写审计 |
+| AC-WTG-004 | Project Worktrees 视图进入 `/worktree?project_id={project_id}`；直接访问、复制和刷新 Index / Group 深链后仍解析同一 Project 与 `worktree_id`；缺少或无效 Project 时不能静默切换到另一 Project；所有这些路由均不重定向到通用任务列表 |
 | AC-TCI-001 | 从任务卡打开 CLI 后，工作目录、Runtime、允许路径和命令策略都与所选 Worktree 一致；越界请求被拒绝并审计 |
 | AC-CAN-001 | Canvas 中选中任务卡或 WorkItem 节点可打开其详情；任务状态变更实时反映到节点；从 Canvas 变更状态仍经过既有 Guard |
 | AC-CHAT-001 | 底栏切换 `WORKTREE` / `GLOBAL` 后，消息、checkpoint、工具调用与 Audit 均记录范围；`WORKTREE` 范围不可读取其他 Worktree 上下文 |
@@ -2300,4 +2313,7 @@ Task Management / Canvas / Chat / Plugin
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
-| v2.1 | 2026-09-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增渡口 Worktree 群组产品树、任务卡 CLI、范围化聊天、Canvas 互操作、插件热插拔和 LangGraph 约束 | 用户提出 Worktree 顶层索引与群组 App 体系 |
+| v2.1 | 2026-09-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 Worktree Group、任务卡 CLI、范围化聊天、Canvas 互操作、插件热插拔和 LangGraph 约束 | 用户提出 Worktree 顶层索引与群组 App 体系 |
+| v2.2 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 导航修订为先选 Project，再展示项目 Worktree 清单，展开 Worktree 后显示同级 Group Apps；补充多 Agent Worktree 可见性和受控管理要求 | 用户澄清产品核心是解决多 Agent Worktree 混乱与内部管理不可控 |
+| v2.3 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 固定 Project Worktree Index / Group 的可访问入口与深链验收，禁止 Worktree Index 被通用任务列表路由替代 | 浏览器验收发现 `/worktree` 被重定向到 Sprint 树视图 |
+| v2.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 规定 Project Index 深链必须携带 `project_id`，缺少/无效 Project 时不静默回退到另一项目，并将该路由行为纳入 AC-WTG-004 | Group 路由和实施计划复核发现项目入口需保留所选 Project，且无参数不应默认切换项目 |
