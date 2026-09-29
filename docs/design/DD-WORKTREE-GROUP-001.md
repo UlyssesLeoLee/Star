@@ -1,8 +1,8 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project Worktree 管理与 Group Apps 详细设计 v0.1**
+> **渡口 Project Worktree 管理与 Group Apps 详细设计 v0.6**
 >
-> - 状态：🟡 Draft（交互、上下文与安全契约已定义；后端实现与集成验收未完成）
+> - 状态：🟡 Draft（Phase 2B/2C/2D 与 Phase 3B Canvas migration/API 代码切片已实现并编译；Phase 3 前端 API 接线、Canvas Outbox consumer、Canvas 创建 WorkItem 命令、数据库部署、ACL/RLS 负向验收与历史归属回填待完成）
 > - 日期：2026-09-29
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - 上位需求：[`docs/requirements.md`](../requirements.md) v2.4 §50
@@ -24,7 +24,7 @@
 4. 创建、归属调整、归档和清理 Worktree 可审计、并发安全，并能处理运行中 Agent、CLI 与 Git 锁。
 5. 需求 §50 的 AC-WTG、AC-TCI、AC-CAN、AC-CHAT、AC-PLG 与 AC-TRACE 均通过服务端集成验收。
 
-当前 UI 是基于浏览器 seed 的预览；WorkItem REST 路由的 Actor 注入、Project/Worktree ACL 与持久化仍是 release blocker。
+当前 UI 仍是浏览器 seed 预览。生产 Group API 已有认证、Project ACL、WorkItem 持久化/生命周期和 Worktree Index/管理命令代码；但 migration 未应用、Project membership 未初始化、负向集成验收未运行，因此这些接口仍不可作为已启用生产能力。
 
 ## §1 范围与导航契约
 
@@ -89,19 +89,15 @@ Worktree Domain 持有 Worktree lifecycle 与 checkout 引用；WorkItem Domain 
 
 ```text
 WorktreeIndexItem {
-  worktree_id, project_id, repository_id,
-  display_name, branch, base_branch,
-  lifecycle_status, health_status,
-  owner_user_id?, owner_display_name?,
-  active_agent_session_id?, active_agent_name?, active_agent_status?,
-  active_runtime_id?, runtime_status?,
-  pull_request_ref?, conflict_summary?, lock_summary?,
-  recent_activity_at?, recent_activity_kind?,
-  lock_version, allowed_actions[]
+  worktree_id, project_id, workspace_id, repository_id,
+  name, path, parent_id?, branch, human_state, machine_state,
+  owner_user_id?, work_item_id?, agent_id?, agent_session_id?, runtime_id?,
+  ahead, behind, dirty, health_score, test_state, risk_count,
+  locked, archived, pull_request_url?, version, created_at, updated_at
 }
 ```
 
-`owner_user_id` 表示人类责任归属；`active_agent_session_id` 表示当前自动化执行，二者不得互相替代。历史 Agent Sessions 通过分页详情 API 获取。缺失字段显示“未绑定/未知”，不得根据分支名或运行进程推断 owner。
+当前 API 投影只返回上述持久字段；Agent / Runtime 展示名、运行状态、冲突摘要、锁来源和历史 Session 列表仍待专用权威数据源。`owner_user_id` 表示人类责任归属；`agent_session_id` 表示会话关联，二者不得互相替代。缺失字段显示“未绑定/未知”，不得根据分支名或运行进程推断 owner。
 
 Index 行上的状态由独立字段组成：Worktree lifecycle、健康探测、Agent Session、Runtime、Git 冲突、Git lock 与 PR 状态。不得将 WorkItem status 当成 Worktree status，也不得把没有冲突证据显示成“无冲突”。
 
@@ -123,20 +119,29 @@ GroupContext 是服务端解析结果，只能在一次已授权请求中使用�
 
 ## §4 API 契约
 
-所有 `/api/v1` 业务 API 使用已验证 Bearer JWT。响应使用统一 REST envelope 和 cursor 分页；每个写命令带 `Idempotency-Key`、`If-Match` 或显式 `expected_version`、`correlation_id`。请求体不得接受 `actor_id`、`tenant_id`、`roles` 或 `granted_scopes` 作为授权来源。
+所有生产 Group API 使用已验证 Bearer JWT。Index 使用有界 cursor 分页；Task Card 列表当前是有界 limit。成功响应目前为 JSON projection，统一 envelope 尚未接入。每个写命令须带 `Idempotency-Key`，状态转移 / Worktree 管理另带 `expected_version`；未提供 `correlation_id` 时由服务端生成。请求体不得接受 `actor_id`、`tenant_id`、`roles` 或 `granted_scopes` 作为授权来源。
 
 | Method / path | 用途 | 必要授权 | 关键结果 |
 |---|---|---|---|
-| `GET /api/v1/projects/{project_id}/worktrees` | Index 分页与筛选 | `project:read` + Project membership | `WorktreeIndexItem[]`, `next_cursor`, `snapshot_version` |
-| `GET /api/v1/worktrees/{worktree_id}/group-context` | 打开 Group 前取得服务端上下文与 App grants | `worktree:read` + Project membership | `GroupContextProjection`, `apps[]`, `allowed_actions[]` |
-| `POST /api/v1/projects/{project_id}/worktrees` | 受权注册/启动 Worktree | `worktree:create` + Repository access | `worktree_id`, lifecycle operation ref |
-| `POST /api/v1/worktrees/{worktree_id}/owner` | 变更人类 owner | `worktree:manage` + 目标用户 Project membership | 新 owner、版本、Audit ref |
-| `POST /api/v1/worktrees/{worktree_id}/archive` | 可恢复归档 | `worktree:manage` | `operation_id`, `new_version`, 资源保留策略 |
+| `GET /api/v1/projects/{project_id}/worktrees` | Index 游标分页与 owner/state/archive 筛选 | `project:read` + Project membership | Worktree 投影、`next_cursor` |
+| `GET /api/v1/worktrees/{worktree_id}/group-context` | 打开 Worktree Group 前解析当前上下文 | `worktree:read` + Project membership | `group_context` 与 Worktree 投影；尚无 `apps[]` / `allowed_actions[]` |
+| `POST /api/v1/worktrees/{worktree_id}/work-items` | 创建 Task Card / canonical WorkItem | `work-item:write` + Project writer role | 任务、Task Card 同 ID，初始 `pending`, version 1 |
+| `GET /api/v1/worktrees/{worktree_id}/work-items` | Task Card / Multica 当前 Worktree 任务列表 | `work-item:read` + Project membership | 有界列表、canonical `work_item_id` 与 lifecycle version |
+| `GET /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}` | 读取 Task Card | `work-item:read` + 当前 Worktree association | metadata + Multica lifecycle projection |
+| `POST /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/lifecycle` | 更新 Multica 六态 | `work-item:write` + Project writer role | version 检查、幂等响应、Transaction audit |
+| `GET /api/v1/worktrees/{worktree_id}/canvases` | 查询当前 Worktree 的 Canvas | `worktree:read` + `canvas:read` + Project membership | 仅返回当前 Worktree registry 与元素数量 |
+| `POST /api/v1/worktrees/{worktree_id}/canvases` | 创建 Worktree-owned Canvas | `worktree:read` + `canvas:write` + Project writer role | `Idempotency-Key`；Canvas Master version 1；同事务 Audit / Outbox |
+| `GET /api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/elements` | 读取 Canvas 元素和当前可解析 EntityRef | `worktree:read` + `canvas:read` + Project membership | stale/越界 WorkItem 关联不解析；无 `work-item:read` 时隐藏 WorkItem ref；详情由 canonical WorkItem API 授权读取 |
+| `POST /api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/elements` | 创建 Canvas 元素，可同时绑定 typed EntityRef | `worktree:read` + `canvas:write` + Project writer role；绑定 WorkItem 另需 `work-item:read` | `Idempotency-Key`；元素/EntityRef Master 与 Audit / Outbox 同事务 |
+| `PUT` / `DELETE /api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/elements/{element_id}` | 更新布局或逻辑移除元素 | 同上，另带 `expected_version` | SCD2 版本条件更新；DELETE 关闭当前版本，不物理删除 |
+| `PUT` / `DELETE /api/v1/worktrees/{worktree_id}/canvases/{canvas_id}/elements/{element_id}/entity-ref` | 设置、替换或解除元素的 typed EntityRef | 同上，另带 EntityRef `expected_version`；绑定 WorkItem 需 `work-item:read` | WorkItem 必须是同 tenant/project 且当前关联当前 Worktree 的 canonical WorkItem |
+| `POST /api/v1/worktrees/{worktree_id}/management-plans` | 预览 owner reassignment 或归档 / 恢复 | `worktree:manage` + `tenant_admin` / `project_admin` | 5 分钟 plan；必须带 `Idempotency-Key` 与当前 version |
+| `POST /api/v1/worktrees/{worktree_id}/management-plans/{plan_id}/confirm` | 确认 Worktree owner / archived 变更 | 同一 requester、当前 membership、原 version | 版本条件更新、Owner SCD2、不可变 Audit |
 | `POST /api/v1/worktrees/{worktree_id}/cleanup/plan` | 生成清理预检 | `worktree:cleanup` | 只读检查、阻断原因、短期 `plan_id` |
 | `POST /api/v1/worktrees/{worktree_id}/cleanup/confirm` | 执行过期清理计划 | `worktree:cleanup` + 二次确认 | 幂等 operation result 与 Audit ref |
 | `GET /api/v1/worktrees/{worktree_id}/agent-sessions` | 查询 Agent Session 历史 | `agent-session:read` + 同一 GroupContext | cursor 分页与当前/历史标记 |
 
-WorkItem 的读写继续走 WorkItem Domain API。Index / Group API 不绕过 WorkItem Command Port，不新增第二个 WorkItem endpoint owner。当前 REST work-item route 仍用 `auth_layer_stub`、默认 `ActorContext` 和 `InMemoryWorkItemService`，因此在这些实现替换前不作为生产数据源。
+新增 Group Task API 在一个 PostgreSQL transaction 内协调 Task metadata、Multica lifecycle、Worktree association、idempotency 和 audit；任务读写同时校验授权 Worktree、关系 Project 与 canonical metadata Project 一致，阻断 tenant 内跨 Project 的错误关联。Worktree 与 Project binding 在请求事务中加共享锁，避免上下文解析期间改变归属。legacy `/api/v1/work-items` 仍是 no-op auth / 默认 Actor / `InMemoryWorkItemService`，生产二进制不挂载该旧路由。当前协调逻辑仍在 REST crate，尚未抽成 WorkItem Command Port / PostgreSQL adapter；因此 2C 是可编译的持久化实现切片，不等于 Domain 架构门已关闭。Jira 外部同步与 alias adapter 仍待后续阶段。
 
 ### 4.1 错误映射
 
@@ -148,6 +153,29 @@ WorkItem 的读写继续走 WorkItem Domain API。Index / Group API 不绕过 Wo
 | 幂等键重复 | 原操作状态码 | 返回同一 operation 结果，不重复创建副作用 |
 | 已有 Agent / CLI / Git 操作阻止归档清理 | 409 | 返回明确、无敏感内容的阻断类型 |
 | 资源依赖不可用 | 503 | 可重试字段与 correlation ID；不伪造成功 |
+
+### 4.2 Phase 2B/2C/2D 已实现的生产路由（部署门未关闭）
+
+生产二进制只挂载下列 Group API；保留的 build_router() 是旧路由骨架，不能用于生产 Group Shell 数据源。
+
+| Method / path | 验证 | 实际行为与边界 |
+|---|---|---|
+| GET /api/v1/projects/{project_id}/worktrees | RS256 Bearer；project:read；active Project Role Binding | 服务端 tenant + project 过滤；owner/state/archive 筛选；按 `(updated_at,id)` 倒序 cursor 分页，cursor 绑定当前查询参数 |
+| GET /api/v1/worktrees/{worktree_id}/group-context | RS256 Bearer；worktree:read；当前 Project membership | tenant-scoped Worktree 投影、Actor、成员角色、granted scopes、membership version 和 permission snapshot ref；当前不返回 App Registry / allowed actions |
+| POST /api/v1/worktrees/{worktree_id}/work-items | RS256 Bearer；work-item:write；developer / project_admin / tenant_admin / agent membership role | 同一事务创建 canonical WorkItem metadata、pending lifecycle、Worktree association、created audit 和幂等结果；`task_card_id = work_item_id` |
+| GET /api/v1/worktrees/{worktree_id}/work-items[/{work_item_id}] | RS256 Bearer；work-item:read；当前 Project membership | 当前 Worktree association 限定 Task Card 读列表或详情；列表最多 100 条 |
+| POST /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/lifecycle | RS256 Bearer；work-item:write；writer membership role | Multica 六态合法转移、active Worktree 绑定、`expected_version`、`Idempotency-Key`、correlation ID 和 append-only audit 在一个事务中处理；claim lease 与终态期限使用 PostgreSQL 时钟，completed/failed/cancelled 设置保留期限，failed → pending 清除终态期限 |
+| POST /api/v1/worktrees/{worktree_id}/management-plans | RS256 Bearer；worktree:manage；tenant_admin / project_admin | 只允许转派 owner 或设置 archived；检查目标 owner membership、Worktree version；确认截止时间由 PostgreSQL 时钟生成，5 分钟确认窗 |
+| POST /api/v1/worktrees/{worktree_id}/management-plans/{plan_id}/confirm | RS256 Bearer；同一 requester + 当前 membership + expected version | 同一事务更新 Worktree projection、owner SCD2、管理 Transaction audit 与 plan 状态；已绑定 AgentSession/Runtime 时拒绝归档 |
+| 错误处理 | invalid actor / scope / UUID / resource / version | 未授权成员与不存在目标统一 404；缺 scope 403；冲突 409；数据库错误为不含 SQL/行内容的通用 500 |
+
+### 4.3 Phase 3B Canvas 路由代码切片（尚未部署）
+
+上述 Canvas endpoints 已接入 Group router 并通过 crate 编译，但对应 Phase 3 migration 尚未应用到目标数据库，不能视为已部署能力。它们复用当前 Worktree Project binding、active membership、writer role 和事务级 RLS scope；所有写入需要 `Idempotency-Key`，元素与 EntityRef 更新需要 `expected_version`。EntityRef 只暴露 canonical type/ID/scope；当前调用者缺少 `work-item:read` 时，Canvas 元素响应不返回 WorkItem ref，任务详情须再通过 canonical WorkItem API 校验。
+
+AuthenticatedUser 拒绝 sub 与 user_id 不一致或 nil tenant/user。JWT roles 不作为 Project ACL；角色从 permission.project_role_binding 实时读取。每次查询在事务内设置 app.tenant_id，并显式加 tenant/project 条件以配合 Worktree RLS。成员表尚无 Project 外键（仓库尚无 PostgreSQL Project SoR）；现存 Worktree 的 project_id 为 NULL 时不会进入 Index，不能从 task_id 或 branch 猜测。
+
+Phase 2B/2C/2D migrations 均为 additive；不运行旧的破坏性 Worktree migration。migration 未应用；membership provisioning、历史 Worktree Project/Owner/WorkItem reconciliation、跨 tenant/project 负向集成、并发重放与真实 RLS 测试尚未完成。旧 Worktree 行的空 project/owner/task link 不做推断回填。
 
 ## §5 认证与 GroupContext 授权流程
 
@@ -175,17 +203,17 @@ HTTP request
 
 ### 6.1 Index 管理动作
 
-每个 Worktree 返回 `allowed_actions[]`；前端按该字段展示动作，但服务端在执行时再次授权。Phase 1 只读展示，Phase 2 起实现动作。
+GroupContext 当前尚未返回 `allowed_actions[]`。Phase 2D 已实现的 plan/confirm API 由服务端重新检查 scope、当前成员角色、Worktree version 和目标 owner membership；UI 仍是 preview，不能把动作显示成已接通。
 
 | 动作 | 预检 | 写入规则 |
 |---|---|---|
-| 创建 / 导入 | Project 与 Repository 可访问；路径 / 分支不冲突；Runtime 可达 | Idempotency-Key，Domain 创建 operation，写 Audit / Outbox |
-| 转派 owner | 目标用户仍是该 Project member；无策略冲突 | 乐观锁 `lock_version`；记录 before/after 与 actor |
-| 归档 | 无未处置的会话；PR/任务/Canvas 引用按保留策略处理 | 先标记 archived 并停止新执行；不物理删除业务事实 |
+| 创建 / 导入 | Project 与 Repository 可访问；路径 / 分支不冲突；Runtime 可达 | 当前未实现；待 Worktree lifecycle / Runtime provisioning API |
+| 转派 owner | `tenant_admin` / `project_admin`；目标用户仍是该 Project member | 已实现 5 分钟 plan/confirm、expected version、SCD2 owner assignment 与 before/after Audit |
+| 归档 / 恢复 | `tenant_admin` / `project_admin`；已有 AgentSession / Runtime 关联时拒绝归档 | 已实现 plan/confirm、expected version、保留截止时间与 Audit；检查当前只按关联 ID 非空保守拒绝，未接 Runtime 活跃状态查询 |
 | 清理 | 先跑 plan：Agent / CLI inactive、Runtime detached、Git lock absent、保留策略满足 | 仅使用未过期 plan；二次确认、幂等执行、审计实际 Git 操作 |
 | 取消 / 恢复 | operation 与当前 lifecycle 匹配 | 版本条件更新，记录恢复来源和失败原因 |
 
-归档与 Git worktree 物理清理是不同操作。存在 active run、未释放 Runtime、未知 Git lock 或无法查询状态时，清理一律拒绝；不通过“强制”开关绕过。清理预检需短 TTL；计划过期后必须重新计算。
+归档与 Git Worktree 物理清理是不同操作。Phase 2D 只做数据库归档标志，不运行 `git worktree remove`，也不探测 Git lock；在 Agent / CLI / Runtime 状态数据源和 cleanup plan 接通前，清理动作不可用。已绑定 Session / Runtime 的 Worktree 目前一律不允许归档，避免把未知状态误认为空闲。
 
 ### 6.2 并行 Agent 可见性
 
@@ -195,17 +223,23 @@ Index 同时呈现一个 Worktree 的 owner、当前 Agent、活跃 Runtime、PR
 
 ## §7 Task Card、CLI 与 Multica/Jira 联动
 
-1. WorkItem ID 是 Multica、Jira 视图、Task Card 与 Canvas 共同的 canonical ID；Task Card 不复制状态机。详情、负责人、状态、priority 与 lock version 从 WorkItem projection 读取。
+1. Phase 2C 新 API 使用一个 canonical `work_item_id`，`task_card_id` 等于该 ID；WorkItem metadata 与 Multica 六态 lifecycle 分表持久化。响应中的 `lifecycle.version` 是 Multica 当前版本。旧三态 `domain-work-item::InMemoryWorkItemService` / legacy REST 不作为生产 Group 数据源。
 2. Task Card 打开时展示当前 Group Worktree。若 WorkItem 未关联当前 Worktree，允许查看并提示关联/选择 Worktree；在关联确认之前不允许启动 CLI、Agent 或写入 Worktree 文件。
 3. 服务端构造 `TaskExecutionContext { actor, project_id, repository_id, worktree_id, work_item_id, runtime_id, approved_profile_id, policy_version, expiry, nonce }`。路径、命令白名单、环境变量和 Secret 句柄均由服务端 policy 与 Runtime 配置派生，客户端不能提交可覆盖值。
 4. Local Runtime 只接受短期、签名且一次性的 session grant；启动、输入、退出和 session 重连均重新验证范围。审计记录 session ID、命令类别、结果摘要和退出码，不把任意终端内容复制进 WorkItem 描述。
-5. Multica 维护 execution / review / poison / stale-dispatch 专属生命周期；Jira Board/Backlog/Sprint 展示可规划的 WorkItem 字段。两者通过 canonical WorkItem ID 与领域事件更新 Task Card，不能彼此覆盖状态事实。
+5. 当前实现支持 pending → claimed → in_progress → completed / failed / cancelled 与 failed → pending 的状态转移，`review_state` 独立保存在表中；Review Gate、poison/stale-dispatch、Jira 外部 alias/sync、Outbox 与事件 adapter 尚未落地。不能宣称 Multica/Jira 已接通，只能确认 canonical persistence contract 与 API 第一切片已实现。
 
 ## §8 Canvas、Chat、LangGraph 与 Plugin 的交互契约
 
 ### 8.1 Canvas
 
-Group Canvas 与 Task Card、Multica、Jira 同级；Canvas Element 仅持有带类型 `EntityRef`，不持有 WorkItem 状态副本。双击任务 Element 导航到 `app=task-card&work_item_id={id}`；“创建任务”“变更状态”“建立关系”须走实体 owner 的 Application Command，再由 Outbox 更新 Canvas 与其它投影。Project 级 Worktree Overview Graph 与 Worktree Group Infinite Canvas 分路由、分查询范围、分用户目的。
+Group Canvas 与 Task Card、Multica、Jira 同级；Canvas Element 仅持有带类型 `EntityRef { ref_type, ref_id, worktree_id }`，不持有 WorkItem 状态副本。Canvas registry 以当前 Worktree 为唯一查询边界；`project` / `free` Canvas 和旧元素中的裸 `work_item_id` 不构成 Worktree 绑定证据。双击任务 Element 导航到保留当前 Worktree 的 `app=task-card&work_item_id={id}`；后端须同时验证 EntityRef 的 `worktree_id`、当前 Worktree 的 canonical WorkItem association 与 Project ACL。“创建任务”“关联任务”“变更状态”“建立关系”须走对应事实 owner 的 Application Command，再由 Outbox 更新 Canvas 与其它投影。Project 级 Worktree Overview Graph 与 Worktree Group Infinite Canvas 分路由、分查询范围、分用户目的。
+
+Phase 3B migration 将 `canvas.group_canvas_registry`、`canvas.canvas_elements_backend`、`canvas.canvas_entity_ref` 定义为 Master/SCD2；`canvas.canvas_group_audit` 与 `canvas.canvas_group_outbox` 是 Transaction/append-only。新 Group API 支持 Worktree Canvas 查询/创建、元素查询/创建/版本更新/逻辑移除、EntityRef 设置/替换/解除。读写均先验证 JWT actor、Worktree 所属 Project 与当前 membership，再设置事务级 `app.tenant_id` / `app.worktree_id` 供 RLS 使用；写命令还需 `canvas:write` 和 Project writer role。Phase 3B 当前只接受 canonical `work_item` 与当前 `worktree` 两类 EntityRef；Jira issue 引用要等 Jira alias/SoR contract 落定后扩展。任务 EntityRef 只解析到同 tenant/project、当前 Worktree association 下同时存在 canonical metadata 与 Multica lifecycle 的 WorkItem；写入或读取 WorkItem 引用还需 `work-item:read`，否则元素响应隐藏此类引用。Canvas `content` 不得另存身份 ID；任务卡元素和 Worktree 节点必须分别绑定同类 typed EntityRef。
+
+元素与 EntityRef 的 SCD2 变更、append-only Audit、Outbox 和幂等响应在同一 PostgreSQL transaction 提交。事件携带 actor、correlation ID、Worktree / Project scope 与 aggregate version；元素与其 EntityRef 共用单调递增的 Element version，EntityRef 自身版本另放入事件 payload，Canvas registry 事件使用 Canvas version。Canvas API 不更新 Multica lifecycle；任务状态仍走 WorkItem Lifecycle Command。当前仍未实现 Canvas Outbox consumer/realtime 投影、从 Canvas 发起 WorkItem Command、Canvas/Jira relation command 或 Canvas 前端 API 接线；迁移尚未在数据库应用，因此这些 API 是未部署代码切片。
+
+Phase 3A 前端切片只加载 `Canvas.ref_kind=worktree && Canvas.ref_id=current_worktree_id`，任务深链要求显式 typed EntityRef 与当前 Worktree task association；旧 Project / Free seed 不自动迁移。Canvas UI 仍读 mock store，未绑定当前 Worktree 的任务不显示 CLI 入口。当前空状态继续提示尚未连接生产 API，不能据此验收 Phase 3。
 
 ### 8.2 Group Chat 与 LangGraph
 
@@ -254,18 +288,22 @@ correlation_id, occurred_at, payload
 
 ## §10 持久化分类约束（W/T/M）
 
-本 DD 不新增物理表；下列为落库时的主分类，DDL 必须在 Data Design 阶段对每张表逐表确认，不能照搬 UI projection：
+Phase 2B-2D 与 Phase 3B migrations 按事实表分类；旧 `worktree_canvas_worktree` 仍是 Work 当前投影，新增的 project/owner 字段仅作 denormalized read projection，权威 Master 事实分别存储在 `worktree_project_binding` 与 `worktree_owner_assignment`。空投影仍需显式 reconciliation：
 
 | 数据事实 | 主分类 | 约束 |
 |---|---|---|
-| Worktree 注册元数据与人类 owner 历史 | Master | SCD Type 2；物理删除禁止；RLS 13 类必携 |
-| Agent / CLI run、审计、Outbox、状态变更历史 | Transaction | Append-only；物理删除禁止；Audit + RLS 13 类必携 |
-| 当前 Runtime lease、临时健康探测、清理预检 plan | Work | 显式 `retention_period` / expiry；允许按 TTL 清除，不承载唯一业务事实 |
+| `permission.project_role_binding`、`multica.worktree_project_binding`、`multica.worktree_owner_assignment`、`multica.task_metadata`、`multica.work_item_worktree` | Master | SCD2 `valid_from/valid_to/version`；禁止物理删除；RLS。当前只有 Project/owner 管理写 API，Task metadata SCD 更新待 Domain adapter |
+| `worktree_canvas_worktree` 与 `multica.task_lifecycle_current` | Work | 当前运行 / lifecycle projection；`retention_period` + nullable `expires_at`；终态 completed/failed/cancelled 设期限，重试回 pending 清除期限；不承载 owner 历史或唯一审计事实 |
+| `multica.task_command_idempotency`、`multica.worktree_management_plan` | Work | 30 天 retention；管理 plan 确认窗 5 分钟；允许按 TTL 清理 |
+| `multica.task_lifecycle_audit`、`multica.worktree_management_audit` | Transaction | Append-only；RLS；拒绝 UPDATE/DELETE；生命周期审计同事务写入 |
+| `canvas.group_canvas_registry`、`canvas.canvas_elements_backend`、`canvas.canvas_entity_ref` | Master | Worktree scoped SCD2；RLS 同时限制 tenant/worktree；每个 Canvas element 至多一个 current EntityRef；物理删除禁止 |
+| `canvas.canvas_group_audit`、`canvas.canvas_group_outbox` | Transaction | 同一业务事务内 append-only；RLS 同时限制 tenant/worktree；consumer offset / realtime 投影另行实现 |
+| `worktree_canvas_worktree.project_id / owner_user_id / work_item_id` | Work 投影（混合字段已知缺口） | Project / owner 的事实分别在独立 Master 表；这些 nullable 列仅作旧 Index 查询投影，不可推断回填；须由受控 reconciliation 维持一致 |
 | GroupContext | Derived projection（不持久化授权快照） | 需要缓存时为 Work/短 TTL；撤权后失效，不可恢复授权 |
 | Plugin manifest / Project enablement / capability grant | Master | 版本化、审计变更；撤权立即作用于新调用 |
 | Chat message / LangGraph run checkpoint | Transaction + Work 分表设计 | 用户可见消息保留策略独立于可过期 checkpoint；两者不可混成一个无期限 blob |
 
-具体数据库表名、外键、索引、RLS、保留期和迁移脚本由 Data Design + Security Design 评审冻结；每张新增表都须单独标注 W/T/M 与派生规则。
+Phase 2 migrations 已逐表加入 tenant RLS；Master 表无 DELETE policy，Transaction 表仅有 SELECT/INSERT policy 且拒绝 UPDATE/DELETE，Work 表记录 retention。仍未覆盖仓库守门要求的完整 RLS policy 分类与 PostgreSQL 真实实例验证；不得据此宣称 W/T/M / Security release gate 已全部通过。
 
 ## §11 关键验收映射
 
@@ -284,34 +322,40 @@ correlation_id, occurred_at, payload
 
 ## §12 实施顺序与阻断门
 
-1. **2B 认证 Actor 与 GroupContext**：把已验证 Authenticated Actor 注入业务请求；移除默认 Actor；建立 Project membership 和 Worktree ownership resolution；未经授权的 Index / Group API fail closed。
-2. **2C 持久化与 WorkItem closure**：实现 WorkItem PostgreSQL repository / migration，对齐 Multica lifecycle、WorkItem status 与 W/T/M；先实现 list/get/transition，再启用 UI 读写。
-3. **2D Worktree Index 投影与安全管理**：接入 owner、Session、Runtime、PR、冲突/锁和 Audit；先实现 read-only，再按 §6 打开受权操作。
-4. 每个子阶段通过权限负向用例、跨 Tenant/Project 隔离、并发版本冲突、幂等重试、审计和真实 API 集成验收后，才能启用下一项写能力。
-5. Group UI 在 2B 与 2C 完成前保持 `preview / seed / not connected` 提示；不把浏览器 store 的变化作为产品事实。
+1. **2B 代码切片完成**：RS256 Actor、scope、Project membership 查询、GroupContext、Project/owner Master binding DDL。部署、membership provisioning、历史数据 reconciliation 和跨 Tenant/Project 负向集成仍是启用门。
+2. **2C 代码切片完成**：canonical task metadata、Worktree relation、Multica 六态 current projection、幂等 command 和 append-only audit；REST SQL coordinator 尚未抽到 Domain/PostgreSQL adapter，Review Gate、Jira alias/sync 与 UI 读写仍未启用。
+3. **2D 代码切片完成**：cursor Index、owner/archived plan-confirm、owner SCD2 和 management audit。创建/导入、Git lock/Runtime 活跃探测、Session drain、物理清理与恢复仍未实现。
+4. 完成 migration apply + 项目成员 provisioning 后，运行跨 Tenant/Project ACL 负向、数据库 RLS、并发 version conflict、同键幂等重放、审计不可变性和 API 集成验收，才能关闭生产写能力 gate。
+5. Group UI 仍显示 `preview / seed / not connected`；直到它使用这些 production API 并完成跨 App 浏览器验收，不把 browser store 变化作为产品事实。
 
 ## §13 已知缺口与实现前置
 
 | # | 缺口 | 影响 | 关闭条件 |
 |---|---|---|---|
-| 1 | REST work-item routes 使用 no-op `auth_layer_stub`、默认 actor 和 `InMemoryWorkItemService` | API 不能承载生产 Group App 数据 | Actor extractor、Project ACL、持久 repository 落地并通过负向验收 |
-| 2 | WorkItem Domain 只有三态 `InMemoryWorkItemService`；Multica 详细设计使用六态 lifecycle 和独立 review state | 命令与迁移映射不一致 | 确认 canonical 写模型、迁移来源和状态映射后实现 PG repository |
-| 3 | Worktree projection 缺 `owner_user_id`，当前列表只读出 session/runtime 引用 | 多 Agent 人类责任归属不可控 | 指定 owner 事实源、owner 转派审计与历史查询 API |
-| 4 | `GroupContextResolver`、EntityRef 授权与统一 `allowed_actions` API 未落地 | 跨 App 可能出现上下文混用 | middleware / application port 与跨 Project 拒绝验收 |
-| 5 | 清理操作的 Git lock 探测、agent/terminal drain 和恢复策略未定 | 清理可能破坏活动工作 | Worktree cleanup ADR + plan/confirm API + 故障恢复演练 |
-| 6 | Canvas Group 数据仍由 Project seed 取得 | Canvas 与当前 Worktree 范围不一致 | Worktree-scoped query/migration 完成，跨 Worktree overview 保持独立 |
+| 1 | 新 Group WorkItem coordinator 仍在 REST crate 直接 orchestrate SQL；旧 domain-work-item 是三态内存 service | Domain Command Port / PG adapter 的边界尚未完成；旧 `/work-items` 不可用作生产 | 抽出同事务 WorkItem Command / Multica Lifecycle application port，并用 PG repository 实作；完成 API 兼容迁移 |
+| 2 | 当前六态 API 只有状态转移；Review Gate、review command、Task metadata 更新和 Jira external alias/sync 未实现 | 任务流程与 Jira adapter 尚不完整 | 接入 DD-MULTICA §14 review/metadata port、alias registry + sync/outbox，跨 App 实测同一 ID/version |
+| 3 | 旧 Worktree projection 保留 `project_id` / `owner_user_id` denormalized columns；权威 Project / Owner SCD2 表已创建 | 历史投影与 Master binding 需保持一致；旧 owner/Project 行未回填 | provisioning/reconciliation 同事务维护 Master 与投影；历史映射有审计证据 |
+| 4 | GroupContext 只返回 context 与 Worktree，没有 App Registry / `allowed_actions[]`；Canvas、Chat、LangGraph、Plugin API 仍未落地 | Worktree group shell 仍无法真实完成跨应用交互 | 接入 Registry / EntityRef resolver 与各 App API，权限测试覆盖每个入口 |
+| 5 | 当前 archive guard 仅根据 AgentSession/Runtime reference 是否为空；没有 Git lock、活跃会话、Runtime drain 状态源 | 对有过绑定但已结束的 Runtime 也会保守拒绝；不能安全执行物理清理 | 接 Agent/Runtime/Git 权威状态、cleanup plan/confirm、恢复策略与故障演练 |
+| 6 | Phase 3B Canvas migration/API 代码已实现，但 migration 未部署；UI 仍用 mock store，Outbox consumer、Canvas 发起 WorkItem Command、Jira relation command 尚未实现 | Canvas 仍不能在已部署系统中创建/协同 Task Card、Multica 或 Jira | 评审并应用 migration；接线前端 API 与 Outbox consumer；Canvas 创建/关联任务只走事实 owner Command；对旧 Project Canvas 做审计分类，歧义项隔离，不自动迁移；完成跨 Worktree/Project ACL 与 RLS 负向验收 |
 | 7 | LangGraph SDK/checkpointer 和 Plugin sandbox/revocation ADR 未冻结 | 无法安全恢复流程或热拔除插件 | SDK/API compatibility review 与运行时撤权演练通过 |
+| 8 | 2B/2C/2D migrations 未应用；Project SoR / Role Binding provisioning API 尚不存在，Worktree 历史 scope/owner/work-item association 未回填 | 代码可编译，但无可用 membership 和可信历史映射；数据库 RLS / FK 未真实验证 | 在目标数据库评审并应用 migrations；通过受控 provisioning 建立 M bindings，审计 reconciliation，并完成跨 tenant/project/RLS 负向集成 |
 
 ## §14 审阅栏与修订履历
 
 | 角色 | 状态 |
 |---|---|
-| 架构 | Draft；Mavis 接手审核，待 Phase 2B/2C 实证后复审 |
+| 架构 | Draft；Mavis 接手审核，Phase 2B-2D 与 Phase 3B 代码切片完成，待 DB / ACL / Domain Port / UI API / Outbox consumer 验收 |
 | SRE Lead | 待详细验证：故障切换、事件积压与 Runtime 清理恢复 |
-| 平台 | 待详细验证：JWT state 注入、ACL、RLS 与部署配置 |
-| 评审主持 | Draft；实现前检查跨 App 事件和错误映射 |
-| PM | Draft；确认 Index 管理动作与发布范围 |
+| 平台 | JWT / scope / ACL、Task lifecycle 与 Index 管理 API 可编译；需验证密钥部署、迁移、RLS 与数据回填 |
+| 评审主持 | Draft；检查事务边界、幂等重放、跨 App 事件和错误映射 |
+| PM | Draft；确认 production API 接入、Jira sync 与清理策略的发布范围 |
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.1 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 Project → Worktree → Group Apps 详细交互、安全上下文、管理操作、CLI、Canvas、Chat/LangGraph、Plugin、事件与 W/T/M 实施门；记录 REST no-op auth 与 in-memory blocker | 推进 Worktree Group Phase 2，并依据 Worktree Index 当前实现核对 API 安全边界 |
+| v0.2 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 落地 RS256 actor 校验、Project scope + active membership、租户 RLS GroupContext resolver 与只读 Index/Group 路由；定义 2B migration 和未回填数据边界 | 推进 Worktree Group Phase 2B；落实 Project → Worktree Index → Worktree 同级应用架构 |
+| v0.3 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补齐 canonical WorkItem / Multica 六态持久化、幂等与追加审计，稳定 cursor Index，Worktree owner SCD2 与 archive plan/confirm；逐项标出未部署数据库、旧投影 reconciliation、Jira/Review/Runtime/Canvas/Chat/Plugin 等生产缺口 | 用户要求继续完成 Phase 2B/2C/2D，并重申 Project Worktree Index 是管理多 Agent Worktree 的主入口 |
+| v0.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 收紧 Task 关系、metadata 与授权 Project 一致性查询；GroupContext/WorkItem 请求锁定 Worktree Project 绑定；claim lease 与管理确认期限改由 DB 时钟判断；为 failed 终态补齐 Work 保留期限与重试清除语义 | 自审发现 tenant 内异常 WorkItem-Project 关系可能越过当前 Project 查询边界，并统一短期 lease / confirm deadline 时钟来源 |
+| v0.5 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义带 `worktree_id` 的 Canvas EntityRef 以及旧 Project/Free Canvas 隔离规则；前端 Group Canvas 仅接受显式 Worktree 绑定，并阻止未绑定任务的 Canvas 深链和 CLI 入口；记录 Canvas persistence/API/Outbox 尚未实现 | Phase 3 源码核对发现 Group 页面复用全局 Project Canvas seed，可能把跨 Worktree 任务当成当前上下文 |
+| v0.6 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 落地 Canvas Worktree scope migration/API 代码契约：Canvas/Element/EntityRef SCD2、Audit/Outbox append-only、幂等与版本更新、当前 WorkItem 关联解析；明确未部署数据库、未接前端 API / Outbox consumer / Canvas WorkItem Command | 用户要求继续推进 Phase 3，补齐 Canvas 与 Worktree 内 Task Card 的服务端持久化边界 |

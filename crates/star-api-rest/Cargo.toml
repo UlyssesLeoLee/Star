@@ -48,6 +48,7 @@ rsa = { version = "0.9", features = ["pem"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 pkcs8 = { version = "0.11", features = ["pem"] }
 star-pg-adapter = { path = "../star-pg-adapter" }
+sqlx = { workspace = true }
 
 # Phase B.2 (Tier 1 真实数据源: tenant / identity / permission) — per star-mcp 同源
 domain-tenant = { path = "../domain-tenant" }
@@ -98,7 +99,6 @@ graph-core = { path = "../graph-core" }
 # axum::Router::oneshot 测试 helper (per star-mcp 模式)
 tower = { version = "0.5", features = ["util"] }
 # v0.49 §14.12 IV OAuth2 路由 wire 集成测试: mock OAuth2State (lazy PgPool)
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres"] }
 
 [lints]
 workspace = true
