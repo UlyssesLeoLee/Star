@@ -17,6 +17,9 @@
 
 #![forbid(unsafe_code)] // 守门 #7
 
+pub mod ipc_adapter; // PR-241 新增: 3 adapter 子模块 (Board + Worktree + Canvas)
+use crate::ipc_adapter::{BoardAdapter, CanvasAdapter, WorktreeAdapter};
+
 /// Mock WorkItem for IPC #1 (list_work_items).
 ///
 /// P2 实战: 接 crates/domain-work-item + crates/star-workflow.
@@ -185,7 +188,60 @@ fn get_keyboard_layout() -> KeyboardLayout {
 ///   5. 不带 `unsafe` (守门 #7 `unsafe_code = "forbid"`)
 ///
 
-/// Tauri 2.0 entry point — 注册 5 IPC commands (P1 扩 1 → 5).
+/// IPC #6: Board 信息 (返 board_kind_count + swimlane_group_by_count + default_column_count)
+/// 真实: 复用 crates/domain-board (BoardKind + SwimlaneGroupBy enum)
+#[tauri::command]
+fn get_board_info() -> BoardInfo {
+    BoardInfo {
+        board_kind_count: BoardAdapter::board_kind_count(),
+        swimlane_group_by_count: BoardAdapter::swimlane_group_by_count(),
+        default_column_count: BoardAdapter::default_column_count(),
+    }
+}
+
+/// IPC #7: Worktree 信息 (返 worktree_status_count + health_dimensions)
+/// 真实: 复用 crates/domain-worktree (WorktreeStatus enum)
+#[tauri::command]
+fn get_worktree_info() -> WorktreeInfo {
+    WorktreeInfo {
+        worktree_status_count: WorktreeAdapter::worktree_status_count(),
+        health_dimensions: WorktreeAdapter::health_dimensions(),
+    }
+}
+
+/// IPC #8: Canvas 引擎信息 (返 route_prefix + phase_count)
+/// 真实: 复用 crates/canvas-engine (router + Phase enum)
+#[tauri::command]
+fn get_canvas_info() -> CanvasInfo {
+    CanvasInfo {
+        route_prefix: CanvasAdapter::route_prefix(),
+        phase_count: CanvasAdapter::phase_count(),
+    }
+}
+
+/// IPC #6 payload: Board 信息
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BoardInfo {
+    pub board_kind_count: u32,
+    pub swimlane_group_by_count: u32,
+    pub default_column_count: u32,
+}
+
+/// IPC #7 payload: Worktree 信息
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WorktreeInfo {
+    pub worktree_status_count: u32,
+    pub health_dimensions: u32,
+}
+
+/// IPC #8 payload: Canvas 信息
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CanvasInfo {
+    pub route_prefix: String,
+    pub phase_count: u32,
+}
+
+/// Tauri 2.0 entry point — 注册 8 IPC commands (P1 5 → P2 8).
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -195,6 +251,9 @@ pub fn run() {
             list_canvas_entities,
             get_app_version,
             get_keyboard_layout,
+            get_board_info,
+            get_worktree_info,
+            get_canvas_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running star-desktop application");
@@ -249,5 +308,29 @@ mod tests {
         assert_eq!(layout.statuses.len(), 6);
         assert_eq!(layout.statuses[0], "todo");
         assert_eq!(layout.statuses[5], "wontfix");
+    }
+
+    // ===== PR-241 tests: 3 new IPC commands (Board/Worktree/Canvas info) =====
+
+    #[test]
+    fn get_board_info_returns_three_four_six() {
+        let info = get_board_info();
+        assert_eq!(info.board_kind_count, 3);
+        assert_eq!(info.swimlane_group_by_count, 4);
+        assert_eq!(info.default_column_count, 6);
+    }
+
+    #[test]
+    fn get_worktree_info_returns_six_four() {
+        let info = get_worktree_info();
+        assert_eq!(info.worktree_status_count, 6);
+        assert_eq!(info.health_dimensions, 4);
+    }
+
+    #[test]
+    fn get_canvas_info_returns_prefix_five_phases() {
+        let info = get_canvas_info();
+        assert_eq!(info.route_prefix, "/api/v1/canvas");
+        assert_eq!(info.phase_count, 5);
     }
 }
