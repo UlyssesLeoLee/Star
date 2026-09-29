@@ -22,9 +22,13 @@ export type CelPalette =
   | "christmas-pine"
   // ── 老上海月份牌 Shanghai Yuefenpai Palettes ──
   | "shanghai-gilt"
-  | "shanghai-jade";
+  | "shanghai-jade"
+  // ── 日式经典赛璐璐 Japanese Cel Palettes ──
+  | "cel-azure"
+  | "cel-vermilion"
+  | "cel-yellow";
 
-export type ActiveTheme = "dark" | "light" | "charisma" | "christmas" | "shanghai";
+export type ActiveTheme = "dark" | "light" | "charisma" | "christmas" | "shanghai" | "cel";
 
 export interface AnimeCelShaderProps {
   palette?: CelPalette;
@@ -298,6 +302,32 @@ const PALETTE_CONFIGS: Record<
     counterRim: "#b8282b",
     outline: "#221c16",
   },
+
+  // ── 日式经典赛璐璐 (80-90s 经典日漫手绘平涂与胶片高光) ──
+  "cel-azure": {
+    base: "#2563eb",
+    shadow: "#0f172a",
+    highlight: "#ffffff",
+    rim: "#ea580c",
+    counterRim: "#f59e0b",
+    outline: "#111827",
+  },
+  "cel-vermilion": {
+    base: "#ea580c",
+    shadow: "#270802",
+    highlight: "#ffffff",
+    rim: "#f59e0b",
+    counterRim: "#2563eb",
+    outline: "#111827",
+  },
+  "cel-yellow": {
+    base: "#f59e0b",
+    shadow: "#291500",
+    highlight: "#ffffff",
+    rim: "#ea580c",
+    counterRim: "#2563eb",
+    outline: "#111827",
+  },
 };
 
 // ============================================================================
@@ -531,7 +561,8 @@ export function AnimeCelShaderCanvas({
 
     const checkTheme = () => {
       const cl = document.documentElement.classList;
-      if (cl.contains("shanghai")) setActiveTheme("shanghai");
+      if (cl.contains("cel")) setActiveTheme("cel");
+      else if (cl.contains("shanghai")) setActiveTheme("shanghai");
       else if (cl.contains("charisma")) setActiveTheme("charisma");
       else if (cl.contains("christmas")) setActiveTheme("christmas");
       else if (cl.contains("light")) setActiveTheme("light");
@@ -571,9 +602,16 @@ export function AnimeCelShaderCanvas({
     };
   }, []);
 
-  // ── Automatic 5-Theme Masterpiece Palette Mapping ──
+  // ── Automatic 6-Theme Masterpiece Palette Mapping ──
   const activePalette = useMemo<CelPalette>(() => {
     switch (activeTheme) {
+      case "cel":
+        // 日式经典手绘赛璐璐: 纯正平涂双阶色块阴影与机械墨线 (EVA蓝 / 活力朱红 / 向日葵黄)
+        switch (palette) {
+          case "crimson": return "cel-vermilion";
+          case "gold":    return "cel-yellow";
+          default:        return "cel-azure";
+        }
       case "light":
         // Shōnen 少年原画: 宣纸白线条美学 (manga-* series)
         switch (palette) {

@@ -124,8 +124,34 @@ export const SHANGHAI_COLORS = {
   paper: "#221c16",
 } as const;
 
-/** 主题 mode (dark | light | christmas | charisma | shanghai) */
-export type ThemeMode = "dark" | "light" | "christmas" | "charisma" | "shanghai";
+/** 日式赛璐璐调色板 (80-90s 经典日漫手绘赛璐璐胶片画与机械墨线平涂) */
+export const CEL_COLORS = {
+  // 赛璐璐胶片透光暖白底
+  inkBlack: "#f8fafc",
+  inkDark: "#eef2f6",
+  inkMid: "#ffffff",
+  inkLight: "#e2e8f0",
+  // 赛璐璐活力朱红
+  vermilion: "#ea580c",
+  vermilionGlow: "#f97316",
+  // 赛璐璐 EVA 蓝
+  neonCyan: "#2563eb",
+  neonCyanGlow: "#3b82f6",
+  // 赛璐璐明黄
+  gold: "#f59e0b",
+  goldGlow: "#fbbf24",
+  // 经典紫电青紫
+  cyberPurple: "#4f46e5",
+  cyberPurpleGlow: "#6366f1",
+  // 赛璐璐描线炭灰
+  ash: "#334155",
+  ashLight: "#64748b",
+  // 赛璐璐机械转印漆黑线 (高对比文字)
+  paper: "#111827",
+} as const;
+
+/** 主题 mode (dark | light | christmas | charisma | shanghai | cel) */
+export type ThemeMode = "dark" | "light" | "christmas" | "charisma" | "shanghai" | "cel";
 
 /** Agent Game 调色板结构类型 */
 export type AgentGamePalette = Record<keyof typeof DARK_COLORS, string>;
@@ -137,6 +163,7 @@ export type AgentGamePalette = Record<keyof typeof DARK_COLORS, string>;
  *   - christmas 模式: CHRISTMAS (圣夜密林黑 + 绯红 + 松绿 + 烛金)
  *   - charisma 模式: CHARISMA (剧院黑曜深渊 + 神恩紫 + 丝绒红 + 帝国金)
  *   - shanghai 模式: SHANGHAI (象牙暖宣纸 + 旗袍朱砂红 + 翡翠墨绿 + 留声机金)
+ *   - cel 模式: CEL (日式手绘赛璐璐 + EVA天青蓝 + 活力朱红 + 胶片暖白 + 机械墨线)
  *   - 默认值: dark (per 守门 #13, dark 优先)
  *   - mount 前返回 dark (避免 hydration 闪烁)
  */
@@ -153,6 +180,8 @@ export function useAgentGameTheme() {
       mode = "charisma";
     } else if (resolvedTheme === "shanghai" || theme === "shanghai") {
       mode = "shanghai";
+    } else if (resolvedTheme === "cel" || theme === "cel") {
+      mode = "cel";
     }
 
     let colors: AgentGamePalette = DARK_COLORS;
@@ -164,6 +193,8 @@ export function useAgentGameTheme() {
       colors = CHARISMA_COLORS;
     } else if (mode === "shanghai") {
       colors = SHANGHAI_COLORS;
+    } else if (mode === "cel") {
+      colors = CEL_COLORS;
     }
 
     return {

@@ -247,12 +247,31 @@ export default function AgentsPage() {
 
             {/* Live Palette Selector Tuning Bar */}
             <div className="mt-3 bg-[var(--cel-surface-stage,#090d16)] border-2 border-black p-3 space-y-2.5 text-xs">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-[var(--cel-text-secondary,#94a3b8)] uppercase font-mono">
-                  CEL PALETTE:
-                </span>
-                <div className="flex gap-1.5">
-                  {(["crimson", "cyan", "gold", "stealth"] as CelPalette[]).map((p) => (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[var(--cel-text-secondary,#94a3b8)] uppercase font-mono">
+                    CEL PALETTE (5大主题流派):
+                  </span>
+                  <span className="text-[10px] font-mono text-[var(--cel-gold,#ffc400)] uppercase font-bold">
+                    {celPalette}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      { id: "crimson", label: "🌙 茜红 (Dark)" },
+                      { id: "cyan", label: "🌙 电光青" },
+                      { id: "gold", label: "🌙 黄金" },
+                      { id: "charisma-violet", label: "✨ 极魅紫 (HD-2D)" },
+                      { id: "charisma-crimson", label: "✨ 醉梦红" },
+                      { id: "shanghai-gilt", label: "🪭 留声金 (月份牌)" },
+                      { id: "shanghai-jade", label: "🪭 翡翠绿" },
+                      { id: "christmas-noel", label: "🎄 圣夜红 (毛玻璃)" },
+                      { id: "christmas-pine", label: "🎄 松针绿" },
+                      { id: "manga-vermilion", label: "☀️ 宣纸红 (Light)" },
+                      { id: "cel-azure", label: "🎞️ 赛璐璐蓝 (Cel)" },
+                    ] as const
+                  ).map((item) => (
                     <button
                       key={p}
                       onClick={() => setCelPalette(p)}
