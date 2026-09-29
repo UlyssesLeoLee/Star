@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v4.6 (2026-09-29)
-> **上游要件定义书**: `D:\Star\docs\requirements.md` v5.13(下文以 §N 引用)
+> **文档版本**: v4.7 (2026-09-30)
+> **上游要件定义书**: `D:\Star\docs\requirements.md` v5.14(下文以 §N 引用)
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -4207,6 +4207,8 @@ Worktree Group 固定底栏：Chat Bar(scope = WORKTREE | GLOBAL)
 
 当宿主认证 provider 已安装时，`ProjectWorktreeIndex` 使用 `GET /api/v1/projects/{project_id}/worktrees` 的服务端授权 projection，展示 owner、Agent Session、Runtime、Worktree 状态、PR、dirty/ahead/behind、health/risk 与锁版本，并支持 owner/state/archive 筛选和 `next_cursor` 续页。401/403 或网络错误进入错误态，不能混合或回退到 Zustand seed；provider 尚未装配时才显示明确标记的本地预览。`ProjectMemberDirectory` 通过 `GET /api/v1/projects/{project_id}/members` 读取当前有效成员及 Project role；仅当当前 role 是 `tenant_admin` / `project_admin` 时展示转派入口。负责人转派先选择目录成员，再向 `POST /management-plans` 提交 `assign_owner`、当前 `expected_version`、correlation 与幂等键，展示短时 plan 并等待二次确认。成员目录失败时关闭转派；确认成功后重读授权 Index，失败或过期不乐观更新。服务端仍会在 plan 与 confirm 时复核 manager role 和目标成员有效性。归档/恢复同样走短时 plan-confirm；API 当前保守拒绝仍有 Agent Session / Runtime 引用的归档。此操作不删除 Git checkout；创建/导入、停止执行和物理清理仍需独立的受权 lifecycle/API。
 
+Index 同时显示两种不同事实：数据库中的持久化 `locked` 标记，以及 `git_lock { state, source, observed_at }` 当前 Git Worktree retention lock 观测。该 Git 锁保护 Git 管理记录免遭 prune，并影响 Worktree 的移动/删除；它不是 Agent 活跃状态、文件编辑互斥锁或独占租约，unlocked 不表示 Worktree 空闲。只有可信 Host Runtime 在最近 30 秒内返回且时间戳不晚于当前时刻的 `locked` / `unlocked` 才是确定 Git 锁状态；没有 Runtime/provider、provider 失败、时间戳缺失或过期时必须显示 `unknown`。观测每页最多并发 8 项、单项 provider 最长等待 2 秒、整页最多等待 3 秒，超时项保持 unknown。unknown/unlocked 都不能证明 Agent 已停止；清理必须先检查独立 Agent/Session/Runtime 活跃状态并完成 drain，再对同一 Repository/Worktree 重新观测并经授权执行器确认。
+
 Task Card 是 WorkItem、Multica lifecycle 与 LangGraph Agent 状态的统一展示卡，并通过 `TaskCardIndex` 直接出现在 Worktree Group 导航中。Board、Backlog、Sprint、Task Card、Canvas 和 Agent 面板传递同一组 typed EntityRef；页面组件不得各自创建独立 task store。Multica 与 Jira 是并列的能力入口，Task Card 索引和 Infinite Canvas 也与二者并列。
 
 一个 Worktree 可以包含多个 Canvas。Group Canvas projection 返回当前 Worktree 全部可见 Canvas 和所选 Canvas 内容；路由 `canvas_id` 保存可分享的选择状态，缺省时选择列表首项，非法值回退到有效授权项。创建 Canvas 使用认证幂等命令，响应得到新 ID 后切换选择并刷新投影；切换 Worktree 或登录主体时不得复用旧 Canvas 内容或待提交命令。将已有 Task Card 放到 Canvas 时，前端从当前 Worktree 未关联列表中选择；单个认证幂等的 Element 创建命令同时携带元素布局和 typed `EntityRef`，后端原子复验 Worktree association 并创建二者。
@@ -4578,3 +4580,4 @@ Chat Bar(scope, text, entity_refs)
 | v4.4 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.11 / Group detailed design v4.9；实现 Group App Registry live UI consumer 的 provider/session generation 隔离、Worktree/version/entry 验证、稳定排序、显式/定时/可见性刷新和错误 fail closed；明确此导航不代表插件 runtime 已接入 | 继续 Phase 6，将授权导航投影接入 Worktree Group 同级 App 树 |
 | v4.5 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.12 / Group detailed design v4.10；把 Plugin Registry UI consumer 的输入校验、稳定排序、provider/session generation 清理和错误 fail closed 约束细化；新增投影契约测试 evidence，明确仍无插件执行权限 | 继续 Phase 6，收紧 Group App navigation projection 的边界验证 |
 | v4.6 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.13；区分 PostgreSQL RLS policy 与 runtime SQL grants，要求 migration owner/service role 分离、逐表最小授权和以实际非特权角色验收；记载 Phase 5/6 隔离库验证与生产 grants 未配置 | Phase 5/6 PostgreSQL 验证发现 FORCE RLS 不授予 schema/table SQL 权限 |
+| v4.7 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.14；为 Project Worktree Index 定义 Git Worktree retention-lock observation、30 秒 freshness、unknown 与持久化 `locked` 分离，并要求 cleanup 在 agent/session drain 后重新观测；宿主 Runtime observer 尚未装配 | Phase 2D 增加 Git 锁观测切片并冻结安全清理前置条件 |

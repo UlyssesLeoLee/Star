@@ -38,9 +38,14 @@
 //! MATCH (m:Module {name:"group_api",type:"module"}),(ga:Module {name:"group_apps",type:"module"}),(s:Class {name:"GroupApiState",type:"class"}),(gp:Interface {name:"GroupAppRegistryProvider",type:"interface"});
 //! CREATE (install:Function {name:"GroupApiState::with_group_app_registry",type:"function",language:"rust"}),(registryRouter:Function {name:"group_apps::router",type:"function",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(ga),(ga)-[:CONTAINS]->(gp),(s)-[:HAS_METHOD]->(install),(install)-[:USES]->(gp),(registryRouter)-[:CALLS]->(ga);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(s:Class {name:"GroupApiState",type:"class"});
+//! CREATE (gls:Enum {name:"WorktreeGitLockState",type:"enum",language:"rust"}),(glo:Class {name:"WorktreeGitLockObservation",type:"class",language:"rust"}),(glq:Class {name:"WorktreeGitLockQuery",type:"class",language:"rust"}),(gle:Enum {name:"WorktreeGitLockObserverError",type:"enum",language:"rust"}),(gloi:Interface {name:"WorktreeGitLockObserver",type:"interface",language:"rust"}),(glb:Function {name:"GroupApiState::with_worktree_git_lock_observer",type:"function",language:"rust"}),(glunknown:Function {name:"WorktreeGitLockObservation::unknown",type:"function",language:"rust"}),(glnorm:Function {name:"WorktreeGitLockObservation::normalize",type:"function",language:"rust"}),(globserve:Function {name:"WorktreeGitLockObserver::observe",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(gls),(m)-[:CONTAINS]->(glo),(m)-[:CONTAINS]->(glq),(m)-[:CONTAINS]->(gle),(m)-[:CONTAINS]->(gloi),(s)-[:HAS_METHOD]->(glb),(glo)-[:HAS_METHOD]->(glunknown),(glo)-[:HAS_METHOD]->(glnorm),(gloi)-[:HAS_METHOD]->(globserve),(glb)-[:USES]->(gloi),(glnorm)-[:USES]->(gls);
 
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::{
     Json, Router,
     extract::{FromRef, Path, State},
@@ -48,6 +53,8 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
 };
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
@@ -79,6 +86,69 @@ pub use scoped_chat_store::{
     PgScopedChatWorkflow, ProtectedTranscriptBody, TranscriptBodyProtector,
     TranscriptProtectionContext,
 };
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum WorktreeGitLockState {
+    Locked,
+    Unlocked,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WorktreeGitLockObservation {
+    pub state: WorktreeGitLockState,
+    pub observed_at: Option<DateTime<Utc>>,
+}
+
+impl WorktreeGitLockObservation {
+    pub fn unknown() -> Self {
+        Self {
+            state: WorktreeGitLockState::Unknown,
+            observed_at: None,
+        }
+    }
+
+    fn normalize(self, now: DateTime<Utc>) -> Self {
+        if self.state == WorktreeGitLockState::Unknown {
+            return self;
+        }
+        match self.observed_at {
+            Some(observed_at)
+                if observed_at <= now
+                    && now.signed_duration_since(observed_at) <= chrono::Duration::seconds(30) =>
+            {
+                self
+            }
+            observed_at => Self {
+                state: WorktreeGitLockState::Unknown,
+                observed_at,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WorktreeGitLockQuery {
+    pub tenant_id: Uuid,
+    pub project_id: Uuid,
+    pub repository_id: Uuid,
+    pub worktree_id: Uuid,
+    pub runtime_id: Uuid,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("host runtime Git lock observation is unavailable")]
+pub enum WorktreeGitLockObserverError {
+    Unavailable,
+}
+
+#[async_trait]
+pub trait WorktreeGitLockObserver: Send + Sync {
+    async fn observe(
+        &self,
+        query: WorktreeGitLockQuery,
+    ) -> Result<WorktreeGitLockObservation, WorktreeGitLockObserverError>;
+}
 
 #[derive(Clone)]
 pub struct GroupApiState {
@@ -87,6 +157,7 @@ pub struct GroupApiState {
     task_cli_session_provisioner: Option<Arc<dyn TaskCliSessionProvisioner>>,
     scoped_chat_workflow: Option<Arc<dyn ScopedChatWorkflow>>,
     group_app_registry: Option<Arc<dyn GroupAppRegistryProvider>>,
+    worktree_git_lock_observer: Option<Arc<dyn WorktreeGitLockObserver>>,
 }
 
 impl GroupApiState {
@@ -97,6 +168,7 @@ impl GroupApiState {
             task_cli_session_provisioner: None,
             scoped_chat_workflow: None,
             group_app_registry: None,
+            worktree_git_lock_observer: None,
         }
     }
 
@@ -118,6 +190,15 @@ impl GroupApiState {
     /// Install a trusted provider for the current, authorized Group App navigation projection.
     pub fn with_group_app_registry(mut self, registry: Arc<dyn GroupAppRegistryProvider>) -> Self {
         self.group_app_registry = Some(registry);
+        self
+    }
+
+    /// Install the trusted host-runtime observer for current Git worktree lock state.
+    pub fn with_worktree_git_lock_observer(
+        mut self,
+        observer: Arc<dyn WorktreeGitLockObserver>,
+    ) -> Self {
+        self.worktree_git_lock_observer = Some(observer);
         self
     }
 }
@@ -195,7 +276,7 @@ impl GroupContextResolver {
                 "permission_snapshot_ref": format!("{}:v{}", binding.id, binding.version),
                 "correlation_id": Uuid::new_v4(),
             },
-            "worktree": worktree_projection(worktree),
+            "worktree": worktree_projection(worktree, WorktreeGitLockObservation::unknown()),
         }))
     }
 }
@@ -312,7 +393,7 @@ struct WorktreeIndexRow {
     updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-fn worktree_projection(row: WorktreeIndexRow) -> Value {
+fn worktree_projection(row: WorktreeIndexRow, git_lock: WorktreeGitLockObservation) -> Value {
     json!({
         "id": row.id,
         "name": row.name,
@@ -337,6 +418,11 @@ fn worktree_projection(row: WorktreeIndexRow) -> Value {
         "test_state": row.test_state,
         "risk_count": row.risk_count,
         "locked": row.locked,
+        "git_lock": {
+            "state": git_lock.state,
+            "source": if git_lock.observed_at.is_some() { "host_runtime" } else { "unavailable" },
+            "observed_at": git_lock.observed_at,
+        },
         "archived": row.archived,
         "version": row.version,
         "pull_request_url": row.pull_request_url,

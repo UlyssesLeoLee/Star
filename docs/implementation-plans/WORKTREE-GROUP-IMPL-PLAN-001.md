@@ -1,11 +1,11 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project Worktree 群组实施计划 v5.9**
+> **渡口 Project Worktree 群组实施计划 v5.11**
 >
-> - 状态：🟡 执行中（Phase 0/1、2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
+> - 状态：🟡 执行中（Phase 0/1、2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 新增 Git retention-lock observer/interface/UI slice，UI 仅接受带 `host_runtime` 来源且 30 秒内的新鲜观测，其余显示 unknown；production main 未安装 Host Runtime observer，创建/导入、活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - 日期：2026-09-30
-> - 关联需求：`docs/requirements.md` v5.13 §50
+> - 关联需求：`docs/requirements.md` v5.14 §50
 > - 关联基本设计：`docs/basic-design.md` v4.6 §16
 > - 关联详细设计：`docs/design/DD-WORKTREE-GROUP-001.md` v4.12、`docs/design/DD-MULTICA-TASK-001.md` v0.3、`docs/design/DD-WORKTREE-CANVAS-001.md` v1.3
 
@@ -117,7 +117,7 @@ Project 选择 → Project Worktree Index → 展开 Worktree → 同级 Apps �
 8. **Plugin 热撤权语义**：需确定在途 run 的 cancel/drain 策略、manifest trust、签名与 API version compatibility；Phase 6 通过 ADR/详细设计冻结。
 9. **开发 Group 守门仍有剩余项**：守门 #33 已实现 Cargo resolved graph 检查，验证结论与脚本状态见 §6.41；`NEXT_PUBLIC_GROUP_ID` 仍是开发分组变量，不代表产品 GroupContext。开发环境变量注入与产品服务端身份解析分别验收。
 10. **Phase 2B-2D 目标数据环境尚未启用**：这些 migrations 尚未应用到目标数据库；Project Role Binding provisioning API / Project SoR 缺失，历史 Worktree 的 Project/Owner/WorkItem link 未 reconciliation；Phase 2 的数据库 RLS、外键、隔离和负向 ACL 尚未真实验证。Phase 5/6 的隔离库验证不覆盖 Phase 2 schema 或目标环境。
-11. **Phase 2D 管理能力边界**：当前 owner/归档 plan-confirm 有版本和审计，但 Session/Runtime 活跃检测只按 ref 存在保守拒绝；没有 Git lock 状态源、agent drain、Worktree create/import 或物理 cleanup。不能把归档 API 当 Git worktree 清理。
+11. **Phase 2D 管理能力边界**：当前 owner/归档 plan-confirm 有版本和审计，Session/Runtime 活跃检测只按 ref 存在保守拒绝。Project Index 已有可注入的 Git Worktree retention lock observer seam 与 unknown-safe UI，但 production main 尚未安装 Host Runtime observer，因此真实 Git 保留锁状态仍未知；Git 保留锁也不表示 Agent 活跃或编辑互斥，unlocked 不等于空闲。当前没有可靠 agent 状态和 drain、Worktree create/import 或物理 cleanup。不能把归档 API 当 Git worktree 清理；unknown/unlocked 都不能通过 cleanup guard，清理必须读取独立活跃状态、drain 后重观测。
 12. **W/T/M 与安全门未全通过**：新迁移逐表标注主分类、RLS 与保留规则；Phase 5/6 的隔离库已经完成迁移重放、12 表 FORCE RLS、scope 与 append-only trigger 验收；仍需完整 RLS policy 分类检查、Phase 2/3 及目标数据库 migration rehearsal、TTL/cleanup 与并发验收。
 13. **数据库运行角色尚无可验证的授权配置**：本地隔离库只确认 `star_app` 角色存在且对 `multica` / `plugin` 无 schema `USAGE`；`star_app_role` 在该库不存在。迁移当前不给 schema/table grants，真实生产 DATABASE_URL 对应身份及连接池有效角色未确认。目标部署前必须建立 migration owner 与最小权限 runtime/worker roles，补齐逐表 grants，并用真实 service identity 验证 SQL privilege + FORCE RLS；不得以 superuser 或临时测试授权关闭此项。
 
@@ -137,7 +137,7 @@ Project 选择 → Project Worktree Index → 展开 Worktree → 同级 Apps �
 | 2A GroupContext / 跨 App 契约 | 🟢 详细设计完成 | DD-WORKTREE-GROUP-001.md v0.5 定义认证 actor、Project/Worktree ACL、Worktree 管理 plan/confirm、TaskExecutionContext、Worktree typed EntityRef、Outbox、Chat/LangGraph 与 Plugin 撤权契约；后端只实现其中 2B-2D 子集 |
 | 2B 认证 Actor / ACL / GroupContextResolver | 🟡 代码与 additive migration 完成，部署/ACL 验收待做 | production-only Group API；JWT sub/user_id 一致性；Project active membership；独立 Project Worktree Master binding；owner/task/link projection 不猜历史值。migration 未部署、membership 未 provisioning、跨 tenant/project/RLS 负向用例未跑 |
 | 2C canonical 任务闭环 / 持久化 | 🟡 API 与 additive migration 完成切片，Domain adapter/数据库验收待做 | 新 Group API 写 canonical WorkItem Master、Multica 六态 Work current、Worktree SCD2 link、version、Idempotency-Key 和 append-only audit；`cargo check -p star-api-rest --all-targets -j 4` 通过。未应用 migration；REST crate 仍持有 SQL coordinator，旧 Domain service 保持 3 态 in-memory；Review/Jira alias/UI 没接通 |
-| 2D Worktree Index 投影 / 管理 API | 🟡 API/条件式 UI 切片完成，数据库与宿主集成验收待做 | stable keyset cursor + owner/state/archive filters；owner SCD2；成员目录 API 只返回当前 Project 有效成员 ID/role；Index live projection、筛选、续页、owner reassignment 和 archive/restore plan-confirm UI 已接 API client；当前应用未装配 provider，所以运行态仍 seed preview。服务端有 session/runtime ref 时保守拒绝 archive；Git lock/Runtime active-state source、create/import/physical cleanup、migration 部署和 RLS/ACL 验收仍缺 |
+| 2D Worktree Index 投影 / 管理 API | 🟡 API/条件式 UI 切片完成，数据库与宿主集成验收待做 | stable keyset cursor + owner/state/archive filters；owner SCD2；成员目录 API 只返回当前 Project 有效成员 ID/role；Index live projection、筛选、续页、owner reassignment 和 archive/restore plan-confirm UI 已接 API client；新增独立 `git_lock` observation DTO、注入式 Host Runtime observer、≤30 秒 freshness、单项 2 秒 / 每页 3 秒与最多 8 路并发；无 provider/runtime、错误、超时、无效时间戳均为 unknown；UI 将其与历史持久化 `locked` 标记分开。生产 main 尚未装配 observer，运行态仍 seed preview/lock unknown；agent drain、create/import/physical cleanup、migration 部署和 RLS/ACL 验收仍缺 |
 | 3A Canvas scope guard | 🟢 前端边界代码切片完成 | Group 页面只查显式 Worktree Canvas；Canvas task link 要求 EntityRef 和任务关联都指向当前 Worktree；未绑定任务无 CLI 入口；UI 数据仍为 mock |
 | 3B Canvas persistence/API | 🟡 后端代码切片完成，DB 未部署 | 新增 Worktree-scoped migration 与 Group API：Canvas list/create，Element list/create/versioned update/soft delete，typed EntityRef set/replace/clear；Project membership + scope/role、RLS GUC、当前 WorkItem association resolver、transactional Audit/Outbox 与幂等；EntityRef 变更同步推进 Element version，Outbox aggregate version 单调；`cargo check -p star-api-rest --all-targets -j 4` 通过；未应用 migration，未做 SQL runtime / ACL/RLS 负向验收 |
 | 3C Canvas Document CAS persistence | 🟡 后端代码切片完成，DB 未部署 | 新增 additive migration：registry SCD2 保存 viewport/frames/connectors；PUT Document 执行 Worktree ACL、writer role、expected_version、幂等、同 Canvas 元素引用校验与 Audit/Outbox 原子提交；connector 不代表 canonical task relation；未应用 migration / 未做 PG、RLS 与 ACL 运行验收 |
@@ -614,6 +614,16 @@ LangGraph 官方文档证实 checkpoint 只恢复状态边界，不能保护外�
 | 静态检查 | 🟢 通过 | `python -m py_compile scripts/automation/group_guard.py scripts/automation/__tests__/test_group_guard.py` 与 `git diff --check` 通过。 |
 | 产品 GroupContext / 全部 Phase | 🟡 未关闭 | 开发守门 #33 不代表宿主认证、产品 GroupContext、目标数据库/RLS、CLI runtime、LangGraph/Chat、Plugin runtime 或 Phase 7 生产验收完成。 |
 
+### 6.42 本轮阶段结果（Phase 2D Worktree Git retention-lock observation slice，2026-09-30）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Observer contract | 🟢 API seam 完成 | `WorktreeGitLockObserver` 接收已授权 query，绑定 tenant/project/repository/worktree/runtime；`locked / unlocked / unknown` 与持久化 `locked` 分开。该 Git Worktree retention lock 保护 Git 管理记录，不表示 Agent 活跃或编辑互斥。缺 provider/runtime、调用失败、单项超时（2 秒）、无时间戳、超过 30 秒或未来时间戳均归一为 unknown。 |
+| Index bounded fan-out | 🟢 代码完成 | 每页最多 8 路并发、总观测预算 3 秒；预算耗尽后未完成项目保留 unknown，避免宿主 Runtime 停顿拖住整页。 |
+| Worktree Index UI | 🟢 条件式消费完成 | Project Index 与详情分别显示 Git observation 状态/时间和持久化 `locked` 标记；只有 `source=host_runtime` 且时间戳有效、未超前并在 30 秒内的新鲜观测才显示 locked/unlocked；缺 source、无效/过期/未来时间戳或旧投影按 unknown 显示。 |
+| 聚焦验证 | 🟢 本地通过 | 隔离 Cargo target 下 `cargo test -p star-api-rest --lib -j 4`：81/81 通过；`pnpm typecheck` 通过；Group/terminal Vitest 46/46（新增来源、无效/缺失/过期/未来时间戳 fail-closed 用例）；改动 Rust `rustfmt --edition 2024 --check` 与 `git diff --check` 通过。 |
+| Phase 2D / Phase 7 生产门 | 🟡 未关闭 | `main.rs` 尚未安装真实 Host Runtime observer；Worktree create/import、独立 Agent 活跃状态与 session drain、lock 下的 plan-confirm physical cleanup、目标 DB/RLS 与 ACL/Runtime 集成、跨 App 生产验收未完成。观察接口自身不能执行或授权删除；fresh unlocked 也不能替代 Agent drain。 |
+
 ### 本轮修订（2026-09-30）
 
 ## 修订履历
@@ -678,3 +688,5 @@ LangGraph 官方文档证实 checkpoint 只恢复状态边界，不能保护外�
 | v5.7 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 修正 Group 详细设计首页的基本设计引用并升至 v4.11；建立 Phase 7 本地回归基线：前端 44/44、REST 75/75、Local Runtime 168/168、terminal-stack 82/82，pnpm typecheck 与 diff-check 通过；明确这些不代替宿主身份、目标数据库/RLS 和跨 App 生产验收 | 继续推进全部 Phase，以当前 Group/terminal/API 改动验证本地回归并校正设计文档引用 |
 | v5.8 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | requirements/basic/detailed 同步到 v5.13/v4.6/v4.12；Phase 5/6 migrations 在隔离 PostgreSQL 库可重复执行，12 表 FORCE RLS、租户/actor policy 与 append-only trigger 事务测试通过；明确 RLS 不授予 SQL role privileges，并新增目标 runtime role/grants blocker 与 WG-ACC-20 验收契约 | 隔离数据库验证发现 schema/table grants 与 FORCE RLS 是互相独立的生产门禁 |
 | v5.9 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将开发守门 #33 从 placeholder 改为 Cargo resolved graph 双向边检查；收敛 Canvas/Domain source ownership 与 shared adapter 范围，并让 #34 显式 Group ID 错配返回非零；聚焦验证 20/20、真实 workspace 0 条跨组边、py_compile 与 diff-check 通过。Phase 产品能力仍受宿主身份、目标 DB/runtime grants、Local Runtime、LangGraph、Plugin runtime 与 Phase 7 生产验收阻塞 | 用户继续推进 Worktree-first Group Apps 全部 Phase；先补完当前分支可落地的跨组依赖守门 |
+| v5.10 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements/basic/detailed 至 v5.14/v4.7/v4.13；Phase 2D 增加 Git lock observer seam、freshness/timeout/bounded fan-out 与 unknown-safe Index UI；`locked` 持久字段不再代表实时 Git lock；生产 main 未安装 observer，agent/session drain、create/import、物理清理、目标环境与 Phase 7 生产验收仍未完成；验证结果见 §6.42 | 继续推进全部 Phase，优先把 Worktree Index 的锁状态做成可区分、可观测且不误导清理决策的信号 |
+| v5.11 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 自审修正 Group Index 消费端：必须同时满足 host_runtime 来源与有效、新鲜时间戳，missing/unavailable/stale/future 均回退 unknown；详细设计链接 Git 官方 retention-lock 语义；Rust 81/81、`pnpm typecheck`、Group/terminal Vitest 46/46、rustfmt 和 diff-check 通过；Phase 2D Host Runtime provider、Agent drain、目标环境与 Phase 7 blockers 继续开放 | Phase 2D UI 边界复核发现应由客户端再次 fail closed 处理无效或陈旧来源 |

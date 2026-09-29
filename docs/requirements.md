@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.13）
+# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.14）
 
 ## 0. 文档说明与前提
 
@@ -1481,6 +1481,7 @@ Business Goal → Business Requirement → WorkItem → Acceptance Criteria
 | WTG-001 | 用户选择 Project 后，系统只展示当前 actor 可访问的 Worktree；展开任一 Worktree 后展示其 Worktree Group | 第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
 | WTG-002 | Worktree Group 下的 Task Management、Task Card 及其 Agent/CLI 会话、Infinite Canvas 与已启用插件必须共享不可伪造的 Tenant、Project、Repository、Worktree 上下文 | 第 50.2-50.3 章 | ARCH-OBL-GRP-001/ARCH-OBL-DEV-001 |
 | WTG-006 | Project Worktree Index 与 Worktree Group 必须可分别访问；Index 深链以 `project_id` 保留所选 Project，Group 深链以 `worktree_id` 保留所选 Worktree；Project Worktrees 视图须能进入 Index，Index 路由不得被通用任务列表路由替代 | 第 50.1-50.2 章 | ARCH-OBL-GRP-001 |
+| WTG-010 | Worktree Index 分开呈现当前 Git lock observation 与持久化 lock 标记；unknown 不得通过 cleanup guard | 第 50.1、50.3、50.8 章 | ARCH-OBL-GRP-001 |
 | TCI-001 | Multica 生命周期、Jira 类 Board/Backlog/Sprint 与 Worktree 下直接访问的 Task Card 索引必须共用同一 WorkItem 事实源 | 第 50.3 章 | ARCH-OBL-GRP-001 |
 | TCI-002 | 任务卡必须能够在已授权的关联 Worktree 中打开受控交互式 PTY CLI 会话，并将会话、命令结果与审计关联回任务卡 | 第 50.4 章 | ARCH-OBL-DEV-004/ARCH-OBL-GRP-001 |
 | TCI-006 | Task Card review gate 必须使用版本化、幂等且可审计的请求/通过/驳回命令，只有非提交者评审通过后才可完成 | 第 50.3 章 | ARCH-OBL-GRP-001 |
@@ -2239,7 +2240,7 @@ Tenant → Workspace → Project（用户先选择）
 
 `Project Worktree Index` 是项目选择后的管理入口，聚合展示该项目已授权的 Worktree 事实和运行信号；它不是跨项目的平铺列表。Worktree 展开后显示该 Worktree 的同级 App 导航。`Worktree Group` 是围绕既有 `Worktree` 的应用上下文和导航投影，以 `worktree_id` 为身份；它不复制 Git Worktree、WorkItem 或 AgentSession 的业务事实。Project 范围的 Worktree Graph Overview 继续用于跨 Worktree 冲突、依赖与全景查看；群组内的 Infinite Canvas 用于当前 Worktree 的协作与编排，两者须在名称、路由和数据范围上明确区分。
 
-Index 是管理面而非仅供跳转的清单：必须汇总 owner、Agent Session、Runtime、分支、生命周期、PR、dirty/ahead/behind、健康/风险和锁状态，帮助用户发现多 Agent Worktree 的归属漂移与执行冲突。生产视图必须以当前用户授权的服务端投影为准；请求失败时显示错误且不回退到本地 seed。归档/恢复必须先生成有版本条件的短时计划，再由用户二次确认并写入审计；归档不得被解释为删除本地 Git checkout。创建/导入、停止执行和物理清理继续走各自的授权 Runtime / Repository 生命周期接口。
+Index 是管理面而非仅供跳转的清单：必须汇总 owner、Agent Session、Runtime、分支、生命周期、PR、dirty/ahead/behind、健康/风险和锁状态，帮助用户发现多 Agent Worktree 的归属漂移与执行冲突。`git_lock { state, source, observed_at }` 专指 Git Worktree retention lock（保护 Git 管理记录免遭 prune，并影响 Git 对该 Worktree 的移动/删除）；它不是 Agent 活跃状态、文件编辑互斥锁或独占租约，`unlocked` 不表示没有 Agent/Session 正在工作。缺少 Runtime/observer、读取失败、时间戳缺失或观测超过 30 秒时为 `unknown`，不得从持久化 `locked` 字段推断当前 Git 保留锁状态。Index 对每页观测最多并发 8 个请求、单个 provider 最长等待 2 秒、总等待最多 3 秒；未按时返回的项目显示 `unknown`。`unknown` 与 `unlocked` 均不能证明 Agent 已停止；物理清理还须读取独立的 Agent/Session/Runtime 活跃状态，在 drain 后重新观测 Git 保留锁，并由 Repository/Runtime 执行器确认。生产视图必须以当前用户授权的服务端投影为准；请求失败时显示错误且不回退到本地 seed。归档/恢复必须先生成有版本条件的短时计划，再由用户二次确认并写入审计；归档不得被解释为删除本地 Git checkout。创建/导入、停止执行和物理清理继续走各自的授权 Runtime / Repository 生命周期接口。
 
 ### 50.2 术语与共同上下文
 
@@ -2275,6 +2276,7 @@ Canvas 可以创建任务链接、定位任务、展示状态、发起受权的�
 | WTG-007 | 已装配宿主认证时，Project Worktree Index 必须读取授权 API 投影并支持 owner/state/archive 筛选与稳定游标续页；401/403/网络错误不得混入本地 seed 作为生产结果 | P0 |
 | WTG-008 | Index 的归档/恢复操作必须使用当前 Worktree version 创建短时 plan 并二次确认；执行绑定未解除时归档必须失败；归档只改变平台可见状态，不删除 Git checkout | P0 |
 | WTG-009 | Worktree owner 必须可由有权管理员转派给当前 Project 的有效成员；候选人只能来自当前认证成员目录，转派使用 Worktree version、短时 plan、二次确认、幂等与审计；成员目录不可用时不得开放自由文本或 seed 转派 | P0 |
+| WTG-010 | Project Worktree Index 必须分开呈现持久化 `locked` 标记与 Host Runtime 实时 Git Worktree retention lock observation；该 Git 锁只保护 Git 管理记录，不能表示 Agent 活跃或文件编辑互斥；缺少 provider/runtime、失败、超时、无效或超过 30 秒的观测为 `unknown`；unknown/unlocked 均不能证明 Agent 已停止，物理清理须检查独立活跃状态并在 drain 后重新观测 | P0 |
 | TCI-001 | Multica 生命周期和 Jira 类计划视图必须投影同一 WorkItem；Task Card 索引作为 Worktree 下的平级入口访问该任务；不得产生并行任务状态机或第二个任务事实源 | P0 |
 | TCI-005 | Multica、Jira 与 Task Card 的生命周期动作必须调用同一个 WorkItem lifecycle command，并遵循合法状态迁移、review gate、writer ACL、版本冲突、幂等、correlation 与审计规则 | P0 |
 | TCI-006 | `in_progress` claimant 可提交当前 WorkItem 进入 `pending_review`；仅当前 Worktree 的非 claimant `tenant_admin` / `project_admin` / `developer` 可通过或驳回；驳回必须有理由；三类命令均校验 `expected_version`、幂等键、scope 与审计；通过转为 `completed`，驳回转为 `failed` | P0 |
@@ -2388,6 +2390,7 @@ Group UI 的 API 认证必须由宿主登录会话注入异步 access-token prov
 | AC-WTG-006 | 归档/恢复必须先以当前 version 生成有期限 plan，再经用户二次确认；活动 Agent/Runtime 绑定阻止归档；确认后刷新授权 Index；此动作不得运行 `git worktree remove` 或删除 checkout |
 | AC-WTG-007 | owner 候选只来自当前 Project 的认证成员目录；仅 `tenant_admin` / `project_admin` 可发起转派；用户选择候选后，系统以当前 Worktree version 创建 `assign_owner` plan，校验返回 Worktree / 操作 / 到期时间，并经二次确认；服务端在 plan / confirm 重验角色与候选成员状态；确认成功后重载授权 Index，失败、过期或成员目录读取异常时不乐观更新 owner |
 | AC-TCI-001 | 从任务卡打开 CLI 后，工作目录、Runtime、允许路径和命令策略都与所选 Worktree 一致；越界请求被拒绝并审计 |
+| AC-WTI-001 | Project Worktree Index 将 Git Worktree retention lock observation 与持久化 `locked` 字段分开；该 Git 锁只说明 Git 是否保护管理记录免遭 prune/移动/删除，不表示 Agent 活跃、编辑互斥或任务空闲；仅带可信来源且年龄不超过 30 秒的 `locked` / `unlocked` observation 可显示为确定状态；缺少 Runtime/provider、读取失败、缺少或过期时间戳、未来时间戳一律显示 `unknown`；unknown/unlocked 都不得视为 Agent 已停止，物理清理须检查独立活跃状态、完成 session/agent drain、重新观测并经受权 Repository/Runtime 执行 |
 | AC-TCI-002 | 在线 Multica、Jira 与 Task Card 对同一任务显示相同 lifecycle version；只显示服务端允许的状态操作；领取/开始/完成/失败/取消/重试使用当前版本和幂等键；pending review 阻止完成；成功与冲突后刷新同一授权投影 |
 | AC-TCI-003 | review submit 仅由当前 Worktree 的 active claimant 在 `in_progress` 发起；accept/reject 仅由非 claimant 的 `tenant_admin` / `project_admin` / `developer` 对 `pending_review` 决定；reject 必须给出理由；提交、通过和驳回都使用当前 lifecycle version、幂等键、correlation 与 append-only audit；accept 进入 `completed`，reject 进入 `failed`，跨 Worktree / stale version / 自我评审均拒绝 |
 | AC-TCI-004 | 篡改 grant context、签名无效、issuer key id 未知或 payload 无效时，Local Runtime 必须 fail closed 且不得消费 nonce；有效 grant 必须绑定 key id、完整 `TaskExecutionContext` 与版本化签名域，验签后仍需重验当前 ACL / Runtime health；签名私钥只部署在受信任 grant issuer，Runtime 只配置公钥并至少保留旧 key 至在途 grant 过期（最长五分钟） |
@@ -2468,3 +2471,4 @@ Group UI 的 API 认证必须由宿主登录会话注入异步 access-token prov
 | v5.11 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 AC-PLG-002 扩充至 Group UI live consumer：服务端授权 projection 成为同级插件入口唯一来源，校验 Worktree/version/entries，加载与错误不回退预览，仅无 provider 的原型环境显示本地预览；刷新和 provider/session 切换边界写入需求 | 继续 Phase 6，接入 PostgreSQL 授权导航并保持错误时 fail closed |
 | v5.12 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Group App 授权导航响应校验细化为 UUID correlation、非负安全整数 Registry version、最多 100 条、唯一 plugin ID、受限字段长度/控制字符与 int32 sort order；要求按 sort order 与 plugin ID 稳定排序；补充实现与聚焦测试证据 | 继续 Phase 6，验证服务端投影的客户端消费边界并扩充 WG-ACC-19 |
 | v5.13 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 Group PostgreSQL runtime SQL grants 与 RLS 分离验收；记录 Phase 5/6 迁移在隔离库幂等重放、12 表 FORCE RLS、租户/actor 策略和 append-only trigger 实测；目标 DB、实际应用角色与正式 grants 尚未确定 | Phase 5/6 隔离数据库验证发现 SQL role privilege 未由 RLS policy 或迁移自动提供 |
+| v5.14 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 Project Worktree Index 的实时 Git Worktree retention lock observation 契约；明确该信号不是 Agent 活跃或编辑互斥状态，与持久化 `locked` 字段分离；缺少/失败/过期显示 unknown，unknown/unlocked 均不能通过清理前置检查，且清理前须检查独立活跃状态并在 drain 后复验；仅记录当前 observer 接口/UI 切片，宿主 Runtime observer 未装配 | 继续推进 Phase 2D，补齐 Worktree 管理面的锁可见性并明确安全清理前置条件 |

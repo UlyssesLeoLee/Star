@@ -1,12 +1,13 @@
 # DD-WORKTREE-GROUP-001
 
-> **渡口 Project Worktree 管理与 Group Apps 详细设计 v4.12**
+> **渡口 Project Worktree 管理与 Group Apps 详细设计 v4.13**
 >
 > - 状态：🟡 Draft（Phase 2B/2C/2D 与 Phase 3B-3F 已有多项条件式 API/UI 切片；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 卡内 xterm ticket-first UI、status/cancel/reattach、bounded Session listing/recovery API seam 与手动 UI 已实现；Phase 5 有 scope-aware Chat 授权提交、GLOBAL 目标目录、多选 UI、加密 Transcript/Run/outbox persistence adapter，但 production main 未装 protector/L0；Phase 6 有五表 Registry migration、生产 main 装配的 PostgreSQL 只读 projection provider/API 与 Group UI live consumer；Phase 5/6 migrations 已在隔离库重复执行并验证 12 张 FORCE RLS、策略及 trigger（事务内临时授权已回滚），目标 DB/runtime role grants 未配置；manifest trust root/ingest、lifecycle writer、capability runtime/revocation、真实 PostgreSQL RLS 验收未完成。仍缺宿主认证 provider、目标 DB migration 部署与 ACL/RLS 运行验收、真实 CLI provisioner/OS sandbox/terminal sink/audit、LangGraph 部署版本/服务身份/权限 broker；Canvas 仍缺服务端 durable event offset/realtime；历史归属 reconciliation 与跨 App 生产验收未完成）
-> - 日期：2026-09-29
+> - 日期：2026-09-30
+> - Phase 2D 状态：Git Worktree retention-lock observer contract 与 Index UI 已有条件式切片；生产 main 未配置 Host Runtime observer，因此运行态仍显示 unknown。
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.13 §50
-> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v4.6 §16
+> - 上位需求：[`docs/requirements.md`](../requirements.md) v5.14 §50
+> - 上位基本设计：[`docs/basic-design.md`](../basic-design.md) v4.7 §16
 > - 配套详细设计：[`DD-MULTICA-TASK-001.md`](DD-MULTICA-TASK-001.md) v0.3、[`DD-WORKTREE-CANVAS-001.md`](DD-WORKTREE-CANVAS-001.md) v1.3、[`DD-SHARED-TASK-001.md`](DD-SHARED-TASK-001.md) §11
 > - 文档边界：本 DD 定义 Project → Worktree → Group Apps 的应用契约，不新增 WorktreeGroup / ProjectGroup 业务聚合，不宣称原型已具备生产授权、持久化或多 Agent 调度能力。
 
@@ -22,7 +23,7 @@
 2. 所有 Group App API 先解析同一 `GroupContext`，对被引用实体再次授权。
 3. WorkItem、Canvas、Agent Session、CLI、Chat、LangGraph 与 Plugin 通过 canonical ID、命令和事件互操作，不维护互相矛盾的事实副本。
 4. 创建、归属调整、归档和清理 Worktree 可审计、并发安全，并能处理运行中 Agent、CLI 与 Git 锁。
-5. 需求 §50 的 AC-WTG、AC-TCI、AC-CAN、AC-CHAT、AC-PLG 与 AC-TRACE 均通过服务端集成验收。
+5. 需求 §50 的 AC-WTG、AC-WTI、AC-TCI、AC-CAN、AC-CHAT、AC-PLG 与 AC-TRACE 均通过服务端集成验收。
 
 Group Shell 当前仍是浏览器 seed 预览。Project Worktree Index 已有条件式授权 API 投影与 archive/restore plan-confirm UI 接线，但应用路由树尚未安装宿主 provider，因此运行时仍是 preview。生产 Group API 已有认证、Project ACL、WorkItem 持久化/生命周期和 Worktree Index/管理命令代码；target migration、membership provisioning/reconciliation 与 ACL/RLS 负向集成验收仍未完成，因此这些接口尚不可作为已启用生产能力。
 
@@ -101,11 +102,14 @@ WorktreeIndexItem {
   name, path, parent_id?, branch, human_state, machine_state,
   owner_user_id?, work_item_id?, agent_id?, agent_session_id?, runtime_id?,
   ahead, behind, dirty, health_score, test_state, risk_count,
-  locked, archived, pull_request_url?, version, created_at, updated_at
+  locked, git_lock { state, source, observed_at },
+  archived, pull_request_url?, version, created_at, updated_at
 }
 ```
 
-当前 API 投影只返回上述持久字段；Agent / Runtime 展示名、运行状态、冲突摘要、锁来源和历史 Session 列表仍待专用权威数据源。`owner_user_id` 表示人类责任归属；`agent_session_id` 表示会话关联，二者不得互相替代。缺失字段显示“未绑定/未知”，不得根据分支名或运行进程推断 owner。
+`locked` 是 Worktree current projection 中的持久化兼容字段，可能由管理命令或历史 Git 导入写入，不能作为当前 Git 锁事实。`git_lock` 是独立 Host Runtime observation：`state ∈ {locked, unlocked, unknown}`，`source ∈ {host_runtime, unavailable}`，并带 `observed_at?`。这里的 Git 锁专指 [`git worktree lock`](https://git-scm.com/docs/git-worktree) retention lock：阻止 Git prune Worktree 管理记录，并限制 Git 对该 Worktree 的移动/删除；它不报告 Agent/Session 活跃状态，也不是共享文件编辑锁或租约。API 仅在可信 observer 返回时间戳、时间戳不晚于当前时刻且年龄不超过 30 秒时保留确定的 locked/unlocked；浏览器消费端再次要求 `source=host_runtime` 且时间戳可解析、未超前并在 30 秒内，否则一律显示 unknown；缺少 Worktree Runtime binding、observer 未装配、调用失败、无时间戳、过期或未来时间戳都归一为 unknown。列表读取仅在 actor、Project membership 与 Worktree binding 已验证后调用 observer；query 同时绑定 tenant/project/repository/worktree/runtime，避免跨 Runtime 查错对象。每页最多并发 8 项、单项 provider 等待上限 2 秒、整页等待上限 3 秒，超出等待时间的项目保持 unknown。`unknown` 或 `unlocked` 均不能证明 Agent 已停止；`owner_user_id` 表示人类责任归属；`agent_session_id` 表示会话关联，二者不得互相替代。缺失字段显示“未绑定/未知”，不得根据分支名或运行进程推断 owner。
+
+`unknown` 既不表示 unlocked，也不能用来通过归档/清理 guard；fresh `unlocked` 只说明 Git retention lock 未设置，不表示无 Agent 在工作。`git_lock` 是管理面信号，不是物理删除授权：未来 cleanup plan/confirm 必须读取独立 Agent/Session/Runtime 活跃状态，先停止并 drain Agent/Session，再对同一 Repository/Worktree 实时复验 Git retention lock、dirty state 和 Runtime 状态，最后由授权 Repository/Runtime lifecycle executor 执行；本 observer 接口本身不执行 Git 命令或删除。
 
 Index UI 通过 `WorktreeGroupApiClient.listProjectWorktrees` 请求当前 Project 的认证投影；校验 envelope 与每行的 `project_id` 后映射 owner、执行绑定、生命周期、PR、dirty/ahead/behind、health/risk、lock 与 version。页面只持有当前 Project 的游标分页结果，并把 owner UUID、human state、archived 筛选传给服务端，不把本地 seed 拼进 API 投影。宿主 provider 尚未安装时明确进入 preview；已配置 provider 后遇到 401/403、网络或 schema 错误则显示错误且不回退 seed。API 未返回 owner / Agent / Runtime 展示名称时，UI 显示 ID 或“未绑定”，不得从本地 seed 补名称。
 
@@ -411,6 +415,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 |---|---|---|
 | WTG-001 / AC-WTG-001 | §1-§5 | Project membership 限定 Index；同级 App 树与唯一 GroupContext |
 | WTG-004 / AC-WTG-003 | §3、§6 | owner、Agent、Runtime、PR、冲突/锁和最近活动来自有版本的服务端投影；操作有授权与 Audit |
+| WTG-010 / AC-WTI-001 | §3.1、§4、§5、§12 | Git retention lock 与持久化 `locked` 分离，且不代表 Agent 活跃/互斥；unknown/unlocked 不表示空闲；cleanup 需独立活跃状态、drain 和最终重观测 |
 | WTG-009 / AC-WTG-007 | §4.2、§6.1.1 | 当前 Project 成员目录、候选人验证、版本化 plan-confirm 和成功后刷新 |
 | WTG-005 / AC-WTG-002 | §1-§5、§9 | Project/Worktree 切换清空旧订阅；跨项目实体引用拒绝 |
 | WTG-006 / AC-WTG-004 | §1.2 | Index 与 Group 深链独立、刷新稳定，不落入通用任务列表 |
@@ -443,7 +448,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 
 1. **2B 代码切片完成**：RS256 Actor、scope、Project membership 查询、GroupContext、Project/owner Master binding DDL。部署、membership provisioning、历史数据 reconciliation 和跨 Tenant/Project 负向集成仍是启用门。
 2. **2C 代码切片完成**：canonical task metadata、Worktree relation、Multica 六态 current projection、幂等 command 和 append-only audit；REST SQL coordinator 尚未抽到 Domain/PostgreSQL adapter，Review Gate、Jira alias/sync 与 UI 读写仍未启用。
-3. **2D 代码切片完成**：cursor Index、owner/archived plan-confirm、owner SCD2 和 management audit。创建/导入、Git lock/Runtime 活跃探测、Session drain、物理清理与恢复仍未实现。
+3. **2D 条件式代码切片**：cursor Index、owner/archived plan-confirm、owner SCD2、management audit 和 Git lock observer contract/UI。生产 main 尚未装配 Host Runtime observer；创建/导入、Runtime 活跃探测、Session drain、物理清理与恢复仍未实现，Index lock unknown 不得视为 unlocked。
 4. 完成 migration apply + 项目成员 provisioning 后，运行跨 Tenant/Project ACL 负向、数据库 RLS、并发 version conflict、同键幂等重放、审计不可变性和 API 集成验收，才能关闭生产写能力 gate。
 5. Group route 已支持宿主 provider 注入后的只读 GroupContext / WorkItem / Canvas 和 Plugin Registry projection；插件入口消费者已实现校验、排序、显式刷新、30 秒/可见性刷新与错误 fail-closed。真实宿主会话 provider 尚未挂载，因此当前运行仍显示 `preview / seed / not connected`；只有在目标 DB/RLS 和真实会话部署后完成跨 App 浏览器验收，才可把生产接线计为通过，不把 browser store 变化作为产品事实。
 
@@ -455,7 +460,7 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | 2 | 当前六态 API 与 review submit/accept/reject REST command 已有条件式代码切片；Review Domain port、Task metadata 更新和 Jira external alias/sync 尚未实现 | 任务流程与 Jira adapter 尚不完整 | 接入 DD-MULTICA §14 review/metadata port、alias registry + sync/outbox，跨 App 实测同一 ID/version |
 | 3 | 旧 Worktree projection 保留 `project_id` / `owner_user_id` denormalized columns；权威 Project / Owner SCD2 表已创建 | 历史投影与 Master binding 需保持一致；旧 owner/Project 行未回填 | provisioning/reconciliation 同事务维护 Master 与投影；历史映射有审计证据 |
 | 4 | App Registry 只读授权导航 API/provider 与 Group UI consumer 已有条件式切片；GroupContext 尚未包含 `allowed_actions[]`；Canvas API 有多项条件式切片，Chat 仅有逐目标 GroupContext 预检与 fail-closed workflow seam；Registry lifecycle writer、LangGraph 与 Plugin runtime/Gateway 仍未落地 | Worktree group shell 仍无法真实完成跨应用交互；显示入口不代表插件可执行 | 接入可信 manifest ingest、Registry lifecycle command、EntityRef resolver / Chat Workflow 与各 App API，补齐 LangGraph runtime 和 Plugin Gateway，并对每个入口通过权限验收 |
-| 5 | 当前 archive guard 仅根据 AgentSession/Runtime reference 是否为空；没有 Git lock、活跃会话、Runtime drain 状态源 | 对有过绑定但已结束的 Runtime 也会保守拒绝；不能安全执行物理清理 | 接 Agent/Runtime/Git 权威状态、cleanup plan/confirm、恢复策略与故障演练 |
+| 5 | 当前 archive guard 仅根据 AgentSession/Runtime reference 是否为空；Git lock 有注入式 observer contract/UI 但 production main 未装配 Host Runtime provider；没有可靠活跃会话状态和 Runtime/Agent drain | 对有过绑定但已结束的 Runtime 也会保守拒绝；Git lock 显示 unknown，不能安全执行物理清理 | 装配带 freshness/deadline 的 Host Runtime observer；接 Agent/Runtime 活跃状态和 drain；实现 cleanup plan/confirm、恢复策略与故障演练；确认动作时对同一 Repository/Worktree 再观测 |
 | 6 | Canvas migration/API、Document CAS、Frame/connector/便笺编辑与引用安全删除已有代码切片；真实宿主 provider 未挂载、目标数据库未部署、Canvas/Worktree 历史冲突未分类；Outbox 浏览器已用本地游标恢复，但没有服务端 durable consumer offset | 无法在已部署系统中提供生产 Canvas 联动、可靠事件消费或跨应用实时更新 | 装配宿主 JWT provider；评审并应用 migration；建立 membership / 历史归属；接服务端 durable consumer offset 与 realtime、Canvas/Jira Relation adapter；完成跨 Worktree ACL/RLS 与并发验收 |
 | 7 | LangGraph 官方 Python checkpoint/resume/replay API 语义已核对；生产包版本、服务部署/身份、独立 Postgres checkpointer schema/retention 与 Plugin sandbox/revocation ADR 尚未冻结 | 无法完成生产恢复、租户隔离和插件热撤权；checkpoint replay 可能重复执行节点副作用 | 固定并审核 runtime/checkpointer 版本与数据库权限/retention；完成 checkpoint restore、interrupt replay、side-effect 幂等、逐次 reauthorization 与 Plugin revoke 演练 |
 | 8 | 2B/2C/2D migrations 未应用；Project SoR / Role Binding provisioning API 尚不存在，Worktree 历史 scope/owner/work-item association 未回填 | 代码可编译，但无可用 membership 和可信历史映射；数据库 RLS / FK 未真实验证 | 在目标数据库评审并应用 migrations；通过受控 provisioning 建立 M bindings，审计 reconciliation，并完成跨 tenant/project/RLS 负向集成 |
@@ -523,3 +528,4 @@ RLS policy 不会自动授予 `CONNECT`、schema `USAGE` 或表级 `SELECT/INSER
 | v1.2 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 盘点 terminal-stack 的协议/hub/snapshot 与 Noop sink、无授权 lazy pane 边界；定义 Phase 4B authenticated REST grant、Local Runtime PTY、首帧单次 ticket、实时 ACL 重验与 Task Card UI 接线；上游同步 basic design v0.9 | 继续推进所有 Phase，冻结受控终端 attachment 边界 |
 | v1.2 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 盘点 terminal-stack 现状，定义 Phase 4B grant→PTY session→首帧单次 WebSocket attachment 流程；明确 Noop sink / lazy pane / pipe stdio 不满足受控 Task CLI，列出 Group UI Token Provider 与 Runtime PTY 的依赖 | 继续推进所有 Phase，基于现有 terminal-stack 推进 Task Card CLI Session |
 | v1.3 | 2026-09-29 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Local Runtime 单次 attachment ticket ledger 与 binding/TTL/清理契约；新增 protected WebSocket 首帧授权和真实 sink 注入 seam，并明确实际 ACL authorizer、Task Session API、Group router、PTY/sandbox 与 Bearer UI wiring 仍未接通；上游同步 basic design v1.0 | 继续推进所有 Phase，开始落地 Task Card CLI attachment 的可实现安全边界 |
+| v4.13 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.14 / basic design v4.7；定义 Project Index 的 Host Runtime Git Worktree retention lock observation DTO、授权后查询、30 秒 freshness、单项/整页 timeout 与 unknown fallback；明确该信号不表示 Agent 活跃或文件互斥，区分历史持久 `locked` 标记，cleanup 需独立活跃状态、drain 与最终重观测；observer 未装配，生产验收仍缺 | Phase 2D 增加 Worktree lock 可见性切片并固定 cleanup 安全门 |

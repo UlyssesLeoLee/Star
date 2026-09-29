@@ -75,7 +75,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useNavStore } from "@/lib/nav/navStore";
-import { GroupApiError, type WorktreeGroupApiClient } from "@/lib/group/worktreeGroupApi";
+import { GroupApiError, normalizeWorktreeGitLock, type GitLockState, type WorktreeGroupApiClient } from "@/lib/group/worktreeGroupApi";
 import { useWorktreeGroupApi } from "@/lib/group/groupProjection";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
@@ -97,6 +97,7 @@ CREATE
   (projectMember:Class {name:"ProjectMember",type:"class",language:"typescript"}),
   (memberEnvelope:Class {name:"ProjectMemberDirectoryEnvelope",type:"class",language:"typescript"}),
   (memberDirectoryStateType:Class {name:"ProjectMemberDirectoryState",type:"class",language:"typescript"}),
+  (gitLockStateType:Class {name:"GitLockState",type:"class",language:"typescript"}),
   (managementPlanType:Class {name:"WorktreeManagementPlan",type:"class",language:"typescript"}),
   (memberEffect:Function {name:"memberDirectoryEffect",type:"function",signature:"useEffect callback(): void",visibility:"private",complexity:"moderate"}),
   (refreshIndex:Function {name:"refreshProjectWorktreeIndex",type:"function",visibility:"private",complexity:"complex"}),
@@ -118,13 +119,15 @@ MATCH (page:Function {name:"WorktreePage"}), (api:Variable {name:"worktreeGroupA
       (directoryEffect:Function {name:"memberDirectoryEffect"}),
       (memberMethod:Function {name:"WorktreeGroupApiClient.listProjectMembers"}),
       (ownerPlan:Function {name:"createOwnerPlan"}),
-      (ownerConfirm:Function {name:"confirmOwnerPlan"});
+      (ownerConfirm:Function {name:"confirmOwnerPlan"}),
+      (normalizeGitLock:Function {name:"normalizeWorktreeGitLock"});
 CREATE (page)-[:USES]->(api), (page)-[:USES]->(state), (page)-[:USES]->(members),
        (page)-[:CALLS]->(refresh), (page)-[:CALLS]->(directoryEffect),
        (directoryEffect)-[:CALLS]->(memberMethod),
        (refresh)-[:CALLS]->(mapper), (details)-[:CALLS]->(plan),
        (details)-[:CALLS]->(confirm), (details)-[:CALLS]->(ownerPlan),
-       (details)-[:CALLS]->(ownerConfirm);
+       (details)-[:CALLS]->(ownerConfirm), (mapper)-[:CALLS]->(normalizeGitLock),
+       (mapper)-[:USES]->(gitLockStateType);
 */
 
 const WORKTREE_INDEX_STATES: readonly WorktreeStatus[] = [
@@ -153,6 +156,8 @@ interface ProjectWorktreeIndexItem {
   ahead: number;
   behind: number;
   locked: boolean;
+  git_lock_state: GitLockState;
+  git_lock_observed_at: string | null;
   health_score: number;
   risk_count: number;
   machine_state: string;
@@ -223,6 +228,7 @@ function mapProjectWorktreeIndexItem(raw: Record<string, unknown>, projectId: st
   const rowProjectId = required("project_id");
   if (rowProjectId !== projectId) throw new Error("Worktree Index 返回了其他 Project 的记录");
   const archived = boolean("archived");
+  const gitLock = normalizeWorktreeGitLock(raw.git_lock);
   const humanState = required("human_state");
   const status = archived ? "archived" : WORKTREE_INDEX_STATES.includes(humanState as WorktreeStatus)
     ? humanState as WorktreeStatus
@@ -249,6 +255,8 @@ function mapProjectWorktreeIndexItem(raw: Record<string, unknown>, projectId: st
     ahead: numeric("ahead"),
     behind: numeric("behind"),
     locked: boolean("locked"),
+    git_lock_state: gitLock.state,
+    git_lock_observed_at: gitLock.observedAt,
     health_score: numeric("health_score"),
     risk_count: numeric("risk_count"),
     machine_state: required("machine_state"),
@@ -600,7 +608,7 @@ export default function WorktreePage() {
                     </td>
                     <td className="text-[10px]">
                       <div>{w.dirty ? "有未提交改动" : "工作区干净"} · +{w.ahead}/−{w.behind}</div>
-                      <div className="text-ink-mute">{w.locked ? "锁定" : "未锁定"} · v{w.version} · 风险 {w.risk_count}</div>
+                      <div className="text-ink-mute">Git Worktree 保留锁：{w.git_lock_state === "locked" ? "已设置" : w.git_lock_state === "unlocked" ? "未设置" : "未知"} · 持久化 locked 标记：{w.locked ? "有" : "无"} · v{w.version} · 风险 {w.risk_count}</div>
                     </td>
                     <td className="text-ink-dim text-xs">{formatTimestamp(w.last_activity)}</td>
                   </tr>
@@ -982,7 +990,8 @@ function LiveWorktreeDetails({
         <Row label="Working tree" value={row.dirty ? "Dirty" : "Clean"} />
         <Row label="Ahead / behind" value={`+${row.ahead} / −${row.behind}`} />
         <Row label="Health / risk" value={`${row.health_score} / ${row.risk_count}`} />
-        <Row label="Lock" value={`${row.locked ? "已锁定" : "未锁定"} · version ${row.version}`} />
+        <Row label="Git worktree retention lock" value={`${row.git_lock_state === "locked" ? "已设置" : row.git_lock_state === "unlocked" ? "未设置" : "未知"} · ${row.git_lock_observed_at ? formatTimestamp(row.git_lock_observed_at) : "无当前观测"}`} />
+        <Row label="Persisted locked marker" value={`${row.locked ? "存在" : "不存在"} · version ${row.version}`} />
         <Row label="Last activity" value={formatTimestamp(row.last_activity)} />
       </dl>
 

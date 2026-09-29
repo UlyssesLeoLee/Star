@@ -8,6 +8,10 @@
 //! MATCH (lm:Function {name:"list_project_members"})
 //! CREATE (va:Function {name:"validate_actor",type:"function"}),(rs:Function {name:"require_scope",type:"function"}),(st:Function {name:"set_tenant",type:"function"}),(ab:Function {name:"active_binding",type:"function"}),
 //!        (lm)-[:CALLS]->(va),(lm)-[:CALLS]->(rs),(lm)-[:CALLS]->(st),(lm)-[:CALLS]->(ab);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"worktrees",type:"module"}),(li:Function {name:"list_project_worktrees",type:"function"}),(wp:Function {name:"worktree_projection",type:"function"}),(observerTrait:Interface {name:"WorktreeGitLockObserver",type:"interface"});
+//! CREATE (observations:Function {name:"observe_git_locks",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(observe:Function {name:"observe_git_lock",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(bounded:Function {name:"observe_git_lock_with_timeout",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(testModule:Module {name:"git_lock_observation_tests",type:"module",language:"rust"}),(test:Class {name:"TestGitLockObserver",type:"class",language:"rust"}),(testObserve:Function {name:"TestGitLockObserver::observe",type:"function",language:"rust"}),(query:Function {name:"query",type:"function",language:"rust",visibility:"private"}),(missing:Function {name:"missing_provider_or_runtime_returns_unknown",type:"function",language:"rust",visibility:"private"}),(unavailable:Function {name:"unavailable_provider_returns_unknown",type:"function",language:"rust",visibility:"private"}),(stale:Function {name:"stale_or_unstamped_provider_result_is_unknown",type:"function",language:"rust",visibility:"private"}),(fresh:Function {name:"fresh_provider_result_preserves_git_lock_state",type:"function",language:"rust",visibility:"private"}),(timeoutTest:Function {name:"slow_provider_times_out_to_unknown",type:"function",language:"rust",visibility:"private"}),(batchTest:Function {name:"batch_observations_preserve_order_and_unknown_missing_runtime",type:"function",language:"rust",visibility:"private"});
+//! CREATE (m)-[:CONTAINS]->(observations),(m)-[:CONTAINS]->(observe),(m)-[:CONTAINS]->(bounded),(m)-[:CONTAINS]->(testModule),(testModule)-[:CONTAINS]->(test),(testModule)-[:CONTAINS]->(query),(testModule)-[:CONTAINS]->(missing),(testModule)-[:CONTAINS]->(unavailable),(testModule)-[:CONTAINS]->(stale),(testModule)-[:CONTAINS]->(fresh),(testModule)-[:CONTAINS]->(timeoutTest),(testModule)-[:CONTAINS]->(batchTest),(test)-[:HAS_METHOD]->(testObserve),(test)-[:IMPLEMENTS]->(observerTrait),(li)-[:CALLS]->(observations),(observations)-[:CALLS]->(observe),(observe)-[:CALLS]->(bounded),(bounded)-[:CALLS]->(observerTrait),(observations)-[:CALLS]->(wp),(missing)-[:CALLS]->(observe),(missing)-[:CALLS]->(observations),(unavailable)-[:CALLS]->(observe),(stale)-[:CALLS]->(observe),(fresh)-[:CALLS]->(observe),(timeoutTest)-[:CALLS]->(bounded),(batchTest)-[:CALLS]->(observations);
 
 use axum::{
     Json, Router,
@@ -21,11 +25,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, Transaction};
+use std::{sync::Arc, time::Duration};
 use uuid::Uuid;
 
 use super::{
-    AuthenticatedUser, GroupApiError, GroupApiState, WorktreeIndexRow, active_binding,
-    require_scope, set_tenant, validate_actor, worktree_projection,
+    AuthenticatedUser, GroupApiError, GroupApiState, WorktreeGitLockObservation,
+    WorktreeGitLockObserver, WorktreeGitLockObserverError, WorktreeGitLockQuery,
+    WorktreeGitLockState, WorktreeIndexRow, active_binding, require_scope, set_tenant,
+    validate_actor, worktree_projection,
 };
 
 #[derive(Debug, Deserialize)]
@@ -175,9 +182,23 @@ async fn list_project_worktrees(
     } else {
         None
     };
+    let queries = rows
+        .iter()
+        .map(|row| {
+            row.runtime_id.map(|runtime_id| WorktreeGitLockQuery {
+                tenant_id: actor.tenant_id,
+                project_id: row.project_id,
+                repository_id: row.repo_id,
+                worktree_id: row.id,
+                runtime_id,
+            })
+        })
+        .collect();
+    let observations = observe_git_locks(state.worktree_git_lock_observer.clone(), queries).await;
     let worktrees = rows
         .into_iter()
-        .map(worktree_projection)
+        .zip(observations)
+        .map(|(row, observation)| worktree_projection(row, observation))
         .collect::<Vec<_>>();
     Ok(Json(json!({
         "project_id": project_id,
@@ -670,5 +691,205 @@ fn require_manager_role(role: &str) -> Result<(), GroupApiError> {
     match role {
         "tenant_admin" | "project_admin" => Ok(()),
         _ => Err(GroupApiError::forbidden()),
+    }
+}
+
+async fn observe_git_lock(
+    observer: Option<&dyn WorktreeGitLockObserver>,
+    query: Option<WorktreeGitLockQuery>,
+) -> WorktreeGitLockObservation {
+    observe_git_lock_with_timeout(observer, query, Duration::from_secs(2)).await
+}
+
+async fn observe_git_lock_with_timeout(
+    observer: Option<&dyn WorktreeGitLockObserver>,
+    query: Option<WorktreeGitLockQuery>,
+    timeout: Duration,
+) -> WorktreeGitLockObservation {
+    let (Some(observer), Some(query)) = (observer, query) else {
+        return WorktreeGitLockObservation::unknown();
+    };
+    match tokio::time::timeout(timeout, observer.observe(query)).await {
+        Ok(Ok(observation)) => observation.normalize(Utc::now()),
+        Ok(Err(WorktreeGitLockObserverError::Unavailable)) | Err(_) => {
+            WorktreeGitLockObservation::unknown()
+        }
+    }
+}
+
+async fn observe_git_locks(
+    observer: Option<Arc<dyn WorktreeGitLockObserver>>,
+    queries: Vec<Option<WorktreeGitLockQuery>>,
+) -> Vec<WorktreeGitLockObservation> {
+    let Some(observer) = observer else {
+        return vec![WorktreeGitLockObservation::unknown(); queries.len()];
+    };
+
+    let results = Arc::new(tokio::sync::Mutex::new(vec![
+        WorktreeGitLockObservation::unknown();
+        queries.len()
+    ]));
+    let concurrency = Arc::new(tokio::sync::Semaphore::new(8));
+    let mut tasks = tokio::task::JoinSet::new();
+
+    for (index, query) in queries.into_iter().enumerate() {
+        let Some(query) = query else {
+            continue;
+        };
+        let observer = observer.clone();
+        let results = results.clone();
+        let concurrency = concurrency.clone();
+        tasks.spawn(async move {
+            let Ok(_permit) = concurrency.acquire_owned().await else {
+                return;
+            };
+            let observation = observe_git_lock(Some(observer.as_ref()), Some(query)).await;
+            results.lock().await[index] = observation;
+        });
+    }
+
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+    while !tasks.is_empty() {
+        match tokio::time::timeout_at(deadline, tasks.join_next()).await {
+            Ok(Some(_)) => {}
+            Ok(None) => break,
+            Err(_) => {
+                tasks.abort_all();
+                break;
+            }
+        }
+    }
+    while tasks.join_next().await.is_some() {}
+
+    let observations = results.lock().await.clone();
+    observations
+}
+
+#[cfg(test)]
+mod git_lock_observation_tests {
+    use super::*;
+
+    struct TestGitLockObserver {
+        observation: WorktreeGitLockObservation,
+        unavailable: bool,
+        delay: Duration,
+    }
+
+    #[async_trait::async_trait]
+    impl WorktreeGitLockObserver for TestGitLockObserver {
+        async fn observe(
+            &self,
+            _query: WorktreeGitLockQuery,
+        ) -> Result<WorktreeGitLockObservation, WorktreeGitLockObserverError> {
+            tokio::time::sleep(self.delay).await;
+            if self.unavailable {
+                Err(WorktreeGitLockObserverError::Unavailable)
+            } else {
+                Ok(self.observation.clone())
+            }
+        }
+    }
+
+    fn query() -> WorktreeGitLockQuery {
+        WorktreeGitLockQuery {
+            tenant_id: Uuid::new_v4(),
+            project_id: Uuid::new_v4(),
+            repository_id: Uuid::new_v4(),
+            worktree_id: Uuid::new_v4(),
+            runtime_id: Uuid::new_v4(),
+        }
+    }
+
+    #[tokio::test]
+    async fn missing_provider_or_runtime_returns_unknown() {
+        let missing_provider = observe_git_lock(None, Some(query())).await;
+        let missing_runtime = observe_git_lock(None, None).await;
+        assert_eq!(missing_provider.state, WorktreeGitLockState::Unknown);
+        assert_eq!(missing_runtime.state, WorktreeGitLockState::Unknown);
+    }
+
+    #[tokio::test]
+    async fn unavailable_provider_returns_unknown() {
+        let observer = TestGitLockObserver {
+            observation: WorktreeGitLockObservation {
+                state: WorktreeGitLockState::Locked,
+                observed_at: Some(Utc::now()),
+            },
+            unavailable: true,
+            delay: Duration::ZERO,
+        };
+        let result = observe_git_lock(Some(&observer), Some(query())).await;
+        assert_eq!(result.state, WorktreeGitLockState::Unknown);
+        assert!(result.observed_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn stale_or_unstamped_provider_result_is_unknown() {
+        for observed_at in [
+            None,
+            Some(Utc::now() - chrono::Duration::seconds(31)),
+            Some(Utc::now() + chrono::Duration::seconds(1)),
+        ] {
+            let observer = TestGitLockObserver {
+                observation: WorktreeGitLockObservation {
+                    state: WorktreeGitLockState::Unlocked,
+                    observed_at,
+                },
+                unavailable: false,
+                delay: Duration::ZERO,
+            };
+            let result = observe_git_lock(Some(&observer), Some(query())).await;
+            assert_eq!(result.state, WorktreeGitLockState::Unknown);
+        }
+    }
+
+    #[tokio::test]
+    async fn fresh_provider_result_preserves_git_lock_state() {
+        let observer = TestGitLockObserver {
+            observation: WorktreeGitLockObservation {
+                state: WorktreeGitLockState::Locked,
+                observed_at: Some(Utc::now()),
+            },
+            unavailable: false,
+            delay: Duration::ZERO,
+        };
+        let result = observe_git_lock(Some(&observer), Some(query())).await;
+        assert_eq!(result.state, WorktreeGitLockState::Locked);
+        assert!(result.observed_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn slow_provider_times_out_to_unknown() {
+        let observer = TestGitLockObserver {
+            observation: WorktreeGitLockObservation {
+                state: WorktreeGitLockState::Unlocked,
+                observed_at: Some(Utc::now()),
+            },
+            unavailable: false,
+            delay: Duration::from_millis(50),
+        };
+        let result =
+            observe_git_lock_with_timeout(Some(&observer), Some(query()), Duration::from_millis(5))
+                .await;
+        assert_eq!(result.state, WorktreeGitLockState::Unknown);
+        assert!(result.observed_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn batch_observations_preserve_order_and_unknown_missing_runtime() {
+        let observer = Arc::new(TestGitLockObserver {
+            observation: WorktreeGitLockObservation {
+                state: WorktreeGitLockState::Unlocked,
+                observed_at: Some(Utc::now()),
+            },
+            unavailable: false,
+            delay: Duration::ZERO,
+        });
+        let results =
+            observe_git_locks(Some(observer), vec![Some(query()), None, Some(query())]).await;
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].state, WorktreeGitLockState::Unlocked);
+        assert_eq!(results[1].state, WorktreeGitLockState::Unknown);
+        assert_eq!(results[2].state, WorktreeGitLockState::Unlocked);
     }
 }

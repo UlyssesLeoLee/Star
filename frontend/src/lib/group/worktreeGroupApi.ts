@@ -133,6 +133,44 @@ CREATE (file)-[:CONTAINS]->(chatTarget),(file)-[:CONTAINS]->(chatTargetPage),
 
 export type GroupAccessTokenProvider = () => Promise<string | null>;
 
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"});
+CREATE (gitLockState:Class {name:"GitLockState",type:"class",language:"typescript",visibility:"public"}),
+       (gitLockView:Class {name:"WorktreeGitLockView",type:"class",language:"typescript",visibility:"public"}),
+       (normalizeGitLock:Function {name:"normalizeWorktreeGitLock",type:"function",language:"typescript",visibility:"public",complexity:"moderate"});
+CREATE (file)-[:CONTAINS]->(gitLockState),(file)-[:CONTAINS]->(gitLockView),(file)-[:CONTAINS]->(normalizeGitLock);
+*/
+
+export type GitLockState = "locked" | "unlocked" | "unknown";
+
+export interface WorktreeGitLockView {
+  state: GitLockState;
+  observedAt: string | null;
+}
+
+export function normalizeWorktreeGitLock(value: unknown, nowMs = Date.now()): WorktreeGitLockView {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { state: "unknown", observedAt: null };
+  }
+
+  const observation = value as Record<string, unknown>;
+  const observedAt = typeof observation.observed_at === "string"
+    && Number.isFinite(Date.parse(observation.observed_at))
+    ? observation.observed_at
+    : null;
+  if (observation.source !== "host_runtime" || observedAt === null) {
+    return { state: "unknown", observedAt };
+  }
+
+  const ageMs = nowMs - Date.parse(observedAt);
+  if (ageMs < 0 || ageMs > 30_000) return { state: "unknown", observedAt };
+  if (observation.state !== "locked" && observation.state !== "unlocked") {
+    return { state: "unknown", observedAt };
+  }
+
+  return { state: observation.state, observedAt };
+}
+
 export type ScopedChatScope = "WORKTREE" | "GLOBAL";
 
 export interface ScopedChatEntityRef {

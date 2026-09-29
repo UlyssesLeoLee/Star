@@ -52,15 +52,56 @@ CREATE (suite)-[:CONTAINS]->(cliLifecycleCase),
        (cliLifecycleCase)-[:CALLS]->(list);
 */
 
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/__tests__/worktreeGroupApi.test.ts"}),
+      (normalizeGitLock:Function {name:"normalizeWorktreeGitLock"});
+CREATE (gitLockSuite:Function {name:"Worktree Git lock observation tests",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),
+       (gitLockFreshCase:Function {name:"fresh Git lock observation case",type:"function",language:"typescript",visibility:"private",complexity:"simple"}),
+       (gitLockFailClosedCase:Function {name:"invalid Git lock observation case",type:"function",language:"typescript",visibility:"private",complexity:"moderate"});
+CREATE (file)-[:CONTAINS]->(gitLockSuite),
+       (gitLockSuite)-[:CONTAINS]->(gitLockFreshCase),(gitLockSuite)-[:CONTAINS]->(gitLockFailClosedCase),
+       (gitLockFreshCase)-[:CALLS]->(normalizeGitLock),(gitLockFailClosedCase)-[:CALLS]->(normalizeGitLock);
+*/
+
 import { describe, expect, it, vi } from "vitest";
 
-import { CanvasOutboxPoller, GroupApiError, WorktreeGroupApiClient } from "../worktreeGroupApi";
+import { CanvasOutboxPoller, GroupApiError, normalizeWorktreeGitLock, WorktreeGroupApiClient } from "../worktreeGroupApi";
 
 function makeClient(token: string | null, response = new Response(JSON.stringify({ ok: true }), { status: 200 })) {
   const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response);
   const api = new WorktreeGroupApiClient(async () => token, fetcher);
   return { api, fetcher };
 }
+
+describe("Worktree Git lock observation", () => {
+  const now = Date.parse("2026-09-30T00:00:30.000Z");
+
+  it("preserves a fresh host runtime locked or unlocked observation", () => {
+    for (const state of ["locked", "unlocked"] as const) {
+      expect(normalizeWorktreeGitLock({
+        state,
+        source: "host_runtime",
+        observed_at: "2026-09-30T00:00:00.000Z",
+      }, now)).toEqual({ state, observedAt: "2026-09-30T00:00:00.000Z" });
+    }
+  });
+
+  it("fails closed for unavailable, invalid, stale, and future observations", () => {
+    const fresh = { state: "locked", source: "host_runtime", observed_at: "2026-09-30T00:00:00.000Z" };
+    const invalid = [
+      { ...fresh, source: "unavailable" },
+      { ...fresh, observed_at: "not-a-time" },
+      { ...fresh, observed_at: "2026-09-29T23:59:59.999Z" },
+      { ...fresh, observed_at: "2026-09-30T00:00:31.000Z" },
+      { state: "locked", source: "host_runtime" },
+      null,
+    ];
+
+    for (const observation of invalid) {
+      expect(normalizeWorktreeGitLock(observation, now).state).toBe("unknown");
+    }
+  });
+});
 
 describe("WorktreeGroupApiClient", () => {
   it("fails closed without a user token", async () => {
