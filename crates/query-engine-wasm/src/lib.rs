@@ -26,6 +26,7 @@
 #![deny(missing_docs)]
 #![allow(clippy::result_large_err)]
 
+use query_engine::dsl_parser::DslParser;
 use query_engine::keywords::{Keyword, KEYWORD_COUNT};
 use wasm_bindgen::prelude::*;
 
@@ -106,6 +107,46 @@ pub fn version() -> String {
     )
 }
 
+/// `parse_full_dsl(input: &str) -> Result<String, JsError>`
+///
+/// Stage 2 PR-236 (per docs §3.2 P2): 完整 DslParser 集成.
+/// 返回 JSON 序列化的 Filter 数组 (Vec<{keyword, value}>), 失败返 JsError.
+#[wasm_bindgen]
+pub fn parse_full_dsl(input: &str) -> Result<String, JsError> {
+    let parser = DslParser::new();
+    let filters = parser
+        .parse(input)
+        .map_err(|e| JsError::new(&format!("DslParser error: {e:?}")))?;
+    serde_json::to_string(&filters)
+        .map_err(|e| JsError::new(&format!("serialize error: {e}")))
+}
+
+/// `operator_count() -> u32`
+///
+/// 5 operator 守门 (per spec §8.7: = / < / > / <= / >=).
+#[wasm_bindgen]
+pub fn operator_count() -> u32 {
+    use query_engine::dsl_parser::Operator;
+    5
+}
+
+/// `operator_at(idx: u32) -> String`
+///
+/// 0..4 → "=" / "<" / ">" / "<=" / ">=".
+/// 越界返空字符串.
+#[wasm_bindgen]
+pub fn operator_at(idx: u32) -> String {
+    use query_engine::dsl_parser::Operator;
+    match idx {
+        0 => "=".to_string(),
+        1 => "<".to_string(),
+        2 => ">".to_string(),
+        3 => "<=".to_string(),
+        4 => ">=".to_string(),
+        _ => String::new(),
+    }
+}
+
 // =====================================================================
 // Unit tests (Rust side, 不依赖 wasm-bindgen-test runtime)
 // =====================================================================
@@ -170,6 +211,30 @@ mod tests {
         assert!(v.contains("query-engine-wasm"));
         assert!(v.contains("rust-to-wasm"));
     }
+
+    // ===== Stage 2 PR-236 tests: operator helpers (wasm-bindgen fn on native OK) =====
+
+    #[test]
+    fn operator_count_is_five() {
+        // 守门 #11: 5 operator per spec §8.7
+        assert_eq!(operator_count(), 5);
+    }
+
+    #[test]
+    fn operator_at_all_five() {
+        assert_eq!(operator_at(0), "=");
+        assert_eq!(operator_at(1), "<");
+        assert_eq!(operator_at(2), ">");
+        assert_eq!(operator_at(3), "<=");
+        assert_eq!(operator_at(4), ">=");
+    }
+
+    #[test]
+    fn operator_at_out_of_bounds() {
+        assert_eq!(operator_at(5), "");
+        assert_eq!(operator_at(100), "");
+        assert_eq!(operator_at(u32::MAX), "");
+    }
 }
 
 // =====================================================================
@@ -193,5 +258,27 @@ mod wasm_tests {
     #[wasm_bindgen_test]
     fn validate_dsl_wasm() {
         assert!(validate_dsl("show ready"));
+    }
+
+    // Stage 2 PR-236: parse_full_dsl (DslParser 完整集成)
+    #[wasm_bindgen_test]
+    fn parse_full_dsl_wasm_basic() {
+        let json = parse_full_dsl("show ready").unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.as_array().unwrap().len(), 1);
+    }
+
+    #[wasm_bindgen_test]
+    fn parse_full_dsl_wasm_multiple() {
+        let json = parse_full_dsl("show ready agent codex").unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.as_array().unwrap().len(), 2);
+    }
+
+    #[wasm_bindgen_test]
+    fn parse_full_dsl_wasm_empty() {
+        let json = parse_full_dsl("").unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.as_array().unwrap().len(), 0);
     }
 }
