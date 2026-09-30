@@ -1,9 +1,9 @@
 # DD-MULTICA-HOOK-001
 
-> **Multica Hook 域詳細設計書 v0.5.6** (Hooks 继续继承 Advanced Settings 并列 tab；Rust-native typed rules、可视化 Builder、Project/Worktree policy 与 RunEvent/BI 方向保持；旧 Python handler 仅作兼容/历史参考)
+> **Multica Hook 域詳細設計書 v0.5.7** (Hooks 是既有 Advanced Settings 的并列选项卡；Phase 9C 已加入条件式 UI 与策略 API adapter，但 session Provider 和生产授权读取尚缺)
 
-> - 状态: 🟡 Draft v0.5.6 (2026-10-01 JST，Phase 9B2C archive-confirm Hook gate conditional REST slice; Host Runtime readiness provider and target DB/RLS/grants are not installed)
-> - 上游: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.1 + [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) v0.5.1 + `docs/requirements.md` v5.20 §50.8D
+> - 状态: 🟡 Draft v0.5.7 (2026-10-01 JST，Phase 9C Advanced Settings Hooks tab implementation; host auth/provider, target DB/RLS/grants remain absent)
+> - 上游: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.2 + [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) v0.5.2 + `docs/requirements.md` v5.20 §50.8D
 > - 下游: 实装代码 + 测试 + 报告
 > - 核心语言: Rust Hook Engine / typed rule evaluator；Rust-native desktop UI；现有 Web UI 仅作同 DTO 的 presentation adapter。旧 Python handler 不具备安全决策 authority。
 > - 平行参考: `DD-PRE-TOOL-USE-GUARD-001.md` v0.1 仅作为既有 guard 行为输入；v0.5 的 Rust builtin policy 对 critical decision 统一 fail-closed，历史 fail-open 方案不具权威性
@@ -1471,7 +1471,7 @@ Canonical route 为 `/settings/advanced/hooks`，位于既有高级设置导航�
 |---|---|---|
 | 左：Policy/Rule list | Project baseline 与当前 Worktree overlay；状态、版本、适用 event、强制/自定义标记、搜索与筛选 | paged authorized projection；不在 client store 持有完整历史 |
 | 中：Visual Rule Builder | typed event phase + scope + condition rows + fixed decision + reason + limits；preview natural-language explanation；draft/save | draft command 使用 expected version/idempotency；无自由代码编辑器 |
-| 右：Trigger Log / Dry-run | 最近 HookEvent、命中条件、decision/reason、关联 Run/Worktree、历史 replay/dry-run 与受影响操作 | read-only cursor paging；高体积 evidence 按需 artifact locator 加载 |
+| 右：Policy Audit / Preview | 当前代码展示策略配置 Audit、版本/继承信息与编辑影响提示；实际 HookEvent、Run 关联、历史 replay 和生产 dry-run 尚未进入 9C UI | 只读策略 Audit；执行事件/BI 属 Phase 9D，不能用配置 Audit 假充 |
 | 顶部：Publish controls | inherited baseline, conflicts, version diff, required approval, publish/rollback, current version | publish 为 versioned audited Domain Command；不能由 preview toggle 即刻改生产规则 |
 
 Dry-run 使用脱敏历史 HookEvent snapshot，不执行 tool/CLI/Worktree command 或外部副作用；结果显示 matched/unmatched/unknown 及规则版本。生产发布前显示新增 deny/人审/可能拦截的 Worktree operation 样本及覆盖不足；审批人只能批准该 immutable digest。UI 不计算最终安全决策，真实 command 必须再经过 Rust Engine。
@@ -1509,7 +1509,17 @@ Archive readiness observer 收到稳定的 management plan `operation_id`、acto
 
 ### 7.1.7 数据兼容、迁移与实现门
 
-旧 `registry.json` 只能作为只读导入源：识别 builtin name/event/action；有可映射的纯数据规则生成 Draft 并人工 review；任意 `handler` module、shell、Python callback、未支持 `transform` 或未知字段均拒绝执行并标出 migration error。旧 Python logs 可以导入为外部 evidence/provenance，不与 canonical RunEvent 伪合并。Phase 9A/9B1 已有 Rust evaluator 与 bounded verified-snapshot loader；`db/migrations/2026-09-30-multica-hook-policy.sql` 定义 policy Master、TTL Draft、append-only Audit 和 FORCE RLS，并已在一次性隔离 PostgreSQL 18 集群双次应用，通过 FORCE RLS、Project/Worktree SCD2 重基、审计 scope 与 append-only/TRUNCATE 场景；9B2B policy API 有 8 条 routes 并通过定向检查、102 个 REST library tests 和 Clippy；9B2C archive-confirm 当前有 103 个 REST library tests，包含 operation-scoped admission fence 最小提交余量检查。production main 未安装 Host Runtime readiness provider，因此缺失时 fail-closed 503；目标 provider 的 fence 时限/事务期限、目标数据库 migration、runtime SQL grants、目标环境 RLS/API integration tests、物理 checkout cleanup 与真正的 lifecycle Domain Command transaction adapter 尚未验收。Hooks 配置入口保持既有 ULYS-235：`/settings/advanced/hooks` 是与 Skills/MCP/Plugins 并列的 Advanced Settings 标签；该 UI/Builder 属 Phase 9C，尚未实现。Phase 9D RunEvent/Audit outbox consumer 与 BI coverage read model、9E Agent/Loop 也仍开放；本地 evaluator/API tests 或隔离 PostgreSQL 通过不等于产品环境部署。
+旧 `registry.json` 只能作为只读导入源：识别 builtin name/event/action；有可映射的纯数据规则生成 Draft 并人工 review；任意 `handler` module、shell、Python callback、未支持 `transform` 或未知字段均拒绝执行并标出 migration error。旧 Python logs 可以导入为外部 evidence/provenance，不与 canonical RunEvent 伪合并。Phase 9A/9B1 已有 Rust evaluator 与 bounded verified-snapshot loader；`db/migrations/2026-09-30-multica-hook-policy.sql` 定义 policy Master、TTL Draft、append-only Audit 和 FORCE RLS，并已在一次性隔离 PostgreSQL 18 集群双次应用，通过 FORCE RLS、Project/Worktree SCD2 重基、审计 scope 与 append-only/TRUNCATE 场景；9B2B policy API 有 8 条 routes 并通过定向检查、102 个 REST library tests 和 Clippy；9B2C archive-confirm 当前有 103 个 REST library tests，包含 operation-scoped admission fence 最小提交余量检查。production main 未安装 Host Runtime readiness provider，因此缺失时 fail-closed 503；目标 provider 的 fence 时限/事务期限、目标数据库 migration、runtime SQL grants、目标环境 RLS/API integration tests、物理 checkout cleanup 与真正的 lifecycle Domain Command transaction adapter 尚未验收。Hooks 配置入口保持既有 ULYS-235：`/settings/advanced/hooks` 是与 Skills/MCP/Plugins 并列的 Advanced Settings 标签。Phase 9C 已加入共用 Advanced Settings tab shell、Hooks 可视规则 Builder 与 REST client contract；实现文件是 `frontend/src/app/(app)/settings/advanced/layout.tsx`、`[tab]/page.tsx`、`[tab]/HookPolicyPage.tsx` 及 `frontend/src/lib/group/worktreeGroupApi.ts`。但应用根部尚未提供 Group API 认证 token/session generation，因此界面当前 fail-closed，不读 seed、不展示假策略、不写入或发布；当前右栏 Audit 仅为策略配置 Audit，不是 Hook 执行日志。Phase 9D RunEvent/Audit outbox consumer 与 BI coverage read model、9E Agent/Loop 仍开放；本地 evaluator/API/UI contract 或隔离 PostgreSQL 通过不等于产品环境部署。
+
+### 7.1.8 Phase 9C 代码路由映射与验收边界
+
+| 产品位置 | 当前实现 | 当前可验收内容 | 未关闭事项 |
+|---|---|---|---|
+| 主导航“高级设置” → Hooks tab | `(app)/settings/advanced/layout.tsx` + `/settings/advanced/[tab]` | Skills、Hooks、MCP、Plugins 并列；`/settings/advanced` 默认进入 Hooks | session generation 与应用根 Providers 的认证接线 |
+| Project/Worktree policy Builder | `[tab]/HookPolicyPage.tsx` | typed 条件/决策、Project/Worktree scope、草稿 CAS、发布角色门、rollback、策略 Audit | API 真实授权读取、目标 DB/RLS、浏览器 E2E、执行日志/BI |
+| Policy REST adapter | `lib/group/worktreeGroupApi.ts` | Project/Worktree read/draft/publish/rollback typed methods | 当前 app 未注入可用 GroupApiClient；目标环境 auth/grants 尚未部署 |
+
+Hooks 是高级设置中的选项卡，不是 Worktree 导航层级。Task identity/Contract 跨多个 Run 保持稳定，每个 Run 是独立执行尝试，Worktree 只是可选执行环境；Run/Evidence 历史不随 Worktree 生命周期清理。BI 与 Benchmark/Improvement 通过 Project Quality & Improvement 视图消费真实 Run/Event，而非插入 Task/Worktree 主导航。
 
 性能验收固定 policy size/rule count/event rate 与 concurrent Run/Worktree load，测 Rust hot-path p50/p95/p99、peak RSS、allocation、queue/backpressure、UI first paint/input p95 和 HookEvent projection coverage；阈值在可重复目标设备测量后版本化，不虚构毫秒/内存数值。Policy cache 按 scope+version+digest 有界淘汰；规则评估不可做同步 DB/network round trip；事务事实不丢，高频 UI projection 可合并并标记 gap。
 
@@ -1543,3 +1553,4 @@ Archive readiness observer 收到稳定的 management plan `operation_id`、acto
 | **v0.5.4** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 9B2B Project/Worktree scoped read/draft/publish/rollback API、Hook scopes/admin role、CAS 与 TTL、原子 Project→Worktree overlay 重基、内存批次上限、rollback provenance 和 correlation/retry 边界；记录 99 个 REST crate library tests 与 targeted check 通过、目标 DB/grants/integration/production 装配仍未完成；重申 `/settings/advanced/hooks` 是既有 Advanced Settings 并列 tab，UI 属 9C | 继续推进 9B2B scoped policy API，并同步实现状态 |
 | **v0.5.5** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9B2C archive-confirm gate 接入 verified effective policy/Rust evaluator；先在 DB 行锁之外读取 Git lock，仅 fresh Unlocked 才请求 bounded Host Runtime drain/readiness；返回后重新授权、检查 Worktree/plan 版本、读取当前策略并验证事实新鲜度；归档决策写现有管理审计，provider 缺失时 fail-closed 503；目标 DB/RLS/grants、生产 provider、物理 cleanup、RunEvent/outbox/BI 与 Advanced Settings Hooks UI 仍未完成 | 推进 Worktree archive-confirm 门，并将导航保留为既有 Advanced Settings 并列标签 |
 | **v0.5.6** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 为 9B2C 增加 operation-scoped admission fence expiry、至少 5 秒提交余量和归档写入前复核；说明 production provider 必须将 fence 与有界 DB transaction 时限联合验收；更新 REST crate 当前测试计数为 103；Hooks 继续位于既有 Advanced Settings 并列标签 | 补强 Runtime drain/readiness 后新 Run/lease 竞态边界，并记录导航要求 |
+| **v0.5.7** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Hook SRS/BD v0.5.2；落档 Phase 9C Advanced Settings 入口与 Skills/Hooks/MCP/Plugins 并列 tab、Project/Worktree typed policy Builder 和 REST adapter 代码位置；明确 host session Provider 缺失时 fail-closed，策略配置 Audit 不等于执行 RunEvent/BI；保持 Task→Run×N 与 Worktree 可选运行环境的分离 | 用户重申 Hooks 是高级设置中的 tab，并要求结合 Run/BI 架构方向 |

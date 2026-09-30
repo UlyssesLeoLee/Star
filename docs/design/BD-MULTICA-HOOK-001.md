@@ -1,13 +1,13 @@
 # BD-MULTICA-HOOK-001
 
-> **Multica Hook 域基本設計書 v0.5.1** (继承 Advanced Settings 多 tab 导航；v0.5 将 Hook Engine / Rule Builder / Worktree safety / BI integration 纳入 Star Rust-native 架构，覆盖旧 Python/Mavis authoritative design)
+> **Multica Hook 域基本設計書 v0.5.2** (Hooks 沿用既有 Advanced Settings 标签导航；Phase 9C 已加入可视 Builder 条件式 UI 代码，宿主认证 Provider 与生产策略仍未就绪)
 
-> - 状态: 🟡 Draft v0.5.1 (2026-09-30 JST，requirements / SRS trace synchronization)
+> - 状态: 🟡 Draft v0.5.2 (2026-10-01 JST，Phase 9C Advanced Settings Hooks tab implementation snapshot)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
-> - 上位要件: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.1 + `docs/requirements.md` v5.20 §50.8D
-> - 兼容参考（非产品决策 runtime）: `scripts/automation/console_server.py`、`scripts/automation/dispatcher.py` 与 `scripts/automation/guardian/pre_tool_use_guard.py` 是现有 Python automation/guard 工具；它们不构成 Star Rust Hook Engine，不拥有产品 ACL、Worktree cleanup 或验收 authority。Hook Engine、Domain gate 与高级设置 tab 均尚待实现。
+> - 上位要件: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.2 + `docs/requirements.md` v5.20 §50.8D
+> - 兼容参考（非产品决策 runtime）: `scripts/automation/console_server.py`、`scripts/automation/dispatcher.py` 与 `scripts/automation/guardian/pre_tool_use_guard.py` 是现有 Python automation/guard 工具；它们不构成 Star Rust Hook Engine，不拥有产品 ACL、Worktree cleanup 或验收 authority。Rust evaluator、policy API 与 archive-confirm gate 已有条件式代码；Phase 9C UI 代码已加入，但宿主 API session/provider 尚未装配，不能读取真实策略或启用写路径。
 > - 平行参考: `docs/automation-design.md` v0.1 (Python 化基线) + `SRS-MULTICA-SKILL-001.md` v0.1 (skills 域, 共享"高级设置"导航) + `SRS-PRE-TOOL-USE-GUARD-001.md` v0.1 (PreToolUse guard 是 hooks 下 1 个 builtin guard)
 > - 守门基线: 守门 #1+#5+#6+#9+#10+#13+#14 v3+#14 v4 8 项必过 (守门 #1 v25 cargo test 不需要跑, 文档工作)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #10 + 守门 #14 v3)
@@ -20,7 +20,7 @@
 
 ## §0 目的 (Purpose)
 
-本文档基于 [`SRS-MULTICA-HOOK-001`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.1 与 `docs/requirements.md` v5.20 §50.8D，定义 STAR 新架构中的 **高级设置 → Hooks**：同导航不同 tab；HookSet 可视化配置；Rust-native enforcement；Worktree/Run/BI 联动。
+本文档基于 [`SRS-MULTICA-HOOK-001`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.2 与 `docs/requirements.md` v5.20 §50.8D，定义 STAR 新架构中的 **高级设置 → Hooks**：Hooks 是与 Skills、MCP、Plugins 并列的内层选项卡；HookSet 可视化配置；Rust-native enforcement；Worktree/Run/BI 联动。主导航只提供“高级设置”入口，不把 Hooks 拆成 Worktree 树节点或独立主导航项。
 
 - **システムアーキテクチャ** (mavis runtime hook 事件流 + UI 高级设置导航 + 标签页架构)
 - **機能分割 / モジュール設計** (6 module: Event Emitter + Hook Registry + Fan-out Scheduler + Hook Runner + Audit Logger + Builtin Hook Loader)
@@ -781,6 +781,14 @@ session_state_manager.save_shared_state(session_id, shared_state)
 /settings/advanced/agents      # (预留)
 ```
 
+以上是稳定的产品路由约定。当前 Phase 9C 使用共享 Advanced Settings 外层布局和动态 tab 页面；它们映射到相同 canonical route，不改变 Hooks 的选项卡层级：
+
+| 产品路由 | 当前 UI 文件 | 状态 |
+|---|---|---|
+| `/settings/advanced/hooks` | `frontend/src/app/(app)/settings/advanced/[tab]/page.tsx` + `HookPolicyPage.tsx` | 🟡 Builder 条件式 UI 已加入；需宿主 session Provider 才可连真实 API |
+| Advanced Settings tab shell | `frontend/src/app/(app)/settings/advanced/layout.tsx` | 🟢 Skills / Hooks / MCP / Plugins 同级 tab 导航已加入 |
+| Advanced Settings default route | `frontend/src/app/(app)/settings/advanced/page.tsx` | 🟢 重定向至 Hooks tab |
+
 ### 7.4 前端组件清单
 
 | 组件 | 路径 | 职责 |
@@ -791,6 +799,12 @@ session_state_manager.save_shared_state(session_id, shared_state)
 | `HookRunLog.tsx` | (同级) | 右: 触发日志 (audit log 查询) |
 | `NewHookDialog.tsx` | (同级) | 创建 hook 表单弹窗 |
 | `useHooks.ts` | (同级) | React hook: 调 hooks/ API |
+
+### 7.5 Phase 9C 实装状态与运行时边界
+
+Phase 9C 已加入 Settings 侧栏的“高级设置”入口及其 Skills / Hooks / MCP / Plugins 并列 tab shell；Hooks 页使用 Project/Worktree 授权选择、typed restrictive rule 表单、Draft CAS、admin publish、rollback 和 policy configuration Audit。规则编辑器只提交 Rust DTO，不允许任意代码、shell 或 plugin callback。UI 的配置 Audit 不代表实际 Hook 执行日志，也不代替 Phase 9D 的 RunEvent/outbox/BI。
+
+当前 Group API client 没有从 app root `Providers` 获得认证 token/session generation，故页面在缺失 session/provider 时不加载 seed、不展示伪策略，也不开放保存/发布；真实 Project baseline 未配置时同样明确阻断 Worktree overlay。已添加路由与 policy API client contract 的代码，不等于浏览器已完成授权读取、目标数据库/RLS 部署或生产写入验收。Task/Run 生命周期仍以独立 Run attempt 为单位，Worktree 是可选执行环境；Run 历史不随 Worktree 归档或清理删除。Project BI、固定 Benchmark 和 Improvement proposal 留在 Project Quality & Improvement 视图，不增加到 Project→Worktree→Task 导航层级。
 
 ---
 
@@ -908,7 +922,7 @@ session_state_manager.save_shared_state(session_id, shared_state)
 | **transform 累积** | 多个 hook 返回 transform 时, 后执行的覆盖前一个的 transformed_args |
 | **decision 优先级** | BLOCK (1) > ASK (2) > WARN (3) > PASS (4), 用于聚合决策 |
 | **mtime 监听** | 通过 watchdog 监听 registry.json 文件修改时间, 触发自动 reload |
-| **跨标签页共享 state** | skills + hooks 标签页共享 session state (per SRS §FR-7.2) |
+| **跨标签页共享 state** | Advanced Settings tabs 可共享已授权的 UI session 状态；Project/Worktree facts 与策略只从当前 API session 读取，不跨 session 复用或回退 seed (per SRS §FR-7.2) |
 
 ---
 
@@ -936,3 +950,4 @@ session_state_manager.save_shared_state(session_id, shared_state)
 | **v0.4** | 2026-09-24 22:13 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 自审饱和: §0 上位 SRS 引用 v0.1→v0.3 + §0 派生来源 SRS 引用 v0.1→v0.3 + §1.2 范围 v0.1+v0.3→v0.2+v0.3 + §1.3 关联文档 SRS 行 v0.1→v0.3; 4 处 cross-reference staleness 修正 | 2026-09-24 22:13 JST Ulysses 评论 "自审, 各级文档都要做到位" |
 | **v0.5** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将高级设置 Hooks tab 的既有导航决策复用为 Rust-native 可视规则管理入口；明确 typed condition/action、Project baseline + Worktree restrictive overlay、不可覆盖 builtin、fail-closed cleanup/Run gate 与 BI/RunEvent provenance；旧 Python/Next.js 方案只作为兼容草案 | 用户要求 Hook 原生实现、可视化配置并纳入 Worktree/BI，同时澄清应位于高级设置标签栏 |
 | **v0.5.1** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 交叉引用更新至 SRS v0.5.1 与总要件 v5.20；设计决策未变 | Phase 8B 扩展总需求后同步当前上位基线 |
+| **v0.5.2** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 SRS v0.5.2；落实 Advanced Settings 侧栏入口与 Hooks 并列 tab 的路由/可视策略 Builder 代码切片；明确 host session、真实策略读取/写入与 Phase 9D 执行 RunEvent/BI 尚未验收，并校正 Task/Run/Worktree/Project BI 的关系 | 用户再次确认 Hooks 是高级设置中的选项卡，并要求融合 Run/BI 架构方向 |

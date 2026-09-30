@@ -233,6 +233,17 @@ export const ALL_MODULES: ModuleDefinition[] = [
     isCore: true,
   },
   {
+    id: "advanced-settings",
+    label: "Advanced Settings",
+    code: "ADV",
+    href: "/settings/advanced/hooks",
+    category: "system",
+    categoryLabel: "System Extensions",
+    description: "Skills、Hooks、MCP 与 Plugins 的统一高级设置入口",
+    icon: Settings,
+    isCore: true,
+  },
+  {
     id: "remote",
     label: "Remote Control",
     code: "M",

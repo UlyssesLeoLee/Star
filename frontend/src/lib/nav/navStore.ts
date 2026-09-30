@@ -62,9 +62,42 @@ export interface NavState {
   resetToDefault: () => void;
 }
 
-export const DEFAULT_SIDEBAR_ITEMS = ["inbox", "issues", "projects", "agents"];
+export const DEFAULT_SIDEBAR_ITEMS = ["inbox", "issues", "projects", "agents", "advanced-settings"];
 export const DEFAULT_PINNED_VIEWS = ["kanban", "timeline"];
 export const DEFAULT_HEADER_TABS = ["inbox", "issues", "projects", "agents", "analytics"];
+
+type PersistedNavState = Pick<
+  NavState,
+  | "sidebarItemIds"
+  | "pinnedViewIds"
+  | "headerTabIds"
+  | "sidebarFold"
+  | "sidebarScope"
+  | "selectedProjectId"
+>;
+
+function migratePersistedNavState(persistedState: unknown): PersistedNavState {
+  const persisted = persistedState as Partial<PersistedNavState> | null;
+  const storedSidebarItems = Array.isArray(persisted?.sidebarItemIds)
+    ? persisted.sidebarItemIds
+    : DEFAULT_SIDEBAR_ITEMS;
+
+  return {
+    sidebarItemIds: storedSidebarItems.includes("advanced-settings")
+      ? storedSidebarItems
+      : [...storedSidebarItems, "advanced-settings"],
+    pinnedViewIds: Array.isArray(persisted?.pinnedViewIds)
+      ? persisted.pinnedViewIds
+      : DEFAULT_PINNED_VIEWS,
+    headerTabIds: Array.isArray(persisted?.headerTabIds)
+      ? persisted.headerTabIds
+      : DEFAULT_HEADER_TABS,
+    sidebarFold: persisted?.sidebarFold === "collapsed" ? "collapsed" : "expanded",
+    sidebarScope: persisted?.sidebarScope === "project" ? "project" : "main",
+    selectedProjectId:
+      typeof persisted?.selectedProjectId === "string" ? persisted.selectedProjectId : "",
+  };
+}
 
 export const useNavStore = create<NavState>()(
   persist(
@@ -155,6 +188,8 @@ export const useNavStore = create<NavState>()(
     {
       // bump v2: 加 sidebarFold + sidebarScope + selectedProjectId 持久化 (per 2026-09-03)
       name: "star-nav-store:v2",
+      version: 3,
+      migrate: (persistedState) => migratePersistedNavState(persistedState),
       storage: createJSONStorage(() => (typeof window !== "undefined" ? localStorage : {
         getItem: () => null,
         setItem: () => {},

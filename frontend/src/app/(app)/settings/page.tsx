@@ -23,6 +23,7 @@
 // =====================================================================
 
 import { useState, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { PageHeader, SectionTitle } from "@/components/PageHeader";
 import { Tabs, type TabItem } from "@/components/Tabs";
@@ -138,6 +139,11 @@ function SettingsPageInner() {
         icon={<Settings className="text-accent" size={20} />}
         count="5 tabs"
       />
+
+      <Link href="/settings/advanced/hooks" className="mb-4 flex items-center justify-between gap-3 rounded border border-accent/30 bg-accent/5 px-4 py-3 hover:bg-accent/10" data-testid="settings-advanced-entry">
+        <span><span className="block text-sm font-semibold text-ink">{t.navModules["advanced-settings"].label}</span><span className="mt-0.5 block text-xs text-ink-dim">{t.navModules["advanced-settings"].description}</span></span>
+        <span aria-hidden="true" className="text-xs text-accent">→</span>
+      </Link>
 
       <Tabs items={TABS as TabItem[]} active={tab} onChange={(id) => setTab(id as SettingsTab)} />
 

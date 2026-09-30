@@ -165,6 +165,58 @@ describe("WorktreeGroupApiClient", () => {
     expect(init?.cache).toBe("no-store");
   });
 
+  it("keeps Hook policy reads, draft writes, publish, and rollback on scoped authenticated routes", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () =>
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    const api = new WorktreeGroupApiClient(async () => "user-jwt", fetcher);
+    const draft = {
+      expected_draft_version: 0,
+      expected_current_policy_set_id: null,
+      correlation_id: "correlation-1",
+      policy_document: { schema_version: 1 },
+    };
+    const publish = { expected_draft_version: 1, correlation_id: "correlation-2" };
+    const rollback = {
+      target_policy_set_id: "policy-old",
+      expected_current_policy_set_id: "policy-current",
+      correlation_id: "correlation-3",
+    };
+
+    await api.listAuthorizedProjects({ limit: 200 });
+    await api.getProjectHookPolicy("project one");
+    await api.getWorktreeHookPolicy("worktree one");
+    await api.saveProjectHookDraft("project one", draft);
+    await api.saveWorktreeHookDraft("worktree one", draft);
+    await api.publishProjectHookDraft("project one", publish);
+    await api.publishWorktreeHookDraft("worktree one", publish);
+    await api.rollbackProjectHookPolicy("project one", rollback);
+    await api.rollbackWorktreeHookPolicy("worktree one", rollback);
+
+    expect(fetcher.mock.calls.map(([input, init]) => [
+      new URL(String(input), "http://localhost").pathname,
+      init?.method ?? "GET",
+    ])).toEqual([
+      ["/api/v1/projects", "GET"],
+      ["/api/v1/projects/project%20one/hook-policy", "GET"],
+      ["/api/v1/worktrees/worktree%20one/hook-policy/effective", "GET"],
+      ["/api/v1/projects/project%20one/hook-policy/draft", "PUT"],
+      ["/api/v1/worktrees/worktree%20one/hook-policy/draft", "PUT"],
+      ["/api/v1/projects/project%20one/hook-policy/publish", "POST"],
+      ["/api/v1/worktrees/worktree%20one/hook-policy/publish", "POST"],
+      ["/api/v1/projects/project%20one/hook-policy/rollback", "POST"],
+      ["/api/v1/worktrees/worktree%20one/hook-policy/rollback", "POST"],
+    ]);
+    expect(JSON.parse(String(fetcher.mock.calls[3][1]?.body))).toEqual(draft);
+    expect(JSON.parse(String(fetcher.mock.calls[5][1]?.body))).toEqual(publish);
+    expect(JSON.parse(String(fetcher.mock.calls[7][1]?.body))).toEqual(rollback);
+    expect(fetcher.mock.calls.every(([, init]) =>
+      new Headers(init?.headers).get("Authorization") === "Bearer user-jwt"
+      && init?.credentials === "omit"
+      && init?.cache === "no-store",
+    )).toBe(true);
+  });
+
   it("uses Project-scoped routes for repository discovery, candidate listing, create, and import", async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async () =>
       new Response(JSON.stringify({ ok: true }), { status: 200 }),
@@ -453,4 +505,11 @@ CREATE (taskRunListCase:Function {name:"Task Run list API case",type:"function",
 CREATE (suite)-[:CONTAINS]->(taskRunListCase),(suite)-[:CONTAINS]->(taskRunLimitCase),
        (taskRunListCase)-[:CALLS]->(makeClient),(taskRunListCase)-[:CALLS]->(listRuns),
        (taskRunLimitCase)-[:CALLS]->(makeClient),(taskRunLimitCase)-[:CALLS]->(listRuns);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (suite:Function {name:"worktreeGroupApi tests"}),
+      (api:Class {name:"WorktreeGroupApiClient"});
+CREATE (hookRoutes:Function {name:"Hook policy scoped routes case",type:"function",language:"typescript",visibility:"private",complexity:"moderate"});
+CREATE (suite)-[:CONTAINS]->(hookRoutes),(hookRoutes)-[:CALLS]->(api);
 */

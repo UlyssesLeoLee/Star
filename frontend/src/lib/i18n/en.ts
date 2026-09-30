@@ -322,6 +322,7 @@ export const en: Dictionary = {
     agents: { label: "Agents", categoryLabel: "Agent / Worktree", description: "Intelligent agent runtime state, orchestration, sessions and execution logs" },
     analytics: { label: "Analytics", categoryLabel: "Work Management", description: "Engineering effectiveness dashboard, burndown chart and telemetry" },
     settings: { label: "Settings", categoryLabel: "System / Meta", description: "Tenant global config, team members, security and permissions" },
+    "advanced-settings": { label: "Advanced Settings", categoryLabel: "System Extensions", description: "Unified Skills, Hooks, MCP and Plugins settings" },
     remote: { label: "Remote Control", categoryLabel: "System / Meta", description: "Mobile connection to desktop / terminal / files" },
     kanban: { label: "Kanban Board", categoryLabel: "Work Management", description: "4-state swimlane drag-and-drop task board" },
     timeline: { label: "Timeline & Gantt", categoryLabel: "Work Management", description: "Gantt chart scheduling, milestones and calendar timeline" },

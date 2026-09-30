@@ -153,4 +153,36 @@ describe("navStore sidebar fold/scope/selectedProjectId (v2)", () => {
     expect(parsed.state.sidebarScope).toBe("project");
     expect(parsed.state.selectedProjectId).toBe("proj-persist-test");
   });
+
+  it("adds Advanced Settings once when migrating saved sidebar preferences", async () => {
+    window.localStorage.setItem(
+      "star-nav-store:v2",
+      JSON.stringify({
+        state: {
+          sidebarItemIds: ["inbox", "projects"],
+          pinnedViewIds: ["kanban"],
+          headerTabIds: ["projects"],
+          sidebarFold: "collapsed",
+          sidebarScope: "project",
+          selectedProjectId: "proj-migration-test",
+        },
+        version: 0,
+      })
+    );
+
+    await useNavStore.persist.rehydrate();
+
+    expect(useNavStore.getState().sidebarItemIds).toEqual([
+      "inbox",
+      "projects",
+      "advanced-settings",
+    ]);
+    expect(useNavStore.getState().sidebarFold).toBe("collapsed");
+    expect(useNavStore.getState().sidebarScope).toBe("project");
+    expect(useNavStore.getState().selectedProjectId).toBe("proj-migration-test");
+
+    useNavStore.getState().removeSidebarItem("advanced-settings");
+    await useNavStore.persist.rehydrate();
+    expect(useNavStore.getState().sidebarItemIds).toEqual(["inbox", "projects"]);
+  });
 });
