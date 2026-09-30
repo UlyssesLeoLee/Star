@@ -14,3 +14,11 @@ src-tauri/target/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Tauri signing keys (per docs/.../p9-ci-secrets-setup-guide.md §3.5 守门 #5)
+keys/
+secrets/
+*.pem
+*.pfx
+*.key
+gpg-private.key
