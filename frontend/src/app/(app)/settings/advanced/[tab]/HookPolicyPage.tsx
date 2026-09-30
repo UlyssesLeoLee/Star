@@ -15,6 +15,7 @@ CREATE
   (conditionValue:Function {name:"valueForCondition",type:"function",signature:"valueForCondition(field,value)",visibility:"private",complexity:"simple"}),
   (operators:Function {name:"operatorsForField",type:"function",signature:"operatorsForField(field)",visibility:"private",complexity:"simple"}),
   (maxRules:Variable {name:"MAX_RULES_PER_SCOPE",type:"variable",language:"typescript"}),
+  (hookPhaseOptions:Variable {name:"HOOK_PHASE_OPTIONS",type:"variable",language:"typescript"}),
   (maxVisibleEvents:Variable {name:"MAX_VISIBLE_HOOK_EVENTS",type:"variable",language:"typescript"}),
   (newCondition:Function {name:"defaultCondition",type:"function",signature:"defaultCondition()",visibility:"private",complexity:"simple"}),
   (newRule:Function {name:"newRestrictiveRule",type:"function",signature:"newRestrictiveRule()",visibility:"private",complexity:"simple"}),
@@ -24,6 +25,7 @@ CREATE
   (ruleEditor)-[:CALLS]->(conditionEditor),(conditionEditor)-[:CALLS]->(valueForCondition),
   (conditionEditor)-[:CALLS]->(operators),(newRule)-[:CALLS]->(defaultCondition),
   (page)-[:USES]->(maxRules),
+  (ruleEditor)-[:USES]->(hookPhaseOptions),
   (executionPanel)-[:USES]->(maxVisibleEvents),
   (file)-[:CONTAINS]->(page),(file)-[:CONTAINS]->(ruleEditor),(file)-[:CONTAINS]->(conditionEditor),
   (file)-[:CONTAINS]->(loadPolicy),(file)-[:CONTAINS]->(editorDocument),(file)-[:CONTAINS]->(digest),
@@ -45,6 +47,7 @@ import {
   type HookExecutionSummary,
   type HookFactField,
   type HookOperator,
+  type HookPhase,
   type HookPolicyDocument,
   type HookPolicyResponse,
   type HookRetentionLockState,
@@ -75,6 +78,11 @@ const DECISIONS: Array<{ id: HookRule["decision"]; label: string }> = [
   { id: "Defer", label: "等待外部条件" },
 ];
 const RETENTION_STATES = ["Fresh", "Missing", "Stale", "Conflict", "Unknown"] as const;
+const HOOK_EVALUATOR_API_VERSION = 2;
+const HOOK_PHASE_OPTIONS: Array<{ id: HookPhase; label: string; requiresRunAdmission?: boolean }> = [
+  { id: "BeforeRunAdmission", label: "Run admission", requiresRunAdmission: true },
+  { id: "BeforeWorktreeArchiveCleanup", label: "Worktree archive / cleanup" },
+];
 const MAX_RULES_PER_SCOPE = 64;
 const MAX_VISIBLE_HOOK_EVENTS = 300;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -191,6 +199,7 @@ export default function HookPolicyPage() {
     setNotice("");
     try {
       const nextDocument = { ...document };
+      nextDocument.evaluator_api_version = HOOK_EVALUATOR_API_VERSION;
       if (scope === "project") {
         nextDocument.worktree_id = null;
         nextDocument.worktree_version = null;
@@ -279,7 +288,7 @@ export default function HookPolicyPage() {
   return (
     <div className="space-y-4" data-testid="hook-policy-page">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div><h2 className="text-lg font-semibold text-ink">Worktree 生命周期 Hook 策略</h2><p className="text-xs text-ink-dim">当前实现覆盖 archive/cleanup 安全门；可视化配置限制性规则，内置安全基线不可关闭、删除或放宽。</p></div>
+        <div><h2 className="text-lg font-semibold text-ink">Worktree 生命周期 Hook 策略</h2><p className="text-xs text-ink-dim">可视化配置服务端已安装 producer 的 phase 限制规则；Rust 内置安全基线不可关闭、删除或放宽。</p></div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs text-ink-mute">策略范围
             <select value={scope} onChange={(event) => setScope(event.target.value as PolicyScopeKind)} className="ml-2 rounded border border-line bg-bg-soft px-2 py-1.5 text-ink">
@@ -332,6 +341,7 @@ export default function HookPolicyPage() {
               {selectedRule ? <HookRuleEditor
                 rule={selectedRule}
                 disabled={!canEdit}
+                runAdmissionEnabled={policy.producer_capabilities.run_admission}
                 onChange={(nextRule) => updateRules(currentRules.map((rule) => ruleKey(rule) === selectedRuleId ? nextRule : rule))}
                 onDelete={() => { updateRules(currentRules.filter((rule) => ruleKey(rule) !== selectedRuleId)); setSelectedRuleId(""); }}
               /> : <div className="grid h-full min-h-64 place-items-center text-sm text-ink-mute">选择一条规则，或新增限制性规则。</div>}
@@ -559,9 +569,10 @@ function formatRunStateCounts(counts: Record<string, number>): string {
   return Object.entries(counts).map(formatRunStateEntry).join(" / ") || "—";
 }
 
-function HookRuleEditor({ rule, disabled, onChange, onDelete }: {
+function HookRuleEditor({ rule, disabled, runAdmissionEnabled, onChange, onDelete }: {
   rule: HookRule;
   disabled: boolean;
+  runAdmissionEnabled: boolean;
   onChange: (rule: HookRule) => void;
   onDelete: () => void;
 }) {
@@ -572,11 +583,15 @@ function HookRuleEditor({ rule, disabled, onChange, onDelete }: {
         <div><h3 className="text-sm font-semibold text-ink">可视化规则</h3><p className="mt-1 font-mono text-[10px] text-ink-mute">{bytesToUuid(rule.rule_id)}</p></div>
         <button type="button" onClick={onDelete} disabled={disabled} className="inline-flex items-center gap-1 text-xs text-red-600 disabled:opacity-40"><Trash2 size={13} />从草稿移除</button>
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-4">
+        <label className="text-xs text-ink-dim">适用阶段<select aria-label="Hook 适用阶段" value={rule.phase ?? "BeforeWorktreeArchiveCleanup"} disabled={disabled} onChange={(event) => { const selected = HOOK_PHASE_OPTIONS.find((option) => option.id === event.target.value && (!option.requiresRunAdmission || runAdmissionEnabled)); if (selected) update({ phase: selected.id }); }} className="mt-1 w-full rounded border border-line bg-bg-soft px-2 py-2 text-ink">{HOOK_PHASE_OPTIONS.map((option) => <option key={option.id} value={option.id} disabled={Boolean(option.requiresRunAdmission && !runAdmissionEnabled)}>{option.label}{option.requiresRunAdmission && !runAdmissionEnabled ? "（producer 未安装）" : ""}</option>)}</select></label>
         <label className="text-xs text-ink-dim">决策<select value={rule.decision} disabled={disabled} onChange={(event) => { const decision = event.target.value as HookRule["decision"]; update({ decision, reason_code: reasonForDecision(decision) }); }} className="mt-1 w-full rounded border border-line bg-bg-soft px-2 py-2 text-ink">{DECISIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
         <label className="text-xs text-ink-dim">优先级<input type="number" min={-32768} max={32767} value={rule.priority} disabled={disabled} onChange={(event) => update({ priority: Math.max(-32768, Math.min(32767, Number(event.target.value) || 0)) })} className="mt-1 w-full rounded border border-line bg-bg-soft px-2 py-2 text-ink" /></label>
         <label className="flex items-center gap-2 self-end rounded border border-line px-2 py-2 text-xs text-ink"><input type="checkbox" checked={rule.enabled} disabled={disabled} onChange={(event) => update({ enabled: event.target.checked })} />启用规则</label>
       </div>
+      {!runAdmissionEnabled
+        ? <p className="mt-2 text-[10px] text-ink-mute">Run admission 的 Rust phase contract 已定义；Local Runtime producer/readiness 未安装时，该阶段保持只读且发布 API 会拒绝。</p>
+        : <p className="mt-2 text-[10px] text-ink-mute">Run admission producer 已由服务端报告可用；策略发布后，新 Run 将在 Runtime fence 与数据库事务内执行此阶段。</p>}
       <div className="mt-5 flex items-center justify-between"><div><h4 className="text-xs font-semibold text-ink">条件（全部满足时触发）</h4><p className="mt-1 text-[10px] text-ink-mute">条件只读取已授权的结构化事实，不接触命令正文、Secret 或任意脚本。</p></div><button type="button" disabled={disabled || rule.conditions.length >= 8} onClick={() => update({ conditions: [...rule.conditions, defaultCondition()] })} className="btn-secondary inline-flex items-center gap-1 text-[11px]"><Plus size={12} />添加条件</button></div>
       <div className="mt-3 space-y-2">{rule.conditions.map((condition, index) => <HookConditionEditor key={`${ruleKey(rule)}-${index}`} condition={condition} disabled={disabled} onChange={(next) => update({ conditions: rule.conditions.map((current, itemIndex) => itemIndex === index ? next : current) })} onDelete={() => update({ conditions: rule.conditions.filter((_, itemIndex) => itemIndex !== index) })} />)}</div>
     </div>
@@ -634,6 +649,7 @@ async function computePolicyDigest(document: HookPolicyDocument): Promise<number
     worktree_version: document.worktree_version,
     project_rules: document.project_rules.map((rule) => ({
       rule_id: rule.rule_id,
+      ...(rule.phase ? { phase: rule.phase } : {}),
       priority: rule.priority,
       enabled: rule.enabled,
       decision: rule.decision,
@@ -642,6 +658,7 @@ async function computePolicyDigest(document: HookPolicyDocument): Promise<number
     })),
     worktree_rules: document.worktree_rules.map((rule) => ({
       rule_id: rule.rule_id,
+      ...(rule.phase ? { phase: rule.phase } : {}),
       priority: rule.priority,
       enabled: rule.enabled,
       decision: rule.decision,
@@ -657,6 +674,7 @@ function newRestrictiveRule(): HookRule {
   const id = crypto.randomUUID();
   return {
     rule_id: uuidToBytes(id),
+    phase: "BeforeWorktreeArchiveCleanup",
     priority: 100,
     enabled: true,
     decision: "Deny",

@@ -16,16 +16,24 @@
 //! MATCH (m:Module {name:"cli_sessions",type:"module"}),(st:Function {name:"start_task_cli_session",type:"function"}),(sp:Interface {name:"TaskCliSessionProvisioner",type:"interface"});
 //! CREATE (idem:Class {name:"TaskRunIdempotency",type:"class",language:"rust"}),(lookup:Function {name:"lookup_cli_task_run",type:"function",language:"rust"}),(record:Function {name:"record_cli_task_run",type:"function",language:"rust"}),(append:Function {name:"append_cli_task_run_event",type:"function",language:"rust"}),(actor_scope:Function {name:"set_actor_scope",type:"function",language:"rust"}),(category:Function {name:"provision_error_category",type:"function",language:"rust"}),(task_run_id:Variable {name:"task_run_id",type:"variable",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(idem),(m)-[:CONTAINS]->(lookup),(m)-[:CONTAINS]->(record),(m)-[:CONTAINS]->(append),(m)-[:CONTAINS]->(actor_scope),(m)-[:CONTAINS]->(category),(st)-[:CALLS]->(lookup),(st)-[:CALLS]->(record),(st)-[:CALLS]->(append),(st)-[:CALLS]->(actor_scope),(st)-[:CALLS]->(category),(st)-[:USES]->(task_run_id),(sp)-[:USES]->(task_run_id),(record)-[:CALLS]->(lookup),(lookup)-[:USES]->(idem);
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"cli_sessions",type:"module"}),(st:Function {name:"start_task_cli_session",type:"function"}),(sp:Interface {name:"TaskCliSessionProvisioner",type:"interface"});
+//! CREATE (readiness:Class {name:"TaskRunAdmissionReadiness",type:"class",language:"rust"}),(readinessCommand:Class {name:"TaskRunAdmissionReadinessCommand",type:"class",language:"rust"}),(loadContext:Function {name:"load_task_cli_start_context",type:"function",language:"rust"}),(freshness:Function {name:"run_admission_readiness_is_fresh",type:"function",language:"rust"}),(appendAdmission:Function {name:"append_run_admission_hook_events",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(readiness),(m)-[:CONTAINS]->(readinessCommand),(m)-[:CONTAINS]->(loadContext),(m)-[:CONTAINS]->(freshness),(m)-[:CONTAINS]->(appendAdmission),(st)-[:CALLS]->(loadContext),(st)-[:CALLS]->(freshness),(st)-[:CALLS]->(appendAdmission),(sp)-[:HAS_METHOD]->(readiness);
 
 use async_trait::async_trait;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::header,
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
 };
 use chrono::{DateTime, Duration, Utc};
+use domain_hook::{
+    EVENT_SCHEMA_VERSION, HookDecision, HookEventEnvelope, HookPhase, HookScope,
+    RetentionLockState, evaluate as evaluate_hook,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -33,15 +41,17 @@ use sqlx::{FromRow, Postgres, Row, Transaction};
 use uuid::Uuid;
 
 use super::{
-    active_binding, require_scope, set_tenant, validate_actor, AuthUser, AuthenticatedUser,
-    GroupApiError, GroupApiState,
+    AuthUser, AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope,
+    set_tenant, validate_actor,
 };
 
 /// A REST-authorized request for provisioning a Task Card CLI session in Local Runtime.
 /// The provisioner must resolve the profile from its trusted catalog and recheck live ACL,
 /// Worktree/runtime health and policy immediately before grant issuance and spawn; persist
 /// TaskRun intent/result audit against the supplied correlation ID. This command is not itself
-/// an execution grant.
+/// an execution grant. For a new admitted Run, the provisioner must consume the supplied
+/// single-use admission fence and verify its full Task/Worktree/Runtime/profile/fingerprint scope
+/// before spawn; `None` is reserved for an already-admitted idempotent replay.
 #[derive(Clone)]
 pub struct TaskCliSessionStartCommand {
     pub tenant_id: Uuid,
@@ -57,6 +67,33 @@ pub struct TaskCliSessionStartCommand {
     pub correlation_id: Uuid,
     pub idempotency_key: String,
     pub request_fingerprint: [u8; 32],
+    /// Short-lived Local Runtime admission fence; absent only for an already-admitted idempotent Run.
+    pub admission_fence_id: Option<Uuid>,
+}
+
+/// Request to observe and fence Local Runtime before the database admission transaction.
+#[derive(Clone, Debug)]
+pub struct TaskRunAdmissionReadinessCommand {
+    pub tenant_id: Uuid,
+    pub actor_id: Uuid,
+    pub project_id: Uuid,
+    pub repository_id: Uuid,
+    pub worktree_id: Uuid,
+    pub work_item_id: Uuid,
+    pub runtime_id: Uuid,
+    pub expected_lifecycle_version: i32,
+    pub approved_launch_profile_id: Uuid,
+    pub correlation_id: Uuid,
+    pub request_fingerprint: [u8; 32],
+}
+
+/// Bounded Local Runtime facts and fence returned before native Run admission evaluation.
+#[derive(Clone, Debug)]
+pub struct TaskRunAdmissionReadiness {
+    pub runtime_healthy: bool,
+    pub observed_at: DateTime<Utc>,
+    pub admission_fence_expires_at: DateTime<Utc>,
+    pub admission_fence_id: Option<Uuid>,
 }
 
 /// Current Group authorization context supplied to Local Runtime for a session operation.
@@ -139,6 +176,21 @@ pub enum TaskCliSessionProvisionError {
 /// previously issued to the browser.
 #[async_trait]
 pub trait TaskCliSessionProvisioner: Send + Sync {
+    /// Explicit opt-in is required before Run-admission policies can be published.
+    fn supports_run_admission(&self) -> bool {
+        false
+    }
+
+    /// Establish a short-lived Worktree fence and report current Runtime health without holding a
+    /// database transaction. Implementations must bind the fence to every supplied identity and
+    /// request field, and consume/validate it in `start_task_cli_session` before spawn.
+    async fn prepare_run_admission(
+        &self,
+        _command: TaskRunAdmissionReadinessCommand,
+    ) -> Result<TaskRunAdmissionReadiness, TaskCliSessionProvisionError> {
+        Err(TaskCliSessionProvisionError::RuntimeUnavailable)
+    }
+
     async fn start_task_cli_session(
         &self,
         command: TaskCliSessionStartCommand,
@@ -193,7 +245,7 @@ struct TaskCliSessionParent {
     correlation_id: Uuid,
 }
 
-#[derive(Debug, FromRow)]
+#[derive(Clone, Debug, FromRow)]
 struct WorktreeTaskCliScope {
     project_id: Uuid,
     repository_id: Uuid,
@@ -209,6 +261,14 @@ struct TaskCliLifecycle {
     active_worktree_id: Option<Uuid>,
     claimed_by: Option<Uuid>,
     version: i32,
+}
+
+struct TaskCliStartContext {
+    worktree: WorktreeTaskCliScope,
+    runtime_id: Uuid,
+    lifecycle: TaskCliLifecycle,
+    request_fingerprint: [u8; 32],
+    existing_run_id: Option<Uuid>,
 }
 
 #[derive(Debug, FromRow)]
@@ -291,111 +351,217 @@ async fn start_task_cli_session(
         .clone()
         .ok_or_else(GroupApiError::service_unavailable)?;
 
-    let mut tx = state
+    let mut preflight_tx = state
         .resolver
         .pool
         .begin()
         .await
         .map_err(|_| GroupApiError::internal())?;
-    set_tenant(&mut tx, actor.tenant_id).await?;
-    set_actor_scope(&mut tx, actor.user_id).await?;
-    let worktree = sqlx::query_as::<_, WorktreeTaskCliScope>(
-        r#"
-        SELECT p.project_id, w.repo_id AS repository_id, w.runtime_id, w.branch, w.archived
-        FROM worktree_canvas_worktree w
-        JOIN multica.worktree_project_binding p
-          ON p.tenant_id = w.tenant_id AND p.worktree_id = w.id
-         AND p.project_id = w.project_id AND p.valid_to IS NULL
-        WHERE w.id = $1 AND w.tenant_id = $2
-        FOR SHARE OF w, p
-        "#,
-    )
-    .bind(worktree_id)
-    .bind(actor.tenant_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?
-    .ok_or_else(GroupApiError::not_found)?;
-    let binding = active_binding(&mut tx, &actor, worktree.project_id).await?;
-    super::work_items::require_task_writer(&binding.role)?;
-    if worktree.archived {
-        return Err(GroupApiError::conflict("worktree_archived"));
-    }
-    let runtime_id = worktree
-        .runtime_id
-        .ok_or_else(|| GroupApiError::conflict("runtime_not_assigned"))?;
-    let request_fingerprint = request_fingerprint(
-        actor.tenant_id,
-        actor.user_id,
-        worktree.project_id,
-        worktree.repository_id,
+    let preflight = load_task_cli_start_context(
+        &mut preflight_tx,
+        &actor,
         worktree_id,
         work_item_id,
-        runtime_id,
         &body,
-    )?;
-    let existing_run_id = lookup_cli_task_run(
-        &mut tx,
-        actor.tenant_id,
-        actor.user_id,
         &idempotency_key,
-        &request_fingerprint,
+        false,
     )
     .await?;
+    preflight_tx
+        .commit()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
 
-    let lifecycle = sqlx::query_as::<_, TaskCliLifecycle>(
-        r#"
-        SELECT c.status, c.review_state, c.active_worktree_id, c.claimed_by, c.version
-        FROM multica.work_item_worktree l
-        JOIN multica.task_metadata m
-          ON m.tenant_id = l.tenant_id AND m.work_item_id = l.work_item_id
-         AND m.project_id = l.project_id AND m.valid_to IS NULL
-        JOIN multica.task_lifecycle_current c
-          ON c.tenant_id = m.tenant_id AND c.work_item_id = m.work_item_id
-        WHERE l.tenant_id = $1 AND l.project_id = $2 AND l.worktree_id = $3
-          AND l.work_item_id = $4 AND l.valid_to IS NULL
-        FOR SHARE OF l, m, c
-        "#,
-    )
-    .bind(actor.tenant_id)
-    .bind(worktree.project_id)
-    .bind(worktree_id)
-    .bind(work_item_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?
-    .ok_or_else(GroupApiError::not_found)?;
+    let (task_run_id, admission_fence_id, worktree, runtime_id, request_fingerprint) =
+        if let Some(existing_run_id) = preflight.existing_run_id {
+            (
+                existing_run_id,
+                None,
+                preflight.worktree,
+                preflight.runtime_id,
+                preflight.request_fingerprint,
+            )
+        } else {
+            if !provisioner.supports_run_admission() {
+                return Err(GroupApiError::feature_unavailable(
+                    "run_admission_producer_unavailable",
+                ));
+            }
+            let readiness = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                provisioner.prepare_run_admission(TaskRunAdmissionReadinessCommand {
+                    tenant_id: actor.tenant_id,
+                    actor_id: actor.user_id,
+                    project_id: preflight.worktree.project_id,
+                    repository_id: preflight.worktree.repository_id,
+                    worktree_id,
+                    work_item_id,
+                    runtime_id: preflight.runtime_id,
+                    expected_lifecycle_version: body.expected_lifecycle_version,
+                    approved_launch_profile_id: body.approved_launch_profile_id,
+                    correlation_id: body.correlation_id,
+                    request_fingerprint: preflight.request_fingerprint,
+                }),
+            )
+            .await;
+            let readiness = match readiness {
+                Ok(Ok(readiness)) => readiness,
+                Ok(Err(_)) | Err(_) => {
+                    return Err(GroupApiError::feature_unavailable(
+                        "run_admission_readiness_unavailable",
+                    ));
+                }
+            };
 
-    if existing_run_id.is_none() {
-        if lifecycle.version != body.expected_lifecycle_version {
-            return Err(GroupApiError::conflict("version_conflict"));
-        }
-        if lifecycle.status != "in_progress"
-            || lifecycle.review_state == "pending_review"
-            || lifecycle.active_worktree_id != Some(worktree_id)
-            || lifecycle.claimed_by != Some(actor.user_id)
-        {
-            return Err(GroupApiError::conflict("task_not_executable_in_worktree"));
-        }
-    }
+            let mut tx = state
+                .resolver
+                .pool
+                .begin()
+                .await
+                .map_err(|_| GroupApiError::internal())?;
+            let current = load_task_cli_start_context(
+                &mut tx,
+                &actor,
+                worktree_id,
+                work_item_id,
+                &body,
+                &idempotency_key,
+                true,
+            )
+            .await?;
+            if let Some(existing_run_id) = current.existing_run_id {
+                tx.commit().await.map_err(|_| GroupApiError::internal())?;
+                (
+                    existing_run_id,
+                    None,
+                    current.worktree,
+                    current.runtime_id,
+                    current.request_fingerprint,
+                )
+            } else {
+                if current.worktree.project_id != preflight.worktree.project_id
+                    || current.worktree.repository_id != preflight.worktree.repository_id
+                    || current.worktree.branch != preflight.worktree.branch
+                    || current.runtime_id != preflight.runtime_id
+                    || current.request_fingerprint != preflight.request_fingerprint
+                {
+                    return Err(GroupApiError::conflict("run_admission_context_changed"));
+                }
 
-    let task_run_id = record_cli_task_run(
-        &mut tx,
-        actor.tenant_id,
-        actor.user_id,
-        worktree.project_id,
-        worktree.repository_id,
-        worktree_id,
-        runtime_id,
-        &worktree.branch,
-        work_item_id,
-        body.correlation_id,
-        &idempotency_key,
-        &request_fingerprint,
-    )
-    .await?;
+                let policy = super::hook_policies::load_verified_effective_snapshot(
+                    &mut tx,
+                    actor.tenant_id,
+                    current.worktree.project_id,
+                    worktree_id,
+                )
+                .await?;
+                let readiness_is_fresh = run_admission_readiness_is_fresh(&readiness);
+                let event = HookEventEnvelope {
+                    event_id: Uuid::new_v4().into_bytes(),
+                    event_schema_version: EVENT_SCHEMA_VERSION,
+                    phase: HookPhase::BeforeRunAdmission,
+                    scope: HookScope {
+                        tenant_id: actor.tenant_id.into_bytes(),
+                        project_id: current.worktree.project_id.into_bytes(),
+                        worktree_id: worktree_id.into_bytes(),
+                        actor_id: actor.user_id.into_bytes(),
+                        correlation_id: body.correlation_id.into_bytes(),
+                    },
+                    actor_authorized: true,
+                    lifecycle_version_matches: current.lifecycle.version
+                        == body.expected_lifecycle_version,
+                    runtime_healthy: Some(readiness.runtime_healthy && readiness_is_fresh),
+                    retention_lock: RetentionLockState::Unknown,
+                    active_run_count: 0,
+                    active_agent_lease_count: 0,
+                    file_claim_count: 0,
+                    owned_process_count: 0,
+                };
+                let evaluation_started = std::time::Instant::now();
+                let evaluation = evaluate_hook(&event, policy.as_ref());
+                let duration_ms =
+                    i64::try_from(evaluation_started.elapsed().as_millis()).unwrap_or(i64::MAX);
 
-    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+                if evaluation.decision != HookDecision::Allow {
+                    append_run_admission_hook_events(
+                        &mut tx,
+                        actor.tenant_id,
+                        actor.user_id,
+                        current.worktree.project_id,
+                        worktree_id,
+                        work_item_id,
+                        None,
+                        &event,
+                        &evaluation,
+                        policy.as_ref(),
+                        duration_ms,
+                        &readiness,
+                    )
+                    .await?;
+                    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+                    return Err(GroupApiError::conflict("hook_admission_denied"));
+                }
+
+                let admission_fence_id = readiness
+                    .admission_fence_id
+                    .filter(|id| !id.is_nil())
+                    .ok_or_else(|| {
+                        GroupApiError::feature_unavailable("run_admission_fence_unavailable")
+                    })?;
+                if !run_admission_readiness_is_fresh(&readiness) {
+                    return Err(GroupApiError::feature_unavailable(
+                        "run_admission_fence_expired",
+                    ));
+                }
+                let hook_snapshot =
+                    serde_json::to_value(policy.as_ref().ok_or_else(GroupApiError::internal)?)
+                        .map_err(|_| GroupApiError::internal())?;
+                let task_run_id = record_cli_task_run(
+                    &mut tx,
+                    actor.tenant_id,
+                    actor.user_id,
+                    current.worktree.project_id,
+                    current.worktree.repository_id,
+                    worktree_id,
+                    current.runtime_id,
+                    &current.worktree.branch,
+                    work_item_id,
+                    body.correlation_id,
+                    &idempotency_key,
+                    &current.request_fingerprint,
+                    &hook_snapshot,
+                )
+                .await?;
+                append_run_admission_hook_events(
+                    &mut tx,
+                    actor.tenant_id,
+                    actor.user_id,
+                    current.worktree.project_id,
+                    worktree_id,
+                    work_item_id,
+                    Some(task_run_id),
+                    &event,
+                    &evaluation,
+                    policy.as_ref(),
+                    duration_ms,
+                    &readiness,
+                )
+                .await?;
+                if !run_admission_readiness_is_fresh(&readiness) {
+                    return Err(GroupApiError::feature_unavailable(
+                        "run_admission_fence_expired",
+                    ));
+                }
+                tx.commit().await.map_err(|_| GroupApiError::internal())?;
+                (
+                    task_run_id,
+                    Some(admission_fence_id),
+                    current.worktree,
+                    current.runtime_id,
+                    current.request_fingerprint,
+                )
+            }
+        };
 
     let provision_result = provisioner
         .start_task_cli_session(TaskCliSessionStartCommand {
@@ -412,6 +578,7 @@ async fn start_task_cli_session(
             correlation_id: body.correlation_id,
             idempotency_key,
             request_fingerprint,
+            admission_fence_id,
         })
         .await;
     let receipt = match provision_result {
@@ -471,6 +638,255 @@ async fn start_task_cli_session(
         axum::http::HeaderValue::from_static("no-cache"),
     );
     Ok(response)
+}
+
+async fn load_task_cli_start_context(
+    tx: &mut Transaction<'_, Postgres>,
+    actor: &AuthUser,
+    worktree_id: Uuid,
+    work_item_id: Uuid,
+    body: &StartTaskCliSessionBody,
+    idempotency_key: &str,
+    tolerate_lifecycle_version_change: bool,
+) -> Result<TaskCliStartContext, GroupApiError> {
+    set_tenant(tx, actor.tenant_id).await?;
+    set_actor_scope(tx, actor.user_id).await?;
+    let worktree = sqlx::query_as::<_, WorktreeTaskCliScope>(
+        r#"
+        SELECT p.project_id, w.repo_id AS repository_id, w.runtime_id, w.branch, w.archived
+        FROM worktree_canvas_worktree w
+        JOIN multica.worktree_project_binding p
+          ON p.tenant_id = w.tenant_id AND p.worktree_id = w.id
+         AND p.project_id = w.project_id AND p.valid_to IS NULL
+        WHERE w.id = $1 AND w.tenant_id = $2
+        FOR SHARE OF w, p
+        "#,
+    )
+    .bind(worktree_id)
+    .bind(actor.tenant_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::not_found)?;
+    let binding = active_binding(tx, actor, worktree.project_id).await?;
+    super::work_items::require_task_writer(&binding.role)?;
+    if worktree.archived {
+        return Err(GroupApiError::conflict("worktree_archived"));
+    }
+    let runtime_id = worktree
+        .runtime_id
+        .ok_or_else(|| GroupApiError::conflict("runtime_not_assigned"))?;
+    let request_fingerprint = request_fingerprint(
+        actor.tenant_id,
+        actor.user_id,
+        worktree.project_id,
+        worktree.repository_id,
+        worktree_id,
+        work_item_id,
+        runtime_id,
+        body,
+    )?;
+    let existing_run_id = lookup_cli_task_run(
+        tx,
+        actor.tenant_id,
+        actor.user_id,
+        idempotency_key,
+        &request_fingerprint,
+    )
+    .await?;
+    let lifecycle = sqlx::query_as::<_, TaskCliLifecycle>(
+        r#"
+        SELECT c.status, c.review_state, c.active_worktree_id, c.claimed_by, c.version
+        FROM multica.work_item_worktree l
+        JOIN multica.task_metadata m
+          ON m.tenant_id = l.tenant_id AND m.work_item_id = l.work_item_id
+         AND m.project_id = l.project_id AND m.valid_to IS NULL
+        JOIN multica.task_lifecycle_current c
+          ON c.tenant_id = m.tenant_id AND c.work_item_id = m.work_item_id
+        WHERE l.tenant_id = $1 AND l.project_id = $2 AND l.worktree_id = $3
+          AND l.work_item_id = $4 AND l.valid_to IS NULL
+        FOR SHARE OF l, m, c
+        "#,
+    )
+    .bind(actor.tenant_id)
+    .bind(worktree.project_id)
+    .bind(worktree_id)
+    .bind(work_item_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::not_found)?;
+    if existing_run_id.is_none() {
+        if !tolerate_lifecycle_version_change
+            && lifecycle.version != body.expected_lifecycle_version
+        {
+            return Err(GroupApiError::conflict("version_conflict"));
+        }
+        if lifecycle.status != "in_progress"
+            || lifecycle.review_state == "pending_review"
+            || lifecycle.active_worktree_id != Some(worktree_id)
+            || lifecycle.claimed_by != Some(actor.user_id)
+        {
+            return Err(GroupApiError::conflict("task_not_executable_in_worktree"));
+        }
+    }
+    Ok(TaskCliStartContext {
+        worktree,
+        runtime_id,
+        lifecycle,
+        request_fingerprint,
+        existing_run_id,
+    })
+}
+
+fn run_admission_readiness_is_fresh(readiness: &TaskRunAdmissionReadiness) -> bool {
+    let now = Utc::now();
+    let Some(fence_id) = readiness.admission_fence_id else {
+        return false;
+    };
+    !fence_id.is_nil()
+        && readiness.observed_at <= now
+        && now.signed_duration_since(readiness.observed_at) <= Duration::seconds(5)
+        && readiness.admission_fence_expires_at > now + Duration::seconds(5)
+        && readiness.admission_fence_expires_at <= now + Duration::seconds(30)
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn append_run_admission_hook_events(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    actor_id: Uuid,
+    project_id: Uuid,
+    worktree_id: Uuid,
+    work_item_id: Uuid,
+    task_run_id: Option<Uuid>,
+    event: &HookEventEnvelope,
+    evaluation: &domain_hook::HookEvaluation,
+    policy: Option<&domain_hook::VerifiedHookPolicySnapshot>,
+    duration_ms: i64,
+    readiness: &TaskRunAdmissionReadiness,
+) -> Result<(), GroupApiError> {
+    let project_policy_version = evaluation
+        .project_version
+        .map(i64::try_from)
+        .transpose()
+        .map_err(|_| GroupApiError::internal())?;
+    let worktree_policy_version = evaluation
+        .worktree_version
+        .map(i64::try_from)
+        .transpose()
+        .map_err(|_| GroupApiError::internal())?;
+    let event_work_item_id = task_run_id.map(|_| work_item_id);
+    let details = json!({
+        "attempted_work_item_id": work_item_id,
+        "readiness_observed_at": readiness.observed_at,
+        "admission_fence_expires_at": readiness.admission_fence_expires_at,
+        "readiness_runtime_healthy": readiness.runtime_healthy,
+        "readiness_fresh_at_evaluation": run_admission_readiness_is_fresh(readiness),
+    });
+    sqlx::query(
+        r#"INSERT INTO multica.hook_execution_event
+           (event_id, tenant_id, project_id, worktree_id, work_item_id, run_id,
+            actor_id, correlation_id, source_kind, hook_phase, hook_decision,
+            hook_reason_code, matched_rule_id, project_policy_version,
+            worktree_policy_version, evaluator_api_version, policy_digest,
+            evaluated_condition_count, duration_ms, timed_out, details)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'task_run', 'run_admission',
+                   $9, $10, $11, $12, $13, $14, $15, $16, $17, false, $18)"#,
+    )
+    .bind(Uuid::from_bytes(event.event_id))
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(worktree_id)
+    .bind(event_work_item_id)
+    .bind(task_run_id)
+    .bind(actor_id)
+    .bind(Uuid::from_bytes(event.scope.correlation_id))
+    .bind(hook_decision_name(evaluation.decision))
+    .bind(hook_reason_name(evaluation.reason_code))
+    .bind(evaluation.matched_rule_id.map(Uuid::from_bytes))
+    .bind(project_policy_version)
+    .bind(worktree_policy_version)
+    .bind(i16::try_from(evaluation.evaluator_api_version).map_err(|_| GroupApiError::internal())?)
+    .bind(evaluation.policy_digest.map(hex::encode))
+    .bind(i32::from(evaluation.evaluated_condition_count))
+    .bind(duration_ms)
+    .bind(details.clone())
+    .execute(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+
+    if let Some(task_run_id) = task_run_id {
+        let hook_set_version = policy
+            .map(|snapshot| snapshot.effective_version())
+            .map(i64::try_from)
+            .transpose()
+            .map_err(|_| GroupApiError::internal())?;
+        let hook_rule_version = evaluation
+            .matched_rule_id
+            .and_then(|rule_id| policy.and_then(|snapshot| snapshot.matched_rule_version(rule_id)))
+            .map(i64::try_from)
+            .transpose()
+            .map_err(|_| GroupApiError::internal())?;
+        sqlx::query(
+            r#"INSERT INTO multica.task_execution_run_event
+               (event_id, tenant_id, project_id, run_id, work_item_id, event_type,
+                hook_set_version, hook_rule_id, hook_rule_version,
+                hook_evaluator_version, hook_digest, hook_phase, hook_decision,
+                hook_reason_class, hook_duration_ms, actor_id, correlation_id, details)
+               VALUES ($1, $2, $3, $4, $5, 'hook_evaluated', $6, $7, $8, $9,
+                       $10, 'run_admission', $11, $12, $13, $14, $15, $16)"#,
+        )
+        .bind(Uuid::from_bytes(event.event_id))
+        .bind(tenant_id)
+        .bind(project_id)
+        .bind(task_run_id)
+        .bind(work_item_id)
+        .bind(hook_set_version)
+        .bind(evaluation.matched_rule_id.map(Uuid::from_bytes))
+        .bind(hook_rule_version)
+        .bind(format!("domain-hook/v{}", evaluation.evaluator_api_version))
+        .bind(evaluation.policy_digest.map(hex::encode))
+        .bind(hook_decision_name(evaluation.decision))
+        .bind(hook_reason_name(evaluation.reason_code))
+        .bind(duration_ms)
+        .bind(actor_id)
+        .bind(Uuid::from_bytes(event.scope.correlation_id))
+        .bind(details)
+        .execute(&mut **tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    }
+    Ok(())
+}
+
+fn hook_decision_name(decision: HookDecision) -> &'static str {
+    match decision {
+        HookDecision::Allow => "allow",
+        HookDecision::Deny => "deny",
+        HookDecision::RequireHuman => "require_human",
+        HookDecision::Defer => "defer",
+    }
+}
+
+fn hook_reason_name(reason: domain_hook::HookReasonCode) -> &'static str {
+    use domain_hook::HookReasonCode;
+
+    match reason {
+        HookReasonCode::AllowedByBuiltinBaseline => "allowed_by_builtin_baseline",
+        HookReasonCode::IncompleteScope => "incomplete_scope",
+        HookReasonCode::EventSchemaUnsupported => "event_schema_unsupported",
+        HookReasonCode::ActorNotAuthorized => "actor_not_authorized",
+        HookReasonCode::LifecycleVersionStale => "lifecycle_version_stale",
+        HookReasonCode::RuntimeUnhealthyOrUnknown => "runtime_unhealthy_or_unknown",
+        HookReasonCode::RetentionLockUnusable => "retention_lock_unusable",
+        HookReasonCode::ExecutionNotDrained => "execution_not_drained",
+        HookReasonCode::PolicyUnavailable => "policy_unavailable",
+        HookReasonCode::PolicyInvalid => "policy_invalid",
+        HookReasonCode::RuleDenied => "rule_denied",
+        HookReasonCode::HumanApprovalRequired => "human_approval_required",
+        HookReasonCode::ExternalConditionPending => "external_condition_pending",
+    }
 }
 
 async fn lookup_cli_task_run(
@@ -536,6 +952,7 @@ async fn record_cli_task_run(
     correlation_id: Uuid,
     idempotency_key: &str,
     request_hash: &[u8; 32],
+    hook_set_snapshot: &serde_json::Value,
 ) -> Result<Uuid, GroupApiError> {
     if let Some(run_id) =
         lookup_cli_task_run(tx, tenant_id, actor_id, idempotency_key, request_hash).await?
@@ -549,7 +966,7 @@ async fn record_cli_task_run(
         INSERT INTO multica.task_execution_run (
             run_id, tenant_id, project_id, work_item_id, initiated_by, execution_channel,
             worktree_id, repository_id, runtime_id, start_ref, task_contract_version,
-            task_snapshot, acceptance_snapshot, correlation_id, run_origin
+            task_snapshot, acceptance_snapshot, correlation_id, run_origin, hook_set_snapshot
         )
         SELECT $1, $2, $3, $4, $5, 'cli', $6, $7, $8, $9, c.version,
                jsonb_build_object(
@@ -566,7 +983,7 @@ async fn record_cli_task_run(
                    'dependencies', c.dependencies,
                    'acceptance_criteria', c.acceptance_criteria
                ) END,
-               $10, 'cli'
+               $10, 'cli', $11
         FROM multica.task_metadata m
         LEFT JOIN multica.task_contract c
           ON c.tenant_id = m.tenant_id AND c.project_id = m.project_id
@@ -585,6 +1002,7 @@ async fn record_cli_task_run(
     .bind(runtime_id)
     .bind(start_ref)
     .bind(correlation_id)
+    .bind(hook_set_snapshot)
     .execute(&mut **tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
@@ -1092,26 +1510,34 @@ mod tests {
             attachment_ticket_expires_at: expires_at,
         };
 
-        assert!(validate_receipt(
-            &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
-            None,
-        )
-        .is_ok());
-        assert!(validate_receipt(
-            &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
-            Some(session_id),
-        )
-        .is_ok());
-        assert!(validate_receipt(
-            &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
-            Some(Uuid::new_v4()),
-        )
-        .is_err());
-        assert!(validate_receipt(
-            &make_receipt(session_id, Utc::now() + Duration::seconds(61)),
-            None,
-        )
-        .is_err());
+        assert!(
+            validate_receipt(
+                &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
+                None,
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_receipt(
+                &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
+                Some(session_id),
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_receipt(
+                &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
+                Some(Uuid::new_v4()),
+            )
+            .is_err()
+        );
+        assert!(
+            validate_receipt(
+                &make_receipt(session_id, Utc::now() + Duration::seconds(61)),
+                None,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -1130,5 +1556,32 @@ mod tests {
             status(session_id)
         ]));
         assert!(!session_statuses_are_valid(&[status(Uuid::nil())]));
+    }
+
+    #[test]
+    fn run_admission_requires_fresh_readiness_and_a_bounded_fence() {
+        let valid = TaskRunAdmissionReadiness {
+            runtime_healthy: true,
+            observed_at: Utc::now(),
+            admission_fence_expires_at: Utc::now() + Duration::seconds(20),
+            admission_fence_id: Some(Uuid::new_v4()),
+        };
+        assert!(run_admission_readiness_is_fresh(&valid));
+
+        let mut stale = valid.clone();
+        stale.observed_at = Utc::now() - Duration::seconds(6);
+        assert!(!run_admission_readiness_is_fresh(&stale));
+
+        let mut missing_fence = valid.clone();
+        missing_fence.admission_fence_id = None;
+        assert!(!run_admission_readiness_is_fresh(&missing_fence));
+
+        let mut short_fence = valid.clone();
+        short_fence.admission_fence_expires_at = Utc::now() + Duration::seconds(4);
+        assert!(!run_admission_readiness_is_fresh(&short_fence));
+
+        let mut unbounded_fence = valid;
+        unbounded_fence.admission_fence_expires_at = Utc::now() + Duration::seconds(31);
+        assert!(!run_admission_readiness_is_fresh(&unbounded_fence));
     }
 }

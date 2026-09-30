@@ -1,13 +1,13 @@
 # SRS-MULTICA-HOOK-001
 
-> **Multica Hook 域要件定义书 v0.5.4** (沿用 Advanced Settings Hooks tab；规定 Phase 9D summary v2 可联合读取 Hook ledger 与 RunEvent、按稳定 event ID 去重并关联最新 Run 状态，但仍明确 partial/unknown coverage 与未接入 producer)
+> **Multica Hook 域要件定义书 v0.5.6** (沿用 ULYS-235 Advanced Settings Hooks tab；补充条件式 Run admission producer/事务双写与当前 production adapter 缺口)
 
-> - 状态: 🟡 Draft v0.5.4 (2026-10-01 JST，Phase 9D Run state read-model contract)
+> - 状态: 🟡 Draft v0.5.6 (2026-10-01 JST，Phase 9D-5b conditional Run admission producer contract)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联基本設計書: [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) v0.5.6
-> - 关联詳細設計書: [`docs/detailed-design/DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.12
+> - 关联基本設計書: [docs/design/BD-MULTICA-HOOK-001.md](../design/BD-MULTICA-HOOK-001.md) v0.5.8
+> - 关联詳細設計書: [docs/detailed-design/DD-MULTICA-HOOK-001.md](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14
 > - 平行 SRS: [`docs/requirements/SRS-MULTICA-SKILL-001.md`](../requirements/SRS-MULTICA-SKILL-001.md) v0.1 (skills 域)
 > - 关联 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §1.3 5 类扩展点 (commands / agents / skills / hooks / MCP)
 > - 拍板来源: 2026-09-24 20:xx JST Ulysses "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计"
@@ -37,7 +37,7 @@
 | 上位文書 | `AGENTS.md` §4 守门硬约束 (守门 #1+#5+#6+#9+#10+#13+#14 v3+#14 v4) |
 | 平行 SRS | `SRS-MULTICA-SKILL-001.md` v0.1 (skills 域, 同走"高级设置"导航 Skills 标签页) |
 | 関連文書 | `docs/automation-design.md` v0.1 + `scripts/automation/console_server.py` v0.1 + `SRS-PRE-TOOL-USE-GUARD-001.md` v0.1 (PreToolUse guard 是 hook 体系下 1 个具体 guard, 本 SRS 是 hook 上位抽象) |
-| 機能数 | 8 機能 (FR-1 ~ FR-8), 業務要件 5 (BR-1 ~ BR-5), 非機能要件 6 類 (NFR-P/A/S/M/T/O), 受理条件 8 (AC-1 ~ AC-8) |
+| 機能数 | 8 機能 (FR-1 ~ FR-8), 業務要件 5 (BR-1 ~ BR-5), 非機能要件 6 類 (NFR-P/A/S/M/T/O), 受理条件 10 (AC-1 ~ AC-10) |
 | データモデル | 3 表 W/T/M 横展 (Hook / Hook Run / Hook Session State, 100% 覆盖 per 守门 #13) |
 | UI 容器 | "高级设置" 导航 (per ULYS-235 拍板) → Skills 标签页 + Hooks 标签页 (per ADR-0026 §1.3 5 类扩展点) |
 
@@ -67,7 +67,7 @@
 - 跟 skills 域并行 (相同导航, 不同标签页, 独立 registry, 共享 session state)
 - 跟 PreToolUse guard 联动 (PreToolUse guard 是 hooks 体系下 1 个具体 builtin guard hook)
 
-本 SRS 与总要件 `docs/requirements.md` v5.21 §50.8D 同步；基本设计见 BD v0.5.6、详细设计见 DD v0.5.12。若 v0.1-v0.4 的 Python runner、用户 handler、任意 transform 或 fail-open 文字与本版冲突，以 v0.5 Rust-native、typed-rule、critical-hook fail-closed 安全边界为准；高级设置导航承接 ULYS-235 的既有决定，不另造 Worktree 级入口。
+本 SRS 与总要件 docs/requirements.md v5.23 §50.8D 同步；基本设计见 BD v0.5.8、详细设计见 DD v0.5.14。若旧版草案与当前 v0.5.6 冲突，以 Rust-native typed evaluator、phase scope、Run admission fence/事务边界与 fail-closed 安全边界为准；Hooks 导航沿用 ULYS-235 的 Advanced Settings 并列标签。
 
 **派生来源**: ULYS-235 (2026-09-24) "hook需求" + ADR-0026 v0.2 §1.3 "5 类扩展点: commands / agents / skills / hooks / MCP" + Claude Code `plugins/hookify` + 9/10 PreToolUse guard 实测 (`SRS-PRE-TOOL-USE-GUARD-001.md` v0.1).
 
@@ -142,6 +142,7 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 ### 1.6 渡口新架构补充（v0.5，优先于旧实现草案）
 
 本版 Hook 是 Star Rust 执行核心内的强约束能力。`HookSet / HookRule / evaluator` 具有稳定 schema、version、digest 与 capability scope；核心 builtin rules 不可关闭，Project policy 作为基线、Worktree policy 只能继承或追加限制。Hook 不授予权限、不改写 Task Contract/验收事实，也不替代 ACL、Domain Command 或独立 Validation。
+Evaluator API v2 将每条 HookRule 绑定到明确 phase。当前原生实现支持 BeforeRunAdmission 与 BeforeWorktreeArchiveCleanup；未填写 phase 的规则固定按 archive/cleanup 解释。已发布的 evaluator API v1 policy 继续按不含 phase 字段的 canonical JSON/digest 校验，只允许用于 archive/cleanup；Run admission 仅支持 ActorAuthorized、LifecycleVersionMatches、RuntimeHealthy facts，其他 phase-specific facts 在策略验证时 fail closed。Phase 9D-5b 已实现条件式 REST producer：Runtime readiness/fence 在锁外有界取得，事务内重授权、重读 scope/lifecycle/policy 并运行 evaluator；Allow 时原子写 Run、HookSet snapshot、Hook ledger 与共享 event_id 的 RunEvent，Deny 时只写无 Task/Run FK 的 ledger。Fence 按完整 request scope 绑定，并要求 Runtime 在 spawn 前消费和重验。由于当前没有生产 TaskCliSessionProvisioner adapter，能力默认关闭：Project/Worktree publish/rollback 服务拒绝包含该 phase 的策略，Builder 依据服务端 capability 禁用该 phase；不能因代码接线存在就将 Run admission 标为生产 coverage。
 
 用户配置入口是已拍板的 **高级设置 → Hooks** tab，与 Skills/MCP/Plugins 共享同一高级设置导航；Hook 不是 Worktree Group App，也不新增 Worktree 树层级。UI 必须提供无代码的可视化 builder：规则/状态列表、结构化事件与条件、有限动作、优先级/范围、继承与覆盖视图、核心规则不可覆盖说明、冲突提示、版本 diff、dry-run/历史事件模拟、审批发布、rollback 与运行日志。禁止任意 Python/JavaScript/shell/动态库和无界 DSL。高级设置管理定义；Worktree Index 展示当前有效 HookSet/version/健康与阻断摘要；Run detail / Project Quality & Improvement 能筛选并下钻 HookEvent。
 
@@ -358,7 +359,7 @@ Rust 核心可执行 phase 以 §1.6 明列的 Run/tool/validation/review/Worktr
 - 路由：`/settings/advanced/hooks`；容器为 Advanced Settings，与 `Skills`、`MCP`、`Plugins` 并列；不得在 Worktree 树中新增 Hook App。
 - 三个工作区：左侧 Project/Worktree scope 和限制规则列表；中间以结构化表单编辑决策、优先级、启用状态与 typed conditions；右侧展示策略版本、继承/覆盖、草稿状态与策略变更 Audit。
 - 用户规则只能选择 `Deny / RequireHuman / Defer`；条件字段、比较符和值由有限类型目录选择；builtin safety baseline 只读。
-- 页面必须说明当前接入的 Hook phase。Phase 9C 仅覆盖 Worktree archive/cleanup 策略；其它 Run/tool/validation/review 触发点由对应阶段接入，不得显示为已支持。
+- 页面必须说明当前接入的 Hook phase。Phase 9D 有 archive producer 与条件式 Run admission producer contract；当前没有生产 Run adapter，因此当前运行环境只报告 `worktree_archive` 已接入、Run admission unknown/未接入。其它 tool/validation/review 触发点由对应阶段接入，不得显示为已支持。
 
 **FR-6.2** Draft / publish / rollback 操作
 
@@ -509,6 +510,8 @@ Rust 核心可执行 phase 以 §1.6 明列的 Run/tool/validation/review/Worktr
 | **AC-6** | FR-6.1 + FR-6.2 | UI 集成测试验证 `/settings/advanced/hooks`、scope 选择、typed 条件编辑、Draft CAS 与 admin-gated publish/rollback；无认证 Provider 时不得显示 seed policy 或发送写请求 | 100% |
 | **AC-7** | FR-6.3 + NFR-O-4 | 9C 验证配置 Audit 与执行日志明确分开；9D 验证有界 summary 窗口/公式/partial coverage 呈现，并验证 RunEvent/outbox 查询、Run outcome 与授权下钻在未接入前不冒充完整 BI | 100% |
 | **AC-8** | NFR-S-1 + NFR-S-5 | 渗透测试 (14 事件 × 4 action type × 10 攻击场景) | 0 命中 |
+| **AC-9** | FR-2.2 + FR-4.1 + FR-6.1 | Rust tests 验证 evaluator API v1 仅用于 archive、phase omission 不跨 phase 匹配、Run admission 拒绝 archive-only facts；REST tests 验证 Project/Worktree publish 拒绝未接入 producer 的 Run admission；Hooks Builder 禁用该选项 | 所有兼容与负例通过；不支持组合 fail closed |
+| **AC-10** | FR-2.2 + FR-4.1 + FR-6.3 | Run admission producer tests 验证 readiness 不在 DB transaction 内等待、freshness/fence 约束、Allow 与 Run/HookSet snapshot/Hook ledger/RunEvent 原子写入并共享 event_id、Deny 不创建 Run；coverage 随服务端 producer capability 更新 | 正负路径、重复请求与 BI 去重契约通过；未装配 adapter 时 capability=false 且 policy/UI 保持关闭 |
 
 ---
 
@@ -554,3 +557,5 @@ Rust 核心可执行 phase 以 §1.6 明列的 Run/tool/validation/review/Worktr
 | **v0.5.2** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | FR-6 改为 Project/Worktree policy Builder 与 typed Audit API；FR-7 明确“高级设置”父入口和并列 tabs，不复制跨 session 授权事实；FR-8/AC 改为 Rust evaluator、policy API 与当前 UI/navigation 验收；更新当前代码文件和认证 Provider 缺口；区分 Phase 9D 执行 RunEvent/BI | Phase 9C 实装 Advanced Settings 导航与 Hooks 策略编辑页，清除旧 registry.json/handler 需求歧义 |
 | **v0.5.3** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Advanced Settings 内部局部标签条与 Settings 主侧栏父入口的层级；规定 Phase 9D `hook_execution_summary_v1` 只覆盖已记录 archive ledger、明确窗口和 partial/unknown 状态，不得当作 Run outcome join 或完整 BI；更新上/下游设计版本 | Phase 9D summary API/UI consumer 接入既有 ULYS-235 Hooks 标签 |
 | **v0.5.4** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 summary 升为 v2：合并 Hook ledger 与完整 RunEvent 投影，使用共享 event_id 去重并以 tenant/project/task/run 键关联最新 Run 状态；将无效投影计数显式暴露，仍保持 Run producer 未接入与 partial/unknown coverage 边界 | Phase 9D-4 加入双来源受限 read model 与 Run 状态 join |
+| **v0.5.5** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 evaluator API v2 的 phase-scoped HookRule、旧 v1 archive policy canonical digest 兼容、Run admission typed-fact allowlist 与 UI producer/readiness gate；同步总要件 v5.22、BD v0.5.7、DD v0.5.13，并保留 ULYS-235 高级设置内并列标签导航 | Phase 9D-5a 将 typed evaluator 扩展到 Run admission contract，但尚未接入 Run producer |
+| **v0.5.6** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 9D-5b 条件式 Run admission producer/readiness 与原子事务双写要求，固定 `tenant_id + event_id` BI 去重、fence freshness/TTL 与当前生产 adapter 缺口；同步总要件 v5.23、BD v0.5.8、DD v0.5.14，保持 Hooks 在 Advanced Settings 并列标签 | Run admission REST/DB producer seam 落地，需明确实现边界与未部署状态 |

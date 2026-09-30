@@ -277,6 +277,7 @@ export interface AuthorizedProjectsQuery {
 }
 
 export type HookDecision = "Allow" | "Deny" | "RequireHuman" | "Defer";
+export type HookPhase = "BeforeRunAdmission" | "BeforeWorktreeArchiveCleanup";
 export type HookReasonCode =
   | "AllowedByBuiltinBaseline"
   | "IncompleteScope"
@@ -321,6 +322,7 @@ export interface HookCondition {
 
 export interface HookRule {
   rule_id: number[];
+  phase?: HookPhase;
   priority: number;
   enabled: boolean;
   decision: Exclude<HookDecision, "Allow">;
@@ -364,6 +366,7 @@ export interface HookPolicyDraftView {
 
 export interface HookPolicyResponse {
   scope: { kind: "project" | "worktree"; project_id: string; worktree_id: string | null };
+  producer_capabilities: { run_admission: boolean };
   policy_set_id: string | null;
   policy_document: HookPolicyDocument | null;
   effective_policy_document: HookPolicyDocument | null;
@@ -1249,6 +1252,7 @@ MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
       (client:Class {name:"WorktreeGroupApiClient"}),
       (request:Function {name:"WorktreeGroupApiClient.request"});
 CREATE (hookDecision:Class {name:"HookDecision",type:"class",language:"typescript",visibility:"public"}),
+       (hookPhase:Class {name:"HookPhase",type:"class",language:"typescript",visibility:"public"}),
        (hookReason:Class {name:"HookReasonCode",type:"class",language:"typescript",visibility:"public"}),
        (hookFact:Class {name:"HookFactField",type:"class",language:"typescript",visibility:"public"}),
        (hookOperator:Class {name:"HookOperator",type:"class",language:"typescript",visibility:"public"}),
@@ -1269,6 +1273,7 @@ CREATE (hookDecision:Class {name:"HookDecision",type:"class",language:"typescrip
        (rollbackProject:Function {name:"WorktreeGroupApiClient.rollbackProjectHookPolicy",type:"function",language:"typescript",visibility:"public",complexity:"simple"}),
        (rollbackWorktree:Function {name:"WorktreeGroupApiClient.rollbackWorktreeHookPolicy",type:"function",language:"typescript",visibility:"public",complexity:"simple"});
 CREATE (file)-[:CONTAINS]->(hookDecision),(file)-[:CONTAINS]->(hookReason),
+       (file)-[:CONTAINS]->(hookPhase),
        (file)-[:CONTAINS]->(hookFact),(file)-[:CONTAINS]->(hookOperator),(file)-[:CONTAINS]->(hookValue),
        (file)-[:CONTAINS]->(hookCondition),(file)-[:CONTAINS]->(hookRule),(file)-[:CONTAINS]->(hookDocument),
        (file)-[:CONTAINS]->(hookAudit),(file)-[:CONTAINS]->(hookDraft),(file)-[:CONTAINS]->(hookResponse),

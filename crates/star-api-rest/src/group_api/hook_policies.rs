@@ -101,6 +101,14 @@
 //! MATCH (m:Module {name:"hook_policies",type:"module"}),(rt:Function {name:"router",type:"function"});
 //! CREATE (summaryQuery:Class {name:"HookSummaryQuery",type:"class",language:"rust"}),(summaryGroup:Class {name:"HookSummaryGroup",type:"class",language:"rust"}),(summaryDays:Variable {name:"window_days",type:"variable",language:"rust"}),(summary:Function {name:"summarize_hook_events",type:"function",language:"rust",visibility:"private",complexity:"complex"}),(sourceUnion:Logic {name:"hook_summary_source_union_and_deduplication",type:"logic",language:"sql"}),(runStateJoin:Logic {name:"hook_summary_latest_run_state_join",type:"logic",language:"sql"}),(incompleteProjectionCount:Logic {name:"hook_summary_incomplete_run_projection_count",type:"logic",language:"sql"});
 //! CREATE (m)-[:CONTAINS]->(summaryQuery),(m)-[:CONTAINS]->(summaryGroup),(m)-[:CONTAINS]->(summary),(summary)-[:CONTAINS]->(sourceUnion),(summary)-[:CONTAINS]->(runStateJoin),(summary)-[:CONTAINS]->(incompleteProjectionCount),(rt)-[:CALLS]->(summary),(summary)-[:USES]->(summaryGroup),(summaryQuery)-[:USES]->(summaryDays);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"hook_policies",type:"module"}),(normalizeProject:Function {name:"normalize_project_document",type:"function"}),(normalizeWorktree:Function {name:"normalize_worktree_document",type:"function"}),(tests:Module {name:"tests",type:"module"});
+//! CREATE (phaseGate:Function {name:"ensure_phase_producers_available",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(phaseGateTest:Function {name:"publish_rejects_run_admission_without_producer",type:"function",language:"rust",visibility:"private",complexity:"moderate"});
+//! CREATE (m)-[:CONTAINS]->(phaseGate),(tests)-[:CONTAINS]->(phaseGateTest),(normalizeProject)-[:CALLS]->(phaseGate),(normalizeWorktree)-[:CALLS]->(phaseGate),(phaseGateTest)-[:CALLS]->(normalizeProject),(phaseGateTest)-[:CALLS]->(normalizeWorktree);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"hook_policies",type:"module"}),(listEvents:Function {name:"list_hook_events",type:"function"}),(summary:Function {name:"summarize_hook_events",type:"function"}),(tests:Module {name:"tests",type:"module"});
+//! CREATE (phaseCoverage:Function {name:"hook_phase_coverage",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(phaseCoverageTest:Function {name:"hook_phase_coverage_tracks_the_installed_run_admission_producer",type:"function",language:"rust",visibility:"private",complexity:"simple"});
+//! CREATE (m)-[:CONTAINS]->(phaseCoverage),(tests)-[:CONTAINS]->(phaseCoverageTest),(listEvents)-[:CALLS]->(phaseCoverage),(summary)-[:CALLS]->(phaseCoverage),(phaseCoverageTest)-[:CALLS]->(phaseCoverage);
 use axum::{
     Json, Router,
     body::Bytes,
@@ -110,7 +118,7 @@ use axum::{
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Duration, Utc};
-use domain_hook::{HookPolicyDocument, MAX_POLICY_DOCUMENT_BYTES};
+use domain_hook::{HookPhase, HookPolicyDocument, MAX_POLICY_DOCUMENT_BYTES};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{FromRow, Postgres, Transaction};
@@ -380,6 +388,8 @@ async fn list_hook_events(
     } else {
         None
     };
+    let (instrumented_phases, not_yet_instrumented_phases) =
+        hook_phase_coverage(state.run_admission_producer_available());
     let body = json!({
         "events": events,
         "next_cursor": next_cursor,
@@ -387,8 +397,8 @@ async fn list_hook_events(
             "scope": "hook_execution_event_ledger",
             "status": "partial",
             "reported_percentage": Value::Null,
-            "instrumented_phases": ["worktree_archive"],
-            "not_yet_instrumented_phases": ["run_admission", "tool", "validation", "review", "worktree_cleanup", "after_commit"],
+            "instrumented_phases": instrumented_phases,
+            "not_yet_instrumented_phases": not_yet_instrumented_phases,
             "note": "Uninstrumented phases are unknown, not zero-risk or zero-volume."
         }
     });
@@ -568,6 +578,8 @@ async fn summarize_hook_events(
         .iter()
         .map(|group| group.duration_total_ms)
         .sum::<i64>();
+    let (instrumented_phases, not_yet_instrumented_phases) =
+        hook_phase_coverage(state.run_admission_producer_available());
     let body = json!({
         "metric_version": "hook_execution_summary_v2",
         "window": {
@@ -586,10 +598,10 @@ async fn summarize_hook_events(
             "scope": "hook_execution_event_and_task_execution_run_event",
             "status": "partial",
             "reported_percentage": Value::Null,
-            "instrumented_phases": ["worktree_archive"],
-            "not_yet_instrumented_phases": ["run_admission", "tool", "validation", "review", "worktree_cleanup", "after_commit"],
+            "instrumented_phases": instrumented_phases,
+            "not_yet_instrumented_phases": not_yet_instrumented_phases,
             "run_state_join": run_state_join,
-            "note": "Summary merges complete Hook ledger rows with complete hook_evaluated RunEvent rows by shared event identity; latest Run state is joined by tenant, Project, Task, and Run. Run producers and unobserved phases remain incomplete or unknown."
+            "note": "Summary merges complete Hook ledger rows with complete hook_evaluated RunEvent rows by shared event identity; latest Run state is joined by tenant, Project, Task, and Run. Other producers and unobserved phases remain incomplete or unknown."
         },
         "formulas": {
             "observed_event_count": "COUNT(*) after union and deduplication of Hook ledger and complete hook_evaluated RunEvent projections for the Project and window",
@@ -640,6 +652,35 @@ fn encode_hook_event_cursor(
     Ok(URL_SAFE_NO_PAD.encode(bytes))
 }
 
+fn hook_phase_coverage(
+    run_admission_producer_available: bool,
+) -> (Vec<&'static str>, Vec<&'static str>) {
+    if run_admission_producer_available {
+        (
+            vec!["worktree_archive", "run_admission"],
+            vec![
+                "tool",
+                "validation",
+                "review",
+                "worktree_cleanup",
+                "after_commit",
+            ],
+        )
+    } else {
+        (
+            vec!["worktree_archive"],
+            vec![
+                "run_admission",
+                "tool",
+                "validation",
+                "review",
+                "worktree_cleanup",
+                "after_commit",
+            ],
+        )
+    }
+}
+
 async fn get_project_policy(
     State(state): State<GroupApiState>,
     AuthenticatedUser(actor): AuthenticatedUser,
@@ -679,7 +720,7 @@ async fn get_worktree_effective_policy(
     )
     .await?;
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
-    Ok(Json(result))
+    Ok(Json(with_producer_capabilities(&state, result)))
 }
 
 async fn save_project_draft(
@@ -831,7 +872,19 @@ async fn read_policy_scope(
     .await?;
     let result = read_policy_in_tx(&mut tx, actor, scope, project_id, worktree_id).await?;
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
-    Ok(Json(result))
+    Ok(Json(with_producer_capabilities(state, result)))
+}
+
+fn with_producer_capabilities(state: &GroupApiState, mut response: Value) -> Value {
+    if let Some(object) = response.as_object_mut() {
+        object.insert(
+            "producer_capabilities".to_owned(),
+            json!({
+                "run_admission": state.run_admission_producer_available(),
+            }),
+        );
+    }
+    response
 }
 
 async fn read_policy_in_tx(
@@ -1175,6 +1228,7 @@ async fn publish_draft(
     }
     let document =
         decode_document(&draft.policy_document).map_err(|_| GroupApiError::internal())?;
+    let run_admission_producer_available = state.run_admission_producer_available();
     let new_policy_set_id = if scope == PolicyScope::Project {
         publish_project_document(
             &mut tx,
@@ -1186,6 +1240,7 @@ async fn publish_draft(
             None,
             body.correlation_id,
             "policy_published",
+            run_admission_producer_available,
         )
         .await?
     } else {
@@ -1201,6 +1256,7 @@ async fn publish_draft(
             None,
             body.correlation_id,
             "policy_published",
+            run_admission_producer_available,
         )
         .await?
     };
@@ -1306,6 +1362,7 @@ async fn rollback_policy(
         ));
     }
     let mut document = verify_stored_policy(&target, actor.tenant_id, project_id, worktree_id)?;
+    let run_admission_producer_available = state.run_admission_producer_available();
     let new_policy_set_id = if scope == PolicyScope::Project {
         publish_project_document(
             &mut tx,
@@ -1317,6 +1374,7 @@ async fn rollback_policy(
             Some(target.policy_set_id),
             body.correlation_id,
             "policy_rolled_back",
+            run_admission_producer_available,
         )
         .await?
     } else {
@@ -1351,6 +1409,7 @@ async fn rollback_policy(
             Some(target.policy_set_id),
             body.correlation_id,
             "policy_rolled_back",
+            run_admission_producer_available,
         )
         .await?
     };
@@ -1371,6 +1430,7 @@ async fn publish_project_document(
     rollback_source: Option<Uuid>,
     correlation_id: Uuid,
     event_type: &'static str,
+    run_admission_producer_available: bool,
 ) -> Result<Uuid, GroupApiError> {
     let current_project_doc = current
         .as_ref()
@@ -1382,8 +1442,13 @@ async fn publish_project_document(
         .unwrap_or(0)
         .checked_add(1)
         .ok_or_else(GroupApiError::internal)?;
-    let project_document =
-        normalize_project_document(document, actor.tenant_id, project_id, next_version)?;
+    let project_document = normalize_project_document(
+        document,
+        actor.tenant_id,
+        project_id,
+        next_version,
+        run_admission_producer_available,
+    )?;
     let rebased_worktree_count = if let Some(current) = current.as_ref() {
         stage_project_overlay_rebases(
             tx,
@@ -1443,6 +1508,7 @@ async fn publish_worktree_document(
     rollback_source: Option<Uuid>,
     correlation_id: Uuid,
     event_type: &'static str,
+    run_admission_producer_available: bool,
 ) -> Result<Uuid, GroupApiError> {
     let project =
         current_project.ok_or_else(|| GroupApiError::conflict("project_policy_missing"))?;
@@ -1461,6 +1527,7 @@ async fn publish_worktree_document(
         worktree_id,
         &project_document,
         next_version,
+        run_admission_producer_available,
     )?;
     if let Some(current) = current_worktree.as_ref() {
         if current.inherited_project_policy_set_id != Some(project.policy_set_id) {
@@ -1769,11 +1836,27 @@ fn validate_document_scope(
     Ok(())
 }
 
+fn ensure_phase_producers_available(
+    document: &HookPolicyDocument,
+    run_admission_producer_available: bool,
+) -> Result<(), GroupApiError> {
+    let has_unavailable_run_admission = document
+        .project_rules
+        .iter()
+        .chain(document.worktree_rules.iter())
+        .any(|rule| rule.phase == Some(HookPhase::BeforeRunAdmission));
+    if has_unavailable_run_admission && !run_admission_producer_available {
+        return Err(GroupApiError::conflict("hook_phase_producer_unavailable"));
+    }
+    Ok(())
+}
+
 fn normalize_project_document(
     mut document: HookPolicyDocument,
     tenant_id: Uuid,
     project_id: Uuid,
     version: i64,
+    run_admission_producer_available: bool,
 ) -> Result<HookPolicyDocument, GroupApiError> {
     document.tenant_id = tenant_id.into_bytes();
     document.project_id = project_id.into_bytes();
@@ -1781,6 +1864,7 @@ fn normalize_project_document(
     document.project_version = u64::try_from(version).map_err(|_| GroupApiError::internal())?;
     document.worktree_version = None;
     document.worktree_rules.clear();
+    ensure_phase_producers_available(&document, run_admission_producer_available)?;
     document.digest = document
         .computed_digest()
         .map_err(|_| GroupApiError::invalid_request("invalid_hook_policy"))?;
@@ -1798,6 +1882,7 @@ fn normalize_worktree_document(
     worktree_id: Uuid,
     project_document: &HookPolicyDocument,
     version: i64,
+    run_admission_producer_available: bool,
 ) -> Result<HookPolicyDocument, GroupApiError> {
     document.tenant_id = tenant_id.into_bytes();
     document.project_id = project_id.into_bytes();
@@ -1808,6 +1893,7 @@ fn normalize_worktree_document(
     document
         .project_rules
         .clone_from(&project_document.project_rules);
+    ensure_phase_producers_available(&document, run_admission_producer_available)?;
     document.digest = document
         .computed_digest()
         .map_err(|_| GroupApiError::invalid_request("invalid_hook_policy"))?;
@@ -2085,6 +2171,18 @@ async fn insert_audit(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use domain_hook::{HookDecision, HookReasonCode, HookRule};
+
+    #[test]
+    fn hook_phase_coverage_tracks_the_installed_run_admission_producer() {
+        let (without_run, pending_without_run) = hook_phase_coverage(false);
+        assert_eq!(without_run, vec!["worktree_archive"]);
+        assert!(pending_without_run.contains(&"run_admission"));
+
+        let (with_run, pending_with_run) = hook_phase_coverage(true);
+        assert_eq!(with_run, vec!["worktree_archive", "run_admission"]);
+        assert!(!pending_with_run.contains(&"run_admission"));
+    }
 
     #[test]
     fn hook_event_cursor_is_project_scoped_and_versioned() {
@@ -2161,8 +2259,8 @@ mod tests {
         let project_id = Uuid::new_v4();
         let document = policy_document(tenant_id, project_id, None, 1, None);
 
-        let normalized =
-            normalize_project_document(document, tenant_id, project_id, 2).expect("valid baseline");
+        let normalized = normalize_project_document(document, tenant_id, project_id, 2, false)
+            .expect("valid baseline");
 
         assert_eq!(normalized.project_version, 2);
         assert_eq!(normalized.worktree_id, None);
@@ -2178,14 +2276,84 @@ mod tests {
         let baseline = policy_document(tenant_id, project_id, None, 4, None);
         let overlay = policy_document(tenant_id, project_id, Some(worktree_id), 3, Some(1));
 
-        let normalized =
-            normalize_worktree_document(overlay, tenant_id, project_id, worktree_id, &baseline, 2)
-                .expect("valid overlay");
+        let normalized = normalize_worktree_document(
+            overlay,
+            tenant_id,
+            project_id,
+            worktree_id,
+            &baseline,
+            2,
+            false,
+        )
+        .expect("valid overlay");
 
         assert_eq!(normalized.project_version, 4);
         assert_eq!(normalized.worktree_version, Some(2));
         assert_eq!(normalized.worktree_id, Some(worktree_id.into_bytes()));
         assert!(normalized.clone().verify().is_ok());
+    }
+
+    #[test]
+    fn publish_rejects_run_admission_without_producer() {
+        let tenant_id = Uuid::new_v4();
+        let project_id = Uuid::new_v4();
+        let worktree_id = Uuid::new_v4();
+        let mut baseline = policy_document(tenant_id, project_id, None, 1, None);
+        baseline.evaluator_api_version = 2;
+        baseline.project_rules.push(HookRule {
+            rule_id: [9; 16],
+            phase: Some(HookPhase::BeforeRunAdmission),
+            priority: 1,
+            enabled: true,
+            decision: HookDecision::Deny,
+            reason_code: HookReasonCode::RuleDenied,
+            conditions: Vec::new(),
+        });
+        baseline.digest = baseline.computed_digest().expect("phase policy digest");
+
+        assert!(
+            normalize_project_document(baseline.clone(), tenant_id, project_id, 2, false).is_err()
+        );
+
+        let overlay = policy_document(tenant_id, project_id, Some(worktree_id), 1, Some(1));
+        assert!(
+            normalize_worktree_document(
+                overlay,
+                tenant_id,
+                project_id,
+                worktree_id,
+                &baseline,
+                2,
+                false,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn publish_allows_run_admission_only_when_producer_is_available() {
+        let tenant_id = Uuid::new_v4();
+        let project_id = Uuid::new_v4();
+        let mut baseline = policy_document(tenant_id, project_id, None, 1, None);
+        baseline.evaluator_api_version = 2;
+        baseline.project_rules.push(HookRule {
+            rule_id: [10; 16],
+            phase: Some(HookPhase::BeforeRunAdmission),
+            priority: 1,
+            enabled: true,
+            decision: HookDecision::Deny,
+            reason_code: HookReasonCode::RuleDenied,
+            conditions: Vec::new(),
+        });
+        baseline.digest = baseline.computed_digest().expect("phase policy digest");
+
+        let normalized = normalize_project_document(baseline, tenant_id, project_id, 2, true)
+            .expect("installed Run producer permits phase publication");
+        assert!(normalized.clone().verify().is_ok());
+        assert_eq!(
+            normalized.project_rules[0].phase,
+            Some(HookPhase::BeforeRunAdmission)
+        );
     }
 
     #[test]

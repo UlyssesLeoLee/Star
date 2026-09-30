@@ -1,12 +1,12 @@
 # BD-MULTICA-HOOK-001
 
-> **Multica Hook 域基本設計書 v0.5.6** (Hooks 沿用既有 Advanced Settings 局部标签导航；Phase 9D summary v2 联合 Hook ledger/RunEvent 并关联最新 Run 状态，Run producer、完整 coverage、目标 DB 与认证 Provider 仍未验收)
+> **Multica Hook 域基本設計書 v0.5.8** (沿用既有 Advanced Settings 局部标签导航；Phase 9D-5b 增加条件式 Run admission producer 与同 event_id 双写，生产 adapter/完整 BI/目标 DB/auth 仍未验收)
 
-> - 状态: 🟡 Draft v0.5.6 (2026-10-01 JST，Phase 9D dual-source summary/read-model code slice)
+> - 状态: 🟡 Draft v0.5.8 (2026-10-01 JST，Phase 9D-5b conditional Run admission producer)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
-> - 上位要件: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.4 + `docs/requirements.md` v5.21 §50.8D
+> - 上位要件: [docs/requirements/SRS-MULTICA-HOOK-001.md](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.6 + docs/requirements.md v5.23 §50.8D
 > - 兼容参考（非产品决策 runtime）: `scripts/automation/console_server.py`、`scripts/automation/dispatcher.py` 与 `scripts/automation/guardian/pre_tool_use_guard.py` 是现有 Python automation/guard 工具；它们不构成 Star Rust Hook Engine，不拥有产品 ACL、Worktree cleanup 或验收 authority。Rust evaluator、policy API 与 archive-confirm gate 已有条件式代码；Phase 9C UI 代码已加入，但宿主 API session/provider 尚未装配，不能读取真实策略或启用写路径。
 > - 平行参考: `docs/automation-design.md` v0.1 (Python 化基线) + `SRS-MULTICA-SKILL-001.md` v0.1 (skills 域, 共享"高级设置"导航) + `SRS-PRE-TOOL-USE-GUARD-001.md` v0.1 (PreToolUse guard 是 hooks 下 1 个 builtin guard)
 > - 守门基线: 守门 #1+#5+#6+#9+#10+#13+#14 v3+#14 v4 8 项必过 (守门 #1 v25 cargo test 不需要跑, 文档工作)
@@ -20,7 +20,7 @@
 
 ## §0 目的 (Purpose)
 
-本文档基于 [`SRS-MULTICA-HOOK-001`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.4 与 `docs/requirements.md` v5.21 §50.8D，定义 STAR 新架构中的 **高级设置 → Hooks**：Settings 主侧栏只提供“高级设置”父入口；高级设置页面内容区保留 Skills、Hooks、MCP、Plugins 局部标签条。Hooks 不拆成 Worktree 树节点或独立主导航项。HookSet 可视化配置、Rust-native enforcement 与 Worktree/Run/BI 联动沿此边界设计。
+本文档基于 [SRS-MULTICA-HOOK-001](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.6 与 docs/requirements.md v5.23 §50.8D，定义 STAR 新架构中的 **高级设置 → Hooks**：Settings 主侧栏只提供“高级设置”父入口；高级设置页面内容区保留 Skills、Hooks、MCP、Plugins 局部标签条。Hooks 不拆成 Worktree 树节点或独立主导航项。HookSet 可视化配置、Rust-native enforcement 与 Worktree/Run/BI 联动沿此边界设计。
 
 - **システムアーキテクチャ** (mavis runtime hook 事件流 + UI 高级设置导航 + 标签页架构)
 - **機能分割 / モジュール設計** (6 module: Event Emitter + Hook Registry + Fan-out Scheduler + Hook Runner + Audit Logger + Builtin Hook Loader)
@@ -816,6 +816,17 @@ Phase 9D 的 `GET /api/v1/projects/{project_id}/hook-events/summary?window_days=
 
 ---
 
+### 7.7 Phase 9D-5a/5b evaluator 与 Run admission producer contract
+
+Rust evaluator API v2 将 HookRule.phase 纳入 typed policy。当前原生 enum 仅支持 BeforeRunAdmission 与 BeforeWorktreeArchiveCleanup；phase 缺省的旧规则固定只应用于 archive/cleanup。evaluator API v1 的已发布 policy 仍按原 canonical JSON 与 digest 解码验证，并且仅能用于 archive/cleanup；包含 phase 字段的 v1 policy 拒绝。API v2 policy 可按 phase 限定规则。
+
+Run admission 使用单独的 builtin gate：actor authorization、lifecycle version 与 Runtime health 必须已知且匹配；Worktree retention lock、active Run/Agent lease、file claim 与 owned process/drain facts 属于 archive/cleanup，不应用于 Run admission。Run admission 自定义规则当前只接受 ActorAuthorized、LifecycleVersionMatches、RuntimeHealthy 三类 typed facts；提交其他 fact/phase 组合时 verified-policy validation 拒绝整个策略，执行保持 fail closed。
+
+REST Run admission producer seam 已实现为条件式能力：`TaskCliSessionProvisioner::supports_run_admission()` 默认 false，只有装配并实现 readiness/fence 的 adapter 才能显式开启。新 Run 先经过短 preflight 授权事务，关闭 transaction 后最多等待 2 秒取得 Runtime readiness/fence；随后重开短事务，重新授权并读取 Worktree/Task/lifecycle/effective policy，生成 `BeforeRunAdmission` envelope 并运行 native evaluator。readiness 不超过 5 秒；admission fence 必须有非空 ID、至少 5 秒提交余量且最大 TTL 30 秒。Allow 时同一事务写入 `task_execution_run.hook_set_snapshot`、Run `run_started`、`hook_execution_event` 与 `task_execution_run_event.hook_evaluated`；两条 Hook 投影使用相同 `tenant_id + event_id`，供 summary v2 去重。事务提交后把 opaque fence 交给 Runtime，adapter 必须按完整 Task/Worktree/Runtime/profile/request fingerprint 绑定、一次性消费并在 spawn 前再验。Deny 时只写 append-only Hook ledger，Task/Run FK 均为空，受限 details 保存 attempted WorkItem ID；不创建 Run。Runtime readiness 等待不持 DB row lock，任何策略/ledger/Run 写入失败使当前事务回滚。
+
+Advanced Settings → Hooks 的 rule builder 根据 policy read response 的 `producer_capabilities.run_admission` 启用或禁用 Run phase；Project/Worktree policy publish/rollback normalization 使用同一 server capability gate，未装配 adapter 时返回 `hook_phase_producer_unavailable`。事件列表与 summary 的 `instrumented_phases`/`not_yet_instrumented_phases` 也由该能力更新，coverage 仍是 `partial`/百分比 `null`，不把 schema 支持误报为采集 coverage。当前仓库没有具体 TaskCliSessionProvisioner 生产实现，故服务 capability 实际仍 false，Builder 当前展示禁用项；本阶段实现 producer seam 和 transactional contract，不宣称 Runtime spawn 已有生产 enforcement。新 rule 默认 BeforeWorktreeArchiveCleanup；旧快照只在显式编辑升级时改变版本。所有 UI 仍位于 ULYS-235 高级设置内容区局部标签，不新增 Worktree 树节点。
+
+当前代码切片已覆盖 evaluator phase matching、非法 archive-only facts 拒绝、v1 digest compatibility、条件式 Run admission REST producer、Run/ledger/RunEvent 事务双写和 capability-gated UI/API；Run transaction 尚无已装配 production Runtime adapter，且目标 DB/RLS/grants、真实认证、独立 Outbox delivery、tool/validation/review producers、完整 BI 与 Run Detail/Quality & Improvement consumer 仍开放，因此 Phase 9D 未关闭。
 ## §8 セキュリティ設計 (Security Design)
 
 ### 8.1 凭据零外泄 (per SRS §NFR-S-1, 跟 SRS-PRE-TOOL-USE-GUARD §8.1.4 一致)
@@ -963,3 +974,5 @@ Phase 9D 的 `GET /api/v1/projects/{project_id}/hook-events/summary?window_days=
 | **v0.5.4** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Project-scoped Hook execution event 面板加入既有 Advanced Settings → Hooks 页面；与策略 Audit 分开展示、限制分页并显式呈现 partial/unknown coverage；记录 targeted Rust/前端/TypeScript 与隔离 PostgreSQL 证据，保留 app Provider、目标 DB/grants/RLS 和完整 BI 未验收边界 | Phase 9D Hooks tab 事件面板和 UI/API contract tests 落地 |
 | **v0.5.5** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 SRS v0.5.3；明确高级设置局部标签条与主侧栏父入口层级；加入既有 Hooks 标签内 summary UI 的窗口选择、phase/decision 摘要与 partial/unknown 文案，并标记 Run outcome、目标 DB/auth 与完整 BI 仍未验收 | Phase 9D summary consumer 接入并复用 ULYS-235 导航 |
 | **v0.5.6** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 SRS v0.5.4 与总要件 v5.21；规定 summary v2 双来源 event_id 去重、完整 Run 状态 join、未完整投影计数和 partial coverage 语义；明确 producer、目标 DB/auth 与完整 BI 尚未验收 | Phase 9D-4 双来源 Hook summary consumer/read model 实装 |
+| **v0.5.7** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 SRS v0.5.5 与总要件 v5.22；定义 evaluator API v2 phase field、v1 archive-only canonical digest 兼容、Run admission builtin/fact allowlist 和 Builder disabled readiness gate；确认 Hooks 持续位于 ULYS-235 Advanced Settings 内容区并列标签 | Phase 9D-5a 扩展 native typed evaluator contract |
+| **v0.5.8** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 SRS v0.5.6、总要件 v5.23 与 DD v0.5.14；定义锁外 readiness/fence、事务内 Run/HookSet snapshot/ledger/RunEvent 原子写入和共享 event_id、服务端 capability 驱动的 Builder/publish/coverage；注明当前无生产 provisioner adapter，Advanced Settings → Hooks 导航不变 | Phase 9D-5b CLI Run admission producer seam 与 BI 去重自审完成 |

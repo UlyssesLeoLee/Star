@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project Worktree 群组实施计划 v5.35**
+> **渡口 Project Worktree 群组实施计划 v5.37**
 >
 > - 状态：🟡 执行中（Phase 0/1、2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -14,10 +14,10 @@
 > - Phase 9D 首个事件切片：新增 Worktree archive HookEvent Transaction ledger、archive-confirm 同事务 producer、Project-scoped keyset read API 与 Advanced Settings → Hooks 页执行事件面板；当前仅 instrument `worktree_archive`，Run-linked producers、异步 Outbox delivery state、统一 BI read model/Run Detail 下钻、app root auth Provider、目标 DB migration/grants/RLS integration 仍开放；覆盖率输出 `partial` 且比例 `null`。Rust crate tests 106/106、Hooks/API 前端定向 25/25、TypeScript 与一次性 PostgreSQL 18 双次应用/append-only/RLS 场景通过。实现状态与验证结果见 §6.47。
 > - Phase 9D-2 更新：新增 Project-scoped hook-events/summary API，默认 30 天、窗口 1–90 天，按 phase/decision 汇总 archive ledger 并返回 hook_execution_summary_v1、公式和 partial/null coverage；source-only API 不代表 RunEvent/outcome join 或完整 BI。定向 crate cargo check 在临时排除 star-desktop workspace member 后通过，未运行 tests；原始 Cargo.toml/Cargo.lock 已恢复，见 §6.48。
 > - Phase 9D-3 更新：将 summary card 接入既有 Advanced Settings → Hooks 标签页，在内容区选择 7/30/90 天；导航遵循 ULYS-235，不新增 Worktree/主侧栏节点。Phase 9D-4 已将其数据 contract 升至 v2，见下文。
-> - Phase 9D-4 更新：summary v2 合并字段完整的 Hook ledger/RunEvent 投影，按 tenant+event_id 去重并以 tenant/project/task/run 键关联最新 Run 状态；显示 join 与不完整投影计数。TypeScript、rustfmt、diff-check 与隔离 workspace 的 star-api-rest lib cargo check 均通过，未运行 tests，migration 未在目标数据库执行。Run producer 仍未验收，Hook phase coverage 仍 partial/unknown；`domain-hook` 当前仅支持 Worktree archive phase，后续 Run admission/tool/validation/review producer 必须先扩展原生 typed evaluator，不得只写入伪造的 `hook_evaluated` 事实。
-> - 关联需求：docs/requirements.md v5.21 §50
-> - 关联基本设计：docs/basic-design.md v5.16 §16
-> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.24、docs/design/DD-MULTICA-TASK-001.md v0.6、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.3、docs/design/BD-MULTICA-HOOK-001.md v0.5.5、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.11、docs/design/DD-WORKTREE-CANVAS-001.md v1.3
+> - Phase 9D-4/9D-5a/9D-5b 更新：summary v2 合并字段完整的 Hook ledger/RunEvent 投影，按 tenant+event_id 去重并以 tenant/project/task/run 键关联最新 Run 状态；9D-5a 将原生 evaluator API 扩展为 phase-scoped v2，增加 BeforeRunAdmission 与 BeforeWorktreeArchiveCleanup，保留 v1 archive-only policy digest 兼容并拒绝 Run admission archive-only facts。9D-5b 增加条件式 Run admission producer seam：锁外 readiness/fencing，锁内最终重授权与 native Hook evaluation；Allow 原子写 Run HookSet snapshot、Run start、Hook ledger 和共享 event_id 的 RunEvent；Deny 只写无 Run/Task FK 的 ledger。policy publish/rollback、Builder 和事件 coverage 共用服务端 producer capability；当前 production adapter 未装配，能力仍 false，不能宣称 Runtime spawn 已有 production Hook protection，见 §6.52。
+> - 关联需求：docs/requirements.md v5.23 §50
+> - 关联基本设计：docs/basic-design.md v5.19 §16
+> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.24、docs/design/DD-MULTICA-TASK-001.md v0.7、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.3
 
 ---
 
@@ -370,7 +370,7 @@ requirements/basic/detailed design 同步为 v2.9/v1.3/v1.8。该 key 只用于�
 | 管理操作 | 🟢 Archive/restore plan-confirm UI 接线 | live detail 用当前 version 创建短时 `set_archived` plan，校验 plan 与 Worktree 绑定，再经用户二次确认；确认成功后重读授权 Index；现有 AgentSession/Runtime 引用时 UI 预先禁用 archive，服务端仍最终重验。该动作不执行 Git checkout 删除 |
 | Preview / fail-closed | 🟢 来源边界明确 | API 错误时显示错误并禁止 seed fallback；当前应用路由树尚未安装宿主 provider，因此默认实际显示本地预览，不能报告为生产 API 已运行 |
 | Owner reassignment / create / cleanup | 🟡 未完成 | Owner 转派 UI 仍缺 Project member directory projection；创建/导入需 Repository/Runtime provisioning；物理 cleanup 需 Git lock、Session/Runtime drain 与受审计执行器 |
-| 验证 | 🟢 TypeScript 检查通过 | 本轮 `pnpm typecheck` 通过；未新增或运行测试；Rust、DB migration、宿主登录与真实 API 未在本轮验证 |
+| 验证 | 🟢 定向验证通过 | domain-hook 17/17 tests；REST policy publish guard 1/1 targeted test；Hooks 页面与 Advanced Settings 导航定向 tests 4/4；TypeScript、rustfmt、git diff --check 通过；star-api-rest library compile 在临时排除既有冲突的 star-desktop workspace member 后通过，manifest/lock 已逐字节恢复。 |
 | Phase 2D / Phase 2 总体 | 🟡 未完成 | 宿主 provider、目标数据库部署、membership provisioning/reconciliation、Domain adapter、RLS/ACL 负向与并发运行验收仍是关闭门 |
 
 requirements/basic/detailed design 已同步为 v4.1/v2.5/v3.0。此 UI 切片加强多 Agent Worktree 的集中可观测与显式归档管理，但不代表当前产品路由已有真实认证 provider，也不代表 Git Worktree 的创建、停止或物理清理已打通。
@@ -729,6 +729,27 @@ Hooks 导航基线已经在 `AGENTS.md` 与 ULYS-235 明确规定：主入口“
 | 验证 | 🟢 静态检查与目标 crate 编译通过 | `pnpm exec tsc --noEmit`、`rustfmt --edition 2024 --check`、`git diff --check` 通过；`cargo check --offline -p star-api-rest --lib -j 4` 在临时排除既存冲突的 `star-desktop` workspace member 后通过，并逐字节恢复 `Cargo.toml`/`Cargo.lock`。未运行 tests；新索引 migration 未在目标 DB 执行。目标 DB/RLS/grants、宿主 auth Provider 及生产 producer 尚未验收。 |
 | 后续门 | 🟡 Phase 9D 未关闭 | 接入 Run admission/tool/validation/review producers 与事务内双写；补齐 Outbox delivery state、版本化 denominator/cohort、Run Detail/Quality & Improvement 下钻；完成目标 DB/RLS/grants 与真实 auth Provider 验收。 |
 
+### 6.51 本轮阶段结果（Phase 9D-5a phase-scoped native evaluator contract，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Typed phase model | 🟡 evaluator API v2 已支持两类 phase | HookRule 可选 phase 将规则绑定到 BeforeRunAdmission 或 BeforeWorktreeArchiveCleanup；未标注规则只适用于 archive/cleanup，不跨 phase。当前 evaluator 不宣称其他 planned phases 已接入。 |
+| 旧策略兼容 | 🟢 archive policy digest 保持兼容 | evaluator API v1 仅接受无 phase 字段的旧 policy 并只支持 archive/cleanup；v2 可用 phase-scoped rules。Run admission 当前仅接受 ActorAuthorized、LifecycleVersionMatches、RuntimeHealthy，archive-only facts 在验证时拒绝。 |
+| Builder 与发布边界 | 🟢 保持高级设置内并列标签且服务端 fail closed | HookRule phase selector 位于既有 Settings → Advanced Settings → Hooks 内容区；Run admission 显示为 disabled，Project/Worktree publish 与 rollback normalization 拒绝无 producer 支撑的规则并返回 hook_phase_producer_unavailable。ULYS-235 的 Skills/Hooks/MCP/Plugins 局部标签条不变，也未增加 Worktree 导航节点。 |
+| 验证 | 🟢 定向验证通过 | domain-hook 17/17 tests；Hooks 页面与 Advanced Settings 导航定向 tests 4/4；TypeScript、rustfmt、git diff --check 通过；star-api-rest library compile 在临时排除既有冲突的 star-desktop workspace member 后通过，manifest/lock 已逐字节恢复。 |
+| 未关闭门 | 🟡 Phase 9D 继续开放 | Run admission producer/readiness provider、Run start transaction dual-write、tool/validation/review producers、Outbox delivery、BI cohort/denominator 与 Quality & Improvement/Run Detail drilldown、目标 DB/RLS/grants 与真实 auth Provider 尚未验收。 |
+
+### 6.52 本轮阶段结果（Phase 9D-5b conditional Run admission producer，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Runtime readiness 与 fence | 🟡 条件式 seam 已接入 | `TaskCliSessionProvisioner::supports_run_admission()` 默认 false；显式 producer 最多 2 秒在事务外返回 readiness/fence。readiness ≤5 秒、非空 fence、提交余量 >5 秒、TTL ≤30 秒；fence 绑定 Task/Worktree/Runtime/profile/request fingerprint，必须由 adapter 在 spawn 前一次性消费与重验。当前无生产 adapter，能力未开启。 |
+| Run + Hook 原子写入 | 🟡 REST producer contract 已实现 | final short transaction 重授权、重读 Worktree/Task/lifecycle/effective policy 并运行 `BeforeRunAdmission` evaluator；Allow 写 immutable HookSet snapshot、Run/start event、Hook ledger 与 Run `hook_evaluated`；Deny 仅写 `run_id/work_item_id=NULL` 的 ledger，不创建 Run。ledger 与 RunEvent 显式共享同一 `event_id`，满足 summary v2 `(tenant_id,event_id)` 去重。Runtime readiness 等待不持 DB row lock。 |
+| Policy UI 与 BI coverage | 🟢 使用同一服务端 capability | GET policy 的 `producer_capabilities.run_admission` 控制 Builder phase option；publish/rollback normalization 对 capability=false fail closed；event list 与 summary `instrumented_phases` 随 capability 切换。Hooks 仍为 ULYS-235 Advanced Settings → Hooks 并列 tab，非 Worktree 节点；目前实际 capability=false，所以 UI 禁用且 Run coverage unknown。 |
+| 验证 | 🟢 定向验证通过 | `domain-hook` 17/17；`star-api-rest` 110/110（首次 linker LNK1104，重试通过）；Hooks 页面 + Advanced Settings 导航 tests 4/4；`pnpm exec tsc --noEmit`、Rust `rustfmt`、`git diff --check` 通过。Cargo 验证临时排除既存 workspace `star-desktop` 成员，`Cargo.toml`/`Cargo.lock` 恢复且 `Cargo.lock.phase9d-backup` 保留。CodeRabbit WSL runner 仍因 `/root/.local/bin/coderabbit: Permission denied` 无法提供独立审查。 |
+| 未关闭门 | 🟡 Phase 9D 未关闭 | 生产 provisioner/runtime fence consume、真实 auth provider、目标 DB migration/grants/RLS/API integration、独立 Outbox delivery、tool/validation/review producers、完整 BI denominator/cohort 与 Run Detail/Quality & Improvement 下钻仍未验收；本切片不宣称生产 Run spawn 已由 Hook 保护。 |
+
+
 ## 修订履历
 
 | 版本 | 日期 | 修订人 | 内容 | 触发 |
@@ -816,3 +837,5 @@ Hooks 导航基线已经在 `AGENTS.md` 与 ULYS-235 明确规定：主入口“
 | v5.33 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在既有 Advanced Settings Hooks 标签接入有界 summary card，选择 7/30/90 天并按 phase/decision 呈现；同步 Hook SRS/BD/DD 与 overall basic design；保持 archive-only partial/unknown、Run outcome、真实 auth/DB 与完整 BI 未关闭状态 | Phase 9D-3 summary API consumer 完成代码切片，同时复核 ULYS-235 标签导航层级 |
 | v5.34 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步需求 v5.21、基本设计 v5.17、Hook SRS/BD/DD v0.5.4/v0.5.6/v0.5.12；新增 summary v2 双来源 event_id 去重、最新 Run 状态关联、不完整 projection 计数、专项时间索引和独立 coverage 语义；明确 Run producer、Outbox、完整 BI、目标 DB/RLS/grants 与 host auth Provider 未完成 | Phase 9D-4 read model 支持跨账本和 Run state join，同时复核 Hooks 的 Advanced Settings 导航归属 |
 | v5.35 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Phase 9D-4 实际验证结果入档：TypeScript、rustfmt、diff-check 与临时排除 star-desktop 的 star-api-rest lib 编译通过，未运行 tests、migration 未在目标 DB 执行；确认下一阶段须先扩展仅支持 archive 的 native typed evaluator，避免伪造 Run-linked Hook event | Phase 9D-4 本地代码验证完成，复核 Run producer 的 evaluator 依赖边界 |
+| v5.36 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Phase 9D-5a typed evaluator API v2、BeforeRunAdmission/archive phase isolation、legacy v1 archive digest compatibility、fact allowlist、UI disabled 与 Project/Worktree publish/rollback fail-closed gate；同步 requirements v5.22、basic v5.18、Hook SRS/BD/DD v0.5.5/v0.5.7/v0.5.13，并确认 Hooks 仍在 ULYS-235 Advanced Settings 内容区并列标签 | 用户再次指出 Hooks 应是高级设置选项卡，同时继续推进 Run/BI 架构 Hook 阶段 |
+| v5.37 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.23、basic v5.19、Hook SRS/BD/DD v0.5.6/v0.5.8/v0.5.14 与 Task DD v0.7；记录 9D-5b readiness/fence、同 event_id Hook ledger/RunEvent 双写、动态 capability/coverage、110 REST + 17 domain + 4 frontend tests 与 TypeScript 通过；注明无 production adapter、目标 DB/auth/Outbox/full BI 仍开放，Advanced Settings → Hooks 标签位置保持不变 | 将 phase-scoped evaluator 推进到 Run admission REST/事务数据流并复核 BI event identity |

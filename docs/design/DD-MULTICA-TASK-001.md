@@ -1,12 +1,12 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v0.6** (per 日本 IPA SEC 標準, Worktree 群组集成补充)
+> **Multica Task Lifecycle 域 詳細設計書 v0.7** (per 日本 IPA SEC 标准，补充条件式 Run Admission Hook 事务契约)
 >
-> - 状态: 🟡 Draft v0.6 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A writer / migration 验证及 Phase 8B 有界 read API / Task Card UI 为条件式代码切片)
+> - 状态: 🟡 Draft v0.7 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b 有条件式代码切片，生产 Runtime adapter 与目标环境验收仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.20 §50；`docs/basic-design.md` v5.4 §16.14-16.17
-> - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.20；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.1
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.23 §50；`docs/basic-design.md` v5.19 §16.14-16.17
+> - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.24；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
 > - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
@@ -847,13 +847,13 @@ Group App Registry 与 LangGraph `SubAgentRegistry` 是两个分离注册表：�
 
 `task_contract` 是 canonical WorkItem 下的 Master/SCD2 版本：goal、scope、dependencies 与 acceptance criteria 组成当前合同。更新必须在一笔领域事务中关闭当前版本、追加 successor、追加 `task_contract_change_audit` 与 Outbox；物理删除禁止。Run 创建时读取当前合同与 Task metadata，在 `task_execution_run.task_snapshot` / `acceptance_snapshot` 中固定快照；没有合同的旧 Task 将 acceptance snapshot 存为 `NULL`，不能写空数组伪装为“零验收项”。历史 Run 不跟随 Task Contract 后续版本变更。
 
-`task_execution_run` 是 Transaction/append-only 的一次尝试事实。它保存 Task/Project/Actor、`run_origin` / execution channel、相关 Agent/Model/Skill/Orchestrator/Strategy 版本、合同版本、输入/验收快照、profile/provider/API version/content digest/grant snapshot、resource budget、loop policy、HookSet/evaluator 与可选 `ProjectEngineeringManifest` snapshot，以及 correlation 和可空 `worktree_id / repository_id / runtime_id / start_ref / start_commit_ref`。新快照字段在 Phase 8A 兼容旧写入可为空；Phase 9 resolver 落地后，新的 Agent/Loop/Hook Run admission 必须填齐 profile/policy snapshot，不能用空 object 伪装选择完成。预算快照记录当次 admitted 上限，不代表真实消耗；Worktree/repo/runtime 仅作为当时上下文的 ID/Ref 快照，不设置外键；在删除 checkout 或关闭 Worktree binding 后，Run 与证据仍按 Project/Task 权限可查。数据库里的 Worktree 主记录若仍被旧 lifecycle audit 的 `ON DELETE RESTRICT` 引用，仍不得绕过该约束硬删；host checkout 清理和平台身份保留是两个不同生命周期。
+`task_execution_run` 是 Transaction/append-only 的一次尝试事实。它保存 Task/Project/Actor、`run_origin` / execution channel、相关 Agent/Model/Skill/Orchestrator/Strategy 版本、合同版本、输入/验收快照、profile/provider/API version/content digest/grant snapshot、resource budget、loop policy、HookSet/evaluator 与可选 `ProjectEngineeringManifest` snapshot，以及 correlation 和可空 `worktree_id / repository_id / runtime_id / start_ref / start_commit_ref`。Phase 8A 为兼容旧写入允许新快照列为空；Phase 9D-5b 条件式 CLI admission 已将 verified effective HookSet snapshot 写入新 Run，其他 Agent/Profile/Loop/Provider snapshot 仍由后续 resolver/provider 接入填充，不能用空 object 伪装选择完成。预算快照记录当次 admitted 上限，不代表真实消耗；Worktree/repo/runtime 仅作为当时上下文的 ID/Ref 快照，不设置外键；在删除 checkout 或关闭 Worktree binding 后，Run 与证据仍按 Project/Task 权限可查。数据库里的 Worktree 主记录若仍被旧 lifecycle audit 的 `ON DELETE RESTRICT` 引用，仍不得绕过该约束硬删；host checkout 清理和平台身份保留是两个不同生命周期。
 
 Schedule Run 以 `run_origin='schedule'` 标记，必须保存 `automation_rule_id / automation_rule_version / automation_occurrence_id`，并用 `(tenant_id, automation_occurrence_id)` 唯一索引防止重复创建 Run。该 Rule/Occurrence 的权威数据仍归 `domain-automation`，此 migration 仅保存不可变 ID/version 关联，不建第二张 schedule definition 表；目前 schedule 字段尚无 producer。
 
 `task_execution_run_event` 以独立 nullable 列记录执行器状态、Agent 声明、验证结果、人工接受/返工和集成状态。`agent_declaration=declared_complete` 只说明 Agent 自报；不得自动写 verifier passed、human accepted 或 integrated。cost record 将 `actual_cost_amount` 与 `estimated_cost_amount` 分开且必须携带 `cost_unit`；unknown 用 `NULL`。Schedule occurrence link、Loop iteration/decision/stop、Hook evaluate/override 和 `resource_summary` 都是 append-only event；Hook 事件固定规则/evaluator version+digest、phase/decision/reason class/latency/timeout，Loop event 固定 iteration/phase/decision/stop reason。Run 完成时最多追加一条 `resource_summary`，单位固定记录 peak RSS bytes、CPU time ms、child process high-water 与 input/output bytes，并携带 measurement source/window；未采到的值为 NULL，高频 telemetry 只进入短 TTL 有界 buffer。失败事件保存稳定 `failure_category`，`details` 只允许脱敏 metadata，不存 prompt、完整 tool transcript 或思维过程。`task_execution_evidence` 只保存类型、摘要、digest、媒体类型、长度和受控 artifact locator；artifact 正文由独立受权/保留策略管理。
 
-Phase 8A 已新增 additive migration `db/migrations/2026-09-30-worktree-task-execution-run.sql`，并将 CLI Session start 命令与 Run ID 连接：在授权的 lifecycle transaction 中创建 Run/input/acceptance snapshot、`run_origin='cli'`、Run started event 与 30 天 actor/key/fingerprint 幂等映射；同幂等请求重放返回原 Run ID，新幂等键产生新尝试。Migration 也预留版本化 Execution Profile/Provider/Loop/HookSet/Project Engineering snapshot、Automation Rule/Occurrence reference、Loop/Hook/resource typed event 字段和每 Run 唯一资源汇总索引；CLI start writer 当前尚未提供这些 snapshots，所以对应字段保持 NULL。CLI writer 目前产生 started/running/provisioning-failure 事件。该 migration 已在隔离临时 PostgreSQL 集群重复应用两次，并确认 6 张 Run 表启用 `FORCE ROW LEVEL SECURITY`；这不是目标数据库部署或目标 runtime role 的 RLS 验收。真实 status/exit、验证、人工 review、integration、cost/evidence/resource-summary producer、Schedule/Loop/Hook provider 与 Runtime provider 尚未接入。`group_chat_run` 仍保留为短 TTL Chat/LangGraph queue projection，可关联 `task_run_id`，但不可复用 Run PK 或状态机。
+Phase 8A 已新增 additive migration `db/migrations/2026-09-30-worktree-task-execution-run.sql`，并将 CLI Session start 命令与 Run ID 连接：在授权的 lifecycle transaction 中创建 Run/input/acceptance snapshot、`run_origin='cli'`、Run started event 与 30 天 actor/key/fingerprint 幂等映射；同幂等请求重放返回原 Run ID，新幂等键产生新尝试。Migration 也预留版本化 Execution Profile/Provider/Loop/HookSet/Project Engineering snapshot、Automation Rule/Occurrence reference、Loop/Hook/resource typed event 字段和每 Run 唯一资源汇总索引。9D-5b producer capability 关闭时保留旧 CLI start writer；能力打开后，新 Run writer 还在同一 admission transaction 写 `hook_set_snapshot` 与 HookEvent/RunEvent dual-write，其他未接入的 Profile/Loop snapshot 仍为 NULL。CLI writer 产生 started/provisioning-failure 事件；Runtime start 的真实 running/exit 事件仍依赖未装配的 production provisioner。该 migration 已在隔离临时 PostgreSQL 集群重复应用两次，并确认 6 张 Run 表启用 `FORCE ROW LEVEL SECURITY`；这不是目标数据库部署或目标 runtime role 的 RLS 验收。真实 status/exit、验证、人工 review、integration、cost/evidence/resource-summary producer、Schedule/Loop provider 与 Runtime adapter 尚未接入。`group_chat_run` 仍保留为短 TTL Chat/LangGraph queue projection，可关联 `task_run_id`，但不可复用 Run PK 或状态机。
 
 #### 14.7.1 Run 查询 API 与 Task Card 历史面板
 
@@ -867,6 +867,14 @@ Phase 8A 已新增 additive migration `db/migrations/2026-09-30-worktree-task-ex
 两个响应均 `Cache-Control: no-store`。读取层不序列化任意 Event `details`、artifact locator、文件正文、prompt、完整 transcript 或模型推理；敏感证据的正文/locator 需由另外的、逐次授权的 artifact API 提供。execution / verification / human acceptance 各自取对应字段最新的非空 Event，不能按整行最新事件把彼此状态覆盖。Task Card 的 Run History 面板只在认证 Group API provider 下出现，保留当前有界页面而不缓存整个历史；加载错误/身份变化必须清空数据，不回退本地 seed。该前端不增加 Worktree 导航层级。
 
 当前实现状态：list/detail 路由和 Task Card 条件式历史面板已落代码；查询边界由 actor/context/关联校验执行。单测与前端类型检查已通过。隔离 PostgreSQL migration 重放与 FORCE RLS 检查已通过，但 `localhost:5432` 目标开发库不可用，目标 DB/runtime grants 和 API 对真实 RLS 的端到端验收仍未完成。Task Contract 写命令、其余 Run Event/Evidence producer 与生产 Runtime 仍为未完成项。
+
+#### 14.7.2 Run Admission Hook snapshot 与事件原子性（Phase 9D-5b）
+
+新 Task CLI Run 的 admission 顺序将 Host Runtime 外部等待与数据库事务分离：先以短事务读取并授权当前 Worktree/Task/Runtime/lifecycle/idempotency，再提交释放行锁；新 Run 通过 `TaskCliSessionProvisioner::prepare_run_admission` 在事务外最多等待 2 秒取得 Runtime health 和一次性 admission fence。Readiness 观测年龄不超过 5 秒；fence 必须非空、至少保留 5 秒事务提交余量且 expiry 不超过 30 秒，并绑定完整 tenant/actor/project/repository/worktree/task/runtime/lifecycle/approved profile/correlation/request fingerprint。
+
+REST 随后开短事务重新设置 tenant/actor scope，重验 membership、Worktree/Task binding、Task active/owner/status、Runtime、expected lifecycle version 和 idempotency；读取当前 verified effective HookSet 并运行 `BeforeRunAdmission` evaluator。Allow 时同事务创建 `task_execution_run`（保存 immutable `hook_set_snapshot`）、`run_started`、append-only `hook_execution_event` 和 `task_execution_run_event.hook_evaluated`。两类 HookEvent 投影共享唯一 `event_id`，供 summary v2 以 `(tenant_id,event_id)` 去重。Deny/RequireHuman/Defer 仅追加 Hook ledger，不创建 Run；因 RunEvent FK 不允许无 Run 事件，拒绝 ledger 的 `work_item_id/run_id` 均为 NULL，attempted WorkItem ID 只出现在 ≤4 KiB sanitized details。策略/evaluator/ledger/Run 写入失败使 admission transaction 回滚。
+
+提交后，REST 将 fence ID 交给 `start_task_cli_session`；Runtime adapter 必须一次性消费并复验完整 scope、fingerprint 与 expiry，在发放 execution grant / spawn 前重新授权。缺失/不可用 adapter 保持 capability=false，Builder 与 policy publish/rollback gate 均关闭。幂等重放返回既有 Run，不重复求值或重新申请 fence。当前代码已实现 REST seam、Run snapshot 与双事件事务写入逻辑，但没有生产 `TaskCliSessionProvisioner` adapter，因此尚不能证明实际 Runtime spawn 已受 Hook admission 保护；目标 DB/RLS/grants/真实 auth Provider 与并发/重试数据库集成仍未验收。
 
 ### 14.8 Project BI、Benchmark 与改进闭环
 
@@ -925,3 +933,4 @@ Hook 规则的唯一配置入口是既有 **高级设置 → Hooks** tab，和 S
 | v0.4 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Pi 的小核心、组合扩展、显式事件与分支 session/context 原则映射为 Rust-native contract；新增 DAG/公平调度、资源层级预算、有界队列、取消/drain、Run 资源摘要、隔离 Plugin 和高性能 Rust 桌面设计/验收；不依赖 Pi/Node runtime | 用户要求多 Agent 并行并确保低内存、高性能 Rust 桌面端 |
 | v0.5 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Group DD v4.19、Basic Design v5.3 与 Hook DD v0.5；新增唯一 Automation Schedule occurrence source、Run 内 Engineering Loop、版本化 Agent/Memory/Skill/Context/Validation/Hook/Loop profile、首期 Rust CLI adapter、Advanced Settings Hooks tab 与 Rust-native Worktree safety/BI 事件契约；计划与 SQL schema 仅定义边界，未实现的 engine/provider/UI 保持未完成 | 用户要求将 AI 提升方向、Loop 与原生可视化 Hook 体系纳入当前架构 |
 | v0.6 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.20、Basic Design v5.4 与 Group DD v4.20；补充 Worktree-scoped Run list/detail API 的 auth、游标、结果上限、字段脱敏与状态维度投影，并记录 Task Card Run History 面板；纠正旧文对 read API/UI 与 migration 的完成状态，区分临时 PostgreSQL 验证与目标 DB/RLS 未部署；Hook DD 对齐 v0.5.1 | Phase 8B 有界 Run 查询/API/UI 条件式切片落地后更新详细设计 |
+| v0.7 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 9D-5b CLI Run Admission 的锁外 readiness/fence 与锁内重授权、HookSet snapshot、Run/Hook ledger/RunEvent 原子双写；要求镜像共享 event_id 并说明 Deny ledger 无 Task/Run FK；区分条件式 REST seam 与尚未装配的生产 Runtime adapter，Hooks 保持 Advanced Settings 标签 | 将 native Hook admission 从 evaluator phase contract 推进到 Task Run 创建路径并同步 BI identity contract |

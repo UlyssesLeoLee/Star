@@ -59,6 +59,10 @@
 //! MATCH (m:Module {name:"group_api",type:"module"}),(s:Class {name:"GroupApiState",type:"class"});
 //! CREATE (archiveQuery:Class {name:"WorktreeArchiveReadinessQuery",type:"class",language:"rust",visibility:"pub"}),(archiveReadiness:Class {name:"WorktreeArchiveReadiness",type:"class",language:"rust",visibility:"pub"}),(archiveError:Enum {name:"WorktreeArchiveReadinessError",type:"enum",language:"rust",visibility:"pub"}),(archiveObserver:Interface {name:"WorktreeArchiveReadinessObserver",type:"interface",language:"rust",visibility:"pub"}),(archiveInstall:Function {name:"GroupApiState::with_worktree_archive_readiness_observer",type:"function",language:"rust"}),(prepare:Function {name:"WorktreeArchiveReadinessObserver::prepare_and_observe",type:"function",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(archiveQuery),(m)-[:CONTAINS]->(archiveReadiness),(m)-[:CONTAINS]->(archiveError),(m)-[:CONTAINS]->(archiveObserver),(s)-[:HAS_METHOD]->(archiveInstall),(archiveObserver)-[:HAS_METHOD]->(prepare),(archiveInstall)-[:USES]->(archiveObserver),(s)-[:USES]->(archiveObserver);
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MATCH (s:Class {name:"GroupApiState",type:"class"}),(p:Interface {name:"TaskCliSessionProvisioner",type:"interface"});
+//! CREATE (available:Function {name:"GroupApiState::run_admission_producer_available",type:"function",language:"rust"});
+//! CREATE (s)-[:HAS_METHOD]->(available),(available)-[:CALLS]->(p);
 use std::{sync::Arc, time::Duration};
 pub use worktree_lifecycle::{
     ProjectWorktreeCreateCommand, ProjectWorktreeImportCommand, ProjectWorktreeLifecycleProvider,
@@ -294,6 +298,12 @@ impl GroupApiState {
     ) -> Self {
         self.worktree_lifecycle_provider = Some(provider);
         self
+    }
+
+    pub(super) fn run_admission_producer_available(&self) -> bool {
+        self.task_cli_session_provisioner
+            .as_ref()
+            .is_some_and(|provisioner| provisioner.supports_run_admission())
     }
 }
 

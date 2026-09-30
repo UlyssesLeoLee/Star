@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.21）
+# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.23）
 
 ## 0. 文档说明与前提
 
@@ -2473,6 +2473,7 @@ Rust 桌面端以 Rust 为 UI 与执行控制的主要实现边界，尤其是 W
 
 性能目标须以设备档位和实测 workload 建立，不臆造内存/延迟数值。基准记录设备、Worktree/Run/Canvas 数量、活跃 Agent 数、desktop 进程树 peak RSS、空闲/高峰 CPU、首屏与事件更新 p95 延迟、取消/drain 时间及测量覆盖率；预算阈值先标记 `TBD-MEASURE`，完成基线测量后才能作为 release gate。
 
+Evaluator API v2 为每条 HookRule 提供 phase scope。旧的无 phase 规则继续只适用于 Worktree archive/cleanup；v1 policy 保持既有 canonical JSON 与 digest，并仅能在 archive/cleanup phase 使用。Run admission 规则只允许使用 actor authorization、lifecycle version 与 Runtime health typed facts；不支持的 phase/fact 组合必须在验证时拒绝并 fail closed。REST 已提供条件式 Run admission producer contract：锁外最多等待 2 秒取得 Runtime readiness/fence，等待期间不得持有 DB transaction/row lock；readiness 最多新鲜 5 秒，fence 必须至少留有 5 秒提交余量且 TTL 不超过 30 秒。随后在短事务内重授权、重读 Worktree/Task/lifecycle/有效策略并执行 Rust evaluator。Allow 事务必须原子写入不可变 HookSet snapshot、Run/start event、Hook ledger 与 Run `hook_evaluated` 镜像，两个事件共享 `tenant_id + event_id`；Deny 只写无 Task/Run FK 的 Hook ledger，不创建 Run。事务提交后，Runtime adapter 必须消费绑定完整 Task/Worktree/Runtime/profile/request fingerprint 的一次性 fence 并在 spawn 前再次校验。`TaskCliSessionProvisioner` 默认不声明 producer；当前仓库没有生产 adapter 装配，因此当前运行环境必须保持 publish/rollback 拒绝与 Builder 禁用，coverage 不得宣称 Run admission 已实际部署。无 producer 时 Project/Worktree policy publish/rollback 服务拒绝该 phase；Builder 依据服务端 capability 禁用该选项。
 | 要求 ID | 要求 | 优先级 |
 |---|---|---|
 | PAR-001 | Run/Agent/Plugin 启动先通过分层 CPU/内存/进程/IO/时间预算 admission；实际值、估计值和未知值分开记录 | P0 |
@@ -2580,6 +2581,8 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 | HOOK-005 | Hook outcome/latency/failure/override 作为 scope/version/correlation 完整的 append-only event；敏感正文不进入 event；非关键 after-commit 采用有界可重放队列 | P0 |
 | HOOK-006 | HookEvent 与 Worktree/Run/Evidence/Audit 联动进入 BI，支持规则版本/Project/Worktree/task cohort 下钻、coverage 与质量/冲突/人工介入关联，未知值保留 unknown | P0 |
 | HOOK-007 | Plugin Hook 仅可在隔离运行时提供受 grant 的 advisory/post-commit capability，不得替代/关闭/减弱 Rust builtin guard | P0 |
+| HOOK-008 | HookRule 按受支持的同步 phase 作用域执行；兼容旧 v1 archive policy 与 digest；Run admission 在 producer/readiness 尚未接入时不得启用或宣称覆盖 | P0 |
+| HOOK-009 | 新 Run admission 在锁外完成有界 Runtime readiness/fencing，在短授权事务内重验并原子写入 HookSet snapshot、Run、Hook ledger 与共享 event_id 的 RunEvent；拒绝不创建 Run；缺少真实 Runtime adapter 时保持 fail closed | P0 |
 
 | 验收 ID | 受入基准 |
 |---|---|
@@ -2590,6 +2593,8 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 | AC-HOOK-005 | BI 可下钻 Hook rule/version → HookRun/Event → Worktree/Run/Evidence/Audit，并报告 coverage、deny、timeout、override、运行成本、返工/接受关联；缺失数据为 unknown |
 | AC-HOOK-006 | Hook Engine 队列、CPU、内存和运行时间有硬上限；配置、plugin 或 worker 故障不造成 UI 阻塞、无界缓存或绕开内置 guard |
 | AC-HOOK-007 | Phase 9D summary v2 对 Hook ledger/RunEvent 镜像按 tenant+event_id 去重，Run state 按完整 tenant/project/task/run 键关联；缺字段记录显式计数，join 状态与 producer/phase coverage 分开呈现 |
+| AC-HOOK-008 | Rust evaluator tests 验证 v1 policy 仅限 archive、未指定 phase 的 rule 不跨 phase 生效、Run admission 只接受允许的 typed facts；policy publish/rollback 在 producer 未就绪时拒绝该 phase，UI Builder 禁用配置 | 100% negative/compatibility cases pass；不可支持配置 fail closed |
+| AC-HOOK-009 | REST/DB 验收验证 Runtime readiness 不持有数据库锁；fence scope/freshness/TTL 与 spawn 消费绑定；Allow 的 Run、Hook ledger、RunEvent 和 HookSet snapshot 原子提交且共享 event_id；Deny 只追加无 Run FK 的 ledger；事件列表/summary coverage 与已装配 producer capability 一致 | 正/负路径和并发/idempotency 场景通过；当前未装配的 production adapter 不得报告为已启用 |
 
 ### 50.9 追溯与后续专题同步
 
@@ -2649,3 +2654,5 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 | v5.19 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Rust 桌面多 Agent 资源预算、Schedule/Engineering Loop、版本化 Agent/Memory/Skill/Context/Validation/Profile contract 与 Rust CLI adapter；明确唯一 Automation occurrence source；新增 Rust-native fail-closed Hook、ULYS-235 Advanced Settings Hooks tab、无代码可视化策略、Worktree lifecycle enforcement 与 Run/BI correlation；本版仅定义架构，不把未实现引擎/provider/UI 标为完成 | 用户要求高性能 Rust 多代理、Loop、可扩展 AI 能力和原生/可视 Hook 与 Worktree/BI 联动 |
 | v5.20 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Worktree/Task-scoped Run list/detail 的认证查询契约、稳定游标与 20/50/100 条硬上限；明确状态维度独立投影、响应脱敏边界和 Task Card 内历史 UI。代码切片与隔离 migration 验证不等同于目标数据库部署或生产 RLS 验收 | Phase 8B 已加入 Run read API 与 Task Card 历史面板，需求需同步到可审计的实际接口 |
 | v5.21 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Phase 9D summary v2 的 Hook ledger/RunEvent 双来源去重、完整 Run 状态关联键、缺失投影计数和 partial/unknown coverage 分离语义；Hooks 仍是 ULYS-235 Advanced Settings 并列 tab | 9D-4 建立双来源 Run-state summary read model，需求同步到可复算 BI contract |
+| v5.22 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 phase-scoped HookRule evaluator API v2 契约、v1 archive policy digest 兼容、Run admission typed-fact allowlist 与 producer 未就绪时禁用 Builder 配置要求；保留 Hooks 在 ULYS-235 Advanced Settings 内容区并列标签中的导航位置 | Phase 9D-5a 扩展 Rust evaluator 的 Run admission phase contract，Run producer 与事务双写仍未接入 |
+| v5.23 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充条件式 Run admission readiness/fence、短事务重授权/evaluator、Run/HookEvent/RunEvent 同 event_id 双写与动态 coverage contract；明确当前无生产 TaskCliSessionProvisioner adapter，UI/policy capability 因而默认关闭；Hooks 继续位于既有 Advanced Settings 并列标签 | Phase 9D-5b 接入 CLI Run admission REST/DB producer seam 并复核 BI 去重与 fence 边界 |
