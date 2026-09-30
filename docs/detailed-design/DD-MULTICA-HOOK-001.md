@@ -1,32 +1,32 @@
 # DD-MULTICA-HOOK-001
 
-> **Multica Hook 域詳細設計書 v0.3** (per 日本 IPA SEC 標準 / 詳細設計書 テンプレート + STAR 仓 OPS-DETAILED-DESIGN-001 模板; v0.2 MCP 实装, v0.3 Plugins 升格为同导航实装标签页, v0.4 自审饱和: 修正 4 处 v0.1→v0.3 交叉引用 staleness + DD §6 TBD-5 mojibake 修正 (per 2026-09-24 22:13 JST Ulysses "自审" 评论)
+> **Multica Hook 域詳細設計書 v0.5.1** (继承高级设置 Hooks tab；v0.5 将安全关键 Hook 改为 Rust-native typed rules，新增可视化 Builder、Project/Worktree policy、RunEvent/BI 联动；旧 Python handler 章节仅作兼容/历史参考)
 
-> - 状态: 🟡 Draft v0.3 (2026-09-24 22:04 JST 升版, Plugins 升格为同导航实装标签页; 22:13 JST 自审饱和, v0.4 修正 4 处 cross-reference staleness + §6 TBD-5 mojibake)
-> - 上游: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.3 (升版含 MCP + Plugins tab) + [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) v0.3 (升版含 MCP + Plugins tab, 6 module / 3 表 / 14 事件 / 4 action type / 5 集成点 / 8 API 端点)
+> - 状态: 🟡 Draft v0.5.1 (2026-09-30 JST，requirements / basic design trace synchronization)
+> - 上游: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.1 + [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) v0.5.1 + `docs/requirements.md` v5.20 §50.8D
 > - 下游: 实装代码 + 测试 + 报告
-> - 核心语言: Python 3.10+ (后端) + TypeScript + Next.js 14+ (前端)
-> - 平行参考: `DD-PRE-TOOL-USE-GUARD-001.md` v0.1 (PreToolUse guard 详细设计, 跟本 DD 共享 audit log + fail-open/closed 模式)
+> - 核心语言: Rust Hook Engine / typed rule evaluator；Rust-native desktop UI；现有 Web UI 仅作同 DTO 的 presentation adapter。旧 Python handler 不具备安全决策 authority。
+> - 平行参考: `DD-PRE-TOOL-USE-GUARD-001.md` v0.1 仅作为既有 guard 行为输入；v0.5 的 Rust builtin policy 对 critical decision 统一 fail-closed，历史 fail-open 方案不具权威性
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #10 + 守门 #14 v3)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST)
-> - 日期: 2026-09-24 JST
+> - 日期: 2026-09-30 JST
 
 ---
 
 ## §0 目的 (Purpose)
 
-本詳細設計書は `BD-MULTICA-HOOK-001.md` v0.3 で定めた基本設計を実装可能なレベルまで展開する。MVP-骨架段階の Python ファイル + JSON 設定 + Next.js コンポーネント + pytest テストの物理形状と 100% 一致させ、実装者が追加設計判断をせずに済む粒度で仕様を提供する。
+本詳細設計書の v0.5 Rust-native supplement（尤其 §7.1）が安全重要実装の authority である。v0.1-v0.4 の Python files/JSON handlers/Next.js components 是旧 Mavis Runtime 草案的兼容历史，不可作为产品决策运行时。旧章节中的 schema、14 event names、任意 handler、transform、fail-open 和 Python framework 仅用于迁移对照；Product Hook policy/decision/Worktree guard 由 Star Rust service 与 typed data 实现。
 
 **核心スコープ**:
 
 - **6 維** 設計: モジュール / クラス / 時序 / 状態遷移 / テスト / UI
-- **W/T/M 3 表 100% カバー** (守門 #13) — `hooks` (W/M) + `hook_runs` (T) + `hook_session_state` (M)
-- **14 类事件** (PreToolUse / PostToolUse / UserPromptSubmit / SessionStart / SessionEnd / SubagentDispatch / SubagentReturn / ToolError / FileWatch / CronTick / RuntimeScan / WorkspaceSwitch / NetworkEgress / CustomEvent)
-- **4 种 action type** (pre / post / block / transform)
-- **fail-open / fail-closed** — registry 加載失敗 vs 審計失敗 二分
-- **UI "高级设置 → Hooks" 标签页** — Next.js 14+ 3 区域布局 (左: 列表 / 中: 详情 / 右: 触发日志)
+- **W/T/M ownership** — HookPolicySet/HookRule 是 Master/SCD2；Draft 是 bounded Work；Hook evaluation/override 是 append-only Transaction，可投影到 Task RunEvent/Audit
+- **Canonical event phase** — Run admission / tool / validation / review / Worktree lifecycle；旧 14 event names 仅可由兼容 adapter 映射，不直接执行任意 callback
+- **4 种 decision** (`allow / deny / require_human / defer`)；不提供参数 transform 或命令改写
+- **Critical fail-closed** — policy/evaluator/scope/audit error、unavailable 或 timeout 阻断关键动作；仅 after-commit advisory 可有界重试
+- **UI "高级设置 → Hooks" 标签页** — no-code typed Rule Builder、Project/Worktree inheritance、diff/dry-run/impact/approval/rollback；Web 只能作 Rust service DTO presentation adapter
 - **跟 skills 域同导航不同标签页协调** — 共享 session state, 独立 registry
-- **Framework 選型** (per 既存 mavis 仓 实证): stdlib `re` / `json` / `pathlib` / `logging` + `jsonschema` (1 依赖) + `watchdog` (1 依赖)
+- **Framework / Runtime**: Rust evaluator 与 Rust-native 桌面设置消费相同 schema；历史 Python tooling 不承担产品 Hook runtime
 
 **不做什么** (per SRS-001 §1.4):
 - 网络层拦截 (egress filtering) → v2.x, 本 v0.1 仅 NetworkEgress 事件 stub
@@ -1423,6 +1423,65 @@ stateDiagram-v2
 
 ---
 
+## §7.1 Rust-native Hook Engine 实装契约（v0.5 authority）
+
+### 7.1.1 类型与决策边界
+
+| 类型 | 必须字段/语义 | 数据所有权 |
+|---|---|---|
+| `HookPolicySet` | `policy_set_id`, `scope_kind`, `scope_id`, `version`, `parent_version`, `schema_version`, `evaluator_api_version`, `digest`, `published_at/by`, `status` | Master/SCD2；Project 为基线，Worktree 仅追加更严格的 rule |
+| `HookRule` | `rule_id`, `event_phase`, typed conditions, decision, reason_code, priority, enabled, resource_limit, overridable_class | 与 policy set revision 一同发布；无 executable/code handler 字段 |
+| `HookEventEnvelope` | typed event ID/schema version, actor/tenant/project/worktree/task/run, correlation ID, event source, sanitized command/resource facts | producer 提供事实；Engine 验 scope 和 schema |
+| `HookEvaluation` | policy/rule/evaluator versions+digests, decision, reason class, duration, timeout/failure/override, coverage status | append-only RunEvent/Audit transaction fact |
+| `HookDraft` | pending typed rule edits, base version, author, expiry, dry-run reference | 有 TTL 的 Work；不可被 runtime 读取 |
+
+Builtin platform rules → tenant/project baseline → Worktree restrictive additions 按固定优先级合并。任一 mandatory deny 产生 deny；否则任一 require_human 要求人审；否则任一 defer 等待条件/外部信号；只有所有 mandatory and applicable rules 明确 allow 才可继续。allow 不能提升 actor capability、放宽 ACL、变更 command target/argv 或验收要求。Plugin advisory result 不参与安全决策。
+
+### 7.1.2 Event phase 与同步执行
+
+同步 phase 清单至少为 `before_run_admission`, `before_tool_call`, `after_tool_result`, `before_validation`, `after_validation`, `before_review_or_complete`, `before_worktree_create_import`, `before_worktree_archive_cleanup`, `before_worktree_binding_change`, `after_worktree_lifecycle_commit`。Schedule/Cron tick 由 Automation occurrence source 创建，Hook 可审核/拦截已生成的触发，不维护 Cron timer 或 schedule definition。
+
+Rust evaluator 在命令 capability 执行前，用已解析并校验的 GroupContext/Run/Worktree facts 和预加载的不可变 PolicySnapshot 做 typed matching；规则 DSL 只允许 schema 注册的字段、比较符、数组/字面量上限和组合深度，禁止 arbitrary expression、filesystem/network callback 和可变共享状态。同步 hook 的 CPU/memory/step/time 上限取自固定 Engine profile；达上限时 critical phase 返回 `deny` 或 `defer`（按 phase policy），绝不能隐式 allow。decision 记录后，Domain Command 自身仍执行 ACL/version/freshness check，Hook 不替代事务守门。
+
+### 7.1.3 Worktree archive/cleanup gate 顺序
+
+1. 由 Index command 提交 opaque Worktree ID、expected lifecycle version、idempotency/correlation ID；拒绝客户端路径/URL。
+2. 解析当前 tenant/Project membership、owner/permission、Worktree binding 和 Runtime；缺一项即 fail closed。
+3. 获取新鲜 Git retention-lock observation；单项 timeout/过期/unknown/conflict 均拒绝 cleanup。
+4. 读取活跃 Run/Agent lease、file claims、PTY/process ownership；发出 drain/cancel request 并等待有界 deadline。未 drain 状态不得通过 Git lock 推断。
+5. 运行 `before_worktree_archive_cleanup` builtin + Project/Worktree typed HookRules；展示 rule ID/reason 和可执行的下一步，不暴露内部策略代码。
+6. Worktree Domain Command 在一个受权写事务内再复验 membership/version/active state/freshness，commit lifecycle state + Audit + Outbox；事务失败不执行物理删除。
+7. 只有 lifecycle receipt 已提交且 drain 完成后，Host Runtime 才进行 checkout cleanup；cleanup receipt/失败写回 Worktree event projection，Index 刷新 authorized state。
+
+HookEngine allow 不会直接删除 checkout；外部物理操作由 Host Runtime 生命周期服务执行。重放相同幂等键返回既有 operation receipt，不能重复归档/删除。
+
+### 7.1.4 HookEvent、Audit 与 BI projection
+
+`HookEvaluation` 写入已有 `multica.task_execution_run_event`（例如 `hook_evaluated`, `hook_blocked`, `hook_timeout`, `hook_override`）和通用 Audit/Outbox：event 数据包含 `hook_set_id/version/digest`, `rule_id/version`, evaluator/schema version, phase, decision, reason_code, duration_ms, `coverage_state`, override actor/reason reference, actor/tenant/project/worktree/work_item/run/correlation IDs。事件唯一性由 producer event ID + command idempotency 保证。敏感 request body、原始 prompt、Secret、stdout/stderr 与 chain-of-thought 只可存外部受控 artifact，不能落在 HookEvent.details。
+
+BI projection 使用版本化公式分别计算 evaluated-event coverage、allow/deny/require-human/defer rate、timeout/error、approved override、阻断到处理耗时、Worktree stale-lock/drain rejection 和 post-hook validation/acceptance/rework outcome。每项输出公式、分子/分母、窗口、hook/evaluator version、task type/complexity cohort、coverage 与授权 drilldown 到 Worktree/Run/Evidence/Audit。event 未采集为 unknown，不合并成零；Hook 次数不作为 agent productivity。
+
+### 7.1.5 高级设置可视化 Hook Builder
+
+Canonical route 为 `/settings/advanced/hooks`，位于既有高级设置导航；Skills/MCP/Plugins 保持同导航独立 tab。Project/Worktree scope 通过 scope selector / authorized picker 切换；从 Worktree Index 或 BI 跳入时传入的 scope 只是筛选上下文，服务端仍实时授权，不能凭 URL 获得写权限。
+
+| 区域 | 组件/行为 | 读写边界 |
+|---|---|---|
+| 左：Policy/Rule list | Project baseline 与当前 Worktree overlay；状态、版本、适用 event、强制/自定义标记、搜索与筛选 | paged authorized projection；不在 client store 持有完整历史 |
+| 中：Visual Rule Builder | typed event phase + scope + condition rows + fixed decision + reason + limits；preview natural-language explanation；draft/save | draft command 使用 expected version/idempotency；无自由代码编辑器 |
+| 右：Trigger Log / Dry-run | 最近 HookEvent、命中条件、decision/reason、关联 Run/Worktree、历史 replay/dry-run 与受影响操作 | read-only cursor paging；高体积 evidence 按需 artifact locator 加载 |
+| 顶部：Publish controls | inherited baseline, conflicts, version diff, required approval, publish/rollback, current version | publish 为 versioned audited Domain Command；不能由 preview toggle 即刻改生产规则 |
+
+Dry-run 使用脱敏历史 HookEvent snapshot，不执行 tool/CLI/Worktree command 或外部副作用；结果显示 matched/unmatched/unknown 及规则版本。生产发布前显示新增 deny/人审/可能拦截的 Worktree operation 样本及覆盖不足；审批人只能批准该 immutable digest。UI 不计算最终安全决策，真实 command 必须再经过 Rust Engine。
+
+桌面端以 Rust-native UI 渲染同一 typed API；复用 immutable snapshot、virtualized policy/event list、cursor paging 和 bounded cache；不可见 tab 停止订阅与刷新；不可将完整日志/规则历史/Canvas 状态复制进多个 store。大型日志在磁盘/受控 artifact 按需读取。Web adapter 暂存时也必须消费同一 API projection 和 capability checks。
+
+### 7.1.6 数据兼容、迁移与实现门
+
+旧 `registry.json` 只能作为只读导入源：识别 builtin name/event/action；有可映射的纯数据规则生成 Draft 并人工 review；任意 `handler` module、shell、Python callback、未支持 `transform` 或未知字段均拒绝执行并标出 migration error。旧 Python logs 可以导入为外部 evidence/provenance，不与 canonical RunEvent 伪合并。正式发布需 migration、RLS/runtime grants、typed Rust evaluator、Advanced Settings UI、Worktree Command double-check、RunEvent/Audit outbox consumer 和 BI coverage read model 全部部署/验收；当前新增仅为设计，未表示这些执行能力已经存在。
+
+性能验收固定 policy size/rule count/event rate 与 concurrent Run/Worktree load，测 Rust hot-path p50/p95/p99、peak RSS、allocation、queue/backpressure、UI first paint/input p95 和 HookEvent projection coverage；阈值在可重复目标设备测量后版本化，不虚构毫秒/内存数值。Policy cache 按 scope+version+digest 有界淘汰；规则评估不可做同步 DB/network round trip；事务事实不丢，高频 UI projection 可合并并标记 gap。
+
 ## §8 签字栏 (Sign-off)
 
 | 角色 | 氏名 | 签字 | 日期 |
@@ -1445,3 +1504,6 @@ stateDiagram-v2
 | **v0.2** | 2026-09-24 15:01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | MCP 升格标签页: §1 不做什么 + §3 影響範圍 (MCP 标签页不影响本 DD 模块) + 标题版本 + 上游引用 v0.2; 跨标签页共享 session_id 假设在 MCP 标签页仍然成立; commands / agents 仍"预留"占位 | 2026-09-24 15:01 JST Ulysses 评论 "MCP也应该是一个标签页" |
 | **v0.3** | 2026-09-24 22:04 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | Plugins 升格标签页: §1 不做什么 (Plugins 不影响本 DD 模块) + §3 影響範圍 + 标题版本 + 上游引用 v0.3; 跨标签页共享 session_id 假设在 Plugins 标签页仍然成立; commands / agents 仍"预留"占位 | 2026-09-24 22:04 JST Ulysses 评论 "还有plugins也应该是一个标签页" |
 | **v0.4** | 2026-09-24 22:13 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 自审饱和: §0 上游 BD 引用 v0.1→v0.3 + §1 不做什么 v0.1+v0.3→v0.2+v0.3 + §6 TBD-5 mojibake `跨標�頁` → `跨標籤頁` + §7 影響範圍 SRS/BD 行 v0.1→v0.3; 4 处 cross-reference staleness + 1 处 mojibake 修正 | 2026-09-24 22:13 JST Ulysses 评论 "自审, 各级文档都要做到位" |
+
+| **v0.5** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 Rust-native HookSet/typed evaluator、Project/Worktree policy 与 destructive lifecycle gate；高级设置 Hooks tab 增加可视化 builder、继承/diff/dry-run/审批/rollback；RunEvent/Audit/BI 联动和旧 Python handler 的非权威迁移边界；implementation gate 明确尚未落地 | 用户要求将原生 Hook、可视配置和 Worktree/BI 联动写入新架构 |
+| **v0.5.1** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 交叉引用更新至当前 SRS/BD v0.5.1 与总要件 v5.20；Hook runtime、可视化 UI 和生产 gate 状态未变 | Phase 8B 增补 Run query acceptance 后同步当前上位基线 |

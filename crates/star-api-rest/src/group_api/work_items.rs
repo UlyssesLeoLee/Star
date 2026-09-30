@@ -11,20 +11,20 @@
 //! CREATE (m)-[:CONTAINS]->(rb),(m)-[:CONTAINS]->(rv),(m)-[:CONTAINS]->(vrb),(m)-[:CONTAINS]->(rr),(rt)-[:CALLS]->(rv),(rv)-[:USES]->(rb),(rv)-[:CALLS]->(vrb),(rv)-[:CALLS]->(rr),(rv)-[:CALLS]->(hk),(rv)-[:CALLS]->(lk),(rv)-[:CALLS]->(sv),(rv)-[:CALLS]->(ld);
 
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::HeaderMap,
     routing::{get, post},
+    Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, Transaction};
 use uuid::Uuid;
 
 use super::{
-    AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope, set_tenant,
-    validate_actor,
+    active_binding, require_scope, set_tenant, validate_actor, AuthenticatedUser, GroupApiError,
+    GroupApiState,
 };
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -12,25 +12,29 @@
 //! MATCH (m:Module {name:"cli_sessions",type:"module"}),(list:Function {name:"list_task_cli_sessions",type:"function"}),(limit:Function {name:"validate_session_list_limit",type:"function"}),(valid:Function {name:"session_statuses_are_valid",type:"function"});
 //! CREATE (list_command:Class {name:"TaskCliSessionListCommand",type:"class",language:"rust"}),(list_query:Class {name:"TaskCliSessionListQuery",type:"class",language:"rust"}),(parent:Class {name:"TaskCliSessionParent",type:"class",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(list_command),(m)-[:CONTAINS]->(list_query),(m)-[:CONTAINS]->(parent),(list)-[:CALLS]->(limit),(list)-[:CALLS]->(valid);
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"cli_sessions",type:"module"}),(st:Function {name:"start_task_cli_session",type:"function"}),(sp:Interface {name:"TaskCliSessionProvisioner",type:"interface"});
+//! CREATE (idem:Class {name:"TaskRunIdempotency",type:"class",language:"rust"}),(lookup:Function {name:"lookup_cli_task_run",type:"function",language:"rust"}),(record:Function {name:"record_cli_task_run",type:"function",language:"rust"}),(append:Function {name:"append_cli_task_run_event",type:"function",language:"rust"}),(actor_scope:Function {name:"set_actor_scope",type:"function",language:"rust"}),(category:Function {name:"provision_error_category",type:"function",language:"rust"}),(task_run_id:Variable {name:"task_run_id",type:"variable",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(idem),(m)-[:CONTAINS]->(lookup),(m)-[:CONTAINS]->(record),(m)-[:CONTAINS]->(append),(m)-[:CONTAINS]->(actor_scope),(m)-[:CONTAINS]->(category),(st)-[:CALLS]->(lookup),(st)-[:CALLS]->(record),(st)-[:CALLS]->(append),(st)-[:CALLS]->(actor_scope),(st)-[:CALLS]->(category),(st)-[:USES]->(task_run_id),(sp)-[:USES]->(task_run_id),(record)-[:CALLS]->(lookup),(lookup)-[:USES]->(idem);
 
 use async_trait::async_trait;
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::header,
     response::{IntoResponse, Response},
     routing::{get, post},
+    Json, Router,
 };
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use sqlx::FromRow;
+use sqlx::{FromRow, Postgres, Row, Transaction};
 use uuid::Uuid;
 
 use super::{
-    AuthUser, AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope,
-    set_tenant, validate_actor,
+    active_binding, require_scope, set_tenant, validate_actor, AuthUser, AuthenticatedUser,
+    GroupApiError, GroupApiState,
 };
 
 /// A REST-authorized request for provisioning a Task Card CLI session in Local Runtime.
@@ -46,6 +50,7 @@ pub struct TaskCliSessionStartCommand {
     pub repository_id: Uuid,
     pub worktree_id: Uuid,
     pub work_item_id: Uuid,
+    pub task_run_id: Uuid,
     pub runtime_id: Uuid,
     pub expected_lifecycle_version: i32,
     pub approved_launch_profile_id: Uuid,
@@ -125,12 +130,13 @@ pub enum TaskCliSessionProvisionError {
 }
 
 /// Trusted bridge from the REST authorization boundary to Local Runtime.
-/// Implementations must be idempotent by `(tenant, actor, idempotency_key)`, compare the request
-/// fingerprint on retries, and return only after a sandboxed session is actually running and a
-/// fresh single-use WebSocket attachment ticket has been issued. Every lifecycle operation must
-/// compare the complete session binding and recheck current ACL and Runtime health. Lifecycle
-/// operations are correlated for TaskRun Audit, cancel is idempotent, and reattach must issue a
-/// new ticket rather than return a ticket previously issued to the browser.
+/// Implementations must be idempotent by `(tenant, actor, task_run_id, idempotency_key)`, compare
+/// the request fingerprint on retries, and return the same session for the same TaskRun. Return
+/// only after a sandboxed session is actually running and a fresh single-use WebSocket attachment
+/// ticket has been issued. Every lifecycle operation must compare the complete session binding
+/// and recheck current ACL and Runtime health. Lifecycle operations are correlated for TaskRun
+/// Audit, cancel is idempotent, and reattach must issue a new ticket rather than return a ticket
+/// previously issued to the browser.
 #[async_trait]
 pub trait TaskCliSessionProvisioner: Send + Sync {
     async fn start_task_cli_session(
@@ -192,6 +198,7 @@ struct WorktreeTaskCliScope {
     project_id: Uuid,
     repository_id: Uuid,
     runtime_id: Option<Uuid>,
+    branch: String,
     archived: bool,
 }
 
@@ -202,6 +209,12 @@ struct TaskCliLifecycle {
     active_worktree_id: Option<Uuid>,
     claimed_by: Option<Uuid>,
     version: i32,
+}
+
+#[derive(Debug, FromRow)]
+struct TaskRunIdempotency {
+    request_hash: Vec<u8>,
+    run_id: Uuid,
 }
 
 pub(super) fn router() -> Router<GroupApiState> {
@@ -273,6 +286,10 @@ async fn start_task_cli_session(
     let worktree_id = Uuid::parse_str(&worktree_id).map_err(|_| GroupApiError::bad_request())?;
     let work_item_id = Uuid::parse_str(&work_item_id).map_err(|_| GroupApiError::bad_request())?;
     let idempotency_key = super::work_items::idempotency_key(&headers)?;
+    let provisioner = state
+        .task_cli_session_provisioner
+        .clone()
+        .ok_or_else(GroupApiError::service_unavailable)?;
 
     let mut tx = state
         .resolver
@@ -281,9 +298,10 @@ async fn start_task_cli_session(
         .await
         .map_err(|_| GroupApiError::internal())?;
     set_tenant(&mut tx, actor.tenant_id).await?;
+    set_actor_scope(&mut tx, actor.user_id).await?;
     let worktree = sqlx::query_as::<_, WorktreeTaskCliScope>(
         r#"
-        SELECT p.project_id, w.repo_id AS repository_id, w.runtime_id, w.archived
+        SELECT p.project_id, w.repo_id AS repository_id, w.runtime_id, w.branch, w.archived
         FROM worktree_canvas_worktree w
         JOIN multica.worktree_project_binding p
           ON p.tenant_id = w.tenant_id AND p.worktree_id = w.id
@@ -316,6 +334,14 @@ async fn start_task_cli_session(
         runtime_id,
         &body,
     )?;
+    let existing_run_id = lookup_cli_task_run(
+        &mut tx,
+        actor.tenant_id,
+        actor.user_id,
+        &idempotency_key,
+        &request_fingerprint,
+    )
+    .await?;
 
     let lifecycle = sqlx::query_as::<_, TaskCliLifecycle>(
         r#"
@@ -340,23 +366,38 @@ async fn start_task_cli_session(
     .map_err(|_| GroupApiError::internal())?
     .ok_or_else(GroupApiError::not_found)?;
 
-    if lifecycle.version != body.expected_lifecycle_version {
-        return Err(GroupApiError::conflict("version_conflict"));
+    if existing_run_id.is_none() {
+        if lifecycle.version != body.expected_lifecycle_version {
+            return Err(GroupApiError::conflict("version_conflict"));
+        }
+        if lifecycle.status != "in_progress"
+            || lifecycle.review_state == "pending_review"
+            || lifecycle.active_worktree_id != Some(worktree_id)
+            || lifecycle.claimed_by != Some(actor.user_id)
+        {
+            return Err(GroupApiError::conflict("task_not_executable_in_worktree"));
+        }
     }
-    if lifecycle.status != "in_progress"
-        || lifecycle.review_state == "pending_review"
-        || lifecycle.active_worktree_id != Some(worktree_id)
-        || lifecycle.claimed_by != Some(actor.user_id)
-    {
-        return Err(GroupApiError::conflict("task_not_executable_in_worktree"));
-    }
+
+    let task_run_id = record_cli_task_run(
+        &mut tx,
+        actor.tenant_id,
+        actor.user_id,
+        worktree.project_id,
+        worktree.repository_id,
+        worktree_id,
+        runtime_id,
+        &worktree.branch,
+        work_item_id,
+        body.correlation_id,
+        &idempotency_key,
+        &request_fingerprint,
+    )
+    .await?;
 
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
 
-    let provisioner = state
-        .task_cli_session_provisioner
-        .ok_or_else(GroupApiError::service_unavailable)?;
-    let receipt = provisioner
+    let provision_result = provisioner
         .start_task_cli_session(TaskCliSessionStartCommand {
             tenant_id: actor.tenant_id,
             actor_id: actor.user_id,
@@ -364,6 +405,7 @@ async fn start_task_cli_session(
             repository_id: worktree.repository_id,
             worktree_id,
             work_item_id,
+            task_run_id,
             runtime_id,
             expected_lifecycle_version: body.expected_lifecycle_version,
             approved_launch_profile_id: body.approved_launch_profile_id,
@@ -371,12 +413,46 @@ async fn start_task_cli_session(
             idempotency_key,
             request_fingerprint,
         })
-        .await
-        .map_err(map_provision_error)?;
-    validate_receipt(&receipt, receipt.session_id)?;
+        .await;
+    let receipt = match provision_result {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            append_cli_task_run_event(
+                &state,
+                actor.tenant_id,
+                actor.user_id,
+                worktree.project_id,
+                work_item_id,
+                task_run_id,
+                "execution_state_changed",
+                "failed",
+                Some(provision_error_category(error)),
+                body.correlation_id,
+                json!({ "failure_category": provision_error_category(error) }),
+            )
+            .await?;
+            return Err(map_provision_error(error));
+        }
+    };
+    validate_receipt(&receipt, None)?;
+    append_cli_task_run_event(
+        &state,
+        actor.tenant_id,
+        actor.user_id,
+        worktree.project_id,
+        work_item_id,
+        task_run_id,
+        "execution_state_changed",
+        "running",
+        None,
+        body.correlation_id,
+        json!({ "cli_session_id": receipt.session_id }),
+    )
+    .await?;
 
     let mut response = Json(json!({
         "session_id": receipt.session_id,
+        "task_run_id": task_run_id,
         "worktree_id": worktree_id,
         "work_item_id": work_item_id,
         "runtime_id": runtime_id,
@@ -395,6 +471,271 @@ async fn start_task_cli_session(
         axum::http::HeaderValue::from_static("no-cache"),
     );
     Ok(response)
+}
+
+async fn lookup_cli_task_run(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    actor_id: Uuid,
+    idempotency_key: &str,
+    request_hash: &[u8; 32],
+) -> Result<Option<Uuid>, GroupApiError> {
+    let lock_key = format!("{tenant_id}:{actor_id}:cli_session_start:{idempotency_key}");
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        .bind(lock_key)
+        .execute(&mut **tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    sqlx::query(
+        r#"
+        DELETE FROM multica.task_execution_run_idempotency
+        WHERE tenant_id = $1 AND actor_id = $2 AND operation = 'cli_session_start'
+          AND idempotency_key = $3 AND expires_at <= now()
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(actor_id)
+    .bind(idempotency_key)
+    .execute(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    let previous = sqlx::query_as::<_, TaskRunIdempotency>(
+        r#"
+        SELECT request_hash, run_id
+        FROM multica.task_execution_run_idempotency
+        WHERE tenant_id = $1 AND actor_id = $2 AND operation = 'cli_session_start'
+          AND idempotency_key = $3 AND expires_at > now()
+        FOR UPDATE
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(actor_id)
+    .bind(idempotency_key)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    match previous {
+        Some(previous) if previous.request_hash.as_slice() == request_hash => {
+            Ok(Some(previous.run_id))
+        }
+        Some(_) => Err(GroupApiError::conflict("idempotency_key_reused")),
+        None => Ok(None),
+    }
+}
+
+async fn record_cli_task_run(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    actor_id: Uuid,
+    project_id: Uuid,
+    repository_id: Uuid,
+    worktree_id: Uuid,
+    runtime_id: Uuid,
+    start_ref: &str,
+    work_item_id: Uuid,
+    correlation_id: Uuid,
+    idempotency_key: &str,
+    request_hash: &[u8; 32],
+) -> Result<Uuid, GroupApiError> {
+    if let Some(run_id) =
+        lookup_cli_task_run(tx, tenant_id, actor_id, idempotency_key, request_hash).await?
+    {
+        return Ok(run_id);
+    }
+
+    let run_id = Uuid::new_v4();
+    let inserted = sqlx::query(
+        r#"
+        INSERT INTO multica.task_execution_run (
+            run_id, tenant_id, project_id, work_item_id, initiated_by, execution_channel,
+            worktree_id, repository_id, runtime_id, start_ref, task_contract_version,
+            task_snapshot, acceptance_snapshot, correlation_id, run_origin
+        )
+        SELECT $1, $2, $3, $4, $5, 'cli', $6, $7, $8, $9, c.version,
+               jsonb_build_object(
+                   'metadata_version', m.version,
+                   'item_type', m.item_type,
+                   'title', m.title,
+                   'description', m.description,
+                   'priority', m.priority,
+                   'labels', to_jsonb(m.labels)
+               ),
+               CASE WHEN c.contract_id IS NULL THEN NULL ELSE jsonb_build_object(
+                   'goal', c.goal,
+                   'scope', c.scope,
+                   'dependencies', c.dependencies,
+                   'acceptance_criteria', c.acceptance_criteria
+               ) END,
+               $10, 'cli'
+        FROM multica.task_metadata m
+        LEFT JOIN multica.task_contract c
+          ON c.tenant_id = m.tenant_id AND c.project_id = m.project_id
+         AND c.work_item_id = m.work_item_id AND c.valid_to IS NULL
+        WHERE m.tenant_id = $2 AND m.project_id = $3 AND m.work_item_id = $4
+          AND m.valid_to IS NULL
+        "#,
+    )
+    .bind(run_id)
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(work_item_id)
+    .bind(actor_id)
+    .bind(worktree_id)
+    .bind(repository_id)
+    .bind(runtime_id)
+    .bind(start_ref)
+    .bind(correlation_id)
+    .execute(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    if inserted.rows_affected() != 1 {
+        return Err(GroupApiError::not_found());
+    }
+
+    sqlx::query(
+        r#"
+        INSERT INTO multica.task_execution_run_event (
+            tenant_id, project_id, run_id, work_item_id, event_type, execution_state,
+            actor_id, correlation_id
+        ) VALUES ($1, $2, $3, $4, 'run_started', 'starting', $5, $6)
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(run_id)
+    .bind(work_item_id)
+    .bind(actor_id)
+    .bind(correlation_id)
+    .execute(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO multica.task_execution_run_idempotency (
+            tenant_id, actor_id, operation, idempotency_key, request_hash, run_id
+        ) VALUES ($1, $2, 'cli_session_start', $3, $4, $5)
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(actor_id)
+    .bind(idempotency_key)
+    .bind(request_hash.as_slice())
+    .bind(run_id)
+    .execute(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::conflict("idempotency_race"))?;
+    Ok(run_id)
+}
+
+async fn append_cli_task_run_event(
+    state: &GroupApiState,
+    tenant_id: Uuid,
+    actor_id: Uuid,
+    project_id: Uuid,
+    work_item_id: Uuid,
+    run_id: Uuid,
+    event_type: &str,
+    execution_state: &str,
+    failure_category: Option<&str>,
+    correlation_id: Uuid,
+    details: serde_json::Value,
+) -> Result<(), GroupApiError> {
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    set_tenant(&mut tx, tenant_id).await?;
+    let run_exists = sqlx::query_scalar::<_, Uuid>(
+        r#"
+        SELECT run_id FROM multica.task_execution_run
+        WHERE tenant_id = $1 AND project_id = $2 AND work_item_id = $3 AND run_id = $4
+        FOR UPDATE
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(work_item_id)
+    .bind(run_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .is_some();
+    if !run_exists {
+        return Err(GroupApiError::internal());
+    }
+
+    let previous = sqlx::query(
+        r#"
+        SELECT execution_state, failure_category, details
+        FROM multica.task_execution_run_event
+        WHERE tenant_id = $1 AND run_id = $2 AND event_type = $3
+        ORDER BY occurred_at DESC, event_id DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(run_id)
+    .bind(event_type)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    if let Some(previous) = previous {
+        let previous_state: Option<String> = previous
+            .try_get("execution_state")
+            .map_err(|_| GroupApiError::internal())?;
+        let previous_category: Option<String> = previous
+            .try_get("failure_category")
+            .map_err(|_| GroupApiError::internal())?;
+        let previous_details: serde_json::Value = previous
+            .try_get("details")
+            .map_err(|_| GroupApiError::internal())?;
+        if previous_state.as_deref() == Some(execution_state)
+            && previous_category.as_deref() == failure_category
+            && previous_details == details
+        {
+            tx.commit().await.map_err(|_| GroupApiError::internal())?;
+            return Ok(());
+        }
+    }
+
+    sqlx::query(
+        r#"
+        INSERT INTO multica.task_execution_run_event (
+            tenant_id, project_id, run_id, work_item_id, event_type, execution_state,
+            failure_category, actor_id, correlation_id, details
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(project_id)
+    .bind(run_id)
+    .bind(work_item_id)
+    .bind(event_type)
+    .bind(execution_state)
+    .bind(failure_category)
+    .bind(actor_id)
+    .bind(correlation_id)
+    .bind(details)
+    .execute(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+    Ok(())
+}
+
+async fn set_actor_scope(
+    tx: &mut Transaction<'_, Postgres>,
+    actor_id: Uuid,
+) -> Result<(), GroupApiError> {
+    sqlx::query("SELECT set_config('app.actor_id', $1, true)")
+        .bind(actor_id.to_string())
+        .execute(&mut **tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    Ok(())
 }
 
 async fn get_task_cli_session_status(
@@ -481,7 +822,7 @@ async fn reattach_task_cli_session(
         .reattach_task_cli_session(access.clone())
         .await
         .map_err(map_provision_error)?;
-    validate_receipt(&receipt, access.session_id)?;
+    validate_receipt(&receipt, Some(access.session_id))?;
     let mut response = Json(json!({
         "session_id": receipt.session_id,
         "worktree_id": access.worktree_id,
@@ -641,10 +982,10 @@ fn required_correlation_id(headers: &axum::http::HeaderMap) -> Result<Uuid, Grou
 
 fn validate_receipt(
     receipt: &TaskCliSessionReceipt,
-    expected_session_id: Uuid,
+    expected_session_id: Option<Uuid>,
 ) -> Result<(), GroupApiError> {
     let now = Utc::now();
-    if receipt.session_id != expected_session_id
+    if expected_session_id.is_some_and(|expected| receipt.session_id != expected)
         || receipt.session_id.is_nil()
         || receipt.attachment_ticket.is_empty()
         || receipt.attachment_ticket.len() > 512
@@ -720,6 +1061,15 @@ fn map_provision_error(error: TaskCliSessionProvisionError) -> GroupApiError {
     }
 }
 
+fn provision_error_category(error: TaskCliSessionProvisionError) -> &'static str {
+    match error {
+        TaskCliSessionProvisionError::RuntimeUnavailable => "runtime_unavailable",
+        TaskCliSessionProvisionError::SessionConflict => "session_conflict",
+        TaskCliSessionProvisionError::SessionNotFound => "session_not_found",
+        TaskCliSessionProvisionError::Internal => "internal",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -731,6 +1081,37 @@ mod tests {
         assert_eq!(validate_session_list_limit(Some(50)).unwrap(), 50);
         assert!(validate_session_list_limit(Some(0)).is_err());
         assert!(validate_session_list_limit(Some(51)).is_err());
+    }
+
+    #[test]
+    fn session_receipt_validates_short_lived_ticket_and_optional_binding() {
+        let session_id = Uuid::new_v4();
+        let make_receipt = |session_id, expires_at| TaskCliSessionReceipt {
+            session_id,
+            attachment_ticket: "single-use-ticket".to_owned(),
+            attachment_ticket_expires_at: expires_at,
+        };
+
+        assert!(validate_receipt(
+            &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
+            None,
+        )
+        .is_ok());
+        assert!(validate_receipt(
+            &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
+            Some(session_id),
+        )
+        .is_ok());
+        assert!(validate_receipt(
+            &make_receipt(session_id, Utc::now() + Duration::seconds(30)),
+            Some(Uuid::new_v4()),
+        )
+        .is_err());
+        assert!(validate_receipt(
+            &make_receipt(session_id, Utc::now() + Duration::seconds(61)),
+            None,
+        )
+        .is_err());
     }
 
     #[test]

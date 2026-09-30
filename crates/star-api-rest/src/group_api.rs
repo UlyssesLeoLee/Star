@@ -47,6 +47,10 @@
 //! MATCH (m:Module {name:"group_api",type:"module"}),(s:Class {name:"GroupApiState",type:"class"}),(b:Function {name:"build_group_router",type:"function"});
 //! CREATE (wl:Module {name:"worktree_lifecycle",type:"module",language:"rust"}),(wp:Interface {name:"ProjectWorktreeLifecycleProvider",type:"interface",language:"rust"}),(install:Function {name:"GroupApiState::with_worktree_lifecycle_provider",type:"function",language:"rust"}),(wlRouter:Function {name:"worktree_lifecycle::router",type:"function",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(wl),(wl)-[:CONTAINS]->(wp),(s)-[:USES]->(wp),(s)-[:HAS_METHOD]->(install),(install)-[:USES]->(wp),(b)-[:CALLS]->(wlRouter);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"});
+//! CREATE (trm:Module {name:"task_runs",type:"module",language:"rust"}),(trr:Function {name:"task_runs::router",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(trm),(b)-[:CALLS]->(trr);
 use std::sync::Arc;
 pub use worktree_lifecycle::{
     ProjectWorktreeCreateCommand, ProjectWorktreeImportCommand, ProjectWorktreeLifecycleProvider,
@@ -57,25 +61,26 @@ pub use worktree_lifecycle::{
 
 use async_trait::async_trait;
 use axum::{
-    Json, Router,
     extract::{FromRef, Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::get,
+    Json, Router,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::auth::{AuthUser, JwtConfig, oauth::AuthenticatedUser};
+use crate::auth::{oauth::AuthenticatedUser, AuthUser, JwtConfig};
 
 mod canvas;
 mod cli_sessions;
 mod group_apps;
 mod scoped_chat;
 mod scoped_chat_store;
+mod task_runs;
 mod work_items;
 mod worktree_lifecycle;
 mod worktrees;
@@ -534,6 +539,7 @@ pub fn build_group_router(state: GroupApiState) -> Router {
         .merge(worktree_lifecycle::router())
         .merge(work_items::router())
         .merge(cli_sessions::router())
+        .merge(task_runs::router())
         .merge(scoped_chat::router())
         .merge(canvas::router())
         .merge(group_apps::router())

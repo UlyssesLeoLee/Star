@@ -1,10 +1,12 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v0.2** (per 日本 IPA SEC 標準, Worktree 群组集成补充)
+> **Multica Task Lifecycle 域 詳細設計書 v0.6** (per 日本 IPA SEC 標準, Worktree 群组集成补充)
 >
-> - 状态: 🟡 Draft v0.2 (群组集成与 canonical WorkItem 契约补充待评审)
+> - 状态: 🟡 Draft v0.6 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A writer / migration 验证及 Phase 8B 有界 read API / Task Card UI 为条件式代码切片)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.20 §50；`docs/basic-design.md` v5.4 §16.14-16.17
+> - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.20；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.1
 > - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
 > - 上位 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §2.1 模式 2
@@ -25,10 +27,10 @@
 |---|---|
 | 文书 ID | DD-MULTICA-TASK-001 |
 | 文书名 | Multica Task Lifecycle 域 詳細設計書 (Worktree Group 集成) |
-| 版本 | v0.2 |
+| 版本 | v0.4 |
 | 作成日 | 2026-09-28 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手**审核** (per DEC-008) |
-| 承認者 | Draft；v0.2 群组集成补充待评审 |
+| 承認者 | Draft；v0.3 Run/Evidence 扩展待评审 |
 | 关联 commit | (待生成) |
 | 关联文档 | `SRS-MULTICA-TASK-001.md` v0.2 + `BD-MULTICA-TASK-001.md` v0.1 + ADR-0026 v0.2 + `DD-SHARED-TASK-001.md` v0.2 |
 | 范围 | TK-1 ~ TK-5 子能力 × 22 FR = 5 关键 class + 1 状态机 + 11 共享类型 + 3 时序图 + 5 张表 (W-T-M 100%) + 6 API + 30+ 测试 |
@@ -691,19 +693,20 @@ ALTER TABLE wbs_task
 
 跟 SRS-MULTICA-TASK-001 §9 同 + DD-MULTICA-POISON-001 强绑定。
 
-## §14 渡口 Worktree 群组集成契约 (v0.2)
+## §14 渡口 Worktree 群组集成契约 (v0.6)
 
-本节是 v0.2 的规范性补充，与 [`BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1 和 [`SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2 对齐。旧样例中的 `task_id` 表示兼容别名；新接口的 canonical key 是 `work_item_id`。旧 §7 中把整个 `wbs_task_v33` 视为 Master、或把 `pending_review` 放入 status enum 的内容不再作为 v0.2 的物理设计依据。
+本节是 v0.3 的规范性补充，与 [`BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1、[`SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2 和总需求 §50.8 对齐。旧样例中的 `task_id` 表示兼容别名；新接口的 canonical key 是 `work_item_id`。旧 §7 中把整个 `wbs_task_v33` 视为 Master、或把 `pending_review` 放入 status enum 的内容不再作为 v0.3 的物理设计依据。
 
 ### 14.1 领域事实源与身份
 
 | 身份/事实 | 唯一所有者 | 详细规则 |
 |---|---|---|
-| `worktree_id` | Worktree Domain | 每个任务只能归属一个 Worktree；所有读取、命令、执行与事件都携带此 ID |
+| `worktree_id` | Worktree Domain | WorkItem 可关联 0..N 个 Worktree；WORKTREE 命令携带当前 `worktree_id`，Task/Run 历史可在 Worktree 外按 Project/Task 授权读取；Run 上保存可空历史快照，不建立阻止 workspace 清理的外键 |
 | `work_item_id` | WorkItem Domain | 跨 Multica、Jira 等价视图、Task Card 和 Canvas 引用的 canonical ID；源系统 ID 通过 alias 映射，不做字符串强转 |
 | `task_card_id` | Task Card Manager | 执行工作面的稳定 ID；`work_item_id` 唯一关联当前 Task Card，执行重试另建 Run/Session ID |
 | lifecycle `status` | Multica Lifecycle Service | 唯一允许改变六态状态的命令入口 |
 | `review_state` | Review Gate | `none/pending_review/accepted/rejected` 与主状态分列；提交 review 不产生第七种任务状态 |
+| `task_execution_run_id` | Task Execution | 每次执行尝试的稳定 ID；同一 WorkItem 可拥有多个 Run；它不等同于 Chat/LangGraph `group_chat_run` |
 | Canvas 元素与位置 | Canvas Domain | 保存布局、元素和类型化 EntityRef；任务状态只能经 Multica 命令更新 |
 | 插件入口/capability | Group App Registry | 管理启用及 capability 暴露，不拥有任务状态与 Task Card |
 
@@ -719,9 +722,15 @@ Multica、Jira 等价视图、Task Card Index、Group Infinite Canvas 和已启�
 | `task_metadata` | Master | WorkItem 标题、描述、标签、优先级、执行策略引用；SCD Type 2 | 物理删除禁止；RLS 13 类必携 |
 | `task_lifecycle_audit` | Transaction | 状态/Review/TMO/ACL/dispatch 事件，带 `worktree_id`, `work_item_id`, `task_card_id`, `actor_id`, `correlation_id`, `event_id` | append-only，物理删除禁止；RLS 13 类和 audit 必携 |
 | `task_session_health` | Transaction | poison/404/fresh-session 决策及 session ref，不能覆写历史事件 | append-only，物理删除禁止；RLS 13 类和 audit 必携 |
+| `task_contract` | Master | goal/scope/dependencies/acceptance criteria 的版本快照；按 WorkItem + version SCD Type 2 | 物理删除禁止；RLS 13 类必携；每次更改追加 Transaction audit |
+| `task_contract_change_audit` | Transaction | Contract create/supersede、actor、version、correlation | append-only，物理删除禁止；RLS 13 类和 audit 必携 |
+| `task_execution_run` | Transaction | 每次尝试的 Task/Input/Acceptance snapshot、可空资源预算、渠道、Actor、版本与可空 Worktree/repo/ref 快照 | append-only，物理删除禁止；RLS 13 类和 audit 必携；Worktree/repo 是无 FK 历史引用 |
+| `task_execution_run_event` | Transaction | 执行、Agent 声明、验证、人工评审/返工、集成、介入、成本、失败和有限资源 high-water summary 的独立事件 | append-only，物理删除禁止；RLS 13 类和 audit 必携 |
+| `task_execution_evidence` | Transaction | 脱敏摘要、类型、digest、byte length 与受控 artifact locator；不存 artifact 正文 | append-only，物理删除禁止；RLS 13 类和 audit 必携 |
+| `task_execution_run_idempotency` | Work | CLI start 的短期幂等映射；actor/key/fingerprint → run_id | `retention_period=30 days` + `expires_at`; 到期可删且不能删除所映射的 Run |
 | `wbs_task_v33` | Compatibility projection | 旧 WBS row 的导入/查询兼容层；通过 alias 映射到 canonical `work_item_id` | 不得成为第二个生命周期事实源；迁移期写入只经 Lifecycle Service |
 
-**v0.2 canonical W/T/M 覆盖**：Work 3/3 (`task_lifecycle_current`, `task_review`, `task_stale_dispatch`)；Transaction 2/2 (`task_lifecycle_audit`, `task_session_health`)；Master 1/1 (`task_metadata`)。`wbs_task_v33` 是迁移兼容投影，不作为混合分类主表计入，W/T/M owner 仍由上述 6 个规范数据集承担。
+**v0.4 W/T/M 覆盖**：Work 4 个（`task_lifecycle_current`, `task_review`, `task_stale_dispatch`, `task_execution_run_idempotency`）；Master 2 个（`task_metadata`, `task_contract`）；Transaction 6 个（`task_lifecycle_audit`, `task_session_health`, `task_contract_change_audit`, `task_execution_run`, `task_execution_run_event`, `task_execution_evidence`）。资源逐样本 telemetry 为有界 TTL Work/runtime buffer，不追加事务事实；Run 高水位摘要属于 `task_execution_run_event`。`wbs_task_v33` 是迁移兼容投影，不作为混合分类主表计入。所有 Work 表定义 TTL，所有 Master 使用 SCD2 + RLS，所有 Transaction 使用 append-only + audit + RLS。
 
 所有 Work 数据都有 `retention_period`；Master 全表使用 SCD Type 2 + RLS；Transaction 全表 append-only + audit + RLS。v0.1 §7 的旧 DDL 供迁移字段参考；实施时按本节分类拆分动态当前态、Master metadata 与不可变审计事件，不允许把混合 WBS 行整表归入一个分类。
 
@@ -806,7 +815,7 @@ CREATE INDEX idx_task_session_health_item_time
 
 ### 14.4 卡内 CLI、LangGraph 与插件交互
 
-Task Card Detail 从 Multica/Jira/Canvas 任一同级入口打开时，先用 canonical `work_item_id` 获取同一卡片。卡内 CLI/Agent Session 启动前创建 `TaskExecutionContext(worktree_id, work_item_id, task_card_id, actor_id, tenant_id, scope_kind, runtime_profile, permission_snapshot_ref, correlation_id)`；Runtime/AgentPolicy 再验证工作目录、可执行工具、secret capability 与目标授权。浏览器 URL、Canvas 节点 ID 和外部 Jira key 均不得直接成为执行目录或授权凭据。
+Task Card Detail 从 Multica/Jira/Canvas 任一同级入口打开时，先用 canonical `work_item_id` 获取同一卡片。每次实际启动前由服务端建立 `TaskExecutionRun` 并快照当前 Task Contract；CLI provisioner 接收 `task_run_id`，其 Session 是 Run 的执行资源，不是 Run 自身。`TaskExecutionContext(task_run_id, worktree_id, work_item_id, task_card_id, actor_id, tenant_id, scope_kind, runtime_profile, permission_snapshot_ref, correlation_id)` 再由 Runtime/AgentPolicy 验证工作目录、可执行工具、secret capability 与目标授权。浏览器 URL、Canvas 节点 ID 和外部 Jira key 均不得直接成为执行目录或授权凭据。
 
 Group App Registry 与 LangGraph `SubAgentRegistry` 是两个分离注册表：前者决定群组入口及插件 capability，后者决定 agent graph type。插件通过 capability bridge 请求 Lifecycle Command 或只读 API；每次调用均复验 enabled/scope/ACL。卸载插件即时阻止新 capability 调用，并保留已有 WorkItem、审计和 disabled EntityRef。
 
@@ -819,12 +828,85 @@ Group App Registry 与 LangGraph `SubAgentRegistry` 是两个分离注册表：�
 | DD-MG-03 | Task Card CLI 只能在绑定 Worktree 内运行；跨 Worktree GLOBAL 操作按目标逐项授权并审计 |
 | DD-MG-04 | `review_state=pending_review` 时主 status 保持 `in_progress`；未接受 review 不可进入 `completed` |
 | DD-MG-05 | 插件 disable 后新调用失败，但核心任务、Transaction audit 和 Canvas EntityRef 保持可读 |
+| DD-MG-06 | Task Contract 每次变更追加 SCD2 successor 与 audit；已有 Run 保存创建时的合同版本和验收快照 |
+| DD-MG-07 | 同一 Task 多次执行各有独立 Run；Worktree/repo 是无 FK 快照；清理 checkout 不删除 Run/Event/Evidence |
+| DD-MG-08 | Agent 声明、自动验证、人工验收/返工与集成状态分列；任何一个状态不得自动推导另一个状态 |
+| DD-MG-09 | 相同 CLI start key/fingerprint 重放返回同一 `task_run_id`；新 key 建立新 Run；`group_chat_run` 不共用身份/状态 |
+| DD-MG-10 | 每个 Project BI metric 可解释 formula、分母、time window、coverage/version 并下钻到 Run/Evidence；unknown 不计为零 |
+| DD-MG-11 | Pi 仅为架构参考；Rust-native scheduler 根据 DAG readiness、Project/Worktree fairness、bounded queue 和 hierarchical resource budget 管理独立 Run；禁止无界 fan-out 和 L1→L1 直连 |
+| DD-MG-12 | Run budget snapshot 不可变且可为空；每 Run 至多 append 一个含 units/source/window 的 resource summary；缺测保持 unknown；cancel/deadline/revoke 必须级联并验收 drain |
+| DD-MG-13 | Rust desktop 使用固定 workload 验收分页/虚拟化/Canvas culling/lazy artifact/bounded terminal buffer/offscreen pause；设备内存和延迟目标经实测定标 |
 
 ### 14.6 尚待详细裁定
 
 - 旧 `wbs_task` 与 canonical `work_item_id` 的 alias 回填冲突/重复处理，按 migration rehearsal 确认；不得以猜测自动合并。
-- `task_card_id` 是 1:1 当前卡投影；历史执行尝试存储在独立 Runtime session 表，确切归属表由 Runtime DD 定稿。
+- 历史 CLI Session 的生产 provisioner / terminal sink 应回传或引用 `task_run_id`；Run 事实不由 Runtime Session 表替代，也不因 Worktree checkout 清理而丢失。
 - GLOBAL 批量操作已定义逐目标授权与结果；跨目标补偿是否自动执行由 LangGraph/TMO review 决定。
+
+### 14.7 Task Contract 与 Execution Run 数据契约
+
+`task_contract` 是 canonical WorkItem 下的 Master/SCD2 版本：goal、scope、dependencies 与 acceptance criteria 组成当前合同。更新必须在一笔领域事务中关闭当前版本、追加 successor、追加 `task_contract_change_audit` 与 Outbox；物理删除禁止。Run 创建时读取当前合同与 Task metadata，在 `task_execution_run.task_snapshot` / `acceptance_snapshot` 中固定快照；没有合同的旧 Task 将 acceptance snapshot 存为 `NULL`，不能写空数组伪装为“零验收项”。历史 Run 不跟随 Task Contract 后续版本变更。
+
+`task_execution_run` 是 Transaction/append-only 的一次尝试事实。它保存 Task/Project/Actor、`run_origin` / execution channel、相关 Agent/Model/Skill/Orchestrator/Strategy 版本、合同版本、输入/验收快照、profile/provider/API version/content digest/grant snapshot、resource budget、loop policy、HookSet/evaluator 与可选 `ProjectEngineeringManifest` snapshot，以及 correlation 和可空 `worktree_id / repository_id / runtime_id / start_ref / start_commit_ref`。新快照字段在 Phase 8A 兼容旧写入可为空；Phase 9 resolver 落地后，新的 Agent/Loop/Hook Run admission 必须填齐 profile/policy snapshot，不能用空 object 伪装选择完成。预算快照记录当次 admitted 上限，不代表真实消耗；Worktree/repo/runtime 仅作为当时上下文的 ID/Ref 快照，不设置外键；在删除 checkout 或关闭 Worktree binding 后，Run 与证据仍按 Project/Task 权限可查。数据库里的 Worktree 主记录若仍被旧 lifecycle audit 的 `ON DELETE RESTRICT` 引用，仍不得绕过该约束硬删；host checkout 清理和平台身份保留是两个不同生命周期。
+
+Schedule Run 以 `run_origin='schedule'` 标记，必须保存 `automation_rule_id / automation_rule_version / automation_occurrence_id`，并用 `(tenant_id, automation_occurrence_id)` 唯一索引防止重复创建 Run。该 Rule/Occurrence 的权威数据仍归 `domain-automation`，此 migration 仅保存不可变 ID/version 关联，不建第二张 schedule definition 表；目前 schedule 字段尚无 producer。
+
+`task_execution_run_event` 以独立 nullable 列记录执行器状态、Agent 声明、验证结果、人工接受/返工和集成状态。`agent_declaration=declared_complete` 只说明 Agent 自报；不得自动写 verifier passed、human accepted 或 integrated。cost record 将 `actual_cost_amount` 与 `estimated_cost_amount` 分开且必须携带 `cost_unit`；unknown 用 `NULL`。Schedule occurrence link、Loop iteration/decision/stop、Hook evaluate/override 和 `resource_summary` 都是 append-only event；Hook 事件固定规则/evaluator version+digest、phase/decision/reason class/latency/timeout，Loop event 固定 iteration/phase/decision/stop reason。Run 完成时最多追加一条 `resource_summary`，单位固定记录 peak RSS bytes、CPU time ms、child process high-water 与 input/output bytes，并携带 measurement source/window；未采到的值为 NULL，高频 telemetry 只进入短 TTL 有界 buffer。失败事件保存稳定 `failure_category`，`details` 只允许脱敏 metadata，不存 prompt、完整 tool transcript 或思维过程。`task_execution_evidence` 只保存类型、摘要、digest、媒体类型、长度和受控 artifact locator；artifact 正文由独立受权/保留策略管理。
+
+Phase 8A 已新增 additive migration `db/migrations/2026-09-30-worktree-task-execution-run.sql`，并将 CLI Session start 命令与 Run ID 连接：在授权的 lifecycle transaction 中创建 Run/input/acceptance snapshot、`run_origin='cli'`、Run started event 与 30 天 actor/key/fingerprint 幂等映射；同幂等请求重放返回原 Run ID，新幂等键产生新尝试。Migration 也预留版本化 Execution Profile/Provider/Loop/HookSet/Project Engineering snapshot、Automation Rule/Occurrence reference、Loop/Hook/resource typed event 字段和每 Run 唯一资源汇总索引；CLI start writer 当前尚未提供这些 snapshots，所以对应字段保持 NULL。CLI writer 目前产生 started/running/provisioning-failure 事件。该 migration 已在隔离临时 PostgreSQL 集群重复应用两次，并确认 6 张 Run 表启用 `FORCE ROW LEVEL SECURITY`；这不是目标数据库部署或目标 runtime role 的 RLS 验收。真实 status/exit、验证、人工 review、integration、cost/evidence/resource-summary producer、Schedule/Loop/Hook provider 与 Runtime provider 尚未接入。`group_chat_run` 仍保留为短 TTL Chat/LangGraph queue projection，可关联 `task_run_id`，但不可复用 Run PK 或状态机。
+
+#### 14.7.1 Run 查询 API 与 Task Card 历史面板
+
+授权查询必须以当前 Worktree + canonical WorkItem 为路径作用域，不从客户端接受 Project ID 作为授权事实：
+
+| 方法 / 路径 | 行为与边界 |
+|---|---|
+| `GET /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/runs?limit=&cursor_started_at=&cursor_run_id=` | 验证 Bearer Actor、`work-item:read`、tenant、当前 Project membership、Worktree binding 与 WorkItem/Worktree 归属；默认 20 条、最多 50 条；复合 `(started_at, run_id)` 倒序游标；返回最小 Run summary、独立状态维度和下一游标 |
+| `GET /api/v1/worktrees/{worktree_id}/work-items/{work_item_id}/runs/{run_id}` | 使用相同 scope 授权并确认 Run 属于路径 Task；最多返回 100 个 Event 与 100 个 Evidence 的结构化 projection |
+
+两个响应均 `Cache-Control: no-store`。读取层不序列化任意 Event `details`、artifact locator、文件正文、prompt、完整 transcript 或模型推理；敏感证据的正文/locator 需由另外的、逐次授权的 artifact API 提供。execution / verification / human acceptance 各自取对应字段最新的非空 Event，不能按整行最新事件把彼此状态覆盖。Task Card 的 Run History 面板只在认证 Group API provider 下出现，保留当前有界页面而不缓存整个历史；加载错误/身份变化必须清空数据，不回退本地 seed。该前端不增加 Worktree 导航层级。
+
+当前实现状态：list/detail 路由和 Task Card 条件式历史面板已落代码；查询边界由 actor/context/关联校验执行。单测与前端类型检查已通过。隔离 PostgreSQL migration 重放与 FORCE RLS 检查已通过，但 `localhost:5432` 目标开发库不可用，目标 DB/runtime grants 和 API 对真实 RLS 的端到端验收仍未完成。Task Contract 写命令、其余 Run Event/Evidence producer 与生产 Runtime 仍为未完成项。
+
+### 14.8 Project BI、Benchmark 与改进闭环
+
+BI 是 Run/Event/Evidence/Audit 的只读、可重建 Project projection，不产生第二套事实。每个 `metric_version` 固定 formula、numerator/denominator、unit、window、cohort、coverage 和 source event types；缺数据不补零。按 task type/complexity 分层，核心度量包括 acceptance、first-pass acceptance、rework、人工介入、cycle time、accepted-task cost，并下钻到 Task → Run → Evidence。项目导航只在 Project Worktree Index 提供 Quality & Improvement 入口；Worktree 内不添加“Run”导航层级，Run 留在 Task Card detail。
+
+Benchmark 保存固定 task set/version、repository commit、运行环境、Task Contract、scoring rule 与隔离 replay receipt；tuning/holdout 分集并禁止候选策略查看 holdout 后回写标准。不可复现条件明确保存为 metadata。Improvement proposal 串起触发失败事件、假设、实验、benchmark 对比、授权采纳版本与 rollback 版本。Phase 10-11 尚无生产实现；schema、Metric API/UI、隔离 runner、approval policy 和 BI coverage 尚待各阶段完成。
+
+### 14.9 Pi-inspired Rust Agent core 与并行资源契约
+
+Pi 的可借鉴部分是小而稳定的执行核心、组合式 tool/skill/extension、生命周期事件、可持久分支的 session/context history，以及只将活动分支装入 prompt、超预算时压缩上下文但保留原始历史。渡口从头实现这些边界为 Rust traits/protocols；Pi/Node 不是依赖或 subprocess backend。Task Contract 和每次 TaskExecutionRun 是产品事实；Agent 对话 branch 是 Run 内的执行上下文，不替代 Run/Event/Evidence，也不允许 Agent 自报状态推进人工验收。
+
+参考 Pi 官方资料：[project README](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/README.md)、[session branches and context](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sessions.md)、[session tree format](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/session-format.md)、[extensions](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md)。这些仅作为设计参考，不引入其 JS runtime 或依赖。
+
+多 Agent 并行由 Rust Project Coordinator 和 Worktree Coordinator 负责。Scheduler 只 admission 依赖已满足的 DAG 节点，使用 Project/Worktree 配额、work-conserving weighted fairness 和有界队列；队列满时背压/排队/拒绝，不无界 fan-out。父 Run 为子 Agent/Plugin 分配 memory、CPU concurrency、process/fd、provider/tool concurrency、event buffer 和 wall-clock 子预算；预算随 Run 快照保存，消耗实测与估计分开，未知保持 NULL。Agent lease 与路径 claim 用于执行互斥；Git retention lock 只表示 Git 元数据保护，三者独立。
+
+RunEvent 追加一条可选、每 Run 至多一条的 `resource_summary`，记录 peak RSS bytes、CPU time ms、child process high-water、输入/输出字节和采样来源/区间；高频样本只能进入有界短 TTL telemetry buffer，不追加逐帧 Transaction。取消、deadline、撤权和 Worktree drain 传播到所有 child Run/process 并等待释放；超时保留可见 incomplete 状态，不报告 drained。跨 Agent 协作经当前授权的 coordinator command/event，GLOBAL L0 为每个 Worktree 目标派生独立 L1，禁止 L1↔L1 直连。
+
+Rust desktop UI 只读取受授权分页/增量 projection，Worktree/Run 使用虚拟列表，Canvas 基于 viewport/spatial index 裁剪，CLI 用有界 ring buffer 与 disk-backed evidence。共享不可变 snapshot 避免跨状态 store 复制大型对象；可见页面外停止 poll/subscription，图片/大证据 lazy-load；网络、磁盘和 layout 不阻塞 UI 线程，worker/channel/cache 各有硬上限和取消。桌面 renderer framework 不在未测情况下定型：Phase 12 使用同一 Worktree/Run/Canvas/CLI workload 评估 Rust UI 候选的 peak RSS、CPU、首屏/更新 p95、Canvas frame time 与平台覆盖，指标先标 `TBD-MEASURE` 再以实测 baseline 固定。
+
+Plugin 仅通过版本化 manifest/capability contract 接入 Rust core；运行采用受限 WASM 或独立隔离进程，不能把任意 native library 动态载入桌面主进程。热插拔先拒绝新调用、撤销授权、drain/cancel 运行中调用、回收 instance/进程，再切换 Registry projection。隔离方案需同时验收内存/CPU/并发预算和 host API 兼容性。
+
+### 14.10 Schedule Loop 与 Engineering Loop
+
+Schedule Loop 的唯一规则与时间 occurrence owner 是 `domain-automation` 的版本化 `AutomationRule` / `AutomationOccurrence`。一次 occurrence 使用稳定 ID、幂等 dispatch、fencing lease，固定 trigger/timezone/target scope/concurrency/overlap/misfire/retry/deadline/pause policy，并在创建时绑定当时的 Task/Worktree/Profile/Hook policy 版本；规则后续修改不得回写既有 occurrence 或 Run。`star-scheduler` 只做 DAG 依赖 readiness，Workflow/LangGraph 只编排已触发的 Run，不创建第二套 Cron rule store 或时钟。现有 Schedule/Cron schema 仍为候选，生产 worker 与恢复逻辑尚未实现。
+
+Engineering Loop 是 Run 内的 Plan/Act/Observe/Verify/Decision 次序。每轮引用固定 Task Contract、acceptance、AgentExecutionProfile、HookSet 与 Validation policy snapshot；循环不能自行修改这些基线。预算至少限制 iteration、wall-clock、peak RSS、CPU、child process、provider/tool concurrency 与累计调用成本；无进展/振荡、budget/deadline、撤权/cancel 均停止新动作并触发 child drain，最后写不可变 stop reason、验证结果与 drain outcome。进度采样可重建，停止/验收/Occurrence/Run facts 必须持久化。
+
+### 14.11 Agent Execution Profile 与 Provider 扩展
+
+`AgentExecutionProfile` 固定组合 Agent、Memory、Skill、Context、Validation、Loop、HookSet 和资源策略的稳定 ID、schema/API version、implementation version、content digest、scope/capabilities、兼容性及 grant snapshot。每次 Run admission 解析并冻结实际选择；撤销、缺失或不兼容的 provider 不回退为更宽权限。Memory 需具来源、scope、ACL、TTL 与删除/保留声明；Skill manifest 含版本/digest/capability/resource budget；Context assembly 限定字节/token 预算、记录 source provenance 和压缩边界，不能静默截断权限、Task Contract 或验收条件；ValidationProvider 独立于 Agent 声明，保存输入/toolchain/rule digest、逐项覆盖、结果与 Evidence。ProjectEngineeringManifest 可按 repository commit 配置任务模板、已批准验证命令 ID、toolchain/env profile、fixtures 和 artifact/redaction 映射，仓库文本不可自行启用命令能力。
+
+第一阶段可经 Star-owned Rust `AgentCliAdapter` 调用现有 CLI。Adapter 只接受直接 executable+argv、allowlisted env、canonical Worktree cwd、明确 grant、bounded I/O/event channel、deadline/cancel 和进程树回收；CLI 不控制授权、scope、Loop budget、Hook decision 或最终验收。后续 Rust-native provider 替换 CLI 时沿用同一版本化 contract 和 Run Event/Evidence，不改变 WorkItem/Run 主身份模型。Pi 继续只作为 session branch/context compaction 的设计参考，不依赖 Pi/Node runtime。
+
+### 14.12 Rust-native Hook 与高级设置导航契约
+
+Hook 规则的唯一配置入口是既有 **高级设置 → Hooks** tab，和 Skills/MCP/Plugins 平级；这里维护可视化 typed rule、Project baseline/Worktree restrictive overlay、version diff、冲突解释、dry-run、影响预览、审批发布与 rollback。不得给 Worktree Group tree 增加 Hook app，也不得要求用户编写 Python/JS/shell/native handler。Worktree Index 显示 effective HookSet/version/health/deny summary，Run detail/BI 可查对应事件并深链回 Advanced Settings Hooks 过滤视图。
+
+安全关键 Hook evaluator 属于 Rust core，内置不可关闭规则并在 Run/tool/validation/review/archive/cleanup gate 执行；decision 仅限 allow/deny/require_human/defer，不可授予权限或修改 command/acceptance facts。policy/evaluator/audit 失败或超时 fail closed；插件 Hook 仅能在隔离、有 grant 的 advisory/post-commit 边界运行。Worktree archive/cleanup 在 Domain Command 前重验 actor ACL、lifecycle version、active Run/Agent/path claim、child process/handle drain 与新鲜 Git lock observation，再由 Domain Command 原子复查；旧 Python handler 不具有 Star 产品授权 authority。
+
+每条 Hook event 关联 Project/Worktree/Task/Run/correlation ID 与 HookSet/rule/evaluator version/digest、phase、decision、reason class、latency、timeout/failure/override provenance，禁止存 Secret、raw prompt、完整 CLI output。BI 根据这些事件派生覆盖率、deny/人工处理、超时/故障、覆盖操作和 cleanup/claim/drain 与 validation/返工关系；漏数显式 unknown，不补零。引擎、设置 UI、Domain Command gate 和 BI consumer 均尚待 Phase 9-10 实装。
 
 ---
 
@@ -839,3 +921,7 @@ Group App Registry 与 LangGraph `SubAgentRegistry` 是两个分离注册表：�
 修订履历:
 | v0.1 | 2026-09-11 | Ulysses — Mavis 接手**审核** | 初版（5 关键 class + 1 状态机 + 11 共享类型 + 3 时序图 + 5 张表 W-T-M 100% + 6 API + 30+ 测试）| 2026-09-11 20:50 JST Ulysses 拍板 |
 | v0.2 | 2026-09-28 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Worktree/WorkItem/Task Card 设为统一身份契约；把 review_state 与六态 lifecycle 分离；补充 scope 授权、卡内 CLI、插件 capability、Outbox 及 W/T/M 物理数据边界。旧版签字记录只适用于 v0.1 | 用户要求基本设计合入 dev 后继续完成详细设计 |
+| v0.3 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 Task Contract Master/SCD2 与 TaskExecutionRun/Event/Evidence Transaction 设计；Run 独立于 Worktree，冻结输入和验收快照，分离声明/验证/人工接受/集成状态；为 CLI start 加 Run ID 和 30 天幂等映射；定义 Project 级 BI、Benchmark、可回滚 Improvement Proposal，标注实现阶段和当前缺口 | 用户引用“AI提升方向”对话，要求 Run 与 BI 架构并入 Worktree-first 任务 |
+| v0.4 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Pi 的小核心、组合扩展、显式事件与分支 session/context 原则映射为 Rust-native contract；新增 DAG/公平调度、资源层级预算、有界队列、取消/drain、Run 资源摘要、隔离 Plugin 和高性能 Rust 桌面设计/验收；不依赖 Pi/Node runtime | 用户要求多 Agent 并行并确保低内存、高性能 Rust 桌面端 |
+| v0.5 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Group DD v4.19、Basic Design v5.3 与 Hook DD v0.5；新增唯一 Automation Schedule occurrence source、Run 内 Engineering Loop、版本化 Agent/Memory/Skill/Context/Validation/Hook/Loop profile、首期 Rust CLI adapter、Advanced Settings Hooks tab 与 Rust-native Worktree safety/BI 事件契约；计划与 SQL schema 仅定义边界，未实现的 engine/provider/UI 保持未完成 | 用户要求将 AI 提升方向、Loop 与原生可视化 Hook 体系纳入当前架构 |
+| v0.6 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.20、Basic Design v5.4 与 Group DD v4.20；补充 Worktree-scoped Run list/detail API 的 auth、游标、结果上限、字段脱敏与状态维度投影，并记录 Task Card Run History 面板；纠正旧文对 read API/UI 与 migration 的完成状态，区分临时 PostgreSQL 验证与目标 DB/RLS 未部署；Hook DD 对齐 v0.5.1 | Phase 8B 有界 Run 查询/API/UI 条件式切片落地后更新详细设计 |

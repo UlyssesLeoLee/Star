@@ -22,27 +22,27 @@
 //! CREATE (m)-[:CONTAINS]->(projectQueryTests),(projectQueryTests)-[:CONTAINS]->(rejectsUnknown);
 
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::{
-        HeaderMap,
         header::{CACHE_CONTROL, VARY},
+        HeaderMap,
     },
     routing::{get, post},
+    Json, Router,
 };
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, Transaction};
 use std::{sync::Arc, time::Duration};
 use uuid::Uuid;
 
 use super::{
+    active_binding, require_scope, set_tenant, validate_actor, worktree_projection,
     AuthenticatedUser, GroupApiError, GroupApiState, WorktreeGitLockObservation,
     WorktreeGitLockObserver, WorktreeGitLockObserverError, WorktreeGitLockQuery, WorktreeIndexRow,
-    active_binding, require_scope, set_tenant, validate_actor, worktree_projection,
 };
 
 #[derive(Debug, Deserialize)]

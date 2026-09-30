@@ -20,7 +20,7 @@
 //!   (submit)-[:USES]->(max_refs),(submit)-[:USES]->(max_bytes);
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::{FromRow, PgPool};
 use std::sync::Arc;
 use uuid::Uuid;

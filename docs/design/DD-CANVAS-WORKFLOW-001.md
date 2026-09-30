@@ -1,8 +1,8 @@
 # DD-CANVAS-WORKFLOW-001
 
-> **无限画布 — 自动化流程域 (Automation Flow Domain) 詳細設計書 v1.0.2 (Draft)**
+> **无限画布 — 自动化流程域 (Automation Flow Domain) 詳細設計書 v1.0.3 (Draft)**
 >
-| 状態 | 🟡 v1.0.2 (Worktree 群组集成详细契约补充待评审；原 Round 7 状态保留为历史记录) |
+| 状態 | 🟡 v1.0.3 (Schedule Trigger 适配 Automation occurrence；原 Round 7 状态保留为历史记录) |
 > - 上位: `docs/design/BD-CANVAS-WORKFLOW-001.md` v1.0.4 / `docs/requirements/SRS-CANVAS-WORKFLOW-001.md` v1.2
 > - 群组总册: `docs/design/BD-CANVAS-001.md` v0.2 / `docs/requirements/SRS-CANVAS-001.md` v1.4
 > - 下游: 開発実装 / テスト設計 / Review
@@ -21,13 +21,13 @@
 | 文書名 | 无限画布 — 自动化流程域 詳細設計書 |
 | 上位要件定義 | SRS-CANVAS-WORKFLOW-001 v1.2 |
 | 上位基本設計 | BD-CANVAS-WORKFLOW-001 v1.0.4 (群组集成补充待评审) |
-| 版数 | v1.0.2 (Draft) |
+| 版数 | v1.0.3 (Draft) |
 | ステータス | 🟡 Draft — Group Shell integration supplement pending review |
 | 対象モジュール | Flow Editor / Template Selector / Group Shell Chat Adapter / Execution History / Flow Tags Manager / Node Config Sidebar / RuleExecutor / LangGraph/L0 Router(本 DD の主担当スコープ) |
 | 非対象 | 既存 Canvas コア・Agent 詳細(参照のみ)/ 25 module コア(参照のみ)。これらは DD-CANVAS-001 / DD-CANVAS-AGENT-001 が担当。 |
-| 作成日 | 2026-09-28 (v1.0.2; initial v1.0 2026-09-14) |
+| 作成日 | 2026-09-30 (v1.0.3; initial v1.0 2026-09-14) |
 | 作成者 | ULYS-33 担当エージェント |
-| Review 状態 | v1.0.2 integration review 待ち；旧 Round 7 结果仅适用于 v1.0.1 基线 |
+| Review 狀態 | v1.0.3 schedule-source alignment review 待ち；旧 Round 7 结果仅适用于 v1.0.1 基线 |
 
 ## §1 文档目的
 
@@ -488,7 +488,7 @@ pub struct TriggerService {
     rule_executor: Arc<RuleExecutor>,
     activation: Arc<FlowActivationService>,
     webhook_index: Arc<RwLock<HashMap<String, Uuid>>>,  // token -> flow_id
-    cron_scheduler: Arc<CronScheduler>,
+    automation_occurrence_dispatcher: Arc<AutomationOccurrenceDispatcher>,
     canvas_event_sub: Arc<CanvasEventSubscriber>,
     tenant_ctx: Arc<TenantContext>,
 }
@@ -496,8 +496,8 @@ pub struct TriggerService {
 impl TriggerService {
     /// FR-W2.1: Manual 触发 (UI "运行" ボタン → API-WF-03 POST)
     pub async fn fire_manual(&self, flow_id: Uuid, input: Option<Value>, actor: Uuid) -> Result<Uuid /* execution_id */, WFError>;
-    /// FR-W2.2: cron 着火 (scheduler callback)
-    pub async fn fire_cron(&self, flow_id: Uuid, schedule_id: Uuid) -> Result<Uuid, WFError>;
+    /// FR-W2.2: 已授权的 Automation occurrence 着火；本模块不拥有 Cron 时钟或计划表
+    pub async fn fire_schedule_occurrence(&self, flow_id: Uuid, occurrence: AutomationOccurrenceRef) -> Result<Uuid, WFError>;
     /// FR-W2.3: Webhook 着火 (API-WF-05)
     pub async fn fire_webhook(&self, flow_id: Uuid, token: &str, body: Value, idempotency_key: Option<String>) -> Result<Uuid, WFError>;
     /// FR-W2.4: canvas_event 着火 (WS subscriber callback)
@@ -2457,6 +2457,7 @@ ActivationGuard.pre_check(flow_id, tenant_id):
 | v1.0 | 2026-09-14 | 初版交付, 覆盖 SRS-CANVAS-WORKFLOW-001 v1.1 全部 54 项 FR (W1-W15), §0-§14 完整章节结构, 11 Module / 30+ Class / 8 REST API / 8 Table / 36 TBD 追踪矩阵 + 5 項目追加 / 12 確認事項 + IPA 自審 | MinimaxM3 (agent) |
 | v1.0.1 | 2026-09-14 | Round 7 補強: ADR-0046 実在パス確認反映 (RV-MAJ-01 / RV-OPN-01 / RV-MIN-04 解消), §7.11/§7.12/§13.1/§14.2.1/§14.2.4/§14.5 を更新, TMO 7 ノード・7 协议・8 API 端点・State 5 字段を §7.11/§7.12 外部 IF に実值反映, 重大指摘 4→3 / 確認事項 12→11 / 軽微 4→3 | MinimaxM3 (agent) |
 | v1.0.2 | 2026-09-28 | 增补 Worktree 群组 / Group Shell 接入、Flow Worktree ownership、scope-aware chat/run schema、canonical WorkItem 深链、GLOBAL 逐目标授权和 Transaction/Work 分层；不覆盖旧版评审记录 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 |
+| v1.0.3 | 2026-09-30 | Schedule Trigger 改为消费 `domain-automation` 的唯一 AutomationOccurrence；移除 Workflow 自有 CronScheduler/计划表的设计 authority，ExecutionScheduler 只负责 DAG readiness，并为 dispatch 固定 occurrence ID、fencing token 与幂等语义 | 统一 Schedule Loop owner，避免 Automation、Workflow/LangGraph、star-scheduler 重复调度 |
 
 ---
 
@@ -2578,3 +2579,7 @@ For new rows, `automation_flow.worktree_id` is required and immutable after crea
 | WF-GROUP-05 | checkpoint expiration 不删除 execution/chat/audit Transaction 事实 |
 
 **版本缺口**：LangGraph Python context/checkpointer 的精确 API 需与仓库实际锁定版本进行 compatibility review；Workflow 设计只依赖“每次 run 的不可变验证上下文”和重新授权语义，不把特定 SDK 版本当作已升级事实。
+
+## §17 Schedule Loop occurrence adapter (v1.0.3)
+
+`domain-automation` 是唯一 Schedule Rule、timezone/misfire/retry policy 与 durable occurrence 的事实源。Workflow `Schedule` Trigger 只接受已授权 `AutomationOccurrenceRef { occurrence_id, rule_id, rule_version, target_scope, fencing_token, correlation_id }`；收到后重新验证当前 Project/Worktree/Task/Run/Profile/Hook authorization，再以 occurrence ID 幂等创建或恢复目标 Run。Workflow 不创建 Cron 时钟、schedule 表或 occurrence ID；`star-scheduler` 只把 DAG 依赖已满足的节点排入有界队列。过期或被新 fencing token 替代的 dispatcher 不得提交迟到结果。当前定义只建立适配契约，Automation occurrence schema/worker 和实际 dispatch 尚未实现。

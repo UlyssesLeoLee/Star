@@ -181,6 +181,21 @@ export function normalizeWorktreeGitLock(value: unknown, nowMs = Date.now()): Wo
   return { state: observation.state, observedAt };
 }
 
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
+      (client:Class {name:"WorktreeGroupApiClient"}),
+      (request:Function {name:"WorktreeGroupApiClient.request"});
+CREATE (runSummary:Class {name:"TaskRunSummary",type:"interface",language:"typescript",visibility:"public"}),
+       (runPage:Class {name:"TaskRunPage",type:"interface",language:"typescript",visibility:"public"}),
+       (runEvent:Class {name:"TaskRunEvent",type:"interface",language:"typescript",visibility:"public"}),
+       (runEvidence:Class {name:"TaskRunEvidence",type:"interface",language:"typescript",visibility:"public"}),
+       (runDetail:Class {name:"TaskRunDetail",type:"interface",language:"typescript",visibility:"public"}),
+       (listRuns:Function {name:"WorktreeGroupApiClient.listTaskRuns",type:"function",language:"typescript",visibility:"public",complexity:"moderate"}),
+       (getRun:Function {name:"WorktreeGroupApiClient.getTaskRunDetail",type:"function",language:"typescript",visibility:"public",complexity:"simple"});
+CREATE (file)-[:CONTAINS]->(runSummary),(file)-[:CONTAINS]->(runPage),(file)-[:CONTAINS]->(runEvent),(file)-[:CONTAINS]->(runEvidence),(file)-[:CONTAINS]->(runDetail),
+       (client)-[:HAS_METHOD]->(listRuns),(client)-[:HAS_METHOD]->(getRun),(listRuns)-[:CALLS]->(request),(getRun)-[:CALLS]->(request);
+*/
+
 export type ScopedChatScope = "WORKTREE" | "GLOBAL";
 
 export interface ScopedChatEntityRef {
@@ -326,6 +341,84 @@ export interface TaskCliSessionPage {
   sessions: TaskCliSessionStatus[];
 }
 
+export interface TaskRunSummary {
+  run_id: string;
+  worktree_id: string | null;
+  repository_id: string | null;
+  work_item_id: string;
+  initiated_by: string;
+  execution_channel: string;
+  run_origin: string;
+  start_ref: string | null;
+  start_commit_ref: string | null;
+  task_contract_version: number | null;
+  agent_id: string | null;
+  model_version: string | null;
+  skill_version: string | null;
+  orchestrator_version: string | null;
+  strategy_version: string | null;
+  execution_profile_id: string | null;
+  execution_profile_version: number | null;
+  execution_profile_digest: string | null;
+  execution_state: string | null;
+  verification_state: string | null;
+  human_acceptance_state: string | null;
+  started_at: string;
+  correlation_id: string;
+}
+
+export interface TaskRunPage {
+  project_id: string;
+  repository_id: string;
+  worktree_id: string;
+  work_item_id: string;
+  permission_snapshot_ref: string;
+  limit: number;
+  runs: TaskRunSummary[];
+  next_cursor: { cursor_started_at: string; cursor_run_id: string } | null;
+}
+
+export interface TaskRunEvent {
+  event_id: string;
+  event_type: string;
+  execution_state: string | null;
+  verification_state: string | null;
+  human_acceptance_state: string | null;
+  failure_category: string | null;
+  loop_iteration_no: number | null;
+  loop_phase: string | null;
+  loop_decision: string | null;
+  hook_phase: string | null;
+  hook_decision: string | null;
+  hook_reason_class: string | null;
+  peak_rss_bytes: number | null;
+  cpu_time_ms: number | null;
+  occurred_at: string;
+}
+
+export interface TaskRunEvidence {
+  evidence_id: string;
+  evidence_kind: string;
+  summary: string | null;
+  sha256_digest: string | null;
+  media_type: string | null;
+  byte_length: number | null;
+  sensitivity: string;
+  captured_at: string;
+}
+
+export interface TaskRunDetail {
+  project_id: string;
+  worktree_id: string;
+  work_item_id: string;
+  permission_snapshot_ref: string;
+  run: TaskRunSummary;
+  events: TaskRunEvent[];
+  events_truncated: boolean;
+  evidence: TaskRunEvidence[];
+  evidence_truncated: boolean;
+}
+
 export type TaskCliSessionAttachmentReceipt = Omit<TaskCliSessionReceipt, "status"> & {
   status: "attachment_ticket_issued";
 };
@@ -459,6 +552,36 @@ export class WorktreeGroupApiClient {
 
   listWorkItems<T>(worktreeId: string): Promise<T> {
     return this.request(`/api/v1/worktrees/${encodeURIComponent(worktreeId)}/work-items`);
+  }
+
+  listTaskRuns(
+    worktreeId: string,
+    workItemId: string,
+    query: {
+      limit?: number;
+      cursor?: { cursor_started_at: string; cursor_run_id: string };
+    } = {},
+  ): Promise<TaskRunPage> {
+    if (query.limit !== undefined && (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 50)) {
+      throw new GroupApiError(400, "invalid_request", "Task Run list limit must be between 1 and 50.");
+    }
+    const params = new URLSearchParams();
+    if (query.limit !== undefined) params.set("limit", String(query.limit));
+    if (query.cursor) {
+      params.set("cursor_started_at", query.cursor.cursor_started_at);
+      params.set("cursor_run_id", query.cursor.cursor_run_id);
+    }
+    const serialized = params.toString();
+    const suffix = serialized ? `?${serialized}` : "";
+    return this.request(
+      `/api/v1/worktrees/${encodeURIComponent(worktreeId)}/work-items/${encodeURIComponent(workItemId)}/runs${suffix}`,
+    );
+  }
+
+  getTaskRunDetail(worktreeId: string, workItemId: string, runId: string): Promise<TaskRunDetail> {
+    return this.request(
+      `/api/v1/worktrees/${encodeURIComponent(worktreeId)}/work-items/${encodeURIComponent(workItemId)}/runs/${encodeURIComponent(runId)}`,
+    );
   }
 
   transitionWorkItem<T>(
