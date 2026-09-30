@@ -240,6 +240,7 @@ dependencies = [
  "domain-cli",
  "domain-comment",
  "domain-feedback",
+ "domain-hook",
  "domain-identity",
  "domain-integration",
  "domain-permission",

@@ -51,6 +51,10 @@
 //! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"});
 //! CREATE (trm:Module {name:"task_runs",type:"module",language:"rust"}),(trr:Function {name:"task_runs::router",type:"function",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(trm),(b)-[:CALLS]->(trr);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"});
+//! CREATE (hpm:Module {name:"hook_policies",type:"module",language:"rust"}),(hpr:Function {name:"hook_policies::router",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(hpm),(b)-[:CALLS]->(hpr);
 use std::sync::Arc;
 pub use worktree_lifecycle::{
     ProjectWorktreeCreateCommand, ProjectWorktreeImportCommand, ProjectWorktreeLifecycleProvider,
@@ -78,6 +82,7 @@ use crate::auth::{oauth::AuthenticatedUser, AuthUser, JwtConfig};
 mod canvas;
 mod cli_sessions;
 mod group_apps;
+mod hook_policies;
 mod scoped_chat;
 mod scoped_chat_store;
 mod task_runs;
@@ -543,5 +548,6 @@ pub fn build_group_router(state: GroupApiState) -> Router {
         .merge(scoped_chat::router())
         .merge(canvas::router())
         .merge(group_apps::router())
+        .merge(hook_policies::router())
         .with_state(state)
 }
