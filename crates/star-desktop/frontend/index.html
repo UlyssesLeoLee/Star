@@ -3,29 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Star Desktop — Worktree Board</title>
-  <style>
-    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
-    body { margin: 0; padding: 0; background: #fafafa; color: #222; }
-    .container { padding: 16px; }
-    .header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #e0e0e0; background: white; }
-    .status { font-size: 14px; color: #555; }
-    .board { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 12px; }
-    .column { background: white; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; min-height: 200px; }
-    .column h3 { margin: 0 0 8px 0; font-size: 14px; color: #333; }
-    .card { background: #f5f5f5; border-radius: 4px; padding: 6px 8px; margin-bottom: 4px; font-size: 12px; }
-    .btn { padding: 6px 12px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; }
-  </style>
+  <title>Star Desktop — Worktree Board (React 19)</title>
 </head>
 <body>
-  <div class="header">
-    <h1 style="font-size: 18px; margin: 0;">🪐 Star Desktop (Tauri 2.0 PoC P0)</h1>
-    <span class="status" id="status">Loading…</span>
-    <button class="btn" id="reload">Reload</button>
-  </div>
-  <div class="container">
-    <div class="board" id="board"></div>
-  </div>
-  <script type="module" src="/src/main.ts"></script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

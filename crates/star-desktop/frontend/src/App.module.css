@@ -1,0 +1,47 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #fafafa;
+  color: #222;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  background: white;
+}
+
+.title {
+  font-size: 18px;
+  margin: 0;
+}
+
+.nav {
+  display: flex;
+  gap: 12px;
+}
+
+.nav a {
+  color: #1976d2;
+  text-decoration: none;
+}
+
+.main {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-top: 1px solid #e0e0e0;
+  background: white;
+  font-size: 12px;
+  color: #666;
+}
