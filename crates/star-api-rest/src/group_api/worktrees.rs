@@ -20,29 +20,47 @@
 //! MATCH (m:Module {name:"worktrees",type:"module"});
 //! CREATE (projectQueryTests:Module {name:"authorized_projects_query_tests",type:"module",language:"rust"}),(rejectsUnknown:Function {name:"rejects_unknown_project_query_fields",type:"function",language:"rust",visibility:"private",complexity:"simple"});
 //! CREATE (m)-[:CONTAINS]->(projectQueryTests),(projectQueryTests)-[:CONTAINS]->(rejectsUnknown);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"worktrees",type:"module"}),(co:Function {name:"confirm_management_plan",type:"function"});
+//! CREATE (archiveOutcome:Class {name:"ArchiveHookOutcome",type:"class",language:"rust"}),(archiveFacts:Class {name:"ArchiveGateFacts",type:"class",language:"rust"}),(confirmContext:Class {name:"ManagementConfirmationContext",type:"class",language:"rust"}),(confirmState:Enum {name:"ManagementConfirmationState",type:"enum",language:"rust"}),(lockContext:Function {name:"lock_management_confirmation_context",type:"function",language:"rust",visibility:"private",complexity:"complex"}),(prepare:Function {name:"prepare_archive_gate_facts",type:"function",language:"rust",visibility:"private",complexity:"complex"}),(archiveGate:Function {name:"evaluate_archive_gate",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(lockState:Function {name:"hook_retention_lock_state",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(fresh:Function {name:"archive_readiness_is_fresh",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(factsFresh:Function {name:"archive_gate_facts_are_fresh",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(projection:Function {name:"archive_hook_projection",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(archiveTests:Module {name:"archive_gate_tests",type:"module",language:"rust"}),(load:Function {name:"load_verified_effective_snapshot",type:"function",language:"rust",visibility:"pub(super)"}),(archiveObserver:Interface {name:"WorktreeArchiveReadinessObserver",type:"interface",language:"rust"}),(gitLockTimeout:Function {name:"observe_git_lock_with_timeout",type:"function",language:"rust",visibility:"private"});
+//! CREATE (m)-[:CONTAINS]->(archiveOutcome),(m)-[:CONTAINS]->(archiveFacts),(m)-[:CONTAINS]->(confirmContext),(m)-[:CONTAINS]->(confirmState),(m)-[:CONTAINS]->(lockContext),(m)-[:CONTAINS]->(prepare),(m)-[:CONTAINS]->(archiveGate),(m)-[:CONTAINS]->(lockState),(m)-[:CONTAINS]->(fresh),(m)-[:CONTAINS]->(factsFresh),(m)-[:CONTAINS]->(projection),(m)-[:CONTAINS]->(archiveTests),(co)-[:CALLS]->(lockContext),(co)-[:CALLS]->(prepare),(co)-[:CALLS]->(archiveGate),(co)-[:CALLS]->(projection),(co)-[:CALLS]->(factsFresh),(prepare)-[:CALLS]->(archiveObserver),(prepare)-[:CALLS]->(gitLockTimeout),(archiveGate)-[:CALLS]->(load),(archiveOutcome)-[:USES]->(projection),(archiveFacts)-[:USES]->(lockState),(factsFresh)-[:CALLS]->(fresh);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (archiveTests:Module {name:"archive_gate_tests",type:"module"}),(lockState:Function {name:"hook_retention_lock_state",type:"function"}),(fresh:Function {name:"archive_readiness_is_fresh",type:"function"});
+//! CREATE (lockTest:Function {name:"lock_facts_fail_closed",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(freshTest:Function {name:"readiness_rejects_stale_and_future_observations",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(gateFreshTest:Function {name:"archive_gate_facts_require_fresh_observations",type:"function",language:"rust",visibility:"private",complexity:"simple"});
+//! CREATE (archiveTests)-[:CONTAINS]->(lockTest),(archiveTests)-[:CONTAINS]->(freshTest),(archiveTests)-[:CONTAINS]->(gateFreshTest),(lockTest)-[:CALLS]->(lockState),(freshTest)-[:CALLS]->(fresh),(gateFreshTest)-[:CALLS]->(factsFresh);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"worktrees",type:"module"}),(factsFresh:Function {name:"archive_gate_facts_are_fresh"}),(archiveTests:Module {name:"archive_gate_tests"});
+//! CREATE (fenceMargin:Function {name:"archive_fence_has_commit_margin",type:"function",language:"rust",visibility:"private",complexity:"simple"});
+//! CREATE (fenceTest:Function {name:"admission_fence_requires_commit_margin",type:"function",language:"rust",visibility:"private",complexity:"simple"});
+//! CREATE (m)-[:CONTAINS]->(fenceMargin),(factsFresh)-[:CALLS]->(fenceMargin),(archiveTests)-[:CONTAINS]->(fenceTest),(fenceTest)-[:CALLS]->(fenceMargin);
 
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::{
-        header::{CACHE_CONTROL, VARY},
         HeaderMap,
+        header::{CACHE_CONTROL, VARY},
     },
     routing::{get, post},
-    Json, Router,
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
+use domain_hook::{
+    EVENT_SCHEMA_VERSION, HookDecision, HookEventEnvelope, HookPhase, HookScope,
+    RetentionLockState, evaluate as evaluate_hook,
+};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, Transaction};
 use std::{sync::Arc, time::Duration};
 use uuid::Uuid;
 
 use super::{
-    active_binding, require_scope, set_tenant, validate_actor, worktree_projection,
-    AuthenticatedUser, GroupApiError, GroupApiState, WorktreeGitLockObservation,
-    WorktreeGitLockObserver, WorktreeGitLockObserverError, WorktreeGitLockQuery, WorktreeIndexRow,
+    AuthenticatedUser, GroupApiError, GroupApiState, WorktreeArchiveReadiness,
+    WorktreeArchiveReadinessQuery, WorktreeGitLockObservation, WorktreeGitLockObserver,
+    WorktreeGitLockObserverError, WorktreeGitLockQuery, WorktreeIndexRow, active_binding,
+    require_scope, set_tenant, validate_actor, worktree_projection,
 };
 
 #[derive(Debug, Deserialize)]
@@ -83,11 +101,27 @@ struct ManagementPlanBody {
 #[derive(Debug, FromRow)]
 struct ManageWorktreeRow {
     project_id: Uuid,
+    repository_id: Uuid,
     owner_user_id: Option<Uuid>,
-    agent_session_id: Option<Uuid>,
     runtime_id: Option<Uuid>,
     archived: bool,
     version: i32,
+}
+
+struct ArchiveHookOutcome {
+    event_id: Uuid,
+    evaluation: domain_hook::HookEvaluation,
+    readiness_observed_at: DateTime<Utc>,
+    admission_fence_expires_at: DateTime<Utc>,
+    git_lock_observed_at: Option<DateTime<Utc>>,
+}
+
+struct ArchiveGateFacts {
+    event_id: Uuid,
+    event: HookEventEnvelope,
+    readiness_observed_at: DateTime<Utc>,
+    admission_fence_expires_at: DateTime<Utc>,
+    git_lock_observed_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, FromRow)]
@@ -384,7 +418,7 @@ async fn create_management_plan(
 
     let current = sqlx::query_as::<_, ManageWorktreeRow>(
         r#"
-        SELECT w.project_id, w.owner_user_id, w.agent_session_id, w.runtime_id, w.archived, w.version
+        SELECT w.project_id, w.repo_id AS repository_id, w.owner_user_id, w.runtime_id, w.archived, w.version
         FROM worktree_canvas_worktree w
         JOIN multica.worktree_project_binding p
           ON p.tenant_id = w.tenant_id AND p.worktree_id = w.id
@@ -402,11 +436,6 @@ async fn create_management_plan(
     .ok_or_else(GroupApiError::not_found)?;
     if current.version != body.expected_version {
         return Err(GroupApiError::conflict("version_conflict"));
-    }
-    if body.archived == Some(true)
-        && (current.agent_session_id.is_some() || current.runtime_id.is_some())
-    {
-        return Err(GroupApiError::conflict("active_execution_requires_stop"));
     }
     if let Some(target_owner) = body.owner_user_id {
         let has_membership = sqlx::query_as::<_, (Uuid,)>(
@@ -490,77 +519,133 @@ async fn confirm_management_plan(
         .begin()
         .await
         .map_err(|_| GroupApiError::internal())?;
-    let worktree = authorize_worktree(&mut tx, &actor, worktree_id).await?;
-    let binding = active_binding(&mut tx, &actor, worktree.project_id).await?;
-    require_manager_role(&binding.role)?;
-    let current = sqlx::query_as::<_, ManageWorktreeRow>(
-        r#"
-        SELECT w.project_id, w.owner_user_id, w.agent_session_id, w.runtime_id, w.archived, w.version
-        FROM worktree_canvas_worktree w
-        JOIN multica.worktree_project_binding p
-          ON p.tenant_id = w.tenant_id AND p.worktree_id = w.id
-         AND p.project_id = w.project_id AND p.valid_to IS NULL
-        WHERE w.id = $1 AND w.tenant_id = $2 AND p.project_id = $3
-        FOR UPDATE OF w
-        "#,
-    )
-    .bind(worktree_id)
-    .bind(actor.tenant_id)
-    .bind(worktree.project_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?
-    .ok_or_else(GroupApiError::not_found)?;
+    let mut context =
+        match lock_management_confirmation_context(&mut tx, &actor, worktree_id, plan_id).await? {
+            ManagementConfirmationState::Confirmed(result) => {
+                tx.commit().await.map_err(|_| GroupApiError::internal())?;
+                return Ok(Json(result));
+            }
+            ManagementConfirmationState::Expired => {
+                tx.commit().await.map_err(|_| GroupApiError::internal())?;
+                return Err(GroupApiError::conflict("management_plan_expired"));
+            }
+            ManagementConfirmationState::Pending(context) => *context,
+        };
 
-    let plan = sqlx::query_as::<_, ManagementPlanRow>(
-        r#"
-        SELECT requester_id, operation, target_owner_user_id, target_archived,
-               expected_version, status, confirm_by <= now() AS expired,
-               idempotency_key, correlation_id, result_body
-        FROM multica.worktree_management_plan
-        WHERE plan_id = $1 AND tenant_id = $2 AND project_id = $3 AND worktree_id = $4
-        FOR UPDATE
-        "#,
-    )
-    .bind(plan_id)
-    .bind(actor.tenant_id)
-    .bind(worktree.project_id)
-    .bind(worktree_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(|_| GroupApiError::internal())?
-    .ok_or_else(GroupApiError::not_found)?;
-    if plan.requester_id != actor.user_id {
-        return Err(GroupApiError::not_found());
-    }
-    if plan.status == "confirmed" {
-        let result = plan.result_body.ok_or_else(GroupApiError::internal)?;
-        tx.commit().await.map_err(|_| GroupApiError::internal())?;
-        return Ok(Json(result));
-    }
-    if plan.status != "pending" {
-        return Err(GroupApiError::conflict("management_plan_expired"));
-    }
-    if plan.expired {
-        sqlx::query(
-            "UPDATE multica.worktree_management_plan SET status = 'expired' WHERE plan_id = $1 AND tenant_id = $2",
+    // Host Runtime calls can take up to two seconds. Release the Worktree and plan row locks
+    // before asking the host to drain, then reacquire and reauthorize before applying anything.
+    let archive_facts = if context.plan.target_archived == Some(true) {
+        let expected_project_id = context.current.project_id;
+        let expected_repository_id = context.current.repository_id;
+        let expected_runtime_id = context.current.runtime_id;
+        let expected_version = context.plan.expected_version;
+        let correlation_id = context.plan.correlation_id;
+        tx.rollback().await.map_err(|_| GroupApiError::internal())?;
+        let facts = prepare_archive_gate_facts(
+            &state,
+            &actor,
+            worktree_id,
+            plan_id,
+            &context.current,
+            expected_version,
+            correlation_id,
         )
-        .bind(plan_id)
-        .bind(actor.tenant_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(|_| GroupApiError::internal())?;
-        tx.commit().await.map_err(|_| GroupApiError::internal())?;
-        return Err(GroupApiError::conflict("management_plan_expired"));
-    }
-    if plan.expected_version != current.version {
-        return Err(GroupApiError::conflict("version_conflict"));
-    }
-    if plan.target_archived == Some(true)
-        && (current.agent_session_id.is_some() || current.runtime_id.is_some())
-    {
-        return Err(GroupApiError::conflict("active_execution_requires_stop"));
-    }
+        .await?;
+
+        tx = state
+            .resolver
+            .pool
+            .begin()
+            .await
+            .map_err(|_| GroupApiError::internal())?;
+        context = match lock_management_confirmation_context(&mut tx, &actor, worktree_id, plan_id)
+            .await?
+        {
+            ManagementConfirmationState::Confirmed(result) => {
+                tx.commit().await.map_err(|_| GroupApiError::internal())?;
+                return Ok(Json(result));
+            }
+            ManagementConfirmationState::Expired => {
+                tx.commit().await.map_err(|_| GroupApiError::internal())?;
+                return Err(GroupApiError::conflict("management_plan_expired"));
+            }
+            ManagementConfirmationState::Pending(context) => *context,
+        };
+        if context.plan.target_archived != Some(true)
+            || context.plan.correlation_id != correlation_id
+            || context.plan.expected_version != expected_version
+            || context.current.project_id != expected_project_id
+            || context.current.repository_id != expected_repository_id
+            || context.current.runtime_id != expected_runtime_id
+            || context.current.version != expected_version
+        {
+            return Err(GroupApiError::conflict("version_conflict"));
+        }
+        Some(facts)
+    } else {
+        None
+    };
+
+    let worktree = context.worktree;
+    let current = context.current;
+    let plan = context.plan;
+    let archive_hook = if let Some(facts) = archive_facts.as_ref() {
+        let outcome = evaluate_archive_gate(&actor, &mut tx, worktree_id, &current, facts).await?;
+        if outcome.evaluation.decision != HookDecision::Allow {
+            let before = json!({
+                "owner_user_id": current.owner_user_id,
+                "archived": current.archived,
+                "version": current.version,
+            });
+            let after = json!({
+                "owner_user_id": current.owner_user_id,
+                "archived": current.archived,
+                "version": current.version,
+                "execution_applied": false,
+                "hook_evaluation": archive_hook_projection(&outcome),
+            });
+            sqlx::query(
+                r#"INSERT INTO multica.worktree_management_audit
+                   (tenant_id, project_id, worktree_id, plan_id, actor_id, idempotency_key,
+                    correlation_id, operation, before_state, after_state)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
+            )
+            .bind(actor.tenant_id)
+            .bind(worktree.project_id)
+            .bind(worktree_id)
+            .bind(plan_id)
+            .bind(actor.user_id)
+            .bind(&plan.idempotency_key)
+            .bind(plan.correlation_id)
+            .bind(&plan.operation)
+            .bind(before)
+            .bind(after)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| GroupApiError::internal())?;
+            if outcome.evaluation.decision == HookDecision::Deny {
+                sqlx::query(
+                    "UPDATE multica.worktree_management_plan SET status = 'cancelled' WHERE plan_id = $1 AND tenant_id = $2",
+                )
+                .bind(plan_id)
+                .bind(actor.tenant_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|_| GroupApiError::internal())?;
+            }
+            tx.commit().await.map_err(|_| GroupApiError::internal())?;
+            let code = match outcome.evaluation.decision {
+                HookDecision::Deny => "worktree_archive_hook_denied",
+                HookDecision::RequireHuman => "worktree_archive_requires_human_approval",
+                HookDecision::Defer => "worktree_archive_gate_deferred",
+                HookDecision::Allow => unreachable!("allowed evaluation was checked above"),
+            };
+            return Err(GroupApiError::conflict(code));
+        }
+        Some(outcome)
+    } else {
+        None
+    };
     if let Some(target_owner) = plan.target_owner_user_id {
         let has_membership = sqlx::query_as::<_, (Uuid,)>(
             r#"
@@ -611,6 +696,24 @@ async fn confirm_management_plan(
         .map_err(|_| GroupApiError::internal())?;
     }
 
+    if let Some(outcome) = archive_hook.as_ref() {
+        let rechecked = authorize_worktree(&mut tx, &actor, worktree_id).await?;
+        let rechecked_binding = active_binding(&mut tx, &actor, rechecked.project_id).await?;
+        require_manager_role(&rechecked_binding.role)?;
+        if rechecked.project_id != worktree.project_id
+            || rechecked.version != plan.expected_version
+            || rechecked.version != current.version
+            || rechecked.archived != current.archived
+        {
+            return Err(GroupApiError::conflict("version_conflict"));
+        }
+        if !archive_gate_facts_are_fresh(outcome) {
+            return Err(GroupApiError::conflict(
+                "worktree_archive_observation_stale",
+            ));
+        }
+    }
+
     let before = json!({
         "owner_user_id": current.owner_user_id,
         "archived": current.archived,
@@ -640,7 +743,7 @@ async fn confirm_management_plan(
     .map_err(|_| GroupApiError::internal())?;
     let updated = sqlx::query_as::<_, ManageWorktreeRow>(
         r#"
-        SELECT w.project_id, w.owner_user_id, w.agent_session_id, w.runtime_id, w.archived, w.version
+        SELECT w.project_id, w.repo_id AS repository_id, w.owner_user_id, w.runtime_id, w.archived, w.version
         FROM worktree_canvas_worktree w WHERE w.id = $1 AND w.tenant_id = $2
         "#,
     )
@@ -653,6 +756,7 @@ async fn confirm_management_plan(
         "owner_user_id": updated.owner_user_id,
         "archived": updated.archived,
         "version": updated.version,
+        "hook_evaluation": archive_hook.as_ref().map(archive_hook_projection),
     });
     let result = json!({
         "worktree_id": worktree_id,
@@ -714,6 +818,279 @@ struct ManagementPlanRow {
     result_body: Option<Value>,
 }
 
+struct ManagementConfirmationContext {
+    worktree: ManageWorktreeRow,
+    current: ManageWorktreeRow,
+    plan: ManagementPlanRow,
+}
+
+enum ManagementConfirmationState {
+    Confirmed(Value),
+    Expired,
+    Pending(Box<ManagementConfirmationContext>),
+}
+
+async fn lock_management_confirmation_context(
+    tx: &mut Transaction<'_, sqlx::Postgres>,
+    actor: &super::AuthUser,
+    worktree_id: Uuid,
+    plan_id: Uuid,
+) -> Result<ManagementConfirmationState, GroupApiError> {
+    let worktree = authorize_worktree(tx, actor, worktree_id).await?;
+    let binding = active_binding(tx, actor, worktree.project_id).await?;
+    require_manager_role(&binding.role)?;
+    let current = sqlx::query_as::<_, ManageWorktreeRow>(
+        r#"
+        SELECT w.project_id, w.repo_id AS repository_id, w.owner_user_id, w.runtime_id, w.archived, w.version
+        FROM worktree_canvas_worktree w
+        JOIN multica.worktree_project_binding p
+          ON p.tenant_id = w.tenant_id AND p.worktree_id = w.id
+         AND p.project_id = w.project_id AND p.valid_to IS NULL
+        WHERE w.id = $1 AND w.tenant_id = $2 AND p.project_id = $3
+        FOR UPDATE OF w
+        "#,
+    )
+    .bind(worktree_id)
+    .bind(actor.tenant_id)
+    .bind(worktree.project_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::not_found)?;
+
+    let plan = sqlx::query_as::<_, ManagementPlanRow>(
+        r#"
+        SELECT requester_id, operation, target_owner_user_id, target_archived,
+               expected_version, status, confirm_by <= now() AS expired,
+               idempotency_key, correlation_id, result_body
+        FROM multica.worktree_management_plan
+        WHERE plan_id = $1 AND tenant_id = $2 AND project_id = $3 AND worktree_id = $4
+        FOR UPDATE
+        "#,
+    )
+    .bind(plan_id)
+    .bind(actor.tenant_id)
+    .bind(worktree.project_id)
+    .bind(worktree_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?
+    .ok_or_else(GroupApiError::not_found)?;
+    if plan.requester_id != actor.user_id {
+        return Err(GroupApiError::not_found());
+    }
+    if plan.status == "confirmed" {
+        return Ok(ManagementConfirmationState::Confirmed(
+            plan.result_body.ok_or_else(GroupApiError::internal)?,
+        ));
+    }
+    if plan.status != "pending" {
+        return Err(GroupApiError::conflict("management_plan_expired"));
+    }
+    if plan.expired {
+        sqlx::query(
+            "UPDATE multica.worktree_management_plan SET status = 'expired' WHERE plan_id = $1 AND tenant_id = $2",
+        )
+        .bind(plan_id)
+        .bind(actor.tenant_id)
+        .execute(&mut **tx)
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+        return Ok(ManagementConfirmationState::Expired);
+    }
+    if plan.expected_version != current.version {
+        return Err(GroupApiError::conflict("version_conflict"));
+    }
+    Ok(ManagementConfirmationState::Pending(Box::new(
+        ManagementConfirmationContext {
+            worktree,
+            current,
+            plan,
+        },
+    )))
+}
+
+async fn prepare_archive_gate_facts(
+    state: &GroupApiState,
+    actor: &super::AuthUser,
+    worktree_id: Uuid,
+    operation_id: Uuid,
+    worktree: &ManageWorktreeRow,
+    expected_version: i32,
+    correlation_id: Uuid,
+) -> Result<ArchiveGateFacts, GroupApiError> {
+    let runtime_id = worktree.runtime_id.ok_or_else(|| {
+        GroupApiError::feature_unavailable("worktree_archive_runtime_unavailable")
+    })?;
+    let readiness_observer = state
+        .worktree_archive_readiness_observer
+        .as_ref()
+        .ok_or_else(|| {
+            GroupApiError::feature_unavailable("worktree_archive_readiness_unavailable")
+        })?;
+    let readiness_query = WorktreeArchiveReadinessQuery {
+        operation_id,
+        tenant_id: actor.tenant_id,
+        project_id: worktree.project_id,
+        repository_id: worktree.repository_id,
+        worktree_id,
+        runtime_id,
+        actor_id: actor.user_id,
+        expected_lifecycle_version: expected_version,
+        correlation_id,
+        max_drain_wait: Duration::from_secs(2),
+    };
+    let lock_query = WorktreeGitLockQuery {
+        tenant_id: actor.tenant_id,
+        project_id: worktree.project_id,
+        repository_id: worktree.repository_id,
+        worktree_id,
+        runtime_id,
+    };
+    let git_lock = observe_git_lock_with_timeout(
+        state.worktree_git_lock_observer.as_deref(),
+        Some(lock_query),
+        Duration::from_secs(2),
+    )
+    .await;
+    match git_lock.state {
+        super::WorktreeGitLockState::Unlocked => {}
+        super::WorktreeGitLockState::Locked => {
+            return Err(GroupApiError::conflict(
+                "worktree_archive_git_lock_conflict",
+            ));
+        }
+        super::WorktreeGitLockState::Unknown => {
+            return Err(GroupApiError::feature_unavailable(
+                "worktree_archive_git_lock_unavailable",
+            ));
+        }
+    }
+
+    let readiness = tokio::time::timeout(
+        Duration::from_secs(2),
+        readiness_observer.prepare_and_observe(readiness_query),
+    )
+    .await;
+    let readiness: WorktreeArchiveReadiness = match readiness {
+        Ok(Ok(snapshot)) => snapshot,
+        Ok(Err(_)) | Err(_) => {
+            return Err(GroupApiError::feature_unavailable(
+                "worktree_archive_readiness_unavailable",
+            ));
+        }
+    };
+    if !readiness.drain_completed {
+        return Err(GroupApiError::conflict("worktree_archive_drain_incomplete"));
+    }
+    if !archive_readiness_is_fresh(readiness.observed_at) {
+        return Err(GroupApiError::feature_unavailable(
+            "worktree_archive_readiness_stale",
+        ));
+    }
+    if !archive_fence_has_commit_margin(readiness.admission_fence_expires_at) {
+        return Err(GroupApiError::feature_unavailable(
+            "worktree_archive_admission_fence_too_short",
+        ));
+    }
+
+    let event_id = Uuid::new_v4();
+    let event = HookEventEnvelope {
+        event_id: event_id.into_bytes(),
+        event_schema_version: EVENT_SCHEMA_VERSION,
+        phase: HookPhase::BeforeWorktreeArchiveCleanup,
+        scope: HookScope {
+            tenant_id: actor.tenant_id.into_bytes(),
+            project_id: worktree.project_id.into_bytes(),
+            worktree_id: worktree_id.into_bytes(),
+            actor_id: actor.user_id.into_bytes(),
+            correlation_id: correlation_id.into_bytes(),
+        },
+        actor_authorized: true,
+        lifecycle_version_matches: worktree.version == expected_version,
+        runtime_healthy: Some(readiness.runtime_healthy),
+        retention_lock: hook_retention_lock_state(&git_lock),
+        active_run_count: readiness.active_run_count,
+        active_agent_lease_count: readiness.active_agent_lease_count,
+        file_claim_count: readiness.file_claim_count,
+        owned_process_count: readiness.owned_process_count,
+    };
+    Ok(ArchiveGateFacts {
+        event_id,
+        event,
+        readiness_observed_at: readiness.observed_at,
+        admission_fence_expires_at: readiness.admission_fence_expires_at,
+        git_lock_observed_at: git_lock.observed_at,
+    })
+}
+
+async fn evaluate_archive_gate(
+    actor: &super::AuthUser,
+    tx: &mut Transaction<'_, sqlx::Postgres>,
+    worktree_id: Uuid,
+    worktree: &ManageWorktreeRow,
+    facts: &ArchiveGateFacts,
+) -> Result<ArchiveHookOutcome, GroupApiError> {
+    let snapshot = super::hook_policies::load_verified_effective_snapshot(
+        tx,
+        actor.tenant_id,
+        worktree.project_id,
+        worktree_id,
+    )
+    .await?;
+    Ok(ArchiveHookOutcome {
+        event_id: facts.event_id,
+        evaluation: evaluate_hook(&facts.event, snapshot.as_ref()),
+        readiness_observed_at: facts.readiness_observed_at,
+        admission_fence_expires_at: facts.admission_fence_expires_at,
+        git_lock_observed_at: facts.git_lock_observed_at,
+    })
+}
+
+fn archive_readiness_is_fresh(observed_at: DateTime<Utc>) -> bool {
+    let now = Utc::now();
+    observed_at <= now && now.signed_duration_since(observed_at) <= chrono::Duration::seconds(5)
+}
+
+fn archive_fence_has_commit_margin(expires_at: DateTime<Utc>) -> bool {
+    expires_at > Utc::now() + chrono::Duration::seconds(5)
+}
+
+fn archive_gate_facts_are_fresh(outcome: &ArchiveHookOutcome) -> bool {
+    let now = Utc::now();
+    let git_lock_is_fresh = outcome.git_lock_observed_at.is_some_and(|observed_at| {
+        observed_at <= now
+            && now.signed_duration_since(observed_at) <= chrono::Duration::seconds(30)
+    });
+    archive_readiness_is_fresh(outcome.readiness_observed_at)
+        && archive_fence_has_commit_margin(outcome.admission_fence_expires_at)
+        && git_lock_is_fresh
+}
+
+fn hook_retention_lock_state(observation: &WorktreeGitLockObservation) -> RetentionLockState {
+    match observation.state {
+        super::WorktreeGitLockState::Unlocked => RetentionLockState::Fresh,
+        super::WorktreeGitLockState::Locked => RetentionLockState::Conflict,
+        super::WorktreeGitLockState::Unknown => RetentionLockState::Unknown,
+    }
+}
+
+fn archive_hook_projection(outcome: &ArchiveHookOutcome) -> Value {
+    json!({
+        "event_id": outcome.event_id,
+        "decision": outcome.evaluation.decision,
+        "reason_code": outcome.evaluation.reason_code,
+        "matched_rule_id": outcome.evaluation.matched_rule_id.map(hex::encode),
+        "evaluator_api_version": outcome.evaluation.evaluator_api_version,
+        "project_policy_version": outcome.evaluation.project_version,
+        "worktree_policy_version": outcome.evaluation.worktree_version,
+        "policy_digest": outcome.evaluation.policy_digest.map(hex::encode),
+        "readiness_observed_at": outcome.readiness_observed_at,
+        "admission_fence_expires_at": outcome.admission_fence_expires_at,
+        "git_lock_observed_at": outcome.git_lock_observed_at,
+    })
+}
+
 async fn authorize_worktree(
     tx: &mut Transaction<'_, sqlx::Postgres>,
     actor: &super::AuthUser,
@@ -722,7 +1099,7 @@ async fn authorize_worktree(
     set_tenant(tx, actor.tenant_id).await?;
     let worktree = sqlx::query_as::<_, ManageWorktreeRow>(
         r#"
-        SELECT w.project_id, w.owner_user_id, w.agent_session_id, w.runtime_id, w.archived, w.version
+        SELECT w.project_id, w.repo_id AS repository_id, w.owner_user_id, w.runtime_id, w.archived, w.version
         FROM worktree_canvas_worktree w
         JOIN multica.worktree_project_binding p
           ON p.tenant_id = w.tenant_id AND p.worktree_id = w.id
@@ -992,5 +1369,85 @@ mod authorized_projects_query_tests {
             "local_seed": true
         }));
         assert!(invalid.is_err());
+    }
+}
+
+#[cfg(test)]
+mod archive_gate_tests {
+    use super::*;
+
+    #[test]
+    fn lock_facts_fail_closed() {
+        assert_eq!(
+            hook_retention_lock_state(&WorktreeGitLockObservation {
+                state: super::super::WorktreeGitLockState::Unlocked,
+                observed_at: Some(Utc::now()),
+            }),
+            RetentionLockState::Fresh
+        );
+        assert_eq!(
+            hook_retention_lock_state(&WorktreeGitLockObservation {
+                state: super::super::WorktreeGitLockState::Locked,
+                observed_at: Some(Utc::now()),
+            }),
+            RetentionLockState::Conflict
+        );
+        assert_eq!(
+            hook_retention_lock_state(&WorktreeGitLockObservation::unknown()),
+            RetentionLockState::Unknown
+        );
+    }
+
+    #[test]
+    fn readiness_rejects_stale_and_future_observations() {
+        assert!(archive_readiness_is_fresh(Utc::now()));
+        assert!(!archive_readiness_is_fresh(
+            Utc::now() - chrono::Duration::seconds(6)
+        ));
+        assert!(!archive_readiness_is_fresh(
+            Utc::now() + chrono::Duration::seconds(1)
+        ));
+    }
+
+    #[test]
+    fn archive_gate_facts_require_fresh_observations() {
+        let now = Utc::now();
+        let evaluation = domain_hook::HookEvaluation {
+            phase: HookPhase::BeforeWorktreeArchiveCleanup,
+            decision: HookDecision::Allow,
+            reason_code: domain_hook::HookReasonCode::AllowedByBuiltinBaseline,
+            matched_rule_id: None,
+            evaluator_api_version: domain_hook::EVALUATOR_API_VERSION,
+            project_version: Some(1),
+            worktree_version: None,
+            policy_digest: Some([1; 32]),
+            evaluated_condition_count: 0,
+        };
+        let fresh = ArchiveHookOutcome {
+            event_id: Uuid::new_v4(),
+            evaluation,
+            readiness_observed_at: now,
+            admission_fence_expires_at: now + chrono::Duration::seconds(10),
+            git_lock_observed_at: Some(now),
+        };
+        assert!(archive_gate_facts_are_fresh(&fresh));
+
+        let stale_lock = ArchiveHookOutcome {
+            git_lock_observed_at: Some(now - chrono::Duration::seconds(31)),
+            ..fresh
+        };
+        assert!(!archive_gate_facts_are_fresh(&stale_lock));
+    }
+
+    #[test]
+    fn admission_fence_requires_commit_margin() {
+        let now = Utc::now();
+        assert!(archive_fence_has_commit_margin(
+            now + chrono::Duration::seconds(10)
+        ));
+        assert!(!archive_fence_has_commit_margin(
+            now + chrono::Duration::seconds(4)
+        ));
+        assert!(!archive_fence_has_commit_margin(now));
     }
 }

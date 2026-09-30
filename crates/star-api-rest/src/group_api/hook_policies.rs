@@ -89,6 +89,10 @@
 //!   (test_size)-[:CALLS]->(decode),(test_request_size)-[:CALLS]->(parse_body),(test_request_size)-[:USES]->(request_limit),
 //!   (publish_project)-[:USES]->(limit),(rebase)-[:USES]->(limit),(rt)-[:USES]->(request_limit);
 
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"hook_policies",type:"module"}),(load:Function {name:"load_current_policy",type:"function"}),(verify:Function {name:"verify_stored_policy",type:"function"});
+//! CREATE (effective:Function {name:"load_verified_effective_snapshot",type:"function",language:"rust",visibility:"pub(super)",complexity:"moderate"});
+//! CREATE (m)-[:CONTAINS]->(effective),(effective)-[:CALLS]->(load),(effective)-[:CALLS]->(verify);
 use axum::{
     Json, Router,
     body::Bytes,
@@ -1437,6 +1441,50 @@ async fn load_current_policy(
         .bind(worktree_id)
         .fetch_optional(&mut **tx)
         .await
+        .map_err(|_| GroupApiError::internal())
+}
+
+/// Load one immutable effective policy in the caller's authorized transaction. Missing Project
+/// baseline is represented as `None`; the Rust evaluator turns that condition into a deny.
+pub(super) async fn load_verified_effective_snapshot(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    project_id: Uuid,
+    worktree_id: Uuid,
+) -> Result<Option<domain_hook::VerifiedHookPolicySnapshot>, GroupApiError> {
+    let Some(project_row) =
+        load_current_policy(tx, tenant_id, project_id, PolicyScope::Project, None, false).await?
+    else {
+        return Ok(None);
+    };
+    let project_document = verify_stored_policy(&project_row, tenant_id, project_id, None)?;
+    let effective_document = if let Some(worktree_row) = load_current_policy(
+        tx,
+        tenant_id,
+        project_id,
+        PolicyScope::Worktree,
+        Some(worktree_id),
+        false,
+    )
+    .await?
+    {
+        if worktree_row.inherited_project_policy_set_id != Some(project_row.policy_set_id) {
+            return Err(GroupApiError::conflict("worktree_policy_rebase_required"));
+        }
+        let worktree_document =
+            verify_stored_policy(&worktree_row, tenant_id, project_id, Some(worktree_id))?;
+        if worktree_document.project_version != project_document.project_version
+            || worktree_document.project_rules != project_document.project_rules
+        {
+            return Err(GroupApiError::internal());
+        }
+        worktree_document
+    } else {
+        project_document
+    };
+    effective_document
+        .verify()
+        .map(Some)
         .map_err(|_| GroupApiError::internal())
 }
 
