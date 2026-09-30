@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project Worktree 群组实施计划 v5.46**
+> **渡口 Project Worktree 群组实施计划 v5.48**
 >
 > - 状态：🟡 执行中（Phase 0/1、2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -15,10 +15,10 @@
 > - Phase 9D-2 更新：新增 Project-scoped hook-events/summary API，默认 30 天、窗口 1–90 天，按 phase/decision 汇总 archive ledger 并返回 hook_execution_summary_v1、公式和 partial/null coverage；source-only API 不代表 RunEvent/outcome join 或完整 BI。定向 crate cargo check 在临时排除 star-desktop workspace member 后通过，未运行 tests；原始 Cargo.toml/Cargo.lock 已恢复，见 §6.48。
 > - Phase 9D-3 更新：将 summary card 接入既有 Advanced Settings → Hooks 标签页，在内容区选择 7/30/90 天；导航遵循 ULYS-235，不新增 Worktree/主侧栏节点。Phase 9D-4 已将其数据 contract 升至 v2，见下文。
 > - Phase 9D-4/9D-5a/9D-5b 更新：summary v2 合并字段完整的 Hook ledger/RunEvent 投影，按 tenant+event_id 去重并以 tenant/project/task/run 键关联最新 Run 状态；9D-5a 将原生 evaluator API 扩展为 phase-scoped v2，增加 BeforeRunAdmission 与 BeforeWorktreeArchiveCleanup，保留 v1 archive-only policy digest 兼容并拒绝 Run admission archive-only facts。9D-5b 增加条件式 Run admission producer seam：锁外 readiness/fencing，锁内最终重授权与 native Hook evaluation；Allow 原子写 Run HookSet snapshot、Run start、Hook ledger 和共享 event_id 的 RunEvent；Deny 只写无 Run/Task FK 的 ledger。policy publish/rollback、Builder 和事件 coverage 共用服务端 producer capability；当前 production adapter 未装配，能力仍 false，不能宣称 Runtime spawn 已有 production Hook protection，见 §6.52。
-> - Phase 9E 更新：9E-1 Rust immutable Profile verifier、9E-2 bounded dependency resolver、9E-3 Profile Master/SCD2 + append-only Audit migration substrate 与 9E-4A Run/Profile guard migration 已交付并完成隔离 DB 验收；9E-4B1 已加入 Worktree-scoped bounded current Profile GET list/detail API 和 4 个 Rust 单测；9E-4B2 已加入 Project/Worktree Profile publish/disable/reenable/rollback 生命周期写 API 代码切片；9E-4B3 将 current verified Project/Worktree Hook policy 映射为 Profile admission 所需的 HookSet ID/version/digest。current Provider/Skill/Grant catalog adapter、生产 Run snapshot writer、目标 DB 部署/RLS、资源 reservation、CLI adapter、occurrence/Loop runtime 仍开放，见 §6.54-§6.59。
-> - 关联需求：docs/requirements.md v5.32 §50
-> - 关联基本设计：docs/basic-design.md v5.28 §16
-> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.24、docs/design/DD-MULTICA-TASK-001.md v1.6、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.3
+> - Phase 9E 更新：9E-1 Rust immutable Profile verifier、9E-2 bounded dependency resolver、9E-3 Profile Master/SCD2 + append-only Audit migration substrate 与 9E-4A Run/Profile guard migration 已交付并完成隔离 DB 验收；9E-4B1 已加入 Worktree-scoped bounded current Profile GET list/detail API 和 4 个 Rust 单测；9E-4B2 已加入 Project/Worktree Profile publish/disable/reenable/rollback 生命周期写 API 代码切片；9E-4B3 将 current verified Project/Worktree Hook policy 映射为 Profile admission 所需的 HookSet ID/version/digest；9E-4B4 明确双 Profile identity 与当前 Run writer 缺口；9E-4C1 已加入 Task Card Profile picker、request identity 与 versioned fingerprint/legacy replay 兼容。新 Run 仍受默认关闭的 Profile-bound provisioner capability 阻断。current Provider/Skill/Grant catalog adapter、生产 Profile snapshot/resource writer、目标 DB 部署/RLS、Runtime fence、CLI adapter、occurrence/Loop runtime 仍开放，见 §6.54-§6.61。
+> - 关联需求：docs/requirements.md v5.34 §50
+> - 关联基本设计：docs/basic-design.md v5.30 §16
+> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.24、docs/design/DD-MULTICA-TASK-001.md v1.8、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.3
 
 ---
 
@@ -830,6 +830,33 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 
 该阶段只关闭 Profile/Run snapshot 所需的 effective HookSet 身份映射，不宣称 9E 整体或跨 App 生产闭环已完成。
 
+### 6.60 本轮阶段结果（Phase 9E-4B4 Task Card CLI Profile identity audit，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| 身份边界审计 | 🟢 设计已收口 | `TaskCliSessionStartBody`、readiness/start command 目前含 `approved_launch_profile_id`，其语义是 Runtime executable/argv/environment launch policy；AgentExecutionProfile 是单独的 Agent/Memory/Skill/Context/Validation/Loop/HookSet/grant/resource document。不得将两者共用 ID 或从客户端 seed 推导。 |
+| 当前 Run writer 差距 | 🟡 已明确阻断 | `record_cli_task_run` 写 Task/acceptance 与 `hook_set_snapshot`，未写 Profile ID/version/digest/document；CLI request fingerprint 没有 AgentExecutionProfile ID；domain resolver 还依赖未接入的当前 Provider/Skill/Grant catalog。该结论来自当前实现读取；本阶段未改运行时代码，也未声称 Run/Profile 已闭环。 |
+| 下一阶段顺序 | 🟡 已定义 | 9E-4C1 Profile picker + request identity/fingerprint 版本兼容；9E-4C2 权威 bounded catalogs 与短时 revision fence；9E-4C3 Rust resolver + Run/Profile/Hook/RunEvent/BI/resource reservation 原子 writer；9E-4C4 双 Profile identity 的一次性 Runtime spawn fence 和 Task Card/Run Detail 投影。未完成任一门时新 Run admission/spawn 均不可用，旧 Run 查询和 replay 保留。 |
+| 性能/并行约束 | 🟢 已纳入设计 | profile 单文档 ≤65,536 bytes、Provider ≤256、Skill ≤4,096 项；锁外准备 bounded catalogs，锁内仅执行有界 verify、scope/version 比较和 SQL 写入，继续使用借用式 verified Profile，避免在并行 Run 中复制 Profile/catalog；资源额度由 admission 原子预约。 |
+| 导航约束 | 🟢 保持已确认决策 | Hooks 是 Settings“高级设置”内容区内与 Skills/MCP/Plugins 并列的 tab；Main/Project scope、Worktree Index 是外层导航，Hook 配置不作为 Worktree 子节点。 |
+| 文档同步 | 🟢 完成 | Requirements v5.33/AC-AEC-014、Basic Design v5.29 §16.16、Task DD v1.7 §14.11.8 同步了身份差异、fail-closed 与 9E-4C1..C4 的阶段依赖。 |
+| 未关闭门 | 🟡 继续执行 | 本阶段仅完成代码审计与跨文档设计同步；Profile picker、幂等兼容实现、provider/skill/grant persistence/adapters、Run snapshot writer、同事务 quota reservation、Runtime fence、真实 Auth/DB/RLS/目标部署、CLI/Schedule/Loop runtime 与 BI 生产闭环仍未完成。 |
+
+该阶段防止将 Local Runtime 的命令启动授权误作 Agent 执行栈版本。9E-4B4 阶段结束时，下一项工作为 9E-4C1；其实现结果见 §6.61。在 C2-C4 实现与验证前，不开放新的 Profile-bound Run。
+
+### 6.61 本轮阶段结果（Phase 9E-4C1 Task Card Profile picker 与 request identity，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Profile 输入与选择 | 🟢 已接入，保持 fail closed | Task Card CLI preview 读取当前 Worktree 有界 Profile metadata 并要求显式选择；验证 ID、scope、revision/schema version、digest 与重复项。最多使用 50 项；存在下一页、空列表、无效响应或读取失败时禁用 start，不自动选第一个或 seed/default。Approved Launch Profile 与 AgentExecutionProfile 分开呈现。 |
+| REST identity 与 fingerprint | 🟢 已接入 | start body 和 readiness/start command 增加独立 `execution_profile_id`。选择 Profile 的新请求将 `cli_session_start_v2` 与 Profile ID 纳入 request fingerprint；缺 Profile 字段时保留旧序列化 tuple 和历史 fingerprint。新 Run 在 readiness 前要求有效 ID 及显式 Profile-bound provisioner capability。 |
+| Run admission 安全门 | 🟢 默认关闭 | `supports_profile_bound_run_admission()` 默认 false，生产 provisioner 尚未装配；Hook/Run admission capability 同时要求该能力。当前代码不允许新 Run 绕过 Profile snapshot writer/C2-C4 完成门。 |
+| 验证 | 🟢 定向静态检查通过 | `cargo check -p star-api-rest --all-targets -j 4` 通过；rustfmt check、`git diff --check` 与直接 `node .\node_modules\typescript\bin\tsc --noEmit` 通过。`npm run typecheck` 的 shim 解析失败，直接调用本地 TypeScript compiler 完成同一检查。未运行单元测试。Cargo check 生成约 240 package 的 Cargo.lock resolver churn，已恢复 tracked lock，并保留既有未跟踪 `Cargo.lock.phase9d-backup`。 |
+| 文档同步 | 🟢 完成 | Requirements v5.34/AEC-014/AC-AEC-015、Basic Design v5.30 §16.16、Task DD v1.8 §14.11.8 与本节同步 C1 输入、幂等和 fail-closed 边界；ULYS-235 Hooks 继续是高级设置内容区并列 tab，不进入 Worktree 树。 |
+| 未关闭门 | 🟡 继续执行 | C2 权威 Provider/Skill/Grant catalogs 与 revision fence；C3 resolver + Run/Profile/Task/Hook/RunEvent/BI/resource 原子 writer；C4 双 identity Runtime spawn fence 与 Run Detail 投影；目标 DB/RLS/Auth Provider/资源 reservation/production CLI/Schedule/Loop 与完整 BI 仍未关闭。 |
+
+本阶段只增加 profile selection identity 和历史幂等兼容，不表示 Profile-bound Run admission 已可用。
+
 
 ## 修订履历
 
@@ -931,3 +958,5 @@ ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Ski
 | v5.44 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.30、basic v5.26、Task DD v1.4；增加 9E-4B1 有界 Worktree current Profile list/detail GET 与 Rust read-time verifier，4 个单测通过；明确 SQL/Auth/RLS 集成、Profile publish/current registry、Run writer 与资源 reservation 仍未完成；确认 ULYS-235 Hooks 是高级设置内容区并列标签 | 9E-4B1 Profile read API 代码切片与验证完成 |
 | v5.45 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.31、basic v5.27、Task DD v1.5；记录 9E-4B2 typed lifecycle routes、67,584-byte body bound、admin auth/CAS、SCD2 successor 与 same-transaction append-only Audit；`cargo check --all-targets` 与 3 个 targeted tests 通过，首次 Windows LNK1104 后重试成功，Cargo.lock churn 已恢复并保留 backup；真实 Auth/DB/RLS/target deployment/current catalog/Run writer/resource reservation 仍开放；ULYS-235 高级设置 Hooks 并列 tab 导航保持 | 实现 Profile publish/disable/reenable/rollback 生命周期最小切片 |
 | v5.46 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.32、basic design v5.28、Task DD v1.6；落地 Phase 9E-4B3 effective Project/Worktree HookSet identity bridge，定向测试 1/1 通过（首次链接遇 LNK1104，重试成功）与 star-api-rest all-targets check 通过；明确 Run writer/catalog/auth/DB/RLS/resource reservation/CLI/Loop/Schedule 仍开放；复核 ULYS-235 Advanced Settings tab 与既有侧栏 scope 导航 | 将 verified Hook policy identity 接入 AgentExecutionProfile admission 路径 |
+| v5.47 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.33、basic design v5.29、Task DD v1.7；记录 Phase 9E-4B4 CLI Run identity 审计：Approved Launch Profile 与 AgentExecutionProfile 独立，当前 request/fence/writer 缺 Profile identity/snapshot；定义 9E-4C1..C4 的选择、catalog fence、原子 Run/resource writer 与双身份 spawn fence；确认 Hooks 高级设置并列 tab 决策 | Run admission 源码审计发现 Launch Profile 与 Agent Profile 尚未打通 |
+| v5.48 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.34、basic design v5.30、Task DD v1.8；记录 9E-4C1 CLI Profile picker、API identity、versioned fingerprint/legacy replay，默认关闭 Profile-bound producer 与 C2-C4 blockers；Rust all-targets check、rustfmt/diff-check 通过，npm typecheck 入口受损、未运行 tests；恢复 Cargo.lock resolver churn 并保留既有 backup；Hooks 高级设置 tab 要求保持 | 完成 Phase 9E-4C1 并核对用户重申的 ULYS-235 导航需求 |

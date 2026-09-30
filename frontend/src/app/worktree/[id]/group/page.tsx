@@ -381,6 +381,21 @@ CREATE (page)-[:CONTAINS]->(refreshCliStatus),(page)-[:CONTAINS]->(reattachCli),
        (reattachCli)-[:USES]->(cliGeneration),(ticket)-[:USES]->(cliReconnect);
 */
 
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (page:Function {name:"GroupWorkspacePage"}),
+      (startCli:Function {name:"startSelectedTaskCliSession"}),
+      (profileApi:Function {name:"WorktreeGroupApiClient.listExecutionProfiles"});
+CREATE (executionProfileId:Variable {name:"cliExecutionProfileId",type:"variable",language:"typescript"}),
+       (executionProfiles:Variable {name:"cliExecutionProfiles",type:"variable",language:"typescript"}),
+       (profilesPending:Variable {name:"cliExecutionProfilesPending",type:"variable",language:"typescript"}),
+       (profilesError:Variable {name:"cliExecutionProfilesError",type:"variable",language:"typescript"}),
+       (profilesMore:Variable {name:"cliExecutionProfilesMore",type:"variable",language:"typescript"});
+CREATE (page)-[:USES]->(executionProfileId),(page)-[:USES]->(executionProfiles),
+       (page)-[:USES]->(profilesPending),(page)-[:USES]->(profilesError),(page)-[:USES]->(profilesMore),
+       (page)-[:CALLS]->(profileApi),(startCli)-[:USES]->(executionProfileId),
+       (startCli)-[:USES]->(executionProfiles);
+*/
+
 "use client";
 
 import { use as ReactUse, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
@@ -422,6 +437,7 @@ import type {
   ScopedChatTarget,
   TaskCliSessionReceipt,
   TaskCliSessionStatus,
+  WorktreeExecutionProfileSummary,
   WorktreeGroupApiClient,
 } from "@/lib/group/worktreeGroupApi";
 import { useStore } from "@/lib/store";
@@ -499,6 +515,7 @@ type PendingTaskCliSessionCommand = {
     expected_lifecycle_version: number;
     approved_launch_profile_id: string;
     correlation_id: string;
+    execution_profile_id: string;
   };
 };
 
@@ -555,6 +572,11 @@ export default function GroupWorkspacePage({ params }: PageProps) {
   const scope: ChatScope = searchParams.get("scope") === "GLOBAL" ? "GLOBAL" : "WORKTREE";
   const [canvasLinkError, setCanvasLinkError] = useState<string | null>(null);
   const [cliProfileId, setCliProfileId] = useState("");
+  const [cliExecutionProfileId, setCliExecutionProfileId] = useState("");
+  const [cliExecutionProfiles, setCliExecutionProfiles] = useState<WorktreeExecutionProfileSummary[]>([]);
+  const [cliExecutionProfilesPending, setCliExecutionProfilesPending] = useState(false);
+  const [cliExecutionProfilesError, setCliExecutionProfilesError] = useState<string | null>(null);
+  const [cliExecutionProfilesMore, setCliExecutionProfilesMore] = useState(false);
   const [cliSession, setCliSession] = useState<(TaskCliSessionReceipt & { requested_worktree_id: string }) | null>(null);
   const [cliSessionStatus, setCliSessionStatus] = useState<TaskCliSessionStatus | null>(null);
   const [cliSessionHistory, setCliSessionHistory] = useState<TaskCliSessionStatus[]>([]);
@@ -720,6 +742,11 @@ export default function GroupWorkspacePage({ params }: PageProps) {
     setChatTargetsError(null);
     setSelectedChatTargetIds([]);
     setCliProfileId("");
+    setCliExecutionProfileId("");
+    setCliExecutionProfiles([]);
+    setCliExecutionProfilesPending(false);
+    setCliExecutionProfilesError(null);
+    setCliExecutionProfilesMore(false);
     setReviewReasons({});
     canvasElementMovePendingRef.current = false;
     canvasElementDeletePendingRef.current = false;
@@ -859,6 +886,53 @@ export default function GroupWorkspacePage({ params }: PageProps) {
   const currentWorkItemId = searchParams.get("work_item_id");
   const selectedTask = projectWorkItems.find((item) => item.id === currentWorkItemId);
   const cliPreviewOpen = searchParams.get("cli") === "1" && selectedTask?.worktree_id === worktreeId;
+  useEffect(() => {
+    if (!cliPreviewOpen || groupProjection.mode !== "live" || !groupApi) {
+      setCliExecutionProfiles([]);
+      setCliExecutionProfilesPending(false);
+      setCliExecutionProfilesError(null);
+      setCliExecutionProfilesMore(false);
+      return;
+    }
+
+    let active = true;
+    const requestGeneration = groupApiGeneration.current;
+    setCliExecutionProfilesPending(true);
+    setCliExecutionProfilesError(null);
+    groupApi.listExecutionProfiles(worktreeId, 50)
+      .then((page) => {
+        if (!active || groupApiGeneration.current !== requestGeneration) return;
+        const seen = new Set<string>();
+        const valid = Array.isArray(page.profiles) && page.profiles.length <= 50 && page.profiles.every((profile) => {
+          const normalizedProfileId = profile.profile_id.toLowerCase();
+          const validProfile = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profile.profile_id) &&
+            (profile.scope_kind === "project" || profile.scope_kind === "worktree") &&
+            (profile.scope_kind === "project" ? profile.worktree_id === null : profile.worktree_id?.toLowerCase() === worktreeId.toLowerCase()) &&
+            Number.isInteger(profile.profile_version) && profile.profile_version > 0 &&
+            Number.isInteger(profile.schema_version) && profile.schema_version > 0 &&
+            /^[0-9a-f]{64}$/.test(profile.content_digest) &&
+            !seen.has(normalizedProfileId);
+          if (validProfile) seen.add(normalizedProfileId);
+          return validProfile;
+        });
+        if (!valid || (page.next_cursor !== null && typeof page.next_cursor !== "string")) {
+          throw new Error("Agent Execution Profile 列表响应无效。");
+        }
+        setCliExecutionProfiles(page.profiles);
+        setCliExecutionProfilesMore(page.next_cursor !== null);
+        setCliExecutionProfileId((current) => page.profiles.some((profile) => profile.profile_id === current) ? current : "");
+      })
+      .catch((error: unknown) => {
+        if (!active || groupApiGeneration.current !== requestGeneration) return;
+        setCliExecutionProfiles([]);
+        setCliExecutionProfileId("");
+        setCliExecutionProfilesError(error instanceof Error ? error.message : "无法读取当前 Worktree 的 Agent Execution Profile 列表。");
+      })
+      .finally(() => {
+        if (active && groupApiGeneration.current === requestGeneration) setCliExecutionProfilesPending(false);
+      });
+    return () => { active = false; };
+  }, [cliPreviewOpen, groupApi, groupProjection.mode, worktreeId]);
   const cliSessionForSelectedTask = cliSession && selectedTask &&
     cliSession.worktree_id === worktreeId &&
     cliSession.work_item_id === selectedTask.id &&
@@ -1682,10 +1756,15 @@ export default function GroupWorkspacePage({ params }: PageProps) {
       setCliSessionError("请填写管理员提供的 Approved Launch Profile UUID。");
       return;
     }
+    const executionProfileId = cliExecutionProfileId.trim();
+    if (!cliExecutionProfiles.some((profile) => profile.profile_id === executionProfileId)) {
+      setCliSessionError("请选择当前 Worktree 可用的 Agent Execution Profile；它与 Approved Launch Profile 是不同配置。");
+      return;
+    }
 
     const item = selectedTask;
     const requestGeneration = groupApiGeneration.current;
-    const fingerprint = JSON.stringify([worktreeId, item.id, item.lifecycle_version, profileId]);
+    const fingerprint = JSON.stringify([worktreeId, item.id, item.lifecycle_version, profileId, executionProfileId]);
     let command = cliSessionCommands.current.get(fingerprint);
     if (!command) {
       const correlationId = crypto.randomUUID();
@@ -1696,6 +1775,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
           expected_lifecycle_version: item.lifecycle_version,
           approved_launch_profile_id: profileId,
           correlation_id: correlationId,
+          execution_profile_id: executionProfileId,
         },
       };
       cliSessionCommands.current.set(fingerprint, command);
@@ -2374,16 +2454,36 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                       <>
                         {groupProjection.mode === "live" ? (
                           <div className="space-y-3 rounded border border-line p-3">
-                            <p className="text-[10px] leading-relaxed text-ink-dim">会话 API 会重新验证当前 claimant、生命周期版本、Runtime 与 Approved Launch Profile。需要管理员提供 Profile UUID；客户端不能提交命令文本或 checkout 路径。</p>
+                            <p className="text-[10px] leading-relaxed text-ink-dim">Approved Launch Profile 只授权 Runtime 启动命令；Agent Execution Profile 固定 Agent、Skill、Memory、验证、Loop 与资源策略。两者分别选择，服务端会重验当前 Profile 与 Worktree 权限；客户端不能提交命令文本或 checkout 路径。</p>
                             <label className="block space-y-1 text-[10px] text-ink-mute">
                               <span>Approved Launch Profile UUID</span>
                               <input className="input w-full font-mono text-xs" aria-label="Approved Launch Profile UUID" value={cliProfileId} onChange={(event) => setCliProfileId(event.target.value)} placeholder="由管理员提供的 UUID" maxLength={36} />
                             </label>
-                            <button type="button" className="btn-primary text-xs" onClick={() => void startSelectedTaskCliSession()} disabled={cliSessionPending || groupProjection.mode !== "live" || !selectedTask || selectedTask.worktree_id !== worktreeId || !("lifecycle_status" in selectedTask) || selectedTask.lifecycle_status !== "in_progress" || selectedTask.active_worktree_id !== worktreeId}>
+                            <label className="block space-y-1 text-[10px] text-ink-mute">
+                              <span>Agent Execution Profile</span>
+                              <select
+                                className="input w-full text-xs"
+                                aria-label="Agent Execution Profile"
+                                value={cliExecutionProfileId}
+                                onChange={(event) => setCliExecutionProfileId(event.target.value)}
+                                disabled={cliExecutionProfilesPending || Boolean(cliExecutionProfilesError) || cliExecutionProfiles.length === 0}
+                              >
+                                <option value="">{cliExecutionProfilesPending ? "正在读取当前 Worktree 的 Profile…" : "选择 Agent Execution Profile"}</option>
+                                {cliExecutionProfiles.map((profile) => (
+                                  <option key={profile.profile_id} value={profile.profile_id}>
+                                    {profile.scope_kind === "worktree" ? "Worktree" : "Project"} · v{profile.profile_version} · {profile.content_digest.slice(0, 12)}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            {cliExecutionProfilesError && <p role="alert" className="text-xs text-error">{cliExecutionProfilesError}</p>}
+                            {cliExecutionProfilesMore && <p className="text-[10px] text-warning">当前只显示前 50 个 Profile；请先整理有效 Profile 数量，再选择完整配置。</p>}
+                            {!cliExecutionProfilesPending && !cliExecutionProfilesError && cliExecutionProfiles.length === 0 && <p className="text-[10px] text-ink-mute">当前 Worktree 没有可用的 Agent Execution Profile；新 Run 不会使用默认或 seed 配置。</p>}
+                            <button type="button" className="btn-primary text-xs" onClick={() => void startSelectedTaskCliSession()} disabled={cliSessionPending || cliExecutionProfilesPending || cliExecutionProfilesMore || !cliExecutionProfileId || groupProjection.mode !== "live" || !selectedTask || selectedTask.worktree_id !== worktreeId || !("lifecycle_status" in selectedTask) || selectedTask.lifecycle_status !== "in_progress" || selectedTask.active_worktree_id !== worktreeId}>
                               {cliSessionPending ? "正在请求受控 Session…" : "启动 Task CLI Session"}
                             </button>
                             {cliSessionError && <p role="alert" className="text-xs text-error">{cliSessionError}</p>}
-                            <p className="text-[10px] text-ink-mute">若 Session provisioner、sandbox 或当前授权未就绪，服务端会拒绝启动；ticket 未产生前终端保持断开。</p>
+                            <p className="text-[10px] text-ink-mute">当前如果 Profile resolver、Run snapshot writer、Session provisioner、sandbox 或授权未就绪，服务端会拒绝启动；ticket 未产生前终端保持断开。</p>
                           </div>
                         ) : (
                           <div className="rounded border border-warning/30 bg-warning/5 p-2 text-[10px] leading-relaxed text-warning">
