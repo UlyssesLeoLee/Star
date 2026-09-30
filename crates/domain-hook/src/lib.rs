@@ -23,6 +23,7 @@
 //!   (max_rules:Variable {name:"MAX_RULES_PER_SCOPE",type:"variable",language:"rust"}),
 //!   (max_conditions:Variable {name:"MAX_CONDITIONS_PER_RULE",type:"variable",language:"rust"}),
 //!   (max_bytes:Variable {name:"MAX_POLICY_DOCUMENT_BYTES",type:"variable",language:"rust"}),
+//!   (legacy_api:Variable {name:"LEGACY_EVALUATOR_API_VERSION",type:"variable",language:"rust"}),
 //!   (evaluate:Function {name:"evaluate",type:"function",signature:"fn evaluate(event: &HookEventEnvelope, policy: Option<&VerifiedHookPolicySnapshot>) -> HookEvaluation",visibility:"pub",language:"rust"}),
 //!   (decode:Function {name:"HookPolicyDocument::decode_and_verify",type:"function",signature:"fn decode_and_verify(bytes: &[u8]) -> Result<VerifiedHookPolicySnapshot, HookPolicyValidationError>",visibility:"pub",language:"rust"}),
 //!   (verify:Function {name:"HookPolicyDocument::verify",type:"function",signature:"fn verify(self) -> Result<VerifiedHookPolicySnapshot, HookPolicyValidationError>",visibility:"pub",language:"rust"}),
@@ -30,11 +31,18 @@
 //!   (valid_policy:Function {name:"policy_is_valid",type:"function",signature:"fn policy_is_valid(event: &HookEventEnvelope, policy: &VerifiedHookPolicySnapshot) -> bool",visibility:"private",language:"rust"}),
 //!   (valid_rules:Function {name:"rules_are_valid",type:"function",signature:"fn rules_are_valid(rules: &[HookRule]) -> bool",visibility:"private",language:"rust"}),
 //!   (valid_condition:Function {name:"condition_is_well_typed",type:"function",signature:"fn condition_is_well_typed(condition: &HookCondition) -> bool",visibility:"private",language:"rust"}),
+//!   (condition_phase:Function {name:"condition_supported_in_phase",type:"function",signature:"fn condition_supported_in_phase(condition: &HookCondition, phase: HookPhase) -> bool",visibility:"private",language:"rust"}),
+//!   (rule_phase:Function {name:"rule_applies_to_phase",type:"function",signature:"fn rule_applies_to_phase(rule: &HookRule, phase: HookPhase) -> bool",visibility:"private",language:"rust"}),
+//!   (evaluator_phase:Function {name:"evaluator_supported_for_phase",type:"function",signature:"fn evaluator_supported_for_phase(evaluator_api_version: u16, phase: HookPhase) -> bool",visibility:"private",language:"rust"}),
 //!   (matches:Function {name:"condition_matches",type:"function",signature:"fn condition_matches(condition: &HookCondition, event: &HookEventEnvelope) -> bool",visibility:"private",language:"rust"}),
-//!   (build:Function {name:"build_evaluation",type:"function",signature:"fn build_evaluation(decision: HookDecision, reason: HookReasonCode, rule_id: Option<[u8; 16]>, policy: Option<&VerifiedHookPolicySnapshot>, steps: u16) -> HookEvaluation",visibility:"private",language:"rust"}),
+//!   (build:Function {name:"build_evaluation",type:"function",signature:"fn build_evaluation(phase: HookPhase, decision: HookDecision, reason: HookReasonCode, rule_id: Option<[u8; 16]>, policy: Option<&VerifiedHookPolicySnapshot>, steps: u16) -> HookEvaluation",visibility:"private",language:"rust"}),
 //!   (tests:Module {name:"domain_hook_tests",type:"module",language:"rust"}),
 //!   (fixture_event:Function {name:"safe_event",type:"function",language:"rust"}),
 //!   (fixture_policy:Function {name:"safe_policy",type:"function",language:"rust"}),
+//!   (run_admission_test:Function {name:"run_admission_ignores_archive_only_facts",type:"function",visibility:"private",language:"rust"}),
+//!   (phase_rule_test:Function {name:"phase_scoped_rules_apply_only_to_their_phase",type:"function",visibility:"private",language:"rust"}),
+//!   (invalid_phase_fact_test:Function {name:"run_admission_rules_reject_archive_only_facts",type:"function",visibility:"private",language:"rust"}),
+//!   (legacy_policy_test:Function {name:"legacy_archive_policy_remains_digest_compatible",type:"function",visibility:"private",language:"rust"}),
 //!   (f)-[:CONTAINS]->(d), (d)-[:CONTAINS]->(event), (d)-[:CONTAINS]->(phase),
 //!   (d)-[:CONTAINS]->(decision), (d)-[:CONTAINS]->(reason), (d)-[:CONTAINS]->(lock),
 //!   (d)-[:CONTAINS]->(scope), (d)-[:CONTAINS]->(field), (d)-[:CONTAINS]->(operator),
@@ -44,17 +52,23 @@
 //!   (d)-[:CONTAINS]->(evaluate), (d)-[:CONTAINS]->(decode),
 //!   (d)-[:CONTAINS]->(verify), (d)-[:CONTAINS]->(digest),
 //!   (d)-[:CONTAINS]->(valid_policy), (d)-[:CONTAINS]->(valid_rules),
-//!   (d)-[:CONTAINS]->(valid_condition), (d)-[:CONTAINS]->(matches),
+//!   (d)-[:CONTAINS]->(valid_condition), (d)-[:CONTAINS]->(condition_phase),
+//!   (d)-[:CONTAINS]->(rule_phase), (d)-[:CONTAINS]->(evaluator_phase),
+//!   (d)-[:CONTAINS]->(matches),
 //!   (d)-[:CONTAINS]->(build), (d)-[:CONTAINS]->(api), (d)-[:CONTAINS]->(event_schema),
-//!   (d)-[:CONTAINS]->(schema), (d)-[:CONTAINS]->(max_rules),
+//!   (d)-[:CONTAINS]->(schema), (d)-[:CONTAINS]->(legacy_api), (d)-[:CONTAINS]->(max_rules),
 //!   (d)-[:CONTAINS]->(max_conditions), (d)-[:CONTAINS]->(max_bytes),
 //!   (d)-[:CONTAINS]->(tests), (tests)-[:CONTAINS]->(fixture_event),
 //!   (tests)-[:CONTAINS]->(fixture_policy), (document)-[:CALLS]->(digest),
+//!   (tests)-[:CONTAINS]->(run_admission_test), (tests)-[:CONTAINS]->(phase_rule_test),
+//!   (tests)-[:CONTAINS]->(invalid_phase_fact_test), (tests)-[:CONTAINS]->(legacy_policy_test),
 //!   (decode)-[:CALLS]->(verify), (decode)-[:USES]->(max_bytes),
 //!   (verify)-[:CALLS]->(valid_rules), (evaluate)-[:CALLS]->(valid_policy),
+//!   (valid_policy)-[:CALLS]->(evaluator_phase), (evaluate)-[:CALLS]->(rule_phase),
 //!   (evaluate)-[:CALLS]->(matches), (evaluate)-[:CALLS]->(build),
-//!   (valid_rules)-[:CALLS]->(valid_condition), (valid_policy)-[:USES]->(schema),
-//!   (valid_policy)-[:USES]->(api), (valid_rules)-[:USES]->(max_rules),
+//!   (valid_rules)-[:CALLS]->(valid_condition), (valid_rules)-[:CALLS]->(condition_phase),
+//!   (valid_policy)-[:USES]->(schema),
+//!   (valid_policy)-[:USES]->(api), (valid_policy)-[:USES]->(legacy_api), (valid_rules)-[:USES]->(max_rules),
 //!   (valid_rules)-[:USES]->(max_conditions),
 //!   (evaluate)-[:USES]->(event_schema), (build)-[:USES]->(api);
 //! ```
@@ -63,7 +77,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 /// Version of the serialized evaluation result contract.
-pub const EVALUATOR_API_VERSION: u16 = 1;
+pub const EVALUATOR_API_VERSION: u16 = 2;
+/// Version retained for already-published archive-only policy snapshots.
+pub const LEGACY_EVALUATOR_API_VERSION: u16 = 1;
 /// Version of the typed event envelope accepted by this evaluator.
 pub const EVENT_SCHEMA_VERSION: u16 = 1;
 /// Version of the typed policy snapshot accepted by this evaluator.
@@ -75,9 +91,11 @@ pub const MAX_CONDITIONS_PER_RULE: usize = 16;
 /// Maximum encoded policy document size accepted by store/API adapters before parsing.
 pub const MAX_POLICY_DOCUMENT_BYTES: usize = 65_536;
 
-/// Synchronous point at which a Rust builtin Hook must finish before cleanup.
+/// Synchronous point at which a Rust builtin Hook must finish before an operation proceeds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HookPhase {
+    /// Before a Task Run may be admitted to its Runtime.
+    BeforeRunAdmission,
     /// Before a Worktree archive or physical cleanup lifecycle command.
     BeforeWorktreeArchiveCleanup,
 }
@@ -252,6 +270,9 @@ pub struct HookCondition {
 pub struct HookRule {
     /// Stable UUID bytes for audit correlation.
     pub rule_id: [u8; 16],
+    /// Event phase this rule can restrict. Omission preserves legacy archive-only behavior.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase: Option<HookPhase>,
     /// Higher values win deterministic same-decision tie breaks.
     pub priority: i16,
     /// Disabled rules are retained in policy history but are not evaluated.
@@ -296,7 +317,7 @@ pub struct HookPolicyDocument {
 /// Validated immutable policy snapshot. Its private fields prevent callers from
 /// changing policy facts after verification; the evaluator borrows it without
 /// allocating or performing I/O.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct VerifiedHookPolicySnapshot {
     schema_version: u16,
     evaluator_api_version: u16,
@@ -398,7 +419,18 @@ impl HookPolicyDocument {
         if self.schema_version != POLICY_SCHEMA_VERSION {
             return Err(HookPolicyValidationError::UnsupportedSchema);
         }
-        if self.evaluator_api_version != EVALUATOR_API_VERSION {
+        if self.evaluator_api_version != EVALUATOR_API_VERSION
+            && self.evaluator_api_version != LEGACY_EVALUATOR_API_VERSION
+        {
+            return Err(HookPolicyValidationError::UnsupportedEvaluator);
+        }
+        if self.evaluator_api_version == LEGACY_EVALUATOR_API_VERSION
+            && self
+                .project_rules
+                .iter()
+                .chain(self.worktree_rules.iter())
+                .any(|rule| rule.phase.is_some())
+        {
             return Err(HookPolicyValidationError::UnsupportedEvaluator);
         }
         if self.tenant_id == [0; 16]
@@ -459,6 +491,31 @@ impl VerifiedHookPolicySnapshot {
     pub fn digest(&self) -> [u8; 32] {
         self.digest
     }
+
+    /// Effective version used by Run and BI projections. The Worktree overlay
+    /// revision takes precedence while the snapshot retains both source versions.
+    pub fn effective_version(&self) -> u64 {
+        self.worktree_version.unwrap_or(self.project_version)
+    }
+
+    /// Revision that owns a matched rule, when that rule still exists in the snapshot.
+    pub fn matched_rule_version(&self, rule_id: [u8; 16]) -> Option<u64> {
+        if self
+            .worktree_rules
+            .iter()
+            .any(|rule| rule.rule_id == rule_id)
+        {
+            self.worktree_version
+        } else if self
+            .project_rules
+            .iter()
+            .any(|rule| rule.rule_id == rule_id)
+        {
+            Some(self.project_version)
+        } else {
+            None
+        }
+    }
 }
 
 /// Sanitized evaluation result suitable for append-only RunEvent/Audit storage.
@@ -500,6 +557,7 @@ pub fn evaluate(
         || event.event_id == [0; 16]
     {
         return build_evaluation(
+            event.phase,
             HookDecision::Deny,
             HookReasonCode::IncompleteScope,
             None,
@@ -509,6 +567,7 @@ pub fn evaluate(
     }
     if event.event_schema_version != EVENT_SCHEMA_VERSION {
         return build_evaluation(
+            event.phase,
             HookDecision::Deny,
             HookReasonCode::EventSchemaUnsupported,
             None,
@@ -524,23 +583,31 @@ pub fn evaluate(
         Some(HookReasonCode::LifecycleVersionStale)
     } else if event.runtime_healthy != Some(true) {
         Some(HookReasonCode::RuntimeUnhealthyOrUnknown)
-    } else if event.retention_lock != RetentionLockState::Fresh {
-        Some(HookReasonCode::RetentionLockUnusable)
-    } else if event.active_run_count > 0
-        || event.active_agent_lease_count > 0
-        || event.file_claim_count > 0
-        || event.owned_process_count > 0
-    {
-        Some(HookReasonCode::ExecutionNotDrained)
     } else {
-        None
+        match event.phase {
+            HookPhase::BeforeRunAdmission => None,
+            HookPhase::BeforeWorktreeArchiveCleanup => {
+                if event.retention_lock != RetentionLockState::Fresh {
+                    Some(HookReasonCode::RetentionLockUnusable)
+                } else if event.active_run_count > 0
+                    || event.active_agent_lease_count > 0
+                    || event.file_claim_count > 0
+                    || event.owned_process_count > 0
+                {
+                    Some(HookReasonCode::ExecutionNotDrained)
+                } else {
+                    None
+                }
+            }
+        }
     };
     if let Some(reason) = builtin_failure {
-        return build_evaluation(HookDecision::Deny, reason, None, policy, 0);
+        return build_evaluation(event.phase, HookDecision::Deny, reason, None, policy, 0);
     }
 
     let Some(policy) = policy else {
         return build_evaluation(
+            event.phase,
             HookDecision::Deny,
             HookReasonCode::PolicyUnavailable,
             None,
@@ -550,6 +617,7 @@ pub fn evaluate(
     };
     if !policy_is_valid(event, policy) {
         return build_evaluation(
+            event.phase,
             HookDecision::Deny,
             HookReasonCode::PolicyInvalid,
             None,
@@ -569,7 +637,7 @@ pub fn evaluate(
         .iter()
         .chain(policy.worktree_rules.iter())
     {
-        if !rule.enabled {
+        if !rule.enabled || !rule_applies_to_phase(rule, event.phase) {
             continue;
         }
         let mut matched = true;
@@ -609,6 +677,7 @@ pub fn evaluate(
     }
 
     build_evaluation(
+        event.phase,
         decision,
         reason,
         matched_rule_id,
@@ -619,7 +688,7 @@ pub fn evaluate(
 
 fn policy_is_valid(event: &HookEventEnvelope, policy: &VerifiedHookPolicySnapshot) -> bool {
     if policy.schema_version != POLICY_SCHEMA_VERSION
-        || policy.evaluator_api_version != EVALUATOR_API_VERSION
+        || !evaluator_supported_for_phase(policy.evaluator_api_version, event.phase)
         || policy.tenant_id != event.scope.tenant_id
         || policy.project_id != event.scope.project_id
     {
@@ -655,10 +724,14 @@ fn rules_are_valid(rules: &[HookRule]) -> bool {
                         HookReasonCode::ExternalConditionPending
                     )
             )
-            || rule
-                .conditions
-                .iter()
-                .any(|condition| !condition_is_well_typed(condition))
+            || rule.conditions.iter().any(|condition| {
+                !condition_is_well_typed(condition)
+                    || !condition_supported_in_phase(
+                        condition,
+                        rule.phase
+                            .unwrap_or(HookPhase::BeforeWorktreeArchiveCleanup),
+                    )
+            })
             || rules[..index]
                 .iter()
                 .any(|prior| prior.rule_id == rule.rule_id)
@@ -667,6 +740,32 @@ fn rules_are_valid(rules: &[HookRule]) -> bool {
         }
     }
     true
+}
+
+fn evaluator_supported_for_phase(evaluator_api_version: u16, phase: HookPhase) -> bool {
+    match evaluator_api_version {
+        EVALUATOR_API_VERSION => true,
+        LEGACY_EVALUATOR_API_VERSION => phase == HookPhase::BeforeWorktreeArchiveCleanup,
+        _ => false,
+    }
+}
+
+fn rule_applies_to_phase(rule: &HookRule, phase: HookPhase) -> bool {
+    rule.phase
+        .unwrap_or(HookPhase::BeforeWorktreeArchiveCleanup)
+        == phase
+}
+
+fn condition_supported_in_phase(condition: &HookCondition, phase: HookPhase) -> bool {
+    match phase {
+        HookPhase::BeforeRunAdmission => matches!(
+            condition.field,
+            HookFactField::ActorAuthorized
+                | HookFactField::LifecycleVersionMatches
+                | HookFactField::RuntimeHealthy
+        ),
+        HookPhase::BeforeWorktreeArchiveCleanup => true,
+    }
 }
 
 fn rule_ids_overlap(project_rules: &[HookRule], worktree_rules: &[HookRule]) -> bool {
@@ -762,6 +861,7 @@ fn condition_matches(condition: &HookCondition, event: &HookEventEnvelope) -> bo
 }
 
 fn build_evaluation(
+    phase: HookPhase,
     decision: HookDecision,
     reason_code: HookReasonCode,
     matched_rule_id: Option<[u8; 16]>,
@@ -777,7 +877,7 @@ fn build_evaluation(
         None => (None, None, None),
     };
     HookEvaluation {
-        phase: HookPhase::BeforeWorktreeArchiveCleanup,
+        phase,
         decision,
         reason_code,
         matched_rule_id,
@@ -814,6 +914,126 @@ mod tests {
             file_claim_count: 0,
             owned_process_count: 0,
         }
+    }
+
+    #[test]
+    fn run_admission_ignores_archive_only_facts() {
+        let mut event = safe_event();
+        event.phase = HookPhase::BeforeRunAdmission;
+        event.retention_lock = RetentionLockState::Unknown;
+        event.active_run_count = 3;
+        event.active_agent_lease_count = 1;
+        event.file_claim_count = 2;
+        event.owned_process_count = 1;
+        let policy = safe_policy(vec![], vec![]);
+
+        let result = evaluate(&event, Some(&policy));
+
+        assert_eq!(result.phase, HookPhase::BeforeRunAdmission);
+        assert_eq!(result.decision, HookDecision::Allow);
+    }
+
+    #[test]
+    fn phase_scoped_rules_apply_only_to_their_phase() {
+        let archive_only_rule = HookRule {
+            rule_id: [10; 16],
+            phase: None,
+            priority: 1,
+            enabled: true,
+            decision: HookDecision::Deny,
+            reason_code: HookReasonCode::RuleDenied,
+            conditions: vec![HookCondition {
+                field: HookFactField::ActorAuthorized,
+                operator: HookOperator::Equal,
+                expected: HookValue::Boolean(true),
+            }],
+        };
+        let policy = safe_policy(vec![archive_only_rule], vec![]);
+        let archive_result = evaluate(&safe_event(), Some(&policy));
+        let mut run_event = safe_event();
+        run_event.phase = HookPhase::BeforeRunAdmission;
+        let run_result = evaluate(&run_event, Some(&policy));
+
+        assert_eq!(archive_result.decision, HookDecision::Deny);
+        assert_eq!(run_result.decision, HookDecision::Allow);
+    }
+
+    #[test]
+    fn run_admission_rules_reject_archive_only_facts() {
+        let run_rule = HookRule {
+            rule_id: [11; 16],
+            phase: Some(HookPhase::BeforeRunAdmission),
+            priority: 1,
+            enabled: true,
+            decision: HookDecision::Deny,
+            reason_code: HookReasonCode::RuleDenied,
+            conditions: vec![HookCondition {
+                field: HookFactField::RetentionLock,
+                operator: HookOperator::Equal,
+                expected: HookValue::RetentionLock(RetentionLockState::Fresh),
+            }],
+        };
+        let mut document = HookPolicyDocument {
+            schema_version: POLICY_SCHEMA_VERSION,
+            evaluator_api_version: EVALUATOR_API_VERSION,
+            tenant_id: [1; 16],
+            project_id: [2; 16],
+            worktree_id: Some([3; 16]),
+            project_version: 1,
+            worktree_version: Some(1),
+            digest: [0; 32],
+            project_rules: vec![run_rule],
+            worktree_rules: vec![],
+        };
+        document.digest = document.computed_digest().unwrap();
+
+        assert_eq!(
+            document.verify(),
+            Err(HookPolicyValidationError::InvalidRule)
+        );
+    }
+
+    #[test]
+    fn legacy_archive_policy_remains_digest_compatible() {
+        let mut document = HookPolicyDocument {
+            schema_version: POLICY_SCHEMA_VERSION,
+            evaluator_api_version: LEGACY_EVALUATOR_API_VERSION,
+            tenant_id: [1; 16],
+            project_id: [2; 16],
+            worktree_id: Some([3; 16]),
+            project_version: 1,
+            worktree_version: Some(1),
+            digest: [0; 32],
+            project_rules: vec![HookRule {
+                rule_id: [12; 16],
+                phase: None,
+                priority: 1,
+                enabled: true,
+                decision: HookDecision::Deny,
+                reason_code: HookReasonCode::RuleDenied,
+                conditions: vec![HookCondition {
+                    field: HookFactField::ActorAuthorized,
+                    operator: HookOperator::Equal,
+                    expected: HookValue::Boolean(false),
+                }],
+            }],
+            worktree_rules: vec![],
+        };
+        document.digest = document.computed_digest().unwrap();
+        let encoded = serde_json::to_vec(&document).unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
+        assert!(value["project_rules"][0].get("phase").is_none());
+        let policy = HookPolicyDocument::decode_and_verify(&encoded).unwrap();
+
+        assert_eq!(
+            evaluate(&safe_event(), Some(&policy)).decision,
+            HookDecision::Allow
+        );
+        let mut run_event = safe_event();
+        run_event.phase = HookPhase::BeforeRunAdmission;
+        let run_result = evaluate(&run_event, Some(&policy));
+        assert_eq!(run_result.decision, HookDecision::Deny);
+        assert_eq!(run_result.reason_code, HookReasonCode::PolicyInvalid);
     }
 
     fn safe_policy(
@@ -901,6 +1121,7 @@ mod tests {
         };
         let project_rule = HookRule {
             rule_id: [7; 16],
+            phase: None,
             priority: 1,
             enabled: true,
             decision: HookDecision::Deny,
@@ -909,6 +1130,7 @@ mod tests {
         };
         let worktree_rule = HookRule {
             rule_id: [8; 16],
+            phase: None,
             priority: 10,
             enabled: true,
             decision: HookDecision::Defer,
@@ -926,6 +1148,7 @@ mod tests {
     fn worktree_allow_rule_is_rejected_before_evaluation() {
         let allow_rule = HookRule {
             rule_id: [6; 16],
+            phase: None,
             priority: 1,
             enabled: true,
             decision: HookDecision::Allow,
@@ -1019,6 +1242,7 @@ mod tests {
         let too_many_rules = vec![
             HookRule {
                 rule_id: [7; 16],
+                phase: None,
                 priority: 0,
                 enabled: false,
                 decision: HookDecision::Deny,

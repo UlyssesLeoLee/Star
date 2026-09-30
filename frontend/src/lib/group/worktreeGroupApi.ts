@@ -276,6 +276,186 @@ export interface AuthorizedProjectsQuery {
   cursor?: string;
 }
 
+export type HookDecision = "Allow" | "Deny" | "RequireHuman" | "Defer";
+export type HookPhase = "BeforeRunAdmission" | "BeforeWorktreeArchiveCleanup";
+export type HookReasonCode =
+  | "AllowedByBuiltinBaseline"
+  | "IncompleteScope"
+  | "EventSchemaUnsupported"
+  | "ActorNotAuthorized"
+  | "LifecycleVersionStale"
+  | "RuntimeUnhealthyOrUnknown"
+  | "RetentionLockUnusable"
+  | "ExecutionNotDrained"
+  | "PolicyUnavailable"
+  | "PolicyInvalid"
+  | "RuleDenied"
+  | "HumanApprovalRequired"
+  | "ExternalConditionPending";
+export type HookFactField =
+  | "ActorAuthorized"
+  | "LifecycleVersionMatches"
+  | "RuntimeHealthy"
+  | "RetentionLock"
+  | "ActiveRunCount"
+  | "ActiveAgentLeaseCount"
+  | "FileClaimCount"
+  | "OwnedProcessCount";
+export type HookOperator =
+  | "Equal"
+  | "NotEqual"
+  | "GreaterThan"
+  | "GreaterThanOrEqual"
+  | "LessThan"
+  | "LessThanOrEqual";
+export type HookRetentionLockState = "Fresh" | "Missing" | "Stale" | "Conflict" | "Unknown";
+export type HookValue =
+  | { Boolean: boolean }
+  | { Count: number }
+  | { RetentionLock: HookRetentionLockState };
+
+export interface HookCondition {
+  field: HookFactField;
+  operator: HookOperator;
+  expected: HookValue;
+}
+
+export interface HookRule {
+  rule_id: number[];
+  phase?: HookPhase;
+  priority: number;
+  enabled: boolean;
+  decision: Exclude<HookDecision, "Allow">;
+  reason_code: Extract<HookReasonCode, "RuleDenied" | "HumanApprovalRequired" | "ExternalConditionPending">;
+  conditions: HookCondition[];
+}
+
+export interface HookPolicyDocument {
+  schema_version: number;
+  evaluator_api_version: number;
+  tenant_id: number[];
+  project_id: number[];
+  worktree_id: number[] | null;
+  project_version: number;
+  worktree_version: number | null;
+  digest: number[];
+  project_rules: HookRule[];
+  worktree_rules: HookRule[];
+}
+
+export interface HookPolicyAuditEvent {
+  event_id: string;
+  event_type: string;
+  policy_set_id: string | null;
+  draft_id: string | null;
+  policy_version: number | null;
+  correlation_id: string;
+  details: unknown;
+  occurred_at: string;
+}
+
+export interface HookPolicyDraftView {
+  draft_id: string;
+  draft_version: number;
+  base_policy_set_id: string | null;
+  inherited_project_policy_set_id: string | null;
+  expires_at: string;
+  is_stale: boolean;
+  policy_document: HookPolicyDocument;
+}
+
+export interface HookPolicyResponse {
+  scope: { kind: "project" | "worktree"; project_id: string; worktree_id: string | null };
+  producer_capabilities: { run_admission: boolean };
+  policy_set_id: string | null;
+  policy_document: HookPolicyDocument | null;
+  effective_policy_document: HookPolicyDocument | null;
+  inherited_project_policy_set_id: string | null;
+  draft: HookPolicyDraftView | null;
+  audit: HookPolicyAuditEvent[];
+}
+
+export interface HookExecutionEvent {
+  event_id: string;
+  worktree_id: string | null;
+  work_item_id: string | null;
+  run_id: string | null;
+  actor_id: string;
+  correlation_id: string;
+  source_kind: string;
+  hook_phase: string;
+  hook_decision: string;
+  hook_reason_code: string;
+  matched_rule_id: string | null;
+  project_policy_version: number | null;
+  worktree_policy_version: number | null;
+  evaluator_api_version: number;
+  policy_digest: string | null;
+  evaluated_condition_count: number;
+  duration_ms: number;
+  timed_out: boolean;
+  occurred_at: string;
+}
+
+export interface HookEventCoverage {
+  scope: "hook_execution_event_ledger";
+  status: "partial" | "unknown" | "complete";
+  reported_percentage: number | null;
+  instrumented_phases: string[];
+  not_yet_instrumented_phases: string[];
+  note: string;
+}
+
+export interface HookExecutionEventPage {
+  events: HookExecutionEvent[];
+  next_cursor: string | null;
+  coverage: HookEventCoverage;
+}
+
+export interface HookExecutionSummaryGroup {
+  hook_phase: string;
+  hook_decision: string;
+  event_count: number;
+  run_linked_event_count: number;
+  run_state_joined_event_count: number;
+  run_state_counts: Record<string, number>;
+  timeout_count: number;
+  duration_total_ms: number;
+  average_duration_ms: number;
+  latest_occurred_at: string;
+}
+
+export interface HookExecutionSummaryCoverage {
+  scope: "hook_execution_event_and_task_execution_run_event";
+  status: "partial" | "unknown" | "complete";
+  reported_percentage: number | null;
+  instrumented_phases: string[];
+  not_yet_instrumented_phases: string[];
+  run_state_join: "no_samples" | "partial" | "complete";
+  note: string;
+}
+
+export interface HookExecutionSummary {
+  metric_version: "hook_execution_summary_v2";
+  window: { days: number; from: string; to: string };
+  observed_event_count: number;
+  run_linked_event_count: number;
+  run_state_joined_event_count: number;
+  excluded_incomplete_run_event_count: number;
+  timeout_count: number;
+  duration_total_ms: number;
+  groups: HookExecutionSummaryGroup[];
+  coverage: HookExecutionSummaryCoverage;
+  formulas: Record<string, string | string[]>;
+}
+
+export interface HookPolicyDraftBody {
+  expected_draft_version: number;
+  expected_current_policy_set_id: string | null;
+  correlation_id: string;
+  policy_document: HookPolicyDocument;
+}
+
 export interface AuthorizedProjectAccess {
   project_id: string;
   role: string;
@@ -491,6 +671,70 @@ export class WorktreeGroupApiClient {
     const serialized = query.toString();
     const suffix = serialized ? `?${serialized}` : "";
     return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/worktrees${suffix}`);
+  }
+
+  getProjectHookPolicy(projectId: string): Promise<HookPolicyResponse> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/hook-policy`);
+  }
+
+  listHookEvents(projectId: string, options: { limit?: number; cursor?: string } = {}): Promise<HookExecutionEventPage> {
+    const query = new URLSearchParams();
+    if (options.limit !== undefined) query.set("limit", String(options.limit));
+    if (options.cursor) query.set("cursor", options.cursor);
+    const serialized = query.toString();
+    const suffix = serialized ? `?${serialized}` : "";
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/hook-events${suffix}`);
+  }
+
+  getHookExecutionSummary(projectId: string, windowDays = 30): Promise<HookExecutionSummary> {
+    const query = new URLSearchParams({ window_days: String(windowDays) });
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/hook-events/summary?${query.toString()}`);
+  }
+
+  getWorktreeHookPolicy(worktreeId: string): Promise<HookPolicyResponse> {
+    return this.request(`/api/v1/worktrees/${encodeURIComponent(worktreeId)}/hook-policy/effective`);
+  }
+
+  saveProjectHookDraft(projectId: string, body: HookPolicyDraftBody): Promise<{ draft_id: string; draft_version: number }> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/hook-policy/draft`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  }
+
+  saveWorktreeHookDraft(worktreeId: string, body: HookPolicyDraftBody): Promise<{ draft_id: string; draft_version: number }> {
+    return this.request(`/api/v1/worktrees/${encodeURIComponent(worktreeId)}/hook-policy/draft`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  }
+
+  publishProjectHookDraft(projectId: string, body: { expected_draft_version: number; correlation_id: string }): Promise<{ policy_set_id: string }> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/hook-policy/publish`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  publishWorktreeHookDraft(worktreeId: string, body: { expected_draft_version: number; correlation_id: string }): Promise<{ policy_set_id: string }> {
+    return this.request(`/api/v1/worktrees/${encodeURIComponent(worktreeId)}/hook-policy/publish`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  rollbackProjectHookPolicy(projectId: string, body: { target_policy_set_id: string; expected_current_policy_set_id: string; correlation_id: string }): Promise<{ policy_set_id: string; rolled_back_from: string }> {
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/hook-policy/rollback`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  rollbackWorktreeHookPolicy(worktreeId: string, body: { target_policy_set_id: string; expected_current_policy_set_id: string; correlation_id: string }): Promise<{ policy_set_id: string; rolled_back_from: string }> {
+    return this.request(`/api/v1/worktrees/${encodeURIComponent(worktreeId)}/hook-policy/rollback`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   }
 
   listAuthorizedProjects<T>(query: AuthorizedProjectsQuery = {}): Promise<T> {
@@ -1002,3 +1246,74 @@ function waitForPoll(ms: number, signal: AbortSignal): Promise<void> {
     signal.addEventListener("abort", finish, { once: true });
   });
 }
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
+      (client:Class {name:"WorktreeGroupApiClient"}),
+      (request:Function {name:"WorktreeGroupApiClient.request"});
+CREATE (hookDecision:Class {name:"HookDecision",type:"class",language:"typescript",visibility:"public"}),
+       (hookPhase:Class {name:"HookPhase",type:"class",language:"typescript",visibility:"public"}),
+       (hookReason:Class {name:"HookReasonCode",type:"class",language:"typescript",visibility:"public"}),
+       (hookFact:Class {name:"HookFactField",type:"class",language:"typescript",visibility:"public"}),
+       (hookOperator:Class {name:"HookOperator",type:"class",language:"typescript",visibility:"public"}),
+       (hookValue:Class {name:"HookValue",type:"class",language:"typescript",visibility:"public"}),
+       (hookCondition:Class {name:"HookCondition",type:"interface",language:"typescript",visibility:"public"}),
+       (hookRule:Class {name:"HookRule",type:"interface",language:"typescript",visibility:"public"}),
+       (hookDocument:Class {name:"HookPolicyDocument",type:"interface",language:"typescript",visibility:"public"}),
+       (hookAudit:Class {name:"HookPolicyAuditEvent",type:"interface",language:"typescript",visibility:"public"}),
+       (hookDraft:Class {name:"HookPolicyDraftView",type:"interface",language:"typescript",visibility:"public"}),
+       (hookResponse:Class {name:"HookPolicyResponse",type:"interface",language:"typescript",visibility:"public"}),
+       (hookDraftBody:Class {name:"HookPolicyDraftBody",type:"interface",language:"typescript",visibility:"public"}),
+       (getProjectPolicy:Function {name:"WorktreeGroupApiClient.getProjectHookPolicy",type:"function",language:"typescript",visibility:"public",complexity:"simple"}),
+       (getWorktreePolicy:Function {name:"WorktreeGroupApiClient.getWorktreeHookPolicy",type:"function",language:"typescript",visibility:"public",complexity:"simple"}),
+       (saveProjectDraft:Function {name:"WorktreeGroupApiClient.saveProjectHookDraft",type:"function",language:"typescript",visibility:"public",complexity:"simple"}),
+       (saveWorktreeDraft:Function {name:"WorktreeGroupApiClient.saveWorktreeHookDraft",type:"function",language:"typescript",visibility:"public",complexity:"simple"}),
+       (publishProject:Function {name:"WorktreeGroupApiClient.publishProjectHookDraft",type:"function",language:"typescript",visibility:"public",complexity:"simple"}),
+       (publishWorktree:Function {name:"WorktreeGroupApiClient.publishWorktreeHookDraft",type:"function",language:"typescript",visibility:"public",complexity:"simple"}),
+       (rollbackProject:Function {name:"WorktreeGroupApiClient.rollbackProjectHookPolicy",type:"function",language:"typescript",visibility:"public",complexity:"simple"}),
+       (rollbackWorktree:Function {name:"WorktreeGroupApiClient.rollbackWorktreeHookPolicy",type:"function",language:"typescript",visibility:"public",complexity:"simple"});
+CREATE (file)-[:CONTAINS]->(hookDecision),(file)-[:CONTAINS]->(hookReason),
+       (file)-[:CONTAINS]->(hookPhase),
+       (file)-[:CONTAINS]->(hookFact),(file)-[:CONTAINS]->(hookOperator),(file)-[:CONTAINS]->(hookValue),
+       (file)-[:CONTAINS]->(hookCondition),(file)-[:CONTAINS]->(hookRule),(file)-[:CONTAINS]->(hookDocument),
+       (file)-[:CONTAINS]->(hookAudit),(file)-[:CONTAINS]->(hookDraft),(file)-[:CONTAINS]->(hookResponse),
+       (file)-[:CONTAINS]->(hookDraftBody),
+       (client)-[:HAS_METHOD]->(getProjectPolicy),(client)-[:HAS_METHOD]->(getWorktreePolicy),
+       (client)-[:HAS_METHOD]->(saveProjectDraft),(client)-[:HAS_METHOD]->(saveWorktreeDraft),
+       (client)-[:HAS_METHOD]->(publishProject),(client)-[:HAS_METHOD]->(publishWorktree),
+       (client)-[:HAS_METHOD]->(rollbackProject),(client)-[:HAS_METHOD]->(rollbackWorktree),
+       (getProjectPolicy)-[:CALLS]->(request),
+       (getWorktreePolicy)-[:CALLS]->(request),(saveProjectDraft)-[:CALLS]->(request),
+       (saveWorktreeDraft)-[:CALLS]->(request),(publishProject)-[:CALLS]->(request),
+       (publishWorktree)-[:CALLS]->(request),(rollbackProject)-[:CALLS]->(request),
+       (rollbackWorktree)-[:CALLS]->(request),(hookDraft)-[:CONTAINS]->(hookDocument),
+       (hookResponse)-[:CONTAINS]->(hookDraft),(hookResponse)-[:CONTAINS]->(hookAudit),
+       (hookRule)-[:CONTAINS]->(hookCondition),(hookCondition)-[:USES]->(hookValue);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
+      (client:Class {name:"WorktreeGroupApiClient"}),
+      (request:Function {name:"WorktreeGroupApiClient.request"});
+CREATE (hookEvent:Class {name:"HookExecutionEvent",type:"interface",language:"typescript",visibility:"public"}),
+       (hookCoverage:Class {name:"HookEventCoverage",type:"interface",language:"typescript",visibility:"public"}),
+       (hookEventPage:Class {name:"HookExecutionEventPage",type:"interface",language:"typescript",visibility:"public"}),
+       (listHookEvents:Function {name:"WorktreeGroupApiClient.listHookEvents",type:"function",language:"typescript",visibility:"public",complexity:"moderate"});
+CREATE (file)-[:CONTAINS]->(hookEvent),(file)-[:CONTAINS]->(hookCoverage),(file)-[:CONTAINS]->(hookEventPage),
+       (client)-[:HAS_METHOD]->(listHookEvents),(listHookEvents)-[:CALLS]->(request),
+       (hookEventPage)-[:CONTAINS]->(hookEvent),(hookEventPage)-[:CONTAINS]->(hookCoverage);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
+      (client:Class {name:"WorktreeGroupApiClient"}),
+      (request:Function {name:"WorktreeGroupApiClient.request"}),
+      (coverage:Class {name:"HookEventCoverage"});
+CREATE (summaryGroup:Class {name:"HookExecutionSummaryGroup",type:"interface",language:"typescript",visibility:"public"}),
+       (summary:Class {name:"HookExecutionSummary",type:"interface",language:"typescript",visibility:"public"}),
+       (summaryCoverage:Class {name:"HookExecutionSummaryCoverage",type:"interface",language:"typescript",visibility:"public"}),
+       (getSummary:Function {name:"WorktreeGroupApiClient.getHookExecutionSummary",type:"function",language:"typescript",visibility:"public",complexity:"simple"});
+CREATE (file)-[:CONTAINS]->(summaryGroup),(file)-[:CONTAINS]->(summary),
+       (client)-[:HAS_METHOD]->(getSummary),(getSummary)-[:CALLS]->(request),
+       (summary)-[:CONTAINS]->(summaryGroup),(summary)-[:CONTAINS]->(summaryCoverage);
+*/

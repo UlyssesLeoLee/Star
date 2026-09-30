@@ -89,14 +89,41 @@
 //!   (test_size)-[:CALLS]->(decode),(test_request_size)-[:CALLS]->(parse_body),(test_request_size)-[:USES]->(request_limit),
 //!   (publish_project)-[:USES]->(limit),(rebase)-[:USES]->(limit),(rt)-[:USES]->(request_limit);
 
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"hook_policies",type:"module"}),(load:Function {name:"load_current_policy",type:"function"}),(verify:Function {name:"verify_stored_policy",type:"function"});
+//! CREATE (effective:Function {name:"load_verified_effective_snapshot",type:"function",language:"rust",visibility:"pub(super)",complexity:"moderate"});
+//! CREATE (m)-[:CONTAINS]->(effective),(effective)-[:CALLS]->(load),(effective)-[:CALLS]->(verify);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"hook_policies",type:"module"}),(rt:Function {name:"router",type:"function"});
+//! CREATE (eventsQuery:Class {name:"HookEventsQuery",type:"class",language:"rust"}),(eventCursor:Class {name:"HookEventCursor",type:"class",language:"rust"}),(eventProjection:Class {name:"HookEventProjection",type:"class",language:"rust"}),(projectKey:Variable {name:"project_id",type:"variable",language:"rust"}),(occurredKey:Variable {name:"occurred_at",type:"variable",language:"rust"}),(eventKey:Variable {name:"event_id",type:"variable",language:"rust"}),(listEvents:Function {name:"list_hook_events",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(decodeEventCursor:Function {name:"decode_hook_event_cursor",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(encodeEventCursor:Function {name:"encode_hook_event_cursor",type:"function",language:"rust",visibility:"private",complexity:"simple"});
+//! CREATE (m)-[:CONTAINS]->(eventsQuery),(m)-[:CONTAINS]->(eventCursor),(m)-[:CONTAINS]->(eventProjection),(m)-[:CONTAINS]->(listEvents),(m)-[:CONTAINS]->(decodeEventCursor),(m)-[:CONTAINS]->(encodeEventCursor),(rt)-[:CALLS]->(listEvents),(listEvents)-[:CALLS]->(decodeEventCursor),(listEvents)-[:CALLS]->(encodeEventCursor),(listEvents)-[:USES]->(eventProjection),(eventCursor)-[:USES]->(projectKey),(eventCursor)-[:USES]->(occurredKey),(eventCursor)-[:USES]->(eventKey);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"hook_policies",type:"module"}),(rt:Function {name:"router",type:"function"});
+//! CREATE (summaryQuery:Class {name:"HookSummaryQuery",type:"class",language:"rust"}),(summaryGroup:Class {name:"HookSummaryGroup",type:"class",language:"rust"}),(summaryDays:Variable {name:"window_days",type:"variable",language:"rust"}),(summary:Function {name:"summarize_hook_events",type:"function",language:"rust",visibility:"private",complexity:"complex"}),(sourceUnion:Logic {name:"hook_summary_source_union_and_deduplication",type:"logic",language:"sql"}),(runStateJoin:Logic {name:"hook_summary_latest_run_state_join",type:"logic",language:"sql"}),(incompleteProjectionCount:Logic {name:"hook_summary_incomplete_run_projection_count",type:"logic",language:"sql"});
+//! CREATE (m)-[:CONTAINS]->(summaryQuery),(m)-[:CONTAINS]->(summaryGroup),(m)-[:CONTAINS]->(summary),(summary)-[:CONTAINS]->(sourceUnion),(summary)-[:CONTAINS]->(runStateJoin),(summary)-[:CONTAINS]->(incompleteProjectionCount),(rt)-[:CALLS]->(summary),(summary)-[:USES]->(summaryGroup),(summaryQuery)-[:USES]->(summaryDays);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"hook_policies",type:"module"}),(normalizeProject:Function {name:"normalize_project_document",type:"function"}),(normalizeWorktree:Function {name:"normalize_worktree_document",type:"function"}),(tests:Module {name:"tests",type:"module"});
+//! CREATE (phaseGate:Function {name:"ensure_phase_producers_available",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(phaseGateTest:Function {name:"publish_rejects_run_admission_without_producer",type:"function",language:"rust",visibility:"private",complexity:"moderate"});
+//! CREATE (m)-[:CONTAINS]->(phaseGate),(tests)-[:CONTAINS]->(phaseGateTest),(normalizeProject)-[:CALLS]->(phaseGate),(normalizeWorktree)-[:CALLS]->(phaseGate),(phaseGateTest)-[:CALLS]->(normalizeProject),(phaseGateTest)-[:CALLS]->(normalizeWorktree);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"hook_policies",type:"module"}),(listEvents:Function {name:"list_hook_events",type:"function"}),(summary:Function {name:"summarize_hook_events",type:"function"}),(tests:Module {name:"tests",type:"module"});
+//! CREATE (phaseCoverage:Function {name:"hook_phase_coverage",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(phaseCoverageTest:Function {name:"hook_phase_coverage_tracks_the_installed_run_admission_producer",type:"function",language:"rust",visibility:"private",complexity:"simple"});
+//! CREATE (m)-[:CONTAINS]->(phaseCoverage),(tests)-[:CONTAINS]->(phaseCoverageTest),(listEvents)-[:CALLS]->(phaseCoverage),(summary)-[:CALLS]->(phaseCoverage),(phaseCoverageTest)-[:CALLS]->(phaseCoverage);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"hook_policies",type:"module"}),(load:Function {name:"load_verified_effective_snapshot",type:"function"}),(tests:Module {name:"tests",type:"module"}),(hookSetTest:Function {name:"execution_profile_hook_set_uses_effective_overlay_identity_and_digest",type:"function"});
+//! CREATE (admission:Type {name:"EffectiveHookAdmissionSnapshot",type:"type_alias",language:"rust"}),(profileHookSet:Function {name:"execution_profile_hook_set_snapshot",type:"function",language:"rust",visibility:"private"}),(loadAdmission:Function {name:"load_verified_effective_run_snapshot",type:"function",language:"rust",visibility:"pub(super)"});
+//! CREATE (m)-[:CONTAINS]->(admission),(m)-[:CONTAINS]->(profileHookSet),(m)-[:CONTAINS]->(loadAdmission),(loadAdmission)-[:CALLS]->(load),(loadAdmission)-[:CALLS]->(profileHookSet),(tests)-[:CONTAINS]->(hookSetTest),(hookSetTest)-[:CALLS]->(profileHookSet);
 use axum::{
     Json, Router,
     body::Bytes,
-    extract::{DefaultBodyLimit, Path, State},
+    extract::{DefaultBodyLimit, Path, Query, State},
+    http::header::{CACHE_CONTROL, VARY},
     routing::{get, post, put},
 };
-use chrono::{DateTime, Utc};
-use domain_hook::{HookPolicyDocument, MAX_POLICY_DOCUMENT_BYTES};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use chrono::{DateTime, Duration, Utc};
+use domain_agent::execution_profile::HookSetSnapshot;
+use domain_hook::{HookPhase, HookPolicyDocument, MAX_POLICY_DOCUMENT_BYTES};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{FromRow, Postgres, Transaction};
@@ -140,6 +167,9 @@ struct PolicyRow {
     inherited_project_policy_set_id: Option<Uuid>,
     valid_to: Option<DateTime<Utc>>,
 }
+
+pub(super) type EffectiveHookAdmissionSnapshot =
+    (domain_hook::VerifiedHookPolicySnapshot, HookSetSnapshot);
 
 #[derive(Debug, FromRow)]
 struct DraftRow {
@@ -194,11 +224,79 @@ struct RebaseStageRow {
     policy_document: Value,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HookEventsQuery {
+    limit: Option<i64>,
+    cursor: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HookSummaryQuery {
+    window_days: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct HookEventCursor {
+    version: u8,
+    project_id: Uuid,
+    occurred_at: DateTime<Utc>,
+    event_id: Uuid,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+struct HookEventProjection {
+    event_id: Uuid,
+    worktree_id: Option<Uuid>,
+    work_item_id: Option<Uuid>,
+    run_id: Option<Uuid>,
+    actor_id: Uuid,
+    correlation_id: Uuid,
+    source_kind: String,
+    hook_phase: String,
+    hook_decision: String,
+    hook_reason_code: String,
+    matched_rule_id: Option<Uuid>,
+    project_policy_version: Option<i64>,
+    worktree_policy_version: Option<i64>,
+    evaluator_api_version: i16,
+    policy_digest: Option<String>,
+    evaluated_condition_count: i32,
+    duration_ms: i64,
+    timed_out: bool,
+    occurred_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+struct HookSummaryGroup {
+    hook_phase: String,
+    hook_decision: String,
+    event_count: i64,
+    run_linked_event_count: i64,
+    run_state_joined_event_count: i64,
+    run_state_counts: Value,
+    timeout_count: i64,
+    duration_total_ms: i64,
+    average_duration_ms: f64,
+    latest_occurred_at: DateTime<Utc>,
+}
+
+const MAX_HOOK_EVENT_CURSOR_BYTES: usize = 512;
+
 pub(super) fn router() -> Router<GroupApiState> {
     Router::new()
         .route(
             "/api/v1/projects/{project_id}/hook-policy",
             get(get_project_policy),
+        )
+        .route(
+            "/api/v1/projects/{project_id}/hook-events",
+            get(list_hook_events),
+        )
+        .route(
+            "/api/v1/projects/{project_id}/hook-events/summary",
+            get(summarize_hook_events),
         )
         .route(
             "/api/v1/worktrees/{worktree_id}/hook-policy/effective",
@@ -229,6 +327,366 @@ pub(super) fn router() -> Router<GroupApiState> {
             post(rollback_worktree_policy),
         )
         .layer(DefaultBodyLimit::max(MAX_POLICY_REQUEST_BYTES))
+}
+
+async fn list_hook_events(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path(project_id): Path<String>,
+    Query(query): Query<HookEventsQuery>,
+) -> Result<impl axum::response::IntoResponse, GroupApiError> {
+    let project_id = parse_id(&project_id)?;
+    let limit = query.limit.unwrap_or(50).clamp(1, 100) as usize;
+    let cursor = query
+        .cursor
+        .as_deref()
+        .map(decode_hook_event_cursor)
+        .transpose()?;
+    if cursor
+        .as_ref()
+        .is_some_and(|cursor| cursor.project_id != project_id)
+    {
+        return Err(GroupApiError::invalid_request("cursor_scope_mismatch"));
+    }
+
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    authorize_scope(
+        &mut tx,
+        &actor,
+        PolicyScope::Project,
+        Some(project_id),
+        None,
+        Access::Read,
+    )
+    .await?;
+    let mut events = sqlx::query_as::<_, HookEventProjection>(
+        r#"SELECT event_id, worktree_id, work_item_id, run_id, actor_id,
+                  correlation_id, source_kind, hook_phase, hook_decision,
+                  hook_reason_code, matched_rule_id, project_policy_version,
+                  worktree_policy_version, evaluator_api_version, policy_digest,
+                  evaluated_condition_count, duration_ms, timed_out, occurred_at
+           FROM multica.hook_execution_event
+           WHERE tenant_id = $1 AND project_id = $2
+             AND ($3::TIMESTAMPTZ IS NULL OR (occurred_at, event_id) < ($3, $4))
+           ORDER BY occurred_at DESC, event_id DESC
+           LIMIT $5"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(cursor.as_ref().map(|value| value.occurred_at))
+    .bind(cursor.as_ref().map(|value| value.event_id))
+    .bind((limit + 1) as i64)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+
+    let has_more = events.len() > limit;
+    events.truncate(limit);
+    let next_cursor = if has_more {
+        events
+            .last()
+            .map(|event| encode_hook_event_cursor(project_id, event))
+            .transpose()?
+    } else {
+        None
+    };
+    let (instrumented_phases, not_yet_instrumented_phases) =
+        hook_phase_coverage(state.run_admission_producer_available());
+    let body = json!({
+        "events": events,
+        "next_cursor": next_cursor,
+        "coverage": {
+            "scope": "hook_execution_event_ledger",
+            "status": "partial",
+            "reported_percentage": Value::Null,
+            "instrumented_phases": instrumented_phases,
+            "not_yet_instrumented_phases": not_yet_instrumented_phases,
+            "note": "Uninstrumented phases are unknown, not zero-risk or zero-volume."
+        }
+    });
+    Ok((
+        [(CACHE_CONTROL, "no-store"), (VARY, "Authorization")],
+        Json(body),
+    ))
+}
+
+async fn summarize_hook_events(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path(project_id): Path<String>,
+    Query(query): Query<HookSummaryQuery>,
+) -> Result<impl axum::response::IntoResponse, GroupApiError> {
+    let project_id = parse_id(&project_id)?;
+    let window_days = query.window_days.unwrap_or(30);
+    if !(1..=90).contains(&window_days) {
+        return Err(GroupApiError::invalid_request(
+            "invalid_hook_summary_window",
+        ));
+    }
+
+    let window_end = Utc::now();
+    let window_start = window_end - Duration::days(window_days);
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    authorize_scope(
+        &mut tx,
+        &actor,
+        PolicyScope::Project,
+        Some(project_id),
+        None,
+        Access::Read,
+    )
+    .await?;
+    let groups = sqlx::query_as::<_, HookSummaryGroup>(
+        r#"WITH candidate_run_events AS (
+               SELECT event_id, tenant_id, project_id, work_item_id, run_id,
+                      hook_phase, hook_decision, hook_duration_ms, hook_timed_out, occurred_at
+               FROM multica.task_execution_run_event
+               WHERE tenant_id = $1 AND project_id = $2
+                 AND occurred_at >= $3 AND occurred_at < $4
+                 AND event_type = 'hook_evaluated'
+           ), source_events AS (
+               SELECT event_id, tenant_id, project_id, work_item_id, run_id,
+                      hook_phase, hook_decision, duration_ms, timed_out, occurred_at
+               FROM multica.hook_execution_event
+               WHERE tenant_id = $1 AND project_id = $2
+                 AND occurred_at >= $3 AND occurred_at < $4
+               UNION ALL
+               SELECT run_event.event_id, run_event.tenant_id, run_event.project_id,
+                      run_event.work_item_id, run_event.run_id,
+                      run_event.hook_phase, run_event.hook_decision,
+                      run_event.hook_duration_ms AS duration_ms,
+                      run_event.hook_timed_out AS timed_out, run_event.occurred_at
+               FROM candidate_run_events run_event
+               WHERE run_event.hook_phase IS NOT NULL
+                 AND run_event.hook_decision IS NOT NULL
+                 AND run_event.hook_duration_ms IS NOT NULL
+                 AND run_event.hook_timed_out IS NOT NULL
+                 AND NOT EXISTS (
+                     SELECT 1 FROM multica.hook_execution_event ledger_event
+                     WHERE ledger_event.tenant_id = run_event.tenant_id
+                       AND ledger_event.event_id = run_event.event_id
+                 )
+           ), run_keys AS (
+               SELECT DISTINCT tenant_id, project_id, work_item_id, run_id
+               FROM source_events
+               WHERE run_id IS NOT NULL
+           ), run_states AS (
+               SELECT run_key.tenant_id, run_key.project_id, run_key.work_item_id,
+                      run_key.run_id, latest_state.execution_state AS run_state
+               FROM run_keys run_key
+               LEFT JOIN LATERAL (
+                   SELECT run_event_state.execution_state
+                   FROM multica.task_execution_run_event run_event_state
+                   WHERE run_event_state.tenant_id = run_key.tenant_id
+                     AND run_event_state.project_id = run_key.project_id
+                     AND run_event_state.work_item_id = run_key.work_item_id
+                     AND run_event_state.run_id = run_key.run_id
+                     AND run_event_state.execution_state IS NOT NULL
+                   ORDER BY run_event_state.occurred_at DESC, run_event_state.event_id DESC
+                   LIMIT 1
+               ) latest_state ON TRUE
+           ), with_run_state AS (
+               SELECT source_event.*, run_states.run_state
+               FROM source_events source_event
+               LEFT JOIN run_states
+                 ON run_states.tenant_id = source_event.tenant_id
+                AND run_states.project_id = source_event.project_id
+                AND run_states.work_item_id = source_event.work_item_id
+                AND run_states.run_id = source_event.run_id
+           ), run_state_group_counts AS (
+               SELECT hook_phase, hook_decision, COALESCE(run_state, 'unknown') AS run_state,
+                      COUNT(*) AS event_count
+               FROM with_run_state
+               WHERE run_id IS NOT NULL
+               GROUP BY hook_phase, hook_decision, COALESCE(run_state, 'unknown')
+           ), run_state_group_json AS (
+               SELECT hook_phase, hook_decision,
+                      jsonb_object_agg(run_state, event_count) AS run_state_counts
+               FROM run_state_group_counts
+               GROUP BY hook_phase, hook_decision
+           )
+           SELECT source_event.hook_phase, source_event.hook_decision,
+                  COUNT(*) AS event_count,
+                  COUNT(*) FILTER (WHERE source_event.run_id IS NOT NULL) AS run_linked_event_count,
+                  COUNT(*) FILTER (
+                      WHERE source_event.run_id IS NOT NULL AND source_event.run_state IS NOT NULL
+                  ) AS run_state_joined_event_count,
+                  COALESCE(run_state_group_json.run_state_counts, '{}'::JSONB) AS run_state_counts,
+                  COUNT(*) FILTER (WHERE source_event.timed_out) AS timeout_count,
+                  COALESCE(SUM(source_event.duration_ms), 0)::BIGINT AS duration_total_ms,
+                  AVG(source_event.duration_ms)::DOUBLE PRECISION AS average_duration_ms,
+                  MAX(source_event.occurred_at) AS latest_occurred_at
+           FROM with_run_state source_event
+           LEFT JOIN run_state_group_json
+             ON run_state_group_json.hook_phase = source_event.hook_phase
+            AND run_state_group_json.hook_decision = source_event.hook_decision
+           GROUP BY source_event.hook_phase, source_event.hook_decision,
+                    run_state_group_json.run_state_counts
+           ORDER BY source_event.hook_phase, source_event.hook_decision"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(window_start)
+    .bind(window_end)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    let excluded_incomplete_run_event_count = sqlx::query_scalar::<_, i64>(
+        r#"SELECT COUNT(*)
+           FROM multica.task_execution_run_event run_event
+           WHERE run_event.tenant_id = $1 AND run_event.project_id = $2
+             AND run_event.occurred_at >= $3 AND run_event.occurred_at < $4
+             AND run_event.event_type = 'hook_evaluated'
+             AND (run_event.hook_phase IS NULL OR run_event.hook_decision IS NULL
+                  OR run_event.hook_duration_ms IS NULL OR run_event.hook_timed_out IS NULL)
+             AND NOT EXISTS (
+                 SELECT 1 FROM multica.hook_execution_event ledger_event
+                 WHERE ledger_event.tenant_id = run_event.tenant_id
+                   AND ledger_event.event_id = run_event.event_id
+             )"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(window_start)
+    .bind(window_end)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+
+    let observed_event_count = groups.iter().map(|group| group.event_count).sum::<i64>();
+    let run_linked_event_count = groups
+        .iter()
+        .map(|group| group.run_linked_event_count)
+        .sum::<i64>();
+    let run_state_joined_event_count = groups
+        .iter()
+        .map(|group| group.run_state_joined_event_count)
+        .sum::<i64>();
+    let run_state_join = if run_linked_event_count == 0 {
+        "no_samples"
+    } else if run_state_joined_event_count == run_linked_event_count {
+        "complete"
+    } else {
+        "partial"
+    };
+    let timeout_count = groups.iter().map(|group| group.timeout_count).sum::<i64>();
+    let duration_total_ms = groups
+        .iter()
+        .map(|group| group.duration_total_ms)
+        .sum::<i64>();
+    let (instrumented_phases, not_yet_instrumented_phases) =
+        hook_phase_coverage(state.run_admission_producer_available());
+    let body = json!({
+        "metric_version": "hook_execution_summary_v2",
+        "window": {
+            "days": window_days,
+            "from": window_start,
+            "to": window_end
+        },
+        "observed_event_count": observed_event_count,
+        "run_linked_event_count": run_linked_event_count,
+        "run_state_joined_event_count": run_state_joined_event_count,
+        "excluded_incomplete_run_event_count": excluded_incomplete_run_event_count,
+        "timeout_count": timeout_count,
+        "duration_total_ms": duration_total_ms,
+        "groups": groups,
+        "coverage": {
+            "scope": "hook_execution_event_and_task_execution_run_event",
+            "status": "partial",
+            "reported_percentage": Value::Null,
+            "instrumented_phases": instrumented_phases,
+            "not_yet_instrumented_phases": not_yet_instrumented_phases,
+            "run_state_join": run_state_join,
+            "note": "Summary merges complete Hook ledger rows with complete hook_evaluated RunEvent rows by shared event identity; latest Run state is joined by tenant, Project, Task, and Run. Other producers and unobserved phases remain incomplete or unknown."
+        },
+        "formulas": {
+            "observed_event_count": "COUNT(*) after union and deduplication of Hook ledger and complete hook_evaluated RunEvent projections for the Project and window",
+            "run_linked_event_count": "COUNT(*) where run_id IS NOT NULL in the deduplicated observed rows",
+            "run_state_joined_event_count": "COUNT(*) where run_id IS NOT NULL and a latest execution_state is present for the same tenant, Project, Task, and Run",
+            "excluded_incomplete_run_event_count": "COUNT(*) of unmirrored hook_evaluated RunEvent rows missing phase, decision, duration, or timeout facts",
+            "run_state_counts": "Counts of Run-linked Hook events grouped by each Run's latest known execution_state; missing state is unknown",
+            "timeout_count": "COUNT(*) FILTER (WHERE timed_out) in the same observed rows",
+            "duration_total_ms": "SUM(duration_ms) in the same observed rows",
+            "grouping": ["hook_phase", "hook_decision"],
+            "deduplication": "RunEvent projections are suppressed when tenant_id and event_id match a Hook ledger row; dual-write producers must reuse the same event_id and occurred_at"
+        }
+    });
+    Ok((
+        [(CACHE_CONTROL, "no-store"), (VARY, "Authorization")],
+        Json(body),
+    ))
+}
+
+fn decode_hook_event_cursor(value: &str) -> Result<HookEventCursor, GroupApiError> {
+    if value.is_empty() || value.len() > MAX_HOOK_EVENT_CURSOR_BYTES {
+        return Err(GroupApiError::invalid_request("invalid_hook_event_cursor"));
+    }
+    let bytes = URL_SAFE_NO_PAD
+        .decode(value)
+        .map_err(|_| GroupApiError::invalid_request("invalid_hook_event_cursor"))?;
+    let cursor: HookEventCursor = serde_json::from_slice(&bytes)
+        .map_err(|_| GroupApiError::invalid_request("invalid_hook_event_cursor"))?;
+    if cursor.version != 1 {
+        return Err(GroupApiError::invalid_request(
+            "unsupported_hook_event_cursor",
+        ));
+    }
+    Ok(cursor)
+}
+
+fn encode_hook_event_cursor(
+    project_id: Uuid,
+    event: &HookEventProjection,
+) -> Result<String, GroupApiError> {
+    let cursor = HookEventCursor {
+        version: 1,
+        project_id,
+        occurred_at: event.occurred_at,
+        event_id: event.event_id,
+    };
+    let bytes = serde_json::to_vec(&cursor).map_err(|_| GroupApiError::internal())?;
+    Ok(URL_SAFE_NO_PAD.encode(bytes))
+}
+
+fn hook_phase_coverage(
+    run_admission_producer_available: bool,
+) -> (Vec<&'static str>, Vec<&'static str>) {
+    if run_admission_producer_available {
+        (
+            vec!["worktree_archive", "run_admission"],
+            vec![
+                "tool",
+                "validation",
+                "review",
+                "worktree_cleanup",
+                "after_commit",
+            ],
+        )
+    } else {
+        (
+            vec!["worktree_archive"],
+            vec![
+                "run_admission",
+                "tool",
+                "validation",
+                "review",
+                "worktree_cleanup",
+                "after_commit",
+            ],
+        )
+    }
 }
 
 async fn get_project_policy(
@@ -270,7 +728,7 @@ async fn get_worktree_effective_policy(
     )
     .await?;
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
-    Ok(Json(result))
+    Ok(Json(with_producer_capabilities(&state, result)))
 }
 
 async fn save_project_draft(
@@ -422,7 +880,19 @@ async fn read_policy_scope(
     .await?;
     let result = read_policy_in_tx(&mut tx, actor, scope, project_id, worktree_id).await?;
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
-    Ok(Json(result))
+    Ok(Json(with_producer_capabilities(state, result)))
+}
+
+fn with_producer_capabilities(state: &GroupApiState, mut response: Value) -> Value {
+    if let Some(object) = response.as_object_mut() {
+        object.insert(
+            "producer_capabilities".to_owned(),
+            json!({
+                "run_admission": state.run_admission_producer_available(),
+            }),
+        );
+    }
+    response
 }
 
 async fn read_policy_in_tx(
@@ -766,6 +1236,7 @@ async fn publish_draft(
     }
     let document =
         decode_document(&draft.policy_document).map_err(|_| GroupApiError::internal())?;
+    let run_admission_producer_available = state.run_admission_producer_available();
     let new_policy_set_id = if scope == PolicyScope::Project {
         publish_project_document(
             &mut tx,
@@ -777,6 +1248,7 @@ async fn publish_draft(
             None,
             body.correlation_id,
             "policy_published",
+            run_admission_producer_available,
         )
         .await?
     } else {
@@ -792,6 +1264,7 @@ async fn publish_draft(
             None,
             body.correlation_id,
             "policy_published",
+            run_admission_producer_available,
         )
         .await?
     };
@@ -897,6 +1370,7 @@ async fn rollback_policy(
         ));
     }
     let mut document = verify_stored_policy(&target, actor.tenant_id, project_id, worktree_id)?;
+    let run_admission_producer_available = state.run_admission_producer_available();
     let new_policy_set_id = if scope == PolicyScope::Project {
         publish_project_document(
             &mut tx,
@@ -908,6 +1382,7 @@ async fn rollback_policy(
             Some(target.policy_set_id),
             body.correlation_id,
             "policy_rolled_back",
+            run_admission_producer_available,
         )
         .await?
     } else {
@@ -942,6 +1417,7 @@ async fn rollback_policy(
             Some(target.policy_set_id),
             body.correlation_id,
             "policy_rolled_back",
+            run_admission_producer_available,
         )
         .await?
     };
@@ -962,6 +1438,7 @@ async fn publish_project_document(
     rollback_source: Option<Uuid>,
     correlation_id: Uuid,
     event_type: &'static str,
+    run_admission_producer_available: bool,
 ) -> Result<Uuid, GroupApiError> {
     let current_project_doc = current
         .as_ref()
@@ -973,8 +1450,13 @@ async fn publish_project_document(
         .unwrap_or(0)
         .checked_add(1)
         .ok_or_else(GroupApiError::internal)?;
-    let project_document =
-        normalize_project_document(document, actor.tenant_id, project_id, next_version)?;
+    let project_document = normalize_project_document(
+        document,
+        actor.tenant_id,
+        project_id,
+        next_version,
+        run_admission_producer_available,
+    )?;
     let rebased_worktree_count = if let Some(current) = current.as_ref() {
         stage_project_overlay_rebases(
             tx,
@@ -1034,6 +1516,7 @@ async fn publish_worktree_document(
     rollback_source: Option<Uuid>,
     correlation_id: Uuid,
     event_type: &'static str,
+    run_admission_producer_available: bool,
 ) -> Result<Uuid, GroupApiError> {
     let project =
         current_project.ok_or_else(|| GroupApiError::conflict("project_policy_missing"))?;
@@ -1052,6 +1535,7 @@ async fn publish_worktree_document(
         worktree_id,
         &project_document,
         next_version,
+        run_admission_producer_available,
     )?;
     if let Some(current) = current_worktree.as_ref() {
         if current.inherited_project_policy_set_id != Some(project.policy_set_id) {
@@ -1360,11 +1844,27 @@ fn validate_document_scope(
     Ok(())
 }
 
+fn ensure_phase_producers_available(
+    document: &HookPolicyDocument,
+    run_admission_producer_available: bool,
+) -> Result<(), GroupApiError> {
+    let has_unavailable_run_admission = document
+        .project_rules
+        .iter()
+        .chain(document.worktree_rules.iter())
+        .any(|rule| rule.phase == Some(HookPhase::BeforeRunAdmission));
+    if has_unavailable_run_admission && !run_admission_producer_available {
+        return Err(GroupApiError::conflict("hook_phase_producer_unavailable"));
+    }
+    Ok(())
+}
+
 fn normalize_project_document(
     mut document: HookPolicyDocument,
     tenant_id: Uuid,
     project_id: Uuid,
     version: i64,
+    run_admission_producer_available: bool,
 ) -> Result<HookPolicyDocument, GroupApiError> {
     document.tenant_id = tenant_id.into_bytes();
     document.project_id = project_id.into_bytes();
@@ -1372,6 +1872,7 @@ fn normalize_project_document(
     document.project_version = u64::try_from(version).map_err(|_| GroupApiError::internal())?;
     document.worktree_version = None;
     document.worktree_rules.clear();
+    ensure_phase_producers_available(&document, run_admission_producer_available)?;
     document.digest = document
         .computed_digest()
         .map_err(|_| GroupApiError::invalid_request("invalid_hook_policy"))?;
@@ -1389,6 +1890,7 @@ fn normalize_worktree_document(
     worktree_id: Uuid,
     project_document: &HookPolicyDocument,
     version: i64,
+    run_admission_producer_available: bool,
 ) -> Result<HookPolicyDocument, GroupApiError> {
     document.tenant_id = tenant_id.into_bytes();
     document.project_id = project_id.into_bytes();
@@ -1399,6 +1901,7 @@ fn normalize_worktree_document(
     document
         .project_rules
         .clone_from(&project_document.project_rules);
+    ensure_phase_producers_available(&document, run_admission_producer_available)?;
     document.digest = document
         .computed_digest()
         .map_err(|_| GroupApiError::invalid_request("invalid_hook_policy"))?;
@@ -1440,6 +1943,80 @@ async fn load_current_policy(
         .map_err(|_| GroupApiError::internal())
 }
 
+/// Map the verified effective Project/Worktree policy to the Profile's pinned HookSet identity.
+fn execution_profile_hook_set_snapshot(
+    project_policy_set_id: Uuid,
+    worktree_policy_set_id: Option<Uuid>,
+    policy: &domain_hook::VerifiedHookPolicySnapshot,
+) -> HookSetSnapshot {
+    HookSetSnapshot {
+        hook_set_id: worktree_policy_set_id.unwrap_or(project_policy_set_id),
+        version: policy.effective_version(),
+        effective_digest: hex::encode(policy.digest()),
+    }
+}
+
+/// Load the verified effective policy and its stable identity for Run/Profile admission.
+/// Missing Project baseline remains `None`, which admission treats as unavailable.
+pub(super) async fn load_verified_effective_run_snapshot(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    project_id: Uuid,
+    worktree_id: Uuid,
+) -> Result<Option<EffectiveHookAdmissionSnapshot>, GroupApiError> {
+    let Some(project_row) =
+        load_current_policy(tx, tenant_id, project_id, PolicyScope::Project, None, false).await?
+    else {
+        return Ok(None);
+    };
+    let project_document = verify_stored_policy(&project_row, tenant_id, project_id, None)?;
+    let worktree_row = load_current_policy(
+        tx,
+        tenant_id,
+        project_id,
+        PolicyScope::Worktree,
+        Some(worktree_id),
+        false,
+    )
+    .await?;
+    let effective_document = if let Some(row) = worktree_row.as_ref() {
+        if row.inherited_project_policy_set_id != Some(project_row.policy_set_id) {
+            return Err(GroupApiError::conflict("worktree_policy_rebase_required"));
+        }
+        let document = verify_stored_policy(row, tenant_id, project_id, Some(worktree_id))?;
+        if document.project_version != project_document.project_version
+            || document.project_rules != project_document.project_rules
+        {
+            return Err(GroupApiError::internal());
+        }
+        document
+    } else {
+        project_document
+    };
+    let policy = effective_document
+        .verify()
+        .map_err(|_| GroupApiError::internal())?;
+    let hook_set = execution_profile_hook_set_snapshot(
+        project_row.policy_set_id,
+        worktree_row.map(|row| row.policy_set_id),
+        &policy,
+    );
+    Ok(Some((policy, hook_set)))
+}
+
+/// Load the immutable effective policy for Hook evaluation callers.
+pub(super) async fn load_verified_effective_snapshot(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    project_id: Uuid,
+    worktree_id: Uuid,
+) -> Result<Option<domain_hook::VerifiedHookPolicySnapshot>, GroupApiError> {
+    Ok(
+        load_verified_effective_run_snapshot(tx, tenant_id, project_id, worktree_id)
+            .await?
+            .map(|(policy, _hook_set)| policy),
+    )
+}
 async fn load_current_draft(
     tx: &mut Transaction<'_, Postgres>,
     tenant_id: Uuid,
@@ -1632,6 +2209,64 @@ async fn insert_audit(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use domain_hook::{HookDecision, HookReasonCode, HookRule};
+
+    #[test]
+    fn hook_phase_coverage_tracks_the_installed_run_admission_producer() {
+        let (without_run, pending_without_run) = hook_phase_coverage(false);
+        assert_eq!(without_run, vec!["worktree_archive"]);
+        assert!(pending_without_run.contains(&"run_admission"));
+
+        let (with_run, pending_with_run) = hook_phase_coverage(true);
+        assert_eq!(with_run, vec!["worktree_archive", "run_admission"]);
+        assert!(!pending_with_run.contains(&"run_admission"));
+    }
+
+    #[test]
+    fn hook_event_cursor_is_project_scoped_and_versioned() {
+        let project_id = Uuid::new_v4();
+        let event = HookEventProjection {
+            event_id: Uuid::new_v4(),
+            worktree_id: Some(Uuid::new_v4()),
+            work_item_id: None,
+            run_id: None,
+            actor_id: Uuid::new_v4(),
+            correlation_id: Uuid::new_v4(),
+            source_kind: "worktree_lifecycle".to_owned(),
+            hook_phase: "worktree_archive".to_owned(),
+            hook_decision: "allow".to_owned(),
+            hook_reason_code: "allowed_by_builtin_baseline".to_owned(),
+            matched_rule_id: None,
+            project_policy_version: Some(1),
+            worktree_policy_version: None,
+            evaluator_api_version: 1,
+            policy_digest: None,
+            evaluated_condition_count: 0,
+            duration_ms: 0,
+            timed_out: false,
+            occurred_at: Utc::now(),
+        };
+
+        let encoded = encode_hook_event_cursor(project_id, &event).expect("encoded cursor");
+        let decoded = decode_hook_event_cursor(&encoded).expect("decoded cursor");
+
+        assert_eq!(decoded.version, 1);
+        assert_eq!(decoded.project_id, project_id);
+        assert_eq!(decoded.event_id, event.event_id);
+        assert_eq!(decoded.occurred_at, event.occurred_at);
+        assert!(decode_hook_event_cursor(&"x".repeat(MAX_HOOK_EVENT_CURSOR_BYTES + 1)).is_err());
+    }
+
+    #[test]
+    fn hook_event_query_rejects_unknown_fields() {
+        assert!(
+            serde_json::from_value::<HookEventsQuery>(json!({
+                "limit": 25,
+                "offset": 100
+            }))
+            .is_err()
+        );
+    }
 
     fn policy_document(
         tenant_id: Uuid,
@@ -1657,13 +2292,48 @@ mod tests {
     }
 
     #[test]
+    fn execution_profile_hook_set_uses_effective_overlay_identity_and_digest() {
+        let tenant_id = Uuid::new_v4();
+        let project_id = Uuid::new_v4();
+        let project_set_id = Uuid::new_v4();
+        let worktree_set_id = Uuid::new_v4();
+        let overlay_policy =
+            policy_document(tenant_id, project_id, Some(Uuid::new_v4()), 6, Some(9))
+                .verify()
+                .expect("verified effective overlay policy");
+
+        let overlay = execution_profile_hook_set_snapshot(
+            project_set_id,
+            Some(worktree_set_id),
+            &overlay_policy,
+        );
+        assert_eq!(overlay.hook_set_id, worktree_set_id);
+        assert_eq!(overlay.version, 9);
+        assert_eq!(
+            overlay.effective_digest,
+            hex::encode(overlay_policy.digest())
+        );
+
+        let project_policy = policy_document(tenant_id, project_id, None, 6, None)
+            .verify()
+            .expect("verified Project policy");
+        let project = execution_profile_hook_set_snapshot(project_set_id, None, &project_policy);
+        assert_eq!(project.hook_set_id, project_set_id);
+        assert_eq!(project.version, 6);
+        assert_eq!(
+            project.effective_digest,
+            hex::encode(project_policy.digest())
+        );
+    }
+
+    #[test]
     fn project_normalization_recomputes_digest_for_next_revision() {
         let tenant_id = Uuid::new_v4();
         let project_id = Uuid::new_v4();
         let document = policy_document(tenant_id, project_id, None, 1, None);
 
-        let normalized =
-            normalize_project_document(document, tenant_id, project_id, 2).expect("valid baseline");
+        let normalized = normalize_project_document(document, tenant_id, project_id, 2, false)
+            .expect("valid baseline");
 
         assert_eq!(normalized.project_version, 2);
         assert_eq!(normalized.worktree_id, None);
@@ -1679,14 +2349,84 @@ mod tests {
         let baseline = policy_document(tenant_id, project_id, None, 4, None);
         let overlay = policy_document(tenant_id, project_id, Some(worktree_id), 3, Some(1));
 
-        let normalized =
-            normalize_worktree_document(overlay, tenant_id, project_id, worktree_id, &baseline, 2)
-                .expect("valid overlay");
+        let normalized = normalize_worktree_document(
+            overlay,
+            tenant_id,
+            project_id,
+            worktree_id,
+            &baseline,
+            2,
+            false,
+        )
+        .expect("valid overlay");
 
         assert_eq!(normalized.project_version, 4);
         assert_eq!(normalized.worktree_version, Some(2));
         assert_eq!(normalized.worktree_id, Some(worktree_id.into_bytes()));
         assert!(normalized.clone().verify().is_ok());
+    }
+
+    #[test]
+    fn publish_rejects_run_admission_without_producer() {
+        let tenant_id = Uuid::new_v4();
+        let project_id = Uuid::new_v4();
+        let worktree_id = Uuid::new_v4();
+        let mut baseline = policy_document(tenant_id, project_id, None, 1, None);
+        baseline.evaluator_api_version = 2;
+        baseline.project_rules.push(HookRule {
+            rule_id: [9; 16],
+            phase: Some(HookPhase::BeforeRunAdmission),
+            priority: 1,
+            enabled: true,
+            decision: HookDecision::Deny,
+            reason_code: HookReasonCode::RuleDenied,
+            conditions: Vec::new(),
+        });
+        baseline.digest = baseline.computed_digest().expect("phase policy digest");
+
+        assert!(
+            normalize_project_document(baseline.clone(), tenant_id, project_id, 2, false).is_err()
+        );
+
+        let overlay = policy_document(tenant_id, project_id, Some(worktree_id), 1, Some(1));
+        assert!(
+            normalize_worktree_document(
+                overlay,
+                tenant_id,
+                project_id,
+                worktree_id,
+                &baseline,
+                2,
+                false,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn publish_allows_run_admission_only_when_producer_is_available() {
+        let tenant_id = Uuid::new_v4();
+        let project_id = Uuid::new_v4();
+        let mut baseline = policy_document(tenant_id, project_id, None, 1, None);
+        baseline.evaluator_api_version = 2;
+        baseline.project_rules.push(HookRule {
+            rule_id: [10; 16],
+            phase: Some(HookPhase::BeforeRunAdmission),
+            priority: 1,
+            enabled: true,
+            decision: HookDecision::Deny,
+            reason_code: HookReasonCode::RuleDenied,
+            conditions: Vec::new(),
+        });
+        baseline.digest = baseline.computed_digest().expect("phase policy digest");
+
+        let normalized = normalize_project_document(baseline, tenant_id, project_id, 2, true)
+            .expect("installed Run producer permits phase publication");
+        assert!(normalized.clone().verify().is_ok());
+        assert_eq!(
+            normalized.project_rules[0].phase,
+            Some(HookPhase::BeforeRunAdmission)
+        );
     }
 
     #[test]

@@ -63,7 +63,7 @@ pub struct DbCanvasEntity {
 }
 
 /// DB Adapter trait (P4 抽象层)
-/// 
+///
 /// 本 trait 抽象 3 类查询, P4.1+ 实现 PostgresDb, P4.2+ 实现 SqliteDb.
 /// 当前 PR 提供 MockDb impl (4 worktrees + 4 work items + 4 canvas entities)
 /// 与 PR #240 mock 数量对齐, 保证 frontend 行为一致.

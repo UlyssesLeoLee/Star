@@ -1,13 +1,13 @@
 # SRS-MULTICA-HOOK-001
 
-> **Multica Hook 域要件定义书 v0.5.1** (沿用 Advanced Settings Hooks tab；新增渡口 Rust-native 强制引擎、可视化策略配置、Project/Worktree scope 与 Run/BI 事实联动。v0.1-v0.4 的 Python/Mavis handler 设计保留作历史兼容参考，不再作为安全关键执行核心)
+> **Multica Hook 域要件定义书 v0.5.6** (沿用 ULYS-235 Advanced Settings Hooks tab；补充条件式 Run admission producer/事务双写与当前 production adapter 缺口)
 
-> - 状态: 🟡 Draft v0.5.1 (2026-09-30 JST，Run query requirement trace synchronization)
+> - 状态: 🟡 Draft v0.5.6 (2026-10-01 JST，Phase 9D-5b conditional Run admission producer contract)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联基本設計書: [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) v0.5.1
-> - 关联詳細設計書: [`docs/detailed-design/DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.1
+> - 关联基本設計書: [docs/design/BD-MULTICA-HOOK-001.md](../design/BD-MULTICA-HOOK-001.md) v0.5.8
+> - 关联詳細設計書: [docs/detailed-design/DD-MULTICA-HOOK-001.md](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.14
 > - 平行 SRS: [`docs/requirements/SRS-MULTICA-SKILL-001.md`](../requirements/SRS-MULTICA-SKILL-001.md) v0.1 (skills 域)
 > - 关联 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §1.3 5 类扩展点 (commands / agents / skills / hooks / MCP)
 > - 拍板来源: 2026-09-24 20:xx JST Ulysses "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计"
@@ -26,7 +26,7 @@
 |---|---|
 | 文书 ID | SRS-MULTICA-HOOK-001 |
 | 文书名 | Multica Hook 域要件定義書 (UI 高级设置 → Hooks 标签页) |
-| 版本 | v0.5 |
+| 版本 | v0.5.2 |
 | 作成日 | 2026-09-24 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
@@ -37,7 +37,7 @@
 | 上位文書 | `AGENTS.md` §4 守门硬约束 (守门 #1+#5+#6+#9+#10+#13+#14 v3+#14 v4) |
 | 平行 SRS | `SRS-MULTICA-SKILL-001.md` v0.1 (skills 域, 同走"高级设置"导航 Skills 标签页) |
 | 関連文書 | `docs/automation-design.md` v0.1 + `scripts/automation/console_server.py` v0.1 + `SRS-PRE-TOOL-USE-GUARD-001.md` v0.1 (PreToolUse guard 是 hook 体系下 1 个具体 guard, 本 SRS 是 hook 上位抽象) |
-| 機能数 | 8 機能 (FR-1 ~ FR-8), 業務要件 5 (BR-1 ~ BR-5), 非機能要件 6 類 (NFR-P/A/S/M/T/O), 受理条件 8 (AC-1 ~ AC-8) |
+| 機能数 | 8 機能 (FR-1 ~ FR-8), 業務要件 5 (BR-1 ~ BR-5), 非機能要件 6 類 (NFR-P/A/S/M/T/O), 受理条件 10 (AC-1 ~ AC-10) |
 | データモデル | 3 表 W/T/M 横展 (Hook / Hook Run / Hook Session State, 100% 覆盖 per 守门 #13) |
 | UI 容器 | "高级设置" 导航 (per ULYS-235 拍板) → Skills 标签页 + Hooks 标签页 (per ADR-0026 §1.3 5 类扩展点) |
 
@@ -67,7 +67,7 @@
 - 跟 skills 域并行 (相同导航, 不同标签页, 独立 registry, 共享 session state)
 - 跟 PreToolUse guard 联动 (PreToolUse guard 是 hooks 体系下 1 个具体 builtin guard hook)
 
-本 SRS 与总要件 `docs/requirements.md` v5.20 §50.8D 同步；基本/详细设计见 BD/DD v0.5.1。若 v0.1-v0.4 的 Python runner、用户 handler、任意 transform 或 fail-open 文字与本版冲突，以 v0.5 Rust-native、typed-rule、critical-hook fail-closed 安全边界为准；高级设置导航承接 ULYS-235 的既有决定，不另造 Worktree 级入口。
+本 SRS 与总要件 docs/requirements.md v5.23 §50.8D 同步；基本设计见 BD v0.5.8、详细设计见 DD v0.5.14。若旧版草案与当前 v0.5.6 冲突，以 Rust-native typed evaluator、phase scope、Run admission fence/事务边界与 fail-closed 安全边界为准；Hooks 导航沿用 ULYS-235 的 Advanced Settings 并列标签。
 
 **派生来源**: ULYS-235 (2026-09-24) "hook需求" + ADR-0026 v0.2 §1.3 "5 类扩展点: commands / agents / skills / hooks / MCP" + Claude Code `plugins/hookify` + 9/10 PreToolUse guard 实测 (`SRS-PRE-TOOL-USE-GUARD-001.md` v0.1).
 
@@ -109,8 +109,8 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 | **FR-3** | Hook 注册中心 | 3 项 | P0 | JSON Schema + 热更新 + builtin hook 默认装载 |
 | **FR-4** | Hook 执行引擎 | 3 项 | P0 | 核心同步策略确定性/有界执行与 fail-closed；非关键 post-commit event 有界重试 |
 | **FR-5** | Hook 审计 log | 2 项 | P0 | 全操作留痕, Transaction append-only per 守门 #13 |
-| **FR-6** | Hook UI 标签页 | 3 项 | P0 | "高级设置 → Hooks" 标签页: CRUD + enable/disable + 触发日志 |
-| **FR-7** | 跟 skills 域协调 | 2 项 | P1 | 同导航不同标签页 + 独立 registry + 共享 session state |
+| **FR-6** | Hook UI 标签页 | 3 项 | P0 | Advanced Settings → Hooks typed Project/Worktree policy Builder、Draft/publish/rollback 与策略 Audit；执行事件/BI 在 Phase 9D 接入 |
+| **FR-7** | 跟 Skills/MCP/Plugins 导航协调 | 2 项 | P1 | Advanced Settings 父入口 + 并列 tabs；各域数据独立、仅共享当前授权 UI session |
 | **FR-8** | 测试 / 报告 | 1 项 | P1 | 单元测试 + 集成测试 + 报告 (跟现有 PHASE-*-IMPL-REPORT 一致) |
 | **合計** | | **22 项** | | |
 
@@ -142,6 +142,7 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 ### 1.6 渡口新架构补充（v0.5，优先于旧实现草案）
 
 本版 Hook 是 Star Rust 执行核心内的强约束能力。`HookSet / HookRule / evaluator` 具有稳定 schema、version、digest 与 capability scope；核心 builtin rules 不可关闭，Project policy 作为基线、Worktree policy 只能继承或追加限制。Hook 不授予权限、不改写 Task Contract/验收事实，也不替代 ACL、Domain Command 或独立 Validation。
+Evaluator API v2 将每条 HookRule 绑定到明确 phase。当前原生实现支持 BeforeRunAdmission 与 BeforeWorktreeArchiveCleanup；未填写 phase 的规则固定按 archive/cleanup 解释。已发布的 evaluator API v1 policy 继续按不含 phase 字段的 canonical JSON/digest 校验，只允许用于 archive/cleanup；Run admission 仅支持 ActorAuthorized、LifecycleVersionMatches、RuntimeHealthy facts，其他 phase-specific facts 在策略验证时 fail closed。Phase 9D-5b 已实现条件式 REST producer：Runtime readiness/fence 在锁外有界取得，事务内重授权、重读 scope/lifecycle/policy 并运行 evaluator；Allow 时原子写 Run、HookSet snapshot、Hook ledger 与共享 event_id 的 RunEvent，Deny 时只写无 Task/Run FK 的 ledger。Fence 按完整 request scope 绑定，并要求 Runtime 在 spawn 前消费和重验。由于当前没有生产 TaskCliSessionProvisioner adapter，能力默认关闭：Project/Worktree publish/rollback 服务拒绝包含该 phase 的策略，Builder 依据服务端 capability 禁用该 phase；不能因代码接线存在就将 Run admission 标为生产 coverage。
 
 用户配置入口是已拍板的 **高级设置 → Hooks** tab，与 Skills/MCP/Plugins 共享同一高级设置导航；Hook 不是 Worktree Group App，也不新增 Worktree 树层级。UI 必须提供无代码的可视化 builder：规则/状态列表、结构化事件与条件、有限动作、优先级/范围、继承与覆盖视图、核心规则不可覆盖说明、冲突提示、版本 diff、dry-run/历史事件模拟、审批发布、rollback 与运行日志。禁止任意 Python/JavaScript/shell/动态库和无界 DSL。高级设置管理定义；Worktree Index 展示当前有效 HookSet/version/健康与阻断摘要；Run detail / Project Quality & Improvement 能筛选并下钻 HookEvent。
 
@@ -171,9 +172,9 @@ Worktree archive、binding removal 与 checkout cleanup 之前重新校验 actor
 | **Builtin hook** | STAR 平台内置的 hook (e.g. PreToolUse guard, SessionStart cleanup), 不可禁用 | 本 SRS 自定义 |
 | **User-defined hook** | 用户/项目自定义的 hook, 可启用/禁用 | 本 SRS 自定义 |
 | **高级设置** | STAR UI 顶层导航, 容纳 skills / hooks 等扩展点, 不同能力走不同标签页 | ULYS-235 拍板 |
-| **Hooks 标签页** | "高级设置" 下 hooks 域的 UI 标签页, 含 CRUD + enable/disable + 触发日志 | 本 SRS 自定义 |
+| **Hooks 标签页** | `/settings/advanced/hooks`；高级设置下的 typed policy Builder、发布/回滚与策略 Audit 视图 | ULYS-235 + FR-6 |
 | **Skills 标签页** | "高级设置" 下 skills 域的 UI 标签页 (per SRS-MULTICA-SKILL-001 v0.1) | 平行 SRS |
-| **Hook registry** | hook 注册中心, 单一来源 JSON 文件, per 热更新 | 本 SRS 自定义 |
+| **Hook policy store** | Rust-owned Project/Worktree versioned HookPolicySet；Python JSON 仅兼容迁移源，不是生产 SoR | v0.5 Rust-native contract |
 | **Hook run** | 单次 hook 执行记录, 写审计 log | 本 SRS 自定义 |
 | **Fan-out** | 1 个事件触发 N 个 hook (per-event 多 hook 列表), 串行或并行执行 | 本 SRS 自定义 |
 | **deny** | 安全关键 rule 拒绝本次操作；不改变其它 scope 的授权事实 | v0.5 Rust-native decision |
@@ -353,55 +354,50 @@ Rust 核心可执行 phase 以 §1.6 明列的 Run/tool/validation/review/Worktr
 
 ### FR-6 Hook UI 标签页 (3 项, P0)
 
-**FR-6.1** "高级设置 → Hooks" 标签页布局
+**FR-6.1** Advanced Settings 导航与可视化策略布局
 
-- 位置: 顶层导航 "高级设置" → 标签页栏 "Hooks" (跟 "Skills" 标签页平行)
-- 入口: UI 侧边栏 "高级设置" 菜单项, 含子标签 "Skills" + "Hooks"
-- 路由: `/settings/advanced/hooks` (前端 next.js 路由)
-- 布局: 3 区域
-  - 左: hook 列表 (按 event_type 分组)
-  - 中: hook 详情 (含 name / event / action / handler / priority / timeout / enabled toggle)
-  - 右: 触发日志 (audit log 查询, 按 hook_name / event_type / decision 过滤)
+- 路由：`/settings/advanced/hooks`；容器为 Advanced Settings，与 `Skills`、`MCP`、`Plugins` 并列；不得在 Worktree 树中新增 Hook App。
+- 三个工作区：左侧 Project/Worktree scope 和限制规则列表；中间以结构化表单编辑决策、优先级、启用状态与 typed conditions；右侧展示策略版本、继承/覆盖、草稿状态与策略变更 Audit。
+- 用户规则只能选择 `Deny / RequireHuman / Defer`；条件字段、比较符和值由有限类型目录选择；builtin safety baseline 只读。
+- 页面必须说明当前接入的 Hook phase。Phase 9D 有 archive producer 与条件式 Run admission producer contract；当前没有生产 Run adapter，因此当前运行环境只报告 `worktree_archive` 已接入、Run admission unknown/未接入。其它 tool/validation/review 触发点由对应阶段接入，不得显示为已支持。
 
-**FR-6.2** CRUD 操作
+**FR-6.2** Draft / publish / rollback 操作
 
-- 创建: "+ New Hook" 按钮 → 表单 (name / event_type / action_type / handler / priority / timeout / description) → 写入 registry.json
-- 读取: 列表点击 → 详情面板
-- 更新: 详情面板编辑 → 写入 registry.json
-- 删除: 详情面板 "Archive" 按钮 → 设 `archived=true` (per FR-1.4, 不物理删除)
-- Enable/Disable: 详情面板 toggle → 写 registry.json + 热更新
+- Project 与 Worktree policy 分别读取 `GET /api/v1/projects/{project_id}/hook-policy` 和 `GET /api/v1/worktrees/{worktree_id}/hook-policy/effective`。
+- 编辑通过对应 scope 的 `PUT .../hook-policy/draft`，提交 expected policy set ID 与 draft version 做 CAS；保存草稿不得修改已发布版本。
+- 发布使用 `POST .../hook-policy/publish` 创建不可变策略版本；Project/tenant admin 才能发布。回滚使用 `POST .../hook-policy/rollback` 产生新版本并保留 Audit。
+- 不直接写 `registry.json`，不执行 Python/JavaScript/shell handler，不允许 UI 放宽或覆盖 builtin rules。缺少认证、scope、权限或 API Provider 时 fail closed，不展示本地 seed policy。
 
-**FR-6.3** 触发日志查看
+**FR-6.3** 策略 Audit 与执行事件区分
 
-- 来源: `scripts/automation/hooks/logs/hook_audit.log`
-- 过滤: hook_name / event_type / decision / 时间范围
-- 分页: 50 条/页, 最多展示 1000 条 (避免前端过载)
-- 详情: 点击单条 → 弹窗显示完整 audit log entry (12 字段)
+- Phase 9C 右侧列表来源为 Hook policy API 的 append-only 配置 Audit；不能将配置变更称作 Hook execution log。
+- RunEvent/outbox execution events、失败和 coverage 的过滤/下钻属于 Phase 9D；summary v2 在 1–90 天窗口内合并 Hook ledger 与字段完整的 `hook_evaluated` RunEvent projection，按 tenant + event_id 去重，并按 tenant/project/task/run 完整键关联最新 Run 状态。缺字段且无 ledger 镜像的 RunEvent 单独计为 excluded；Run producers 尚未完整接入，覆盖仍为 partial/unknown，不能把状态 join 完成误作全阶段 coverage 或完整 Project BI。完整结果接入后由 Project Quality & Improvement / Run Detail 深链回 Advanced Settings Hooks。
+- 读接口不可用时展示明确错误/unknown，不把空列表解释为零次触发，也不回退 Python JSONL 文件。
 
 ### FR-7 跟 skills 域协调 (2 项, P1)
 
 **FR-7.1** 同导航不同标签页
 
-- "高级设置" 顶层导航: tabs = [`Skills`, `Hooks`, `MCP`, `Plugins`, (预留: `Commands`, `Agents`)]
-- Skills 标签页: 走 SRS-MULTICA-SKILL-001 v0.1 的 skill CRUD
-- Hooks 标签页: 走本 SRS §FR-6 的 hook CRUD
-- MCP 标签页: 走 SRS-MULTICA-MCP-001 (v0.1 占位 stub, per 2026-09-24 15:01 JST 用户拍板 "MCP也应该是一个标签页") — 列出本机已注册 MCP servers, 启停 toggle, transport 类型 (stdio / sse / http), 详见 MCP 域独立 SRS
-- Plugins 标签页: 走 SRS-MULTICA-PLUGIN-001 (v0.1 占位 stub, per 2026-09-24 22:04 JST 用户拍板 "还有plugins也应该是一个标签页") — 列出本机已安装 plugin 包 (来源 = `~/.multica/plugins/` + 内置 builtin), 启停 toggle, 版本显示, 详见 Plugin 域独立 SRS
-- 四个实装标签页独立 registry, 共享 session_id (跨标签页 state 可传递)
+- Settings 主侧栏只提供“高级设置”父入口；进入 `/settings/advanced` 后，在页面内容区显示 `Skills`、`Hooks`、`MCP`、`Plugins` 四个并列的局部选项卡导航条；默认进入 `/settings/advanced/hooks`。该标签条沿用 ULYS-235，不能变成 Worktree 主导航节点或独立侧栏入口。
+- Hooks 不成为独立主导航项，也不插入 Project→Worktree→Group Apps 树；Worktree Index 只显示当前 effective policy/version/health 与阻断摘要，并深链到同一个 Hooks tab。
+- 各 tab 分别遵循其领域 SRS 与授权 API：Skills registry、Hook policy、MCP connection 和 Plugin manifest/grant 不共享数据所有权，也不互相授予权限。
+- 只有非敏感的显示状态（当前 tab、筛选器和 Project/Worktree scope）可在高级设置页间保留；认证身份、授权事实、策略快照与凭据必须由当前 session/server 重新解析，不可跨 session 复制。
+- Commands / Agents 如后续成为 tab，必须沿用相同父导航和独立领域权限模型；当前不代表这些 tab 已实现。
 
-**FR-7.2** 独立 registry + 共享 session state
+**FR-7.2** 独立领域数据 + 有界 UI session state
 
-- Skill registry: `docs/skills/<name>/SKILL.md` (per SRS-MULTICA-SKILL-001 §FR-12)
-- Hook registry: `scripts/automation/hooks/registry.json` (per FR-3.1)
-- Session state: `scripts/automation/hooks/state/session_state.json` (跨标签页共享, per session_id)
+- Skill registry 按 `SRS-MULTICA-SKILL-001` 管理；Hook policy 使用 Rust-owned Project/Worktree versioned store (Master/SCD2) 与 TTL Draft；MCP/Plugin 分别使用其专属连接和 capability/grant store。
+- `registry.json`、Python handler 与旧 JSONL 只可进入显式只读迁移/兼容流程，不能提供在线 Hook 决策或覆盖 Rust builtin baseline。
+- 当前 Advanced Settings 页面若没有 host auth session/provider，必须不显示 seed policy 且禁用所有 read/write；接入 Provider 后也要对 principal/session generation 变化清除旧 API 投影。
+- tab、筛选器与选中的 Project/Worktree 只是 UI projection；每个 API request 都由服务端重新校验当前 tenant/Project membership、role、scope 与 policy revision。
 
 ### FR-8 测试 / 报告 (1 项, P1)
 
 **FR-8.1** 单元测试 + 集成测试 + 报告
 
-- 单元测试: `tests/automation/hooks/test_hook_engine.py` 覆盖 14 类事件 + 4 种 action type + fan-out + transform + fail-open/closed
-- 集成测试: `tests/e2e/test_hook_ui.py` 覆盖 "高级设置 → Hooks" 标签页 CRUD + enable/disable + 触发日志查看
-- 报告: `docs/reports/PHASE-HOOK-IMPL-REPORT.md` 跟现有 PHASE-*-IMPL-REPORT 一致
+- Rust unit tests 覆盖 typed policy bounds/digest/scope、builtin fail-closed evaluator 与 restrictive rule 校验；REST tests 覆盖 Project/Worktree authorization、CAS/TTL、publish/rollback、Audit/RLS 边界。
+- UI tests 验证高级设置父导航与并列 tabs、无 auth Provider 时 fail closed、policy API 路由契约；后续 browser E2E 需在实际 session Provider/目标 DB 下覆盖 read/draft/publish/rollback、继承与错误恢复。
+- 验证报告分开记录 compile/typecheck、unit、API/RLS integration、browser/E2E、production runtime 和性能结果；旧 Python handler/fan-out/transform/fail-open 测试仅作为迁移参考，不作为产品验收。
 
 ---
 
@@ -492,16 +488,13 @@ Rust 核心可执行 phase 以 §1.6 明列的 Run/tool/validation/review/Worktr
 
 ### 6.3 依赖
 
-- `scripts/automation/console_server.py` v0.1 (hook 事件流入口)
-- `scripts/automation/dispatcher.py` v0.1 (子代理 invoke 前置, SubagentDispatch 事件点)
-- `scripts/automation/guardian/pre_tool_use_guard.py` (PreToolUse builtin guard hook)
-- `scripts/automation/hooks/registry.json` (新建, hook 注册中心)
-- `scripts/automation/hooks/builtin/` (新建, builtin hook 模块)
-- `scripts/automation/hooks/logs/hook_audit.log` (runtime 生成)
-- `scripts/automation/hooks/state/session_state.json` (runtime 生成)
-- 前端 `frontend/src/app/(app)/settings/advanced/hooks/page.tsx` (新建, UI 标签页)
-- mavis runtime hook 事件流 (现役, audit 已有)
-- SRS-MULTICA-SKILL-001 v0.1 平行 SRS (skills 域, 共享"高级设置"导航)
+- Rust evaluator：`crates/domain-hook` 的 typed policy verifier/evaluator；critical decision 必须在 Rust builtin baseline 下 fail closed。
+- Policy API：`crates/star-api-rest/src/group_api/hook_policies.rs` 与 Worktree lifecycle gate；依赖当前 actor/tenant/Project scope，目标 DB/RLS/grants 部署另列生产启用门。
+- Policy storage migration：`db/migrations/2026-09-30-multica-hook-policy.sql`；源码与隔离环境验证不代表目标数据库已部署。
+- Advanced Settings UI：`frontend/src/app/(app)/settings/advanced/layout.tsx`、`[tab]/page.tsx`、`[tab]/HookPolicyPage.tsx`；调用 `frontend/src/lib/group/worktreeGroupApi.ts` 的 scope-aware API adapter。
+- 宿主前置条件：应用根 `Providers` 注入认证 `WorktreeGroupApiProvider`，提供 token 与非敏感 session generation；当前未接入时页面必须 fail closed。
+- 历史兼容参考：`scripts/automation/console_server.py`、`dispatcher.py`、`guardian/pre_tool_use_guard.py` 与旧 JSON/JSONL；不得作为产品 policy store、决策引擎或 authoritative execution audit。
+- SRS-MULTICA-SKILL-001 v0.1 为并列 Skills tab 的领域要求；MCP/Plugins 继续由各自领域 API 与 capability grant 约束。
 
 ---
 
@@ -509,14 +502,16 @@ Rust 核心可执行 phase 以 §1.6 明列的 Run/tool/validation/review/Worktr
 
 | AC | 关联 FR / NFR | 验收方法 | 阈值 |
 |---|---|---|---|
-| **AC-1** | FR-2.1 + FR-4.1 | 单元测试 14 类事件全部 hook 触发 | 100% |
-| **AC-2** | FR-2.2 + FR-4.2 | 单元测试 4 种 action type 全部跑通 | 100% |
-| **AC-3** | FR-1.1 + FR-1.4 | 单元测试 4 状态 (registered / enabled / disabled / archived) 全部跑通 | 100% |
-| **AC-4** | FR-3.2 + NFR-P-5 | registry 修改实测 | < 100ms reload, 0 中断 |
-| **AC-5** | FR-4.3 + FR-4.4 | 单元测试串行 / 并行 / transform 累积 | 100% |
-| **AC-6** | FR-6.1 + FR-6.2 | UI 集成测试 "高级设置 → Hooks" 标签页 CRUD | 100% |
-| **AC-7** | FR-6.3 + NFR-O-4 | UI 集成测试触发日志查看 | 100% |
+| **AC-1** | FR-2.1 + FR-4.1 | Rust unit tests 证明 builtin 在 scope/authorization/runtime/retention lock 事实缺失、冲突或过期时 fail closed | 所有 mandatory negative cases 均阻断 |
+| **AC-2** | FR-2.2 + FR-4.2 | typed policy decoder 验证 schema、大小/数量边界、scope/version、restrictive-only action 与 canonical digest | 有效 fixture 接受；每类无效/越界 fixture 拒绝 |
+| **AC-3** | FR-1.1 + FR-1.4 | Project baseline 与 Worktree overlay inheritance/rebase 测试证明 overlay 只能追加限制且 revision 不可变 | 所有跨 scope/放宽规则用例拒绝 |
+| **AC-4** | FR-3.2 + FR-7.1 | Navigation contract test 验证 Settings 侧栏为“高级设置”父入口，Hooks 与 Skills/MCP/Plugins 并列且路径固定 | 四个 tab route 100% 匹配；Hooks 不出现为 Worktree App |
+| **AC-5** | FR-4.3 + FR-4.4 | REST/API tests 覆盖权限/RLS、Draft CAS/TTL、publish/rollback Audit、冲突和错误时的 fail-closed 行为 | 全部授权负例拒绝；状态变更有审计事实 |
+| **AC-6** | FR-6.1 + FR-6.2 | UI 集成测试验证 `/settings/advanced/hooks`、scope 选择、typed 条件编辑、Draft CAS 与 admin-gated publish/rollback；无认证 Provider 时不得显示 seed policy 或发送写请求 | 100% |
+| **AC-7** | FR-6.3 + NFR-O-4 | 9C 验证配置 Audit 与执行日志明确分开；9D 验证有界 summary 窗口/公式/partial coverage 呈现，并验证 RunEvent/outbox 查询、Run outcome 与授权下钻在未接入前不冒充完整 BI | 100% |
 | **AC-8** | NFR-S-1 + NFR-S-5 | 渗透测试 (14 事件 × 4 action type × 10 攻击场景) | 0 命中 |
+| **AC-9** | FR-2.2 + FR-4.1 + FR-6.1 | Rust tests 验证 evaluator API v1 仅用于 archive、phase omission 不跨 phase 匹配、Run admission 拒绝 archive-only facts；REST tests 验证 Project/Worktree publish 拒绝未接入 producer 的 Run admission；Hooks Builder 禁用该选项 | 所有兼容与负例通过；不支持组合 fail closed |
+| **AC-10** | FR-2.2 + FR-4.1 + FR-6.3 | Run admission producer tests 验证 readiness 不在 DB transaction 内等待、freshness/fence 约束、Allow 与 Run/HookSet snapshot/Hook ledger/RunEvent 原子写入并共享 event_id、Deny 不创建 Run；coverage 随服务端 producer capability 更新 | 正负路径、重复请求与 BI 去重契约通过；未装配 adapter 时 capability=false 且 policy/UI 保持关闭 |
 
 ---
 
@@ -559,3 +554,8 @@ Rust 核心可执行 phase 以 §1.6 明列的 Run/tool/validation/review/Worktr
 | **v0.4** | 2026-09-24 22:13 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3) | 自审饱和: §0.1 版本号 v0.3 (头部 banner 已标 v0.3) + §1.1 后续 BD/DD 引用 v0.3 (头部 banner 已同步) + §1.4 排除範囲 v0.1→v0.3 (新增 MCP 升格 + Plugins 升格行, 旧 4 类→3 类枚举补全) + §10 修订履歴 v0.2/v0.3/v0.4 三行同步追加; 修正 4 处 cross-reference staleness | 2026-09-24 22:13 JST Ulysses 评论 "自审, 各级文档都要做到位" |
 | **v0.5** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 保留 ULYS-235 高级设置同导航不同 tab 决策；增加 Rust builtin typed HookSet、不可关闭 fail-closed 规则、Project/Worktree 继承、视觉无代码 builder、Run/Worktree lifecycle/BI 事件联动；旧 Python handler 降为兼容历史，产品 Hook runtime/UI 仍待实施 | 用户要求 Hook 是原生强约束、与 BI/Worktree 联动、可视配置并指出它属于高级设置 tab |
 | **v0.5.1** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将总需求交叉引用更新到 v5.20；该版本的 Hook 规则和 Advanced Settings 标签页要求未变 | Phase 8B Run requirement 增补后，同步当前总需求基线引用 |
+| **v0.5.2** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | FR-6 改为 Project/Worktree policy Builder 与 typed Audit API；FR-7 明确“高级设置”父入口和并列 tabs，不复制跨 session 授权事实；FR-8/AC 改为 Rust evaluator、policy API 与当前 UI/navigation 验收；更新当前代码文件和认证 Provider 缺口；区分 Phase 9D 执行 RunEvent/BI | Phase 9C 实装 Advanced Settings 导航与 Hooks 策略编辑页，清除旧 registry.json/handler 需求歧义 |
+| **v0.5.3** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Advanced Settings 内部局部标签条与 Settings 主侧栏父入口的层级；规定 Phase 9D `hook_execution_summary_v1` 只覆盖已记录 archive ledger、明确窗口和 partial/unknown 状态，不得当作 Run outcome join 或完整 BI；更新上/下游设计版本 | Phase 9D summary API/UI consumer 接入既有 ULYS-235 Hooks 标签 |
+| **v0.5.4** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 summary 升为 v2：合并 Hook ledger 与完整 RunEvent 投影，使用共享 event_id 去重并以 tenant/project/task/run 键关联最新 Run 状态；将无效投影计数显式暴露，仍保持 Run producer 未接入与 partial/unknown coverage 边界 | Phase 9D-4 加入双来源受限 read model 与 Run 状态 join |
+| **v0.5.5** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 evaluator API v2 的 phase-scoped HookRule、旧 v1 archive policy canonical digest 兼容、Run admission typed-fact allowlist 与 UI producer/readiness gate；同步总要件 v5.22、BD v0.5.7、DD v0.5.13，并保留 ULYS-235 高级设置内并列标签导航 | Phase 9D-5a 将 typed evaluator 扩展到 Run admission contract，但尚未接入 Run producer |
+| **v0.5.6** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 9D-5b 条件式 Run admission producer/readiness 与原子事务双写要求，固定 `tenant_id + event_id` BI 去重、fence freshness/TTL 与当前生产 adapter 缺口；同步总要件 v5.23、BD v0.5.8、DD v0.5.14，保持 Hooks 在 Advanced Settings 并列标签 | Run admission REST/DB producer seam 落地，需明确实现边界与未部署状态 |

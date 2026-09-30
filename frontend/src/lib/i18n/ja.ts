@@ -322,6 +322,7 @@ export const ja: Dictionary = {
     agents: { label: "Agent 一覧", categoryLabel: "Agent / Worktree", description: "智能 Agent 実行状態・编排・会话と実行ログ" },
     analytics: { label: "效能分析", categoryLabel: "ワーク管理", description: "工程效能ダッシュボード・バーンダウン・テレメトリ" },
     settings: { label: "システム設定", categoryLabel: "システム / 治理", description: "テナント全局設定・チーム成员・セキュリティと権限管理" },
+    "advanced-settings": { label: "詳細設定", categoryLabel: "システム拡張", description: "Skills、Hooks、MCP、Plugins をまとめて管理" },
     remote: { label: "リモート制御", categoryLabel: "システム / 治理", description: "モバイルから desktop / terminal / files に接続" },
     kanban: { label: "カンバン", categoryLabel: "ワーク管理", description: "4 状態スイムレーン即時ドラッグタスクボード" },
     timeline: { label: "タイムライン / ガント", categoryLabel: "ワーク管理", description: "ガントチャート・里程碑とカレンダタイムライン联动" },

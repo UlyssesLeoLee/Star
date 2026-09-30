@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
-// Tauri 2.0 Vite config per docs/architecture/2026-09-29-upgrade/rust-app-end-research.md §3.2 P0
+// Tauri 2.0 + React 19 + Vite config (per PR #246 + PR #239 + PR #244 §3.1)
 export default defineConfig({
+  plugins: [react()],
   clearScreen: false,
   server: {
     port: 1420,
@@ -21,5 +23,10 @@ export default defineConfig({
     target: 'chrome105',
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_DEBUG,
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./tests/setup.ts'],
   },
 });

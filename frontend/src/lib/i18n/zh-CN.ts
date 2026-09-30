@@ -334,6 +334,7 @@ export const zhCN: Dictionary = {
     agents: { label: "Agent 总览", categoryLabel: "Agent / Worktree", description: "智能 Agent 运行状态、编排、会话与执行日志" },
     analytics: { label: "效能分析", categoryLabel: "工作管理", description: "工程效能大盘、燃尽图与遥测指标统计" },
     settings: { label: "系统设置", categoryLabel: "系统 / 治理", description: "租户全局配置、团队成员、安全与权限管理" },
+    "advanced-settings": { label: "高级设置", categoryLabel: "系统扩展", description: "统一管理 Skills、Hooks、MCP 与 Plugins" },
     remote: { label: "远程控制", categoryLabel: "系统 / 治理", description: "手机端远程连接 desktop / terminal / files" },
     kanban: { label: "看板", categoryLabel: "工作管理", description: "4 态泳道即时拖拽任务看板" },
     timeline: { label: "甘特图 / 时间线", categoryLabel: "工作管理", description: "甘特图排期、里程碑与日历时间线联动" },

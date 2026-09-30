@@ -1,18 +1,24 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project Worktree 群组实施计划 v5.25**
+> **渡口 Project Worktree 群组实施计划 v5.46**
 >
 > - 状态：🟡 执行中（Phase 0/1、2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
-> - 日期：2026-09-30
+> - 日期：2026-10-01
 > - 本轮补充：生产 Project 选择通过当前 actor 的服务端 membership 目录加载；API session generation 切换时同步隐藏旧 Project/Index/member-role 投影；分页与深链权限状态均 fail closed，缺失 Project 名称 SoR 时不借本地 seed 补名。
 > - Phase 8 更新：Run migration 在隔离临时 PostgreSQL 重复应用并通过 6 张表 FORCE RLS 检查，目标 DB/runtime grants 未部署；CLI Run writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已形成条件式代码切片；Contract 写命令、完整事件/Evidence producer、真实 Runtime 与目标环境端到端验收仍未完成。
 > - Phase 9A 更新：新增 `domain-hook` bounded Rust evaluator core 和 8 个单测，仅覆盖 Worktree archive/cleanup gate；未接入 lifecycle Domain Command、HookSet 持久化/发布、Advanced Settings UI 或 RunEvent/BI，Phase 9 仍开放。定向 test/Clippy 使用临时解析后的 lock 通过；原始锁文件仍有既存 `objc2 0.6.3` 与 Wry `^0.6.4` 冲突，完整刷新会改动 240 个 package，未混入本阶段。使用刷新锁进行的 `cargo check --workspace --all-targets -j 4` 随后被既有 `star-desktop/src-tauri/src/main.rs` 截断占位阻断。
 > - Phase 9B1 更新：policy JSON 有界解码（≤64 KiB）、unknown-field 拒绝、scope/version/rule/action 校验、canonical SHA-256 核验和只读 verified snapshot 已加入 `domain-hook`；13 个定向单测与 Clippy 通过。此为运行时快照 contract，不是数据库策略存储/发布 API，也没有接 lifecycle command。原始 Cargo.lock 的 workspace 解析仍需临时生成锁才可运行目标 crate；Phase 9B2 继续完成 DB/RLS/store/publish 与实际双门。
-> - Phase 9B2A/9B2B 更新：`db/migrations/2026-09-30-multica-hook-policy.sql` 写入 Project/Worktree SCD2 policy Master、短 TTL Draft 和 append-only policy audit 三表及 tenant FORCE RLS；迁移已在一次性隔离 PostgreSQL 18 集群重复应用，三表 FORCE RLS、Project/Worktree policy close/rebase、审计 scope 和 UPDATE/DELETE/TRUNCATE 不可变约束场景通过。9B2B 新增 8 条 Project/Worktree scoped policy REST routes，支持 effective read、Draft CAS/TTL、admin-gated publish/rollback、Audit 和 Project baseline 发布时的事务内 overlay rebase；定向 `cargo check -p star-api-rest --lib -j 4` 与 99 个 crate library tests 通过。原始 workspace lock 在 `--locked` 下仍要求重新解析，关联既存 Wry/objc2 依赖冲突；本阶段只补 `star-api-rest -> domain-hook` 直接依赖边，未引入约 240 个 package 的全量 lock churn。目标 DB/runtime grants/API DB-RLS integration 未就绪；correlation ID 是追踪值而非 replay key，响应超时后先重读 revision/Audit。9B2C lifecycle gate、9C Advanced Settings UI、9D BI 与 9E Agent/Loop 继续开放。
-> - 关联需求：docs/requirements.md v5.20 §50
-> - 关联基本设计：docs/basic-design.md v5.9 §16
-> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.21、docs/design/DD-MULTICA-TASK-001.md v0.6、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.1、docs/design/BD-MULTICA-HOOK-001.md v0.5.1、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.4、docs/design/DD-WORKTREE-CANVAS-001.md v1.3
+> - Phase 9B2A/9B2B 更新：`db/migrations/2026-09-30-multica-hook-policy.sql` 写入 Project/Worktree SCD2 policy Master、短 TTL Draft 和 append-only policy audit 三表及 tenant FORCE RLS；迁移已在一次性隔离 PostgreSQL 18 集群重复应用，三表 FORCE RLS、Project/Worktree policy close/rebase、审计 scope 和 UPDATE/DELETE/TRUNCATE 不可变约束场景通过。9B2B 新增 8 条 Project/Worktree scoped policy REST routes，支持 effective read、Draft CAS/TTL、admin-gated publish/rollback、Audit 和 Project baseline 发布时的事务内 overlay rebase；定向 `cargo check -p star-api-rest --lib -j 4` 与 99 个 crate library tests 通过。原始 workspace lock 在 `--locked` 下仍要求重新解析，关联既存 Wry/objc2 依赖冲突；本阶段只补 `star-api-rest -> domain-hook` 直接依赖边，未引入约 240 个 package 的全量 lock churn。目标 DB/runtime grants/API DB-RLS integration 未就绪；correlation ID 是追踪值而非 replay key，响应超时后先重读 revision/Audit。9B2C production provider/DB integration、9C UI 条件式代码切片已加入但宿主 session Provider 未接、9D BI 与 9E Agent/Loop 继续开放。
+> - Phase 9B2C 更新：archive-confirm REST gate 已读取当前 Project/Worktree verified policy 并调用 Rust evaluator；先在数据库行锁外检查 Git lock（最多 2 秒），仅新鲜 Unlocked 才请求最多 2 秒的 Host Runtime drain/readiness，并为稳定 operation ID 建立 admission fence；返回后重开短事务、复验 manager authorization、Worktree/plan 状态、effective policy、lifecycle version 与事实新鲜度。fence 必须至少留有 5 秒提交余量并在最终写入前复核；生产 provider 必须确保 fence 覆盖命令完成窗口，并与有界事务时限联合验收。Runtime provider 缺失/不可用或 fence 余量不足时 fail-closed；Deny 记录 Worktree management audit projection 并取消 plan，RequireHuman/Defer 保持 pending。现有 production main 未安装 readiness provider，且目标 DB/runtime grants/API RLS integration、物理 checkout cleanup、通用 Hook RunEvent/outbox 仍未完成。定向 check/test/Clippy evidence 与已知限制见 §6.45。
+> - Phase 9D 首个事件切片：新增 Worktree archive HookEvent Transaction ledger、archive-confirm 同事务 producer、Project-scoped keyset read API 与 Advanced Settings → Hooks 页执行事件面板；当前仅 instrument `worktree_archive`，Run-linked producers、异步 Outbox delivery state、统一 BI read model/Run Detail 下钻、app root auth Provider、目标 DB migration/grants/RLS integration 仍开放；覆盖率输出 `partial` 且比例 `null`。Rust crate tests 106/106、Hooks/API 前端定向 25/25、TypeScript 与一次性 PostgreSQL 18 双次应用/append-only/RLS 场景通过。实现状态与验证结果见 §6.47。
+> - Phase 9D-2 更新：新增 Project-scoped hook-events/summary API，默认 30 天、窗口 1–90 天，按 phase/decision 汇总 archive ledger 并返回 hook_execution_summary_v1、公式和 partial/null coverage；source-only API 不代表 RunEvent/outcome join 或完整 BI。定向 crate cargo check 在临时排除 star-desktop workspace member 后通过，未运行 tests；原始 Cargo.toml/Cargo.lock 已恢复，见 §6.48。
+> - Phase 9D-3 更新：将 summary card 接入既有 Advanced Settings → Hooks 标签页，在内容区选择 7/30/90 天；导航遵循 ULYS-235，不新增 Worktree/主侧栏节点。Phase 9D-4 已将其数据 contract 升至 v2，见下文。
+> - Phase 9D-4/9D-5a/9D-5b 更新：summary v2 合并字段完整的 Hook ledger/RunEvent 投影，按 tenant+event_id 去重并以 tenant/project/task/run 键关联最新 Run 状态；9D-5a 将原生 evaluator API 扩展为 phase-scoped v2，增加 BeforeRunAdmission 与 BeforeWorktreeArchiveCleanup，保留 v1 archive-only policy digest 兼容并拒绝 Run admission archive-only facts。9D-5b 增加条件式 Run admission producer seam：锁外 readiness/fencing，锁内最终重授权与 native Hook evaluation；Allow 原子写 Run HookSet snapshot、Run start、Hook ledger 和共享 event_id 的 RunEvent；Deny 只写无 Run/Task FK 的 ledger。policy publish/rollback、Builder 和事件 coverage 共用服务端 producer capability；当前 production adapter 未装配，能力仍 false，不能宣称 Runtime spawn 已有 production Hook protection，见 §6.52。
+> - Phase 9E 更新：9E-1 Rust immutable Profile verifier、9E-2 bounded dependency resolver、9E-3 Profile Master/SCD2 + append-only Audit migration substrate 与 9E-4A Run/Profile guard migration 已交付并完成隔离 DB 验收；9E-4B1 已加入 Worktree-scoped bounded current Profile GET list/detail API 和 4 个 Rust 单测；9E-4B2 已加入 Project/Worktree Profile publish/disable/reenable/rollback 生命周期写 API 代码切片；9E-4B3 将 current verified Project/Worktree Hook policy 映射为 Profile admission 所需的 HookSet ID/version/digest。current Provider/Skill/Grant catalog adapter、生产 Run snapshot writer、目标 DB 部署/RLS、资源 reservation、CLI adapter、occurrence/Loop runtime 仍开放，见 §6.54-§6.59。
+> - 关联需求：docs/requirements.md v5.32 §50
+> - 关联基本设计：docs/basic-design.md v5.28 §16
+> - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.24、docs/design/DD-MULTICA-TASK-001.md v1.6、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.6、docs/design/BD-MULTICA-HOOK-001.md v0.5.8、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.14、docs/design/DD-WORKTREE-CANVAS-001.md v1.3
 
 ---
 
@@ -83,7 +89,7 @@ Project（先选择，限定可见工作范围）
 
 | **8A Run foundation** | Task Contract / Run / Event / Evidence migration；CLI start 创建 Run 并返回 Run ID | migration/RLS/append-only/idempotency 运行验收；重放同键与新尝试语义 | CLI writer 与 migration 已有条件式切片；migration 在隔离临时 PostgreSQL 重复应用，6 张 Run 表通过 FORCE RLS 检查；目标 DB、正式 runtime grants 和 production writer 验收未完成 |
 | **8B Task Card Run integration** | Contract commands、Run list/detail、Task Card Run history、CLI/Agent/LangGraph 状态与 Evidence producer | tenant/project ACL、RLS、状态事实分离、evidence authorization/retention | 有界 list/detail API 与 Task Card 历史面板已实现；Contract 写命令、CLI 后续状态和 Agent/LangGraph/Validation/Review/Integration/Cost/Evidence producer、目标 DB/RLS E2E 仍缺 |
-| **9 Agent Execution & Loop** | 9A bounded Rust Hook evaluator；9B1 bounded policy decoder/verifier + immutable snapshot；9B2A SCD2 Master / expiring Draft / append-only Audit migration；9B2B scoped policy store/read/publish/rollback API；9B2C Worktree Domain Command 双门；9C Advanced Settings → Hooks 无代码可视 Builder；9D RunEvent/Audit/BI；9E versioned Agent/Memory/Skill/Context/Validation profiles、Rust CLI adapter、唯一 Automation occurrence dispatcher、Schedule/Engineering Loop 与公平有界并行 | profile/provider version/digest，scope/ACL，DB/RLS/SCD2/append-only，fair admission/backpressure，occurrence fencing/idempotency，Loop budgets/cancel/drain，Hook fail-closed 与 lifecycle command 二次校验，CLI process cleanup；Git lock 与 Agent lease 分离 | 9A/9B1 有 13 个单测和 targeted Clippy；9B2A migration 在一次性 PostgreSQL 18 隔离集群双次应用，三表 FORCE RLS、Project/Worktree policy close/rebase、Audit scope 与 UPDATE/DELETE/TRUNCATE 约束场景通过；9B2B 已有 8 条 scoped policy routes、Draft CAS/TTL、publish/rollback Audit 与事务内 baseline overlay rebase，targeted check 和 99 个 REST library tests 通过；目标 DB/runtime grants/API RLS integration 未验收，verified snapshot 未进入 lifecycle Domain Command，9B2C 未接线。9C-9E、Advanced Settings UI、RunEvent/BI 与生产验证仍开放。ULYS-235 已定 Hooks 为 Advanced Settings → Hooks 独立并列 tab，与 Skills/MCP/Plugins 同级，不是 Worktree App；UI route 尚未实现 |
+| **9 Agent Execution & Loop** | 9A bounded Rust Hook evaluator；9B1 policy decoder/verifier；9B2A SCD2 Master/Draft/Audit schema；9B2B scoped policy API；9B2C Worktree archive-confirm gate；9C Advanced Settings → Hooks Builder；9D Hook/RunEvent/BI seam；9E-1 Profile verifier、9E-2 dependency resolver、9E-3 Profile Master/SCD2 + Audit migration；9E-4A Run Profile snapshot all-or-none 与 scope/digest guard migration（隔离 PostgreSQL 验收通过）；9E-4B1 bounded current Profile GET list/detail 与 Rust read-time verifier（4 个单测）；9E-4B2 Project/Worktree Profile lifecycle write API 代码切片；9E-4B3 verified effective HookSet identity adapter；current Provider/Skill/Grant catalog adapter、生产 Run writer、Rust CLI adapter、唯一 Automation occurrence dispatcher、Schedule/Engineering Loop runtime 与公平有界并行调度 | profile/provider version/digest，scope/ACL，DB/RLS/SCD2/append-only，fair admission/backpressure，occurrence fencing/idempotency，Loop budgets/cancel/drain，Hook fail-closed 与 lifecycle command 二次校验，CLI process cleanup；Git lock 与 Agent lease 分离 | 9A/9B1 有 13 个单测与 targeted Clippy；9B2A migration 在一次性 PostgreSQL 18 隔离集群双次应用并验证三表 FORCE RLS、SCD2/rebase、Audit 不可变约束；9B2B 8 条 scoped routes 支持 Draft CAS/TTL、publish/rollback Audit 与原子 baseline overlay rebase；9B2C archive-confirm 的锁外 Git/Runtime 预检、admission fence、锁内重授权与 policy recheck 已实现，103 REST library tests/check/Clippy 通过，但 production readiness provider、目标 DB/RLS、physical cleanup 与通用 RunEvent/outbox 未验收；9C宿主认证和实环境仍开放；9D Run-linked producer/Outbox/full BI 仍开放。9E-1/2 domain core 完成，129/129 domain-agent tests 与 targeted Clippy 通过；9E-3 migration 在临时 PostgreSQL 双次应用，3 revisions/3 Audit、8 类负例与两表 tenant RLS 通过；组合 Run/Profile migration 确认 v1 Run 快照在 v2 successor 后不变，测试 DB/role 已清理。9E-4A guard migration 在隔离 PostgreSQL 重复应用通过；旧 Run 与 Project/Worktree 快照成功，5 类负例拒绝，零 Profile FK，临时库已清理。current Provider/Skill/Grant catalog adapter、Run writer/目标 DB部署/原子 reservation、CLI adapter、occurrence/Loop runtime、公平 scheduler 与生产验收仍开放。9E-4B2 Profile lifecycle write API 已有代码切片。ULYS-235 Hooks tab 位于 `/settings/advanced/hooks` 的高级设置内容区，与 Skills/MCP/Plugins 并列，不新增 Worktree 节点 |
 | **10 Project Quality BI** | versioned Run/Loop/Hook/Worktree read model、coverage、cohort 与 authorized drilldown | 指标可复算，unknown 保留，不跨 Project 泄漏 | 设计定义；未实现 |
 | **11 Benchmark / Improvement** | 固定 task/repo commit/environment replay、benchmark sets、Proposal adoption/rollback | tuning 与 holdout 隔离，评分/规则版本固定，重复性证据 | 设计定义；未实现 |
 | **12 Rust desktop performance** | bounded projection/event/cache/terminal/evidence，Worktree/Run virtualization 与 Canvas culling | 目标设备 peak RSS、CPU、p95 更新延迟/frame time 与并发压力实测 | 指标 TBD，未实现 |
@@ -365,7 +371,8 @@ requirements/basic/detailed design 同步为 v2.9/v1.3/v1.8。该 key 只用于�
 | 管理操作 | 🟢 Archive/restore plan-confirm UI 接线 | live detail 用当前 version 创建短时 `set_archived` plan，校验 plan 与 Worktree 绑定，再经用户二次确认；确认成功后重读授权 Index；现有 AgentSession/Runtime 引用时 UI 预先禁用 archive，服务端仍最终重验。该动作不执行 Git checkout 删除 |
 | Preview / fail-closed | 🟢 来源边界明确 | API 错误时显示错误并禁止 seed fallback；当前应用路由树尚未安装宿主 provider，因此默认实际显示本地预览，不能报告为生产 API 已运行 |
 | Owner reassignment / create / cleanup | 🟡 未完成 | Owner 转派 UI 仍缺 Project member directory projection；创建/导入需 Repository/Runtime provisioning；物理 cleanup 需 Git lock、Session/Runtime drain 与受审计执行器 |
-| 验证 | 🟢 TypeScript 检查通过 | 本轮 `pnpm typecheck` 通过；未新增或运行测试；Rust、DB migration、宿主登录与真实 API 未在本轮验证 |
+| 验证 | 🟢 隔离 PostgreSQL 验收通过 | Run、Profile、guard 三 migration 应用成功；guard migration 重复应用；旧 Run 与两类完整 snapshot 接受，5 类负例拒绝；accepted Runs=3（legacy=1、Profile snapshot=2），Profile FK=0；临时数据库清理并复查不存在。目标数据库未触碰。 |
+
 | Phase 2D / Phase 2 总体 | 🟡 未完成 | 宿主 provider、目标数据库部署、membership provisioning/reconciliation、Domain adapter、RLS/ACL 负向与并发运行验收仍是关闭门 |
 
 requirements/basic/detailed design 已同步为 v4.1/v2.5/v3.0。此 UI 切片加强多 Agent Worktree 的集中可观测与显式归档管理，但不代表当前产品路由已有真实认证 provider，也不代表 Git Worktree 的创建、停止或物理清理已打通。
@@ -377,7 +384,7 @@ requirements/basic/detailed design 已同步为 v4.1/v2.5/v3.0。此 UI 切片�
 | Project member directory | 🟢 条件式 API | 新增 `GET /api/v1/projects/{project_id}/members`；必须使用有效 Bearer、`project:read` 和当前 Project membership；响应仅包含有效成员 UUID / role，不查询其它 Project 身份 |
 | Owner reassignment | 🟢 条件式 UI/API 接线 | Index 负责人选择仅从上述成员目录取值；`assign_owner` 使用当前 Worktree version、correlation/idempotency key、5 分钟 plan 和显式确认；确认后刷新授权 Index，失败/过期不乐观更新；服务端确认仍重验 manager role、Project membership、owner membership 与 version |
 | fail-closed | 🟢 保持 | 成员目录错误时关闭转派入口；provider 缺失时 Index 仍明确显示 preview，不借用本地 seed 的成员或 owner |
-| 验证 | 🟢 本地静态检查通过 | `pnpm typecheck`、`cargo check -p star-api-rest --all-targets -j 4`、`git diff --check` 均通过；Cargo 输出已有 deprecation / unused warnings；未新增或运行测试；目标 PostgreSQL schema / ACL / RLS、真实 JWT provider 和浏览器操作未在本轮验收 |
+| 验证 | 🟢 隔离 PostgreSQL 验收通过 | Run、Profile、guard 三 migration 应用成功；guard migration 重复应用；旧 Run 与两类完整 snapshot 接受，5 类负例拒绝；accepted Runs=3（legacy=1、Profile snapshot=2），Profile FK=0；临时数据库清理并复查不存在。目标数据库未触碰。 |
 | Phase 2D / Phase 2 总体 | 🟡 未完成 | 宿主 provider、目标库部署、membership provisioning / 历史 reconciliation、Domain adapter、真实 ACL/RLS 负向与并发验收、Git/Runtime lifecycle 仍是关闭门 |
 
 本轮将需求/基本/详细设计同步至 v4.2/v2.6/v3.1。Index 现在具备 owner directory 与二次确认转派的条件式 UI/API 路径，但当前应用没有安装登录 provider，因而不能宣称用户已能在运行中的产品里真实转派。
@@ -527,7 +534,7 @@ LangGraph 官方文档证实 checkpoint 只恢复状态边界，不能保护外�
 | PostgreSQL adapter | 🟢 代码切片完成 | 新增 `PgScopedChatWorkflow`，先锁定 actor/tenant/key 幂等记录；同 fingerprint 返回保存的 queued receipt，不同 fingerprint 冲突；首次请求单事务写 Session + server-generated LangGraph thread ID、user message、queued Run、outbox event、Audit 和 30 天幂等 receipt；事务失败不返回 202 |
 | W/T 数据治理 | 🟢 schema 切片完成，运行验收待做 | `group_chat_session`、`group_chat_message`、`group_chat_dispatch_event`、`group_chat_audit_event` 分类 T 并 append-only；`group_chat_run`、`group_chat_idempotency` 分类 W 并显式 30 天 `retention_period` / `expires_at`；六张表均 FORCE RLS；目前无 cleanup scheduler、目标 DB migration 尚未应用，真实 RLS/并发/append-only 验收未跑 |
 | L0 / LangGraph execution | 🟡 未完成 | 没有 outbox consumer、Run state worker、LangGraph/checkpointer/resume/interrupt、逐次权限 broker、stream UI 或 production service identity；`main.rs` 未安装 adapter，API 默认仍 503，composer 保持禁用 |
-| 验证 | 🟢 静态检查通过 | `rustfmt --edition 2024` 与 `cargo check -p star-api-rest --all-targets -j 4` 通过；出现的 warning 均为已有弃用/unused warning；未连接 PostgreSQL，未应用 migration 或声称真实 DB 行为通过 |
+| 验证 | 🟢 隔离 PostgreSQL 验收通过 | Run、Profile、guard 三 migration 应用成功；guard migration 重复应用；旧 Run 与两类完整 snapshot 接受，5 类负例拒绝；accepted Runs=3（legacy=1、Profile snapshot=2），Profile FK=0；临时数据库清理并复查不存在。目标数据库未触碰。 |
 | Phase 5 / 全部 Phase | 🟡 未完成 | §6.34 已将 schema 改为 T 元数据 + W ciphertext/wrapped-key 且 adapter 强制 protector 注入；真实 protector、密钥轮换/销毁、期限清理与导出/删除仍未实现；还缺 outbox/L0/LangGraph/checkpoint/stream、Phase 2/3/4/6 生产服务及 Phase 7 跨 App/ACL/RLS/故障验收 |
 
 本切片不会自动发送模型请求：outbox event 只在业务事务提交后存在，生产入口未安装 adapter，且没有消费 worker；配置缺失时现有接口保持 fail closed。当前隐私边界和可继续的实现切片见 §6.34。
@@ -637,7 +644,7 @@ LangGraph 官方文档证实 checkpoint 只恢复状态边界，不能保护外�
 | 聚焦验证 | 🟢 本地通过 | 隔离 Cargo target 下 `cargo test -p star-api-rest --lib -j 4`：81/81 通过；`pnpm typecheck` 通过；Group/terminal Vitest 46/46（新增来源、无效/缺失/过期/未来时间戳 fail-closed 用例）；改动 Rust `rustfmt --edition 2024 --check` 与 `git diff --check` 通过。 |
 | Phase 2D / Phase 7 生产门 | 🟡 未关闭 | `main.rs` 尚未安装真实 Host Runtime observer；Worktree create/import、独立 Agent 活跃状态与 session drain、lock 下的 plan-confirm physical cleanup、目标 DB/RLS 与 ACL/Runtime 集成、跨 App 生产验收未完成。观察接口自身不能执行或授权删除；fresh unlocked 也不能替代 Agent drain。 |
 
-### 本轮修订（2026-09-30）
+### 本轮修订（2026-10-01）
 
 ### 6.43 本轮阶段结果（Phase 2D Project Repository discovery + Index create/import UI，2026-09-30）
 
@@ -657,6 +664,172 @@ LangGraph 官方文档证实 checkpoint 只恢复状态边界，不能保护外�
 | 生产 Project Selector | 🟢 条件式 UI 完成 | Group API 存在时只消费服务端授权目录；校验精确字段、UUID、role、重复 ID 与游标，提供续页/重试。深链在目录加载完之前不会被误判无权；接口错误不回退本地 seed。API session generation 切换时 Project directory、Worktree Index 与 member role 投影立即隐藏旧 session 内容。无宿主 API 的原型继续以明确标签展示本地预览。 |
 | 剩余 Phase 2D / 生产启用 | 🟡 未完成 | 需接入宿主认证 provider、目标 DB 与实际 membership provisioning；Project 名称和 Project→Repository 关系的 SoR、生产 lifecycle/Host Runtime provider、durable writer、历史归属 reconciliation、Git/Agent 独立活跃状态与 drain/物理 cleanup 仍缺；必须完成 RLS/ACL 负向集成验收。Phase 3-7 的已知生产 blockers 仍按上方 phase 表保持开放。 |
 | 聚焦验证 | 🟢 本地通过 | 前端 selector/API/lifecycle 测试 26/26，`pnpm typecheck` 通过；`cargo test -p star-api-rest --lib -j 4` 90/90，`cargo check -p star-api-rest --all-targets -j 4` 通过；三份改动 Rust 文件的 rustfmt check 与 `git diff --check` 通过。编译输出只含其它 crate/API auth 测试的既存 deprecation/unused warnings。 |
+
+### 6.45 本轮阶段结果（Phase 9B2C Worktree archive-confirm Hook gate，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| policy/evaluator 接线 | 🟢 条件式代码切片完成 | archive confirm 在最终授权事务内读取并验证 Project baseline/Worktree overlay，生成当前 Rust Hook evaluation；缺 Project baseline、不可用 policy、Runtime unhealthy、执行未 drain、活跃 Run/lease/claim/process、locked/unknown Git retention lock 均由 builtin evaluator fail closed。 |
+| Runtime/Git 预检 | 🟢 有界 observer seam 完成 | 数据库事务外先最多等待 2 秒获取 Git lock observation；只有新鲜 Unlocked 才请求最多 2 秒 Runtime drain/readiness，避免 lock conflict 时停止 Agent。返回后重开短事务，再锁定 plan/Worktree、检查 Project/Repository/Runtime/lifecycle version、当前 actor manager 权限、policy 与 observation freshness。readiness observer 收到稳定 operation ID、plan correlation 和期望 lifecycle version；admission fence expiry 必须为最终 archive mutation 留至少 5 秒，并在写入前重检。生产 provider 必须保持 fence 至命令完成，且其期限要和目标数据库有界事务时限一起验收。 |
+| 决策和审计 | 🟢 条件式实现 | Allow 才执行 archive row 状态更新；Deny 把计划置 cancelled；RequireHuman/Defer 记录未执行 decision projection 并保留待处理计划。当前投影写入 `worktree_management_audit`，不能替代 Phase 9D 通用 append-only Hook RunEvent/outbox/BI。 |
+| 生产启用/cleanup | 🟡 未完成 | `GroupApiState` 有可注入 readiness observer seam，但 production main 尚未安装 provider，缺失时 API 返回 503；目标 DB migration/runtime grants/API RLS integration 未验收，DB archive 不执行物理 checkout 删除，Host Runtime cleanup/provider 仍需另行实现。事务期限与 admission fence 的联合运行保证仍待 production adapter 验收。 |
+| 聚焦验证 | 🟢 本地通过 | `cargo check -p star-api-rest --lib -j 4` 通过；`cargo test -p star-api-rest --lib -j 4` 103/103；`cargo clippy -p star-api-rest --lib -j 4` exit 0，REST crate 报告 51 条 warning，但定向扫描确认改动的 `group_api.rs`、`hook_policies.rs`、`worktrees.rs` 无 Clippy warning。workspace 仍有既存弃用/unused/style/large-error warnings；rustfmt check 通过，`git diff --check` 在提交前复核。 |
+
+导航约束不变：Settings 侧栏提供“高级设置”主入口，内部 Hooks 是与 Skills/MCP/Plugins 并列的 tab（`/settings/advanced/hooks`）；Hooks 不进入 Worktree Group App 树。Worktree Index 只呈现有效策略和决策状态。Phase 9C UI 代码切片已加入但 session Provider/生产 API 验收仍开放，9D RunEvent/outbox/BI、9E Agent/Loop 与目标环境验收继续开放。
+
+### 6.46 本轮阶段结果（Phase 9C Advanced Settings Hooks tab，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| 导航层级 | 🟢 代码切片完成 | 沿用 ULYS-235 的既有决策：Settings 侧栏只有“高级设置”入口；进入后 Skills、Hooks、MCP、Plugins 是同层 tabs。Hooks canonical route 为 `/settings/advanced/hooks`，不是 Worktree Group App，也没有 Hooks 独立顶级项。`star-nav-store:v2`→v3 一次性迁移保留旧侧栏顺序/折叠/项目 scope，并补入高级设置；迁移后仍尊重用户移除该入口的选择。 |
+| Policy Builder | 🟢 条件式 UI 代码完成 | Project/Worktree 授权选择、typed restrictive rule editor、Draft CAS、publish role gate、rollback 与策略配置 Audit；缺 API session 时明确 fail closed，不读取 seed、不显示假策略、不允许写入。当前范围仅 Worktree archive/cleanup。 |
+| API 对接 | 🟡 客户端契约已加，运行时未接通 | 增加 Project/Worktree policy read/draft/publish/rollback 方法；应用 root Providers 尚未注入 Group API token/session generation，故没有真实授权读取或发布验收。生产目标 DB/RLS/grants 也未安装。 |
+| RunEvent/BI | 🟡 9D 首个切片 | 新增 Worktree archive append-only HookEvent ledger、同确认事务写入、`hook:read` Project 授权 keyset API 和 Advanced Settings → Hooks 页执行事件面板；只覆盖 `worktree_archive`，coverage=`partial`、百分比 `null`。9C 右栏仍只显示策略配置 Audit；Run-linked producers、真实 Outbox delivery state、BI read model/授权下钻与 Run Detail/Quality & Improvement consumer 尚未实现。Run 仍是每次尝试独立身份，Worktree 是可选 execution reference，Project BI 留在 Quality & Improvement。 |
+| 聚焦验证 | 🟡 有边界通过 | `pnpm exec vitest run` 对 Hooks/导航、偏好迁移与 Group API 的四个定向文件 38/38 通过；`pnpm exec tsc --noEmit` 通过。`pnpm typecheck` 在当前 PowerShell 环境报 `tsc is not recognized`，直接调用本地 TSC 已验证。`pnpm exec next build` 的 production bundle compile 成功，但全站静态生成在未修改的 `/worktree` 页因 `useSearchParams()` 缺少 Suspense boundary 失败；此阻断与本次新增 route 不同。 |
+
+**本阶段结论**：Advanced Settings 导航和 Hooks 可视策略 UI 已形成可测试代码切片，不能标为生产 9C 验收完成。关闭条件为装配 app session Provider、在目标 DB/RLS 下验证策略 read/write/publish/rollback、浏览器端 route/accessibility/E2E，并提供策略审计与 9D execution-event 的明确分界测试。
+
+Hooks 导航基线已经在 `AGENTS.md` 与 ULYS-235 明确规定：主入口“高级设置”，内层并列 tabs 为 Skills、Hooks、MCP、Plugins；不得将 Hooks 添加到 Project→Worktree→Apps 树。
+
+### 6.47 本轮阶段结果（Phase 9D HookEvent 事件源、读取 API 与 Hooks 页面事件面板，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| 存储 schema | 🟡 migration 已写、隔离验证通过 | `db/migrations/2026-10-01-multica-hook-execution-event.sql` 增加 Transaction/append-only `multica.hook_execution_event`，无 Worktree/Run 外键以保留生命周期历史，设置 tenant FORCE RLS、bounded JSON 与 cursor/metric indexes。一次性 PostgreSQL 18 集群重复应用成功；租户隔离和 UPDATE/DELETE/TRUNCATE 拒绝通过。目标 DB/runtime role grants/RLS integration 未验收。 |
+| archive producer | 🟡 条件式代码通过 | Worktree archive evaluation 测量 evaluator latency，将 stable decision/reason、policy/evaluator versions、digest 与 freshness timestamps 写入该 ledger；事件与 Worktree mutation/audit 同事务，写失败 fail closed。仅 Allow 通过最终授权与新鲜度复核后记录；Deny/RequireHuman/Defer 随管理审计提交。`star-api-rest` library tests 106/106 通过。 |
+| read API | 🟡 条件式 API 代码通过 | 新增 `GET /api/v1/projects/{project_id}/hook-events`，复用 `hook:read` + membership + tenant RLS，Project-bound `(occurred_at,event_id)` cursor，limit 上限 100，allowlisted projection/no-store。返回 partial coverage 与 null percentage；这只是 ledger 读取源，不提供 Outbox consumer 状态。 |
+| Advanced Settings UI | 🟡 受控事件面板代码通过 | 既有 `/settings/advanced/hooks` tab 增加 Project-scoped、每页 30 条且页面最多保留 300 条的 Hook 执行事件列表，配置 Audit 与 execution event 分开；Project/session 切换清除旧数据，coverage=`partial`/比例 unknown 明示。测试使用显式 Provider；app root 尚未装配真实认证 session。 |
+| 与 RunEvent/BI 的关系 | 🟡 后续接线开放 | `task_execution_run_event` 保持 task/run FK，仅承载 Run-linked Hook facts；Worktree lifecycle ledger 承载独立 archive Hook。Run/tool/validation/review producers、联合 BI read model、聚合公式、Run Detail/Quality & Improvement drilldown 均未完成；未采集 phase 是 unknown，不能按 0 处理。 |
+| 验证与启用 | 🟡 本地切片通过、生产未验收 | Rust focused tests 106/106、前端 Hooks/API 两个定向文件 25/25、`pnpm exec tsc --noEmit` 通过；SQL 在一次性 PostgreSQL 18 集群重复应用并验证 FORCE RLS、租户隔离及 append-only 拒绝。目标 DB、host session Provider、生产 Runtime readiness provider 与物理 checkout cleanup 未验收，不能宣称 Phase 9D 或生产 Hook execution 完成。 |
+### 6.48 本轮阶段结果（Phase 9D Project Hook summary API，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Project-scoped API | 🟡 条件式 Rust API 已实现 | GET /api/v1/projects/{project_id}/hook-events/summary?window_days=；复用 hook:read、Project membership 与 tenant RLS，默认窗口 30 天、边界 1–90 天、no-store。目标数据库、runtime grants/RLS 与 host session Provider 未验收。 |
+| 指标 contract | 🟡 source-only metric v1 | hook_execution_summary_v1 按 phase/decision 聚合 event_count、run_linked_event_count、timeout_count、duration_total_ms、average_duration_ms 与 latest time；响应携带公式、窗口与 partial/null coverage。当前 run_linked 只表示 Hook ledger 的 run_id 非空行，不是 task_execution_run_event join。 |
+| Coverage | 🟡 明确 partial/unknown | 当前仅 instrument worktree_archive；coverage percentage 为 null，run_outcome_join 为 not_available；未接入 phase 和质量 outcome 均 unknown，不按零或完整覆盖率解释。 |
+| 验证 | 🟢 隔离 PostgreSQL 验收通过 | Run、Profile、guard 三 migration 应用成功；guard migration 重复应用；旧 Run 与两类完整 snapshot 接受，5 类负例拒绝；accepted Runs=3（legacy=1、Profile snapshot=2），Profile FK=0；临时数据库清理并复查不存在。目标数据库未触碰。 |
+| 后续门 | 🟡 Phase 9D/生产未关闭 | 接入 Run-linked producers、跨两类 event source 的去重/Run outcome join、Outbox delivery state、版本化 denominator/cohort 与 Quality & Improvement/Run Detail UI；在目标 DB/RLS/grants 和真实 auth Provider 下验收后才可关闭。 |
+
+### 6.49 本轮阶段结果（Phase 9D Hook summary UI consumer，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Advanced Settings consumer | 🟡 条件式前端代码已实现 | 原 `/settings/advanced/hooks` 标签中增加 7/30/90 天窗口、总量指标和 phase/decision 表；Project/session/API client 变化时清除旧投影。与用户此前 ULYS-235 的高级设置并列标签要求一致，不新增 Worktree/主侧栏导航项。 |
+| coverage 语义 | 🟡 显式 partial/unknown | 只展示 `hook_execution_summary_v1` 已记录 archive ledger；Run ID 行数不宣称 RunEvent join，Run outcome 标记尚未接入；无记录只表示当前已接入账本在窗口内无行。 |
+| 验证与启用 | 🟡 未运行测试 | 本轮未运行 tests；目标宿主 auth Provider、目标 DB/RLS/grants、完整 Run-linked producers、Outbox 和 BI read model/UI 仍未完成。 |
+| 后续门 | 🟡 Phase 9D/生产未关闭 | 先接 Run-linked Hook producers 与稳定去重/Run outcome join，再实现 Outbox delivery state、完整 coverage/cohort 与 Quality & Improvement/Run Detail 授权下钻。 |
+
+### 6.50 本轮阶段结果（Phase 9D-4 双来源 Hook summary read model，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| 双来源读取与去重 | 🟡 summary v2 代码已实现 | 在 1–90 天 Project 窗口内合并 Hook ledger 与字段完整的 `hook_evaluated` TaskRunEvent；RunEvent 镜像以 `(tenant_id,event_id)` 去重，producer 必须共享 event ID；新增 Project/time/event-type 索引支持有界扫描。 |
+| Run 状态关联 | 🟡 read-model join 已实现 | 通过 tenant/project/work_item/run 完整键读取每个 Run 最新 execution_state，按 phase/decision 展示状态计数；`no_samples/partial/complete` 只描述 join 样本关系，不代表 Run terminal outcome 或全阶段 Hook coverage。 |
+| 不完整数据与 coverage | 🟡 可见缺口 | 缺 phase/decision/duration/timeout 且无 ledger 镜像的 RunEvent 不纳入指标，单独报告 excluded 数；known producer 仍只有 `worktree_archive`，Run producer 未接、coverage percentage=null、其他阶段 unknown。 |
+| Advanced Settings 位置 | 🟢 延用既有决策 | v2 汇总仍显示在 `/settings/advanced/hooks` 的 Hooks tab 内容区；它属于「高级设置」父入口下的并列标签，未添加 Worktree 或主侧栏导航节点。 |
+| 验证 | 🟢 隔离 PostgreSQL 验收通过 | Run、Profile、guard 三 migration 应用成功；guard migration 重复应用；旧 Run 与两类完整 snapshot 接受，5 类负例拒绝；accepted Runs=3（legacy=1、Profile snapshot=2），Profile FK=0；临时数据库清理并复查不存在。目标数据库未触碰。 |
+| 后续门 | 🟡 Phase 9D 未关闭 | 接入 Run admission/tool/validation/review producers 与事务内双写；补齐 Outbox delivery state、版本化 denominator/cohort、Run Detail/Quality & Improvement 下钻；完成目标 DB/RLS/grants 与真实 auth Provider 验收。 |
+
+### 6.51 本轮阶段结果（Phase 9D-5a phase-scoped native evaluator contract，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Typed phase model | 🟡 evaluator API v2 已支持两类 phase | HookRule 可选 phase 将规则绑定到 BeforeRunAdmission 或 BeforeWorktreeArchiveCleanup；未标注规则只适用于 archive/cleanup，不跨 phase。当前 evaluator 不宣称其他 planned phases 已接入。 |
+| 旧策略兼容 | 🟢 archive policy digest 保持兼容 | evaluator API v1 仅接受无 phase 字段的旧 policy 并只支持 archive/cleanup；v2 可用 phase-scoped rules。Run admission 当前仅接受 ActorAuthorized、LifecycleVersionMatches、RuntimeHealthy，archive-only facts 在验证时拒绝。 |
+| Builder 与发布边界 | 🟢 保持高级设置内并列标签且服务端 fail closed | HookRule phase selector 位于既有 Settings → Advanced Settings → Hooks 内容区；Run admission 显示为 disabled，Project/Worktree publish 与 rollback normalization 拒绝无 producer 支撑的规则并返回 hook_phase_producer_unavailable。ULYS-235 的 Skills/Hooks/MCP/Plugins 局部标签条不变，也未增加 Worktree 导航节点。 |
+| 验证 | 🟢 隔离 PostgreSQL 验收通过 | Run、Profile、guard 三 migration 应用成功；guard migration 重复应用；旧 Run 与两类完整 snapshot 接受，5 类负例拒绝；accepted Runs=3（legacy=1、Profile snapshot=2），Profile FK=0；临时数据库清理并复查不存在。目标数据库未触碰。 |
+| 未关闭门 | 🟡 Phase 9D 继续开放 | Run admission producer/readiness provider、Run start transaction dual-write、tool/validation/review producers、Outbox delivery、BI cohort/denominator 与 Quality & Improvement/Run Detail drilldown、目标 DB/RLS/grants 与真实 auth Provider 尚未验收。 |
+
+### 6.52 本轮阶段结果（Phase 9D-5b conditional Run admission producer，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Runtime readiness 与 fence | 🟡 条件式 seam 已接入 | `TaskCliSessionProvisioner::supports_run_admission()` 默认 false；显式 producer 最多 2 秒在事务外返回 readiness/fence。readiness ≤5 秒、非空 fence、提交余量 >5 秒、TTL ≤30 秒；fence 绑定 Task/Worktree/Runtime/profile/request fingerprint，必须由 adapter 在 spawn 前一次性消费与重验。当前无生产 adapter，能力未开启。 |
+| Run + Hook 原子写入 | 🟡 REST producer contract 已实现 | final short transaction 重授权、重读 Worktree/Task/lifecycle/effective policy 并运行 `BeforeRunAdmission` evaluator；Allow 写 immutable HookSet snapshot、Run/start event、Hook ledger 与 Run `hook_evaluated`；Deny 仅写 `run_id/work_item_id=NULL` 的 ledger，不创建 Run。ledger 与 RunEvent 显式共享同一 `event_id`，满足 summary v2 `(tenant_id,event_id)` 去重。Runtime readiness 等待不持 DB row lock。 |
+| Policy UI 与 BI coverage | 🟢 使用同一服务端 capability | GET policy 的 `producer_capabilities.run_admission` 控制 Builder phase option；publish/rollback normalization 对 capability=false fail closed；event list 与 summary `instrumented_phases` 随 capability 切换。Hooks 仍为 ULYS-235 Advanced Settings → Hooks 并列 tab，非 Worktree 节点；目前实际 capability=false，所以 UI 禁用且 Run coverage unknown。 |
+| 验证 | 🟢 隔离 PostgreSQL 验收通过 | Run、Profile、guard 三 migration 应用成功；guard migration 重复应用；旧 Run 与两类完整 snapshot 接受，5 类负例拒绝；accepted Runs=3（legacy=1、Profile snapshot=2），Profile FK=0；临时数据库清理并复查不存在。目标数据库未触碰。 |
+| 未关闭门 | 🟡 Phase 9D 未关闭 | 生产 provisioner/runtime fence consume、真实 auth provider、目标 DB migration/grants/RLS/API integration、独立 Outbox delivery、tool/validation/review producers、完整 BI denominator/cohort 与 Run Detail/Quality & Improvement 下钻仍未验收；本切片不宣称生产 Run spawn 已由 Hook 保护。 |
+
+
+### 6.53 本轮阶段结果（Phase 9E-1 immutable Agent Execution Profile contract，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Profile 类型与不可变包装 | 🟢 9E-1/9E-2 domain core 已实现 | 新增 domain-agent execution_profile：schema v1 Draft/Document/Verified wrapper 与 bounded current dependency resolver；固定 tenant/project/worktree scope、provider/skill version/digest、grant/HookSet/Worktree 状态，无 fallback；借用式输出不复制大字段。 |
+| provider 与跨能力约束 | 🟢 fail-closed field verification | Agent/Memory/Skill/ContextAssembler/Validation/LoopPolicy provider 的 version/digest/capabilities 固定；列表排序唯一；所有 provider/skill capability 必须为 grant snapshot 子集；Validation provider ID 与 Agent provider 分离；Memory 必须显式 Disabled 或有界 Enabled，Unavailable 拒绝。 |
+| 上下文与循环/资源预算 | 🟢 单 Run hard ceilings | Profile ≤65,536 bytes，Skill ≤128、capability ≤64、criteria ≤256；Context ≤64 MiB/16,777,216 tokens/4,096 sources；Memory ≤4,096 items/16 MiB/4,194,304 tokens/10 年；Run ≤8 GiB RSS、24 小时 CPU/runtime、256 children/tools、100,000 calls、128 MiB output、16 MiB event buffer。Project/主机聚合预算与设备性能实测仍属后续 scheduler/Phase 12。 |
+| scope 与历史 digest | 🟢 API contract 已实现 | Worktree profile 只能精确匹配请求 Worktree；Project profile 仅能在同 tenant/project 的 Worktree 使用；修改 payload 后 verify 检测 digest mismatch。每次实际 create/resume 仍须在 Run command 中重授权并复核 grant expiry/provider/lifecycle。 |
+| 验证 | 🟢 隔离 PostgreSQL 验收通过 | Run、Profile、guard 三 migration 应用成功；guard migration 重复应用；旧 Run 与两类完整 snapshot 接受，5 类负例拒绝；accepted Runs=3（legacy=1、Profile snapshot=2），Profile FK=0；临时数据库清理并复查不存在。目标数据库未触碰。 |
+| 高级设置导航 | 🟢 既有 ULYS-235 保持 | Hooks 是 Advanced Settings 页面内容区内与 Skills/MCP/Plugins 并列的 tab；主侧栏只承载高级设置父入口，Worktree Index 只投影 effective HookSet 与状态，Worktree 树不新增 Hook 节点。仓库 AGENTS.md 已有此规则，无需重复新增。 |
+| 未关闭门 | 🟡 Phase 9E/9D 与生产验收开放 | 9E-3 Profile Master/SCD2 + Audit migration substrate 已新增但未部署目标 DB；9E-4A Run snapshot guard migration 隔离 PostgreSQL 验收通过，尚未部署目标 DB；发布/读取 API、生产 Run writer、current provider catalog adapter、资源原子 reservation 与 DB/RLS runtime 驗收仍开放。Rust-owned CLI adapter、Automation occurrence worker/fencing、Schedule/Cron rule、Loop checkpoint/runtime、跨 Project 有界公平调度也未完成；Phase 9D production provisioner/fence consume、真实 auth、Outbox 与完整 BI 仍开放。 |
+
+### 6.54 本轮阶段结果（Phase 9E-2 bounded Execution Profile resolver，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| 当前 Provider/Skill 匹配 | 🟢 bounded fail-closed resolver | `ExecutionProfileResolver` 先拒绝乱序/重复/无效/超限 catalog（Provider ≤256、Skill ≤4,096），再精确匹配 ID/version、provider implementation/config digest、capability support、Skill content digest 和 revoke/available 状态；不回退到其它版本。 |
+| scope/grant/HookSet/lifecycle 复核 | 🟢 admission facts contract | 匹配 tenant/project/worktree，current grant set/version/capabilities/expiry 必须完全等于 profile snapshot 且未过期；effective HookSet ID/version/digest 必须一致；Worktree 非 Active 时拒绝。caller 必须先完成 actor/GroupContext ACL；这不是 auth provider 或 Run writer。 |
+| Rust 前端/并行开销 | 🟢 借用式返回与有界目录 | Resolver 返回 `ResolvedAgentExecutionProfile<'_>` 借用，避免复制 Profile/Context/Skill 内容；catalog 校验线性扫描 bounded 条目，依赖查找使用 binary search；resolver 不持锁。共享 resource reservation、公平排队和设备级总 RSS 仍在后续 scheduler/Phase 12。 |
+| 验证 | 🟢 隔离 PostgreSQL 验收通过 | Run、Profile、guard 三 migration 应用成功；guard migration 重复应用；旧 Run 与两类完整 snapshot 接受，5 类负例拒绝；accepted Runs=3（legacy=1、Profile snapshot=2），Profile FK=0；临时数据库清理并复查不存在。目标数据库未触碰。 |
+| 未关闭门 | 🟡 后续 9E/9D 与生产验收开放 | Profile registry/SCD2 与授权 API、Run snapshot 原子 writer、provider/Skill 生产 catalog、quota reservation、CLI adapter/进程树 cleanup、Schedule occurrence/fencing、Loop checkpoint/runtime、BI/evidence 生产联动、目标 DB/RLS/grants/auth 均未接通。 |
+
+ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Skills/MCP/Plugins 并列的 tab，不是主导航或 Worktree 节点。
+
+### 6.55 本轮阶段结果（Phase 9E-3 Profile Master/SCD2 持久化基底，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Profile 主记录 | 🟢 additive PostgreSQL migration | 新增 `multica.agent_execution_profile` Master，稳定 profile ID、Project/Worktree scope、连续 revision、schema version、active/disabled 状态、verified document JSONB、SHA-256 digest、操作者与 SCD2 有效区间；数据库将 envelope scope/version/digest 与 JSON document 字段对照。 |
+| 历史与并发写保护 | 🟢 SCD2 guard contract | 事务级 advisory lock 串行化同 tenant/profile 的写入；只能关闭当前 revision 一次后追加连续 successor，禁止 scope 改绑、历史字段 UPDATE 与物理 DELETE；current revision 唯一。 |
+| 审计与租户隔离 | 🟢 append-only Audit + FORCE RLS | 新增 publish/rollback/enable/disable Audit Transaction；目标/source revision FK 与 scope/state guard、4 KiB 脱敏 details；Audit 拒绝 UPDATE/DELETE/TRUNCATE；Profile/Audit 均启用并 FORCE tenant RLS。 |
+| Run 快照边界 | 🟡 writer 接入仍待后续阶段 | Phase 8A 已有 nullable Run `execution_profile_id/version/digest/snapshot` 列；本 migration 不写 Run、不创建 API、不部署目标 DB。配对 migration 验证中，先写入 Profile v1 的 Run snapshot，再关闭 v1 并追加 v2 后，Run 内 JSON 与 digest 仍匹配 v1；生产 writer 仍须原子写入且保持对 Profile Master 无 FK。 |
+| W/T/M 分类 | 🟢 100% 新表分类 | Profile 为 Master (M)，Audit 为 Transaction (T)；无临时 Draft 表，因此没有遗漏 Work TTL。详细设计表从 Work 4 / Master 2 / Transaction 6 更新到 Work 4 / Master 3 / Transaction 7。 |
+| 验证 | 🟢 隔离 PostgreSQL 验收通过 | Run、Profile、guard 三 migration 应用成功；guard migration 重复应用；旧 Run 与两类完整 snapshot 接受，5 类负例拒绝；accepted Runs=3（legacy=1、Profile snapshot=2），Profile FK=0；临时数据库清理并复查不存在。目标数据库未触碰。 |
+
+### 6.56 本轮阶段结果（Phase 9E-4A Run/Profile snapshot 数据库不变量，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| 完整快照约束 | 🟢 additive migration 重复应用通过 | 2026-10-01 Run Profile snapshot guards migration 要求 Profile ID/version/digest/document 全空或全有；保留无 Profile 的既有 Run。 |
+| Run envelope 一致性 | 🟢 正/负向 PostgreSQL 验收通过 | 无 Profile 的旧 Run、Project scoped 与 Worktree scoped 完整 snapshot 插入成功；部分 tuple、tenant/project/Worktree scope 与 digest 不匹配的 5 类负例均被拒绝；Run 到 Profile Master 的 FK 数为 0。 |
+| 生命周期与集成边界 | 🟡 尚未接生产 writer | 迁移依赖 Phase 8A Run schema；Profile API、resolver current catalog、Run writer、目标 DB部署与资源原子 reservation 仍未完成。 |
+| 验证 | 🟢 隔离 PostgreSQL 验收通过 | Run、Profile、guard 三 migration 应用成功；guard migration 重复应用；旧 Run 与两类完整 snapshot 接受，5 类负例拒绝；accepted Runs=3（legacy=1、Profile snapshot=2），Profile FK=0；临时数据库清理并复查不存在。目标数据库未触碰。 |
+
+
+### 6.57 本轮阶段结果（Phase 9E-4B1 current Profile read API，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| 有界 current Profile 列表 | 🟢 REST 代码切片 | `GET /api/v1/worktrees/{worktree_id}/execution-profiles` 要求 `worktree:read`，在 tenant RLS transaction 中验证 Worktree/有效 Project binding 和 active Project membership；只返回当前 active Project Profile 与当前 Worktree Profile 的 metadata，默认 20、最大 50、UUID keyset cursor，不返回 JSON document。 |
+| current Profile 详情 | 🟢 Rust read-time verifier | `GET /api/v1/worktrees/{worktree_id}/execution-profiles/{profile_id}` 在同一 scope 授权边界中读取当前 document，调用 `decode_and_verify`，核对 tenant/project/worktree/schema/digest 后执行 `validate_for_scope`；历史、disabled 与其他 Worktree Profile 不暴露。 |
+| 缓存与执行边界 | 🟢 fail-closed contract | 两 endpoint 都设置 `Cache-Control: no-store`。读取 Profile 不会验证当前 Provider/Skill/Grant/HookSet catalog，不发布 Profile、不创建 Run，也不执行资源 reservation；Run admission 必须继续调用 9E-2 resolver 并重授权。 |
+| 验证 | 🟢 定向 Rust 测试通过 | `cargo test -p star-api-rest --lib group_api::execution_profiles::tests -j 4`：4 passed；crate test binary 完成编译。原始 Cargo.lock 在测试自动解析 240 个依赖后恢复，未提交锁文件 churn。SQL/真实 HTTP Auth/目标 DB RLS/grants 未做集成验收；保留已有用户文件 `Cargo.lock.phase9d-backup`。 |
+| 后续门 | 🟡 未完成 | Profile publish/rollback/disable API 已由 §6.58 的 9E-4B2 代码切片覆盖；current Provider/Skill/Grant registry adapter、生产 Run snapshot writer、同事务 quota reservation、真实身份/RLS 与目标 DB 部署、Rust CLI adapter、Schedule occurrence、Engineering Loop 与公平调度继续开放。ULYS-235 Hooks 仍是 Settings“高级设置”内容区并列 tab，不进入 Worktree 树。 |
+
+### 6.58 本轮阶段结果（Phase 9E-4B2 Profile lifecycle write API，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Project/Worktree Profile lifecycle routes | 🟢 有界 typed REST 代码切片 | 新增两条 `POST .../execution-profiles/{profile_id}/lifecycle` 路径；请求 ≤67,584 bytes，typed Profile document ≤65,536 bytes，Serde 拒绝未知字段。支持 publish/disable/reenable/rollback。Project/Worktree profile scope 从 URL 和当前绑定解析，document 不能改 scope。 |
+| 身份、授权与 CAS | 🟢 fail-closed route gate | 要求 `execution-profile:publish`、tenant RLS、当前 Project membership 与 `tenant_admin` / `project_admin` 角色；操作前锁 profile ID 并比较 `expected_current_version`，stale write 拒绝；Worktree endpoint 只改精确 Worktree scope。真实 JWT/OAuth scope provisioning 尚未接入。 |
+| SCD2 与审计 | 🟢 同事务代码路径 | Publish 先 Rust verify；状态操作与 rollback 重验 stored document；事务在 SCD2 trigger 同键 advisory lock 后锁 current row，关闭旧 revision、插入 next successor 和 append-only Audit 后一次提交；错误整笔回滚。Rollback 以新 active revision 表示，不复活/覆盖历史行。 |
+| 内存与响应 | 🟢 单请求 body bound | request body 硬上限 67,584 bytes；没有 provider/外部 I/O 在事务锁内；响应只回 digest 与小型 revision receipt，所有匹配路由的响应 no-store。真实 API 并发上限、DB pool 队列仍由服务主机配置控制。 |
+| 验证 | 🟢 targeted Rust tests 通过 | `cargo check -p star-api-rest --all-targets -j 4` 通过；`cargo test -p star-api-rest --lib group_api::execution_profile_admin::tests -j 4` 重试后 3 passed、0 failed（首次链接收到 Windows `LNK1104`，检查无同名运行进程后重试成功）；rustfmt check 与 `git diff --check` 通过。Cargo.lock 的 240-package 自动解析 churn 已恢复，保留 `Cargo.lock.phase9d-backup`。 |
+| 后续门 | 🟡 未完成 | 真实 Auth scope issuance、隔离 PostgreSQL 并发/CAS/trigger/Audit/RLS 验收、目标 DB/grants、Profile 可视 UI、current Provider/Skill/Grant catalog、Run snapshot writer、资源 reservation 与 production CLI/Loop/Schedule runtime 仍开放。ULYS-235 Hooks 保持 Settings“高级设置”内容区并列 tab，不进入 Worktree 树。 |
+
+### 6.59 本轮阶段结果（Phase 9E-4B3 Profile HookSet identity bridge，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| Effective policy load | 🟢 已实现 identity seam | 在调用方授权的当前事务以 `FOR SHARE` 读取 Project baseline 与可选 Worktree overlay；校验继承 policy-set ID、Project version/rules 与 effective document digest。缺 baseline 返回 None，继承不一致拒绝。 |
+| Profile HookSet snapshot | 🟢 已实现映射 | overlay 存在时使用 Worktree policy-set ID，否则 Project policy-set ID；effective version 与 lowercase digest 来自 Rust verified snapshot。旧 evaluator 调用仍走 policy-only compatibility wrapper。 |
+| 验证 | 🟢 定向验证通过 | `cargo test -p star-api-rest --lib group_api::hook_policies::tests::execution_profile_hook_set_uses_effective_overlay_identity_and_digest -j 4`：1 passed（首次链接遇 LNK1104；确认无同名进程后重试成功）；`cargo check -p star-api-rest --all-targets -j 4` 通过；rustfmt check 与 `git diff --check` 通过。Cargo.lock 因当前 workspace resolver 自动展开 240 个 package，恢复生成 churn；保留既有未跟踪 `Cargo.lock.phase9d-backup`。 |
+| 导航决策 | 🟡 源码/测试断言一致，动态未验证 | ULYS-235 Hooks 入口是 Settings“高级设置”内容区 tab，与 Skills/MCP/Plugins 并列；不新增 Worktree app 节点。Main/Project sidebar scope toggle 沿用既有 sidebar 需求，属于外层导航。对应 Vitest 因本 worktree 未安装前端依赖而无法启动。 |
+| 后续门 | 🟡 未完成 | identity bridge 不等于 Run admission。当前 Provider/Skill/Grant catalog adapter、生产 Run snapshot writer/同事务 Hook ledger + RunEvent、actor/Auth provider、目标 DB/RLS/grants、资源 reservation、Rust CLI adapter、Schedule occurrence 与 Engineering Loop runtime 仍开放。Run writer 必须重授权并在最终事务内重读 effective HookSet。 |
+
+该阶段只关闭 Profile/Run snapshot 所需的 effective HookSet 身份映射，不宣称 9E 整体或跨 App 生产闭环已完成。
+
 
 ## 修订履历
 
@@ -735,3 +908,26 @@ LangGraph 官方文档证实 checkpoint 只恢复状态边界，不能保护外�
 | v5.23 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步基本设计 v5.8 / Hook DD v0.5.3；补入一次性 PostgreSQL 18 上的 migration 双次应用、FORCE RLS、Project/Worktree 重基与 Audit 约束场景证据；区分隔离验证与目标 DB 部署/runtime grants；保持 ULYS-235 Advanced Settings 独立并列 tab 约束 | 完成 9B2A 隔离数据库验证并更新实施状态 |
 | v5.24 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步基本设计 v5.9、Group DD v4.21、Hook DD v0.5.4；记录 9B2B scoped policy API、CAS/TTL、admin publish/rollback、16-document memory batches、事务内 overlay rebase、99 个 library tests；保留目标 DB/grants/API RLS integration、9B2C-9E blocker 与 ULYS-235 Advanced Settings 并列 tab 导航 | 完成 9B2B policy API 条件式代码切片并同步 Phase 状态 |
 | v5.25 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录当前 workspace lock 的 `--locked` 重新解析限制与既存 Wry/objc2 依赖冲突；仅补直接依赖边，未提交 240-package 全量解析 churn；保留 9B2B 测试证据、目标 DB/RLS blocker、后续 Phase 与 ULYS-235 Advanced Settings 并列 tab 导航 | 提交前复核发现原始 workspace lock 不能在 `--locked` 下完成解析 |
+| v5.26 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 basic design v5.10、Group DD v4.22、Hook DD v0.5.5；记录 9B2C archive-confirm gate、锁外 bounded Runtime/Git 预检、锁内 reauthorization/effective policy evaluation/version-freshness CAS 与 102 REST library tests/check/Clippy evidence；明确 provider 缺失 503、target DB/RLS、physical cleanup、RunEvent/outbox/BI 与 9C UI blockers；保持 Hooks Advanced Settings 并列 tab | 推进 9B2C 并将外部等待从 Worktree database-lock window 移出 |
+| v5.27 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 basic design v5.11、Group DD v4.23、Hook DD v0.5.6；记录 archive admission fence expiry、至少 5 秒提交余量与写入前重检、103 REST library tests；明确生产 provider/事务期限联合验收、目标 DB/RLS、physical cleanup、RunEvent/outbox/BI 与 9C UI blockers；Hooks 保持 Advanced Settings 并列 tab | 补强 archive 命令期间 admission fence，并同步设计/实施边界 |
+| v5.28 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 basic design v5.12 与 Hook SRS/BD/DD v0.5.2/v0.5.2/v0.5.7；记录 Advanced Settings 主入口及 Hooks/Skills/MCP/Plugins 并列 tabs、9C typed policy Builder/API client 条件式代码和 fail-closed session 缺口；补入前端定向测试、TypeScript 与全站 build 限制 | 用户再次确认 Hooks 是高级设置中的选项卡，并要求持续推进 Run/BI 架构 |
+| v5.29 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Phase 9C 导航是 ULYS-235 的既有决策；新增旧版 `star-nav-store:v2` 一次性迁移，保留侧栏偏好并补入“高级设置”，后续仍尊重用户移除；导航、迁移、Builder 与 Group API 聚焦验证 38/38，TypeScript 通过；宿主认证/生产 API、全站 `/worktree` build 阻断及 9D-9E 缺口保持显式 | 用户提醒 Hooks 应沿用此前规定，作为高级设置中的一个选项卡 |
+| v5.30 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 Phase 9D `hook_execution_event` migration、archive producer 与 Project-authorized keyset API 的阶段范围；区分独立 lifecycle event ledger 与有 Run/Task FK 的 RunEvent；声明当前仅 archive phase、coverage partial/null，Rust/SQL 验证、目标 DB/grants、Run producers、Outbox state、BI read model/UI consumer 均开放；修正文档 cross-reference | 推进 Hook execution event / BI 接缝实现 |
+| v5.31 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将已实现的 Project-scoped Hook execution event panel 纳入 Advanced Settings → Hooks 阶段边界；同步 Rust 106/106、前端 targeted 25/25、TypeScript、隔离 PostgreSQL FORCE RLS/append-only 验证；明确真实 app auth Provider、目标 DB/RLS/grants、Run-linked producer、Outbox delivery state 和 BI read model 仍待验收 | 完成 9D Hooks tab 事件面板/API contract 并同步验证事实 |
+| v5.32 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 Project-scoped Hook summary API 与 hook_execution_summary_v1 phase/decision 计数，固定 1–90 天窗口、公式及 partial/null coverage；只统计当前 archive ledger，不宣称 RunEvent/outcome join、完整 BI、Outbox、目标 DB/RLS 或 Quality & Improvement UI 已实现；记录 targeted cargo check 通过且未运行 tests | 推进 Phase 9D 第一个可复算的 Hook BI 汇总切片 |
+| v5.33 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 在既有 Advanced Settings Hooks 标签接入有界 summary card，选择 7/30/90 天并按 phase/decision 呈现；同步 Hook SRS/BD/DD 与 overall basic design；保持 archive-only partial/unknown、Run outcome、真实 auth/DB 与完整 BI 未关闭状态 | Phase 9D-3 summary API consumer 完成代码切片，同时复核 ULYS-235 标签导航层级 |
+| v5.34 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步需求 v5.21、基本设计 v5.17、Hook SRS/BD/DD v0.5.4/v0.5.6/v0.5.12；新增 summary v2 双来源 event_id 去重、最新 Run 状态关联、不完整 projection 计数、专项时间索引和独立 coverage 语义；明确 Run producer、Outbox、完整 BI、目标 DB/RLS/grants 与 host auth Provider 未完成 | Phase 9D-4 read model 支持跨账本和 Run state join，同时复核 Hooks 的 Advanced Settings 导航归属 |
+| v5.35 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Phase 9D-4 实际验证结果入档：TypeScript、rustfmt、diff-check 与临时排除 star-desktop 的 star-api-rest lib 编译通过，未运行 tests、migration 未在目标 DB 执行；确认下一阶段须先扩展仅支持 archive 的 native typed evaluator，避免伪造 Run-linked Hook event | Phase 9D-4 本地代码验证完成，复核 Run producer 的 evaluator 依赖边界 |
+| v5.36 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Phase 9D-5a typed evaluator API v2、BeforeRunAdmission/archive phase isolation、legacy v1 archive digest compatibility、fact allowlist、UI disabled 与 Project/Worktree publish/rollback fail-closed gate；同步 requirements v5.22、basic v5.18、Hook SRS/BD/DD v0.5.5/v0.5.7/v0.5.13，并确认 Hooks 仍在 ULYS-235 Advanced Settings 内容区并列标签 | 用户再次指出 Hooks 应是高级设置选项卡，同时继续推进 Run/BI 架构 Hook 阶段 |
+| v5.37 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.23、basic v5.19、Hook SRS/BD/DD v0.5.6/v0.5.8/v0.5.14 与 Task DD v0.7；记录 9D-5b readiness/fence、同 event_id Hook ledger/RunEvent 双写、动态 capability/coverage、110 REST + 17 domain + 4 frontend tests 与 TypeScript 通过；注明无 production adapter、目标 DB/auth/Outbox/full BI 仍开放，Advanced Settings → Hooks 标签位置保持不变 | 将 phase-scoped evaluator 推进到 Run admission REST/事务数据流并复核 BI event identity |
+
+| v5.38 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.24、basic design v5.20、Task DD v0.8；记录 Phase 9E-1 Rust Profile immutable verifier、scope/canonical digest/grant checks、explicit Memory、Context preservation、independent Validation 与 per-Run memory/CPU/queue ceilings；定向 domain-agent 124/124 测试通过，workspace lock conflict 与目标环境/provider/Run persistence blockers 保留；确认 ULYS-235 高级设置并列标签不变 | 用户指出 Hooks 入口应遵循既有 Advanced Settings 导航需求，并继续推进所有 Phase |
+| v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.25、basic design v5.21、Task DD v0.9；补齐 ContextAssembler/LoopPolicy versioned provider+digest+grant snapshot 与 Profile Master/Run admission snapshot 边界；provider grant 负向验证通过；ULYS-235 Hooks 仍是 Advanced Settings 内容区并列 tab | Phase 9E-1 自审补齐上下文与循环实现版本引用，继续推进 Run admission |
+| v5.40 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.26、basic design v5.22、Task DD v1.0；记录 bounded resolver 对当前 provider/skill/grant/HookSet/Worktree 精确复核、borrowed return、129/129 定向测试与现有 workspace resolver blocker；保留 DB registry/Run writer/shared quota/runtime/production auth 缺口；确认 ULYS-235 导航不变 | 推进 Phase 9E-2 当前执行依赖解析与安全准入 seam |
+| v5.41 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.27、basic design v5.23、Task DD v1.1；新增 Profile Master/SCD2 + append-only Audit migration substrate、Scope/digest/schema consistency、FORCE RLS 与 Run self-contained snapshot boundary；临时 PostgreSQL 双次应用、3 revision/3 Audit、8 类负例、tenant RLS 隔离通过；组合 Run + Profile migration 验证 v1 Run JSON/digest 在 Profile v2 successor 后保持不变；临时 DB/角色清理；保留目标 DB/API/生产 Run writer/resource reservation 与 9D/9E runtime blockers；ULYS-235 Advanced Settings tab 导航保持 | Phase 9E-3 为 Run Profile snapshot 建立持久化基底并完成隔离 schema 与历史快照组合验收 |
+| v5.42 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.28、basic design v5.24、Task DD v1.2；新增 Run Profile snapshot all-or-none 与 envelope scope/digest guard migration；明确无 Profile FK 与旧 Run 兼容；SQL 静态审查完成，隔离 PostgreSQL 验收待办，Profile API/生产 Run writer/resource reservation/9D runtime 仍开放；ULYS-235 Advanced Settings tab 导航保持 | 修复 Run Profile 可部分为空或与任务 scope 不匹配的持久化风险 |
+
+| v5.43 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.29、basic design v5.25、Task DD v1.3；完成 Phase 9E-4A guard migration 隔离 PostgreSQL 双次应用、legacy Run、Project/Worktree snapshot、5 类负例与 no-FK 验收并清理临时库；保留目标 DB/Profile API/生产 Run writer/resource reservation/9D runtime blockers；ULYS-235 Advanced Settings tab 导航保持 | Phase 9E-4A 验收闭环 |
+| v5.44 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.30、basic v5.26、Task DD v1.4；增加 9E-4B1 有界 Worktree current Profile list/detail GET 与 Rust read-time verifier，4 个单测通过；明确 SQL/Auth/RLS 集成、Profile publish/current registry、Run writer 与资源 reservation 仍未完成；确认 ULYS-235 Hooks 是高级设置内容区并列标签 | 9E-4B1 Profile read API 代码切片与验证完成 |
+| v5.45 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.31、basic v5.27、Task DD v1.5；记录 9E-4B2 typed lifecycle routes、67,584-byte body bound、admin auth/CAS、SCD2 successor 与 same-transaction append-only Audit；`cargo check --all-targets` 与 3 个 targeted tests 通过，首次 Windows LNK1104 后重试成功，Cargo.lock churn 已恢复并保留 backup；真实 Auth/DB/RLS/target deployment/current catalog/Run writer/resource reservation 仍开放；ULYS-235 高级设置 Hooks 并列 tab 导航保持 | 实现 Profile publish/disable/reenable/rollback 生命周期最小切片 |
+| v5.46 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.32、basic design v5.28、Task DD v1.6；落地 Phase 9E-4B3 effective Project/Worktree HookSet identity bridge，定向测试 1/1 通过（首次链接遇 LNK1104，重试成功）与 star-api-rest all-targets check 通过；明确 Run writer/catalog/auth/DB/RLS/resource reservation/CLI/Loop/Schedule 仍开放；复核 ULYS-235 Advanced Settings tab 与既有侧栏 scope 导航 | 将 verified Hook policy identity 接入 AgentExecutionProfile admission 路径 |

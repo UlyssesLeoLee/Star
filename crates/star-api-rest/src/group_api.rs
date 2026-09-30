@@ -55,7 +55,23 @@
 //! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"});
 //! CREATE (hpm:Module {name:"hook_policies",type:"module",language:"rust"}),(hpr:Function {name:"hook_policies::router",type:"function",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(hpm),(b)-[:CALLS]->(hpr);
-use std::sync::Arc;
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(s:Class {name:"GroupApiState",type:"class"});
+//! CREATE (archiveQuery:Class {name:"WorktreeArchiveReadinessQuery",type:"class",language:"rust",visibility:"pub"}),(archiveReadiness:Class {name:"WorktreeArchiveReadiness",type:"class",language:"rust",visibility:"pub"}),(archiveError:Enum {name:"WorktreeArchiveReadinessError",type:"enum",language:"rust",visibility:"pub"}),(archiveObserver:Interface {name:"WorktreeArchiveReadinessObserver",type:"interface",language:"rust",visibility:"pub"}),(archiveInstall:Function {name:"GroupApiState::with_worktree_archive_readiness_observer",type:"function",language:"rust"}),(prepare:Function {name:"WorktreeArchiveReadinessObserver::prepare_and_observe",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(archiveQuery),(m)-[:CONTAINS]->(archiveReadiness),(m)-[:CONTAINS]->(archiveError),(m)-[:CONTAINS]->(archiveObserver),(s)-[:HAS_METHOD]->(archiveInstall),(archiveObserver)-[:HAS_METHOD]->(prepare),(archiveInstall)-[:USES]->(archiveObserver),(s)-[:USES]->(archiveObserver);
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MATCH (s:Class {name:"GroupApiState",type:"class"}),(p:Interface {name:"TaskCliSessionProvisioner",type:"interface"});
+//! CREATE (available:Function {name:"GroupApiState::run_admission_producer_available",type:"function",language:"rust"});
+//! CREATE (s)-[:HAS_METHOD]->(available),(available)-[:CALLS]->(p);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"});
+//! CREATE (ep:Module {name:"execution_profiles",type:"module",language:"rust"}),(epr:Function {name:"execution_profiles::router",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(ep),(b)-[:CALLS]->(epr);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"});
+//! CREATE (epa:Module {name:"execution_profile_admin",type:"module",language:"rust"}),(epar:Function {name:"execution_profile_admin::router",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(epa),(b)-[:CALLS]->(epar);
+use std::{sync::Arc, time::Duration};
 pub use worktree_lifecycle::{
     ProjectWorktreeCreateCommand, ProjectWorktreeImportCommand, ProjectWorktreeLifecycleProvider,
     ProjectWorktreeRepository, ProjectWorktreeRepositoryQuery, WorktreeImportCandidate,
@@ -65,24 +81,26 @@ pub use worktree_lifecycle::{
 
 use async_trait::async_trait;
 use axum::{
+    Json, Router,
     extract::{FromRef, Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::get,
-    Json, Router,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::auth::{oauth::AuthenticatedUser, AuthUser, JwtConfig};
+use crate::auth::{AuthUser, JwtConfig, oauth::AuthenticatedUser};
 
 mod canvas;
 mod cli_sessions;
+mod execution_profile_admin;
+mod execution_profiles;
 mod group_apps;
-mod hook_policies;
+pub(super) mod hook_policies;
 mod scoped_chat;
 mod scoped_chat_store;
 mod task_runs;
@@ -171,6 +189,53 @@ pub trait WorktreeGitLockObserver: Send + Sync {
     ) -> Result<WorktreeGitLockObservation, WorktreeGitLockObserverError>;
 }
 
+/// Trusted host-runtime input for a destructive Worktree archive. The observer must request
+/// bounded drain/cancel for this confirmed operation before returning a readiness snapshot.
+/// It must fence new Worktree admissions until the returned fence expiry; repeated requests with
+/// the same operation ID must be safe and must not start duplicate drain/cleanup work.
+#[derive(Debug, Clone)]
+pub struct WorktreeArchiveReadinessQuery {
+    /// Stable identity of the confirmed management plan.
+    pub operation_id: Uuid,
+    pub tenant_id: Uuid,
+    pub project_id: Uuid,
+    pub repository_id: Uuid,
+    pub worktree_id: Uuid,
+    pub runtime_id: Uuid,
+    pub actor_id: Uuid,
+    pub expected_lifecycle_version: i32,
+    pub correlation_id: Uuid,
+    pub max_drain_wait: Duration,
+}
+
+/// Bounded host-runtime facts after the requested drain attempt.
+#[derive(Debug, Clone)]
+pub struct WorktreeArchiveReadiness {
+    pub observed_at: DateTime<Utc>,
+    /// The host admission fence remains active through this instant.
+    pub admission_fence_expires_at: DateTime<Utc>,
+    pub runtime_healthy: bool,
+    pub drain_completed: bool,
+    pub active_run_count: u32,
+    pub active_agent_lease_count: u32,
+    pub file_claim_count: u32,
+    pub owned_process_count: u32,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum WorktreeArchiveReadinessError {
+    #[error("host runtime archive readiness is unavailable")]
+    Unavailable,
+}
+
+#[async_trait]
+pub trait WorktreeArchiveReadinessObserver: Send + Sync {
+    async fn prepare_and_observe(
+        &self,
+        query: WorktreeArchiveReadinessQuery,
+    ) -> Result<WorktreeArchiveReadiness, WorktreeArchiveReadinessError>;
+}
+
 #[derive(Clone)]
 pub struct GroupApiState {
     jwt: Arc<JwtConfig>,
@@ -179,6 +244,7 @@ pub struct GroupApiState {
     scoped_chat_workflow: Option<Arc<dyn ScopedChatWorkflow>>,
     group_app_registry: Option<Arc<dyn GroupAppRegistryProvider>>,
     worktree_git_lock_observer: Option<Arc<dyn WorktreeGitLockObserver>>,
+    worktree_archive_readiness_observer: Option<Arc<dyn WorktreeArchiveReadinessObserver>>,
     worktree_lifecycle_provider: Option<Arc<dyn ProjectWorktreeLifecycleProvider>>,
 }
 
@@ -191,6 +257,7 @@ impl GroupApiState {
             scoped_chat_workflow: None,
             group_app_registry: None,
             worktree_git_lock_observer: None,
+            worktree_archive_readiness_observer: None,
             worktree_lifecycle_provider: None,
         }
     }
@@ -225,6 +292,15 @@ impl GroupApiState {
         self
     }
 
+    /// Install the trusted Local Runtime drain/readiness observer for archive commands.
+    pub fn with_worktree_archive_readiness_observer(
+        mut self,
+        observer: Arc<dyn WorktreeArchiveReadinessObserver>,
+    ) -> Self {
+        self.worktree_archive_readiness_observer = Some(observer);
+        self
+    }
+
     /// Install a trusted Project-scoped Git Worktree lifecycle adapter.
     pub fn with_worktree_lifecycle_provider(
         mut self,
@@ -232,6 +308,12 @@ impl GroupApiState {
     ) -> Self {
         self.worktree_lifecycle_provider = Some(provider);
         self
+    }
+
+    pub(super) fn run_admission_producer_available(&self) -> bool {
+        self.task_cli_session_provisioner
+            .as_ref()
+            .is_some_and(|provisioner| provisioner.supports_run_admission())
     }
 }
 
@@ -544,6 +626,8 @@ pub fn build_group_router(state: GroupApiState) -> Router {
         .merge(worktree_lifecycle::router())
         .merge(work_items::router())
         .merge(cli_sessions::router())
+        .merge(execution_profiles::router())
+        .merge(execution_profile_admin::router())
         .merge(task_runs::router())
         .merge(scoped_chat::router())
         .merge(canvas::router())
