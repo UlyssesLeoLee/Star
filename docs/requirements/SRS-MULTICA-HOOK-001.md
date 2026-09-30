@@ -1,19 +1,19 @@
 # SRS-MULTICA-HOOK-001
 
-> **Multica Hook 域要件定義書 v0.3** (per ADR-0026 v0.2 §1.1 "5 类扩展点" 中的 hooks, 与 SRS-MULTICA-SKILL-001 v0.1 平行; v0.2 升版 MCP 实装, v0.3 升版 Plugins 升格为同导航实装标签页, v0.4 自审饱和: 4 处 v0.1→v0.3 交叉引用 staleness 修正 (per 2026-09-24 22:13 JST Ulysses "自审" 评论)
+> **Multica Hook 域要件定义书 v0.5.1** (沿用 Advanced Settings Hooks tab；新增渡口 Rust-native 强制引擎、可视化策略配置、Project/Worktree scope 与 Run/BI 事实联动。v0.1-v0.4 的 Python/Mavis handler 设计保留作历史兼容参考，不再作为安全关键执行核心)
 
-> - 状态: 🟡 Draft v0.3 (2026-09-24 22:13 JST 自审饱和, v0.4 修正 4 处 cross-reference staleness)
+> - 状态: 🟡 Draft v0.5.1 (2026-09-30 JST，Run query requirement trace synchronization)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联基本設計書: [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) (同期落档)
-> - 关联詳細設計書: [`docs/detailed-design/DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) (同期落档)
+> - 关联基本設計書: [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) v0.5.1
+> - 关联詳細設計書: [`docs/detailed-design/DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.1
 > - 平行 SRS: [`docs/requirements/SRS-MULTICA-SKILL-001.md`](../requirements/SRS-MULTICA-SKILL-001.md) v0.1 (skills 域)
 > - 关联 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §1.3 5 类扩展点 (commands / agents / skills / hooks / MCP)
 > - 拍板来源: 2026-09-24 20:xx JST Ulysses "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计"
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #10 + 守门 #14 v3)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST, 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses)
-> - 日期: 2026-09-24 JST
+> - 日期: 2026-09-30 JST
 > - 受众: 詳細設計エンジニア / アーキテクト / SRE / 5 域 Lead 真人
 
 ---
@@ -26,12 +26,12 @@
 |---|---|
 | 文书 ID | SRS-MULTICA-HOOK-001 |
 | 文书名 | Multica Hook 域要件定義書 (UI 高级设置 → Hooks 标签页) |
-| 版本 | v0.3 |
+| 版本 | v0.5 |
 | 作成日 | 2026-09-24 |
 | 作成者 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per DEC-008) |
 | 承認者 | 架构师 (Mavis 接手 agent per DEC-008) |
-| 対象範囲 | STAR 平台 "高级设置" 导航下 Hooks 标签页 + hooks 注册 / 匹配 / 执行 / 审计 |
-| 対象バージョン | mavis v0.x (现役) + mavis v1.0 (规划) |
+| 対象範囲 | STAR Rust 核心 Hook Engine + 高级设置 Hooks 标签页 + Project/Worktree Hook policy + Run/Worktree/BI 集成 |
+| 対象バージョン | Star Rust Agent/Worktree Runtime；Mavis/Python 仅限显式兼容 adapter，不具备核心 guard authority |
 | 適用プラットフォーム | Windows (PowerShell) + POSIX (bash) 双平台 |
 | 関連 commit | (root 统一 commit 时填, per 守门 #1 v15) |
 | 上位文書 | `AGENTS.md` §4 守门硬约束 (守门 #1+#5+#6+#9+#10+#13+#14 v3+#14 v4) |
@@ -61,13 +61,13 @@
 - 14 类 Hook 事件 (per Claude Code PreToolUse/PostToolUse/UserPromptSubmit/SessionStart/SessionEnd 等 + 扩展)
 - 4 状态 (registered / enabled / disabled / archived) + 30 天归档策略
 - Hook 注册中心 (单一来源, JSON Schema + 热更新)
-- Hook 执行引擎 (per-event fan-out, 含 pre/post/block/transform 4 种动作类型)
+- Hook 执行引擎 (Rust builtin typed evaluator；关键 phase 执行 allow/deny/require_human/defer；post-commit advisory 走有界隔离队列)
 - 全操作审计 log (Transaction append-only per 守门 #13)
 - UI "高级设置 → Hooks" 标签页 (CRUD + enable/disable + 触发日志查看)
 - 跟 skills 域并行 (相同导航, 不同标签页, 独立 registry, 共享 session state)
 - 跟 PreToolUse guard 联动 (PreToolUse guard 是 hooks 体系下 1 个具体 builtin guard hook)
 
-作为后续基本設計 (`BD-MULTICA-HOOK-001.md` v0.3, 同期落档) / 詳細設計 (`DD-MULTICA-HOOK-001.md` v0.3, 同期落档) / 実装 / テスト的唯一依据.
+本 SRS 与总要件 `docs/requirements.md` v5.20 §50.8D 同步；基本/详细设计见 BD/DD v0.5.1。若 v0.1-v0.4 的 Python runner、用户 handler、任意 transform 或 fail-open 文字与本版冲突，以 v0.5 Rust-native、typed-rule、critical-hook fail-closed 安全边界为准；高级设置导航承接 ULYS-235 的既有决定，不另造 Worktree 级入口。
 
 **派生来源**: ULYS-235 (2026-09-24) "hook需求" + ADR-0026 v0.2 §1.3 "5 类扩展点: commands / agents / skills / hooks / MCP" + Claude Code `plugins/hookify` + 9/10 PreToolUse guard 实测 (`SRS-PRE-TOOL-USE-GUARD-001.md` v0.1).
 
@@ -105,9 +105,9 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 | 機能 ID | 名称 | 项数 | 优先级 | 概要 |
 |---|---|---|---|---|
 | **FR-1** | Hook 生命周期 | 4 项 | P0 | 4 状态 (registered / enabled / disabled / archived) + 30 天归档 |
-| **FR-2** | Hook 事件模型 | 4 项 | P0 | 14 类事件 + 4 种动作类型 (pre / post / block / transform) |
+| **FR-2** | Hook 事件模型 | 4 项 | P0 | Rust schema 定义的关键 phase + allow/deny/require_human/defer 四种 decision；旧 14 个 Python event name 仅作兼容输入 |
 | **FR-3** | Hook 注册中心 | 3 项 | P0 | JSON Schema + 热更新 + builtin hook 默认装载 |
-| **FR-4** | Hook 执行引擎 | 3 项 | P0 | per-event fan-out + 串行/并行策略 + timeout / retry |
+| **FR-4** | Hook 执行引擎 | 3 项 | P0 | 核心同步策略确定性/有界执行与 fail-closed；非关键 post-commit event 有界重试 |
 | **FR-5** | Hook 审计 log | 2 项 | P0 | 全操作留痕, Transaction append-only per 守门 #13 |
 | **FR-6** | Hook UI 标签页 | 3 项 | P0 | "高级设置 → Hooks" 标签页: CRUD + enable/disable + 触发日志 |
 | **FR-7** | 跟 skills 域协调 | 2 项 | P1 | 同导航不同标签页 + 独立 registry + 共享 session state |
@@ -139,6 +139,27 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 
 ---
 
+### 1.6 渡口新架构补充（v0.5，优先于旧实现草案）
+
+本版 Hook 是 Star Rust 执行核心内的强约束能力。`HookSet / HookRule / evaluator` 具有稳定 schema、version、digest 与 capability scope；核心 builtin rules 不可关闭，Project policy 作为基线、Worktree policy 只能继承或追加限制。Hook 不授予权限、不改写 Task Contract/验收事实，也不替代 ACL、Domain Command 或独立 Validation。
+
+用户配置入口是已拍板的 **高级设置 → Hooks** tab，与 Skills/MCP/Plugins 共享同一高级设置导航；Hook 不是 Worktree Group App，也不新增 Worktree 树层级。UI 必须提供无代码的可视化 builder：规则/状态列表、结构化事件与条件、有限动作、优先级/范围、继承与覆盖视图、核心规则不可覆盖说明、冲突提示、版本 diff、dry-run/历史事件模拟、审批发布、rollback 与运行日志。禁止任意 Python/JavaScript/shell/动态库和无界 DSL。高级设置管理定义；Worktree Index 展示当前有效 HookSet/version/健康与阻断摘要；Run detail / Project Quality & Improvement 能筛选并下钻 HookEvent。
+
+安全关键同步 hook 至少覆盖 Run admission、tool call 前后、validation 前后、review/complete，以及 Worktree create/import/archive/restore/owner-transfer/binding-change/cleanup。决策为 `allow / deny / require_human / defer`。引擎、版本、规则或 append-only audit 不可验证/不可用/超时，则关键操作 fail closed；无影响决策的通知类 post-commit hook 可以有界重试。Plugin Hook 只能隔离执行 advisory/post-commit action，永远不能替换或削弱 builtin guard。
+
+Worktree archive、binding removal 与 checkout cleanup 之前重新校验 actor membership/role、lifecycle version、Runtime health、活跃 Run/Agent lease、file claim、PTY/process drain 与新鲜 Git retention-lock observation；unknown/expired/conflict 阻断操作。Hook decision 是 veto/approval gate，实际状态仍由 Worktree domain command 在写事务中再次原子校验。操作完成通过 Audit/Outbox 刷新 Worktree Index。
+
+每次 Hook evaluation 作为 RunEvent/Transaction audit 投影保存 hook_set/rule/evaluator version+digest、phase、decision/reason class、duration、timeout/fail-closed/override、Project/Worktree/Run/Task/actor/correlation scope；不保存 Secret、原始 prompt、完整 stdout 或隐式推理。BI 按 HookSet/rule version 计算覆盖率、阻断、人审、超时/失败、override 和处置耗时，并按 Project/Worktree/任务类型/复杂度与 Run 的验证/接受/返工/冲突关联；coverage 不足显示 unknown。Hook policy 改进必须经独立评审和固定 Benchmark，不得自行降低规则或评分基准。
+
+| Requirement | Added acceptance |
+|---|---|
+| HOOK-001/002 | Rust builtin fail-closed policy + visual no-code builder, inherited/versioned HookSet; fail unavailable and no arbitrary code |
+
+**v0.5 优先级说明**：本节定义当前 normative behavior。后续 §3-§9 保留 v0.1-v0.4 的 FR ID 以维持 traceability；凡描述 Python handler/JSON registry、任意 fan-out/transform、用户可关闭 builtin 或 critical fail-open 的段落均为历史实现草案，不适用于 Star 产品 runtime。旧 BLOCK→deny、ASK→require_human 只可用于兼容映射；WARN/PASS 不能授权放行，transform/未知 event 必须拒绝执行。
+| HOOK-003/004 | Run/Tool/Validation/Review and Worktree lifecycle gate; cleanup checks ACL/lease/claims/drain/fresh lock before Domain Command CAS |
+| HOOK-005/006 | Append-only scoped HookEvent linked to Run/Worktree/Audit and BI with coverage and quality/operations drilldown |
+| HOOK-007 | Plugin hook isolated/advisory only; cannot replace or weaken core policy |
+
 ## §2 用語定義 / 略語 (Glossary)
 
 | 用語 | 定義 | 出典 |
@@ -146,7 +167,7 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 | **Mavis** | 本机 root session agent (Mavis As a Jarvis), 运行在 MiniMax Code | per agent-context block |
 | **Hook** | 事件触发回调, 在 STAR 平台某个事件点 (e.g. PreToolUse) 触发的可注册回调 | ADR-0026 §1.3 |
 | **Hook event** | 14 类事件之一: PreToolUse / PostToolUse / UserPromptSubmit / SessionStart / SessionEnd / SubagentDispatch / SubagentReturn / ToolError / FileWatch / CronTick / RuntimeScan / WorkspaceSwitch / NetworkEgress / CustomEvent | 本 SRS 自定义 |
-| **Hook action type** | 4 种动作: pre (前置) / post (后置) / block (阻断) / transform (转换) | 本 SRS 自定义 |
+| **Hook decision** | `allow / deny / require_human / defer`；decision 不可改写命令、授权或任务验收事实 | v0.5 Rust-native contract |
 | **Builtin hook** | STAR 平台内置的 hook (e.g. PreToolUse guard, SessionStart cleanup), 不可禁用 | 本 SRS 自定义 |
 | **User-defined hook** | 用户/项目自定义的 hook, 可启用/禁用 | 本 SRS 自定义 |
 | **高级设置** | STAR UI 顶层导航, 容纳 skills / hooks 等扩展点, 不同能力走不同标签页 | ULYS-235 拍板 |
@@ -155,13 +176,11 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 | **Hook registry** | hook 注册中心, 单一来源 JSON 文件, per 热更新 | 本 SRS 自定义 |
 | **Hook run** | 单次 hook 执行记录, 写审计 log | 本 SRS 自定义 |
 | **Fan-out** | 1 个事件触发 N 个 hook (per-event 多 hook 列表), 串行或并行执行 | 本 SRS 自定义 |
-| **BLOCK** | hook 返回 BLOCK 决策, 阻断后续 hook 执行 + 阻断原工具调用 | 跟 SRS-PRE-TOOL-USE-GUARD §FR-2.1 一致 |
-| **ASK** | hook 返回 ASK 决策, 走 ask_user, 推荐项放"取消" | 跟 SRS-PRE-TOOL-USE-GUARD §FR-2.2 一致 |
-| **WARN** | hook 返回 WARN 决策, 注入 system_reminder, 继续执行 | 跟 SRS-PRE-TOOL-USE-GUARD §FR-2.3 一致 |
-| **PASS** | hook 返回 PASS 决策, 无动作 | 跟 SRS-PRE-TOOL-USE-GUARD §FR-2 一致 |
-| **transform** | hook 返回 transform 决策, 修改工具调用参数 (e.g. 路径标准化 / 凭据脱敏) | 本 SRS 自定义 |
-| **fail-open** | hook 加载失败 / 执行失败 → 默认放行, 不阻断主流程 | 行业术语 |
-| **fail-closed** | 审计 log 写失败 → BLOCK, 凭据外泄零容忍 | 行业术语 |
+| **deny** | 安全关键 rule 拒绝本次操作；不改变其它 scope 的授权事实 | v0.5 Rust-native decision |
+| **require_human** | 暂停本次操作并等待具备当前权限的人类决策；撤权/超时不得默认为通过 | v0.5 Rust-native decision |
+| **legacy BLOCK/ASK/WARN/PASS** | 仅作为旧 Python event/result 的可映射输入；映射到 Rust typed decision 后仍由核心 evaluator 决策，不能直接放行 | v0.5 兼容说明 |
+| **legacy transform** | 不支持执行，不得改写 executable/argv/Task Contract/acceptance 或权限 scope | v0.5 明确拒绝 |
+| **critical fail-closed** | policy/evaluator/audit unverifiable、unavailable 或超时 → 阻断关键操作；只对无决策影响的 after-commit notification 允许有界重试 | v0.5 安全要求 |
 | **W/T/M** | Work / Transaction / Master 三类横展 (per 守门 #13) | STAR 守门 #13 |
 | **IPA SEC** | Information-technology Promotion Agency, Software Engineering Center | 日本独立行政法人 |
 | **要件定義書** | Software Requirements Specification (SRS) | IPA SEC テンプレート |
@@ -174,15 +193,15 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 
 ### BR-1 统一事件扩展机制
 
-用户能在 "高级设置 → Hooks" 标签页 CRUD hook, 注册到 14 类事件点之一, 平台在事件触发时 fan-out 执行, 全操作留痕. **跟 PreToolUse guard 派生**: PreToolUse guard 是 hooks 体系下 1 个具体 builtin guard hook (per SRS-PRE-TOOL-USE-GUARD §1.5), 本 SRS 是 hooks 上位抽象, 收敛所有事件点.
+用户能在 **高级设置 → Hooks** 用无代码 typed rule Builder 管理规则与版本；Rust engine 在受支持的 Run/tool/validation/review/Worktree lifecycle phase 计算有限 decision 并留存 scope/version provenance。核心 rule 不可关闭，未知 Python event、任意 handler 和不支持 action 必须拒绝或保留为待映射 draft。既有 PreToolUse guard 迁移为 builtin HookRule；Hook 不能成为 Worktree tree app。
 
 ### BR-2 凭据外泄防护 (跟 BR-2 PreToolUse guard 一致)
 
-凭据 (env var / GitHub PAT / SSH 私钥 / `.env` 文件) 任何形式的打印 / 复制 / 上传, hook 返回 BLOCK. **跟守门 #5 派生**: 守门 #5 是 review guard, 本 SRS 的 hooks 是 execution guard, 两者互补不重复.
+凭据 (env var / GitHub PAT / SSH 私钥 / `.env` 文件) 任何形式的打印 / 复制 / 上传均触发 Rust builtin deny；decision 由 core engine 作出，不委托用户代码。**跟守门 #5 派生**: 守门 #5 是 review guard，本 SRS 的 Hook 是 execution guard。
 
 ### BR-3 不可逆操作二次确认 (跟 BR-3 PreToolUse guard 一致)
 
-不可逆操作 (`rm -rf` 命中 `/` `~` `*`、`mkfs`、`sudo`、force push) hook 返回 ASK, **推荐项必放"取消"** (per 守门 v28 拍板必带推荐项).
+不可逆操作 (`rm -rf` 命中 `/` `~` `*`、`mkfs`、`sudo`、force push) 由 builtin policy deny 或 require_human；人类决定必须在完成二次授权后经 Domain Command 执行，超时/身份失效不得转为 allow。
 
 ### BR-4 高级设置导航统一容器 (per ULYS-235 拍板)
 
@@ -190,7 +209,7 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 
 ### BR-5 规则可观测 (跟 BR-4 PreToolUse guard 一致)
 
-所有 hook 触发结果 (BLOCK / ASK / WARN / PASS / transform 命中) 必写入审计 log, 可查询 / 可回放 / 可聚合. 审计 log 是 Transaction append-only (per 守门 #13), 不可物理删除. UI "高级设置 → Hooks" 标签页可直接查看触发日志.
+所有 Hook decision、timeout、failure、override 和 post-commit advisory outcome 均作为 scope/version/correlation 完整的 append-only event/audit；敏感正文不得进入日志。可视化日志查看仍在 **高级设置 → Hooks** tab，Run detail/BI 只提供授权筛选和回链。
 
 ---
 
@@ -208,26 +227,28 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 
 **FR-1.2** Hook 创建
 
-- 触发: UI "高级设置 → Hooks → + New Hook" 按钮, 或 `automation/hook_create.py <name>` 命令
-- 必填字段: `name / event_type / action_type / handler / enabled`
-- 可选字段: `priority / timeout_ms / retry / description`
-- 落盘: `scripts/automation/hooks/registry.json` (单一来源, 跟 skills registry 平行)
+- 触发: UI "高级设置 → Hooks → 新建规则"；本表不提供 Python/CLI handler 注册入口
+- 必填字段: `rule_id / event_phase / typed_conditions / decision / scope / version`
+- 可选字段: `priority / timeout_budget / human_review / description`
+- 落盘: Star-owned HookPolicySet/HookRule versioned store；发布与审计经 Rust service，不以本地 JSON 为生产 SoR
 
 **FR-1.3** Hook 启用 / 禁用
 
-- 触发: UI "高级设置 → Hooks" 标签页 toggle 按钮, 或 `automation/hook_enable.py <name>` / `automation/hook_disable.py <name>`
-- 行为: 修改 `registry.json` 中 `enabled` 字段, 热更新 (per FR-3.2)
-- 审计: 每次 enable/disable 写 audit log (per FR-5)
+- 触发: UI "高级设置 → Hooks" 标签页草稿编辑与版本发布
+- 行为: 发布创建新的不可变 HookSet version；builtin safety rule 不提供禁用/删除开关；Worktree overlay 只能增加限制
+- 审计: 发布/停用/回滚均记录 actor、scope、from/to version、reason 与 correlation ID
 
 **FR-1.4** Hook 归档
 
-- 触发: 30 天 disabled 状态自动归档, 或 `automation/hook_archive.py <name>` 手动归档
-- 行为: registry entry 设 `archived=true`, UI 默认隐藏, 但可查可复活
-- 跟守门 #11 一致: **archived 不物理删除**, 30 天内可回滚
+- 触发: 策略负责人在高级设置中归档不再生效的用户规则版本
+- 行为: 新有效版本不再引用该用户规则；历史版本和 Audit 保留可查，不物理删除；builtin baseline 不可归档
+- 回滚: 仅授权角色可恢复先前策略版本；恢复时仍需检查当前 ACL、schema 和 Worktree inheritance constraints
 
 ### FR-2 Hook 事件模型 (4 项, P0)
 
-**FR-2.1** 14 类事件 (per Claude Code 14 事件基线 + 扩展)
+**FR-2.1** 既有来源事件词汇 (兼容输入，不等同于 Rust 可执行 hook point)
+
+Rust 核心可执行 phase 以 §1.6 明列的 Run/tool/validation/review/Worktree lifecycle 为准。下表 14 个名称保留作已存在 Python tooling 或外部 CLI event 的映射来源；`CustomEvent`、未映射名称和用户注册的回调不能直接进入决策路径。
 
 | Event ID | 名称 | 触发时机 | 典型用法 |
 |---|---|---|---|
@@ -246,19 +267,20 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 | EVT-013 | NetworkEgress | 网络出站调用前 | egress filtering (v0.1 stub, v2.x 实装) |
 | EVT-014 | CustomEvent | 用户自定义事件 | 自定义触发 |
 
-**FR-2.2** 4 种 action type
+**FR-2.2** Rust typed decision (取代旧 pre/post/block/transform action type)
 
-- `pre`: 前置, hook 在原动作前执行, 返回 PASS/WARN 继续, 返回 BLOCK 阻断
-- `post`: 后置, hook 在原动作后执行, 返回 PASS/WARN 继续, 返回 BLOCK 仅阻断后续 fan-out, 不回滚原动作
-- `block`: 强阻断, hook 返回 BLOCK 必阻断原动作 (跟 pre 区别: block 无条件阻断, pre 可选)
-- `transform`: 转换, hook 返回 `transform` 决策 + 新参数, 修改原动作参数后再执行
+- `allow`: 本 rule 没有否决；所有 ACL、Domain Command 和其它 mandatory rules 仍需通过
+- `deny`: 阻止本次操作
+- `require_human`: 等待当前有权角色显式决策；超时、撤权或审计失败不得默认为 allow
+- `defer`: 仅用于受界限的非破坏性异步准备；不能延后后绕过同步 Worktree safety gate
+- 旧 `transform` 一律不执行；pre/post 只是 evaluation phase，不是用户可编写 handler 的 action type
 
-**FR-2.3** 事件 fan-out
+**FR-2.3** 有界确定性 policy evaluation
 
-- 1 个事件触发 N 个 hook (N >= 0), 按 `priority` 升序执行 (priority 越小越先执行)
-- 同 priority 多个 hook: 默认串行 (可配并行, per FR-4.3)
-- 任一 hook 返回 BLOCK: 立即停止 fan-out, 阻断原动作 (pre/block action type)
-- 任一 hook 返回 transform: 累积 transform, 最后 1 个生效 (per FR-4.4)
+- 由 Rust evaluator 按固定 baseline → Project → Worktree restrictive overlay 顺序合并 typed rules
+- 相同优先级按稳定 rule ID 排序；关键决策串行、确定性执行，不允许任意用户回调并行 fan-out
+- 任一 mandatory rule deny / evaluator error / deadline 超限 / 审计不可写，立即 fail-closed
+- 非关键 after-commit event 可进入有界、可重放队列，不回滚已提交业务事实
 
 **FR-2.4** 事件 schema
 
@@ -268,75 +290,66 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 
 ### FR-3 Hook 注册中心 (3 项, P0)
 
-**FR-3.1** JSON Schema + 单一来源
+**FR-3.1** Versioned typed HookPolicySet + 单一来源
 
-- 格式: JSON, 符合本 SRS §4.3.1 Hook schema
-- 存储: `scripts/automation/hooks/registry.json` (单一来源, git tracked)
-- 加载: 启动时一次性加载 + 运行期热更新 (per FR-3.2)
-- schema 校验: 启动时 JSON Schema 校验, 失败 → fail-open (per FR-3.3) + WARN log
+- 存储: Star-owned HookPolicySet/HookRule typed model 与受控版本化 store；本地 Python JSON 不作生产 SoR
+- 每次 publish 先验证 schema、scope、capability、继承约束、冲突、mandatory baseline 和审批，再原子切换当前 version
+- 加载/校验失败: 关键 operation fail-closed，并记录不含敏感正文的状态事件
 
-**FR-3.2** 热更新
+**FR-3.2** Policy version rollout
 
-- 监听: registry.json mtime 变化, 自动 reload
-- 不重启 mavis runtime
-- reload 失败 → fail-open (per FR-3.3) + WARN log
-- reload 成功 → info log (含新 hook 数)
+- Draft 编辑不影响已发布 HookSet；发布形成不可变新版本和 digest
+- Project→Worktree effective policy 更新须明确 preview、审批结果和生效范围
+- evaluator 缺少新版本/版本不兼容时阻断关键操作并提供恢复/rollback 路径
 
-**FR-3.3** Builtin hook 默认装载
+**FR-3.3** Builtin guard 保留
 
-- builtin hook (e.g. PreToolUse guard, SessionStart cleanup) 启动时自动装载, 不依赖 registry.json
-- 用户可在 UI 禁用 builtin hook (但不可删除)
-- builtin hook 列表: `scripts/automation/hooks/builtin/` (Python 模块, 不是 JSON)
+- Rust builtin safety rules 总是装载，用户和 Plugin 均不能禁用、删除、覆盖或放宽
+- 已有 PreToolUse guard 逻辑迁移为 builtin typed rule；Python 代码可供行为对照，但不能作为执行核心
 
 ### FR-4 Hook 执行引擎 (3 项, P0)
 
-**FR-4.1** Hook handler 接口
+**FR-4.1** Rust typed evaluator interface
 
-- 签名: `def handler(event: Event, context: Context) -> HookResult`
-- `HookResult`: `{decision: BLOCK|ASK|WARN|PASS|transform, reason?: str, rule_id?: str, transformed_args?: dict, latency_ms: float}`
-- 失败处理: handler 抛异常 → 视为 WARN (per FR-4.5)
+- Evaluator 输入为 immutable `HookEvent + HookPolicySnapshot + authorized HookContext`，输出 `HookDecision + sanitized reason class + evaluator provenance`
+- 仅支持 `allow / deny / require_human / defer`；无 Python/JavaScript/shell callback、动态库、网络访问或命令参数 transform
+- HookContext 只提供当前 scope 与已授予 capability 的最小引用；不得从 hook 自行获取新权限
 
-**FR-4.2** Per-event fan-out 调度
+**FR-4.2** Bounded deterministic evaluation
 
-- 调度算法: 按 priority 升序遍历 hook 列表, 同 priority 默认串行
-- 任一 hook 返回 BLOCK: 立即停止 fan-out, 返回 BLOCK 给调用方
-- 任一 hook 返回 ASK: 立即停止 fan-out, 走 ask_user, 用户回复后才继续 (或取消)
-- 任一 hook 返回 PASS/WARN: 继续下一个 hook
-- 任一 hook 返回 transform: 累积 transformed_args, 继续下一个 hook
+- 基线、Project rule 与 Worktree restrictive overlay 按固定顺序合并；同层按 priority、rule ID 稳定排序
+- Critical decision 串行确定性执行，并限制 CPU/memory/instruction/event payload 与 wall-clock deadline
+- 规则冲突以 deny/require_human precedence 和显式冲突诊断处理；policy version mismatch 阻断关键操作
 
-**FR-4.3** 串行 / 并行策略
+**FR-4.3** Admission 与并发
 
-- 默认: 串行执行 (同 priority)
-- 配置: registry.json 中 `parallel: true` 字段, 同 priority hook 可并行
-- 并行上限: max 4 (避免资源耗尽)
-- 超时: 单 hook `timeout_ms` 默认 1000ms (可配)
+- 同步安全 gate 不得排入无界队列；队列满时返回明确 busy/defer 状态且不能先执行被保护动作
+- after-commit advisory 才可使用有界、可取消、可重放的 worker pool；子任务继承 Project/Worktree/Run 资源额度
 
-**FR-4.4** Transform 累积
+**FR-4.4** No transform of authority-bearing data
 
-- 多个 hook 返回 transform: 后执行的 hook 覆盖前一个的 `transformed_args`
-- 最终 transformed_args 传给原动作
-- 若任一 hook 返回 BLOCK: transform 不生效, 阻断原动作
+- Hook 不能改写 executable/argv/cwd/Task Contract/acceptance/capability scope；数据规范化必须由其所属 Domain Command 执行
+- dry-run/impact simulation 只读已授权脱敏 event snapshot，不写业务事实，不触发实际副作用
 
-**FR-4.5** 失败处理
+**FR-4.5** Failure handling
 
-- handler 抛异常: 视为 WARN, 继续下一个 hook, 写 audit log (含异常 stack trace, 但 log level = ERROR)
-- handler 超时: 视为 BLOCK (安全优先), 写 audit log (含 timeout 原因)
-- handler 返回非法 decision (非 BLOCK/ASK/WARN/PASS/transform): 视为 WARN, 写 audit log
+- policy/evaluator/schema/scope/audit error 或关键 phase 超时 → fail-closed，追加 failure classification；敏感异常正文不进入日志
+- `require_human` timeout、撤权、身份切换或审批版本过期 → stop；不得默认 allow
+- 非关键 after-commit notification 可 bounded retry；失败与重试计数可观测且不能回写原 Run/Worktree 事实
 
 ### FR-5 Hook 审计 log (2 项, P0)
 
-**FR-5.1** 全操作留痕
+**FR-5.1** Scoped immutable Hook event
 
-- 写入: 任何 hook 触发 (无论 BLOCK / ASK / WARN / PASS / transform) 必写 audit log
-- 字段: 见 §4.3.2 Hook Run schema, 12 字段
-- 存储: `scripts/automation/hooks/logs/hook_audit.log` (JSON Lines)
-- 保留: 90 天 (跟 PreToolUse guard 一致, per 守门 #5 隐含)
+- 每次 decision/timeout/failure/override/post-commit result 写入 append-only RunEvent/Audit projection
+- 字段至少包括 tenant/project/worktree/task/run/actor/correlation、HookSet/rule/evaluator version+digest、phase、decision/reason class、duration、timeout/fail-closed/override
+- event 不存 Secret、原始 prompt、完整 stdout/stack trace、命令参数正文或思维过程；保留期遵从所属 Transaction/Audit policy，不使用本地 JSONL 作为生产 SoR
 
 **FR-5.2** Transaction append-only
 
-- 不允许物理删除 / 物理修改
-- 不允许 truncate
-- 完整字段: actor / event_type / hook_name / decision / rule_id / timestamp / session_id / latency_ms / env_hash / transformed_args / before_args / after_args (per 守门 #13)
+- 不允许物理删除、原位改写或 truncate；policy update 追加新版本，audit/event 只追加
+- BI 从版本化事件重算 coverage/deny/human/timeout/override 与 Worktree/validation/review 关联；缺少事件保留 unknown，不补零
+- 高速 telemetry 进入有界短 TTL buffer，不把每帧采样复制进 durable Transaction history
 
 ### FR-6 Hook UI 标签页 (3 项, P0)
 
@@ -544,3 +557,5 @@ ULYS-235 拍板: 把 skills + hooks + 未来 commands / agents 扩展点统一�
 | **v0.2** | 2026-09-24 15:01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | MCP 升格标签页: §1.4 范围 + §FR-7.1 tabs 列表更新 (`Skills`, `Hooks`, `MCP`, 预留 `Commands`, `Agents`), MCP 标签页走独立 SRS-MULTICA-MCP-001 (v0.1 stub, 列出已注册 servers + 启停 toggle + transport 类型 stdio/sse/http); commands / agents 仍"预留"占位 | 2026-09-24 15:01 JST Ulysses 评论 "MCP也应该是一个标签页" |
 | **v0.3** | 2026-09-24 22:04 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | Plugins 升格标签页: §1.4 范围更新 + §FR-7.1 tabs 列表增加 `Plugins` 实装位 + 新增 Plugins 标签页条目 (走 SRS-MULTICA-PLUGIN-001 v0.1 stub, 列出已安装 plugin 包 `~/.multica/plugins/` + 内置 builtin + 启停 toggle + 版本显示) + §BR-4 描述细化; commands / agents 仍"预留"占位 | 2026-09-24 22:04 JST Ulysses 评论 "还有plugins也应该是一个标签页" |
 | **v0.4** | 2026-09-24 22:13 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 (per 守门 #14 v3) | 自审饱和: §0.1 版本号 v0.3 (头部 banner 已标 v0.3) + §1.1 后续 BD/DD 引用 v0.3 (头部 banner 已同步) + §1.4 排除範囲 v0.1→v0.3 (新增 MCP 升格 + Plugins 升格行, 旧 4 类→3 类枚举补全) + §10 修订履歴 v0.2/v0.3/v0.4 三行同步追加; 修正 4 处 cross-reference staleness | 2026-09-24 22:13 JST Ulysses 评论 "自审, 各级文档都要做到位" |
+| **v0.5** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 保留 ULYS-235 高级设置同导航不同 tab 决策；增加 Rust builtin typed HookSet、不可关闭 fail-closed 规则、Project/Worktree 继承、视觉无代码 builder、Run/Worktree lifecycle/BI 事件联动；旧 Python handler 降为兼容历史，产品 Hook runtime/UI 仍待实施 | 用户要求 Hook 是原生强约束、与 BI/Worktree 联动、可视配置并指出它属于高级设置 tab |
+| **v0.5.1** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将总需求交叉引用更新到 v5.20；该版本的 Hook 规则和 Advanced Settings 标签页要求未变 | Phase 8B Run requirement 增补后，同步当前总需求基线引用 |

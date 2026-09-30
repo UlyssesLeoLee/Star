@@ -42,14 +42,14 @@ use std::collections::HashSet;
 
 use async_trait::async_trait;
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::{
-        HeaderMap, StatusCode,
         header::{CACHE_CONTROL, VARY},
+        HeaderMap, StatusCode,
     },
     response::IntoResponse,
     routing::{get, post},
+    Json, Router,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -60,8 +60,8 @@ use uuid::Uuid;
 use crate::auth::AuthUser;
 
 use super::{
-    AuthenticatedUser, GroupApiError, GroupApiState, ProjectBinding, active_binding, require_scope,
-    set_tenant, validate_actor,
+    active_binding, require_scope, set_tenant, validate_actor, AuthenticatedUser, GroupApiError,
+    GroupApiState, ProjectBinding,
 };
 
 /// A Project-scoped opaque Git Worktree candidate returned by the trusted host registry.

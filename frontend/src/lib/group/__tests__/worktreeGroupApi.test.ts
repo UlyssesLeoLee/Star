@@ -340,6 +340,34 @@ describe("WorktreeGroupApiClient", () => {
     expect(url.searchParams.get("cursor_event_id")).toBe("event-1");
   });
 
+  it("lists Task Runs using an encoded Task scope and bounded cursor", async () => {
+    const { api, fetcher } = makeClient("user-jwt");
+
+    await api.listTaskRuns("wt one", "task/one", {
+      limit: 20,
+      cursor: {
+        cursor_started_at: "2026-09-29T10:00:00Z",
+        cursor_run_id: "run-1",
+      },
+    });
+
+    const [input, init] = fetcher.mock.calls[0];
+    const url = new URL(String(input), "http://localhost");
+    expect(url.pathname).toBe("/api/v1/worktrees/wt%20one/work-items/task%2Fone/runs");
+    expect(url.searchParams.get("limit")).toBe("20");
+    expect(url.searchParams.get("cursor_started_at")).toBe("2026-09-29T10:00:00Z");
+    expect(url.searchParams.get("cursor_run_id")).toBe("run-1");
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer user-jwt");
+    expect(init?.cache).toBe("no-store");
+  });
+
+  it("rejects an out-of-range Task Run page limit before fetching", async () => {
+    const { api, fetcher } = makeClient("user-jwt");
+
+    expect(() => api.listTaskRuns("wt-1", "task-1", { limit: 51 })).toThrow(GroupApiError);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("replays events until authorized projection refresh succeeds", async () => {
     const page = JSON.stringify({
       events: [{ event_id: "event-1", occurred_at: "2026-09-29T10:00:00Z" }],
@@ -414,4 +442,15 @@ MATCH (suite:Function {name:"worktreeGroupApi tests"}),
 CREATE (lifecycleRoutes:Function {name:"Project Worktree lifecycle route case",type:"function",visibility:"private",complexity:"moderate"});
 CREATE (suite)-[:CONTAINS]->(lifecycleRoutes),
        (lifecycleRoutes)-[:CALLS]->(api);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (suite:Function {name:"worktreeGroupApi tests"}),
+      (makeClient:Function {name:"makeClient"}),
+      (listRuns:Function {name:"WorktreeGroupApiClient.listTaskRuns"});
+CREATE (taskRunListCase:Function {name:"Task Run list API case",type:"function",language:"typescript",visibility:"private",complexity:"moderate"}),
+       (taskRunLimitCase:Function {name:"Task Run bounded page limit case",type:"function",language:"typescript",visibility:"private",complexity:"simple"});
+CREATE (suite)-[:CONTAINS]->(taskRunListCase),(suite)-[:CONTAINS]->(taskRunLimitCase),
+       (taskRunListCase)-[:CALLS]->(makeClient),(taskRunListCase)-[:CALLS]->(listRuns),
+       (taskRunLimitCase)-[:CALLS]->(makeClient),(taskRunLimitCase)-[:CALLS]->(listRuns);
 */

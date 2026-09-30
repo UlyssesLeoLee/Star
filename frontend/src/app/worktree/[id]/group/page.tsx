@@ -404,6 +404,13 @@ import {
 import { CanvasView } from "@/components/CanvasView";
 import { StatusPill } from "@/components/StatusPill";
 import { TerminalStackContainer } from "@/components/terminal/TerminalStackContainer";
+import { TaskRunHistoryPanel } from "./TaskRunHistoryPanel";
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (page:File {name:"frontend/src/app/worktree/[id]/group/page.tsx"}),
+      (runPanel:Function {name:"TaskRunHistoryPanel"});
+CREATE (page)-[:USES]->(runPanel);
+*/
 import {
   useWorktreeGroupApi,
   useWorktreeGroupProjection,
@@ -2293,6 +2300,7 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                 </span>
               </div>
               {selectedTask ? (
+                <>
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]">
                   <article className="card space-y-4">
                     <div className="flex items-start justify-between gap-3">
@@ -2443,6 +2451,12 @@ export default function GroupWorkspacePage({ params }: PageProps) {
                     )}
                   </section>
                 </div>
+                <TaskRunHistoryPanel
+                  worktreeId={worktreeId}
+                  workItemId={selectedTask.id}
+                  api={groupProjection.mode === "live" ? groupApi : null}
+                />
+                </>
               ) : taskList}
             </div>
           )}

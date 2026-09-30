@@ -25,17 +25,17 @@ use std::collections::HashSet;
 
 use async_trait::async_trait;
 use axum::{
-    Json, Router,
     extract::{Path, State},
-    http::{HeaderMap, HeaderValue, header::CACHE_CONTROL},
+    http::{header::CACHE_CONTROL, HeaderMap, HeaderValue},
     response::{IntoResponse, Response},
     routing::get,
+    Json, Router,
 };
 use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::{AuthenticatedUser, GroupApiError, GroupApiState, require_scope, validate_actor};
+use super::{require_scope, validate_actor, AuthenticatedUser, GroupApiError, GroupApiState};
 
 const MAX_GROUP_APPS: usize = 100;
 

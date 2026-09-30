@@ -1,18 +1,18 @@
 # BD-MULTICA-HOOK-001
 
-> **Multica Hook 域基本設計書 v0.3** (per 日本 IPA SEC 標準 / 基本設計書 テンプレート; v0.2 升版 MCP 实装, v0.3 Plugins 升格为同导航实装标签页, v0.4 自审饱和: 修正 4 处 v0.1→v0.3 交叉引用 staleness (per 2026-09-24 22:13 JST Ulysses "自审" 评论)
+> **Multica Hook 域基本設計書 v0.5.1** (继承 Advanced Settings 多 tab 导航；v0.5 将 Hook Engine / Rule Builder / Worktree safety / BI integration 纳入 Star Rust-native 架构，覆盖旧 Python/Mavis authoritative design)
 
-> - 状态: 🟡 Draft v0.3 (2026-09-24 22:04 JST 升版, Plugins 升格为同导航实装标签页; 22:13 JST 自审饱和, v0.4 修正 4 处 cross-reference staleness)
+> - 状态: 🟡 Draft v0.5.1 (2026-09-30 JST，requirements / SRS trace synchronization)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
-> - 上位要件: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.3 (升版含 MCP + Plugins tab, 8 機能 / 5 業務 / 6 非機能 / 8 验收 / 8 已知缺口, 守门 8/8 通过)
-> - 关联実装基线: `scripts/automation/hooks/` (v0.0 未创建, 待 v0.1 落档) + `scripts/automation/console_server.py` v0.1 (hook 事件流入口, 现役) + `scripts/automation/dispatcher.py` v0.1 (子代理 invoke 前置, 现役) + `scripts/automation/guardian/pre_tool_use_guard.py` (PreToolUse builtin guard hook)
+> - 上位要件: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.1 + `docs/requirements.md` v5.20 §50.8D
+> - 兼容参考（非产品决策 runtime）: `scripts/automation/console_server.py`、`scripts/automation/dispatcher.py` 与 `scripts/automation/guardian/pre_tool_use_guard.py` 是现有 Python automation/guard 工具；它们不构成 Star Rust Hook Engine，不拥有产品 ACL、Worktree cleanup 或验收 authority。Hook Engine、Domain gate 与高级设置 tab 均尚待实现。
 > - 平行参考: `docs/automation-design.md` v0.1 (Python 化基线) + `SRS-MULTICA-SKILL-001.md` v0.1 (skills 域, 共享"高级设置"导航) + `SRS-PRE-TOOL-USE-GUARD-001.md` v0.1 (PreToolUse guard 是 hooks 下 1 个 builtin guard)
 > - 守门基线: 守门 #1+#5+#6+#9+#10+#13+#14 v3+#14 v4 8 项必过 (守门 #1 v25 cargo test 不需要跑, 文档工作)
 > - 修订人: `Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手` (per 2026-08-27 19:39 JST 用户授权 + 守门 #10 + 守门 #14 v3)
 > - 审批: `架构师 (Mavis 接手 agent per DEC-008)` (per 守门 #14 v4 反转 v0.62 2026-09-10 12:45 JST, 真人代签流程全部取消, 改为 Mavis 审核 author=Ulysses)
-> - 日期: 2026-09-24 JST
+> - 日期: 2026-09-30 JST
 > - 受众: 詳細設計エンジニア / 実装エンジニア / SRE Lead / 5 域 Lead (未到位, Mavis 临时代签 per 9/3 11:35 JST 拍板 B + 9/5 10:43 JST 拍板 D, **不沿用代签决策** per 守门 #1 禁回溯叙事)
 > - 拍板来源: ULYS-235 (2026-09-24 20:xx JST) "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计" (本 BD 落档)
 
@@ -20,7 +20,7 @@
 
 ## §0 目的 (Purpose)
 
-本文档基于 [`SRS-MULTICA-HOOK-001`](../requirements/SRS-MULTICA-HOOK-001.md) v0.3 的需求, 定义 **STAR 平台 "高级设置 → Hooks" 域** 的基本設計:
+本文档基于 [`SRS-MULTICA-HOOK-001`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.1 与 `docs/requirements.md` v5.20 §50.8D，定义 STAR 新架构中的 **高级设置 → Hooks**：同导航不同 tab；HookSet 可视化配置；Rust-native enforcement；Worktree/Run/BI 联动。
 
 - **システムアーキテクチャ** (mavis runtime hook 事件流 + UI 高级设置导航 + 标签页架构)
 - **機能分割 / モジュール設計** (6 module: Event Emitter + Hook Registry + Fan-out Scheduler + Hook Runner + Audit Logger + Builtin Hook Loader)
@@ -36,6 +36,38 @@
 **派生来源**: ULYS-235 (2026-09-24) + ADR-0026 v0.2 §1.3 "5 类扩展点" + SRS-MULTICA-HOOK-001 v0.3 全部 FR-1~FR-8 / BR-1~BR-5 / NFR-P/A/S/M/T/O + Claude Code `plugins/hookify` 14 类事件基线 + `SRS-PRE-TOOL-USE-GUARD-001.md` v0.1 (PreToolUse guard 是 hooks 下 1 个 builtin guard).
 
 ---
+
+## §0.1 渡口 Rust-native 架构修订（v0.5，覆盖旧执行草案）
+
+v0.1-v0.4 的 6 个 Python module / JSON registry / Python user handler / 本地 JSONL HookRun log 是旧草案形态，不再是安全关键生产架构。保留已有 Mavis/PowerShell/Python hooks 作为显式兼容输入或可观察事件来源；兼容 adapter 不具有策略权威、不能拦截绕过 Rust builtin guard，也不拥有独立 SoR。安全决策与 Worktree lifecycle gate 由 Star Rust Hook Engine 执行，策略以 typed data 存储。现有 PreToolUse guard 作为 builtin HookRule 转入同一 Engine，而不是平行旁路。
+
+```text
+Advanced Settings (one shared navigation; Hook is a sibling tab to Skills/MCP/Plugins)
+└── Hooks tab: policy list | visual typed rule builder | recent decisions/impact preview
+       │ draft -> validate -> dry-run -> approve -> publish HookSet version
+       ▼
+Rust Hook Policy Service ──> versioned Project HookSet / Worktree restriction overlay
+       │                         │
+       ├── Rust Hook Engine <── GroupContext + Run/Worktree command facts
+       │      ├── builtin guards (mandatory, no plugin replacement)
+       │      ├── typed condition evaluator (bounded, deterministic, no network)
+       │      └── allow/deny/require_human/defer
+       └── append-only RunEvent/Audit + bounded post-commit Outbox
+                              │
+                              └── Worktree Index / Task Run Detail / Project BI
+```
+
+**事实所有权与策略继承**：组织/平台 builtin baseline 不可变更；Project HookSet 版本化；Worktree 可继承指定 Project version 并仅新增更严格规则。每个 Run admission 固定有效 HookSet、RuleSet、evaluator/API version 与 digest；Worktree admin command 记录相同 provenance。History 不随未来版本回写。高级设置负责维护策略，Worktree Index 显示当前 effective version/health/deny summary，Run detail 与 Quality & Improvement 页面提供只读筛选/下钻；不改变 Project → Worktree Index → Worktree 同级 Apps 的产品树。
+
+**可视化配置**：Hooks tab 使用三栏布局：左栏规则/状态/版本列表；中栏结构化事件、scope、条件、优先级、决策与人审要求编辑器；右栏最近触发记录、解释、dry-run 结果和受影响 Worktree/Run 预览。页面提供 Project→Worktree inheritance tree、只读 mandatory baseline、冲突/优先级说明、草稿/已发布 diff、影响模拟、审批发布和 rollback。用户无需写代码。规则仅使用 schema-defined field/operator/value 与有限 action；拒绝 arbitrary source code、shell/script handler、dynamic native library、网络调用和无界 DSL。Web 前端若暂时保留，必须调用相同 Rust policy API/DTO；不能在浏览器执行授权决定。最终桌面设置体验由 Rust-native UI 消费相同 typed projection。
+
+**执行与失败边界**：关键事件前 Hook 在 Domain Command/Tool capability 执行之前同步返回 allow/deny/require_human/defer，不能授予能力、变更 command payload 或将人工审批转换成自动通过。关键 Hook policy/evaluator/version/audit 无法校验、超时或 queue/resource 预算耗尽均 fail closed；builtin baseline 在 Registry 不可用时仍由 Rust core 生效，禁止“加载失败即跳过 guard”。Post-commit observer/BI enrich 可用 bounded Outbox retry，但只影响可重建 projection，不伪造原交易成功/失败。Plugin callbacks 只允许隔离、grant-limited、non-authoritative advisory/post-commit。
+
+**Worktree 与 Agent Runtime 集成**：Hook 处理 Run admission、tool calls、validation/review/completion 和 Worktree create/import/archive/restore/owner-transfer/binding change/cleanup。归档或物理清理前必须在 Hook 与 Worktree Domain Command 双重检查：当前 membership/role、lifecycle version、Runtime health、active Run/Agent lease、file claim、PTY/process drain 和 fresh Git retention-lock observation；unknown/stale/conflict 一律 deny。单个 Git lock、Agent lease 或 file claim 不得替代其它信号。成功写入时 Run/Worktree facts、Audit、Outbox 与 correlation ID 一致，Index 刷新授权 projection。
+
+**BI contract**：一次 Hook evaluation 生成 typed HookEvent，包含 hook_set/rule/evaluator version+digest、phase、decision、reason class、duration、timeout/fail-closed/override、actor/tenant/project/worktree/task/run/correlation IDs。event 进入已有 RunEvent/Audit canonical stream；独立 HookRun 列表如保留，仅是有界分页投影，不复制大 payload。BI 指标包括 Hook invocation coverage、deny/require_human、timeout/error、approved override、阻断到处理时长、Worktree cleanup rejected/stale-signal、RuleSet 发布前后验证/人工接受/返工 cohort 关联。所有指标显示窗口/分母/coverage/version，缺事件为 unknown；proposal 不能自动放宽规则或改评分。
+
+**W/T/M 归属**：HookSet/Rule published version 是 Master/SCD2；草稿/模拟缓存是有 TTL 的 Work；Hook evaluation、审批、发布/撤销、Worktree action outcome 是 append-only Transaction/Audit/RunEvent。Session tab state 只保存视图选择，不复制策略事实。禁止以本地 registry JSON 或独立 rotating log 作为 production source of truth。
 
 ## §1 适用范围 (Scope)
 
@@ -902,3 +934,5 @@ session_state_manager.save_shared_state(session_id, shared_state)
 | **v0.2** | 2026-09-24 15:01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | MCP 升格标签页: §1.2 范围 + §7.1 导航 ASCII 图 + §7.3 路由 Next.js 14+ (`/settings/advanced/mcp` 加入实装) + §3 架构 ASCII 图更新 (Skills / Hooks / MCP 三标签页); commands / agents 仍"预留"占位 | 2026-09-24 15:01 JST Ulysses 评论 "MCP也应该是一个标签页" |
 | **v0.3** | 2026-09-24 22:04 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | Plugins 升格标签页: §1.2 范围更新 + §7.1 导航 ASCII 图增加 `[Plugins]` + §7.3 路由增加 `/settings/advanced/plugins` + §3 架构 ASCII 图更新为四标签页 (Skills / Hooks / MCP / Plugins); commands / agents 仍"预留"占位 | 2026-09-24 22:04 JST Ulysses 评论 "还有plugins也应该是一个标签页" |
 | **v0.4** | 2026-09-24 22:13 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手 | 自审饱和: §0 上位 SRS 引用 v0.1→v0.3 + §0 派生来源 SRS 引用 v0.1→v0.3 + §1.2 范围 v0.1+v0.3→v0.2+v0.3 + §1.3 关联文档 SRS 行 v0.1→v0.3; 4 处 cross-reference staleness 修正 | 2026-09-24 22:13 JST Ulysses 评论 "自审, 各级文档都要做到位" |
+| **v0.5** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将高级设置 Hooks tab 的既有导航决策复用为 Rust-native 可视规则管理入口；明确 typed condition/action、Project baseline + Worktree restrictive overlay、不可覆盖 builtin、fail-closed cleanup/Run gate 与 BI/RunEvent provenance；旧 Python/Next.js 方案只作为兼容草案 | 用户要求 Hook 原生实现、可视化配置并纳入 Worktree/BI，同时澄清应位于高级设置标签栏 |
+| **v0.5.1** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 交叉引用更新至 SRS v0.5.1 与总要件 v5.20；设计决策未变 | Phase 8B 扩展总需求后同步当前上位基线 |

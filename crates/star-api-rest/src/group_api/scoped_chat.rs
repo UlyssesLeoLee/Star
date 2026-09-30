@@ -16,11 +16,11 @@
 
 use async_trait::async_trait;
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
+    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -28,8 +28,8 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 use super::{
-    AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope, set_tenant,
-    validate_actor,
+    active_binding, require_scope, set_tenant, validate_actor, AuthenticatedUser, GroupApiError,
+    GroupApiState,
 };
 
 const MAX_GLOBAL_TARGETS: usize = 20;
