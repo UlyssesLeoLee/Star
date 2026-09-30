@@ -372,6 +372,43 @@ export interface HookPolicyResponse {
   audit: HookPolicyAuditEvent[];
 }
 
+export interface HookExecutionEvent {
+  event_id: string;
+  worktree_id: string | null;
+  work_item_id: string | null;
+  run_id: string | null;
+  actor_id: string;
+  correlation_id: string;
+  source_kind: string;
+  hook_phase: string;
+  hook_decision: string;
+  hook_reason_code: string;
+  matched_rule_id: string | null;
+  project_policy_version: number | null;
+  worktree_policy_version: number | null;
+  evaluator_api_version: number;
+  policy_digest: string | null;
+  evaluated_condition_count: number;
+  duration_ms: number;
+  timed_out: boolean;
+  occurred_at: string;
+}
+
+export interface HookEventCoverage {
+  scope: "hook_execution_event_ledger";
+  status: "partial" | "unknown" | "complete";
+  reported_percentage: number | null;
+  instrumented_phases: string[];
+  not_yet_instrumented_phases: string[];
+  note: string;
+}
+
+export interface HookExecutionEventPage {
+  events: HookExecutionEvent[];
+  next_cursor: string | null;
+  coverage: HookEventCoverage;
+}
+
 export interface HookPolicyDraftBody {
   expected_draft_version: number;
   expected_current_policy_set_id: string | null;
@@ -598,6 +635,15 @@ export class WorktreeGroupApiClient {
 
   getProjectHookPolicy(projectId: string): Promise<HookPolicyResponse> {
     return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/hook-policy`);
+  }
+
+  listHookEvents(projectId: string, options: { limit?: number; cursor?: string } = {}): Promise<HookExecutionEventPage> {
+    const query = new URLSearchParams();
+    if (options.limit !== undefined) query.set("limit", String(options.limit));
+    if (options.cursor) query.set("cursor", options.cursor);
+    const serialized = query.toString();
+    const suffix = serialized ? `?${serialized}` : "";
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/hook-events${suffix}`);
   }
 
   getWorktreeHookPolicy(worktreeId: string): Promise<HookPolicyResponse> {
@@ -1196,4 +1242,17 @@ CREATE (file)-[:CONTAINS]->(hookDecision),(file)-[:CONTAINS]->(hookReason),
        (rollbackWorktree)-[:CALLS]->(request),(hookDraft)-[:CONTAINS]->(hookDocument),
        (hookResponse)-[:CONTAINS]->(hookDraft),(hookResponse)-[:CONTAINS]->(hookAudit),
        (hookRule)-[:CONTAINS]->(hookCondition),(hookCondition)-[:USES]->(hookValue);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
+      (client:Class {name:"WorktreeGroupApiClient"}),
+      (request:Function {name:"WorktreeGroupApiClient.request"});
+CREATE (hookEvent:Class {name:"HookExecutionEvent",type:"interface",language:"typescript",visibility:"public"}),
+       (hookCoverage:Class {name:"HookEventCoverage",type:"interface",language:"typescript",visibility:"public"}),
+       (hookEventPage:Class {name:"HookExecutionEventPage",type:"interface",language:"typescript",visibility:"public"}),
+       (listHookEvents:Function {name:"WorktreeGroupApiClient.listHookEvents",type:"function",language:"typescript",visibility:"public",complexity:"moderate"});
+CREATE (file)-[:CONTAINS]->(hookEvent),(file)-[:CONTAINS]->(hookCoverage),(file)-[:CONTAINS]->(hookEventPage),
+       (client)-[:HAS_METHOD]->(listHookEvents),(listHookEvents)-[:CALLS]->(request),
+       (hookEventPage)-[:CONTAINS]->(hookEvent),(hookEventPage)-[:CONTAINS]->(hookCoverage);
 */

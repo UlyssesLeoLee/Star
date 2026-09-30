@@ -104,6 +104,32 @@ describe("Worktree Git lock observation", () => {
 });
 
 describe("WorktreeGroupApiClient", () => {
+  it("lists Project-scoped Hook execution events with a bounded cursor", async () => {
+    const responseBody = {
+      events: [],
+      next_cursor: null,
+      coverage: {
+        scope: "hook_execution_event_ledger",
+        status: "partial",
+        reported_percentage: null,
+        instrumented_phases: ["worktree_archive"],
+        not_yet_instrumented_phases: ["run_admission", "tool"],
+        note: "Coverage is partial.",
+      },
+    };
+    const { api, fetcher } = makeClient("user-jwt", new Response(JSON.stringify(responseBody), { status: 200 }));
+
+    await expect(api.listHookEvents("project one", { limit: 30, cursor: "event-cursor" })).resolves.toEqual(responseBody);
+
+    const [input, init] = fetcher.mock.calls[0];
+    const url = new URL(String(input), "http://localhost");
+    expect(url.pathname).toBe("/api/v1/projects/project%20one/hook-events");
+    expect(Object.fromEntries(url.searchParams.entries())).toEqual({ limit: "30", cursor: "event-cursor" });
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer user-jwt");
+    expect(init?.credentials).toBe("omit");
+    expect(init?.cache).toBe("no-store");
+  });
+
   it("fails closed without a user token", async () => {
     const { api, fetcher } = makeClient(null);
 
@@ -512,4 +538,11 @@ MATCH (suite:Function {name:"worktreeGroupApi tests"}),
       (api:Class {name:"WorktreeGroupApiClient"});
 CREATE (hookRoutes:Function {name:"Hook policy scoped routes case",type:"function",language:"typescript",visibility:"private",complexity:"moderate"});
 CREATE (suite)-[:CONTAINS]->(hookRoutes),(hookRoutes)-[:CALLS]->(api);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (suite:Function {name:"worktreeGroupApi tests"}),
+      (api:Class {name:"WorktreeGroupApiClient"});
+CREATE (hookEvents:Function {name:"Hook execution events API case",type:"function",language:"typescript",visibility:"private",complexity:"moderate"});
+CREATE (suite)-[:CONTAINS]->(hookEvents),(hookEvents)-[:CALLS]->(api);
 */

@@ -3,6 +3,8 @@ CYPHER STRUCTURE MANIFEST
 CREATE
   (file:File {name:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx",type:"file",language:"tsx"}),
   (page:Function {name:"HookPolicyPage",type:"function",signature:"HookPolicyPage()",visibility:"public",complexity:"complex"}),
+  (executionPanel:Function {name:"HookExecutionEventPanel",type:"function",signature:"HookExecutionEventPanel({api,projectId})",visibility:"private",complexity:"moderate"}),
+  (eventDecisionLabel:Function {name:"hookEventDecisionLabel",type:"function",signature:"hookEventDecisionLabel(decision)",visibility:"private",complexity:"simple"}),
   (ruleEditor:Function {name:"HookRuleEditor",type:"function",signature:"HookRuleEditor({rule,onChange,onDelete})",visibility:"private",complexity:"complex"}),
   (conditionEditor:Function {name:"HookConditionEditor",type:"function",signature:"HookConditionEditor({condition,onChange,onDelete})",visibility:"private",complexity:"moderate"}),
   (loadPolicy:Function {name:"loadHookPolicy",type:"function",signature:"loadHookPolicy(api,scope,projectId,worktreeId)",visibility:"private",complexity:"simple"}),
@@ -13,27 +15,33 @@ CREATE
   (conditionValue:Function {name:"valueForCondition",type:"function",signature:"valueForCondition(field,value)",visibility:"private",complexity:"simple"}),
   (operators:Function {name:"operatorsForField",type:"function",signature:"operatorsForField(field)",visibility:"private",complexity:"simple"}),
   (maxRules:Variable {name:"MAX_RULES_PER_SCOPE",type:"variable",language:"typescript"}),
+  (maxVisibleEvents:Variable {name:"MAX_VISIBLE_HOOK_EVENTS",type:"variable",language:"typescript"}),
   (newCondition:Function {name:"defaultCondition",type:"function",signature:"defaultCondition()",visibility:"private",complexity:"simple"}),
   (newRule:Function {name:"newRestrictiveRule",type:"function",signature:"newRestrictiveRule()",visibility:"private",complexity:"simple"}),
   (page)-[:CALLS]->(loadPolicy),(page)-[:CALLS]->(editorDocument),(page)-[:CALLS]->(digest),
-  (page)-[:CALLS]->(newRule),(page)-[:CALLS]->(reason),(page)-[:CALLS]->(formatError),
+  (page)-[:CALLS]->(newRule),(page)-[:CALLS]->(reason),(page)-[:CALLS]->(formatError),(page)-[:CALLS]->(executionPanel),
+  (executionPanel)-[:CALLS]->(eventDecisionLabel),
   (ruleEditor)-[:CALLS]->(conditionEditor),(conditionEditor)-[:CALLS]->(valueForCondition),
   (conditionEditor)-[:CALLS]->(operators),(newRule)-[:CALLS]->(defaultCondition),
   (page)-[:USES]->(maxRules),
+  (executionPanel)-[:USES]->(maxVisibleEvents),
   (file)-[:CONTAINS]->(page),(file)-[:CONTAINS]->(ruleEditor),(file)-[:CONTAINS]->(conditionEditor),
   (file)-[:CONTAINS]->(loadPolicy),(file)-[:CONTAINS]->(editorDocument),(file)-[:CONTAINS]->(digest),
   (file)-[:CONTAINS]->(formatError),(file)-[:CONTAINS]->(reason),(file)-[:CONTAINS]->(conditionValue),
-  (file)-[:CONTAINS]->(operators),(file)-[:CONTAINS]->(newCondition),(file)-[:CONTAINS]->(newRule);
+  (file)-[:CONTAINS]->(operators),(file)-[:CONTAINS]->(newCondition),(file)-[:CONTAINS]->(newRule),
+  (file)-[:CONTAINS]->(executionPanel),(file)-[:CONTAINS]->(eventDecisionLabel);
 */
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Check, CircleHelp, Clock3, FileClock, Plus, RotateCcw, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { useWorktreeGroupApi } from "@/lib/group/groupProjection";
 import {
   type HookCondition,
   type HookDecision,
+  type HookExecutionEvent,
+  type HookExecutionEventPage,
   type HookFactField,
   type HookOperator,
   type HookPolicyDocument,
@@ -67,6 +75,7 @@ const DECISIONS: Array<{ id: HookRule["decision"]; label: string }> = [
 ];
 const RETENTION_STATES = ["Fresh", "Missing", "Stale", "Conflict", "Unknown"] as const;
 const MAX_RULES_PER_SCOPE = 64;
+const MAX_VISIBLE_HOOK_EVENTS = 300;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default function HookPolicyPage() {
@@ -291,6 +300,7 @@ export default function HookPolicyPage() {
 
       {error && <div role="alert" className="rounded border border-red-500/40 bg-red-500/5 px-3 py-2 text-sm text-red-600">{error}</div>}
       {notice && <div role="status" className="rounded border border-emerald-500/40 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700">{notice}</div>}
+      <HookExecutionEventPanel api={api} projectId={projectId} />
       {loading && <div className="card p-4 text-sm text-ink-mute">正在加载服务端策略…</div>}
       {!loading && !projects.length && <div className="card p-4 text-sm text-ink-dim">当前账号没有可读取的 Project，或授权目录尚不可用。</div>}
       {!loading && scope === "worktree" && projectId && !worktrees.length && <div className="card p-4 text-sm text-ink-dim">所选 Project 暂无可管理 Worktree；Worktree 策略仅能增加 Project 基线之上的限制。</div>}
@@ -348,7 +358,7 @@ export default function HookPolicyPage() {
                   </div>)}
                   {!policy.audit.length && <p className="text-[10px] text-ink-mute">暂无策略变更记录。</p>}
                 </div>
-                <p className="mt-3 flex items-start gap-1 text-[10px] text-ink-mute"><CircleHelp size={12} className="mt-px shrink-0" />这里仅显示策略配置审计。Hook 执行事件/RunEvent 与 BI coverage 属 Phase 9D 数据面，接入前不显示虚构日志。</p>
+                <p className="mt-3 flex items-start gap-1 text-[10px] text-ink-mute"><CircleHelp size={12} className="mt-px shrink-0" />这里仅显示策略配置审计。实际执行事件单独列在本 Hooks 选项卡下方，并与配置审计分开。</p>
               </section>
               {policy.draft && <section className="card p-3 text-[11px] text-ink-dim"><h3 className="flex items-center gap-1.5 font-semibold text-ink"><Clock3 size={13} />草稿保留期</h3><p className="mt-1">过期时间：{new Date(policy.draft.expires_at).toLocaleString()}</p></section>}
             </aside>
@@ -357,6 +367,112 @@ export default function HookPolicyPage() {
       )}
     </div>
   );
+}
+
+function HookExecutionEventPanel({ api, projectId }: { api: WorktreeGroupApiClient; projectId: string }) {
+  const [page, setPage] = useState<HookExecutionEventPage | null>(null);
+  const [pageProjectId, setPageProjectId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const requestGeneration = useRef(0);
+
+  useEffect(() => {
+    const generation = ++requestGeneration.current;
+    setPage(null);
+    setPageProjectId("");
+    setError("");
+    if (!projectId) {
+      setLoading(false);
+      return () => { requestGeneration.current += 1; };
+    }
+
+    setLoading(true);
+    api.listHookEvents(projectId, { limit: 30 }).then((result) => {
+      if (requestGeneration.current !== generation) return;
+      setPage({ ...result, events: result.events.slice(0, 30) });
+      setPageProjectId(projectId);
+    }).catch((cause: unknown) => {
+      if (requestGeneration.current === generation) setError(formatError(cause));
+    }).finally(() => {
+      if (requestGeneration.current === generation) setLoading(false);
+    });
+
+    return () => { requestGeneration.current += 1; };
+  }, [api, projectId, refreshKey]);
+
+  const loadMore = async () => {
+    const cursor = pageProjectId === projectId ? page?.next_cursor : null;
+    if (!projectId || !cursor || loadingMore || (page?.events.length ?? 0) >= MAX_VISIBLE_HOOK_EVENTS) return;
+    const generation = requestGeneration.current;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const nextPage = await api.listHookEvents(projectId, { limit: 30, cursor });
+      if (requestGeneration.current !== generation) return;
+      setPage((current) => current && pageProjectId === projectId
+        ? { ...nextPage, events: [...current.events, ...nextPage.events].slice(0, MAX_VISIBLE_HOOK_EVENTS) }
+        : current);
+    } catch (cause) {
+      if (requestGeneration.current === generation) setError(formatError(cause));
+    } finally {
+      if (requestGeneration.current === generation) setLoadingMore(false);
+    }
+  };
+
+  const visiblePage = pageProjectId === projectId ? page : null;
+  const coverage = visiblePage?.coverage;
+  const events: HookExecutionEvent[] = visiblePage?.events ?? [];
+
+  return (
+    <section className="card space-y-3 p-4" aria-label="Hook 执行事件" data-testid="hook-execution-events">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-ink"><FileClock size={14} />Hook 执行事件</h3>
+          <p className="mt-1 text-[11px] text-ink-dim">按 Project 授权读取追加式事件账本；此处与策略配置审计分开。每页 30 条，最多在页面保留 300 条。</p>
+        </div>
+        <button type="button" onClick={() => setRefreshKey((value) => value + 1)} disabled={!projectId || loading} className="btn-secondary text-xs">刷新事件</button>
+      </header>
+
+      {coverage && <div className={`rounded border p-3 text-xs ${coverage.status === "complete" ? "border-emerald-500/40 bg-emerald-500/5 text-emerald-800" : "border-amber-500/40 bg-amber-500/5 text-amber-800"}`} role="status" data-testid="hook-event-coverage">
+        <div className="flex flex-wrap items-center gap-2 font-medium"><span>覆盖状态：{coverage.status === "partial" ? "部分接入" : coverage.status === "complete" ? "完整" : "未知"}</span><span className="rounded border border-amber-700/20 px-1.5 py-0.5">{coverage.reported_percentage === null ? "覆盖比例未知" : `${coverage.reported_percentage}%`}</span></div>
+        <p className="mt-1">当前接入：{coverage.instrumented_phases.length ? coverage.instrumented_phases.join("、") : "无"}。未接入范围不按 0 次处理。</p>
+        {coverage.not_yet_instrumented_phases.length > 0 && <p className="mt-1 text-amber-700">尚未接入：{coverage.not_yet_instrumented_phases.join("、")}</p>}
+      </div>}
+
+      {loading && <p className="text-xs text-ink-mute">正在读取执行事件…</p>}
+      {!projectId && <p className="text-xs text-ink-mute">选择 Project 后读取其授权事件。</p>}
+      {error && <p role="alert" className="rounded border border-red-500/40 bg-red-500/5 px-3 py-2 text-xs text-red-600">事件读取失败：{error}</p>}
+      {!loading && projectId && visiblePage && events.length === 0 && <p className="rounded border border-dashed border-line p-3 text-xs text-ink-mute">该 Project 当前没有可显示的 Hook 执行事件；覆盖状态请以上方说明为准。</p>}
+
+      {events.length > 0 && <ol className="max-h-80 space-y-2 overflow-y-auto" aria-label="Hook 执行事件列表">
+        {events.map((event) => <li key={event.event_id} className="rounded border border-line px-3 py-2 text-xs" data-testid="hook-execution-event">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-medium text-ink">{hookEventDecisionLabel(event.hook_decision)} · {event.hook_phase}</span>
+            <time className="text-ink-mute" dateTime={event.occurred_at}>{new Date(event.occurred_at).toLocaleString()}</time>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-ink-dim">
+            <span>原因：{event.hook_reason_code}</span><span>评估：{event.duration_ms} ms</span>
+            <span>Project v{event.project_policy_version ?? "未知"} · Worktree v{event.worktree_policy_version ?? "继承/未知"}</span>
+            {event.timed_out && <span className="font-medium text-amber-700">超时</span>}
+          </div>
+          <p className="mt-1 break-all font-mono text-[10px] text-ink-mute">event {event.event_id} · correlation {event.correlation_id}</p>
+        </li>)}
+      </ol>}
+
+      {visiblePage?.next_cursor && events.length < MAX_VISIBLE_HOOK_EVENTS && <button type="button" onClick={loadMore} disabled={loadingMore || loading} className="btn-secondary text-xs">{loadingMore ? "正在加载…" : "加载更多"}</button>}
+      {events.length >= MAX_VISIBLE_HOOK_EVENTS && <p className="text-[10px] text-ink-mute">已达到本页 300 条内存上限；事件记录仍保留在服务端账本中。</p>}
+    </section>
+  );
+}
+
+function hookEventDecisionLabel(decision: string): string {
+  if (decision === "allow") return "允许";
+  if (decision === "deny") return "拒绝";
+  if (decision === "require_human") return "需要人工审批";
+  if (decision === "defer") return "等待条件";
+  return `未知决策 (${decision})`;
 }
 
 function HookRuleEditor({ rule, disabled, onChange, onDelete }: {
@@ -497,6 +613,12 @@ function reasonForDecision(decision: HookDecision): HookRule["reason_code"] {
 function ruleKey(rule: HookRule): string {
   return rule.rule_id.join(",");
 }
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (executionPanel:Function {name:"HookExecutionEventPanel",type:"function"}),
+      (listHookEvents:Function {name:"WorktreeGroupApiClient.listHookEvents",type:"function"});
+CREATE (executionPanel)-[:CALLS]->(listHookEvents);
+*/
 
 function uuidToBytes(uuid: string): number[] {
   if (!UUID_RE.test(uuid)) throw new Error("Group API returned an invalid UUID scope.");

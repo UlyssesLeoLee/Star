@@ -1,8 +1,8 @@
 # BD-MULTICA-HOOK-001
 
-> **Multica Hook 域基本設計書 v0.5.2** (Hooks 沿用既有 Advanced Settings 标签导航；Phase 9C 已加入可视 Builder 条件式 UI 代码，宿主认证 Provider 与生产策略仍未就绪)
+> **Multica Hook 域基本設計書 v0.5.4** (Hooks 沿用既有 Advanced Settings 标签导航；Phase 9D 已加入 Worktree archive event ledger/API 与 Hooks 页事件面板代码切片，目标 DB、认证 Provider 与 BI read model 尚未验收)
 
-> - 状态: 🟡 Draft v0.5.2 (2026-10-01 JST，Phase 9C Advanced Settings Hooks tab implementation snapshot)
+> - 状态: 🟡 Draft v0.5.4 (2026-10-01 JST，Phase 9D event panel code slice)
 > - 目标阶段: 基本設計 → 詳細設計 → 実装 → テスト → リリース
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填, per 守门 #1 v15 docs 同步饱和 + 1 commit 多文件)
@@ -804,7 +804,13 @@ session_state_manager.save_shared_state(session_id, shared_state)
 
 Phase 9C 已加入 Settings 侧栏的“高级设置”入口及其 Skills / Hooks / MCP / Plugins 并列 tab shell；Hooks 页使用 Project/Worktree 授权选择、typed restrictive rule 表单、Draft CAS、admin publish、rollback 和 policy configuration Audit。规则编辑器只提交 Rust DTO，不允许任意代码、shell 或 plugin callback。UI 的配置 Audit 不代表实际 Hook 执行日志，也不代替 Phase 9D 的 RunEvent/outbox/BI。
 
-当前 Group API client 没有从 app root `Providers` 获得认证 token/session generation，故页面在缺失 session/provider 时不加载 seed、不展示伪策略，也不开放保存/发布；真实 Project baseline 未配置时同样明确阻断 Worktree overlay。已添加路由与 policy API client contract 的代码，不等于浏览器已完成授权读取、目标数据库/RLS 部署或生产写入验收。Task/Run 生命周期仍以独立 Run attempt 为单位，Worktree 是可选执行环境；Run 历史不随 Worktree 归档或清理删除。Project BI、固定 Benchmark 和 Improvement proposal 留在 Project Quality & Improvement 视图，不增加到 Project→Worktree→Task 导航层级。
+### 7.6 Phase 9D Hook execution event 与 BI 接缝
+
+Phase 9D 先为无 Task/Run 绑定的 Worktree archive lifecycle Hook 增加 `multica.hook_execution_event` Transaction 账本；Run-linked Hook 事件仍使用有 `(work_item_id, run_id)` 外键的 `multica.task_execution_run_event`。事件源只记录已脱敏的 actor/tenant/project/worktree/task/run/correlation scope、decision/reason、policy/evaluator version/digest、duration/timeout 与 bounded freshness facts，不写入 prompt、command、stdout/stderr 或 Secret。Worktree archive producer 将事件与 Worktree 确认及管理审计放在同一事务；事件写入失败则整体 fail closed。
+
+`GET /api/v1/projects/{project_id}/hook-events` 以 `hook:read`、当前 Project membership 和 tenant RLS 授权，使用绑定 Project 的 keyset cursor，页大小上限 100，只返回 allowlisted projection 且设置 no-store。当前 instrumented phase 仅 `worktree_archive`，响应 `coverage.status=partial`、`reported_percentage=null`；其他 phase 属尚未接入/unknown，不能按零处理。Hooks 页已有独立的“Hook 执行事件”只读面板，使用同一 Project selector、每页最多 30 条、页面最多驻留 300 条并支持 cursor 续读，清楚呈现 partial/unknown coverage；策略配置 Audit 与执行事件分开展示。该表是只读事件账本和 BI 输入源，不等同于有投递状态的 Outbox；Run/tool/validation/review producer、事件投递/重放状态、跨 Run/Worktree BI read model、聚合口径、Run Detail/Quality & Improvement 下钻与目标 DB/RLS/grants 验收仍未完成。导航保持既有要求：Hooks 是高级设置内与 Skills/MCP/Plugins 并列的 tab。
+
+当前 Group API client 没有从 app root `Providers` 获得认证 token/session generation，故页面在缺失 session/provider 时不加载 seed、不展示伪策略，也不开放保存/发布；事件面板也不会读取或伪造未授权数据。真实 Project baseline 未配置时同样明确阻断 Worktree overlay。已有的受控 Provider 测试只验证组件消费契约，不等于 app session 装配、浏览器真实授权读取、目标数据库/RLS 部署或生产写入验收。Task/Run 生命周期仍以独立 Run attempt 为单位，Worktree 是可选执行环境；Run 历史不随 Worktree 归档或清理删除。Project BI、固定 Benchmark 和 Improvement proposal 留在 Project Quality & Improvement 视图，不增加到 Project→Worktree→Task 导航层级。
 
 ---
 
@@ -951,3 +957,5 @@ Phase 9C 已加入 Settings 侧栏的“高级设置”入口及其 Skills / Hoo
 | **v0.5** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将高级设置 Hooks tab 的既有导航决策复用为 Rust-native 可视规则管理入口；明确 typed condition/action、Project baseline + Worktree restrictive overlay、不可覆盖 builtin、fail-closed cleanup/Run gate 与 BI/RunEvent provenance；旧 Python/Next.js 方案只作为兼容草案 | 用户要求 Hook 原生实现、可视化配置并纳入 Worktree/BI，同时澄清应位于高级设置标签栏 |
 | **v0.5.1** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 交叉引用更新至 SRS v0.5.1 与总要件 v5.20；设计决策未变 | Phase 8B 扩展总需求后同步当前上位基线 |
 | **v0.5.2** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 SRS v0.5.2；落实 Advanced Settings 侧栏入口与 Hooks 并列 tab 的路由/可视策略 Builder 代码切片；明确 host session、真实策略读取/写入与 Phase 9D 执行 RunEvent/BI 尚未验收，并校正 Task/Run/Worktree/Project BI 的关系 | 用户再次确认 Hooks 是高级设置中的选项卡，并要求融合 Run/BI 架构方向 |
+| **v0.5.3** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 Phase 9D Worktree archive append-only HookEvent T 表、同事务 fail-closed producer、Project-scoped keyset read API 与 partial/unknown coverage；明确该表是事件账本而非异步 Outbox，Run-linked Event、BI consumer/read model、Advanced Settings 事件 UI 和目标 DB/RLS/grants 验收仍开放；高级设置 Hooks tab 不变 | Phase 9D 首个生命周期 HookEvent/API 代码切片落地 |
+| **v0.5.4** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Project-scoped Hook execution event 面板加入既有 Advanced Settings → Hooks 页面；与策略 Audit 分开展示、限制分页并显式呈现 partial/unknown coverage；记录 targeted Rust/前端/TypeScript 与隔离 PostgreSQL 证据，保留 app Provider、目标 DB/grants/RLS 和完整 BI 未验收边界 | Phase 9D Hooks tab 事件面板和 UI/API contract tests 落地 |

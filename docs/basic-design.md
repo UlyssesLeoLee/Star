@@ -1,6 +1,6 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.12 (2026-10-01)
+> **文档版本**: v5.14 (2026-10-01)
 > **上游要件定义书**: docs/requirements.md v5.20(下文以 §N 引用)
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
@@ -4664,6 +4664,8 @@ Hook phase 覆盖 Run admission、before/after tool、before/after validation、
 
 Hook evaluation event 固定 `hook_set/rule/evaluator version + digest`、phase/decision/reason class/duration/timeout/fail-closed/override、actor/project/worktree/run/task/correlation IDs；不记录 Secret/prompt/原始 stdout/chain-of-thought。可覆盖规则的人工 override 限定角色、理由、期限并审计，核心安全规则不可 override。BI 派生 Hook coverage、deny/require-human、timeout/failure、override、阻断和恢复时间，并跟 Worktree lock/lease/claim/drain、cleanup 故障、Validation、返工、接受结果做版本化 cohort 关联；event 缺失标 unknown。HookSet 改进通过固定 Benchmark 与独立审批，禁止规则自动放宽自身限制。
 
+Phase 9D 的首个实现切片增加 `multica.hook_execution_event`（Transaction / append-only）保存不依赖 Run 的 Worktree archive Hook evaluation；Run-linked execution event 继续写 `multica.task_execution_run_event`，其 Task/Run FK 不可绕过。两个来源在 BI 层按稳定的 Hook scope/version/phase/decision/correlation 字段联合读取，不以虚构的 `hook_blocked` / `hook_timeout` event type 写入 RunEvent。当前 Worktree producer 与 `GET /api/v1/projects/{project_id}/hook-events` keyset API 只覆盖 `worktree_archive`；响应给出 `partial`、百分比 `null` 和未接入 phase，unknown 不得折算为零。Hooks 事件列表已作为 Advanced Settings → Hooks 页内独立于策略配置 Audit 的 Project-scoped 有界分页只读面板接入代码，每页 30 条且最多驻留 300 条；目标环境认证 Provider、migration/grants/RLS、Run/tool/validation/review producers、Outbox delivery state、聚合 BI read model、Run Detail/Quality & Improvement 下钻仍开放。插入失败时归档事务 fail closed，敏感正文不进入事件投影。
+
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
 | v0.2 | 2026-09-27 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 继承 requirements v2.1 §50，新增 Worktree Index/Group Shell、同级 App、Group Context、受控任务卡 CLI、范围化 LangGraph Chat、Plugin 热插拔、W/T/M 分类、跨 App 事件与追踪验收 | 用户要求 Worktree 作为顶层索引及群组应用体系 |
@@ -4722,3 +4724,5 @@ Hook evaluation event 固定 `hook_set/rule/evaluator version + digest`、phase/
 | v5.10 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9B2C archive-confirm gate 的 verified policy/Rust evaluator 接线、锁外 Runtime/Git 预检和锁内重授权/版本/新鲜度核验；明确 readiness provider 缺失返回 503、目标 DB/RLS、物理 cleanup、RunEvent/outbox 与 9C UI 仍未完成；再次确认 Hooks 是 `/settings/advanced/hooks` 下 Advanced Settings 并列标签 | 推进 9B2C Worktree 生命周期 Hook 门，并复核 Runtime 等待不得持有 Worktree 数据库行锁 |
 | v5.11 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补入 archive-confirm admission fence expiry contract、最终写入前至少 5 秒余量检查和 provider 覆盖命令完成窗口的验收责任；更新 REST library test 数为 103；Hooks 高级设置标签位置保持 ULYS-235 | 收紧归档时新 Run/lease 竞态，并同步验证边界 |
 | v5.12 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Hook SRS/BD/DD v0.5.2/v0.5.2/v0.5.7；记录 Phase 9C Advanced Settings 入口、Skills/Hooks/MCP/Plugins 并列 tab、typed policy Builder/API client 代码切片与宿主认证 Provider 缺口；维持 Task→Run×N、Worktree 可选运行环境、Project BI/Benchmark 位于 Quality & Improvement 的层级 | 用户再次确认 Hooks 属于高级设置中的选项卡，并要求按 Run/BI 架构持续推进 |
+| v5.13 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Phase 9D 第一个 Worktree archive HookEvent 代码切片纳入基本设计；区分无 Run 外键的生命周期事件账本与有 Task/Run FK 的 RunEvent；定义同事务 fail-closed 写入、有界授权 keyset API 与 partial/unknown coverage；完整 BI、Run-linked producers、目标 DB/grants/RLS 与 UI consumer 仍开放 | Phase 9D archive HookEvent migration、producer 与读取 API 代码落地 |
+| v5.14 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Project-authorized Hook execution event 分页面板纳入既有 Advanced Settings → Hooks tab；区分只读执行事件与策略配置 Audit，呈现 partial/unknown coverage；同步 Rust 106/106、前端定向 25/25、TypeScript 与隔离 PostgreSQL append-only/RLS 验证，并保留 app auth provider、目标 DB/BI 与 Run-linked producer 边界 | Phase 9D HookEvent panel/UI client 与 targeted tests 落地 |

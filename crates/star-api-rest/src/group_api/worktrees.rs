@@ -25,6 +25,10 @@
 //! CREATE (archiveOutcome:Class {name:"ArchiveHookOutcome",type:"class",language:"rust"}),(archiveFacts:Class {name:"ArchiveGateFacts",type:"class",language:"rust"}),(confirmContext:Class {name:"ManagementConfirmationContext",type:"class",language:"rust"}),(confirmState:Enum {name:"ManagementConfirmationState",type:"enum",language:"rust"}),(lockContext:Function {name:"lock_management_confirmation_context",type:"function",language:"rust",visibility:"private",complexity:"complex"}),(prepare:Function {name:"prepare_archive_gate_facts",type:"function",language:"rust",visibility:"private",complexity:"complex"}),(archiveGate:Function {name:"evaluate_archive_gate",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(lockState:Function {name:"hook_retention_lock_state",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(fresh:Function {name:"archive_readiness_is_fresh",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(factsFresh:Function {name:"archive_gate_facts_are_fresh",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(projection:Function {name:"archive_hook_projection",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(archiveTests:Module {name:"archive_gate_tests",type:"module",language:"rust"}),(load:Function {name:"load_verified_effective_snapshot",type:"function",language:"rust",visibility:"pub(super)"}),(archiveObserver:Interface {name:"WorktreeArchiveReadinessObserver",type:"interface",language:"rust"}),(gitLockTimeout:Function {name:"observe_git_lock_with_timeout",type:"function",language:"rust",visibility:"private"});
 //! CREATE (m)-[:CONTAINS]->(archiveOutcome),(m)-[:CONTAINS]->(archiveFacts),(m)-[:CONTAINS]->(confirmContext),(m)-[:CONTAINS]->(confirmState),(m)-[:CONTAINS]->(lockContext),(m)-[:CONTAINS]->(prepare),(m)-[:CONTAINS]->(archiveGate),(m)-[:CONTAINS]->(lockState),(m)-[:CONTAINS]->(fresh),(m)-[:CONTAINS]->(factsFresh),(m)-[:CONTAINS]->(projection),(m)-[:CONTAINS]->(archiveTests),(co)-[:CALLS]->(lockContext),(co)-[:CALLS]->(prepare),(co)-[:CALLS]->(archiveGate),(co)-[:CALLS]->(projection),(co)-[:CALLS]->(factsFresh),(prepare)-[:CALLS]->(archiveObserver),(prepare)-[:CALLS]->(gitLockTimeout),(archiveGate)-[:CALLS]->(load),(archiveOutcome)-[:USES]->(projection),(archiveFacts)-[:USES]->(lockState),(factsFresh)-[:CALLS]->(fresh);
 //! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"worktrees",type:"module"}),(co:Function {name:"confirm_management_plan",type:"function"}),(archiveTests:Module {name:"archive_gate_tests",type:"module"});
+//! CREATE (appendEvent:Function {name:"append_archive_hook_event",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(decisionName:Function {name:"hook_decision_name",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(reasonName:Function {name:"hook_reason_name",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(eventTest:Function {name:"archive_hook_event_names_are_stable",type:"function",language:"rust",visibility:"private",complexity:"simple"});
+//! CREATE (m)-[:CONTAINS]->(appendEvent),(m)-[:CONTAINS]->(decisionName),(m)-[:CONTAINS]->(reasonName),(archiveTests)-[:CONTAINS]->(eventTest),(co)-[:CALLS]->(appendEvent),(appendEvent)-[:CALLS]->(decisionName),(appendEvent)-[:CALLS]->(reasonName),(eventTest)-[:CALLS]->(decisionName),(eventTest)-[:CALLS]->(reasonName);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! MATCH (archiveTests:Module {name:"archive_gate_tests",type:"module"}),(lockState:Function {name:"hook_retention_lock_state",type:"function"}),(fresh:Function {name:"archive_readiness_is_fresh",type:"function"});
 //! CREATE (lockTest:Function {name:"lock_facts_fail_closed",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(freshTest:Function {name:"readiness_rejects_stale_and_future_observations",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(gateFreshTest:Function {name:"archive_gate_facts_require_fresh_observations",type:"function",language:"rust",visibility:"private",complexity:"simple"});
 //! CREATE (archiveTests)-[:CONTAINS]->(lockTest),(archiveTests)-[:CONTAINS]->(freshTest),(archiveTests)-[:CONTAINS]->(gateFreshTest),(lockTest)-[:CALLS]->(lockState),(freshTest)-[:CALLS]->(fresh),(gateFreshTest)-[:CALLS]->(factsFresh);
@@ -35,32 +39,35 @@
 //! CREATE (m)-[:CONTAINS]->(fenceMargin),(factsFresh)-[:CALLS]->(fenceMargin),(archiveTests)-[:CONTAINS]->(fenceTest),(fenceTest)-[:CALLS]->(fenceMargin);
 
 use axum::{
-    Json, Router,
     extract::{Path, Query, State},
     http::{
-        HeaderMap,
         header::{CACHE_CONTROL, VARY},
+        HeaderMap,
     },
     routing::{get, post},
+    Json, Router,
 };
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{DateTime, Utc};
 use domain_hook::{
-    EVENT_SCHEMA_VERSION, HookDecision, HookEventEnvelope, HookPhase, HookScope,
-    RetentionLockState, evaluate as evaluate_hook,
+    evaluate as evaluate_hook, HookDecision, HookEventEnvelope, HookPhase, HookScope,
+    RetentionLockState, EVENT_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, Transaction};
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use uuid::Uuid;
 
 use super::{
+    active_binding, require_scope, set_tenant, validate_actor, worktree_projection,
     AuthenticatedUser, GroupApiError, GroupApiState, WorktreeArchiveReadiness,
     WorktreeArchiveReadinessQuery, WorktreeGitLockObservation, WorktreeGitLockObserver,
-    WorktreeGitLockObserverError, WorktreeGitLockQuery, WorktreeIndexRow, active_binding,
-    require_scope, set_tenant, validate_actor, worktree_projection,
+    WorktreeGitLockObserverError, WorktreeGitLockQuery, WorktreeIndexRow,
 };
 
 #[derive(Debug, Deserialize)]
@@ -111,6 +118,7 @@ struct ManageWorktreeRow {
 struct ArchiveHookOutcome {
     event_id: Uuid,
     evaluation: domain_hook::HookEvaluation,
+    duration_ms: i64,
     readiness_observed_at: DateTime<Utc>,
     admission_fence_expires_at: DateTime<Utc>,
     git_lock_observed_at: Option<DateTime<Utc>>,
@@ -592,6 +600,15 @@ async fn confirm_management_plan(
     let archive_hook = if let Some(facts) = archive_facts.as_ref() {
         let outcome = evaluate_archive_gate(&actor, &mut tx, worktree_id, &current, facts).await?;
         if outcome.evaluation.decision != HookDecision::Allow {
+            append_archive_hook_event(
+                &mut tx,
+                &actor,
+                worktree.project_id,
+                worktree_id,
+                plan.correlation_id,
+                &outcome,
+            )
+            .await?;
             let before = json!({
                 "owner_user_id": current.owner_user_id,
                 "archived": current.archived,
@@ -712,6 +729,15 @@ async fn confirm_management_plan(
                 "worktree_archive_observation_stale",
             ));
         }
+        append_archive_hook_event(
+            &mut tx,
+            &actor,
+            worktree.project_id,
+            worktree_id,
+            plan.correlation_id,
+            outcome,
+        )
+        .await?;
     }
 
     let before = json!({
@@ -1038,13 +1064,105 @@ async fn evaluate_archive_gate(
         worktree_id,
     )
     .await?;
+    let evaluation_started = Instant::now();
+    let evaluation = evaluate_hook(&facts.event, snapshot.as_ref());
+    let duration_ms = i64::try_from(evaluation_started.elapsed().as_millis()).unwrap_or(i64::MAX);
     Ok(ArchiveHookOutcome {
         event_id: facts.event_id,
-        evaluation: evaluate_hook(&facts.event, snapshot.as_ref()),
+        evaluation,
+        duration_ms,
         readiness_observed_at: facts.readiness_observed_at,
         admission_fence_expires_at: facts.admission_fence_expires_at,
         git_lock_observed_at: facts.git_lock_observed_at,
     })
+}
+
+async fn append_archive_hook_event(
+    tx: &mut Transaction<'_, sqlx::Postgres>,
+    actor: &super::AuthUser,
+    project_id: Uuid,
+    worktree_id: Uuid,
+    correlation_id: Uuid,
+    outcome: &ArchiveHookOutcome,
+) -> Result<(), GroupApiError> {
+    let evaluation = &outcome.evaluation;
+    let evaluator_api_version =
+        i16::try_from(evaluation.evaluator_api_version).map_err(|_| GroupApiError::internal())?;
+    let project_policy_version = evaluation
+        .project_version
+        .map(i64::try_from)
+        .transpose()
+        .map_err(|_| GroupApiError::internal())?;
+    let worktree_policy_version = evaluation
+        .worktree_version
+        .map(i64::try_from)
+        .transpose()
+        .map_err(|_| GroupApiError::internal())?;
+    let details = json!({
+        "readiness_observed_at": outcome.readiness_observed_at,
+        "admission_fence_expires_at": outcome.admission_fence_expires_at,
+        "git_lock_observed_at": outcome.git_lock_observed_at,
+    });
+
+    sqlx::query(
+        r#"INSERT INTO multica.hook_execution_event
+           (event_id, tenant_id, project_id, worktree_id, work_item_id, run_id,
+            actor_id, correlation_id, source_kind, hook_phase, hook_decision,
+            hook_reason_code, matched_rule_id, project_policy_version,
+            worktree_policy_version, evaluator_api_version, policy_digest,
+            evaluated_condition_count, duration_ms, timed_out, details)
+           VALUES ($1, $2, $3, $4, NULL, NULL, $5, $6, 'worktree_lifecycle',
+                   'worktree_archive', $7, $8, $9, $10, $11, $12, $13, $14, $15, false, $16)"#,
+    )
+    .bind(outcome.event_id)
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(worktree_id)
+    .bind(actor.user_id)
+    .bind(correlation_id)
+    .bind(hook_decision_name(evaluation.decision))
+    .bind(hook_reason_name(evaluation.reason_code))
+    .bind(evaluation.matched_rule_id.map(Uuid::from_bytes))
+    .bind(project_policy_version)
+    .bind(worktree_policy_version)
+    .bind(evaluator_api_version)
+    .bind(evaluation.policy_digest.map(hex::encode))
+    .bind(i32::from(evaluation.evaluated_condition_count))
+    .bind(outcome.duration_ms)
+    .bind(details)
+    .execute(&mut **tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    Ok(())
+}
+
+fn hook_decision_name(decision: HookDecision) -> &'static str {
+    match decision {
+        HookDecision::Allow => "allow",
+        HookDecision::Deny => "deny",
+        HookDecision::RequireHuman => "require_human",
+        HookDecision::Defer => "defer",
+    }
+}
+
+fn hook_reason_name(reason: domain_hook::HookReasonCode) -> &'static str {
+    use domain_hook::HookReasonCode;
+
+    match reason {
+        HookReasonCode::AllowedByBuiltinBaseline => "allowed_by_builtin_baseline",
+        HookReasonCode::IncompleteScope => "incomplete_scope",
+        HookReasonCode::EventSchemaUnsupported => "event_schema_unsupported",
+        HookReasonCode::ActorNotAuthorized => "actor_not_authorized",
+        HookReasonCode::LifecycleVersionStale => "lifecycle_version_stale",
+        HookReasonCode::RuntimeUnhealthyOrUnknown => "runtime_unhealthy_or_unknown",
+        HookReasonCode::RetentionLockUnusable => "retention_lock_unusable",
+        HookReasonCode::ExecutionNotDrained => "execution_not_drained",
+        HookReasonCode::PolicyUnavailable => "policy_unavailable",
+        HookReasonCode::PolicyInvalid => "policy_invalid",
+        HookReasonCode::RuleDenied => "rule_denied",
+        HookReasonCode::HumanApprovalRequired => "human_approval_required",
+        HookReasonCode::ExternalConditionPending => "external_condition_pending",
+    }
 }
 
 fn archive_readiness_is_fresh(observed_at: DateTime<Utc>) -> bool {
@@ -1085,6 +1203,8 @@ fn archive_hook_projection(outcome: &ArchiveHookOutcome) -> Value {
         "project_policy_version": outcome.evaluation.project_version,
         "worktree_policy_version": outcome.evaluation.worktree_version,
         "policy_digest": outcome.evaluation.policy_digest.map(hex::encode),
+        "duration_ms": outcome.duration_ms,
+        "timed_out": false,
         "readiness_observed_at": outcome.readiness_observed_at,
         "admission_fence_expires_at": outcome.admission_fence_expires_at,
         "git_lock_observed_at": outcome.git_lock_observed_at,
@@ -1426,6 +1546,7 @@ mod archive_gate_tests {
         let fresh = ArchiveHookOutcome {
             event_id: Uuid::new_v4(),
             evaluation,
+            duration_ms: 1,
             readiness_observed_at: now,
             admission_fence_expires_at: now + chrono::Duration::seconds(10),
             git_lock_observed_at: Some(now),
@@ -1449,5 +1570,17 @@ mod archive_gate_tests {
             now + chrono::Duration::seconds(4)
         ));
         assert!(!archive_fence_has_commit_margin(now));
+    }
+
+    #[test]
+    fn archive_hook_event_names_are_stable() {
+        assert_eq!(
+            hook_decision_name(HookDecision::RequireHuman),
+            "require_human"
+        );
+        assert_eq!(
+            hook_reason_name(domain_hook::HookReasonCode::ExternalConditionPending),
+            "external_condition_pending"
+        );
     }
 }

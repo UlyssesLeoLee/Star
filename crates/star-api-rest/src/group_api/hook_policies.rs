@@ -93,22 +93,28 @@
 //! MATCH (m:Module {name:"hook_policies",type:"module"}),(load:Function {name:"load_current_policy",type:"function"}),(verify:Function {name:"verify_stored_policy",type:"function"});
 //! CREATE (effective:Function {name:"load_verified_effective_snapshot",type:"function",language:"rust",visibility:"pub(super)",complexity:"moderate"});
 //! CREATE (m)-[:CONTAINS]->(effective),(effective)-[:CALLS]->(load),(effective)-[:CALLS]->(verify);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"hook_policies",type:"module"}),(rt:Function {name:"router",type:"function"});
+//! CREATE (eventsQuery:Class {name:"HookEventsQuery",type:"class",language:"rust"}),(eventCursor:Class {name:"HookEventCursor",type:"class",language:"rust"}),(eventProjection:Class {name:"HookEventProjection",type:"class",language:"rust"}),(projectKey:Variable {name:"project_id",type:"variable",language:"rust"}),(occurredKey:Variable {name:"occurred_at",type:"variable",language:"rust"}),(eventKey:Variable {name:"event_id",type:"variable",language:"rust"}),(listEvents:Function {name:"list_hook_events",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(decodeEventCursor:Function {name:"decode_hook_event_cursor",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(encodeEventCursor:Function {name:"encode_hook_event_cursor",type:"function",language:"rust",visibility:"private",complexity:"simple"});
+//! CREATE (m)-[:CONTAINS]->(eventsQuery),(m)-[:CONTAINS]->(eventCursor),(m)-[:CONTAINS]->(eventProjection),(m)-[:CONTAINS]->(listEvents),(m)-[:CONTAINS]->(decodeEventCursor),(m)-[:CONTAINS]->(encodeEventCursor),(rt)-[:CALLS]->(listEvents),(listEvents)-[:CALLS]->(decodeEventCursor),(listEvents)-[:CALLS]->(encodeEventCursor),(listEvents)-[:USES]->(eventProjection),(eventCursor)-[:USES]->(projectKey),(eventCursor)-[:USES]->(occurredKey),(eventCursor)-[:USES]->(eventKey);
 use axum::{
-    Json, Router,
     body::Bytes,
-    extract::{DefaultBodyLimit, Path, State},
+    extract::{DefaultBodyLimit, Path, Query, State},
+    http::header::{CACHE_CONTROL, VARY},
     routing::{get, post, put},
+    Json, Router,
 };
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{DateTime, Utc};
 use domain_hook::{HookPolicyDocument, MAX_POLICY_DOCUMENT_BYTES};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
-    AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope, set_tenant,
-    validate_actor, work_items::authorize_worktree,
+    active_binding, require_scope, set_tenant, validate_actor, work_items::authorize_worktree,
+    AuthenticatedUser, GroupApiError, GroupApiState,
 };
 
 // Each batch holds at most 16 verified 64 KiB policy documents in Rust memory.
@@ -198,11 +204,55 @@ struct RebaseStageRow {
     policy_document: Value,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HookEventsQuery {
+    limit: Option<i64>,
+    cursor: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct HookEventCursor {
+    version: u8,
+    project_id: Uuid,
+    occurred_at: DateTime<Utc>,
+    event_id: Uuid,
+}
+
+#[derive(Debug, FromRow, Serialize)]
+struct HookEventProjection {
+    event_id: Uuid,
+    worktree_id: Option<Uuid>,
+    work_item_id: Option<Uuid>,
+    run_id: Option<Uuid>,
+    actor_id: Uuid,
+    correlation_id: Uuid,
+    source_kind: String,
+    hook_phase: String,
+    hook_decision: String,
+    hook_reason_code: String,
+    matched_rule_id: Option<Uuid>,
+    project_policy_version: Option<i64>,
+    worktree_policy_version: Option<i64>,
+    evaluator_api_version: i16,
+    policy_digest: Option<String>,
+    evaluated_condition_count: i32,
+    duration_ms: i64,
+    timed_out: bool,
+    occurred_at: DateTime<Utc>,
+}
+
+const MAX_HOOK_EVENT_CURSOR_BYTES: usize = 512;
+
 pub(super) fn router() -> Router<GroupApiState> {
     Router::new()
         .route(
             "/api/v1/projects/{project_id}/hook-policy",
             get(get_project_policy),
+        )
+        .route(
+            "/api/v1/projects/{project_id}/hook-events",
+            get(list_hook_events),
         )
         .route(
             "/api/v1/worktrees/{worktree_id}/hook-policy/effective",
@@ -233,6 +283,122 @@ pub(super) fn router() -> Router<GroupApiState> {
             post(rollback_worktree_policy),
         )
         .layer(DefaultBodyLimit::max(MAX_POLICY_REQUEST_BYTES))
+}
+
+async fn list_hook_events(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path(project_id): Path<String>,
+    Query(query): Query<HookEventsQuery>,
+) -> Result<impl axum::response::IntoResponse, GroupApiError> {
+    let project_id = parse_id(&project_id)?;
+    let limit = query.limit.unwrap_or(50).clamp(1, 100) as usize;
+    let cursor = query
+        .cursor
+        .as_deref()
+        .map(decode_hook_event_cursor)
+        .transpose()?;
+    if cursor
+        .as_ref()
+        .is_some_and(|cursor| cursor.project_id != project_id)
+    {
+        return Err(GroupApiError::invalid_request("cursor_scope_mismatch"));
+    }
+
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    authorize_scope(
+        &mut tx,
+        &actor,
+        PolicyScope::Project,
+        Some(project_id),
+        None,
+        Access::Read,
+    )
+    .await?;
+    let mut events = sqlx::query_as::<_, HookEventProjection>(
+        r#"SELECT event_id, worktree_id, work_item_id, run_id, actor_id,
+                  correlation_id, source_kind, hook_phase, hook_decision,
+                  hook_reason_code, matched_rule_id, project_policy_version,
+                  worktree_policy_version, evaluator_api_version, policy_digest,
+                  evaluated_condition_count, duration_ms, timed_out, occurred_at
+           FROM multica.hook_execution_event
+           WHERE tenant_id = $1 AND project_id = $2
+             AND ($3::TIMESTAMPTZ IS NULL OR (occurred_at, event_id) < ($3, $4))
+           ORDER BY occurred_at DESC, event_id DESC
+           LIMIT $5"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(cursor.as_ref().map(|value| value.occurred_at))
+    .bind(cursor.as_ref().map(|value| value.event_id))
+    .bind((limit + 1) as i64)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+
+    let has_more = events.len() > limit;
+    events.truncate(limit);
+    let next_cursor = if has_more {
+        events
+            .last()
+            .map(|event| encode_hook_event_cursor(project_id, event))
+            .transpose()?
+    } else {
+        None
+    };
+    let body = json!({
+        "events": events,
+        "next_cursor": next_cursor,
+        "coverage": {
+            "scope": "hook_execution_event_ledger",
+            "status": "partial",
+            "reported_percentage": Value::Null,
+            "instrumented_phases": ["worktree_archive"],
+            "not_yet_instrumented_phases": ["run_admission", "tool", "validation", "review", "worktree_cleanup", "after_commit"],
+            "note": "Uninstrumented phases are unknown, not zero-risk or zero-volume."
+        }
+    });
+    Ok((
+        [(CACHE_CONTROL, "no-store"), (VARY, "Authorization")],
+        Json(body),
+    ))
+}
+
+fn decode_hook_event_cursor(value: &str) -> Result<HookEventCursor, GroupApiError> {
+    if value.is_empty() || value.len() > MAX_HOOK_EVENT_CURSOR_BYTES {
+        return Err(GroupApiError::invalid_request("invalid_hook_event_cursor"));
+    }
+    let bytes = URL_SAFE_NO_PAD
+        .decode(value)
+        .map_err(|_| GroupApiError::invalid_request("invalid_hook_event_cursor"))?;
+    let cursor: HookEventCursor = serde_json::from_slice(&bytes)
+        .map_err(|_| GroupApiError::invalid_request("invalid_hook_event_cursor"))?;
+    if cursor.version != 1 {
+        return Err(GroupApiError::invalid_request(
+            "unsupported_hook_event_cursor",
+        ));
+    }
+    Ok(cursor)
+}
+
+fn encode_hook_event_cursor(
+    project_id: Uuid,
+    event: &HookEventProjection,
+) -> Result<String, GroupApiError> {
+    let cursor = HookEventCursor {
+        version: 1,
+        project_id,
+        occurred_at: event.occurred_at,
+        event_id: event.event_id,
+    };
+    let bytes = serde_json::to_vec(&cursor).map_err(|_| GroupApiError::internal())?;
+    Ok(URL_SAFE_NO_PAD.encode(bytes))
 }
 
 async fn get_project_policy(
@@ -1680,6 +1846,50 @@ async fn insert_audit(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hook_event_cursor_is_project_scoped_and_versioned() {
+        let project_id = Uuid::new_v4();
+        let event = HookEventProjection {
+            event_id: Uuid::new_v4(),
+            worktree_id: Some(Uuid::new_v4()),
+            work_item_id: None,
+            run_id: None,
+            actor_id: Uuid::new_v4(),
+            correlation_id: Uuid::new_v4(),
+            source_kind: "worktree_lifecycle".to_owned(),
+            hook_phase: "worktree_archive".to_owned(),
+            hook_decision: "allow".to_owned(),
+            hook_reason_code: "allowed_by_builtin_baseline".to_owned(),
+            matched_rule_id: None,
+            project_policy_version: Some(1),
+            worktree_policy_version: None,
+            evaluator_api_version: 1,
+            policy_digest: None,
+            evaluated_condition_count: 0,
+            duration_ms: 0,
+            timed_out: false,
+            occurred_at: Utc::now(),
+        };
+
+        let encoded = encode_hook_event_cursor(project_id, &event).expect("encoded cursor");
+        let decoded = decode_hook_event_cursor(&encoded).expect("decoded cursor");
+
+        assert_eq!(decoded.version, 1);
+        assert_eq!(decoded.project_id, project_id);
+        assert_eq!(decoded.event_id, event.event_id);
+        assert_eq!(decoded.occurred_at, event.occurred_at);
+        assert!(decode_hook_event_cursor(&"x".repeat(MAX_HOOK_EVENT_CURSOR_BYTES + 1)).is_err());
+    }
+
+    #[test]
+    fn hook_event_query_rejects_unknown_fields() {
+        assert!(serde_json::from_value::<HookEventsQuery>(json!({
+            "limit": 25,
+            "offset": 100
+        }))
+        .is_err());
+    }
 
     fn policy_document(
         tenant_id: Uuid,
