@@ -228,6 +228,8 @@ pub struct SkillBindingSnapshot {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ContextPolicySnapshot {
+    /// Versioned ContextAssembler implementation.
+    pub assembler: ProviderReference,
     /// Maximum context bytes.
     pub max_input_bytes: u32,
     /// Maximum context tokens.
@@ -258,10 +260,12 @@ pub struct ValidationPolicySnapshot {
     pub acceptance_criteria: Vec<String>,
 }
 
-/// Schedule/Engineering Loop termination limits.
+/// Engineering Loop policy and termination limits. Schedule occurrence policy stays with Automation.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LoopBudgetSnapshot {
+    /// Versioned Engineering Loop policy implementation.
+    pub policy: ProviderReference,
     /// Maximum iteration count.
     pub max_iterations: u32,
     /// Stop after this many iterations without progress.
@@ -350,7 +354,7 @@ pub struct AgentExecutionProfileDraft {
     pub context: ContextPolicySnapshot,
     /// Independent validation policy.
     pub validation: ValidationPolicySnapshot,
-    /// Schedule/Engineering Loop budget.
+    /// Engineering Loop policy and budget; Schedule Loop remains an Automation concern.
     pub loop_budget: LoopBudgetSnapshot,
     /// Hard Run resource budget.
     pub resource_budget: ResourceBudgetSnapshot,
@@ -544,6 +548,11 @@ fn validate_profile(profile: &AgentExecutionProfileDraft) -> Result<(), Executio
         }
     }
     let context = &profile.context;
+    validate_provider(&context.assembler)?;
+    check_grants(
+        &context.assembler.capabilities,
+        &profile.grants.capabilities,
+    )?;
     validate_digest(
         &context.compaction_policy_digest,
         "context.compaction_policy_digest",
@@ -578,6 +587,11 @@ fn validate_profile(profile: &AgentExecutionProfileDraft) -> Result<(), Executio
         &validation.acceptance_criteria,
         MAX_ACCEPTANCE_CRITERIA,
         "validation.acceptance_criteria",
+    )?;
+    validate_provider(&profile.loop_budget.policy)?;
+    check_grants(
+        &profile.loop_budget.policy.capabilities,
+        &profile.grants.capabilities,
     )?;
     validate_budgets(&profile.loop_budget, &profile.resource_budget)?;
     if profile.hook_set.hook_set_id.is_nil() || profile.hook_set.version == 0 {
@@ -767,6 +781,7 @@ mod tests {
                 capabilities: vec!["tool.read".to_owned()],
             }],
             context: ContextPolicySnapshot {
+                assembler: provider("context.assembler", &[]),
                 max_input_bytes: 32_768,
                 max_input_tokens: 8_192,
                 max_sources: 32,
@@ -782,6 +797,7 @@ mod tests {
                 acceptance_criteria: vec!["ac-compile".to_owned(), "ac-tests".to_owned()],
             },
             loop_budget: LoopBudgetSnapshot {
+                policy: provider("loop.engineering", &[]),
                 max_iterations: 8,
                 max_no_progress_iterations: 2,
                 max_wall_clock_ms: 120_000,
@@ -871,6 +887,28 @@ mod tests {
         };
         assert_eq!(
             ungranted.seal().unwrap_err(),
+            ExecutionProfileError::CapabilityUnavailable
+        );
+        let ungranted_context = AgentExecutionProfileDraft {
+            context: ContextPolicySnapshot {
+                assembler: provider("context.assembler", &["context.remote"]),
+                ..valid_draft().context
+            },
+            ..valid_draft()
+        };
+        assert_eq!(
+            ungranted_context.seal().unwrap_err(),
+            ExecutionProfileError::CapabilityUnavailable
+        );
+        let ungranted_loop_policy = AgentExecutionProfileDraft {
+            loop_budget: LoopBudgetSnapshot {
+                policy: provider("loop.engineering", &["loop.remote"]),
+                ..valid_draft().loop_budget
+            },
+            ..valid_draft()
+        };
+        assert_eq!(
+            ungranted_loop_policy.seal().unwrap_err(),
             ExecutionProfileError::CapabilityUnavailable
         );
         let over_budget = valid_draft();

@@ -1,11 +1,11 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v0.8** (per 日本 IPA SEC 标准，补充条件式 Run Admission Hook 事务契约)
+> **Multica Task Lifecycle 域 詳細設計書 v0.9** (per 日本 IPA SEC 标准，补充条件式 Run Admission Hook 事务契约)
 >
-> - 状态: 🟡 Draft v0.8 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-1 有条件式代码切片，生产 Runtime adapter 与目标环境验收仍开放)
+> - 状态: 🟡 Draft v0.9 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-1 有条件式代码切片，生产 Runtime adapter 与目标环境验收仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.24 §50；`docs/basic-design.md` v5.20 §16.14-16.17
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.25 §50；`docs/basic-design.md` v5.21 §16.14-16.17
 > - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.24；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
 > - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
@@ -912,7 +912,7 @@ Engineering Loop 是 Run 内的 Plan/Act/Observe/Verify/Decision 次序。每轮
 
 Phase 9E-1 在 domain-agent 的 execution_profile 模块定义 AgentExecutionProfileDraft、AgentExecutionProfileDocument 和只读 VerifiedAgentExecutionProfile。schema_version 当前为 1；JSON unknown fields 被拒绝，输入完整 document 上限为 65,536 bytes，content_digest 为 profile payload 序列化后的 lowercase SHA-256。profile payload 仅用固定字段顺序结构与 canonical sorted unique vectors，不含 map、Secret、raw prompt、完整日志或模型隐式推理；seal 先验证字段与各资源界限，再产生 digest，decode_and_verify 先限制输入长度再反序列化，verify 返回的包装仅提供不可变借用。
 
-Profile 固定 tenant/project/可选 worktree scope、Agent provider/version/实现与非敏感配置 digest、Memory 状态、Skill ID/version/content digest、Context 字节/token/source 上限和 compaction digest、独立 Validation provider/suite/toolchain/acceptance criteria、Loop budget、Run resource ceilings、HookSet version/digest、capability grant version/expiry，以及可选 repository commit 与 engineering manifest digest。Agent/Memory/Skill/Validation provider 声明的 capabilities 必须按字典序唯一且是 grant snapshot 的子集；Validation provider ID 必须与 Agent provider 不同；Memory 仅接受显式 Disabled 或带正值硬上限及 provenance_required 的 Enabled，Unavailable 令 profile admission fail closed。绑定 Worktree 的 profile 和 Memory scope 不可扩大到 Project；Project profile 可在同租户同 Project 的 Worktree 内使用，最终 Run scope 必须有 Worktree ID。
+Profile 固定 tenant/project/可选 worktree scope、Agent provider/version/实现与非敏感配置 digest、Memory 状态、Skill ID/version/content digest、ContextAssembler provider/version/digest 与字节/token/source 上限及 compaction digest、独立 Validation provider/suite/toolchain/acceptance criteria、LoopPolicy provider/version/digest 与 Loop budget、Run resource ceilings、HookSet version/digest、capability grant version/expiry，以及可选 repository commit 与 engineering manifest digest。Agent/Memory/Skill/ContextAssembler/Validation/LoopPolicy provider 声明的 capabilities 必须按字典序唯一且是 grant snapshot 的子集；Validation provider ID 必须与 Agent provider 不同；Memory 仅接受显式 Disabled 或带正值硬上限及 provenance_required 的 Enabled，Unavailable 令 profile admission fail closed。绑定 Worktree 的 profile 和 Memory scope 不可扩大到 Project；Project profile 可在同租户同 Project 的 Worktree 内使用，最终 Run scope 必须有 Worktree ID。Schedule occurrence、Task/acceptance 与检索到的 Memory source 摘要另存于不可变 Run admission snapshot，不写入共享 Profile Master。
 
 边界常量：Profile ≤64 KiB；Skill ≤128；单 capability 列表 ≤64；Acceptance criteria ≤256；Context ≤64 MiB、16,777,216 tokens、4,096 sources；Memory ≤4,096 items、16 MiB、4,194,304 tokens、10 年 source age；单 Run ≤8 GiB RSS、24 小时 CPU/runtime、256 child processes、256 parallel tools、100,000 provider calls、128 MiB captured output、16 MiB event buffer。实际 Project/主机并行总配额仍由后续 scheduler admission 汇总，Phase 12 benchmark 可基于设备档收紧，profile 中的每 Run 上限不能替代聚合公平调度。
 
@@ -946,3 +946,4 @@ Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高
 | v0.7 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 9D-5b CLI Run Admission 的锁外 readiness/fence 与锁内重授权、HookSet snapshot、Run/Hook ledger/RunEvent 原子双写；要求镜像共享 event_id 并说明 Deny ledger 无 Task/Run FK；区分条件式 REST seam 与尚未装配的生产 Runtime adapter，Hooks 保持 Advanced Settings 标签 | 将 native Hook admission 从 evaluator phase contract 推进到 Task Run 创建路径并同步 BI identity contract |
 
 | v0.8 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.1 Phase 9E-1 Profile schema v1、bounded canonical digest、provider/grant/scope 校验、Memory/Context/Validation 与 Loop/RSS/queue 上限和测试证据；明确 registry/resolver/Run persistence/CLI/occurrence/Loop scheduler 仍未实现；Hooks 继续沿用 ULYS-235 Advanced Settings 并列 tab | AgentExecutionProfile Rust 类型化快照核心首片落地 |
+| v0.9 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Profile schema 增加 ContextAssembler 与 LoopPolicy 的版本化 provider/digest/grant 引用；将 Schedule occurrence、Task/acceptance、Memory source 与证据明确留在 Run admission snapshot；同步总要件 v5.25 与基本设计 v5.21，ULYS-235 导航不变 | 自审发现原 verifier 未冻结 ContextAssembler/LoopPolicy 的实现版本 |

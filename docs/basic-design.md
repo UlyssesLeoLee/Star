@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.20 (2026-10-01)
-> **上游要件定义书**: docs/requirements.md v5.24
+> **文档版本**: v5.21 (2026-10-01)
+> **上游要件定义书**: docs/requirements.md v5.25
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -10,7 +10,7 @@
 
 ### 0.1 文档目的与定位
 
-本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.20》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
+本文档为 Star 平台(AI Coding Worktree Control Plane + Jira-class Work Management + SCM Integration)《基本設計書》阶段的产出。其上游是《要件定義書 v5.25》(§0-§50),下游将依次进入《外部設計》《内部設計》《API Design》《Data Design》《Security Design》《Runtime Design》《Integration Design》《AI/Agent Design》《Test Design》《Operation Design》等详细设计阶段。
 
 **本文档不输出生产代码**(重申 §47):
 
@@ -4656,7 +4656,7 @@ BI/Benchmark/Improvement 以固定 Run/Event/Evidence/Profile/HookSet/Loop/Sched
 
 #### Phase 9E-1 Profile snapshot verifier
 
-Rust domain-agent 提供版本化 ProfileDraft、bounded JSON document、VerifiedProfile 不可变包装与 tenant/project/worktree scope 检查。digest 固定为对结构化 payload 的 SHA-256；provider、Skill、Validation criterion 等列表排序唯一，未知字段拒绝。Memory 只允许显式 Disabled 或带 provider/scope/provenance/字节/token/条目/年龄预算的 Enabled；Unavailable fail closed。Context 必须保留 Task Contract、验收标准和授权范围，Validation provider 与 Agent provider 分离。HookSet、grant、可选 repository commit manifest、Schedule/Engineering Loop 和 Run 资源上限进入同一个 profile payload。profile schema/大小/字段验证不代替当前 ACL/grant expiry 重验，也不表示 profile 已写入 Run 或 provider 已可执行；后续阶段继续建设 Profile registry/resolver、Run 持久化、Rust CLI adapter、Schedule occurrence dispatcher、Loop/runtime、共享 scheduler 与数据库/生产验收。
+Rust domain-agent 提供版本化 ProfileDraft、bounded JSON document、VerifiedProfile 不可变包装与 tenant/project/worktree scope 检查。digest 固定为对结构化 payload 的 SHA-256；provider、Skill、Validation criterion 等列表排序唯一，未知字段拒绝。Agent、Memory、ContextAssembler、Validation 与 LoopPolicy 均固定 provider/version/digest/capability，ContextAssembler 和 LoopPolicy capability 也必须属于 grant。Memory 只允许显式 Disabled 或带 provider/scope/provenance/字节/token/条目/年龄预算的 Enabled；Unavailable fail closed。Context 必须保留 Task Contract、验收标准和授权范围，Validation provider 与 Agent provider 分离。HookSet、grant、可选 repository commit manifest、Engineering Loop policy/budget 和 Run 资源上限进入 Profile；Schedule occurrence、Task/acceptance、Memory source 与执行时 evidence 属于 Run admission snapshot，不与 Profile Master 混为一体。Profile 校验不代替当前 ACL/grant expiry 重验，也不表示 Profile 已写入 Run 或 provider 已可执行；后续阶段继续建设 Profile registry/resolver、Run 持久化、Rust CLI adapter、Schedule occurrence dispatcher、Loop/runtime、共享 scheduler 与数据库/生产验收。
 
 ### 16.17 Rust 原生 Hook Engine 与 Worktree/BI 联动
 
@@ -4739,3 +4739,4 @@ Phase 9D 以 `multica.hook_execution_event`（Transaction / append-only）保存
 | v5.19 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9D-5b 条件式 CLI Run admission producer：锁外 readiness/fencing、锁内最终授权与 Hook evaluator、Run+HookSet snapshot+ledger+RunEvent 原子写入及共享 event_id；coverage 与服务端 capability 联动；明确当前无生产 adapter、能力仍关闭；Hooks 保持 Advanced Settings 并列标签 | 接入 Run admission REST/事务 seam 并自审发现 BI 去重必须复用 event_id |
 
 | v5.20 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.24 与 Task DD v0.8；记录 Phase 9E-1 类型化不可变 Profile verifier 的 scope/digest/canonical list、显式 Memory/独立 Validation 与硬资源上限；resolver/Run persistence/CLI/Loop scheduler 仍开放；ULYS-235 Hooks 继续是 Advanced Settings 内容区与 Skills/MCP/Plugins 并列的 tab | Phase 9E 开始交付 AgentExecutionProfile contract core |
+| v5.21 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.25 与 Task DD v0.9；补入 ContextAssembler/LoopPolicy 的 provider/version/digest/capability 冻结引用，并区分 Profile Master 与 Run admission snapshot；ULYS-235 Hooks 仍是 Advanced Settings 内容区并列 tab | 自审补齐上下文构造器与 Engineering Loop 的历史复现依据 |
