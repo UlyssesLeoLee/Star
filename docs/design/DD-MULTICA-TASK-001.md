@@ -1,11 +1,11 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v0.9** (per 日本 IPA SEC 标准，补充条件式 Run Admission Hook 事务契约)
+> **Multica Task Lifecycle 域 詳細設計書 v1.0** (per 日本 IPA SEC 标准，补充条件式 Run Admission Hook 事务契约)
 >
-> - 状态: 🟡 Draft v0.9 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-1 有条件式代码切片，生产 Runtime adapter 与目标环境验收仍开放)
+> - 状态: 🟡 Draft v1.0 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-2 有条件式代码切片，生产 Runtime adapter 与目标环境验收仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.25 §50；`docs/basic-design.md` v5.21 §16.14-16.17
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.26 §50；`docs/basic-design.md` v5.22 §16.14-16.17
 > - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.24；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
 > - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
@@ -918,6 +918,14 @@ Profile 固定 tenant/project/可选 worktree scope、Agent provider/version/实
 
 VerifiedProfile scope check 仅校验冻结 scope 与请求的 tenant/project/worktree 关系；它不证明当前 actor ACL/grant 仍有效。每次真实 Run create/resume 仍须重新授权、复核 grant expiry/provider availability/Worktree lifecycle，并原子固定该 Profile digest 与 Task Contract、HookSet 和 Schedule occurrence。此阶段尚未实现 profile registry/resolver、Master/SCD2 持久化、Run writer 联接、provider compatibility negotiation、Rust CLI adapter、Automation occurrence dispatcher、Loop runtime 或 scheduler；SQL 中已有 snapshot 列不等于该 producer 已启用。
 
+#### 14.11.2 当前依赖 resolver 与 admission seam
+
+Phase 9E-2 的 `ExecutionProfileResolver` 只接受经过 9E-1 immutable verifier 的 Profile 与外层已授权 caller 提供的 `ExecutionProfileAdmissionFacts`。先确认 tenant/project/worktree scope 与 Worktree 必须为 Active；再检查 current grant 与 Profile grant snapshot 的 ID/version/capabilities/expiry 完全相等并且未过期；逐个精确解析 Agent、Memory（若启用）、ContextAssembler、Validation、LoopPolicy provider 与 Skill ID/version，要求 provider implementation/config digest、capabilities、Skill content digest 全部匹配且可用；effective HookSet ID/version/digest 必须一致。不同 provider/Skill version 不作为 fallback，任何 drift/revoke/missing 都以稳定 fail-closed error 退出。
+
+Provider catalog 最多 256 项，Skill catalog 最多 4,096 项；二者都必须已按 stable key 排序、唯一且每个条目通过字段校验。catalog validation 对 bounded input 做线性扫描，具体 dependency lookup 走 binary search；resolver 返回只借用原始 immutable Profile 的 `ResolvedAgentExecutionProfile`，不会 clone Profile、Context、Skill 或 prompt 数据。catalog/profile 由 Rust caller 持有，resolver 不持有锁、不访问数据库，也不实现 actor ACL：调用者必须在构造 facts 前完成当前 actor/GroupContext 授权。
+
+本 seam 不代表 provider/Skill registry 已持久化，不写 `task_execution_run.execution_profile_snapshot`，不创建 `TaskExecutionRun`，也不锁定跨 Project/host 的资源配额。实际 Run create/resume 还要将 current authorization、Profile/Task/acceptance/HookSet/Schedule occurrence snapshot 与 scheduler 的原子 reservation 接入同一 admission 生命周期；没有 availability、quota reservation 或 runtime adapter 时继续 fail closed。
+
 ### 14.12 Rust-native Hook 与高级设置导航契约
 
 Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高级设置”是父入口，Hooks 位于该页面内容区的 tabs，与 Skills/MCP/Plugins 并列；这里维护可视化 typed rule、Project baseline/Worktree restrictive overlay、version diff、冲突解释、dry-run、影响预览、审批发布与 rollback。不得给 Worktree Group tree 增加 Hook app，也不得要求用户编写 Python/JS/shell/native handler。Worktree Index 显示 effective HookSet/version/health/deny summary，Run detail/BI 可查对应事件并深链回 Advanced Settings Hooks 过滤视图。
@@ -947,3 +955,4 @@ Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高
 
 | v0.8 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.1 Phase 9E-1 Profile schema v1、bounded canonical digest、provider/grant/scope 校验、Memory/Context/Validation 与 Loop/RSS/queue 上限和测试证据；明确 registry/resolver/Run persistence/CLI/occurrence/Loop scheduler 仍未实现；Hooks 继续沿用 ULYS-235 Advanced Settings 并列 tab | AgentExecutionProfile Rust 类型化快照核心首片落地 |
 | v0.9 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Profile schema 增加 ContextAssembler 与 LoopPolicy 的版本化 provider/digest/grant 引用；将 Schedule occurrence、Task/acceptance、Memory source 与证据明确留在 Run admission snapshot；同步总要件 v5.25 与基本设计 v5.21，ULYS-235 导航不变 | 自审发现原 verifier 未冻结 ContextAssembler/LoopPolicy 的实现版本 |
+| v1.0 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.2 bounded current dependency resolver 的 scope/grant/provider/Skill/HookSet/lifecycle 精确校验、目录上限、no-fallback 与借用式返回；明确外层 ACL、DB registry、Run snapshot writer、资源 reservation 与 Production adapter 未接通；ULYS-235 导航保持 | Phase 9E-2 resolver core 完成并纳入受入边界 |

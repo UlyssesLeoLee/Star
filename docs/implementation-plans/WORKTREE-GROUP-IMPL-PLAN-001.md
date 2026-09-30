@@ -1,6 +1,6 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project Worktree 群组实施计划 v5.39**
+> **渡口 Project Worktree 群组实施计划 v5.40**
 >
 > - 状态：🟡 执行中（Phase 0/1、2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
@@ -760,7 +760,19 @@ Hooks 导航基线已经在 `AGENTS.md` 与 ULYS-235 明确规定：主入口“
 | scope 与历史 digest | 🟢 API contract 已实现 | Worktree profile 只能精确匹配请求 Worktree；Project profile 仅能在同 tenant/project 的 Worktree 使用；修改 payload 后 verify 检测 digest mismatch。每次实际 create/resume 仍须在 Run command 中重授权并复核 grant expiry/provider/lifecycle。 |
 | 验证 | 🟢 targeted crate tests 通过 | 临时从 workspace member 列表排除存在既有 objc2/Wry resolver 冲突的 star-desktop 后，cargo test --offline -j 4 -p domain-agent --lib 124/124 通过；脚本 finally 逐字节恢复 Cargo.toml/Cargo.lock，保留未跟踪 Cargo.lock.phase9d-backup。全 workspace cargo test 仍被既有 objc2 版本冲突阻断。 |
 | 高级设置导航 | 🟢 既有 ULYS-235 保持 | Hooks 是 Advanced Settings 页面内容区内与 Skills/MCP/Plugins 并列的 tab；主侧栏只承载高级设置父入口，Worktree Index 只投影 effective HookSet 与状态，Worktree 树不新增 Hook 节点。仓库 AGENTS.md 已有此规则，无需重复新增。 |
-| 未关闭门 | 🟡 Phase 9E/9D 与生产验收开放 | 尚无 profile registry/resolver、Run snapshot writer/DB/RLS 部署、真实 provider availability/compat negotiation、Rust-owned CLI adapter、Automation occurrence worker/fencing、Schedule/Cron rule、Loop checkpoint/runtime、跨 Project 有界公平调度；Phase 9D production provisioner/fence consume、真实 auth、目标 DB/grants/RLS、Outbox 与完整 BI 也未关闭。 |
+| 未关闭门 | 🟡 Phase 9E/9D 与生产验收开放 | 9E-2 bounded domain resolver 已完成，但 DB-backed profile registry、Run snapshot writer/DB/RLS 部署、授权 provider availability/compat negotiation、Rust-owned CLI adapter、Automation occurrence worker/fencing、Schedule/Cron rule、Loop checkpoint/runtime、原子配额 reservation 与跨 Project 有界公平调度仍未完成；Phase 9D production provisioner/fence consume、真实 auth、目标 DB/grants/RLS、Outbox 与完整 BI 也未关闭。 |
+
+### 6.54 本轮阶段结果（Phase 9E-2 bounded Execution Profile resolver，2026-10-01）
+
+| 子阶段 | 结果 | 证据/限制 |
+|---|---|---|
+| 当前 Provider/Skill 匹配 | 🟢 bounded fail-closed resolver | `ExecutionProfileResolver` 先拒绝乱序/重复/无效/超限 catalog（Provider ≤256、Skill ≤4,096），再精确匹配 ID/version、provider implementation/config digest、capability support、Skill content digest 和 revoke/available 状态；不回退到其它版本。 |
+| scope/grant/HookSet/lifecycle 复核 | 🟢 admission facts contract | 匹配 tenant/project/worktree，current grant set/version/capabilities/expiry 必须完全等于 profile snapshot 且未过期；effective HookSet ID/version/digest 必须一致；Worktree 非 Active 时拒绝。caller 必须先完成 actor/GroupContext ACL；这不是 auth provider 或 Run writer。 |
+| Rust 前端/并行开销 | 🟢 借用式返回与有界目录 | Resolver 返回 `ResolvedAgentExecutionProfile<'_>` 借用，避免复制 Profile/Context/Skill 内容；catalog 校验线性扫描 bounded 条目，依赖查找使用 binary search；resolver 不持锁。共享 resource reservation、公平排队和设备级总 RSS 仍在后续 scheduler/Phase 12。 |
+| 验证 | 🟢 定向验证通过 | 临时排除既有 objc2/Wry resolver 冲突的 `star-desktop` 后，`cargo test --offline -j 4 -p domain-agent --lib` 129/129；定向 Clippy 通过，对 domain-agent 既有 `new_without_default` / `collapsible_if` / `derivable_impls` lint 做显式 baseline allow；最终 rustfmt 与 diff-check 通过。 |
+| 未关闭门 | 🟡 后续 9E/9D 与生产验收开放 | Profile registry/SCD2 与授权 API、Run snapshot 原子 writer、provider/Skill 生产 catalog、quota reservation、CLI adapter/进程树 cleanup、Schedule occurrence/fencing、Loop checkpoint/runtime、BI/evidence 生产联动、目标 DB/RLS/grants/auth 均未接通。 |
+
+ULYS-235 导航保持：Hooks 仍是 Settings 高级设置页面内容区与 Skills/MCP/Plugins 并列的 tab，不是主导航或 Worktree 节点。
 
 ## 修订履历
 
@@ -854,3 +866,4 @@ Hooks 导航基线已经在 `AGENTS.md` 与 ULYS-235 明确规定：主入口“
 
 | v5.38 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.24、basic design v5.20、Task DD v0.8；记录 Phase 9E-1 Rust Profile immutable verifier、scope/canonical digest/grant checks、explicit Memory、Context preservation、independent Validation 与 per-Run memory/CPU/queue ceilings；定向 domain-agent 124/124 测试通过，workspace lock conflict 与目标环境/provider/Run persistence blockers 保留；确认 ULYS-235 高级设置并列标签不变 | 用户指出 Hooks 入口应遵循既有 Advanced Settings 导航需求，并继续推进所有 Phase |
 | v5.39 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.25、basic design v5.21、Task DD v0.9；补齐 ContextAssembler/LoopPolicy versioned provider+digest+grant snapshot 与 Profile Master/Run admission snapshot 边界；provider grant 负向验证通过；ULYS-235 Hooks 仍是 Advanced Settings 内容区并列 tab | Phase 9E-1 自审补齐上下文与循环实现版本引用，继续推进 Run admission |
+| v5.40 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.26、basic design v5.22、Task DD v1.0；记录 bounded resolver 对当前 provider/skill/grant/HookSet/Worktree 精确复核、borrowed return、129/129 定向测试与现有 workspace resolver blocker；保留 DB registry/Run writer/shared quota/runtime/production auth 缺口；确认 ULYS-235 导航不变 | 推进 Phase 9E-2 当前执行依赖解析与安全准入 seam |

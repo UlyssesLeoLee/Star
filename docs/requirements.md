@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.25）
+# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.26）
 
 ## 0. 文档说明与前提
 
@@ -2527,7 +2527,7 @@ Run detail 应能折叠查看每轮输入摘要、采取的工具/命令类别�
 
 Agent 执行能力按稳定契约组合，不把某个 CLI、模型、记忆实现、Skill 格式、上下文算法或验证器写死进 Task/Worktree 身份模型。`AgentExecutionProfile` 是版本化 Master，引用具名且版本固定的 `AgentProvider`、`MemoryProvider`、`SkillRegistry`、`ContextAssembler`、`ValidationProvider`、`LoopPolicy` 与资源预算；Provider 可由内建 Rust 实现或通过隔离 Plugin capability 提供。新增实现应只注册兼容 provider/version/manifest，不改变 `work_item_id`、`run_id`、Worktree 关系或已有历史 Run 语义。未支持的 provider/capability 必须显式标为 unavailable，不得用 mock 或空成功冒充。
 
-Phase 9E-1 Rust profile verifier 使用 ≤65,536 字节 serialized document、版本化 schema、固定字段顺序 JSON SHA-256、排序去重引用与明确上限；verified wrapper 只暴露不可变借用。Worktree 运行期间 profile、grant、HookSet、Validation、Loop 与资源预算均被绑定；恢复或真正创建 Run 仍需独立复核 actor ACL、provider availability、grant expiry 和当前 lifecycle version。
+Phase 9E-1 Rust profile verifier 使用 ≤65,536 字节 serialized document、版本化 schema、固定字段顺序 JSON SHA-256、排序去重引用与明确上限；verified wrapper 只暴露不可变借用。Phase 9E-2 resolver 将该 snapshot 与当前 bounded Provider/Skill catalog、grant、effective HookSet 和 Worktree lifecycle 逐项精确匹配；缺失、撤销、版本/digest 变化、grant 过期或 Worktree 非 Active 都 fail closed，不回退到其它版本。resolver 只返回对 immutable profile 的借用，不复制大型对象。恢复或真正创建 Run 仍需外层重新完成 actor ACL/GroupContext 授权，并由后续 registry/Run writer/scheduler 完成持久化与原子资源 admission。
 
 每个 Run 创建时保存不可变的 `execution_profile_snapshot`：各 provider ID/API version/实现版本、Skill ID/version/content digest/capability grant、Memory policy 与引用摘要、Context assembler version/budget/source digest、Validation suite/version/命令标识与 toolchain digest、Engineering Loop policy、Schedule occurrence（若有）和资源预算。快照只保存复现与审计所需引用、版本、脱敏摘要和 digest，不保存 Secret、未脱敏提示正文、原始大日志或模型隐式推理。provider 更新不得回写历史快照；恢复 Run 时复核当前授权并明确记录使用原版本还是兼容的新版本。
 
@@ -2549,7 +2549,7 @@ ValidationProvider 与 AgentProvider 解耦：验证 profile 独立定义固定�
 | AEC-006 | 第一阶段可通过 Rust-owned CLI adapter 接入现有 CLI；必须 direct argv、allowlisted env、canonical cwd、显式 capability、bounded I/O、deadline/cancel 与进程回收，不接受 CLI 自授权限或自判验收 | P0 |
 | AEC-007 | ProjectEngineeringManifest 可按 repository commit/version 增加任务约定、验证入口、环境和证据映射，新增项目适配不改变 Task/Run 主身份模型 | P1 |
 | AEC-008 | BI/Benchmark/Improvement 按 Execution Profile/Provider/Loop/Validation 版本切片并固定评分标准、coverage 与复现条件；改进可回滚且不得自改验收标准 | P0 |
-| AEC-009 | Run admission 仅接受经 schema、scope、canonical SHA-256 与 bounded-value 校验的不可变 Profile snapshot；Agent/Memory/ContextAssembler/Validation/LoopPolicy/Skill capability 不得超出 grant，Memory unavailable 不得静默降级 | P0 |
+| AEC-009 | Run admission 仅接受经 schema、scope、canonical SHA-256 与 bounded-value 校验的不可变 Profile snapshot；Agent/Memory/ContextAssembler/Validation/LoopPolicy/Skill capability 不得超出当前 grant，当前 Provider/Skill/HookSet/Worktree 状态必须与 snapshot 相符且不得静默回退 | P0 |
 
 | 验收 ID | 受入基准 |
 |---|---|
@@ -2561,6 +2561,7 @@ ValidationProvider 与 AgentProvider 解耦：验证 profile 独立定义固定�
 | AC-AEC-006 | ProjectEngineeringManifest 跟 repository commit/version 固定；换项目 manifest 可换验证命令与夹具而不改 WorkItem/Run 身份，未配置时按明确的项目 capability 缺口处理 |
 | AC-AEC-007 | BI/Benchmark 对两个 profile 做同标准对比，能展示任务分层、人工介入、返工、验证结果、实际/估算成本和 coverage；proposal 经隔离验证、批准采纳与回滚，评分历史不变 |
 | AC-AEC-008 | Profile 解码拒绝未知 schema/字段、非 canonical 列表、digest 篡改、越 scope、越 grant、Memory 缺失或超限、ContextAssembler/LoopPolicy capability 越权、Context 丢失关键约束及 Loop/资源预算越界；Project profile 只能在同 Project Worktree 使用，Worktree profile 必须精确匹配；每项负向边界拒绝，历史 digest 不因后续 profile 更新改变 |
+| AC-AEC-009 | Provider/Skill 缺失、撤销、版本或 digest 不匹配、Grant 变更/过期、effective HookSet 改变、Worktree 进入 draining/archive 均拒绝 admission；目录超限、乱序、重复也拒绝；resolver 不复制 Profile snapshot，缺失版本不得选择兼容项替代 |
 
 ### 50.8D Rust 原生 Hook Engine 与高级设置可视化
 
@@ -2663,3 +2664,4 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 
 | v5.24 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 9E-1 Rust immutable AgentExecutionProfile snapshot verifier、scope/digest/canonical list/capability 与 Memory/Context/Loop/RSS/queue hard ceilings；明确 profile resolver、Run persistence 与 Rust CLI adapter 仍未接通；Hooks 继续位于既有 Advanced Settings 并列标签 | 开始 Phase 9E 的类型化执行 profile 核心切片 |
 | v5.25 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 AgentExecutionProfile 必须固定 ContextAssembler 与 LoopPolicy provider/version/digest/grant，不能只记录 compaction digest 或 Loop 数值预算；Run occurrence 与 Task/Memory evidence 仍作为 Run admission snapshot 维度 | 9E-1 自审发现上下文与循环实现版本缺少可复现引用 |
+| v5.26 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 9E-2 当前依赖 resolver 受入基准：bounded Provider/Skill catalog、grant expiry/version、HookSet 与 Worktree lifecycle 全部精确匹配且 fail closed；明确该 domain seam 不替代 ACL、DB writer 与原子资源预约 | Profile verifier 具备后推进当前注册表与 Run admission 的一致性检查 |

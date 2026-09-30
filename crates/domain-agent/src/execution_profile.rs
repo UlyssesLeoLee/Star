@@ -4,6 +4,12 @@
 //!   (draft:Class {name:"AgentExecutionProfileDraft",type:"class",language:"rust"}),
 //!   (document:Class {name:"AgentExecutionProfileDocument",type:"class",language:"rust"}),
 //!   (verified:Class {name:"VerifiedAgentExecutionProfile",type:"class",language:"rust"}),
+//!   (provider_entry:Class {name:"ExecutionProviderCatalogEntry",type:"class",language:"rust"}),
+//!   (skill_entry:Class {name:"ExecutionSkillCatalogEntry",type:"class",language:"rust"}),
+//!   (worktree_state:Class {name:"WorktreeRunState",type:"class",language:"rust"}),
+//!   (admission_facts:Class {name:"ExecutionProfileAdmissionFacts",type:"class",language:"rust"}),
+//!   (resolved:Class {name:"ResolvedAgentExecutionProfile",type:"class",language:"rust"}),
+//!   (resolver:Class {name:"ExecutionProfileResolver",type:"class",language:"rust"}),
 //!   (scope:Class {name:"ExecutionProfileScope",type:"class",language:"rust"}),
 //!   (provider:Class {name:"ProviderReference",type:"class",language:"rust"}),
 //!   (memory:Class {name:"MemoryPolicySnapshot",type:"class",language:"rust"}),
@@ -22,6 +28,13 @@
 //!   (decode:Function {name:"AgentExecutionProfileDocument::decode_and_verify",type:"function",language:"rust"}),
 //!   (document_ref:Function {name:"VerifiedAgentExecutionProfile::document",type:"function",language:"rust"}),
 //!   (scope_check:Function {name:"VerifiedAgentExecutionProfile::validate_for_scope",type:"function",language:"rust"}),
+//!   (resolve:Function {name:"ExecutionProfileResolver::resolve",type:"function",language:"rust"}),
+//!   (resolved_document:Function {name:"ResolvedAgentExecutionProfile::document",type:"function",language:"rust"}),
+//!   (resolved_digest:Function {name:"ResolvedAgentExecutionProfile::content_digest",type:"function",language:"rust"}),
+//!   (provider_catalog_check:Function {name:"validate_provider_catalog",type:"function",language:"rust"}),
+//!   (skill_catalog_check:Function {name:"validate_skill_catalog",type:"function",language:"rust"}),
+//!   (resolve_provider:Function {name:"resolve_provider",type:"function",language:"rust"}),
+//!   (resolve_skill:Function {name:"resolve_skill",type:"function",language:"rust"}),
 //!   (validate:Function {name:"validate_profile",type:"function",language:"rust"}),
 //!   (provider_check:Function {name:"validate_provider",type:"function",language:"rust"}),
 //!   (budget_check:Function {name:"validate_budgets",type:"function",language:"rust"}),
@@ -38,9 +51,22 @@
 //!   (test_limits:Function {name:"tests::missing_memory_grants_and_unbounded_limits_fail_closed",type:"function",language:"rust"}),
 //!   (test_memory_scope:Function {name:"tests::scoped_memory_and_context_requirements_are_enforced",type:"function",language:"rust"}),
 //!   (test_canonical:Function {name:"tests::noncanonical_lists_and_oversized_documents_are_rejected",type:"function",language:"rust"}),
+//!   (test_resolver_success:Function {name:"tests::resolver_admits_only_exact_current_profile_dependencies",type:"function",language:"rust"}),
+//!   (test_provider_drift:Function {name:"tests::resolver_rejects_provider_drift_and_invalid_catalog_order",type:"function",language:"rust"}),
+//!   (test_grant_lifecycle:Function {name:"tests::resolver_rejects_expired_or_changed_grants_and_draining_worktrees",type:"function",language:"rust"}),
+//!   (test_skill_hook:Function {name:"tests::resolver_rejects_revoked_skills_and_changed_hooksets",type:"function",language:"rust"}),
+//!   (test_catalog_bounds:Function {name:"tests::execution_catalogs_enforce_entry_bounds",type:"function",language:"rust"}),
+//!   (catalogs_fixture:Function {name:"tests::catalogs_from",type:"function",language:"rust"}),
+//!   (admission_fixture:Function {name:"tests::admission_facts",type:"function",language:"rust"}),
 //!   (f)-[:CONTAINS]->(draft),
 //!   (f)-[:CONTAINS]->(document),
 //!   (f)-[:CONTAINS]->(verified),
+//!   (f)-[:CONTAINS]->(provider_entry),
+//!   (f)-[:CONTAINS]->(skill_entry),
+//!   (f)-[:CONTAINS]->(worktree_state),
+//!   (f)-[:CONTAINS]->(admission_facts),
+//!   (f)-[:CONTAINS]->(resolved),
+//!   (f)-[:CONTAINS]->(resolver),
 //!   (f)-[:CONTAINS]->(scope),
 //!   (f)-[:CONTAINS]->(provider),
 //!   (f)-[:CONTAINS]->(memory),
@@ -70,16 +96,44 @@
 //!   (f)-[:CONTAINS]->(test_limits),
 //!   (f)-[:CONTAINS]->(test_memory_scope),
 //!   (f)-[:CONTAINS]->(test_canonical),
+//!   (f)-[:CONTAINS]->(resolve),
+//!   (f)-[:CONTAINS]->(resolved_document),
+//!   (f)-[:CONTAINS]->(resolved_digest),
+//!   (f)-[:CONTAINS]->(provider_catalog_check),
+//!   (f)-[:CONTAINS]->(skill_catalog_check),
+//!   (f)-[:CONTAINS]->(resolve_provider),
+//!   (f)-[:CONTAINS]->(resolve_skill),
+//!   (f)-[:CONTAINS]->(test_resolver_success),
+//!   (f)-[:CONTAINS]->(test_provider_drift),
+//!   (f)-[:CONTAINS]->(test_grant_lifecycle),
+//!   (f)-[:CONTAINS]->(test_skill_hook),
+//!   (f)-[:CONTAINS]->(test_catalog_bounds),
+//!   (f)-[:CONTAINS]->(catalogs_fixture),
+//!   (f)-[:CONTAINS]->(admission_fixture),
 //!   (draft)-[:HAS_METHOD]->(seal),
 //!   (document)-[:HAS_METHOD]->(verify),
 //!   (document)-[:HAS_METHOD]->(decode),
 //!   (verified)-[:HAS_METHOD]->(document_ref),
 //!   (verified)-[:HAS_METHOD]->(scope_check),
+//!   (resolver)-[:HAS_METHOD]->(resolve),
+//!   (resolved)-[:HAS_METHOD]->(resolved_document),
+//!   (resolved)-[:HAS_METHOD]->(resolved_digest),
 //!   (seal)-[:CALLS]->(validate),
 //!   (seal)-[:CALLS]->(digest),
 //!   (verify)-[:CALLS]->(validate),
 //!   (verify)-[:CALLS]->(digest),
 //!   (decode)-[:CALLS]->(verify),
+//!   (resolve)-[:CALLS]->(scope_check),
+//!   (resolve)-[:CALLS]->(provider_catalog_check),
+//!   (resolve)-[:CALLS]->(skill_catalog_check),
+//!   (resolve)-[:CALLS]->(resolve_provider),
+//!   (resolve)-[:CALLS]->(resolve_skill),
+//!   (provider_catalog_check)-[:CALLS]->(provider_check),
+//!   (skill_catalog_check)-[:CALLS]->(labels_check),
+//!   (skill_catalog_check)-[:CALLS]->(identifier_check),
+//!   (skill_catalog_check)-[:CALLS]->(digest_check),
+//!   (resolve_provider)-[:CALLS]->(grant_check),
+//!   (resolve_skill)-[:CALLS]->(grant_check),
 //!   (validate)-[:CALLS]->(provider_check),
 //!   (validate)-[:CALLS]->(budget_check),
 //!   (validate)-[:CALLS]->(grant_check),
@@ -95,6 +149,7 @@
 //!   (test_roundtrip)-[:CALLS]->(fixture),
 //!   (test_tamper)-[:CALLS]->(fixture),
 //!   (test_limits)-[:CALLS]->(fixture),
+//!   (test_limits)-[:CALLS]->(fixture_provider),
 //!   (test_roundtrip)-[:CALLS]->(seal),
 //!   (test_roundtrip)-[:CALLS]->(decode),
 //!   (test_roundtrip)-[:CALLS]->(scope_check),
@@ -107,9 +162,33 @@
 //!   (test_memory_scope)-[:CALLS]->(seal),
 //!   (test_canonical)-[:CALLS]->(fixture),
 //!   (test_canonical)-[:CALLS]->(seal),
-//!   (test_canonical)-[:CALLS]->(decode);
-//! Immutable execution profile contract for Run admission. No provider resolution or
-//! persistence is implied by this type-level slice.
+//!   (test_canonical)-[:CALLS]->(decode),
+//!   (test_resolver_success)-[:CALLS]->(fixture),
+//!   (test_resolver_success)-[:CALLS]->(seal),
+//!   (test_resolver_success)-[:CALLS]->(catalogs_fixture),
+//!   (test_resolver_success)-[:CALLS]->(admission_fixture),
+//!   (test_resolver_success)-[:CALLS]->(resolve),
+//!   (test_provider_drift)-[:CALLS]->(fixture),
+//!   (test_provider_drift)-[:CALLS]->(seal),
+//!   (test_provider_drift)-[:CALLS]->(catalogs_fixture),
+//!   (test_provider_drift)-[:CALLS]->(admission_fixture),
+//!   (test_provider_drift)-[:CALLS]->(resolve),
+//!   (test_grant_lifecycle)-[:CALLS]->(fixture),
+//!   (test_grant_lifecycle)-[:CALLS]->(seal),
+//!   (test_grant_lifecycle)-[:CALLS]->(catalogs_fixture),
+//!   (test_grant_lifecycle)-[:CALLS]->(admission_fixture),
+//!   (test_grant_lifecycle)-[:CALLS]->(resolve),
+//!   (test_skill_hook)-[:CALLS]->(fixture),
+//!   (test_skill_hook)-[:CALLS]->(seal),
+//!   (test_skill_hook)-[:CALLS]->(catalogs_fixture),
+//!   (test_skill_hook)-[:CALLS]->(admission_fixture),
+//!   (test_skill_hook)-[:CALLS]->(resolve),
+//!   (test_catalog_bounds)-[:CALLS]->(fixture_digest),
+//!   (test_catalog_bounds)-[:CALLS]->(fixture_provider),
+//!   (test_catalog_bounds)-[:CALLS]->(provider_catalog_check),
+//!   (test_catalog_bounds)-[:CALLS]->(skill_catalog_check);
+//! Immutable execution profile contract and bounded dependency resolver for Run admission.
+//! Registry persistence and Run writer integration are not implied by this domain slice.
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -141,6 +220,8 @@ const MAX_LOOP_ITERATIONS: u32 = 100_000;
 const MAX_OUTPUT_BYTES: u64 = 134_217_728;
 const MAX_EVENT_BUFFER_BYTES: u32 = 16_777_216;
 const MAX_LABEL_BYTES: usize = 128;
+const MAX_PROVIDER_CATALOG_ENTRIES: usize = 256;
+const MAX_SKILL_CATALOG_ENTRIES: usize = 4_096;
 
 /// Tenant, Project, and optional Worktree profile scope.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -382,6 +463,64 @@ pub struct VerifiedAgentExecutionProfile {
     document: AgentExecutionProfileDocument,
 }
 
+/// One bounded provider catalog entry visible to Run admission.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExecutionProviderCatalogEntry {
+    /// Exact provider implementation and capability snapshot.
+    pub provider: ProviderReference,
+    /// Whether the provider is currently available for new work.
+    pub available: bool,
+}
+
+/// One bounded Skill registry entry visible to Run admission.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExecutionSkillCatalogEntry {
+    /// Exact Skill manifest binding.
+    pub skill: SkillBindingSnapshot,
+    /// Whether the Skill is currently enabled and not revoked.
+    pub available: bool,
+}
+
+/// Current Worktree lifecycle state used by Run admission.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WorktreeRunState {
+    /// Worktree accepts new Runs.
+    Active,
+    /// Worktree is draining and rejects new Runs.
+    Draining,
+    /// Worktree is archived and rejects new Runs.
+    Archived,
+}
+
+/// Current bounded facts required to resolve a verified Profile for a Run.
+/// The caller must perform actor and GroupContext authorization before constructing these facts.
+pub struct ExecutionProfileAdmissionFacts<'a> {
+    /// Exact target tenant/project/worktree scope.
+    pub requested_scope: &'a ExecutionProfileScope,
+    /// Current time in Unix epoch milliseconds.
+    pub now_epoch_ms: u64,
+    /// Current grant snapshot read after authorization.
+    pub current_grants: &'a GrantSnapshot,
+    /// Sorted provider catalog visible to this target.
+    pub providers: &'a [ExecutionProviderCatalogEntry],
+    /// Sorted Skill catalog visible to this target.
+    pub skills: &'a [ExecutionSkillCatalogEntry],
+    /// Current effective Worktree HookSet.
+    pub effective_hook_set: &'a HookSetSnapshot,
+    /// Current Worktree lifecycle state.
+    pub worktree_state: WorktreeRunState,
+}
+
+/// Resolved Profile that passed current provider, Skill, grant, HookSet, and lifecycle checks.
+#[derive(Debug)]
+pub struct ResolvedAgentExecutionProfile<'a> {
+    profile: &'a VerifiedAgentExecutionProfile,
+}
+
+/// Resolves immutable Profile references against bounded current registries.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ExecutionProfileResolver;
+
 /// Bounded parse, validation, digest, and scope failures.
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum ExecutionProfileError {
@@ -409,6 +548,24 @@ pub enum ExecutionProfileError {
     /// Profile cannot run in the requested scope.
     #[error("profile scope mismatch")]
     ScopeMismatch,
+    /// A required provider or Skill is missing, unavailable, revoked, or changed.
+    #[error("required provider or Skill is unavailable")]
+    RegistryUnavailable,
+    /// Current grant differs from the immutable Profile grant snapshot.
+    #[error("current grant differs from the Profile snapshot")]
+    GrantChanged,
+    /// Current grant snapshot is expired.
+    #[error("current grant is expired")]
+    GrantExpired,
+    /// Current effective HookSet differs from the Profile snapshot.
+    #[error("effective HookSet changed")]
+    HookSetChanged,
+    /// Worktree is not accepting new Runs.
+    #[error("Worktree is not accepting new Runs")]
+    WorktreeUnavailable,
+    /// Provider or Skill catalog is oversized, unsorted, or duplicated.
+    #[error("execution catalog is invalid")]
+    InvalidCatalog,
 }
 
 impl AgentExecutionProfileDraft {
@@ -476,6 +633,150 @@ impl VerifiedAgentExecutionProfile {
         }
         Ok(())
     }
+}
+
+impl ExecutionProfileResolver {
+    /// Resolve this Profile against current, already-authorized Worktree facts.
+    pub fn resolve<'a>(
+        &self,
+        profile: &'a VerifiedAgentExecutionProfile,
+        facts: &ExecutionProfileAdmissionFacts<'_>,
+    ) -> Result<ResolvedAgentExecutionProfile<'a>, ExecutionProfileError> {
+        profile.validate_for_scope(facts.requested_scope)?;
+        if facts.worktree_state != WorktreeRunState::Active {
+            return Err(ExecutionProfileError::WorktreeUnavailable);
+        }
+        if facts.now_epoch_ms == 0 {
+            return Err(ExecutionProfileError::InvalidField("now_epoch_ms"));
+        }
+
+        let selected = &profile.document().profile.grants;
+        if facts.current_grants != selected {
+            return Err(ExecutionProfileError::GrantChanged);
+        }
+        if facts.now_epoch_ms >= selected.expires_at_epoch_ms {
+            return Err(ExecutionProfileError::GrantExpired);
+        }
+
+        validate_provider_catalog(facts.providers)?;
+        validate_skill_catalog(facts.skills)?;
+
+        let draft = &profile.document().profile;
+        resolve_provider(&draft.agent_provider, facts.providers)?;
+        if let MemoryPolicySnapshot::Enabled { provider, .. } = &draft.memory {
+            resolve_provider(provider, facts.providers)?;
+        }
+        resolve_provider(&draft.context.assembler, facts.providers)?;
+        resolve_provider(&draft.validation.provider, facts.providers)?;
+        resolve_provider(&draft.loop_budget.policy, facts.providers)?;
+        for skill in &draft.skills {
+            resolve_skill(skill, facts.skills)?;
+        }
+        if facts.effective_hook_set != &draft.hook_set {
+            return Err(ExecutionProfileError::HookSetChanged);
+        }
+
+        Ok(ResolvedAgentExecutionProfile { profile })
+    }
+}
+
+impl ResolvedAgentExecutionProfile<'_> {
+    /// Borrow the immutable profile document that passed current admission checks.
+    #[must_use]
+    pub fn document(&self) -> &AgentExecutionProfileDocument {
+        self.profile.document()
+    }
+
+    /// Return the verified Profile content digest.
+    #[must_use]
+    pub fn content_digest(&self) -> &str {
+        &self.profile.document().content_digest
+    }
+}
+
+fn validate_provider_catalog(
+    entries: &[ExecutionProviderCatalogEntry],
+) -> Result<(), ExecutionProfileError> {
+    if entries.len() > MAX_PROVIDER_CATALOG_ENTRIES {
+        return Err(ExecutionProfileError::InvalidCatalog);
+    }
+    let mut previous: Option<(&str, u32)> = None;
+    for entry in entries {
+        validate_provider(&entry.provider).map_err(|_| ExecutionProfileError::InvalidCatalog)?;
+        let key = (entry.provider.provider_id.as_str(), entry.provider.version);
+        if previous.is_some_and(|value| value >= key) {
+            return Err(ExecutionProfileError::InvalidCatalog);
+        }
+        previous = Some(key);
+    }
+    Ok(())
+}
+
+fn validate_skill_catalog(
+    entries: &[ExecutionSkillCatalogEntry],
+) -> Result<(), ExecutionProfileError> {
+    if entries.len() > MAX_SKILL_CATALOG_ENTRIES {
+        return Err(ExecutionProfileError::InvalidCatalog);
+    }
+    let mut previous: Option<(&str, u32)> = None;
+    for entry in entries {
+        validate_identifier(&entry.skill.skill_id, "catalog.skill_id")
+            .map_err(|_| ExecutionProfileError::InvalidCatalog)?;
+        validate_digest(&entry.skill.content_digest, "catalog.skill_digest")
+            .map_err(|_| ExecutionProfileError::InvalidCatalog)?;
+        validate_labels(
+            &entry.skill.capabilities,
+            MAX_CAPABILITIES,
+            "catalog.skill_capabilities",
+        )
+        .map_err(|_| ExecutionProfileError::InvalidCatalog)?;
+        if entry.skill.version == 0 {
+            return Err(ExecutionProfileError::InvalidCatalog);
+        }
+        let key = (entry.skill.skill_id.as_str(), entry.skill.version);
+        if previous.is_some_and(|value| value >= key) {
+            return Err(ExecutionProfileError::InvalidCatalog);
+        }
+        previous = Some(key);
+    }
+    Ok(())
+}
+
+fn resolve_provider(
+    required: &ProviderReference,
+    entries: &[ExecutionProviderCatalogEntry],
+) -> Result<(), ExecutionProfileError> {
+    let index = entries
+        .binary_search_by(|entry| {
+            (entry.provider.provider_id.as_str(), entry.provider.version)
+                .cmp(&(required.provider_id.as_str(), required.version))
+        })
+        .map_err(|_| ExecutionProfileError::RegistryUnavailable)?;
+    let entry = &entries[index];
+    if !entry.available
+        || entry.provider.implementation_digest != required.implementation_digest
+        || entry.provider.configuration_digest != required.configuration_digest
+    {
+        return Err(ExecutionProfileError::RegistryUnavailable);
+    }
+    check_grants(&required.capabilities, &entry.provider.capabilities)
+}
+
+fn resolve_skill(
+    required: &SkillBindingSnapshot,
+    entries: &[ExecutionSkillCatalogEntry],
+) -> Result<(), ExecutionProfileError> {
+    let index = entries
+        .binary_search_by(|entry| {
+            (entry.skill.skill_id.as_str(), entry.skill.version)
+                .cmp(&(required.skill_id.as_str(), required.version))
+        })
+        .map_err(|_| ExecutionProfileError::RegistryUnavailable)?;
+    let entry = &entries[index];
+    if !entry.available || entry.skill.content_digest != required.content_digest {
+        return Err(ExecutionProfileError::RegistryUnavailable);
+    }
+    check_grants(&required.capabilities, &entry.skill.capabilities)
 }
 
 fn validate_profile(profile: &AgentExecutionProfileDraft) -> Result<(), ExecutionProfileError> {
@@ -832,6 +1133,67 @@ mod tests {
         }
     }
 
+    fn catalogs_from(
+        draft: &AgentExecutionProfileDraft,
+    ) -> (
+        Vec<ExecutionProviderCatalogEntry>,
+        Vec<ExecutionSkillCatalogEntry>,
+    ) {
+        let mut providers = vec![
+            draft.agent_provider.clone(),
+            draft.context.assembler.clone(),
+            draft.validation.provider.clone(),
+            draft.loop_budget.policy.clone(),
+        ];
+        if let MemoryPolicySnapshot::Enabled { provider, .. } = &draft.memory {
+            providers.push(provider.clone());
+        }
+        providers.sort_by(|left, right| {
+            (left.provider_id.as_str(), left.version)
+                .cmp(&(right.provider_id.as_str(), right.version))
+        });
+        providers.dedup_by(|left, right| {
+            left.provider_id == right.provider_id && left.version == right.version && left == right
+        });
+        let providers = providers
+            .into_iter()
+            .map(|provider| ExecutionProviderCatalogEntry {
+                provider,
+                available: true,
+            })
+            .collect();
+        let skills = draft
+            .skills
+            .iter()
+            .cloned()
+            .map(|skill| ExecutionSkillCatalogEntry {
+                skill,
+                available: true,
+            })
+            .collect();
+        (providers, skills)
+    }
+
+    fn admission_facts<'a>(
+        requested_scope: &'a ExecutionProfileScope,
+        current_grants: &'a GrantSnapshot,
+        providers: &'a [ExecutionProviderCatalogEntry],
+        skills: &'a [ExecutionSkillCatalogEntry],
+        effective_hook_set: &'a HookSetSnapshot,
+        now_epoch_ms: u64,
+        worktree_state: WorktreeRunState,
+    ) -> ExecutionProfileAdmissionFacts<'a> {
+        ExecutionProfileAdmissionFacts {
+            requested_scope,
+            now_epoch_ms,
+            current_grants,
+            providers,
+            skills,
+            effective_hook_set,
+            worktree_state,
+        }
+    }
+
     #[test]
     fn verified_profile_round_trips_and_binds_scope() {
         let verified = valid_draft().seal().expect("valid profile");
@@ -974,6 +1336,272 @@ mod tests {
         assert_eq!(
             invalid_context.seal().unwrap_err(),
             ExecutionProfileError::InvalidField("context")
+        );
+    }
+
+    #[test]
+    fn resolver_admits_only_exact_current_profile_dependencies() {
+        let draft = valid_draft();
+        let verified = draft.clone().seal().expect("valid profile");
+        let (providers, skills) = catalogs_from(&draft);
+        let scope = ExecutionProfileScope {
+            tenant_id: Uuid::from_u128(1),
+            project_id: Uuid::from_u128(2),
+            worktree_id: Some(Uuid::from_u128(8)),
+        };
+        let facts = admission_facts(
+            &scope,
+            &draft.grants,
+            &providers,
+            &skills,
+            &draft.hook_set,
+            1_800_000_000_000,
+            WorktreeRunState::Active,
+        );
+        let resolved = ExecutionProfileResolver
+            .resolve(&verified, &facts)
+            .expect("current dependencies resolve");
+        assert_eq!(
+            resolved.content_digest(),
+            verified.document().content_digest.as_str()
+        );
+    }
+
+    #[test]
+    fn resolver_rejects_provider_drift_and_invalid_catalog_order() {
+        let draft = valid_draft();
+        let verified = draft.clone().seal().expect("valid profile");
+        let (mut providers, skills) = catalogs_from(&draft);
+        let scope = ExecutionProfileScope {
+            tenant_id: Uuid::from_u128(1),
+            project_id: Uuid::from_u128(2),
+            worktree_id: Some(Uuid::from_u128(8)),
+        };
+        let agent = providers
+            .iter_mut()
+            .find(|entry| entry.provider.provider_id == "agent.local")
+            .expect("agent catalog entry");
+        agent.available = false;
+        let facts = admission_facts(
+            &scope,
+            &draft.grants,
+            &providers,
+            &skills,
+            &draft.hook_set,
+            1_800_000_000_000,
+            WorktreeRunState::Active,
+        );
+        assert_eq!(
+            ExecutionProfileResolver
+                .resolve(&verified, &facts)
+                .unwrap_err(),
+            ExecutionProfileError::RegistryUnavailable
+        );
+
+        let (mut providers, skills) = catalogs_from(&draft);
+        let agent = providers
+            .iter_mut()
+            .find(|entry| entry.provider.provider_id == "agent.local")
+            .expect("agent catalog entry");
+        agent.provider.implementation_digest = digest('9');
+        let facts = admission_facts(
+            &scope,
+            &draft.grants,
+            &providers,
+            &skills,
+            &draft.hook_set,
+            1_800_000_000_000,
+            WorktreeRunState::Active,
+        );
+        assert_eq!(
+            ExecutionProfileResolver
+                .resolve(&verified, &facts)
+                .unwrap_err(),
+            ExecutionProfileError::RegistryUnavailable
+        );
+
+        let (mut providers, skills) = catalogs_from(&draft);
+        let agent = providers
+            .iter_mut()
+            .find(|entry| entry.provider.provider_id == "agent.local")
+            .expect("agent catalog entry");
+        agent.provider.capabilities.clear();
+        let facts = admission_facts(
+            &scope,
+            &draft.grants,
+            &providers,
+            &skills,
+            &draft.hook_set,
+            1_800_000_000_000,
+            WorktreeRunState::Active,
+        );
+        assert_eq!(
+            ExecutionProfileResolver
+                .resolve(&verified, &facts)
+                .unwrap_err(),
+            ExecutionProfileError::CapabilityUnavailable
+        );
+
+        let (mut providers, skills) = catalogs_from(&draft);
+        providers.reverse();
+        let facts = admission_facts(
+            &scope,
+            &draft.grants,
+            &providers,
+            &skills,
+            &draft.hook_set,
+            1_800_000_000_000,
+            WorktreeRunState::Active,
+        );
+        assert_eq!(
+            ExecutionProfileResolver
+                .resolve(&verified, &facts)
+                .unwrap_err(),
+            ExecutionProfileError::InvalidCatalog
+        );
+    }
+
+    #[test]
+    fn resolver_rejects_expired_or_changed_grants_and_draining_worktrees() {
+        let draft = valid_draft();
+        let verified = draft.clone().seal().expect("valid profile");
+        let (providers, skills) = catalogs_from(&draft);
+        let scope = ExecutionProfileScope {
+            tenant_id: Uuid::from_u128(1),
+            project_id: Uuid::from_u128(2),
+            worktree_id: Some(Uuid::from_u128(8)),
+        };
+        let facts = admission_facts(
+            &scope,
+            &draft.grants,
+            &providers,
+            &skills,
+            &draft.hook_set,
+            draft.grants.expires_at_epoch_ms,
+            WorktreeRunState::Active,
+        );
+        assert_eq!(
+            ExecutionProfileResolver
+                .resolve(&verified, &facts)
+                .unwrap_err(),
+            ExecutionProfileError::GrantExpired
+        );
+
+        let mut changed_grant = draft.grants.clone();
+        changed_grant.version += 1;
+        let facts = admission_facts(
+            &scope,
+            &changed_grant,
+            &providers,
+            &skills,
+            &draft.hook_set,
+            1_800_000_000_000,
+            WorktreeRunState::Active,
+        );
+        assert_eq!(
+            ExecutionProfileResolver
+                .resolve(&verified, &facts)
+                .unwrap_err(),
+            ExecutionProfileError::GrantChanged
+        );
+
+        let facts = admission_facts(
+            &scope,
+            &draft.grants,
+            &providers,
+            &skills,
+            &draft.hook_set,
+            1_800_000_000_000,
+            WorktreeRunState::Draining,
+        );
+        assert_eq!(
+            ExecutionProfileResolver
+                .resolve(&verified, &facts)
+                .unwrap_err(),
+            ExecutionProfileError::WorktreeUnavailable
+        );
+    }
+
+    #[test]
+    fn resolver_rejects_revoked_skills_and_changed_hooksets() {
+        let draft = valid_draft();
+        let verified = draft.clone().seal().expect("valid profile");
+        let (providers, mut skills) = catalogs_from(&draft);
+        let scope = ExecutionProfileScope {
+            tenant_id: Uuid::from_u128(1),
+            project_id: Uuid::from_u128(2),
+            worktree_id: Some(Uuid::from_u128(8)),
+        };
+        skills[0].available = false;
+        let facts = admission_facts(
+            &scope,
+            &draft.grants,
+            &providers,
+            &skills,
+            &draft.hook_set,
+            1_800_000_000_000,
+            WorktreeRunState::Active,
+        );
+        assert_eq!(
+            ExecutionProfileResolver
+                .resolve(&verified, &facts)
+                .unwrap_err(),
+            ExecutionProfileError::RegistryUnavailable
+        );
+
+        skills[0].available = true;
+        let mut changed_hook_set = draft.hook_set.clone();
+        changed_hook_set.version += 1;
+        let facts = admission_facts(
+            &scope,
+            &draft.grants,
+            &providers,
+            &skills,
+            &changed_hook_set,
+            1_800_000_000_000,
+            WorktreeRunState::Active,
+        );
+        assert_eq!(
+            ExecutionProfileResolver
+                .resolve(&verified, &facts)
+                .unwrap_err(),
+            ExecutionProfileError::HookSetChanged
+        );
+    }
+
+    #[test]
+    fn execution_catalogs_enforce_entry_bounds() {
+        let provider_entry = ExecutionProviderCatalogEntry {
+            provider: provider("catalog.local", &[]),
+            available: true,
+        };
+        assert_eq!(
+            validate_provider_catalog(&[provider_entry.clone(), provider_entry.clone()]),
+            Err(ExecutionProfileError::InvalidCatalog)
+        );
+        let oversized_providers = vec![provider_entry; MAX_PROVIDER_CATALOG_ENTRIES + 1];
+        assert_eq!(
+            validate_provider_catalog(&oversized_providers),
+            Err(ExecutionProfileError::InvalidCatalog)
+        );
+
+        let skill_entry = ExecutionSkillCatalogEntry {
+            skill: SkillBindingSnapshot {
+                skill_id: "catalog.skill".to_owned(),
+                version: 1,
+                content_digest: digest('a'),
+                capabilities: Vec::new(),
+            },
+            available: true,
+        };
+        assert_eq!(
+            validate_skill_catalog(&[skill_entry.clone(), skill_entry.clone()]),
+            Err(ExecutionProfileError::InvalidCatalog)
+        );
+        let oversized_skills = vec![skill_entry; MAX_SKILL_CATALOG_ENTRIES + 1];
+        assert_eq!(
+            validate_skill_catalog(&oversized_skills),
+            Err(ExecutionProfileError::InvalidCatalog)
         );
     }
 
