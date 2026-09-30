@@ -1,6 +1,6 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.14 (2026-10-01)
+> **文档版本**: v5.15 (2026-10-01)
 > **上游要件定义书**: docs/requirements.md v5.20(下文以 §N 引用)
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
@@ -4656,6 +4656,8 @@ BI/Benchmark/Improvement 以固定 Run/Event/Evidence/Profile/HookSet/Loop/Sched
 
 ### 16.17 Rust 原生 Hook Engine 与 Worktree/BI 联动
 
+Phase 9D 的 source-only 汇总切片新增 GET /api/v1/projects/{project_id}/hook-events/summary?window_days=。该 Project-authorized API 默认查询 30 天，窗口限 1–90 天，按 Hook phase/decision 输出 ledger 观察计数、Run-linked ledger 行数、timeout 与耗时统计，并返回 metric version、公式及 partial/null coverage。它只读当前 archive ledger，尚未 join task_execution_run_event、Run outcomes、Outbox 或 task cohort，不构成完整 Project BI；未接入 phase 和质量结果继续标为 unknown。Hooks 仍保留在既有 Advanced Settings → Hooks 选项卡，不新增 Worktree 树节点。
+
 Hook Engine 是 Rust 执行核心的一部分，内置不可关闭的强制规则；用户配置的是 versioned HookSet/HookRule 数据，不是用户代码。Project HookSet 作为基线，Worktree 只能继承或追加限制，不能降低平台/租户/项目保护。Run admission 固定有效 HookSet/rule/evaluator version/hash。Hook 的同步 decision 仅为 allow/deny/require_human/defer；它可 veto 或请求人审，但不能授予 capability、修改目标/argv/Task Contract/验收事实。关键规则确定性执行，CPU/memory/time 有上限、无网络、无任意 native/plugin/script load；policy/evaluator/audit failure 或超时按操作风险 fail closed。非关键 after-commit event 由有界 Outbox consumer 处理，可重放，不回滚业务事实。Plugin hooks 最多提供隔离、受 grant 的 advisory/post-commit capability。
 
 Hook 设置沿用已拍板的“高级设置 → Hooks”选项卡，与 Skills、MCP、Plugins 等高级能力在同一设置导航内并列，不加到 Project→Worktree→Group App 树。Hook Builder 以三栏视图（规则/状态列表、结构化规则编辑、最近触发日志/影响预览）提供选择与检查；提供 Project→Worktree policy inheritance，分 scope 的规则表单、触发事件/typed condition/action、优先级、不可覆盖核心基线提示、冲突诊断、草稿/version diff、dry-run 和审批发布/回滚。用户无需写代码；任意 shell/script/native module 和无界表达式不进入表单。Worktree Index 保持为管理入口：展示 effective HookSet/version/health 和阻断摘要；从 Run Detail/Quality & Improvement 可跳到同一 Advanced Settings Hooks tab 的过滤视图。
@@ -4726,3 +4728,4 @@ Phase 9D 的首个实现切片增加 `multica.hook_execution_event`（Transactio
 | v5.12 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 Hook SRS/BD/DD v0.5.2/v0.5.2/v0.5.7；记录 Phase 9C Advanced Settings 入口、Skills/Hooks/MCP/Plugins 并列 tab、typed policy Builder/API client 代码切片与宿主认证 Provider 缺口；维持 Task→Run×N、Worktree 可选运行环境、Project BI/Benchmark 位于 Quality & Improvement 的层级 | 用户再次确认 Hooks 属于高级设置中的选项卡，并要求按 Run/BI 架构持续推进 |
 | v5.13 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Phase 9D 第一个 Worktree archive HookEvent 代码切片纳入基本设计；区分无 Run 外键的生命周期事件账本与有 Task/Run FK 的 RunEvent；定义同事务 fail-closed 写入、有界授权 keyset API 与 partial/unknown coverage；完整 BI、Run-linked producers、目标 DB/grants/RLS 与 UI consumer 仍开放 | Phase 9D archive HookEvent migration、producer 与读取 API 代码落地 |
 | v5.14 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Project-authorized Hook execution event 分页面板纳入既有 Advanced Settings → Hooks tab；区分只读执行事件与策略配置 Audit，呈现 partial/unknown coverage；同步 Rust 106/106、前端定向 25/25、TypeScript 与隔离 PostgreSQL append-only/RLS 验证，并保留 app auth provider、目标 DB/BI 与 Run-linked producer 边界 | Phase 9D HookEvent panel/UI client 与 targeted tests 落地 |
+| v5.15 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 Project-scoped Hook summary API 的 bounded window、metric version/formula、phase/decision 聚合与 partial/null coverage；限定数据只来自 archive ledger，RunEvent/outcome join、BI consumer 与目标环境 DB/RLS 仍开放；Hooks 继续是既有 Advanced Settings 标签 | 推进 Phase 9D 首个可复算的 Hook BI 汇总切片 |

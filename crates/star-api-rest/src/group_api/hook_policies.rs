@@ -97,6 +97,10 @@
 //! MATCH (m:Module {name:"hook_policies",type:"module"}),(rt:Function {name:"router",type:"function"});
 //! CREATE (eventsQuery:Class {name:"HookEventsQuery",type:"class",language:"rust"}),(eventCursor:Class {name:"HookEventCursor",type:"class",language:"rust"}),(eventProjection:Class {name:"HookEventProjection",type:"class",language:"rust"}),(projectKey:Variable {name:"project_id",type:"variable",language:"rust"}),(occurredKey:Variable {name:"occurred_at",type:"variable",language:"rust"}),(eventKey:Variable {name:"event_id",type:"variable",language:"rust"}),(listEvents:Function {name:"list_hook_events",type:"function",language:"rust",visibility:"private",complexity:"moderate"}),(decodeEventCursor:Function {name:"decode_hook_event_cursor",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(encodeEventCursor:Function {name:"encode_hook_event_cursor",type:"function",language:"rust",visibility:"private",complexity:"simple"});
 //! CREATE (m)-[:CONTAINS]->(eventsQuery),(m)-[:CONTAINS]->(eventCursor),(m)-[:CONTAINS]->(eventProjection),(m)-[:CONTAINS]->(listEvents),(m)-[:CONTAINS]->(decodeEventCursor),(m)-[:CONTAINS]->(encodeEventCursor),(rt)-[:CALLS]->(listEvents),(listEvents)-[:CALLS]->(decodeEventCursor),(listEvents)-[:CALLS]->(encodeEventCursor),(listEvents)-[:USES]->(eventProjection),(eventCursor)-[:USES]->(projectKey),(eventCursor)-[:USES]->(occurredKey),(eventCursor)-[:USES]->(eventKey);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"hook_policies",type:"module"}),(rt:Function {name:"router",type:"function"});
+//! CREATE (summaryQuery:Class {name:"HookSummaryQuery",type:"class",language:"rust"}),(summaryGroup:Class {name:"HookSummaryGroup",type:"class",language:"rust"}),(summaryDays:Variable {name:"window_days",type:"variable",language:"rust"}),(summary:Function {name:"summarize_hook_events",type:"function",language:"rust",visibility:"private",complexity:"moderate"});
+//! CREATE (m)-[:CONTAINS]->(summaryQuery),(m)-[:CONTAINS]->(summaryGroup),(m)-[:CONTAINS]->(summary),(rt)-[:CALLS]->(summary),(summary)-[:USES]->(summaryGroup),(summaryQuery)-[:USES]->(summaryDays);
 use axum::{
     body::Bytes,
     extract::{DefaultBodyLimit, Path, Query, State},
@@ -105,7 +109,7 @@ use axum::{
     Json, Router,
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use domain_hook::{HookPolicyDocument, MAX_POLICY_DOCUMENT_BYTES};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -211,6 +215,12 @@ struct HookEventsQuery {
     cursor: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HookSummaryQuery {
+    window_days: Option<i64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct HookEventCursor {
     version: u8,
@@ -242,6 +252,18 @@ struct HookEventProjection {
     occurred_at: DateTime<Utc>,
 }
 
+#[derive(Debug, FromRow, Serialize)]
+struct HookSummaryGroup {
+    hook_phase: String,
+    hook_decision: String,
+    event_count: i64,
+    run_linked_event_count: i64,
+    timeout_count: i64,
+    duration_total_ms: i64,
+    average_duration_ms: f64,
+    latest_occurred_at: DateTime<Utc>,
+}
+
 const MAX_HOOK_EVENT_CURSOR_BYTES: usize = 512;
 
 pub(super) fn router() -> Router<GroupApiState> {
@@ -253,6 +275,10 @@ pub(super) fn router() -> Router<GroupApiState> {
         .route(
             "/api/v1/projects/{project_id}/hook-events",
             get(list_hook_events),
+        )
+        .route(
+            "/api/v1/projects/{project_id}/hook-events/summary",
+            get(summarize_hook_events),
         )
         .route(
             "/api/v1/worktrees/{worktree_id}/hook-policy/effective",
@@ -362,6 +388,105 @@ async fn list_hook_events(
             "instrumented_phases": ["worktree_archive"],
             "not_yet_instrumented_phases": ["run_admission", "tool", "validation", "review", "worktree_cleanup", "after_commit"],
             "note": "Uninstrumented phases are unknown, not zero-risk or zero-volume."
+        }
+    });
+    Ok((
+        [(CACHE_CONTROL, "no-store"), (VARY, "Authorization")],
+        Json(body),
+    ))
+}
+
+async fn summarize_hook_events(
+    State(state): State<GroupApiState>,
+    AuthenticatedUser(actor): AuthenticatedUser,
+    Path(project_id): Path<String>,
+    Query(query): Query<HookSummaryQuery>,
+) -> Result<impl axum::response::IntoResponse, GroupApiError> {
+    let project_id = parse_id(&project_id)?;
+    let window_days = query.window_days.unwrap_or(30);
+    if !(1..=90).contains(&window_days) {
+        return Err(GroupApiError::invalid_request(
+            "invalid_hook_summary_window",
+        ));
+    }
+
+    let window_end = Utc::now();
+    let window_start = window_end - Duration::days(window_days);
+    let mut tx = state
+        .resolver
+        .pool
+        .begin()
+        .await
+        .map_err(|_| GroupApiError::internal())?;
+    authorize_scope(
+        &mut tx,
+        &actor,
+        PolicyScope::Project,
+        Some(project_id),
+        None,
+        Access::Read,
+    )
+    .await?;
+    let groups = sqlx::query_as::<_, HookSummaryGroup>(
+        r#"SELECT hook_phase, hook_decision,
+                  COUNT(*) AS event_count,
+                  COUNT(*) FILTER (WHERE run_id IS NOT NULL) AS run_linked_event_count,
+                  COUNT(*) FILTER (WHERE timed_out) AS timeout_count,
+                  COALESCE(SUM(duration_ms), 0)::BIGINT AS duration_total_ms,
+                  AVG(duration_ms)::DOUBLE PRECISION AS average_duration_ms,
+                  MAX(occurred_at) AS latest_occurred_at
+           FROM multica.hook_execution_event
+           WHERE tenant_id = $1 AND project_id = $2
+             AND occurred_at >= $3 AND occurred_at < $4
+           GROUP BY hook_phase, hook_decision
+           ORDER BY hook_phase, hook_decision"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(window_start)
+    .bind(window_end)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    tx.commit().await.map_err(|_| GroupApiError::internal())?;
+
+    let observed_event_count = groups.iter().map(|group| group.event_count).sum::<i64>();
+    let run_linked_event_count = groups
+        .iter()
+        .map(|group| group.run_linked_event_count)
+        .sum::<i64>();
+    let timeout_count = groups.iter().map(|group| group.timeout_count).sum::<i64>();
+    let duration_total_ms = groups
+        .iter()
+        .map(|group| group.duration_total_ms)
+        .sum::<i64>();
+    let body = json!({
+        "metric_version": "hook_execution_summary_v1",
+        "window": {
+            "days": window_days,
+            "from": window_start,
+            "to": window_end
+        },
+        "observed_event_count": observed_event_count,
+        "run_linked_event_count": run_linked_event_count,
+        "timeout_count": timeout_count,
+        "duration_total_ms": duration_total_ms,
+        "groups": groups,
+        "coverage": {
+            "scope": "hook_execution_event_ledger",
+            "status": "partial",
+            "reported_percentage": Value::Null,
+            "instrumented_phases": ["worktree_archive"],
+            "not_yet_instrumented_phases": ["run_admission", "tool", "validation", "review", "worktree_cleanup", "after_commit"],
+            "run_outcome_join": "not_available",
+            "note": "Counts cover recorded ledger rows only; missing phases and Run outcomes are unknown, not zero."
+        },
+        "formulas": {
+            "observed_event_count": "COUNT(*) in hook_execution_event for the Project and window",
+            "run_linked_event_count": "COUNT(*) where run_id IS NOT NULL in the same observed rows",
+            "timeout_count": "COUNT(*) FILTER (WHERE timed_out) in the same observed rows",
+            "duration_total_ms": "SUM(duration_ms) in the same observed rows",
+            "grouping": ["hook_phase", "hook_decision"]
         }
     });
     Ok((
