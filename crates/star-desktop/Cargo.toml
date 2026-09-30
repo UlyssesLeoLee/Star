@@ -21,6 +21,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
 # 复用现有 crates (守门 #19: 0 动业务 logic, 本 crate 新文件 adapter 仅用 enum/struct)
 domain-board = { path = "../../crates/domain-board" }
 domain-worktree = { path = "../../crates/domain-worktree" }
