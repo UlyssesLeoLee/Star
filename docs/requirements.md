@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.23）
+# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.24）
 
 ## 0. 文档说明与前提
 
@@ -2527,6 +2527,8 @@ Run detail 应能折叠查看每轮输入摘要、采取的工具/命令类别�
 
 Agent 执行能力按稳定契约组合，不把某个 CLI、模型、记忆实现、Skill 格式、上下文算法或验证器写死进 Task/Worktree 身份模型。`AgentExecutionProfile` 是版本化 Master，引用具名且版本固定的 `AgentProvider`、`MemoryProvider`、`SkillRegistry`、`ContextAssembler`、`ValidationProvider`、`LoopPolicy` 与资源预算；Provider 可由内建 Rust 实现或通过隔离 Plugin capability 提供。新增实现应只注册兼容 provider/version/manifest，不改变 `work_item_id`、`run_id`、Worktree 关系或已有历史 Run 语义。未支持的 provider/capability 必须显式标为 unavailable，不得用 mock 或空成功冒充。
 
+Phase 9E-1 Rust profile verifier 使用 ≤65,536 字节 serialized document、版本化 schema、固定字段顺序 JSON SHA-256、排序去重引用与明确上限；verified wrapper 只暴露不可变借用。Worktree 运行期间 profile、grant、HookSet、Validation、Loop 与资源预算均被绑定；恢复或真正创建 Run 仍需独立复核 actor ACL、provider availability、grant expiry 和当前 lifecycle version。
+
 每个 Run 创建时保存不可变的 `execution_profile_snapshot`：各 provider ID/API version/实现版本、Skill ID/version/content digest/capability grant、Memory policy 与引用摘要、Context assembler version/budget/source digest、Validation suite/version/命令标识与 toolchain digest、Engineering Loop policy、Schedule occurrence（若有）和资源预算。快照只保存复现与审计所需引用、版本、脱敏摘要和 digest，不保存 Secret、未脱敏提示正文、原始大日志或模型隐式推理。provider 更新不得回写历史快照；恢复 Run 时复核当前授权并明确记录使用原版本还是兼容的新版本。
 
 MemoryProvider 必须实施 tenant/project/worktree/task scope、读写 ACL、来源/时间/置信度或审核状态、TTL/保留与删除策略；跨租户或未获批的 scope 不得被 ContextAssembler 读取。SkillRegistry 发布不可变 manifest，声明版本、内容 hash、输入输出契约、所需 capability、资源需求、兼容 API 与撤销状态；Run 固定本次实际采用的 Skill 集合，skill 更新/撤销不改变旧记录。ContextAssembler 按 Task Contract、当前 Worktree 授权可见的仓库资料、获批 memory 与 skill 说明构建有预算、可归因的 Context Packet；必须保留 source provenance 与 compaction 边界，超预算按策略压缩可恢复材料，不能丢掉 acceptance criteria、权限约束或作用域信息，且不能把 compaction 摘要冒充原始证据。
@@ -2547,6 +2549,7 @@ ValidationProvider 与 AgentProvider 解耦：验证 profile 独立定义固定�
 | AEC-006 | 第一阶段可通过 Rust-owned CLI adapter 接入现有 CLI；必须 direct argv、allowlisted env、canonical cwd、显式 capability、bounded I/O、deadline/cancel 与进程回收，不接受 CLI 自授权限或自判验收 | P0 |
 | AEC-007 | ProjectEngineeringManifest 可按 repository commit/version 增加任务约定、验证入口、环境和证据映射，新增项目适配不改变 Task/Run 主身份模型 | P1 |
 | AEC-008 | BI/Benchmark/Improvement 按 Execution Profile/Provider/Loop/Validation 版本切片并固定评分标准、coverage 与复现条件；改进可回滚且不得自改验收标准 | P0 |
+| AEC-009 | Run admission 仅接受经 schema、scope、canonical SHA-256 与 bounded-value 校验的不可变 Profile snapshot；provider/Skill capability 不得超出 grant，Memory unavailable 不得静默降级 | P0 |
 
 | 验收 ID | 受入基准 |
 |---|---|
@@ -2557,12 +2560,13 @@ ValidationProvider 与 AgentProvider 解耦：验证 profile 独立定义固定�
 | AC-AEC-005 | CLI adapter 验收拒绝 shell 插值、未批准 executable/env/cwd/capability 和越界 I/O；超时/取消会结束子进程树或明确记录未回收，重放保留相同 Run/幂等语义 |
 | AC-AEC-006 | ProjectEngineeringManifest 跟 repository commit/version 固定；换项目 manifest 可换验证命令与夹具而不改 WorkItem/Run 身份，未配置时按明确的项目 capability 缺口处理 |
 | AC-AEC-007 | BI/Benchmark 对两个 profile 做同标准对比，能展示任务分层、人工介入、返工、验证结果、实际/估算成本和 coverage；proposal 经隔离验证、批准采纳与回滚，评分历史不变 |
+| AC-AEC-008 | Profile 解码拒绝未知 schema/字段、非 canonical 列表、digest 篡改、越 scope、越 grant、Memory 缺失或超限、Context 丢失关键约束及 Loop/资源预算越界；Project profile 只能在同 Project Worktree 使用，Worktree profile 必须精确匹配；每项负向边界拒绝，历史 digest 不因后续 profile 更新改变 |
 
 ### 50.8D Rust 原生 Hook Engine 与高级设置可视化
 
 Hook Engine 是 Agent/Run/Worktree 的原生控制点，用于在关键操作前后施加不可绕过的授权、安全和生命周期约束并留下可分析事实。它必须由渡口 Rust 核心实现，包含强制内置规则；不是可关闭的 Plugin provider，也不能被 CLI、Skill、仓库脚手架或用户 HookSet 替换。Project HookSet 是 Master/version，Worktree 继承 Project 基线并可追加更严格的规则；不可降低平台/tenant/project 安全基线。每次 Run 固定有效 HookSet、规则与 evaluator 的 version/hash；Worktree 管理命令也记录当时策略 provenance。
 
-Hook 配置沿用既有 **高级设置 → Hooks** 标签页，与高级设置中的 Skills、MCP、Plugins 等标签平级；不得新增 Worktree 树层级。必须提供可视化规则列表、结构化编辑器、规则解释、草稿/发布版本 diff、继承与覆盖视图、冲突/不可覆盖提示、影响范围预览、dry-run/历史事件模拟、审批和 rollback。规则通过受限 typed condition/action schema 配置，不要求编写代码；拒绝任意脚本、shell、动态库和无限制表达式。高级设置负责策略定义和规则管理；Project Worktree Index 显示该 Worktree 生效的 HookSet/version/健康状态和常见阻断原因，Run detail 与 Quality & Improvement 提供可下钻执行记录和 BI 分析。
+Hook 配置沿用既有 ULYS-235 导航：Settings 主导航中的“高级设置”是父入口；Hooks 位于该页面内容区的标签条，与 Skills、MCP、Plugins 等并列，不是独立主导航项，也不得新增 Worktree 树层级。必须提供可视化规则列表、结构化编辑器、规则解释、草稿/发布版本 diff、继承与覆盖视图、冲突/不可覆盖提示、影响范围预览、dry-run/历史事件模拟、审批和 rollback。规则通过受限 typed condition/action schema 配置，不要求编写代码；拒绝任意脚本、shell、动态库和无限制表达式。高级设置负责策略定义和规则管理；Project Worktree Index 显示该 Worktree 生效的 HookSet/version/健康状态和常见阻断原因，Run detail 与 Quality & Improvement 提供可下钻执行记录和 BI 分析。
 
 原生同步 Hook 至少覆盖 Run admission、工具调用前后、验证前后、review/complete、Worktree 创建/导入/归档/恢复/转派/binding 变更/清理。决策限定 `allow / deny / require_human / defer`；Hook 不能授予 capability、改变目标/argv、改写 Task Contract 或代替验证/人工接受。critical hook 使用受限、确定性的 Rust evaluator，无网络与任意代码装载，配置/引擎/审计不可用或超时则 fail closed。non-critical post-commit 通知/指标 enrich 通过有界 Outbox 异步执行、可重放且不回滚已提交事实。Plugin 可提供隔离的 advisory hook，但不能替代核心决策。
 
@@ -2586,7 +2590,7 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 
 | 验收 ID | 受入基准 |
 |---|---|
-| AC-HOOK-001 | 高级设置 Hooks 能用可视化表单创建、比较、模拟、审批和回滚 typed rule；普通规则配置无须写代码，无法输入可执行脚本/native code |
+| AC-HOOK-001 | Settings 主导航的“高级设置”作为父入口；Hooks 位于该页内容区并与 Skills/MCP/Plugins 并列，不是独立主导航项或 Worktree 节点；Hooks 可用可视化表单创建、比较、模拟、审批和回滚 typed rule，普通规则配置无须写代码，无法输入可执行脚本/native code |
 | AC-HOOK-002 | Project 基线与 Worktree policy 合并后只能等强或更严格；Run 和 Worktree 命令可回看命中的版本、规则、decision 与理由 |
 | AC-HOOK-003 | Hook 缺失、超时、版本不兼容或 audit 无法持久化时，关键 Run/tool/Worktree cleanup 命令阻断；非关键通知任务可按有界重试重放 |
 | AC-HOOK-004 | 过期 lock observation、活跃 Run/Agent lease/file claim/子进程阻止 Worktree archive/cleanup；drain + 新鲜重检后才允许继续，重复请求不重复执行 |
@@ -2656,3 +2660,5 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 | v5.21 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Phase 9D summary v2 的 Hook ledger/RunEvent 双来源去重、完整 Run 状态关联键、缺失投影计数和 partial/unknown coverage 分离语义；Hooks 仍是 ULYS-235 Advanced Settings 并列 tab | 9D-4 建立双来源 Run-state summary read model，需求同步到可复算 BI contract |
 | v5.22 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 phase-scoped HookRule evaluator API v2 契约、v1 archive policy digest 兼容、Run admission typed-fact allowlist 与 producer 未就绪时禁用 Builder 配置要求；保留 Hooks 在 ULYS-235 Advanced Settings 内容区并列标签中的导航位置 | Phase 9D-5a 扩展 Rust evaluator 的 Run admission phase contract，Run producer 与事务双写仍未接入 |
 | v5.23 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充条件式 Run admission readiness/fence、短事务重授权/evaluator、Run/HookEvent/RunEvent 同 event_id 双写与动态 coverage contract；明确当前无生产 TaskCliSessionProvisioner adapter，UI/policy capability 因而默认关闭；Hooks 继续位于既有 Advanced Settings 并列标签 | Phase 9D-5b 接入 CLI Run admission REST/DB producer seam 并复核 BI 去重与 fence 边界 |
+
+| v5.24 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 9E-1 Rust immutable AgentExecutionProfile snapshot verifier、scope/digest/canonical list/capability 与 Memory/Context/Loop/RSS/queue hard ceilings；明确 profile resolver、Run persistence 与 Rust CLI adapter 仍未接通；Hooks 继续位于既有 Advanced Settings 并列标签 | 开始 Phase 9E 的类型化执行 profile 核心切片 |

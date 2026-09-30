@@ -1,3 +1,8 @@
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MATCH (f:File {name:"lib.rs",type:"file",language:"rust"});
+//! CREATE (execution_profile:Module {name:"execution_profile",type:"module",language:"rust"});
+//! CREATE (f)-[:CONTAINS]->(execution_profile);
+//!
 //! domain-agent crate
 //!
 //! 详细 spec: docs/specs/domain-agent-spec.md §4.2 / §24 Agent 适配层
@@ -2145,6 +2150,9 @@ mod tests {
 // (per SRS-PI-BORROW-001 §4 FR-13~18 + §7 AC-4). 100% 文档化 -- 守门
 // `missing_docs = "deny"` 已 verify (per ULYS-181 PI-5 policy_hooks.rs 同款).
 pub mod loop_boundary;
+
+// Versioned provider/profile snapshots used by Run admission and execution.
+pub mod execution_profile;
 
 // ULYS-181 (PI-5): `PolicyHook` trait + `PolicyHooks` container + audit hooks
 // (per SRS-PI-BORROW-001 §4 FR-24~26 + §7 AC-6). PI-3 (`loop_boundary.rs`)

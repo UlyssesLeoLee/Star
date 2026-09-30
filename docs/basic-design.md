@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.19 (2026-10-01)
-> **上游要件定义书**: docs/requirements.md v5.23
+> **文档版本**: v5.20 (2026-10-01)
+> **上游要件定义书**: docs/requirements.md v5.24
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -4597,7 +4597,7 @@ Phase 11 Benchmark 使用固定 task set/version、repository commit、environme
 |---|---|---|---|
 | Phase 8A Run foundation | Contract/Run/Event/Evidence schema；CLI start 创建 Run 并返回 Run ID | migration/RLS/append-only/idempotency 运行验收；CLI 多重放和新尝试分离 | CLI writer 与 additive migration 已有条件式代码；migration 在隔离临时 PostgreSQL 重复应用并检查 6 张表 FORCE RLS；目标 DB/runtime grants 与真实 provisioner 未接通 |
 | Phase 8B Task Card integration | Contract command、Run list/detail、Task Card Run 历史、CLI/Agent/LangGraph 状态 producer | 项目授权/RLS、Task/Run snapshot、各状态分栏与 evidence ACL/retention | 有界 list/detail REST 与 Task Card 历史面板已实现；Contract 写命令、目标 DB/RLS、CLI 后续事件、Agent/LangGraph/Validation/Review/Integration/Cost/Evidence producer 尚缺 |
-| Phase 9 Agent Execution & Loop | 9A Rust-native typed Hook evaluator；9B1 bounded serialized policy verifier/immutable snapshot；9B2A Project/Worktree Master SCD2 + expiring Draft + append-only Audit schema；9B2B scoped repository/read/publish/rollback APIs；9B2C Worktree archive-confirm 双门；9C Advanced Settings → Hooks 可视 Builder；9D Hook RunEvent/Audit/BI 与有界 source-summary consumer；9E Agent/Memory/Skill/Context/Validation Profile、受控 CLI adapter、唯一 Automation occurrence dispatcher、Schedule/Engineering Loop 与有界公平并行调度 | 固定 profile/provider/HookSet 版本并验证 scope/ACL、DB/RLS/SCD2/append-only、队列公平与背压、occurrence fencing/idempotency、Loop budget/cancel/drain、Hook fail-closed、CLI cleanup；Git lock 与 Agent lease 分离 | 9A/9B1 有 13 个单测与 targeted Clippy；9B2A migration 在隔离 PostgreSQL 18 环境双次应用，3 表 FORCE RLS、Project/Worktree SCD2 重基、Audit scope 与 append-only 场景通过；9B2B 有 8 条 scoped policy 路由及 Draft CAS/TTL、publish/rollback Audit 和原子 overlay rebase；9B2C 将 verified effective policy 与 Rust evaluator 接入 archive-confirm：锁外先观测 Git lock（最多 2 秒），仅新鲜 Unlocked 才请求最多 2 秒 Runtime drain/readiness；admission fence 至少保留 5 秒提交余量，最终写入前复核，provider 需覆盖命令完成窗口；随后在短事务中重新授权、锁定、读取策略、复核版本/观测新鲜度并写入归档；`cargo check -p star-api-rest --lib -j 4`、103 个 library tests 和 targeted Clippy 通过。Phase 9D 增加 1–90 天 bounded Project summary API 与 Advanced Settings Hooks 页 7/30/90 天 summary card，只统计 archive ledger 并显示 partial/unknown；RunEvent/outcome join、Outbox、完整 BI/UI、真实认证与目标 DB/RLS 仍未验收。生产 main 缺 readiness provider 时 fail-closed 503；物理 checkout cleanup 未验收。9E 与生产验收继续开放。ULYS-235 导航不变：Hooks 是 Settings 高级设置页面内容区内与 Skills/MCP/Plugins 并列的标签，不是主侧栏独立入口或 Worktree App |
+| Phase 9 Agent Execution & Loop | 9A Rust-native typed Hook evaluator；9B1 bounded serialized policy verifier/immutable snapshot；9B2A Project/Worktree Master SCD2 + expiring Draft + append-only Audit schema；9B2B scoped repository/read/publish/rollback APIs；9B2C Worktree archive-confirm 双门；9C Advanced Settings → Hooks 可视 Builder；9D Hook RunEvent/Audit/BI 与有界 source-summary consumer；9E Agent/Memory/Skill/Context/Validation Profile、受控 CLI adapter、唯一 Automation occurrence dispatcher、Schedule/Engineering Loop 与有界公平并行调度 | 固定 profile/provider/HookSet 版本并验证 scope/ACL、DB/RLS/SCD2/append-only、队列公平与背压、occurrence fencing/idempotency、Loop budget/cancel/drain、Hook fail-closed、CLI cleanup；Git lock 与 Agent lease 分离 | 9A/9B1 有 13 个单测与 targeted Clippy；9B2A migration 在隔离 PostgreSQL 18 环境双次应用，3 表 FORCE RLS、Project/Worktree SCD2 重基、Audit scope 与 append-only 场景通过；9B2B 有 8 条 scoped policy 路由及 Draft CAS/TTL、publish/rollback Audit 和原子 overlay rebase；9B2C 将 verified effective policy 与 Rust evaluator 接入 archive-confirm：锁外先观测 Git lock（最多 2 秒），仅新鲜 Unlocked 才请求最多 2 秒 Runtime drain/readiness；admission fence 至少保留 5 秒提交余量，最终写入前复核，provider 需覆盖命令完成窗口；随后在短事务中重新授权、锁定、读取策略、复核版本/观测新鲜度并写入归档；`cargo check -p star-api-rest --lib -j 4`、103 个 library tests 和 targeted Clippy 通过。Phase 9D 增加 1–90 天 bounded Project summary API 与 Advanced Settings Hooks 页 7/30/90 天 summary card，只统计 archive ledger 并显示 partial/unknown；RunEvent/outcome join、Outbox、完整 BI/UI、真实认证与目标 DB/RLS 仍未验收。生产 main 缺 readiness provider 时 fail-closed 503；物理 checkout cleanup 未验收。9E-1 已实现 bounded typed profile snapshot verifier；profile resolver、Run snapshot persistence、CLI adapter、Occurrence dispatcher、Loop runtime 与公平 scheduler 仍开放，生产与环境验收继续开放。ULYS-235 导航不变：Hooks 是 Settings 高级设置页面内容区内与 Skills/MCP/Plugins 并列的标签，不是主侧栏独立入口或 Worktree App |
 | Phase 10 Quality BI | 有版本 metric model、coverage、Project query/UI/drilldown | 公式可复算、unknown 保留、分层和权限无跨 Project 泄漏 | 设计定义；未实现 |
 | Phase 11 Benchmark / Improvement | 固定数据集、隔离 replay、proposal/adopt/rollback 和 BI follow-up | tuning/holdout 不串用，验收/评分规则锁定，策略版本可复现/回滚 | 设计定义；未实现 |
 | Phase 12 Rust desktop performance | Rust 主实现桌面 UI；Worktree/Run 虚拟列表、Canvas viewport culling、增量事件投影、有界 terminal/artifact/cache、可观测设备档位性能基线 | 目标设备上测量 peak RSS、CPU、p95 更新/呈现延迟与 coverage；非性能敏感框架选择由 spike 数据决定 | 要求已定义；未实现 |
@@ -4637,7 +4637,7 @@ Phase 12 定义目标设备档位与固定 workload（Worktree/Run/Canvas 数量
 | PAR-001..004 | §16.15 分层调度、quota、claims、coordinator event | AC-PAR-001..003 | Phase 9 |
 | PERF-001..004 | §16.15 Rust desktop memory/render/cache/plugin budget | AC-PERF-001..003 | Phase 12 |
 | Pi inspiration (no runtime dependency) | §16.15 Rust Agent core / branch history / compaction | AC-PAR / AC-AEC | Phase 9 / 12 |
-| LOOP-001..005 / AEC-001..008 | §16.16 Schedule/Engineering Loop 与 versioned Provider/Profile | AC-LOOP-001..006 / AC-AEC-001..007 | Phase 9-11 |
+| LOOP-001..005 / AEC-001..009 | §16.16 Schedule/Engineering Loop 与 versioned Provider/Profile | AC-LOOP-001..006 / AC-AEC-001..008 | Phase 9-11 |
 | HOOK-001..007 | §16.17 Rust-native Hook Engine、Advanced Settings Hooks tab、Worktree enforcement 与 BI | AC-HOOK-001..006 | Phase 9-12 |
 
 ### 16.16 Schedule Loop 与可扩展 Agent Execution Profile
@@ -4653,6 +4653,10 @@ Memory 的读取/写入/检索/遗忘 capability 分离，并由当前 tenant/pr
 第一期可将现有 CLI 作为 Rust `AgentCliAdapter` provider：类型化 Run request、直接 executable+argv、环境变量 allowlist、canonical Worktree cwd、显式 capability grant、有界 stdin/stdout/stderr/事件队列、deadline/cancel 与进程树回收。CLI 不控制授权、scope、Task Contract、HookSet 或验收决定。Project 可提供可选 `ProjectEngineeringManifest`，把任务模板、项目说明、批准的验证入口 ID、toolchain/environment、fixtures、artifact mapping 和 redaction 规则绑定到 repository commit/digest；Phase 1 可先映射现有工程命令，后续再生成/安装脚手架。仓库文本不可直接授予命令 capability。
 
 BI/Benchmark/Improvement 以固定 Run/Event/Evidence/Profile/HookSet/Loop/Schedule/Validation versions 建 cohort，显示任务类型/复杂度、验收、人工介入、返工、实际/估算成本、资源与 coverage。Benchmark 使用固定 Task Contract、repo commit、环境和评分版本，在隔离 runner 比较。Improvement Proposal 可升级 provider/skill/context/validation/hook/loop policy，但必须有可复现 evidence、独立审批、固定口径比较和 rollback；unknown 不能按零填补。
+
+#### Phase 9E-1 Profile snapshot verifier
+
+Rust domain-agent 提供版本化 ProfileDraft、bounded JSON document、VerifiedProfile 不可变包装与 tenant/project/worktree scope 检查。digest 固定为对结构化 payload 的 SHA-256；provider、Skill、Validation criterion 等列表排序唯一，未知字段拒绝。Memory 只允许显式 Disabled 或带 provider/scope/provenance/字节/token/条目/年龄预算的 Enabled；Unavailable fail closed。Context 必须保留 Task Contract、验收标准和授权范围，Validation provider 与 Agent provider 分离。HookSet、grant、可选 repository commit manifest、Schedule/Engineering Loop 和 Run 资源上限进入同一个 profile payload。profile schema/大小/字段验证不代替当前 ACL/grant expiry 重验，也不表示 profile 已写入 Run 或 provider 已可执行；后续阶段继续建设 Profile registry/resolver、Run 持久化、Rust CLI adapter、Schedule occurrence dispatcher、Loop/runtime、共享 scheduler 与数据库/生产验收。
 
 ### 16.17 Rust 原生 Hook Engine 与 Worktree/BI 联动
 
@@ -4733,3 +4737,5 @@ Phase 9D 以 `multica.hook_execution_event`（Transaction / append-only）保存
 | v5.17 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.21 与 Hook SRS/BD/DD v0.5.4/v0.5.6/v0.5.12；加入 summary v2 的双来源 event_id 去重、完整 Run 状态 join、不完整投影排除计数和 partial/unknown 语义；校正文档头版本并保留 Run producer、认证 Provider、目标 DB/RLS、Outbox 与完整 BI 缺口 | Phase 9D-4 summary read model 支持 Run 状态关联并同步三层设计 |
 | v5.18 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 加入 phase-scoped evaluator API v2：Run admission 与 Worktree archive/cleanup 分开匹配；保持 v1 archive policy digest 兼容，限制 Run admission facts，并明确 Run producer/readiness 未接入前 Builder 选项禁用；Hooks 继续使用 ULYS-235 Advanced Settings 并列标签 | Phase 9D-5a Rust evaluator phase contract 落地并同步需求与详细设计 |
 | v5.19 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9D-5b 条件式 CLI Run admission producer：锁外 readiness/fencing、锁内最终授权与 Hook evaluator、Run+HookSet snapshot+ledger+RunEvent 原子写入及共享 event_id；coverage 与服务端 capability 联动；明确当前无生产 adapter、能力仍关闭；Hooks 保持 Advanced Settings 并列标签 | 接入 Run admission REST/事务 seam 并自审发现 BI 去重必须复用 event_id |
+
+| v5.20 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.24 与 Task DD v0.8；记录 Phase 9E-1 类型化不可变 Profile verifier 的 scope/digest/canonical list、显式 Memory/独立 Validation 与硬资源上限；resolver/Run persistence/CLI/Loop scheduler 仍开放；ULYS-235 Hooks 继续是 Advanced Settings 内容区与 Skills/MCP/Plugins 并列的 tab | Phase 9E 开始交付 AgentExecutionProfile contract core |
