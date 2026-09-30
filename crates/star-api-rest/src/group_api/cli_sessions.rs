@@ -20,6 +20,10 @@
 //! MATCH (m:Module {name:"cli_sessions",type:"module"}),(st:Function {name:"start_task_cli_session",type:"function"}),(sp:Interface {name:"TaskCliSessionProvisioner",type:"interface"});
 //! CREATE (readiness:Class {name:"TaskRunAdmissionReadiness",type:"class",language:"rust"}),(readinessCommand:Class {name:"TaskRunAdmissionReadinessCommand",type:"class",language:"rust"}),(loadContext:Function {name:"load_task_cli_start_context",type:"function",language:"rust"}),(freshness:Function {name:"run_admission_readiness_is_fresh",type:"function",language:"rust"}),(appendAdmission:Function {name:"append_run_admission_hook_events",type:"function",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(readiness),(m)-[:CONTAINS]->(readinessCommand),(m)-[:CONTAINS]->(loadContext),(m)-[:CONTAINS]->(freshness),(m)-[:CONTAINS]->(appendAdmission),(st)-[:CALLS]->(loadContext),(st)-[:CALLS]->(freshness),(st)-[:CALLS]->(appendAdmission),(sp)-[:HAS_METHOD]->(readiness);
+//! CYPHER STRUCTURE MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"cli_sessions",type:"module"}),(st:Function {name:"start_task_cli_session",type:"function"}),(p:Interface {name:"TaskCliSessionProvisioner",type:"interface"}),(body:Class {name:"StartTaskCliSessionBody",type:"class"}),(readiness:Class {name:"TaskRunAdmissionReadinessCommand",type:"class"}),(sessionStart:Class {name:"TaskCliSessionStartCommand",type:"class"}),(fp:Function {name:"request_fingerprint",type:"function"}),(validate:Function {name:"validate_start_body",type:"function"});
+//! CREATE (capability:Function {name:"TaskCliSessionProvisioner::supports_profile_bound_run_admission",type:"function",language:"rust"}),(profileId:Variable {name:"execution_profile_id",type:"variable",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(capability),(p)-[:HAS_METHOD]->(capability),(st)-[:CALLS]->(capability),(body)-[:USES]->(profileId),(readiness)-[:USES]->(profileId),(sessionStart)-[:USES]->(profileId),(fp)-[:USES]->(profileId),(validate)-[:USES]->(profileId);
 
 use async_trait::async_trait;
 use axum::{
@@ -46,8 +50,9 @@ use super::{
 };
 
 /// A REST-authorized request for provisioning a Task Card CLI session in Local Runtime.
-/// The provisioner must resolve the profile from its trusted catalog and recheck live ACL,
-/// Worktree/runtime health and policy immediately before grant issuance and spawn; persist
+/// The provisioner must resolve the Approved Launch Profile and bind the separately selected
+/// Agent Execution Profile from trusted catalogs, then recheck live ACL, Worktree/runtime health
+/// and policy immediately before grant issuance and spawn; persist
 /// TaskRun intent/result audit against the supplied correlation ID. This command is not itself
 /// an execution grant. For a new admitted Run, the provisioner must consume the supplied
 /// single-use admission fence and verify its full Task/Worktree/Runtime/profile/fingerprint scope
@@ -64,6 +69,9 @@ pub struct TaskCliSessionStartCommand {
     pub runtime_id: Uuid,
     pub expected_lifecycle_version: i32,
     pub approved_launch_profile_id: Uuid,
+    /// Agent Execution Profile selected separately from the executable launch policy.
+    /// `None` is reserved for a replay of a legacy Run admitted before Profile identity binding.
+    pub execution_profile_id: Option<Uuid>,
     pub correlation_id: Uuid,
     pub idempotency_key: String,
     pub request_fingerprint: [u8; 32],
@@ -83,6 +91,8 @@ pub struct TaskRunAdmissionReadinessCommand {
     pub runtime_id: Uuid,
     pub expected_lifecycle_version: i32,
     pub approved_launch_profile_id: Uuid,
+    /// Agent Execution Profile identity, independent from the Approved Launch Profile.
+    pub execution_profile_id: Option<Uuid>,
     pub correlation_id: Uuid,
     pub request_fingerprint: [u8; 32],
 }
@@ -181,6 +191,12 @@ pub trait TaskCliSessionProvisioner: Send + Sync {
         false
     }
 
+    /// Opt in only when the REST host also installs current Profile/catalog resolution and the
+    /// transactional Run snapshot writer. The Runtime fence must bind the same Profile identity.
+    fn supports_profile_bound_run_admission(&self) -> bool {
+        false
+    }
+
     /// Establish a short-lived Worktree fence and report current Runtime health without holding a
     /// database transaction. Implementations must bind the fence to every supplied identity and
     /// request field, and consume/validate it in `start_task_cli_session` before spawn.
@@ -225,6 +241,8 @@ struct StartTaskCliSessionBody {
     expected_lifecycle_version: i32,
     approved_launch_profile_id: Uuid,
     correlation_id: Uuid,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    execution_profile_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -387,6 +405,17 @@ async fn start_task_cli_session(
                     "run_admission_producer_unavailable",
                 ));
             }
+            let execution_profile_id = body.execution_profile_id.ok_or_else(|| {
+                GroupApiError::feature_unavailable("execution_profile_selection_required")
+            })?;
+            if execution_profile_id.is_nil() {
+                return Err(GroupApiError::bad_request());
+            }
+            if !provisioner.supports_profile_bound_run_admission() {
+                return Err(GroupApiError::feature_unavailable(
+                    "execution_profile_admission_unavailable",
+                ));
+            }
             let readiness = tokio::time::timeout(
                 std::time::Duration::from_secs(2),
                 provisioner.prepare_run_admission(TaskRunAdmissionReadinessCommand {
@@ -399,6 +428,7 @@ async fn start_task_cli_session(
                     runtime_id: preflight.runtime_id,
                     expected_lifecycle_version: body.expected_lifecycle_version,
                     approved_launch_profile_id: body.approved_launch_profile_id,
+                    execution_profile_id: Some(execution_profile_id),
                     correlation_id: body.correlation_id,
                     request_fingerprint: preflight.request_fingerprint,
                 }),
@@ -575,6 +605,7 @@ async fn start_task_cli_session(
             runtime_id,
             expected_lifecycle_version: body.expected_lifecycle_version,
             approved_launch_profile_id: body.approved_launch_profile_id,
+            execution_profile_id: body.execution_profile_id,
             correlation_id: body.correlation_id,
             idempotency_key,
             request_fingerprint,
@@ -1436,6 +1467,9 @@ fn validate_start_body(body: &StartTaskCliSessionBody) -> Result<(), GroupApiErr
     if body.expected_lifecycle_version < 1
         || body.approved_launch_profile_id.is_nil()
         || body.correlation_id.is_nil()
+        || body
+            .execution_profile_id
+            .is_some_and(|profile_id| profile_id.is_nil())
     {
         return Err(GroupApiError::invalid_request(
             "invalid_task_cli_session_start",
@@ -1454,16 +1488,31 @@ fn request_fingerprint(
     runtime_id: Uuid,
     body: &StartTaskCliSessionBody,
 ) -> Result<[u8; 32], GroupApiError> {
-    let encoded = serde_json::to_vec(&(
-        tenant_id,
-        actor_id,
-        project_id,
-        repository_id,
-        worktree_id,
-        work_item_id,
-        runtime_id,
-        body,
-    ))
+    let encoded = if body.execution_profile_id.is_some() {
+        serde_json::to_vec(&(
+            tenant_id,
+            actor_id,
+            project_id,
+            repository_id,
+            worktree_id,
+            work_item_id,
+            runtime_id,
+            "cli_session_start_v2",
+            body,
+        ))
+    } else {
+        // Keep the exact pre-v2 serialized tuple for retries of legacy admitted Runs.
+        serde_json::to_vec(&(
+            tenant_id,
+            actor_id,
+            project_id,
+            repository_id,
+            worktree_id,
+            work_item_id,
+            runtime_id,
+            body,
+        ))
+    }
     .map_err(|_| GroupApiError::internal())?;
     Ok(Sha256::digest(encoded).into())
 }

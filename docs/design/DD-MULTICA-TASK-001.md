@@ -1,11 +1,11 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.7** (per 日本 IPA SEC 标准，补充 Run Profile identity binding 契约)
+> **Multica Task Lifecycle 域 詳細設計書 v1.8** (per 日本 IPA SEC 标准，补充 Run Profile identity binding 契约)
 >
-> - 状态: 🟡 Draft v1.7 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4 有条件式代码/schema 切片或设计收口，生产 Profile-bound Run writer 与目标环境验收仍开放)
+> - 状态: 🟡 Draft v1.8 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3/9E-4B4/9E-4C1 有条件式代码/schema 切片或设计收口，生产 Profile-bound Run writer 与目标环境验收仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.33 §50；`docs/basic-design.md` v5.29 §16.14-16.17
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.34 §50；`docs/basic-design.md` v5.30 §16.14-16.17
 > - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.24；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
 > - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
@@ -970,13 +970,17 @@ Group API 以 `POST /api/v1/projects/{project_id}/execution-profiles/{profile_id
 
 该代码切片新增 overlay 与 Project baseline 两种身份/digest 单测并通过（首次链接遇 LNK1104，确认无同名进程后重试成功），且 `cargo check -p star-api-rest --all-targets -j 4` 通过；这不证明 SQL/Auth/RLS/并发/目标 DB 或 production Runtime 集成。ULYS-235 导航不变：Hooks 仍是 Settings“高级设置”内容区的 tab，与 Skills/MCP/Plugins 并列；现有 Main/Project sidebar scope 与其属于不同导航层。
 
-#### 14.11.8 Phase 9E-4B4 Task Card CLI 与 AgentExecutionProfile identity 分离
+#### 14.11.8 Phase 9E-4B4/4C1 Task Card CLI 与 AgentExecutionProfile identity 分离
 
 `approved_launch_profile_id` 与 `execution_profile_id` 是不同领域对象。前者是 Local Runtime 的 Approved Task Launch Profile，决定被允许的 executable/argv、环境变量与 canonical Worktree cwd；后者是 Multica 的 AgentExecutionProfile，固定 Agent/Memory/Skill/ContextAssembler/Validation/LoopPolicy/HookSet/grants/resource budget 版本。不得把 approved launch ID 当作 Agent Profile ID，不得由 CLI、客户端 seed 或当前唯一可见选项隐式推导 Profile。Task Card 必须提供明确 Profile 选择或经过授权的确定性 Project default；未来 CLI start request 将分别提交两个 ID。
 
 最终 admission 需要顺序完成：锁外读取 Runtime readiness/fence 与 bounded current catalog revision；短事务内设置 tenant/actor、重授权 GroupContext 与 Worktree/Task、锁定并重读 active Profile revision 和 verified effective HookSet、检查 registry/grant revision fence、调用 `ExecutionProfileResolver`，随后将 canonical AgentExecutionProfile document 写入 Run 的 `execution_profile_id/version/digest/snapshot`，并在相同业务事务写 Task/acceptance snapshot、HookSet、Hook ledger 与共享 `tenant_id + event_id` 的 RunEvent，以及由 scheduler 同步预留的资源配额。锁内不得调用网络/CLI/插件；profile/current-catalog envelope 超时、revision drift、授权撤销、quota 不足或任一写入失败均回滚，不创建 Run。Commit 后的一次性 Runtime fence 同时包含 `approved_launch_profile_id/version/digest` 与 `execution_profile_id/version/digest`、Task/Worktree/Runtime/actor/request fingerprint；Runtime spawn 前复验 scope、budget 与两个版本，并消费 fence 一次。
 
-当前代码差距已定位：Task Card `StartTaskCliSessionBody`、readiness/start command 仅含 `approved_launch_profile_id`；request fingerprint 未绑定 AgentExecutionProfile；`record_cli_task_run` 只写 `hook_set_snapshot`，未填 Run 的 Profile 四字段；9E-2 resolver 当前需要调用方提供 current Provider/Skill catalog 与 GrantSnapshot，而仓内尚无这些权威 registry adapter。因此该阶段是设计收口，不宣称 Profile-bound Run admission 已实现。实现顺序为：9E-4C1 request/Profile picker + 带版本的 idempotency fingerprint 和旧 Run replay 兼容；9E-4C2 Provider/Skill/Grant current registry 与短时 revision fence；9E-4C3 resolver + Profile/Task/Hook/RunEvent/BI/resource reservation 原子 writer；9E-4C4 双 Profile identity 的一次性 Runtime spawn fence 与 Task Card/Run Detail 显示。当前没有完整能力时 producer 必须不可用，新 Run 不得创建或 spawn；已有 Run 查询/重放保持可读，不改变其历史快照。Profile 65,536-byte envelope 与 resolver 的 Provider ≤256、Skill ≤4,096 项上限必须在读入前后均强制，避免并行 Run 按大 catalog 复制内存；resolver 继续使用借用式 verified snapshot。
+Phase 9E-4C1 已接入 Task Card 的 AgentExecutionProfile metadata picker，并将独立 `execution_profile_id` 传入 REST body、readiness command 与 CLI session start command。Profile 列表最多读取 50 项；客户端校验 ID、Project/Worktree scope、revision/schema version、digest 格式与重复项；无效列表、读取失败、空列表或存在下一页时均不提供默认 Profile 且不能启动。`approved_launch_profile_id` 与该字段在 UI 中分开选择、分别进入请求幂等键。带 Profile ID 的 request fingerprint 前置 `cli_session_start_v2` 版本标记；缺 Profile 字段的 body 使用 serde 跳过该字段并按原 tuple 编码，保持旧 Run fingerprint replay。
+
+REST 新 Run admission 在任何 readiness/preparation 前要求非空、非 nil 的 `execution_profile_id` 和 `supports_profile_bound_run_admission()`。该 capability 默认 false，且 `run_admission_producer_available` 同时要求 Run admission 与 Profile-bound capability；仓内目前无可证明已接入 authoritative Provider/Skill/Grant resolver 和 transactional Run snapshot writer 的生产 provisioner。因此本 slice 只保证身份请求边界与 fail-closed 保护，不能创建或 spawn 新 Profile-bound Run。既有 Run 状态读取与幂等重放继续兼容。
+
+仍待完成：9E-4C2 Provider/Skill/Grant current registry 与短时 revision fence；9E-4C3 resolver + Profile/Task/Hook/RunEvent/BI/resource reservation 原子 writer；9E-4C4 双 Profile identity 的一次性 Runtime spawn fence 与 Task Card/Run Detail 显示。Profile 65,536-byte envelope 与 resolver 的 Provider ≤256、Skill ≤4,096 项上限必须在读入前后均强制，避免并行 Run 按大 catalog 复制内存；resolver 继续使用借用式 verified snapshot。
 
 ### 14.12 Rust-native Hook 与高级设置导航契约
 
@@ -1015,3 +1019,4 @@ Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高
 | v1.5 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.6 Project/Worktree typed lifecycle POST API、admin auth scope、65,536-byte Profile/67,584-byte request bound、expected-version CAS、publish/disable/reenable/rollback successor 状态机、advisory lock + SCD2 + same-transaction append-only Audit、no-store receipt 和生产集成限制；ULYS-235 Hooks 仍是高级设置内容区并列 tab | Phase 9E-4B2 Profile lifecycle write API 代码切片完成 |
 | v1.6 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.7：在同一授权事务中验证 Project baseline/Worktree overlay 继承，并将 effective policy 映射为 Profile HookSet ID/version/digest；保留 policy-only evaluator wrapper；明确此 seam 不创建 Run、不解析 catalogs、不做资源预约；Hooks 仍位于 Advanced Settings 并列 tab | Phase 9E-4B3 HookSet admission identity adapter 落地 |
 | v1.7 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.8，区分 Approved Launch Profile 与 AgentExecutionProfile，记录当前 CLI Run DTO/fingerprint/writer 的实际缺口，并拆分 Profile picker/idempotency、权威 catalogs、原子 snapshot/reservation writer 与双身份 Runtime fence 四个后续阶段；Hooks 仍是 Advanced Settings 内并列 tab | Run writer 复核发现 Launch Profile 不等同于 AgentExecutionProfile |
+| v1.8 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Phase 9E-4C1 Profile metadata picker、独立 CLI Run identity 输入、50 项上限与无 fallback、versioned request fingerprint 和 legacy replay 兼容；新 Run 仍要求默认关闭的 Profile-bound producer capability；C2-C4 与生产 Run/Profile snapshot writer、resource reservation、Runtime fence 保持开放；Hooks 沿用 ULYS-235 Advanced Settings 并列 tab | 将已实现的 Profile 选择/幂等身份 seam 与 fail-closed 限制同步入详细设计 |

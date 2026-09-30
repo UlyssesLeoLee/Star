@@ -521,6 +521,20 @@ export interface TaskCliSessionPage {
   sessions: TaskCliSessionStatus[];
 }
 
+export interface WorktreeExecutionProfileSummary {
+  profile_id: string;
+  scope_kind: "project" | "worktree";
+  worktree_id: string | null;
+  profile_version: number;
+  schema_version: number;
+  content_digest: string;
+}
+
+export interface WorktreeExecutionProfilePage {
+  profiles: WorktreeExecutionProfileSummary[];
+  next_cursor: string | null;
+}
+
 export interface TaskRunSummary {
   run_id: string;
   worktree_id: string | null;
@@ -851,6 +865,7 @@ export class WorktreeGroupApiClient {
       expected_lifecycle_version: number;
       approved_launch_profile_id: string;
       correlation_id: string;
+      execution_profile_id: string;
     },
     idempotencyKey: string,
   ): Promise<TaskCliSessionReceipt> {
@@ -861,6 +876,17 @@ export class WorktreeGroupApiClient {
         headers: { "Idempotency-Key": idempotencyKey },
         body: JSON.stringify(body),
       },
+    );
+  }
+
+  listExecutionProfiles(worktreeId: string, limit = 50): Promise<WorktreeExecutionProfilePage> {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+      throw new GroupApiError(400, "invalid_request", "Execution Profile list limit must be between 1 and 50.");
+    }
+    const query = new URLSearchParams({ limit: String(limit) });
+    return this.request(
+      `/api/v1/worktrees/${encodeURIComponent(worktreeId)}/execution-profiles?${query.toString()}`,
+      { cache: "no-store" },
     );
   }
 
@@ -1316,4 +1342,18 @@ CREATE (summaryGroup:Class {name:"HookExecutionSummaryGroup",type:"interface",la
 CREATE (file)-[:CONTAINS]->(summaryGroup),(file)-[:CONTAINS]->(summary),
        (client)-[:HAS_METHOD]->(getSummary),(getSummary)-[:CALLS]->(request),
        (summary)-[:CONTAINS]->(summaryGroup),(summary)-[:CONTAINS]->(summaryCoverage);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
+      (client:Class {name:"WorktreeGroupApiClient"}),
+      (request:Function {name:"WorktreeGroupApiClient.request"}),
+      (startCli:Function {name:"WorktreeGroupApiClient.startTaskCliSession"});
+CREATE (profileSummary:Class {name:"WorktreeExecutionProfileSummary",type:"interface",language:"typescript",visibility:"public"}),
+       (profilePage:Class {name:"WorktreeExecutionProfilePage",type:"interface",language:"typescript",visibility:"public"}),
+       (listProfiles:Function {name:"WorktreeGroupApiClient.listExecutionProfiles",type:"function",language:"typescript",visibility:"public",complexity:"simple"}),
+       (executionProfileId:Variable {name:"execution_profile_id",type:"variable",language:"typescript"});
+CREATE (file)-[:CONTAINS]->(profileSummary),(file)-[:CONTAINS]->(profilePage),
+       (client)-[:HAS_METHOD]->(listProfiles),(listProfiles)-[:CALLS]->(request),
+       (profilePage)-[:CONTAINS]->(profileSummary),(startCli)-[:USES]->(executionProfileId);
 */
