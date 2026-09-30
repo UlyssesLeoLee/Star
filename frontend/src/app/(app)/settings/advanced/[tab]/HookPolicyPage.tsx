@@ -42,6 +42,7 @@ import {
   type HookDecision,
   type HookExecutionEvent,
   type HookExecutionEventPage,
+  type HookExecutionSummary,
   type HookFactField,
   type HookOperator,
   type HookPolicyDocument,
@@ -372,11 +373,18 @@ export default function HookPolicyPage() {
 function HookExecutionEventPanel({ api, projectId }: { api: WorktreeGroupApiClient; projectId: string }) {
   const [page, setPage] = useState<HookExecutionEventPage | null>(null);
   const [pageProjectId, setPageProjectId] = useState("");
+  const [summary, setSummary] = useState<HookExecutionSummary | null>(null);
+  const [summaryProjectId, setSummaryProjectId] = useState("");
+  const [summaryClient, setSummaryClient] = useState<WorktreeGroupApiClient | null>(null);
+  const [summaryWindowDays, setSummaryWindowDays] = useState<7 | 30 | 90>(30);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const [error, setError] = useState("");
+  const [summaryError, setSummaryError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const requestGeneration = useRef(0);
+  const summaryRequestGeneration = useRef(0);
 
   useEffect(() => {
     const generation = ++requestGeneration.current;
@@ -402,6 +410,32 @@ function HookExecutionEventPanel({ api, projectId }: { api: WorktreeGroupApiClie
     return () => { requestGeneration.current += 1; };
   }, [api, projectId, refreshKey]);
 
+  useEffect(() => {
+    const generation = ++summaryRequestGeneration.current;
+    setSummary(null);
+    setSummaryProjectId("");
+    setSummaryClient(null);
+    setSummaryError("");
+    if (!projectId) {
+      setSummaryLoading(false);
+      return () => { summaryRequestGeneration.current += 1; };
+    }
+
+    setSummaryLoading(true);
+    api.getHookExecutionSummary(projectId, summaryWindowDays).then((result) => {
+      if (summaryRequestGeneration.current !== generation) return;
+      setSummary(result);
+      setSummaryProjectId(projectId);
+      setSummaryClient(api);
+    }).catch((cause: unknown) => {
+      if (summaryRequestGeneration.current === generation) setSummaryError(formatError(cause));
+    }).finally(() => {
+      if (summaryRequestGeneration.current === generation) setSummaryLoading(false);
+    });
+
+    return () => { summaryRequestGeneration.current += 1; };
+  }, [api, projectId, refreshKey, summaryWindowDays]);
+
   const loadMore = async () => {
     const cursor = pageProjectId === projectId ? page?.next_cursor : null;
     if (!projectId || !cursor || loadingMore || (page?.events.length ?? 0) >= MAX_VISIBLE_HOOK_EVENTS) return;
@@ -424,6 +458,7 @@ function HookExecutionEventPanel({ api, projectId }: { api: WorktreeGroupApiClie
   const visiblePage = pageProjectId === projectId ? page : null;
   const coverage = visiblePage?.coverage;
   const events: HookExecutionEvent[] = visiblePage?.events ?? [];
+  const visibleSummary = summaryProjectId === projectId && summaryClient === api ? summary : null;
 
   return (
     <section className="card space-y-3 p-4" aria-label="Hook 执行事件" data-testid="hook-execution-events">
@@ -432,8 +467,46 @@ function HookExecutionEventPanel({ api, projectId }: { api: WorktreeGroupApiClie
           <h3 className="flex items-center gap-1.5 text-sm font-semibold text-ink"><FileClock size={14} />Hook 执行事件</h3>
           <p className="mt-1 text-[11px] text-ink-dim">按 Project 授权读取追加式事件账本；此处与策略配置审计分开。每页 30 条，最多在页面保留 300 条。</p>
         </div>
-        <button type="button" onClick={() => setRefreshKey((value) => value + 1)} disabled={!projectId || loading} className="btn-secondary text-xs">刷新事件</button>
+        <button type="button" onClick={() => setRefreshKey((value) => value + 1)} disabled={!projectId || loading || summaryLoading} className="btn-secondary text-xs">刷新摘要与事件</button>
       </header>
+
+      <section className="rounded border border-line p-3" aria-label="Hook 执行概览" data-testid="hook-execution-summary">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h4 className="text-xs font-semibold text-ink">Hook 执行概览</h4>
+            <p className="mt-1 text-[10px] text-ink-mute">指标版本 hook_execution_summary_v1；只汇总已记录事件，不推断未接入阶段。</p>
+          </div>
+          <label className="text-[10px] text-ink-dim">统计窗口
+            <select aria-label="Hook 汇总统计窗口" value={summaryWindowDays} onChange={(event) => setSummaryWindowDays(Number(event.target.value) as 7 | 30 | 90)} className="ml-2 rounded border border-line bg-bg-soft px-2 py-1 text-ink">
+              <option value={7}>近 7 天</option><option value={30}>近 30 天</option><option value={90}>近 90 天</option>
+            </select>
+          </label>
+        </header>
+
+        {summaryLoading && <p className="mt-3 text-xs text-ink-mute">正在读取 Hook 汇总…</p>}
+        {!projectId && <p className="mt-3 text-xs text-ink-mute">选择 Project 后读取其授权汇总。</p>}
+        {summaryError && <p role="alert" className="mt-3 rounded border border-red-500/40 bg-red-500/5 px-3 py-2 text-xs text-red-600">汇总读取失败：{summaryError}</p>}
+        {visibleSummary && <>
+          <dl className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
+            <div className="rounded bg-bg-soft px-3 py-2"><dt className="text-[10px] text-ink-mute">账本观察事件</dt><dd className="mt-1 text-lg font-semibold text-ink">{visibleSummary.observed_event_count.toLocaleString()}</dd></div>
+            <div className="rounded bg-bg-soft px-3 py-2"><dt className="text-[10px] text-ink-mute">账本携带 Run ID</dt><dd className="mt-1 text-lg font-semibold text-ink">{visibleSummary.run_linked_event_count.toLocaleString()}</dd></div>
+            <div className="rounded bg-bg-soft px-3 py-2"><dt className="text-[10px] text-ink-mute">超时事件</dt><dd className="mt-1 text-lg font-semibold text-ink">{visibleSummary.timeout_count.toLocaleString()}</dd></div>
+            <div className="rounded bg-bg-soft px-3 py-2"><dt className="text-[10px] text-ink-mute">总评估时长</dt><dd className="mt-1 text-lg font-semibold text-ink">{visibleSummary.duration_total_ms.toLocaleString()} ms</dd></div>
+          </dl>
+          <div className="mt-3 rounded border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-[10px] text-amber-800" role="status" data-testid="hook-summary-coverage">
+            覆盖：{visibleSummary.coverage.status === "partial" ? "部分接入" : visibleSummary.coverage.status === "complete" ? "完整" : "未知"}；已接入 {visibleSummary.coverage.instrumented_phases.join("、") || "无"}。未接入阶段按未知处理。Run outcome 关联：{visibleSummary.coverage.run_outcome_join === "not_available" ? "尚未接入" : visibleSummary.coverage.run_outcome_join}。
+          </div>
+          {visibleSummary.groups.length > 0 && <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-[10px]" aria-label="Hook 汇总分组">
+              <thead><tr className="border-b border-line text-ink-mute"><th className="py-1 pr-3">阶段</th><th className="py-1 pr-3">决策</th><th className="py-1 pr-3">事件数</th><th className="py-1 pr-3">超时</th><th className="py-1 pr-3">平均时长</th><th className="py-1">最近事件</th></tr></thead>
+              <tbody>{visibleSummary.groups.map((group) => <tr key={`${group.hook_phase}:${group.hook_decision}`} className="border-b border-line/60 text-ink-dim">
+                <td className="py-1.5 pr-3">{group.hook_phase}</td><td className="py-1.5 pr-3">{hookEventDecisionLabel(group.hook_decision)}</td><td className="py-1.5 pr-3">{group.event_count.toLocaleString()}</td><td className="py-1.5 pr-3">{group.timeout_count.toLocaleString()}</td><td className="py-1.5 pr-3">{group.average_duration_ms.toFixed(1)} ms</td><td className="py-1.5">{new Date(group.latest_occurred_at).toLocaleString()}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>}
+          {visibleSummary.groups.length === 0 && <p className="mt-3 text-[10px] text-ink-mute">此窗口内，当前已接入事件账本没有可汇总记录；其他 Hook 阶段仍未知。</p>}
+        </>}
+      </section>
 
       {coverage && <div className={`rounded border p-3 text-xs ${coverage.status === "complete" ? "border-emerald-500/40 bg-emerald-500/5 text-emerald-800" : "border-amber-500/40 bg-amber-500/5 text-amber-800"}`} role="status" data-testid="hook-event-coverage">
         <div className="flex flex-wrap items-center gap-2 font-medium"><span>覆盖状态：{coverage.status === "partial" ? "部分接入" : coverage.status === "complete" ? "完整" : "未知"}</span><span className="rounded border border-amber-700/20 px-1.5 py-0.5">{coverage.reported_percentage === null ? "覆盖比例未知" : `${coverage.reported_percentage}%`}</span></div>
@@ -616,8 +689,27 @@ function ruleKey(rule: HookRule): string {
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM
 MATCH (executionPanel:Function {name:"HookExecutionEventPanel",type:"function"}),
-      (listHookEvents:Function {name:"WorktreeGroupApiClient.listHookEvents",type:"function"});
-CREATE (executionPanel)-[:CALLS]->(listHookEvents);
+      (listHookEvents:Function {name:"WorktreeGroupApiClient.listHookEvents",type:"function"}),
+      (getSummary:Function {name:"WorktreeGroupApiClient.getHookExecutionSummary",type:"function"});
+CREATE (executionPanel)-[:CALLS]->(listHookEvents),(executionPanel)-[:CALLS]->(getSummary);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx"}),
+      (executionPanel:Function {name:"HookExecutionEventPanel",type:"function"});
+CREATE (summaryState:Variable {name:"summary",type:"variable",language:"typescript"}),
+       (summaryProject:Variable {name:"summaryProjectId",type:"variable",language:"typescript"}),
+       (summaryClient:Variable {name:"summaryClient",type:"variable",language:"typescript"}),
+       (summaryWindow:Variable {name:"summaryWindowDays",type:"variable",language:"typescript"}),
+       (summaryLoading:Variable {name:"summaryLoading",type:"variable",language:"typescript"}),
+       (summaryError:Variable {name:"summaryError",type:"variable",language:"typescript"}),
+       (summaryGeneration:Variable {name:"summaryRequestGeneration",type:"variable",language:"typescript"});
+CREATE (file)-[:CONTAINS]->(summaryState),(file)-[:CONTAINS]->(summaryProject),
+       (file)-[:CONTAINS]->(summaryClient),(file)-[:CONTAINS]->(summaryWindow),(file)-[:CONTAINS]->(summaryLoading),
+       (file)-[:CONTAINS]->(summaryError),(file)-[:CONTAINS]->(summaryGeneration),
+       (executionPanel)-[:USES]->(summaryState),(executionPanel)-[:USES]->(summaryProject),(executionPanel)-[:USES]->(summaryClient),
+       (executionPanel)-[:USES]->(summaryWindow),(executionPanel)-[:USES]->(summaryLoading),
+       (executionPanel)-[:USES]->(summaryError),(executionPanel)-[:USES]->(summaryGeneration);
 */
 
 function uuidToBytes(uuid: string): number[] {

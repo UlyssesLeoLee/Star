@@ -1,13 +1,13 @@
 # SRS-MULTICA-HOOK-001
 
-> **Multica Hook 域要件定义书 v0.5.2** (沿用 Advanced Settings Hooks tab；明确可视化 Builder 的策略/审计 API contract 与 Phase 9C 实装边界。v0.1-v0.4 的 Python/Mavis handler 设计保留作历史兼容参考，不再作为安全关键执行核心)
+> **Multica Hook 域要件定义书 v0.5.3** (沿用 Advanced Settings Hooks tab；规定 Phase 9D source-only summary 在同一标签中呈现 partial/unknown coverage，不冒充完整 BI。v0.1-v0.4 的 Python/Mavis handler 设计保留作历史兼容参考，不再作为安全关键执行核心)
 
-> - 状态: 🟡 Draft v0.5.2 (2026-10-01 JST，Phase 9C Advanced Settings route and policy UI contract)
+> - 状态: 🟡 Draft v0.5.3 (2026-10-01 JST，Phase 9D bounded summary consumer contract)
 > - 目标阶段: 要件定義 → 基本設計 → 詳細設計 → 実装
 > - 关联 issue: ULYS-235 ("hook需求")
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联基本設計書: [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) v0.5.2
-> - 关联詳細設計書: [`docs/detailed-design/DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.7
+> - 关联基本設計書: [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) v0.5.5
+> - 关联詳細設計書: [`docs/detailed-design/DD-MULTICA-HOOK-001.md`](../detailed-design/DD-MULTICA-HOOK-001.md) v0.5.11
 > - 平行 SRS: [`docs/requirements/SRS-MULTICA-SKILL-001.md`](../requirements/SRS-MULTICA-SKILL-001.md) v0.1 (skills 域)
 > - 关联 ADR: [`docs/adr/0026-multica-patterns-borrow.md`](../adr/0026-multica-patterns-borrow.md) v0.2 §1.3 5 类扩展点 (commands / agents / skills / hooks / MCP)
 > - 拍板来源: 2026-09-24 20:xx JST Ulysses "我需要有hooks功能，可以和skills合并成同一个导航里不同标签页，这个可以叫高级设置。给我需求文档、基本设计、详细设计"
@@ -370,14 +370,14 @@ Rust 核心可执行 phase 以 §1.6 明列的 Run/tool/validation/review/Worktr
 **FR-6.3** 策略 Audit 与执行事件区分
 
 - Phase 9C 右侧列表来源为 Hook policy API 的 append-only 配置 Audit；不能将配置变更称作 Hook execution log。
-- RunEvent/outbox execution events、失败和 coverage 的过滤/下钻属于 Phase 9D；接入后由 Project Quality & Improvement / Run Detail 深链回 Advanced Settings Hooks。
+- RunEvent/outbox execution events、失败和 coverage 的过滤/下钻属于 Phase 9D；当前 summary API/UI 只读归档事件账本，窗口为 1–90 天并按 phase/decision 返回 `hook_execution_summary_v1`，不能表示 RunEvent join、Run outcome 或完整 Project BI。完整结果接入后由 Project Quality & Improvement / Run Detail 深链回 Advanced Settings Hooks。
 - 读接口不可用时展示明确错误/unknown，不把空列表解释为零次触发，也不回退 Python JSONL 文件。
 
 ### FR-7 跟 skills 域协调 (2 项, P1)
 
 **FR-7.1** 同导航不同标签页
 
-- 主侧栏提供“高级设置”父入口，进入 `/settings/advanced` 后显示 `Skills`、`Hooks`、`MCP`、`Plugins` 四个并列选项卡；默认进入 `/settings/advanced/hooks`。
+- Settings 主侧栏只提供“高级设置”父入口；进入 `/settings/advanced` 后，在页面内容区显示 `Skills`、`Hooks`、`MCP`、`Plugins` 四个并列的局部选项卡导航条；默认进入 `/settings/advanced/hooks`。该标签条沿用 ULYS-235，不能变成 Worktree 主导航节点或独立侧栏入口。
 - Hooks 不成为独立主导航项，也不插入 Project→Worktree→Group Apps 树；Worktree Index 只显示当前 effective policy/version/health 与阻断摘要，并深链到同一个 Hooks tab。
 - 各 tab 分别遵循其领域 SRS 与授权 API：Skills registry、Hook policy、MCP connection 和 Plugin manifest/grant 不共享数据所有权，也不互相授予权限。
 - 只有非敏感的显示状态（当前 tab、筛选器和 Project/Worktree scope）可在高级设置页间保留；认证身份、授权事实、策略快照与凭据必须由当前 session/server 重新解析，不可跨 session 复制。
@@ -507,7 +507,7 @@ Rust 核心可执行 phase 以 §1.6 明列的 Run/tool/validation/review/Worktr
 | **AC-4** | FR-3.2 + FR-7.1 | Navigation contract test 验证 Settings 侧栏为“高级设置”父入口，Hooks 与 Skills/MCP/Plugins 并列且路径固定 | 四个 tab route 100% 匹配；Hooks 不出现为 Worktree App |
 | **AC-5** | FR-4.3 + FR-4.4 | REST/API tests 覆盖权限/RLS、Draft CAS/TTL、publish/rollback Audit、冲突和错误时的 fail-closed 行为 | 全部授权负例拒绝；状态变更有审计事实 |
 | **AC-6** | FR-6.1 + FR-6.2 | UI 集成测试验证 `/settings/advanced/hooks`、scope 选择、typed 条件编辑、Draft CAS 与 admin-gated publish/rollback；无认证 Provider 时不得显示 seed policy 或发送写请求 | 100% |
-| **AC-7** | FR-6.3 + NFR-O-4 | 9C 验证配置 Audit 与执行日志明确分开；9D 验证 RunEvent/outbox 查询、覆盖率与授权下钻 | 100% |
+| **AC-7** | FR-6.3 + NFR-O-4 | 9C 验证配置 Audit 与执行日志明确分开；9D 验证有界 summary 窗口/公式/partial coverage 呈现，并验证 RunEvent/outbox 查询、Run outcome 与授权下钻在未接入前不冒充完整 BI | 100% |
 | **AC-8** | NFR-S-1 + NFR-S-5 | 渗透测试 (14 事件 × 4 action type × 10 攻击场景) | 0 命中 |
 
 ---
@@ -552,3 +552,4 @@ Rust 核心可执行 phase 以 §1.6 明列的 Run/tool/validation/review/Worktr
 | **v0.5** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 保留 ULYS-235 高级设置同导航不同 tab 决策；增加 Rust builtin typed HookSet、不可关闭 fail-closed 规则、Project/Worktree 继承、视觉无代码 builder、Run/Worktree lifecycle/BI 事件联动；旧 Python handler 降为兼容历史，产品 Hook runtime/UI 仍待实施 | 用户要求 Hook 是原生强约束、与 BI/Worktree 联动、可视配置并指出它属于高级设置 tab |
 | **v0.5.1** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将总需求交叉引用更新到 v5.20；该版本的 Hook 规则和 Advanced Settings 标签页要求未变 | Phase 8B Run requirement 增补后，同步当前总需求基线引用 |
 | **v0.5.2** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | FR-6 改为 Project/Worktree policy Builder 与 typed Audit API；FR-7 明确“高级设置”父入口和并列 tabs，不复制跨 session 授权事实；FR-8/AC 改为 Rust evaluator、policy API 与当前 UI/navigation 验收；更新当前代码文件和认证 Provider 缺口；区分 Phase 9D 执行 RunEvent/BI | Phase 9C 实装 Advanced Settings 导航与 Hooks 策略编辑页，清除旧 registry.json/handler 需求歧义 |
+| **v0.5.3** | 2026-10-01 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 明确 Advanced Settings 内部局部标签条与 Settings 主侧栏父入口的层级；规定 Phase 9D `hook_execution_summary_v1` 只覆盖已记录 archive ledger、明确窗口和 partial/unknown 状态，不得当作 Run outcome join 或完整 BI；更新上/下游设计版本 | Phase 9D summary API/UI consumer 接入既有 ULYS-235 Hooks 标签 |

@@ -409,6 +409,29 @@ export interface HookExecutionEventPage {
   coverage: HookEventCoverage;
 }
 
+export interface HookExecutionSummaryGroup {
+  hook_phase: string;
+  hook_decision: string;
+  event_count: number;
+  run_linked_event_count: number;
+  timeout_count: number;
+  duration_total_ms: number;
+  average_duration_ms: number;
+  latest_occurred_at: string;
+}
+
+export interface HookExecutionSummary {
+  metric_version: "hook_execution_summary_v1";
+  window: { days: number; from: string; to: string };
+  observed_event_count: number;
+  run_linked_event_count: number;
+  timeout_count: number;
+  duration_total_ms: number;
+  groups: HookExecutionSummaryGroup[];
+  coverage: HookEventCoverage & { run_outcome_join: "not_available" | "partial" | "complete" };
+  formulas: Record<string, string | string[]>;
+}
+
 export interface HookPolicyDraftBody {
   expected_draft_version: number;
   expected_current_policy_set_id: string | null;
@@ -644,6 +667,11 @@ export class WorktreeGroupApiClient {
     const serialized = query.toString();
     const suffix = serialized ? `?${serialized}` : "";
     return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/hook-events${suffix}`);
+  }
+
+  getHookExecutionSummary(projectId: string, windowDays = 30): Promise<HookExecutionSummary> {
+    const query = new URLSearchParams({ window_days: String(windowDays) });
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectId)}/hook-events/summary?${query.toString()}`);
   }
 
   getWorktreeHookPolicy(worktreeId: string): Promise<HookPolicyResponse> {
@@ -1255,4 +1283,17 @@ CREATE (hookEvent:Class {name:"HookExecutionEvent",type:"interface",language:"ty
 CREATE (file)-[:CONTAINS]->(hookEvent),(file)-[:CONTAINS]->(hookCoverage),(file)-[:CONTAINS]->(hookEventPage),
        (client)-[:HAS_METHOD]->(listHookEvents),(listHookEvents)-[:CALLS]->(request),
        (hookEventPage)-[:CONTAINS]->(hookEvent),(hookEventPage)-[:CONTAINS]->(hookCoverage);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
+      (client:Class {name:"WorktreeGroupApiClient"}),
+      (request:Function {name:"WorktreeGroupApiClient.request"}),
+      (coverage:Class {name:"HookEventCoverage"});
+CREATE (summaryGroup:Class {name:"HookExecutionSummaryGroup",type:"interface",language:"typescript",visibility:"public"}),
+       (summary:Class {name:"HookExecutionSummary",type:"interface",language:"typescript",visibility:"public"}),
+       (getSummary:Function {name:"WorktreeGroupApiClient.getHookExecutionSummary",type:"function",language:"typescript",visibility:"public",complexity:"simple"});
+CREATE (file)-[:CONTAINS]->(summaryGroup),(file)-[:CONTAINS]->(summary),
+       (client)-[:HAS_METHOD]->(getSummary),(getSummary)-[:CALLS]->(request),
+       (summary)-[:CONTAINS]->(summaryGroup),(summary)-[:CONTAINS]->(coverage);
 */
