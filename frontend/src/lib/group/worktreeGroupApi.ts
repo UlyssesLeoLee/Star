@@ -414,21 +414,35 @@ export interface HookExecutionSummaryGroup {
   hook_decision: string;
   event_count: number;
   run_linked_event_count: number;
+  run_state_joined_event_count: number;
+  run_state_counts: Record<string, number>;
   timeout_count: number;
   duration_total_ms: number;
   average_duration_ms: number;
   latest_occurred_at: string;
 }
 
+export interface HookExecutionSummaryCoverage {
+  scope: "hook_execution_event_and_task_execution_run_event";
+  status: "partial" | "unknown" | "complete";
+  reported_percentage: number | null;
+  instrumented_phases: string[];
+  not_yet_instrumented_phases: string[];
+  run_state_join: "no_samples" | "partial" | "complete";
+  note: string;
+}
+
 export interface HookExecutionSummary {
-  metric_version: "hook_execution_summary_v1";
+  metric_version: "hook_execution_summary_v2";
   window: { days: number; from: string; to: string };
   observed_event_count: number;
   run_linked_event_count: number;
+  run_state_joined_event_count: number;
+  excluded_incomplete_run_event_count: number;
   timeout_count: number;
   duration_total_ms: number;
   groups: HookExecutionSummaryGroup[];
-  coverage: HookEventCoverage & { run_outcome_join: "not_available" | "partial" | "complete" };
+  coverage: HookExecutionSummaryCoverage;
   formulas: Record<string, string | string[]>;
 }
 
@@ -1292,8 +1306,9 @@ MATCH (file:File {name:"frontend/src/lib/group/worktreeGroupApi.ts"}),
       (coverage:Class {name:"HookEventCoverage"});
 CREATE (summaryGroup:Class {name:"HookExecutionSummaryGroup",type:"interface",language:"typescript",visibility:"public"}),
        (summary:Class {name:"HookExecutionSummary",type:"interface",language:"typescript",visibility:"public"}),
+       (summaryCoverage:Class {name:"HookExecutionSummaryCoverage",type:"interface",language:"typescript",visibility:"public"}),
        (getSummary:Function {name:"WorktreeGroupApiClient.getHookExecutionSummary",type:"function",language:"typescript",visibility:"public",complexity:"simple"});
 CREATE (file)-[:CONTAINS]->(summaryGroup),(file)-[:CONTAINS]->(summary),
        (client)-[:HAS_METHOD]->(getSummary),(getSummary)-[:CALLS]->(request),
-       (summary)-[:CONTAINS]->(summaryGroup),(summary)-[:CONTAINS]->(coverage);
+       (summary)-[:CONTAINS]->(summaryGroup),(summary)-[:CONTAINS]->(summaryCoverage);
 */

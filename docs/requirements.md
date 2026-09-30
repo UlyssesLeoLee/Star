@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.20）
+# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.21）
 
 ## 0. 文档说明与前提
 
@@ -2569,6 +2569,8 @@ Worktree 的归档、解绑或物理清理前，Hook 与 Worktree domain command
 
 每次 Hook 评估记录 HookSet/rule/evaluator version/hash、phase、decision/result class、duration、timeout/fail-closed/override、Project/Worktree/Run/Task/actor/correlation scope；不存 Secret、prompt、完整 stdout 或模型隐式推理。人工 override 限定可覆盖等级、角色、理由、期限并审计，核心安全规则不可 override。BI 从 Hook Event/Audit/Worktree/Run/Event 派生版本化 coverage、allow/deny/require-human、timeout/failure、override、阻断/恢复时间，并与 Worktree 冲突、lease/claim、drain/cleanup 故障、验证失败、返工与接受结果关联。unknown coverage 不等于零次触发或零风险；HookSet 改善提案经过独立审批和固定 Benchmark，不能由 Hook 自动降低自己的保护或评分标准。
 
+Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整的 `hook_evaluated` RunEvent 投影，以 `(tenant_id,event_id)` 去重，并以 `(tenant_id,project_id,work_item_id,run_id)` 关联最新 Run 状态；不使用 correlation ID 作为事件身份。缺少 phase/decision/duration/timeout 的 RunEvent 计入排除数据质量计数。摘要窗口限制 1–90 天，coverage 仍按真实 producer 状态报告为 partial/unknown；状态 join 完整不等于 Hook 阶段 coverage 完整，也不等于所有 Run 已达到终态。
+
 | 要求 ID | 要求 | 优先级 |
 |---|---|---|
 | HOOK-001 | Rust 核心原生提供版本化、fail-closed Hook Engine 与不可关闭的 builtin guard；HookSet/规则/evaluator version/hash 固定到 Run 和 Worktree command provenance | P0 |
@@ -2587,6 +2589,7 @@ Worktree 的归档、解绑或物理清理前，Hook 与 Worktree domain command
 | AC-HOOK-004 | 过期 lock observation、活跃 Run/Agent lease/file claim/子进程阻止 Worktree archive/cleanup；drain + 新鲜重检后才允许继续，重复请求不重复执行 |
 | AC-HOOK-005 | BI 可下钻 Hook rule/version → HookRun/Event → Worktree/Run/Evidence/Audit，并报告 coverage、deny、timeout、override、运行成本、返工/接受关联；缺失数据为 unknown |
 | AC-HOOK-006 | Hook Engine 队列、CPU、内存和运行时间有硬上限；配置、plugin 或 worker 故障不造成 UI 阻塞、无界缓存或绕开内置 guard |
+| AC-HOOK-007 | Phase 9D summary v2 对 Hook ledger/RunEvent 镜像按 tenant+event_id 去重，Run state 按完整 tenant/project/task/run 键关联；缺字段记录显式计数，join 状态与 producer/phase coverage 分开呈现 |
 
 ### 50.9 追溯与后续专题同步
 
@@ -2645,3 +2648,4 @@ Worktree 的归档、解绑或物理清理前，Hook 与 Worktree domain command
 | v5.18 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Task Contract/Run/Event/Evidence、Agent 声明与独立验证/人工接受/集成事实分开；增加 Project Quality BI、Benchmark 与可回滚 Improvement Proposal；Phase 8A Run schema/CLI start writer 状态标为条件式、未部署 | 用户引用“AI提升方向”对话，要求将 Run 和 BI 架构融入 Worktree-first 任务 |
 | v5.19 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Rust 桌面多 Agent 资源预算、Schedule/Engineering Loop、版本化 Agent/Memory/Skill/Context/Validation/Profile contract 与 Rust CLI adapter；明确唯一 Automation occurrence source；新增 Rust-native fail-closed Hook、ULYS-235 Advanced Settings Hooks tab、无代码可视化策略、Worktree lifecycle enforcement 与 Run/BI correlation；本版仅定义架构，不把未实现引擎/provider/UI 标为完成 | 用户要求高性能 Rust 多代理、Loop、可扩展 AI 能力和原生/可视 Hook 与 Worktree/BI 联动 |
 | v5.20 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Worktree/Task-scoped Run list/detail 的认证查询契约、稳定游标与 20/50/100 条硬上限；明确状态维度独立投影、响应脱敏边界和 Task Card 内历史 UI。代码切片与隔离 migration 验证不等同于目标数据库部署或生产 RLS 验收 | Phase 8B 已加入 Run read API 与 Task Card 历史面板，需求需同步到可审计的实际接口 |
+| v5.21 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 Phase 9D summary v2 的 Hook ledger/RunEvent 双来源去重、完整 Run 状态关联键、缺失投影计数和 partial/unknown coverage 分离语义；Hooks 仍是 ULYS-235 Advanced Settings 并列 tab | 9D-4 建立双来源 Run-state summary read model，需求同步到可复算 BI contract |

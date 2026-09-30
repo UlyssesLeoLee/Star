@@ -99,26 +99,26 @@
 //! CREATE (m)-[:CONTAINS]->(eventsQuery),(m)-[:CONTAINS]->(eventCursor),(m)-[:CONTAINS]->(eventProjection),(m)-[:CONTAINS]->(listEvents),(m)-[:CONTAINS]->(decodeEventCursor),(m)-[:CONTAINS]->(encodeEventCursor),(rt)-[:CALLS]->(listEvents),(listEvents)-[:CALLS]->(decodeEventCursor),(listEvents)-[:CALLS]->(encodeEventCursor),(listEvents)-[:USES]->(eventProjection),(eventCursor)-[:USES]->(projectKey),(eventCursor)-[:USES]->(occurredKey),(eventCursor)-[:USES]->(eventKey);
 //! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! MATCH (m:Module {name:"hook_policies",type:"module"}),(rt:Function {name:"router",type:"function"});
-//! CREATE (summaryQuery:Class {name:"HookSummaryQuery",type:"class",language:"rust"}),(summaryGroup:Class {name:"HookSummaryGroup",type:"class",language:"rust"}),(summaryDays:Variable {name:"window_days",type:"variable",language:"rust"}),(summary:Function {name:"summarize_hook_events",type:"function",language:"rust",visibility:"private",complexity:"moderate"});
-//! CREATE (m)-[:CONTAINS]->(summaryQuery),(m)-[:CONTAINS]->(summaryGroup),(m)-[:CONTAINS]->(summary),(rt)-[:CALLS]->(summary),(summary)-[:USES]->(summaryGroup),(summaryQuery)-[:USES]->(summaryDays);
+//! CREATE (summaryQuery:Class {name:"HookSummaryQuery",type:"class",language:"rust"}),(summaryGroup:Class {name:"HookSummaryGroup",type:"class",language:"rust"}),(summaryDays:Variable {name:"window_days",type:"variable",language:"rust"}),(summary:Function {name:"summarize_hook_events",type:"function",language:"rust",visibility:"private",complexity:"complex"}),(sourceUnion:Logic {name:"hook_summary_source_union_and_deduplication",type:"logic",language:"sql"}),(runStateJoin:Logic {name:"hook_summary_latest_run_state_join",type:"logic",language:"sql"}),(incompleteProjectionCount:Logic {name:"hook_summary_incomplete_run_projection_count",type:"logic",language:"sql"});
+//! CREATE (m)-[:CONTAINS]->(summaryQuery),(m)-[:CONTAINS]->(summaryGroup),(m)-[:CONTAINS]->(summary),(summary)-[:CONTAINS]->(sourceUnion),(summary)-[:CONTAINS]->(runStateJoin),(summary)-[:CONTAINS]->(incompleteProjectionCount),(rt)-[:CALLS]->(summary),(summary)-[:USES]->(summaryGroup),(summaryQuery)-[:USES]->(summaryDays);
 use axum::{
+    Json, Router,
     body::Bytes,
     extract::{DefaultBodyLimit, Path, Query, State},
     http::header::{CACHE_CONTROL, VARY},
     routing::{get, post, put},
-    Json, Router,
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Duration, Utc};
 use domain_hook::{HookPolicyDocument, MAX_POLICY_DOCUMENT_BYTES};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::{FromRow, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
-    active_binding, require_scope, set_tenant, validate_actor, work_items::authorize_worktree,
-    AuthenticatedUser, GroupApiError, GroupApiState,
+    AuthenticatedUser, GroupApiError, GroupApiState, active_binding, require_scope, set_tenant,
+    validate_actor, work_items::authorize_worktree,
 };
 
 // Each batch holds at most 16 verified 64 KiB policy documents in Rust memory.
@@ -258,6 +258,8 @@ struct HookSummaryGroup {
     hook_decision: String,
     event_count: i64,
     run_linked_event_count: i64,
+    run_state_joined_event_count: i64,
+    run_state_counts: Value,
     timeout_count: i64,
     duration_total_ms: i64,
     average_duration_ms: f64,
@@ -428,24 +430,119 @@ async fn summarize_hook_events(
     )
     .await?;
     let groups = sqlx::query_as::<_, HookSummaryGroup>(
-        r#"SELECT hook_phase, hook_decision,
+        r#"WITH candidate_run_events AS (
+               SELECT event_id, tenant_id, project_id, work_item_id, run_id,
+                      hook_phase, hook_decision, hook_duration_ms, hook_timed_out, occurred_at
+               FROM multica.task_execution_run_event
+               WHERE tenant_id = $1 AND project_id = $2
+                 AND occurred_at >= $3 AND occurred_at < $4
+                 AND event_type = 'hook_evaluated'
+           ), source_events AS (
+               SELECT event_id, tenant_id, project_id, work_item_id, run_id,
+                      hook_phase, hook_decision, duration_ms, timed_out, occurred_at
+               FROM multica.hook_execution_event
+               WHERE tenant_id = $1 AND project_id = $2
+                 AND occurred_at >= $3 AND occurred_at < $4
+               UNION ALL
+               SELECT run_event.event_id, run_event.tenant_id, run_event.project_id,
+                      run_event.work_item_id, run_event.run_id,
+                      run_event.hook_phase, run_event.hook_decision,
+                      run_event.hook_duration_ms AS duration_ms,
+                      run_event.hook_timed_out AS timed_out, run_event.occurred_at
+               FROM candidate_run_events run_event
+               WHERE run_event.hook_phase IS NOT NULL
+                 AND run_event.hook_decision IS NOT NULL
+                 AND run_event.hook_duration_ms IS NOT NULL
+                 AND run_event.hook_timed_out IS NOT NULL
+                 AND NOT EXISTS (
+                     SELECT 1 FROM multica.hook_execution_event ledger_event
+                     WHERE ledger_event.tenant_id = run_event.tenant_id
+                       AND ledger_event.event_id = run_event.event_id
+                 )
+           ), run_keys AS (
+               SELECT DISTINCT tenant_id, project_id, work_item_id, run_id
+               FROM source_events
+               WHERE run_id IS NOT NULL
+           ), run_states AS (
+               SELECT run_key.tenant_id, run_key.project_id, run_key.work_item_id,
+                      run_key.run_id, latest_state.execution_state AS run_state
+               FROM run_keys run_key
+               LEFT JOIN LATERAL (
+                   SELECT run_event_state.execution_state
+                   FROM multica.task_execution_run_event run_event_state
+                   WHERE run_event_state.tenant_id = run_key.tenant_id
+                     AND run_event_state.project_id = run_key.project_id
+                     AND run_event_state.work_item_id = run_key.work_item_id
+                     AND run_event_state.run_id = run_key.run_id
+                     AND run_event_state.execution_state IS NOT NULL
+                   ORDER BY run_event_state.occurred_at DESC, run_event_state.event_id DESC
+                   LIMIT 1
+               ) latest_state ON TRUE
+           ), with_run_state AS (
+               SELECT source_event.*, run_states.run_state
+               FROM source_events source_event
+               LEFT JOIN run_states
+                 ON run_states.tenant_id = source_event.tenant_id
+                AND run_states.project_id = source_event.project_id
+                AND run_states.work_item_id = source_event.work_item_id
+                AND run_states.run_id = source_event.run_id
+           ), run_state_group_counts AS (
+               SELECT hook_phase, hook_decision, COALESCE(run_state, 'unknown') AS run_state,
+                      COUNT(*) AS event_count
+               FROM with_run_state
+               WHERE run_id IS NOT NULL
+               GROUP BY hook_phase, hook_decision, COALESCE(run_state, 'unknown')
+           ), run_state_group_json AS (
+               SELECT hook_phase, hook_decision,
+                      jsonb_object_agg(run_state, event_count) AS run_state_counts
+               FROM run_state_group_counts
+               GROUP BY hook_phase, hook_decision
+           )
+           SELECT source_event.hook_phase, source_event.hook_decision,
                   COUNT(*) AS event_count,
-                  COUNT(*) FILTER (WHERE run_id IS NOT NULL) AS run_linked_event_count,
-                  COUNT(*) FILTER (WHERE timed_out) AS timeout_count,
-                  COALESCE(SUM(duration_ms), 0)::BIGINT AS duration_total_ms,
-                  AVG(duration_ms)::DOUBLE PRECISION AS average_duration_ms,
-                  MAX(occurred_at) AS latest_occurred_at
-           FROM multica.hook_execution_event
-           WHERE tenant_id = $1 AND project_id = $2
-             AND occurred_at >= $3 AND occurred_at < $4
-           GROUP BY hook_phase, hook_decision
-           ORDER BY hook_phase, hook_decision"#,
+                  COUNT(*) FILTER (WHERE source_event.run_id IS NOT NULL) AS run_linked_event_count,
+                  COUNT(*) FILTER (
+                      WHERE source_event.run_id IS NOT NULL AND source_event.run_state IS NOT NULL
+                  ) AS run_state_joined_event_count,
+                  COALESCE(run_state_group_json.run_state_counts, '{}'::JSONB) AS run_state_counts,
+                  COUNT(*) FILTER (WHERE source_event.timed_out) AS timeout_count,
+                  COALESCE(SUM(source_event.duration_ms), 0)::BIGINT AS duration_total_ms,
+                  AVG(source_event.duration_ms)::DOUBLE PRECISION AS average_duration_ms,
+                  MAX(source_event.occurred_at) AS latest_occurred_at
+           FROM with_run_state source_event
+           LEFT JOIN run_state_group_json
+             ON run_state_group_json.hook_phase = source_event.hook_phase
+            AND run_state_group_json.hook_decision = source_event.hook_decision
+           GROUP BY source_event.hook_phase, source_event.hook_decision,
+                    run_state_group_json.run_state_counts
+           ORDER BY source_event.hook_phase, source_event.hook_decision"#,
     )
     .bind(actor.tenant_id)
     .bind(project_id)
     .bind(window_start)
     .bind(window_end)
     .fetch_all(&mut *tx)
+    .await
+    .map_err(|_| GroupApiError::internal())?;
+    let excluded_incomplete_run_event_count = sqlx::query_scalar::<_, i64>(
+        r#"SELECT COUNT(*)
+           FROM multica.task_execution_run_event run_event
+           WHERE run_event.tenant_id = $1 AND run_event.project_id = $2
+             AND run_event.occurred_at >= $3 AND run_event.occurred_at < $4
+             AND run_event.event_type = 'hook_evaluated'
+             AND (run_event.hook_phase IS NULL OR run_event.hook_decision IS NULL
+                  OR run_event.hook_duration_ms IS NULL OR run_event.hook_timed_out IS NULL)
+             AND NOT EXISTS (
+                 SELECT 1 FROM multica.hook_execution_event ledger_event
+                 WHERE ledger_event.tenant_id = run_event.tenant_id
+                   AND ledger_event.event_id = run_event.event_id
+             )"#,
+    )
+    .bind(actor.tenant_id)
+    .bind(project_id)
+    .bind(window_start)
+    .bind(window_end)
+    .fetch_one(&mut *tx)
     .await
     .map_err(|_| GroupApiError::internal())?;
     tx.commit().await.map_err(|_| GroupApiError::internal())?;
@@ -455,13 +552,24 @@ async fn summarize_hook_events(
         .iter()
         .map(|group| group.run_linked_event_count)
         .sum::<i64>();
+    let run_state_joined_event_count = groups
+        .iter()
+        .map(|group| group.run_state_joined_event_count)
+        .sum::<i64>();
+    let run_state_join = if run_linked_event_count == 0 {
+        "no_samples"
+    } else if run_state_joined_event_count == run_linked_event_count {
+        "complete"
+    } else {
+        "partial"
+    };
     let timeout_count = groups.iter().map(|group| group.timeout_count).sum::<i64>();
     let duration_total_ms = groups
         .iter()
         .map(|group| group.duration_total_ms)
         .sum::<i64>();
     let body = json!({
-        "metric_version": "hook_execution_summary_v1",
+        "metric_version": "hook_execution_summary_v2",
         "window": {
             "days": window_days,
             "from": window_start,
@@ -469,24 +577,30 @@ async fn summarize_hook_events(
         },
         "observed_event_count": observed_event_count,
         "run_linked_event_count": run_linked_event_count,
+        "run_state_joined_event_count": run_state_joined_event_count,
+        "excluded_incomplete_run_event_count": excluded_incomplete_run_event_count,
         "timeout_count": timeout_count,
         "duration_total_ms": duration_total_ms,
         "groups": groups,
         "coverage": {
-            "scope": "hook_execution_event_ledger",
+            "scope": "hook_execution_event_and_task_execution_run_event",
             "status": "partial",
             "reported_percentage": Value::Null,
             "instrumented_phases": ["worktree_archive"],
             "not_yet_instrumented_phases": ["run_admission", "tool", "validation", "review", "worktree_cleanup", "after_commit"],
-            "run_outcome_join": "not_available",
-            "note": "Counts cover recorded ledger rows only; missing phases and Run outcomes are unknown, not zero."
+            "run_state_join": run_state_join,
+            "note": "Summary merges complete Hook ledger rows with complete hook_evaluated RunEvent rows by shared event identity; latest Run state is joined by tenant, Project, Task, and Run. Run producers and unobserved phases remain incomplete or unknown."
         },
         "formulas": {
-            "observed_event_count": "COUNT(*) in hook_execution_event for the Project and window",
-            "run_linked_event_count": "COUNT(*) where run_id IS NOT NULL in the same observed rows",
+            "observed_event_count": "COUNT(*) after union and deduplication of Hook ledger and complete hook_evaluated RunEvent projections for the Project and window",
+            "run_linked_event_count": "COUNT(*) where run_id IS NOT NULL in the deduplicated observed rows",
+            "run_state_joined_event_count": "COUNT(*) where run_id IS NOT NULL and a latest execution_state is present for the same tenant, Project, Task, and Run",
+            "excluded_incomplete_run_event_count": "COUNT(*) of unmirrored hook_evaluated RunEvent rows missing phase, decision, duration, or timeout facts",
+            "run_state_counts": "Counts of Run-linked Hook events grouped by each Run's latest known execution_state; missing state is unknown",
             "timeout_count": "COUNT(*) FILTER (WHERE timed_out) in the same observed rows",
             "duration_total_ms": "SUM(duration_ms) in the same observed rows",
-            "grouping": ["hook_phase", "hook_decision"]
+            "grouping": ["hook_phase", "hook_decision"],
+            "deduplication": "RunEvent projections are suppressed when tenant_id and event_id match a Hook ledger row; dual-write producers must reuse the same event_id and occurred_at"
         }
     });
     Ok((
@@ -2009,11 +2123,13 @@ mod tests {
 
     #[test]
     fn hook_event_query_rejects_unknown_fields() {
-        assert!(serde_json::from_value::<HookEventsQuery>(json!({
-            "limit": 25,
-            "offset": 100
-        }))
-        .is_err());
+        assert!(
+            serde_json::from_value::<HookEventsQuery>(json!({
+                "limit": 25,
+                "offset": 100
+            }))
+            .is_err()
+        );
     }
 
     fn policy_document(

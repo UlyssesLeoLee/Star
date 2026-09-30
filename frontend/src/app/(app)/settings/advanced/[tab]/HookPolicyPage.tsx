@@ -474,7 +474,7 @@ function HookExecutionEventPanel({ api, projectId }: { api: WorktreeGroupApiClie
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h4 className="text-xs font-semibold text-ink">Hook 执行概览</h4>
-            <p className="mt-1 text-[10px] text-ink-mute">指标版本 hook_execution_summary_v1；只汇总已记录事件，不推断未接入阶段。</p>
+            <p className="mt-1 text-[10px] text-ink-mute">指标版本 hook_execution_summary_v2；合并 Hook 账本与完整 RunEvent 投影，按 tenant + event_id 去重。</p>
           </div>
           <label className="text-[10px] text-ink-dim">统计窗口
             <select aria-label="Hook 汇总统计窗口" value={summaryWindowDays} onChange={(event) => setSummaryWindowDays(Number(event.target.value) as 7 | 30 | 90)} className="ml-2 rounded border border-line bg-bg-soft px-2 py-1 text-ink">
@@ -487,20 +487,23 @@ function HookExecutionEventPanel({ api, projectId }: { api: WorktreeGroupApiClie
         {!projectId && <p className="mt-3 text-xs text-ink-mute">选择 Project 后读取其授权汇总。</p>}
         {summaryError && <p role="alert" className="mt-3 rounded border border-red-500/40 bg-red-500/5 px-3 py-2 text-xs text-red-600">汇总读取失败：{summaryError}</p>}
         {visibleSummary && <>
-          <dl className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
-            <div className="rounded bg-bg-soft px-3 py-2"><dt className="text-[10px] text-ink-mute">账本观察事件</dt><dd className="mt-1 text-lg font-semibold text-ink">{visibleSummary.observed_event_count.toLocaleString()}</dd></div>
-            <div className="rounded bg-bg-soft px-3 py-2"><dt className="text-[10px] text-ink-mute">账本携带 Run ID</dt><dd className="mt-1 text-lg font-semibold text-ink">{visibleSummary.run_linked_event_count.toLocaleString()}</dd></div>
+          <dl className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-6">
+            <div className="rounded bg-bg-soft px-3 py-2"><dt className="text-[10px] text-ink-mute">观察到的 Hook 事件</dt><dd className="mt-1 text-lg font-semibold text-ink">{visibleSummary.observed_event_count.toLocaleString()}</dd></div>
+            <div className="rounded bg-bg-soft px-3 py-2"><dt className="text-[10px] text-ink-mute">Run-linked Hook 事件</dt><dd className="mt-1 text-lg font-semibold text-ink">{visibleSummary.run_linked_event_count.toLocaleString()}</dd></div>
+            <div className="rounded bg-bg-soft px-3 py-2"><dt className="text-[10px] text-ink-mute">已关联 Run 状态</dt><dd className="mt-1 text-lg font-semibold text-ink">{visibleSummary.run_state_joined_event_count.toLocaleString()}</dd></div>
             <div className="rounded bg-bg-soft px-3 py-2"><dt className="text-[10px] text-ink-mute">超时事件</dt><dd className="mt-1 text-lg font-semibold text-ink">{visibleSummary.timeout_count.toLocaleString()}</dd></div>
             <div className="rounded bg-bg-soft px-3 py-2"><dt className="text-[10px] text-ink-mute">总评估时长</dt><dd className="mt-1 text-lg font-semibold text-ink">{visibleSummary.duration_total_ms.toLocaleString()} ms</dd></div>
+            <div className="rounded bg-bg-soft px-3 py-2"><dt className="text-[10px] text-ink-mute">不完整 RunEvent</dt><dd className="mt-1 text-lg font-semibold text-ink">{visibleSummary.excluded_incomplete_run_event_count.toLocaleString()}</dd></div>
           </dl>
           <div className="mt-3 rounded border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-[10px] text-amber-800" role="status" data-testid="hook-summary-coverage">
-            覆盖：{visibleSummary.coverage.status === "partial" ? "部分接入" : visibleSummary.coverage.status === "complete" ? "完整" : "未知"}；已接入 {visibleSummary.coverage.instrumented_phases.join("、") || "无"}。未接入阶段按未知处理。Run outcome 关联：{visibleSummary.coverage.run_outcome_join === "not_available" ? "尚未接入" : visibleSummary.coverage.run_outcome_join}。
+            覆盖：{visibleSummary.coverage.status === "partial" ? "部分接入" : visibleSummary.coverage.status === "complete" ? "完整" : "未知"}；已接入 {visibleSummary.coverage.instrumented_phases.join("、") || "无"}。未接入阶段按未知处理。Run 状态关联：{visibleSummary.coverage.run_state_join === "no_samples" ? "暂无关联样本" : visibleSummary.coverage.run_state_join === "complete" ? "观测样本均已关联" : "部分样本已关联"}。状态为当前最新 Run 状态，running/starting 尚非最终结果。
           </div>
+          {visibleSummary.excluded_incomplete_run_event_count > 0 && <p className="mt-2 text-[10px] text-amber-800">有 {visibleSummary.excluded_incomplete_run_event_count} 条 RunEvent 缺少 phase、decision、duration 或 timeout 投影，未计入指标。</p>}
           {visibleSummary.groups.length > 0 && <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-[10px]" aria-label="Hook 汇总分组">
-              <thead><tr className="border-b border-line text-ink-mute"><th className="py-1 pr-3">阶段</th><th className="py-1 pr-3">决策</th><th className="py-1 pr-3">事件数</th><th className="py-1 pr-3">超时</th><th className="py-1 pr-3">平均时长</th><th className="py-1">最近事件</th></tr></thead>
+            <table className="w-full min-w-[720px] text-left text-[10px]" aria-label="Hook 汇总分组">
+              <thead><tr className="border-b border-line text-ink-mute"><th className="py-1 pr-3">阶段</th><th className="py-1 pr-3">决策</th><th className="py-1 pr-3">事件数</th><th className="py-1 pr-3">超时</th><th className="py-1 pr-3">平均时长</th><th className="py-1 pr-3">Run 状态计数</th><th className="py-1">最近事件</th></tr></thead>
               <tbody>{visibleSummary.groups.map((group) => <tr key={`${group.hook_phase}:${group.hook_decision}`} className="border-b border-line/60 text-ink-dim">
-                <td className="py-1.5 pr-3">{group.hook_phase}</td><td className="py-1.5 pr-3">{hookEventDecisionLabel(group.hook_decision)}</td><td className="py-1.5 pr-3">{group.event_count.toLocaleString()}</td><td className="py-1.5 pr-3">{group.timeout_count.toLocaleString()}</td><td className="py-1.5 pr-3">{group.average_duration_ms.toFixed(1)} ms</td><td className="py-1.5">{new Date(group.latest_occurred_at).toLocaleString()}</td>
+                <td className="py-1.5 pr-3">{group.hook_phase}</td><td className="py-1.5 pr-3">{hookEventDecisionLabel(group.hook_decision)}</td><td className="py-1.5 pr-3">{group.event_count.toLocaleString()}</td><td className="py-1.5 pr-3">{group.timeout_count.toLocaleString()}</td><td className="py-1.5 pr-3">{group.average_duration_ms.toFixed(1)} ms</td><td className="py-1.5 pr-3">{formatRunStateCounts(group.run_state_counts)}</td><td className="py-1.5">{new Date(group.latest_occurred_at).toLocaleString()}</td>
               </tr>)}</tbody>
             </table>
           </div>}
@@ -546,6 +549,14 @@ function hookEventDecisionLabel(decision: string): string {
   if (decision === "require_human") return "需要人工审批";
   if (decision === "defer") return "等待条件";
   return `未知决策 (${decision})`;
+}
+
+function formatRunStateEntry([state, count]: [string, number]): string {
+  return `${state} ${count}`;
+}
+
+function formatRunStateCounts(counts: Record<string, number>): string {
+  return Object.entries(counts).map(formatRunStateEntry).join(" / ") || "—";
 }
 
 function HookRuleEditor({ rule, disabled, onChange, onDelete }: {
@@ -692,6 +703,26 @@ MATCH (executionPanel:Function {name:"HookExecutionEventPanel",type:"function"})
       (listHookEvents:Function {name:"WorktreeGroupApiClient.listHookEvents",type:"function"}),
       (getSummary:Function {name:"WorktreeGroupApiClient.getHookExecutionSummary",type:"function"});
 CREATE (executionPanel)-[:CALLS]->(listHookEvents),(executionPanel)-[:CALLS]->(getSummary);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (panel:Function {name:"HookExecutionEventPanel",type:"function"}),
+      (summary:Class {name:"HookExecutionSummary",type:"interface"});
+CREATE (panel)-[:USES]->(summary);
+*/
+
+/* CYPHER STRUCTURE MANIFEST ADDENDUM
+MATCH (file:File {name:"frontend/src/app/(app)/settings/advanced/[tab]/HookPolicyPage.tsx"}),
+      (panel:Function {name:"HookExecutionEventPanel",type:"function"});
+CREATE (formatEntry:Function {name:"formatRunStateEntry",type:"function",signature:"formatRunStateEntry([state,count])",visibility:"private",complexity:"simple"}),
+       (formatCounts:Function {name:"formatRunStateCounts",type:"function",signature:"formatRunStateCounts(counts)",visibility:"private",complexity:"simple"}),
+       (objectEntries:Function {name:"Object.entries",type:"function",signature:"Object.entries(counts)",visibility:"public",complexity:"simple"}),
+       (arrayMap:Function {name:"Array.map",type:"function",signature:"entries.map(formatRunStateEntry)",visibility:"public",complexity:"simple"}),
+       (arrayJoin:Function {name:"Array.join",type:"function",signature:"entries.join(separator)",visibility:"public",complexity:"simple"});
+CREATE (file)-[:CONTAINS]->(formatEntry),(file)-[:CONTAINS]->(formatCounts),
+       (panel)-[:CALLS]->(formatCounts),(formatCounts)-[:CALLS]->(objectEntries),
+       (formatCounts)-[:CALLS]->(arrayMap),(arrayMap)-[:CALLS]->(formatEntry),
+       (formatCounts)-[:CALLS]->(arrayJoin);
 */
 
 /* CYPHER STRUCTURE MANIFEST ADDENDUM

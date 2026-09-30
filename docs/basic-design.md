@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.15 (2026-10-01)
-> **上游要件定义书**: docs/requirements.md v5.20(下文以 §N 引用)
+> **文档版本**: v5.17 (2026-10-01)
+> **上游要件定义书**: docs/requirements.md v5.21(下文以 §N 引用)
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -4666,7 +4666,7 @@ Hook phase 覆盖 Run admission、before/after tool、before/after validation、
 
 Hook evaluation event 固定 `hook_set/rule/evaluator version + digest`、phase/decision/reason class/duration/timeout/fail-closed/override、actor/project/worktree/run/task/correlation IDs；不记录 Secret/prompt/原始 stdout/chain-of-thought。可覆盖规则的人工 override 限定角色、理由、期限并审计，核心安全规则不可 override。BI 派生 Hook coverage、deny/require-human、timeout/failure、override、阻断和恢复时间，并跟 Worktree lock/lease/claim/drain、cleanup 故障、Validation、返工、接受结果做版本化 cohort 关联；event 缺失标 unknown。HookSet 改进通过固定 Benchmark 与独立审批，禁止规则自动放宽自身限制。
 
-Phase 9D 的首个实现切片增加 `multica.hook_execution_event`（Transaction / append-only）保存不依赖 Run 的 Worktree archive Hook evaluation；Run-linked execution event 继续写 `multica.task_execution_run_event`，其 Task/Run FK 不可绕过。两个来源在 BI 层按稳定的 Hook scope/version/phase/decision/correlation 字段联合读取，不以虚构的 `hook_blocked` / `hook_timeout` event type 写入 RunEvent。当前 Worktree producer 与 `GET /api/v1/projects/{project_id}/hook-events` keyset API 只覆盖 `worktree_archive`；响应给出 `partial`、百分比 `null` 和未接入 phase，unknown 不得折算为零。Hooks 页面事件面板每页 30 条且最多驻留 300 条；同一 Advanced Settings Hooks 标签现可读 `hook_execution_summary_v1`，选择 7/30/90 天窗口，按 phase/decision 展示 archive ledger 汇总并注明 Run outcome join 未接入。该 summary 不是完整 Project BI。目标环境认证 Provider、migration/grants/RLS、Run/tool/validation/review producers、Outbox delivery state、聚合 BI read model、Run Detail/Quality & Improvement 下钻仍开放。插入失败时归档事务 fail closed，敏感正文不进入事件投影。
+Phase 9D 的首个实现切片增加 `multica.hook_execution_event`（Transaction / append-only）保存不依赖 Run 的 Worktree archive Hook evaluation；Run-linked execution event 继续写 `multica.task_execution_run_event`，其 Task/Run FK 不可绕过。`hook_execution_summary_v2` 在 1–90 天 Project 窗口内联合两个来源，完整 RunEvent projection 与 ledger 镜像使用相同 `tenant_id + event_id` 去重；最新 Run 状态只用完整 tenant/project/work_item/run 键关联，不用 correlation ID 作为身份。缺少 phase/decision/duration/timeout 的未镜像 RunEvent 显示为排除计数。`run_state_join` 的 complete 仅表示观测到的 Run-linked Hook 行均找到最新状态，不代表 Run 已终态或 Hook coverage 全面。当前已验收的 producer 仍只覆盖 `worktree_archive`；响应维持 `partial`、百分比 `null`，未接入 phase 为 unknown。Hooks 页面事件面板每页 30 条且最多驻留 300 条；同一 Advanced Settings Hooks 标签选择 7/30/90 天窗口，展示跨源去重后的 phase/decision、Run 状态关联与不完整投影计数。该 summary 不是完整 Project BI。目标环境认证 Provider、migration/grants/RLS、Run/tool/validation/review producers、Outbox delivery state、版本化 coverage/cohort read model、Run Detail/Quality & Improvement 下钻仍开放。插入失败时归档事务 fail closed，敏感正文不进入事件投影。
 
 | 版本 | 日期 | 修订人 | 修订内容 | 触发 |
 |---|---|---|---|---|
@@ -4730,3 +4730,4 @@ Phase 9D 的首个实现切片增加 `multica.hook_execution_event`（Transactio
 | v5.14 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 Project-authorized Hook execution event 分页面板纳入既有 Advanced Settings → Hooks tab；区分只读执行事件与策略配置 Audit，呈现 partial/unknown coverage；同步 Rust 106/106、前端定向 25/25、TypeScript 与隔离 PostgreSQL append-only/RLS 验证，并保留 app auth provider、目标 DB/BI 与 Run-linked producer 边界 | Phase 9D HookEvent panel/UI client 与 targeted tests 落地 |
 | v5.15 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 Project-scoped Hook summary API 的 bounded window、metric version/formula、phase/decision 聚合与 partial/null coverage；限定数据只来自 archive ledger，RunEvent/outcome join、BI consumer 与目标环境 DB/RLS 仍开放；Hooks 继续是既有 Advanced Settings 标签 | 推进 Phase 9D 首个可复算的 Hook BI 汇总切片 |
 | v5.16 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 将 source-only Hook summary API 接入既有 Advanced Settings → Hooks 标签，限定 7/30/90 天 UI 窗口、phase/decision 表和 partial/unknown 文案；澄清高级设置标签条在页面内容区、主侧栏仅提供父入口，并保留 Run outcome/完整 BI 的未验收边界 | Phase 9D summary UI consumer 完成代码切片并复核 ULYS-235 导航边界 |
+| v5.17 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.21 与 Hook SRS/BD/DD v0.5.4/v0.5.6/v0.5.12；加入 summary v2 的双来源 event_id 去重、完整 Run 状态 join、不完整投影排除计数和 partial/unknown 语义；校正文档头版本并保留 Run producer、认证 Provider、目标 DB/RLS、Outbox 与完整 BI 缺口 | Phase 9D-4 summary read model 支持 Run 状态关联并同步三层设计 |
