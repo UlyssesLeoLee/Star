@@ -64,6 +64,9 @@
 //! CREATE (available:Function {name:"GroupApiState::run_admission_producer_available",type:"function",language:"rust"});
 //! CREATE (s)-[:HAS_METHOD]->(available),(available)-[:CALLS]->(p);
 //! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (s:Class {name:"GroupApiState",type:"class"}),(available:Function {name:"GroupApiState::run_admission_producer_available",type:"function"}),(p:Interface {name:"TaskCliSessionProvisioner",type:"interface"});
+//! CREATE (profileCapability:Function {name:"TaskCliSessionProvisioner::supports_profile_bound_run_admission",type:"function",language:"rust"}),(p)-[:HAS_METHOD]->(profileCapability),(available)-[:CALLS]->(profileCapability);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
 //! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"});
 //! CREATE (ep:Module {name:"execution_profiles",type:"module",language:"rust"}),(epr:Function {name:"execution_profiles::router",type:"function",language:"rust"});
 //! CREATE (m)-[:CONTAINS]->(ep),(b)-[:CALLS]->(epr);
@@ -313,7 +316,10 @@ impl GroupApiState {
     pub(super) fn run_admission_producer_available(&self) -> bool {
         self.task_cli_session_provisioner
             .as_ref()
-            .is_some_and(|provisioner| provisioner.supports_run_admission())
+            .is_some_and(|provisioner| {
+                provisioner.supports_run_admission()
+                    && provisioner.supports_profile_bound_run_admission()
+            })
     }
 }
 
