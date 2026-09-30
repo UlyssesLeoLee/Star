@@ -63,6 +63,10 @@
 //! MATCH (s:Class {name:"GroupApiState",type:"class"}),(p:Interface {name:"TaskCliSessionProvisioner",type:"interface"});
 //! CREATE (available:Function {name:"GroupApiState::run_admission_producer_available",type:"function",language:"rust"});
 //! CREATE (s)-[:HAS_METHOD]->(available),(available)-[:CALLS]->(p);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"group_api",type:"module"}),(b:Function {name:"build_group_router",type:"function"});
+//! CREATE (ep:Module {name:"execution_profiles",type:"module",language:"rust"}),(epr:Function {name:"execution_profiles::router",type:"function",language:"rust"});
+//! CREATE (m)-[:CONTAINS]->(ep),(b)-[:CALLS]->(epr);
 use std::{sync::Arc, time::Duration};
 pub use worktree_lifecycle::{
     ProjectWorktreeCreateCommand, ProjectWorktreeImportCommand, ProjectWorktreeLifecycleProvider,
@@ -89,6 +93,7 @@ use crate::auth::{AuthUser, JwtConfig, oauth::AuthenticatedUser};
 
 mod canvas;
 mod cli_sessions;
+mod execution_profiles;
 mod group_apps;
 pub(super) mod hook_policies;
 mod scoped_chat;
@@ -616,6 +621,7 @@ pub fn build_group_router(state: GroupApiState) -> Router {
         .merge(worktree_lifecycle::router())
         .merge(work_items::router())
         .merge(cli_sessions::router())
+        .merge(execution_profiles::router())
         .merge(task_runs::router())
         .merge(scoped_chat::router())
         .merge(canvas::router())

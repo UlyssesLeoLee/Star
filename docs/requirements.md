@@ -1,4 +1,4 @@
-# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.29）
+# Vibe Coding Work Management SaaS 要件定義书（统合扩展版 v5.30）
 
 ## 0. 文档说明与前提
 
@@ -2527,7 +2527,7 @@ Run detail 应能折叠查看每轮输入摘要、采取的工具/命令类别�
 
 Agent 执行能力按稳定契约组合，不把某个 CLI、模型、记忆实现、Skill 格式、上下文算法或验证器写死进 Task/Worktree 身份模型。`AgentExecutionProfile` 是版本化 Master，引用具名且版本固定的 `AgentProvider`、`MemoryProvider`、`SkillRegistry`、`ContextAssembler`、`ValidationProvider`、`LoopPolicy` 与资源预算；Provider 可由内建 Rust 实现或通过隔离 Plugin capability 提供。新增实现应只注册兼容 provider/version/manifest，不改变 `work_item_id`、`run_id`、Worktree 关系或已有历史 Run 语义。未支持的 provider/capability 必须显式标为 unavailable，不得用 mock 或空成功冒充。
 
-Phase 9E-1 Rust profile verifier 使用 ≤65,536 字节 serialized document、版本化 schema、固定字段顺序 JSON SHA-256、排序去重引用与明确上限；verified wrapper 只暴露不可变借用。Phase 9E-2 resolver 将 snapshot 与当前 bounded Provider/Skill catalog、grant、effective HookSet 和 Worktree lifecycle 逐项精确匹配，漂移 fail closed。Phase 9E-3 建立 Profile Master/SCD2 + append-only Audit，scope/schema/digest 一致且两表 FORCE RLS。Phase 9E-4A 增加 Run Profile snapshot all-or-none、Run/document tenant/project/可选 Worktree scope 与 digest CHECK，不建立 Profile 外键。Run、Profile、guard 三份 migration 在隔离 PostgreSQL 数据库执行，guard migration 重复应用通过；无 Profile 的旧 Run 与 Project/Worktree 两类完整快照插入成功，部分 tuple、tenant/project/Worktree scope 与 digest 不一致的 5 类负例均被拒绝，Profile FK 数为 0；临时数据库已清理。Profile API、生产 Run writer、目标 DB 部署与资源 admission 仍开放，恢复或创建 Run 仍需外层完成 actor ACL/GroupContext 授权。
+Phase 9E-1 Rust profile verifier 使用 ≤65,536 字节 serialized document、版本化 schema、固定字段顺序 JSON SHA-256、排序去重引用与明确上限；verified wrapper 只暴露不可变借用。Phase 9E-2 resolver 将 snapshot 与当前 bounded Provider/Skill catalog、grant、effective HookSet 和 Worktree lifecycle 逐项精确匹配，漂移 fail closed。Phase 9E-3 建立 Profile Master/SCD2 + append-only Audit，scope/schema/digest 一致且两表 FORCE RLS。Phase 9E-4A 增加 Run Profile snapshot all-or-none、Run/document tenant/project/可选 Worktree scope 与 digest CHECK，不建立 Profile 外键。Run、Profile、guard 三份 migration 在隔离 PostgreSQL 数据库执行，guard migration 重复应用通过；无 Profile 的旧 Run 与 Project/Worktree 两类完整快照插入成功，部分 tuple、tenant/project/Worktree scope 与 digest 不一致的 5 类负例均被拒绝，Profile FK 数为 0；临时数据库已清理。Profile publish/current catalog API、生产 Run writer、目标 DB 部署与资源 admission 仍开放，恢复或创建 Run 仍需外层完成 actor ACL/GroupContext 授权。
 
 每个 Run 创建时保存不可变的 `execution_profile_snapshot`：各 provider ID/API version/实现版本、Skill ID/version/content digest/capability grant、Memory policy 与引用摘要、Context assembler version/budget/source digest、Validation suite/version/命令标识与 toolchain digest、Engineering Loop policy、Schedule occurrence（若有）和资源预算。快照只保存复现与审计所需引用、版本、脱敏摘要和 digest，不保存 Secret、未脱敏提示正文、原始大日志或模型隐式推理。provider 更新不得回写历史快照；恢复 Run 时复核当前授权并明确记录使用原版本还是兼容的新版本。
 
@@ -2551,6 +2551,7 @@ ValidationProvider 与 AgentProvider 解耦：验证 profile 独立定义固定�
 | AEC-008 | BI/Benchmark/Improvement 按 Execution Profile/Provider/Loop/Validation 版本切片并固定评分标准、coverage 与复现条件；改进可回滚且不得自改验收标准 | P0 |
 | AEC-009 | Run admission 仅接受经 schema、scope、canonical SHA-256 与 bounded-value 校验的不可变 Profile snapshot；Agent/Memory/ContextAssembler/Validation/LoopPolicy/Skill capability 不得超出当前 grant，当前 Provider/Skill/HookSet/Worktree 状态必须与 snapshot 相符且不得静默回退 | P0 |
 | AEC-010 | AgentExecutionProfile 持久化为 Project/Worktree scoped Master/SCD2；document、scope/schema/digest 一致；revision 单调，active/disabled 仅以 successor 表达，禁止历史覆写/删除；Audit append-only + FORCE RLS；Run Profile ID/version/digest/snapshot 全空或全有，snapshot scope/digest 与 Run envelope 一致，不依赖当前 Master 存活 | P0 |
+| AEC-011 | Worktree current Profile 只读 API 每次验证 Bearer actor、`worktree:read`、tenant RLS 与 Project/Worktree binding；列表有界分页且只返回元数据，详情经 Rust verifier 校验 scope/schema/digest，响应 `no-store`；该读取不等价于 Run admission、Profile publish 或当前 Provider/Skill/Grant 解析 | P0 |
 
 | 验收 ID | 受入基准 |
 |---|---|
@@ -2564,6 +2565,9 @@ ValidationProvider 与 AgentProvider 解耦：验证 profile 独立定义固定�
 | AC-AEC-008 | Profile 解码拒绝未知 schema/字段、非 canonical 列表、digest 篡改、越 scope、越 grant、Memory 缺失或超限、ContextAssembler/LoopPolicy capability 越权、Context 丢失关键约束及 Loop/资源预算越界；Project profile 只能在同 Project Worktree 使用，Worktree profile 必须精确匹配；每项负向边界拒绝，历史 digest 不因后续 profile 更新改变 |
 | AC-AEC-009 | Provider/Skill 缺失、撤销、版本或 digest 不匹配、Grant 变更/过期、effective HookSet 改变、Worktree 进入 draining/archive 均拒绝 admission；目录超限、乱序、重复也拒绝；resolver 不复制 Profile snapshot，缺失版本不得选择兼容项替代 |
 | AC-AEC-010 | Profile Master migration 重复应用、连续 revision/SCD2、append-only Audit 和 tenant RLS 正确；Run guard migration 可重复应用；兼容无 Profile 旧 Run，接受完整 Project/Worktree 快照，拒绝部分 tuple 与 tenant/project/Worktree scope 或 digest mismatch；Run 不设 Profile FK，历史 snapshot 在 successor 后仍可独立读取 |
+| AC-AEC-011 | Profile list 默认 20、拒绝 0 或大于 50 的 limit、非法 UUID cursor 且不返回 document；detail 仅允许当前 Project profile 或当前 Worktree profile，拒绝 scope/schema/digest 不一致；两类 API 均带 `Cache-Control: no-store` |
+
+Phase 9E-4B1 增加 Worktree-scoped current Profile 只读 API：列表默认 20、上限 50、使用 UUID keyset cursor 且只返回 profile metadata；详情重新运行 Rust decode/digest/schema/scope verifier；两类响应均 `no-store`。读取不发布 Profile、不解析当前 Provider/Skill/Grant，也不创建 Run。Profile 发布/current catalog API、生产 Run writer、目标 DB/RLS 部署与资源 admission 仍开放；恢复或创建 Run 需外层重新完成 actor ACL/GroupContext 授权。接口验收以 AC-AEC-011 为准。
 
 ### 50.8D Rust 原生 Hook Engine 与高级设置可视化
 
@@ -2671,3 +2675,4 @@ Phase 9D 的有界摘要使用 metric v2 合并 Hook 执行账本与字段完整
 | v5.28 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 Phase 9E-4A Run Profile 快照 all-or-none 与 tenant/project/Worktree scope/digest 数据库约束；保留无 Profile FK；注明 migration 尚未隔离库执行验收 | 修复 Run nullable Profile 字段可能形成不完整或跨 scope 快照的风险 |
 
 | v5.29 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Phase 9E-4A Run/Profile guard 三迁移隔离 PostgreSQL 验收：重复应用成功，旧 Run 与 Project/Worktree 完整快照接受，5 类不完整/错 scope/digest 负例拒绝，零 Profile 外键，临时数据库清理 | 完成 Run Profile snapshot database invariants 验收 |
+| v5.30 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 定义 Phase 9E-4B1 current Profile bounded list/detail API、actor/Worktree scope、metadata-only list、Rust read-time verifier 与 no-store；明确读 API 不等同于 Profile 发布或 Run admission；Hooks 继续是 ULYS-235 高级设置内容区并列 tab | Profile read API 代码切片与单测完成 |

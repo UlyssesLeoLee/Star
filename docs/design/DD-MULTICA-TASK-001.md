@@ -1,11 +1,11 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.3** (per 日本 IPA SEC 标准，补充 Profile Master/SCD2 持久化契约)
+> **Multica Task Lifecycle 域 詳細設計書 v1.4** (per 日本 IPA SEC 标准，补充 Profile read API 契约)
 >
-> - 状态: 🟡 Draft v1.3 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A 有条件式代码/schema 切片，生产 Runtime adapter、Profile API/Run writer 与目标环境验收仍开放)
+> - 状态: 🟡 Draft v1.4 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1 有条件式代码/schema 切片，Profile publish API、生产 Run writer 与目标环境验收仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.27 §50；`docs/basic-design.md` v5.23 §16.14-16.17
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.30 §50；`docs/basic-design.md` v5.26 §16.14-16.17
 > - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.24；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
 > - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
@@ -936,11 +936,17 @@ SCD2 trigger 使用事务级锁按 `(tenant_id, profile_id)` 串行化首次发�
 
 Audit 保存目标 profile/version、`profile_published` / `profile_rolled_back` / `profile_disabled` / `profile_reenabled`、操作者、correlation、可选 rollback source version 和最多 4 KiB 脱敏 metadata；外键确保目标/来源 revision 存在，scope/state guard 与 Profile 一致。Audit 拒绝 UPDATE/DELETE/TRUNCATE。Profile/Audit 表均开启并 FORCE tenant RLS；RLS 只隔离 tenant，不取代 Group API 的当前 actor/Project membership/Worktree role 授权。两表为 M/T，无 Draft/Work 表；后续可视配置 API 如需临时 Draft，须另以有明确 TTL/retention 的 Work 表设计。
 
-Run 的 `execution_profile_id/version/digest/snapshot` 保持 nullable 以兼容旧 Run。新 Run writer 应将 registry 中再次 decode/verify、经 9E-2 当前依赖 resolver 通过的完整 document 自包含复制到 `execution_profile_snapshot`，并在同一短事务内固定 Profile revision、Task/acceptance、HookSet、Schedule occurrence 与 resource reservation。Run snapshot 不设置 Profile FK：即使 Profile successor 发布或 Project/Worktree 状态变化，历史执行仍独立保留可审计证据。当前 migration 尚未部署到目标 DB，API 与事务写入仍在后续阶段。
+Run 的 `execution_profile_id/version/digest/snapshot` 保持 nullable 以兼容旧 Run。新 Run writer 应将 registry 中再次 decode/verify、经 9E-2 当前依赖 resolver 通过的完整 document 自包含复制到 `execution_profile_snapshot`，并在同一短事务内固定 Profile revision、Task/acceptance、HookSet、Schedule occurrence 与 resource reservation。Run snapshot 不设置 Profile FK：即使 Profile successor 发布或 Project/Worktree 状态变化，历史执行仍独立保留可审计证据。当前 migration 尚未部署到目标 DB；current read API 在 9E-4B1 已有代码切片，Profile 发布 API 与事务 Run 写入仍在后续阶段。
 
 #### 14.11.4 Run/Profile snapshot 数据库不变量
 
 Phase 9E-4A 在 Run 表增加两个 CHECK：Profile ID、version、digest、snapshot 必须全空或全有；存在 snapshot 时，document tenant/project 与 Run envelope 一致，document Worktree scope 若非空必须等于 Run Worktree，顶层 digest 必须等于 Run digest。Rust verifier 仍负责 canonical SHA-256 与 schema 语义校验，数据库 CHECK 只绑定 envelope 字段。约束不创建 Profile 外键，因此 Run 历史只依赖本行自包含 document，旧的无 Profile Run 保持有效。迁移依赖 2026-09-30 Run schema，重复执行不重复创建约束；隔离 PostgreSQL 验收通过：旧 Run 与 Project/Worktree 完整 snapshot 接受，5 类部分 tuple/scope/digest mismatch 拒绝，迁移重复应用成功，Profile FK 为 0，临时库已清理。
+
+#### 14.11.5 Worktree current Profile read API
+
+Group API 增加两个只读 endpoint：`GET /api/v1/worktrees/{worktree_id}/execution-profiles?limit=&cursor=` 与 `GET /api/v1/worktrees/{worktree_id}/execution-profiles/{profile_id}`。两者先验证 Bearer actor 与 `worktree:read`，在设置 tenant RLS 的事务中 `FOR SHARE` Worktree 和有效 Project binding，再验证当前 actor 的 Project membership；仅返回 `valid_to IS NULL` 且 `lifecycle_state='active'` 的当前 Profile，Project scope 对该 Worktree 可见，Worktree scope 必须等于 path Worktree。列表默认 20、上限 50，以 UUID `profile_id` 升序 keyset cursor 翻页，每项只返回 ID/scope/version/schema/digest 元数据，不读取或复制 Profile JSON。详情单项读取当前 document 并在 Rust 中重新 `decode_and_verify`，对照 DB envelope 的 project/scope/schema/digest 后调用 `validate_for_scope`；历史 revision、disabled Profile、其他 Worktree Profile 均不经此 current endpoint 暴露。所有成功响应设置 `Cache-Control: no-store`。
+
+读取结果不等于 Run admission：此切片没有 Profile publish/rollback API、当前 Provider/Skill/Grant catalog adapter、资源 reservation 或 Run writer；调用者仍须按 9E-2 用当前依赖事实重新 resolve，并在 Run admission 时原子重授权、冻结 Profile/Task/HookSet/Occurrence 与资源 reservation。4 个 Rust 单测验证分页边界、游标、Project/Worktree scope 与 digest fail-closed、no-store；它们未执行 SQL/HTTP Auth/RLS 集成。目标数据库部署、真实 Auth Provider 与 RLS/grants 验收仍开放。Hooks 的设置入口继续遵循 ULYS-235：Settings“高级设置”内容区中的 Hooks 并列 tab，不是 Worktree Group 子级。
 
 ### 14.12 Rust-native Hook 与高级设置导航契约
 
@@ -976,3 +982,4 @@ Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高
 | v1.2 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.4 Run/Profile snapshot all-or-none、tenant/project/Worktree scope 与 digest CHECK；保留无 FK 历史快照与旧 Run 兼容；记录 9E-4A migration 尚待隔离库执行验收，ULYS-235 Advanced Settings 导航不变 | 补齐 Run Profile snapshot envelope 数据库不变量 |
 
 | v1.3 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Phase 9E-4A Run/Profile guard migration 隔离 PostgreSQL 验收：重复应用、legacy Run、Project/Worktree snapshot、5 类负例与 no-FK 均通过；生产 API/Run writer 与目标 DB 部署仍开放 | 完成 snapshot envelope 数据库不变量验收 |
+| v1.4 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.5 current Profile bounded list/detail REST 契约与读时 Rust scope/schema/digest 校验、RLS/Auth/no-store 边界；4 个纯 Rust API 单测通过，未宣称 SQL/真实身份/RLS 集成或 Run admission 已完成；ULYS-235 Hooks 仍是高级设置内容区并列 tab | Phase 9E-4B1 Profile read API 代码切片完成 |
