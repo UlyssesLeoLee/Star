@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.28 (2026-10-01)
-> **上游要件定义书**: docs/requirements.md v5.32
+> **文档版本**: v5.29 (2026-10-01)
+> **上游要件定义书**: docs/requirements.md v5.33
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -4639,7 +4639,7 @@ Phase 12 定义目标设备档位与固定 workload（Worktree/Run/Canvas 数量
 | PAR-001..004 | §16.15 分层调度、quota、claims、coordinator event | AC-PAR-001..003 | Phase 9 |
 | PERF-001..004 | §16.15 Rust desktop memory/render/cache/plugin budget | AC-PERF-001..003 | Phase 12 |
 | Pi inspiration (no runtime dependency) | §16.15 Rust Agent core / branch history / compaction | AC-PAR / AC-AEC | Phase 9 / 12 |
-| LOOP-001..005 / AEC-001..013 | §16.16 Schedule/Engineering Loop、versioned Provider/Profile、Profile read 与 lifecycle API | AC-LOOP-001..006 / AC-AEC-001..013 | Phase 9-11 |
+| LOOP-001..005 / AEC-001..013 | §16.16 Schedule/Engineering Loop、versioned Provider/Profile、Profile read/lifecycle 与 CLI Profile identity binding | AC-LOOP-001..006 / AC-AEC-001..014 | Phase 9-11 |
 | HOOK-001..007 | §16.17 Rust-native Hook Engine、Advanced Settings Hooks tab、Worktree enforcement 与 BI | AC-HOOK-001..006 | Phase 9-12 |
 
 ### 16.16 Schedule Loop 与可扩展 Agent Execution Profile
@@ -4691,6 +4691,12 @@ Action `publish` 的 `expected_current_version` 为 0 表示首次创建，否�
 #### Phase 9E-4B3 verified HookSet 身份桥接
 
 Group Hook policy loader 在调用方授权的事务中以 `FOR SHARE` 锁定 current Project/Worktree policy rows，校验 baseline 与 restrictive overlay 的继承版本和规则，再生成 `HookSetSnapshot`：有 Worktree overlay 时使用当前 Worktree policy-set ID，无 overlay 时使用 Project baseline ID；effective version 与 lowercase digest 均来自 Rust verified snapshot。原 Hook evaluator 调用继续取得 policy-only projection；Profile/Run admission 可取完整的 `(VerifiedHookPolicySnapshot, HookSetSnapshot)`。此 slice 不创建 Run、不查询 Provider/Skill/Grant registry，也不占用并行资源；因此生产 Run writer、真实授权 Provider、当前 catalogs、目标 DB/RLS 与原子 reservation 仍未完成。Hooks 的管理入口仍为 Settings“高级设置”内容区中的并列标签，Worktree Index 与 Run/BI 只呈现当前有效策略和执行事实。
+
+#### Phase 9E-4B4 Task Card CLI 的 Profile identity 分离
+
+Task Card 的 `approved_launch_profile_id` 属于 Local Runtime 命令启动授权，约束 executable、argv、environment 与工作目录；Agent `execution_profile_id` 属于多代理执行栈，固定 Agent/Memory/Skill/Context/Validation/Loop/HookSet/grant/resource budget。两个 ID 即使由同一 UI 选择也必须独立持久化、授权、版本化和审计，不能互相映射。代码审查确认当前 CLI start DTO/fence 只有 Approved Launch Profile，Run insert 只存 HookSet，未接 Agent Execution Profile ID 或 `execution_profile_snapshot`；9E-1/2 的 verifier/resolver 尚未被此 Run writer 调用。当前 Provider/Skill/Grant 只有 domain 类型，没有可供 admission 使用的权威持久化目录 adapter。
+
+后续实现拆为四个有序门：9E-4C1 增加独立 Profile 选择与版本化幂等指纹，同时保持既有 Run replay；9E-4C2 接入有界且权威的 Provider/Skill/Grant catalog 与当前 Worktree 状态，锁外读取后用短时版本 fence 在最终事务校验；9E-4C3 在一个受控短事务内重授权、锁定并复读 Profile/Task/HookSet/occurrence，执行 Rust resolver，并原子写 Run 自包含 Profile/Task/acceptance/Hook snapshot、Hook ledger、共享 event_id RunEvent 与资源 reservation；9E-4C4 让一次性 Runtime spawn fence 同时绑定并消费 Approved Launch Profile 与 Agent Execution Profile ID/version/digest，Runtime 在进程启动前复核 ACL、预算与完整 scope。任一门未就绪时不创建新 Run、不 spawn、不对 BI 计为成功；历史 Run 维持可读，旧 idempotency 指纹通过明确版本兼容。此划分避免在 DB row lock 内等待 CLI/provider 网络，并将 65 KiB Profile、Provider 256 项、Skill 4096 项的上限沿用至并发 admission。
 
 ### 16.17 Rust 原生 Hook Engine 与 Worktree/BI 联动
 
@@ -4781,3 +4787,4 @@ Phase 9D 以 `multica.hook_execution_event`（Transaction / append-only）保存
 | v5.25 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.29 与 Task DD v1.3；记录 Phase 9E-4A guard migration 在隔离 PostgreSQL 的幂等、旧 Run 兼容、两类完整 snapshot 与五类负向约束验收；目标库/API/writer 仍开放，Hooks 遵循 ULYS-235 Advanced Settings tab | 9E-4A 数据库验收完成 |
 | v5.27 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.31 与 Task DD v1.5；记录 9E-4B2 Project/Worktree typed Profile 生命周期 API、≤67,584-byte body、admin scope/CAS、Rust digest/scope verifier、SCD2 successor 与同事务 append-only Audit/no-store receipt；`cargo check -p star-api-rest --all-targets -j 4` 通过且新增 3 个状态机单测通过；首次链接遇 Windows LNK1104 后重试成功；SQL 并发/真实 Auth Provider/目标 DB/RLS/grants/Profile UI/Run writer/current catalogs/resource reservation 仍开放；Hooks 遵循 ULYS-235 Advanced Settings 并列 tab | Profile 管理写路径与一致性边界进入实现 |
 | v5.28 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.32 与 Task DD v1.6；补入 Phase 9E-4B3 verified effective Hook policy 到 `HookSetSnapshot` 的 Project baseline/Worktree overlay 身份映射及兼容 policy-only 调用边界；记录定向身份映射测试 1/1 通过（首次链接遇 LNK1104，确认无同名进程后重试成功）与 star-api-rest all-targets check 通过；不宣称生产 Run writer/current catalogs/resource reservation 完成；Hooks 继续在 Advanced Settings 并列标签 | 将当前 HookSet 身份接入 Profile/Run admission 设计切片 |
+| v5.29 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.33 与 Task DD v1.7；区分 Approved Launch Profile 与 AgentExecutionProfile，补入 Task Card → Profile/catalog resolver → Run snapshot/Hook/BI → Runtime fence 的 9E-4C1..C4 实施顺序、版本化幂等兼容和 fail-closed 门；Hooks 仍是 Advanced Settings 内 Skills/MCP/Plugins 并列 tab | Run writer 检视确认当前 CLI path 未绑定 AgentExecutionProfile |
