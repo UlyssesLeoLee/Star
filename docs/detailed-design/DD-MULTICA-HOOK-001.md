@@ -1,8 +1,8 @@
 # DD-MULTICA-HOOK-001
 
-> **Multica Hook 域詳細設計書 v0.5.1** (继承高级设置 Hooks tab；v0.5 将安全关键 Hook 改为 Rust-native typed rules，新增可视化 Builder、Project/Worktree policy、RunEvent/BI 联动；旧 Python handler 章节仅作兼容/历史参考)
+> **Multica Hook 域詳細設計書 v0.5.3** (继承高级设置 Hooks tab；v0.5 将安全关键 Hook 改为 Rust-native typed rules，新增可视化 Builder、Project/Worktree policy、RunEvent/BI 联动；旧 Python handler 章节仅作兼容/历史参考)
 
-> - 状态: 🟡 Draft v0.5.1 (2026-09-30 JST，requirements / basic design trace synchronization)
+> - 状态: 🟡 Draft v0.5.3 (2026-09-30 JST，Phase 9B1/9B2A isolated PostgreSQL validation evidence)
 > - 上游: [`docs/requirements/SRS-MULTICA-HOOK-001.md`](../requirements/SRS-MULTICA-HOOK-001.md) v0.5.1 + [`docs/design/BD-MULTICA-HOOK-001.md`](../design/BD-MULTICA-HOOK-001.md) v0.5.1 + `docs/requirements.md` v5.20 §50.8D
 > - 下游: 实装代码 + 测试 + 报告
 > - 核心语言: Rust Hook Engine / typed rule evaluator；Rust-native desktop UI；现有 Web UI 仅作同 DTO 的 presentation adapter。旧 Python handler 不具备安全决策 authority。
@@ -1437,6 +1437,8 @@ stateDiagram-v2
 
 Builtin platform rules → tenant/project baseline → Worktree restrictive additions 按固定优先级合并。任一 mandatory deny 产生 deny；否则任一 require_human 要求人审；否则任一 defer 等待条件/外部信号；只有所有 mandatory and applicable rules 明确 allow 才可继续。allow 不能提升 actor capability、放宽 ACL、变更 command target/argv 或验收要求。Plugin advisory result 不参与安全决策。
 
+Phase 9B2A migration 以 `hook_policy_set` 保存 Project/Worktree policy Master/SCD2、以 TTL Draft 保存编辑中的 Work 数据、以 append-only Audit 保存发布/回滚事实。新 policy revision 必须以 open 状态插入且仅能关闭一次；Project baseline 变更前，引用该 revision 的当前 Worktree overlay 必须先关闭并在同一事务中重基。Audit 引用 policy 时必须匹配 tenant/project/scope/worktree；Audit 禁止 UPDATE、DELETE 与 TRUNCATE。Draft audit 中的 draft UUID 是 provenance 标识，不建 FK，以支持 Draft 到期物理清理。Worktree overlay 是否只收紧仍由 Rust typed-policy verifier 和发布 Domain Command 校验，SQL 不承担语义解释。
+
 ### 7.1.2 Event phase 与同步执行
 
 同步 phase 清单至少为 `before_run_admission`, `before_tool_call`, `after_tool_result`, `before_validation`, `after_validation`, `before_review_or_complete`, `before_worktree_create_import`, `before_worktree_archive_cleanup`, `before_worktree_binding_change`, `after_worktree_lifecycle_commit`。Schedule/Cron tick 由 Automation occurrence source 创建，Hook 可审核/拦截已生成的触发，不维护 Cron timer 或 schedule definition。
@@ -1478,7 +1480,7 @@ Dry-run 使用脱敏历史 HookEvent snapshot，不执行 tool/CLI/Worktree comm
 
 ### 7.1.6 数据兼容、迁移与实现门
 
-旧 `registry.json` 只能作为只读导入源：识别 builtin name/event/action；有可映射的纯数据规则生成 Draft 并人工 review；任意 `handler` module、shell、Python callback、未支持 `transform` 或未知字段均拒绝执行并标出 migration error。旧 Python logs 可以导入为外部 evidence/provenance，不与 canonical RunEvent 伪合并。正式发布需 migration、RLS/runtime grants、typed Rust evaluator、Advanced Settings UI、Worktree Command double-check、RunEvent/Audit outbox consumer 和 BI coverage read model 全部部署/验收；当前新增仅为设计，未表示这些执行能力已经存在。
+旧 `registry.json` 只能作为只读导入源：识别 builtin name/event/action；有可映射的纯数据规则生成 Draft 并人工 review；任意 `handler` module、shell、Python callback、未支持 `transform` 或未知字段均拒绝执行并标出 migration error。旧 Python logs 可以导入为外部 evidence/provenance，不与 canonical RunEvent 伪合并。Phase 9A/9B1 已有 Rust evaluator 与 bounded verified-snapshot loader；`db/migrations/2026-09-30-multica-hook-policy.sql` 定义 policy Master、TTL Draft、append-only Audit 和 FORCE RLS，并已在一次性隔离 PostgreSQL 18 集群双次应用，通过 FORCE RLS、Project/Worktree SCD2 重基、审计 scope 与 append-only/TRUNCATE 场景；项目目标数据库尚未部署，runtime grants 也未配置。正式发布仍需目标环境 schema/RLS/grants 验收、scoped store/publish API、Advanced Settings UI、Worktree Command double-check、RunEvent/Audit outbox consumer 和 BI coverage read model 全部部署/验收；隔离数据库通过不等于产品环境部署。
 
 性能验收固定 policy size/rule count/event rate 与 concurrent Run/Worktree load，测 Rust hot-path p50/p95/p99、peak RSS、allocation、queue/backpressure、UI first paint/input p95 和 HookEvent projection coverage；阈值在可重复目标设备测量后版本化，不虚构毫秒/内存数值。Policy cache 按 scope+version+digest 有界淘汰；规则评估不可做同步 DB/network round trip；事务事实不丢，高频 UI projection 可合并并标记 gap。
 
@@ -1507,3 +1509,5 @@ Dry-run 使用脱敏历史 HookEvent snapshot，不执行 tool/CLI/Worktree comm
 
 | **v0.5** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 增加 Rust-native HookSet/typed evaluator、Project/Worktree policy 与 destructive lifecycle gate；高级设置 Hooks tab 增加可视化 builder、继承/diff/dry-run/审批/rollback；RunEvent/Audit/BI 联动和旧 Python handler 的非权威迁移边界；implementation gate 明确尚未落地 | 用户要求将原生 Hook、可视配置和 Worktree/BI 联动写入新架构 |
 | **v0.5.1** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 交叉引用更新至当前 SRS/BD v0.5.1 与总要件 v5.20；Hook runtime、可视化 UI 和生产 gate 状态未变 | Phase 8B 增补 Run query acceptance 后同步当前上位基线 |
+| **v0.5.2** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 9B1 verified policy document contract 与 9B2A 三表 W/T/M migration source；将“源码存在”与 PostgreSQL apply/RLS/runtime grants、policy API、lifecycle gate 和 UI 部署验收明确分开；高级设置 Hooks tab 导航保持既有 ULYS-235 要求 | 用户强调 Advanced Settings 是既有标签导航，并继续推进原生 Hook policy persistence |
+| **v0.5.3** | 2026-09-30 JST | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 补充 9B2A migration 在一次性 PostgreSQL 18 集群双次 apply 与 FORCE RLS、Project/Worktree SCD2 重基、Audit scope/append-only 场景验证；目标库未部署、9B2B/C 与 UI/BI/Agent/Loop 仍开放；高级设置 Hooks 继续作为独立 tab | 完成隔离 migration 验证并同步实施边界 |
