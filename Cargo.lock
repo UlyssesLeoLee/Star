@@ -1259,6 +1259,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "domain-hook"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "domain-identity"
 version = "0.1.0"
 dependencies = [

@@ -31,6 +31,8 @@ members = [
     "crates/domain-workflow",
     "crates/domain-workspace",
     "crates/domain-worktree",
+    # Phase 9A: Rust-native, bounded Worktree Hook policy evaluator.
+    "crates/domain-hook",
     # Phase W11-14 (2026-08-29) 新增 4 crate
     "crates/domain-report",
     "crates/domain-dashboard",

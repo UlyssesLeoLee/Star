@@ -1,14 +1,15 @@
 # WORKTREE-GROUP-IMPL-PLAN-001
 
-> **渡口 Project Worktree 群组实施计划 v5.19**
+> **渡口 Project Worktree 群组实施计划 v5.20**
 >
 > - 状态：🟡 执行中（Phase 0/1、2A 完成；Phase 2B/2C/2D、Phase 3A-3F 有多项 API/UI/migration 代码切片，但宿主认证 provider、目标数据库部署、membership provisioning/reconciliation、ACL/RLS 运行验收、Domain adapter 与 durable realtime 仍未关闭；Phase 2D 已有 Git retention-lock observer/interface/UI 与认证 create/import API contract；Index 条件式 create/import controls 已接入脱敏 Repository/candidate API 并消费受理 receipt、刷新 Index，但 production main 未安装 lifecycle/Host Runtime provider，Project-Repository SoR 与 durable writer 未接通；活跃状态源、drain 与物理 cleanup 未实现；Phase 4A signed grant helper、4B1 Session start seam、4B2 PTY adapter、4B3 Task Card start/status/cancel/manual reattach UI、4B4 bounded Session listing/recovery seam 已实现，生产 provisioner、签名/nonce spawn wiring、实时 ACL/Runtime health、OS sandbox、terminal sink/scrollback、TaskRun Audit 仍缺；Phase 5/6 migrations 已在隔离 PostgreSQL 库重复执行并通过 12 表 FORCE RLS/策略/append-only 验证（事务临时 grants 已回滚）；目标库与 runtime role grants 未部署。Phase 5 已有逐目标 GroupContext 授权、加密 Transcript/W payload persistence seam 与 GLOBAL 目标目录；生产未接真实 protector/key lifecycle、outbox/L0/LangGraph、stream UI、provider 或目标 DB/RLS；Phase 6 已有五表 Master/SCD2 + append-only Audit migration、生产 main 装配的 PostgreSQL 只读 Registry provider、fail-closed API 和 Group UI live consumer，仍缺目标 DB 部署、受信任 manifest ingest/trust root、lifecycle writer、capability gateway/runtime、热撤权/在途 drain 与真实 RLS 验收；Phase 7 跨 App 生产验收未开始）
 > - 修订人：Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核
 > - 日期：2026-09-30
 > - 本轮补充：生产 Project 选择通过当前 actor 的服务端 membership 目录加载；API session generation 切换时同步隐藏旧 Project/Index/member-role 投影；分页与深链权限状态均 fail closed，缺失 Project 名称 SoR 时不借本地 seed 补名。
 > - Phase 8 更新：Run migration 在隔离临时 PostgreSQL 重复应用并通过 6 张表 FORCE RLS 检查，目标 DB/runtime grants 未部署；CLI Run writer 与 Worktree/Task-scoped Run list/detail API、Task Card Run History 面板已形成条件式代码切片；Contract 写命令、完整事件/Evidence producer、真实 Runtime 与目标环境端到端验收仍未完成。
+> - Phase 9A 更新：新增 `domain-hook` bounded Rust evaluator core 和 8 个单测，仅覆盖 Worktree archive/cleanup gate；未接入 lifecycle Domain Command、HookSet 持久化/发布、Advanced Settings UI 或 RunEvent/BI，Phase 9 仍开放。定向 test/Clippy 使用临时解析后的 lock 通过；原始锁文件仍有既存 `objc2 0.6.3` 与 Wry `^0.6.4` 冲突，完整刷新会改动 240 个 package，未混入本阶段。使用刷新锁进行的 `cargo check --workspace --all-targets -j 4` 随后被既有 `star-desktop/src-tauri/src/main.rs` 截断占位阻断。
 > - 关联需求：docs/requirements.md v5.20 §50
-> - 关联基本设计：docs/basic-design.md v5.4 §16
+> - 关联基本设计：docs/basic-design.md v5.5 §16
 > - 关联详细设计：docs/design/DD-WORKTREE-GROUP-001.md v4.20、docs/design/DD-MULTICA-TASK-001.md v0.6、docs/requirements/SRS-MULTICA-HOOK-001.md v0.5.1、docs/design/BD-MULTICA-HOOK-001.md v0.5.1、docs/detailed-design/DD-MULTICA-HOOK-001.md v0.5.1、docs/design/DD-WORKTREE-CANVAS-001.md v1.3
 
 ---
@@ -80,7 +81,7 @@ Project（先选择，限定可见工作范围）
 
 | **8A Run foundation** | Task Contract / Run / Event / Evidence migration；CLI start 创建 Run 并返回 Run ID | migration/RLS/append-only/idempotency 运行验收；重放同键与新尝试语义 | CLI writer 与 migration 已有条件式切片；migration 在隔离临时 PostgreSQL 重复应用，6 张 Run 表通过 FORCE RLS 检查；目标 DB、正式 runtime grants 和 production writer 验收未完成 |
 | **8B Task Card Run integration** | Contract commands、Run list/detail、Task Card Run history、CLI/Agent/LangGraph 状态与 Evidence producer | tenant/project ACL、RLS、状态事实分离、evidence authorization/retention | 有界 list/detail API 与 Task Card 历史面板已实现；Contract 写命令、CLI 后续状态和 Agent/LangGraph/Validation/Review/Integration/Cost/Evidence producer、目标 DB/RLS E2E 仍缺 |
-| **9 Agent Execution & Loop** | Rust Profile/provider resolver 与 scheduler；受控 Rust CLI adapter；唯一 Automation occurrence dispatcher；单 Run Engineering Loop；Rust-native Hook Engine 与 Advanced Settings Hooks tab | profile/provider version/digest，scope/ACL，fair admission/backpressure，occurrence fencing/idempotency，Loop budgets/cancel/drain，Hook fail-closed 与 Worktree Domain Command 二次校验 | 本轮仅同步设计契约；未实现 |
+| **9 Agent Execution & Loop** | 9A bounded Rust Hook evaluator；9B HookSet policy snapshot/store/publish + Worktree Domain Command 双门；9C Advanced Settings → Hooks 无代码可视 Builder；9D RunEvent/Audit/BI；9E versioned Agent/Memory/Skill/Context/Validation profiles、Rust CLI adapter、唯一 Automation occurrence dispatcher、Schedule Loop、单 Run Engineering Loop 与公平有界并行 | profile/provider version/digest，scope/ACL，fair admission/backpressure，occurrence fencing/idempotency，Loop budgets/cancel/drain，Hook fail-closed 与 lifecycle command 二次校验，CLI process cleanup；Git lock 与 Agent lease 分离 | 9A evaluator core 有条件式代码和 8 个单测，仅支持 archive/cleanup phase，未接 lifecycle command；9B-9E、Advanced Settings route/UI、policy persistence/API、RunEvent/BI 与生产验证未完成。原始 lock `--locked` 被既有 Wry/objc2 冲突阻断；刷新后 all-targets 又被既有 star-desktop 截断 main placeholder 阻断 |
 | **10 Project Quality BI** | versioned Run/Loop/Hook/Worktree read model、coverage、cohort 与 authorized drilldown | 指标可复算，unknown 保留，不跨 Project 泄漏 | 设计定义；未实现 |
 | **11 Benchmark / Improvement** | 固定 task/repo commit/environment replay、benchmark sets、Proposal adoption/rollback | tuning 与 holdout 隔离，评分/规则版本固定，重复性证据 | 设计定义；未实现 |
 | **12 Rust desktop performance** | bounded projection/event/cache/terminal/evidence，Worktree/Run virtualization 与 Canvas culling | 目标设备 peak RSS、CPU、p95 更新延迟/frame time 与并发压力实测 | 指标 TBD，未实现 |
@@ -726,3 +727,4 @@ LangGraph 官方文档证实 checkpoint 只恢复状态边界，不能保护外�
 
 | v5.18 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 对齐 requirements v5.19/basic design v5.3/Group DD v4.19/Task DD v0.5/Hook SRS-BD-DD v0.5；增加 Phase 8A/8B 到 Phase 9-13 的范围、依赖与验收门；标明 Profile/Loop/Hook/BI/Benchmark/Rust desktop 尚未实现，外部身份/DB/RLS blockers 继续开放 | 用户要求推进所有 Phase 并同步文档，同时补齐 Rust Hook 高级设置导航与 Run/BI/Loop 架构 |
 | v5.19 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.20/basic design v5.4/Group DD v4.20/Task DD v0.6；将 Phase 8A 隔离 migration 验证与 Phase 8B 有界 Run list/detail API、Task Card 历史面板记为条件式实现；目标数据库/RLS、Contract commands、非 CLI producer、Phase 9-13 和生产跨 App/性能验收继续开放 | Phase 8B Run 查询/UI 代码落地并纠正计划中的旧“未实现”状态 |
+| v5.20 | 2026-09-30 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步基本设计 v5.5；新增 Phase 9A Rust-native archive/cleanup evaluator core 的实现证据与未接线边界；将 Phase 9 拆为 evaluator、policy/domain gate、Advanced Settings tab、BI 与 Agent/Loop 五个可验收切片；保留 root lockfile Wry/objc2 冲突和 star-desktop 截断占位作为 workspace validation blockers；Hook SRS/BD/DD 的既有 ULYS-235 导航契约保持 v0.5.1 | 用户重申 Hooks 属于既有 Advanced Settings 标签栏并要求继续完成 Phase |
