@@ -1,7 +1,7 @@
 # Star 平台《基本设计書》
 
-> **文档版本**: v5.27 (2026-10-01)
-> **上游要件定义书**: docs/requirements.md v5.31
+> **文档版本**: v5.28 (2026-10-01)
+> **上游要件定义书**: docs/requirements.md v5.32
 > **文档定位**: 基本设计書(架构视图 / Module 划分 / 数据所有权 / 状态机 / 接口契约 / 安全边界 / 部署拓扑 / ADR 草案)
 
 ---
@@ -4639,7 +4639,7 @@ Phase 12 定义目标设备档位与固定 workload（Worktree/Run/Canvas 数量
 | PAR-001..004 | §16.15 分层调度、quota、claims、coordinator event | AC-PAR-001..003 | Phase 9 |
 | PERF-001..004 | §16.15 Rust desktop memory/render/cache/plugin budget | AC-PERF-001..003 | Phase 12 |
 | Pi inspiration (no runtime dependency) | §16.15 Rust Agent core / branch history / compaction | AC-PAR / AC-AEC | Phase 9 / 12 |
-| LOOP-001..005 / AEC-001..012 | §16.16 Schedule/Engineering Loop、versioned Provider/Profile、Profile read 与 lifecycle API | AC-LOOP-001..006 / AC-AEC-001..012 | Phase 9-11 |
+| LOOP-001..005 / AEC-001..013 | §16.16 Schedule/Engineering Loop、versioned Provider/Profile、Profile read 与 lifecycle API | AC-LOOP-001..006 / AC-AEC-001..013 | Phase 9-11 |
 | HOOK-001..007 | §16.17 Rust-native Hook Engine、Advanced Settings Hooks tab、Worktree enforcement 与 BI | AC-HOOK-001..006 | Phase 9-12 |
 
 ### 16.16 Schedule Loop 与可扩展 Agent Execution Profile
@@ -4687,6 +4687,10 @@ Project 与 Worktree scope 分别使用 `POST /api/v1/projects/{project_id}/exec
 Action `publish` 的 `expected_current_version` 为 0 表示首次创建，否则必须等于当前 revision；`disable` / `reenable` / `rollback` 要求精确的正数 current version。Rollback 还要求同一稳定 Profile ID 下存在较旧历史版本，重新验证其 document 后把内容写入新的 active successor。所有 action 均先按 `(tenant_id, profile_id)` 获取与 SCD2 trigger 相同的 transaction advisory lock，再锁定并比较 current row；需要替换时只关闭当前 `valid_to`，插入递增 successor，并在同一短事务写匹配的 append-only Audit。停用/恢复只改变 successor 的 `lifecycle_state`；不覆盖历史 JSON、digest、scope 或操作者。stale version、越 scope、错误状态、无效 digest/历史目标以稳定错误拒绝。
 
 成功响应仅含 revision ID、Profile ID/version、lifecycle state、digest 和可选 rollback source version；所有匹配路由的响应（含 extractor/handler 错误）均 `Cache-Control: no-store`。Profile body 只在请求处理期间有界反序列化和验证，事务内不调用外部 provider；真实 Auth scope 签发、目标 DB/RLS/grants、并发 SQL 验收、Profile UI、current Provider/Skill/Grant catalogs、Run snapshot writer 与原子资源 reservation 仍未接通。该 API 只管理不可变配置 Master，不构成 Run admission。Hooks 的配置入口继续遵循 ULYS-235“高级设置”内部并列标签。
+
+#### Phase 9E-4B3 verified HookSet 身份桥接
+
+Group Hook policy loader 在调用方授权的事务中以 `FOR SHARE` 锁定 current Project/Worktree policy rows，校验 baseline 与 restrictive overlay 的继承版本和规则，再生成 `HookSetSnapshot`：有 Worktree overlay 时使用当前 Worktree policy-set ID，无 overlay 时使用 Project baseline ID；effective version 与 lowercase digest 均来自 Rust verified snapshot。原 Hook evaluator 调用继续取得 policy-only projection；Profile/Run admission 可取完整的 `(VerifiedHookPolicySnapshot, HookSetSnapshot)`。此 slice 不创建 Run、不查询 Provider/Skill/Grant registry，也不占用并行资源；因此生产 Run writer、真实授权 Provider、当前 catalogs、目标 DB/RLS 与原子 reservation 仍未完成。Hooks 的管理入口仍为 Settings“高级设置”内容区中的并列标签，Worktree Index 与 Run/BI 只呈现当前有效策略和执行事实。
 
 ### 16.17 Rust 原生 Hook Engine 与 Worktree/BI 联动
 
@@ -4776,3 +4780,4 @@ Phase 9D 以 `multica.hook_execution_event`（Transaction / append-only）保存
 
 | v5.25 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.29 与 Task DD v1.3；记录 Phase 9E-4A guard migration 在隔离 PostgreSQL 的幂等、旧 Run 兼容、两类完整 snapshot 与五类负向约束验收；目标库/API/writer 仍开放，Hooks 遵循 ULYS-235 Advanced Settings tab | 9E-4A 数据库验收完成 |
 | v5.27 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.31 与 Task DD v1.5；记录 9E-4B2 Project/Worktree typed Profile 生命周期 API、≤67,584-byte body、admin scope/CAS、Rust digest/scope verifier、SCD2 successor 与同事务 append-only Audit/no-store receipt；`cargo check -p star-api-rest --all-targets -j 4` 通过且新增 3 个状态机单测通过；首次链接遇 Windows LNK1104 后重试成功；SQL 并发/真实 Auth Provider/目标 DB/RLS/grants/Profile UI/Run writer/current catalogs/resource reservation 仍开放；Hooks 遵循 ULYS-235 Advanced Settings 并列 tab | Profile 管理写路径与一致性边界进入实现 |
+| v5.28 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 同步 requirements v5.32 与 Task DD v1.6；补入 Phase 9E-4B3 verified effective Hook policy 到 `HookSetSnapshot` 的 Project baseline/Worktree overlay 身份映射及兼容 policy-only 调用边界；记录定向身份映射测试 1/1 通过（首次链接遇 LNK1104，确认无同名进程后重试成功）与 star-api-rest all-targets check 通过；不宣称生产 Run writer/current catalogs/resource reservation 完成；Hooks 继续在 Advanced Settings 并列标签 | 将当前 HookSet 身份接入 Profile/Run admission 设计切片 |

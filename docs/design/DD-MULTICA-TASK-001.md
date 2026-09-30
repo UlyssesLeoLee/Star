@@ -1,11 +1,11 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.5** (per 日本 IPA SEC 标准，补充 Profile lifecycle API 契约)
+> **Multica Task Lifecycle 域 詳細設計書 v1.6** (per 日本 IPA SEC 标准，补充 Profile lifecycle API 契约)
 >
-> - 状态: 🟡 Draft v1.5 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2 有条件式代码/schema 切片，生产 Run writer 与目标环境验收仍开放)
+> - 状态: 🟡 Draft v1.6 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A/9E-4B1/9E-4B2/9E-4B3 有条件式代码/schema 切片，生产 Run writer 与目标环境验收仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.31 §50；`docs/basic-design.md` v5.27 §16.14-16.17
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.32 §50；`docs/basic-design.md` v5.28 §16.14-16.17
 > - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.24；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
 > - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
@@ -960,6 +960,16 @@ Group API 以 `POST /api/v1/projects/{project_id}/execution-profiles/{profile_id
 
 定向单测验证首次/后续 publish、CAS、disable/reenable 的状态限制和 rollback successor/source version；Rust compile 不证明 SQL transaction、RLS、grant、并发与 deferred trigger 集成。当前目标 DB 未部署，真实 Auth scope、SQL concurrent writer、SCD2/Audit 数据库验收、Profile 可视化编辑、current Provider/Skill/Grant registry、Run writer、同事务资源 reservation 和 production runtime adapter 仍开放。此 API 只管理 Profile Master，不作 Run admission，也不改变 ULYS-235 导航：Hooks 仍在 Settings“高级设置”内容区，与 Skills/MCP/Plugins 并列。
 
+#### 14.11.7 Phase 9E-4B3 effective HookSet admission identity
+
+`load_verified_effective_run_snapshot(tx, tenant, project, worktree)` 在调用方已授权的当前事务中按 Project baseline、Worktree overlay 顺序读取策略行；`load_current_policy(..., false)` 使用 `FOR SHARE`，使两个 current row 在 Run admission 短事务提交前保持稳定。缺少 Project baseline 返回 `None`；存在 overlay 时必须满足 `inherited_project_policy_set_id == current_project.policy_set_id`，并且 overlay document 的 `project_version` 与 `project_rules` 必须和 current baseline 完全相同；否则返回冲突/内部错误，不生成可用于 admission 的 snapshot。对 effective document 重新执行 Rust `verify` 后返回 verified policy 与其 `HookSetSnapshot`.
+
+身份映射固定为：`hook_set_id = current_worktree_policy.policy_set_id`（存在 overlay）或 `current_project_policy.policy_set_id`（仅 Project baseline）；`version = verified_policy.effective_version()`；`effective_digest = lowercase_hex(verified_policy.digest())`。Worktree overlay 的有效 digest 覆盖其继承 Project rules/version 与 Worktree rules/version，因此 Profile resolver 比较的是一个不可拆分的 effective HookSet。Project/Worktree ID、version 和 digest 必须来自同一已授权、已验证的当前读取，禁止用客户端 Profile 字段、缓存或 seed 值补齐。
+
+`load_verified_effective_snapshot` 保留旧 evaluator 调用形态，只投影返回 verified policy；Run/Profile admission 调用 richer snapshot 读取 HookSet 身份。该函数提供 identity adapter seam，不创建 `TaskExecutionRun`，不写 `execution_profile_snapshot` / Hook ledger / RunEvent，不加载 Provider/Skill/Grant catalog，也不执行 quota/resource reservation。完整 Run writer 必须在最终锁内重新授权和重读这些事实，并与 Task/acceptance/Profile/occurrence snapshot、Hook ledger、RunEvent 和资源预约按已定义事务边界提交。
+
+该代码切片新增 overlay 与 Project baseline 两种身份/digest 单测并通过（首次链接遇 LNK1104，确认无同名进程后重试成功），且 `cargo check -p star-api-rest --all-targets -j 4` 通过；这不证明 SQL/Auth/RLS/并发/目标 DB 或 production Runtime 集成。ULYS-235 导航不变：Hooks 仍是 Settings“高级设置”内容区的 tab，与 Skills/MCP/Plugins 并列；现有 Main/Project sidebar scope 与其属于不同导航层。
+
 ### 14.12 Rust-native Hook 与高级设置导航契约
 
 Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高级设置”是父入口，Hooks 位于该页面内容区的 tabs，与 Skills/MCP/Plugins 并列；这里维护可视化 typed rule、Project baseline/Worktree restrictive overlay、version diff、冲突解释、dry-run、影响预览、审批发布与 rollback。不得给 Worktree Group tree 增加 Hook app，也不得要求用户编写 Python/JS/shell/native handler。Worktree Index 显示 effective HookSet/version/health/deny summary，Run detail/BI 可查对应事件并深链回 Advanced Settings Hooks 过滤视图。
@@ -995,3 +1005,4 @@ Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高
 
 | v1.3 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Phase 9E-4A Run/Profile guard migration 隔离 PostgreSQL 验收：重复应用、legacy Run、Project/Worktree snapshot、5 类负例与 no-FK 均通过；生产 API/Run writer 与目标 DB 部署仍开放 | 完成 snapshot envelope 数据库不变量验收 |
 | v1.5 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.6 Project/Worktree typed lifecycle POST API、admin auth scope、65,536-byte Profile/67,584-byte request bound、expected-version CAS、publish/disable/reenable/rollback successor 状态机、advisory lock + SCD2 + same-transaction append-only Audit、no-store receipt 和生产集成限制；ULYS-235 Hooks 仍是高级设置内容区并列 tab | Phase 9E-4B2 Profile lifecycle write API 代码切片完成 |
+| v1.6 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.7：在同一授权事务中验证 Project baseline/Worktree overlay 继承，并将 effective policy 映射为 Profile HookSet ID/version/digest；保留 policy-only evaluator wrapper；明确此 seam 不创建 Run、不解析 catalogs、不做资源预约；Hooks 仍位于 Advanced Settings 并列 tab | Phase 9E-4B3 HookSet admission identity adapter 落地 |

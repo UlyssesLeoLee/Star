@@ -109,6 +109,10 @@
 //! MATCH (m:Module {name:"hook_policies",type:"module"}),(listEvents:Function {name:"list_hook_events",type:"function"}),(summary:Function {name:"summarize_hook_events",type:"function"}),(tests:Module {name:"tests",type:"module"});
 //! CREATE (phaseCoverage:Function {name:"hook_phase_coverage",type:"function",language:"rust",visibility:"private",complexity:"simple"}),(phaseCoverageTest:Function {name:"hook_phase_coverage_tracks_the_installed_run_admission_producer",type:"function",language:"rust",visibility:"private",complexity:"simple"});
 //! CREATE (m)-[:CONTAINS]->(phaseCoverage),(tests)-[:CONTAINS]->(phaseCoverageTest),(listEvents)-[:CALLS]->(phaseCoverage),(summary)-[:CALLS]->(phaseCoverage),(phaseCoverageTest)-[:CALLS]->(phaseCoverage);
+//! CYPHER STRUCTURAL MANIFEST ADDENDUM
+//! MATCH (m:Module {name:"hook_policies",type:"module"}),(load:Function {name:"load_verified_effective_snapshot",type:"function"}),(tests:Module {name:"tests",type:"module"}),(hookSetTest:Function {name:"execution_profile_hook_set_uses_effective_overlay_identity_and_digest",type:"function"});
+//! CREATE (admission:Type {name:"EffectiveHookAdmissionSnapshot",type:"type_alias",language:"rust"}),(profileHookSet:Function {name:"execution_profile_hook_set_snapshot",type:"function",language:"rust",visibility:"private"}),(loadAdmission:Function {name:"load_verified_effective_run_snapshot",type:"function",language:"rust",visibility:"pub(super)"});
+//! CREATE (m)-[:CONTAINS]->(admission),(m)-[:CONTAINS]->(profileHookSet),(m)-[:CONTAINS]->(loadAdmission),(loadAdmission)-[:CALLS]->(load),(loadAdmission)-[:CALLS]->(profileHookSet),(tests)-[:CONTAINS]->(hookSetTest),(hookSetTest)-[:CALLS]->(profileHookSet);
 use axum::{
     Json, Router,
     body::Bytes,
@@ -118,6 +122,7 @@ use axum::{
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Duration, Utc};
+use domain_agent::execution_profile::HookSetSnapshot;
 use domain_hook::{HookPhase, HookPolicyDocument, MAX_POLICY_DOCUMENT_BYTES};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -162,6 +167,9 @@ struct PolicyRow {
     inherited_project_policy_set_id: Option<Uuid>,
     valid_to: Option<DateTime<Utc>>,
 }
+
+pub(super) type EffectiveHookAdmissionSnapshot =
+    (domain_hook::VerifiedHookPolicySnapshot, HookSetSnapshot);
 
 #[derive(Debug, FromRow)]
 struct DraftRow {
@@ -1935,21 +1943,34 @@ async fn load_current_policy(
         .map_err(|_| GroupApiError::internal())
 }
 
-/// Load one immutable effective policy in the caller's authorized transaction. Missing Project
-/// baseline is represented as `None`; the Rust evaluator turns that condition into a deny.
-pub(super) async fn load_verified_effective_snapshot(
+/// Map the verified effective Project/Worktree policy to the Profile's pinned HookSet identity.
+fn execution_profile_hook_set_snapshot(
+    project_policy_set_id: Uuid,
+    worktree_policy_set_id: Option<Uuid>,
+    policy: &domain_hook::VerifiedHookPolicySnapshot,
+) -> HookSetSnapshot {
+    HookSetSnapshot {
+        hook_set_id: worktree_policy_set_id.unwrap_or(project_policy_set_id),
+        version: policy.effective_version(),
+        effective_digest: hex::encode(policy.digest()),
+    }
+}
+
+/// Load the verified effective policy and its stable identity for Run/Profile admission.
+/// Missing Project baseline remains `None`, which admission treats as unavailable.
+pub(super) async fn load_verified_effective_run_snapshot(
     tx: &mut Transaction<'_, Postgres>,
     tenant_id: Uuid,
     project_id: Uuid,
     worktree_id: Uuid,
-) -> Result<Option<domain_hook::VerifiedHookPolicySnapshot>, GroupApiError> {
+) -> Result<Option<EffectiveHookAdmissionSnapshot>, GroupApiError> {
     let Some(project_row) =
         load_current_policy(tx, tenant_id, project_id, PolicyScope::Project, None, false).await?
     else {
         return Ok(None);
     };
     let project_document = verify_stored_policy(&project_row, tenant_id, project_id, None)?;
-    let effective_document = if let Some(worktree_row) = load_current_policy(
+    let worktree_row = load_current_policy(
         tx,
         tenant_id,
         project_id,
@@ -1957,28 +1978,45 @@ pub(super) async fn load_verified_effective_snapshot(
         Some(worktree_id),
         false,
     )
-    .await?
-    {
-        if worktree_row.inherited_project_policy_set_id != Some(project_row.policy_set_id) {
+    .await?;
+    let effective_document = if let Some(row) = worktree_row.as_ref() {
+        if row.inherited_project_policy_set_id != Some(project_row.policy_set_id) {
             return Err(GroupApiError::conflict("worktree_policy_rebase_required"));
         }
-        let worktree_document =
-            verify_stored_policy(&worktree_row, tenant_id, project_id, Some(worktree_id))?;
-        if worktree_document.project_version != project_document.project_version
-            || worktree_document.project_rules != project_document.project_rules
+        let document = verify_stored_policy(row, tenant_id, project_id, Some(worktree_id))?;
+        if document.project_version != project_document.project_version
+            || document.project_rules != project_document.project_rules
         {
             return Err(GroupApiError::internal());
         }
-        worktree_document
+        document
     } else {
         project_document
     };
-    effective_document
+    let policy = effective_document
         .verify()
-        .map(Some)
-        .map_err(|_| GroupApiError::internal())
+        .map_err(|_| GroupApiError::internal())?;
+    let hook_set = execution_profile_hook_set_snapshot(
+        project_row.policy_set_id,
+        worktree_row.map(|row| row.policy_set_id),
+        &policy,
+    );
+    Ok(Some((policy, hook_set)))
 }
 
+/// Load the immutable effective policy for Hook evaluation callers.
+pub(super) async fn load_verified_effective_snapshot(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Uuid,
+    project_id: Uuid,
+    worktree_id: Uuid,
+) -> Result<Option<domain_hook::VerifiedHookPolicySnapshot>, GroupApiError> {
+    Ok(
+        load_verified_effective_run_snapshot(tx, tenant_id, project_id, worktree_id)
+            .await?
+            .map(|(policy, _hook_set)| policy),
+    )
+}
 async fn load_current_draft(
     tx: &mut Transaction<'_, Postgres>,
     tenant_id: Uuid,
@@ -2251,6 +2289,41 @@ mod tests {
         };
         document.digest = document.computed_digest().expect("empty policy digest");
         document
+    }
+
+    #[test]
+    fn execution_profile_hook_set_uses_effective_overlay_identity_and_digest() {
+        let tenant_id = Uuid::new_v4();
+        let project_id = Uuid::new_v4();
+        let project_set_id = Uuid::new_v4();
+        let worktree_set_id = Uuid::new_v4();
+        let overlay_policy =
+            policy_document(tenant_id, project_id, Some(Uuid::new_v4()), 6, Some(9))
+                .verify()
+                .expect("verified effective overlay policy");
+
+        let overlay = execution_profile_hook_set_snapshot(
+            project_set_id,
+            Some(worktree_set_id),
+            &overlay_policy,
+        );
+        assert_eq!(overlay.hook_set_id, worktree_set_id);
+        assert_eq!(overlay.version, 9);
+        assert_eq!(
+            overlay.effective_digest,
+            hex::encode(overlay_policy.digest())
+        );
+
+        let project_policy = policy_document(tenant_id, project_id, None, 6, None)
+            .verify()
+            .expect("verified Project policy");
+        let project = execution_profile_hook_set_snapshot(project_set_id, None, &project_policy);
+        assert_eq!(project.hook_set_id, project_set_id);
+        assert_eq!(project.version, 6);
+        assert_eq!(
+            project.effective_digest,
+            hex::encode(project_policy.digest())
+        );
     }
 
     #[test]
