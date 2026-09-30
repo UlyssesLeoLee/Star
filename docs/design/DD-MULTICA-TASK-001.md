@@ -1,11 +1,11 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.0** (per 日本 IPA SEC 标准，补充条件式 Run Admission Hook 事务契约)
+> **Multica Task Lifecycle 域 詳細設計書 v1.1** (per 日本 IPA SEC 标准，补充 Profile Master/SCD2 持久化契约)
 >
-> - 状态: 🟡 Draft v1.0 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-2 有条件式代码切片，生产 Runtime adapter 与目标环境验收仍开放)
+> - 状态: 🟡 Draft v1.1 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-3 有条件式代码/schema 切片，生产 Runtime adapter、Profile API/Run writer 与目标环境验收仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
-> - 关联总要件 / 基本设计: `docs/requirements.md` v5.26 §50；`docs/basic-design.md` v5.22 §16.14-16.17
+> - 关联总要件 / 基本设计: `docs/requirements.md` v5.27 §50；`docs/basic-design.md` v5.23 §16.14-16.17
 > - 关联 Group / Hook 详细设计: `docs/design/DD-WORKTREE-GROUP-001.md` v4.24；`docs/detailed-design/DD-MULTICA-HOOK-001.md` v0.5.14
 > - 上位要件: [`docs/requirements/SRS-MULTICA-TASK-001.md`](../requirements/SRS-MULTICA-TASK-001.md) v0.2
 > - 上位基本設計: [`docs/design/BD-MULTICA-TASK-001.md`](BD-MULTICA-TASK-001.md) v0.1
@@ -728,9 +728,11 @@ Multica、Jira 等价视图、Task Card Index、Group Infinite Canvas 和已启�
 | `task_execution_run_event` | Transaction | 执行、Agent 声明、验证、人工评审/返工、集成、介入、成本、失败和有限资源 high-water summary 的独立事件 | append-only，物理删除禁止；RLS 13 类和 audit 必携 |
 | `task_execution_evidence` | Transaction | 脱敏摘要、类型、digest、byte length 与受控 artifact locator；不存 artifact 正文 | append-only，物理删除禁止；RLS 13 类和 audit 必携 |
 | `task_execution_run_idempotency` | Work | CLI start 的短期幂等映射；actor/key/fingerprint → run_id | `retention_period=30 days` + `expires_at`; 到期可删且不能删除所映射的 Run |
+| `agent_execution_profile` | Master | Project/Worktree scoped typed Profile document 与 active/disabled 状态；稳定 profile ID 下按 revision SCD2 | 物理删除禁止；scope/schema/digest 与 document 一致；FORCE RLS；更新追加 Transaction audit |
+| `agent_execution_profile_audit_event` | Transaction | Profile publish/rollback/enable/disable revision、操作者、correlation 与脱敏 details | append-only，禁止 UPDATE/DELETE/TRUNCATE；FORCE RLS；不得包含 Secret/prompt/raw process output |
 | `wbs_task_v33` | Compatibility projection | 旧 WBS row 的导入/查询兼容层；通过 alias 映射到 canonical `work_item_id` | 不得成为第二个生命周期事实源；迁移期写入只经 Lifecycle Service |
 
-**v0.4 W/T/M 覆盖**：Work 4 个（`task_lifecycle_current`, `task_review`, `task_stale_dispatch`, `task_execution_run_idempotency`）；Master 2 个（`task_metadata`, `task_contract`）；Transaction 6 个（`task_lifecycle_audit`, `task_session_health`, `task_contract_change_audit`, `task_execution_run`, `task_execution_run_event`, `task_execution_evidence`）。资源逐样本 telemetry 为有界 TTL Work/runtime buffer，不追加事务事实；Run 高水位摘要属于 `task_execution_run_event`。`wbs_task_v33` 是迁移兼容投影，不作为混合分类主表计入。所有 Work 表定义 TTL，所有 Master 使用 SCD2 + RLS，所有 Transaction 使用 append-only + audit + RLS。
+**W/T/M 覆盖**：Work 4 个（`task_lifecycle_current`, `task_review`, `task_stale_dispatch`, `task_execution_run_idempotency`）；Master 3 个（`task_metadata`, `task_contract`, `agent_execution_profile`）；Transaction 7 个（`task_lifecycle_audit`, `task_session_health`, `task_contract_change_audit`, `task_execution_run`, `task_execution_run_event`, `task_execution_evidence`, `agent_execution_profile_audit_event`）。资源逐样本 telemetry 为有界 TTL Work/runtime buffer，不追加事务事实；Run 高水位摘要属于 `task_execution_run_event`。`wbs_task_v33` 是迁移兼容投影，不作为混合分类主表计入。所有 Work 表定义 TTL，所有 Master 使用 SCD2 + RLS，所有 Transaction 使用 append-only + audit + RLS。
 
 所有 Work 数据都有 `retention_period`；Master 全表使用 SCD Type 2 + RLS；Transaction 全表 append-only + audit + RLS。v0.1 §7 的旧 DDL 供迁移字段参考；实施时按本节分类拆分动态当前态、Master metadata 与不可变审计事件，不允许把混合 WBS 行整表归入一个分类。
 
@@ -916,7 +918,7 @@ Profile 固定 tenant/project/可选 worktree scope、Agent provider/version/实
 
 边界常量：Profile ≤64 KiB；Skill ≤128；单 capability 列表 ≤64；Acceptance criteria ≤256；Context ≤64 MiB、16,777,216 tokens、4,096 sources；Memory ≤4,096 items、16 MiB、4,194,304 tokens、10 年 source age；单 Run ≤8 GiB RSS、24 小时 CPU/runtime、256 child processes、256 parallel tools、100,000 provider calls、128 MiB captured output、16 MiB event buffer。实际 Project/主机并行总配额仍由后续 scheduler admission 汇总，Phase 12 benchmark 可基于设备档收紧，profile 中的每 Run 上限不能替代聚合公平调度。
 
-VerifiedProfile scope check 仅校验冻结 scope 与请求的 tenant/project/worktree 关系；它不证明当前 actor ACL/grant 仍有效。每次真实 Run create/resume 仍须重新授权、复核 grant expiry/provider availability/Worktree lifecycle，并原子固定该 Profile digest 与 Task Contract、HookSet 和 Schedule occurrence。此阶段尚未实现 profile registry/resolver、Master/SCD2 持久化、Run writer 联接、provider compatibility negotiation、Rust CLI adapter、Automation occurrence dispatcher、Loop runtime 或 scheduler；SQL 中已有 snapshot 列不等于该 producer 已启用。
+VerifiedProfile scope check 仅校验冻结 scope 与请求的 tenant/project/worktree 关系；它不证明当前 actor ACL/grant 仍有效。每次真实 Run create/resume 仍须重新授权、复核 grant expiry/provider availability/Worktree lifecycle，并原子固定该 Profile digest 与 Task Contract、HookSet 和 Schedule occurrence。Phase 9E-2 已实现纯域层 resolver；9E-3 新增 Profile Master/SCD2 与 Audit migration，但尚未部署目标 DB，也没有 registry API 或 Run writer 联接。provider compatibility negotiation、Rust CLI adapter、Automation occurrence dispatcher、Loop runtime 与 scheduler 仍未实现；SQL 中已有 snapshot 列不等于该 producer 已启用。
 
 #### 14.11.2 当前依赖 resolver 与 admission seam
 
@@ -924,7 +926,17 @@ Phase 9E-2 的 `ExecutionProfileResolver` 只接受经过 9E-1 immutable verifie
 
 Provider catalog 最多 256 项，Skill catalog 最多 4,096 项；二者都必须已按 stable key 排序、唯一且每个条目通过字段校验。catalog validation 对 bounded input 做线性扫描，具体 dependency lookup 走 binary search；resolver 返回只借用原始 immutable Profile 的 `ResolvedAgentExecutionProfile`，不会 clone Profile、Context、Skill 或 prompt 数据。catalog/profile 由 Rust caller 持有，resolver 不持有锁、不访问数据库，也不实现 actor ACL：调用者必须在构造 facts 前完成当前 actor/GroupContext 授权。
 
-本 seam 不代表 provider/Skill registry 已持久化，不写 `task_execution_run.execution_profile_snapshot`，不创建 `TaskExecutionRun`，也不锁定跨 Project/host 的资源配额。实际 Run create/resume 还要将 current authorization、Profile/Task/acceptance/HookSet/Schedule occurrence snapshot 与 scheduler 的原子 reservation 接入同一 admission 生命周期；没有 availability、quota reservation 或 runtime adapter 时继续 fail closed。
+本 seam 不代表 provider/Skill registry 已持久化，不写 `task_execution_run.execution_profile_snapshot`，不创建 `TaskExecutionRun`，也不锁定跨 Project/host 的资源配额。Phase 9E-3 提供 Profile Master/SCD2 与 audit schema substrate；实际 Run create/resume 还要将 current authorization、Profile/Task/acceptance/HookSet/Schedule occurrence snapshot 与 scheduler 的原子 reservation 接入同一 admission 生命周期；没有 availability、quota reservation 或 runtime adapter 时继续 fail closed。
+
+#### 14.11.3 Profile Master/SCD2 与 Run snapshot persistence
+
+Phase 9E-3 的 additive migration 新增 `multica.agent_execution_profile`（Master）与 `multica.agent_execution_profile_audit_event`（Transaction）。Profile 表以 `(tenant_id, profile_id, profile_version)` 识别不可变 revision；稳定 profile ID 的 Project/Worktree scope 在首次建立后不可迁移，Project profile 的 `worktree_id` 必须为空，Worktree profile 必须带 Worktree ID。每行保存完整 9E-1 `AgentExecutionProfileDocument` JSONB、schema version、content digest、操作者和 SCD2 有效区间。数据库 check 对照 document 的 tenant/project/worktree、schema version 和顶层 digest。Rust verifier 对 canonical document 使用 65,536 字节上限；数据库对 JSONB 文本表示另设 131,072 字节存储防线，该值不改变 canonical encoding 规则。DB 只校验 digest 字段一致性，真正 SHA-256 仍由 Rust verifier 计算并在读取时重验。
+
+SCD2 trigger 使用事务级锁按 `(tenant_id, profile_id)` 串行化首次发布与 successor；初版从 1 开始，后续版本必须连续递增且不存在未关闭 current row。UPDATE 仅允许把 current row 的 `valid_to` 从 NULL 关闭一次，所有历史字段不变；DELETE 拒绝。数据库唯一索引保证每个 profile 最多一个 current version。scope、Project/Worktree 绑定、Profile payload 和 digest 变化必须新建 successor；scope 迁移应创建新 profile ID 并在更高层显式审批。
+
+Audit 保存目标 profile/version、`profile_published` / `profile_rolled_back` / `profile_disabled` / `profile_reenabled`、操作者、correlation、可选 rollback source version 和最多 4 KiB 脱敏 metadata；外键确保目标/来源 revision 存在，scope/state guard 与 Profile 一致。Audit 拒绝 UPDATE/DELETE/TRUNCATE。Profile/Audit 表均开启并 FORCE tenant RLS；RLS 只隔离 tenant，不取代 Group API 的当前 actor/Project membership/Worktree role 授权。两表为 M/T，无 Draft/Work 表；后续可视配置 API 如需临时 Draft，须另以有明确 TTL/retention 的 Work 表设计。
+
+Run 的 `execution_profile_id/version/digest/snapshot` 保持 nullable 以兼容旧 Run。新 Run writer 应将 registry 中再次 decode/verify、经 9E-2 当前依赖 resolver 通过的完整 document 自包含复制到 `execution_profile_snapshot`，并在同一短事务内固定 Profile revision、Task/acceptance、HookSet、Schedule occurrence 与 resource reservation。Run snapshot 不设置 Profile FK：即使 Profile successor 发布或 Project/Worktree 状态变化，历史执行仍独立保留可审计证据。当前 migration 尚未部署到目标 DB，API 与事务写入仍在后续阶段。
 
 ### 14.12 Rust-native Hook 与高级设置导航契约
 
@@ -956,3 +968,4 @@ Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高
 | v0.8 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.1 Phase 9E-1 Profile schema v1、bounded canonical digest、provider/grant/scope 校验、Memory/Context/Validation 与 Loop/RSS/queue 上限和测试证据；明确 registry/resolver/Run persistence/CLI/occurrence/Loop scheduler 仍未实现；Hooks 继续沿用 ULYS-235 Advanced Settings 并列 tab | AgentExecutionProfile Rust 类型化快照核心首片落地 |
 | v0.9 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Profile schema 增加 ContextAssembler 与 LoopPolicy 的版本化 provider/digest/grant 引用；将 Schedule occurrence、Task/acceptance、Memory source 与证据明确留在 Run admission snapshot；同步总要件 v5.25 与基本设计 v5.21，ULYS-235 导航不变 | 自审发现原 verifier 未冻结 ContextAssembler/LoopPolicy 的实现版本 |
 | v1.0 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.2 bounded current dependency resolver 的 scope/grant/provider/Skill/HookSet/lifecycle 精确校验、目录上限、no-fallback 与借用式返回；明确外层 ACL、DB registry、Run snapshot writer、资源 reservation 与 Production adapter 未接通；ULYS-235 导航保持 | Phase 9E-2 resolver core 完成并纳入受入边界 |
+| v1.1 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.3 Profile Master/SCD2 + append-only Audit 的 scope/digest/schema consistency、连续 revision、FORCE RLS 和 Run self-contained snapshot 设计；同步 W/T/M 覆盖至 Work 4 / Master 3 / Transaction 7；明确 migration-only substrate 与未部署 DB/API/Run writer 边界，ULYS-235 导航不变 | Phase 9E-3 建立 Profile 持久化 schema 基底 |
