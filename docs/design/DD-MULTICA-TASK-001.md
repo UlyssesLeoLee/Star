@@ -1,8 +1,8 @@
 # DD-MULTICA-TASK-001
 
-> **Multica Task Lifecycle 域 詳細設計書 v1.1** (per 日本 IPA SEC 标准，补充 Profile Master/SCD2 持久化契约)
+> **Multica Task Lifecycle 域 詳細設計書 v1.3** (per 日本 IPA SEC 标准，补充 Profile Master/SCD2 持久化契约)
 >
-> - 状态: 🟡 Draft v1.1 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-3 有条件式代码/schema 切片，生产 Runtime adapter、Profile API/Run writer 与目标环境验收仍开放)
+> - 状态: 🟡 Draft v1.3 (Run/BI、Agent Profile、双 Loop 与 Hook contract 已设计；Phase 8A/8B/9D-5b/9E-4A 有条件式代码/schema 切片，生产 Runtime adapter、Profile API/Run writer 与目标环境验收仍开放)
 > - 目标阶段: 詳細設計 → 実装 → テスト → リリース
 > - 关联 commit: (留空, root 统一 commit 时填)
 > - 关联总要件 / 基本设计: `docs/requirements.md` v5.27 §50；`docs/basic-design.md` v5.23 §16.14-16.17
@@ -938,6 +938,10 @@ Audit 保存目标 profile/version、`profile_published` / `profile_rolled_back`
 
 Run 的 `execution_profile_id/version/digest/snapshot` 保持 nullable 以兼容旧 Run。新 Run writer 应将 registry 中再次 decode/verify、经 9E-2 当前依赖 resolver 通过的完整 document 自包含复制到 `execution_profile_snapshot`，并在同一短事务内固定 Profile revision、Task/acceptance、HookSet、Schedule occurrence 与 resource reservation。Run snapshot 不设置 Profile FK：即使 Profile successor 发布或 Project/Worktree 状态变化，历史执行仍独立保留可审计证据。当前 migration 尚未部署到目标 DB，API 与事务写入仍在后续阶段。
 
+#### 14.11.4 Run/Profile snapshot 数据库不变量
+
+Phase 9E-4A 在 Run 表增加两个 CHECK：Profile ID、version、digest、snapshot 必须全空或全有；存在 snapshot 时，document tenant/project 与 Run envelope 一致，document Worktree scope 若非空必须等于 Run Worktree，顶层 digest 必须等于 Run digest。Rust verifier 仍负责 canonical SHA-256 与 schema 语义校验，数据库 CHECK 只绑定 envelope 字段。约束不创建 Profile 外键，因此 Run 历史只依赖本行自包含 document，旧的无 Profile Run 保持有效。迁移依赖 2026-09-30 Run schema，重复执行不重复创建约束；隔离 PostgreSQL 验收通过：旧 Run 与 Project/Worktree 完整 snapshot 接受，5 类部分 tuple/scope/digest mismatch 拒绝，迁移重复应用成功，Profile FK 为 0，临时库已清理。
+
 ### 14.12 Rust-native Hook 与高级设置导航契约
 
 Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高级设置”是父入口，Hooks 位于该页面内容区的 tabs，与 Skills/MCP/Plugins 并列；这里维护可视化 typed rule、Project baseline/Worktree restrictive overlay、version diff、冲突解释、dry-run、影响预览、审批发布与 rollback。不得给 Worktree Group tree 增加 Hook app，也不得要求用户编写 Python/JS/shell/native handler。Worktree Index 显示 effective HookSet/version/health/deny summary，Run detail/BI 可查对应事件并深链回 Advanced Settings Hooks 过滤视图。
@@ -969,3 +973,6 @@ Hook 规则的唯一配置入口沿用 ULYS-235：Settings 主导航中的“高
 | v0.9 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | Profile schema 增加 ContextAssembler 与 LoopPolicy 的版本化 provider/digest/grant 引用；将 Schedule occurrence、Task/acceptance、Memory source 与证据明确留在 Run admission snapshot；同步总要件 v5.25 与基本设计 v5.21，ULYS-235 导航不变 | 自审发现原 verifier 未冻结 ContextAssembler/LoopPolicy 的实现版本 |
 | v1.0 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.2 bounded current dependency resolver 的 scope/grant/provider/Skill/HookSet/lifecycle 精确校验、目录上限、no-fallback 与借用式返回；明确外层 ACL、DB registry、Run snapshot writer、资源 reservation 与 Production adapter 未接通；ULYS-235 导航保持 | Phase 9E-2 resolver core 完成并纳入受入边界 |
 | v1.1 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.3 Profile Master/SCD2 + append-only Audit 的 scope/digest/schema consistency、连续 revision、FORCE RLS 和 Run self-contained snapshot 设计；同步 W/T/M 覆盖至 Work 4 / Master 3 / Transaction 7；明确 migration-only substrate 与未部署 DB/API/Run writer 边界，ULYS-235 导航不变 | Phase 9E-3 建立 Profile 持久化 schema 基底 |
+| v1.2 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 新增 §14.11.4 Run/Profile snapshot all-or-none、tenant/project/Worktree scope 与 digest CHECK；保留无 FK 历史快照与旧 Run 兼容；记录 9E-4A migration 尚待隔离库执行验收，ULYS-235 Advanced Settings 导航不变 | 补齐 Run Profile snapshot envelope 数据库不变量 |
+
+| v1.3 | 2026-10-01 | Ulysses（一人公司 12 角色 per DEC-008）— Mavis 接手审核 | 记录 Phase 9E-4A Run/Profile guard migration 隔离 PostgreSQL 验收：重复应用、legacy Run、Project/Worktree snapshot、5 类负例与 no-FK 均通过；生产 API/Run writer 与目标 DB 部署仍开放 | 完成 snapshot envelope 数据库不变量验收 |
